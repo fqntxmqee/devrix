@@ -1,0 +1,25 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.exe
+*.exe~
+devrix
+*.tmp
+
+# Devrix data
+.devrix/
+
+# Logs
+*.log
+
+# Test coverage
+coverage.out
+coverage.html
