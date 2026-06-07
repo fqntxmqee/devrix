@@ -43,25 +43,33 @@
 
 ## Layer 2: Context Engine (CTX)
 
+> 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
+
 ### P0
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-CTX-01 | 新会话初始化上下文与 system prompt | L4-CTX-STATE | `internal/layers/contextengine/memory/manager_test.go` | PLANNED |
-| L5-CTX-02 | 用户消息后历史正确追加 | L4-CTX-STATE | 同上 | PLANNED |
-| L5-CTX-03 | 超 Token 阈值触发七步压缩 | L4-CTX-COMPRESS | `tests/acceptance/p0/ctx_compression_test.go` | PLANNED |
-| L5-CTX-04 | TokenBlock 超限返回 ContextExceeded | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | PLANNED |
-| L5-CTX-05 | ContextSnapshot 保存与恢复 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | PLANNED |
-| L5-CTX-06 | PEV Execute 调用 LLM 并流式输出 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | PLANNED |
-| L5-CTX-07 | 工具执行后 Verify basic 模式 | L4-CTX-PEV | `internal/layers/contextengine/pev_engine.go` | PLANNED |
-| L5-CTX-09 | EngineEvent 与通信层四流契约一致 | L4-CTX-STATE | `tests/integration/context_gateway_flow_test.go` | PLANNED |
-| L5-CTX-11 | 权限批准/拒绝后 PEV 行为正确 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | PLANNED |
+| L5-CTX-01 | 新会话初始化上下文与 system prompt | L4-CTX-STATE | `internal/layers/contextengine/memory/manager_test.go` | IMPLEMENTED |
+| L5-CTX-02 | 用户消息后历史正确追加 | L4-CTX-STATE | `internal/layers/contextengine/memory/manager_test.go` | IMPLEMENTED |
+| L5-CTX-03 | 超 Token 阈值触发七步压缩 | L4-CTX-COMPRESS | `tests/acceptance/p0/ctx_compression_test.go` | IMPLEMENTED |
+| L5-CTX-04 | TokenBlock 超限返回 ContextExceeded | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
+| L5-CTX-05 | ContextSnapshot 保存与恢复 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
+| L5-CTX-06 | PEV Execute 调用 LLM 并流式输出 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
+| L5-CTX-07 | 工具执行后 Verify basic 模式 | L4-CTX-PEV | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED |
+| L5-CTX-09 | EngineEvent 与通信层四流契约一致 | L4-CTX-STATE | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
+| L5-CTX-11 | 权限批准/拒绝后 PEV 行为正确 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
 
 ### P1
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-CTX-08 | V1 跳过 Autocompact 步骤 6 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | PLANNED |
+| L5-CTX-08 | V1 跳过 Autocompact 步骤 6 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
+
+### P2
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-CTX-10 | L3 长期记忆返回 NotImplemented | L4-CTX-MEMORY | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
 
 ---
 

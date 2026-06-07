@@ -3,7 +3,7 @@ demand-id: DM-20260607-002
 title: 上下文引擎（Layer 2）详细方案设计
 source: 产品/架构团队
 priority: P0
-status: IN_PROGRESS
+status: ARCHIVED
 l1-domain: devrix
 created: 2026-06-07
 ---

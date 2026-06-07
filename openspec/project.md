@@ -145,7 +145,7 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 
 ## L3/L4 Asset Registry (Context Engine)
 
-> Change: `openspec/changes/devrix-context-engine/` — 消除悬空 ID
+> Change: `openspec/archive/2026-06-07-devrix-context-engine/` (archived) — 消除悬空 ID
 
 ### L3 业务活动
 

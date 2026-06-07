@@ -3,7 +3,7 @@
 **Change ID:** devrix-context-engine
 **Layer:** 2 - Context Engine
 **Type:** New Capability
-**Status:** Draft
+**Status:** Archived
 **Based on:** devrix-foundation delta, communication layer integration
 
 ---
@@ -83,7 +83,7 @@
 | 产物 | 路径 | 框架 |
 |------|------|------|
 | 详细架构设计 | `docs/context-engine-design.md` | `docs/detail design framework.md` ①~⑥ |
-| OpenSpec 实施设计 | `openspec/changes/devrix-context-engine/design.md` | 包结构/代码/分期 |
+| OpenSpec 实施设计 | `openspec/archive/2026-06-07-devrix-context-engine/design.md` | 包结构/代码/分期 |
 | Delta 规格 | `specs/context-engine/spec.md` | OpenSpec Gherkin |
 | 任务清单 | `tasks.md` | L4/L5 映射 |
 
@@ -95,3 +95,29 @@
 - [x] 与通信层 `IContextEngine` 契约对齐（含 L1-L2 集成 §3.4）
 - [x] V1/V2/V3 分期明确
 - [x] 开放问题 #1-#4 已决议
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-07
+**Duration:** 1 day (2026-06-07)
+**Outcome:** Successfully implemented (V1)
+
+### PR
+- https://github.com/fqntxmqee/devrix/pull/1 (merged as `37392df`)
+
+### Files Modified
+- `internal/layers/contextengine/` — Context Engine implementation
+- `internal/layers/communication/gateway/` — Permission gate adapter, Stopper, event contract
+- `internal/shared/types/context.go`, `config/contextengine.go`, `errors/context.go`
+- `tests/integration/context_gateway_flow_test.go`, `tests/acceptance/p0/ctx_compression_test.go`
+
+### Specs Updated
+- `openspec/specs/context-engine/spec.md` — canonical Layer 2 specification
+- `openspec/specs/context_engine_layer_delta.md` — merged reference
+- `openspec/l5-registry.md` — L5-CTX-01~11 IMPLEMENTED
+
+### Acceptance
+- Verdict: **ACCEPTED** (see `acceptance-report.md`)
+- Demand: DM-20260607-002

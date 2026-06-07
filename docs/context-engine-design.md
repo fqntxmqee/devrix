@@ -5,7 +5,7 @@
 **Demand ID:** DM-20260607-002
 **版本:** 1.0.0
 **状态:** Ready for S4
-**关联 OpenSpec:** `openspec/changes/devrix-context-engine/`
+**关联 OpenSpec:** `openspec/archive/2026-06-07-devrix-context-engine/`（已归档）；规格 SoT：`openspec/specs/context-engine/spec.md`
 
 ---
 
@@ -14,8 +14,8 @@
 | 文档 | 用途 |
 |------|------|
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
-| `openspec/changes/devrix-context-engine/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
-| `openspec/changes/devrix-context-engine/specs/context-engine/spec.md` | 验收规格（Gherkin Scenario → L5） |
+| `openspec/archive/2026-06-07-devrix-context-engine/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
+| `openspec/specs/context-engine/spec.md` | 验收规格（Gherkin Scenario → L5，canonical） |
 | `openspec/specs/context_engine_layer_delta.md` | 层能力 Delta SoT |
 
 ---
@@ -545,4 +545,4 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 
 ---
 
-**维护：** 实现阶段变更须同步更新本文档、`openspec/changes/devrix-context-engine/design.md` 与 `spec.md`。
+**维护：** 实现阶段变更须同步更新本文档、`openspec/specs/context-engine/spec.md` 与归档包内 `design.md`。
