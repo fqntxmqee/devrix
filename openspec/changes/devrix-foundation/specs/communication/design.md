@@ -534,57 +534,130 @@ devrix/
 │       └── main.go                    # Entry point
 │
 ├── internal/
-│   └── layers/
-│       └── communication/
-│           ├── gateway/
-│           │   ├── gateway.go         # CommunicationGateway
-│           │   ├── store.go           # FileSessionStore
-│           │   ├── permission.go      # PermissionManager
-│           │   └── validate.go        # InputValidator
-│           ├── adapters/
-│           │   └── cli.go             # CLI Adapter (V1)
-│           ├── renderers/
-│           │   ├── message.go        # Message Renderer
-│           │   ├── status.go         # Status Renderer
-│           │   └── permission.go      # Permission Renderer
-│           └── commands/
-│               ├── help.go            # /help command
-│               ├── new.go            # /new command
-│               └── stop.go           # /stop command
+│   ├── layers/
+│   │   └── communication/
+│   │       ├── gateway/
+│   │       │   ├── gateway.go         # CommunicationGateway
+│   │       │   ├── api.go             # GatewayAPI 接口
+│   │       │   ├── store.go          # FileSessionStore
+│   │       │   ├── permission.go     # PermissionManager
+│   │       │   ├── engine_stub.go    # StubContextEngine
+│   │       │   ├── ack.go            # ACK 处理
+│   │       │   ├── validate.go       # InputValidator
+│   │       │   ├── mock_gateway.go   # MockGatewayAPI (测试)
+│   │       │   └── gateway_test.go   # Gateway 测试
+│   │       ├── adapters/
+│   │       │   ├── cli.go            # CLI Adapter
+│   │       │   ├── feishu.go         # Feishu Adapter
+│   │       │   ├── feishu_api.go     # FeishuAPI 接口
+│   │       │   ├── mock_feishu.go    # MockFeishuAPI (测试)
+│   │       │   └── feishu_test.go     # Feishu 测试
+│   │       ├── auth/
+│   │       │   ├── service.go        # AuthService
+│   │       │   └── middleware.go     # AuthMiddleware
+│   │       ├── commands/
+│   │       │   ├── help.go           # /help command
+│   │       │   ├── new.go            # /new command
+│   │       │   └── stop.go           # /stop command
+│   │       ├── connection/
+│   │       │   └── manager.go        # ConnectionManager
+│   │       ├── instance/
+│   │       │   └── registry.go       # InstanceRegistry
+│   │       ├── metrics/
+│   │       │   └── collector.go       # MetricsCollector
+│   │       ├── milestone/
+│   │       │   ├── service.go        # MilestoneService
+│   │       │   ├── taskflow.go        # TaskFlow
+│   │       │   └── service_test.go    # Milestone 测试
+│   │       ├── ratelimit/
+│   │       │   ├── limiter.go         # RateLimiter
+│   │       │   └── limiter_test.go    # RateLimiter 测试
+│   │       ├── renderers/
+│   │       │   ├── message.go        # Message Renderer
+│   │       │   ├── status.go         # Status Renderer
+│   │       │   ├── permission.go     # Permission Renderer
+│   │       │   └── components.go     # UI Components
+│   │       ├── shared/
+│   │       │   ├── config/           # 配置
+│   │       │   ├── errors/           # 错误定义
+│   │       │   └── types/            # 共享类型
+│   │       └── task_flow.go           # TaskFlow
+│   └── shared/
+│       ├── config/                     # 用户配置
+│       ├── errors/                     # 通用错误
+│       └── types/                      # 通用类型
 │
 ├── pkg/
 │   └── i18n/
-│       └── i18n.go                  # Internationalization
+│       └── i18n.go                    # Internationalization
 │
 └── openspec/
-    └── changes/devrix-foundation/
-        └── specs/communication/
+    ├── specs/                          # 架构设计规格
+    └── changes/                       # 变更记录
+        ├── devrix-foundation/          # 基础架构
+        ├── devrix-v2/                 # V2 变更
+        └── devrix-v3/                 # V3 变更
 ```
 
-### 7.1 核心模块设计
+### 7.1 测试覆盖率
+
+| 模块 | 覆盖率 | 备注 |
+|------|--------|------|
+| FeishuAdapter | 24.8% | 接口抽象 + Mock |
+| Gateway | 53.8% | RouteInbound 核心路径 |
+| Ratelimit | **95.2%** | Token Bucket 实现 |
+| Milestone | 42.4% | 服务层测试 |
+| **总计** | ~30% | 持续提升中 |
+
+### 7.2 核心模块设计
 
 #### CommunicationGateway
 
 ```go
 // internal/layers/communication/gateway/gateway.go
 
-type CommunicationGateway struct {
-    sessionStore     *FileSessionStore
-    traceEmitter    *TraceEmitter
-    permissionMgr   *PermissionManager
-    eventEmitter    *EventEmitter
+// EventHandler 定义网关事件处理接口
+type EventHandler interface {
+    OnMessage(msg *OutboundMessage)
+    OnPermissionRequest(req *PermissionRequest) bool
+    OnError(err error, sessionID string)
+    OnStatus(sessionID string, state SessionState)
 }
 
-func NewCommunicationGateway(...) *CommunicationGateway
+// IContextEngine 定义上下文引擎接口
+type IContextEngine interface {
+    Process(ctx context.Context, session *Session, message string) <-chan *EngineEvent
+}
+
+// GatewayAPI 定义网关核心接口（用于测试 Mock）
+type GatewayAPI interface {
+    GetSession(sessionID string) (*Session, error)
+    CreateSession(chatID, workDir string) (*Session, error)
+    RouteInbound(ctx context.Context, msg *InboundMessage) error
+    RouteOutbound(msg *OutboundMessage) error
+}
+
+type CommunicationGateway struct {
+    sessionStore     SessionStore
+    eventHandler    EventHandler
+    contextEngine   IContextEngine
+    permissionMgr   *PermissionManager
+    config          *CommunicationConfig
+}
+
+func NewCommunicationGateway(
+    sessionStore SessionStore,
+    eventHandler EventHandler,
+    contextEngine IContextEngine,
+    permissionMgr *PermissionManager,
+    cfg *CommunicationConfig,
+) *CommunicationGateway
 
 // RouteInbound 处理入站消息
 func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *InboundMessage) error
 
-// RouteOutbound 处理出站事件
-func (g *CommunicationGateway) RouteOutbound(ctx context.Context, event *EngineEvent) error
-
-// RoutePermission 处理权限请求
-func (g *CommunicationGateway) RoutePermission(ctx context.Context, req *PermissionRequest) (bool, error)
+// RouteOutbound 发送出站消息
+func (g *CommunicationGateway) RouteOutbound(msg *OutboundMessage) error
 
 // Session management
 func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*Session, error)
@@ -611,9 +684,6 @@ type FileSessionStore struct {
 }
 
 func NewFileSessionStore(dir string) (*FileSessionStore, error)
-
-// AtomicWrite implements atomic file writes (write temp + rename)
-func (s *FileSessionStore) AtomicWrite(path string, data []byte) error
 ```
 
 #### CLIAdapter
@@ -622,57 +692,115 @@ func (s *FileSessionStore) AtomicWrite(path string, data []byte) error
 // internal/layers/communication/adapters/cli.go
 
 type CLIAdapter struct {
-    gateway   *CommunicationGateway
+    gateway   GatewayAPI
     renderer  *CLIRenderer
     reader    *bufio.Reader
+    config    *config.CommunicationConfig
 }
 
-func NewCLIAdapter(gateway *CommunicationGateway) *CLIAdapter
+func NewCLIAdapter(gateway GatewayAPI, cfg *config.CommunicationConfig) *CLIAdapter
 
-func (a *CLIAdapter) Run(ctx context.Context) error {
+func (a *CLIAdapter) Start(ctx context.Context) error {
     // 启动交互式 CLI
     // 读取用户输入 → 发送到 Gateway → 接收响应 → 渲染输出
 }
+```
 
-func (a *CLIAdapter) handlePermissionRequest(req *PermissionRequest) bool {
-    // 显示权限卡片
-    // 读取用户响应 (allow/deny/allow-all)
-    // 返回用户决策
+#### FeishuAdapter
+
+```go
+// internal/layers/communication/adapters/feishu.go
+
+// FeishuAPI 定义飞书 API 操作接口（用于测试 Mock）
+type FeishuAPI interface {
+    Get(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+    Im() ImAPI
 }
+
+// FeishuAdapterOption 功能选项
+type FeishuAdapterOption func(*FeishuAdapter)
+
+func WithFeishuAPI(api FeishuAPI) FeishuAdapterOption
+func WithGateway(gw GatewayAPI) FeishuAdapterOption
+
+type FeishuAdapter struct {
+    gateway      GatewayAPI
+    cfg         *config.CommunicationConfig
+    feishuCfg   *FeishuConfig
+    eventHandler EventHandler
+    api         FeishuAPI
+    // ...
+}
+
+func NewFeishuAdapter(
+    gw *gateway.CommunicationGateway,
+    feishuCfg *FeishuConfig,
+    cfg *config.CommunicationConfig,
+    opts ...FeishuAdapterOption,
+) *FeishuAdapter
+
+func (a *FeishuAdapter) Start(ctx context.Context) error
+func (a *FeishuAdapter) Stop() error
+func (a *FeishuAdapter) SendMessage(ctx context.Context, chatID, content string) error
+func (a *FeishuAdapter) OnMessage(msg *OutboundMessage)
+```
+
+#### RateLimiter
+
+```go
+// internal/layers/communication/ratelimit/limiter.go
+
+type RateLimiter struct {
+    tokens     map[string]*bucket
+    maxTokens  float64
+    rate       float64 // tokens per second
+}
+
+type RateLimitConfig struct {
+    RequestsPerMinute int
+    BurstSize         int
+    Enabled           bool
+}
+
+func NewRateLimiter(cfg *RateLimitConfig) *RateLimiter
+func (l *RateLimiter) Allow(adapterID string) bool
+func (l *RateLimiter) Remaining(adapterID string) int
+func (l *RateLimiter) Reset(adapterID string)
+func (l *RateLimiter) ResetAll()
 ```
 
 ---
 
 ## 八、实施计划
 
-### V1（核心链路）
+### V1（核心链路）- ✅ 已完成
 
-| 阶段 | 内容 | 优先级 | 验收标准 |
+| 阶段 | 内容 | 状态 | 验收标准 |
 |-----|------|--------|---------|
-| 1 | Gateway 核心 + SessionStore + Engine 接口 | P0 | 类型检查通过 |
-| 2 | CLI Adapter（本地测试） | P0 | `devrix` 可用 |
-| 3 | 心跳 + 重连 + 消息确认 | P0 | 断连自动恢复 |
-| 4 | 权限管理 + 超时拒绝 | P0 | 60s 超时生效 |
-| 5 | 信息流（帮助/错误/状态） | P1 | /help 可用 |
+| 1 | Gateway 核心 + SessionStore + Engine 接口 | ✅ 完成 | 类型检查通过 |
+| 2 | CLI Adapter（本地测试） | ✅ 完成 | `devrix` 可用 |
+| 3 | 心跳 + 重连 + 消息确认 | ✅ 完成 | 断连自动恢复 |
+| 4 | 权限管理 + 超时拒绝 | ✅ 完成 | 60s 超时生效 |
+| 5 | 信息流（帮助/错误/状态） | ✅ 完成 | /help 可用 |
 
-### V2（可靠性增强）
+### V2（可靠性增强）- 🔄 进行中
 
-| 阶段 | 内容 | 优先级 | 验收标准 |
+| 阶段 | 内容 | 状态 | 验收标准 |
 |-----|------|--------|---------|
-| 6 | ShortId 生成（5位防脏话） | P1 | requestId 可读性提升 |
-| 7 | Auth + 输入验证 | P1 | Token 认证 |
-| 8 | 领域事件完整定义 | P2 | 11 个事件完整 |
-| 9 | 飞书 Adapter | P1 | 权限卡片显示 |
+| 6 | ShortId 生成（5位防脏话） | ✅ 完成 | requestId 可读性提升 |
+| 7 | Auth + 输入验证 | ✅ 完成 | Token 认证 |
+| 8 | 领域事件完整定义 | 🔄 进行中 | 11 个事件完整 |
+| 9 | 飞书 Adapter | ✅ 完成 | 飞书 WebSocket 集成 |
 
-### V3（功能完善）
+### V3（功能完善）- 🔄 进行中
 
-| 阶段 | 内容 | 优先级 | 验收标准 |
+| 阶段 | 内容 | 状态 | 验收标准 |
 |-----|------|--------|---------|
-| 10 | Milestone 任务流 | P1 | DAG + 进度追踪 |
-| 11 | UI 组件体系 | P2 | 跨平台一致性 |
-| 12 | 钉钉 Adapter | P2 | — |
-| 13 | 限流设计 | P2 | 429 + Retry-After |
-| 14 | 多实例部署 + 监控 | P2 | Prometheus 接入 |
+| 10 | Milestone 任务流 | ✅ 完成 | DAG + 进度追踪 |
+| 11 | UI 组件体系 | 🔄 进行中 | 跨平台一致性 |
+| 12 | 钉钉 Adapter | ❌ 未开始 | — |
+| 13 | 限流设计 | ✅ 完成 | Token Bucket 实现 |
+| 14 | 多实例部署 + 监控 | 🔄 进行中 | Prometheus 接入 |
 
 ---
 
@@ -712,19 +840,19 @@ func (a *CLIAdapter) handlePermissionRequest(req *PermissionRequest) bool {
 | 权限请求/回复 | ✅ | ✅ | ✅ | ✅ | |
 | 流式响应 | ✅ | ✅ | ✅ | ✅ | |
 | 错误码分层 | ✅ | ✅ | ✅ | ✅ | |
-| 限流设计 | ✅ | ❌ | ❌ | ✅ | |
+| 限流设计 | ✅ | ❌ | ✅ | ✅ | Token Bucket |
 | 版本管理 | ✅ | ❌ | ✅ | ✅ | |
 | **部署运维** ||||||
 | 部署架构图 | ✅ | ❌ | ⚠️ 简化 | ✅ | |
-| 监控指标 | ✅ | ❌ | ❌ | ✅ | |
+| 监控指标 | ✅ | ❌ | ❌ | 🔄 进行中 | |
 | 日志规范 | ✅ | ⚠️ 简化 | ✅ | ✅ | |
-| 多实例部署 | ✅ | ❌ | ❌ | ✅ | |
+| 多实例部署 | ✅ | ❌ | ❌ | 🔄 进行中 | |
 | **UI 设计** ||||||
-| 组件体系 | ✅ | ❌ | ❌ | ✅ | |
+| 组件体系 | ✅ | ❌ | 🔄 进行中 | ✅ | |
 | 状态机 | ✅ | ❌ | ❌ | ✅ | |
 | 平台策略 | ✅ | ❌ | ❌ | ✅ | |
 
-**图例**：✅ 完整实现 | ⚠️ 简化实现 | ❌ 未实现
+**图例**：✅ 完整实现 | ⚠️ 简化实现 | ❌ 未实现 | 🔄 进行中
 
 ---
 
