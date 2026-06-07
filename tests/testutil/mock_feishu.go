@@ -48,6 +48,7 @@ func (m *MockImAPI) MessageReaction() adapters.MessageReactionAPI {
 type MockMessageAPI struct {
 	CreateFunc func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error)
 	ReplyFunc  func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error)
+	PatchFunc  func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error)
 }
 
 var _ adapters.MessageAPI = (*MockMessageAPI)(nil)
@@ -64,6 +65,13 @@ func (m *MockMessageAPI) Reply(ctx context.Context, req *larkim.ReplyMessageReq)
 		return m.ReplyFunc(ctx, req)
 	}
 	return &larkim.ReplyMessageResp{}, nil
+}
+
+func (m *MockMessageAPI) Patch(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+	if m.PatchFunc != nil {
+		return m.PatchFunc(ctx, req)
+	}
+	return &larkim.PatchMessageResp{}, nil
 }
 
 // MockMessageReactionAPI is a test double for adapters.MessageReactionAPI.
