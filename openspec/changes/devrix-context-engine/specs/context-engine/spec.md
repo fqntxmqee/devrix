@@ -66,7 +66,7 @@
 
 #### Scenario: Restore session from snapshot
 
-- GIVEN a session with valid `ContextSnapshot`
+- GIVEN a session with valid `ContextSnapshot` (format `ctx-v1`, camelCase JSON per `ContextSnapshotV1`)
 - WHEN context is loaded
 - THEN message history is restored
 - AND token budget state is restored
@@ -170,7 +170,7 @@
 **Priority**: P0
 **Rationale**: 工具调用需要执行与基本验证闭环
 **L4 映射**: L4-CTX-PEV
-**L5 映射**: L5-CTX-06, L5-CTX-07
+**L5 映射**: L5-CTX-06, L5-CTX-07, L5-CTX-11
 
 #### Scenario: Execute phase invokes LLM
 
@@ -183,9 +183,18 @@
 
 - GIVEN LLM response contains tool calls
 - WHEN Execute handles tools
-- THEN `tool_call` events are emitted
-- AND `IToolRunner` is invoked after permission approval
-- AND `tool_result` events are emitted
+- THEN `tool_call` events are emitted for Gateway display
+- AND `IPermissionGate.Request` is invoked synchronously before tool execution
+- AND `IToolRunner` is invoked only when permission is approved
+- AND `tool_result` events are emitted on success
+
+#### Scenario: Tool call permission denied
+
+- GIVEN LLM response contains tool calls
+- WHEN `IPermissionGate.Request` returns false
+- THEN an `error` EngineEvent is emitted with permission denied
+- AND `IToolRunner` is not invoked
+- AND partial assistant context is preserved
 
 #### Scenario: Verify phase basic mode
 
@@ -238,7 +247,7 @@
 
 **Priority**: P0
 **Rationale**: UI/Adapter 已按 EngineEvent 类型渲染
-**L5 映射**: L5-CTX-09
+**L5 映射**: L5-CTX-09, L5-CTX-11
 
 #### Scenario: Event flow types
 
@@ -246,6 +255,22 @@
 - WHEN events are emitted
 - THEN types include `thinking`, `text`, `tool_call`, `tool_result`, `complete`
 - AND optional `error` on failure
+
+#### Scenario: EngineEvent field compatibility
+
+- GIVEN the context engine emits events
+- WHEN Gateway consumes events
+- THEN `text` events use Metadata `is_complete` (`"false"` streaming, `"true"` final)
+- AND `tool_call` events populate `ToolName`, `ToolInput` and Metadata `tool_name`, `input`, `risk_level`
+- AND `complete` events include Metadata `usage` and `duration`
+- AND Gateway does not block on `tool_call` for permission (display only)
+
+#### Scenario: Process stop via context cancel
+
+- GIVEN `Process` is running for a session
+- WHEN Gateway `Stop(sessionID)` is called (e.g. `/stop` command)
+- THEN the Process context is cancelled
+- AND event emission stops without panic
 
 #### Scenario: Task flow milestone progress (V3 ready)
 

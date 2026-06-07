@@ -143,6 +143,26 @@ devrix/
 
 CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → coverage 报告）。
 
+## L3/L4 Asset Registry (Context Engine)
+
+> Change: `openspec/changes/devrix-context-engine/` — 消除悬空 ID
+
+### L3 业务活动
+
+| ID | 名称 | L4 映射 |
+|----|------|---------|
+| L3-BE-CTX-01 | 处理用户消息并维护上下文 | L4-CTX-STATE, L4-CTX-PEV, L4-CTX-MEMORY |
+| L3-BE-CTX-02 | 超长对话压缩 | L4-CTX-COMPRESS |
+
+### L4 功能点
+
+| ID | 名称 | 包路径 |
+|----|------|--------|
+| L4-CTX-STATE | 上下文状态管理 | `contextengine/engine.go`, `prompt/` |
+| L4-CTX-PEV | PEV 执行循环 | `contextengine/pev/` |
+| L4-CTX-COMPRESS | 七步压缩管道 | `contextengine/compression/` |
+| L4-CTX-MEMORY | 分层记忆 | `contextengine/memory/`, `snapshot/` |
+
 ## Related Documents
 
 - **Architecture Docs:** `docs/README.md`（含 `detail design framework.md` 六段式模板）

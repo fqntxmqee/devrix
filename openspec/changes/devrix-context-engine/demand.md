@@ -3,7 +3,7 @@ demand-id: DM-20260607-002
 title: 上下文引擎（Layer 2）详细方案设计
 source: 产品/架构团队
 priority: P0
-status: PLANNING
+status: READY_FOR_S4
 l1-domain: devrix
 created: 2026-06-07
 ---
@@ -28,7 +28,13 @@ created: 2026-06-07
 **A**: 通信层只依赖 `IContextEngine.Process()` 事件流；上下文引擎不反向依赖 Adapter。Session.ContextSnapshot 由引擎写入。 — 2026-06-07
 
 ### Q4: LLM / Multi-Agent 依赖？
-**A**: V1 通过接口依赖 `ILLMGateway`、`IToolExecutor`（由 multi-agent 层提供 stub/最小实现）；不阻塞上下文引擎独立开发与测试。 — 2026-06-07
+**A**: V1 通过接口依赖 `ILLMGateway`、`IToolRunner`、`IToolRegistry`（由 multi-agent 层提供 stub/最小实现）；不阻塞上下文引擎独立开发与测试。 — 2026-06-07
+
+### Q5: 权限握手与 Gateway 关系？
+**A**: V1 采用 `IPermissionGate` 注入 L2；PEV 在 `IToolRunner` 前同步审批；Gateway 对 `tool_call` 仅展示，不阻塞事件流。 — 2026-06-07
+
+### Q6: verify_mode 默认值？
+**A**: V1 默认 `basic`（tool result 无 error 即通过）。 — 2026-06-07
 
 ## 3. 澄清范围
 

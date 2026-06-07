@@ -1,7 +1,7 @@
 # Devrix L5 测试点注册表
 
 **Status:** Active
-**Last Updated:** 2026-06-07 (CTX 草案登记)
+**Last Updated:** 2026-06-07 (CTX S3 签核：+L5-CTX-11，L5-CTX-07 升 P0)
 
 > L5 测试点是 OpenSpec S5 验收的确定性锚点。新增 L4 能力前 MUST 先在此登记或复用已有 L5。
 
@@ -84,13 +84,14 @@
 | L5-CTX-04 | TokenBlock 超限返回 ContextExceeded | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/*_test.go` | PLANNED |
 | L5-CTX-05 | ContextSnapshot 保存与恢复 | L4-CTX-MEMORY | `tests/integration/context_gateway_flow_test.go` | PLANNED |
 | L5-CTX-06 | PEV Execute 调用 LLM 并流式输出 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | PLANNED |
+| L5-CTX-07 | 工具执行后 Verify basic 模式 | L4-CTX-PEV | `internal/layers/contextengine/pev/*_test.go` | PLANNED |
 | L5-CTX-09 | EngineEvent 与通信层四流契约一致 | L4-CTX-STATE | `tests/integration/context_gateway_flow_test.go` | PLANNED |
+| L5-CTX-11 | 权限批准/拒绝后 PEV 行为正确 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | PLANNED |
 
 ### P1
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-CTX-07 | 工具执行后 Verify basic 模式 | L4-CTX-PEV | `internal/layers/contextengine/pev/*_test.go` | PLANNED |
 | L5-CTX-08 | V1 跳过 Autocompact 步骤 6 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/*_test.go` | PLANNED |
 
 ### P2

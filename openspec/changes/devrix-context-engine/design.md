@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-context-engine
 **Layer:** 2 - Context Engine
-**Status:** Draft
+**Status:** Ready for S4
 **Version:** 1.0
 **Based on:** `docs/context-engine-design.md`, `docs/detail design framework.md`, `openspec/specs/context_engine_layer_delta.md`, 通信层 design §四流映射
 
@@ -96,7 +96,8 @@ type PEVState struct {
     Iteration     int
     MaxIterations int       // V1 默认 3
     LastToolCalls []ToolCallRecord
-    VerifyResult  *VerifyResult
+    // VerifyResult 值类型，"未验证"状态通过 passed=false + deviation=0 表示
+    VerifyResult VerifyResult
 }
 
 type PEVPhase string
@@ -142,6 +143,62 @@ ContextEngine 持有内存中的 SessionContext map[sessionID]
 ```
 
 恢复流程：`GetSession` → 若 `ContextSnapshot` 非空 → 反序列化 → 继续对话。
+
+### 2.4 ContextSnapshot v1 JSON Schema
+
+```go
+// ContextSnapshotV1 定义 SessionContext 的精简序列化格式（用于持久化）
+// 版本标识："ctx-v1"
+type ContextSnapshotV1 struct {
+    Version     string              `json:"version"`               // 固定 "ctx-v1"
+    SessionID   string              `json:"sessionId"`
+    Model       string              `json:"model"`
+    WorkDir     string              `json:"workDir"`
+    Messages    []MessageSnapshot   `json:"messages"`             // types.Message 的精简版
+    TokenBudget TokenBudgetSnapshot `json:"tokenBudget"`
+    PEVState    PEVStateSnapshot   `json:"pevState"`
+    SystemPrompt string             `json:"systemPrompt"`
+    UpdatedAt   string              `json:"updatedAt"`            // RFC3339
+}
+
+// MessageSnapshot 是 types.Message 的序列化版本（无指针字段）
+type MessageSnapshot struct {
+    ID        string            `json:"id"`
+    Role      string            `json:"role"`                  // user | assistant | system | tool
+    Content   string            `json:"content"`
+    Metadata  map[string]string `json:"metadata,omitempty"`
+    Timestamp string            `json:"timestamp"`             // RFC3339
+}
+
+// TokenBudgetSnapshot 是 TokenBudget 的序列化版本
+type TokenBudgetSnapshot struct {
+    MaxContextTokens  int `json:"maxContextTokens"`
+    ReservedOutput    int `json:"reservedOutput"`
+    ToolResultBudget  int `json:"toolResultBudget"`
+    CompressionTarget int `json:"compressionTarget"`
+}
+
+// PEVStateSnapshot 是 PEVState 的序列化版本（VerifyResult 为值类型）
+type PEVStateSnapshot struct {
+    Phase         string                 `json:"phase"`          // execute | verify | done
+    Iteration     int                   `json:"iteration"`
+    MaxIterations int                   `json:"maxIterations"`
+    LastToolCalls []ToolCallRecord      `json:"lastToolCalls"`
+    VerifyResult  VerifyResultSnapshot   `json:"verifyResult"`   // 未验证={passed:false,deviation:0}
+}
+
+// VerifyResultSnapshot 是 VerifyResult 的序列化版本
+type VerifyResultSnapshot struct {
+    Passed    bool     `json:"passed"`
+    Deviation float64  `json:"deviation"`
+    Commands  []string `json:"commands,omitempty"`
+}
+```
+
+**序列化约束**：
+- `Session.ContextSnapshot` = `json.Marshal(ContextSnapshotV1)`
+- 反序列化时若 `Version != "ctx-v1"` 返回 `CTX_SNAPSHOT_4002`
+- 冗余备份文件路径：`~/.devrix/context/{sessionId}.json`（可选，仅灾难恢复用）
 
 ---
 
@@ -202,6 +259,8 @@ type ContextEngine struct {
     pev         PEVEngine
     llm         ILLMGateway
     tools       IToolRunner
+    toolsReg    IToolRegistry
+    permission  IPermissionGate
     observer    IObserver
     cfg         *config.ContextEngineConfig
 }
@@ -226,8 +285,101 @@ type IToolRunner interface {
 type IObserver interface {
     EmitContextCompressed(report CompressionReport)
     EmitPEVPhase(sessionID string, phase PEVPhase, iteration int)
+    EmitSnapshotRestored(sessionID string, fromBackup bool)
+    EmitErrorOccurred(sessionID string, code string, err error)
+    EmitPEVIteration(sessionID string, iteration int, phase PEVPhase)
+}
+
+// IToolRegistry 提供工具 schema 与 risk_level（V1 可内置最小集，L4 完整实现后替换）
+type IToolRegistry interface {
+    ListTools(ctx context.Context, workDir string) ([]ToolSchema, error)
+    RiskLevel(toolName string) RiskLevel
+}
+
+// IPermissionGate 权限门控：PEV 在 IToolRunner.Execute 之前同步调用
+// 实现方由 main.go 注入 gateway.PermissionManager 适配器
+type IPermissionGate interface {
+    Request(ctx context.Context, sessionID, toolName, input string, risk RiskLevel) (approved bool)
 }
 ```
+
+### 3.4 L1-L2 集成契约
+
+#### 3.4.1 Permission Gate（已决议）
+
+**问题**：Gateway 单向消费 `tool_call` 事件无法让 PEV 在批准后继续执行。
+
+**方案 A（V1 采用）**：权限下沉至 L2，Gateway 仅渲染通知。
+
+```
+PEV Execute 检测到 tool_call
+  → emit tool_call 事件（通知 Gateway/Adapter 展示）
+  → IPermissionGate.Request() 同步阻塞
+  → approved ? IToolRunner.Execute() : emit error(permission_denied)
+  → emit tool_result / 进入 Verify
+```
+
+```go
+// internal/layers/communication/gateway/permission_adapter.go（L1 提供适配器）
+type PermissionGateAdapter struct {
+    mgr *PermissionManager
+    ui  EventHandler // 可选：触发 OnPermissionRequest UI
+}
+
+func (a *PermissionGateAdapter) Request(ctx context.Context, sessionID, toolName, input string, risk types.RiskLevel) bool {
+    return a.mgr.Request(ctx, sessionID, toolName, input, risk)
+}
+```
+
+Gateway `handleEngineEvent` 对 `tool_call` **仅展示**，不再调用 `PermissionManager`（移除 L234-228 阻塞逻辑）。
+
+#### 3.4.2 EngineEvent 与 Gateway 对齐（已决议）
+
+引擎 MUST 发出与现有 `gateway.go` 兼容的字段（L5-CTX-09）：
+
+| Type | Struct 字段 | Metadata（冗余，Gateway 优先读 Metadata） |
+|------|-------------|------------------------------------------|
+| `text` | Content | `is_complete`: `"false"` 流式 / `"true"` 最终块 |
+| `tool_call` | ToolName, ToolInput | `tool_name`, `input`, `risk_level` |
+| `tool_result` | ToolName, Content | `tool_name`, `error`（空=成功） |
+| `complete` | — | `usage`（token 数）, `duration`（耗时 ms） |
+| `error` | Content | `code`, `recoverable` |
+
+实现责任：**T15 引擎按上表 emit；T25 Gateway 移除 tool_call 权限阻塞，仅保留展示。**
+
+#### 3.4.3 Process 取消与 `/stop`（已决议）
+
+```go
+// Gateway 为每 Session 维护 Process 生命周期
+type processHandle struct {
+    cancel context.CancelFunc
+}
+
+// 实现 commands.Stopper
+func (g *CommunicationGateway) Stop(sessionID string) error {
+    g.mu.Lock()
+    defer g.mu.Unlock()
+    if h, ok := g.activeProcesses[sessionID]; ok {
+        h.cancel()
+        delete(g.activeProcesses, sessionID)
+        return nil
+    }
+    return nil // 无活跃 Process 视为成功
+}
+```
+
+`RouteInbound` 创建 `context.WithCancel`，传入 `Process`；`handleEngineEvents` 在 ctx.Done 时退出。
+
+#### 3.4.4 消息幂等
+
+Gateway 在调用 `Process` 前 MUST 设置 `session.RequestID = inbound.MessageID`（`InboundMessage.MessageID` 已存在）。
+引擎在 `AppendUserMessage` 前检查：若 `RequestID` 与上次处理相同则跳过追加（幂等）。
+
+#### 3.4.5 流式文本入历史
+
+- 流式 chunk 写入 `WorkingMemory.StreamBuffer`，**不**逐条追加 `Messages[]`
+- 收到 `is_complete=true` 的 `text` 事件或 `complete` 事件时，将 StreamBuffer 合并为一条 `assistant` message 写入 `Messages[]`
+- `Process` 异常退出时丢弃未完成的 StreamBuffer
 
 ---
 
@@ -237,11 +389,12 @@ type IObserver interface {
 
 ```
 用户消息
-  → Execute: 调用 LLM（带 tools schema）
+  → Execute: 调用 LLM（tools schema 来自 IToolRegistry.ListTools）
   → 若 LLM 返回 tool_calls:
-       → 权限由通信层 PermissionManager 处理（已有）
-       → IToolRunner 执行
-       → Verify: 运行轻量检查（V1: 仅检查结果非空 / 无 error）
+       → emit tool_call 事件（Gateway 仅展示）
+       → IPermissionGate.Request() 同步审批
+       → approved ? IToolRunner.Execute() : error(permission_denied)
+       → Verify（verify_mode=basic）: tool result 无 error
        → 若 fail 且 iteration < max: 再 Execute
   → 输出最终 text + complete
 ```
@@ -258,8 +411,8 @@ EngineEvent.milestone_progress 由 PEV 在 milestone 状态变更时发出
 
 | 级别 | 行为 | 版本 |
 |------|------|------|
-| `none` | 跳过 Verify | V1 默认 |
-| `basic` | tool result 无 error | V1 可选 |
+| `basic` | tool result 无 error | **V1 默认** |
+| `none` | 跳过 Verify | 测试/快速模式 |
 | `commands` | 运行配置的 verify 命令（如 `go test ./...`） | V2+ |
 
 ---
@@ -305,6 +458,13 @@ messages
 | ContextCollapse | minContentLength | 20 字符以下可折叠 |
 | SystemPromptAssembly | position | index 0 |
 | TokenBlock | — | 抛 `CTX_EXCEEDED_4001` |
+
+**ContextCollapse 折叠规则（V1 详细逻辑）**：
+1. 识别连续 2+ 条消息，单条 `content.length < minContentLength`（默认 20）
+2. 保留第一条和最后一条消息
+3. 中间消息用 `"[折叠 N 条消息]"` 占位符替代
+4. 折叠后的内容**不生成摘要**（V2 Autocompact 才用 LLM 生成摘要）
+5. 示例：`[user: hi] [assistant: hi] [user: help] → [user: hi] [折叠 2 条消息] [user: help]`
 
 ### 5.3 触发条件
 
@@ -352,8 +512,14 @@ type ShortTermMemory struct {
 ```
 
 持久化路径：
-- `Session.ContextSnapshot`（随 Session Store 写入）
-- 冗余备份：`~/.devrix/context/{sessionId}.json`（可选，配置开启）
+- **主存储**：`Session.ContextSnapshot`（随 Session Store 写入，V1 主要数据源）
+- **备份存储**：`~/.devrix/context/{sessionId}.json`（可选，仅灾难恢复；由 `SnapshotConfig.backup_dir` 控制）
+
+**一致性策略**：
+- 先写主存储（SessionStore），再写备份（若 enabled=true）
+- 读取时优先从主存储（SessionStore）获取
+- 备份仅在主存储损坏/丢失时用于灾难恢复
+- 两种存储格式完全相同（均为 `ContextSnapshotV1` JSON）
 
 ### 6.4 Long-Term Memory（V3 占位）
 
@@ -503,7 +669,8 @@ devrix/
 | L5-CTX-04 | TokenBlock 超限报错 | P0 | unit |
 | L5-CTX-05 | 快照保存与恢复 | P0 | integration |
 | L5-CTX-06 | PEV Execute 调用 LLM | P0 | integration (mock LLM) |
-| L5-CTX-07 | 工具调用后 Verify | P1 | integration |
+| L5-CTX-07 | 工具调用后 Verify basic 模式 | P0 | integration |
+| L5-CTX-11 | 权限批准/拒绝后 PEV 行为正确 | P0 | integration |
 | L5-CTX-08 | Autocompact 跳过（V1） | P1 | unit |
 | L5-CTX-09 | Gateway 四流事件完整 | P0 | integration |
 | L5-CTX-10 | L3 记忆访问返回 NotImplemented | P2 | unit |
@@ -527,11 +694,17 @@ contextEngine := gateway.NewStubContextEngine()
 
 // After
 contextEngine := contextengine.NewContextEngine(contextengine.EngineDeps{
-    LLM:      llmGateway,      // 可先 stub
-    Tools:    toolRunner,      // 可先 stub
-    Observer: metricsBridge,
-    Config:   cfg.ContextEngine,
+    LLM:        llmGateway,
+    Tools:      toolRunner,
+    ToolsReg:   toolRegistry,   // V1: BuiltinToolRegistry stub
+    Permission: permissionGate, // gateway.NewPermissionGateAdapter(permissionMgr, handler)
+    Observer:   metricsBridge,
+    Config:     cfg.ContextEngine,
 })
+
+// Gateway 注入 Stopper（实现 commands.Stopper）
+gateway := gateway.NewCommunicationGateway(..., contextEngine)
+stopCmd := commands.NewStopCommand(gateway)
 ```
 
 ### 12.2 与 LLM Gateway（Layer 3）
@@ -550,12 +723,20 @@ V3 在 PEV Plan 阶段调用 `milestone.Service` 创建 DAG，通过 `EngineEven
 
 ## 十三、开放问题
 
-| # | 问题 | 建议 | 决策人 |
-|---|------|------|--------|
-| 1 | Token 计数实现位置 | V1 内置 `token/counter.go`，L3 可统一 | 架构 |
-| 2 | System Prompt 加载优先级 | AGENTS.md > .devrix > fallback | 产品 |
-| 3 | 快照是否加密 | V1 明文 JSON，V2 可选 AES | 安全 |
-| 4 | 压缩是否异步 | V1 同步（<100ms 目标），V2 可考虑后台 | 性能 |
+| # | 问题 | 建议 | 决策人 | 状态 |
+|---|------|------|--------|------|
+| 1 | Token 计数实现位置 | V1 内置 `token/counter.go`，L3 可统一 | 架构 | **已决议** ✅ |
+| 2 | System Prompt 加载优先级 | AGENTS.md > .devrix > fallback | 产品 | **已决议** ✅ |
+| 3 | 权限握手方案 | IPermissionGate 注入引擎，Gateway 仅展示 | 架构 | **已决议** ✅ |
+| 4 | PEV verify_mode 默认值 | `basic` | 架构 | **已决议** ✅ |
+| 5 | 快照是否加密 | V1 明文 JSON，V2 可选 AES | 安全 | 待决议 |
+| 6 | 压缩是否异步 | V1 同步（<100ms 目标），V2 可考虑后台 | 性能 | 待决议 |
+
+**已决议问题详情**：
+- **#1 Token 计数**：V1 实现 `token/counter.go`（cl100k_base），V2 考虑迁移至 LLM Gateway 统一提供
+- **#2 System Prompt 加载**：优先级为 `AGENTS.md` > `.devrix/AGENTS.md` > `fallback` 默认值（见 §7.1 配置）
+- **#3 权限握手**：见 §3.4.1；L5-CTX-11
+- **#4 verify_mode**：V1 默认 `basic`（见 §4.3、§7.1）
 
 ---
 

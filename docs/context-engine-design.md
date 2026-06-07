@@ -4,7 +4,7 @@
 **Change ID:** devrix-context-engine
 **Demand ID:** DM-20260607-002
 **版本:** 1.0.0
-**状态:** Draft
+**状态:** Ready for S4
 **关联 OpenSpec:** `openspec/changes/devrix-context-engine/`
 
 ---
@@ -125,11 +125,16 @@ sequenceDiagram
         A-->>U: 流式渲染
 
         opt tool_calls
-            V-->>C: tool_call event
-            G->>G: PermissionManager
-            V->>V: IToolRunner.Execute
-            V-->>C: tool_result event
-            C->>V: Verify
+            V-->>C: tool_call event（通知）
+            C-->>G: tool_call（Gateway 仅展示）
+            V->>V: IPermissionGate.Request
+            alt approved
+                V->>V: IToolRunner.Execute
+                V-->>C: tool_result event
+                C->>V: Verify
+            else denied
+                V-->>C: error(permission_denied)
+            end
         end
     end
 
@@ -175,8 +180,9 @@ sequenceDiagram
 | Token 超限 | TokenBlock | 返回 `CTX_EXCEEDED`，不发 LLM | 同消息重试结果一致 |
 | LLM 熔断 | ILLMGateway | `CTX_LLM_4004`，recoverable | 用户重发消息 |
 | 工具执行失败 | IToolRunner | Verify fail → PEV 重试 | 工具需幂等设计 |
+| 权限拒绝 | IPermissionGate | `error` + `recoverable=false` | 用户换指令重试 |
 | PEV 超限 | iteration == max | `CTX_PEV_4003`，保留 partial 回复 | — |
-| context 取消 | ctx.Done | 停止 goroutine，不发 complete | — |
+| context 取消 | ctx.Done / `/stop` | Gateway.Stop → cancel，不发 complete | — |
 | 快照写入失败 | PersistSnapshot | 日志告警，内存态仍可用 | 下次消息重试持久化 |
 
 ### 3.4 分支：压缩触发
@@ -350,20 +356,21 @@ type IContextEngine interface {
 }
 ```
 
-**EngineEvent 协议：**
+**EngineEvent 协议（与 `gateway.go` 对齐，SoT）：**
 
 | Type | 必填字段 | Metadata 键 | 说明 |
 |------|----------|-------------|------|
 | `thinking` | Content | — | 推理中 |
-| `text` | Content | `is_partial` | 流式文本 |
-| `tool_call` | ToolName, ToolInput | `risk_level`, `tool_name` | 待权限 |
-| `tool_result` | Content, ToolName | `error` | 工具结果 |
-| `permission` | — | 委托 Gateway | V1 由 Gateway 处理 |
+| `text` | Content | `is_complete`: `"false"`/`"true"` | 流式文本；最终块 `true` |
+| `tool_call` | ToolName, ToolInput | `tool_name`, `input`, `risk_level` | 通知展示；权限在 L2 `IPermissionGate` |
+| `tool_result` | Content, ToolName | `tool_name`, `error` | 工具结果 |
 | `status` | Content | `state` | 会话状态 |
-| `milestone_progress` | Content | `milestone_id`, `progress` | V3 |
+| `milestone_progress` | Content | `milestone_id`, `progress`, `task` | V3 |
 | `info` | Content | `category` | 压缩/恢复提示 |
-| `complete` | — | `usage_tokens` | 本轮结束 |
+| `complete` | — | `usage`, `duration` | 本轮结束 |
 | `error` | Content | `code`, `recoverable` | 错误 |
+
+> Gateway 对 `tool_call` **仅展示**；`IPermissionGate` 在引擎内同步审批（见 §6.7）。
 
 ### 6.2 下游依赖接口（L2 → L3/L4/L5）
 
@@ -376,9 +383,21 @@ type IToolRunner interface {
     Execute(ctx context.Context, call ToolCall) (*ToolResult, error)
 }
 
+type IToolRegistry interface {
+    ListTools(ctx context.Context, workDir string) ([]ToolSchema, error)
+    RiskLevel(toolName string) RiskLevel
+}
+
+type IPermissionGate interface {
+    Request(ctx context.Context, sessionID, toolName, input string, risk RiskLevel) (approved bool)
+}
+
 type IObserver interface {
     EmitContextCompressed(report CompressionReport)
     EmitPEVPhase(sessionID string, phase PEVPhase, iteration int)
+    EmitSnapshotRestored(sessionID string, fromBackup bool)
+    EmitErrorOccurred(sessionID string, code string, err error)
+    EmitPEVIteration(sessionID string, iteration int, phase PEVPhase)
 }
 ```
 
@@ -422,31 +441,67 @@ context_engine:
     sources: ["AGENTS.md", ".devrix/AGENTS.md"]
 ```
 
-### 6.5 快照格式契约（ContextSnapshot v1）
+### 6.5 快照格式契约（ContextSnapshotV1）
+
+SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 
 ```json
 {
   "version": "ctx-v1",
-  "session_id": "sess_xxx",
-  "messages": [],
-  "pev_state": { "phase": "done", "iteration": 0 },
-  "token_budget": { "max_context_tokens": 128000 },
-  "system_prompt_hash": "sha256:...",
-  "updated_at": "2026-06-07T12:00:00Z"
+  "sessionId": "sess_xxx",
+  "model": "claude-sonnet",
+  "workDir": "/path/to/project",
+  "messages": [
+    {
+      "id": "msg_001",
+      "role": "user",
+      "content": "hello",
+      "timestamp": "2026-06-07T12:00:00Z"
+    }
+  ],
+  "tokenBudget": {
+    "maxContextTokens": 128000,
+    "reservedOutput": 8192,
+    "toolResultBudget": 800,
+    "compressionTarget": 115200
+  },
+  "pevState": {
+    "phase": "done",
+    "iteration": 0,
+    "maxIterations": 3,
+    "lastToolCalls": [],
+    "verifyResult": { "passed": false, "deviation": 0 }
+  },
+  "systemPrompt": "You are Devrix...",
+  "updatedAt": "2026-06-07T12:00:00Z"
 }
 ```
 
-**版本策略：** `version` 字段升级时提供迁移器；旧版快照无法迁移则降级初始化 + `info` 事件。
+**存储策略：**
+- **主存储（SoT）**：`Session.ContextSnapshot` → SessionStore
+- **备份**：`~/.devrix/context/{sessionId}.json`（可选，灾难恢复）
+- 先写主存储，再写备份；读取优先主存储
+
+**版本策略：** `version != "ctx-v1"` → `CTX_SNAPSHOT_4002` → 降级初始化 + `info` 事件。
 
 ### 6.6 幂等与并发
 
 | 操作 | 幂等键 | 说明 |
 |------|--------|------|
-| Process | `session_id + message_id`（L1 提供） | 同一 message_id 不重复追加 |
+| Process | `session.RequestID`（Gateway 设 = `InboundMessage.MessageID`） | 相同 ID 不重复追加 user message |
 | PersistSnapshot | `session_id + updated_at` | 覆盖写 |
 | Compress | 输入 messages 确定性 | 同步纯函数 |
 
 并发：单 Session 由 Gateway 串行 RouteInbound；ContextEngine 内 `SessionContext` 使用 per-session mutex。
+
+### 6.7 L1-L2 集成契约
+
+| 契约 | 责任方 | 说明 |
+|------|--------|------|
+| **Permission Gate** | L2 执行，L1 适配 | `IPermissionGate` 注入；Gateway `tool_call` 仅展示 |
+| **Process 取消** | L1 Gateway | 实现 `Stopper`；`/stop` → `context.Cancel` |
+| **EngineEvent 格式** | L2 emit，L1 消费 | 字段与 Metadata 见 §6.1；L5-CTX-09 契约测试 |
+| **流式入历史** | L2 | StreamBuffer 在 `is_complete=true` 时合并为 assistant message |
 
 ---
 
@@ -458,7 +513,8 @@ context_engine:
 | ③ 业务流程 | spec.md Scenarios | L5-CTX-05, 06, 09 |
 | ④ 领域模型 | design.md §二 | L5-CTX-01, 02 |
 | ⑤ 链路 | design.md §三 Process | L5-CTX-03, 04 |
-| ⑥ 接口 | spec.md Gateway Contract | L5-CTX-09 |
+| ⑥ 接口 | spec.md Gateway Contract | L5-CTX-09, 11 |
+| L1-L2 集成 | design.md §3.4 | L5-CTX-11 |
 | 压缩 | spec.md Compression | L5-CTX-03, 04, 08 |
 | PEV | spec.md PEV | L5-CTX-06, 07 |
 
@@ -476,13 +532,16 @@ context_engine:
 
 ---
 
-## 附录 C：待决策项
+## 附录 C：决策记录
 
-| # | 问题 | 建议 | 状态 |
+| # | 问题 | 决议 | 状态 |
 |---|------|------|------|
-| 1 | Token 计数归属 | V1 内置，V2 与 LLM Gateway 统一 | OPEN |
-| 2 | System Prompt 优先级 | AGENTS.md > .devrix > fallback | OPEN |
-| 3 | 快照加密 | V1 明文，V2 可选 | OPEN |
+| 1 | Token 计数归属 | V1 内置 cl100k_base，V2 与 LLM Gateway 统一 | **已决议** |
+| 2 | System Prompt 优先级 | AGENTS.md > .devrix/AGENTS.md > fallback | **已决议** |
+| 3 | 权限握手 | IPermissionGate 注入 L2，Gateway 仅展示 | **已决议** |
+| 4 | verify_mode 默认 | `basic` | **已决议** |
+| 5 | 快照加密 | V1 明文，V2 可选 AES | 待决议 |
+| 6 | 压缩异步 | V1 同步，V2 可后台 | 待决议 |
 
 ---
 

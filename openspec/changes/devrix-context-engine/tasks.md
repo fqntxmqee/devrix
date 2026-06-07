@@ -1,7 +1,7 @@
 # Tasks: devrix-context-engine
 
 **Change ID:** devrix-context-engine
-**Status:** Draft (Design Phase — 无代码任务)
+**Status:** Ready for S4 (Design signed off)
 **Based on:** design.md, specs/context-engine/spec.md
 
 ---
@@ -76,7 +76,7 @@
 
 ## Milestone 4: PEV Engine
 
-- [ ] **T11**: 定义 `contracts.go`（ILLMGateway, IToolRunner, IObserver）
+- [ ] **T11**: 定义 `contracts.go`（ILLMGateway, IToolRunner, IToolRegistry, IPermissionGate, IObserver）
   - L4: L4-CTX-PEV
   - L5: —
   - Estimate: 2h
@@ -100,10 +100,11 @@
 
 ## Milestone 5: ContextEngine 集成
 
-- [ ] **T15**: 实现 `engine.go`（Process 主流程）
+- [ ] **T15**: 实现 `engine.go`（Process 主流程 + EngineEvent 契约 emit）
   - L4: L4-CTX-STATE
   - L5: L5-CTX-09
   - Estimate: 8h
+  - Note: 流式 StreamBuffer 合并、RequestID 幂等、IPermissionGate 注入
 
 - [ ] **T16**: 实现 `prompt/loader.go`（AGENTS.md）
   - L4: L4-CTX-STATE
@@ -126,7 +127,7 @@
 
 - [ ] **T19**: 集成测试 `tests/integration/context_gateway_flow_test.go`
   - L4: L4-CTX-STATE
-  - L5: L5-CTX-05, L5-CTX-09
+  - L5: L5-CTX-05, L5-CTX-09, L5-CTX-11
   - Estimate: 4h
 
 - [ ] **T20**: 验收测试 `tests/acceptance/p0/ctx_compression_test.go`
@@ -144,6 +145,32 @@
 
 ---
 
+## Milestone 7: L1-L2 集成契约
+
+- [ ] **T23**: 实现 `IPermissionGate` + `PermissionGateAdapter`（gateway 适配器）
+  - L4: L4-CTX-PEV, L4-COMM-PERM
+  - L5: L5-CTX-11
+  - Estimate: 4h
+  - Note: Gateway `tool_call` handler 改为仅展示，移除权限阻塞
+
+- [ ] **T24**: Gateway 实现 `Stopper` + `activeProcesses` 生命周期
+  - L4: L4-COMM-GW, L4-COMM-CMD
+  - L5: L5-CTX-09（Process cancellation）
+  - Estimate: 3h
+  - Note: `/stop` → context.Cancel；RouteInbound 创建 WithCancel
+
+- [ ] **T25**: Gateway EngineEvent 消费对齐（is_complete / ToolInput / complete metadata）
+  - L4: L4-CTX-STATE, L4-COMM-GW
+  - L5: L5-CTX-09
+  - Estimate: 2h
+
+- [ ] **T26**: 实现 `IToolRegistry` 最小内置集（V1 stub）
+  - L4: L4-CTX-PEV
+  - L5: L5-CTX-06
+  - Estimate: 2h
+
+---
+
 ## 任务统计
 
 | Milestone | 任务数 | 预估 |
@@ -154,7 +181,8 @@
 | M4 PEV | 4 | 18h |
 | M5 集成 | 4 | 17h |
 | M6 测试 | 4 | 10h |
-| **合计** | **22** | **~86h** |
+| M7 L1-L2 | 4 | 11h |
+| **合计** | **26** | **~97h** |
 
 ---
 

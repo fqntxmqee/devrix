@@ -64,11 +64,19 @@
 
 **Out of Scope:** 实现、LLM 多模型适配、Evolution 层
 
+## Resolved Decisions
+
+| # | 问题 | 决议 |
+|---|------|------|
+| 1 | Token 计数 | V1 内置 `cl100k_base`；V2 与 LLM Gateway 统一 |
+| 2 | System Prompt | `AGENTS.md` > `.devrix/AGENTS.md` > fallback |
+| 3 | 权限握手 | `IPermissionGate` 注入 L2；Gateway `tool_call` 仅展示 |
+| 4 | verify_mode | V1 默认 `basic` |
+
 ## Open Questions
 
-1. Token 计数使用本地 tiktoken 还是 LLM Gateway 统一提供？
-2. System Prompt 来源：项目 `AGENTS.md` / `.devrix/` 配置 / 内置默认？
-3. PEV Verify 阶段默认验证命令集（test / lint / build）是否可配置？
+1. 快照是否加密（V1 明文，V2 可选 AES）？
+2. 压缩是否异步（V1 同步，V2 后台）？
 
 ## Documentation Deliverables
 
@@ -82,7 +90,8 @@
 ## Success Criteria (S3 准出)
 
 - [x] `docs/context-engine-design.md` 按六段式框架完整
-- [ ] proposal / design / specs / tasks 四件套完整
-- [ ] 每个 L4 能力至少 1 个 L5 测试点
-- [ ] 与通信层 `IContextEngine` 契约对齐
-- [ ] V1/V2/V3 分期明确
+- [x] proposal / design / specs / tasks 四件套完整
+- [x] 每个 L4 能力至少 1 个 L5 测试点（含 L5-CTX-11）
+- [x] 与通信层 `IContextEngine` 契约对齐（含 L1-L2 集成 §3.4）
+- [x] V1/V2/V3 分期明确
+- [x] 开放问题 #1-#4 已决议
