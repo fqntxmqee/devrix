@@ -48,7 +48,7 @@ func main() {
 		obs = observability.NewNoOp()
 	}
 
-	commCfg, _, _, _, err := config.LoadConfig(configFile)
+	commCfg, _, _, ctxCfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -62,7 +62,7 @@ func main() {
 
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
-	contextEngine := selectContextEngine(os.Getenv("DEVRIX_ENGINE"))
+	contextEngine := selectContextEngine(os.Getenv("DEVRIX_ENGINE"), permissionMgr, ctxCfg)
 
 	feishuCfg := &adapters.FeishuConfig{
 		AppID:         userCfg.IM.Feishu.AppID,
@@ -133,10 +133,19 @@ func main() {
 	_ = obs.Shutdown(context.Background())
 }
 
-func selectContextEngine(name string) gateway.IContextEngine {
+func selectContextEngine(name string, permMgr *gateway.PermissionManager, ctxCfg *config.ContextEngineConfig) gateway.IContextEngine {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "stub", "echo":
 		return gateway.NewStubContextEngine()
+	case "context", "ctx":
+		return contextengine.NewContextEngine(contextengine.EngineDeps{
+			LLM:        &mockctx.LLMGateway{},
+			Tools:      &mockctx.ToolRunner{},
+			ToolsReg:   registry.NewBuiltinRegistry(),
+			Permission: gateway.NewPermissionGateAdapter(permMgr),
+			Observer:   contextengine.NoOpObserver{},
+			Config:     ctxCfg,
+		})
 	default:
 		return gateway.NewFourFlowEngine()
 	}
