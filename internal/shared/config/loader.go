@@ -24,7 +24,8 @@ type ConfigFile struct {
 	Feishu      FeishuFileConfig `yaml:"feishu"`
 	Instance    InstanceConfig    `yaml:"instance"`
 	Logging     LoggingConfig     `yaml:"logging"`
-	Metrics     MetricsConfig     `yaml:"metrics"`
+	Metrics        MetricsConfig        `yaml:"metrics"`
+	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
 }
 
 // AppConfig 应用配置
@@ -99,7 +100,7 @@ func LoadConfigFile(path string) (*ConfigFile, error) {
 }
 
 // LoadConfig loads configuration with fallback to defaults
-func LoadConfig(path string) (*CommunicationConfig, *types.AuthConfig, *RateLimitConfig, error) {
+func LoadConfig(path string) (*CommunicationConfig, *types.AuthConfig, *RateLimitConfig, *ContextEngineConfig, error) {
 	// Try to load from file
 	var fileCfg *ConfigFile
 	if path != "" {
@@ -115,8 +116,44 @@ func LoadConfig(path string) (*CommunicationConfig, *types.AuthConfig, *RateLimi
 	commCfg := buildCommunicationConfig(fileCfg)
 	authCfg := buildAuthConfig(fileCfg)
 	rateCfg := buildRateLimitConfig(fileCfg)
+	ctxCfg := buildContextEngineConfig(fileCfg)
 
-	return commCfg, authCfg, rateCfg, nil
+	return commCfg, authCfg, rateCfg, ctxCfg, nil
+}
+
+func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
+	cfg := DefaultContextEngineConfig()
+	if fileCfg == nil {
+		return cfg
+	}
+	f := fileCfg.ContextEngine
+	if f.MaxContextTokens != 0 {
+		cfg.MaxContextTokens = f.MaxContextTokens
+	}
+	if f.ReservedOutput != 0 {
+		cfg.ReservedOutput = f.ReservedOutput
+	}
+	if f.ToolResultBudget != 0 {
+		cfg.ToolResultBudget = f.ToolResultBudget
+	}
+	cfg.CompressionEnabled = f.CompressionEnabled || cfg.CompressionEnabled
+	if f.PEV.MaxIterations != 0 {
+		cfg.PEV.MaxIterations = f.PEV.MaxIterations
+	}
+	if f.PEV.VerifyMode != "" {
+		cfg.PEV.VerifyMode = f.PEV.VerifyMode
+	}
+	if f.Snapshot.BackupDir != "" {
+		cfg.Snapshot.BackupDir = f.Snapshot.BackupDir
+	}
+	cfg.Snapshot.Enabled = f.Snapshot.Enabled || cfg.Snapshot.Enabled
+	if len(f.SystemPrompt.Sources) > 0 {
+		cfg.SystemPrompt.Sources = f.SystemPrompt.Sources
+	}
+	if f.SystemPrompt.Fallback != "" {
+		cfg.SystemPrompt.Fallback = f.SystemPrompt.Fallback
+	}
+	return cfg
 }
 
 // FindConfigFile looks for config file in standard locations

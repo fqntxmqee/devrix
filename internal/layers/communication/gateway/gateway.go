@@ -46,8 +46,9 @@ type CommunicationGateway struct {
 	config       *config.CommunicationConfig
 	obsBridge    *observability.Bridge
 
-	mu      sync.RWMutex
-	sessions map[string]*types.Session
+	mu              sync.RWMutex
+	sessions        map[string]*types.Session
+	activeProcesses map[string]context.CancelFunc
 }
 
 // NewCommunicationGateway creates a new CommunicationGateway
@@ -64,9 +65,36 @@ func NewCommunicationGateway(
 		contextEngine: contextEngine,
 		permissionMgr: permissionMgr,
 		config:       cfg,
-		sessions:    make(map[string]*types.Session),
+		sessions:        make(map[string]*types.Session),
+		activeProcesses: make(map[string]context.CancelFunc),
 	}
 	return gw
+}
+
+// Stop implements commands.Stopper — cancels the active context engine Process.
+func (g *CommunicationGateway) Stop(sessionID string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if cancel, ok := g.activeProcesses[sessionID]; ok {
+		cancel()
+		delete(g.activeProcesses, sessionID)
+	}
+	return nil
+}
+
+func (g *CommunicationGateway) registerProcess(sessionID string, cancel context.CancelFunc) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if prev, ok := g.activeProcesses[sessionID]; ok {
+		prev()
+	}
+	g.activeProcesses[sessionID] = cancel
+}
+
+func (g *CommunicationGateway) unregisterProcess(sessionID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.activeProcesses, sessionID)
 }
 
 // SetObservability wires tracing/metrics into the gateway.
@@ -143,15 +171,22 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 	// Update session
 	session.LastMessageAt = time.Now()
+	session.RequestID = msg.MessageID
 	if err := g.sessionStore.Update(session); err != nil {
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
 	}
 
+	processCtx, cancel := context.WithCancel(ctx)
+	g.registerProcess(session.SessionID, cancel)
+
 	// Process message through context engine
-	eventChan := g.contextEngine.Process(ctx, session, msg.Content)
+	eventChan := g.contextEngine.Process(processCtx, session, msg.Content)
 
 	// Handle events from context engine
-	go g.handleEngineEvents(ctx, session, eventChan)
+	go func() {
+		g.handleEngineEvents(processCtx, session, eventChan)
+		g.unregisterProcess(session.SessionID)
+	}()
 
 	return nil
 }
@@ -223,29 +258,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			},
 		}
 		g.eventHandler.OnMessage(outMsg)
-
-		// Check if auto-approved (for testing)
-		if event.Metadata != nil && event.Metadata["auto_approved"] == "true" {
-			// Skip permission request for testing
-			break
-		}
-
-		// Request permission
-		riskLevel := parseRiskLevel(event.Metadata["risk_level"])
-
-		approved := g.permissionMgr.Request(ctx, session.SessionID, toolName, event.Metadata["input"], riskLevel)
-		if !approved {
-			outMsg := &types.OutboundMessage{
-				MessageID:  generateMessageID(),
-				SessionID: session.SessionID,
-				Content:   fmt.Sprintf("❌ Permission denied for tool: %s", toolName),
-				IsComplete: true,
-				Role:      types.MessageRoleAssistant,
-				Metadata:  map[string]string{"event_type": "permission_denied"},
-			}
-			g.eventHandler.OnMessage(outMsg)
-			return
-		}
+		// Permission handled in L2 via IPermissionGate; Gateway display only.
 
 	case "tool_result":
 		session.SetState(types.SessionStateToolExecuting)

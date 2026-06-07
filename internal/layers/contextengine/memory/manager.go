@@ -1,0 +1,111 @@
+package memory
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/types"
+)
+
+// Manager manages in-memory session contexts and persistence.
+type Manager struct {
+	mu      sync.RWMutex
+	contexts map[string]*types.SessionContext
+	store   *snapshot.Store
+	cfg     *config.ContextEngineConfig
+}
+
+// NewManager creates a memory manager.
+func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store) *Manager {
+	return &Manager{
+		contexts: make(map[string]*types.SessionContext),
+		store:    store,
+		cfg:      cfg,
+	}
+}
+
+// LoadOrInit loads session context from snapshot or initializes fresh.
+func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*types.SessionContext, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if sc, ok := m.contexts[session.SessionID]; ok {
+		return sc, nil
+	}
+
+	var sc *types.SessionContext
+	var err error
+	if len(session.ContextSnapshot) > 0 {
+		sc, err = m.store.Deserialize(session.ContextSnapshot)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		max, reserved, toolResult, target := m.cfg.ToTokenBudget()
+		sc = &types.SessionContext{
+			SessionID:    session.SessionID,
+			WorkDir:      session.WorkDir,
+			Model:        session.Model,
+			Messages:     []types.Message{},
+			TokenBudget: types.TokenBudget{
+				MaxContextTokens:  max,
+				ReservedOutput:    reserved,
+				ToolResultBudget:  toolResult,
+				CompressionTarget: target,
+			},
+			PEVState:     types.DefaultPEVState(m.cfg.PEV.MaxIterations),
+			SystemPrompt: systemPrompt,
+			UpdatedAt:    time.Now(),
+		}
+	}
+	m.contexts[session.SessionID] = sc
+	return sc, nil
+}
+
+// AppendUserMessage appends a user message with idempotency on RequestID.
+func (m *Manager) AppendUserMessage(sc *types.SessionContext, requestID, content string) bool {
+	if requestID != "" && requestID == sc.LastRequestID {
+		return false
+	}
+	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, types.MessageRoleUser, content)
+	sc.Messages = append(sc.Messages, *msg)
+	sc.LastRequestID = requestID
+	sc.UpdatedAt = time.Now()
+	return true
+}
+
+// AppendMessage appends any message role.
+func (m *Manager) AppendMessage(sc *types.SessionContext, role types.MessageRole, content string) {
+	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, role, content)
+	sc.Messages = append(sc.Messages, *msg)
+	sc.UpdatedAt = time.Now()
+}
+
+// SetCompressedView updates the LLM-facing view.
+func (m *Manager) SetCompressedView(sc *types.SessionContext, view []types.Message) {
+	sc.CompressedView = view
+	sc.UpdatedAt = time.Now()
+}
+
+// PersistSnapshot serializes and returns snapshot bytes.
+func (m *Manager) PersistSnapshot(sc *types.SessionContext) ([]byte, error) {
+	data, err := m.store.Serialize(sc)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.store.WriteBackup(sc.SessionID, data); err != nil {
+		return data, fmt.Errorf("backup write: %w", err)
+	}
+	return data, nil
+}
+
+// Get returns cached context.
+func (m *Manager) Get(sessionID string) (*types.SessionContext, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	sc, ok := m.contexts[sessionID]
+	return sc, ok
+}

@@ -35,7 +35,7 @@ func TestSmoke_ProjectConfigFileExists(t *testing.T) {
 		t.Fatalf("expected devrix.yaml at repo root: %v", err)
 	}
 
-	commCfg, authCfg, _, err := config.LoadConfig(configPath)
+	commCfg, authCfg, _, _, err := config.LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}

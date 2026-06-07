@@ -11,6 +11,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -45,7 +48,7 @@ func main() {
 		obs = observability.NewNoOp()
 	}
 
-	commCfg, _, _, err := config.LoadConfig(configFile)
+	commCfg, _, _, _, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
