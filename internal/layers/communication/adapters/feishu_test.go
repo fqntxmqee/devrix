@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 
@@ -415,19 +414,19 @@ func equalStringSlices(a, b []string) bool {
 
 // TestFeishuAdapter_SendMessage_WithMock tests SendMessage using mock FeishuAPI
 func TestFeishuAdapter_SendMessage_WithMock(t *testing.T) {
-	mockMsgAPI := &MockMessageAPI{}
+	mockMsgAPI := &mockMessageAPI{}
 
 	var createCalled bool
-	mockMsgAPI.CreateFunc = func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
+	mockMsgAPI.createFunc = func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
 		createCalled = true
 		t.Logf("CreateFunc called - mock is working")
 		return &larkim.CreateMessageResp{}, nil
 	}
 
-	mockImAPI := &MockImAPI{MessageAPI: mockMsgAPI}
-	mockAPI := &MockFeishuAPI{ImAPI: mockImAPI}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
 
-	mockGW := &gateway.MockGatewayAPI{}
+	mockGW := &mockGatewayAPI{}
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -445,7 +444,7 @@ func TestFeishuAdapter_SendMessage_WithMock(t *testing.T) {
 
 // TestFeishuAdapter_BuildSessionKey_WithGateway tests buildSessionKey with mock gateway
 func TestFeishuAdapter_BuildSessionKey_WithGateway(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
+	mockGW := &mockGatewayAPI{}
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -460,10 +459,10 @@ func TestFeishuAdapter_BuildSessionKey_WithGateway(t *testing.T) {
 
 // TestFeishuAdapter_HealthCheck_WithMock tests HealthCheck using mock FeishuAPI
 func TestFeishuAdapter_HealthCheck_WithMock(t *testing.T) {
-	mockAPI := NewMockFeishuAPI()
+	mockAPI := newMockFeishuAPI()
 
 	var called bool
-	mockAPI.GetFunc = func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	mockAPI.getFunc = func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
 		called = true
 		if path != "/open-apis/bot/v3/info" {
 			t.Errorf("path = %s, want /open-apis/bot/v3/info", path)
@@ -489,9 +488,9 @@ func TestFeishuAdapter_HealthCheck_WithMock(t *testing.T) {
 
 // TestFeishuAdapter_HealthCheck_Error_WithMock tests HealthCheck error handling with mock
 func TestFeishuAdapter_HealthCheck_Error_WithMock(t *testing.T) {
-	mockAPI := NewMockFeishuAPI()
+	mockAPI := newMockFeishuAPI()
 
-	mockAPI.GetFunc = func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	mockAPI.getFunc = func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
 		return &larkcore.ApiResp{
 			RawBody: []byte(`{"code":1,"msg":"error"}`),
 		}, nil
@@ -510,18 +509,18 @@ func TestFeishuAdapter_HealthCheck_Error_WithMock(t *testing.T) {
 
 // TestFeishuAdapter_OnMessage_WithMock tests OnMessage callback using mock
 func TestFeishuAdapter_OnMessage_WithMock(t *testing.T) {
-	mockMsgAPI := &MockMessageAPI{}
+	mockMsgAPI := &mockMessageAPI{}
 
 	var createCalled bool
-	mockMsgAPI.CreateFunc = func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
+	mockMsgAPI.createFunc = func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
 		createCalled = true
 		t.Logf("OnMessage: CreateFunc called - mock is working")
 		return &larkim.CreateMessageResp{}, nil
 	}
 
-	mockImAPI := &MockImAPI{MessageAPI: mockMsgAPI}
-	mockAPI := &MockFeishuAPI{ImAPI: mockImAPI}
-	mockGW := &gateway.MockGatewayAPI{}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+	mockGW := &mockGatewayAPI{}
 
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
@@ -543,7 +542,7 @@ func TestFeishuAdapter_OnMessage_WithMock(t *testing.T) {
 
 // TestFeishuAdapter_OnPermissionRequest tests permission request callback
 func TestFeishuAdapter_OnPermissionRequest(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
+	mockGW := &mockGatewayAPI{}
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -562,7 +561,7 @@ func TestFeishuAdapter_OnPermissionRequest(t *testing.T) {
 
 // TestFeishuAdapter_OnError tests error callback
 func TestFeishuAdapter_OnError(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
+	mockGW := &mockGatewayAPI{}
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -574,7 +573,7 @@ func TestFeishuAdapter_OnError(t *testing.T) {
 
 // TestFeishuAdapter_OnStatus tests status callback
 func TestFeishuAdapter_OnStatus(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
+	mockGW := &mockGatewayAPI{}
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -586,8 +585,8 @@ func TestFeishuAdapter_OnStatus(t *testing.T) {
 
 // TestFeishuAdapter_DuplicateMessage tests message deduplication
 func TestFeishuAdapter_DuplicateMessage(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
-	mockAPI := NewMockFeishuAPI()
+	mockGW := &mockGatewayAPI{}
+	mockAPI := newMockFeishuAPI()
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -614,8 +613,8 @@ func TestFeishuAdapter_DuplicateMessage(t *testing.T) {
 
 // TestFeishuAdapter_Start_AlreadyRunning tests Start when already running
 func TestFeishuAdapter_Start_AlreadyRunning(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
-	mockAPI := NewMockFeishuAPI()
+	mockGW := &mockGatewayAPI{}
+	mockAPI := newMockFeishuAPI()
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -634,8 +633,8 @@ func TestFeishuAdapter_Start_AlreadyRunning(t *testing.T) {
 
 // TestFeishuAdapter_Stop_NotRunning tests Stop when not running
 func TestFeishuAdapter_Stop_NotRunning(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
-	mockAPI := NewMockFeishuAPI()
+	mockGW := &mockGatewayAPI{}
+	mockAPI := newMockFeishuAPI()
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
@@ -655,13 +654,13 @@ func ptrString(s string) *string {
 
 // TestFeishuAdapter_GetOrCreateSession_WithMock tests session creation via mock gateway
 func TestFeishuAdapter_GetOrCreateSession_WithMock(t *testing.T) {
-	mockGW := &gateway.MockGatewayAPI{}
-	mockAPI := NewMockFeishuAPI()
+	mockGW := &mockGatewayAPI{}
+	mockAPI := newMockFeishuAPI()
 	cfg := &config.CommunicationConfig{}
 	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
 
 	var createSessionCalled bool
-	mockGW.CreateSessionFunc = func(chatID, workDir string) (*types.Session, error) {
+	mockGW.createSessionFunc = func(chatID, workDir string) (*types.Session, error) {
 		createSessionCalled = true
 		if chatID != "feishu_oc_123456_ou_654321" {
 			t.Errorf("chatID = %s, want feishu_oc_123456_ou_654321", chatID)

@@ -129,10 +129,10 @@ func TestCommunicationGateway_ExpireSession(t *testing.T) {
 		t.Fatalf("failed to expire session: %v", err)
 	}
 
-	// Verify session is expired in store
+	// ExpireSession removes the session from persistent store
 	expired, _ := store.Get(session.SessionID)
-	if expired.State != types.SessionStateFailed {
-		t.Errorf("expected state 'failed', got '%s'", expired.State)
+	if expired != nil {
+		t.Errorf("expected session to be removed from store, got session %s", expired.SessionID)
 	}
 }
 

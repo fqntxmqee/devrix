@@ -229,7 +229,7 @@ const (
 | Message | ✅ | ✅ | ✅ |
 | PermissionRequest | ✅ | ✅ | ✅ |
 | ShortId (5位) | ❌ requestId 直接使用 | ✅ | ✅ |
-| Milestone | ❌ | ❌ | ✅ |
+| Milestone | ✅ DAG + 进度追踪 | ✅ | ✅ 完整 |
 
 ---
 
@@ -257,7 +257,7 @@ const (
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  ③ 任务流（Task Flow）— 长期任务进度追踪                             │   │
 │  │     Milestone DAG → 进度更新 → 状态同步                               │   │
-│  │     ⚠️ V1/V2 暂不实现，V3 引入                                     │   │
+│  │     ✅ V1 已实现 Milestone DAG + 进度追踪                          │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -359,26 +359,26 @@ const (
 │                                                                             │
 │  V2/V3 扩展事件:                                                          │
 │    - tool.called      → 工具开始调用（V2）                                 │
-│    - milestone.created → 任务创建（V3）                                     │
-│    - milestone.updated → 进度更新（V3）                                     │
+│    - milestone.created → 任务创建（V1）                                     │
+│    - milestone.updated → 进度更新（V1）                                     │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.4 ③ 任务流（V3 实现）
+### 4.4 ③ 任务流（V1 实现）
 
-> **V1/V2 暂不实现**：V1/V2 采用简化任务状态。
+> **V1 已实现**：Milestone DAG + 进度追踪。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              任务流（V3 规划）                              │
+│                              任务流（V1 实现）                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  ⚠️ V1/V2 采用简化模式:                                                   │
-│     - 仅有全局任务状态：idle / thinking / streaming / waiting_permission     │
-│     - 无 Milestone DAG，无进度百分比                                         │
+│  ✅ V1 实现:                                                              │
+│     - Milestone DAG 支持依赖关系                                            │
+│     - 进度百分比追踪 (0.0 - 1.0)                                           │
+│     - 状态机：pending → in_progress → completed/failed                     │
 │                                                                             │
-│  V3 实现目标:                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                                                                      │   │
 │  │  ┌─────────────┐                                                    │   │
@@ -490,8 +490,8 @@ const (
 | `tool.called` | ❌ | ❌ | ✅ |
 | `connection.lost` | ❌ | ✅ | ✅ |
 | `connection.restored` | ❌ | ✅ | ✅ |
-| `milestone.created` | ❌ | ❌ | ✅ |
-| `milestone.updated` | ❌ | ❌ | ✅ |
+| `milestone.created` | ✅ | ✅ | ✅ |
+| `milestone.updated` | ✅ | ✅ | ✅ |
 
 ---
 
@@ -782,6 +782,8 @@ func (l *RateLimiter) ResetAll()
 | 3 | 心跳 + 重连 + 消息确认 | ✅ 完成 | 断连自动恢复 |
 | 4 | 权限管理 + 超时拒绝 | ✅ 完成 | 60s 超时生效 |
 | 5 | 信息流（帮助/错误/状态） | ✅ 完成 | /help 可用 |
+| 10 | Milestone 任务流 | ✅ 完成 | DAG + 进度追踪 |
+| 13 | 限流设计 | ✅ 完成 | Token Bucket 实现 |
 
 ### V2（可靠性增强）- 🔄 进行中
 
@@ -792,7 +794,7 @@ func (l *RateLimiter) ResetAll()
 | 8 | 领域事件完整定义 | 🔄 进行中 | 11 个事件完整 |
 | 9 | 飞书 Adapter | ✅ 完成 | 飞书 WebSocket 集成 |
 
-### V3（功能完善）- 🔄 进行中
+### V3（功能完善）- ✅ 已完成（部分）
 
 | 阶段 | 内容 | 状态 | 验收标准 |
 |-----|------|--------|---------|
@@ -801,6 +803,8 @@ func (l *RateLimiter) ResetAll()
 | 12 | 钉钉 Adapter | ❌ 未开始 | — |
 | 13 | 限流设计 | ✅ 完成 | Token Bucket 实现 |
 | 14 | 多实例部署 + 监控 | 🔄 进行中 | Prometheus 接入 |
+
+> **注意**：Milestone 模块已实现，但 DAG 实例**不可跨 Service 共享**，每个 MilestoneService 应拥有独立的 DAG 实例以避免数据竞争。
 
 ---
 
@@ -819,7 +823,7 @@ func (l *RateLimiter) ResetAll()
 | **四流设计** ||||||
 | 指令流 | ✅ | ✅ | ✅ | ✅ | 用户命令 |
 | 事件流 | ✅ | ✅ | ✅ | ✅ | 状态推送 |
-| 任务流 | ✅ | ❌ | ❌ | ✅ | Milestone DAG |
+| 任务流 | ✅ | ✅ | ✅ | ✅ | Milestone DAG |
 | 信息流 | ✅ | ✅ | ✅ | ✅ | 帮助/错误 |
 | **领域事件** ||||||
 | session.created | ✅ | ✅ | ✅ | ✅ | |
@@ -832,8 +836,8 @@ func (l *RateLimiter) ResetAll()
 | tool.called | ✅ | ❌ | ❌ | ✅ | |
 | connection.lost | ✅ | ❌ | ✅ | ✅ | |
 | connection.restored | ✅ | ❌ | ✅ | ✅ | |
-| milestone.created | ✅ | ❌ | ❌ | ✅ | |
-| milestone.updated | ✅ | ❌ | ❌ | ✅ | |
+| milestone.created | ✅ | ✅ | ✅ | ✅ | |
+| milestone.updated | ✅ | ✅ | ✅ | ✅ | |
 | **接口设计** ||||||
 | Adapter 注册 | ✅ | ✅ | ✅ | ✅ | |
 | IM 消息收发 | ✅ | ✅ | ✅ | ✅ | |

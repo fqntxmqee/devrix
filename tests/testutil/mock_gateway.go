@@ -1,27 +1,22 @@
-package gateway
+package testutil
 
 import (
 	"context"
 
+	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// MockGatewayAPI is a mock implementation of GatewayAPI for testing
+// MockGatewayAPI is a test double for gateway.GatewayAPI.
 type MockGatewayAPI struct {
-	// GetSessionFunc mocks the GetSession method
-	GetSessionFunc func(sessionID string) (*types.Session, error)
-	// CreateSessionFunc mocks the CreateSession method
+	GetSessionFunc    func(sessionID string) (*types.Session, error)
 	CreateSessionFunc func(chatID, workDir string) (*types.Session, error)
-	// RouteInboundFunc mocks the RouteInbound method
-	RouteInboundFunc func(ctx context.Context, msg *types.InboundMessage) error
-	// RouteOutboundFunc mocks the RouteOutbound method
+	RouteInboundFunc  func(ctx context.Context, msg *types.InboundMessage) error
 	RouteOutboundFunc func(msg *types.OutboundMessage) error
 }
 
-// Ensure MockGatewayAPI implements GatewayAPI
-var _ GatewayAPI = (*MockGatewayAPI)(nil)
+var _ gateway.GatewayAPI = (*MockGatewayAPI)(nil)
 
-// GetSession implements GatewayAPI
 func (m *MockGatewayAPI) GetSession(sessionID string) (*types.Session, error) {
 	if m.GetSessionFunc != nil {
 		return m.GetSessionFunc(sessionID)
@@ -29,7 +24,6 @@ func (m *MockGatewayAPI) GetSession(sessionID string) (*types.Session, error) {
 	return nil, nil
 }
 
-// CreateSession implements GatewayAPI
 func (m *MockGatewayAPI) CreateSession(chatID, workDir string) (*types.Session, error) {
 	if m.CreateSessionFunc != nil {
 		return m.CreateSessionFunc(chatID, workDir)
@@ -37,7 +31,6 @@ func (m *MockGatewayAPI) CreateSession(chatID, workDir string) (*types.Session, 
 	return nil, nil
 }
 
-// RouteInbound implements GatewayAPI
 func (m *MockGatewayAPI) RouteInbound(ctx context.Context, msg *types.InboundMessage) error {
 	if m.RouteInboundFunc != nil {
 		return m.RouteInboundFunc(ctx, msg)
@@ -45,7 +38,6 @@ func (m *MockGatewayAPI) RouteInbound(ctx context.Context, msg *types.InboundMes
 	return nil
 }
 
-// RouteOutbound implements GatewayAPI
 func (m *MockGatewayAPI) RouteOutbound(msg *types.OutboundMessage) error {
 	if m.RouteOutboundFunc != nil {
 		return m.RouteOutboundFunc(msg)

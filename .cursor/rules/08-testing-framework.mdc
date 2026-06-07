@@ -1,0 +1,81 @@
+---
+description: Devrix 测试框架强制规约 — 测试放置、L5 追溯、执行门禁
+globs: devrix/**
+alwaysApply: false
+---
+
+# Devrix 测试框架规约
+
+> SoT: `devrix/openspec/specs/testing-framework/spec.md`
+> L5 注册表: `devrix/openspec/l5-registry.md`
+
+本规则适用于 Devrix 项目所有测试相关开发与代码变更。**违反下列 MUST 规则的 PR 不得合入。**
+
+## 测试金字塔（MUST）
+
+| 层级 | 位置 | Build Tag | 执行命令 |
+|------|------|-----------|----------|
+| 单元测试 | `internal/**/*_test.go` | 无 | `./scripts/test-unit.sh` |
+| 集成测试 | `tests/integration/` | `integration` | `./scripts/test-integration.sh` |
+| E2E 冒烟 | `tests/e2e/` | `smoke` | `./scripts/test-e2e.sh` |
+| L5 验收 | `tests/acceptance/p0\|p1\|p2/` | `acceptance` | `./scripts/test-acceptance.sh` |
+
+- MUST NOT 在 `internal/` 下新增 `integration_test.go` 或跨包流程测试
+- MUST NOT 让超过 1s 的等待测试进入默认单元测试路径
+- 新增 build tag 必须先更新 `openspec/specs/testing-framework/spec.md`
+
+## Mock 放置（MUST NOT 违反）
+
+| 场景 | 放置位置 |
+|------|----------|
+| 同包测未导出符号 | `{pkg}/*_mock_test.go`，`package` 与源码相同 |
+| 跨包集成/验收共享 | `tests/testutil/` |
+| **禁止** | `internal/**/mock_*.go`（非 `_test.go`） |
+
+- `tests/testutil/` MUST NOT 被 `internal/` 同包 `*_test.go` import（防循环依赖）
+
+## L5 追溯（MUST）
+
+1. 新增/变更 L4 能力前，先在 `openspec/l5-registry.md` 登记或复用 L5 ID
+2. 覆盖 L5 的测试函数上方 MUST 标注：`// Covers: L5-{LAYER}-{NN}`
+3. P0 L5 MUST 有 `tests/acceptance/p0/` 测试或 registry 中标注 PLANNED + 排期
+4. `tasks.md` 每个任务 MUST 标注关联 L5 ID
+
+## 命名约定
+
+```
+单元:  Test{Type}_{Method}_{Condition}
+集成:  TestIntegration_{Flow}
+验收:  TestL5_{DOMAIN}_{NN}_{Behavior}
+```
+
+## 提交前检查清单
+
+- [ ] `./scripts/test-unit.sh` 通过
+- [ ] 受影响 L5 测试通过（`./scripts/test-acceptance.sh` 或对应集成脚本）
+- [ ] 新 L5 已登记到 `openspec/l5-registry.md`
+- [ ] 无 `internal/**/mock_*.go` 新增
+- [ ] S5 阶段执行 `./scripts/gen-acceptance-report.sh --change {slug}`
+
+## S5 验收报告
+
+```bash
+./scripts/gen-acceptance-report.sh --change devrix-v3
+# 输出: openspec/changes/devrix-v3/acceptance-report.md
+# exit 0 = ACCEPTED, exit 1 = REJECTED
+```
+
+可选参数：`--priority P0,P1` `--env ci` `--executor $USER` `--skip-tests`
+
+## 新增六层测试时
+
+| 层 | L5 前缀 | 单元测试目录 |
+|----|---------|-------------|
+| Communication | `L5-COMM-*` | `internal/layers/communication/` |
+| Context Engine | `L5-CTX-*` | `internal/layers/contextengine/` |
+| LLM Gateway | `L5-LLM-*` | `internal/layers/llmgateway/` |
+| Multi-Agent | `L5-AGENT-*` | `internal/layers/multiagent/` |
+| Observability | `L5-OBS-*` | `internal/layers/observability/` |
+| Evolution | `L5-EVO-*` | `internal/layers/evolution/` |
+
+跨包测试统一放 `tests/integration/` 或 `tests/acceptance/`，不得每层自建 `tests/` 子目录。

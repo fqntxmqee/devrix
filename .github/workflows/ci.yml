@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master, feat/**]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Verify module
+        run: go mod verify
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Unit tests
+        run: ./scripts/test-unit.sh
+
+  gate:
+    name: integration / e2e / acceptance
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Integration tests
+        run: ./scripts/test-integration.sh
+
+      - name: E2E smoke tests
+        run: ./scripts/test-e2e.sh
+
+      - name: Acceptance tests (P0)
+        run: ./scripts/test-acceptance.sh
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: gate
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Coverage report (internal)
+        run: |
+          go test ./internal/... -coverprofile=coverage.out -covermode=atomic
+          total="$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($3, 1, length($3)-1)}')"
+          echo "Total coverage: ${total}%"
+          echo "::notice::Coverage target is 80% (project.md). Raise CI gate when baseline improves."
+          # Gate threshold: enable strict 80% check once baseline >= 50%
+          min=20
+          awk -v c="${total}" -v m="${min}" 'BEGIN { exit !(c+0 >= m+0) }' || {
+            echo "::error::Coverage ${total}% is below minimum ${min}%"
+            exit 1
+          }
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out

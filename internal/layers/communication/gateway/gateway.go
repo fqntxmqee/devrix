@@ -276,6 +276,12 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 	delete(g.sessions, sessionID)
 	g.mu.Unlock()
 
+	// Also delete from persistent store to prevent storage leak
+	if err := g.sessionStore.Delete(sessionID); err != nil {
+		// Log but don't fail - session is already removed from memory
+		// The store implementation may not support delete or already cleaned up
+	}
+
 	return nil
 }
 

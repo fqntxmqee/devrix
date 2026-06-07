@@ -102,8 +102,6 @@ func (p *PermissionManager) shouldAutoApprove(toolName string, riskLevel types.R
 
 // resolveRequest updates the request status (caller must hold mutex)
 func (p *PermissionManager) resolveRequest(request *types.PermissionRequest, approved bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	request.RespondedAt = time.Now()
 	if approved {
 		request.Status = types.PermissionStatusApproved

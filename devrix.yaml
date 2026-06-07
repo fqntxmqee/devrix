@@ -1,0 +1,91 @@
+# Devrix 配置文件
+# 文档: https://github.com/devrix/devrix/docs/config.md
+
+# 应用配置
+app:
+  name: "devrix"
+  version: "2.0.0"
+  mode: "cli"  # cli | server | daemon
+
+# 会话配置
+session:
+  idle_timeout: "30m"
+  storage_dir: "~/.devrix/sessions"
+  max_sessions: 1000
+
+# 认证配置
+auth:
+  secret: "change-me-in-production"
+  token_expiry: "24h"
+  issuer: "devrix"
+
+# 权限配置
+permission:
+  default_timeout: "60s"
+  max_retries: 3
+
+# 连接配置
+connection:
+  heartbeat_interval: "10s"
+  heartbeat_timeout: "60s"
+
+# 限流配置
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  burst_size: 10
+
+# CLI 配置
+cli:
+  welcome_message: |
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                    Devrix v2.0 - 开发大脑                    ║
+    ║            多智能协同开发助手 (Multi-Agent CLI)               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  prompt: "> "
+  ansi:
+    user: "\x1b[34m"
+    assistant: "\x1b[32m"
+    error: "\x1b[31m"
+    warning: "\x1b[33m"
+    reset: "\x1b[0m"
+
+# 命令配置
+commands:
+  prefix: "/"
+  list:
+    - "new"
+    - "stop"
+    - "help"
+
+# 飞书配置
+feishu:
+  enabled: false
+  app_id: ""
+  app_secret: ""
+  bot_name: "Devrix"
+  domain: ""  # 自定义域名，留空使用飞书默认
+  encrypt_key: ""
+  callback_path: "/feishu/webhook"
+  port: "8080"
+  use_webhook: false
+
+# 实例配置（用于集群部署）
+instance:
+  id: ""  # 留空自动生成
+  name: "devrix"
+  address: ""
+  port: 0
+  cluster_enabled: false
+
+# 日志配置
+logging:
+  level: "info"  # debug | info | warn | error
+  format: "json"  # json | text
+  output: "stdout"  # stdout | stderr | file
+
+# Metrics 配置
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"

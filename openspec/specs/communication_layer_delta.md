@@ -177,7 +177,7 @@ Core events for layer coordination.
 | Session idle timeout (30min) | ✅ | ✅ | ✅ |
 | Command Handler (/new, /stop, /help) | ✅ | ✅ | ✅ |
 | ShortId (5-char permission) | ❌ | ✅ | ✅ |
-| Milestone DAG | ❌ | ❌ | ✅ |
+| Milestone DAG | ✅ | ✅ | ✅ |
 | Task Flow (simplified) | ✅ | ✅ | ✅ |
 | Instruction Flow | ✅ | ✅ | ✅ |
 | Event Flow | ✅ | ✅ | ✅ |

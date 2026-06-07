@@ -25,7 +25,7 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | Category | Technology | Version |
 |----------|------------|---------|
 | Language | Go | 1.21+ |
-| Testing | Go testing (builtin) | - |
+| Testing | Go testing + 分层测试框架 | See `specs/testing-framework/spec.md` |
 | Build | go build | - |
 | CLI | cobra / urfave/cli | latest |
 | Logging | slog | builtin |
@@ -68,6 +68,7 @@ User → Communication → Context Engine → LLM Gateway → Multi-Agent → Ob
 4. **Explicit Over Implicit** - No magic, clear dependencies
 5. **Concurrency Safety** - Use channels or mutexes, document ownership
 6. **Minimum Coverage** - 80% test coverage
+7. **L5-Driven Testing** - All L4 changes MUST map to L5 test points (see `l5-registry.md`)
 
 ## Directory Structure
 
@@ -93,9 +94,18 @@ devrix/
 │   └── i18n/                   # Internationalization
 ├── openspec/
 │   ├── project.md               # This file
-│   ├── specs/                   # Delta specs per layer
-│   └── changes/                # Change proposals
-└── tests/                       # Integration tests
+│   ├── l5-registry.md           # L5 测试点注册表（验收锚点）
+│   ├── specs/                   # Source of Truth specs
+│   │   ├── testing-framework/   # 测试框架规范（强制）
+│   │   └── *_layer_delta.md     # 各层 Delta 规格
+│   └── changes/                 # Change proposals
+├── tests/
+│   ├── testutil/                # 跨包 Mock / Fixture
+│   ├── integration/             # //go:build integration
+│   ├── e2e/                     # //go:build smoke
+│   └── acceptance/              # //go:build acceptance (L5 P0/P1/P2)
+└── scripts/
+    └── test-*.sh                # 测试执行门禁
 ```
 
 **Note:** Go project structure follows standard layout:
@@ -117,7 +127,25 @@ devrix/
 | `devrix session new` | New session |
 | `/new`, `/stop`, `/help` | In-session commands |
 
+## Testing Framework
+
+**强制规范**: `openspec/specs/testing-framework/spec.md`
+
+| 阶段 | 命令 | 用途 |
+|------|------|------|
+| 日常开发 | `./scripts/test-unit.sh` | PR 门禁 |
+| 合入前 | `./scripts/test-integration.sh` + `./scripts/test-e2e.sh` | 集成验证 |
+| S5 验收 | `./scripts/test-acceptance.sh` | L5 P0 验收 |
+| 全量 | `./scripts/test-all.sh` | 发布前 |
+| S5 验收报告 | `./scripts/gen-acceptance-report.sh --change {slug}` | 生成 acceptance-report.md |
+
+新增 L4 能力流程：登记 L5 → 编写测试（标注 `// Covers: L5-*`）→ 更新 `l5-registry.md` → 跑关联脚本 → S5 生成验收报告。
+
+CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → coverage 报告）。
+
 ## Related Documents
 
 - Obsidian Vault: `01知识探索/项目/devrix/`
 - Architecture Reference: cc-connect (Go daemon)
+- Testing Framework Spec: `openspec/specs/testing-framework/spec.md`
+- L5 Registry: `openspec/l5-registry.md`

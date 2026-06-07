@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-foundation`
 **Created:** 2026-06-06
-**Status:** Draft
+**Status:** Archived
 
 ---
 
@@ -122,3 +122,50 @@ Communication Layer
 | Token 预算控制不准确 | Medium | High | 充分测试边界情况 |
 | 权限管线超时导致阻塞 | Low | Medium | 60s 超时自动拒绝 |
 | 单进程内存泄漏 | Low | High | Observability 监控 |
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-07
+**Duration:** 1 day (2026-06-06 to 2026-06-07)
+**Outcome:** Partially implemented - Communication Layer complete
+
+### Completed (Phase 1 - Communication Layer)
+- [x] CLI Adapter with ANSI rendering
+- [x] FileSessionStore with idle timeout
+- [x] Communication Gateway (RouteInbound/RouteOutbound)
+- [x] PermissionManager with timeout
+- [x] Command handler (/new, /stop, /help)
+- [x] RateLimiter (Token Bucket)
+- [x] Milestone Service with DAG
+- [x] Feishu Adapter (WebSocket)
+- [x] Interface abstractions for testability (FeishuAPI, GatewayAPI)
+- [x] Unit tests with mock implementations
+
+### Files Modified
+- `internal/layers/communication/` - Complete communication layer implementation
+- `internal/shared/types/` - Shared types (Session, Message, PermissionRequest, Milestone)
+- `openspec/changes/devrix-foundation/specs/communication/design.md` - Updated architecture doc
+
+### Specs Updated
+- `openspec/specs/communication_layer_delta.md` - Milestone DAG moved from V3 to V1
+
+### Test Coverage
+| Module | Coverage |
+|--------|----------|
+| ratelimit | 95.2% |
+| gateway | 55.7% |
+| milestone | 42.4% |
+| adapters/feishu | 23.2% |
+
+### Critical Fixes Applied
+1. escapeJSON - Added `/` escaping
+2. RateLimiter - Fixed integer division bug
+3. Gateway - Added sessionStore.Delete() on expire
+4. PermissionManager - Fixed deadlock in resolveRequest
+
+### Remaining Work
+- Phases 3-9 (Context Engine, LLM Gateway, Multi-Agent, Observability, Evolution)
+- Full test coverage (target 80%)
+- CLI entry point integration

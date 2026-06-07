@@ -666,6 +666,8 @@ func escapeJSON(s string) string {
 			builder.WriteString("\\\"")
 		case '\\':
 			builder.WriteString("\\\\")
+		case '/':
+			builder.WriteString("\\/")
 		case '\n':
 			builder.WriteString("\\n")
 		case '\r':

@@ -1,63 +1,52 @@
-package adapters
+package testutil
 
 import (
 	"context"
+
+	"github.com/devrix/devrix/internal/layers/communication/adapters"
 
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
 
-// MockFeishuAPI is a mock implementation of FeishuAPI for testing
+// MockFeishuAPI is a test double for adapters.FeishuAPI.
 type MockFeishuAPI struct {
-	// GetFunc mocks the Get method
 	GetFunc func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
-
-	// ImAPI mock
-	ImAPI ImAPI
+	ImAPI   adapters.ImAPI
 }
 
-// Ensure MockFeishuAPI implements FeishuAPI
-var _ FeishuAPI = (*MockFeishuAPI)(nil)
+var _ adapters.FeishuAPI = (*MockFeishuAPI)(nil)
 
-// Get implements FeishuAPI
 func (m *MockFeishuAPI) Get(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
 	if m.GetFunc != nil {
 		return m.GetFunc(ctx, path, params, tokenType)
 	}
-	// Default implementation returns empty response
 	return &larkcore.ApiResp{}, nil
 }
 
-// Im implements FeishuAPI
-func (m *MockFeishuAPI) Im() ImAPI {
+func (m *MockFeishuAPI) Im() adapters.ImAPI {
 	return m.ImAPI
 }
 
-// MockImAPI is a mock implementation of ImAPI
+// MockImAPI is a test double for adapters.ImAPI.
 type MockImAPI struct {
-	MessageAPI MessageAPI
+	MessageAPI adapters.MessageAPI
 }
 
-// Ensure MockImAPI implements ImAPI
-var _ ImAPI = (*MockImAPI)(nil)
+var _ adapters.ImAPI = (*MockImAPI)(nil)
 
-// Message implements ImAPI
-func (m *MockImAPI) Message() MessageAPI {
+func (m *MockImAPI) Message() adapters.MessageAPI {
 	return m.MessageAPI
 }
 
-// MockMessageAPI is a mock implementation of MessageAPI
+// MockMessageAPI is a test double for adapters.MessageAPI.
 type MockMessageAPI struct {
-	// CreateFunc mocks the Create method
 	CreateFunc func(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error)
-	// ReplyFunc mocks the Reply method
-	ReplyFunc func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error)
+	ReplyFunc  func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error)
 }
 
-// Ensure MockMessageAPI implements MessageAPI
-var _ MessageAPI = (*MockMessageAPI)(nil)
+var _ adapters.MessageAPI = (*MockMessageAPI)(nil)
 
-// Create implements MessageAPI
 func (m *MockMessageAPI) Create(ctx context.Context, req *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(ctx, req)
@@ -65,7 +54,6 @@ func (m *MockMessageAPI) Create(ctx context.Context, req *larkim.CreateMessageRe
 	return &larkim.CreateMessageResp{}, nil
 }
 
-// Reply implements MessageAPI
 func (m *MockMessageAPI) Reply(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
 	if m.ReplyFunc != nil {
 		return m.ReplyFunc(ctx, req)
@@ -73,7 +61,7 @@ func (m *MockMessageAPI) Reply(ctx context.Context, req *larkim.ReplyMessageReq)
 	return &larkim.ReplyMessageResp{}, nil
 }
 
-// NewMockFeishuAPI creates a MockFeishuAPI with default mock implementations
+// NewMockFeishuAPI returns a MockFeishuAPI with default nested mocks.
 func NewMockFeishuAPI() *MockFeishuAPI {
 	mockMsgAPI := &MockMessageAPI{}
 	mockImAPI := &MockImAPI{MessageAPI: mockMsgAPI}
