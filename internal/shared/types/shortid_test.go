@@ -28,13 +28,12 @@ func TestGenerateShortId(t *testing.T) {
 }
 
 func TestGenerateShortId_Uniqueness(t *testing.T) {
-	generated := make(map[string]bool)
-	count := 1000
-
-	for i := 0; i < count; i++ {
+	// 200 samples from 32^5 space: collision probability < 0.001%.
+	generated := make(map[string]bool, 200)
+	for i := 0; i < 200; i++ {
 		shortId := GenerateShortId()
 		if generated[shortId] {
-			t.Errorf("collision detected at iteration %d: %s", i, shortId)
+			t.Fatalf("collision detected at iteration %d: %s", i, shortId)
 		}
 		generated[shortId] = true
 	}

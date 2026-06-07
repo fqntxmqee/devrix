@@ -1,8 +1,8 @@
 package types
 
 import (
-	"math/rand"
-	"time"
+	"crypto/rand"
+	"math/big"
 )
 
 // ShortIdCharset 是 ShortId 使用的字符集
@@ -12,16 +12,16 @@ const ShortIdCharset = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 const ShortIdLength = 5
 
 // GenerateShortId 生成一个 5 位的短 ID
-// 使用时间戳 + 随机数确保唯一性
 func GenerateShortId() string {
 	b := make([]byte, ShortIdLength)
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// 使用加密强度较低的随机数生成器，对于 ShortId 场景足够
+	charsetLen := big.NewInt(int64(len(ShortIdCharset)))
 	for i := range b {
-		b[i] = ShortIdCharset[r.Intn(len(ShortIdCharset))]
+		n, err := rand.Int(rand.Reader, charsetLen)
+		if err != nil {
+			panic("shortid: crypto/rand failed: " + err.Error())
+		}
+		b[i] = ShortIdCharset[n.Int64()]
 	}
-
 	return string(b)
 }
 
