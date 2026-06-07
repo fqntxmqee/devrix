@@ -30,13 +30,18 @@ func (m *MockFeishuAPI) Im() adapters.ImAPI {
 
 // MockImAPI is a test double for adapters.ImAPI.
 type MockImAPI struct {
-	MessageAPI adapters.MessageAPI
+	MessageAPI         adapters.MessageAPI
+	MessageReactionAPI adapters.MessageReactionAPI
 }
 
 var _ adapters.ImAPI = (*MockImAPI)(nil)
 
 func (m *MockImAPI) Message() adapters.MessageAPI {
 	return m.MessageAPI
+}
+
+func (m *MockImAPI) MessageReaction() adapters.MessageReactionAPI {
+	return m.MessageReactionAPI
 }
 
 // MockMessageAPI is a test double for adapters.MessageAPI.
@@ -61,9 +66,32 @@ func (m *MockMessageAPI) Reply(ctx context.Context, req *larkim.ReplyMessageReq)
 	return &larkim.ReplyMessageResp{}, nil
 }
 
+// MockMessageReactionAPI is a test double for adapters.MessageReactionAPI.
+type MockMessageReactionAPI struct {
+	CreateFunc func(ctx context.Context, req *larkim.CreateMessageReactionReq) (*larkim.CreateMessageReactionResp, error)
+	DeleteFunc func(ctx context.Context, req *larkim.DeleteMessageReactionReq) (*larkim.DeleteMessageReactionResp, error)
+}
+
+var _ adapters.MessageReactionAPI = (*MockMessageReactionAPI)(nil)
+
+func (m *MockMessageReactionAPI) Create(ctx context.Context, req *larkim.CreateMessageReactionReq) (*larkim.CreateMessageReactionResp, error) {
+	if m.CreateFunc != nil {
+		return m.CreateFunc(ctx, req)
+	}
+	return &larkim.CreateMessageReactionResp{}, nil
+}
+
+func (m *MockMessageReactionAPI) Delete(ctx context.Context, req *larkim.DeleteMessageReactionReq) (*larkim.DeleteMessageReactionResp, error) {
+	if m.DeleteFunc != nil {
+		return m.DeleteFunc(ctx, req)
+	}
+	return &larkim.DeleteMessageReactionResp{}, nil
+}
+
 // NewMockFeishuAPI returns a MockFeishuAPI with default nested mocks.
 func NewMockFeishuAPI() *MockFeishuAPI {
 	mockMsgAPI := &MockMessageAPI{}
-	mockImAPI := &MockImAPI{MessageAPI: mockMsgAPI}
+	mockReactionAPI := &MockMessageReactionAPI{}
+	mockImAPI := &MockImAPI{MessageAPI: mockMsgAPI, MessageReactionAPI: mockReactionAPI}
 	return &MockFeishuAPI{ImAPI: mockImAPI}
 }

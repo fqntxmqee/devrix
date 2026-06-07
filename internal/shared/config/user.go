@@ -35,13 +35,26 @@ type IMPlatformConfig struct {
 
 // FeishuUserConfig 飞书用户配置 (当 im.platform="feishu" 时生效)
 type FeishuUserConfig struct {
-	AppID       string `yaml:"app_id"`
-	AppSecret   string `yaml:"app_secret"`
-	BotName     string `yaml:"bot_name"`
-	Domain      string `yaml:"domain"`      // 自定义域名
-	EncryptKey  string `yaml:"encrypt_key"` // 回调加密密钥
-	CallbackURL string `yaml:"callback_url"` // 回调地址
-	UseWebhook  bool   `yaml:"use_webhook"` // 使用 Webhook 模式
+	AppID         string `yaml:"app_id"`
+	AppSecret     string `yaml:"app_secret"`
+	BotName       string `yaml:"bot_name"`
+	Domain        string `yaml:"domain"`         // 自定义域名
+	EncryptKey    string `yaml:"encrypt_key"`    // 回调加密密钥
+	CallbackURL   string `yaml:"callback_url"`   // 回调地址
+	UseWebhook    bool   `yaml:"use_webhook"`    // 使用 Webhook 模式
+	ReactionEmoji string `yaml:"reaction_emoji"` // 收到消息时的表情回复，默认 OnIt；设为 none 禁用
+	DoneEmoji     string `yaml:"done_emoji"`     // agent 完成时的表情回复，如 Done；设为 none 禁用
+	ReplyInThread *bool  `yaml:"reply_in_thread"` // 在用户消息下以话题回复，默认 true
+	ProgressStyle string `yaml:"progress_style"` // legacy | compact | card | structured，默认 structured
+}
+
+// IsReplyInThread returns whether bot replies should appear in a thread under the user's message.
+func (f FeishuUserConfig) IsReplyInThread() bool {
+	if f.ReplyInThread == nil {
+		// Match cc-connect default: Reply API with quote header; Feishu still shows "N 条回复".
+		return false
+	}
+	return *f.ReplyInThread
 }
 
 // DingTalkUserConfig 钉钉用户配置 (当 im.platform="dingtalk" 时生效)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -16,32 +17,55 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 func main() {
-	// Initialize structured logger
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	configFile := config.FindConfigFile()
+	if configFile != "" {
+		slog.Info("loading config file", "path", configFile)
+	}
 
-	// Load user config first (for YOLO mode)
+	obsCfg := observability.DefaultConfig()
+	if configFile != "" {
+		if loaded, err := observability.LoadConfigFromFile(configFile); err != nil {
+			slog.Warn("failed to load observability config, using defaults", "error", err)
+		} else {
+			obsCfg = loaded
+		}
+	}
+
+	var obs *observability.Observability
+	var err error
+
+	obs, err = observability.New(obsCfg)
+	if err != nil {
+		slog.Warn("failed to initialize observability, continuing without", "error", err)
+		obs = observability.NewNoOp()
+	} else {
+		slog.Info("observability initialized",
+			"tracing", obsCfg.IsTracingEnabled(),
+			"exporter", obsCfg.Tracing.Exporter,
+			"otlp_endpoint", obsCfg.Tracing.OTLP.Endpoint,
+			"metrics", obsCfg.IsMetricsEnabled(),
+			"logging", obsCfg.IsLoggingEnabled(),
+		)
+	}
+
+	// Load user config
 	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		slog.Warn("failed to load user config, using defaults", "error", err)
 		userCfg = config.DefaultUserConfig()
 	}
 
-	// Show YOLO mode status
 	if userCfg.IsYOLOMode() {
 		slog.Info("YOLO mode enabled - all permissions auto-approved")
 	}
 
-	// Find and load project config file
-	configFile := config.FindConfigFile()
-	if configFile != "" {
-		slog.Info("loading config file", "path", configFile)
-	}
-
+	// Find and load project config
 	commCfg, authCfg, _, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
@@ -55,77 +79,62 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize V2 components
+	// Initialize components
 	authService := auth.NewAuthService(authCfg)
-
-	connManager := connection.NewConnectionManager(
-		60*time.Second, // heartbeat timeout (from connection config)
-		10*time.Second, // heartbeat interval
-	)
-
+	connManager := connection.NewConnectionManager(60*time.Second, 10*time.Second)
 	rateLimiter := ratelimit.NewRateLimiter(ratelimit.DefaultRateLimitConfig())
-
-	// Initialize V3 components
 	metricsCollector := metrics.NewMetricsCollector()
 	instanceRegistry := instance.NewInstanceRegistry(60 * time.Second)
 	milestoneService := milestone.NewMilestoneService(nil)
+	_ = authService
+	_ = rateLimiter
+	_ = milestoneService
 
 	// Initialize permission manager
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
-	permissionMgr.SetUserConfig(userCfg) // Enable YOLO mode if configured
+	permissionMgr.SetUserConfig(userCfg)
 
-	// Create context engine (stub for now)
+	// Create context engine
 	contextEngine := gateway.NewStubContextEngine()
 
-	// Create default event handler (used when no IM is connected)
+	// Create event handler
 	defaultEventHandler := &DefaultEventHandler{
 		connManager: connManager,
-		metrics:     metricsCollector,
+		metrics:    metricsCollector,
+		obs:        obs,
 	}
 
-	// Setup context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize IM adapter based on user config (only ONE platform at a time)
+	// Initialize IM adapter
 	var feishuAdapter *adapters.FeishuAdapter
 	var eventHandler gateway.EventHandler = defaultEventHandler
-	imConnected := false
 
 	if userCfg.IM.Enabled {
 		switch userCfg.IM.Platform.Provider {
 		case "feishu":
 			if userCfg.IM.Feishu.AppID != "" && userCfg.IM.Feishu.AppSecret != "" {
 				feishuCfg := &adapters.FeishuConfig{
-					AppID:       userCfg.IM.Feishu.AppID,
-					AppSecret:   userCfg.IM.Feishu.AppSecret,
-					BotName:     userCfg.IM.Feishu.BotName,
-					Domain:      userCfg.IM.Feishu.Domain,
-					EncryptKey:  userCfg.IM.Feishu.EncryptKey,
-					CallbackPath: "/feishu/webhook",
-					Port:        "8080",
-					UseWebhook:  userCfg.IM.Feishu.UseWebhook,
+					AppID:         userCfg.IM.Feishu.AppID,
+					AppSecret:     userCfg.IM.Feishu.AppSecret,
+					BotName:       userCfg.IM.Feishu.BotName,
+					Domain:        userCfg.IM.Feishu.Domain,
+					EncryptKey:    userCfg.IM.Feishu.EncryptKey,
+					CallbackPath:  "/feishu/webhook",
+					Port:          "8080",
+					UseWebhook:    userCfg.IM.Feishu.UseWebhook,
+					ReactionEmoji: userCfg.IM.Feishu.ReactionEmoji,
+					DoneEmoji:     userCfg.IM.Feishu.DoneEmoji,
+					ReplyInThread: userCfg.IM.Feishu.IsReplyInThread(),
 				}
 				feishuAdapter = adapters.NewFeishuAdapter(nil, feishuCfg, commCfg)
-				// Feishu adapter IS the event handler when IM is connected
 				eventHandler = feishuAdapter
-			} else {
-				slog.Warn("feishu enabled but app_id or app_secret is empty")
 			}
-
-		case "dingtalk":
-			if userCfg.IM.DingTalk.AppKey != "" && userCfg.IM.DingTalk.AppSecret != "" {
-				slog.Info("dingtalk adapter not yet implemented")
-			} else {
-				slog.Warn("dingtalk enabled but app_key or app_secret is empty")
-			}
-
-		default:
-			slog.Warn("IM enabled but no valid platform configured", "provider", userCfg.IM.Platform.Provider)
 		}
 	}
 
-	// Create communication gateway with the event handler
+	// Create gateway
 	gw := gateway.NewCommunicationGateway(
 		sessionStore,
 		eventHandler,
@@ -133,32 +142,24 @@ func main() {
 		permissionMgr,
 		commCfg,
 	)
+	gw.SetObservability(obs)
 
-	// Start session cleanup routine
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 
-	// Now set the gateway on Feishu adapter
+	// Start IM adapter
 	if feishuAdapter != nil {
 		feishuAdapter.SetGateway(gw)
 		if err := feishuAdapter.Start(ctx); err != nil {
 			slog.Warn("failed to start feishu adapter", "error", err)
 		} else {
 			slog.Info("feishu adapter started", "app_id", userCfg.IM.Feishu.AppID)
-			imConnected = true
 		}
 	}
 
 	// Create CLI adapter
 	cli := adapters.NewCLIAdapter(gw, commCfg)
 
-	// Log IM status
-	slog.Info("IM configuration",
-		"enabled", userCfg.IM.Enabled,
-		"provider", userCfg.IM.Platform.Provider,
-		"connected", imConnected,
-	)
-
-	// Register this instance
+	// Register instance
 	instanceID := os.Getenv("DEVRIX_INSTANCE_ID")
 	if instanceID == "" {
 		instanceID = "devrix-cli"
@@ -169,50 +170,58 @@ func main() {
 	}
 
 	instanceInfo := &instance.InstanceInfo{
-		ID:        instanceID,
-		Name:      instanceName,
-		Address:   "localhost",
-		Port:      0,
-		Status:    "healthy",
+		ID:      instanceID,
+		Name:    instanceName,
+		Address: "localhost",
+		Port:    0,
+		Status:  "healthy",
 	}
 	if err := instanceRegistry.Register(ctx, instanceInfo); err != nil {
 		slog.Warn("failed to register instance", "error", err)
 	}
 
-	// Handle shutdown signals
-	sigCh := make(chan os.Signal, 1)
+	// Handle shutdown: first Ctrl+C cancels ctx; second (or timeout) force-exits.
+	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		sig := <-sigCh
 		slog.Info("received signal, shutting down", "signal", sig)
-		connManager.Stop()
-		instanceRegistry.Unregister(ctx, instanceInfo.ID)
-		if feishuAdapter != nil {
-			feishuAdapter.Stop()
-		}
 		cancel()
+
+		select {
+		case sig2 := <-sigCh:
+			slog.Warn("force exit on repeated signal", "signal", sig2)
+			os.Exit(130)
+		case <-time.After(3 * time.Second):
+			slog.Warn("shutdown timeout, force exit")
+			os.Exit(130)
+		}
 	}()
 
-	// Log startup info
-	slog.Info("devrix components initialized",
-		"auth", authService != nil,
-		"conn_manager", connManager != nil,
-		"rate_limiter", rateLimiter != nil,
-		"metrics", metricsCollector != nil,
-		"instance_registry", instanceRegistry != nil,
-		"milestone_service", milestoneService != nil,
-		"feishu", feishuAdapter != nil,
+	slog.Info("devrix started",
+		"version", "v2.0",
+		"observability", obsCfg.Enabled,
+		"tracing", obsCfg.IsTracingEnabled(),
+		"metrics", obsCfg.IsMetricsEnabled(),
+		"logging", obsCfg.IsLoggingEnabled(),
 		"yolo_mode", userCfg.IsYOLOMode(),
-		"im_enabled", userCfg.IM.Enabled,
-		"im_provider", userCfg.IM.Platform.Provider,
 	)
 
-	// Start CLI
-	slog.Info("starting devrix", "version", "v2.0")
-	if err := cli.Start(ctx); err != nil {
+	if err := cli.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("cli exited with error", "error", err)
 		os.Exit(1)
+	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := obs.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("observability shutdown error", "error", err)
+	}
+	connManager.Stop()
+	instanceRegistry.Unregister(shutdownCtx, instanceInfo.ID)
+	if feishuAdapter != nil {
+		_ = feishuAdapter.Stop()
 	}
 
 	slog.Info("devrix stopped")
@@ -221,7 +230,8 @@ func main() {
 // DefaultEventHandler handles gateway events
 type DefaultEventHandler struct {
 	connManager *connection.ConnectionManager
-	metrics     *metrics.MetricsCollector
+	metrics    *metrics.MetricsCollector
+	obs        *observability.Observability
 }
 
 func (h *DefaultEventHandler) OnMessage(msg *types.OutboundMessage) {

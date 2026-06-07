@@ -145,6 +145,8 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 
 ## Related Documents
 
+- **Architecture Docs:** `docs/README.md`（含 `detail design framework.md` 六段式模板）
+- Context Engine Design: `docs/context-engine-design.md`
 - Obsidian Vault: `01知识探索/项目/devrix/`
 - Architecture Reference: cc-connect (Go daemon)
 - Testing Framework Spec: `openspec/specs/testing-framework/spec.md`

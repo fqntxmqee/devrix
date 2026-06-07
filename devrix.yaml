@@ -80,7 +80,7 @@ instance:
 
 # 日志配置
 logging:
-  level: "info"  # debug | info | warn | error
+  level: "debug"  # debug | info | warn | error
   format: "json"  # json | text
   output: "stdout"  # stdout | stderr | file
 
@@ -89,3 +89,76 @@ metrics:
   enabled: true
   port: 9090
   path: "/metrics"
+
+# 可观察层配置 (Observability Layer)
+observability:
+  enabled: true
+
+  tracing:
+    enabled: true
+    service_name: "devrix"
+    service_version: "2.0.0"
+    exporter: "otlp"  # console | otlp | null
+    sampling:
+      type: "always_on"  # always_on | always_off | trace_id_ratio
+      rate: 1.0  # 0.0-1.0 (仅 trace_id_ratio 模式使用)
+    otlp:
+      endpoint: "http://localhost:4318/v1/traces"
+      insecure: true
+      timeout: "5s"
+
+  metrics:
+    enabled: true
+    exporter: "prometheus"  # prometheus | otlp | null
+    endpoint: "/metrics"
+    labels:
+      allowlist:
+        - provider
+        - model
+        - adapter
+        - tool
+        - risk_level
+        - status
+        - direction
+        - decision
+        - error_type
+      blocklist:
+        - session_id
+        - user_id
+        - api_key
+
+  logging:
+    enabled: true
+    level: "debug"  # debug | info | warn | error
+    format: "json"  # json | text
+    include_trace_id: true
+    sampling:
+      enabled: true
+      max_entries_per_span: 100
+    redactor:
+      enabled: true
+      patterns:
+        - password
+        - token
+        - secret
+        - api_key
+        - authorization
+
+  health:
+    enabled: true
+    endpoint: "/health"
+
+# ========================================
+# 可观察性配置说明
+# ========================================
+# 
+# 启动后访问:
+#   - Jaeger UI: http://localhost:16686
+#   - Prometheus: http://localhost:9090
+#   - Devrix Health: http://localhost:8080/health
+#   - Devrix Metrics: http://localhost:9090/metrics
+#
+# OTLP 端口:
+#   - gRPC: localhost:4317
+#   - HTTP: localhost:4318
+#

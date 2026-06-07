@@ -3,6 +3,7 @@ package adapters
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -71,28 +72,28 @@ func (a *CLIAdapter) Start(ctx context.Context) error {
 	slog.Info("CLI adapter started", "sessionID", session.SessionID)
 
 	for {
-		select {
-		case <-ctx.Done():
+		if err := ctx.Err(); err != nil {
 			return a.Stop()
-		default:
-			if err := a.readInput(ctx); err != nil {
-				if err == io.EOF {
-					// In non-interactive mode (IM connected), wait for context cancellation
-					slog.Info("CLI stdin closed, waiting for shutdown signal")
-					<-ctx.Done()
-					return a.Stop()
-				}
-				slog.Error("error reading input", "error", err)
+		}
+		if err := a.readInput(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return a.Stop()
 			}
+			if err == io.EOF {
+				// Non-interactive stdin (e.g. IM-only mode): wait for shutdown signal.
+				slog.Info("CLI stdin closed, waiting for shutdown signal")
+				<-ctx.Done()
+				return a.Stop()
+			}
+			slog.Error("error reading input", "error", err)
 		}
 	}
 }
 
-// readInput reads a line of input and processes it
+// readInput reads a line of input and processes it.
+// The read is interruptible: Ctrl+C cancels ctx and returns without waiting for Enter.
 func (a *CLIAdapter) readInput(ctx context.Context) error {
-	a.writer.Write([]byte(a.cfg.CLI.Prompt))
-
-	input, err := a.reader.ReadString('\n')
+	input, err := a.readLine(ctx)
 	if err != nil {
 		return err
 	}
@@ -109,6 +110,26 @@ func (a *CLIAdapter) readInput(ctx context.Context) error {
 
 	// Send to gateway
 	return a.sendMessage(ctx, input)
+}
+
+func (a *CLIAdapter) readLine(ctx context.Context) (string, error) {
+	type readResult struct {
+		line string
+		err  error
+	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		a.writer.Write([]byte(a.cfg.CLI.Prompt))
+		line, err := a.reader.ReadString('\n')
+		resultCh <- readResult{line: line, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", context.Canceled
+	case res := <-resultCh:
+		return res.line, res.err
+	}
 }
 
 // handleCommand processes a CLI command

@@ -1,0 +1,225 @@
+# OpenSpec Change Metadata
+
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-observability
+  demand_id: DM-20260607-001
+  title: "Devrix 可观察层"
+  status: s5_pending
+  priority: P1
+  owner: architecture
+  created_at: "2026-06-07"
+  updated_at: "2026-06-07"
+  started_at: "2026-06-07"
+  completed_at: "2026-06-07"
+
+scope:
+  layers:
+    - id: L5
+      name: Observability
+      affected: true
+  
+  capabilities:
+    - OBS-TRACE
+    - OBS-METRICS
+    - OBS-LOG
+    - OBS-EXPORTER
+    - OBS-CONFIG
+    - OBS-HEALTH
+    - OBS-SAMPLING
+    - OBS-PROPAGATION
+    - OBS-SHUTDOWN
+    - OBS-RESOURCE
+    - OBS-BAGGAGE
+
+  l5_test_points:
+    - L5-OBS-01
+    - L5-OBS-02
+    - L5-OBS-03
+    - L5-OBS-04
+    - L5-OBS-05
+    - L5-OBS-06
+    - L5-OBS-07
+    - L5-OBS-08
+    - L5-OBS-09
+    - L5-OBS-10
+    - L5-OBS-11
+    - L5-OBS-12
+
+deliverables:
+  - path: demand.md
+    status: completed
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/observability/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: acceptance-report.md
+    status: completed
+  - path: internal/layers/observability/
+    status: completed
+    description: 30 Go files implemented
+
+version_scope:
+  v1:
+    features:
+      - Trace/Span (Console Exporter)
+      - Prometheus Metrics
+      - Structured Logging
+      - Health Endpoint
+      - Graceful Shutdown
+      - Resource Injection
+      - Baggage Propagation
+    status: s4_completed
+    tasks: T1-T40
+    estimate: 128h
+    completed_at: "2026-06-07"
+  
+  v2:
+    features:
+      - OTLP Exporter
+      - Sampling
+      - Health Enhanced
+      - Observable Metrics
+    status: future
+
+  v3:
+    features:
+      - Jaeger Integration
+      - Tail Sampling
+      - APM
+    status: future
+
+external_dependencies:
+  - Go 1.21+
+
+task_milestones:
+  - id: M1
+    name: 基础类型与配置
+    tasks: [T1, T2, T3]
+    estimate: 7h
+    status: completed
+  - id: M2
+    name: Tracer 实现
+    tasks: [T4, T5, T6, T7, T8]
+    estimate: 24h
+    status: completed
+  - id: M3
+    name: Metrics 实现
+    tasks: [T9, T10, T11, T12, T13, T14]
+    estimate: 19h
+    status: completed
+  - id: M4
+    name: Logger 实现
+    tasks: [T15, T16, T17]
+    estimate: 10h
+    status: completed
+  - id: M5
+    name: Exporter 实现
+    tasks: [T18, T19, T20]
+    estimate: 9h
+    status: completed
+  - id: M6
+    name: Facade 与集成
+    tasks: [T21, T22, T23, T24]
+    estimate: 12h
+    status: completed
+  - id: M7
+    name: 各层集成
+    tasks: [T25, T26, T27]
+    estimate: 11h
+    status: completed
+  - id: M8
+    name: 测试与验收
+    tasks: [T28, T29, T30, T31, T32, T33, T34, T35]
+    estimate: 22h
+    status: completed
+  - id: M9
+    name: 增强功能
+    tasks: [T36, T37, T38, T39, T40]
+    estimate: 14h
+    status: completed
+
+metrics_definitions:
+  - name: devrix_llm_tokens_total
+    type: Counter
+    labels: [provider, model, direction]
+  - name: devrix_llm_latency_seconds
+    type: Histogram
+    labels: [provider, model]
+  - name: devrix_llm_errors_total
+    type: Counter
+    labels: [provider, model, error_type]
+  - name: devrix_tool_calls_total
+    type: Counter
+    labels: [tool, risk_level, status]
+  - name: devrix_session_active
+    type: Gauge
+    labels: [adapter]
+  - name: devrix_permission_timeouts_total
+    type: Counter
+    labels: []
+  - name: devrix_permission_decisions_total
+    type: Counter
+    labels: [decision]
+  - name: devrix_context_tokens_current
+    type: Gauge
+    labels: [session_id]
+
+span_naming:
+  conventions:
+    - operation: message.receive
+      attributes: [adapter, session_id]
+    - operation: llm.chat
+      attributes: [provider, model, tokens]
+    - operation: tool.execute
+      attributes: [tool.name, risk_level]
+    - operation: permission.request
+      attributes: [tool_name, timeout]
+    - operation: context.compress
+      attributes: [before_tokens, after_tokens]
+    - operation: session.create
+      attributes: [adapter]
+    - operation: session.expire
+      attributes: [session_id, reason]
+
+label_policy:
+  allowlist:
+    - provider
+    - model
+    - adapter
+    - tool
+    - risk_level
+    - status
+    - direction
+    - decision
+    - error_type
+  blocklist:
+    - session_id
+    - user_id
+    - api_key
+
+s5_verification:
+  status: pending
+  p0_total: 5
+  p0_passed: 0
+  p0_failed: 0
+  p1_total: 4
+  p1_passed: 0
+  p1_skipped: 0
+  p2_total: 3
+  p2_passed: 0
+  p2_skipped: 0
+
+notes: |
+  S4 implementation completed. Code review passed. S5 verification pending Go environment.
+  All 40 tasks marked complete. 30 Go files created.
+
+related_changes:
+  - devrix-context-engine
+  - devrix-llm-gateway

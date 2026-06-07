@@ -20,6 +20,12 @@ type PermissionManager struct {
 
 // NewPermissionManager creates a new PermissionManager
 func NewPermissionManager(cfg *config.PermissionConfig) *PermissionManager {
+	if cfg == nil {
+		cfg = &config.PermissionConfig{
+			DefaultTimeout: 60 * time.Second,
+			MaxRetries:     3,
+		}
+	}
 	return &PermissionManager{
 		config:   cfg,
 		userCfg:  config.DefaultUserConfig(),

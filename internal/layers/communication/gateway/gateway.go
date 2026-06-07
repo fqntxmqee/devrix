@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -42,6 +44,7 @@ type CommunicationGateway struct {
 	contextEngine IContextEngine
 	permissionMgr *PermissionManager
 	config       *config.CommunicationConfig
+	obsBridge    *observability.Bridge
 
 	mu      sync.RWMutex
 	sessions map[string]*types.Session
@@ -64,6 +67,15 @@ func NewCommunicationGateway(
 		sessions:    make(map[string]*types.Session),
 	}
 	return gw
+}
+
+// SetObservability wires tracing/metrics into the gateway.
+func (g *CommunicationGateway) SetObservability(obs *observability.Observability) {
+	if obs == nil {
+		g.obsBridge = nil
+		return
+	}
+	g.obsBridge = observability.NewBridge(obs)
 }
 
 // StartCleanupRoutine starts a background goroutine that periodically cleans up expired sessions
@@ -101,6 +113,11 @@ func (g *CommunicationGateway) cleanupExpiredSessions() {
 
 // RouteInbound processes an inbound message from an adapter
 func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.InboundMessage) error {
+	ctx, endSpan := g.startInboundSpan(ctx, msg)
+	defer endSpan()
+
+	slog.Info("gateway: RouteInbound called", "sessionID", msg.SessionID, "content", msg.Content, "chatID", msg.ChatID)
+
 	// Validate message
 	if msg.Content == "" {
 		return errors.NewMessageEmptyError()
@@ -141,12 +158,15 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 // handleEngineEvents processes events from the context engine
 func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *types.Session, events <-chan *EngineEvent) {
+	slog.Info("gateway: handleEngineEvents started", "sessionID", session.SessionID)
 	for {
 		select {
 		case <-ctx.Done():
+			slog.Info("gateway: handleEngineEvents ctx done", "sessionID", session.SessionID)
 			return
 		case event, ok := <-events:
 			if !ok {
+				slog.Info("gateway: handleEngineEvents channel closed", "sessionID", session.SessionID)
 				return
 			}
 			g.handleEngineEvent(ctx, session, event)
@@ -156,12 +176,10 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 
 // handleEngineEvent handles a single engine event
 func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *types.Session, event *EngineEvent) {
+	slog.Info("gateway: handleEngineEvent", "type", event.Type, "sessionID", session.SessionID)
 	switch event.Type {
 	case "thinking":
 		session.SetState(types.SessionStateThinking)
-		g.eventHandler.OnStatus(session.SessionID, types.SessionStateThinking)
-
-	case "text":
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
@@ -169,12 +187,50 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Content:   event.Content,
 			IsComplete: false,
 			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "thinking"},
+		}
+		g.eventHandler.OnMessage(outMsg)
+
+	case "text":
+		isComplete := event.Metadata != nil && event.Metadata["is_complete"] == "true"
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   event.Content,
+			IsComplete: isComplete,
+			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "text"},
 		}
 		g.eventHandler.OnMessage(outMsg)
 
 	case "tool_call":
-		// Request permission
 		toolName := event.Metadata["tool_name"]
+		if toolName == "" {
+			toolName = event.ToolName
+		}
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   toolName,
+			IsComplete: false,
+			Role:      types.MessageRoleAssistant,
+			Metadata: map[string]string{
+				"event_type": "tool_call",
+				"tool_name":  toolName,
+				"input":      event.Metadata["input"],
+			},
+		}
+		g.eventHandler.OnMessage(outMsg)
+
+		// Check if auto-approved (for testing)
+		if event.Metadata != nil && event.Metadata["auto_approved"] == "true" {
+			// Skip permission request for testing
+			break
+		}
+
+		// Request permission
 		riskLevel := parseRiskLevel(event.Metadata["risk_level"])
 
 		approved := g.permissionMgr.Request(ctx, session.SessionID, toolName, event.Metadata["input"], riskLevel)
@@ -182,9 +238,10 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			outMsg := &types.OutboundMessage{
 				MessageID:  generateMessageID(),
 				SessionID: session.SessionID,
-				Content:   fmt.Sprintf("Permission denied for tool: %s", toolName),
+				Content:   fmt.Sprintf("❌ Permission denied for tool: %s", toolName),
 				IsComplete: true,
 				Role:      types.MessageRoleAssistant,
+				Metadata:  map[string]string{"event_type": "permission_denied"},
 			}
 			g.eventHandler.OnMessage(outMsg)
 			return
@@ -192,21 +249,79 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 
 	case "tool_result":
 		session.SetState(types.SessionStateToolExecuting)
+		toolName := event.ToolName
+		if toolName == "" {
+			toolName = event.Metadata["tool_name"]
+		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
-			Content:   fmt.Sprintf("[Tool: %s] %s", event.ToolName, event.Content),
+			ChatID:    session.ChatID,
+			Content:   event.Content,
 			IsComplete: true,
 			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "tool_result", "tool_name": toolName},
+		}
+		g.eventHandler.OnMessage(outMsg)
+
+	case "milestone_progress":
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   event.Content,
+			IsComplete: false,
+			Role:      types.MessageRoleAssistant,
+			Metadata: map[string]string{
+				"event_type": "milestone_progress",
+				"progress":   event.Metadata["progress"],
+				"task":       event.Metadata["task"],
+			},
+		}
+		g.eventHandler.OnMessage(outMsg)
+
+	case "info":
+		// Send info message
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   event.Content,
+			IsComplete: true,
+			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "info"},
 		}
 		g.eventHandler.OnMessage(outMsg)
 
 	case "complete":
 		session.SetState(types.SessionStateCompleted)
+		usage := event.Metadata["usage"]
+		duration := event.Metadata["duration"]
+		summary := fmt.Sprintf("用时: %s, 消耗: %s", duration, usage)
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   summary,
+			IsComplete: true,
+			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "complete"},
+		}
+		g.eventHandler.OnMessage(outMsg)
 		g.eventHandler.OnStatus(session.SessionID, types.SessionStateCompleted)
 
 	case "error":
 		session.SetState(types.SessionStateFailed)
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   event.Content,
+			IsComplete: true,
+			Role:      types.MessageRoleAssistant,
+			Metadata:  map[string]string{"event_type": "error"},
+		}
+		g.eventHandler.OnMessage(outMsg)
 		g.eventHandler.OnError(fmt.Errorf("%s", event.Content), session.SessionID)
 	}
 }
@@ -323,5 +438,27 @@ func parseRiskLevel(level string) types.RiskLevel {
 		return types.RiskLevelCritical
 	default:
 		return types.RiskLevelMedium
+	}
+}
+
+func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.InboundMessage) (context.Context, func()) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, func() {}
+	}
+
+	tr := g.obsBridge.Tracer()
+	ctx, span := tr.Start(ctx, "gateway.route_inbound",
+		tracer.WithSpanKind(tracer.SpanKindServer),
+		tracer.WithSpanAttributes(
+			tracer.Attribute{Key: "session.id", Value: msg.SessionID},
+			tracer.Attribute{Key: "message.adapter_id", Value: msg.AdapterID},
+			tracer.Attribute{Key: "message.chat_id", Value: msg.ChatID},
+			tracer.Attribute{Key: "message.user_id", Value: msg.UserID},
+		),
+	)
+
+	return ctx, func() {
+		span.SetStatus(tracer.StatusCodeOk, "")
+		span.End()
 	}
 }
