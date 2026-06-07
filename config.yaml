@@ -1,0 +1,25 @@
+# Devrix Configuration
+
+observability:
+  enabled: true
+  tracing:
+    enabled: true
+    service_name: "devrix"
+    exporter: "otlp"
+    otlp:
+      endpoint: "http://localhost:4318/v1/traces"
+      insecure: true
+    sampling:
+      type: "always_on"
+      rate: 1.0
+  metrics:
+    enabled: true
+  logging:
+    enabled: true
+    level: "debug"
+    format: "json"
+    include_trace_id: true
+
+communication:
+  gateway:
+    port: 8080
