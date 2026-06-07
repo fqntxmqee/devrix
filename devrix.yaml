@@ -90,6 +90,24 @@ metrics:
   port: 9090
   path: "/metrics"
 
+# 上下文引擎配置 (Layer 2)
+context_engine:
+  max_context_tokens: 128000
+  reserved_output_tokens: 8192
+  tool_result_budget: 800
+  compression_enabled: true
+  pev:
+    max_iterations: 3
+    verify_mode: "basic"
+  snapshot:
+    enabled: true
+    backup_dir: "~/.devrix/context"
+  system_prompt:
+    sources:
+      - "AGENTS.md"
+      - ".devrix/AGENTS.md"
+    fallback: "You are Devrix, a multi-agent development assistant."
+
 # 可观察层配置 (Observability Layer)
 observability:
   enabled: true

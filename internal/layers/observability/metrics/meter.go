@@ -41,9 +41,11 @@ func (mp *MeterProvider) Meter(name string) *Meter {
 func (m *Meter) Int64Counter(name string, opts ...CounterOption) (Counter, error) {
 	cfg := &CounterConfig{Labels: make(LabelMap)}
 	for _, opt := range opts {
-		opt(cfg)
+		if opt != nil {
+			opt(cfg)
+		}
 	}
-	
+
 	counter := NewCounter(fullMetricName(m.name, name), cfg.Labels)
 	
 	if err := m.provider.registry.RegisterCounter(
@@ -64,9 +66,11 @@ func (m *Meter) Float64Histogram(name string, opts ...HistogramOption) (Histogra
 		Bounds: DefaultHistogramBounds(),
 	}
 	for _, opt := range opts {
-		opt(cfg)
+		if opt != nil {
+			opt(cfg)
+		}
 	}
-	
+
 	histo := NewHistogram(fullMetricName(m.name, name), cfg.Labels, cfg.Bounds)
 	
 	if err := m.provider.registry.RegisterHistogram(
@@ -85,11 +89,13 @@ func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Counter,
 	// For now, use counter as gauge
 	cfg := &CounterConfig{Labels: make(LabelMap)}
 	for _, opt := range opts {
-		opt(cfg)
+		if opt != nil {
+			opt(cfg)
+		}
 	}
-	
+
 	counter := NewCounter(fullMetricName(m.name, name), cfg.Labels)
-	
+
 	if err := m.provider.registry.RegisterCounter(
 		fullMetricName(m.name, name),
 		cfg.Labels,
@@ -97,7 +103,7 @@ func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Counter,
 	); err != nil {
 		return nil, err
 	}
-	
+
 	return counter, nil
 }
 

@@ -94,7 +94,7 @@ func TestMetricsRecording(t *testing.T) {
 	meter := obs.Meter()
 
 	// Create counter without restricted labels
-	counter, err := meter.Int64Counter("test_counter_simple", nil)
+	counter, err := meter.Int64Counter("test_counter_simple")
 	if err != nil {
 		t.Fatalf("failed to create counter: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestMetricsRecording(t *testing.T) {
 	counter.Inc()
 
 	// Create histogram
-	histogram, err := meter.Float64Histogram("test_histogram_simple", nil)
+	histogram, err := meter.Float64Histogram("test_histogram_simple")
 	if err != nil {
 		t.Fatalf("failed to create histogram: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestPrometheusExporter(t *testing.T) {
 	meter := obs.Meter()
 
 	// Create test metrics
-	counter, _ := meter.Int64Counter("test_requests", nil)
+	counter, _ := meter.Int64Counter("test_requests")
 	counter.Add(100)
 
 	registry := meter.Registry()
@@ -253,7 +253,7 @@ func TestMetricsRegistry(t *testing.T) {
 	}
 
 	// Test counter
-	counter, err := meter.Int64Counter("registry_test_counter", nil)
+	counter, err := meter.Int64Counter("registry_test_counter")
 	if err != nil {
 		t.Fatalf("failed to create counter: %v", err)
 	}

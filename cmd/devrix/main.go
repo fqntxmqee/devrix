@@ -13,6 +13,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/auth"
 	"github.com/devrix/devrix/internal/layers/communication/connection"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/communication/instance"
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
@@ -66,7 +69,7 @@ func main() {
 	}
 
 	// Find and load project config
-	commCfg, authCfg, _, err := config.LoadConfig(configFile)
+	commCfg, authCfg, _, ctxCfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -94,8 +97,16 @@ func main() {
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
 
-	// Create context engine
-	contextEngine := gateway.NewStubContextEngine()
+	// Create context engine (Layer 2)
+	permissionGate := gateway.NewPermissionGateAdapter(permissionMgr)
+	contextEngine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		LLM:        &mockctx.LLMGateway{},
+		Tools:      &mockctx.ToolRunner{},
+		ToolsReg:   registry.NewBuiltinRegistry(),
+		Permission: permissionGate,
+		Observer:   contextengine.NoOpObserver{},
+		Config:     ctxCfg,
+	})
 
 	// Create event handler
 	defaultEventHandler := &DefaultEventHandler{
