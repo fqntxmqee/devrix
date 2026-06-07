@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"sync/atomic"
+	"sync"
 )
 
 // Gauge represents a gauge metric (瞬时值)
@@ -21,7 +21,8 @@ type Gauge interface {
 type gauge struct {
 	name   string
 	labels LabelMap
-	value  uint64 // stored as integer representation
+	mu     sync.Mutex
+	value  float64
 }
 
 // NewGauge creates a new gauge
@@ -29,38 +30,45 @@ func NewGauge(name string, labels LabelMap) Gauge {
 	return &gauge{
 		name:   name,
 		labels: labels,
-		value:  0,
 	}
 }
 
 // Set sets the gauge to a value
 func (g *gauge) Set(value float64) {
-	atomic.StoreUint64(&g.value, float64ToUint64(value))
+	g.mu.Lock()
+	g.value = value
+	g.mu.Unlock()
 }
 
 // Inc increments the gauge by 1
 func (g *gauge) Inc() {
-	atomic.AddUint64(&g.value, 1)
+	g.Add(1)
 }
 
 // Dec decrements the gauge by 1
 func (g *gauge) Dec() {
-	atomic.AddUint64(&g.value, ^uint64(0)) // subtract 1 using two's complement
+	g.Sub(1)
 }
 
 // Add adds a value to the gauge
 func (g *gauge) Add(value float64) {
-	atomic.AddUint64(&g.value, float64ToUint64(value))
+	g.mu.Lock()
+	g.value += value
+	g.mu.Unlock()
 }
 
 // Sub subtracts a value from the gauge
 func (g *gauge) Sub(value float64) {
-	atomic.AddUint64(&g.value, float64ToUint64(-value))
+	g.mu.Lock()
+	g.value -= value
+	g.mu.Unlock()
 }
 
 // Value returns the current value
 func (g *gauge) Value() float64 {
-	return uint64ToFloat64(atomic.LoadUint64(&g.value))
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.value
 }
 
 // Name returns the gauge name
@@ -78,30 +86,16 @@ func (g *gauge) Type() MetricType {
 	return MetricTypeGauge
 }
 
-// float64ToUint64 converts float64 to uint64 for atomic operations
-func float64ToUint64(f float64) uint64 {
-	return uint64(int64(f + (1 << 63)))
-}
-
-// uint64ToFloat64 converts uint64 back to float64
-func uint64ToFloat64(u uint64) float64 {
-	return float64(int64(u)) - (1 << 63)
-}
-
 // AsyncGauge is a gauge with callback on update
 type AsyncGauge struct {
-	gauge    *gauge
+	gauge    Gauge
 	onUpdate func(value float64)
 }
 
 // NewAsyncGauge creates a new async gauge
 func NewAsyncGauge(name string, labels LabelMap, onUpdate func(value float64)) *AsyncGauge {
 	return &AsyncGauge{
-		gauge: &gauge{
-			name:   name,
-			labels: labels,
-			value:  0,
-		},
+		gauge:    NewGauge(name, labels),
 		onUpdate: onUpdate,
 	}
 }

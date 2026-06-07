@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"sync"
 	"sync/atomic"
 )
 
@@ -20,7 +19,6 @@ type counter struct {
 	name   string
 	labels LabelMap
 	value  int64
-	mu     sync.Mutex
 }
 
 // NewCounter creates a new counter

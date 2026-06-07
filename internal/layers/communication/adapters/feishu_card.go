@@ -52,7 +52,7 @@ func renderElement(elem core.CardElement) map[string]interface{} {
 	case core.CardMarkdown:
 		return map[string]interface{}{
 			"tag":     "markdown",
-			"content": e.Content,
+			"content": PreprocessMarkdown(e.Content),
 		}
 	case core.CardDivider:
 		return map[string]interface{}{

@@ -12,7 +12,7 @@ import (
 // Covers: L5-CTX-01, L5-CTX-02
 func TestManager_should_initialize_new_session_context(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot))
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
 	session := types.NewSession("sess_1", "cli", "/tmp")
 
 	sc, err := mgr.LoadOrInit(session, "system prompt")
@@ -30,7 +30,7 @@ func TestManager_should_initialize_new_session_context(t *testing.T) {
 // Covers: L5-CTX-02
 func TestManager_should_append_user_message_and_dedupe_request_id(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot))
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
 	session := types.NewSession("sess_2", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 

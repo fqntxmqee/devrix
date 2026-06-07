@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -12,19 +13,64 @@ import (
 
 // Manager manages in-memory session contexts and persistence.
 type Manager struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 	contexts map[string]*types.SessionContext
-	store   *snapshot.Store
-	cfg     *config.ContextEngineConfig
+	store    *snapshot.Store
+	cfg      *config.ContextEngineConfig
+	longTerm ILongTermMemory
 }
 
 // NewManager creates a memory manager.
-func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store) *Manager {
+func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store, longTerm ILongTermMemory) *Manager {
 	return &Manager{
 		contexts: make(map[string]*types.SessionContext),
 		store:    store,
 		cfg:      cfg,
+		longTerm: longTerm,
 	}
+}
+
+// EnrichWithLongTermRecall appends recalled entries to the session system prompt.
+func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.SessionContext, query string) error {
+	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
+		return nil
+	}
+	limit := m.cfg.LongTerm.RecallMaxEntries
+	if limit <= 0 {
+		limit = 5
+	}
+	entries, err := m.longTerm.Recall(ctx, query, limit)
+	if err != nil {
+		return err
+	}
+	appendix := FormatLongTermAppendix(entries, m.cfg.LongTerm.RecallMaxTokens)
+	if appendix != "" {
+		sc.SystemPrompt += appendix
+	}
+	return nil
+}
+
+// AutoStoreLongTerm persists a summary when auto_store is enabled.
+func (m *Manager) AutoStoreLongTerm(ctx context.Context, sc *types.SessionContext, userMessage, summary string) error {
+	if m.longTerm == nil || !m.cfg.LongTerm.Enabled || !m.cfg.LongTerm.AutoStore {
+		return nil
+	}
+	topic := ResolveStoreTopic(userMessage, m.cfg.LongTerm.Topics)
+	if topic == "" {
+		return nil
+	}
+	content := summary
+	if len(content) > 2000 {
+		content = content[:2000]
+	}
+	if content == "" {
+		return nil
+	}
+	return m.longTerm.Store(ctx, MemoryEntry{
+		SessionID: sc.SessionID,
+		Topic:     topic,
+		Content:   content,
+	})
 }
 
 // LoadOrInit loads session context from snapshot or initializes fresh.

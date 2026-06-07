@@ -146,7 +146,8 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 ## L3/L4 Asset Registry (Context Engine)
 
 > V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
-> V2 进行中：`openspec/changes/devrix-context-engine-v2/` — Autocompact + Verify commands + Token 统一
+> V2 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v2/` — Autocompact + Verify commands + Token 统一
+> V3 规划中：`openspec/changes/devrix-context-engine-v3/` — PEV Plan + Milestone DAG + LongTerm Memory
 
 ### L3 业务活动
 
@@ -154,6 +155,7 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 |----|------|---------|
 | L3-BE-CTX-01 | 处理用户消息并维护上下文 | L4-CTX-STATE, L4-CTX-PEV, L4-CTX-MEMORY |
 | L3-BE-CTX-02 | 超长对话压缩 | L4-CTX-COMPRESS |
+| L3-BE-CTX-03 | 复杂任务分解与里程碑推进 | L4-CTX-PLAN, L4-CTX-PEV |
 
 ### L4 功能点
 
@@ -164,6 +166,7 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 | L4-CTX-COMPRESS | 七步压缩管道 | `contextengine/compression/` |
 | L4-CTX-MEMORY | 分层记忆 | `contextengine/memory/`, `snapshot/` |
 | L4-CTX-OBS | 压缩/验证可观测 | `contextengine/` + Observability bridge（V2） |
+| L4-CTX-PLAN | 任务规划与 DAG 生成 | `contextengine/pev/plan.go`（V3） |
 
 ## Related Documents
 

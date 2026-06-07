@@ -8,58 +8,31 @@ import (
 	"sync"
 
 	"github.com/devrix/devrix/internal/layers/communication/core"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-const (
-	progressStyleLegacy     = "legacy"
-	progressStyleCompact    = "compact"
-	progressStyleCard       = "card"
-	progressStyleStructured = "structured"
-)
-
-type progressItemKind string
-
-const (
-	progressKindThinking   progressItemKind = "thinking"
-	progressKindToolCall   progressItemKind = "tool_call"
-	progressKindToolResult progressItemKind = "tool_result"
-	progressKindMilestone  progressItemKind = "milestone"
-	progressKindInfo       progressItemKind = "info"
-)
-
-type progressItem struct {
-	kind     progressItemKind
-	text     string
-	toolName string
-	progress string
-	task     string
-}
+const progressStyleStructured = "structured"
 
 type feishuSessionStream struct {
-	mu            sync.Mutex
-	progressMsgID string
-	responseMsgID string
-	items         []progressItem
-	textBuffer    strings.Builder
-	completed     bool
-	toolCount     int
-	summaries     []string
-	progressPct   int
-	taskName      string
+	mu             sync.Mutex
+	progressMsgID  string
+	responseMsgID  string
+	thinkingMsgID  string
+	lastToolMsgID  string
+	lastToolName   string
+	lastToolInput  string
+	textBuffer     strings.Builder
+	thinkingBuffer strings.Builder
+	toolCount      int
+	summaries      []string
+	progressPct    int
+	taskName       string
 }
 
-func normalizeProgressStyle(style string) string {
-	switch strings.ToLower(strings.TrimSpace(style)) {
-	case progressStyleLegacy:
-		return progressStyleLegacy
-	case progressStyleCompact:
-		return progressStyleCompact
-	case progressStyleCard:
-		return progressStyleCard
-	default:
-		return progressStyleStructured
-	}
+// normalizeProgressStyle always returns structured; legacy card/compact modes were removed.
+func normalizeProgressStyle(string) string {
+	return progressStyleStructured
 }
 
 func (a *FeishuAdapter) sessionStream(sessionID string) *feishuSessionStream {
@@ -78,14 +51,7 @@ func (a *FeishuAdapter) clearSessionStream(sessionID string) {
 }
 
 func (a *FeishuAdapter) handleProgressEvent(ctx context.Context, msg *types.OutboundMessage) error {
-	switch a.progressStyle {
-	case progressStyleLegacy:
-		return a.sendLegacyProgressCard(ctx, msg)
-	case progressStyleStructured:
-		return a.handleStructuredProgressEvent(ctx, msg)
-	default:
-		return a.appendCoalescedProgress(ctx, msg)
-	}
+	return a.handleStructuredProgressEvent(ctx, msg)
 }
 
 func (a *FeishuAdapter) handleStructuredProgressEvent(ctx context.Context, msg *types.OutboundMessage) error {
@@ -104,7 +70,15 @@ func (a *FeishuAdapter) handleStructuredProgressEvent(ctx context.Context, msg *
 }
 
 func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *types.OutboundMessage) error {
-	text := strings.TrimSpace(msg.Content)
+	stream := a.sessionStream(msg.SessionID)
+	stream.mu.Lock()
+	if msg.Content != "" {
+		stream.thinkingBuffer.WriteString(msg.Content)
+	}
+	text := strings.TrimSpace(stream.thinkingBuffer.String())
+	thinkingMsgID := stream.thinkingMsgID
+	stream.mu.Unlock()
+
 	if text == "" {
 		text = "思考中..."
 	}
@@ -112,7 +86,19 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 		Title("思考", "blue").
 		Markdown(text).
 		Build()
-	return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
+	cardJSON := BuildCardJSON(card)
+
+	if thinkingMsgID == "" {
+		msgID, err := a.sendCardReplyAndGetID(ctx, msg.SessionID, msg.ChatID, cardJSON)
+		if err != nil {
+			return err
+		}
+		stream.mu.Lock()
+		stream.thinkingMsgID = msgID
+		stream.mu.Unlock()
+		return nil
+	}
+	return a.patchMessage(ctx, thinkingMsgID, cardJSON)
 }
 
 func (a *FeishuAdapter) sendStructuredToolCard(ctx context.Context, msg *types.OutboundMessage) error {
@@ -143,21 +129,72 @@ func (a *FeishuAdapter) sendStructuredToolCard(ctx context.Context, msg *types.O
 		Title("工具", "orange").
 		Markdown(body.String()).
 		Build()
-	return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
+	cardJSON := BuildCardJSON(card)
+
+	msgID, err := a.sendCardReplyAndGetID(ctx, msg.SessionID, msg.ChatID, cardJSON)
+	if err != nil {
+		return err
+	}
+	stream.mu.Lock()
+	stream.lastToolMsgID = msgID
+	stream.lastToolName = toolName
+	stream.lastToolInput = input
+	stream.mu.Unlock()
+	return nil
 }
 
 func (a *FeishuAdapter) sendStructuredToolResultCard(ctx context.Context, msg *types.OutboundMessage) error {
 	toolName := strings.TrimSpace(msg.Metadata["tool_name"])
-	body := stripOuterCodeFence(msg.Content)
-	if !strings.Contains(body, "```") && body != "" {
-		body = "```\n" + body + "\n```"
+	if toolName == "" {
+		toolName = strings.TrimSpace(msg.Content)
 	}
+	resultBody := formatToolResultMarkdown(msg.Content)
+
+	stream := a.sessionStream(msg.SessionID)
+	stream.mu.Lock()
+	toolMsgID := stream.lastToolMsgID
+	pendingName := stream.lastToolName
+	pendingInput := stream.lastToolInput
+	stream.lastToolMsgID = ""
+	stream.lastToolName = ""
+	stream.lastToolInput = ""
+	stream.mu.Unlock()
+
+	if toolMsgID != "" {
+		displayName := pendingName
+		if toolName != "" {
+			displayName = toolName
+		}
+		var body strings.Builder
+		fmt.Fprintf(&body, "**工具:** `%s`", displayName)
+		if pendingInput != "" && pendingInput != displayName {
+			body.WriteString("\n```\n")
+			body.WriteString(pendingInput)
+			body.WriteString("\n```")
+		}
+		body.WriteString("\n\n**结果**\n")
+		body.WriteString(resultBody)
+		card := NewCard().Title("工具", "orange").Markdown(body.String()).Build()
+		return a.patchMessage(ctx, toolMsgID, BuildCardJSON(card))
+	}
+
 	title := "工具结果"
 	if toolName != "" {
 		title = fmt.Sprintf("工具结果 · %s", toolName)
 	}
-	card := NewCard().Title(title, "green").Markdown(body).Build()
+	card := NewCard().Title(title, "green").Markdown(resultBody).Build()
 	return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
+}
+
+func formatToolResultMarkdown(content string) string {
+	body := strings.TrimSpace(stripOuterCodeFence(content))
+	if body == "" {
+		return "_无输出_"
+	}
+	if strings.Contains(body, "```") {
+		return PreprocessMarkdown(body)
+	}
+	return "```\n" + body + "\n```"
 }
 
 func (a *FeishuAdapter) appendTaskProgress(ctx context.Context, msg *types.OutboundMessage) error {
@@ -183,11 +220,8 @@ func (a *FeishuAdapter) appendTaskProgress(ctx context.Context, msg *types.Outbo
 func (a *FeishuAdapter) upsertTaskProgressCard(ctx context.Context, sessionID, chatID string, completed bool) error {
 	stream := a.sessionStream(sessionID)
 	stream.mu.Lock()
-	if completed {
-		stream.completed = true
-		if stream.progressPct < 100 {
-			stream.progressPct = 100
-		}
+	if completed && stream.progressPct < 100 {
+		stream.progressPct = 100
 	}
 	card := buildTaskProgressCard(stream, completed)
 	stream.mu.Unlock()
@@ -205,6 +239,31 @@ func (a *FeishuAdapter) upsertTaskProgressCard(ctx context.Context, sessionID, c
 		return nil
 	}
 	return a.patchMessage(ctx, stream.progressMsgID, cardJSON)
+}
+
+func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID, chatID, summary string) error {
+	stream := a.sessionStream(sessionID)
+	stream.mu.Lock()
+	hasTaskCard := stream.progressMsgID != "" || stream.taskName != "" || stream.progressPct > 0
+	responseMsgID := stream.responseMsgID
+	responseText := stream.textBuffer.String()
+	if hasTaskCard && strings.TrimSpace(summary) != "" {
+		stream.summaries = append(stream.summaries, strings.TrimSpace(summary))
+	}
+	stream.mu.Unlock()
+
+	if hasTaskCard {
+		return a.upsertTaskProgressCard(ctx, sessionID, chatID, true)
+	}
+	if responseMsgID != "" && strings.TrimSpace(summary) != "" {
+		footer := responseText + "\n\n---\n_" + strings.TrimSpace(summary) + "_"
+		card := NewCard().
+			Title("回复", "blue").
+			Markdown(PreprocessMarkdown(footer)).
+			Build()
+		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
+	}
+	return nil
 }
 
 func buildTaskProgressCard(stream *feishuSessionStream, completed bool) *core.Card {
@@ -267,76 +326,8 @@ func parseProgressPercent(raw string) int {
 	return n
 }
 
-func (a *FeishuAdapter) appendCoalescedProgress(ctx context.Context, msg *types.OutboundMessage) error {
-	stream := a.sessionStream(msg.SessionID)
-	item := progressItemFromOutbound(msg)
-	if item.kind == "" {
-		return nil
-	}
-
-	stream.mu.Lock()
-	stream.items = append(stream.items, item)
-	stream.mu.Unlock()
-
-	return a.upsertProgressCard(ctx, msg.SessionID, msg.ChatID, false)
-}
-
-func progressItemFromOutbound(msg *types.OutboundMessage) progressItem {
-	eventType := msg.Metadata["event_type"]
-	switch eventType {
-	case "thinking":
-		return progressItem{kind: progressKindThinking, text: strings.TrimSpace(msg.Content)}
-	case "tool_call":
-		tool := strings.TrimSpace(msg.Metadata["tool_name"])
-		text := strings.TrimSpace(msg.Content)
-		if text == "" && tool != "" {
-			text = tool
-		}
-		return progressItem{kind: progressKindToolCall, text: text, toolName: tool}
-	case "tool_result":
-		return progressItem{
-			kind:     progressKindToolResult,
-			text:     stripOuterCodeFence(msg.Content),
-			toolName: strings.TrimSpace(msg.Metadata["tool_name"]),
-		}
-	case "milestone_progress":
-		return progressItem{
-			kind:     progressKindMilestone,
-			progress: strings.TrimSpace(msg.Metadata["progress"]),
-			task:     strings.TrimSpace(msg.Metadata["task"]),
-		}
-	case "info":
-		return progressItem{kind: progressKindInfo, text: strings.TrimSpace(msg.Content)}
-	default:
-		return progressItem{}
-	}
-}
-
-func (a *FeishuAdapter) upsertProgressCard(ctx context.Context, sessionID, chatID string, completed bool) error {
-	stream := a.sessionStream(sessionID)
-	stream.mu.Lock()
-	items := append([]progressItem(nil), stream.items...)
-	stream.completed = completed || stream.completed
-	stream.mu.Unlock()
-
-	card := buildCoalescedProgressCard(items, a.progressStyle, completed)
-	cardJSON := BuildCardJSON(card)
-
-	stream.mu.Lock()
-	defer stream.mu.Unlock()
-
-	if stream.progressMsgID == "" {
-		msgID, err := a.sendCardReplyAndGetID(ctx, sessionID, chatID, cardJSON)
-		if err != nil {
-			return err
-		}
-		stream.progressMsgID = msgID
-		return nil
-	}
-	return a.patchMessage(ctx, stream.progressMsgID, cardJSON)
-}
-
 func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatID, chunk string) error {
+	chunk = textutil.StripThinkingTags(chunk)
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}
@@ -347,7 +338,10 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	content := stream.textBuffer.String()
 	stream.mu.Unlock()
 
-	card := NewCard().Markdown(content).Build()
+	card := NewCard().
+		Title("回复", "blue").
+		Markdown(PreprocessMarkdown(content)).
+		Build()
 	cardJSON := BuildCardJSON(card)
 
 	stream.mu.Lock()
@@ -364,105 +358,6 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	return a.patchMessage(ctx, stream.responseMsgID, cardJSON)
 }
 
-func buildCoalescedProgressCard(items []progressItem, style string, completed bool) *core.Card {
-	builder := NewCard()
-	color := "blue"
-	title := "Devrix 处理中"
-	if completed {
-		color = "green"
-		title = "Devrix 完成"
-	}
-	builder = builder.Title(title, color)
-
-	if style == progressStyleCompact {
-		var sections []string
-		for _, item := range items {
-			if line := renderProgressItemCompact(item); line != "" {
-				sections = append(sections, line)
-			}
-		}
-		if len(sections) == 0 {
-			builder = builder.Markdown("_处理中…_")
-		} else {
-			builder = builder.Markdown(strings.Join(sections, "\n\n"))
-		}
-		return builder.Build()
-	}
-
-	for _, item := range items {
-		if block := renderProgressItemCard(item); block != "" {
-			builder = builder.Markdown(block)
-		}
-	}
-	if len(items) == 0 {
-		builder = builder.Markdown("_处理中…_")
-	}
-	return builder.Build()
-}
-
-func renderProgressItemCompact(item progressItem) string {
-	switch item.kind {
-	case progressKindThinking:
-		return "💭 " + item.text
-	case progressKindToolCall:
-		if item.toolName != "" {
-			return fmt.Sprintf("🔧 `%s`", item.toolName)
-		}
-		return "🔧 " + item.text
-	case progressKindToolResult:
-		if item.toolName != "" {
-			return fmt.Sprintf("✅ `%s`\n%s", item.toolName, item.text)
-		}
-		return "✅ " + item.text
-	case progressKindMilestone:
-		if item.task != "" {
-			return fmt.Sprintf("📊 %s — %s", item.progress, item.task)
-		}
-		return "📊 " + item.progress
-	case progressKindInfo:
-		return item.text
-	default:
-		return ""
-	}
-}
-
-func renderProgressItemCard(item progressItem) string {
-	switch item.kind {
-	case progressKindThinking:
-		return "**思考**\n" + item.text
-	case progressKindToolCall:
-		if item.toolName != "" {
-			return fmt.Sprintf("**工具调用**\n`%s`", item.toolName)
-		}
-		return "**工具调用**\n" + item.text
-	case progressKindToolResult:
-		body := item.text
-		if !strings.Contains(body, "```") && body != "" {
-			body = "```\n" + body + "\n```"
-		}
-		if item.toolName != "" {
-			return fmt.Sprintf("**工具结果** · `%s`\n%s", item.toolName, body)
-		}
-		return "**工具结果**\n" + body
-	case progressKindMilestone:
-		lines := make([]string, 0, 2)
-		if item.progress != "" {
-			lines = append(lines, "**进度:** "+item.progress)
-		}
-		if item.task != "" {
-			lines = append(lines, "**任务:** "+item.task)
-		}
-		if len(lines) == 0 {
-			return ""
-		}
-		return "**任务进度**\n" + strings.Join(lines, "\n")
-	case progressKindInfo:
-		return item.text
-	default:
-		return ""
-	}
-}
-
 func stripOuterCodeFence(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if !strings.HasPrefix(trimmed, "```") {
@@ -473,11 +368,6 @@ func stripOuterCodeFence(content string) string {
 		return trimmed
 	}
 	start := 1
-	if strings.TrimSpace(lines[0]) == "```" {
-		start = 1
-	} else if strings.HasPrefix(lines[0], "```") {
-		start = 1
-	}
 	end := len(lines)
 	if end > start && strings.TrimSpace(lines[end-1]) == "```" {
 		end--
@@ -486,38 +376,4 @@ func stripOuterCodeFence(content string) string {
 		return trimmed
 	}
 	return strings.TrimSpace(strings.Join(lines[start:end], "\n"))
-}
-
-func (a *FeishuAdapter) sendLegacyProgressCard(ctx context.Context, msg *types.OutboundMessage) error {
-	eventType := msg.Metadata["event_type"]
-	content := msg.Content
-
-	switch eventType {
-	case "thinking":
-		card := NewCard().Title(content, "blue").Build()
-		return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
-	case "tool_call":
-		tool := msg.Metadata["tool_name"]
-		card := NewCard().
-			Title("工具调用", "orange").
-			Markdown(fmt.Sprintf("**工具:** `%s`", tool)).
-			Build()
-		return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
-	case "tool_result":
-		body := stripOuterCodeFence(content)
-		if !strings.Contains(body, "```") && body != "" {
-			body = "```\n" + body + "\n```"
-		}
-		card := NewCard().Title("工具执行结果", "green").Markdown(body).Build()
-		return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
-	case "milestone_progress":
-		card := NewCard().
-			Title("任务进度", "purple").
-			Markdown("**进度:** " + msg.Metadata["progress"]).
-			Markdown("**任务:** " + msg.Metadata["task"]).
-			Build()
-		return a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card)
-	default:
-		return nil
-	}
 }

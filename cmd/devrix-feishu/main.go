@@ -9,16 +9,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
 func main() {
+	logBinaryInfo()
+
 	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		slog.Error("failed to load user config", "error", err)
@@ -62,7 +65,15 @@ func main() {
 
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
-	contextEngine := selectContextEngine(os.Getenv("DEVRIX_ENGINE"), permissionMgr, ctxCfg)
+	obsBridge := observability.NewBridge(obs)
+	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
+	llmbridge.LogLLMReadiness(configFile)
+	if llmbridge.IsMockGateway(llmStack) {
+		slog.Warn("llm gateway using mock — set MINIMAX_API_KEY and check devrix.yaml")
+	}
+	milestoneService := milestone.NewMilestoneService(nil)
+	engineMode := config.ResolveContextEngine(userCfg.IM)
+	contextEngine := selectContextEngine(engineMode, permissionMgr, ctxCfg, obsBridge, llmStack, milestoneService)
 
 	feishuCfg := &adapters.FeishuConfig{
 		AppID:         userCfg.IM.Feishu.AppID,
@@ -133,30 +144,45 @@ func main() {
 	_ = obs.Shutdown(context.Background())
 }
 
-func selectContextEngine(name string, permMgr *gateway.PermissionManager, ctxCfg *config.ContextEngineConfig) gateway.IContextEngine {
+func selectContextEngine(
+	name string,
+	permMgr *gateway.PermissionManager,
+	ctxCfg *config.ContextEngineConfig,
+	obsBridge *observability.Bridge,
+	llmStack llmbridge.ContextLLMStack,
+	milestoneSvc milestone.IMilestoneService,
+) gateway.IContextEngine {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "stub", "echo":
 		return gateway.NewStubContextEngine()
-	case "context", "ctx":
-		return contextengine.NewContextEngine(contextengine.EngineDeps{
-			LLM:        &mockctx.LLMGateway{},
-			Tools:      &mockctx.ToolRunner{},
-			ToolsReg:   registry.NewBuiltinRegistry(),
-			Permission: gateway.NewPermissionGateAdapter(permMgr),
-			Observer:   contextengine.NoOpObserver{},
-			Config:     ctxCfg,
-		})
 	default:
-		return gateway.NewFourFlowEngine()
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, obsBridge, milestoneSvc)
 	}
+}
+
+func logBinaryInfo() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		slog.Info("devrix-feishu binary", "path", exe)
+		return
+	}
+	slog.Info("devrix-feishu binary",
+		"path", exe,
+		"mod_time", info.ModTime().Format(time.RFC3339),
+		"size_bytes", info.Size(),
+	)
 }
 
 func engineName(engine gateway.IContextEngine) string {
 	switch engine.(type) {
-	case *gateway.FourFlowEngine:
-		return "four_flow"
 	case *gateway.StubContextEngine:
 		return "stub"
+	case *contextengine.ContextEngine:
+		return "context"
 	default:
 		return "unknown"
 	}

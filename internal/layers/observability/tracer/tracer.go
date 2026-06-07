@@ -10,9 +10,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 )
 
-// contextKey is the key used to store span in context
-type contextKey struct{}
-
 // TracerProvider creates Tracer instances
 type TracerProvider struct {
 	config     *settings.TracingConfig
@@ -20,6 +17,8 @@ type TracerProvider struct {
 	exporter   SpanExporter
 	shutdownMu sync.RWMutex
 	shutdown   bool
+	tracersMu  sync.Mutex
+	tracers    []*Tracer
 }
 
 // NewTracerProvider creates a new TracerProvider
@@ -38,12 +37,16 @@ func NewTracerProvider(cfg *settings.TracingConfig, exporter SpanExporter) *Trac
 
 // Tracer creates a new Tracer
 func (tp *TracerProvider) Tracer(name string) *Tracer {
-	return &Tracer{
-		name:            name,
-		provider:        tp,
-		activeSpansMu:   sync.RWMutex{},
-		activeSpans:     make(map[SpanID]*span),
+	t := &Tracer{
+		name:          name,
+		provider:      tp,
+		activeSpansMu: sync.RWMutex{},
+		activeSpans:   make(map[SpanID]*span),
 	}
+	tp.tracersMu.Lock()
+	tp.tracers = append(tp.tracers, t)
+	tp.tracersMu.Unlock()
+	return t
 }
 
 // Shutdown shuts down the TracerProvider
@@ -56,6 +59,23 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	}
 
 	tp.shutdown = true
+
+	tp.tracersMu.Lock()
+	tracers := append([]*Tracer(nil), tp.tracers...)
+	tp.tracersMu.Unlock()
+
+	for _, tr := range tracers {
+		tr.activeSpansMu.Lock()
+		for _, s := range tr.activeSpans {
+			s.End()
+		}
+		tr.activeSpans = make(map[SpanID]*span)
+		tr.activeSpansMu.Unlock()
+	}
+
+	if tp.exporter != nil {
+		return tp.exporter.Shutdown(ctx)
+	}
 	return nil
 }
 
@@ -162,7 +182,7 @@ func (t *Tracer) Start(ctx context.Context, name string, opts ...SpanStartOption
 	t.activeSpansMu.Unlock()
 
 	// Inject span context into context
-	ctx = context.WithValue(ctx, contextKey{}, sc)
+	ctx = context.WithValue(ctx, spanContextKey, sc)
 
 	return ctx, s
 }

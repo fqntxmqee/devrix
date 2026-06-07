@@ -1,0 +1,103 @@
+# OpenSpec Change Metadata
+
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-observability-fix
+  demand_id: DM-20260607-005
+  title: "Devrix 可观察层缺陷修复"
+  status: s7_archived
+  archived_at: "2026-06-07"
+  priority: P0
+  owner: architecture
+  created_at: "2026-06-07"
+  updated_at: "2026-06-07"
+  parent_change: devrix-observability
+
+scope:
+  layers:
+    - id: L5
+      name: Observability
+      affected: true
+
+  capabilities:
+    - OBS-METRICS      # gauge float64 fix, histogram cumulative fix
+    - OBS-TRACE        # shutdown flush
+    - OBS-LOG          # stack trace, sampling
+    - OBS-SHUTDOWN     # full component shutdown
+    - OBS-EXPORTER     # interface compliance
+
+  l5_test_points:
+    - L5-OBS-FIX-01    # Gauge float64 atomic correctness
+    - L5-OBS-CONCUR-01 # AsyncGauge/Counter callback concurrency safety
+    - L5-OBS-FIX-02    # Histogram cumulative bucket + +Inf correctness
+    - L5-OBS-FIX-03    # Shutdown flushes all pending spans + double-check
+    - L5-OBS-FIX-04    # Shutdown covers all components
+    - L5-OBS-FIX-05    # Int64UpDownCounter returns Gauge
+    - L5-OBS-FIX-06    # Error logs include stack trace (StackTracer + Callers)
+    - L5-OBS-FIX-07    # Log sampling + capacity protection
+    - L5-OBS-FIX-08    # ConsoleExporter implements SpanExporter
+    - L5-OBS-FIX-09    # Registry.Reset covers Counter + Gauge + Histogram
+    - L5-OBS-FIX-10    # Handler.Close interface + delegation
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/observability/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+
+version_scope:
+  v1.1:
+    features:
+      - Gauge float64 原子操作修复
+      - AsyncGauge/Counter 回调竞态修复
+      - Histogram 桶计数修复（含 +Inf）
+      - Shutdown pending spans 刷写 + double-check
+      - 全组件 Shutdown
+      - Int64UpDownCounter 改为 Gauge
+      - Registry.Reset 全类型
+      - Handler.Close 接口扩展
+      - 错误日志堆栈跟踪（StackTracer）
+      - 日志采样实现（容量保护）
+      - Logger-Tracer 依赖解耦
+      - 接口一致性修复
+      - 死代码清理
+      - 测试增强
+    status: s7_archived
+    tasks: T1-T15 + T1b, T6b, T6c
+    estimate: 32h
+
+bug_severity:
+  critical:
+    - gauge-float64-conversion    # Gauge float64 → uint64 转换精度丢失
+    - async-gauge-counter-race    # AsyncGauge/Counter 回调并发无保护
+    - histogram-double-cumulative # Histogram 双重累积导致 Prometheus 输出错误
+    - shutdown-no-flush           # TracerProvider.Shutdown 未刷写 pending spans
+  high:
+    - updown-counter-is-counter   # Int64UpDownCounter 返回 Counter 而非 Gauge
+    - shutdown-missing-metrics    # Shutdown 遗漏 Logger 组件
+    - registry-reset-incomplete   # Registry.Reset 未重置 Gauge/Histogram
+    - handler-missing-close       # Handler 接口缺少 Close 方法
+    - dead-mutex                  # Counter 中未使用的 sync.Mutex
+    - log-sampling-unimplemented  # 日志采样配置存在但未实现
+  medium:
+    - error-log-no-stacktrace     # 错误日志无堆栈跟踪
+    - bubble-sort-in-registry     # sortedKeys 使用冒泡排序
+    - exporter-interface-mismatch # ConsoleExporter 未实现 SpanExporter
+    - null-export-batch-dead      # NullExporter.ExportBatch 不在接口中
+    - weak-unit-tests             # 部分测试无实际断言
+
+related_changes:
+  - devrix-observability
+
+notes: |
+  基于深度代码 Review 发现初始 13 个缺陷。
+  Grill-with-docs 审查新增 3 个缺陷（AsyncGauge/Counter 竞态、Registry.Reset 不完整、Handler 缺少 Close）。
+  最终共 16 个缺陷：4 个 Critical、6 个 High、6 个 Medium。
+  设计文档已完成 8 项 grill 决议修订。
+  总任务数 18，预估 32h。

@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,7 +24,7 @@ func NewConsoleExporter() *ConsoleExporter {
 }
 
 // Export exports a span to stdout
-func (e *ConsoleExporter) Export(s tracer.ReadableSpan) error {
+func (e *ConsoleExporter) Export(_ context.Context, s tracer.ReadableSpan) error {
 	if s == nil {
 		return nil
 	}
@@ -78,16 +79,6 @@ func (e *ConsoleExporter) SetOutput(f *os.File) {
 }
 
 // Shutdown shuts down the exporter
-func (e *ConsoleExporter) Shutdown() error {
-	return nil
-}
-
-// ExportBatch exports multiple spans
-func (e *ConsoleExporter) ExportBatch(spans []tracer.ReadableSpan) error {
-	for _, s := range spans {
-		if err := e.Export(s); err != nil {
-			return err
-		}
-	}
+func (e *ConsoleExporter) Shutdown(_ context.Context) error {
 	return nil
 }

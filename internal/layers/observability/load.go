@@ -35,6 +35,17 @@ func mergeConfig(base *Config, loaded *Config) {
 	if loaded == nil {
 		return
 	}
+	// Only apply loaded values when the config file actually contains an
+	// observability section. Otherwise, zero-valued fields would overwrite
+	// DefaultConfig (e.g. Enabled=true → false when the key is absent).
+	hasContent := loaded.Enabled ||
+		loaded.Tracing.Enabled || loaded.Tracing.Exporter != "" || loaded.Tracing.ServiceName != "" ||
+		loaded.Metrics.Enabled || loaded.Metrics.Exporter != "" ||
+		loaded.Logging.Enabled || loaded.Logging.Level != "" ||
+		loaded.Health.Enabled || loaded.Health.Endpoint != ""
+	if !hasContent {
+		return
+	}
 	base.Enabled = loaded.Enabled
 	if loaded.Tracing.Enabled || loaded.Tracing.Exporter != "" || loaded.Tracing.ServiceName != "" {
 		base.Tracing = loaded.Tracing

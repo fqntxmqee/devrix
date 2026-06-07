@@ -9,13 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/auth"
 	"github.com/devrix/devrix/internal/layers/communication/connection"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/instance"
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
@@ -91,22 +90,16 @@ func main() {
 	milestoneService := milestone.NewMilestoneService(nil)
 	_ = authService
 	_ = rateLimiter
-	_ = milestoneService
 
 	// Initialize permission manager
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
 
-	// Create context engine (Layer 2)
-	permissionGate := gateway.NewPermissionGateAdapter(permissionMgr)
-	contextEngine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{},
-		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
-		Permission: permissionGate,
-		Observer:   contextengine.NoOpObserver{},
-		Config:     ctxCfg,
-	})
+	// Wire LLM gateway (Layer 3) → Context Engine (Layer 2)
+	obsBridge := observability.NewBridge(obs)
+	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
+	llmbridge.LogLLMReadiness(configFile)
+	contextEngine := bootstrap.NewContextEngine(llmStack, permissionMgr, ctxCfg, obsBridge, milestoneService)
 
 	// Create event handler
 	defaultEventHandler := &DefaultEventHandler{
@@ -138,6 +131,7 @@ func main() {
 					ReactionEmoji: userCfg.IM.Feishu.ReactionEmoji,
 					DoneEmoji:     userCfg.IM.Feishu.DoneEmoji,
 					ReplyInThread: userCfg.IM.Feishu.IsReplyInThread(),
+					ProgressStyle: userCfg.IM.Feishu.ProgressStyle,
 				}
 				feishuAdapter = adapters.NewFeishuAdapter(nil, feishuCfg, commCfg)
 				eventHandler = feishuAdapter
@@ -261,3 +255,4 @@ func (h *DefaultEventHandler) OnError(err error, sessionID string) {
 func (h *DefaultEventHandler) OnStatus(sessionID string, state types.SessionState) {
 	slog.Debug("session status", "sessionID", sessionID, "state", state)
 }
+

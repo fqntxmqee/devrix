@@ -1,0 +1,63 @@
+# OpenSpec Change Metadata
+
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-llm-gateway
+  demand_id: DM-20260607-004
+  title: "LLM Gateway Layer V1"
+  status: s7_archived
+  priority: P0
+  owner: architecture
+  created_at: "2026-06-07"
+  updated_at: "2026-06-07"
+  archived_at: "2026-06-07"
+
+scope:
+  layers:
+    - id: L3
+      name: LLM Gateway
+      affected: true
+
+  capabilities:
+    - LLM-GATEWAY
+    - LLM-ADAPTER
+    - LLM-BREAKER
+    - LLM-TOKEN
+    - LLM-CONFIG
+    - LLM-RETRY
+    - LLM-OBS
+
+  l5_test_points:
+    - L5-LLM-01
+    - L5-LLM-02
+    - L5-LLM-03
+    - L5-LLM-04
+    - L5-LLM-05
+    - L5-LLM-06
+    - L5-LLM-07
+    - L5-LLM-08
+    - L5-LLM-09
+    - L5-LLM-10
+    - L5-LLM-11
+    - L5-LLM-12
+    - L5-LLM-13
+    - L5-LLM-16
+
+dependencies:
+  - change_id: devrix-context-engine
+    version: v1
+    status: archived
+  - change_id: devrix-observability
+    version: v1
+    status: implemented
+    optional: true
+
+consumers:
+  - change_id: devrix-context-engine-v2
+    version: v2
+    requires_milestones: [M1, M3, M4, M5, M6]
+    shared_contracts:
+      - internal/shared/contracts/tokencounter.go
+      - contextengine.ILLMGateway

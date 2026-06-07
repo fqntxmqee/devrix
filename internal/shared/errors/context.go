@@ -1,6 +1,9 @@
 package errors
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Context engine sentinel errors.
 var (
@@ -18,6 +21,12 @@ const (
 	CodeLLMUnavailable       = "CTX_LLM_4004"
 	CodeMemoryNotImplemented = "CTX_MEMORY_4005"
 	CodePermissionDenied     = "CTX_PERMISSION_4006"
+	CodeAutocompactFailed    = "CTX_AUTOCOMPACT_4010"
+	CodeVerifyCommandFailed  = "CTX_VERIFY_CMD_4011"
+	CodeVerifyCommandReject  = "CTX_VERIFY_CMD_4012"
+	CodePlanValidationFailed = "CTX_PLAN_4020"
+	CodePlanLLMTimeout       = "CTX_PLAN_4021"
+	CodeLongTermDBError      = "CTX_MEMORY_4022"
 )
 
 // NewContextExceededError returns a context exceeded error.
@@ -48,4 +57,34 @@ func NewFeatureNotImplementedError(feature, version string) *SentinelError {
 // NewContextPermissionDeniedError returns a permission denied error for tool calls.
 func NewContextPermissionDeniedError(toolName string) *SentinelError {
 	return WithCode(CodePermissionDenied, "permission denied for tool: "+toolName, ErrPermissionDenied)
+}
+
+// NewAutocompactFailedError returns an autocompact degradation error.
+func NewAutocompactFailedError(reason string, err error) *SentinelError {
+	return WithCode(CodeAutocompactFailed, "autocompact degraded: "+reason, err)
+}
+
+// NewVerifyCommandFailedError returns a verify command non-zero exit error.
+func NewVerifyCommandFailedError(name string, exitCode int) *SentinelError {
+	return WithCode(CodeVerifyCommandFailed, fmt.Sprintf("verify command %s failed with exit %d", name, exitCode), ErrPEVMaxIterations)
+}
+
+// NewVerifyCommandRejectedError returns a verify command configuration/runtime rejection.
+func NewVerifyCommandRejectedError(reason string) *SentinelError {
+	return WithCode(CodeVerifyCommandReject, "verify command rejected: "+reason, ErrPEVMaxIterations)
+}
+
+// NewPlanValidationFailedError returns a plan DAG/JSON validation error (degraded path).
+func NewPlanValidationFailedError(reason string) *SentinelError {
+	return WithCode(CodePlanValidationFailed, "plan validation failed: "+reason, ErrFeatureNotImplemented)
+}
+
+// NewPlanLLMTimeoutError returns a plan LLM timeout error.
+func NewPlanLLMTimeoutError(err error) *SentinelError {
+	return WithCode(CodePlanLLMTimeout, "plan llm timeout", err)
+}
+
+// NewLongTermDBError returns a long-term memory persistence error.
+func NewLongTermDBError(err error) *SentinelError {
+	return WithCode(CodeLongTermDBError, "long-term memory db error", err)
 }

@@ -527,18 +527,28 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 | 版本 | ①目标增量 | ③流程增量 | ④模型增量 |
 |------|-----------|-----------|-----------|
 | V1 | 替换 Stub，压缩 1-5+7 | Execute→Verify | Working+ShortTerm |
-| V2 | Autocompact + Token 统一 | Verify commands（executable+args） | 管道 1-4→6→5→7；OpenSpec: `openspec/changes/devrix-context-engine-v2/` |
-| V3 | 跨会话记忆 | Plan+Milestone | LongTerm SQLite |
+| V2 | Autocompact + Token 统一 | Verify commands（executable+args） | 管道 1-4→6→5→7；OpenSpec: `openspec/archive/2026-06-07-devrix-context-engine-v2/` |
+| V3 | 跨会话记忆 | Plan+Milestone | LongTerm SQLite；OpenSpec: `openspec/changes/devrix-context-engine-v3/` |
 
-### V2 增量摘要（DM-20260607-003）
+### V2 增量摘要（DM-20260607-003，Grill 2026-06-07）
 
 | 能力 | 要点 |
 |------|------|
-| Autocompact | 步骤 6 在 Assembly 前对消息历史做 LLM 摘要；`autocompact.model` 直传 Gateway |
-| Token | `shared/contracts.ITokenCounter`；Gateway 实现，L2 注入 |
-| Verify | `verify_mode: commands`；`executable`+`args[]`，禁止 shell |
-| 可观测 | 独立 `ICompressionObserver`，不破坏 V1 `IObserver` |
-| 接线 | 主路径真实 LLM Gateway（L5-CTX-18） |
+| Autocompact | 步骤 6 在 Assembly 前对消息历史做 LLM 摘要；`autocompact.model` 直传 Gateway；P99 < 10s；turn 以 user role 为边界 |
+| Token | `shared/contracts.ITokenCounter`；Gateway 实现，L2 注入（已就绪） |
+| Verify | `verify_mode: commands`；`executable`+`args[]`，禁止 shell；WorkDir 精确匹配 |
+| 可观测 | `ICompressionObserver` + `IPEVObserver` 两个独立接口；metrics 标签基数约束 |
+| 接线 | 主路径真实 LLM Gateway（L5-CTX-18）；Pipeline functional options 模式 |
+
+### V3 增量摘要（DM-20260607-006，Grill 2026-06-07）
+
+| 能力 | 要点 |
+|------|------|
+| Plan | `plan.model` 独立；JSON DAG 校验 + Kahn 拓扑；`plan.enabled=false` 默认回退 V2 |
+| Milestone PEV | `IMilestonePlanner` 经 `bridges/milestone` 对接 L1；`milestone_progress` 事件；fail-fast |
+| LongTerm | SQLite `~/.devrix/memory.db`；Recall LIKE 注入 system prompt；`auto_store=false` 默认 |
+| 接线 | `bootstrap.WireContextV3` 在 main / devrix-feishu 注入 Planner + LongTerm |
+| 压缩顺序 | 不变：1-4 → 6 → 5 → 7（V2 行为保持） |
 
 ---
 
@@ -551,9 +561,25 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 | 3 | 权限握手 | IPermissionGate 注入 L2，Gateway 仅展示 | **已决议** |
 | 4 | verify_mode 默认 | `basic`；V2 增 `commands` | **已决议** |
 | 5 | 快照加密 | V2 不做，维持明文 | **已决议（V2）** |
-| 6 | 压缩/Autocompact 异步 | V2 同步；1-4 <100ms，摘要 P99 <30s | **已决议（V2）** |
+| 6 | 压缩/Autocompact 异步 | V2 同步；1-4 <100ms，摘要 P99 <10s | **已决议（V2/Grill）** |
 | 7 | 管道步骤顺序 | 1-4 → 6 → 5 → 7 | **已决议（V2）** |
 | 8 | Verify 执行方式 | exec.CommandContext(executable, args...) | **已决议（V2）** |
+| 9 | Autocompact 超时 | 10s（不可接受 30s 用户等待） | **已决议（Grill）** |
+| 10 | Observer 接口拆分 | `ICompressionObserver` + `IPEVObserver` | **已决议（Grill）** |
+| 11 | Turn 定义 | 以 `user` role 为边界切分 | **已决议（Grill）** |
+| 12 | Autocompact Prompt 模板 | JSON + ≤5项/数组 + 空数组允许 | **已决议（Grill）** |
+| 13 | Verify WorkDir 沙箱 | 固定 session.WorkDir + 精确匹配 | **已决议（Grill）** |
+| 14 | Metrics 标签基数 | ≤10 命令 + name regex + 不加 exit_code 标签 | **已决议（Grill）** |
+| 15 | Pipeline 构造函数 | Functional options 模式 | **已决议（Grill）** |
+| 16 | verifyPEV 重构 | 改为 PEVEngine 方法 | **已决议（Grill）** |
+| 17 | 错误码 4010 | 不拆分，error message 区分 | **已决议（Grill）** |
+| 18 | 快照版本兼容 | 保持 ctx-v1，不升版本 | **已决议（Grill）** |
+| 19 | 幻觉防护 | metadata 标记 + prompt 约束 | **已决议（Grill）** |
+| 20 | Plan 模型分离 | `plan.model` 独立，timeout 15s | **已决议（V3 Grill）** |
+| 21 | milestone metrics 基数 | milestone_id 标签，单任务 ≤10 | **已决议（V3 Grill）** |
+| 22 | LongTerm 加密 | V3 不做 at-rest 加密 | **已决议（V3 Grill）** |
+| 23 | Milestone fail-fast | 失败后跳过后续 milestone | **已决议（V3 Grill）** |
+| 24 | Plan 默认关闭 | `plan.enabled=false` 灰度 | **已决议（V3 Grill）** |
 
 ---
 

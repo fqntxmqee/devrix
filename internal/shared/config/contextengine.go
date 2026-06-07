@@ -2,19 +2,25 @@ package config
 
 // ContextEngineConfig holds Layer 2 configuration.
 type ContextEngineConfig struct {
-	MaxContextTokens   int              `yaml:"max_context_tokens"`
-	ReservedOutput     int              `yaml:"reserved_output_tokens"`
-	ToolResultBudget   int              `yaml:"tool_result_budget"`
-	CompressionEnabled bool             `yaml:"compression_enabled"`
-	PEV                PEVConfig        `yaml:"pev"`
-	Snapshot           SnapshotConfig   `yaml:"snapshot"`
+	MaxContextTokens   int                `yaml:"max_context_tokens"`
+	ReservedOutput     int                `yaml:"reserved_output_tokens"`
+	ToolResultBudget   int                `yaml:"tool_result_budget"`
+	CompressionEnabled bool               `yaml:"compression_enabled"`
+	Compression        CompressionConfig  `yaml:"compression"`
+	TokenCounter       TokenCounterConfig `yaml:"token_counter"`
+	PEV                PEVConfig          `yaml:"pev"`
+	Snapshot           SnapshotConfig     `yaml:"snapshot"`
 	SystemPrompt       SystemPromptConfig `yaml:"system_prompt"`
+	Plan               PlanConfig         `yaml:"plan"`
+	LongTerm           LongTermConfig     `yaml:"longterm"`
 }
 
 // PEVConfig holds PEV loop settings.
 type PEVConfig struct {
-	MaxIterations int    `yaml:"max_iterations"`
-	VerifyMode    string `yaml:"verify_mode"`
+	MaxIterations  int                   `yaml:"max_iterations"`
+	VerifyMode     string                `yaml:"verify_mode"`
+	VerifyPolicy   string                `yaml:"verify_policy"`
+	VerifyCommands []VerifyCommandConfig `yaml:"verify_commands"`
 }
 
 // SnapshotConfig holds snapshot persistence settings.
@@ -36,9 +42,16 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		ReservedOutput:     8192,
 		ToolResultBudget:   800,
 		CompressionEnabled: true,
+		Compression: CompressionConfig{
+			Autocompact: DefaultAutocompactConfig(),
+		},
+		TokenCounter: TokenCounterConfig{
+			Source: TokenCounterSourceGateway,
+		},
 		PEV: PEVConfig{
 			MaxIterations: 3,
-			VerifyMode:    "basic",
+			VerifyMode:    VerifyModeBasic,
+			VerifyPolicy:  VerifyPolicyAllPass,
 		},
 		Snapshot: SnapshotConfig{
 			Enabled:   true,
@@ -48,6 +61,8 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 			Sources:  []string{"AGENTS.md", ".devrix/AGENTS.md"},
 			Fallback: "You are Devrix, a multi-agent development assistant.",
 		},
+		Plan:     DefaultPlanConfig(),
+		LongTerm: DefaultLongTermConfig(),
 	}
 }
 

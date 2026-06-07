@@ -1,9 +1,9 @@
 # Context Engine Specification
 
 **Capability:** context-engine
-**Change ID:** devrix-context-engine (archived 2026-06-07)
+**Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07)
 **Layer:** 2
-**Version:** 1.0.0
+**Version:** 3.0.0
 **Status:** Canonical — source of truth
 
 ---
@@ -11,6 +11,10 @@
 ## Overview
 
 上下文引擎负责会话级消息历史、Token 预算、七步压缩与 PEV 执行循环，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
+
+V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。
+
+V3（DM-20260607-006）增强：PEV Plan 阶段、Milestone DAG 驱动执行、`milestone_progress` 事件生产、LongTerm SQLite 跨 Session 记忆；`plan.enabled=false` 时保持 V2 Execute→Verify 路径。
 
 ---
 
@@ -100,126 +104,210 @@
 
 ### Requirement: Seven-Step Compression Pipeline
 
-系统 MUST 实现七步压缩管道；V1 MUST 执行步骤 1-5 和 7，跳过步骤 6。
+系统 MUST 实现七步压缩管道。V2 在 `autocompact.enabled=true` 且仍超 `CompressionTarget` 时执行步骤 6；否则跳过。
+
+**物理执行顺序：** 1 → 2 → 3 → 4 → [6] → 5 → 7
 
 **Priority**: P0
-**Rationale**: 超长对话必须在 Token 预算内
-**L3 映射**: L3-BE-CTX-02
 **L4 映射**: L4-CTX-COMPRESS
+**L5 映射**: L5-CTX-03, L5-CTX-04, L5-CTX-08, L5-CTX-12
 
-#### Scenario: Step 1 Tool Result Budget
+#### Scenario: Step 6 Autocompact skipped
 
-- GIVEN tool result messages exceed per-result budget
-- WHEN compression step 1 runs
-- THEN tool results are truncated
-- AND truncation marker is appended
+- GIVEN `autocompact.enabled` is false
+- WHEN pipeline reaches step 6 slot (after step 4, before assembly)
+- THEN step is skipped (`autocompact:skipped`)
 
-#### Scenario: Step 2 Snip
+#### Scenario: Step 6 Autocompact executed
 
-- GIVEN total tokens exceed compression target
-- WHEN Snip runs
-- THEN oldest messages are removed until within target
-- AND minimum recent turns are preserved
-
-#### Scenario: Step 3 Microcompact
-
-- GIVEN consecutive messages share the same role
-- WHEN Microcompact runs
-- THEN they are merged into one message
-
-#### Scenario: Step 4 Context Collapse
-
-- GIVEN trivial short exchanges exist
-- WHEN Collapse runs
-- THEN trivial messages are folded
-- AND substantive content is preserved
-
-#### Scenario: Step 5 System Prompt Assembly
-
-- GIVEN compressed messages and system prompt
-- WHEN Assembly runs
-- THEN system prompt is first
-- AND messages remain chronological
-
-#### Scenario: Step 6 Autocompact skipped in V1
-
-- GIVEN V1 implementation
-- WHEN pipeline reaches step 6
-- THEN step is skipped
-- AND skip is logged via observer
+- GIVEN V2 with `autocompact.enabled` true
+- AND steps 1-4 applied on message history (no system prompt)
+- AND token count still exceeds `CompressionTarget`
+- WHEN step 6 runs
+- THEN middle segment is replaced by LLM summary assistant message
+- AND pipeline proceeds to step 5 Assembly
 
 #### Scenario: Step 7 Token Block
 
 - GIVEN compressed context still exceeds max budget
 - WHEN TokenBlock runs
 - THEN `ContextExceededError` is returned
-- AND LLM is not invoked
-
-#### Scenario: Compression triggered by threshold
-
-- GIVEN token count exceeds `CompressionTarget`
-- WHEN user message is processed
-- THEN compression pipeline runs before LLM call
-- AND compression report is emitted
 
 ---
 
-### Requirement: PEV Engine (V1 Simplified)
+### Requirement: Autocompact Compression Step
 
-系统 MUST 实现简化 PEV 循环：Execute → Verify（V1 无 Plan 阶段）。
+系统 MUST 在步骤 6 使用 LLM 对中间消息段生成结构化 JSON 摘要。
 
 **Priority**: P0
-**Rationale**: 工具调用需要执行与基本验证闭环
+**L4 映射**: L4-CTX-COMPRESS
+**L5 映射**: L5-CTX-12, L5-CTX-13
+
+#### Scenario: Autocompact LLM failure degrades gracefully
+
+- GIVEN autocompact is enabled
+- WHEN LLM times out (>10s), fails, or returns invalid JSON after 1 retry
+- THEN step 6 is skipped (`autocompact:degraded`)
+- AND pipeline continues without panic
+
+---
+
+### Requirement: PEV Verify Commands Mode
+
+系统 MUST 支持 `verify_mode: commands`，运行白名单 `executable`+`args[]` 命令（禁止 shell）。
+
+**Priority**: P0
 **L4 映射**: L4-CTX-PEV
-**L5 映射**: L5-CTX-06, L5-CTX-07, L5-CTX-11
+**L5 映射**: L5-CTX-14, L5-CTX-15
 
-#### Scenario: Execute phase invokes LLM
+---
 
-- GIVEN compressed context within budget
-- WHEN Execute phase runs
-- THEN `ILLMGateway.ChatStream` is called
-- AND streaming chunks map to `thinking`/`text` events
+### Requirement: Gateway Token Counter Integration
 
-#### Scenario: Tool call delegation
+系统 MUST 通过 `shared/contracts.ITokenCounter` 注入 Gateway 计数器作为生产默认（`token_counter.source: gateway`）。
 
-- GIVEN LLM response contains tool calls
-- WHEN Execute handles tools
-- THEN `tool_call` events are emitted for Gateway display
-- AND `IPermissionGate.Request` is invoked synchronously before tool execution
-- AND `IToolRunner` is invoked only when permission is approved
-- AND `tool_result` events are emitted on success
+**Priority**: P0
+**L4 映射**: L4-CTX-STATE, L4-CTX-COMPRESS
+**L5 映射**: L5-CTX-16
 
-#### Scenario: Tool call permission denied
+---
 
-- GIVEN LLM response contains tool calls
-- WHEN `IPermissionGate.Request` returns false
-- THEN an `error` EngineEvent is emitted with permission denied
-- AND `IToolRunner` is not invoked
-- AND partial assistant context is preserved
+### Requirement: PEV Engine (V3 Enhanced)
+
+系统 MUST 实现 PEV 循环。`plan.enabled=true` 时支持 Plan → Execute → Verify（按 Milestone 拓扑序）；否则保持 V2 Execute → Verify。支持 `verify_mode: basic | commands | none`。
+
+**Priority**: P0
+**L4 映射**: L4-CTX-PEV, L4-CTX-PLAN
+**L5 映射**: L5-CTX-06, L5-CTX-07, L5-CTX-11, L5-CTX-14, L5-CTX-15, L5-CTX-19, L5-CTX-20, L5-CTX-24
 
 #### Scenario: Verify phase basic mode
 
 - GIVEN tool execution completed
 - WHEN Verify runs in `basic` mode
 - THEN verification passes if tool result has no error
-- AND on failure PEV may re-execute up to `max_iterations`
+
+#### Scenario: Verify phase commands mode
+
+- GIVEN `verify_mode` is `commands`
+- WHEN Verify runs after tool execution
+- THEN whitelisted commands run in `session.WorkDir` via `exec.CommandContext`
 
 #### Scenario: PEV max iterations exceeded
 
 - GIVEN Verify fails repeatedly
 - WHEN iteration reaches `max_iterations`
 - THEN `PEVMaxIterations` error is returned
-- AND partial result is preserved in context
+
+#### Scenario: Plan disabled preserves V2 behavior
+
+- GIVEN `plan.enabled=false`
+- WHEN Process handles user message
+- THEN Plan phase is skipped
+- AND Execute→Verify loop runs as V2
+
+---
+
+### Requirement: PEV Plan Phase
+
+系统 MUST 在 `plan.enabled=true` 时支持 PEV Plan 阶段，将用户意图分解为 Milestone DAG。
+
+**Priority**: P0
+**L4 映射**: L4-CTX-PLAN, L4-CTX-PEV
+**L5 映射**: L5-CTX-19, L5-CTX-25
+
+#### Scenario: Plan generates milestone DAG
+
+- GIVEN `plan.enabled=true` and user message requires multi-step work
+- WHEN PEVEngine enters Plan phase
+- THEN LLM produces structured milestone JSON
+- AND milestones are validated (id format, dependency refs, acyclic DAG)
+- AND milestones are created via `IMilestonePlanner`
+
+#### Scenario: Plan validation failure degrades to V2
+
+- GIVEN Plan LLM output fails validation
+- WHEN validation detects cycle or invalid refs
+- THEN error `CTX_PLAN_4020` is logged
+- AND execution continues as V2 Execute→Verify without DAG
+
+---
+
+### Requirement: Milestone-Driven Execution
+
+系统 MUST 按 Milestone DAG 拓扑序驱动 Execute→Verify，并更新进度。
+
+**Priority**: P0
+**L4 映射**: L4-CTX-PEV
+**L5 映射**: L5-CTX-20, L5-CTX-21
+
+#### Scenario: Milestones execute in dependency order
+
+- GIVEN a valid Milestone DAG for a task
+- WHEN PEV runs after Plan
+- THEN milestones execute in topological order
+- AND blocked milestones wait until dependencies complete
+
+#### Scenario: Milestone progress events emitted
+
+- GIVEN milestone progress changes during PEV
+- WHEN UpdateProgress or Complete is called
+- THEN `milestone_progress` EngineEvent is emitted
+- AND metadata includes `milestone_id`, `progress`, `task`
+
+#### Scenario: Milestone verify failure fail-fast
+
+- GIVEN verify fails after max iterations for a milestone
+- WHEN retry budget is exhausted
+- THEN `IMilestonePlanner.Fail` is called with reason
+- AND subsequent milestones are skipped (fail_fast)
+
+---
+
+### Requirement: IMilestonePlanner Contract
+
+Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communication layer internals.
+
+**Priority**: P0
+**L4 映射**: L4-CTX-PLAN
+**L5 映射**: L5-CTX-19
+
+#### Scenario: Context engine uses planner contract
+
+- GIVEN context engine Plan phase
+- WHEN milestones are created or updated
+- THEN only `IMilestonePlanner` interface methods are invoked
+- AND communication `milestone` package is not imported by L2
+
+---
+
+### Requirement: Compression and Verify Observability
+
+系统 MUST 通过 `ICompressionObserver` 与 `IPEVObserver` 发射压缩步骤与 Verify 命令事件。
+
+**Priority**: P1
+**L4 映射**: L4-CTX-OBS
+**L5 映射**: L5-CTX-17
+
+---
+
+### Requirement: Real LLM Gateway Wiring
+
+系统 MUST 在主路径注入真实 LLM Gateway（`bridges/llm.WireContextLLM`），配置缺失时降级 Mock。
+
+**Priority**: P1
+**L4 映射**: L4-CTX-STATE
+**L5 映射**: L5-CTX-18
 
 ---
 
 ### Requirement: Layered Memory
 
-系统 MUST 提供三层记忆模型；V1 MUST 实现 Working 与 Short-Term。
+系统 MUST 提供三层记忆模型：Working、Short-Term（快照）、Long-Term（SQLite）。
 
 **Priority**: P0
-**Rationale**: 分离临时状态与会话持久化
+**Rationale**: 分离临时状态、会话持久化与跨 Session 项目知识
 **L4 映射**: L4-CTX-MEMORY
+**L5 映射**: L5-CTX-10, L5-CTX-22, L5-CTX-23
 
 #### Scenario: Working memory not persisted
 
@@ -234,11 +322,24 @@
 - THEN `Session.ContextSnapshot` is updated
 - AND snapshot can reload on next message
 
-#### Scenario: Long-term memory not available in V1
+#### Scenario: LongTerm recall injects context
 
-- GIVEN V1 implementation
-- WHEN long-term memory recall is requested
-- THEN `FeatureNotImplementedError` is returned
+- GIVEN `longterm.enabled=true` and entries exist for query topic
+- WHEN Process starts
+- THEN Recall returns matching entries
+- AND recalled content is injected into system prompt within token budget
+
+#### Scenario: LongTerm store on completion
+
+- GIVEN `longterm.auto_store=true` and topic in whitelist
+- WHEN Process completes successfully
+- THEN a memory entry is persisted to SQLite
+
+#### Scenario: LongTerm disabled returns not implemented
+
+- GIVEN `longterm.enabled=false`
+- WHEN Recall is called on disabled backend
+- THEN `CTX_MEMORY_4005` FeatureNotImplemented is returned
 
 ---
 
@@ -273,12 +374,12 @@
 - THEN the Process context is cancelled
 - AND event emission stops without panic
 
-#### Scenario: Task flow milestone progress (V3 ready)
+#### Scenario: Task flow milestone progress
 
-- GIVEN milestone progress update
-- WHEN PEV Plan is integrated (V3)
-- THEN `milestone_progress` events may be emitted
-- AND metadata includes milestone_id and progress
+- GIVEN milestone progress update from PEV Plan/Execute
+- WHEN milestone state changes
+- THEN `milestone_progress` events are emitted
+- AND metadata includes `milestone_id`, `progress`, and `task`
 
 #### Scenario: Info flow
 

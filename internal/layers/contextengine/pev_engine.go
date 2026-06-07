@@ -3,11 +3,18 @@ package contextengine
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/contextengine/pev"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -17,8 +24,21 @@ type PEVEngine struct {
 	tools      IToolRunner
 	toolsReg   IToolRegistry
 	permission IPermissionGate
-	observer   IObserver
-	cfg        *config.PEVConfig
+	observer      IObserver
+	pevObserver   IPEVObserver
+	verifyRunner  IVerifyCommandRunner
+	cfg             *config.PEVConfig
+	planCfg         config.PlanConfig
+	planEngine      *pev.PlanEngine
+	milestoneRunner *pev.MilestoneRunner
+	obsBridge       *observability.Bridge
+
+	metricsOnce sync.Once
+	llmTokens   metrics.Counter
+	llmLatency  metrics.Histogram
+	llmErrors   metrics.Counter
+	toolCalls   metrics.Counter
+	toolErrors  metrics.Counter
 }
 
 // NewPEVEngine creates a PEV engine.
@@ -29,21 +49,73 @@ func NewPEVEngine(
 	permission IPermissionGate,
 	observer IObserver,
 	cfg *config.PEVConfig,
+	obsBridge *observability.Bridge,
+	verifyRunner IVerifyCommandRunner,
+	pevObserver IPEVObserver,
+	planner contracts.IMilestonePlanner,
+	planCfg config.PlanConfig,
 ) *PEVEngine {
 	if cfg == nil {
-		cfg = &config.PEVConfig{MaxIterations: 3, VerifyMode: "basic"}
+		cfg = &config.PEVConfig{MaxIterations: 3, VerifyMode: config.VerifyModeBasic}
 	}
 	if observer == nil {
 		observer = NoOpObserver{}
 	}
-	return &PEVEngine{
-		llm:        llm,
-		tools:      tools,
-		toolsReg:   toolsReg,
-		permission: permission,
-		observer:   observer,
-		cfg:        cfg,
+	if pevObserver == nil {
+		pevObserver = NoOpPEVObserver{}
 	}
+	e := &PEVEngine{
+		llm:          llm,
+		tools:        tools,
+		toolsReg:     toolsReg,
+		permission:   permission,
+		observer:     observer,
+		pevObserver:  pevObserver,
+		verifyRunner: verifyRunner,
+		cfg:          cfg,
+		planCfg:      planCfg,
+		obsBridge:    obsBridge,
+	}
+	if planner != nil && llm != nil {
+		e.planEngine = pev.NewPlanEngine(newPlanLLMAdapter(llm), planner, planCfg)
+		e.milestoneRunner = pev.NewMilestoneRunner(
+			planner,
+			planCfg,
+			e.executeMilestone,
+			pevObserver.EmitMilestoneProgress,
+		)
+	}
+	return e
+}
+
+func (e *PEVEngine) initMetrics() {
+	e.metricsOnce.Do(func() {
+		if e.obsBridge == nil || e.obsBridge.Meter() == nil {
+			return
+		}
+		m := e.obsBridge.Meter()
+		e.llmTokens, _ = m.Int64Counter("engine_llm_tokens", metrics.WithLabels(metrics.LabelMap{
+			"provider": "mock", "model": "mock",
+		}))
+		e.llmLatency, _ = m.Float64Histogram("engine_llm_latency",
+			metrics.WithHistogramLabels(metrics.LabelMap{"provider": "mock", "model": "mock"}),
+			metrics.WithBounds(metrics.LLMHistogramBounds()),
+		)
+		e.llmErrors, _ = m.Int64Counter("engine_llm_errors", metrics.WithLabels(metrics.LabelMap{
+			"provider": "mock", "model": "mock",
+		}))
+		e.toolCalls, _ = m.Int64Counter("engine_tool_calls", metrics.WithLabels(metrics.LabelMap{
+			"tool": "all", "risk_level": "all",
+		}))
+		e.toolErrors, _ = m.Int64Counter("engine_tool_errors", metrics.WithLabels(metrics.LabelMap{
+			"tool": "all", "risk_level": "all",
+		}))
+	})
+}
+
+// VerifyPEV runs the verify phase for tests and tooling.
+func (e *PEVEngine) VerifyPEV(ctx context.Context, sc *types.SessionContext, results []ToolResult) types.VerifyResult {
+	return e.verify(ctx, sc, results)
 }
 
 // PEVRunResult holds PEV output.
@@ -53,17 +125,87 @@ type PEVRunResult struct {
 }
 
 // Run executes PEV loop and emits gateway events.
-func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []types.Message, emit func(*gateway.EngineEvent)) (*PEVRunResult, error) {
+func (e *PEVEngine) Run(
+	ctx context.Context,
+	sc *types.SessionContext,
+	view []types.Message,
+	userMessage string,
+	emit func(*gateway.EngineEvent),
+) (*PEVRunResult, error) {
+	e.initMetrics()
+
+	if e.planEngine != nil && e.milestoneRunner != nil && pev.ShouldPlan(e.planCfg, sc.PEVState, userMessage) {
+		sc.PEVState.Phase = types.PEVPhasePlan
+		e.observer.EmitPEVPhase(sc.SessionID, types.PEVPhasePlan, 0)
+
+		planResult, err := e.planEngine.Plan(ctx, userMessage)
+		if err != nil {
+			return nil, err
+		}
+		if planResult != nil && !planResult.Degraded && len(planResult.Milestones) > 0 {
+			e.pevObserver.EmitPlanCompleted(sc.SessionID, len(planResult.Milestones))
+			if runErr := e.milestoneRunner.Run(ctx, sc, view, planResult.TaskID, emit); runErr != nil {
+				return nil, runErr
+			}
+			emit(&gateway.EngineEvent{
+				Type: "complete", SessionID: sc.SessionID,
+				Metadata: map[string]string{"usage": "0", "duration": "0"},
+			})
+			sc.PEVState.Phase = types.PEVPhaseDone
+			return &PEVRunResult{Messages: sc.Messages}, nil
+		}
+	}
+
+	return e.runExecuteVerifyLoop(ctx, sc, view, sc.SystemPrompt, emit, true)
+}
+
+func (e *PEVEngine) executeMilestone(
+	ctx context.Context,
+	sc *types.SessionContext,
+	view []types.Message,
+	m *types.Milestone,
+	emit func(*gateway.EngineEvent),
+) (bool, error) {
+	prompt := sc.SystemPrompt + milestonePromptSuffix(m)
+	_, err := e.runExecuteVerifyLoop(ctx, sc, view, prompt, emit, false)
+	if err != nil {
+		return false, err
+	}
+	return sc.PEVState.VerifyResult.Passed, nil
+}
+
+func milestonePromptSuffix(m *types.Milestone) string {
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf("\n\n## Current Milestone: %s (%s)\n%s", m.Name, m.ID, m.Description)
+}
+
+func (e *PEVEngine) runExecuteVerifyLoop(
+	ctx context.Context,
+	sc *types.SessionContext,
+	view []types.Message,
+	systemPrompt string,
+	emit func(*gateway.EngineEvent),
+	emitComplete bool,
+) (*PEVRunResult, error) {
 	start := time.Now()
 	maxIter := e.cfg.MaxIterations
 	if maxIter <= 0 {
 		maxIter = 3
 	}
 
+	ctx, runSpan := e.startSpan(ctx, "pev_engine.run", tracer.SpanKindInternal,
+		tracer.Attribute{Key: "pev.max_iterations", Value: fmt.Sprintf("%d", maxIter)},
+	)
+	if runSpan != nil {
+		defer runSpan.End()
+	}
+
 	toolSchemas, _ := e.toolsReg.ListTools(ctx, sc.WorkDir)
 	req := &LLMRequest{
 		Model:        sc.Model,
-		SystemPrompt: sc.SystemPrompt,
+		SystemPrompt: systemPrompt,
 		Messages:     view,
 		Tools:        toolSchemas,
 	}
@@ -77,15 +219,29 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 		sc.PEVState.Iteration = iter
 		e.observer.EmitPEVIteration(sc.SessionID, iter, types.PEVPhaseExecute)
 
+		// LLM call span + metrics.
+		llmStart := time.Now()
+		_, llmSpan := e.startSpan(ctx, "pev_engine.llm_call", tracer.SpanKindClient,
+			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
+		)
 		chunks, err := e.llm.ChatStream(ctx, req)
 		if err != nil {
+			if llmSpan != nil {
+				llmSpan.RecordError(err)
+				llmSpan.End()
+			}
+			e.recordLLMError()
 			return nil, errors.NewLLMUnavailableError(err)
 		}
 
 		var pendingTools []ToolCall
+		var tagSplitter textutil.ThinkTagSplitter
 		for chunk := range chunks {
 			select {
 			case <-ctx.Done():
+				if llmSpan != nil {
+					llmSpan.End()
+				}
 				return nil, ctx.Err()
 			default:
 			}
@@ -93,11 +249,17 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 				emit(&gateway.EngineEvent{Type: "thinking", Content: chunk.Thinking, SessionID: sc.SessionID})
 			}
 			if chunk.Content != "" {
-				assistantText += chunk.Content
-				emit(&gateway.EngineEvent{
-					Type: "text", Content: chunk.Content, SessionID: sc.SessionID,
-					Metadata: map[string]string{"is_complete": "false"},
-				})
+				thinking, content := tagSplitter.Push(chunk.Content)
+				if thinking != "" {
+					emit(&gateway.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
+				}
+				if content != "" {
+					assistantText += content
+					emit(&gateway.EngineEvent{
+						Type: "text", Content: content, SessionID: sc.SessionID,
+						Metadata: map[string]string{"is_complete": "false"},
+					})
+				}
 			}
 			if len(chunk.ToolCalls) > 0 {
 				pendingTools = append(pendingTools, chunk.ToolCalls...)
@@ -106,6 +268,26 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 				usage = chunk.Usage
 			}
 		}
+		if thinking, content := tagSplitter.Flush(); thinking != "" || content != "" {
+			if thinking != "" {
+				emit(&gateway.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
+			}
+			if content != "" {
+				assistantText += content
+				emit(&gateway.EngineEvent{
+					Type: "text", Content: content, SessionID: sc.SessionID,
+					Metadata: map[string]string{"is_complete": "false"},
+				})
+			}
+		}
+		if llmSpan != nil {
+			llmSpan.SetAttributes(
+				tracer.Attribute{Key: "llm.tokens_prompt", Value: fmt.Sprintf("%d", usage.PromptTokens)},
+				tracer.Attribute{Key: "llm.tokens_completion", Value: fmt.Sprintf("%d", usage.CompletionTokens)},
+			)
+			llmSpan.End()
+		}
+		e.recordLLMCall(usage, time.Since(llmStart))
 
 		if len(pendingTools) == 0 {
 			break
@@ -121,14 +303,46 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 				Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input, "risk_level": string(risk)},
 			})
 
+			// Tool execution span.
+			_, toolSpan := e.startSpan(ctx, "pev_engine.tool_execution", tracer.SpanKindInternal,
+				tracer.Attribute{Key: "tool.name", Value: tc.Name},
+				tracer.Attribute{Key: "tool.risk_level", Value: string(risk)},
+			)
+
+			// Permission check span.
+			_, permSpan := e.startSpan(ctx, "pev_engine.permission_check", tracer.SpanKindInternal,
+				tracer.Attribute{Key: "tool.name", Value: tc.Name},
+			)
 			if e.permission != nil && !e.permission.Request(ctx, sc.SessionID, tc.Name, tc.Input, risk) {
+				if permSpan != nil {
+					permSpan.SetAttributes(tracer.Attribute{Key: "permission.result", Value: "denied"})
+					permSpan.End()
+				}
+				if toolSpan != nil {
+					toolSpan.RecordError(fmt.Errorf("permission denied"))
+					toolSpan.End()
+				}
+				e.recordToolError()
 				emit(pevErrorEvent(sc.SessionID, errors.NewContextPermissionDeniedError(tc.Name), false))
 				return &PEVRunResult{Usage: usage}, errors.NewContextPermissionDeniedError(tc.Name)
+			}
+			if permSpan != nil {
+				permSpan.SetAttributes(tracer.Attribute{Key: "permission.result", Value: "approved"})
+				permSpan.End()
 			}
 
 			result, err := e.tools.Execute(ctx, tc)
 			if err != nil {
 				result = &ToolResult{Error: err.Error()}
+				if toolSpan != nil {
+					toolSpan.RecordError(err)
+				}
+				e.recordToolError()
+			} else {
+				e.recordToolCall()
+			}
+			if toolSpan != nil {
+				toolSpan.End()
 			}
 			toolResults = append(toolResults, *result)
 
@@ -151,7 +365,7 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 
 		sc.PEVState.Phase = types.PEVPhaseVerify
 		e.observer.EmitPEVPhase(sc.SessionID, types.PEVPhaseVerify, iter)
-		vr := verifyPEV(e.cfg.VerifyMode, toolResults)
+		vr := e.verify(ctx, sc, toolResults)
 		sc.PEVState.VerifyResult = vr
 		if vr.Passed {
 			break
@@ -162,27 +376,78 @@ func (e *PEVEngine) Run(ctx context.Context, sc *types.SessionContext, view []ty
 		}
 	}
 
-	if assistantText != "" {
+	if len(toolResults) == 0 && !sc.PEVState.VerifyResult.Passed {
+		sc.PEVState.VerifyResult = types.VerifyResult{Passed: true}
+	}
+
+	assistantText = textutil.StripThinkingTags(assistantText)
+
+	duration := time.Since(start).Milliseconds()
+	if emitComplete {
 		emit(&gateway.EngineEvent{
-			Type: "text", Content: assistantText, SessionID: sc.SessionID,
-			Metadata: map[string]string{"is_complete": "true"},
+			Type: "complete", SessionID: sc.SessionID,
+			Metadata: map[string]string{
+				"usage": fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens), "duration": fmt.Sprintf("%d", duration),
+			},
 		})
 	}
 
-	duration := time.Since(start).Milliseconds()
-	emit(&gateway.EngineEvent{
-		Type: "complete", SessionID: sc.SessionID,
-		Metadata: map[string]string{
-			"usage": fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens), "duration": fmt.Sprintf("%d", duration),
-		},
-	})
+	if runSpan != nil {
+		runSpan.SetAttributes(
+			tracer.Attribute{Key: "pev.duration_ms", Value: fmt.Sprintf("%d", duration)},
+			tracer.Attribute{Key: "pev.total_tokens", Value: fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens)},
+		)
+	}
 
-	sc.PEVState.Phase = types.PEVPhaseDone
+	if emitComplete {
+		sc.PEVState.Phase = types.PEVPhaseDone
+	}
 	var msgs []types.Message
 	if assistantText != "" {
 		msgs = append(msgs, types.Message{Role: types.MessageRoleAssistant, Content: assistantText})
 	}
 	return &PEVRunResult{Usage: usage, Messages: msgs}, nil
+}
+
+func (e *PEVEngine) startSpan(ctx context.Context, name string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if e.obsBridge == nil || e.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(attrs...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return e.obsBridge.Tracer().Start(ctx, name, opts...)
+}
+
+func (e *PEVEngine) recordLLMCall(usage TokenUsage, latency time.Duration) {
+	if e.llmTokens != nil {
+		e.llmTokens.Add(int64(usage.PromptTokens + usage.CompletionTokens))
+	}
+	if e.llmLatency != nil {
+		e.llmLatency.Observe(latency.Seconds())
+	}
+}
+
+func (e *PEVEngine) recordLLMError() {
+	if e.llmErrors != nil {
+		e.llmErrors.Inc()
+	}
+}
+
+func (e *PEVEngine) recordToolCall() {
+	if e.toolCalls != nil {
+		e.toolCalls.Inc()
+	}
+}
+
+func (e *PEVEngine) recordToolError() {
+	if e.toolErrors != nil {
+		e.toolErrors.Inc()
+	}
 }
 
 func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *gateway.EngineEvent {
@@ -196,17 +461,3 @@ func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool
 	}
 }
 
-func verifyPEV(mode string, results []ToolResult) types.VerifyResult {
-	if mode == "none" {
-		return types.VerifyResult{Passed: true}
-	}
-	for _, r := range results {
-		if r.Error != "" {
-			return types.VerifyResult{Passed: false, Deviation: 1}
-		}
-		if mode == "basic" && r.Output == "" {
-			return types.VerifyResult{Passed: false, Deviation: 0.5}
-		}
-	}
-	return types.VerifyResult{Passed: true}
-}

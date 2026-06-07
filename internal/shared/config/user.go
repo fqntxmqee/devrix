@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,6 +24,7 @@ type UserConfig struct {
 // IMConfig IM 平台配置
 type IMConfig struct {
 	Enabled  bool                    `yaml:"enabled"`  // 是否启用 IM
+	Engine   string                  `yaml:"engine"`   // context | stub，默认 context（真实 LLM）
 	Platform IMPlatformConfig        `yaml:"platform"` // 当前选中的平台
 	Feishu  FeishuUserConfig        `yaml:"feishu"`  // 飞书配置
 	DingTalk DingTalkUserConfig     `yaml:"dingtalk"` // 钉钉配置
@@ -266,6 +268,9 @@ func applyUserEnvOverrides(cfg *UserConfig) {
 	if val := os.Getenv("DEVRIX_IM_PROVIDER"); val != "" {
 		cfg.IM.Platform.Provider = val
 	}
+	if val := os.Getenv("DEVRIX_ENGINE"); val != "" {
+		cfg.IM.Engine = val
+	}
 
 	// 飞书配置
 	if val := os.Getenv("FEISHU_APP_ID"); val != "" {
@@ -329,3 +334,16 @@ func (c *UserConfig) ShouldAutoApproveFile() bool {
 func (c *UserConfig) ShouldAutoApproveNetwork() bool {
 	return c.YOLO.Enabled && c.YOLO.AutoApproveNetwork
 }
+
+// ResolveContextEngine returns the context engine name for devrix-feishu.
+// Priority: DEVRIX_ENGINE env > im.engine config > "context" (real LLM).
+func ResolveContextEngine(im IMConfig) string {
+	if val := strings.ToLower(strings.TrimSpace(os.Getenv("DEVRIX_ENGINE"))); val != "" {
+		return val
+	}
+	if val := strings.ToLower(strings.TrimSpace(im.Engine)); val != "" {
+		return val
+	}
+	return "context"
+}
+

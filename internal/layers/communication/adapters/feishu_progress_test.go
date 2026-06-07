@@ -20,69 +20,12 @@ func TestStripOuterCodeFence(t *testing.T) {
 	}
 }
 
-func TestBuildCoalescedProgressCard_IncludesMilestoneTask(t *testing.T) {
-	items := []progressItem{
-		{kind: progressKindThinking, text: "思考中..."},
-		{kind: progressKindMilestone, progress: "50%", task: "读取代码文件"},
-	}
-	card := buildCoalescedProgressCard(items, progressStyleCard, false)
-	if card.Header == nil || card.Header.Title != "Devrix 处理中" {
-		t.Fatalf("header title = %#v", card.Header)
-	}
-	body := cardBodyMarkdown(card)
-	if !strings.Contains(body, "50%") || !strings.Contains(body, "读取代码文件") {
-		t.Fatalf("milestone task missing from card body: %q", body)
-	}
-}
-
-func TestFeishuAdapter_CoalescedProgress_ReplyOncePatchMany(t *testing.T) {
-	var replyCount int
-	var patchCount int
-
-	msgID := "om_progress"
-	mockMsgAPI := &mockMessageAPI{
-		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
-			replyCount++
-			return &larkim.ReplyMessageResp{
-				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
-			}, nil
-		},
-		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
-			patchCount++
-			return &larkim.PatchMessageResp{}, nil
-		},
-	}
-	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
-	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
-
-	adapter := NewFeishuAdapter(nil, &FeishuConfig{
-		AppID:         "test_app",
-		AppSecret:     "test_secret",
-		ProgressStyle: progressStyleCard,
-	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
-	adapter.sessionReplyCtx.Store("sess_1", feishuReplyContext{userMessageID: "om_root"})
-
-	events := []types.OutboundMessage{
-		{SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321", Content: "思考中...", Metadata: map[string]string{"event_type": "thinking"}},
-		{SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321", Content: "read", Metadata: map[string]string{"event_type": "tool_call", "tool_name": "read"}},
-		{SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321", Content: "ok", Metadata: map[string]string{"event_type": "tool_result", "tool_name": "read"}},
-		{SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321", Metadata: map[string]string{"event_type": "milestone_progress", "progress": "50%", "task": "读取代码文件"}},
-	}
-	for i := range events {
-		adapter.OnMessage(&events[i])
-	}
-
-	if replyCount != 1 {
-		t.Fatalf("replyCount = %d, want 1", replyCount)
-	}
-	if patchCount != 3 {
-		t.Fatalf("patchCount = %d, want 3", patchCount)
-	}
-}
-
 func TestNormalizeProgressStyle_DefaultStructured(t *testing.T) {
 	if got := normalizeProgressStyle(""); got != progressStyleStructured {
 		t.Fatalf("normalizeProgressStyle(\"\") = %q, want %q", got, progressStyleStructured)
+	}
+	if got := normalizeProgressStyle("card"); got != progressStyleStructured {
+		t.Fatalf("normalizeProgressStyle(\"card\") = %q, want structured only", got)
 	}
 }
 
@@ -153,13 +96,56 @@ func TestFeishuAdapter_StructuredProgress_SeparateThinkingToolAndTaskCard(t *tes
 		Metadata:  map[string]string{"event_type": "complete"},
 	})
 
-	// thinking + tool + task progress create = 3 replies
+	// thinking + tool + task progress create = 3 replies; tool_result patches tool card
 	if replyCount != 3 {
 		t.Fatalf("replyCount = %d, want 3", replyCount)
 	}
-	// info + complete patch the same task progress card
-	if patchCount != 2 {
-		t.Fatalf("patchCount = %d, want 2", patchCount)
+	if patchCount < 2 {
+		t.Fatalf("patchCount = %d, want at least 2", patchCount)
+	}
+}
+
+func TestFeishuAdapter_StructuredProgress_SimpleReplyNoEmptyTaskCard(t *testing.T) {
+	var replyCount int
+	var patchCount int
+
+	msgID := "om_response"
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			replyCount++
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+			patchCount++
+			return &larkim.PatchMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:         "test_app",
+		AppSecret:     "test_secret",
+		ProgressStyle: progressStyleStructured,
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_1", feishuReplyContext{userMessageID: "om_root"})
+
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "你好！", Metadata: map[string]string{"event_type": "text"},
+	})
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "用时: 2.5s, 消耗: 1000 tokens", Metadata: map[string]string{"event_type": "complete"},
+	})
+
+	if replyCount != 1 {
+		t.Fatalf("replyCount = %d, want 1 (response only)", replyCount)
+	}
+	if patchCount != 1 {
+		t.Fatalf("patchCount = %d, want 1 (complete footer on response)", patchCount)
 	}
 }
 

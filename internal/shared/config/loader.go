@@ -26,6 +26,7 @@ type ConfigFile struct {
 	Logging     LoggingConfig     `yaml:"logging"`
 	Metrics        MetricsConfig        `yaml:"metrics"`
 	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
+	LLMGateway     LLMGatewayFileConfig `yaml:"llm_gateway"`
 }
 
 // AppConfig 应用配置
@@ -99,6 +100,18 @@ func LoadConfigFile(path string) (*ConfigFile, error) {
 	return &cfg, nil
 }
 
+// LoadLLMGatewayConfig loads Layer 3 config from a YAML file path.
+func LoadLLMGatewayConfig(path string) (*LLMGatewayConfig, error) {
+	if path == "" {
+		return DefaultLLMGatewayConfig(), nil
+	}
+	fileCfg, err := LoadConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return BuildLLMGatewayConfig(&fileCfg.LLMGateway), nil
+}
+
 // LoadConfig loads configuration with fallback to defaults
 func LoadConfig(path string) (*CommunicationConfig, *types.AuthConfig, *RateLimitConfig, *ContextEngineConfig, error) {
 	// Try to load from file
@@ -137,11 +150,23 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 		cfg.ToolResultBudget = f.ToolResultBudget
 	}
 	cfg.CompressionEnabled = f.CompressionEnabled || cfg.CompressionEnabled
+	if f.Compression.Autocompact.Enabled || f.Compression.Autocompact.Model != "" {
+		cfg.Compression.Autocompact = mergeAutocompact(cfg.Compression.Autocompact, f.Compression.Autocompact)
+	}
+	if f.TokenCounter.Source != "" {
+		cfg.TokenCounter.Source = f.TokenCounter.Source
+	}
 	if f.PEV.MaxIterations != 0 {
 		cfg.PEV.MaxIterations = f.PEV.MaxIterations
 	}
 	if f.PEV.VerifyMode != "" {
 		cfg.PEV.VerifyMode = f.PEV.VerifyMode
+	}
+	if f.PEV.VerifyPolicy != "" {
+		cfg.PEV.VerifyPolicy = f.PEV.VerifyPolicy
+	}
+	if len(f.PEV.VerifyCommands) > 0 {
+		cfg.PEV.VerifyCommands = f.PEV.VerifyCommands
 	}
 	if f.Snapshot.BackupDir != "" {
 		cfg.Snapshot.BackupDir = f.Snapshot.BackupDir
@@ -153,7 +178,36 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 	if f.SystemPrompt.Fallback != "" {
 		cfg.SystemPrompt.Fallback = f.SystemPrompt.Fallback
 	}
+	if err := ValidateContextEngineConfig(cfg); err != nil {
+		fmt.Printf("warning: context engine config invalid, using defaults where needed: %v\n", err)
+	}
 	return cfg
+}
+
+func mergeAutocompact(base, override AutocompactConfig) AutocompactConfig {
+	out := base
+	if override.Enabled {
+		out.Enabled = true
+	}
+	if override.Model != "" {
+		out.Model = override.Model
+	}
+	if override.SummaryMaxTokens > 0 {
+		out.SummaryMaxTokens = override.SummaryMaxTokens
+	}
+	if override.MinMessagesForSummary > 0 {
+		out.MinMessagesForSummary = override.MinMessagesForSummary
+	}
+	if override.PreserveHeadTurns > 0 {
+		out.PreserveHeadTurns = override.PreserveHeadTurns
+	}
+	if override.PreserveTailTurns > 0 {
+		out.PreserveTailTurns = override.PreserveTailTurns
+	}
+	if override.Timeout > 0 {
+		out.Timeout = override.Timeout
+	}
+	return out
 }
 
 // FindConfigFile looks for config file in standard locations

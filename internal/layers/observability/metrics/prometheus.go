@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -76,22 +77,26 @@ func (r *Registry) Output() string {
 		
 		labels := labelsToPrometheus(r.histos[key].Labels())
 		
-		// Cumulative buckets
+		// Cumulative buckets (Observe stores per-bucket counts, not cumulative)
 		var cumulative uint64
 		for _, bound := range sortedBounds {
-			cumulative += buckets[bound]
-			le := "+Inf"
-			if bound < 1e308 {
-				le = fmt.Sprintf("%g", bound)
+			if math.IsInf(bound, 1) {
+				continue
 			}
+			cumulative += buckets[bound]
 			sb.WriteString(key)
 			sb.WriteString("_bucket{le=\"")
-			sb.WriteString(le)
+			sb.WriteString(fmt.Sprintf("%g", bound))
 			sb.WriteString("\"")
 			sb.WriteString(labels)
 			sb.WriteString("} ")
 			sb.WriteString(fmt.Sprintf("%d\n", cumulative))
 		}
+		sb.WriteString(key)
+		sb.WriteString("_bucket{le=\"+Inf\"")
+		sb.WriteString(labels)
+		sb.WriteString("} ")
+		sb.WriteString(fmt.Sprintf("%d\n", h.Count()))
 		
 		// Sum and count
 		sb.WriteString(key)

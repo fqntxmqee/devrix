@@ -90,15 +90,86 @@ metrics:
   port: 9090
   path: "/metrics"
 
+# LLM 网关配置 (Layer 3)
+llm_gateway:
+  default_provider: "minimax"
+  default_model: "MiniMax-M2.7-highspeed"
+  model_routing:
+    "deepseek-*": deepseek
+    "minimax-*": minimax
+    "MiniMax-*": minimax
+  circuit_breaker:
+    failure_threshold: 5
+    success_threshold: 2
+    open_duration: "30s"
+    scope: "provider"
+  providers:
+    deepseek:
+      type: "deepseek"
+      base_url: "https://api.deepseek.com/v1"
+      api_key_env: "DEEPSEEK_API_KEY"
+      default_model: "deepseek-v4-flash"
+      fallback_model: "deepseek-v4-pro"
+      timeout: "60s"
+      max_tokens: 8192
+      temperature: 0.7
+      retry:
+        max_attempts: 3
+        initial_delay: "1s"
+        max_delay: "10s"
+        backoff: 2.0
+    minimax:
+      type: "minimax"
+      base_url: "https://api.minimaxi.com/v1"
+      api_key_env: "MINIMAX_API_KEY"
+      default_model: "MiniMax-M2.7-highspeed"
+      fallback_model: "MiniMax-M2.5-highspeed"
+      timeout: "60s"
+      max_tokens: 8192
+      temperature: 0.7
+      retry:
+        max_attempts: 3
+        initial_delay: "1s"
+        max_delay: "10s"
+        backoff: 2.0
+
 # 上下文引擎配置 (Layer 2)
 context_engine:
   max_context_tokens: 128000
   reserved_output_tokens: 8192
   tool_result_budget: 800
   compression_enabled: true
+
+  # V2 新增: 压缩管道配置
+  compression:
+    autocompact:
+      enabled: true
+      model: "deepseek-v4-flash"       # 直接指定模型名，映射至 LLMRequest.Model
+      summary_max_tokens: 512
+      min_messages_for_summary: 8
+      preserve_head_turns: 2
+      preserve_tail_turns: 2
+      timeout: "10s"                   # P99 摘要延迟上限
+
+  # V2 增强: PEV 配置
   pev:
     max_iterations: 3
-    verify_mode: "basic"
+    verify_mode: "basic"               # basic | none | commands
+    verify_policy: "all_pass"          # all_pass | any_pass
+    verify_commands:                   # 仅在 verify_mode=commands 时生效
+      - name: "go-test"                # 仅允许 [a-z0-9_-]+
+        executable: "go"
+        args: ["test", "./..."]
+        timeout: "120s"
+      - name: "go-vet"
+        executable: "go"
+        args: ["vet", "./..."]
+        timeout: "30s"
+
+  # V2 新增: Token 计数源
+  token_counter:
+    source: "gateway"                  # gateway | heuristic（仅测试）
+
   snapshot:
     enabled: true
     backup_dir: "~/.devrix/context"
@@ -107,6 +178,28 @@ context_engine:
       - "AGENTS.md"
       - ".devrix/AGENTS.md"
     fallback: "You are Devrix, a multi-agent development assistant."
+
+  # V3 新增: Plan 阶段（默认关闭，等同 V2 Execute→Verify）
+  plan:
+    enabled: false
+    auto_detect: true
+    min_chars_for_plan: 200
+    model: "deepseek-v4"
+    max_milestones: 10
+    timeout: "15s"
+    on_milestone_fail: "fail_fast"
+
+  # V3 新增: 跨 Session 长期记忆（SQLite）
+  longterm:
+    enabled: true
+    db_path: "~/.devrix/memory.db"
+    auto_store: false
+    topics:
+      - "architecture"
+      - "decisions"
+      - "bugs"
+    recall_max_entries: 5
+    recall_max_tokens: 2000
 
 # 可观察层配置 (Observability Layer)
 observability:

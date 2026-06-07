@@ -4,10 +4,13 @@ import (
 	"testing"
 )
 
-func TestConsoleExporter(t *testing.T) {
+func TestConsoleExporter_should_create_instance(t *testing.T) {
 	exporter := NewConsoleExporter()
 	if exporter == nil {
 		t.Fatal("should create exporter")
+	}
+	if exporter.Shutdown(nil) != nil {
+		t.Fatal("shutdown should succeed")
 	}
 }
 

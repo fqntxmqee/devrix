@@ -160,8 +160,8 @@ func NewSessionBridge(obs *Observability) *SessionBridge {
 	}
 }
 
-// ActiveSessions returns a counter for active sessions
-func (b *SessionBridge) ActiveSessions(adapter string) (metrics.Counter, error) {
+// ActiveSessions returns a gauge for active sessions
+func (b *SessionBridge) ActiveSessions(adapter string) (metrics.Gauge, error) {
 	if b.bridge == nil || b.bridge.meter == nil {
 		return nil, nil
 	}

@@ -66,6 +66,10 @@ func New(cfg *Config) (*Observability, error) {
 		obs.log = logger.NewStructuredLogger(&logger.LoggerConfig{
 			Level:  cfg.Logging.Level,
 			Format: cfg.Logging.Format,
+			Sampling: logger.SamplingConfig{
+				Enabled:           cfg.Logging.Sampling.Enabled,
+				MaxEntriesPerSpan: cfg.Logging.Sampling.MaxEntriesPerSpan,
+			},
 			Redactor: logger.RedactorConfig{
 				Enabled:  cfg.Logging.Redactor.Enabled,
 				Patterns: cfg.Logging.Redactor.Patterns,
@@ -112,6 +116,12 @@ func (o *Observability) Shutdown(ctx context.Context) error {
 	if o.tracerProvider != nil {
 		if err := o.tracerProvider.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("tracer shutdown: %w", err))
+		}
+	}
+
+	if o.log != nil {
+		if err := o.log.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("logger shutdown: %w", err))
 		}
 	}
 

@@ -1,0 +1,70 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/types"
+	"github.com/devrix/devrix/tests/testutil"
+)
+
+func main() {
+	obsCfg := observability.DefaultConfig()
+	obsCfg.Enabled = true
+	obsCfg.Tracing.Enabled = true
+	obsCfg.Tracing.Exporter = "console"
+	obsCfg.Metrics.Enabled = true
+	obsCfg.Logging.Enabled = true
+
+	obs, _ := observability.New(obsCfg)
+	obsBridge := observability.NewBridge(obs)
+
+	dir, _ := os.MkdirTemp("", "devrix-obs-verify")
+	defer os.RemoveAll(dir)
+
+	store, _ := gateway.NewFileSessionStore(dir)
+	cfg := config.DefaultConfig()
+	ctxCfg := config.DefaultContextEngineConfig()
+	handler := testutil.NewMockEventHandler()
+	permMgr := gateway.NewPermissionManager(&cfg.Permission)
+
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
+		Tools:      &mockctx.ToolRunner{},
+		ToolsReg:   registry.NewBuiltinRegistry(),
+		Permission: mockctx.AllowAllPermission{},
+		Config:     ctxCfg,
+		ObsBridge:  obsBridge,
+	})
+
+	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
+	gw.SetObservability(obs)
+
+	session, _ := gw.CreateSession("cli", "/tmp")
+	ctx := context.Background()
+
+	gw.RouteInbound(ctx, &types.InboundMessage{
+		SessionID: session.SessionID,
+		Content:   "test message",
+		MessageID: "msg-001",
+		ChatID:    "chat-1",
+	})
+
+	handler.WaitForMessages(1, 3*time.Second)
+	fmt.Fprintf(os.Stderr, "\n=== Messages received: %d ===\n", handler.MessageCount())
+
+	if obs.Meter() != nil {
+		fmt.Fprintf(os.Stderr, "\n=== Metrics Output ===\n")
+		fmt.Print(obs.Meter().Registry().Output())
+	}
+
+	obs.Shutdown(context.Background())
+}

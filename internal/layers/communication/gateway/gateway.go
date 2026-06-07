@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/errors"
@@ -49,6 +50,11 @@ type CommunicationGateway struct {
 	mu              sync.RWMutex
 	sessions        map[string]*types.Session
 	activeProcesses map[string]context.CancelFunc
+
+	// metrics
+	metricInboundMsgs   metrics.Counter
+	metricOutboundMsgs  metrics.Counter
+	metricSessionsTotal metrics.Counter
 }
 
 // NewCommunicationGateway creates a new CommunicationGateway
@@ -104,6 +110,23 @@ func (g *CommunicationGateway) SetObservability(obs *observability.Observability
 		return
 	}
 	g.obsBridge = observability.NewBridge(obs)
+	g.initMetrics()
+}
+
+func (g *CommunicationGateway) initMetrics() {
+	if g.obsBridge == nil || g.obsBridge.Meter() == nil {
+		return
+	}
+	m := g.obsBridge.Meter()
+	g.metricInboundMsgs, _ = m.Int64Counter("gateway_inbound_messages", metrics.WithLabels(metrics.LabelMap{
+		"adapter": "all",
+	}))
+	g.metricOutboundMsgs, _ = m.Int64Counter("gateway_outbound_messages", metrics.WithLabels(metrics.LabelMap{
+		"event_type": "all",
+	}))
+	g.metricSessionsTotal, _ = m.Int64Counter("gateway_sessions_total", metrics.WithLabels(metrics.LabelMap{
+		"adapter": "all",
+	}))
 }
 
 // StartCleanupRoutine starts a background goroutine that periodically cleans up expired sessions
@@ -146,6 +169,11 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 	slog.Info("gateway: RouteInbound called", "sessionID", msg.SessionID, "content", msg.Content, "chatID", msg.ChatID)
 
+	// Record inbound metric
+	if g.metricInboundMsgs != nil {
+		g.metricInboundMsgs.Inc()
+	}
+
 	// Validate message
 	if msg.Content == "" {
 		return errors.NewMessageEmptyError()
@@ -176,7 +204,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
 	}
 
-	processCtx, cancel := context.WithCancel(ctx)
+	processCtx, cancel := context.WithCancel(context.Background())
 	g.registerProcess(session.SessionID, cancel)
 
 	// Process message through context engine
@@ -212,6 +240,12 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 // handleEngineEvent handles a single engine event
 func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *types.Session, event *EngineEvent) {
 	slog.Info("gateway: handleEngineEvent", "type", event.Type, "sessionID", session.SessionID)
+
+	// Record outbound metric
+	if g.metricOutboundMsgs != nil {
+		g.metricOutboundMsgs.Inc()
+	}
+
 	switch event.Type {
 	case "thinking":
 		session.SetState(types.SessionStateThinking)
@@ -369,6 +403,11 @@ func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Ses
 	g.mu.Lock()
 	g.sessions[sessionID] = session
 	g.mu.Unlock()
+
+	// Record session creation metric
+	if g.metricSessionsTotal != nil {
+		g.metricSessionsTotal.Inc()
+	}
 
 	return session, nil
 }

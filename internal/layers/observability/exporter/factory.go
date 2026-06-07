@@ -1,7 +1,6 @@
 package exporter
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -9,22 +8,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
-// consoleExporterAdapter adapts ConsoleExporter to SpanExporter.
-type consoleExporterAdapter struct {
-	inner *ConsoleExporter
-}
-
-func (a *consoleExporterAdapter) Export(_ context.Context, span tracer.ReadableSpan) error {
-	return a.inner.Export(span)
-}
-
-func (a *consoleExporterAdapter) Shutdown(_ context.Context) error {
-	return a.inner.Shutdown()
-}
-
 // NewConsoleExporterSpanExporter returns a console span exporter.
 func NewConsoleExporterSpanExporter() tracer.SpanExporter {
-	return &consoleExporterAdapter{inner: NewConsoleExporter()}
+	return NewConsoleExporter()
 }
 
 // ResolveOTLPEndpoint normalizes OTLP HTTP endpoint configuration.

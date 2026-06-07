@@ -309,7 +309,7 @@ func TestHandleFeishuCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handled := adapter.handleFeishuCommand(ctx, tt.text, "feishu_oc_123_ou_456")
+			handled := adapter.handleFeishuCommand(ctx, tt.text, "feishu_oc_123_ou_456", "")
 			if handled != tt.wantHandled {
 				t.Errorf("handleFeishuCommand(%q) = %v, want %v", tt.text, handled, tt.wantHandled)
 			}
@@ -698,6 +698,37 @@ func TestNormalizeReactionEmoji(t *testing.T) {
 		if got := normalizeReactionEmoji(tt.input); got != tt.want {
 			t.Errorf("normalizeReactionEmoji(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestFeishuAdapter_ReplyAckToUser_UsesReplyAPI(t *testing.T) {
+	var replyCalled bool
+	var replyMsgID string
+
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			replyCalled = true
+			replyMsgID = "om_user_cmd"
+			return &larkim.ReplyMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+
+	err := adapter.replyAckToUser(context.Background(), "om_user_cmd", "feishu_oc_123456_ou_654321", "✅ 新会话已创建")
+	if err != nil {
+		t.Fatalf("replyAckToUser() error = %v", err)
+	}
+	if !replyCalled {
+		t.Fatal("expected Reply API for command ack")
+	}
+	if replyMsgID != "om_user_cmd" {
+		t.Fatalf("reply target = %q, want om_user_cmd", replyMsgID)
 	}
 }
 

@@ -3,9 +3,9 @@ package compression
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -22,18 +22,29 @@ const (
 
 // Pipeline runs the seven-step compression chain.
 type Pipeline struct {
-	counter *token.Counter
-	enabled bool
+	counter        contracts.ITokenCounter
+	enabled        bool
+	autocompactCfg config.AutocompactConfig
+	summarizer     Summarizer
+	stepObserver   StepObserver
 }
 
-// NewPipeline creates a compression pipeline.
-func NewPipeline(enabled bool) *Pipeline {
-	return &Pipeline{counter: token.NewCounter(), enabled: enabled}
+// NewPipeline creates a compression pipeline with functional options.
+func NewPipeline(opts ...Option) *Pipeline {
+	p := defaultPipeline()
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
+}
+
+// NewPipelineEnabled is a convenience constructor for tests (enabled/disabled only).
+func NewPipelineEnabled(enabled bool) *Pipeline {
+	return NewPipeline(WithEnabled(enabled))
 }
 
 // Run compresses messages to fit within budget.
 func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt string, budget types.TokenBudget) ([]types.Message, types.CompressionReport, error) {
-	_ = ctx
 	report := types.CompressionReport{OriginalTokens: p.counter.CountMessages(msgs)}
 	if !p.enabled {
 		out := assemble(systemPrompt, msgs)
@@ -51,15 +62,35 @@ func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt s
 		{stepToolResultBudget, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
 			next := toolResultBudget(p.counter, m, b.ToolResultBudget)
-			return next, before != p.counter.CountMessages(next)
+			after := p.counter.CountMessages(next)
+			p.emitStep(stepToolResultBudget, before, after)
+			return next, before != after
 		}},
 		{stepSnip, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
-			next := snip(p.counter, m, b.CompressionTarget)
-			return next, before != p.counter.CountMessages(next)
+			next := snip(p.counter, m, b.CompressionTarget, p.minKeepForAutocompact())
+			after := p.counter.CountMessages(next)
+			p.emitStep(stepSnip, before, after)
+			return next, before != after
 		}},
-		{stepMicrocompact, microcompact},
-		{stepCollapse, collapse},
+		{stepMicrocompact, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
+			before := p.counter.CountMessages(m)
+			next, applied := microcompact(m, b)
+			after := p.counter.CountMessages(next)
+			if applied {
+				p.emitStep(stepMicrocompact, before, after)
+			}
+			return next, applied
+		}},
+		{stepCollapse, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
+			before := p.counter.CountMessages(m)
+			next, applied := collapse(m, b)
+			after := p.counter.CountMessages(next)
+			if applied {
+				p.emitStep(stepCollapse, before, after)
+			}
+			return next, applied
+		}},
 	}
 
 	for _, step := range steps {
@@ -71,11 +102,19 @@ func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt s
 		current = next
 	}
 
-	// Step 6: autocompact skipped in V1
-	report.StepsApplied = append(report.StepsApplied, stepAutocompact+":skipped")
+	// Step 6: autocompact (before assembly, on message history only)
+	next, stepLabel, _ := runAutocompact(ctx, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver)
+	current = next
+	report.StepsApplied = append(report.StepsApplied, stepLabel)
+	if stepLabel == stepAutocompact {
+		report.Truncated = true
+	}
 
+	beforeAsm := p.counter.CountMessages(current)
 	current = assemble(systemPrompt, current)
-	report.CompressedTokens = p.counter.CountMessages(current)
+	afterAsm := p.counter.CountMessages(current)
+	p.emitStep(stepAssembly, beforeAsm, afterAsm)
+	report.CompressedTokens = afterAsm
 
 	if p.counter.CountMessages(current) > budget.MaxContextTokens-budget.ReservedOutput {
 		report.StepsApplied = append(report.StepsApplied, stepTokenBlock)
@@ -84,27 +123,74 @@ func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt s
 	return current, report, nil
 }
 
-func toolResultBudget(counter *token.Counter, msgs []types.Message, maxPerResult int) []types.Message {
+func (p *Pipeline) emitStep(step string, before, after int) {
+	if p.stepObserver != nil {
+		p.stepObserver.OnStep(step, before, after)
+	}
+}
+
+func toolResultBudget(counter contracts.ITokenCounter, msgs []types.Message, maxPerResult int) []types.Message {
 	out := make([]types.Message, len(msgs))
 	for i, m := range msgs {
 		out[i] = m
-		if m.Role == types.MessageRoleTool && counter.Count(m.Content) > maxPerResult {
+		if m.Role == types.MessageRoleTool && counter.CountText(m.Content) > maxPerResult {
 			out[i].Content = counter.TruncateToTokens(m.Content, maxPerResult) + "\n...[truncated]"
 		}
 	}
 	return out
 }
 
-func snip(counter *token.Counter, msgs []types.Message, target int) []types.Message {
-	const minKeep = 4
+func (p *Pipeline) minKeepForAutocompact() int {
+	const defaultMinKeep = 4
+	if !p.autocompactCfg.Enabled {
+		return defaultMinKeep
+	}
+	turns := p.autocompactCfg.PreserveHeadTurns + p.autocompactCfg.PreserveTailTurns + 1
+	if turns < 3 {
+		turns = 3
+	}
+	// Each turn needs at least one user message; keep enough messages for head+middle+tail turns.
+	minKeep := turns * 2
+	if minKeep < defaultMinKeep {
+		return defaultMinKeep
+	}
+	return minKeep
+}
+
+func snip(counter contracts.ITokenCounter, msgs []types.Message, target, minKeep int) []types.Message {
+	if minKeep <= 0 {
+		minKeep = 4
+	}
 	if len(msgs) <= minKeep {
 		return msgs
 	}
-	current := append([]types.Message(nil), msgs...)
-	for counter.CountMessages(current) > target && len(current) > minKeep {
-		current = current[1:]
+	out := append([]types.Message(nil), msgs...)
+	for counter.CountMessages(out) > target && len(out) > minKeep {
+		out = out[1:]
 	}
-	return current
+	return out
+}
+
+func assemble(systemPrompt string, msgs []types.Message) []types.Message {
+	if systemPrompt == "" {
+		return msgs
+	}
+	sys := types.Message{
+		ID:      "system_prompt",
+		Role:    types.MessageRoleSystem,
+		Content: systemPrompt,
+	}
+	return append([]types.Message{sys}, msgs...)
+}
+
+// ShouldCompress returns true if compression should run.
+func (p *Pipeline) ShouldCompress(msgs []types.Message, budget types.TokenBudget) bool {
+	return p.counter.CountMessages(msgs) > budget.CompressionTarget
+}
+
+// CountMessages exposes token counting.
+func (p *Pipeline) CountMessages(msgs []types.Message) int {
+	return p.counter.CountMessages(msgs)
 }
 
 func microcompact(msgs []types.Message, _ types.TokenBudget) ([]types.Message, bool) {
@@ -160,36 +246,4 @@ func collapse(msgs []types.Message, _ types.TokenBudget) ([]types.Message, bool)
 		out = append(out, msgs[i])
 	}
 	return out, changed
-}
-
-func assemble(systemPrompt string, msgs []types.Message) []types.Message {
-	if systemPrompt == "" {
-		return msgs
-	}
-	sys := types.Message{
-		ID:      "system_prompt",
-		Role:    types.MessageRoleSystem,
-		Content: systemPrompt,
-	}
-	return append([]types.Message{sys}, msgs...)
-}
-
-// ShouldCompress returns true if compression should run.
-func (p *Pipeline) ShouldCompress(msgs []types.Message, budget types.TokenBudget) bool {
-	return p.counter.CountMessages(msgs) > budget.CompressionTarget
-}
-
-// CountMessages exposes token counting.
-func (p *Pipeline) CountMessages(msgs []types.Message) int {
-	return p.counter.CountMessages(msgs)
-}
-
-// AutocompactStub logs skip for V1.
-func AutocompactStub() string {
-	return stepAutocompact + ":skipped"
-}
-
-// TruncationMarker is appended to truncated tool results.
-func TruncationMarker() string {
-	return strings.TrimSpace("...[truncated]")
 }

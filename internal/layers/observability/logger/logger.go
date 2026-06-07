@@ -3,21 +3,50 @@ package logger
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
-
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
 // StructuredLogger provides trace-aware structured logging
 type StructuredLogger struct {
 	handler    Handler
 	redactor   *Redactor
+	sampler    *spanLogTracker
 	attrs      []any
 	component  string
 	service    string
 	version    string
 	mu         sync.RWMutex
+}
+
+type spanLogTracker struct {
+	mu      sync.Mutex
+	counts  map[string]int
+	dropped map[string]int
+	max     int
+}
+
+func newSpanLogTracker(max int) *spanLogTracker {
+	return &spanLogTracker{
+		counts:  make(map[string]int),
+		dropped: make(map[string]int),
+		max:     max,
+	}
+}
+
+func (t *spanLogTracker) shouldLog(spanID string) (bool, int) {
+	if spanID == "" || t.max <= 0 {
+		return true, 0
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.counts[spanID]++
+	if t.counts[spanID] <= t.max {
+		return true, 0
+	}
+	t.dropped[spanID]++
+	return false, t.dropped[spanID]
 }
 
 // NewStructuredLogger creates a new structured logger
@@ -46,6 +75,9 @@ func NewStructuredLogger(cfg *LoggerConfig) *StructuredLogger {
 	if cfg.Redactor.Enabled && len(cfg.Redactor.Patterns) > 0 {
 		l.redactor = NewRedactor(cfg.Redactor.Patterns)
 	}
+	if cfg.Sampling.Enabled && cfg.Sampling.MaxEntriesPerSpan > 0 {
+		l.sampler = newSpanLogTracker(cfg.Sampling.MaxEntriesPerSpan)
+	}
 
 	return l
 }
@@ -55,6 +87,7 @@ func (l *StructuredLogger) With(args ...any) *StructuredLogger {
 	newLogger := &StructuredLogger{
 		handler:   l.handler,
 		redactor:  l.redactor,
+		sampler:   l.sampler,
 		attrs:     append(l.attrs, args...),
 		component: l.component,
 		service:   l.service,
@@ -68,11 +101,11 @@ func (l *StructuredLogger) WithComponent(component string) *StructuredLogger {
 	return l.With("component", component)
 }
 
-// WithTrace returns a new logger with trace context
-func (l *StructuredLogger) WithTrace(sc tracer.SpanContext) *StructuredLogger {
+// WithTrace returns a new logger with trace context.
+func (l *StructuredLogger) WithTrace(traceID, spanID string) *StructuredLogger {
 	return l.With(
-		"traceId", sc.TraceID.String(),
-		"spanId", sc.SpanID.String(),
+		"traceId", traceID,
+		"spanId", spanID,
 	)
 }
 
@@ -99,6 +132,9 @@ func (l *StructuredLogger) Error(msg string, args ...any) {
 // log creates and handles a log entry
 func (l *StructuredLogger) log(level LogLevel, msg string, args ...any) {
 	entry := l.buildEntry(level, msg, args...)
+	if entry == nil {
+		return
+	}
 	l.handler.Handle(entry)
 }
 
@@ -142,6 +178,7 @@ func (l *StructuredLogger) buildEntry(level LogLevel, msg string, args ...any) *
 				fields[key] = err.Error()
 				if key == "error" {
 					fields["error_type"] = fmt.Sprintf("%T", err)
+					fields["stack"] = string(debug.Stack())
 				}
 			} else {
 				fields[key] = value
@@ -178,6 +215,26 @@ func (l *StructuredLogger) buildEntry(level LogLevel, msg string, args ...any) *
 		entry.Fields = fields
 	}
 
+	if l.sampler != nil && entry.SpanID != "" {
+		ok, dropped := l.sampler.shouldLog(entry.SpanID)
+		if !ok {
+			if dropped == 1 {
+				prefix := entry.SpanID
+				if len(prefix) > 8 {
+					prefix = prefix[:8]
+				}
+				entry.Level = LevelWarn.String()
+				entry.Message = fmt.Sprintf(
+					"log sampling threshold reached for span %s (max %d entries per span, further entries dropped)",
+					prefix, l.sampler.max,
+				)
+				entry.Fields = map[string]interface{}{"sampled": true}
+				return entry
+			}
+			return nil
+		}
+	}
+
 	return entry
 }
 
@@ -191,6 +248,12 @@ func toString(v any) string {
 	}
 }
 
+// SamplingConfig holds per-span log sampling settings.
+type SamplingConfig struct {
+	Enabled           bool `yaml:"enabled"`
+	MaxEntriesPerSpan int  `yaml:"max_entries_per_span"`
+}
+
 // LoggerConfig holds logger configuration
 type LoggerConfig struct {
 	Level        string          `yaml:"level"`
@@ -199,6 +262,7 @@ type LoggerConfig struct {
 	Service     string          `yaml:"service"`
 	Version     string          `yaml:"version"`
 	IncludeTrace bool            `yaml:"include_trace_id"`
+	Sampling    SamplingConfig  `yaml:"sampling"`
 	Redactor    RedactorConfig `yaml:"redactor"`
 }
 
@@ -255,4 +319,17 @@ func (l *StructuredLogger) SetLevel(level string) {
 // Handler returns the underlying handler
 func (l *StructuredLogger) Handler() Handler {
 	return l.handler
+}
+
+// Close flushes logger state on shutdown.
+func (l *StructuredLogger) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.sampler != nil {
+		l.sampler.mu.Lock()
+		l.sampler.counts = make(map[string]int)
+		l.sampler.dropped = make(map[string]int)
+		l.sampler.mu.Unlock()
+	}
+	return nil
 }

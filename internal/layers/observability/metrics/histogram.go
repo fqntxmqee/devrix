@@ -56,8 +56,10 @@ func (h *histogram) Observe(value float64) {
 	for _, bound := range h.bounds {
 		if value <= bound {
 			h.buckets[bound]++
+			break
 		}
 	}
+	h.buckets[math.Inf(1)]++
 }
 
 // Count returns the total count

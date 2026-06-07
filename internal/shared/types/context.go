@@ -9,6 +9,7 @@ const ContextSnapshotVersion = "ctx-v1"
 type PEVPhase string
 
 const (
+	PEVPhasePlan    PEVPhase = "plan"
 	PEVPhaseExecute PEVPhase = "execute"
 	PEVPhaseVerify  PEVPhase = "verify"
 	PEVPhaseDone    PEVPhase = "done"
@@ -52,11 +53,13 @@ func DefaultTokenBudget() TokenBudget {
 
 // PEVState holds PEV loop state.
 type PEVState struct {
-	Phase         PEVPhase
-	Iteration     int
-	MaxIterations int
-	LastToolCalls []ToolCallRecord
-	VerifyResult  VerifyResult
+	Phase              PEVPhase
+	Iteration          int
+	MaxIterations      int
+	ActiveTaskID       string
+	ActiveMilestoneID  string
+	LastToolCalls      []ToolCallRecord
+	VerifyResult       VerifyResult
 }
 
 // DefaultPEVState returns initial PEV state.

@@ -84,9 +84,8 @@ func (m *Meter) Float64Histogram(name string, opts ...HistogramOption) (Histogra
 	return histo, nil
 }
 
-// Int64UpDownCounter creates a new gauge (up-down counter)
-func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Counter, error) {
-	// For now, use counter as gauge
+// Int64UpDownCounter creates a gauge-backed up-down counter.
+func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Gauge, error) {
 	cfg := &CounterConfig{Labels: make(LabelMap)}
 	for _, opt := range opts {
 		if opt != nil {
@@ -94,17 +93,17 @@ func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Counter,
 		}
 	}
 
-	counter := NewCounter(fullMetricName(m.name, name), cfg.Labels)
+	gauge := NewGauge(fullMetricName(m.name, name), cfg.Labels)
 
-	if err := m.provider.registry.RegisterCounter(
+	if err := m.provider.registry.RegisterGauge(
 		fullMetricName(m.name, name),
 		cfg.Labels,
-		counter,
+		gauge,
 	); err != nil {
 		return nil, err
 	}
 
-	return counter, nil
+	return gauge, nil
 }
 
 // Registry returns the underlying registry

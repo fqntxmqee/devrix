@@ -1,7 +1,8 @@
 # Delta: Context Engine Layer (Layer 2)
 
-**Change ID:** devrix-foundation (initial) → **devrix-context-engine** (implemented 2026-06-07)
-**Canonical spec:** `openspec/specs/context-engine/spec.md`
+**Change ID:** devrix-foundation (initial) → **devrix-context-engine** (archived 2026-06-07) → **devrix-context-engine-v2** (archived 2026-06-07)
+**Canonical spec:** `openspec/specs/context-engine/spec.md` (v2.0.0)
+**Status:** Merged (2026-06-07)
 **Affects:** context engine, PEV engine, compression pipeline, layered memory
 
 ---

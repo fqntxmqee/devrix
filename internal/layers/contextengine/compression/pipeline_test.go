@@ -12,7 +12,7 @@ import (
 
 // Covers: L5-CTX-03, L5-CTX-04
 func TestPipeline_should_compress_when_over_target(t *testing.T) {
-	p := compression.NewPipeline(true)
+	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
 	budget.CompressionTarget = 10
 
@@ -35,7 +35,7 @@ func TestPipeline_should_compress_when_over_target(t *testing.T) {
 
 // Covers: L5-CTX-04
 func TestPipeline_should_return_context_exceeded_when_still_over_budget(t *testing.T) {
-	p := compression.NewPipeline(true)
+	p := compression.NewPipelineEnabled(true)
 	budget := types.TokenBudget{
 		MaxContextTokens:  50,
 		ReservedOutput:    10,
@@ -58,7 +58,7 @@ func TestPipeline_should_return_context_exceeded_when_still_over_budget(t *testi
 
 // Covers: L5-CTX-08
 func TestPipeline_should_skip_autocompact_in_v1(t *testing.T) {
-	p := compression.NewPipeline(true)
+	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
 	msgs := []types.Message{*types.NewMessage("m", "s", types.MessageRoleUser, "hi")}
 	_, report, err := p.Run(context.Background(), msgs, "", budget)

@@ -1,18 +1,35 @@
 package memory
 
 import (
+	"context"
+
 	"github.com/devrix/devrix/internal/shared/errors"
 )
 
-// LongTermMemory is a V3 placeholder.
-type LongTermMemory struct{}
+// DisabledLongTermMemory is used when longterm.enabled=false.
+type DisabledLongTermMemory struct{}
 
-// NewLongTermMemory creates the stub.
-func NewLongTermMemory() *LongTermMemory {
-	return &LongTermMemory{}
+// NewDisabledLongTermMemory creates a disabled long-term memory backend.
+func NewDisabledLongTermMemory() *DisabledLongTermMemory {
+	return &DisabledLongTermMemory{}
 }
 
-// Recall returns FeatureNotImplemented in V1.
-func (m *LongTermMemory) Recall(query string) error {
-	return errors.NewFeatureNotImplementedError("long-term memory", "v3")
+// NewLongTermMemory creates the disabled stub (L5-CTX-10 compatibility).
+func NewLongTermMemory() ILongTermMemory {
+	return NewDisabledLongTermMemory()
+}
+
+// Recall returns FeatureNotImplemented when long-term memory is disabled.
+func (m *DisabledLongTermMemory) Recall(_ context.Context, _ string, _ int) ([]MemoryEntry, error) {
+	return nil, errors.NewFeatureNotImplementedError("long-term memory", "v3")
+}
+
+// Store is a no-op for disabled memory.
+func (m *DisabledLongTermMemory) Store(_ context.Context, _ MemoryEntry) error {
+	return nil
+}
+
+// Close is a no-op.
+func (m *DisabledLongTermMemory) Close() error {
+	return nil
 }

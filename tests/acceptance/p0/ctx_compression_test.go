@@ -14,7 +14,7 @@ import (
 
 // Covers: L5-CTX-03, L5-CTX-04
 func TestAcceptance_CompressionPipelineP0(t *testing.T) {
-	p := compression.NewPipeline(true)
+	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
 	budget.CompressionTarget = 20
 
@@ -34,7 +34,7 @@ func TestAcceptance_CompressionPipelineP0(t *testing.T) {
 
 // Covers: L5-CTX-04
 func TestAcceptance_TokenBlockP0(t *testing.T) {
-	p := compression.NewPipeline(true)
+	p := compression.NewPipelineEnabled(true)
 	budget := types.TokenBudget{MaxContextTokens: 30, ReservedOutput: 5, CompressionTarget: 5}
 
 	_, _, err := p.Run(context.Background(),

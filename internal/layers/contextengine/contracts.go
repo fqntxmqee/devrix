@@ -71,6 +71,39 @@ type IPermissionGate interface {
 	Request(ctx context.Context, sessionID, toolName, input string, risk types.RiskLevel) bool
 }
 
+// AutocompactMeta describes autocompact observability metadata.
+type AutocompactMeta struct {
+	Degraded      bool
+	SummaryTokens int
+	Model         string
+}
+
+// ICompressionObserver emits compression pipeline events.
+type ICompressionObserver interface {
+	EmitCompressionStep(sessionID, step string, before, after int)
+	EmitAutocompact(sessionID string, meta AutocompactMeta)
+}
+
+// IPEVObserver emits PEV phase events.
+type IPEVObserver interface {
+	EmitVerifyCommand(sessionID, cmd string, result VerifyCommandResult)
+	EmitPlanCompleted(sessionID string, milestoneCount int)
+	EmitMilestoneProgress(sessionID, milestoneID string, progress float64)
+}
+
+// NoOpCompressionObserver discards compression observer events.
+type NoOpCompressionObserver struct{}
+
+func (NoOpCompressionObserver) EmitCompressionStep(string, string, int, int) {}
+func (NoOpCompressionObserver) EmitAutocompact(string, AutocompactMeta)       {}
+
+// NoOpPEVObserver discards PEV observer events.
+type NoOpPEVObserver struct{}
+
+func (NoOpPEVObserver) EmitVerifyCommand(string, string, VerifyCommandResult)                 {}
+func (NoOpPEVObserver) EmitPlanCompleted(string, int)                                           {}
+func (NoOpPEVObserver) EmitMilestoneProgress(string, string, float64)                           {}
+
 // IObserver emits context engine observability events.
 type IObserver interface {
 	EmitContextCompressed(report types.CompressionReport)

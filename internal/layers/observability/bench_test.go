@@ -29,3 +29,12 @@ func BenchmarkRegistryOutput(b *testing.B) {
 		_ = r.Output()
 	}
 }
+
+func BenchmarkGaugeSetAdd(b *testing.B) {
+	g := metrics.NewGauge("bench_gauge", nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		g.Set(float64(i))
+		g.Add(0.5)
+	}
+}

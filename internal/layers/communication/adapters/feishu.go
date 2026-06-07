@@ -97,6 +97,9 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 
 	ctx := context.Background()
 	eventType := msg.Metadata["event_type"]
+	if eventType == "" {
+		eventType = "text"
+	}
 	content := msg.Content
 
 	switch eventType {
@@ -106,35 +109,8 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		}
 
 	case "complete":
-		if a.progressStyle == progressStyleStructured {
-			if strings.TrimSpace(content) != "" {
-				stream := a.sessionStream(msg.SessionID)
-				stream.mu.Lock()
-				stream.summaries = append(stream.summaries, content)
-				stream.mu.Unlock()
-			}
-			if err := a.upsertTaskProgressCard(ctx, msg.SessionID, msg.ChatID, true); err != nil {
-				slog.Error("feishu: failed to finalize task progress card", "error", err)
-			}
-		} else if a.progressStyle != progressStyleLegacy {
-			if strings.TrimSpace(content) != "" {
-				stream := a.sessionStream(msg.SessionID)
-				stream.mu.Lock()
-				stream.items = append(stream.items, progressItem{kind: progressKindInfo, text: content})
-				stream.mu.Unlock()
-			}
-			if err := a.upsertProgressCard(ctx, msg.SessionID, msg.ChatID, true); err != nil {
-				slog.Error("feishu: failed to finalize progress card", "error", err)
-			}
-		} else {
-			card := NewCard().
-				Title("完成", "green").
-				Markdown(content).
-				Build()
-			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
-				slog.Error("feishu: failed to send complete card", "error", err)
-				return
-			}
+		if err := a.finalizeStructuredSession(ctx, msg.SessionID, msg.ChatID, content); err != nil {
+			slog.Error("feishu: failed to finalize structured session", "error", err)
 		}
 
 		if a.doneEmoji != "" {
@@ -156,42 +132,21 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		a.clearSessionStream(msg.SessionID)
 
 	case "info":
-		if a.progressStyle != progressStyleLegacy {
-			if err := a.handleProgressEvent(ctx, msg); err != nil {
-				slog.Error("feishu: failed to send info progress", "error", err)
-			}
-		} else {
-			card := NewCard().
-				Title("提示", "blue").
-				Markdown(content).
-				Build()
-			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
-				slog.Error("feishu: failed to send info card", "error", err)
-				return
-			}
+		if err := a.handleProgressEvent(ctx, msg); err != nil {
+			slog.Error("feishu: failed to send info progress", "error", err)
 		}
 
-	default:
-		// Streaming text chunks — accumulate into one response card in card/compact mode
-		if a.progressStyle != progressStyleLegacy {
-			if err := a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content); err != nil {
-				slog.Error("feishu: failed to send response text", "error", err)
-			}
+	case "text":
+		if msg.IsComplete {
 			return
 		}
-
-		if hasComplexMarkdown(content) {
-			card := NewCard().Markdown(content).Build()
-			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
-				slog.Error("feishu: failed to send card", "error", err)
-				return
-			}
-		} else {
-			if err := a.sendMessageToSession(ctx, msg.SessionID, msg.ChatID, content); err != nil {
-				slog.Error("feishu: failed to send message", "error", err, "chatID", msg.ChatID)
-				return
-			}
+		if err := a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content); err != nil {
+			slog.Error("feishu: failed to send response text", "error", err)
 		}
+		return
+
+	default:
+		slog.Warn("feishu: unhandled outbound event", "eventType", eventType)
 	}
 
 	slog.Info("feishu: message sent successfully", "chatID", msg.ChatID)
@@ -230,9 +185,9 @@ func (a *FeishuAdapter) OnStatus(sessionID string, state types.SessionState) {
 	slog.Debug("feishu: session status", "sessionID", sessionID, "state", state)
 }
 
-// handleFeishuCommand handles built-in commands like /help
-// Returns true if the message was handled as a command, false otherwise
-func (a *FeishuAdapter) handleFeishuCommand(ctx context.Context, text, sessionKey string) bool {
+// handleFeishuCommand handles built-in commands like /help.
+// Returns true if the message was handled as a command, false otherwise.
+func (a *FeishuAdapter) handleFeishuCommand(ctx context.Context, text, sessionKey, userMessageID string) bool {
 	if !strings.HasPrefix(text, "/") {
 		return false
 	}
@@ -241,53 +196,72 @@ func (a *FeishuAdapter) handleFeishuCommand(ctx context.Context, text, sessionKe
 
 	switch cmd.Type {
 	case types.CommandHelp:
-		helpText := `🤖 *Devrix - 开发大脑*
+		helpText := `🤖 **Devrix - 开发大脑**
 
-*基础命令：*
+**基础命令：**
 /new - 开始新会话
 /help - 显示帮助信息
 /stop - 停止当前生成
 
-*功能说明：*
+**功能说明：**
 Devrix 是一个多智能体 AI 编程助手，可以通过飞书与你对话。
 
-*使用方式：*
+**使用方式：**
 直接发送消息即可与我对话。我会帮助你：
 • 编写和调试代码
 • 分析项目结构
 • 执行开发任务
 • 回答技术问题
 
-*权限说明：*
+**权限说明：**
 YOLO 模式已启用，所有操作自动授权。`
 
-		if err := a.SendMessage(ctx, sessionKey, helpText); err != nil {
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, helpText); err != nil {
 			slog.Error("feishu: failed to send help message", "error", err)
 		}
 		return true
 
 	case types.CommandNew:
-		// Create new session
+		if oldSessionID, ok := a.sessionMap.Load(sessionKey); ok {
+			if sid, ok := oldSessionID.(string); ok && sid != "" {
+				a.clearSessionStream(sid)
+				a.clearSessionReplyContext(sid)
+			}
+		}
 		session, err := a.gateway.CreateSession(sessionKey, "")
 		if err != nil {
 			slog.Error("feishu: failed to create new session", "error", err)
-			a.SendMessage(ctx, sessionKey, "❌ 创建新会话失败")
+			_ = a.replyAckToUser(ctx, userMessageID, sessionKey, "❌ 创建新会话失败")
 			return true
 		}
-		// Update session map with new session
 		a.sessionMap.Store(sessionKey, session.SessionID)
-		a.SendMessage(ctx, sessionKey, "✅ 已开始新会话")
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "✅ 新会话已创建"); err != nil {
+			slog.Error("feishu: failed to send new session ack", "error", err)
+		}
 		return true
 
 	case types.CommandStop:
 		// TODO: Implement stop functionality
-		a.SendMessage(ctx, sessionKey, "⏸️ 停止功能开发中")
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "⏸️ 停止功能开发中"); err != nil {
+			slog.Error("feishu: failed to send stop ack", "error", err)
+		}
 		return true
 
 	default:
 		slog.Debug("feishu: unknown command", "command", text)
 		return false
 	}
+}
+
+// replyAckToUser sends a command acknowledgement as a reply under the user's message (cc-connect style).
+func (a *FeishuAdapter) replyAckToUser(ctx context.Context, userMessageID, sessionKey, text string) error {
+	card := NewCard().Markdown(text).Build()
+	cardJSON := BuildCardJSON(card)
+	if userMessageID != "" {
+		_, err := a.replyToUserMessage(ctx, userMessageID, "interactive", cardJSON)
+		return err
+	}
+	return a.SendCard(ctx, sessionKey, card)
 }
 
 // FeishuConfig holds Feishu-specific configuration
@@ -561,8 +535,13 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 	}
 	sessionKey := a.buildSessionKey(chatID, userID)
 
-	// Handle built-in commands before routing to gateway
-	if a.handleFeishuCommand(ctx, text, sessionKey) {
+	messageID := ""
+	if msg.MessageId != nil {
+		messageID = *msg.MessageId
+	}
+
+	// Handle built-in commands before routing to gateway (reply under user's message).
+	if a.handleFeishuCommand(ctx, text, sessionKey, messageID) {
 		return nil
 	}
 
@@ -573,11 +552,7 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		return nil
 	}
 
-	// Create inbound message
-	messageID := ""
-	if msg.MessageId != nil {
-		messageID = *msg.MessageId
-	}
+	// Create inbound message (messageID extracted above for commands)
 
 	// Deduplicate messages
 	if a.isDuplicateMessage(messageID) {
