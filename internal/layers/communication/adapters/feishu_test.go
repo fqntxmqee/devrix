@@ -684,3 +684,71 @@ func TestFeishuAdapter_GetOrCreateSession_WithMock(t *testing.T) {
 		t.Errorf("session.SessionID = %s, want sess_new_123", session.SessionID)
 	}
 }
+
+func TestNormalizeReactionEmoji(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", "OnIt"},
+		{"none", ""},
+		{"Done", "Done"},
+	}
+	for _, tt := range tests {
+		if got := normalizeReactionEmoji(tt.input); got != tt.want {
+			t.Errorf("normalizeReactionEmoji(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestFeishuAdapter_SendMessageToSession_UsesReply(t *testing.T) {
+	var replyCalled bool
+
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			replyCalled = true
+			return &larkim.ReplyMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+
+	adapter.sessionReplyCtx.Store("sess_1", feishuReplyContext{userMessageID: "om_root"})
+
+	err := adapter.sendMessageToSession(context.Background(), "sess_1", "feishu_oc_123456_ou_654321", "hello")
+	if err != nil {
+		t.Fatalf("sendMessageToSession() error = %v", err)
+	}
+	if !replyCalled {
+		t.Fatal("expected Reply API to be called when reply context exists")
+	}
+}
+
+func TestFeishuAdapter_AddReaction_UsesMessageReactionAPI(t *testing.T) {
+	var createCalled bool
+	mockReactionAPI := &mockMessageReactionAPI{
+		createFunc: func(ctx context.Context, req *larkim.CreateMessageReactionReq) (*larkim.CreateMessageReactionResp, error) {
+			createCalled = true
+			reactionID := "re_123"
+			return &larkim.CreateMessageReactionResp{
+				Data: &larkim.CreateMessageReactionRespData{ReactionId: &reactionID},
+			}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: &mockMessageAPI{}, messageReactionAPI: mockReactionAPI}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+
+	if err := adapter.AddReaction(context.Background(), "om_root", "Done"); err != nil {
+		t.Fatalf("AddReaction() error = %v", err)
+	}
+	if !createCalled {
+		t.Fatal("expected MessageReaction.Create to be called")
+	}
+}

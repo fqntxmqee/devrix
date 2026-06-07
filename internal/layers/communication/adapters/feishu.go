@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/communication/core"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -44,6 +45,22 @@ type FeishuAdapter struct {
 
 	sessionMap sync.Map // sessionKey -> sessionID mapping
 	dedupMap   sync.Map // messageID -> timestamp for deduplication
+
+	// OK confirmation and done_emoji settings
+	reactionEmoji string
+	doneEmoji     string
+	replyInThread bool
+	progressStyle string
+
+	sessionMsgMap   sync.Map // sessionID -> userMessageID mapping
+	sessionReplyCtx sync.Map // sessionID -> feishuReplyContext
+	sessionStreams  sync.Map // sessionID -> *feishuSessionStream for coalesced progress
+}
+
+// feishuReplyContext tracks the user's root message for threaded replies and typing reaction.
+type feishuReplyContext struct {
+	userMessageID string
+	reactionID    string
 }
 
 // isDuplicateMessage checks if the message has been seen before
@@ -76,13 +93,125 @@ var _ gateway.EventHandler = (*FeishuAdapter)(nil)
 
 // OnMessage handles outbound messages from the gateway
 func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
-	slog.Info("feishu: sending message", "sessionID", msg.SessionID, "chatID", msg.ChatID, "content", msg.Content)
+	slog.Info("feishu: OnMessage called", "sessionID", msg.SessionID, "chatID", msg.ChatID, "contentLen", len(msg.Content), "eventType", msg.Metadata["event_type"])
 
 	ctx := context.Background()
+	eventType := msg.Metadata["event_type"]
+	content := msg.Content
 
-	if err := a.SendMessage(ctx, msg.ChatID, msg.Content); err != nil {
-		slog.Error("feishu: failed to send message", "error", err, "chatID", msg.ChatID)
+	switch eventType {
+	case "thinking", "tool_call", "tool_result", "milestone_progress":
+		if err := a.handleProgressEvent(ctx, msg); err != nil {
+			slog.Error("feishu: failed to send progress", "error", err, "eventType", eventType)
+		}
+
+	case "complete":
+		if a.progressStyle == progressStyleStructured {
+			if strings.TrimSpace(content) != "" {
+				stream := a.sessionStream(msg.SessionID)
+				stream.mu.Lock()
+				stream.summaries = append(stream.summaries, content)
+				stream.mu.Unlock()
+			}
+			if err := a.upsertTaskProgressCard(ctx, msg.SessionID, msg.ChatID, true); err != nil {
+				slog.Error("feishu: failed to finalize task progress card", "error", err)
+			}
+		} else if a.progressStyle != progressStyleLegacy {
+			if strings.TrimSpace(content) != "" {
+				stream := a.sessionStream(msg.SessionID)
+				stream.mu.Lock()
+				stream.items = append(stream.items, progressItem{kind: progressKindInfo, text: content})
+				stream.mu.Unlock()
+			}
+			if err := a.upsertProgressCard(ctx, msg.SessionID, msg.ChatID, true); err != nil {
+				slog.Error("feishu: failed to finalize progress card", "error", err)
+			}
+		} else {
+			card := NewCard().
+				Title("完成", "green").
+				Markdown(content).
+				Build()
+			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
+				slog.Error("feishu: failed to send complete card", "error", err)
+				return
+			}
+		}
+
+		if a.doneEmoji != "" {
+			go a.finishUserMessageReaction(context.Background(), msg.SessionID)
+		} else {
+			a.clearSessionReplyContext(msg.SessionID)
+		}
+		a.clearSessionStream(msg.SessionID)
+
+	case "error":
+		card := NewCard().
+			Title("错误", "red").
+			Markdown(content).
+			Build()
+		if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
+			slog.Error("feishu: failed to send error card", "error", err)
+			return
+		}
+		a.clearSessionStream(msg.SessionID)
+
+	case "info":
+		if a.progressStyle != progressStyleLegacy {
+			if err := a.handleProgressEvent(ctx, msg); err != nil {
+				slog.Error("feishu: failed to send info progress", "error", err)
+			}
+		} else {
+			card := NewCard().
+				Title("提示", "blue").
+				Markdown(content).
+				Build()
+			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
+				slog.Error("feishu: failed to send info card", "error", err)
+				return
+			}
+		}
+
+	default:
+		// Streaming text chunks — accumulate into one response card in card/compact mode
+		if a.progressStyle != progressStyleLegacy {
+			if err := a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content); err != nil {
+				slog.Error("feishu: failed to send response text", "error", err)
+			}
+			return
+		}
+
+		if hasComplexMarkdown(content) {
+			card := NewCard().Markdown(content).Build()
+			if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
+				slog.Error("feishu: failed to send card", "error", err)
+				return
+			}
+		} else {
+			if err := a.sendMessageToSession(ctx, msg.SessionID, msg.ChatID, content); err != nil {
+				slog.Error("feishu: failed to send message", "error", err, "chatID", msg.ChatID)
+				return
+			}
+		}
 	}
+
+	slog.Info("feishu: message sent successfully", "chatID", msg.ChatID)
+}
+
+// hasComplexMarkdown returns true if content contains code blocks or tables
+func hasComplexMarkdown(content string) bool {
+	if strings.Contains(content, "```") {
+		return true
+	}
+	// Check for table-like lines
+	lines := strings.Split(content, "\n")
+	count := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 && trimmed[0] == '|' {
+			count++
+		}
+	}
+	return count >= 2 // At least 2 table rows
 }
 
 // OnPermissionRequest handles permission requests
@@ -163,15 +292,19 @@ YOLO 模式已启用，所有操作自动授权。`
 
 // FeishuConfig holds Feishu-specific configuration
 type FeishuConfig struct {
-	AppID       string
-	AppSecret   string
-	BotName     string
-	AllowFrom   string
-	Domain      string
-	EncryptKey  string
-	CallbackPath string
-	Port        string
-	UseWebhook  bool
+	AppID         string
+	AppSecret     string
+	BotName       string
+	AllowFrom     string
+	Domain        string
+	EncryptKey    string
+	CallbackPath  string
+	Port          string
+	UseWebhook    bool
+	ReactionEmoji string // emoji reaction on incoming messages (default: OnIt); "none" to disable
+	DoneEmoji     string // emoji reaction when agent completes (e.g. Done); "none" or empty to disable
+	ReplyInThread bool   // reply in thread under user's message (shows "N 条回复")
+	ProgressStyle string // legacy | compact | card | structured — structured 为默认
 }
 
 // FeishuAdapterOption is a functional option for FeishuAdapter
@@ -206,10 +339,14 @@ func NewFeishuAdapter(
 	}
 
 	adapter := &FeishuAdapter{
-		gateway:   gw,
-		cfg:       cfg,
-		feishuCfg: feishuCfg,
-		client:    lark.NewClient(feishuCfg.AppID, feishuCfg.AppSecret, clientOpts...),
+		gateway:       gw,
+		cfg:           cfg,
+		feishuCfg:     feishuCfg,
+		client:        lark.NewClient(feishuCfg.AppID, feishuCfg.AppSecret, clientOpts...),
+		reactionEmoji: normalizeReactionEmoji(feishuCfg.ReactionEmoji),
+		doneEmoji:     normalizeDoneEmoji(feishuCfg.DoneEmoji),
+		replyInThread: feishuCfg.ReplyInThread,
+		progressStyle: normalizeProgressStyle(feishuCfg.ProgressStyle),
 	}
 
 	// Apply functional options
@@ -266,6 +403,12 @@ func (a *FeishuAdapter) createEventDispatcher() *dispatcher.EventDispatcher {
 			slog.Info("feishu: WS event received - message", "event_type", "P2MessageReceiveV1")
 			slog.Debug("feishu: event detail", "event", fmt.Sprintf("%+v", event))
 			return a.onMessage(ctx, event)
+		}).
+		OnP2MessageReactionCreatedV1(func(ctx context.Context, event *larkim.P2MessageReactionCreatedV1) error {
+			return nil // ignore reaction events triggered by our own reactions
+		}).
+		OnP2MessageReactionDeletedV1(func(ctx context.Context, event *larkim.P2MessageReactionDeletedV1) error {
+			return nil // ignore reaction removal events triggered by our own reactions
 		})
 	slog.Info("feishu: dispatcher created with P2MessageReceiveV1 handler")
 	return d
@@ -356,7 +499,7 @@ func (a *FeishuAdapter) webhookHandler(w http.ResponseWriter, r *http.Request) {
 
 // onMessage handles incoming Feishu messages
 func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageReceiveV1) error {
-	slog.Info("feishu: onMessage called", "event", fmt.Sprintf("%+v", event))
+	slog.Info("feishu: onMessage called", "event_type", fmt.Sprintf("%T", event))
 
 	if event == nil || event.Event == nil || event.Event.Message == nil {
 		slog.Warn("feishu: event is nil or missing message")
@@ -377,6 +520,8 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		content = *msg.Content
 	}
 
+	slog.Info("feishu: message received", "msgType", msgType, "content", content)
+
 	// Parse text content if it's a text message
 	var text string
 	if msgType == "text" {
@@ -393,8 +538,11 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 	}
 
 	if text == "" {
+		slog.Warn("feishu: text is empty, ignoring message")
 		return nil
 	}
+
+	slog.Info("feishu: parsed text", "text", text)
 
 	// Extract sender info first (needed for command handling)
 	userID := ""
@@ -468,6 +616,35 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 			"msg_type":  msgType,
 		},
 	}
+
+	// Store reply context synchronously before routing so outbound replies use
+	// Im.Message.Reply (thread/quote) instead of CreateMessage.
+	if messageID != "" {
+		a.sessionReplyCtx.Store(session.SessionID, feishuReplyContext{
+			userMessageID: messageID,
+		})
+	}
+
+	// Immediate ACK: add reaction emoji on user's message (like cc-connect "OnIt")
+	if a.reactionEmoji != "" && messageID != "" {
+		go func(sessionID, msgID string) {
+			ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			reactionID := a.addReactionWithEmoji(ackCtx, msgID, a.reactionEmoji)
+			if reactionID == "" {
+				slog.Warn("feishu: failed to add typing reaction", "emoji", a.reactionEmoji)
+				return
+			}
+			a.sessionReplyCtx.Store(sessionID, feishuReplyContext{
+				userMessageID: msgID,
+				reactionID:    reactionID,
+			})
+			slog.Info("feishu: added typing reaction", "emoji", a.reactionEmoji, "messageID", msgID)
+		}(session.SessionID, messageID)
+	}
+
+	// Store the user message ID for done_emoji later
+	a.sessionMsgMap.Store(session.SessionID, messageID)
 
 	// Route to gateway
 	if err := a.gateway.RouteInbound(ctx, inboundMsg); err != nil {
@@ -572,34 +749,27 @@ func (a *FeishuAdapter) SetEventHandler(h gateway.EventHandler) {
 	a.eventHandler = h
 }
 
-// SendMessage sends a message to Feishu user
+// SendMessage sends a standalone message to a Feishu chat (used for commands without reply context).
 func (a *FeishuAdapter) SendMessage(ctx context.Context, chatID, content string) error {
-	// Parse chat_id to extract Feishu user/chat ID
-	// sessionKey format: feishu_{chat_id}_{user_id}
-	// chat_id format is "oc_xxxxxx", user_id format is "ou_xxxxxx"
-	parts := strings.Split(chatID, "_")
-	if len(parts) < 5 {
-		return fmt.Errorf("invalid session key: %s", chatID)
+	feishuChatID, err := parseFeishuChatID(chatID)
+	if err != nil {
+		return err
 	}
 
-	// parts = ["feishu", "oc", "123456", "ou", "654321"]
-	// chat_id = parts[1] + "_" + parts[2] = "oc_123456"
-	// user_id = parts[3] + "_" + parts[4] = "ou_654321"
-	chatID = parts[1] + "_" + parts[2]
 	msgType := "text"
 	contentJSON := fmt.Sprintf(`{"text":"%s"}`, escapeJSON(content))
 
 	req := larkim.NewCreateMessageReqBuilder().
 		ReceiveIdType("chat_id").
 		Body(larkim.NewCreateMessageReqBodyBuilder().
-			ReceiveId(chatID).
+			ReceiveId(feishuChatID).
 			MsgType(msgType).
 			Content(contentJSON).
 			Build()).
 		Build()
 
 	var resp *larkim.CreateMessageResp
-	err := a.withRetry(ctx, "send message", func() error {
+	err = a.withRetry(ctx, "send message", func() error {
 		var apiErr error
 		resp, apiErr = a.api.Im().Message().Create(ctx, req)
 		return apiErr
@@ -616,17 +786,172 @@ func (a *FeishuAdapter) SendMessage(ctx context.Context, chatID, content string)
 	return nil
 }
 
-// ReplyMessage replies to a specific message in Feishu
-func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content string) error {
-	msgType := "text"
-	contentJSON := fmt.Sprintf(`{"text":"%s"}`, escapeJSON(content))
+func (a *FeishuAdapter) sendMessageToSession(ctx context.Context, sessionID, chatID, content string) error {
+	if replyCtx, ok := a.getSessionReplyContext(sessionID); ok && replyCtx.userMessageID != "" {
+		_, err := a.replyToUserMessage(ctx, replyCtx.userMessageID, "text", fmt.Sprintf(`{"text":"%s"}`, escapeJSON(content)))
+		return err
+	}
+	return a.SendMessage(ctx, chatID, content)
+}
+
+// SendCard sends an interactive card to Feishu user (standalone, no reply context).
+func (a *FeishuAdapter) SendCard(ctx context.Context, chatID string, card *core.Card) error {
+	feishuChatID, err := parseFeishuChatID(chatID)
+	if err != nil {
+		return err
+	}
+
+	cardJSON := BuildCardJSON(card)
+
+	req := larkim.NewCreateMessageReqBuilder().
+		ReceiveIdType("chat_id").
+		Body(larkim.NewCreateMessageReqBodyBuilder().
+			ReceiveId(feishuChatID).
+			MsgType("interactive").
+			Content(cardJSON).
+			Build()).
+		Build()
+
+	var resp *larkim.CreateMessageResp
+	err = a.withRetry(ctx, "send card", func() error {
+		var apiErr error
+		resp, apiErr = a.api.Im().Message().Create(ctx, req)
+		return apiErr
+	})
+
+	if err != nil {
+		return fmt.Errorf("feishu: send card failed: %w", err)
+	}
+
+	if !resp.Success() {
+		return fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
+	}
+
+	return nil
+}
+
+func (a *FeishuAdapter) sendCardToSession(ctx context.Context, sessionID, chatID string, card *core.Card) error {
+	cardJSON := BuildCardJSON(card)
+	_, err := a.sendCardReplyAndGetID(ctx, sessionID, chatID, cardJSON)
+	return err
+}
+
+// AddReaction adds a Feishu emoji reaction to a message.
+func (a *FeishuAdapter) AddReaction(ctx context.Context, messageID, emoji string) error {
+	if emoji == "" || messageID == "" {
+		return nil
+	}
+	if a.addReactionWithEmoji(ctx, messageID, emoji) == "" {
+		return fmt.Errorf("feishu: add reaction failed")
+	}
+	return nil
+}
+
+func (a *FeishuAdapter) addReactionWithEmoji(ctx context.Context, messageID, emojiType string) string {
+	if emojiType == "" || messageID == "" {
+		return ""
+	}
+
+	req := larkim.NewCreateMessageReactionReqBuilder().
+		MessageId(messageID).
+		Body(larkim.NewCreateMessageReactionReqBodyBuilder().
+			ReactionType(&larkim.Emoji{EmojiType: &emojiType}).
+			Build()).
+		Build()
+
+	var resp *larkim.CreateMessageReactionResp
+	err := a.withRetry(ctx, "add reaction", func() error {
+		var apiErr error
+		resp, apiErr = a.api.Im().MessageReaction().Create(ctx, req)
+		return apiErr
+	})
+	if err != nil {
+		slog.Debug("feishu: add reaction failed", "error", err, "emoji", emojiType)
+		return ""
+	}
+	if resp == nil || !resp.Success() {
+		code, msg := 0, ""
+		if resp != nil {
+			code, msg = resp.Code, resp.Msg
+		}
+		slog.Debug("feishu: add reaction API error", "code", code, "msg", msg, "emoji", emojiType)
+		return ""
+	}
+	if resp.Data != nil && resp.Data.ReactionId != nil {
+		return *resp.Data.ReactionId
+	}
+	return ""
+}
+
+func (a *FeishuAdapter) removeReaction(ctx context.Context, messageID, reactionID string) {
+	if reactionID == "" || messageID == "" {
+		return
+	}
+
+	req := larkim.NewDeleteMessageReactionReqBuilder().
+		MessageId(messageID).
+		ReactionId(reactionID).
+		Build()
+
+	err := a.withRetry(ctx, "remove reaction", func() error {
+		resp, apiErr := a.api.Im().MessageReaction().Delete(ctx, req)
+		if apiErr != nil {
+			return apiErr
+		}
+		if resp != nil && !resp.Success() {
+			return fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Debug("feishu: remove reaction failed", "error", err)
+	}
+}
+
+func (a *FeishuAdapter) finishUserMessageReaction(ctx context.Context, sessionID string) {
+	replyCtx, ok := a.getSessionReplyContext(sessionID)
+	if !ok {
+		return
+	}
+	defer a.clearSessionReplyContext(sessionID)
+
+	if replyCtx.reactionID != "" {
+		a.removeReaction(ctx, replyCtx.userMessageID, replyCtx.reactionID)
+	}
+	if a.doneEmoji != "" {
+		if reactionID := a.addReactionWithEmoji(ctx, replyCtx.userMessageID, a.doneEmoji); reactionID != "" {
+			slog.Info("feishu: added done emoji", "emoji", a.doneEmoji)
+		} else {
+			slog.Warn("feishu: failed to add done emoji", "emoji", a.doneEmoji)
+		}
+	}
+}
+
+func (a *FeishuAdapter) getSessionReplyContext(sessionID string) (feishuReplyContext, bool) {
+	if value, ok := a.sessionReplyCtx.Load(sessionID); ok {
+		if replyCtx, ok := value.(feishuReplyContext); ok {
+			return replyCtx, true
+		}
+	}
+	return feishuReplyContext{}, false
+}
+
+func (a *FeishuAdapter) clearSessionReplyContext(sessionID string) {
+	a.sessionReplyCtx.Delete(sessionID)
+	a.sessionMsgMap.Delete(sessionID)
+}
+
+func (a *FeishuAdapter) replyToUserMessage(ctx context.Context, messageID, msgType, content string) (string, error) {
+	bodyBuilder := larkim.NewReplyMessageReqBodyBuilder().
+		MsgType(msgType).
+		Content(content)
+	if a.replyInThread {
+		bodyBuilder.ReplyInThread(true)
+	}
 
 	req := larkim.NewReplyMessageReqBuilder().
 		MessageId(messageID).
-		Body(larkim.NewReplyMessageReqBodyBuilder().
-			MsgType(msgType).
-			Content(contentJSON).
-			Build()).
+		Body(bodyBuilder.Build()).
 		Build()
 
 	var resp *larkim.ReplyMessageResp
@@ -637,14 +962,112 @@ func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content str
 	})
 
 	if err != nil {
-		return fmt.Errorf("feishu: reply message failed: %w", err)
+		return "", fmt.Errorf("feishu: reply message failed: %w", err)
 	}
 
 	if !resp.Success() {
-		return fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
+		return "", fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
 	}
 
+	if resp.Data != nil && resp.Data.MessageId != nil {
+		return *resp.Data.MessageId, nil
+	}
+	return "", nil
+}
+
+func (a *FeishuAdapter) sendCardReplyAndGetID(ctx context.Context, sessionID, chatID, cardJSON string) (string, error) {
+	if replyCtx, ok := a.getSessionReplyContext(sessionID); ok && replyCtx.userMessageID != "" {
+		return a.replyToUserMessage(ctx, replyCtx.userMessageID, "interactive", cardJSON)
+	}
+	return a.createInteractiveMessage(ctx, chatID, cardJSON)
+}
+
+func (a *FeishuAdapter) createInteractiveMessage(ctx context.Context, chatID, cardJSON string) (string, error) {
+	feishuChatID, err := parseFeishuChatID(chatID)
+	if err != nil {
+		return "", err
+	}
+
+	req := larkim.NewCreateMessageReqBuilder().
+		ReceiveIdType("chat_id").
+		Body(larkim.NewCreateMessageReqBodyBuilder().
+			ReceiveId(feishuChatID).
+			MsgType("interactive").
+			Content(cardJSON).
+			Build()).
+		Build()
+
+	var resp *larkim.CreateMessageResp
+	err = a.withRetry(ctx, "create interactive message", func() error {
+		var apiErr error
+		resp, apiErr = a.api.Im().Message().Create(ctx, req)
+		return apiErr
+	})
+	if err != nil {
+		return "", fmt.Errorf("feishu: create message failed: %w", err)
+	}
+	if !resp.Success() {
+		return "", fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
+	}
+	if resp.Data != nil && resp.Data.MessageId != nil {
+		return *resp.Data.MessageId, nil
+	}
+	return "", nil
+}
+
+func (a *FeishuAdapter) patchMessage(ctx context.Context, messageID, cardJSON string) error {
+	req := larkim.NewPatchMessageReqBuilder().
+		MessageId(messageID).
+		Body(larkim.NewPatchMessageReqBodyBuilder().
+			Content(cardJSON).
+			Build()).
+		Build()
+
+	var resp *larkim.PatchMessageResp
+	err := a.withRetry(ctx, "patch message", func() error {
+		var apiErr error
+		resp, apiErr = a.api.Im().Message().Patch(ctx, req)
+		return apiErr
+	})
+	if err != nil {
+		return fmt.Errorf("feishu: patch message failed: %w", err)
+	}
+	if !resp.Success() {
+		return fmt.Errorf("feishu API error: code=%d msg=%s", resp.Code, resp.Msg)
+	}
 	return nil
+}
+
+// ReplyMessage replies to a specific message in Feishu (without thread context lookup).
+func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content string) error {
+	_, err := a.replyToUserMessage(ctx, messageID, "text", fmt.Sprintf(`{"text":"%s"}`, escapeJSON(content)))
+	return err
+}
+
+func parseFeishuChatID(sessionKey string) (string, error) {
+	// sessionKey format: feishu_{chat_id}_{user_id}
+	parts := strings.Split(sessionKey, "_")
+	if len(parts) < 5 {
+		return "", fmt.Errorf("invalid session key: %s", sessionKey)
+	}
+	return parts[1] + "_" + parts[2], nil
+}
+
+func normalizeReactionEmoji(value string) string {
+	if value == "none" {
+		return ""
+	}
+	if value == "" {
+		return "OnIt"
+	}
+	return value
+}
+
+func normalizeDoneEmoji(value string) string {
+	if value == "none" {
+		return ""
+	}
+	return value
 }
 
 // withRetry executes an operation with retry logic
