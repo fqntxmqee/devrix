@@ -55,13 +55,47 @@ func NewCommunicationGateway(
 	permissionMgr *PermissionManager,
 	cfg *config.CommunicationConfig,
 ) *CommunicationGateway {
-	return &CommunicationGateway{
+	gw := &CommunicationGateway{
 		sessionStore:  sessionStore,
 		eventHandler: eventHandler,
 		contextEngine: contextEngine,
 		permissionMgr: permissionMgr,
 		config:       cfg,
 		sessions:    make(map[string]*types.Session),
+	}
+	return gw
+}
+
+// StartCleanupRoutine starts a background goroutine that periodically cleans up expired sessions
+func (g *CommunicationGateway) StartCleanupRoutine(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				g.cleanupExpiredSessions()
+			}
+		}
+	}()
+}
+
+// cleanupExpiredSessions removes expired sessions from the in-memory cache
+func (g *CommunicationGateway) cleanupExpiredSessions() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	timeout := g.config.Session.IdleTimeout
+	now := time.Now()
+
+	for sessionID, session := range g.sessions {
+		if now.Sub(session.LastMessageAt) > timeout {
+			slog.Debug("cleaning up expired session", "sessionID", sessionID)
+			delete(g.sessions, sessionID)
+		}
 	}
 }
 

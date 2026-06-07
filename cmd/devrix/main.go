@@ -134,6 +134,9 @@ func main() {
 		commCfg,
 	)
 
+	// Start session cleanup routine
+	gw.StartCleanupRoutine(ctx, 30*time.Second)
+
 	// Now set the gateway on Feishu adapter
 	if feishuAdapter != nil {
 		feishuAdapter.SetGateway(gw)

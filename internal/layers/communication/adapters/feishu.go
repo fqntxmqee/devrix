@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,32 @@ type FeishuAdapter struct {
 	cancel    context.CancelFunc
 
 	sessionMap sync.Map // sessionKey -> sessionID mapping
+	dedupMap   sync.Map // messageID -> timestamp for deduplication
+}
+
+// isDuplicateMessage checks if the message has been seen before
+// Returns true if duplicate, and records the message ID
+func (a *FeishuAdapter) isDuplicateMessage(messageID string) bool {
+	if messageID == "" {
+		return false
+	}
+
+	// Clean up old entries (older than 5 minutes)
+	now := time.Now().Unix()
+	a.dedupMap.Range(func(key, value interface{}) bool {
+		if timestamp, ok := value.(int64); ok {
+			if now-timestamp > 300 {
+				a.dedupMap.Delete(key)
+			}
+		}
+		return true
+	})
+
+	// Check if already seen
+	if _, exists := a.dedupMap.LoadOrStore(messageID, now); exists {
+		return true
+	}
+	return false
 }
 
 // Ensure FeishuAdapter implements gateway.EventHandler
@@ -373,9 +400,27 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		messageID = *msg.MessageId
 	}
 
+	// Deduplicate messages
+	if a.isDuplicateMessage(messageID) {
+		slog.Debug("feishu: duplicate message ignored", "messageID", messageID)
+		return nil
+	}
+
 	chatType := ""
 	if msg.ChatType != nil {
 		chatType = *msg.ChatType
+	}
+
+	// Check message age and filter out old messages (older than 5 minutes)
+	// This prevents replaying old messages after reconnection
+	if msg.CreateTime != nil {
+		if ms, err := strconv.ParseInt(*msg.CreateTime, 10, 64); err == nil {
+			msgTime := time.Unix(ms/1000, (ms%1000)*int64(time.Millisecond))
+			if time.Since(msgTime) > 5*time.Minute {
+				slog.Debug("feishu: ignoring old message", "messageID", messageID, "age", time.Since(msgTime))
+				return nil
+			}
+		}
 	}
 
 	inboundMsg := &types.InboundMessage{
