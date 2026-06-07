@@ -26,10 +26,11 @@ import (
 
 // FeishuAdapter provides Feishu/Lark integration for the communication layer
 type FeishuAdapter struct {
-	gateway    *gateway.CommunicationGateway
+	gateway    gateway.GatewayAPI
 	cfg        *config.CommunicationConfig
 	feishuCfg  *FeishuConfig
 	eventHandler gateway.EventHandler
+	api        FeishuAPI
 
 	client      *lark.Client
 	wsClient    *larkws.Client
@@ -173,11 +174,29 @@ type FeishuConfig struct {
 	UseWebhook  bool
 }
 
+// FeishuAdapterOption is a functional option for FeishuAdapter
+type FeishuAdapterOption func(*FeishuAdapter)
+
+// WithFeishuAPI sets the Feishu API implementation
+func WithFeishuAPI(api FeishuAPI) FeishuAdapterOption {
+	return func(a *FeishuAdapter) {
+		a.api = api
+	}
+}
+
+// WithGateway sets the gateway implementation
+func WithGateway(gw gateway.GatewayAPI) FeishuAdapterOption {
+	return func(a *FeishuAdapter) {
+		a.gateway = gw
+	}
+}
+
 // NewFeishuAdapter creates a new Feishu adapter
 func NewFeishuAdapter(
 	gw *gateway.CommunicationGateway,
 	feishuCfg *FeishuConfig,
 	cfg *config.CommunicationConfig,
+	opts ...FeishuAdapterOption,
 ) *FeishuAdapter {
 	var clientOpts []lark.ClientOptionFunc
 	domain := lark.FeishuBaseUrl
@@ -186,12 +205,24 @@ func NewFeishuAdapter(
 		clientOpts = append(clientOpts, lark.WithOpenBaseUrl(domain))
 	}
 
-	return &FeishuAdapter{
+	adapter := &FeishuAdapter{
 		gateway:   gw,
 		cfg:       cfg,
 		feishuCfg: feishuCfg,
 		client:    lark.NewClient(feishuCfg.AppID, feishuCfg.AppSecret, clientOpts...),
 	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(adapter)
+	}
+
+	// If no API was provided, use the default lark implementation
+	if adapter.api == nil {
+		adapter.api = NewLarkFeishuAPI(adapter.client)
+	}
+
+	return adapter
 }
 
 // SetGateway sets the gateway reference
@@ -480,7 +511,7 @@ func (a *FeishuAdapter) getOrCreateSession(sessionKey string) (*types.Session, e
 
 // fetchBotInfo fetches the bot's information using the low-level API
 func (a *FeishuAdapter) fetchBotInfo(ctx context.Context) error {
-	resp, err := a.client.Get(ctx, "/open-apis/bot/v3/info", nil, larkcore.AccessTokenTypeTenant)
+	resp, err := a.api.Get(ctx, "/open-apis/bot/v3/info", nil, larkcore.AccessTokenTypeTenant)
 	if err != nil {
 		return err
 	}
@@ -570,7 +601,7 @@ func (a *FeishuAdapter) SendMessage(ctx context.Context, chatID, content string)
 	var resp *larkim.CreateMessageResp
 	err := a.withRetry(ctx, "send message", func() error {
 		var apiErr error
-		resp, apiErr = a.client.Im.Message.Create(ctx, req)
+		resp, apiErr = a.api.Im().Message().Create(ctx, req)
 		return apiErr
 	})
 
@@ -601,7 +632,7 @@ func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content str
 	var resp *larkim.ReplyMessageResp
 	err := a.withRetry(ctx, "reply message", func() error {
 		var apiErr error
-		resp, apiErr = a.client.Im.Message.Reply(ctx, req)
+		resp, apiErr = a.api.Im().Message().Reply(ctx, req)
 		return apiErr
 	})
 
@@ -650,11 +681,11 @@ func escapeJSON(s string) string {
 
 // HealthCheck checks if the Feishu connection is healthy
 func (a *FeishuAdapter) HealthCheck(ctx context.Context) error {
-	if a.client == nil {
-		return fmt.Errorf("feishu client not initialized")
+	if a.api == nil {
+		return fmt.Errorf("feishu API not initialized")
 	}
 
-	resp, err := a.client.Get(ctx, "/open-apis/bot/v3/info", nil, larkcore.AccessTokenTypeTenant)
+	resp, err := a.api.Get(ctx, "/open-apis/bot/v3/info", nil, larkcore.AccessTokenTypeTenant)
 	if err != nil {
 		return fmt.Errorf("feishu health check failed: %w", err)
 	}
