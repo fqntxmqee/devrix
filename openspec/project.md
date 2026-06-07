@@ -145,7 +145,8 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 
 ## L3/L4 Asset Registry (Context Engine)
 
-> Change: `openspec/archive/2026-06-07-devrix-context-engine/` (archived) — 消除悬空 ID
+> V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
+> V2 进行中：`openspec/changes/devrix-context-engine-v2/` — Autocompact + Verify commands + Token 统一
 
 ### L3 业务活动
 
@@ -162,6 +163,7 @@ CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → covera
 | L4-CTX-PEV | PEV 执行循环 | `contextengine/pev/` |
 | L4-CTX-COMPRESS | 七步压缩管道 | `contextengine/compression/` |
 | L4-CTX-MEMORY | 分层记忆 | `contextengine/memory/`, `snapshot/` |
+| L4-CTX-OBS | 压缩/验证可观测 | `contextengine/` + Observability bridge（V2） |
 
 ## Related Documents
 

@@ -527,8 +527,18 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 | 版本 | ①目标增量 | ③流程增量 | ④模型增量 |
 |------|-----------|-----------|-----------|
 | V1 | 替换 Stub，压缩 1-5+7 | Execute→Verify | Working+ShortTerm |
-| V2 | Autocompact | Verify commands | 压缩可观测增强 |
+| V2 | Autocompact + Token 统一 | Verify commands（executable+args） | 管道 1-4→6→5→7；OpenSpec: `openspec/changes/devrix-context-engine-v2/` |
 | V3 | 跨会话记忆 | Plan+Milestone | LongTerm SQLite |
+
+### V2 增量摘要（DM-20260607-003）
+
+| 能力 | 要点 |
+|------|------|
+| Autocompact | 步骤 6 在 Assembly 前对消息历史做 LLM 摘要；`autocompact.model` 直传 Gateway |
+| Token | `shared/contracts.ITokenCounter`；Gateway 实现，L2 注入 |
+| Verify | `verify_mode: commands`；`executable`+`args[]`，禁止 shell |
+| 可观测 | 独立 `ICompressionObserver`，不破坏 V1 `IObserver` |
+| 接线 | 主路径真实 LLM Gateway（L5-CTX-18） |
 
 ---
 
@@ -536,12 +546,14 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 
 | # | 问题 | 决议 | 状态 |
 |---|------|------|------|
-| 1 | Token 计数归属 | V1 内置 cl100k_base，V2 与 LLM Gateway 统一 | **已决议** |
+| 1 | Token 计数归属 | `shared/contracts.ITokenCounter`；Gateway 实现 | **已决议（V2）** |
 | 2 | System Prompt 优先级 | AGENTS.md > .devrix/AGENTS.md > fallback | **已决议** |
 | 3 | 权限握手 | IPermissionGate 注入 L2，Gateway 仅展示 | **已决议** |
-| 4 | verify_mode 默认 | `basic` | **已决议** |
-| 5 | 快照加密 | V1 明文，V2 可选 AES | 待决议 |
-| 6 | 压缩异步 | V1 同步，V2 可后台 | 待决议 |
+| 4 | verify_mode 默认 | `basic`；V2 增 `commands` | **已决议** |
+| 5 | 快照加密 | V2 不做，维持明文 | **已决议（V2）** |
+| 6 | 压缩/Autocompact 异步 | V2 同步；1-4 <100ms，摘要 P99 <30s | **已决议（V2）** |
+| 7 | 管道步骤顺序 | 1-4 → 6 → 5 → 7 | **已决议（V2）** |
+| 8 | Verify 执行方式 | exec.CommandContext(executable, args...) | **已决议（V2）** |
 
 ---
 

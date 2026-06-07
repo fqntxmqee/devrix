@@ -43,7 +43,8 @@
 
 ## Layer 2: Context Engine (CTX)
 
-> 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
+> V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
+> V2 设计中：`openspec/changes/devrix-context-engine-v2/`
 
 ### P0
 
@@ -58,12 +59,19 @@
 | L5-CTX-07 | 工具执行后 Verify basic 模式 | L4-CTX-PEV | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED |
 | L5-CTX-09 | EngineEvent 与通信层四流契约一致 | L4-CTX-STATE | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
 | L5-CTX-11 | 权限批准/拒绝后 PEV 行为正确 | L4-CTX-PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
+| L5-CTX-12 | Autocompact 触发并降低 token | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
+| L5-CTX-13 | Autocompact LLM 失败降级跳过 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
+| L5-CTX-14 | Verify commands 全部通过 | L4-CTX-PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
+| L5-CTX-15 | Verify 命令失败触发重试 | L4-CTX-PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
+| L5-CTX-16 | Token 计数共享契约与 Gateway 对齐 | L4-CTX-STATE | `internal/layers/contextengine/token/counter_test.go` | PLANNED |
 
 ### P1
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-CTX-08 | V1 跳过 Autocompact 步骤 6 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
+| L5-CTX-08 | Autocompact 禁用时跳过步骤 6 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
+| L5-CTX-17 | 压缩/Verify 步骤可观测事件 | L4-CTX-OBS | `tests/integration/context_compression_obs_test.go` | PLANNED |
+| L5-CTX-18 | 主路径接入真实 LLM Gateway | L4-CTX-STATE | `tests/integration/context_llm_gateway_test.go` | PLANNED |
 
 ### P2
 
