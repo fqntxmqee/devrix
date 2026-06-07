@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // SessionState represents the current state of a session
 type SessionState string
@@ -41,16 +44,30 @@ type Session struct {
 
 	// 上下文快照（可选持久化）
 	ContextSnapshot []byte
+
+	// 并发保护
+	mu sync.RWMutex
 }
 
-// SetState transitions the session to a new state
+// SetState transitions the session to a new state (thread-safe)
 func (s *Session) SetState(state SessionState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.State = state
 	s.UpdatedAt = time.Now()
 }
 
+// GetState returns the current state (thread-safe)
+func (s *Session) GetState() SessionState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.State
+}
+
 // IsIdle returns true if session has been idle longer than the given duration
 func (s *Session) IsIdle(timeout time.Duration) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return time.Since(s.LastMessageAt) > timeout
 }
 

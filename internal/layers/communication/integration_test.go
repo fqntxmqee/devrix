@@ -184,7 +184,7 @@ func TestIntegration_PermissionRequest(t *testing.T) {
 	session, _ := gw.CreateSession("cli", "/tmp")
 
 	// Test permission request
-	approved := permMgr.Request(session.SessionID, "bash", "ls -la", types.RiskLevelMedium)
+	approved := permMgr.Request(context.Background(), session.SessionID, "bash", "ls -la", types.RiskLevelMedium)
 
 	// Without mock input, this will timeout
 	if approved {

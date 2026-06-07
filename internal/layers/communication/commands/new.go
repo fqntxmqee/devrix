@@ -1,6 +1,10 @@
 package commands
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/devrix/devrix/internal/shared/types"
+)
 
 // NewCommand implements the /new command
 type NewCommand struct {
@@ -9,7 +13,7 @@ type NewCommand struct {
 
 // SessionCreator creates a new session
 type SessionCreator interface {
-	CreateSession(chatID, workDir string) (string, error)
+	CreateSession(chatID, workDir string) (*types.Session, error)
 }
 
 // NewNewCommand creates a new NewCommand
@@ -25,12 +29,12 @@ func (c *NewCommand) Execute(args []string) (string, error) {
 		workDir = args[0]
 	}
 
-	sessionID, err := c.sessionCreator.CreateSession("cli", workDir)
+	session, err := c.sessionCreator.CreateSession("cli", workDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 
-	return fmt.Sprintf("New session started: %s", sessionID), nil
+	return fmt.Sprintf("New session started: %s", session.SessionID), nil
 }
 
 // Name returns the command name

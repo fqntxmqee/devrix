@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,7 +26,8 @@ func NewPermissionManager(cfg *config.PermissionConfig) *PermissionManager {
 }
 
 // Request creates a permission request and waits for user response
-func (p *PermissionManager) Request(sessionID, toolName, inputPreview string, riskLevel types.RiskLevel) bool {
+// The ctx is used for cancellation; if ctx is cancelled, request is denied
+func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, inputPreview string, riskLevel types.RiskLevel) bool {
 	request := &types.PermissionRequest{
 		ID:           generateRequestID(),
 		SessionID:    sessionID,
@@ -42,32 +44,27 @@ func (p *PermissionManager) Request(sessionID, toolName, inputPreview string, ri
 	p.mu.Unlock()
 
 	// Wait for response with timeout
-	done := make(chan bool, 1)
-
-	go func() {
-		// This would be replaced with actual user input handling
-		// For now, we simulate a timeout
-		time.Sleep(p.config.DefaultTimeout)
-		done <- false
-	}()
+	timeout := time.After(p.config.DefaultTimeout)
 
 	select {
-	case approved := <-done:
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		if approved {
-			request.Status = types.PermissionStatusApproved
-		} else {
-			request.Status = types.PermissionStatusDenied
-		}
-		request.RespondedAt = time.Now()
-		return approved
-	case <-time.After(p.config.DefaultTimeout + time.Second):
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		request.Status = types.PermissionStatusExpired
-		request.RespondedAt = time.Now()
+	case <-ctx.Done():
+		p.resolveRequest(request, false)
 		return false
+	case <-timeout:
+		p.resolveRequest(request, false)
+		return false
+	}
+}
+
+// resolveRequest updates the request status (caller must hold mutex)
+func (p *PermissionManager) resolveRequest(request *types.PermissionRequest, approved bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	request.RespondedAt = time.Now()
+	if approved {
+		request.Status = types.PermissionStatusApproved
+	} else {
+		request.Status = types.PermissionStatusDenied
 	}
 }
 

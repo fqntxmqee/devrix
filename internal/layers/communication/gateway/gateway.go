@@ -27,8 +27,10 @@ type IContextEngine interface {
 
 // EngineEvent represents an event from the context engine
 type EngineEvent struct {
-	Type      string      // thinking | text | tool_call | tool_result | permission | status | complete | error
+	Type      string            // thinking | text | tool_call | tool_result | permission | status | complete | error
 	Content   string
+	ToolName  string
+	ToolInput string
 	SessionID string
 	Metadata  map[string]string
 }
@@ -113,13 +115,13 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 			if !ok {
 				return
 			}
-			g.handleEngineEvent(session, event)
+			g.handleEngineEvent(ctx, session, event)
 		}
 	}
 }
 
 // handleEngineEvent handles a single engine event
-func (g *CommunicationGateway) handleEngineEvent(session *types.Session, event *EngineEvent) {
+func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *types.Session, event *EngineEvent) {
 	switch event.Type {
 	case "thinking":
 		session.SetState(types.SessionStateThinking)
@@ -141,7 +143,7 @@ func (g *CommunicationGateway) handleEngineEvent(session *types.Session, event *
 		toolName := event.Metadata["tool_name"]
 		riskLevel := parseRiskLevel(event.Metadata["risk_level"])
 
-		approved := g.permissionMgr.Request(session.SessionID, toolName, event.Metadata["input"], riskLevel)
+		approved := g.permissionMgr.Request(ctx, session.SessionID, toolName, event.Metadata["input"], riskLevel)
 		if !approved {
 			outMsg := &types.OutboundMessage{
 				MessageID:  generateMessageID(),
@@ -153,6 +155,17 @@ func (g *CommunicationGateway) handleEngineEvent(session *types.Session, event *
 			g.eventHandler.OnMessage(outMsg)
 			return
 		}
+
+	case "tool_result":
+		session.SetState(types.SessionStateToolExecuting)
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			Content:   fmt.Sprintf("[Tool: %s] %s", event.ToolName, event.Content),
+			IsComplete: true,
+			Role:      types.MessageRoleAssistant,
+		}
+		g.eventHandler.OnMessage(outMsg)
 
 	case "complete":
 		session.SetState(types.SessionStateCompleted)

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -15,9 +16,10 @@ func TestPermissionManager_Request(t *testing.T) {
 	}
 
 	mgr := NewPermissionManager(cfg)
+	ctx := context.Background()
 
 	// This test will timeout quickly due to short timeout
-	approved := mgr.Request("sess_123", "bash", "ls -la", types.RiskLevelMedium)
+	approved := mgr.Request(ctx, "sess_123", "bash", "ls -la", types.RiskLevelMedium)
 
 	// Without a mock, this will timeout
 	if approved {
