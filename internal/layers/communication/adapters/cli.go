@@ -77,6 +77,9 @@ func (a *CLIAdapter) Start(ctx context.Context) error {
 		default:
 			if err := a.readInput(ctx); err != nil {
 				if err == io.EOF {
+					// In non-interactive mode (IM connected), wait for context cancellation
+					slog.Info("CLI stdin closed, waiting for shutdown signal")
+					<-ctx.Done()
 					return a.Stop()
 				}
 				slog.Error("error reading input", "error", err)

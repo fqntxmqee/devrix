@@ -22,8 +22,10 @@ const (
 type Session struct {
 	// 标识
 	SessionID string // 内部会话 ID（sess_时间戳_随机）
+	ShortID   string // 5位短 ID (V2+，友好展示)
 	RequestID string // 请求关联 ID
 	AdapterID string // 所属 Adapter
+	ChatID    string // 平台相关的会话标识（如飞书的 feishu_{chat_id}_{user_id}）
 
 	// 参与者
 	UserID   string // 用户 ID（CLI 无用户概念）
@@ -76,6 +78,7 @@ func NewSession(sessionID, adapterID, workDir string) *Session {
 	now := time.Now()
 	return &Session{
 		SessionID:      sessionID,
+		ShortID:        GenerateShortId(),
 		AdapterID:      adapterID,
 		WorkDir:        workDir,
 		State:          SessionStateIdle,

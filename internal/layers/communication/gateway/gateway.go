@@ -131,7 +131,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
-			ChatID:    session.SessionID,
+			ChatID:    session.ChatID,
 			Content:   event.Content,
 			IsComplete: false,
 			Role:      types.MessageRoleAssistant,
@@ -198,6 +198,7 @@ func (g *CommunicationGateway) RouteError(err error, sessionID string) {
 func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Session, error) {
 	sessionID := generateSessionID()
 	session := types.NewSession(sessionID, "cli", workDir)
+	session.ChatID = chatID
 
 	if err := g.sessionStore.Create(session); err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)

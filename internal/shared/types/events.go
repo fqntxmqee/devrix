@@ -44,3 +44,32 @@ func (e *DomainEvent) WithMetadata(key, value string) *DomainEvent {
 	e.Metadata[key] = value
 	return e
 }
+
+// EventConnectionLostData 连接断开事件数据
+type EventConnectionLostData struct {
+	ConnectionID string // 连接 ID
+	AdapterID    string // 适配器 ID
+	Reason       string // 断开原因
+}
+
+// EventConnectionRestoredData 连接恢复事件数据
+type EventConnectionRestoredData struct {
+	ConnectionID string // 连接 ID
+	AdapterID    string // 适配器 ID
+}
+
+// EventPermissionRespondedData 权限响应事件数据
+type EventPermissionRespondedData struct {
+	RequestID    string    // 权限请求 ID
+	SessionID    string    // 会话 ID
+	Approved     bool      // 是否批准
+	ResponseTime time.Time // 响应时间
+}
+
+// EventPermissionExpiredData 权限过期事件数据
+type EventPermissionExpiredData struct {
+	RequestID string    // 权限请求 ID
+	SessionID string    // 会话 ID
+	ExpiredAt time.Time // 过期时间
+}
+

@@ -13,6 +13,7 @@ import (
 // PermissionManager handles permission request lifecycle
 type PermissionManager struct {
 	config   *config.PermissionConfig
+	userCfg  *config.UserConfig
 	mu       sync.RWMutex
 	requests map[string]*types.PermissionRequest
 }
@@ -21,12 +22,21 @@ type PermissionManager struct {
 func NewPermissionManager(cfg *config.PermissionConfig) *PermissionManager {
 	return &PermissionManager{
 		config:   cfg,
+		userCfg:  config.DefaultUserConfig(),
 		requests: make(map[string]*types.PermissionRequest),
 	}
 }
 
+// SetUserConfig sets the user configuration (for YOLO mode)
+func (p *PermissionManager) SetUserConfig(userCfg *config.UserConfig) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.userCfg = userCfg
+}
+
 // Request creates a permission request and waits for user response
 // The ctx is used for cancellation; if ctx is cancelled, request is denied
+// In YOLO mode, requests are auto-approved based on configuration
 func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, inputPreview string, riskLevel types.RiskLevel) bool {
 	request := &types.PermissionRequest{
 		ID:           generateRequestID(),
@@ -41,7 +51,17 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 
 	p.mu.Lock()
 	p.requests[request.ID] = request
+	userCfg := p.userCfg
 	p.mu.Unlock()
+
+	// Check YOLO mode for auto-approve
+	if userCfg != nil && userCfg.IsYOLOMode() {
+		approved := p.shouldAutoApprove(toolName, riskLevel)
+		if approved {
+			p.resolveRequest(request, true)
+			return true
+		}
+	}
 
 	// Wait for response with timeout
 	timeout := time.After(p.config.DefaultTimeout)
@@ -54,6 +74,30 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 		p.resolveRequest(request, false)
 		return false
 	}
+}
+
+// shouldAutoApprove checks if a tool should be auto-approved in YOLO mode
+func (p *PermissionManager) shouldAutoApprove(toolName string, riskLevel types.RiskLevel) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.userCfg == nil || !p.userCfg.YOLO.Enabled {
+		return false
+	}
+
+	// YOLO mode always approves for LOW and MEDIUM risk
+	// HIGH and CRITICAL risk require specific auto-approve flags
+	switch riskLevel {
+	case types.RiskLevelLow, types.RiskLevelMedium:
+		return true
+	case types.RiskLevelHigh:
+		return p.userCfg.YOLO.AutoApproveTools
+	case types.RiskLevelCritical:
+		// Critical risks never auto-approve in YOLO mode unless explicitly trusted
+		return false
+	}
+
+	return false
 }
 
 // resolveRequest updates the request status (caller must hold mutex)
