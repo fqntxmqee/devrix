@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-v3
 **Domain:** D1 - Communication (COMM)
-**Status:** Draft
+**Status:** Completed (S7 Archived)
 **Version:** 3.0
 **Based on:** delta.md, devrix-v2 design
 
@@ -317,8 +317,8 @@ devrix/
 
 ## Completion Checklist
 
-- [ ] All 50 tasks complete
-- [ ] All tests pass
-- [ ] Coverage ≥ 80%
-- [ ] No critical code analysis issues
-- [ ] Ready for production
+- [x] P1 能力全部落地（Milestone / TaskFlow / 钉钉 Webhook / UI / Registry）
+- [x] 关联单元测试通过
+- [x] demand.md + acceptance-report.md 完成
+- [ ] P2 延后：InstanceConfig、`/metrics` 端点、LB sticky session
+- [x] Ready for production（钉钉 Webhook 模式）

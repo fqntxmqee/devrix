@@ -11,8 +11,9 @@ Thumbs.db
 # Build
 *.exe
 *.exe~
-devrix
-devrix-feishu
+/devrix
+/devrix-feishu
+/devrix-dingtalk
 *.tmp
 
 # Devrix data
