@@ -75,3 +75,19 @@ func TestPipeline_should_skip_autocompact_in_v1(t *testing.T) {
 		t.Error("expected autocompact skip logged")
 	}
 }
+
+// Covers: L5-CTX-30
+func TestPipeline_should_handle_empty_messages_without_error(t *testing.T) {
+	p := compression.NewPipelineEnabled(true)
+	budget := types.DefaultTokenBudget()
+	out, report, err := p.Run(context.Background(), nil, "", budget)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected non-nil output slice")
+	}
+	if report.OriginalTokens != 0 {
+		t.Fatalf("expected zero original tokens, got %d", report.OriginalTokens)
+	}
+}

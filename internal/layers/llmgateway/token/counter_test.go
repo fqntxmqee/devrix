@@ -153,6 +153,43 @@ func max(a, b int) int {
 	return b
 }
 
+// Covers: L5-LLM-19
+func TestCounter_should_count_chinese_within_tolerance(t *testing.T) {
+	c, err := token.NewCounter()
+	if err != nil {
+		t.Fatalf("NewCounter: %v", err)
+	}
+	enc, err := tiktoken.GetEncoding("cl100k_base")
+	if err != nil {
+		t.Fatalf("GetEncoding: %v", err)
+	}
+	text := "你好世界，这是一个测试句子，用于验证中文 Token 计数准确性。"
+	expected := len(enc.Encode(text, nil, nil))
+	got := c.CountText(text)
+	delta := abs(got-expected) * 100 / max(1, expected)
+	if delta > 5 {
+		t.Fatalf("Chinese CountText delta %d%%: got %d want %d", delta, got, expected)
+	}
+}
+
+// Covers: L5-LLM-19
+func TestCounter_should_count_mixed_cjk_ascii(t *testing.T) {
+	c, err := token.NewCounter()
+	if err != nil {
+		t.Fatalf("NewCounter: %v", err)
+	}
+	text := "Hello 世界 mixed 123 JSON"
+	if got := c.CountText(text); got <= 3 {
+		t.Fatalf("expected reasonable token count, got %d", got)
+	}
+	msgs := []types.Message{
+		*types.NewMessage("1", "s", types.MessageRoleTool, `{"name":"search","args":{"q":"北京 weather"}}`),
+	}
+	if got := c.CountMessages(msgs); got <= c.CountText(`{"name":"search","args":{"q":"北京 weather"}}`) {
+		t.Fatalf("expected role overhead for nested JSON tool message, got %d", got)
+	}
+}
+
 func TestCounter_should_apply_cjk_multiplier_when_configured(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {

@@ -1,0 +1,83 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-testing-quality
+  demand_id: DM-20260608-004
+  title: "测试质量增强"
+  status: s2_design
+  priority: P1
+  owner: architecture
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+  parent_change: devrix-test-framework
+
+scope:
+  layers:
+    - id: L2
+      name: Context Engine
+      affected: true
+    - id: L3
+      name: LLM Gateway
+      affected: true
+    - id: L5
+      name: Observability
+      affected: true
+
+  capabilities:
+    - TEST-BOUNDARY      # 边界条件测试
+    - TEST-CONCURRENCY   # 并发安全测试
+    - TEST-REAL-API      # 真实 API 集成测试
+    - TEST-ASSERTION     # 严格断言标准
+    - TEST-PERFORMANCE   # 性能测试基线
+
+  l5_test_points:
+    - L5-CTX-26          # Verify timeout returns CodeVerifyTimeout
+    - L5-CTX-27          # Shell injection attack prevention
+    - L5-CTX-28          # PEV concurrent session isolation
+    - L5-CTX-29          # PEV context cancellation cleanup
+    - L5-CTX-30          # Compression autocompact timeout fallback
+    - L5-LLM-17          # LLM 429 rate limit handling
+    - L5-LLM-18          # SSE parse error handling
+    - L5-LLM-19          # Token counter Chinese accuracy
+    - L5-OBS-19          # Compression P99 latency < 500ms
+    - L5-OBS-20          # Concurrent session memory bounded
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/testing-quality/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - 边界条件测试覆盖（超时/shell注入/退出码）
+      - 并发安全测试（session隔离/context取消）
+      - 真实 API 测试（429限流/SSE错误）
+      - 严格断言标准（字段级验证）
+      - 性能测试基线（P99延迟/内存）
+    status: s2_design
+    tasks: T1-T5
+    estimate: 16h
+
+bug_severity:
+  medium:
+    - missing-boundary-tests     # 关键路径缺少边界和错误路径测试
+    - mock-only-tests            # 仅依赖 mock 无法验证真实 I/O 行为
+    - weak-assertions            # 断言过于宽松或只检查 error==nil
+
+related_changes:
+  - devrix-test-framework
+  - devrix-tool-security
+  - devrix-llm-gateway-v2
+  - devrix-context-engine-v4
+
+notes: |
+  基于 Gemini 代码质量深度审查报告。审计范围覆盖所有 L2/L3/L5 测试文件。
+  识别出三大类问题：(1) 边界条件缺失 (2) Mock 滥用缺乏真实 API 测试 (3) 断言不严格。
+  本变更不修改生产代码，仅增强测试套件。
