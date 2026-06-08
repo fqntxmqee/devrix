@@ -132,6 +132,9 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	}
 	adapterCh, err := g.retry.Stream(streamCtx, streamCall, primaryModel, providerCfg.FallbackModel, providerCfg.Retry)
 	if err != nil {
+		if cancel != nil {
+			cancel()
+		}
 		g.breaker.RecordFailure(provider)
 		g.recordError(provider, primaryModel)
 		finishSpan(err, llmgateway.TokenUsage{})
