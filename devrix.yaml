@@ -201,6 +201,14 @@ context_engine:
     recall_max_entries: 5
     recall_max_tokens: 2000
 
+# 工具执行安全 (Tool Security)
+tool:
+  sandbox:
+    enabled: true
+    allowlist_extra: []
+    deny_patterns_extra: []
+  concurrent_max: 10
+
 # 可观察层配置 (Observability Layer)
 observability:
   enabled: true

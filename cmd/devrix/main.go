@@ -73,6 +73,11 @@ func main() {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+	toolCfg, err := config.LoadToolConfig(configFile)
+	if err != nil {
+		slog.Error("failed to load tool config", "error", err)
+		os.Exit(1)
+	}
 
 	// Initialize session store
 	sessionStore, err := gateway.NewFileSessionStore(commCfg.Session.StorageDir)
@@ -99,7 +104,7 @@ func main() {
 	obsBridge := observability.NewBridge(obs)
 	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
 	llmbridge.LogLLMReadiness(configFile)
-	contextEngine := bootstrap.NewContextEngine(llmStack, permissionMgr, ctxCfg, obsBridge, milestoneService)
+	contextEngine := bootstrap.NewContextEngine(llmStack, permissionMgr, ctxCfg, toolCfg, obsBridge, milestoneService)
 
 	// Create event handler
 	defaultEventHandler := &DefaultEventHandler{

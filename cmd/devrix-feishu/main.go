@@ -56,6 +56,11 @@ func main() {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+	toolCfg, err := config.LoadToolConfig(configFile)
+	if err != nil {
+		slog.Error("failed to load tool config", "error", err)
+		os.Exit(1)
+	}
 
 	sessionStore, err := gateway.NewFileSessionStore(commCfg.Session.StorageDir)
 	if err != nil {
@@ -73,7 +78,7 @@ func main() {
 	}
 	milestoneService := milestone.NewMilestoneService(nil)
 	engineMode := config.ResolveContextEngine(userCfg.IM)
-	contextEngine := selectContextEngine(engineMode, permissionMgr, ctxCfg, obsBridge, llmStack, milestoneService)
+	contextEngine := selectContextEngine(engineMode, permissionMgr, ctxCfg, toolCfg, obsBridge, llmStack, milestoneService)
 
 	feishuCfg := &adapters.FeishuConfig{
 		AppID:         userCfg.IM.Feishu.AppID,
@@ -148,15 +153,23 @@ func selectContextEngine(
 	name string,
 	permMgr *gateway.PermissionManager,
 	ctxCfg *config.ContextEngineConfig,
+	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	llmStack llmbridge.ContextLLMStack,
 	milestoneSvc milestone.IMilestoneService,
 ) gateway.IContextEngine {
-	switch strings.ToLower(strings.TrimSpace(name)) {
+	engine := strings.ToLower(strings.TrimSpace(name))
+	switch engine {
 	case "stub", "echo":
 		return gateway.NewStubContextEngine()
+	case "four_flow", "fourflow", "four-flow":
+		slog.Warn("four_flow engine was removed; using context engine with real LLM")
+		fallthrough
+	case "", "context", "ctx":
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc)
 	default:
-		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, obsBridge, milestoneSvc)
+		slog.Warn("unknown context engine; using context engine", "requested", engine)
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc)
 	}
 }
 
