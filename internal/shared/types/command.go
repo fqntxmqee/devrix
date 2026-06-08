@@ -1,5 +1,7 @@
 package types
 
+import "strings"
+
 // CommandType represents the type of a CLI command
 type CommandType string
 
@@ -24,6 +26,7 @@ func IsCommand(input string, prefix string) bool {
 
 // ParseCommand parses a command string into a Command struct
 func ParseCommand(input string, prefix string) *Command {
+	input = strings.TrimSpace(input)
 	if !IsCommand(input, prefix) {
 		return &Command{
 			Type: CommandUnknown,
@@ -43,12 +46,12 @@ func ParseCommand(input string, prefix string) *Command {
 	}
 
 	var cmdType CommandType
-	switch parts[0] {
-	case "new":
+	switch {
+	case strings.EqualFold(parts[0], "new"):
 		cmdType = CommandNew
-	case "stop":
+	case strings.EqualFold(parts[0], "stop"):
 		cmdType = CommandStop
-	case "help":
+	case strings.EqualFold(parts[0], "help"):
 		cmdType = CommandHelp
 	default:
 		cmdType = CommandUnknown

@@ -27,7 +27,7 @@
 
 ## D1: Communication Domain (COMM)
 
-> **Spec Reference:** `openspec/changes/devrix-d1-d6-testing/demand.md`
+> **Spec Reference:** `openspec/archive/2026-06-08-devrix-d1-d6-testing/demand.md`
 
 ### D1-S1: Gateway Module
 
@@ -302,7 +302,7 @@
 
 ## D6: Evolution Domain (EVO)
 
-> **Spec Reference:** `openspec/changes/devrix-d1-d6-testing/demand.md`
+> **Spec Reference:** `openspec/archive/2026-06-08-devrix-d1-d6-testing/demand.md`
 
 ### D6-S1: Version Module
 
@@ -343,14 +343,14 @@
 
 | Domain | Domain Name | Total | IMPLEMENTED | PLANNED | P0 |
 |--------|------------|-------|-------------|---------|-----|
-| D0 | Code Integrity | 9 | 0 | 9 | 3 |
-| D1 | Communication | 5 | 0 | 5 | 1 |
-| D2 | Context Engine | 21 | 16 | 5 | 0 |
-| D3 | LLM Gateway | 17 | 13 | 4 | 0 |
+| D0 | Code Integrity | 9 | 9 | 0 | 3 |
+| D1 | Communication | 13 | 13 | 0 | 2 |
+| D2 | Context Engine | 31 | 31 | 0 | 0 |
+| D3 | LLM Gateway | 21 | 20 | 1 | 0 |
 | D4 | Multi-Agent | 15 | 15 | 0 | 0 |
-| D5 | Observability | 16 | 11 | 5 | 0 |
+| D5 | Observability | 19 | 15 | 4 | 0 |
 | D6 | Evolution | 2 | 0 | 2 | 0 |
-| **Total** | | **85** | **47** | **38** | **4** |
+| **Total** | | **110** | **103** | **7** | **5** |
 
 ---
 
@@ -361,3 +361,4 @@
 | 1.0.0 | 2026-06-08 | Complete rewrite with D-S numbering system |
 | 1.1.0 | 2026-06-08 | Section headers migrated L1-L2 → D-S (DM-20260608-007) |
 | 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |
+| 1.3.0 | 2026-06-08 | D1 L5 IMPLEMENTED; registry summary reconciled (DM-20260608-011) |

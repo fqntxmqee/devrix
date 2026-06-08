@@ -1,0 +1,26 @@
+change_id: devrix-d1-d6-testing
+priority: P1
+demand_id: DM-20260608-011
+status: s7_archived
+completed_at: "2026-06-08"
+archived_at: "2026-06-08"
+domains: [D1, D6]
+l5_points: [L5-1-1-01, L5-1-2-01, L5-1-3-01, L5-1-3-02, L5-1-3-03, L5-1-8-01, L5-6-1-01, L5-6-2-01]
+estimated_hours: 8
+version_scope:
+  v1.0: D1 L5 测试闭合 + ParseCommand 增强
+  v2.1.0: D6 版本检测 (L5-6-1-01)
+  v2.2.0: D6 配置热更新 (L5-6-2-01)
+related_changes:
+  - devrix-code-integrity
+deliverables:
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: proposal.md
+    status: in_progress
+  - path: tasks.md
+    status: in_progress
+  - path: acceptance-report.md
+    status: pending

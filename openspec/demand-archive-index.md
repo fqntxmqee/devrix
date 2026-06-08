@@ -21,6 +21,7 @@
 | DM-20260608-008 | Communication Layer V3 功能补全 | devrix-v3 | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-010 | Communication V3 集成补全 | devrix-v3-integration | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-009 | Devrix 代码健康规范 | devrix-code-integrity | 2026-06-08 | — | ACCEPTED |
+| DM-20260608-011 | D1 & D6 Testing Coverage | devrix-d1-d6-testing | 2026-06-08 | — | ACCEPTED |
 
 ## Archive Locations
 
@@ -45,11 +46,11 @@
 | devrix-v3 | `openspec/archive/2026-06-08-devrix-v3/` |
 | devrix-v3-integration | `openspec/archive/2026-06-08-devrix-v3-integration/` |
 | devrix-code-integrity | `openspec/archive/2026-06-08-devrix-code-integrity/` |
+| devrix-d1-d6-testing | `openspec/archive/2026-06-08-devrix-d1-d6-testing/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
-| devrix-d1-d6-testing | — | `openspec/changes/devrix-d1-d6-testing/` | 规划中 |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |

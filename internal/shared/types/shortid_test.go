@@ -27,10 +27,11 @@ func TestGenerateShortId(t *testing.T) {
 	}
 }
 
+// Covers: L5-1-8-01
 func TestGenerateShortId_Uniqueness(t *testing.T) {
-	// 200 samples from 32^5 space: collision probability < 0.001%.
-	generated := make(map[string]bool, 200)
-	for i := 0; i < 200; i++ {
+	const iterations = 1000
+	generated := make(map[string]bool, iterations)
+	for i := 0; i < iterations; i++ {
 		shortId := GenerateShortId()
 		if generated[shortId] {
 			t.Fatalf("collision detected at iteration %d: %s", i, shortId)

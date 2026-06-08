@@ -18,8 +18,12 @@ func TestL5_COMM_Commands_Parse(t *testing.T) {
 	}{
 		{name: "new command", input: "/new", expected: types.CommandNew},
 		{name: "new with workdir", input: "/new /tmp/work", expected: types.CommandNew, args: []string{"/tmp/work"}},
+		{name: "new uppercase", input: "/NEW", expected: types.CommandNew},
+		{name: "new leading spaces", input: "  /new", expected: types.CommandNew},
 		{name: "stop command", input: "/stop", expected: types.CommandStop},
+		{name: "stop uppercase", input: "/STOP", expected: types.CommandStop},
 		{name: "help command", input: "/help", expected: types.CommandHelp},
+		{name: "help uppercase", input: "/HELP", expected: types.CommandHelp},
 		{name: "unknown command", input: "/unknown", expected: types.CommandUnknown},
 		{name: "regular message", input: "hello", expected: types.CommandUnknown},
 	}
