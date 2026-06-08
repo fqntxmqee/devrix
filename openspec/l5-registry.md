@@ -149,6 +149,17 @@
 | L5-LLM-14 | 多 Provider 并发调用 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
 | L5-LLM-15 | 熔断器状态持久化 | L4-LLM-BREAKER | — | PLANNED |
 
+### Reliability V2 (P0/P1)
+
+> 变更：`openspec/changes/devrix-llm-gateway-v2/`（Demand: DM-20260608-002）
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-LLM-20 | Retry 与 CB 协调，context 取消不触发 CB | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
+| L5-LLM-21 | 无 deadline 时注入 provider 超时 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
+| L5-LLM-22 | Retry Full Jitter 退避 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_jitter_test.go` | IMPLEMENTED |
+| L5-LLM-23 | Half-Open 并发探测上限 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
+
 ---
 
 ## Layer 4: Multi-Agent (AGENT)

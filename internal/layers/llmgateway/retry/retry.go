@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -13,11 +14,23 @@ import (
 type StreamFunc func(ctx context.Context, model string) (<-chan *llmgateway.AdapterChunk, error)
 
 // Executor runs retry with exponential backoff and optional fallback model.
-type Executor struct{}
+type Executor struct {
+	rng *rand.Rand
+}
 
 // NewExecutor creates a retry executor.
 func NewExecutor() *Executor {
-	return &Executor{}
+	return &Executor{
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+// WithRNG injects a random source (tests).
+func (e *Executor) WithRNG(rng *rand.Rand) *Executor {
+	if rng != nil {
+		e.rng = rng
+	}
+	return e
 }
 
 // Stream executes call with retries on primary then fallback model.
@@ -45,7 +58,7 @@ func (e *Executor) Stream(
 				return nil, err
 			}
 			if attempt > 0 || mi > 0 && attempt == 0 && lastErr != nil {
-				delay := backoffDelay(cfg, attempt)
+				delay := e.backoffDelay(cfg, attempt)
 				if mi > 0 && attempt == 0 {
 					delay = cfg.InitialDelay
 					if delay <= 0 {
@@ -79,7 +92,7 @@ func (e *Executor) Stream(
 	return nil, lastErr
 }
 
-func backoffDelay(cfg sharedconfig.LLMRetryConfig, attempt int) time.Duration {
+func (e *Executor) backoffDelay(cfg sharedconfig.LLMRetryConfig, attempt int) time.Duration {
 	initial := cfg.InitialDelay
 	if initial <= 0 {
 		initial = time.Second
@@ -92,11 +105,19 @@ func backoffDelay(cfg sharedconfig.LLMRetryConfig, attempt int) time.Duration {
 	if backoff <= 0 {
 		backoff = 2.0
 	}
-	delay := float64(initial) * pow(backoff, float64(attempt))
-	if delay > float64(maxDelay) {
-		delay = float64(maxDelay)
+
+	cap := float64(initial) * pow(backoff, float64(attempt))
+	if cap > float64(maxDelay) {
+		cap = float64(maxDelay)
 	}
-	return time.Duration(delay)
+	if cap <= 0 {
+		return 0
+	}
+	jitter := time.Duration(e.rng.Int63n(int64(cap)))
+	if jitter > maxDelay {
+		return maxDelay
+	}
+	return jitter
 }
 
 func pow(base, exp float64) float64 {

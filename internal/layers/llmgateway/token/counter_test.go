@@ -152,3 +152,17 @@ func max(a, b int) int {
 	}
 	return b
 }
+
+func TestCounter_should_apply_cjk_multiplier_when_configured(t *testing.T) {
+	c, err := token.NewCounter()
+	if err != nil {
+		t.Fatalf("NewCounter: %v", err)
+	}
+	base := c.CountText("你好世界")
+	c.WithCJKMultiplier(1.5)
+	got := c.CountText("你好世界")
+	want := int(float64(base) * 1.5)
+	if got != want {
+		t.Fatalf("CountText CJK: got %d want %d", got, want)
+	}
+}

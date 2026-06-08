@@ -18,8 +18,9 @@ const (
 
 // Counter implements contracts.ITokenCounter using cl100k_base (tiktoken).
 type Counter struct {
-	mu       sync.RWMutex
-	encoding *tiktoken.Tiktoken
+	mu            sync.RWMutex
+	encoding      *tiktoken.Tiktoken
+	cjkMultiplier float64
 }
 
 // NewCounter creates a cl100k_base token counter (embedded BPE, no network).
@@ -29,7 +30,15 @@ func NewCounter() (*Counter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Counter{encoding: enc}, nil
+	return &Counter{encoding: enc, cjkMultiplier: 1.0}, nil
+}
+
+// WithCJKMultiplier sets a multiplier applied when text contains CJK characters.
+func (c *Counter) WithCJKMultiplier(multiplier float64) *Counter {
+	if multiplier > 0 {
+		c.cjkMultiplier = multiplier
+	}
+	return c
 }
 
 // CountText returns the token count for plain text.
@@ -39,7 +48,22 @@ func (c *Counter) CountText(text string) int {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return len(c.encoding.Encode(text, nil, nil))
+	count := len(c.encoding.Encode(text, nil, nil))
+	if c.cjkMultiplier > 1.0 && containsCJK(text) {
+		count = int(float64(count) * c.cjkMultiplier)
+	}
+	return count
+}
+
+func containsCJK(s string) bool {
+	for _, r := range s {
+		if (r >= 0x4E00 && r <= 0x9FFF) ||
+			(r >= 0x3400 && r <= 0x4DBF) ||
+			(r >= 0x3000 && r <= 0x303F) {
+			return true
+		}
+	}
+	return false
 }
 
 // CountMessages sums tokens across chat messages including role overhead.

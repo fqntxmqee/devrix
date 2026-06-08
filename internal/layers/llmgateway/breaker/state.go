@@ -7,10 +7,11 @@ import (
 )
 
 type circuitRecord struct {
-	state            llmgateway.CircuitState
-	failureCount     int
+	state             llmgateway.CircuitState
+	failureCount      int
 	halfOpenSuccesses int
-	openedAt         time.Time
+	halfOpenInFlight  int
+	openedAt          time.Time
 }
 
 func newCircuitRecord() *circuitRecord {
