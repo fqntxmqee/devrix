@@ -44,12 +44,12 @@
 | devrix-d-layer-rename | `openspec/archive/2026-06-08-devrix-d-layer-rename/` |
 | devrix-v3 | `openspec/archive/2026-06-08-devrix-v3/` |
 | devrix-v3-integration | `openspec/archive/2026-06-08-devrix-v3-integration/` |
+| devrix-code-integrity | `openspec/archive/2026-06-08-devrix-code-integrity/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
-| devrix-code-integrity | DM-20260608-009 | `openspec/changes/devrix-code-integrity/` | S3 设计中 |
 | devrix-d1-d6-testing | — | `openspec/changes/devrix-d1-d6-testing/` | 规划中 |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |
