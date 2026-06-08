@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 const (
@@ -20,58 +21,109 @@ const (
 	defaultMaxToolOutput = 64 * 1024
 )
 
-// BuiltinToolRunner executes built-in tools (bash, read_file, write_file) in the session workspace.
-type BuiltinToolRunner struct {
-	Timeout        time.Duration
-	MaxOutputBytes int
-	Policy         *CommandPolicy
-	AuditEnabled   bool
+type toolExecConfig struct {
+	timeout        time.Duration
+	maxOutputBytes int
+	policy         *CommandPolicy
+	auditEnabled   bool
 }
 
-// NewBuiltinToolRunner creates a production tool runner with safe defaults.
-func NewBuiltinToolRunner() *BuiltinToolRunner {
-	return NewBuiltinToolRunnerFromConfig(config.DefaultToolConfig())
-}
-
-// NewBuiltinToolRunnerFromConfig builds a runner from tool configuration.
-func NewBuiltinToolRunnerFromConfig(toolCfg *config.ToolConfig) *BuiltinToolRunner {
+func newToolExecConfig(toolCfg *config.ToolConfig) *toolExecConfig {
 	if toolCfg == nil {
 		toolCfg = config.DefaultToolConfig()
 	}
 	enabled := toolCfg.SandboxEnabled()
-	policy := NewCommandPolicy(
-		enabled,
-		toolCfg.Sandbox.AllowlistExtra,
-		toolCfg.Sandbox.DenyPatternsExtra,
-	)
-	return &BuiltinToolRunner{
-		Timeout:        defaultToolTimeout,
-		MaxOutputBytes: defaultMaxToolOutput,
-		Policy:         policy,
-		AuditEnabled:   enabled,
+	return &toolExecConfig{
+		timeout:        defaultToolTimeout,
+		maxOutputBytes: defaultMaxToolOutput,
+		policy:         NewCommandPolicy(enabled, toolCfg.Sandbox.AllowlistExtra, toolCfg.Sandbox.DenyPatternsExtra),
+		auditEnabled:   enabled,
 	}
 }
 
-// Execute runs a tool call in the workspace from context.
-func (r *BuiltinToolRunner) Execute(ctx context.Context, call ToolCall) (*ToolResult, error) {
-	workDir, err := ResolveToolWorkDir(ctx)
-	if err != nil {
-		return &ToolResult{Error: err.Error()}, nil
+func (c *toolExecConfig) maxOutput() int {
+	if c.maxOutputBytes > 0 {
+		return c.maxOutputBytes
 	}
+	return defaultMaxToolOutput
+}
 
-	switch call.Name {
-	case "bash":
-		return r.runBash(ctx, workDir, call.Input)
-	case "read_file":
-		return r.runReadFile(workDir, call.Input)
-	case "write_file":
-		return r.runWriteFile(workDir, call.Input)
-	default:
-		return &ToolResult{Error: fmt.Sprintf("unknown tool: %s", call.Name)}, nil
+// NewBuiltinToolRunner creates the default built-in tool registry as IToolRunner.
+func NewBuiltinToolRunner() IToolRunner {
+	return NewBuiltinToolRegistry(config.DefaultToolConfig())
+}
+
+// NewBuiltinToolRunnerFromConfig builds the built-in registry from tool config.
+func NewBuiltinToolRunnerFromConfig(toolCfg *config.ToolConfig) IToolRunner {
+	return NewBuiltinToolRegistry(toolCfg)
+}
+
+type bashRunner struct {
+	cfg *toolExecConfig
+}
+
+func newBashRunner(cfg *toolExecConfig) *bashRunner {
+	return &bashRunner{cfg: cfg}
+}
+
+func (r *bashRunner) Name() string { return "bash" }
+
+func (r *bashRunner) Schema() ToolSchema {
+	return ToolSchema{
+		Name:        "bash",
+		Description: "Execute a shell command (sandboxed)",
 	}
 }
 
-func (r *BuiltinToolRunner) runBash(ctx context.Context, workDir, input string) (*ToolResult, error) {
+func (r *bashRunner) RiskLevel() types.RiskLevel { return types.RiskLevelHigh }
+
+func (r *bashRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
+	return runBash(ctx, workDir, input, r.cfg)
+}
+
+type readFileRunner struct {
+	cfg *toolExecConfig
+}
+
+func newReadFileRunner(cfg *toolExecConfig) *readFileRunner {
+	return &readFileRunner{cfg: cfg}
+}
+
+func (r *readFileRunner) Name() string { return "read_file" }
+
+func (r *readFileRunner) Schema() ToolSchema {
+	return ToolSchema{Name: "read_file", Description: "Read a file from the workspace"}
+}
+
+func (r *readFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
+
+func (r *readFileRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
+	_ = ctx
+	return runReadFile(workDir, input, r.cfg)
+}
+
+type writeFileRunner struct {
+	cfg *toolExecConfig
+}
+
+func newWriteFileRunner(cfg *toolExecConfig) *writeFileRunner {
+	return &writeFileRunner{cfg: cfg}
+}
+
+func (r *writeFileRunner) Name() string { return "write_file" }
+
+func (r *writeFileRunner) Schema() ToolSchema {
+	return ToolSchema{Name: "write_file", Description: "Write content to a file"}
+}
+
+func (r *writeFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelMedium }
+
+func (r *writeFileRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
+	_ = ctx
+	return runWriteFile(workDir, input, r.cfg)
+}
+
+func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
 	command := toolInputString(input, "command", "cmd")
 	if command == "" {
 		command = strings.TrimSpace(input)
@@ -80,20 +132,17 @@ func (r *BuiltinToolRunner) runBash(ctx context.Context, workDir, input string) 
 		return &ToolResult{Error: "bash: command is required"}, nil
 	}
 
-	if r.Policy != nil {
-		if err := r.Policy.Validate(command); err != nil {
+	if cfg.policy != nil {
+		if err := cfg.policy.Validate(command); err != nil {
 			return &ToolResult{Error: err.Error()}, nil
 		}
 	}
 
-	if r.AuditEnabled {
-		slog.Info("tool.bash.audit",
-			"command", command,
-			"work_dir", workDir,
-		)
+	if cfg.auditEnabled {
+		slog.Info("tool.bash.audit", "command", command, "work_dir", workDir)
 	}
 
-	timeout := r.Timeout
+	timeout := cfg.timeout
 	if timeout <= 0 {
 		timeout = defaultToolTimeout
 	}
@@ -102,7 +151,7 @@ func (r *BuiltinToolRunner) runBash(ctx context.Context, workDir, input string) 
 
 	cmd := exec.CommandContext(runCtx, "sh", "-c", command)
 	cmd.Dir = workDir
-	if r.Policy != nil && r.Policy.Enabled {
+	if cfg.policy != nil && cfg.policy.Enabled {
 		cmd.Env = []string{
 			"HOME=" + workDir,
 			"PATH=/usr/local/bin:/usr/bin:/bin",
@@ -117,7 +166,7 @@ func (r *BuiltinToolRunner) runBash(ctx context.Context, workDir, input string) 
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	out := formatCommandOutput(stdout.String(), stderr.String(), r.maxOutput())
+	out := formatCommandOutput(stdout.String(), stderr.String(), cfg.maxOutput())
 	if err != nil {
 		if runCtx.Err() == context.DeadlineExceeded {
 			return &ToolResult{Error: fmt.Sprintf("bash: timeout after %s", timeout), Output: out}, nil
@@ -134,7 +183,7 @@ func (r *BuiltinToolRunner) runBash(ctx context.Context, workDir, input string) 
 	return &ToolResult{Output: out}, nil
 }
 
-func (r *BuiltinToolRunner) runReadFile(workDir, input string) (*ToolResult, error) {
+func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
 	path := toolInputString(input, "path", "file")
 	if path == "" {
 		path = strings.TrimSpace(input)
@@ -148,10 +197,10 @@ func (r *BuiltinToolRunner) runReadFile(workDir, input string) (*ToolResult, err
 	if err != nil {
 		return &ToolResult{Error: err.Error()}, nil
 	}
-	return &ToolResult{Output: truncateToolOutput(string(data), r.maxOutput())}, nil
+	return &ToolResult{Output: truncateToolOutput(string(data), cfg.maxOutput())}, nil
 }
 
-func (r *BuiltinToolRunner) runWriteFile(workDir, input string) (*ToolResult, error) {
+func runWriteFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
 	fields := parseToolInput(input)
 	path := firstNonEmpty(fields, "path", "file")
 	content := fields["content"]
@@ -171,13 +220,6 @@ func (r *BuiltinToolRunner) runWriteFile(workDir, input string) (*ToolResult, er
 		return &ToolResult{Error: err.Error()}, nil
 	}
 	return &ToolResult{Output: fmt.Sprintf("wrote %d bytes to %s", len(content), path)}, nil
-}
-
-func (r *BuiltinToolRunner) maxOutput() int {
-	if r.MaxOutputBytes > 0 {
-		return r.MaxOutputBytes
-	}
-	return defaultMaxToolOutput
 }
 
 func parseToolInput(input string) map[string]string {
