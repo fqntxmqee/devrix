@@ -27,3 +27,23 @@ func TestInstanceRegistry_RegisterHealthCheck(t *testing.T) {
 		t.Fatalf("HealthCheck() error = %v", err)
 	}
 }
+
+// Covers: L5-1-1-02
+func TestInstanceRegistry_RegisterUnregister(t *testing.T) {
+	reg := NewInstanceRegistry(time.Minute)
+	ctx := context.Background()
+
+	info := &InstanceInfo{ID: "devrix-dingtalk", Name: "DingTalk Bot", Address: "127.0.0.1", Port: 8081}
+	if err := reg.Register(ctx, info); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if reg.Count() != 1 {
+		t.Fatalf("count = %d, want 1", reg.Count())
+	}
+	if err := reg.Unregister(ctx, "devrix-dingtalk"); err != nil {
+		t.Fatalf("Unregister() error = %v", err)
+	}
+	if reg.Count() != 0 {
+		t.Fatalf("count after unregister = %d", reg.Count())
+	}
+}

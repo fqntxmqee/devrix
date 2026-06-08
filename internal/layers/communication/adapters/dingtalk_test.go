@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/shared/config"
@@ -30,6 +31,7 @@ func TestParseDingTalkPayload(t *testing.T) {
 	}
 }
 
+// Covers: L5-1-2-02
 func TestDingTalkWebhookHandler_routesInbound(t *testing.T) {
 	var routed bool
 	mockGW := &mockGatewayAPI{
@@ -69,6 +71,7 @@ func TestDingTalkWebhookHandler_routesInbound(t *testing.T) {
 	}
 }
 
+// Covers: L5-1-2-02
 func TestDingTalkAdapter_OnMessage_sendsViaWebhook(t *testing.T) {
 	mockAPI := &mockDingTalkAPI{}
 	adapter := NewDingTalkAdapter(nil, &DingTalkConfig{}, config.DefaultConfig(), WithDingTalkAPI(mockAPI))
@@ -102,4 +105,48 @@ func TestDingTalkAdapter_Start_prefetchesToken(t *testing.T) {
 		t.Fatalf("tokenCalls = %d", mockAPI.tokenCalls)
 	}
 	_ = adapter.Stop()
+}
+
+// Covers: L5-1-2-03
+func TestDingTalkAdapter_OnMessage_milestoneRender(t *testing.T) {
+	mockAPI := &mockDingTalkAPI{}
+	adapter := NewDingTalkAdapter(nil, &DingTalkConfig{}, config.DefaultConfig(), WithDingTalkAPI(mockAPI))
+	adapter.webhookMap.Store("cid-1", "https://example.com/hook")
+
+	adapter.OnMessage(&types.OutboundMessage{
+		ChatID:  "cid-1",
+		Content: "raw should not be sent",
+		Metadata: map[string]string{
+			"render":             "milestone",
+			"milestone_id":       "m1",
+			"milestone_name":     "Design API",
+			"milestone_status":   "in_progress",
+			"milestone_progress": "0.5",
+		},
+	})
+
+	if len(mockAPI.sendContents) != 1 {
+		t.Fatalf("sendContents = %d", len(mockAPI.sendContents))
+	}
+	sent := mockAPI.sendContents[0]
+	if sent == "raw should not be sent" {
+		t.Fatal("expected rendered milestone card, got raw content")
+	}
+	if !strings.Contains(sent, "Design API") {
+		t.Fatalf("content = %q", sent)
+	}
+}
+
+func TestRenderDingTalkOutboundContent_milestoneProgressEvent(t *testing.T) {
+	out := renderDingTalkOutboundContent(&types.OutboundMessage{
+		Content: "ignored",
+		Metadata: map[string]string{
+			"event_type": "milestone_progress",
+			"task":       "Fix auth",
+			"progress":   "50%",
+		},
+	})
+	if out == "" || !strings.Contains(out, "Fix auth") {
+		t.Fatalf("content = %q", out)
+	}
 }

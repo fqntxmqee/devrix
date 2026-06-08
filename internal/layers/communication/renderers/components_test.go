@@ -3,6 +3,8 @@ package renderers
 import (
 	"testing"
 
+	"strings"
+
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -26,4 +28,32 @@ func TestDingTalkCardRenderer_RenderMilestone(t *testing.T) {
 	if out == "" {
 		t.Fatal("expected markdown output")
 	}
+}
+
+// Covers: L5-1-8-02
+func TestProgressBar_Render(t *testing.T) {
+	out := NewProgressBar(0.5, 10).Render()
+	if out == "" {
+		t.Fatal("expected non-empty output")
+	}
+	if !containsAll(out, "50%") {
+		t.Fatalf("output = %q", out)
+	}
+}
+
+// Covers: L5-1-8-02
+func TestStatusBadge_Render(t *testing.T) {
+	out := NewStatusBadge("in_progress").Render()
+	if out == "" {
+		t.Fatal("expected non-empty output")
+	}
+}
+
+func containsAll(s string, parts ...string) bool {
+	for _, p := range parts {
+		if !strings.Contains(s, p) {
+			return false
+		}
+	}
+	return true
 }

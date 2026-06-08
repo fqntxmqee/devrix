@@ -318,3 +318,27 @@ func TestMilestoneService_CalculateOverallProgress(t *testing.T) {
 		t.Errorf("OverallProgress = %f, want 0.75", progress)
 	}
 }
+
+// Covers: L5-1-5-01
+func TestMilestoneService_AddDependency_CycleRejected(t *testing.T) {
+	svc := NewMilestoneService(nil)
+
+	m1 := &types.Milestone{ID: "m1", Name: "A", TaskID: "task_1"}
+	m2 := &types.Milestone{ID: "m2", Name: "B", TaskID: "task_1"}
+	m3 := &types.Milestone{ID: "m3", Name: "C", TaskID: "task_1"}
+	for _, m := range []*types.Milestone{m1, m2, m3} {
+		if err := svc.Create(m); err != nil {
+			t.Fatalf("Create(%s) error = %v", m.ID, err)
+		}
+	}
+
+	if err := svc.AddDependency("m2", "m1"); err != nil {
+		t.Fatalf("AddDependency(m2,m1) error = %v", err)
+	}
+	if err := svc.AddDependency("m3", "m2"); err != nil {
+		t.Fatalf("AddDependency(m3,m2) error = %v", err)
+	}
+	if err := svc.AddDependency("m1", "m3"); err == nil {
+		t.Fatal("AddDependency(m1,m3) should reject cycle")
+	}
+}

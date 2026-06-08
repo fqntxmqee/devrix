@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/instance"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
@@ -106,6 +108,29 @@ func main() {
 	defer cancel()
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 
+	instanceRegistry := instance.NewInstanceRegistry(60 * time.Second)
+	instanceID := os.Getenv("DEVRIX_INSTANCE_ID")
+	if instanceID == "" {
+		instanceID = "devrix-dingtalk"
+	}
+	instanceName := os.Getenv("DEVRIX_INSTANCE_NAME")
+	if instanceName == "" {
+		instanceName = "Devrix DingTalk"
+	}
+	port, _ := strconv.Atoi(dtCfg.Port)
+	if port == 0 {
+		port = 8081
+	}
+	instanceInfo := &instance.InstanceInfo{
+		ID:      instanceID,
+		Name:    instanceName,
+		Address: "localhost",
+		Port:    port,
+	}
+	if err := instanceRegistry.Register(ctx, instanceInfo); err != nil {
+		slog.Warn("failed to register instance", "error", err)
+	}
+
 	if err := dingTalkAdapter.Start(ctx); err != nil {
 		slog.Error("failed to start dingtalk adapter", "error", err)
 		os.Exit(1)
@@ -139,6 +164,9 @@ func main() {
 
 	<-ctx.Done()
 	slog.Info("shutting down")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	_ = instanceRegistry.Unregister(shutdownCtx, instanceInfo.ID)
 	_ = dingTalkAdapter.Stop()
 	_ = obs.Shutdown(context.Background())
 }

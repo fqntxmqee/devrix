@@ -326,6 +326,16 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		g.eventHandler.OnMessage(outMsg)
 
 	case "milestone_progress":
+		meta := map[string]string{
+			"event_type":         "milestone_progress",
+			"progress":           event.Metadata["progress"],
+			"task":               event.Metadata["task"],
+			"milestone_id":       event.Metadata["milestone_id"],
+			"render":             "milestone",
+			"milestone_name":     event.Metadata["task"],
+			"milestone_progress": event.Metadata["progress"],
+			"milestone_status": string(types.MilestoneStatusInProgress),
+		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
@@ -333,11 +343,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Content:   event.Content,
 			IsComplete: false,
 			Role:      types.MessageRoleAssistant,
-			Metadata: map[string]string{
-				"event_type": "milestone_progress",
-				"progress":   event.Metadata["progress"],
-				"task":       event.Metadata["task"],
-			},
+			Metadata:  meta,
 		}
 		g.eventHandler.OnMessage(outMsg)
 

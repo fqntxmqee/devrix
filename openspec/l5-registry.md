@@ -27,31 +27,47 @@
 
 ## D1: Communication Domain (COMM)
 
+> **Spec Reference:** `openspec/changes/devrix-d1-d6-testing/demand.md`
+
 ### D1-S1: Gateway Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-1-1-01 | 新会话创建 CLI 会话入库被拒绝 | Gateway | `tests/integration/gateway_session_test.go` | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-1-01 | 新会话创建 CLI 会话入库被拒绝 | Gateway | `tests/integration/gateway_session_test.go` | PLANNED | P0 |
+| L5-1-1-02 | IM 入口实例 Register/Unregister | Gateway | `internal/layers/communication/instance/registry_test.go` | IMPLEMENTED | P2 |
+
+### D1-S5: Milestone Module
+
+> **Change:** `devrix-v3-integration` (DM-20260608-010)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-5-01 | Milestone 环检测拒绝循环依赖 | Milestone | `internal/layers/communication/milestone/service_test.go` | IMPLEMENTED | P1 |
+| L5-1-5-02 | TaskFlow 多里程碑链顺序执行至完成 | Milestone | `internal/layers/communication/milestone/taskflow_test.go` | IMPLEMENTED | P1 |
+| L5-1-5-03 | 无 V1 TaskFlow stub 误导日志 | Milestone | — (file removed) | IMPLEMENTED | P2 |
 
 ### D1-S3: Commands Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-1-3-01 | /new 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
-| L5-1-3-02 | /help 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
-| L5-1-3-03 | /stop 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-3-01 | /new 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P0 |
+| L5-1-3-02 | /help 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P1 |
+| L5-1-3-03 | /stop 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P1 |
 
 ### D1-S8: Renderers Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-1-8-01 | ShortId 唯一且排除异议字符 | Renderers | `internal/shared/types/shortid_test.go` | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-8-01 | ShortId 唯一且排除异议字符 | Renderers | `internal/shared/types/shortid_test.go` | PLANNED | P1 |
+| L5-1-8-02 | ProgressBar / StatusBadge 渲染输出合法 | Renderers | `internal/layers/communication/renderers/components_test.go` | IMPLEMENTED | P2 |
 
 ### D1-S2: Adapters Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | PLANNED | P1 |
+| L5-1-2-02 | 钉钉 Webhook 入站路由 + Session 出站 | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
+| L5-1-2-03 | 钉钉 milestone 出站走 CardRenderer | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
 
 ---
 
@@ -286,31 +302,55 @@
 
 ## D6: Evolution Domain (EVO)
 
+> **Spec Reference:** `openspec/changes/devrix-d1-d6-testing/demand.md`
+
 ### D6-S1: Version Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-6-1-01 | 版本检测与记录 | Version | - | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-6-1-01 | 版本检测与记录 | Version | `internal/layers/evolution/version/version_test.go` | PLANNED | P2 |
 
 ### D6-S2: Config Module
 
-| L5 ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-6-2-01 | 配置热更新 | Config | - | PLANNED |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-6-2-01 | 配置热更新 | Config | `internal/layers/evolution/config/hotreload_test.go` | PLANNED | P2 |
+
+---
+
+## D0: Code Integrity Domain (INTEGRITY)
+
+> 跨域代码健康规范。属架构治理层，非业务域。
+> **Spec Reference:** `openspec/changes/devrix-code-integrity/`
+
+### D0-S1: Specification Module
+
+| L5 ID | 描述 | Test 位置 | Status | Priority |
+|-------|------|-----------|--------|----------|
+| L5-0-1-01 | `coding.md §9` 包含不可变性分层规范 | `openspec/specs/project/coding.md` §9 | PLANNED | P0 |
+| L5-0-1-02 | CLAUDE.md 引用新规范 | `CLAUDE.md` | PLANNED | P0 |
+| L5-0-1-03 | emitEvent 处理 EventConnectionLostData 不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
+| L5-0-1-04 | emitEvent 处理 EventConnectionRestoredData 不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
+| L5-0-1-05 | emitEvent 处理未知类型不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
+| L5-0-1-06 | 新会话创建被拒绝 | `tests/acceptance/p0/comm_gateway_flow_test.go` | PLANNED | P0 |
+| L5-0-1-07 | /new /help /stop 命令解析正确 | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P0 |
+| L5-0-1-08 | 飞书消息解析正确 | `internal/layers/communication/adapters/feishu_test.go` | PLANNED | P1 |
+| L5-0-1-09 | D6 L5 注册表条目包含目标版本 | `openspec/l5-registry.md` | PLANNED | P1 |
 
 ---
 
 ## 状态汇总
 
-| Domain | Domain Name | Total | IMPLEMENTED | PLANNED |
-|----|------------|-------|-------------|---------|
-| D1 | Communication | 5 | 0 | 5 |
-| D2 | Context Engine | 21 | 16 | 5 |
-| D3 | LLM Gateway | 17 | 13 | 4 |
-| D4 | Multi-Agent | 15 | 15 | 0 |
-| D5 | Observability | 16 | 11 | 5 |
-| D6 | Evolution | 2 | 0 | 2 |
-| **Total** | | **76** | **47** | **27** |
+| Domain | Domain Name | Total | IMPLEMENTED | PLANNED | P0 |
+|--------|------------|-------|-------------|---------|-----|
+| D0 | Code Integrity | 9 | 0 | 9 | 3 |
+| D1 | Communication | 5 | 0 | 5 | 1 |
+| D2 | Context Engine | 21 | 16 | 5 | 0 |
+| D3 | LLM Gateway | 17 | 13 | 4 | 0 |
+| D4 | Multi-Agent | 15 | 15 | 0 | 0 |
+| D5 | Observability | 16 | 11 | 5 | 0 |
+| D6 | Evolution | 2 | 0 | 2 | 0 |
+| **Total** | | **85** | **47** | **38** | **4** |
 
 ---
 
@@ -320,3 +360,4 @@
 |---------|------|---------|
 | 1.0.0 | 2026-06-08 | Complete rewrite with D-S numbering system |
 | 1.1.0 | 2026-06-08 | Section headers migrated L1-L2 → D-S (DM-20260608-007) |
+| 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |

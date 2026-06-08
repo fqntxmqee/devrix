@@ -178,11 +178,16 @@ func (d *MilestoneDAG) GetExecutionOrder() ([]*Milestone, error) {
 		order = append(order, m)
 		visited[id] = true
 
-		// Reduce in-degree for dependent milestones
-		for _, depID := range m.Dependencies {
-			inDegree[depID]--
-			if inDegree[depID] == 0 {
-				queue = append(queue, depID)
+		// Reduce in-degree for milestones that depend on the completed node.
+		for _, other := range d.Milestones {
+			for _, depID := range other.Dependencies {
+				if depID != id {
+					continue
+				}
+				inDegree[other.ID]--
+				if inDegree[other.ID] == 0 {
+					queue = append(queue, other.ID)
+				}
 			}
 		}
 	}

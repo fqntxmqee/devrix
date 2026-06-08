@@ -304,7 +304,8 @@ func (a *DingTalkAdapter) OnMessage(msg *types.OutboundMessage) {
 		slog.Warn("dingtalk: missing session webhook", "chatID", msg.ChatID)
 		return
 	}
-	if err := a.api.SendSessionMessage(ctx, webhook, msg.Content); err != nil {
+	content := renderDingTalkOutboundContent(msg)
+	if err := a.api.SendSessionMessage(ctx, webhook, content); err != nil {
 		slog.Error("dingtalk: send message failed", "error", err, "chatID", msg.ChatID)
 	}
 }

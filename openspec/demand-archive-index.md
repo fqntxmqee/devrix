@@ -19,6 +19,7 @@
 | DM-20260608-006 | Feishu Card Adapter Redesign | devrix-feishu-cards | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-007 | 架构分层命名从 L1-X 迁移至 D1-D6 | devrix-d-layer-rename | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-008 | Communication Layer V3 功能补全 | devrix-v3 | 2026-06-08 | — | ACCEPTED |
+| DM-20260608-010 | Communication V3 集成补全 | devrix-v3-integration | 2026-06-08 | — | ACCEPTED |
 
 ## Archive Locations
 
@@ -41,10 +42,13 @@
 | devrix-feishu-cards | `openspec/archive/2026-06-08-devrix-feishu-cards/` |
 | devrix-d-layer-rename | `openspec/archive/2026-06-08-devrix-d-layer-rename/` |
 | devrix-v3 | `openspec/archive/2026-06-08-devrix-v3/` |
+| devrix-v3-integration | `openspec/archive/2026-06-08-devrix-v3-integration/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
 
-| Change ID | Path | 状态 |
-|-----------|------|------|
-| devrix-layering-standard | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |
+| Change ID | Demand ID | Path | 状态 |
+|-----------|-----------|------|------|
+| devrix-code-integrity | DM-20260608-009 | `openspec/changes/devrix-code-integrity/` | S3 设计中 |
+| devrix-d1-d6-testing | — | `openspec/changes/devrix-d1-d6-testing/` | 规划中 |
+| devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |

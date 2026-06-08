@@ -119,6 +119,7 @@ Devrix 有多个入口点，各有不同配置需求：
 |------|------|-------------|
 | CLI 主程序 | `cmd/devrix/main.go` | `devrix.yaml` + `config.yaml` + env |
 | 飞书机器人 | `cmd/devrix-feishu/main.go` | `devrix.yaml` + env（飞书必填） |
+| 钉钉机器人 | `cmd/devrix-dingtalk/main.go` | `devrix.yaml` + `~/.devrix/config.yaml`（`im.platform.provider=dingtalk`） |
 | 冒烟测试 | `cmd/feishu-smoke/main.go` | 硬编码测试值（仅测试用） |
 | 覆盖率报告 | `cmd/obs-coverage-report/main.go` | CLI flags |
 
