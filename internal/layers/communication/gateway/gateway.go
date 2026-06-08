@@ -114,6 +114,9 @@ func (g *CommunicationGateway) SetObservability(obs *observability.Observability
 	}
 	g.obsBridge = observability.NewBridge(obs)
 	g.initMetrics(obs)
+	if g.permissionMgr != nil {
+		g.permissionMgr.SetObservability(obs)
+	}
 }
 
 func (g *CommunicationGateway) initMetrics(obs *observability.Observability) {

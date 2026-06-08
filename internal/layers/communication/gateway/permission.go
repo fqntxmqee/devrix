@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -16,6 +18,10 @@ type PermissionManager struct {
 	userCfg  *config.UserConfig
 	mu       sync.RWMutex
 	requests map[string]*types.PermissionRequest
+
+	metricApproved metrics.Counter
+	metricDenied   metrics.Counter
+	metricTimeouts metrics.Counter
 }
 
 // NewPermissionManager creates a new PermissionManager
@@ -30,6 +36,38 @@ func NewPermissionManager(cfg *config.PermissionConfig) *PermissionManager {
 		config:   cfg,
 		userCfg:  config.DefaultUserConfig(),
 		requests: make(map[string]*types.PermissionRequest),
+	}
+}
+
+// SetObservability wires permission decision and timeout counters.
+func (p *PermissionManager) SetObservability(obs *observability.Observability) {
+	if obs == nil || obs.Meter() == nil {
+		return
+	}
+	m := obs.Meter()
+	p.metricApproved, _ = m.Int64Counter("permission_decisions_total",
+		metrics.WithLabels(metrics.LabelMap{"decision": "approved"}))
+	p.metricDenied, _ = m.Int64Counter("permission_decisions_total",
+		metrics.WithLabels(metrics.LabelMap{"decision": "denied"}))
+	p.metricTimeouts, _ = m.Int64Counter("permission_timeouts_total",
+		metrics.WithLabels(metrics.LabelMap{}))
+}
+
+func (p *PermissionManager) recordDecision(approved bool) {
+	if approved {
+		if p.metricApproved != nil {
+			p.metricApproved.Inc()
+		}
+		return
+	}
+	if p.metricDenied != nil {
+		p.metricDenied.Inc()
+	}
+}
+
+func (p *PermissionManager) recordTimeout() {
+	if p.metricTimeouts != nil {
+		p.metricTimeouts.Inc()
 	}
 }
 
@@ -65,6 +103,7 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 		approved := p.shouldAutoApprove(toolName, riskLevel)
 		if approved {
 			p.resolveRequest(request, true)
+			p.recordDecision(true)
 			return true
 		}
 	}
@@ -75,9 +114,12 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 	select {
 	case <-ctx.Done():
 		p.resolveRequest(request, false)
+		p.recordDecision(false)
 		return false
 	case <-timeout:
 		p.resolveRequest(request, false)
+		p.recordTimeout()
+		p.recordDecision(false)
 		return false
 	}
 }

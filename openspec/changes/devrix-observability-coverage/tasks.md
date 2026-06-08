@@ -3,7 +3,7 @@
 **Change ID:** devrix-observability-coverage
 **Demand ID:** DM-20260607-007
 **Target Version:** 1.3.0
-**Status:** S4 — In Progress (M1–M4 implemented)
+**Status:** S5 — Acceptance complete (pending S7 archive)
 
 ---
 
@@ -30,7 +30,7 @@
 | T8 | `pev_engine.go`：plan generate span | L4-OBS-INSTRUMENT | L5-OBS-14 | 1h | completed |
 | T9 | `pev_engine.go`：milestone run span | L4-OBS-INSTRUMENT | L5-OBS-14 | 1h | completed |
 | T10 | `adapters/feishu.go`：adapter 入站 span + ctx 传播 | L4-OBS-INSTRUMENT | L5-OBS-15 | 2h | completed |
-| T11 | 确保 Feishu→Gateway traceId 继承（集成测试） | L4-OBS-INSTRUMENT | L5-OBS-15 | 1h | pending |
+| T11 | 确保 Feishu→Gateway traceId 继承（集成测试） | L4-OBS-INSTRUMENT | L5-OBS-15 | 1h | completed |
 
 **M2 小计**: 7h
 
@@ -53,9 +53,9 @@
 | ID | 任务 | L4 | L5 | 估时 | 状态 |
 |----|------|-----|-----|------|------|
 | T15 | Gateway 迁 SessionBridge；`gateway.session.lifecycle` span | L4-OBS-METRICS | L5-OBS-18 | 2h | completed |
-| T16 | `collector.go` deprecate + 转发注释 | L4-OBS-METRICS | L5-OBS-18 | 0.5h | pending |
-| T17 | `tests/integration/obs_session_bridge_test.go` | L4-OBS-METRICS | L5-OBS-18 | 1h | pending |
-| T18 | 权限 metrics 接线（decisions/timeouts counter） | L4-OBS-METRICS | — | 2h | pending |
+| T16 | `collector.go` deprecate + 转发注释 | L4-OBS-METRICS | L5-OBS-18 | 0.5h | completed |
+| T17 | `tests/integration/obs_session_bridge_test.go` | L4-OBS-METRICS | L5-OBS-18 | 1h | completed |
+| T18 | 权限 metrics 接线（decisions/timeouts counter） | L4-OBS-METRICS | — | 2h | completed |
 
 **M4 小计**: 5.5h
 
@@ -65,10 +65,10 @@
 
 | ID | 任务 | L4 | L5 | 估时 | 状态 |
 |----|------|-----|-----|------|------|
-| T19 | 更新 `openspec/l5-registry.md`：L5-OBS-13~18 → PLANNED | — | — | 0.5h | pending |
+| T19 | 更新 `openspec/l5-registry.md`：L5-OBS-13~18 → IMPLEMENTED | — | — | 0.5h | completed |
 | T20 | 合并 delta 到 canonical `openspec/specs/observability/spec.md` v1.3.0（S7） | — | — | 1h | pending |
-| T21 | 编写 `acceptance-report.md`（S5） | — | L5-OBS-13~18 | 1h | pending |
-| T22 | 运行 `./scripts/test-unit.sh` + `./scripts/test-integration.sh` | — | — | 0.5h | pending |
+| T21 | 编写 `acceptance-report.md`（S5） | — | L5-OBS-13~18 | 1h | completed |
+| T22 | 运行 `./scripts/test-unit.sh` + `./scripts/test-integration.sh` | — | — | 0.5h | completed |
 
 **M5 小计**: 3h
 
