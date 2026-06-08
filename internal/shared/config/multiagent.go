@@ -4,6 +4,7 @@ import "time"
 
 // MultiAgentFileConfig is the YAML shape for multi_agent.
 type MultiAgentFileConfig struct {
+	Enabled           bool          `yaml:"enabled"`
 	MaxChildren       int           `yaml:"max_children"`
 	MaxTotalAgents    int           `yaml:"max_total_agents"`
 	DefaultTimeout    time.Duration `yaml:"default_timeout"`
@@ -14,6 +15,7 @@ type MultiAgentFileConfig struct {
 
 // MultiAgentConfig is the resolved Layer 4 configuration.
 type MultiAgentConfig struct {
+	Enabled           bool
 	MaxChildren       int
 	MaxTotalAgents    int
 	DefaultTimeout    time.Duration
@@ -40,6 +42,7 @@ func BuildMultiAgentConfig(file *MultiAgentFileConfig) *MultiAgentConfig {
 	if file == nil {
 		return cfg
 	}
+	cfg.Enabled = file.Enabled
 	if file.MaxChildren > 0 && file.MaxChildren <= 10 {
 		cfg.MaxChildren = file.MaxChildren
 	}

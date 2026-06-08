@@ -78,6 +78,11 @@ func main() {
 		slog.Error("failed to load tool config", "error", err)
 		os.Exit(1)
 	}
+	multiAgentCfg, err := config.LoadMultiAgentConfig(configFile)
+	if err != nil {
+		slog.Error("failed to load multi-agent config", "error", err)
+		os.Exit(1)
+	}
 
 	// Initialize session store
 	sessionStore, err := gateway.NewFileSessionStore(commCfg.Session.StorageDir)
@@ -153,6 +158,17 @@ func main() {
 		commCfg,
 	)
 	gw.SetObservability(obs)
+
+	if multiAgentCfg.Enabled {
+		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService)
+		agentFactory := bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg)
+		gw.SetAgentFactory(agentFactory)
+		slog.Info("multi-agent layer enabled",
+			"max_children", multiAgentCfg.MaxChildren,
+			"max_total_agents", multiAgentCfg.MaxTotalAgents,
+			"default_mode", multiAgentCfg.DefaultMode,
+		)
+	}
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 

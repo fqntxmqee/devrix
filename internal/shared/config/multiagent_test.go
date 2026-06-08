@@ -18,6 +18,13 @@ func TestBuildMultiAgentConfig_should_apply_defaults(t *testing.T) {
 	}
 }
 
+func TestBuildMultiAgentConfig_should_merge_enabled_flag(t *testing.T) {
+	cfg := BuildMultiAgentConfig(&MultiAgentFileConfig{Enabled: true})
+	if !cfg.Enabled {
+		t.Fatal("Enabled should be true when set in file config")
+	}
+}
+
 func TestBuildMultiAgentConfig_should_merge_file_values(t *testing.T) {
 	cfg := BuildMultiAgentConfig(&MultiAgentFileConfig{
 		MaxChildren:    5,

@@ -58,7 +58,7 @@ verdict: ACCEPTED
 
 ## 5. 已知限制（V1）
 
-- `cmd/devrix/main.go` 尚未接入 `WireMultiAgent`；生产启用需加载 `multi_agent` 配置并 `gw.SetAgentFactory(factory)`。
+- Multi-Agent 默认关闭；生产启用需在配置中设置 `multi_agent.enabled: true`。
 - L5-4-3-03/04 留待后续迭代。
 
 ## 6. 结论
