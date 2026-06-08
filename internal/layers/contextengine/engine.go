@@ -13,6 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -114,8 +115,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	// Create "context_engine.process" span as child of gateway span.
-	ctx, processSpan := e.startSpan(ctx, "context_engine.process", tracer.SpanKindInternal,
+	ctx, processSpan := e.startSpan(ctx, telemetry.OpContextProcess, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session.id", Value: session.SessionID},
+		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(message))},
 	)
 	if processSpan != nil {
 		defer processSpan.End()
@@ -124,7 +126,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	systemPrompt := e.prompt.Load(session.WorkDir)
 
 	// Load or init snapshot — with child span.
-	loadCtx, loadSpan := e.startSpan(ctx, "context_engine.load_snapshot", tracer.SpanKindInternal)
+	loadCtx, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
 	sc, err := e.memory.LoadOrInit(session, systemPrompt)
 	if err != nil {
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
@@ -145,7 +147,15 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 	_ = loadCtx
 
-	if recallErr := e.memory.EnrichWithLongTermRecall(ctx, sc, message); recallErr != nil {
+	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal)
+	recallErr := e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
+	if recallSpan != nil {
+		if recallErr != nil {
+			recallSpan.RecordError(recallErr)
+		}
+		recallSpan.End()
+	}
+	if recallErr != nil {
 		if processSpan != nil {
 			processSpan.RecordError(recallErr)
 		}
@@ -165,7 +175,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	msgs := sc.Messages
 	if e.shouldCompress(msgs, sc.TokenBudget) {
-		compCtx, compSpan := e.startSpan(ctx, "context_engine.compression", tracer.SpanKindInternal,
+		compCtx, compSpan := e.startSpan(ctx, telemetry.OpContextCompressionRun, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(msgs))},
 		)
 		compressed, report, compErr := e.compressionPipeline(session.SessionID).Run(compCtx, msgs, sc.SystemPrompt, sc.TokenBudget)
@@ -213,12 +223,21 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
-		if storeErr := e.memory.AutoStoreLongTerm(ctx, sc, message, assistantSummary); storeErr != nil {
+		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpContextLongTermStore, tracer.SpanKindInternal)
+		storeErr := e.memory.AutoStoreLongTerm(storeCtx, sc, message, assistantSummary)
+		if storeSpan != nil {
+			if storeErr != nil {
+				storeSpan.RecordError(storeErr)
+			}
+			storeSpan.End()
+		}
+		if storeErr != nil {
 			slog.Warn("contextengine: longterm auto_store failed", "error", storeErr)
 		}
 	} else {
 		if processSpan != nil {
 			processSpan.RecordError(runErr)
+			processSpan.SetStatus(tracer.StatusCodeError, runErr.Error())
 		}
 		emit(mapProcessError(session.SessionID, runErr))
 	}
@@ -234,18 +253,18 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 }
 
 // startSpan creates a child span if observability is configured.
-func (e *ContextEngine) startSpan(ctx context.Context, name string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+func (e *ContextEngine) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
 	if e.obsBridge == nil || e.obsBridge.Tracer() == nil {
 		return ctx, nil
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(kind),
-		tracer.WithSpanAttributes(attrs...),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
 	}
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return e.obsBridge.Tracer().Start(ctx, name, opts...)
+	return e.obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 func (e *ContextEngine) shouldCompress(msgs []types.Message, budget types.TokenBudget) bool {

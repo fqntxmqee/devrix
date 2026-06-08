@@ -156,6 +156,19 @@
 | L5-OBS-FIX-06 | Error 日志包含 stacktrace 字段 | L4-OBS-LOGGING | `internal/layers/observability/logger/logger_test.go` | IMPLEMENTED |
 | L5-OBS-FIX-07 | 日志采样 max_entries_per_span 生效 | L4-OBS-LOGGING | `internal/layers/observability/logger/sampling_test.go` | IMPLEMENTED |
 | L5-OBS-FIX-08 | ConsoleExporter 可直接作为 SpanExporter | L4-OBS-TRACING | `internal/layers/observability/exporter/console_test.go` | IMPLEMENTED |
+| L5-OBS-13 | LongTerm recall/store 产生 canonical Operation span | L4-OBS-INSTRUMENT | `tests/integration/obs_coverage_test.go` | PLANNED |
+| L5-OBS-14 | Plan 生成与 Milestone Run 产生 canonical Operation span | L4-OBS-INSTRUMENT | `tests/integration/obs_coverage_test.go` | PLANNED |
+| L5-OBS-15 | Feishu 入站产生 adapter.message.receive span | L4-OBS-INSTRUMENT | `tests/integration/obs_coverage_test.go` | PLANNED |
+| L5-OBS-16 | Operation Registry 与 names.go 常量全集一致 | L4-OBS-REGISTRY | `internal/layers/observability/coverage/registry_test.go` | PLANNED |
+| L5-OBS-17 | Coverage 报告正确列出 zero_hit operations | L4-OBS-COVERAGE | `internal/layers/observability/coverage/coverage_test.go` | PLANNED |
+
+### P1
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-OBS-18 | Gateway 会话 Gauge 使用 SessionBridge | L4-OBS-METRICS | `tests/integration/obs_session_bridge_test.go` | PLANNED |
+
+> 变更：`openspec/changes/devrix-observability-coverage/`（Demand: DM-20260607-007，Target: observability v1.3.0）
 
 ---
 

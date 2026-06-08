@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability/coverage"
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 )
 
@@ -113,6 +115,14 @@ func (t *Tracer) Start(ctx context.Context, name string, opts ...SpanStartOption
 	if t.provider.isShutdown() {
 		// Return no-op span if shutdown
 		return ctx, &noOpSpan{}
+	}
+
+	if name != "" {
+		coverage.RecordHit(name)
+		if !coverage.IsKnown(name) {
+			coverage.RecordUnknown()
+			slog.Warn("observability: unknown operation", "operation", name)
+		}
 	}
 
 	// Apply options
