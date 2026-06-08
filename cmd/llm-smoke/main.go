@@ -40,13 +40,18 @@ func main() {
 		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
 		os.Exit(1)
 	}
+	toolCfg, err := config.LoadToolConfig(configFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load tool config: %v\n", err)
+		os.Exit(1)
+	}
 
 	userCfg, _ := config.LoadUserConfig()
 	permMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	if userCfg != nil {
 		permMgr.SetUserConfig(userCfg)
 	}
-	engine := bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, obsBridge, nil)
+	engine := bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, nil)
 
 	prompt := "你好，请用一句话介绍你自己。"
 	if len(os.Args) > 1 {

@@ -1,0 +1,72 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-tool-security
+  demand_id: DM-20260608-001
+  title: "工具执行安全增强"
+  status: s2_design
+  priority: P0
+  owner: architecture
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+
+scope:
+  layers:
+    - id: L2
+      name: Context Engine
+      affected: true
+    - id: L4
+      name: Multi-Agent / Tool System
+      affected: true
+
+  capabilities:
+    - TOOL-SANDBOX       # bash 执行沙箱化
+    - TOOL-REGISTRY       # 插件化工具注册
+    - TOOL-PERMISSION     # 权限分级细化
+
+  l5_test_points:
+    - L5-TOOL-01          # bash 执行受限工作目录 + 命令白名单
+    - L5-TOOL-02          # CRITICAL 风险工具永不自动批准
+    - L5-TOOL-03          # 插件工具注册后可在 PEV 中调用
+    - L5-TOOL-04          # 并发工具执行隔离
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/tool-security/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - bash 命令白名单 + 工作目录锁定
+      - 危险命令检测与拒绝（rm -rf, curl pipe bash 等）
+      - 插件化工具注册接口
+      - RiskLevel 细化（新增 CRITICAL 的细粒度控制）
+      - 并发工具执行资源限制
+    status: s2_design
+    tasks: T1-T6
+    estimate: 16h
+
+bug_severity:
+  critical:
+    - bash-no-sandbox           # bash 直接执行无沙箱
+    - dangerous-command-pattern  # 危险命令模式未检测
+  high:
+    - tool-hardcoded-switch      # 工具硬编码 switch-case
+    - concurrent-tool-no-limit   # 并发工具执行无限制
+
+related_changes:
+  - devrix-context-engine-v3
+  - devrix-test-framework
+
+notes: |
+  基于 Gemini 深度分析报告 issue #1（bash 工具无沙箱，HIGH）。
+  当前 bash 工具通过 exec.Command("sh", "-c", command) 直接执行，无任何沙箱保护。
+  read_file/write_file 已有路径穿越防护（resolveWorkspacePath），但 bash 无等效机制。
+  工具注册为硬编码 switch-case，新增工具需修改核心代码。

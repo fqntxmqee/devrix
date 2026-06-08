@@ -27,6 +27,7 @@ type ConfigFile struct {
 	Metrics        MetricsConfig        `yaml:"metrics"`
 	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
 	LLMGateway     LLMGatewayFileConfig `yaml:"llm_gateway"`
+	Tool           ToolConfig           `yaml:"tool"`
 }
 
 // AppConfig 应用配置
@@ -98,6 +99,18 @@ func LoadConfigFile(path string) (*ConfigFile, error) {
 	}
 
 	return &cfg, nil
+}
+
+// LoadToolConfig loads tool sandbox settings from a YAML file path.
+func LoadToolConfig(path string) (*ToolConfig, error) {
+	if path == "" {
+		return DefaultToolConfig(), nil
+	}
+	fileCfg, err := LoadConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return BuildToolConfig(fileCfg), nil
 }
 
 // LoadLLMGatewayConfig loads Layer 3 config from a YAML file path.

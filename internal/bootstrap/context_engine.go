@@ -5,8 +5,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -16,15 +14,21 @@ func NewContextEngine(
 	stack llmbridge.ContextLLMStack,
 	permMgr *gateway.PermissionManager,
 	ctxCfg *config.ContextEngineConfig,
+	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	milestoneSvc milestone.IMilestoneService,
 ) *contextengine.ContextEngine {
 	planner, longTerm := WireContextV3(ctxCfg, milestoneSvc)
+	toolReg := contextengine.NewBuiltinToolRegistry(toolCfg)
+	tools := contextengine.NewLimitedToolRunner(
+		toolReg,
+		contextengine.NewToolLimiter(toolCfg.ConcurrentMax),
+	)
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:          stack.Gateway,
 		TokenCounter: stack.TokenCounter,
-		Tools:        &mockctx.ToolRunner{},
-		ToolsReg:     registry.NewBuiltinRegistry(),
+		Tools:        tools,
+		ToolsReg:     toolReg,
 		Permission:   gateway.NewPermissionGateAdapter(permMgr),
 		Observer:     contextengine.NoOpObserver{},
 		Planner:      planner,

@@ -121,6 +121,31 @@ func labelSubset(actual, want metrics.LabelMap) bool {
 	return true
 }
 
+// Covers: L5-TOOL-02
+func TestPermissionManager_should_never_auto_approve_critical_in_yolo(t *testing.T) {
+	cfg := &config.PermissionConfig{
+		DefaultTimeout: time.Second,
+		MaxRetries:     3,
+	}
+	mgr := NewPermissionManager(cfg)
+	mgr.SetUserConfig(&config.UserConfig{
+		YOLO: config.YOLOConfig{
+			Enabled:          true,
+			AutoApproveTools: true,
+		},
+	})
+
+	if mgr.shouldAutoApprove("danger_tool", types.RiskLevelCritical) {
+		t.Fatal("CRITICAL risk must never auto-approve in YOLO mode")
+	}
+	if !mgr.shouldAutoApprove("read_file", types.RiskLevelLow) {
+		t.Fatal("LOW risk should auto-approve in YOLO mode")
+	}
+	if !mgr.shouldAutoApprove("write_file", types.RiskLevelMedium) {
+		t.Fatal("MEDIUM risk should auto-approve in YOLO mode")
+	}
+}
+
 func TestPermissionManager_ListPending(t *testing.T) {
 	cfg := &config.PermissionConfig{
 		DefaultTimeout: 60 * time.Second,
