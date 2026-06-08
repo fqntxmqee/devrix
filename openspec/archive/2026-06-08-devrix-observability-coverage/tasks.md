@@ -3,7 +3,7 @@
 **Change ID:** devrix-observability-coverage
 **Demand ID:** DM-20260607-007
 **Target Version:** 1.3.0
-**Status:** S5 — Acceptance complete (pending S7 archive)
+**Status:** S7 — Archived 2026-06-08
 
 ---
 
@@ -66,7 +66,7 @@
 | ID | 任务 | L4 | L5 | 估时 | 状态 |
 |----|------|-----|-----|------|------|
 | T19 | 更新 `openspec/l5-registry.md`：L5-OBS-13~18 → IMPLEMENTED | — | — | 0.5h | completed |
-| T20 | 合并 delta 到 canonical `openspec/specs/observability/spec.md` v1.3.0（S7） | — | — | 1h | pending |
+| T20 | 合并 delta 到 canonical `openspec/specs/observability/spec.md` v1.3.0（S7） | — | — | 1h | completed |
 | T21 | 编写 `acceptance-report.md`（S5） | — | L5-OBS-13~18 | 1h | completed |
 | T22 | 运行 `./scripts/test-unit.sh` + `./scripts/test-integration.sh` | — | — | 0.5h | completed |
 

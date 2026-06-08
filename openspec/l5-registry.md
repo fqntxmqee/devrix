@@ -168,7 +168,7 @@
 |-------|------|---------|-----------|--------|
 | L5-OBS-18 | Gateway 会话 Gauge 使用 SessionBridge | L4-OBS-METRICS | `tests/integration/obs_session_bridge_test.go` | IMPLEMENTED |
 
-> 变更：`openspec/changes/devrix-observability-coverage/`（Demand: DM-20260607-007，Target: observability v1.3.0）
+> V1.3 已归档：`openspec/archive/2026-06-08-devrix-observability-coverage/`（Demand: DM-20260607-007）
 
 ---
 

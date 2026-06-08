@@ -7,7 +7,8 @@ meta:
   change_id: devrix-observability-coverage
   demand_id: DM-20260607-007
   title: "可观察层运行时代码染色与 Operation 对账"
-  status: s5_pending
+  status: s7_archived
+  archived_at: "2026-06-08"
   priority: P1
   owner: architecture
   created_at: "2026-06-07"

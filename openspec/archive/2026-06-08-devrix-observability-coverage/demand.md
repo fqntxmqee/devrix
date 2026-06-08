@@ -3,7 +3,7 @@ demand-id: DM-20260607-007
 title: 可观察层运行时代码染色与 Operation 对账
 source: 架构 Review / 无效代码治理
 priority: P1
-status: PLANNING
+status: S7_ARCHIVED
 l1-domain: devrix
 created: 2026-06-07
 ---
