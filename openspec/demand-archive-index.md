@@ -10,7 +10,7 @@
 | DM-20260607-007 | 可观察层运行时代码染色与 Operation 对账 | devrix-observability-coverage | 2026-06-08 | [#2](https://github.com/fqntxmqee/devrix/pull/2) | ACCEPTED |
 | DM-20260608-001 | 工具执行安全增强（Bash 沙箱 + 插件化注册） | devrix-tool-security | 2026-06-08 | [#3](https://github.com/fqntxmqee/devrix/pull/3) | ACCEPTED |
 | DM-20260608-002 | LLM Gateway 可靠性增强（CB+Retry+Jitter+Timeout） | devrix-llm-gateway-v2 | 2026-06-08 | [#4](https://github.com/fqntxmqee/devrix/pull/4) | ACCEPTED |
-| DM-20260608-003 | 上下文引擎 V4（Autocompact 异步 + Snappy 压缩） | devrix-context-engine-v4 | — | — | ACCEPTED |
+| DM-20260608-003 | 上下文引擎 V4（Autocompact 异步 + Snappy 压缩） | devrix-context-engine-v4 | 2026-06-08 | [#5](https://github.com/fqntxmqee/devrix/pull/5) | ACCEPTED |
 | DM-20260608-004 | 测试质量增强（边界/VCR/断言/性能基线） | devrix-testing-quality | — | — | ACCEPTED |
 
 ## Archive Locations
@@ -26,4 +26,5 @@
 | devrix-observability-coverage | `openspec/archive/2026-06-08-devrix-observability-coverage/` |
 | devrix-tool-security | `openspec/archive/2026-06-08-devrix-tool-security/` |
 | devrix-llm-gateway-v2 | `openspec/archive/2026-06-08-devrix-llm-gateway-v2/` |
+| devrix-context-engine-v4 | `openspec/archive/2026-06-08-devrix-context-engine-v4/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |

@@ -1,9 +1,9 @@
 # Context Engine Specification
 
 **Capability:** context-engine
-**Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07)
+**Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08)
 **Layer:** 2
-**Version:** 3.0.0
+**Version:** 4.0.0
 **Status:** Canonical — source of truth
 
 ---
@@ -15,6 +15,10 @@
 V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。
 
 V3（DM-20260607-006）增强：PEV Plan 阶段、Milestone DAG 驱动执行、`milestone_progress` 事件生产、LongTerm SQLite 跨 Session 记忆；`plan.enabled=false` 时保持 V2 Execute→Verify 路径。
+
+V4（DM-20260608-003）增强：Autocompact 异步化（占位摘要 + 后台 LLM 摘要 + `OnAutocompactComplete`）、快照 Snappy 压缩（魔数头 + legacy JSON 兼容）。
+
+**Archive:** `openspec/archive/2026-06-08-devrix-context-engine-v4/`
 
 ---
 
@@ -404,6 +408,53 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 - WHEN communication gateway compiles
 - THEN it imports only the interface package
 - AND does not import compression or pev internals
+
+---
+
+## ADDED Requirements (V4 Performance)
+
+### Requirement: Async Autocompact
+
+当 `AsyncAutocompacter` 启用时，压缩管道 Step 6 MUST 在 50ms 内返回 head + 占位摘要 + tail；真实 LLM 摘要 MUST 在后台 goroutine 执行。同 session 重复触发 MUST 取消先前任务；仅最新 async token 的结果通过 `OnAutocompactComplete` 交付。`Shutdown` MUST 取消所有 pending goroutine。
+
+**Priority**: P1  
+**L4**: L4-CTX-COMPRESS  
+**L5**: L5-CTX-31, L5-CTX-33
+
+#### Scenario: Placeholder returns immediately
+
+- GIVEN a conversation exceeding compression target with autocompact enabled
+- WHEN step 6 runs with async compactor wired
+- THEN placeholder summary is returned within 50ms
+- AND PEV loop is not blocked on LLM summarization
+
+#### Scenario: Async failure degrades gracefully
+
+- GIVEN an async autocompact is in progress
+- WHEN the LLM call fails or times out
+- THEN the placeholder remains in the conversation
+- AND observer receives a degraded autocompact event
+
+### Requirement: Snappy Snapshot Compression
+
+`SnapshotConfig.compression` 启用时，大于 `compression_threshold` 的快照 MUST 以魔数 `\xfe\x53` + Snappy 编码存储；小于阈值或未启用时 MUST 保持 raw JSON。`Deserialize` MUST 兼容 legacy 未压缩 JSON。
+
+**Priority**: P2  
+**L4**: L4-CTX-MEMORY  
+**L5**: L5-CTX-32
+
+#### Scenario: Large snapshot compressed
+
+- GIVEN compression enabled and payload exceeds threshold
+- WHEN Serialize is called
+- THEN output begins with snappy magic bytes
+- AND compressed size is materially smaller than raw JSON
+
+#### Scenario: Legacy snapshot readable
+
+- GIVEN a legacy raw JSON snapshot without magic header
+- WHEN Deserialize is called
+- THEN session context is restored correctly
 
 ---
 

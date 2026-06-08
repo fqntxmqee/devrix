@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-context-engine-v4
 **Parent Spec:** `openspec/archive/2026-06-07-devrix-context-engine-v3/specs/context-engine/spec.md`
-**Status:** Draft
+**Status:** Archived
 **Version:** 4.0.0
 
 ---

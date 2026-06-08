@@ -45,7 +45,8 @@
 
 > V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
 > V2 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v2/`
-> V3 规划中：`openspec/changes/devrix-context-engine-v3/`
+> V3 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v3/`
+> V4 已归档：`openspec/archive/2026-06-08-devrix-context-engine-v4/`
 
 ### P0
 
@@ -80,22 +81,15 @@
 | L5-CTX-18 | 主路径接入真实 LLM Gateway | L4-CTX-STATE | `tests/integration/context_llm_gateway_test.go` | IMPLEMENTED |
 | L5-CTX-24 | plan.enabled=false 时回退 V2 路径 | L4-CTX-PEV | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED |
 | L5-CTX-25 | Plan DAG 环检测拒绝无效图 | L4-CTX-PLAN | `internal/layers/contextengine/pev/plan_test.go` | IMPLEMENTED |
+| L5-CTX-31 | Autocompact 异步执行不阻塞主请求 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
+| L5-CTX-33 | 异步压缩失败降级不丢失数据 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 
 ### P2
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-CTX-10 | L3 长期记忆返回 NotImplemented | L4-CTX-MEMORY | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
-
-### Context Engine V4 (P2)
-
-> 变更：`openspec/changes/devrix-context-engine-v4/`（Demand: DM-20260608-003）
-
-| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-CTX-31 | Autocompact 异步执行不阻塞主请求 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 | L5-CTX-32 | 快照使用 snappy 压缩后体积显著减小 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
-| L5-CTX-33 | 异步压缩失败降级不丢失数据 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 
 ### Tool Security (P0)
 
