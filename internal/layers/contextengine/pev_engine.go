@@ -3,8 +3,6 @@ package contextengine
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -235,8 +233,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	var assistantText string
 	var toolResults []ToolResult
 	var usage TokenUsage
-	var synthesisLLMDone bool
-	var forcedSynthesis bool
 
 	for iter := 0; iter < maxIter; iter++ {
 		sc.PEVState.Phase = types.PEVPhaseExecute
@@ -245,50 +241,17 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 
 		// LLM call span + metrics.
 		llmStart := time.Now()
-		llmAttrs := []tracer.Attribute{
+		_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
 			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
 			tracer.Attribute{Key: "llm.model", Value: sc.Model},
-		}
-		isSynthesisCall := forcedSynthesis
-		if forcedSynthesis {
-			llmAttrs = append(llmAttrs, tracer.Attribute{Key: "pev.synthesis_llm", Value: "true"})
-			req.Tools = nil
-			forcedSynthesis = false
-		}
-		_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient, llmAttrs...)
+		)
 		chunks, err := e.llm.ChatStream(ctx, req)
 		if err != nil {
-			errDetail := errors.FormatLLMError(err)
 			if llmSpan != nil {
 				llmSpan.RecordError(err)
-				llmSpan.SetAttributes(
-					tracer.Attribute{Key: "llm.status", Value: "error"},
-					tracer.Attribute{Key: "llm.error.detail", Value: truncateSpanAttr(errDetail, 500)},
-				)
 				llmSpan.End()
 			}
 			e.recordLLMError()
-			slog.Warn("pev: llm call failed",
-				"sessionID", sc.SessionID,
-				"iteration", iter,
-				"synthesis", isSynthesisCall,
-				"error", err,
-				"cause", errDetail,
-			)
-			if summary := summarizeSuccessfulToolResults(toolResults); summary != "" && (isSynthesisCall || iter > 0) {
-				if isSynthesisCall && runSpan != nil {
-					runSpan.SetAttributes(
-						tracer.Attribute{Key: "pev.degraded", Value: "true"},
-						tracer.Attribute{Key: "pev.fallback", Value: "tool_results"},
-					)
-				}
-				emit(&gateway.EngineEvent{
-					Type: "text", Content: summary, SessionID: sc.SessionID,
-					Metadata: map[string]string{"is_complete": "false", "source": "tool_fallback"},
-				})
-				assistantText += summary
-				break
-			}
 			return nil, errors.NewLLMUnavailableError(err)
 		}
 
@@ -322,7 +285,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			if len(chunk.ToolCalls) > 0 {
 				pendingTools = append(pendingTools, chunk.ToolCalls...)
 			}
-			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+			if chunk.Done {
 				usage = chunk.Usage
 			}
 		}
@@ -352,10 +315,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			break
 		}
 
-		req.Messages = append(req.Messages, buildAssistantToolCallsMessage(sc.SessionID, pendingTools))
-		callIDs := toolCallIDs(pendingTools)
-
-		for i, tc := range pendingTools {
+		for _, tc := range pendingTools {
 			risk := tc.RiskLevel
 			if risk == "" {
 				risk = e.toolsReg.RiskLevel(tc.Name)
@@ -365,12 +325,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input, "risk_level": string(risk)},
 			})
 
-			toolStart := time.Now()
 			// Tool execution span.
 			_, toolSpan := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
 				tracer.Attribute{Key: "tool.name", Value: tc.Name},
 				tracer.Attribute{Key: "tool.risk_level", Value: string(risk)},
-				tracer.Attribute{Key: "tool.input", Value: truncateSpanAttr(tc.Input, 500)},
 			)
 
 			// Permission check span.
@@ -395,8 +353,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				permSpan.End()
 			}
 
-			toolCtx := WithToolWorkDir(ctx, sc.WorkDir)
-			result, err := e.tools.Execute(toolCtx, tc)
+			result, err := e.tools.Execute(ctx, tc)
 			if err != nil {
 				result = &ToolResult{Error: err.Error()}
 				if toolSpan != nil {
@@ -407,17 +364,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				e.recordToolCall()
 			}
 			if toolSpan != nil {
-				out := ""
-				if result != nil {
-					out = result.Output
-					if result.Error != "" {
-						out = result.Error
-					}
-				}
-				toolSpan.SetAttributes(
-					tracer.Attribute{Key: "tool.output", Value: truncateSpanAttr(out, 500)},
-					tracer.Attribute{Key: "tool.duration_ms", Value: fmt.Sprintf("%d", time.Since(toolStart).Milliseconds())},
-				)
 				toolSpan.End()
 			}
 			toolResults = append(toolResults, *result)
@@ -435,8 +381,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
 			})
 
-			toolMsg := buildToolResultMessage(sc.SessionID, callIDs[i], content)
-			req.Messages = append(req.Messages, toolMsg)
+			toolMsg := types.NewMessage(fmt.Sprintf("tool_%d", time.Now().UnixNano()), sc.SessionID, types.MessageRoleTool, content)
+			req.Messages = append(req.Messages, *toolMsg)
 		}
 
 		sc.PEVState.Phase = types.PEVPhaseVerify
@@ -449,16 +395,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		if verifySpan != nil {
 			verifySpan.SetAttributes(
 				tracer.Attribute{Key: "verify.passed", Value: fmt.Sprintf("%t", vr.Passed)},
-				tracer.Attribute{Key: "verify.deviation", Value: fmt.Sprintf("%.2f", vr.Deviation)},
 			)
 			verifySpan.End()
 		}
 		if vr.Passed {
-			if strings.TrimSpace(assistantText) == "" && hasSuccessfulToolOutput(toolResults) && !synthesisLLMDone {
-				synthesisLLMDone = true
-				forcedSynthesis = true
-				continue
-			}
 			break
 		}
 		if iter == maxIter-1 {
@@ -472,15 +412,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	}
 
 	assistantText = textutil.StripThinkingTags(assistantText)
-	if assistantText == "" {
-		if summary := summarizeSuccessfulToolResults(toolResults); summary != "" {
-			assistantText = summary
-			emit(&gateway.EngineEvent{
-				Type: "text", Content: summary, SessionID: sc.SessionID,
-				Metadata: map[string]string{"is_complete": "false", "source": "tool_fallback"},
-			})
-		}
-	}
 
 	duration := time.Since(start).Milliseconds()
 	if emitComplete {
@@ -559,33 +490,5 @@ func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool
 		Type: "error", Content: err.Error(), SessionID: sessionID,
 		Metadata: map[string]string{"code": err.Code, "recoverable": rec},
 	}
-}
-
-func truncateSpanAttr(s string, max int) string {
-	s = strings.TrimSpace(s)
-	if max <= 0 || len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}
-
-func hasSuccessfulToolOutput(results []ToolResult) bool {
-	for _, r := range results {
-		if r.Error == "" && strings.TrimSpace(r.Output) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func summarizeSuccessfulToolResults(results []ToolResult) string {
-	var parts []string
-	for _, r := range results {
-		if r.Error != "" || strings.TrimSpace(r.Output) == "" {
-			continue
-		}
-		parts = append(parts, strings.TrimSpace(r.Output))
-	}
-	return strings.Join(parts, "\n")
 }
 
