@@ -307,10 +307,10 @@
 | L1-1 | Communication | 5 | 0 | 5 |
 | L1-2 | Context Engine | 21 | 16 | 5 |
 | L1-3 | LLM Gateway | 17 | 13 | 4 |
-| L1-4 | Multi-Agent | 8 | 0 | 8 |
+| L1-4 | Multi-Agent | 15 | 15 | 0 |
 | L1-5 | Observability | 16 | 11 | 5 |
 | L1-6 | Evolution | 2 | 0 | 2 |
-| **Total** | | **69** | **40** | **29** |
+| **Total** | | **76** | **47** | **27** |
 
 ---
 
