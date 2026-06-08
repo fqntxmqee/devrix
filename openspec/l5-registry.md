@@ -82,9 +82,9 @@
 | L5-2-2-03 | Autocompact 触发并降低 token | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
 | L5-2-2-04 | Autocompact LLM 失败降级跳过 | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
 | L5-2-2-05 | Autocompact 禁用时跳过步骤 6 | Compression | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
-| L5-2-2-06 | Plan DAG 环检测拒绝阻拦主请求 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
+| L5-2-2-06 | 异步压缩占位不阻塞主路径 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 | L5-2-2-07 | 异步压缩失败降级不丢失数据 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
-| L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
+| L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
 
 ### L1-2-L2-1: PEV Module
 
@@ -98,10 +98,10 @@
 | L5-2-1-06 | Verify 命令失败触发重试 | PEV | `internal/layers/contextengine/verify_runner_test.go` | IMPLEMENTED |
 | L5-2-1-07 | Milestone 按序执行 | PEV | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED |
 | L5-2-1-08 | milestone_progress 事件正确投射 | PEV | `tests/acceptance/p0/ctx_plan_longterm_test.go` | IMPLEMENTED |
-| L5-2-1-09 | Verify timeout returns CodeVerifyTimeout | PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
-| L5-2-1-10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | PLANNED |
-| L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
-| L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| L5-2-1-09 | Verify timeout kills command (DeadlineExceeded) | PEV | `tests/integration/context_verify_commands_test.go` | IMPLEMENTED |
+| L5-2-1-10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | IMPLEMENTED |
+| L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
+| L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
 
 ### L1-2-L2-4: Token Module
 
@@ -133,7 +133,7 @@
 |-------|------|---------|-----------|--------|
 | L5-3-1-01 | DeepSeek 适配器流响应 | Adapter | `internal/layers/llmgateway/adapter/deepseek_test.go` | IMPLEMENTED |
 | L5-3-1-02 | MiniMax 适配器流响应 | Adapter | `internal/layers/llmgateway/adapter/minimax_test.go` | IMPLEMENTED |
-| L5-3-1-03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | PLANNED |
+| L5-3-1-03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
 
 ### L1-3-L2-3: Breaker Module
 
@@ -151,7 +151,7 @@
 |-------|------|---------|-----------|--------|
 | L5-3-5-01 | Token 计数准确性 (cl100k_base) | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-3-5-02 | Token 预算检查 | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
-| L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
+| L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 
 ### L1-3-L2-6: Config Module
 
@@ -176,47 +176,58 @@
 | L5-3-2-03 | 多 Provider 并发调用 | Gateway | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
 | L5-3-2-04 | Retry 与 CB 联动，context 取消不触发 CB | Gateway | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
 | L5-3-2-05 | Half-Open 并发探测上游 | Gateway | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
-| L5-3-2-06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | PLANNED |
+| L5-3-2-06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
 
 ---
 
 ## L1-4: Multi-Agent Layer
 
+> Change: `devrix-multi-agent`（Demand: DM-20260608-005）
+
 ### L1-4-L2-1: Factory Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-1-01 | AgentFactory 创建 Agent 实例 | Factory | `multiagent/factory/factory_test.go` | PLANNED |
+| L5-4-1-01 | AgentFactory 创建 Agent 实例 | Factory | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
 
 ### L1-4-L2-2: Agent Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-2-01 | Agent 生命周期状态转换 | Agent | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-2-02 | Fork/Join 并发 | Agent | `multiagent/agent/agent_test.go` | PLANNED |
-| L5-4-2-03 | Agent 并发安全 (-race 检测无 race) | Agent | `multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-2-01 | Agent 生命周期状态转换 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-2-02 | AgentPermissionGate 批准/拒绝/超时 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
+| L5-4-2-03 | CRITICAL 工具权限异步流程 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
 
-### L1-4-L2-3: Permission Module
+### L1-4-L2-3: ForkJoin Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-3-01 | 工具注册与风险等级 | Permission | - | PLANNED |
-| L5-4-3-02 | Permission Pipeline 授权流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-3-03 | CRITICAL 触发审计授权流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-3-04 | PermissionManager 集中用户批准/拒绝超时全流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
+| L5-4-3-01 | Fork/Join 消息隔离模型 | ForkJoin | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-3-02 | Fork 双层限额 MaxChildren+MaxTotalAgents | ForkJoin | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
+| L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
+
+### L1-4-L2-4: Collaboration Module
+
+| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-4-4-01 | CoT prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
+| L5-4-4-02 | Iterative-Refinement prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
 
 ### L1-4-L2-5: Observer Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-5-01 | ObserverAdapter 正确桥接 Agent 事件到 IObserver | Observer | `multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | IMPLEMENTED |
 
 ### L1-4: Cross-Module Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
-| L5-4-0-01 | Fork 数超限消息传播到父 Fork+Join 无 race | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-0-02 | E2E: 用户指令触发 Agent Fork 并行结果 | `tests/e2e/agent_fork_e2e_test.go` | PLANNED |
+| L5-4-0-01 | Agent 并发安全 (-race) | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-0-02 | Fork 消息隔离并发安全 | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-0-03 | Gateway → ResolvePermission 集成全流程 | `tests/integration/agent_integration_test.go` | IMPLEMENTED |
+| L5-4-0-04 | E2E Fork 端到端 | `tests/e2e/agent_fork_e2e_test.go` | IMPLEMENTED |
 
 ---
 
@@ -286,37 +297,6 @@
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-6-2-01 | 配置热更新 | Config | - | PLANNED |
-
----
-
-## 测试质量增强 (Testing Quality)
-
-> 已归档：`openspec/archive/2026-06-08-devrix-testing-quality/`（Demand: DM-20260608-004）
-
-### L1-2: Context Engine Extensions
-
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
-| L5-2-1-09 | Verify timeout returns CodeVerifyTimeout | PEV | `tests/integration/context_verify_commands_test.go` | IMPLEMENTED |
-| L5-2-1-10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | IMPLEMENTED |
-| L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
-| L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
-
-### L1-3: LLM Gateway Extensions
-
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-3-1-03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
-| L5-3-2-06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
-| L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
-
-### L1-5: Observability Extensions
-
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-5-2-06 | Compression P99 latency < 500ms | Metrics | `tests/performance/compression_test.go` | IMPLEMENTED |
-| L5-5-2-07 | Concurrent session memory bounded | Metrics | `tests/performance/memory_test.go` | IMPLEMENTED |
 
 ---
 

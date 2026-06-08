@@ -10,9 +10,11 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -25,20 +27,11 @@ type EventHandler interface {
 	OnStatus(sessionID string, state types.SessionState)
 }
 
-// IContextEngine defines the interface for the context engine
-type IContextEngine interface {
-	Process(ctx context.Context, session *types.Session, message string) <-chan *EngineEvent
-}
+// IContextEngine is the L1 alias for the cross-layer engine contract.
+type IContextEngine = contracts.IEngine
 
-// EngineEvent represents an event from the context engine
-type EngineEvent struct {
-	Type      string            // thinking | text | tool_call | tool_result | permission | status | complete | error
-	Content   string
-	ToolName  string
-	ToolInput string
-	SessionID string
-	Metadata  map[string]string
-}
+// EngineEvent is the L1 alias for engine events.
+type EngineEvent = contracts.EngineEvent
 
 // CommunicationGateway routes messages between adapters and the context engine
 type CommunicationGateway struct {
@@ -52,6 +45,8 @@ type CommunicationGateway struct {
 	mu              sync.RWMutex
 	sessions        map[string]*types.Session
 	activeProcesses map[string]context.CancelFunc
+	agentFactory    multiagent.IAgentFactory
+	sessionAgents   map[string]multiagent.Agent
 
 	// metrics
 	metricInboundMsgs    metrics.Counter
@@ -211,6 +206,14 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	session.RequestID = msg.MessageID
 	if err := g.sessionStore.Update(session); err != nil {
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
+	}
+
+	if g.agentFactory != nil {
+		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
+	}
+
+	if g.contextEngine == nil {
+		return fmt.Errorf("context engine not configured")
 	}
 
 	processCtx, cancel := context.WithCancel(ctx)

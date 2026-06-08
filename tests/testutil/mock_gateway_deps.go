@@ -50,6 +50,13 @@ func (h *MockEventHandler) OnStatus(sessionID string, state types.SessionState) 
 	h.Statuses[sessionID] = state
 }
 
+// PermissionRequestCount returns how many permission prompts were handled.
+func (h *MockEventHandler) PermissionRequestCount() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.PermissionCalls
+}
+
 // MessageCount returns the number of outbound messages received so far.
 func (h *MockEventHandler) MessageCount() int {
 	h.mu.Lock()
