@@ -291,7 +291,7 @@
 
 ## 测试质量增强 (Testing Quality)
 
-> 变更：`openspec/changes/devrix-testing-quality/`
+> 已归档：`openspec/archive/2026-06-08-devrix-testing-quality/`（Demand: DM-20260608-004）
 
 ### L1-2: Context Engine Extensions
 

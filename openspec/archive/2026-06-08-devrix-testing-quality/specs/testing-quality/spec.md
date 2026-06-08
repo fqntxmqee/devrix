@@ -1,7 +1,7 @@
 # Testing Quality Enhancement Specification
 
 **Change ID:** devrix-testing-quality
-**Status:** Draft
+**Status:** Archived
 **Version:** 1.0.0
 
 ---
