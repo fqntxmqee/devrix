@@ -23,6 +23,7 @@
 | DM-20260608-009 | Devrix 代码健康规范 | devrix-code-integrity | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-011 | D1 & D6 Testing Coverage | devrix-d1-d6-testing | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-012 | Devrix Agent Tool 系统 | devrix-agent-tools | 2026-06-09 | [#9](https://github.com/fqntxmqee/devrix/pull/9) | ACCEPTED |
+| DM-20260609-001 | D2/D3/D4 域分段测试 | devrix-d234-domain-testing | 2026-06-09 | — | ACCEPTED |
 
 ## Archive Locations
 
@@ -48,7 +49,8 @@
 | devrix-v3-integration | `openspec/archive/2026-06-08-devrix-v3-integration/` |
 | devrix-code-integrity | `openspec/archive/2026-06-08-devrix-code-integrity/` |
 | devrix-d1-d6-testing | `openspec/archive/2026-06-08-devrix-d1-d6-testing/` |
-| devrix-agent-tools | `openspec/archive/2026-06-09-devrix-agent-tools/` | |
+| devrix-agent-tools | `openspec/archive/2026-06-09-devrix-agent-tools/` |
+| devrix-d234-domain-testing | `openspec/archive/2026-06-09-devrix-d234-domain-testing/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)

@@ -1,4 +1,4 @@
-//go:build acceptance
+//go:build acceptance && d1
 
 package p0
 

@@ -14,6 +14,7 @@
 | 规范 | 路径 | 内容 |
 |------|------|------|
 | 测试框架规范 | `openspec/specs/testing-framework/spec.md` | 测试金字塔、目录结构、Mock 规则、L5 追溯 |
+| **域分段测试** | `openspec/specs/testing-framework/domain-segmentation.md` | D2/D3/D4 build tag、分段脚本、Stage 矩阵 |
 | 测试质量规范 | `openspec/specs/testing-quality/spec.md` | 边界条件、Mock 滥用治理、断言深度 |
 
 **规则：** `testing-framework/spec.md` 是测试规范的权威来源（SoT）。本文件不重复其内容。
@@ -25,10 +26,25 @@
 | 层级 | 位置 | Build Tag | 运行命令 | 超时 | 阻断 |
 |------|------|-----------|---------|------|------|
 | 单元 | `internal/**/*_test.go` | 无 | `./scripts/test-unit.sh` | < 2min | PR 门禁 |
-| 集成 | `tests/integration/` | `integration` | `./scripts/test-integration.sh` | < 10min | 合入前 |
-| E2E | `tests/e2e/` | `smoke` | `./scripts/test-e2e.sh` | < 5min | 合入前 |
-| 验收 | `tests/acceptance/p0/` | `acceptance` | `./scripts/test-acceptance.sh` | < 5min | S5 |
-| 性能 | `tests/performance/` | `performance` | — | — | 可选 |
+| 集成 | `tests/integration/` | `integration` + 域 tag | `./scripts/test-integration.sh` | < 10min | 合入前 |
+| E2E | `tests/e2e/` | `smoke` + 域 tag | `./scripts/test-e2e.sh` | < 5min | 合入前 |
+| 验收 | `tests/acceptance/p0/` | `acceptance` + 域 tag | `./scripts/test-acceptance.sh` | < 5min | S5 |
+| 性能 | `tests/performance/` | `performance` + 域 tag | — | — | 可选 |
+
+### 2.1 域分段（D2 / D3 / D4）
+
+按架构域独立跑测试（方案 B：build tag 第二轴）：
+
+| 命令 | 范围 |
+|------|------|
+| `./scripts/test-domain.sh d2` | Context Engine 单元 + 集成 + 验收 + 性能 |
+| `./scripts/test-domain.sh d3` | LLM Gateway 单元 + 集成 |
+| `./scripts/test-domain.sh d3 --live` | 追加真实 LLM API 集成 |
+| `./scripts/test-domain.sh d4` | Multi-Agent 单元 + 集成 + 验收 + E2E |
+
+详见 `openspec/specs/testing-framework/domain-segmentation.md`。
+
+**变更影响：** 修改 `contextengine/` → 至少 `./scripts/test-domain.sh d2`；`llmgateway/` → `d3`；`multiagent/` → `d4`。
 
 ---
 
@@ -42,8 +58,12 @@ S2 阶段在 `openspec/l5-registry.md` 预登记（状态：PLANNED）。
 
 ```go
 // Covers: L5-4-1-01
+// Domain: D4
+// Stage: s0_unit
 func TestAgent_Run_NormalFlow(t *testing.T) { ... }
 ```
+
+域 tag 与 Stage 约定见 `openspec/specs/testing-framework/domain-segmentation.md` §4。
 
 ### 3.3 验收标准
 
@@ -113,6 +133,7 @@ func TestAgent_StateTransition(t *testing.T) {
 S4 提测前：
 - [ ] 所有 L5 P0 测试已编写
 - [ ] `./scripts/test-unit.sh` 通过
+- [ ] 受影响域 `./scripts/test-domain.sh d{N}` 通过（D2/D3/D4 变更时）
 - [ ] 新代码有对应的 `_test.go`
 - [ ] 并发代码通过 `-race` 检测
 - [ ] 测试文件无 `t.Skip`（除非有注释说明原因）

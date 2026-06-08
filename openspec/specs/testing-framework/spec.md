@@ -17,6 +17,7 @@ Devrix 测试框架将 OpenSpec L5 测试点、Go 测试金字塔与 S5 自动�
 | 文档 | 路径 |
 |------|------|
 | L5 注册表 | `openspec/l5-registry.md` |
+| 域分段测试 | `openspec/specs/testing-framework/domain-segmentation.md` |
 | 项目元数据 | `openspec/project.md` |
 | 交付流程 | `specs/05-delivery-process.md`（工作区） |
 
@@ -187,9 +188,11 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 | 阶段 | 命令 | 超时预算 | 阻断级别 |
 |------|------|----------|----------|
 | 日常开发 / PR | `./scripts/test-unit.sh` | < 2min | MUST PASS |
+| 域变更验证 | `./scripts/test-domain.sh d{2\|3\|4}` | < 5min | SHOULD PASS |
 | 合入前 | `./scripts/test-integration.sh` + `./scripts/test-e2e.sh` | < 10min | MUST PASS |
 | S5 验收 | `./scripts/test-acceptance.sh` | < 5min | P0 MUST PASS |
 | 全量 | `./scripts/test-all.sh` | < 15min | MUST PASS |
+| D3 真实 API | `./scripts/test-domain.sh d3 --live` | — | 可选 |
 
 #### Scenario: Developer completes a feature task
 
@@ -252,10 +255,12 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 
 ### Requirement: Build Tags Reference
 
-Build tags MUST 使用以下标准值，不得自定义未登记的 tag。
+Build tags MUST 使用以下标准值，不得自定义未登记的 tag。域分段细则见 `domain-segmentation.md`。
 
-**Priority**: P1
-**Rationale**: 避免 CI 与脚本分叉。
+**Priority**: P0
+**Rationale**: 避免 CI 与脚本分叉；支持 D2/D3/D4 独立分段。
+
+#### 层级 Tag
 
 | Tag | 目录 | 用途 |
 |-----|------|------|
@@ -263,7 +268,68 @@ Build tags MUST 使用以下标准值，不得自定义未登记的 tag。
 | `smoke` | `tests/e2e/` | 冒烟 |
 | `acceptance` | `tests/acceptance/` | L5 验收 |
 | `performance` | `tests/performance/` | 基准（可选） |
-| `live` | `tests/acceptance/live/` | 需外部凭证（不阻断 PR） |
+
+#### 域 Tag（与层级 Tag 组合）
+
+| Tag | 域 | 组合示例 |
+|-----|-----|----------|
+| `d1` | Communication | `integration && d1` |
+| `d2` | Context Engine | `integration && d2` |
+| `d3` | LLM Gateway | `integration && d3` |
+| `d4` | Multi-Agent | `acceptance && d4` |
+| `d5` | Observability | `integration && d5` |
+| `cross` | 跨域集成 | `integration && cross` |
+| `live` | 需外部凭证 | `integration && d3 && live` |
+
+#### Scenario: Full integration run passes all domain tags
+
+- GIVEN integration tests declare `//go:build integration && d2` (or d3, d4, cross, etc.)
+- WHEN `./scripts/test-integration.sh` executes
+- THEN it MUST pass `-tags="integration,d1,d2,d3,d4,d5,cross"`
+- AND MUST NOT pass `live` unless explicitly running live suite
+
+#### Scenario: Domain-scoped run
+
+- GIVEN a developer modifies `internal/layers/llmgateway/`
+- WHEN validating the change
+- THEN `./scripts/test-domain.sh d3` MUST pass
+- AND MUST compile only tests whose build constraint includes `d3` or `cross` (per script filter)
+
+#### Scenario: Live tests excluded from PR gate
+
+- GIVEN a test requires real LLM API credentials
+- WHEN it is added under `tests/integration/`
+- THEN it MUST declare `//go:build integration && d3 && live`
+- AND MUST NOT run in default `./scripts/test-integration.sh`
+- AND MAY run via `./scripts/test-domain.sh d3 --live`
+
+#### Scenario: Unit tests remain untagged
+
+- GIVEN a unit test under `internal/layers/{domain}/`
+- WHEN the test is a single-package unit test
+- THEN it MUST NOT declare domain build tags
+- AND domain unit scope MUST be selected via package path in `./scripts/test-domain.sh`
+
+---
+
+### Requirement: Domain Segmentation Scripts
+
+项目 MUST 提供域分段测试脚本，与 `domain-segmentation.md` 保持一致。
+
+**Priority**: P1
+
+#### Scenario: Domain script entry points
+
+- GIVEN domains D2, D3, D4 have distinct test suites
+- WHEN `./scripts/test-domain.sh {d2|d3|d4}` is executed
+- THEN it MUST run unit packages for that domain
+- AND MUST run integration/acceptance/e2e subsets per domain matrix in `domain-segmentation.md` §5
+
+---
+
+### Requirement: Build Tags Reference (Legacy table merged above)
+
+See `openspec/specs/testing-framework/domain-segmentation.md` for cross-domain file mapping and Stage definitions.
 
 ---
 

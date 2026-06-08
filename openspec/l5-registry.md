@@ -73,6 +73,8 @@
 
 ## D2: Context Engine Domain (CTX)
 
+> **Domain tests:** `./scripts/test-domain.sh d2` · **Spec:** `openspec/specs/testing-framework/domain-segmentation.md`
+
 > V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
 > V2 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v2/`
 > V3 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v3/`
@@ -143,6 +145,8 @@
 
 ## D3: LLM Gateway Domain (LLM)
 
+> **Domain tests:** `./scripts/test-domain.sh d3` · **Live:** `--live` · **Spec:** `domain-segmentation.md`
+
 ### D3-S1: Adapter Module
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status |
@@ -197,6 +201,8 @@
 ---
 
 ## D4: Multi-Agent Domain (AGENT)
+
+> **Domain tests:** `./scripts/test-domain.sh d4` · **Spec:** `domain-segmentation.md`
 
 > 已归档：`openspec/archive/2026-06-08-devrix-multi-agent/`（Demand: DM-20260608-005）
 
@@ -376,3 +382,4 @@
 | 1.1.0 | 2026-06-08 | Section headers migrated L1-L2 → D-S (DM-20260608-007) |
 | 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |
 | 1.3.0 | 2026-06-08 | D1 L5 IMPLEMENTED; registry summary reconciled (DM-20260608-011) |
+| 1.4.0 | 2026-06-09 | D2/D3/D4 domain build tags + test-domain.sh (DM-20260609-001) |

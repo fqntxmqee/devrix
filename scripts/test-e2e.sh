@@ -4,4 +4,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> e2e smoke tests"
-go test -tags=smoke ./tests/e2e/... -timeout 120s "$@"
+go test -tags="smoke,d4" ./tests/e2e/... -timeout 120s "$@"

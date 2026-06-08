@@ -1,0 +1,8 @@
+change_id: devrix-d234-domain-testing
+priority: P1
+demand_id: DM-20260609-001
+status: s7_archived
+completed_at: "2026-06-09"
+archived_at: "2026-06-09"
+domains: [D2, D3, D4]
+estimated_hours: 4

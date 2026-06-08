@@ -1,4 +1,4 @@
-//go:build integration
+//go:build smoke && d4
 
 package e2e
 

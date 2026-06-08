@@ -1,4 +1,4 @@
-//go:build acceptance
+//go:build acceptance && d2
 
 package p0_test
 

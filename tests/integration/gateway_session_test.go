@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && d1
 
 package integration
 
