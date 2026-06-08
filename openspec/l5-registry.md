@@ -87,9 +87,19 @@
 |-------|------|---------|-----------|--------|
 | L5-CTX-10 | L3 长期记忆返回 NotImplemented | L4-CTX-MEMORY | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
 
+### Context Engine V4 (P2)
+
+> 变更：`openspec/changes/devrix-context-engine-v4/`（Demand: DM-20260608-003）
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-CTX-31 | Autocompact 异步执行不阻塞主请求 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | PLANNED |
+| L5-CTX-32 | 快照使用 snappy 压缩后体积显著减小 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | PLANNED |
+| L5-CTX-33 | 异步压缩失败降级不丢失数据 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | PLANNED |
+
 ### Tool Security (P0)
 
-> 变更：`openspec/changes/devrix-tool-security/`（Demand: DM-20260608-001）
+> 已归档：`openspec/archive/2026-06-08-devrix-tool-security/`（Demand: DM-20260608-001，Canonical: `openspec/specs/tool-security/spec.md`）
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
@@ -117,6 +127,8 @@
 | L5-LLM-07 | Token 计数准确性 (cl100k_base) | L4-LLM-TOKEN | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-LLM-08 | Token 预算检查 | L4-LLM-TOKEN | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-LLM-09 | Provider 配置加载 | L4-LLM-CONFIG | `internal/layers/llmgateway/config/loader_test.go` | IMPLEMENTED |
+| L5-LLM-20 | Retry 失败等待 CB 冷却而非快速触发熔断 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | PLANNED |
+| L5-LLM-23 | Half-Open 探测请求数量控制 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | PLANNED |
 
 ### P1
 
@@ -127,6 +139,8 @@
 | L5-LLM-12 | 重试策略执行 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_test.go` | IMPLEMENTED |
 | L5-LLM-13 | LLM 调用可观测事件 | L4-LLM-OBS | `tests/integration/llm_observer_test.go` | IMPLEMENTED |
 | L5-LLM-16 | 未知 Provider/Model 报错 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/router_test.go` | IMPLEMENTED |
+| L5-LLM-21 | LLM 超时后 Context 被取消 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | PLANNED |
+| L5-LLM-22 | Jitter 随机化避免重试风暴 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_test.go` | PLANNED |
 
 ### P2
 
@@ -195,6 +209,8 @@
 ---
 
 ## Layer Extensions: Testing Quality (TEST)
+
+> 变更：`openspec/changes/devrix-testing-quality/`（Demand: DM-20260608-004）
 
 ### CTX Layer Extensions (P0)
 

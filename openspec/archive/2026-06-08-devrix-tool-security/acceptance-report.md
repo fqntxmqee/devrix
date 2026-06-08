@@ -65,4 +65,4 @@ verdict: ACCEPTED
 
 ## 6. 结论
 
-DM-20260608-001 P0 L5（L5-TOOL-01~04）全部通过，满足 S5 验收条件。建议合入 PR 后进入 S6 交付与 S7 归档。
+DM-20260608-001 P0 L5（L5-TOOL-01~04）全部通过。已合入 PR #3（`1b89f5f`），S7 归档至 `openspec/archive/2026-06-08-devrix-tool-security/`。

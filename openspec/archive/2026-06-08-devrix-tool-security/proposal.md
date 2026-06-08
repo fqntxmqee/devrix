@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-tool-security
 **Demand ID:** DM-20260608-001
-**Status:** S5 Accepted
+**Status:** S7 Archived
 **Author:** Architecture
 **Date:** 2026-06-08
 
@@ -119,3 +119,15 @@ type ToolRegistry struct {
 | M3 Concurrency | 1 | 2h |
 | M4 Test | 1 | 3h |
 | **合计** | **7** | **~16h** |
+
+---
+
+## Archive Information
+
+| 项 | 值 |
+|---|---|
+| Archived | 2026-06-08 |
+| PR | [#3](https://github.com/fqntxmqee/devrix/pull/3) |
+| Merge commit | `1b89f5f` |
+| Canonical spec | `openspec/specs/tool-security/spec.md` v1.0.0 |
+| Verdict | ACCEPTED |

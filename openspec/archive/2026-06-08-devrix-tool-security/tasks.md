@@ -1,7 +1,7 @@
 # Tasks: devrix-tool-security
 
 **Change ID:** devrix-tool-security
-**Status:** S5 Accepted
+**Status:** S7 Archived
 **Based on:** design.md, `specs/tool-security/spec.md`
 
 ---
