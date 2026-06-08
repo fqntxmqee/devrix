@@ -1,0 +1,69 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-llm-gateway-v2
+  demand_id: DM-20260608-002
+  title: "LLM Gateway 可靠性增强"
+  status: s2_design
+  priority: P1
+  owner: architecture
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+  parent_change: devrix-llm-gateway
+
+scope:
+  layers:
+    - id: L3
+      name: LLM Gateway
+      affected: true
+
+  capabilities:
+    - LLM-BREAKER-RETRY   # CB+Retry 协调
+    - LLM-TIMEOUT-PROP    # Context 超时传播
+    - LLM-RETRY-JITTER    # Retry jitter
+
+  l5_test_points:
+    - L5-LLM-20           # Retry 失败等待 CB 冷却而非快速触发熔断
+    - L5-LLM-21           # LLM 超时后 Context 被取消
+    - L5-LLM-22           # Jitter 随机化避免重试风暴
+    - L5-LLM-23           # Half-Open 探测请求数量控制
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/llm-gateway/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+
+version_scope:
+  v2.0:
+    features:
+      - CircuitBreaker 感知 Retry 状态
+      - LLM 调用超时取消 Context 传播
+      - Retry 指数退避增加 jitter
+      - Half-Open 状态探测请求限制
+      - 中文 token 计数补偿
+    status: s2_design
+    tasks: T1-T6
+    estimate: 14h
+
+bug_severity:
+  high:
+    - cb-retry-conflict          # CB 与 Retry 独立运作导致快速熔断
+  medium:
+    - timeout-no-context-cancel  # LLM 超时不取消 Context
+    - retry-no-jitter            # 重试退避无随机性
+    - half-open-no-probe-limit   # 半开状态无探测限制
+
+related_changes:
+  - devrix-llm-gateway
+  - devrix-context-engine-v3
+
+notes: |
+  基于 Gemini 深度分析报告 issues #2（CB+Retry 冲突）、#6（超时不传播 Context）、#8（Retry 无 jitter）。
+  LLM Gateway V1 已归档，CB/Retry/Token 均独立运作，存在生产风险。
+  所有修复为增量式，不改变公开接口。

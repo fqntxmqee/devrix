@@ -13,10 +13,11 @@ type LLMGatewayFileConfig struct {
 
 // LLMCircuitBreakerFileConfig holds circuit breaker YAML fields.
 type LLMCircuitBreakerFileConfig struct {
-	FailureThreshold int           `yaml:"failure_threshold"`
-	SuccessThreshold int           `yaml:"success_threshold"`
-	OpenDuration     time.Duration `yaml:"open_duration"`
-	Scope            string        `yaml:"scope"`
+	FailureThreshold  int           `yaml:"failure_threshold"`
+	SuccessThreshold  int           `yaml:"success_threshold"`
+	OpenDuration      time.Duration `yaml:"open_duration"`
+	HalfOpenMaxProbes int           `yaml:"half_open_max_probes"`
+	Scope             string        `yaml:"scope"`
 }
 
 // LLMProviderConfig holds per-provider YAML fields.
@@ -52,10 +53,11 @@ type LLMGatewayConfig struct {
 
 // LLMCircuitBreakerConfig holds resolved circuit breaker settings.
 type LLMCircuitBreakerConfig struct {
-	FailureThreshold int
-	SuccessThreshold int
-	OpenDuration     time.Duration
-	Scope            string
+	FailureThreshold  int
+	SuccessThreshold  int
+	OpenDuration      time.Duration
+	HalfOpenMaxProbes int
+	Scope             string
 }
 
 // LLMProviderRuntimeConfig holds resolved provider settings.
@@ -91,10 +93,11 @@ func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 			"MiniMax-*":  "minimax",
 		},
 		CircuitBreaker: LLMCircuitBreakerConfig{
-			FailureThreshold: 5,
-			SuccessThreshold: 2,
-			OpenDuration:     30 * time.Second,
-			Scope:            "provider",
+			FailureThreshold:  5,
+			SuccessThreshold:  2,
+			OpenDuration:      30 * time.Second,
+			HalfOpenMaxProbes: 1,
+			Scope:             "provider",
 		},
 		Providers: map[string]LLMProviderRuntimeConfig{
 			"deepseek": {
@@ -159,6 +162,9 @@ func BuildLLMGatewayConfig(file *LLMGatewayFileConfig) *LLMGatewayConfig {
 	}
 	if file.CircuitBreaker.Scope != "" {
 		cfg.CircuitBreaker.Scope = file.CircuitBreaker.Scope
+	}
+	if file.CircuitBreaker.HalfOpenMaxProbes != 0 {
+		cfg.CircuitBreaker.HalfOpenMaxProbes = file.CircuitBreaker.HalfOpenMaxProbes
 	}
 	for name, p := range file.Providers {
 		existing := cfg.Providers[name]

@@ -119,6 +119,38 @@ func TestCircuitBreaker_should_reopen_when_half_open_probe_fails(t *testing.T) {
 	}
 }
 
+// Covers: L5-LLM-23
+func TestCircuitBreaker_should_limit_half_open_concurrent_probes(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(0, 0)}
+	cfg := sharedconfig.LLMCircuitBreakerConfig{
+		FailureThreshold:  3,
+		SuccessThreshold:  2,
+		OpenDuration:      30 * time.Second,
+		HalfOpenMaxProbes: 1,
+		Scope:             "provider",
+	}
+	cb := breaker.New(cfg).WithClock(clock.Now)
+	const key = "deepseek"
+
+	for i := 0; i < 3; i++ {
+		cb.RecordFailure(key)
+	}
+	clock.Advance(31 * time.Second)
+
+	allowed, err := cb.Allow(key)
+	if err != nil || !allowed {
+		t.Fatalf("first half-open probe: allowed=%v err=%v", allowed, err)
+	}
+	allowed, err = cb.Allow(key)
+	if allowed || err == nil {
+		t.Fatalf("expected second probe rejected, allowed=%v err=%v", allowed, err)
+	}
+	var llmErr *sharederrors.LLMError
+	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMCircuitOpen {
+		t.Fatalf("err: %v", err)
+	}
+}
+
 func TestCircuitBreaker_should_isolate_providers(t *testing.T) {
 	cb, _ := newTestBreaker()
 	for i := 0; i < 3; i++ {

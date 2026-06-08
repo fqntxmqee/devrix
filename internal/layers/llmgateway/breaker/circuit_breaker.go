@@ -14,10 +14,10 @@ type Clock func() time.Time
 
 // CircuitBreaker implements provider-scoped circuit breaking.
 type CircuitBreaker struct {
-	cfg       sharedconfig.LLMCircuitBreakerConfig
-	circuits  map[string]*circuitRecord
-	mu        sync.Mutex
-	now       Clock
+	cfg      sharedconfig.LLMCircuitBreakerConfig
+	circuits map[string]*circuitRecord
+	mu       sync.Mutex
+	now      Clock
 }
 
 // New creates a circuit breaker with the given configuration.
@@ -30,6 +30,9 @@ func New(cfg sharedconfig.LLMCircuitBreakerConfig) *CircuitBreaker {
 	}
 	if cfg.OpenDuration <= 0 {
 		cfg.OpenDuration = 30 * time.Second
+	}
+	if cfg.HalfOpenMaxProbes <= 0 {
+		cfg.HalfOpenMaxProbes = 1
 	}
 	if cfg.Scope == "" {
 		cfg.Scope = "provider"
@@ -62,10 +65,16 @@ func (b *CircuitBreaker) Allow(circuitKey string) (bool, error) {
 		if b.now().Sub(rec.openedAt) >= b.cfg.OpenDuration {
 			rec.state = llmgateway.CircuitHalfOpen
 			rec.halfOpenSuccesses = 0
-			return true, nil
+			rec.halfOpenInFlight = 0
+		} else {
+			return false, sharederrors.NewCircuitOpenError(circuitKey)
 		}
-		return false, sharederrors.NewCircuitOpenError(circuitKey)
+		fallthrough
 	case llmgateway.CircuitHalfOpen:
+		if rec.halfOpenInFlight >= b.cfg.HalfOpenMaxProbes {
+			return false, sharederrors.NewCircuitOpenError(circuitKey)
+		}
+		rec.halfOpenInFlight++
 		return true, nil
 	default:
 		return true, nil
@@ -87,8 +96,10 @@ func (b *CircuitBreaker) RecordSuccess(circuitKey string) {
 			rec.state = llmgateway.CircuitClosed
 			rec.failureCount = 0
 			rec.halfOpenSuccesses = 0
+			rec.halfOpenInFlight = 0
 		}
 	}
+	b.finalize(rec)
 }
 
 // RecordFailure records a failed call.
@@ -106,6 +117,7 @@ func (b *CircuitBreaker) RecordFailure(circuitKey string) {
 	case llmgateway.CircuitHalfOpen:
 		b.open(rec)
 	}
+	b.finalize(rec)
 }
 
 // State returns the current circuit state.
@@ -129,6 +141,13 @@ func (b *CircuitBreaker) open(rec *circuitRecord) {
 	rec.openedAt = b.now()
 	rec.failureCount = b.cfg.FailureThreshold
 	rec.halfOpenSuccesses = 0
+	rec.halfOpenInFlight = 0
+}
+
+func (b *CircuitBreaker) finalize(rec *circuitRecord) {
+	if rec.state == llmgateway.CircuitHalfOpen && rec.halfOpenInFlight > 0 {
+		rec.halfOpenInFlight--
+	}
 }
 
 var _ llmgateway.ICircuitBreaker = (*CircuitBreaker)(nil)
