@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/devrix/devrix/internal/layers/observability/coverage"
 	"github.com/devrix/devrix/internal/layers/observability/exporter"
 	"github.com/devrix/devrix/internal/layers/observability/logger"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
@@ -41,6 +42,8 @@ func New(cfg *Config) (*Observability, error) {
 	obs := &Observability{
 		config: cfg,
 	}
+
+	coverage.InitGlobal(coverage.AllOperations())
 
 	// Initialize tracer
 	if cfg.IsTracingEnabled() {
@@ -156,7 +159,25 @@ func (o *Observability) HealthCheck() map[string]interface{} {
 		result["status"] = "degraded"
 	}
 
+	if counter := coverage.Global(); counter != nil {
+		report := counter.Report(coverage.AllOperations(), false)
+		result["coverage"] = map[string]interface{}{
+			"operations_total": report.OperationsTotal,
+			"operations_hit":   report.OperationsHit,
+			"coverage_ratio":   report.CoverageRatio,
+			"zero_hit_count":   len(report.OperationsZeroHit),
+		}
+	}
+
 	return result
+}
+
+// CoverageReport returns the full operation coverage reconciliation report.
+func (o *Observability) CoverageReport(includeHits bool) coverage.Report {
+	if counter := coverage.Global(); counter != nil {
+		return counter.Report(coverage.AllOperations(), includeHits)
+	}
+	return coverage.Report{}
 }
 
 // NewNoOp returns a no-op observability instance (when observability is disabled)

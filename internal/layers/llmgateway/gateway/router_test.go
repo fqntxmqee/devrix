@@ -43,7 +43,7 @@ func TestRouter_should_use_provider_default_when_model_empty(t *testing.T) {
 	if provider != "minimax" {
 		t.Errorf("provider: got %s", provider)
 	}
-	if model != "minimax-3" {
+	if model != "MiniMax-M2.7-highspeed" {
 		t.Errorf("model: got %s", model)
 	}
 }

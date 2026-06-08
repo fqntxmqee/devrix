@@ -14,6 +14,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/core"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 
@@ -55,6 +58,7 @@ type FeishuAdapter struct {
 	sessionMsgMap   sync.Map // sessionID -> userMessageID mapping
 	sessionReplyCtx sync.Map // sessionID -> feishuReplyContext
 	sessionStreams  sync.Map // sessionID -> *feishuSessionStream for coalesced progress
+	obsBridge       *observability.Bridge
 }
 
 // feishuReplyContext tracks the user's root message for threaded replies and typing reaction.
@@ -137,9 +141,6 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		}
 
 	case "text":
-		if msg.IsComplete {
-			return
-		}
 		if err := a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content); err != nil {
 			slog.Error("feishu: failed to send response text", "error", err)
 		}
@@ -295,6 +296,17 @@ func WithFeishuAPI(api FeishuAPI) FeishuAdapterOption {
 func WithGateway(gw gateway.GatewayAPI) FeishuAdapterOption {
 	return func(a *FeishuAdapter) {
 		a.gateway = gw
+	}
+}
+
+// WithObservability wires tracing into the Feishu adapter.
+func WithObservability(obs *observability.Observability) FeishuAdapterOption {
+	return func(a *FeishuAdapter) {
+		if obs == nil {
+			a.obsBridge = nil
+			return
+		}
+		a.obsBridge = observability.NewBridge(obs)
 	}
 }
 
@@ -556,7 +568,7 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 
 	// Deduplicate messages
 	if a.isDuplicateMessage(messageID) {
-		slog.Debug("feishu: duplicate message ignored", "messageID", messageID)
+		slog.Info("feishu: duplicate message ignored", "messageID", messageID, "text", text)
 		return nil
 	}
 
@@ -571,7 +583,7 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		if ms, err := strconv.ParseInt(*msg.CreateTime, 10, 64); err == nil {
 			msgTime := time.Unix(ms/1000, (ms%1000)*int64(time.Millisecond))
 			if time.Since(msgTime) > 5*time.Minute {
-				slog.Debug("feishu: ignoring old message", "messageID", messageID, "age", time.Since(msgTime))
+				slog.Info("feishu: ignoring old message", "messageID", messageID, "text", text, "age", time.Since(msgTime))
 				return nil
 			}
 		}
@@ -621,8 +633,21 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 	// Store the user message ID for done_emoji later
 	a.sessionMsgMap.Store(session.SessionID, messageID)
 
+	routeCtx := ctx
+	if a.obsBridge != nil && a.obsBridge.Tracer() != nil {
+		var span tracer.Span
+		routeCtx, span = a.obsBridge.Tracer().Start(ctx, telemetry.OpAdapterMessageReceive,
+			tracer.WithSpanKind(tracer.SpanKindServer),
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAdapterMessageReceive,
+				tracer.Attribute{Key: "adapter", Value: "feishu"},
+				tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(text))},
+			)...),
+		)
+		defer span.End()
+	}
+
 	// Route to gateway
-	if err := a.gateway.RouteInbound(ctx, inboundMsg); err != nil {
+	if err := a.gateway.RouteInbound(routeCtx, inboundMsg); err != nil {
 		slog.Error("feishu: failed to route message",
 			"error", err,
 			"sessionID", session.SessionID,

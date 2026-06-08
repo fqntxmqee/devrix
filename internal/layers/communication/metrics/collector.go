@@ -1,3 +1,9 @@
+// Package metrics provides a legacy in-process metrics collector for the
+// communication layer.
+//
+// Deprecated: use observability.SessionBridge and observability.Bridge metrics
+// (DM-20260607-007). This package remains for reference only and is not wired
+// in the production gateway path.
 package metrics
 
 import (

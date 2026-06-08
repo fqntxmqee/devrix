@@ -12,6 +12,7 @@ Thumbs.db
 *.exe
 *.exe~
 devrix
+devrix-feishu
 *.tmp
 
 # Devrix data

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/errors"
@@ -52,9 +54,10 @@ type CommunicationGateway struct {
 	activeProcesses map[string]context.CancelFunc
 
 	// metrics
-	metricInboundMsgs   metrics.Counter
-	metricOutboundMsgs  metrics.Counter
-	metricSessionsTotal metrics.Counter
+	metricInboundMsgs    metrics.Counter
+	metricOutboundMsgs   metrics.Counter
+	metricSessionsTotal  metrics.Counter
+	metricActiveSessions metrics.Gauge
 }
 
 // NewCommunicationGateway creates a new CommunicationGateway
@@ -110,10 +113,13 @@ func (g *CommunicationGateway) SetObservability(obs *observability.Observability
 		return
 	}
 	g.obsBridge = observability.NewBridge(obs)
-	g.initMetrics()
+	g.initMetrics(obs)
+	if g.permissionMgr != nil {
+		g.permissionMgr.SetObservability(obs)
+	}
 }
 
-func (g *CommunicationGateway) initMetrics() {
+func (g *CommunicationGateway) initMetrics(obs *observability.Observability) {
 	if g.obsBridge == nil || g.obsBridge.Meter() == nil {
 		return
 	}
@@ -127,6 +133,10 @@ func (g *CommunicationGateway) initMetrics() {
 	g.metricSessionsTotal, _ = m.Int64Counter("gateway_sessions_total", metrics.WithLabels(metrics.LabelMap{
 		"adapter": "all",
 	}))
+	sessionBridge := observability.NewSessionBridge(obs)
+	if sessionBridge != nil {
+		g.metricActiveSessions, _ = sessionBridge.ActiveSessions("all")
+	}
 }
 
 // StartCleanupRoutine starts a background goroutine that periodically cleans up expired sessions
@@ -165,7 +175,6 @@ func (g *CommunicationGateway) cleanupExpiredSessions() {
 // RouteInbound processes an inbound message from an adapter
 func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.InboundMessage) error {
 	ctx, endSpan := g.startInboundSpan(ctx, msg)
-	defer endSpan()
 
 	slog.Info("gateway: RouteInbound called", "sessionID", msg.SessionID, "content", msg.Content, "chatID", msg.ChatID)
 
@@ -204,7 +213,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
 	}
 
-	processCtx, cancel := context.WithCancel(context.Background())
+	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
 
 	// Process message through context engine
@@ -212,6 +221,8 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 	// Handle events from context engine
 	go func() {
+		defer endSpan()
+		defer cancel()
 		g.handleEngineEvents(processCtx, session, eventChan)
 		g.unregisterProcess(session.SessionID)
 	}()
@@ -392,6 +403,11 @@ func (g *CommunicationGateway) RouteError(err error, sessionID string) {
 
 // CreateSession creates a new session
 func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Session, error) {
+	if workDir == "" {
+		if wd, err := os.Getwd(); err == nil {
+			workDir = wd
+		}
+	}
 	sessionID := generateSessionID()
 	session := types.NewSession(sessionID, "cli", workDir)
 	session.ChatID = chatID
@@ -408,6 +424,10 @@ func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Ses
 	if g.metricSessionsTotal != nil {
 		g.metricSessionsTotal.Inc()
 	}
+	if g.metricActiveSessions != nil {
+		g.metricActiveSessions.Inc()
+	}
+	g.recordSessionLifecycle(sessionID, session.AdapterID, "create")
 
 	return session, nil
 }
@@ -448,6 +468,11 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 		// Log but don't fail - session is already removed from memory
 		// The store implementation may not support delete or already cleaned up
 	}
+
+	if g.metricActiveSessions != nil {
+		g.metricActiveSessions.Dec()
+	}
+	g.recordSessionLifecycle(sessionID, session.AdapterID, "expire")
 
 	return nil
 }
@@ -493,20 +518,40 @@ func parseRiskLevel(level string) types.RiskLevel {
 	}
 }
 
+func (g *CommunicationGateway) recordSessionLifecycle(sessionID, adapter, action string) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return
+	}
+	if adapter == "" {
+		adapter = "unknown"
+	}
+	_, span := g.obsBridge.Tracer().Start(context.Background(), telemetry.OpGatewaySessionLifecycle,
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionLifecycle,
+			tracer.Attribute{Key: "session.action", Value: action},
+			tracer.Attribute{Key: "session.id", Value: sessionID},
+			tracer.Attribute{Key: "adapter", Value: adapter},
+		)...),
+	)
+	span.End()
+}
+
 func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.InboundMessage) (context.Context, func()) {
 	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
 		return ctx, func() {}
 	}
 
 	tr := g.obsBridge.Tracer()
-	ctx, span := tr.Start(ctx, "gateway.route_inbound",
+	ctx, span := tr.Start(ctx, telemetry.OpGatewayMessageReceive,
 		tracer.WithSpanKind(tracer.SpanKindServer),
-		tracer.WithSpanAttributes(
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayMessageReceive,
 			tracer.Attribute{Key: "session.id", Value: msg.SessionID},
 			tracer.Attribute{Key: "message.adapter_id", Value: msg.AdapterID},
 			tracer.Attribute{Key: "message.chat_id", Value: msg.ChatID},
 			tracer.Attribute{Key: "message.user_id", Value: msg.UserID},
-		),
+			tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(msg.Content)),
+			},
+		)...),
 	)
 
 	return ctx, func() {

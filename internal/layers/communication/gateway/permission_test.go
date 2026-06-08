@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -65,6 +67,58 @@ func TestPermissionManager_GetRequest_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nonexistent request")
 	}
+}
+
+func TestPermissionManager_should_record_timeout_metrics(t *testing.T) {
+	cfg := &config.PermissionConfig{
+		DefaultTimeout: 50 * time.Millisecond,
+		MaxRetries:     3,
+	}
+	mgr := NewPermissionManager(cfg)
+	obs, err := observability.New(observability.DefaultConfig())
+	if err != nil {
+		t.Fatalf("observability: %v", err)
+	}
+	mgr.SetObservability(obs)
+
+	approved := mgr.Request(context.Background(), "sess_1", "bash", "ls", types.RiskLevelMedium)
+	if approved {
+		t.Fatal("expected timeout denial")
+	}
+
+	denied := findCounterValue(t, obs, "devrix_permission_decisions_total", metrics.LabelMap{"decision": "denied"})
+	if denied != 1 {
+		t.Fatalf("denied decisions=%d, want 1", denied)
+	}
+	timeouts := findCounterValue(t, obs, "devrix_permission_timeouts_total", metrics.LabelMap{})
+	if timeouts != 1 {
+		t.Fatalf("timeouts=%d, want 1", timeouts)
+	}
+}
+
+func findCounterValue(t *testing.T, obs *observability.Observability, name string, labels metrics.LabelMap) int64 {
+	t.Helper()
+	for _, metric := range obs.Meter().Registry().List() {
+		c, ok := metric.(metrics.Counter)
+		if !ok || c.Name() != name {
+			continue
+		}
+		if !labelSubset(c.Labels(), labels) {
+			continue
+		}
+		return c.Value()
+	}
+	t.Fatalf("counter %s labels=%v not found", name, labels)
+	return 0
+}
+
+func labelSubset(actual, want metrics.LabelMap) bool {
+	for k, v := range want {
+		if actual[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 func TestPermissionManager_ListPending(t *testing.T) {
