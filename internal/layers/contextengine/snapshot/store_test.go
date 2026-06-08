@@ -34,8 +34,26 @@ func TestStore_should_roundtrip_snapshot_v1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Deserialize: %v", err)
 	}
-	if restored.SessionID != sc.SessionID || len(restored.Messages) != 1 {
-		t.Errorf("unexpected restore: %+v", restored)
+	if restored.SessionID != sc.SessionID {
+		t.Errorf("sessionID: got %s want %s", restored.SessionID, sc.SessionID)
+	}
+	if restored.WorkDir != sc.WorkDir {
+		t.Errorf("workDir: got %s want %s", restored.WorkDir, sc.WorkDir)
+	}
+	if restored.Model != sc.Model {
+		t.Errorf("model: got %s want %s", restored.Model, sc.Model)
+	}
+	if restored.SystemPrompt != sc.SystemPrompt {
+		t.Errorf("systemPrompt: got %q want %q", restored.SystemPrompt, sc.SystemPrompt)
+	}
+	if len(restored.Messages) != 1 {
+		t.Fatalf("messages: got %d want 1", len(restored.Messages))
+	}
+	if restored.Messages[0].Content != sc.Messages[0].Content {
+		t.Errorf("message content mismatch")
+	}
+	if restored.TokenBudget.MaxContextTokens != sc.TokenBudget.MaxContextTokens {
+		t.Errorf("token budget mismatch")
 	}
 }
 

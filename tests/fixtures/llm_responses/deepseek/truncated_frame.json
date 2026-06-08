@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "text/event-stream"
+  },
+  "body": "data: {not-valid-json}\n\ndata: [DONE]\n\n"
+}

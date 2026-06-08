@@ -95,7 +95,7 @@ func TestPipeline_should_autocompact_when_enabled_and_over_budget(t *testing.T) 
 	}
 }
 
-// Covers: L5-CTX-13
+// Covers: L5-CTX-13, L5-CTX-30
 func TestPipeline_should_degrade_autocompact_on_llm_failure(t *testing.T) {
 	counter := &highTokenCounter{inner: token.NewCounter()}
 	cfg := config.DefaultAutocompactConfig()

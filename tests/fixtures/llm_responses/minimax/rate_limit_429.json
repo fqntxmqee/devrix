@@ -1,0 +1,7 @@
+{
+  "status": 429,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"error\":{\"message\":\"rate limit exceeded\",\"type\":\"rate_limit\"}}"
+}
