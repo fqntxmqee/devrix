@@ -1,4 +1,4 @@
-# Delta: LLM Gateway Layer (Layer 3)
+# Delta: Domain D3 (LLM)
 
 **Change ID:** devrix-llm-gateway
 **Demand:** DM-20260607-004

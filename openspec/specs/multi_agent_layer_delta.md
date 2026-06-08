@@ -1,4 +1,4 @@
-# Delta: Multi-Agent Layer (Layer 4)
+# Delta: Domain D4 (AGENT)
 
 > **已合并至 Canonical Spec：** `openspec/specs/multi-agent/spec.md`（归档于 2026-06-08）
 

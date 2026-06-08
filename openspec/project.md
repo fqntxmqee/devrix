@@ -36,86 +36,86 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 
 ---
 
-## Layer 1 (L1) - Top-Level Architecture
+## Domain (D) - Top-Level Architecture
 
-| L1 ID | Layer Name | Responsibility |
-|-------|------------|----------------|
-| **L1-1** | Communication Layer | IM Gateway, WebSocket, CLI adapter |
-| **L1-2** | Context Engine Layer | PEV Engine, 7-step compression, layered memory |
-| **L1-3** | LLM Gateway Layer | Model adapter, circuit breaker, token counter |
-| **L1-4** | Multi-Agent Layer | Agent lifecycle, fork, collaboration modes |
-| **L1-5** | Observability Layer | Tracing, metrics, logging |
-| **L1-6** | Evolution Layer | Version management, A/B testing |
+| Domain ID | Domain Name | Responsibility |
+|-----------|-------------|----------------|
+| **D1** | Communication Domain (COMM) | IM Gateway, WebSocket, CLI adapter |
+| **D2** | Context Engine Domain (CTX) | PEV Engine, 7-step compression, layered memory |
+| **D3** | LLM Gateway Domain (LLM) | Model adapter, circuit breaker, token counter |
+| **D4** | Multi-Agent Domain (AGENT) | Agent lifecycle, fork, collaboration modes |
+| **D5** | Observability Domain (OBS) | Tracing, metrics, logging |
+| **D6** | Evolution Domain (EVO) | Version management, A/B testing |
 
 ---
 
-## Layer 2 (L2) - Sub-Modules
+## Scenario (S) - Domain Scenarios
 
-### L1-1 Communication Layer Modules
+### D1 Communication Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-1-L2-1 | Gateway | 消息网关、路由、会话管理 |
-| L1-1-L2-2 | Adapters | 飞书、WebSocket、CLI 适配器 |
-| L1-1-L2-3 | Commands | CLI 命令解析 (/new, /stop, /help) |
-| L1-1-L2-4 | Auth | 认证与授权 |
-| L1-1-L2-5 | Milestone | 里程碑跟踪 |
-| L1-1-L2-6 | RateLimit | 限流控制 |
-| L1-1-L2-7 | Metrics | 通信层指标 |
-| L1-1-L2-8 | Renderers | 消息渲染器 |
+| D1-S1 | Gateway | 消息网关、路由、会话管理 |
+| D1-S2 | Adapters | 飞书、WebSocket、CLI 适配器 |
+| D1-S3 | Commands | CLI 命令解析 (/new, /stop, /help) |
+| D1-S4 | Auth | 认证与授权 |
+| D1-S5 | Milestone | 里程碑跟踪 |
+| D1-S6 | RateLimit | 限流控制 |
+| D1-S7 | Metrics | 通信层指标 |
+| D1-S8 | Renderers | 消息渲染器 |
 
-### L1-2 Context Engine Layer Modules
+### D2 Context Engine Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-2-L2-1 | PEV | Plan-Execute-Verify 循环引擎 |
-| L1-2-L2-2 | Compression | 七步压缩管道 |
-| L1-2-L2-3 | Memory | 分层记忆管理 (Working/LongTerm) |
-| L1-2-L2-4 | Token | Token 计数与预算管理 |
-| L1-2-L2-5 | Registry | 操作注册表 |
-| L1-2-L2-6 | Snapshot | 上下文快照 |
-| L1-2-L2-7 | Prompt | Prompt 模板管理 |
-| L1-2-L2-8 | Sandbox | 工具沙箱隔离 |
+| D2-S1 | PEV | Plan-Execute-Verify 循环引擎 |
+| D2-S2 | Compression | 七步压缩管道 |
+| D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) |
+| D2-S4 | Token | Token 计数与预算管理 |
+| D2-S5 | Registry | 操作注册表 |
+| D2-S6 | Snapshot | 上下文快照 |
+| D2-S7 | Prompt | Prompt 模板管理 |
+| D2-S8 | Sandbox | 工具沙箱隔离 |
 
-### L1-3 LLM Gateway Layer Modules
+### D3 LLM Gateway Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-3-L2-1 | Adapter | 模型适配器 (DeepSeek, MiniMax) |
-| L1-3-L2-2 | Gateway | LLM 路由与聚合 |
-| L1-3-L2-3 | Breaker | 熔断器 |
-| L1-3-L2-4 | Retry | 重试策略 |
-| L1-3-L2-5 | Token | Token 计数 |
-| L1-3-L2-6 | Config | 配置加载 |
+| D3-S1 | Adapter | 模型适配器 (DeepSeek, MiniMax) |
+| D3-S2 | Gateway | LLM 路由与聚合 |
+| D3-S3 | Breaker | 熔断器 |
+| D3-S4 | Retry | 重试策略 |
+| D3-S5 | Token | Token 计数 |
+| D3-S6 | Config | 配置加载 |
 
-### L1-4 Multi-Agent Layer Modules
+### D4 Multi-Agent Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-4-L2-1 | Factory | Agent 工厂 |
-| L1-4-L2-2 | Agent | Agent 生命周期管理 |
-| L1-4-L2-3 | Permission | 权限管道 |
-| L1-4-L2-4 | Fork | Agent Fork/Join |
-| L1-4-L2-5 | Observer | 事件观察者 |
+| D4-S1 | Factory | Agent 工厂 |
+| D4-S2 | Agent | Agent 生命周期管理 |
+| D4-S3 | Permission | 权限管道 |
+| D4-S4 | Fork | Agent Fork/Join |
+| D4-S5 | Observer | 事件观察者 |
 
-### L1-5 Observability Layer Modules
+### D5 Observability Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-5-L2-1 | Tracer | 分布式追踪 |
-| L1-5-L2-2 | Metrics | 指标收集 |
-| L1-5-L2-3 | Logger | 日志记录 |
-| L1-5-L2-4 | Exporter | 数据导出 |
-| L1-5-L2-5 | Coverage | 操作覆盖率 |
-| L1-5-L2-6 | Telemetry | 遥测数据 |
-| L1-5-L2-7 | Settings | 配置管理 |
+| D5-S1 | Tracer | 分布式追踪 |
+| D5-S2 | Metrics | 指标收集 |
+| D5-S3 | Logger | 日志记录 |
+| D5-S4 | Exporter | 数据导出 |
+| D5-S5 | Coverage | 操作覆盖率 |
+| D5-S6 | Telemetry | 遥测数据 |
+| D5-S7 | Settings | 配置管理 |
 
-### L1-6 Evolution Layer Modules
+### D6 Evolution Domain Scenarios
 
-| L2 ID | Module | Responsibility |
+| Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| L1-6-L2-1 | Version | 版本检测与记录 |
-| L1-6-L2-2 | Config | 配置热更新 |
+| D6-S1 | Version | 版本检测与记录 |
+| D6-S2 | Config | 配置热更新 |
 
 ---
 
@@ -151,40 +151,40 @@ devrix/
 │       └── main.go              # Entry point
 ├── internal/
 │   ├── layers/
-│   │   ├── communication/        # L1-1
-│   │   │   ├── gateway/        # L1-1-L2-1
-│   │   │   ├── adapters/       # L1-1-L2-2
-│   │   │   ├── commands/       # L1-1-L2-3
-│   │   │   ├── auth/          # L1-1-L2-4
-│   │   │   ├── milestone/     # L1-1-L2-5
-│   │   │   ├── ratelimit/     # L1-1-L2-6
-│   │   │   ├── metrics/       # L1-1-L2-7
-│   │   │   └── renderers/     # L1-1-L2-8
-│   │   ├── contextengine/     # L1-2
-│   │   │   ├── pev/           # L1-2-L2-1
-│   │   │   ├── compression/   # L1-2-L2-2
-│   │   │   ├── memory/        # L1-2-L2-3
-│   │   │   ├── token/         # L1-2-L2-4
-│   │   │   ├── registry/      # L1-2-L2-5
-│   │   │   ├── snapshot/      # L1-2-L2-6
-│   │   │   ├── prompt/        # L1-2-L2-7
-│   │   │   └── sandbox/       # L1-2-L2-8
-│   │   ├── llmgateway/        # L1-3
-│   │   │   ├── adapter/       # L1-3-L2-1
-│   │   │   ├── gateway/       # L1-3-L2-2
-│   │   │   ├── breaker/       # L1-3-L2-3
-│   │   │   ├── retry/         # L1-3-L2-4
-│   │   │   ├── token/         # L1-3-L2-5
-│   │   │   └── config/        # L1-3-L2-6
-│   │   ├── observability/     # L1-5
-│   │   │   ├── tracer/        # L1-5-L2-1
-│   │   │   ├── metrics/       # L1-5-L2-2
-│   │   │   ├── logger/        # L1-5-L2-3
-│   │   │   ├── exporter/      # L1-5-L2-4
-│   │   │   ├── coverage/      # L1-5-L2-5
-│   │   │   ├── telemetry/     # L1-5-L2-6
-│   │   │   └── settings/      # L1-5-L2-7
-│   │   └── multiagent/        # L1-4 (待实现)
+│   │   ├── communication/        # D1
+│   │   │   ├── gateway/        # D1-S1
+│   │   │   ├── adapters/       # D1-S2
+│   │   │   ├── commands/       # D1-S3
+│   │   │   ├── auth/          # D1-S4
+│   │   │   ├── milestone/     # D1-S5
+│   │   │   ├── ratelimit/     # D1-S6
+│   │   │   ├── metrics/       # D1-S7
+│   │   │   └── renderers/     # D1-S8
+│   │   ├── contextengine/     # D2
+│   │   │   ├── pev/           # D2-S1
+│   │   │   ├── compression/   # D2-S2
+│   │   │   ├── memory/        # D2-S3
+│   │   │   ├── token/         # D2-S4
+│   │   │   ├── registry/      # D2-S5
+│   │   │   ├── snapshot/      # D2-S6
+│   │   │   ├── prompt/        # D2-S7
+│   │   │   └── sandbox/       # D2-S8
+│   │   ├── llmgateway/        # D3
+│   │   │   ├── adapter/       # D3-S1
+│   │   │   ├── gateway/       # D3-S2
+│   │   │   ├── breaker/       # D3-S3
+│   │   │   ├── retry/         # D3-S4
+│   │   │   ├── token/         # D3-S5
+│   │   │   └── config/        # D3-S6
+│   │   ├── observability/     # D5
+│   │   │   ├── tracer/        # D5-S1
+│   │   │   ├── metrics/       # D5-S2
+│   │   │   ├── logger/        # D5-S3
+│   │   │   ├── exporter/      # D5-S4
+│   │   │   ├── coverage/      # D5-S5
+│   │   │   ├── telemetry/     # D5-S6
+│   │   │   └── settings/      # D5-S7
+│   │   └── multiagent/        # D4 (待实现)
 │   └── shared/
 │       ├── types/
 │       ├── config/
@@ -265,14 +265,14 @@ devrix/
 
 See `openspec/l5-registry.md` for full details.
 
-| L1 | Layer Name | Total | IMPLEMENTED | PLANNED |
+| Domain | Domain Name | Total | IMPLEMENTED | PLANNED |
 |----|------------|-------|-------------|---------|
-| L1-1 | Communication | 5 | 0 | 5 |
-| L1-2 | Context Engine | 21 | 16 | 5 |
-| L1-3 | LLM Gateway | 17 | 13 | 4 |
-| L1-4 | Multi-Agent | 8 | 0 | 8 |
-| L1-5 | Observability | 16 | 11 | 5 |
-| L1-6 | Evolution | 2 | 0 | 2 |
+| D1 | Communication | 5 | 0 | 5 |
+| D2 | Context Engine | 21 | 16 | 5 |
+| D3 | LLM Gateway | 17 | 13 | 4 |
+| D4 | Multi-Agent | 8 | 0 | 8 |
+| D5 | Observability | 16 | 11 | 5 |
+| D6 | Evolution | 2 | 0 | 2 |
 | **Total** | | **69** | **40** | **29** |
 
 ---
@@ -293,4 +293,4 @@ See `openspec/l5-registry.md` for full details.
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-06 | Initial project metadata |
-| 1.1.0 | 2026-06-08 | Updated to L1-L2 layering system |
+| 1.1.0 | 2026-06-08 | Updated to D-S domain system |

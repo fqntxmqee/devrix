@@ -6,9 +6,9 @@
 
 > L5 测试点是 OpenSpec S5 验收的确定性锚点。新增 L4/L3 能力时 MUST 先在此记录或复用现有 L5。
 >
-> **编号格式**: `L5-{L1}-{L2}-{NN}`
-> - L1 = 顶层层级 (1-6)
-> - L2 = 子模块编号 (1-8)
+> **编号格式**: `L5-{D}-{S}-{NN}`
+> - D = 域编号 Domain (1-6)
+> - S = 场景编号 Scenario (1-8)
 > - NN = 序号 (01-99)
 
 ---
@@ -17,54 +17,54 @@
 
 | 字段 | 说明 |
 |------|------|
-| ID | `L5-{L1}-{L2}-{NN}` |
+| ID | `L5-{D}-{S}-{NN}` |
 | Priority | P0（阻断交付）/ P1（需执行，失败记例外）/ P2（尽力） |
-| L2 映射 | 关联的 L2 模块 ID |
+| S 映射 | 关联的 Scenario 模块 ID |
 | Test 位置 | 测试文件路径 |
 | Status | PLANNED / IMPLEMENTED / DEPRECATED |
 
 ---
 
-## L1-1: Communication Layer
+## D1: Communication Domain (COMM)
 
-### L1-1-L2-1: Gateway Module
+### D1-S1: Gateway Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-1-1-01 | 新会话创建 CLI 会话入库被拒绝 | Gateway | `tests/integration/gateway_session_test.go` | PLANNED |
 
-### L1-1-L2-3: Commands Module
+### D1-S3: Commands Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-1-3-01 | /new 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
 | L5-1-3-02 | /help 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
 | L5-1-3-03 | /stop 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED |
 
-### L1-1-L2-8: Renderers Module
+### D1-S8: Renderers Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-1-8-01 | ShortId 唯一且排除异议字符 | Renderers | `internal/shared/types/shortid_test.go` | PLANNED |
 
-### L1-1-L2-2: Adapters Module
+### D1-S2: Adapters Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | PLANNED |
 
 ---
 
-## L1-2: Context Engine Layer
+## D2: Context Engine Domain (CTX)
 
 > V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
 > V2 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v2/`
 > V3 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v3/`
 > V4 已归档：`openspec/archive/2026-06-08-devrix-context-engine-v4/`
 
-### L1-2-L2-3: Memory Module
+### D2-S3: Memory Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-3-01 | 新会话历史正确追加 | Memory | `internal/layers/contextengine/memory/manager_test.go` | IMPLEMENTED |
 | L5-2-3-02 | ContextSnapshot 备份 | Memory | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
@@ -73,9 +73,9 @@
 | L5-2-3-05 | L3 长期记忆返回 NotImplemented | Memory | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
 | L5-2-3-06 | 快照使用 snappy 压缩体积显著缩减 | Memory | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
 
-### L1-2-L2-2: Compression Module
+### D2-S2: Compression Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-2-01 | 超 Token 阈值触发七步压缩 | Compression | `tests/acceptance/p0/ctx_compression_test.go` | IMPLEMENTED |
 | L5-2-2-02 | TokenBlock 超限返回 ContextExceeded | Compression | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
@@ -86,9 +86,9 @@
 | L5-2-2-07 | 异步压缩失败降级不丢失数据 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 | L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
 
-### L1-2-L2-1: PEV Module
+### D2-S1: PEV Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-1-01 | PEV Execute 调用 LLM 并流输出 | PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
 | L5-2-1-02 | 工具执行 Verify basic 模式 | PEV | `internal/layers/contextengine/verify_runner_test.go` | IMPLEMENTED |
@@ -103,19 +103,19 @@
 | L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
 | L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
 
-### L1-2-L2-4: Token Module
+### D2-S4: Token Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-4-01 | Token 计数共享约定与 Gateway 对齐 | Token | `tests/acceptance/p0/ctx_plan_longterm_test.go` | IMPLEMENTED |
 
-### L1-2-L2-8: Sandbox Module
+### D2-S8: Sandbox Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-8-01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/sandbox_test.go` | IMPLEMENTED |
 
-### L1-2: Cross-Module Tests
+### D2: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
@@ -125,19 +125,19 @@
 
 ---
 
-## L1-3: LLM Gateway Layer
+## D3: LLM Gateway Domain (LLM)
 
-### L1-3-L2-1: Adapter Module
+### D3-S1: Adapter Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-1-01 | DeepSeek 适配器流响应 | Adapter | `internal/layers/llmgateway/adapter/deepseek_test.go` | IMPLEMENTED |
 | L5-3-1-02 | MiniMax 适配器流响应 | Adapter | `internal/layers/llmgateway/adapter/minimax_test.go` | IMPLEMENTED |
 | L5-3-1-03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
 
-### L1-3-L2-3: Breaker Module
+### D3-S3: Breaker Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-3-01 | Circuit breaker 正常关闭 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
 | L5-3-3-02 | Circuit breaker 触发放开 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
@@ -145,31 +145,31 @@
 | L5-3-3-04 | Circuit breaker 半开→放开 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
 | L5-3-3-05 | 熔断器状态长久化 | Breaker | - | PLANNED |
 
-### L1-3-L2-5: Token Module
+### D3-S5: Token Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-5-01 | Token 计数准确性 (cl100k_base) | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-3-5-02 | Token 预算检查 | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 
-### L1-3-L2-6: Config Module
+### D3-S6: Config Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-6-01 | Provider 配置加载 | Config | `internal/layers/llmgateway/config/loader_test.go` | IMPLEMENTED |
 
-### L1-3-L2-4: Retry Module
+### D3-S4: Retry Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-4-01 | 重试策略执行 | Retry | `internal/layers/llmgateway/retry/retry_test.go` | IMPLEMENTED |
 | L5-3-4-02 | DeepSeek Fallback 模型切换 | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
 | L5-3-4-03 | MiniMax Fallback 模型切换 | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
 
-### L1-3-L2-2: Gateway Module
+### D3-S2: Gateway Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-3-2-01 | LLM 调用可观测事件 | Gateway | `tests/integration/llm_observer_test.go` | IMPLEMENTED |
 | L5-3-2-02 | 未知 Provider/Model 报错 | Gateway | `internal/layers/llmgateway/gateway/router_test.go` | IMPLEMENTED |
@@ -180,47 +180,47 @@
 
 ---
 
-## L1-4: Multi-Agent Layer
+## D4: Multi-Agent Domain (AGENT)
 
 > 已归档：`openspec/archive/2026-06-08-devrix-multi-agent/`（Demand: DM-20260608-005）
 
-### L1-4-L2-1: Factory Module
+### D4-S1: Factory Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-4-1-01 | AgentFactory 创建 Agent 实例 | Factory | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
 
-### L1-4-L2-2: Agent Module
+### D4-S2: Agent Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-4-2-01 | Agent 生命周期状态转换 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-2-02 | AgentPermissionGate 批准/拒绝/超时 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
 | L5-4-2-03 | CRITICAL 工具权限异步流程 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
 
-### L1-4-L2-3: ForkJoin Module
+### D4-S3: ForkJoin Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-4-3-01 | Fork/Join 消息隔离模型 | ForkJoin | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-3-02 | Fork 双层限额 MaxChildren+MaxTotalAgents | ForkJoin | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
 | L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 
-### L1-4-L2-4: Collaboration Module
+### D4-S4: Collaboration Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-4-4-01 | CoT prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
 | L5-4-4-02 | Iterative-Refinement prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
 
-### L1-4-L2-5: Observer Module
+### D4-S5: Observer Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | IMPLEMENTED |
 
-### L1-4: Cross-Module Tests
+### D4: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
@@ -231,11 +231,11 @@
 
 ---
 
-## L1-5: Observability Layer
+## D5: Observability Domain (OBS)
 
-### L1-5-L2-2: Metrics Module
+### D5-S2: Metrics Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-2-01 | Tracing Span 创建与传播 | Metrics | - | PLANNED |
 | L5-5-2-02 | Metrics Counter 计数 | Metrics | - | PLANNED |
@@ -245,38 +245,38 @@
 | L5-5-2-06 | Compression P99 latency < 500ms | Metrics | `tests/performance/compression_test.go` | IMPLEMENTED |
 | L5-5-2-07 | Concurrent session memory bounded | Metrics | `tests/performance/memory_test.go` | IMPLEMENTED |
 
-### L1-5-L2-3: Logger Module
+### D5-S3: Logger Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-3-01 | 日志级别过滤 | Logger | - | PLANNED |
 | L5-5-3-02 | Shutdown 覆盖 Tracer + Logger | Logger | `internal/layers/observability/logger/logger_test.go` | IMPLEMENTED |
 | L5-5-3-03 | Error 日志包含 stacktrace 字段 | Logger | `internal/layers/observability/logger/logger_test.go` | IMPLEMENTED |
 | L5-5-3-04 | 日志采样 max_entries_per_span 生效 | Logger | `internal/layers/observability/logger/sampling_test.go` | IMPLEMENTED |
 
-### L1-5-L2-1: Tracer Module
+### D5-S1: Tracer Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-1-01 | Shutdown 刷写所有 pending spans | Tracer | `internal/layers/observability/tracer/tracer_test.go` | IMPLEMENTED |
 | L5-5-1-02 | ConsoleExporter 可直接作为 SpanExporter | Tracer | `internal/layers/observability/exporter/console_test.go` | IMPLEMENTED |
 
-### L1-5-L2-4: Exporter Module
+### D5-S4: Exporter Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-4-01 | LongTerm recall/store 产生 canonical Operation span | Exporter | `internal/layers/contextengine/engine.go` | IMPLEMENTED |
 | L5-5-4-02 | Plan 产生 Milestone Run 产生 canonical Operation span | Exporter | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED |
 | L5-5-4-03 | Feishu 入站产生 adapter.message.receive span | Exporter | `tests/integration/obs_trace_propagation_test.go` | IMPLEMENTED |
 
-### L1-5-L2-5: Coverage Module
+### D5-S5: Coverage Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-5-01 | Operation Registry 与 names.go 常驻全集一致 | Coverage | `internal/layers/observability/coverage/registry_test.go` | IMPLEMENTED |
 | L5-5-5-02 | Coverage 报告正确列出 zero_hit operations | Coverage | `tests/integration/obs_coverage_test.go` | IMPLEMENTED |
 
-### L1-5: Cross-Module Tests
+### D5: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
@@ -284,17 +284,17 @@
 
 ---
 
-## L1-6: Evolution Layer
+## D6: Evolution Domain (EVO)
 
-### L1-6-L2-1: Version Module
+### D6-S1: Version Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-6-1-01 | 版本检测与记录 | Version | - | PLANNED |
 
-### L1-6-L2-2: Config Module
+### D6-S2: Config Module
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-6-2-01 | 配置热更新 | Config | - | PLANNED |
 
@@ -302,14 +302,14 @@
 
 ## 状态汇总
 
-| L1 | Layer Name | Total | IMPLEMENTED | PLANNED |
+| Domain | Domain Name | Total | IMPLEMENTED | PLANNED |
 |----|------------|-------|-------------|---------|
-| L1-1 | Communication | 5 | 0 | 5 |
-| L1-2 | Context Engine | 21 | 16 | 5 |
-| L1-3 | LLM Gateway | 17 | 13 | 4 |
-| L1-4 | Multi-Agent | 15 | 15 | 0 |
-| L1-5 | Observability | 16 | 11 | 5 |
-| L1-6 | Evolution | 2 | 0 | 2 |
+| D1 | Communication | 5 | 0 | 5 |
+| D2 | Context Engine | 21 | 16 | 5 |
+| D3 | LLM Gateway | 17 | 13 | 4 |
+| D4 | Multi-Agent | 15 | 15 | 0 |
+| D5 | Observability | 16 | 11 | 5 |
+| D6 | Evolution | 2 | 0 | 2 |
 | **Total** | | **76** | **47** | **27** |
 
 ---
@@ -318,4 +318,5 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-06-08 | Complete rewrite with L1-L2 numbering system |
+| 1.0.0 | 2026-06-08 | Complete rewrite with D-S numbering system |
+| 1.1.0 | 2026-06-08 | Section headers migrated L1-L2 → D-S (DM-20260608-007) |

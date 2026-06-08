@@ -1,4 +1,4 @@
-# Delta: Observability Layer (Layer 5)
+# Delta: Domain D5 (OBS)
 
 **Change ID:** devrix-foundation
 **Affects:** observability, tracing, metrics, logging

@@ -1,4 +1,4 @@
-# Delta: Communication Layer (Layer 1)
+# Delta: Domain D1 (COMM)
 
 **Change ID:** devrix-foundation
 **Affects:** communication layer, session management, CLI adapter

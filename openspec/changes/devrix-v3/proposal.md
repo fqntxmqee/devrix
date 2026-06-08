@@ -1,7 +1,7 @@
 # Proposal: Communication Layer V3 - Feature Completion
 
 **Change ID:** devrix-v3
-**Layer:** 1 - Communication
+**Domain:** D1 - Communication (COMM)
 **Type:** Enhancement
 **Status:** In Progress (Partial — 见 STATUS.md)
 **Based on:** devrix-v2 (V2)

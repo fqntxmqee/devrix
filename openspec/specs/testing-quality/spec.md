@@ -26,13 +26,13 @@
 
 ### 1. Boundary Condition Test Gaps
 
-| L1-L2 | Module | Missing Tests |
+| D-S | Module | Missing Tests |
 |--------|--------|---------------|
-| L1-2-L2-1 | PEV | timeout, shell injection, concurrent isolation |
-| L1-2-L2-2 | Compression | autocompact timeout fallback |
-| L1-2-L2-3 | Memory | longterm failure handling |
-| L1-3-L2-1 | Adapter | SSE parse errors |
-| L1-3-L2-2 | Gateway | 429 rate limit, network timeout |
+| D2-S1 | PEV | timeout, shell injection, concurrent isolation |
+| D2-S2 | Compression | autocompact timeout fallback |
+| D2-S3 | Memory | longterm failure handling |
+| D3-S1 | Adapter | SSE parse errors |
+| D3-S2 | Gateway | 429 rate limit, network timeout |
 
 ### 2. Mock Overuse Issues
 
@@ -52,7 +52,7 @@
 
 ## ADDED Requirements
 
-### Requirement: L1-2-L2-1 PEV Boundary Testing
+### Requirement: D2-S1 PEV Boundary Testing
 
 **Priority**: P0
 
@@ -78,7 +78,7 @@
 
 ---
 
-### Requirement: L1-2-L2-1 PEV Concurrent Safety
+### Requirement: D2-S1 PEV Concurrent Safety
 
 **Priority**: P0
 
@@ -98,7 +98,7 @@
 
 ---
 
-### Requirement: L1-2-L2-2 Compression Fallback
+### Requirement: D2-S2 Compression Fallback
 
 **Priority**: P0
 
@@ -112,7 +112,7 @@
 
 ---
 
-### Requirement: L1-3-L2-1 Adapter Real API Testing
+### Requirement: D3-S1 Adapter Real API Testing
 
 **Priority**: P1
 
@@ -131,7 +131,7 @@
 
 ---
 
-### Requirement: L1-3-L2-2 Gateway Rate Limit
+### Requirement: D3-S2 Gateway Rate Limit
 
 **Priority**: P1
 
@@ -171,7 +171,7 @@
 
 ## L5 Test Points Registry
 
-### L1-2 Context Engine Extensions
+### D2 Context Engine Extensions
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
@@ -181,7 +181,7 @@
 | L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
 | L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
 
-### L1-3 LLM Gateway Extensions
+### D3 LLM Gateway Extensions
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
@@ -189,7 +189,7 @@
 | L5-3-2-06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | PLANNED |
 | L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
 
-### L1-5 Observability Extensions
+### D5 Observability Extensions
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
@@ -249,4 +249,4 @@ tests/
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-06-08 | Initial proposal with L1-L2 numbering |
+| 1.0.0 | 2026-06-08 | Initial proposal with D-S numbering |

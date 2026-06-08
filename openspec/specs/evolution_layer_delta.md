@@ -1,4 +1,4 @@
-# Delta: Evolution Layer (Layer 6)
+# Delta: Domain D6 (EVO)
 
 **Change ID:** devrix-foundation
 **Affects:** evolution layer, version management, feedback loop, A/B testing

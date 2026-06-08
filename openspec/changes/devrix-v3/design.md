@@ -1,7 +1,7 @@
 # Communication Layer V3 Design - Feature Completion
 
 **Change ID:** devrix-v3
-**Layer:** 1 - Communication
+**Domain:** D1 - Communication (COMM)
 **Status:** Draft
 **Version:** 3.0
 

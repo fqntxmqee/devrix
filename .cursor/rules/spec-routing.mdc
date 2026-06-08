@@ -1,0 +1,35 @@
+---
+alwaysApply: true
+description: Devrix 项目规范路由 — 根据当前开发阶段自动确定应遵守的规范
+---
+
+# Devrix 项目规范
+
+多智能体协作开发助手。6 域架构（D1 通信 → D6 演化），OpenSpec S1-S6 驱动开发。
+
+## 阶段→规范路由
+
+执行任何开发任务前，确定当前阶段，然后加载 `openspec/specs/project/` 下对应规范：
+
+| 阶段 | 加载规范 | 门禁 |
+|------|---------|------|
+| S1 需求 | `requirements.md` | DM ID 合法 |
+| S2 提案 | `requirements.md` + `architecture-design.md` | 文件完整性 |
+| S3 设计 | `architecture-design.md` | — |
+| **S3-Gate** | **`review-design.md`** | 设计审查 |
+| S4 实现 | `coding.md` + `testing.md` | go vet + test-unit |
+| **S4-Gate** | **`review-code.md`** | 代码审查 |
+| S5 验收 | `testing.md` | P0 L5 100% + 覆盖率 ≥ 80% |
+| S6 归档 | `archiving.md` | 归档检查清单 |
+
+权威入口：`openspec/specs/project/master.md`
+
+## 关键规则速查
+
+- 错误: `internal/shared/errors/` SentinelError 模式，禁止 panic
+- 配置: `devrix.yaml` → `config.yaml` → 环境变量 → CLI flags
+- 不可变: 创建新对象，禁止原地修改
+- 文件: 函数 < 50 行，文件 < 800 行
+- Git: GitHub Flow，`feat/<change-id>`，squash merge
+- L5: `L5-{D}-{S}-{NN}`，注册在 `openspec/l5-registry.md`
+- 归档: `openspec/archive/<YYYY-MM-DD>-<change-id>/`

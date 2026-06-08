@@ -1,0 +1,63 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-d-layer-rename
+  demand_id: DM-20260608-007
+  title: "架构分层命名从 L1-X 迁移至 D1-D6"
+  status: s5_accepted
+  priority: P1
+  owner: architecture
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+  completed_at: "2026-06-08"
+
+scope:
+  layers:
+    - id: META
+      name: 架构元数据
+      affected: true
+    - id: D1-D6
+      name: 全部 6 个领域
+      affected: true
+
+  capabilities:
+    - ARCH-NAMING   # 架构分层命名标准
+
+  l5_test_points: []  # 纯文档重构，无 L5 变更
+
+deliverables:
+  - path: demand.md
+    status: completed
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: acceptance-report.md
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - 架构分层从 L1-X 重命名为 D1-D6
+      - L2 重命名为 S（子模块→场景）
+      - layering.md 重写，合并 4 个冗余文档
+      - project.md 更新域/场景表
+      - l5-registry.md 更新节标题
+      - 项目规范（specs/project/）更新
+      - 入口文件（AGENTS/CLAUDE/GEMINI/Cursor）更新
+      - 层级增量文件标题更新
+    status: s5_accepted
+    tasks: T1-T6
+    estimate: 4h
+
+related_changes:
+  - devrix-layering-standard   # 搁置的 D-S-A-F-T 方案，本次仅落地 D 层
+
+notes: |
+  当前架构分层使用 L1-X / L1-X-L2-Y 编号，语义不直观（L1 和 L1-1 关系模糊）。
+  改为 D1-D6 域编号，对齐 D-S-A-F-T 中的 D（Domain）层，但不引入完整的五层 ID。
+  L5 ID 字符串保持不变（L5-2-3-01 无变化），仅语义解释从"第2层第3子模块"改为"域2场景3"。
+  Go 源码和配置文件不受影响（internal/ 中无任何 L1- 引用）。

@@ -1,7 +1,7 @@
 # Communication Layer V3 Tasks
 
 **Change ID:** devrix-v3
-**Layer:** 1 - Communication
+**Domain:** D1 - Communication (COMM)
 **Status:** Draft
 **Version:** 3.0
 **Based on:** delta.md, devrix-v2 design

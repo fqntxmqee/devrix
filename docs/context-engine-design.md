@@ -494,7 +494,7 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 
 并发：单 Session 由 Gateway 串行 RouteInbound；ContextEngine 内 `SessionContext` 使用 per-session mutex。
 
-### 6.7 L1-L2 集成契约
+### 6.7 D-S 集成契约
 
 | 契约 | 责任方 | 说明 |
 |------|--------|------|
@@ -514,7 +514,7 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 | ④ 领域模型 | design.md §二 | L5-CTX-01, 02 |
 | ⑤ 链路 | design.md §三 Process | L5-CTX-03, 04 |
 | ⑥ 接口 | spec.md Gateway Contract | L5-CTX-09, 11 |
-| L1-L2 集成 | design.md §3.4 | L5-CTX-11 |
+| D-S 集成 | design.md §3.4 | L5-CTX-11 |
 | 压缩 | spec.md Compression | L5-CTX-03, 04, 08 |
 | PEV | spec.md PEV | L5-CTX-06, 07 |
 

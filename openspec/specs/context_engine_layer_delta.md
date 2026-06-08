@@ -1,4 +1,4 @@
-# Delta: Context Engine Layer (Layer 2)
+# Delta: Domain D2 (CTX)
 
 **Change ID:** devrix-foundation (initial) → **devrix-context-engine** (archived 2026-06-07) → **devrix-context-engine-v2** (archived 2026-06-07)
 **Canonical spec:** `openspec/specs/context-engine/spec.md` (v2.0.0)
