@@ -321,7 +321,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				risk = e.toolsReg.RiskLevel(tc.Name)
 			}
 			emit(&gateway.EngineEvent{
-				Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, SessionID: sc.SessionID,
+				Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, ToolRisk: risk,
+				SessionID: sc.SessionID,
 				Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input, "risk_level": string(risk)},
 			})
 

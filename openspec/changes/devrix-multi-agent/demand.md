@@ -1,9 +1,9 @@
 ---
-demand-id: DM-20260608-001
+demand-id: DM-20260608-005
 title: "Multi-Agent Layer V1 — 生命周期 + Fork/Join + 协作模式"
 source: docs/multi-agent-design.md
 priority: P0
-status: S2_DESIGN
+status: S4_DEVELOPMENT
 l1-domain: multi-agent
 created: 2026-06-08
 ---
@@ -12,7 +12,7 @@ created: 2026-06-08
 
 ## 1. 原始描述
 
-实现 Layer 4 Multi-Agent 层：Agent 生命周期状态机、Factory 创建、Fork/Join 并行子任务（V1 简化版，共享 `*SessionContext` 指针）、协作模式 prompt 增强（CoT / Iterative-Refinement / Default）、Observer 事件桥接、权限委托 `gateway.PermissionManager`，并接入 CommunicationGateway bootstrap。
+实现 Layer 4 Multi-Agent 层：Agent 生命周期状态机、Factory 创建、Fork/Join（消息隔离 + Join 合并）、协作模式 prompt 增强、AgentPermissionGate 异步权限、Observer 桥接，并接入 CommunicationGateway bootstrap。
 
 ## 2. 澄清记录
 
@@ -20,13 +20,13 @@ created: 2026-06-08
 
 **A**: 委托 PEVEngine（`IContextEngine.Process()`）。Agent 是协调者，不持有 LLM/ToolRunner。 — 2026-06-08
 
-### Q2: SessionContext vs Session？
+### Q2: Fork 消息如何共享？
 
-**A**: Fork 时共享 `*types.SessionContext` 指针（与 `gateway.IContextEngine.Process` 契约一致），V1 不实现 COW，使用 `sync.RWMutex` 保护并发写。 — 2026-06-08
+**A**: Grill 决策：子 Agent 使用独立消息缓冲区（`GetMessages()`），Join 时合并到父 Agent；Session 元信息共享 `*types.Session`，避免并发写 SessionContext。 — 2026-06-08
 
-### Q3: Tool Registry / Permission Pipeline 自建还是复用？
+### Q3: 权限模型？
 
-**A**: 全部复用。Tool Registry → `contextengine/registry`；Permission → `gateway.PermissionManager`。不在 L4 新建。 — 2026-06-08
+**A**: Agent 实现 `contextengine.IPermissionGate`（AgentPermissionGate），CRITICAL 工具通过 channel 阻塞，Gateway 调用 `ResolvePermission()` 注入用户响应；非 CRITICAL 自动批准。 — 2026-06-08
 
 ### Q4: V1 范围？
 

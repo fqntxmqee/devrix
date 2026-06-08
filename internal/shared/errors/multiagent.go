@@ -16,6 +16,7 @@ var (
 	ErrAgentPermissionTimeout = errors.New("agent permission timeout")
 	ErrAgentPermissionDenied  = errors.New("agent permission denied")
 	ErrAgentContextCancelled  = errors.New("agent context cancelled")
+	ErrAgentMaxTotal          = errors.New("agent max total exceeded")
 )
 
 const (
@@ -28,6 +29,7 @@ const (
 	CodeAgentPermissionTimeout = "AGT_PERMISSION_5007"
 	CodeAgentPermissionDenied  = "AGT_PERMISSION_5008"
 	CodeAgentContextCancelled  = "AGT_CONTEXT_5009"
+	CodeAgentMaxTotal          = "AGT_FACTORY_5010"
 )
 
 // NewAgentInvalidTransitionError returns an invalid state transition error.
@@ -82,4 +84,10 @@ func NewAgentPermissionDeniedError(toolName string) *SentinelError {
 func NewAgentContextCancelledError(agentID string) *SentinelError {
 	return WithCode(CodeAgentContextCancelled,
 		fmt.Sprintf("Agent %s 上下文已取消", agentID), ErrAgentContextCancelled)
+}
+
+// NewAgentMaxTotalError returns a max total agents exceeded error.
+func NewAgentMaxTotalError(current, max int) *SentinelError {
+	return WithCode(CodeAgentMaxTotal,
+		fmt.Sprintf("Session Agent 总数超限: 当前 %d, 最大 %d", current, max), ErrAgentMaxTotal)
 }

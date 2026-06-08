@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -59,15 +59,16 @@ const (
 
 // AgentConfig holds creation-time settings.
 type AgentConfig struct {
-	SessionID    string
-	WorkDir      string
-	Mode         CollaborationMode
-	MaxIter      int
-	MaxChildren  int
-	Timeout      time.Duration
-	SystemPrompt string
-	ParentID     string
-	InitialInput string
+	SessionID         string
+	WorkDir           string
+	Mode              CollaborationMode
+	MaxIter           int
+	MaxChildren       int
+	Timeout           time.Duration
+	PermissionTimeout time.Duration
+	SystemPrompt      string
+	ParentID          string
+	InitialInput      string
 }
 
 // AgentResult is produced when an agent terminates.
@@ -80,8 +81,7 @@ type AgentResult struct {
 
 // AgentDeps are injected dependencies for agent construction.
 type AgentDeps struct {
-	Engine        gateway.IContextEngine
-	PermissionMgr *gateway.PermissionManager
+	Engine        contracts.IEngine
 	Observer      contextengine.IObserver
 	AgentObserver AgentObserver
 }
@@ -118,4 +118,6 @@ type Agent interface {
 	Join(ctx context.Context, child Agent) error
 	Terminate(ctx context.Context) error
 	Wait(ctx context.Context) (*AgentResult, error)
+	ResolvePermission(toolName string, granted bool)
+	GetMessages() []types.Message
 }

@@ -10,6 +10,9 @@ func TestBuildMultiAgentConfig_should_apply_defaults(t *testing.T) {
 	if cfg.MaxChildren != 3 {
 		t.Fatalf("MaxChildren = %d, want 3", cfg.MaxChildren)
 	}
+	if cfg.MaxTotalAgents != 5 {
+		t.Fatalf("MaxTotalAgents = %d, want 5", cfg.MaxTotalAgents)
+	}
 	if cfg.DefaultTimeout != 5*time.Minute {
 		t.Fatalf("DefaultTimeout = %v, want 5m", cfg.DefaultTimeout)
 	}

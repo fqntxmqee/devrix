@@ -182,41 +182,52 @@
 
 ## L1-4: Multi-Agent Layer
 
+> Change: `devrix-multi-agent`（Demand: DM-20260608-005）
+
 ### L1-4-L2-1: Factory Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-1-01 | AgentFactory 创建 Agent 实例 | Factory | `multiagent/factory/factory_test.go` | PLANNED |
+| L5-4-1-01 | AgentFactory 创建 Agent 实例 | Factory | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
 
 ### L1-4-L2-2: Agent Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-2-01 | Agent 生命周期状态转换 | Agent | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-2-02 | Fork/Join 并发 | Agent | `multiagent/agent/agent_test.go` | PLANNED |
-| L5-4-2-03 | Agent 并发安全 (-race 检测无 race) | Agent | `multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-2-01 | Agent 生命周期状态转换 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-2-02 | AgentPermissionGate 批准/拒绝/超时 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
+| L5-4-2-03 | CRITICAL 工具权限异步流程 | Agent | `internal/layers/multiagent/agent/perm_gate_test.go` | IMPLEMENTED |
 
-### L1-4-L2-3: Permission Module
+### L1-4-L2-3: ForkJoin Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-3-01 | 工具注册与风险等级 | Permission | - | PLANNED |
-| L5-4-3-02 | Permission Pipeline 授权流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-3-03 | CRITICAL 触发审计授权流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-3-04 | PermissionManager 集中用户批准/拒绝超时全流程 | Permission | `tests/integration/agent_integration_test.go` | PLANNED |
+| L5-4-3-01 | Fork/Join 消息隔离模型 | ForkJoin | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-3-02 | Fork 双层限额 MaxChildren+MaxTotalAgents | ForkJoin | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
+| L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
+
+### L1-4-L2-4: Collaboration Module
+
+| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-4-4-01 | CoT prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
+| L5-4-4-02 | Iterative-Refinement prompt 增强 | Collaboration | `internal/layers/multiagent/collaboration/mode_test.go` | IMPLEMENTED |
 
 ### L1-4-L2-5: Observer Module
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-5-01 | ObserverAdapter 正确桥接 Agent 事件到 IObserver | Observer | `multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | PLANNED |
 
 ### L1-4: Cross-Module Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
-| L5-4-0-01 | Fork 数超限消息传播到父 Fork+Join 无 race | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-0-02 | E2E: 用户指令触发 Agent Fork 并行结果 | `tests/e2e/agent_fork_e2e_test.go` | PLANNED |
+| L5-4-0-01 | Agent 并发安全 (-race) | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-0-02 | Fork 消息隔离并发安全 | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-0-03 | Gateway → ResolvePermission 集成全流程 | `tests/integration/agent_integration_test.go` | PLANNED |
+| L5-4-0-04 | E2E Fork 端到端 | `tests/e2e/agent_fork_e2e_test.go` | PLANNED |
 
 ---
 

@@ -1,8 +1,8 @@
 # Proposal: Multi-Agent Layer V1
 
 **Change ID:** devrix-multi-agent
-**Demand ID:** DM-20260608-001
-**Status:** S2 Design
+**Demand ID:** DM-20260608-005
+**Status:** S4 Development
 **Version:** 1.0.0
 
 ---

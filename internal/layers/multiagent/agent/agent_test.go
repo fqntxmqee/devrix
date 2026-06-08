@@ -7,17 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
 	"github.com/devrix/devrix/internal/layers/multiagent/factory"
 	"github.com/devrix/devrix/internal/layers/multiagent/observer"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-func newTestFactory(engine gateway.IContextEngine) *factory.AgentFactory {
+func newTestFactory(engine contracts.IEngine) *factory.AgentFactory {
 	return factory.NewAgentFactory(multiagent.AgentDeps{
 		Engine:        engine,
 		AgentObserver: observer.NoOpAgentObserver{},
@@ -27,7 +27,7 @@ func newTestFactory(engine gateway.IContextEngine) *factory.AgentFactory {
 // Covers: L5-4-2-01
 func TestAgent_should_transition_created_to_terminated_on_run(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{
-		Events: []*gateway.EngineEvent{
+		Events: []*contracts.EngineEvent{
 			{Type: "text", Content: "hello", Metadata: map[string]string{"is_complete": "true"}},
 			{Type: "complete", Content: "done"},
 		},
@@ -52,10 +52,13 @@ func TestAgent_should_transition_created_to_terminated_on_run(t *testing.T) {
 	if result.ExitCode != 0 {
 		t.Fatalf("ExitCode = %d, want 0", result.ExitCode)
 	}
+	if len(ag.GetMessages()) == 0 {
+		t.Fatal("expected isolated message buffer to capture assistant output")
+	}
 }
 
 func TestAgent_should_reject_run_when_already_terminated(t *testing.T) {
-	f := newTestFactory(&agent.StubEngine{Events: []*gateway.EngineEvent{{Type: "complete"}}})
+	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	session := types.NewSession("sess_twice", "cli", "/tmp")
 	ag, _ := f.Create(context.Background(), multiagent.AgentConfig{
 		SessionID: session.SessionID,
@@ -69,10 +72,10 @@ func TestAgent_should_reject_run_when_already_terminated(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-2-02, L5-4-0-01
-func TestAgent_should_fork_join_and_enforce_max_children(t *testing.T) {
+// Covers: L5-4-3-01, L5-4-0-01, L5-4-0-02
+func TestAgent_should_fork_join_with_isolated_buffers(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{
-		Events: []*gateway.EngineEvent{{Type: "complete", Content: "child-done"}},
+		Events: []*contracts.EngineEvent{{Type: "complete", Content: "child-done"}},
 	})
 	session := types.NewSession("sess_fork", "cli", "/tmp")
 	parent, err := f.Create(context.Background(), multiagent.AgentConfig{
@@ -111,18 +114,16 @@ func TestAgent_should_fork_join_and_enforce_max_children(t *testing.T) {
 	if err := parent.Join(context.Background(), child1); err != nil {
 		t.Fatalf("Join child1: %v", err)
 	}
-	if child2.State() != multiagent.AgentStateTerminated {
-		t.Fatalf("child2 state = %s, want TERMINATED", child2.State())
-	}
 	if err := parent.Join(context.Background(), child2); err != nil {
 		t.Fatalf("Join child2: %v", err)
+	}
+	if len(parent.GetMessages()) == 0 {
+		t.Fatal("parent should have merged child messages")
 	}
 }
 
 func TestAgent_should_reject_join_before_child_completes(t *testing.T) {
-	f := newTestFactory(&agent.StubEngine{
-		Events: []*gateway.EngineEvent{{Type: "complete"}},
-	})
+	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	session := types.NewSession("sess_join_early", "cli", "/tmp")
 	parent, _ := f.Create(context.Background(), multiagent.AgentConfig{
 		SessionID: session.SessionID,
@@ -174,8 +175,8 @@ type blockingEngine struct {
 	block chan struct{}
 }
 
-func (b *blockingEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *gateway.EngineEvent {
-	ch := make(chan *gateway.EngineEvent)
+func (b *blockingEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
+	ch := make(chan *contracts.EngineEvent)
 	go func() {
 		defer close(ch)
 		select {

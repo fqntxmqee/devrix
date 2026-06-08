@@ -3,6 +3,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -15,8 +16,10 @@ import (
 
 // AgentFactory creates multi-agent instances.
 type AgentFactory struct {
-	deps multiagent.AgentDeps
-	cfg  *sharedconfig.MultiAgentConfig
+	deps          multiagent.AgentDeps
+	cfg           *sharedconfig.MultiAgentConfig
+	sessionCounts map[string]int
+	mu            sync.Mutex
 }
 
 var _ multiagent.IAgentFactory = (*AgentFactory)(nil)
@@ -26,7 +29,11 @@ func NewAgentFactory(deps multiagent.AgentDeps, cfg *sharedconfig.MultiAgentConf
 	if cfg == nil {
 		cfg = sharedconfig.DefaultMultiAgentConfig()
 	}
-	return &AgentFactory{deps: deps, cfg: cfg}
+	return &AgentFactory{
+		deps:          deps,
+		cfg:           cfg,
+		sessionCounts: make(map[string]int),
+	}
 }
 
 // Create implements multiagent.IAgentFactory.
@@ -44,8 +51,31 @@ func (f *AgentFactory) Create(
 	if session == nil {
 		return nil, sharederrors.NewAgentInvalidConfigError("session is nil")
 	}
+	if err := f.reserveSessionSlot(cfg.SessionID); err != nil {
+		return nil, err
+	}
 	resolved := resolveConfig(cfg, f.cfg)
 	return agent.New(resolved, session, f.deps, f), nil
+}
+
+// ReleaseSession decrements the session agent quota when an agent terminates.
+func (f *AgentFactory) ReleaseSession(sessionID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.sessionCounts[sessionID] > 0 {
+		f.sessionCounts[sessionID]--
+	}
+}
+
+func (f *AgentFactory) reserveSessionSlot(sessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	current := f.sessionCounts[sessionID]
+	if current >= f.cfg.MaxTotalAgents {
+		return sharederrors.NewAgentMaxTotalError(current, f.cfg.MaxTotalAgents)
+	}
+	f.sessionCounts[sessionID]++
+	return nil
 }
 
 func validateConfig(cfg multiagent.AgentConfig, defaults *sharedconfig.MultiAgentConfig) error {
@@ -64,9 +94,9 @@ func validateConfig(cfg multiagent.AgentConfig, defaults *sharedconfig.MultiAgen
 	if maxChildren <= 0 {
 		maxChildren = defaults.MaxChildren
 	}
-	if maxChildren <= 0 || maxChildren > 10 {
+	if maxChildren < 0 || maxChildren > 10 {
 		return sharederrors.NewAgentInvalidConfigError(
-			fmt.Sprintf("max_children must be 1..10, got %d", maxChildren),
+			fmt.Sprintf("max_children must be 0..10, got %d", maxChildren),
 		)
 	}
 	if cfg.MaxIter < 0 {
@@ -95,6 +125,9 @@ func resolveConfig(cfg multiagent.AgentConfig, defaults *sharedconfig.MultiAgent
 	if out.Timeout <= 0 {
 		out.Timeout = defaults.DefaultTimeout
 	}
+	if out.PermissionTimeout <= 0 {
+		out.PermissionTimeout = defaults.PermissionTimeout
+	}
 	if out.SystemPrompt != "" {
 		out.SystemPrompt = collaboration.BuildPromptForMode(out.Mode, out.SystemPrompt)
 	}
@@ -112,4 +145,11 @@ func (f *AgentFactory) DefaultTimeout() time.Duration {
 		return 5 * time.Minute
 	}
 	return f.cfg.DefaultTimeout
+}
+
+// SessionAgentCount returns active agents for a session (testing helper).
+func (f *AgentFactory) SessionAgentCount(sessionID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sessionCounts[sessionID]
 }

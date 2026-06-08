@@ -3,9 +3,9 @@ kind: change
 
 meta:
   change_id: devrix-multi-agent
-  demand_id: DM-20260608-001
+  demand_id: DM-20260608-005
   title: "Multi-Agent Layer V1 — Agent 生命周期、Fork/Join、Collaboration Modes"
-  status: s2_design
+  status: s4_development
   priority: P0
   owner: devrix-team
   created_at: "2026-06-08"
@@ -45,18 +45,18 @@ scope:
   l5_test_points:
     - L5-4-1-01  # AgentFactory 创建 Agent 实例
     - L5-4-2-01  # Agent 生命周期状态转换
-    - L5-4-2-02  # 工具风险等级映射，CRITICAL 触发权限
-    - L5-4-2-03  # 权限管线授权/拒绝/超时流程
-    - L5-4-3-01  # Fork/Join 子 Agent 创建+并行+合并
-    - L5-4-3-02  # Fork 数超限 MaxChildren 拒绝
+    - L5-4-2-02  # AgentPermissionGate 批准/拒绝/超时
+    - L5-4-2-03  # CRITICAL 工具权限异步流程
+    - L5-4-3-01  # Fork/Join 消息隔离模型
+    - L5-4-3-02  # Fork 双层限额（MaxChildren+MaxTotalAgents）
     - L5-4-3-03  # Agent 超时自动终止
     - L5-4-3-04  # Context 取消传播到子 Agent
     - L5-4-4-01  # CoT prompt 增强
     - L5-4-4-02  # Iterative-Refinement prompt 增强
     - L5-4-5-01  # ObserverAdapter 桥接 AgentEvent → IObserver
     - L5-4-0-01  # Agent 并发安全 (-race)
-    - L5-4-0-02  # SessionContext 共享写入安全
-    - L5-4-0-03  # PermissionManager 集成全流程
+    - L5-4-0-02  # Fork 消息隔离并发安全
+    - L5-4-0-03  # Gateway → Agent.ResolvePermission 集成全流程
     - L5-4-0-04  # E2E Fork 端到端
 
 deliverables:
@@ -101,12 +101,12 @@ version_scope:
   v1.0:
     features:
       - "Agent 生命周期状态机 (CREATED→RUNNING→ITERATING→WAITING_PERMISSION→TERMINATED)"
-      - "Fork/Join 子 Agent (V1 简化版，同步 Wait+Join，共享 *SessionContext)"
+      - "Fork/Join 子 Agent (消息隔离 + Join 合并，双层限额)"
       - "CollaborationMode prompt 增强 (CoT / Iterative-Refinement / Default)"
-      - "权限委托 gateway.PermissionManager"
+      - "AgentPermissionGate 异步权限 (ResolvePermission)"
       - "Observer 适配器桥接到 contextengine.IObserver"
       - "Bootstrap WireMultiAgent 引导集成"
-    status: s2_design
+    status: s4_development
     tasks: T1-T16
     estimate: 40h
   v1.1:
@@ -128,35 +128,25 @@ version_scope:
     status: future
 
 task_milestones:
-  - id: M1
-    name: "基础类型与接口定义"
+  - id: PR1
+    name: "contracts.IEngine 跨层契约提取"
     tasks: T1-T3
-    estimate: 6h
-    status: pending
-  - id: M2
-    name: "Agent 状态机 + 生命周期"
-    tasks: T4-T7
-    estimate: 10h
-    status: pending
-  - id: M3
-    name: "Fork/Join 子 Agent"
-    tasks: T8-T10
-    estimate: 8h
-    status: pending
-  - id: M4
-    name: "Collaboration Modes + Permission"
-    tasks: T11-T13
-    estimate: 6h
-    status: pending
-  - id: M5
-    name: "Observer 适配器 + 可观测性"
-    tasks: T14-T15
     estimate: 4h
-    status: pending
-  - id: M6
+    status: completed
+  - id: PR2
+    name: "AgentPermissionGate"
+    tasks: T4-T6
+    estimate: 6h
+    status: completed
+  - id: PR3
+    name: "Agent 核心实现"
+    tasks: T7-T15
+    estimate: 24h
+    status: completed
+  - id: PR4
     name: "Bootstrap 集成 + 测试"
     tasks: T16
-    estimate: 6h
+    estimate: 8h
     status: pending
 
 external_dependencies:

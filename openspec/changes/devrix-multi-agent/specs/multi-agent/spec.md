@@ -76,25 +76,26 @@ Agent 遵循严格的状态机驱动的生命周期管理。
 
 父 Agent 可创建并行子 Agent 执行独立子任务。
 
-### Scenario: Fork creates child agent with shared context
+### Scenario: Fork creates child agent with isolated message buffer
 - GIVEN 父 Agent 需要并行子任务
 - WHEN `Agent.Fork(ctx, childCfg)` 被调用
 - THEN 子 Agent 状态 = CREATED
-- AND 子 Agent.SessionCtx == 父 Agent.SessionCtx（同一指针）
+- AND 子 Agent 拥有独立的消息缓冲区（GetMessages() 仅返回自己的消息）
 - AND 子 Agent 加入 `childAgents` map
 - AND 发送 `agent.forked` 事件
 
-### Scenario: Fork respects MaxChildren limit
+### Scenario: Fork respects double limits
 - GIVEN 父 Agent 已有 3 个子 Agent（MaxChildren=3）
 - WHEN `Fork()` 被再次调用
 - THEN 返回 `AGT_FACTORY_5002` 错误
-- AND 不创建新 Agent
-- AND 现有子 Agent 不受影响
+- GIVEN Session 已有 5 个 Agent（MaxTotalAgents=5）
+- WHEN `Fork()` 被调用
+- THEN 返回 `AGT_FACTORY_5010` 错误
 
-### Scenario: Join merges child result into SessionContext
+### Scenario: Join merges child message buffer into parent
 - GIVEN 子 Agent 状态 = TERMINATED
 - WHEN `Join(ctx, child)` 被调用
-- THEN 子 Agent.Messages 追加到 SessionContext.Messages
+- THEN 子 Agent 的独立消息缓冲区追加到父 Agent 的 messageBuffer
 - AND 子 Agent 从 `childAgents` 中移除
 - AND 发送 `agent.joined` 事件
 
@@ -104,11 +105,11 @@ Agent 遵循严格的状态机驱动的生命周期管理。
 - THEN 返回 `AGT_FORK_5004` 错误
 - AND 子 Agent 状态不受影响
 
-### Scenario: Parallel child agents execute concurrently
-- GIVEN 父 Agent 创建 2 个子 Agent
+### Scenario: Parallel child agents execute with isolated buffers
+- GIVEN 父 Agent 创建 2 个子 Agent（各自独立消息缓冲区）
 - WHEN 父 Agent 调用子 Agent.Run()（分别在 goroutine 中）
-- THEN 两个子 Agent 并行执行
-- AND 通过 `-race` 检测，无 data race
+- THEN 两个子 Agent 并行执行，消息写入各自缓冲区
+- AND 通过 `-race` 检测，无 data race（不需要共享锁）
 
 ### Scenario: Wait blocks until child terminal
 - GIVEN 子 Agent 正在 RUNNING
@@ -144,42 +145,50 @@ Agent 支持不同的推理策略，通过 CollaborationMode 配置生效。
 
 ---
 
-## Feature: Permission Delegation
+## Feature: AgentPermissionGate（异步权限）
 
-CRITICAL 风险等级工具委托 PermissionManager 进行用户确认。
+Agent 实现 contextengine.IPermissionGate 注入 PEVEngine。CRITICAL 工具触发时，AgentPermissionGate 通过 channel 阻塞等待 Gateway 注入用户响应。
 
-### Scenario: CRITICAL tool triggers permission state
-- GIVEN PEVEngine 返回 tool_call，riskLevel = CRITICAL
-- WHEN Agent 处理 tool_call
-- THEN Agent 状态: ITERATING → WAITING_PERMISSION
-- AND 调用 `PermissionManager.Request(ctx, sessionID, toolName, input, CRITICAL)`
-- AND 发送 `agent.waiting_permission` 事件
+### Scenario: CRITICAL tool triggers permission via AgentPermissionGate
+- GIVEN PEVEngine 内部 tool execution
+- AND Agent 作为 IPermissionGate 注入 PEVEngine
+- WHEN 工具 riskLevel = CRITICAL
+- THEN AgentPermissionGate.Request() 被调用
+- AND 非 CRITICAL 工具直接返回 true
+- AND CRITICAL 工具创建 channel 并阻塞
+- AND Agent 状态: → WAITING_PERMISSION
+- AND 发送 `permission_required` 事件（Gateway → Adapter → 用户 UI）
 
-### Scenario: Grant — resume iteration
+### Scenario: Gateway resolves permission — granted
 - GIVEN Agent 状态 = WAITING_PERMISSION
-- WHEN PermissionManager 返回 true（批准）
-- THEN Agent 状态: WAITING_PERMISSION → ITERATING
-- AND 工具正常执行
+- AND AgentPermissionGate.Request() 阻塞在 channel read
+- WHEN Gateway 调用 `Agent.ResolvePermission(toolName, true)`
+- THEN channel 收到 true
+- AND AgentPermissionGate.Request() 返回 true
+- AND Agent 状态: WAITING_PERMISSION → ITERATING
+- AND PEVEngine 继续执行工具
 
-### Scenario: Deny — terminate agent
+### Scenario: Gateway resolves permission — denied
 - GIVEN Agent 状态 = WAITING_PERMISSION
-- WHEN PermissionManager 返回 false（拒绝）
-- THEN Agent 状态: WAITING_PERMISSION → TERMINATED
-- AND 返回 `AGT_PERMISSION_5008` 错误
+- WHEN Gateway 调用 `Agent.ResolvePermission(toolName, false)`
+- THEN channel 收到 false
+- AND AgentPermissionGate.Request() 返回 false
+- AND Agent 状态: WAITING_PERMISSION → TERMINATED
+- AND PEVEngine 收到 permission denied
 
-### Scenario: Timeout — terminate agent
+### Scenario: Permission timeout
 - GIVEN Agent 状态 = WAITING_PERMISSION
-- WHEN 60s 超时
-- THEN PermissionManager 返回 false
+- WHEN AgentConfig.PermissionTimeout（默认 60s）超时
+- THEN AgentPermissionGate.Request() 返回 false
 - AND Agent 状态: WAITING_PERMISSION → TERMINATED
 - AND 返回 `AGT_PERMISSION_5007` 错误
 
 ### Scenario: Non-CRITICAL tools auto-authorize
-- GIVEN PEVEngine 返回 tool_call，riskLevel = LOW / MEDIUM / HIGH
-- WHEN Agent 处理 tool_call
-- THEN 不调用 PermissionManager.Request
+- GIVEN PEVEngine 调用 AgentPermissionGate.Request()
+- WHEN riskLevel = LOW / MEDIUM / HIGH
+- THEN 直接返回 true（不阻塞）
 - AND Agent 状态保持 ITERATING
-- AND 工具自动执行
+- AND 不触发 `permission_required` 事件
 
 ---
 

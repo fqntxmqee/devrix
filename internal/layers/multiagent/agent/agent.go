@@ -10,24 +10,26 @@ import (
 	"github.com/google/uuid"
 )
 
-// Creator creates child agents without importing the factory package.
+// Creator creates child agents and tracks session-level quotas.
 type Creator interface {
 	Create(ctx context.Context, cfg multiagent.AgentConfig, session *types.Session) (multiagent.Agent, error)
+	ReleaseSession(sessionID string)
 }
 
 // Impl is the concrete Agent implementation.
 type Impl struct {
-	id          string
-	state       multiagent.AgentState
-	cfg         multiagent.AgentConfig
-	session     *types.Session
-	deps        multiagent.AgentDeps
-	creator     Creator
-	childAgents map[string]multiagent.Agent
-	joinedMsgs  []types.Message
-	result      *multiagent.AgentResult
-	done        chan struct{}
-	doneOnce    sync.Once
+	id            string
+	state         multiagent.AgentState
+	cfg           multiagent.AgentConfig
+	session       *types.Session
+	deps          multiagent.AgentDeps
+	creator       Creator
+	permGate      *agentPermissionGate
+	childAgents   map[string]multiagent.Agent
+	messageBuffer []types.Message
+	result        *multiagent.AgentResult
+	done          chan struct{}
+	doneOnce      sync.Once
 
 	mu     sync.RWMutex
 	cancel context.CancelFunc
@@ -45,16 +47,19 @@ func New(
 	if deps.AgentObserver == nil {
 		deps.AgentObserver = observer.NoOpAgentObserver{}
 	}
-	return &Impl{
-		id:          uuid.New().String(),
-		state:       multiagent.AgentStateCreated,
-		cfg:         cfg,
-		session:     session,
-		deps:        deps,
-		creator:     creator,
-		childAgents: make(map[string]multiagent.Agent),
-		done:        make(chan struct{}),
+	a := &Impl{
+		id:            uuid.New().String(),
+		state:         multiagent.AgentStateCreated,
+		cfg:           cfg,
+		session:       session,
+		deps:          deps,
+		creator:       creator,
+		childAgents:   make(map[string]multiagent.Agent),
+		messageBuffer: make([]types.Message, 0),
+		done:          make(chan struct{}),
 	}
+	a.permGate = newAgentPermissionGate(a)
+	return a
 }
 
 // ID returns the agent identifier.
@@ -74,6 +79,31 @@ func (a *Impl) Config() multiagent.AgentConfig {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.cfg
+}
+
+// GetMessages returns a copy of the agent message buffer.
+func (a *Impl) GetMessages() []types.Message {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make([]types.Message, len(a.messageBuffer))
+	copy(out, a.messageBuffer)
+	return out
+}
+
+// ResolvePermission injects the user permission decision for a pending CRITICAL tool.
+func (a *Impl) ResolvePermission(toolName string, granted bool) {
+	if a.permGate != nil {
+		a.permGate.resolve(toolName, granted)
+	}
+}
+
+func (a *Impl) appendMessages(msgs ...types.Message) {
+	if len(msgs) == 0 {
+		return
+	}
+	a.mu.Lock()
+	a.messageBuffer = append(a.messageBuffer, msgs...)
+	a.mu.Unlock()
 }
 
 func (a *Impl) setState(to multiagent.AgentState) error {
@@ -110,6 +140,9 @@ func (a *Impl) finishResult(result *multiagent.AgentResult) {
 	a.result = result
 	a.state = multiagent.AgentStateTerminated
 	a.doneOnce.Do(func() { close(a.done) })
+	if a.creator != nil {
+		a.creator.ReleaseSession(a.cfg.SessionID)
+	}
 }
 
 func (a *Impl) activeChildCount() int {
@@ -130,13 +163,6 @@ func (a *Impl) removeChild(childID string) {
 	delete(a.childAgents, childID)
 }
 
-func (a *Impl) getChild(childID string) (multiagent.Agent, bool) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	child, ok := a.childAgents[childID]
-	return child, ok
-}
-
 func (a *Impl) terminateChildren(ctx context.Context) {
 	a.mu.RLock()
 	children := make([]multiagent.Agent, 0, len(a.childAgents))
@@ -147,4 +173,9 @@ func (a *Impl) terminateChildren(ctx context.Context) {
 	for _, child := range children {
 		_ = child.Terminate(ctx)
 	}
+}
+
+// PermissionGate exposes the agent permission gate for PEVEngine injection (PR4 bootstrap).
+func (a *Impl) PermissionGate() *agentPermissionGate {
+	return a.permGate
 }
