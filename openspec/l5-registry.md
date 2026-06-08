@@ -112,7 +112,7 @@
 
 ## Layer 3: LLM Gateway (LLM)
 
-> 变更：`openspec/archive/2026-06-07-devrix-llm-gateway/`（Demand: DM-20260607-004，Status: S7 Archived）
+> 变更：`openspec/archive/2026-06-07-devrix-llm-gateway/`（DM-20260607-004）、`openspec/archive/2026-06-08-devrix-llm-gateway-v2/`（DM-20260608-002），Status: S7 Archived
 
 ### P0
 
@@ -127,8 +127,8 @@
 | L5-LLM-07 | Token 计数准确性 (cl100k_base) | L4-LLM-TOKEN | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-LLM-08 | Token 预算检查 | L4-LLM-TOKEN | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
 | L5-LLM-09 | Provider 配置加载 | L4-LLM-CONFIG | `internal/layers/llmgateway/config/loader_test.go` | IMPLEMENTED |
-| L5-LLM-20 | Retry 失败等待 CB 冷却而非快速触发熔断 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | PLANNED |
-| L5-LLM-23 | Half-Open 探测请求数量控制 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | PLANNED |
+| L5-LLM-20 | Retry 与 CB 协调，context 取消不触发 CB | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
+| L5-LLM-23 | Half-Open 并发探测上限 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
 
 ### P1
 
@@ -139,8 +139,8 @@
 | L5-LLM-12 | 重试策略执行 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_test.go` | IMPLEMENTED |
 | L5-LLM-13 | LLM 调用可观测事件 | L4-LLM-OBS | `tests/integration/llm_observer_test.go` | IMPLEMENTED |
 | L5-LLM-16 | 未知 Provider/Model 报错 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/router_test.go` | IMPLEMENTED |
-| L5-LLM-21 | LLM 超时后 Context 被取消 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | PLANNED |
-| L5-LLM-22 | Jitter 随机化避免重试风暴 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_test.go` | PLANNED |
+| L5-LLM-21 | 无 deadline 时注入 provider 超时 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
+| L5-LLM-22 | Retry Full Jitter 退避 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_jitter_test.go` | IMPLEMENTED |
 
 ### P2
 
@@ -148,17 +148,6 @@
 |-------|------|---------|-----------|--------|
 | L5-LLM-14 | 多 Provider 并发调用 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
 | L5-LLM-15 | 熔断器状态持久化 | L4-LLM-BREAKER | — | PLANNED |
-
-### Reliability V2 (P0/P1)
-
-> 变更：`openspec/changes/devrix-llm-gateway-v2/`（Demand: DM-20260608-002）
-
-| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| L5-LLM-20 | Retry 与 CB 协调，context 取消不触发 CB | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
-| L5-LLM-21 | 无 deadline 时注入 provider 超时 | L4-LLM-GATEWAY | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
-| L5-LLM-22 | Retry Full Jitter 退避 | L4-LLM-RETRY | `internal/layers/llmgateway/retry/retry_jitter_test.go` | IMPLEMENTED |
-| L5-LLM-23 | Half-Open 并发探测上限 | L4-LLM-BREAKER | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
 
 ---
 
