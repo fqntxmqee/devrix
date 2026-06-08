@@ -27,6 +27,8 @@ type Pipeline struct {
 	autocompactCfg config.AutocompactConfig
 	summarizer     Summarizer
 	stepObserver   StepObserver
+	asyncCompact   *AsyncAutocompacter
+	sessionID      string
 }
 
 // NewPipeline creates a compression pipeline with functional options.
@@ -45,6 +47,11 @@ func NewPipelineEnabled(enabled bool) *Pipeline {
 
 // Run compresses messages to fit within budget.
 func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt string, budget types.TokenBudget) ([]types.Message, types.CompressionReport, error) {
+	return p.RunForSession(ctx, p.sessionID, msgs, systemPrompt, budget)
+}
+
+// RunForSession compresses messages for a specific session (enables async autocompact).
+func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []types.Message, systemPrompt string, budget types.TokenBudget) ([]types.Message, types.CompressionReport, error) {
 	report := types.CompressionReport{OriginalTokens: p.counter.CountMessages(msgs)}
 	if !p.enabled {
 		out := assemble(systemPrompt, msgs)
@@ -103,7 +110,7 @@ func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt s
 	}
 
 	// Step 6: autocompact (before assembly, on message history only)
-	next, stepLabel, _ := runAutocompact(ctx, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver)
+	next, stepLabel, _ := runAutocompact(ctx, sessionID, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver, p.asyncCompact)
 	current = next
 	report.StepsApplied = append(report.StepsApplied, stepLabel)
 	if stepLabel == stepAutocompact {

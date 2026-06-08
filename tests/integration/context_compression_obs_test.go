@@ -26,6 +26,8 @@ func (o *recordingCompressionObserver) EmitAutocompact(_ string, _ contextengine
 	o.autocompact++
 }
 
+func (o *recordingCompressionObserver) EmitAutocompactComplete(_ string, _ types.Message, _ string) {}
+
 // Covers: L5-CTX-17
 func TestIntegration_CompressionObserverReceivesSteps(t *testing.T) {
 	obs := &recordingCompressionObserver{}
@@ -66,3 +68,5 @@ func (a *pipelineObsAdapter) OnAutocompact(meta compression.AutocompactMeta) {
 		Degraded: meta.Degraded, SummaryTokens: meta.SummaryTokens, Model: meta.Model,
 	})
 }
+
+func (a *pipelineObsAdapter) OnAutocompactComplete(_ types.Message, _, _ string) {}

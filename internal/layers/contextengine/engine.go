@@ -40,14 +40,15 @@ type EngineDeps struct {
 
 // ContextEngine implements gateway.IContextEngine.
 type ContextEngine struct {
-	memory       *memory.Manager
-	counter      contracts.ITokenCounter
-	pev          *PEVEngine
-	prompt       *prompt.Loader
-	cfg          *config.ContextEngineConfig
-	observer     IObserver
-	compObserver ICompressionObserver
-	obsBridge    *observability.Bridge
+	memory        *memory.Manager
+	counter       contracts.ITokenCounter
+	pev           *PEVEngine
+	prompt        *prompt.Loader
+	cfg           *config.ContextEngineConfig
+	observer      IObserver
+	compObserver  ICompressionObserver
+	obsBridge     *observability.Bridge
+	asyncCompact  *compression.AsyncAutocompacter
 }
 
 // NewContextEngine creates the Layer 2 context engine.
@@ -70,6 +71,13 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 	counter := ResolveTokenCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)
+	var asyncCompact *compression.AsyncAutocompacter
+	if cfg.Compression.Autocompact.Enabled {
+		asyncCompact = compression.NewAsyncAutocompacter(&AutocompactSummarizer{
+			LLM:     deps.LLM,
+			Timeout: cfg.Compression.Autocompact.Timeout,
+		})
+	}
 	return &ContextEngine{
 		memory:  memory.NewManager(cfg, store, deps.LongTerm),
 		counter: counter,
@@ -91,7 +99,16 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		observer:          observer,
 		compObserver:      compObserver,
 		obsBridge:         deps.ObsBridge,
+		asyncCompact:      asyncCompact,
 	}
+}
+
+// Shutdown waits for background autocompact work to finish.
+func (e *ContextEngine) Shutdown(timeout time.Duration) error {
+	if e.asyncCompact == nil {
+		return nil
+	}
+	return e.asyncCompact.Shutdown(timeout)
 }
 
 // Process implements gateway.IContextEngine.
@@ -282,7 +299,13 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		}),
 	}
 	if sessionID != "" {
-		opts = append(opts, compression.WithStepObserver(newPipelineStepObserver(sessionID, e.compObserver)))
+		opts = append(opts,
+			compression.WithStepObserver(newPipelineStepObserver(sessionID, e.compObserver)),
+			compression.WithSessionID(sessionID),
+		)
+	}
+	if e.asyncCompact != nil {
+		opts = append(opts, compression.WithAsyncAutocompacter(e.asyncCompact))
 	}
 	return compression.NewPipeline(opts...)
 }

@@ -1,0 +1,64 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-context-engine-v4
+  demand_id: DM-20260608-003
+  title: "上下文引擎性能优化"
+  status: s2_design
+  priority: P2
+  owner: architecture
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+  parent_change: devrix-context-engine-v3
+
+scope:
+  layers:
+    - id: L2
+      name: Context Engine
+      affected: true
+
+  capabilities:
+    - CTX-ASYNC-COMPACT   # Autocompact 异步化
+    - CTX-SNAPSHOT-COMPRESS # 快照压缩
+
+  l5_test_points:
+    - L5-CTX-31            # Autocompact 异步执行不阻塞主请求
+    - L5-CTX-32            # 快照使用 snappy 压缩后体积显著减小
+    - L5-CTX-33            # 异步压缩失败降级不丢失数据
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/context-engine/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+
+version_scope:
+  v4.0:
+    features:
+      - Autocompact 异步执行 + 预览占位
+      - 快照 snappy 压缩
+      - 压缩失败降级路径
+      - 异步压缩可观测事件
+    status: s2_design
+    tasks: T1-T5
+    estimate: 12h
+
+bug_severity:
+  medium:
+    - autocompact-sync-block      # Autocompact 同步阻塞 10s
+  low:
+    - snapshot-no-compression      # JSON 快照无压缩
+
+related_changes:
+  - devrix-context-engine-v3
+  - devrix-observability
+
+notes: |
+  基于 Gemini 深度分析报告 issues #3（Autocompact 同步阻塞）和 #4（快照无压缩）。
+  Context Engine V3 已归档（含 Plan + Milestone + LongTerm Memory）。
+  V4 聚焦性能优化，不改变压缩语义或快照格式。

@@ -93,9 +93,9 @@
 
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-CTX-31 | Autocompact 异步执行不阻塞主请求 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | PLANNED |
-| L5-CTX-32 | 快照使用 snappy 压缩后体积显著减小 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | PLANNED |
-| L5-CTX-33 | 异步压缩失败降级不丢失数据 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | PLANNED |
+| L5-CTX-31 | Autocompact 异步执行不阻塞主请求 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
+| L5-CTX-32 | 快照使用 snappy 压缩后体积显著减小 | L4-CTX-MEMORY | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
+| L5-CTX-33 | 异步压缩失败降级不丢失数据 | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 
 ### Tool Security (P0)
 
