@@ -1,0 +1,178 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-multi-agent
+  demand_id: DM-20260608-001
+  title: "Multi-Agent Layer V1 — Agent 生命周期、Fork/Join、Collaboration Modes"
+  status: s2_design
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-08"
+  updated_at: "2026-06-08"
+  parent_change: devrix-context-engine-v4
+
+scope:
+  layers:
+    - id: L4
+      name: Multi-Agent
+      affected: true
+    - id: L1
+      name: Communication
+      affected: true
+      reason: "CommunicationGateway 注入 IAgentFactory"
+    - id: L2
+      name: Context Engine
+      affected: false
+      reason: "Agent 委托 IContextEngine，不修改 L2"
+
+  capabilities:
+    - id: AGT-FACTORY
+      name: Agent factory + config validation
+    - id: AGT-LIFECYCLE
+      name: State machine Run/Wait/Terminate
+    - id: AGT-FORKJOIN
+      name: Parallel child agents (max 3)
+    - id: AGT-COLLAB
+      name: Collaboration mode prompt enhancement
+    - id: AGT-PERMISSION
+      name: Permission delegation to PermissionManager
+    - id: AGT-OBSERVER
+      name: Agent events → IObserver adapter
+    - id: AGT-BOOTSTRAP
+      name: WireMultiAgent in bootstrap
+
+  l5_test_points:
+    - L5-4-1-01  # AgentFactory 创建 Agent 实例
+    - L5-4-2-01  # Agent 生命周期状态转换
+    - L5-4-2-02  # 工具风险等级映射，CRITICAL 触发权限
+    - L5-4-2-03  # 权限管线授权/拒绝/超时流程
+    - L5-4-3-01  # Fork/Join 子 Agent 创建+并行+合并
+    - L5-4-3-02  # Fork 数超限 MaxChildren 拒绝
+    - L5-4-3-03  # Agent 超时自动终止
+    - L5-4-3-04  # Context 取消传播到子 Agent
+    - L5-4-4-01  # CoT prompt 增强
+    - L5-4-4-02  # Iterative-Refinement prompt 增强
+    - L5-4-5-01  # ObserverAdapter 桥接 AgentEvent → IObserver
+    - L5-4-0-01  # Agent 并发安全 (-race)
+    - L5-4-0-02  # SessionContext 共享写入安全
+    - L5-4-0-03  # PermissionManager 集成全流程
+    - L5-4-0-04  # E2E Fork 端到端
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: specs/multi-agent/spec.md
+    status: completed
+  - path: internal/layers/multiagent/contracts.go
+    status: pending
+  - path: internal/layers/multiagent/agent/agent.go
+    status: pending
+  - path: internal/layers/multiagent/agent/state.go
+    status: pending
+  - path: internal/layers/multiagent/agent/lifecycle.go
+    status: pending
+  - path: internal/layers/multiagent/agent/forkjoin.go
+    status: pending
+  - path: internal/layers/multiagent/factory/factory.go
+    status: pending
+  - path: internal/layers/multiagent/collaboration/mode.go
+    status: pending
+  - path: internal/layers/multiagent/collaboration/prompt.go
+    status: pending
+  - path: internal/layers/multiagent/observer/adapter.go
+    status: pending
+  - path: internal/layers/multiagent/observer/noop.go
+    status: pending
+  - path: internal/bootstrap/multi_agent.go
+    status: pending
+  - path: internal/shared/errors/multiagent.go
+    status: completed
+  - path: internal/shared/config/multiagent.go
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - "Agent 生命周期状态机 (CREATED→RUNNING→ITERATING→WAITING_PERMISSION→TERMINATED)"
+      - "Fork/Join 子 Agent (V1 简化版，同步 Wait+Join，共享 *SessionContext)"
+      - "CollaborationMode prompt 增强 (CoT / Iterative-Refinement / Default)"
+      - "权限委托 gateway.PermissionManager"
+      - "Observer 适配器桥接到 contextengine.IObserver"
+      - "Bootstrap WireMultiAgent 引导集成"
+    status: s2_design
+    tasks: T1-T16
+    estimate: 40h
+  v1.1:
+    features:
+      - "Fork 异步化（不阻塞父 Agent 迭代）"
+      - "子 Agent 数量可配置"
+    status: future
+  v2.0:
+    features:
+      - "Supervisor-Worker 模式"
+      - "完整 COW SessionContext"
+      - "Agent 持久化 + 恢复"
+    status: future
+  v3.0:
+    features:
+      - "Peer-Review 模式"
+      - "Vote-Consensus 模式"
+      - "Full Fork/Merge + Milestone DAG"
+    status: future
+
+task_milestones:
+  - id: M1
+    name: "基础类型与接口定义"
+    tasks: T1-T3
+    estimate: 6h
+    status: pending
+  - id: M2
+    name: "Agent 状态机 + 生命周期"
+    tasks: T4-T7
+    estimate: 10h
+    status: pending
+  - id: M3
+    name: "Fork/Join 子 Agent"
+    tasks: T8-T10
+    estimate: 8h
+    status: pending
+  - id: M4
+    name: "Collaboration Modes + Permission"
+    tasks: T11-T13
+    estimate: 6h
+    status: pending
+  - id: M5
+    name: "Observer 适配器 + 可观测性"
+    tasks: T14-T15
+    estimate: 4h
+    status: pending
+  - id: M6
+    name: "Bootstrap 集成 + 测试"
+    tasks: T16
+    estimate: 6h
+    status: pending
+
+external_dependencies:
+  - component: gateway.IContextEngine
+    layer: L2
+    status: available
+  - component: gateway.PermissionManager
+    layer: L1
+    status: available
+  - component: contextengine.IObserver
+    layer: L2
+    status: available
+  - component: observability.Bridge
+    layer: L5
+    status: available
+
+related_changes:
+  - devrix-context-engine-v4
+  - devrix-observability
