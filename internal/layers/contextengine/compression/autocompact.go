@@ -21,12 +21,14 @@ type summaryOutput struct {
 // runAutocompact executes step 6 on message history (no system prompt).
 func runAutocompact(
 	ctx context.Context,
+	sessionID string,
 	msgs []types.Message,
 	budget types.TokenBudget,
 	counter contracts.ITokenCounter,
 	cfg config.AutocompactConfig,
 	summarizer Summarizer,
 	observer StepObserver,
+	async *AsyncAutocompacter,
 ) ([]types.Message, string, error) {
 	if !shouldAutocompact(msgs, budget, counter, cfg) {
 		return msgs, stepAutocompact + ":skipped", nil
@@ -46,6 +48,12 @@ func runAutocompact(
 	}
 	if len(turns) <= head+tail {
 		return msgs, stepAutocompact + ":skipped", nil
+	}
+
+	if async != nil && sessionID != "" {
+		out := buildAutocompactPlaceholder(turns, head, tail)
+		async.StartAsync(sessionID, cfg, turns, head, tail, observer)
+		return out, stepAutocompact, nil
 	}
 
 	middle := flattenTurns(turns[head : len(turns)-tail])

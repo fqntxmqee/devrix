@@ -10,7 +10,10 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
+	"github.com/golang/snappy"
 )
+
+const snappyMagic = "\xfe\x53"
 
 // Store handles ContextSnapshotV1 serialization.
 type Store struct {
@@ -38,7 +41,40 @@ func (s *Store) Serialize(sc *types.SessionContext) ([]byte, error) {
 		SystemPrompt: sc.SystemPrompt,
 		UpdatedAt:    sc.UpdatedAt.UTC().Format(time.RFC3339),
 	}
-	return json.Marshal(snap)
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		return nil, err
+	}
+	return s.encodeSnapshot(raw), nil
+}
+
+func (s *Store) encodeSnapshot(raw []byte) []byte {
+	if s.cfg == nil || !s.cfg.Compression {
+		return raw
+	}
+	threshold := s.cfg.CompressionThreshold
+	if threshold <= 0 {
+		threshold = 4096
+	}
+	if len(raw) < threshold {
+		return raw
+	}
+	compressed := snappy.Encode(nil, raw)
+	out := make([]byte, len(snappyMagic)+len(compressed))
+	copy(out, snappyMagic)
+	copy(out[len(snappyMagic):], compressed)
+	return out
+}
+
+func decodeSnapshotPayload(data []byte) ([]byte, error) {
+	if len(data) >= len(snappyMagic) && string(data[:len(snappyMagic)]) == snappyMagic {
+		raw, err := snappy.Decode(nil, data[len(snappyMagic):])
+		if err != nil {
+			return nil, err
+		}
+		return raw, nil
+	}
+	return data, nil
 }
 
 // Deserialize parses JSON into SessionContext.
@@ -46,8 +82,12 @@ func (s *Store) Deserialize(data []byte) (*types.SessionContext, error) {
 	if len(data) == 0 {
 		return nil, errors.NewSnapshotCorruptError(fmt.Errorf("empty snapshot"))
 	}
+	payload, err := decodeSnapshotPayload(data)
+	if err != nil {
+		return nil, errors.NewSnapshotCorruptError(err)
+	}
 	var snap types.ContextSnapshotV1
-	if err := json.Unmarshal(data, &snap); err != nil {
+	if err := json.Unmarshal(payload, &snap); err != nil {
 		return nil, errors.NewSnapshotCorruptError(err)
 	}
 	if snap.Version != types.ContextSnapshotVersion {

@@ -25,8 +25,10 @@ type PEVConfig struct {
 
 // SnapshotConfig holds snapshot persistence settings.
 type SnapshotConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	BackupDir string `yaml:"backup_dir"`
+	Enabled              bool   `yaml:"enabled"`
+	BackupDir            string `yaml:"backup_dir"`
+	Compression          bool   `yaml:"compression"`
+	CompressionThreshold int    `yaml:"compression_threshold"`
 }
 
 // SystemPromptConfig holds system prompt source paths.

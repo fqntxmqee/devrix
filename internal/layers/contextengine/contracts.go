@@ -82,6 +82,7 @@ type AutocompactMeta struct {
 type ICompressionObserver interface {
 	EmitCompressionStep(sessionID, step string, before, after int)
 	EmitAutocompact(sessionID string, meta AutocompactMeta)
+	EmitAutocompactComplete(sessionID string, summary types.Message, asyncToken string)
 }
 
 // IPEVObserver emits PEV phase events.
@@ -94,8 +95,9 @@ type IPEVObserver interface {
 // NoOpCompressionObserver discards compression observer events.
 type NoOpCompressionObserver struct{}
 
-func (NoOpCompressionObserver) EmitCompressionStep(string, string, int, int) {}
-func (NoOpCompressionObserver) EmitAutocompact(string, AutocompactMeta)       {}
+func (NoOpCompressionObserver) EmitCompressionStep(string, string, int, int)              {}
+func (NoOpCompressionObserver) EmitAutocompact(string, AutocompactMeta)                   {}
+func (NoOpCompressionObserver) EmitAutocompactComplete(string, types.Message, string)     {}
 
 // NoOpPEVObserver discards PEV observer events.
 type NoOpPEVObserver struct{}

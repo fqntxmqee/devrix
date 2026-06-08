@@ -46,6 +46,20 @@ func WithStepObserver(obs StepObserver) Option {
 	}
 }
 
+// WithAsyncAutocompacter enables background autocompact summarization.
+func WithAsyncAutocompacter(a *AsyncAutocompacter) Option {
+	return func(p *Pipeline) {
+		p.asyncCompact = a
+	}
+}
+
+// WithSessionID sets the session ID for async autocompact deduplication.
+func WithSessionID(sessionID string) Option {
+	return func(p *Pipeline) {
+		p.sessionID = sessionID
+	}
+}
+
 func defaultPipeline() *Pipeline {
 	return &Pipeline{
 		counter:        token.NewCounter(),

@@ -2,6 +2,7 @@ package contextengine
 
 import (
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 type pipelineStepObserver struct {
@@ -26,4 +27,11 @@ func (o *pipelineStepObserver) OnAutocompact(meta compression.AutocompactMeta) {
 		SummaryTokens: meta.SummaryTokens,
 		Model:         meta.Model,
 	})
+}
+
+func (o *pipelineStepObserver) OnAutocompactComplete(summaryMsg types.Message, sessionID, asyncToken string) {
+	if sessionID == "" {
+		sessionID = o.sessionID
+	}
+	o.observer.EmitAutocompactComplete(sessionID, summaryMsg, asyncToken)
 }

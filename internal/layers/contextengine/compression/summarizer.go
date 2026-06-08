@@ -1,6 +1,10 @@
 package compression
 
-import "context"
+import (
+	"context"
+
+	"github.com/devrix/devrix/internal/shared/types"
+)
 
 // Summarizer generates a text summary for autocompact.
 type Summarizer interface {
@@ -11,6 +15,7 @@ type Summarizer interface {
 type StepObserver interface {
 	OnStep(step string, before, after int)
 	OnAutocompact(meta AutocompactMeta)
+	OnAutocompactComplete(summaryMsg types.Message, sessionID, asyncToken string)
 }
 
 // AutocompactMeta describes an autocompact event.
