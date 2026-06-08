@@ -1,5 +1,5 @@
 ---
-demand-id: DM-20260607-001
+demand-id: DM-20260607-008
 title: Devrix 测试框架规范与目录拆分 — 验收报告
 executor: fukai
 environment: local
@@ -14,7 +14,7 @@ change: devrix-test-framework
 
 | 项目 | 值 |
 |------|---|
-| 需求 ID | DM-20260607-001 |
+| 需求 ID | DM-20260607-008 |
 | 变更 | devrix-test-framework |
 | 执行人 | fukai |
 | 测试环境 | local |

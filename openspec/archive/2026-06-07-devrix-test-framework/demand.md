@@ -1,5 +1,5 @@
 ---
-demand-id: DM-20260607-001
+demand-id: DM-20260607-008
 title: Devrix 测试框架规范与目录拆分
 source: 技术团队 / AI Agent
 priority: P0

@@ -1,0 +1,50 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-test-framework
+  demand_id: DM-20260607-008
+  title: "Devrix 测试框架规范与目录拆分"
+  status: archived
+  priority: P0
+  owner: architecture
+  created_at: "2026-06-07"
+  updated_at: "2026-06-08"
+  archived_at: "2026-06-08"
+  completed_at: "2026-06-07"
+
+scope:
+  layers:
+    - id: L2
+      name: 规格驱动交付
+      affected: true
+    - id: L3-BE
+      name: 自动化测试与验收
+      affected: true
+
+  capabilities:
+    - TEST-PYRAMID
+    - TEST-L5-TRACE
+    - TEST-GATE-SCRIPTS
+    - TEST-CI
+
+deliverables:
+  - path: demand.md
+    status: completed
+  - path: proposal.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: specs/testing-framework/spec.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: acceptance-report.md
+    status: completed
+
+related_changes:
+  - devrix-testing-quality
+
+notes: |
+  父变更。后续 devrix-testing-quality 在其基础上增强边界/VCR/性能测试。
+  SoT 规范见 openspec/specs/testing-framework/spec.md。

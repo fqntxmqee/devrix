@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-feishu-cards`
 **Type:** Architecture Redesign
-**Status:** Draft
+**Status:** Delivered
 **Version:** 1.0
 **Based on:** cc-connect feishu platform + devrix-foundation communication layer
 

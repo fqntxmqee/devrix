@@ -2,6 +2,9 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260607-001 | Devrix 可观察层 | devrix-observability | 2026-06-07 | — | PASS |
+| DM-20260607-008 | 测试框架规范与目录拆分 | devrix-test-framework | 2026-06-07 | — | ACCEPTED |
+| DM-20260607-009 | Communication Layer V2 可靠性增强 | devrix-v2 | 2026-06-07 | — | ACCEPTED |
 | DM-20260607-002 | 上下文引擎（Layer 2）详细方案设计 | devrix-context-engine | 2026-06-07 | [#1](https://github.com/fqntxmqee/devrix/pull/1) | ACCEPTED |
 | DM-20260607-003 | 上下文引擎 V2（Autocompact + Verify Commands + Token 统一） | devrix-context-engine-v2 | 2026-06-07 | — | ACCEPTED |
 | DM-20260607-004 | LLM Gateway Layer V1（DeepSeek + MiniMax + 熔断 + Token 统一） | devrix-llm-gateway | 2026-06-07 | — | ACCEPTED |
@@ -13,21 +16,31 @@
 | DM-20260608-003 | 上下文引擎 V4（Autocompact 异步 + Snappy 压缩） | devrix-context-engine-v4 | 2026-06-08 | [#5](https://github.com/fqntxmqee/devrix/pull/5) | ACCEPTED |
 | DM-20260608-004 | 测试质量增强（边界/VCR/断言/性能基线） | devrix-testing-quality | 2026-06-08 | [#6](https://github.com/fqntxmqee/devrix/pull/6) | ACCEPTED |
 | DM-20260608-005 | Multi-Agent Layer V1（生命周期 + Fork/Join + 协作模式） | devrix-multi-agent | 2026-06-08 | [#7](https://github.com/fqntxmqee/devrix/pull/7) | ACCEPTED |
+| DM-20260608-006 | Feishu Card Adapter Redesign | devrix-feishu-cards | 2026-06-08 | — | ACCEPTED |
 
 ## Archive Locations
 
 | Change ID | Path |
 |-----------|------|
+| devrix-observability | `openspec/archive/2026-06-07-devrix-observability/` |
+| devrix-test-framework | `openspec/archive/2026-06-07-devrix-test-framework/` |
+| devrix-v2 | `openspec/archive/2026-06-07-devrix-v2/` |
 | devrix-context-engine-v3 | `openspec/archive/2026-06-07-devrix-context-engine-v3/` |
 | devrix-observability-fix | `openspec/archive/2026-06-07-devrix-observability-fix/` |
 | devrix-context-engine-v2 | `openspec/archive/2026-06-07-devrix-context-engine-v2/` |
 | devrix-llm-gateway | `openspec/archive/2026-06-07-devrix-llm-gateway/` |
 | devrix-context-engine | `openspec/archive/2026-06-07-devrix-context-engine/` |
-| devrix-observability | `openspec/archive/2026-06-07-devrix-observability/` |
 | devrix-observability-coverage | `openspec/archive/2026-06-08-devrix-observability-coverage/` |
 | devrix-tool-security | `openspec/archive/2026-06-08-devrix-tool-security/` |
 | devrix-llm-gateway-v2 | `openspec/archive/2026-06-08-devrix-llm-gateway-v2/` |
 | devrix-context-engine-v4 | `openspec/archive/2026-06-08-devrix-context-engine-v4/` |
 | devrix-testing-quality | `openspec/archive/2026-06-08-devrix-testing-quality/` |
 | devrix-multi-agent | `openspec/archive/2026-06-08-devrix-multi-agent/` |
+| devrix-feishu-cards | `openspec/archive/2026-06-08-devrix-feishu-cards/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
+
+## Active Changes (未归档)
+
+| Change ID | Path | 状态 |
+|-----------|------|------|
+| devrix-v3 | `openspec/changes/devrix-v3/` | 部分完成（钉钉 Adapter 未实现） |

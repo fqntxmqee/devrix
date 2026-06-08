@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-v2
 **Layer:** 1 - Communication
-**Status:** Draft
+**Status:** Completed
 **Version:** 2.0
 **Based on:** delta.md, devrix-foundation design
 
