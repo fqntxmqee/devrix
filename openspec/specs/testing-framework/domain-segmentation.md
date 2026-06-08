@@ -115,7 +115,9 @@ func TestIntegration_LLMRealAPI(t *testing.T) { ... }
 | `./scripts/test-domain.sh d2` | D2 单元 + D2/cross 集成 + D2 验收 + D2 性能 |
 | `./scripts/test-domain.sh d3` | D3 单元 + D3 集成（不含 live） |
 | `./scripts/test-domain.sh d4` | D4 单元 + D4/cross 集成 + D4 验收 + D4 E2E |
+| `./scripts/test-domain.sh d2 --cover` | 同上，并输出该域 unit/integration cover 汇总 |
 | `./scripts/test-domain.sh d3 --live` | 追加 D3 live 集成 |
+| `./scripts/coverage-domains.sh` | 生成 D1–D5 行/块覆盖 Markdown（CI artifact） |
 
 ### 5.2 Tag 传参规则
 

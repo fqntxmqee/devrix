@@ -72,15 +72,19 @@ jobs:
           total="$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($3, 1, length($3)-1)}')"
           echo "Total coverage: ${total}%"
           echo "::notice::Coverage target is 80% (project.md). Raise CI gate when baseline improves."
-          # Gate threshold: enable strict 80% check once baseline >= 50%
           min=20
           awk -v c="${total}" -v m="${min}" 'BEGIN { exit !(c+0 >= m+0) }' || {
             echo "::error::Coverage ${total}% is below minimum ${min}%"
             exit 1
           }
 
+      - name: Coverage by domain (D1-D5)
+        run: ./scripts/coverage-domains.sh
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage.out
+          path: |
+            coverage.out
+            coverage-reports/

@@ -3,6 +3,7 @@ package contextengine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -416,6 +417,13 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 	}
 
+	if hasSuccessfulToolOutput(toolResults) {
+		synthText, synthUsage := e.runToolSynthesis(ctx, sc, view, systemPrompt, assistantText, toolResults, emit)
+		usage.PromptTokens += synthUsage.PromptTokens
+		usage.CompletionTokens += synthUsage.CompletionTokens
+		assistantText = synthText
+	}
+
 	if len(toolResults) == 0 && !sc.PEVState.VerifyResult.Passed {
 		sc.PEVState.VerifyResult = types.VerifyResult{Passed: true}
 	}
@@ -447,6 +455,104 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		msgs = append(msgs, types.Message{Role: types.MessageRoleAssistant, Content: assistantText})
 	}
 	return &PEVRunResult{Usage: usage, Messages: msgs}, nil
+}
+
+// runToolSynthesis calls the LLM without tools to summarize successful tool output.
+// On LLM failure it emits tool_fallback text from raw tool output.
+func (e *PEVEngine) runToolSynthesis(
+	ctx context.Context,
+	sc *types.SessionContext,
+	view []types.Message,
+	systemPrompt string,
+	preamble string,
+	toolResults []ToolResult,
+	emit func(*gateway.EngineEvent),
+) (string, TokenUsage) {
+	synthReq := &LLMRequest{
+		Model:        sc.Model,
+		SystemPrompt: systemPrompt,
+		Messages:     buildSynthesisMessages(view, preamble, toolResults),
+		Tools:        nil,
+	}
+
+	llmStart := time.Now()
+	_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
+		tracer.Attribute{Key: "pev.synthesis", Value: "true"},
+		tracer.Attribute{Key: "llm.model", Value: sc.Model},
+	)
+	chunks, err := e.llm.ChatStream(ctx, synthReq)
+	if err != nil {
+		if llmSpan != nil {
+			llmSpan.RecordError(err)
+			llmSpan.End()
+		}
+		e.recordLLMError()
+		fallback := summarizeSuccessfulToolResults(toolResults)
+		emit(&gateway.EngineEvent{
+			Type: "text", Content: fallback, SessionID: sc.SessionID,
+			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
+		})
+		return fallback, TokenUsage{}
+	}
+
+	var synthText string
+	var usage TokenUsage
+	var tagSplitter textutil.ThinkTagSplitter
+	for chunk := range chunks {
+		select {
+		case <-ctx.Done():
+			if llmSpan != nil {
+				llmSpan.End()
+			}
+			fallback := summarizeSuccessfulToolResults(toolResults)
+			emit(&gateway.EngineEvent{
+				Type: "text", Content: fallback, SessionID: sc.SessionID,
+				Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
+			})
+			return fallback, usage
+		default:
+		}
+		if chunk.Content != "" {
+			_, content := tagSplitter.Push(chunk.Content)
+			if content != "" {
+				synthText += content
+				emit(&gateway.EngineEvent{
+					Type: "text", Content: content, SessionID: sc.SessionID,
+					Metadata: map[string]string{"is_complete": "false"},
+				})
+			}
+		}
+		if chunk.Done {
+			usage = chunk.Usage
+		}
+	}
+	if _, content := tagSplitter.Flush(); content != "" {
+		synthText += content
+		emit(&gateway.EngineEvent{
+			Type: "text", Content: content, SessionID: sc.SessionID,
+			Metadata: map[string]string{"is_complete": "false"},
+		})
+	}
+	if llmSpan != nil {
+		llmSpan.SetAttributes(telemetry.LLMUsageAttrs(
+			usage.PromptTokens,
+			usage.CompletionTokens,
+			time.Since(llmStart).Milliseconds(),
+		)...)
+		llmSpan.End()
+	}
+	e.recordLLMCall(usage, time.Since(llmStart))
+
+	synthText = textutil.StripThinkingTags(synthText)
+	if strings.TrimSpace(synthText) == "" {
+		fallback := summarizeSuccessfulToolResults(toolResults)
+		emit(&gateway.EngineEvent{
+			Type: "text", Content: fallback, SessionID: sc.SessionID,
+			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
+		})
+		return fallback, usage
+	}
+	return synthText, usage
 }
 
 func (e *PEVEngine) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
