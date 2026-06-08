@@ -140,6 +140,73 @@ func TestAgent_should_reject_join_before_child_completes(t *testing.T) {
 	}
 }
 
+// Covers: L5-4-3-03
+func TestAgent_should_timeout_when_exceeded(t *testing.T) {
+	block := make(chan struct{})
+	f := newTestFactory(&blockingEngine{block: block})
+	session := types.NewSession("sess_timeout", "cli", "/tmp")
+	ag, err := f.Create(context.Background(), multiagent.AgentConfig{
+		SessionID:    session.SessionID,
+		WorkDir:      session.WorkDir,
+		InitialInput: "hi",
+		Timeout:      50 * time.Millisecond,
+	}, session)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	_, err = ag.Run(context.Background())
+	if err == nil {
+		close(block)
+		t.Fatal("expected timeout error")
+	}
+	var se *sharederrors.SentinelError
+	if !errors.As(err, &se) || se.Code != sharederrors.CodeAgentTimeout {
+		t.Fatalf("expected AGT_LIFECYCLE_5005, got %v", err)
+	}
+	if ag.State() != multiagent.AgentStateTerminated {
+		t.Fatalf("State() = %s, want TERMINATED", ag.State())
+	}
+}
+
+// Covers: L5-4-3-04
+func TestAgent_should_terminate_children_on_parent_terminate(t *testing.T) {
+	block := make(chan struct{})
+	f := newTestFactory(&blockingEngine{block: block})
+	session := types.NewSession("sess_child_cancel", "cli", "/tmp")
+	parent, err := f.Create(context.Background(), multiagent.AgentConfig{
+		SessionID: session.SessionID,
+		WorkDir:   session.WorkDir,
+	}, session)
+	if err != nil {
+		t.Fatalf("Create parent: %v", err)
+	}
+	child, err := parent.Fork(context.Background(), multiagent.AgentConfig{})
+	if err != nil {
+		t.Fatalf("Fork: %v", err)
+	}
+
+	childDone := make(chan struct{})
+	go func() {
+		defer close(childDone)
+		_, _ = child.Run(context.Background())
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	if err := parent.Terminate(context.Background()); err != nil {
+		t.Fatalf("Terminate parent: %v", err)
+	}
+	select {
+	case <-childDone:
+	case <-time.After(2 * time.Second):
+		close(block)
+		t.Fatal("child did not stop after parent Terminate")
+	}
+	if child.State() != multiagent.AgentStateTerminated {
+		t.Fatalf("child State() = %s, want TERMINATED", child.State())
+	}
+}
+
 func TestAgent_should_cancel_on_terminate(t *testing.T) {
 	block := make(chan struct{})
 	engine := &blockingEngine{block: block}

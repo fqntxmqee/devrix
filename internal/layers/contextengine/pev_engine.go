@@ -315,6 +315,15 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			break
 		}
 
+		for i := range pendingTools {
+			pendingTools[i].ID = ensureToolCallID(pendingTools[i], i)
+		}
+		assistantMsg := buildAssistantToolCallsMessage(sc.SessionID, pendingTools)
+		if assistantText != "" {
+			assistantMsg.Content = assistantText
+		}
+		req.Messages = append(req.Messages, assistantMsg)
+
 		for _, tc := range pendingTools {
 			risk := tc.RiskLevel
 			if risk == "" {
@@ -382,8 +391,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
 			})
 
-			toolMsg := types.NewMessage(fmt.Sprintf("tool_%d", time.Now().UnixNano()), sc.SessionID, types.MessageRoleTool, content)
-			req.Messages = append(req.Messages, *toolMsg)
+			req.Messages = append(req.Messages, buildToolResultMessage(sc.SessionID, tc.ID, content))
 		}
 
 		sc.PEVState.Phase = types.PEVPhaseVerify
