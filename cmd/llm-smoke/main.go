@@ -51,7 +51,7 @@ func main() {
 	if userCfg != nil {
 		permMgr.SetUserConfig(userCfg)
 	}
-	engine := bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, nil)
+	engine := bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, nil, nil)
 
 	prompt := "你好，请用一句话介绍你自己。"
 	if len(os.Args) > 1 {

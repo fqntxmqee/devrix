@@ -2,12 +2,14 @@ package bootstrap
 
 import (
 	"context"
+	"log/slog"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -27,6 +29,7 @@ type ContextEngineBuilder struct {
 	toolCfg      *config.ToolConfig
 	obsBridge    *observability.Bridge
 	milestoneSvc milestone.IMilestoneService
+	agentToolReg *tool.Registry
 }
 
 // NewContextEngineBuilder creates a reusable engine builder.
@@ -36,6 +39,7 @@ func NewContextEngineBuilder(
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	milestoneSvc milestone.IMilestoneService,
+	agentToolReg *tool.Registry,
 ) *ContextEngineBuilder {
 	return &ContextEngineBuilder{
 		stack:        stack,
@@ -43,6 +47,7 @@ func NewContextEngineBuilder(
 		toolCfg:      toolCfg,
 		obsBridge:    obsBridge,
 		milestoneSvc: milestoneSvc,
+		agentToolReg: agentToolReg,
 	}
 }
 
@@ -61,6 +66,16 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 	}
 	planner, longTerm := WireContextV3(b.ctxCfg, b.milestoneSvc)
 	toolReg := contextengine.NewBuiltinToolRegistry(b.toolCfg)
+
+	if b.agentToolReg != nil {
+		plugin := newAgentToolPlugin(b.agentToolReg)
+		if err := toolReg.Register(plugin); err != nil {
+			slog.Error("register call_agent plugin", "error", err)
+		} else {
+			slog.Info("call_agent tool registered", "tools", len(b.agentToolReg.List()))
+		}
+	}
+
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
 		contextengine.NewToolLimiter(b.toolCfg.ConcurrentMax),

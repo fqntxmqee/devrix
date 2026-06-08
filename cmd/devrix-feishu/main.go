@@ -189,10 +189,10 @@ func selectContextEngine(
 		slog.Warn("four_flow engine was removed; using context engine with real LLM")
 		fallthrough
 	case "", "context", "ctx":
-		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc)
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, nil)
 	default:
 		slog.Warn("unknown context engine; using context engine", "requested", engine)
-		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc)
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, nil)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 )
 
 type toolWorkDirKey struct{}
+type toolSessionIDKey struct{}
 
 // WithToolWorkDir attaches the session workspace directory to ctx for tool execution.
 func WithToolWorkDir(ctx context.Context, workDir string) context.Context {
@@ -19,6 +20,19 @@ func WithToolWorkDir(ctx context.Context, workDir string) context.Context {
 // ToolWorkDirFromContext returns the workspace directory for tool execution.
 func ToolWorkDirFromContext(ctx context.Context) string {
 	if v, ok := ctx.Value(toolWorkDirKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// WithToolSessionID attaches the session ID to ctx for tool execution.
+func WithToolSessionID(ctx context.Context, sessionID string) context.Context {
+	return context.WithValue(ctx, toolSessionIDKey{}, sessionID)
+}
+
+// ToolSessionIDFromContext returns the session ID for tool execution.
+func ToolSessionIDFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(toolSessionIDKey{}).(string); ok {
 		return v
 	}
 	return ""

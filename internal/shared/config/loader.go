@@ -27,8 +27,9 @@ type ConfigFile struct {
 	Metrics        MetricsConfig        `yaml:"metrics"`
 	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
 	LLMGateway     LLMGatewayFileConfig `yaml:"llm_gateway"`
-	Tool           ToolConfig           `yaml:"tool"`
-	MultiAgent     MultiAgentFileConfig `yaml:"multi_agent"`
+	Tool           ToolConfig            `yaml:"tool"`
+	MultiAgent     MultiAgentFileConfig  `yaml:"multi_agent"`
+	AgentTools     AgentToolsFileConfig  `yaml:"agent_tools"`
 }
 
 // AppConfig 应用配置
@@ -125,6 +126,20 @@ func LoadMultiAgentConfig(path string) (*MultiAgentConfig, error) {
 	}
 	return BuildMultiAgentConfig(&fileCfg.MultiAgent), nil
 }
+
+
+// LoadAgentToolsConfig loads agent tools configuration from a YAML file path.
+func LoadAgentToolsConfig(path string) (*AgentToolsConfig, error) {
+	if path == "" {
+		return DefaultAgentToolsConfig(), nil
+	}
+	fileCfg, err := LoadConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return BuildAgentToolsConfig(&fileCfg.AgentTools), nil
+}
+
 
 // LoadLLMGatewayConfig loads Layer 3 config from a YAML file path.
 func LoadLLMGatewayConfig(path string) (*LLMGatewayConfig, error) {
