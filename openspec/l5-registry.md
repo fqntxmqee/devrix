@@ -1,7 +1,7 @@
 # Devrix L5 测试点注册表
 
 **Status:** Active
-**Last Updated:** 2026-06-07
+**Last Updated:** 2026-06-08
 
 > L5 测试点是 OpenSpec S5 验收的确定性锚点。新增 L4 能力前 MUST 先在此登记或复用已有 L5。
 
@@ -86,6 +86,17 @@
 | L5 ID | 描述 | L4 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-CTX-10 | L3 长期记忆返回 NotImplemented | L4-CTX-MEMORY | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
+
+### Tool Security (P0)
+
+> 变更：`openspec/changes/devrix-tool-security/`（Demand: DM-20260608-001）
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-TOOL-01 | bash 受限工作目录 + 命令白名单 | L4-TOOL-SANDBOX | `internal/layers/contextengine/sandbox_test.go` | IMPLEMENTED |
+| L5-TOOL-02 | CRITICAL 风险工具永不自动批准 | L4-TOOL-PERMISSION | `internal/layers/communication/gateway/permission_test.go` | IMPLEMENTED |
+| L5-TOOL-03 | 插件工具注册后可在 PEV 中调用 | L4-TOOL-REGISTRY | `internal/layers/contextengine/tool_plugin_test.go` | IMPLEMENTED |
+| L5-TOOL-04 | 并发工具执行隔离 | L4-TOOL-REGISTRY | `internal/layers/contextengine/tool_limiter_test.go` | IMPLEMENTED |
 
 ---
 
@@ -180,3 +191,32 @@
 |-------|------|---------|-----------|--------|
 | L5-EVO-01 | 版本检测与记录 | L4-EVO-VERSION | — | PLANNED |
 | L5-EVO-02 | 配置热更新 | L4-EVO-CONFIG | — | PLANNED |
+
+---
+
+## Layer Extensions: Testing Quality (TEST)
+
+### CTX Layer Extensions (P0)
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-CTX-26 | Verify timeout returns CodeVerifyTimeout | L4-CTX-PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
+| L5-CTX-27 | Shell injection attack prevention | L4-CTX-PEV | `tests/security/shell_injection_test.go` | PLANNED |
+| L5-CTX-28 | PEV concurrent session isolation | L4-CTX-PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| L5-CTX-29 | PEV context cancellation cleanup | L4-CTX-PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| L5-CTX-30 | Compression autocompact timeout fallback | L4-CTX-COMPRESS | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
+
+### LLM Layer Extensions (P1)
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-LLM-17 | LLM 429 rate limit handling | L4-LLM-GATEWAY | `tests/integration/llm_real_api_test.go` | PLANNED |
+| L5-LLM-18 | SSE parse error handling | L4-LLM-ADAPTER | `tests/integration/llm_real_api_test.go` | PLANNED |
+| L5-LLM-19 | Token counter Chinese accuracy | L4-LLM-TOKEN | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
+
+### OBS Layer Extensions (P2)
+
+| L5 ID | 描述 | L4 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-OBS-19 | Compression P99 latency < 500ms | L4-OBS-METRICS | `tests/performance/compression_test.go` | PLANNED |
+| L5-OBS-20 | Concurrent session memory bounded | L4-OBS-METRICS | `tests/performance/memory_test.go` | PLANNED |
