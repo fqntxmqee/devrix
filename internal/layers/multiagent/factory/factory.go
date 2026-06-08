@@ -11,13 +11,20 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/collaboration"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// EngineBuilder constructs a per-agent IEngine with the agent permission gate.
+type EngineBuilder interface {
+	Build(perm multiagent.PermissionGate) contracts.IEngine
+}
 
 // AgentFactory creates multi-agent instances.
 type AgentFactory struct {
 	deps          multiagent.AgentDeps
 	cfg           *sharedconfig.MultiAgentConfig
+	builder       EngineBuilder
 	sessionCounts map[string]int
 	mu            sync.Mutex
 }
@@ -34,6 +41,16 @@ func NewAgentFactory(deps multiagent.AgentDeps, cfg *sharedconfig.MultiAgentConf
 		cfg:           cfg,
 		sessionCounts: make(map[string]int),
 	}
+}
+
+// NewAgentFactoryWithBuilder wires per-agent engines via the supplied builder.
+func NewAgentFactoryWithBuilder(
+	builder EngineBuilder,
+	cfg *sharedconfig.MultiAgentConfig,
+) *AgentFactory {
+	f := NewAgentFactory(multiagent.AgentDeps{}, cfg)
+	f.builder = builder
+	return f
 }
 
 // Create implements multiagent.IAgentFactory.
@@ -55,7 +72,13 @@ func (f *AgentFactory) Create(
 		return nil, err
 	}
 	resolved := resolveConfig(cfg, f.cfg)
-	return agent.New(resolved, session, f.deps, f), nil
+	impl := agent.New(resolved, session, f.deps, f)
+	if f.builder != nil {
+		impl.SetEngine(f.builder.Build(impl.PermissionGate()))
+	} else if f.deps.Engine == nil {
+		impl.SetEngine(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
+	}
+	return impl, nil
 }
 
 // ReleaseSession decrements the session agent quota when an agent terminates.

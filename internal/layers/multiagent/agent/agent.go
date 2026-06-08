@@ -6,6 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
 )
@@ -22,9 +23,11 @@ type Impl struct {
 	state         multiagent.AgentState
 	cfg           multiagent.AgentConfig
 	session       *types.Session
-	deps          multiagent.AgentDeps
-	creator       Creator
-	permGate      *agentPermissionGate
+	deps            multiagent.AgentDeps
+	creator         Creator
+	permGate        *agentPermissionGate
+	engine          contracts.IEngine
+	engineEventSink func(*contracts.EngineEvent)
 	childAgents   map[string]multiagent.Agent
 	messageBuffer []types.Message
 	result        *multiagent.AgentResult
@@ -175,7 +178,41 @@ func (a *Impl) terminateChildren(ctx context.Context) {
 	}
 }
 
-// PermissionGate exposes the agent permission gate for PEVEngine injection (PR4 bootstrap).
-func (a *Impl) PermissionGate() *agentPermissionGate {
+// SetEngine binds the per-agent context engine (with agent permission gate).
+func (a *Impl) SetEngine(engine contracts.IEngine) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.engine = engine
+	if a.deps.Engine == nil {
+		a.deps.Engine = engine
+	}
+}
+
+// SetAgentObserver replaces the agent lifecycle observer.
+func (a *Impl) SetAgentObserver(obs multiagent.AgentObserver) {
+	if obs == nil {
+		obs = observer.NoOpAgentObserver{}
+	}
+	a.deps.AgentObserver = obs
+}
+
+// SetEngineEventSink forwards engine events to gateway/adapters during Run.
+func (a *Impl) SetEngineEventSink(sink func(*contracts.EngineEvent)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.engineEventSink = sink
+}
+
+func (a *Impl) processEngine() contracts.IEngine {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.engine != nil {
+		return a.engine
+	}
+	return a.deps.Engine
+}
+
+// PermissionGate exposes the agent permission gate for PEVEngine injection.
+func (a *Impl) PermissionGate() multiagent.PermissionGate {
 	return a.permGate
 }

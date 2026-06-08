@@ -70,7 +70,11 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 		input = "continue"
 	}
 
-	eventCh := a.deps.Engine.Process(ctx, a.session, input)
+	engine := a.processEngine()
+	if engine == nil {
+		return nil, sharederrors.WithCode("AGT_ENGINE_ERROR", "engine not configured", nil)
+	}
+	eventCh := engine.Process(ctx, a.session, input)
 	var finalText string
 
 	for ev := range eventCh {
@@ -82,6 +86,10 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 				return nil, sharederrors.NewAgentTimeoutError(a.id, a.cfg.Timeout.String())
 			}
 			return nil, sharederrors.NewAgentContextCancelledError(a.id)
+		}
+
+		if a.engineEventSink != nil {
+			a.engineEventSink(ev)
 		}
 
 		switch ev.Type {

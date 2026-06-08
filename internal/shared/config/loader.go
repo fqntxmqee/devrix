@@ -28,6 +28,7 @@ type ConfigFile struct {
 	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
 	LLMGateway     LLMGatewayFileConfig `yaml:"llm_gateway"`
 	Tool           ToolConfig           `yaml:"tool"`
+	MultiAgent     MultiAgentFileConfig `yaml:"multi_agent"`
 }
 
 // AppConfig 应用配置
@@ -111,6 +112,18 @@ func LoadToolConfig(path string) (*ToolConfig, error) {
 		return nil, err
 	}
 	return BuildToolConfig(fileCfg), nil
+}
+
+// LoadMultiAgentConfig loads Layer 4 multi-agent settings from a YAML file path.
+func LoadMultiAgentConfig(path string) (*MultiAgentConfig, error) {
+	if path == "" {
+		return DefaultMultiAgentConfig(), nil
+	}
+	fileCfg, err := LoadConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return BuildMultiAgentConfig(&fileCfg.MultiAgent), nil
 }
 
 // LoadLLMGatewayConfig loads Layer 3 config from a YAML file path.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -79,10 +78,14 @@ type AgentResult struct {
 	Duration time.Duration
 }
 
+// PermissionGate approves tool execution (implemented by AgentPermissionGate).
+type PermissionGate interface {
+	Request(ctx context.Context, sessionID, toolName, input string, risk types.RiskLevel) bool
+}
+
 // AgentDeps are injected dependencies for agent construction.
 type AgentDeps struct {
 	Engine        contracts.IEngine
-	Observer      contextengine.IObserver
 	AgentObserver AgentObserver
 }
 
@@ -120,4 +123,6 @@ type Agent interface {
 	Wait(ctx context.Context) (*AgentResult, error)
 	ResolvePermission(toolName string, granted bool)
 	GetMessages() []types.Message
+	SetAgentObserver(AgentObserver)
+	SetEngineEventSink(func(*contracts.EngineEvent))
 }

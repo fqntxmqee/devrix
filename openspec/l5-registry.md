@@ -218,7 +218,7 @@
 
 | L5 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | PLANNED |
+| L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | IMPLEMENTED |
 
 ### L1-4: Cross-Module Tests
 
@@ -226,8 +226,8 @@
 |-------|------|-----------|--------|
 | L5-4-0-01 | Agent 并发安全 (-race) | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-0-02 | Fork 消息隔离并发安全 | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
-| L5-4-0-03 | Gateway → ResolvePermission 集成全流程 | `tests/integration/agent_integration_test.go` | PLANNED |
-| L5-4-0-04 | E2E Fork 端到端 | `tests/e2e/agent_fork_e2e_test.go` | PLANNED |
+| L5-4-0-03 | Gateway → ResolvePermission 集成全流程 | `tests/integration/agent_integration_test.go` | IMPLEMENTED |
+| L5-4-0-04 | E2E Fork 端到端 | `tests/e2e/agent_fork_e2e_test.go` | IMPLEMENTED |
 
 ---
 

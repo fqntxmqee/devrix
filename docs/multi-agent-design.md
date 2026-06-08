@@ -2,7 +2,7 @@
 
 **文档类型:** 详细架构设计（遵循 `docs/detail design framework.md`）
 **Change ID:** devrix-multi-agent
-**Demand ID:** DM-20260608-001
+**Demand ID:** DM-20260608-005
 **版本:** 1.0.0
 **状态:** Design Review（Grill 审查通过，6 决策已合入，2026-06-08）
 **关联 OpenSpec:** `openspec/specs/multi_agent_layer_delta.md`

@@ -5,7 +5,7 @@ meta:
   change_id: devrix-multi-agent
   demand_id: DM-20260608-005
   title: "Multi-Agent Layer V1 — Agent 生命周期、Fork/Join、Collaboration Modes"
-  status: s4_development
+  status: s5_acceptance
   priority: P0
   owner: devrix-team
   created_at: "2026-06-08"
@@ -91,7 +91,7 @@ deliverables:
   - path: internal/layers/multiagent/observer/noop.go
     status: pending
   - path: internal/bootstrap/multi_agent.go
-    status: pending
+    status: completed
   - path: internal/shared/errors/multiagent.go
     status: completed
   - path: internal/shared/config/multiagent.go
@@ -106,7 +106,7 @@ version_scope:
       - "AgentPermissionGate 异步权限 (ResolvePermission)"
       - "Observer 适配器桥接到 contextengine.IObserver"
       - "Bootstrap WireMultiAgent 引导集成"
-    status: s4_development
+    status: s5_acceptance
     tasks: T1-T16
     estimate: 40h
   v1.1:
@@ -147,7 +147,7 @@ task_milestones:
     name: "Bootstrap 集成 + 测试"
     tasks: T16
     estimate: 8h
-    status: pending
+    status: completed
 
 external_dependencies:
   - component: gateway.IContextEngine
