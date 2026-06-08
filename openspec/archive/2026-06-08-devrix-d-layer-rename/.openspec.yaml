@@ -5,12 +5,13 @@ meta:
   change_id: devrix-d-layer-rename
   demand_id: DM-20260608-007
   title: "架构分层命名从 L1-X 迁移至 D1-D6"
-  status: s5_accepted
+  status: s7_archived
   priority: P1
   owner: architecture
   created_at: "2026-06-08"
   updated_at: "2026-06-08"
   completed_at: "2026-06-08"
+  archived_at: "2026-06-08"
 
 scope:
   layers:
@@ -49,7 +50,7 @@ version_scope:
       - 项目规范（specs/project/）更新
       - 入口文件（AGENTS/CLAUDE/GEMINI/Cursor）更新
       - 层级增量文件标题更新
-    status: s5_accepted
+    status: s7_archived
     tasks: T1-T6
     estimate: 4h
 

@@ -17,6 +17,7 @@
 | DM-20260608-004 | 测试质量增强（边界/VCR/断言/性能基线） | devrix-testing-quality | 2026-06-08 | [#6](https://github.com/fqntxmqee/devrix/pull/6) | ACCEPTED |
 | DM-20260608-005 | Multi-Agent Layer V1（生命周期 + Fork/Join + 协作模式） | devrix-multi-agent | 2026-06-08 | [#7](https://github.com/fqntxmqee/devrix/pull/7) | ACCEPTED |
 | DM-20260608-006 | Feishu Card Adapter Redesign | devrix-feishu-cards | 2026-06-08 | — | ACCEPTED |
+| DM-20260608-007 | 架构分层命名从 L1-X 迁移至 D1-D6 | devrix-d-layer-rename | 2026-06-08 | — | ACCEPTED |
 
 ## Archive Locations
 
@@ -37,6 +38,7 @@
 | devrix-testing-quality | `openspec/archive/2026-06-08-devrix-testing-quality/` |
 | devrix-multi-agent | `openspec/archive/2026-06-08-devrix-multi-agent/` |
 | devrix-feishu-cards | `openspec/archive/2026-06-08-devrix-feishu-cards/` |
+| devrix-d-layer-rename | `openspec/archive/2026-06-08-devrix-d-layer-rename/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
@@ -44,3 +46,4 @@
 | Change ID | Path | 状态 |
 |-----------|------|------|
 | devrix-v3 | `openspec/changes/devrix-v3/` | 部分完成（钉钉 Adapter 未实现） |
+| devrix-layering-standard | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |

@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d-layer-rename
 **Demand ID:** DM-20260608-007
-**Status:** S5 Accepted
+**Status:** Archived
 
 ---
 

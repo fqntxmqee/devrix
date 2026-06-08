@@ -3,7 +3,7 @@ demand-id: DM-20260608-007
 title: 架构分层命名从 L1-X 迁移至 D1-D6
 source: 项目架构规范
 priority: P1
-status: DELIVERED
+status: ARCHIVED
 l1-domain: architecture
 created: 2026-06-08
 ---
