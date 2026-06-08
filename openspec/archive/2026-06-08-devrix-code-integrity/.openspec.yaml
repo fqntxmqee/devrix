@@ -1,0 +1,13 @@
+change_id: devrix-code-integrity
+priority: P0
+demand_id: DM-20260608-009
+status: s7_archived
+completed_at: "2026-06-08"
+archived_at: "2026-06-08"
+domains: [D0, D1, D6]
+l5_points: [L5-0-1-01, L5-0-1-02, L5-0-1-03, L5-0-1-04, L5-0-1-05, L5-0-1-06, L5-0-1-07, L5-0-1-08, L5-0-1-09]
+estimated_hours: 12
+version_scope:
+  v1.0: 规范发布 + type assertion 修复 + D1 L5 补全
+  v1.1: 命名/异味清理
+  v2.0: D6 L5 实现（备选）

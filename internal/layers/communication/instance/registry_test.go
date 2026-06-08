@@ -47,3 +47,25 @@ func TestInstanceRegistry_RegisterUnregister(t *testing.T) {
 		t.Fatalf("count after unregister = %d", reg.Count())
 	}
 }
+
+// Covers: CQS — GetInstances read-only
+func TestInstanceRegistry_GetInstances_doesNotMutateStatus(t *testing.T) {
+	reg := NewInstanceRegistry(10 * time.Millisecond)
+	ctx := context.Background()
+
+	if err := reg.Register(ctx, &InstanceInfo{ID: "i-1", Name: "n", Port: 8080}); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	list, err := reg.GetInstances(ctx)
+	if err != nil {
+		t.Fatalf("GetInstances() error = %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len = %d", len(list))
+	}
+	if list[0].Status != "healthy" {
+		t.Fatalf("GetInstances mutated status to %q", list[0].Status)
+	}
+}

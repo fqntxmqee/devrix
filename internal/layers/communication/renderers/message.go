@@ -8,18 +8,18 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// CLRenderer renders CLI output with ANSI colors
-type CLRenderer struct {
+// CLIRenderer renders CLI output with ANSI colors
+type CLIRenderer struct {
 	ansi config.ANSIConfig
 }
 
-// NewCLIRenderer creates a new CLRenderer
-func NewCLIRenderer(ansi config.ANSIConfig) *CLRenderer {
-	return &CLRenderer{ansi: ansi}
+// NewCLIRenderer creates a new CLIRenderer
+func NewCLIRenderer(ansi config.ANSIConfig) *CLIRenderer {
+	return &CLIRenderer{ansi: ansi}
 }
 
 // RenderMessage renders a message with appropriate coloring
-func (r *CLRenderer) RenderMessage(msg *types.OutboundMessage) {
+func (r *CLIRenderer) RenderMessage(msg *types.OutboundMessage) {
 	var color string
 	switch msg.Role {
 	case types.MessageRoleUser:
@@ -38,7 +38,7 @@ func (r *CLRenderer) RenderMessage(msg *types.OutboundMessage) {
 }
 
 // RenderStreamingMessage renders a streaming message (incremental)
-func (r *CLRenderer) RenderStreamingMessage(content string, isComplete bool) {
+func (r *CLIRenderer) RenderStreamingMessage(content string, isComplete bool) {
 	if isComplete {
 		fmt.Printf("%s%s%s\n", r.ansi.Assistant, content, r.ansi.Reset)
 	} else {
@@ -48,12 +48,12 @@ func (r *CLRenderer) RenderStreamingMessage(content string, isComplete bool) {
 }
 
 // RenderError renders an error message
-func (r *CLRenderer) RenderError(err error) {
+func (r *CLIRenderer) RenderError(err error) {
 	fmt.Printf("%sError: %s%s\n", r.ansi.Error, err.Error(), r.ansi.Reset)
 }
 
 // RenderStatus renders a status message
-func (r *CLRenderer) RenderStatus(state types.SessionState) {
+func (r *CLIRenderer) RenderStatus(state types.SessionState) {
 	var statusText string
 	var color string
 
@@ -89,7 +89,7 @@ func (r *CLRenderer) RenderStatus(state types.SessionState) {
 }
 
 // RenderPermissionRequest renders a permission request card
-func (r *CLRenderer) RenderPermissionRequest(req *types.PermissionRequest) {
+func (r *CLIRenderer) RenderPermissionRequest(req *types.PermissionRequest) {
 	border := strings.Repeat("-", 50)
 	riskColor := r.getRiskColor(req.RiskLevel)
 
@@ -109,7 +109,7 @@ func (r *CLRenderer) RenderPermissionRequest(req *types.PermissionRequest) {
 }
 
 // RenderToolCall renders a tool call
-func (r *CLRenderer) RenderToolCall(toolName string, args string) {
+func (r *CLIRenderer) RenderToolCall(toolName string, args string) {
 	fmt.Printf("%s🔧 Tool: %s%s\n", r.ansi.Warning, toolName, r.ansi.Reset)
 	if args != "" {
 		fmt.Printf("Args:\n%s\n", indent(args, "  "))
@@ -117,7 +117,7 @@ func (r *CLRenderer) RenderToolCall(toolName string, args string) {
 }
 
 // RenderToolResult renders a tool result
-func (r *CLRenderer) RenderToolResult(output string, err error) {
+func (r *CLIRenderer) RenderToolResult(output string, err error) {
 	if err != nil {
 		fmt.Printf("%s✗ Error: %s%s\n", r.ansi.Error, err.Error(), r.ansi.Reset)
 	} else {
@@ -129,7 +129,7 @@ func (r *CLRenderer) RenderToolResult(output string, err error) {
 }
 
 // RenderComplete renders a completion message with stats
-func (r *CLRenderer) RenderComplete(usage map[string]int) {
+func (r *CLIRenderer) RenderComplete(usage map[string]int) {
 	fmt.Printf("%s✓ Complete%s\n", r.ansi.Assistant, r.ansi.Reset)
 	if usage != nil {
 		fmt.Println("Usage:")
@@ -140,7 +140,7 @@ func (r *CLRenderer) RenderComplete(usage map[string]int) {
 }
 
 // getRiskColor returns the color for a risk level
-func (r *CLRenderer) getRiskColor(level types.RiskLevel) string {
+func (r *CLIRenderer) getRiskColor(level types.RiskLevel) string {
 	switch level {
 	case types.RiskLevelCritical:
 		return r.ansi.Error

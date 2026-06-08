@@ -97,13 +97,8 @@ func (r *InstanceRegistry) GetInstances(ctx context.Context) ([]*InstanceInfo, e
 	defer r.mu.RUnlock()
 
 	result := make([]*InstanceInfo, 0, len(r.instances))
-	now := time.Now()
 
 	for _, inst := range r.instances {
-		// Update status based on last seen
-		if now.Sub(inst.LastSeen) > r.timeout {
-			inst.Status = "unhealthy"
-		}
 		result = append(result, inst)
 	}
 

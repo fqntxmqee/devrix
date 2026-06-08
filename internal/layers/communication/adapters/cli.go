@@ -20,7 +20,7 @@ import (
 // CLIAdapter provides a command-line interface for the communication layer
 type CLIAdapter struct {
 	gateway  *gateway.CommunicationGateway
-	renderer *renderers.CLRenderer
+	renderer *renderers.CLIRenderer
 	cfg      *config.CommunicationConfig
 	reader   *bufio.Reader
 	writer   io.Writer

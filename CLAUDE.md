@@ -42,7 +42,7 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 
 - **错误处理**: 使用 `internal/shared/errors/` SentinelError 模式，禁止 `panic` 用于业务错误
 - **配置**: `devrix.yaml`（默认）→ `config.yaml`（本地覆盖）→ 环境变量 → CLI flags
-- **不可变性**: 创建新对象，禁止原地修改
+- **不可变性**: 值对象不可变（`With*` 返回新副本）；实体通过 method 加锁变更状态。详见 `openspec/specs/project/coding.md` §9
 - **文件规模**: 函数 < 50 行，文件 < 800 行
 - **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge
 - **L5 测试**: 编号 `L5-{D}-{S}-{NN}`，注册在 `openspec/l5-registry.md`

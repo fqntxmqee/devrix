@@ -178,3 +178,45 @@ import (
 - [ ] 新文件在正确 D-S 目录下
 - [ ] 函数 < 50 行，文件 < 800 行
 - [ ] 无硬编码密钥/凭证
+
+---
+
+## 9. 代码完整性
+
+### 9.1 不可变性分层策略
+
+| 类型类别 | 允许变异 | 要求 | 示例 |
+|---------|---------|------|------|
+| 值对象 (Value Object) | 不可变 | `With*()` 返回新副本 | Attachment, AuthConfig |
+| 聚合根/实体 (Entity) | 受控可变 | method + 内部锁，禁止外部直接改字段 | Session, Milestone |
+| Service/Manager | 内部可变 | 对外暴露只读视图或副本 | AuthService, SessionStore |
+| 基础设施 | 自由 | Timer、sync.Mutex | — |
+
+### 9.2 值对象不可变模式
+
+```go
+// CORRECT
+func (a *Attachment) WithName(name string) *Attachment {
+    return &Attachment{Type: a.Type, Name: name, Path: a.Path, Content: a.Content}
+}
+```
+
+### 9.3 实体受控可变模式
+
+```go
+// CORRECT
+func (s *Session) SetState(state SessionState) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.State = state
+    s.UpdatedAt = time.Now()
+}
+```
+
+### 9.4 不安全类型断言
+
+禁止 `.(*ConcreteType)` 裸断言；使用 type switch 或 `ok` 模式。
+
+### 9.5 命令查询分离 (CQS)
+
+读方法（Get/List/Count）不得修改状态；状态刷新使用独立写方法（如 `HealthCheck`）。

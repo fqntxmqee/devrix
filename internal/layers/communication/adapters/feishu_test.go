@@ -14,7 +14,7 @@ import (
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
 
-// TestFeishuMessageParsing 测试飞书消息解析
+// Covers: L5-1-2-01, L5-0-1-08
 func TestFeishuMessageParsing(t *testing.T) {
 	// 构造一个模拟的飞书消息事件
 	eventJSON := `{

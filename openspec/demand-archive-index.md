@@ -20,6 +20,7 @@
 | DM-20260608-007 | 架构分层命名从 L1-X 迁移至 D1-D6 | devrix-d-layer-rename | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-008 | Communication Layer V3 功能补全 | devrix-v3 | 2026-06-08 | — | ACCEPTED |
 | DM-20260608-010 | Communication V3 集成补全 | devrix-v3-integration | 2026-06-08 | — | ACCEPTED |
+| DM-20260608-009 | Devrix 代码健康规范 | devrix-code-integrity | 2026-06-08 | — | ACCEPTED |
 
 ## Archive Locations
 

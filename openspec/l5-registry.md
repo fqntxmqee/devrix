@@ -33,7 +33,7 @@
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-1-1-01 | 新会话创建 CLI 会话入库被拒绝 | Gateway | `tests/integration/gateway_session_test.go` | PLANNED | P0 |
+| L5-1-1-01 | 新会话创建被拒绝 | Gateway | `tests/acceptance/p0/comm_gateway_flow_test.go` | IMPLEMENTED | P0 |
 | L5-1-1-02 | IM 入口实例 Register/Unregister | Gateway | `internal/layers/communication/instance/registry_test.go` | IMPLEMENTED | P2 |
 
 ### D1-S5: Milestone Module
@@ -50,22 +50,22 @@
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-1-3-01 | /new 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P0 |
-| L5-1-3-02 | /help 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P1 |
-| L5-1-3-03 | /stop 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P1 |
+| L5-1-3-01 | /new 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | IMPLEMENTED | P0 |
+| L5-1-3-02 | /help 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | IMPLEMENTED | P1 |
+| L5-1-3-03 | /stop 命令解析正确 | Commands | `tests/acceptance/p0/comm_commands_test.go` | IMPLEMENTED | P1 |
 
 ### D1-S8: Renderers Module
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-1-8-01 | ShortId 唯一且排除异议字符 | Renderers | `internal/shared/types/shortid_test.go` | PLANNED | P1 |
+| L5-1-8-01 | ShortId 唯一且排除异议字符 | Renderers | `internal/shared/types/shortid_test.go` | IMPLEMENTED | P1 |
 | L5-1-8-02 | ProgressBar / StatusBadge 渲染输出合法 | Renderers | `internal/layers/communication/renderers/components_test.go` | IMPLEMENTED | P2 |
 
 ### D1-S2: Adapters Module
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | PLANNED | P1 |
+| L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | IMPLEMENTED | P1 |
 | L5-1-2-02 | 钉钉 Webhook 入站路由 + Session 出站 | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
 | L5-1-2-03 | 钉钉 milestone 出站走 CardRenderer | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
 
@@ -308,13 +308,13 @@
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-6-1-01 | 版本检测与记录 | Version | `internal/layers/evolution/version/version_test.go` | PLANNED | P2 |
+| L5-6-1-01 | 版本检测与记录（PlannedVersion: v2.1.0） | Version | `internal/layers/evolution/version/version_test.go` | PLANNED | P2 |
 
 ### D6-S2: Config Module
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-6-2-01 | 配置热更新 | Config | `internal/layers/evolution/config/hotreload_test.go` | PLANNED | P2 |
+| L5-6-2-01 | 配置热更新（PlannedVersion: v2.2.0） | Config | `internal/layers/evolution/config/hotreload_test.go` | PLANNED | P2 |
 
 ---
 
@@ -327,15 +327,15 @@
 
 | L5 ID | 描述 | Test 位置 | Status | Priority |
 |-------|------|-----------|--------|----------|
-| L5-0-1-01 | `coding.md §9` 包含不可变性分层规范 | `openspec/specs/project/coding.md` §9 | PLANNED | P0 |
-| L5-0-1-02 | CLAUDE.md 引用新规范 | `CLAUDE.md` | PLANNED | P0 |
-| L5-0-1-03 | emitEvent 处理 EventConnectionLostData 不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
-| L5-0-1-04 | emitEvent 处理 EventConnectionRestoredData 不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
-| L5-0-1-05 | emitEvent 处理未知类型不 panic | `internal/layers/communication/connection/manager_test.go` | PLANNED | P1 |
-| L5-0-1-06 | 新会话创建被拒绝 | `tests/acceptance/p0/comm_gateway_flow_test.go` | PLANNED | P0 |
-| L5-0-1-07 | /new /help /stop 命令解析正确 | `tests/acceptance/p0/comm_commands_test.go` | PLANNED | P0 |
-| L5-0-1-08 | 飞书消息解析正确 | `internal/layers/communication/adapters/feishu_test.go` | PLANNED | P1 |
-| L5-0-1-09 | D6 L5 注册表条目包含目标版本 | `openspec/l5-registry.md` | PLANNED | P1 |
+| L5-0-1-01 | `coding.md §9` 包含不可变性分层规范 | `openspec/specs/project/coding.md` §9 | IMPLEMENTED | P0 |
+| L5-0-1-02 | CLAUDE.md 引用新规范 | `CLAUDE.md` | IMPLEMENTED | P0 |
+| L5-0-1-03 | emitEvent 处理 EventConnectionLostData 不 panic | `internal/layers/communication/connection/manager_test.go` | IMPLEMENTED | P1 |
+| L5-0-1-04 | emitEvent 处理 EventConnectionRestoredData 不 panic | `internal/layers/communication/connection/manager_test.go` | IMPLEMENTED | P1 |
+| L5-0-1-05 | emitEvent 处理未知类型不 panic | `internal/layers/communication/connection/manager_test.go` | IMPLEMENTED | P1 |
+| L5-0-1-06 | 新会话创建被拒绝 | `tests/acceptance/p0/comm_gateway_flow_test.go` | IMPLEMENTED | P0 |
+| L5-0-1-07 | /new /help /stop 命令解析正确 | `tests/acceptance/p0/comm_commands_test.go` | IMPLEMENTED | P0 |
+| L5-0-1-08 | 飞书消息解析正确 | `internal/layers/communication/adapters/feishu_test.go` | IMPLEMENTED | P1 |
+| L5-0-1-09 | D6 L5 注册表条目包含目标版本 | `openspec/l5-registry.md` | IMPLEMENTED | P1 |
 
 ---
 

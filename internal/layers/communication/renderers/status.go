@@ -54,11 +54,3 @@ func (r *StatusRenderer) getStateInfo(state types.SessionState) (string, string)
 func clearLine() string {
 	return "\r\033[K"
 }
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

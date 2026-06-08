@@ -2,6 +2,7 @@ package connection
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -295,10 +296,23 @@ func (m *ConnectionManager) handleConnectionRestored(conn *Connection) {
 
 // emitEvent 发出事件（可以通过事件总线发送）
 func (m *ConnectionManager) emitEvent(event *types.DomainEvent) {
-	slog.Debug("emitting event",
-		"type", event.Type,
-		"connection_id", event.Data.(*types.EventConnectionLostData).ConnectionID,
-	)
+	switch data := event.Data.(type) {
+	case *types.EventConnectionLostData:
+		slog.Debug("emitting event",
+			"type", event.Type,
+			"connection_id", data.ConnectionID,
+		)
+	case *types.EventConnectionRestoredData:
+		slog.Debug("emitting event",
+			"type", event.Type,
+			"connection_id", data.ConnectionID,
+		)
+	default:
+		slog.Warn("emitting unknown event type",
+			"type", event.Type,
+			"data_type", fmt.Sprintf("%T", event.Data),
+		)
+	}
 }
 
 // Stop 停止连接管理器
