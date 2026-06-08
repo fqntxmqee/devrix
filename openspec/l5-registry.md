@@ -204,8 +204,8 @@
 |-------|------|---------|-----------|--------|
 | L5-4-3-01 | Fork/Join 消息隔离模型 | ForkJoin | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-3-02 | Fork 双层限额 MaxChildren+MaxTotalAgents | ForkJoin | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
-| L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
-| L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | PLANNED |
+| L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 
 ### L1-4-L2-4: Collaboration Module
 
