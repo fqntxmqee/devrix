@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-tool-security
 **Demand ID:** DM-20260608-001
-**Status:** S2 Design
+**Status:** S5 Accepted
 **Author:** Architecture
 **Date:** 2026-06-08
 
