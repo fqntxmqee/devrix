@@ -1,10 +1,12 @@
 # Devrix - OpenSpec Project Metadata
 
-**Project Name:** Devrix - 开发大脑
+**Project Name:** Devrix - 开放大脑
 **Project Type:** Go CLI Application
 **Spec Version:** 1.0.0
+**Layering Spec:** `openspec/specs/architecture/layering.md`
+**L5 Registry:** `openspec/l5-registry.md`
 **Created:** 2026-06-06
-**Status:** Draft
+**Status:** Active
 
 ---
 
@@ -32,33 +34,101 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | Storage | File System (JSON) | - |
 | LLM | Anthropic, DeepSeek, OpenAI Compatible | - |
 
-## Six-Layer Architecture
+---
 
-| Layer | Name | Responsibility |
-|-------|------|----------------|
-| ① | Communication Layer | IM Gateway, WebSocket, CLI adapter |
-| ② | Context Engine Layer | PEV Engine, 7-step compression, layered memory |
-| ③ | LLM Gateway Layer | Model adapter, circuit breaker, token counter |
-| ④ | Multi-Agent Layer | Agent lifecycle, fork, collaboration modes |
-| ⑤ | Observability Layer | Tracing, metrics, logging |
-| ⑥ | Evolution Layer | Version management, A/B testing |
+## Layer 1 (L1) - Top-Level Architecture
 
-## Version Scope
+| L1 ID | Layer Name | Responsibility |
+|-------|------------|----------------|
+| **L1-1** | Communication Layer | IM Gateway, WebSocket, CLI adapter |
+| **L1-2** | Context Engine Layer | PEV Engine, 7-step compression, layered memory |
+| **L1-3** | LLM Gateway Layer | Model adapter, circuit breaker, token counter |
+| **L1-4** | Multi-Agent Layer | Agent lifecycle, fork, collaboration modes |
+| **L1-5** | Observability Layer | Tracing, metrics, logging |
+| **L1-6** | Evolution Layer | Version management, A/B testing |
 
-| Version | Milestone | Features |
-|---------|-----------|----------|
-| V1 | MVP | CLI mode, basic context compression (steps 1-5,7), single/simple agent |
-| V2 | Enhanced | IM adapters, autocompact (step 6), rate limiter |
-| V3 | Full | All features, milestone DAG, peer-review, full collaboration modes |
+---
+
+## Layer 2 (L2) - Sub-Modules
+
+### L1-1 Communication Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-1-L2-1 | Gateway | 消息网关、路由、会话管理 |
+| L1-1-L2-2 | Adapters | 飞书、WebSocket、CLI 适配器 |
+| L1-1-L2-3 | Commands | CLI 命令解析 (/new, /stop, /help) |
+| L1-1-L2-4 | Auth | 认证与授权 |
+| L1-1-L2-5 | Milestone | 里程碑跟踪 |
+| L1-1-L2-6 | RateLimit | 限流控制 |
+| L1-1-L2-7 | Metrics | 通信层指标 |
+| L1-1-L2-8 | Renderers | 消息渲染器 |
+
+### L1-2 Context Engine Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-2-L2-1 | PEV | Plan-Execute-Verify 循环引擎 |
+| L1-2-L2-2 | Compression | 七步压缩管道 |
+| L1-2-L2-3 | Memory | 分层记忆管理 (Working/LongTerm) |
+| L1-2-L2-4 | Token | Token 计数与预算管理 |
+| L1-2-L2-5 | Registry | 操作注册表 |
+| L1-2-L2-6 | Snapshot | 上下文快照 |
+| L1-2-L2-7 | Prompt | Prompt 模板管理 |
+| L1-2-L2-8 | Sandbox | 工具沙箱隔离 |
+
+### L1-3 LLM Gateway Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-3-L2-1 | Adapter | 模型适配器 (DeepSeek, MiniMax) |
+| L1-3-L2-2 | Gateway | LLM 路由与聚合 |
+| L1-3-L2-3 | Breaker | 熔断器 |
+| L1-3-L2-4 | Retry | 重试策略 |
+| L1-3-L2-5 | Token | Token 计数 |
+| L1-3-L2-6 | Config | 配置加载 |
+
+### L1-4 Multi-Agent Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-4-L2-1 | Factory | Agent 工厂 |
+| L1-4-L2-2 | Agent | Agent 生命周期管理 |
+| L1-4-L2-3 | Permission | 权限管道 |
+| L1-4-L2-4 | Fork | Agent Fork/Join |
+| L1-4-L2-5 | Observer | 事件观察者 |
+
+### L1-5 Observability Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-5-L2-1 | Tracer | 分布式追踪 |
+| L1-5-L2-2 | Metrics | 指标收集 |
+| L1-5-L2-3 | Logger | 日志记录 |
+| L1-5-L2-4 | Exporter | 数据导出 |
+| L1-5-L2-5 | Coverage | 操作覆盖率 |
+| L1-5-L2-6 | Telemetry | 遥测数据 |
+| L1-5-L2-7 | Settings | 配置管理 |
+
+### L1-6 Evolution Layer Modules
+
+| L2 ID | Module | Responsibility |
+|-------|--------|----------------|
+| L1-6-L2-1 | Version | 版本检测与记录 |
+| L1-6-L2-2 | Config | 配置热更新 |
+
+---
 
 ## Data Flow
 
 ```
 User → Communication → Context Engine → LLM Gateway → Multi-Agent → Observability → Evolution → User
-                ↓              ↓              ↓            ↓            ↓
-              Session        PEV           Model        Tool        Trace
-              Store          Compress      Breaker      Permission  Metrics
+           ↓              ↓              ↓            ↓            ↓
+         Session       PEV           Model        Tool        Trace
+         Store       Compress       Breaker     Permission  Metrics
 ```
+
+---
 
 ## Design Principles
 
@@ -68,7 +138,9 @@ User → Communication → Context Engine → LLM Gateway → Multi-Agent → Ob
 4. **Explicit Over Implicit** - No magic, clear dependencies
 5. **Concurrency Safety** - Use channels or mutexes, document ownership
 6. **Minimum Coverage** - 80% test coverage
-7. **L5-Driven Testing** - All L4 changes MUST map to L5 test points (see `l5-registry.md`)
+7. **L5-Driven Testing** - All L4/L3 changes MUST map to L5 test points (see `l5-registry.md`)
+
+---
 
 ## Directory Structure
 
@@ -79,39 +151,83 @@ devrix/
 │       └── main.go              # Entry point
 ├── internal/
 │   ├── layers/
-│   │   ├── communication/        # Layer 1
-│   │   ├── contextengine/       # Layer 2
-│   │   ├── llmgateway/          # Layer 3
-│   │   ├── multiagent/          # Layer 4
-│   │   ├── observability/        # Layer 5
-│   │   └── evolution/           # Layer 6
+│   │   ├── communication/        # L1-1
+│   │   │   ├── gateway/        # L1-1-L2-1
+│   │   │   ├── adapters/       # L1-1-L2-2
+│   │   │   ├── commands/       # L1-1-L2-3
+│   │   │   ├── auth/          # L1-1-L2-4
+│   │   │   ├── milestone/     # L1-1-L2-5
+│   │   │   ├── ratelimit/     # L1-1-L2-6
+│   │   │   ├── metrics/       # L1-1-L2-7
+│   │   │   └── renderers/     # L1-1-L2-8
+│   │   ├── contextengine/     # L1-2
+│   │   │   ├── pev/           # L1-2-L2-1
+│   │   │   ├── compression/   # L1-2-L2-2
+│   │   │   ├── memory/        # L1-2-L2-3
+│   │   │   ├── token/         # L1-2-L2-4
+│   │   │   ├── registry/      # L1-2-L2-5
+│   │   │   ├── snapshot/      # L1-2-L2-6
+│   │   │   ├── prompt/        # L1-2-L2-7
+│   │   │   └── sandbox/       # L1-2-L2-8
+│   │   ├── llmgateway/        # L1-3
+│   │   │   ├── adapter/       # L1-3-L2-1
+│   │   │   ├── gateway/       # L1-3-L2-2
+│   │   │   ├── breaker/       # L1-3-L2-3
+│   │   │   ├── retry/         # L1-3-L2-4
+│   │   │   ├── token/         # L1-3-L2-5
+│   │   │   └── config/        # L1-3-L2-6
+│   │   ├── observability/     # L1-5
+│   │   │   ├── tracer/        # L1-5-L2-1
+│   │   │   ├── metrics/       # L1-5-L2-2
+│   │   │   ├── logger/        # L1-5-L2-3
+│   │   │   ├── exporter/      # L1-5-L2-4
+│   │   │   ├── coverage/      # L1-5-L2-5
+│   │   │   ├── telemetry/     # L1-5-L2-6
+│   │   │   └── settings/      # L1-5-L2-7
+│   │   └── multiagent/        # L1-4 (待实现)
 │   └── shared/
-│       ├── types/               # Shared type definitions
-│       ├── config/              # Configuration management
-│       ├── errors/              # Error definitions
-│       └── utils/               # Utility functions
+│       ├── types/
+│       ├── config/
+│       ├── errors/
+│       └── utils/
 ├── pkg/
-│   └── i18n/                   # Internationalization
+│   └── i18n/
 ├── openspec/
-│   ├── project.md               # This file
-│   ├── l5-registry.md           # L5 测试点注册表（验收锚点）
-│   ├── specs/                   # Source of Truth specs
-│   │   ├── testing-framework/   # 测试框架规范（强制）
-│   │   └── *_layer_delta.md     # 各层 Delta 规格
-│   └── changes/                 # Change proposals
+│   ├── project.md             # This file
+│   ├── l5-registry.md         # L5 测试点注册表
+│   ├── specs/
+│   │   ├── architecture/
+│   │   │   └── layering.md    # 分层架构规范
+│   │   ├── testing-framework/
+│   │   └── testing-quality/
+│   └── changes/
 ├── tests/
-│   ├── testutil/                # 跨包 Mock / Fixture
-│   ├── integration/             # //go:build integration
-│   ├── e2e/                     # //go:build smoke
-│   └── acceptance/              # //go:build acceptance (L5 P0/P1/P2)
+│   ├── testutil/
+│   ├── integration/           # //go:build integration
+│   ├── e2e/                  # //go:build smoke
+│   ├── acceptance/            # //go:build acceptance
+│   │   └── p0/
+│   ├── performance/           # //go:build performance
+│   └── security/              # //go:build security
 └── scripts/
-    └── test-*.sh                # 测试执行门禁
+    ├── test-unit.sh
+    ├── test-integration.sh
+    ├── test-e2e.sh
+    ├── test-acceptance.sh
+    └── test-all.sh
 ```
 
-**Note:** Go project structure follows standard layout:
-- `cmd/` - Application entry points
-- `internal/` - Private application code
-- `pkg/` - Public libraries
+---
+
+## Version Scope
+
+| Version | Milestone | Features |
+|---------|-----------|----------|
+| V1 | MVP | CLI mode, basic context compression (steps 1-5,7), single/simple agent |
+| V2 | Enhanced | IM adapters, autocompact (step 6), rate limiter |
+| V3 | Full | All features, milestone DAG, peer-review, full collaboration modes |
+
+---
 
 ## CLI Commands
 
@@ -127,52 +243,54 @@ devrix/
 | `devrix session new` | New session |
 | `/new`, `/stop`, `/help` | In-session commands |
 
+---
+
 ## Testing Framework
 
 **强制规范**: `openspec/specs/testing-framework/spec.md`
 
 | 阶段 | 命令 | 用途 |
 |------|------|------|
-| 日常开发 | `./scripts/test-unit.sh` | PR 门禁 |
-| 合入前 | `./scripts/test-integration.sh` + `./scripts/test-e2e.sh` | 集成验证 |
+| 日常开发 | `./scripts/test-unit.sh` | PR 门槛 |
+| 集成测试 | `./scripts/test-integration.sh` + `./scripts/test-e2e.sh` | 集成验证 |
 | S5 验收 | `./scripts/test-acceptance.sh` | L5 P0 验收 |
-| 全量 | `./scripts/test-all.sh` | 发布前 |
-| S5 验收报告 | `./scripts/gen-acceptance-report.sh --change {slug}` | 生成 acceptance-report.md |
+| 全部 | `./scripts/test-all.sh` | 颁布前 |
+| S5 验收报告 | `./scripts/gen-acceptance-report.sh --change {slug}` | 生成报告 |
 
-新增 L4 能力流程：登记 L5 → 编写测试（标注 `// Covers: L5-*`）→ 更新 `l5-registry.md` → 跑关联脚本 → S5 生成验收报告。
+**CI**: `.github/workflows/ci.yml`（unit → integration/e2e/acceptance → coverage 报告）
 
-CI：`.github/workflows/ci.yml`（unit → integration/e2e/acceptance → coverage 报告）。
+---
 
-## L3/L4 Asset Registry (Context Engine)
+## L5 Test Points Summary
 
-> V1 已归档：`openspec/archive/2026-06-07-devrix-context-engine/`
-> V2 已归档：`openspec/archive/2026-06-07-devrix-context-engine-v2/` — Autocompact + Verify commands + Token 统一
-> V3 规划中：`openspec/changes/devrix-context-engine-v3/` — PEV Plan + Milestone DAG + LongTerm Memory
+See `openspec/l5-registry.md` for full details.
 
-### L3 业务活动
+| L1 | Layer Name | Total | IMPLEMENTED | PLANNED |
+|----|------------|-------|-------------|---------|
+| L1-1 | Communication | 5 | 0 | 5 |
+| L1-2 | Context Engine | 21 | 16 | 5 |
+| L1-3 | LLM Gateway | 17 | 13 | 4 |
+| L1-4 | Multi-Agent | 8 | 0 | 8 |
+| L1-5 | Observability | 16 | 11 | 5 |
+| L1-6 | Evolution | 2 | 0 | 2 |
+| **Total** | | **69** | **40** | **29** |
 
-| ID | 名称 | L4 映射 |
-|----|------|---------|
-| L3-BE-CTX-01 | 处理用户消息并维护上下文 | L4-CTX-STATE, L4-CTX-PEV, L4-CTX-MEMORY |
-| L3-BE-CTX-02 | 超长对话压缩 | L4-CTX-COMPRESS |
-| L3-BE-CTX-03 | 复杂任务分解与里程碑推进 | L4-CTX-PLAN, L4-CTX-PEV |
+---
 
-### L4 功能点
+## Related Specifications
 
-| ID | 名称 | 包路径 |
-|----|------|--------|
-| L4-CTX-STATE | 上下文状态管理 | `contextengine/engine.go`, `prompt/` |
-| L4-CTX-PEV | PEV 执行循环 | `contextengine/pev/` |
-| L4-CTX-COMPRESS | 七步压缩管道 | `contextengine/compression/` |
-| L4-CTX-MEMORY | 分层记忆 | `contextengine/memory/`, `snapshot/` |
-| L4-CTX-OBS | 压缩/验证可观测 | `contextengine/` + Observability bridge（V2） |
-| L4-CTX-PLAN | 任务规划与 DAG 生成 | `contextengine/pev/plan.go`（V3） |
+| Spec | Path |
+|------|------|
+| Layer Architecture | `openspec/specs/architecture/layering.md` |
+| L5 Test Registry | `openspec/l5-registry.md` |
+| Testing Framework | `openspec/specs/testing-framework/spec.md` |
+| Testing Quality | `openspec/specs/testing-quality/spec.md` |
 
-## Related Documents
+---
 
-- **Architecture Docs:** `docs/README.md`（含 `detail design framework.md` 六段式模板）
-- Context Engine Design: `docs/context-engine-design.md`
-- Obsidian Vault: `01知识探索/项目/devrix/`
-- Architecture Reference: cc-connect (Go daemon)
-- Testing Framework Spec: `openspec/specs/testing-framework/spec.md`
-- L5 Registry: `openspec/l5-registry.md`
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-06 | Initial project metadata |
+| 1.1.0 | 2026-06-08 | Updated to L1-L2 layering system |

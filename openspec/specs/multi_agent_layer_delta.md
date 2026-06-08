@@ -1,10 +1,12 @@
 # Delta: Multi-Agent Layer (Layer 4)
 
-**Change ID:** devrix-multi-agent
+> **已合并至 Canonical Spec：** `openspec/specs/multi-agent/spec.md`（归档于 2026-06-08）
+
+**Change ID:** devrix-multi-agent (archived)
 **Demand ID:** DM-20260608-005
 **版本:** 1.0.0
 **父设计:** `docs/multi-agent-design.md`
-**实施设计:** `openspec/changes/devrix-multi-agent/design.md`（Grill Review 2026-06-08）
+**实施设计:** `openspec/archive/2026-06-08-devrix-multi-agent/design.md`（Grill Review 2026-06-08）
 **关联 L5 Registry:** `openspec/l5-registry.md` (L5-4-*)
 
 > **Grill Review 修正（2026-06-08）：** 权限改为 AgentPermissionGate（Agent 实现 IPermissionGate）；Fork 改为消息隔离 + Join 合并；新增 MaxTotalAgents 双层限额；跨层契约提取为 `contracts.IEngine`。详见 change design.md。

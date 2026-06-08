@@ -182,7 +182,7 @@
 
 ## L1-4: Multi-Agent Layer
 
-> Change: `devrix-multi-agent`（Demand: DM-20260608-005）
+> 已归档：`openspec/archive/2026-06-08-devrix-multi-agent/`（Demand: DM-20260608-005）
 
 ### L1-4-L2-1: Factory Module
 

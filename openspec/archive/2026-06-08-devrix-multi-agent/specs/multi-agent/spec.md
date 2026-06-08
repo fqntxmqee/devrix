@@ -1,7 +1,7 @@
 # Multi-Agent Layer V1 — Acceptance Specification
 
 **Change ID:** devrix-multi-agent
-**Status:** S2 Design
+**Status:** Archived
 
 ---
 

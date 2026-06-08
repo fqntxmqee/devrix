@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-llm-gateway-v2
 **Parent Spec:** `openspec/archive/2026-06-07-devrix-llm-gateway/specs/llm-gateway/spec.md`
-**Status:** Draft
+**Status:** Archived
 **Version:** 2.0.0
 
 ---

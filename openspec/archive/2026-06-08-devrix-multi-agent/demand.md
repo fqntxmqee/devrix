@@ -3,7 +3,7 @@ demand-id: DM-20260608-005
 title: "Multi-Agent Layer V1 — 生命周期 + Fork/Join + 协作模式"
 source: docs/multi-agent-design.md
 priority: P0
-status: S5_ACCEPTANCE
+status: S7_ARCHIVED
 l1-domain: multi-agent
 created: 2026-06-08
 ---

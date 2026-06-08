@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-multi-agent
 **Demand ID:** DM-20260608-005
-**Status:** S4 Development
+**Status:** Archived
 **Version:** 1.0.0
 
 ---
@@ -106,5 +106,18 @@ L1 CommunicationGateway → IAgentFactory.Create() → Agent.Run()
 ## 10. Related
 
 - `docs/multi-agent-design.md` — 可读架构设计文档
-- `openspec/specs/multi_agent_layer_delta.md` — Delta 规格
+- `openspec/specs/multi-agent/spec.md` — Canonical 规格
 - `openspec/l5-registry.md` — L5 测试点注册
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-08
+**Duration:** 1 day
+**Outcome:** Successfully implemented
+**PR:** [#7](https://github.com/fqntxmqee/devrix/pull/7)
+**Verdict:** ACCEPTED
+
+### Specs Updated
+- `openspec/specs/multi-agent/spec.md`

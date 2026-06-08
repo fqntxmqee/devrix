@@ -1,7 +1,7 @@
 # Tasks: devrix-multi-agent
 
 **Change ID:** devrix-multi-agent
-**Status:** S5 Acceptance (PR4 complete, acceptance-report.md)
+**Status:** S7 Archived (PR #7 merged)
 **Grill Review:** 2026-06-08
 
 ---
