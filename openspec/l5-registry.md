@@ -236,6 +236,20 @@
 |-------|------|---------|-----------|--------|
 | L5-4-5-01 | ObserverAdapter 桥接 AgentEvent → IObserver | Observer | `internal/layers/multiagent/observer/adapter.go` | IMPLEMENTED |
 
+### D4-S6: Agent Tool Module
+
+> **Change:** `devrix-agent-tools` (DM-20260608-012)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-4-6-01 | Agent Tool Registry 注册/查找/按能力查询 | AgentTool | `internal/layers/multiagent/tool/registry_test.go` | IMPLEMENTED | P0 |
+| L5-4-6-02 | CLI 适配器正常启动子进程并解析 stream-json | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
+| L5-4-6-03 | CLI 适配器超时正确终止子进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P1 |
+| L5-4-6-04 | Session 首次创建子进程，后续调用复用的同一进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
+| L5-4-6-05 | Session 空闲超时自动回收子进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P1 |
+| L5-4-6-06 | D1 Session 销毁清理关联的 Agent Tool 子进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P1 |
+| L5-4-6-07 | 不同 D1 Session 的 Agent Tool 隔离运行互不干扰 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
+
 ### D4: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
@@ -321,7 +335,7 @@
 ## D0: Code Integrity Domain (INTEGRITY)
 
 > 跨域代码健康规范。属架构治理层，非业务域。
-> **Spec Reference:** `openspec/changes/devrix-code-integrity/`
+> **Spec Reference:** `openspec/archive/2026-06-08-devrix-code-integrity/demand.md`
 
 ### D0-S1: Specification Module
 

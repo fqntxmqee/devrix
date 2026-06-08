@@ -281,3 +281,28 @@ observability:
 #   - gRPC: localhost:4317
 #   - HTTP: localhost:4318
 #
+
+# Agent Tool 配置
+# 注册外部 CLI Agent 工具，由 LLM 按需调用。
+# agent_tools:
+#   enabled: false
+#   tools:
+#     - name: claude-code
+#       display_name: "Claude Code"
+#       description: "通用编码、代码审查、重构、调试"
+#       capabilities: ["coding", "code-review", "debug", "refactor"]
+#       command: "claude"
+#       args: ["--print", "--output-format", "stream-json", "--input-format", "stream-json", "--permission-prompt-tool", "stdio", "--replay-user-messages"]
+#       work_dir: "."
+#       timeout: "5m"
+#       idle_timeout: "5m"
+#
+#     - name: gemini
+#       display_name: "Gemini CLI"
+#       description: "AI 研究和分析"
+#       capabilities: ["research", "analysis"]
+#       command: "gemini"
+#       args: ["--output-format", "stream-json"]
+#       work_dir: "."
+#       timeout: "5m"
+#       idle_timeout: "5m"

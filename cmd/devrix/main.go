@@ -19,6 +19,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
+	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -84,6 +85,36 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load agent tools configuration
+	agentToolsCfg, err := config.LoadAgentToolsConfig(configFile)
+	if err != nil {
+		slog.Error("failed to load agent tools config", "error", err)
+		os.Exit(1)
+	}
+	var agentToolReg *tool.Registry
+	if agentToolsCfg.Enabled {
+		reg := tool.NewRegistry()
+		for _, tCfg := range agentToolsCfg.Tools {
+			cliTool := tool.NewCLIAgentTool(tool.CLIConfig{
+				Name:         tCfg.Name,
+				DisplayName:  tCfg.DisplayName,
+				Description:  tCfg.Description,
+				Capabilities: tCfg.Capabilities,
+				Command:      tCfg.Command,
+				Args:         tCfg.Args,
+				WorkDir:      tCfg.WorkDir,
+				Timeout:      tCfg.Timeout,
+				IdleTimeout:  tCfg.IdleTimeout,
+			})
+			if err := reg.Register(cliTool); err != nil {
+				slog.Error("register agent tool", "name", tCfg.Name, "error", err)
+				os.Exit(1)
+			}
+			slog.Info("agent tool registered", "name", tCfg.Name)
+		}
+		agentToolReg = reg
+	}
+
 	// Initialize session store
 	sessionStore, err := gateway.NewFileSessionStore(commCfg.Session.StorageDir)
 	if err != nil {
@@ -109,7 +140,7 @@ func main() {
 	obsBridge := observability.NewBridge(obs)
 	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
 	llmbridge.LogLLMReadiness(configFile)
-	contextEngine := bootstrap.NewContextEngine(llmStack, permissionMgr, ctxCfg, toolCfg, obsBridge, milestoneService)
+	contextEngine := bootstrap.NewContextEngine(llmStack, permissionMgr, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg)
 
 	// Create event handler
 	defaultEventHandler := &DefaultEventHandler{
@@ -160,7 +191,7 @@ func main() {
 	gw.SetObservability(obs)
 
 	if multiAgentCfg.Enabled {
-		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService)
+		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg)
 		agentFactory := bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",

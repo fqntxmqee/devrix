@@ -363,7 +363,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				permSpan.End()
 			}
 
-			result, err := e.tools.Execute(WithToolWorkDir(ctx, sc.WorkDir), tc)
+			result, err := e.tools.Execute(WithToolSessionID(WithToolWorkDir(ctx, sc.WorkDir), sc.SessionID), tc)
 			if err != nil {
 				result = &ToolResult{Error: err.Error()}
 				if toolSpan != nil {
