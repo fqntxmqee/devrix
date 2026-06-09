@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Shared helpers: list/stop Devrix server processes (feishu daemon, CLI with IM, go run, stale paths).
+# Shared helpers: list/stop Devrix server processes.
 # Source from scripts/devrix.sh — do not execute directly.
 
 devrix_process_init() {
   if [[ -z "${ROOT:-}" ]]; then
     ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   fi
-  BIN_FEISHU="${DEVRIX_FEISHU_BIN:-$ROOT/devrix-feishu}"
-  BIN_CLI="${DEVRIX_CLI_BIN:-$ROOT/bin/devrix}"
-  PIDFILE="${DEVRIX_FEISHU_PIDFILE:-/tmp/devrix-feishu.pid}"
-  LOG="${DEVRIX_FEISHU_LOG:-/tmp/devrix-feishu.log}"
-  STALE_BIN="/tmp/devrix-feishu"
+  BIN="${DEVRIX_BIN:-$ROOT/bin/devrix}"
+  PIDFILE="${DEVRIX_PIDFILE:-/tmp/devrix.pid}"
+  LOG="${DEVRIX_LOG:-/tmp/devrix.log}"
+  STALE_BINS=(
+    "$ROOT/devrix-feishu"
+    "$ROOT/devrix-dingtalk"
+    "/tmp/devrix-feishu"
+    "/tmp/devrix-dingtalk"
+  )
 }
 
 devrix_process_cwd() {
@@ -18,7 +22,7 @@ devrix_process_cwd() {
   lsof -p "$pid" -a -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | tail -1
 }
 
-# Any long-running Devrix server that can steal the Feishu WebSocket or handle IM messages.
+# Any long-running Devrix server (IM daemon or CLI with IM enabled).
 is_devrix_server_pid() {
   local pid="$1"
   [[ -n "$pid" ]] || return 1
@@ -29,20 +33,22 @@ is_devrix_server_pid() {
   [[ "$cmd" != *"git "* ]] || return 1
 
   case "$cmd" in
-    *"$ROOT/devrix-feishu"*|*"./devrix-feishu"*|*"/devrix-feishu "*|"$STALE_BIN"*)
-      return 0
-      ;;
     *"$ROOT/bin/devrix"*|*"./bin/devrix"*|*" $ROOT/devrix"*|*"./devrix "*|*"./devrix"*)
       cwd="$(devrix_process_cwd "$pid")"
       [[ "$cwd" == "$ROOT" ]] && return 0
       ;;
   esac
 
+  local stale
+  for stale in "${STALE_BINS[@]}"; do
+    case "$cmd" in
+      *"$stale"*)
+        return 0
+        ;;
+    esac
+  done
+
   case "$cmd" in
-    *go\ run*cmd/devrix-feishu*|*go\ run\ ./cmd/devrix-feishu*)
-      cwd="$(devrix_process_cwd "$pid")"
-      [[ "$cwd" == "$ROOT" ]] && return 0
-      ;;
     *go\ run*cmd/devrix/main*|*go\ run\ ./cmd/devrix*|*go\ run\ ./cmd/devrix/main*)
       cwd="$(devrix_process_cwd "$pid")"
       [[ "$cwd" == "$ROOT" ]] && return 0
@@ -67,10 +73,11 @@ list_devrix_server_pids() {
     echo "$p"
   }
 
-  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "${BIN_FEISHU}\$" 2>/dev/null || true)
-  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "^${STALE_BIN}\$" 2>/dev/null || true)
-  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "${BIN_CLI}\$" 2>/dev/null || true)
-  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go run.*cmd/devrix-feishu|go run.*\./cmd/devrix-feishu' 2>/dev/null || true)
+  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "${BIN}\$" 2>/dev/null || true)
+  local stale
+  for stale in "${STALE_BINS[@]}"; do
+    while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "^${stale}\$" 2>/dev/null || true)
+  done
   while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go run.*cmd/devrix/main|go run.*\./cmd/devrix' 2>/dev/null || true)
   while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go-build.*/exe/main' 2>/dev/null || true)
 }
@@ -96,7 +103,7 @@ kill_devrix_pid() {
 stop_all_devrix_servers() {
   devrix_process_init
 
-  screen -S devrix-feishu -X quit 2>/dev/null || true
+  screen -S devrix -X quit 2>/dev/null || true
 
   if [[ -f "$PIDFILE" ]]; then
     kill_devrix_pid "$(cat "$PIDFILE" 2>/dev/null || true)"
@@ -109,7 +116,7 @@ stop_all_devrix_servers() {
 
   rm -f "$PIDFILE"
 
-  # Allow Feishu WS slot to release before reconnecting.
+  # Allow IM WebSocket slot to release before reconnecting.
   sleep 5
 }
 
@@ -132,8 +139,6 @@ devrix_load_env() {
 
 devrix_build() {
   devrix_process_init
-  echo "building devrix-feishu → $BIN_FEISHU"
-  (cd "$ROOT" && go build -o "$BIN_FEISHU" ./cmd/devrix-feishu)
-  echo "building bin/devrix → $BIN_CLI"
-  (cd "$ROOT" && go build -o "$BIN_CLI" ./cmd/devrix)
+  echo "building bin/devrix → $BIN"
+  (cd "$ROOT" && go build -o "$BIN" ./cmd/devrix)
 }

@@ -285,15 +285,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 					}{Name: tc.ToolName, Arguments: tc.Input},
 				}})
 				tcMsg := types.Message{
-					Role:      types.MessageRoleAssistant,
-					Content:   "",
-					Metadata:  map[string]string{"tool_calls": string(tcJSON)},
+					Role:     types.MessageRoleAssistant,
+					Content:  "",
+					Metadata: map[string]string{"tool_calls": string(tcJSON)},
 				}
-				e.memory.AppendMessage(sc, types.MessageRoleAssistant, tcMsg.Content)
-				// 直接追加到 sc.Messages（通过 Metadata 保存 tool_calls）
-				sc.Messages = append(sc.Messages, tcMsg)
+				e.memory.AppendFullMessage(sc, tcMsg)
 
-				// 构建工具结果的 tool 消息
 				resultContent := tc.Output
 				if tc.Error != "" {
 					resultContent = "Error: " + tc.Error
@@ -303,9 +300,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 					Content:  resultContent,
 					Metadata: map[string]string{"tool_call_id": callID},
 				}
-				e.memory.AppendMessage(sc, types.MessageRoleTool, resultContent)
-				// 直接追加到 sc.Messages
-				sc.Messages = append(sc.Messages, resultMsg)
+				e.memory.AppendFullMessage(sc, resultMsg)
 			}
 		}
 		

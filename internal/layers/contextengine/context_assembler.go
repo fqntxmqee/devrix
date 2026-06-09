@@ -1,6 +1,11 @@
 package contextengine
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -63,15 +68,14 @@ func (ca *ContextAssembler) buildMessageHistory(
 	
 	// 追加本轮的工具调用和结果
 	for _, tc := range toolCallHistory {
-		// 添加 assistant 的工具调用消息
-		tcJSON := ca.formatToolCall(tc)
+		callID := ca.toolCallID(tc)
+		tcJSON := ca.formatToolCall(tc, callID)
 		result = append(result, types.Message{
 			Role:     types.MessageRoleAssistant,
 			Content:  "",
 			Metadata: map[string]string{"tool_calls": tcJSON},
 		})
-		
-		// 添加 tool 的结果消息
+
 		content := tc.Output
 		if tc.Error != "" {
 			content = "Error: " + tc.Error
@@ -79,45 +83,33 @@ func (ca *ContextAssembler) buildMessageHistory(
 		result = append(result, types.Message{
 			Role:     types.MessageRoleTool,
 			Content:  content,
-			Metadata: map[string]string{"tool_call_id": ca.toolCallID(tc)},
+			Metadata: map[string]string{"tool_call_id": callID},
 		})
 	}
 	
 	return result
 }
 
-// formatToolCall 将 ToolCallRecord 格式化为 JSON
-func (ca *ContextAssembler) formatToolCall(tc types.ToolCallRecord) string {
-	// 使用与 OpenAI tool_calls 相同的格式
-	return ` [{"type":"function","function":{"name":"` + tc.ToolName + `","arguments":"` + escapeJSON(tc.Input) + `"}}]`
+// formatToolCall 将 ToolCallRecord 格式化为 OpenAI tool_calls JSON
+func (ca *ContextAssembler) formatToolCall(tc types.ToolCallRecord, callID string) string {
+	payload := []map[string]any{{
+		"id":   callID,
+		"type": "function",
+		"function": map[string]string{
+			"name":      tc.ToolName,
+			"arguments": normalizeToolArguments(tc.Input),
+		},
+	}}
+	raw, _ := json.Marshal(payload)
+	return string(raw)
 }
 
-// toolCallID 生成工具调用的 ID
+// toolCallID returns a stable tool call id for provider round-trips.
 func (ca *ContextAssembler) toolCallID(tc types.ToolCallRecord) string {
-	return "call_" + tc.ToolName
-}
-
-// escapeJSON 转义 JSON 字符串
-func escapeJSON(s string) string {
-	// 简单的 JSON 转义
-	result := make([]byte, 0, len(s)*2)
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"':
-			result = append(result, '\\', '"')
-		case '\\':
-			result = append(result, '\\', '\\')
-		case '\n':
-			result = append(result, '\\', 'n')
-		case '\r':
-			result = append(result, '\\', 'r')
-		case '\t':
-			result = append(result, '\\', 't')
-		default:
-			result = append(result, s[i])
-		}
+	if id := strings.TrimSpace(tc.CallID); id != "" {
+		return id
 	}
-	return string(result)
+	return fmt.Sprintf("call_%s_%d", tc.ToolName, time.Now().UnixNano())
 }
 
 // FormatContextForLogging 格式化上下文用于日志输出（人类可读）

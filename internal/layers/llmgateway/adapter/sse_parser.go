@@ -3,8 +3,10 @@ package adapter
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 )
@@ -100,8 +102,12 @@ func (a *streamAccumulator) mergedToolCalls() []llmgateway.ToolCall {
 	out := make([]llmgateway.ToolCall, 0, len(indices))
 	for _, idx := range indices {
 		merged := a.toolCalls[idx]
+		id := strings.TrimSpace(merged.id)
+		if id == "" {
+			id = fmt.Sprintf("call_%d_%d", time.Now().UnixNano(), idx)
+		}
 		out = append(out, llmgateway.ToolCall{
-			ID:    merged.id,
+			ID:    id,
 			Name:  merged.name,
 			Input: merged.arguments.String(),
 		})

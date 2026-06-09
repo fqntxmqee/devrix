@@ -123,10 +123,25 @@ func (m *Manager) AppendUserMessage(sc *types.SessionContext, requestID, content
 	return true
 }
 
-// AppendMessage appends any message role.
+// AppendMessage appends a plain text message (no metadata).
 func (m *Manager) AppendMessage(sc *types.SessionContext, role types.MessageRole, content string) {
 	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, role, content)
 	sc.Messages = append(sc.Messages, *msg)
+	sc.UpdatedAt = time.Now()
+}
+
+// AppendFullMessage appends a message preserving metadata (tool_calls, tool_call_id).
+func (m *Manager) AppendFullMessage(sc *types.SessionContext, msg types.Message) {
+	if msg.ID == "" {
+		msg.ID = fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	}
+	if msg.SessionID == "" {
+		msg.SessionID = sc.SessionID
+	}
+	if msg.Timestamp.IsZero() {
+		msg.Timestamp = time.Now()
+	}
+	sc.Messages = append(sc.Messages, msg)
 	sc.UpdatedAt = time.Now()
 }
 
