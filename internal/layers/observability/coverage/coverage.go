@@ -19,12 +19,13 @@ type ZeroHitEntry struct {
 
 // Report is the coverage reconciliation output.
 type Report struct {
-	Since             time.Time         `json:"since"`
-	OperationsTotal   int               `json:"operations_total"`
-	OperationsHit     int               `json:"operations_hit"`
-	OperationsZeroHit []ZeroHitEntry    `json:"operations_zero_hit"`
-	CoverageRatio     float64           `json:"coverage_ratio"`
-	Hits              map[string]uint64 `json:"hits,omitempty"`
+	Since              time.Time         `json:"since"`
+	OperationsTotal    int               `json:"operations_total"`
+	OperationsHit      int               `json:"operations_hit"`
+	OperationsZeroHit  []ZeroHitEntry    `json:"operations_zero_hit"`
+	CoverageRatio      float64           `json:"coverage_ratio"`
+	Hits               map[string]uint64 `json:"hits,omitempty"`
+	UnknownHits        uint64            `json:"unknown_hits,omitempty"`
 }
 
 // Counter tracks per-operation hit counts for the process lifetime.
@@ -84,7 +85,7 @@ func (c *Counter) Report(registry []OperationMeta, includeHits bool) Report {
 		}
 	}
 
-	hitCounts := c.snapshot()
+	hitCounts, unknownCount := c.snapshot()
 	hit := 0
 	zeroHit := make([]ZeroHitEntry, 0)
 	for _, op := range instrumented {
@@ -107,11 +108,12 @@ func (c *Counter) Report(registry []OperationMeta, includeHits bool) Report {
 	}
 
 	report := Report{
-		Since:             c.since,
-		OperationsTotal:   total,
-		OperationsHit:     hit,
-		OperationsZeroHit: zeroHit,
-		CoverageRatio:     ratio,
+		Since:              c.since,
+		OperationsTotal:    total,
+		OperationsHit:      hit,
+		OperationsZeroHit:  zeroHit,
+		CoverageRatio:      ratio,
+		UnknownHits:        unknownCount,
 	}
 	if includeHits {
 		report.Hits = hitCounts
@@ -129,17 +131,19 @@ func (c *Counter) Reset() {
 	c.since = time.Now().UTC()
 }
 
-func (c *Counter) snapshot() map[string]uint64 {
+func (c *Counter) snapshot() (map[string]uint64, uint64) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	out := make(map[string]uint64, len(c.hits))
+	var unknownCount uint64
 	for name, counter := range c.hits {
 		if name == unknownOperation {
+			unknownCount = counter.Load()
 			continue
 		}
 		out[name] = counter.Load()
 	}
-	return out
+	return out, unknownCount
 }
 
 var (

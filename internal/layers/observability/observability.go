@@ -101,6 +101,18 @@ func (o *Observability) Logger() *logger.StructuredLogger {
 	return o.log
 }
 
+// MemoryExporter returns the span collector when exporter type is "memory".
+func (o *Observability) MemoryExporter() *exporter.MemoryExporter {
+	if o.tracerProvider == nil {
+		return nil
+	}
+	me, ok := o.tracerProvider.Exporter().(*exporter.MemoryExporter)
+	if !ok {
+		return nil
+	}
+	return me
+}
+
 // Status returns the current status
 func (o *Observability) Status() ComponentStatus {
 	o.mu.RLock()

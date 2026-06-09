@@ -81,6 +81,11 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// Exporter returns the span exporter.
+func (tp *TracerProvider) Exporter() SpanExporter {
+	return tp.exporter
+}
+
 // isShutdown returns whether the provider is shut down
 func (tp *TracerProvider) isShutdown() bool {
 	tp.shutdownMu.RLock()
