@@ -14,7 +14,13 @@ Thumbs.db
 /devrix
 /devrix-feishu
 /devrix-dingtalk
+bin/
 *.tmp
+*.bak
+
+# Generated analysis / coverage output
+coverage-reports/
+.understand-anything/
 
 # Devrix data
 .devrix/
