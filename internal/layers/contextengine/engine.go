@@ -105,6 +105,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 }
 
+// SessionContext returns the cached session context for a session ID (test helper).
+func (e *ContextEngine) SessionContext(sessionID string) (*types.SessionContext, bool) {
+	return e.memory.Get(sessionID)
+}
+
 // Shutdown waits for background autocompact work to finish.
 func (e *ContextEngine) Shutdown(timeout time.Duration) error {
 	if e.asyncCompact == nil {
@@ -258,7 +263,11 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		// 方案 2: 同步工具调用历史到 sc.Messages
 		// 这样下一轮对话时，LLM 能感知到之前的工具调用和结果
 		if result != nil && len(result.ToolCallHistory) > 0 {
-			for _, tc := range result.ToolCallHistory {
+			for i, tc := range result.ToolCallHistory {
+				callID := strings.TrimSpace(tc.CallID)
+				if callID == "" {
+					callID = fmt.Sprintf("call_%s_%d", tc.ToolName, i)
+				}
 				// 构建工具调用的 assistant 消息（包含 tool_calls）
 				tcJSON, _ := json.Marshal([]struct {
 					ID       string `json:"id"`
@@ -268,8 +277,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 						Arguments string `json:"arguments"`
 					} `json:"function"`
 				}{{
-					ID:       "call_" + tc.ToolName,
-					Type:     "function",
+					ID:   callID,
+					Type: "function",
 					Function: struct {
 						Name      string `json:"name"`
 						Arguments string `json:"arguments"`
@@ -283,7 +292,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				e.memory.AppendMessage(sc, types.MessageRoleAssistant, tcMsg.Content)
 				// 直接追加到 sc.Messages（通过 Metadata 保存 tool_calls）
 				sc.Messages = append(sc.Messages, tcMsg)
-				
+
 				// 构建工具结果的 tool 消息
 				resultContent := tc.Output
 				if tc.Error != "" {
@@ -292,7 +301,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				resultMsg := types.Message{
 					Role:     types.MessageRoleTool,
 					Content:  resultContent,
-					Metadata: map[string]string{"tool_call_id": "call_" + tc.ToolName},
+					Metadata: map[string]string{"tool_call_id": callID},
 				}
 				e.memory.AppendMessage(sc, types.MessageRoleTool, resultContent)
 				// 直接追加到 sc.Messages

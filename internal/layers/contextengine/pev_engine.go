@@ -289,7 +289,14 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				"iteration", iter,
 				"cause", errDetail,
 			)
-			if iter > 0 && hasSuccessfulToolOutput(toolResults) {
+			// After tools ran, never fail the whole user message on a follow-up LLM error:
+			// synthesis / tool_fallback can still produce a useful reply.
+			if len(toolResults) > 0 || (iter > 0 && hasSuccessfulToolOutput(toolResults)) {
+				slog.Warn("pev: llm call failed after tools, degrading to synthesis",
+					"sessionID", sc.SessionID,
+					"iteration", iter,
+					"cause", errDetail,
+				)
 				break
 			}
 			return nil, errors.NewLLMUnavailableError(err)
@@ -436,14 +443,18 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				Metadata: map[string]string{"tool_name": tc.Name, "error": result.Error},
 			})
 
-			sc.PEVState.LastToolCalls = append(sc.PEVState.LastToolCalls, types.ToolCallRecord{
-				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
-			})
+			callRecord := types.ToolCallRecord{
+				CallID:    tc.ID,
+				ToolName:  tc.Name,
+				Input:     tc.Input,
+				Output:    result.Output,
+				RiskLevel: risk,
+				Error:     result.Error,
+			}
+			sc.PEVState.LastToolCalls = append(sc.PEVState.LastToolCalls, callRecord)
 
 			// 方案 2: 收集工具调用记录
-			allToolCallRecords = append(allToolCallRecords, types.ToolCallRecord{
-				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
-			})
+			allToolCallRecords = append(allToolCallRecords, callRecord)
 
 			req.Messages = append(req.Messages, buildToolResultMessage(sc.SessionID, tc.ID, content))
 		}
@@ -468,6 +479,11 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 		if vr.Passed {
 			break
+		}
+		// Follow-up PEV iterations: avoid re-sending raw tool_calls/tool messages to
+		// providers (MiniMax returns 400 on mismatched tool_call_id).
+		if len(toolResults) > 0 {
+			req.Messages = buildSynthesisMessages(view, assistantText, toolResults)
 		}
 		if iter == maxIter-1 {
 			emit(pevErrorEvent(sc.SessionID, errors.NewPEVMaxIterationsError(), true))

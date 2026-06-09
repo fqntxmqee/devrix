@@ -48,6 +48,10 @@ func buildAssistantToolCallsMessage(sessionID string, calls []ToolCall) types.Me
 }
 
 func buildToolResultMessage(sessionID, toolCallID, content string) types.Message {
+	toolCallID = strings.TrimSpace(toolCallID)
+	if toolCallID == "" {
+		toolCallID = fmt.Sprintf("call_%d", time.Now().UnixNano())
+	}
 	msg := types.NewMessage(
 		fmt.Sprintf("tool_%d", time.Now().UnixNano()),
 		sessionID,

@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
+	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -85,8 +86,9 @@ func main() {
 		slog.Warn("llm gateway using mock — set MINIMAX_API_KEY and check devrix.yaml")
 	}
 	milestoneService := milestone.NewMilestoneService(nil)
+	agentToolReg := bootstrap.WireAgentToolRegistry(configFile)
 	engineMode := config.ResolveContextEngine(userCfg.IM)
-	contextEngine := selectContextEngine(engineMode, permissionMgr, ctxCfg, toolCfg, obsBridge, llmStack, milestoneService)
+	contextEngine := selectContextEngine(engineMode, permissionMgr, ctxCfg, toolCfg, obsBridge, llmStack, milestoneService, agentToolReg)
 
 	feishuCfg := &adapters.FeishuConfig{
 		AppID:         userCfg.IM.Feishu.AppID,
@@ -187,6 +189,7 @@ func selectContextEngine(
 	obsBridge *observability.Bridge,
 	llmStack llmbridge.ContextLLMStack,
 	milestoneSvc milestone.IMilestoneService,
+	agentToolReg *tool.Registry,
 ) gateway.IContextEngine {
 	engine := strings.ToLower(strings.TrimSpace(name))
 	switch engine {
@@ -196,10 +199,10 @@ func selectContextEngine(
 		slog.Warn("four_flow engine was removed; using context engine with real LLM")
 		fallthrough
 	case "", "context", "ctx":
-		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, nil)
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, agentToolReg)
 	default:
 		slog.Warn("unknown context engine; using context engine", "requested", engine)
-		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, nil)
+		return bootstrap.NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, agentToolReg)
 	}
 }
 

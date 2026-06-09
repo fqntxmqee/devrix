@@ -50,6 +50,8 @@ func NewTracingExporter(cfg settings.TracingConfig) tracer.SpanExporter {
 		return NewOTLPExporter(ResolveOTLPEndpoint(cfg.OTLP), cfg.ServiceName, timeout)
 	case "null":
 		return NewNullExporter()
+	case "memory":
+		return NewMemoryExporter()
 	default:
 		return NewConsoleExporterSpanExporter()
 	}

@@ -81,7 +81,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 		ctxCfg:   ctxCfg,
 		toolCfg:  toolCfg,
 	}
-	factory := multiagentfactory.NewAgentFactoryWithBuilder(builder, config.DefaultMultiAgentConfig())
+	factory := multiagentfactory.NewAgentFactoryWithBuilder(multiagent.AgentDeps{}, builder, config.DefaultMultiAgentConfig())
 	gw.SetAgentFactory(factory)
 
 	session, err := gw.CreateSession("cli", t.TempDir())

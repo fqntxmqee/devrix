@@ -24,6 +24,7 @@ type VerifyResult struct {
 
 // ToolCallRecord records a single tool invocation.
 type ToolCallRecord struct {
+	CallID    string    `json:"callId,omitempty"`
 	ToolName  string    `json:"toolName"`
 	Input     string    `json:"input"`
 	Output    string    `json:"output,omitempty"`

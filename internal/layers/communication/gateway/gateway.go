@@ -235,6 +235,12 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		defer cancel()
 		g.handleEngineEvents(processCtx, session, eventChan)
 		g.unregisterProcess(session.SessionID)
+		// Persist the updated session (including ContextSnapshot) to the
+		// file store. runProcess sets session.ContextSnapshot during
+		// processing; this call ensures it survives process restarts.
+		if err := g.sessionStore.Update(session); err != nil {
+			slog.Warn("failed to persist session after process", "sessionID", session.SessionID, "error", err)
+		}
 	}()
 
 	return nil

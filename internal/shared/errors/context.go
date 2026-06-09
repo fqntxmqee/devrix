@@ -48,12 +48,34 @@ func NewPEVMaxIterationsError() *SentinelError {
 // NewLLMUnavailableError returns an LLM unavailable error.
 func NewLLMUnavailableError(err error) *SentinelError {
 	msg := "llm gateway unavailable"
-	if detail := FormatLLMError(err); isProviderOverloaded(detail) {
+	detail := FormatLLMError(err)
+	if isProviderOverloaded(detail) {
 		msg = "MiniMax 服务当前负载较高，请稍后重试（HTTP 529）"
 	} else if isLLMTimeout(detail) {
 		msg = "LLM 响应超时（模型思考耗时较长），请稍后重试"
+	} else if isToolProtocolError(detail) {
+		msg = "LLM 工具消息格式被拒绝（tool_call_id 不匹配），已记录详情，请重试或新开会话"
+	} else if detail != "" && !strings.Contains(strings.ToLower(detail), "llm gateway unavailable") {
+		msg = "LLM 调用失败: " + truncateLLMUserMessage(detail)
 	}
 	return WithCode(CodeLLMUnavailable, msg, err)
+}
+
+func isToolProtocolError(detail string) bool {
+	lower := strings.ToLower(detail)
+	return strings.Contains(lower, "tool_call_id") ||
+		strings.Contains(lower, "tool id") ||
+		strings.Contains(lower, "tool_calls") ||
+		strings.Contains(lower, "invalid function arguments")
+}
+
+func truncateLLMUserMessage(s string) string {
+	const max = 240
+	s = strings.TrimSpace(s)
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 func isProviderOverloaded(detail string) bool {
