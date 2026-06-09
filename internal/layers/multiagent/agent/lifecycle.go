@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -29,6 +32,12 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	}
 	a.emit("agent.started", nil)
 
+	ctx, runSpan := a.startSpan(ctx, telemetry.OpAgentRun, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "agent.id", Value: a.id},
+		tracer.Attribute{Key: "agent.mode", Value: string(a.cfg.Mode)},
+		tracer.Attribute{Key: "session.id", Value: a.cfg.SessionID},
+	)
+
 	runCtx, cancel := context.WithCancel(ctx)
 	if a.cfg.Timeout > 0 {
 		runCtx, cancel = context.WithTimeout(runCtx, a.cfg.Timeout)
@@ -44,6 +53,11 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 
 	if err != nil {
 		a.emit("agent.error", map[string]any{"error": err})
+		if runSpan != nil {
+			runSpan.RecordError(err)
+			runSpan.SetAttributes(tracer.Attribute{Key: "agent.duration_ms", Value: fmt.Sprintf("%d", duration.Milliseconds())})
+			runSpan.End()
+		}
 		a.finishResult(&multiagent.AgentResult{
 			Messages: a.GetMessages(),
 			ExitCode: 1,
@@ -55,6 +69,11 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	result.Messages = append(a.GetMessages(), result.Messages...)
 	result.Duration = duration
 	a.emit("agent.terminated", nil)
+	if runSpan != nil {
+		runSpan.SetAttributes(tracer.Attribute{Key: "agent.duration_ms", Value: fmt.Sprintf("%d", duration.Milliseconds())})
+		runSpan.SetStatus(tracer.StatusCodeOk, "")
+		runSpan.End()
+	}
 	a.finishResult(result)
 	return result, nil
 }
@@ -144,6 +163,9 @@ func (a *Impl) Terminate(ctx context.Context) error {
 	if a.State() == multiagent.AgentStateTerminated {
 		return sharedTerminated(a.id)
 	}
+	_, termSpan := a.startSpan(ctx, telemetry.OpAgentTerminate, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "agent.id", Value: a.id},
+	)
 	a.mu.Lock()
 	if a.cancel != nil {
 		a.cancel()
@@ -155,6 +177,10 @@ func (a *Impl) Terminate(ctx context.Context) error {
 		ExitCode: 130,
 		Error:    sharederrors.NewAgentContextCancelledError(a.id),
 	})
+	if termSpan != nil {
+		termSpan.SetStatus(tracer.StatusCodeOk, "")
+		termSpan.End()
+	}
 	return nil
 }
 

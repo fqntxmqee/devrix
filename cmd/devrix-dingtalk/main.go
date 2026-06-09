@@ -47,6 +47,10 @@ func main() {
 			obsCfg = loaded
 		}
 	}
+	contextengine.ConfigureLLMLogging(contextengine.LLMLogSettings{
+		LogContent: obsCfg.LLM.LogContent,
+		LogDir:     obsCfg.LLM.LogDir,
+	})
 	obs, err := observability.New(obsCfg)
 	if err != nil {
 		slog.Warn("failed to initialize observability, continuing without", "error", err)

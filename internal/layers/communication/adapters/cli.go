@@ -13,6 +13,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/renderers"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -24,6 +27,7 @@ type CLIAdapter struct {
 	cfg      *config.CommunicationConfig
 	reader   *bufio.Reader
 	writer   io.Writer
+	obsBridge *observability.Bridge
 
 	mu             sync.RWMutex
 	running        bool
@@ -44,6 +48,15 @@ func NewCLIAdapter(
 		reader:   bufio.NewReader(os.Stdin),
 		writer:   os.Stdout,
 	}
+}
+
+// SetObservability wires tracing/metrics into the CLI adapter.
+func (a *CLIAdapter) SetObservability(obs *observability.Observability) {
+	if obs == nil {
+		a.obsBridge = nil
+		return
+	}
+	a.obsBridge = observability.NewBridge(obs)
 }
 
 // Start begins the interactive CLI session
@@ -172,6 +185,8 @@ func (a *CLIAdapter) sendMessage(ctx context.Context, content string) error {
 	session := a.currentSession
 	a.mu.RUnlock()
 
+	_, cliSpan := a.startCLISendSpan(ctx, session.SessionID, content)
+
 	msg := &types.InboundMessage{
 		SessionID:  session.SessionID,
 		ChatID:    "cli",
@@ -185,10 +200,32 @@ func (a *CLIAdapter) sendMessage(ctx context.Context, content string) error {
 
 	if err := a.gateway.RouteInbound(ctx, msg); err != nil {
 		a.renderer.RenderError(err)
+		if cliSpan != nil { cliSpan.End() }
 		return err
+	}
+	if cliSpan != nil {
+		cliSpan.SetStatus(tracer.StatusCodeOk, "")
+		cliSpan.End()
 	}
 
 	return nil
+}
+
+func (a *CLIAdapter) startCLISendSpan(ctx context.Context, sessionID, content string) (context.Context, tracer.Span) {
+	if a.obsBridge == nil || a.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindProducer),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAdapterCLISend,
+			tracer.Attribute{Key: "session.id", Value: sessionID},
+			tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(content))},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return a.obsBridge.Tracer().Start(ctx, telemetry.OpAdapterCLISend, opts...)
 }
 
 // showHelp displays the help message

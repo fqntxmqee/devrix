@@ -76,68 +76,156 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		return nil, fmt.Errorf("request is nil")
 	}
 
-	provider, model, err := g.router.Resolve(req.Model)
-	if err != nil {
-		return nil, err
+	// Main llm.stream span (parent for all sub-operations)
+	streamCtx, streamSpan := g.startSpan(ctx, telemetry.OpLLMStream, tracer.SpanKindClient)
+	streamStart := time.Now()
+	finishStream := func(err error, usage llmgateway.TokenUsage, provider, model string) {
+		if streamSpan == nil {
+			return
+		}
+		attrs := telemetry.SpanAttrs(telemetry.OpLLMStream,
+			tracer.Attribute{Key: "llm.provider", Value: provider},
+			tracer.Attribute{Key: "llm.model", Value: model},
+		)
+		attrs = append(attrs, telemetry.LLMUsageAttrs(usage.PromptTokens, usage.CompletionTokens, time.Since(streamStart).Milliseconds())...)
+		if err != nil {
+			streamSpan.RecordError(err)
+			streamSpan.SetStatus(tracer.StatusCodeError, err.Error())
+			attrs = append(attrs, tracer.Attribute{Key: "llm.status", Value: "error"})
+		} else {
+			streamSpan.SetStatus(tracer.StatusCodeOk, "")
+			attrs = append(attrs, tracer.Attribute{Key: "llm.status", Value: "ok"})
+		}
+		streamSpan.SetAttributes(attrs...)
+		streamSpan.End()
 	}
+
+	var provider, model string
+
+	// llm.provider.route child span
+	{
+		_, routeSpan := g.startSpan(streamCtx, telemetry.OpLLMProviderRoute, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "llm.model_requested", Value: req.Model},
+		)
+		p, m, err := g.router.Resolve(req.Model)
+		if routeSpan != nil {
+			routeSpan.SetAttributes(
+				tracer.Attribute{Key: "llm.provider", Value: p},
+				tracer.Attribute{Key: "llm.model_resolved", Value: m},
+			)
+			routeSpan.End()
+		}
+		if err != nil {
+			finishStream(err, llmgateway.TokenUsage{}, "", "")
+			return nil, err
+		}
+		provider, model = p, m
+	}
+
 	providerCfg, ok := g.cfg.Providers[provider]
 	if !ok {
-		return nil, fmt.Errorf("provider config missing: %s", provider)
+		err := fmt.Errorf("provider config missing: %s", provider)
+		finishStream(err, llmgateway.TokenUsage{}, provider, model)
+		return nil, err
 	}
 
 	count := g.counter.CountWithSystemPrompt(req.SystemPrompt, req.Messages)
 	if err := g.counter.CheckBudget(count, defaultPromptTokenBudget); err != nil {
+		finishStream(err, llmgateway.TokenUsage{}, provider, model)
 		return nil, err
 	}
 
-	allowed, err := g.breaker.Allow(provider)
-	if err != nil {
-		return nil, err
-	}
-	if !allowed {
-		return nil, err
+	// llm.circuit_breaker child span
+	{
+		_, cbSpan := g.startSpan(streamCtx, telemetry.OpLLMCircuitBreaker, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "llm.provider", Value: provider},
+		)
+		allowed, err := g.breaker.Allow(provider)
+		if cbSpan != nil {
+			cbSpan.SetAttributes(tracer.Attribute{Key: "llm.breaker_allowed", Value: fmt.Sprintf("%t", allowed)})
+			cbSpan.End()
+		}
+		if err != nil {
+			finishStream(err, llmgateway.TokenUsage{}, provider, model)
+			return nil, err
+		}
+		if !allowed {
+			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, provider, model)
+			return nil, fmt.Errorf("circuit breaker rejected: %s", provider)
+		}
 	}
 
 	ad, err := g.reg.Get(provider)
 	if err != nil {
+		finishStream(err, llmgateway.TokenUsage{}, provider, model)
 		return nil, err
 	}
 
-	streamCtx := ctx
+	// Timeout setup
 	var cancel context.CancelFunc
-	if _, ok := ctx.Deadline(); !ok {
+	if _, ok := streamCtx.Deadline(); !ok {
 		timeout := providerCfg.Timeout
 		if timeout <= 0 {
 			timeout = defaultStreamTimeout
 		}
-		streamCtx, cancel = context.WithTimeout(ctx, timeout)
+		streamCtx, cancel = context.WithTimeout(streamCtx, timeout)
 	}
 
-	ctx, finishSpan := g.startStreamSpan(streamCtx, provider, model)
+	// llm.retry span (wraps retry + stream lifecycle)
+	retryCtx, retrySpan := g.startSpan(streamCtx, telemetry.OpLLMRetry, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "llm.provider", Value: provider},
+		tracer.Attribute{Key: "llm.model_primary", Value: model},
+	)
+	if providerCfg.FallbackModel != "" && providerCfg.FallbackModel != model {
+		if retrySpan != nil {
+			retrySpan.SetAttributes(tracer.Attribute{Key: "llm.model_fallback", Value: providerCfg.FallbackModel})
+		}
+	}
+
 	start := time.Now()
 
 	streamCall := func(callCtx context.Context, callModel string) (<-chan *llmgateway.AdapterChunk, error) {
+		// llm.adapter.stream child span (child of llm.retry via retryCtx)
+		_, adSpan := g.startSpan(callCtx, telemetry.OpLLMAdapterStream, tracer.SpanKindClient,
+			tracer.Attribute{Key: "llm.provider", Value: provider},
+			tracer.Attribute{Key: "llm.model", Value: callModel},
+		)
+
 		callReq := *req
 		callReq.Provider = provider
 		callReq.Model = callModel
 		callReq.MaxTokens = providerCfg.MaxTokens
 		callReq.Temperature = providerCfg.Temperature
 		callReq.Stream = true
-		return ad.Stream(callCtx, &callReq)
+		ch, err := ad.Stream(callCtx, &callReq)
+
+		if adSpan != nil {
+			if err != nil {
+				adSpan.RecordError(err)
+				adSpan.SetStatus(tracer.StatusCodeError, err.Error())
+			}
+			adSpan.End()
+		}
+		return ch, err
 	}
 
 	primaryModel := model
 	if primaryModel == "" {
 		primaryModel = providerCfg.DefaultModel
 	}
-	adapterCh, err := g.retry.Stream(streamCtx, streamCall, primaryModel, providerCfg.FallbackModel, providerCfg.Retry)
+
+	adapterCh, err := g.retry.Stream(retryCtx, streamCall, primaryModel, providerCfg.FallbackModel, providerCfg.Retry)
 	if err != nil {
 		if cancel != nil {
 			cancel()
 		}
 		g.breaker.RecordFailure(provider)
 		g.recordError(provider, primaryModel)
-		finishSpan(err, llmgateway.TokenUsage{})
+		if retrySpan != nil {
+			retrySpan.RecordError(err)
+			retrySpan.End()
+		}
+		finishStream(err, llmgateway.TokenUsage{}, provider, model)
 		return nil, err
 	}
 
@@ -146,6 +234,9 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		defer close(out)
 		if cancel != nil {
 			defer cancel()
+		}
+		if retrySpan != nil {
+			defer retrySpan.End()
 		}
 
 		var streamErr error
@@ -184,12 +275,12 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				g.breaker.RecordFailure(provider)
 			}
 			g.recordError(provider, primaryModel)
-			finishSpan(streamErr, usage)
+			finishStream(streamErr, usage, provider, model)
 			return
 		}
 		g.breaker.RecordSuccess(provider)
 		g.recordSuccess(provider, primaryModel, start)
-		finishSpan(nil, usage)
+		finishStream(nil, usage, provider, model)
 	}()
 
 	return out, nil
@@ -200,34 +291,19 @@ func (g *Gateway) Close() error {
 	return nil
 }
 
-func (g *Gateway) startStreamSpan(ctx context.Context, provider, model string) (context.Context, func(error, llmgateway.TokenUsage)) {
+// startSpan creates a child span if observability is configured.
+func (g *Gateway) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
 	if g.obs == nil || g.obs.Tracer() == nil {
-		return ctx, func(error, llmgateway.TokenUsage) {}
+		return ctx, nil
 	}
-	start := time.Now()
-	ctx, span := g.obs.Tracer().Start(ctx, telemetry.OpLLMStream,
-		tracer.WithSpanKind(tracer.SpanKindClient),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpLLMStream,
-			tracer.Attribute{Key: "llm.provider", Value: provider},
-			tracer.Attribute{Key: "llm.model", Value: model},
-		)...),
-	)
-	return ctx, func(err error, usage llmgateway.TokenUsage) {
-		if span == nil {
-			return
-		}
-		attrs := telemetry.LLMUsageAttrs(usage.PromptTokens, usage.CompletionTokens, time.Since(start).Milliseconds())
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(tracer.StatusCodeError, err.Error())
-			attrs = append(attrs, tracer.Attribute{Key: "llm.status", Value: "error"})
-		} else {
-			span.SetStatus(tracer.StatusCodeOk, "")
-			attrs = append(attrs, tracer.Attribute{Key: "llm.status", Value: "ok"})
-		}
-		span.SetAttributes(attrs...)
-		span.End()
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
 	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obs.Tracer().Start(ctx, operation, opts...)
 }
 
 func (g *Gateway) recordSuccess(provider, model string, start time.Time) {

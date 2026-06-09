@@ -3,6 +3,7 @@ package contextengine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -249,13 +250,28 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
 			tracer.Attribute{Key: "llm.model", Value: sc.Model},
 		)
+		AddLLMRequestEvent(llmSpan, sc.SessionID, iter, sc.Model, req)
 		chunks, err := e.llm.ChatStream(ctx, req)
 		if err != nil {
+			errDetail := errors.FormatLLMError(err)
 			if llmSpan != nil {
+				AddLLMResponseEvent(llmSpan, sc.SessionID, iter, "", TokenUsage{}, nil, nil)
 				llmSpan.RecordError(err)
+				llmSpan.SetAttributes(
+					tracer.Attribute{Key: "llm.status", Value: "error"},
+					tracer.Attribute{Key: "llm.error.detail", Value: truncateSpanAttr(errDetail, 500)},
+				)
 				llmSpan.End()
 			}
 			e.recordLLMError()
+			slog.Warn("pev: llm call failed",
+				"sessionID", sc.SessionID,
+				"iteration", iter,
+				"cause", errDetail,
+			)
+			if iter > 0 && hasSuccessfulToolOutput(toolResults) {
+				break
+			}
 			return nil, errors.NewLLMUnavailableError(err)
 		}
 
@@ -287,7 +303,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				}
 			}
 			if len(chunk.ToolCalls) > 0 {
-				pendingTools = append(pendingTools, chunk.ToolCalls...)
+				// Stream accumulator emits the full merged set on every delta.
+				pendingTools = chunk.ToolCalls
 			}
 			if chunk.Done {
 				usage = chunk.Usage
@@ -306,6 +323,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			}
 		}
 		if llmSpan != nil {
+			AddLLMResponseEvent(llmSpan, sc.SessionID, iter, assistantText, usage, pendingTools, nil)
 			llmSpan.SetAttributes(telemetry.LLMUsageAttrs(
 				usage.PromptTokens,
 				usage.CompletionTokens,
@@ -319,6 +337,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			break
 		}
 
+		pendingTools = dedupeToolCalls(pendingTools)
 		for i := range pendingTools {
 			pendingTools[i].ID = ensureToolCallID(pendingTools[i], i)
 		}
@@ -339,14 +358,14 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input, "risk_level": string(risk)},
 			})
 
-			// Tool execution span.
-			_, toolSpan := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
+			// Tool execution span - permission_check is a child.
+			toolCtx, toolSpan := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
 				tracer.Attribute{Key: "tool.name", Value: tc.Name},
 				tracer.Attribute{Key: "tool.risk_level", Value: string(risk)},
 			)
 
 			// Permission check span.
-			_, permSpan := e.startSpan(ctx, telemetry.OpContextPEVPermissionCheck, tracer.SpanKindInternal,
+			_, permSpan := e.startSpan(toolCtx, telemetry.OpContextPEVPermissionCheck, tracer.SpanKindInternal,
 				tracer.Attribute{Key: "tool.name", Value: tc.Name},
 			)
 			if e.permission != nil && !e.permission.Request(ctx, sc.SessionID, tc.Name, tc.Input, risk) {
@@ -416,6 +435,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			)
 			verifySpan.End()
 		}
+		// basic/none: one tool round per user message; synthesis handles the final reply.
+		if isSingleRoundVerifyMode(e.cfg.VerifyMode) {
+			break
+		}
 		if vr.Passed {
 			break
 		}
@@ -425,7 +448,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 	}
 
-	if hasSuccessfulToolOutput(toolResults) {
+	if len(toolResults) > 0 {
 		synthText, synthUsage := e.runToolSynthesis(ctx, sc, view, systemPrompt, assistantText, toolResults, emit)
 		usage.PromptTokens += synthUsage.PromptTokens
 		usage.CompletionTokens += synthUsage.CompletionTokens
@@ -485,17 +508,24 @@ func (e *PEVEngine) runToolSynthesis(
 	}
 
 	llmStart := time.Now()
-	_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
+	_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVSynthesis, tracer.SpanKindClient,
 		tracer.Attribute{Key: "pev.synthesis", Value: "true"},
 		tracer.Attribute{Key: "llm.model", Value: sc.Model},
 	)
+	AddLLMRequestEvent(llmSpan, sc.SessionID, -1, sc.Model, synthReq)
 	chunks, err := e.llm.ChatStream(ctx, synthReq)
 	if err != nil {
+		errDetail := errors.FormatLLMError(err)
 		if llmSpan != nil {
 			llmSpan.RecordError(err)
+			llmSpan.SetAttributes(
+				tracer.Attribute{Key: "llm.status", Value: "error"},
+				tracer.Attribute{Key: "llm.error.detail", Value: truncateSpanAttr(errDetail, 500)},
+			)
 			llmSpan.End()
 		}
 		e.recordLLMError()
+		slog.Warn("pev: synthesis llm failed", "sessionID", sc.SessionID, "cause", errDetail)
 		fallback := summarizeSuccessfulToolResults(toolResults)
 		emit(&gateway.EngineEvent{
 			Type: "text", Content: fallback, SessionID: sc.SessionID,
@@ -543,6 +573,7 @@ func (e *PEVEngine) runToolSynthesis(
 		})
 	}
 	if llmSpan != nil {
+		AddLLMResponseEvent(llmSpan, sc.SessionID, -1, synthText, usage, nil, toolResults)
 		llmSpan.SetAttributes(telemetry.LLMUsageAttrs(
 			usage.PromptTokens,
 			usage.CompletionTokens,

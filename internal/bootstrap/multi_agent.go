@@ -1,7 +1,9 @@
 package bootstrap
 
 import (
+	"github.com/devrix/devrix/internal/layers/multiagent"
 	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -9,9 +11,13 @@ import (
 func WireMultiAgent(
 	builder *ContextEngineBuilder,
 	cfg *config.MultiAgentConfig,
+	obsBridge *observability.Bridge,
 ) *multiagentfactory.AgentFactory {
 	if cfg == nil {
 		cfg = config.DefaultMultiAgentConfig()
 	}
-	return multiagentfactory.NewAgentFactoryWithBuilder(builder, cfg)
+	deps := multiagent.AgentDeps{
+		ObsBridge: obsBridge,
+	}
+	return multiagentfactory.NewAgentFactoryWithBuilder(deps, builder, cfg)
 }

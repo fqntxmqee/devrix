@@ -11,8 +11,21 @@ type openAIChatRequest struct {
 }
 
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string              `json:"role"`
+	Content    string              `json:"content,omitempty"`
+	ToolCalls  []openAIToolCallMsg `json:"tool_calls,omitempty"`
+	ToolCallID string              `json:"tool_call_id,omitempty"`
+}
+
+type openAIToolCallMsg struct {
+	ID       string                `json:"id"`
+	Type     string                `json:"type"`
+	Function openAIToolFunctionMsg `json:"function"`
+}
+
+type openAIToolFunctionMsg struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type openAITool struct {

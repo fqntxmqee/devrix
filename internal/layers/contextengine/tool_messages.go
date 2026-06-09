@@ -3,6 +3,7 @@ package contextengine
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/shared/types"
@@ -35,7 +36,7 @@ func buildAssistantToolCallsMessage(sessionID string, calls []ToolCall) types.Me
 		refs[i].ID = ensureToolCallID(call, i)
 		refs[i].Type = "function"
 		refs[i].Function.Name = call.Name
-		refs[i].Function.Arguments = call.Input
+		refs[i].Function.Arguments = normalizeToolArguments(call.Input)
 	}
 	raw, _ := json.Marshal(refs)
 	return types.Message{
@@ -55,6 +56,36 @@ func buildToolResultMessage(sessionID, toolCallID, content string) types.Message
 	)
 	msg.Metadata = map[string]string{metaToolCallID: toolCallID}
 	return *msg
+}
+
+func normalizeToolArguments(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "{}"
+	}
+	if json.Valid([]byte(raw)) {
+		return raw
+	}
+	// Streaming deltas may yield truncated JSON; never forward invalid args to the provider.
+	return "{}"
+}
+
+func dedupeToolCalls(calls []ToolCall) []ToolCall {
+	if len(calls) <= 1 {
+		return calls
+	}
+	seen := make(map[string]struct{}, len(calls))
+	out := make([]ToolCall, 0, len(calls))
+	for i, call := range calls {
+		id := ensureToolCallID(call, i)
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		call.ID = id
+		out = append(out, call)
+	}
+	return out
 }
 
 func toolCallIDs(calls []ToolCall) []string {

@@ -42,7 +42,8 @@ func mergeConfig(base *Config, loaded *Config) {
 		loaded.Tracing.Enabled || loaded.Tracing.Exporter != "" || loaded.Tracing.ServiceName != "" ||
 		loaded.Metrics.Enabled || loaded.Metrics.Exporter != "" ||
 		loaded.Logging.Enabled || loaded.Logging.Level != "" ||
-		loaded.Health.Enabled || loaded.Health.Endpoint != ""
+		loaded.Health.Enabled || loaded.Health.Endpoint != "" ||
+		loaded.LLM.LogContent || loaded.LLM.LogDir != ""
 	if !hasContent {
 		return
 	}
@@ -58,5 +59,8 @@ func mergeConfig(base *Config, loaded *Config) {
 	}
 	if loaded.Health.Enabled || loaded.Health.Endpoint != "" {
 		base.Health = loaded.Health
+	}
+	if loaded.LLM.LogContent || loaded.LLM.LogDir != "" {
+		base.LLM = loaded.LLM
 	}
 }

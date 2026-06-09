@@ -2,13 +2,22 @@ package contextengine
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+func isSingleRoundVerifyMode(mode string) bool {
+	mode = strings.TrimSpace(mode)
+	return mode == "" || mode == config.VerifyModeBasic || mode == config.VerifyModeNone
+}
+
 func (e *PEVEngine) verify(ctx context.Context, sc *types.SessionContext, toolResults []ToolResult) types.VerifyResult {
-	switch e.cfg.VerifyMode {
+	switch strings.TrimSpace(e.cfg.VerifyMode) {
 	case config.VerifyModeNone:
 		return types.VerifyResult{Passed: true}
 	case config.VerifyModeCommands:
@@ -24,15 +33,15 @@ func (e *PEVEngine) verify(ctx context.Context, sc *types.SessionContext, toolRe
 }
 
 func verifyBasic(results []ToolResult) types.VerifyResult {
+	if len(results) == 0 {
+		return types.VerifyResult{Passed: true}
+	}
 	for _, r := range results {
-		if r.Error != "" {
-			return types.VerifyResult{Passed: false, Deviation: 1}
-		}
-		if r.Output == "" {
-			return types.VerifyResult{Passed: false, Deviation: 0.5}
+		if r.Error == "" && strings.TrimSpace(r.Output) != "" {
+			return types.VerifyResult{Passed: true}
 		}
 	}
-	return types.VerifyResult{Passed: true}
+	return types.VerifyResult{Passed: false, Deviation: 1}
 }
 
 func (e *PEVEngine) verifyCommands(ctx context.Context, sc *types.SessionContext, toolResults []ToolResult) types.VerifyResult {
@@ -54,7 +63,21 @@ func (e *PEVEngine) verifyCommands(ctx context.Context, sc *types.SessionContext
 			Timeout:    cfgCmd.Timeout,
 			WorkDir:    sc.WorkDir,
 		}
+		_, verifySpan := e.startSpan(ctx, telemetry.OpContextVerifyCommand, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "command.name", Value: cmd.Name},
+			tracer.Attribute{Key: "work_dir", Value: cmd.WorkDir},
+		)
 		result, err := e.verifyRunner.Run(ctx, cmd)
+		if verifySpan != nil {
+			verifySpan.SetAttributes(
+				tracer.Attribute{Key: "verify.exit_code", Value: fmt.Sprintf("%d", result.ExitCode)},
+				tracer.Attribute{Key: "verify.duration_ms", Value: fmt.Sprintf("%d", result.Duration.Milliseconds())},
+			)
+			if err != nil {
+				verifySpan.RecordError(err)
+			}
+			verifySpan.End()
+		}
 		if e.pevObserver != nil {
 			e.pevObserver.EmitVerifyCommand(sc.SessionID, cmd.Name, result)
 		}

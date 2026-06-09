@@ -318,7 +318,7 @@ func TestCommunicationGateway_GetOrCreateSession(t *testing.T) {
 	}
 
 	// getOrCreateSession with existing SessionID should return that session
-	session, err := gw.getOrCreateSession(msg)
+	session, err := gw.getOrCreateSession(context.Background(), msg)
 	if err != nil {
 		t.Fatalf("getOrCreateSession() error = %v", err)
 	}

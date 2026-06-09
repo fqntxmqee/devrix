@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
@@ -27,25 +29,44 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 		childCfg.PermissionTimeout = a.cfg.PermissionTimeout
 	}
 
+	ctx, forkSpan := a.startSpan(ctx, telemetry.OpAgentFork, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "agent.id", Value: a.id},
+		tracer.Attribute{Key: "child.mode", Value: string(childCfg.Mode)},
+	)
+
 	child, err := a.creator.Create(ctx, childCfg, a.session)
 	if err != nil {
+		if forkSpan != nil { forkSpan.End() }
 		return nil, err
 	}
 	a.addChild(child)
 	a.emit("agent.forked", map[string]any{"child_id": child.ID()})
+	if forkSpan != nil {
+		forkSpan.SetAttributes(tracer.Attribute{Key: "child.id", Value: child.ID()})
+		forkSpan.SetStatus(tracer.StatusCodeOk, "")
+		forkSpan.End()
+	}
 	return child, nil
 }
 
 // Join merges a completed child message buffer into the parent.
 func (a *Impl) Join(ctx context.Context, child multiagent.Agent) error {
+	_, joinSpan := a.startSpan(ctx, telemetry.OpAgentJoin, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "agent.id", Value: a.id},
+		tracer.Attribute{Key: "child.id", Value: child.ID()},
+	)
+
 	if err := ctx.Err(); err != nil {
+		if joinSpan != nil { joinSpan.End() }
 		return sharederrors.NewAgentContextCancelledError(a.id)
 	}
 	if child.State() != multiagent.AgentStateTerminated {
+		if joinSpan != nil { joinSpan.End() }
 		return sharederrors.NewAgentJoinNotCompletedError(child.ID())
 	}
 	result, err := child.Wait(ctx)
 	if err != nil && result == nil {
+		if joinSpan != nil { joinSpan.End() }
 		return err
 	}
 	a.appendMessages(child.GetMessages()...)
@@ -54,5 +75,9 @@ func (a *Impl) Join(ctx context.Context, child multiagent.Agent) error {
 	}
 	a.removeChild(child.ID())
 	a.emit("agent.joined", map[string]any{"child_id": child.ID()})
+	if joinSpan != nil {
+		joinSpan.SetStatus(tracer.StatusCodeOk, "")
+		joinSpan.End()
+	}
 	return nil
 }

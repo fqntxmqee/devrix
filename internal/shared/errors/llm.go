@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // LLM layer sentinel errors.
@@ -47,6 +48,27 @@ func (e *LLMError) Error() string {
 
 func (e *LLMError) Unwrap() error {
 	return e.Err
+}
+
+// FormatLLMError unwraps the full error chain for logging and tracing.
+func FormatLLMError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var parts []string
+	seen := make(map[string]struct{})
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		msg := strings.TrimSpace(e.Error())
+		if msg == "" {
+			continue
+		}
+		if _, dup := seen[msg]; dup {
+			continue
+		}
+		seen[msg] = struct{}{}
+		parts = append(parts, msg)
+	}
+	return strings.Join(parts, ": ")
 }
 
 // IsRetryable reports whether the error may be retried.

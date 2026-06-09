@@ -16,6 +16,7 @@ for f in "$HOME/.devrix/env" "$HOME/.local/share/codex-minimax/.env"; do
 done
 
 export DEVRIX_ENGINE="${DEVRIX_ENGINE:-context}"
+cd "$ROOT"
 exec >>"$LOG" 2>&1
 echo "==== devrix-feishu launch $(date '+%Y-%m-%d %H:%M:%S') engine=$DEVRIX_ENGINE bin=$BIN ===="
 exec "$BIN"

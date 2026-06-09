@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -72,6 +74,12 @@ func (t *CursorAgentTool) Execute(ctx context.Context, sessionID string, req Req
 	}
 	if workDir == "" {
 		workDir = "."
+	}
+	workDir = filepath.Clean(workDir)
+	if info, err := os.Stat(workDir); err != nil {
+		return nil, fmt.Errorf("cursor: invalid workspace %q: %w", workDir, err)
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("cursor: workspace is not a directory: %q", workDir)
 	}
 
 	// Note: we do NOT wrap ctx with a timeout here because

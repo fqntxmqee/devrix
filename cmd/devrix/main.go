@@ -19,6 +19,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
+	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -39,6 +40,10 @@ func main() {
 			obsCfg = loaded
 		}
 	}
+	contextengine.ConfigureLLMLogging(contextengine.LLMLogSettings{
+		LogContent: obsCfg.LLM.LogContent,
+		LogDir:     obsCfg.LLM.LogDir,
+	})
 
 	var obs *observability.Observability
 	var err error
@@ -210,7 +215,7 @@ func main() {
 
 	if multiAgentCfg.Enabled {
 		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg)
-		agentFactory := bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg)
+		agentFactory := bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
 			"max_children", multiAgentCfg.MaxChildren,

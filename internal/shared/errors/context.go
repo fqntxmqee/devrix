@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Context engine sentinel errors.
@@ -46,7 +47,26 @@ func NewPEVMaxIterationsError() *SentinelError {
 
 // NewLLMUnavailableError returns an LLM unavailable error.
 func NewLLMUnavailableError(err error) *SentinelError {
-	return WithCode(CodeLLMUnavailable, "llm gateway unavailable", err)
+	msg := "llm gateway unavailable"
+	if detail := FormatLLMError(err); isProviderOverloaded(detail) {
+		msg = "MiniMax 服务当前负载较高，请稍后重试（HTTP 529）"
+	} else if isLLMTimeout(detail) {
+		msg = "LLM 响应超时（模型思考耗时较长），请稍后重试"
+	}
+	return WithCode(CodeLLMUnavailable, msg, err)
+}
+
+func isProviderOverloaded(detail string) bool {
+	lower := strings.ToLower(detail)
+	return strings.Contains(lower, "529") ||
+		strings.Contains(lower, "overloaded") ||
+		strings.Contains(detail, "负载较高")
+}
+
+func isLLMTimeout(detail string) bool {
+	lower := strings.ToLower(detail)
+	return strings.Contains(lower, "deadline exceeded") ||
+		strings.Contains(lower, "llm request timeout")
 }
 
 // NewFeatureNotImplementedError returns a feature not implemented error.

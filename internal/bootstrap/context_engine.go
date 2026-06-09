@@ -31,7 +31,7 @@ func NewContextEngine(
 
 	// Register per-agent call_<name> plugins if agent tools are enabled.
 	if agentToolReg != nil {
-		plugins := newAgentToolPlugins(agentToolReg)
+		plugins := newAgentToolPlugins(agentToolReg, obsBridge)
 		for _, plugin := range plugins {
 			if err := toolReg.Register(plugin); err != nil {
 				slog.Error("register agent plugin", "tool", plugin.Name(), "error", err)

@@ -144,7 +144,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	systemPrompt := e.prompt.Load(session.WorkDir)
 
 	// Load or init snapshot — with child span.
-	loadCtx, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
+	_, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
 	sc, err := e.memory.LoadOrInit(session, systemPrompt)
 	if err != nil {
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
@@ -163,7 +163,6 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	if loadSpan != nil {
 		loadSpan.End()
 	}
-	_ = loadCtx
 
 	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal)
 	recallErr := e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)

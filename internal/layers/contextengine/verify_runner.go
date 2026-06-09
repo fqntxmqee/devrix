@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
 )
 
 // VerifyCommand describes a whitelisted verify command.

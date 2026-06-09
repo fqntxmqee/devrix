@@ -188,7 +188,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	}
 
 	// Get or create session
-	session, err := g.getOrCreateSession(msg)
+	session, err := g.getOrCreateSession(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to get or create session: %w", err)
 	}
@@ -204,8 +204,15 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	// Update session
 	session.LastMessageAt = time.Now()
 	session.RequestID = msg.MessageID
+	_, storeSpan := g.startStoreUpdateSpan(ctx, session.SessionID)
 	if err := g.sessionStore.Update(session); err != nil {
+		if storeSpan != nil {
+			storeSpan.RecordError(err)
+			storeSpan.End()
+		}
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
+	} else {
+		if storeSpan != nil { storeSpan.End() }
 	}
 
 	if g.agentFactory != nil {
@@ -254,6 +261,11 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 // handleEngineEvent handles a single engine event
 func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *types.Session, event *EngineEvent) {
 	slog.Info("gateway: handleEngineEvent", "type", event.Type, "sessionID", session.SessionID)
+
+	ctx, evSpan := g.startEngineEventSpan(ctx, session, event.Type)
+	if evSpan != nil {
+		defer evSpan.End()
+	}
 
 	// Record outbound metric
 	if g.metricOutboundMsgs != nil {
@@ -401,7 +413,15 @@ func (g *CommunicationGateway) RouteOutbound(msg *types.OutboundMessage) error {
 
 // RoutePermission handles a permission request
 func (g *CommunicationGateway) RoutePermission(req *types.PermissionRequest) (bool, error) {
+	_, permSpan := g.startPermissionSpan(context.Background(), req)
 	approved := g.eventHandler.OnPermissionRequest(req)
+	if permSpan != nil {
+		permSpan.SetAttributes(
+			tracer.Attribute{Key: "permission.result", Value: fmt.Sprintf("%t", approved)},
+		)
+		permSpan.SetStatus(tracer.StatusCodeOk, "")
+		permSpan.End()
+	}
 	return approved, nil
 }
 
@@ -417,11 +437,15 @@ func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Ses
 			workDir = wd
 		}
 	}
+
+	_, createSpan := g.startSessionCreateSpan(context.Background(), chatID, workDir)
+
 	sessionID := generateSessionID()
 	session := types.NewSession(sessionID, "cli", workDir)
 	session.ChatID = chatID
 
 	if err := g.sessionStore.Create(session); err != nil {
+		if createSpan != nil { createSpan.End() }
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -436,7 +460,10 @@ func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Ses
 	if g.metricActiveSessions != nil {
 		g.metricActiveSessions.Inc()
 	}
-	g.recordSessionLifecycle(sessionID, session.AdapterID, "create")
+	if createSpan != nil {
+		createSpan.SetAttributes(tracer.Attribute{Key: "session.id", Value: sessionID})
+		createSpan.End()
+	}
 
 	return session, nil
 }
@@ -455,16 +482,21 @@ func (g *CommunicationGateway) GetSession(sessionID string) (*types.Session, err
 
 // ExpireSession marks a session as expired
 func (g *CommunicationGateway) ExpireSession(sessionID string) error {
+	_, expireSpan := g.startSessionExpireSpan(context.Background(), sessionID)
+
 	session, err := g.sessionStore.Get(sessionID)
 	if err != nil {
+		if expireSpan != nil { expireSpan.End() }
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 	if session == nil {
+		if expireSpan != nil { expireSpan.End() }
 		return errors.NewSessionNotFoundError(sessionID)
 	}
 
 	session.State = types.SessionStateFailed
 	if err := g.sessionStore.Update(session); err != nil {
+		if expireSpan != nil { expireSpan.End() }
 		return fmt.Errorf("failed to update session: %w", err)
 	}
 
@@ -481,15 +513,38 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 	if g.metricActiveSessions != nil {
 		g.metricActiveSessions.Dec()
 	}
-	g.recordSessionLifecycle(sessionID, session.AdapterID, "expire")
+	if expireSpan != nil {
+		expireSpan.SetAttributes(tracer.Attribute{Key: "adapter", Value: session.AdapterID})
+		expireSpan.End()
+	}
 
 	return nil
 }
 
+func (g *CommunicationGateway) startSessionExpireSpan(ctx context.Context, sessionID string) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionExpire,
+			tracer.Attribute{Key: "session.id", Value: sessionID},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionExpire, opts...)
+}
+
 // getOrCreateSession gets an existing session or creates a new one
-func (g *CommunicationGateway) getOrCreateSession(msg *types.InboundMessage) (*types.Session, error) {
+func (g *CommunicationGateway) getOrCreateSession(ctx context.Context, msg *types.InboundMessage) (*types.Session, error) {
 	if msg.SessionID != "" {
+		_, getSpan := g.startSessionGetSpan(ctx, msg.SessionID)
 		session, err := g.sessionStore.Get(msg.SessionID)
+		if getSpan != nil {
+			getSpan.End()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -499,6 +554,22 @@ func (g *CommunicationGateway) getOrCreateSession(msg *types.InboundMessage) (*t
 	}
 
 	return g.CreateSession(msg.ChatID, msg.Metadata["work_dir"])
+}
+
+func (g *CommunicationGateway) startSessionGetSpan(ctx context.Context, sessionID string) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionGet,
+			tracer.Attribute{Key: "session.id", Value: sessionID},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionGet, opts...)
 }
 
 // generateSessionID generates a unique session ID
@@ -543,6 +614,74 @@ func (g *CommunicationGateway) recordSessionLifecycle(sessionID, adapter, action
 		)...),
 	)
 	span.End()
+}
+
+func (g *CommunicationGateway) startEngineEventSpan(ctx context.Context, session *types.Session, eventType string) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayEngineEvent,
+			tracer.Attribute{Key: "session.id", Value: session.SessionID},
+			tracer.Attribute{Key: "event.type", Value: eventType},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayEngineEvent, opts...)
+}
+
+func (g *CommunicationGateway) startStoreUpdateSpan(ctx context.Context, sessionID string) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayStoreUpdate,
+			tracer.Attribute{Key: "session.id", Value: sessionID},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayStoreUpdate, opts...)
+}
+
+func (g *CommunicationGateway) startSessionCreateSpan(ctx context.Context, chatID, workDir string) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionCreate,
+			tracer.Attribute{Key: "adapter", Value: "cli"},
+			tracer.Attribute{Key: "work_dir", Value: workDir},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionCreate, opts...)
+}
+
+func (g *CommunicationGateway) startPermissionSpan(ctx context.Context, req *types.PermissionRequest) (context.Context, tracer.Span) {
+	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayPermissionCheck,
+			tracer.Attribute{Key: "session.id", Value: req.SessionID},
+			tracer.Attribute{Key: "tool.name", Value: req.ToolName},
+			tracer.Attribute{Key: "risk_level", Value: string(req.RiskLevel)},
+		)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayPermissionCheck, opts...)
 }
 
 func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.InboundMessage) (context.Context, func()) {

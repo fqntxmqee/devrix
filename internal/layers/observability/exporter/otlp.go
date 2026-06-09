@@ -87,8 +87,9 @@ type OTLPSpan struct {
 
 // OTLPEvent is a span event
 type OTLPEvent struct {
-	Name         string `json:"name"`
-	TimeUnixNano string `json:"timeUnixNano"`
+	Name         string         `json:"name"`
+	TimeUnixNano string         `json:"timeUnixNano"`
+	Attributes   []OTLPKeyValue `json:"attributes,omitempty"`
 }
 
 // OTLPStatus is a span status
@@ -196,6 +197,7 @@ func (e *OTLPExporter) spanToOTLP(s tracer.ReadableSpan) OTLPSpan {
 		otlpSpan.Events = append(otlpSpan.Events, OTLPEvent{
 			Name:         evt.Name,
 			TimeUnixNano: strconv.FormatInt(evt.Timestamp.UnixNano(), 10),
+			Attributes:   otlpEventAttributes(evt.Attributes),
 		})
 	}
 
@@ -218,6 +220,20 @@ func (e *OTLPExporter) spanToOTLP(s tracer.ReadableSpan) OTLPSpan {
 func otlpSpanKind(kind tracer.SpanKind) int {
 	// OpenTelemetry SpanKind enum: 1=INTERNAL, 2=SERVER, 3=CLIENT, 4=PRODUCER, 5=CONSUMER
 	return int(kind) + 1
+}
+
+func otlpEventAttributes(attrs []tracer.Attribute) []OTLPKeyValue {
+	if len(attrs) == 0 {
+		return nil
+	}
+	out := make([]OTLPKeyValue, 0, len(attrs))
+	for _, attr := range attrs {
+		out = append(out, OTLPKeyValue{
+			Key:   attr.Key,
+			Value: OTLPAnyValue{StringValue: fmt.Sprintf("%v", attr.Value)},
+		})
+	}
+	return out
 }
 
 // Shutdown shuts down the exporter

@@ -13,7 +13,14 @@ type Config struct {
 	Tracing settings.TracingConfig `yaml:"tracing"`
 	Metrics settings.MetricsConfig `yaml:"metrics"`
 	Logging  LoggingConfig         `yaml:"logging"`
+	LLM      LLMConfig             `yaml:"llm"`
 	Health   HealthConfig          `yaml:"health"`
+}
+
+// LLMConfig controls LLM request/response capture for tracing and local logs.
+type LLMConfig struct {
+	LogContent bool   `yaml:"log_content"`
+	LogDir     string `yaml:"log_dir"`
 }
 
 // TracingConfig holds tracing configuration
@@ -112,6 +119,10 @@ func DefaultConfig() *Config {
 		Health: HealthConfig{
 			Enabled:  true,
 			Endpoint: "/health",
+		},
+		LLM: LLMConfig{
+			LogContent: false,
+			LogDir:     "~/.devrix/logs/llm",
 		},
 	}
 }

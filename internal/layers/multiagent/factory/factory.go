@@ -9,6 +9,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
 	"github.com/devrix/devrix/internal/layers/multiagent/collaboration"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -45,10 +47,11 @@ func NewAgentFactory(deps multiagent.AgentDeps, cfg *sharedconfig.MultiAgentConf
 
 // NewAgentFactoryWithBuilder wires per-agent engines via the supplied builder.
 func NewAgentFactoryWithBuilder(
+	deps multiagent.AgentDeps,
 	builder EngineBuilder,
 	cfg *sharedconfig.MultiAgentConfig,
 ) *AgentFactory {
-	f := NewAgentFactory(multiagent.AgentDeps{}, cfg)
+	f := NewAgentFactory(deps, cfg)
 	f.builder = builder
 	return f
 }
@@ -59,16 +62,21 @@ func (f *AgentFactory) Create(
 	cfg multiagent.AgentConfig,
 	session *types.Session,
 ) (multiagent.Agent, error) {
+	ctx, createSpan := f.startCreateSpan(ctx, cfg)
+
 	if err := ctx.Err(); err != nil {
 		return nil, sharederrors.NewAgentContextCancelledError(cfg.SessionID)
 	}
 	if err := validateConfig(cfg, f.cfg); err != nil {
+		if createSpan != nil { createSpan.End() }
 		return nil, err
 	}
 	if session == nil {
+		if createSpan != nil { createSpan.End() }
 		return nil, sharederrors.NewAgentInvalidConfigError("session is nil")
 	}
 	if err := f.reserveSessionSlot(cfg.SessionID); err != nil {
+		if createSpan != nil { createSpan.End() }
 		return nil, err
 	}
 	resolved := resolveConfig(cfg, f.cfg)
@@ -78,7 +86,22 @@ func (f *AgentFactory) Create(
 	} else if f.deps.Engine == nil {
 		impl.SetEngine(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	}
+	if createSpan != nil { createSpan.End() }
 	return impl, nil
+}
+
+func (f *AgentFactory) startCreateSpan(ctx context.Context, cfg multiagent.AgentConfig) (context.Context, tracer.Span) {
+	if f.deps.ObsBridge == nil || f.deps.ObsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	ctx, span := f.deps.ObsBridge.Tracer().Start(ctx, telemetry.OpGatewayAgentCreate,
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayAgentCreate,
+			tracer.Attribute{Key: "session.id", Value: cfg.SessionID},
+			tracer.Attribute{Key: "agent.mode", Value: string(cfg.Mode)},
+		)...),
+	)
+	return ctx, span
 }
 
 // ReleaseSession decrements the session agent quota when an agent terminates.

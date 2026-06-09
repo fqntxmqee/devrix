@@ -14,25 +14,49 @@ type OperationMeta struct {
 // AllOperations returns the canonical operation registry sorted by name.
 func AllOperations() []OperationMeta {
 	ops := []OperationMeta{
-		{Name: "gateway.message.receive", Layer: "communication", Component: "gateway", SinceVersion: "1.2.0", Instrumented: true},
-		{Name: "gateway.session.lifecycle", Layer: "communication", Component: "gateway", SinceVersion: "1.3.0", Instrumented: true},
-
+		{Name: "adapter.cli.send", Layer: "communication", Component: "adapter", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "adapter.feishu.outbound", Layer: "communication", Component: "adapter", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "adapter.message.receive", Layer: "communication", Component: "adapter", SinceVersion: "1.3.0", Instrumented: true},
 
-		{Name: "context.process", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
-		{Name: "context.snapshot.load", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "agent.fork", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "agent.join", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "agent.run", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "agent.state.transition", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "agent.terminate", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "agent.tool.call", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
+
 		{Name: "context.compression.run", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
-		{Name: "context.plan.generate", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
-		{Name: "context.milestone.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.longterm.recall", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.longterm.store", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
-
-		{Name: "context.pev.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.milestone.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.pev.llm_call", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
-		{Name: "context.pev.tool_execute", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.pev.permission_check", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.pev.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.pev.synthesis", Layer: "context", Component: "pev_engine", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "context.pev.tool_execute", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.pev.verify", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.plan.generate", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
+		{Name: "context.process", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.snapshot.load", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.verify.command", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
+		{Name: "gateway.agent.create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.engine_event.handle", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.message.receive", Layer: "communication", Component: "gateway", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "gateway.permission.check", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.session.create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.session.expire", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.session.get", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.session.lifecycle", Layer: "communication", Component: "gateway", SinceVersion: "1.3.0", Instrumented: true},
+		{Name: "gateway.store.create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.store.delete", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.store.get", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "gateway.store.update", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+
+		{Name: "llm.adapter.stream", Layer: "llm", Component: "llm_adapter", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "llm.circuit_breaker", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "llm.provider.route", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "llm.retry", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "llm.stream", Layer: "llm", Component: "llm_gateway", SinceVersion: "1.2.0", Instrumented: true},
 	}
 	sort.Slice(ops, func(i, j int) bool { return ops[i].Name < ops[j].Name })

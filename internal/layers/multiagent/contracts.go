@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -87,6 +88,7 @@ type PermissionGate interface {
 type AgentDeps struct {
 	Engine        contracts.IEngine
 	AgentObserver AgentObserver
+	ObsBridge     *observability.Bridge
 }
 
 // AgentObserver receives agent lifecycle events (optional).

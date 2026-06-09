@@ -7,6 +7,11 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+const (
+	metaToolCallID = "tool_call_id"
+	metaToolCalls  = "tool_calls"
+)
+
 func buildOpenAIChatRequest(req *llmgateway.Request) (*openAIChatRequest, error) {
 	if req == nil {
 		return nil, errNilRequest
@@ -24,10 +29,7 @@ func buildOpenAIChatRequest(req *llmgateway.Request) (*openAIChatRequest, error)
 		})
 	}
 	for _, m := range req.Messages {
-		out.Messages = append(out.Messages, openAIMessage{
-			Role:    string(m.Role),
-			Content: m.Content,
-		})
+		out.Messages = append(out.Messages, mapOpenAIMessage(m))
 	}
 	for _, tool := range req.Tools {
 		params, err := parseToolParameters(tool.Parameters)
@@ -47,6 +49,26 @@ func buildOpenAIChatRequest(req *llmgateway.Request) (*openAIChatRequest, error)
 		out.Stream = false
 	}
 	return out, nil
+}
+
+func mapOpenAIMessage(m types.Message) openAIMessage {
+	out := openAIMessage{
+		Role:    string(m.Role),
+		Content: m.Content,
+	}
+	if m.Metadata == nil {
+		return out
+	}
+	if raw, ok := m.Metadata[metaToolCalls]; ok && raw != "" {
+		var calls []openAIToolCallMsg
+		if err := json.Unmarshal([]byte(raw), &calls); err == nil && len(calls) > 0 {
+			out.ToolCalls = calls
+		}
+	}
+	if id, ok := m.Metadata[metaToolCallID]; ok && id != "" {
+		out.ToolCallID = id
+	}
+	return out
 }
 
 func parseToolParameters(raw string) (any, error) {

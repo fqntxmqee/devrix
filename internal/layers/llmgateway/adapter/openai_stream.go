@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	llmconfig "github.com/devrix/devrix/internal/layers/llmgateway/config"
@@ -28,14 +27,10 @@ type OpenAIStreamClient struct {
 
 // NewOpenAIStreamClient creates a streaming HTTP client for a provider.
 func NewOpenAIStreamClient(provider string, cfg sharedconfig.LLMProviderRuntimeConfig) *OpenAIStreamClient {
-	timeout := cfg.Timeout
-	if timeout <= 0 {
-		timeout = 60 * time.Second
-	}
 	return &OpenAIStreamClient{
 		provider: provider,
 		cfg:      cfg,
-		client:   &http.Client{Timeout: timeout},
+		client:   &http.Client{Timeout: 0},
 	}
 }
 

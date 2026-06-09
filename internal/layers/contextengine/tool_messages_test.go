@@ -42,3 +42,21 @@ func TestEnsureToolCallID_should_generate_when_missing(t *testing.T) {
 		t.Fatal("expected generated id")
 	}
 }
+
+func TestNormalizeToolArguments_should_default_invalid_json_to_empty_object(t *testing.T) {
+	got := normalizeToolArguments(`{"task":`)
+	if got != "{}" {
+		t.Fatalf("got %q, want {}", got)
+	}
+}
+
+func TestDedupeToolCalls_should_keep_last_unique_id(t *testing.T) {
+	calls := dedupeToolCalls([]ToolCall{
+		{ID: "tc1", Name: "bash", Input: `{}`},
+		{ID: "tc1", Name: "bash", Input: `{"command":"ls"}`},
+		{ID: "tc2", Name: "call_cursor", Input: `{}`},
+	})
+	if len(calls) != 2 {
+		t.Fatalf("len = %d, want 2", len(calls))
+	}
+}

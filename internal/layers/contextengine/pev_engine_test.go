@@ -151,7 +151,23 @@ func TestPEV_ContextCancellation_Cleanup(t *testing.T) {
 // Covers: L5-CTX-29
 func TestPEV_MaxIterations_Exhausted(t *testing.T) {
 	llm := &infiniteToolLLM{}
-	engine := newTestPEVEngine(t, llm, failingToolRunner{}, 3)
+	cfg := config.DefaultContextEngineConfig()
+	cfg.PEV.MaxIterations = 3
+	cfg.PEV.VerifyMode = config.VerifyModeCommands
+	cfg.Plan.Enabled = false
+	engine := contextengine.NewPEVEngine(
+		llm,
+		failingToolRunner{},
+		registry.NewBuiltinRegistry(),
+		mockctx.AllowAllPermission{},
+		contextengine.NoOpObserver{},
+		&cfg.PEV,
+		nil,
+		contextengine.NewBuiltinVerifyRunner(t.TempDir()),
+		contextengine.NoOpPEVObserver{},
+		nil,
+		cfg.Plan,
+	)
 	sc := &types.SessionContext{
 		SessionID: "max-iter",
 		WorkDir:   t.TempDir(),

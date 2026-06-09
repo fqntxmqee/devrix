@@ -6,6 +6,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
@@ -111,14 +113,29 @@ func (a *Impl) appendMessages(msgs ...types.Message) {
 
 func (a *Impl) setState(to multiagent.AgentState) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if err := transition(a.state, to); err != nil {
+		a.mu.Unlock()
 		if a.state == multiagent.AgentStateTerminated {
 			return sharedTerminated(a.id)
 		}
 		return err
 	}
+	from := a.state
 	a.state = to
+	a.mu.Unlock()
+
+	// Non-blocking state transition trace.
+	if a.deps.ObsBridge != nil && a.deps.ObsBridge.Tracer() != nil {
+		_, stSpan := a.deps.ObsBridge.Tracer().Start(context.Background(), telemetry.OpAgentStateTransition,
+			tracer.WithSpanKind(tracer.SpanKindInternal),
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAgentStateTransition,
+				tracer.Attribute{Key: "agent.id", Value: a.id},
+				tracer.Attribute{Key: "from", Value: from.String()},
+				tracer.Attribute{Key: "to", Value: to.String()},
+			)...),
+		)
+		stSpan.End()
+	}
 	return nil
 }
 
@@ -152,6 +169,21 @@ func (a *Impl) activeChildCount() int {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return len(a.childAgents)
+}
+
+// startSpan creates a tracing child span from context if observability is wired.
+func (a *Impl) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if a.deps.ObsBridge == nil || a.deps.ObsBridge.Tracer() == nil {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return a.deps.ObsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 func (a *Impl) addChild(child multiagent.Agent) {
