@@ -25,21 +25,21 @@ func (c *CLI) ListReports() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if len(reports) == 0 {
 		fmt.Println("No coverage reports available")
 		return nil
 	}
-	
+
 	fmt.Println("Available coverage reports:")
 	for _, r := range reports {
-		date := r[9 : len(r)-5] // 去掉前缀和后缀
+		date := r[9 : len(r)-5]
 		report, err := c.persistence.LoadDailyReport(date)
 		if err != nil {
 			continue
 		}
 		fmt.Printf("  %s | coverage: %5.1f%% | hit: %d/%d | zero: %d\n",
-			date, report.CoverageRatio*100, report.OperationsHit, 
+			date, report.CoverageRatio*100, report.OperationsHit,
 			report.OperationsTotal, report.OperationsZero)
 	}
 	return nil
@@ -47,7 +47,14 @@ func (c *CLI) ListReports() error {
 
 // ShowReport shows a specific day's report
 func (c *CLI) ShowReport(date string) error {
-	return NewReporter(c.persistence, nil, nil, 0).PrintDailyReport(date)
+	reporter := NewReporter(c.persistence, nil, nil, 0)
+	return reporter.PrintDailyReport(date)
+}
+
+// ShowSummary shows a compact summary
+func (c *CLI) ShowSummary(date string) error {
+	reporter := NewReporter(c.persistence, nil, nil, 0)
+	return reporter.PrintSummary(date)
 }
 
 // ShowTrend shows coverage trend
@@ -62,12 +69,11 @@ func (c *CLI) ExportJSON(date, output string) error {
 	if err != nil {
 		return err
 	}
-	
-	// 输出到文件或 stdout
+
 	if output == "" || output == "-" {
 		fmt.Println(report.JSON())
 		return nil
 	}
-	
+
 	return os.WriteFile(output, []byte(report.JSON()), 0644)
 }
