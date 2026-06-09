@@ -2,6 +2,7 @@ package contextengine
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"log/slog"
@@ -224,7 +225,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	working := memory.NewWorkingMemory()
-	_, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *gateway.EngineEvent) {
+	result, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *gateway.EngineEvent) {
 		if ev.Type == "text" && ev.Metadata["is_complete"] == "false" {
 			working.AppendStream(ev.Content)
 		}
@@ -233,6 +234,51 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	var assistantSummary string
 	if runErr == nil {
+		// 方案 2: 同步工具调用历史到 sc.Messages
+		// 这样下一轮对话时，LLM 能感知到之前的工具调用和结果
+		if result != nil && len(result.ToolCallHistory) > 0 {
+			for _, tc := range result.ToolCallHistory {
+				// 构建工具调用的 assistant 消息（包含 tool_calls）
+				tcJSON, _ := json.Marshal([]struct {
+					ID       string `json:"id"`
+					Type     string `json:"type"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				}{{
+					ID:       "call_" + tc.ToolName,
+					Type:     "function",
+					Function: struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					}{Name: tc.ToolName, Arguments: tc.Input},
+				}})
+				tcMsg := types.Message{
+					Role:      types.MessageRoleAssistant,
+					Content:   "",
+					Metadata:  map[string]string{"tool_calls": string(tcJSON)},
+				}
+				e.memory.AppendMessage(sc, types.MessageRoleAssistant, tcMsg.Content)
+				// 直接追加到 sc.Messages（通过 Metadata 保存 tool_calls）
+				sc.Messages = append(sc.Messages, tcMsg)
+				
+				// 构建工具结果的 tool 消息
+				resultContent := tc.Output
+				if tc.Error != "" {
+					resultContent = "Error: " + tc.Error
+				}
+				resultMsg := types.Message{
+					Role:     types.MessageRoleTool,
+					Content:  resultContent,
+					Metadata: map[string]string{"tool_call_id": "call_" + tc.ToolName},
+				}
+				e.memory.AppendMessage(sc, types.MessageRoleTool, resultContent)
+				// 直接追加到 sc.Messages
+				sc.Messages = append(sc.Messages, resultMsg)
+			}
+		}
+		
 		if text := working.FlushStream(); text != "" {
 			e.memory.AppendMessage(sc, types.MessageRoleAssistant, text)
 			assistantSummary = text

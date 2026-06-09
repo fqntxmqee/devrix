@@ -121,9 +121,11 @@ func (e *PEVEngine) VerifyPEV(ctx context.Context, sc *types.SessionContext, res
 }
 
 // PEVRunResult holds PEV output.
+// 方案 2: 增加 ToolCallHistory 字段，用于同步到 sc.Messages
 type PEVRunResult struct {
-	Messages []types.Message
-	Usage    TokenUsage
+	Messages        []types.Message     // 当前轮次的助手消息（最终回复）
+	Usage           TokenUsage
+	ToolCallHistory []types.ToolCallRecord // 完整的工具调用历史，用于同步到 sc.Messages
 }
 
 // Run executes PEV loop and emits gateway events.
@@ -234,6 +236,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	var assistantText string
 	var toolResults []ToolResult
 	var usage TokenUsage
+	var allToolCallRecords []types.ToolCallRecord // 方案 2: 收集所有工具调用记录
 
 	for iter := 0; iter < maxIter; iter++ {
 		sc.PEVState.Phase = types.PEVPhaseExecute
@@ -392,6 +395,11 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
 			})
 
+			// 方案 2: 收集工具调用记录
+			allToolCallRecords = append(allToolCallRecords, types.ToolCallRecord{
+				ToolName: tc.Name, Input: tc.Input, Output: result.Output, RiskLevel: risk, Error: result.Error,
+			})
+
 			req.Messages = append(req.Messages, buildToolResultMessage(sc.SessionID, tc.ID, content))
 		}
 
@@ -454,7 +462,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	if assistantText != "" {
 		msgs = append(msgs, types.Message{Role: types.MessageRoleAssistant, Content: assistantText})
 	}
-	return &PEVRunResult{Usage: usage, Messages: msgs}, nil
+	// 方案 2: 返回完整的工具调用历史
+	return &PEVRunResult{Usage: usage, Messages: msgs, ToolCallHistory: allToolCallRecords}, nil
 }
 
 // runToolSynthesis calls the LLM without tools to summarize successful tool output.
