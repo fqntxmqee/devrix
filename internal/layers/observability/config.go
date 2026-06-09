@@ -4,17 +4,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability/coverage"
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 )
 
 // Config represents the observability configuration
 type Config struct {
-	Enabled bool                  `yaml:"enabled"`
-	Tracing settings.TracingConfig `yaml:"tracing"`
-	Metrics settings.MetricsConfig `yaml:"metrics"`
-	Logging  LoggingConfig         `yaml:"logging"`
-	LLM      LLMConfig             `yaml:"llm"`
-	Health   HealthConfig          `yaml:"health"`
+	Enabled  bool                    `yaml:"enabled"`
+	Tracing  settings.TracingConfig   `yaml:"tracing"`
+	Metrics  settings.MetricsConfig `yaml:"metrics"`
+	Logging  LoggingConfig           `yaml:"logging"`
+	LLM      LLMConfig              `yaml:"llm"`
+	Health   HealthConfig           `yaml:"health"`
+	Coverage coverage.Config        `yaml:"coverage"`
 }
 
 // LLMConfig controls LLM request/response capture for tracing and local logs.
@@ -40,12 +42,12 @@ type LabelsConfig = settings.LabelsConfig
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Enabled        bool         `yaml:"enabled"`
-	Level         string       `yaml:"level"`
-	Format        string       `yaml:"format"`
-	IncludeTrace  bool         `yaml:"include_trace_id"`
-	Sampling      LogSamplingConfig `yaml:"sampling"`
-	Redactor      RedactorConfig `yaml:"redactor"`
+	Enabled       bool             `yaml:"enabled"`
+	Level         string           `yaml:"level"`
+	Format        string           `yaml:"format"`
+	IncludeTrace  bool             `yaml:"include_trace_id"`
+	Sampling     LogSamplingConfig `yaml:"sampling"`
+	Redactor     RedactorConfig   `yaml:"redactor"`
 }
 
 // LogSamplingConfig holds log sampling configuration
@@ -70,7 +72,7 @@ type HealthConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Enabled: true,
-	Tracing: TracingConfig{
+		Tracing: TracingConfig{
 			Enabled:        true,
 			ServiceName:    "devrix",
 			ServiceVersion: "1.0.0",
@@ -103,7 +105,7 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			Level:        "info",
 			Format:       "json",
-			IncludeTrace:  true,
+			IncludeTrace: true,
 			Sampling: LogSamplingConfig{
 				Enabled:          true,
 				MaxEntriesPerSpan: 100,
@@ -124,13 +126,14 @@ func DefaultConfig() *Config {
 			LogContent: false,
 			LogDir:     "~/.devrix/logs/llm",
 		},
+		Coverage: coverage.DefaultConfig(),
 	}
 }
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
 	// Validate tracing exporter
-	if c.Tracing.Exporter != "console" && c.Tracing.Exporter != "otlp" && c.Tracing.Exporter != "null" {
+	if c.Tracing.Exporter != "console" && c.Tracing.Exporter != "otlp" && c.Tracing.Exporter != "null" && c.Tracing.Exporter != "memory" {
 		return fmt.Errorf("tracing.exporter must be one of: console, otlp, null")
 	}
 

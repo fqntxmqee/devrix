@@ -21,6 +21,7 @@ type Observability struct {
 	meterProvider  *metrics.MeterProvider
 	meterInst      *metrics.Meter
 	log            *logger.StructuredLogger
+	coverageReporter *coverage.Reporter
 
 	mu     sync.RWMutex
 	status ComponentStatus
@@ -83,6 +84,20 @@ func New(cfg *Config) (*Observability, error) {
 		obs.status.Logging = "disabled"
 	}
 
+	// Start coverage reporter
+	if cfg.Coverage.Enabled {
+		persistence, err := coverage.NewPersistence(cfg.Coverage.Dir)
+		if err != nil {
+			return nil, fmt.Errorf("create coverage persistence: %w", err)
+		}
+		obs.coverageReporter = coverage.NewReporter(
+			persistence,
+			coverage.Global(),
+			coverage.AllOperations(),
+			cfg.Coverage.Interval,
+		)
+	}
+
 	return obs, nil
 }
 
@@ -138,6 +153,11 @@ func (o *Observability) Shutdown(ctx context.Context) error {
 		if err := o.log.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("logger shutdown: %w", err))
 		}
+	}
+
+	// Stop coverage reporter
+	if o.coverageReporter != nil {
+		o.coverageReporter.Stop()
 	}
 
 	if len(errs) > 0 {
@@ -207,4 +227,24 @@ func NewNoOp() *Observability {
 // IsEnabled returns whether observability is enabled
 func (o *Observability) IsEnabled() bool {
 	return o.config.Enabled
+}
+
+// CoverageReporter returns the coverage reporter
+func (o *Observability) CoverageReporter() *coverage.Reporter {
+	return o.coverageReporter
+}
+
+// StartCoverageReporter starts the coverage reporting background job
+func (o *Observability) StartCoverageReporter(ctx context.Context) {
+	if o.coverageReporter != nil {
+		o.coverageReporter.Start(ctx)
+	}
+}
+
+// GenerateCoverageReport generates and persists a coverage report immediately
+func (o *Observability) GenerateCoverageReport() (*coverage.DailyReport, error) {
+	if o.coverageReporter != nil {
+		return o.coverageReporter.GenerateNow()
+	}
+	return nil, fmt.Errorf("coverage reporter not enabled")
 }
