@@ -68,11 +68,13 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 	toolReg := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 
 	if b.agentToolReg != nil {
-		plugin := newAgentToolPlugin(b.agentToolReg)
-		if err := toolReg.Register(plugin); err != nil {
-			slog.Error("register call_agent plugin", "error", err)
-		} else {
-			slog.Info("call_agent tool registered", "tools", len(b.agentToolReg.List()))
+		plugins := newAgentToolPlugins(b.agentToolReg)
+		for _, plugin := range plugins {
+			if err := toolReg.Register(plugin); err != nil {
+				slog.Error("register agent plugin", "tool", plugin.Name(), "error", err)
+			} else {
+				slog.Info("agent tool registered", "tool", plugin.Name())
+			}
 		}
 	}
 

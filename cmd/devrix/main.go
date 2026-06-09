@@ -95,18 +95,36 @@ func main() {
 	if agentToolsCfg.Enabled {
 		reg := tool.NewRegistry()
 		for _, tCfg := range agentToolsCfg.Tools {
-			cliTool := tool.NewCLIAgentTool(tool.CLIConfig{
-				Name:         tCfg.Name,
-				DisplayName:  tCfg.DisplayName,
-				Description:  tCfg.Description,
-				Capabilities: tCfg.Capabilities,
-				Command:      tCfg.Command,
-				Args:         tCfg.Args,
-				WorkDir:      tCfg.WorkDir,
-				Timeout:      tCfg.Timeout,
-				IdleTimeout:  tCfg.IdleTimeout,
-			})
-			if err := reg.Register(cliTool); err != nil {
+			var agt tool.AgentTool
+			switch tCfg.Type {
+			case "cursor":
+				agt = tool.NewCursorAgentTool(tool.CursorConfig{
+					Name:         tCfg.Name,
+					DisplayName:  tCfg.DisplayName,
+					Description:  tCfg.Description,
+					Capabilities: tCfg.Capabilities,
+					Role:         tCfg.Role,
+					Command:      tCfg.Command,
+					Model:        tCfg.Model,
+					Mode:         tCfg.Mode,
+					WorkDir:      tCfg.WorkDir,
+					Timeout:      tCfg.Timeout,
+				})
+			default:
+				agt = tool.NewCLIAgentTool(tool.CLIConfig{
+					Name:         tCfg.Name,
+					DisplayName:  tCfg.DisplayName,
+					Description:  tCfg.Description,
+					Capabilities: tCfg.Capabilities,
+					Role:         tCfg.Role,
+					Command:      tCfg.Command,
+					Args:         tCfg.Args,
+					WorkDir:      tCfg.WorkDir,
+					Timeout:      tCfg.Timeout,
+					IdleTimeout:  tCfg.IdleTimeout,
+				})
+			}
+			if err := reg.Register(agt); err != nil {
 				slog.Error("register agent tool", "name", tCfg.Name, "error", err)
 				os.Exit(1)
 			}

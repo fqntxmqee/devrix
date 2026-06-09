@@ -29,13 +29,15 @@ func NewContextEngine(
 	planner, longTerm := WireContextV3(ctxCfg, milestoneSvc)
 	toolReg := contextengine.NewBuiltinToolRegistry(toolCfg)
 
-	// Register call_agent bridge if agent tools are enabled.
+	// Register per-agent call_<name> plugins if agent tools are enabled.
 	if agentToolReg != nil {
-		plugin := newAgentToolPlugin(agentToolReg)
-		if err := toolReg.Register(plugin); err != nil {
-			slog.Error("register call_agent plugin", "error", err)
-		} else {
-			slog.Info("call_agent tool registered", "tools", len(agentToolReg.List()))
+		plugins := newAgentToolPlugins(agentToolReg)
+		for _, plugin := range plugins {
+			if err := toolReg.Register(plugin); err != nil {
+				slog.Error("register agent plugin", "tool", plugin.Name(), "error", err)
+			} else {
+				slog.Info("agent tool registered", "tool", plugin.Name())
+			}
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,40 +13,54 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// agentToolPlugin bridges D4's tool.Registry to D2's PluginRunner.
+// agentToolPlugin wraps a single AgentTool from D4's Registry as a D2 PluginRunner.
+// Each registered agent becomes a separate "call_<name>" tool for the LLM.
 type agentToolPlugin struct {
-	registry *tool.Registry
+	agent tool.AgentTool
+	info  tool.Info
 }
 
-// callAgentInput is the JSON shape LLM sends to call_agent.
-type callAgentInput struct {
-	AgentName string `json:"agent_name"`
-	Task      string `json:"task"`
-	WorkDir   string `json:"work_dir,omitempty"`
+// toolName returns the tool name exposed to LLM, e.g. "call_cursor", "call_claude-code".
+func (p *agentToolPlugin) toolName() string {
+	return "call_" + p.info.Name
 }
 
-func newAgentToolPlugin(registry *tool.Registry) *agentToolPlugin {
-	return &agentToolPlugin{registry: registry}
+// newAgentToolPlugins creates one PluginRunner per registered agent tool.
+func newAgentToolPlugins(registry *tool.Registry) []contextengine.PluginRunner {
+	infos := registry.List()
+	plugins := make([]contextengine.PluginRunner, 0, len(infos))
+	for _, info := range infos {
+		agt, err := registry.Get(info.Name)
+		if err != nil {
+			slog.Warn("agent tool not found in registry", "name", info.Name)
+			continue
+		}
+		plugins = append(plugins, &agentToolPlugin{
+			agent: agt,
+			info:  info,
+		})
+	}
+	return plugins
 }
 
-func (p *agentToolPlugin) Name() string { return "call_agent" }
+// Name returns "call_<agent_name>" for LLM tool calling.
+func (p *agentToolPlugin) Name() string { return p.toolName() }
 
 func (p *agentToolPlugin) Schema() contextengine.ToolSchema {
-	tools := p.registry.List()
-	names := make([]string, 0, len(tools))
-	for _, t := range tools {
-		names = append(names, t.Name)
+	desc := p.info.Role
+	if desc == "" {
+		// Fallback: auto-generate from description + capabilities
+		desc = p.info.Description
+		if len(p.info.Capabilities) > 0 {
+			desc += "。擅长: " + strings.Join(p.info.Capabilities, ", ")
+		}
 	}
-
-	enumJSON, _ := json.Marshal(names)
-	params := fmt.Sprintf(`{
+	return contextengine.ToolSchema{
+		Name:        p.toolName(),
+		Description: desc,
+		Parameters: `{
   "type": "object",
   "properties": {
-    "agent_name": {
-      "type": "string",
-      "enum": %s,
-      "description": "目标 Agent 工具"
-    },
     "task": {
       "type": "string",
       "description": "发送给 Agent 的任务描述"
@@ -55,27 +70,23 @@ func (p *agentToolPlugin) Schema() contextengine.ToolSchema {
       "description": "工作目录（可选，默认使用会话工作目录）"
     }
   },
-  "required": ["agent_name", "task"]
-}`, string(enumJSON))
-
-	return contextengine.ToolSchema{
-		Name:        "call_agent",
-		Description: "调用外部 Agent 工具执行任务并返回结果。可用工具: " + strings.Join(names, ", "),
-		Parameters:  params,
+  "required": ["task"]
+}`,
 	}
 }
 
 func (p *agentToolPlugin) RiskLevel() types.RiskLevel { return types.RiskLevelHigh }
 
+// callAgentInput is the JSON shape LLM sends to a call_<name> tool.
+type callAgentInput struct {
+	Task    string `json:"task"`
+	WorkDir string `json:"work_dir,omitempty"`
+}
+
 func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*contextengine.ToolResult, error) {
 	var args callAgentInput
 	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return &contextengine.ToolResult{Error: fmt.Sprintf("invalid call_agent input: %v", err)}, nil
-	}
-
-	agentTool, err := p.registry.Get(args.AgentName)
-	if err != nil {
-		return &contextengine.ToolResult{Error: fmt.Sprintf("unknown agent tool: %s", args.AgentName)}, nil
+		return &contextengine.ToolResult{Error: fmt.Sprintf("invalid input for %s: %v", p.toolName(), err)}, nil
 	}
 
 	sessionID := contextengine.ToolSessionIDFromContext(ctx)
@@ -84,18 +95,16 @@ func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*
 		args.WorkDir = workDir
 	}
 
-	req := tool.Request{
-		Task:    args.Task,
-		WorkDir: args.WorkDir,
-	}
-
 	// Apply a default 5-minute execution timeout.
 	execCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	evtCh, err := agentTool.Execute(execCtx, sessionID, req)
+	evtCh, err := p.agent.Execute(execCtx, sessionID, tool.Request{
+		Task:    args.Task,
+		WorkDir: args.WorkDir,
+	})
 	if err != nil {
-		return &contextengine.ToolResult{Error: fmt.Sprintf("agent tool execution failed: %v", err)}, nil
+		return &contextengine.ToolResult{Error: fmt.Sprintf("agent %s execution failed: %v", p.info.Name, err)}, nil
 	}
 
 	var parts []string

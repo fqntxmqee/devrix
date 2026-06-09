@@ -8,8 +8,12 @@ type AgentToolFileConfig struct {
 	DisplayName  string   `yaml:"display_name"`
 	Description  string   `yaml:"description"`
 	Capabilities []string `yaml:"capabilities"`
+	Role         string   `yaml:"role"`         // LLM role description for tool decision
+	Type         string   `yaml:"type"`         // "cli" (default) | "cursor"
 	Command      string   `yaml:"command"`
 	Args         []string `yaml:"args"`
+	Model        string   `yaml:"model"`         // cursor: model override
+	Mode         string   `yaml:"mode"`          // cursor: "force" | "plan" | "ask"
 	WorkDir      string   `yaml:"work_dir"`
 	Timeout      string   `yaml:"timeout"`
 	IdleTimeout  string   `yaml:"idle_timeout"`
@@ -27,8 +31,12 @@ type AgentToolConfig struct {
 	DisplayName  string
 	Description  string
 	Capabilities []string
+	Role         string // LLM role description for tool decision
+	Type         string // "cli" | "cursor"
 	Command      string
 	Args         []string
+	Model        string
+	Mode         string
 	WorkDir      string
 	Timeout      time.Duration
 	IdleTimeout  time.Duration
@@ -53,13 +61,21 @@ func BuildAgentToolsConfig(file *AgentToolsFileConfig) *AgentToolsConfig {
 	}
 	cfg.Enabled = file.Enabled
 	for _, ft := range file.Tools {
+		toolType := ft.Type
+		if toolType == "" {
+			toolType = "cli"
+		}
 		t := AgentToolConfig{
 			Name:         ft.Name,
 			DisplayName:  ft.DisplayName,
 			Description:  ft.Description,
 			Capabilities: ft.Capabilities,
+			Role:         ft.Role,
+			Type:         toolType,
 			Command:      ft.Command,
 			Args:         ft.Args,
+			Model:        ft.Model,
+			Mode:         ft.Mode,
 			WorkDir:      ft.WorkDir,
 			Timeout:      5 * time.Minute,
 			IdleTimeout:  5 * time.Minute,

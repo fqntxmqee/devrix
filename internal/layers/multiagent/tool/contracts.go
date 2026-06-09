@@ -8,6 +8,7 @@ type Info struct {
 	DisplayName  string
 	Description  string
 	Capabilities []string
+	Role         string // LLM role description for tool decision
 }
 
 // Request is the input to execute an agent tool.

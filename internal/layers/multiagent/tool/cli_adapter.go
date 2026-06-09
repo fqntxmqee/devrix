@@ -20,6 +20,7 @@ type CLIConfig struct {
 	DisplayName  string
 	Description  string
 	Capabilities []string
+	Role         string // LLM role description for tool decision
 	Command      string
 	Args         []string
 	WorkDir      string
@@ -55,6 +56,7 @@ func NewCLIAgentTool(cfg CLIConfig) *CLIAgentTool {
 		DisplayName:  cfg.DisplayName,
 		Description:  cfg.Description,
 		Capabilities: cfg.Capabilities,
+		Role:         cfg.Role,
 	}
 	t := &CLIAgentTool{
 		cfg:      cfg,

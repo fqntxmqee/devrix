@@ -284,25 +284,32 @@ observability:
 
 # Agent Tool 配置
 # 注册外部 CLI Agent 工具，由 LLM 按需调用。
-# agent_tools:
-#   enabled: false
-#   tools:
-#     - name: claude-code
-#       display_name: "Claude Code"
-#       description: "通用编码、代码审查、重构、调试"
-#       capabilities: ["coding", "code-review", "debug", "refactor"]
-#       command: "claude"
-#       args: ["--print", "--output-format", "stream-json", "--input-format", "stream-json", "--permission-prompt-tool", "stdio", "--replay-user-messages"]
-#       work_dir: "."
-#       timeout: "5m"
-#       idle_timeout: "5m"
-#
-#     - name: gemini
-#       display_name: "Gemini CLI"
-#       description: "AI 研究和分析"
-#       capabilities: ["research", "analysis"]
-#       command: "gemini"
-#       args: ["--output-format", "stream-json"]
-#       work_dir: "."
-#       timeout: "5m"
-#       idle_timeout: "5m"
+agent_tools:
+  enabled: true
+  tools:
+    - name: claude-code
+      display_name: "Claude Code"
+      description: "通用编码、代码审查、重构、调试"
+      capabilities: ["coding", "code-review", "debug", "refactor"]
+      role: |
+        通用编码助手，精通代码审查、重构、调试与文档。
+        适合需要深度推理的编程任务：重构模块、排查 Bug、代码评审、生成设计文档。
+      command: "claude"
+      args: ["--print", "--output-format", "stream-json", "--input-format", "stream-json", "--replay-user-messages"]
+      work_dir: "."
+      timeout: "5m"
+      idle_timeout: "5m"
+
+    - name: cursor
+      display_name: "Cursor Agent"
+      description: "AI 代码编辑、文件操作、项目级重构"
+      capabilities: ["editing", "refactor", "project-wide"]
+      role: |
+        代码编辑专家，擅长多文件编辑和项目级重构。
+        适合需要大量修改既有代码的任务：批量修改变量命名、跨文件重构、生成新模块代码。
+      type: "cursor"
+      command: "cursor"
+      model: "auto"
+      mode: "force"
+      work_dir: "."
+      timeout: "5m"

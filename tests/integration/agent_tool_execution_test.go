@@ -14,30 +14,27 @@ import (
 )
 
 // testAgentToolPlugin implements contextengine.PluginRunner to simulate
-// how the bootstrap-level call_agent plugin bridges the tool.Registry to D2.
+// the bootstrap-level per-agent call_<name> plugin pattern.
 type testAgentToolPlugin struct {
-	reg *tool.Registry
+	agt  tool.AgentTool
+	name string
 }
 
-func (p *testAgentToolPlugin) Name() string { return "call_agent" }
+func (p *testAgentToolPlugin) Name() string { return p.name }
 
 func (p *testAgentToolPlugin) Schema() contextengine.ToolSchema {
 	return contextengine.ToolSchema{
-		Name:        "call_agent",
-		Description: "Call an external agent tool",
-		Parameters:  `{"type":"object","properties":{"agent_name":{"type":"string"},"task":{"type":"string"}},"required":["agent_name","task"]}`,
+		Name:        p.name,
+		Description: "Test agent",
+		Parameters:  `{"type":"object","properties":{"task":{"type":"string"}},"required":["task"]}`,
 	}
 }
 
 func (p *testAgentToolPlugin) RiskLevel() types.RiskLevel { return types.RiskLevelHigh }
 
 func (p *testAgentToolPlugin) Execute(ctx context.Context, workDir, input string) (*contextengine.ToolResult, error) {
-	agentTool, err := p.reg.Get("echo-agent")
-	if err != nil {
-		return &contextengine.ToolResult{Error: err.Error()}, nil
-	}
 	sessionID := "integration-session"
-	evtCh, err := agentTool.Execute(ctx, sessionID, tool.Request{Task: input, WorkDir: workDir})
+	evtCh, err := p.agt.Execute(ctx, sessionID, tool.Request{Task: input, WorkDir: workDir})
 	if err != nil {
 		return &contextengine.ToolResult{Error: err.Error()}, nil
 	}
@@ -77,7 +74,8 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 		t.Fatalf("List len = %d, want 1", len(reg.List()))
 	}
 
-	plugin := &testAgentToolPlugin{reg: reg}
+	// Simulate the per-agent plugin pattern: each agent gets a call_<name> tool.
+	plugin := &testAgentToolPlugin{agt: echoTool, name: "call_echo-agent"}
 	cfg := config.DefaultToolConfig()
 	builtinReg := contextengine.NewBuiltinToolRegistry(cfg)
 	if err := builtinReg.Register(plugin); err != nil {
@@ -91,8 +89,8 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 	defer cancel()
 
 	result, err := toolRunner.Execute(ctx, contextengine.ToolCall{
-		Name: "call_agent",
-		Input: `{"agent_name":"echo-agent","task":"hello","work_dir":"/tmp"}`,
+		Name: "call_echo-agent",
+		Input: `{"task":"hello","work_dir":"/tmp"}`,
 	})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
