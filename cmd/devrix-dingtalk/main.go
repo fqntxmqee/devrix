@@ -47,7 +47,7 @@ func main() {
 			obsCfg = loaded
 		}
 	}
-	contextengine.ConfigureLLMLogging(contextengine.LLMLogSettings{
+	observability.ConfigureLLMLogging(observability.LLMLogSettings{
 		LogContent: obsCfg.LLM.LogContent,
 		LogDir:     obsCfg.LLM.LogDir,
 	})

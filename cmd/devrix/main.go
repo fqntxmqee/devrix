@@ -19,7 +19,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
-	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -40,7 +39,7 @@ func main() {
 			obsCfg = loaded
 		}
 	}
-	contextengine.ConfigureLLMLogging(contextengine.LLMLogSettings{
+	observability.ConfigureLLMLogging(observability.LLMLogSettings{
 		LogContent: obsCfg.LLM.LogContent,
 		LogDir:     obsCfg.LLM.LogDir,
 	})

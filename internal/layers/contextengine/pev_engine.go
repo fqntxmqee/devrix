@@ -218,15 +218,25 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	if maxIter <= 0 {
 		maxIter = 3
 	}
+	if isSingleRoundVerifyMode(e.cfg.VerifyMode) {
+		maxIter = 1
+	}
+
+	toolSchemas, _ := e.toolsReg.ListTools(ctx, sc.WorkDir)
+	toolNames := make([]string, 0, len(toolSchemas))
+	for _, t := range toolSchemas {
+		toolNames = append(toolNames, t.Name)
+	}
 
 	ctx, runSpan := e.startSpan(ctx, telemetry.OpContextPEVRun, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "pev.max_iterations", Value: fmt.Sprintf("%d", maxIter)},
+		tracer.Attribute{Key: "pev.tools_count", Value: fmt.Sprintf("%d", len(toolSchemas))},
+		tracer.Attribute{Key: "pev.tools_names", Value: strings.Join(toolNames, ",")},
 	)
 	if runSpan != nil {
 		defer runSpan.End()
 	}
 
-	toolSchemas, _ := e.toolsReg.ListTools(ctx, sc.WorkDir)
 	req := &LLMRequest{
 		Model:        sc.Model,
 		SystemPrompt: systemPrompt,
@@ -240,6 +250,14 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	var allToolCallRecords []types.ToolCallRecord // 方案 2: 收集所有工具调用记录
 
 	for iter := 0; iter < maxIter; iter++ {
+		_, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
+			tracer.Attribute{Key: "pev.messages_before", Value: fmt.Sprintf("%d", len(req.Messages))},
+			tracer.Attribute{Key: "pev.tools_count", Value: fmt.Sprintf("%d", len(req.Tools))},
+		)
+		if iterSpan != nil {
+			defer iterSpan.End()
+		}
 		sc.PEVState.Phase = types.PEVPhaseExecute
 		sc.PEVState.Iteration = iter
 		e.observer.EmitPEVIteration(sc.SessionID, iter, types.PEVPhaseExecute)
@@ -249,6 +267,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
 			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
 			tracer.Attribute{Key: "llm.model", Value: sc.Model},
+			tracer.Attribute{Key: "llm.tools_names", Value: strings.Join(toolNames, ",")},
+			tracer.Attribute{Key: "llm.system_prompt_len", Value: fmt.Sprintf("%d", len(systemPrompt))},
 		)
 		AddLLMRequestEvent(llmSpan, sc.SessionID, iter, sc.Model, req)
 		chunks, err := e.llm.ChatStream(ctx, req)
@@ -362,6 +382,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			toolCtx, toolSpan := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
 				tracer.Attribute{Key: "tool.name", Value: tc.Name},
 				tracer.Attribute{Key: "tool.risk_level", Value: string(risk)},
+				tracer.Attribute{Key: "tool.input_preview", Value: truncateSpanAttr(tc.Input, 500)},
 			)
 
 			// Permission check span.
@@ -386,6 +407,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				permSpan.End()
 			}
 
+			toolStart := time.Now()
 			result, err := e.tools.Execute(WithToolSessionID(WithToolWorkDir(ctx, sc.WorkDir), sc.SessionID), tc)
 			if err != nil {
 				result = &ToolResult{Error: err.Error()}
@@ -397,6 +419,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				e.recordToolCall()
 			}
 			if toolSpan != nil {
+				toolSpan.SetAttributes(
+					tracer.Attribute{Key: "tool.duration_ms", Value: fmt.Sprintf("%d", time.Since(toolStart).Milliseconds())},
+					tracer.Attribute{Key: "tool.output_preview", Value: truncateSpanAttr(result.Output, 500)},
+				)
 				toolSpan.End()
 			}
 			toolResults = append(toolResults, *result)
@@ -432,6 +458,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		if verifySpan != nil {
 			verifySpan.SetAttributes(
 				tracer.Attribute{Key: "verify.passed", Value: fmt.Sprintf("%t", vr.Passed)},
+				tracer.Attribute{Key: "verify.command_count", Value: fmt.Sprintf("%d", len(vr.Commands))},
 			)
 			verifySpan.End()
 		}

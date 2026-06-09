@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -79,10 +80,14 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	// Main llm.stream span (parent for all sub-operations)
 	streamCtx, streamSpan := g.startSpan(ctx, telemetry.OpLLMStream, tracer.SpanKindClient)
 	streamStart := time.Now()
+	if streamSpan != nil {
+		g.recordStreamRequest(streamSpan, req)
+	}
 	finishStream := func(err error, usage llmgateway.TokenUsage, provider, model string) {
 		if streamSpan == nil {
 			return
 		}
+		g.recordStreamResponse(streamSpan, err, usage, provider, model)
 		attrs := telemetry.SpanAttrs(telemetry.OpLLMStream,
 			tracer.Attribute{Key: "llm.provider", Value: provider},
 			tracer.Attribute{Key: "llm.model", Value: model},
@@ -334,6 +339,60 @@ func (g *Gateway) recordError(provider, model string) {
 	if c, err := g.obs.Meter().Int64Counter("llm_errors_total", metrics.WithLabels(labels)); err == nil && c != nil {
 		c.Add(1)
 	}
+}
+
+func (g *Gateway) recordStreamRequest(span tracer.Span, req *llmgateway.Request) {
+	if req == nil {
+		return
+	}
+	full := observability.LLMLogContentEnabled()
+	msgs := make([]map[string]string, 0, len(req.Messages))
+	limit := 500
+	if full {
+		limit = 0
+	}
+	for _, m := range req.Messages {
+		content := m.Content
+		if limit > 0 && len(content) > limit {
+			content = content[:limit] + "..."
+		}
+		msgs = append(msgs, map[string]string{"role": string(m.Role), "content": content})
+	}
+	info := map[string]interface{}{
+		"model":                req.Model,
+		"message_count":        len(req.Messages),
+		"tool_count":           len(req.Tools),
+		"system_prompt_length": len(req.SystemPrompt),
+		"messages":             msgs,
+	}
+	if full {
+		info["system_prompt"] = req.SystemPrompt
+	}
+	bz, _ := json.Marshal(info)
+	observability.RecordLLMSpanPayload(
+		span, "", "request", "llm.request", "llm.request_json", string(bz),
+		0, req.Model,
+		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
+		tracer.Attribute{Key: "llm.tools_count", Value: len(req.Tools)},
+	)
+}
+
+func (g *Gateway) recordStreamResponse(span tracer.Span, err error, usage llmgateway.TokenUsage, provider, model string) {
+	info := map[string]interface{}{
+		"provider":          provider,
+		"model":             model,
+		"prompt_tokens":     usage.PromptTokens,
+		"completion_tokens": usage.CompletionTokens,
+	}
+	if err != nil {
+		info["error"] = err.Error()
+	}
+	bz, _ := json.Marshal(info)
+	observability.RecordLLMSpanPayload(
+		span, "", "response", "llm.response", "llm.response_json", string(bz),
+		0, model,
+		tracer.Attribute{Key: "llm.provider", Value: provider},
+	)
 }
 
 var _ llmgateway.IGateway = (*Gateway)(nil)

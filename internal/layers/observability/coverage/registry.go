@@ -28,7 +28,9 @@ func AllOperations() []OperationMeta {
 		{Name: "context.compression.run", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.longterm.recall", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.longterm.store", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
+			{Name: "context.memory.snapshot.save", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "context.milestone.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.3.0", Instrumented: true},
+			{Name: "context.pev.iteration", Layer: "context", Component: "pev_engine", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "context.pev.llm_call", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.pev.permission_check", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.pev.run", Layer: "context", Component: "pev_engine", SinceVersion: "1.2.0", Instrumented: true},
@@ -38,6 +40,8 @@ func AllOperations() []OperationMeta {
 		{Name: "context.plan.generate", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.process", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
 		{Name: "context.snapshot.load", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+			{Name: "context.system_prompt.load", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
+			{Name: "context.tools.register", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "context.verify.command", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
 		{Name: "gateway.agent.create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},

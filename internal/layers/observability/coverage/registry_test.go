@@ -24,7 +24,9 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpContextCompressionRun,
 		telemetry.OpContextLongTermRecall,
 		telemetry.OpContextLongTermStore,
+	telemetry.OpContextMemorySnapshotSave,
 		telemetry.OpContextMilestoneRun,
+	telemetry.OpContextPEVIteration,
 		telemetry.OpContextPEVLLMCall,
 		telemetry.OpContextPEVPermissionCheck,
 		telemetry.OpContextPEVRun,
@@ -34,6 +36,8 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpContextPlanGenerate,
 		telemetry.OpContextProcess,
 		telemetry.OpContextSnapshotLoad,
+	telemetry.OpContextSystemPromptLoad,
+	telemetry.OpContextToolsRegister,
 		telemetry.OpContextVerifyCommand,
 
 		telemetry.OpGatewayAgentCreate,

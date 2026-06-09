@@ -6,6 +6,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
@@ -142,9 +143,20 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	systemPrompt := e.prompt.Load(session.WorkDir)
+	// System prompt load observability.
+	{
+		_, spSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptLoad, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "system_prompt.length", Value: fmt.Sprintf("%d", len(systemPrompt))},
+			tracer.Attribute{Key: "system_prompt.sources_count", Value: fmt.Sprintf("%d", len(e.cfg.SystemPrompt.Sources))},
+		)
+		if spSpan != nil {
+			spSpan.End()
+		}
+	}
 
 	// Load or init snapshot — with child span.
 	_, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
+	hadSnapshot := session.ContextSnapshot != nil
 	sc, err := e.memory.LoadOrInit(session, systemPrompt)
 	if err != nil {
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
@@ -161,10 +173,17 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		e.observer.EmitSnapshotRestored(session.SessionID, false)
 	}
 	if loadSpan != nil {
+		loadSpan.SetAttributes(
+			tracer.Attribute{Key: "snapshot.message_count", Value: fmt.Sprintf("%d", len(sc.Messages))},
+			tracer.Attribute{Key: "snapshot.restored", Value: fmt.Sprintf("%t", hadSnapshot)},
+		)
 		loadSpan.End()
 	}
 
-	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal)
+	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "longterm.enabled", Value: fmt.Sprintf("%t", e.cfg.LongTerm.Enabled)},
+		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
+	)
 	recallErr := e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
 	if recallSpan != nil {
 		if recallErr != nil {
@@ -209,6 +228,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if compSpan != nil {
 			compSpan.SetAttributes(
 				tracer.Attribute{Key: "context.tokens_after", Value: fmt.Sprintf("%d", report.CompressedTokens)},
+				tracer.Attribute{Key: "context.messages_before", Value: fmt.Sprintf("%d", len(msgs))},
+				tracer.Attribute{Key: "context.messages_after", Value: fmt.Sprintf("%d", len(compressed))},
+				tracer.Attribute{Key: "context.steps_applied", Value: strings.Join(report.StepsApplied, ",")},
 			)
 			compSpan.End()
 		}
@@ -304,11 +326,22 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		emit(mapProcessError(session.SessionID, runErr))
 	}
 
+	_, saveSpan := e.startSpan(ctx, telemetry.OpContextMemorySnapshotSave, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "snapshot.message_count", Value: fmt.Sprintf("%d", len(sc.Messages))},
+	)
 	if data, persistErr := e.memory.PersistSnapshot(sc); persistErr == nil {
 		session.ContextSnapshot = data
 		e.observer.EmitSnapshotRestored(session.SessionID, false)
+		if saveSpan != nil {
+			saveSpan.SetAttributes(tracer.Attribute{Key: "snapshot.size_bytes", Value: fmt.Sprintf("%d", len(data))})
+			saveSpan.End()
+		}
 	} else {
 		slog.Warn("contextengine: persist snapshot failed", "error", persistErr)
+		if saveSpan != nil {
+			saveSpan.RecordError(persistErr)
+			saveSpan.End()
+		}
 	}
 
 	slog.Debug("contextengine: process done", "sessionID", session.SessionID, "duration", time.Since(start))

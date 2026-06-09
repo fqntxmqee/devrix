@@ -3,12 +3,8 @@ package contextengine
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -20,8 +16,6 @@ const (
 	defaultToolDescLen    = 100
 	spanPreviewTruncate   = 16384
 )
-
-var llmLogFileMu sync.Mutex
 
 // LLMCallLogger captures LLM input/output for observability.
 type LLMCallLogger struct {
@@ -64,15 +58,6 @@ type ToolCallInfo struct {
 	Input  string `json:"input"`
 	Output string `json:"output,omitempty"`
 	Error  string `json:"error,omitempty"`
-}
-
-type llmLogRecord struct {
-	Timestamp string          `json:"timestamp"`
-	SessionID string          `json:"session_id"`
-	Phase     string          `json:"phase"`
-	Iteration int             `json:"iteration"`
-	Model     string          `json:"model,omitempty"`
-	Data      json.RawMessage `json:"data"`
 }
 
 func contentLimit(full bool, spanPreview bool) int {
@@ -220,32 +205,17 @@ func buildResponseInfo(
 // AddLLMRequestEvent records LLM request info on the span and optionally to a local file.
 func AddLLMRequestEvent(span tracer.Span, sessionID string, iter int, model string, req *LLMRequest) {
 	settings := currentLLMLogSettings()
-	if settings.LogContent {
-		info := buildRequestInfo(iter, model, req, true, false)
-		appendLLMLogFile(settings.LogDir, sessionID, "request", iter, model, info)
-	}
-
-	if span == nil || !span.IsRecording() {
-		return
-	}
-
 	fullForSpan := settings.LogContent
 	info := buildRequestInfo(iter, model, req, fullForSpan, !fullForSpan)
 	bz, _ := json.Marshal(info)
-	span.SetAttributes(
+	observability.RecordLLMSpanPayload(
+		span, sessionID, "request", "llm.request", "llm.request_json", string(bz),
+		iter, model,
 		tracer.Attribute{Key: "llm.iteration", Value: iter},
 		tracer.Attribute{Key: "llm.model", Value: model},
 		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
 		tracer.Attribute{Key: "llm.tools_count", Value: len(req.Tools)},
-		tracer.Attribute{Key: "llm.request_json", Value: string(bz)},
 	)
-	span.AddEvent("llm.request", tracer.WithEventAttributes(
-		tracer.Attribute{Key: "llm.iteration", Value: iter},
-		tracer.Attribute{Key: "llm.model", Value: model},
-		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
-		tracer.Attribute{Key: "llm.tools_count", Value: len(req.Tools)},
-		tracer.Attribute{Key: "llm.request_json", Value: string(bz)},
-	))
 }
 
 // AddLLMResponseEvent records LLM response info on the span and optionally to a local file.
@@ -259,29 +229,16 @@ func AddLLMResponseEvent(
 	toolResults []ToolResult,
 ) {
 	settings := currentLLMLogSettings()
-	if settings.LogContent {
-		info := buildResponseInfo(iter, responseText, usage, toolCalls, toolResults, true, false)
-		appendLLMLogFile(settings.LogDir, sessionID, "response", iter, "", info)
-	}
-
-	if span == nil || !span.IsRecording() {
-		return
-	}
-
 	fullForSpan := settings.LogContent
 	info := buildResponseInfo(iter, responseText, usage, toolCalls, toolResults, fullForSpan, !fullForSpan)
 	bz, _ := json.Marshal(info)
-	span.SetAttributes(
-		tracer.Attribute{Key: "llm.response_length", Value: len(responseText)},
-		tracer.Attribute{Key: "llm.tool_calls_count", Value: len(toolCalls)},
-		tracer.Attribute{Key: "llm.response_json", Value: string(bz)},
-	)
-	span.AddEvent("llm.response", tracer.WithEventAttributes(
+	observability.RecordLLMSpanPayload(
+		span, sessionID, "response", "llm.response", "llm.response_json", string(bz),
+		iter, "",
 		tracer.Attribute{Key: "llm.iteration", Value: iter},
 		tracer.Attribute{Key: "llm.response_length", Value: len(responseText)},
 		tracer.Attribute{Key: "llm.tool_calls_count", Value: len(toolCalls)},
-		tracer.Attribute{Key: "llm.response_json", Value: string(bz)},
-	))
+	)
 }
 
 func formatToolSchemas(tools []ToolSchema, maxDescLen int) []ToolInfo {
@@ -294,53 +251,4 @@ func formatToolSchemas(tools []ToolSchema, maxDescLen int) []ToolInfo {
 		result = append(result, ToolInfo{Name: t.Name, Description: desc})
 	}
 	return result
-}
-
-func sanitizeSessionFilename(sessionID string) string {
-	if strings.TrimSpace(sessionID) == "" {
-		return "unknown"
-	}
-	var b strings.Builder
-	for _, r := range sessionID {
-		switch r {
-		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
-			b.WriteRune('_')
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func appendLLMLogFile(logDir, sessionID, phase string, iter int, model string, payload interface{}) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-	record := llmLogRecord{
-		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
-		SessionID: sessionID,
-		Phase:     phase,
-		Iteration: iter,
-		Model:     model,
-		Data:      data,
-	}
-	line, err := json.Marshal(record)
-	if err != nil {
-		return
-	}
-
-	llmLogFileMu.Lock()
-	defer llmLogFileMu.Unlock()
-
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		return
-	}
-	path := filepath.Join(logDir, sanitizeSessionFilename(sessionID)+".jsonl")
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	_, _ = f.Write(append(line, '\n'))
 }
