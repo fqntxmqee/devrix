@@ -145,7 +145,7 @@ func (e *EvalEngine) Run(ctx context.Context, opts EvalOpts) (*EvalReport, error
 
 	// 6. 保存基线
 	if opts.SaveBaseline {
-		basePath := filepath.Join(filepath.Dir(opts.DatasetPath), "..", "baseline.yaml")
+		basePath := filepath.Join(filepath.Dir(opts.DatasetPath), "baseline.yaml")
 		if err := SaveBaseline(basePath, report); err != nil {
 			return nil, fmt.Errorf("save baseline: %w", err)
 		}

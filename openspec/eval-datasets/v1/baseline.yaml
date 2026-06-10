@@ -1,0 +1,184 @@
+id: eval-20260610175329
+dataset_id: compression-recall-v1
+run_at: 2026-06-10T17:53:29.097672+08:00
+judge_model: mock
+scores:
+    - domain: d2
+      dimension: compression_recall
+      score: 0.6216666666666667
+      confidence: 0.7999999999999999
+      buckets:
+        adversarial: 0.625
+        edge: 0
+        failure: 0.16666666666666666
+        production: 0.809375
+      details:
+        judge_score: 0.85
+        kept_count: 1
+        must_keep_count: 6
+        recall: 0.16666666666666666
+      judge_logs:
+        - itemid: cr-prod-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-prod-02
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-prod-03
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-prod-04
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-prod-05
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-prod-06
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-adv-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-adv-02
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-edge-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: cr-fail-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+    - domain: d2
+      dimension: pev_tool_accuracy
+      score: 0.5555555555555555
+      confidence: 1
+      buckets:
+        adversarial: 0
+        edge: 0.6666666666666666
+        production: 1
+      details:
+        f1: 0.6666666666666666
+        precision: 0.6666666666666666
+        recall: 0.6666666666666666
+    - domain: d3
+      dimension: provider_quality
+      score: 0.4314814814814814
+      confidence: 0.8000000000000002
+      buckets:
+        adversarial: 0
+        production: 0.6472222222222221
+      details:
+        instruction_following: 0
+        instruction_following_a: 0
+        instruction_following_b: 0
+        judge_score: 0.85
+        semantic_similarity: 0.14285714285714285
+      judge_logs:
+        - itemid: pq-prod-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: pq-cross-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: pq-adv-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+    - domain: d4
+      dimension: agent_forkjoin
+      score: 0.45
+      confidence: 0.8000000000000002
+      buckets:
+        adversarial: 0
+        edge: 0.5
+        production: 0.85
+      details:
+        isolation_a: 1
+        isolation_b: 1
+        join_completeness: 0.5
+        judge_score: 0.85
+      judge_logs:
+        - itemid: fj-prod-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: fj-adv-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+        - itemid: fj-edge-01
+          score: 0.85
+          reasoning: 'primary: mock evaluation | reversed: mock evaluation'
+          cost:
+            prompttokens: 20
+            completiontokens: 10
+            totaltokens: 30
+dashboard:
+    overallscore: 0.5146759259259259
+    dimensioncount: 4
+    itemcount: 19
+    judgecost:
+        prompttokens: 320
+        completiontokens: 160
+        totaltokens: 480
+    bydomain:
+        d2: 0.5886111111111111
+        d3: 0.4314814814814814
+        d4: 0.45
