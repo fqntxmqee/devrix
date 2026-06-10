@@ -10,4 +10,4 @@
 - [x] TuneGenerator 在 delta regression 时填充 TuneSuggest（L5-6-3-12）
 - [x] `go test ./internal/layers/evolution/eval/... ./internal/cli/eval/...` 全绿
 
-**Deferred:** provider_quality / agent_forkjoin 探针
+**Follow-up (archived):** provider / forkjoin probes → DM-20260610-010

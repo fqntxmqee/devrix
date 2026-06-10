@@ -1,10 +1,10 @@
 # D6-S3 Eval Engine Specification
 
 **Capability:** eval
-**Change ID:** devrix-d6-eval-phase3 (in progress)
+**Change ID:** devrix-d6-eval-phase3 (archived 2026-06-10)
 **Layer:** Evolution
 **Version:** 1.2.0
-**Status:** Canonical — phase 3 partial
+**Status:** Canonical
 
 ---
 
