@@ -32,14 +32,7 @@ func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store, longTerm
 
 // EnrichWithLongTermRecall appends recalled entries to the session system prompt.
 func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.SessionContext, query string) error {
-	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
-		return nil
-	}
-	limit := m.cfg.LongTerm.RecallMaxEntries
-	if limit <= 0 {
-		limit = 5
-	}
-	entries, err := m.longTerm.Recall(ctx, query, limit)
+	entries, err := m.RecallLongTermEntries(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -48,6 +41,18 @@ func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.Sessio
 		sc.SystemPrompt += appendix
 	}
 	return nil
+}
+
+// RecallLongTermEntries returns recalled memory entries without mutating session context.
+func (m *Manager) RecallLongTermEntries(ctx context.Context, query string) ([]MemoryEntry, error) {
+	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
+		return nil, nil
+	}
+	limit := m.cfg.LongTerm.RecallMaxEntries
+	if limit <= 0 {
+		limit = 5
+	}
+	return m.longTerm.Recall(ctx, query, limit)
 }
 
 // AutoStoreLongTerm persists a summary when auto_store is enabled.

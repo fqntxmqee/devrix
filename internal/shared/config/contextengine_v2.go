@@ -81,6 +81,9 @@ func ValidateContextEngineConfig(cfg *ContextEngineConfig) error {
 		src != TokenCounterSourceGateway && src != TokenCounterSourceHeuristic {
 		return fmt.Errorf("context_engine.token_counter.source: invalid value %q", src)
 	}
+	if err := ValidateHarnessConfig(cfg.Harness, cfg.Preflight); err != nil {
+		return err
+	}
 	return ValidateContextEngineV3Config(cfg)
 }
 

@@ -95,6 +95,8 @@ type SessionContext struct {
 	MilestoneRefs  []string
 	LastRequestID  string
 	UpdatedAt      time.Time
+	Harness        *HarnessSessionState
+	Transcript     *TranscriptStore
 }
 
 // ContextSnapshotV1 is the persisted snapshot format.

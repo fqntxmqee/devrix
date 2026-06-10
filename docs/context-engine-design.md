@@ -583,4 +583,27 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 
 ---
 
+## 附录 V5：Harness Bootstrap（D2-S9）
+
+**Change ID:** `devrix-harness-bootstrap` · **Demand:** DM-20260609-004 · **L3:** D2-S9 / L3-BE-CTX-04
+
+| 能力 | 说明 |
+|------|------|
+| Bootstrap | prefetch → guards → setup → deferred_init → tool_pool |
+| ToolPool | simple_mode 保留 `bash`/`read_file`/`write_file` |
+| Assembly | messages-only 压缩 → `SystemPromptAssembler.Build` → PEV |
+| 灰度 | `context_engine.harness.enabled=false` 默认；与 V4 bit-identical |
+
+**规格 SoT：** `openspec/changes/devrix-harness-bootstrap/design.md` §十（System Prompt Assembly）、§十一（Jaeger）、§十二（测试矩阵）
+
+**验收命令：**
+
+```bash
+./scripts/test-domain.sh d2
+go test -tags='integration && d2' ./tests/integration/ -run Harness -count=1
+go test -tags='acceptance && p0 && d2' ./tests/acceptance/p0/ -run Harness -count=1
+```
+
+---
+
 **维护：** 实现阶段变更须同步更新本文档、`openspec/specs/context-engine/spec.md` 与归档包内 `design.md`。

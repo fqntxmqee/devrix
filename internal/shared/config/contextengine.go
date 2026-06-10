@@ -13,6 +13,9 @@ type ContextEngineConfig struct {
 	SystemPrompt       SystemPromptConfig `yaml:"system_prompt"`
 	Plan               PlanConfig         `yaml:"plan"`
 	LongTerm           LongTermConfig     `yaml:"longterm"`
+	Harness            HarnessConfig      `yaml:"harness"`
+	Preflight          PreflightConfig    `yaml:"preflight"`
+	Workspace          WorkspacePromptConfig `yaml:"workspace"`
 }
 
 // PEVConfig holds PEV loop settings.
@@ -63,8 +66,11 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 			Sources:  []string{"AGENTS.md", ".devrix/AGENTS.md"},
 			Fallback: "You are Devrix, a multi-agent development assistant.",
 		},
-		Plan:     DefaultPlanConfig(),
-		LongTerm: DefaultLongTermConfig(),
+		Plan:      DefaultPlanConfig(),
+		LongTerm:  DefaultLongTermConfig(),
+		Harness:   DefaultHarnessConfig(),
+		Preflight: DefaultPreflightConfig(),
+		Workspace: DefaultWorkspacePromptConfig(),
 	}
 }
 

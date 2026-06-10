@@ -47,6 +47,9 @@ type Session struct {
 	// 上下文快照（可选持久化）
 	ContextSnapshot []byte
 
+	// Harness bootstrap completed for this session (V5).
+	HarnessInitialized bool
+
 	// 并发保护
 	mu sync.RWMutex
 }

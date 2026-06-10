@@ -1,0 +1,69 @@
+package harness_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/harness"
+	"github.com/devrix/devrix/internal/layers/contextengine/memory"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/types"
+)
+
+// Covers: L5-2-9-10
+func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.T) {
+	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	prompt, report := assembler.Build(harness.SystemPromptBuildInput{
+		HarnessEnabled: true,
+		AgentsRaw:      "Project agents content",
+		MemoryEntries: []memory.MemoryEntry{
+			{Topic: "architecture", Content: "use DDD"},
+		},
+		Bootstrap: &types.BootstrapReport{
+			Trusted:      true,
+			ToolCount:    5,
+			VisibleTools: 3,
+			VisibleToolList: []types.VisibleTool{
+				{Name: "bash"}, {Name: "read_file"}, {Name: "write_file"},
+			},
+			StagesApplied: []types.BootstrapStage{types.BootstrapStageToolPool},
+		},
+		Workspace: &types.WorkspaceContext{WorkDir: "/tmp/proj", GoFileCount: 10},
+		Session:   types.NewSession("sess_1", "cli", "/tmp/proj"),
+		Runtime: harness.ProcessRuntimeContext{
+			SessionID: "sess_1",
+			RequestID: "req_1",
+		},
+	})
+	if !strings.Contains(prompt, "<agents_context>") {
+		t.Fatal("expected agents_context block")
+	}
+	if !strings.Contains(prompt, "<memory_context>") {
+		t.Fatal("expected memory_context block")
+	}
+	if !strings.Contains(prompt, "Session ID: sess_1") {
+		t.Fatal("expected session context")
+	}
+	if report.TotalTokens <= 0 {
+		t.Fatal("expected token report")
+	}
+}
+
+// Covers: L5-2-9-10
+func TestSystemPromptAssembler_BuildLegacy_should_match_v4_shape(t *testing.T) {
+	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	appendix := memory.FormatLongTermAppendix([]memory.MemoryEntry{
+		{Topic: "bugs", Content: "fix race"},
+	}, 2000)
+	legacy := assembler.BuildLegacy("Agents body", appendix)
+	disabled, _ := assembler.Build(harness.SystemPromptBuildInput{
+		HarnessEnabled: false,
+		AgentsRaw:      "Agents body",
+		MemoryEntries: []memory.MemoryEntry{
+			{Topic: "bugs", Content: "fix race"},
+		},
+	})
+	if legacy != disabled {
+		t.Fatalf("legacy mismatch:\nlegacy=%q\ndisabled=%q", legacy, disabled)
+	}
+}

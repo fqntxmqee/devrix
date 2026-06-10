@@ -213,6 +213,9 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 		cfg.Snapshot.BackupDir = f.Snapshot.BackupDir
 	}
 	cfg.Snapshot.Enabled = f.Snapshot.Enabled || cfg.Snapshot.Enabled
+	cfg.Harness = mergeHarnessConfig(cfg.Harness, f.Harness)
+	cfg.Preflight = mergePreflightConfig(cfg.Preflight, f.Preflight)
+	cfg.Workspace = mergeWorkspaceConfig(cfg.Workspace, f.Workspace)
 	if len(f.SystemPrompt.Sources) > 0 {
 		cfg.SystemPrompt.Sources = f.SystemPrompt.Sources
 	}
@@ -247,6 +250,83 @@ func mergeAutocompact(base, override AutocompactConfig) AutocompactConfig {
 	}
 	if override.Timeout > 0 {
 		out.Timeout = override.Timeout
+	}
+	return out
+}
+
+func mergeHarnessConfig(base, override HarnessConfig) HarnessConfig {
+	out := base
+	if override.Enabled {
+		out.Enabled = true
+		out.Trusted = override.Trusted
+	}
+	if override.Prefetch.MaxWalkDepth != 0 {
+		out.Prefetch.MaxWalkDepth = override.Prefetch.MaxWalkDepth
+	}
+	out.Prefetch.Enabled = override.Prefetch.Enabled || out.Prefetch.Enabled
+	if override.ToolPool.SimpleMode {
+		out.ToolPool.SimpleMode = true
+	}
+	if !override.ToolPool.IncludeMCP {
+		out.ToolPool.IncludeMCP = false
+	}
+	if len(override.ToolPool.DenyNames) > 0 {
+		out.ToolPool.DenyNames = override.ToolPool.DenyNames
+	}
+	if len(override.ToolPool.DenyPrefixes) > 0 {
+		out.ToolPool.DenyPrefixes = override.ToolPool.DenyPrefixes
+	}
+	if override.Routing.Enabled {
+		out.Routing.Enabled = true
+	}
+	if override.Routing.MaxMatches != 0 {
+		out.Routing.MaxMatches = override.Routing.MaxMatches
+	}
+	out.DeferredInit.Enabled = override.DeferredInit.Enabled || out.DeferredInit.Enabled
+	if override.Transcript.CompactAfterTurns != 0 {
+		out.Transcript.CompactAfterTurns = override.Transcript.CompactAfterTurns
+	}
+	out.Transcript.Enabled = override.Transcript.Enabled || out.Transcript.Enabled
+	out.Transcript.SessionLogEnabled = override.Transcript.SessionLogEnabled || out.Transcript.SessionLogEnabled
+	return out
+}
+
+func mergePreflightConfig(base, override PreflightConfig) PreflightConfig {
+	out := base
+	if override.Enabled {
+		out.Enabled = true
+	}
+	if override.Mode != "" {
+		out.Mode = override.Mode
+	}
+	if override.TokenBudget != 0 {
+		out.TokenBudget = override.TokenBudget
+	}
+	if override.WarnRatio != 0 {
+		out.WarnRatio = override.WarnRatio
+	}
+	if override.ToolFilter.Enabled {
+		out.ToolFilter.Enabled = true
+	}
+	if override.ToolFilter.Mode != "" {
+		out.ToolFilter.Mode = override.ToolFilter.Mode
+	}
+	return out
+}
+
+func mergeWorkspaceConfig(base, override WorkspacePromptConfig) WorkspacePromptConfig {
+	out := base
+	if override.MaxContextTokens != 0 {
+		out.MaxContextTokens = override.MaxContextTokens
+	}
+	if override.AgentName != "" {
+		out.AgentName = override.AgentName
+	}
+	if len(override.AdditionalContextFiles) > 0 {
+		out.AdditionalContextFiles = override.AdditionalContextFiles
+	}
+	if !override.EmbedCoreTemplate {
+		out.EmbedCoreTemplate = false
 	}
 	return out
 }
