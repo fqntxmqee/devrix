@@ -27,6 +27,8 @@ import (
 
 // Covers: L5-OBS-TRACE-04 — Canonical Trace Tree parent-child (R1-R2)
 func TestIntegration_PEVSpanHierarchy_should_match_canonical_tree(t *testing.T) {
+	t.Cleanup(testutil.WaitForGatewayAsync)
+
 	obs, err := observability.New(&observability.Config{
 		Enabled: true,
 		Tracing: settings.TracingConfig{
