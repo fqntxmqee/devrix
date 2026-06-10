@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
 func TestCLIAgentTool_Execute_StreamJSON(t *testing.T) {
@@ -314,4 +316,39 @@ func TestCLIAgentTool_Stop(t *testing.T) {
 	if count != 0 {
 		t.Errorf("expected 0 sessions after Stop, got %d", count)
 	}
+}
+
+func TestCLIAgentTool_Execute_should_propagate_trace_env(t *testing.T) {
+	traceID, err := tracer.ParseTraceID("4bf92f3577b34da6a3ce929d0e0e4736")
+	if err != nil {
+		t.Fatalf("trace id: %v", err)
+	}
+	spanID, err := tracer.ParseSpanID("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("span id: %v", err)
+	}
+	ctx := tracer.ContextWithSpan(context.Background(), tracer.SpanContext{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: tracer.FlagSampled,
+	})
+	ctx = tracer.DefaultBaggageManager.Set(ctx, "session.id", "sess_env")
+
+	tool := NewCLIAgentTool(CLIConfig{
+		Name:    "env-test",
+		Command: "bash",
+		Args: []string{"-c", `test -n "$TRACEPARENT" && test -n "$BAGGAGE" && echo '{"type":"complete","content":""}'`},
+		Timeout: 5 * time.Second,
+	})
+
+	ch, err := tool.Execute(ctx, "sess_env", Request{Task: "check env"})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	for evt := range ch {
+		if evt.Type == "error" {
+			t.Fatalf("unexpected error event: %s", evt.Content)
+		}
+	}
+	tool.Stop()
 }

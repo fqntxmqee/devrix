@@ -314,9 +314,14 @@ Bundle schema v1：`internal/layers/observability/incident/export.go`（`llm_rou
 
 ---
 
-## 十、Baggage（Deferred）
+## 十、Baggage
 
-单进程下 `session.id` / `llm.model` 已在 span attributes。OTel Baggage 在 adapter/agent 独立进程时再接入。
+W3C `baggage` 头由 `tracer.Propagator` inject/extract；Gateway 入站写入 `session.id` / `user.id`；CLI agent 子进程通过 `TRACEPARENT` + `BAGGAGE` 环境变量继承。
+
+| Key | 设置点 |
+|-----|--------|
+| `session.id` | Gateway `RouteInbound` |
+| `user.id` | Gateway（UserID 非空时） |
 
 ---
 
@@ -325,6 +330,6 @@ Bundle schema v1：`internal/layers/observability/incident/export.go`（`llm_rou
 | 优先级 | 任务 | 状态 |
 |--------|------|------|
 | — | Observability P0–P2 主链 | **DONE** |
-| P3 | Baggage propagation | Deferred |
+| P3 | Baggage propagation | **DONE** (DM-20260610-005) |
 | P3 | cache_read/reasoning token metrics | 待 provider |
 | P3 | OTLP tail-sampling | 规划 |

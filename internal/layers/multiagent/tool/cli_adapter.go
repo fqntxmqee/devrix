@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
 // CLIConfig holds configuration for a CLI agent tool.
@@ -76,7 +79,7 @@ func (t *CLIAgentTool) Info() Info { return t.info }
 
 // Execute sends a task to the agent tool and streams events until complete.
 func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
-	sess, err := t.ensureSession(sessionID, req.WorkDir)
+	sess, err := t.ensureSession(ctx, sessionID, req.WorkDir)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
 	}
@@ -136,7 +139,7 @@ func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Reques
 }
 
 // ensureSession returns an existing session or creates a new one.
-func (t *CLIAgentTool) ensureSession(sessionID string, workDir string) (*CLISession, error) {
+func (t *CLIAgentTool) ensureSession(ctx context.Context, sessionID string, workDir string) (*CLISession, error) {
 	t.mu.RLock()
 	sess, ok := t.sessions[sessionID]
 	t.mu.RUnlock()
@@ -157,6 +160,12 @@ func (t *CLIAgentTool) ensureSession(sessionID string, workDir string) (*CLISess
 		cmd.Dir = dir
 	} else if t.cfg.WorkDir != "" {
 		cmd.Dir = t.cfg.WorkDir
+	}
+
+	if ctx != nil {
+		if envVars := tracer.PropagationEnvVars(ctx); len(envVars) > 0 {
+			cmd.Env = append(os.Environ(), envVars...)
+		}
 	}
 
 	stdin, err := cmd.StdinPipe()

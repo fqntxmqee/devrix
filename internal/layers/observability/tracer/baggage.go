@@ -1,4 +1,4 @@
-package observability
+package tracer
 
 import (
 	"context"
@@ -6,21 +6,26 @@ import (
 	"strings"
 )
 
-// BaggageContextKey is the key for baggage in context
+const BaggageHeader = "baggage"
+
+// BaggageContextKey is the key for baggage in context.
 type BaggageContextKey struct{}
 
-// BaggageItem represents a single baggage item
+// BaggageItem represents a single baggage item.
 type BaggageItem struct {
 	Key   string
 	Value string
 }
 
-// BaggageManager manages trace baggage
+// BaggageManager manages trace baggage per W3C Baggage spec.
 type BaggageManager struct {
 	maxItems int
 }
 
-// NewBaggageManager creates a new baggage manager
+// DefaultBaggageManager is the process-wide baggage manager.
+var DefaultBaggageManager = NewBaggageManager(32)
+
+// NewBaggageManager creates a new baggage manager.
 func NewBaggageManager(maxItems int) *BaggageManager {
 	if maxItems <= 0 {
 		maxItems = 32
@@ -28,7 +33,7 @@ func NewBaggageManager(maxItems int) *BaggageManager {
 	return &BaggageManager{maxItems: maxItems}
 }
 
-// Set sets a baggage item
+// Set sets a baggage item.
 func (m *BaggageManager) Set(ctx context.Context, key, value string) context.Context {
 	if key == "" || value == "" {
 		return ctx
@@ -37,9 +42,7 @@ func (m *BaggageManager) Set(ctx context.Context, key, value string) context.Con
 	baggage := m.getAll(ctx)
 	baggage[key] = value
 
-	// Limit baggage size
 	if len(baggage) > m.maxItems {
-		// Remove oldest (first) item by sorting keys
 		keys := make([]string, 0, len(baggage))
 		for k := range baggage {
 			keys = append(keys, k)
@@ -51,33 +54,31 @@ func (m *BaggageManager) Set(ctx context.Context, key, value string) context.Con
 	return context.WithValue(ctx, BaggageContextKey{}, baggage)
 }
 
-// Get retrieves a baggage item
+// Get retrieves a baggage item.
 func (m *BaggageManager) Get(ctx context.Context, key string) (string, bool) {
 	baggage := m.getAll(ctx)
 	val, ok := baggage[key]
 	return val, ok
 }
 
-// List returns all baggage items in sorted order
+// List returns all baggage items in sorted order.
 func (m *BaggageManager) List(ctx context.Context) []BaggageItem {
 	baggage := m.getAll(ctx)
 	items := make([]BaggageItem, 0, len(baggage))
 	for k, v := range baggage {
 		items = append(items, BaggageItem{Key: k, Value: v})
 	}
-	// Sort by key for deterministic order
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Key < items[j].Key
 	})
 	return items
 }
 
-// Clear removes all baggage
+// Clear removes all baggage.
 func (m *BaggageManager) Clear(ctx context.Context) context.Context {
 	return context.WithValue(ctx, BaggageContextKey{}, make(map[string]string))
 }
 
-// getAll returns all baggage as a map
 func (m *BaggageManager) getAll(ctx context.Context) map[string]string {
 	val := ctx.Value(BaggageContextKey{})
 	if val == nil {
@@ -87,7 +88,6 @@ func (m *BaggageManager) getAll(ctx context.Context) map[string]string {
 	if !ok {
 		return make(map[string]string)
 	}
-	// Return a copy to avoid mutation issues
 	result := make(map[string]string, len(baggage))
 	for k, v := range baggage {
 		result[k] = v
@@ -95,32 +95,30 @@ func (m *BaggageManager) getAll(ctx context.Context) map[string]string {
 	return result
 }
 
-// InjectToHeader injects baggage into W3C tracestate header format
-func (m *BaggageManager) InjectToHeader(ctx context.Context) string {
+// FormatHeader serializes baggage into the W3C baggage header value.
+func (m *BaggageManager) FormatHeader(ctx context.Context) string {
 	items := m.List(ctx)
 	if len(items) == 0 {
 		return ""
 	}
 
-	var parts []string
+	parts := make([]string, 0, len(items))
 	for _, item := range items {
 		parts = append(parts, item.Key+"="+item.Value)
 	}
 	return strings.Join(parts, ",")
 }
 
-// ExtractFromHeader extracts baggage from W3C tracestate header
-func (m *BaggageManager) ExtractFromHeader(ctx context.Context, header string) context.Context {
+// ApplyHeader merges baggage from a W3C baggage header into context.
+func (m *BaggageManager) ApplyHeader(ctx context.Context, header string) context.Context {
 	if header == "" {
 		return ctx
 	}
 
-	pairs := strings.Split(header, ",")
-	baggage := make(map[string]string)
-
-	for _, pair := range pairs {
+	baggage := m.getAll(ctx)
+	for _, pair := range strings.Split(header, ",") {
 		kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
-		if len(kv) == 2 {
+		if len(kv) == 2 && kv[0] != "" && kv[1] != "" {
 			baggage[kv[0]] = kv[1]
 		}
 	}

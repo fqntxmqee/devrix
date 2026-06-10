@@ -419,7 +419,7 @@
 | L5-5-1-01 | LLM 请求日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
 | L5-5-1-02 | LLM 响应日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
 | L5-5-1-03 | PEV 迭代独立 Span | OBS-TRACE | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
-| L5-5-1-04 | Baggage 传递业务上下文 | OBS-TRACE | `internal/layers/observability/baggage_test.go` | PLANNED |
+| L5-5-1-04 | Baggage 传递业务上下文 | OBS-TRACE | `internal/layers/observability/tracer/baggage_test.go` | IMPLEMENTED |
 
 ### D5-S2: Metrics Module
 
@@ -462,3 +462,4 @@
 | L5-OBS-DECISION-03 | gen_ai.prompt.version + template_hash | OBS-TRACE | `system_prompt_assembler_test.go` | IMPLEMENTED |
 | L5-OBS-METRICS-03 | gen_ai.client.token.usage Counter | OBS-METRICS | `genai_tokens_test.go` | IMPLEMENTED |
 | L5-OBS-EXPORT-02 | devrix debug export 子命令 | OBS-EXPORT | `internal/cli/debug/export_test.go` | IMPLEMENTED |
+| L5-OBS-TRACE-03 | W3C Baggage 传播 (session.id/user.id) | OBS-TRACE | `tracer/baggage_test.go`, `propagation_test.go` | IMPLEMENTED |

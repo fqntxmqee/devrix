@@ -170,6 +170,7 @@ func (g *CommunicationGateway) cleanupExpiredSessions() {
 // RouteInbound processes an inbound message from an adapter
 func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.InboundMessage) error {
 	ctx, endSpan := g.startInboundSpan(ctx, msg)
+	ctx = g.seedInboundBaggage(ctx, msg)
 
 	slog.Info("gateway: RouteInbound called", "sessionID", msg.SessionID, "content", msg.Content, "chatID", msg.ChatID)
 
@@ -712,4 +713,16 @@ func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.
 		span.SetStatus(tracer.StatusCodeOk, "")
 		span.End()
 	}
+}
+
+func (g *CommunicationGateway) seedInboundBaggage(ctx context.Context, msg *types.InboundMessage) context.Context {
+	if msg == nil {
+		return ctx
+	}
+	bm := tracer.DefaultBaggageManager
+	ctx = bm.Set(ctx, "session.id", msg.SessionID)
+	if msg.UserID != "" {
+		ctx = bm.Set(ctx, "user.id", msg.UserID)
+	}
+	return ctx
 }

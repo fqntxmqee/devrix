@@ -105,6 +105,39 @@ func TestHTTPHeaderCarrier_should_store_headers(t *testing.T) {
 	}
 }
 
+func TestPropagator_should_inject_and_extract_baggage(t *testing.T) {
+	traceID, _ := ParseTraceID("4bf92f3577b34da6a3ce929d0e0e4736")
+	spanID, _ := ParseSpanID("00f067aa0ba902b7")
+	sc := SpanContext{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: FlagSampled,
+	}
+	ctx := ContextWithSpan(context.Background(), sc)
+	ctx = DefaultBaggageManager.Set(ctx, "session.id", "sess_prop")
+	ctx = DefaultBaggageManager.Set(ctx, "user.id", "user_prop")
+
+	carrier := MapCarrier{}
+	prop := NewPropagator()
+	if err := prop.Inject(ctx, carrier); err != nil {
+		t.Fatalf("inject: %v", err)
+	}
+	if carrier.Get(BaggageHeader) == "" {
+		t.Fatal("expected baggage header")
+	}
+
+	outCtx, extracted, err := prop.ExtractContext(context.Background(), carrier)
+	if err != nil {
+		t.Fatalf("extract context: %v", err)
+	}
+	if !extracted.IsValid() {
+		t.Fatal("expected valid span context")
+	}
+	if val, ok := DefaultBaggageManager.Get(outCtx, "session.id"); !ok || val != "sess_prop" {
+		t.Fatalf("session.id baggage: %q ok=%v", val, ok)
+	}
+}
+
 func TestSpanContext_traceparent_helpers(t *testing.T) {
 	traceID, _ := ParseTraceID("4bf92f3577b34da6a3ce929d0e0e4736")
 	spanID, _ := ParseSpanID("00f067aa0ba902b7")
