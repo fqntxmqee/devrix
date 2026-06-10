@@ -76,7 +76,7 @@ func (t *CLIAgentTool) Info() Info { return t.info }
 
 // Execute sends a task to the agent tool and streams events until complete.
 func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
-	sess, err := t.ensureSession(sessionID)
+	sess, err := t.ensureSession(sessionID, req.WorkDir)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
 	}
@@ -115,19 +115,15 @@ func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Reques
 				continue
 			}
 
-			var evt Event
-			if err := json.Unmarshal([]byte(line), &evt); err != nil {
-				ch <- Event{Type: "text", Content: line}
-				continue
+			parsed := ParseStreamJSONLine(line)
+			for _, evt := range parsed.Events {
+				select {
+				case ch <- evt:
+				case <-ctx.Done():
+					return
+				}
 			}
-
-			select {
-			case ch <- evt:
-			case <-ctx.Done():
-				return
-			}
-
-			if evt.Type == "complete" {
+			if parsed.Done {
 				return
 			}
 		}
@@ -140,7 +136,7 @@ func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Reques
 }
 
 // ensureSession returns an existing session or creates a new one.
-func (t *CLIAgentTool) ensureSession(sessionID string) (*CLISession, error) {
+func (t *CLIAgentTool) ensureSession(sessionID string, workDir string) (*CLISession, error) {
 	t.mu.RLock()
 	sess, ok := t.sessions[sessionID]
 	t.mu.RUnlock()
@@ -157,7 +153,9 @@ func (t *CLIAgentTool) ensureSession(sessionID string) (*CLISession, error) {
 
 	// Start new subprocess
 	cmd := exec.Command(t.cfg.Command, t.cfg.Args...)
-	if t.cfg.WorkDir != "" {
+	if dir := strings.TrimSpace(workDir); dir != "" {
+		cmd.Dir = dir
+	} else if t.cfg.WorkDir != "" {
 		cmd.Dir = t.cfg.WorkDir
 	}
 
@@ -182,10 +180,14 @@ func (t *CLIAgentTool) ensureSession(sessionID string) (*CLISession, error) {
 	go func() {
 		sc := bufio.NewScanner(stderr)
 		for sc.Scan() {
-			slog.Debug("agent tool stderr",
+			line := strings.TrimSpace(sc.Text())
+			if line == "" {
+				continue
+			}
+			slog.Warn("agent tool stderr",
 				"tool", t.cfg.Name,
 				"session", sessionID,
-				"line", sc.Text(),
+				"line", line,
 			)
 		}
 	}()

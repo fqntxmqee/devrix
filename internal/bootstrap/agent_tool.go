@@ -160,7 +160,9 @@ func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*
 			}
 			return &contextengine.ToolResult{Error: evt.Content}, nil
 		case "complete":
-			// Done
+			if evt.Content != "" && len(parts) == 0 {
+				parts = append(parts, evt.Content)
+			}
 		}
 	}
 
