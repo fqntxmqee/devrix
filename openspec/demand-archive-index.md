@@ -36,6 +36,7 @@
 | DM-20260610-006 | D6 自演化评测引擎 Pilot — Compression Recall | devrix-d6-eval | 2026-06-10 | [#19](https://github.com/fqntxmqee/devrix/pull/19) | ACCEPTED (Pilot) |
 | DM-20260610-008 | D6 Eval CLI — devrix eval run | devrix-d6-eval-cli | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
 | DM-20260610-009 | D6 Eval Phase 2 — PEV probe, real Judge, tune | devrix-d6-eval-phase2 | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
+| DM-20260610-010 | D6 Eval Phase 3 — Provider + Fork/Join probes | devrix-d6-eval-phase3 | 2026-06-10 | [#22](https://github.com/fqntxmqee/devrix/pull/22) | ACCEPTED |
 
 ## Archive Locations
 
@@ -75,6 +76,7 @@
 | devrix-d6-eval | `openspec/archive/2026-06-10-devrix-d6-eval/` |
 | devrix-d6-eval-cli | `openspec/archive/2026-06-10-devrix-d6-eval-cli/` |
 | devrix-d6-eval-phase2 | `openspec/archive/2026-06-10-devrix-d6-eval-phase2/` |
+| devrix-d6-eval-phase3 | `openspec/archive/2026-06-10-devrix-d6-eval-phase3/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
