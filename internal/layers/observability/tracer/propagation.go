@@ -38,6 +38,10 @@ func (p *Propagator) Inject(ctx context.Context, carrier TextMapCarrier) error {
 		carrier.Set("tracestate", string(sc.TraceState))
 	}
 
+	if baggage := DefaultBaggageManager.FormatHeader(ctx); baggage != "" {
+		carrier.Set(BaggageHeader, baggage)
+	}
+
 	return nil
 }
 
@@ -63,6 +67,17 @@ func (p *Propagator) Extract(ctx context.Context, carrier TextMapCarrier) (SpanC
 
 	sc.Remote = true
 	return sc, nil
+}
+
+// ExtractContext extracts trace and baggage context from a carrier.
+func (p *Propagator) ExtractContext(ctx context.Context, carrier TextMapCarrier) (context.Context, SpanContext, error) {
+	sc, err := p.Extract(ctx, carrier)
+	if err != nil {
+		return ctx, SpanContext{}, err
+	}
+	ctx = ContextWithSpan(ctx, sc)
+	ctx = DefaultBaggageManager.ApplyHeader(ctx, carrier.Get(BaggageHeader))
+	return ctx, sc, nil
 }
 
 // parseTraceparent parses W3C traceparent header
