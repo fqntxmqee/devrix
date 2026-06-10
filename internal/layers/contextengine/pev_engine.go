@@ -376,7 +376,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			)...)
 			llmSpan.End()
 		}
-		e.recordLLMCall(usage, time.Since(llmStart))
+		e.recordLLMCall(sc.Model, usage, time.Since(llmStart))
 
 		if len(pendingTools) == 0 {
 			endIterSpan()
@@ -662,7 +662,7 @@ func (e *PEVEngine) runToolSynthesis(
 		llmSpan.SetAttributes(tracer.Attribute{Key: "pev.synthesis_source", Value: "llm"})
 		llmSpan.End()
 	}
-	e.recordLLMCall(usage, time.Since(llmStart))
+	e.recordLLMCall(sc.Model, usage, time.Since(llmStart))
 
 	synthText = textutil.StripThinkingTags(synthText)
 	if strings.TrimSpace(synthText) == "" {
@@ -690,12 +690,15 @@ func (e *PEVEngine) startSpan(ctx context.Context, operation string, kind tracer
 	return e.obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
-func (e *PEVEngine) recordLLMCall(usage TokenUsage, latency time.Duration) {
+func (e *PEVEngine) recordLLMCall(model string, usage TokenUsage, latency time.Duration) {
 	if e.llmTokens != nil {
 		e.llmTokens.Add(int64(usage.PromptTokens + usage.CompletionTokens))
 	}
 	if e.llmLatency != nil {
 		e.llmLatency.Observe(latency.Seconds())
+	}
+	if e.obsBridge != nil {
+		observability.RecordGenAITokenUsage(e.obsBridge.Meter(), model, usage.PromptTokens, usage.CompletionTokens)
 	}
 }
 

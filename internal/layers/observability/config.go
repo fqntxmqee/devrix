@@ -95,6 +95,7 @@ func DefaultConfig() *Config {
 				Allowlist: []string{
 					"provider", "model", "adapter", "tool",
 					"risk_level", "status", "direction", "decision", "error_type",
+					"token_type",
 				},
 				Blocklist: []string{
 					"session_id", "user_id", "api_key",

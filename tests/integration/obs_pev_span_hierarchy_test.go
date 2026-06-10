@@ -98,6 +98,13 @@ func TestIntegration_PEVSpanHierarchy_should_match_canonical_tree(t *testing.T) 
 	assertSpanParent(t, byName, telemetry.OpContextPEVLLMCall, telemetry.OpContextPEVIteration)
 	assertSpanParent(t, byName, telemetry.OpLLMStream, telemetry.OpContextPEVLLMCall)
 
+	// Covers: L5-OBS-TRACE-06 — SpanKind contract
+	assertSpanKind(t, byName, telemetry.OpGatewayMessageReceive, tracer.SpanKindServer)
+	assertSpanKind(t, byName, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient)
+	assertSpanKind(t, byName, telemetry.OpLLMStream, tracer.SpanKindClient)
+	assertSpanKind(t, byName, telemetry.OpLLMAdapterStream, tracer.SpanKindClient)
+	assertSpanKind(t, byName, telemetry.OpContextPEVRun, tracer.SpanKindInternal)
+
 	// gen_ai.* dual-write on LLM call span
 	for _, s := range byName[telemetry.OpContextPEVLLMCall] {
 		attrs := s.Attributes()
@@ -140,6 +147,19 @@ func assertSpanParent(t *testing.T, byName map[string][]tracer.ReadableSpan, chi
 		}
 		if !parentIDs[p.SpanID.String()] {
 			t.Fatalf("%q parent spanID=%s not in %q spans", childName, p.SpanID.String(), parentName)
+		}
+	}
+}
+
+func assertSpanKind(t *testing.T, byName map[string][]tracer.ReadableSpan, name string, want tracer.SpanKind) {
+	t.Helper()
+	spans := byName[name]
+	if len(spans) == 0 {
+		t.Fatalf("no spans named %q for SpanKind check", name)
+	}
+	for _, s := range spans {
+		if s.Kind() != want {
+			t.Errorf("%q: kind=%s want=%s", name, s.Kind(), want)
 		}
 	}
 }

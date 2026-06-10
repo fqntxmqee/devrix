@@ -50,6 +50,25 @@ func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.
 }
 
 // Covers: L5-2-9-10
+func TestSystemPromptAssembler_should_produce_stable_template_hash(t *testing.T) {
+	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	in := harness.SystemPromptBuildInput{
+		HarnessEnabled: true,
+		AgentsRaw:      "# Agents\n",
+	}
+	_, r1 := assembler.Build(in)
+	_, r2 := assembler.Build(in)
+	if r1.TemplateHash == "" {
+		t.Fatal("expected template hash")
+	}
+	if r1.TemplateHash != r2.TemplateHash {
+		t.Fatalf("template hash unstable: %s vs %s", r1.TemplateHash, r2.TemplateHash)
+	}
+	if r1.AgentsMDHash == "" {
+		t.Fatal("expected agents md hash")
+	}
+}
+
 func TestSystemPromptAssembler_BuildLegacy_should_match_v4_shape(t *testing.T) {
 	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	appendix := memory.FormatLongTermAppendix([]memory.MemoryEntry{

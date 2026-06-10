@@ -103,6 +103,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		streamSpan.SetAttributes(attrs...)
 		streamSpan.End()
+		observability.RecordGenAITokenUsage(g.obs.Meter(), model, usage.PromptTokens, usage.CompletionTokens)
 	}
 
 	var provider, model string

@@ -1,7 +1,9 @@
 package harness
 
 import (
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"runtime"
 	"strings"
@@ -46,6 +48,8 @@ type SystemPromptBuildReport struct {
 	LayerTokens     [4]int
 	MemoryTruncated bool
 	BlocksIncluded  []string
+	TemplateHash    string
+	AgentsMDHash    string
 }
 
 // SystemPromptAssembler builds the final system prompt per §十 spec.
@@ -74,10 +78,17 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	if !in.HarnessEnabled {
 		appendix := memory.FormatLongTermAppendix(in.MemoryEntries, 0)
 		legacy := a.BuildLegacy(in.AgentsRaw, appendix)
-		return legacy, SystemPromptBuildReport{TotalTokens: estimateTokens(legacy)}
+		return legacy, SystemPromptBuildReport{
+			TotalTokens:  estimateTokens(legacy),
+			TemplateHash: a.templateFingerprint(),
+			AgentsMDHash: contentHash(in.AgentsRaw),
+		}
 	}
 
-	report := SystemPromptBuildReport{}
+	report := SystemPromptBuildReport{
+		TemplateHash: a.templateFingerprint(),
+		AgentsMDHash: contentHash(in.AgentsRaw),
+	}
 	layer0 := strings.TrimSpace(a.coreTemplate)
 	report.LayerTokens[0] = estimateTokens(layer0)
 
@@ -321,3 +332,28 @@ func truncateToTokenBudget(text string, maxTokens int) string {
 }
 
 const memoryTruncationNoticeZH = "\n... (记忆已截断 — 更多内容请依赖 LongTerm recall 或项目文档) ..."
+
+func (a *SystemPromptAssembler) templateFingerprint() string {
+	if a == nil {
+		return ""
+	}
+	h := sha256.New()
+	h.Write([]byte(a.coreTemplate))
+	h.Write([]byte{0})
+	h.Write([]byte(a.guidanceTemplate))
+	h.Write([]byte{0})
+	h.Write([]byte(fmt.Sprintf("%t", a.cfg.EmbedCoreTemplate)))
+	return shortHash(h.Sum(nil))
+}
+
+func contentHash(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(s))
+	return shortHash(h[:])
+}
+
+func shortHash(sum []byte) string {
+	return hex.EncodeToString(sum)[:12]
+}
