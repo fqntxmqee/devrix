@@ -1,0 +1,266 @@
+id: compression-recall-v1
+version: v1
+created_at: "2026-06-10T00:00:00Z"
+buckets:
+  - name: production
+    weight: 0.6
+  - name: adversarial
+    weight: 0.15
+  - name: edge
+    weight: 0.15
+  - name: failure
+    weight: 0.10
+
+items:
+  # ── Production Bucket (6 items) ──────────────────────────────────────
+
+  - id: cr-prod-01
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: authentication
+      difficulty: easy
+    input:
+      original: >
+        The user wants to add user authentication with JWT tokens. They use PostgreSQL as their primary database.
+        The project is a Go web API using the Gin framework. They also need refresh token rotation and
+        password reset functionality via email.
+      compressed: >
+        User authentication with JWT tokens using PostgreSQL. Go web API project.
+        Includes refresh token rotation and password reset via email.
+    expectation:
+      must_keep:
+        - JWT
+        - PostgreSQL
+        - Go web API
+        - refresh token rotation
+        - password reset
+
+  - id: cr-prod-02
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: multi-service
+      difficulty: medium
+    input:
+      original: >
+        The system consists of three microservices: User Service (Go), Order Service (Node.js),
+        and Notification Service (Python). Services communicate via RabbitMQ message broker.
+        User Service authenticates via JWT and publishes user events to RabbitMQ. Order Service
+        consumes order events and stores data in MongoDB. Notification Service sends emails via
+        SendGrid API when it receives notification events.
+      compressed: >
+        Three microservices: User Service (Go), Order Service (Node.js), Notification Service (Python).
+        Communication via RabbitMQ. User Service does JWT auth. Order Service uses MongoDB.
+        Notification Service sends emails via SendGrid.
+    expectation:
+      must_keep:
+        - User Service
+        - Order Service
+        - Notification Service
+        - RabbitMQ
+        - JWT
+        - MongoDB
+        - SendGrid
+
+  - id: cr-prod-03
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: database
+      difficulty: easy
+    input:
+      original: >
+        The database migration plan has three phases. Phase 1 adds a `status` column to the `orders` table
+        with a CHECK constraint allowing only 'pending', 'confirmed', 'shipped', 'completed', or 'cancelled'.
+        Phase 2 creates an index on `orders.status` to speed up filtering queries. Phase 3 backfills
+        existing rows with a default value of 'pending'.
+      compressed: >
+        Three-phase database migration: add `status` column to `orders` table with CHECK constraint,
+        create index on `orders.status`, and backfill existing rows to 'pending'.
+    expectation:
+      must_keep:
+        - status column
+        - orders table
+        - CHECK constraint
+        - index
+        - backfill
+
+  - id: cr-prod-04
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: api
+      difficulty: medium
+    input:
+      original: >
+        The API endpoint GET /api/v2/users supports pagination with `cursor` and `limit` parameters.
+        It returns a JSON response containing `data` (array of user objects) and `next_cursor` for
+        the next page. Rate limiting is set to 100 requests per minute per API key. The endpoint
+        requires a valid JWT in the Authorization header with the 'users:read' scope.
+      compressed: >
+        GET /api/v2/users supports cursor-based pagination. Returns user array and next_cursor.
+        Rate limited to 100 req/min per API key. Requires JWT with 'users:read' scope.
+    expectation:
+      must_keep:
+        - /api/v2/users
+        - cursor
+        - pagination
+        - JWT
+        - users:read
+        - 100 req/min
+
+  - id: cr-prod-05
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: deployment
+      difficulty: easy
+    input:
+      original: >
+        The CI/CD pipeline has four stages: build, test, deploy-staging, and deploy-production.
+        The build stage compiles the Go binary, runs golangci-lint, and builds the Docker image.
+        The test stage runs unit tests, integration tests, and end-to-end tests. Deploy-staging
+        deploys to a Kubernetes cluster in the staging namespace and runs smoke tests.
+        Deploy-production requires manual approval before deploying to the production namespace.
+      compressed: >
+        Four-stage CI/CD: build (compile, lint, Docker), test (unit, integration, e2e),
+        deploy-staging (Kubernetes staging namespace + smoke tests),
+        deploy-production (manual approval, production namespace).
+    expectation:
+      must_keep:
+        - build
+        - test
+        - deploy-staging
+        - deploy-production
+        - Kubernetes
+        - manual approval
+        - Docker
+
+  - id: cr-prod-06
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: config
+      difficulty: medium
+    input:
+      original: >
+        Application configuration is managed through a hierarchical system. Default values are in
+        config/default.yaml, environment overrides in config/production.yaml, and secrets in
+        Vault. The configuration loading order is: defaults < environment config < Vault secrets
+        < CLI flags. Each level merges with the previous, with later sources taking precedence.
+        Vault is used for database passwords, API keys, and TLS certificates.
+      compressed: >
+        Config hierarchy: defaults < env config < Vault < CLI flags.
+        Later sources override. Vault manages database passwords, API keys, and TLS certs.
+    expectation:
+      must_keep:
+        - Vault
+        - CLI flags
+        - database passwords
+        - API keys
+        - TLS certificates
+
+  # ── Adversarial Bucket (2 items) ────────────────────────────────────
+
+  - id: cr-adv-01
+    bucket: adversarial
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: meaning-alteration
+      difficulty: hard
+    input:
+      original: >
+        The payment service MUST validate webhook signatures using HMAC-SHA256 before processing
+        any Stripe event. It MUST reject events with invalid signatures. It MUST NOT process
+        unverified webhooks under any circumstances.
+      compressed: >
+        The payment service validates webhook signatures using HMAC-SHA256 before processing
+        Stripe events, and rejects invalid ones.
+    expectation:
+      must_keep:
+        - HMAC-SHA256
+        - MUST
+        - reject
+        - invalid signatures
+
+  - id: cr-adv-02
+    bucket: adversarial
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: security-dropped
+      difficulty: hard
+    input:
+      original: >
+        User passwords are hashed using bcrypt with cost factor 12. Passwords must be at least
+        8 characters and contain at least one uppercase letter, one lowercase letter, one digit,
+        and one special character. Plain text passwords are never logged or stored.
+        Rate limiting on the login endpoint allows 5 attempts per minute per IP address.
+      compressed: >
+        Passwords hashed with bcrypt, cost factor 12. Minimum 8 characters with mixed case,
+        digits, and special chars. Login rate limited to 5 attempts per minute per IP.
+    expectation:
+      must_keep:
+        - bcrypt
+        - cost factor 12
+        - rate limiting
+        - 5 attempts
+
+  # ── Edge Bucket (1 item) ────────────────────────────────────────────
+
+  - id: cr-edge-01
+    bucket: edge
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: ultra-short
+      difficulty: easy
+    input:
+      original: "Server port: 8080"
+      compressed: "Port 8080"
+    expectation:
+      must_keep:
+        - 8080
+
+  # ── Failure Bucket (1 item) ─────────────────────────────────────────
+
+  - id: cr-fail-01
+    bucket: failure
+    domain: d2
+    dimension: compression_recall
+    rubric_ref: rubrics/compression_recall.yaml
+    tags:
+      category: total-loss
+      difficulty: easy
+    input:
+      original: >
+        The cache layer uses Redis with a TTL of 300 seconds for user sessions.
+        Cache keys follow the pattern 'session:{user_id}'. Cache invalidation happens
+        on password change and logout. The system falls back to PostgreSQL if Redis is
+        unreachable. Cache hit rate is monitored via Prometheus metrics.
+      compressed: "Redis is used for caching."
+    expectation:
+      must_keep:
+        - Redis
+        - TTL
+        - session
+        - cache invalidation
+        - Prometheus
+        - PostgreSQL fallback

@@ -1,0 +1,54 @@
+# Gold Labels — Compression Recall Calibration Set
+# 人工标注的标准答案，用于 Judge 校准（Cohen's kappa ≥ 0.6）
+
+dataset_id: compression-recall-v1
+created_at: "2026-06-10T00:00:00Z"
+labels:
+  - item_id: cr-prod-01
+    human_score: 1.0
+    reason: "All 5 must_keep facts clearly preserved in compressed version. Key entities (JWT, PostgreSQL, Go web API, refresh token rotation, password reset) all present with correct semantics."
+    tags:
+      bucket: production
+      difficulty: easy
+
+  - item_id: cr-prod-02
+    human_score: 0.85
+    reason: "Most facts preserved. However the compressed version omits the detail that User Service publishes events to RabbitMQ and Order Service consumes events — the communication direction is partially lost."
+    tags:
+      bucket: production
+      difficulty: medium
+
+  - item_id: cr-prod-04
+    human_score: 0.9
+    reason: "All key facts present. Minor loss: the compressed version uses 'rate limited' without explicitly stating the original '100 requests per minute per API key' constraint — slightly less specific."
+    tags:
+      bucket: production
+      difficulty: medium
+
+  - item_id: cr-adv-01
+    human_score: 0.6
+    reason: "Factual content preserved but normative force lost. Original uses 'MUST' (RFC 2119 keyword) three times, indicating mandatory security requirement. Compressed downgrades to descriptive language, losing the requirement strength. HMAC-SHA256 and rejection logic preserved."
+    tags:
+      bucket: adversarial
+      difficulty: hard
+
+  - item_id: cr-adv-02
+    human_score: 0.7
+    reason: "Most security facts preserved (bcrypt, cost 12, rate limiting, 5 attempts). Missing: 'plain text passwords are never logged or stored' which is a critical security policy. The adversarial nature makes this omission significant."
+    tags:
+      bucket: adversarial
+      difficulty: hard
+
+  - item_id: cr-edge-01
+    human_score: 1.0
+    reason: "Ultra-short original with single fact (port 8080). Compressed version preserves it perfectly."
+    tags:
+      bucket: edge
+      difficulty: easy
+
+  - item_id: cr-fail-01
+    human_score: 0.2
+    reason: "Only 'Redis' is preserved from a rich context containing TTL, session keys, cache invalidation, PostgreSQL fallback, and Prometheus monitoring. 5 of 6 must_keep facts lost. The compressed version is critically insufficient."
+    tags:
+      bucket: failure
+      difficulty: easy
