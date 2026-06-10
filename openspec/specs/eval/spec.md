@@ -4,7 +4,7 @@
 **Change ID:** devrix-d6-eval-phase3 (archived 2026-06-10)
 **Layer:** Evolution
 **Version:** 1.3.0
-**Status:** Canonical — phase 4 partial
+**Status:** Canonical
 
 ---
 

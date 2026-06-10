@@ -9,4 +9,5 @@
 - [x] 评测集 v1 扩展至 19 条（+6 provider/forkjoin）
 - [x] `go test ./internal/layers/evolution/eval/...` 全绿
 
-**D6 Eval 探针全集完成** — 无剩余 deferred 探针
+**D6 Eval 探针全集完成** — 无剩余 deferred 探针  
+**Follow-up (archived):** CI delta gate → DM-20260610-011
