@@ -9,4 +9,5 @@
 - [x] DeltaAnalyzer 基线对比
 - [x] `go test ./internal/layers/evolution/eval/...` 全绿
 
-**Out of Pilot:** PEV tool / provider / forkjoin probes, tune.go, CLI 子命令
+**Follow-ups (archived):** CLI → DM-20260610-008; PEV probe / tune / real Judge → DM-20260610-009  
+**Still deferred:** provider / forkjoin probes

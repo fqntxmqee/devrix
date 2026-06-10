@@ -34,6 +34,8 @@
 | DM-20260610-005 | 可观察层 P3 — W3C Baggage 业务上下文传播 | devrix-observability-baggage | 2026-06-10 | [#17](https://github.com/fqntxmqee/devrix/pull/17) | ACCEPTED (P3) |
 | DM-20260610-007 | 可观察层 P3 — cache_read / reasoning Token 细分 | devrix-observability-token-breakdown | 2026-06-10 | [#18](https://github.com/fqntxmqee/devrix/pull/18) | ACCEPTED (P3) |
 | DM-20260610-006 | D6 自演化评测引擎 Pilot — Compression Recall | devrix-d6-eval | 2026-06-10 | [#19](https://github.com/fqntxmqee/devrix/pull/19) | ACCEPTED (Pilot) |
+| DM-20260610-008 | D6 Eval CLI — devrix eval run | devrix-d6-eval-cli | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
+| DM-20260610-009 | D6 Eval Phase 2 — PEV probe, real Judge, tune | devrix-d6-eval-phase2 | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
 
 ## Archive Locations
 
@@ -71,6 +73,8 @@
 | devrix-observability-baggage | `openspec/archive/2026-06-10-devrix-observability-baggage/` |
 | devrix-observability-token-breakdown | `openspec/archive/2026-06-10-devrix-observability-token-breakdown/` |
 | devrix-d6-eval | `openspec/archive/2026-06-10-devrix-d6-eval/` |
+| devrix-d6-eval-cli | `openspec/archive/2026-06-10-devrix-d6-eval-cli/` |
+| devrix-d6-eval-phase2 | `openspec/archive/2026-06-10-devrix-d6-eval-phase2/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
