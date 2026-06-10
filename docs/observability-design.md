@@ -109,10 +109,11 @@ Layer.Component:
 标签:
 "provider": "openai"
 "model": "gpt-4o"
+"token_type": "input|output"
 "tool": "bash"
 "risk_level": "high"
 "adapter": "cli"
-"status": "success|error"
+"status": "ok|error|denied"
 ```
 
 ### 2.4 LLM 日志
