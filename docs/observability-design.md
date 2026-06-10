@@ -175,226 +175,155 @@ L1: Communication  ←→  L2: Context  ←→  L3: LLM
 
 **问题 4: 为什么需要 Baggage？**
 
-跨服务传递上下文（如 trace ID 不足以携带业务语义）：
-- session_id 在 span 之间传递
-- 用户意图摘要
-- 中间计算结果
+跨服务传递上下文（单进程 monolith 下 span attributes 通常足够，见 §十）。
 
-## 四、当前埋点覆盖
+## 四、当前埋点覆盖（2026-06-10，P0–P2 后）
 
-### 4.1 已埋点 (按 Layer)
+### 4.1 Registry 状态
 
-| Layer | Component | Operation | 状态 |
-|-------|-----------|-----------|------|
-| context | pev_engine | context.pev.run | ✅ |
-| context | pev_engine | context.pev.llm_call | ✅ |
-| context | pev_engine | context.pev.verify | ✅ |
-| context | pev_engine | context.pev.tool_execute | ✅ |
-| context | pev_engine | context.pev.permission_check | ✅ |
-| context | context_engine | context.process | ✅ |
-| llm | llm_gateway | llm.stream | ✅ |
-| llm | llm_gateway | llm.retry | ✅ |
-| llm | llm_gateway | llm.circuit_breaker | ✅ |
-| llm | llm_gateway | llm.provider.route | ✅ |
-| communication | gateway | gateway.session.* | ✅ |
-| communication | gateway | gateway.store.* | ✅ |
-| communication | adapter | adapter.message.receive | ✅ |
-| communication | adapter | adapter.cli.send | ✅ |
-| agent | agent_tool | agent.* | ⚠️ 部分 |
+- **Operation 总数**: 44+（见 `internal/layers/observability/coverage/registry.go`）
+- **静态注册**: 主链 operation 均已 `Instrumented: true`
+- **Runtime Hit**: 取决于流量路径；条件分支（compression、plan、milestone、longterm）在未触发时为零命中，**不代表死代码**
 
-### 4.2 缺失的埋点
+### 4.2 主链埋点（已实现）
 
-#### 高优先级
+| Layer | 代表 Operation | 状态 |
+|-------|----------------|------|
+| communication | `gateway.message.receive` | ✅ SERVER |
+| context | `context.process`, `context.compression.run`, `context.system_prompt.build` | ✅ |
+| context | `context.pev.run` → `iteration` → `llm_call` / `tool_execute` / `verify` | ✅ 层级契约 |
+| llm | `llm.stream` → `llm.adapter.stream` | ✅ CLIENT |
+| agent | `agent.tool.call`, `agent.run` | ✅ |
 
-```
-context.context_engine:
-  ❌ context.system_prompt.load      # System prompt 加载
-  ❌ context.memory.snapshot.save    # 快照保存
-  ❌ context.compression.run        # 压缩执行（只在触发时）
-  ❌ context.verify.command          # 命令验证
+### 4.3 条件触发 Operation（zero-hit 常见）
 
-context.pev_engine:
-  ❌ context.pev.iteration         # 每次迭代开始
-  ❌ context.pev.synthesis          # 工具结果合成
-  ❌ context.milestone.run           # 里程碑执行
-  ❌ context.plan.generate         # 计划生成
+| Operation | 触发条件 |
+|-----------|----------|
+| `context.compression.run` | token 超 `CompressionTarget` |
+| `context.plan.generate` | PEV plan 模式 |
+| `context.milestone.run` | milestone DAG |
+| `context.longterm.*` | longterm.enabled |
+| `context.harness.*` | harness.enabled |
+| `context.pev.synthesis` | 工具轮次后合成 |
+| `context.pev.tool_execute` | LLM 返回 tool_calls |
 
-llm.llm_gateway:
-  ❌ llm.adapter.stream            # 适配器层调用
+### 4.4 仍待扩展（非阻塞）
 
-communication.gateway:
-  ❌ gateway.permission.check       # 权限检查
-  ❌ gateway.engine_event.handle    # 事件处理
+| 项 | 说明 |
+|----|------|
+| Baggage 业务接入 | 单进程 monolith 下 span attributes 已够用；多服务拆分时再启用 |
+| `cache_read` / `reasoning` token metrics | 待 provider 返回对应字段 |
+| OTLP tail-sampling | 见 §九，仅规划 |
 
-agent.agent_tool:
-  ❌ agent.state.transition        # 状态转换
-  ❌ agent.terminate               # 终止
-```
+---
 
-#### 中优先级
+## 五、Canonical Trace Tree（L5-OBS-TRACE-04/06）
+
+集成测试 `tests/integration/obs_pev_span_hierarchy_test.go` 验证 R1–R2 与 SpanKind。
 
 ```
-context.context_engine:
-  ❌ context.longterm.recall       # 长期记忆召回
-  ❌ context.longterm.store        # 长期记忆存储
-
-llm.llm_gateway:
-  ❌ llm.fallback                 # 模型降级
-  ❌ llm.timeout                  # 超时处理
+gateway.message.receive                          [Server]
+└── context.process                              [Internal]
+    ├── context.system_prompt.load
+    ├── context.snapshot.load
+    ├── context.longterm.recall                  [if longterm.enabled]
+    ├── context.compression.run                  [if shouldCompress]
+    │   attrs: compression.trigger_reason, compression.ratio
+    ├── context.system_prompt.build              [if harness.enabled]
+    │   attrs: gen_ai.prompt.version, gen_ai.prompt.template_hash
+    └── context.pev.run
+        ├── context.plan.generate                [if ShouldPlan]
+        ├── context.milestone.run
+        └── context.pev.iteration                [per iter; ctx propagated]
+            ├── context.pev.llm_call             [Client]
+            │   └── llm.stream                   [Client; ctx from llm_call]
+            │       ├── llm.provider.route
+            │       ├── llm.circuit_breaker
+            │       ├── llm.retry
+            │       └── llm.adapter.stream       [Client]
+            ├── context.pev.tool_execute         [Internal]
+            │   └── context.pev.permission_check
+            └── context.pev.verify
+        └── context.pev.synthesis                [if tools]
+            └── llm.stream → … (同上)
+    ├── context.memory.snapshot.save
+    └── context.longterm.store
 ```
 
-### 4.3 埋点缺失的根因分析
+### 层级约束（MUST）
 
-1. **迭代过程中遗漏**: PEV 引擎中部分子操作没有独立 span
-2. **工具层未覆盖**: Tool 执行层没有独立的 operation
-3. **压缩/合成等条件分支**: 非常规路径可能被忽略
-4. **Agent 层早期实现**: D4 层还在完善
+| 规则 | 约束 | 测试 |
+|------|------|------|
+| R1 | `context.pev.llm_call` parent = `context.pev.iteration` | ✅ |
+| R2 | `llm.stream` parent = `context.pev.llm_call` 或 synthesis 链 | ✅ |
+| R3 | `context.pev.permission_check` parent = `context.pev.tool_execute` | 结构保证 |
+| R4 | `context.pev.iteration` 生命周期 = 单轮（无 loop defer） | ✅ |
+| R5 | 同 trace 共享 trace_id；`session.id` 一致 | ✅ |
 
-## 五、遗漏发现
+---
 
-### 5.1 LLM 请求/响应未在 span events 中记录
+## 六、Metrics 目录（已实现）
 
-**问题**: `AddLLMRequestEvent` 和 `AddLLMResponseEvent` 在 contextengine 中定义，但：
+| Metric | Labels | 写入位置 |
+|--------|--------|----------|
+| `devrix_tool_latency` | tool, risk_level, status | PEV tool execute |
+| `devrix_compression_ratio` | — | context compression |
+| `devrix_gen_ai.client.token.usage` | token_type, model | LLM gateway + PEV |
+| `devrix_engine_tool_calls` | tool, risk_level | PEV |
+| `devrix_llm_*` | provider, model | LLM gateway |
+| `devrix_active_sessions` | adapter | Session bridge |
 
-1. **未在 LLM Gateway 层调用** - LLM gateway 直接写 span attributes，未调用这些函数
-2. **未在 PEV Engine 中传递** - PEV 调用 LLM 时没有记录完整请求/响应
+Prometheus 端点：`observability.metrics` 配置（默认 `/metrics`）。
 
-**影响**: 
-- 无法在 Jaeger 中查看 LLM 完整输入输出
-- 调试 LLM 相关问题需要额外日志
+---
 
-**建议**:
-```go
-// 在 pev_engine.go 中调用
-_, span := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, ...)
-AddLLMRequestEvent(span, sc.SessionID, iter, sc.Model, req)
+## 七、Log ↔ Trace ↔ LLM 关联（P0）
+
+| 信号 | 关联字段 | 实现 |
+|------|----------|------|
+| slog | `trace_id`, `span_id` | `InstallSlogBridge()` |
+| LLM JSONL | `trace_id`, `span_id` | `llm_log.go` |
+| Span | `gen_ai.*` 双写 | PEV / LLM spans |
+
+---
+
+## 八、Session Incident Export
+
+```bash
+# 主二进制
+devrix debug export --session sess_xxx --output /tmp/incident.json
+
+# 独立命令（等价）
+go run ./cmd/debug-export --session sess_xxx
 ```
 
-### 5.2 Metrics 未完整使用
+Bundle schema v1：`internal/layers/observability/incident/export.go`（`llm_rounds`, `trace`, `coverage_hits`）。
 
-**现状**: Metrics 定义完善，但部分未注册：
-- `tool_latency` - 工具执行延迟（未注册）
-- `compression_ratio` - 压缩率（未注册）
-- `session_duration` - 会话时长（未注册）
+---
 
-### 5.3 Baggage 未充分利用
+## 九、采样策略（规划，未实现）
 
-**现状**: Baggage 已实现但未广泛使用
-**建议**: 在 context engine 中传递关键上下文：
-```go
-// 传递 session 相关 baggage
-ctx = baggageManager.Set(ctx, "session_id", sc.SessionID)
-ctx = baggageManager.Set(ctx, "user_intent", summary)
-```
+| 流量 | 建议采样率 |
+|------|-----------|
+| ERROR span | 100% |
+| 高延迟 P99+ | 100% |
+| 正常流量 | 5–20% |
 
-### 5.4 缺少的关联能力
+当前：**全量采集**（sampling=1.0）。待 OTLP 成本数据积累后启用 Collector tail-sampling。
 
-1. **Trace 与 Metrics 关联**: 通过 trace_id 关联
-2. **Trace 与 Logs 关联**: 通过 session_id 关联
-3. **Trace 与 Coverage 关联**: 已实现 (operation 名称)
+---
 
-## 六、改进建议
+## 十、Baggage（Deferred）
 
-### 6.1 高优先级修复
+单进程下 `session.id` / `llm.model` 已在 span attributes。OTel Baggage 在 adapter/agent 独立进程时再接入。
 
-```go
-// 1. 在 PEV Engine 中添加完整的 LLM 请求记录
-func (e *PEVEngine) startSpan(...) {
-    _, span := e.obsBridge.Tracer().Start(ctx, operation, opts...)
-    
-    // 添加 LLM 日志
-    if operation == telemetry.OpContextPEVLLMCall {
-        AddLLMRequestEvent(span, sc.SessionID, iter, sc.Model, req)
-    }
-}
+---
 
-// 2. 添加缺失的 context engine 埋点
-ctx, span := e.startSpan(ctx, telemetry.OpContextCompressionRun, ...)
-ctx, span := e.startSpan(ctx, telemetry.OpContextLongTermRecall, ...)
+## 十一、改进行动（剩余）
 
-// 3. 添加 PEV 迭代计数
-ctx, span := e.startSpan(ctx, telemetry.OpContextPEVIteration, ...)
-
-// 4. 添加工具执行独立埋点
-ctx, span := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.Attribute{Key: "tool.name", Value: tc.Name})
-```
-
-### 6.2 新增 Metrics
-
-```go
-// 在 pev_engine.go
-e.toolLatency, _ = m.Float64Histogram("tool_latency",
-    metrics.WithHistogramLabels(labels),
-    metrics.WithBounds(metrics.DefaultHistogramBounds()))
-
-// 在工具执行时
-e.toolLatency.Observe(time.Since(start).Seconds())
-```
-
-### 6.3 Baggage 增强
-
-```go
-// 添加到 context engine
-type ContextBaggage struct {
-    SessionID    string
-    UserIntent   string
-    WorkDir      string
-    Model        string
-}
-
-// 在 PEV 循环中传递
-ctx = baggageManager.Set(ctx, "user_intent", extractIntent(message))
-```
-
-### 6.4 架构增强: 多维分析
-
-```go
-// 添加 Span 属性支持多维查询
-type SpanAttributes struct {
-    // 基础维度
-    Layer      string
-    Component  string
-    Operation  string
-    
-    // 业务维度
-    SessionID  string
-    UserID    string
-    WorkDir   string
-    
-    // 技术维度
-    Model      string
-    Provider   string
-    Duration   int64
-    
-    // 质量维度
-    Status     string
-    ErrorCode  string
-}
-```
-
-## 七、总结
-
-### 设计优点
-
-1. **分层清晰**: L1-L6 分层与架构对应
-2. **标准化**: 遵循 OpenTelemetry 规范
-3. **可扩展**: Bridge 模式便于新增功能
-4. **代码染色**: 与 operation 注册表联动
-
-### 改进空间
-
-1. **埋点覆盖率**: 约 60%，部分关键路径缺失
-2. **LLM 日志**: 未充分利用 span events
-3. **Metrics**: 部分指标未注册
-4. **Baggage**: 未充分使用
-
-### 行动计划
-
-| 优先级 | 任务 | 工作量 |
-|--------|------|--------|
-| P0 | PEV Engine 完整 LLM 日志 | 2h |
-| P0 | 添加缺失的 context 埋点 | 3h |
-| P1 | 添加 tool latency metrics | 2h |
-| P1 | Agent 层埋点完善 | 4h |
-| P2 | Baggage 增强使用 | 2h |
-| P2 | 多维分析支持 | 4h |
+| 优先级 | 任务 | 状态 |
+|--------|------|------|
+| — | Observability P0–P2 主链 | **DONE** |
+| P3 | Baggage propagation | Deferred |
+| P3 | cache_read/reasoning token metrics | 待 provider |
+| P3 | OTLP tail-sampling | 规划 |
