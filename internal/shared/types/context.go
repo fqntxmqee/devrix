@@ -82,6 +82,14 @@ type CompressionReport struct {
 	Truncated        bool
 }
 
+// Ratio returns compressed/original token ratio in [0,1]; returns 1 when original is zero.
+func (r CompressionReport) Ratio() float64 {
+	if r.OriginalTokens <= 0 {
+		return 1
+	}
+	return float64(r.CompressedTokens) / float64(r.OriginalTokens)
+}
+
 // SessionContext is the context engine aggregate root (in-memory).
 type SessionContext struct {
 	SessionID      string

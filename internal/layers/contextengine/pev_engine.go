@@ -42,6 +42,9 @@ type PEVEngine struct {
 	llmErrors   metrics.Counter
 	toolCalls   metrics.Counter
 	toolErrors  metrics.Counter
+
+	toolLatencyMu sync.Mutex
+	toolLatency   map[string]metrics.Histogram
 }
 
 // NewPEVEngine creates a PEV engine.
@@ -433,18 +436,22 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 
 			toolStart := time.Now()
 			result, err := e.tools.Execute(WithToolSessionID(WithToolWorkDir(ctx, sc.WorkDir), sc.SessionID), tc)
+			toolDuration := time.Since(toolStart)
+			toolStatus := "ok"
 			if err != nil {
 				result = &ToolResult{Error: err.Error()}
+				toolStatus = "error"
 				if toolSpan != nil {
-					toolSpan.RecordError(err)
+					telemetry.RecordSpanError(toolSpan, err)
 				}
 				e.recordToolError()
 			} else {
 				e.recordToolCall()
 			}
+			e.recordToolLatency(tc.Name, risk, toolStatus, toolDuration)
 			if toolSpan != nil {
 				toolSpan.SetAttributes(
-					tracer.Attribute{Key: "tool.duration_ms", Value: fmt.Sprintf("%d", time.Since(toolStart).Milliseconds())},
+					tracer.Attribute{Key: "tool.duration_ms", Value: fmt.Sprintf("%d", toolDuration.Milliseconds())},
 					tracer.Attribute{Key: "tool.output_preview", Value: truncateSpanAttr(result.Output, 500)},
 				)
 				toolSpan.End()
@@ -708,6 +715,34 @@ func (e *PEVEngine) recordToolError() {
 	if e.toolErrors != nil {
 		e.toolErrors.Inc()
 	}
+}
+
+func (e *PEVEngine) recordToolLatency(toolName string, risk types.RiskLevel, status string, duration time.Duration) {
+	if h := e.toolLatencyHistogram(toolName, risk, status); h != nil {
+		h.Observe(duration.Seconds())
+	}
+}
+
+func (e *PEVEngine) toolLatencyHistogram(toolName string, risk types.RiskLevel, status string) metrics.Histogram {
+	if e.obsBridge == nil || e.obsBridge.Meter() == nil {
+		return nil
+	}
+	key := toolName + "|" + string(risk) + "|" + status
+	e.toolLatencyMu.Lock()
+	defer e.toolLatencyMu.Unlock()
+	if e.toolLatency == nil {
+		e.toolLatency = make(map[string]metrics.Histogram)
+	}
+	if h, ok := e.toolLatency[key]; ok {
+		return h
+	}
+	tb := observability.NewToolBridgeFromBridge(e.obsBridge)
+	lm, err := tb.InitLatencyMetrics(toolName, string(risk), status)
+	if err != nil || lm == nil || lm.Latency == nil {
+		return nil
+	}
+	e.toolLatency[key] = lm.Latency
+	return lm.Latency
 }
 
 func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *gateway.EngineEvent {

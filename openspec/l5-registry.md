@@ -454,6 +454,7 @@
 | L5-OBS-TRACE-05 | Log-Trace-LLM 关联 | OBS-TRACE | `logger/slog_bridge_test.go`, `llm_log_test.go` | IMPLEMENTED |
 | L5-OBS-GENAI-ATTR | gen_ai.* 语义属性双写 | OBS-TRACE | `obs_pev_span_hierarchy_test.go`, `telemetry/names_test.go` | IMPLEMENTED |
 | L5-OBS-DECISION-01 | verify.failure_reason | OBS-TRACE | `pev_engine` integration (partial) | IMPLEMENTED |
-| L5-OBS-METRICS-01 | tool_latency histogram | OBS-METRICS | — | PLANNED (P1) |
-| L5-OBS-METRICS-02 | compression_ratio histogram | OBS-METRICS | — | PLANNED (P1) |
-| L5-OBS-EXPORT-01 | Session incident export | OBS-EXPORT | — | PLANNED (P1) |
+| L5-OBS-METRICS-01 | tool_latency histogram | OBS-METRICS | `bridge_tool_latency_test.go`, `pev_engine.go` | IMPLEMENTED |
+| L5-OBS-METRICS-02 | compression_ratio histogram | OBS-METRICS | `engine.go`, `types/context_test.go` | IMPLEMENTED |
+| L5-OBS-DECISION-02 | compression.trigger_reason + ratio | OBS-TRACE | `engine.go` compression span | IMPLEMENTED |
+| L5-OBS-EXPORT-01 | Session incident export | OBS-EXPORT | `incident/export_test.go`, `cmd/debug-export` | IMPLEMENTED |

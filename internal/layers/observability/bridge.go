@@ -113,6 +113,38 @@ func NewToolBridge(obs *Observability) *ToolBridge {
 	}
 }
 
+// NewToolBridgeFromBridge creates a ToolBridge from an existing Bridge (no Observability wrapper).
+func NewToolBridgeFromBridge(bridge *Bridge) *ToolBridge {
+	return &ToolBridge{bridge: bridge}
+}
+
+// InitLatencyMetrics registers a tool_latency histogram for the given label set.
+func (b *ToolBridge) InitLatencyMetrics(toolName, riskLevel, status string) (*ToolLatencyMetrics, error) {
+	if b.bridge == nil || b.bridge.meter == nil {
+		return nil, nil
+	}
+
+	labels := metrics.LabelMap{
+		"tool":       toolName,
+		"risk_level": riskLevel,
+		"status":     status,
+	}
+
+	latency, err := b.bridge.meter.Float64Histogram("tool_latency",
+		metrics.WithHistogramLabels(labels),
+		metrics.WithBounds(metrics.DefaultHistogramBounds()))
+	if err != nil {
+		return nil, err
+	}
+
+	return &ToolLatencyMetrics{Latency: latency}, nil
+}
+
+// ToolLatencyMetrics holds tool latency histogram instruments.
+type ToolLatencyMetrics struct {
+	Latency metrics.Histogram
+}
+
 // InitMetrics initializes tool metrics
 func (b *ToolBridge) InitMetrics(toolName, riskLevel string) (*ToolMetrics, error) {
 	if b.bridge == nil || b.bridge.meter == nil {
