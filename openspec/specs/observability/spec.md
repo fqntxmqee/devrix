@@ -1,16 +1,16 @@
 # Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1)
+**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1), devrix-observability-enhancement-p2 (in progress)
 **Layer:** Observability
-**Version:** 1.6.0
+**Version:** 1.7.0
 **Status:** Canonical — source of truth
 
 ---
 
 ## Overview
 
-可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写；V1.6（DM-20260610-002，P1）补齐 `tool_latency` / `compression_ratio` metrics、压缩决策属性与 session incident export CLI。
+可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写；V1.6（DM-20260610-002，P1）补齐 `tool_latency` / `compression_ratio` metrics、压缩决策属性与 session incident export；V1.7（DM-20260610-003，P2）SpanKind 契约测试、prompt 版本哈希、`gen_ai.client.token.usage` metrics、`devrix debug export` 子命令。
 
 ---
 
@@ -462,6 +462,57 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 - GIVEN LLM JSONL exists for session
 - WHEN `debug-export --session {id}` runs
 - THEN stdout/file contains valid JSON with `schema_version=1.0` and `llm_rounds` array
+
+---
+
+## ADDED Requirements (V1.7 P2 SpanKind / Prompt / Token Metrics / Debug CLI)
+
+### Requirement: SpanKind Contract
+
+关键 span MUST 使用正确 SpanKind：`gateway.message.receive` = SERVER；`context.pev.llm_call` / `llm.stream` / `llm.adapter.stream` = CLIENT；其余引擎内操作 = INTERNAL。
+
+**Priority**: P2
+**L5 映射**: L5-OBS-TRACE-06
+
+#### Scenario: Integration asserts SpanKind
+
+- GIVEN full PEV request via gateway
+- WHEN spans are exported to memory
+- THEN `gateway.message.receive` has SpanKind SERVER
+- AND `context.pev.llm_call` has SpanKind CLIENT
+
+---
+
+### Requirement: Prompt Version Metadata
+
+`context.system_prompt.build` span MUST 携带 `gen_ai.prompt.version`、`gen_ai.prompt.template_hash`；可选 `gen_ai.prompt.agents_md_hash`。
+
+**Priority**: P2
+**L5 映射**: L5-OBS-DECISION-03
+
+#### Scenario: Stable template hash
+
+- GIVEN identical SystemPromptAssembler inputs
+- WHEN Build runs twice
+- THEN `template_hash` is identical
+
+---
+
+### Requirement: GenAI Token Usage Metrics
+
+系统 MUST 注册 `devrix_gen_ai.client.token.usage` Counter（labels: `token_type`, `model`），LLM 调用成功后按 input/output 分别 Add。
+
+**Priority**: P2
+**L5 映射**: L5-OBS-METRICS-03
+
+---
+
+### Requirement: Debug Export Subcommand
+
+主二进制 MUST 支持 `devrix debug export --session <id>`，行为与 `cmd/debug-export` 一致。
+
+**Priority**: P2
+**L5 映射**: L5-OBS-EXPORT-02
 
 ---
 

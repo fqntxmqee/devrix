@@ -136,6 +136,21 @@ func LLMUsageAttrs(promptTokens, completionTokens int, latencyMs int64) []tracer
 }
 
 // GenAIUsageAttrs returns OTel GenAI semantic convention attributes (dual-written alongside llm.*).
+// GenAIPromptAttrs returns prompt version metadata for system prompt build spans.
+func GenAIPromptAttrs(version, templateHash, agentsMDHash string) []tracer.Attribute {
+	attrs := []tracer.Attribute{}
+	if version != "" {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.prompt.version", Value: version})
+	}
+	if templateHash != "" {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.prompt.template_hash", Value: templateHash})
+	}
+	if agentsMDHash != "" {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.prompt.agents_md_hash", Value: agentsMDHash})
+	}
+	return attrs
+}
+
 func GenAIUsageAttrs(model, sessionID string, promptTokens, completionTokens int, finishReason string) []tracer.Attribute {
 	attrs := []tracer.Attribute{
 		{Key: "gen_ai.request.model", Value: model},

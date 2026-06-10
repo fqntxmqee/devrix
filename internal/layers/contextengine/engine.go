@@ -20,6 +20,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/shared/buildinfo"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
@@ -371,6 +372,11 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				tracer.Attribute{Key: "system_prompt.total_tokens", Value: fmt.Sprintf("%d", buildReport.TotalTokens)},
 				tracer.Attribute{Key: "system_prompt.memory_truncated", Value: fmt.Sprintf("%t", buildReport.MemoryTruncated)},
 			)
+			buildSpan.SetAttributes(telemetry.GenAIPromptAttrs(
+				buildinfo.Version,
+				buildReport.TemplateHash,
+				buildReport.AgentsMDHash,
+			)...)
 			buildSpan.End()
 		}
 		sc.SystemPrompt = builtPrompt

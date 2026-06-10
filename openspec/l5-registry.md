@@ -458,3 +458,7 @@
 | L5-OBS-METRICS-02 | compression_ratio histogram | OBS-METRICS | `engine.go`, `types/context_test.go` | IMPLEMENTED |
 | L5-OBS-DECISION-02 | compression.trigger_reason + ratio | OBS-TRACE | `engine.go` compression span | IMPLEMENTED |
 | L5-OBS-EXPORT-01 | Session incident export | OBS-EXPORT | `incident/export_test.go`, `cmd/debug-export` | IMPLEMENTED |
+| L5-OBS-TRACE-06 | SpanKind 契约 (SERVER/CLIENT/INTERNAL) | OBS-TRACE | `obs_pev_span_hierarchy_test.go` | IMPLEMENTED |
+| L5-OBS-DECISION-03 | gen_ai.prompt.version + template_hash | OBS-TRACE | `system_prompt_assembler_test.go` | IMPLEMENTED |
+| L5-OBS-METRICS-03 | gen_ai.client.token.usage Counter | OBS-METRICS | `genai_tokens_test.go` | IMPLEMENTED |
+| L5-OBS-EXPORT-02 | devrix debug export 子命令 | OBS-EXPORT | `internal/cli/debug/export_test.go` | IMPLEMENTED |
