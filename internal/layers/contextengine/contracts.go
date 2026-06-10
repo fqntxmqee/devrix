@@ -19,6 +19,8 @@ type LLMChunk struct {
 type TokenUsage struct {
 	PromptTokens     int
 	CompletionTokens int
+	CacheReadTokens  int
+	ReasoningTokens  int
 }
 
 // LLMRequest is the input to ChatStream.

@@ -372,7 +372,8 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				time.Since(llmStart).Milliseconds(),
 			)...)
 			llmSpan.SetAttributes(telemetry.GenAIUsageAttrs(
-				sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens, finishReason,
+				sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens,
+				usage.CacheReadTokens, usage.ReasoningTokens, finishReason,
 			)...)
 			llmSpan.End()
 		}
@@ -657,7 +658,8 @@ func (e *PEVEngine) runToolSynthesis(
 			time.Since(llmStart).Milliseconds(),
 		)...)
 		llmSpan.SetAttributes(telemetry.GenAIUsageAttrs(
-			sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens, "stop",
+			sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens,
+			usage.CacheReadTokens, usage.ReasoningTokens, "stop",
 		)...)
 		llmSpan.SetAttributes(tracer.Attribute{Key: "pev.synthesis_source", Value: "llm"})
 		llmSpan.End()
@@ -698,7 +700,12 @@ func (e *PEVEngine) recordLLMCall(model string, usage TokenUsage, latency time.D
 		e.llmLatency.Observe(latency.Seconds())
 	}
 	if e.obsBridge != nil {
-		observability.RecordGenAITokenUsage(e.obsBridge.Meter(), model, usage.PromptTokens, usage.CompletionTokens)
+		observability.RecordGenAITokenUsage(e.obsBridge.Meter(), model, observability.GenAITokenBreakdown{
+			Input:     usage.PromptTokens,
+			Output:    usage.CompletionTokens,
+			CacheRead: usage.CacheReadTokens,
+			Reasoning: usage.ReasoningTokens,
+		})
 	}
 }
 

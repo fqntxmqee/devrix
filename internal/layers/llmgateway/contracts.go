@@ -32,6 +32,8 @@ type TokenUsage struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
+	CacheReadTokens  int // prompt_tokens_details.cached_tokens
+	ReasoningTokens  int // completion_tokens_details.reasoning_tokens
 }
 
 // ToolSchema describes a tool for the LLM.

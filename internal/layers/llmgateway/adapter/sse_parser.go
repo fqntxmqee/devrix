@@ -78,11 +78,18 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 	}
 
 	if event.Usage != nil {
-		chunk.Usage = llmgateway.TokenUsage{
+		usage := llmgateway.TokenUsage{
 			PromptTokens:     event.Usage.PromptTokens,
 			CompletionTokens: event.Usage.CompletionTokens,
 			TotalTokens:      event.Usage.TotalTokens,
 		}
+		if event.Usage.PromptTokensDetails != nil {
+			usage.CacheReadTokens = event.Usage.PromptTokensDetails.CachedTokens
+		}
+		if event.Usage.CompletionTokensDetails != nil {
+			usage.ReasoningTokens = event.Usage.CompletionTokensDetails.ReasoningTokens
+		}
+		chunk.Usage = usage
 		hasDelta = true
 	}
 

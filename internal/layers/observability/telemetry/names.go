@@ -151,12 +151,18 @@ func GenAIPromptAttrs(version, templateHash, agentsMDHash string) []tracer.Attri
 	return attrs
 }
 
-func GenAIUsageAttrs(model, sessionID string, promptTokens, completionTokens int, finishReason string) []tracer.Attribute {
+func GenAIUsageAttrs(model, sessionID string, promptTokens, completionTokens, cacheReadTokens, reasoningTokens int, finishReason string) []tracer.Attribute {
 	attrs := []tracer.Attribute{
 		{Key: "gen_ai.request.model", Value: model},
 		{Key: "gen_ai.usage.input_tokens", Value: fmt.Sprintf("%d", promptTokens)},
 		{Key: "gen_ai.usage.output_tokens", Value: fmt.Sprintf("%d", completionTokens)},
 		{Key: "gen_ai.agent.name", Value: "devrix"},
+	}
+	if cacheReadTokens > 0 {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.usage.cache_read.input_tokens", Value: fmt.Sprintf("%d", cacheReadTokens)})
+	}
+	if reasoningTokens > 0 {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.usage.reasoning.output_tokens", Value: fmt.Sprintf("%d", reasoningTokens)})
 	}
 	if sessionID != "" {
 		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.conversation.id", Value: sessionID})

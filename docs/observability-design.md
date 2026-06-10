@@ -109,7 +109,7 @@ Layer.Component:
 标签:
 "provider": "openai"
 "model": "gpt-4o"
-"token_type": "input|output"
+"token_type": "input|output|cache_read|reasoning"
 "tool": "bash"
 "risk_level": "high"
 "adapter": "cli"
@@ -213,7 +213,7 @@ L1: Communication  ←→  L2: Context  ←→  L3: LLM
 | 项 | 说明 |
 |----|------|
 | Baggage 业务接入 | 单进程 monolith 下 span attributes 已够用；多服务拆分时再启用 |
-| `cache_read` / `reasoning` token metrics | 待 provider 返回对应字段 |
+| `cache_read` / `reasoning` token metrics | Provider usage details → metrics + span attrs |
 | OTLP tail-sampling | 见 §九，仅规划 |
 
 ---
@@ -331,5 +331,5 @@ W3C `baggage` 头由 `tracer.Propagator` inject/extract；Gateway 入站写入 `
 |--------|------|------|
 | — | Observability P0–P2 主链 | **DONE** |
 | P3 | Baggage propagation | **DONE** (DM-20260610-005) |
-| P3 | cache_read/reasoning token metrics | 待 provider |
+| P3 | cache_read/reasoning token metrics | **DONE** (DM-20260610-007) |
 | P3 | OTLP tail-sampling | 规划 |
