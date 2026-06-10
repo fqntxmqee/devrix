@@ -146,3 +146,19 @@ HarnessBootstrap.Run(ctx, session, opts)
 | Dual session files | compact `.jsonl` + full `.log.jsonl` | TranscriptStore + SessionLog |
 | Context Preflight | RuleBasedPreflightChecker | 四维规则评分 warn-only |
 | Shared objects | WorkspaceManager + RuntimeContext | HarnessSessionState + WorkspaceContext |
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-10
+**Duration:** 1 day (2026-06-09 demand → 2026-06-10 merge)
+**Outcome:** Successfully implemented
+**PR:** [#10](https://github.com/fqntxmqee/devrix/pull/10)
+
+### Specs Updated
+- `openspec/specs/context-engine/spec.md` — v5.0.0 Harness Bootstrap requirements
+- `openspec/specs/observability/spec.md` — v1.4.0 harness Jaeger operations
+
+### Archive Location
+- `openspec/archive/2026-06-10-devrix-harness-bootstrap/`

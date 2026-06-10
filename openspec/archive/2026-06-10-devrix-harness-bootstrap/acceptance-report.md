@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-harness-bootstrap
 **Demand ID:** DM-20260609-004
-**Status:** S5 Ready（自动化验收通过，待合入 main）
+**Status:** S7 Archived（2026-06-10）
 **Review Round:** 2（2026-06-10）
 
 ---
@@ -69,15 +69,15 @@ openspec validate devrix-harness-bootstrap            # PASS
 
 ---
 
-## S6/S7 待办（合入 main 后）
+## S6/S7 完成
 
-- [ ] 合入 main
-- [ ] 更新 `openspec/demand-archive-index.md`
-- [ ] 执行 `/openspec-archive devrix-harness-bootstrap`
-- [ ] 灰度文档：启用 harness 的配置与回滚步骤
+- [x] 合入 main — PR [#10](https://github.com/fqntxmqee/devrix/pull/10) merged 2026-06-10
+- [x] 更新 `openspec/demand-archive-index.md`
+- [x] 执行 `/openspec-archive devrix-harness-bootstrap`
+- [x] 灰度文档：`devrix.yaml` harness 块注释 + `design.md` §四
 
 ---
 
 ## Verdict
 
-**S5 自动化验收：通过。** 可进入 PR 合入与归档流程。
+**ACCEPTED.** S5 自动化验收 16/16 Pass；已合入 main 并完成 OpenSpec 归档。

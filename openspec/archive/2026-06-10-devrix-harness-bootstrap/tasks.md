@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-harness-bootstrap
 **Demand ID:** DM-20260609-004
-**Status:** S4 Complete / S5 Ready (2026-06-10)
+**Status:** S7 Archived (2026-06-10)
 **Based on:** design.md, specs/context-engine/spec.md, specs/observability/spec.md
 
 ---
@@ -233,18 +233,18 @@ V5a 拆为 **两个 PR** 交付，降低单分支变更风险与 review 负担�
 - [x] PR1 轻量集成测试通过
 - [x] `harness.enabled=false` 回归通过（V4 行为 bit-identical）
 - [x] **`openspec validate devrix-harness-bootstrap` 通过**
-- [ ] S4 代码审查通过
-- [ ] → **合入 main，不归档**
+- [x] S4 代码审查通过（PR #10）
+- [x] → **合入 main，不归档**
 
 ### PR2「装配」合入门禁（S4 Gate → Merge）
 - [x] M4/M5/M6/M7 所有任务完成
 - [x] L5-2-9-11 + L5-5-5-02 IMPLEMENTED
 - [x] P0 L5 全绿
-- [ ] S4 代码审查通过
-- [ ] → **合入 main**
+- [x] S4 代码审查通过（PR #10）
+- [x] → **合入 main**
 
 ### S5 验收 + S6 归档（PR2 合入后一次性执行）
 - [x] acceptance-report.md 填写
-- [ ] harness.enabled 灰度文档就绪（见 devrix.yaml 注释 + design §四）
-- [ ] 覆盖率 ≥ 80%（待 CI/人工确认）
-- [ ] 准备 `/openspec-archive devrix-harness-bootstrap`
+- [x] harness.enabled 灰度文档就绪（见 devrix.yaml 注释 + design §四）
+- [x] 覆盖率 ≥ 80%（CI coverage job PASS）
+- [x] 执行 `/openspec-archive devrix-harness-bootstrap`

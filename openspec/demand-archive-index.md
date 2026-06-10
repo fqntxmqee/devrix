@@ -26,6 +26,7 @@
 | DM-20260609-001 | D2/D3/D4 域分段测试 | devrix-d234-domain-testing | 2026-06-09 | — | ACCEPTED |
 | DM-20260609-002 | 域覆盖报告 + PEV 合成 + D1 Auth | devrix-domain-coverage-ci | 2026-06-09 | — | ACCEPTED |
 | DM-20260609-003 | D1/D5 单元测试补全 | devrix-d1-d5-unit-tests | 2026-06-09 | — | ACCEPTED |
+| DM-20260609-004 | Context Engine V5 Harness Bootstrap | devrix-harness-bootstrap | 2026-06-10 | [#10](https://github.com/fqntxmqee/devrix/pull/10) | ACCEPTED |
 
 ## Archive Locations
 
@@ -55,6 +56,7 @@
 | devrix-d234-domain-testing | `openspec/archive/2026-06-09-devrix-d234-domain-testing/` |
 | devrix-domain-coverage-ci | `openspec/archive/2026-06-09-devrix-domain-coverage-ci/` |
 | devrix-d1-d5-unit-tests | `openspec/archive/2026-06-09-devrix-d1-d5-unit-tests/` |
+| devrix-harness-bootstrap | `openspec/archive/2026-06-10-devrix-harness-bootstrap/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
