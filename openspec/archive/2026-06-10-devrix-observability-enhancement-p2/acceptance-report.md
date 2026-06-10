@@ -2,6 +2,8 @@
 
 **Demand ID:** DM-20260610-003
 **Verdict:** ACCEPTED (P2)
+**PR:** [#15](https://github.com/fqntxmqee/devrix/pull/15)
+**Archived:** 2026-06-10
 
 | L5 ID | Result |
 |-------|--------|

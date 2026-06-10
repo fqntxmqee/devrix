@@ -29,6 +29,7 @@
 | DM-20260609-004 | Context Engine V5 Harness Bootstrap | devrix-harness-bootstrap | 2026-06-10 | [#10](https://github.com/fqntxmqee/devrix/pull/10) | ACCEPTED |
 | DM-20260610-001 | 可观察层增强 — AI 排查就绪 (P0) | devrix-observability-enhancement | 2026-06-10 | [#11](https://github.com/fqntxmqee/devrix/pull/11) | ACCEPTED (P0) |
 | DM-20260610-002 | 可观察层增强 P1 — Metrics 与 Incident Export | devrix-observability-enhancement-p1 | 2026-06-10 | [#12](https://github.com/fqntxmqee/devrix/pull/12) | ACCEPTED (P1) |
+| DM-20260610-003 | 可观察层增强 P2 — SpanKind / Prompt / Token / Debug CLI | devrix-observability-enhancement-p2 | 2026-06-10 | [#15](https://github.com/fqntxmqee/devrix/pull/15) | ACCEPTED (P2) |
 
 ## Archive Locations
 
@@ -61,6 +62,7 @@
 | devrix-harness-bootstrap | `openspec/archive/2026-06-10-devrix-harness-bootstrap/` |
 | devrix-observability-enhancement | `openspec/archive/2026-06-10-devrix-observability-enhancement/` |
 | devrix-observability-enhancement-p1 | `openspec/archive/2026-06-10-devrix-observability-enhancement-p1/` |
+| devrix-observability-enhancement-p2 | `openspec/archive/2026-06-10-devrix-observability-enhancement-p2/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
