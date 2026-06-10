@@ -1,7 +1,7 @@
 # Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1), devrix-observability-enhancement-p2 (archived 2026-06-10, P2), devrix-observability-baggage (archived 2026-06-10, P3), devrix-observability-token-breakdown (in progress, P3)
+**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1), devrix-observability-enhancement-p2 (archived 2026-06-10, P2), devrix-observability-baggage (archived 2026-06-10, P3), devrix-observability-token-breakdown (archived 2026-06-10, P3)
 **Layer:** Observability
 **Version:** 1.9.0
 **Status:** Canonical — source of truth

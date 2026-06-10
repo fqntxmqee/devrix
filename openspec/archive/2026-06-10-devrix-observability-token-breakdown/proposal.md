@@ -1,7 +1,7 @@
 # Proposal: devrix-observability-token-breakdown
 
 **Demand ID:** DM-20260610-007
-**Status:** In Progress
+**Status:** Archived
 
 ## Capabilities
 

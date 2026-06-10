@@ -31,6 +31,8 @@
 | DM-20260610-002 | 可观察层增强 P1 — Metrics 与 Incident Export | devrix-observability-enhancement-p1 | 2026-06-10 | [#12](https://github.com/fqntxmqee/devrix/pull/12) | ACCEPTED (P1) |
 | DM-20260610-003 | 可观察层增强 P2 — SpanKind / Prompt / Token / Debug CLI | devrix-observability-enhancement-p2 | 2026-06-10 | [#15](https://github.com/fqntxmqee/devrix/pull/15) | ACCEPTED (P2) |
 | DM-20260610-004 | 可观察层文档同步 — Canonical Trace Tree 与 Coverage 指南 | devrix-observability-docs-sync | 2026-06-10 | [#16](https://github.com/fqntxmqee/devrix/pull/16) | ACCEPTED |
+| DM-20260610-005 | 可观察层 P3 — W3C Baggage 业务上下文传播 | devrix-observability-baggage | 2026-06-10 | [#17](https://github.com/fqntxmqee/devrix/pull/17) | ACCEPTED (P3) |
+| DM-20260610-007 | 可观察层 P3 — cache_read / reasoning Token 细分 | devrix-observability-token-breakdown | 2026-06-10 | [#18](https://github.com/fqntxmqee/devrix/pull/18) | ACCEPTED (P3) |
 
 ## Archive Locations
 
