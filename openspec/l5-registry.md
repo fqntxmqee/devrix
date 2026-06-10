@@ -367,6 +367,10 @@
 | L5-6-3-03 | Compression Recall Probe F1 | Eval | `internal/layers/evolution/eval/compression_recall_probe_test.go` | IMPLEMENTED | P0 |
 | L5-6-3-04 | Delta 报告对比 | Eval | `internal/layers/evolution/eval/delta_test.go` | IMPLEMENTED | P0 |
 | L5-6-3-07 | eval.enabled=false 零行为 | Eval | `internal/layers/evolution/eval/engine_test.go` | IMPLEMENTED | P0 |
+| L5-6-3-06 | PEV Tool 选择准确率探针 | Eval | `internal/layers/evolution/eval/pev_tool_accuracy_probe_test.go` | IMPLEMENTED | P1 |
+| L5-6-3-11 | devrix eval run 子命令 | Eval | `internal/cli/eval/run_test.go` | IMPLEMENTED | P1 |
+| L5-6-3-12 | 调优建议生成 | Eval | `internal/layers/evolution/eval/tune_test.go` | IMPLEMENTED | P2 |
+| L5-6-3-13 | eval run 真实 Judge 接入 | Eval | `internal/cli/eval/judge.go` | IMPLEMENTED | P1 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d6-eval
 **Demand ID:** DM-20260610-006
-**Status:** S2_Proposal
+**Status:** Archived (Pilot)
 **Based on:** `demand.md`（DM-20260610-006），业界实践参考 MLflow Trace-Aware Evaluation、AEMA、MemAlign、FutureAGI CI/CD for AI Agents 2026
 
 ---

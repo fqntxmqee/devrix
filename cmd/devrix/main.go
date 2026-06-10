@@ -10,6 +10,7 @@ import (
 	"time"
 
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
+	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/auth"
@@ -29,6 +30,14 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "debug" {
 		if err := clidebug.Run(os.Args[2:]); err != nil {
 			slog.Error("debug command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if len(os.Args) >= 2 && os.Args[1] == "eval" {
+		if err := evalcli.Run(os.Args[2:]); err != nil {
+			slog.Error("eval command failed", "error", err)
 			os.Exit(1)
 		}
 		return

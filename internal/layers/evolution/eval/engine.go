@@ -138,6 +138,9 @@ func (e *EvalEngine) Run(ctx context.Context, opts EvalOpts) (*EvalReport, error
 	// 5. Delta 对比
 	if e.deltaAnalyzer != nil {
 		report.Delta = e.deltaAnalyzer.Compare(report)
+		if report.Delta != nil {
+			report.TuneSuggest = NewTuneGenerator().Suggest(report.Delta)
+		}
 	}
 
 	// 6. 保存基线

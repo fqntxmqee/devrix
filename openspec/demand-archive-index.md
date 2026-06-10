@@ -33,6 +33,7 @@
 | DM-20260610-004 | 可观察层文档同步 — Canonical Trace Tree 与 Coverage 指南 | devrix-observability-docs-sync | 2026-06-10 | [#16](https://github.com/fqntxmqee/devrix/pull/16) | ACCEPTED |
 | DM-20260610-005 | 可观察层 P3 — W3C Baggage 业务上下文传播 | devrix-observability-baggage | 2026-06-10 | [#17](https://github.com/fqntxmqee/devrix/pull/17) | ACCEPTED (P3) |
 | DM-20260610-007 | 可观察层 P3 — cache_read / reasoning Token 细分 | devrix-observability-token-breakdown | 2026-06-10 | [#18](https://github.com/fqntxmqee/devrix/pull/18) | ACCEPTED (P3) |
+| DM-20260610-006 | D6 自演化评测引擎 Pilot — Compression Recall | devrix-d6-eval | 2026-06-10 | [#19](https://github.com/fqntxmqee/devrix/pull/19) | ACCEPTED (Pilot) |
 
 ## Archive Locations
 
@@ -67,6 +68,9 @@
 | devrix-observability-enhancement-p1 | `openspec/archive/2026-06-10-devrix-observability-enhancement-p1/` |
 | devrix-observability-enhancement-p2 | `openspec/archive/2026-06-10-devrix-observability-enhancement-p2/` |
 | devrix-observability-docs-sync | `openspec/archive/2026-06-10-devrix-observability-docs-sync/` |
+| devrix-observability-baggage | `openspec/archive/2026-06-10-devrix-observability-baggage/` |
+| devrix-observability-token-breakdown | `openspec/archive/2026-06-10-devrix-observability-token-breakdown/` |
+| devrix-d6-eval | `openspec/archive/2026-06-10-devrix-d6-eval/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)

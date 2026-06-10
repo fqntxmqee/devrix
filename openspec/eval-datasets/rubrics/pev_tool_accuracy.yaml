@@ -1,0 +1,8 @@
+dimension: pev_tool_accuracy
+instruction: >
+  Compare expected tool invocations against actual tool invocations.
+  Score is deterministic precision/recall/F1 over tool name sets.
+scale: "0-1"
+reference: >
+  Perfect match yields precision=1, recall=1, F1=1.
+  Wrong tool substitution lowers both precision and recall.

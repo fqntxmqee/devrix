@@ -204,12 +204,37 @@ items: []
 }
 
 func TestProbeRegistry(t *testing.T) {
-	p := GetProbe("compression_recall")
-	if p == nil {
-		t.Fatal("compression_recall probe not registered")
+	for _, id := range []string{"compression_recall", "pev_tool_accuracy"} {
+		p := GetProbe(id)
+		if p == nil {
+			t.Fatalf("%s probe not registered", id)
+		}
+		if p.ID() != id {
+			t.Errorf("ID = %s, want %s", p.ID(), id)
+		}
 	}
-	if p.ID() != "compression_recall" {
-		t.Errorf("ID = %s, want compression_recall", p.ID())
+}
+
+func TestEvalEngine_TuneSuggestionsOnRegression(t *testing.T) {
+	baseline := &EvalReport{
+		ID: "baseline",
+		Scores: []DomainScore{
+			{Domain: "d2", Dimension: "compression_recall", Score: 0.95},
+		},
+	}
+	current := &EvalReport{
+		ID: "current",
+		Scores: []DomainScore{
+			{Domain: "d2", Dimension: "compression_recall", Score: 0.70},
+		},
+	}
+	delta := NewDeltaAnalyzer(baseline).Compare(current)
+	suggestions := NewTuneGenerator().Suggest(delta)
+	if len(suggestions) != 1 {
+		t.Fatalf("len(suggestions) = %d, want 1", len(suggestions))
+	}
+	if suggestions[0].Target != "context_engine.compression.budget" {
+		t.Errorf("Target = %q", suggestions[0].Target)
 	}
 }
 
@@ -227,8 +252,8 @@ func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDataset() error = %v", err)
 	}
-	if len(ds.Items) != 10 {
-		t.Errorf("dataset items = %d, want 10", len(ds.Items))
+	if len(ds.Items) != 13 {
+		t.Errorf("dataset items = %d, want 13", len(ds.Items))
 	}
 
 	now = func() time.Time {
@@ -266,11 +291,11 @@ func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
 	if len(report.Scores) == 0 {
 		t.Fatal("Scores is empty — no probes matched items")
 	}
-	if report.Dashboard.ItemCount != 10 {
-		t.Errorf("ItemCount = %d, want 10", report.Dashboard.ItemCount)
+	if report.Dashboard.ItemCount != 13 {
+		t.Errorf("ItemCount = %d, want 13", report.Dashboard.ItemCount)
 	}
-	if report.Dashboard.DimensionCount < 1 {
-		t.Error("DimensionCount < 1")
+	if report.Dashboard.DimensionCount < 2 {
+		t.Errorf("DimensionCount = %d, want >= 2", report.Dashboard.DimensionCount)
 	}
 	if report.Dashboard.OverallScore <= 0 {
 		t.Errorf("OverallScore = %v, want > 0", report.Dashboard.OverallScore)
