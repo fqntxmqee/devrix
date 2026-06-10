@@ -45,6 +45,32 @@ func TestStreamOpenAISSE_should_parse_content_and_usage(t *testing.T) {
 	}
 }
 
+func TestStreamOpenAISSE_should_parse_usage_token_details(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"prompt_tokens_details":{"cached_tokens":80},"completion_tokens_details":{"reasoning_tokens":30}}}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var usage llmgateway.TokenUsage
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		if chunk.Usage.PromptTokens > 0 {
+			usage = chunk.Usage
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if usage.CacheReadTokens != 80 {
+		t.Fatalf("cache read: %d", usage.CacheReadTokens)
+	}
+	if usage.ReasoningTokens != 30 {
+		t.Fatalf("reasoning: %d", usage.ReasoningTokens)
+	}
+}
+
 func TestStreamOpenAISSE_should_merge_tool_call_deltas(t *testing.T) {
 	body := strings.Join([]string{
 		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"bash","arguments":"hel"}}]}}]}`,

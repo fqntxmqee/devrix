@@ -463,3 +463,4 @@
 | L5-OBS-METRICS-03 | gen_ai.client.token.usage Counter | OBS-METRICS | `genai_tokens_test.go` | IMPLEMENTED |
 | L5-OBS-EXPORT-02 | devrix debug export 子命令 | OBS-EXPORT | `internal/cli/debug/export_test.go` | IMPLEMENTED |
 | L5-OBS-TRACE-03 | W3C Baggage 传播 (session.id/user.id) | OBS-TRACE | `tracer/baggage_test.go`, `propagation_test.go` | IMPLEMENTED |
+| L5-OBS-METRICS-04 | cache_read/reasoning token breakdown | OBS-METRICS | `genai_tokens_test.go`, `sse_parser_test.go` | IMPLEMENTED |

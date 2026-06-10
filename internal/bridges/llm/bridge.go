@@ -72,6 +72,8 @@ func mapChunk(c llmgateway.Chunk) contextengine.LLMChunk {
 		Usage: contextengine.TokenUsage{
 			PromptTokens:     c.Usage.PromptTokens,
 			CompletionTokens: c.Usage.CompletionTokens,
+			CacheReadTokens:  c.Usage.CacheReadTokens,
+			ReasoningTokens:  c.Usage.ReasoningTokens,
 		},
 	}
 	if len(c.ToolCalls) > 0 {

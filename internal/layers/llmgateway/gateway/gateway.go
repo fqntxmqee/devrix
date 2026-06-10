@@ -103,7 +103,12 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		streamSpan.SetAttributes(attrs...)
 		streamSpan.End()
-		observability.RecordGenAITokenUsage(g.obs.Meter(), model, usage.PromptTokens, usage.CompletionTokens)
+		observability.RecordGenAITokenUsage(g.obs.Meter(), model, observability.GenAITokenBreakdown{
+			Input:     usage.PromptTokens,
+			Output:    usage.CompletionTokens,
+			CacheRead: usage.CacheReadTokens,
+			Reasoning: usage.ReasoningTokens,
+		})
 	}
 
 	var provider, model string

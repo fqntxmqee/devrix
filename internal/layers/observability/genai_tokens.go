@@ -9,16 +9,30 @@ import (
 
 var genAITokenCounters sync.Map // key: meterName|model|tokenType → metrics.Counter
 
-// RecordGenAITokenUsage increments gen_ai.client.token.usage for input/output tokens.
-func RecordGenAITokenUsage(meter *metrics.Meter, model string, inputTokens, outputTokens int) {
+// GenAITokenBreakdown holds token counts for gen_ai.client.token.usage metrics.
+type GenAITokenBreakdown struct {
+	Input       int
+	Output      int
+	CacheRead   int
+	Reasoning   int
+}
+
+// RecordGenAITokenUsage increments gen_ai.client.token.usage by token_type.
+func RecordGenAITokenUsage(meter *metrics.Meter, model string, usage GenAITokenBreakdown) {
 	if meter == nil {
 		return
 	}
-	if inputTokens > 0 {
-		addGenAITokenUsage(meter, model, "input", inputTokens)
+	if usage.Input > 0 {
+		addGenAITokenUsage(meter, model, "input", usage.Input)
 	}
-	if outputTokens > 0 {
-		addGenAITokenUsage(meter, model, "output", outputTokens)
+	if usage.Output > 0 {
+		addGenAITokenUsage(meter, model, "output", usage.Output)
+	}
+	if usage.CacheRead > 0 {
+		addGenAITokenUsage(meter, model, "cache_read", usage.CacheRead)
+	}
+	if usage.Reasoning > 0 {
+		addGenAITokenUsage(meter, model, "reasoning", usage.Reasoning)
 	}
 }
 

@@ -1,6 +1,7 @@
 package telemetry_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
@@ -34,7 +35,7 @@ func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
 }
 
 func TestGenAIUsageAttrs_should_include_otel_semantics(t *testing.T) {
-	attrs := telemetry.GenAIUsageAttrs("deepseek-chat", "sess-1", 10, 20, "stop")
+	attrs := telemetry.GenAIUsageAttrs("deepseek-chat", "sess-1", 10, 20, 0, 0, "stop")
 	keys := make(map[string]bool)
 	for _, a := range attrs {
 		keys[a.Key] = true
@@ -46,5 +47,19 @@ func TestGenAIUsageAttrs_should_include_otel_semantics(t *testing.T) {
 		if !keys[want] {
 			t.Fatalf("missing attribute %q", want)
 		}
+	}
+}
+
+func TestGenAIUsageAttrs_should_include_breakdown_when_present(t *testing.T) {
+	attrs := telemetry.GenAIUsageAttrs("o3", "sess-2", 100, 50, 80, 30, "stop")
+	keys := make(map[string]string)
+	for _, a := range attrs {
+		keys[a.Key] = fmt.Sprintf("%v", a.Value)
+	}
+	if keys["gen_ai.usage.cache_read.input_tokens"] != "80" {
+		t.Fatalf("cache_read attr: %+v", keys)
+	}
+	if keys["gen_ai.usage.reasoning.output_tokens"] != "30" {
+		t.Fatalf("reasoning attr: %+v", keys)
 	}
 }
