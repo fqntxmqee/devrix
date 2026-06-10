@@ -134,3 +134,20 @@ func LLMUsageAttrs(promptTokens, completionTokens int, latencyMs int64) []tracer
 		{Key: "llm.latency_ms", Value: fmt.Sprintf("%d", latencyMs)},
 	}
 }
+
+// GenAIUsageAttrs returns OTel GenAI semantic convention attributes (dual-written alongside llm.*).
+func GenAIUsageAttrs(model, sessionID string, promptTokens, completionTokens int, finishReason string) []tracer.Attribute {
+	attrs := []tracer.Attribute{
+		{Key: "gen_ai.request.model", Value: model},
+		{Key: "gen_ai.usage.input_tokens", Value: fmt.Sprintf("%d", promptTokens)},
+		{Key: "gen_ai.usage.output_tokens", Value: fmt.Sprintf("%d", completionTokens)},
+		{Key: "gen_ai.agent.name", Value: "devrix"},
+	}
+	if sessionID != "" {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.conversation.id", Value: sessionID})
+	}
+	if finishReason != "" {
+		attrs = append(attrs, tracer.Attribute{Key: "gen_ai.response.finish_reasons", Value: finishReason})
+	}
+	return attrs
+}
