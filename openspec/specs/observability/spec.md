@@ -1,7 +1,7 @@
 # Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (in progress)
+**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1)
 **Layer:** Observability
 **Version:** 1.6.0
 **Status:** Canonical — source of truth

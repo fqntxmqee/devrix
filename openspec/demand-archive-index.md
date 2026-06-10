@@ -28,6 +28,7 @@
 | DM-20260609-003 | D1/D5 单元测试补全 | devrix-d1-d5-unit-tests | 2026-06-09 | — | ACCEPTED |
 | DM-20260609-004 | Context Engine V5 Harness Bootstrap | devrix-harness-bootstrap | 2026-06-10 | [#10](https://github.com/fqntxmqee/devrix/pull/10) | ACCEPTED |
 | DM-20260610-001 | 可观察层增强 — AI 排查就绪 (P0) | devrix-observability-enhancement | 2026-06-10 | [#11](https://github.com/fqntxmqee/devrix/pull/11) | ACCEPTED (P0) |
+| DM-20260610-002 | 可观察层增强 P1 — Metrics 与 Incident Export | devrix-observability-enhancement-p1 | 2026-06-10 | [#12](https://github.com/fqntxmqee/devrix/pull/12) | ACCEPTED (P1) |
 
 ## Archive Locations
 
@@ -59,6 +60,7 @@
 | devrix-d1-d5-unit-tests | `openspec/archive/2026-06-09-devrix-d1-d5-unit-tests/` |
 | devrix-harness-bootstrap | `openspec/archive/2026-06-10-devrix-harness-bootstrap/` |
 | devrix-observability-enhancement | `openspec/archive/2026-06-10-devrix-observability-enhancement/` |
+| devrix-observability-enhancement-p1 | `openspec/archive/2026-06-10-devrix-observability-enhancement-p1/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
