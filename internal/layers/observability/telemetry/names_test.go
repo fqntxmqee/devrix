@@ -32,3 +32,19 @@ func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
 		t.Fatalf("component attr: %+v", attrs[1])
 	}
 }
+
+func TestGenAIUsageAttrs_should_include_otel_semantics(t *testing.T) {
+	attrs := telemetry.GenAIUsageAttrs("deepseek-chat", "sess-1", 10, 20, "stop")
+	keys := make(map[string]bool)
+	for _, a := range attrs {
+		keys[a.Key] = true
+	}
+	for _, want := range []string{
+		"gen_ai.request.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens",
+		"gen_ai.agent.name", "gen_ai.conversation.id", "gen_ai.response.finish_reasons",
+	} {
+		if !keys[want] {
+			t.Fatalf("missing attribute %q", want)
+		}
+	}
+}

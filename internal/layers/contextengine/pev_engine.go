@@ -250,41 +250,46 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	var allToolCallRecords []types.ToolCallRecord // 方案 2: 收集所有工具调用记录
 
 	for iter := 0; iter < maxIter; iter++ {
-		_, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, tracer.SpanKindInternal,
+		iterCtx, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
 			tracer.Attribute{Key: "pev.messages_before", Value: fmt.Sprintf("%d", len(req.Messages))},
 			tracer.Attribute{Key: "pev.tools_count", Value: fmt.Sprintf("%d", len(req.Tools))},
 		)
-		if iterSpan != nil {
-			defer iterSpan.End()
+		endIterSpan := func() {
+			if iterSpan != nil {
+				iterSpan.End()
+			}
 		}
+
 		sc.PEVState.Phase = types.PEVPhaseExecute
 		sc.PEVState.Iteration = iter
 		e.observer.EmitPEVIteration(sc.SessionID, iter, types.PEVPhaseExecute)
 
 		// LLM call span + metrics.
 		llmStart := time.Now()
-		_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
+		llmCtx, llmSpan := e.startSpan(iterCtx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
 			tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
 			tracer.Attribute{Key: "llm.model", Value: sc.Model},
 			tracer.Attribute{Key: "llm.tools_names", Value: strings.Join(toolNames, ",")},
 			tracer.Attribute{Key: "llm.system_prompt_len", Value: fmt.Sprintf("%d", len(systemPrompt))},
 		)
 		AddLLMRequestEvent(llmSpan, sc.SessionID, iter, sc.Model, req)
-		chunks, err := e.llm.ChatStream(ctx, req)
+		chunks, err := e.llm.ChatStream(llmCtx, req)
 		if err != nil {
 			errDetail := errors.FormatLLMError(err)
 			if llmSpan != nil {
 				AddLLMResponseEvent(llmSpan, sc.SessionID, iter, "", TokenUsage{}, nil, nil)
 				llmSpan.RecordError(err)
+				llmSpan.SetStatus(tracer.StatusCodeError, errDetail)
 				llmSpan.SetAttributes(
 					tracer.Attribute{Key: "llm.status", Value: "error"},
 					tracer.Attribute{Key: "llm.error.detail", Value: truncateSpanAttr(errDetail, 500)},
+					tracer.Attribute{Key: "error.code", Value: errors.ErrorCode(err)},
 				)
 				llmSpan.End()
 			}
 			e.recordLLMError()
-			slog.Warn("pev: llm call failed",
+			slog.WarnContext(iterCtx, "pev: llm call failed",
 				"sessionID", sc.SessionID,
 				"iteration", iter,
 				"cause", errDetail,
@@ -292,13 +297,15 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			// After tools ran, never fail the whole user message on a follow-up LLM error:
 			// synthesis / tool_fallback can still produce a useful reply.
 			if len(toolResults) > 0 || (iter > 0 && hasSuccessfulToolOutput(toolResults)) {
-				slog.Warn("pev: llm call failed after tools, degrading to synthesis",
+				slog.WarnContext(iterCtx, "pev: llm call failed after tools, degrading to synthesis",
 					"sessionID", sc.SessionID,
 					"iteration", iter,
 					"cause", errDetail,
 				)
+				endIterSpan()
 				break
 			}
+			endIterSpan()
 			return nil, errors.NewLLMUnavailableError(err)
 		}
 
@@ -310,6 +317,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				if llmSpan != nil {
 					llmSpan.End()
 				}
+				endIterSpan()
 				return nil, ctx.Err()
 			default:
 			}
@@ -351,16 +359,24 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 		if llmSpan != nil {
 			AddLLMResponseEvent(llmSpan, sc.SessionID, iter, assistantText, usage, pendingTools, nil)
+			finishReason := "stop"
+			if len(pendingTools) > 0 {
+				finishReason = "tool_calls"
+			}
 			llmSpan.SetAttributes(telemetry.LLMUsageAttrs(
 				usage.PromptTokens,
 				usage.CompletionTokens,
 				time.Since(llmStart).Milliseconds(),
+			)...)
+			llmSpan.SetAttributes(telemetry.GenAIUsageAttrs(
+				sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens, finishReason,
 			)...)
 			llmSpan.End()
 		}
 		e.recordLLMCall(usage, time.Since(llmStart))
 
 		if len(pendingTools) == 0 {
+			endIterSpan()
 			break
 		}
 
@@ -386,7 +402,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			})
 
 			// Tool execution span - permission_check is a child.
-			toolCtx, toolSpan := e.startSpan(ctx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
+			toolCtx, toolSpan := e.startSpan(iterCtx, telemetry.OpContextPEVToolExecute, tracer.SpanKindInternal,
 				tracer.Attribute{Key: "tool.name", Value: tc.Name},
 				tracer.Attribute{Key: "tool.risk_level", Value: string(risk)},
 				tracer.Attribute{Key: "tool.input_preview", Value: truncateSpanAttr(tc.Input, 500)},
@@ -407,6 +423,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				}
 				e.recordToolError()
 				emit(pevErrorEvent(sc.SessionID, errors.NewContextPermissionDeniedError(tc.Name), false))
+				endIterSpan()
 				return &PEVRunResult{Usage: usage}, errors.NewContextPermissionDeniedError(tc.Name)
 			}
 			if permSpan != nil {
@@ -461,23 +478,28 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 
 		sc.PEVState.Phase = types.PEVPhaseVerify
 		e.observer.EmitPEVPhase(sc.SessionID, types.PEVPhaseVerify, iter)
-		_, verifySpan := e.startSpan(ctx, telemetry.OpContextPEVVerify, tracer.SpanKindInternal,
+		_, verifySpan := e.startSpan(iterCtx, telemetry.OpContextPEVVerify, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "verify.mode", Value: e.cfg.VerifyMode},
 		)
-		vr := e.verify(ctx, sc, toolResults)
+		vr := e.verify(iterCtx, sc, toolResults)
 		sc.PEVState.VerifyResult = vr
 		if verifySpan != nil {
 			verifySpan.SetAttributes(
 				tracer.Attribute{Key: "verify.passed", Value: fmt.Sprintf("%t", vr.Passed)},
 				tracer.Attribute{Key: "verify.command_count", Value: fmt.Sprintf("%d", len(vr.Commands))},
 			)
+			if !vr.Passed {
+				verifySpan.SetAttributes(tracer.Attribute{Key: "verify.failure_reason", Value: verifyFailureReason(vr)})
+			}
 			verifySpan.End()
 		}
 		// basic/none: one tool round per user message; synthesis handles the final reply.
 		if isSingleRoundVerifyMode(e.cfg.VerifyMode) {
+			endIterSpan()
 			break
 		}
 		if vr.Passed {
+			endIterSpan()
 			break
 		}
 		// Follow-up PEV iterations: avoid re-sending raw tool_calls/tool messages to
@@ -487,8 +509,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 		if iter == maxIter-1 {
 			emit(pevErrorEvent(sc.SessionID, errors.NewPEVMaxIterationsError(), true))
+			endIterSpan()
 			return &PEVRunResult{Usage: usage}, errors.NewPEVMaxIterationsError()
 		}
+		endIterSpan()
 	}
 
 	if len(toolResults) > 0 {
@@ -551,19 +575,22 @@ func (e *PEVEngine) runToolSynthesis(
 	}
 
 	llmStart := time.Now()
-	_, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVSynthesis, tracer.SpanKindClient,
+	llmCtx, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVSynthesis, tracer.SpanKindClient,
 		tracer.Attribute{Key: "pev.synthesis", Value: "true"},
 		tracer.Attribute{Key: "llm.model", Value: sc.Model},
 	)
 	AddLLMRequestEvent(llmSpan, sc.SessionID, -1, sc.Model, synthReq)
-	chunks, err := e.llm.ChatStream(ctx, synthReq)
+	chunks, err := e.llm.ChatStream(llmCtx, synthReq)
 	if err != nil {
 		errDetail := errors.FormatLLMError(err)
 		if llmSpan != nil {
 			llmSpan.RecordError(err)
+			llmSpan.SetStatus(tracer.StatusCodeError, errDetail)
 			llmSpan.SetAttributes(
 				tracer.Attribute{Key: "llm.status", Value: "error"},
 				tracer.Attribute{Key: "llm.error.detail", Value: truncateSpanAttr(errDetail, 500)},
+				tracer.Attribute{Key: "pev.synthesis_source", Value: "tool_fallback"},
+				tracer.Attribute{Key: "error.code", Value: errors.ErrorCode(err)},
 			)
 			llmSpan.End()
 		}
@@ -622,6 +649,10 @@ func (e *PEVEngine) runToolSynthesis(
 			usage.CompletionTokens,
 			time.Since(llmStart).Milliseconds(),
 		)...)
+		llmSpan.SetAttributes(telemetry.GenAIUsageAttrs(
+			sc.Model, sc.SessionID, usage.PromptTokens, usage.CompletionTokens, "stop",
+		)...)
+		llmSpan.SetAttributes(tracer.Attribute{Key: "pev.synthesis_source", Value: "llm"})
 		llmSpan.End()
 	}
 	e.recordLLMCall(usage, time.Since(llmStart))
@@ -700,5 +731,15 @@ func resolveVisibleTools(ctx context.Context, reg IToolRegistry, sc *types.Sessi
 	}
 	tools, _ := reg.ListTools(ctx, workDir)
 	return tools
+}
+
+func verifyFailureReason(vr types.VerifyResult) string {
+	if vr.Passed {
+		return ""
+	}
+	if vr.Deviation > 0 {
+		return fmt.Sprintf("verify_failed:deviation=%.2f", vr.Deviation)
+	}
+	return "verify_failed:no_successful_tool_output"
 }
 

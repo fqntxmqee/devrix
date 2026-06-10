@@ -51,6 +51,8 @@ func (s stubAdapter) Provider() string { return "deepseek" }
 //
 // Covers: L5-CTX-05, L5-CTX-06, L5-CTX-09, L5-CTX-11, L5-LLM-14
 func TestIntegration_FullChainD1toD3(t *testing.T) {
+	t.Cleanup(testutil.WaitForGatewayAsync)
+
 	// --- Setup observability with memory exporter ---
 	obs, err := observability.New(&observability.Config{
 		Enabled: true,
@@ -235,6 +237,8 @@ func TestIntegration_FullChainD1toD3(t *testing.T) {
 //
 // Covers: L5-CTX-05, L5-CTX-06, L5-CTX-09, L5-CTX-11, L5-LLM-14
 func TestIntegration_D2MultiRoundPEV(t *testing.T) {
+	t.Cleanup(testutil.WaitForGatewayAsync)
+
 	obs, err := observability.New(&observability.Config{
 		Enabled: true,
 		Tracing: settings.TracingConfig{

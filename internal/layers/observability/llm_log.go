@@ -70,7 +70,8 @@ func RecordLLMSpanPayload(
 ) {
 	settings := currentLLMLogSettings()
 	if settings.LogContent && jsonValue != "" {
-		appendLLMLogRaw(settings.LogDir, sessionID, phase, iteration, model, json.RawMessage(jsonValue))
+		traceID, spanID := spanTraceFields(span)
+		appendLLMLogRaw(settings.LogDir, sessionID, phase, iteration, model, traceID, spanID, json.RawMessage(jsonValue))
 	}
 
 	if span == nil {
@@ -90,10 +91,21 @@ func AppendLLMLogFile(logDir, sessionID, phase string, iter int, model string, p
 		slog.Warn("llm log: marshal payload failed", "error", err)
 		return
 	}
-	appendLLMLogRaw(logDir, sessionID, phase, iter, model, data)
+	appendLLMLogRaw(logDir, sessionID, phase, iter, model, "", "", data)
 }
 
-func appendLLMLogRaw(logDir, sessionID, phase string, iter int, model string, data json.RawMessage) {
+func spanTraceFields(span tracer.Span) (traceID, spanID string) {
+	if span == nil {
+		return "", ""
+	}
+	sc := span.SpanContext()
+	if !sc.IsValid() {
+		return "", ""
+	}
+	return sc.TraceID.String(), sc.SpanID.String()
+}
+
+func appendLLMLogRaw(logDir, sessionID, phase string, iter int, model, traceID, spanID string, data json.RawMessage) {
 	record := map[string]interface{}{
 		"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
 		"session_id": sessionID,
@@ -101,6 +113,12 @@ func appendLLMLogRaw(logDir, sessionID, phase string, iter int, model string, da
 		"iteration":  iter,
 		"model":      model,
 		"data":       json.RawMessage(data),
+	}
+	if traceID != "" {
+		record["trace_id"] = traceID
+	}
+	if spanID != "" {
+		record["span_id"] = spanID
 	}
 	line, err := json.Marshal(record)
 	if err != nil {

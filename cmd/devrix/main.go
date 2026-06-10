@@ -50,6 +50,7 @@ func main() {
 		slog.Warn("failed to initialize observability, continuing without", "error", err)
 		obs = observability.NewNoOp()
 	} else {
+		observability.InstallSlogBridge()
 		slog.Info("observability initialized",
 			"tracing", obsCfg.IsTracingEnabled(),
 			"exporter", obsCfg.Tracing.Exporter,

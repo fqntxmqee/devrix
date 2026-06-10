@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -34,8 +35,13 @@ func (m *cliMockContextEngine) Process(_ context.Context, _ *types.Session, _ st
 
 func newTestGateway(t *testing.T) *gateway.CommunicationGateway {
 	t.Helper()
+	return newTestGatewayInDir(t, t.TempDir())
+}
 
-	store, err := gateway.NewFileSessionStore(t.TempDir())
+func newTestGatewayInDir(t *testing.T, dir string) *gateway.CommunicationGateway {
+	t.Helper()
+
+	store, err := gateway.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
@@ -46,6 +52,12 @@ func newTestGateway(t *testing.T) *gateway.CommunicationGateway {
 		},
 	}
 	return gateway.NewCommunicationGateway(store, cliMockEventHandler{}, engine, nil, config.DefaultConfig())
+}
+
+// waitGatewayAsync lets RouteInbound background goroutines finish before t.TempDir cleanup.
+func waitGatewayAsync(t *testing.T) {
+	t.Helper()
+	time.Sleep(100 * time.Millisecond)
 }
 
 func newTestCLIAdapter(t *testing.T, gw *gateway.CommunicationGateway, stdin string) (*CLIAdapter, *bytes.Buffer) {
@@ -98,10 +110,11 @@ func TestCLIAdapter_should_create_new_session_on_new_command(t *testing.T) {
 }
 
 func TestCLIAdapter_should_route_message_to_gateway(t *testing.T) {
-	gw := newTestGateway(t)
+	dir := t.TempDir()
+	gw := newTestGatewayInDir(t, dir)
 	a, _ := newTestCLIAdapter(t, gw, "")
 
-	session, err := gw.CreateSession("cli", t.TempDir())
+	session, err := gw.CreateSession("cli", dir)
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -110,6 +123,7 @@ func TestCLIAdapter_should_route_message_to_gateway(t *testing.T) {
 	if err := a.sendMessage(context.Background(), "hello gateway"); err != nil {
 		t.Fatalf("sendMessage: %v", err)
 	}
+	waitGatewayAsync(t)
 }
 
 func TestCLIAdapter_should_ignore_empty_input(t *testing.T) {

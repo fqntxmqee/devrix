@@ -1,8 +1,18 @@
-# Delta Spec: Devrix 可观察层增强
+# Delta Spec: Devrix 可观察层增强 — AI 排查就绪
 
 **Change ID:** devrix-observability-enhancement
-**Based on:** `openspec/l5-registry.md` v1.0.0
-**Status:** Draft
+**Based on:** `openspec/l5-registry.md` v1.0.0, `demand.md` v2026-06-10
+**Status:** Draft (Revised 2026-06-10)
+
+---
+
+## 〇、Revision Summary
+
+原 delta 假设「新增 9 operation + LLM events」。Code Review 后修订：
+
+- **删除**：重复 operation 注册、LLM events 接入（已 DONE）
+- **新增**：Span 层级契约、Log-Trace 关联、决策属性、Incident export
+- **降级**：Baggage → P2 DEFERRED
 
 ---
 
@@ -11,175 +21,145 @@
 ### 1.1 新增文件
 
 ```
-openspec/changes/devrix-observability-enhancement/
-├── proposal.md      # 问题陈述和解决方案概述
-├── design.md        # 详细设计
-├── tasks.md         # 任务分解
-├── acceptance-report.md  # 验收标准
-└── delta.md        # 本文件
-
-internal/layers/observability/
-└── (无新增文件，仅修改现有文件)
-
-internal/layers/contextengine/
-└── (无新增文件，仅修改现有文件)
+observability/logger/slog_bridge.go          # slog trace_id 注入
+cmd/debug/main.go                            # incident export CLI（或扩展现有 cmd）
+openspec/changes/devrix-observability-enhancement/demand.md  # 新增
 ```
 
 ### 1.2 修改文件
 
 | 文件 | 变更类型 | 说明 |
 |------|----------|------|
-| `coverage/registry.go` | 新增 operation 注册 | +9 个 operation |
-| `observability/bridge.go` | 新增 metrics | +3 个 metrics |
-| `contextengine/pev_engine.go` | 新增 span 调用 | LLM 日志 + 迭代 span |
-| `contextengine/engine.go` | 新增 span 调用 | 压缩/记忆 span |
-| `docs/observability-design.md` | 新增 | 深度分析文档 |
-| `docs/coverage.md` | 更新 | 使用手册 |
+| `contextengine/pev_engine.go` | **修复** ctx 传播 + defer；决策属性；tool_latency | P0/P1 |
+| `contextengine/engine.go` | 决策属性 + compression_ratio | P1 |
+| `observability/llm_log.go` | JSONL 增加 trace_id/span_id | P0 |
+| `observability/bridge.go` | ToolBridge.InitLatencyMetrics | P1 |
+| `tests/integration/full_chain_trace_test.go` | Span hierarchy 断言 R1-R5 | P0 |
+| `docs/observability-design.md` | Canonical Trace Tree | P2 |
 
-### 1.3 删除文件
+### 1.3 不再修改（已 DONE，勿重复）
 
-无
+| 文件 | 原因 |
+|------|------|
+| `coverage/registry.go` | 44 operations 已完整 |
+| `llmgateway/gateway/gateway.go` | llm.adapter.stream 已有 |
+| `contextengine/llm_logger.go` | AddLLM* 已调用 |
 
 ---
 
 ## 二、Registry 增量
 
-### 2.1 新增 Operation
+**无新增 operation**。本 change 聚焦层级质量与 AI 消费，不扩 Registry。
 
-```diff
- // coverage/registry.go
-
-+ // === 新增 context.context_engine ===
-+ {Name: "context.compression.run", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true}
-+ {Name: "context.longterm.recall", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true}
-+ {Name: "context.longterm.store", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true}
-+ {Name: "context.plan.generate", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true}
-
- // === 新增 context.pev_engine ===
-+ {Name: "context.pev.iteration", Layer: "context", Component: "pev_engine", SinceVersion: "2.1.0", Instrumented: true}
-+ {Name: "context.pev.synthesis", Layer: "context", Component: "pev_engine", SinceVersion: "2.1.0", Instrumented: true}
-+ {Name: "context.milestone.run", Layer: "context", Component: "pev_engine", SinceVersion: "2.1.0", Instrumented: true}
-
- // === 新增 llm ===
-+ {Name: "llm.adapter.stream", Layer: "llm", Component: "llm_adapter", SinceVersion: "2.1.0", Instrumented: true}
-
- // === 新增 communication ===
-+ {Name: "adapter.feishu.outbound", Layer: "communication", Component: "adapter", SinceVersion: "2.1.0", Instrumented: true}
-```
-
-### 2.2 新增 Metrics
-
-```diff
- // observability/bridge.go
-
-+ type ToolBridge struct {
-+   // 新增
-+   latencies sync.Map  // map[string]*ToolLatencyMetrics
-+ }
-+
-+ type ToolLatencyMetrics struct {
-+   Latency metrics.Histogram
-+ }
-+
-+ func (b *ToolBridge) InitLatencyMetrics(...) (*ToolLatencyMetrics, error)
-
-+ type LLMBridge struct {
-+   // 新增
-+   compression Metrics *CompressionMetrics
-+ }
-+
-+ type CompressionMetrics struct {
-+   Ratio metrics.Histogram
-+ }
-+
-+ func (b *LLMBridge) InitCompressionMetrics() (*CompressionMetrics, error)
-```
+可选后续（Out of Scope）：
+- `debug.incident.export` — 若 export 本身需要 span
 
 ---
 
-## 三、Span 调用增量
+## 三、Span 变更增量
 
-### 3.1 PEV Engine
+### 3.1 PEV Engine — 修复（非新增）
 
 ```diff
  // contextengine/pev_engine.go
-
-  for iter := 0; iter < maxIter; iter++ {
-+   // 新增: 迭代开始 span
-+   _, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, tracer.SpanKindInternal, ...)
-+   defer func() { iterSpan.End() }()
-
-    // LLM 调用
-    _, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, ...)
-
-+   // 新增: LLM 请求日志
-+   AddLLMRequestEvent(llmSpan, sc.SessionID, iter, sc.Model, req)
-
-    chunks, err := e.llm.ChatStream(ctx, req)
-
-+   // 新增: LLM 响应日志
-+   AddLLMResponseEvent(llmSpan, sc.SessionID, iter, assistantText, usage, pendingTools, toolResults)
-  }
-
-  // 工具合成
-+ // 新增: 工具合成 span
-+ ctx, synthSpan := e.startSpan(ctx, telemetry.OpContextPEVSynthesis, ...)
+ for iter := 0; iter < maxIter; iter++ {
+-    _, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, ...)
+-    defer iterSpan.End()
+-    _, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, ...)
++    ctx, iterSpan := e.startSpan(ctx, telemetry.OpContextPEVIteration, ...)
++    // End at iteration boundary (NOT loop defer)
++    ctx, llmSpan := e.startSpan(ctx, telemetry.OpContextPEVLLMCall, ...)
+     AddLLMRequestEvent(llmSpan, ...)
+-    chunks, err := e.llm.ChatStream(ctx, req)
++    chunks, err := e.llm.ChatStream(ctx, req)  // ctx includes llmSpan
++    // verify span: use iter ctx
++    if verifySpan != nil {
++        verifySpan.SetAttributes(
++            tracer.Attribute{Key: "verify.failure_reason", Value: vr.Reason},
++        )
++    }
+ }
 ```
 
-### 3.2 Context Engine
+### 3.2 新增 Span 属性
+
+| Operation | 新增 Attribute |
+|-----------|---------------|
+| `context.pev.verify` | `verify.failure_reason` |
+| `context.compression.run` | `compression.trigger_reason` |
+| `context.pev.synthesis` | `pev.synthesis_source` |
+| `*` (error paths) | `error.code` |
+
+---
+
+## 四、Metrics 增量
 
 ```diff
- // contextengine/engine.go
+ // observability/bridge.go
++ func (b *ToolBridge) InitLatencyMetrics(toolName, riskLevel string) (*ToolLatencyMetrics, error)
++
++ type ToolLatencyMetrics struct {
++     Latency metrics.Histogram  // name: tool_latency
++ }
 
-  // 压缩
-  if e.shouldCompress(msgs, sc.TokenBudget) {
-+   // 新增: 压缩执行 span
-+   ctx, compSpan := e.startSpan(ctx, telemetry.OpContextCompressionRun, ...)
-+   defer func() { compSpan.End() }()
-
-    compressed, report, err := e.compressionPipeline.Run(...)
-  }
-
-  // 记忆召回
-+ // 新增: 记忆召回 span
-+ recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, ...)
-  err := e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
++ func (b *LLMBridge) InitCompressionMetrics() (*CompressionMetrics, error)
++ // name: compression_ratio
 ```
 
 ---
 
-## 四、配置变更
+## 五、Log / Export 增量
 
-### 4.1 新增配置项
+### 5.1 LLM JSONL Schema v2
 
 ```diff
- # internal/shared/config/contextengine.go 或 devrix.yaml
+ {
+   "timestamp": "...",
+   "session_id": "...",
++  "trace_id": "...",
++  "span_id": "...",
+   "phase": "request|response",
+   ...
+ }
+```
 
-+ observability:
-+   coverage:
-+     enabled: true
-+     dir: "~/.devrix/coverage"
-+     interval: 1h
+### 5.2 Incident Export API
+
+```
+GET /debug/export?session_id=xxx   # 可选 HTTP
+CLI: devrix debug export --session xxx --format json
 ```
 
 ---
 
-## 五、兼容性
+## 六、L5 Registry 增量（待登记）
 
-### 5.1 向后兼容
-
-- 所有新增 operation 默认 `Instrumented: true`
-- `coverage.enabled=false` 时行为不变
-- Metrics 可选注册
-
-### 5.2 数据库迁移
-
-无
+| ID | 说明 | 优先级 |
+|----|------|--------|
+| L5-OBS-TRACE-04 | Span 父子层级契约 | P0 |
+| L5-OBS-TRACE-05 | Log-Trace-LLM 关联 | P0 |
+| L5-OBS-EXPORT-01 | Session incident export | P1 |
+| L5-OBS-DECISION-01 | 决策语义 span 属性 | P1 |
 
 ---
 
-## 六、部署注意事项
+## 七、兼容性
 
-- 无特殊部署要求
-- Metrics 和 Tracing 默认开启
-- Coverage 报表存储在 `~/.devrix/coverage/`
+### 7.1 向后兼容
+
+- Trace JSON 形态变化（层级修复）— **breaking for dashboards** 依赖扁平结构的需更新
+- LLM JSONL 新增字段 — 向后兼容（additive）
+- 新 metrics — additive
+
+### 7.2 迁移
+
+- Jaeger 查询：按 iteration 折叠 previously 不可用，修复后可用
+- 无数据库 migration
+
+---
+
+## 八、部署注意事项
+
+- 开发环境保持 `tracing.sampling.type: always_on` 直至 hierarchy 测试稳定
+- 生产启用 `log_content: true` 前评估 redaction（见 acceptance I3）
+- Incident export 需访问 `~/.devrix/logs/llm/` 读权限
