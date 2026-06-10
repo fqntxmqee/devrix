@@ -1,0 +1,8 @@
+dimension: provider_quality
+instruction: >
+  Score semantic consistency between two provider responses and instruction-following
+  against must_follow requirements.
+scale: "0-1"
+reference: >
+  Identical compliant responses score 1.0. Missing required elements or low
+  semantic overlap reduce the score.

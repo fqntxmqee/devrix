@@ -204,7 +204,7 @@ items: []
 }
 
 func TestProbeRegistry(t *testing.T) {
-	for _, id := range []string{"compression_recall", "pev_tool_accuracy"} {
+	for _, id := range []string{"compression_recall", "pev_tool_accuracy", "provider_quality", "agent_forkjoin"} {
 		p := GetProbe(id)
 		if p == nil {
 			t.Fatalf("%s probe not registered", id)
@@ -252,8 +252,8 @@ func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDataset() error = %v", err)
 	}
-	if len(ds.Items) != 13 {
-		t.Errorf("dataset items = %d, want 13", len(ds.Items))
+	if len(ds.Items) != 19 {
+		t.Errorf("dataset items = %d, want 19", len(ds.Items))
 	}
 
 	now = func() time.Time {
@@ -291,11 +291,11 @@ func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
 	if len(report.Scores) == 0 {
 		t.Fatal("Scores is empty — no probes matched items")
 	}
-	if report.Dashboard.ItemCount != 13 {
-		t.Errorf("ItemCount = %d, want 13", report.Dashboard.ItemCount)
+	if report.Dashboard.ItemCount != 19 {
+		t.Errorf("ItemCount = %d, want 19", report.Dashboard.ItemCount)
 	}
-	if report.Dashboard.DimensionCount < 2 {
-		t.Errorf("DimensionCount = %d, want >= 2", report.Dashboard.DimensionCount)
+	if report.Dashboard.DimensionCount < 4 {
+		t.Errorf("DimensionCount = %d, want >= 4", report.Dashboard.DimensionCount)
 	}
 	if report.Dashboard.OverallScore <= 0 {
 		t.Errorf("OverallScore = %v, want > 0", report.Dashboard.OverallScore)

@@ -180,7 +180,7 @@ type EvalItem struct {
 // --- Judge 接口 ---
 
 // Judge 是评分器接口，JudgeManager 实现此接口。定义在 types.go 而非 judge.go
-// 以供 probes 包和测试代码按接口 mock，不依赖 JudgeManager 具体实现。
+// 以供测试代码按接口 mock，不依赖 JudgeManager 具体实现。
 type Judge interface {
 	Score(ctx context.Context, item EvalItem, rubric ScoreRubric) (*JudgeScore, error)
 	Calibrate(ctx context.Context, goldSet []GoldLabel, rubric ScoreRubric) (*CalibrationReport, error)
