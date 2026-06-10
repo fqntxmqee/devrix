@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-observability-enhancement
 **Demand ID:** DM-20260610-001
-**Status:** S4 In Progress (P0 complete 2026-06-10)
+**Status:** S7 Archived (P0 complete 2026-06-10)
 **Review Note:** T1-T3 大部分已在代码完成；本版重排为 P0 层级修复 + P1 AI 就绪 + P2 文档
 
 ---

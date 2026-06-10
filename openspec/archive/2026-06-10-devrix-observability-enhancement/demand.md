@@ -3,7 +3,7 @@ demand-id: DM-20260610-001
 title: Devrix 可观察层增强 — AI 排查就绪
 source: 技术团队 / observability-design 深度分析 + Code Review（2026-06-10）
 priority: P1
-status: IN_PROGRESS
+status: ACCEPTED
 l1-domain: observability
 created: 2026-06-10
 ---

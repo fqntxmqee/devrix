@@ -229,3 +229,19 @@ CLI/API：`devrix debug export --session <id> --format json`
 | `llm_log.go` | 增加 trace_id 字段 | 低 |
 | `bridge.go` | 新 metrics | 低 |
 | `cmd/` 或 `coverage/` | incident export CLI | 低 |
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-10  
+**Scope delivered:** P0 (span hierarchy, log-trace correlation, gen_ai.* attrs, verify.failure_reason)  
+**PR:** [#11](https://github.com/fqntxmqee/devrix/pull/11)  
+**P1 deferred:** tool_latency, compression_ratio, incident export, SpanKind audit, prompt version hash
+
+### Specs Updated
+- `openspec/specs/observability/spec.md` — v1.5.0
+- `openspec/l5-registry.md` — D5-S6
+
+### Archive Location
+- `openspec/archive/2026-06-10-devrix-observability-enhancement/`

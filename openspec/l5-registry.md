@@ -445,3 +445,15 @@
 | L5-5-4-01 | Context → LLM → Tool 链路可追踪 | OBS-TRACE | `tests/integration/full_chain_trace_test.go` | PLANNED |
 | L5-5-4-02 | Metrics 与 Trace 关联 | OBS-METRICS | `tests/integration/observability_test.go` | PLANNED |
 | L5-5-4-03 | HealthCheck 包含 Coverage 统计 | OBS-COVERAGE | `internal/layers/observability/observability_test.go` | IMPLEMENTED |
+
+### D5-S6: AI Debug Readiness (DM-20260610-001 P0)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-OBS-TRACE-04 | Span 父子层级契约 (R1-R2) | OBS-TRACE | `tests/integration/obs_pev_span_hierarchy_test.go` | IMPLEMENTED |
+| L5-OBS-TRACE-05 | Log-Trace-LLM 关联 | OBS-TRACE | `logger/slog_bridge_test.go`, `llm_log_test.go` | IMPLEMENTED |
+| L5-OBS-GENAI-ATTR | gen_ai.* 语义属性双写 | OBS-TRACE | `obs_pev_span_hierarchy_test.go`, `telemetry/names_test.go` | IMPLEMENTED |
+| L5-OBS-DECISION-01 | verify.failure_reason | OBS-TRACE | `pev_engine` integration (partial) | IMPLEMENTED |
+| L5-OBS-METRICS-01 | tool_latency histogram | OBS-METRICS | — | PLANNED (P1) |
+| L5-OBS-METRICS-02 | compression_ratio histogram | OBS-METRICS | — | PLANNED (P1) |
+| L5-OBS-EXPORT-01 | Session incident export | OBS-EXPORT | — | PLANNED (P1) |

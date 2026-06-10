@@ -1,16 +1,16 @@
 # Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10)
+**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0)
 **Layer:** Observability
-**Version:** 1.4.0
+**Version:** 1.5.0
 **Status:** Canonical — source of truth
 
 ---
 
 ## Overview
 
-可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范。
+可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写（P1 metrics/export 见归档说明）。
 
 ---
 
@@ -318,6 +318,87 @@ Bootstrap 各阶段 MUST 产生 info 事件（与 span 双写），供 Adapter �
 - WHEN bootstrap runs
 - THEN info events are emitted per stage with metadata `tools.before`, `tools.after`, `trusted`
 - AND event metadata aligns with corresponding span attributes
+
+---
+
+## ADDED Requirements (V1.5 AI Debug Readiness — P0)
+
+### Requirement: Canonical PEV Span Hierarchy
+
+PEV 执行链 MUST 满足 Canonical Trace Tree：`context.pev.iteration` → `context.pev.llm_call` → `llm.stream` 父子关系正确；禁止 loop 内 `defer iterSpan.End()`。
+
+**Priority**: P0
+**L4 映射**: L4-OBS-SPAN-TREE
+**L5 映射**: L5-OBS-TRACE-04
+
+#### Scenario: LLM call nested under iteration
+
+- GIVEN PEV runs one iteration with LLM call
+- WHEN spans are collected after Process
+- THEN `context.pev.llm_call` parent MUST be `context.pev.iteration`
+- AND `llm.stream` parent MUST be `context.pev.llm_call`
+- AND iteration span ends before next iteration starts (no overlapping defer)
+
+#### Scenario: LLM ChatStream receives span context
+
+- GIVEN observability tracing enabled
+- WHEN PEV calls `ChatStream`
+- THEN ctx MUST include `context.pev.llm_call` span context
+- AND downstream LLM gateway spans share the same trace_id
+
+---
+
+### Requirement: Log-Trace-LLM Correlation
+
+slog 与 LLM JSONL MUST 携带 trace_id/span_id，与 Jaeger span 可交叉引用。
+
+**Priority**: P0
+**L4 映射**: L4-OBS-LOG-CORR
+**L5 映射**: L5-OBS-TRACE-05
+
+#### Scenario: slog injects traceId from context
+
+- GIVEN a recording span in context
+- WHEN slog.InfoContext is called
+- THEN log output includes traceId and spanId matching the span
+
+#### Scenario: LLM JSONL includes trace_id
+
+- GIVEN `observability.llm.log_content=true`
+- WHEN LLM request/response is logged to JSONL
+- THEN each record includes trace_id and span_id fields
+
+---
+
+### Requirement: GenAI Semantic Attributes
+
+LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与现有 `llm.*` 并存）。
+
+**Priority**: P0
+**L5 映射**: L5-OBS-GENAI-ATTR
+
+#### Scenario: gen_ai attributes on LLM span
+
+- GIVEN PEV completes an LLM call
+- WHEN `context.pev.llm_call` span ends
+- THEN attributes include `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`
+- AND include `gen_ai.agent.name` and `gen_ai.conversation.id`
+
+---
+
+### Requirement: Verify Failure Semantics (partial P1)
+
+Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
+
+**Priority**: P1
+**L5 映射**: L5-OBS-DECISION-01
+
+#### Scenario: Verify failure reason on span
+
+- GIVEN verify does not pass
+- WHEN `context.pev.verify` span ends
+- THEN attribute `verify.failure_reason` is set
+- AND `verify.passed=false`
 
 ---
 
