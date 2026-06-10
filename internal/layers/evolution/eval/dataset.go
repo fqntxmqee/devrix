@@ -2,7 +2,6 @@ package eval
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -85,10 +84,12 @@ func StratifiedSample(items []EvalItem, maxItems int) []EvalItem {
 			count = 0
 		}
 
-		// shuffle and take
-		perm := rand.Perm(len(bucket))
+		// deterministic: sort by item ID then take first count
+		sort.Slice(bucket, func(a, b int) bool {
+			return bucket[a].ID < bucket[b].ID
+		})
 		for j := 0; j < count; j++ {
-			result = append(result, bucket[perm[j]])
+			result = append(result, bucket[j])
 		}
 		remaining -= count
 	}

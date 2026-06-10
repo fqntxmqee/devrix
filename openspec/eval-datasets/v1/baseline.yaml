@@ -1,6 +1,6 @@
-id: eval-20260610175329
+id: eval-20260610180119
 dataset_id: compression-recall-v1
-run_at: 2026-06-10T17:53:29.097672+08:00
+run_at: 2026-06-10T18:01:19.981391+08:00
 judge_model: mock
 scores:
     - domain: d2
