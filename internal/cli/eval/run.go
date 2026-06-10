@@ -32,12 +32,19 @@ func RunEval(args []string) error {
 	dataset := fs.String("dataset", "openspec/eval-datasets/v1/dataset.yaml", "path to eval dataset YAML")
 	output := fs.String("output", "", "output report JSON path (default: stdout)")
 	saveBaseline := fs.Bool("save-baseline", false, "save report as baseline alongside dataset")
+	mockJudge := fs.Bool("mock-judge", true, "use static mock judge (set false for real LLM-as-Judge)")
+	configPath := fs.String("config", "", "path to devrix.yaml (for real judge)")
+	judgeModel := fs.String("judge-model", "", "judge model override")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	client := eval.NewStaticLLMClient()
-	jm := eval.NewJudgeManager(client, nil, eval.JudgeConfig{Model: "mock", Temperature: 0})
+	stack, err := buildJudgeStack(*mockJudge, *configPath, *judgeModel)
+	if err != nil {
+		return err
+	}
+
+	jm := eval.NewJudgeManager(stack.client, nil, stack.config)
 	jm.RegisterRubric(eval.ScoreRubric{
 		Dimension:   "compression_recall",
 		Instruction: "Evaluate whether ALL key facts from the original context are preserved in the compressed version.",
@@ -46,7 +53,7 @@ func RunEval(args []string) error {
 
 	engine := eval.NewEvalEngine(eval.EvalConfig{
 		Enabled: true,
-		Judge:   eval.JudgeConfig{Model: "mock", Temperature: 0},
+		Judge:   stack.config,
 	}, jm)
 
 	report, err := engine.Run(context.Background(), eval.EvalOpts{

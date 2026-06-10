@@ -3,17 +3,17 @@
 **Capability:** eval
 **Change ID:** devrix-d6-eval (archived 2026-06-10, Pilot)
 **Layer:** Evolution
-**Version:** 1.0.0-pilot
-**Status:** Canonical — pilot scope
+**Version:** 1.1.0-phase2
+**Status:** Canonical — phase 2 partial
 
 ---
 
 ## Overview
 
-D6-S3 评测引擎 Pilot：EvalRun 编排、JudgeManager、Compression Recall Probe、DeltaAnalyzer、YAML 评测集 v1。
+D6-S3 评测引擎：EvalRun 编排、JudgeManager、Compression Recall Probe、PEV Tool Accuracy Probe、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
 
-**Pilot 已实现：** L5-6-3-01/02/03/04/07  
-**后续扩展：** PEV tool / provider / forkjoin 探针、CLI、调优建议
+**已实现：** L5-6-3-01/02/03/04/06/07/11/12/13  
+**后续扩展：** provider / forkjoin 探针
 
 ---
 
@@ -64,9 +64,18 @@ Delta 分析器必须能对比当前评分与基线，标记 regression。
 
 ---
 
+<!-- L5: L5-6-3-06 -->
+### Requirement: PEV Tool 选择准确率探针
+
+PEV Tool 准确率探针必须能评估 tool 选择的 precision/recall/F1（确定性，基于 expected_tools / actual_tools）。
+
+<!-- L5: L5-6-3-12 -->
+### Requirement: 调优建议生成
+
+Delta 报告出现 regression 时必须生成 TuneSuggestion 列表（预定义规则映射）。
+
 ## Deferred Requirements
 
-- L5-6-3-06 PEV Tool 选择准确率探针
 - L5-6-3-09 Provider 质量对比探针
 - L5-6-3-10 Agent Fork/Join 质量探针
 

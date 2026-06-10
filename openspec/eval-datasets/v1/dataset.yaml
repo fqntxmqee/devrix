@@ -264,3 +264,41 @@ items:
         - cache invalidation
         - Prometheus
         - PostgreSQL fallback
+
+  # ── PEV Tool Accuracy (3 items) ────────────────────────────────────
+
+  - id: pev-prod-01
+    bucket: production
+    domain: d2
+    dimension: pev_tool_accuracy
+    rubric_ref: rubrics/pev_tool_accuracy.yaml
+    tags:
+      category: file-read
+      difficulty: easy
+    input:
+      expected_tools: ["read_file", "grep"]
+      actual_tools: ["read_file", "grep"]
+
+  - id: pev-adv-01
+    bucket: adversarial
+    domain: d2
+    dimension: pev_tool_accuracy
+    rubric_ref: rubrics/pev_tool_accuracy.yaml
+    tags:
+      category: wrong-tool
+      difficulty: medium
+    input:
+      expected_tools: ["read_file"]
+      actual_tools: ["write_file"]
+
+  - id: pev-edge-01
+    bucket: edge
+    domain: d2
+    dimension: pev_tool_accuracy
+    rubric_ref: rubrics/pev_tool_accuracy.yaml
+    tags:
+      category: partial-match
+      difficulty: medium
+    input:
+      expected_tools: ["read_file", "grep", "glob"]
+      actual_tools: ["read_file", "grep", "write_file"]
