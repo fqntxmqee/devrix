@@ -1,7 +1,7 @@
 # Proposal: devrix-observability-docs-sync
 
 **Demand ID:** DM-20260610-004
-**Status:** In Progress
+**Status:** Archived
 
 ## Capabilities
 
