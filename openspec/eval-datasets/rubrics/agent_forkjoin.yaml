@@ -1,0 +1,8 @@
+dimension: agent_forkjoin
+instruction: >
+  Score fork/join coordination: sub-agent message isolation and join result
+  completeness without cross-contamination or hallucination.
+scale: "0-1"
+reference: >
+  Perfect isolation and full join inclusion score 1.0. Leaked forbidden context
+  or missing join outputs reduce the score.

@@ -38,29 +38,6 @@ func (p *PEVToolAccuracyProbe) Run(_ context.Context, item EvalItem, _ Judge) (*
 	}, nil
 }
 
-func stringSliceFromInput(input map[string]any, key string) []string {
-	raw, ok := input[key]
-	if !ok {
-		return nil
-	}
-	switch v := raw.(type) {
-	case []string:
-		return append([]string(nil), v...)
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				continue
-			}
-			out = append(out, s)
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
 func toolSelectionMetrics(expected, actual []string) (precision, recall, f1 float64) {
 	if len(expected) == 0 && len(actual) == 0 {
 		return 1, 1, 1

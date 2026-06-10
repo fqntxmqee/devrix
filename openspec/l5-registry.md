@@ -371,6 +371,8 @@
 | L5-6-3-11 | devrix eval run 子命令 | Eval | `internal/cli/eval/run_test.go` | IMPLEMENTED | P1 |
 | L5-6-3-12 | 调优建议生成 | Eval | `internal/layers/evolution/eval/tune_test.go` | IMPLEMENTED | P2 |
 | L5-6-3-13 | eval run 真实 Judge 接入 | Eval | `internal/cli/eval/judge.go` | IMPLEMENTED | P1 |
+| L5-6-3-09 | Provider 质量对比探针 | Eval | `internal/layers/evolution/eval/provider_quality_probe_test.go` | IMPLEMENTED | P1 |
+| L5-6-3-10 | Agent Fork/Join 质量探针 | Eval | `internal/layers/evolution/eval/agent_forkjoin_probe_test.go` | IMPLEMENTED | P2 |
 
 ---
 

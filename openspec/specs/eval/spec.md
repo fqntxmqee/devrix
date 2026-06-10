@@ -1,19 +1,18 @@
 # D6-S3 Eval Engine Specification
 
 **Capability:** eval
-**Change ID:** devrix-d6-eval-phase2 (archived 2026-06-10)
+**Change ID:** devrix-d6-eval-phase3 (in progress)
 **Layer:** Evolution
-**Version:** 1.1.0
-**Status:** Canonical
+**Version:** 1.2.0
+**Status:** Canonical — phase 3 partial
 
 ---
 
 ## Overview
 
-D6-S3 评测引擎：EvalRun 编排、JudgeManager、Compression Recall Probe、PEV Tool Accuracy Probe、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
+D6-S3 评测引擎：EvalRun 编排、JudgeManager、四类探针（compression / PEV / provider / forkjoin）、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
 
-**已实现：** L5-6-3-01/02/03/04/06/07/11/12/13  
-**后续扩展：** provider / forkjoin 探针
+**已实现：** L5-6-3-01/02/03/04/06/07/09/10/11/12/13
 
 ---
 
@@ -74,9 +73,14 @@ PEV Tool 准确率探针必须能评估 tool 选择的 precision/recall/F1（确
 
 Delta 报告出现 regression 时必须生成 TuneSuggestion 列表（预定义规则映射）。
 
-## Deferred Requirements
+<!-- L5: L5-6-3-09 -->
+### Requirement: Provider 质量对比探针
 
-- L5-6-3-09 Provider 质量对比探针
-- L5-6-3-10 Agent Fork/Join 质量探针
+Provider 质量探针必须能评估语义相似度与指令遵循率（确定性 + Judge 保守融合）。
+
+<!-- L5: L5-6-3-10 -->
+### Requirement: Agent Fork/Join 质量探针
+
+Fork/Join 探针必须能评估子 Agent 消息隔离与 Join 结果完整度。
 
 完整需求见 `openspec/archive/2026-06-10-devrix-d6-eval/specs/eval/spec.md`。

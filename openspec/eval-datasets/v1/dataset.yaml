@@ -302,3 +302,104 @@ items:
     input:
       expected_tools: ["read_file", "grep", "glob"]
       actual_tools: ["read_file", "grep", "write_file"]
+
+  # ── Provider Quality (3 items) ───────────────────────────────────────
+
+  - id: pq-prod-01
+    bucket: production
+    domain: d3
+    dimension: provider_quality
+    rubric_ref: rubrics/provider_quality.yaml
+    tags:
+      category: same-provider
+      difficulty: easy
+    input:
+      prompt: "Summarize JWT auth with PostgreSQL and refresh token rotation."
+      response_a: "JWT auth with PostgreSQL. Refresh token rotation enabled."
+      response_b: "JWT auth with PostgreSQL. Refresh token rotation enabled."
+    expectation:
+      must_follow: ["JWT", "PostgreSQL", "refresh token"]
+
+  - id: pq-cross-01
+    bucket: production
+    domain: d3
+    dimension: provider_quality
+    rubric_ref: rubrics/provider_quality.yaml
+    tags:
+      category: cross-provider
+      difficulty: medium
+    input:
+      provider_a: deepseek
+      provider_b: minimax
+      prompt: "List three microservices and the message broker."
+      response_a: "User Service, Order Service, Notification Service use RabbitMQ."
+      response_b: "Three services: User, Order, Notification. RabbitMQ messaging."
+    expectation:
+      must_follow: ["User Service", "Order Service", "RabbitMQ"]
+
+  - id: pq-adv-01
+    bucket: adversarial
+    domain: d3
+    dimension: provider_quality
+    rubric_ref: rubrics/provider_quality.yaml
+    tags:
+      category: instruction-miss
+      difficulty: medium
+    input:
+      response_a: "Uses Redis for caching."
+      response_b: "Session cache in Redis."
+    expectation:
+      must_follow: ["JWT", "PostgreSQL", "refresh token"]
+
+  # ── Agent Fork/Join (3 items) ────────────────────────────────────────
+
+  - id: fj-prod-01
+    bucket: production
+    domain: d4
+    dimension: agent_forkjoin
+    rubric_ref: rubrics/agent_forkjoin.yaml
+    tags:
+      category: isolation
+      difficulty: easy
+    input:
+      agent_a_messages: ["Analyzing order schema in MongoDB."]
+      agent_b_messages: ["Drafting SendGrid email template."]
+      join_result: "Order schema uses MongoDB. Email template ready via SendGrid."
+    expectation:
+      must_include_in_join: ["MongoDB", "SendGrid"]
+      agent_a_forbidden: ["SendGrid"]
+      agent_b_forbidden: ["MongoDB"]
+
+  - id: fj-adv-01
+    bucket: adversarial
+    domain: d4
+    dimension: agent_forkjoin
+    rubric_ref: rubrics/agent_forkjoin.yaml
+    tags:
+      category: contamination
+      difficulty: medium
+    input:
+      agent_a_messages: ["Order uses MongoDB and SendGrid for emails."]
+      agent_b_messages: ["Email template only."]
+      join_result: "MongoDB orders and SendGrid emails."
+    expectation:
+      must_include_in_join: ["MongoDB", "SendGrid"]
+      agent_a_forbidden: ["SendGrid"]
+      agent_b_forbidden: ["MongoDB"]
+
+  - id: fj-edge-01
+    bucket: edge
+    domain: d4
+    dimension: agent_forkjoin
+    rubric_ref: rubrics/agent_forkjoin.yaml
+    tags:
+      category: incomplete-join
+      difficulty: medium
+    input:
+      agent_a_messages: ["MongoDB order schema ready."]
+      agent_b_messages: ["SendGrid template drafted."]
+      join_result: "Order schema uses MongoDB only."
+    expectation:
+      must_include_in_join: ["MongoDB", "SendGrid"]
+      agent_a_forbidden: ["SendGrid"]
+      agent_b_forbidden: ["MongoDB"]
