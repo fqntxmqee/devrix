@@ -110,6 +110,24 @@ func TestStratifiedSample(t *testing.T) {
 	}
 }
 
+func TestStratifiedSample_Deterministic(t *testing.T) {
+	items := []EvalItem{
+		{ID: "b", Bucket: "production", Domain: "d2", Dimension: "test"},
+		{ID: "a", Bucket: "production", Domain: "d2", Dimension: "test"},
+		{ID: "c", Bucket: "adversarial", Domain: "d2", Dimension: "test"},
+	}
+	first := StratifiedSample(items, 2)
+	second := StratifiedSample(items, 2)
+	if len(first) != len(second) {
+		t.Fatalf("len mismatch %d vs %d", len(first), len(second))
+	}
+	for i := range first {
+		if first[i].ID != second[i].ID {
+			t.Fatalf("non-deterministic sample at %d: %s vs %s", i, first[i].ID, second[i].ID)
+		}
+	}
+}
+
 func TestStratifiedSample_Empty(t *testing.T) {
 	result := StratifiedSample(nil, 10)
 	if result != nil {

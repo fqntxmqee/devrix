@@ -3,8 +3,8 @@
 **Capability:** eval
 **Change ID:** devrix-d6-eval-phase3 (archived 2026-06-10)
 **Layer:** Evolution
-**Version:** 1.2.0
-**Status:** Canonical
+**Version:** 1.3.0
+**Status:** Canonical — phase 4 partial
 
 ---
 
@@ -12,7 +12,7 @@
 
 D6-S3 评测引擎：EvalRun 编排、JudgeManager、四类探针（compression / PEV / provider / forkjoin）、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
 
-**已实现：** L5-6-3-01/02/03/04/06/07/09/10/11/12/13
+**已实现：** L5-6-3-01/02/03/04/06/07/09/10/11/12/13/14/15
 
 ---
 
@@ -82,5 +82,15 @@ Provider 质量探针必须能评估语义相似度与指令遵循率（确定�
 ### Requirement: Agent Fork/Join 质量探针
 
 Fork/Join 探针必须能评估子 Agent 消息隔离与 Join 结果完整度。
+
+<!-- L5: L5-6-3-14 -->
+### Requirement: CI Delta 门禁
+
+`devrix eval run --baseline --gate` 必须在检测到 regression 时非零退出；`scripts/eval/run-eval.sh` 供 CI 快速抽检。
+
+<!-- L5: L5-6-3-15 -->
+### Requirement: 评测基线
+
+评测集目录必须包含可版本化的 `baseline.yaml`，用于 PR delta 对比。
 
 完整需求见 `openspec/archive/2026-06-10-devrix-d6-eval/specs/eval/spec.md`。

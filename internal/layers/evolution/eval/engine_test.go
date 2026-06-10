@@ -300,19 +300,29 @@ func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
 	if report.Dashboard.OverallScore <= 0 {
 		t.Errorf("OverallScore = %v, want > 0", report.Dashboard.OverallScore)
 	}
-	if len(report.Scores[0].JudgeLogs) != 10 {
-		t.Errorf("JudgeLogs = %d, want 10", len(report.Scores[0].JudgeLogs))
+	crScore := findDimensionScore(report.Scores, "compression_recall")
+	if crScore == nil {
+		t.Fatal("compression_recall score not found")
+	}
+	if len(crScore.JudgeLogs) != 10 {
+		t.Errorf("JudgeLogs = %d, want 10", len(crScore.JudgeLogs))
 	}
 	if report.Dashboard.JudgeCost.TotalTokens <= 0 {
 		t.Error("JudgeCost.TotalTokens should be > 0")
 	}
-
-	// Verify bucket scores exist in details
-	score := report.Scores[0]
-	if score.Details == nil {
+	if crScore.Details == nil {
 		t.Fatal("Details is nil")
 	}
-	if _, ok := score.Details["must_keep_count"]; !ok {
+	if _, ok := crScore.Details["must_keep_count"]; !ok {
 		t.Error("Details missing must_keep_count")
 	}
+}
+
+func findDimensionScore(scores []DomainScore, dimension string) *DomainScore {
+	for i := range scores {
+		if scores[i].Dimension == dimension {
+			return &scores[i]
+		}
+	}
+	return nil
 }

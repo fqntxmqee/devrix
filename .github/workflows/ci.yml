@@ -31,6 +31,9 @@ jobs:
       - name: Unit tests
         run: ./scripts/test-unit.sh
 
+      - name: Eval fast check (mock judge)
+        run: ./scripts/eval/run-eval.sh
+
   gate:
     name: integration / e2e / acceptance
     runs-on: ubuntu-latest
