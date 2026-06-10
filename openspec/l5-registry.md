@@ -383,3 +383,43 @@
 | 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |
 | 1.3.0 | 2026-06-08 | D1 L5 IMPLEMENTED; registry summary reconciled (DM-20260608-011) |
 | 1.4.0 | 2026-06-09 | D2/D3/D4 domain build tags + test-domain.sh (DM-20260609-001) |
+
+---
+
+## D5: Observability Domain (OBS)
+
+> **Spec Reference:** `docs/observability-design.md`
+
+### D5-S1: Tracing Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-1-01 | LLM 请求日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
+| L5-5-1-02 | LLM 响应日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
+| L5-5-1-03 | PEV 迭代独立 Span | OBS-TRACE | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| L5-5-1-04 | Baggage 传递业务上下文 | OBS-TRACE | `internal/layers/observability/baggage_test.go` | PLANNED |
+
+### D5-S2: Metrics Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-2-01 | 工具延迟 Histogram 注册 | OBS-METRICS | `internal/layers/observability/metrics/tool_latency_test.go` | PLANNED |
+| L5-5-2-02 | 压缩率 Histogram 注册 | OBS-METRICS | `internal/layers/observability/metrics/compression_test.go` | PLANNED |
+| L5-5-2-03 | 活跃会话 Gauge 注册 | OBS-METRICS | `internal/layers/observability/metrics/session_test.go` | PLANNED |
+
+### D5-S3: Coverage Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-3-01 | Span 创建触发 RecordHit | OBS-COVERAGE | `internal/layers/observability/tracer/tracer_test.go` | IMPLEMENTED |
+| L5-5-3-02 | 未知 Operation 记录 Unknown | OBS-COVERAGE | `internal/layers/observability/coverage/coverage_test.go` | IMPLEMENTED |
+| L5-5-3-03 | 每日报表持久化 | OBS-COVERAGE | `internal/layers/observability/coverage/persistence_test.go` | IMPLEMENTED |
+| L5-5-3-04 | Coverage 覆盖率 ≥80% | OBS-COVERAGE | `internal/layers/observability/coverage/coverage_test.go` | PLANNED |
+
+### D5-S4: Integration Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-4-01 | Context → LLM → Tool 链路可追踪 | OBS-TRACE | `tests/integration/full_chain_trace_test.go` | PLANNED |
+| L5-5-4-02 | Metrics 与 Trace 关联 | OBS-METRICS | `tests/integration/observability_test.go` | PLANNED |
+| L5-5-4-03 | HealthCheck 包含 Coverage 统计 | OBS-COVERAGE | `internal/layers/observability/observability_test.go` | IMPLEMENTED |
