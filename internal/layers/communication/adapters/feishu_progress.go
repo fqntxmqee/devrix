@@ -258,7 +258,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	if responseMsgID != "" && strings.TrimSpace(summary) != "" {
 		footer := responseText + "\n\n---\n_" + strings.TrimSpace(summary) + "_"
 		card := NewCard().
-			Title("回复", "blue").
+			Title("回复", "green").
 			Markdown(PreprocessMarkdown(footer)).
 			Build()
 		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
@@ -339,7 +339,7 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	stream.mu.Unlock()
 
 	card := NewCard().
-		Title("回复", "blue").
+		Title("回复", "green").
 		Markdown(PreprocessMarkdown(content)).
 		Build()
 	cardJSON := BuildCardJSON(card)
