@@ -1,16 +1,16 @@
 # Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0)
+**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (in progress)
 **Layer:** Observability
-**Version:** 1.5.0
+**Version:** 1.6.0
 **Status:** Canonical — source of truth
 
 ---
 
 ## Overview
 
-可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写（P1 metrics/export 见归档说明）。
+可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写；V1.6（DM-20260610-002，P1）补齐 `tool_latency` / `compression_ratio` metrics、压缩决策属性与 session incident export CLI。
 
 ---
 
@@ -399,6 +399,69 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 - WHEN `context.pev.verify` span ends
 - THEN attribute `verify.failure_reason` is set
 - AND `verify.passed=false`
+
+---
+
+## ADDED Requirements (V1.6 P1 Metrics & Export)
+
+### Requirement: Tool Latency Histogram
+
+系统 MUST 注册 `devrix_tool_latency` Histogram，labels：`tool`、`risk_level`、`status`；PEV 工具执行完成后 MUST observe 秒级延迟。
+
+**Priority**: P1
+**L5 映射**: L5-OBS-METRICS-01
+
+#### Scenario: Tool latency recorded after execution
+
+- GIVEN observability metrics enabled
+- WHEN PEV executes a tool successfully
+- THEN `devrix_tool_latency{tool, risk_level, status="ok"}` receives an observation
+
+---
+
+### Requirement: Compression Ratio Histogram
+
+系统 MUST 注册 `devrix_compression_ratio` Histogram；上下文压缩成功后 MUST observe `CompressedTokens/OriginalTokens`。
+
+**Priority**: P1
+**L5 映射**: L5-OBS-METRICS-02
+
+#### Scenario: Compression ratio observed
+
+- GIVEN compression pipeline reduces token count
+- WHEN `context.compression.run` completes successfully
+- THEN `devrix_compression_ratio` receives an observation in (0,1]
+
+---
+
+### Requirement: Compression Decision Attributes
+
+`context.compression.run` span MUST 携带 `compression.trigger_reason` 与 `compression.ratio`。
+
+**Priority**: P1
+**L5 映射**: L5-OBS-DECISION-02
+
+#### Scenario: Compression span decision attrs
+
+- GIVEN compression triggered by token budget
+- WHEN compression span ends
+- THEN `compression.trigger_reason=token_budget_exceeded`
+- AND `compression.ratio` reflects token reduction ratio
+
+---
+
+### Requirement: Session Incident Export
+
+系统 MUST 提供 CLI `debug-export --session <id>`，输出 schema v1 JSON bundle（含 `llm_rounds`、可选 `trace` 与 `coverage_hits`）。
+
+**Priority**: P1
+**L5 映射**: L5-OBS-EXPORT-01
+
+#### Scenario: Export valid incident bundle
+
+- GIVEN LLM JSONL exists for session
+- WHEN `debug-export --session {id}` runs
+- THEN stdout/file contains valid JSON with `schema_version=1.0` and `llm_rounds` array
 
 ---
 

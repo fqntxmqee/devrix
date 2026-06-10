@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
@@ -16,6 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -58,6 +60,9 @@ type ContextEngine struct {
 	preflight     *harness.PreflightEvaluator
 	router        *harness.PromptRouter
 	transcript    *harness.TranscriptManager
+
+	metricsOnce      sync.Once
+	compressionRatio metrics.Histogram
 }
 
 // NewContextEngine creates the Layer 2 context engine.
@@ -156,6 +161,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		case ch <- ev:
 		}
 	}
+
+	e.initMetrics()
 
 	// Create "context_engine.process" span as child of gateway span.
 	ctx, processSpan := e.startSpan(ctx, telemetry.OpContextProcess, tracer.SpanKindInternal,
@@ -266,7 +273,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		compressed, report, compErr := e.compressionPipeline(session.SessionID).Run(compCtx, msgs, compSystemPrompt, sc.TokenBudget)
 		if compErr != nil {
 			if compSpan != nil {
-				compSpan.RecordError(compErr)
+				telemetry.RecordSpanError(compSpan, compErr)
 				compSpan.End()
 			}
 			if se, ok := compErr.(*errors.SentinelError); ok {
@@ -275,13 +282,19 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			return
 		}
 		if compSpan != nil {
+			ratio := report.Ratio()
 			compSpan.SetAttributes(
 				tracer.Attribute{Key: "context.tokens_after", Value: fmt.Sprintf("%d", report.CompressedTokens)},
 				tracer.Attribute{Key: "context.messages_before", Value: fmt.Sprintf("%d", len(msgs))},
 				tracer.Attribute{Key: "context.messages_after", Value: fmt.Sprintf("%d", len(compressed))},
 				tracer.Attribute{Key: "context.steps_applied", Value: strings.Join(report.StepsApplied, ",")},
+				tracer.Attribute{Key: "compression.trigger_reason", Value: "token_budget_exceeded"},
+				tracer.Attribute{Key: "compression.ratio", Value: fmt.Sprintf("%.4f", ratio)},
 			)
 			compSpan.End()
+		}
+		if e.compressionRatio != nil {
+			e.compressionRatio.Observe(report.Ratio())
 		}
 		e.observer.EmitContextCompressed(report)
 		if !harnessEnabled {
@@ -561,6 +574,16 @@ func stripSystemMessage(msgs []types.Message) []types.Message {
 		return append([]types.Message(nil), msgs[1:]...)
 	}
 	return msgs
+}
+
+func (e *ContextEngine) initMetrics() {
+	e.metricsOnce.Do(func() {
+		if e.obsBridge == nil || e.obsBridge.Meter() == nil {
+			return
+		}
+		e.compressionRatio, _ = e.obsBridge.Meter().Float64Histogram("compression_ratio",
+			metrics.WithBounds(metrics.CompressionRatioBounds()))
+	})
 }
 
 func mapProcessError(sessionID string, err error) *gateway.EngineEvent {

@@ -118,6 +118,11 @@ func DefaultHistogramBounds() []float64 {
 	return []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 }
 
+// CompressionRatioBounds returns bucket bounds for compression ratio (0-1).
+func CompressionRatioBounds() []float64 {
+	return []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
+}
+
 // LLMHistogramBounds returns bucket bounds suitable for LLM latency
 func LLMHistogramBounds() []float64 {
 	return []float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0}
