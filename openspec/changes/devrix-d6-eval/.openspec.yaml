@@ -1,6 +1,6 @@
 change_id: devrix-d6-eval
 priority: P1
 demand_id: DM-20260610-006
-status: s3_design
+status: s5_acceptance
 domains: [D6]
 l5_points: []

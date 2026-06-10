@@ -1,0 +1,32 @@
+# Compression Recall Rubric
+# 评估 compression 前后的事实保留率
+
+dimension: compression_recall
+scale: 0-1
+instruction: >
+  Evaluate whether ALL key facts from the original context are preserved in the compressed version.
+  Focus on factual completeness, not phrasing. A key fact is considered preserved if the compressed
+  version contains semantically equivalent information, even if worded differently.
+  Penalize missing facts, ambiguous phrasing that loses specificity, and any addition of
+  information not present in the original.
+
+reference: >
+  Score 1.0: Every key fact from the original is fully preserved in the compressed version.
+  Score 0.7: Most key facts preserved, but minor details lost or slightly ambiguous.
+  Score 0.5: About half the key facts preserved — significant information loss.
+  Score 0.3: Only a few key facts preserved — most critical details missing.
+  Score 0.0: No key facts survived compression — output is empty or entirely unrelated.
+
+examples:
+  - original: "The user wants to add user authentication with JWT tokens. They use PostgreSQL database. The project is a Go web API."
+    compressed: "User authentication with JWT tokens using PostgreSQL. Go web API project."
+    score: 1.0
+    reason: "All three key facts (JWT, PostgreSQL, Go web API) are preserved."
+  - original: "fact A, fact B, fact C, fact D, fact E"
+    compressed: "fact A, fact C"
+    score: 0.4
+    reason: "Only 2 of 5 facts preserved — 60% information loss."
+  - original: "important fact X, important fact Y"
+    compressed: "nothing relevant preserved"
+    score: 0.0
+    reason: "All facts lost — compressed output contains no original information."

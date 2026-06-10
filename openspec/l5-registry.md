@@ -358,6 +358,16 @@
 |-------|------|---------|-----------|--------|----------|
 | L5-6-2-01 | 配置热更新（PlannedVersion: v2.2.0） | Config | `internal/layers/evolution/config/hotreload_test.go` | PLANNED | P2 |
 
+### D6-S3: Eval Module (Pilot)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-6-3-01 | EvalRun 编排 | Eval | `internal/layers/evolution/eval/engine_test.go` | IMPLEMENTED | P0 |
+| L5-6-3-02 | LLM-as-Judge 校准与分歧 | Eval | `internal/layers/evolution/eval/judge_test.go` | IMPLEMENTED | P0 |
+| L5-6-3-03 | Compression Recall Probe F1 | Eval | `internal/layers/evolution/eval/compression_recall_probe_test.go` | IMPLEMENTED | P0 |
+| L5-6-3-04 | Delta 报告对比 | Eval | `internal/layers/evolution/eval/delta_test.go` | IMPLEMENTED | P0 |
+| L5-6-3-07 | eval.enabled=false 零行为 | Eval | `internal/layers/evolution/eval/engine_test.go` | IMPLEMENTED | P0 |
+
 ---
 
 ## D0: Code Integrity Domain (INTEGRITY)
