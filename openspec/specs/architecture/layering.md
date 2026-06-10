@@ -60,6 +60,7 @@
 | D2-S6 | Snapshot | 上下文快照 |
 | D2-S7 | Prompt | Prompt 模板管理 |
 | D2-S8 | Sandbox | 工具沙箱隔离 |
+| D2-S9 | Harness | 会话 Bootstrap、ToolPool、Preflight、System Prompt 装配（V5） |
 
 ### D3 LLM Gateway Domain
 
@@ -127,7 +128,8 @@ layers/
 │   ├── registry/                  # D2-S5
 │   ├── snapshot/                  # D2-S6
 │   ├── prompt/                    # D2-S7
-│   └── sandbox/                   # D2-S8
+│   ├── sandbox/                   # D2-S8
+│   └── harness/                   # D2-S9 (V5)
 │
 ├── llmgateway/                    # D3
 │   ├── adapter/                   # D3-S1
@@ -202,6 +204,12 @@ L5 测试点编号格式: `L5-{D}-{S}-{NN}`
 | L4-COMM-CMD | D1-S3 (Commands) | 命令处理 |
 | L4-CTX-PEV | D2-S1 (PEV) | PEV 引擎 |
 | L4-CTX-COMPRESS | D2-S2 (Compression) | 压缩管道 |
+| L4-CTX-HARNESS | D2-S9 (Harness) | Bootstrap 编排 |
+| L4-CTX-TOOLPOOL | D2-S9 (Harness) | 可见工具集裁剪 |
+| L4-CTX-ROUTER | D2-S9 (Harness) | Advisory 路由 hints |
+| L4-CTX-PREFLIGHT | D2-S9 (Harness) | Pre-LLM 上下文评分 |
+| L4-CTX-WORKSPACE | D2-S9 (Harness) | System Prompt 四层装配 |
+| L4-CTX-TRANSCRIPT | D2-S9 (Harness) | Transcript / SessionLog |
 | L4-LLM-ADAPTER | D3-S1 (Adapter) | 模型适配器 |
 | L4-OBS-TRACING | D5-S1 (Tracer) | 追踪 |
 

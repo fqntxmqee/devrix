@@ -1,0 +1,6 @@
+change_id: devrix-harness-bootstrap
+priority: P1
+demand_id: DM-20260609-004
+status: s3_planning
+openspec_valid: true
+domains: [D2]

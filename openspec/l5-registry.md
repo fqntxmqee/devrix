@@ -1,7 +1,7 @@
 # Devrix L5 测试点注册表
 
 **Status:** Active
-**Last Updated:** 2026-06-08
+**Last Updated:** 2026-06-10
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 
 > L5 测试点是 OpenSpec S5 验收的确定性锚点。新增 L4/L3 能力时 MUST 先在此记录或复用现有 L5。
@@ -132,6 +132,28 @@
 | L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-2-8-01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/sandbox_test.go` | IMPLEMENTED |
+
+### D2-S9: Harness Module
+
+> **Change:** `devrix-harness-bootstrap` (DM-20260609-004)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-2-9-01 | harness.enabled 首次 Process 触发 Bootstrap | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-02 | WorkspaceContext 扫描 Go 文件与 AGENTS.md | Harness | `internal/layers/contextengine/harness/workspace_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-03 | Bootstrap 幂等（同 Session 不重复） | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-04 | trusted=false 时 deferred_init 标志全 false | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-05 | ToolPool simple_mode / MCP / deny 过滤 | Harness | `internal/layers/contextengine/harness/toolpool_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-06 | PromptRouter advisory 关键词计分 | Harness | `internal/layers/contextengine/harness/router_test.go` | IMPLEMENTED | P2 |
+| L5-2-9-07 | Transcript 内存分离与 compact | Harness | `internal/layers/contextengine/harness/transcript_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-08 | harness.enabled=false V4 回归 + 无 bootstrap info | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-09 | Preflight warn-only 规则评分与 tool filter | Harness | `internal/layers/contextengine/harness/preflight_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-10 | System Prompt Assembly §十 XML 块 | Harness | `internal/layers/contextengine/harness/system_prompt_assembler_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-11 | Jaeger span 树（enabled/disabled） | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-12 | disabled 与 BuildLegacy 字节级一致 | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-13 | CompressedView system = Build 输出 | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-14 | PEV 可见工具 ⊆ VisibleTools | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-15 | bootstrap.stage parent = bootstrap.run | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 
 ### D2: Cross-Scenario Tests
 
@@ -310,7 +332,7 @@
 | L5 ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | L5-5-5-01 | Operation Registry 与 names.go 常驻全集一致 | Coverage | `internal/layers/observability/coverage/registry_test.go` | IMPLEMENTED |
-| L5-5-5-02 | Coverage 报告正确列出 zero_hit operations | Coverage | `tests/integration/obs_coverage_test.go` | IMPLEMENTED |
+| L5-5-5-02 | Coverage 报告正确列出 zero_hit operations | Coverage | `tests/integration/obs_coverage_test.go`, `tests/integration/context_harness_obs_test.go` | IMPLEMENTED |
 
 ### D5: Cross-Scenario Tests
 
@@ -383,3 +405,43 @@
 | 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |
 | 1.3.0 | 2026-06-08 | D1 L5 IMPLEMENTED; registry summary reconciled (DM-20260608-011) |
 | 1.4.0 | 2026-06-09 | D2/D3/D4 domain build tags + test-domain.sh (DM-20260609-001) |
+
+---
+
+## D5: Observability Domain (OBS)
+
+> **Spec Reference:** `docs/observability-design.md`
+
+### D5-S1: Tracing Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-1-01 | LLM 请求日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
+| L5-5-1-02 | LLM 响应日志完整记录 | OBS-TRACE | `internal/layers/observability/llm_logger_test.go` | PLANNED |
+| L5-5-1-03 | PEV 迭代独立 Span | OBS-TRACE | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| L5-5-1-04 | Baggage 传递业务上下文 | OBS-TRACE | `internal/layers/observability/baggage_test.go` | PLANNED |
+
+### D5-S2: Metrics Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-2-01 | 工具延迟 Histogram 注册 | OBS-METRICS | `internal/layers/observability/metrics/tool_latency_test.go` | PLANNED |
+| L5-5-2-02 | 压缩率 Histogram 注册 | OBS-METRICS | `internal/layers/observability/metrics/compression_test.go` | PLANNED |
+| L5-5-2-03 | 活跃会话 Gauge 注册 | OBS-METRICS | `internal/layers/observability/metrics/session_test.go` | PLANNED |
+
+### D5-S3: Coverage Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-3-01 | Span 创建触发 RecordHit | OBS-COVERAGE | `internal/layers/observability/tracer/tracer_test.go` | IMPLEMENTED |
+| L5-5-3-02 | 未知 Operation 记录 Unknown | OBS-COVERAGE | `internal/layers/observability/coverage/coverage_test.go` | IMPLEMENTED |
+| L5-5-3-03 | 每日报表持久化 | OBS-COVERAGE | `internal/layers/observability/coverage/persistence_test.go` | IMPLEMENTED |
+| L5-5-3-04 | Coverage 覆盖率 ≥80% | OBS-COVERAGE | `internal/layers/observability/coverage/coverage_test.go` | PLANNED |
+
+### D5-S4: Integration Module
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status |
+|-------|------|---------|-----------|--------|
+| L5-5-4-01 | Context → LLM → Tool 链路可追踪 | OBS-TRACE | `tests/integration/full_chain_trace_test.go` | PLANNED |
+| L5-5-4-02 | Metrics 与 Trace 关联 | OBS-METRICS | `tests/integration/observability_test.go` | PLANNED |
+| L5-5-4-03 | HealthCheck 包含 Coverage 统计 | OBS-COVERAGE | `internal/layers/observability/observability_test.go` | IMPLEMENTED |

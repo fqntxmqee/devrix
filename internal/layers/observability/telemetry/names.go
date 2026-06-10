@@ -42,6 +42,13 @@ const (
 	OpContextToolsRegister   = "context.tools.register"
 	OpContextMemorySnapshotSave = "context.memory.snapshot.save"
 
+	OpContextHarnessBootstrapRun = "context.harness.bootstrap.run"
+	OpContextHarnessBootstrapStage = "context.harness.bootstrap.stage"
+	OpContextHarnessToolPool       = "context.harness.tool_pool"
+	OpContextHarnessPreflight      = "context.harness.preflight"
+	OpContextHarnessRoute          = "context.harness.route"
+	OpContextSystemPromptBuild     = "context.system_prompt.build"
+
 	OpContextPEVRun             = "context.pev.run"
 	OpContextPEVLLMCall         = "context.pev.llm_call"
 	OpContextPEVIteration       = "context.pev.iteration"
@@ -94,6 +101,10 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "context.longterm."):
 		return LayerContext, "context_engine"
+	case strings.HasPrefix(operation, "context.harness."):
+		return LayerContext, "harness"
+	case operation == OpContextSystemPromptBuild:
+		return LayerContext, "harness"
 	case strings.HasPrefix(operation, "context.verify."):
 		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "context."):

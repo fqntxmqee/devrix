@@ -222,7 +222,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		maxIter = 1
 	}
 
-	toolSchemas, _ := e.toolsReg.ListTools(ctx, sc.WorkDir)
+	toolSchemas := resolveVisibleTools(ctx, e.toolsReg, sc)
 	toolNames := make([]string, 0, len(toolSchemas))
 	for _, t := range toolSchemas {
 		toolNames = append(toolNames, t.Name)
@@ -688,5 +688,17 @@ func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool
 		Type: "error", Content: err.Error(), SessionID: sessionID,
 		Metadata: map[string]string{"code": err.Code, "recoverable": rec},
 	}
+}
+
+func resolveVisibleTools(ctx context.Context, reg IToolRegistry, sc *types.SessionContext) []ToolSchema {
+	if sc != nil && sc.Harness != nil && len(sc.Harness.Report.VisibleToolList) > 0 {
+		return visibleToolsToSchemas(sc.Harness)
+	}
+	workDir := ""
+	if sc != nil {
+		workDir = sc.WorkDir
+	}
+	tools, _ := reg.ListTools(ctx, workDir)
+	return tools
 }
 

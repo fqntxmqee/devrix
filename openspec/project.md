@@ -76,6 +76,7 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | D2-S6 | Snapshot | 上下文快照 |
 | D2-S7 | Prompt | Prompt 模板管理 |
 | D2-S8 | Sandbox | 工具沙箱隔离 |
+| D2-S9 | Harness | 会话 Bootstrap、ToolPool、System Prompt 装配（V5，灰度 `harness.enabled`） |
 
 ### D3 LLM Gateway Domain Scenarios
 
@@ -168,7 +169,8 @@ devrix/
 │   │   │   ├── registry/      # D2-S5
 │   │   │   ├── snapshot/      # D2-S6
 │   │   │   ├── prompt/        # D2-S7
-│   │   │   └── sandbox/       # D2-S8
+│   │   │   ├── sandbox/       # D2-S8
+│   │   │   └── harness/       # D2-S9 (V5)
 │   │   ├── llmgateway/        # D3
 │   │   │   ├── adapter/       # D3-S1
 │   │   │   ├── gateway/       # D3-S2

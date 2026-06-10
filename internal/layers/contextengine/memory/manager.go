@@ -32,14 +32,7 @@ func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store, longTerm
 
 // EnrichWithLongTermRecall appends recalled entries to the session system prompt.
 func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.SessionContext, query string) error {
-	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
-		return nil
-	}
-	limit := m.cfg.LongTerm.RecallMaxEntries
-	if limit <= 0 {
-		limit = 5
-	}
-	entries, err := m.longTerm.Recall(ctx, query, limit)
+	entries, err := m.RecallLongTermEntries(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -48,6 +41,18 @@ func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.Sessio
 		sc.SystemPrompt += appendix
 	}
 	return nil
+}
+
+// RecallLongTermEntries returns recalled memory entries without mutating session context.
+func (m *Manager) RecallLongTermEntries(ctx context.Context, query string) ([]MemoryEntry, error) {
+	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
+		return nil, nil
+	}
+	limit := m.cfg.LongTerm.RecallMaxEntries
+	if limit <= 0 {
+		limit = 5
+	}
+	return m.longTerm.Recall(ctx, query, limit)
 }
 
 // AutoStoreLongTerm persists a summary when auto_store is enabled.
@@ -123,10 +128,25 @@ func (m *Manager) AppendUserMessage(sc *types.SessionContext, requestID, content
 	return true
 }
 
-// AppendMessage appends any message role.
+// AppendMessage appends a plain text message (no metadata).
 func (m *Manager) AppendMessage(sc *types.SessionContext, role types.MessageRole, content string) {
 	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, role, content)
 	sc.Messages = append(sc.Messages, *msg)
+	sc.UpdatedAt = time.Now()
+}
+
+// AppendFullMessage appends a message preserving metadata (tool_calls, tool_call_id).
+func (m *Manager) AppendFullMessage(sc *types.SessionContext, msg types.Message) {
+	if msg.ID == "" {
+		msg.ID = fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	}
+	if msg.SessionID == "" {
+		msg.SessionID = sc.SessionID
+	}
+	if msg.Timestamp.IsZero() {
+		msg.Timestamp = time.Now()
+	}
+	sc.Messages = append(sc.Messages, msg)
 	sc.UpdatedAt = time.Now()
 }
 

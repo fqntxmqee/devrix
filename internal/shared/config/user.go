@@ -335,7 +335,7 @@ func (c *UserConfig) ShouldAutoApproveNetwork() bool {
 	return c.YOLO.Enabled && c.YOLO.AutoApproveNetwork
 }
 
-// ResolveContextEngine returns the context engine name for devrix-feishu.
+// ResolveContextEngine returns the context engine name when IM is enabled.
 // Priority: DEVRIX_ENGINE env > im.engine config > "context" (real LLM).
 func ResolveContextEngine(im IMConfig) string {
 	if val := strings.ToLower(strings.TrimSpace(os.Getenv("DEVRIX_ENGINE"))); val != "" {

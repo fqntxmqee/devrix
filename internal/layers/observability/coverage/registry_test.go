@@ -22,6 +22,11 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpAgentToolCall,
 
 		telemetry.OpContextCompressionRun,
+		telemetry.OpContextHarnessBootstrapRun,
+		telemetry.OpContextHarnessBootstrapStage,
+		telemetry.OpContextHarnessPreflight,
+		telemetry.OpContextHarnessRoute,
+		telemetry.OpContextHarnessToolPool,
 		telemetry.OpContextLongTermRecall,
 		telemetry.OpContextLongTermStore,
 	telemetry.OpContextMemorySnapshotSave,
@@ -37,6 +42,7 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpContextProcess,
 		telemetry.OpContextSnapshotLoad,
 	telemetry.OpContextSystemPromptLoad,
+		telemetry.OpContextSystemPromptBuild,
 	telemetry.OpContextToolsRegister,
 		telemetry.OpContextVerifyCommand,
 

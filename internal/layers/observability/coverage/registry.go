@@ -26,6 +26,12 @@ func AllOperations() []OperationMeta {
 		{Name: "agent.tool.call", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
 
 		{Name: "context.compression.run", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+		{Name: "context.harness.bootstrap.run", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
+		{Name: "context.harness.bootstrap.stage", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
+		{Name: "context.harness.preflight", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
+		{Name: "context.harness.route", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
+		{Name: "context.harness.tool_pool", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
+		{Name: "context.system_prompt.build", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
 		{Name: "context.longterm.recall", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "context.longterm.store", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 			{Name: "context.memory.snapshot.save", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},

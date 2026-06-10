@@ -11,6 +11,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
+	"github.com/devrix/devrix/internal/layers/contextengine/harness"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
@@ -51,6 +52,12 @@ type ContextEngine struct {
 	compObserver  ICompressionObserver
 	obsBridge     *observability.Bridge
 	asyncCompact  *compression.AsyncAutocompacter
+	toolsReg      IToolRegistry
+	harnessBoot   *harness.Bootstrap
+	assembler     *harness.SystemPromptAssembler
+	preflight     *harness.PreflightEvaluator
+	router        *harness.PromptRouter
+	transcript    *harness.TranscriptManager
 }
 
 // NewContextEngine creates the Layer 2 context engine.
@@ -80,6 +87,12 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 			Timeout: cfg.Compression.Autocompact.Timeout,
 		})
 	}
+	toolsReg := deps.ToolsReg
+	harnessBoot := harness.NewBootstrap(harness.BootstrapDeps{
+		Config:    cfg.Harness,
+		ToolsReg:  toolRegistryAdapter{reg: toolsReg},
+		ObsBridge: deps.ObsBridge,
+	})
 	return &ContextEngine{
 		memory:  memory.NewManager(cfg, store, deps.LongTerm),
 		counter: counter,
@@ -96,12 +109,18 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 			deps.Planner,
 			cfg.Plan,
 		),
-		prompt:    prompt.NewLoader(&cfg.SystemPrompt),
-		cfg:               cfg,
-		observer:          observer,
-		compObserver:      compObserver,
-		obsBridge:         deps.ObsBridge,
-		asyncCompact:      asyncCompact,
+		prompt:       prompt.NewLoader(&cfg.SystemPrompt),
+		cfg:          cfg,
+		observer:     observer,
+		compObserver: compObserver,
+		obsBridge:    deps.ObsBridge,
+		asyncCompact: asyncCompact,
+		toolsReg:     toolsReg,
+		harnessBoot:  harnessBoot,
+		assembler:    harness.NewSystemPromptAssembler(cfg.Workspace),
+		preflight:    harness.NewPreflightEvaluator(cfg.Preflight, harness.NewToolPoolFilter(cfg.Harness.ToolPool)),
+		router:       harness.NewPromptRouter(cfg.Harness.Routing),
+		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
 	}
 }
 
@@ -147,12 +166,15 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		defer processSpan.End()
 	}
 
-	systemPrompt := e.prompt.Load(session.WorkDir)
+	harnessEnabled := e.cfg.Harness.Enabled
+	basePrompt := e.prompt.Load(session.WorkDir)
+	systemPrompt := basePrompt
 	// System prompt load observability.
 	{
 		_, spSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptLoad, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "system_prompt.length", Value: fmt.Sprintf("%d", len(systemPrompt))},
 			tracer.Attribute{Key: "system_prompt.sources_count", Value: fmt.Sprintf("%d", len(e.cfg.SystemPrompt.Sources))},
+			tracer.Attribute{Key: "harness.enabled", Value: fmt.Sprintf("%t", harnessEnabled)},
 		)
 		if spSpan != nil {
 			spSpan.End()
@@ -162,7 +184,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	// Load or init snapshot — with child span.
 	_, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
 	hadSnapshot := session.ContextSnapshot != nil
-	sc, err := e.memory.LoadOrInit(session, systemPrompt)
+	sc, err := e.memory.LoadOrInit(session, basePrompt)
 	if err != nil {
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
 		session.ContextSnapshot = nil
@@ -185,11 +207,29 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		loadSpan.End()
 	}
 
+	if harnessEnabled && !session.HarnessInitialized {
+		harnessState, bootErr := e.harnessBoot.Run(ctx, session)
+		if bootErr != nil {
+			emit(errorEvent(session.SessionID, errors.WithCode("CTX_HARNESS_BOOTSTRAP", bootErr.Error(), bootErr), false))
+			return
+		}
+		sc.Harness = harnessState
+		session.HarnessInitialized = true
+		emit(infoEvent(session.SessionID, fmt.Sprintf("Harness bootstrap 完成 (%d→%d 工具)",
+			harnessState.Report.ToolCount, harnessState.Report.VisibleTools)))
+	}
+
+	var memoryEntries []memory.MemoryEntry
 	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "longterm.enabled", Value: fmt.Sprintf("%t", e.cfg.LongTerm.Enabled)},
 		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
 	)
-	recallErr := e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
+	var recallErr error
+	if harnessEnabled {
+		memoryEntries, recallErr = e.memory.RecallLongTermEntries(recallCtx, message)
+	} else {
+		recallErr = e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
+	}
 	if recallSpan != nil {
 		if recallErr != nil {
 			recallSpan.RecordError(recallErr)
@@ -215,11 +255,15 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	msgs := sc.Messages
+	compSystemPrompt := sc.SystemPrompt
+	if harnessEnabled {
+		compSystemPrompt = ""
+	}
 	if e.shouldCompress(msgs, sc.TokenBudget) {
 		compCtx, compSpan := e.startSpan(ctx, telemetry.OpContextCompressionRun, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(msgs))},
 		)
-		compressed, report, compErr := e.compressionPipeline(session.SessionID).Run(compCtx, msgs, sc.SystemPrompt, sc.TokenBudget)
+		compressed, report, compErr := e.compressionPipeline(session.SessionID).Run(compCtx, msgs, compSystemPrompt, sc.TokenBudget)
 		if compErr != nil {
 			if compSpan != nil {
 				compSpan.RecordError(compErr)
@@ -240,8 +284,88 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			compSpan.End()
 		}
 		e.observer.EmitContextCompressed(report)
-		e.memory.SetCompressedView(sc, compressed)
+		if !harnessEnabled {
+			e.memory.SetCompressedView(sc, compressed)
+		}
 		emit(infoEvent(session.SessionID, fmt.Sprintf("上下文已压缩 (%d→%d tokens)", report.OriginalTokens, report.CompressedTokens)))
+		msgs = stripSystemMessage(compressed)
+	}
+
+	var routingHint *types.RoutingHint
+	var preflightResult *types.PreflightResult
+	visibleTools := harness.VisibleToolsFromState(sc.Harness)
+	if harnessEnabled {
+		provisionalContext := basePrompt
+		if len(memoryEntries) > 0 {
+			memCtx, _ := memory.FormatMemoryContext(memoryEntries, e.cfg.LongTerm.RecallMaxTokens)
+			provisionalContext += "\n" + memCtx
+		}
+		if e.cfg.Preflight.Enabled {
+			pfCtx, pfSpan := e.startSpan(ctx, telemetry.OpContextHarnessPreflight, tracer.SpanKindInternal)
+			result := e.preflight.Evaluate(sc, message, visibleTools, provisionalContext)
+			preflightResult = &result
+			filtered, _ := e.preflight.FilterVisibleTools(message, visibleTools)
+			visibleTools = filtered
+			if sc.Harness != nil {
+				sc.Harness.Report.VisibleToolList = toolDescsToVisibleTools(visibleTools)
+				sc.Harness.Report.VisibleTools = len(visibleTools)
+			}
+			if pfSpan != nil {
+				pfSpan.SetAttributes(tracer.Attribute{Key: "preflight.warning_count", Value: fmt.Sprintf("%d", len(result.Warnings))})
+				pfSpan.End()
+			}
+			_ = pfCtx
+		}
+		if e.cfg.Harness.Routing.Enabled {
+			routeCtx, routeSpan := e.startSpan(ctx, telemetry.OpContextHarnessRoute, tracer.SpanKindInternal)
+			hint := e.router.Route(message, visibleTools, e.cfg.Harness.Routing.MaxMatches)
+			if len(hint.Tools) > 0 {
+				routingHint = &hint
+			}
+			if routeSpan != nil {
+				routeSpan.SetAttributes(tracer.Attribute{Key: "matched_tools", Value: strings.Join(hint.Tools, ",")})
+				routeSpan.End()
+			}
+			_ = routeCtx
+		}
+
+		var bootstrapReport *types.BootstrapReport
+		var workspace *types.WorkspaceContext
+		if sc.Harness != nil {
+			bootstrapReport = &sc.Harness.Report
+			workspace = &sc.Harness.Report.Workspace
+		}
+		buildInput := harness.SystemPromptBuildInput{
+			WorkDir:        session.WorkDir,
+			Session:        session,
+			Runtime: harness.ProcessRuntimeContext{
+				SessionID: session.SessionID,
+				RequestID: session.RequestID,
+				UserID:    session.UserID,
+			},
+			AgentsRaw:       basePrompt,
+			MemoryEntries:   memoryEntries,
+			Bootstrap:       bootstrapReport,
+			Workspace:       workspace,
+			Routing:         routingHint,
+			Preflight:       preflightResult,
+			HarnessEnabled:  true,
+		}
+		_, buildSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptBuild, tracer.SpanKindInternal)
+		builtPrompt, buildReport := e.assembler.Build(buildInput)
+		if buildSpan != nil {
+			buildSpan.SetAttributes(
+				tracer.Attribute{Key: "system_prompt.total_tokens", Value: fmt.Sprintf("%d", buildReport.TotalTokens)},
+				tracer.Attribute{Key: "system_prompt.memory_truncated", Value: fmt.Sprintf("%t", buildReport.MemoryTruncated)},
+			)
+			buildSpan.End()
+		}
+		sc.SystemPrompt = builtPrompt
+		view := append([]types.Message{}, msgs...)
+		if sc.SystemPrompt != "" {
+			view = append([]types.Message{{Role: types.MessageRoleSystem, Content: sc.SystemPrompt}}, view...)
+		}
+		e.memory.SetCompressedView(sc, view)
 	} else {
 		view := append([]types.Message{}, msgs...)
 		if sc.SystemPrompt != "" {
@@ -285,15 +409,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 					}{Name: tc.ToolName, Arguments: tc.Input},
 				}})
 				tcMsg := types.Message{
-					Role:      types.MessageRoleAssistant,
-					Content:   "",
-					Metadata:  map[string]string{"tool_calls": string(tcJSON)},
+					Role:     types.MessageRoleAssistant,
+					Content:  "",
+					Metadata: map[string]string{"tool_calls": string(tcJSON)},
 				}
-				e.memory.AppendMessage(sc, types.MessageRoleAssistant, tcMsg.Content)
-				// 直接追加到 sc.Messages（通过 Metadata 保存 tool_calls）
-				sc.Messages = append(sc.Messages, tcMsg)
+				e.memory.AppendFullMessage(sc, tcMsg)
 
-				// 构建工具结果的 tool 消息
 				resultContent := tc.Output
 				if tc.Error != "" {
 					resultContent = "Error: " + tc.Error
@@ -303,9 +424,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 					Content:  resultContent,
 					Metadata: map[string]string{"tool_call_id": callID},
 				}
-				e.memory.AppendMessage(sc, types.MessageRoleTool, resultContent)
-				// 直接追加到 sc.Messages
-				sc.Messages = append(sc.Messages, resultMsg)
+				e.memory.AppendFullMessage(sc, resultMsg)
 			}
 		}
 		
@@ -315,6 +434,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		}
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
+		}
+		if harnessEnabled {
+			e.transcript.AppendTurn(sc, message, assistantSummary)
 		}
 		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpContextLongTermStore, tracer.SpanKindInternal)
 		storeErr := e.memory.AutoStoreLongTerm(storeCtx, sc, message, assistantSummary)
@@ -429,6 +551,16 @@ func lastAssistantContent(msgs []types.Message) string {
 		}
 	}
 	return ""
+}
+
+func stripSystemMessage(msgs []types.Message) []types.Message {
+	if len(msgs) == 0 {
+		return msgs
+	}
+	if msgs[0].Role == types.MessageRoleSystem {
+		return append([]types.Message(nil), msgs[1:]...)
+	}
+	return msgs
 }
 
 func mapProcessError(sessionID string, err error) *gateway.EngineEvent {

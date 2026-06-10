@@ -70,7 +70,7 @@ if $COVER; then
 fi
 
 echo "==> domain ${DOMAIN} unit tests"
-go test "${UNIT_PKGS[@]}" -race -timeout 120s "${COVER_ARGS[@]}" "${EXTRA_ARGS[@]:-}"
+go test "${UNIT_PKGS[@]}" -race -timeout 120s ${COVER_ARGS[@]+"${COVER_ARGS[@]}"} "${EXTRA_ARGS[@]:-}"
 
 if $COVER; then
   echo "==> domain ${DOMAIN} unit coverage"

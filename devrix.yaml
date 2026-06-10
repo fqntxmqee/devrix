@@ -201,6 +201,42 @@ context_engine:
     recall_max_entries: 5
     recall_max_tokens: 2000
 
+  # V5 新增: Harness Bootstrap（默认关闭，灰度开关）
+  harness:
+    enabled: false
+    trusted: true
+    prefetch:
+      enabled: true
+      max_walk_depth: 4
+    tool_pool:
+      simple_mode: false
+      include_mcp: true
+      deny_names: []
+      deny_prefixes: []
+    routing:
+      enabled: false
+      max_matches: 5
+    deferred_init:
+      enabled: true
+    transcript:
+      enabled: true
+      compact_after_turns: 20
+      session_log_enabled: true
+
+  preflight:
+    enabled: false
+    mode: warn-only
+    token_budget: 8000
+    warn_ratio: 0.85
+    tool_filter:
+      enabled: true
+      mode: auto-repair
+
+  workspace:
+    max_context_tokens: 8000
+    agent_name: Devrix
+    embed_core_template: true
+
 # 工具执行安全 (Tool Security)
 tool:
   sandbox:
@@ -299,7 +335,7 @@ agent_tools:
         通用编码助手，精通代码审查、重构、调试与文档。
         适合需要深度推理的编程任务：重构模块、排查 Bug、代码评审、生成设计文档。
       command: "claude"
-      args: ["--print", "--output-format", "stream-json", "--input-format", "stream-json", "--replay-user-messages"]
+      args: ["--print", "--verbose", "--output-format", "stream-json", "--input-format", "stream-json", "--replay-user-messages"]
       work_dir: "."
       timeout: "5m"
       idle_timeout: "5m"

@@ -2,6 +2,9 @@ package adapter
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -29,7 +32,12 @@ func buildOpenAIChatRequest(req *llmgateway.Request) (*openAIChatRequest, error)
 		})
 	}
 	for _, m := range req.Messages {
-		out.Messages = append(out.Messages, mapOpenAIMessage(m))
+		om := mapOpenAIMessage(m)
+		// Legacy sessions may contain duplicate tool rows without tool_call_id.
+		if m.Role == types.MessageRoleTool && om.ToolCallID == "" {
+			continue
+		}
+		out.Messages = append(out.Messages, om)
 	}
 	for _, tool := range req.Tools {
 		params, err := parseToolParameters(tool.Parameters)
@@ -62,11 +70,33 @@ func mapOpenAIMessage(m types.Message) openAIMessage {
 	if raw, ok := m.Metadata[metaToolCalls]; ok && raw != "" {
 		var calls []openAIToolCallMsg
 		if err := json.Unmarshal([]byte(raw), &calls); err == nil && len(calls) > 0 {
-			out.ToolCalls = calls
+			out.ToolCalls = sanitizeOpenAIToolCalls(calls)
 		}
 	}
-	if id, ok := m.Metadata[metaToolCallID]; ok && id != "" {
-		out.ToolCallID = id
+	if id, ok := m.Metadata[metaToolCallID]; ok {
+		id = strings.TrimSpace(id)
+		if id == "" && out.Role == string(types.MessageRoleTool) {
+			id = fmt.Sprintf("call_%d", time.Now().UnixNano())
+		}
+		if id != "" {
+			out.ToolCallID = id
+		}
+	}
+	return out
+}
+
+// sanitizeOpenAIToolCalls ensures provider-bound messages never send empty tool call IDs
+// (MiniMax returns 400: tool call id is empty).
+func sanitizeOpenAIToolCalls(calls []openAIToolCallMsg) []openAIToolCallMsg {
+	out := make([]openAIToolCallMsg, 0, len(calls))
+	for i, call := range calls {
+		if strings.TrimSpace(call.ID) == "" {
+			call.ID = fmt.Sprintf("call_%d_%d", time.Now().UnixNano(), i)
+		}
+		if call.Type == "" {
+			call.Type = "function"
+		}
+		out = append(out, call)
 	}
 	return out
 }
