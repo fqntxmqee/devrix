@@ -197,6 +197,30 @@ observability:
 }
 ```
 
+## 按 Layer 验收（D1–D5）
+
+Runtime coverage 按 **Layer** 分组统计，用于识别「某层完全未触达」而非追求 100% operation hit。
+
+| Layer | 典型 integration 测试 | 说明 |
+|-------|------------------------|------|
+| `communication` | `integration && d1` | Gateway / adapter 入站 |
+| `context` | `integration && d2` | PEV + compression + harness |
+| `llm` | `integration && d3` | LLM gateway 链 |
+| `agent` | `integration && d4` | Agent tool |
+| cross | `integration && cross` | 全链 trace 层级（含 SpanKind） |
+
+**注意**: 条件 operation（见 `docs/observability-design.md` §4.3）在未触发时显示 zero-hit 是正常现象。
+
+### 与 L5 测试点
+
+| L5 | 验证方式 |
+|----|----------|
+| L5-OBS-TRACE-04 | `obs_pev_span_hierarchy_test.go` — R1/R2 父子层级 |
+| L5-OBS-TRACE-06 | 同上 — SpanKind SERVER/CLIENT |
+| Registry 对账 | `coverage/registry_test.go` vs `telemetry/names.go` |
+
+---
+
 ## 识别无用代码
 
 零命中的操作可能是：
