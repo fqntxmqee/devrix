@@ -37,6 +37,7 @@
 | DM-20260610-008 | D6 Eval CLI — devrix eval run | devrix-d6-eval-cli | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
 | DM-20260610-009 | D6 Eval Phase 2 — PEV probe, real Judge, tune | devrix-d6-eval-phase2 | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
 | DM-20260610-010 | D6 Eval Phase 3 — Provider + Fork/Join probes | devrix-d6-eval-phase3 | 2026-06-10 | [#22](https://github.com/fqntxmqee/devrix/pull/22) | ACCEPTED |
+| DM-20260610-011 | D6 Eval Phase 4 — CI fast check + delta gate | devrix-d6-eval-phase4 | 2026-06-10 | [#24](https://github.com/fqntxmqee/devrix/pull/24) | ACCEPTED |
 
 ## Archive Locations
 
