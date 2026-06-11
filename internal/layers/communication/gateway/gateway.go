@@ -45,6 +45,7 @@ type CommunicationGateway struct {
 	mu              sync.RWMutex
 	sessions        map[string]*types.Session
 	activeProcesses map[string]context.CancelFunc
+	processes       sync.WaitGroup
 	agentFactory    multiagent.IAgentFactory
 	agentObserverFactory func(ctx context.Context, session *types.Session) multiagent.AgentObserver
 	sessionAgents   map[string]multiagent.Agent
@@ -100,6 +101,13 @@ func (g *CommunicationGateway) unregisterProcess(sessionID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	delete(g.activeProcesses, sessionID)
+}
+
+// WaitForProcesses blocks until all in-flight RouteInbound goroutines
+// (including the post-persist session store writes) have completed. Intended
+// for tests that need deterministic shutdown before t.TempDir cleanup.
+func (g *CommunicationGateway) WaitForProcesses() {
+	g.processes.Wait()
 }
 
 // SetObservability wires tracing/metrics into the gateway.
@@ -241,7 +249,9 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	eventChan := g.contextEngine.Process(processCtx, session, msg.Content)
 
 	// Handle events from context engine
+	g.processes.Add(1)
 	go func() {
+		defer g.processes.Done()
 		defer endSpan()
 		defer cancel()
 		g.handleEngineEvents(processCtx, session, eventChan)
