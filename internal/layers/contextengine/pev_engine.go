@@ -136,9 +136,17 @@ func (e *PEVEngine) Run(
 			if runErr := e.milestoneRunner.Run(ctx, sc, view, planResult.TaskID, emit); runErr != nil {
 				return nil, runErr
 			}
+			// DM-20260611-008：milestone-only 路径不调 LLM（plan 已先调过），
+			// usage="0" 是真实情况；打 llm_called="false" 让 D5 观测层能区分。
 			emit(&gateway.EngineEvent{
 				Type: "complete", SessionID: sc.SessionID,
-				Metadata: map[string]string{"usage": "0", "duration": "0"},
+				Metadata: map[string]string{
+					"usage":      "0",
+					"duration":   "0",
+					"model":      sc.Model,
+					"ctx_pct":    "0",
+					"llm_called": "false",
+				},
 			})
 			sc.PEVState.Phase = types.PEVPhaseDone
 			return &PEVRunResult{Messages: sc.Messages}, nil
@@ -508,11 +516,16 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	assistantText = textutil.StripThinkingTags(assistantText)
 
 	duration := time.Since(start).Milliseconds()
+	ctxPct := gateway.ComputeCtxPct(usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
 	if emitComplete {
 		emit(&gateway.EngineEvent{
 			Type: "complete", SessionID: sc.SessionID,
 			Metadata: map[string]string{
-				"usage": fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens), "duration": fmt.Sprintf("%d", duration),
+				"usage":      fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens),
+				"duration":   fmt.Sprintf("%d", duration),
+				"model":      sc.Model,
+				"ctx_pct":    fmt.Sprintf("%d", ctxPct),
+				"llm_called": "true",
 			},
 		})
 	}
@@ -521,6 +534,11 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		runSpan.SetAttributes(
 			tracer.Attribute{Key: "pev.duration_ms", Value: fmt.Sprintf("%d", duration)},
 			tracer.Attribute{Key: "pev.total_tokens", Value: fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens)},
+			tracer.Attribute{Key: "pev.prompt_tokens", Value: fmt.Sprintf("%d", usage.PromptTokens)},
+			tracer.Attribute{Key: "pev.completion_tokens", Value: fmt.Sprintf("%d", usage.CompletionTokens)},
+			tracer.Attribute{Key: "pev.ctx_pct", Value: fmt.Sprintf("%d", ctxPct)},
+			tracer.Attribute{Key: "pev.max_context_tokens", Value: fmt.Sprintf("%d", sc.TokenBudget.MaxContextTokens)},
+			tracer.Attribute{Key: "pev.llm_called", Value: "true"},
 		)
 	}
 

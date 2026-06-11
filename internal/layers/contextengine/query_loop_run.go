@@ -9,6 +9,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -23,6 +25,14 @@ func (e *PEVEngine) runViaQueryLoop(
 	emitComplete bool,
 ) (*PEVRunResult, error) {
 	start := time.Now()
+	// DM-20260611-008：query loop 路径补充 runSpan，让 D5 观测层能定位
+	// token 链路（与 legacy PEV 路径的 pev.run 对齐）。
+	ctx, queryRunSpan := e.startSpan(ctx, telemetry.OpContextPEVRun, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "pev.path", Value: "query_loop"},
+	)
+	if queryRunSpan != nil {
+		defer queryRunSpan.End()
+	}
 	toolSchemas := resolveVisibleTools(ctx, e.toolsReg, sc)
 	toolSchemas = FilterToolsByPermissionMode(sc.PermissionMode, toolSchemas, sc.PlanFilePath)
 	toolSchemas = FilterToolsForAgentRole(sc, toolSchemas)
@@ -173,17 +183,31 @@ func (e *PEVEngine) runViaQueryLoop(
 		}
 	}
 
-	// When YOLO mode is active and tool calls were made, suppress "complete" so the
-	// gateway keeps the session open and the LLM may continue with remaining tasks.
 	assistantText = textutil.StripThinkingTags(assistantText)
-	if emitComplete && !(e.isYOLO() && len(res.ToolCallHistory) > 0) {
+	if emitComplete {
+		duration := time.Since(start).Milliseconds()
+		ctxPct := gateway.ComputeCtxPct(res.Usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
 		emit(&gateway.EngineEvent{
 			Type: "complete", SessionID: sc.SessionID,
 			Metadata: map[string]string{
-				"usage": fmt.Sprintf("%d", res.Usage.PromptTokens+res.Usage.CompletionTokens),
-				"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+				"usage":      fmt.Sprintf("%d", res.Usage.PromptTokens+res.Usage.CompletionTokens),
+				"duration":   fmt.Sprintf("%d", duration),
+				"model":      sc.Model,
+				"ctx_pct":    fmt.Sprintf("%d", ctxPct),
+				"llm_called": "true",
 			},
 		})
+		if queryRunSpan != nil {
+			queryRunSpan.SetAttributes(
+				tracer.Attribute{Key: "pev.duration_ms", Value: fmt.Sprintf("%d", duration)},
+				tracer.Attribute{Key: "pev.total_tokens", Value: fmt.Sprintf("%d", res.Usage.PromptTokens+res.Usage.CompletionTokens)},
+				tracer.Attribute{Key: "pev.prompt_tokens", Value: fmt.Sprintf("%d", res.Usage.PromptTokens)},
+				tracer.Attribute{Key: "pev.completion_tokens", Value: fmt.Sprintf("%d", res.Usage.CompletionTokens)},
+				tracer.Attribute{Key: "pev.ctx_pct", Value: fmt.Sprintf("%d", ctxPct)},
+				tracer.Attribute{Key: "pev.max_context_tokens", Value: fmt.Sprintf("%d", sc.TokenBudget.MaxContextTokens)},
+				tracer.Attribute{Key: "pev.llm_called", Value: "true"},
+			)
+		}
 		sc.PEVState.Phase = types.PEVPhaseDone
 	}
 

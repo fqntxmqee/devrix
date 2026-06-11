@@ -35,6 +35,8 @@
 |-------|------|---------|-----------|--------|----------|
 | L5-1-1-01 | 新会话创建被拒绝 | Gateway | `tests/acceptance/p0/comm_gateway_flow_test.go` | IMPLEMENTED | P0 |
 | L5-1-1-02 | IM 入口实例 Register/Unregister | Gateway | `internal/layers/communication/instance/registry_test.go` | IMPLEMENTED | P2 |
+| L5-1-1-03 | `buildCompletionSummary` 注入 ctx_pct 段（含/省略/clamp/异常） | Gateway | `internal/layers/communication/gateway/summary_test.go` | IMPLEMENTED | P1 |
+| L5-1-1-04 | `ComputeCtxPct` 边界：0 prompt / 0 max / 负数 / 超限 clamp | Gateway | `internal/layers/communication/gateway/summary_test.go` | IMPLEMENTED | P1 |
 
 ### D1-S5: Milestone Module
 
@@ -68,6 +70,11 @@
 | L5-1-2-01 | 飞书消息解析正确 | Adapters | `internal/layers/communication/adapters/feishu_test.go` | IMPLEMENTED | P1 |
 | L5-1-2-02 | 钉钉 Webhook 入站路由 + Session 出站 | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
 | L5-1-2-03 | 钉钉 milestone 出站走 CardRenderer | Adapters | `internal/layers/communication/adapters/dingtalk_test.go` | IMPLEMENTED | P1 |
+| L5-1-2-04 | Cardkit 双步发卡成功 | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P0 |
+| L5-1-2-05 | 元素级流式 PUT sequence 递增 | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P0 |
+| L5-1-2-06 | cardkit 失败降级 Patch | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P0 |
+| L5-1-2-07 | complete 关闭 streaming_mode | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P0 |
+| L5-1-2-08 | 流式节流配置生效 | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P1 |
 
 ---
 
@@ -120,6 +127,8 @@
 | L5-2-1-10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 | L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
 | L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
+| L5-2-1-13 | PEV emit complete 透传 ctx_pct + llm_called（主路径/milestone-only 区分） | PEV | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED | P1 |
+| L5-2-1-14 | query loop runSpan 含 pev.prompt_tokens / pev.completion_tokens / pev.ctx_pct | PEV | `internal/layers/contextengine/query_loop_run.go` | IMPLEMENTED | P1 |
 
 ### D2-S4: Token Module
 

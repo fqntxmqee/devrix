@@ -83,7 +83,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	if streamSpan != nil {
 		g.recordStreamRequest(streamSpan, req)
 	}
-	finishStream := func(err error, usage llmgateway.TokenUsage, provider, model string) {
+	finishStream := func(err error, usage llmgateway.TokenUsage, usageReceived bool, provider, model string) {
 		if streamSpan == nil {
 			return
 		}
@@ -93,6 +93,9 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			tracer.Attribute{Key: "llm.model", Value: model},
 		)
 		attrs = append(attrs, telemetry.LLMUsageAttrs(usage.PromptTokens, usage.CompletionTokens, time.Since(streamStart).Milliseconds())...)
+		// DM-20260611-008：记录 provider 是否回传了 usage 帧。
+		// false 表示 SSE 流里完全没出现 usage 字段 → 需排查 provider 协议。
+		attrs = append(attrs, tracer.Attribute{Key: "llm.usage_received", Value: fmt.Sprintf("%t", usageReceived)})
 		if err != nil {
 			streamSpan.RecordError(err)
 			streamSpan.SetStatus(tracer.StatusCodeError, err.Error())
@@ -127,7 +130,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			routeSpan.End()
 		}
 		if err != nil {
-			finishStream(err, llmgateway.TokenUsage{}, "", "")
+			finishStream(err, llmgateway.TokenUsage{}, false, "", "")
 			return nil, err
 		}
 		provider, model = p, m
@@ -136,13 +139,13 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	providerCfg, ok := g.cfg.Providers[provider]
 	if !ok {
 		err := fmt.Errorf("provider config missing: %s", provider)
-		finishStream(err, llmgateway.TokenUsage{}, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
 		return nil, err
 	}
 
 	count := g.counter.CountWithSystemPrompt(req.SystemPrompt, req.Messages)
 	if err := g.counter.CheckBudget(count, defaultPromptTokenBudget); err != nil {
-		finishStream(err, llmgateway.TokenUsage{}, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
 		return nil, err
 	}
 
@@ -157,18 +160,18 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			cbSpan.End()
 		}
 		if err != nil {
-			finishStream(err, llmgateway.TokenUsage{}, provider, model)
+			finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
 			return nil, err
 		}
 		if !allowed {
-			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, provider, model)
+			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, false, provider, model)
 			return nil, fmt.Errorf("circuit breaker rejected: %s", provider)
 		}
 	}
 
 	ad, err := g.reg.Get(provider)
 	if err != nil {
-		finishStream(err, llmgateway.TokenUsage{}, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
 		return nil, err
 	}
 
@@ -236,7 +239,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			retrySpan.RecordError(err)
 			retrySpan.End()
 		}
-		finishStream(err, llmgateway.TokenUsage{}, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
 		return nil, err
 	}
 
@@ -252,6 +255,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 
 		var streamErr error
 		var usage llmgateway.TokenUsage
+		var usageReceived bool
 	streamLoop:
 		for {
 			select {
@@ -271,6 +275,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				}
 				if ac.Parsed.Usage.PromptTokens > 0 || ac.Parsed.Usage.CompletionTokens > 0 {
 					usage = ac.Parsed.Usage
+					usageReceived = true
 				}
 				select {
 				case <-streamCtx.Done():
@@ -286,12 +291,12 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				g.breaker.RecordFailure(provider)
 			}
 			g.recordError(provider, primaryModel)
-			finishStream(streamErr, usage, provider, model)
+			finishStream(streamErr, usage, usageReceived, provider, model)
 			return
 		}
 		g.breaker.RecordSuccess(provider)
 		g.recordSuccess(provider, primaryModel, start)
-		finishStream(nil, usage, provider, model)
+		finishStream(nil, usage, usageReceived, provider, model)
 	}()
 
 	return out, nil

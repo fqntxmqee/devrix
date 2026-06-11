@@ -419,7 +419,11 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		session.SetState(types.SessionStateCompleted)
 		usage := event.Metadata["usage"]
 		duration := event.Metadata["duration"]
-		summary := fmt.Sprintf("用时: %s, 消耗: %s", duration, usage)
+		model := event.Metadata["model"]
+		// DM-20260611-008：D2 PEV/QueryLoop 在 emit complete 时透传 ctx_pct。
+		// 为空/0/异常时 D1 buildCompletionSummary 自动省略 ctx 段。
+		ctxPct := event.Metadata["ctx_pct"]
+		summary := buildCompletionSummary(duration, usage, model, ctxPct)
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
