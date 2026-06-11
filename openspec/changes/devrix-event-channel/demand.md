@@ -10,6 +10,17 @@ created: 2026-06-11
 
 # 事件通道与背压机制
 
+## 0. 范围界定（2026-06-11 修订）
+
+| 概念 | 本需求 | **不属于**本需求 |
+|------|--------|------------------|
+| `Process()` 返回的 `chan *EngineEvent` | ✅ | |
+| `SessionQueue.Drain`（Delegate 进度队列） | | ✅ 见 QueryLoop D4 |
+| Feishu IM 卡片 sequence | | ✅ 见 DM-006 |
+| Wave Scheduler Worker 事件 fan-in | | ✅ 见 DM-007（可复用本通道抽象） |
+
+**不可丢弃事件（P0 约束）：** `complete`、`error` 类终结事件永远不得被 Drain/Compact 合并或丢弃（参见 tech-debt TD-QL-05）。
+
 ## 1. 背景
 
 当前 ContextEngine 使用 `chan *EngineEvent` 作为 Process() 的返回值通道，buffer 固定为 32。当生产者（LLM 流式输出 + 工具执行）速度快于消费者（上层调度器）时，通道写阻塞会导致全链路背压失控。Claude Code 使用 async generator（`async *submitMessage()`），其 `for await...of` 是拉模式（pull-based）：消费者不拉取，生产者不推进，天然零积压。Devrix 的 `chan *EngineEvent` 是推模式（push-based），消费者来不及处理时生产者仍被强制写入，必然积压。两种模式的背压特性存在本质差异。

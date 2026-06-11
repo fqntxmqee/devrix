@@ -49,8 +49,8 @@
 
 | # | 任务 | 说明 |
 |---|------|------|
-| T24 | D7 Work Orchestration 升格 + Milestone↔Task | `design-orchestration-v3.md` |
-| T25 | PEV Verify semantic 模式 | Hook 增强 |
+| T24 | D7 Work Orchestration 升格 + Milestone↔Task | **已迁移 → DM-20260611-007** Wave Scheduler |
+| T25 | PEV Verify semantic 模式 | Hook 增强（仍 open，非 Wave 范围） |
 | T26 | Feishu worker_card / 任务树卡片 | D1 adapter |
 | T27 | L5 E2E Plan Mode + WorkPlan 场景 | 测试网 |
 
@@ -70,4 +70,4 @@ T1 → T2 → T3,T4 → T5 → T6,T7 → T8
 - [x] `harness.enabled=false` 回归绿
 - [x] context-engine spec V6 delta 合并至 `openspec/specs/context-engine/spec.md`
 - [x] orchestration / multi-agent spec 与 architecture 注册表同步
-- [ ] v3.0 D7 Work Orchestration（T24–T27，见 `design-orchestration-v3.md`）
+- [x] v3.0 D7 Work Orchestration（T24–T27）→ **迁移至 DM-20260611-007** `devrix-wave-scheduler`

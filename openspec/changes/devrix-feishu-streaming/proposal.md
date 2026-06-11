@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-feishu-streaming  
 **Demand ID:** DM-20260611-006  
-**Status:** S3_Planning
+**Status:** S5_Acceptance（单测 PASS，待真机 E2E 验收）
 
 ## 1. Background
 

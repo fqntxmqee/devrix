@@ -1,0 +1,88 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-multiagent-isolation
+  demand_id: DM-20260611-005
+  title: "多 Agent 会话隔离 — Join 合并与 Session 元数据隔离"
+  status: s2_proposal
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-11"
+  updated_at: "2026-06-11"
+  source: devrix-harness-architecture-audit
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "ProcessOverlay 与 snapshot 对齐"
+    - id: D4
+      name: Multi-Agent
+      affected: true
+      reason: "Join 合并 + metadata COW + ForkSessionView"
+    - id: D6
+      name: Evolution
+      affected: true
+      reason: "SessionIsolationProbe 评测探针"
+
+  capabilities:
+    - id: AGT-JOIN-ORDER
+      name: Join 消息按 agent 完成序排序
+    - id: AGT-METADATA-COW
+      name: Fork 子 Agent metadata 写操作隔离
+    - id: AGT-SESSION-VIEW
+      name: ForkSessionView 快照 API
+    - id: AGT-ISOLATION-PROBE
+      name: D6 会话隔离评测探针
+
+  l5_test_points:
+    - L5-4-3-01  # Join 排序 + tool_call ID 去重
+    - L5-4-3-02  # Fork metadata 写操作不污染父
+    - L5-4-3-03  # 并发 3 Fork + Join 一致性
+    - L5-4-3-04  # ForkSessionView API 注入
+    - L5-4-3-05  # SessionIsolationProbe 注册
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: pending
+  - path: tasks.md
+    status: pending
+  - path: internal/layers/multiagent/agent/agent.go
+    status: pending
+  - path: internal/layers/multiagent/factory/factory.go
+    status: pending
+
+version_scope:
+  v1.0:
+    features:
+      - "Join 排序 + tool_call ID 去重"
+      - "Fork metadata COW 隔离"
+      - "ForkSessionView 快照 API"
+      - "SessionIsolationProbe 注册"
+    status: planned
+  v1.1:
+    features:
+      - "Task 抽象（local_bash / local_agent）作为 Fork 通用替代"
+    status: future
+  v2.0:
+    features:
+      - "Fork 策略注入（CopyOnWrite / Snapshot / Shared）"
+    status: future
+
+external_dependencies:
+  - component: "DM-007 Wave Scheduler"
+    status: planned
+    note: "ContextPolicy resolver 消费 ForkSessionView"
+  - component: "DM-012 QueryLoop v6（已归档）"
+    status: available
+
+related_changes:
+  - devrix-wave-scheduler
+  - devrix-harness-unification
+  - devrix-layer-isolation

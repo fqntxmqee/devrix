@@ -1,0 +1,110 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-event-channel
+  demand_id: DM-20260611-003
+  title: "事件通道与背压机制 — Channel Drain/Compact/Reconnect"
+  status: s2_proposal
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-11"
+  updated_at: "2026-06-11"
+  source: devrix-harness-architecture-audit
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "EngineEvent 通道增加优先级、Compact、Drain/Reconnect 生命周期"
+    - id: D4
+      name: Multi-Agent
+      affected: true
+      reason: "Fork/Join 子 Agent 通道隔离"
+    - id: D5
+      name: Observability
+      affected: true
+      reason: "通道监控指标 + TraceContext 注入"
+    - id: D6
+      name: Evolution
+      affected: true
+      reason: "BackpressureProbe 评测探针"
+
+  capabilities:
+    - id: EVT-PRI
+      name: EngineEvent 优先级字段
+    - id: EVT-DRAIN
+      name: Drain 机制（按优先级淘汰）
+    - id: EVT-COMPACT
+      name: 同类事件合并（Compact）
+    - id: EVT-RECONNECT
+      name: Drain→Compact→重建通道
+    - id: EVT-ISOLATION
+      name: Fork 子 Agent 独立通道
+    - id: EVT-TRACE
+      name: TraceContext 字段
+    - id: EVT-BACKPRESSURE-PROBE
+      name: D6 背压评测探针
+
+  l5_test_points:
+    - L5-2-3-01  # 通道积压量可查询
+    - L5-2-3-02  # Drain 排空非关键事件
+    - L5-2-3-03  # 关键事件（complete/error）不可丢弃
+    - L5-2-3-04  # Compact 同类事件合并
+    - L5-2-3-05  # Reconnect 重建通道后继续处理
+    - L5-2-3-06  # Fork 子 Agent 独立通道
+    - L5-2-3-07  # TraceContext 注入事件
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: pending
+  - path: tasks.md
+    status: pending
+  - path: specs/context-engine/spec.md
+    status: pending
+  - path: internal/layers/contextengine/eventbus/backpressure.go
+    status: pending
+  - path: internal/layers/contextengine/eventbus/drain.go
+    status: pending
+  - path: internal/layers/contextengine/eventbus/compact.go
+    status: pending
+  - path: internal/layers/observability/metrics/channel_backlog.go
+    status: pending
+
+version_scope:
+  v1.0:
+    features:
+      - "EngineEvent 增加 priority 字段（Critical/Normal/Low）"
+      - "Drain 机制：积压超阈值按优先级淘汰，保留 Critical"
+      - "Compact 合并连续 ProgressEvent 为聚合事件"
+      - "Reconnect 生命周期"
+      - "Fork 子 Agent 独立通道"
+    status: planned
+  v1.1:
+    features:
+      - "TraceContext 注入事件"
+      - "BackpressureProbe 注册 D6"
+      - "动态 buffer 大小自适应"
+    status: future
+  v2.0:
+    features:
+      - "拉模式（async generator 等价物）"
+    status: future
+
+external_dependencies:
+  - component: "D5 Metrics"
+    status: available
+  - component: "D6 Eval 框架"
+    status: available
+  - component: "DM-007 Wave Scheduler"
+    status: planned
+    note: "可复用本通道抽象"
+
+related_changes:
+  - devrix-wave-scheduler
+  - devrix-layer-isolation

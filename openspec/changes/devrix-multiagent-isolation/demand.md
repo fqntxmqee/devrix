@@ -1,84 +1,89 @@
 ---
 demand-id: DM-20260611-005
-title: 多 Agent 会话隔离 — Fork/Join 独立 Session 上下文
-source: devrix-harness-architecture-audit
-priority: P0
-status: S1_Proposal
+title: 多 Agent 会话隔离 — Join 合并与 Session 元数据隔离
+source: devrix-harness-architecture-audit（2026-06-11 修订）
+priority: P1
+status: S2_Revised
+revised: 2026-06-11
 l1-domain: multi-agent
 created: 2026-06-11
 ---
 
 # 多 Agent 会话隔离
 
-## 1. 背景
+## 1. 背景（修订）
 
-当前 Fork/Join 实现中，Fork() 创建子 Agent 时直接复用父 Agent 的 `session` 指针。Join() 将所有子 Agent 的消息追加到同一共享 Session。当子 Agent 并发运行时会存在竞态写入和状态污染风险。对照 Claude Code Harness 的 Task 隔离模型（4 种 Task 类型各有独立状态上下文），差距明显。
+2026-06-11 审计指出 Fork/Join 共享 `session` 指针导致竞态。  
+**DM-012 QueryLoop v2 已部分缓解：**
 
-## 2. 问题陈述
+| 机制 | 位置 | 作用 |
+|------|------|------|
+| 每 Agent 独立 `messageBuffer` | `agent/agent.go` | Agent 层消息累积隔离 |
+| Fork Worker → `WorkerEngine` | `factory/factory.go:91-93` | D2 `ProcessOverlay` 上下文隔离 |
+| `BuildForkedMessages` | `query/fork.go` | SubQuery cache-friendly fork 前缀 |
 
-### 2.1 共享 Session 指针
+**仍存在的真实风险**（修订后 P0 焦点）：
+
+- Fork 子 Agent 仍持有父 `*types.Session` 指针（session ID / metadata 共享）
+- Join 合并语义未保证排序/去重
+- 并发 Fork 时 Session 元数据 / ContextSnapshot 写入未 `-race` 验证
+- 与 **DM-007 Wave Scheduler** SubAgent 槽的 `ContextPolicy=fresh` 需对齐
+
+## 2. 问题陈述（修订）
+
+### 2.1 ~~消息列表竞态~~ → 降级为已缓解
+
+原审计「子 Agent A/B 同时写 Session.Messages 导致交错」—— 当前 Agent 层使用独立 `messageBuffer`，D2 侧 Worker 使用 `ProcessOverlay`。**不应再作为 P0 主论据。**
+
+### 2.2 Session 元数据与 Join 合并（新 P0）
 
 | 问题 | 位置 | 影响 |
 |------|------|------|
-| Fork() 子 Agent 使用 `a.session` | `agent/agent.go` Fork() | 子 Agent 与父 Agent 共享同一 Session |
-| Join() 追加至同一 Session | `agent/agent.go` Join() | 所有子 Agent 输出合并到同一上下文 |
-| 并发写入无保护 | `agent/agent.go` | 竞态条件导致消息交错或丢失 |
+| 共享 `*types.Session` 指针 | `agent/agent.go` Fork → `creator.Create(..., a.session)` | metadata / snapshot 字段并发写 |
+| Join 合并无排序去重 | `agent/agent.go` Join | 父上下文乱序或重复 |
+| 压缩触发跨 Agent | D2 compression | 多 Worker 同时 compact 同一 Session |
 
-**证据**：`internal/layers/multiagent/agent/agent.go` 中 Fork() 创建的 child Agent 持有 `a.session` 的同一引用。
+### 2.3 与 Wave Scheduler 的衔接
 
-### 2.2 引入的缺陷场景
+DM-007 要求 SubAgent 槽 **fresh context**（directive only）。本需求 P1 应提供：
 
-| 场景 | 后果 |
+- Session 快照 API：`SnapshotMetadata()` / `ForkSessionView()` 供 Scheduler 注入
+- Join 时 artifact 合并而非全量 Messages 灌入 Leader
+
+## 3. 验收标准（修订）
+
+### P0
+
+- [ ] Join() 合并路径：消息按 agent 完成序排序 + tool_call ID 去重，`-race` 测试通过
+- [ ] Fork 子 Agent 对 Session **metadata 写操作**隔离（COW 或显式禁止回写）
+- [ ] 集成测试：并发 3 Fork + Join，父 Agent 上下文一致
+
+### P1
+
+- [ ] Session 快照机制：`ForkSessionView(parent)` 共享 ID + 隔离 overlay 字段
+- [ ] 与 DM-007 `ContextPolicy` resolver 对接
+- [ ] `SessionIsolationProbe` 注册 D6 Eval
+
+### P2
+
+- [ ] Task 抽象（local_bash / local_agent）作为 Fork 通用替代
+- [ ] Fork 策略注入：CopyOnWrite / Snapshot / Shared（Shared 仅测试/兼容）
+
+## 4. 非目标
+
+- **不**要求每个 Fork 完整复制 Session（内存开销大；Wave fresh policy 只需 directive + 元数据子集）
+- **不**重复 DM-012 SubQuery / Delegate 已实现的 overlay 隔离
+
+## 5. 领域映射
+
+| 子域 | 变更 |
 |------|------|
-| 子 Agent A 写 Session 消息列表时被 B 中断 | 消息交错，上下文乱序 |
-| 子 Agent 修改 Session Metadata | 父 Agent 感知到意外状态变更 |
-| 多个子 Agent 触发压缩 | 重复压缩或压缩冲突 |
+| `multiagent/agent` | Join 合并 + metadata COW |
+| `multiagent/factory` | ForkSessionView 注入 |
+| `contextengine` | ProcessOverlay 与 snapshot 对齐 |
+| `orchestration/`（DM-007） | ContextPolicy 消费快照 API |
 
-### 2.3 Claude Code 的对照
+## 6. 回归风险
 
-Claude Code 使用 Task 类型（local_bash / local_agent / remote_agent / dream），每个 Task 拥有独立的：
-- 工作目录（cwd）
-- 状态上下文（state）
-- 输出通道（output channel）
-- 生命周期（独立的创建 → 执行 → 完成 → 清理）
-
-Fork/Join 应借鉴此模式，为每个子 Agent 分配独立的 Session 快照而非共享指针。
-
-## 3. 验收标准
-
-### P0 (阻止合并)
-
-- [ ] Fork() 创建子 Agent 时分配独立的 Session 副本（Copy-on-Write 或完整快照）
-- [ ] Join() 合并时进行消息排序和去重，保证父 Agent 上下文一致性
-- [ ] 消除所有因共享 Session 指针导致的竞态风险，通过 `-race` 测试
-
-### P1 (必须完成)
-
-- [ ] 实现 Session 快照机制：允许按需选择共享字段元数据和隔离消息列表
-- [ ] 子 Agent 生命周期内对 Session 的修改不回写父 Agent（除非显式 Export）
-- [ ] 提供兼容模式（通过 Opt-in 保留共享行为）以便逐步迁移现有调用方
-- [ ] 实现会话隔离评测探针（`SessionIsolationProbe`）：`-race` 测试持续通过率 + 快照拷贝性能基线，注册到 D6 Eval 框架
-
-### P2 (建议完成)
-
-- [ ] 实现 Task 抽象的独立上下文（参考 Claude Code 的 4 种 Task 类型），作为 Fork/Join 的通用替代
-- [ ] Fork 支持策略注入（CopyOnWrite / Snapshot / Shared）按场景选择
-- [ ] Fork/Join 运行时指标：Fork 次数、Session 快照大小、快照拷贝延迟、Join 合并消息数，通过 D5 暴露
-
-## 4. 领域映射
-
-| 子域 | 影响范围 | 预期工作量 |
-|------|----------|-----------|
-| `multiagent/agent` | Fork/Join 会话隔离改造 | 高 |
-| `multiagent/contracts` | AgentState 扩展（Session 策略） | 中 |
-| `shared/contracts` | Task 抽象定义 | 高 |
-| `contextengine` | 适配独立 Session 的压缩和路由 | 中 |
-| `communication` | 适配独立 Session 的响应分发 | 低 |
-| `observability/metrics` | Fork/Join 操作指标 | 低 |
-| `d6/eval` | SessionIsolation 探针 | 低 |
-
-## 5. 回归风险
-
-- 从共享 Session 到独立 Session 的迁移可能破坏依赖共享状态的外部逻辑
-- Copy-on-Write 实现可能引入显著的额外内存开销（需压测验证）
-- Task 抽象引入后需同步更新 Fork/Join 控制流
+- Join 排序变更可能影响依赖「追加顺序」的现有测试
+- metadata COW 需压测大 Session 拷贝开销

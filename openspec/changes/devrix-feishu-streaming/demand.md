@@ -3,7 +3,7 @@ demand-id: DM-20260611-006
 title: 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机
 source: 用户反馈 + v3.0 Feishu 流式 UX 规划
 priority: P1
-status: S4_Developing
+status: S5_Acceptance
 l1-domain: communication
 created: 2026-06-11
 ---

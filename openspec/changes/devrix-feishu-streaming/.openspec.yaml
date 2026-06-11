@@ -1,7 +1,7 @@
 change_id: devrix-feishu-streaming
 priority: P1
 demand_id: DM-20260611-006
-status: s4_developing
+status: s5_acceptance
 domains: [D1, communication]
 parent_initiative: devrix-queryloop-context-v3
 l5_points:

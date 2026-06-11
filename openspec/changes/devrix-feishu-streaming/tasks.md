@@ -40,10 +40,10 @@
 
 | # | 任务 | L4 | L5 | PR 估算 |
 |---|------|-----|-----|---------|
-| T14 | 确认工具卡 Patch 与回复 cardkit 无 sequence 干扰（文档+测试） | stream-reply | — | ~40 |
-| T15 | 飞书真机验收清单 + `acceptance-report.md` 草稿 | — | 全部 P0 | ~60 |
-| T16 | 启动日志：cardkit 权限缺失时 WARN 指引 | cardkit | — | ~30 |
-| T17 | 更新 `openspec/l5-registry.md` 登记 L5-1-2-04~08 | — | — | ~40 |
+| T14 | 确认工具卡 Patch 与回复 cardkit 无 sequence 干扰（文档+测试） | stream-reply | — | ~40 | [x] |
+| T15 | 飞书真机验收清单 + `acceptance-report.md` 草稿 | — | 全部 P0 | ~60 | [x] |
+| T16 | 启动日志：cardkit 权限缺失时 WARN 指引 | cardkit | — | ~30 | [x] |
+| T17 | 更新 `openspec/l5-registry.md` 登记 L5-1-2-04~08 | — | — | ~40 | [x] |
 
 **Phase 3 验收**：P0 L5 全 PASS + 真机打字机可见
 

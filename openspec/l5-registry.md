@@ -164,6 +164,17 @@
 | L5-2-9-14 | PEV 可见工具 ⊆ VisibleTools | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | L5-2-9-15 | bootstrap.stage parent = bootstrap.run | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 
+### D2-S9.BG: Background SubQuery Task Tools
+
+> **Change:** `devrix-background-task-tools` (DM-20260611-009)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-2-9-16 | stop running task → cancelled (idempotent) | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
+| L5-2-9-17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
+| L5-2-9-18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
+| L5-2-9-19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P1 |
+
 ### D2-S10: QueryLoop Module
 
 > **Change:** `devrix-queryloop-context` (DM-20260610-012)
@@ -205,6 +216,25 @@
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
 | L5-ORCH-01 | WorkPlan.Snapshot 含 Task + ExecutionFlow | WorkPlan | `internal/layers/orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
+
+### ORCH-S2: Wave Scheduler Module
+
+> **Change:** `devrix-wave-scheduler` (DM-20260611-007)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-ORCH-10 | DAG 6 ready subagent + 1 cursor 持续调度峰值并发=5 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | PLANNED | P0 |
+| L5-ORCH-11 | upstream policy 收到 A artifact，无 Leader 全量 | ContextPolicy | `internal/layers/orchestration/wave/context_test.go` | PLANNED | P0 |
+| L5-ORCH-12 | fresh policy SubAgent 启动 Messages 仅含 directive | ContextPolicy | `internal/layers/orchestration/wave/context_test.go` | PLANNED | P0 |
+| L5-ORCH-13 | 同 conflict_group Task 不并行 | ConflictGuard | `internal/layers/orchestration/wave/conflict_test.go` | PLANNED | P0 |
+| L5-ORCH-14 | 每 Task 独立双区块 IM 卡流式 | WorkerCard | `internal/layers/communication/adapters/feishu_worker_card_test.go` | PLANNED | P0 |
+| L5-ORCH-15 | 槽位释放后 ready Task 立即派发 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | PLANNED | P0 |
+| L5-ORCH-16 | cursor + claude-code 并行 file_scope 不交 | ConflictGuard | `internal/layers/orchestration/wave/conflict_test.go` | PLANNED | P1 |
+| L5-ORCH-17 | Plan 产出 DAG 仅 ready 节点被派发 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | PLANNED | P0 |
+| L5-ORCH-18 | wave 全完成 Leader 收到 wave_completed 汇总 | WaveScheduler | `internal/layers/orchestration/wave/leader_test.go` | PLANNED | P1 |
+| L5-ORCH-19 | CancelWorker 槽位释放 status=cancelled | WorkerLifecycle | `internal/layers/orchestration/wave/lifecycle_test.go` | PLANNED | P0 |
+| L5-ORCH-20 | CancelAll 5 running 全部 terminal pool 全释放 | WorkerLifecycle | `internal/layers/orchestration/wave/lifecycle_test.go` | PLANNED | P0 |
+| L5-ORCH-21 | CLI Worker cancel 进程终止 IM 卡 cancelled | WorkerLifecycle | `internal/layers/orchestration/wave/agent_tool_test.go` | PLANNED | P1 |
 
 ---
 

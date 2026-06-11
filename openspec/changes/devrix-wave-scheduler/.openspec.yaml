@@ -1,0 +1,28 @@
+change_id: devrix-wave-scheduler
+priority: P0
+demand_id: DM-20260611-007
+status: s3_design
+domains: [orchestration, D1, D2, D4]
+parent_initiative: devrix-queryloop-context-v3
+decisions:
+  dag_source: plan_engine          # 1B
+  dispatch_mode: continuous        # 2B
+  workdir_policy: shared           # 3B — conflict guard at scheduler layer
+worker_pool:
+  cursor: 1
+  claude_code: 1
+  subagent: 3
+l5_points:
+  - L5-ORCH-10
+  - L5-ORCH-11
+  - L5-ORCH-12
+  - L5-ORCH-13
+  - L5-ORCH-14
+  - L5-ORCH-15
+  - L5-ORCH-16
+  - L5-ORCH-17
+  - L5-ORCH-18
+version_scope:
+  v1.0: WaveScheduler + ContextPolicy + ConflictGuard + SubAgent/AgentTool runners
+  v1.1: Feishu Worker 双区块卡片 + cardkit 流式
+  v1.2: Plan Engine TaskGraph 物化 + Leader wave_completed 集成
