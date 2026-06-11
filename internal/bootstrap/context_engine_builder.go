@@ -84,6 +84,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 	if err := contextengine.RegisterQueryLoopTools(toolReg, b.ctxCfg, tasks.GlobalTaskManager); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
+	if err := contextengine.RegisterBackgroundTaskTools(toolReg); err != nil {
+		slog.Error("register background task tools", "error", err)
+	}
 	if b.maCfg != nil && b.maCfg.Delegate.Enabled {
 		if err := contextengine.RegisterDelegateTools(toolReg, b.maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)

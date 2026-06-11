@@ -37,6 +37,9 @@ func NewContextEngine(
 	if err := contextengine.RegisterQueryLoopTools(toolReg, ctxCfg, tasks.GlobalTaskManager); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
+	if err := contextengine.RegisterBackgroundTaskTools(toolReg); err != nil {
+		slog.Error("register background task tools", "error", err)
+	}
 
 	// Register per-agent call_<name> plugins if agent tools are enabled.
 	if agentToolReg != nil {

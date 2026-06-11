@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/harness"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
-	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
-	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
@@ -55,22 +55,22 @@ type EngineDeps struct {
 
 // ContextEngine implements gateway.IContextEngine.
 type ContextEngine struct {
-	memory        *memory.Manager
-	counter       contracts.ITokenCounter
-	pev           *PEVEngine
-	prompt        *prompt.Loader
-	cfg           *config.ContextEngineConfig
-	observer      IObserver
-	compObserver  ICompressionObserver
-	obsBridge     *observability.Bridge
-	asyncCompact  *compression.AsyncAutocompacter
-	toolsReg      IToolRegistry
-	harnessBoot   *harness.Bootstrap
-	assembler     *harness.SystemPromptAssembler
-	preflight     *harness.PreflightEvaluator
-	router        *harness.PromptRouter
-	transcript    *harness.TranscriptManager
-	defaultModel  string
+	memory       *memory.Manager
+	counter      contracts.ITokenCounter
+	pev          *PEVEngine
+	prompt       *prompt.Loader
+	cfg          *config.ContextEngineConfig
+	observer     IObserver
+	compObserver ICompressionObserver
+	obsBridge    *observability.Bridge
+	asyncCompact *compression.AsyncAutocompacter
+	toolsReg     IToolRegistry
+	harnessBoot  *harness.Bootstrap
+	assembler    *harness.SystemPromptAssembler
+	preflight    *harness.PreflightEvaluator
+	router       *harness.PromptRouter
+	transcript   *harness.TranscriptManager
+	defaultModel string
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -132,7 +132,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		Attachments:    attachReg,
 		UserContext:    ucProvider,
 		SessionQueue:   queue.GlobalSessionQueue,
-		Background:     query.NewBackgroundRegistry(),
+		Background:     query.SetGlobalBackgroundRegistry(),
 		CompressFn: newCompressFn(
 			cfg.QueryLoop.CompressPerTurn,
 			cfg,
@@ -143,9 +143,9 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		),
 	})
 	return &ContextEngine{
-		memory:  memory.NewManager(cfg, store, deps.LongTerm),
-		counter: counter,
-		pev:     pevEngine,
+		memory:       memory.NewManager(cfg, store, deps.LongTerm),
+		counter:      counter,
+		pev:          pevEngine,
 		prompt:       prompt.NewLoader(&cfg.SystemPrompt),
 		cfg:          cfg,
 		observer:     observer,
@@ -401,8 +401,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			workspace = &sc.Harness.Report.Workspace
 		}
 		buildInput := harness.SystemPromptBuildInput{
-			WorkDir:        session.WorkDir,
-			Session:        session,
+			WorkDir: session.WorkDir,
+			Session: session,
 			Runtime: harness.ProcessRuntimeContext{
 				SessionID: session.SessionID,
 				RequestID: session.RequestID,
@@ -498,7 +498,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				e.memory.AppendFullMessage(sc, resultMsg)
 			}
 		}
-		
+
 		if text := working.FlushStream(); text != "" {
 			e.memory.AppendMessage(sc, types.MessageRoleAssistant, text)
 			assistantSummary = text
