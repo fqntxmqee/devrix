@@ -42,8 +42,6 @@ const (
 	ToolNameTaskList    = "task_list"
 	ToolNameTaskUpdate  = "task_update"
 	ToolNameTaskDelete  = "task_delete"
-	ToolNameTaskPlan    = "task_plan"
-	ToolNameTaskVerify  = "task_verify"
 )
 
 // Execute runs a task tool by name.
@@ -59,10 +57,6 @@ func (t *ToolSuite) Execute(ctx context.Context, input TaskToolInput) (*TaskTool
 		return t.Update(ctx, input)
 	case ToolNameTaskDelete:
 		return t.Delete(ctx, input)
-	case ToolNameTaskPlan:
-		return t.Plan(ctx, input)
-	case ToolNameTaskVerify:
-		return t.Verify(ctx, input)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", input.ToolName)
 	}
@@ -205,24 +199,6 @@ func (t *ToolSuite) Delete(_ context.Context, input TaskToolInput) (*TaskToolOut
 	return &TaskToolOutput{
 		Success: true,
 		Message: fmt.Sprintf("Task deleted: %s", input.TaskID),
-	}, nil
-}
-
-// Plan generates a plan using PlanAgent.
-func (t *ToolSuite) Plan(ctx context.Context, input TaskToolInput) (*TaskToolOutput, error) {
-	// This would use the PlanAgent - simplified here
-	return &TaskToolOutput{
-		Success: true,
-		Message: "Plan generation not yet implemented - use /plan command",
-	}, nil
-}
-
-// Verify performs verification using VerificationAgent.
-func (t *ToolSuite) Verify(ctx context.Context, input TaskToolInput) (*TaskToolOutput, error) {
-	// This would use the VerificationAgent - simplified here
-	return &TaskToolOutput{
-		Success: true,
-		Message: "Verification not yet implemented - use /verify command",
 	}, nil
 }
 

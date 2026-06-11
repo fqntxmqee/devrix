@@ -26,8 +26,6 @@ func SelectContextEngine(
 ) gateway.IContextEngine {
 	engine := strings.ToLower(strings.TrimSpace(name))
 	switch engine {
-	case "stub", "echo":
-		return gateway.NewStubContextEngine()
 	case "four_flow", "fourflow", "four-flow":
 		slog.Warn("four_flow engine was removed; using context engine with real LLM")
 		fallthrough
@@ -42,8 +40,6 @@ func SelectContextEngine(
 // ContextEngineKind returns a short label for logs.
 func ContextEngineKind(engine gateway.IContextEngine) string {
 	switch engine.(type) {
-	case *gateway.StubContextEngine:
-		return "stub"
 	case *contextengine.ContextEngine:
 		return "context"
 	default:

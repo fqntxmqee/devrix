@@ -1,6 +1,8 @@
 package orchestration
 
 import (
+	"strconv"
+
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
 )
@@ -29,7 +31,7 @@ func initOrchMetrics(obs *observability.Observability) *orchMetrics {
 		metrics.WithLabels(metrics.LabelMap{"category": "all", "risk_class": "all"}),
 	)
 	m.validationsTotal, _ = meter.Int64Counter("orch_validations_total",
-		metrics.WithLabels(metrics.LabelMap{"result": "all"}),
+		metrics.WithLabels(metrics.LabelMap{"result": "all", "from_judge": "all"}),
 	)
 	m.interventionsTotal, _ = meter.Int64Counter("orch_interventions_total",
 		metrics.WithLabels(metrics.LabelMap{"action": "all"}),
@@ -56,6 +58,8 @@ func (m *orchMetrics) recordDecision(category string, riskClass int) {
 	if m == nil || m.decisionsTotal == nil {
 		return
 	}
+	m.decisionsTotal.Labels()["category"] = category
+	m.decisionsTotal.Labels()["risk_class"] = strconv.Itoa(riskClass)
 	m.decisionsTotal.Add(1)
 }
 
@@ -63,6 +67,8 @@ func (m *orchMetrics) recordValidation(valid bool, fromJudge bool) {
 	if m == nil || m.validationsTotal == nil {
 		return
 	}
+	m.validationsTotal.Labels()["result"] = strconv.FormatBool(valid)
+	m.validationsTotal.Labels()["from_judge"] = strconv.FormatBool(fromJudge)
 	m.validationsTotal.Add(1)
 }
 
@@ -70,6 +76,7 @@ func (m *orchMetrics) recordIntervention(action string) {
 	if m == nil || m.interventionsTotal == nil {
 		return
 	}
+	m.interventionsTotal.Labels()["action"] = action
 	m.interventionsTotal.Add(1)
 }
 
@@ -84,6 +91,7 @@ func (m *orchMetrics) recordStage(stage string) {
 	if m == nil || m.decisionsByStage == nil {
 		return
 	}
+	m.decisionsByStage.Labels()["stage"] = stage
 	m.decisionsByStage.Add(1)
 }
 

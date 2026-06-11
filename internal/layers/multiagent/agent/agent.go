@@ -21,20 +21,20 @@ type Creator interface {
 
 // Impl is the concrete Agent implementation.
 type Impl struct {
-	id            string
-	state         multiagent.AgentState
-	cfg           multiagent.AgentConfig
-	session       *types.Session
+	id              string
+	state           multiagent.AgentState
+	cfg             multiagent.AgentConfig
+	session         *types.Session
 	deps            multiagent.AgentDeps
 	creator         Creator
 	permGate        *agentPermissionGate
 	engine          contracts.IEngine
 	engineEventSink func(*contracts.EngineEvent)
-	childAgents   map[string]multiagent.Agent
-	messageBuffer []types.Message
-	result        *multiagent.AgentResult
-	done          chan struct{}
-	doneOnce      sync.Once
+	childAgents     map[string]multiagent.Agent
+	messageBuffer   []types.Message
+	result          *multiagent.AgentResult
+	done            chan struct{}
+	doneOnce        sync.Once
 
 	mu     sync.RWMutex
 	cancel context.CancelFunc
@@ -146,8 +146,6 @@ func (a *Impl) emit(eventType string, metadata map[string]any) {
 		ParentID:  a.cfg.ParentID,
 		SessionID: a.cfg.SessionID,
 		EventType: eventType,
-		State:     a.State(),
-		Mode:      a.cfg.Mode,
 		Metadata:  metadata,
 	})
 }

@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func (rj *RuntimeJudge) tryFallback(ctx context.Context, rec DecisionRecord, ori
 	}
 
 	req := &llmgateway.Request{
-		Model: rj.config.FallbackJudgeProvider + "/" + rj.config.FallbackJudgeModel,
+		Model:        rj.config.FallbackJudgeProvider + "/" + rj.config.FallbackJudgeModel,
 		SystemPrompt: "You are a routing decision validator. Respond in JSON only.",
 		Messages: []types.Message{
 			{Role: "user", Content: rj.buildJudgePrompt(rec)},
@@ -99,10 +100,29 @@ Respond with JSON:
 }
 
 func (rj *RuntimeJudge) parseResponse(raw string) *ValidationResult {
-	result := &ValidationResult{
-		Valid:           true,
-		Confidence:      1.0,
-		SuggestedAction: "none",
+	var resp struct {
+		Valid           bool    `json:"valid"`
+		Confidence      float64 `json:"confidence"`
+		Reason          string  `json:"reason"`
+		Reasoning       string  `json:"reasoning"`
+		SuggestedAction string  `json:"suggested_action"`
 	}
-	return result
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		return &ValidationResult{
+			Valid:           false,
+			Confidence:      0.0,
+			SuggestedAction: "none",
+			Reasoning:       fmt.Sprintf("parse error: %v", err),
+		}
+	}
+	reasoning := resp.Reason
+	if reasoning == "" {
+		reasoning = resp.Reasoning
+	}
+	return &ValidationResult{
+		Valid:           resp.Valid,
+		Confidence:      resp.Confidence,
+		Reasoning:       reasoning,
+		SuggestedAction: resp.SuggestedAction,
+	}
 }

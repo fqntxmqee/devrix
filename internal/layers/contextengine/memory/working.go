@@ -2,15 +2,11 @@ package memory
 
 import (
 	"strings"
-
-	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // WorkingMemory holds ephemeral state for a single Process call.
 type WorkingMemory struct {
-	ActiveTools  []string
 	StreamBuffer strings.Builder
-	CurrentPEV   types.PEVState
 }
 
 // NewWorkingMemory creates working memory.

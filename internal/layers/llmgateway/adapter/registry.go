@@ -43,14 +43,3 @@ func (r *Registry) Get(provider string) (llmgateway.IAdapter, error) {
 	}
 	return a, nil
 }
-
-// List returns registered provider names.
-func (r *Registry) List() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	names := make([]string, 0, len(r.adapters))
-	for name := range r.adapters {
-		names = append(names, name)
-	}
-	return names
-}

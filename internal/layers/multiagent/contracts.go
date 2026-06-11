@@ -130,8 +130,6 @@ type AgentEvent struct {
 	ParentID  string
 	SessionID string
 	EventType string
-	State     AgentState
-	Mode      CollaborationMode
 	Timestamp time.Time
 	Metadata  map[string]any
 }

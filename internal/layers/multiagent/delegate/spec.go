@@ -8,21 +8,19 @@ import (
 type WorkerRole string
 
 const (
-	WorkerRoleExplore    WorkerRole = "explore"
-	WorkerRolePlan       WorkerRole = "plan"
-	WorkerRoleImplement  WorkerRole = "implement"
+	WorkerRoleExplore   WorkerRole = "explore"
+	WorkerRolePlan      WorkerRole = "plan"
+	WorkerRoleImplement WorkerRole = "implement"
 )
 
 // WorkerSpec configures a D4 delegated worker run.
 type WorkerSpec struct {
-	Role           WorkerRole
-	Directive      string
-	TaskID         string
-	BuiltinProfile string
-	WorktreeSlug   string
-	MaxTurns       int
-	ReadOnly       bool
-	Async          bool
+	Role         WorkerRole
+	Directive    string
+	TaskID       string
+	WorktreeSlug string
+	MaxTurns     int
+	Async        bool
 }
 
 // DelegateResult is returned after a synchronous delegate completes.

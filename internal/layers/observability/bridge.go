@@ -45,72 +45,9 @@ func (b *Bridge) IsEnabled() bool {
 	return b != nil && b.tracer != nil
 }
 
-// LLMBridge provides LLM-specific observability helpers
-type LLMBridge struct {
-	bridge *Bridge
-}
-
-// NewLLMBridge creates a new LLM bridge
-func NewLLMBridge(obs *Observability) *LLMBridge {
-	return &LLMBridge{
-		bridge: NewBridge(obs),
-	}
-}
-
-// InitMetrics initializes LLM metrics
-func (b *LLMBridge) InitMetrics(provider, model string) (*LLMMetrics, error) {
-	if b.bridge == nil || b.bridge.meter == nil {
-		return nil, nil
-	}
-
-	labels := metrics.LabelMap{
-		"provider": provider,
-		"model":   model,
-	}
-
-	tokensInput, err := b.bridge.meter.Int64Counter("tokens",
-		metrics.WithLabels(labels))
-	if err != nil {
-		return nil, err
-	}
-
-	latency, err := b.bridge.meter.Float64Histogram("latency",
-		metrics.WithHistogramLabels(labels),
-		metrics.WithBounds(metrics.LLMHistogramBounds()))
-	if err != nil {
-		return nil, err
-	}
-
-	errors, err := b.bridge.meter.Int64Counter("errors",
-		metrics.WithLabels(labels))
-	if err != nil {
-		return nil, err
-	}
-
-	return &LLMMetrics{
-		TokensInput: tokensInput,
-		Latency:    latency,
-		Errors:     errors,
-	}, nil
-}
-
-// LLMMetrics holds LLM-related metrics
-type LLMMetrics struct {
-	TokensInput metrics.Counter
-	Latency     metrics.Histogram
-	Errors      metrics.Counter
-}
-
 // ToolBridge provides tool-specific observability helpers
 type ToolBridge struct {
 	bridge *Bridge
-}
-
-// NewToolBridge creates a new tool bridge
-func NewToolBridge(obs *Observability) *ToolBridge {
-	return &ToolBridge{
-		bridge: NewBridge(obs),
-	}
 }
 
 // NewToolBridgeFromBridge creates a ToolBridge from an existing Bridge (no Observability wrapper).

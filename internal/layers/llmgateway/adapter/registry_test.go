@@ -42,12 +42,4 @@ func TestRegistry_should_error_on_missing_provider(t *testing.T) {
 	}
 }
 
-func TestRegistry_should_list_providers(t *testing.T) {
-	reg := adapter.NewRegistry()
-	_ = reg.Register(stubAdapter{provider: "deepseek"})
-	_ = reg.Register(stubAdapter{provider: "minimax"})
-	list := reg.List()
-	if len(list) != 2 {
-		t.Errorf("List: got %v", list)
-	}
-}
+

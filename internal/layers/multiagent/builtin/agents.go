@@ -31,27 +31,6 @@ func RunPlan(ctx context.Context, deps query.LoopDeps, parent *types.SessionCont
 	return runBuiltin(ctx, deps, parent, AgentPlan, planSystemPrompt, prompt, tools, maxTurns, true)
 }
 
-// RunExploreFork runs a fork-subagent with cache-friendly parent context prefix.
-func RunExploreFork(ctx context.Context, deps query.LoopDeps, parent *types.SessionContext, parentMessages []types.Message, directive string, tools []query.ToolSchema, maxTurns int) (*query.SubQueryResult, error) {
-	if query.IsInForkChild(parentMessages) {
-		return nil, fmt.Errorf("recursive fork is not allowed")
-	}
-	return query.Run(ctx, deps, query.SubQueryParams{
-		ParentSC:       parent,
-		AgentID:        fmt.Sprintf("fork_%s", uuid.New().String()[:8]),
-		AgentName:      "fork",
-		SystemPrompt:   exploreSystemPrompt,
-		PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: directive, SessionID: parent.SessionID}},
-		ForkMessages:   parentMessages,
-		ForkEnabled:    true,
-		ForkDirective:  directive,
-		Tools:          tools,
-		MaxTurns:       maxTurns,
-		OmitClaudeMd:   true,
-		ReadOnlyTools:  false,
-	})
-}
-
 func runBuiltin(
 	ctx context.Context,
 	deps query.LoopDeps,

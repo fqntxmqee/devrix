@@ -51,7 +51,7 @@ func (s *Service) DelegateSync(ctx context.Context, leader multiagent.Agent, spe
 	if leader == nil {
 		return DelegateResult{}, fmt.Errorf("delegate: leader is nil")
 	}
-	child, bridge, wtPath, err := s.forkWorker(ctx, leader, spec)
+	child, _, wtPath, err := s.forkWorker(ctx, leader, spec)
 	if err != nil {
 		return DelegateResult{}, err
 	}
@@ -60,7 +60,7 @@ func (s *Service) DelegateSync(ctx context.Context, leader multiagent.Agent, spe
 	}
 	result, runErr := child.Run(ctx)
 	summary := extractSummary(result)
-	s.publishTerminal(ctx, leader.Config().SessionID, child.ID(), spec, bridge, summary, runErr)
+	s.publishTerminal(ctx, leader.Config().SessionID, child.ID(), spec, summary, runErr)
 	if runErr != nil {
 		_ = leader.Join(ctx, child)
 		return DelegateResult{
@@ -87,7 +87,7 @@ func (s *Service) DelegateAsync(ctx context.Context, leader multiagent.Agent, sp
 	if !s.cfg.AllowAsync {
 		return "", fmt.Errorf("delegate: async not enabled")
 	}
-	child, bridge, wtPath, err := s.forkWorker(ctx, leader, spec)
+	child, _, wtPath, err := s.forkWorker(ctx, leader, spec)
 	if err != nil {
 		return "", err
 	}
@@ -100,7 +100,7 @@ func (s *Service) DelegateAsync(ctx context.Context, leader multiagent.Agent, sp
 		}
 		result, runErr := child.Run(bgCtx)
 		summary := extractSummary(result)
-		s.publishTerminal(bgCtx, sessionID, child.ID(), spec, bridge, summary, runErr)
+		s.publishTerminal(bgCtx, sessionID, child.ID(), spec, summary, runErr)
 		_ = l.Join(bgCtx, child)
 		s.notifyLeaderAsyncComplete(sessionID, child.ID(), spec, summary, runErr)
 	}(leader)
@@ -173,7 +173,6 @@ func (s *Service) publishTerminal(
 	ctx context.Context,
 	sessionID, workerID string,
 	spec WorkerSpec,
-	bridge *FlowBridge,
 	summary string,
 	runErr error,
 ) {
@@ -204,7 +203,6 @@ func (s *Service) publishTerminal(
 		Kind:      contracts.FlowJoined,
 		Summary:   summary,
 	})
-	_ = bridge
 }
 
 func (s *Service) notifyLeaderAsyncComplete(sessionID, workerID string, spec WorkerSpec, summary string, runErr error) {

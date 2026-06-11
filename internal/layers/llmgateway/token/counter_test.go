@@ -130,14 +130,7 @@ func TestCounter_should_return_cl100k_base_encoding(t *testing.T) {
 	}
 }
 
-func TestEstimateRemaining_should_not_go_negative(t *testing.T) {
-	if got := token.EstimateRemaining(200, 100); got != 0 {
-		t.Errorf("got %d", got)
-	}
-	if got := token.EstimateRemaining(40, 100); got != 60 {
-		t.Errorf("got %d", got)
-	}
-}
+
 
 func abs(n int) int {
 	if n < 0 {
@@ -190,16 +183,4 @@ func TestCounter_should_count_mixed_cjk_ascii(t *testing.T) {
 	}
 }
 
-func TestCounter_should_apply_cjk_multiplier_when_configured(t *testing.T) {
-	c, err := token.NewCounter()
-	if err != nil {
-		t.Fatalf("NewCounter: %v", err)
-	}
-	base := c.CountText("你好世界")
-	c.WithCJKMultiplier(1.5)
-	got := c.CountText("你好世界")
-	want := int(float64(base) * 1.5)
-	if got != want {
-		t.Fatalf("CountText CJK: got %d want %d", got, want)
-	}
-}
+

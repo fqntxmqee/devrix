@@ -66,20 +66,3 @@ func (r *Registry) List() []Info {
 	}
 	return out
 }
-
-// FindByCapability returns tools that have the given capability.
-func (r *Registry) FindByCapability(cap string) []AgentTool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	var out []AgentTool
-	for _, tool := range r.tools {
-		for _, c := range tool.Info().Capabilities {
-			if c == cap {
-				out = append(out, tool)
-				break
-			}
-		}
-	}
-	return out
-}

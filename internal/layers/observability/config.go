@@ -25,21 +25,6 @@ type LLMConfig struct {
 	LogDir     string `yaml:"log_dir"`
 }
 
-// TracingConfig holds tracing configuration
-type TracingConfig = settings.TracingConfig
-
-// SamplingConfig holds sampling configuration
-type SamplingConfig = settings.SamplingConfig
-
-// OTLPConfig holds OTLP exporter configuration
-type OTLPConfig = settings.OTLPConfig
-
-// MetricsConfig holds metrics configuration
-type MetricsConfig = settings.MetricsConfig
-
-// LabelsConfig holds label allowlist/blocklist configuration
-type LabelsConfig = settings.LabelsConfig
-
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
 	Enabled       bool             `yaml:"enabled"`
@@ -72,26 +57,26 @@ type HealthConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Enabled: true,
-		Tracing: TracingConfig{
+		Tracing: settings.TracingConfig{
 			Enabled:        true,
 			ServiceName:    "devrix",
 			ServiceVersion: "1.0.0",
 			Exporter:       "otlp",
-			Sampling: SamplingConfig{
+			Sampling: settings.SamplingConfig{
 				Type: "always_on",
 				Rate: 1.0,
 			},
-			OTLP: OTLPConfig{
+			OTLP: settings.OTLPConfig{
 				Endpoint: "http://localhost:4318/v1/traces",
 				Insecure: true,
 				Timeout: 5 * time.Second,
 			},
 		},
-		Metrics: MetricsConfig{
+		Metrics: settings.MetricsConfig{
 			Enabled:  true,
 			Exporter: "prometheus",
 			Endpoint: "/metrics",
-			Labels: LabelsConfig{
+			Labels: settings.LabelsConfig{
 				Allowlist: []string{
 					"provider", "model", "adapter", "tool",
 					"risk_level", "status", "direction", "decision", "error_type",

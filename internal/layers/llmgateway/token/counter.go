@@ -1,10 +1,8 @@
 package token
 
 import (
-	"math"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
@@ -19,23 +17,9 @@ const (
 )
 
 // Counter implements contracts.ITokenCounter using cl100k_base (tiktoken).
-// atomicFloat64 is an atomically accessible float64 (sync/atomic has no public Float64 type).
-type atomicFloat64 struct {
-	bits atomic.Uint64
-}
-
-func (f *atomicFloat64) Store(v float64) {
-	f.bits.Store(math.Float64bits(v))
-}
-
-func (f *atomicFloat64) Load() float64 {
-	return math.Float64frombits(f.bits.Load())
-}
-
 type Counter struct {
-	mu            sync.RWMutex
-	encoding      *tiktoken.Tiktoken
-	cjkMultiplier atomicFloat64
+	mu       sync.RWMutex
+	encoding *tiktoken.Tiktoken
 }
 
 // NewCounter creates a cl100k_base token counter (embedded BPE, no network).
@@ -46,16 +30,7 @@ func NewCounter() (*Counter, error) {
 		return nil, err
 	}
 	c := &Counter{encoding: enc}
-	c.cjkMultiplier.Store(1.0)
 	return c, nil
-}
-
-// WithCJKMultiplier sets a multiplier applied when text contains CJK characters.
-func (c *Counter) WithCJKMultiplier(multiplier float64) *Counter {
-	if multiplier > 0 {
-		c.cjkMultiplier.Store(multiplier)
-	}
-	return c
 }
 
 // CountText returns the token count for plain text.
@@ -66,22 +41,7 @@ func (c *Counter) CountText(text string) int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	count := len(c.encoding.Encode(text, nil, nil))
-	multiplier := c.cjkMultiplier.Load()
-	if multiplier > 1.0 && containsCJK(text) {
-		count = int(float64(count) * multiplier)
-	}
 	return count
-}
-
-func containsCJK(s string) bool {
-	for _, r := range s {
-		if (r >= 0x4E00 && r <= 0x9FFF) ||
-			(r >= 0x3400 && r <= 0x4DBF) ||
-			(r >= 0x3000 && r <= 0x303F) {
-			return true
-		}
-	}
-	return false
 }
 
 // CountMessages sums tokens across chat messages including role overhead.
@@ -138,15 +98,6 @@ func (c *Counter) CheckBudget(count, budget int) error {
 		return nil
 	}
 	return sharederrors.NewTokenBudgetExceededError(count, budget)
-}
-
-// EstimateRemaining returns tokens left before hitting max.
-func EstimateRemaining(current, max int) int {
-	remaining := max - current
-	if remaining < 0 {
-		return 0
-	}
-	return remaining
 }
 
 // Compile-time interface check.

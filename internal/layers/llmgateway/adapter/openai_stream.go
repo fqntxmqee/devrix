@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,10 +115,6 @@ func (c *OpenAIStreamClient) Stream(ctx context.Context, req *llmgateway.Request
 func mapStreamError(err error) error {
 	if err == nil {
 		return nil
-	}
-	var syntax *json.SyntaxError
-	if errors.As(err, &syntax) {
-		return sharederrors.NewLLMParseError(err)
 	}
 	return sharederrors.NewLLMParseError(err)
 }

@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
@@ -11,15 +12,11 @@ func TestSpanToOTLP_should_include_event_attributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spanID, err := tracer.ParseSpanID("00f067aa0ba902b7")
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	sp := tracer.NewSpan("context.pev.llm_call", tracer.SpanContext{
-		TraceID: traceID,
-		SpanID:  spanID,
-	})
+	tp := tracer.NewTracerProvider(nil, nil)
+	_, sp := tp.Tracer("test").Start(context.Background(), "context.pev.llm_call",
+		tracer.WithTraceID(traceID),
+	)
 	sp.AddEvent("llm.request", tracer.WithEventAttributes(
 		tracer.Attribute{Key: "llm.request_json", Value: `{"model":"test"}`},
 	))
@@ -28,7 +25,7 @@ func TestSpanToOTLP_should_include_event_attributes(t *testing.T) {
 	))
 
 	exp := &OTLPExporter{serviceName: "devrix-test"}
-	got := exp.spanToOTLP(sp)
+	got := exp.spanToOTLP(sp.(tracer.ReadableSpan))
 	if len(got.Events) != 2 {
 		t.Fatalf("events = %d, want 2", len(got.Events))
 	}

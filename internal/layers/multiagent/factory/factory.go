@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
@@ -12,8 +11,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
-	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -68,15 +67,21 @@ func (f *AgentFactory) Create(
 		return nil, sharederrors.NewAgentContextCancelledError(cfg.SessionID)
 	}
 	if err := validateConfig(cfg, f.cfg); err != nil {
-		if createSpan != nil { createSpan.End() }
+		if createSpan != nil {
+			createSpan.End()
+		}
 		return nil, err
 	}
 	if session == nil {
-		if createSpan != nil { createSpan.End() }
+		if createSpan != nil {
+			createSpan.End()
+		}
 		return nil, sharederrors.NewAgentInvalidConfigError("session is nil")
 	}
 	if err := f.reserveSessionSlot(cfg.SessionID); err != nil {
-		if createSpan != nil { createSpan.End() }
+		if createSpan != nil {
+			createSpan.End()
+		}
 		return nil, err
 	}
 	resolved := resolveConfig(cfg, f.cfg)
@@ -96,7 +101,9 @@ func (f *AgentFactory) Create(
 	default:
 		impl.SetEngine(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	}
-	if createSpan != nil { createSpan.End() }
+	if createSpan != nil {
+		createSpan.End()
+	}
 	return impl, nil
 }
 
@@ -188,24 +195,4 @@ func resolveConfig(cfg multiagent.AgentConfig, defaults *sharedconfig.MultiAgent
 		out.SystemPrompt = collaboration.BuildPromptForMode(out.Mode, out.SystemPrompt)
 	}
 	return out
-}
-
-// LayerConfig exposes factory defaults for agents.
-func (f *AgentFactory) LayerConfig() *sharedconfig.MultiAgentConfig {
-	return f.cfg
-}
-
-// DefaultTimeout returns the configured default agent timeout.
-func (f *AgentFactory) DefaultTimeout() time.Duration {
-	if f.cfg == nil {
-		return 5 * time.Minute
-	}
-	return f.cfg.DefaultTimeout
-}
-
-// SessionAgentCount returns active agents for a session (testing helper).
-func (f *AgentFactory) SessionAgentCount(sessionID string) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.sessionCounts[sessionID]
 }

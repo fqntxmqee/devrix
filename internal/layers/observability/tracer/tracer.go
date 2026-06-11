@@ -108,13 +108,6 @@ type tracerConfig struct {
 	schemaURL string
 }
 
-// WithSchemaURL sets the schema URL
-func WithSchemaURL(url string) TracerOption {
-	return func(cfg *tracerConfig) {
-		cfg.schemaURL = url
-	}
-}
-
 // Start starts a new span
 func (t *Tracer) Start(ctx context.Context, name string, opts ...SpanStartOption) (context.Context, Span) {
 	if t.provider.isShutdown() {
@@ -200,24 +193,6 @@ func (t *Tracer) Start(ctx context.Context, name string, opts ...SpanStartOption
 	ctx = context.WithValue(ctx, spanContextKey, sc)
 
 	return ctx, s
-}
-
-// EndSpan ends a span by its ID
-func (t *Tracer) EndSpan(spanID SpanID) {
-	t.activeSpansMu.Lock()
-	defer t.activeSpansMu.Unlock()
-
-	if s, ok := t.activeSpans[spanID]; ok {
-		s.End()
-		delete(t.activeSpans, spanID)
-	}
-}
-
-// ActiveSpanCount returns the number of active spans
-func (t *Tracer) ActiveSpanCount() int {
-	t.activeSpansMu.RLock()
-	defer t.activeSpansMu.RUnlock()
-	return len(t.activeSpans)
 }
 
 // SpanStartOption applies configuration when starting a span

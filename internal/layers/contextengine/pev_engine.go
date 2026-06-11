@@ -36,13 +36,6 @@ type PEVEngine struct {
 	milestoneRunner *pev.MilestoneRunner
 	obsBridge       *observability.Bridge
 
-	metricsOnce sync.Once
-	llmTokens   metrics.Counter
-	llmLatency  metrics.Histogram
-	llmErrors   metrics.Counter
-	toolCalls   metrics.Counter
-	toolErrors  metrics.Counter
-
 	toolLatencyMu sync.Mutex
 	toolLatency   map[string]metrics.Histogram
 
@@ -96,30 +89,6 @@ func NewPEVEngine(
 	return e
 }
 
-func (e *PEVEngine) initMetrics() {
-	e.metricsOnce.Do(func() {
-		if e.obsBridge == nil || e.obsBridge.Meter() == nil {
-			return
-		}
-		m := e.obsBridge.Meter()
-		e.llmTokens, _ = m.Int64Counter("engine_llm_tokens", metrics.WithLabels(metrics.LabelMap{
-			"provider": "mock", "model": "mock",
-		}))
-		e.llmLatency, _ = m.Float64Histogram("engine_llm_latency",
-			metrics.WithHistogramLabels(metrics.LabelMap{"provider": "mock", "model": "mock"}),
-			metrics.WithBounds(metrics.LLMHistogramBounds()),
-		)
-		e.llmErrors, _ = m.Int64Counter("engine_llm_errors", metrics.WithLabels(metrics.LabelMap{
-			"provider": "mock", "model": "mock",
-		}))
-		e.toolCalls, _ = m.Int64Counter("engine_tool_calls", metrics.WithLabels(metrics.LabelMap{
-			"tool": "all", "risk_level": "all",
-		}))
-		e.toolErrors, _ = m.Int64Counter("engine_tool_errors", metrics.WithLabels(metrics.LabelMap{
-			"tool": "all", "risk_level": "all",
-		}))
-	})
-}
 
 // VerifyPEV runs the verify phase for tests and tooling.
 func (e *PEVEngine) VerifyPEV(ctx context.Context, sc *types.SessionContext, results []ToolResult) types.VerifyResult {
@@ -142,8 +111,6 @@ func (e *PEVEngine) Run(
 	userMessage string,
 	emit func(*gateway.EngineEvent),
 ) (*PEVRunResult, error) {
-	e.initMetrics()
-
 	if e.planEngine != nil && e.milestoneRunner != nil && pev.ShouldPlan(e.planCfg, sc.PEVState, userMessage) {
 		sc.PEVState.Phase = types.PEVPhasePlan
 		e.observer.EmitPEVPhase(sc.SessionID, types.PEVPhasePlan, 0)
@@ -296,7 +263,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				)
 				llmSpan.End()
 			}
-			e.recordLLMError()
 			slog.WarnContext(iterCtx, "pev: llm call failed",
 				"sessionID", sc.SessionID,
 				"iteration", iter,
@@ -382,7 +348,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			)...)
 			llmSpan.End()
 		}
-		e.recordLLMCall(sc.Model, usage, time.Since(llmStart))
 
 		if len(pendingTools) == 0 {
 			endIterSpan()
@@ -430,7 +395,6 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 					toolSpan.RecordError(fmt.Errorf("permission denied"))
 					toolSpan.End()
 				}
-				e.recordToolError()
 				emit(pevErrorEvent(sc.SessionID, errors.NewContextPermissionDeniedError(tc.Name), false))
 				endIterSpan()
 				return &PEVRunResult{Usage: usage}, errors.NewContextPermissionDeniedError(tc.Name)
@@ -454,9 +418,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 				if toolSpan != nil {
 					telemetry.RecordSpanError(toolSpan, err)
 				}
-				e.recordToolError()
 			} else {
-				e.recordToolCall()
 			}
 			e.recordToolLatency(tc.Name, risk, toolStatus, toolDuration)
 			if toolSpan != nil {
@@ -620,7 +582,6 @@ func (e *PEVEngine) runToolSynthesis(
 			)
 			llmSpan.End()
 		}
-		e.recordLLMError()
 		slog.Warn("pev: synthesis llm failed", "sessionID", sc.SessionID, "cause", errDetail)
 		fallback := summarizeSuccessfulToolResults(toolResults)
 		emit(&gateway.EngineEvent{
@@ -686,7 +647,6 @@ func (e *PEVEngine) runToolSynthesis(
 		llmSpan.SetAttributes(tracer.Attribute{Key: "pev.synthesis_source", Value: "llm"})
 		llmSpan.End()
 	}
-	e.recordLLMCall(sc.Model, usage, time.Since(llmStart))
 
 	synthText = textutil.StripThinkingTags(synthText)
 	if strings.TrimSpace(synthText) == "" {
@@ -712,41 +672,6 @@ func (e *PEVEngine) startSpan(ctx context.Context, operation string, kind tracer
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
 	return e.obsBridge.Tracer().Start(ctx, operation, opts...)
-}
-
-func (e *PEVEngine) recordLLMCall(model string, usage TokenUsage, latency time.Duration) {
-	if e.llmTokens != nil {
-		e.llmTokens.Add(int64(usage.PromptTokens + usage.CompletionTokens))
-	}
-	if e.llmLatency != nil {
-		e.llmLatency.Observe(latency.Seconds())
-	}
-	if e.obsBridge != nil {
-		observability.RecordGenAITokenUsage(e.obsBridge.Meter(), model, observability.GenAITokenBreakdown{
-			Input:     usage.PromptTokens,
-			Output:    usage.CompletionTokens,
-			CacheRead: usage.CacheReadTokens,
-			Reasoning: usage.ReasoningTokens,
-		})
-	}
-}
-
-func (e *PEVEngine) recordLLMError() {
-	if e.llmErrors != nil {
-		e.llmErrors.Inc()
-	}
-}
-
-func (e *PEVEngine) recordToolCall() {
-	if e.toolCalls != nil {
-		e.toolCalls.Inc()
-	}
-}
-
-func (e *PEVEngine) recordToolError() {
-	if e.toolErrors != nil {
-		e.toolErrors.Inc()
-	}
 }
 
 func (e *PEVEngine) recordToolLatency(toolName string, risk types.RiskLevel, status string, duration time.Duration) {

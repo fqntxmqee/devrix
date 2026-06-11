@@ -14,11 +14,6 @@ func NewDisabledLongTermMemory() *DisabledLongTermMemory {
 	return &DisabledLongTermMemory{}
 }
 
-// NewLongTermMemory creates the disabled stub (L5-CTX-10 compatibility).
-func NewLongTermMemory() ILongTermMemory {
-	return NewDisabledLongTermMemory()
-}
-
 // Recall returns FeatureNotImplemented when long-term memory is disabled.
 func (m *DisabledLongTermMemory) Recall(_ context.Context, _ string, _ int) ([]MemoryEntry, error) {
 	return nil, errors.NewFeatureNotImplementedError("long-term memory", "v3")

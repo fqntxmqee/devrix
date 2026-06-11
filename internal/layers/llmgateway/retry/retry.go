@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"time"
 
@@ -107,7 +108,7 @@ func (e *Executor) backoffDelay(cfg sharedconfig.LLMRetryConfig, attempt int) ti
 		backoff = 2.0
 	}
 
-	cap := float64(initial) * pow(backoff, float64(attempt))
+	cap := float64(initial) * math.Pow(backoff, float64(attempt))
 	if cap > float64(maxDelay) {
 		cap = float64(maxDelay)
 	}
@@ -121,10 +122,3 @@ func (e *Executor) backoffDelay(cfg sharedconfig.LLMRetryConfig, attempt int) ti
 	return jitter
 }
 
-func pow(base, exp float64) float64 {
-	result := 1.0
-	for i := 0; i < int(exp); i++ {
-		result *= base
-	}
-	return result
-}

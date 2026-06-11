@@ -90,27 +90,6 @@ type Status struct {
 	Description string
 }
 
-// NewSpan creates a new span
-func NewSpan(name string, sc SpanContext, opts ...SpanOption) *span {
-	cfg := &SpanConfig{
-		StartTime: time.Now(),
-		SpanKind:  SpanKindInternal,
-	}
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
-	return &span{
-		name:      name,
-		sc:        sc,
-		kind:      cfg.SpanKind,
-		startTime: cfg.StartTime,
-		attrs:     make(map[string]interface{}),
-		events:    make([]Event, 0),
-		recording: true,
-	}
-}
-
 // End ends the span
 func (s *span) End(opts ...SpanEndOption) {
 	cfg := &SpanEndConfig{EndTime: time.Now()}

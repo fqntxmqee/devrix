@@ -2,7 +2,6 @@ package tracer
 
 import (
 	"hash/fnv"
-	"math/rand"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability/settings"
@@ -87,46 +86,3 @@ func formatRate(rate float64) string {
 	return time.Duration(rate * 1e11).String() // approximate
 }
 
-// DeterministicSampler samples based on a deterministic function of trace ID
-// Useful for testing
-type DeterministicSampler struct {
-	threshold uint64
-}
-
-func NewDeterministicSampler(rate float64) *DeterministicSampler {
-	return &DeterministicSampler{
-		threshold: uint64(rate * float64(1<<63)),
-	}
-}
-
-func (s *DeterministicSampler) ShouldSample(traceID TraceID) bool {
-	hasher := fnv.New64a()
-	hasher.Write(traceID[:])
-	hash := hasher.Sum64()
-	return hash < s.threshold
-}
-
-func (s *DeterministicSampler) Description() string {
-	return "DeterministicSampler"
-}
-
-// RandomSampler uses random sampling
-type RandomSampler struct {
-	rng *rand.Rand
-	rate float64
-}
-
-func NewRandomSampler(rate float64) *RandomSampler {
-	return &RandomSampler{
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
-		rate: rate,
-	}
-}
-
-func (s *RandomSampler) ShouldSample(traceID TraceID) bool {
-	return s.rng.Float64() < s.rate
-}
-
-func (s *RandomSampler) Description() string {
-	return "RandomSampler"
-}

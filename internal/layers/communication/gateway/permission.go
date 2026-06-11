@@ -18,6 +18,7 @@ type PermissionManager struct {
 	userCfg  *config.UserConfig
 	mu       sync.RWMutex
 	requests map[string]*types.PermissionRequest
+	signals  map[string]chan struct{} // requestID -> closed on Resolve
 
 	metricApproved metrics.Counter
 	metricDenied   metrics.Counter
@@ -36,6 +37,7 @@ func NewPermissionManager(cfg *config.PermissionConfig) *PermissionManager {
 		config:   cfg,
 		userCfg:  config.DefaultUserConfig(),
 		requests: make(map[string]*types.PermissionRequest),
+		signals:  make(map[string]chan struct{}),
 	}
 }
 
@@ -95,6 +97,8 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 
 	p.mu.Lock()
 	p.requests[request.ID] = request
+	signal := make(chan struct{})
+	p.signals[request.ID] = signal
 	userCfg := p.userCfg
 	p.mu.Unlock()
 
@@ -104,6 +108,7 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 		if approved {
 			p.resolveRequest(request, true)
 			p.recordDecision(true)
+			p.cleanupSignal(request.ID)
 			return true
 		}
 	}
@@ -112,14 +117,23 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 	timeout := time.After(p.config.DefaultTimeout)
 
 	select {
+	case <-signal:
+		p.mu.RLock()
+		req, ok := p.requests[request.ID]
+		approved := ok && req.Status == types.PermissionStatusApproved
+		p.mu.RUnlock()
+		p.recordDecision(approved)
+		return approved
 	case <-ctx.Done():
 		p.resolveRequest(request, false)
 		p.recordDecision(false)
+		p.cleanupSignal(request.ID)
 		return false
 	case <-timeout:
 		p.resolveRequest(request, false)
 		p.recordTimeout()
 		p.recordDecision(false)
+		p.cleanupSignal(request.ID)
 		return false
 	}
 }
@@ -190,6 +204,10 @@ func (p *PermissionManager) Resolve(requestID string, approved bool) error {
 	}
 
 	req.Resolve(approved)
+	if sig, ok := p.signals[requestID]; ok {
+		close(sig)
+		delete(p.signals, requestID)
+	}
 	return nil
 }
 
@@ -231,6 +249,17 @@ func (p *PermissionManager) CleanupExpired() {
 			req.Expire()
 			delete(p.requests, id)
 		}
+	}
+}
+
+// cleanupSignal safely closes and removes the signal channel for a request.
+// No-op if the signal was already removed (e.g. by Resolve).
+func (p *PermissionManager) cleanupSignal(requestID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if sig, ok := p.signals[requestID]; ok {
+		close(sig)
+		delete(p.signals, requestID)
 	}
 }
 

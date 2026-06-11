@@ -1,6 +1,7 @@
 package retry
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ func TestExecutor_should_apply_full_jitter_within_cap(t *testing.T) {
 
 	for attempt := 0; attempt < 3; attempt++ {
 		delay := exec.backoffDelay(cfg, attempt)
-		cap := time.Duration(float64(cfg.InitialDelay) * pow(cfg.Backoff, float64(attempt)))
+		cap := time.Duration(float64(cfg.InitialDelay) * math.Pow(cfg.Backoff, float64(attempt)))
 		if cap > cfg.MaxDelay {
 			cap = cfg.MaxDelay
 		}

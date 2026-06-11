@@ -14,13 +14,11 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
-	"github.com/devrix/devrix/internal/layers/communication/auth"
 	"github.com/devrix/devrix/internal/layers/communication/connection"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/instance"
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
-	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/evolution/orchestration"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -95,7 +93,7 @@ func main() {
 		slog.Info("YOLO mode enabled - all permissions auto-approved")
 	}
 
-	commCfg, authCfg, _, ctxCfg, err := config.LoadConfig(configFile)
+	commCfg, _, _, ctxCfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -117,14 +115,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	authService := auth.NewAuthService(authCfg)
 	connManager := connection.NewConnectionManager(60*time.Second, 10*time.Second)
-	rateLimiter := ratelimit.NewRateLimiter(ratelimit.DefaultRateLimitConfig())
 	metricsCollector := metrics.NewMetricsCollector()
 	instanceRegistry := instance.NewInstanceRegistry(60 * time.Second)
 	milestoneService := milestone.NewMilestoneService(nil)
-	_ = authService
-	_ = rateLimiter
 
 	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)

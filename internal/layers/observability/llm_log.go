@@ -14,12 +14,6 @@ import (
 
 const defaultLLMLogDir = "~/.devrix/logs/llm"
 
-const (
-	defaultMsgTruncate  = 500
-	defaultRespTruncate = 2000
-	spanPreviewTruncate = 16384
-)
-
 // LLMLogSettings controls LLM content capture for tracing and local files.
 type LLMLogSettings struct {
 	LogContent bool
@@ -133,7 +127,22 @@ func appendLLMLogRaw(logDir, sessionID, phase string, iter int, model, traceID, 
 		slog.Warn("llm log: mkdir failed", "dir", logDir, "error", err)
 		return
 	}
-	path := filepath.Join(logDir, sanitizeSessionFilename(sessionID)+".jsonl")
+	safeName := sessionID
+	if strings.TrimSpace(safeName) == "" {
+		safeName = "unknown"
+	} else {
+		var b strings.Builder
+		for _, r := range safeName {
+			switch r {
+			case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+				b.WriteRune('_')
+			default:
+				b.WriteRune(r)
+			}
+		}
+		safeName = b.String()
+	}
+	path := filepath.Join(logDir, safeName+".jsonl")
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		slog.Warn("llm log: open file failed", "path", path, "error", err)
@@ -164,43 +173,4 @@ func expandHomePath(path string) string {
 		return filepath.Join(home, path[2:])
 	}
 	return path
-}
-
-func sanitizeSessionFilename(sessionID string) string {
-	if strings.TrimSpace(sessionID) == "" {
-		return "unknown"
-	}
-	var b strings.Builder
-	for _, r := range sessionID {
-		switch r {
-		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
-			b.WriteRune('_')
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-// TruncateForSpan limits payload size when full logging is disabled.
-func TruncateForSpan(s string, full bool) string {
-	if full || len(s) <= spanPreviewTruncate {
-		return s
-	}
-	if len(s) <= defaultMsgTruncate {
-		return s
-	}
-	return s[:defaultMsgTruncate] + "..."
-}
-
-// TruncateResponseForSpan limits response preview size.
-func TruncateResponseForSpan(s string, full bool) string {
-	if full || len(s) <= spanPreviewTruncate {
-		return s
-	}
-	limit := defaultRespTruncate
-	if len(s) <= limit {
-		return s
-	}
-	return s[:limit] + "..."
 }

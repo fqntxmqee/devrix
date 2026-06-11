@@ -1,7 +1,6 @@
 package prompt
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -212,19 +211,6 @@ If you can say it in one sentence, don't use three.`
 - Include file_path:line_number for code references.
 - Be precise and factual.`
 )
-
-// DefaultSectionDefinitions returns the default static sections.
-func DefaultSectionDefinitions() []string {
-	return []string{
-		"intro", "system", "doing_tasks", "actions",
-		"using_tools", "output_efficiency", "tone_and_style",
-	}
-}
-
-// FormatTaskSummary returns a formatted summary string.
-func FormatTaskSummary(completed, inProgress, pending, failed int) string {
-	return fmt.Sprintf("✓%d ●%d ○%d ✗%d", completed, inProgress, pending, failed)
-}
 
 // Load resolves system prompt for a work directory.
 func (l *Loader) Load(workDir string) string {

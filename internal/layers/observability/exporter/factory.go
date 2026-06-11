@@ -8,11 +8,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
-// NewConsoleExporterSpanExporter returns a console span exporter.
-func NewConsoleExporterSpanExporter() tracer.SpanExporter {
-	return NewConsoleExporter()
-}
-
 // ResolveOTLPEndpoint normalizes OTLP HTTP endpoint configuration.
 func ResolveOTLPEndpoint(cfg settings.OTLPConfig) string {
 	endpoint := strings.TrimSpace(cfg.Endpoint)
@@ -53,6 +48,6 @@ func NewTracingExporter(cfg settings.TracingConfig) tracer.SpanExporter {
 	case "memory":
 		return NewMemoryExporter()
 	default:
-		return NewConsoleExporterSpanExporter()
+		return NewConsoleExporter()
 	}
 }

@@ -22,7 +22,7 @@ func tempSQLiteDB(t *testing.T) string {
 
 // Covers: L5-CTX-10
 func TestLongTermMemory_should_return_not_implemented_when_disabled(t *testing.T) {
-	lt := memory.NewLongTermMemory()
+	lt := memory.NewDisabledLongTermMemory()
 	_, err := lt.Recall(context.Background(), "query", 5)
 	if err == nil {
 		t.Fatal("expected error")

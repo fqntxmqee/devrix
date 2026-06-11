@@ -32,8 +32,8 @@ func TestTracerProvider_should_flush_pending_spans_on_shutdown(t *testing.T) {
 	tp := NewTracerProvider(nil, exp)
 	tr := tp.Tracer("test")
 	_, span := tr.Start(context.Background(), "pending-span")
-	if tr.ActiveSpanCount() != 1 {
-		t.Fatalf("expected 1 active span, got %d", tr.ActiveSpanCount())
+	if len(tr.activeSpans) != 1 {
+		t.Fatalf("expected 1 active span, got %d", len(tr.activeSpans))
 	}
 	_ = span
 	if err := tp.Shutdown(context.Background()); err != nil {
@@ -42,8 +42,8 @@ func TestTracerProvider_should_flush_pending_spans_on_shutdown(t *testing.T) {
 	if got := exp.count(); got != 1 {
 		t.Fatalf("expected 1 exported span, got %d", got)
 	}
-	if tr.ActiveSpanCount() != 0 {
-		t.Fatalf("expected active spans cleared, got %d", tr.ActiveSpanCount())
+	if len(tr.activeSpans) != 0 {
+		t.Fatalf("expected active spans cleared, got %d", len(tr.activeSpans))
 	}
 }
 

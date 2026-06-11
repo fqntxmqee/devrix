@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -104,7 +105,7 @@ func (a *streamAccumulator) mergedToolCalls() []llmgateway.ToolCall {
 	for idx := range a.toolCalls {
 		indices = append(indices, idx)
 	}
-	sortInts(indices)
+	sort.Ints(indices)
 
 	out := make([]llmgateway.ToolCall, 0, len(indices))
 	for _, idx := range indices {
@@ -120,16 +121,6 @@ func (a *streamAccumulator) mergedToolCalls() []llmgateway.ToolCall {
 		})
 	}
 	return out
-}
-
-func sortInts(nums []int) {
-	for i := 0; i < len(nums); i++ {
-		for j := i + 1; j < len(nums); j++ {
-			if nums[j] < nums[i] {
-				nums[i], nums[j] = nums[j], nums[i]
-			}
-		}
-	}
 }
 
 func streamOpenAISSE(reader io.Reader, emit func(*llmgateway.Chunk) error) error {

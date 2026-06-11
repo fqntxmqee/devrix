@@ -29,13 +29,12 @@ func TestConsoleExporter_should_export_span_json(t *testing.T) {
 	exp := NewConsoleExporter()
 	exp.SetOutput(writer)
 
-	s := tracer.NewSpan("test-span", tracer.SpanContext{
-		TraceID: tracer.GenerateTraceID(),
-		SpanID:  tracer.GenerateSpanID(),
-	})
-	s.End()
+	tp := tracer.NewTracerProvider(nil, nil)
+	_, raw := tp.Tracer("test").Start(context.Background(), "test-span")
+	raw.End()
+	rs := raw.(tracer.ReadableSpan)
 
-	if err := exp.Export(context.Background(), s); err != nil {
+	if err := exp.Export(context.Background(), rs); err != nil {
 		t.Fatalf("export: %v", err)
 	}
 	writer.Close()

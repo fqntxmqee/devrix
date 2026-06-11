@@ -41,26 +41,6 @@ func TestStaticSectionsContent(t *testing.T) {
 	}
 }
 
-// TestSectionDefinitions verifies default section definitions.
-func TestSectionDefinitions(t *testing.T) {
-	defs := DefaultSectionDefinitions()
-	
-	expected := []string{
-		"intro", "system", "doing_tasks", "actions",
-		"using_tools", "output_efficiency", "tone_and_style",
-	}
-
-	if len(defs) != len(expected) {
-		t.Fatalf("expected %d definitions, got %d", len(expected), len(defs))
-	}
-
-	for i, name := range expected {
-		if defs[i] != name {
-			t.Errorf("definition %d: expected %s, got %s", i, name, defs[i])
-		}
-	}
-}
-
 // TestContextAssemblerUsesNewLoader verifies assembler uses new loader.
 func TestContextAssemblerUsesNewLoader(t *testing.T) {
 	loader := NewLoader(nil)
