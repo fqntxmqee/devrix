@@ -104,7 +104,7 @@
 | devrix-multiagent-isolation | DM-20260611-005 | `openspec/changes/devrix-multiagent-isolation/` | S2_Proposal |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Acceptance（单测 PASS，待真机 E2E 验收） |
 | devrix-wave-scheduler | DM-20260611-007 | `openspec/changes/devrix-wave-scheduler/` | S3_Design（design.md 12 章就绪，待 S3-Gate 审查） |
-| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S3_Design（design + tasks 就绪，待 S3-Gate 审查） |
+| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（task_stop/task_output/task_list_background 工具已实现，L5-2-9-16~19 IMPLEMENTED，-race 全绿，待 Wave Worker 接线 + S4-Gate） |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |
 
 **2026-06-12 更新说明**：

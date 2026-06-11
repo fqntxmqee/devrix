@@ -170,10 +170,10 @@
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-2-9-16 | stop running task → cancelled (idempotent) | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
-| L5-2-9-17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
-| L5-2-9-18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P0 |
-| L5-2-9-19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/query/background_test.go` | PLANNED | P1 |
+| L5-2-9-16 | stop running task → cancelled (idempotent) | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` | IMPLEMENTED | P1 |
 
 ### D2-S10: QueryLoop Module
 
