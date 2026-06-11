@@ -1132,11 +1132,17 @@ func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content str
 
 func parseFeishuChatID(sessionKey string) (string, error) {
 	// sessionKey format: feishu_{chat_id}_{user_id}
-	parts := strings.Split(sessionKey, "_")
-	if len(parts) < 5 {
+	// chat_id may contain underscores (e.g. oc_xxxxx), so use LastIndex instead of Split.
+	prefix := "feishu_"
+	if !strings.HasPrefix(sessionKey, prefix) {
 		return "", fmt.Errorf("invalid session key: %s", sessionKey)
 	}
-	return parts[1] + "_" + parts[2], nil
+	trimmed := strings.TrimPrefix(sessionKey, prefix)
+	lastUnderscore := strings.LastIndex(trimmed, "_")
+	if lastUnderscore <= 0 {
+		return "", fmt.Errorf("invalid session key: %s", sessionKey)
+	}
+	return trimmed[:lastUnderscore], nil
 }
 
 func normalizeReactionEmoji(value string) string {

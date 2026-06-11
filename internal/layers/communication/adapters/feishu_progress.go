@@ -109,6 +109,10 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 			return err
 		}
 		stream.mu.Lock()
+		if stream.thinkingMsgID != "" {
+			stream.mu.Unlock()
+			return a.patchMessage(ctx, stream.thinkingMsgID, cardJSON)
+		}
 		stream.thinkingMsgID = msgID
 		stream.mu.Unlock()
 		return nil
@@ -150,6 +154,10 @@ func (a *FeishuAdapter) upsertToolsCard(ctx context.Context, sessionID, chatID s
 			return err
 		}
 		stream.mu.Lock()
+		if stream.toolsMsgID != "" {
+			stream.mu.Unlock()
+			return a.patchMessage(ctx, stream.toolsMsgID, cardJSON)
+		}
 		stream.toolsMsgID = msgID
 		stream.mu.Unlock()
 		return nil

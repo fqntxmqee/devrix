@@ -104,7 +104,8 @@ func (e *PEVEngine) runViaQueryLoop(
 					Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, SessionID: sc.SessionID,
 					Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input},
 				})
-				result, err := e.tools.Execute(ctx, tc)
+				toolCtx := withToolStreamEmitter(ctx, emit, sc.SessionID, tc.Name)
+				result, err := e.tools.Execute(toolCtx, tc)
 				var output, errMsg string
 				if err != nil {
 					errMsg = err.Error()

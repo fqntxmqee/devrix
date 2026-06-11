@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
@@ -92,7 +93,8 @@ func (s *Service) DelegateAsync(ctx context.Context, leader multiagent.Agent, sp
 	}
 	sessionID := leader.Config().SessionID
 	go func(l multiagent.Agent) {
-		bgCtx := context.Background()
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
 		if wtPath != "" && s.worktree != nil {
 			defer func() { _ = s.worktree.Exit(bgCtx, wtPath, false) }()
 		}
