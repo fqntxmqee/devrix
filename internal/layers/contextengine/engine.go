@@ -15,6 +15,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/harness"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
+	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
+	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
+	"github.com/devrix/devrix/internal/layers/contextengine/queue"
+	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
@@ -99,22 +103,43 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		ToolsReg:  toolRegistryAdapter{reg: toolsReg},
 		ObsBridge: deps.ObsBridge,
 	})
+	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
+	attachReg := attachments.NewRegistry(cfg.Attachments)
+	pevEngine := NewPEVEngine(
+		deps.LLM,
+		deps.Tools,
+		deps.ToolsReg,
+		deps.Permission,
+		observer,
+		&cfg.PEV,
+		deps.ObsBridge,
+		deps.VerifyRunner,
+		pevObserver,
+		deps.Planner,
+		cfg.Plan,
+	)
+	pevEngine.setQueryLoopSupport(QueryLoopSupport{
+		Enabled:        cfg.QueryLoop.Enabled,
+		MaxTurns:       cfg.QueryLoop.MaxTurns,
+		Compress:       cfg.QueryLoop.CompressPerTurn,
+		StreamingTools: cfg.QueryLoop.StreamingTools,
+		Attachments:    attachReg,
+		UserContext:    ucProvider,
+		SessionQueue:   queue.GlobalSessionQueue,
+		Background:     query.NewBackgroundRegistry(),
+		CompressFn: newCompressFn(
+			cfg.QueryLoop.CompressPerTurn,
+			cfg,
+			counter,
+			deps.LLM,
+			asyncCompact,
+			compObserver,
+		),
+	})
 	return &ContextEngine{
 		memory:  memory.NewManager(cfg, store, deps.LongTerm),
 		counter: counter,
-		pev: NewPEVEngine(
-			deps.LLM,
-			deps.Tools,
-			deps.ToolsReg,
-			deps.Permission,
-			observer,
-			&cfg.PEV,
-			deps.ObsBridge,
-			deps.VerifyRunner,
-			pevObserver,
-			deps.Planner,
-			cfg.Plan,
-		),
+		pev:     pevEngine,
 		prompt:       prompt.NewLoader(&cfg.SystemPrompt),
 		cfg:          cfg,
 		observer:     observer,
@@ -133,6 +158,15 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 // SessionContext returns the cached session context for a session ID (test helper).
 func (e *ContextEngine) SessionContext(sessionID string) (*types.SessionContext, bool) {
 	return e.memory.Get(sessionID)
+}
+
+// ExportSessionSnapshot serializes the in-memory session context for persistence.
+func (e *ContextEngine) ExportSessionSnapshot(sessionID string) ([]byte, error) {
+	sc, ok := e.memory.Get(sessionID)
+	if !ok || sc == nil {
+		return nil, fmt.Errorf("session context not found: %s", sessionID)
+	}
+	return e.memory.PersistSnapshot(sc)
 }
 
 // Shutdown waits for background autocompact work to finish.
@@ -214,6 +248,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		)
 		loadSpan.End()
 	}
+	workerLocal := false
+	if ov, ok := ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
+		sc = forkWorkerSessionContext(sc, ov)
+		workerLocal = true
+	}
+	InitSessionPermission(sc, e.cfg.Permission)
 
 	if harnessEnabled && !session.HarnessInitialized {
 		harnessState, bootErr := e.harnessBoot.Run(ctx, session)
@@ -233,7 +273,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
 	)
 	var recallErr error
-	if harnessEnabled {
+	if harnessEnabled && !workerLocal {
 		memoryEntries, recallErr = e.memory.RecallLongTermEntries(recallCtx, message)
 	} else {
 		recallErr = e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
@@ -264,10 +304,11 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	msgs := sc.Messages
 	compSystemPrompt := sc.SystemPrompt
-	if harnessEnabled {
+	if harnessEnabled && !workerLocal {
 		compSystemPrompt = ""
 	}
-	if e.shouldCompress(msgs, sc.TokenBudget) {
+	skipEntryCompress := e.cfg.QueryLoop.Enabled && e.cfg.QueryLoop.CompressPerTurn
+	if !skipEntryCompress && e.shouldCompress(msgs, sc.TokenBudget) {
 		compCtx, compSpan := e.startSpan(ctx, telemetry.OpContextCompressionRun, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(msgs))},
 		)
@@ -308,7 +349,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	var routingHint *types.RoutingHint
 	var preflightResult *types.PreflightResult
 	visibleTools := harness.VisibleToolsFromState(sc.Harness)
-	if harnessEnabled {
+	if harnessEnabled && !workerLocal {
 		provisionalContext := basePrompt
 		if len(memoryEntries) > 0 {
 			memCtx, _ := memory.FormatMemoryContext(memoryEntries, e.cfg.LongTerm.RecallMaxTokens)
@@ -357,13 +398,14 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				RequestID: session.RequestID,
 				UserID:    session.UserID,
 			},
-			AgentsRaw:       basePrompt,
-			MemoryEntries:   memoryEntries,
-			Bootstrap:       bootstrapReport,
-			Workspace:       workspace,
-			Routing:         routingHint,
-			Preflight:       preflightResult,
-			HarnessEnabled:  true,
+			AgentsRaw:            basePrompt,
+			MemoryEntries:        memoryEntries,
+			Bootstrap:            bootstrapReport,
+			Workspace:            workspace,
+			Routing:              routingHint,
+			Preflight:            preflightResult,
+			HarnessEnabled:       true,
+			OmitAgentsFromSystem: e.cfg.UserContext.Mode == "prepend",
 		}
 		_, buildSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptBuild, tracer.SpanKindInternal)
 		builtPrompt, buildReport := e.assembler.Build(buildInput)
@@ -454,7 +496,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
-		if harnessEnabled {
+		if harnessEnabled && !workerLocal {
 			e.transcript.AppendTurn(sc, message, assistantSummary)
 		}
 		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpContextLongTermStore, tracer.SpanKindInternal)
@@ -479,19 +521,23 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	_, saveSpan := e.startSpan(ctx, telemetry.OpContextMemorySnapshotSave, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "snapshot.message_count", Value: fmt.Sprintf("%d", len(sc.Messages))},
 	)
-	if data, persistErr := e.memory.PersistSnapshot(sc); persistErr == nil {
-		session.ContextSnapshot = data
-		e.observer.EmitSnapshotRestored(session.SessionID, false)
-		if saveSpan != nil {
-			saveSpan.SetAttributes(tracer.Attribute{Key: "snapshot.size_bytes", Value: fmt.Sprintf("%d", len(data))})
-			saveSpan.End()
+	if !workerLocal {
+		if data, persistErr := e.memory.PersistSnapshot(sc); persistErr == nil {
+			session.ContextSnapshot = data
+			e.observer.EmitSnapshotRestored(session.SessionID, false)
+			if saveSpan != nil {
+				saveSpan.SetAttributes(tracer.Attribute{Key: "snapshot.size_bytes", Value: fmt.Sprintf("%d", len(data))})
+				saveSpan.End()
+			}
+		} else {
+			slog.Warn("contextengine: persist snapshot failed", "error", persistErr)
+			if saveSpan != nil {
+				saveSpan.RecordError(persistErr)
+				saveSpan.End()
+			}
 		}
-	} else {
-		slog.Warn("contextengine: persist snapshot failed", "error", persistErr)
-		if saveSpan != nil {
-			saveSpan.RecordError(persistErr)
-			saveSpan.End()
-		}
+	} else if saveSpan != nil {
+		saveSpan.End()
 	}
 
 	slog.Debug("contextengine: process done", "sessionID", session.SessionID, "duration", time.Since(start))

@@ -607,3 +607,192 @@ go test -tags='acceptance && p0 && d2' ./tests/acceptance/p0/ -run Harness -coun
 ---
 
 **维护：** 实现阶段变更须同步更新本文档、`openspec/specs/context-engine/spec.md` 与归档包内 `design.md`。
+
+---
+
+## 附录 D：提示词系统（Prompt System）
+
+**Change ID:** devrix-prompt-system · **版本:** 1.0.0
+
+### D.1 概述
+
+提示词系统负责构建发送给 LLM 的 System Prompt，采用 Section 分层设计，支持缓存和动态内容扩展。
+
+详细设计见：[prompt-system-design.md](./prompt-system-design.md)
+
+### D.2 架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Prompt System                                │
+│                                                                  │
+│  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐   │
+│  │   Loader    │───▶│   Section    │───▶│      Cache      │   │
+│  │             │    │  Registry    │    │                 │   │
+│  └─────────────┘    └──────────────┘    └─────────────────┘   │
+│         │                                                       │
+│         ▼                                                       │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                    Section Content                         │   │
+│  │  intro | system | doing_tasks | actions | using_tools |   │   │
+│  │  output_efficiency | tone_and_style                       │   │
+│  │  ┌─────────────────────────────────────────────────┐   │   │
+│  │  │ DynamicBoundary ────▶ 动态 Sections               │   │   │
+│  │  └─────────────────────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### D.3 调用链路
+
+```
+用户消息
+    │
+    ▼
+ContextEngine.Process()
+    │
+    ├─► MemoryManager.LoadOrInit()
+    │
+    └─► prompt.Loader.LoadAsSections()
+            │
+            ├─► 读取 AGENTS.md (如存在)
+            │       或
+            ├─► 返回 7 个静态 Sections
+            │
+            ▼
+        SystemPromptAssembler.Build()
+            │
+            ├─► Layer 0: Core Sections / AGENTS.md
+            ├─► Layer 1: Session Context
+            ├─► Layer 2: Guidance Template
+            └─► Layer 3: Dynamic Blocks
+                    ├─ agents_context
+                    ├─ memory_context
+                    ├─ harness_init
+                    └─ workspace_snapshot
+            │
+            ▼
+        LLM.ChatStream()
+```
+
+### D.4 静态 Sections (7个)
+
+| Section | 用途 | 缓存 |
+|---------|------|------|
+| `intro` | 角色定义 | CacheScopeGlobal |
+| `system` | 系统行为、权限 | CacheScopeGlobal |
+| `doing_tasks` | 代码规范、验证优先 | CacheScopeGlobal |
+| `actions` | 风险分级、谨慎行动 | CacheScopeGlobal |
+| `using_tools` | 专用工具优先 | CacheScopeGlobal |
+| `output_efficiency` | 简洁直接 | CacheScopeGlobal |
+| `tone_and_style` | 无 emoji、引用格式 | CacheScopeGlobal |
+
+### D.5 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `prompt/loader.go` | Section 加载、缓存管理 |
+| `prompt/templates/static.go` | 静态内容常量 |
+| `harness/system_prompt_assembler.go` | 4-Layer 组装 |
+| `harness/templates/devrix_core.zh.md` | 中文默认模板 |
+| `shared/config/contextengine_harness.go` | PromptConfig |
+
+### D.6 验收命令
+
+```bash
+# 单元测试
+go test ./internal/layers/contextengine/prompt/... -v
+
+# 集成测试
+go test ./internal/layers/contextengine/harness/... -v -run SystemPromptAssembler
+
+# 查看生成的提示词
+go run scripts/show_prompts.go
+
+# 一键验收
+./scripts/verify_prompt_sections.sh
+```
+
+### D.7 与 Claude Code 对照
+
+| 特性 | Claude Code | Devrix |
+|------|-------------|--------|
+| Section 抽象 | ✅ systemPromptSection | ✅ SectionDefinition |
+| 缓存策略 | ✅ memoize | ✅ Cache |
+| 动态 Section | ✅ DANGEROUS_uncached | ✅ CacheScopeEphemeral |
+| 边界标记 | ✅ SYSTEM_PROMPT_DYNAMIC_BOUNDARY | ✅ DynamicBoundary |
+| 工具使用规范 | ✅ getUsingYourToolsSection | ✅ sectionUsingTools |
+
+---
+
+**维护：** 提示词内容变更需同步更新本文档和 `docs/prompt-system-design.md`。
+
+---
+
+## 附录 E：任务规划系统
+
+**Change ID:** devrix-task-planning · **版本:** 1.0.0
+
+### E.1 概述
+
+任务规划系统借鉴 Claude Code 的设计，提供结构化的任务分解、规划探索和对抗性验证能力。
+
+详细设计见：[task-planning-design.md](./task-planning-design.md)
+
+### E.2 架构图
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Task Planning System                           │
+│                                                                      │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐   │
+│  │  TaskList   │     │  PlanAgent │     │ VerificationAgent  │   │
+│  │  Manager    │     │   (LLM)    │     │       (LLM)       │   │
+│  └──────┬──────┘     └──────┬──────┘     └──────────┬──────────┘   │
+│         │                    │                        │              │
+│         ▼                    ▼                        ▼              │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    PEV Loop                                   │   │
+│  │  ┌─────────┐    ┌─────────┐    ┌─────────┐               │   │
+│  │  │  Plan   │───▶│ Execute │───▶│ Verify  │               │   │
+│  │  └─────────┘    └─────────┘    └─────────┘               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### E.3 核心组件
+
+| 组件 | 职责 | 源码位置 |
+|------|------|----------|
+| `TaskManager` | 任务 CRUD、依赖管理 | `tasks/task_manager.go` |
+| `PlanAgent` | LLM 探索 + 生成计划 | `tasks/plan_agent.go` |
+| `VerificationAgent` | 对抗性验证 | `tasks/verification_agent.go` |
+| `ToolSuite` | 任务操作工具集 | `tasks/tool_suite.go` |
+
+### E.4 Task 数据结构
+
+```go
+type Task struct {
+    ID          string      // task_<uuid>
+    Subject     string      // 任务标题
+    Description string      // 详细描述
+    Status      TaskStatus // pending|in_progress|completed|failed
+    Owner       string      // 负责人
+    BlockedBy   []string   // 依赖的任务 IDs
+    Blocks      []string   // 被阻塞的任务 IDs
+}
+```
+
+### E.5 与 Claude Code 对照
+
+| 特性 | Claude Code | Devrix |
+|------|-------------|--------|
+| 任务列表 | TaskCreateTool | ✅ TaskManager |
+| 任务状态 | pending/in_progress/completed | ✅ 相同 |
+| 依赖管理 | blocks/blockedBy | ✅ 相同 |
+| PlanAgent | 只读探索 agent | ✅ PlanAgent |
+| VerificationAgent | 对抗性测试 | ✅ VerificationAgent |
+
+---
+
+**维护：** 功能变更需同步更新本文档和 `docs/task-planning-design.md`。

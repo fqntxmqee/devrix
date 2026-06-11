@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -37,9 +38,10 @@ type SystemPromptBuildInput struct {
 	MemoryEntries  []memory.MemoryEntry
 	Bootstrap      *types.BootstrapReport
 	Workspace      *types.WorkspaceContext
-	Routing        *types.RoutingHint
-	Preflight      *types.PreflightResult
-	HarnessEnabled bool
+	Routing              *types.RoutingHint
+	Preflight            *types.PreflightResult
+	HarnessEnabled       bool
+	OmitAgentsFromSystem bool
 }
 
 // SystemPromptBuildReport describes assembly observability metadata.
@@ -50,26 +52,37 @@ type SystemPromptBuildReport struct {
 	BlocksIncluded  []string
 	TemplateHash    string
 	AgentsMDHash    string
+	SectionCount    int
 }
 
 // SystemPromptAssembler builds the final system prompt per §十 spec.
+// Supports both legacy mode and new section-based prompt system.
 type SystemPromptAssembler struct {
 	coreTemplate     string
 	guidanceTemplate string
 	cfg              config.WorkspacePromptConfig
+	promptLoader     *prompt.Loader
 }
 
 // NewSystemPromptAssembler creates an assembler from workspace config.
 func NewSystemPromptAssembler(cfg config.WorkspacePromptConfig) *SystemPromptAssembler {
 	core := defaultCoreTemplate
 	guidance := defaultGuidanceTemplate
+	
+	// Create prompt loader for section-based prompts
+	var loader *prompt.Loader
+	if cfg.PromptConfig != nil && cfg.PromptConfig.UseSections {
+		loader = prompt.NewLoader(nil)
+	}
+
 	if !cfg.EmbedCoreTemplate {
-		core = "You are Devrix, a multi-agent development assistant."
+		core = "你是 Devrix，多智能体开发助手。"
 	}
 	return &SystemPromptAssembler{
 		coreTemplate:     core,
 		guidanceTemplate: guidance,
 		cfg:              cfg,
+		promptLoader:     loader,
 	}
 }
 
@@ -89,15 +102,21 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 		TemplateHash: a.templateFingerprint(),
 		AgentsMDHash: contentHash(in.AgentsRaw),
 	}
-	layer0 := strings.TrimSpace(a.coreTemplate)
-	report.LayerTokens[0] = estimateTokens(layer0)
 
+	// Layer 0: Core system prompt (from template or sections)
+	layer0, sectionCount := a.buildCoreLayer(in)
+	report.LayerTokens[0] = estimateTokens(layer0)
+	report.SectionCount = sectionCount
+
+	// Layer 1: Session context
 	layer1 := a.buildSessionContext(in)
 	report.LayerTokens[1] = estimateTokens(layer1)
 
+	// Layer 2: Guidance template
 	layer2 := strings.TrimSpace(a.guidanceTemplate)
 	report.LayerTokens[2] = estimateTokens(layer2)
 
+	// Layer 3: Dynamic blocks
 	blocks, blockReport := a.buildLayer3Blocks(in)
 	report.MemoryTruncated = blockReport.MemoryTruncated
 	report.BlocksIncluded = blockReport.BlocksIncluded
@@ -107,6 +126,7 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	layer3 := layer3Header + loaded
 	report.LayerTokens[3] = estimateTokens(layer3)
 
+	// Assemble final prompt
 	parts := make([]string, 0, 4)
 	for _, p := range []string{layer0, layer1, layer2, layer3} {
 		if strings.TrimSpace(p) != "" {
@@ -116,6 +136,28 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	out := strings.Join(parts, "\n\n")
 	report.TotalTokens = estimateTokens(out)
 	return out, report
+}
+
+// buildCoreLayer builds layer 0 from sections or template.
+func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (string, int) {
+	// Check if section-based loader is available
+	if a.promptLoader != nil {
+		// Check for custom prompt file first
+		if a.promptLoader.IsCustomPromptAvailable(in.WorkDir) {
+			if custom := a.promptLoader.LoadCustom(in.WorkDir); custom != "" {
+				return custom, 0
+			}
+		}
+
+		// Use section-based prompts
+		sections := a.promptLoader.LoadAsSections(in.WorkDir)
+		if len(sections) > 0 {
+			return strings.Join(sections, "\n\n"), len(sections)
+		}
+	}
+
+	// Fallback to embedded template
+	return a.coreTemplate, 1
 }
 
 // BuildLegacy returns the V4 system prompt (agents + longterm appendix).
@@ -198,6 +240,9 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 		agentsBudget = 0
 	}
 	agentsRaw := truncateToTokenBudget(strings.TrimSpace(in.AgentsRaw), agentsBudget)
+	if in.OmitAgentsFromSystem {
+		agentsRaw = ""
+	}
 	budget -= fixedTokens + estimateTokens(agentsRaw)
 	if budget < 0 {
 		budget = 0

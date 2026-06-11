@@ -53,7 +53,7 @@ is_devrix_server_pid() {
       cwd="$(devrix_process_cwd "$pid")"
       [[ "$cwd" == "$ROOT" ]] && return 0
       ;;
-    *go-build*/exe/main*)
+    *go-build*/exe/main*|*go-build*/devrix)
       cwd="$(devrix_process_cwd "$pid")"
       [[ "$cwd" == "$ROOT" ]] && return 0
       ;;
@@ -74,12 +74,44 @@ list_devrix_server_pids() {
   }
 
   while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "${BIN}\$" 2>/dev/null || true)
+  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f '[./]bin/devrix' 2>/dev/null || true)
   local stale
   for stale in "${STALE_BINS[@]}"; do
     while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f "^${stale}\$" 2>/dev/null || true)
   done
   while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go run.*cmd/devrix/main|go run.*\./cmd/devrix' 2>/dev/null || true)
-  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go-build.*/exe/main' 2>/dev/null || true)
+  while read -r pid; do append_unique_pid "$pid"; done < <(pgrep -f 'go-build.*/exe/main|go-build.*/devrix' 2>/dev/null || true)
+}
+
+count_devrix_server_pids() {
+  local count=0 pid
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    count=$((count + 1))
+  done < <(list_devrix_server_pids)
+  echo "$count"
+}
+
+# Exit 0 when exactly one server pid is running; sync pidfile to that pid.
+ensure_single_devrix_server_or_fail() {
+  devrix_process_init
+  local count pid
+  count="$(count_devrix_server_pids)"
+  if [[ "$count" -eq 0 ]]; then
+    echo "error: no devrix server process found"
+    exit 1
+  fi
+  if [[ "$count" -gt 1 ]]; then
+    echo "error: expected 1 devrix process, found $count:"
+    while read -r pid; do
+      [[ -n "$pid" ]] || continue
+      echo "  $pid $(ps -p "$pid" -o command= 2>/dev/null | head -c 120)"
+    done < <(list_devrix_server_pids)
+    echo "run: ./scripts/devrix.sh restart"
+    exit 1
+  fi
+  pid="$(list_devrix_server_pids | head -1)"
+  echo "$pid" >"$PIDFILE"
 }
 
 kill_devrix_pid() {
@@ -115,6 +147,19 @@ stop_all_devrix_servers() {
   done < <(list_devrix_server_pids)
 
   rm -f "$PIDFILE"
+
+  local round=0
+  while [[ "$round" -lt 3 ]]; do
+    if [[ "$(count_devrix_server_pids)" -eq 0 ]]; then
+      break
+    fi
+    while read -r pid; do
+      [[ -n "$pid" ]] || continue
+      kill_devrix_pid "$pid"
+    done < <(list_devrix_server_pids)
+    sleep 2
+    round=$((round + 1))
+  done
 
   # Allow IM WebSocket slot to release before reconnecting.
   sleep 5

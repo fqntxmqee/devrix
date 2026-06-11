@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -17,6 +18,13 @@ func (g *CommunicationGateway) SetAgentFactory(factory multiagent.IAgentFactory)
 	if g.sessionAgents == nil {
 		g.sessionAgents = make(map[string]multiagent.Agent)
 	}
+}
+
+// SetAgentObserverFactory sets a factory function that creates additional agent observers.
+func (g *CommunicationGateway) SetAgentObserverFactory(factory func(ctx context.Context, session *types.Session) multiagent.AgentObserver) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.agentObserverFactory = factory
 }
 
 // RegisterSessionAgent binds an active agent to a session (tests and explicit wiring).
@@ -70,6 +78,19 @@ func (g *CommunicationGateway) routeInboundViaAgent(
 	g.mu.Unlock()
 
 	ag.SetAgentObserver(&gatewayAgentObserver{gw: g, session: session})
+	if g.agentObserverFactory != nil {
+		obs := g.agentObserverFactory(ctx, session)
+		if obs != nil {
+			ag.SetAgentObserver(obs)
+			slog.Info("gateway: orchestration observer attached",
+				"session_id", session.SessionID,
+			)
+		} else {
+			slog.Warn("gateway: agentObserverFactory returned nil",
+				"session_id", session.SessionID,
+			)
+		}
+	}
 	ag.SetEngineEventSink(func(ev *contracts.EngineEvent) {
 		g.handleEngineEvent(ctx, session, ev)
 	})
@@ -81,9 +102,15 @@ func (g *CommunicationGateway) routeInboundViaAgent(
 		defer cancel()
 		defer g.clearSessionAgent(session.SessionID)
 		if _, runErr := ag.Run(processCtx); runErr != nil {
-			g.eventHandler.OnError(runErr, session.SessionID)
+			g.handleEngineEvent(ctx, session, &EngineEvent{
+				Type:      "error",
+				Content:   runErr.Error(),
+				SessionID: session.SessionID,
+				Metadata:  map[string]string{"source": "agent_run"},
+			})
 		}
 		g.unregisterProcess(session.SessionID)
+		g.persistSessionAfterProcess(session)
 	}()
 	return nil
 }

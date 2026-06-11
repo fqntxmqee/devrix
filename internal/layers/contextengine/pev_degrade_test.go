@@ -8,7 +8,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -53,7 +52,7 @@ func TestPEVEngine_should_degrade_when_followup_llm_fails_after_tools(t *testing
 	engine := contextengine.NewPEVEngine(
 		llm,
 		failingToolRunner{},
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,

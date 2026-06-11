@@ -23,3 +23,19 @@ func (a *PermissionGateAdapter) Request(ctx context.Context, sessionID, toolName
 	}
 	return a.mgr.Request(ctx, sessionID, toolName, input, risk)
 }
+
+// IsYOLOMode delegates to PermissionManager.
+func (a *PermissionGateAdapter) IsYOLOMode() bool {
+	if a.mgr == nil {
+		return false
+	}
+	return a.mgr.IsYOLOMode()
+}
+
+// AutoApproveFiles delegates to PermissionManager YOLO file policy.
+func (a *PermissionGateAdapter) AutoApproveFiles() bool {
+	if a.mgr == nil {
+		return false
+	}
+	return a.mgr.AutoApproveFiles()
+}

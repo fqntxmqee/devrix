@@ -2,9 +2,12 @@ package contextengine
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
+
+const sandboxPolicyHint = "This is a sandbox policy (not permission/YOLO); use relative paths under WorkDir or read_file/glob/list_dir for files."
 
 // CommandPolicy validates bash commands against allow/deny rules and workspace constraints.
 type CommandPolicy struct {
@@ -86,17 +89,18 @@ func (p *CommandPolicy) Validate(command string) error {
 	}
 
 	if !p.isAllowed(cmdName) {
-		return fmt.Errorf("command not allowed: %s (add to tool.allowlist in config)", cmdName)
+		return fmt.Errorf("sandbox: command not allowed: %s (add to tool.allowlist in config). %s", cmdName, sandboxPolicyHint)
 	}
 
+	scrubbed := scrubBenignDevNullRedirects(command)
 	for _, pattern := range p.DenyPatterns {
-		if pattern.MatchString(command) {
-			return fmt.Errorf("dangerous command pattern detected: %s", pattern.String())
+		if pattern.MatchString(scrubbed) {
+			return fmt.Errorf("sandbox: dangerous command pattern detected: %s. %s", pattern.String(), sandboxPolicyHint)
 		}
 	}
 
 	if p.WorkDirLock && containsAbsPath(command) {
-		return fmt.Errorf("absolute paths are not allowed")
+		return fmt.Errorf("sandbox: absolute paths outside workspace are not allowed in bash. %s", sandboxPolicyHint)
 	}
 
 	return nil
@@ -134,4 +138,43 @@ func containsAbsPath(command string) bool {
 		}
 	}
 	return strings.Contains(command, " /") || strings.Contains(command, "\t/")
+}
+
+// normalizeWorkspacePaths rewrites absolute paths under workDir to workspace-relative
+// paths so bash commands that use the full project path can pass WorkDirLock checks.
+func normalizeWorkspacePaths(workDir, command string) string {
+	workDir = filepath.Clean(workDir)
+	if workDir == "" {
+		return command
+	}
+
+	childPrefix := workDir + string(filepath.Separator)
+	if strings.Contains(command, childPrefix) {
+		command = strings.ReplaceAll(command, childPrefix, "")
+	}
+
+	return replaceAbsolutePathToken(command, workDir, ".")
+}
+
+// scrubBenignDevNullRedirects removes common stderr-null redirects before deny-pattern checks.
+func scrubBenignDevNullRedirects(command string) string {
+	for _, token := range []string{"2>/dev/null", "1>/dev/null", ">/dev/null"} {
+		command = strings.ReplaceAll(command, token, "")
+	}
+	return command
+}
+
+func replaceAbsolutePathToken(command, absPath, rel string) string {
+	if absPath == "" || !strings.Contains(command, absPath) {
+		return command
+	}
+
+	delims := []string{" ", "\t", ";", "|", "&&", "||", "\"", "'", ")", ">", "\n"}
+	for _, d := range delims {
+		command = strings.ReplaceAll(command, absPath+d, rel+d)
+	}
+	if strings.HasPrefix(command, absPath) {
+		command = rel + command[len(absPath):]
+	}
+	return command
 }

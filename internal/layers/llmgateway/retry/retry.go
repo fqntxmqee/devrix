@@ -27,10 +27,11 @@ func NewExecutor() *Executor {
 
 // WithRNG injects a random source (tests).
 func (e *Executor) WithRNG(rng *rand.Rand) *Executor {
+	next := *e
 	if rng != nil {
-		e.rng = rng
+		next.rng = rng
 	}
-	return e
+	return &next
 }
 
 // Stream executes call with retries on primary then fallback model.

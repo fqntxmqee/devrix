@@ -14,13 +14,17 @@ type BuiltinRegistry struct {
 }
 
 // NewBuiltinRegistry creates the built-in tool registry with default config.
-func NewBuiltinRegistry() *BuiltinRegistry {
+func NewBuiltinRegistry() (*BuiltinRegistry, error) {
 	return NewBuiltinRegistryFromConfig(nil)
 }
 
 // NewBuiltinRegistryFromConfig creates the built-in registry from tool config.
-func NewBuiltinRegistryFromConfig(toolCfg *config.ToolConfig) *BuiltinRegistry {
-	return &BuiltinRegistry{inner: contextengine.NewBuiltinToolRegistry(toolCfg)}
+func NewBuiltinRegistryFromConfig(toolCfg *config.ToolConfig) (*BuiltinRegistry, error) {
+	inner, err := contextengine.NewBuiltinToolRegistry(toolCfg)
+	if err != nil {
+		return nil, err
+	}
+	return &BuiltinRegistry{inner: inner}, nil
 }
 
 // ListTools returns registered tool schemas.

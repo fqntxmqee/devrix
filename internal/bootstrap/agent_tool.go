@@ -130,8 +130,13 @@ func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*
 	}
 	args.WorkDir = resolveAgentWorkDir(args.WorkDir, workDir)
 
-	// Apply a default 5-minute execution timeout.
-	execCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	execTimeout := 5 * time.Minute
+	if withTimeout, ok := p.agent.(interface{ ExecutionTimeout() time.Duration }); ok {
+		if d := withTimeout.ExecutionTimeout(); d > 0 {
+			execTimeout = d
+		}
+	}
+	execCtx, cancel := context.WithTimeout(ctx, execTimeout)
 	defer cancel()
 
 	evtCh, err := p.agent.Execute(execCtx, sessionID, tool.Request{
@@ -147,9 +152,26 @@ func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*
 	}
 
 	var parts []string
+	streamEmit := contextengine.ToolStreamEmitterFromContext(ctx)
+	agentLabel := p.info.DisplayName
+	if agentLabel == "" {
+		agentLabel = p.info.Name
+	}
+
 	for evt := range evtCh {
 		switch evt.Type {
+		case "thinking":
+			if streamEmit != nil && evt.Content != "" {
+				streamEmit(contextengine.ToolStreamEvent{
+					Type: "thinking", Content: evt.Content, ToolName: agentLabel,
+				})
+			}
 		case "text", "tool_use":
+			if streamEmit != nil && evt.Content != "" {
+				streamEmit(contextengine.ToolStreamEvent{
+					Type: evt.Type, Content: evt.Content, ToolName: agentLabel,
+				})
+			}
 			if evt.Content != "" {
 				parts = append(parts, evt.Content)
 			}

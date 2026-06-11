@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -70,7 +69,7 @@ func newTestPEVEngine(t *testing.T, llm contextengine.ILLMGateway, tools context
 	return contextengine.NewPEVEngine(
 		llm,
 		tools,
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,
@@ -158,7 +157,7 @@ func TestPEV_MaxIterations_Exhausted(t *testing.T) {
 	engine := contextengine.NewPEVEngine(
 		llm,
 		failingToolRunner{},
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,

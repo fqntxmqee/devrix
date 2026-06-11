@@ -49,12 +49,12 @@ func (c *toolExecConfig) maxOutput() int {
 }
 
 // NewBuiltinToolRunner creates the default built-in tool registry as IToolRunner.
-func NewBuiltinToolRunner() IToolRunner {
+func NewBuiltinToolRunner() (IToolRunner, error) {
 	return NewBuiltinToolRegistry(config.DefaultToolConfig())
 }
 
 // NewBuiltinToolRunnerFromConfig builds the built-in registry from tool config.
-func NewBuiltinToolRunnerFromConfig(toolCfg *config.ToolConfig) IToolRunner {
+func NewBuiltinToolRunnerFromConfig(toolCfg *config.ToolConfig) (IToolRunner, error) {
 	return NewBuiltinToolRegistry(toolCfg)
 }
 
@@ -71,7 +71,7 @@ func (r *bashRunner) Name() string { return "bash" }
 func (r *bashRunner) Schema() ToolSchema {
 	return ToolSchema{
 		Name:        "bash",
-		Description: "Execute a shell command (sandboxed)",
+		Description: "Execute a shell command in the session WorkDir (sandboxed). Use relative paths; prefer read_file/glob/list_dir for file reads.",
 	}
 }
 
@@ -92,7 +92,11 @@ func newReadFileRunner(cfg *toolExecConfig) *readFileRunner {
 func (r *readFileRunner) Name() string { return "read_file" }
 
 func (r *readFileRunner) Schema() ToolSchema {
-	return ToolSchema{Name: "read_file", Description: "Read a file from the workspace"}
+	return ToolSchema{
+		Name:        "read_file",
+		Description: "Read a file from the workspace. Args: {\"path\":\"relative/or/abs/path\"}",
+		Parameters:  `{"type":"object","required":["path"],"properties":{"path":{"type":"string"},"file_path":{"type":"string"}}}`,
+	}
 }
 
 func (r *readFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
@@ -113,13 +117,27 @@ func newWriteFileRunner(cfg *toolExecConfig) *writeFileRunner {
 func (r *writeFileRunner) Name() string { return "write_file" }
 
 func (r *writeFileRunner) Schema() ToolSchema {
-	return ToolSchema{Name: "write_file", Description: "Write content to a file"}
+	return ToolSchema{
+		Name:        "write_file",
+		Description: "Write content to a file in the workspace. Args: {\"path\":\"...\",\"content\":\"...\"}",
+		Parameters:  `{"type":"object","required":["path","content"],"properties":{"path":{"type":"string"},"file_path":{"type":"string"},"content":{"type":"string"}}}`,
+	}
 }
 
 func (r *writeFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelMedium }
 
 func (r *writeFileRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
-	_ = ctx
+	fields := parseToolInput(input)
+	path := firstNonEmpty(fields, "path", "file", "file_path")
+	if path != "" {
+		target := path
+		if workDir != "" && !filepath.IsAbs(path) {
+			target = filepath.Join(workDir, path)
+		}
+		if denied := enforcePlanModeWrite(ctx, target); denied != nil {
+			return denied, nil
+		}
+	}
 	return runWriteFile(workDir, input, r.cfg)
 }
 
@@ -130,6 +148,10 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 	}
 	if command == "" {
 		return &ToolResult{Error: "bash: command is required"}, nil
+	}
+
+	if workDir != "" {
+		command = normalizeWorkspacePaths(workDir, command)
 	}
 
 	if cfg.policy != nil {
@@ -184,7 +206,7 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 }
 
 func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
-	path := toolInputString(input, "path", "file")
+	path := toolInputString(input, "path", "file", "file_path")
 	if path == "" {
 		path = strings.TrimSpace(input)
 	}
@@ -202,10 +224,10 @@ func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error
 
 func runWriteFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
 	fields := parseToolInput(input)
-	path := firstNonEmpty(fields, "path", "file")
+	path := firstNonEmpty(fields, "path", "file", "file_path")
 	content := fields["content"]
 	if path == "" {
-		return &ToolResult{Error: "write_file: path is required"}, nil
+		return &ToolResult{Error: "write_file: path is required (use \"path\" or \"file_path\")"}, nil
 	}
 
 	target, err := resolveWorkspacePath(workDir, path)

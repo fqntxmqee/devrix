@@ -77,7 +77,10 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 	// Simulate the per-agent plugin pattern: each agent gets a call_<name> tool.
 	plugin := &testAgentToolPlugin{agt: echoTool, name: "call_echo-agent"}
 	cfg := config.DefaultToolConfig()
-	builtinReg := contextengine.NewBuiltinToolRegistry(cfg)
+	builtinReg, err := contextengine.NewBuiltinToolRegistry(cfg)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
 	if err := builtinReg.Register(plugin); err != nil {
 		t.Fatalf("register plugin: %v", err)
 	}

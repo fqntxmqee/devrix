@@ -7,10 +7,19 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+// DefaultAuthSecretPlaceholder is the dev-only JWT signing key.
+// Production deployments MUST override via DEVRIX_AUTH_SECRET or auth.secret in config.yaml.
+const DefaultAuthSecretPlaceholder = "devrix-secret-change-me"
+
+// IsDefaultAuthSecret reports whether secret is empty or still the dev placeholder.
+func IsDefaultAuthSecret(secret string) bool {
+	return secret == "" || secret == DefaultAuthSecretPlaceholder
+}
+
 // DefaultAuthConfig 返回默认认证配置
 func DefaultAuthConfig() *types.AuthConfig {
 	return &types.AuthConfig{
-		Secret:      getEnvOrDefault("DEVRIX_AUTH_SECRET", "default-secret-change-me"),
+		Secret:      getEnvOrDefault("DEVRIX_AUTH_SECRET", DefaultAuthSecretPlaceholder),
 		TokenExpiry: 24 * time.Hour,
 		Issuer:      "devrix",
 	}

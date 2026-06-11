@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -36,10 +37,14 @@ func main() {
 	handler := testutil.NewMockEventHandler()
 	permMgr := gateway.NewPermissionManager(&cfg.Permission)
 
+	toolsReg, err := registry.NewBuiltinRegistry()
+	if err != nil {
+		log.Fatal(err)
+	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   toolsReg,
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 		ObsBridge:  obsBridge,

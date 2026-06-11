@@ -30,6 +30,7 @@ type ConfigFile struct {
 	Tool           ToolConfig            `yaml:"tool"`
 	MultiAgent     MultiAgentFileConfig  `yaml:"multi_agent"`
 	AgentTools     AgentToolsFileConfig  `yaml:"agent_tools"`
+	Orchestration  OrchestrationFileConfig `yaml:"orchestration"`
 }
 
 // AppConfig 应用配置
@@ -86,6 +87,21 @@ type MetricsConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Port    int    `yaml:"port"`
 	Path    string `yaml:"path"`
+}
+
+// OrchestrationFileConfig 编排验证配置（文件格式）
+type OrchestrationFileConfig struct {
+	Enabled                bool     `yaml:"enabled"`
+	JudgeProvider          string   `yaml:"judge_provider"`
+	JudgeModel             string   `yaml:"judge_model"`
+	FallbackJudgeProvider  string   `yaml:"fallback_judge_provider"`
+	FallbackJudgeModel     string   `yaml:"fallback_judge_model"`
+	PreFilterEnabled       bool     `yaml:"pre_filter_enabled"`
+	MinIntervalBetweenJudges string `yaml:"min_interval_between_judges"`
+	MaxJudgeCallsPerMinute int      `yaml:"max_judge_calls_per_minute"`
+	TrustedToolAllowlist   []string `yaml:"trusted_tool_allowlist"`
+	InterventionThreshold  float64  `yaml:"intervention_threshold"`
+	AutoIntervene          bool     `yaml:"auto_intervene"`
 }
 
 // LoadConfigFile loads configuration from a YAML file
@@ -222,6 +238,7 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 	if f.SystemPrompt.Fallback != "" {
 		cfg.SystemPrompt.Fallback = f.SystemPrompt.Fallback
 	}
+	*cfg = mergeContextEngineV6(*cfg, f)
 	if err := ValidateContextEngineConfig(cfg); err != nil {
 		fmt.Printf("warning: context engine config invalid, using defaults where needed: %v\n", err)
 	}
@@ -412,12 +429,16 @@ func buildCommunicationConfig(fileCfg *ConfigFile) *CommunicationConfig {
 
 func buildAuthConfig(fileCfg *ConfigFile) *types.AuthConfig {
 	authCfg := &types.AuthConfig{
-		Secret:      "devrix-secret-change-me",
+		// DefaultAuthSecretPlaceholder is dev-only; override via DEVRIX_AUTH_SECRET or auth.secret in production.
+		Secret:      DefaultAuthSecretPlaceholder,
 		TokenExpiry: 24 * time.Hour,
 		Issuer:      "devrix",
 	}
 
 	if fileCfg == nil {
+		if IsDefaultAuthSecret(authCfg.Secret) {
+			fmt.Printf("warning: using default auth secret; set DEVRIX_AUTH_SECRET or auth.secret in config for production\n")
+		}
 		return authCfg
 	}
 
@@ -440,6 +461,10 @@ func buildAuthConfig(fileCfg *ConfigFile) *types.AuthConfig {
 		authCfg.Issuer = issuer
 	} else if fileCfg.Auth.Issuer != "" {
 		authCfg.Issuer = fileCfg.Auth.Issuer
+	}
+
+	if IsDefaultAuthSecret(authCfg.Secret) {
+		fmt.Printf("warning: using default auth secret; set DEVRIX_AUTH_SECRET or auth.secret in config for production\n")
 	}
 
 	return authCfg

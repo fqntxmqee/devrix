@@ -272,20 +272,7 @@ func (a *DingTalkAdapter) buildSessionKey(conversationID, senderNick string) str
 }
 
 func (a *DingTalkAdapter) getOrCreateSession(sessionKey string) (*types.Session, error) {
-	if existing, ok := a.sessionMap.Load(sessionKey); ok {
-		session, err := a.gateway.GetSession(existing.(string))
-		if err == nil && session != nil {
-			return session, nil
-		}
-		a.sessionMap.Delete(sessionKey)
-	}
-
-	session, err := a.gateway.CreateSession(sessionKey, "")
-	if err != nil {
-		return nil, err
-	}
-	a.sessionMap.Store(sessionKey, session.SessionID)
-	return session, nil
+	return resolveOrCreateSession(a.gateway, &a.sessionMap, sessionKey)
 }
 
 // OnMessage handles outbound messages from the gateway.

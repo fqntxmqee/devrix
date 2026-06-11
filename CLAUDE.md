@@ -11,7 +11,7 @@
 | D3 | LLM 网关 | `internal/layers/llmgateway/` |
 | D4 | 多智能体 | `internal/layers/multiagent/` |
 | D5 | 可观测性 | `internal/layers/observability/` |
-| D6 | 演化层 | — |
+| D6 | 演化层 | `internal/layers/evolution/` |
 
 ## 研发流程
 

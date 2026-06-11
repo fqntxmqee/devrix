@@ -11,7 +11,7 @@ Multi-agent development assistant. 6-layer architecture, OpenSpec S1-S6 workflow
 | D3 | LLM Gateway | `internal/layers/llmgateway/` |
 | D4 | Multi-Agent | `internal/layers/multiagent/` |
 | D5 | Observability | `internal/layers/observability/` |
-| D6 | Evolution | — |
+| D6 | Evolution | `internal/layers/evolution/` |
 
 ## Development Workflow (OpenSpec S1-S6)
 

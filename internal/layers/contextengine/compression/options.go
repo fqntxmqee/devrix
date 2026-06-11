@@ -60,6 +60,13 @@ func WithSessionID(sessionID string) Option {
 	}
 }
 
+// WithSkipAssembly skips step 5 system prompt assembly (QueryLoop passes system separately).
+func WithSkipAssembly(skip bool) Option {
+	return func(p *Pipeline) {
+		p.skipAssembly = skip
+	}
+}
+
 func defaultPipeline() *Pipeline {
 	return &Pipeline{
 		counter:        token.NewCounter(),

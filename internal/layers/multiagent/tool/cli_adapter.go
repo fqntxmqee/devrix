@@ -30,6 +30,7 @@ type CLIConfig struct {
 	Timeout      time.Duration
 	IdleTimeout  time.Duration
 	MaxSessions  int // 0 = unlimited
+	OneShot      bool // true when subprocess exits after each turn (e.g. claude --print)
 }
 
 // CLISession wraps a long-running subprocess.
@@ -67,6 +68,14 @@ func NewCLIAgentTool(cfg CLIConfig) *CLIAgentTool {
 		sessions: make(map[string]*CLISession),
 		stopCh:   make(chan struct{}),
 	}
+	if !t.cfg.OneShot {
+		for _, arg := range t.cfg.Args {
+			if arg == "--print" {
+				t.cfg.OneShot = true
+				break
+			}
+		}
+	}
 	if cfg.IdleTimeout > 0 {
 		t.wg.Add(1)
 		go t.idleSweeper()
@@ -77,15 +86,29 @@ func NewCLIAgentTool(cfg CLIConfig) *CLIAgentTool {
 // Info returns the tool's identity metadata.
 func (t *CLIAgentTool) Info() Info { return t.info }
 
+// ExecutionTimeout returns the configured per-call timeout for this agent tool.
+func (t *CLIAgentTool) ExecutionTimeout() time.Duration {
+	if t.cfg.Timeout > 0 {
+		return t.cfg.Timeout
+	}
+	return 5 * time.Minute
+}
+
+// isAlive reports whether the subprocess is still running.
+func (s *CLISession) isAlive() bool {
+	if s == nil || s.cmd == nil || s.cmd.Process == nil {
+		return false
+	}
+	// ProcessState is only populated after Wait(); use signal 0 to probe liveness.
+	return s.cmd.Process.Signal(syscall.Signal(0)) == nil
+}
+
 // Execute sends a task to the agent tool and streams events until complete.
 func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
 	sess, err := t.ensureSession(ctx, sessionID, req.WorkDir)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
 	}
-
-	sess.mu.Lock()
-	defer sess.mu.Unlock()
 
 	// Build stdin message (stream-json protocol)
 	msg := map[string]any{
@@ -97,29 +120,89 @@ func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Reques
 	}
 	data, _ := json.Marshal(msg)
 
-	if _, err := fmt.Fprintln(sess.stdin, string(data)); err != nil {
-		return nil, fmt.Errorf("%s: write stdin: %w", t.cfg.Name, err)
+	var writeErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		writeErr = func() error {
+			sess.mu.Lock()
+			defer sess.mu.Unlock()
+			if _, err := fmt.Fprintln(sess.stdin, string(data)); err != nil {
+				return err
+			}
+			sess.lastUsedAt = time.Now()
+			return nil
+		}()
+		if writeErr == nil {
+			break
+		}
+		// Stale session (e.g. prior ctx cancel closed stdin, or --print subprocess exited).
+		t.dropSession(sessionID)
+		sess, err = t.ensureSession(ctx, sessionID, req.WorkDir)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
+		}
 	}
-	sess.lastUsedAt = time.Now()
+	if writeErr != nil {
+		return nil, fmt.Errorf("%s: write stdin: %w", t.cfg.Name, writeErr)
+	}
 
 	ch := make(chan Event)
 	go func() {
 		defer close(ch)
 
+		t.mu.RLock()
+		scanSess := t.sessions[sessionID]
+		t.mu.RUnlock()
+		if scanSess == nil {
+			ch <- Event{Type: "error", Content: "session terminated"}
+			return
+		}
+
+		scanSess.mu.Lock()
+		scanner := scanSess.stdout
+		scanSess.mu.Unlock()
+		if scanner == nil {
+			ch <- Event{Type: "error", Content: "session terminated"}
+			return
+		}
+
 		// Close stdin on context cancellation to unblock the scanner.
 		go func() {
 			<-ctx.Done()
-			sess.stdin.Close()
+			scanSess.mu.Lock()
+			defer scanSess.mu.Unlock()
+			if scanSess.stdin != nil {
+				_ = scanSess.stdin.Close()
+			}
 		}()
 
-		for sess.stdout.Scan() {
-			line := strings.TrimSpace(sess.stdout.Text())
+		normalDone := false
+		defer func() {
+			// Aborted turns leave a broken pipe; drop so the next call starts fresh.
+			if !normalDone {
+				t.dropSession(sessionID)
+			}
+		}()
+
+		for scanner.Scan() {
+			if ctx.Err() != nil {
+				return
+			}
+
+			line := strings.TrimSpace(scanner.Text())
 			if line == "" {
 				continue
 			}
 
 			parsed := ParseStreamJSONLine(line)
 			for _, evt := range parsed.Events {
+				if evt.Type == "thinking" || evt.Type == "text" || evt.Type == "tool_use" {
+					slog.Debug("agent tool stream event",
+						"tool", t.cfg.Name,
+						"session", sessionID,
+						"type", evt.Type,
+						"len", len(evt.Content),
+					)
+				}
 				select {
 				case ch <- evt:
 				case <-ctx.Done():
@@ -127,10 +210,14 @@ func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Reques
 				}
 			}
 			if parsed.Done {
+				normalDone = true
+				if t.cfg.OneShot || !scanSess.isAlive() {
+					t.dropSession(sessionID)
+				}
 				return
 			}
 		}
-		if err := sess.stdout.Err(); err != nil {
+		if err := scanner.Err(); err != nil {
 			ch <- Event{Type: "error", Content: fmt.Sprintf("stdout error: %v", err)}
 		}
 	}()
@@ -143,8 +230,11 @@ func (t *CLIAgentTool) ensureSession(ctx context.Context, sessionID string, work
 	t.mu.RLock()
 	sess, ok := t.sessions[sessionID]
 	t.mu.RUnlock()
-	if ok {
+	if ok && sess.isAlive() {
 		return sess, nil
+	}
+	if ok {
+		t.dropSession(sessionID)
 	}
 
 	t.mu.RLock()
@@ -201,10 +291,13 @@ func (t *CLIAgentTool) ensureSession(ctx context.Context, sessionID string, work
 		}
 	}()
 
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 256*1024), 4*1024*1024)
+
 	sess = &CLISession{
 		cmd:        cmd,
 		stdin:      stdin,
-		stdout:     bufio.NewScanner(stdout),
+		stdout:     scanner,
 		createdAt:  time.Now(),
 		lastUsedAt: time.Now(),
 	}
@@ -231,6 +324,25 @@ func (t *CLIAgentTool) CloseSession(sessionID string) error {
 	return t.closeSession(sess)
 }
 
+// dropSession removes a cached session without waiting for graceful shutdown.
+// Used when stdin/stdout is already broken.
+func (t *CLIAgentTool) dropSession(sessionID string) {
+	t.mu.Lock()
+	sess, ok := t.sessions[sessionID]
+	if ok {
+		delete(t.sessions, sessionID)
+	}
+	t.mu.Unlock()
+	if !ok {
+		return
+	}
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+		_ = t.closeSession(sess)
+	}()
+}
+
 func (t *CLIAgentTool) closeSession(sess *CLISession) error {
 	if sess == nil {
 		return nil
@@ -239,7 +351,12 @@ func (t *CLIAgentTool) closeSession(sess *CLISession) error {
 	// Phase 1: graceful — close stdin
 	// Ignore stdin close errors — the pipe may already be closed by a concurrent
 	// context cancellation in Execute().
-	_ = sess.stdin.Close()
+	sess.mu.Lock()
+	if sess.stdin != nil {
+		_ = sess.stdin.Close()
+		sess.stdin = nil
+	}
+	sess.mu.Unlock()
 
 	done := make(chan error, 1)
 	go func() {

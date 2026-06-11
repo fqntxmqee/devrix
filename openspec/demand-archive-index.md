@@ -38,6 +38,13 @@
 | DM-20260610-009 | D6 Eval Phase 2 — PEV probe, real Judge, tune | devrix-d6-eval-phase2 | 2026-06-10 | [#20](https://github.com/fqntxmqee/devrix/pull/20) | ACCEPTED |
 | DM-20260610-010 | D6 Eval Phase 3 — Provider + Fork/Join probes | devrix-d6-eval-phase3 | 2026-06-10 | [#22](https://github.com/fqntxmqee/devrix/pull/22) | ACCEPTED |
 | DM-20260610-011 | D6 Eval Phase 4 — CI fast check + delta gate | devrix-d6-eval-phase4 | 2026-06-10 | [#24](https://github.com/fqntxmqee/devrix/pull/24) | ACCEPTED |
+| DM-20260610-012 | QueryLoop 全量对齐 Claude Code Harness (v1/v2) | devrix-queryloop-context | 2026-06-10 | — | ACCEPTED (P0) |
+| DM-20260611-001 | D2 上下文引擎 Agentic Loop 深化 | devrix-agentic-loop | 2026-06-11 | — | S1_Proposal |
+| DM-20260611-002 | 架构分层合规 — 消除反向依赖与契约错放 | devrix-layer-isolation | 2026-06-11 | — | S1_Proposal |
+| DM-20260611-003 | 事件通道与背压机制 — Channel Drain/Compact/Reconnect | devrix-event-channel | 2026-06-11 | — | S1_Proposal |
+| DM-20260611-004 | Harness 路径统一 — 消除双代码路径分支 | devrix-harness-unification | 2026-06-11 | — | S1_Proposal |
+| DM-20260611-005 | 多 Agent 会话隔离 — Fork/Join 独立 Session 上下文 | devrix-multiagent-isolation | 2026-06-11 | — | S1_Proposal |
+| DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-11 | — | S3_Planning |
 
 ## Archive Locations
 
@@ -78,10 +85,17 @@
 | devrix-d6-eval-cli | `openspec/archive/2026-06-10-devrix-d6-eval-cli/` |
 | devrix-d6-eval-phase2 | `openspec/archive/2026-06-10-devrix-d6-eval-phase2/` |
 | devrix-d6-eval-phase3 | `openspec/archive/2026-06-10-devrix-d6-eval-phase3/` |
+| devrix-queryloop-context | `openspec/archive/2026-06-10-devrix-queryloop-context/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
+| devrix-agentic-loop | DM-20260611-001 | `openspec/changes/devrix-agentic-loop/` | S1_Proposal |
+| devrix-layer-isolation | DM-20260611-002 | `openspec/changes/devrix-layer-isolation/` | S1_Proposal |
+| devrix-event-channel | DM-20260611-003 | `openspec/changes/devrix-event-channel/` | S1_Proposal |
+| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S1_Proposal |
+| devrix-multiagent-isolation | DM-20260611-005 | `openspec/changes/devrix-multiagent-isolation/` | S1_Proposal |
+| devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S3_Planning |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |

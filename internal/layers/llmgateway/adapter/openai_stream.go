@@ -36,10 +36,11 @@ func NewOpenAIStreamClient(provider string, cfg sharedconfig.LLMProviderRuntimeC
 
 // WithHTTPClient overrides the HTTP client (tests).
 func (c *OpenAIStreamClient) WithHTTPClient(client *http.Client) *OpenAIStreamClient {
+	next := *c
 	if client != nil {
-		c.client = client
+		next.client = client
 	}
-	return c
+	return &next
 }
 
 // Stream calls POST /chat/completions and parses SSE output.

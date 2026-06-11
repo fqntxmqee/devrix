@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -27,6 +28,7 @@ type ContextEngineBuilder struct {
 	stack        llmbridge.ContextLLMStack
 	ctxCfg       *config.ContextEngineConfig
 	toolCfg      *config.ToolConfig
+	maCfg        *config.MultiAgentConfig
 	obsBridge    *observability.Bridge
 	milestoneSvc milestone.IMilestoneService
 	agentToolReg *tool.Registry
@@ -51,6 +53,14 @@ func NewContextEngineBuilder(
 	}
 }
 
+// WithMultiAgentConfig enables delegate tool registration on per-agent engines.
+func (b *ContextEngineBuilder) WithMultiAgentConfig(maCfg *config.MultiAgentConfig) *ContextEngineBuilder {
+	if b != nil {
+		b.maCfg = maCfg
+	}
+	return b
+}
+
 // Build returns a context engine using the agent permission gate.
 func (b *ContextEngineBuilder) Build(perm multiagent.PermissionGate) contracts.IEngine {
 	var gate contextengine.IPermissionGate
@@ -65,7 +75,20 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 		return nil
 	}
 	planner, longTerm := WireContextV3(b.ctxCfg, b.milestoneSvc)
-	toolReg := contextengine.NewBuiltinToolRegistry(b.toolCfg)
+	tasks.InitGlobalTaskManager(b.ctxCfg.Tasks)
+	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
+	if err != nil {
+		slog.Error("create builtin tool registry", "error", err)
+		toolReg = contextengine.NewToolRegistry()
+	}
+	if err := contextengine.RegisterQueryLoopTools(toolReg, b.ctxCfg, tasks.GlobalTaskManager); err != nil {
+		slog.Error("register query loop tools", "error", err)
+	}
+	if b.maCfg != nil && b.maCfg.Delegate.Enabled {
+		if err := contextengine.RegisterDelegateTools(toolReg, b.maCfg); err != nil {
+			slog.Error("register delegate tools", "error", err)
+		}
+	}
 
 	if b.agentToolReg != nil {
 		plugins := newAgentToolPlugins(b.agentToolReg, b.obsBridge)

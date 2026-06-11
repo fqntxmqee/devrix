@@ -10,10 +10,18 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 )
 
+func mustBuiltinToolRunner(t *testing.T) contextengine.IToolRunner {
+	runner, err := contextengine.NewBuiltinToolRunner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return runner
+}
+
 // Covers: L5-CTX-06
 func TestBuiltinToolRunner_should_run_bash_pwd_when_workdir_set(t *testing.T) {
 	dir := t.TempDir()
-	runner := contextengine.NewBuiltinToolRunner()
+	runner := mustBuiltinToolRunner(t)
 	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
 
 	result, err := runner.Execute(ctx, contextengine.ToolCall{
@@ -39,7 +47,7 @@ func TestBuiltinToolRunner_should_read_file_in_workspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	runner := contextengine.NewBuiltinToolRunner()
+	runner := mustBuiltinToolRunner(t)
 	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
 	result, err := runner.Execute(ctx, contextengine.ToolCall{
 		Name:  "read_file",
@@ -58,7 +66,7 @@ func TestBuiltinToolRunner_should_read_file_in_workspace(t *testing.T) {
 
 func TestBuiltinToolRunner_should_reject_path_escape(t *testing.T) {
 	dir := t.TempDir()
-	runner := contextengine.NewBuiltinToolRunner()
+	runner := mustBuiltinToolRunner(t)
 	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
 	result, err := runner.Execute(ctx, contextengine.ToolCall{
 		Name:  "read_file",
@@ -75,7 +83,7 @@ func TestBuiltinToolRunner_should_reject_path_escape(t *testing.T) {
 // Covers: L5-TOOL-01
 func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	dir := t.TempDir()
-	runner := contextengine.NewBuiltinToolRunner()
+	runner := mustBuiltinToolRunner(t)
 	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
 
 	result, err := runner.Execute(ctx, contextengine.ToolCall{
@@ -93,9 +101,61 @@ func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	}
 }
 
+// Covers: L5-TOOL-01
+func TestBuiltinToolRunner_should_accept_bash_with_workdir_absolute_path(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "pkg")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "note.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := mustBuiltinToolRunner(t)
+	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, contextengine.ToolCall{
+		Name:  "bash",
+		Input: `{"command":"cat ` + filepath.Join(dir, "pkg", "note.txt") + `"}`,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("unexpected error: %s output=%q", result.Error, result.Output)
+	}
+	if strings.TrimSpace(result.Output) != "ok" {
+		t.Fatalf("output = %q", result.Output)
+	}
+}
+
+func TestBuiltinToolRunner_should_read_file_with_file_path_alias(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hello.txt")
+	if err := os.WriteFile(path, []byte("alias ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := mustBuiltinToolRunner(t)
+	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, contextengine.ToolCall{
+		Name:  "read_file",
+		Input: `{"file_path":"hello.txt"}`,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("unexpected error: %s", result.Error)
+	}
+	if result.Output != "alias ok" {
+		t.Fatalf("output = %q", result.Output)
+	}
+}
+
 func TestBuiltinToolRunner_should_write_file_in_workspace(t *testing.T) {
 	dir := t.TempDir()
-	runner := contextengine.NewBuiltinToolRunner()
+	runner := mustBuiltinToolRunner(t)
 	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
 	result, err := runner.Execute(ctx, contextengine.ToolCall{
 		Name:  "write_file",

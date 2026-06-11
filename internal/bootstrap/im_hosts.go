@@ -56,6 +56,7 @@ func WireIM(
 			slog.Warn("im.feishu enabled but app_id/app_secret missing; skipping feishu adapter")
 			return nil, defaultHandler
 		}
+		streamEnabled, streamIntervalMs, streamMinDelta := userCfg.IM.Feishu.ResolveFeishuStreamingConfig()
 		feishuCfg := &adapters.FeishuConfig{
 			AppID:         userCfg.IM.Feishu.AppID,
 			AppSecret:     userCfg.IM.Feishu.AppSecret,
@@ -69,6 +70,12 @@ func WireIM(
 			DoneEmoji:     userCfg.IM.Feishu.DoneEmoji,
 			ReplyInThread: userCfg.IM.Feishu.IsReplyInThread(),
 			ProgressStyle: userCfg.IM.Feishu.ProgressStyle,
+			ShowToolResults: userCfg.IM.Feishu.IsShowToolResults(),
+			Streaming: adapters.FeishuStreamingConfig{
+				Enabled:       streamEnabled,
+				IntervalMs:    streamIntervalMs,
+				MinDeltaChars: streamMinDelta,
+			},
 		}
 		hosts.Feishu = adapters.NewFeishuAdapter(nil, feishuCfg, commCfg)
 		return hosts, hosts.Feishu

@@ -12,21 +12,29 @@ import (
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/auth"
 	"github.com/devrix/devrix/internal/layers/communication/connection"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/instance"
 	"github.com/devrix/devrix/internal/layers/communication/metrics"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/communication/ratelimit"
+	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/evolution/orchestration"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 func main() {
+	// Go 1.26: replace default slog handler before any log call to avoid
+	// circular log→slog→log deadlock in the runtime default handler.
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
 	if len(os.Args) >= 2 && os.Args[1] == "debug" {
 		if err := clidebug.Run(os.Args[2:]); err != nil {
 			slog.Error("debug command failed", "error", err)
@@ -151,6 +159,11 @@ func main() {
 	}
 
 	imHosts, eventHandler := bootstrap.WireIM(userCfg, commCfg, defaultEventHandler)
+	imActive := imHosts != nil && imHosts.Active()
+	runCLI := !imActive || os.Getenv("DEVRIX_CLI") == "1"
+	if runCLI && (imHosts == nil || !imActive) {
+		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
+	}
 
 	gw := gateway.NewCommunicationGateway(
 		sessionStore,
@@ -161,15 +174,24 @@ func main() {
 	)
 	gw.SetObservability(obs)
 
+	var agentFactory multiagent.IAgentFactory
 	if multiAgentCfg.Enabled {
-		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg)
-		agentFactory := bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge)
+		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg).
+			WithMultiAgentConfig(multiAgentCfg)
+		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
 			"max_children", multiAgentCfg.MaxChildren,
 			"max_total_agents", multiAgentCfg.MaxTotalAgents,
 			"default_mode", multiAgentCfg.DefaultMode,
 		)
+	}
+
+	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
+
+	bootstrap.WireExecutionFlow(ctxCfg, gw)
+	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -220,9 +242,6 @@ func main() {
 		}
 	}()
 
-	imActive := imHosts != nil && imHosts.Active()
-	runCLI := !imActive || os.Getenv("DEVRIX_CLI") == "1"
-
 	slog.Info("devrix started",
 		"version", "v2.0",
 		"engine", bootstrap.ContextEngineKind(contextEngine),
@@ -255,6 +274,43 @@ func main() {
 	}
 
 	slog.Info("devrix stopped")
+}
+
+// initOrchestration wires cross-model decision validation.
+func initOrchestration(
+	configFile string,
+	multiAgentEnabled bool,
+	rawGateway llmgateway.IGateway,
+	gw *gateway.CommunicationGateway,
+	milestoneSvc *milestone.MilestoneService,
+	agentFactory multiagent.IAgentFactory,
+	obs *observability.Observability,
+) {
+	if !multiAgentEnabled || rawGateway == nil {
+		return
+	}
+
+	orchCfg := config.DefaultOrchestrationConfig()
+	if configFile != "" {
+		if fileCfg, err := config.LoadConfigFile(configFile); err == nil {
+			orchCfg = *config.BuildOrchestrationConfig(&fileCfg.Orchestration)
+		}
+	}
+	if !orchCfg.Enabled {
+		return
+	}
+
+	runtimeJudge := orchestration.NewRuntimeJudge(rawGateway, orchCfg)
+	executor := orchestration.NewInterventionExecutor(gw, milestoneSvc, agentFactory)
+	orchValidator := orchestration.NewRuntimeOrchestrationValidator(orchCfg, runtimeJudge, executor)
+	orchValidator.SetObservability(obs)
+	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) orchestration.AgentObserver {
+		return orchestration.NewOrchestrationObserver(orchValidator, ctx, session)
+	})
+	slog.Info("orchestration validator enabled",
+		"judge_provider", orchCfg.JudgeProvider,
+		"auto_intervene", orchCfg.AutoIntervene,
+	)
 }
 
 func logBinaryInfo() {

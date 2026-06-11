@@ -18,26 +18,23 @@ type PermissionStatus string
 const (
 	PermissionStatusPending  PermissionStatus = "pending"
 	PermissionStatusApproved PermissionStatus = "approved"
-	PermissionStatusDenied  PermissionStatus = "denied"
-	PermissionStatusExpired PermissionStatus = "expired"
+	PermissionStatusDenied   PermissionStatus = "denied"
+	PermissionStatusExpired  PermissionStatus = "expired"
 )
 
 // PermissionRequest represents a request for user permission to execute a tool
 type PermissionRequest struct {
-	ID           string           // 内部 ID (UUID)
-	SessionID    string           // 所属会话
-	ToolName     string           // 工具名称
-	Description  string           // 工具描述
-	InputPreview string           // 输入预览（截断）
-
-	RiskLevel RiskLevel // LOW | MEDIUM | HIGH | CRITICAL
-
-	// 生命周期
-	CreatedAt   time.Time        // 创建时间
-	ExpiresAt   time.Time        // 过期时间（创建 + 60s）
-	Status      PermissionStatus  // pending | approved | denied | expired
-	RespondedAt time.Time        // 响应时间
-	Response    *bool            // 响应结果（nil=未响应）
+	ID           string
+	SessionID    string
+	ToolName     string
+	Description  string
+	InputPreview string
+	RiskLevel    RiskLevel
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+	Status       PermissionStatus
+	RespondedAt  time.Time
+	Response     *bool
 }
 
 // IsExpired returns true if the permission request has expired
@@ -71,13 +68,34 @@ func (p *PermissionRequest) Expire() {
 func NewPermissionRequest(id, sessionID, toolName string, riskLevel RiskLevel, timeout time.Duration) *PermissionRequest {
 	now := time.Now()
 	return &PermissionRequest{
-		ID:           id,
-		SessionID:    sessionID,
-		ToolName:     toolName,
-		RiskLevel:    riskLevel,
-		Status:       PermissionStatusPending,
-		CreatedAt:    now,
-		ExpiresAt:    now.Add(timeout),
-		RespondedAt:  time.Time{},
+		ID:          id,
+		SessionID:   sessionID,
+		ToolName:    toolName,
+		RiskLevel:   riskLevel,
+		Status:      PermissionStatusPending,
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(timeout),
+		RespondedAt: time.Time{},
 	}
+}
+
+// PermissionMode controls tool visibility and approval semantics (Claude Code aligned).
+type PermissionMode string
+
+const (
+	PermissionDefault     PermissionMode = "default"
+	PermissionPlan        PermissionMode = "plan"
+	PermissionAcceptEdits PermissionMode = "accept_edits"
+	PermissionBypass      PermissionMode = "bypass"
+	PermissionBubble      PermissionMode = "bubble"
+)
+
+// DefaultPermissionMode is the session default when unset.
+func DefaultPermissionMode() PermissionMode {
+	return PermissionDefault
+}
+
+// IsPlanMode reports whether the session is in read-only plan mode.
+func (m PermissionMode) IsPlanMode() bool {
+	return m == PermissionPlan
 }

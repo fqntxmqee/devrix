@@ -29,6 +29,7 @@ type Pipeline struct {
 	stepObserver   StepObserver
 	asyncCompact   *AsyncAutocompacter
 	sessionID      string
+	skipAssembly   bool
 }
 
 // NewPipeline creates a compression pipeline with functional options.
@@ -118,7 +119,9 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 	}
 
 	beforeAsm := p.counter.CountMessages(current)
-	current = assemble(systemPrompt, current)
+	if !p.skipAssembly {
+		current = assemble(systemPrompt, current)
+	}
 	afterAsm := p.counter.CountMessages(current)
 	p.emitStep(stepAssembly, beforeAsm, afterAsm)
 	report.CompressedTokens = afterAsm

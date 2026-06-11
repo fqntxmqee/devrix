@@ -11,7 +11,18 @@
 | D3 | LLM 网关 | `internal/layers/llmgateway/` |
 | D4 | 多智能体 | `internal/layers/multiagent/` |
 | D5 | 可观测性 | `internal/layers/observability/` |
-| D6 | 演化层 | — |
+| D6 | 演化层 | `internal/layers/evolution/` |
+
+### D6 演化层子模块
+
+| 场景 | 目录 | 说明 |
+|------|------|------|
+| D6-S3 Eval | `evolution/eval/` | 评测引擎：EvalRun、Judge、探针、Delta、调优；CLI `devrix eval run` |
+| D6-S4 Orchestration | `evolution/orchestration/` | 运行时决策校验：跨模型判官、干预、Observer |
+| D6-S1 Version | `evolution/version/` | 规划中 (PlannedVersion v2.1.0) |
+| D6-S2 Config | `evolution/config/` | 规划中 (PlannedVersion v2.2.0) |
+
+规范：`openspec/specs/eval/spec.md`、`openspec/specs/architecture/layering.md`
 
 ## 研发流程
 

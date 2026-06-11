@@ -276,6 +276,65 @@ func TestCursorAgentTool_CleanupBySessionID(t *testing.T) {
 	}()
 }
 
+func TestCursorAgentTool_Execute_ToolCallAndThinking(t *testing.T) {
+	script := `echo '{"type":"thinking","subtype":"delta","text":"planning review"}'; ` +
+		`echo '{"type":"tool_call","subtype":"started","tool_call":{"readToolCall":{"args":{"path":"/tmp/foo.go"}}}}'; ` +
+		`echo '{"type":"tool_call","subtype":"completed","tool_call":{"readToolCall":{"result":{"success":{}}}}}'; ` +
+		`echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}'; ` +
+		`echo '{"type":"result","subtype":"success","result":"done","is_error":false}'`
+
+	agt := NewCursorAgentTool(CursorConfig{
+		Name:    "cursor-stream",
+		Command: "bash",
+		Args:    []string{"-c", script},
+		WorkDir: ".",
+		Timeout: 5 * time.Second,
+	})
+	defer agt.Stop()
+
+	ch, err := agt.Execute(context.Background(), "sess_stream", Request{Task: "ignored"})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	var types []string
+	for evt := range ch {
+		types = append(types, evt.Type)
+	}
+
+	want := []string{"thinking", "tool_use", "text", "complete"}
+	if len(types) != len(want) {
+		t.Fatalf("event types = %v, want %v", types, want)
+	}
+	for i, wt := range want {
+		if types[i] != wt {
+			t.Errorf("event[%d] type = %q, want %q", i, types[i], wt)
+		}
+	}
+}
+
+func TestFormatCursorToolCallLabel(t *testing.T) {
+	toolCall := map[string]any{
+		"shellToolCall": map[string]any{
+			"description": "List bootstrap files",
+			"args": map[string]any{
+				"command": "ls internal/bootstrap",
+			},
+		},
+	}
+	got := formatCursorToolCallLabel(toolCall)
+	if got != "🔧 shell: List bootstrap files" {
+		t.Errorf("label = %q", got)
+	}
+}
+
+func TestCursorAgentTool_ExecutionTimeout(t *testing.T) {
+	agt := NewCursorAgentTool(CursorConfig{Timeout: 12 * time.Minute})
+	if got := agt.ExecutionTimeout(); got != 12*time.Minute {
+		t.Errorf("ExecutionTimeout() = %v, want 12m", got)
+	}
+}
+
 func TestCursorAgentTool_StopClearsAll(t *testing.T) {
 	agt := NewCursorAgentTool(CursorConfig{
 		Name:    "cursor-stop",

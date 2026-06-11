@@ -79,9 +79,13 @@ func (s *Session) IsIdle(timeout time.Duration) bool {
 // NewSession creates a new session with default values
 func NewSession(sessionID, adapterID, workDir string) *Session {
 	now := time.Now()
+	shortID, err := GenerateShortId()
+	if err != nil {
+		shortID = "00000"
+	}
 	return &Session{
 		SessionID:      sessionID,
-		ShortID:        GenerateShortId(),
+		ShortID:        shortID,
 		AdapterID:      adapterID,
 		WorkDir:        workDir,
 		State:          SessionStateIdle,

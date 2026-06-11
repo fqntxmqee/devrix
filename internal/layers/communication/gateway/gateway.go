@@ -46,6 +46,7 @@ type CommunicationGateway struct {
 	sessions        map[string]*types.Session
 	activeProcesses map[string]context.CancelFunc
 	agentFactory    multiagent.IAgentFactory
+	agentObserverFactory func(ctx context.Context, session *types.Session) multiagent.AgentObserver
 	sessionAgents   map[string]multiagent.Agent
 
 	// metrics
@@ -160,6 +161,9 @@ func (g *CommunicationGateway) cleanupExpiredSessions() {
 	now := time.Now()
 
 	for sessionID, session := range g.sessions {
+		if _, active := g.activeProcesses[sessionID]; active {
+			continue
+		}
 		if now.Sub(session.LastMessageAt) > timeout {
 			slog.Debug("cleaning up expired session", "sessionID", sessionID)
 			delete(g.sessions, sessionID)
@@ -194,17 +198,23 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		return fmt.Errorf("failed to get or create session: %w", err)
 	}
 
-	// Check idle timeout
-	if session.IsIdle(g.config.Session.IdleTimeout) {
-		if err := g.ExpireSession(session.SessionID); err != nil {
-			slog.Warn("failed to expire idle session", "sessionID", session.SessionID)
-		}
-		return errors.NewSessionExpiredError(session.SessionID)
+	// Inbound message means the user is active again — resume idle sessions instead
+	// of rejecting. Background cleanup (StartCleanupRoutine) handles abandoned sessions.
+	if g.config.Session.IdleTimeout > 0 && session.IsIdle(g.config.Session.IdleTimeout) {
+		slog.Info("gateway: resuming idle session on inbound message", "sessionID", session.SessionID)
 	}
 
 	// Update session
 	session.LastMessageAt = time.Now()
 	session.RequestID = msg.MessageID
+	g.mu.Lock()
+	if cached, ok := g.sessions[session.SessionID]; ok && cached != nil {
+		cached.LastMessageAt = session.LastMessageAt
+		cached.RequestID = session.RequestID
+	} else {
+		g.sessions[session.SessionID] = session
+	}
+	g.mu.Unlock()
 	_, storeSpan := g.startStoreUpdateSpan(ctx, session.SessionID)
 	if err := g.sessionStore.Update(session); err != nil {
 		if storeSpan != nil {
@@ -236,12 +246,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		defer cancel()
 		g.handleEngineEvents(processCtx, session, eventChan)
 		g.unregisterProcess(session.SessionID)
-		// Persist the updated session (including ContextSnapshot) to the
-		// file store. runProcess sets session.ContextSnapshot during
-		// processing; this call ensures it survives process restarts.
-		if err := g.sessionStore.Update(session); err != nil {
-			slog.Warn("failed to persist session after process", "sessionID", session.SessionID, "error", err)
-		}
+		g.persistSessionAfterProcess(session)
 	}()
 
 	return nil
@@ -263,6 +268,19 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 			g.handleEngineEvent(ctx, session, event)
 		}
 	}
+}
+
+// PublishEngineEvent delivers an engine event for a session (async worker progress, etc.).
+func (g *CommunicationGateway) PublishEngineEvent(ev *EngineEvent) {
+	if g == nil || ev == nil || ev.SessionID == "" {
+		return
+	}
+	session, err := g.GetSession(ev.SessionID)
+	if err != nil || session == nil {
+		slog.Debug("gateway: PublishEngineEvent session not found", "sessionID", ev.SessionID)
+		return
+	}
+	go g.handleEngineEvent(context.Background(), session, ev)
 }
 
 // handleEngineEvent handles a single engine event
@@ -289,7 +307,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Content:   event.Content,
 			IsComplete: false,
 			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "thinking"},
+			Metadata:  outboundMetadata("thinking", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -302,7 +320,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Content:   event.Content,
 			IsComplete: isComplete,
 			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "text"},
+			Metadata:  outboundMetadata("text", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -366,8 +384,26 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		}
 		g.eventHandler.OnMessage(outMsg)
 
+	case "worker_progress":
+		meta := map[string]string{"event_type": "worker_progress"}
+		for k, v := range event.Metadata {
+			meta[k] = v
+		}
+		if meta["render"] == "" {
+			meta["render"] = "worker_tree"
+		}
+		outMsg := &types.OutboundMessage{
+			MessageID:  generateMessageID(),
+			SessionID: session.SessionID,
+			ChatID:    session.ChatID,
+			Content:   event.Content,
+			IsComplete: false,
+			Role:      types.MessageRoleAssistant,
+			Metadata:  meta,
+		}
+		g.eventHandler.OnMessage(outMsg)
+
 	case "info":
-		// Send info message
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
 			SessionID: session.SessionID,
@@ -375,7 +411,7 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Content:   event.Content,
 			IsComplete: true,
 			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "info"},
+			Metadata:  outboundMetadata("info", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -408,7 +444,6 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			Metadata:  map[string]string{"event_type": "error"},
 		}
 		g.eventHandler.OnMessage(outMsg)
-		g.eventHandler.OnError(fmt.Errorf("%s", event.Content), session.SessionID)
 	}
 }
 
@@ -485,6 +520,59 @@ func (g *CommunicationGateway) GetSession(sessionID string) (*types.Session, err
 		return nil, errors.NewSessionNotFoundError(sessionID)
 	}
 	return session, nil
+}
+
+// ResolveSessionByChatID returns the most recently active session for chatID
+// that has not exceeded the idle timeout. Used to recover context after restart.
+func (g *CommunicationGateway) ResolveSessionByChatID(chatID string) (*types.Session, error) {
+	if chatID == "" {
+		return nil, nil
+	}
+
+	sessions, err := g.sessionStore.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+
+	var best *types.Session
+	var bestScore int64
+	for _, session := range sessions {
+		if session == nil || session.ChatID != chatID {
+			continue
+		}
+		score := sessionRestoreScore(session)
+		if best == nil || score > bestScore {
+			best = session
+			bestScore = score
+		}
+	}
+	if best == nil {
+		return nil, nil
+	}
+
+	g.mu.Lock()
+	g.sessions[best.SessionID] = best
+	g.mu.Unlock()
+
+	slog.Info("gateway: restored session from store",
+		"sessionID", best.SessionID,
+		"chatID", chatID,
+		"snapshotBytes", len(best.ContextSnapshot),
+	)
+	return best, nil
+}
+
+// sessionRestoreScore ranks sessions for post-restart recovery.
+// Sessions with persisted context outrank empty ones even if they are idle.
+func sessionRestoreScore(session *types.Session) int64 {
+	if session == nil {
+		return 0
+	}
+	snapshotLen := int64(len(session.ContextSnapshot))
+	if snapshotLen > 0 {
+		return snapshotLen*1_000_000_000_000 + session.LastMessageAt.Unix()
+	}
+	return session.LastMessageAt.Unix()
 }
 
 // ExpireSession marks a session as expired
@@ -621,6 +709,20 @@ func (g *CommunicationGateway) recordSessionLifecycle(sessionID, adapter, action
 		)...),
 	)
 	span.End()
+}
+
+func outboundMetadata(eventType string, event *EngineEvent) map[string]string {
+	meta := map[string]string{"event_type": eventType}
+	if event == nil || event.Metadata == nil {
+		return meta
+	}
+	for k, v := range event.Metadata {
+		if k == "event_type" || v == "" {
+			continue
+		}
+		meta[k] = v
+	}
+	return meta
 }
 
 func (g *CommunicationGateway) startEngineEventSpan(ctx context.Context, session *types.Session, eventType string) (context.Context, tracer.Span) {

@@ -7,6 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 
@@ -27,7 +28,15 @@ func NewContextEngine(
 	agentToolReg *tool.Registry,
 ) *contextengine.ContextEngine {
 	planner, longTerm := WireContextV3(ctxCfg, milestoneSvc)
-	toolReg := contextengine.NewBuiltinToolRegistry(toolCfg)
+	tasks.InitGlobalTaskManager(ctxCfg.Tasks)
+	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
+	if err != nil {
+		slog.Error("create builtin tool registry", "error", err)
+		toolReg = contextengine.NewToolRegistry()
+	}
+	if err := contextengine.RegisterQueryLoopTools(toolReg, ctxCfg, tasks.GlobalTaskManager); err != nil {
+		slog.Error("register query loop tools", "error", err)
+	}
 
 	// Register per-agent call_<name> plugins if agent tools are enabled.
 	if agentToolReg != nil {

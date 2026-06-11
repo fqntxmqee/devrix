@@ -320,47 +320,13 @@ func TestFeishuIntegration_CardHasButtons(t *testing.T) {
 	}
 }
 
-// TestFeishuIntegration_PreprocessMarkdown 验证 Markdown 预处理
+// TestFeishuIntegration_PreprocessMarkdown 验证 Markdown 预处理为 JSON 2.0 透传
 func TestFeishuIntegration_PreprocessMarkdown(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "h3 header",
-			input:    "### Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "h2 header",
-			input:    "## Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "h1 header",
-			input:    "# Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "bold text",
-			input:    "This is **bold** text",
-			expected: "<strong>bold</strong>",
-		},
-		{
-			name:     "multiple headers",
-			input:    "### Header\n## Another",
-			expected: "**Header",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := PreprocessMarkdown(tt.input)
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("PreprocessMarkdown(%q) = %q, want to contain %q", tt.input, result, tt.expected)
-			}
-		})
+	input := `### Header
+**bold** and | A | B | table`
+	result := PreprocessMarkdown(input)
+	if result != input {
+		t.Errorf("PreprocessMarkdown() = %q, want passthrough", result)
 	}
 }
 

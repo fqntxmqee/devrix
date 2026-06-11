@@ -89,8 +89,12 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 
 	var sc *types.SessionContext
 	var err error
-	if len(session.ContextSnapshot) > 0 {
-		sc, err = m.store.Deserialize(session.ContextSnapshot)
+	snapshotData := session.ContextSnapshot
+	if len(snapshotData) == 0 {
+		snapshotData, _ = m.store.ReadBackup(session.SessionID)
+	}
+	if len(snapshotData) > 0 {
+		sc, err = m.store.Deserialize(snapshotData)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +167,8 @@ func (m *Manager) PersistSnapshot(sc *types.SessionContext) ([]byte, error) {
 		return nil, err
 	}
 	if err := m.store.WriteBackup(sc.SessionID, data); err != nil {
-		return data, fmt.Errorf("backup write: %w", err)
+		// Backup is best-effort; session store remains the source of truth.
+		return data, nil
 	}
 	return data, nil
 }

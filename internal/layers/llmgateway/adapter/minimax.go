@@ -24,8 +24,9 @@ func NewMiniMaxAdapter(cfg sharedconfig.LLMProviderRuntimeConfig) *MiniMaxAdapte
 
 // WithHTTPClient overrides HTTP client (tests).
 func (a *MiniMaxAdapter) WithHTTPClient(client *http.Client) *MiniMaxAdapter {
-	a.client.WithHTTPClient(client)
-	return a
+	return &MiniMaxAdapter{
+		client: a.client.WithHTTPClient(client),
+	}
 }
 
 // Provider returns the provider name.

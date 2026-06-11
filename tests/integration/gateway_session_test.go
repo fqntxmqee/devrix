@@ -65,6 +65,16 @@ func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 	}
 }
 
+// resumeEngine completes immediately for idle-resume integration checks.
+type resumeEngine struct{}
+
+func (resumeEngine) Process(context.Context, *types.Session, string) <-chan *gateway.EngineEvent {
+	ch := make(chan *gateway.EngineEvent, 1)
+	ch <- &gateway.EngineEvent{Type: "complete"}
+	close(ch)
+	return ch
+}
+
 // Covers: L5-COMM-03
 func TestIntegration_SessionExpiration(t *testing.T) {
 	dir := t.TempDir()
@@ -76,7 +86,7 @@ func TestIntegration_SessionExpiration(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = 100 * time.Millisecond
 
-	gw := gateway.NewCommunicationGateway(store, nil, nil, nil, cfg)
+	gw := gateway.NewCommunicationGateway(store, nil, resumeEngine{}, nil, cfg)
 
 	session, err := gw.CreateSession("cli", "/tmp")
 	if err != nil {
@@ -92,10 +102,24 @@ func TestIntegration_SessionExpiration(t *testing.T) {
 		SessionID: session.SessionID,
 		ChatID:    "cli",
 		Content:   "hello",
+		MessageID: "msg-resume-1",
 	}
 
 	err = gw.RouteInbound(context.Background(), msg)
-	if err == nil {
-		t.Error("expected error for expired session")
+	if err != nil {
+		t.Fatalf("idle session should resume on inbound message, got: %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	got, err := store.Get(session.SessionID)
+	if err != nil {
+		t.Fatalf("failed to get session after resume: %v", err)
+	}
+	if got == nil {
+		t.Fatal("session should still exist after resume")
+	}
+	if got.IsIdle(cfg.Session.IdleTimeout) {
+		t.Error("LastMessageAt should be refreshed after inbound message")
 	}
 }

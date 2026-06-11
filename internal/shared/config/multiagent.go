@@ -91,6 +91,12 @@ func BuildAgentToolsConfig(file *AgentToolsFileConfig) *AgentToolsConfig {
 	return cfg
 }
 
+// DelegateConfig controls D4-S10 hub-spoke delegate tools.
+type DelegateConfig struct {
+	Enabled    bool
+	AllowAsync bool
+}
+
 // MultiAgentFileConfig is the YAML shape for multi_agent.
 type MultiAgentFileConfig struct {
 	Enabled           bool          `yaml:"enabled"`
@@ -100,6 +106,13 @@ type MultiAgentFileConfig struct {
 	DefaultMaxIter    int           `yaml:"default_max_iter"`
 	PermissionTimeout time.Duration `yaml:"permission_timeout"`
 	DefaultMode       string        `yaml:"default_mode"`
+	Delegate          DelegateFileConfig `yaml:"delegate"`
+}
+
+// DelegateFileConfig is the YAML shape for multi_agent.delegate.
+type DelegateFileConfig struct {
+	Enabled    bool `yaml:"enabled"`
+	AllowAsync bool `yaml:"allow_async"`
 }
 
 // MultiAgentConfig is the resolved Layer 4 configuration.
@@ -111,6 +124,7 @@ type MultiAgentConfig struct {
 	DefaultMaxIter    int
 	PermissionTimeout time.Duration
 	DefaultMode       string
+	Delegate          DelegateConfig
 }
 
 // DefaultMultiAgentConfig returns V1 defaults.
@@ -150,5 +164,7 @@ func BuildMultiAgentConfig(file *MultiAgentFileConfig) *MultiAgentConfig {
 	if file.DefaultMode != "" {
 		cfg.DefaultMode = file.DefaultMode
 	}
+	cfg.Delegate.Enabled = file.Delegate.Enabled
+	cfg.Delegate.AllowAsync = file.Delegate.AllowAsync
 	return cfg
 }

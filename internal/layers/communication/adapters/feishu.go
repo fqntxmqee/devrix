@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +41,7 @@ type FeishuAdapter struct {
 	dispatcher  *dispatcher.EventDispatcher
 
 	mu        sync.RWMutex
+	wsWg      sync.WaitGroup // tracks WebSocket goroutine for clean shutdown
 	running   bool
 	botOpenID string
 	cancel    context.CancelFunc
@@ -54,6 +54,11 @@ type FeishuAdapter struct {
 	doneEmoji     string
 	replyInThread bool
 	progressStyle string
+	showToolResults bool
+	streamingEnabled bool
+	streamThrottle  streamThrottleConfig
+
+	cardkit *cardkitClient
 
 	sessionMsgMap   sync.Map // sessionID -> userMessageID mapping
 	sessionReplyCtx sync.Map // sessionID -> feishuReplyContext
@@ -107,7 +112,18 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 	content := msg.Content
 
 	switch eventType {
-	case "thinking", "tool_call", "tool_result", "milestone_progress":
+	case "thinking", "tool_call", "tool_result", "milestone_progress", "worker_progress":
+		if eventType == "tool_call" && isCallAgentTool(msg) {
+			if err := a.ensureAgentStreamCard(ctx, msg, "⏳ 执行中，输出将实时更新…"); err != nil {
+				slog.Error("feishu: failed to start agent stream card", "error", err)
+			}
+		}
+		if msg.Metadata["source"] == "agent_tool" && (eventType == "thinking" || eventType == "info") {
+			if err := a.appendAgentStreamText(ctx, msg); err != nil {
+				slog.Error("feishu: failed to append agent stream", "error", err, "eventType", eventType)
+			}
+			return
+		}
 		if err := a.handleProgressEvent(ctx, msg); err != nil {
 			slog.Error("feishu: failed to send progress", "error", err, "eventType", eventType)
 		}
@@ -136,12 +152,24 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		a.clearSessionStream(msg.SessionID)
 
 	case "info":
+		if msg.Metadata["source"] == "agent_tool" {
+			if err := a.appendAgentStreamText(ctx, msg); err != nil {
+				slog.Error("feishu: failed to append agent stream", "error", err)
+			}
+			return
+		}
 		if err := a.handleProgressEvent(ctx, msg); err != nil {
 			slog.Error("feishu: failed to send info progress", "error", err)
 		}
 
 	case "text":
-		if err := a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content); err != nil {
+		var err error
+		if msg.Metadata["source"] == "agent_tool" {
+			err = a.appendAgentStreamText(ctx, msg)
+		} else {
+			err = a.appendResponseText(ctx, msg.SessionID, msg.ChatID, content)
+		}
+		if err != nil {
 			slog.Error("feishu: failed to send response text", "error", err)
 		}
 		return
@@ -179,6 +207,34 @@ func (a *FeishuAdapter) OnPermissionRequest(req *types.PermissionRequest) bool {
 // OnError handles errors
 func (a *FeishuAdapter) OnError(err error, sessionID string) {
 	slog.Error("feishu: session error", "sessionID", sessionID, "error", err)
+	if err == nil {
+		return
+	}
+
+	ctx := context.Background()
+	chatID := ""
+	if a.gateway != nil {
+		if session, getErr := a.gateway.GetSession(sessionID); getErr == nil && session != nil {
+			chatID = session.ChatID
+		}
+	}
+	if chatID == "" {
+		return
+	}
+
+	card := NewCard().
+		Title("错误", "red").
+		Markdown(err.Error()).
+		Build()
+	if sendErr := a.sendCardToSession(ctx, sessionID, chatID, card); sendErr != nil {
+		slog.Error("feishu: failed to send error card", "sessionID", sessionID, "error", sendErr)
+	}
+	a.clearSessionStream(sessionID)
+	if a.doneEmoji != "" {
+		go a.finishUserMessageReaction(context.Background(), sessionID)
+	} else {
+		a.clearSessionReplyContext(sessionID)
+	}
 }
 
 // OnStatus handles session status changes
@@ -215,12 +271,52 @@ Devrix 是一个多智能体 AI 编程助手，可以通过飞书与你对话。
 • 回答技术问题
 
 **权限说明：**
-YOLO 模式已启用，所有操作自动授权。`
+YOLO 模式已启用：工具调用自动批准；WorkDir 内文件可写。
+沙箱安全策略（命令白名单、危险模式）仍会生效，与 YOLO 无关。`
 
 		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, helpText); err != nil {
 			slog.Error("feishu: failed to send help message", "error", err)
 		}
 		return true
+
+	case types.CommandTask:
+		taskHelp := `📋 **任务命令**
+
+/task create <任务> - 创建任务
+/task list - 列出所有任务
+/task ready - 显示就绪任务
+
+示例：
+/task create 添加单元测试
+/task list`
+
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, taskHelp); err != nil {
+			slog.Error("feishu: failed to send task help", "error", err)
+		}
+		return true
+
+	case types.CommandPlan:
+		goal := strings.Join(cmd.Args, " ")
+		if goal == "" {
+			goal = "Plan mode"
+		}
+
+		planHelp := fmt.Sprintf(`📝 **规划模式**
+
+已收到目标: %s
+
+**规划命令：**
+/plan show - 查看计划
+/plan approve - 审批执行
+/plan reject - 拒绝计划
+
+*完整规划功能开发中*`, goal)
+
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, planHelp); err != nil {
+			slog.Error("feishu: failed to send plan help", "error", err)
+		}
+		return true
+
 
 	case types.CommandNew:
 		if oldSessionID, ok := a.sessionMap.Load(sessionKey); ok {
@@ -280,6 +376,15 @@ type FeishuConfig struct {
 	DoneEmoji     string // emoji reaction when agent completes (e.g. Done); "none" or empty to disable
 	ReplyInThread bool   // reply in thread under user's message (shows "N 条回复")
 	ProgressStyle string // legacy | compact | card | structured — structured 为默认
+	ShowToolResults bool // push tool_result body to IM; default false
+	Streaming       FeishuStreamingConfig
+}
+
+// FeishuStreamingConfig controls cardkit element-level streaming for reply cards.
+type FeishuStreamingConfig struct {
+	Enabled       bool
+	IntervalMs    int
+	MinDeltaChars int
 }
 
 // FeishuAdapterOption is a functional option for FeishuAdapter
@@ -333,6 +438,9 @@ func NewFeishuAdapter(
 		doneEmoji:     normalizeDoneEmoji(feishuCfg.DoneEmoji),
 		replyInThread: feishuCfg.ReplyInThread,
 		progressStyle: normalizeProgressStyle(feishuCfg.ProgressStyle),
+		showToolResults:  feishuCfg.ShowToolResults,
+		streamingEnabled: feishuCfg.Streaming.Enabled,
+		streamThrottle:   feishuCfg.Streaming.throttleConfig(),
 	}
 
 	// Apply functional options
@@ -344,6 +452,7 @@ func NewFeishuAdapter(
 	if adapter.api == nil {
 		adapter.api = NewLarkFeishuAPI(adapter.client)
 	}
+	adapter.cardkit = newCardkitClient(adapter.api)
 
 	return adapter
 }
@@ -416,7 +525,9 @@ func (a *FeishuAdapter) startWebSocketMode(ctx context.Context) error {
 	slog.Info("feishu: creating WS client with dispatcher", "has_dispatcher", a.dispatcher != nil)
 	a.wsClient = larkws.NewClient(a.feishuCfg.AppID, a.feishuCfg.AppSecret, wsOpts...)
 
+	a.wsWg.Add(1)
 	go func() {
+		defer a.wsWg.Done()
 		if err := a.wsClient.Start(ctx); err != nil {
 			slog.Error("feishu: websocket error", "error", err)
 		}
@@ -577,18 +688,6 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		chatType = *msg.ChatType
 	}
 
-	// Check message age and filter out old messages (older than 5 minutes)
-	// This prevents replaying old messages after reconnection
-	if msg.CreateTime != nil {
-		if ms, err := strconv.ParseInt(*msg.CreateTime, 10, 64); err == nil {
-			msgTime := time.Unix(ms/1000, (ms%1000)*int64(time.Millisecond))
-			if time.Since(msgTime) > 5*time.Minute {
-				slog.Info("feishu: ignoring old message", "messageID", messageID, "text", text, "age", time.Since(msgTime))
-				return nil
-			}
-		}
-	}
-
 	inboundMsg := &types.InboundMessage{
 		SessionID:  session.SessionID,
 		ChatID:     sessionKey,
@@ -652,6 +751,10 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 			"error", err,
 			"sessionID", session.SessionID,
 		)
+		if messageID != "" {
+			_ = a.replyAckToUser(ctx, messageID, sessionKey,
+				"⚠️ 消息处理失败："+err.Error()+"\n请重试，或发送 /new 开启新会话。")
+		}
 	}
 
 	return nil
@@ -664,26 +767,7 @@ func (a *FeishuAdapter) buildSessionKey(chatID, userID string) string {
 
 // getOrCreateSession gets an existing session or creates a new one
 func (a *FeishuAdapter) getOrCreateSession(sessionKey string) (*types.Session, error) {
-	// Check if we already have a session for this chat+user
-	if existingSessionID, ok := a.sessionMap.Load(sessionKey); ok {
-		session, err := a.gateway.GetSession(existingSessionID.(string))
-		if err == nil && session != nil {
-			return session, nil
-		}
-		// Session not found or expired, remove from map
-		a.sessionMap.Delete(sessionKey)
-	}
-
-	// Create new session
-	session, err := a.gateway.CreateSession(sessionKey, "")
-	if err != nil {
-		return nil, err
-	}
-
-	// Store mapping
-	a.sessionMap.Store(sessionKey, session.SessionID)
-
-	return session, nil
+	return resolveOrCreateSession(a.gateway, &a.sessionMap, sessionKey)
 }
 
 // fetchBotInfo fetches the bot's information using the low-level API
@@ -737,6 +821,8 @@ func (a *FeishuAdapter) Stop() error {
 	if a.server != nil {
 		a.server.Shutdown(context.Background())
 	}
+
+	a.wsWg.Wait()
 
 	slog.Info("feishu adapter stopped")
 	return nil

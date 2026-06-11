@@ -24,8 +24,9 @@ func NewDeepSeekAdapter(cfg sharedconfig.LLMProviderRuntimeConfig) *DeepSeekAdap
 
 // WithHTTPClient overrides HTTP client (tests).
 func (a *DeepSeekAdapter) WithHTTPClient(client *http.Client) *DeepSeekAdapter {
-	a.client.WithHTTPClient(client)
-	return a
+	return &DeepSeekAdapter{
+		client: a.client.WithHTTPClient(client),
+	}
 }
 
 // Provider returns the provider name.

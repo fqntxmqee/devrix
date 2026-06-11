@@ -111,12 +111,38 @@ func (s *Store) WriteBackup(sessionID string, data []byte) error {
 	if !s.cfg.Enabled || s.cfg.BackupDir == "" {
 		return nil
 	}
+	path, err := s.backupPath(sessionID)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+// ReadBackup loads a session snapshot from the backup directory.
+func (s *Store) ReadBackup(sessionID string) ([]byte, error) {
+	if !s.cfg.Enabled || s.cfg.BackupDir == "" {
+		return nil, nil
+	}
+	path, err := s.backupPath(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read backup: %w", err)
+	}
+	return data, nil
+}
+
+func (s *Store) backupPath(sessionID string) (string, error) {
 	dir := expandPath(s.cfg.BackupDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create backup dir: %w", err)
+		return "", fmt.Errorf("create backup dir: %w", err)
 	}
-	path := filepath.Join(dir, sessionID+".json")
-	return os.WriteFile(path, data, 0o600)
+	return filepath.Join(dir, sessionID+".json"), nil
 }
 
 func messagesToSnapshots(msgs []types.Message) []types.MessageSnapshot {

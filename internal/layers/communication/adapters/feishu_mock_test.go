@@ -8,8 +8,10 @@ import (
 )
 
 type mockFeishuAPI struct {
-	getFunc func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
-	imAPI   ImAPI
+	getFunc  func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	postFunc func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	putFunc  func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	imAPI    ImAPI
 }
 
 var _ FeishuAPI = (*mockFeishuAPI)(nil)
@@ -19,6 +21,20 @@ func (m *mockFeishuAPI) Get(ctx context.Context, path string, params interface{}
 		return m.getFunc(ctx, path, params, tokenType)
 	}
 	return &larkcore.ApiResp{}, nil
+}
+
+func (m *mockFeishuAPI) Post(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	if m.postFunc != nil {
+		return m.postFunc(ctx, path, body, tokenType)
+	}
+	return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0,"data":{"card_id":"card_test_001"}}`)}, nil
+}
+
+func (m *mockFeishuAPI) Put(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	if m.putFunc != nil {
+		return m.putFunc(ctx, path, body, tokenType)
+	}
+	return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
 }
 
 func (m *mockFeishuAPI) Im() ImAPI {

@@ -48,6 +48,45 @@ type FeishuUserConfig struct {
 	DoneEmoji     string `yaml:"done_emoji"`     // agent 完成时的表情回复，如 Done；设为 none 禁用
 	ReplyInThread *bool  `yaml:"reply_in_thread"` // 在用户消息下以话题回复，默认 true
 	ProgressStyle string `yaml:"progress_style"` // legacy | compact | card | structured，默认 structured
+	ShowToolResults *bool `yaml:"show_tool_results"` // 是否在 IM 展示工具执行结果，默认 false
+	Streaming       FeishuStreamingUserConfig `yaml:"streaming"`
+}
+
+// FeishuStreamingUserConfig controls cardkit element-level reply streaming.
+type FeishuStreamingUserConfig struct {
+	Enabled       *bool `yaml:"enabled"`         // 默认 true
+	IntervalMs    int   `yaml:"interval_ms"`     // 流式 PUT 最小间隔，默认 400
+	MinDeltaChars int   `yaml:"min_delta_chars"` // 最小字符增量，默认 24
+}
+
+// IsStreamingEnabled reports whether cardkit streaming is enabled for reply cards.
+func (f FeishuUserConfig) IsStreamingEnabled() bool {
+	if f.Streaming.Enabled == nil {
+		return true
+	}
+	return *f.Streaming.Enabled
+}
+
+// ResolveFeishuStreamingConfig maps user YAML to adapter config with defaults.
+func (f FeishuUserConfig) ResolveFeishuStreamingConfig() (enabled bool, intervalMs, minDeltaChars int) {
+	enabled = f.IsStreamingEnabled()
+	intervalMs = f.Streaming.IntervalMs
+	if intervalMs <= 0 {
+		intervalMs = 400
+	}
+	minDeltaChars = f.Streaming.MinDeltaChars
+	if minDeltaChars <= 0 {
+		minDeltaChars = 24
+	}
+	return enabled, intervalMs, minDeltaChars
+}
+
+// IsShowToolResults reports whether tool_result content is pushed to IM.
+func (f FeishuUserConfig) IsShowToolResults() bool {
+	if f.ShowToolResults == nil {
+		return false
+	}
+	return *f.ShowToolResults
 }
 
 // IsReplyInThread returns whether bot replies should appear in a thread under the user's message.

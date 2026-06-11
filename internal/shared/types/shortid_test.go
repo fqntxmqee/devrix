@@ -7,7 +7,10 @@ import (
 )
 
 func TestGenerateShortId(t *testing.T) {
-	shortId := GenerateShortId()
+	shortId, err := GenerateShortId()
+	if err != nil {
+		t.Fatalf("GenerateShortId: %v", err)
+	}
 
 	// Check length
 	if len(shortId) != ShortIdLength {
@@ -32,7 +35,10 @@ func TestGenerateShortId_Uniqueness(t *testing.T) {
 	const iterations = 1000
 	generated := make(map[string]bool, iterations)
 	for i := 0; i < iterations; i++ {
-		shortId := GenerateShortId()
+		shortId, err := GenerateShortId()
+		if err != nil {
+			t.Fatalf("GenerateShortId: %v", err)
+		}
 		if generated[shortId] {
 			t.Fatalf("collision detected at iteration %d: %s", i, shortId)
 		}
@@ -88,12 +94,15 @@ func TestShortIdCharset_NoAmbiguousChars(t *testing.T) {
 
 func BenchmarkGenerateShortId(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = GenerateShortId()
+		_, _ = GenerateShortId()
 	}
 }
 
 func BenchmarkValidateShortId(b *testing.B) {
-	shortId := GenerateShortId()
+	shortId, err := GenerateShortId()
+	if err != nil {
+		b.Fatalf("GenerateShortId: %v", err)
+	}
 	for i := 0; i < b.N; i++ {
 		_ = ValidateShortId(shortId)
 	}

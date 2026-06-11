@@ -36,13 +36,19 @@ func truncateSpanAttr(s string, maxLen int) string {
 
 // buildSynthesisMessages converts tool results into plain text so the synthesis LLM
 // call matches the first-round request shape (no tool_calls / tool_call_id history).
-func buildSynthesisMessages(base []types.Message, preamble string, results []ToolResult) []types.Message {
+// When yoloMode is true the instruction allows continued tool calling so the LLM can
+// autonomously fix remaining items without requiring manual user confirmation.
+func buildSynthesisMessages(base []types.Message, preamble string, results []ToolResult, yoloMode bool) []types.Message {
 	msgs := append([]types.Message{}, base...)
 	if trimmed := strings.TrimSpace(preamble); trimmed != "" {
 		msgs = append(msgs, types.Message{Role: types.MessageRoleAssistant, Content: trimmed})
 	}
 	var b strings.Builder
-	b.WriteString("以下是工具执行结果，请用自然语言向用户总结回答，不要再调用工具：\n\n")
+	if yoloMode {
+		b.WriteString("以下是工具执行结果，请继续处理剩余的任务。如果需要调用更多工具可以继续调用。\n\n")
+	} else {
+		b.WriteString("以下是工具执行结果，请用自然语言向用户总结回答，不要再调用工具：\n\n")
+	}
 	for i, r := range results {
 		if r.Error != "" {
 			fmt.Fprintf(&b, "[工具 %d 失败] %s\n\n", i+1, r.Error)

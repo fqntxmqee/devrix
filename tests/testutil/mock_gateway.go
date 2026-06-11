@@ -9,10 +9,11 @@ import (
 
 // MockGatewayAPI is a test double for gateway.GatewayAPI.
 type MockGatewayAPI struct {
-	GetSessionFunc    func(sessionID string) (*types.Session, error)
-	CreateSessionFunc func(chatID, workDir string) (*types.Session, error)
-	RouteInboundFunc  func(ctx context.Context, msg *types.InboundMessage) error
-	RouteOutboundFunc func(msg *types.OutboundMessage) error
+	GetSessionFunc             func(sessionID string) (*types.Session, error)
+	ResolveSessionByChatIDFunc func(chatID string) (*types.Session, error)
+	CreateSessionFunc          func(chatID, workDir string) (*types.Session, error)
+	RouteInboundFunc           func(ctx context.Context, msg *types.InboundMessage) error
+	RouteOutboundFunc          func(msg *types.OutboundMessage) error
 }
 
 var _ gateway.GatewayAPI = (*MockGatewayAPI)(nil)
@@ -20,6 +21,13 @@ var _ gateway.GatewayAPI = (*MockGatewayAPI)(nil)
 func (m *MockGatewayAPI) GetSession(sessionID string) (*types.Session, error) {
 	if m.GetSessionFunc != nil {
 		return m.GetSessionFunc(sessionID)
+	}
+	return nil, nil
+}
+
+func (m *MockGatewayAPI) ResolveSessionByChatID(chatID string) (*types.Session, error) {
+	if m.ResolveSessionByChatIDFunc != nil {
+		return m.ResolveSessionByChatIDFunc(chatID)
 	}
 	return nil, nil
 }

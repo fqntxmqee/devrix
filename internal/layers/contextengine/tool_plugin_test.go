@@ -59,7 +59,10 @@ func TestToolRegistry_should_reject_duplicate_registration(t *testing.T) {
 
 // Covers: L5-TOOL-03
 func TestToolRegistry_should_return_unknown_tool_error(t *testing.T) {
-	reg := NewBuiltinToolRegistry(nil)
+	reg, err := NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
 	result, err := reg.Execute(context.Background(), ToolCall{Name: "nonexistent"})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -71,7 +74,10 @@ func TestToolRegistry_should_return_unknown_tool_error(t *testing.T) {
 
 // Covers: L5-TOOL-03
 func TestNewBuiltinToolRegistry_should_register_builtin_tools(t *testing.T) {
-	reg := NewBuiltinToolRegistry(nil)
+	reg, err := NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
 	for _, name := range []string{"bash", "read_file", "write_file"} {
 		if reg.RiskLevel(name) == types.RiskLevelLow && name == "bash" {
 			t.Fatal("bash should not be LOW risk")
@@ -93,7 +99,10 @@ func TestNewBuiltinToolRegistry_should_register_builtin_tools(t *testing.T) {
 }
 
 func TestNewBuiltinToolRegistry_should_set_bash_high_risk(t *testing.T) {
-	reg := NewBuiltinToolRegistry(nil)
+	reg, err := NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
 	if reg.RiskLevel("bash") != types.RiskLevelHigh {
 		t.Fatalf("bash risk = %v, want HIGH", reg.RiskLevel("bash"))
 	}

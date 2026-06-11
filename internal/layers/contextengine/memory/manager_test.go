@@ -1,6 +1,7 @@
 package memory_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
@@ -42,5 +43,42 @@ func TestManager_should_append_user_message_and_dedupe_request_id(t *testing.T) 
 	}
 	if len(sc.Messages) != 1 || sc.Messages[0].Content != "hello" {
 		t.Errorf("unexpected messages: %+v", sc.Messages)
+	}
+}
+
+// Covers: L5-CTX-05
+func TestManager_should_restore_from_backup_when_session_snapshot_empty(t *testing.T) {
+	cfg := config.DefaultContextEngineConfig()
+	cfg.Snapshot.Enabled = true
+	cfg.Snapshot.BackupDir = t.TempDir()
+	store := snapshot.NewStore(&cfg.Snapshot)
+	mgr := memory.NewManager(cfg, store, nil)
+
+	orig := &types.SessionContext{
+		SessionID:    "sess_backup",
+		WorkDir:      "/tmp",
+		SystemPrompt: "prompt",
+		Messages:     []types.Message{*types.NewMessage("m1", "sess_backup", types.MessageRoleUser, "prior turn")},
+		TokenBudget:  types.DefaultTokenBudget(),
+		PEVState:     types.DefaultPEVState(3),
+	}
+	data, err := store.Serialize(orig)
+	if err != nil {
+		t.Fatalf("Serialize: %v", err)
+	}
+	if err := store.WriteBackup(orig.SessionID, data); err != nil {
+		t.Fatalf("WriteBackup: %v", err)
+	}
+
+	session := types.NewSession(orig.SessionID, "cli", orig.WorkDir)
+	sc, err := mgr.LoadOrInit(session, "fresh prompt")
+	if err != nil {
+		t.Fatalf("LoadOrInit: %v", err)
+	}
+	if len(sc.Messages) != 1 || sc.Messages[0].Content != "prior turn" {
+		t.Fatalf("messages = %+v, want prior turn restored from backup", sc.Messages)
+	}
+	if _, err := filepath.Abs(cfg.Snapshot.BackupDir); err != nil {
+		t.Fatalf("backup dir: %v", err)
 	}
 }

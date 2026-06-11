@@ -105,6 +105,15 @@ type SessionContext struct {
 	UpdatedAt      time.Time
 	Harness        *HarnessSessionState
 	Transcript     *TranscriptStore
+	// QueryLoop / permission state (Claude Code aligned).
+	PermissionMode PermissionMode
+	PrePlanMode    PermissionMode
+	PlanFilePath   string
+	AgentID        string
+	QueryChainID   string
+	QueryDepth     int
+	IsWorker       bool
+	WorkerRole     string
 }
 
 // ContextSnapshotV1 is the persisted snapshot format.

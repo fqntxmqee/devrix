@@ -27,7 +27,7 @@ func TestParseStreamJSONLine_should_parse_claude_assistant_text(t *testing.T) {
 	if len(got.Events) != 2 {
 		t.Fatalf("events = %d, want 2", len(got.Events))
 	}
-	if got.Events[0].Type != "text" || !strings.Contains(got.Events[0].Content, "plan") {
+	if got.Events[0].Type != "thinking" || !strings.Contains(got.Events[0].Content, "plan") {
 		t.Fatalf("thinking block = %+v", got.Events[0])
 	}
 	if got.Events[1].Type != "text" || got.Events[1].Content != "你好" {

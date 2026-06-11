@@ -14,6 +14,9 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 	if a.State() == multiagent.AgentStateTerminated {
 		return nil, sharedTerminated(a.id)
 	}
+	if a.cfg.ParentID != "" {
+		return nil, sharederrors.NewAgentInvalidConfigError("worker agents cannot fork")
+	}
 	if a.activeChildCount() >= a.cfg.MaxChildren {
 		return nil, sharederrors.NewAgentMaxChildrenError(a.activeChildCount(), a.cfg.MaxChildren)
 	}

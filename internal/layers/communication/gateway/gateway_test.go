@@ -113,6 +113,118 @@ func TestCommunicationGateway_GetSession(t *testing.T) {
 	}
 }
 
+func TestCommunicationGateway_ResolveSessionByChatID(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+
+	chatKey := "feishu_oc_123_ou_456"
+	older, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	older.LastMessageAt = time.Now().Add(-10 * time.Minute)
+	if err := store.Update(older); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	newer, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	newer.LastMessageAt = time.Now().Add(-1 * time.Minute)
+	if err := store.Update(newer); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	got, err := gw.ResolveSessionByChatID(chatKey)
+	if err != nil {
+		t.Fatalf("ResolveSessionByChatID() error = %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected restored session, got nil")
+	}
+	if got.SessionID != newer.SessionID {
+		t.Errorf("sessionID = %s, want %s", got.SessionID, newer.SessionID)
+	}
+}
+
+func TestCommunicationGateway_ResolveSessionByChatID_should_restore_idle_with_snapshot(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	cfg.Session.IdleTimeout = 5 * time.Minute
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+
+	chatKey := "feishu_oc_idle_ou_456"
+	stale, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	stale.LastMessageAt = time.Now().Add(-30 * time.Minute)
+	stale.ContextSnapshot = []byte("ctx-v1-snapshot")
+	if err := store.Update(stale); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	got, err := gw.ResolveSessionByChatID(chatKey)
+	if err != nil {
+		t.Fatalf("ResolveSessionByChatID() error = %v", err)
+	}
+	if got == nil || got.SessionID != stale.SessionID {
+		t.Fatalf("expected idle session with snapshot restored, got %v", got)
+	}
+}
+
+func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_snapshot_over_empty(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+
+	chatKey := "feishu_oc_ctx_ou_456"
+	rich, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	rich.LastMessageAt = time.Now().Add(-2 * time.Hour)
+	rich.ContextSnapshot = []byte("large-context-snapshot")
+
+	empty, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	empty.LastMessageAt = time.Now().Add(-1 * time.Minute)
+
+	if err := store.Update(rich); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if err := store.Update(empty); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	got, err := gw.ResolveSessionByChatID(chatKey)
+	if err != nil {
+		t.Fatalf("ResolveSessionByChatID() error = %v", err)
+	}
+	if got == nil || got.SessionID != rich.SessionID {
+		t.Fatalf("sessionID = %v, want %s", got, rich.SessionID)
+	}
+}
+
 func TestCommunicationGateway_ExpireSession(t *testing.T) {
 	dir := t.TempDir()
 	store, err := NewFileSessionStore(dir)
@@ -159,6 +271,47 @@ func TestCommunicationGateway_RouteInbound_EmptyMessage(t *testing.T) {
 // mockContextEngineWithEvents creates a mock context engine that returns specified events
 func mockContextEngineWithEvents(events ...*EngineEvent) *mockContextEngine {
 	return &mockContextEngine{events: events}
+}
+
+func TestCommunicationGateway_RouteInbound_ResumesIdleSession(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	handler := newMockEventHandler()
+	cfg := config.DefaultConfig()
+	cfg.Session.IdleTimeout = 5 * time.Minute
+
+	mockEngine := &mockContextEngine{
+		events: []*EngineEvent{{Type: "complete"}},
+	}
+	gw := NewCommunicationGateway(store, handler, mockEngine, nil, cfg)
+
+	session, _ := gw.CreateSession("feishu_chat", "/tmp")
+	session.LastMessageAt = time.Now().Add(-2 * time.Hour)
+	if err := store.Update(session); err != nil {
+		t.Fatalf("update session: %v", err)
+	}
+
+	msg := &types.InboundMessage{
+		SessionID: session.SessionID,
+		ChatID:    "feishu_chat",
+		Content:   "wake up",
+		MessageID: "msg-idle-resume",
+	}
+	if err := gw.RouteInbound(context.Background(), msg); err != nil {
+		t.Fatalf("RouteInbound() error = %v", err)
+	}
+
+	got, err := store.Get(session.SessionID)
+	if err != nil || got == nil {
+		t.Fatalf("session missing after resume: %v", err)
+	}
+	if got.IsIdle(cfg.Session.IdleTimeout) {
+		t.Fatal("session should not be idle after inbound message")
+	}
 }
 
 func TestCommunicationGateway_RouteInbound_NormalMessage(t *testing.T) {
@@ -264,6 +417,38 @@ func TestCommunicationGateway_RouteError(t *testing.T) {
 	}
 }
 
+func TestCommunicationGateway_CleanupExpiredSessions_SkipsActiveProcess(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	cfg.Session.IdleTimeout = time.Millisecond
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+
+	session, err := gw.CreateSession("chat_active", "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	session.LastMessageAt = time.Now().Add(-time.Hour)
+	gw.mu.Lock()
+	gw.sessions[session.SessionID] = session
+	gw.activeProcesses[session.SessionID] = func() {}
+	gw.mu.Unlock()
+
+	time.Sleep(5 * time.Millisecond)
+	gw.cleanupExpiredSessions()
+
+	gw.mu.RLock()
+	_, ok := gw.sessions[session.SessionID]
+	gw.mu.RUnlock()
+	if !ok {
+		t.Fatal("active session should not be cleaned from in-memory cache")
+	}
+}
+
 func TestCommunicationGateway_StartCleanupRoutine(t *testing.T) {
 	dir := t.TempDir()
 	store, err := NewFileSessionStore(dir)
@@ -327,5 +512,21 @@ func TestCommunicationGateway_GetOrCreateSession(t *testing.T) {
 	}
 	if session.SessionID != existingSession.SessionID {
 		t.Errorf("expected session ID %s, got %s", existingSession.SessionID, session.SessionID)
+	}
+}
+
+func TestOutboundMetadata_should_merge_engine_metadata(t *testing.T) {
+	meta := outboundMetadata("text", &EngineEvent{
+		Metadata: map[string]string{
+			"source":     "agent_tool",
+			"agent":      "Claude Code",
+			"is_complete": "false",
+		},
+	})
+	if meta["event_type"] != "text" {
+		t.Fatalf("event_type = %q", meta["event_type"])
+	}
+	if meta["source"] != "agent_tool" || meta["agent"] != "Claude Code" {
+		t.Fatalf("metadata = %#v", meta)
 	}
 }

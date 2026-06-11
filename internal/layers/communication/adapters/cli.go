@@ -13,6 +13,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/communication/renderers"
+	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
@@ -22,16 +23,18 @@ import (
 
 // CLIAdapter provides a command-line interface for the communication layer
 type CLIAdapter struct {
-	gateway  *gateway.CommunicationGateway
-	renderer *renderers.CLIRenderer
-	cfg      *config.CommunicationConfig
-	reader   *bufio.Reader
-	writer   io.Writer
-	obsBridge *observability.Bridge
+	gateway      *gateway.CommunicationGateway
+	renderer     *renderers.CLIRenderer
+	cfg          *config.CommunicationConfig
+	reader       *bufio.Reader
+	writer       io.Writer
+	obsBridge    *observability.Bridge
+	taskCommands *tasks.CLICommands
+	planMode     *tasks.PlanMode
 
-	mu             sync.RWMutex
-	running        bool
-	currentSession *types.Session
+	mu               sync.RWMutex
+	running          bool
+	currentSession   *types.Session
 	messageHandler   func(*types.OutboundMessage)
 	permissionHandler func(*types.PermissionRequest) bool
 }
@@ -42,11 +45,22 @@ func NewCLIAdapter(
 	cfg *config.CommunicationConfig,
 ) *CLIAdapter {
 	return &CLIAdapter{
-		gateway:  gw,
-		renderer: renderers.NewCLIRenderer(cfg.CLI.ANSI),
-		cfg:      cfg,
-		reader:   bufio.NewReader(os.Stdin),
-		writer:   os.Stdout,
+		gateway:      gw,
+		renderer:     renderers.NewCLIRenderer(cfg.CLI.ANSI),
+		cfg:          cfg,
+		reader:       bufio.NewReader(os.Stdin),
+		writer:       os.Stdout,
+		taskCommands: tasks.NewCLICommands(tasks.GlobalTaskManager),
+		planMode:     tasks.NewPlanMode(nil), // LLM injected later
+	}
+}
+
+// SetPlanModeLLM sets the LLM for plan mode.
+func (a *CLIAdapter) SetPlanModeLLM(llm tasks.LLMCompleter) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.planMode != nil {
+		a.planMode = tasks.NewPlanMode(llm)
 	}
 }
 
@@ -93,7 +107,6 @@ func (a *CLIAdapter) Start(ctx context.Context) error {
 				return a.Stop()
 			}
 			if err == io.EOF {
-				// Non-interactive stdin (e.g. IM-only mode): wait for shutdown signal.
 				slog.Info("CLI stdin closed, waiting for shutdown signal")
 				<-ctx.Done()
 				return a.Stop()
@@ -104,7 +117,6 @@ func (a *CLIAdapter) Start(ctx context.Context) error {
 }
 
 // readInput reads a line of input and processes it.
-// The read is interruptible: Ctrl+C cancels ctx and returns without waiting for Enter.
 func (a *CLIAdapter) readInput(ctx context.Context) error {
 	input, err := a.readLine(ctx)
 	if err != nil {
@@ -151,25 +163,19 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 
 	switch cmd.Type {
 	case types.CommandNew:
-		// Create new session
-		workDir, _ := os.Getwd()
-		newSession, err := a.gateway.CreateSession("cli", workDir)
-		if err != nil {
-			return fmt.Errorf("failed to create new session: %w", err)
-		}
-		a.mu.Lock()
-		a.currentSession = newSession
-		a.mu.Unlock()
-
-		a.writer.Write([]byte("\n--- New session started ---\n\n"))
-		slog.Info("new session created", "sessionID", newSession.SessionID)
+		return a.handleNewSession()
 
 	case types.CommandStop:
 		a.writer.Write([]byte("\n--- Stop requested ---\n"))
-		// TODO: Cancel current LLM call
 
 	case types.CommandHelp:
 		a.showHelp()
+
+	case types.CommandTask:
+		a.handleTaskCommand(cmd.Args)
+
+	case types.CommandPlan:
+		a.handlePlanCommand(cmd.Args)
 
 	default:
 		a.writer.Write([]byte(fmt.Sprintf("%sUnknown command: %s%s\n", a.cfg.CLI.ANSI.Warning, input, a.cfg.CLI.ANSI.Reset)))
@@ -177,6 +183,58 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 	}
 
 	return nil
+}
+
+// handleNewSession creates a new session
+func (a *CLIAdapter) handleNewSession() error {
+	workDir, _ := os.Getwd()
+	newSession, err := a.gateway.CreateSession("cli", workDir)
+	if err != nil {
+		return fmt.Errorf("failed to create new session: %w", err)
+	}
+	a.mu.Lock()
+	a.currentSession = newSession
+	a.mu.Unlock()
+
+	a.writer.Write([]byte("\n--- New session started ---\n\n"))
+	slog.Info("new session created", "sessionID", newSession.SessionID)
+	return nil
+}
+
+// handleTaskCommand processes task-related commands
+func (a *CLIAdapter) handleTaskCommand(args []string) {
+	a.mu.RLock()
+	sessionID := ""
+	if a.currentSession != nil {
+		sessionID = a.currentSession.SessionID
+	}
+	a.mu.RUnlock()
+
+	raw := "/task " + strings.Join(args, " ")
+	cmd := tasks.ParseCommand(raw)
+	if cmd == nil {
+		a.writer.Write([]byte("Invalid task command\n"))
+		return
+	}
+
+	output := a.taskCommands.Handle(cmd, sessionID)
+	a.writer.Write([]byte(output + "\n"))
+}
+
+// handlePlanCommand processes plan-related commands
+func (a *CLIAdapter) handlePlanCommand(args []string) {
+	a.mu.RLock()
+	sessionID := ""
+	workDir := ""
+	if a.currentSession != nil {
+		sessionID = a.currentSession.SessionID
+		workDir = a.currentSession.WorkDir
+	}
+	a.mu.RUnlock()
+
+	planCommands := tasks.NewPlanCLICommands(a.planMode)
+	output := planCommands.Handle(args, sessionID, workDir, nil)
+	a.writer.Write([]byte(output + "\n"))
 }
 
 // sendMessage sends a message to the gateway
@@ -188,7 +246,7 @@ func (a *CLIAdapter) sendMessage(ctx context.Context, content string) error {
 	_, cliSpan := a.startCLISendSpan(ctx, session.SessionID, content)
 
 	msg := &types.InboundMessage{
-		SessionID:  session.SessionID,
+		SessionID: session.SessionID,
 		ChatID:    "cli",
 		Content:   content,
 		MessageID: fmt.Sprintf("cli_%s", session.SessionID),
@@ -200,7 +258,9 @@ func (a *CLIAdapter) sendMessage(ctx context.Context, content string) error {
 
 	if err := a.gateway.RouteInbound(ctx, msg); err != nil {
 		a.renderer.RenderError(err)
-		if cliSpan != nil { cliSpan.End() }
+		if cliSpan != nil {
+			cliSpan.End()
+		}
 		return err
 	}
 	if cliSpan != nil {
@@ -232,9 +292,26 @@ func (a *CLIAdapter) startCLISendSpan(ctx context.Context, sessionID, content st
 func (a *CLIAdapter) showHelp() {
 	help := `
 Commands:
-  /new    - Start a new session
-  /stop   - Stop current generation
-  /help   - Show this help
+  /new        - Start a new session
+  /stop       - Stop current generation
+  /task       - Task management (see /task help)
+  /plan       - Plan mode (see /plan help)
+  /help       - Show this help
+
+Task Commands:
+  /task create <subject> [description]  - Create a new task
+  /task list                          - List all tasks
+  /task get <task_id>                - Get task details
+  /task update <task_id> [status]   - Update task status
+  /task ready                       - Show ready tasks
+  /task dep <task_id> <blocked_by> - Add dependency
+
+Plan Commands:
+  /plan <goal>  - Enter plan mode with a goal
+  /plan approve - Approve the plan
+  /plan reject  - Reject the plan
+  /plan status - Show plan status
+  /plan show   - Show current plan
 
 `
 	a.writer.Write([]byte(help))
@@ -286,7 +363,6 @@ func (a *CLIAdapter) HandlePermission(req *types.PermissionRequest) bool {
 	case "yes", "y":
 		return true
 	case "all", "a":
-		// TODO: Implement allow-all logic
 		return true
 	default:
 		return false

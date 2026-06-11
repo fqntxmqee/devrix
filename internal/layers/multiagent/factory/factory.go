@@ -81,9 +81,19 @@ func (f *AgentFactory) Create(
 	}
 	resolved := resolveConfig(cfg, f.cfg)
 	impl := agent.New(resolved, session, f.deps, f)
-	if f.builder != nil {
-		impl.SetEngine(f.builder.Build(impl.PermissionGate()))
-	} else if f.deps.Engine == nil {
+	switch {
+	case cfg.ParentID != "" && f.builder != nil:
+		// Forked workers need an isolated engine with the agent permission gate.
+		inner := f.builder.Build(impl.PermissionGate())
+		impl.SetEngine(agent.NewWorkerEngine(inner, resolved, impl.ID()))
+	case f.deps.Engine != nil:
+		// Root session agents share the gateway context engine so conversation
+		// history accumulates across inbound messages in the same session.
+		impl.SetEngine(f.deps.Engine)
+	case f.builder != nil:
+		inner := f.builder.Build(impl.PermissionGate())
+		impl.SetEngine(agent.NewWorkerEngine(inner, resolved, impl.ID()))
+	default:
 		impl.SetEngine(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	}
 	if createSpan != nil { createSpan.End() }

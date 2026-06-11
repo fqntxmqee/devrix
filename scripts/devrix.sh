@@ -24,6 +24,13 @@ usage() {
 cmd_status() {
   devrix_process_init
   echo "=== devrix status ==="
+  local proc_count
+  proc_count="$(count_devrix_server_pids)"
+  if [[ "$proc_count" -gt 1 ]]; then
+    echo "warning: multiple devrix processes ($proc_count) — run: ./scripts/devrix.sh restart"
+  elif [[ "$proc_count" -eq 0 ]]; then
+    echo "warning: no devrix server process found"
+  fi
   if [[ -f "$PIDFILE" ]]; then
     local pid
     pid="$(cat "$PIDFILE")"
@@ -74,16 +81,27 @@ cmd_start() {
     fi
   done
 
-  if [[ "${DEVRIX_FORCE:-}" != "1" && -f "$PIDFILE" ]]; then
-    local existing_pid
-    existing_pid="$(cat "$PIDFILE" 2>/dev/null || true)"
-    if is_devrix_server_pid "$existing_pid"; then
+  if [[ "${DEVRIX_FORCE:-}" != "1" ]]; then
+    local running_count existing_pid
+    running_count="$(count_devrix_server_pids)"
+    if [[ "$running_count" -eq 1 ]]; then
+      existing_pid="$(list_devrix_server_pids | head -1)"
+      echo "$existing_pid" >"$PIDFILE"
       echo "devrix already running pid=$existing_pid (DEVRIX_FORCE=1 to restart)"
       exit 0
+    fi
+    if [[ "$running_count" -gt 1 ]]; then
+      echo "error: multiple devrix processes ($running_count) — run: ./scripts/devrix.sh restart"
+      exit 1
     fi
   fi
 
   stop_all_devrix_servers
+
+  if [[ "$(count_devrix_server_pids)" -ne 0 ]]; then
+    echo "error: failed to stop all devrix processes before start"
+    exit 1
+  fi
 
   if [[ ! -x "$BIN" ]]; then
     devrix_build
@@ -128,13 +146,22 @@ cmd_start() {
       exit 1
     fi
     echo "$server_pid" >"$PIDFILE"
+    ensure_single_devrix_server_or_fail
     echo "devrix running pid=$server_pid (screen: devrix)"
     echo "tail -f $LOG"
     return 0
   fi
 
-  nohup env "${run_env[@]}" "$BIN" >>"$LOG" 2>&1 &
-  echo $! >"$PIDFILE"
+  # Run from repo root so config paths and process detection stay consistent.
+  (
+    cd "$ROOT"
+    if command -v setsid >/dev/null 2>&1; then
+      setsid nohup env "${run_env[@]}" "$BIN" >>"$LOG" 2>&1 </dev/null &
+    else
+      nohup env "${run_env[@]}" "$BIN" >>"$LOG" 2>&1 </dev/null &
+    fi
+    echo $! >"$PIDFILE"
+  )
   sleep 1
 
   if ! is_devrix_server_pid "$(cat "$PIDFILE")"; then
@@ -142,6 +169,7 @@ cmd_start() {
     exit 1
   fi
 
+  ensure_single_devrix_server_or_fail
   echo "devrix running pid=$(cat "$PIDFILE")"
   echo "tail -f $LOG"
 }

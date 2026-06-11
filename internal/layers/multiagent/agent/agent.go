@@ -52,6 +52,7 @@ func New(
 	if deps.AgentObserver == nil {
 		deps.AgentObserver = observer.NoOpAgentObserver{}
 	}
+	deps.AgentObserver = multiagent.NewAgentObserverChain(deps.AgentObserver)
 	a := &Impl{
 		id:            uuid.New().String(),
 		state:         multiagent.AgentStateCreated,
@@ -220,12 +221,16 @@ func (a *Impl) SetEngine(engine contracts.IEngine) {
 	}
 }
 
-// SetAgentObserver replaces the agent lifecycle observer.
+// SetAgentObserver adds an observer to the agent lifecycle observer chain.
 func (a *Impl) SetAgentObserver(obs multiagent.AgentObserver) {
 	if obs == nil {
 		obs = observer.NoOpAgentObserver{}
 	}
-	a.deps.AgentObserver = obs
+	if chain, ok := a.deps.AgentObserver.(*multiagent.AgentObserverChain); ok {
+		chain.Add(obs)
+	} else {
+		a.deps.AgentObserver = obs
+	}
 }
 
 // SetEngineEventSink forwards engine events to gateway/adapters during Run.

@@ -65,6 +65,11 @@ func NewCursorAgentTool(cfg CursorConfig) *CursorAgentTool {
 // Info returns the tool's identity metadata.
 func (t *CursorAgentTool) Info() Info { return t.info }
 
+// ExecutionTimeout returns the configured per-call timeout for this agent tool.
+func (t *CursorAgentTool) ExecutionTimeout() time.Duration {
+	return t.cfg.Timeout
+}
+
 // Execute sends a task to Cursor Agent and streams events until complete.
 // Each call spawns a one-shot process; multi-turn uses --resume <chatID>.
 func (t *CursorAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
@@ -168,6 +173,14 @@ func (t *CursorAgentTool) readLoop(ctx context.Context, cmd *exec.Cmd, stdout io
 			if !t.handleAssistant(raw, ch, ctx) {
 				return
 			}
+		case "thinking":
+			if !t.handleThinking(raw, ch, ctx) {
+				return
+			}
+		case "tool_call":
+			if !t.handleToolCall(raw, ch, ctx) {
+				return
+			}
 		case "result":
 			if t.handleResult(raw, ch, ctx) {
 				return
@@ -208,20 +221,151 @@ func (t *CursorAgentTool) handleAssistant(raw map[string]any, ch chan<- Event, c
 			continue
 		}
 		contentType, _ := m["type"].(string)
-		if contentType != "text" {
-			continue
-		}
-		text, ok := m["text"].(string)
-		if !ok || text == "" {
-			continue
-		}
-		select {
-		case ch <- Event{Type: "text", Content: text}:
-		case <-ctx.Done():
-			return false
+		switch contentType {
+		case "text":
+			text, _ := m["text"].(string)
+			if text == "" {
+				continue
+			}
+			if !emitCursorEvent(ch, ctx, Event{Type: "text", Content: text}) {
+				return false
+			}
+		case "thinking":
+			text, _ := m["thinking"].(string)
+			if text == "" {
+				text, _ = m["text"].(string)
+			}
+			if text == "" {
+				continue
+			}
+			if !emitCursorEvent(ch, ctx, Event{Type: "thinking", Content: text}) {
+				return false
+			}
+		case "tool_use":
+			label := strings.TrimSpace(fmt.Sprint(m["name"]))
+			if label == "" {
+				label = strings.TrimSpace(fmt.Sprint(m["text"]))
+			}
+			if label == "" {
+				continue
+			}
+			if !emitCursorEvent(ch, ctx, Event{Type: "tool_use", Content: "🔧 " + label}) {
+				return false
+			}
 		}
 	}
 	return true
+}
+
+func (t *CursorAgentTool) handleThinking(raw map[string]any, ch chan<- Event, ctx context.Context) bool {
+	subtype, _ := raw["subtype"].(string)
+	if subtype != "delta" {
+		return true
+	}
+	text, _ := raw["text"].(string)
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return true
+	}
+	return emitCursorEvent(ch, ctx, Event{Type: "thinking", Content: text})
+}
+
+func (t *CursorAgentTool) handleToolCall(raw map[string]any, ch chan<- Event, ctx context.Context) bool {
+	subtype, _ := raw["subtype"].(string)
+	if subtype != "started" {
+		return true
+	}
+	toolCall, ok := raw["tool_call"].(map[string]any)
+	if !ok {
+		return true
+	}
+	label := formatCursorToolCallLabel(toolCall)
+	if label == "" {
+		return true
+	}
+	return emitCursorEvent(ch, ctx, Event{Type: "tool_use", Content: label})
+}
+
+func emitCursorEvent(ch chan<- Event, ctx context.Context, evt Event) bool {
+	select {
+	case ch <- evt:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func formatCursorToolCallLabel(toolCall map[string]any) string {
+	for key, val := range toolCall {
+		if key == "hookAdditionalContexts" || key == "toolCallId" {
+			continue
+		}
+		if !strings.HasSuffix(key, "ToolCall") {
+			continue
+		}
+		toolName := strings.TrimSuffix(key, "ToolCall")
+		detail := cursorToolCallDetail(toolName, val)
+		if detail != "" {
+			return "🔧 " + toolName + ": " + detail
+		}
+		return "🔧 " + toolName
+	}
+	return ""
+}
+
+func cursorToolCallDetail(toolName string, raw any) string {
+	payload, ok := raw.(map[string]any)
+	if !ok {
+		return ""
+	}
+	if desc, ok := payload["description"].(string); ok && strings.TrimSpace(desc) != "" {
+		return strings.TrimSpace(desc)
+	}
+	args, _ := payload["args"].(map[string]any)
+	if args == nil {
+		return ""
+	}
+	switch toolName {
+	case "shell":
+		if cmd, ok := args["command"].(string); ok {
+			return truncateCursorDetail(cmd, 120)
+		}
+	case "read":
+		if path, ok := args["path"].(string); ok {
+			return truncateCursorDetail(path, 120)
+		}
+	case "write", "edit", "delete":
+		if path, ok := args["path"].(string); ok {
+			return truncateCursorDetail(path, 120)
+		}
+	case "glob":
+		pattern, _ := args["globPattern"].(string)
+		dir, _ := args["targetDirectory"].(string)
+		if pattern != "" && dir != "" {
+			return truncateCursorDetail(pattern+" @ "+dir, 120)
+		}
+		if pattern != "" {
+			return truncateCursorDetail(pattern, 120)
+		}
+	case "grep":
+		if pattern, ok := args["pattern"].(string); ok {
+			return truncateCursorDetail(pattern, 120)
+		}
+	}
+	for _, key := range []string{"path", "command", "pattern", "query", "globPattern", "targetDirectory"} {
+		if v, ok := args[key].(string); ok && strings.TrimSpace(v) != "" {
+			return truncateCursorDetail(v, 120)
+		}
+	}
+	return ""
+}
+
+func truncateCursorDetail(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }
 
 // handleResult returns true if the caller should return (stream finished).

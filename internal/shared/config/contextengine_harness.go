@@ -70,10 +70,11 @@ type PreflightToolFilterConfig struct {
 
 // WorkspacePromptConfig holds system prompt assembly workspace settings.
 type WorkspacePromptConfig struct {
-	MaxContextTokens       int      `yaml:"max_context_tokens"`
-	AgentName              string   `yaml:"agent_name"`
-	AdditionalContextFiles []string `yaml:"additional_context_files"`
-	EmbedCoreTemplate      bool     `yaml:"embed_core_template"`
+	MaxContextTokens       int             `yaml:"max_context_tokens"`
+	AgentName              string          `yaml:"agent_name"`
+	AdditionalContextFiles []string        `yaml:"additional_context_files"`
+	EmbedCoreTemplate      bool            `yaml:"embed_core_template"`
+	PromptConfig           *PromptConfig   `yaml:"prompt"`
 }
 
 // DefaultHarnessConfig returns V5 harness defaults (disabled for safe rollout).
@@ -122,8 +123,9 @@ func DefaultPreflightConfig() PreflightConfig {
 func DefaultWorkspacePromptConfig() WorkspacePromptConfig {
 	return WorkspacePromptConfig{
 		MaxContextTokens:  8000,
-		AgentName:         "Devrix",
+		AgentName:        "Devrix",
 		EmbedCoreTemplate: true,
+		PromptConfig:     DefaultPromptConfig(),
 	}
 }
 

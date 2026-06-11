@@ -1,8 +1,10 @@
 package token
 
 import (
+	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
@@ -17,10 +19,23 @@ const (
 )
 
 // Counter implements contracts.ITokenCounter using cl100k_base (tiktoken).
+// atomicFloat64 is an atomically accessible float64 (sync/atomic has no public Float64 type).
+type atomicFloat64 struct {
+	bits atomic.Uint64
+}
+
+func (f *atomicFloat64) Store(v float64) {
+	f.bits.Store(math.Float64bits(v))
+}
+
+func (f *atomicFloat64) Load() float64 {
+	return math.Float64frombits(f.bits.Load())
+}
+
 type Counter struct {
 	mu            sync.RWMutex
 	encoding      *tiktoken.Tiktoken
-	cjkMultiplier float64
+	cjkMultiplier atomicFloat64
 }
 
 // NewCounter creates a cl100k_base token counter (embedded BPE, no network).
@@ -30,13 +45,15 @@ func NewCounter() (*Counter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Counter{encoding: enc, cjkMultiplier: 1.0}, nil
+	c := &Counter{encoding: enc}
+	c.cjkMultiplier.Store(1.0)
+	return c, nil
 }
 
 // WithCJKMultiplier sets a multiplier applied when text contains CJK characters.
 func (c *Counter) WithCJKMultiplier(multiplier float64) *Counter {
 	if multiplier > 0 {
-		c.cjkMultiplier = multiplier
+		c.cjkMultiplier.Store(multiplier)
 	}
 	return c
 }
@@ -49,8 +66,9 @@ func (c *Counter) CountText(text string) int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	count := len(c.encoding.Encode(text, nil, nil))
-	if c.cjkMultiplier > 1.0 && containsCJK(text) {
-		count = int(float64(count) * c.cjkMultiplier)
+	multiplier := c.cjkMultiplier.Load()
+	if multiplier > 1.0 && containsCJK(text) {
+		count = int(float64(count) * multiplier)
 	}
 	return count
 }

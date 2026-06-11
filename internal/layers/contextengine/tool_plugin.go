@@ -32,7 +32,7 @@ func NewToolRegistry() *ToolRegistry {
 }
 
 // NewBuiltinToolRegistry registers bash, read_file, and write_file built-ins.
-func NewBuiltinToolRegistry(toolCfg *config.ToolConfig) *ToolRegistry {
+func NewBuiltinToolRegistry(toolCfg *config.ToolConfig) (*ToolRegistry, error) {
 	if toolCfg == nil {
 		toolCfg = config.DefaultToolConfig()
 	}
@@ -44,10 +44,10 @@ func NewBuiltinToolRegistry(toolCfg *config.ToolConfig) *ToolRegistry {
 		newWriteFileRunner(execCfg),
 	} {
 		if err := reg.Register(runner); err != nil {
-			panic(fmt.Sprintf("register builtin %s: %v", runner.Name(), err))
+			return nil, fmt.Errorf("register builtin %s: %w", runner.Name(), err)
 		}
 	}
-	return reg
+	return reg, nil
 }
 
 // Register adds a plugin runner. Duplicate names return an error.

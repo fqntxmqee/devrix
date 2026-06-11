@@ -128,6 +128,23 @@ func (r *CLIRenderer) RenderToolResult(output string, err error) {
 	}
 }
 
+// RenderWorkerProgress renders sub-agent execution progress (Hub-Spoke v2).
+func (r *CLIRenderer) RenderWorkerProgress(msg *types.OutboundMessage) {
+	role := msg.Metadata["role"]
+	source := msg.Metadata["source"]
+	kind := msg.Metadata["kind"]
+	worker := msg.Metadata["worker_id"]
+	prefix := "  ├─"
+	if role != "" {
+		fmt.Printf("%s [%s/%s] %s · %s%s\n", prefix, source, role, worker, kind, r.ansi.Reset)
+	} else {
+		fmt.Printf("%s %s · %s%s\n", prefix, worker, msg.Content, r.ansi.Reset)
+	}
+	if msg.Content != "" && kind != "" {
+		fmt.Printf("     %s%s\n", msg.Content, r.ansi.Reset)
+	}
+}
+
 // RenderComplete renders a completion message with stats
 func (r *CLIRenderer) RenderComplete(usage map[string]int) {
 	fmt.Printf("%s✓ Complete%s\n", r.ansi.Assistant, r.ansi.Reset)

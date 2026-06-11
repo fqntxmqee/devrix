@@ -10,6 +10,19 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+// Covers: L5-CTX-35
+func TestSystemPromptAssembler_should_omit_agents_when_prepend_mode(t *testing.T) {
+	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	prompt, _ := assembler.Build(harness.SystemPromptBuildInput{
+		HarnessEnabled:       true,
+		AgentsRaw:            "Project agents content",
+		OmitAgentsFromSystem: true,
+	})
+	if strings.Contains(prompt, "<agents_context>") && strings.Contains(prompt, "Project agents content") {
+		t.Fatal("agents content should be omitted from system prompt in prepend mode")
+	}
+}
+
 // Covers: L5-2-9-10
 func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.T) {
 	assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())

@@ -155,6 +155,30 @@
 | L5-2-9-14 | PEV 可见工具 ⊆ VisibleTools | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | L5-2-9-15 | bootstrap.stage parent = bootstrap.run | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 
+### D2-S10: QueryLoop Module
+
+> **Change:** `devrix-queryloop-context` (DM-20260610-012)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-CTX-34 | 多轮 tool_use 直至无 tool | QueryLoop | `internal/layers/contextengine/query/loop_test.go` | IMPLEMENTED | P0 |
+| L5-CTX-35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/usercontext/` | IMPLEMENTED | P0 |
+| L5-CTX-36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
+| L5-CTX-37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/permission/mode_test.go` | IMPLEMENTED | P0 |
+| L5-CTX-38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/contextengine/tasks/disk_store_test.go` | IMPLEMENTED | P0 |
+| L5-CTX-39 | query_loop.enabled=false V4 回归 | QueryLoop | `tests/integration/query_loop_integration_test.go` | IMPLEMENTED | P0 |
+| L5-CTX-40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/query/subquery_test.go` | IMPLEMENTED | P1 |
+| L5-CTX-41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/query/fork_test.go` | IMPLEMENTED | P1 |
+| L5-CTX-42 | sidechain transcript resume 重建 messages | QueryLoop | `internal/layers/contextengine/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
+
+### D2-S12: Worktree Module
+
+> **Change:** `devrix-queryloop-context` v2.0 (DM-20260610-012)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-4-12-01 | Worktree enter 后 write 不污染主 WorkDir | Worktree | `internal/layers/contextengine/worktree/manager_test.go` | IMPLEMENTED | P0 |
+
 ### D2: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
@@ -162,6 +186,16 @@
 | L5-2-0-01 | 压缩/Verify 步骤可观事务 | `tests/integration/context_compression_obs_test.go` | IMPLEMENTED |
 | L5-2-0-02 | 主路径接入真实 LLM Gateway | `tests/integration/context_llm_gateway_test.go` | IMPLEMENTED |
 | L5-2-0-03 | plan.enabled=false 时回退 V2 路径 | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED |
+
+---
+
+## ORCH: Orchestration Layer (Cross-Domain)
+
+> **Change:** `devrix-queryloop-context` v2.0 (DM-20260610-012) · Package: `internal/layers/orchestration/`
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-ORCH-01 | WorkPlan.Snapshot 含 Task + ExecutionFlow | WorkPlan | `internal/layers/orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -278,6 +312,22 @@
 | L5-4-6-06 | D1 Session 销毁清理关联的 Agent Tool 子进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P1 |
 | L5-4-6-07 | 不同 D1 Session 的 Agent Tool 隔离运行互不干扰 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
 
+### D4-S10: Delegate Module
+
+> **Change:** `devrix-queryloop-context` v2.0 (DM-20260610-012)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-4-10-01 | Leader delegate_explore 创建 Worker / MaxWorkers | Delegate | `internal/layers/multiagent/delegate/service_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-02 | Worker Run 设置 AgentID，sidechain 隔离 | Delegate | `internal/layers/contextengine/worker_tools_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-03 | Worker 不能 delegate_* 或 Fork | Delegate | `internal/layers/multiagent/agent/worker_engine_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-04 | delegate-progress 仅 Leader Drain | Delegate | `internal/layers/contextengine/queue/delegate_progress_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-05 | worker_progress 到达 Gateway/IM | Delegate | `internal/layers/orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-06 | SubQuery 与 D4 Worker 共用 FlowEvent schema | Delegate | `internal/layers/orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-07 | FlowStarted 自动 task owner + in_progress | Delegate | `internal/layers/orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-08 | D4 未启用 delegate 降级 SubQuery | Delegate | `internal/layers/contextengine/delegate_fallback_flow_test.go` | IMPLEMENTED | P0 |
+| L5-4-10-09 | 用户单会话：无第二对话入口 | Delegate | `internal/bootstrap/cli_events_test.go` | IMPLEMENTED | P0 |
+
 ### D4: Cross-Scenario Tests
 
 | L5 ID | 描述 | Test 位置 | Status |
@@ -344,7 +394,7 @@
 
 ## D6: Evolution Domain (EVO)
 
-> **Spec Reference:** `openspec/archive/2026-06-08-devrix-d1-d6-testing/demand.md`
+> **Spec Reference:** `openspec/specs/eval/spec.md` (D6-S3); D6-S1/S2 见 `openspec/archive/2026-06-08-devrix-d1-d6-testing/demand.md`
 
 ### D6-S1: Version Module
 
@@ -405,12 +455,13 @@
 |--------|------------|-------|-------------|---------|-----|
 | D0 | Code Integrity | 9 | 9 | 0 | 3 |
 | D1 | Communication | 13 | 13 | 0 | 2 |
-| D2 | Context Engine | 31 | 31 | 0 | 0 |
+| D2 | Context Engine | 41 | 41 | 0 | 7 |
 | D3 | LLM Gateway | 21 | 20 | 1 | 0 |
-| D4 | Multi-Agent | 15 | 15 | 0 | 0 |
+| D4 | Multi-Agent | 24 | 24 | 0 | 9 |
 | D5 | Observability | 19 | 15 | 4 | 0 |
 | D6 | Evolution | 2 | 0 | 2 | 0 |
-| **Total** | | **110** | **103** | **7** | **5** |
+| ORCH | Orchestration | 1 | 1 | 0 | 1 |
+| **Total** | | **130** | **123** | **7** | **22** |
 
 ---
 
@@ -423,6 +474,7 @@
 | 1.2.0 | 2026-06-08 | D1/D6 testing specs added; Priority column added (devrix-d1-d6-testing) |
 | 1.3.0 | 2026-06-08 | D1 L5 IMPLEMENTED; registry summary reconciled (DM-20260608-011) |
 | 1.4.0 | 2026-06-09 | D2/D3/D4 domain build tags + test-domain.sh (DM-20260609-001) |
+| 1.5.0 | 2026-06-10 | QueryLoop v1/v2 + Delegate + WorkPlan L5 (DM-20260610-012) |
 
 ---
 

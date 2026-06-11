@@ -11,6 +11,8 @@ import (
 type GatewayAPI interface {
 	// GetSession returns a session by ID
 	GetSession(sessionID string) (*types.Session, error)
+	// ResolveSessionByChatID returns the latest non-idle session for a chat key.
+	ResolveSessionByChatID(chatID string) (*types.Session, error)
 	// CreateSession creates a new session
 	CreateSession(chatID, workDir string) (*types.Session, error)
 	// RouteInbound processes an inbound message

@@ -1,0 +1,23 @@
+change_id: devrix-feishu-streaming
+priority: P1
+demand_id: DM-20260611-006
+status: s4_developing
+domains: [D1, communication]
+parent_initiative: devrix-queryloop-context-v3
+l5_points:
+  - L5-1-2-04
+  - L5-1-2-05
+  - L5-1-2-06
+  - L5-1-2-07
+  - L5-1-2-08
+version_scope:
+  v1.0: Cardkit 双步发卡 + 回复卡元素级流式（Phase 1–2）
+  v1.1: 多卡协同 + 节流配置 + 真机验收（Phase 3）
+reference:
+  cc_connect:
+    - cc-connect-src/core/streaming.go
+    - cc-connect-src/platform/feishu/feishu.go
+  feishu_openapi:
+    - card_json_v2_structure
+    - cardkit_v1_cards
+    - streaming_element_content_put

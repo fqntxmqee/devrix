@@ -12,6 +12,8 @@ import (
 // MockFeishuAPI is a test double for adapters.FeishuAPI.
 type MockFeishuAPI struct {
 	GetFunc func(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	PostFunc func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	PutFunc  func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
 	ImAPI   adapters.ImAPI
 }
 
@@ -20,6 +22,20 @@ var _ adapters.FeishuAPI = (*MockFeishuAPI)(nil)
 func (m *MockFeishuAPI) Get(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
 	if m.GetFunc != nil {
 		return m.GetFunc(ctx, path, params, tokenType)
+	}
+	return &larkcore.ApiResp{}, nil
+}
+
+func (m *MockFeishuAPI) Post(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	if m.PostFunc != nil {
+		return m.PostFunc(ctx, path, body, tokenType)
+	}
+	return &larkcore.ApiResp{}, nil
+}
+
+func (m *MockFeishuAPI) Put(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	if m.PutFunc != nil {
+		return m.PutFunc(ctx, path, body, tokenType)
 	}
 	return &larkcore.ApiResp{}, nil
 }

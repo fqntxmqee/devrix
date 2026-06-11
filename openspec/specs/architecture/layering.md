@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-08
+**Version:** 2.2.0
+**Last Updated:** 2026-06-11
 
 ---
 
@@ -27,7 +27,7 @@
 | **D3** | LLM Gateway Domain | LLM | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain | AGENT | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain | OBS | Tracing, metrics, logging |
-| **D6** | Evolution Domain | EVO | Version management, A/B testing |
+| **D6** | Evolution Domain | EVO | Eval engine, quality probes, runtime orchestration validation |
 
 ---
 
@@ -61,6 +61,18 @@
 | D2-S7 | Prompt | Prompt 模板管理 |
 | D2-S8 | Sandbox | 工具沙箱隔离 |
 | D2-S9 | Harness | 会话 Bootstrap、ToolPool、Preflight、System Prompt 装配（V5） |
+| D2-S10 | QueryLoop | QueryLoop 运行时、UserContext、Attachments、PermissionMode、TaskTools（V6） |
+| D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） |
+| D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） |
+
+### ORCH Orchestration (Cross-Domain, v2)
+
+> v2 读模型包，非顶层 D1–D6；包路径 `internal/layers/orchestration/`。v3 可升格 D7。
+
+| Module ID | Scenario | Responsibility |
+|-----------|----------|----------------|
+| ORCH-S1 | WorkPlan | Task + ExecutionFlow 读模型聚合 |
+| ORCH-S2 | ExecutionFlowHub | FlowEvent 双通道：Leader Queue + D1 IM |
 
 ### D3 LLM Gateway Domain
 
@@ -82,6 +94,7 @@
 | D4-S3 | Permission | 权限管道 |
 | D4-S4 | Fork | Agent Fork/Join |
 | D4-S5 | Observer | 事件观察者 |
+| D4-S10 | Delegate | Hub-Spoke 委派 Worker、delegate_* 工具、FlowBridge（V6） |
 
 ### D5 Observability Domain
 
@@ -97,10 +110,14 @@
 
 ### D6 Evolution Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D6-S1 | Version | 版本检测与记录 |
-| D6-S2 | Config | 配置热更新 |
+| Module ID | Scenario | Responsibility | Status |
+|-----------|----------|----------------|--------|
+| D6-S1 | Version | 版本检测与记录 | PLANNED (v2.1.0) |
+| D6-S2 | Config | 配置热更新 | PLANNED (v2.2.0) |
+| D6-S3 | Eval | 评测引擎：EvalRun、Judge、探针、Delta、Tune、`devrix eval run` | IMPLEMENTED |
+| D6-S4 | Orchestration | 运行时决策校验：跨模型判官、干预、Observer | IMPLEMENTED |
+
+Spec: `openspec/specs/eval/spec.md` (D6-S3)
 
 ---
 
@@ -129,7 +146,20 @@ layers/
 │   ├── snapshot/                  # D2-S6
 │   ├── prompt/                    # D2-S7
 │   ├── sandbox/                   # D2-S8
-│   └── harness/                   # D2-S9 (V5)
+│   ├── harness/                   # D2-S9 (V5)
+│   ├── query/                     # D2-S10 QueryLoop
+│   ├── usercontext/               # D2-S10 UserContext
+│   ├── attachments/               # D2-S10 Attachments
+│   ├── permission/                # D2-S10 PermissionMode
+│   ├── tasks/                     # D2-S10 TaskTools
+│   ├── transcript/                # D2-S10 Sidechain
+│   ├── queue/                     # D2-S11 SessionQueue
+│   └── worktree/                  # D2-S12 Worktree
+│
+├── orchestration/                 # ORCH (v2 read model)
+│   ├── flow/                      # ORCH-S2 ExecutionFlowHub
+│   ├── workplan/                  # ORCH-S1 WorkPlan
+│   └── imsink/                    # ORCH-S2 → D1 Gateway bridge
 │
 ├── llmgateway/                    # D3
 │   ├── adapter/                   # D3-S1
@@ -144,7 +174,8 @@ layers/
 │   ├── agent/                     # D4-S2
 │   ├── permission/                # D4-S3
 │   ├── fork/                      # D4-S4
-│   └── observer/                  # D4-S5
+│   ├── observer/                  # D4-S5
+│   └── delegate/                  # D4-S10 Delegate (V6)
 │
 ├── observability/                 # D5
 │   ├── tracer/                    # D5-S1
@@ -156,8 +187,9 @@ layers/
 │   └── settings/                  # D5-S7
 │
 └── evolution/                     # D6
-    ├── version/                   # D6-S1
-    └── config/                    # D6-S2
+    ├── eval/                      # D6-S3 Eval engine + probes
+    └── orchestration/             # D6-S4 Runtime judge / intervention
+    # PLANNED: version/ (D6-S1), config/ (D6-S2)
 ```
 
 ---
@@ -210,6 +242,17 @@ L5 测试点编号格式: `L5-{D}-{S}-{NN}`
 | L4-CTX-PREFLIGHT | D2-S9 (Harness) | Pre-LLM 上下文评分 |
 | L4-CTX-WORKSPACE | D2-S9 (Harness) | System Prompt 四层装配 |
 | L4-CTX-TRANSCRIPT | D2-S9 (Harness) | Transcript / SessionLog |
+| L4-CTX-QUERYLOOP | D2-S10 (QueryLoop) | QueryLoop 主循环 |
+| L4-CTX-USERCTX | D2-S10 (QueryLoop) | UserContext prepend |
+| L4-CTX-ATTACH | D2-S10 (QueryLoop) | Plan mode attachments |
+| L4-CTX-PERM | D2-S10 (QueryLoop) | PermissionMode plan |
+| L4-CTX-TASK | D2-S10 (QueryLoop) | Task disk tools |
+| L4-CTX-SUBQUERY | D2-S10 (QueryLoop) | SubQuery / Fork |
+| L4-CTX-QUEUE | D2-S11 (Queue) | SessionQueue drain |
+| L4-CTX-WORKTREE | D2-S12 (Worktree) | Worktree sandbox |
+| L4-AGENT-DELEGATE | D4-S10 (Delegate) | Hub-Spoke delegate |
+| L4-ORCH-WORKPLAN | ORCH-S1 (WorkPlan) | 读模型聚合 |
+| L4-ORCH-FLOWHUB | ORCH-S2 (ExecutionFlowHub) | FlowEvent 双通道 |
 | L4-LLM-ADAPTER | D3-S1 (Adapter) | 模型适配器 |
 | L4-OBS-TRACING | D5-S1 (Tracer) | 追踪 |
 
@@ -235,3 +278,4 @@ L5 测试点编号格式: `L5-{D}-{S}-{NN}`
 |---------|------|---------|
 | 1.0.0 | 2026-06-08 | Initial L1-L2 specification |
 | 2.0.0 | 2026-06-08 | Renamed to D-S domains (DM-20260608-007); merged redundant architecture docs |
+| 2.1.0 | 2026-06-10 | D2-S10~S12, D4-S10, ORCH-S1/S2 QueryLoop v2 (DM-20260610-012) |

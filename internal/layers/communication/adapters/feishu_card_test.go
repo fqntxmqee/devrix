@@ -266,43 +266,21 @@ func TestBuildCardJSON_WideScreenMode(t *testing.T) {
 	if config["wide_screen_mode"] != true {
 		t.Errorf("expected wide_screen_mode true, got %v", config["wide_screen_mode"])
 	}
+	if config["width_mode"] != "fill" {
+		t.Errorf("expected width_mode fill, got %v", config["width_mode"])
+	}
 }
 
 func TestPreprocessMarkdown(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "h3 header",
-			input:    "### Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "h2 header",
-			input:    "## Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "h1 header",
-			input:    "# Hello World",
-			expected: "**Hello World",
-		},
-		{
-			name:     "bold text",
-			input:    "This is **bold** text",
-			expected: "This is <strong>bold</strong> text",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := PreprocessMarkdown(tt.input)
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("expected result to contain %q, got %q", tt.expected, result)
-			}
-		})
+	input := `### Hello World
+## Another
+This is **bold** text
+| A | B |
+|---|---|
+| 1 | 2 |`
+	result := PreprocessMarkdown(input)
+	if result != input {
+		t.Fatalf("PreprocessMarkdown should pass through JSON 2.0 markdown, got %q", result)
 	}
 }
 
@@ -310,17 +288,9 @@ func TestPreprocessMarkdown_MultipleLines(t *testing.T) {
 	input := `### Header Line
 ## Another Header
 Some **bold** text`
-
 	result := PreprocessMarkdown(input)
-
-	if !strings.Contains(result, "**Header Line") {
-		t.Error("expected h3 to be converted")
-	}
-	if !strings.Contains(result, "**Another Header") {
-		t.Error("expected h2 to be converted")
-	}
-	if !strings.Contains(result, "<strong>bold</strong>") {
-		t.Error("expected bold to be converted")
+	if result != input {
+		t.Fatalf("PreprocessMarkdown() = %q, want passthrough %q", result, input)
 	}
 }
 
@@ -388,5 +358,16 @@ func TestBuildCardJSON_RenderText(t *testing.T) {
 	}
 	if !strings.Contains(text, "[OK]") {
 		t.Error("expected rendered text to contain button")
+	}
+}
+
+func TestFlattenMarkdownTablesForFeishu(t *testing.T) {
+	input := "| A | B |\n|---|---|\n| 1 | 2 |"
+	got := flattenMarkdownTablesForFeishu(input)
+	if strings.Contains(got, "| A |") {
+		t.Fatalf("table pipes should be flattened, got %q", got)
+	}
+	if !strings.Contains(got, "A · B") || !strings.Contains(got, "1 · 2") {
+		t.Fatalf("flattened rows = %q", got)
 	}
 }

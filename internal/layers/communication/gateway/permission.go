@@ -124,6 +124,23 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 	}
 }
 
+// IsYOLOMode reports whether YOLO mode is enabled.
+func (p *PermissionManager) IsYOLOMode() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.userCfg != nil && p.userCfg.YOLO.Enabled
+}
+
+// AutoApproveFiles reports whether YOLO allows workspace file writes without plan-mode restrictions.
+func (p *PermissionManager) AutoApproveFiles() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.userCfg == nil {
+		return false
+	}
+	return p.userCfg.ShouldAutoApproveFile()
+}
+
 // shouldAutoApprove checks if a tool should be auto-approved in YOLO mode
 func (p *PermissionManager) shouldAutoApprove(toolName string, riskLevel types.RiskLevel) bool {
 	p.mu.RLock()

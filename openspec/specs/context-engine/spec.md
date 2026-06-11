@@ -1,9 +1,9 @@
 # Context Engine Specification
 
 **Capability:** context-engine
-**Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10)
+**Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-queryloop-context (archived 2026-06-10)
 **Layer:** 2
-**Version:** 5.0.0
+**Version:** 6.0.0
 **Status:** Canonical — source of truth
 
 ---
@@ -20,7 +20,9 @@ V4（DM-20260608-003）增强：Autocompact 异步化（占位摘要 + 后台 LL
 
 V5（DM-20260609-004）增强：Harness Bootstrap 分阶段启动、ToolPool 过滤、SystemPromptAssembler 四层组装、Transcript 双轨、Preflight warn-only；`harness.enabled=false` 时保持 V4 bit-identical 行为。
 
-**Archive:** `openspec/archive/2026-06-08-devrix-context-engine-v4/`, `openspec/archive/2026-06-10-devrix-harness-bootstrap/`
+V6（DM-20260610-012）增强：QueryLoop 运行时（`query_loop.enabled`）、UserContext API 边界 prepend、Plan Mode 附件与写过滤、Task 磁盘持久化、SubQuery/Fork/Background/Sidechain；v2.0 Hub-Spoke 增加 ExecutionFlowHub 双通道、WorkPlan 读模型、Worktree 沙箱目录；`query_loop.enabled=false` 时保持 V5 bit-identical 行为。
+
+**Archive:** `openspec/archive/2026-06-08-devrix-context-engine-v4/`, `openspec/archive/2026-06-10-devrix-harness-bootstrap/`, `openspec/archive/2026-06-10-devrix-queryloop-context/`
 
 ---
 
@@ -757,6 +759,194 @@ Transcript 分离 MUST 支持 compact view 与 append-only full log 双轨（对
 - WHEN Process completes
 - THEN user and assistant turns are appended to session log
 - AND log is not replaced by compression pipeline
+
+---
+
+## ADDED Requirements (V6 QueryLoop — v1.0/v1.1)
+
+### Requirement: QueryLoop Runtime
+
+When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool rounds to `query.Loop` instead of the legacy fixed-iteration execute loop. When `enabled=false`, behavior MUST remain bit-identical to V5.
+
+**Priority:** P0  
+**L3:** L3-BE-CTX-QueryLoop  
+**L4:** query_loop  
+**L5:** L5-CTX-34, L5-CTX-39
+
+#### Scenario: Multi-turn tool loop
+
+- GIVEN `query_loop.enabled=true` and LLM returns tool_use until final text
+- WHEN Process runs
+- THEN Loop continues until no pending tool calls or `max_turns` reached
+- AND `TurnCount` reflects tool rounds executed
+
+#### Scenario: V5 regression with query loop disabled
+
+- GIVEN `query_loop.enabled=false`
+- WHEN any V5 L5 scenario runs
+- THEN behavior is unchanged from V5
+
+---
+
+### Requirement: UserContext Prepend Boundary
+
+AGENTS.md and runtime user context MUST be injected via `usercontext.PrependForAPI` at the API boundary only when `user_context.mode=prepend`. They MUST NOT appear in persisted snapshot `Messages`.
+
+**Priority:** P0  
+**L4:** user_context  
+**L5:** L5-CTX-35
+
+#### Scenario: Prepend not in snapshot
+
+- GIVEN prepend mode and non-empty AGENTS.md
+- WHEN Loop builds API messages
+- THEN prepend block is present in API call only
+- AND snapshot messages exclude the prepend meta-user block
+
+---
+
+### Requirement: Permission Plan Mode
+
+Plan mode MUST restrict writable paths to `PlanFilePath` and filter ToolPool to read-only tools plus plan file writes.
+
+**Priority:** P0  
+**L4:** permission_mode  
+**L5:** L5-CTX-36, L5-CTX-37
+
+#### Scenario: Write denied outside plan file
+
+- GIVEN `PermissionMode=plan` and configured plan file path
+- WHEN `write_file` targets another path
+- THEN tool returns plan mode denial without writing
+
+---
+
+### Requirement: Task Disk Persistence
+
+When `tasks.mode=v2`, task_create/update/get/list MUST persist to `tasks.store_dir` and survive process restart.
+
+**Priority:** P0  
+**L4:** task_tools  
+**L5:** L5-CTX-38
+
+---
+
+### Requirement: SubQuery and Sidechain Transcript
+
+SubQuery MUST run nested agents via the same `query.Loop` with incremented `QueryDepth` and optional `AgentID`. Sidechain transcript MUST append JSONL under `{sessions}/{sessionId}/subagents/{agentId}.jsonl` when enabled.
+
+**Priority:** P1  
+**L4:** subquery, sidechain_transcript  
+**L5:** L5-CTX-40, L5-CTX-42
+
+#### Scenario: Explore read-only sub-agent
+
+- GIVEN builtin Explore agent invocation
+- WHEN SubQuery runs
+- THEN `OmitClaudeMd` applies and write tools are excluded
+
+#### Scenario: Sidechain resume
+
+- GIVEN existing sidechain JSONL for agentId
+- WHEN SubQuery runs with `Resume=true`
+- THEN initial messages include loaded sidechain history
+
+---
+
+### Requirement: Fork Subagent Cache Prefix
+
+When `subquery.fork_subagent_enabled=true`, fork children MUST share identical assistant + placeholder tool_result prefixes; only the per-child directive differs.
+
+**Priority:** P1  
+**L4:** subquery  
+**L5:** L5-CTX-41
+
+#### Scenario: Identical placeholder tool results
+
+- GIVEN parent assistant message with multiple tool_use blocks
+- WHEN two fork children are built with different directives
+- THEN placeholder tool_result text is identical across children
+
+---
+
+### Requirement: Streaming Tool Execution
+
+When `query_loop.streaming_tools=true`, concurrency-safe tools in the same batch MAY execute in parallel; results MUST remain ordered in the transcript.
+
+**Priority:** P1  
+**L4:** query_loop
+
+---
+
+### Requirement: Background Task Notifications
+
+Background SubQuery completion MUST enqueue `task-notification` commands scoped to the sub-agent's `agentId`; Loop MUST drain matching notifications each iteration.
+
+**Priority:** P1  
+**L4:** background_tasks
+
+---
+
+## ADDED Requirements (V6 QueryLoop v2 — ExecutionFlow & Worktree)
+
+> Delegate Worker 约束与 `delegate_*` 工具见 `openspec/specs/multi-agent/spec.md` (D4-S10)。  
+> WorkPlan / ExecutionFlowHub 契约见 `openspec/specs/orchestration/spec.md`。
+
+### Requirement: ExecutionFlow Dual Channel
+
+When `context_engine.execution_flow.enabled=true`, SubQuery and D4 Worker runtime events MUST publish unified `FlowEvent` records via `ExecutionFlowHub` to both Leader `SessionQueue` (`ModeDelegateProgress`) and D1 Gateway (`worker_progress`).
+
+**Priority:** P0  
+**L4:** execution_flow  
+**L5:** L5-4-10-04, L5-4-10-05, L5-4-10-06
+
+#### Scenario: Leader-only delegate-progress drain
+
+- GIVEN an in-progress Worker or SubQuery flow
+- WHEN FlowEvent is published
+- THEN Leader queue receives `delegate-progress` with empty AgentID
+- AND Worker session queue does NOT drain delegate-progress for itself
+
+#### Scenario: IM worker_progress projection
+
+- GIVEN `execution_flow.im_progress=true`
+- WHEN FlowEvent is published
+- THEN Gateway emits `worker_progress` EngineEvent with flow metadata
+- AND user remains in the same session thread (no second chat entry)
+
+#### Scenario: D4 disabled fallback still emits flow events
+
+- GIVEN `multi_agent.delegate.enabled=false`
+- WHEN Leader invokes explore via SubQuery fallback
+- THEN FlowEvents use `ExecutionSourceSubQuery`
+- AND IM progress remains visible
+
+---
+
+### Requirement: Task Binding on Flow Start
+
+When `execution_flow.link_tasks=true` and `FlowStarted` includes or resolves a `task_id`, Hub MUST set task owner to WorkerID and status to `in_progress`; completion events MUST update task status.
+
+**Priority:** P0  
+**L4:** execution_flow, task_tools  
+**L5:** L5-4-10-07
+
+---
+
+### Requirement: Worktree Sandbox Directory
+
+When `context_engine.worktree.enabled=true`, delegate or implement workers MAY bind `WorkDir` to an isolated worktree under `worktree.base_dir`. Writes in worktree MUST NOT mutate the session's primary WorkDir.
+
+**Priority:** P0  
+**L4:** worktree  
+**L5:** L5-4-12-01
+
+#### Scenario: Enter worktree isolates writes
+
+- GIVEN worktree enabled and slug provided
+- WHEN Worker runs write tools
+- THEN files are created under worktree path only
+- AND primary session WorkDir is unchanged after Worker completes
 
 ---
 

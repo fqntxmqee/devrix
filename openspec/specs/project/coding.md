@@ -29,21 +29,42 @@
 
 ```
 internal/
-├── bootstrap/     # 依赖注入、启动组装
+├── bootstrap/     # 依赖注入、启动组装（execution_flow, delegate wiring）
 ├── bridges/       # 层间桥接器
+├── cli/           # CLI 子命令与事件渲染
 ├── layers/
 │   ├── communication/   # D1
 │   ├── contextengine/   # D2
+│   │   ├── query/           # D2-S10 QueryLoop 主循环、SubQuery、Fork
+│   │   ├── usercontext/     # D2-S10 UserContext prepend
+│   │   ├── attachments/     # D2-S10 Plan mode attachments
+│   │   ├── permission/      # D2-S10 PermissionMode
+│   │   ├── tasks/           # D2-S10 TaskManager 磁盘 store
+│   │   ├── transcript/      # D2-S10 Sidechain JSONL
+│   │   ├── queue/             # D2-S11 SessionQueue、delegate-progress
+│   │   ├── worktree/          # D2-S12 Worktree enter/exit
+│   │   ├── harness/           # D2-S9 Harness Bootstrap
+│   │   ├── compression/       # D2-S2
+│   │   ├── memory/            # D2-S3
+│   │   └── pev/               # D2-S1（委托 QueryLoop 当 enabled）
+│   ├── orchestration/   # ORCH v2 读模型（非顶层 D）
+│   │   ├── flow/            # ORCH-S2 ExecutionFlowHub
+│   │   ├── workplan/        # ORCH-S1 WorkPlan 快照
+│   │   └── imsink/          # FlowEvent → D1 worker_progress
 │   ├── llmgateway/      # D3
 │   ├── multiagent/      # D4
+│   │   ├── delegate/        # D4-S10 DelegateService、FlowBridge
+│   │   └── agent/           # WorkerEngine、ProcessOverlay
 │   └── observability/   # D5
 └── shared/
-    ├── types/      # 共享类型定义
-    ├── config/     # 配置结构与加载
-    ├── errors/     # 分层错误定义
-    ├── contracts/  # 跨层接口契约
-    └── textutil/   # 文本工具
+    ├── types/
+    ├── config/       # QueryLoop、ExecutionFlow、Worktree、Delegate 配置
+    ├── errors/
+    ├── contracts/    # ExecutionFlowHub、FlowEvent、WorkPlanSnapshot
+    └── textutil/
 ```
+
+完整 D-S 映射与模块依赖见 `openspec/specs/architecture/layering.md` 与 `openspec/specs/architecture/code-atlas.md`。
 
 ### 2.2 包命名规则
 

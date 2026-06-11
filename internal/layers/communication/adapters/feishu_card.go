@@ -7,12 +7,37 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/core"
 )
 
+// BuildStreamingReplyCardJSON builds a JSON 2.0 reply card for cardkit streaming.
+func BuildStreamingReplyCardJSON(content string, streaming bool) string {
+	result := map[string]any{
+		"schema": "2.0",
+		"config": map[string]any{
+			"streaming_mode":   streaming,
+			"update_multi":     true,
+			"width_mode":       "fill",
+			"wide_screen_mode": true,
+		},
+		"body": map[string]any{
+			"elements": []map[string]any{
+				{
+					"tag":        "markdown",
+					"element_id": replyTextElementID,
+					"content":    content,
+				},
+			},
+		},
+	}
+	b, _ := json.Marshal(result)
+	return string(b)
+}
+
 // BuildCardJSON builds a Feishu interactive card JSON string from core.Card
 func BuildCardJSON(card *core.Card) string {
 	result := map[string]interface{}{
 		"schema": "2.0",
 		"config": map[string]interface{}{
 			"wide_screen_mode": true,
+			"width_mode":       "fill",
 		},
 	}
 
@@ -226,44 +251,36 @@ func plainText(content string) map[string]interface{} {
 	}
 }
 
-// PreprocessMarkdown converts markdown to Feishu markdown
-func PreprocessMarkdown(content string) string {
-	// Convert common markdown to Feishu markdown
-	// Headers: ### -> **  (but replace only first occurrence per line)
+// flattenMarkdownTablesForFeishu converts pipe-table rows to plain text so Feishu
+// markdown cards do not hit the per-card table element limit during streaming.
+func flattenMarkdownTablesForFeishu(content string) string {
 	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "### ") {
-			lines[i] = "**" + line[4:]
-		} else if strings.HasPrefix(line, "## ") {
-			lines[i] = "**" + line[3:]
-		} else if strings.HasPrefix(line, "# ") {
-			lines[i] = "**" + line[2:]
-		} else if strings.Contains(line, "**") {
-			// Bold - replace inline **text** with <strong>text</strong>
-			// Only for lines that are not headers
-			lines[i] = replaceInlineBold(line)
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "|") {
+			cells := strings.Split(trimmed, "|")
+			parts := make([]string, 0, len(cells))
+			for _, cell := range cells {
+				cell = strings.TrimSpace(cell)
+				if cell == "" || strings.Contains(cell, "---") {
+					continue
+				}
+				parts = append(parts, cell)
+			}
+			if len(parts) > 0 {
+				out = append(out, strings.Join(parts, " · "))
+				continue
+			}
 		}
+		out = append(out, line)
 	}
-	content = strings.Join(lines, "\n")
-
-	// Code blocks - keep as-is for markdown element
-	return content
+	return strings.Join(out, "\n")
 }
 
-// replaceInlineBold replaces **text** with <strong>text</strong> on a single line
-// It skips the header prefix ** that was already added
-func replaceInlineBold(line string) string {
-	// Find ** that is NOT at the start of the line (header marker)
-	idx := strings.Index(line[1:], "**")
-	if idx < 0 {
-		return line
-	}
-	// idx is relative to line[1:], so actual position is idx+1
-	actualIdx := idx + 1
-	end := strings.Index(line[actualIdx+2:], "**")
-	if end < 0 {
-		return line
-	}
-	actualEnd := actualIdx + 2 + end
-	return line[:actualIdx] + "<strong>" + line[actualIdx+2:actualEnd] + "</strong>" + line[actualEnd+2:]
+// PreprocessMarkdown prepares markdown for Feishu JSON 2.0 rich-text components.
+// Schema 2.0 supports standard Markdown (headings, tables, code blocks, bold, lists),
+// so we pass content through unchanged instead of converting to legacy lark_md syntax.
+func PreprocessMarkdown(content string) string {
+	return content
 }

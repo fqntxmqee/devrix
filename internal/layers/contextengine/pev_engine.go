@@ -45,6 +45,8 @@ type PEVEngine struct {
 
 	toolLatencyMu sync.Mutex
 	toolLatency   map[string]metrics.Histogram
+
+	queryLoop QueryLoopSupport
 }
 
 // NewPEVEngine creates a PEV engine.
@@ -216,6 +218,9 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	emit func(*gateway.EngineEvent),
 	emitComplete bool,
 ) (*PEVRunResult, error) {
+	if e.queryLoopEnabled() {
+		return e.runViaQueryLoop(ctx, sc, view, systemPrompt, emit, emitComplete)
+	}
 	start := time.Now()
 	maxIter := e.cfg.MaxIterations
 	if maxIter <= 0 {
@@ -436,7 +441,11 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			}
 
 			toolStart := time.Now()
-			result, err := e.tools.Execute(WithToolSessionID(WithToolWorkDir(ctx, sc.WorkDir), sc.SessionID), tc)
+			toolExecCtx := withToolStreamEmitter(
+				ToolContextWithGate(ctx, sc, e.permission),
+				emit, sc.SessionID, tc.Name,
+			)
+			result, err := e.tools.Execute(toolExecCtx, tc)
 			toolDuration := time.Since(toolStart)
 			toolStatus := "ok"
 			if err != nil {
@@ -513,7 +522,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		// Follow-up PEV iterations: avoid re-sending raw tool_calls/tool messages to
 		// providers (MiniMax returns 400 on mismatched tool_call_id).
 		if len(toolResults) > 0 {
-			req.Messages = buildSynthesisMessages(view, assistantText, toolResults)
+			req.Messages = buildSynthesisMessages(view, assistantText, toolResults, e.isYOLO())
 		}
 		if iter == maxIter-1 {
 			emit(pevErrorEvent(sc.SessionID, errors.NewPEVMaxIterationsError(), true))
@@ -524,7 +533,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	}
 
 	if len(toolResults) > 0 {
-		synthText, synthUsage := e.runToolSynthesis(ctx, sc, view, systemPrompt, assistantText, toolResults, emit)
+		synthText, _, synthUsage := e.runToolSynthesis(ctx, sc, view, systemPrompt, assistantText, toolResults, emit)
 		usage.PromptTokens += synthUsage.PromptTokens
 		usage.CompletionTokens += synthUsage.CompletionTokens
 		assistantText = synthText
@@ -564,8 +573,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	return &PEVRunResult{Usage: usage, Messages: msgs, ToolCallHistory: allToolCallRecords}, nil
 }
 
-// runToolSynthesis calls the LLM without tools to summarize successful tool output.
+// runToolSynthesis calls the LLM to summarize successful tool output.
 // On LLM failure it emits tool_fallback text from raw tool output.
+// In YOLO mode tools are kept in the request so the LLM may continue calling them.
+// When toolCalls are returned the caller should execute them in YOLO mode.
 func (e *PEVEngine) runToolSynthesis(
 	ctx context.Context,
 	sc *types.SessionContext,
@@ -574,12 +585,19 @@ func (e *PEVEngine) runToolSynthesis(
 	preamble string,
 	toolResults []ToolResult,
 	emit func(*gateway.EngineEvent),
-) (string, TokenUsage) {
+) (string, []ToolCall, TokenUsage) {
+	yolo := e.isYOLO()
+	var tools []ToolSchema
+	if yolo {
+		tools = resolveVisibleTools(ctx, e.toolsReg, sc)
+		tools = FilterToolsByPermissionMode(sc.PermissionMode, tools, sc.PlanFilePath)
+		tools = FilterToolsForAgentRole(sc, tools)
+	}
 	synthReq := &LLMRequest{
 		Model:        sc.Model,
 		SystemPrompt: systemPrompt,
-		Messages:     buildSynthesisMessages(view, preamble, toolResults),
-		Tools:        nil,
+		Messages:     buildSynthesisMessages(view, preamble, toolResults, yolo),
+		Tools:        tools, // kept in YOLO mode so LLM may continue tool calls
 	}
 
 	llmStart := time.Now()
@@ -609,10 +627,11 @@ func (e *PEVEngine) runToolSynthesis(
 			Type: "text", Content: fallback, SessionID: sc.SessionID,
 			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 		})
-		return fallback, TokenUsage{}
+					return fallback, nil, TokenUsage{}
 	}
 
 	var synthText string
+	var toolCalls []ToolCall
 	var usage TokenUsage
 	var tagSplitter textutil.ThinkTagSplitter
 	for chunk := range chunks {
@@ -626,7 +645,7 @@ func (e *PEVEngine) runToolSynthesis(
 				Type: "text", Content: fallback, SessionID: sc.SessionID,
 				Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 			})
-			return fallback, usage
+			return fallback, nil, usage
 		default:
 		}
 		if chunk.Content != "" {
@@ -638,6 +657,9 @@ func (e *PEVEngine) runToolSynthesis(
 					Metadata: map[string]string{"is_complete": "false"},
 				})
 			}
+		}
+		if len(chunk.ToolCalls) > 0 {
+			toolCalls = chunk.ToolCalls
 		}
 		if chunk.Done {
 			usage = chunk.Usage
@@ -673,9 +695,9 @@ func (e *PEVEngine) runToolSynthesis(
 			Type: "text", Content: fallback, SessionID: sc.SessionID,
 			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 		})
-		return fallback, usage
+		return fallback, nil, usage
 	}
-	return synthText, usage
+	return synthText, toolCalls, usage
 }
 
 func (e *PEVEngine) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
@@ -753,6 +775,47 @@ func (e *PEVEngine) toolLatencyHistogram(toolName string, risk types.RiskLevel, 
 	}
 	e.toolLatency[key] = lm.Latency
 	return lm.Latency
+}
+
+// yoloChecker is an optional interface that IPermissionGate can implement
+// to report whether YOLO auto-approval mode is active.
+type yoloChecker interface {
+	IsYOLOMode() bool
+}
+
+// isYOLO reports whether the permission gate has YOLO mode enabled.
+func (e *PEVEngine) isYOLO() bool {
+	yc, ok := e.permission.(yoloChecker)
+	return ok && yc.IsYOLOMode()
+}
+
+func withToolStreamEmitter(
+	ctx context.Context,
+	emit func(*gateway.EngineEvent),
+	sessionID, toolName string,
+) context.Context {
+	if emit == nil {
+		return ctx
+	}
+	return WithToolStreamEmitter(ctx, func(ev ToolStreamEvent) {
+		switch ev.Type {
+		case "thinking":
+			emit(&gateway.EngineEvent{
+				Type: "thinking", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		case "text":
+			emit(&gateway.EngineEvent{
+				Type: "text", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"is_complete": "false", "source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		case "tool_use":
+			emit(&gateway.EngineEvent{
+				Type: "info", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		}
+	})
 }
 
 func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *gateway.EngineEvent {

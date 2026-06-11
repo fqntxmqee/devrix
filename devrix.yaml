@@ -232,6 +232,38 @@ context_engine:
       enabled: true
       mode: auto-repair
 
+  # V6 QueryLoop（Claude Code queryLoop 对齐）
+  query_loop:
+    enabled: true
+    max_turns: 0
+    compress_per_turn: true
+    streaming_tools: true
+  execution_flow:
+    enabled: true
+    link_tasks: true
+    im_progress: true
+  worktree:
+    enabled: true
+    base_dir: "~/.devrix/worktrees"
+  user_context:
+    mode: prepend
+  attachments:
+    enabled: true
+    plan_mode_full_every: 5
+  permission:
+    default_mode: default
+    plan:
+      explore_agent_count: 3
+      plan_agent_count: 1
+      plan_file_dir: "~/.devrix/plans"
+  tasks:
+    mode: v2
+    store_dir: "~/.devrix/tasks"
+  subquery:
+    fork_subagent_enabled: false
+    sidechain_transcript: true
+    default_subagent_max_turns: 50
+
   workspace:
     max_context_tokens: 8000
     agent_name: Devrix
@@ -322,6 +354,16 @@ observability:
 #   - HTTP: localhost:4318
 #
 
+# Multi-Agent Layer（Hub-Spoke Delegate v2）
+multi_agent:
+  enabled: true
+  default_timeout: "15m"
+  max_children: 3
+  max_total_agents: 5
+  delegate:
+    enabled: true
+    allow_async: true
+
 # Agent Tool 配置
 # 注册外部 CLI Agent 工具，由 LLM 按需调用。
 agent_tools:
@@ -337,8 +379,8 @@ agent_tools:
       command: "claude"
       args: ["--print", "--verbose", "--output-format", "stream-json", "--input-format", "stream-json", "--replay-user-messages"]
       work_dir: "."
-      timeout: "5m"
-      idle_timeout: "5m"
+      timeout: "15m"
+      idle_timeout: "10m"
 
     - name: cursor
       display_name: "Cursor Agent"
@@ -352,4 +394,20 @@ agent_tools:
       model: "auto"
       mode: "force"
       work_dir: "."
-      timeout: "5m"
+      timeout: "15m"
+
+# 运行时编排验证配置 (Orchestration Validator)
+# 跨模型判官对 Agent 路由决策进行运行时验证，支持自动干预。
+# 默认关闭（opt-in），开启后由独立 provider（如 minimax）验证主 LLM 的决策。
+orchestration:
+  enabled: true
+  judge_provider: "minimax"
+  judge_model: "MiniMax-M2.7-highspeed"
+  fallback_judge_provider: "deepseek"
+  fallback_judge_model: "deepseek-v4-flash"
+  pre_filter_enabled: true
+  min_interval_between_judges: "2s"
+  max_judge_calls_per_minute: 10
+  trusted_tool_allowlist: []
+  intervention_threshold: 0.3
+  auto_intervene: false

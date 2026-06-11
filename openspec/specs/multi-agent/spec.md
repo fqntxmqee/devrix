@@ -4,7 +4,7 @@
 **Change ID:** devrix-multi-agent (archived 2026-06-08)
 **Demand:** DM-20260608-005
 **Layer:** 4
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Canonical — source of truth
 **Parent Design:** `docs/multi-agent-design.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
@@ -282,3 +282,89 @@ TERMINATED    → ITERATING              REJECT (AGT_LIFECYCLE_5003)
 10. parentAgent.Join(child2) → merge messages
 11. parentAgent.Terminate() → TERMINATED
 ```
+
+---
+
+## ADDED Requirements (V2 Delegate — D4-S10)
+
+**Change:** devrix-queryloop-context (DM-20260610-012)  
+**Design:** `openspec/archive/2026-06-10-devrix-queryloop-context/design-d4-v2.md`
+
+### Requirement: Delegate Service Hub-Spoke
+
+When `multi_agent.delegate.enabled=true`, Leader MUST invoke `delegate_explore`, `delegate_plan`, `delegate_implement`, and `delegate_status` tools. Worker agents MUST be forked in-process with isolated sidechain context and MUST report lifecycle via `DelegateFlowBridge` → `ExecutionFlowHub`.
+
+When `multi_agent.delegate.enabled=false`, delegate tools MUST fall back to D2 SubQuery while preserving FlowEvent visibility.
+
+**Priority:** P0  
+**L4:** delegate  
+**L5:** L5-4-10-01, L5-4-10-08
+
+#### Scenario: Delegate explore creates worker
+
+- GIVEN delegate enabled and under MaxWorkers limit
+- WHEN Leader calls delegate_explore
+- THEN a Worker agent is forked with WorkerSpec role explore
+- AND FlowStarted is published to ExecutionFlowHub
+
+#### Scenario: Delegate disabled uses SubQuery fallback
+
+- GIVEN `multi_agent.delegate.enabled=false`
+- WHEN Leader calls delegate_explore
+- THEN SubQuery fallback runs
+- AND summary is returned without forking D4 Worker
+
+---
+
+### Requirement: Worker Isolation Constraints
+
+Delegated Worker agents MUST set `SessionContext.AgentID` for sidechain isolation. Workers MUST NOT register `delegate_*` tools or call Fork.
+
+**Priority:** P0  
+**L4:** delegate, worker_engine  
+**L5:** L5-4-10-02, L5-4-10-03
+
+#### Scenario: Worker cannot re-delegate
+
+- GIVEN an active Worker agent
+- WHEN tool registry is built for Worker Process
+- THEN delegate_* tools are excluded
+- AND Fork returns permission error
+
+---
+
+### Requirement: Async Delegate Completion
+
+When `multi_agent.delegate.allow_async=true`, delegate MAY return before Worker completes. On completion, Service MUST publish FlowJoined and enqueue Leader `ModeTaskNotification` for QueryLoop drain.
+
+**Priority:** P1  
+**L4:** delegate
+
+#### Scenario: Async notify Leader main thread
+
+- GIVEN async delegate in flight
+- WHEN Worker completes
+- THEN Leader session queue receives task-notification with empty AgentID
+- AND WorkPlan reflects completed flow status
+
+---
+
+## Configuration (Delegate)
+
+```yaml
+multi_agent:
+  enabled: true
+  delegate:
+    enabled: true
+    allow_async: true
+    max_workers: 4
+```
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-08 | Initial Multi-Agent V1 (DM-20260608-005) |
+| 1.1.0 | 2026-06-10 | D4-S10 Hub-Spoke Delegate (DM-20260610-012) |

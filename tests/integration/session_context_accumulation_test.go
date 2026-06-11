@@ -148,7 +148,10 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 
 	// --- Print registered tool schemas ---
 	{
-		toolReg := contextengine.NewBuiltinToolRegistry(nil)
+		toolReg, err := contextengine.NewBuiltinToolRegistry(nil)
+		if err != nil {
+			t.Fatalf("NewBuiltinToolRegistry: %v", err)
+		}
 		toolSchemas, err := toolReg.ListTools(context.Background(), "/tmp")
 		if err != nil {
 			t.Fatalf("list tools: %v", err)

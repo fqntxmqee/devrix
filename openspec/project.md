@@ -45,7 +45,7 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | **D3** | LLM Gateway Domain (LLM) | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain (AGENT) | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain (OBS) | Tracing, metrics, logging |
-| **D6** | Evolution Domain (EVO) | Version management, A/B testing |
+| **D6** | Evolution Domain (EVO) | Eval engine, quality probes, runtime orchestration validation |
 
 ---
 
@@ -113,10 +113,12 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 
 ### D6 Evolution Domain Scenarios
 
-| Module ID | Module | Responsibility |
-|-------|--------|----------------|
-| D6-S1 | Version | 版本检测与记录 |
-| D6-S2 | Config | 配置热更新 |
+| Module ID | Module | Responsibility | Status |
+|-------|--------|----------------|--------|
+| D6-S1 | Version | 版本检测与记录 | PLANNED (v2.1.0) |
+| D6-S2 | Config | 配置热更新 | PLANNED (v2.2.0) |
+| D6-S3 | Eval | 评测引擎：EvalRun、Judge、探针、Delta、Tune、`devrix eval run` | IMPLEMENTED |
+| D6-S4 | Orchestration | 运行时决策校验：跨模型判官、干预、Observer | IMPLEMENTED |
 
 ---
 
@@ -178,15 +180,21 @@ devrix/
 │   │   │   ├── retry/         # D3-S4
 │   │   │   ├── token/         # D3-S5
 │   │   │   └── config/        # D3-S6
-│   │   ├── observability/     # D5
-│   │   │   ├── tracer/        # D5-S1
-│   │   │   ├── metrics/       # D5-S2
-│   │   │   ├── logger/        # D5-S3
-│   │   │   ├── exporter/      # D5-S4
-│   │   │   ├── coverage/      # D5-S5
-│   │   │   ├── telemetry/     # D5-S6
-│   │   │   └── settings/      # D5-S7
-│   │   └── multiagent/        # D4 (待实现)
+│   │   ├── multiagent/        # D4
+│   │   │   ├── factory/       # D4-S1
+│   │   │   ├── agent/         # D4-S2
+│   │   │   └── delegate/      # D4-S10
+│   │   ├── evolution/         # D6
+│   │   │   ├── eval/          # D6-S3
+│   │   │   └── orchestration/ # D6-S4
+│   │   └── observability/     # D5
+│   │       ├── tracer/        # D5-S1
+│   │       ├── metrics/       # D5-S2
+│   │       ├── logger/        # D5-S3
+│   │       ├── exporter/      # D5-S4
+│   │       ├── coverage/      # D5-S5
+│   │       ├── telemetry/     # D5-S6
+│   │       └── settings/      # D5-S7
 │   └── shared/
 │       ├── types/
 │       ├── config/

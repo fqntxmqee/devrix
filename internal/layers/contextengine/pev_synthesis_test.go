@@ -10,7 +10,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -80,7 +79,7 @@ func newSynthesisTestEngine(t *testing.T, llm contextengine.ILLMGateway, tools c
 	return contextengine.NewPEVEngine(
 		llm,
 		tools,
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,

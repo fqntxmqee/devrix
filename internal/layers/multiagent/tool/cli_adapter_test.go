@@ -2,6 +2,7 @@ package tool
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -351,4 +352,78 @@ func TestCLIAgentTool_Execute_should_propagate_trace_env(t *testing.T) {
 		}
 	}
 	tool.Stop()
+}
+
+func TestCLIAgentTool_Execute_should_reuse_session_after_context_cancel(t *testing.T) {
+	// Simulates call_claude-code: first turn completes, parent ctx is cancelled,
+	// second turn must still write to stdin successfully.
+	script := `while read line; do echo '{"type":"text","content":"ok"}'; echo '{"type":"complete","content":""}'; done`
+	tool := NewCLIAgentTool(CLIConfig{
+		Name:    "reuse-after-cancel",
+		Command: "bash",
+		Args:    []string{"-c", script},
+		Timeout: 10 * time.Second,
+	})
+	defer tool.Stop()
+
+	sessionID := "sess_reuse_cancel"
+	runOnce := func(task string) error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ch, err := tool.Execute(ctx, sessionID, Request{Task: task})
+		if err != nil {
+			return err
+		}
+		for evt := range ch {
+			if evt.Type == "error" {
+				return fmt.Errorf("event error: %s", evt.Content)
+			}
+			if evt.Type == "complete" {
+				break
+			}
+		}
+		cancel()
+		return nil
+	}
+
+	if err := runOnce("first"); err != nil {
+		t.Fatalf("first Execute: %v", err)
+	}
+	if err := runOnce("second"); err != nil {
+		t.Fatalf("second Execute: %v", err)
+	}
+}
+
+func TestCLIAgentTool_Execute_should_recreate_after_oneshot_exit(t *testing.T) {
+	// Simulates claude --print: subprocess exits after each complete event.
+	script := `read line; echo '{"type":"text","content":"turn"}'; echo '{"type":"complete","content":""}'`
+	tool := NewCLIAgentTool(CLIConfig{
+		Name:    "oneshot",
+		Command: "bash",
+		Args:    []string{"-c", script},
+		Timeout: 10 * time.Second,
+		OneShot: true,
+	})
+	defer tool.Stop()
+
+	sessionID := "sess_oneshot"
+	for i := 0; i < 2; i++ {
+		ch, err := tool.Execute(context.Background(), sessionID, Request{Task: fmt.Sprintf("turn-%d", i)})
+		if err != nil {
+			t.Fatalf("Execute #%d: %v", i+1, err)
+		}
+		gotText := false
+		for evt := range ch {
+			if evt.Type == "text" && evt.Content == "turn" {
+				gotText = true
+			}
+			if evt.Type == "error" {
+				t.Fatalf("turn %d error: %s", i+1, evt.Content)
+			}
+		}
+		if !gotText {
+			t.Fatalf("turn %d: missing text event", i+1)
+		}
+	}
 }

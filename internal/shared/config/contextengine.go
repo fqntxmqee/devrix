@@ -11,11 +11,20 @@ type ContextEngineConfig struct {
 	PEV                PEVConfig          `yaml:"pev"`
 	Snapshot           SnapshotConfig     `yaml:"snapshot"`
 	SystemPrompt       SystemPromptConfig `yaml:"system_prompt"`
+	Prompt            *PromptConfig       `yaml:"prompt"`
 	Plan               PlanConfig         `yaml:"plan"`
 	LongTerm           LongTermConfig     `yaml:"longterm"`
 	Harness            HarnessConfig      `yaml:"harness"`
 	Preflight          PreflightConfig    `yaml:"preflight"`
 	Workspace          WorkspacePromptConfig `yaml:"workspace"`
+	QueryLoop          QueryLoopConfig    `yaml:"query_loop"`
+	UserContext        UserContextConfig  `yaml:"user_context"`
+	Attachments        AttachmentsConfig  `yaml:"attachments"`
+	Permission         ContextPermissionConfig `yaml:"permission"`
+	Tasks              TasksConfig        `yaml:"tasks"`
+	SubQuery           SubQueryConfig     `yaml:"subquery"`
+	ExecutionFlow      ExecutionFlowConfig `yaml:"execution_flow"`
+	Worktree           WorktreeConfig     `yaml:"worktree"`
 }
 
 // PEVConfig holds PEV loop settings.
@@ -66,11 +75,20 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 			Sources:  []string{"AGENTS.md", ".devrix/AGENTS.md"},
 			Fallback: "You are Devrix, a multi-agent development assistant.",
 		},
-		Plan:      DefaultPlanConfig(),
-		LongTerm:  DefaultLongTermConfig(),
-		Harness:   DefaultHarnessConfig(),
-		Preflight: DefaultPreflightConfig(),
-		Workspace: DefaultWorkspacePromptConfig(),
+		Prompt:     DefaultPromptConfig(),
+		Plan:       DefaultPlanConfig(),
+		LongTerm:   DefaultLongTermConfig(),
+		Harness:    DefaultHarnessConfig(),
+		Preflight:  DefaultPreflightConfig(),
+		Workspace:   DefaultWorkspacePromptConfig(),
+		QueryLoop:   DefaultQueryLoopConfig(),
+		UserContext: DefaultUserContextConfig(),
+		Attachments: DefaultAttachmentsConfig(),
+		Permission:  DefaultContextPermissionConfig(),
+		Tasks:       DefaultTasksConfig(),
+		SubQuery:    DefaultSubQueryConfig(),
+		ExecutionFlow: DefaultExecutionFlowConfig(),
+		Worktree:      DefaultWorktreeConfig(),
 	}
 }
 

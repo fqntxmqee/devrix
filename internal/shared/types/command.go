@@ -9,6 +9,9 @@ const (
 	CommandNew     CommandType = "new"
 	CommandStop    CommandType = "stop"
 	CommandHelp    CommandType = "help"
+	CommandTask    CommandType = "task"
+	CommandPlan    CommandType = "plan"
+	CommandVerify  CommandType = "verify"
 	CommandUnknown CommandType = "unknown"
 )
 
@@ -53,6 +56,12 @@ func ParseCommand(input string, prefix string) *Command {
 		cmdType = CommandStop
 	case strings.EqualFold(parts[0], "help"):
 		cmdType = CommandHelp
+	case strings.EqualFold(parts[0], "task"):
+		cmdType = CommandTask
+	case strings.EqualFold(parts[0], "plan"):
+		cmdType = CommandPlan
+	case strings.EqualFold(parts[0], "verify"):
+		cmdType = CommandVerify
 	default:
 		cmdType = CommandUnknown
 	}

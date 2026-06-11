@@ -69,6 +69,8 @@ type AgentConfig struct {
 	SystemPrompt      string
 	ParentID          string
 	InitialInput      string
+	WorkerRole        string // explore|plan|implement (worker agents)
+	TaskID            string
 }
 
 // AgentResult is produced when an agent terminates.
@@ -95,6 +97,32 @@ type AgentDeps struct {
 type AgentObserver interface {
 	EmitAgentEvent(event AgentEvent)
 }
+
+// AgentObserverChain composes multiple observers into one.
+type AgentObserverChain struct {
+	observers []AgentObserver
+}
+
+// NewAgentObserverChain creates a chain from the given observers.
+func NewAgentObserverChain(observers ...AgentObserver) *AgentObserverChain {
+	return &AgentObserverChain{observers: observers}
+}
+
+// Add appends an observer to the chain.
+func (c *AgentObserverChain) Add(obs AgentObserver) {
+	c.observers = append(c.observers, obs)
+}
+
+// EmitAgentEvent dispatches the event to all observers in order.
+func (c *AgentObserverChain) EmitAgentEvent(event AgentEvent) {
+	for _, obs := range c.observers {
+		if obs != nil {
+			obs.EmitAgentEvent(event)
+		}
+	}
+}
+
+var _ AgentObserver = (*AgentObserverChain)(nil)
 
 // AgentEvent is emitted to observers.
 type AgentEvent struct {

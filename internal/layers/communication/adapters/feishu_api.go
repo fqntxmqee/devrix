@@ -13,6 +13,10 @@ import (
 type FeishuAPI interface {
 	// Get performs a GET request to the Feishu API
 	Get(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	// Post performs a POST request to the Feishu API (cardkit, etc.)
+	Post(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
+	// Put performs a PUT request to the Feishu API (cardkit streaming, etc.)
+	Put(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error)
 	// Im returns the IM API interface
 	Im() ImAPI
 }
@@ -56,6 +60,14 @@ func NewLarkFeishuAPI(client *lark.Client) FeishuAPI {
 
 func (f *larkFeishuAPI) Get(ctx context.Context, path string, params interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
 	return f.client.Get(ctx, path, params, tokenType)
+}
+
+func (f *larkFeishuAPI) Post(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	return f.client.Post(ctx, path, body, tokenType)
+}
+
+func (f *larkFeishuAPI) Put(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+	return f.client.Put(ctx, path, body, tokenType)
 }
 
 func (f *larkFeishuAPI) Im() ImAPI {

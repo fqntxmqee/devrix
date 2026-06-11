@@ -73,6 +73,11 @@ type IPermissionGate interface {
 	Request(ctx context.Context, sessionID, toolName, input string, risk types.RiskLevel) bool
 }
 
+// FileAutoApprover is implemented by gates that skip plan-mode write restrictions in WorkDir.
+type FileAutoApprover interface {
+	AutoApproveFiles() bool
+}
+
 // AutocompactMeta describes autocompact observability metadata.
 type AutocompactMeta struct {
 	Degraded      bool

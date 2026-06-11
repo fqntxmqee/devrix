@@ -12,18 +12,19 @@ import (
 const (
 	maxPlanMilestones   = 10
 	maxPlanTimeout      = 15 * time.Second
-	maxLongTermTopics     = 20
-	defaultPlanModel      = "deepseek-v4"
+	maxLongTermTopics   = 20
+	defaultPlanModel    = "deepseek-v4"
 	defaultLongTermDBPath = "~/.devrix/memory.db"
 )
 
 var milestoneIDPattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 // PlanConfig holds PEV Plan phase settings (V3).
+// Aligned with Claude Code's Plan Mode behavior.
 type PlanConfig struct {
 	Enabled          bool          `yaml:"enabled"`
-	AutoDetect       bool          `yaml:"auto_detect"`
-	MinCharsForPlan  int           `yaml:"min_chars_for_plan"`
+	AutoDetect       bool          `yaml:"auto_detect"`        // 自动检测复杂任务
+	MinCharsForPlan  int           `yaml:"min_chars_for_plan"` // 触发规划的最短消息长度
 	Model            string        `yaml:"model"`
 	MaxMilestones    int           `yaml:"max_milestones"`
 	Timeout          time.Duration `yaml:"timeout"`
@@ -32,25 +33,33 @@ type PlanConfig struct {
 
 // LongTermConfig holds cross-session memory settings (V3).
 type LongTermConfig struct {
-	Enabled           bool     `yaml:"enabled"`
-	DBPath            string   `yaml:"db_path"`
-	AutoStore         bool     `yaml:"auto_store"`
-	Topics            []string `yaml:"topics"`
-	RecallMaxEntries  int      `yaml:"recall_max_entries"`
-	RecallMaxTokens   int      `yaml:"recall_max_tokens"`
+	Enabled          bool     `yaml:"enabled"`
+	DBPath          string   `yaml:"db_path"`
+	AutoStore       bool     `yaml:"auto_store"`
+	Topics          []string `yaml:"topics"`
+	RecallMaxEntries int     `yaml:"recall_max_entries"`
+	RecallMaxTokens  int     `yaml:"recall_max_tokens"`
 }
 
-// DefaultPlanConfig returns V3 plan defaults (disabled for safe rollout).
+// DefaultPlanConfig returns V3 plan defaults.
+// Note: plan.enabled defaults to false for safe rollout.
 func DefaultPlanConfig() PlanConfig {
 	return PlanConfig{
-		Enabled:         false,
-		AutoDetect:      true,
+		Enabled:         false, // 显式启用，Claude Code 风格
+		AutoDetect:      false, // 默认关闭，需要显式 /plan 命令
 		MinCharsForPlan: 200,
 		Model:           defaultPlanModel,
 		MaxMilestones:   maxPlanMilestones,
 		Timeout:         maxPlanTimeout,
 		OnMilestoneFail: "fail_fast",
 	}
+}
+
+// EnabledPlanConfig returns plan config with plan mode enabled.
+func EnabledPlanConfig() PlanConfig {
+	cfg := DefaultPlanConfig()
+	cfg.Enabled = true
+	return cfg
 }
 
 // DefaultLongTermConfig returns V3 long-term memory defaults.

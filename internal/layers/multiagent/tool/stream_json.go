@@ -62,6 +62,7 @@ func parseClaudeAssistantLine(line string) StreamParseResult {
 				Type     string `json:"type"`
 				Text     string `json:"text"`
 				Thinking string `json:"thinking"`
+				Name     string `json:"name"`
 			} `json:"content"`
 		} `json:"message"`
 	}
@@ -76,9 +77,16 @@ func parseClaudeAssistantLine(line string) StreamParseResult {
 				events = append(events, Event{Type: "text", Content: text})
 			}
 		case "thinking":
-			// Claude Code may emit thinking blocks; surface as text for agent tool output.
 			if text := strings.TrimSpace(block.Thinking); text != "" {
-				events = append(events, Event{Type: "text", Content: text})
+				events = append(events, Event{Type: "thinking", Content: text})
+			}
+		case "tool_use":
+			label := strings.TrimSpace(block.Name)
+			if label == "" {
+				label = strings.TrimSpace(block.Text)
+			}
+			if label != "" {
+				events = append(events, Event{Type: "tool_use", Content: "🔧 " + label})
 			}
 		}
 	}

@@ -1,7 +1,8 @@
 package types
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
+	"fmt"
 	"math/big"
 )
 
@@ -12,17 +13,17 @@ const ShortIdCharset = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 const ShortIdLength = 5
 
 // GenerateShortId 生成一个 5 位的短 ID
-func GenerateShortId() string {
+func GenerateShortId() (string, error) {
 	b := make([]byte, ShortIdLength)
 	charsetLen := big.NewInt(int64(len(ShortIdCharset)))
 	for i := range b {
-		n, err := rand.Int(rand.Reader, charsetLen)
+		n, err := crand.Int(crand.Reader, charsetLen)
 		if err != nil {
-			panic("shortid: crypto/rand failed: " + err.Error())
+			return "", fmt.Errorf("shortid: crypto/rand failed: %w", err)
 		}
 		b[i] = ShortIdCharset[n.Int64()]
 	}
-	return string(b)
+	return string(b), nil
 }
 
 // ValidateShortId 验证 ShortId 格式是否正确
