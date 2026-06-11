@@ -65,5 +65,6 @@ func NewContextEngine(
 		LongTerm:     longTerm,
 		Config:       ctxCfg,
 		ObsBridge:    obsBridge,
+		DefaultModel: stack.DefaultModel,
 	})
 }

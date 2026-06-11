@@ -292,7 +292,7 @@ func TestFeishuAdapter_StructuredProgress_SimpleReplyNoEmptyTaskCard(t *testing.
 	})
 	adapter.OnMessage(&types.OutboundMessage{
 		SessionID: "sess_1", ChatID: "feishu_oc_123456_ou_654321",
-		Content: "用时: 2.5s, 消耗: 1000 tokens", Metadata: map[string]string{"event_type": "complete"},
+		Content: "用时: 8s, 消耗: 1500 tokens, 模型: claude-sonnet-4-6", Metadata: map[string]string{"event_type": "complete"},
 	})
 
 	if replyCount != 1 {

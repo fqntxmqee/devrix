@@ -111,3 +111,44 @@ func TestBuildOpenAIChatRequest_should_fill_empty_tool_call_ids(t *testing.T) {
 		t.Fatal("expected synthetic tool call id")
 	}
 }
+
+func TestBuildOpenAIChatRequest_should_set_stream_options_when_streaming(t *testing.T) {
+	req, err := buildOpenAIChatRequest(&llmgateway.Request{
+		Model:  "MiniMax-M2.7-highspeed",
+		Stream: true,
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if req.StreamOptions == nil || !req.StreamOptions.IncludeUsage {
+		t.Fatalf("stream_options.include_usage should be true for streaming requests, got %+v", req.StreamOptions)
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	opts, ok := decoded["stream_options"].(map[string]any)
+	if !ok {
+		t.Fatalf("stream_options missing in body: %s", body)
+	}
+	if v, _ := opts["include_usage"].(bool); !v {
+		t.Fatalf("include_usage should be true, got %+v", opts)
+	}
+}
+
+func TestBuildOpenAIChatRequest_should_omit_stream_options_when_not_streaming(t *testing.T) {
+	req, err := buildOpenAIChatRequest(&llmgateway.Request{
+		Model:  "MiniMax-M2.7-highspeed",
+		Stream: false,
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if req.StreamOptions != nil {
+		t.Fatalf("stream_options should be nil for non-streaming, got %+v", req.StreamOptions)
+	}
+}

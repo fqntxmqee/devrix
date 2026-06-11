@@ -46,6 +46,11 @@ type EngineDeps struct {
 	LongTerm            memory.ILongTermMemory
 	Config              *config.ContextEngineConfig
 	ObsBridge           *observability.Bridge
+	// DefaultModel 由 L3 LLM 网关解析后的全局默认模型名（来自
+	// llm_gateway.default_model）。仅用于在 SessionContext.Model 为空时
+	// 回填展示用字段（例：飞书任务完成卡片"模型: xxx"）。LLM 路由仍由
+	// 网关自身处理，与该字段无关。
+	DefaultModel string
 }
 
 // ContextEngine implements gateway.IContextEngine.
@@ -65,6 +70,7 @@ type ContextEngine struct {
 	preflight     *harness.PreflightEvaluator
 	router        *harness.PromptRouter
 	transcript    *harness.TranscriptManager
+	defaultModel  string
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -152,6 +158,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		preflight:    harness.NewPreflightEvaluator(cfg.Preflight, harness.NewToolPoolFilter(cfg.Harness.ToolPool)),
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
+		defaultModel: deps.DefaultModel,
 	}
 }
 
@@ -254,6 +261,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		workerLocal = true
 	}
 	InitSessionPermission(sc, e.cfg.Permission)
+	if sc.Model == "" && e.defaultModel != "" {
+		sc.Model = e.defaultModel
+	}
 
 	if harnessEnabled && !session.HarnessInitialized {
 		harnessState, bootErr := e.harnessBoot.Run(ctx, session)

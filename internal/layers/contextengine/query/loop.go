@@ -114,6 +114,7 @@ func (l *Loop) Run(
 
 		var pending []ToolCall
 		assistantText = ""
+		var iterUsage TokenUsage
 		for chunk := range chunks {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -130,11 +131,18 @@ func (l *Loop) Run(
 			if len(chunk.ToolCalls) > 0 {
 				pending = chunk.ToolCalls
 			}
-			if chunk.Done {
-				usage.PromptTokens += chunk.Usage.PromptTokens
-				usage.CompletionTokens += chunk.Usage.CompletionTokens
+			// Usage 可能出现在 finish_reason 帧或独立 usage 帧，亦可能由
+			// [DONE] 哨兵帧带回（参见 sse_parser 的 lastUsage 处理）。
+			// 用"最后一次非零值覆盖"语义，避免被多次累加。
+			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+				iterUsage = TokenUsage{
+					PromptTokens:     chunk.Usage.PromptTokens,
+					CompletionTokens: chunk.Usage.CompletionTokens,
+				}
 			}
 		}
+		usage.PromptTokens += iterUsage.PromptTokens
+		usage.CompletionTokens += iterUsage.CompletionTokens
 
 		if len(pending) == 0 {
 			if l.Hooks.BeforeComplete != nil {

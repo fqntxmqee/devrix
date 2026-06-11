@@ -56,6 +56,9 @@ func buildOpenAIChatRequest(req *llmgateway.Request) (*openAIChatRequest, error)
 	if !req.Stream {
 		out.Stream = false
 	}
+	if out.Stream {
+		out.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
+	}
 	return out, nil
 }
 

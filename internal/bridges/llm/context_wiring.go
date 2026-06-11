@@ -16,6 +16,11 @@ type ContextLLMStack struct {
 	Gateway      contextengine.ILLMGateway
 	RawGateway   llmgateway.IGateway
 	TokenCounter contracts.ITokenCounter
+	// DefaultModel 是 LLM 网关解析后的全局默认模型名（来自
+	// llm_gateway.default_model）。供上层（如 ContextEngine）在
+	// SessionContext.Model 为空时回填，用于"任务完成卡片显示模型"等
+	// 仅展示用途，不参与路由（路由仍由 LLM 网关执行）。
+	DefaultModel string
 }
 
 // WireContextLLM loads and wires the LLM stack; falls back to mock on error.
@@ -30,10 +35,11 @@ func WireContextLLM(configFile string, obsBridge *observability.Bridge) ContextL
 		slog.Warn("failed to wire llm gateway, using mock", "error", err)
 		return ContextLLMStack{Gateway: &mockctx.LLMGateway{}, RawGateway: nil, TokenCounter: nil}
 	}
-	slog.Info("llm gateway wired", "default_provider", llmCfg.DefaultProvider)
+	slog.Info("llm gateway wired", "default_provider", llmCfg.DefaultProvider, "default_model", llmCfg.DefaultModel)
 	return ContextLLMStack{
 		Gateway:      wired.Bridge,
 		RawGateway:   wired.Gateway,
 		TokenCounter: wired.TokenCounter,
+		DefaultModel: llmCfg.DefaultModel,
 	}
 }

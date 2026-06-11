@@ -167,7 +167,7 @@ func TestFeishuAdapter_Complete_ClosesStreamingMode(t *testing.T) {
 	})
 	adapter.OnMessage(&types.OutboundMessage{
 		SessionID: "sess_done", ChatID: "feishu_oc_123456_ou_654321",
-		Content: "用时: 1s", Metadata: map[string]string{"event_type": "complete"},
+		Content: "用时: 1s, 消耗: 0 tokens", Metadata: map[string]string{"event_type": "complete"},
 	})
 
 	if lastUpdateBody == nil {
@@ -203,5 +203,84 @@ func TestFeishuUserConfig_ResolveStreamingDefaults(t *testing.T) {
 	enabled, _, _ = (config.FeishuUserConfig{Streaming: config.FeishuStreamingUserConfig{Enabled: &disabled}}).ResolveFeishuStreamingConfig()
 	if enabled {
 		t.Fatal("expected disabled")
+	}
+}
+
+// Covers: DM-20260611-006 T14 — tool cards use Im.Message.Patch, not cardkit sequence.
+func TestFeishuAdapter_ToolCardPatch_DoesNotAffectCardkitSequence(t *testing.T) {
+	var putPaths []string
+	imOutbound := 0
+	msgID := "om_tool_seq"
+	mockAPI := &mockFeishuAPI{
+		postFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			return &larkcore.ApiResp{
+				StatusCode: http.StatusOK,
+				RawBody:    []byte(`{"code":0,"data":{"card_id":"card_tool_seq"}}`),
+			}, nil
+		},
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			putPaths = append(putPaths, path)
+			return &larkcore.ApiResp{StatusCode: http.StatusOK, RawBody: []byte(`{"code":0}`)}, nil
+		},
+		imAPI: &mockImAPI{
+			messageAPI: &mockMessageAPI{
+				replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+					imOutbound++
+					return &larkim.ReplyMessageResp{
+						Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+					}, nil
+				},
+				patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+					imOutbound++
+					return &larkim.PatchMessageResp{}, nil
+				},
+			},
+			messageReactionAPI: &mockMessageReactionAPI{},
+		},
+	}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+		Streaming: FeishuStreamingConfig{Enabled: true, IntervalMs: 0, MinDeltaChars: 1},
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_tool_seq", feishuReplyContext{userMessageID: "om_root"})
+
+	// Start reply card via cardkit.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_tool_seq", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "hello", Metadata: map[string]string{"event_type": "text"},
+	})
+
+	stream := adapter.sessionStream("sess_tool_seq")
+	stream.mu.Lock()
+	seqAfterReply := stream.cardkitSequence
+	putCountBeforeTool := len(putPaths)
+	stream.mu.Unlock()
+	if seqAfterReply == 0 {
+		t.Fatal("expected cardkit sequence after first reply chunk")
+	}
+
+	// Tool card uses Im API — must not touch cardkitSequence or add reply element PUTs.
+	imBeforeTool := imOutbound
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_tool_seq", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "read_file", Metadata: map[string]string{"event_type": "tool_call", "tool_name": "read_file"},
+	})
+
+	stream.mu.Lock()
+	seqAfterTool := stream.cardkitSequence
+	putCountAfterTool := len(putPaths)
+	stream.mu.Unlock()
+	if seqAfterTool != seqAfterReply {
+		t.Fatalf("tool handling changed cardkitSequence: before=%d after=%d", seqAfterReply, seqAfterTool)
+	}
+	if imOutbound <= imBeforeTool {
+		t.Fatal("expected Im API outbound for tool card (reply or patch)")
+	}
+	for _, p := range putPaths[putCountBeforeTool:putCountAfterTool] {
+		if strings.Contains(p, "/elements/"+replyTextElementID) {
+			t.Fatalf("tool handling issued reply cardkit PUT: %s", p)
+		}
 	}
 }

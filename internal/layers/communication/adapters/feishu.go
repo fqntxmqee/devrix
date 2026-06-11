@@ -454,6 +454,11 @@ func NewFeishuAdapter(
 	}
 	adapter.cardkit = newCardkitClient(adapter.api)
 
+	if adapter.streamingEnabled {
+		slog.Info("feishu: cardkit streaming enabled for reply cards",
+			"hint", "ensure app has cardkit:v1 scope; missing scope falls back to Im.Message.Patch (no typewriter)")
+	}
+
 	return adapter
 }
 

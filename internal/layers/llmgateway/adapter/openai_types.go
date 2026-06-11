@@ -2,12 +2,20 @@ package adapter
 
 // openAIChatRequest is the OpenAI-compatible chat completions body.
 type openAIChatRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Tools       []openAITool    `json:"tools,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-	Stream      bool            `json:"stream"`
+	Model       string               `json:"model"`
+	Messages    []openAIMessage      `json:"messages"`
+	Tools       []openAITool         `json:"tools,omitempty"`
+	MaxTokens   int                  `json:"max_tokens,omitempty"`
+	Temperature float64              `json:"temperature,omitempty"`
+	Stream      bool                 `json:"stream"`
+	// StreamOptions asks the provider to emit a usage chunk at the end of the
+	// stream. Without it, OpenAI-compatible providers (including MiniMax)
+	// never populate Usage, so token counts stay at 0.
+	StreamOptions *openAIStreamOptions `json:"stream_options,omitempty"`
+}
+
+type openAIStreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
 }
 
 type openAIMessage struct {

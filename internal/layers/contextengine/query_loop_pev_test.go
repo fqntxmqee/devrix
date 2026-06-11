@@ -77,3 +77,57 @@ func TestPEVEngine_queryLoop_should_run_multi_turn_until_no_tools(t *testing.T) 
 		t.Fatal("expected final assistant message from query loop")
 	}
 }
+
+type yoloPermission struct{}
+
+func (yoloPermission) Request(context.Context, string, string, string, types.RiskLevel) bool {
+	return true
+}
+
+func (yoloPermission) IsYOLOMode() bool { return true }
+
+// Covers: L5-CTX-34
+func TestPEVEngine_queryLoop_yolo_should_emit_complete_after_tool_round(t *testing.T) {
+	cfg := config.DefaultContextEngineConfig()
+	cfg.PEV.VerifyMode = config.VerifyModeBasic
+	cfg.Plan.Enabled = false
+	engine := contextengine.NewPEVEngine(
+		&twoRoundLLM{},
+		&mockctx.ToolRunner{Output: "hi"},
+		mustBuiltinRegistry(t),
+		yoloPermission{},
+		contextengine.NoOpObserver{},
+		&cfg.PEV,
+		nil,
+		contextengine.NewBuiltinVerifyRunner(t.TempDir()),
+		contextengine.NoOpPEVObserver{},
+		nil,
+		cfg.Plan,
+	)
+	engine.SetQueryLoopSupport(contextengine.QueryLoopSupport{
+		Enabled:  true,
+		MaxTurns: 5,
+	})
+
+	sc := &types.SessionContext{
+		SessionID: "sess_ql_yolo",
+		WorkDir:   t.TempDir(),
+		Model:     "test",
+		PEVState:  types.DefaultPEVState(3),
+	}
+	var gotComplete bool
+	_, err := engine.Run(context.Background(), sc, nil, "run", func(ev *gateway.EngineEvent) {
+		if ev.Type == "complete" {
+			gotComplete = true
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !gotComplete {
+		t.Fatal("expected complete event after YOLO query loop with tool calls")
+	}
+	if sc.PEVState.Phase != types.PEVPhaseDone {
+		t.Fatalf("expected PEV phase done, got %q", sc.PEVState.Phase)
+	}
+}
