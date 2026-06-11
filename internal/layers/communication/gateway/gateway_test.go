@@ -304,6 +304,7 @@ func TestCommunicationGateway_RouteInbound_ResumesIdleSession(t *testing.T) {
 	if err := gw.RouteInbound(context.Background(), msg); err != nil {
 		t.Fatalf("RouteInbound() error = %v", err)
 	}
+	gw.WaitForProcesses()
 
 	got, err := store.Get(session.SessionID)
 	if err != nil || got == nil {

@@ -97,7 +97,9 @@ func (g *CommunicationGateway) routeInboundViaAgent(
 
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
+	g.processes.Add(1)
 	go func() {
+		defer g.processes.Done()
 		defer endSpan()
 		defer cancel()
 		defer g.clearSessionAgent(session.SessionID)
