@@ -54,3 +54,39 @@
 - PR3: T8-T13（Phase 3-4，观测 + 验收）
 
 PR 间相互独立，可独立回滚。
+
+---
+
+## S4-Gate 审查结论
+
+**审查时间**: 2026-06-12
+**审查人**: team-reviewer (multi-perspective)
+**结论**: ✅ **Approved**
+
+| 维度 | 严重级别 | 结果 |
+|------|---------|------|
+| OpenSpec 文档完整性 | — | PASS (4 文档齐全 + L5 4 条注册) |
+| 代码质量 | — | PASS (函数 < 50 行、文件 < 800 行、嵌套 ≤ 2) |
+| 错误与安全 | — | PASS (ctx% 边界覆盖、纯函数无副作用) |
+| 测试完整性 | — | PASS (33 sub-case + race detector) |
+| **总计** | CRITICAL: 0 / HIGH: 0 / MEDIUM: 0 / LOW: 2 | **Approved** |
+
+**LOW 项（不阻断）**:
+- LOW-1: L5-2-1-13/14 测试位置指向源文件本身；建议后续 PR 拆出独立 `_test.go` 显式断言 metadata/span 属性
+- LOW-2: `gateway.ComputeCtxPct` 在 D2 调用属 pre-existing 模式（非新违规）；建议未来 refactor 移至 `internal/shared/` 让 D2 不必依赖 D1 包路径
+
+## S5 验收备注
+
+- ✅ L5-1-1-03/04: 14 case 全绿（boundary / happy / sad path）
+- ✅ L5-2-1-13/14: PEV 主路径 + milestone-only + query loop 三条 complete emit 均含 `ctx_pct` / `llm_called`
+- ✅ D5 埋点: pev.run / query.run / llm.stream span 5 个新属性 + 1 个诊断属性
+- ⏳ T11-T13（Phase 4）需真机 miniMax 调用 + Jaeger 截图 + token=0 根因判定；建议在 PR 合并后由用户在预发环境跑完，作为 release gate
+
+**token=0 排查路径**（用户用 Jaeger 自助定位）:
+1. 查 `llm.stream.llm.usage_received`：
+   - `false` → provider SSE 协议层不返回 usage（MiniMax M2.7-highspeed 嫌疑）
+   - `true` 但 `llm.tokens.prompt=0` → 不应出现的矛盾状态
+2. 查 `pev.run.pev.prompt_tokens`：
+   - 0 而上一步 > 0 → D2 累加链路问题（极少见，本变更后链路已强化）
+3. 都 > 0 但 IM 仍 0 → 检查 D1 gateway 部署版本
+
