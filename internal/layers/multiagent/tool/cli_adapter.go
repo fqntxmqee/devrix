@@ -41,6 +41,7 @@ type CLISession struct {
 	createdAt  time.Time
 	lastUsedAt time.Time
 	mu         sync.Mutex // serializes access to this session
+	closed     bool
 }
 
 // CLIAgentTool implements AgentTool for CLI subprocesses with session management.
@@ -347,6 +348,13 @@ func (t *CLIAgentTool) closeSession(sess *CLISession) error {
 	if sess == nil {
 		return nil
 	}
+	sess.mu.Lock()
+	if sess.closed {
+		sess.mu.Unlock()
+		return nil
+	}
+	sess.closed = true
+	sess.mu.Unlock()
 
 	// Phase 1: graceful — close stdin
 	// Ignore stdin close errors — the pipe may already be closed by a concurrent
@@ -438,15 +446,18 @@ func (t *CLIAgentTool) idleSweeper() {
 }
 
 func (t *CLIAgentTool) reapIdle() {
-	t.mu.Lock()
+	t.mu.RLock()
 	var idle []string
 	now := time.Now()
 	for id, sess := range t.sessions {
-		if now.Sub(sess.lastUsedAt) > t.cfg.IdleTimeout {
+		sess.mu.Lock()
+		lastUsed := sess.lastUsedAt
+		sess.mu.Unlock()
+		if now.Sub(lastUsed) > t.cfg.IdleTimeout {
 			idle = append(idle, id)
 		}
 	}
-	t.mu.Unlock()
+	t.mu.RUnlock()
 
 	for _, id := range idle {
 		slog.Info("reaping idle session", "tool", t.cfg.Name, "session", id)

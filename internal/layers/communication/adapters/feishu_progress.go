@@ -522,7 +522,8 @@ func (a *FeishuAdapter) streamReplyElement(ctx context.Context, stream *feishuSe
 	defer stream.mu.Unlock()
 	if err != nil {
 		if errors.Is(err, ErrFeishuCardRateLimited) {
-			stream.cardkitSequence--
+			// Do NOT decrement cardkitSequence — another goroutine may
+			// have already incremented past it, causing sequence inversion.
 			return nil
 		}
 		if errors.Is(err, ErrFeishuCardStreamClosed) {
