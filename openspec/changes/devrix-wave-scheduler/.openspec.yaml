@@ -1,7 +1,10 @@
 change_id: devrix-wave-scheduler
 priority: P0
 demand_id: DM-20260611-007
-status: s4_implemented
+status: s5_acceptance
+s4_gate_verdict: PASS
+s4_gate_date: "2026-06-12"
+s4_gate_note: "S4-Gate 首次 review 误报（reviewer 看错 worktree）；race fix commit 5fc88f4 已在 fix/remaining-critical integrated branch"
 domains: [orchestration, D1, D2, D4]
 parent_initiative: devrix-queryloop-context-v3
 decisions:

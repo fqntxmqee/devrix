@@ -5,12 +5,15 @@ meta:
   change_id: devrix-multiagent-isolation
   demand_id: DM-20260611-005
   title: "多 Agent 会话隔离 — Join 合并与 Session 元数据隔离"
-  status: s4_implemented
+  status: s5_acceptance
   priority: P1
   owner: devrix-team
   created_at: "2026-06-11"
   updated_at: "2026-06-12"
   source: devrix-harness-architecture-audit
+  s4_gate_verdict: PASS
+  s4_gate_date: "2026-06-12"
+  s4_gate_note: "S4-Gate follow-up 已修复 call_id/tool_call_id 键不一致 + L5-4-3-05 补登记"
 
 scope:
   layers:
@@ -65,6 +68,9 @@ deliverables:
     status: completed
   - path: internal/layers/evolution/eval/session_isolation_probe.go
     status: completed
+  - path: acceptance-report.md
+    status: completed
+    date: "2026-06-12"
 
 version_scope:
   v1.0:

@@ -5,12 +5,15 @@ meta:
   change_id: devrix-event-channel
   demand_id: DM-20260611-003
   title: "事件通道与背压机制 — Channel Drain/Compact/Reconnect"
-  status: s4_impl
+  status: s5_acceptance
   priority: P0
   owner: devrix-team
   created_at: "2026-06-11"
   updated_at: "2026-06-12"
   source: devrix-harness-architecture-audit
+  s4_gate_verdict: PASS
+  s4_gate_date: "2026-06-12"
+  s4_gate_note: "S4-Gate follow-up 已修复 gateway race + L5 编号 + 死代码"
 
 scope:
   layers:
@@ -77,6 +80,9 @@ deliverables:
     status: completed
   - path: internal/shared/config/eventbus.go
     status: completed
+  - path: acceptance-report.md
+    status: completed
+    date: "2026-06-12"
 
 version_scope:
   v1.0:

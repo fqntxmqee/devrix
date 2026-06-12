@@ -5,12 +5,15 @@ meta:
   change_id: devrix-layer-isolation
   demand_id: DM-20260611-002
   title: "架构分层合规 — 消除反向依赖与契约错放"
-  status: s4_implemented
+  status: s5_acceptance
   priority: P0
   owner: devrix-team
   created_at: "2026-06-11"
   updated_at: "2026-06-12"
   source: devrix-harness-architecture-audit
+  s4_gate_verdict: WARN
+  s4_gate_date: "2026-06-12"
+  s4_gate_note: "4 接口契约迁移（ILLMGateway/IToolRunner/IToolRegistry/IPermissionGate）+ design/tasks.md 留 v1.1 跟进"
 
 scope:
   layers:
@@ -57,14 +60,28 @@ deliverables:
     status: completed
   - path: design.md
     status: pending
+    note: "v1.1 跟进"
   - path: tasks.md
     status: pending
+    note: "v1.1 跟进"
+  - path: acceptance-report.md
+    status: completed
+    date: "2026-06-12"
+  - path: cmd/devrix-layer-lint/main.go
+    status: completed
+  - path: internal/lint/layer/scanner.go
+    status: completed
+  - path: internal/shared/contracts/registry.go
+    status: completed
+  - path: internal/layers/evolution/eval/layer_violation_probe.go
+    status: completed
+  - path: .github/workflows/layer-lint.yml
+    status: completed
   - path: specs/architecture/spec.md
     status: pending
-  - path: scripts/layer-lint/main.go
-    status: pending
-  - path: .github/workflows/layer-lint.yml
-    status: pending
+    note: "v1.1 跟进"
+  - path: internal/shared/contracts/ctxutil.go
+    status: completed
 
 version_scope:
   v1.0:
