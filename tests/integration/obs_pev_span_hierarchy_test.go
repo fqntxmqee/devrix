@@ -10,7 +10,6 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
 	"github.com/devrix/devrix/internal/layers/llmgateway/breaker"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/gateway"
@@ -37,7 +36,7 @@ func TestIntegration_PEVSpanHierarchy_should_match_canonical_tree(t *testing.T) 
 			Exporter:    "memory",
 			Sampling:    settings.SamplingConfig{Type: "always_on", Rate: 1.0},
 		},
-		Metrics: observability.MetricsConfig{Enabled: false, Exporter: "null"},
+		Metrics: settings.MetricsConfig{Enabled: false, Exporter: "null"},
 		Logging: observability.LoggingConfig{Level: "info", Format: "text"},
 	})
 	if err != nil {
@@ -63,7 +62,7 @@ func TestIntegration_PEVSpanHierarchy_should_match_canonical_tree(t *testing.T) 
 	ctxCfg.LongTerm.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM: llmbridge.New(llmGW), TokenCounter: counter,
-		Tools: &NoOpToolRunner{}, ToolsReg: registry.NewBuiltinRegistry(),
+		Tools: &NoOpToolRunner{}, ToolsReg: mustBuiltinRegistry(t),
 		Permission: &AllowAllPermission{}, Config: ctxCfg, ObsBridge: obsBridge,
 	})
 

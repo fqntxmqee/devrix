@@ -13,7 +13,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -55,7 +54,7 @@ func TestIntegration_PlanMilestoneProgressEvents(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &planLLMGateway{response: planJSON},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Planner:    planner,
 		Config:     ctxCfg,
@@ -98,7 +97,7 @@ func TestIntegration_PlanDisabledUsesV2Path(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "hello without plan"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})

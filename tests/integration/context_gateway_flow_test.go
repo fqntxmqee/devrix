@@ -10,7 +10,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -31,7 +30,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})
@@ -74,7 +73,7 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM: &mockctx.LLMGatewayWithTools{},
 		Tools: &mockctx.ToolRunner{},
-		ToolsReg: registry.NewBuiltinRegistry(),
+		ToolsReg: mustBuiltinRegistry(t),
 		Permission: mockctx.DenyAllPermission{},
 		Config: ctxCfg,
 	})

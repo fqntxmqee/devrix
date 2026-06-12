@@ -10,7 +10,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -24,7 +23,7 @@ func TestIntegration_HarnessBootstrapSmoke_disabled_zero_change(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})
@@ -43,7 +42,7 @@ func TestIntegration_HarnessBootstrapSmoke_enabled_bootstrap(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "harness ok"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})

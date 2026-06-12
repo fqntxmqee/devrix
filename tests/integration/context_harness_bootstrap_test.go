@@ -11,7 +11,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -27,7 +26,7 @@ func TestIntegration_HarnessBootstrap_disabled_v4_regression(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "legacy ok"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})
@@ -63,7 +62,7 @@ func TestIntegration_HarnessBootstrap_enabled_flow(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "harness ok"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 	})

@@ -9,7 +9,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
@@ -28,7 +27,7 @@ func newHarnessObs(t *testing.T) (*observability.Observability, *observability.B
 			Exporter:    "memory",
 			Sampling:    settings.SamplingConfig{Type: "always_on", Rate: 1.0},
 		},
-		Metrics: observability.MetricsConfig{Enabled: false, Exporter: "null"},
+		Metrics: settings.MetricsConfig{Enabled: false, Exporter: "null"},
 		Logging: observability.LoggingConfig{Level: "info", Format: "text"},
 	})
 	if err != nil {
@@ -50,7 +49,7 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "obs ok"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 		ObsBridge:  bridge,
@@ -124,7 +123,7 @@ func TestIntegration_HarnessObs_disabled_no_harness_spans(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "legacy"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 		ObsBridge:  bridge,
@@ -153,7 +152,7 @@ func TestIntegration_HarnessObs_coverage_hits_harness_operations(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "cov"},
 		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   registry.NewBuiltinRegistry(),
+		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
 		Config:     ctxCfg,
 		ObsBridge:  bridge,

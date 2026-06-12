@@ -73,7 +73,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	toolCfg := config.DefaultToolConfig()
-	reg := &criticalBashRegistry{BuiltinRegistry: registry.NewBuiltinRegistry()}
+	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
 	builder := &integrationEngineBuilder{
 		llm:      &mockctx.LLMGatewayWithTools{},
 		tools:    &mockctx.ToolRunner{},

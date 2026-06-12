@@ -11,7 +11,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -38,7 +37,7 @@ func TestIntegration_VerifyCommandsMode(t *testing.T) {
 	engine := contextengine.NewPEVEngine(
 		&mockctx.LLMGateway{Response: "done"},
 		&mockctx.ToolRunner{Output: "ok"},
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,
@@ -73,7 +72,7 @@ func TestIntegration_VerifyCommandTimeoutFailsVerify(t *testing.T) {
 	engine := contextengine.NewPEVEngine(
 		&mockctx.LLMGateway{Response: "done"},
 		&mockctx.ToolRunner{Output: "ok"},
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,
@@ -107,7 +106,7 @@ func TestIntegration_VerifyCommandNonZeroExitFailsVerify(t *testing.T) {
 	engine := contextengine.NewPEVEngine(
 		&mockctx.LLMGateway{Response: "done"},
 		&mockctx.ToolRunner{Output: "ok"},
-		registry.NewBuiltinRegistry(),
+		mustBuiltinRegistry(t),
 		mockctx.AllowAllPermission{},
 		contextengine.NoOpObserver{},
 		&cfg.PEV,

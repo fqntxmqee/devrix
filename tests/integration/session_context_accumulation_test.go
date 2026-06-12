@@ -13,7 +13,6 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/gateway"
@@ -93,7 +92,7 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 			Exporter:    "memory",
 			Sampling:    settings.SamplingConfig{Type: "always_on", Rate: 1.0},
 		},
-		Metrics: observability.MetricsConfig{Enabled: false, Exporter: "null"},
+		Metrics: settings.MetricsConfig{Enabled: false, Exporter: "null"},
 		Logging: observability.LoggingConfig{Level: "info", Format: "text"},
 	})
 	if err != nil {
@@ -129,7 +128,7 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 		LLM:          llmBridge,
 		TokenCounter: counter,
 		Tools:        &NoOpToolRunner{},
-		ToolsReg:     registry.NewBuiltinRegistry(),
+		ToolsReg:     mustBuiltinRegistry(t),
 		Permission:   &AllowAllPermission{},
 		Config:       ctxCfg,
 		ObsBridge:    obsBridge,
