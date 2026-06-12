@@ -385,6 +385,25 @@ func (g *CommunicationGateway) handleEngineEventsViaBus(ctx context.Context, ses
 	// bus. The bus's fanout + monitor goroutines will pick them up
 	// and deliver to sub.ch asynchronously.
 	<-producerDone
+	// Wait for the bus's monitor to drain all Normal/Low events that
+	// the producer just enqueued into normalCh. This eliminates the
+	// race where cancelSub() removes our subscription from the bus
+	// BEFORE the monitor's fanout has had a chance to deliver the
+	// event to sub.ch (without this wait, a slow monitor would
+	// observe the sub-already-removed on its next fanout and skip
+	// the send — silently dropping the event).
+	//
+	// We bound the wait to a few seconds to avoid hanging on a
+	// pathological monitor stall. The monitor's normalCh-receive
+	// path runs on a 20ms ticker, so backlog=0 is expected within
+	// a few iterations of the producer finishing.
+	if g.eventDispatcher != nil && g.eventDispatcher.bus != nil {
+		bus := g.eventDispatcher.bus
+		deadline := time.Now().Add(2 * time.Second)
+		for bus.Backlog() > 0 && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
 	// Cancel the subscription. This atomically (under subsMu) removes
 	// the sub from the bus and closes sub.done — so no new events can
 	// be fanned to this consumer and any in-flight fanout will see
