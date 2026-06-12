@@ -86,7 +86,22 @@ created: 2026-06-11
 - 跨 Session 持久化 Task 看板（v3 D7 升格）
 - Agent 间 Mailbox / 用户与 Worker 直接对话
 - 自动 merge 冲突解决（git merge bot）
-- Worktree 默认隔离（用户明确选择 3B）
+- Worktree **默认**隔离（用户明确选择 3B；可选 git worktree 见 **DM-20260612-010**）
+
+### 3.3 v1.2 增补范围（clawcode 闭环对照）
+
+> 依赖 **DM-20260612-011**（TaskRegistry）作为通知与 output 数据源。
+
+**In Scope（v1.2）**:
+
+- Plan **用户批准** 后才调用 `WaveScheduler.Start`（Plan gate）
+- Worker terminal 写入 **真实 Artifact**（summary/result/error，非 directive 占位）
+- Wave 全 terminal → `SessionQueue` 推送 **`wave_completed`** → QueryLoop **下一 turn 自动注入 Leader**（对齐 clawcode `task-notification`）
+- 实现 `finalizeTask`：FlowHub 事件 + queue 入队 + artifact 汇总
+
+**Out of Scope（v1.2）**:
+
+- git worktree 隔离（**DM-20260612-010**）
 
 ## 4. 验收标准（P0 摘要）
 
@@ -103,6 +118,15 @@ created: 2026-06-11
 | AC9 | Session `/new` 或结束时 `CancelAll` 终止全部 running Worker |
 | AC10 | CLI Worker cancel 终止底层进程，不产生 zombie 槽占用 |
 
+### v1.2 验收（P0/P1）
+
+| ID | 标准 |
+|----|------|
+| AC11 | Plan 未批准时 Scheduler 不 Start |
+| AC12 | Worker 完成后 Artifact.Summary 来自 terminal result（≠ Directive） |
+| AC13 | Wave 全完成后 QueryLoop 下一 turn Leader 收到 `wave_completed` 附件（含每 task artifact） |
+| AC14 | 同一 wave 不重复推送 `wave_completed`（notified 去重，DM-011） |
+
 ## 5. 关联需求
 
 - DM-20260607-006（Milestone DAG / Plan）
@@ -110,3 +134,5 @@ created: 2026-06-11
 - DM-20260608-012（Agent Tools call_*）
 - DM-20260611-006（Feishu Cardkit 流式 — Worker 卡可复用 cardkit 能力）
 - **DM-20260611-009（Background Cancel 协议 — task_stop 复用）**
+- **DM-20260612-011（Unified Task Registry — wave_completed 数据源）**
+- **DM-20260612-010（Wave Git Worktree — 可选写并行隔离）**

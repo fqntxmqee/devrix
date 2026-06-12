@@ -25,4 +25,9 @@ l5_points:
 version_scope:
   v1.0: WaveScheduler + ContextPolicy + ConflictGuard + SubAgent/AgentTool runners
   v1.1: Feishu Worker 双区块卡片 + cardkit 流式
-  v1.2: Plan Engine TaskGraph 物化 + Leader wave_completed 集成
+  v1.2: Plan gate + 真实 Artifact + wave_completed QueryLoop 回灌（依赖 DM-20260612-011）
+
+related_changes:
+  - devrix-unified-task-registry
+  - devrix-wave-worktree-isolation
+  - devrix-background-task-tools

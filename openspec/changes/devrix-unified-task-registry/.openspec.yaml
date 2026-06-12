@@ -1,0 +1,67 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-unified-task-registry
+  demand_id: DM-20260612-011
+  title: "Unified Task Registry — 后台任务统一注册与 output delta"
+  status: s2_clarified
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-12"
+  updated_at: "2026-06-12"
+  source: clawcode-task-framework-comparison
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "TaskRegistry facade + disk output + QueryLoop attachments"
+    - id: D1
+      name: Orchestration
+      affected: true
+      reason: "Wave Worker 注册/terminal 走统一 registry"
+
+  capabilities:
+    - id: CTX-TASK-REGISTRY
+      name: TaskRegistry Register/Terminal/GetOutputDelta
+    - id: CTX-BG-ATTACHMENTS
+      name: QueryLoop collectBackgroundTaskAttachments
+    - id: CTX-WAVE-COMPLETED-PAYLOAD
+      name: wave_completed 附件数据源
+
+  l5_test_points:
+    - L5-CTX-REG-01
+    - L5-CTX-REG-02
+    - L5-CTX-REG-03
+    - L5-CTX-REG-04
+    - L5-CTX-REG-05
+
+version_scope:
+  v1.0:
+    features:
+      - "TaskRegistry facade 包装 BackgroundRegistry + Wave handle"
+      - "disk output + GetOutputDelta"
+      - "notified 去重 + SessionQueue 入队"
+      - "DM-009 task_output 读 registry"
+    status: planned
+  v1.1:
+    features:
+      - "QueryLoop per-turn output delta attachments"
+      - "wave_completed payload 组装"
+      - "D6 BackgroundTaskProbe 扩展"
+    status: planned
+
+external_dependencies:
+  - component: "DM-012 QueryLoop（已交付）"
+    status: available
+  - component: "DM-009 Background Task 工具"
+    status: in_progress
+  - component: "DM-007 Wave Scheduler v1.2 T15"
+    status: planned
+
+related_changes:
+  - devrix-wave-scheduler
+  - devrix-background-task-tools
+  - devrix-wave-worktree-isolation

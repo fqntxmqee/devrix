@@ -40,12 +40,12 @@
 | DM-20260610-011 | D6 Eval Phase 4 — CI fast check + delta gate | devrix-d6-eval-phase4 | 2026-06-10 | [#24](https://github.com/fqntxmqee/devrix/pull/24) | ACCEPTED |
 | DM-20260610-012 | QueryLoop 全量对齐 Claude Code Harness (v1/v2) | devrix-queryloop-context | 2026-06-10 | — | ACCEPTED (P0) |
 | DM-20260611-001 | D2 上下文引擎 Agentic Loop 深化 | devrix-agentic-loop | 2026-06-11 | — | **Superseded** → DM-012 + tech-debt |
-| DM-20260611-002 | 架构分层合规 — 消除反向依赖与契约错放 | devrix-layer-isolation | 2026-06-11 | — | S2_Proposal |
-| DM-20260611-003 | 事件通道与背压机制 — Channel Drain/Compact/Reconnect | devrix-event-channel | 2026-06-11 | — | S2_Proposal（范围已修订） |
-| DM-20260611-004 | Legacy Harness 退役 — QueryLoop 为唯一主路径 | devrix-harness-unification | 2026-06-11 | — | S2_Proposal |
-| DM-20260611-005 | 多 Agent 会话隔离 — Join 合并与 metadata 隔离 | devrix-multiagent-isolation | 2026-06-11 | — | S2_Proposal |
+| DM-20260611-002 | 架构分层合规 — 消除反向依赖与契约错放 | devrix-layer-isolation | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`) |
+| DM-20260611-003 | 事件通道与背压机制 — Channel Drain/Compact/Reconnect | devrix-event-channel | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`) |
+| DM-20260611-004 | Legacy Harness 退役 — QueryLoop 为唯一主路径 | devrix-harness-unification | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`) |
+| DM-20260611-005 | 多 Agent 会话隔离 — Join 合并与 metadata 隔离 | devrix-multiagent-isolation | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`) |
 | DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-11 | — | S5_Acceptance（单测 PASS，待真机） |
-| DM-20260611-007 | Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块 | devrix-wave-scheduler | 2026-06-11 | — | S3_Planning |
+| DM-20260611-007 | Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块 | devrix-wave-scheduler | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`，含 completeTask race fix) |
 | DM-20260611-008 | 飞书 IM 完成卡 — ctx 比例 + token 链路埋点 | devrix-im-card-ctx | 2026-06-11 | [#27](https://github.com/fqntxmqee/devrix/pull/27) | ACCEPTED (P1) |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
@@ -98,12 +98,12 @@
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
-| devrix-layer-isolation | DM-20260611-002 | `openspec/changes/devrix-layer-isolation/` | S2_Proposal |
-| devrix-event-channel | DM-20260611-003 | `openspec/changes/devrix-event-channel/` | S2_Proposal |
-| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S2_Proposal |
-| devrix-multiagent-isolation | DM-20260611-005 | `openspec/changes/devrix-multiagent-isolation/` | S2_Proposal |
+| devrix-layer-isolation | DM-20260611-002 | `openspec/changes/devrix-layer-isolation/` | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
+| devrix-event-channel | DM-20260611-003 | `openspec/changes/devrix-event-channel/` | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
+| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
+| devrix-multiagent-isolation | DM-20260611-005 | `openspec/changes/devrix-multiagent-isolation/` | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Acceptance（单测 PASS，待真机 E2E 验收） |
-| devrix-wave-scheduler | DM-20260611-007 | `openspec/changes/devrix-wave-scheduler/` | S3_Design（design.md 12 章就绪，待 S3-Gate 审查） |
+| devrix-wave-scheduler | DM-20260611-007 | `openspec/changes/devrix-wave-scheduler/` | S4_Implemented (合并 `fix/remaining-critical`，含 completeTask race fix `5fc88f4`，待 S4-Gate + S5) |
 | devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（task_stop/task_output/task_list_background 工具已实现，L5-2-9-16~19 IMPLEMENTED，-race 全绿，待 Wave Worker 接线 + S4-Gate） |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |
 
@@ -116,6 +116,12 @@
 - `devrix-background-task-tools` 从 S2_Clarified 推进至 S3_Design；L5-2-9-16~19 已在 l5-registry 注册
 - `devrix-feishu-streaming` 状态对齐：S5_Acceptance，单测 PASS（L5-1-2-04~08），待真机 E2E 验收后归档
 - `openspec/tech-debt/` 新增 `queryloop-error-recovery.md`（TD-QL-01~07）+ `streaming-tool-executor-v2.md`（TD-STE-01~06）
+- **5 个 change 并行 S4 实现完成并合并至 `fix/remaining-critical`**（全仓 `-race` 大回归两次全绿）：
+  - DM-002 `devrix-layer-isolation` — 反向依赖消除（commit `25b9d68`+ 合并 `c5c3e2a`）
+  - DM-003 `devrix-event-channel` — BackpressureEventBus + Gateway 接入（commit `4a9f0d6` + 合并 `06a668a`）
+  - DM-004 `devrix-harness-unification` — QueryLoop 默认 + TD-QL-01/03（合并 `a8eabc6`）
+  - DM-005 `devrix-multiagent-isolation` — SessionView COW + Join dedup（合并 `12c6462`）
+  - DM-007 `devrix-wave-scheduler` — DAG Worker 池 + IM 多卡（合并 `e0d81bf`），含 `completeTask` side-effects 必须先于 SetState 的 race 修复（commit `5fc88f4`）
 
 ## Tech Debt
 

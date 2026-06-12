@@ -43,8 +43,9 @@
 | ID | 任务 | L4 | L5 | 估行 |
 |----|------|-----|-----|------|
 | T14 | bootstrap WireWaveScheduler + devrix.yaml 配置 | L4-BE-ORCH-WAVE-SCHEDULER | — | ~60 |
-| T15 | Plan 完成 → Scheduler.Start；wave_completed 回灌 Leader | L3-BE-ORCH-DISPATCH | L5-ORCH-18 | ~80 |
-| T16 | 登记 L5-ORCH-10~18 至 l5-registry.md | — | ALL | ~40 |
+| T15 | Plan **批准** → Scheduler.Start；AllTerminal → `ModeWaveCompleted` 入队 → QueryLoop 附件回灌 Leader（依赖 DM-011） | L3-BE-ORCH-DISPATCH | L5-ORCH-18, L5-ORCH-22~24 | ~120 |
+| T15b | `finalizeTask` 实现：真实 Artifact + FlowHub + SessionQueue | L4-BE-ORCH-WAVE-SCHEDULER | L5-ORCH-23, L5-ORCH-24 | ~80 |
+| T16 | 登记 L5-ORCH-10~24 至 l5-registry.md | — | ALL | ~40 |
 
 ## Phase 6 — 测试与验收
 
@@ -65,7 +66,16 @@ T1 → T2 → T4 → T5 → T6 → T7 → T7b → T7c
          T14 → T15 → T16 → T17~T20
 T3 可与 T7 并行
 T7b 依赖 DM-009 T1（Cancel 协议）；可先 stub 后对接
+T15/T15b 依赖 DM-20260612-011 TaskRegistry v1.0
 ```
+
+## Phase 7 — v1.2 Leader 闭环（DM-011 之后）
+
+| ID | 任务 | L4 | L5 | 估行 |
+|----|------|-----|-----|------|
+| T21 | Plan gate：未批准 Plan 禁止 WaveScheduler.Start | L3-BE-ORCH-DISPATCH | L5-ORCH-23 | ~40 |
+| T22 | Runner terminal → 真实 Artifact（SubAgentResult / AgentTool complete） | L4-BE-ORCH-CONTEXT-POLICY | L5-ORCH-24 | ~80 |
+| T23 | `ModeWaveCompleted` SessionQueue + QueryLoop attachment 消费 | L3-BE-CTX-BG-NOTIFY | L5-ORCH-22 | ~100 |
 
 ## 建议 PR 拆分（≤400 行/PR）
 
