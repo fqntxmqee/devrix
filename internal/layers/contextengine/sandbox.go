@@ -28,8 +28,8 @@ var defaultAllowlist = []string{
 var defaultDenyPatternStrings = []string{
 	`\brm\s+(-[a-zA-Z]+\s+)*[/~]`,
 	`\bsudo\b`,
-	`\bcurl\b.*\|.*\b(?:sh|bash|python|perl)\b`,
-	`\bwget\b.*\|.*\b(?:sh|bash|python|perl)\b`,
+	`\bcurl\b.*\|.*\b(?:sh|bash|python3?|perl|node|ruby)\b`,
+	`\bwget\b.*\|.*\b(?:sh|bash|python3?|perl|node|ruby)\b`,
 	`>[>]?\s*/dev/[a-z]`,
 	`\bmkfifo\b`,
 	`\bnc\s+-[lL]`,

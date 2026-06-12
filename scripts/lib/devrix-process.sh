@@ -32,8 +32,15 @@ is_devrix_server_pid() {
   [[ -n "$cmd" ]] || return 1
   [[ "$cmd" != *"git "* ]] || return 1
 
+  # Ignore screen/login/bash wrappers that embed the devrix binary path.
   case "$cmd" in
-    *"$ROOT/bin/devrix"*|*"./bin/devrix"*|*" $ROOT/devrix"*|*"./devrix "*|*"./devrix"*)
+    SCREEN\ *|screen\ *|*bash\ -lc\ *|login\ -pflq\ *)
+      return 1
+      ;;
+  esac
+
+  case "$cmd" in
+    "$BIN"|"$BIN "*|./bin/devrix|./bin/devrix\ *)
       cwd="$(devrix_process_cwd "$pid")"
       [[ "$cwd" == "$ROOT" ]] && return 0
       ;;

@@ -12,6 +12,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
+	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/harness"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
@@ -325,7 +326,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		slog.Debug("contextengine: duplicate request skipped", "sessionID", session.SessionID, "requestID", requestID)
 	}
 
-	msgs := sc.Messages
+	msgs := conversation.RepairToolMessageChain(sc.Messages)
 	compSystemPrompt := sc.SystemPrompt
 	// #deprecated: legacy fallback (QueryLoop path keeps system prompt during compression)
 	if harnessEnabled && !workerLocal {
@@ -531,10 +532,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				}
 				e.memory.AppendFullMessage(sc, tcMsg)
 
-				resultContent := tc.Output
-				if tc.Error != "" {
-					resultContent = "Error: " + tc.Error
-				}
+				resultContent := conversation.FormatToolResultContent(tc.ToolName, tc.Output, tc.Error)
 				resultMsg := types.Message{
 					Role:     types.MessageRoleTool,
 					Content:  resultContent,

@@ -131,13 +131,20 @@ cmd_start() {
     run_env+=("MINIMAX_API_KEY=$MINIMAX_API_KEY")
   fi
 
+  # macOS has no setsid; nohup from IDE terminals often dies on shell exit — use screen.
+  if [[ "${DEVRIX_SCREEN:-}" != "0" && "$(uname -s)" == "Darwin" ]]; then
+    if ! command -v setsid >/dev/null 2>&1; then
+      DEVRIX_SCREEN=1
+    fi
+  fi
+
   if [[ "${DEVRIX_SCREEN:-}" == "1" ]]; then
     if screen -ls | grep -q '[.]devrix'; then
       echo "error: screen session devrix already exists"
       exit 1
     fi
-    local screen_cmd="exec $(printf '%q' "$BIN")"
-    screen -dmS devrix bash -lc "$screen_cmd >>$LOG 2>&1"
+    local screen_cmd="cd $(printf '%q' "$ROOT") && exec env $(printf '%s ' "${run_env[@]}") $(printf '%q' "$BIN")"
+    screen -dmS devrix bash -lc "$screen_cmd >>$(printf '%q' "$LOG") 2>&1"
     sleep 2
     local server_pid
     server_pid="$(list_devrix_server_pids | head -1 || true)"

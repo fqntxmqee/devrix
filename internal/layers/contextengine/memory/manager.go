@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -98,6 +99,7 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 		if err != nil {
 			return nil, err
 		}
+		sc.Messages = conversation.RepairToolMessageChain(sc.Messages)
 	} else {
 		max, reserved, toolResult, target, snipTarget := m.cfg.ToTokenBudget()
 		sc = &types.SessionContext{

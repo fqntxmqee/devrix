@@ -96,7 +96,7 @@ func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	if result.Error == "" {
 		t.Fatal("expected sandbox rejection")
 	}
-	if !strings.Contains(result.Error, "command not allowed") {
+	if !strings.Contains(result.Error, "dangerous command pattern") {
 		t.Fatalf("error = %q", result.Error)
 	}
 }
@@ -174,5 +174,24 @@ func TestBuiltinToolRunner_should_write_file_in_workspace(t *testing.T) {
 	}
 	if string(data) != "written" {
 		t.Fatalf("file content = %q", data)
+	}
+}
+
+func TestBuiltinToolRunner_should_redirect_glob_json_from_bash(t *testing.T) {
+	dir := t.TempDir()
+	runner := mustBuiltinToolRunner(t)
+	ctx := contextengine.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, contextengine.ToolCall{
+		Name:  "bash",
+		Input: `{"pattern":"**/*.go","path":"."}`,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Error == "" {
+		t.Fatal("expected redirect hint")
+	}
+	if !strings.Contains(result.Error, "glob tool") {
+		t.Fatalf("error = %q", result.Error)
 	}
 }

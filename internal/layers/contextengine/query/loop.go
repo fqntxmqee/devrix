@@ -108,6 +108,8 @@ func (l *Loop) Run(
 			}
 		}
 
+		messages = conversation.RepairToolMessageChain(messages)
+
 		apiMessages := messages
 		if prepend != nil && len(uc) > 0 {
 			apiMessages = prepend(messages, uc)
@@ -150,9 +152,6 @@ func (l *Loop) Run(
 					return nil, err
 				}
 			} else {
-				if len(toolRoundResults) > 0 {
-					break
-				}
 				return nil, err
 			}
 		}
@@ -226,10 +225,7 @@ func (l *Loop) Run(
 			batch := exec.ExecuteBatch(ctx, sc, batchRefs)
 			for i, res := range batch {
 				ref := refs[i]
-				content := res.Output
-				if res.Error != "" {
-					content = res.Error
-				}
+				content := conversation.FormatToolResultContent(ref.Name, res.Output, res.Error)
 				if emit != nil {
 					emitToolCall(emit, sc, ref)
 					emitToolResult(emit, sc.SessionID, ref.Name, content, res.Error)
@@ -262,10 +258,7 @@ func (l *Loop) Run(
 				if execErr != nil && errMsg == "" {
 					errMsg = execErr.Error()
 				}
-				content := out
-				if errMsg != "" {
-					content = errMsg
-				}
+				content := conversation.FormatToolResultContent(ref.Name, out, errMsg)
 				if emit != nil {
 					emitToolResult(emit, sc.SessionID, ref.Name, content, errMsg)
 				}
