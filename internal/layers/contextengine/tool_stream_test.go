@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 func TestWithToolStreamEmitter_should_forward_agent_events(t *testing.T) {
-	var events []*gateway.EngineEvent
-	emit := func(ev *gateway.EngineEvent) {
+	var events []*contracts.EngineEvent
+	emit := func(ev *contracts.EngineEvent) {
 		events = append(events, ev)
 	}
 	ctx := withToolStreamEmitter(context.Background(), emit, "sess_1", "call_claude-code")

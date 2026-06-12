@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -70,8 +70,8 @@ func TestPEVEngine_should_degrade_when_followup_llm_fails_after_tools(t *testing
 		PEVState:  types.DefaultPEVState(3),
 	}
 
-	var events []gateway.EngineEvent
-	result, err := engine.Run(context.Background(), sc, nil, "run tools", func(ev *gateway.EngineEvent) {
+	var events []contracts.EngineEvent
+	result, err := engine.Run(context.Background(), sc, nil, "run tools", func(ev *contracts.EngineEvent) {
 		events = append(events, *ev)
 	})
 	if err != nil {

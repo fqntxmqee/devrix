@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -62,7 +62,7 @@ func TestPEVEngine_queryLoop_should_run_multi_turn_until_no_tools(t *testing.T) 
 		PEVState:  types.DefaultPEVState(3),
 	}
 	var toolCalls int
-	res, err := engine.Run(context.Background(), sc, nil, "run", func(ev *gateway.EngineEvent) {
+	res, err := engine.Run(context.Background(), sc, nil, "run", func(ev *contracts.EngineEvent) {
 		if ev.Type == "tool_call" {
 			toolCalls++
 		}
@@ -116,7 +116,7 @@ func TestPEVEngine_queryLoop_yolo_should_emit_complete_after_tool_round(t *testi
 		PEVState:  types.DefaultPEVState(3),
 	}
 	var gotComplete bool
-	_, err := engine.Run(context.Background(), sc, nil, "run", func(ev *gateway.EngineEvent) {
+	_, err := engine.Run(context.Background(), sc, nil, "run", func(ev *contracts.EngineEvent) {
 		if ev.Type == "complete" {
 			gotComplete = true
 		}

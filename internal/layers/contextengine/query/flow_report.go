@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -67,7 +66,7 @@ func subQueryFlowEmit(
 	if hub == nil {
 		return inner
 	}
-	return func(ev *gateway.EngineEvent) {
+	return func(ev *contracts.EngineEvent) {
 		if inner != nil {
 			inner(ev)
 		}

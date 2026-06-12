@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -21,7 +21,7 @@ func (e *PEVEngine) runViaQueryLoop(
 	sc *types.SessionContext,
 	view []types.Message,
 	systemPrompt string,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 	emitComplete bool,
 ) (*PEVRunResult, error) {
 	start := time.Now()
@@ -110,7 +110,7 @@ func (e *PEVEngine) runViaQueryLoop(
 				if e.permission != nil && !e.permission.Request(ctx, sc.SessionID, tc.Name, tc.Input, risk) {
 					continue
 				}
-				emit(&gateway.EngineEvent{
+				emit(&contracts.EngineEvent{
 					Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, SessionID: sc.SessionID,
 					Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input},
 				})
@@ -127,7 +127,7 @@ func (e *PEVEngine) runViaQueryLoop(
 				if errMsg != "" {
 					content = errMsg
 				}
-				emit(&gateway.EngineEvent{
+				emit(&contracts.EngineEvent{
 					Type: "tool_result", Content: content, ToolName: tc.Name, SessionID: sc.SessionID,
 					Metadata: map[string]string{"tool_name": tc.Name, "error": errMsg},
 				})
@@ -155,7 +155,7 @@ func (e *PEVEngine) runViaQueryLoop(
 							_, content := ftSplitter.Push(chunk.Content)
 							if content != "" {
 								finalText += content
-								emit(&gateway.EngineEvent{
+								emit(&contracts.EngineEvent{
 									Type: "text", Content: content, SessionID: sc.SessionID,
 									Metadata: map[string]string{"is_complete": "false"},
 								})
@@ -167,7 +167,7 @@ func (e *PEVEngine) runViaQueryLoop(
 					}
 					if _, content := ftSplitter.Flush(); content != "" {
 						finalText += content
-						emit(&gateway.EngineEvent{
+						emit(&contracts.EngineEvent{
 							Type: "text", Content: content, SessionID: sc.SessionID,
 							Metadata: map[string]string{"is_complete": "false"},
 						})
@@ -186,8 +186,8 @@ func (e *PEVEngine) runViaQueryLoop(
 	assistantText = textutil.StripThinkingTags(assistantText)
 	if emitComplete {
 		duration := time.Since(start).Milliseconds()
-		ctxPct := gateway.ComputeCtxPct(res.Usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
-		emit(&gateway.EngineEvent{
+		ctxPct := contracts.ComputeCtxPct(res.Usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
+		emit(&contracts.EngineEvent{
 			Type: "complete", SessionID: sc.SessionID,
 			Metadata: map[string]string{
 				"usage":      fmt.Sprintf("%d", res.Usage.PromptTokens+res.Usage.CompletionTokens),

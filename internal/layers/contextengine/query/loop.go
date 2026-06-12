@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -267,7 +267,7 @@ func (l *Loop) Run(
 }
 
 func emitThinking(emit EmitFunc, sessionID, content string) {
-	emit(&gateway.EngineEvent{Type: "thinking", Content: content, SessionID: sessionID})
+	emit(&contracts.EngineEvent{Type: "thinking", Content: content, SessionID: sessionID})
 }
 
 func emitText(emit EmitFunc, sessionID, content string, complete bool) {
@@ -275,18 +275,18 @@ func emitText(emit EmitFunc, sessionID, content string, complete bool) {
 	if complete {
 		meta["is_complete"] = "true"
 	}
-	emit(&gateway.EngineEvent{Type: "text", Content: content, SessionID: sessionID, Metadata: meta})
+	emit(&contracts.EngineEvent{Type: "text", Content: content, SessionID: sessionID, Metadata: meta})
 }
 
 func emitToolCall(emit EmitFunc, sc *types.SessionContext, ref conversation.ToolCallRef) {
-	emit(&gateway.EngineEvent{
+	emit(&contracts.EngineEvent{
 		Type: "tool_call", ToolName: ref.Name, ToolInput: ref.Input, SessionID: sc.SessionID,
 		Metadata: map[string]string{"tool_name": ref.Name, "input": ref.Input},
 	})
 }
 
 func emitToolResult(emit EmitFunc, sessionID, name, content, errMsg string) {
-	emit(&gateway.EngineEvent{
+	emit(&contracts.EngineEvent{
 		Type: "tool_result", Content: content, ToolName: name, SessionID: sessionID,
 		Metadata: map[string]string{"tool_name": name, "error": errMsg},
 	})
