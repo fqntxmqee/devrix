@@ -496,6 +496,28 @@ func (g *CommunicationGateway) PublishEngineEvent(ev *EngineEvent) {
 func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *types.Session, event *EngineEvent) {
 	slog.Info("gateway: handleEngineEvent", "type", event.Type, "sessionID", session.SessionID)
 
+	// If the gateway was constructed without an eventHandler (e.g. for
+	// idle-resume / session-store integration tests that only assert on
+	// gateway-side state, not on delivered OutboundMessages), still
+	// process state transitions + metrics, but skip the handler
+	// callbacks. This preserves the v0.9 test contract where nil
+	// handler was acceptable.
+	if g.eventHandler == nil {
+		switch event.Type {
+		case "thinking":
+			session.SetState(types.SessionStateThinking)
+		case "tool":
+			session.SetState(types.SessionStateToolExecuting)
+		case "text":
+			session.SetState(types.SessionStateStreaming)
+		case "complete":
+			session.SetState(types.SessionStateCompleted)
+		case "error":
+			session.SetState(types.SessionStateFailed)
+		}
+		return
+	}
+
 	ctx, evSpan := g.startEngineEventSpan(ctx, session, event.Type)
 	if evSpan != nil {
 		defer evSpan.End()

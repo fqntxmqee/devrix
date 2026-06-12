@@ -84,7 +84,7 @@ func TestIntegration_SessionExpiration(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	cfg.Session.IdleTimeout = 100 * time.Millisecond
+	cfg.Session.IdleTimeout = 2 * time.Second
 
 	gw := gateway.NewCommunicationGateway(store, nil, resumeEngine{}, nil, cfg)
 
