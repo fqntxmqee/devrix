@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/communication/eventbus"
+	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
-	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -36,25 +37,30 @@ type EngineEvent = contracts.EngineEvent
 // CommunicationGateway routes messages between adapters and the context engine
 type CommunicationGateway struct {
 	sessionStore  SessionStore
-	eventHandler EventHandler
+	eventHandler  EventHandler
 	contextEngine IContextEngine
 	permissionMgr *PermissionManager
-	config       *config.CommunicationConfig
-	obsBridge    *observability.Bridge
+	config        *config.CommunicationConfig
+	obsBridge     *observability.Bridge
 
-	mu              sync.RWMutex
-	sessions        map[string]*types.Session
-	activeProcesses map[string]context.CancelFunc
-	processes       sync.WaitGroup
-	agentFactory    multiagent.IAgentFactory
+	mu                   sync.RWMutex
+	sessions             map[string]*types.Session
+	activeProcesses      map[string]context.CancelFunc
+	processes            sync.WaitGroup
+	agentFactory         multiagent.IAgentFactory
 	agentObserverFactory func(ctx context.Context, session *types.Session) multiagent.AgentObserver
-	sessionAgents   map[string]multiagent.Agent
+	sessionAgents        map[string]multiagent.Agent
 
 	// metrics
 	metricInboundMsgs    metrics.Counter
 	metricOutboundMsgs   metrics.Counter
 	metricSessionsTotal  metrics.Counter
 	metricActiveSessions metrics.Gauge
+
+	// eventDispatcher routes engine events through the backpressure
+	// bus when wired (DM-20260611-003). When nil, events flow
+	// synchronously through handleEngineEvents as before.
+	eventDispatcher *eventDispatcher
 }
 
 // NewCommunicationGateway creates a new CommunicationGateway
@@ -66,11 +72,11 @@ func NewCommunicationGateway(
 	cfg *config.CommunicationConfig,
 ) *CommunicationGateway {
 	gw := &CommunicationGateway{
-		sessionStore:  sessionStore,
-		eventHandler: eventHandler,
-		contextEngine: contextEngine,
-		permissionMgr: permissionMgr,
-		config:       cfg,
+		sessionStore:    sessionStore,
+		eventHandler:    eventHandler,
+		contextEngine:   contextEngine,
+		permissionMgr:   permissionMgr,
+		config:          cfg,
 		sessions:        make(map[string]*types.Session),
 		activeProcesses: make(map[string]context.CancelFunc),
 	}
@@ -121,6 +127,26 @@ func (g *CommunicationGateway) SetObservability(obs *observability.Observability
 	if g.permissionMgr != nil {
 		g.permissionMgr.SetObservability(obs)
 	}
+}
+
+// SetEventBus wires a BackpressureEventBus into the gateway. When set,
+// engine events are routed through the bus (Publish for Normal/Low,
+// PublishCritical for complete/error). When nil, the gateway falls back
+// to its original synchronous fanout path — fully wire-compatible.
+//
+// This is a bootstrap-time setter; calling it while processes are
+// in-flight is not supported.
+func (g *CommunicationGateway) SetEventBus(bus EventBusPort) {
+	if g.eventDispatcher == nil {
+		g.eventDispatcher = newEventDispatcher(bus)
+	} else {
+		g.eventDispatcher.SetBus(bus)
+	}
+}
+
+// EventBusEnabled reports whether a backpressure event bus is wired in.
+func (g *CommunicationGateway) EventBusEnabled() bool {
+	return g.eventDispatcher != nil && g.eventDispatcher.IsEnabled()
 }
 
 func (g *CommunicationGateway) initMetrics(obs *observability.Observability) {
@@ -231,7 +257,9 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		}
 		slog.Warn("failed to update session", "sessionID", session.SessionID)
 	} else {
-		if storeSpan != nil { storeSpan.End() }
+		if storeSpan != nil {
+			storeSpan.End()
+		}
 	}
 
 	if g.agentFactory != nil {
@@ -262,9 +290,19 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	return nil
 }
 
-// handleEngineEvents processes events from the context engine
+// handleEngineEvents processes events from the context engine.
+//
+// When an event bus is wired, events are pushed through the bus
+// (g.eventDispatcher.Publish) and a dedicated consumer goroutine
+// dispatches them back to handleEngineEvent — giving us backpressure
+// at the bus boundary. When no bus is wired, the original synchronous
+// fanout path is preserved.
 func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *types.Session, events <-chan *EngineEvent) {
 	slog.Info("gateway: handleEngineEvents started", "sessionID", session.SessionID)
+	if g.EventBusEnabled() {
+		g.handleEngineEventsViaBus(ctx, session, events)
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -276,6 +314,144 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 				return
 			}
 			g.handleEngineEvent(ctx, session, event)
+		}
+	}
+}
+
+// handleEngineEventsViaBus pushes engine events into the bus and runs
+// a consumer goroutine that pulls fanout events back and dispatches
+// them via handleEngineEvent. Returns ONLY after both the producer
+// (events channel) and the consumer (bus subscription) have completed —
+// this preserves the original ordering: handleEngineEvents → unregister
+// → persist in the RouteInbound goroutine, with no concurrent
+// session-state mutation.
+//
+// Teardown sequence (deterministic, no sleeps):
+//  1. Producer drains `events` into the bus until the channel closes.
+//  2. After producerDone, we call cancelSub. cancelSub atomically
+//     (under subsMu) removes the sub from the bus and closes sub.done.
+//     - New fanout calls won't include this sub (removed from subs).
+//     - In-flight fanout calls see done-closed and skip the send.
+//  3. The consumer observes done-closed, drains any remaining events
+//     already buffered in sub.ch (non-blocking), and exits.
+//  4. We wait for consumerDone before returning — guarantees all
+//     session-state mutations (e.g. SetState) have completed.
+func (g *CommunicationGateway) handleEngineEventsViaBus(ctx context.Context, session *types.Session, events <-chan *EngineEvent) {
+	// Subscribe SYNCHRONOUSLY before starting the consumer goroutine
+	// so the bus's fanout path can see the subscription.
+	subscribe := extractBusSubscribe(g.eventDispatcher.bus)
+	var ch <-chan eventbus.Event
+	var doneSub <-chan struct{}
+	var cancelSub func()
+	if subscribe != nil {
+		_, ch, doneSub, cancelSub = subscribe(session.SessionID)
+		g.eventDispatcher.SetSubCancel(cancelSub)
+	}
+
+	// consumerDone signals that the consumer has fully drained the
+	// bus's subscriber channel and exited.
+	consumerDone := make(chan struct{})
+	g.processes.Add(1)
+	go func() {
+		defer g.processes.Done()
+		defer close(consumerDone)
+		g.handleEngineEventsBusConsumer(ctx, session, ch, doneSub)
+	}()
+
+	// Producer: forward from the context engine's event channel into
+	// the bus. This is a tiny, non-blocking pump. We exit when the
+	// source channel closes or ctx fires.
+	producerDone := make(chan struct{})
+	go func() {
+		defer close(producerDone)
+		slog.Info("gateway: bus producer started", "sessionID", session.SessionID)
+		defer slog.Info("gateway: bus producer exited", "sessionID", session.SessionID)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
+				slog.Info("gateway: bus producer publish", "type", event.Type, "sessionID", session.SessionID)
+				g.eventDispatcher.Publish(ctx, event)
+				slog.Info("gateway: bus producer publish done", "type", event.Type, "sessionID", session.SessionID)
+			}
+		}
+	}()
+
+	// Wait for the producer to finish forwarding all events into the
+	// bus. The bus's fanout + monitor goroutines will pick them up
+	// and deliver to sub.ch asynchronously.
+	<-producerDone
+	// Cancel the subscription. This atomically (under subsMu) removes
+	// the sub from the bus and closes sub.done — so no new events can
+	// be fanned to this consumer and any in-flight fanout will see
+	// done-closed and skip the send.
+	if cancelSub != nil {
+		cancelSub()
+	}
+	// Wait for the consumer to finish processing all fanned-out
+	// events (which mutates session state) before returning.
+	<-consumerDone
+}
+
+// handleEngineEventsBusConsumer is the consumer side of the bus-pump.
+// It reads events from the bus's subscriber channel and dispatches
+// them to handleEngineEvent. It exits when ANY of:
+//   - ctx.Done() fires (caller cancellation)
+//   - doneSub is closed (the bus's cancel was called, and the
+//     consumer has drained everything currently in ch — including
+//     a bounded settle period to absorb any in-flight fanout)
+//   - ch is closed (the bus itself was Close()d)
+//
+// When doneSub is closed, the consumer first waits a small "settle"
+// period (so any in-flight fanout that has already started can
+// complete and deliver to ch), then drains ch (non-blocking) before
+// exiting. This is the critical correctness window for
+// complete/error events: the publisher's PublishCritical rendezvous
+// is already complete by the time the event lands in ch, so the
+// event must be in our buffer and dispatched. The settle period is
+// bounded to keep the gateway's shutdown latency small.
+func (g *CommunicationGateway) handleEngineEventsBusConsumer(
+	ctx context.Context,
+	session *types.Session,
+	ch <-chan eventbus.Event,
+	doneSub <-chan struct{},
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-doneSub:
+			// Bus cancelled the subscription. Give any
+			// in-flight fanout a brief settle window to
+			// complete and land in ch, then drain. The
+			// fanout is non-blocking with a default case,
+			// so it can complete in microseconds; a small
+			// settle is sufficient.
+			time.Sleep(100 * time.Millisecond)
+			for {
+				select {
+				case ev, ok := <-ch:
+					if !ok {
+						return
+					}
+					if ev.EngineEvent != nil {
+						g.handleEngineEvent(ctx, session, ev.EngineEvent)
+					}
+				default:
+					return
+				}
+			}
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			if ev.EngineEvent != nil {
+				g.handleEngineEvent(ctx, session, ev.EngineEvent)
+			}
 		}
 	}
 }
@@ -312,12 +488,12 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		session.SetState(types.SessionStateThinking)
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: false,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  outboundMetadata("thinking", event),
+			Role:       types.MessageRoleAssistant,
+			Metadata:   outboundMetadata("thinking", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -325,12 +501,12 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		isComplete := event.Metadata != nil && event.Metadata["is_complete"] == "true"
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: isComplete,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  outboundMetadata("text", event),
+			Role:       types.MessageRoleAssistant,
+			Metadata:   outboundMetadata("text", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -341,11 +517,11 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   toolName,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    toolName,
 			IsComplete: false,
-			Role:      types.MessageRoleAssistant,
+			Role:       types.MessageRoleAssistant,
 			Metadata: map[string]string{
 				"event_type": "tool_call",
 				"tool_name":  toolName,
@@ -363,12 +539,12 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: true,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "tool_result", "tool_name": toolName},
+			Role:       types.MessageRoleAssistant,
+			Metadata:   map[string]string{"event_type": "tool_result", "tool_name": toolName},
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -381,16 +557,16 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			"render":             "milestone",
 			"milestone_name":     event.Metadata["task"],
 			"milestone_progress": event.Metadata["progress"],
-			"milestone_status": string(types.MilestoneStatusInProgress),
+			"milestone_status":   string(types.MilestoneStatusInProgress),
 		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: false,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  meta,
+			Role:       types.MessageRoleAssistant,
+			Metadata:   meta,
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -404,24 +580,24 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		}
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: false,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  meta,
+			Role:       types.MessageRoleAssistant,
+			Metadata:   meta,
 		}
 		g.eventHandler.OnMessage(outMsg)
 
 	case "info":
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: true,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  outboundMetadata("info", event),
+			Role:       types.MessageRoleAssistant,
+			Metadata:   outboundMetadata("info", event),
 		}
 		g.eventHandler.OnMessage(outMsg)
 
@@ -436,12 +612,12 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		summary := buildCompletionSummary(duration, usage, model, ctxPct)
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   summary,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    summary,
 			IsComplete: true,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "complete"},
+			Role:       types.MessageRoleAssistant,
+			Metadata:   map[string]string{"event_type": "complete"},
 		}
 		g.eventHandler.OnMessage(outMsg)
 		g.eventHandler.OnStatus(session.SessionID, types.SessionStateCompleted)
@@ -450,12 +626,12 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		session.SetState(types.SessionStateFailed)
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
-			SessionID: session.SessionID,
-			ChatID:    session.ChatID,
-			Content:   event.Content,
+			SessionID:  session.SessionID,
+			ChatID:     session.ChatID,
+			Content:    event.Content,
 			IsComplete: true,
-			Role:      types.MessageRoleAssistant,
-			Metadata:  map[string]string{"event_type": "error"},
+			Role:       types.MessageRoleAssistant,
+			Metadata:   map[string]string{"event_type": "error"},
 		}
 		g.eventHandler.OnMessage(outMsg)
 	}
@@ -501,7 +677,9 @@ func (g *CommunicationGateway) CreateSession(chatID, workDir string) (*types.Ses
 	session.ChatID = chatID
 
 	if err := g.sessionStore.Create(session); err != nil {
-		if createSpan != nil { createSpan.End() }
+		if createSpan != nil {
+			createSpan.End()
+		}
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -595,17 +773,23 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 
 	session, err := g.sessionStore.Get(sessionID)
 	if err != nil {
-		if expireSpan != nil { expireSpan.End() }
+		if expireSpan != nil {
+			expireSpan.End()
+		}
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 	if session == nil {
-		if expireSpan != nil { expireSpan.End() }
+		if expireSpan != nil {
+			expireSpan.End()
+		}
 		return errors.NewSessionNotFoundError(sessionID)
 	}
 
 	session.State = types.SessionStateFailed
 	if err := g.sessionStore.Update(session); err != nil {
-		if expireSpan != nil { expireSpan.End() }
+		if expireSpan != nil {
+			expireSpan.End()
+		}
 		return fmt.Errorf("failed to update session: %w", err)
 	}
 
@@ -820,8 +1004,7 @@ func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.
 			tracer.Attribute{Key: "message.adapter_id", Value: msg.AdapterID},
 			tracer.Attribute{Key: "message.chat_id", Value: msg.ChatID},
 			tracer.Attribute{Key: "message.user_id", Value: msg.UserID},
-			tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(msg.Content)),
-			},
+			tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(msg.Content))},
 		)...),
 	)
 
