@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 	"golang.org/x/sync/errgroup"
@@ -52,9 +52,9 @@ func (failingToolRunner) Execute(context.Context, contextengine.ToolCall) (*cont
 	return &contextengine.ToolResult{Error: "tool failed"}, nil
 }
 
-func collectEvents(run func(emit func(*gateway.EngineEvent))) []*gateway.EngineEvent {
-	var events []*gateway.EngineEvent
-	run(func(e *gateway.EngineEvent) {
+func collectEvents(run func(emit func(*contracts.EngineEvent))) []*contracts.EngineEvent {
+	var events []*contracts.EngineEvent
+	run(func(e *contracts.EngineEvent) {
 		events = append(events, e)
 	})
 	return events
@@ -96,7 +96,7 @@ func TestPEV_ConcurrentSessionIsolation(t *testing.T) {
 				Model:     "test",
 				PEVState:  types.DefaultPEVState(3),
 			}
-			events := collectEvents(func(emit func(*gateway.EngineEvent)) {
+			events := collectEvents(func(emit func(*contracts.EngineEvent)) {
 				_, _ = engine.Run(context.Background(), sc, nil, "hello", emit)
 			})
 			for _, ev := range events {
@@ -126,7 +126,7 @@ func TestPEV_ContextCancellation_Cleanup(t *testing.T) {
 		Model:     "test",
 		PEVState:  types.DefaultPEVState(3),
 	}
-	_, err := engine.Run(ctx, sc, nil, "hello", func(*gateway.EngineEvent) {})
+	_, err := engine.Run(ctx, sc, nil, "hello", func(*contracts.EngineEvent) {})
 	if err == nil {
 		t.Fatal("expected context cancellation error")
 	}
@@ -174,7 +174,7 @@ func TestPEV_MaxIterations_Exhausted(t *testing.T) {
 		PEVState:  types.DefaultPEVState(3),
 	}
 
-	_, err := engine.Run(context.Background(), sc, nil, "hello", func(*gateway.EngineEvent) {})
+	_, err := engine.Run(context.Background(), sc, nil, "hello", func(*contracts.EngineEvent) {})
 	if err == nil {
 		t.Fatal("expected max iterations error")
 	}

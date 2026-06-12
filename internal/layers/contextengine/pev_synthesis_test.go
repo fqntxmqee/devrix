@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -116,7 +116,7 @@ func TestPEVEngine_should_force_synthesis_after_failed_tools_in_basic_mode(t *te
 	engine := newSynthesisTestEngine(t, llm, &failingToolRunner{})
 	sc := &types.SessionContext{SessionID: "sess_basic_fail", Model: "test", WorkDir: t.TempDir()}
 
-	_, err := engine.Run(context.Background(), sc, nil, "hello", func(*gateway.EngineEvent) {})
+	_, err := engine.Run(context.Background(), sc, nil, "hello", func(*contracts.EngineEvent) {})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -155,8 +155,8 @@ func TestPEVEngine_should_force_synthesis_llm_when_tools_only(t *testing.T) {
 	engine := newSynthesisTestEngine(t, llm, &mockctx.ToolRunner{Output: "total 48\ndrwxr-xr-x devrix"})
 	sc := &types.SessionContext{SessionID: "sess_test", Model: "test", WorkDir: t.TempDir()}
 
-	var events []gateway.EngineEvent
-	result, err := engine.Run(context.Background(), sc, nil, "list files", func(ev *gateway.EngineEvent) {
+	var events []contracts.EngineEvent
+	result, err := engine.Run(context.Background(), sc, nil, "list files", func(ev *contracts.EngineEvent) {
 		events = append(events, *ev)
 	})
 	if err != nil {
@@ -204,7 +204,7 @@ func TestPEVEngine_should_force_synthesis_llm_when_preamble_text_with_tools(t *t
 	engine := newSynthesisTestEngine(t, llm, &mockctx.ToolRunner{Output: "devrix-layering-standard/"})
 	sc := &types.SessionContext{SessionID: "sess_test", Model: "test", WorkDir: t.TempDir()}
 
-	_, err := engine.Run(context.Background(), sc, nil, "未完成项目?", func(*gateway.EngineEvent) {})
+	_, err := engine.Run(context.Background(), sc, nil, "未完成项目?", func(*contracts.EngineEvent) {})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -231,8 +231,8 @@ func TestPEVEngine_should_emit_tool_fallback_when_synthesis_llm_fails(t *testing
 	engine := newSynthesisTestEngine(t, failingLLM, &mockctx.ToolRunner{Output: "devrix output"})
 	sc := &types.SessionContext{SessionID: "sess_test", Model: "test", WorkDir: t.TempDir()}
 
-	var events []gateway.EngineEvent
-	result, err := engine.Run(context.Background(), sc, nil, "hello", func(ev *gateway.EngineEvent) {
+	var events []contracts.EngineEvent
+	result, err := engine.Run(context.Background(), sc, nil, "hello", func(ev *contracts.EngineEvent) {
 		events = append(events, *ev)
 	})
 	if err != nil {

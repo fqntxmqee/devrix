@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -16,7 +15,7 @@ type MilestoneRunFunc func(
 	sc *types.SessionContext,
 	view []types.Message,
 	m *types.Milestone,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 ) (passed bool, err error)
 
 // MilestoneProgressFunc emits observability for milestone progress updates.
@@ -51,7 +50,7 @@ func (r *MilestoneRunner) Run(
 	sc *types.SessionContext,
 	view []types.Message,
 	taskID string,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 ) error {
 	order, err := r.planner.GetExecutionOrder(taskID)
 	if err != nil {
@@ -107,7 +106,7 @@ func (r *MilestoneRunner) Run(
 	return nil
 }
 
-func emitMilestoneProgress(emit func(*gateway.EngineEvent), sessionID string, m *types.Milestone, progress float64) {
+func emitMilestoneProgress(emit func(*contracts.EngineEvent), sessionID string, m *types.Milestone, progress float64) {
 	if emit == nil || m == nil {
 		return
 	}
@@ -115,7 +114,7 @@ func emitMilestoneProgress(emit func(*gateway.EngineEvent), sessionID string, m 
 	if pct > 100 {
 		pct = 100
 	}
-	emit(&gateway.EngineEvent{
+	emit(&contracts.EngineEvent{
 		Type:      "milestone_progress",
 		SessionID: sessionID,
 		Metadata: map[string]string{
@@ -127,11 +126,11 @@ func emitMilestoneProgress(emit func(*gateway.EngineEvent), sessionID string, m 
 	})
 }
 
-func emitMilestoneInfo(emit func(*gateway.EngineEvent), sessionID, content string) {
+func emitMilestoneInfo(emit func(*contracts.EngineEvent), sessionID, content string) {
 	if emit == nil {
 		return
 	}
-	emit(&gateway.EngineEvent{
+	emit(&contracts.EngineEvent{
 		Type:      "info",
 		Content:   content,
 		SessionID: sessionID,

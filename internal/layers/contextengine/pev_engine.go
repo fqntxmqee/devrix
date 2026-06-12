@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/pev"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
@@ -109,7 +108,7 @@ func (e *PEVEngine) Run(
 	sc *types.SessionContext,
 	view []types.Message,
 	userMessage string,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 ) (*PEVRunResult, error) {
 	if e.planEngine != nil && e.milestoneRunner != nil && pev.ShouldPlan(e.planCfg, sc.PEVState, userMessage) {
 		sc.PEVState.Phase = types.PEVPhasePlan
@@ -138,7 +137,7 @@ func (e *PEVEngine) Run(
 			}
 			// DM-20260611-008：milestone-only 路径不调 LLM（plan 已先调过），
 			// usage="0" 是真实情况；打 llm_called="false" 让 D5 观测层能区分。
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "complete", SessionID: sc.SessionID,
 				Metadata: map[string]string{
 					"usage":      "0",
@@ -161,7 +160,7 @@ func (e *PEVEngine) executeMilestone(
 	sc *types.SessionContext,
 	view []types.Message,
 	m *types.Milestone,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 ) (bool, error) {
 	msCtx, msSpan := e.startSpan(ctx, telemetry.OpContextMilestoneRun, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "milestone.id", Value: m.ID},
@@ -190,7 +189,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	sc *types.SessionContext,
 	view []types.Message,
 	systemPrompt string,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 	emitComplete bool,
 ) (*PEVRunResult, error) {
 	if e.queryLoopEnabled() {
@@ -304,16 +303,16 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			default:
 			}
 			if chunk.Thinking != "" {
-				emit(&gateway.EngineEvent{Type: "thinking", Content: chunk.Thinking, SessionID: sc.SessionID})
+				emit(&contracts.EngineEvent{Type: "thinking", Content: chunk.Thinking, SessionID: sc.SessionID})
 			}
 			if chunk.Content != "" {
 				thinking, content := tagSplitter.Push(chunk.Content)
 				if thinking != "" {
-					emit(&gateway.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
+					emit(&contracts.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
 				}
 				if content != "" {
 					assistantText += content
-					emit(&gateway.EngineEvent{
+					emit(&contracts.EngineEvent{
 						Type: "text", Content: content, SessionID: sc.SessionID,
 						Metadata: map[string]string{"is_complete": "false"},
 					})
@@ -329,11 +328,11 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 		}
 		if thinking, content := tagSplitter.Flush(); thinking != "" || content != "" {
 			if thinking != "" {
-				emit(&gateway.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
+				emit(&contracts.EngineEvent{Type: "thinking", Content: thinking, SessionID: sc.SessionID})
 			}
 			if content != "" {
 				assistantText += content
-				emit(&gateway.EngineEvent{
+				emit(&contracts.EngineEvent{
 					Type: "text", Content: content, SessionID: sc.SessionID,
 					Metadata: map[string]string{"is_complete": "false"},
 				})
@@ -377,7 +376,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			if risk == "" {
 				risk = e.toolsReg.RiskLevel(tc.Name)
 			}
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, ToolRisk: risk,
 				SessionID: sc.SessionID,
 				Metadata: map[string]string{"tool_name": tc.Name, "input": tc.Input, "risk_level": string(risk)},
@@ -442,7 +441,7 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 			if result.Error != "" {
 				content = result.Error
 			}
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "tool_result", Content: content, ToolName: tc.Name, SessionID: sc.SessionID,
 				Metadata: map[string]string{"tool_name": tc.Name, "error": result.Error},
 			})
@@ -516,9 +515,9 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	assistantText = textutil.StripThinkingTags(assistantText)
 
 	duration := time.Since(start).Milliseconds()
-	ctxPct := gateway.ComputeCtxPct(usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
+	ctxPct := contracts.ComputeCtxPct(usage.PromptTokens, sc.TokenBudget.MaxContextTokens)
 	if emitComplete {
-		emit(&gateway.EngineEvent{
+		emit(&contracts.EngineEvent{
 			Type: "complete", SessionID: sc.SessionID,
 			Metadata: map[string]string{
 				"usage":      fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens),
@@ -564,7 +563,7 @@ func (e *PEVEngine) runToolSynthesis(
 	systemPrompt string,
 	preamble string,
 	toolResults []ToolResult,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 ) (string, []ToolCall, TokenUsage) {
 	yolo := e.isYOLO()
 	var tools []ToolSchema
@@ -602,7 +601,7 @@ func (e *PEVEngine) runToolSynthesis(
 		}
 		slog.Warn("pev: synthesis llm failed", "sessionID", sc.SessionID, "cause", errDetail)
 		fallback := summarizeSuccessfulToolResults(toolResults)
-		emit(&gateway.EngineEvent{
+		emit(&contracts.EngineEvent{
 			Type: "text", Content: fallback, SessionID: sc.SessionID,
 			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 		})
@@ -620,7 +619,7 @@ func (e *PEVEngine) runToolSynthesis(
 				llmSpan.End()
 			}
 			fallback := summarizeSuccessfulToolResults(toolResults)
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "text", Content: fallback, SessionID: sc.SessionID,
 				Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 			})
@@ -631,7 +630,7 @@ func (e *PEVEngine) runToolSynthesis(
 			_, content := tagSplitter.Push(chunk.Content)
 			if content != "" {
 				synthText += content
-				emit(&gateway.EngineEvent{
+				emit(&contracts.EngineEvent{
 					Type: "text", Content: content, SessionID: sc.SessionID,
 					Metadata: map[string]string{"is_complete": "false"},
 				})
@@ -646,7 +645,7 @@ func (e *PEVEngine) runToolSynthesis(
 	}
 	if _, content := tagSplitter.Flush(); content != "" {
 		synthText += content
-		emit(&gateway.EngineEvent{
+		emit(&contracts.EngineEvent{
 			Type: "text", Content: content, SessionID: sc.SessionID,
 			Metadata: map[string]string{"is_complete": "false"},
 		})
@@ -669,7 +668,7 @@ func (e *PEVEngine) runToolSynthesis(
 	synthText = textutil.StripThinkingTags(synthText)
 	if strings.TrimSpace(synthText) == "" {
 		fallback := summarizeSuccessfulToolResults(toolResults)
-		emit(&gateway.EngineEvent{
+		emit(&contracts.EngineEvent{
 			Type: "text", Content: fallback, SessionID: sc.SessionID,
 			Metadata: map[string]string{"source": "tool_fallback", "is_complete": "false"},
 		})
@@ -734,7 +733,7 @@ func (e *PEVEngine) isYOLO() bool {
 
 func withToolStreamEmitter(
 	ctx context.Context,
-	emit func(*gateway.EngineEvent),
+	emit func(*contracts.EngineEvent),
 	sessionID, toolName string,
 ) context.Context {
 	if emit == nil {
@@ -743,17 +742,17 @@ func withToolStreamEmitter(
 	return WithToolStreamEmitter(ctx, func(ev ToolStreamEvent) {
 		switch ev.Type {
 		case "thinking":
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "thinking", Content: ev.Content, SessionID: sessionID,
 				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
 			})
 		case "text":
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "text", Content: ev.Content, SessionID: sessionID,
 				Metadata: map[string]string{"is_complete": "false", "source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
 			})
 		case "tool_use":
-			emit(&gateway.EngineEvent{
+			emit(&contracts.EngineEvent{
 				Type: "info", Content: ev.Content, SessionID: sessionID,
 				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
 			})
@@ -761,12 +760,12 @@ func withToolStreamEmitter(
 	})
 }
 
-func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *gateway.EngineEvent {
+func pevErrorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *contracts.EngineEvent {
 	rec := "false"
 	if recoverable {
 		rec = "true"
 	}
-	return &gateway.EngineEvent{
+	return &contracts.EngineEvent{
 		Type: "error", Content: err.Error(), SessionID: sessionID,
 		Metadata: map[string]string{"code": err.Code, "recoverable": rec},
 	}

@@ -3,7 +3,7 @@ package query
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -52,7 +52,7 @@ type TokenUsage struct {
 }
 
 // EmitFunc streams engine events to the gateway.
-type EmitFunc func(*gateway.EngineEvent)
+type EmitFunc func(*contracts.EngineEvent)
 
 // CompressFunc runs messages-only compression for one iteration.
 type CompressFunc func(ctx context.Context, msgs []types.Message) ([]types.Message, error)

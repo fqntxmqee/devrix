@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/harness"
@@ -53,7 +52,7 @@ type EngineDeps struct {
 	DefaultModel string
 }
 
-// ContextEngine implements gateway.IContextEngine.
+// ContextEngine implements contracts.IEngine.
 type ContextEngine struct {
 	memory       *memory.Manager
 	counter      contracts.ITokenCounter
@@ -184,19 +183,19 @@ func (e *ContextEngine) Shutdown(timeout time.Duration) error {
 	return e.asyncCompact.Shutdown(timeout)
 }
 
-// Process implements gateway.IContextEngine.
-func (e *ContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *gateway.EngineEvent {
-	ch := make(chan *gateway.EngineEvent, 32)
+// Process implements contracts.IEngine.
+func (e *ContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
+	ch := make(chan *contracts.EngineEvent, 32)
 	go e.runProcess(ctx, session, message, ch)
 	return ch
 }
 
-func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, message string, ch chan<- *gateway.EngineEvent) {
+func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, message string, ch chan<- *contracts.EngineEvent) {
 	defer close(ch)
 	start := time.Now()
 	slog.Info("context engine: Process", "sessionID", session.SessionID, "messageLen", len(message))
 
-	emit := func(ev *gateway.EngineEvent) {
+	emit := func(ev *contracts.EngineEvent) {
 		select {
 		case <-ctx.Done():
 			return
@@ -446,7 +445,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	working := memory.NewWorkingMemory()
-	result, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *gateway.EngineEvent) {
+	result, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *contracts.EngineEvent) {
 		if ev.Type == "text" && ev.Metadata["is_complete"] == "false" {
 			working.AppendStream(ev.Content)
 		}
@@ -594,8 +593,8 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 	return compression.NewPipeline(opts...)
 }
 
-func infoEvent(sessionID, content string) *gateway.EngineEvent {
-	return &gateway.EngineEvent{
+func infoEvent(sessionID, content string) *contracts.EngineEvent {
+	return &contracts.EngineEvent{
 		Type:      "info",
 		Content:   content,
 		SessionID: sessionID,
@@ -603,12 +602,12 @@ func infoEvent(sessionID, content string) *gateway.EngineEvent {
 	}
 }
 
-func errorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *gateway.EngineEvent {
+func errorEvent(sessionID string, err *errors.SentinelError, recoverable bool) *contracts.EngineEvent {
 	rec := "false"
 	if recoverable {
 		rec = "true"
 	}
-	return &gateway.EngineEvent{
+	return &contracts.EngineEvent{
 		Type:      "error",
 		Content:   err.Error(),
 		SessionID: sessionID,
@@ -648,7 +647,7 @@ func (e *ContextEngine) initMetrics() {
 	})
 }
 
-func mapProcessError(sessionID string, err error) *gateway.EngineEvent {
+func mapProcessError(sessionID string, err error) *contracts.EngineEvent {
 	if err == nil {
 		return nil
 	}

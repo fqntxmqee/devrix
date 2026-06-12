@@ -1,0 +1,44 @@
+name: layer-lint
+
+# Covers: L5-0-0-03  (CI gate that blocks reverse D{N}→D{M} imports)
+#
+# This workflow runs the devrix-layer-lint scanner on every PR. In WARN mode
+# the scanner reports violations but exits 0; the strict job in the same file
+# runs with --strict and exits 1 on any violation. Future change sets can flip
+# the default to --strict once the violation count is at zero (see
+# devrix-layer-isolation / DM-20260611-002).
+
+on:
+  pull_request:
+    branches: [main, master, feat/**]
+  push:
+    branches: [feat/**]
+
+jobs:
+  warn:
+    name: layer-lint (warn)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run layer-lint (report only)
+        run: go run ./cmd/devrix-layer-lint --root=internal/layers --format=text
+
+  strict:
+    name: layer-lint (strict gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run layer-lint (block on violation)
+        run: go run ./cmd/devrix-layer-lint --root=internal/layers --format=text --strict

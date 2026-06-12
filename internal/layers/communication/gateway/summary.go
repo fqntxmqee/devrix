@@ -4,7 +4,18 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
+
+// ComputeCtxPct is a thin shim kept for backward compatibility with any caller
+// that still imports the function from D1. The canonical implementation lives
+// in shared/contracts (L5-0-0-02: cross-layer contract surface must be free of
+// D{N}→D{N} imports). D2 PEV/QueryLoop has been migrated to call contracts.ComputeCtxPct
+// directly. New code should import the shared helper.
+func ComputeCtxPct(promptTokens, maxContextTokens int) int {
+	return contracts.ComputeCtxPct(promptTokens, maxContextTokens)
+}
 
 // formatDuration 将毫秒数格式化为人类可读时间。
 //   - durationMs <= 0       → "0s"
@@ -51,23 +62,6 @@ func parseInt64Safe(s string) int64 {
 		return 0
 	}
 	return n
-}
-
-// ComputeCtxPct 计算当前 PEV run 最后一次 LLM 调用的 prompt tokens
-// 占上下文窗口的百分比（0-100）。当 maxContextTokens 或 promptTokens
-// 任一为 0 时返回 0；超限 clamp 至 100。
-//
-// DM-20260611-008：与 D1 摘要的 "ctx: X%" 段口径一致。D2 PEV/QueryLoop
-// 在 emit complete 时也用此函数计算 ctx_pct metadata，保证两侧一致。
-func ComputeCtxPct(promptTokens, maxContextTokens int) int {
-	if maxContextTokens <= 0 || promptTokens <= 0 {
-		return 0
-	}
-	pct := promptTokens * 100 / maxContextTokens
-	if pct > 100 {
-		pct = 100
-	}
-	return pct
 }
 
 // buildCompletionSummary 拼装"任务完成"卡片的摘要字符串。
