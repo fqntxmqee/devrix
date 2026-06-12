@@ -3,9 +3,11 @@ package agent
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/sessionview"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -25,6 +27,7 @@ type Impl struct {
 	state           multiagent.AgentState
 	cfg             multiagent.AgentConfig
 	session         *types.Session
+	view            *sessionview.View // DM-20260611-005: fork-isolated metadata view
 	deps            multiagent.AgentDeps
 	creator         Creator
 	permGate        *agentPermissionGate
@@ -32,7 +35,9 @@ type Impl struct {
 	engineEventSink func(*contracts.EngineEvent)
 	childAgents     map[string]multiagent.Agent
 	messageBuffer   []types.Message
+	joinedToolIDs   map[string]struct{} // DM-20260611-005: dedup state for Join
 	result          *multiagent.AgentResult
+	finishedAt      time.Time // captured by finishResult; used by Join sort
 	done            chan struct{}
 	doneOnce        sync.Once
 
@@ -58,10 +63,12 @@ func New(
 		state:         multiagent.AgentStateCreated,
 		cfg:           cfg,
 		session:       session,
+		view:          sessionview.Fork(session),
 		deps:          deps,
 		creator:       creator,
 		childAgents:   make(map[string]multiagent.Agent),
 		messageBuffer: make([]types.Message, 0),
+		joinedToolIDs: make(map[string]struct{}, 4),
 		done:          make(chan struct{}),
 	}
 	a.permGate = newAgentPermissionGate(a)
@@ -157,11 +164,37 @@ func (a *Impl) finishResult(result *multiagent.AgentResult) {
 		return
 	}
 	a.result = result
+	a.finishedAt = time.Now()
 	a.state = multiagent.AgentStateTerminated
 	a.doneOnce.Do(func() { close(a.done) })
 	if a.creator != nil {
 		a.creator.ReleaseSession(a.cfg.SessionID)
 	}
+}
+
+// FinishedAt returns the wall-clock timestamp at which the agent entered
+// the TERMINATED state. Zero before termination. Used by Join to sort
+// child contributions by completion order (DM-20260611-005).
+func (a *Impl) FinishedAt() time.Time {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.finishedAt
+}
+
+// AttachSessionView binds a COW view to this agent. Subsequent child
+// forks will inherit an isolated child view of the bound view.
+func (a *Impl) AttachSessionView(v *sessionview.View) {
+	a.mu.Lock()
+	a.view = v
+	a.mu.Unlock()
+}
+
+// SessionView returns the COW view bound to this agent. Nil only when
+// the agent was created without going through a Fork flow.
+func (a *Impl) SessionView() *sessionview.View {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.view
 }
 
 func (a *Impl) activeChildCount() int {

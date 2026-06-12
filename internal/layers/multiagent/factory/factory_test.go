@@ -7,6 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
 	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/sessionview"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -108,5 +109,33 @@ func TestAgentFactory_should_enforce_max_total_agents_per_session(t *testing.T) 
 	}
 	if _, err := f.Create(context.Background(), base, session); err == nil {
 		t.Fatal("expected max total agents error")
+	}
+}
+
+// Covers: L5-4-3-04 (ForkSessionView API injection via factory)
+func TestAgentFactory_CreateWithView_should_bind_view_to_agent(t *testing.T) {
+	f := NewAgentFactory(multiagent.AgentDeps{
+		Engine: &agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
+	}, config.DefaultMultiAgentConfig())
+	session := types.NewSession("sess_create_view", "cli", "/tmp")
+	view := sessionview.Fork(session)
+	view.SetMetadata("pre_bind", "yes")
+
+	ag, err := f.CreateWithView(context.Background(), multiagent.AgentConfig{
+		SessionID: session.SessionID,
+		WorkDir:   session.WorkDir,
+	}, session, view)
+	if err != nil {
+		t.Fatalf("CreateWithView: %v", err)
+	}
+	impl, ok := ag.(*agent.Impl)
+	if !ok {
+		t.Fatalf("expected *agent.Impl, got %T", ag)
+	}
+	if impl.SessionView() == nil {
+		t.Fatal("agent has no SessionView after CreateWithView")
+	}
+	if v, _ := impl.SessionView().GetMetadata("pre_bind"); v != "yes" {
+		t.Errorf("pre_bind = %v, want yes", v)
 	}
 }

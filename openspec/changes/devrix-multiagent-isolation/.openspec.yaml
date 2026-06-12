@@ -5,11 +5,11 @@ meta:
   change_id: devrix-multiagent-isolation
   demand_id: DM-20260611-005
   title: "多 Agent 会话隔离 — Join 合并与 Session 元数据隔离"
-  status: s2_proposal
+  status: s4_implemented
   priority: P1
   owner: devrix-team
   created_at: "2026-06-11"
-  updated_at: "2026-06-11"
+  updated_at: "2026-06-12"
   source: devrix-harness-architecture-audit
 
 scope:
@@ -50,13 +50,21 @@ deliverables:
   - path: demand.md
     status: completed
   - path: design.md
-    status: pending
+    status: completed
   - path: tasks.md
-    status: pending
+    status: completed
   - path: internal/layers/multiagent/agent/agent.go
-    status: pending
+    status: completed
   - path: internal/layers/multiagent/factory/factory.go
-    status: pending
+    status: completed
+  - path: internal/layers/multiagent/sessionview/sessionview.go
+    status: completed
+  - path: internal/layers/multiagent/observability/metrics.go
+    status: completed
+  - path: internal/layers/observability/metrics/multiagent.go
+    status: completed
+  - path: internal/layers/evolution/eval/session_isolation_probe.go
+    status: completed
 
 version_scope:
   v1.0:
@@ -65,7 +73,7 @@ version_scope:
       - "Fork metadata COW 隔离"
       - "ForkSessionView 快照 API"
       - "SessionIsolationProbe 注册"
-    status: planned
+    status: implemented
   v1.1:
     features:
       - "Task 抽象（local_bash / local_agent）作为 Fork 通用替代"
@@ -77,8 +85,8 @@ version_scope:
 
 external_dependencies:
   - component: "DM-007 Wave Scheduler"
-    status: planned
-    note: "ContextPolicy resolver 消费 ForkSessionView"
+    status: available
+    note: "ContextPolicy resolver 消费 ForkSessionView (via factory.CreateWithView)"
   - component: "DM-012 QueryLoop v6（已归档）"
     status: available
 
