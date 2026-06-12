@@ -11,6 +11,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/gateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/breaker"
@@ -51,15 +52,15 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:          llmBridge,
 		TokenCounter: counter,
-		Tools:        &NoOpToolRunner{},
+		Tools:        &mockctx.ToolRunner{},
 		ToolsReg:     mustBuiltinRegistry(t),
-		Permission:   &AllowAllPermission{},
+		Permission:   mockctx.AllowAllPermission{},
 		Config:       ctxCfg,
 	})
 
 	builder := &integrationEngineBuilder{
 		llm:      llmBridge,
-		tools:    &NoOpToolRunner{},
+		tools:    &mockctx.ToolRunner{},
 		toolsReg: mustBuiltinRegistry(t),
 		ctxCfg:   ctxCfg,
 	}

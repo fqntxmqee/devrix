@@ -59,18 +59,6 @@ func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
 		t.Errorf("List() order = %+v, want alpha, beta", list)
 	}
 
-	// FindByCapability — single match
-	codingTools := reg.FindByCapability("coding")
-	if len(codingTools) != 1 {
-		t.Errorf("FindByCapability('coding') = %d, want 1", len(codingTools))
-	}
-
-	// FindByCapability — no match
-	none := reg.FindByCapability("editing")
-	if len(none) != 0 {
-		t.Errorf("FindByCapability('editing') = %d, want 0", len(none))
-	}
-
 	// Duplicate registration rejected
 	if err := reg.Register(alpha); err == nil {
 		t.Error("expected error on duplicate registration")

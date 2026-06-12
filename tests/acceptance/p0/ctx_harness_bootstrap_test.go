@@ -12,9 +12,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/harness"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -46,10 +46,14 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 	t.Run("disabled matches legacy system prompt", func(t *testing.T) {
 		ctxCfg := config.DefaultContextEngineConfig()
 		ctxCfg.LongTerm.Enabled = false
+		toolsReg, err := registry.NewBuiltinRegistry()
+		if err != nil {
+			t.Fatalf("NewBuiltinRegistry: %v", err)
+		}
 		engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 			LLM:        &mockctx.LLMGateway{Response: "ok"},
 			Tools:      &mockctx.ToolRunner{},
-			ToolsReg:   registry.NewBuiltinRegistry(),
+			ToolsReg:   toolsReg,
 			Permission: mockctx.AllowAllPermission{},
 			Config:     ctxCfg,
 		})
@@ -76,10 +80,14 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		ctxCfg.LongTerm.Enabled = false
 
 		llm := &harnessCaptureLLM{response: "done"}
+		toolsReg, err := registry.NewBuiltinRegistry()
+		if err != nil {
+			t.Fatalf("NewBuiltinRegistry: %v", err)
+		}
 		engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 			LLM:        llm,
 			Tools:      &mockctx.ToolRunner{},
-			ToolsReg:   registry.NewBuiltinRegistry(),
+			ToolsReg:   toolsReg,
 			Permission: mockctx.AllowAllPermission{},
 			Config:     ctxCfg,
 		})
@@ -105,7 +113,7 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 			t.Fatal("agents body missing from assembled prompt")
 		}
 		if len(llm.lastTools) != 3 {
-			t.Fatalf("PEV tool count: got %d want 3", len(llm.lastTools))
+			t.Fatalf("visible tool count: got %d want 3", len(llm.lastTools))
 		}
 		for _, tool := range llm.lastTools {
 			switch tool.Name {
@@ -117,11 +125,11 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 	})
 
 	t.Run("build legacy equals disabled build path", func(t *testing.T) {
-		assembler := harness.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+		assembler := prompt.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 		entries := []memory.MemoryEntry{{Topic: "bugs", Content: "race fix"}}
 		appendix := memory.FormatLongTermAppendix(entries, 2000)
 		legacy := assembler.BuildLegacy("Agents", appendix)
-		disabled, _ := assembler.Build(harness.SystemPromptBuildInput{
+		disabled, _ := assembler.Build(prompt.SystemPromptBuildInput{
 			HarnessEnabled: false,
 			AgentsRaw:      "Agents",
 			MemoryEntries:  entries,

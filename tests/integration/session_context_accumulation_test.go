@@ -13,6 +13,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/gateway"
@@ -127,9 +128,9 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:          llmBridge,
 		TokenCounter: counter,
-		Tools:        &NoOpToolRunner{},
+		Tools:        &mockctx.ToolRunner{},
 		ToolsReg:     mustBuiltinRegistry(t),
-		Permission:   &AllowAllPermission{},
+		Permission:   mockctx.AllowAllPermission{},
 		Config:       ctxCfg,
 		ObsBridge:    obsBridge,
 	})
