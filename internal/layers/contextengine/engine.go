@@ -465,7 +465,18 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	working := memory.NewWorkingMemory()
+	// Defer the "complete" event until AFTER snapshot persist + sc.Messages
+	// writes finish below. The PEV / QueryLoop paths historically emit
+	// complete inline (before AppendMessage at L522 and PersistSnapshot at
+	// L555), which races with downstream readers (gateway persist,
+	// integration tests reading sc.Messages once the handler counts
+	// "complete"). Intercept it here, replay after the writes are durable.
+	var pendingComplete *contracts.EngineEvent
 	result, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *contracts.EngineEvent) {
+		if ev.Type == "complete" {
+			pendingComplete = ev
+			return
+		}
 		if ev.Type == "text" && ev.Metadata["is_complete"] == "false" {
 			working.AppendStream(ev.Content)
 		}
@@ -568,6 +579,13 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		}
 	} else if saveSpan != nil {
 		saveSpan.End()
+	}
+
+	// Replay the deferred "complete" so downstream consumers (gateway
+	// persist, integration tests) only see it after all sc.Messages /
+	// session.ContextSnapshot writes above are durable.
+	if pendingComplete != nil {
+		emit(pendingComplete)
 	}
 
 	slog.Debug("contextengine: process done", "sessionID", session.SessionID, "duration", time.Since(start))

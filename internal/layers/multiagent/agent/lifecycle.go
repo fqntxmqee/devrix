@@ -143,6 +143,14 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 					Content: finalText,
 				})
 			}
+			// Drain the channel so the engine goroutine fully exits before
+			// we return. The engine writes to session.ContextSnapshot AFTER
+			// emitting "complete" (snapshot persist happens at the tail of
+			// runProcess); gateway.persistSessionAfterProcess then races
+			// with that write under -race. Channel close establishes the
+			// happens-before edge we need.
+			for range eventCh {
+			}
 			return &multiagent.AgentResult{Messages: a.GetMessages(), ExitCode: 0}, nil
 		case "error":
 			return nil, sharederrors.WithCode("AGT_ENGINE_ERROR", ev.Content, nil)

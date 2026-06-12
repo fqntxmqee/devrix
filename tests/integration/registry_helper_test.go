@@ -1,4 +1,4 @@
-//go:build integration && cross
+//go:build integration
 
 package integration
 
