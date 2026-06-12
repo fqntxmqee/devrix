@@ -46,9 +46,15 @@ type SubQueryConfig struct {
 }
 
 // DefaultQueryLoopConfig returns v1.0 defaults.
+//
+// As of DM-20260611-004 (Legacy Harness 退役), QueryLoop is the *only*
+// supported primary LLM↔Tool path. Enabled defaults to true so that
+// production deployments get the QueryLoop path without any extra
+// configuration. Operators who genuinely need the legacy harness path
+// can still flip `query_loop.enabled: false` explicitly.
 func DefaultQueryLoopConfig() QueryLoopConfig {
 	return QueryLoopConfig{
-		Enabled:         false,
+		Enabled:         true,
 		MaxTurns:        0,
 		CompressPerTurn: true,
 	}

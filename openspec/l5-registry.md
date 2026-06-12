@@ -191,6 +191,20 @@
 | L5-CTX-41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/query/fork_test.go` | IMPLEMENTED | P1 |
 | L5-CTX-42 | sidechain transcript resume 重建 messages | QueryLoop | `internal/layers/contextengine/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
 
+### D2-S11: Harness Unification (Legacy 退役)
+
+> **Change:** `devrix-harness-unification` (DM-20260611-004)
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-2-9-01 | `query_loop.enabled` 默认 true (L5 命名沿用 §D2-S9 编号区间以避免重复) | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-02 | harnessEnabled 分支不再被生产路径触发 (D5 runtime.path_resolved_total{path=query_loop}++) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-03 | 旧路径调用计数基线=0 (100 次 Process 循环后 LegacyHarness=0) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
+| L5-2-9-04 | 压缩入口统一：QueryLoop 走 messages-only 七步管道 (`WithSkipAssembly=true`) | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-TD01 | TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call | HarnessUnification | `internal/layers/contextengine/query/loop_recovery_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-TD03 | TD-QL-03: overload/5xx → 切换 fallback model | HarnessUnification | `internal/layers/contextengine/query/loop_fallback_test.go` | IMPLEMENTED | P1 |
+| L5-2-9-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 (CI 阻断) | HarnessUnification | `internal/layers/evolution/eval/path_regression_probe_test.go` | IMPLEMENTED | P0 |
+
 ### D2-S12: Worktree Module
 
 > **Change:** `devrix-queryloop-context` v2.0 (DM-20260610-012)
