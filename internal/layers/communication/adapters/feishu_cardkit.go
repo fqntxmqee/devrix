@@ -32,6 +32,69 @@ func newCardkitClient(api FeishuAPI) *cardkitClient {
 	return &cardkitClient{api: api}
 }
 
+// CardkitClient is the public surface for cardkit operations. The
+// WaveScheduler worker card renderer uses this to stream element content
+// without depending on the full FeishuAdapter. It wraps a FeishuAPI and is
+// safe for concurrent use.
+type CardkitClient struct {
+	api FeishuAPI
+}
+
+// NewCardkitClient returns a public CardkitClient.
+func NewCardkitClient(api FeishuAPI) *CardkitClient {
+	return &CardkitClient{api: api}
+}
+
+// CreateCard creates a cardkit card and returns its ID.
+func (c *CardkitClient) CreateCard(ctx context.Context, cardJSON string) (string, error) {
+	body := map[string]any{
+		"type": "card_json",
+		"data": cardJSON,
+	}
+	apiResp, err := c.api.Post(ctx, "/open-apis/cardkit/v1/cards", body, larkcore.AccessTokenTypeTenant)
+	if err != nil {
+		return "", fmt.Errorf("cardkit create card: %w", err)
+	}
+	return parseCardkitCreateResponse(apiResp)
+}
+
+// StreamElementContent streams a markdown/text element by element id.
+func (c *CardkitClient) StreamElementContent(ctx context.Context, cardID, elementID, content string, sequence int) error {
+	apiPath := fmt.Sprintf("/open-apis/cardkit/v1/cards/%s/elements/%s/content", cardID, elementID)
+	body := map[string]any{
+		"content":  content,
+		"sequence": sequence,
+	}
+	apiResp, err := c.api.Put(ctx, apiPath, body, larkcore.AccessTokenTypeTenant)
+	if err != nil {
+		return fmt.Errorf("cardkit stream element: %w", err)
+	}
+	return parseCardkitMutationResponse(apiResp, "stream element")
+}
+
+// UpdateCard replaces the entire card JSON.
+func (c *CardkitClient) UpdateCard(ctx context.Context, cardID, cardJSON string, sequence int) error {
+	apiPath := fmt.Sprintf("/open-apis/cardkit/v1/cards/%s", cardID)
+	body := map[string]any{
+		"card": map[string]any{
+			"type": "card_json",
+			"data": cardJSON,
+		},
+		"sequence": sequence,
+	}
+	apiResp, err := c.api.Put(ctx, apiPath, body, larkcore.AccessTokenTypeTenant)
+	if err != nil {
+		return fmt.Errorf("cardkit update card: %w", err)
+	}
+	return parseCardkitMutationResponse(apiResp, "update card")
+}
+
+// BuildCardIDContent serializes a card reference message body. Exposed for
+// callers that need to deliver a cardkit card via the IM Create API.
+func (c *CardkitClient) BuildCardIDContent(cardID string) (string, error) {
+	return buildCardIDMessageContent(cardID)
+}
+
 func (c *cardkitClient) CreateCard(ctx context.Context, cardJSON string) (string, error) {
 	body := map[string]any{
 		"type": "card_json",
