@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// L5-2-9-02: 当 query_loop.enabled=true（默认）时，Process() 必须走
+// L5-2-11-02: 当 query_loop.enabled=true（默认）时，Process() 必须走
 // query_loop 路径，runtime 计数 legacy_harness 增量 = 0。
 func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	runtime.Reset()
@@ -45,7 +45,7 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	}
 }
 
-// L5-2-9-03: 100 次 Process() 循环后，legacy_harness 计数 = 0。
+// L5-2-11-03: 100 次 Process() 循环后，legacy_harness 计数 = 0。
 func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	runtime.Reset()
 
@@ -81,7 +81,7 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	}
 }
 
-// L5-2-9-02 副: 显式 query_loop.enabled=false → 路径计数走 legacy。
+// L5-2-11-02 副: 显式 query_loop.enabled=false → 路径计数走 legacy。
 func TestContextEngine_QueryLoopDisabled_LegacyIncrement(t *testing.T) {
 	runtime.Reset()
 

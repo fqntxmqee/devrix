@@ -139,6 +139,18 @@ type IAgentFactory interface {
 	Create(ctx context.Context, cfg AgentConfig, session *types.Session) (Agent, error)
 }
 
+// MetaToolCallID is the metadata key under which the engine stores a
+// tool_call identifier on both `*contracts.EngineEvent.Metadata` and
+// `types.Message.Metadata`. It MUST stay in sync with
+// `contextengine.MetaToolCallID` — the production context engine uses
+// this key to tag tool_call events, and multi-agent dedup relies on it
+// to collapse duplicate tool results from forked children.
+//
+// 历史：早期实现误用 "call_id" 作为 dedup key，与 contextengine 的
+// "tool_call_id" 不一致，导致 dedup 在生产路径上为死代码。
+// 2026-06-12 S4-Gate review 修正。
+const MetaToolCallID = "tool_call_id"
+
 // Agent is the multi-agent aggregate root interface.
 type Agent interface {
 	ID() string

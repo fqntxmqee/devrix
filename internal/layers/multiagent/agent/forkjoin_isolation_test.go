@@ -127,10 +127,12 @@ func TestJoin_should_dedup_tool_call_ids(t *testing.T) {
 	// Two children emit `complete` with a tool_call id "call_shared".
 	// The third child emits a different id "call_unique".
 	// Join must dedup tool_call ids and keep exactly one entry per id.
+	// Note: the key MUST be multiagent.MetaToolCallID ("tool_call_id")
+	// to match the production context engine — see S4-Gate review 2026-06-12.
 	mkEvents := func(callID, final string) []*contracts.EngineEvent {
 		return []*contracts.EngineEvent{
 			{Type: "tool_call", ToolName: "bash", Content: "echo",
-				Metadata: map[string]string{"call_id": callID}},
+				Metadata: map[string]string{multiagent.MetaToolCallID: callID}},
 			{Type: "complete", Content: final},
 		}
 	}
@@ -189,7 +191,7 @@ func TestJoin_should_dedup_tool_call_ids(t *testing.T) {
 	// Verify dedup: only one message per distinct tool_call id.
 	seen := map[string]int{}
 	for _, m := range parent.GetMessages() {
-		if id, ok := m.Metadata["call_id"]; ok && id != "" {
+		if id, ok := m.Metadata[multiagent.MetaToolCallID]; ok && id != "" {
 			seen[id]++
 		}
 	}

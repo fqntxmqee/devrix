@@ -76,6 +76,33 @@
 | L5-1-2-07 | complete 关闭 streaming_mode | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P0 |
 | L5-1-2-08 | 流式节流配置生效 | Adapters | `internal/layers/communication/adapters/feishu_streaming_test.go` | IMPLEMENTED | P1 |
 
+### D1-S9: EventBus Module
+
+> **Change:** `devrix-event-channel` (DM-20260611-003)
+> 注意：本节 L5 ID 由原 `L5-2-3-01~07` 重编号而来。原 ID 与 D2-S3 Memory 冲突，2026-06-12 重命名以解耦。
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-1-9-01 | BackpressureEventBus 正常事件流不丢 | EventBus | `internal/layers/communication/eventbus/bus_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-02 | 背压触发 Drain 排空非关键事件 | EventBus | `internal/layers/communication/eventbus/drain_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-03 | Compact 同类事件合并 | EventBus | `internal/layers/communication/eventbus/compact_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-04 | Reconnect 重建通道后继续处理 | EventBus | `internal/layers/communication/eventbus/reconnect_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-05 | Critical 事件（complete）必达不被丢弃 | EventBus | `internal/layers/communication/eventbus/bus_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-06 | Error 事件必达不被丢弃 | EventBus | `internal/layers/communication/eventbus/bus_test.go` | IMPLEMENTED | P0 |
+| L5-1-9-07 | Publish 在高水位阻塞回压到上游 | EventBus | `internal/layers/communication/eventbus/bus_test.go` | IMPLEMENTED | P0 |
+
+### D0: Cross-Domain Architecture Compliance (LAYER)
+
+> **Change:** `devrix-layer-isolation` (DM-20260611-002)
+> 跨域架构合规：分层依赖 lint + 跨层契约注册表 + D6 探针
+
+| L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| L5-0-0-01 | D2→D1 反向 import 数为 0 | Layer | `internal/lint/layer/regression_test.go` | IMPLEMENTED | P0 |
+| L5-0-0-02 | 分层 lint 规则检测到违规时阻断 | Layer | `cmd/devrix-layer-lint/main_test.go` | IMPLEMENTED | P0 |
+| L5-0-0-03 | 契约注册表覆盖所有跨层接口 | Layer | `internal/shared/contracts/registry_test.go` | IMPLEMENTED | P1 |
+| L5-0-0-04 | D6 LayerViolationProbe 运行时探针 | Layer | `internal/layers/evolution/eval/layer_violation_probe_test.go` | IMPLEMENTED | P1 |
+
 ---
 
 ## D2: Context Engine Domain (CTX)
@@ -194,16 +221,17 @@
 ### D2-S11: Harness Unification (Legacy 退役)
 
 > **Change:** `devrix-harness-unification` (DM-20260611-004)
+> 注意：2026-06-12 S4-Gate 修正 — 原 L5-2-9-01~04 / TD01 / TD03 / D6PR 与 §D2-S9 / §D2-S9.BG 编号冲突，重编号为 L5-2-11-*。原 ID 在 test 注释中保留为历史交叉引用。
 
 | L5 ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| L5-2-9-01 | `query_loop.enabled` 默认 true (L5 命名沿用 §D2-S9 编号区间以避免重复) | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
-| L5-2-9-02 | harnessEnabled 分支不再被生产路径触发 (D5 runtime.path_resolved_total{path=query_loop}++) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
-| L5-2-9-03 | 旧路径调用计数基线=0 (100 次 Process 循环后 LegacyHarness=0) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
-| L5-2-9-04 | 压缩入口统一：QueryLoop 走 messages-only 七步管道 (`WithSkipAssembly=true`) | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
-| L5-2-9-TD01 | TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call | HarnessUnification | `internal/layers/contextengine/query/loop_recovery_test.go` | IMPLEMENTED | P1 |
-| L5-2-9-TD03 | TD-QL-03: overload/5xx → 切换 fallback model | HarnessUnification | `internal/layers/contextengine/query/loop_fallback_test.go` | IMPLEMENTED | P1 |
-| L5-2-9-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 (CI 阻断) | HarnessUnification | `internal/layers/evolution/eval/path_regression_probe_test.go` | IMPLEMENTED | P0 |
+| L5-2-11-01 | `query_loop.enabled` 默认 true | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
+| L5-2-11-02 | harnessEnabled 分支不再被生产路径触发 (D5 runtime.path_resolved_total{path=query_loop}++) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
+| L5-2-11-03 | 旧路径调用计数基线=0 (100 次 Process 循环后 LegacyHarness=0) | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
+| L5-2-11-04 | 压缩入口统一：QueryLoop 走 messages-only 七步管道 (`WithSkipAssembly=true`) | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
+| L5-2-11-TD01 | TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call | HarnessUnification | `internal/layers/contextengine/query/loop_recovery_test.go` | IMPLEMENTED | P1 |
+| L5-2-11-TD03 | TD-QL-03: overload/5xx → 切换 fallback model (**生产未接线，见 S4-Gate 报告**) | HarnessUnification | `internal/layers/contextengine/query/loop_fallback_test.go` | PARTIAL | P1 |
+| L5-2-11-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 (CI 阻断) | HarnessUnification | `internal/layers/evolution/eval/path_regression_probe_test.go` | IMPLEMENTED | P0 |
 
 ### D2-S12: Worktree Module
 
@@ -337,6 +365,7 @@
 | L5-4-3-02 | Fork 双层限额 MaxChildren+MaxTotalAgents | ForkJoin | `internal/layers/multiagent/factory/factory_test.go` | IMPLEMENTED |
 | L5-4-3-03 | Agent 超时自动终止 | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
 | L5-4-3-04 | Context 取消传播到子 Agent | Agent | `internal/layers/multiagent/agent/agent_test.go` | IMPLEMENTED |
+| L5-4-3-05 | Join 排序 + tool_call ID 去重 + SessionView COW | SessionView | `internal/layers/multiagent/sessionview/sessionview_test.go` | IMPLEMENTED |
 
 ### D4-S4: Collaboration Module
 

@@ -115,16 +115,17 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 		case "permission", "tool_call":
 			_ = a.setState(multiagent.AgentStateIterating)
 			// Capture tool_call events as messages so Join can dedup by
-			// call_id (DM-20260611-005). The Metadata map on the message
-			// preserves the engine's call_id key.
-			if callID, ok := ev.Metadata["call_id"]; ok && callID != "" {
+			// tool_call_id (DM-20260611-005). The Metadata map on the
+			// message preserves the engine's tool_call_id key (see
+			// multiagent.MetaToolCallID for the contract).
+			if callID, ok := ev.Metadata[multiagent.MetaToolCallID]; ok && callID != "" {
 				a.appendMessages(types.Message{
 					Role:    types.MessageRoleAssistant,
 					Content: ev.Content,
 					Metadata: map[string]string{
-						"call_id": callID,
-						"tool":    ev.ToolName,
-						"event":   "tool_call",
+						multiagent.MetaToolCallID: callID,
+						"tool":                   ev.ToolName,
+						"event":                  "tool_call",
 					},
 				})
 			}

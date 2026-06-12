@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// L5-2-9-04: 统一压缩入口 (DM-20260611-004)。
+// L5-2-11-04: 统一压缩入口 (DM-20260611-004)。
 //
 // 验证：当 QueryLoop 走 CompressPerTurn=true 时，Loop 内部触发的
 // 压缩调用的是 messages-only 七步管道（即 WithSkipAssembly=true，
@@ -53,7 +53,7 @@ func TestContextEngine_QueryLoop_UsesMessagesOnlyCompression(t *testing.T) {
 	t.Log("Process() completed via QueryLoop path; compression entry is unified (messages-only).")
 }
 
-// L5-2-9-04 子断言: QueryLoop 的 CompressFn 必须以 WithSkipAssembly(true)
+// L5-2-11-04 子断言: QueryLoop 的 CompressFn 必须以 WithSkipAssembly(true)
 // 创建 pipeline，否则 Loop.Run() 在 system_prompt 已经单独走 UserContext
 // 路径的前提下会重复 inject。
 func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
@@ -88,7 +88,7 @@ func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
 	}
 }
 
-// L5-2-9-04 副: harness 路径（query_loop.enabled=false）下，
+// L5-2-11-04 副: harness 路径（query_loop.enabled=false）下，
 // engine 入口压缩带 system prompt，但**不**走 QueryLoop 路径。
 // 验证：基线 legacy_harness 计数 = 1。
 func TestContextEngine_LegacyHarness_HarnessCompressionBranch(t *testing.T) {

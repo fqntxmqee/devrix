@@ -14,7 +14,7 @@ func TestPathRegressionProbe_ID(t *testing.T) {
 	}
 }
 
-// L5-2-9-02: harnessEnabled 分支不再被生产路径触发。
+// L5-2-11-02: harnessEnabled 分支不再被生产路径触发。
 // 场景：CI 中 baseline 是 query_loop=0 legacy_harness=0 → pass。
 func TestPathRegressionProbe_AllZero_Pass(t *testing.T) {
 	runtime.Reset()
@@ -35,7 +35,7 @@ func TestPathRegressionProbe_AllZero_Pass(t *testing.T) {
 	}
 }
 
-// L5-2-9-02: query_loop=1, legacy_harness=0 → pass。
+// L5-2-11-02: query_loop=1, legacy_harness=0 → pass。
 func TestPathRegressionProbe_QueryLoopOnly_Pass(t *testing.T) {
 	runtime.Reset()
 	runtime.Record(runtime.PathQueryLoop)
@@ -55,7 +55,7 @@ func TestPathRegressionProbe_QueryLoopOnly_Pass(t *testing.T) {
 	}
 }
 
-// L5-2-9-02: legacy_harness > 0 → fail。
+// L5-2-11-02: legacy_harness > 0 → fail。
 func TestPathRegressionProbe_LegacyHarnessFires_Fail(t *testing.T) {
 	runtime.Reset()
 	runtime.Record(runtime.PathLegacyHarness)

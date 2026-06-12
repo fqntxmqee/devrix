@@ -425,14 +425,17 @@ func (g *CommunicationGateway) handleEngineEventsBusConsumer(
 		case <-ctx.Done():
 			return
 		case <-doneSub:
-			// Bus cancelled the subscription. Give any
-			// in-flight fanout a brief settle window to
-			// complete and land in ch, then drain. The
-			// fanout is non-blocking with a default case,
-			// so it can complete in microseconds; a small
-			// settle is sufficient.
-			time.Sleep(100 * time.Millisecond)
-			for {
+			// Bus cancelled the subscription. Poll for up to
+			// 1 second to give any in-flight monitor fanout a
+			// chance to deliver Normal events to ch before
+			// we exit. The fanout is non-blocking with a
+			// default case, but it can be preempted between
+			// PublishCritical release and the next monitor
+			// select. The polling loop closes the race window
+			// without a fixed sleep (S4-Gate review fix,
+			// 2026-06-12).
+			deadline := time.Now().Add(1 * time.Second)
+			for time.Now().Before(deadline) {
 				select {
 				case ev, ok := <-ch:
 					if !ok {
@@ -442,9 +445,10 @@ func (g *CommunicationGateway) handleEngineEventsBusConsumer(
 						g.handleEngineEvent(ctx, session, ev.EngineEvent)
 					}
 				default:
-					return
+					time.Sleep(time.Millisecond)
 				}
 			}
+			return
 		case ev, ok := <-ch:
 			if !ok {
 				return

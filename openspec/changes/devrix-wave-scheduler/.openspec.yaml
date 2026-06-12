@@ -1,7 +1,7 @@
 change_id: devrix-wave-scheduler
 priority: P0
 demand_id: DM-20260611-007
-status: s3_design
+status: s4_implemented
 domains: [orchestration, D1, D2, D4]
 parent_initiative: devrix-queryloop-context-v3
 decisions:

@@ -119,7 +119,7 @@ func (a *Impl) Join(ctx context.Context, child multiagent.Agent) error {
 }
 
 // dedupToolCallMessages collapses tool_call messages that share a
-// non-empty call_id, keeping the first occurrence globally across
+// non-empty tool_call_id, keeping the first occurrence globally across
 // Join calls on this parent. Non-tool messages pass through unchanged.
 func (a *Impl) dedupToolCallMessages(msgs []types.Message) []types.Message {
 	a.mu.Lock()
@@ -129,7 +129,7 @@ func (a *Impl) dedupToolCallMessages(msgs []types.Message) []types.Message {
 	}
 	out := make([]types.Message, 0, len(msgs))
 	for _, m := range msgs {
-		if callID, ok := m.Metadata["call_id"]; ok && callID != "" {
+		if callID, ok := m.Metadata[multiagent.MetaToolCallID]; ok && callID != "" {
 			if _, dup := a.joinedToolIDs[callID]; dup {
 				continue
 			}

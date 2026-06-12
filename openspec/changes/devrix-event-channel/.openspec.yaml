@@ -48,13 +48,13 @@ scope:
       name: D6 背压评测探针
 
   l5_test_points:
-    - L5-2-3-01  # 通道积压量可查询
-    - L5-2-3-02  # Drain 排空非关键事件
-    - L5-2-3-03  # 关键事件（complete/error）不可丢弃
-    - L5-2-3-04  # Compact 同类事件合并
-    - L5-2-3-05  # Reconnect 重建通道后继续处理
-    - L5-2-3-06  # Fork 子 Agent 独立通道
-    - L5-2-3-07  # TraceContext 注入事件
+    - L5-1-9-01  # BackpressureEventBus 正常事件流不丢
+    - L5-1-9-02  # 背压触发 Drain
+    - L5-1-9-03  # Compact 同类事件合并
+    - L5-1-9-04  # Reconnect 重建通道后继续处理
+    - L5-1-9-05  # Critical 事件（complete）必达
+    - L5-1-9-06  # Error 事件必达
+    - L5-1-9-07  # Publish 在高水位阻塞
 
 deliverables:
   - path: proposal.md

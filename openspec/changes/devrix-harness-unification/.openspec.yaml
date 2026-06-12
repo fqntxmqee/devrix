@@ -5,7 +5,7 @@ meta:
   change_id: devrix-harness-unification
   demand_id: DM-20260611-004
   title: "Legacy Harness 退役 — QueryLoop 为唯一主路径"
-  status: s2_proposal
+  status: s4_implemented
   priority: P1
   owner: devrix-team
   created_at: "2026-06-11"
@@ -38,10 +38,13 @@ scope:
       name: D6 路径回退评测探针
 
   l5_test_points:
-    - L5-2-9-01  # query_loop.enabled=true 默认
-    - L5-2-9-02  # harnessEnabled 分支不再被生产路径触发
-    - L5-2-9-03  # 旧路径调用计数基线=0
-    - L5-2-9-04  # 压缩入口统一
+    - L5-2-11-01  # query_loop.enabled=true 默认
+    - L5-2-11-02  # harnessEnabled 分支不再被生产路径触发
+    - L5-2-11-03  # 旧路径调用计数基线=0
+    - L5-2-11-04  # 压缩入口统一
+    - L5-2-11-TD01  # TD-QL-01: 413 recovery
+    - L5-2-11-TD03  # TD-QL-03: fallback model (生产未接线, PARTIAL)
+    - L5-2-11-D6PR  # D6 PathRegressionProbe
 
 deliverables:
   - path: proposal.md
