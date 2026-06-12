@@ -13,7 +13,7 @@
 
 | 规范 | 路径 | 内容 |
 |------|------|------|
-| 测试框架规范 | `openspec/specs/testing-framework/spec.md` | 测试金字塔、目录结构、Mock 规则、L5 追溯 |
+| 测试框架规范 | `openspec/specs/testing-framework/spec.md` | 测试金字塔、目录结构、Mock 规则、T 层追溯 |
 | **域分段测试** | `openspec/specs/testing-framework/domain-segmentation.md` | D2/D3/D4 build tag、分段脚本、Stage 矩阵 |
 | 测试质量规范 | `openspec/specs/testing-quality/spec.md` | 边界条件、Mock 滥用治理、断言深度 |
 
@@ -48,16 +48,16 @@
 
 ---
 
-## 3. L5 追溯要求
+## 3. T 层追溯要求
 
 ### 3.1 注册
 
-S2 阶段在 `openspec/l5-registry.md` 预登记（状态：PLANNED）。
+S2 阶段在 `openspec/t-registry.md` 预登记（状态：PLANNED）。编号使用 DSAFT T 层标准格式。
 
 ### 3.2 代码标注
 
 ```go
-// Covers: L5-4-1-01
+// T: D4-S1-A01-T01
 // Domain: D4
 // Stage: s0_unit
 func TestAgent_Run_NormalFlow(t *testing.T) { ... }
@@ -131,7 +131,8 @@ func TestAgent_StateTransition(t *testing.T) {
 ## 7. 检查清单
 
 S4 提测前：
-- [ ] 所有 L5 P0 测试已编写
+- [ ] 所有 P0 T 层测试已编写（编号格式 `D{X}-S{X}-A{XX}-T{XX}`）
+- [ ] 测试代码标注了 T 层编号
 - [ ] `./scripts/test-unit.sh` 通过
 - [ ] 受影响域 `./scripts/test-domain.sh d{N}` 通过（D2/D3/D4 变更时）
 - [ ] 新代码有对应的 `_test.go`
@@ -142,4 +143,5 @@ S5 验收前：
 - [ ] `./scripts/test-all.sh` 通过
 - [ ] 覆盖率 >= 80%
 - [ ] `acceptance-report.md` 已生成，状态 PASS
-- [ ] `l5-registry.md` 对应条目更新为 IMPLEMENTED
+- [ ] `t-registry.md` 对应条目更新为 IMPLEMENTED
+- [ ] P0 T 层测试 100% PASS（阻断交付）

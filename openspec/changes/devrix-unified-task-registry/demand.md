@@ -4,7 +4,7 @@ title: Unified Task Registry — 后台任务统一注册与 output delta
 source: clawcode 能力对照（task/framework + diskOutput + task-notification）
 priority: P1
 status: S2_Clarified
-l1-domain: context-engine
+dsaft_domain: context-engine
 created: 2026-06-12
 ---
 
@@ -69,7 +69,7 @@ Devrix 已有 DM-009（`task_stop` / `task_output`）和 DM-007 v1.2（`wave_com
 | L3-BE | L3-BE-CTX-BG-NOTIFY | QueryLoop 消费 task/wave 通知 | **新增** |
 | L4-BE | L4-BE-CTX-TASK-REGISTRY | TaskRegistry + disk output | **新增** |
 | L4-BE | L4-BE-CTX-BG-ATTACHMENTS | collectBackgroundTaskAttachments | **新增** |
-| L5 | L5-CTX-REG-01 ~ 05 | 见 §6 | **草拟** |
+| T 层 | {T}-CTX-REG-01 ~ 05 | 见 §6 | **草拟** |
 
 ## 5. 范围
 
@@ -116,15 +116,15 @@ Devrix 已有 DM-009（`task_stop` / `task_output`）和 DM-007 v1.2（`wave_com
 |----|------|
 | AC9 | registry 元数据 disk persist（重启可 `List`，不 resume goroutine） |
 
-### L5 测试点（草案，S3 登记 l5-registry）
+### T 层测试点（草案，S3 登记 t-registry）
 
-| L5 ID | Given-When-Then | 优先级 |
+| T ID | Given-When-Then | 优先级 |
 |-------|-----------------|--------|
-| L5-CTX-REG-01 | Given SubQuery background 启动 When Register Then registry 含 running 且 output 文件创建 | P0 |
-| L5-CTX-REG-02 | Given running task 写入 output When GetOutputDelta Then 仅返回新字节 | P0 |
-| L5-CTX-REG-03 | Given task terminal When SetTerminal Then notified 置位且 SessionQueue 入队一次 | P0 |
-| L5-CTX-REG-04 | Given notified=true When 再次 SetTerminal Then 不入队 | P0 |
-| L5-CTX-REG-05 | Given Wave Worker 完成 When List(session) Then 含 worker task_id 与 terminal status | P1 |
+| {T}-CTX-REG-01 | Given SubQuery background 启动 When Register Then registry 含 running 且 output 文件创建 | P0 |
+| {T}-CTX-REG-02 | Given running task 写入 output When GetOutputDelta Then 仅返回新字节 | P0 |
+| {T}-CTX-REG-03 | Given task terminal When SetTerminal Then notified 置位且 SessionQueue 入队一次 | P0 |
+| {T}-CTX-REG-04 | Given notified=true When 再次 SetTerminal Then 不入队 | P0 |
+| {T}-CTX-REG-05 | Given Wave Worker 完成 When List(session) Then 含 worker task_id 与 terminal status | P1 |
 
 ## 7. 依赖
 

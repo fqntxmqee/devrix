@@ -19,8 +19,6 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.QueryLoop.Enabled = true
 	cfg.QueryLoop.MaxTurns = 3
-	cfg.PEV.VerifyMode = config.VerifyModeBasic
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},
@@ -52,8 +50,6 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.QueryLoop.Enabled = true
 	cfg.QueryLoop.MaxTurns = 2
-	cfg.PEV.VerifyMode = config.VerifyModeBasic
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},
@@ -88,7 +84,6 @@ func TestContextEngine_QueryLoopDisabled_LegacyIncrement(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.QueryLoop.Enabled = false
 	cfg.Harness.Enabled = true
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},

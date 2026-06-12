@@ -8,6 +8,8 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
+const usageSplitSep = "/"
+
 // ComputeCtxPct is a thin shim kept for backward compatibility with any caller
 // that still imports the function from D1. The canonical implementation lives
 // in shared/contracts (L5-0-0-02: cross-layer contract surface must be free of
@@ -64,6 +66,34 @@ func parseInt64Safe(s string) int64 {
 	return n
 }
 
+// parseDurationMs accepts canonical millisecond strings and legacy second floats.
+func parseDurationMs(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if ms := parseInt64Safe(raw); ms > 0 || raw == "0" {
+		return ms
+	}
+	if sec, err := strconv.ParseFloat(raw, 64); err == nil && sec >= 0 {
+		return int64(sec*1000 + 0.5)
+	}
+	return 0
+}
+
+// parseUsageTokens accepts total token count or legacy "prompt/completion" pairs.
+func parseUsageTokens(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if strings.Contains(raw, usageSplitSep) {
+		parts := strings.SplitN(raw, usageSplitSep, 2)
+		return parseInt64Safe(parts[0]) + parseInt64Safe(parts[1])
+	}
+	return parseInt64Safe(raw)
+}
+
 // buildCompletionSummary 拼装"任务完成"卡片的摘要字符串。
 //
 // 段顺序：duration → usage → ctx(可选) → model(可选)
@@ -78,8 +108,8 @@ func parseInt64Safe(s string) int64 {
 //   - "" / "0" / 不可解析 → 省略 ctx 段
 //   - 其它数字           → 渲染 "ctx: N%"
 func buildCompletionSummary(durationStr, usageStr, model, ctxPctStr string) string {
-	dur := formatDuration(parseInt64Safe(durationStr))
-	usage := formatTokens(parseInt64Safe(usageStr))
+	dur := formatDuration(parseDurationMs(durationStr))
+	usage := formatTokens(parseUsageTokens(usageStr))
 	ctxPct := parseInt64Safe(ctxPctStr)
 	parts := []string{fmt.Sprintf("用时: %s", dur), fmt.Sprintf("消耗: %s", usage)}
 	if ctxPct > 0 {

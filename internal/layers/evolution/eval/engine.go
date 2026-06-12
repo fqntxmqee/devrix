@@ -9,6 +9,8 @@ import (
 )
 
 // EvalEngine 评测引擎，负责编排评测流程。
+//
+// DSAFT: D6-S3-A01 (RunEval)
 type EvalEngine struct {
 	config        EvalConfig
 	judge         *JudgeManager

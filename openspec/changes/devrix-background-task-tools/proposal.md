@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-background-task-tools  
 **Demand ID:** DM-20260611-009  
-**Status:** S4_Developing（task_stop / task_output / task_list_background 工具已实现，L5-2-9-16~19 IMPLEMENTED，-race 测试全绿，待 Wave Worker 接线与 S4-Gate 审查）
+**Status:** S4_Developing（task_stop / task_output / task_list_background 工具已实现，D2-S9-T16~19 IMPLEMENTED，-race 测试全绿，待 Wave Worker 接线与 S4-Gate 审查）
 
 ## Summary
 

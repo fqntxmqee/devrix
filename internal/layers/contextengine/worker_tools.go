@@ -42,6 +42,8 @@ func filterReadOnlyWorkerTools(tools []ToolSchema) []ToolSchema {
 	allowed := map[string]bool{
 		"read_file": true, "glob": true, "grep": true, "list_dir": true, "bash": true,
 		"enter_plan_mode": true, "exit_plan_mode": true,
+		"todo_write": true,
+			"edit_file": true,
 		"task_create": true, "task_get": true, "task_list": true, "task_update": true,
 	}
 	out := make([]ToolSchema, 0, len(tools))

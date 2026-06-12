@@ -18,7 +18,7 @@ S4-Gate follow-up 已修复关键 HIGH：`call_id` ↔ `tool_call_id` 元数据�
 | SV-COW | ✅ | `sessionview/cow.go` — Copy-on-Write 隔离父子视图 |
 | JOIN-DEDUP | ✅ | `forkjoin.go` 消费 `multiagent.MetaToolCallID` |
 | RUNTIME-OBSERVABILITY | ✅ | `runtime.Record(runtime.PathQueryLoop / PathLegacyHarness)` 接入 D6 probe |
-| L5-4-3-05 | ✅ | SessionView COW 集成测试守护（已加入 l5-registry） |
+| D4-S3-T05 | ✅ | SessionView COW 集成测试守护（已加入 t-registry） |
 
 ## Automated Verification
 
@@ -28,20 +28,20 @@ go test -race -count=1 ./internal/layers/multiagent/sessionview/...  # cow_test
 go test -race -count=1 ./internal/layers/evolution/eval/...  # PathRegressionProbe
 ```
 
-| L5 ID | 描述 | 结果 |
+| T ID | 描述 | 结果 |
 |-------|------|------|
-| L5-4-3-01 | SessionView COW 父子隔离 | PASS |
-| L5-4-3-02 | 子 Agent 写入不污染父 | PASS |
-| L5-4-3-03 | Join 去重 — 同一 tool_call_id 只触发一次 complete | PASS |
-| L5-4-3-04 | runtime.PathQueryLoop 计数 0 → pass | PASS |
-| L5-4-3-05 | SessionView COW 集成测试 | PASS（2026-06-12 补） |
+| D4-S3-T01 | SessionView COW 父子隔离 | PASS |
+| D4-S3-T02 | 子 Agent 写入不污染父 | PASS |
+| D4-S3-T03 | Join 去重 — 同一 tool_call_id 只触发一次 complete | PASS |
+| D4-S3-T04 | runtime.PathQueryLoop 计数 0 → pass | PASS |
+| D4-S3-T05 | SessionView COW 集成测试 | PASS（2026-06-12 补） |
 
 ## 关键修复（2026-06-12 S4-Gate follow-up commit `69e0401`）
 
 | 等级 | 问题 | 修复 | 验证 |
 |---|---|---|---|
 | HIGH | `call_id` vs `tool_call_id` 键不一致（Join dedup 失效） | 抽 `multiagent.MetaToolCallID` 常量，lifecycle.go / forkjoin.go 改读共享常量 | `forkjoin_isolation_test` PASS |
-| MEDIUM | l5-registry 缺 L5-4-3-05 编号 | 加入 SessionView COW 集成测试条目 | yaml / 文档同步 |
+| MEDIUM | t-registry 缺 D4-S3-T05 编号 | 加入 SessionView COW 集成测试条目 | yaml / 文档同步 |
 
 ## Known Issues
 
@@ -58,5 +58,5 @@ go test -race -count=1 ./internal/layers/evolution/eval/...  # PathRegressionPro
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
 | Dev | — | 2026-06-12 | 单测 + 集成 PASS |
-| QA | — | 2026-06-12 | L5 100% PASS + Join dedup 真实生效 |
+| QA | — | 2026-06-12 | T 层 100% PASS + Join dedup 真实生效 |
 | S4-Gate | code-reviewer | 2026-06-12 | ✅ PASS |

@@ -6,13 +6,13 @@ type ContextEngineConfig struct {
 	ReservedOutput     int                `yaml:"reserved_output_tokens"`
 	ToolResultBudget   int                `yaml:"tool_result_budget"`
 	CompressionEnabled bool               `yaml:"compression_enabled"`
+	CompressionRatio   float64            `yaml:"compression_ratio"`    // autocompact 触发阈值比率, 默认 0.6
+	SnipRatio          float64            `yaml:"snip_ratio"`           // snip 触发阈值比率, 默认 0.8
 	Compression        CompressionConfig  `yaml:"compression"`
 	TokenCounter       TokenCounterConfig `yaml:"token_counter"`
-	PEV                PEVConfig          `yaml:"pev"`
 	Snapshot           SnapshotConfig     `yaml:"snapshot"`
 	SystemPrompt       SystemPromptConfig `yaml:"system_prompt"`
 	Prompt            *PromptConfig       `yaml:"prompt"`
-	Plan               PlanConfig         `yaml:"plan"`
 	LongTerm           LongTermConfig     `yaml:"longterm"`
 	Harness            HarnessConfig      `yaml:"harness"`
 	Preflight          PreflightConfig    `yaml:"preflight"`
@@ -25,14 +25,7 @@ type ContextEngineConfig struct {
 	SubQuery           SubQueryConfig     `yaml:"subquery"`
 	ExecutionFlow      ExecutionFlowConfig `yaml:"execution_flow"`
 	Worktree           WorktreeConfig     `yaml:"worktree"`
-}
-
-// PEVConfig holds PEV loop settings.
-type PEVConfig struct {
-	MaxIterations  int                   `yaml:"max_iterations"`
-	VerifyMode     string                `yaml:"verify_mode"`
-	VerifyPolicy   string                `yaml:"verify_policy"`
-	VerifyCommands []VerifyCommandConfig `yaml:"verify_commands"`
+	TodoWrite          TodoWriteConfig    `yaml:"todo_write"`
 }
 
 // SnapshotConfig holds snapshot persistence settings.
@@ -56,16 +49,13 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		ReservedOutput:     8192,
 		ToolResultBudget:   800,
 		CompressionEnabled: true,
+		CompressionRatio:   0.6,
+		SnipRatio:          0.8,
 		Compression: CompressionConfig{
 			Autocompact: DefaultAutocompactConfig(),
 		},
 		TokenCounter: TokenCounterConfig{
 			Source: TokenCounterSourceGateway,
-		},
-		PEV: PEVConfig{
-			MaxIterations: 3,
-			VerifyMode:    VerifyModeBasic,
-			VerifyPolicy:  VerifyPolicyAllPass,
 		},
 		Snapshot: SnapshotConfig{
 			Enabled:   true,
@@ -76,7 +66,6 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 			Fallback: "You are Devrix, a multi-agent development assistant.",
 		},
 		Prompt:     DefaultPromptConfig(),
-		Plan:       DefaultPlanConfig(),
 		LongTerm:   DefaultLongTermConfig(),
 		Harness:    DefaultHarnessConfig(),
 		Preflight:  DefaultPreflightConfig(),
@@ -89,11 +78,12 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		SubQuery:    DefaultSubQueryConfig(),
 		ExecutionFlow: DefaultExecutionFlowConfig(),
 		Worktree:      DefaultWorktreeConfig(),
+		TodoWrite:      DefaultTodoWriteConfig(),
 	}
 }
 
 // ToTokenBudget converts config to types.TokenBudget.
-func (c *ContextEngineConfig) ToTokenBudget() (max, reserved, toolResult, target int) {
+func (c *ContextEngineConfig) ToTokenBudget() (max, reserved, toolResult, target, snipTarget int) {
 	max = c.MaxContextTokens
 	reserved = c.ReservedOutput
 	toolResult = c.ToolResultBudget
@@ -106,6 +96,26 @@ func (c *ContextEngineConfig) ToTokenBudget() (max, reserved, toolResult, target
 	if toolResult <= 0 {
 		toolResult = 800
 	}
-	target = int(float64(max-reserved) * 0.9)
-	return max, reserved, toolResult, target
+	ratio := c.CompressionRatio
+	if ratio <= 0 || ratio > 1.0 {
+		ratio = 0.6
+	}
+	target = int(float64(max-reserved) * ratio)
+
+	snipRatio := c.SnipRatio
+	if snipRatio <= 0 || snipRatio > 1.0 {
+		snipRatio = 0.8
+	}
+	snipTarget = int(float64(max-reserved) * snipRatio)
+	return max, reserved, toolResult, target, snipTarget
+}
+
+// TodoWriteConfig holds todo_write tool settings.
+type TodoWriteConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// DefaultTodoWriteConfig returns default todo_write settings.
+func DefaultTodoWriteConfig() TodoWriteConfig {
+	return TodoWriteConfig{Enabled: true}
 }

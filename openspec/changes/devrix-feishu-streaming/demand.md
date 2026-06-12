@@ -4,7 +4,7 @@ title: 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机
 source: 用户反馈 + v3.0 Feishu 流式 UX 规划
 priority: P1
 status: S5_Acceptance
-l1-domain: communication
+dsaft_domain: communication
 created: 2026-06-11
 ---
 
@@ -70,11 +70,11 @@ cc-connect 已实现 `createCardEntity` → `StreamRichCardText`（cardkit PUT�
 | L3-BE | L3-BE-COM-01 | 飞书入站消息处理与出站推送 | 已有 |
 | L4-BE | L4-BE-COM-cardkit | Cardkit 卡片实体生命周期 | **新增** |
 | L4-BE | L4-BE-COM-stream-reply | 回复卡元素级流式更新 | **新增** |
-| L5 | L5-1-2-04 | Cardkit 双步发卡成功 | 草拟 |
-| L5 | L5-1-2-05 | 元素级流式 PUT sequence 递增 | 草拟 |
-| L5 | L5-1-2-06 | cardkit 失败降级 Patch | 草拟 |
-| L5 | L5-1-2-07 | complete 关闭 streaming_mode | 草拟 |
-| L5 | L5-1-2-08 | 流式节流配置生效 | 草拟 |
+| T 层 | D1-S2-T04 | Cardkit 双步发卡成功 | 草拟 |
+| T 层 | D1-S2-T05 | 元素级流式 PUT sequence 递增 | 草拟 |
+| T 层 | D1-S2-T06 | cardkit 失败降级 Patch | 草拟 |
+| T 层 | D1-S2-T07 | complete 关闭 streaming_mode | 草拟 |
+| T 层 | D1-S2-T08 | 流式节流配置生效 | 草拟 |
 
 ### 4.2 范围
 

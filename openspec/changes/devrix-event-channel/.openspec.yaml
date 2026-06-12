@@ -13,7 +13,7 @@ meta:
   source: devrix-harness-architecture-audit
   s4_gate_verdict: PASS
   s4_gate_date: "2026-06-12"
-  s4_gate_note: "S4-Gate follow-up 已修复 gateway race + L5 编号 + 死代码"
+  s4_gate_note: "S4-Gate follow-up 已修复 gateway race + T 层编号 + 死代码"
 
 scope:
   layers:
@@ -50,14 +50,14 @@ scope:
     - id: EVT-BACKPRESSURE-PROBE
       name: D6 背压评测探针
 
-  l5_test_points:
-    - L5-1-9-01  # BackpressureEventBus 正常事件流不丢
-    - L5-1-9-02  # 背压触发 Drain
-    - L5-1-9-03  # Compact 同类事件合并
-    - L5-1-9-04  # Reconnect 重建通道后继续处理
-    - L5-1-9-05  # Critical 事件（complete）必达
-    - L5-1-9-06  # Error 事件必达
-    - L5-1-9-07  # Publish 在高水位阻塞
+  t_points:
+    - D1-S9-A01-T01  # BackpressureEventBus 正常事件流不丢
+    - D1-S9-A02-T02  # 背压触发 Drain
+    - D1-S9-A02-T03  # Compact 同类事件合并
+    - D1-S9-A02-T04  # Reconnect 重建通道后继续处理
+    - D1-S9-A01-T05  # Critical 事件（complete）必达
+    - D1-S9-A01-T06  # Error 事件必达
+    - D1-S9-A01-T07  # Publish 在高水位阻塞
 
 deliverables:
   - path: proposal.md

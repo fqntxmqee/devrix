@@ -9,27 +9,27 @@
 - [x] `types.go`：Event wrapper + Priority + With* 不可变
 - [x] `bus.go`：BackpressureEventBus struct + 状态机字段
 - [x] 状态机 Running 状态
-- [x] L5-2-3-01 TestNormalEventFlow_NoLoss（RED → GREEN）
-- [x] L5-2-3-05 TestCompleteEventNeverDropped
-- [x] L5-2-3-06 TestErrorEventNeverDropped
-- [x] L5-2-3-07 TestPublishBlocksAtHighWatermark
+- [x] D2-S3-T01 TestNormalEventFlow_NoLoss（RED → GREEN）
+- [x] D2-S3-T05 TestCompleteEventNeverDropped
+- [x] D2-S3-T06 TestErrorEventNeverDropped
+- [x] D2-S3-T07 TestPublishBlocksAtHighWatermark
 
 ## S4-3 Drain 协议
 - [x] `drain.go`：Drain report + drainLoop
 - [x] 状态机 Draining 转换
-- [x] L5-2-3-02 TestBackpressureTriggersDrain
+- [x] D2-S3-T02 TestBackpressureTriggersDrain
 - [x] Critical 事件不被 Drain（断言：drain report 不含 complete/error）
 
 ## S4-4 Compact 协议
 - [x] `compact.go`：相邻同 type 事件合并
 - [x] 状态机 Compacting 转换
-- [x] L5-2-3-03 TestCompactConsecutiveEvents
+- [x] D2-S3-T03 TestCompactConsecutiveEvents
 - [x] Critical 不参与 Compact
 
 ## S4-5 Reconnect 协议
 - [x] `reconnect.go`：Drain→Compact→重建 channel→刷 pending
 - [x] 状态机 Reconnecting → Running
-- [x] L5-2-3-04 TestReconnectRecovery
+- [x] D2-S3-T04 TestReconnectRecovery
 
 ## S4-6 Gateway 集成
 - [x] `gateway.go` 注入可选 bus

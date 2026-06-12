@@ -31,7 +31,7 @@ Before starting any task, determine the stage and load the corresponding spec fr
 | S3-Gate | `review-design.md` | Design review passed |
 | S4 Implementation | `coding.md` + `testing.md` | go vet + test-unit |
 | S4-Gate | `review-code.md` | Code review passed |
-| S5 Acceptance | `testing.md` | P0 L5 100% + coverage ≥ 80% |
+| S5 Acceptance | `testing.md` | P0 T-layer 100% + coverage ≥ 80% |
 | S6 Archive | `archiving.md` | Archive checklist |
 
 Authority: `openspec/specs/project/master.md`
@@ -43,5 +43,5 @@ Authority: `openspec/specs/project/master.md`
 - **Immutability**: Create new objects. Do NOT mutate in place.
 - **File size**: Functions < 50 lines, files < 800 lines
 - **Git**: GitHub Flow, `feat/<change-id>` branches, squash merge
-- **L5 tests**: Format `L5-{D}-{S}-{NN}`, registered in `openspec/l5-registry.md`
+- **T-layer tests**: Format `D{D}-S{S}-T{NN}` (DSAFT), registered in `openspec/t-registry.md`
 - **Changes**: `openspec/changes/<change-id>/`, archived to `openspec/archive/<YYYY-MM-DD>-<change-id>/`

@@ -142,7 +142,6 @@ func main() {
 		toolCfg,
 		obsBridge,
 		llmStack,
-		milestoneService,
 		agentToolReg,
 	)
 
@@ -170,7 +169,7 @@ func main() {
 
 	var agentFactory multiagent.IAgentFactory
 	if multiAgentCfg.Enabled {
-		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, milestoneService, agentToolReg).
+		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
 			WithMultiAgentConfig(multiAgentCfg)
 		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
 		gw.SetAgentFactory(agentFactory)

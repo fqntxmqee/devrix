@@ -37,9 +37,9 @@ func (s *Store) Serialize(sc *types.SessionContext) ([]byte, error) {
 		WorkDir:      sc.WorkDir,
 		Messages:     messagesToSnapshots(sc.Messages),
 		TokenBudget:  budgetToSnapshot(sc.TokenBudget),
-		PEVState:     pevToSnapshot(sc.PEVState),
 		SystemPrompt: sc.SystemPrompt,
 		UpdatedAt:    sc.UpdatedAt.UTC().Format(time.RFC3339),
+		Todos:        sc.Todos,
 	}
 	raw, err := json.Marshal(snap)
 	if err != nil {
@@ -99,10 +99,10 @@ func (s *Store) Deserialize(data []byte) (*types.SessionContext, error) {
 		WorkDir:      snap.WorkDir,
 		Model:        snap.Model,
 		Messages:     snapshotsToMessages(snap.Messages, snap.SessionID),
-		PEVState:     snapshotToPEV(snap.PEVState),
 		TokenBudget:  snapshotToBudget(snap.TokenBudget),
 		SystemPrompt: snap.SystemPrompt,
 		UpdatedAt:    updatedAt,
+		Todos:        snap.Todos,
 	}, nil
 }
 
@@ -193,38 +193,6 @@ func snapshotToBudget(s types.TokenBudgetSnapshot) types.TokenBudget {
 		ReservedOutput:    s.ReservedOutput,
 		ToolResultBudget:  s.ToolResultBudget,
 		CompressionTarget: s.CompressionTarget,
-	}
-}
-
-func pevToSnapshot(p types.PEVState) types.PEVStateSnapshot {
-	cmds := p.VerifyResult.Commands
-	if cmds == nil {
-		cmds = []string{}
-	}
-	return types.PEVStateSnapshot{
-		Phase:         string(p.Phase),
-		Iteration:     p.Iteration,
-		MaxIterations: p.MaxIterations,
-		LastToolCalls: p.LastToolCalls,
-		VerifyResult: types.VerifyResultSnapshot{
-			Passed:    p.VerifyResult.Passed,
-			Deviation: p.VerifyResult.Deviation,
-			Commands:  cmds,
-		},
-	}
-}
-
-func snapshotToPEV(s types.PEVStateSnapshot) types.PEVState {
-	return types.PEVState{
-		Phase:         types.PEVPhase(s.Phase),
-		Iteration:     s.Iteration,
-		MaxIterations: s.MaxIterations,
-		LastToolCalls: s.LastToolCalls,
-		VerifyResult: types.VerifyResult{
-			Passed:    s.VerifyResult.Passed,
-			Deviation: s.VerifyResult.Deviation,
-			Commands:  s.VerifyResult.Commands,
-		},
 	}
 }
 

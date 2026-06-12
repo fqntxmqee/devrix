@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/prompt/agent"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
@@ -14,12 +15,13 @@ const (
 	AgentPlan    = "Plan"
 )
 
-var exploreSystemPrompt = `You are the Explore sub-agent. Investigate the codebase read-only.
-Use read_file, glob, grep, list_dir, and bash (read-only commands) to gather facts.
-Return concise findings; do not modify files.`
+// exploreSystemPrompt is the structured prompt for Explore agents,
+// loaded from the embedded prompts/explore.md.
+var exploreSystemPrompt = agent.ExplorePrompt
 
-var planSystemPrompt = `You are the Plan sub-agent. Produce an implementation plan from exploration context.
-Use read-only tools only. Output structured steps and critical files; do not edit source files.`
+// planSystemPrompt is the structured prompt for Plan agents,
+// loaded from the embedded prompts/plan.md.
+var planSystemPrompt = agent.PlanPrompt
 
 // RunExplore runs a read-only exploration sub-query.
 func RunExplore(ctx context.Context, deps query.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*query.SubQueryResult, error) {

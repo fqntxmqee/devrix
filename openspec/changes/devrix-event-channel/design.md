@@ -61,7 +61,7 @@ internal/layers/communication/eventbus/
 ├── compact.go    # Compact 协议
 ├── reconnect.go  # Reconnect 协议
 ├── types.go      # Event 包装 + Priority + 不可变 With* 工具
-└── *_test.go     # L5 测试
+└── *_test.go     # T 层测试
 ```
 
 > 注：本 change 落地在 `internal/layers/communication/eventbus/`，与
@@ -92,7 +92,7 @@ type BackpressureEventBus interface {
 - `complete` / `error` 事件**永远不被 Drain / Compact 丢弃**（P0 约束）
   - `PublishCritical` 走独立的 unbuffered channel
   - 即使在 Draining / Compacting / Reconnecting 状态也必达
-  - 测试覆盖：L5-2-3-05、L5-2-3-06
+  - 测试覆盖：D2-S3-T05、D2-S3-T06
 - Drain 仅作用于 `normalCh`；`criticalCh` 不动
 - Compact 仅合并**相邻同 type** 的 Normal/Low 事件；不合并 Critical
 - Reconnect 期间新发布的事件暂存到 `pendingCh`，新 channel 就绪后刷入
@@ -127,23 +127,23 @@ type BackpressureEventBus interface {
 **Wire 兼容性**：`OutboundMessage` 字段、`OnMessage` 接口、metric 名称、event type 字符串
 保持完全不变。仅内部增加一层 bus。
 
-## 7. L5 测试覆盖
+## 7. T 层测试覆盖
 
 | ID | 描述 | 文件 |
 |----|------|------|
-| L5-2-3-01 | 正常事件流不丢 | `bus_test.go` TestNormalEventFlow_NoLoss |
-| L5-2-3-02 | 背压触发 Drain | `drain_test.go` TestBackpressureTriggersDrain |
-| L5-2-3-03 | Compact 降采样 | `compact_test.go` TestCompactConsecutiveEvents |
-| L5-2-3-04 | Reconnect 恢复 | `reconnect_test.go` TestReconnectRecovery |
-| L5-2-3-05 | Complete 事件必达 | `bus_test.go` TestCompleteEventNeverDropped |
-| L5-2-3-06 | Error 事件必达 | `bus_test.go` TestErrorEventNeverDropped |
-| L5-2-3-07 | 通道满时回压到上游 | `bus_test.go` TestPublishBlocksAtHighWatermark |
+| D2-S3-T01 | 正常事件流不丢 | `bus_test.go` TestNormalEventFlow_NoLoss |
+| D2-S3-T02 | 背压触发 Drain | `drain_test.go` TestBackpressureTriggersDrain |
+| D2-S3-T03 | Compact 降采样 | `compact_test.go` TestCompactConsecutiveEvents |
+| D2-S3-T04 | Reconnect 恢复 | `reconnect_test.go` TestReconnectRecovery |
+| D2-S3-T05 | Complete 事件必达 | `bus_test.go` TestCompleteEventNeverDropped |
+| D2-S3-T06 | Error 事件必达 | `bus_test.go` TestErrorEventNeverDropped |
+| D2-S3-T07 | 通道满时回压到上游 | `bus_test.go` TestPublishBlocksAtHighWatermark |
 
 ## 8. 风险与缓解
 
 | 风险 | 缓解 |
 |------|------|
-| Drain 误丢 Critical | criticalCh 独立；测试覆盖 L5-2-3-05/06 |
+| Drain 误丢 Critical | criticalCh 独立；测试覆盖 D2-S3-T05/06 |
 | Compact 损失粒度 | 仅合并相邻同 type；测试断言计数 + 内容 |
 | Reconnect 状态机竞争 | 状态转换加 `sync.Mutex`；`go test -race` |
 | Subscribe 慢消费者阻塞 bus | Subscribe 返回 buffered channel（64），慢只丢订阅者侧 |

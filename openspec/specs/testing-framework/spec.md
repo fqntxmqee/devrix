@@ -9,14 +9,14 @@
 
 ## Overview
 
-Devrix 测试框架将 OpenSpec L5 测试点、Go 测试金字塔与 S5 自动化验收串联为统一契约。
+Devrix 测试框架将 OpenSpec T 层测试点、Go 测试金字塔与 S5 自动化验收串联为统一契约。
 所有新增或变更 L3/L4 能力的开发 MUST 遵循本规范。
 
 **关联文档：**
 
 | 文档 | 路径 |
 |------|------|
-| L5 注册表 | `openspec/l5-registry.md` |
+| T 层注册表 | `openspec/t-registry.md` |
 | 域分段测试 | `openspec/specs/testing-framework/domain-segmentation.md` |
 | 项目元数据 | `openspec/project.md` |
 | 交付流程 | `specs/05-delivery-process.md`（工作区） |
@@ -58,7 +58,7 @@ Devrix 测试框架将 OpenSpec L5 测试点、Go 测试金字塔与 S5 自动�
 
 #### Scenario: Acceptance tests separated
 
-- GIVEN a test maps to an L5 P0 acceptance criterion
+- GIVEN a test maps to an T 层 P0 acceptance criterion
 - WHEN the test validates a user-visible or contract-level behavior
 - THEN it MUST be placed under `tests/acceptance/p0/` (or `p1/`, `p2/`)
 - AND MUST declare `//go:build acceptance`
@@ -81,9 +81,9 @@ devrix/
 │   ├── integration/               # //go:build integration
 │   ├── e2e/                       # //go:build smoke
 │   ├── acceptance/
-│   │   ├── p0/                    # L5 P0 验收
-│   │   ├── p1/                    # L5 P1
-│   │   └── p2/                    # L5 P2
+│   │   ├── p0/                    # T 层 P0 验收
+│   │   ├── p1/                    # T 层 P1
+│   │   └── p2/                    # T 层 P2
 │   └── performance/               # //go:build performance（可选）
 └── scripts/
     ├── test-unit.sh
@@ -133,32 +133,32 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 
 ---
 
-### Requirement: L5 Traceability
+### Requirement: T 层 Traceability
 
-每个 L5 测试点 MUST 有可追溯的测试用例，测试代码 MUST 标注 L5 ID。
+每个 T 层测试点 MUST 有可追溯的测试用例，测试代码 MUST 标注 T 层 ID。
 
 **Priority**: P0
-**Rationale**: L5 是 OpenSpec S5 验收的确定性锚点。
+**Rationale**: T 层是 OpenSpec S5 验收的确定性锚点。
 
-#### Scenario: Register new L5 before implementation
+#### Scenario: Register new T 层 before implementation
 
 - GIVEN a new L4 capability is planned in `tasks.md`
 - WHEN development begins
-- THEN a corresponding L5 ID MUST exist in `openspec/l5-registry.md`
-- AND the L5 entry MUST include Priority, L4 mapping, and test file path
+- THEN a corresponding T 层 ID MUST exist in `openspec/t-registry.md`
+- AND the T 层 entry MUST include Priority, L4 mapping, and test file path
 
-#### Scenario: Annotate test with L5 ID
+#### Scenario: Annotate test with T 层 ID
 
-- GIVEN a test case covers an L5 acceptance criterion
+- GIVEN a test case covers a T 层 acceptance criterion
 - WHEN the test function is written
-- THEN it MUST include a comment `// Covers: L5-{LAYER}-{NN}` above the function
-- AND P0 L5 tests MUST reside in `tests/acceptance/p0/`
+- THEN it MUST include a comment `// Covers: T-{LAYER}-{NN}` above the function
+- AND P0 T 层 tests MUST reside in `tests/acceptance/p0/`
 
 #### Scenario: Acceptance test naming
 
-- GIVEN an acceptance test maps to L5-COMM-04
+- GIVEN an acceptance test maps to D1-COMM-T04
 - WHEN the test function is named
-- THEN it SHOULD use the pattern `TestL5_{LAYER}_{NN}_{Behavior}`
+- THEN it SHOULD use the pattern `Test_{LAYER}_{NN}_{Behavior}`
 
 ---
 
@@ -173,7 +173,7 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 |------|----------|------|
 | 单元测试 | `Test{Type}_{Method}_{Condition}` | `TestPermissionManager_Request_Timeout` |
 | 集成测试 | `TestIntegration_{Flow}` | `TestIntegration_SessionExpiration` |
-| 验收测试 | `TestL5_{DOMAIN}_{NN}_{Behavior}` | `TestL5_COMM_Commands_Parse` |
+| 验收测试 | `Test_{DOMAIN}_{NN}_{Behavior}` | `Test_COMM_Commands_Parse` |
 | 性能测试 | `Benchmark{Type}_{Method}` | `BenchmarkFileSessionStore_Create` |
 
 ---
@@ -199,8 +199,8 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 - GIVEN a task in `tasks.md` is marked complete
 - WHEN the developer submits for review
 - THEN `./scripts/test-unit.sh` MUST pass
-- AND affected L5 tests MUST pass via `./scripts/test-acceptance.sh`
-- AND `tasks.md` MUST list associated L5 IDs
+- AND affected T 层 tests MUST pass via `./scripts/test-acceptance.sh`
+- AND `tasks.md` MUST list associated T 层 IDs
 
 #### Scenario: Slow tests use short timeouts in unit path
 
@@ -231,14 +231,14 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 - GIVEN a change reaches S5 acceptance
 - WHEN `./scripts/gen-acceptance-report.sh --change {slug}` is executed
 - THEN `acceptance-report.md` MUST be written under `openspec/changes/{slug}/`
-- AND P0 L5 results MUST be included from `openspec/l5-registry.md`
+- AND P0 T 层 results MUST be included from `openspec/t-registry.md`
 - AND exit code MUST be 0 only when verdict is ACCEPTED
 
 ---
 
 ### Requirement: OpenSpec S5 Acceptance Integration
 
-功能变更的 S5 验收 MUST 基于 L5 测试点生成 `acceptance-report.md`。
+功能变更的 S5 验收 MUST 基于 T 层测试点生成 `acceptance-report.md`。
 
 **Priority**: P0
 **Rationale**: 对齐工作区交付管线 S5 阶段。
@@ -247,7 +247,7 @@ Mock 代码 MUST NOT 出现在非 `*_test.go` 的正式源文件中。
 
 - GIVEN a change in `openspec/changes/{slug}/` reaches S5
 - WHEN acceptance is executed
-- THEN each P0 L5 MUST have PASS status with evidence (test name or CI link)
+- THEN each P0 T 层 MUST have PASS status with evidence (test name or CI link)
 - AND `acceptance-report.md` MUST be generated per `specs/05-delivery-process.md` §9.2
 - AND overall verdict MUST be ACCEPTED before S6 delivery
 
@@ -266,7 +266,7 @@ Build tags MUST 使用以下标准值，不得自定义未登记的 tag。域分
 |-----|------|------|
 | `integration` | `tests/integration/` | 跨包集成 |
 | `smoke` | `tests/e2e/` | 冒烟 |
-| `acceptance` | `tests/acceptance/` | L5 验收 |
+| `acceptance` | `tests/acceptance/` | T 层验收 |
 | `performance` | `tests/performance/` | 基准（可选） |
 
 #### 域 Tag（与层级 Tag 组合）

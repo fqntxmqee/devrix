@@ -31,12 +31,12 @@ scope:
     - id: CTX-WAVE-COMPLETED-PAYLOAD
       name: wave_completed 附件数据源
 
-  l5_test_points:
-    - L5-CTX-REG-01
-    - L5-CTX-REG-02
-    - L5-CTX-REG-03
-    - L5-CTX-REG-04
-    - L5-CTX-REG-05
+  t_points:
+    - D2-S5-A01-T01
+    - D2-S5-A01-T02
+    - D2-S5-A01-T03
+    - D2-S5-A01-T04
+    - D2-S5-A01-T05
 
 version_scope:
   v1.0:

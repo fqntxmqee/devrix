@@ -1,15 +1,37 @@
 # 架构设计规范
 
-**版本:** 1.0.0
+**版本:** 1.1.0
 **状态:** Active
 **所属阶段:** S2、S3
-**关联规范:** `requirements.md`、`review-design.md`
+**关联规范:** `requirements.md`、`review-design.md`、`dsaft-methodology.md`
 
 ---
 
 ## 1. 设计原则
 
-### 1.1 六段式框架
+### 1.1 DSAFT 五层架构（强制）
+
+所有架构设计必须遵循 DSAFT 方法论（详见 `dsaft-methodology.md`）：
+
+```
+D 领域 → S 场景 → A 活动 → F 功能点 → T 测试点
+```
+
+各阶段 DSAFT 产出：
+
+| OpenSpec 阶段 | DSAFT 产出 | 说明 |
+|---------------|-----------|------|
+| S2 proposal | D + S | 定位领域和场景 |
+| S3 design | A + F | 定义活动和功能点编排 |
+| S4 tasks | F 实现 | 任务标注归属 T |
+| S5 verify | T 验收 | P0 全绿方可交付 |
+
+S3 设计文档必须包含：
+- **领域归属**：本 change 涉及哪个 D，领域类型（核心/支撑/公共）
+- **活动定义**：对外暴露哪些 A（A-BE 或 A-FE），输入/输出/状态变更
+- **功能点编排**：每个 A 由哪些 F 协作完成
+
+### 1.2 六段式框架
 
 复杂架构文档（`docs/<module>-design.md`）应参照 `docs/detail design framework.md` 六段式：
 1. 架构目标 — 业务与技术目标、约束
@@ -19,7 +41,7 @@
 5. 核心链路 — 端到端路径与时序
 6. 接口/API 设计 — 契约、幂等、版本
 
-### 1.2 轻量变更
+### 1.3 轻量变更
 
 非架构级变更可跳过六段式，但 design.md 必须包含：
 - 问题根因
@@ -37,7 +59,9 @@ priority: P0 | P1 | P2
 demand_id: DM-YYYYMMDD-NNN
 status: s2_design | s3_design | s4_implementation | s5_acceptance | s7_archived
 domains: [D1, D2, ...]
-l5_points: [L5-X-Y-NN, ...]
+dsaft_scenarios: [D{X}-S{X}, ...]        # 涉及的场景 ID
+dsaft_activities: [D{X}-S{X}-A{XX}, ...]  # 涉及的活动 ID
+t_points: [D{X}-S{X}-A{XX}-T{XX}, ...]
 version_scope:
   v1.0: <scope>
   v1.1: <optional>
@@ -128,12 +152,16 @@ proposal.md、design.md **不得**包含工时估算。理由：
 - THEN 语句包含可验证的具体结果
 - 错误路径（sad path）必须有独立 Scenario
 
-### 6.3 L5 映射
+### 6.3 T 层映射
 
-每个 Requirement 应在注释中标注关联的 L5 测试点：
+每个 Requirement 应在注释中标注关联的 T 层测试点：
+
 ```markdown
-<!-- L5: L5-4-1-01, L5-4-1-02 -->
+<!-- T: D4-S1-A01-T01, D4-S1-A01-F01-T01 -->
 ```
+
+- **T 归属 A**（4 段）：`D{X}-S{X}-A{XX}-T{XX}` — 契约/E2E 级验证
+- **T 归属 F**（5 段）：`D{X}-S{X}-A{XX}-F{XX}-T{XX}` — 单元/集成级验证
 
 ---
 
@@ -160,12 +188,15 @@ proposal.md、design.md **不得**包含工时估算。理由：
 
 S2 完成前：
 - [ ] `.openspec.yaml` 所有字段已填写
+- [ ] `dsaft_scenarios` 已标注涉及的 DSAFT 场景 ID
 - [ ] `proposal.md` 包含方案对比与风险评估
-- [ ] L5 测试点在 `l5-registry.md` 预登记（PLANNED）
+- [ ] T 层测试点在 `t-registry.md` 预登记（PLANNED）
 
 S3 完成前：
 - [ ] `design.md` 包含根因、方案、文件清单、回归风险
+- [ ] `dsaft_activities` 已标注涉及的活动 ID
+- [ ] `design.md` 明确每个 A 的 F 编排关系（A↔F）
 - [ ] `specs/*/spec.md` 包含所有 Gherkin Scenario
-- [ ] 每个 Requirement 有对应的 L5 注释
+- [ ] 每个 Requirement 有对应的 T 层注释
 - [ ] 重大决策已记录（Decision 节）
 - [ ] Draft PR 已创建

@@ -2,19 +2,9 @@ package config_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/devrix/devrix/internal/shared/config"
 )
-
-func TestValidateContextEngineV3Config_should_reject_plan_timeout_over_limit(t *testing.T) {
-	cfg := config.DefaultContextEngineConfig()
-	cfg.Plan.Enabled = true
-	cfg.Plan.Timeout = 30 * time.Second
-	if err := config.ValidateContextEngineConfig(cfg); err == nil {
-		t.Fatal("expected validation error for plan timeout")
-	}
-}
 
 func TestValidateContextEngineV3Config_should_reject_invalid_longterm_topic(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()

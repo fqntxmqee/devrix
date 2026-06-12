@@ -10,9 +10,9 @@
 | T6 | lifecycle captures tool_call events as messages | done | call_id in Metadata |
 | T7 | D5 metric runtime.fork_session_view_total{policy} | done | local atomic + D5 mirror |
 | T8 | D6 SessionIsolationProbe (deterministic) | done | registered in init() |
-| T9 | L5-4-3-01 ~ 05 tests + -race -count=3 | done | all green |
+| T9 | D4-S3-T01 ~ 05 tests + -race -count=3 | done | all green |
 
-## 5. L5 Test Mapping
+## 5. T Test Mapping
 
 See `design.md` §5.
 

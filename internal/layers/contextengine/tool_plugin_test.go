@@ -88,8 +88,8 @@ func TestNewBuiltinToolRegistry_should_register_builtin_tools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	if len(schemas) != 3 {
-		t.Fatalf("schema count = %d, want 3", len(schemas))
+	if len(schemas) != 6 {
+		t.Fatalf("schema count = %d, want 6", len(schemas))
 	}
 	for _, s := range schemas {
 		if s.Name == "" || s.Description == "" {

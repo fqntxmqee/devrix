@@ -37,7 +37,7 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 ### TD-QL-05: IM 事件契约（P0 回归）
 
 - **背景：** YOLO + tool calls 曾 suppress `complete`，导致飞书无 Done（已修复 `query_loop_run.go`）
-- **目标：** L5 回归：`complete` 事件在 QueryLoop 所有模式（含 YOLO）下必达 IM 层
+- **目标：** T 层回归：`complete` 事件在 QueryLoop 所有模式（含 YOLO）下必达 IM 层
 
 ### TD-QL-06: 恢复时 orphan message tombstone（P1）
 
@@ -53,7 +53,7 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 
 - **依赖：** TD-QL-03（Loop fallback）+ `streaming-tool-executor-v2.md` TD-STE-03
 - **目标：** 切换 fallback model 前 discard 在途 executor，防止 orphan tool_result
-- **验收：** 与 TD-STE-03 共用 L5
+- **验收：** 与 TD-STE-03 共用 T 层
 
 ## 不在此 tech-debt
 

@@ -9,6 +9,8 @@ import (
 )
 
 // Bridge adapts the L3 gateway to contextengine.ILLMGateway.
+//
+// DSAFT: D3-S1-A01-F03 (AdaptToContextEngine)
 type Bridge struct {
 	gw llmgateway.IGateway
 }

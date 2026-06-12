@@ -14,7 +14,7 @@
 
 ## Overview
 
-本文档基于 `l5-registry.md` 测试审计结果，定义 Devrix 测试质量增强需求。覆盖三大类问题：
+本文档基于 `t-registry.md` 测试审计结果，定义 Devrix 测试质量增强需求。覆盖三大类问题：
 
 1. **边界条件测试缺失** - 错误处理、超时、并发
 2. **Mock 滥用导致真实场景缺失** - 需要引入 VCR/真实 API 测试
@@ -169,32 +169,32 @@
 
 ---
 
-## L5 Test Points Registry
+##T 层测试点注册表
 
 ### D2 Context Engine Extensions
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| T 层 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-2-1-09 | Verify timeout returns CodeVerifyTimeout | PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
-| L5-2-1-10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | PLANNED |
-| L5-2-1-11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
-| L5-2-1-12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
-| L5-2-2-08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
+| D2-S1-T09 | Verify timeout returns CodeVerifyTimeout | PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
+| D2-S1-T10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | PLANNED |
+| D2-S1-T11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| D2-S1-T12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| D2-S2-T08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
 
 ### D3 LLM Gateway Extensions
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| T 层 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-3-1-03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | PLANNED |
-| L5-3-2-06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | PLANNED |
-| L5-3-5-03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
+| D3-S1-T03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | PLANNED |
+| D3-S2-T06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | PLANNED |
+| D3-S5-T03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
 
 ### D5 Observability Extensions
 
-| L5 ID | 描述 | L2 映射 | Test 位置 | Status |
+| T 层 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| L5-5-2-06 | Compression P99 latency < 500ms | Metrics | `tests/performance/compression_test.go` | PLANNED |
-| L5-5-2-07 | Concurrent session memory bounded | Metrics | `tests/performance/memory_test.go` | PLANNED |
+| D5-S2-T06 | Compression P99 latency < 500ms | Metrics | `tests/performance/compression_test.go` | PLANNED |
+| D5-S2-T07 | Concurrent session memory bounded | Metrics | `tests/performance/memory_test.go` | PLANNED |
 
 ---
 
@@ -203,10 +203,10 @@
 ```
 tests/
 ├── security/
-│   └── shell_injection_test.go     # L5-2-1-10
+│   └── shell_injection_test.go     # D2-S1-T10
 ├── performance/
-│   ├── compression_test.go         # L5-5-2-06
-│   └── memory_test.go              # L5-5-2-07
+│   ├── compression_test.go         # D5-S2-T06
+│   └── memory_test.go              # D5-S2-T07
 └── fixtures/
     └── llm_responses/              # VCR recorded responses
 ```
@@ -227,7 +227,7 @@ tests/
 
 | ID | 描述 | 验证方法 |
 |----|------|----------|
-| AC-01 | L5-2-1-09 到 L5-2-1-12 实现并通过 | `./scripts/test-acceptance.sh` |
+| AC-01 | D2-S1-T09 到 D2-S1-T12 实现并通过 | `./scripts/test-acceptance.sh` |
 | AC-02 | Shell injection 测试覆盖 5+ 危险模式 | `grep -c dangerous tests/security/` |
 | AC-03 | PEV 并发测试验证 10+ 并发 session | `TestPEVEngine_concurrent_sessions` |
 | AC-04 | 压缩超时测试验证降级到 truncation | `TestPipeline_autocompact_timeout_skips_and_fallback` |

@@ -44,7 +44,7 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 | **S3-Gate** | **`review-design.md`** | 设计审查通过 |
 | S4 实现 | `coding.md` + `testing.md` | go vet + test-unit |
 | **S4-Gate** | **`review-code.md`** | 代码审查通过 |
-| S5 验收 | `testing.md` | P0 L5 100% + 覆盖率 ≥ 80% |
+| S5 验收 | `testing.md` | P0 T 层 100% + 覆盖率 ≥ 80% |
 | S6 归档 | `archiving.md` | 归档检查清单 |
 
 所有子规范路径：`openspec/specs/project/<规范名>`
@@ -56,5 +56,5 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 - **不可变性**: 创建新对象，禁止原地修改
 - **文件规模**: 函数 < 50 行，文件 < 800 行
 - **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge
-- **L5 测试**: 编号 `L5-{D}-{S}-{NN}`，注册在 `openspec/l5-registry.md`
+- **T 层测试点**: 编号 `D{X}-S{X}-T{NN}`（DSAFT 标准），注册在 `openspec/t-registry.md`
 - **Change 目录**: `openspec/changes/<change-id>/`，归档到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`

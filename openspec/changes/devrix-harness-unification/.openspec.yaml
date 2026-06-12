@@ -40,14 +40,14 @@ scope:
     - id: PATH-REGRESSION-PROBE
       name: D6 路径回退评测探针
 
-  l5_test_points:
-    - L5-2-11-01  # query_loop.enabled=true 默认
-    - L5-2-11-02  # harnessEnabled 分支不再被生产路径触发
-    - L5-2-11-03  # 旧路径调用计数基线=0
-    - L5-2-11-04  # 压缩入口统一
-    - L5-2-11-TD01  # TD-QL-01: 413 recovery
-    - L5-2-11-TD03  # TD-QL-03: fallback model (生产未接线, PARTIAL)
-    - L5-2-11-D6PR  # D6 PathRegressionProbe
+  t_points:
+    - D2-S11-A01-T01  # query_loop.enabled=true 默认
+    - D2-S11-A01-T02  # harnessEnabled 分支不再被生产路径触发
+    - D2-S11-A01-T03  # 旧路径调用计数基线=0
+    - D2-S11-A01-T04  # 压缩入口统一
+    - D2-S11-A01-TD01  # TD-QL-01: 413 recovery
+    - D2-S11-A01-TD03  # TD-QL-03: fallback model (生产未接线, PARTIAL)
+    - D2-S11-A01-D6PR  # D6 PathRegressionProbe
 
 deliverables:
   - path: proposal.md
@@ -77,7 +77,7 @@ deliverables:
     status: completed
   - path: internal/layers/contextengine/query/recovery.go
     status: completed
-  - path: openspec/l5-registry.md
+  - path: openspec/t-registry.md
     status: completed
 
 version_scope:

@@ -42,6 +42,9 @@ func NewBuiltinToolRegistry(toolCfg *config.ToolConfig) (*ToolRegistry, error) {
 		newBashRunner(execCfg),
 		newReadFileRunner(execCfg),
 		newWriteFileRunner(execCfg),
+		newGlobRunner(),
+		newGrepRunner(),
+		newEditFileRunner(execCfg),
 	} {
 		if err := reg.Register(runner); err != nil {
 			return nil, fmt.Errorf("register builtin %s: %w", runner.Name(), err)

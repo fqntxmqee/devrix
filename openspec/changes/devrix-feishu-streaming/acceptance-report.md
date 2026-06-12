@@ -15,13 +15,13 @@
 go test ./internal/layers/communication/adapters/... -count=1 -run 'Cardkit|Stream|Throttle|ToolCardPatch'
 ```
 
-| L5 ID | 描述 | 结果 |
+| T ID | 描述 | 结果 |
 |-------|------|------|
-| L5-1-2-04 | Cardkit 双步发卡 | PASS |
-| L5-1-2-05 | 元素 PUT sequence 递增 | PASS |
-| L5-1-2-06 | cardkit 失败降级 Patch | PASS |
-| L5-1-2-07 | complete 关闭 streaming_mode | PASS |
-| L5-1-2-08 | 流式节流配置 | PASS |
+| D1-S2-T04 | Cardkit 双步发卡 | PASS |
+| D1-S2-T05 | 元素 PUT sequence 递增 | PASS |
+| D1-S2-T06 | cardkit 失败降级 Patch | PASS |
+| D1-S2-T07 | complete 关闭 streaming_mode | PASS |
+| D1-S2-T08 | 流式节流配置 | PASS |
 | — | T14 工具卡 Patch 不干扰 cardkit sequence | PASS |
 
 ## Manual E2E Checklist（待执行）

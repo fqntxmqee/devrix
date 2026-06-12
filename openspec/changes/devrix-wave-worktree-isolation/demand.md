@@ -4,7 +4,7 @@ title: Wave Git Worktree — 写并行可选 git 隔离与合并收尾
 source: clawcode 能力对照（createAgentWorktree / hasWorktreeChanges / batch PR）
 priority: P1
 status: S2_Clarified
-l1-domain: context-engine
+dsaft_domain: context-engine
 created: 2026-06-12
 ---
 
@@ -72,7 +72,7 @@ Devrix 现有 D2-S12 `worktree.Manager` 仅为 **mkdir 沙箱**（`~/.devrix/wor
 | L3-BE | L3-BE-ORCH-WAVE-WORKTREE | Wave Worker worktree 生命周期 | **新增** |
 | L4-BE | L4-BE-CTX-GIT-WORKTREE | GitWorktreeAdapter enter/exit/hasChanges | **新增** |
 | L4-BE | L4-BE-ORCH-WAVE-ISOLATION | TaskNode.Isolation 解析 | **新增** |
-| L5 | L5-CTX-WT-01 ~ 06 | 见 §6 | **草拟** |
+| T 层 | {T}-CTX-WT-01 ~ 06 | 见 §6 | **草拟** |
 
 ## 5. 范围
 
@@ -116,16 +116,16 @@ Devrix 现有 D2-S12 `worktree.Manager` 仅为 **mkdir 沙箱**（`~/.devrix/wor
 | AC7 | wave_completed 附件含 PR 汇总表（task_id / status / pr_url） |
 | AC8 | stale agent worktree 清理策略（可配置 retention 天数） |
 
-### L5 测试点（草案，S3 登记 l5-registry）
+### T 层测试点（草案，S3 登记 t-registry）
 
-| L5 ID | Given-When-Then | 优先级 |
+| T ID | Given-When-Then | 优先级 |
 |-------|-----------------|--------|
-| L5-CTX-WT-01 | Given git repo When Enter worktree Then write 不污染主 WorkDir | P0 |
-| L5-CTX-WT-02 | Given worktree 无改动 When Exit Then 目录与 branch 已删除 | P0 |
-| L5-CTX-WT-03 | Given worktree 有新 commit When Exit Then path/branch 保留且 Artifact 可查 | P0 |
-| L5-CTX-WT-04 | Given Isolation=shared When dispatch Then 不使用 git worktree | P0 |
-| L5-CTX-WT-05 | Given 非 git repo When Isolation=worktree Then 降级 shared + warn | P0 |
-| L5-CTX-WT-06 | Given result 含 PR URL When 解析 Artifact Then PRURL 正确 | P1 |
+| {T}-CTX-WT-01 | Given git repo When Enter worktree Then write 不污染主 WorkDir | P0 |
+| {T}-CTX-WT-02 | Given worktree 无改动 When Exit Then 目录与 branch 已删除 | P0 |
+| {T}-CTX-WT-03 | Given worktree 有新 commit When Exit Then path/branch 保留且 Artifact 可查 | P0 |
+| {T}-CTX-WT-04 | Given Isolation=shared When dispatch Then 不使用 git worktree | P0 |
+| {T}-CTX-WT-05 | Given 非 git repo When Isolation=worktree Then 降级 shared + warn | P0 |
+| {T}-CTX-WT-06 | Given result 含 PR URL When 解析 Artifact Then PRURL 正确 | P1 |
 
 ## 7. 依赖
 

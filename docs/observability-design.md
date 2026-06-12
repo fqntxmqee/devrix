@@ -218,7 +218,7 @@ L1: Communication  ←→  L2: Context  ←→  L3: LLM
 
 ---
 
-## 五、Canonical Trace Tree（L5-OBS-TRACE-04/06）
+## 五、Canonical Trace Tree（D5-TRACE-T04/06）
 
 集成测试 `tests/integration/obs_pev_span_hierarchy_test.go` 验证 R1–R2 与 SpanKind。
 

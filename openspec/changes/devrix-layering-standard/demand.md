@@ -4,7 +4,7 @@ title: Devrix 分层 ID 规范标准化
 source: Devrix 内部规范
 priority: P1
 status: S0_Deferred
-l1-domain: architecture
+dsaft_domain: architecture
 created: 2026-06-08
 reviewer: Claude
 ---
@@ -41,7 +41,7 @@ Devrix 作为多智能体开发助手，当前缺乏统一的 ID 规范来标识
 | ID | 标准 | 优先级 |
 |----|------|--------|
 | AC1 | D-S-A-F-T 规范文档发布至 `specs/architecture/` | P0 |
-| AC2 | 核心模块（D01-D06）ID 映射完成 | P0 |
+| AC2 | 核心模块（D1-D6）ID 映射完成 | P0 |
 | AC3 | 新增功能点必须包含 ID 前缀 | P0 |
 | AC4 | 测试用例包含对应功能 ID | P1 |
 | AC5 | ID 生成脚本可用 | P2 |
@@ -54,13 +54,13 @@ Devrix 作为多智能体开发助手，当前缺乏统一的 ID 规范来标识
 | 约束 | 不修改生产代码逻辑 |
 | 约束 | 不引入新依赖 |
 
-## 5. L1–L5 映射草案
+## 5. DSAFT 域映射草案
 
-| 层级 | 资产 |
+| 层 | 资产 |
 |------|------|
-| L1 | Architecture |
-| L4 | ID 规范、标准文档 |
-| L5 | L4-1-01~03 (规范定义、代码映射、扩展规则) |
+| D | Architecture（公共域） |
+| F | ID 规范、标准文档 |
+| T | T 层（规范定义、代码映射、扩展规则） |
 
 ## 6. 变更范围
 

@@ -1,8 +1,8 @@
 # Devrix 项目研发规范
 
-**版本:** 1.0.0
+**版本:** 1.1.0
 **状态:** Active
-**最后更新:** 2026-06-08
+**最后更新:** 2026-06-12
 
 ---
 
@@ -21,10 +21,11 @@
 | 子规范 | 文件 | 用途 |
 |--------|------|------|
 | 需求规范 | `requirements.md` | DM ID 分配、demand.md 模板、验收标准格式 |
+| DSAFT 方法论 | `dsaft-methodology.md` | 五层架构体系、领域类型、ID 格式、追溯规则（所有阶段基础） |
 | 架构设计规范 | `architecture-design.md` | .openspec.yaml、proposal/design/spec 模板与设计原则 |
 | 设计 Review 规范 | `review-design.md` | S3 门禁：设计审查清单与通过标准 |
 | 编码规范 | `coding.md` | Go 编码规则（引全局规则 + 项目补充） |
-| 测试规范 | `testing.md` | 测试金字塔、L5 追溯、覆盖率要求（引 testing-framework/spec.md） |
+| 测试规范 | `testing.md` | 测试金字塔、T 层追溯、覆盖率要求（引 testing-framework/spec.md） |
 | 代码 Review 规范 | `review-code.md` | S4 门禁：代码审查清单与通过标准 |
 | 归档规范 | `archiving.md` | S6 归档检查清单与操作流程 |
 | 配置与环境规范 | `config-environment.md` | 配置层级、环境变量、secret 管理 |
@@ -50,17 +51,18 @@ Agent 或开发者进入任一阶段时，**必须**加载对应的子规范。�
 | 阶段 | 角色 | 必须遵循的规范 | 产出物 | 门禁 |
 |------|------|---------------|--------|------|
 | S1 需求 | 提出者 | `requirements.md` | `demand.md`（可选，轻量变更可免） | DM ID 合法 |
-| S2 提案 | 架构师 | `requirements.md`、`architecture-design.md` | `.openspec.yaml`、`proposal.md` | 文件完整性检查 |
-| S3 设计 | 架构师 | `architecture-design.md` | `design.md`、`specs/*/spec.md` | — |
+| S2 提案 | 架构师 | `requirements.md`、`dsaft-methodology.md`、`architecture-design.md` | `.openspec.yaml`、`proposal.md` | 文件完整性检查 |
+| S3 设计 | 架构师 | `dsaft-methodology.md`、`architecture-design.md` | `design.md`、`specs/*/spec.md` | — |
 | **S3-Gate** | **Reviewer** | **`review-design.md`** | **Review 结论** | **设计审查通过** |
 | S4 实现 | 开发者 | `coding.md`、`testing.md` | 代码 + 测试 + `tasks.md` | `go vet` + `test-unit` 通过 |
 | **S4-Gate** | **Reviewer** | **`review-code.md`** | **Review 结论** | **代码审查通过** |
-| S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 L5 100% PASS、覆盖率 >= 80% |
+| S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 T 层 100% PASS、覆盖率 ≥ 80% |
 | S6 归档 | 维护者 | `archiving.md` | `archive/` 目录 | 归档检查清单通过 |
 
 ### 2.3 如何使用
 
 **Agent 模式：** 当 Agent 需要执行某个阶段的任务时，先读 `master.md` 找到该阶段的规范列表，再加载对应子规范。例如：
+- S2 提案阶段 → 加载 `requirements.md` + `dsaft-methodology.md` + `architecture-design.md`
 - S4 实现阶段 → 加载 `coding.md` + `testing.md`
 - S3-Gate → 加载 `review-design.md`
 
@@ -91,7 +93,7 @@ main
 ```
 <type>: <简短描述>
 
-关联: L5-{D}-{S}-{NN}
+关联: D{X}-S{X}-A{XX}-T{XX}
 Change: <change-id>
 ```
 
@@ -129,9 +131,9 @@ openspec/changes/<change-id>/
 openspec/archive/<YYYY-MM-DD>-<change-id>/
 ```
 
-### 4.3 L5 测试点注册
+### 4.3 T 层测试点注册
 
-所有能力变更必须在 `openspec/l5-registry.md` 预登记 L5 测试点。编号格式：`L5-{D}-{S}-{NN}`。
+所有能力变更必须在 `openspec/t-registry.md` 预登记 T 层测试点。编号格式：`D{X}-S{X}-A{XX}-T{XX}`（T 归属 A）或 `D{X}-S{X}-A{XX}-F{XX}-T{XX}`（T 归属 F）。
 
 ---
 

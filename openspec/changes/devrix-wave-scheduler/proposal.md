@@ -60,6 +60,6 @@ Devrix v2 已有 ExecutionFlowHub、SubQuery、D4 Delegate、`call_cursor` / `ca
 
 ## 7. Success Metrics
 
-- P0 L5 全绿（见 design.md §6）
+- P0 T 层 全绿（见 design.md §6）
 - 飞书真机：5 Worker 并行可见 5 卡双区块流式
 - 集成测试：DAG 10 节点持续调度，峰值并发=5

@@ -23,7 +23,7 @@
 
 bash 工具执行前 MUST 经过 `CommandPolicy.Validate`：命令白名单、危险模式正则、绝对路径拦截。启用沙箱时 MUST 设置受限环境变量（HOME/PATH/PWD）并记录审计日志。
 
-**L5:** L5-TOOL-01
+**T:** D2-TOOL-T01
 
 ```gherkin
 Feature: Bash Command Sandbox
@@ -77,7 +77,7 @@ tool:
 
 系统 MUST 提供 `PluginRunner` 接口与 `ToolRegistry`，支持注册、去重校验、ListTools、Execute 分发。内置 bash / read_file / write_file MUST 以插件形式注册。
 
-**L5:** L5-TOOL-03, L5-TOOL-04
+**T:** D2-TOOL-T03, D2-TOOL-T04
 
 ```gherkin
 Feature: Pluggable Tool Registry
@@ -123,7 +123,7 @@ Feature: Tool Execution Concurrency
 
 bash MUST 为 HIGH 风险；write_file 为 MEDIUM；read_file 为 LOW。YOLO 模式下 CRITICAL 风险 MUST 永不自动批准。
 
-**L5:** L5-TOOL-02
+**T:** D2-TOOL-T02
 
 ```gherkin
 Feature: Tool Risk Level Refinement

@@ -55,7 +55,7 @@ type SubQueryConfig struct {
 func DefaultQueryLoopConfig() QueryLoopConfig {
 	return QueryLoopConfig{
 		Enabled:         true,
-		MaxTurns:        0,
+		MaxTurns:        50,
 		CompressPerTurn: true,
 	}
 }
@@ -91,6 +91,7 @@ func DefaultTasksConfig() TasksConfig {
 
 func DefaultSubQueryConfig() SubQueryConfig {
 	return SubQueryConfig{
+		ForkSubagentEnabled:     true,
 		SidechainTranscript:     true,
 		DefaultSubagentMaxTurns: 50,
 	}

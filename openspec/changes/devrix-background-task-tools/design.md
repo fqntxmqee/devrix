@@ -120,7 +120,7 @@ Leader `/new`、session 结束 → `WaveScheduler.CancelAll(sessionID)`。
 
 | 测试 | L5 |
 |------|-----|
-| stop running task → cancelled | L5-2-9-01 |
-| output block=false on running | L5-2-9-02 |
-| output block=true waits complete | L5-2-9-03 |
-| cancel suppresses completed notification | L5-2-9-04 |
+| stop running task → cancelled | D2-S9-T01 |
+| output block=false on running | D2-S9-T02 |
+| output block=true waits complete | D2-S9-T03 |
+| cancel suppresses completed notification | D2-S9-T04 |

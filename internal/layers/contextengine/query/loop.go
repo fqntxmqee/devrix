@@ -19,6 +19,7 @@ type Loop struct {
 	Tools           ToolExecutor
 	Permission      PermissionChecker
 	Compress        CompressFunc
+	CompressFactory func(sessionID string) CompressFunc // lazy-init when sessionID is known
 	Attachments     *attachments.Registry
 	UserContext     *usercontext.Provider
 	Hooks           LoopHooks
@@ -77,6 +78,9 @@ func (l *Loop) Run(
 			break
 		}
 
+		if l.Compress == nil && l.CompressFactory != nil && sc != nil {
+			l.Compress = l.CompressFactory(sc.SessionID)
+		}
 		if l.Compress != nil {
 			compressed, err := l.Compress(ctx, messages)
 			if err != nil {

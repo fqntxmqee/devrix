@@ -25,12 +25,12 @@ go test -race -count=1 ./internal/layers/evolution/eval/...
 go test -race -count=1 ./tools/layer-lint/...
 ```
 
-| L5 ID | 描述 | 结果 |
+| T ID | 描述 | 结果 |
 |-------|------|------|
-| L5-0-0-01 | Layer-Lint 阻断 D2→D1 反向 import | PASS |
-| L5-0-0-02 | Layer-Lint 阻断 D3→D2 反向 import | PASS |
-| L5-0-0-03 | LayerViolationProbe 评测探针在 D6 框架内注册 | PASS |
-| L5-0-0-04 | Contract Registry 文档含完整 6 接口矩阵 | PASS |
+| CROSS-T01 | Layer-Lint 阻断 D2→D1 反向 import | PASS |
+| CROSS-T02 | Layer-Lint 阻断 D3→D2 反向 import | PASS |
+| CROSS-T03 | LayerViolationProbe 评测探针在 D6 框架内注册 | PASS |
+| CROSS-T04 | Contract Registry 文档含完整 6 接口矩阵 | PASS |
 
 覆盖率：`internal/layers/evolution/eval/` 84.8% ≥ 80% ✅；`tools/layer-lint/` 88.1% ≥ 80% ✅
 
@@ -58,5 +58,5 @@ go test -race -count=1 ./tools/layer-lint/...
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
 | Dev | — | 2026-06-12 | 单测 + Lint PASS |
-| QA | — | 2026-06-12 | L5 100% PASS；v1.1 跟进项已开 |
+| QA | — | 2026-06-12 | T 层 100% PASS；v1.1 跟进项已开 |
 | S4-Gate | code-reviewer | 2026-06-12 | ⚠️ WARN（v1.1 follow-up） |

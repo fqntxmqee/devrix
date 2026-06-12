@@ -60,7 +60,6 @@ func TestManager_should_restore_from_backup_when_session_snapshot_empty(t *testi
 		SystemPrompt: "prompt",
 		Messages:     []types.Message{*types.NewMessage("m1", "sess_backup", types.MessageRoleUser, "prior turn")},
 		TokenBudget:  types.DefaultTokenBudget(),
-		PEVState:     types.DefaultPEVState(3),
 	}
 	data, err := store.Serialize(orig)
 	if err != nil {

@@ -13,7 +13,7 @@ meta:
   source: devrix-harness-architecture-audit
   s4_gate_verdict: PASS
   s4_gate_date: "2026-06-12"
-  s4_gate_note: "S4-Gate follow-up 已修复 call_id/tool_call_id 键不一致 + L5-4-3-05 补登记"
+  s4_gate_note: "S4-Gate follow-up 已修复 call_id/tool_call_id 键不一致 + D4-S3-A02-T05 补登记"
 
 scope:
   layers:
@@ -40,12 +40,12 @@ scope:
     - id: AGT-ISOLATION-PROBE
       name: D6 会话隔离评测探针
 
-  l5_test_points:
-    - L5-4-3-01  # Join 排序 + tool_call ID 去重
-    - L5-4-3-02  # Fork metadata 写操作不污染父
-    - L5-4-3-03  # 并发 3 Fork + Join 一致性
-    - L5-4-3-04  # ForkSessionView API 注入
-    - L5-4-3-05  # SessionIsolationProbe 注册
+  t_points:
+    - D4-S3-A01-T01  # Join 排序 + tool_call ID 去重
+    - D4-S3-A01-T02  # Fork metadata 写操作不污染父
+    - D4-S3-A01-T03  # 并发 3 Fork + Join 一致性
+    - D4-S3-A01-T04  # ForkSessionView API 注入
+    - D4-S3-A02-T05  # SessionIsolationProbe 注册
 
 deliverables:
   - path: proposal.md

@@ -4,7 +4,7 @@ title: 事件通道与背压机制 — Channel Drain/Compact/Reconnect
 source: devrix-harness-architecture-audit
 priority: P0
 status: S1_Proposal
-l1-domain: context-engine
+dsaft_domain: context-engine
 created: 2026-06-11
 ---
 

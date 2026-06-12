@@ -12,7 +12,7 @@
 以下任一情况发生时，必须进行设计 Review：
 
 - S3 设计阶段完成，design.md 和 specs/*/spec.md 已编写
-- 涉及跨层（L1）变更
+- 涉及跨域（D 层）变更
 - 涉及新模块/新包的创建
 - 变更影响 > 3 个文件
 - 新增或修改公开接口（`internal/shared/contracts/` 或层间接口）
@@ -50,7 +50,7 @@
 | Happy path 和 sad path | 两者都有对应 Scenario |
 | 并发场景覆盖 | 共享状态操作有并发安全 Scenario |
 | 错误路径覆盖 | 超时、取消、权限拒绝等有 Scenario |
-| L5 映射完整 | 每个 Requirement 标注了 L5 ID |
+| T 层映射完整 | 每个 Requirement 标注了 T 层 ID |
 
 ### 2.4 风险审查
 

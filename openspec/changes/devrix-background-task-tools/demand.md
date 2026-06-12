@@ -4,7 +4,7 @@ title: Background Task 工具 — task_stop / task_output 对齐 clawcode
 source: clawcode 能力对照（TaskStopTool / TaskOutputTool）
 priority: P1
 status: S2_Clarified
-l1-domain: context-engine
+dsaft_domain: context-engine
 created: 2026-06-11
 ---
 
@@ -65,7 +65,7 @@ clawcode 对照：
 - [ ] `task_output(task_id, block=false)` 返回 running/completed/failed + 已有 result 片段
 - [ ] `task_output(task_id, block=true, timeout_ms=30000)` 阻塞至完成或超时
 - [ ] 取消后 SessionQueue **不**再发 completed notification（或发 cancelled notification）
-- [ ] L5-2-9-01~03 单测/集成测试绿
+- [ ] D2-S9-T01~03 单测/集成测试绿
 
 ### P1
 

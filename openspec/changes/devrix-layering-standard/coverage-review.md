@@ -11,7 +11,7 @@
 | 指标 | 数值 | 状态 |
 |------|------|------|
 | 测试文件总数 | 264 个 | ✅ |
-| L5 测试点总数 | 76 个 | — |
+| T 层测试点总数 | 76 个 | — |
 | 已实现 (IMPLEMENTED) | 47 个 | 61.8% |
 | 已规划 (PLANNED) | 27 个 | 35.5% |
 | 废弃 (DEPRECATED) | 0 个 | — |
@@ -28,27 +28,27 @@
 
 ### 2.1 P0 需求覆盖
 
-| 需求 | L5 测试点 | 状态 | 验证文件 |
+| 需求 | T 层测试点 | 状态 | 验证文件 |
 |------|-----------|------|----------|
-| Verify 超时/退出码 | L5-2-1-09, L5-2-1-05 | ✅ | `tests/integration/context_verify_commands_test.go` |
-| Shell injection | L5-2-1-10 | ✅ | `tests/security/shell_injection_test.go` |
-| PEV 并发隔离 | L5-2-1-11, L5-2-1-12 | ✅ | `internal/layers/contextengine/pev_engine_test.go` |
-| 429/SSE 错误场景 | L5-3-1-03, L5-3-2-06 | ✅ | `tests/integration/llm_real_api_test.go` |
-| 断言深度 (中文 Token) | L5-3-5-03 | ✅ | `internal/layers/llmgateway/token/counter_test.go` |
+| Verify 超时/退出码 | D2-S1-T09, D2-S1-T05 | ✅ | `tests/integration/context_verify_commands_test.go` |
+| Shell injection | D2-S1-T10 | ✅ | `tests/security/shell_injection_test.go` |
+| PEV 并发隔离 | D2-S1-T11, D2-S1-T12 | ✅ | `internal/layers/contextengine/pev_engine_test.go` |
+| 429/SSE 错误场景 | D3-S1-T03, D3-S2-T06 | ✅ | `tests/integration/llm_real_api_test.go` |
+| 断言深度 (中文 Token) | D3-S5-T03 | ✅ | `internal/layers/llmgateway/token/counter_test.go` |
 
 ### 2.2 P1 需求覆盖
 
-| 需求 | L5 测试点 | 状态 | 验证文件 |
+| 需求 | T 层测试点 | 状态 | 验证文件 |
 |------|-----------|------|----------|
-| VCR 回放 | L5-3-1-03, L5-3-2-06 | ✅ | `tests/integration/llm_real_api_test.go` |
-| Token 中文准确性 | L5-3-5-03 | ✅ | `internal/layers/llmgateway/token/counter_test.go` |
-| 性能基线 | L5-5-2-06, L5-5-2-07 | ✅ | `tests/performance/` |
+| VCR 回放 | D3-S1-T03, D3-S2-T06 | ✅ | `tests/integration/llm_real_api_test.go` |
+| Token 中文准确性 | D3-S5-T03 | ✅ | `internal/layers/llmgateway/token/counter_test.go` |
+| 性能基线 | D5-S2-T06, D5-S2-T07 | ✅ | `tests/performance/` |
 
 ### 2.3 P2 需求覆盖
 
-| 需求 | L5 测试点 | 状态 | 备注 |
+| 需求 | T 层测试点 | 状态 | 备注 |
 |------|-----------|------|------|
-| 性能基线本地可执行 | L5-5-2-06, L5-5-2-07 | ✅ | `-tags=performance` 独立执行 |
+| 性能基线本地可执行 | D5-S2-T06, D5-S2-T07 | ✅ | `-tags=performance` 独立执行 |
 
 ---
 
@@ -57,12 +57,12 @@
 ### 3.1 D2 Context Engine (76%)
 
 **已覆盖场景:**
-- ✅ 压缩管道七步流程 (L5-2-2-01~07)
-- ✅ Autocompact 超时降级 (L5-2-2-08)
-- ✅ PEV Execute/Verify 完整流程 (L5-2-1-01~08)
-- ✅ 边界: 超时/非零退出码/Shell injection (L5-2-1-09~10)
-- ✅ 并发: Session 隔离/Context 取消 (L5-2-1-11~12)
-- ✅ Memory 长期记忆 (L5-2-3-01~06)
+- ✅ 压缩管道七步流程 (D2-S2-T01~07)
+- ✅ Autocompact 超时降级 (D2-S2-T08)
+- ✅ PEV Execute/Verify 完整流程 (D2-S1-T01~08)
+- ✅ 边界: 超时/非零退出码/Shell injection (D2-S1-T09~10)
+- ✅ 并发: Session 隔离/Context 取消 (D2-S1-T11~12)
+- ✅ Memory 长期记忆 (D2-S3-T01~06)
 
 **缺口:**
 | 缺口 | 影响 | 建议 |
@@ -73,52 +73,52 @@
 ### 3.2 D3 LLM Gateway (76%)
 
 **已覆盖场景:**
-- ✅ Token 计数 (L5-3-5-01~03) - 含中文 5% 容差
-- ✅ Circuit Breaker 三态转换 (L5-3-3-01~04)
-- ✅ VCR 回放: SSE/429/500 (L5-3-1-03, L5-3-2-06)
-- ✅ Retry 与 CB 联动 (L5-3-2-04)
-- ✅ Fallback 模型切换 (L5-3-4-02~03)
+- ✅ Token 计数 (D3-S5-T01~03) - 含中文 5% 容差
+- ✅ Circuit Breaker 三态转换 (D3-S3-T01~04)
+- ✅ VCR 回放: SSE/429/500 (D3-S1-T03, D3-S2-T06)
+- ✅ Retry 与 CB 联动 (D3-S2-T04)
+- ✅ Fallback 模型切换 (D3-S4-T02~03)
 
 **缺口:**
 | 缺口 | 影响 | 建议 |
 |------|------|------|
-| 熔断器状态持久化 (L5-3-3-05) | 中 | 需文件系统测试 |
-| 未知 Provider 错误 (L5-3-2-02) | 低 | 已有单元测试 |
+| 熔断器状态持久化 (D3-S3-T05) | 中 | 需文件系统测试 |
+| 未知 Provider 错误 (D3-S2-T02) | 低 | 已有单元测试 |
 
 ### 3.3 D5 Observability (69%)
 
 **已覆盖场景:**
-- ✅ P99 压缩延迟 < 500ms (L5-5-2-06)
-- ✅ 并发 Session 内存有界 (L5-5-2-07)
-- ✅ Logger Shutdown + Sampling (L5-5-3-02~04)
-- ✅ Tracer Span 传播 (L5-5-1-01~02)
-- ✅ Operation Registry 一致性 (L5-5-5-01~02)
+- ✅ P99 压缩延迟 < 500ms (D5-S2-T06)
+- ✅ 并发 Session 内存有界 (D5-S2-T07)
+- ✅ Logger Shutdown + Sampling (D5-S3-T02~04)
+- ✅ Tracer Span 传播 (D5-S1-T01~02)
+- ✅ Operation Registry 一致性 (D5-S5-T01~02)
 
 **缺口:**
 | 缺口 | 影响 | 建议 |
 |------|------|------|
-| Tracing/Counter (L5-5-2-01~02) | 中 | 已有 tracer_test.go |
-| 日志级别过滤 (L5-5-3-01) | 低 | PLANNED |
+| Tracing/Counter (D5-S2-T01~02) | 中 | 已有 tracer_test.go |
+| 日志级别过滤 (D5-S3-T01) | 低 | PLANNED |
 
 ### 3.4 D1 Communication (0% ❌)
 
 **未覆盖场景:**
-| L5 ID | 描述 | 状态 | 优先级 |
+| T ID | 描述 | 状态 | 优先级 |
 |-------|------|------|--------|
-| L5-1-1-01 | 新会话创建被拒绝 | PLANNED | P0 |
-| L5-1-3-01~03 | /new /help /stop 命令解析 | PLANNED | P1 |
-| L5-1-2-01 | 飞书消息解析 | PLANNED | P1 |
-| L5-1-8-01 | ShortId 唯一性 | PLANNED | P1 |
+| D1-S1-T01 | 新会话创建被拒绝 | PLANNED | P0 |
+| D1-S3-T01~03 | /new /help /stop 命令解析 | PLANNED | P1 |
+| D1-S2-T01 | 飞书消息解析 | PLANNED | P1 |
+| D1-S8-T01 | ShortId 唯一性 | PLANNED | P1 |
 
 **风险:** D1 是用户交互入口，缺少测试可能导致用户体验问题。
 
 ### 3.5 D6 Evolution (0% ❌)
 
 **未覆盖场景:**
-| L5 ID | 描述 | 状态 | 优先级 |
+| T ID | 描述 | 状态 | 优先级 |
 |-------|------|------|--------|
-| L5-6-1-01 | 版本检测与记录 | PLANNED | P2 |
-| L5-6-2-01 | 配置热更新 | PLANNED | P2 |
+| D6-S1-T01 | 版本检测与记录 | PLANNED | P2 |
+| D6-S2-T01 | 配置热更新 | PLANNED | P2 |
 
 **风险:** 低，Evolution 域属于可选增强。
 
@@ -199,7 +199,7 @@ P2 (可选):
 | 维度 | 评分 | 说明 |
 |------|------|------|
 | 整体覆盖率 | **76/76 (100%)** | 需求层面全覆盖 |
-| L5 实现率 | **47/76 (62%)** | 核心场景已实现 |
+| T 层实现率 | **47/76 (62%)** | 核心场景已实现 |
 | 边界测试 | **优秀** | 超时/并发/注入全覆盖 |
 | Mock vs 真实 | **良好** | VCR 补充了真实 I/O |
 | D1/D6 缺口 | **需关注** | D1 是入口，优先级高 |

@@ -32,6 +32,8 @@ type ContextResolverIface interface {
 // acquires slots from WorkerPool, checks ConflictGuard, and dispatches
 // WorkerRunners. The dispatch loop is "continuous" (D2): any slot release
 // triggers an immediate re-dispatch attempt.
+//
+// DSAFT: ORCH-S3-A01 (ScheduleWave)
 type WaveScheduler struct {
 	pool      *WorkerPool
 	guard     *ConflictGuard

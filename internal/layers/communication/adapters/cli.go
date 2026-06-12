@@ -166,7 +166,21 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 		return a.handleNewSession()
 
 	case types.CommandStop:
-		a.writer.Write([]byte("\n--- Stop requested ---\n"))
+		a.mu.RLock()
+		sessionID := ""
+		if a.currentSession != nil {
+			sessionID = a.currentSession.SessionID
+		}
+		a.mu.RUnlock()
+		if sessionID == "" {
+			a.writer.Write([]byte("\n⏸️ 没有正在运行的任务\n"))
+			return nil
+		}
+		if err := a.gateway.StopProcess(sessionID); err != nil {
+			a.writer.Write([]byte(fmt.Sprintf("\n❌ 停止失败: %v\n", err)))
+			return nil
+		}
+		a.writer.Write([]byte("\n⏸️ 已停止当前任务\n"))
 
 	case types.CommandHelp:
 		a.showHelp()
@@ -187,6 +201,15 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 
 // handleNewSession creates a new session
 func (a *CLIAdapter) handleNewSession() error {
+	a.mu.RLock()
+	oldSession := a.currentSession
+	a.mu.RUnlock()
+	if oldSession != nil {
+		if err := a.gateway.StopProcess(oldSession.SessionID); err != nil {
+			slog.Warn("cli: failed to stop old session process", "sessionID", oldSession.SessionID, "error", err)
+		}
+	}
+
 	workDir, _ := os.Getwd()
 	newSession, err := a.gateway.CreateSession("cli", workDir)
 	if err != nil {

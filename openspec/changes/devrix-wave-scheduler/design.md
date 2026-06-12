@@ -206,13 +206,13 @@ func (s *WaveScheduler) CancelByConflictGroup(group string) int // ConflictGuard
 | tmux pane kill | CLI process SIGTERM/KILL |
 | in-process AsyncLocalStorage cleanup | SubQuery ctx cancel + ProcessOverlay 释放 |
 
-### 6.5 L5 增补
+### 6.5 T 层增补
 
-| L5 ID | Given-When-Then | 优先级 |
+| T ID | Given-When-Then | 优先级 |
 |-------|-----------------|--------|
-| L5-ORCH-19 | Given running SubAgent Worker When CancelWorker Then 30s 内槽位释放且 status=cancelled | P0 |
-| L5-ORCH-20 | Given 5 running When CancelAll Then 全部 terminal 且 pool 全释放 | P0 |
-| L5-ORCH-21 | Given CLI Worker running When cancel Then 进程终止且 IM 卡显示 cancelled | P1 |
+| {T}-ORCH-19 | Given running SubAgent Worker When CancelWorker Then 30s 内槽位释放且 status=cancelled | P0 |
+| {T}-ORCH-20 | Given 5 running When CancelAll Then 全部 terminal 且 pool 全释放 | P0 |
+| {T}-ORCH-21 | Given CLI Worker running When cancel Then 进程终止且 IM 卡显示 cancelled | P1 |
 
 ## 7. IM — Worker 双区块卡片
 
@@ -272,22 +272,22 @@ internal/layers/communication/adapters/
   feishu_worker_card.go  # 双区块 Renderer
 ```
 
-## 10. L5 测试点（草拟 — 实施前登记 l5-registry）
+## 10. T 层测试点（草拟 — 实施前登记 t-registry）
 
-| L5 ID | Given-When-Then | 优先级 |
+| T ID | Given-When-Then | 优先级 |
 |-------|-----------------|--------|
-| L5-ORCH-10 | Given DAG 6 ready subagent + 1 cursor When 持续调度 Then 峰值并发=5且cursor≤1 sub≤3 | P0 |
-| L5-ORCH-11 | Given Task A completes When B depends A and policy=upstream Then B 收到 A artifact 无 Leader 全量 | P0 |
-| L5-ORCH-12 | Given policy=fresh When SubAgent 启动 Then Messages 仅含 directive | P0 |
-| L5-ORCH-13 | Given 两 Task 同 conflict_group When 调度 Then 不并行 | P0 |
-| L5-ORCH-14 | Given Worker 流式事件 When IM 渲染 Then 每 Task 独立双区块卡 | P0 |
-| L5-ORCH-15 | Given 槽位释放 When 队列仍有 ready Then 立即派发下一 Task | P0 |
-| L5-ORCH-16 | Given call_cursor + call_claude-code 并行 When 不同 file_scope Then 可同时 running | P1 |
-| L5-ORCH-17 | Given Plan 产出 DAG When Scheduler Start Then 仅 ready 节点被派发 | P0 |
-| L5-ORCH-18 | Given wave 全完成 When Leader 回调 Then 收到 wave_completed 汇总 | P1 |
-| L5-ORCH-19 | Given running SubAgent When CancelWorker Then 槽位释放 status=cancelled | P0 |
-| L5-ORCH-20 | Given 5 running When CancelAll Then 全释放 | P0 |
-| L5-ORCH-21 | Given CLI Worker When cancel Then 进程终止 IM 卡 cancelled | P1 |
+| {T}-ORCH-10 | Given DAG 6 ready subagent + 1 cursor When 持续调度 Then 峰值并发=5且cursor≤1 sub≤3 | P0 |
+| {T}-ORCH-11 | Given Task A completes When B depends A and policy=upstream Then B 收到 A artifact 无 Leader 全量 | P0 |
+| {T}-ORCH-12 | Given policy=fresh When SubAgent 启动 Then Messages 仅含 directive | P0 |
+| {T}-ORCH-13 | Given 两 Task 同 conflict_group When 调度 Then 不并行 | P0 |
+| {T}-ORCH-14 | Given Worker 流式事件 When IM 渲染 Then 每 Task 独立双区块卡 | P0 |
+| {T}-ORCH-15 | Given 槽位释放 When 队列仍有 ready Then 立即派发下一 Task | P0 |
+| {T}-ORCH-16 | Given call_cursor + call_claude-code 并行 When 不同 file_scope Then 可同时 running | P1 |
+| {T}-ORCH-17 | Given Plan 产出 DAG When Scheduler Start Then 仅 ready 节点被派发 | P0 |
+| {T}-ORCH-18 | Given wave 全完成 When Leader 回调 Then 收到 wave_completed 汇总 | P1 |
+| {T}-ORCH-19 | Given running SubAgent When CancelWorker Then 槽位释放 status=cancelled | P0 |
+| {T}-ORCH-20 | Given 5 running When CancelAll Then 全释放 | P0 |
+| {T}-ORCH-21 | Given CLI Worker When cancel Then 进程终止 IM 卡 cancelled | P1 |
 
 ## 11. 与现有设计文档关系
 

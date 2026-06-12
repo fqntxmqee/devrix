@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -130,4 +131,34 @@ func ResolveToolWorkDir(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return filepath.Clean(cwd), nil
+}
+
+// withToolStreamEmitter bridges ToolStreamEmitter events to EngineEvent emit.
+func withToolStreamEmitter(
+	ctx context.Context,
+	emit func(*contracts.EngineEvent),
+	sessionID, toolName string,
+) context.Context {
+	if emit == nil {
+		return ctx
+	}
+	return WithToolStreamEmitter(ctx, func(ev ToolStreamEvent) {
+		switch ev.Type {
+		case "thinking":
+			emit(&contracts.EngineEvent{
+				Type: "thinking", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		case "text":
+			emit(&contracts.EngineEvent{
+				Type: "text", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"is_complete": "false", "source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		case "tool_use":
+			emit(&contracts.EngineEvent{
+				Type: "info", Content: ev.Content, SessionID: sessionID,
+				Metadata: map[string]string{"source": "agent_tool", "tool_name": toolName, "agent": ev.ToolName},
+			})
+		}
+	})
 }

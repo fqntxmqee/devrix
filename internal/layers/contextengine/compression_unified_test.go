@@ -32,8 +32,6 @@ func TestContextEngine_QueryLoop_UsesMessagesOnlyCompression(t *testing.T) {
 	cfg.QueryLoop.Enabled = true
 	cfg.QueryLoop.CompressPerTurn = true
 	cfg.QueryLoop.MaxTurns = 3
-	cfg.PEV.VerifyMode = config.VerifyModeBasic
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &multiTurnQueryLLM{},
@@ -65,8 +63,6 @@ func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.QueryLoop.Enabled = true
 	cfg.QueryLoop.CompressPerTurn = true
-	cfg.PEV.VerifyMode = config.VerifyModeBasic
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},
@@ -96,7 +92,6 @@ func TestContextEngine_LegacyHarness_HarnessCompressionBranch(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.QueryLoop.Enabled = false
 	cfg.Harness.Enabled = true
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "ok"},

@@ -47,7 +47,7 @@ demand-id: DM-YYYYMMDD-NNN
 title: <一句话描述>
 priority: P0 | P1 | P2
 status: S1_Proposal
-l1-domain: architecture | communication | context-engine | llm-gateway | multi-agent | observability
+dsaft_domain: architecture | communication | context-engine | llm-gateway | multi-agent | observability
 created: YYYY-MM-DD
 ---
 
@@ -102,10 +102,10 @@ created: YYYY-MM-DD
 
 ---
 
-## 5. 需求与 L5 映射
+## 5. 需求与 T 层映射
 
-- S1 阶段不需要完成 L5 注册，但应在 demand.md 中标注关联的 L1 领域
-- S2 阶段必须在 `openspec/l5-registry.md` 预登记 L5 测试点（状态：PLANNED）
+- S1 阶段不需要完成 T 层注册，但应在 demand.md 中标注关联的 DSAFT 域
+- S2 阶段必须在 `openspec/t-registry.md` 预登记 T 层测试点（状态：PLANNED）
 
 ---
 
@@ -128,4 +128,4 @@ S1 完成前确认：
 - [ ] demand.md 包含背景、问题、验收标准、范围
 - [ ] 至少 1 个 P0 验收标准
 - [ ] Out of Scope 已明确声明
-- [ ] L1 领域标注正确
+- [ ] DSAFT 域标注正确

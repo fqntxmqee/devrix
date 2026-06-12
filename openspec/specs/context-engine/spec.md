@@ -41,7 +41,7 @@ The system MUST provide a real context engine implementation. When harness is en
 #### Scenario: V4 compatibility with harness disabled
 
 - GIVEN `context_engine.harness.enabled=false`
-- WHEN any V4 L5 scenario for Process runs
+- WHEN any V4 T 层 scenario for Process runs
 - THEN all V4 expectations still pass
 
 #### Scenario: Process pipeline order when harness enabled
@@ -82,7 +82,7 @@ The system MUST provide a real context engine implementation. When harness is en
 **Priority**: P0
 **Rationale**: 对话需要一致的 system prompt 与空历史基线
 **L3 映射**: L3-BE-CTX-01
-**L5 映射**: L5-CTX-01
+**T 映射**: D2-CTX-T01
 
 #### Scenario: Initialize new session context
 
@@ -108,7 +108,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **Rationale**: 压缩与 LLM 调用依赖完整历史
-**L5 映射**: L5-CTX-02
+**T 映射**: D2-CTX-T02
 
 #### Scenario: Append user message
 
@@ -133,7 +133,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-COMPRESS
-**L5 映射**: L5-CTX-03, L5-CTX-04, L5-CTX-08, L5-CTX-12
+**T 映射**: D2-CTX-T03, D2-CTX-T04, D2-CTX-T08, D2-CTX-T12
 
 #### Scenario: Step 6 Autocompact skipped
 
@@ -164,7 +164,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-COMPRESS
-**L5 映射**: L5-CTX-12, L5-CTX-13
+**T 映射**: D2-CTX-T12, D2-CTX-T13
 
 #### Scenario: Autocompact LLM failure degrades gracefully
 
@@ -181,7 +181,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-PEV
-**L5 映射**: L5-CTX-14, L5-CTX-15
+**T 映射**: D2-CTX-T14, D2-CTX-T15
 
 ---
 
@@ -191,7 +191,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-STATE, L4-CTX-COMPRESS
-**L5 映射**: L5-CTX-16
+**T 映射**: D2-CTX-T16
 
 ---
 
@@ -201,7 +201,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-PEV, L4-CTX-PLAN
-**L5 映射**: L5-CTX-06, L5-CTX-07, L5-CTX-11, L5-CTX-14, L5-CTX-15, L5-CTX-19, L5-CTX-20, L5-CTX-24
+**T 映射**: D2-CTX-T06, D2-CTX-T07, D2-CTX-T11, D2-CTX-T14, D2-CTX-T15, D2-CTX-T19, D2-CTX-T20, D2-CTX-T24
 
 #### Scenario: Verify phase basic mode
 
@@ -236,7 +236,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-PLAN, L4-CTX-PEV
-**L5 映射**: L5-CTX-19, L5-CTX-25
+**T 映射**: D2-CTX-T19, D2-CTX-T25
 
 #### Scenario: Plan generates milestone DAG
 
@@ -261,7 +261,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 **Priority**: P0
 **L4 映射**: L4-CTX-PEV
-**L5 映射**: L5-CTX-20, L5-CTX-21
+**T 映射**: D2-CTX-T20, D2-CTX-T21
 
 #### Scenario: Milestones execute in dependency order
 
@@ -292,7 +292,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P0
 **L4 映射**: L4-CTX-PLAN
-**L5 映射**: L5-CTX-19
+**T 映射**: D2-CTX-T19
 
 #### Scenario: Context engine uses planner contract
 
@@ -309,7 +309,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P1
 **L4 映射**: L4-CTX-OBS
-**L5 映射**: L5-CTX-17
+**T 映射**: D2-CTX-T17
 
 ---
 
@@ -319,7 +319,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P1
 **L4 映射**: L4-CTX-STATE
-**L5 映射**: L5-CTX-18
+**T 映射**: D2-CTX-T18
 
 ---
 
@@ -330,7 +330,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 **Priority**: P0
 **Rationale**: 分离临时状态、会话持久化与跨 Session 项目知识
 **L4 映射**: L4-CTX-MEMORY
-**L5 映射**: L5-CTX-10, L5-CTX-22, L5-CTX-23
+**T 映射**: D2-CTX-T10, D2-CTX-T22, D2-CTX-T23
 
 #### Scenario: Working memory not persisted
 
@@ -372,7 +372,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P0
 **Rationale**: UI/Adapter 已按 EngineEvent 类型渲染
-**L5 映射**: L5-CTX-09, L5-CTX-11
+**T 映射**: D2-CTX-T09, D2-CTX-T11
 
 #### Scenario: Event flow types
 
@@ -438,7 +438,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P1  
 **L4**: L4-CTX-COMPRESS  
-**L5**: L5-CTX-31, L5-CTX-33
+**T**: D2-CTX-T31, D2-CTX-T33
 
 #### Scenario: Placeholder returns immediately
 
@@ -460,7 +460,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 
 **Priority**: P2  
 **L4**: L4-CTX-MEMORY  
-**L5**: L5-CTX-32
+**T**: D2-CTX-T32
 
 #### Scenario: Large snapshot compressed
 
@@ -487,7 +487,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 **Rationale**: Devrix V4 缺少 trust-gated 启动与工具面预装配，扩展 plugin/MCP 时无明确接入点
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-HARNESS
-**L5 映射**: L5-2-9-01, L5-2-9-03, L5-2-9-08
+**T 映射**: D2-S9-T01, D2-S9-T03, D2-S9-T08
 
 #### Scenario: Bootstrap runs on first Process when enabled
 
@@ -522,7 +522,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 **Rationale**: PEV 与 Assembler 需要工作区元信息用于 system 注入与调试
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-HARNESS
-**L5 映射**: L5-2-9-02
+**T 映射**: D2-S9-T02
 
 #### Scenario: Scan work directory metadata
 
@@ -549,7 +549,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 **Rationale**: IM/非受信入口不应预加载扩展面
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-HARNESS
-**L5 映射**: L5-2-9-04
+**T 映射**: D2-S9-T04
 
 #### Scenario: Trusted deferred init
 
@@ -574,7 +574,7 @@ Layer 2 MUST depend on `shared/contracts.IMilestonePlanner` rather than Communic
 **Rationale**: 启动期缩小工具面，减少误调用与 schema token 开销
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-TOOLPOOL
-**L5 映射**: L5-2-9-05, L5-2-9-14
+**T 映射**: D2-S9-T05, D2-S9-T14
 
 #### Scenario: Simple mode restricts tool surface
 
@@ -608,7 +608,7 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 **Rationale**: 高频命令可选缩短 LLM 选工具成本，不替代 tool calling
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-ROUTER
-**L5 映射**: L5-2-9-06
+**T 映射**: D2-S9-T06
 
 #### Scenario: Routing enabled produces hints
 
@@ -635,7 +635,7 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 **Rationale**: 压缩视图丢失原始 turn 细节，审计需要独立序列
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-TRANSCRIPT
-**L5 映射**: L5-2-9-07
+**T 映射**: D2-S9-T07
 
 #### Scenario: Append transcript on Process completion
 
@@ -668,7 +668,7 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 **Rationale**: 在 reasoning 前发现 token/安全/工具面问题
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-PREFLIGHT
-**L5 映射**: L5-2-9-09
+**T 映射**: D2-S9-T09
 
 #### Scenario: Preflight warn-only emits warnings
 
@@ -703,7 +703,7 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 **Rationale**: 分层 system prompt 分离人格、会话事实与 loaded context
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-WORKSPACE
-**L5 映射**: L5-2-9-10, L5-2-9-12, L5-2-9-13
+**T 映射**: D2-S9-T10, D2-S9-T12, D2-S9-T13
 
 #### Scenario: Four-layer prompt with loaded_context XML
 
@@ -751,7 +751,7 @@ Transcript 分离 MUST 支持 compact view 与 append-only full log 双轨（对
 **Rationale**: 审计需要 append-only 完整 log，LLM 仅需 compact view
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-TRANSCRIPT
-**L5 映射**: L5-2-9-07
+**T 映射**: D2-S9-T07
 
 #### Scenario: Append-only session log
 
@@ -771,7 +771,7 @@ When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool roun
 **Priority:** P0  
 **L3:** L3-BE-CTX-QueryLoop  
 **L4:** query_loop  
-**L5:** L5-CTX-34, L5-CTX-39
+**T:** D2-CTX-T34, D2-CTX-T39
 
 #### Scenario: Multi-turn tool loop
 
@@ -783,7 +783,7 @@ When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool roun
 #### Scenario: V5 regression with query loop disabled
 
 - GIVEN `query_loop.enabled=false`
-- WHEN any V5 L5 scenario runs
+- WHEN any V5 T 层 scenario runs
 - THEN behavior is unchanged from V5
 
 ---
@@ -794,7 +794,7 @@ AGENTS.md and runtime user context MUST be injected via `usercontext.PrependForA
 
 **Priority:** P0  
 **L4:** user_context  
-**L5:** L5-CTX-35
+**T:** D2-CTX-T35
 
 #### Scenario: Prepend not in snapshot
 
@@ -811,7 +811,7 @@ Plan mode MUST restrict writable paths to `PlanFilePath` and filter ToolPool to 
 
 **Priority:** P0  
 **L4:** permission_mode  
-**L5:** L5-CTX-36, L5-CTX-37
+**T:** D2-CTX-T36, D2-CTX-T37
 
 #### Scenario: Write denied outside plan file
 
@@ -827,7 +827,7 @@ When `tasks.mode=v2`, task_create/update/get/list MUST persist to `tasks.store_d
 
 **Priority:** P0  
 **L4:** task_tools  
-**L5:** L5-CTX-38
+**T:** D2-CTX-T38
 
 ---
 
@@ -837,7 +837,7 @@ SubQuery MUST run nested agents via the same `query.Loop` with incremented `Quer
 
 **Priority:** P1  
 **L4:** subquery, sidechain_transcript  
-**L5:** L5-CTX-40, L5-CTX-42
+**T:** D2-CTX-T40, D2-CTX-T42
 
 #### Scenario: Explore read-only sub-agent
 
@@ -859,7 +859,7 @@ When `subquery.fork_subagent_enabled=true`, fork children MUST share identical a
 
 **Priority:** P1  
 **L4:** subquery  
-**L5:** L5-CTX-41
+**T:** D2-CTX-T41
 
 #### Scenario: Identical placeholder tool results
 
@@ -898,7 +898,7 @@ When `context_engine.execution_flow.enabled=true`, SubQuery and D4 Worker runtim
 
 **Priority:** P0  
 **L4:** execution_flow  
-**L5:** L5-4-10-04, L5-4-10-05, L5-4-10-06
+**T:** D4-S10-T04, D4-S10-T05, D4-S10-T06
 
 #### Scenario: Leader-only delegate-progress drain
 
@@ -929,7 +929,7 @@ When `execution_flow.link_tasks=true` and `FlowStarted` includes or resolves a `
 
 **Priority:** P0  
 **L4:** execution_flow, task_tools  
-**L5:** L5-4-10-07
+**T:** D4-S10-T07
 
 ---
 
@@ -939,7 +939,7 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 
 **Priority:** P0  
 **L4:** worktree  
-**L5:** L5-4-12-01
+**T:** D4-S12-T01
 
 #### Scenario: Enter worktree isolates writes
 

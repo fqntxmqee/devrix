@@ -22,7 +22,7 @@
 
 **Priority**: P0
 **L4**: L4-OBS-REGISTRY
-**L5**: L5-OBS-16
+**T**: D5-OBS-T16
 
 #### Scenario: Registry 包含 v1.2 与 v1.3 全部 Operation
 
@@ -46,7 +46,7 @@
 
 **Priority**: P0
 **L4**: L4-OBS-COVERAGE
-**L5**: L5-OBS-17
+**T**: D5-OBS-T17
 
 #### Scenario: 采样关闭仍计数
 
@@ -69,7 +69,7 @@
 
 **Priority**: P0
 **L4**: L4-OBS-COVERAGE
-**L5**: L5-OBS-17
+**T**: D5-OBS-T17
 
 #### Scenario: Health 摘要暴露
 
@@ -87,14 +87,14 @@
 **Priority**: P0
 **L4**: L4-OBS-INSTRUMENT
 
-| Operation | 触发点 | L5 |
+| Operation | 触发点 | T 层 |
 |-----------|--------|-----|
-| `adapter.message.receive` | Feishu 入站消息 | L5-OBS-15 |
-| `context.longterm.recall` | LongTerm recall 注入 | L5-OBS-13 |
-| `context.longterm.store` | LongTerm auto_store | L5-OBS-13 |
-| `context.plan.generate` | PlanEngine 生成 DAG | L5-OBS-14 |
-| `context.milestone.run` | Milestone 执行 | L5-OBS-14 |
-| `gateway.session.lifecycle` | 会话创建/过期 | L5-OBS-18 |
+| `adapter.message.receive` | Feishu 入站消息 | D5-OBS-T15 |
+| `context.longterm.recall` | LongTerm recall 注入 | D5-OBS-T13 |
+| `context.longterm.store` | LongTerm auto_store | D5-OBS-T13 |
+| `context.plan.generate` | PlanEngine 生成 DAG | D5-OBS-T14 |
+| `context.milestone.run` | Milestone 执行 | D5-OBS-T14 |
+| `gateway.session.lifecycle` | 会话创建/过期 | D5-OBS-T18 |
 
 ---
 
@@ -104,7 +104,7 @@ Communication Gateway MUST 通过 `SessionBridge.ActiveSessions` 管理会话活
 
 **Priority**: P1
 **L4**: L4-OBS-METRICS
-**L5**: L5-OBS-18
+**T**: D5-OBS-T18
 
 ---
 
@@ -175,7 +175,7 @@ OTLP `ScopeSpans.scope.name` MUST 取自 span 的 `devrix.component` 属性（�
 Gauge MUST 使用 mutex 保护 float64 读写，`Set`/`Add`/`Sub`/`Inc`/`Dec` 结果精确。
 
 **Priority**: P0
-**L5**: L5-OBS-FIX-01
+**T**: D5-OBS-FIX-T01
 
 ---
 
@@ -184,7 +184,7 @@ Gauge MUST 使用 mutex 保护 float64 读写，`Set`/`Add`/`Sub`/`Inc`/`Dec` �
 Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST 正确累积各 `le` 桶与 `+Inf` 计数。
 
 **Priority**: P0
-**L5**: L5-OBS-FIX-02
+**T**: D5-OBS-FIX-T02
 
 ---
 
@@ -193,7 +193,7 @@ Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST �
 `TracerProvider.Shutdown` MUST 遍历 active spans、调用 `End` 并刷写至 exporter，避免 pending span 丢失。
 
 **Priority**: P0
-**L5**: L5-OBS-FIX-03
+**T**: D5-OBS-FIX-T03
 
 ---
 
@@ -202,7 +202,7 @@ Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST �
 `Observability.Shutdown` MUST 关闭 TracerProvider 与 Logger（`Close()`），错误聚合返回。
 
 **Priority**: P0
-**L5**: L5-OBS-FIX-04
+**T**: D5-OBS-FIX-T04
 
 ---
 
@@ -211,7 +211,7 @@ Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST �
 `Meter.Int64UpDownCounter` MUST 返回 Gauge（可增减），用于 Session 活跃数等场景。
 
 **Priority**: P0
-**L5**: L5-OBS-FIX-05
+**T**: D5-OBS-FIX-T05
 
 ---
 
@@ -220,7 +220,7 @@ Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST �
 结构化日志在 `error` 字段为 error 类型时 MUST 附加 `stack` 字段（`debug.Stack()`）。
 
 **Priority**: P1
-**L5**: L5-OBS-FIX-06
+**T**: D5-OBS-FIX-T06
 
 ---
 
@@ -229,7 +229,7 @@ Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST �
 Logger MUST 遵守 `max_entries_per_span` 配置，超限时丢弃并发出 WARN。
 
 **Priority**: P1
-**L5**: L5-OBS-FIX-07
+**T**: D5-OBS-FIX-T07
 
 ---
 
@@ -238,7 +238,7 @@ Logger MUST 遵守 `max_entries_per_span` 配置，超限时丢弃并发出 WARN
 `ConsoleExporter` MUST 直接实现 `SpanExporter` 接口（`Export(ctx, span)`），无需 adapter。
 
 **Priority**: P2
-**L5**: L5-OBS-FIX-08
+**T**: D5-OBS-FIX-T08
 
 ---
 
@@ -251,7 +251,7 @@ Harness Bootstrap 相关 Span MUST 使用 `{layer}.{module}.{action}` canonical 
 **Priority**: P0
 **Rationale**: Harness 多阶段编排需可追踪；Jaeger 过滤依赖 canonical Operation
 **L4 映射**: L4-OBS-REGISTRY, L4-OBS-COVERAGE
-**L5 映射**: L5-2-9-11, L5-5-5-02
+**T 映射**: D2-S9-T11, D5-S5-T02
 
 #### Scenario: Registry includes harness operations
 
@@ -310,7 +310,7 @@ Bootstrap 各阶段 MUST 产生 info 事件（与 span 双写），供 Adapter �
 **Rationale**: 用户需在 CLI/飞书看到 bootstrap 进度，不仅 Jaeger
 **L3 映射**: L3-BE-CTX-04
 **L4 映射**: L4-CTX-HARNESS
-**L5 映射**: L5-2-9-08
+**T 映射**: D2-S9-T08
 
 #### Scenario: Bootstrap stages observable via info events
 
@@ -329,7 +329,7 @@ PEV 执行链 MUST 满足 Canonical Trace Tree：`context.pev.iteration` → `co
 
 **Priority**: P0
 **L4 映射**: L4-OBS-SPAN-TREE
-**L5 映射**: L5-OBS-TRACE-04
+**T 映射**: D5-OBS-TRACE-T04
 
 #### Scenario: LLM call nested under iteration
 
@@ -354,7 +354,7 @@ slog 与 LLM JSONL MUST 携带 trace_id/span_id，与 Jaeger span 可交叉引�
 
 **Priority**: P0
 **L4 映射**: L4-OBS-LOG-CORR
-**L5 映射**: L5-OBS-TRACE-05
+**T 映射**: D5-OBS-TRACE-T05
 
 #### Scenario: slog injects traceId from context
 
@@ -375,7 +375,7 @@ slog 与 LLM JSONL MUST 携带 trace_id/span_id，与 Jaeger span 可交叉引�
 LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与现有 `llm.*` 并存）。
 
 **Priority**: P0
-**L5 映射**: L5-OBS-GENAI-ATTR
+**T 映射**: D5-OBS-GENAI-TATTR
 
 #### Scenario: gen_ai attributes on LLM span
 
@@ -391,7 +391,7 @@ LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与现有 `llm.*` 并存）�
 Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 
 **Priority**: P1
-**L5 映射**: L5-OBS-DECISION-01
+**T 映射**: D5-OBS-DECISION-T01
 
 #### Scenario: Verify failure reason on span
 
@@ -409,7 +409,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 系统 MUST 注册 `devrix_tool_latency` Histogram，labels：`tool`、`risk_level`、`status`；PEV 工具执行完成后 MUST observe 秒级延迟。
 
 **Priority**: P1
-**L5 映射**: L5-OBS-METRICS-01
+**T 映射**: D5-OBS-METRICS-T01
 
 #### Scenario: Tool latency recorded after execution
 
@@ -424,7 +424,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 系统 MUST 注册 `devrix_compression_ratio` Histogram；上下文压缩成功后 MUST observe `CompressedTokens/OriginalTokens`。
 
 **Priority**: P1
-**L5 映射**: L5-OBS-METRICS-02
+**T 映射**: D5-OBS-METRICS-T02
 
 #### Scenario: Compression ratio observed
 
@@ -439,7 +439,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 `context.compression.run` span MUST 携带 `compression.trigger_reason` 与 `compression.ratio`。
 
 **Priority**: P1
-**L5 映射**: L5-OBS-DECISION-02
+**T 映射**: D5-OBS-DECISION-T02
 
 #### Scenario: Compression span decision attrs
 
@@ -455,7 +455,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 系统 MUST 提供 CLI `debug-export --session <id>`，输出 schema v1 JSON bundle（含 `llm_rounds`、可选 `trace` 与 `coverage_hits`）。
 
 **Priority**: P1
-**L5 映射**: L5-OBS-EXPORT-01
+**T 映射**: D5-OBS-EXPORT-T01
 
 #### Scenario: Export valid incident bundle
 
@@ -472,7 +472,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 关键 span MUST 使用正确 SpanKind：`gateway.message.receive` = SERVER；`context.pev.llm_call` / `llm.stream` / `llm.adapter.stream` = CLIENT；其余引擎内操作 = INTERNAL。
 
 **Priority**: P2
-**L5 映射**: L5-OBS-TRACE-06
+**T 映射**: D5-OBS-TRACE-T06
 
 #### Scenario: Integration asserts SpanKind
 
@@ -488,7 +488,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 `context.system_prompt.build` span MUST 携带 `gen_ai.prompt.version`、`gen_ai.prompt.template_hash`；可选 `gen_ai.prompt.agents_md_hash`。
 
 **Priority**: P2
-**L5 映射**: L5-OBS-DECISION-03
+**T 映射**: D5-OBS-DECISION-T03
 
 #### Scenario: Stable template hash
 
@@ -503,7 +503,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 系统 MUST 注册 `devrix_gen_ai.client.token.usage` Counter（labels: `token_type`, `model`），LLM 调用成功后按 input/output 分别 Add。
 
 **Priority**: P2
-**L5 映射**: L5-OBS-METRICS-03
+**T 映射**: D5-OBS-METRICS-T03
 
 ---
 
@@ -512,7 +512,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 主二进制 MUST 支持 `devrix debug export --session <id>`，行为与 `cmd/debug-export` 一致。
 
 **Priority**: P2
-**L5 映射**: L5-OBS-EXPORT-02
+**T 映射**: D5-OBS-EXPORT-T02
 
 ---
 
@@ -524,7 +524,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 
 **Priority**: P2
 **L4**: L4-OBS-BAGGAGE
-**L5**: L5-OBS-TRACE-03
+**T**: D5-OBS-TRACE-T03
 
 #### Scenario: Propagator 往返 baggage
 
@@ -549,7 +549,7 @@ Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
 
 **Priority**: P2
 **L4**: L4-OBS-METRICS
-**L5**: L5-OBS-METRICS-04
+**T**: D5-OBS-METRICS-T04
 
 #### Scenario: Provider 返回 cached/reasoning tokens
 

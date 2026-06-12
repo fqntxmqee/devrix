@@ -26,6 +26,8 @@ type SubQueryFallback interface {
 }
 
 // Service implements D4-S10 delegate orchestration.
+//
+// DSAFT: D4-S10-A01 (DelegateTask)
 type Service struct {
 	cfg      config.DelegateConfig
 	fallback SubQueryFallback

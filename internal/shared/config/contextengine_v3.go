@@ -6,30 +6,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
 const (
-	maxPlanMilestones   = 10
-	maxPlanTimeout      = 15 * time.Second
-	maxLongTermTopics   = 20
-	defaultPlanModel    = "deepseek-v4"
+	maxLongTermTopics     = 20
 	defaultLongTermDBPath = "~/.devrix/memory.db"
 )
 
 var milestoneIDPattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
-
-// PlanConfig holds PEV Plan phase settings (V3).
-// Aligned with Claude Code's Plan Mode behavior.
-type PlanConfig struct {
-	Enabled          bool          `yaml:"enabled"`
-	AutoDetect       bool          `yaml:"auto_detect"`        // 自动检测复杂任务
-	MinCharsForPlan  int           `yaml:"min_chars_for_plan"` // 触发规划的最短消息长度
-	Model            string        `yaml:"model"`
-	MaxMilestones    int           `yaml:"max_milestones"`
-	Timeout          time.Duration `yaml:"timeout"`
-	OnMilestoneFail  string        `yaml:"on_milestone_fail"` // fail_fast (only supported V3)
-}
 
 // LongTermConfig holds cross-session memory settings (V3).
 type LongTermConfig struct {
@@ -39,27 +23,6 @@ type LongTermConfig struct {
 	Topics          []string `yaml:"topics"`
 	RecallMaxEntries int     `yaml:"recall_max_entries"`
 	RecallMaxTokens  int     `yaml:"recall_max_tokens"`
-}
-
-// DefaultPlanConfig returns V3 plan defaults.
-// Note: plan.enabled defaults to false for safe rollout.
-func DefaultPlanConfig() PlanConfig {
-	return PlanConfig{
-		Enabled:         false, // 显式启用，Claude Code 风格
-		AutoDetect:      false, // 默认关闭，需要显式 /plan 命令
-		MinCharsForPlan: 200,
-		Model:           defaultPlanModel,
-		MaxMilestones:   maxPlanMilestones,
-		Timeout:         maxPlanTimeout,
-		OnMilestoneFail: "fail_fast",
-	}
-}
-
-// EnabledPlanConfig returns plan config with plan mode enabled.
-func EnabledPlanConfig() PlanConfig {
-	cfg := DefaultPlanConfig()
-	cfg.Enabled = true
-	return cfg
 }
 
 // DefaultLongTermConfig returns V3 long-term memory defaults.
@@ -74,47 +37,12 @@ func DefaultLongTermConfig() LongTermConfig {
 	}
 }
 
-// ValidateContextEngineV3Config validates V3 plan and longterm settings.
+// ValidateContextEngineV3Config validates V3 longterm settings.
 func ValidateContextEngineV3Config(cfg *ContextEngineConfig) error {
 	if cfg == nil {
 		return nil
 	}
-	if err := validatePlan(cfg.Plan); err != nil {
-		return err
-	}
-	if err := validateLongTerm(cfg.LongTerm); err != nil {
-		return err
-	}
-	return nil
-}
-
-func validatePlan(cfg PlanConfig) error {
-	if !cfg.Enabled {
-		return nil
-	}
-	if cfg.Model == "" {
-		return fmt.Errorf("context_engine.plan.model: required when enabled")
-	}
-	if cfg.Timeout <= 0 {
-		return fmt.Errorf("context_engine.plan.timeout: required when enabled")
-	}
-	if cfg.Timeout > maxPlanTimeout {
-		return fmt.Errorf("context_engine.plan.timeout: must be <= %s", maxPlanTimeout)
-	}
-	maxMS := cfg.MaxMilestones
-	if maxMS <= 0 {
-		maxMS = maxPlanMilestones
-	}
-	if maxMS > maxPlanMilestones {
-		return fmt.Errorf("context_engine.plan.max_milestones: must be <= %d", maxPlanMilestones)
-	}
-	if cfg.MinCharsForPlan < 0 {
-		return fmt.Errorf("context_engine.plan.min_chars_for_plan: must be >= 0")
-	}
-	if cfg.OnMilestoneFail != "" && cfg.OnMilestoneFail != "fail_fast" {
-		return fmt.Errorf("context_engine.plan.on_milestone_fail: only fail_fast supported in V3")
-	}
-	return nil
+	return validateLongTerm(cfg.LongTerm)
 }
 
 func validateLongTerm(cfg LongTermConfig) error {

@@ -115,7 +115,7 @@ hot-path code.
 | `internal/layers/multiagent/agent/agent.go` | +View field, +FinishedAt, +Attach/SessionView, +New auto-fork view |
 | `internal/layers/multiagent/agent/forkjoin.go` | Fork binds view; Join dedups; metric bump |
 | `internal/layers/multiagent/agent/lifecycle.go` | capture tool_call as message |
-| `internal/layers/multiagent/agent/forkjoin_isolation_test.go` | new (L5-4-3-01/02/03) |
+| `internal/layers/multiagent/agent/forkjoin_isolation_test.go` | new (D4-S3-T01/02/03) |
 | `internal/layers/multiagent/factory/factory.go` | +CreateWithView |
 | `internal/layers/multiagent/factory/factory_test.go` | +CreateWithView test |
 | `internal/shared/types/session.go` | +Metadata field (additive) |
@@ -131,12 +131,12 @@ hot-path code.
 | D4 existing tests | none | `TestAgent_should_fork_join_with_isolated_buffers` and friends pass without modification |
 | DM-007 Wave Scheduler | additive | opt-in via `CreateWithView` |
 
-## 5. L5 Test Mapping
+## 5. T Test Mapping
 
-| L5 ID | Test | File |
+| T ID | Test | File |
 |-------|------|------|
-| L5-4-3-01 | `TestJoin_should_dedup_tool_call_ids` | `agent/forkjoin_isolation_test.go` |
-| L5-4-3-02 | `TestFork_metadata_writes_should_not_pollute_parent_session` | `agent/forkjoin_isolation_test.go` |
-| L5-4-3-03 | `TestFork_concurrent_three_children_should_join_consistently` | `agent/forkjoin_isolation_test.go` |
-| L5-4-3-04 | `TestFork_should_share_readonly_fields` + `TestAgentFactory_CreateWithView_should_bind_view_to_agent` | `sessionview/sessionview_test.go`, `factory/factory_test.go` |
-| L5-4-3-05 | `TestSessionIsolationProbe_is_registered` + scoring tests | `eval/session_isolation_probe_test.go` |
+| D4-S3-T01 | `TestJoin_should_dedup_tool_call_ids` | `agent/forkjoin_isolation_test.go` |
+| D4-S3-T02 | `TestFork_metadata_writes_should_not_pollute_parent_session` | `agent/forkjoin_isolation_test.go` |
+| D4-S3-T03 | `TestFork_concurrent_three_children_should_join_consistently` | `agent/forkjoin_isolation_test.go` |
+| D4-S3-T04 | `TestFork_should_share_readonly_fields` + `TestAgentFactory_CreateWithView_should_bind_view_to_agent` | `sessionview/sessionview_test.go`, `factory/factory_test.go` |
+| D4-S3-T05 | `TestSessionIsolationProbe_is_registered` + scoring tests | `eval/session_isolation_probe_test.go` |

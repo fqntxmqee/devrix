@@ -14,12 +14,6 @@ func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
 	}
 }
 
-func TestLayerAndComponent_should_map_pev_operation(t *testing.T) {
-	layer, component := telemetry.LayerAndComponent(telemetry.OpContextPEVToolExecute)
-	if layer != telemetry.LayerContext || component != "pev_engine" {
-		t.Fatalf("got layer=%q component=%q", layer, component)
-	}
-}
 
 func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
 	attrs := telemetry.SpanAttrs(telemetry.OpLLMStream)

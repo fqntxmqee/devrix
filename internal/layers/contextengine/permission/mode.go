@@ -80,9 +80,9 @@ func IsPlanModeAllowedToolName(name, planFilePath string) bool {
 	switch name {
 	case "read_file", "glob", "grep", "list_dir", "task_list", "task_get",
 		"enter_plan_mode", "exit_plan_mode", "todo_write", "task_create", "task_update",
-		"bash", "agent", "call_agent":
+		"edit_file", "bash", "agent", "call_agent":
 		return true
-	case "write_file", "edit_file":
+	case "write_file":
 		return planFilePath != ""
 	default:
 		return len(name) > 5 && (name[:5] == "task_" || name[:5] == "read_")

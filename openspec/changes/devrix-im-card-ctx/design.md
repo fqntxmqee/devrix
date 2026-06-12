@@ -178,13 +178,13 @@ func computeCtxPct(promptTokens, maxContextTokens int) int {
 
 ## 5. 测试矩阵
 
-| L5 | 场景 | 断言 |
+| T 层 | 场景 | 断言 |
 |----|------|------|
-| L5-1-1-03 | `buildCompletionSummary("7655", "1500", "claude-sonnet-4-6", "12")` | `"用时: 8s, 消耗: 1500 tokens, ctx: 12%, 模型: claude-sonnet-4-6"` |
-| L5-1-1-03 | `buildCompletionSummary` ctx=0/空/garbage 全部省略 ctx 段 | 4 个子 case |
-| L5-1-1-04 | `ComputeCtxPct` 边界：0 prompt / 0 max / 负数 / 超限 clamp | 9 个子 case |
-| L5-2-1-13 | PEV 主路径 + milestone-only 路径 emit complete 含 `ctx_pct` / `llm_called` | metadata 断言 |
-| L5-2-1-14 | query loop runSpan 含 `pev.prompt_tokens` / `pev.completion_tokens` / `pev.ctx_pct` | span attribute 断言 |
+| D1-S1-T03 | `buildCompletionSummary("7655", "1500", "claude-sonnet-4-6", "12")` | `"用时: 8s, 消耗: 1500 tokens, ctx: 12%, 模型: claude-sonnet-4-6"` |
+| D1-S1-T03 | `buildCompletionSummary` ctx=0/空/garbage 全部省略 ctx 段 | 4 个子 case |
+| D1-S1-T04 | `ComputeCtxPct` 边界：0 prompt / 0 max / 负数 / 超限 clamp | 9 个子 case |
+| D2-S1-T13 | PEV 主路径 + milestone-only 路径 emit complete 含 `ctx_pct` / `llm_called` | metadata 断言 |
+| D2-S1-T14 | query loop runSpan 含 `pev.prompt_tokens` / `pev.completion_tokens` / `pev.ctx_pct` | span attribute 断言 |
 
 ## 6. 风险与回滚
 

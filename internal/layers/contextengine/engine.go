@@ -40,9 +40,6 @@ type EngineDeps struct {
 	Permission          IPermissionGate
 	Observer            IObserver
 	CompressionObserver ICompressionObserver
-	PEVObserver         IPEVObserver
-	VerifyRunner        IVerifyCommandRunner
-	Planner             contracts.IMilestonePlanner
 	LongTerm            memory.ILongTermMemory
 	Config              *config.ContextEngineConfig
 	ObsBridge           *observability.Bridge
@@ -54,19 +51,24 @@ type EngineDeps struct {
 }
 
 // ContextEngine implements contracts.IEngine.
+//
+// DSAFT: D2-S1-A01 (ExecuteQuery)
 type ContextEngine struct {
 	memory       *memory.Manager
 	counter      contracts.ITokenCounter
-	pev          *PEVEngine
+	queryLoop    *query.Loop
+	llm          ILLMGateway
+	tools        IToolRunner
+	toolsReg     IToolRegistry
+	permission   IPermissionGate
 	prompt       *prompt.Loader
 	cfg          *config.ContextEngineConfig
 	observer     IObserver
 	compObserver ICompressionObserver
 	obsBridge    *observability.Bridge
 	asyncCompact *compression.AsyncAutocompacter
-	toolsReg     IToolRegistry
 	harnessBoot  *harness.Bootstrap
-	assembler    *harness.SystemPromptAssembler
+	assembler    *prompt.SystemPromptAssembler
 	preflight    *harness.PreflightEvaluator
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
@@ -90,10 +92,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	if compObserver == nil {
 		compObserver = NoOpCompressionObserver{}
 	}
-	pevObserver := deps.PEVObserver
-	if pevObserver == nil {
-		pevObserver = NoOpPEVObserver{}
-	}
 	counter := ResolveTokenCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)
 	var asyncCompact *compression.AsyncAutocompacter
@@ -111,50 +109,49 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	})
 	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
 	attachReg := attachments.NewRegistry(cfg.Attachments)
-	pevEngine := NewPEVEngine(
-		deps.LLM,
-		deps.Tools,
-		deps.ToolsReg,
-		deps.Permission,
-		observer,
-		&cfg.PEV,
-		deps.ObsBridge,
-		deps.VerifyRunner,
-		pevObserver,
-		deps.Planner,
-		cfg.Plan,
-	)
-	pevEngine.setQueryLoopSupport(QueryLoopSupport{
-		Enabled:        cfg.QueryLoop.Enabled,
-		MaxTurns:       cfg.QueryLoop.MaxTurns,
-		Compress:       cfg.QueryLoop.CompressPerTurn,
-		StreamingTools: cfg.QueryLoop.StreamingTools,
-		Attachments:    attachReg,
-		UserContext:    ucProvider,
+
+	loop := &query.Loop{
+		LLM:             &llmCaller{llm: deps.LLM},
+		Tools:           &toolExecutor{tools: deps.Tools, toolsReg: toolsReg},
+		Permission:      &permChecker{gate: deps.Permission, reg: toolsReg},
+		Attachments:     attachReg,
+		UserContext:     ucProvider,
+		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
+			return ToolContextWithGate(ctx, sc, deps.Permission)
+		},
+		WrapToolStreamContext: func(ctx context.Context, emit query.EmitFunc, sessionID, toolName string) context.Context {
+			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
+		},
 		SessionQueue:   queue.GlobalSessionQueue,
-		Background:     query.SetGlobalBackgroundRegistry(),
-		CompressFn: newCompressFn(
+		StreamingTools: cfg.QueryLoop.StreamingTools,
+	}
+	if cfg.QueryLoop.CompressPerTurn {
+		loop.CompressFactory = newCompressFn(
 			cfg.QueryLoop.CompressPerTurn,
 			cfg,
 			counter,
 			deps.LLM,
 			asyncCompact,
 			compObserver,
-		),
-	})
+		)
+	}
+
 	return &ContextEngine{
 		memory:       memory.NewManager(cfg, store, deps.LongTerm),
 		counter:      counter,
-		pev:          pevEngine,
+		queryLoop:    loop,
 		prompt:       prompt.NewLoader(&cfg.SystemPrompt),
 		cfg:          cfg,
 		observer:     observer,
 		compObserver: compObserver,
 		obsBridge:    deps.ObsBridge,
 		asyncCompact: asyncCompact,
+		llm:          deps.LLM,
+		tools:        deps.Tools,
 		toolsReg:     toolsReg,
+		permission:   deps.Permission,
 		harnessBoot:  harnessBoot,
-		assembler:    harness.NewSystemPromptAssembler(cfg.Workspace),
+		assembler:    prompt.NewSystemPromptAssembler(cfg.Workspace),
 		preflight:    harness.NewPreflightEvaluator(cfg.Preflight, harness.NewToolPoolFilter(cfg.Harness.ToolPool)),
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
@@ -419,10 +416,10 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			bootstrapReport = &sc.Harness.Report
 			workspace = &sc.Harness.Report.Workspace
 		}
-		buildInput := harness.SystemPromptBuildInput{
+		buildInput := prompt.SystemPromptBuildInput{
 			WorkDir: session.WorkDir,
 			Session: session,
-			Runtime: harness.ProcessRuntimeContext{
+			Runtime: prompt.ProcessRuntimeContext{
 				SessionID: session.SessionID,
 				RequestID: session.RequestID,
 				UserID:    session.UserID,
@@ -466,13 +463,33 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	working := memory.NewWorkingMemory()
 	// Defer the "complete" event until AFTER snapshot persist + sc.Messages
-	// writes finish below. The PEV / QueryLoop paths historically emit
+	// writes finish below. The QueryLoop path historically emits
 	// complete inline (before AppendMessage at L522 and PersistSnapshot at
 	// L555), which races with downstream readers (gateway persist,
 	// integration tests reading sc.Messages once the handler counts
 	// "complete"). Intercept it here, replay after the writes are durable.
 	var pendingComplete *contracts.EngineEvent
-	result, runErr := e.pev.Run(ctx, sc, sc.CompressedView, message, func(ev *contracts.EngineEvent) {
+	messages := sc.CompressedView
+	if len(messages) > 0 && messages[0].Role == types.MessageRoleSystem {
+		messages = messages[1:]
+	}
+
+	toolSchemas := harness.VisibleToolsFromState(sc.Harness)
+	var tools []ToolSchema
+	if len(toolSchemas) > 0 && sc.Harness != nil {
+		tools = visibleToolsToSchemas(sc.Harness)
+	} else {
+		tools, _ = e.toolsReg.ListTools(ctx, sc.WorkDir)
+	}
+	tools = FilterToolsByPermissionMode(sc.PermissionMode, tools, sc.PlanFilePath)
+	tools = FilterToolsForAgentRole(sc, tools)
+
+	res, runErr := e.queryLoop.Run(ctx, sc, query.Params{
+		SystemPrompt: sc.SystemPrompt,
+		Messages:     messages,
+		Tools:        toolSchemasToQuery(tools),
+		MaxTurns:     e.cfg.QueryLoop.MaxTurns,
+	}, func(ev *contracts.EngineEvent) {
 		if ev.Type == "complete" {
 			pendingComplete = ev
 			return
@@ -485,10 +502,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	var assistantSummary string
 	if runErr == nil {
-		// 方案 2: 同步工具调用历史到 sc.Messages
-		// 这样下一轮对话时，LLM 能感知到之前的工具调用和结果
-		if result != nil && len(result.ToolCallHistory) > 0 {
-			for i, tc := range result.ToolCallHistory {
+		if res != nil && len(res.ToolCallHistory) > 0 {
+			for i, tc := range res.ToolCallHistory {
 				callID := strings.TrimSpace(tc.CallID)
 				if callID == "" {
 					callID = fmt.Sprintf("call_%s_%d", tc.ToolName, i)
@@ -586,6 +601,28 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	// session.ContextSnapshot writes above are durable.
 	if pendingComplete != nil {
 		emit(pendingComplete)
+	} else if runErr == nil {
+		// The query loop path does not emit "complete" natively — only the
+		// PEV engine does (via pendingComplete at L471). Emit the final
+		// completion event here so gateway can finalize the session (persist,
+		// Feishu reaction, stream cleanup, etc.).
+		// Metadata shape must match gateway.buildCompletionSummary: duration in
+		// milliseconds, usage as total token count (not prompt/completion split).
+		meta := map[string]string{
+			"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+			"model":    sc.Model,
+		}
+		if res != nil {
+			meta["usage"] = fmt.Sprintf("%d", res.Usage.PromptTokens+res.Usage.CompletionTokens)
+			if pct := contracts.ComputeCtxPct(res.Usage.PromptTokens, sc.TokenBudget.MaxContextTokens); pct > 0 {
+				meta["ctx_pct"] = fmt.Sprintf("%d", pct)
+			}
+		}
+		emit(&contracts.EngineEvent{
+			Type:      "complete",
+			SessionID: session.SessionID,
+			Metadata:  meta,
+		})
 	}
 
 	slog.Debug("contextengine: process done", "sessionID", session.SessionID, "duration", time.Since(start))
@@ -616,7 +653,7 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		compression.WithCounter(e.counter),
 		compression.WithAutocompactConfig(e.cfg.Compression.Autocompact),
 		compression.WithSummarizer(&AutocompactSummarizer{
-			LLM:     e.pev.llm,
+			LLM:     e.llm,
 			Timeout: e.cfg.Compression.Autocompact.Timeout,
 		}),
 	}
@@ -694,5 +731,10 @@ func mapProcessError(sessionID string, err error) *contracts.EngineEvent {
 	if stderrors.As(err, &se) {
 		return errorEvent(sessionID, se, false)
 	}
-	return errorEvent(sessionID, errors.WithCode("CTX_PROCESS_FAILED", err.Error(), err), false)
+	msg := errors.FormatLLMError(err)
+	if msg == "" {
+		msg = err.Error()
+	}
+	slog.Warn("contextengine: process failed", "sessionID", sessionID, "error", msg)
+	return errorEvent(sessionID, errors.WithCode("CTX_PROCESS_FAILED", msg, err), false)
 }

@@ -72,7 +72,6 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	for _, name := range []string{
 		telemetry.OpContextHarnessBootstrapRun,
 		telemetry.OpContextSystemPromptBuild,
-		telemetry.OpContextPEVRun,
 	} {
 		if counts[name] == 0 {
 			t.Errorf("missing span %q", name)

@@ -1,34 +1,75 @@
-change_id: devrix-wave-scheduler
-priority: P0
-demand_id: DM-20260611-007
-status: s5_acceptance
-s4_gate_verdict: PASS
-s4_gate_date: "2026-06-12"
-s4_gate_note: "S4-Gate 首次 review 误报（reviewer 看错 worktree）；race fix commit 5fc88f4 已在 fix/remaining-critical integrated branch"
-domains: [orchestration, D1, D2, D4]
-parent_initiative: devrix-queryloop-context-v3
-decisions:
-  dag_source: plan_engine          # 1B
-  dispatch_mode: continuous        # 2B
-  workdir_policy: shared           # 3B — conflict guard at scheduler layer
-worker_pool:
-  cursor: 1
-  claude_code: 1
-  subagent: 3
-l5_points:
-  - L5-ORCH-10
-  - L5-ORCH-11
-  - L5-ORCH-12
-  - L5-ORCH-13
-  - L5-ORCH-14
-  - L5-ORCH-15
-  - L5-ORCH-16
-  - L5-ORCH-17
-  - L5-ORCH-18
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-wave-scheduler
+  demand_id: DM-20260611-007
+  title: "Wave Scheduler — DAG 调度 + ContextPolicy + ConflictGuard"
+  status: s5_acceptance
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-11"
+  updated_at: "2026-06-12"
+  source: devrix-queryloop-context-v3
+  s4_gate_verdict: PASS
+  s4_gate_date: "2026-06-12"
+  s4_gate_note: "S4-Gate 首次 review 误报（reviewer 看错 worktree）；race fix commit 5fc88f4 已在 fix/remaining-critical integrated branch"
+
+scope:
+  layers:
+    - id: D1
+      name: Orchestration
+      affected: true
+      reason: "WaveScheduler + ContextPolicy + ConflictGuard + runners"
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "SubAgent/AgentTool runners"
+    - id: D4
+      name: Multi-Agent
+      affected: true
+      reason: "Wave Worker 调度"
+  capabilities:
+    - id: WAVE-DAG-SCHEDULE
+      name: DAG 拓扑排序 + continuous dispatch
+    - id: WAVE-CONTEXT-POLICY
+      name: ContextPolicy 注入
+    - id: WAVE-CONFLICT-GUARD
+      name: shared workdir 冲突保护
+  t_points:
+    - ORCH-S2-A01-T10
+    - ORCH-S2-A01-T11
+    - ORCH-S2-A01-T12
+    - ORCH-S2-A01-T13
+    - ORCH-S2-A01-T14
+    - ORCH-S2-A01-T15
+    - ORCH-S2-A01-T16
+    - ORCH-S2-A01-T17
+    - ORCH-S2-A01-T18
+
 version_scope:
-  v1.0: WaveScheduler + ContextPolicy + ConflictGuard + SubAgent/AgentTool runners
-  v1.1: Feishu Worker 双区块卡片 + cardkit 流式
-  v1.2: Plan gate + 真实 Artifact + wave_completed QueryLoop 回灌（依赖 DM-20260612-011）
+  v1.0:
+    features:
+      - "WaveScheduler DAG 调度"
+      - "ContextPolicy + ConflictGuard"
+      - "SubAgent/AgentTool runners"
+    status: implemented
+  v1.1:
+    features:
+      - "Feishu Worker 双区块卡片 + cardkit 流式"
+    status: future
+  v1.2:
+    features:
+      - "Plan gate"
+      - "真实 Artifact"
+      - "wave_completed QueryLoop 回灌"
+    status: planned
+
+external_dependencies:
+  - component: "DM-012 QueryLoop"
+    status: available
+  - component: "DM-20260612-011 Unified Task Registry"
+    status: planned
 
 related_changes:
   - devrix-unified-task-registry

@@ -6,7 +6,6 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
@@ -21,7 +20,6 @@ func SelectContextEngine(
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	llmStack llmbridge.ContextLLMStack,
-	milestoneSvc milestone.IMilestoneService,
 	agentToolReg *tool.Registry,
 ) gateway.IContextEngine {
 	engine := strings.ToLower(strings.TrimSpace(name))
@@ -30,10 +28,10 @@ func SelectContextEngine(
 		slog.Warn("four_flow engine was removed; using context engine with real LLM")
 		fallthrough
 	case "", "context", "ctx":
-		return NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, agentToolReg)
+		return NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, agentToolReg)
 	default:
 		slog.Warn("unknown context engine; using context engine", "requested", engine)
-		return NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, milestoneSvc, agentToolReg)
+		return NewContextEngine(llmStack, permMgr, ctxCfg, toolCfg, obsBridge, agentToolReg)
 	}
 }
 

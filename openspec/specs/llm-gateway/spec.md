@@ -220,7 +220,7 @@ Gateway MUST 仅在 Retry 链整体失败后调用 `RecordFailure` 一次；`con
 
 **Priority**: P0  
 **L4**: L4-LLM-BREAKER, L4-LLM-GATEWAY  
-**L5**: L5-LLM-20, L5-LLM-23
+**T**: D3-LLM-T20, D3-LLM-T23
 
 #### Scenario: Single retry success does not open circuit
 
@@ -254,7 +254,7 @@ Gateway MUST 仅在 Retry 链整体失败后调用 `RecordFailure` 一次；`con
 
 **Priority**: P1  
 **L4**: L4-LLM-GATEWAY  
-**L5**: L5-LLM-21
+**T**: D3-LLM-T21
 
 #### Scenario: Gateway injects default timeout when none set
 
@@ -274,7 +274,7 @@ Retry 退避 MUST 使用 Full Jitter 随机化；延迟 MUST 受 `maxDelay` 上�
 
 **Priority**: P1  
 **L4**: L4-LLM-RETRY  
-**L5**: L5-LLM-22
+**T**: D3-LLM-T22
 
 #### Scenario: Retry delays are randomized
 

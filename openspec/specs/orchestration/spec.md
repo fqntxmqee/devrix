@@ -27,7 +27,7 @@ v2.0 引入 **Hub-Spoke** 编排读模型：D2 SubQuery 与 D4 Delegate Worker �
 
 **Priority:** P0  
 **L4:** workplan  
-**L5:** L5-ORCH-01
+**T:** ORCH-S2-T01
 
 #### Scenario: Snapshot includes tasks and flows
 
@@ -44,7 +44,7 @@ v2.0 引入 **Hub-Spoke** 编排读模型：D2 SubQuery 与 D4 Delegate Worker �
 
 **Priority:** P0  
 **L4:** execution_flow_hub  
-**L5:** L5-4-10-04, L5-4-10-06
+**T:** D4-S10-T04, D4-S10-T06
 
 #### Scenario: Dual publish on flow event
 

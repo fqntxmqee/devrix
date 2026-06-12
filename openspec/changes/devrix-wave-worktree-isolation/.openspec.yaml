@@ -31,13 +31,13 @@ scope:
     - id: ORCH-WAVE-ARTIFACT-PR
       name: Artifact PRURL 解析与 wave 汇总
 
-  l5_test_points:
-    - L5-CTX-WT-01
-    - L5-CTX-WT-02
-    - L5-CTX-WT-03
-    - L5-CTX-WT-04
-    - L5-CTX-WT-05
-    - L5-CTX-WT-06
+  t_points:
+    - D2-S12-A01-T01
+    - D2-S12-A01-T02
+    - D2-S12-A01-T03
+    - D2-S12-A01-T04
+    - D2-S12-A01-T05
+    - D2-S12-A01-T06
 
 version_scope:
   v1.0:

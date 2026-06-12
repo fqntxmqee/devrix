@@ -24,7 +24,7 @@ devrix 飞书 IM 完成卡底部摘要当前仅展示 `用时 / 消耗 / 模型`
 
 D2 PEV 在 emit `complete` 前计算 `ctx_pct`，放入 metadata；D1 gateway 读取并拼到摘要。
 
-- **优点**：最小侵入；与现有 `usage/duration/model` 透传路径一致；L5 测试稳定
+- **优点**：最小侵入；与现有 `usage/duration/model` 透传路径一致；T 层测试稳定
 - **缺点**：ctx_pct 跨 PEV run 不累加（仅当前 run 内）
 
 ### 方案 B：Session 累计 token，存进 SessionContext
@@ -71,8 +71,8 @@ D2 PEV 在 emit `complete` 前计算 `ctx_pct`，放入 metadata；D1 gateway �
 | `internal/layers/contextengine/query_loop_run.go` | 1 处 emit complete + span 属性 |
 | `internal/layers/observability/telemetry/names.go` | 新增 `PEVCtxPctAttrs` helper（可选） |
 
-## 7. L5 测试点
+## 7. T 层测试点
 
-- L5-1-2-09 `summary_buildCompletionSummary_withCtxPct`
-- L5-1-2-10 `summary_buildCompletionSummary_zeroCtxPct_omitted`
-- L5-1-2-11 `pev_runSpan_containsCtxPct`
+- D1-S2-T09 `summary_buildCompletionSummary_withCtxPct`
+- D1-S2-T10 `summary_buildCompletionSummary_zeroCtxPct_omitted`
+- D1-S2-T11 `pev_runSpan_containsCtxPct`

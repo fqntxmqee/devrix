@@ -97,7 +97,7 @@ EOF
 **产出文件：**
 ```
 openspec/changes/<change-id>/
-  ├── .openspec.yaml          # 元数据：优先级、L5测试点、关联层
+  ├── .openspec.yaml          # 元数据：优先级、T层测试点、关联层
   └── proposal.md             # 提案：背景、方案、任务估算、风险
 ```
 
@@ -108,8 +108,8 @@ change_id: <change-id>
 priority: P0 | P1 | P2
 demand_id: DM-YYYYMMDD-NNN
 parent_change: <parent-change-id>  # 可选
-layers: [L1, L2, ...]
-l5_points: [L5-XXX-NN, ...]
+layers: [D1, D2, ...]
+t_points: [{T}-XXX-NN, ...]
 estimated_hours: <hours>
 ```
 
@@ -117,7 +117,7 @@ estimated_hours: <hours>
 
 1. 创建分支（如尚未创建）
 2. 编写 `.openspec.yaml` 和 `proposal.md`
-3. 在 `openspec/l5-registry.md` 预登记 L5 测试点（状态: `PLANNED`）
+3. 在 `openspec/t-registry.md` 预登记 T 层测试点（状态: `PLANNED`）
 
 **GitHub 操作：**
 
@@ -128,7 +128,7 @@ git push -u origin feat/<change-id>
 
 # 提交 proposal
 git add openspec/changes/<change-id>/
-git add openspec/l5-registry.md
+git add openspec/t-registry.md
 git add openspec/demand-archive-index.md
 git commit -m "$(cat <<'EOF'
 proposal: <change-id> 提案
@@ -192,7 +192,7 @@ gh pr create \
 ## 测试计划
 - [ ] 单元测试
 - [ ] 集成测试
-- [ ] L5 验收测试（L5-XXX-NN ~ L5-XXX-MM）
+- [ ] T 层验收测试（{T}-XXX-NN ~ {T}-XXX-MM）
 - [ ] 回归测试通过
 
 ## 风险评估
@@ -214,7 +214,7 @@ EOF
 **产出文件：**
 ```
 openspec/changes/<change-id>/
-  └── tasks.md                # 任务拆解：Milestone → Task → L5 映射
+  └── tasks.md                # 任务拆解：Milestone → Task → T 层映射
 
 internal/                     # 源代码变更
   └── layers/
@@ -225,9 +225,9 @@ internal/                     # 源代码变更
 
 **操作流程：**
 
-1. 编写 `tasks.md`，拆解为 Milestone → Task，标注依赖关系和 L5 映射
+1. 编写 `tasks.md`，拆解为 Milestone → Task，标注依赖关系和 T 层映射
 2. 按 TDD 流程开发：先写测试（RED）→ 实现（GREEN）→ 重构（IMPROVE）
-3. 每个 Task 完成后提交，commit message 包含 L5 引用
+3. 每个 Task 完成后提交，commit message 包含 T 层引用
 
 **Commit 规范：**
 
@@ -235,7 +235,7 @@ internal/                     # 源代码变更
 # 常规格式
 <type>: <简短描述>
 
-关联: L5-XXX-NN
+关联: {T}-XXX-NN
 Change: <change-id>
 ```
 
@@ -246,7 +246,7 @@ Change: <change-id>
 git commit -m "$(cat <<'EOF'
 feat: 实现 CommandPolicy Validate 白名单校验
 
-关联: L5-TOOL-01
+关联: {T}-TOOL-01
 Change: devrix-tool-security
 EOF
 )"
@@ -255,7 +255,7 @@ EOF
 git commit -m "$(cat <<'EOF'
 fix: Half-Open 状态无限并发探测
 
-关联: L5-LLM-17
+关联: D3-LLM-T17
 Change: devrix-llm-gateway-v2
 EOF
 )"
@@ -264,7 +264,7 @@ EOF
 git commit -m "$(cat <<'EOF'
 test: 添加 CB + Retry 协调集成测试
 
-关联: L5-LLM-17, L5-LLM-18
+关联: D3-LLM-T17, D3-LLM-T18
 Change: devrix-llm-gateway-v2
 EOF
 )"
@@ -304,7 +304,7 @@ openspec/changes/<change-id>/
 
 1. 运行全量测试
 2. 生成验收报告
-3. 更新 `openspec/l5-registry.md` 对应测试点状态为 `IMPLEMENTED`
+3. 更新 `openspec/t-registry.md` 对应测试点状态为 `IMPLEMENTED`
 
 ```bash
 # 全量测试
@@ -319,7 +319,7 @@ go tool cover -func=coverage.out | grep total
 ```
 
 **验收通过标准：**
-- P0 L5 测试 100% PASS
+- P0 T 层测试 100% PASS
 - 覆盖率 ≥ 80%
 - 无 race condition（`-race` 通过）
 - 回归测试 100% PASS
@@ -328,11 +328,11 @@ go tool cover -func=coverage.out | grep total
 
 ```bash
 git add openspec/changes/<change-id>/acceptance-report.md
-git add openspec/l5-registry.md
+git add openspec/t-registry.md
 git commit -m "$(cat <<'EOF'
 acceptance: <change-id> 验收通过
 
-S5 阶段，L5 测试 N/N PASS，覆盖率 XX%。
+S5 阶段，T 层测试 N/N PASS，覆盖率 XX%。
 EOF
 )"
 git push
@@ -397,7 +397,7 @@ git push
 ## 测试计划
 - [ ] 单元测试 (<2min)
 - [ ] 集成测试
-- [ ] L5 验收测试（P0 全部 PASS）
+- [ ] T 层验收测试（P0 全部 PASS）
 - [ ] 回归测试 100%
 - [ ] 覆盖率 ≥ 80%
 
@@ -466,7 +466,7 @@ gh pr view --json reviews
 ### Review Checklist
 
 - [ ] OpenSpec 文档完整（proposal / design / specs / tasks）
-- [ ] L5 测试点已在 `l5-registry.md` 登记
+- [ ] T 层测试点已在 `t-registry.md` 登记
 - [ ] 代码符合 `CLAUDE.md` 编码风格（不可变、小函数、错误处理）
 - [ ] 无硬编码密钥/凭证
 - [ ] 覆盖率 ≥ 80%
@@ -583,7 +583,7 @@ gh pr create --title "devrix-tool-security: 工具执行安全增强" --body "..
 git commit -m "$(cat <<'EOF'
 feat: 实现 CommandPolicy 命令白名单校验
 
-关联: L5-TOOL-01
+关联: {T}-TOOL-01
 Change: devrix-tool-security
 EOF
 )"

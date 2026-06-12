@@ -29,16 +29,16 @@ import (
 
 // FeishuAdapter provides Feishu/Lark integration for the communication layer
 type FeishuAdapter struct {
-	gateway    gateway.GatewayAPI
-	cfg        *config.CommunicationConfig
-	feishuCfg  *FeishuConfig
+	gateway      gateway.GatewayAPI
+	cfg          *config.CommunicationConfig
+	feishuCfg    *FeishuConfig
 	eventHandler gateway.EventHandler
-	api        FeishuAPI
+	api          FeishuAPI
 
-	client      *lark.Client
-	wsClient    *larkws.Client
-	server      *http.Server
-	dispatcher  *dispatcher.EventDispatcher
+	client     *lark.Client
+	wsClient   *larkws.Client
+	server     *http.Server
+	dispatcher *dispatcher.EventDispatcher
 
 	mu        sync.RWMutex
 	wsWg      sync.WaitGroup // tracks WebSocket goroutine for clean shutdown
@@ -50,13 +50,13 @@ type FeishuAdapter struct {
 	dedupMap   sync.Map // messageID -> timestamp for deduplication
 
 	// OK confirmation and done_emoji settings
-	reactionEmoji string
-	doneEmoji     string
-	replyInThread bool
-	progressStyle string
-	showToolResults bool
+	reactionEmoji    string
+	doneEmoji        string
+	replyInThread    bool
+	progressStyle    string
+	showToolResults  bool
 	streamingEnabled bool
-	streamThrottle  streamThrottleConfig
+	streamThrottle   streamThrottleConfig
 
 	cardkit *cardkitClient
 
@@ -317,12 +317,15 @@ YOLO 模式已启用：工具调用自动批准；WorkDir 内文件可写。
 		}
 		return true
 
-
 	case types.CommandNew:
 		if oldSessionID, ok := a.sessionMap.Load(sessionKey); ok {
 			if sid, ok := oldSessionID.(string); ok && sid != "" {
 				a.clearSessionStream(sid)
 				a.clearSessionReplyContext(sid)
+				// 停止旧 session 的活跃进程（LLM/Agent/子进程）
+				if err := a.gateway.StopProcess(sid); err != nil {
+					slog.Warn("feishu: failed to stop old session process", "sessionID", sid, "error", err)
+				}
 			}
 		}
 		session, err := a.gateway.CreateSession(sessionKey, "")
@@ -338,8 +341,23 @@ YOLO 模式已启用：工具调用自动批准；WorkDir 内文件可写。
 		return true
 
 	case types.CommandStop:
-		// TODO: Implement stop functionality
-		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "⏸️ 停止功能开发中"); err != nil {
+		sid := a.lookupSessionID(sessionKey)
+		if sid == "" {
+			if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "⏸️ 没有正在运行的任务"); err != nil {
+				slog.Error("feishu: failed to send stop ack", "error", err)
+			}
+			return true
+		}
+		if err := a.gateway.StopProcess(sid); err != nil {
+			slog.Error("feishu: failed to stop process", "sessionID", sid, "error", err)
+			if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "❌ 停止失败，请重试"); err != nil {
+				slog.Error("feishu: failed to send stop error", "error", err)
+			}
+			return true
+		}
+		// Clear the session mapping so the next message starts fresh.
+		a.sessionMap.Delete(sessionKey)
+		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "⏸️ 已停止当前任务"); err != nil {
 			slog.Error("feishu: failed to send stop ack", "error", err)
 		}
 		return true
@@ -363,20 +381,20 @@ func (a *FeishuAdapter) replyAckToUser(ctx context.Context, userMessageID, sessi
 
 // FeishuConfig holds Feishu-specific configuration
 type FeishuConfig struct {
-	AppID         string
-	AppSecret     string
-	BotName       string
-	AllowFrom     string
-	Domain        string
-	EncryptKey    string
-	CallbackPath  string
-	Port          string
-	UseWebhook    bool
-	ReactionEmoji string // emoji reaction on incoming messages (default: OnIt); "none" to disable
-	DoneEmoji     string // emoji reaction when agent completes (e.g. Done); "none" or empty to disable
-	ReplyInThread bool   // reply in thread under user's message (shows "N 条回复")
-	ProgressStyle string // legacy | compact | card | structured — structured 为默认
-	ShowToolResults bool // push tool_result body to IM; default false
+	AppID           string
+	AppSecret       string
+	BotName         string
+	AllowFrom       string
+	Domain          string
+	EncryptKey      string
+	CallbackPath    string
+	Port            string
+	UseWebhook      bool
+	ReactionEmoji   string // emoji reaction on incoming messages (default: OnIt); "none" to disable
+	DoneEmoji       string // emoji reaction when agent completes (e.g. Done); "none" or empty to disable
+	ReplyInThread   bool   // reply in thread under user's message (shows "N 条回复")
+	ProgressStyle   string // legacy | compact | card | structured — structured 为默认
+	ShowToolResults bool   // push tool_result body to IM; default false
 	Streaming       FeishuStreamingConfig
 }
 
@@ -430,14 +448,14 @@ func NewFeishuAdapter(
 	}
 
 	adapter := &FeishuAdapter{
-		gateway:       gw,
-		cfg:           cfg,
-		feishuCfg:     feishuCfg,
-		client:        lark.NewClient(feishuCfg.AppID, feishuCfg.AppSecret, clientOpts...),
-		reactionEmoji: normalizeReactionEmoji(feishuCfg.ReactionEmoji),
-		doneEmoji:     normalizeDoneEmoji(feishuCfg.DoneEmoji),
-		replyInThread: feishuCfg.ReplyInThread,
-		progressStyle: normalizeProgressStyle(feishuCfg.ProgressStyle),
+		gateway:          gw,
+		cfg:              cfg,
+		feishuCfg:        feishuCfg,
+		client:           lark.NewClient(feishuCfg.AppID, feishuCfg.AppSecret, clientOpts...),
+		reactionEmoji:    normalizeReactionEmoji(feishuCfg.ReactionEmoji),
+		doneEmoji:        normalizeDoneEmoji(feishuCfg.DoneEmoji),
+		replyInThread:    feishuCfg.ReplyInThread,
+		progressStyle:    normalizeProgressStyle(feishuCfg.ProgressStyle),
 		showToolResults:  feishuCfg.ShowToolResults,
 		streamingEnabled: feishuCfg.Streaming.Enabled,
 		streamThrottle:   feishuCfg.Streaming.throttleConfig(),
@@ -522,6 +540,11 @@ func (a *FeishuAdapter) startWebSocketMode(ctx context.Context) error {
 		larkws.WithEventHandler(a.dispatcher),
 		larkws.WithLogLevel(larkcore.LogLevelDebug),
 		larkws.WithLogger(larkcore.NewEventLogger()),
+		larkws.WithOnReady(func() { slog.Info("feishu: ws ready") }),
+		larkws.WithOnError(func(err error) { slog.Error("feishu: ws error", "error", err) }),
+		larkws.WithOnDisconnected(func() { slog.Warn("feishu: ws disconnected") }),
+		larkws.WithOnReconnecting(func() { slog.Info("feishu: ws reconnecting") }),
+		larkws.WithOnReconnected(func() { slog.Info("feishu: ws reconnected") }),
 	}
 	if a.feishuCfg.Domain != "" {
 		wsOpts = append(wsOpts, larkws.WithDomain(a.feishuCfg.Domain))
@@ -530,11 +553,35 @@ func (a *FeishuAdapter) startWebSocketMode(ctx context.Context) error {
 	slog.Info("feishu: creating WS client with dispatcher", "has_dispatcher", a.dispatcher != nil)
 	a.wsClient = larkws.NewClient(a.feishuCfg.AppID, a.feishuCfg.AppSecret, wsOpts...)
 
+	// The SDK's Start() blocks on select{} after a successful connection
+	// and cannot be cleanly joined. Run it detached — the wsWg below
+	// tracks the health-monitor goroutine instead.
+	go func() {
+		if err := a.wsClient.Start(ctx); err != nil {
+			slog.Error("feishu: ws client exited with error", "error", err)
+		}
+	}()
+
+	// Monitor goroutine: periodic health check via Feishu REST API.
+	// When ctx is cancelled (Stop()), best-effort close the WS so the
+	// SDK stops reading and the reconnect loop is the only leftover.
 	a.wsWg.Add(1)
 	go func() {
 		defer a.wsWg.Done()
-		if err := a.wsClient.Start(ctx); err != nil {
-			slog.Error("feishu: websocket error", "error", err)
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				if a.wsClient != nil {
+					a.wsClient.Close()
+				}
+				return
+			case <-ticker.C:
+				if err := a.HealthCheck(ctx); err != nil {
+					slog.Warn("feishu: ws health check failed", "error", err)
+				}
+			}
 		}
 	}()
 
@@ -775,6 +822,16 @@ func (a *FeishuAdapter) getOrCreateSession(sessionKey string) (*types.Session, e
 	return resolveOrCreateSession(a.gateway, &a.sessionMap, sessionKey)
 }
 
+// lookupSessionID returns the session ID for a session key without creating a new session.
+func (a *FeishuAdapter) lookupSessionID(sessionKey string) string {
+	if v, ok := a.sessionMap.Load(sessionKey); ok {
+		if sid, ok := v.(string); ok && sid != "" {
+			return sid
+		}
+	}
+	return ""
+}
+
 // fetchBotInfo fetches the bot's information using the low-level API
 func (a *FeishuAdapter) fetchBotInfo(ctx context.Context) error {
 	resp, err := a.api.Get(ctx, "/open-apis/bot/v3/info", nil, larkcore.AccessTokenTypeTenant)
@@ -827,7 +884,18 @@ func (a *FeishuAdapter) Stop() error {
 		a.server.Shutdown(context.Background())
 	}
 
-	a.wsWg.Wait()
+	// The SDK's wsClient.Start() cannot be cleanly joined (select{}).
+	// Wait for the health-monitor goroutine with a timeout.
+	done := make(chan struct{})
+	go func() {
+		a.wsWg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		slog.Warn("feishu: ws shutdown timeout")
+	}
 
 	slog.Info("feishu adapter stopped")
 	return nil

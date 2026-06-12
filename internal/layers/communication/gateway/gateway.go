@@ -34,7 +34,9 @@ type IContextEngine = contracts.IEngine
 // EngineEvent is the L1 alias for engine events.
 type EngineEvent = contracts.EngineEvent
 
-// CommunicationGateway routes messages between adapters and the context engine
+// CommunicationGateway routes messages between adapters and the context engine.
+//
+// DSAFT: D1-S1-A02 (RouteMessage)
 type CommunicationGateway struct {
 	sessionStore  SessionStore
 	eventHandler  EventHandler
@@ -81,6 +83,11 @@ func NewCommunicationGateway(
 		activeProcesses: make(map[string]context.CancelFunc),
 	}
 	return gw
+}
+
+// StopProcess cancels the active context engine process for the given session.
+func (g *CommunicationGateway) StopProcess(sessionID string) error {
+	return g.Stop(sessionID)
 }
 
 // Stop implements commands.Stopper — cancels the active context engine Process.

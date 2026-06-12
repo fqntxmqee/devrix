@@ -72,6 +72,8 @@ type WorkPlanSnapshot struct {
 }
 
 // ExecutionFlowHub publishes sub-agent progress to Leader cognition and IM.
+//
+// DSAFT: ORCH-S2-A01-F01 (Publish), ORCH-S2-A01-F02 (DispatchToIM)
 type ExecutionFlowHub interface {
 	Publish(ctx context.Context, ev FlowEvent)
 	Snapshot(sessionID string) WorkPlanSnapshot

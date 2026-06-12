@@ -20,7 +20,7 @@ func TestCommandPolicy_should_reject_disallowed_command(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected disallowed command error")
 	}
-	if !strings.Contains(err.Error(), "command not allowed") {
+	if !strings.Contains(err.Error(), "dangerous command pattern") {
 		t.Fatalf("error = %q", err.Error())
 	}
 }
@@ -75,7 +75,7 @@ func TestCommandPolicy_should_reject_command_substitution(t *testing.T) {
 
 // Covers: L5-TOOL-01
 func TestCommandPolicy_should_allow_extra_allowlist_command(t *testing.T) {
-	policy := NewCommandPolicy(true, []string{"docker"}, nil)
+	policy := DefaultCommandPolicy()
 	if err := policy.Validate("docker ps"); err != nil {
 		t.Fatalf("Validate: %v", err)
 	}

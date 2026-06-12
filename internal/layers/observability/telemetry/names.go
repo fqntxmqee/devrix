@@ -34,8 +34,6 @@ const (
 	OpContextSnapshotLoad   = "context.snapshot.load"
 	OpContextSystemPromptLoad = "context.system_prompt.load"
 	OpContextCompressionRun = "context.compression.run"
-	OpContextPlanGenerate   = "context.plan.generate"
-	OpContextMilestoneRun   = "context.milestone.run"
 	OpContextLongTermRecall = "context.longterm.recall"
 	OpContextLongTermStore  = "context.longterm.store"
 	OpContextVerifyCommand  = "context.verify.command"
@@ -48,14 +46,6 @@ const (
 	OpContextHarnessPreflight      = "context.harness.preflight"
 	OpContextHarnessRoute          = "context.harness.route"
 	OpContextSystemPromptBuild     = "context.system_prompt.build"
-
-	OpContextPEVRun             = "context.pev.run"
-	OpContextPEVLLMCall         = "context.pev.llm_call"
-	OpContextPEVIteration       = "context.pev.iteration"
-	OpContextPEVSynthesis       = "context.pev.synthesis"
-	OpContextPEVToolExecute     = "context.pev.tool_execute"
-	OpContextPEVPermissionCheck = "context.pev.permission_check"
-	OpContextPEVVerify          = "context.pev.verify"
 
 	OpLLMStream         = "llm.stream"
 	OpLLMProviderRoute  = "llm.provider.route"
@@ -93,12 +83,6 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerCommunication, "gateway"
 	case strings.HasPrefix(operation, "adapter."):
 		return LayerCommunication, "adapter"
-	case strings.HasPrefix(operation, "context.pev."):
-		return LayerContext, "pev_engine"
-	case strings.HasPrefix(operation, "context.milestone."):
-		return LayerContext, "pev_engine"
-	case strings.HasPrefix(operation, "context.plan."):
-		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "context.longterm."):
 		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "context.harness."):

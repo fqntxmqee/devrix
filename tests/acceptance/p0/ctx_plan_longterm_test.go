@@ -43,8 +43,6 @@ func TestAcceptance_PlanMilestoneP0(t *testing.T) {
 	planner := milestonebridge.NewPlannerAdapter(msSvc)
 
 	ctxCfg := config.DefaultContextEngineConfig()
-	ctxCfg.Plan.Enabled = true
-	ctxCfg.Plan.AutoDetect = false
 
 	planJSON := `{
 		"task_id": "task_accept",
@@ -104,7 +102,6 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 
 	llm := &accPlanLLM{}
 	ctxCfg := config.DefaultContextEngineConfig()
-	ctxCfg.Plan.Enabled = false
 	ctxCfg.LongTerm.Enabled = true
 	ctxCfg.LongTerm.RecallMaxEntries = 5
 	ctxCfg.LongTerm.RecallMaxTokens = 500

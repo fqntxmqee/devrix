@@ -4,7 +4,7 @@ title: 飞书 IM 完成卡 — 追加 ctx 比例 + token 链路全埋点
 source: 用户反馈（IM 卡片 "消耗: 0 tokens" 排查）
 priority: P1
 status: S1_Proposed
-l1-domain: communication
+dsaft_domain: communication
 created: 2026-06-11
 ---
 
@@ -75,7 +75,7 @@ LLM SSE 帧
 
 ## 4. 验收
 
-- [ ] L5-1-2-{09,10,11} 单测绿
+- [ ] {T}-1-2-{09,10,11} 单测绿
 - [ ] 真机 miniMax 调用：IM 卡片显示 `用时: X, 消耗: Y tokens, ctx: Z%, 模型: M`
 - [ ] Jaeger 截图：可见 `pev.run` span 含 `pev.prompt_tokens` / `pev.ctx_pct` / `pev.completion_tokens`；`llm.stream` span 含 `llm.tokens.prompt` / `llm.tokens.completion`
 - [ ] token=0 根因定位：Jaeger `llm.tokens.prompt=0` 但 query loop 收到 usage → 问题在 provider 协议；反之 → 问题在 Devrix 链路

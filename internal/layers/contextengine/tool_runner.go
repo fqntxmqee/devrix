@@ -149,6 +149,9 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 	if command == "" {
 		return &ToolResult{Error: "bash: command is required"}, nil
 	}
+	if hint := bashWrongToolHint(input, command); hint != "" {
+		return &ToolResult{Error: hint}, nil
+	}
 
 	if workDir != "" {
 		command = normalizeWorkspacePaths(workDir, command)
@@ -325,4 +328,25 @@ func truncateToolOutput(s string, maxBytes int) string {
 		return s
 	}
 	return s[:maxBytes] + "\n...(output truncated)"
+}
+
+// bashWrongToolHint detects when the model invoked bash with another tool's JSON args.
+func bashWrongToolHint(rawInput, command string) string {
+	if !strings.HasPrefix(strings.TrimSpace(rawInput), "{") {
+		return ""
+	}
+	if toolInputString(rawInput, "command", "cmd") != "" {
+		return ""
+	}
+	fields := parseToolInput(rawInput)
+	switch {
+	case fields["pattern"] != "":
+		return "bash: use the glob tool for file pattern search, not bash"
+	case fields["path"] != "" || fields["file_path"] != "":
+		return "bash: use read_file or glob for file access, not bash"
+	case strings.HasPrefix(command, "{"):
+		return "bash: invalid command — pass a shell command string, or use read_file/glob/grep tools"
+	default:
+		return ""
+	}
 }

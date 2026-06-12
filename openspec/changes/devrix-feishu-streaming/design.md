@@ -255,7 +255,7 @@ flowchart TD
 | 修改 | `adapters/feishu.go` | session stream 字段、FeishuConfig |
 | 修改 | `shared/config/user.go` | streaming 配置 |
 | 修改 | `bootstrap/im_hosts.go` | 接线 |
-| 修改 | `openspec/l5-registry.md` | S7 登记 L5-1-2-04~08 |
+| 修改 | `openspec/t-registry.md` | S7 登记 D1-S2-T04~08 |
 
 ---
 
@@ -265,11 +265,11 @@ flowchart TD
 
 | 测试 | Covers |
 |------|--------|
-| `TestCreateCardEntity_Success` | L5-1-2-04 |
-| `TestStreamElementContent_SequenceMonotonic` | L5-1-2-05 |
-| `TestAppendResponseText_FallbackPatchOnCardkitError` | L5-1-2-06 |
-| `TestFinalize_ClosesStreamingMode` | L5-1-2-07 |
-| `TestStreamThrottle_RespectsInterval` | L5-1-2-08 |
+| `TestCreateCardEntity_Success` | D1-S2-T04 |
+| `TestStreamElementContent_SequenceMonotonic` | D1-S2-T05 |
+| `TestAppendResponseText_FallbackPatchOnCardkitError` | D1-S2-T06 |
+| `TestFinalize_ClosesStreamingMode` | D1-S2-T07 |
+| `TestStreamThrottle_RespectsInterval` | D1-S2-T08 |
 
 ### 7.2 集成 / 真机
 

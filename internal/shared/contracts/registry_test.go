@@ -72,7 +72,6 @@ func TestRegistry_DefaultCatalog_HasCoreContracts(t *testing.T) {
 	want := map[string]bool{
 		"IEngine":           false,
 		"EngineEvent":       false,
-		"IMilestonePlanner": false,
 		"ITokenCounter":     false,
 		"ExecutionFlowHub":  false,
 	}

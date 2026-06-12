@@ -6,7 +6,6 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -30,7 +29,6 @@ type ContextEngineBuilder struct {
 	toolCfg      *config.ToolConfig
 	maCfg        *config.MultiAgentConfig
 	obsBridge    *observability.Bridge
-	milestoneSvc milestone.IMilestoneService
 	agentToolReg *tool.Registry
 }
 
@@ -40,7 +38,6 @@ func NewContextEngineBuilder(
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
-	milestoneSvc milestone.IMilestoneService,
 	agentToolReg *tool.Registry,
 ) *ContextEngineBuilder {
 	return &ContextEngineBuilder{
@@ -48,7 +45,6 @@ func NewContextEngineBuilder(
 		ctxCfg:       ctxCfg,
 		toolCfg:      toolCfg,
 		obsBridge:    obsBridge,
-		milestoneSvc: milestoneSvc,
 		agentToolReg: agentToolReg,
 	}
 }
@@ -74,7 +70,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 	if b == nil {
 		return nil
 	}
-	planner, longTerm := WireContextV3(b.ctxCfg, b.milestoneSvc)
+	longTerm := WireContextV3(b.ctxCfg)
 	tasks.InitGlobalTaskManager(b.ctxCfg.Tasks)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
@@ -86,6 +82,11 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 	}
 	if err := contextengine.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
+	}
+	if b.ctxCfg.TodoWrite.Enabled {
+		if err := toolReg.Register(contextengine.NewTodoWriteRunner()); err != nil {
+			slog.Error("register todo_write", "error", err)
+		}
 	}
 	if b.maCfg != nil && b.maCfg.Delegate.Enabled {
 		if err := contextengine.RegisterDelegateTools(toolReg, b.maCfg); err != nil {
@@ -118,7 +119,6 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 		ToolsReg:     toolReg,
 		Permission:   perm,
 		Observer:     contextengine.NoOpObserver{},
-		Planner:      planner,
 		LongTerm:     longTerm,
 		Config:       b.ctxCfg,
 		ObsBridge:    b.obsBridge,

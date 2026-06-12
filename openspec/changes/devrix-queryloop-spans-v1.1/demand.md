@@ -4,7 +4,7 @@ title: QueryLoop Span 对齐 v1.1 — runViaQueryLoop 补 iteration / llm_call s
 source: devrix-harness-unification v1.0 S4 副作用（QueryLoop 取代 legacy PEV 后丢失中间 span）
 priority: P1
 status: S1_Proposal
-l1-domain: context-engine
+dsaft_domain: context-engine
 parent_change: devrix-harness-unification
 created: 2026-06-12
 ---
@@ -30,7 +30,7 @@ DM-20260611-004（Harness Unification S4）将 `query_loop.enabled` 默认设为
 
 3 个测试在 `master` 与 `fix/remaining-critical` 上均失败 — 属于 DM-20260611-004 合入后
 未同步的可观测性回归，不阻塞 5 个 S4 change 合并（验收已 100% 覆盖各自范围），但是
-**L5-OBS-TRACE-04 / L5-OBS-TRACE-06 在 CI 上长期红灯**，需 v1.1 闭环。
+**D5-TRACE-T04 / D5-TRACE-T06 在 CI 上长期红灯**，需 v1.1 闭环。
 
 ## 2. 改动范围
 
@@ -76,19 +76,19 @@ DM-20260611-004（Harness Unification S4）将 `query_loop.enabled` 默认设为
   - 1 个 `context.pev.run` + 2 个 `context.pev.iteration`
   - 每个 iteration 下至少 1 个 `context.pev.llm_call`
 
-## 3. L5 覆盖
+## 3. T 层覆盖
 
 | 测试 ID | 描述 |
 |---------|------|
-| L5-OBS-TRACE-04（既有） | Canonical span hierarchy parent-child |
-| L5-OBS-TRACE-06（既有） | SpanKind contract |
-| L5-OBS-TRACE-07（新增） | QueryLoop 路径下 iteration span 数量等于 turn 数 |
+| D5-TRACE-T04（既有） | Canonical span hierarchy parent-child |
+| D5-TRACE-T06（既有） | SpanKind contract |
+| D5-TRACE-T07（新增） | QueryLoop 路径下 iteration span 数量等于 turn 数 |
 
 ## 4. 验收门禁
 
 - `go test -tags 'integration cross' ./tests/integration/` 0 failure
 - `go test ./internal/layers/contextengine/...` 0 failure
-- L5-OBS-TRACE-04 / -06 / -07 全部 PASS
+- D5-TRACE-T04 / -06 / -07 全部 PASS
 - D5 canonical trace tree 文档同步更新（`openspec/specs/project/canonical-trace-tree.md` 若存在）
 
 ## 5. 时间窗口

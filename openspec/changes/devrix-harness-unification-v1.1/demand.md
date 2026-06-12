@@ -4,7 +4,7 @@ title: Harness Unification v1.1 — TD-QL-03 兜底接线 + design/tasks.md 补�
 source: devrix-harness-unification v1.0 S4-Gate CONDITIONAL（2026-06-12）
 priority: P1
 status: S1_Proposal
-l1-domain: context-engine
+dsaft_domain: context-engine
 parent_change: devrix-harness-unification
 created: 2026-06-12
 ---
@@ -55,7 +55,7 @@ LLM 调用失败 → 检查 Loop.FallbackLLM 是否配置
 
 - [ ] TD-QL-03 兜底接线完成（`runViaQueryLoop` 消费 `Loop.FallbackLLM` / `Loop.FallbackOnErr`）
 - [ ] 3 个集成测试 PASS（见 §2.2）
-- [ ] 现有 L5-2-11-01~04 / TD01 / TD02 测试全部 PASS（无回归）
+- [ ] 现有 D2-S11-T01~04 / TD01 / TD02 测试全部 PASS（无回归）
 - [ ] `-race -count=1` PASS
 
 ### P1（必须完成）

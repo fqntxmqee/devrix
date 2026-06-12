@@ -58,7 +58,7 @@
 ```go
 //go:build integration && d2
 
-// Covers: L5-2-1-05
+// Covers: D2-S1-T05
 // Domain: D2
 // Stage: s2
 func TestIntegration_VerifyCommands(t *testing.T) { ... }
@@ -67,10 +67,10 @@ func TestIntegration_VerifyCommands(t *testing.T) { ... }
 ```go
 //go:build acceptance && d2
 
-// Covers: L5-2-2-01
+// Covers: D2-S2-T01
 // Domain: D2
 // Stage: s2
-func TestL5_CTX_Compression_Trigger(t *testing.T) { ... }
+func TestT_CTX_Compression_Trigger(t *testing.T) { ... }
 ```
 
 ### 4.2 跨域测试
@@ -78,7 +78,7 @@ func TestL5_CTX_Compression_Trigger(t *testing.T) { ... }
 ```go
 //go:build integration && cross
 
-// Covers: L5-2-0-02
+// Covers: D2-S0-T02
 // Domain: cross (D2+D3)
 // Stage: s2
 func TestIntegration_ContextLLMGateway(t *testing.T) { ... }
@@ -89,7 +89,7 @@ func TestIntegration_ContextLLMGateway(t *testing.T) { ... }
 ```go
 //go:build integration && d3 && live
 
-// Covers: L5-3-1-03
+// Covers: D3-S1-T03
 // Domain: D3
 // Stage: s3_live
 func TestIntegration_LLMRealAPI(t *testing.T) { ... }
@@ -182,6 +182,6 @@ go test -tags="acceptance,d2" ./tests/acceptance/p0/...
 
 ---
 
-## 8. 与 L5 注册表
+## 8. 与 T 层注册表
 
-`openspec/l5-registry.md` 中 D2/D3/D4 条目 SHOULD 在 Test 位置旁维护 Stage；新增 L5 时 MUST 指定 Domain tag 并更新本节跨域表（若适用）。
+`openspec/t-registry.md` 中 D2/D3/D4 条目 SHOULD 在 Test 位置旁维护 Stage；新增 T 层时 MUST 指定 Domain tag 并更新本节跨域表（若适用）。

@@ -4,7 +4,7 @@ title: 架构分层 v1.1 — 4 接口契约物理迁移 + design/tasks.md 补全
 source: devrix-layer-isolation v1.0 S4-Gate WARN（2026-06-12）
 priority: P0
 status: S1_Proposal
-l1-domain: architecture
+dsaft_domain: architecture
 parent_change: devrix-layer-isolation
 created: 2026-06-12
 ---

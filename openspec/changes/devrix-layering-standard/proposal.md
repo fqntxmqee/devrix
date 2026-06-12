@@ -6,7 +6,7 @@
 **Author:** Devrix Team
 **Date:** 2026-06-08
 
-> **搁置原因 (2026-06-08)：** D-S-A-F-T 方案与当前实际使用的 L1-L2 格式（l5-registry.md 中的 `L5-{L1}-{L2}-{NN}`）存在冲突。当前 L1-L2 方案已能满足需要，且与目录结构天然对应。待项目规模增长、需求追溯成为明确痛点时再重新评估。
+> **搁置原因 (2026-06-08)：** D-S-A-F-T 方案与当前实际使用的 L1-L2 格式（t-registry.md 中的 `{T}-{L1}-{L2}-{NN}`）存在冲突。当前 L1-L2 方案已能满足需要，且与目录结构天然对应。待项目规模增长、需求追溯成为明确痛点时再重新评估。
 
 ---
 
@@ -33,7 +33,7 @@ Devrix 作为一个多智能体开发助手，当前缺乏统一的 ID 规范来
 | 维度 | L1-L2 (技术分层) | D-S-A-F-T (业务分层) |
 |------|-----------------|---------------------|
 | 分层依据 | 技术架构 | 业务语义 |
-| ID 语义 | `L5-{领域}-{模块}-{序号}` | `{领域}-{场景}-{活动}-{功能}-{测试}` |
+| ID 语义 | `{T}-{领域}-{模块}-{序号}` | `{领域}-{场景}-{活动}-{功能}-{测试}` |
 | 可追溯性 | 单向追溯 | 双向追溯 |
 | ID 长度 | 短 (8-10 字符) | 中 (17-19 字符) |
 | 适用场景 | 小团队 | 中大型团队 |
@@ -60,18 +60,18 @@ Devrix 作为一个多智能体开发助手，当前缺乏统一的 ID 规范来
 
 | ID | 领域 | 英文 | 描述 |
 |----|------|------|------|
-| D01 | 通信域 | COMM | 用户交互、消息路由、会话管理 |
-| D02 | 上下文域 | CTX | 上下文压缩、PEV 引擎、记忆管理 |
-| D03 | LLM 网关域 | LLM | 模型适配、熔断、重试、Token 管理 |
-| D04 | 多智能体域 | AGENT | Agent 生命周期、Fork/Join、权限管道 |
-| D05 | 可观测域 | OBS | 链路追踪、指标、日志 |
-| D06 | 演化域 | EVO | 版本管理、配置热更新 |
+| D1 | 通信域 | COMM | 用户交互、消息路由、会话管理 |
+| D2 | 上下文域 | CTX | 上下文压缩、PEV 引擎、记忆管理 |
+| D3 | LLM 网关域 | LLM | 模型适配、熔断、重试、Token 管理 |
+| D4 | 多智能体域 | AGENT | Agent 生命周期、Fork/Join、权限管道 |
+| D5 | 可观测域 | OBS | 链路追踪、指标、日志 |
+| D6 | 演化域 | EVO | 版本管理、配置热更新 |
 
 ### 3.3 示例
 
 **完整 ID:**
 ```
-D02-S02-A03-F03-T01
+D2-S02-A03-F03-T01
 │  │   │   │   │   └── 验证超时处理测试
 │  │   │   │   └────── 命令验证执行器
 │  │   │   └────────── 结果验证活动
@@ -81,10 +81,10 @@ D02-S02-A03-F03-T01
 
 **实际代码映射:**
 ```go
-// D01-S04-A01-F01: 创建新会话
-// D02-S01-A02-F06-T01: Autocompact 降级测试
+// D1-S04-A01-F01: 创建新会话
+// D2-S01-A02-F06-T01: Autocompact 降级测试
 func (s *SessionManager) Create(...) error {
-    // D01-S04-A01-F01-T01: 验证输入
+    // D1-S04-A01-F01-T01: 验证输入
     if req.ProjectID == "" {
         return ErrInvalidProject
     }
@@ -97,27 +97,27 @@ func (s *SessionManager) Create(...) error {
 ```
 internal/
 ├── layers/
-│   ├── communication/           # D01
-│   │   ├── gateway/           # D01-S04
-│   │   │   └── session.go    # D01-S04-A01-F01
-│   │   └── adapters/         # D01-S01
-│   │       └── feishu.go     # D01-S01-A02-F01
+│   ├── communication/           # D1
+│   │   ├── gateway/           # D1-S04
+│   │   │   └── session.go    # D1-S04-A01-F01
+│   │   └── adapters/         # D1-S01
+│   │       └── feishu.go     # D1-S01-A02-F01
 │   │
-│   ├── contextengine/         # D02
-│   │   ├── compression/     # D02-S01
-│   │   │   ├── pipeline.go  # D02-S01-A02-F01~F07
-│   │   │   └── autocompact.go  # D02-S01-A02-F06
-│   │   ├── pev/            # D02-S02
-│   │   │   └── verify_runner.go  # D02-S02-A03-F03
-│   │   └── memory/        # D02-S03
+│   ├── contextengine/         # D2
+│   │   ├── compression/     # D2-S01
+│   │   │   ├── pipeline.go  # D2-S01-A02-F01~F07
+│   │   │   └── autocompact.go  # D2-S01-A02-F06
+│   │   ├── pev/            # D2-S02
+│   │   │   └── verify_runner.go  # D2-S02-A03-F03
+│   │   └── memory/        # D2-S03
 │   │
-│   ├── llmgateway/          # D03
-│   │   ├── breaker/       # D03-S02
-│   │   └── adapter/       # D03-S01
+│   ├── llmgateway/          # D3
+│   │   ├── breaker/       # D3-S02
+│   │   └── adapter/       # D3-S01
 │   │
-│   └── observability/      # D05
-│       ├── tracer/        # D05-S01
-│       └── metrics/       # D05-S02
+│   └── observability/      # D5
+│       ├── tracer/        # D5-S01
+│       └── metrics/       # D5-S02
 │
 └── tests/
     ├── integration/        # D*-S*-A*-F*-T* integration
@@ -130,7 +130,7 @@ internal/
 | Metric | Target |
 |--------|--------|
 | 规范文档发布 | `specs/architecture/layering-standard.md` |
-| 核心领域 ID 映射 | D01-D06 完成 |
+| 核心领域 ID 映射 | D1-D6 完成 |
 | 新功能 ID 覆盖率 | 100% (新功能) |
 | 现有代码迁移 | 按需，不强制 |
 
@@ -141,7 +141,7 @@ internal/
 | Phase | 内容 | 输出 |
 |-------|------|------|
 | **P1: 规范制定** | 完善 D-S-A-F-T 规范 | `layering-standard.md` |
-| **P2: 核心映射** | D01-D06 ID 分配 | ID 映射表 |
+| **P2: 核心映射** | D1-D6 ID 分配 | ID 映射表 |
 | **P3: 新功能试点** | 新增功能使用 ID | 代码示例 |
 | **P4: 工具支持** | ID 生成/验证脚本 | `scripts/` |
 

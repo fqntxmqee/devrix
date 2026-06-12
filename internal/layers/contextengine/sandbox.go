@@ -88,10 +88,7 @@ func (p *CommandPolicy) Validate(command string) error {
 		return fmt.Errorf("empty command")
 	}
 
-	if !p.isAllowed(cmdName) {
-		return fmt.Errorf("sandbox: command not allowed: %s (add to tool.allowlist in config). %s", cmdName, sandboxPolicyHint)
-	}
-
+	// Denylist-only: block known-dangerous patterns; do not require yaml allowlist entries.
 	scrubbed := scrubBenignDevNullRedirects(command)
 	for _, pattern := range p.DenyPatterns {
 		if pattern.MatchString(scrubbed) {
@@ -106,6 +103,8 @@ func (p *CommandPolicy) Validate(command string) error {
 	return nil
 }
 
+// isAllowed reports whether cmdName is on the optional extra allowlist (legacy tightening).
+// Default sandbox policy does not use a command whitelist.
 func (p *CommandPolicy) isAllowed(cmdName string) bool {
 	cmdName = strings.ToLower(strings.TrimSpace(cmdName))
 	for _, allowed := range p.Allowlist {

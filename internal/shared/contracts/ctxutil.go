@@ -4,7 +4,7 @@
 // arithmetic helper that D2 PEV/QueryLoop also needs. It lives here so that no D{N}
 // has to import another D{N} just to compute a context-window percentage.
 //
-// Covers: L5-0-0-02  (cross-layer contract surface available for any D)
+// DSAFT: CROSS-A02-F01
 package contracts
 
 // ComputeCtxPct returns the current prompt tokens as a percentage of the context
@@ -12,6 +12,8 @@ package contracts
 //
 // D1 summary cards ("ctx: X%") and D2 PEV/QueryLoop complete events both use this
 // helper to keep the two sides byte-identical. See DM-20260611-008.
+//
+// DSAFT: CROSS-A02-F01
 func ComputeCtxPct(promptTokens, maxContextTokens int) int {
 	if maxContextTokens <= 0 || promptTokens <= 0 {
 		return 0

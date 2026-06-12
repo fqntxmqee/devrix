@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/golang/snappy v0.0.4
 	github.com/google/uuid v1.6.0
-	github.com/larksuite/oapi-sdk-go/v3 v3.5.3
+	github.com/larksuite/oapi-sdk-go/v3 v3.9.4
 	github.com/pkoukk/tiktoken-go v0.1.7
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.37.0

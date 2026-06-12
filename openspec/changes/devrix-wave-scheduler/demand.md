@@ -4,7 +4,7 @@ title: Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块
 source: 产品 / 架构讨论（飞书 IM 多 Agent 并行编排）
 priority: P0
 status: S3_Planning
-l1-domain: orchestration
+dsaft_domain: orchestration
 created: 2026-06-11
 ---
 
@@ -66,7 +66,7 @@ created: 2026-06-11
 | L4-BE | L4-BE-ORCH-CONTEXT-POLICY | Task 上下文策略（fresh/resume/upstream） | **新增** |
 | L4-BE | L4-BE-ORCH-CONFLICT-GUARD | 同目录写冲突规避（调度层） | **新增** |
 | L4-FE | L4-FE-IM-WORKER-CARD-RENDER | Worker 双区块 Card Renderer | **新增** |
-| L5 | L5-ORCH-10 ~ L5-ORCH-18 | 见 design.md §6 | **草拟** |
+| T 层 | {T}-ORCH-10 ~ {T}-ORCH-18 | 见 design.md §6 | **草拟** |
 
 ### 3.2 范围
 

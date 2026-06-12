@@ -21,7 +21,6 @@ func TestStore_should_roundtrip_snapshot_v1(t *testing.T) {
 		SystemPrompt: "hello",
 		Messages:     []types.Message{*types.NewMessage("m1", "sess_1", types.MessageRoleUser, "hi")},
 		TokenBudget:  types.DefaultTokenBudget(),
-		PEVState:     types.DefaultPEVState(3),
 		UpdatedAt:    time.Now(),
 	}
 
@@ -82,7 +81,6 @@ func TestStore_should_compress_large_snapshots_with_snappy(t *testing.T) {
 		SystemPrompt: strings.Repeat("prompt ", 200),
 		Messages:     msgs,
 		TokenBudget:  types.DefaultTokenBudget(),
-		PEVState:     types.DefaultPEVState(3),
 		UpdatedAt:    time.Now(),
 	}
 

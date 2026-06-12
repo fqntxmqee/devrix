@@ -90,10 +90,10 @@ clawcode 支持 **混合批次**（只读工具并行 + 写工具独占）、并
 2. TD-STE-02 + TD-STE-03（与 TD-QL-03 同 PR 可合并）
 3. TD-STE-04~06
 
-## L5 草拟（实施前登记）
+## T 层草拟（实施前登记）
 
-| L5 ID | Given-When-Then | 优先级 |
+| T ID | Given-When-Then | 优先级 |
 |-------|-----------------|--------|
-| L5-2-8-01 | Given read×2+bash 同批 When ExecuteBatch Then read 并行且 bash 最后 | P0 |
-| L5-2-8-02 | Given bash 并行首错 When sibling abort Then 第二 bash 合成 cancelled | P0 |
-| L5-2-8-03 | Given fallback When discard Then 无 orphan tool_use | P1 |
+| D2-S8-T01 | Given read×2+bash 同批 When ExecuteBatch Then read 并行且 bash 最后 | P0 |
+| D2-S8-T02 | Given bash 并行首错 When sibling abort Then 第二 bash 合成 cancelled | P0 |
+| D2-S8-T03 | Given fallback When discard Then 无 orphan tool_use | P1 |

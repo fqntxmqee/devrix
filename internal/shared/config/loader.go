@@ -207,23 +207,17 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 		cfg.ToolResultBudget = f.ToolResultBudget
 	}
 	cfg.CompressionEnabled = f.CompressionEnabled || cfg.CompressionEnabled
+	if f.CompressionRatio != 0 {
+		cfg.CompressionRatio = f.CompressionRatio
+	}
+	if f.SnipRatio != 0 {
+		cfg.SnipRatio = f.SnipRatio
+	}
 	if f.Compression.Autocompact.Enabled || f.Compression.Autocompact.Model != "" {
 		cfg.Compression.Autocompact = mergeAutocompact(cfg.Compression.Autocompact, f.Compression.Autocompact)
 	}
 	if f.TokenCounter.Source != "" {
 		cfg.TokenCounter.Source = f.TokenCounter.Source
-	}
-	if f.PEV.MaxIterations != 0 {
-		cfg.PEV.MaxIterations = f.PEV.MaxIterations
-	}
-	if f.PEV.VerifyMode != "" {
-		cfg.PEV.VerifyMode = f.PEV.VerifyMode
-	}
-	if f.PEV.VerifyPolicy != "" {
-		cfg.PEV.VerifyPolicy = f.PEV.VerifyPolicy
-	}
-	if len(f.PEV.VerifyCommands) > 0 {
-		cfg.PEV.VerifyCommands = f.PEV.VerifyCommands
 	}
 	if f.Snapshot.BackupDir != "" {
 		cfg.Snapshot.BackupDir = f.Snapshot.BackupDir

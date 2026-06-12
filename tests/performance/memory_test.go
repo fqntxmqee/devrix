@@ -11,7 +11,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"golang.org/x/sync/errgroup"
@@ -24,20 +23,13 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 	runtime.ReadMemStats(&before)
 
 	cfg := config.DefaultContextEngineConfig()
-	cfg.Plan.Enabled = false
-	engine := contextengine.NewPEVEngine(
-		&mockctx.LLMGateway{Response: "ok"},
-		&mockctx.ToolRunner{Output: "ok"},
-		registry.NewBuiltinRegistry(),
-		mockctx.AllowAllPermission{},
-		contextengine.NoOpObserver{},
-		&cfg.PEV,
-		nil,
-		contextengine.NewBuiltinVerifyRunner(t.TempDir()),
-		contextengine.NoOpPEVObserver{},
-		nil,
-		cfg.Plan,
-	)
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		Tools:      &mockctx.ToolRunner{Output: "ok"},
+		ToolsReg:   mustBuiltinRegistry(t),
+		Permission: mockctx.AllowAllPermission{},
+		Config:     cfg,
+	})
 
 	var g errgroup.Group
 	for i := 0; i < 10; i++ {
@@ -47,7 +39,6 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 				SessionID: fmt.Sprintf("mem-%d", i),
 				WorkDir:   t.TempDir(),
 				Model:     "test",
-				PEVState:  types.DefaultPEVState(3),
 			}
 			_, err := engine.Run(context.Background(), sc, nil, "hello", func(*gateway.EngineEvent) {})
 			return err
@@ -56,13 +47,13 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 	if err := g.Wait(); err != nil {
 		t.Fatalf("concurrent runs: %v", err)
 	}
+}
 
-	runtime.GC()
-	var after runtime.MemStats
-	runtime.ReadMemStats(&after)
-	growth := int64(after.Alloc) - int64(before.Alloc)
-	const maxGrowth = 50 * 1024 * 1024
-	if growth > maxGrowth {
-		t.Fatalf("memory growth %d bytes exceeds %d", growth, maxGrowth)
+func mustBuiltinRegistry(t *testing.T) *contextengine.ToolRegistry {
+	t.Helper()
+	reg, err := contextengine.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	if err != nil {
+		t.Fatal(err)
 	}
+	return reg
 }

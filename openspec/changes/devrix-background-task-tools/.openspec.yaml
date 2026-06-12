@@ -35,11 +35,11 @@ scope:
     - id: WAVE-WORKER-CANCEL-PROTOCOL
       name: Wave Worker 共享 context.CancelFunc 注册表
 
-  l5_test_points:
-    - L5-2-9-16  # stop running task → cancelled (idempotent)
-    - L5-2-9-17  # output block=false on running
-    - L5-2-9-18  # output block=true waits complete (max 600s)
-    - L5-2-9-19  # cancel suppresses completed notification (tombstone 协议)
+  t_points:
+    - D2-S9-A01-T16  # stop running task → cancelled (idempotent)
+    - D2-S9-A01-T17  # output block=false on running
+    - D2-S9-A01-T18  # output block=true waits complete (max 600s)
+    - D2-S9-A01-T19  # cancel suppresses completed notification (tombstone 协议)
 
 deliverables:
   - path: proposal.md

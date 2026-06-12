@@ -10,46 +10,12 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-39
-func TestContextEngine_harness_disabled_regression(t *testing.T) {
-	cfg := config.DefaultContextEngineConfig()
-	cfg.Harness.Enabled = false
-	cfg.QueryLoop.Enabled = false
-
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "legacy ok"},
-		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
-	})
-
-	session := types.NewSession("sess_v4", "cli", t.TempDir())
-	ch := engine.Process(context.Background(), session, "hello")
-	var gotText, gotComplete bool
-	for ev := range ch {
-		switch ev.Type {
-		case "text":
-			gotText = true
-		case "complete":
-			gotComplete = true
-		case "error":
-			t.Fatalf("unexpected error event: %s", ev.Content)
-		}
-	}
-	if !gotText || !gotComplete {
-		t.Fatalf("expected text+complete, got text=%t complete=%t", gotText, gotComplete)
-	}
-}
-
 // Covers: L5-CTX-34 (engine integration)
 func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Harness.Enabled = false
 	cfg.QueryLoop.Enabled = true
 	cfg.QueryLoop.MaxTurns = 5
-	cfg.PEV.VerifyMode = config.VerifyModeBasic
-	cfg.Plan.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &twoRoundToolLLM{},

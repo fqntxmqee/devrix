@@ -13,8 +13,8 @@ S6 归档在以下条件**全部满足**后执行：
 
 - [ ] PR 已合并到 `main` 分支
 - [ ] S5 验收报告状态为 PASS
-- [ ] 所有 P0 L5 测试 100% PASS
-- [ ] `l5-registry.md` 对应条目已更新为 IMPLEMENTED
+- [ ] 所有 P0 T 层测试 100% PASS
+- [ ] `t-registry.md` 对应条目已更新为 IMPLEMENTED
 
 ---
 
@@ -39,7 +39,7 @@ S6 归档在以下条件**全部满足**后执行：
 
 ### 2.3 索引更新
 
-- [ ] `openspec/l5-registry.md` 对应 L5 条目状态为 IMPLEMENTED
+- [ ] `openspec/t-registry.md` 对应 T 层条目状态为 IMPLEMENTED
 - [ ] `openspec/demand-archive-index.md` 将新增记录
 
 ---

@@ -47,11 +47,11 @@ scope:
     - id: LAYER-VIOLATION-PROBE
       name: D6 架构合规评测探针
 
-  l5_test_points:
-    - L5-0-0-01  # D2→D1 反向 import 数为 0
-    - L5-0-0-02  # 分层 lint 规则检测到违规时阻断
-    - L5-0-0-03  # 契约注册表覆盖所有跨层接口
-    - L5-0-0-04  # 运行时反向依赖调用频次指标暴露
+  t_points:
+    - CROSS-A01-T01  # D2→D1 反向 import 数为 0
+    - CROSS-A01-T02  # 分层 lint 规则检测到违规时阻断
+    - CROSS-A02-T03  # 契约注册表覆盖所有跨层接口
+    - CROSS-A01-T04  # 运行时反向依赖调用频次指标暴露
 
 deliverables:
   - path: proposal.md

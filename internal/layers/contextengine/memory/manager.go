@@ -99,7 +99,7 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 			return nil, err
 		}
 	} else {
-		max, reserved, toolResult, target := m.cfg.ToTokenBudget()
+		max, reserved, toolResult, target, snipTarget := m.cfg.ToTokenBudget()
 		sc = &types.SessionContext{
 			SessionID:    session.SessionID,
 			WorkDir:      session.WorkDir,
@@ -110,8 +110,8 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 				ReservedOutput:    reserved,
 				ToolResultBudget:  toolResult,
 				CompressionTarget: target,
+				SnipTarget:        snipTarget,
 			},
-			PEVState:     types.DefaultPEVState(m.cfg.PEV.MaxIterations),
 			SystemPrompt: systemPrompt,
 			UpdatedAt:    time.Now(),
 		}

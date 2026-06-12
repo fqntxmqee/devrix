@@ -115,6 +115,14 @@ func TestBuildCompletionSummary(t *testing.T) {
 			ctxPct:   "",
 			want:     "用时: 0s, 消耗: 0 tokens, 模型: gpt-4",
 		},
+		{
+			name:     "legacy_seconds_float",
+			duration: "8.45",
+			usage:    "1500/500",
+			model:    "claude-sonnet-4-6",
+			ctxPct:   "",
+			want:     "用时: 8s, 消耗: 2000 tokens, 模型: claude-sonnet-4-6",
+		},
 		// DM-20260611-008：ctx 比例注入
 		{
 			name:     "with_model_with_ctx",

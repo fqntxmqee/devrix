@@ -1,6 +1,7 @@
 package delegate
 
 import (
+	"github.com/devrix/devrix/internal/layers/contextengine/prompt/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -44,12 +45,14 @@ func SystemPromptForRole(role WorkerRole) string {
 	}
 }
 
-const exploreSystemPrompt = `You are the Explore worker agent. Investigate read-only.
-Use read_file, glob, grep, list_dir, and bash (read-only) to gather facts.
-Return concise findings; do not modify files.`
+// exploreSystemPrompt is the structured prompt for Explore worker agents,
+// loaded from the embedded prompts/explore.md.
+var exploreSystemPrompt = agent.ExplorePrompt
 
-const planSystemPrompt = `You are the Plan worker agent. Produce an implementation plan.
-Use read-only tools only. Output structured steps; do not edit source files.`
+// planSystemPrompt is the structured prompt for Plan worker agents,
+// loaded from the embedded prompts/plan.md.
+var planSystemPrompt = agent.PlanPrompt
 
-const implementSystemPrompt = `You are the Implement worker agent. Execute the assigned task.
-Use available tools to implement the directive safely.`
+// implementSystemPrompt is the structured prompt for Implement worker agents,
+// loaded from the embedded prompts/implement.md.
+var implementSystemPrompt = agent.ImplementPrompt

@@ -1,6 +1,6 @@
 name: layer-lint
 
-# Covers: L5-0-0-03  (CI gate that blocks reverse D{N}→D{M} imports)
+# Covers: CROSS-T03  (CI gate that blocks reverse D{N}→D{M} imports)
 #
 # This workflow runs the devrix-layer-lint scanner on every PR. In WARN mode
 # the scanner reports violations but exits 0; the strict job in the same file

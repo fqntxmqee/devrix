@@ -7,7 +7,7 @@
 
 ## Summary
 
-完成 `query_loop.enabled` 默认 true（DM-20260611-004 修订后核心 P0），统一压缩入口（QueryLoop 迭代前走 messages-only 七步管道，删除 harness 专用压缩分叉），`PathRegressionProbe` 注册 D6 Eval 注册并以**旧路径调用计数 → 0** 为门禁指标。S4-Gate follow-up 已修复 L5 编号冲突（D2-S11 与 D2-S9 重命名）。
+完成 `query_loop.enabled` 默认 true（DM-20260611-004 修订后核心 P0），统一压缩入口（QueryLoop 迭代前走 messages-only 七步管道，删除 harness 专用压缩分叉），`PathRegressionProbe` 注册 D6 Eval 注册并以**旧路径调用计数 → 0** 为门禁指标。S4-Gate follow-up 已修复 T 层编号冲突（D2-S11 与 D2-S9 重命名）。
 
 TD-QL-03（`Loop.FallbackLLM` / `FallbackOnErr` 兜底接线）生产路径未接入测试断言：FallbackLLM 字段已存在，**生产路径 `runViaQueryLoop` 暂未消费它**（v1.1 跟进项）。
 
@@ -15,7 +15,7 @@ TD-QL-03（`Loop.FallbackLLM` / `FallbackOnErr` 兜底接线）生产路径未�
 
 | Capability | Status | Note |
 |---|---|---|
-| QL-DEFAULT-TRUE | ✅ | `DefaultQueryLoopConfig().Enabled == true`（L5-2-11-01 测试守护） |
+| QL-DEFAULT-TRUE | ✅ | `DefaultQueryLoopConfig().Enabled == true`（D2-S11-T01 测试守护） |
 | HARNESS-DEPRECATE | ✅ | `engine.go` 中 7+ 处 `harnessEnabled && !workerLocal` 标 `# DEPRECATED` |
 | QL-COMPRESS-UNIFIED | ✅ | `compression_unified.go` — messages-only 七步管道；harness 专用压缩分叉删除 |
 | PATH-REGRESSION-PROBE | ✅ | `PathRegressionProbe` 在 D6 注册；`query_loop=0, legacy_harness=0 → pass` / `legacy_harness>0 → fail` |
@@ -31,15 +31,15 @@ go test -race -count=1 -run 'TestDefaultQueryLoopConfig|TestPathRegressionProbe|
   ./internal/layers/contextengine/...
 ```
 
-| L5 ID | 描述 | 结果 |
+| T ID | 描述 | 结果 |
 |-------|------|------|
-| L5-2-11-01 | `query_loop.enabled` 默认 true | PASS |
-| L5-2-11-02 | `PathRegressionProbe` 旧路径计数=0 pass / >0 fail | PASS |
-| L5-2-11-03 | 统一压缩入口（messages-only 七步管道） | PASS |
-| L5-2-11-04 | `engine.go` 7+ 处 harness 分支已 `# DEPRECATED` | PASS |
-| L5-2-11-TD01 | QueryLoop 错误恢复 | PASS |
-| L5-2-11-TD02 | QueryLoop Loop 断点恢复 | PASS |
-| **L5-2-11-TD03** | **`Loop.FallbackLLM` 兜底接线** | ⚠️ **PARTIAL — v1.1 跟进** |
+| D2-S11-T01 | `query_loop.enabled` 默认 true | PASS |
+| D2-S11-T02 | `PathRegressionProbe` 旧路径计数=0 pass / >0 fail | PASS |
+| D2-S11-T03 | 统一压缩入口（messages-only 七步管道） | PASS |
+| D2-S11-T04 | `engine.go` 7+ 处 harness 分支已 `# DEPRECATED` | PASS |
+| D2-S11-TD01 | QueryLoop 错误恢复 | PASS |
+| D2-S11-TD02 | QueryLoop Loop 断点恢复 | PASS |
+| **D2-S11-TD03** | **`Loop.FallbackLLM` 兜底接线** | ⚠️ **PARTIAL — v1.1 跟进** |
 
 ## v1.1 Follow-ups
 
@@ -62,5 +62,5 @@ go test -race -count=1 -run 'TestDefaultQueryLoopConfig|TestPathRegressionProbe|
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
 | Dev | — | 2026-06-12 | 单测 PASS（除 TD-QL-03） |
-| QA | — | 2026-06-12 | L5 6/7 PASS；TD-QL-03 走 v1.1 |
+| QA | — | 2026-06-12 | T 层 6/7 PASS；TD-QL-03 走 v1.1 |
 | S4-Gate | code-reviewer | 2026-06-12 | ⚠️ CONDITIONAL PASS |

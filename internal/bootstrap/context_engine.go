@@ -5,7 +5,6 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/communication/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -24,10 +23,9 @@ func NewContextEngine(
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
-	milestoneSvc milestone.IMilestoneService,
 	agentToolReg *tool.Registry,
 ) *contextengine.ContextEngine {
-	planner, longTerm := WireContextV3(ctxCfg, milestoneSvc)
+	longTerm := WireContextV3(ctxCfg)
 	tasks.InitGlobalTaskManager(ctxCfg.Tasks)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
@@ -64,7 +62,6 @@ func NewContextEngine(
 		ToolsReg:     toolReg,
 		Permission:   gateway.NewPermissionGateAdapter(permMgr),
 		Observer:     contextengine.NoOpObserver{},
-		Planner:      planner,
 		LongTerm:     longTerm,
 		Config:       ctxCfg,
 		ObsBridge:    obsBridge,

@@ -76,7 +76,11 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 		}},
 		{stepSnip, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
-			next := snip(p.counter, m, b.CompressionTarget, p.minKeepForAutocompact())
+			snipTarget := b.SnipTarget
+				if snipTarget <= 0 {
+					snipTarget = b.CompressionTarget
+				}
+				next := snip(p.counter, m, snipTarget, p.minKeepForAutocompact())
 			after := p.counter.CountMessages(next)
 			p.emitStep(stepSnip, before, after)
 			return next, before != after

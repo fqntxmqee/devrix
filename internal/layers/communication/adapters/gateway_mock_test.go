@@ -51,3 +51,7 @@ func (m *mockGatewayAPI) RouteOutbound(msg *types.OutboundMessage) error {
 	}
 	return nil
 }
+
+func (m *mockGatewayAPI) StopProcess(sessionID string) error {
+	return nil
+}

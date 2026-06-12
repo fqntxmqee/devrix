@@ -298,7 +298,7 @@ When `multi_agent.delegate.enabled=false`, delegate tools MUST fall back to D2 S
 
 **Priority:** P0  
 **L4:** delegate  
-**L5:** L5-4-10-01, L5-4-10-08
+**T:** D4-S10-T01, D4-S10-T08
 
 #### Scenario: Delegate explore creates worker
 
@@ -322,7 +322,7 @@ Delegated Worker agents MUST set `SessionContext.AgentID` for sidechain isolatio
 
 **Priority:** P0  
 **L4:** delegate, worker_engine  
-**L5:** L5-4-10-02, L5-4-10-03
+**T:** D4-S10-T02, D4-S10-T03
 
 #### Scenario: Worker cannot re-delegate
 

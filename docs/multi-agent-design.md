@@ -31,7 +31,7 @@
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
 | `openspec/specs/multi_agent_layer_delta.md` | 层能力 Delta SoT（Gherkin Scenario） |
 | `openspec/changes/devrix-multi-agent/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
-| `openspec/l5-registry.md` | L5-AGENT 测试点注册（P0/P1/P2 优先级） |
+| `openspec/t-registry.md` | {T}-AGENT 测试点注册（P0/P1/P2 优先级） |
 
 ---
 
@@ -69,7 +69,7 @@
 | **复用** | 不复建 Permission 管线 | 委托 `gateway.PermissionManager` |
 | **复用** | 不复建 Observer 体系 | 适配器桥接到 `contextengine.IObserver` |
 | **版本** | V1 不实现 Supervisor-Worker、Peer-Review | 明确 FeatureNotImplemented |
-| **测试** | 遵守测试框架规约 | L5-AGENT-* 测试点 + `tests/` 分层 |
+| **测试** | 遵守测试框架规约 | {T}-AGENT-* 测试点 + `tests/` 分层 |
 | **安全** | Agent 沙箱不可逃逸 | 工具执行复用 `contextengine/sandbox` |
 
 ---
@@ -983,7 +983,7 @@ func (a *agentImpl) Run(ctx context.Context) (*AgentResult, error) {
 | L2 Context Engine | **Observer 桥接**：Agent 事件适配到 IObserver | `contextengine.IObserver` | L4 → L2 |
 | L2 Context Engine | **工具注册复用**：不新建，直接引用 L2 | `contextengine.IToolRegistry` | L4 → L2 |
 | L3 LLM Gateway | **间接**：通过 PEVEngine 调用（Agent 不直接调用） | （无直接接口） | L4 → L2 → L3 |
-| L5 Observability | **内建追踪**：Agent 创建 Span/Metric | `observability.Bridge` | L4 → L5 |
+| T 层 Observability | **内建追踪**：Agent 创建 Span/Metric | `observability.Bridge` | L4 → L5 |
 
 ### 与 L1 CommunicationGateway 的集成点
 
@@ -1023,25 +1023,25 @@ func (g *CommunicationGateway) handleForkCommand(session *types.Session, cmd str
          └─────┘
 ```
 
-### 11.2 L5 测试点（OpenSpec l5-registry）
+### 11.2 T 层测试点（OpenSpec t-registry）
 
-| L5 ID | 描述 | 优先级 | 类型 |
+| T 层 ID | 描述 | 优先级 | 类型 |
 |-------|------|--------|------|
-| L5-AGENT-01 | AgentFactory 创建智能体实例（状态=CREATED，配置正确） | P0 | 单元 |
-| L5-AGENT-02 | Agent 生命周期状态转换（全路径覆盖，非法转换拒绝） | P0 | 单元 |
-| L5-AGENT-03 | 工具风险等级映射正确，CRITICAL 触发权限 | P0 | 单元 |
-| L5-AGENT-04 | 权限管线授权/拒绝/超时流程 | P0 | 集成 |
-| L5-AGENT-05 | Fork/Join 子 Agent 创建+并行执行+结果合并 | P0 | 单元 |
-| L5-AGENT-06 | Fork 数超限 MaxChildren 返回错误 | P1 | 单元 |
-| L5-AGENT-07 | Agent 超时自动终止 | P1 | 单元 |
-| L5-AGENT-08 | Context 取消传播到子 Agent | P1 | 单元 |
-| L5-AGENT-09 | CollaborationMode Chain-of-Thought prompt 生成 | P1 | 单元 |
-| L5-AGENT-10 | CollaborationMode Iterative-Refinement prompt 生成 | P1 | 单元 |
-| L5-AGENT-11 | ObserverAdapter 正确桥接 Agent 事件到 IObserver | P2 | 单元 |
-| L5-AGENT-12 | Agent 并发安全（-race 检测无 race condition） | P0 | 单元 |
-| L5-AGENT-13 | SessionContext 共享写入安全（并发 Fork + Join） | P1 | 集成 |
-| L5-AGENT-14 | PermissionManager 集成—用户批准、拒绝、超时 | P1 | 集成 |
-| L5-AGENT-15 | 端到端：用户指令触发 Agent Fork 并得到并行结果 | P2 | E2E |
+| D4-AGENT-T01 | AgentFactory 创建智能体实例（状态=CREATED，配置正确） | P0 | 单元 |
+| D4-AGENT-T02 | Agent 生命周期状态转换（全路径覆盖，非法转换拒绝） | P0 | 单元 |
+| D4-AGENT-T03 | 工具风险等级映射正确，CRITICAL 触发权限 | P0 | 单元 |
+| D4-AGENT-T04 | 权限管线授权/拒绝/超时流程 | P0 | 集成 |
+| D4-AGENT-T05 | Fork/Join 子 Agent 创建+并行执行+结果合并 | P0 | 单元 |
+| D4-AGENT-T06 | Fork 数超限 MaxChildren 返回错误 | P1 | 单元 |
+| D4-AGENT-T07 | Agent 超时自动终止 | P1 | 单元 |
+| D4-AGENT-T08 | Context 取消传播到子 Agent | P1 | 单元 |
+| D4-AGENT-T09 | CollaborationMode Chain-of-Thought prompt 生成 | P1 | 单元 |
+| D4-AGENT-T10 | CollaborationMode Iterative-Refinement prompt 生成 | P1 | 单元 |
+| D4-AGENT-T11 | ObserverAdapter 正确桥接 Agent 事件到 IObserver | P2 | 单元 |
+| D4-AGENT-T12 | Agent 并发安全（-race 检测无 race condition） | P0 | 单元 |
+| D4-AGENT-T13 | SessionContext 共享写入安全（并发 Fork + Join） | P1 | 集成 |
+| D4-AGENT-T14 | PermissionManager 集成—用户批准、拒绝、超时 | P1 | 集成 |
+| D4-AGENT-T15 | 端到端：用户指令触发 Agent Fork 并得到并行结果 | P2 | E2E |
 
 ### 11.3 Mock 策略
 
@@ -1144,7 +1144,7 @@ cmd/devrix/main.go
 | OpenSpec Delta | `openspec/specs/multi_agent_layer_delta.md` |
 | L2 Context Engine 设计 | `docs/context-engine-design.md` |
 | L3 LLM Gateway 设计 | `docs/llm-gateway-design.md` |
-| L5 注册表 | `openspec/l5-registry.md` |
+| T 层注册表 | `openspec/t-registry.md` |
 | 详细设计框架 | `docs/detail design framework.md` |
 | 测试框架规约 | `.cursor/rules/08-testing-framework.mdc` |
 | 项目元数据 | `openspec/project.md` |

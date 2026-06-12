@@ -92,13 +92,6 @@ type ICompressionObserver interface {
 	EmitAutocompactComplete(sessionID string, summary types.Message, asyncToken string)
 }
 
-// IPEVObserver emits PEV phase events.
-type IPEVObserver interface {
-	EmitVerifyCommand(sessionID, cmd string, result VerifyCommandResult)
-	EmitPlanCompleted(sessionID string, milestoneCount int)
-	EmitMilestoneProgress(sessionID, milestoneID string, progress float64)
-}
-
 // NoOpCompressionObserver discards compression observer events.
 type NoOpCompressionObserver struct{}
 
@@ -106,27 +99,16 @@ func (NoOpCompressionObserver) EmitCompressionStep(string, string, int, int)    
 func (NoOpCompressionObserver) EmitAutocompact(string, AutocompactMeta)                   {}
 func (NoOpCompressionObserver) EmitAutocompactComplete(string, types.Message, string)     {}
 
-// NoOpPEVObserver discards PEV observer events.
-type NoOpPEVObserver struct{}
-
-func (NoOpPEVObserver) EmitVerifyCommand(string, string, VerifyCommandResult)                 {}
-func (NoOpPEVObserver) EmitPlanCompleted(string, int)                                           {}
-func (NoOpPEVObserver) EmitMilestoneProgress(string, string, float64)                           {}
-
 // IObserver emits context engine observability events.
 type IObserver interface {
 	EmitContextCompressed(report types.CompressionReport)
-	EmitPEVPhase(sessionID string, phase types.PEVPhase, iteration int)
 	EmitSnapshotRestored(sessionID string, fromBackup bool)
 	EmitErrorOccurred(sessionID string, code string, err error)
-	EmitPEVIteration(sessionID string, iteration int, phase types.PEVPhase)
 }
 
 // NoOpObserver discards observer events.
 type NoOpObserver struct{}
 
 func (NoOpObserver) EmitContextCompressed(types.CompressionReport)              {}
-func (NoOpObserver) EmitPEVPhase(string, types.PEVPhase, int)                 {}
 func (NoOpObserver) EmitSnapshotRestored(string, bool)                       {}
 func (NoOpObserver) EmitErrorOccurred(string, string, error)                   {}
-func (NoOpObserver) EmitPEVIteration(string, int, types.PEVPhase)              {}

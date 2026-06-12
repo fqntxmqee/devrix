@@ -77,7 +77,7 @@ D4 Delegate ──fork──► D2 WorkerEngine ──► QueryLoop
 
 ## Test Placement
 
-| L5 域 | 测试目录 |
+| T 层域 | 测试目录 |
 |-------|----------|
 | D2-S10 QueryLoop | `contextengine/query/*_test.go`, `tests/integration/query_loop_*` |
 | D2-S12 Worktree | `contextengine/worktree/manager_test.go` |

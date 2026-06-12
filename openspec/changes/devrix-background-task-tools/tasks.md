@@ -6,18 +6,18 @@
 
 | ID | 任务 | L4 | L5 | 估行 |
 |----|------|-----|-----|------|
-| T1 | `BackgroundRegistry.RegisterWithCancel` + `Cancel` + `List` | L4-BE-CTX-BG-STOP | L5-2-9-01 | ~80 |
-| T2 | `RunBackground` 接入 cancel ctx；`CompleteCancelled` | L4-BE-CTX-BG-STOP | L5-2-9-01 | ~60 |
-| T3 | 单测：stop / idempotent cancel / race | — | L5-2-9-01 | ~80 |
+| T1 | `BackgroundRegistry.RegisterWithCancel` + `Cancel` + `List` | L4-BE-CTX-BG-STOP | D2-S9-T01 | ~80 |
+| T2 | `RunBackground` 接入 cancel ctx；`CompleteCancelled` | L4-BE-CTX-BG-STOP | D2-S9-T01 | ~60 |
+| T3 | 单测：stop / idempotent cancel / race | — | D2-S9-T01 | ~80 |
 
 ## Phase 2 — LLM 工具（~1d）
 
 | ID | 任务 | L4 | L5 | 估行 |
 |----|------|-----|-----|------|
-| T4 | `task_stop` tool runner + schema | L4-BE-CTX-BG-STOP | L5-2-9-01 | ~60 |
-| T5 | `task_output` block/poll + timeout | L4-BE-CTX-BG-OUTPUT | L5-2-9-02, L5-2-9-03 | ~100 |
+| T4 | `task_stop` tool runner + schema | L4-BE-CTX-BG-STOP | D2-S9-T01 | ~60 |
+| T5 | `task_output` block/poll + timeout | L4-BE-CTX-BG-OUTPUT | D2-S9-T02, D2-S9-T03 | ~100 |
 | T6 | QueryLoop 工具注册 + permission 白名单 | — | — | ~40 |
-| T7 | 集成测试：async delegate → output → stop | — | L5-2-9-04 | ~80 |
+| T7 | 集成测试：async delegate → output → stop | — | D2-S9-T04 | ~80 |
 
 ## Phase 3 — Wave 对接（~0.5d，可与 DM-007 PR-2 合并）
 

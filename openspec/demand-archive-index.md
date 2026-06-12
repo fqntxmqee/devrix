@@ -104,7 +104,7 @@
 | devrix-multiagent-isolation | DM-20260611-005 | `openspec/changes/devrix-multiagent-isolation/` | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Acceptance（单测 PASS，待真机 E2E 验收） |
 | devrix-wave-scheduler | DM-20260611-007 | `openspec/changes/devrix-wave-scheduler/` | S4_Implemented (合并 `fix/remaining-critical`，含 completeTask race fix `5fc88f4`，待 S4-Gate + S5) |
-| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（task_stop/task_output/task_list_background 工具已实现，L5-2-9-16~19 IMPLEMENTED，-race 全绿，待 Wave Worker 接线 + S4-Gate） |
+| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（task_stop/task_output/task_list_background 工具已实现，D2-S9-T16~19 IMPLEMENTED，-race 全绿，待 Wave Worker 接线 + S4-Gate） |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | 已搁置（由 DM-20260608-007 取代 D 层落地） |
 
 **2026-06-12 更新说明**：
@@ -113,8 +113,8 @@
 - `devrix-agentic-loop` 因 DM-012 覆盖主体能力，Superseded 归档到 `archive/2026-06-11-devrix-agentic-loop/`
 - 4 个 S1 change（DM-002/003/004/005）已补 `proposal.md` + `.openspec.yaml`，推进至 S2_Proposal
 - `devrix-wave-scheduler` 从 S3_Planning 推进至 S3_Design（design.md 12 章就绪，待 S3-Gate 审查）
-- `devrix-background-task-tools` 从 S2_Clarified 推进至 S3_Design；L5-2-9-16~19 已在 l5-registry 注册
-- `devrix-feishu-streaming` 状态对齐：S5_Acceptance，单测 PASS（L5-1-2-04~08），待真机 E2E 验收后归档
+- `devrix-background-task-tools` 从 S2_Clarified 推进至 S3_Design；D2-S9-T16~19 已在 t-registry 注册
+- `devrix-feishu-streaming` 状态对齐：S5_Acceptance，单测 PASS（D1-S2-T04~08），待真机 E2E 验收后归档
 - `openspec/tech-debt/` 新增 `queryloop-error-recovery.md`（TD-QL-01~07）+ `streaming-tool-executor-v2.md`（TD-STE-01~06）
 - **5 个 change 并行 S4 实现完成并合并至 `fix/remaining-critical`**（全仓 `-race` 大回归两次全绿）：
   - DM-002 `devrix-layer-isolation` — 反向依赖消除（commit `25b9d68`+ 合并 `c5c3e2a`）

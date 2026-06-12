@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -83,9 +84,9 @@ func (c *OpenAIStreamClient) Stream(ctx context.Context, req *llmgateway.Request
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
-		return nil, sharederrors.NewProviderUnavailableError(
-			fmt.Errorf("provider %s status %d: %s", c.provider, resp.StatusCode, string(bodyBytes)),
-		)
+		apiErr := fmt.Errorf("provider %s status %d: %s", c.provider, resp.StatusCode, string(bodyBytes))
+		slog.Warn("llm: provider HTTP error", "provider", c.provider, "status", resp.StatusCode, "body", string(bodyBytes))
+		return nil, sharederrors.NewProviderUnavailableError(apiErr)
 	}
 
 	out := make(chan *llmgateway.AdapterChunk, streamChannelBuffer)

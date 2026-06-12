@@ -3,6 +3,8 @@ package contracts
 import "github.com/devrix/devrix/internal/shared/types"
 
 // ITokenCounter counts tokens for context budgeting (L2 Context Engine + L3 LLM Gateway).
+//
+// DSAFT: D2-S4-A01-F01~F05
 type ITokenCounter interface {
 	CountText(text string) int
 	CountMessages(messages []types.Message) int

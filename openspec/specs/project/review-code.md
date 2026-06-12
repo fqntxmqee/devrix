@@ -24,7 +24,7 @@
 | 检查项 | 说明 |
 |--------|------|
 | Change 文件齐全 | `.openspec.yaml`、`proposal.md`、`design.md`、`tasks.md`、`specs/` |
-| L5 已登记 | `l5-registry.md` 中有对应条目 |
+| T 层已登记 | `t-registry.md` 中有对应条目 |
 | 文档状态一致 | `.openspec.yaml` 和 `proposal.md` 中的 status 一致 |
 
 ### 2.2 代码质量
@@ -58,7 +58,7 @@
 |--------|------|
 | 单元测试存在 | 每个新函数/方法有对应 `_test.go` |
 | Happy path + sad path | 正常和异常路径均有测试 |
-| L5 测试覆盖 | 所有 P0 L5 有对应的验收测试 |
+| T 层测试覆盖 | 所有 P0 T 层有对应的验收测试 |
 | Race 检测 | 并发代码通过 `-race` |
 
 ---
@@ -80,7 +80,7 @@
 1. 检查 OpenSpec 文档完整性
 2. 检查代码质量（包位置、命名、规模）
 3. 检查安全（密钥、输入校验、并发）
-4. 检查测试（覆盖率、L5 映射、race）
+4. 检查测试（覆盖率、T 层映射、race）
 5. 运行测试确认 CI 通过
 6. 提交 Review 结论
 ```
@@ -109,11 +109,11 @@ gh pr review --comment --body "建议: ..."
 Review 完成时确认：
 
 - [ ] OpenSpec 文档齐全且状态一致
-- [ ] L5 注册表已更新
+- [ ] T 层注册表已更新
 - [ ] 代码在正确的 D-S 包中
 - [ ] 无 CRITICAL 安全问题
 - [ ] `go vet` 和 `./scripts/test-unit.sh` 通过
 - [ ] 新功能有对应测试
-- [ ] P0 L5 测试通过
+- [ ] P0 T 层测试通过
 - [ ] CI 全绿
 - [ ] Review 结论明确（Approved / Changes Requested）

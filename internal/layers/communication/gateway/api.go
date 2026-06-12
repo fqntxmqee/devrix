@@ -19,6 +19,8 @@ type GatewayAPI interface {
 	RouteInbound(ctx context.Context, msg *types.InboundMessage) error
 	// RouteOutbound sends an outbound message
 	RouteOutbound(msg *types.OutboundMessage) error
+	// StopProcess cancels the active context engine process for the given session.
+	StopProcess(sessionID string) error
 }
 
 // Ensure CommunicationGateway implements GatewayAPI

@@ -351,21 +351,21 @@ func IsRetryable(err error) bool {
 
 ## 八、测试策略
 
-| L5 ID | 描述 | 优先级 |
+| T 层 ID | 描述 | 优先级 |
 |-------|------|--------|
-| L5-LLM-01 | DeepSeek 适配器流式响应 | P0 |
-| L5-LLM-02 | MiniMax 适配器流式响应 | P0 |
-| L5-LLM-03 | Circuit breaker 正常关闭 | P0 |
-| L5-LLM-04 | Circuit breaker 触发开启 | P0 |
-| L5-LLM-05 | Circuit breaker 半开→关闭 | P0 |
-| L5-LLM-06 | Circuit breaker 半开→开启 | P0 |
-| L5-LLM-07 | Token 计数准确性 | P0 |
-| L5-LLM-08 | Token 预算检查 | P0 |
-| L5-LLM-09 | Provider 配置加载 | P0 |
-| L5-LLM-10 | 未知 Provider 报错 | P1 |
-| L5-LLM-11 | 重试策略执行 | P1 |
-| L5-LLM-12 | Fallback 模型切换 | P1 |
-| L5-LLM-13 | LLM 调用可观测事件 | P1 |
+| D3-LLM-T01 | DeepSeek 适配器流式响应 | P0 |
+| D3-LLM-T02 | MiniMax 适配器流式响应 | P0 |
+| D3-LLM-T03 | Circuit breaker 正常关闭 | P0 |
+| D3-LLM-T04 | Circuit breaker 触发开启 | P0 |
+| D3-LLM-T05 | Circuit breaker 半开→关闭 | P0 |
+| D3-LLM-T06 | Circuit breaker 半开→开启 | P0 |
+| D3-LLM-T07 | Token 计数准确性 | P0 |
+| D3-LLM-T08 | Token 预算检查 | P0 |
+| D3-LLM-T09 | Provider 配置加载 | P0 |
+| D3-LLM-T10 | 未知 Provider 报错 | P1 |
+| D3-LLM-T11 | 重试策略执行 | P1 |
+| D3-LLM-T12 | Fallback 模型切换 | P1 |
+| D3-LLM-T13 | LLM 调用可观测事件 | P1 |
 
 ---
 

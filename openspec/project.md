@@ -4,7 +4,7 @@
 **Project Type:** Go CLI Application
 **Spec Version:** 1.0.0
 **Layering Spec:** `openspec/specs/architecture/layering.md`
-**L5 Registry:** `openspec/l5-registry.md`
+**T Registry:** `openspec/t-registry.md`
 **Created:** 2026-06-06
 **Status:** Active
 
@@ -141,7 +141,7 @@ User → Communication → Context Engine → LLM Gateway → Multi-Agent → Ob
 4. **Explicit Over Implicit** - No magic, clear dependencies
 5. **Concurrency Safety** - Use channels or mutexes, document ownership
 6. **Minimum Coverage** - 80% test coverage
-7. **L5-Driven Testing** - All L4/L3 changes MUST map to L5 test points (see `l5-registry.md`)
+7. **T-Layer-Driven Testing** - All L4/L3 changes MUST map to T-layer test points (see `t-registry.md`)
 
 ---
 
@@ -204,7 +204,7 @@ devrix/
 │   └── i18n/
 ├── openspec/
 │   ├── project.md             # This file
-│   ├── l5-registry.md         # L5 测试点注册表
+│   ├── t-registry.md         # T 层测试点注册表
 │   ├── specs/
 │   │   ├── architecture/
 │   │   │   └── layering.md    # 分层架构规范
@@ -263,7 +263,7 @@ devrix/
 |------|------|------|
 | 日常开发 | `./scripts/test-unit.sh` | PR 门槛 |
 | 集成测试 | `./scripts/test-integration.sh` + `./scripts/test-e2e.sh` | 集成验证 |
-| S5 验收 | `./scripts/test-acceptance.sh` | L5 P0 验收 |
+| S5 验收 | `./scripts/test-acceptance.sh` | T 层 P0 验收 |
 | 全部 | `./scripts/test-all.sh` | 颁布前 |
 | S5 验收报告 | `./scripts/gen-acceptance-report.sh --change {slug}` | 生成报告 |
 
@@ -271,9 +271,9 @@ devrix/
 
 ---
 
-## L5 Test Points Summary
+## T Test Points Summary
 
-See `openspec/l5-registry.md` for full details.
+See `openspec/t-registry.md` for full details.
 
 | Domain | Domain Name | Total | IMPLEMENTED | PLANNED |
 |----|------------|-------|-------------|---------|
@@ -292,7 +292,7 @@ See `openspec/l5-registry.md` for full details.
 | Spec | Path |
 |------|------|
 | Layer Architecture | `openspec/specs/architecture/layering.md` |
-| L5 Test Registry | `openspec/l5-registry.md` |
+| T Test Registry | `openspec/t-registry.md` |
 | Testing Framework | `openspec/specs/testing-framework/spec.md` |
 | Testing Quality | `openspec/specs/testing-quality/spec.md` |
 

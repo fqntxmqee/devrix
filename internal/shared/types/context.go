@@ -5,23 +5,6 @@ import "time"
 // ContextSnapshotVersion is the JSON snapshot format version.
 const ContextSnapshotVersion = "ctx-v1"
 
-// PEVPhase represents the current PEV loop phase.
-type PEVPhase string
-
-const (
-	PEVPhasePlan    PEVPhase = "plan"
-	PEVPhaseExecute PEVPhase = "execute"
-	PEVPhaseVerify  PEVPhase = "verify"
-	PEVPhaseDone    PEVPhase = "done"
-)
-
-// VerifyResult holds PEV verification outcome (value type; zero = not verified).
-type VerifyResult struct {
-	Passed    bool
-	Deviation float64
-	Commands  []string
-}
-
 // ToolCallRecord records a single tool invocation.
 type ToolCallRecord struct {
 	CallID    string    `json:"callId,omitempty"`
@@ -37,7 +20,8 @@ type TokenBudget struct {
 	MaxContextTokens  int
 	ReservedOutput    int
 	ToolResultBudget  int
-	CompressionTarget int
+	CompressionTarget int // autocompact 触发阈值（LLM 摘要）
+	SnipTarget        int // snip 触发阈值（逐出旧消息，高于 autocompact）
 }
 
 // DefaultTokenBudget returns V1 default token budget.
@@ -48,29 +32,8 @@ func DefaultTokenBudget() TokenBudget {
 		MaxContextTokens:  max,
 		ReservedOutput:    reserved,
 		ToolResultBudget:  800,
-		CompressionTarget: int(float64(max-reserved) * 0.9),
-	}
-}
-
-// PEVState holds PEV loop state.
-type PEVState struct {
-	Phase              PEVPhase
-	Iteration          int
-	MaxIterations      int
-	ActiveTaskID       string
-	ActiveMilestoneID  string
-	LastToolCalls      []ToolCallRecord
-	VerifyResult       VerifyResult
-}
-
-// DefaultPEVState returns initial PEV state.
-func DefaultPEVState(maxIterations int) PEVState {
-	if maxIterations <= 0 {
-		maxIterations = 3
-	}
-	return PEVState{
-		Phase:         PEVPhaseDone,
-		MaxIterations: maxIterations,
+		CompressionTarget: int(float64(max-reserved) * 0.6),
+		SnipTarget:        int(float64(max-reserved) * 0.8),
 	}
 }
 
@@ -90,6 +53,28 @@ func (r CompressionReport) Ratio() float64 {
 	return float64(r.CompressedTokens) / float64(r.OriginalTokens)
 }
 
+// TodoStatus represents a task status for todo_write tool.
+type TodoStatus string
+
+const (
+	TodoStatusPending    TodoStatus = "pending"
+	TodoStatusInProgress TodoStatus = "in_progress"
+	TodoStatusCompleted  TodoStatus = "completed"
+)
+
+// TodoItem is a single task tracked by todo_write.
+type TodoItem struct {
+	Content    string     `json:"content"`
+	Status     TodoStatus `json:"status"`
+	ActiveForm string     `json:"activeForm"`
+}
+
+// VerifState tracks verification nudges.
+type VerifState struct {
+	VerifTriggered          bool `json:"verifTriggered"`
+	CompletedSinceLastVerif int  `json:"completedSinceLastVerif"`
+}
+
 // SessionContext is the context engine aggregate root (in-memory).
 type SessionContext struct {
 	SessionID      string
@@ -97,10 +82,8 @@ type SessionContext struct {
 	Model          string
 	Messages       []Message
 	CompressedView []Message
-	PEVState       PEVState
 	TokenBudget    TokenBudget
 	SystemPrompt   string
-	MilestoneRefs  []string
 	LastRequestID  string
 	UpdatedAt      time.Time
 	Harness        *HarnessSessionState
@@ -114,6 +97,9 @@ type SessionContext struct {
 	QueryDepth     int
 	IsWorker       bool
 	WorkerRole     string
+	// TodoWrite tracking.
+	Todos      []TodoItem `json:"todos,omitempty"`
+	VerifState VerifState `json:"verifState,omitempty"`
 }
 
 // ContextSnapshotV1 is the persisted snapshot format.
@@ -124,9 +110,9 @@ type ContextSnapshotV1 struct {
 	WorkDir      string              `json:"workDir"`
 	Messages     []MessageSnapshot   `json:"messages"`
 	TokenBudget  TokenBudgetSnapshot `json:"tokenBudget"`
-	PEVState     PEVStateSnapshot    `json:"pevState"`
 	SystemPrompt string              `json:"systemPrompt"`
 	UpdatedAt    string              `json:"updatedAt"`
+	Todos        []TodoItem          `json:"todos,omitempty"`
 }
 
 // MessageSnapshot is a serializable message.
@@ -146,18 +132,3 @@ type TokenBudgetSnapshot struct {
 	CompressionTarget int `json:"compressionTarget"`
 }
 
-// PEVStateSnapshot is a serializable PEV state.
-type PEVStateSnapshot struct {
-	Phase         string             `json:"phase"`
-	Iteration     int                `json:"iteration"`
-	MaxIterations int                `json:"maxIterations"`
-	LastToolCalls []ToolCallRecord   `json:"lastToolCalls"`
-	VerifyResult  VerifyResultSnapshot `json:"verifyResult"`
-}
-
-// VerifyResultSnapshot is a serializable verify result.
-type VerifyResultSnapshot struct {
-	Passed    bool     `json:"passed"`
-	Deviation float64  `json:"deviation"`
-	Commands  []string `json:"commands,omitempty"`
-}

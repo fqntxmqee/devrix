@@ -348,7 +348,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 		return a.finalizeReplyCardStreaming(ctx, stream, summary)
 	}
 	if responseMsgID != "" && strings.TrimSpace(summary) != "" {
-		footer := responseText + "\n\n---\n_" + strings.TrimSpace(summary) + "_"
+		footer := responseText + "\n\n---\n" + strings.TrimSpace(summary)
 		card := NewCard().
 			Markdown(footer).
 			Build()
@@ -367,7 +367,7 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 
 	content := stream.textBuffer.String()
 	if strings.TrimSpace(summary) != "" {
-		content += "\n\n---\n_" + strings.TrimSpace(summary) + "_"
+		content += "\n\n---\n" + strings.TrimSpace(summary)
 	}
 
 	stream.cardkitSequence++

@@ -5,7 +5,7 @@ source: devrix-harness-architecture-audit（2026-06-11 修订）
 priority: P1
 status: S2_Revised
 revised: 2026-06-11
-l1-domain: multi-agent
+dsaft_domain: multi-agent
 created: 2026-06-11
 ---
 

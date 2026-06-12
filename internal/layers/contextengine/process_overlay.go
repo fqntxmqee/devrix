@@ -46,7 +46,6 @@ func forkWorkerSessionContext(parent *types.SessionContext, ov ProcessOverlay) *
 		PermissionMode: parent.PermissionMode,
 		PlanFilePath:   parent.PlanFilePath,
 		TokenBudget:    parent.TokenBudget,
-		PEVState:       parent.PEVState,
 		AgentID:        ov.AgentID,
 		IsWorker:       ov.IsWorker,
 		WorkerRole:     ov.WorkerRole,

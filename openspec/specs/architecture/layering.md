@@ -2,19 +2,22 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.2.0
-**Last Updated:** 2026-06-11
+**Version:** 3.0.0
+**Last Updated:** 2026-06-12
 
 ---
 
 ## Overview
 
-本文档定义 Devrix 的正式分层架构，使用 **D-S 两层编号系统**：
+本文档定义 Devrix 的正式分层架构，使用 **DSAFT 五层编号系统**：
 
 - **D (Domain)** — 顶层领域，对应 `internal/layers/` 下的一级目录
 - **S (Scenario)** — 域内场景/模块，对应二级包目录
+- **A (Activity)** — 可发起的业务动作，归属于 D-S 场景
+- **F (Function Point)** — 最小业务/技术逻辑单元，被 A 层活动编排
+- **T (Test Point)** — 测试点，标准格式 `D{X}-S{X}-A{XX}-T{NN}`
 
-> **L5 ID 字符串不变**：`L5-2-3-01` 等现有编号保持原样；语义从「L1=层、L2=子模块」解释为「D=域、S=场景」。
+> A/F 注册表权威来源分别为 `openspec/a-registry.md` 和 `openspec/f-registry.md`。
 
 ---
 
@@ -37,33 +40,39 @@
 
 ### D1 Communication Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D1-S1 | Gateway | 消息网关、路由、会话管理 |
-| D1-S2 | Adapters | 飞书、WebSocket、CLI 适配器 |
-| D1-S3 | Commands | CLI 命令解析 (/new, /stop, /help) |
-| D1-S4 | Auth | 认证与授权 |
-| D1-S5 | Milestone | 里程碑跟踪 |
-| D1-S6 | RateLimit | 限流控制 |
-| D1-S7 | Metrics | 通信层指标 |
-| D1-S8 | Renderers | 消息渲染器 |
+| Module ID | Scenario | Responsibility | Status |
+|-----------|----------|----------------|--------|
+| D1-S1 | Gateway | 消息网关、路由、会话管理 | IMPLEMENTED |
+| D1-S2 | Adapters | 飞书、WebSocket、CLI 适配器 | IMPLEMENTED |
+| D1-S3 | Commands | CLI 命令解析 (/new, /stop, /help) | PLANNED (code in gateway) |
+| D1-S4 | Auth | 认证与授权 | PLANNED |
+| D1-S5 | Milestone | 里程碑跟踪 | IMPLEMENTED |
+| D1-S6 | RateLimit | 限流控制 | IMPLEMENTED |
+| D1-S7 | Metrics | 通信层指标 | IMPLEMENTED |
+| D1-S8 | Renderers | 消息渲染器 | IMPLEMENTED |
+| D1-S9 | EventBus | 事件总线：背压、Drain、Compact、Reconnect | IMPLEMENTED |
+| D1-S10 | Connection | IM 实例连接管理 | IMPLEMENTED |
+| D1-S11 | Core | 核心配置解析 | IMPLEMENTED |
+| D1-S12 | Instance | 实例注册/注销 | IMPLEMENTED |
 
 ### D2 Context Engine Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D2-S1 | PEV | Plan-Execute-Verify 循环引擎 |
-| D2-S2 | Compression | 七步压缩管道 |
-| D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) |
-| D2-S4 | Token | Token 计数与预算管理 |
-| D2-S5 | Registry | 操作注册表 |
-| D2-S6 | Snapshot | 上下文快照 |
-| D2-S7 | Prompt | Prompt 模板管理 |
-| D2-S8 | Sandbox | 工具沙箱隔离 |
-| D2-S9 | Harness | 会话 Bootstrap、ToolPool、Preflight、System Prompt 装配（V5） |
-| D2-S10 | QueryLoop | QueryLoop 运行时、UserContext、Attachments、PermissionMode、TaskTools（V6） |
-| D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） |
-| D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） |
+| Module ID | Scenario | Responsibility | Status |
+|-----------|----------|----------------|--------|
+| D2-S1 | PEV | Plan-Execute-Verify 循环引擎 | IMPLEMENTED |
+| D2-S2 | Compression | 七步压缩管道 | IMPLEMENTED |
+| D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) | IMPLEMENTED |
+| D2-S4 | Token | Token 计数与预算管理 | IMPLEMENTED |
+| D2-S5 | Registry | 操作注册表 | IMPLEMENTED |
+| D2-S6 | Snapshot | 上下文快照 | IMPLEMENTED |
+| D2-S7 | Prompt | Prompt 模板管理 | IMPLEMENTED |
+| D2-S8 | Sandbox | 工具沙箱隔离 | PLANNED (test only) |
+| D2-S9 | Harness | 会话 Bootstrap、ToolPool、Preflight、System Prompt 装配（V5） | IMPLEMENTED |
+| D2-S10 | QueryLoop | QueryLoop 运行时、UserContext、Attachments、PermissionMode、TaskTools（V6） | IMPLEMENTED |
+| D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） | IMPLEMENTED |
+| D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） | IMPLEMENTED |
+| D2-S13 | Conversation | 会话对话管理 | IMPLEMENTED |
+| D2-S14 | Mock | PEV Engine Mock（测试辅助） | IMPLEMENTED |
 
 ### ORCH Orchestration (Cross-Domain, v2)
 
@@ -73,6 +82,7 @@
 |-----------|----------|----------------|
 | ORCH-S1 | WorkPlan | Task + ExecutionFlow 读模型聚合 |
 | ORCH-S2 | ExecutionFlowHub | FlowEvent 双通道：Leader Queue + D1 IM |
+| ORCH-S3 | WaveScheduler | DAG 调度、ContextPolicy、ConflictGuard |
 
 ### D3 LLM Gateway Domain
 
@@ -87,26 +97,32 @@
 
 ### D4 Multi-Agent Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D4-S1 | Factory | Agent 工厂 |
-| D4-S2 | Agent | Agent 生命周期管理 |
-| D4-S3 | Permission | 权限管道 |
-| D4-S4 | Fork | Agent Fork/Join |
-| D4-S5 | Observer | 事件观察者 |
-| D4-S10 | Delegate | Hub-Spoke 委派 Worker、delegate_* 工具、FlowBridge（V6） |
+| Module ID | Scenario | Responsibility | Status |
+|-----------|----------|----------------|--------|
+| D4-S1 | Factory | Agent 工厂 | IMPLEMENTED |
+| D4-S2 | Agent | Agent 生命周期管理 | IMPLEMENTED |
+| D4-S3 | ForkJoin | Agent Fork/Join、子 Agent 隔离、结果合并 | IMPLEMENTED |
+| D4-S4 | Collaboration | CoT/Iterative-Refinement Prompt 增强 | IMPLEMENTED |
+| D4-S5 | Observer | 事件观察者桥接 | IMPLEMENTED |
+| D4-S6 | AgentTool | Agent 工具注册表 + CLI 适配器 | IMPLEMENTED |
+| D4-S7 | Builtin | 内建 Agent 加载 | IMPLEMENTED |
+| D4-S8 | AgentObservability | Agent 可观测性指标 | IMPLEMENTED |
+| D4-S9 | SessionView | 会话视图 COW 快照 | IMPLEMENTED |
+| D4-S10 | Delegate | Hub-Spoke 委派 Worker、delegate_* 工具、FlowBridge（V6） | IMPLEMENTED |
 
 ### D5 Observability Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D5-S1 | Tracer | 分布式追踪 |
-| D5-S2 | Metrics | 指标收集 |
-| D5-S3 | Logger | 日志记录 |
-| D5-S4 | Exporter | 数据导出 |
-| D5-S5 | Coverage | 操作覆盖率 |
-| D5-S6 | Telemetry | 遥测数据 |
-| D5-S7 | Settings | 配置管理 |
+| Module ID | Scenario | Responsibility | Status |
+|-----------|----------|----------------|--------|
+| D5-S1 | Tracer | 分布式追踪 | IMPLEMENTED |
+| D5-S2 | Metrics | 指标收集 | IMPLEMENTED |
+| D5-S3 | Logger | 日志记录 | IMPLEMENTED |
+| D5-S4 | Exporter | 数据导出 | IMPLEMENTED |
+| D5-S5 | Coverage | 操作覆盖率 | IMPLEMENTED |
+| D5-S6 | Telemetry | 遥测数据 | IMPLEMENTED |
+| D5-S7 | Settings | 配置管理 | IMPLEMENTED |
+| D5-S8 | Incident | 事件声明与处理 | IMPLEMENTED |
+| D5-S9 | Runtime | 运行时指标监控 | IMPLEMENTED |
 
 ### D6 Evolution Domain
 
@@ -130,12 +146,15 @@ layers/
 ├── communication/                  # D1
 │   ├── gateway/                   # D1-S1
 │   ├── adapters/                  # D1-S2
-│   ├── commands/                  # D1-S3
-│   ├── auth/                      # D1-S4
 │   ├── milestone/                 # D1-S5
 │   ├── ratelimit/                 # D1-S6
 │   ├── metrics/                   # D1-S7
-│   └── renderers/                 # D1-S8
+│   ├── renderers/                 # D1-S8
+│   ├── eventbus/                  # D1-S9
+│   ├── connection/                # D1-S10
+│   ├── core/                      # D1-S11
+│   └── instance/                  # D1-S12
+│   # PLANNED: commands/ (D1-S3), auth/ (D1-S4)
 │
 ├── contextengine/                 # D2
 │   ├── pev/                       # D2-S1
@@ -145,7 +164,6 @@ layers/
 │   ├── registry/                  # D2-S5
 │   ├── snapshot/                  # D2-S6
 │   ├── prompt/                    # D2-S7
-│   ├── sandbox/                   # D2-S8
 │   ├── harness/                   # D2-S9 (V5)
 │   ├── query/                     # D2-S10 QueryLoop
 │   ├── usercontext/               # D2-S10 UserContext
@@ -154,12 +172,16 @@ layers/
 │   ├── tasks/                     # D2-S10 TaskTools
 │   ├── transcript/                # D2-S10 Sidechain
 │   ├── queue/                     # D2-S11 SessionQueue
-│   └── worktree/                  # D2-S12 Worktree
+│   ├── worktree/                  # D2-S12 Worktree
+│   ├── conversation/              # D2-S13 Conversation
+│   └── mock/                      # D2-S14 Mock Engine
+│   # PLANNED: sandbox/ (D2-S8)
 │
 ├── orchestration/                 # ORCH (v2 read model)
-│   ├── flow/                      # ORCH-S2 ExecutionFlowHub
 │   ├── workplan/                  # ORCH-S1 WorkPlan
-│   └── imsink/                    # ORCH-S2 → D1 Gateway bridge
+│   ├── flow/                      # ORCH-S2 ExecutionFlowHub
+│   ├── imsink/                    # ORCH-S2 → D1 Gateway bridge
+│   └── wave/                      # ORCH-S3 WaveScheduler
 │
 ├── llmgateway/                    # D3
 │   ├── adapter/                   # D3-S1
@@ -172,10 +194,14 @@ layers/
 ├── multiagent/                    # D4
 │   ├── factory/                   # D4-S1
 │   ├── agent/                     # D4-S2
-│   ├── permission/                # D4-S3
-│   ├── fork/                      # D4-S4
 │   ├── observer/                  # D4-S5
-│   └── delegate/                  # D4-S10 Delegate (V6)
+│   ├── tool/                      # D4-S6 AgentTool
+│   ├── builtin/                   # D4-S7 Builtin
+│   ├── observability/             # D4-S8 AgentObservability
+│   ├── sessionview/               # D4-S9 SessionView
+│   ├── delegate/                  # D4-S10 Delegate (V6)
+│   ├── collaboration/             # D4-S4 Collaboration
+│   └── permission/                # D4-S3 ForkJoin (code in agent/ forkjoin.go)
 │
 ├── observability/                 # D5
 │   ├── tracer/                    # D5-S1
@@ -184,7 +210,9 @@ layers/
 │   ├── exporter/                  # D5-S4
 │   ├── coverage/                  # D5-S5
 │   ├── telemetry/                 # D5-S6
-│   └── settings/                  # D5-S7
+│   ├── settings/                  # D5-S7
+│   ├── incident/                  # D5-S8
+│   └── runtime/                   # D5-S9
 │
 └── evolution/                     # D6
     ├── eval/                      # D6-S3 Eval engine + probes
@@ -194,21 +222,48 @@ layers/
 
 ---
 
-## L5 Test Points Registry
+## Activity (A) — Domain Activities
 
-L5 测试点编号格式: `L5-{D}-{S}-{NN}`
+A 层定义每个场景下调用方可发起的**具体业务动作**。编号格式: `D{X}-S{X}-A{XX}`。
+
+每个 Activity 具有明确的输入、输出和状态变更。A 层归属于对应的 D-S 场景。
+
+**A 层注册表权威来源**: `openspec/a-registry.md`
+
+当前注册: **77 个活动**，覆盖 7 个领域 + CROSS 跨域活动。
+
+---
+
+## Function Point (F) — Domain Functions
+
+F 层定义可被 A 层活动编排的最小业务/技术逻辑单元。编号格式: `D{X}-S{X}-A{XX}-F{NN}`。
+
+每个 Function Point 具有明确的输入、输出，且可独立测试。F 层归属于对应的 D-S-A 活动。
+
+**F 层注册表权威来源**: `openspec/f-registry.md`
+
+当前注册: **98 个功能点**，覆盖 7 个领域 + CROSS + Bridges。
+
+---
+
+## T 层测试点注册表
+
+T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 
 - **D** = 域编号 (1-6)，与 D1-D6 对应
-- **S** = 场景编号 (1-8)
-- **NN** = 序号 (01-99)
+- **S** = 场景编号
+- **A** = 活动编号 (01-99)
+- **NN** = 测试序号 (01-99)
 
-示例（ID 字符串与迁移前相同）:
+> **迁移状态**: ✅ 已完成 (2026-06-12)。所有 130+ 条目已升级为标准格式。遗留 ID 映射见 `openspec/t-registry.md` 文末。
 
-- `L5-1-1-01` = D1 (Communication) S1 (Gateway) 测试点 01
-- `L5-2-1-01` = D2 (Context Engine) S1 (PEV) 测试点 01
-- `L5-3-3-01` = D3 (LLM Gateway) S3 (Breaker) 测试点 01
+示例:
 
-完整注册表见 `openspec/l5-registry.md`。
+- `D1-S1-A01-T01` = D1 (Communication) S1 (Gateway) A01 (ManageSession) 测试点 01
+- `D2-S1-A01-T01` = D2 (Context Engine) S1 (PEV) A01 (ExecutePEV) 测试点 01
+- `D3-S3-A01-T01` = D3 (LLM Gateway) S3 (Breaker) A01 (ManageCircuitBreaker) 测试点 01
+
+完整注册表见 `openspec/t-registry.md`。
 
 ---
 
@@ -279,3 +334,5 @@ L5 测试点编号格式: `L5-{D}-{S}-{NN}`
 | 1.0.0 | 2026-06-08 | Initial L1-L2 specification |
 | 2.0.0 | 2026-06-08 | Renamed to D-S domains (DM-20260608-007); merged redundant architecture docs |
 | 2.1.0 | 2026-06-10 | D2-S10~S12, D4-S10, ORCH-S1/S2 QueryLoop v2 (DM-20260610-012) |
+| 3.0.0 | 2026-06-12 | DSAFT full A/F layer definition; A-registry (77 activities), F-registry (98 function points) |
+| 3.1.0 | 2026-06-12 | Directory/spec sync: +14 new S-IDs, D4 conflict resolution (Permission→ForkJoin, Fork→Collaboration), +Status column on all S tables |

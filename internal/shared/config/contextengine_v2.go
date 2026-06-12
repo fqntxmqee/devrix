@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 	"time"
 )
 
@@ -11,18 +9,8 @@ const (
 	TokenCounterSourceGateway   = "gateway"
 	TokenCounterSourceHeuristic = "heuristic"
 
-	VerifyModeNone     = "none"
-	VerifyModeBasic    = "basic"
-	VerifyModeCommands = "commands"
-
-	VerifyPolicyAllPass = "all_pass"
-	VerifyPolicyAnyPass = "any_pass"
-
-	maxVerifyCommands     = 10
 	maxAutocompactTimeout = 10 * time.Second
 )
-
-var verifyCommandNamePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 // CompressionConfig holds compression sub-settings.
 type CompressionConfig struct {
@@ -45,14 +33,6 @@ type TokenCounterConfig struct {
 	Source string `yaml:"source"`
 }
 
-// VerifyCommandConfig is a whitelisted verify command.
-type VerifyCommandConfig struct {
-	Name       string        `yaml:"name"`
-	Executable string        `yaml:"executable"`
-	Args       []string      `yaml:"args"`
-	Timeout    time.Duration `yaml:"timeout"`
-}
-
 // DefaultAutocompactConfig returns V2 autocompact defaults (disabled until explicitly enabled).
 func DefaultAutocompactConfig() AutocompactConfig {
 	return AutocompactConfig{
@@ -72,9 +52,6 @@ func ValidateContextEngineConfig(cfg *ContextEngineConfig) error {
 		return nil
 	}
 	if err := validateAutocompact(cfg.Compression.Autocompact); err != nil {
-		return err
-	}
-	if err := validateVerifyCommands(cfg.PEV); err != nil {
 		return err
 	}
 	if src := cfg.TokenCounter.Source; src != "" &&
@@ -99,39 +76,6 @@ func validateAutocompact(cfg AutocompactConfig) error {
 	}
 	if cfg.Model == "" {
 		return fmt.Errorf("context_engine.compression.autocompact.model: required when enabled")
-	}
-	return nil
-}
-
-func validateVerifyCommands(pev PEVConfig) error {
-	if pev.VerifyMode != VerifyModeCommands {
-		return nil
-	}
-	if len(pev.VerifyCommands) > maxVerifyCommands {
-		return fmt.Errorf("context_engine.pev.verify_commands: at most %d commands allowed", maxVerifyCommands)
-	}
-	for _, cmd := range pev.VerifyCommands {
-		if !verifyCommandNamePattern.MatchString(cmd.Name) {
-			return fmt.Errorf("context_engine.pev.verify_commands: name %q must match [a-z0-9_-]+", cmd.Name)
-		}
-		if err := validateNoShellMeta(cmd.Executable); err != nil {
-			return fmt.Errorf("context_engine.pev.verify_commands[%s].executable: %w", cmd.Name, err)
-		}
-		for i, arg := range cmd.Args {
-			if err := validateNoShellMeta(arg); err != nil {
-				return fmt.Errorf("context_engine.pev.verify_commands[%s].args[%d]: %w", cmd.Name, i, err)
-			}
-		}
-	}
-	if pev.VerifyPolicy != "" && pev.VerifyPolicy != VerifyPolicyAllPass && pev.VerifyPolicy != VerifyPolicyAnyPass {
-		return fmt.Errorf("context_engine.pev.verify_policy: invalid value %q", pev.VerifyPolicy)
-	}
-	return nil
-}
-
-func validateNoShellMeta(s string) error {
-	if strings.ContainsAny(s, ";|&$`") {
-		return fmt.Errorf("shell metacharacters not allowed")
 	}
 	return nil
 }

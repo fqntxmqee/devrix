@@ -211,12 +211,12 @@ Runtime coverage 按 **Layer** 分组统计，用于识别「某层完全未触�
 
 **注意**: 条件 operation（见 `docs/observability-design.md` §4.3）在未触发时显示 zero-hit 是正常现象。
 
-### 与 L5 测试点
+### 与 T 层测试点
 
-| L5 | 验证方式 |
+| T 层 | 验证方式 |
 |----|----------|
-| L5-OBS-TRACE-04 | `obs_pev_span_hierarchy_test.go` — R1/R2 父子层级 |
-| L5-OBS-TRACE-06 | 同上 — SpanKind SERVER/CLIENT |
+| D5-TRACE-T04 | `obs_pev_span_hierarchy_test.go` — R1/R2 父子层级 |
+| D5-TRACE-T06 | 同上 — SpanKind SERVER/CLIENT |
 | Registry 对账 | `coverage/registry_test.go` vs `telemetry/names.go` |
 
 ---

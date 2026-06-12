@@ -4,7 +4,7 @@ title: 架构分层合规 — 消除反向依赖与契约错放
 source: devrix-harness-architecture-audit
 priority: P0
 status: S1_Proposal
-l1-domain: architecture
+dsaft_domain: architecture
 created: 2026-06-11
 ---
 

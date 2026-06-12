@@ -15,7 +15,7 @@
 |------|------|
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
 | `openspec/archive/2026-06-07-devrix-context-engine/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
-| `openspec/specs/context-engine/spec.md` | 验收规格（Gherkin Scenario → L5，canonical） |
+| `openspec/specs/context-engine/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
 | `openspec/specs/context_engine_layer_delta.md` | 层能力 Delta SoT |
 
 ---
@@ -51,7 +51,7 @@
 | **依赖** | LLM/Multi-Agent 可滞后实现 | `ILLMGateway` / `IToolRunner` 接口 + Mock |
 | **存储** | V1 文件 JSON，无 SQLite | ShortTerm → `ContextSnapshot` |
 | **版本** | V1 无 Plan、无 Autocompact、无 L3 记忆 | 明确 stub / FeatureNotImplemented |
-| **测试** | 遵守测试框架规约 | L5-CTX-* + `tests/` 分层 |
+| **测试** | 遵守测试框架规约 | {T}-CTX-* + `tests/` 分层 |
 | **时间** | 约 86h（见 tasks.md） | 分 6 个 Milestone 交付 |
 
 ---
@@ -500,25 +500,25 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 |------|--------|------|
 | **Permission Gate** | L2 执行，L1 适配 | `IPermissionGate` 注入；Gateway `tool_call` 仅展示 |
 | **Process 取消** | L1 Gateway | 实现 `Stopper`；`/stop` → `context.Cancel` |
-| **EngineEvent 格式** | L2 emit，L1 消费 | 字段与 Metadata 见 §6.1；L5-CTX-09 契约测试 |
+| **EngineEvent 格式** | L2 emit，L1 消费 | 字段与 Metadata 见 §6.1；D2-CTX-T09 契约测试 |
 | **流式入历史** | L2 | StreamBuffer 在 `is_complete=true` 时合并为 assistant message |
 
 ---
 
-## 附录 A：与 OpenSpec / L5 对照
+## 附录 A：与 OpenSpec / T 层对照
 
-| 框架章节 | OpenSpec 映射 | L5 测试点 |
+| 框架章节 | OpenSpec 映射 | T 层测试点 |
 |----------|---------------|-----------|
 | ① 目标 | proposal.md Goals | — |
-| ③ 业务流程 | spec.md Scenarios | L5-CTX-05, 06, 09 |
-| ④ 领域模型 | design.md §二 | L5-CTX-01, 02 |
-| ⑤ 链路 | design.md §三 Process | L5-CTX-03, 04 |
-| ⑥ 接口 | spec.md Gateway Contract | L5-CTX-09, 11 |
-| D-S 集成 | design.md §3.4 | L5-CTX-11 |
-| 压缩 | spec.md Compression | L5-CTX-03, 04, 08 |
-| PEV | spec.md PEV | L5-CTX-06, 07 |
+| ③ 业务流程 | spec.md Scenarios | D2-CTX-T05, 06, 09 |
+| ④ 领域模型 | design.md §二 | D2-CTX-T01, 02 |
+| ⑤ 链路 | design.md §三 Process | D2-CTX-T03, 04 |
+| ⑥ 接口 | spec.md Gateway Contract | D2-CTX-T09, 11 |
+| D-S 集成 | design.md §3.4 | D2-CTX-T11 |
+| 压缩 | spec.md Compression | D2-CTX-T03, 04, 08 |
+| PEV | spec.md PEV | D2-CTX-T06, 07 |
 
-完整 L5 清单：`openspec/l5-registry.md` § Layer 2 Context Engine。
+完整 T 层清单：`openspec/t-registry.md` § Layer 2 Context Engine。
 
 ---
 
@@ -538,7 +538,7 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 | Token | `shared/contracts.ITokenCounter`；Gateway 实现，L2 注入（已就绪） |
 | Verify | `verify_mode: commands`；`executable`+`args[]`，禁止 shell；WorkDir 精确匹配 |
 | 可观测 | `ICompressionObserver` + `IPEVObserver` 两个独立接口；metrics 标签基数约束 |
-| 接线 | 主路径真实 LLM Gateway（L5-CTX-18）；Pipeline functional options 模式 |
+| 接线 | 主路径真实 LLM Gateway（D2-CTX-T18）；Pipeline functional options 模式 |
 
 ### V3 增量摘要（DM-20260607-006，Grill 2026-06-07）
 

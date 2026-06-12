@@ -57,7 +57,7 @@ cc-connect 已在生产环境验证 cardkit 双步发卡 + 元素 PUT 路径；d
 3. `appendResponseText` 分流：有 card_id → 元素 PUT；无 → Patch
 4. `finalizeStructuredSession` / `complete`：关闭 streaming + footer
 5. 配置 `im.feishu.streaming`（enabled、interval_ms、min_delta_chars）
-6. L5-1-2-04~08 测试用例
+6. D1-S2-T04~08 测试用例
 
 ## 6. Capabilities
 
@@ -92,7 +92,7 @@ cc-connect 已在生产环境验证 cardkit 双步发卡 + 元素 PUT 路径；d
 | 首字可见延迟 | 与现网持平（< 2s，不含 LLM） |
 | 流式 PUT 频率 | 可配置，默认 ≤ 3 QPS / 会话 |
 | 降级可用性 | cardkit 不可用时 Patch 路径 100% 可用 |
-| P0 L5 | 全部 PASS 方可 S5 验收 |
+| P0 T 层 | 全部 PASS 方可 S5 验收 |
 
 ## 10. Risks & Mitigations
 
@@ -115,7 +115,7 @@ cc-connect 已在生产环境验证 cardkit 双步发卡 + 元素 PUT 路径；d
 
 ## 12. Success Criteria
 
-- [ ] P0 L5（L5-1-2-04~07）全绿
+- [ ] P0 T 层（D1-S2-T04~07）全绿
 - [ ] 飞书真机：回复打字机效果可见
 - [ ] cardkit 关闭时降级 Patch 内容完整
 - [ ] `openspec/specs/communication/spec.md` 归档合并（S7）
