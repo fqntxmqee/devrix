@@ -9,7 +9,7 @@ meta:
   priority: P1
   owner: devrix-team
   created_at: "2026-06-11"
-  updated_at: "2026-06-11"
+  updated_at: "2026-06-12"
   source: devrix-harness-architecture-audit
 
 scope:
@@ -53,9 +53,21 @@ deliverables:
   - path: tasks.md
     status: pending
   - path: internal/layers/contextengine/engine.go
-    status: pending
+    status: completed
   - path: internal/shared/config/contextengine.go
-    status: pending
+    status: completed
+  - path: internal/shared/config/queryloop.go
+    status: completed
+  - path: internal/layers/observability/runtime/path_resolver.go
+    status: completed
+  - path: internal/layers/observability/runtime/d5_metric.go
+    status: completed
+  - path: internal/layers/evolution/eval/path_regression_probe.go
+    status: completed
+  - path: internal/layers/contextengine/query/recovery.go
+    status: completed
+  - path: openspec/l5-registry.md
+    status: completed
 
 version_scope:
   v1.0:
@@ -64,7 +76,9 @@ version_scope:
       - "harnessEnabled 分支 #deprecated 标记"
       - "统一压缩入口"
       - "PathRegressionProbe 注册"
-    status: planned
+      - "TD-QL-01: 413 恢复"
+      - "TD-QL-03: fallback model"
+    status: implemented
   v1.1:
     features:
       - "移除 harnessEnabled 配置项（no-op + WARN）"

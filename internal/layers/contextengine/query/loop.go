@@ -15,20 +15,30 @@ import (
 
 // Loop runs the Claude Code-aligned query loop (while tool_use continue).
 type Loop struct {
-	LLM          LLMCaller
-	Tools        ToolExecutor
-	Permission   PermissionChecker
-	Compress     CompressFunc
-	Attachments  *attachments.Registry
-	UserContext  *usercontext.Provider
+	LLM             LLMCaller
+	Tools           ToolExecutor
+	Permission      PermissionChecker
+	Compress        CompressFunc
+	Attachments     *attachments.Registry
+	UserContext     *usercontext.Provider
 	Hooks           LoopHooks
 	PrependUC       func(msgs []types.Message, uc map[string]string) []types.Message
 	WrapToolContext func(ctx context.Context, sc *types.SessionContext) context.Context
 	// WrapToolStreamContext wraps the tool execution context with a stream emitter
 	// so agent tools (call_claude-code etc.) can stream mid-execution events.
 	WrapToolStreamContext func(ctx context.Context, emit EmitFunc, sessionID, toolName string) context.Context
-	SessionQueue    *queue.SessionQueue
-	StreamingTools  bool
+	SessionQueue          *queue.SessionQueue
+	StreamingTools        bool
+
+	// FallbackLLM (TD-QL-03) is the secondary LLMCaller used when the
+	// primary `LLM` returns an overload / 5xx-class error. nil disables
+	// the fallback path entirely. The primary caller is responsible for
+	// wiring an LLMCaller whose Model points at the fallback provider.
+	FallbackLLM LLMCaller
+	// FallbackOnErr classifies errors that should trigger a switch to
+	// FallbackLLM. nil means "never fallback" (the safer default).
+	// Production code wires `query.IsOverloadOr5xx` (see recovery.go).
+	FallbackOnErr func(err error) bool
 }
 
 // Run executes the loop until no tool calls, max turns, cancel, or hook stop.
@@ -50,10 +60,10 @@ func (l *Loop) Run(
 	messages = conversation.StripSystem(messages)
 
 	var (
-		assistantText     string
-		usage             TokenUsage
-		allToolRecords    []types.ToolCallRecord
-		toolRoundResults  []ToolRoundResult
+		assistantText    string
+		usage            TokenUsage
+		allToolRecords   []types.ToolCallRecord
+		toolRoundResults []ToolRoundResult
 	)
 
 	maxTurns := params.MaxTurns
@@ -99,17 +109,48 @@ func (l *Loop) Run(
 			apiMessages = prepend(messages, uc)
 		}
 
-		chunks, err := l.LLM.Call(ctx, LLMRequest{
-			Model:        sc.Model,
-			SystemPrompt: params.SystemPrompt,
-			Messages:     apiMessages,
-			Tools:        params.Tools,
-		})
+		// TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call 一次。
+		// 失败仍按原 error 透传给上层；恢复逻辑在 LLMCaller 协议下是
+		// 透明的（透明 retry，最多 1 次）。
+		//
+		// TD-QL-03: 若 413 recovery 不触发（错误是 5xx / overload 而非
+		// 413），`runWithFallbackRetry` 会切换到 FallbackLLM。
+		chunks, err := runWithContextLengthRecovery(
+			ctx,
+			l.LLM,
+			LLMRequest{
+				Model:        sc.Model,
+				SystemPrompt: params.SystemPrompt,
+				Messages:     apiMessages,
+				Tools:        params.Tools,
+			},
+			l.Compress,
+			&messages,
+		)
+		// 同步压缩后副本到 apiMessages 引用（如果 recovery 替换了
+		// messages，则下一轮 prepend 也会自然拿到压缩后版本）。
+		apiMessages = messages
+		if prepend != nil && len(uc) > 0 {
+			apiMessages = prepend(messages, uc)
+		}
 		if err != nil {
-			if len(toolRoundResults) > 0 {
-				break
+			// Try fallback model (TD-QL-03) before giving up.
+			if l.FallbackLLM != nil && l.FallbackOnErr != nil && l.FallbackOnErr(err) && len(toolRoundResults) == 0 {
+				chunks, err = l.FallbackLLM.Call(ctx, LLMRequest{
+					Model:        sc.Model,
+					SystemPrompt: params.SystemPrompt,
+					Messages:     apiMessages,
+					Tools:        params.Tools,
+				})
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if len(toolRoundResults) > 0 {
+					break
+				}
+				return nil, err
 			}
-			return nil, err
 		}
 
 		var pending []ToolCall
@@ -168,10 +209,10 @@ func (l *Loop) Run(
 		toolRoundResults = toolRoundResults[:0]
 		if l.StreamingTools && len(refs) > 1 {
 			exec := &StreamingToolExecutor{
-				Tools:           l.Tools,
-				Permission:      l.Permission,
-				WrapToolContext: l.WrapToolContext,
-				Emit:            emit,
+				Tools:                 l.Tools,
+				Permission:            l.Permission,
+				WrapToolContext:       l.WrapToolContext,
+				Emit:                  emit,
 				WrapToolStreamEmitter: l.WrapToolStreamContext,
 			}
 			batchRefs := make([]BatchToolRef, len(refs))

@@ -22,6 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	obsruntime "github.com/devrix/devrix/internal/layers/observability/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/buildinfo"
@@ -215,7 +216,21 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		defer processSpan.End()
 	}
 
+	// #deprecated: legacy fallback, will be removed in v2.0 (DM-20260611-004).
+	// QueryLoop (`cfg.QueryLoop.Enabled`) is now the sole primary LLM↔Tool
+	// path. The `harnessEnabled && !workerLocal` branches below are kept as
+	// legacy fallback only when `query_loop.enabled: false` is explicitly set.
 	harnessEnabled := e.cfg.Harness.Enabled
+
+	// Record the resolved path before any LLM call. The D6
+	// PathRegressionProbe uses these counters to assert that the legacy
+	// harness path never fires in production (query_loop.enabled=true is
+	// the default after DM-20260611-004).
+	if e.cfg.QueryLoop.Enabled {
+		obsruntime.Record(obsruntime.PathQueryLoop)
+	} else {
+		obsruntime.Record(obsruntime.PathLegacyHarness)
+	}
 	basePrompt := e.prompt.Load(session.WorkDir)
 	systemPrompt := basePrompt
 	// System prompt load observability.
@@ -265,6 +280,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		sc.Model = e.defaultModel
 	}
 
+	// #deprecated: legacy fallback (see harnessEnabled declaration above)
 	if harnessEnabled && !session.HarnessInitialized {
 		harnessState, bootErr := e.harnessBoot.Run(ctx, session)
 		if bootErr != nil {
@@ -283,6 +299,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
 	)
 	var recallErr error
+	// #deprecated: legacy fallback (QueryLoop path uses EnrichWithLongTermRecall unconditionally)
 	if harnessEnabled && !workerLocal {
 		memoryEntries, recallErr = e.memory.RecallLongTermEntries(recallCtx, message)
 	} else {
@@ -314,6 +331,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	msgs := sc.Messages
 	compSystemPrompt := sc.SystemPrompt
+	// #deprecated: legacy fallback (QueryLoop path keeps system prompt during compression)
 	if harnessEnabled && !workerLocal {
 		compSystemPrompt = ""
 	}
@@ -349,6 +367,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			e.compressionRatio.Observe(report.Ratio())
 		}
 		e.observer.EmitContextCompressed(report)
+		// #deprecated: legacy harness path skipped SetCompressedView (QueryLoop always sets it below)
 		if !harnessEnabled {
 			e.memory.SetCompressedView(sc, compressed)
 		}
@@ -359,6 +378,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	var routingHint *types.RoutingHint
 	var preflightResult *types.PreflightResult
 	visibleTools := harness.VisibleToolsFromState(sc.Harness)
+	// #deprecated: legacy fallback (preflight + routing + system prompt build are QueryLoop-irrelevant)
 	if harnessEnabled && !workerLocal {
 		provisionalContext := basePrompt
 		if len(memoryEntries) > 0 {
@@ -506,6 +526,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
+		// #deprecated: legacy fallback (QueryLoop manages its own transcript via sidechain)
 		if harnessEnabled && !workerLocal {
 			e.transcript.AppendTurn(sc, message, assistantSummary)
 		}
