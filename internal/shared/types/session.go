@@ -47,6 +47,12 @@ type Session struct {
 	// 上下文快照（可选持久化）
 	ContextSnapshot []byte
 
+	// Metadata holds fork-isolated key/value tags.
+	// Children write through SessionView.SetMetadata; reads are direct.
+	// Field is additive and unlocked: writers are expected to use SessionView
+	// for COW semantics (DM-20260611-005).
+	Metadata map[string]any
+
 	// Harness bootstrap completed for this session (V5).
 	HarnessInitialized bool
 

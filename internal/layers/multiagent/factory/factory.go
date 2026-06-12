@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
 	"github.com/devrix/devrix/internal/layers/multiagent/collaboration"
+	"github.com/devrix/devrix/internal/layers/multiagent/sessionview"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
@@ -105,6 +106,29 @@ func (f *AgentFactory) Create(
 		createSpan.End()
 	}
 	return impl, nil
+}
+
+// CreateWithView is the DM-20260611-005 entry point: callers (notably the
+// Wave Scheduler fresh-policy path) pass a pre-built SessionView, and the
+// returned agent is bound to that view before becoming observable.
+//
+// When the supplied view is nil, behavior is identical to Create.
+func (f *AgentFactory) CreateWithView(
+	ctx context.Context,
+	cfg multiagent.AgentConfig,
+	session *types.Session,
+	view *sessionview.View,
+) (multiagent.Agent, error) {
+	ag, err := f.Create(ctx, cfg, session)
+	if err != nil {
+		return nil, err
+	}
+	if view != nil {
+		if impl, ok := ag.(*agent.Impl); ok {
+			impl.AttachSessionView(view)
+		}
+	}
+	return ag, nil
 }
 
 func (f *AgentFactory) startCreateSpan(ctx context.Context, cfg multiagent.AgentConfig) (context.Context, tracer.Span) {
