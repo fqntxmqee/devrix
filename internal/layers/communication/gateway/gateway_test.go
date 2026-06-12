@@ -2,27 +2,29 @@ package gateway
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/communication/eventbus"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // mockEventHandler implements EventHandler for testing
 type mockEventHandler struct {
-	mu              sync.Mutex
-	messages        []*types.OutboundMessage
-	errors          []error
-	statuses        map[string]types.SessionState
+	mu               sync.Mutex
+	messages         []*types.OutboundMessage
+	errors           []error
+	statuses         map[string]types.SessionState
 	permissionResult bool
 }
 
 func newMockEventHandler() *mockEventHandler {
 	return &mockEventHandler{
-		messages: make([]*types.OutboundMessage, 0),
-		statuses: make(map[string]types.SessionState),
+		messages:         make([]*types.OutboundMessage, 0),
+		statuses:         make(map[string]types.SessionState),
 		permissionResult: true,
 	}
 }
@@ -519,8 +521,8 @@ func TestCommunicationGateway_GetOrCreateSession(t *testing.T) {
 func TestOutboundMetadata_should_merge_engine_metadata(t *testing.T) {
 	meta := outboundMetadata("text", &EngineEvent{
 		Metadata: map[string]string{
-			"source":     "agent_tool",
-			"agent":      "Claude Code",
+			"source":      "agent_tool",
+			"agent":       "Claude Code",
 			"is_complete": "false",
 		},
 	})
@@ -529,5 +531,90 @@ func TestOutboundMetadata_should_merge_engine_metadata(t *testing.T) {
 	}
 	if meta["source"] != "agent_tool" || meta["agent"] != "Claude Code" {
 		t.Fatalf("metadata = %#v", meta)
+	}
+}
+
+// DM-20260611-003 (devrix-event-channel): integration smoke — when a
+// BackpressureEventBus is wired into the gateway, engine events are
+// routed through the bus and still reach the EventHandler with the
+// original wire-level OutboundMessage shape. This is the wire-compat
+// invariant the S4 change must preserve.
+func TestCommunicationGateway_WithEventBus_RoutesThroughBus(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	handler := newMockEventHandler()
+	mockEngine := &mockContextEngine{
+		events: []*EngineEvent{
+			{Type: "text", Content: "hi"},
+			{Type: "complete", Content: ""},
+		},
+	}
+	gw := NewCommunicationGateway(store, handler, mockEngine, nil, cfg)
+
+	// Wire a real BackpressureEventBus.
+	busCfg := config.DefaultEventBusConfig()
+	bus, err := eventbus.NewBus(busCfg)
+	if err != nil {
+		t.Fatalf("NewBus: %v", err)
+	}
+	defer bus.Close()
+	gw.SetEventBus(bus)
+
+	if !gw.EventBusEnabled() {
+		t.Fatalf("EventBusEnabled() = false after SetEventBus")
+	}
+
+	session, _ := gw.CreateSession("chat_bus", "/tmp")
+	msg := &types.InboundMessage{
+		SessionID: session.SessionID,
+		ChatID:    "chat_bus",
+		Content:   "hello",
+	}
+	if err := gw.RouteInbound(context.Background(), msg); err != nil {
+		t.Fatalf("RouteInbound: %v", err)
+	}
+	gw.WaitForProcesses()
+
+	// Drain residual events from the bus.
+	ctx, cc := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cc()
+	if _, err := bus.Drain(ctx, session.SessionID, 200*time.Millisecond); err != nil &&
+		err != eventbus.ErrDrainTimeout {
+		t.Logf("post-test drain: %v", err)
+	}
+
+	// The handler must have received both text and complete messages
+	// through the bus round-trip.
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	slog.Info("test: handler.messages after wait", "count", len(handler.messages), "sessionID", session.SessionID)
+	for i, m := range handler.messages {
+		if m == nil {
+			continue
+		}
+		slog.Info("test: msg", "i", i, "type", m.Metadata["event_type"], "content", m.Content)
+	}
+	var sawText, sawComplete bool
+	for _, m := range handler.messages {
+		if m == nil {
+			continue
+		}
+		switch m.Metadata["event_type"] {
+		case "text":
+			sawText = true
+		case "complete":
+			sawComplete = true
+		}
+	}
+	if !sawText {
+		t.Error("text event did not reach handler through bus")
+	}
+	if !sawComplete {
+		t.Error("complete event did not reach handler through bus")
 	}
 }
