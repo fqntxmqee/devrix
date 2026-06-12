@@ -57,6 +57,41 @@ func TestAgent_should_transition_created_to_terminated_on_run(t *testing.T) {
 	}
 }
 
+// Covers: subagent streaming text (QueryLoop emits is_complete=false deltas)
+func TestAgent_should_accumulate_streaming_text_deltas(t *testing.T) {
+	f := newTestFactory(&agent.StubEngine{
+		Events: []*contracts.EngineEvent{
+			{Type: "text", Content: "分析", Metadata: map[string]string{"is_complete": "false"}},
+			{Type: "text", Content: "结论", Metadata: map[string]string{"is_complete": "false"}},
+			{Type: "complete"},
+		},
+	})
+	session := types.NewSession("sess_stream", "cli", "/tmp")
+	ag, err := f.Create(context.Background(), multiagent.AgentConfig{
+		SessionID:    session.SessionID,
+		WorkDir:      session.WorkDir,
+		InitialInput: "analyze",
+	}, session)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	result, err := ag.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	msgs := ag.GetMessages()
+	if len(msgs) == 0 {
+		t.Fatal("expected assistant message from streamed deltas")
+	}
+	last := msgs[len(msgs)-1]
+	if last.Role != types.MessageRoleAssistant || last.Content != "分析结论" {
+		t.Fatalf("assistant content = %+v, want 分析结论", last)
+	}
+	if result == nil || len(result.Messages) == 0 {
+		t.Fatal("expected result messages")
+	}
+}
+
 func TestAgent_should_reject_run_when_already_terminated(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	session := types.NewSession("sess_twice", "cli", "/tmp")

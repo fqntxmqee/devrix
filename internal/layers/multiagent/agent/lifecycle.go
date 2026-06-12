@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -94,7 +95,7 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 		return nil, sharederrors.WithCode("AGT_ENGINE_ERROR", "engine not configured", nil)
 	}
 	eventCh := engine.Process(ctx, a.session, input)
-	var finalText string
+	var finalText strings.Builder
 
 	for ev := range eventCh {
 		if ev == nil {
@@ -130,17 +131,26 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 				})
 			}
 		case "text":
-			if ev.Metadata["is_complete"] == "true" || ev.Metadata["is_complete"] == "" {
-				finalText = ev.Content
+			if strings.TrimSpace(ev.Content) == "" {
+				break
+			}
+			// QueryLoop streams deltas with is_complete=false; only legacy paths
+			// emit a final is_complete=true frame.
+			if ev.Metadata["is_complete"] == "true" {
+				finalText.Reset()
+				finalText.WriteString(ev.Content)
+			} else {
+				finalText.WriteString(ev.Content)
 			}
 		case "complete":
-			if ev.Content != "" {
-				finalText = ev.Content
+			if strings.TrimSpace(ev.Content) != "" {
+				finalText.Reset()
+				finalText.WriteString(ev.Content)
 			}
-			if finalText != "" {
+			if text := strings.TrimSpace(finalText.String()); text != "" {
 				a.appendMessages(types.Message{
 					Role:    types.MessageRoleAssistant,
-					Content: finalText,
+					Content: text,
 				})
 			}
 			// Drain the channel so the engine goroutine fully exits before

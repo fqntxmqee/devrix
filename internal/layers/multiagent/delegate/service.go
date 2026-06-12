@@ -234,7 +234,19 @@ func extractSummary(result *multiagent.AgentResult) string {
 	}
 	for i := len(result.Messages) - 1; i >= 0; i-- {
 		if result.Messages[i].Role == types.MessageRoleAssistant {
-			return strings.TrimSpace(result.Messages[i].Content)
+			if c := strings.TrimSpace(result.Messages[i].Content); c != "" {
+				return c
+			}
+		}
+	}
+	for i := len(result.Messages) - 1; i >= 0; i-- {
+		if result.Messages[i].Role == types.MessageRoleTool {
+			if c := strings.TrimSpace(result.Messages[i].Content); c != "" {
+				if len(c) > 4000 {
+					c = c[:4000] + "…"
+				}
+				return c
+			}
 		}
 	}
 	for i := len(result.Messages) - 1; i >= 0; i-- {

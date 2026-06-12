@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	AgentExplore = "Explore"
-	AgentPlan    = "Plan"
+	AgentExplore   = "Explore"
+	AgentPlan      = "Plan"
+	AgentImplement = "Implement"
 )
 
 // exploreSystemPrompt is the structured prompt for Explore agents,
@@ -23,6 +24,10 @@ var exploreSystemPrompt = agent.ExplorePrompt
 // loaded from the embedded prompts/plan.md.
 var planSystemPrompt = agent.PlanPrompt
 
+// implementSystemPrompt is the structured prompt for Implement agents,
+// loaded from the embedded prompts/implement.md.
+var implementSystemPrompt = agent.ImplementPrompt
+
 // RunExplore runs a read-only exploration sub-query.
 func RunExplore(ctx context.Context, deps query.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*query.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentExplore, exploreSystemPrompt, prompt, tools, maxTurns, true)
@@ -31,6 +36,28 @@ func RunExplore(ctx context.Context, deps query.LoopDeps, parent *types.SessionC
 // RunPlan runs a read-only planning sub-query.
 func RunPlan(ctx context.Context, deps query.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*query.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentPlan, planSystemPrompt, prompt, tools, maxTurns, true)
+}
+
+// RunImplement runs a read-write implementation sub-query.
+func RunImplement(ctx context.Context, deps query.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*query.SubQueryResult, error) {
+	if parent == nil {
+		return nil, fmt.Errorf("builtin %s: parent context is nil", AgentImplement)
+	}
+	if maxTurns <= 0 {
+		maxTurns = 50
+	}
+	agentID := fmt.Sprintf("%s_%s", AgentImplement, uuid.New().String()[:8])
+	return query.Run(ctx, deps, query.SubQueryParams{
+		ParentSC:       parent,
+		AgentID:        agentID,
+		AgentName:      AgentImplement,
+		SystemPrompt:   implementSystemPrompt,
+		PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: prompt, SessionID: parent.SessionID}},
+		Tools:          tools,
+		MaxTurns:       maxTurns,
+		OmitClaudeMd:   false,
+		ReadOnlyTools:  false,
+	})
 }
 
 func runBuiltin(

@@ -41,6 +41,8 @@ func (a *SubQueryFallbackAdapter) RunSubQuery(ctx context.Context, parent *types
 		res, err = builtin.RunExplore(ctx, deps, parent, spec.Directive, nil, maxTurns)
 	case delegate.WorkerRolePlan:
 		res, err = builtin.RunPlan(ctx, deps, parent, spec.Directive, nil, maxTurns)
+	case delegate.WorkerRoleImplement:
+		res, err = builtin.RunImplement(ctx, deps, parent, spec.Directive, nil, maxTurns)
 	default:
 		res, err = query.Run(ctx, deps, query.SubQueryParams{
 			ParentSC:       parent,
@@ -148,7 +150,11 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*Too
 	if err != nil {
 		return &ToolResult{Error: err.Error()}, nil
 	}
-	return &ToolResult{Output: res.Summary}, nil
+	out := strings.TrimSpace(res.Summary)
+	if out == "" && res.Error == nil {
+		out = "(subagent completed without a textual summary)"
+	}
+	return &ToolResult{Output: out}, nil
 }
 
 type delegateStatusRunner struct{}
