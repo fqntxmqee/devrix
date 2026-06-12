@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -193,8 +194,10 @@ func (e *PEVEngine) runExecuteVerifyLoop(
 	emitComplete bool,
 ) (*PEVRunResult, error) {
 	if e.queryLoopEnabled() {
+		fmt.Fprintf(os.Stderr, "[DEBUG-PEV] queryLoop path enabled=%v verifyMode=%q\n", e.queryLoopEnabled(), e.cfg.VerifyMode)
 		return e.runViaQueryLoop(ctx, sc, view, systemPrompt, emit, emitComplete)
 	}
+	fmt.Fprintf(os.Stderr, "[DEBUG-PEV] legacy path enabled=%v verifyMode=%q\n", e.queryLoopEnabled(), e.cfg.VerifyMode)
 	start := time.Now()
 	maxIter := e.cfg.MaxIterations
 	if maxIter <= 0 {

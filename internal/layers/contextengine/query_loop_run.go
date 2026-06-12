@@ -3,6 +3,7 @@ package contextengine
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +16,79 @@ import (
 	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// tracingLLMCaller wraps query.LLMCaller with context.pev.iteration and
+// context.pev.llm_call spans so the QueryLoop path emits the same span
+// hierarchy as the legacy PEV run() path. Each Call creates one iteration
+// span as child of runCtx (the pev.run context), with an llm_call child.
+type tracingLLMCaller struct {
+	inner     query.LLMCaller
+	engine    *PEVEngine
+	runCtx    context.Context // pev.run span context
+	model     string
+	sessionID string
+	iter      int
+}
+
+func (t *tracingLLMCaller) Call(ctx context.Context, req query.LLMRequest) (<-chan query.LLMChunk, error) {
+	t.iter++
+	iter := t.iter
+
+	iterCtx, iterSpan := t.engine.startSpan(t.runCtx, telemetry.OpContextPEVIteration, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
+	)
+
+	llmCtx, llmSpan := t.engine.startSpan(iterCtx, telemetry.OpContextPEVLLMCall, tracer.SpanKindClient,
+		tracer.Attribute{Key: "pev.iteration", Value: fmt.Sprintf("%d", iter)},
+	)
+
+	chunks, err := t.inner.Call(llmCtx, req)
+	if err != nil {
+		if llmSpan != nil {
+			llmSpan.End()
+		}
+		if iterSpan != nil {
+			iterSpan.End()
+		}
+		return nil, err
+	}
+
+	wrapped := make(chan query.LLMChunk)
+	go func() {
+		var lastUsage query.TokenUsage
+		var hasToolCalls bool
+		for ch := range chunks {
+			if ch.Usage.PromptTokens > 0 || ch.Usage.CompletionTokens > 0 {
+				lastUsage = ch.Usage
+			}
+			if len(ch.ToolCalls) > 0 {
+				hasToolCalls = true
+			}
+			wrapped <- ch
+		}
+		if llmSpan != nil {
+			finishReason := "stop"
+			if hasToolCalls {
+				finishReason = "tool_calls"
+			}
+			llmSpan.SetAttributes(telemetry.LLMUsageAttrs(
+				lastUsage.PromptTokens,
+				lastUsage.CompletionTokens,
+				0,
+			)...)
+			llmSpan.SetAttributes(telemetry.GenAIUsageAttrs(
+				t.model, t.sessionID, lastUsage.PromptTokens, lastUsage.CompletionTokens,
+				0, 0, finishReason,
+			)...)
+			llmSpan.End()
+		}
+		if iterSpan != nil {
+			iterSpan.End()
+		}
+		close(wrapped)
+	}()
+	return wrapped, nil
+}
 
 func (e *PEVEngine) runViaQueryLoop(
 	ctx context.Context,
@@ -44,7 +118,7 @@ func (e *PEVEngine) runViaQueryLoop(
 	}
 
 	loop := &query.Loop{
-		LLM:             &llmCaller{llm: e.llm},
+		LLM:             &tracingLLMCaller{inner: &llmCaller{llm: e.llm}, engine: e, runCtx: ctx, model: sc.Model, sessionID: sc.SessionID},
 		Tools:           &toolExecutor{tools: e.tools, toolsReg: e.toolsReg},
 		Permission:      &permChecker{gate: e.permission, reg: e.toolsReg},
 		Attachments:     e.queryLoop.Attachments,
@@ -86,6 +160,14 @@ func (e *PEVEngine) runViaQueryLoop(
 	}, emit)
 	if err != nil {
 		return nil, err
+	}
+
+	// DM-20260612-014: 补齐旧版 runExecuteVerifyLoop 的 VerifyResult guard
+	// （pev_engine.go:514）。当 LLM 仅返回纯文本而无工具调用时，模拟测试
+	// 不会触发 AfterToolRound hook，VerifyResult 保持默认 false；显式设为
+	// passed 以让上层（milestoneRunner 等）正确继续。
+	if len(res.ToolCallHistory) == 0 && !sc.PEVState.VerifyResult.Passed {
+		sc.PEVState.VerifyResult = types.VerifyResult{Passed: true}
 	}
 
 	assistantText := res.AssistantText
@@ -215,6 +297,8 @@ func (e *PEVEngine) runViaQueryLoop(
 	if assistantText != "" {
 		msgs = append(msgs, types.Message{Role: types.MessageRoleAssistant, Content: assistantText, SessionID: sc.SessionID})
 	}
+	fmt.Fprintf(os.Stderr, "[DEBUG-QLOOP] end: sessID=%s toolHistoryLen=%d VerifyResult.Passed=%v\n",
+		sc.SessionID, len(res.ToolCallHistory), sc.PEVState.VerifyResult.Passed)
 	return &PEVRunResult{
 		Messages:        msgs,
 		Usage:           queryUsage(res.Usage),
