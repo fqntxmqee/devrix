@@ -373,12 +373,11 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 			terminal = StateFailed
 		}
 	}
-	state.graph.SetState(taskID, terminal)
-	s.guard.Unregister(slotID)
-	s.pool.Release(slotID)
+	// Side-effects MUST land before SetState flips the node terminal — once a
+	// task is observable as terminal, dispatchLoop can call AllTerminal() →
+	// markWaveDone() → close(doneCh) and WaitForCompletion returns. Anything
+	// written after SetState risks being missed by the awaiter.
 	s.artifacts.Put(art)
-	s.finalizeTask(sessionID, state, taskID, art)
-
 	switch terminal {
 	case StateCompleted:
 		s.incMetric("completed")
@@ -387,6 +386,10 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 	case StateCancelled:
 		s.incMetric("cancelled")
 	}
+	s.guard.Unregister(slotID)
+	s.pool.Release(slotID)
+	s.finalizeTask(sessionID, state, taskID, art)
+	state.graph.SetState(taskID, terminal)
 
 	// Update handle.
 	state.mu.Lock()
