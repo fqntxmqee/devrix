@@ -19,6 +19,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -77,6 +78,7 @@ type ContextEngine struct {
 	preflight    *harness.PreflightEvaluator
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
+	mainTranscript *transcript.MainThreadStore
 	defaultModel string
 	tierResolver llmgateway.ITierResolver
 
@@ -144,6 +146,19 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		)
 	}
 
+	var mainTranscript *transcript.MainThreadStore
+	if cfg.MainTranscript.Enabled {
+		baseDir := cfg.MainTranscript.BaseDir
+		if baseDir == "" {
+			baseDir = config.DefaultMainTranscriptConfig().BaseDir
+		}
+		if store, err := transcript.NewMainThreadStore(baseDir); err != nil {
+			slog.Warn("contextengine: main transcript disabled", "error", err)
+		} else {
+			mainTranscript = store
+		}
+	}
+
 	return &ContextEngine{
 		memory:       memory.NewManager(cfg, store, deps.LongTerm),
 		counter:      counter,
@@ -163,6 +178,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		preflight:    harness.NewPreflightEvaluator(cfg.Preflight, harness.NewToolPoolFilter(cfg.Harness.ToolPool)),
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
+		mainTranscript: mainTranscript,
 		defaultModel: deps.DefaultModel,
 		tierResolver: deps.TierResolver,
 	}
@@ -343,8 +359,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	if !e.memory.AppendUserMessage(sc, requestID, message) {
 		slog.Debug("contextengine: duplicate request skipped", "sessionID", session.SessionID, "requestID", requestID)
 	}
+	transcriptFrom := len(sc.Messages)
 
-	msgs := conversation.RepairToolMessageChain(sc.Messages)
+	msgs := conversation.RepairToolMessageChain(conversation.MessagesAfterCompactBoundary(sc.Messages))
 	compSystemPrompt := sc.SystemPrompt
 	// #deprecated: legacy fallback (QueryLoop path keeps system prompt during compression)
 	if harnessEnabled && !workerLocal {
@@ -568,8 +585,10 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			e.memory.AppendMessage(sc, types.MessageRoleAssistant, text)
 			assistantSummary = text
 		}
+		e.appendMainTranscript(session.SessionID, sc.Messages[transcriptFrom:], workerLocal)
 		// 压缩消息历史到最近 N 条，防止无界增长
 		e.memory.TrimMessages(sc)
+		e.commitActiveWindow(ctx, sc, session.SessionID)
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
@@ -678,6 +697,35 @@ func (e *ContextEngine) startSpan(ctx context.Context, operation string, kind tr
 
 func (e *ContextEngine) shouldCompress(msgs []types.Message, budget types.TokenBudget) bool {
 	return e.compressionPipeline("").ShouldCompress(msgs, budget)
+}
+
+func (e *ContextEngine) appendMainTranscript(sessionID string, delta []types.Message, workerLocal bool) {
+	if e.mainTranscript == nil || workerLocal || len(delta) == 0 {
+		return
+	}
+	if err := e.mainTranscript.AppendBatch(sessionID, delta); err != nil {
+		slog.Warn("contextengine: main transcript append failed", "sessionID", sessionID, "error", err)
+	}
+}
+
+func (e *ContextEngine) commitActiveWindow(ctx context.Context, sc *types.SessionContext, sessionID string) {
+	active := conversation.RepairToolMessageChain(conversation.MessagesAfterCompactBoundary(sc.Messages))
+	max := e.cfg.Compression.MaxMessages
+	if max <= 0 {
+		max = 50
+	}
+	overMessages := len(active) > max
+	overTokens := e.shouldCompress(active, sc.TokenBudget)
+	if !overMessages && !overTokens {
+		return
+	}
+	compressed, report, err := e.compressionPipeline(sessionID).Run(ctx, active, "", sc.TokenBudget)
+	if err != nil || len(report.StepsApplied) == 0 {
+		return
+	}
+	committed := conversation.RepairToolMessageChain(stripSystemMessage(compressed))
+	e.memory.SetActiveMessages(sc, committed)
+	e.memory.TrimMessages(sc)
 }
 
 func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipeline {

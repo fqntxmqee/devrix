@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -87,6 +88,7 @@ func runAutocompact(
 	for i := 0; i < head; i++ {
 		out = append(out, turns[i]...)
 	}
+	out = append(out, conversation.NewCompactBoundaryMessage(sessionID, "auto", len(middle)))
 	out = append(out, summaryMsg)
 	for i := len(turns) - tail; i < len(turns); i++ {
 		out = append(out, turns[i]...)

@@ -26,6 +26,21 @@ type ContextEngineConfig struct {
 	ExecutionFlow      ExecutionFlowConfig `yaml:"execution_flow"`
 	Worktree           WorktreeConfig     `yaml:"worktree"`
 	TodoWrite          TodoWriteConfig    `yaml:"todo_write"`
+	MainTranscript     MainTranscriptConfig `yaml:"main_transcript"`
+}
+
+// MainTranscriptConfig controls append-only JSONL persistence for main sessions.
+type MainTranscriptConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	BaseDir string `yaml:"base_dir"`
+}
+
+// DefaultMainTranscriptConfig returns main-thread transcript defaults.
+func DefaultMainTranscriptConfig() MainTranscriptConfig {
+	return MainTranscriptConfig{
+		Enabled: true,
+		BaseDir: "~/.devrix/sessions",
+	}
 }
 
 // SnapshotConfig holds snapshot persistence settings.
@@ -136,6 +151,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		ExecutionFlow: DefaultExecutionFlowConfig(),
 		Worktree:      DefaultWorktreeConfig(),
 		TodoWrite:      DefaultTodoWriteConfig(),
+		MainTranscript: DefaultMainTranscriptConfig(),
 	}
 }
 

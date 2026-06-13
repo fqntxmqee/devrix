@@ -188,6 +188,14 @@ func (m *Manager) RemoveLastUserMessage(sc *types.SessionContext) {
 	}
 }
 
+// SetActiveMessages replaces the in-memory active message window.
+func (m *Manager) SetActiveMessages(sc *types.SessionContext, msgs []types.Message) {
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	sc.Messages = append([]types.Message(nil), msgs...)
+	sc.UpdatedAt = time.Now()
+}
+
 // TrimMessages trims sc.Messages using head+tail retention, then repairs tool chains.
 func (m *Manager) TrimMessages(sc *types.SessionContext) {
 	m.messagesMu.Lock()

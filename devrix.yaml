@@ -162,6 +162,9 @@ context_engine:
       preserve_tail_turns: 2
       timeout: "10s"                   # P99 摘要延迟上限
 
+  main_transcript:
+    enabled: true
+    base_dir: "~/.devrix/sessions"
 
   # V2 新增: Token 计数源
   token_counter:

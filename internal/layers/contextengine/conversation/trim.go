@@ -66,10 +66,12 @@ func HeadTailTrim(msgs []types.Message, maxMessages, headTurns, tailMessages int
 
 	out := make([]types.Message, 0, headEnd+1+(len(msgs)-tailStart))
 	out = append(out, msgs[:headEnd]...)
-	out = append(out, types.Message{
+	snip := types.Message{
 		Role:    types.MessageRoleSystem,
 		Content: fmt.Sprintf(snippedMessagesFmt, snipped),
-	})
+	}
+	MarkSnipAsCompactBoundary(&snip, snipped)
+	out = append(out, snip)
 	out = append(out, msgs[tailStart:]...)
 	return out
 }

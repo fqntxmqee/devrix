@@ -225,6 +225,12 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 	if f.Compression.Microcompact.KeepRecentToolResults != 0 {
 		cfg.Compression.Microcompact.KeepRecentToolResults = f.Compression.Microcompact.KeepRecentToolResults
 	}
+	if f.MainTranscript.Enabled {
+		cfg.MainTranscript.Enabled = true
+	}
+	if f.MainTranscript.BaseDir != "" {
+		cfg.MainTranscript.BaseDir = f.MainTranscript.BaseDir
+	}
 	if f.TokenCounter.Source != "" {
 		cfg.TokenCounter.Source = f.TokenCounter.Source
 	}

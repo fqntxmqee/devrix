@@ -41,6 +41,13 @@ func TestHeadTailTrim_should_preserve_first_user_when_trimming(t *testing.T) {
 	if !foundSnip {
 		t.Fatal("expected snip placeholder in trimmed history")
 	}
+	for _, m := range out {
+		if m.Role == types.MessageRoleSystem && strings.Contains(m.Content, "snipped") {
+			if !conversation.IsCompactBoundary(m) {
+				t.Fatal("snip placeholder should be a compact boundary")
+			}
+		}
+	}
 	last := out[len(out)-1]
 	if last.Role != types.MessageRoleUser || last.Content != "rollback" {
 		t.Fatalf("tail user = %+v, want rollback", last)
