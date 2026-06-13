@@ -7,7 +7,7 @@
 **状态:** Active — IMPLEMENTED (PlanMode + TaskManager)
 **Last Updated:** 2026-06-14
 **对标:** Claude Code Plan Mode
-**关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`
+**关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`, `demand.md` (DM-20260613-001)
 
 ---
 

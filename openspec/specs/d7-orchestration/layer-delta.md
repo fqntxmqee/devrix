@@ -132,6 +132,8 @@ PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
 D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 
+**Review R1 补充：** OrchestratePath v1.0 不依赖 SynthesizeTaskGraph；并行 execute 委托 S3 Wave。见 `d7-domain.md` Routing Matrix。
+
 #### Scenario: Entry point migration
 
 - GIVEN `orchestration.d7_enabled=true`
@@ -143,7 +145,21 @@ D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 
 ---
 
-### Requirement: D2 Thin QueryLoop
+### Requirement: D7 Migration Coexistence
+
+Four-combination regression (`d7_enabled` × `plan.enabled`) MUST pass before defaulting `d7_enabled=true`.
+
+See `d7-domain.md` §Migration Coexistence Contract. T: D7-MIG-T01.
+
+---
+
+### Requirement: D7 Task Model Trinity
+
+Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain separate in v1.0 with unified QueryWorkPlan. T: D7-S1-T07.
+
+**Current:** PlanTask in D2 tasks/; Wave in orchestration/wave/; Background in query/background.go
+
+---
 
 `query.Loop.Run` MUST be ≤200 lines with no D4/queue imports.
 
@@ -173,17 +189,18 @@ D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 
 ---
 
-## Migration Checklist (D7 v1.0)
+## Migration Checklist (D7 v1.0 — Review R1)
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| Phase 1 | D7 域定义 + A/F/T 注册表 | ✅ 文档完成 |
-| Phase 2 | D7-S1 Work Model 统一 | ⬜ Task 仍在 D2 |
-| Phase 3 | D7-S5 Decision & Planning | ⬜ 仅 PlanMode |
-| Phase 4 | D7-S2 Session Orchestrator | ⬜ 入口未上移 |
-| Phase 5 | D7-S3/S4 包路径迁移 | ⬜ 仍在 orchestration/ |
-| Phase 6 | D2 瘦身 | ⬜ loop.go 414 行 |
-| Phase 7 | 回归验收 P0 T 全绿 | ⬜ D7-S2/S5 T 未实现 |
+| 1 / A | 域定义 + Review R1 澄清（demand/review-r1/tasks） | ✅ |
+| 5 | D7-S3/S4 实现（ORCH 代码） | ✅ 待路径迁移 |
+| B | D7 骨架 + contracts + re-export | ⬜ |
+| C | S5-P2 Classify + S2 ProcessMessage | ⬜ |
+| D+E | 入口切换 + D2 瘦身（同 release） | ⬜ |
+| F | S3/S4 包路径迁移 | ⬜ |
+| G | 回归 + D7-MIG-T01 四组合矩阵 | ⬜ |
+| H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ⬜ |
 
 ---
 
@@ -193,3 +210,4 @@ D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | 初始 D7 delta（设计阶段） |
 | 2.0.0 | 2026-06-14 | 对齐代码审计：IMPLEMENTED/PARTIAL/PLANNED 三分 |
+| 2.1.0 | 2026-06-14 | Review R1 决议同步：路由矩阵、三模型、迁移契约 |

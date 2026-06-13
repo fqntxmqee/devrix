@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
-**Status:** S3_Design
+**Status:** S2_Clarified (Review R1 incorporated)
 
 ## 1. Background
 
@@ -33,7 +33,7 @@ ORCH-S3 WaveScheduler 已具备 DAG 调度、WorkerPool、ConflictGuard、Contex
 
 ## 3. Proposed Solution
 
-升格 ORCH 为 **D7 Orchestration Domain**（编排域），作为 D1-D6 之上的协调层：
+升格 ORCH 为 **D7 Orchestration Domain**（编排域），作为**横向协调层**编排 D2+D4 跨域执行（D1 仍拥有 ingress）：
 
 ```
 D7 Orchestration Domain
@@ -48,8 +48,10 @@ D7 Orchestration Domain
 
 1. **入口上移**：D1 `RouteInbound` 从调用 `D2.Process` 改为调用 `D7.ProcessMessage`
 2. **D2 瘦身**：Task、Background、Queue、Delegate 回调从 D2 迁出
-3. **决策显式化**：D7-S5 提供规则+LLM 分层的意图分类与任务拆解
+3. **决策显式化**：D7-S5-P2 提供规则+command-first 分类；自动拆解（S5-P3）推迟 v1.1
 4. **ORCH 升格**：现有 ORCH 包代码迁移到 D7-S3/D7-S4，业务语义不变
+
+**Review R1 修订（2026-06-14）：** 见 `demand.md`、`review-r1.md`。核心变更：三模型职责分离、S2/S3 路由矩阵、迁移共存契约、Phase 顺序调整。
 
 ## 4. Success Metrics
 
@@ -60,17 +62,20 @@ D7 Orchestration Domain
 | 快速路径延迟增量 | ≤2ms（D7 路由开销） | benchmark |
 | Task 模型唯一归属 | 100% Task 操作经 D7-S1 | 代码审计 |
 
-## 5. Implementation Plan
+## 5. Implementation Plan（修订 — Review R1）
 
 | 阶段 | 内容 | 影响范围 |
 |------|------|----------|
-| **Phase 1**：D7 域定义 + A/F 注册 | 创建 D7 包骨架、注册表、layering 更新 | 文档 + 接口 |
-| **Phase 2**：D7-S1 Work Model | Task 数据模型从 D2/D4/ORCH 统一迁入 | D2 tasks/, ORCH workplan/ |
-| **Phase 3**：D7-S5 Decision & Planning | 意图分类 + 任务拆解 | 新增代码 |
-| **Phase 4**：D7-S2 Session Orchestrator | 新主入口，D1 调用上移 | D1 gateway, D2 engine |
-| **Phase 5**：D7-S3/S4 升格 | ORCH 现有代码迁移 | ORCH 包路径变更 |
-| **Phase 6**：D2 瘦身 | 移除 D2 中迁出的职责 | D2 query/loop, tasks/ |
-| **Phase 7**：回归验收 | P0 T 层全绿 + 覆盖率 ≥80% | 全量测试 |
+| **Phase A**：需求澄清 + 文档 | demand.md、review-r1、tasks.md、d7-domain R1 | 文档 |
+| **Phase B**：D7 骨架 + re-export | `internal/layers/d7/`、contracts、feature flag | 接口 |
+| **Phase C**：S5-P2 Classify + S2 ProcessMessage | 规则/command-first 分类、FastPath | 新增代码 |
+| **Phase D**：HandleInterrupt + D1 入口 | gateway 灰度、`d7_enabled` | D1 gateway |
+| **Phase E**：D7-S1 迁移 + D2 瘦身 | tasks/ 迁入、loop 去 hooks | D2 query/loop |
+| **Phase F**：D7-S3/S4 包路径迁移 | re-export 桥接 | orchestration/ |
+| **Phase G**：回归验收 | P0 T 全绿 + 4 组合迁移矩阵 | 全量测试 |
+| **Phase H**（v1.1）：S5-P3 自动拆解 | SynthesizeTaskGraph、CreateWorkPlan | 新增代码 |
+
+> **顺序修订：** Phase D 与 E 同 release 或相邻 release，避免 `d7_enabled=true` 且 loop 仍含 delegate hooks。S3/S4 已实现，Phase F 可与 B 合并。
 
 ## 6. Risks & Mitigations
 

@@ -45,6 +45,14 @@ type CommunicationGateway struct {
 	config        *config.CommunicationConfig
 	obsBridge     *observability.Bridge
 
+	// d7Entry is the optional D7 orchestration entry. When non-nil and
+	// d7Enabled is true, RouteInbound routes to d7Entry.ProcessMessage
+	// instead of contextEngine.Process. Per R2 命题 A: D1 owns ingress
+	// owner (route-or-not decision via feature flag); D7 owns routing
+	// decision owner (FastPath vs OrchestratePath).
+	d7Entry    contracts.IOrchestrationEntry
+	d7Enabled  bool
+
 	mu                   sync.RWMutex
 	sessions             map[string]*types.Session
 	activeProcesses      map[string]context.CancelFunc
@@ -86,12 +94,34 @@ func NewCommunicationGateway(
 	return gw
 }
 
+// SetD7Entry wires the optional D7 orchestration entry. When d7Enabled is
+// true, RouteInbound calls entry.ProcessMessage instead of
+// contextEngine.Process. Per R2 命题 A: D1 has ingress owner (whether to
+// route to D7); D7 has routing decision owner (FastPath vs OrchestratePath).
+//
+// This setter exists so existing call sites (e.g. bootstrap) that pass a
+// fixed argument list to NewCommunicationGateway do not need to be
+// modified. Callers that want D7 must call SetD7Entry before the gateway
+// starts processing inbound messages.
+func (g *CommunicationGateway) SetD7Entry(entry contracts.IOrchestrationEntry, enabled bool) {
+	g.d7Entry = entry
+	g.d7Enabled = enabled
+	if !enabled {
+		slog.Info("gateway: D7 disabled, legacy D1→D2.Process path active")
+		return
+	}
+	slog.Info("gateway: D7 enabled, D1→D7.ProcessMessage path active")
+}
+
 // StopProcess cancels the active context engine process for the given session.
 func (g *CommunicationGateway) StopProcess(sessionID string) error {
 	return g.Stop(sessionID)
 }
 
 // Stop implements commands.Stopper — cancels the active context engine Process.
+//
+// When D7 is enabled, Stop also calls d7Entry.Cancel which runs the
+// full Wave→D4→Process sequence plus the stopped event (per R2 命题 E).
 func (g *CommunicationGateway) Stop(sessionID string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -100,6 +130,15 @@ func (g *CommunicationGateway) Stop(sessionID string) error {
 		delete(g.activeProcesses, sessionID)
 	}
 	g.stoppedSessions.Store(sessionID, struct{}{})
+	// D7 cancel is best-effort. The interrupt handler is idempotent.
+	if g.d7Enabled && g.d7Entry != nil {
+		// Use a fresh context with a short timeout to avoid blocking Stop.
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := g.d7Entry.Cancel(ctx, sessionID); err != nil {
+			slog.Warn("gateway: d7 Cancel failed", "sessionID", sessionID, "err", err)
+		}
+	}
 	return nil
 }
 
@@ -275,15 +314,29 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
 	}
 
-	if g.contextEngine == nil {
+	if g.contextEngine == nil && (g.d7Entry == nil || !g.d7Enabled) {
 		return fmt.Errorf("context engine not configured")
 	}
 
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
 
-	// Process message through context engine
-	eventChan := g.contextEngine.Process(processCtx, session, msg.Content)
+	var eventChan <-chan *EngineEvent
+	if g.d7Enabled && g.d7Entry != nil {
+		// D7 path: D1 ingress routes to D7 orchestrator, which fans out
+		// to D2 RunQueryLoop (FastPath) or Wave/Plan (OrchestratePath).
+		// See d7-domain.md §D7-D1 Contract.
+		ch, err := g.d7Entry.ProcessMessage(processCtx, session.SessionID, msg.Content)
+		if err != nil {
+			cancel()
+			g.unregisterProcess(session.SessionID)
+			return fmt.Errorf("d7 entry ProcessMessage: %w", err)
+		}
+		eventChan = ch
+	} else {
+		// Legacy path: D1 → D2.ContextEngine.Process.
+		eventChan = g.contextEngine.Process(processCtx, session, msg.Content)
+	}
 
 	// Handle events from context engine
 	g.processes.Add(1)
