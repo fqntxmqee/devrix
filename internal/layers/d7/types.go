@@ -31,10 +31,10 @@ import (
 type IntentKind string
 
 const (
-	IntentFast       IntentKind = "fast"
-	IntentCommand    IntentKind = "command"
+	IntentFast        IntentKind = "fast"
+	IntentCommand     IntentKind = "command"
 	IntentOrchestrate IntentKind = "orchestrate"
-	IntentSkip       IntentKind = "skip"
+	IntentSkip        IntentKind = "skip"
 )
 
 // IntentClassification is the result of ClassifyIntent.
@@ -81,21 +81,21 @@ const (
 
 // TaskSpec is a serializable, in-flight task description.
 type TaskSpec struct {
-	ID           string        `json:"id"`
-	Subject      string        `json:"subject"`
-	Type         TaskType      `json:"type"`
-	Goal         string        `json:"goal,omitempty"`
-	Dependencies []string      `json:"dependencies,omitempty"`
-	WorkerType   string        `json:"worker_type,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
+	ID           string    `json:"id"`
+	Subject      string    `json:"subject"`
+	Type         TaskType  `json:"type"`
+	Goal         string    `json:"goal,omitempty"`
+	Dependencies []string  `json:"dependencies,omitempty"`
+	WorkerType   string    `json:"worker_type,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // Plan is a DAG of tasks for a single orchestration request.
 type Plan struct {
-	ID        string    `json:"id"`
-	SessionID string    `json:"session_id"`
+	ID        string     `json:"id"`
+	SessionID string     `json:"session_id"`
 	Tasks     []TaskSpec `json:"tasks"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // ProcessRequest is the input to SessionOrchestrator.ProcessMessage.

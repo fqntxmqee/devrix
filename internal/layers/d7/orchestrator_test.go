@@ -15,9 +15,9 @@ import (
 // fakeD2 is a minimal D2 executor for testing. It returns a channel
 // containing a single text EngineEvent followed by a complete.
 type fakeD2 struct {
-	calls      int
+	calls        int
 	executedMsgs []string
-	mu         sync.Mutex
+	mu           sync.Mutex
 }
 
 func (f *fakeD2) RunQueryLoop(_ context.Context, req QueryRequest) (<-chan *contracts.EngineEvent, error) {

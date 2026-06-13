@@ -21,25 +21,25 @@ import (
 // 与「正常 Process 结束」区分（正常结束 Wave 自行 ctx 触发收尾）。
 //
 // v1.0 实现：
-//   1. wave.CancelAll(sessionID)  （D7-S3）— 若有 Wave 在跑
-//   2. d4.CancelAll(sessionID)    （D4）— 若有 delegate worker 在跑
-//   3. orchestrator.cancel(sessionID)  — 取消 D2 RunQueryLoop
-//   4. 发射 "stopped" EngineEvent 到 sink
-//   5. 任务状态联动：running → cancelled （由 caller / WorkModel 触发）
+//  1. wave.CancelAll(sessionID)  （D7-S3）— 若有 Wave 在跑
+//  2. d4.CancelAll(sessionID)    （D4）— 若有 delegate worker 在跑
+//  3. orchestrator.cancel(sessionID)  — 取消 D2 RunQueryLoop
+//  4. 发射 "stopped" EngineEvent 到 sink
+//  5. 任务状态联动：running → cancelled （由 caller / WorkModel 触发）
 //
 // 子能力 5 (TaskCancel→WorkerCancel 反向链路) 在 v1.0 由 HandleInterrupt
 // 的 d4 step 隐式覆盖；v1.1 可显式拆出。
 type InterruptOptions struct {
-	WaveCanceler   func(sessionID string) error
-	D4Canceler     func(sessionID string) error
+	WaveCanceler    func(sessionID string) error
+	D4Canceler      func(sessionID string) error
 	ProcessCanceler func(sessionID string) error
-	Sink           D1EventSink
+	Sink            D1EventSink
 }
 
 // InterruptHandler is the v1.0 HandleInterrupt entry point.
 type InterruptHandler struct {
-	mu      sync.Mutex
-	opts    InterruptOptions
+	mu           sync.Mutex
+	opts         InterruptOptions
 	orchestrator *SessionOrchestrator
 }
 

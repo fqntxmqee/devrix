@@ -35,10 +35,10 @@ type WorkPlanSnapshot struct {
 // FlowLite is a minimal D7-S4 projection; the full ExecutionFlowSnapshot
 // lives in internal/shared/contracts.
 type FlowLite struct {
-	FlowID  string
+	FlowID   string
 	WorkerID string
-	TaskID  string
-	Status  string
+	TaskID   string
+	Status   string
 }
 
 // BackgroundLite is a minimal D7-S1 BackgroundRun projection. v1.0 sources
@@ -53,9 +53,9 @@ type BackgroundLite struct {
 // DelegatedWorkModel is the v1.0 implementation: it forwards to D2
 // TaskManager. The wire-up happens in bootstrap (D7-D1 Contract).
 type DelegatedWorkModel struct {
-	createTask  func(ctx context.Context, subject, goal string) (string, error)
-	updateStat  func(ctx context.Context, taskID string, status TaskStatus) error
-	queryPlan   func(ctx context.Context, sessionID string) (WorkPlanSnapshot, error)
+	createTask func(ctx context.Context, subject, goal string) (string, error)
+	updateStat func(ctx context.Context, taskID string, status TaskStatus) error
+	queryPlan  func(ctx context.Context, sessionID string) (WorkPlanSnapshot, error)
 }
 
 // NewDelegatedWorkModel returns a WorkModel that calls into D2 TaskManager

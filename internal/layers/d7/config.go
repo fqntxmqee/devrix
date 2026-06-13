@@ -4,15 +4,15 @@ package d7
 //
 // v1.0 fields:
 //   - Enabled:           feature flag (orchestration.d7_enabled). When false,
-//                        D1 routes directly to D2.Process (legacy).
+//     D1 routes directly to D2.Process (legacy).
 //   - FastPathThreshold: minimum ClassifyIntent confidence for the FastPath.
-//                        Below this, the message is routed to OrchestratePath.
+//     Below this, the message is routed to OrchestratePath.
 //   - CommandFirst:      if true, recognized commands short-circuit Classify
-//                        and bypass the LLM (v1.0 default true).
+//     and bypass the LLM (v1.0 default true).
 //   - LLMFallback:       v1.0 always false (LLM fallback deferred to v1.1).
 //   - D6ValidationTimeoutMs: advisory D6 validation budget. Timeout → pass.
 //   - PlanModeApproveGate: when true, Wave triggers require an explicit
-//                          Plan approve (per R2 OQ-1 resolution A).
+//     Plan approve (per R2 OQ-1 resolution A).
 type Config struct {
 	Enabled               bool
 	FastPathThreshold     int

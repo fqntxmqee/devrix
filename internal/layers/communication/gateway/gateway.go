@@ -50,8 +50,8 @@ type CommunicationGateway struct {
 	// instead of contextEngine.Process. Per R2 命题 A: D1 owns ingress
 	// owner (route-or-not decision via feature flag); D7 owns routing
 	// decision owner (FastPath vs OrchestratePath).
-	d7Entry    contracts.IOrchestrationEntry
-	d7Enabled  bool
+	d7Entry   contracts.IOrchestrationEntry
+	d7Enabled bool
 
 	mu                   sync.RWMutex
 	sessions             map[string]*types.Session

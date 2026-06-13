@@ -17,9 +17,9 @@ import (
 //
 // v1.0 metrics: orchestration.fast_path.count (counter).
 type FastPath struct {
-	cfg     *Config
+	cfg      *Config
 	executor D2Executor
-	sink    D1EventSink
+	sink     D1EventSink
 }
 
 // NewFastPath builds the proxy. executor is required; sink is optional

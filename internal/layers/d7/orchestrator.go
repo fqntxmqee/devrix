@@ -12,9 +12,9 @@ import (
 //
 // D1 RouteInbound (when d7_enabled=true) calls ProcessMessage. The
 // orchestrator:
-//   1. Classifies the intent (rule-only in v1.0).
-//   2. Routes to FastPath or OrchestratePath per the routing matrix.
-//   3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
+//  1. Classifies the intent (rule-only in v1.0).
+//  2. Routes to FastPath or OrchestratePath per the routing matrix.
+//  3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
@@ -87,10 +87,10 @@ func NewSessionOrchestrator(cfg *Config, executor D2Executor, opts ...Orchestrat
 // Routing:
 //   - skip        → return empty channel
 //   - command     → handleCommand (v1.0: passthrough to D2 with a
-//                   system-prompt hint that this is a command)
+//     system-prompt hint that this is a command)
 //   - fast        → FastPath.Run (D2.RunQueryLoop direct)
 //   - orchestrate → OrchestratePath (v1.0: route to PlanMode if active,
-//                   else to a single-task D2 call; Wave is a v1.1+
+//     else to a single-task D2 call; Wave is a v1.1+
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) (<-chan *contracts.EngineEvent, error) {
 	intent, err := o.classifier.Classify(ctx, req.Message)
 	if err != nil {

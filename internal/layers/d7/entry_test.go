@@ -263,9 +263,9 @@ func TestBuildConfig_Overrides(t *testing.T) {
 	yes, threshold := true, 75
 	whitelist := []string{"/x", "/y"}
 	file := &FileConfig{
-		Enabled:               &yes,
-		FastPathThreshold:     &threshold,
-		CommandWhitelist:      whitelist,
+		Enabled:           &yes,
+		FastPathThreshold: &threshold,
+		CommandWhitelist:  whitelist,
 	}
 	cfg := BuildConfig(file)
 	if !cfg.Enabled {

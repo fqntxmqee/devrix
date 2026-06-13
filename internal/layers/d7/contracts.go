@@ -44,11 +44,11 @@ type D4Executor interface {
 
 // AgentSpec describes a delegate worker.
 type AgentSpec struct {
-	WorkerType   string            // cursor | claude_code | subagent
-	Directive    string            // task description
-	Tools        []string          // tool whitelist (e.g. "read", "grep", "edit")
-	ContextPolicy string           // fresh | resume | upstream
-	Metadata     map[string]string
+	WorkerType    string   // cursor | claude_code | subagent
+	Directive     string   // task description
+	Tools         []string // tool whitelist (e.g. "read", "grep", "edit")
+	ContextPolicy string   // fresh | resume | upstream
+	Metadata      map[string]string
 }
 
 // AgentHandle is opaque from D7's view; D4 owns the lifecycle.
@@ -70,9 +70,9 @@ type D6Validator interface {
 
 // OrchestrationDecision is the input to D6 advisory validation.
 type OrchestrationDecision struct {
-	Intent  IntentClassification
+	Intent    IntentClassification
 	SessionID string
-	Plan    *Plan
+	Plan      *Plan
 }
 
 // ValidationResult is the D6 advisory output.
