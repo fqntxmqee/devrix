@@ -1024,25 +1024,9 @@ func (g *CommunicationGateway) handleForkCommand(session *types.Session, cmd str
          └─────┘
 ```
 
-### 11.2 T 层测试点（OpenSpec t-registry）
+### 11.2 T 层测试点
 
-| T 层 ID | 描述 | 优先级 | 类型 |
-|-------|------|--------|------|
-| D4-AGENT-T01 | AgentFactory 创建智能体实例（状态=CREATED，配置正确） | P0 | 单元 |
-| D4-AGENT-T02 | Agent 生命周期状态转换（全路径覆盖，非法转换拒绝） | P0 | 单元 |
-| D4-AGENT-T03 | 工具风险等级映射正确，CRITICAL 触发权限 | P0 | 单元 |
-| D4-AGENT-T04 | 权限管线授权/拒绝/超时流程 | P0 | 集成 |
-| D4-AGENT-T05 | Fork/Join 子 Agent 创建+并行执行+结果合并 | P0 | 单元 |
-| D4-AGENT-T06 | Fork 数超限 MaxChildren 返回错误 | P1 | 单元 |
-| D4-AGENT-T07 | Agent 超时自动终止 | P1 | 单元 |
-| D4-AGENT-T08 | Context 取消传播到子 Agent | P1 | 单元 |
-| D4-AGENT-T09 | CollaborationMode Chain-of-Thought prompt 生成 | P1 | 单元 |
-| D4-AGENT-T10 | CollaborationMode Iterative-Refinement prompt 生成 | P1 | 单元 |
-| D4-AGENT-T11 | ObserverAdapter 正确桥接 Agent 事件到 IObserver | P2 | 单元 |
-| D4-AGENT-T12 | Agent 并发安全（-race 检测无 race condition） | P0 | 单元 |
-| D4-AGENT-T13 | SessionContext 共享写入安全（并发 Fork + Join） | P1 | 集成 |
-| D4-AGENT-T14 | PermissionManager 集成—用户批准、拒绝、超时 | P1 | 集成 |
-| D4-AGENT-T15 | 端到端：用户指令触发 Agent Fork 并得到并行结果 | P2 | E2E |
+完整的测试点清单见 `openspec/specs/d4-multi-agent/t-registry.md`（38 条：38 IMPLEMENTED，P0 19 条）。本文档不重复列出。
 
 ### 11.3 Mock 策略
 
@@ -1054,14 +1038,7 @@ func (g *CommunicationGateway) handleForkCommand(session *types.Session, cmd str
 
 ### 11.4 测试文件对应
 
-| 源文件 | 测试文件 | 覆盖要求 |
-|--------|----------|---------|
-| `agent/lifecycle.go` | `agent/agent_test.go` | ≥ 80% |
-| `agent/forkjoin.go` | `agent/agent_test.go` | ≥ 80% |
-| `agent/state.go` | `agent/agent_test.go` | 100%（状态机） |
-| `factory/factory.go` | `factory/factory_test.go` | ≥ 80% |
-| `collaboration/prompt.go` | `collaboration/mode_test.go` | ≥ 80% |
-| `observer/adapter.go` | （通过 agent_test 间接覆盖） | ≥ 70% |
+测试文件与源文件对应关系见 `openspec/specs/d4-multi-agent/t-registry.md` 中的 Test 位置列。
 
 ---
 

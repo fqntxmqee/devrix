@@ -454,31 +454,7 @@ Gateway 通过 `observability.Bridge` 集成 OpenTelemetry：
 
 ## 九、测试策略
 
-| T 层 ID | 描述 | 优先级 | 场景 |
-|---------|------|--------|------|
-| D3-S1-A01-T01 | DeepSeek 适配器流式响应 | P0 | Adapter |
-| D3-S1-A01-T02 | MiniMax 适配器流式响应 | P0 | Adapter |
-| D3-S1-A01-T03 | SSE parse error handling | P1 | Adapter |
-| D3-S3-A01-T01 | Circuit breaker 正常关闭 | P0 | Breaker |
-| D3-S3-A01-T02 | Circuit breaker 触发开启 | P0 | Breaker |
-| D3-S3-A01-T03 | Circuit breaker 半开→关闭 | P0 | Breaker |
-| D3-S3-A01-T04 | Circuit breaker 半开→开启 | P0 | Breaker |
-| D3-S3-A01-T05 | 熔断器状态持久化 | P2 | Breaker (PLANNED) |
-| D3-S5-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | Token |
-| D3-S5-A01-T02 | Token 预算检查 | P0 | Token |
-| D3-S5-A01-T03 | Token counter 中文准确性 | P1 | Token |
-| D3-S6-A01-T01 | Provider 配置加载 | P0 | Config |
-| D3-S4-A01-T01 | 重试策略执行 (Full Jitter) | P0 | Retry |
-| D3-S4-A01-T02 | DeepSeek Fallback 模型切换 | P1 | Retry |
-| D3-S4-A01-T03 | MiniMax Fallback 模型切换 | P1 | Retry |
-| D3-S2-A01-T01 | LLM 调用可观测事件 | P1 | Gateway |
-| D3-S2-A01-T02 | 未知 Provider/Model 报错 | P1 | Gateway |
-| D3-S2-A01-T03 | 多 Provider 并发调用 | P1 | Gateway |
-| D3-S2-A01-T04 | Retry 与 CB 联动，context 取消不触发 CB | P0 | Gateway |
-| D3-S2-A01-T05 | Half-Open 并发探测限制 | P0 | Gateway |
-| D3-S2-A01-T06 | LLM 429 rate limit handling | P1 | Gateway |
-| D3-S7-A01-T01 | Safety filter critical rejection | P0 | Safety |
-| D3-S7-A01-T02 | Safety filter warning matches | P1 | Safety |
+完整的测试点清单见 `openspec/specs/d3-llm-gateway/t-registry.md`（26 条：25 IMPLEMENTED + 1 PLANNED，P0 11 条）。本文档不重复列出。
 
 ---
 
