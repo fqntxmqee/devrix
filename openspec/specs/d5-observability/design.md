@@ -1,339 +1,300 @@
-# Devrix 可观察层深度分析
+# D5 Observability Layer 详细设计
 
-> **架构入口:** [architecture/contracts-and-boundaries.md](./architecture/contracts-and-boundaries.md)  
-> **Operation 常量:** `internal/layers/observability/telemetry/names.go`  
-> **注意:** 下文 `pev_engine` 组件名已退役；生产路径以 `context.process` + `llm.stream` 为主。
+**文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
+**Domain:** D5 Observability
+**DSAFT Type:** 公共域
+**Version:** 2.0.0
+**Status:** Active
+**Last Updated:** 2026-06-14
+**架构入口:** `openspec/specs/d5-observability/spec.md`
+**Operation 常量:** `internal/layers/observability/telemetry/names.go`
+**Registry SoT:** `internal/layers/observability/coverage/registry.go`
 
-## 一、架构总览
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    可观察层 (Observability)                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Tracer          │  Metrics        │  Logger      │  Coverage   │
-│  ─────           │  ──────         │  ──────       │  ───────    │
-│  分布式追踪      │  指标聚合       │  结构化日志   │  代码染色    │
-│  (Jaeger/OTLP) │  (Prometheus)   │  (slog)      │  (覆盖率)   │
-└─────────────────┴─────────────────┴───────────────┴─────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │      Bridge (统一入口)        │
-              │  tracer / meter / logger     │
-              │  LLMBridge / ToolBridge    │
-              │  SessionBridge              │
-              └───────────────────────────────┘
-```
-
-## 二、核心数据结构
-
-### 2.1 Span (分布式追踪)
-
-```go
-// tracer/span.go
-type Span struct {
-    name      string
-    sc        SpanContext  // TraceID + SpanID + Flags
-    parent    *SpanContext
-    kind      SpanKind     // internal/server/client/producer/consumer
-    startTime time.Time
-    endTime   time.Time
-    attrs     map[string]interface{}  // 关键属性
-    events    []Event             // 事件列表
-    status    Status
-}
-
-// Span 属性结构
-Attributes = {
-    "devrix.layer":        "context|llm|communication|agent",
-    "devrix.component":     "context_engine|harness|llm_gateway|gateway|agent_tool|...",
-    "session.id":          "sess_xxx",
-    "llm.provider":        "openai|anthropic",
-    "llm.model":           "gpt-4|claude-3",
-    "llm.tokens.prompt":    "128",
-    "llm.tokens.completion": "256",
-    "llm.latency_ms":      "150",
-    "pev.iteration":       "0|1|2",
-    "tool.name":            "bash|write_file|...",
-    "tool.risk_level":      "low|medium|high|critical",
-}
-```
-
-### 2.2 Operation 注册表 (Coverage)
-
-```go
-// coverage/registry.go
-type OperationMeta struct {
-    Name          string  // "context.pev.run"
-    Layer         string  // "context"
-    Component     string  // "pev_engine"
-    SinceVersion  string  // "1.2.0"
-    Instrumented  bool
-}
-
-// 层级结构
-Layer.Component:
-├── context.context_engine
-│   ├── context.process
-│   ├── context.snapshot.load
-│   ├── context.compression.run
-│   ├── context.plan.generate
-│   └── context.longterm.*
-├── context.pev_engine
-│   ├── context.pev.run
-│   ├── context.pev.llm_call
-│   ├── context.pev.tool_execute
-│   ├── context.pev.verify
-│   └── context.pev.permission_check
-├── llm.llm_gateway
-│   ├── llm.stream
-│   ├── llm.provider.route
-│   ├── llm.circuit_breaker
-│   └── llm.retry
-├── communication.gateway
-│   ├── gateway.message.receive
-│   ├── gateway.session.*
-│   └── gateway.store.*
-└── agent.agent_tool
-    ├── agent.run
-    ├── agent.tool.call
-    └── agent.fork|join|terminate
-```
-
-### 2.3 Metrics 指标
-
-```go
-// metrics/meter.go
-类型:
-├── Counter      // 计数器 (累加值)
-├── Histogram    // 直方图 (延迟分布)
-├── Gauge       // 仪表 (当前值)
-└── UpDownCounter // 增减计数器
-
-标签:
-"provider": "openai"
-"model": "gpt-4o"
-"token_type": "input|output|cache_read|reasoning"
-"tool": "bash"
-"risk_level": "high"
-"adapter": "cli"
-"status": "ok|error|denied"
-```
-
-### 2.4 LLM 日志
-
-```go
-// llm_log.go
-LLMCallInfo = {
-    iteration: 0,
-    model: "gpt-4",
-    message_count: 12,
-    tool_count: 5,
-    messages: [
-        {role: "user", content: "..."},
-        {role: "assistant", content: "..."},
-    ],
-    tool_calls: [
-        {name: "bash", input: "ls -la"},
-    ],
-    prompt_tokens: 512,
-    completion_tokens: 128,
-}
-```
-
-## 三、第一性原理分析
-
-### 3.1 为什么这样设计？
-
-**问题 1: 为什么需要分层 (L1-L6)？**
-
-Devrix 是一个复杂的多智能体系统，需要：
-- 理解请求在不同层之间的流转
-- 定位问题发生在哪一层
-- 关联跨层的调用链路
-
-**设计选择**: Jaeger 的 Layer/Component 结构天然适配
-
-```
-L1: Communication  ←→  L2: Context  ←→  L3: LLM
-     ↓                     ↓                  ↓
-  用户输入              上下文管理          模型调用
-  飞书/CLI              PEV Loop           OpenAI/Claude
-```
-
-**问题 2: 为什么用 Operation Name 作为代码染色的粒度？**
-
-- 比函数级别更粗（避免过多噪音）
-- 比模块级别更细（能定位到具体操作）
-- 与 Jaeger trace 直接对应（可关联查看）
-
-**问题 3: 为什么 Metrics 和 Tracer 分开？**
-
-| 维度 | Metrics | Tracer |
-|------|---------|--------|
-| 用途 | 聚合统计 | 单次请求追踪 |
-| 保留 | 长期 | 短期 |
-| 聚合 | sum/avg/p99 | - |
-| 场景 | 容量规划、SLO | 调试、根因 |
-
-**互补设计**: Metrics 回答"系统怎么样"，Tracer 回答"这次请求发生了什么"
-
-**问题 4: 为什么需要 Baggage？**
-
-跨服务传递上下文（单进程 monolith 下 span attributes 通常足够，见 §十）。
-
-## 四、当前埋点覆盖（2026-06-10，P0–P2 后）
-
-### 4.1 Registry 状态
-
-- **Operation 总数**: 44+（见 `internal/layers/observability/coverage/registry.go`）
-- **静态注册**: 主链 operation 均已 `Instrumented: true`
-- **Runtime Hit**: 取决于流量路径；条件分支（compression、plan、milestone、longterm）在未触发时为零命中，**不代表死代码**
-
-### 4.2 主链埋点（已实现）
-
-| Layer | 代表 Operation | 状态 |
-|-------|----------------|------|
-| communication | `gateway.message.receive` | ✅ SERVER |
-| context | `context.process`, `context.compression.run`, `context.system_prompt.build` | ✅ |
-| context | `context.pev.run` → `iteration` → `llm_call` / `tool_execute` / `verify` | ✅ 层级契约 |
-| llm | `llm.stream` → `llm.adapter.stream` | ✅ CLIENT |
-| agent | `agent.tool.call`, `agent.run` | ✅ |
-
-### 4.3 条件触发 Operation（zero-hit 常见）
-
-| Operation | 触发条件 |
-|-----------|----------|
-| `context.compression.run` | token 超 `CompressionTarget` |
-| `context.plan.generate` | PEV plan 模式 |
-| `context.milestone.run` | milestone DAG |
-| `context.longterm.*` | longterm.enabled |
-| `context.harness.*` | harness.enabled |
-| `context.pev.synthesis` | 工具轮次后合成 |
-| `context.pev.tool_execute` | LLM 返回 tool_calls |
-
-### 4.4 仍待扩展（非阻塞）
-
-| 项 | 说明 |
-|----|------|
-| Baggage 业务接入 | 单进程 monolith 下 span attributes 已够用；多服务拆分时再启用 |
-| `cache_read` / `reasoning` token metrics | Provider usage details → metrics + span attrs |
-| OTLP tail-sampling | 见 §九，仅规划 |
+> **注意:** `context.pev.*` 与 `pev_engine` 组件已退役（2026-06-13）。生产路径以 `context.process` + `query.loop.*` + `llm.stream` 为主；`context.harness.*` 仅在 `harness.enabled=true` 时触发。
 
 ---
 
-## 五、Canonical Trace Tree（D5-TRACE-T04/06）
+## 文档索引
 
-集成测试 `tests/integration/obs_pev_span_hierarchy_test.go` 验证 R1–R2 与 SpanKind。
+| 文档 | 用途 |
+|------|------|
+| `spec.md` | DSAFT 规范 SoT（Scenarios、Requirements） |
+| 本文档 | 六段式可读架构设计（评审 / onboarding） |
+| `layer-delta.md` | 层能力 Delta（Gherkin Scenario） |
+| `coverage.md` | 代码染色操作手册 |
+| `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
+
+---
+
+## ① 架构目标
+
+### 业务目标
+
+| 痛点 | 目标能力 | 可观测结果 |
+|------|----------|------------|
+| 多域 Agent 请求链路不可追踪 | W3C Trace Context + Jaeger Operation 树 | 单次会话完整 span 树 |
+| 问题定位不知发生在哪一层 | `devrix.layer` / `devrix.component` 属性 | Jaeger 按层/组件过滤 |
+| 埋点遗漏无法发现 | Operation Registry + Runtime Hit 对账 | Health `coverage.zero_hit_count` |
+| LLM 调试缺乏上下文 | LLM JSONL + trace 关联 + incident export | `devrix debug export` bundle |
+| 新旧执行路径混用难量化 | Runtime path metric | `runtime_path_resolved_total` |
+
+### 技术目标（量化）
+
+| 指标 | 目标 | 测量方式 |
+|------|------|----------|
+| Span 创建开销 | P99 < 50µs（无 exporter IO） | `bench_test.go` |
+| Coverage RecordHit | 原子计数，无锁竞争 panic | `coverage_test.go` 100 goroutine |
+| Shutdown flush | 100% pending span 导出 | `tracer_test.go` |
+| Gauge 数值正确性 | 100% 精确读写 | `gauge_test.go` |
+| Histogram 桶累积 | 与 Prometheus golden 一致 | `histogram_test.go` |
+| Registry 对账 | names.go ≡ registry.go（56 ops） | `registry_test.go` |
+
+### 约束条件
+
+| 类型 | 约束 | 设计响应 |
+|------|------|----------|
+| 架构 | 可观测故障不阻断业务 | `NewNoOp()` + nil Bridge 守卫 |
+| 基数 | 禁止 session_id 等高基数 label | Metrics `blocklist` |
+| 兼容 | 未知 operation 仍创建 span | WARN + 向后兼容 |
+| 退役 | PEV span 族不再注册 | Registry 已移除 `context.pev.*` |
+
+---
+
+## ② 架构原则
+
+### 设计原则
+
+1. **OTel Native** — SpanContext、Propagator、GenAI 语义属性对齐 OpenTelemetry
+2. **Zero-Config Default** — `DefaultConfig()` 开箱 OTLP + Prometheus
+3. **Graceful Degradation** — observability 模块故障 → `degraded`，不 panic
+4. **Cardinality Safety** — Label allowlist/blocklist 防指标爆炸
+5. **Coverage ≠ Sampling** — Hit 计数独立于 trace 采样决策
+
+### 命名规范
+
+| 场景 | 格式 | 示例 |
+|------|------|------|
+| Span / Jaeger Operation | `{layer}.{module}.{action}` | `query.loop.llm.call` |
+| Prometheus metric | `devrix_{instrument}` | `devrix_tool_latency` |
+| Layer attribute | `devrix.layer` | `context` |
+| Component attribute | `devrix.component` | `query_loop` |
+
+### 代码风格
+
+- 各域通过 `Bridge` 注入，禁止直接 `new Tracer`
+- Span 属性使用 `telemetry.SpanAttrs()` 统一注入 layer/component
+- 错误日志经 `StructuredLogger`，error 类型自动附加 stack
+
+---
+
+## ③ 业务流程
+
+### 主路径：QueryLoop Trace Tree
 
 ```
-gateway.message.receive                          [Server]
-└── context.process                              [Internal]
-    ├── context.system_prompt.load
+gateway.message.receive                          [SERVER]
+└── context.process                              [INTERNAL]
     ├── context.snapshot.load
+    ├── context.system_prompt.load
     ├── context.longterm.recall                  [if longterm.enabled]
     ├── context.compression.run                  [if shouldCompress]
-    │   attrs: compression.trigger_reason, compression.ratio
-    ├── context.system_prompt.build              [if harness.enabled]
-    │   attrs: gen_ai.prompt.version, gen_ai.prompt.template_hash
-    └── context.pev.run
-        ├── context.plan.generate                [if ShouldPlan]
-        ├── context.milestone.run
-        └── context.pev.iteration                [per iter; ctx propagated]
-            ├── context.pev.llm_call             [Client]
-            │   └── llm.stream                   [Client; ctx from llm_call]
-            │       ├── llm.provider.route
-            │       ├── llm.circuit_breaker
-            │       ├── llm.retry
-            │       └── llm.adapter.stream       [Client]
-            ├── context.pev.tool_execute         [Internal]
-            │   └── context.pev.permission_check
-            └── context.pev.verify
-        └── context.pev.synthesis                [if tools]
-            └── llm.stream → … (同上)
+    │   └── context.compression.step.{step}      [per pipeline step]
+    ├── query.loop.run                           [if query_loop.enabled]
+    │   └── query.loop.turn                      [per turn]
+    │       ├── query.loop.llm.call              [CLIENT]
+    │       │   └── llm.stream                   [CLIENT]
+    │       │       ├── llm.provider.route
+    │       │       ├── llm.circuit_breaker
+    │       │       ├── llm.retry
+    │       │       └── llm.adapter.stream       [CLIENT]
+    │       └── tool.execute.single              [if tool_calls]
+    │           └── tool.execute.permission      [if CRITICAL]
     ├── context.memory.snapshot.save
-    └── context.longterm.store
+    └── context.longterm.store                   [if auto_store]
 ```
 
-### 层级约束（MUST）
+### 条件路径：Legacy Harness
 
-| 规则 | 约束 | 测试 |
+当 `query_loop.enabled=false` 且 `harness.enabled=true`：
+
+```
+context.process
+├── context.harness.bootstrap.run
+│   └── context.harness.bootstrap.stage  (prefetch|guards|setup|deferred_init|tool_pool)
+├── context.harness.preflight
+├── context.harness.tool_pool
+├── context.harness.route
+└── context.system_prompt.build
+```
+
+### 跨域 Agent / Orchestration
+
+```
+agent.run → agent.tool.call → agent.fork|join|terminate
+orchestration.wave.schedule → orchestration.wave.task.execute
+orchestration.flow.event.publish
+```
+
+### 异常与补偿
+
+| 场景 | 行为 | 可观测性 |
+|------|------|----------|
+| Tracer shutdown 中 | 返回 no-op span | 不 panic |
+| Exporter 失败 | span 本地记录，health `degraded` | WARN 日志 |
+| 未知 operation | 仍创建 span + WARN | `unknown_hits` 计数 |
+| Observability disabled | `NewNoOp()` | 零开销路径 |
+
+---
+
+## ④ 领域模型
+
+### 核心聚合
+
+```
+Observability (Facade)
+├── TracerProvider → Tracer → Span
+├── MeterProvider → Meter → Counter|Histogram|Gauge
+├── StructuredLogger → Handler + Sampler + Redactor
+├── CoverageReporter → Counter + Persistence
+└── Bridge → ToolBridge | SessionBridge
+```
+
+### Operation 注册表（56 条，按 Layer 分组）
+
+| Layer | Component 数 | 代表 Operation |
+|-------|---------------|----------------|
+| `communication` | gateway(11), adapter(3) | `gateway.message.receive`, `adapter.message.receive` |
+| `context` | context_engine(10), harness(5), query_loop(3), tool_runner(2), plan_*(7) | `context.process`, `query.loop.run` |
+| `llm` | llm_gateway(4), llm_adapter(1) | `llm.stream`, `llm.adapter.stream` |
+| `agent` | agent_tool(6) | `agent.run`, `agent.tool.call` |
+| `orchestration` | orchestrator(3) | `orchestration.wave.schedule` |
+
+### 值对象
+
+| 类型 | 字段 | 用途 |
 |------|------|------|
-| R1 | `context.pev.llm_call` parent = `context.pev.iteration` | ✅ |
-| R2 | `llm.stream` parent = `context.pev.llm_call` 或 synthesis 链 | ✅ |
-| R3 | `context.pev.permission_check` parent = `context.pev.tool_execute` | 结构保证 |
-| R4 | `context.pev.iteration` 生命周期 = 单轮（无 loop defer） | ✅ |
-| R5 | 同 trace 共享 trace_id；`session.id` 一致 | ✅ |
+| `SpanContext` | TraceID, SpanID, TraceFlags | W3C 传播 |
+| `OperationMeta` | Name, Layer, Component, SinceVersion, Instrumented | Registry 元数据 |
+| `GenAITokenBreakdown` | Input, Output, CacheRead, Reasoning | Token metrics |
+| `Bundle` (incident) | schema_version, llm_rounds, trace, coverage_hits | 调试导出 |
 
 ---
 
-## 六、Metrics 目录（已实现）
+## ⑤ 核心链路图
 
-| Metric | Labels | 写入位置 |
-|--------|--------|----------|
-| `devrix_tool_latency` | tool, risk_level, status | PEV tool execute |
-| `devrix_compression_ratio` | — | context compression |
-| `devrix_gen_ai.client.token.usage` | token_type, model | LLM gateway + PEV |
-| `devrix_engine_tool_calls` | tool, risk_level | PEV |
-| `devrix_llm_*` | provider, model | LLM gateway |
-| `devrix_active_sessions` | adapter | Session bridge |
+### 端到端可观测路径
 
-Prometheus 端点：`observability.metrics` 配置（默认 `/metrics`）。
+```
+用户消息 (D1)
+  → gateway.message.receive span [trace_id 生成/继承]
+  → context.process span [ctx 传播]
+  → query.loop.run span
+  → query.loop.llm.call span
+  → llm.stream span (D3) [gen_ai.* attrs + devrix_gen_ai.client.token.usage]
+  → tool.execute.single span [devrix_tool_latency observe]
+  → slog.InfoContext [traceId 注入]
+  → LLM JSONL [trace_id 写入]
+  → OTLP exporter → Jaeger
+  → coverage.RecordHit [无条件，不受采样影响]
+  → HealthCheck [coverage 摘要]
+```
+
+### 单点风险
+
+| 节点 | 风险 | 缓解 |
+|------|------|------|
+| OTLP Collector 不可用 | span 丢失 | Console/Memory fallback；health `degraded` |
+| `~/.devrix/coverage/` 不可写 | 日报失败 | 进程内 Report 仍可用 |
+| 高基数 label 误用 | Prometheus 爆炸 | Registry blocklist + validateLabels |
 
 ---
 
-## 七、Log ↔ Trace ↔ LLM 关联（P0）
+## ⑥ 接口 / API 设计
 
-| 信号 | 关联字段 | 实现 |
-|------|----------|------|
-| slog | `trace_id`, `span_id` | `InstallSlogBridge()` |
-| LLM JSONL | `trace_id`, `span_id` | `llm_log.go` |
-| Span | `gen_ai.*` 双写 | PEV / LLM spans |
+### 编程接口
 
----
+```go
+// Facade
+obs, _ := observability.New(cfg)
+bridge := observability.NewBridge(obs)
 
-## 八、Session Incident Export
+// Span 创建（各域标准模式）
+ctx, span := bridge.Tracer().Start(ctx, telemetry.OpQueryLoopLLMCall,
+    tracer.WithSpanKind(tracer.SpanKindClient),
+    tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpQueryLoopLLMCall)...),
+)
+defer span.End()
+
+// GenAI token metrics
+observability.RecordGenAITokenUsage(bridge.Meter(), model, usage)
+
+// Health + Coverage
+obs.HealthCheck()        // → coverage 摘要
+obs.CoverageReport(true) // → 完整 Report
+```
+
+### HTTP 端点
+
+| 端点 | 方法 | 响应 |
+|------|------|------|
+| `/health` | GET | `{status, components, coverage}` |
+| `/metrics` | GET | Prometheus exposition format |
+
+### CLI
 
 ```bash
-# 主二进制
+# Session incident export
 devrix debug export --session sess_xxx --output /tmp/incident.json
 
-# 独立命令（等价）
-go run ./cmd/debug-export --session sess_xxx
+# Coverage 报表
+go run ./cmd/coverage --date 2026-06-14 --summary
 ```
 
-Bundle schema v1：`internal/layers/observability/incident/export.go`（`llm_rounds`, `trace`, `coverage_hits`）。
+### 配置 Schema（摘要）
+
+```yaml
+observability:
+  enabled: true
+  tracing:
+    service_name: devrix
+    exporter: otlp  # console | otlp | memory | null
+    sampling: { type: always_on, rate: 1.0 }
+  metrics:
+    exporter: prometheus
+    endpoint: /metrics
+    labels:
+      allowlist: [provider, model, tool, risk_level, status, token_type, adapter, path]
+      blocklist: [session_id, user_id]
+  logging:
+    level: info
+    format: json
+    sampling: { max_entries_per_span: 100 }
+  llm:
+    log_content: true
+    log_dir: ~/.devrix/logs/llm
+  coverage:
+    enabled: true
+    dir: ~/.devrix/coverage
+    interval: 1h
+```
+
+### Metrics 目录
+
+| Metric | Type | Labels | 写入位置 |
+|--------|------|--------|----------|
+| `devrix_tool_latency` | Histogram | tool, risk_level, status | QueryLoop tool execute |
+| `devrix_compression_ratio` | Histogram | — | context compression |
+| `devrix_gen_ai.client.token.usage` | Counter | token_type, model | LLM gateway |
+| `devrix_active_sessions` | Gauge | adapter | SessionBridge |
+| `devrix_runtime_path_resolved_total` | Counter | path | runtime.D5 bridge |
 
 ---
 
-## 九、采样策略（规划，未实现）
-
-| 流量 | 建议采样率 |
-|------|-----------|
-| ERROR span | 100% |
-| 高延迟 P99+ | 100% |
-| 正常流量 | 5–20% |
-
-当前：**全量采集**（sampling=1.0）。待 OTLP 成本数据积累后启用 Collector tail-sampling。
-
----
-
-## 十、Baggage
-
-W3C `baggage` 头由 `tracer.Propagator` inject/extract；Gateway 入站写入 `session.id` / `user.id`；CLI agent 子进程通过 `TRACEPARENT` + `BAGGAGE` 环境变量继承。
-
-| Key | 设置点 |
-|-----|--------|
-| `session.id` | Gateway `RouteInbound` |
-| `user.id` | Gateway（UserID 非空时） |
-
----
-
-## 十一、改进行动（剩余）
+## 改进行动（剩余）
 
 | 优先级 | 任务 | 状态 |
 |--------|------|------|
-| — | Observability P0–P2 主链 | **DONE** |
-| P3 | Baggage propagation | **DONE** (DM-20260610-005) |
-| P3 | cache_read/reasoning token metrics | **DONE** (DM-20260610-007) |
-| P3 | OTLP tail-sampling | 规划 |
+| — | V1.0–V1.9 主链 | **DONE** |
+| — | QueryLoop span 族 + Registry 对账 | **DONE** (V2.0) |
+| P3 | OTLP tail-sampling | 规划（需 Collector 侧配置） |
+| P3 | SpanKind 契约集成测试（QueryLoop 路径） | PLANNED |

@@ -1,240 +1,183 @@
 # 代码染色 (Code Coverage)
 
-实时跟踪运行时 Span 调用，识别从未被触发过的操作（潜在无用代码）。
+实时跟踪运行时 Span 调用，识别从未被触发过的 Operation（潜在死代码或未启用功能）。
+
+**Registry SoT:** `internal/layers/observability/coverage/registry.go`（当前 **56** 条 Operation）
+**常量 SoT:** `internal/layers/observability/telemetry/names.go`
+
+> **2026-06-13 变更:** `context.pev.*` 族已移除；新增 `query.loop.*`、`tool.execute.*`、`task.*`、`orchestration.*`。
+
+---
 
 ## 工作原理
 
 ```
-Span 创建 → coverage.RecordHit() → 全局 Counter 原子计数
-                            ↓
-                    累积统计到内存
-                            ↓
-                    每日生成报告到 ~/.devrix/coverage/
+Tracer.Start(operation)
+  → coverage.RecordHit(operation)   # 无条件，不受采样影响
+  → coverage.IsKnown(operation)     # 未知则 WARN
+  → 原子计数累积到进程内 Counter
+  → CoverageReporter 定期持久化到 ~/.devrix/coverage/
+  → HealthCheck() 暴露 coverage 摘要
 ```
+
+---
 
 ## 操作注册表
 
-所有 Span 操作必须在 `coverage/registry.go` 中注册：
-
-```go
-// internal/layers/observability/coverage/registry.go
-func AllOperations() []OperationMeta {
-    return []OperationMeta{
-        {Name: "context.process", Layer: "context", Component: "context_engine", ...},
-        {Name: "context.pev.run", Layer: "context", Component: "pev_engine", ...},
-        {Name: "llm.stream", Layer: "llm", Component: "llm_gateway", ...},
-        // ...
-    }
-}
-```
+所有 Span 操作 MUST 在 `coverage/registry.go` 的 `AllOperations()` 中注册，并与 `telemetry/names.go` `Op*` 常量全集一致（`registry_test.go` 强制对账）。
 
 ### 层级结构
 
-| Layer | 说明 | 示例 |
-|-------|------|------|
-| `context` | 上下文引擎层 | `context_engine`, `pev_engine` |
-| `llm` | LLM 网关层 | `llm_gateway`, `llm_adapter` |
-| `communication` | 通信层 | `gateway`, `adapter` |
-| `agent` | Agent 工具层 | `agent_tool` |
+| Layer | Components | 示例 Operation |
+|-------|------------|----------------|
+| `communication` | `gateway`, `adapter` | `gateway.message.receive`, `adapter.feishu.outbound` |
+| `context` | `context_engine`, `harness`, `query_loop`, `tool_runner`, `plan_agent`, `plan_mode`, `task_manager` | `context.process`, `query.loop.run` |
+| `llm` | `llm_gateway`, `llm_adapter` | `llm.stream`, `llm.adapter.stream` |
+| `agent` | `agent_tool` | `agent.run`, `agent.tool.call` |
+| `orchestration` | `orchestrator` | `orchestration.wave.schedule` |
 
 ### 命名规范
 
 ```
-{layer}.{component}.{action}
+{layer}.{module}.{action}
 ```
 
-- `context.process` - 上下文处理主入口
-- `context.pev.llm_call` - PEV LLM 调用
-- `context.pev.tool_execute` - 工具执行
-- `llm.stream` - LLM 流式调用
+| Operation | 说明 |
+|-----------|------|
+| `context.process` | 上下文处理主入口 |
+| `query.loop.llm.call` | QueryLoop LLM 调用（现行主路径） |
+| `tool.execute.single` | 单工具执行 |
+| `llm.stream` | LLM 流式调用 |
 
-## 新增操作
+### 已退役 Operation（不再注册）
 
-1. 在 `registry.go` 的 `AllOperations()` 中添加：
+- `context.pev.run`, `context.pev.iteration`, `context.pev.llm_call`, `context.pev.tool_execute`, `context.pev.verify`
+- `context.plan.generate`, `context.milestone.run`（旧 PEV plan，由 `task.plan.*` 替代）
+
+---
+
+## 新增 Operation 流程
+
+1. 在 `telemetry/names.go` 添加 `Op*` 常量
+2. 在 `coverage/registry.go` `AllOperations()` 添加 `OperationMeta`
+3. 在 `coverage/registry_test.go` expected 列表追加
+4. 在业务代码 `tracer.Start(ctx, telemetry.OpXxx, ...)` 创建 span
+5. 运行 `go test ./internal/layers/observability/coverage/...`
 
 ```go
-{Name: "context.my_operation", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true}
+{Name: "context.my_operation", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true}
 ```
 
-2. 在创建 Span 时使用相同名称：
-
-```go
-ctx, span := tracer.Start(ctx, "context.my_operation")
-```
+---
 
 ## 命令行工具
 
-### 安装
-
 ```bash
-cd cmd/coverage
-go build -o ../bin/devrix-coverage .
-```
+# 构建
+go build -o bin/devrix-coverage ./cmd/coverage
 
-或直接运行：
-
-```bash
-go run ./cmd/coverage
-```
-
-### 使用
-
-```bash
-# 列出所有报表
+# 列出报表
 devrix-coverage --list
 
-# 查看指定日期详细报表
-devrix-coverage --date 2026-06-09
+# 查看指定日期
+devrix-coverage --date 2026-06-14 --summary
 
-# 查看简洁统计（按 Layer 分组）
-devrix-coverage --date 2026-06-09 --summary
-
-# 查看 N 天趋势
+# 7 天趋势
 devrix-coverage --trend 7
-
-# 查看最新报表
-devrix-coverage
 ```
+
+---
 
 ## 输出示例
 
-### 详细报表
+### 简洁统计
 
 ```
-========== Coverage Report: 2026-06-09 ==========
-Coverage: 22.2% (4/18 operations hit)
+========== Coverage Summary: 2026-06-14 ==========
+Total: 28.6% (16/56 operations)
 
-┌─ CONTEXT ──────────────────────────────────────
-│  Layer: context
-│
-│  ├─ pev_engine (3/8 hit)
-│  │   ● context.pev.run [1.2.0] 5 hits
-│  │   ● context.pev.llm_call [1.2.0] 8 hits
-│  │   ○ context.pev.tool_execute [1.2.0] 0 hits
-│  │   ● context.pev.verify [1.2.0] 5 hits
-│
-│  ├─ context_engine (1/10 hit)
-│  │   ● context.process [1.2.0] 10 hits
-│  │   ○ context.snapshot.load [1.2.0] 0 hits
-
-┌─ LLM ──────────────────────────────────────
-│  Layer: llm
-│
-│  ├─ llm_gateway (0/4 hit)
-│  │   ○ llm.stream [1.2.0] 0 hits
-│  │   ○ llm.retry [2.0.0] 0 hits
+context         |██████░░░░░░░░░░░░░░|  32.1% (9/28)
+communication   |████░░░░░░░░░░░░░░░░|  21.4% (3/14)
+llm             |███░░░░░░░░░░░░░░░░░|  20.0% (1/5)
+agent           |░░░░░░░░░░░░░░░░░░░░|   0.0% (0/6)
+orchestration   |░░░░░░░░░░░░░░░░░░░░|   0.0% (0/3)
 ```
 
 ### 符号说明
 
 | 符号 | 含义 |
 |------|------|
-| `●` | 已命中（运行时被调用） |
-| `○` | 零命中（从未被调用，可能是无用代码） |
+| `●` | 已命中 |
+| `○` | 零命中（可能是条件分支或未启用功能） |
 
-### 简洁统计
-
-```
-========== Coverage Summary: 2026-06-09 ==========
-Total: 22.2% (4/18 operations)
-
-context         |████░░░░░░░░░░░░░░░░| 22.2% (4/18)
-communication   |░░░░░░░░░░░░░░░░░░░░|  0.0% (0/15)
-agent           |░░░░░░░░░░░░░░░░░░░░|  0.0% (0/6)
-llm             |░░░░░░░░░░░░░░░░░░░░|  0.0% (0/5)
-```
-
-### 趋势报表
-
-```
-========== Coverage Trend ==========
-Period: 2026-06-07 → 2026-06-09
-
-2026-06-07 |████████████░░░░░░░░░░░░░░░░░░░░░░░|  25.0% hit:11 zero:33
-2026-06-08 |██████████░░░░░░░░░░░░░░░░░░░░░░░░░|  20.5% hit:9  zero:35
-2026-06-09 |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|  15.9% hit:7  zero:37
-```
+---
 
 ## 配置文件
 
 ```yaml
-# devrix.yaml 或 .env
 observability:
   coverage:
     enabled: true
-    dir: "~/.devrix/coverage"  # 报表存储目录
-    interval: 1h                       # 检查间隔
+    dir: "~/.devrix/coverage"
+    interval: 1h
 ```
 
-## 报表存储
-
-```
-~/.devrix/coverage/
-├── coverage_2026-06-07.json
-├── coverage_2026-06-08.json
-└── coverage_2026-06-09.json
-```
-
-### JSON 格式
+报表存储：`~/.devrix/coverage/coverage_YYYY-MM-DD.json`
 
 ```json
 {
-  "date": "2026-06-09",
-  "generated_at": "2026-06-09T00:00:00Z",
-  "operations_total": 44,
-  "operations_hit": 7,
-  "operations_zero": 37,
-  "coverage_ratio": 0.159,
+  "date": "2026-06-14",
+  "operations_total": 56,
+  "operations_hit": 16,
+  "operations_zero": 40,
+  "coverage_ratio": 0.286,
   "zero_hit_operations": [
-    {"operation": "context.snapshot.load", "layer": "context", "component": "context_engine", "since_version": "1.2.0"}
+    {"operation": "orchestration.wave.schedule", "layer": "orchestration", "component": "orchestrator", "since_version": "2.1.0"}
   ],
-  "unknown_hits": 1,
   "hits": {
-    "context.process": 5,
-    "context.pev.run": 5,
-    "context.pev.llm_call": 8
+    "context.process": 42,
+    "query.loop.run": 38,
+    "query.loop.llm.call": 35,
+    "llm.stream": 35
   }
 }
 ```
 
-## 按 Layer 验收（D1–D5）
+---
 
-Runtime coverage 按 **Layer** 分组统计，用于识别「某层完全未触达」而非追求 100% operation hit。
+## 按 Layer 验收
 
-| Layer | 典型 integration 测试 | 说明 |
-|-------|------------------------|------|
-| `communication` | `integration && d1` | Gateway / adapter 入站 |
-| `context` | `integration && d2` | PEV + compression + harness |
-| `llm` | `integration && d3` | LLM gateway 链 |
-| `agent` | `integration && d4` | Agent tool |
-| cross | `integration && cross` | 全链 trace 层级（含 SpanKind） |
+| Layer | 典型 integration 测试 | build tag |
+|-------|------------------------|-----------|
+| `communication` | `obs_trace_propagation_test.go` | `integration && d5` |
+| `context` | `context_harness_obs_test.go` | `integration && d2` |
+| `llm` | D3 integration | `integration && d3` |
+| `agent` | D4 integration | `integration && d4` |
+| cross | trace 层级 + SpanKind | `integration && cross` |
 
-**注意**: 条件 operation（见 `docs/observability-design.md` §4.3）在未触发时显示 zero-hit 是正常现象。
+**注意:** 条件 Operation 在未触发时 zero-hit 是正常现象，不代表死代码。常见条件触发：
 
-### 与 T 层测试点
-
-| T 层 | 验证方式 |
-|----|----------|
-| D5-TRACE-T04 | `obs_pev_span_hierarchy_test.go` — R1/R2 父子层级 |
-| D5-TRACE-T06 | 同上 — SpanKind SERVER/CLIENT |
-| Registry 对账 | `coverage/registry_test.go` vs `telemetry/names.go` |
+| Operation | 触发条件 |
+|-----------|----------|
+| `context.compression.run` | token 超 CompressionTarget |
+| `context.harness.*` | `harness.enabled=true` |
+| `context.longterm.*` | `longterm.enabled` |
+| `task.plan_mode.*` | plan mode 激活 |
+| `orchestration.*` | Wave Scheduler 启用 |
+| `agent.*` | Multi-Agent 路径 |
 
 ---
 
-## 识别无用代码
+## 与 T 层测试点
 
-零命中的操作可能是：
+| T 层 | 验证方式 |
+|------|----------|
+| D5-S5-A01-T01 | `registry_test.go` — Registry ≡ names.go |
+| D5-S5-A01-T02~T04 | `coverage_test.go` — zero_hit / 并发 / 采样独立 |
+| D5-S5-A01-T05 | `context_harness_obs_test.go` — harness span 树 |
+| D5-S4-A01-T03 | `obs_trace_propagation_test.go` — trace_id 继承 |
 
-1. **未启用功能** - 配置关闭了该功能
-2. **死代码** - 代码存在但从未被调用
-3. **条件分支** - 需要特定条件才会触发
-
-### 处理流程
-
-1. 查看零命中操作列表
-2. 检查对应代码是否仍在使用
-3. 如确认无用，清理代码或移除注册表项
-4. 如需保留，添加测试覆盖
+---
 
 ## API 接口
 
@@ -244,15 +187,14 @@ Runtime coverage 按 **Layer** 分组统计，用于识别「某层完全未触�
 curl http://localhost:8080/health
 ```
 
-响应包含：
-
 ```json
 {
+  "status": "healthy",
   "coverage": {
-    "operations_total": 44,
-    "operations_hit": 7,
-    "coverage_ratio": 0.159,
-    "zero_hit_count": 37
+    "operations_total": 56,
+    "operations_hit": 16,
+    "coverage_ratio": 0.286,
+    "zero_hit_count": 40
   }
 }
 ```
@@ -260,42 +202,24 @@ curl http://localhost:8080/health
 ### 编程接口
 
 ```go
-import "github.com/devrix/devrix/internal/layers/observability"
-
-// 获取当前报表
 report := obs.CoverageReport(true)
-
-// 生成日报
-dailyReport, err := obs.GenerateCoverageReport()
-
-// 获取趋势
+daily, err := obs.GenerateCoverageReport()
 trend, err := obs.CoverageReporter().GetTrend(7)
 ```
 
+---
+
 ## 最佳实践
 
-1. **新增 Span 时同步注册** - 保持 registry 与实际代码一致
-2. **定期审查零命中** - 每周检查一次
-3. **版本标记** - `since_version` 记录引入版本
-4. **测试覆盖** - 确保关键路径有测试
+1. **新增 Span 时同步注册** — 三处：`names.go` + `registry.go` + `registry_test.go`
+2. **定期审查 zero-hit** — 区分「条件未触发」vs「死代码」
+3. **版本标记** — `since_version` 记录引入版本
+4. **不追求 100% hit** — Coverage 用于发现「完全未触达的层」，非行覆盖率
 
 ## 故障排查
 
-### 报表为空
-
-- 检查 `observability.enabled` 配置
-- 确认 tracer 正常初始化
-- 查看日志中的 coverage reporter 启动信息
-
-### 未知操作警告
-
-```
-WARN observability: unknown operation operation=my.operation
-```
-
-解决方案：在 `registry.go` 中添加注册
-
-### 数据不累积
-
-- 每次启动是新进程，计数从零开始
-- 需要长期累积看报表目录
+| 症状 | 原因 | 解决 |
+|------|------|------|
+| 报表为空 | `observability.enabled=false` | 检查配置 |
+| `unknown operation` WARN | Registry 未登记 | 添加 `OperationMeta` |
+| 每次启动计数归零 | 进程内 Counter 设计 | 查看 `~/.devrix/coverage/` 持久化报表 |

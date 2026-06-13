@@ -1,413 +1,131 @@
 # Delta: Domain D5 (OBS)
 
-**Change ID:** devrix-foundation
-**Affects:** observability, tracing, metrics, logging
-**Version:** 2.0.0
-**Status:** Draft
-**Last Updated:** 2026-06-07
+**Change ID:** devrix-foundation → current
+**Affects:** observability, tracing, metrics, logging, coverage, incident export, runtime metrics
+**Version:** 3.0.0
+**Status:** Active
+**Last Updated:** 2026-06-14
 
 ---
 
-## Overview
+## Current State Summary
 
-可观察层为 Devrix 提供分布式追踪、指标采集和结构化日志能力，对齐 OpenTelemetry (OTel) 标准。分为 **Trace**（调用链）、**Metrics**（指标）、**Log**（日志）三大支柱。
-
-### Design Principles
-
-1. **OTel Native** - 数据模型、SpanContext、Propagator 对齐 W3C Trace Context
-2. **Zero-Config Default** - 开箱即用，无需配置即可工作
-3. **Graceful Degradation** - 可观察模块故障不影响核心业务
-4. **Cardinality Safety** - Label 白名单防止高基数指标爆炸
-
-### Version Scope
-
-| Version | Milestone | Features |
-|---------|-----------|----------|
-| V1 | MVP | Console exporter, basic spans, Prometheus metrics |
-| V2 | Enhanced | OTLP exporter, sampling, baggage propagation |
-| V3 | Full | Jaeger/Zipkin, tail-based sampling, APM integration |
+D5 可观测性域已从 V1 基础能力演进为完整的 V2 实现：56 条 canonical Operation、QueryLoop 主路径 span 族、W3C Baggage、GenAI token 细分 metrics、Session incident export、Runtime path metric。PEV 引擎退役后，Registry 与文档已移除 `context.pev.*` 族。
 
 ---
 
-## ADDED
+## ADDED (V2.0 — 2026-06-14)
 
-### Requirement: Trace/Span Data Model
+### Requirement: QueryLoop Span Family
 
-基于 OpenTelemetry Span 模型实现调用链追踪。
+QueryLoop 主路径 MUST 注册并创建以下 canonical Operation span：
 
-#### Scenario: Create root span on message arrival
-- GIVEN a new message arrives at Communication Layer
-- WHEN `RouteInbound` is called
-- THEN a root span is created with:
-  - `traceId`: 32-char hex string (W3C standard)
-  - `spanId`: 16-char hex string
-  - `parentSpanId`: empty (root span)
-  - `service.name`: "devrix"
-  - `service.version`: from `devrix.yaml`
-  - `session.id`: from message
-  - start timestamp
+| Operation | Component | SpanKind |
+|-----------|-----------|----------|
+| `query.loop.run` | query_loop | INTERNAL |
+| `query.loop.turn` | query_loop | INTERNAL |
+| `query.loop.llm.call` | query_loop | CLIENT |
 
-#### Scenario: Create child span for LLM call
-- GIVEN a root span exists with traceId
-- WHEN `LLMGateway.chat` is called
-- THEN a child span is created with:
-  - `parentSpanId`: from parent span
-  - `span.name`: "llm.chat"
-  - `span.attributes["llm.provider"]`: provider name
-  - `span.attributes["llm.model"]`: model name
-  - `span.attributes["llm.tokens.input"]`: input token count
-  - `span.attributes["llm.tokens.output"]`: output token count
-  - `span.attributes["llm.latency_ms"]`: call duration
+#### Scenario: QueryLoop span hierarchy
 
-#### Scenario: Create child span for tool execution
-- GIVEN a span exists with traceId
-- WHEN `ToolRegistry.execute` is called
-- THEN a child span is created with:
-  - `span.name`: "tool.execute"
-  - `span.attributes["tool.name"]`: tool name
-  - `span.attributes["tool.risk_level"]`: risk level
-  - `span.attributes["tool.args"]`: sanitized args (secrets redacted)
-  - `span.status`: Ok or Error
-
-#### Scenario: End span with status
-- GIVEN a span is active
-- WHEN operation completes
-- THEN span is ended with:
-  - end timestamp
-  - `span.status.code`: Unset | Ok | Error
-  - `span.status.description`: error message if Error
-
-#### Scenario: Record exception in span
-- GIVEN a span is active and an error occurs
-- WHEN `RecordError` is called
-- THEN span is updated with:
-  - `span.events` adds exception event
-  - `span.events[-1].name`: "exception"
-  - `span.events[-1].attributes["exception.type"]`: error type
-  - `span.events[-1].attributes["exception.message"]`: error message
-  - `span.events[-1].attributes["exception.stacktrace"]`: stack trace
-  - `span.status.code`: Error
+- GIVEN `query_loop.enabled=true` and tracing enabled
+- WHEN `ContextEngine.Process` completes one turn with LLM call
+- THEN span `query.loop.run` exists under `context.process`
+- AND `query.loop.turn` parent is `query.loop.run`
+- AND `query.loop.llm.call` parent is `query.loop.turn`
+- AND `llm.stream` parent is `query.loop.llm.call`
 
 ---
 
-### Requirement: Span Lifecycle
+### Requirement: Tool Execution Span Family
 
-Span 的完整生命周期管理。
-
-#### Scenario: Span starts with correct parent
-- GIVEN a context with parent SpanContext
-- WHEN tracer.StartSpan is called
-- THEN new span's parent is the given SpanContext
-- AND traceId is inherited from parent
-
-#### Scenario: Span starts with no parent (root)
-- GIVEN a context with no SpanContext
-- WHEN tracer.StartSpan is called
-- THEN new span is a root span
-- AND new traceId is generated
-
-#### Scenario: Span context propagation via Context
-- GIVEN a span is active
-- WHEN context is passed to child operation
-- THEN child inherits span via `context.WithSpan`
-- AND span can be retrieved via `SpanFromContext`
-
-#### Scenario: Span attributes are mutable
-- GIVEN an active span
-- WHEN SetAttribute is called multiple times
-- THEN attributes are merged (later wins for same key)
-- AND attribute count does not exceed 128
+| Operation | Component | 触发点 |
+|-----------|-----------|--------|
+| `tool.execute.single` | tool_runner | QueryLoop 工具执行 |
+| `tool.execute.permission` | tool_runner | CRITICAL 工具权限检查 |
 
 ---
 
-### Requirement: Trace ID Propagation
+### Requirement: Task/Plan Span Family
 
-跨组件和跨进程的消息传播。
-
-#### Scenario: Generate trace ID on entry
-- GIVEN a request enters via CLI adapter
-- WHEN `RouteInbound` is called
-- THEN traceId is generated as:
-  - Format: 32-char lowercase hex (W3C Traceparent compatible)
-  - Example: `4bf92f3577b34da6a3ce929d0e0e4736`
-  - OR extracted from incoming `traceparent` header if present
-
-#### Scenario: Extract trace ID from incoming traceparent header
-- GIVEN an incoming request has `traceparent` header
-- WHEN headers are parsed
-- THEN traceId is extracted from header format: `00-{traceId}-{spanId}-{flags}`
-- AND span is created with that traceId
-- AND incoming spanId becomes parent
-
-#### Scenario: Propagate trace ID through layers
-- GIVEN traceId exists at Communication Layer entry
-- WHEN message flows through layers (Context Engine → LLM Gateway → Tool Registry)
-- THEN traceId is passed via Go context.Context
-- AND included in all log entries
-
-#### Scenario: Inject trace ID into outgoing request headers
-- GIVEN trace context exists
-- WHEN outgoing HTTP/gRPC request is made
-- THEN `traceparent` header is injected
-- AND `tracestate` header is injected if baggage exists
-
-#### Scenario: No trace ID (initial request)
-- GIVEN request has no trace context
-- WHEN it enters the system
-- THEN new traceId is generated (root trace)
-- AND `tracestate` is empty
+| Operation | Component |
+|-----------|-----------|
+| `task.plan.generate` | plan_agent |
+| `task.plan_mode.enter/execute/approve/reject` | plan_mode |
+| `task.manager.create/update` | task_manager |
 
 ---
 
-### Requirement: Metrics Collection
+### Requirement: Orchestration Span Family
 
-Prometheus 格式指标采集，对齐 OpenMetrics 标准。
-
-#### Scenario: Track llm_tokens_total counter
-- GIVEN LLM call completes
-- WHEN response is received
-- THEN Counter `devrix_llm_tokens_total` is incremented
-- AND labels:
-  - `provider`: "anthropic" | "deepseek" | "openai"
-  - `model`: model name
-  - `direction`: "input" | "output"
-
-#### Scenario: Track llm_latency_seconds histogram
-- GIVEN LLM call completes
-- WHEN response is received
-- THEN Histogram `devrix_llm_latency_seconds` is recorded
-- AND labels: `provider`, `model`
-- AND bucket bounds: [0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, +Inf]
-
-#### Scenario: Track llm_errors_total counter
-- GIVEN LLM call fails
-- WHEN error is returned
-- THEN Counter `devrix_llm_errors_total` is incremented
-- AND labels: `provider`, `model`, `error_type`
-
-#### Scenario: Track tool_calls_total counter
-- GIVEN tool execution completes
-- WHEN `ToolRegistry.execute` returns
-- THEN Counter `devrix_tool_calls_total` is incremented
-- AND labels: `tool`, `risk_level`, `status` (success | error)
-
-#### Scenario: Track session_active gauge
-- GIVEN session is created
-- WHEN `CreateSession` succeeds
-- THEN Gauge `devrix_session_active` is incremented
-
-#### Scenario: Track session_active gauge decrements
-- GIVEN an active session
-- WHEN `ExpireSession` is called
-- THEN Gauge `devrix_session_active` is decremented
-
-#### Scenario: Track permission_timeouts counter
-- GIVEN permission request times out
-- WHEN timeout handler is called
-- THEN Counter `devrix_permission_timeouts_total` is incremented
-
-#### Scenario: Track permission_decisions counter
-- GIVEN user responds to permission
-- WHEN response is processed
-- THEN Counter `devrix_permission_decisions_total` is incremented
-- AND labels: `decision`: "approved" | "denied"
-
-#### Scenario: Label cardinality is controlled
-- GIVEN metric labels are configured
-- WHEN label value has high cardinality (e.g., session ID)
-- THEN label is NOT added to metric
-- AND warning is logged if debug enabled
-
-#### Scenario: Track context_tokens_gauge
-- GIVEN context engine processes a message
-- WHEN token count is calculated
-- THEN Gauge `devrix_context_tokens_current` is set
-- AND labels: `session_id` (truncated to 8 chars)
+| Operation | Component |
+|-----------|-----------|
+| `orchestration.wave.schedule` | orchestrator |
+| `orchestration.wave.task.execute` | orchestrator |
+| `orchestration.flow.event.publish` | orchestrator |
 
 ---
 
-### Requirement: Metrics Exporter
+### Requirement: Runtime Path Metric
 
-指标导出到 Prometheus 端点。
+系统 MUST 注册 `devrix_runtime_path_resolved_total` Counter，labels `path` ∈ {`query_loop`, `legacy_harness`}，与 in-process `PathResolver` 同步。
 
-#### Scenario: Prometheus endpoint returns metrics
-- GIVEN metrics are collected
-- WHEN `GET /metrics` is called
-- THEN response is in Prometheus exposition format
-- AND includes TYPE and HELP comments
-- AND includes all registered metrics
+#### Scenario: Path counter increments on Process
 
-#### Scenario: Metrics endpoint with authentication
-- GIVEN auth is configured for metrics endpoint
-- WHEN `GET /metrics` is called without token
-- THEN 401 Unauthorized is returned
-- AND no metrics are exposed
-
-#### Scenario: OTLP metrics export
-- GIVEN OTLP exporter is configured
-- WHEN metric is recorded
-- THEN metric is exported via OTLP protocol
-- AND batched (every 5 seconds or 100 metrics)
-
-#### Scenario: Metrics export on graceful shutdown
-- GIVEN shutdown is initiated
-- WHEN `Shutdown` is called on metrics exporter
-- THEN all pending metrics are flushed
-- AND exporter connection is closed
+- GIVEN observability metrics enabled and RegisterD5 called
+- WHEN ContextEngine routes to QueryLoop path
+- THEN `devrix_runtime_path_resolved_total{path="query_loop"}` increments by 1
 
 ---
 
-### Requirement: Structured Logging
+### Requirement: Compression Step Spans
 
-JSON 格式结构化日志，带 trace context。
-
-#### Scenario: Log entry includes trace context
-- GIVEN logger is called
-- WHEN `logger.Info` / `logger.Error` is invoked
-- THEN log entry includes:
-  - `timestamp`: ISO8601
-  - `level`: INFO/WARN/ERROR
-  - `message`: the log message
-  - `traceId`: 32-char hex
-  - `spanId`: 16-char hex
-  - `component`: layer name
-  - `service`: "devrix"
-  - `version`: from config
-
-#### Scenario: Log entry from different component
-- GIVEN log comes from communication layer
-- WHEN logger is instantiated in component
-- THEN `component` field is set to "communication"
-- AND distinguishes: "communication", "context_engine", "llm_gateway", "tool_registry", "multi_agent"
-
-#### Scenario: Log level filtering
-- GIVEN log level is set to INFO
-- WHEN `logger.Debug` is called
-- THEN log is not output (filtered)
-- AND `logger.Info` / `logger.Warn` / `logger.Error` are output
-
-#### Scenario: Error log includes stack trace
-- GIVEN an error occurs
-- WHEN `logger.Error` is called with error
-- THEN log entry includes:
-  - `error`: error message
-  - `stacktrace`: formatted stack trace
-  - `error.type`: error type name
-
-#### Scenario: Log sampling for high-volume spans
-- GIVEN span has > 100 log entries
-- WHEN sampling is enabled
-- THEN only first 10 and last 10 logs are kept
-- AND warning indicates sampling occurred
-
-#### Scenario: Secret redaction in logs
-- GIVEN log contains sensitive fields
-- WHEN `logger` formats message
-- THEN keys matching `[password, token, secret, api_key]` are redacted
-- AND value is replaced with `"[REDACTED]"`
+`context.compression.step` 族（`OpContextCompressionStep + "." + step`）MUST 在七步压缩管道每步触发时创建子 span。
 
 ---
 
-### Requirement: Configuration Schema
+## ADDED (V1.3–V1.9 — 已归档，仍有效)
 
-可观察模块的配置管理。
+### Requirement: Operation Registry & Runtime Hit Counter
 
-#### Scenario: Observability disabled
-- GIVEN `observability.enabled: false`
-- WHEN Devrix starts
-- THEN no tracing, metrics, or structured logging is initialized
-- AND application functions normally without observability overhead
+- Registry 56 条与 `names.go` 对账（`registry_test.go`）
+- `Tracer.Start` 无条件 `RecordHit`，不受采样影响
+- `HealthCheck` 暴露 coverage 摘要
 
-#### Scenario: Tracing enabled with console exporter
-- GIVEN `observability.tracing.enabled: true`
-- AND `observability.tracing.exporter: "console"`
-- WHEN Devrix starts
-- THEN spans are printed to stdout in JSON format
+### Requirement: Jaeger Alignment
 
-#### Scenario: Tracing enabled with OTLP exporter
-- GIVEN `observability.tracing.enabled: true`
-- AND `observability.tracing.exporter: "otlp"`
-- AND `observability.tracing.otlp.endpoint: "localhost:4317"`
-- WHEN Devrix starts
-- THEN spans are exported via OTLP/gRPC
+- `service.name` / `service.version` Resource 属性
+- `devrix.layer` / `devrix.component` span 属性
+- OTLP ScopeSpans.scope.name 取自 `devrix.component`
 
-#### Scenario: Sampling rate configuration
-- GIVEN `observability.tracing.sampling.rate: 0.1`
-- WHEN span is created
-- THEN 10% of spans are sampled
-- AND traceId ending determines sampling decision
+### Requirement: Log-Trace-LLM Correlation
 
-#### Scenario: Metrics enabled with Prometheus exporter
-- GIVEN `observability.metrics.enabled: true`
-- AND `observability.metrics.exporter: "prometheus"`
-- AND `observability.metrics.endpoint: "/metrics"`
-- WHEN Devrix starts
-- THEN Prometheus endpoint is registered
-- AND metrics are served at configured path
+- slog `traceId`/`spanId` 注入（`ContextHandler`）
+- LLM JSONL `trace_id`/`span_id` 字段
 
-#### Scenario: Log level configuration
-- GIVEN `observability.logging.level: "debug"`
-- WHEN logger is initialized
-- THEN DEBUG level logs are output
-- AND higher severity logs (INFO, WARN, ERROR) are also output
+### Requirement: GenAI Semantic Attributes & Metrics
 
-#### Scenario: JSON log format
-- GIVEN `observability.logging.format: "json"`
-- WHEN log entry is written
-- THEN output is valid JSON to stdout
+- Span 双写 `gen_ai.*` + `llm.*`
+- `devrix_gen_ai.client.token.usage` 含 `cache_read`/`reasoning` 细分
 
-#### Scenario: Text log format
-- GIVEN `observability.logging.format: "text"`
-- WHEN log entry is written
-- THEN output is human-readable text format
+### Requirement: Tool Latency & Compression Metrics
 
----
+- `devrix_tool_latency` Histogram
+- `devrix_compression_ratio` Histogram
+- `compression.trigger_reason` / `compression.ratio` span attrs
 
-### Requirement: Graceful Shutdown
+### Requirement: Session Incident Export
 
-可观察模块的优雅关闭。
+- `devrix debug export --session <id>` schema v1 bundle
 
-#### Scenario: Flush traces on shutdown
-- GIVEN Devrix receives SIGTERM
-- WHEN shutdown is initiated
-- THEN TracerProvider.Shutdown is called
-- AND all in-progress spans are ended
-- AND pending spans are exported
+### Requirement: W3C Baggage Propagation
 
-#### Scenario: Flush metrics on shutdown
-- GIVEN Devrix receives SIGTERM
-- WHEN shutdown is initiated
-- THEN MetricsExporter.Shutdown is called
-- AND all pending metric batches are sent
+- Gateway 入站 `session.id` / `user.id`
+- CLI 子进程 `TRACEPARENT` + `BAGGAGE` 环境变量
 
-#### Scenario: Shutdown timeout
-- GIVEN shutdown is initiated
-- WHEN TracerProvider.Shutdown hangs
-- THEN shutdown fails after 5 second timeout
-- AND warning is logged
+### Requirement: Harness Bootstrap Spans (条件)
 
----
-
-### Requirement: Health Endpoint
-
-可观察模块自身健康状态。
-
-#### Scenario: Health check includes observability status
-- GIVEN health check is requested
-- WHEN `GET /health` is called
-- THEN response includes:
-  - `status`: "healthy" | "degraded" | "unhealthy"
-  - `components.tracer.status`: current tracer state
-  - `components.tracer.exported_spans`: count
-  - `components.metrics.status`: current metrics state
-  - `components.metrics.collected_metrics`: count
-
-#### Scenario: Unhealthy tracer does not affect app
-- GIVEN tracer fails to export
-- WHEN span is created
-- THEN span is still recorded locally
-- AND app continues to function
-- AND health check shows tracer as degraded
+- `context.harness.*` + `context.system_prompt.build` 作为 `context.process` 子 span
 
 ---
 
@@ -415,225 +133,78 @@ JSON 格式结构化日志，带 trace context。
 
 | Item | Change | Reason |
 |------|--------|--------|
-| Trace Events → Trace/Span Data Model | 重构为 OTel Span 模型 | 对齐 OpenTelemetry 标准 |
-| Metrics Collection | 增加 llm_errors_total, context_tokens_gauge | 完善可观察性 |
-| Structured Logging | 增加 secret redaction, sampling | 生产环境安全 |
-| Trace ID Propagation | 使用 W3C Trace Context 标准 | 跨系统互通性 |
+| Canonical Trace Tree | PEV 层级 → QueryLoop 层级 | D2-S1 PEV 退役，D2-S10 QueryLoop 主路径 |
+| Operation 总数 | 44+ → 56 | 新增 query/tool/task/orchestration 族 |
+| `context.plan.generate` | 从 PEV plan 迁移到 `task.plan.generate` | Plan 能力重构到 task 子系统 |
+| Coverage 文档 | 移除 pev_engine 组件 | 对齐现行 Registry |
+| A/F/T 注册表 | 骨架 → 完整代码映射 | DSAFT 文档规范对齐 |
 
 ---
 
-## REMOVED
+## REMOVED / RETIRED
 
-| Item | Reason |
-|------|--------|
-| Agent Fork/Merge trace events | V3 feature |
-| Verify Pass/Fail trace events | V3 feature |
-| Jaeger/Zipkin native exporters | V2+ use OTLP instead |
-| Custom traceId format | Replaced with W3C 32-char hex |
+| Item | 退役日期 | 原因 |
+|------|----------|------|
+| `context.pev.run` | 2026-06-13 | PEV 引擎下线 |
+| `context.pev.iteration` | 2026-06-13 | 由 `query.loop.turn` 替代 |
+| `context.pev.llm_call` | 2026-06-13 | 由 `query.loop.llm.call` 替代 |
+| `context.pev.tool_execute` | 2026-06-13 | 由 `tool.execute.single` 替代 |
+| `context.pev.verify` | 2026-06-13 | Verify 逻辑重构 |
+| `context.pev.synthesis` | 2026-06-13 | QueryLoop 内置合成 |
+| `context.pev.permission_check` | 2026-06-13 | 由 `tool.execute.permission` 替代 |
+| `context.milestone.run` | 2026-06-13 | Milestone 重构到 task 子系统 |
+| `pev_engine` component | 2026-06-13 | Registry/文档移除 |
+| PEV Span Hierarchy requirements | 2026-06-13 | spec.md V2.0 标记 RETIRED |
+| Custom traceId `{adapter}:{session}:{msg}` | V1.2 | W3C 32-char hex 替代 |
+| `communication/metrics/collector.go` Session gauge | V1.3 | `SessionBridge.ActiveSessions` 替代 |
 
 ---
 
 ## Technical Notes
 
-### File Structure
+### File Structure (current)
 
 ```
 internal/layers/observability/
-├── tracer/
-│   ├── tracer.go           # TracerProvider, Span creation
-│   ├── span.go             # Span implementation
-│   ├── propagation.go      # W3C TraceContext inject/extract
-│   ├── sampler.go          # Sampling strategies
-│   └── context.go          # SpanContext in Go context
-├── metrics/
-│   ├── meter.go            # MeterProvider, metric instruments
-│   ├── counter.go          # Counter implementation
-│   ├── histogram.go        # Histogram implementation
-│   ├── gauge.go            # Gauge implementation
-│   ├── registry.go         # Metric registry, label validation
-│   └── prometheus.go       # Prometheus exporter
-├── logger/
-│   ├── logger.go           # StructuredLogger
-│   ├── handler.go          # Log handlers (JSON, text)
-│   └── redactor.go         # Secret redaction
-├── exporter/
-│   ├── console.go          # Console span/log exporter
-│   ├── otlp.go             # OTLP gRPC/HTTP exporter
-│   └── null.go             # No-op exporter (disabled)
-├── config.go               # Config structs
-├── observability.go        # Facade, initialization
-├── health.go               # Health checks
-└── shutdown.go             # Graceful shutdown
+├── observability.go          # Facade: New, Shutdown, HealthCheck
+├── bridge.go                 # Bridge, ToolBridge, SessionBridge
+├── config.go, load.go        # 配置加载
+├── genai_tokens.go           # GenAI token metrics
+├── llm_log.go                # LLM JSONL capture
+├── health.go                 # Health endpoint
+├── tracer/                   # D5-S1
+├── metrics/                  # D5-S2
+├── logger/                   # D5-S3
+├── exporter/                 # D5-S4
+├── coverage/                 # D5-S5
+├── telemetry/                # D5-S6
+├── settings/                 # D5-S7
+├── incident/                 # D5-S8
+└── runtime/                  # D5-S9
 ```
 
-### Config Schema
+### Metric Definitions (current)
 
-```yaml
-observability:
-  enabled: true
+| Metric | Type | Labels |
+|--------|------|--------|
+| `devrix_tool_latency` | Histogram | tool, risk_level, status |
+| `devrix_compression_ratio` | Histogram | — |
+| `devrix_gen_ai.client.token.usage` | Counter | token_type, model |
+| `devrix_active_sessions` | Gauge | adapter |
+| `devrix_runtime_path_resolved_total` | Counter | path |
+| `devrix_llm_*` | Counter/Histogram | provider, model |
 
-  tracing:
-    enabled: true
-    service_name: "devrix"
-    service_version: "1.0.0"
-    exporter: "console"  # console | otlp | null
-    sampling:
-      type: "always_on"  # always_on | always_off | trace_id_ratio
-      rate: 1.0           # 0.0-1.0, used when type is trace_id_ratio
-    otlp:
-      endpoint: "localhost:4317"
-      insecure: true
+### Sampling (current)
 
-  metrics:
-    enabled: true
-    exporter: "prometheus"  # prometheus | otlp | null
-    endpoint: "/metrics"
-    labels:
-      allowlist:
-        - provider
-        - model
-        - adapter
-        - tool
-        - risk_level
-        - status
-        - direction
-      blocklist:
-        - session_id
-        - user_id
-
-  logging:
-    enabled: true
-    level: "info"          # debug | info | warn | error
-    format: "json"         # json | text
-    include_trace_id: true
-    sampling:
-      enabled: true
-      max_entries_per_span: 100
-```
-
-### Key Interfaces
-
-```go
-// Span represents an OpenTelemetry-compatible span
-type Span interface {
-    SpanContext() SpanContext
-    SetAttribute(key string, value interface{})
-    SetStatus(code StatusCode, description string)
-    RecordError(err error)
-    AddEvent(name string, attributes map[string]interface{})
-    End()
-}
-
-// SpanContext contains trace identification
-type SpanContext struct {
-    TraceID    TraceID
-    SpanID     SpanID
-    TraceFlags uint8
-    TraceState TraceState
-    Remote     bool
-}
-
-// Tracer creates spans
-type Tracer interface {
-    StartSpan(name string, opts ...SpanOption) (Span, context.Context)
-    TracerProvider() TracerProvider
-}
-
-// Meter creates metric instruments
-type Meter interface {
-    NewCounter(name string, opts ...MetricOption) Counter
-    NewHistogram(name string, opts ...MetricOption) Histogram
-    NewGauge(name string, opts ...MetricOption) Gauge
-}
-
-// StructuredLogger provides trace-aware logging
-type StructuredLogger interface {
-    Debug(msg string, args ...interface{})
-    Info(msg string, args ...interface{})
-    Warn(msg string, args ...interface{})
-    Error(msg string, args ...interface{})
-    With(args ...interface{}) StructuredLogger
-}
-
-// MetricRegistry validates label cardinality
-type MetricRegistry interface {
-    Register(metric Metric) error
-    Get(name string) (Metric, bool)
-    List() []Metric
-    ValidateLabels(labels map[string]string) error
-}
-
-### Metric Definitions
-
-| Metric Name | Type | Labels | Description |
-|-------------|------|--------|-------------|
-| devrix_llm_tokens_total | Counter | provider, model, direction | Total LLM tokens |
-| devrix_llm_latency_seconds | Histogram | provider, model | LLM call latency |
-| devrix_llm_errors_total | Counter | provider, model, error_type | LLM call errors |
-| devrix_tool_calls_total | Counter | tool, risk_level, status | Tool execution count |
-| devrix_session_active | Gauge | adapter | Active sessions |
-| devrix_permission_timeouts_total | Counter | - | Permission timeouts |
-| devrix_permission_decisions_total | Counter | decision | Permission decisions |
-| devrix_context_tokens_current | Gauge | session_id (truncated) | Current context tokens |
-
-### Span Naming Convention
-
-| Operation | Span Name | Attributes |
-|-----------|-----------|------------|
-| Message received | `message.receive` | adapter, session_id |
-| LLM chat | `llm.chat` | provider, model, tokens |
-| Tool execution | `tool.execute` | tool_name, risk_level |
-| Permission request | `permission.request` | tool_name, timeout |
-| Context compression | `context.compress` | before_tokens, after_tokens |
-| Session create | `session.create` | adapter |
-| Session expire | `session.expire` | session_id, reason |
-
-### W3C TraceContext Format
-
-Traceparent header format:
-```
-traceparent: 00-{TraceID}-{SpanID}-{TraceFlags}
-```
-
-Example:
-```
-traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00abd067c2d9ab65-01
-```
-
-TraceFlags:
-- `01`: Sampled flag (span should be recorded)
-- `00`: Not sampled
-
-### Sampling Strategies
-
-| Type | Description | Use Case |
-|------|-------------|----------|
-| always_on | All spans are recorded | Development, debugging |
-| always_off | No spans are recorded | Performance-critical paths |
-| trace_id_ratio | Sample based on traceId hash | Production with high volume |
-
-### Dependencies (Go)
-
-```go
-// Core OTel
-go.opentelemetry.io/otel
-
-// OTLP Exporters
-go.opentelemetry.io/otel/exporters/otlp/otlptrace
-go.opentelemetry.io/otel/exporters/otlp/otlpmetric
-
-// Prometheus
-github.com/prometheus/client_golang
-
-// Logging (using slog - builtin)
-log/slog
-```
-
-### Backward Compatibility Notes
-
-V1 implementations using custom traceId format `{adapterId}:{sessionId}:{messageId}` should be migrated to W3C format. A migration script will be provided in V2.
-
-For environments requiring legacy traceId format, a configuration option `tracing.legacy_trace_id_format: true` will be available in V2 as a temporary bridge.
+生产默认 `always_on`（rate=1.0）。OTLP tail-sampling 规划于 Collector 侧，应用层未实现。
 
 ---
 
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-07 | V1 MVP: Console exporter, basic spans |
+| 2.0.0 | 2026-06-07 | OTel Span 模型、Prometheus metrics |
+| 2.1.0–2.9.0 | 2026-06-07–10 | Fix + Jaeger + Coverage + Harness + GenAI + Baggage |
+| 3.0.0 | 2026-06-14 | QueryLoop/Orchestration span 族、PEV 退役、DSAFT 全文档同步 |

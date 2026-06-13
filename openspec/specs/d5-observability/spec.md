@@ -1,35 +1,152 @@
-# Observability Layer Specification
+# D5 Observability Layer Specification
 
 **Capability:** observability
-**Change ID:** devrix-observability (archived 2026-06-07), devrix-observability-fix (archived 2026-06-07), devrix-observability-coverage (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-observability-enhancement (archived 2026-06-10, P0), devrix-observability-enhancement-p1 (archived 2026-06-10, P1), devrix-observability-enhancement-p2 (archived 2026-06-10, P2), devrix-observability-baggage (archived 2026-06-10, P3), devrix-observability-token-breakdown (archived 2026-06-10, P3)
-**Layer:** Observability
-**Version:** 1.9.0
+**Domain:** D5
+**DSAFT Type:** 公共域 (Common Domain)
+**Version:** 2.0.0
 **Status:** Canonical — source of truth
+**Last Updated:** 2026-06-14
+**Layering Spec:** `openspec/specs/architecture/layering.md`
+
+**Archived Changes:** devrix-observability (2026-06-07), devrix-observability-fix (2026-06-07), devrix-observability-coverage (2026-06-08), devrix-harness-bootstrap (2026-06-10), devrix-observability-enhancement P0–P3 (2026-06-10), devrix-queryloop-spans-v1.1
 
 ---
 
 ## Overview
 
-可观察层提供 Tracing、Metrics、结构化 Logging 与 Bridge 集成。V1（DM-20260607-001）建立基础能力；V1.1（DM-20260607-005）修复 Gauge/Histogram 数据错误、Shutdown 丢 Span、UpDownCounter 语义、日志采样与 ConsoleExporter 接口一致性；V1.2 对齐 Jaeger Service/Operation 命名与 span 属性规范；V1.3（DM-20260607-007）新增 Operation 级运行时代码染色、Registry 对账与模块 Span 补全；V1.4（DM-20260609-004）新增 Harness Bootstrap Jaeger Operation 与 info 事件双写规范；V1.5（DM-20260610-001，P0）修复 PEV Span 层级传播、Log-Trace-LLM 关联、OTel `gen_ai.*` 双写；V1.6（DM-20260610-002，P1）补齐 `tool_latency` / `compression_ratio` metrics、压缩决策属性与 session incident export；V1.7（DM-20260610-003，P2）SpanKind 契约测试、prompt 版本哈希、`gen_ai.client.token.usage` metrics、`devrix debug export` 子命令；V1.8（DM-20260610-005，P3）W3C Baggage 传播；V1.9（DM-20260610-007，P3）`cache_read` / `reasoning` token 细分 metrics 与 span attrs。
+D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成、Operation 代码染色（Coverage）、Session Incident Export 与运行时路径指标。对齐 OpenTelemetry 语义，通过 `{layer}.{module}.{action}` canonical Operation 名称贯穿 Jaeger/OTLP 与 Prometheus。
+
+**现行主路径（2026-06-14）：** `context.process` → `query.loop.*` → `llm.stream`。**PEV 引擎与 `context.pev.*` span 族已退役**（见 D2-S1 RETIRED）。
+
+| 版本里程碑 | 能力 |
+|-----------|------|
+| V1.0 | Tracer / Metrics / Logger / Bridge 基础 |
+| V1.1 | Gauge/Histogram 修复、Shutdown flush、UpDownCounter |
+| V1.2 | Jaeger Service/Operation 命名对齐 |
+| V1.3 | Operation Registry + Runtime Hit Counter + Coverage 对账 |
+| V1.4 | Harness Bootstrap span + info 事件双写 |
+| V1.5–V1.7 | Log-Trace-LLM 关联、`gen_ai.*` 双写、tool_latency/compression metrics、debug export |
+| V1.8–V1.9 | W3C Baggage、`cache_read`/`reasoning` token 细分 |
+| V2.0 | QueryLoop span 族、Orchestration span、Runtime path metric；PEV 文档退役 |
 
 ---
 
-## ADDED Requirements (V1.3 Runtime Coverage)
+## DSAFT 结构
 
-### Requirement: Operation Registry
+| 层级 | ID | 名称 | 说明 |
+|------|-----|------|------|
+| D | D5 | Observability | 公共域，横向 Tracing/Metrics/Logging 能力 |
+| S | D5-S1 | Tracer | 分布式追踪、W3C 传播、Baggage |
+| S | D5-S2 | Metrics | Counter/Histogram/Gauge、Prometheus 导出 |
+| S | D5-S3 | Logger | 结构化日志、slog 桥接、采样与脱敏 |
+| S | D5-S4 | Exporter | Console / OTLP / Memory span 导出 |
+| S | D5-S5 | Coverage | Operation 注册表、Runtime Hit、日报 |
+| S | D5-S6 | Telemetry | Operation 常量、`SpanAttrs`、Layer/Component 映射 |
+| S | D5-S7 | Settings | Tracing/Metrics 配置 schema |
+| S | D5-S8 | Incident | Session incident bundle 导出 |
+| S | D5-S9 | Runtime | QueryLoop vs LegacyHarness 路径计数 |
 
-系统 MUST 维护 canonical Operation 静态注册表，包含全部已定义 `{layer}.{module}.{action}` 名称及元数据（`layer`、`component`、`since_version`、`instrumented`）。实现于 `internal/layers/observability/coverage/registry.go`。
+---
 
-**Priority**: P0
-**L4**: L4-OBS-REGISTRY
-**T**: D5-OBS-T16
+## Scenarios
 
-#### Scenario: Registry 包含 v1.2 与 v1.3 全部 Operation
+| ID | Scenario | Responsibility | Status |
+|----|----------|----------------|--------|
+| D5-S1 | Tracer | Span 生命周期、采样、Shutdown flush、W3C/Baggage 传播 | IMPLEMENTED |
+| D5-S2 | Metrics | 指标注册、Label 白名单、Prometheus `/metrics` | IMPLEMENTED |
+| D5-S3 | Logger | JSON/Text 日志、trace 注入、error stack、per-span 采样 | IMPLEMENTED |
+| D5-S4 | Exporter | Console/OTLP/Memory SpanExporter | IMPLEMENTED |
+| D5-S5 | Coverage | 56 Operation 注册表、Runtime Hit、Health 对账 | IMPLEMENTED |
+| D5-S6 | Telemetry | `telemetry/names.go` canonical Operation + `LayerAndComponent` | IMPLEMENTED |
+| D5-S7 | Settings | `settings/` Tracing/Metrics 配置 | IMPLEMENTED |
+| D5-S8 | Incident | `debug export` schema v1 bundle | IMPLEMENTED |
+| D5-S9 | Runtime | `runtime_path_resolved_total{path}` 路径分流指标 | IMPLEMENTED |
+
+---
+
+## Architecture
+
+```
+D1 Gateway ──→ root span (gateway.message.receive)
+                    │
+D2 ContextEngine ──→ context.process
+                    ├─→ query.loop.run → query.loop.turn → query.loop.llm.call
+                    ├─→ context.compression.run (+ step spans)
+                    ├─→ context.harness.* (legacy path, harness.enabled)
+                    └─→ tool.execute.*
+                    │
+D3 LLMGateway ─────→ llm.stream → llm.adapter.stream
+                    │
+D4 MultiAgent ─────→ agent.run / agent.tool.call / agent.fork|join
+                    │
+D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
+                    │
+                    ▼
+         ┌──────────────────────────────────────┐
+         │  Observability Facade (D5)             │
+         │  Tracer │ Metrics │ Logger │ Coverage │
+         │  Bridge │ LLMLog │ Incident │ Runtime │
+         └──────────────────────────────────────┘
+                    │
+                    ▼
+         Console / OTLP / Prometheus / ~/.devrix/coverage/
+```
+
+## Cross-Domain Dependencies
+
+| Domain | 依赖内容 | 使用位置 |
+|--------|---------|---------|
+| D1 Communication | 入站创建 root span、`SessionBridge.ActiveSessions` | `gateway/`, `adapters/` |
+| D2 Context Engine | `observability.Bridge` tracer/meter/logger | `engine.go`, `query/loop.go`, `harness/` |
+| D3 LLM Gateway | `llm.stream` span、`RecordGenAITokenUsage` | `gateway/gateway.go`, `adapter/` |
+| D4 Multi-Agent | `agent.*` spans、Fork policy metrics sink | `multiagent/observability/` |
+| D7 Orchestration | `orchestration.*` spans | `orchestration/flow/`, `wave/` |
+| Shared | `config`, `types` | 全子包 |
+
+## Package Map
+
+| 子包 / 根文件 | 场景 | 职责 |
+|--------------|------|------|
+| `observability.go`, `bridge.go` | D5-S1~S3 | Facade、`Bridge`/`ToolBridge`/`SessionBridge` |
+| `tracer/` | D5-S1 | TracerProvider、Span、采样、W3C Propagator、Baggage |
+| `metrics/` | D5-S2 | Meter、Counter/Histogram/Gauge、Prometheus 导出 |
+| `logger/` | D5-S3 | StructuredLogger、slog 桥接、脱敏、采样 |
+| `exporter/` | D5-S4 | Console、OTLP、Memory、Null exporter |
+| `coverage/` | D5-S5 | Registry、Counter、Reporter、Persistence、CLI |
+| `telemetry/` | D5-S6 | `Op*` 常量、`SpanAttrs`、`LayerAndComponent`、`GenAI*` attrs |
+| `settings/` | D5-S7 | TracingConfig、MetricsConfig、OTLP 配置 |
+| `incident/` | D5-S8 | `BuildBundle` schema v1 |
+| `runtime/` | D5-S9 | PathResolver、`runtime_path_resolved_total` D5 bridge |
+| `llm_log.go`, `genai_tokens.go` | D5-S2/S3 | LLM JSONL、gen_ai token metrics |
+| `health.go`, `config.go`, `load.go` | — | HealthCheck、配置加载 |
+
+---
+
+## Key Design Patterns
+
+1. **Canonical Operation Naming**: Span name = Jaeger Operation = `{layer}.{module}.{action}`，常量于 `telemetry/names.go`，注册于 `coverage/registry.go`（当前 **56** 条）。
+2. **Coverage 独立于采样**: `Tracer.Start` 无条件 `RecordHit`，`always_off` 采样仍计数。
+3. **Bridge 零侵入集成**: 各域注入 `*observability.Bridge`，`IsEnabled()` 守卫避免 nil 开销。
+4. **Metrics 前缀**: Meter name `devrix` → Prometheus 名 `devrix_{instrument}`（如 `devrix_tool_latency`）。
+5. **Log-Trace-LLM 三联**: slog `traceId`/`spanId` + LLM JSONL `trace_id`/`span_id` + span `gen_ai.*` 双写。
+6. **Graceful Degradation**: `NewNoOp()` / nil Bridge 时业务路径不受影响；observability 故障标记 `degraded` 不阻断 Process。
+
+---
+
+## Requirements
+
+### Requirement: Operation Registry (P0)
+
+系统 MUST 维护 canonical Operation 静态注册表（`coverage/registry.go`），与 `telemetry/names.go` `Op*` 常量全集一致。
+
+**T:** D5-S5-A01-T01
+
+#### Scenario: Registry 与 names.go 对账
 
 - GIVEN `coverage.AllOperations()` 被调用
-- WHEN 与 `telemetry/names.go` 中 `Op*` 常量集合对比
-- THEN 两者 MUST 完全一致（无遗漏、无多余）
-- AND 每个 entry 的 `layer` / `component` 与 `LayerAndComponent(operation)` 一致
+- WHEN 与 `registry_test` expected 列表对比
+- THEN 两者 MUST 完全一致（当前 56 条）
+- AND 每个 entry 的 `layer`/`component` 与 `LayerAndComponent(operation)` 一致
 
 #### Scenario: 未知 Operation 启动 Span
 
@@ -40,531 +157,184 @@
 
 ---
 
-### Requirement: Runtime Operation Hit Counter
+### Requirement: Runtime Operation Hit Counter (P0)
 
-`Tracer.Start` MUST 在创建 span 时无条件递增对应 Operation 的进程内命中计数，**不受** trace 采样策略影响。
+`Tracer.Start` MUST 无条件递增对应 Operation 的进程内命中计数，不受 trace 采样影响。
 
-**Priority**: P0
-**L4**: L4-OBS-COVERAGE
-**T**: D5-OBS-T17
+**T:** D5-S5-A01-T02, D5-S5-A01-T03
 
 #### Scenario: 采样关闭仍计数
 
 - GIVEN `tracing.sampling.type = always_off`
-- WHEN 任意 instrumented operation 调用 `Tracer.Start`
-- THEN 对应 operation 命中计数 MUST 递增
+- WHEN instrumented operation 调用 `Tracer.Start`
+- THEN 命中计数 MUST 递增
 - AND 无 span 导出到 exporter
 
 #### Scenario: 计数并发安全
 
 - GIVEN 100 个并发 goroutine 对同一 operation 调用 `Start`
-- WHEN 无 panic
 - THEN 最终命中计数 MUST 等于 100
 
 ---
 
-### Requirement: Coverage Reconciliation Report
+### Requirement: Coverage Health Summary (P0)
 
-系统 MUST 提供 Coverage 报告，对比 Registry 全集与进程生命周期内命中计数，列出 `operations_zero_hit`。
+`HealthCheck()` MUST 暴露 `coverage` 对象：`operations_total`、`operations_hit`、`coverage_ratio`、`zero_hit_count`。
 
-**Priority**: P0
-**L4**: L4-OBS-COVERAGE
-**T**: D5-OBS-T17
-
-#### Scenario: Health 摘要暴露
-
-- GIVEN Observability 已启用
-- WHEN `HealthCheck()` 被调用
-- THEN 响应 MUST 包含 `coverage` 对象
-- AND 含 `operations_total`、`operations_hit`、`coverage_ratio`、`zero_hit_count`
+**T:** D5-S5-A01-T02
 
 ---
 
-### Requirement: Extended Module Instrumentation
+### Requirement: Jaeger Service Identity (P0)
 
-以下模块 MUST 在关键路径创建 canonical Operation span，并传播 trace context。
-
-**Priority**: P0
-**L4**: L4-OBS-INSTRUMENT
-
-| Operation | 触发点 | T 层 |
-|-----------|--------|-----|
-| `adapter.message.receive` | Feishu 入站消息 | D5-OBS-T15 |
-| `context.longterm.recall` | LongTerm recall 注入 | D5-OBS-T13 |
-| `context.longterm.store` | LongTerm auto_store | D5-OBS-T13 |
-| `context.plan.generate` | PlanEngine 生成 DAG | D5-OBS-T14 |
-| `context.milestone.run` | Milestone 执行 | D5-OBS-T14 |
-| `gateway.session.lifecycle` | 会话创建/过期 | D5-OBS-T18 |
+OTLP Resource MUST 包含 `service.name`（默认 `devrix`）与 `service.version`。
 
 ---
 
-### Requirement: Session Metrics via SessionBridge
+### Requirement: Devrix Layer Attributes (P0)
 
-Communication Gateway MUST 通过 `SessionBridge.ActiveSessions` 管理会话活跃 Gauge；`communication/metrics/collector.go` 已 Deprecated。
+每个 span MUST 包含 `devrix.layer` 与 `devrix.component`，由 `telemetry.SpanAttrs` 注入。
 
-**Priority**: P1
-**L4**: L4-OBS-METRICS
-**T**: D5-OBS-T18
-
----
-
-## ADDED Requirements (V1.2 Jaeger Alignment)
-
-### Requirement: Jaeger Service Identity
-
-OTLP Resource MUST 包含 `service.name`（默认 `devrix`，部署形态可覆盖为 `devrix-feishu` / `devrix-cli`）与 `service.version`（来自 `observability.tracing.service_version`）。
-
-**Priority**: P0
-
-#### Scenario: Jaeger service filter
-
-- GIVEN OTLP exporter enabled
-- WHEN span is exported
-- THEN Jaeger Service 列表显示配置的 `service.name`
-- AND Resource 包含 `service.version`
+| Layer | Components |
+|-------|------------|
+| `communication` | `gateway`, `adapter` |
+| `context` | `context_engine`, `harness`, `query_loop`, `tool_runner`, `plan_agent`, `plan_mode`, `task_manager` |
+| `llm` | `llm_gateway`, `llm_adapter` |
+| `agent` | `agent_tool` |
+| `orchestration` | `orchestrator` |
 
 ---
 
-### Requirement: Canonical Operation Names
+### Requirement: QueryLoop Span Hierarchy (P0)
 
-Span name（Jaeger Operation）MUST 使用 `{layer}.{module}.{action}` 格式，常量定义于 `internal/layers/observability/telemetry/names.go`。
+QueryLoop 主路径 MUST 形成以下层级（PEV 已退役）：
 
-**Priority**: P0
+```
+gateway.message.receive [SERVER]
+└── context.process [INTERNAL]
+    └── query.loop.run [INTERNAL]
+        └── query.loop.turn [INTERNAL]
+            ├── query.loop.llm.call [CLIENT]
+            │   └── llm.stream [CLIENT]
+            └── tool.execute.single [INTERNAL]
+```
 
-| Operation | Layer | span.kind | 必填 Attributes |
-|-----------|-------|-----------|-----------------|
-| `gateway.message.receive` | communication | SERVER | `session.id`, `message.len`, `devrix.layer`, `devrix.component` |
-| `context.process` | context | INTERNAL | `session.id`, `message.len` |
-| `context.snapshot.load` | context | INTERNAL | — |
-| `context.compression.run` | context | INTERNAL | `context.tokens_before`, `context.tokens_after` |
-| `llm.stream` | llm | CLIENT | `llm.provider`, `llm.model`, `llm.tokens.*`, `llm.latency_ms`, `llm.status` |
-| `adapter.message.receive` | communication | SERVER | `adapter`, `message.len` |
-| `context.plan.generate` | context | INTERNAL | `plan.task_id`, `plan.milestone_count` |
-| `context.milestone.run` | context | INTERNAL | `plan.task_id`, `milestone.id` |
-| `context.longterm.recall` | context | INTERNAL | `longterm.topic`, `longterm.entries` |
-| `context.longterm.store` | context | INTERNAL | `longterm.topic` |
-| `gateway.session.lifecycle` | communication | INTERNAL | `session.action`, `session.id`, `adapter` |
+**T:** D5-S4-A01-T02
 
 ---
 
-### Requirement: Devrix Layer Attributes
+### Requirement: Harness Bootstrap Spans (P0, 条件触发)
 
-每个 span MUST 包含 `devrix.layer`（`communication` \| `context` \| `llm`）与 `devrix.component`（`gateway` \| `context_engine` \| `harness` \| `llm_gateway`），由 `telemetry.SpanAttrs` 注入。
+当 `harness.enabled=true` 时，`context.harness.*` 与 `context.system_prompt.build` span MUST 作为 `context.process` 子 span 创建。
 
-> **RETIRED（2026-06-13）**：`context.pev.*` operation 族随 PEV 引擎下线，不再注册于 coverage registry。
-
-**Priority**: P0
+**T:** D5-S5-A01-T02 (integration `context_harness_obs_test.go`)
 
 ---
 
-### Requirement: OTLP Instrumentation Scope
+### Requirement: Log-Trace-LLM Correlation (P0)
 
-OTLP `ScopeSpans.scope.name` MUST 取自 span 的 `devrix.component` 属性（缺省 `devrix`），便于 Jaeger 按组件过滤。
+slog 与 LLM JSONL MUST 携带 `trace_id`/`span_id`，与 Jaeger span 可交叉引用。
 
-**Priority**: P1
-
----
-
-## ADDED Requirements (V1.1 Fix)
-
-### Requirement: Gauge Numeric Correctness
-
-Gauge MUST 使用 mutex 保护 float64 读写，`Set`/`Add`/`Sub`/`Inc`/`Dec` 结果精确。
-
-**Priority**: P0
-**T**: D5-OBS-FIX-T01
+**T:** D5-S3-A01-T04 (slog bridge), D5-S8-A01-T01 (LLM JSONL in bundle)
 
 ---
 
-### Requirement: Histogram Bucket Correctness
+### Requirement: GenAI Semantic Attributes (P0)
 
-Histogram `Observe` MUST 仅递增第一个匹配桶；Prometheus 输出 MUST 正确累积各 `le` 桶与 `+Inf` 计数。
+LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 
-**Priority**: P0
-**T**: D5-OBS-FIX-T02
-
----
-
-### Requirement: Tracer Shutdown Flush
-
-`TracerProvider.Shutdown` MUST 遍历 active spans、调用 `End` 并刷写至 exporter，避免 pending span 丢失。
-
-**Priority**: P0
-**T**: D5-OBS-FIX-T03
+**T:** D5-S2-A01-T08
 
 ---
 
-### Requirement: Observability Graceful Shutdown
+### Requirement: Tool Latency & Compression Metrics (P1)
 
-`Observability.Shutdown` MUST 关闭 TracerProvider 与 Logger（`Close()`），错误聚合返回。
+- `devrix_tool_latency` Histogram: labels `tool`, `risk_level`, `status`
+- `devrix_compression_ratio` Histogram: 压缩成功后 observe ratio
+- `context.compression.run` span: `compression.trigger_reason`, `compression.ratio`
 
-**Priority**: P0
-**T**: D5-OBS-FIX-T04
-
----
-
-### Requirement: Int64UpDownCounter Semantics
-
-`Meter.Int64UpDownCounter` MUST 返回 Gauge（可增减），用于 Session 活跃数等场景。
-
-**Priority**: P0
-**T**: D5-OBS-FIX-T05
+**T:** D5-S2-A01-T03, D5-S2-A01-T09
 
 ---
 
-### Requirement: Error Log Stack Trace
+### Requirement: GenAI Token Usage Metrics (P2)
 
-结构化日志在 `error` 字段为 error 类型时 MUST 附加 `stack` 字段（`debug.Stack()`）。
+`devrix_gen_ai.client.token.usage` Counter: labels `token_type`（`input`/`output`/`cache_read`/`reasoning`）, `model`。
 
-**Priority**: P1
-**T**: D5-OBS-FIX-T06
-
----
-
-### Requirement: Per-Span Log Sampling
-
-Logger MUST 遵守 `max_entries_per_span` 配置，超限时丢弃并发出 WARN。
-
-**Priority**: P1
-**T**: D5-OBS-FIX-T07
+**T:** D5-S2-A01-T08
 
 ---
 
-### Requirement: ConsoleExporter SpanExporter
+### Requirement: Session Incident Export (P1)
 
-`ConsoleExporter` MUST 直接实现 `SpanExporter` 接口（`Export(ctx, span)`），无需 adapter。
+主二进制 MUST 支持 `devrix debug export --session <id>`，输出 schema v1 JSON（`llm_rounds`, 可选 `trace`, `coverage_hits`）。
 
-**Priority**: P2
-**T**: D5-OBS-FIX-T08
-
----
-
-## ADDED Requirements (V1.4 Harness Bootstrap)
-
-### Requirement: Harness Bootstrap Jaeger Operations
-
-Harness Bootstrap 相关 Span MUST 使用 `{layer}.{module}.{action}` canonical 名称，常量定义于 `telemetry/names.go`，并登记于 `coverage/registry.go`（`Instrumented: true`，`SinceVersion: "2.1.0"`）。
-
-**Priority**: P0
-**Rationale**: Harness 多阶段编排需可追踪；Jaeger 过滤依赖 canonical Operation
-**L4 映射**: L4-OBS-REGISTRY, L4-OBS-COVERAGE
-**T 映射**: D2-S9-T11, D5-S5-T02
-
-#### Scenario: Registry includes harness operations
-
-- GIVEN `coverage.AllOperations()` is loaded
-- WHEN comparing to `telemetry/names.go` harness constants
-- THEN all harness operation names exist with `Layer=context`, `Component=context_engine`
-- AND `registry_test` expected list includes each harness operation
-
-#### Scenario: Span hierarchy under context.process
-
-- GIVEN harness enabled and OTLP/console tracing enabled
-- WHEN `ContextEngine.Process` completes one turn
-- THEN span `context.process` exists
-- AND child span `context.harness.bootstrap.run` parent is `context.process` (first Process only)
-- AND child span `context.system_prompt.build` parent is `context.process` and precedes `context.pev.run`
-- AND child spans have `devrix.layer=context` and `devrix.component=context_engine`
-
-#### Scenario: Bootstrap stage spans with ctx propagation
-
-- GIVEN harness bootstrap runs with prefetch and tool_pool stages
-- WHEN bootstrap completes
-- THEN span `context.harness.bootstrap.stage` is emitted per stage
-- AND each stage span parent MUST be `context.harness.bootstrap.run`
-- AND each stage span has attribute `harness.stage` ∈ {prefetch, guards, setup, deferred_init, tool_pool}
-- AND `context.harness.tool_pool` span includes `harness.tools.before` and `harness.tools.after`
-
-#### Scenario: System prompt build span attributes
-
-- GIVEN SystemPromptAssembler.Build completes
-- WHEN span `context.system_prompt.build` ends
-- THEN attributes include `system_prompt.total_tokens`, `system_prompt.memory_truncated`
-- AND attributes include `system_prompt.layer3_tokens` and comma-separated `system_prompt.blocks`
-
-#### Scenario: Preflight span without score cardinality explosion
-
-- GIVEN preflight enabled with warnings
-- WHEN `context.harness.preflight` span ends
-- THEN attributes include `preflight.mode`, `preflight.warning_count`
-- AND attributes MUST NOT include unbounded label values (no raw user message)
-
-#### Scenario: harness.disabled skips harness spans
-
-- GIVEN `context_engine.harness.enabled=false`
-- WHEN Process runs
-- THEN spans matching `context.harness.*` are NOT created
-- AND span `context.system_prompt.build` is NOT created
-- AND legacy `context.system_prompt.load` behavior unchanged
+**T:** D5-S8-A01-T01, D5-S8-A01-T02
 
 ---
 
-### Requirement: Harness Bootstrap Info Events
+### Requirement: W3C Baggage Propagation (P2)
 
-Bootstrap 各阶段 MUST 产生 info 事件（与 span 双写），供 Adapter 四流展示。
+Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CLI 子进程通过 `TRACEPARENT` + `BAGGAGE` 环境变量继承。
 
-**Priority**: P1
-**Rationale**: 用户需在 CLI/飞书看到 bootstrap 进度，不仅 Jaeger
-**L3 映射**: L3-BE-CTX-04
-**L4 映射**: L4-CTX-HARNESS
-**T 映射**: D2-S9-T08
-
-#### Scenario: Bootstrap stages observable via info events
-
-- GIVEN harness enabled and observability bridge configured
-- WHEN bootstrap runs
-- THEN info events are emitted per stage with metadata `tools.before`, `tools.after`, `trusted`
-- AND event metadata aligns with corresponding span attributes
+**T:** D5-S1-A01-T03
 
 ---
 
-## ADDED Requirements (V1.5 AI Debug Readiness — P0)
+### Requirement: Tracer Shutdown Flush (P0)
 
-### Requirement: Canonical PEV Span Hierarchy (RETIRED)
+`TracerProvider.Shutdown` MUST 结束所有 active spans 并刷写 exporter。
 
-> **2026-06-13**：PEV 引擎与 `context.pev.*` span 族已下线。现行 QueryLoop 路径以 `context.process` + `llm.stream` 为主。
-
-PEV 执行链曾要求 Canonical Trace Tree：`context.pev.iteration` → `context.pev.llm_call` → `llm.stream`。**本 requirement 不再适用于生产路径。**
-
-**Priority**: P0
-**L4 映射**: L4-OBS-SPAN-TREE
-**T 映射**: D5-OBS-TRACE-T04
-
-#### Scenario: LLM call nested under iteration
-
-- GIVEN PEV runs one iteration with LLM call
-- WHEN spans are collected after Process
-- THEN `context.pev.llm_call` parent MUST be `context.pev.iteration`
-- AND `llm.stream` parent MUST be `context.pev.llm_call`
-- AND iteration span ends before next iteration starts (no overlapping defer)
-
-#### Scenario: LLM ChatStream receives span context
-
-- GIVEN observability tracing enabled
-- WHEN PEV calls `ChatStream`
-- THEN ctx MUST include `context.pev.llm_call` span context
-- AND downstream LLM gateway spans share the same trace_id
+**T:** D5-S1-A01-T01
 
 ---
 
-### Requirement: Log-Trace-LLM Correlation
+### Requirement: Metrics Correctness (P0)
 
-slog 与 LLM JSONL MUST 携带 trace_id/span_id，与 Jaeger span 可交叉引用。
+- Gauge `Set`/`Add`/`Sub`/`Inc`/`Dec` 精确（mutex 保护）
+- Histogram 仅递增第一个匹配桶
+- `Int64UpDownCounter` 返回 Gauge 语义
 
-**Priority**: P0
-**L4 映射**: L4-OBS-LOG-CORR
-**T 映射**: D5-OBS-TRACE-T05
-
-#### Scenario: slog injects traceId from context
-
-- GIVEN a recording span in context
-- WHEN slog.InfoContext is called
-- THEN log output includes traceId and spanId matching the span
-
-#### Scenario: LLM JSONL includes trace_id
-
-- GIVEN `observability.llm.log_content=true`
-- WHEN LLM request/response is logged to JSONL
-- THEN each record includes trace_id and span_id fields
+**T:** D5-S2-A01-T03, D5-S2-A01-T04, D5-S2-A01-T05
 
 ---
 
-### Requirement: GenAI Semantic Attributes
+### Requirement: Logger Semantics (P1)
 
-LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与现有 `llm.*` 并存）。
+- Error 日志 MUST 附加 `stack` 字段
+- `max_entries_per_span` 采样超限 MUST 发 WARN
 
-**Priority**: P0
-**T 映射**: D5-OBS-GENAI-TATTR
-
-#### Scenario: gen_ai attributes on LLM span
-
-- GIVEN PEV completes an LLM call
-- WHEN `context.pev.llm_call` span ends
-- THEN attributes include `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`
-- AND include `gen_ai.agent.name` and `gen_ai.conversation.id`
+**T:** D5-S3-A01-T02, D5-S3-A01-T03, D5-S3-A01-T04
 
 ---
 
-### Requirement: Verify Failure Semantics (partial P1)
+### Requirement: Runtime Path Metric (P1)
 
-Verify 失败时 span MUST 携带可读 `verify.failure_reason`。
+`devrix_runtime_path_resolved_total{path="query_loop|legacy_harness"}` MUST 与 in-process `PathResolver` 同步。
 
-**Priority**: P1
-**T 映射**: D5-OBS-DECISION-T01
-
-#### Scenario: Verify failure reason on span
-
-- GIVEN verify does not pass
-- WHEN `context.pev.verify` span ends
-- THEN attribute `verify.failure_reason` is set
-- AND `verify.passed=false`
+**T:** D5-S9-A01-T01
 
 ---
 
-## ADDED Requirements (V1.6 P1 Metrics & Export)
+## RETIRED
 
-### Requirement: Tool Latency Histogram
-
-系统 MUST 注册 `devrix_tool_latency` Histogram，labels：`tool`、`risk_level`、`status`；PEV 工具执行完成后 MUST observe 秒级延迟。
-
-**Priority**: P1
-**T 映射**: D5-OBS-METRICS-T01
-
-#### Scenario: Tool latency recorded after execution
-
-- GIVEN observability metrics enabled
-- WHEN PEV executes a tool successfully
-- THEN `devrix_tool_latency{tool, risk_level, status="ok"}` receives an observation
+| Item | 退役日期 | 替代 |
+|------|----------|------|
+| `context.pev.*` operation 族 | 2026-06-13 | `query.loop.*` |
+| PEV Span Hierarchy requirements | 2026-06-13 | QueryLoop Span Hierarchy |
+| `context.plan.generate` / `context.milestone.run` (旧 PEV plan) | 2026-06-13 | `task.plan.*` / `task.manager.*` |
 
 ---
 
-### Requirement: Compression Ratio Histogram
+## Registries
 
-系统 MUST 注册 `devrix_compression_ratio` Histogram；上下文压缩成功后 MUST observe `CompressedTokens/OriginalTokens`。
+- **A 层**: `a-registry.md` — 18 Activities
+- **F 层**: `f-registry.md` — 39 Function Points
+- **T 层**: `t-registry.md` — Test Points
 
-**Priority**: P1
-**T 映射**: D5-OBS-METRICS-T02
+## Revision History
 
-#### Scenario: Compression ratio observed
-
-- GIVEN compression pipeline reduces token count
-- WHEN `context.compression.run` completes successfully
-- THEN `devrix_compression_ratio` receives an observation in (0,1]
-
----
-
-### Requirement: Compression Decision Attributes
-
-`context.compression.run` span MUST 携带 `compression.trigger_reason` 与 `compression.ratio`。
-
-**Priority**: P1
-**T 映射**: D5-OBS-DECISION-T02
-
-#### Scenario: Compression span decision attrs
-
-- GIVEN compression triggered by token budget
-- WHEN compression span ends
-- THEN `compression.trigger_reason=token_budget_exceeded`
-- AND `compression.ratio` reflects token reduction ratio
-
----
-
-### Requirement: Session Incident Export
-
-系统 MUST 提供 CLI `debug-export --session <id>`，输出 schema v1 JSON bundle（含 `llm_rounds`、可选 `trace` 与 `coverage_hits`）。
-
-**Priority**: P1
-**T 映射**: D5-OBS-EXPORT-T01
-
-#### Scenario: Export valid incident bundle
-
-- GIVEN LLM JSONL exists for session
-- WHEN `debug-export --session {id}` runs
-- THEN stdout/file contains valid JSON with `schema_version=1.0` and `llm_rounds` array
-
----
-
-## ADDED Requirements (V1.7 P2 SpanKind / Prompt / Token Metrics / Debug CLI)
-
-### Requirement: SpanKind Contract
-
-关键 span MUST 使用正确 SpanKind：`gateway.message.receive` = SERVER；`context.pev.llm_call` / `llm.stream` / `llm.adapter.stream` = CLIENT；其余引擎内操作 = INTERNAL。
-
-**Priority**: P2
-**T 映射**: D5-OBS-TRACE-T06
-
-#### Scenario: Integration asserts SpanKind
-
-- GIVEN full PEV request via gateway
-- WHEN spans are exported to memory
-- THEN `gateway.message.receive` has SpanKind SERVER
-- AND `context.pev.llm_call` has SpanKind CLIENT
-
----
-
-### Requirement: Prompt Version Metadata
-
-`context.system_prompt.build` span MUST 携带 `gen_ai.prompt.version`、`gen_ai.prompt.template_hash`；可选 `gen_ai.prompt.agents_md_hash`。
-
-**Priority**: P2
-**T 映射**: D5-OBS-DECISION-T03
-
-#### Scenario: Stable template hash
-
-- GIVEN identical SystemPromptAssembler inputs
-- WHEN Build runs twice
-- THEN `template_hash` is identical
-
----
-
-### Requirement: GenAI Token Usage Metrics
-
-系统 MUST 注册 `devrix_gen_ai.client.token.usage` Counter（labels: `token_type`, `model`），LLM 调用成功后按 input/output 分别 Add。
-
-**Priority**: P2
-**T 映射**: D5-OBS-METRICS-T03
-
----
-
-### Requirement: Debug Export Subcommand
-
-主二进制 MUST 支持 `devrix debug export --session <id>`，行为与 `cmd/debug-export` 一致。
-
-**Priority**: P2
-**T 映射**: D5-OBS-EXPORT-T02
-
----
-
-## ADDED Requirements (V1.8 Baggage)
-
-### Requirement: W3C Baggage Propagation
-
-系统 MUST 通过 W3C `baggage` 头在 context 与 HTTP/子进程边界传播业务键值；Gateway 入站 MUST 写入 `session.id`，并在 `user.id` 可用时写入 baggage。
-
-**Priority**: P2
-**L4**: L4-OBS-BAGGAGE
-**T**: D5-OBS-TRACE-T03
-
-#### Scenario: Propagator 往返 baggage
-
-- GIVEN context 含有效 span 与 baggage `session.id=sess_1`
-- WHEN `Propagator.Inject` 后 `ExtractContext`
-- THEN `baggage` 头 MUST 非空
-- AND 提取后 context MUST 含 `session.id=sess_1`
-
-#### Scenario: CLI 子进程继承传播环境
-
-- GIVEN 父 context 含 trace 与 baggage
-- WHEN `CLIAgentTool` 创建新子进程
-- THEN 子进程环境 MUST 含 `TRACEPARENT` 与 `BAGGAGE`
-
----
-
-## ADDED Requirements (V1.9 Token Breakdown)
-
-### Requirement: GenAI Token Type Breakdown
-
-系统 MUST 在 provider 返回 usage details 时，将 `cache_read` 与 `reasoning` 分别写入 `devrix_gen_ai.client.token.usage`（label `token_type`）及 LLM span 属性。
-
-**Priority**: P2
-**L4**: L4-OBS-METRICS
-**T**: D5-OBS-METRICS-T04
-
-#### Scenario: Provider 返回 cached/reasoning tokens
-
-- GIVEN SSE usage 含 `prompt_tokens_details.cached_tokens` 与 `completion_tokens_details.reasoning_tokens`
-- WHEN LLM 调用完成
-- THEN metrics MUST 含 `token_type=cache_read` 与 `token_type=reasoning`
-- AND span MUST 含 `gen_ai.usage.cache_read.input_tokens` 与 `gen_ai.usage.reasoning.output_tokens`
-
-#### Scenario: Provider 无 details 字段
-
-- GIVEN usage 仅含 prompt/completion tokens
-- WHEN LLM 调用完成
-- THEN 行为 MUST 与 V1.7 一致（仅 input/output）
-
----
-
-## Inherited Requirements (V1)
-
-V1 基线能力（Tracing Span 生命周期、Counter/Histogram 注册、JSON/Text 日志、Bridge 集成）见归档包 `openspec/archive/2026-06-07-devrix-observability/`。
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0–1.9.0 | 2026-06-07–10 | V1 基线 → Baggage + token breakdown |
+| 2.0.0 | 2026-06-14 | QueryLoop/Orchestration span 族、PEV 退役、全文档 DSAFT 对齐 |
