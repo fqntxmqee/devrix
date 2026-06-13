@@ -213,8 +213,17 @@ func buildContextEngineConfig(fileCfg *ConfigFile) *ContextEngineConfig {
 	if f.SnipRatio != 0 {
 		cfg.SnipRatio = f.SnipRatio
 	}
+	if f.Compression.MaxMessages != 0 {
+		cfg.Compression.MaxMessages = f.Compression.MaxMessages
+	}
+	if f.Compression.KeepTailMessages != 0 {
+		cfg.Compression.KeepTailMessages = f.Compression.KeepTailMessages
+	}
 	if f.Compression.Autocompact.Enabled || f.Compression.Autocompact.Model != "" {
 		cfg.Compression.Autocompact = mergeAutocompact(cfg.Compression.Autocompact, f.Compression.Autocompact)
+	}
+	if f.Compression.Microcompact.KeepRecentToolResults != 0 {
+		cfg.Compression.Microcompact.KeepRecentToolResults = f.Compression.Microcompact.KeepRecentToolResults
 	}
 	if f.TokenCounter.Source != "" {
 		cfg.TokenCounter.Source = f.TokenCounter.Source

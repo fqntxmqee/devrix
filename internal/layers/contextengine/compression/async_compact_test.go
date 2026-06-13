@@ -44,7 +44,7 @@ type asyncObserver struct {
 	lastToken string
 }
 
-func (o *asyncObserver) OnStep(string, int, int) {}
+func (o *asyncObserver) OnStep(_ context.Context, _ string, _ int, _ int) {}
 func (o *asyncObserver) OnAutocompact(meta compression.AutocompactMeta) {
 	o.mu.Lock()
 	defer o.mu.Unlock()

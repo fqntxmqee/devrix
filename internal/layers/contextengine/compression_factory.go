@@ -5,6 +5,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -19,6 +20,7 @@ func newCompressFn(
 	llm llmgateway.ILLMGateway,
 	async *compression.AsyncAutocompacter,
 	compObserver ICompressionObserver,
+		obsBridge *observability.Bridge,
 ) func(sessionID string) query.CompressFunc {
 	return func(sessionID string) query.CompressFunc {
 		if !enabled || cfg == nil || !cfg.CompressionEnabled {
@@ -30,12 +32,15 @@ func newCompressFn(
 				compression.WithEnabled(true),
 				compression.WithCounter(counter),
 				compression.WithAutocompactConfig(cfg.Compression.Autocompact),
+				compression.WithCompressionConfig(cfg.Compression),
 				compression.WithSummarizer(&AutocompactSummarizer{LLM: llm, Timeout: cfg.Compression.Autocompact.Timeout}),
 				compression.WithSkipAssembly(true),
 				compression.WithSessionID(sessionID),
 			}
 			if compObserver != nil {
-				opts = append(opts, compression.WithStepObserver(newPipelineStepObserver(sessionID, compObserver)))
+				opts = append(opts, compression.WithStepObserver(
+					newTracingStepObserver(sessionID, obsBridge, compObserver),
+				))
 			}
 			if async != nil {
 				opts = append(opts, compression.WithAsyncAutocompacter(async))

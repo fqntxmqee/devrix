@@ -22,6 +22,7 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpAgentToolCall,
 
 		telemetry.OpContextCompressionRun,
+	telemetry.OpContextCompressionStep,
 		telemetry.OpContextHarnessBootstrapRun,
 		telemetry.OpContextHarnessBootstrapStage,
 		telemetry.OpContextHarnessPreflight,
@@ -54,6 +55,25 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpLLMProviderRoute,
 		telemetry.OpLLMRetry,
 		telemetry.OpLLMStream,
+
+		telemetry.OpQueryLoopRun,
+		telemetry.OpQueryLoopTurn,
+		telemetry.OpQueryLoopLLMCall,
+
+		telemetry.OpOrchFlowEventPublish,
+	telemetry.OpOrchWaveSchedule,
+	telemetry.OpOrchWaveTaskExecute,
+
+	telemetry.OpToolExecuteSingle,
+		telemetry.OpToolExecutePermission,
+
+		telemetry.OpTaskPlanGenerate,
+		telemetry.OpTaskPlanModeEnter,
+		telemetry.OpTaskPlanModeExecute,
+		telemetry.OpTaskPlanModeApprove,
+		telemetry.OpTaskPlanModeReject,
+		telemetry.OpTaskManagerCreate,
+		telemetry.OpTaskManagerUpdate,
 	}
 
 	registry := coverage.AllOperations()

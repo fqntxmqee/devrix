@@ -13,6 +13,7 @@ const (
 	LayerContext       = "context"
 	LayerLLM           = "llm"
 	LayerAgent         = "agent" // D4 multi-agent layer
+	LayerOrchestration = "orchestration"
 )
 
 // Canonical Jaeger / OTLP operation names: {layer}.{module}.{action}
@@ -33,7 +34,8 @@ const (
 	OpContextProcess        = "context.process"
 	OpContextSnapshotLoad   = "context.snapshot.load"
 	OpContextSystemPromptLoad = "context.system_prompt.load"
-	OpContextCompressionRun = "context.compression.run"
+	OpContextCompressionRun  = "context.compression.run"
+	OpContextCompressionStep = "context.compression.step"
 	OpContextLongTermRecall = "context.longterm.recall"
 	OpContextLongTermStore  = "context.longterm.store"
 	OpContextToolsRegister   = "context.tools.register"
@@ -63,6 +65,29 @@ const (
 	OpAgentJoin            = "agent.join"
 	OpAgentTerminate       = "agent.terminate"
 	OpAgentStateTransition = "agent.state.transition"
+
+	// QueryLoop (D2-S10)
+	OpQueryLoopRun     = "query.loop.run"
+	OpQueryLoopTurn    = "query.loop.turn"
+	OpQueryLoopLLMCall = "query.loop.llm.call"
+
+	// Tool Execution (D2-S5)
+	OpToolExecuteSingle     = "tool.execute.single"
+	OpToolExecutePermission = "tool.execute.permission"
+
+	// Task / Plan (D2-S8)
+	OpTaskPlanGenerate    = "task.plan.generate"
+	OpTaskPlanModeEnter   = "task.plan_mode.enter"
+	OpTaskPlanModeExecute = "task.plan_mode.execute"
+	OpTaskPlanModeApprove = "task.plan_mode.approve"
+	OpTaskPlanModeReject  = "task.plan_mode.reject"
+	OpTaskManagerCreate   = "task.manager.create"
+	OpTaskManagerUpdate   = "task.manager.update"
+
+	// Orchestration (D5 orchestration layer)
+	OpOrchWaveSchedule   = "orchestration.wave.schedule"
+	OpOrchWaveTaskExecute = "orchestration.wave.task.execute"
+	OpOrchFlowEventPublish = "orchestration.flow.event.publish"
 )
 
 // SpanAttrs returns standard devrix.layer / devrix.component attributes plus extras.
@@ -102,6 +127,22 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerLLM, "llm_gateway"
 	case strings.HasPrefix(operation, "agent."):
 		return LayerAgent, "agent_tool"
+	case strings.HasPrefix(operation, "query."):
+		return LayerContext, "query_loop"
+	case strings.HasPrefix(operation, "tool.execute."):
+		return LayerContext, "tool_runner"
+	case strings.HasPrefix(operation, "tool."):
+		return LayerContext, "tool_runner"
+	case strings.HasPrefix(operation, "task.plan_mode."):
+		return LayerContext, "plan_mode"
+	case strings.HasPrefix(operation, "task.plan."):
+		return LayerContext, "plan_agent"
+	case strings.HasPrefix(operation, "task.manager."):
+		return LayerContext, "task_manager"
+	case strings.HasPrefix(operation, "task."):
+		return LayerContext, "task_manager"
+	case strings.HasPrefix(operation, "orchestration."):
+		return LayerOrchestration, "orchestrator"
 	default:
 		return LayerContext, "devrix"
 	}

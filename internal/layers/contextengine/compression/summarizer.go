@@ -13,7 +13,7 @@ type Summarizer interface {
 
 // StepObserver receives compression step notifications.
 type StepObserver interface {
-	OnStep(step string, before, after int)
+	OnStep(ctx context.Context, step string, before, after int)
 	OnAutocompact(meta AutocompactMeta)
 	OnAutocompactComplete(summaryMsg types.Message, sessionID, asyncToken string)
 }

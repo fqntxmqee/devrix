@@ -118,8 +118,8 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 
 	loop := &query.Loop{
 		LLM:             query.NewLLMCaller(deps.LLM),
-		Tools:           query.NewToolExecutor(deps.Tools, toolsReg),
-		Permission:      query.NewPermChecker(deps.Permission, toolsReg),
+		Tools:           query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
+		Permission:      query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
 		Attachments:     attachReg,
 		UserContext:     ucProvider,
 		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
@@ -129,7 +129,8 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
 		},
 		SessionQueue:   queue.GlobalSessionQueue,
-		StreamingTools: cfg.QueryLoop.StreamingTools,
+		StreamingTools:    cfg.QueryLoop.StreamingTools,
+			Observability:     deps.ObsBridge,
 	}
 	if cfg.QueryLoop.CompressPerTurn {
 		loop.CompressFactory = newCompressFn(
@@ -139,6 +140,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 			deps.LLM,
 			asyncCompact,
 			compObserver,
+			deps.ObsBridge,
 		)
 	}
 
@@ -234,12 +236,11 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	} else {
 		obsruntime.Record(obsruntime.PathLegacyHarness)
 	}
-	basePrompt := e.prompt.Load(session.WorkDir)
-	systemPrompt := basePrompt
-	// System prompt load observability.
+	agentsRaw := e.prompt.Load(session.WorkDir)
+	// System prompt load observability (agents file for prepend / optional Layer 3).
 	{
 		_, spSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptLoad, tracer.SpanKindInternal,
-			tracer.Attribute{Key: "system_prompt.length", Value: fmt.Sprintf("%d", len(systemPrompt))},
+			tracer.Attribute{Key: "agents_raw.length", Value: fmt.Sprintf("%d", len(agentsRaw))},
 			tracer.Attribute{Key: "system_prompt.sources_count", Value: fmt.Sprintf("%d", len(e.cfg.SystemPrompt.Sources))},
 			tracer.Attribute{Key: "harness.enabled", Value: fmt.Sprintf("%t", harnessEnabled)},
 		)
@@ -251,11 +252,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	// Load or init snapshot — with child span.
 	_, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
 	hadSnapshot := session.ContextSnapshot != nil
-	sc, err := e.memory.LoadOrInit(session, basePrompt)
+	sc, err := e.memory.LoadOrInit(session, "")
 	if err != nil {
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
 		session.ContextSnapshot = nil
-		sc, err = e.memory.LoadOrInit(session, systemPrompt)
+		prompt.ClearDynamicSectionCache(session.SessionID)
+		sc, err = e.memory.LoadOrInit(session, "")
 		if err != nil {
 			if loadSpan != nil {
 				loadSpan.RecordError(err)
@@ -314,11 +316,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
 	)
 	var recallErr error
-	// #deprecated: legacy fallback (QueryLoop path uses EnrichWithLongTermRecall unconditionally)
-	if harnessEnabled && !workerLocal {
+	if !workerLocal {
 		memoryEntries, recallErr = e.memory.RecallLongTermEntries(recallCtx, message)
-	} else {
-		recallErr = e.memory.EnrichWithLongTermRecall(recallCtx, sc, message)
 	}
 	if recallSpan != nil {
 		if recallErr != nil {
@@ -393,9 +392,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	var routingHint *types.RoutingHint
 	var preflightResult *types.PreflightResult
 	visibleTools := harness.VisibleToolsFromState(sc.Harness)
-	// #deprecated: legacy fallback (preflight + routing + system prompt build are QueryLoop-irrelevant)
+	// #deprecated: legacy fallback (preflight + routing only when harness on)
 	if harnessEnabled && !workerLocal {
-		provisionalContext := basePrompt
+		provisionalContext := agentsRaw
 		if len(memoryEntries) > 0 {
 			memCtx, _ := memory.FormatMemoryContext(memoryEntries, e.cfg.LongTerm.RecallMaxTokens)
 			provisionalContext += "\n" + memCtx
@@ -428,13 +427,16 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			}
 			_ = routeCtx
 		}
+	}
 
+	if !workerLocal {
 		var bootstrapReport *types.BootstrapReport
 		var workspace *types.WorkspaceContext
 		if sc.Harness != nil {
 			bootstrapReport = &sc.Harness.Report
 			workspace = &sc.Harness.Report.Workspace
 		}
+		omitAgents := e.cfg.UserContext.Mode == "prepend"
 		buildInput := prompt.SystemPromptBuildInput{
 			WorkDir: session.WorkDir,
 			Session: session,
@@ -443,14 +445,15 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				RequestID: session.RequestID,
 				UserID:    session.UserID,
 			},
-			AgentsRaw:            basePrompt,
+			AgentsRaw:            agentsRaw,
 			MemoryEntries:        memoryEntries,
 			Bootstrap:            bootstrapReport,
 			Workspace:            workspace,
 			Routing:              routingHint,
 			Preflight:            preflightResult,
-			HarnessEnabled:       true,
-			OmitAgentsFromSystem: e.cfg.UserContext.Mode == "prepend",
+			HarnessEnabled:       harnessEnabled,
+			OmitAgentsFromSystem: omitAgents,
+			RecallMaxTokens:      e.cfg.LongTerm.RecallMaxTokens,
 		}
 		_, buildSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptBuild, tracer.SpanKindInternal)
 		builtPrompt, buildReport := e.assembler.Build(buildInput)
@@ -467,18 +470,13 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			buildSpan.End()
 		}
 		sc.SystemPrompt = builtPrompt
-		view := append([]types.Message{}, msgs...)
-		if sc.SystemPrompt != "" {
-			view = append([]types.Message{{Role: types.MessageRoleSystem, Content: sc.SystemPrompt}}, view...)
-		}
-		e.memory.SetCompressedView(sc, view)
-	} else {
-		view := append([]types.Message{}, msgs...)
-		if sc.SystemPrompt != "" {
-			view = append([]types.Message{{Role: types.MessageRoleSystem, Content: sc.SystemPrompt}}, view...)
-		}
-		e.memory.SetCompressedView(sc, view)
 	}
+
+	view := append([]types.Message{}, msgs...)
+	if sc.SystemPrompt != "" {
+		view = append([]types.Message{{Role: types.MessageRoleSystem, Content: sc.SystemPrompt}}, view...)
+	}
+	e.memory.SetCompressedView(sc, view)
 
 	working := memory.NewWorkingMemory()
 	// Defer the "complete" event until AFTER snapshot persist + sc.Messages
@@ -551,6 +549,11 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 				e.memory.AppendFullMessage(sc, tcMsg)
 
 				resultContent := conversation.FormatToolResultContent(tc.ToolName, tc.Output, tc.Error)
+				if e.cfg.ToolResultBudget > 0 && e.counter != nil {
+					if e.counter.CountText(resultContent) > e.cfg.ToolResultBudget {
+						resultContent = e.counter.TruncateToTokens(resultContent, e.cfg.ToolResultBudget) + "\n...[truncated for persist]"
+					}
+				}
 				resultMsg := types.Message{
 					Role:     types.MessageRoleTool,
 					Content:  resultContent,
@@ -565,7 +568,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			assistantSummary = text
 		}
 		// 压缩消息历史到最近 N 条，防止无界增长
-		e.memory.TrimMessages(sc, 50)
+		e.memory.TrimMessages(sc)
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
@@ -590,7 +593,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		// 移除本轮未回复的用户消息，避免污染下次交互
 		e.memory.RemoveLastUserMessage(sc)
 		// 清理消息历史到最近 N 条，防止无界增长
-		e.memory.TrimMessages(sc, 50)
+		e.memory.TrimMessages(sc)
 		// Direct send to ch bypasses emit which may drop events on ctx.Done().
 		// Even if consumer has returned, this reliably fills the buffer; the
 		// gateway handleEngineEvents (after ctx.Done) can drain it.
@@ -681,6 +684,7 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		compression.WithEnabled(e.cfg.CompressionEnabled),
 		compression.WithCounter(e.counter),
 		compression.WithAutocompactConfig(e.cfg.Compression.Autocompact),
+		compression.WithCompressionConfig(e.cfg.Compression),
 		compression.WithSummarizer(&AutocompactSummarizer{
 			LLM:     e.llm,
 			Timeout: e.cfg.Compression.Autocompact.Timeout,
@@ -688,7 +692,7 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 	}
 	if sessionID != "" {
 		opts = append(opts,
-			compression.WithStepObserver(newPipelineStepObserver(sessionID, e.compObserver)),
+			compression.WithStepObserver(newTracingStepObserver(sessionID, e.obsBridge, e.compObserver)),
 			compression.WithSessionID(sessionID),
 		)
 	}

@@ -51,7 +51,7 @@ func NewCLIAdapter(
 		reader:       bufio.NewReader(os.Stdin),
 		writer:       os.Stdout,
 		taskCommands: tasks.NewCLICommands(tasks.GlobalTaskManager),
-		planMode:     tasks.NewPlanMode(nil), // LLM injected later
+		planMode:     tasks.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
 	}
 }
 
@@ -60,7 +60,7 @@ func (a *CLIAdapter) SetPlanModeLLM(llm tasks.LLMCompleter) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.planMode != nil {
-		a.planMode = tasks.NewPlanMode(llm)
+		a.planMode = tasks.NewPlanMode(llm, a.obsBridge)
 	}
 }
 

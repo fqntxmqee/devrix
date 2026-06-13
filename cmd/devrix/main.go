@@ -182,7 +182,7 @@ func main() {
 
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 
-	bootstrap.WireExecutionFlow(ctxCfg, gw)
+	bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
 		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry())
 	}

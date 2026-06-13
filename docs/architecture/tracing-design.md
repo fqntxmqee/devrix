@@ -6,13 +6,15 @@
 
 ### 已埋点的领域（现有 36 个操作名）
 
-| 层 | 操作名 | 粒度 |
-|---|--------|------|
-| D1 Gateway | `gateway.session.*`, `gateway.store.*`, `gateway.permission.check`, `gateway.message.receive` | 中 |
-| D1 Adapter | `adapter.message.receive`, `adapter.cli.send`, `adapter.feishu.outbound` | 粗 |
+
+| 层                | 操作名                                                                                                              | 粒度  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- | --- |
+| D1 Gateway       | `gateway.session.*`, `gateway.store.*`, `gateway.permission.check`, `gateway.message.receive`                    | 中   |
+| D1 Adapter       | `adapter.message.receive`, `adapter.cli.send`, `adapter.feishu.outbound`                                         | 粗   |
 | D2 ContextEngine | `context.process`, `context.snapshot.load`, `context.longterm.*`, `context.compression.run`, `context.harness.*` | 中-细 |
-| D3 LLMGateway | `llm.stream`, `llm.provider.route`, `llm.circuit_breaker`, `llm.retry`, `llm.adapter.stream` | 细 |
-| D4 MultiAgent | `agent.run`, `agent.fork`, `agent.join`, `agent.terminate`, `agent.state.transition`, `agent.tool.call` | 中 |
+| D3 LLMGateway    | `llm.stream`, `llm.provider.route`, `llm.circuit_breaker`, `llm.retry`, `llm.adapter.stream`                     | 细   |
+| D4 MultiAgent    | `agent.run`, `agent.fork`, `agent.join`, `agent.terminate`, `agent.state.transition`, `agent.tool.call`          | 中   |
+
 
 ### 关键缺失（导致无法快速定位问题的根因）
 
@@ -31,63 +33,77 @@
 
 ### 2.1 QueryLoop 域（D2-S10）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `query.loop.run` | `query/loop.go` `Run()` | 父: `context.process` | `session.id`, `max_turns`, `result.turn_count`, `result.total_tokens` |
-| `query.loop.turn` | `query/loop.go` for 循环内 | 父: `query.loop.run` | `turn.number`, `turn.tool_count`, `turn.has_fallback` |
-| `query.loop.llm.call` | `query/loop.go` LLM 调用处 | 父: `query.loop.turn` | `llm.model`, `llm.prompt_tokens`, `llm.completion_tokens`, `llm.latency_ms`, `gen_ai.*` |
+
+| 操作名                   | 位置                      | 父子关系                 | 关键属性                                                                                    |
+| --------------------- | ----------------------- | -------------------- | --------------------------------------------------------------------------------------- |
+| `query.loop.run`      | `query/loop.go` `Run()` | 父: `context.process` | `session.id`, `max_turns`, `result.turn_count`, `result.total_tokens`                   |
+| `query.loop.turn`     | `query/loop.go` for 循环内 | 父: `query.loop.run`  | `turn.number`, `turn.tool_count`, `turn.has_fallback`                                   |
+| `query.loop.llm.call` | `query/loop.go` LLM 调用处 | 父: `query.loop.turn` | `llm.model`, `llm.prompt_tokens`, `llm.completion_tokens`, `llm.latency_ms`, `gen_ai.`* |
+
 
 ### 2.2 工具执行域（D2-S5）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `tool.execute.single` | `query/adapters.go` `toolExecutor.Execute()` | 父: `query.loop.turn` | `tool.name`, `tool.input`(截断 500B), `tool.risk_level`, `tool.output_size`, `tool.duration_ms`, `tool.error` |
-| `tool.execute.batch` | `query/streaming_executor.go` `ExecuteBatch()` | 父: `query.loop.turn` | `tool.count`, `tool.names`, `tool.concurrent` |
-| `tool.execute.permission` | `query/adapters.go` `permChecker.Request()` | 父: `tool.execute.single` | `tool.name`, `permission.granted` |
+
+| 操作名                       | 位置                                             | 父子关系                     | 关键属性                                                                                                        |
+| ------------------------- | ---------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `tool.execute.single`     | `query/adapters.go` `toolExecutor.Execute()`   | 父: `query.loop.turn`     | `tool.name`, `tool.input`(截断 500B), `tool.risk_level`, `tool.output_size`, `tool.duration_ms`, `tool.error` |
+| `tool.execute.batch`      | `query/streaming_executor.go` `ExecuteBatch()` | 父: `query.loop.turn`     | `tool.count`, `tool.names`, `tool.concurrent`                                                               |
+| `tool.execute.permission` | `query/adapters.go` `permChecker.Request()`    | 父: `tool.execute.single` | `tool.name`, `permission.granted`                                                                           |
+
 
 ### 2.3 任务探索/规划域（D2-S8）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `task.plan.generate` | `tasks/plan_agent.go` `Plan()` | 父: `context.process` | `task.user_goal`(截断), `task.tool_count`, `task.result_count`, `task.critical_files_count`, `error` |
-| `task.plan_mode.enter` | `tasks/plan_mode.go` `Enter()` | 父: `context.process` | `plan_mode.state` |
-| `task.plan_mode.execute` | `tasks/plan_mode.go` `Execute()` | 父: `context.process` | `plan_mode.state`, `plan_mode.result_tasks`, `plan_mode.duration_ms` |
-| `task.plan_mode.approve` | `tasks/plan_mode.go` `Approve()` | 父: `context.process` | `plan_mode.task_count` |
-| `task.plan_mode.reject` | `tasks/plan_mode.go` `Reject()` | 父: `context.process` | — |
-| `task.manager.create` | `tasks/task_manager.go` | 父: `query.loop.turn` | `task.id`, `task.subject`, `task.status` |
-| `task.manager.update` | `tasks/task_manager.go` | 父: `query.loop.turn` | `task.id`, `task.status` |
-| `task.manager.list` | `tasks/task_manager.go` | 父: `query.loop.turn` | `task.count` |
+
+| 操作名                      | 位置                               | 父子关系                 | 关键属性                                                                                               |
+| ------------------------ | -------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `task.plan.generate`     | `tasks/plan_agent.go` `Plan()`   | 父: `context.process` | `task.user_goal`(截断), `task.tool_count`, `task.result_count`, `task.critical_files_count`, `error` |
+| `task.plan_mode.enter`   | `tasks/plan_mode.go` `Enter()`   | 父: `context.process` | `plan_mode.state`                                                                                  |
+| `task.plan_mode.execute` | `tasks/plan_mode.go` `Execute()` | 父: `context.process` | `plan_mode.state`, `plan_mode.result_tasks`, `plan_mode.duration_ms`                               |
+| `task.plan_mode.approve` | `tasks/plan_mode.go` `Approve()` | 父: `context.process` | `plan_mode.task_count`                                                                             |
+| `task.plan_mode.reject`  | `tasks/plan_mode.go` `Reject()`  | 父: `context.process` | —                                                                                                  |
+| `task.manager.create`    | `tasks/task_manager.go`          | 父: `query.loop.turn` | `task.id`, `task.subject`, `task.status`                                                           |
+| `task.manager.update`    | `tasks/task_manager.go`          | 父: `query.loop.turn` | `task.id`, `task.status`                                                                           |
+| `task.manager.list`      | `tasks/task_manager.go`          | 父: `query.loop.turn` | `task.count`                                                                                       |
+
 
 ### 2.4 压缩管道域（D2-S2）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `context.compression.step.{name}` | `compression/pipeline.go` 各步骤 | 父: `context.compression.run` | `step.name`, `messages.before`, `messages.after`, `tokens_before`, `tokens_after` |
-| `context.compression.check` | `engine.go` `shouldCompress()` | 父: `context.process` | `messages.count`, `budget.target`, `should_compress` |
+
+| 操作名                               | 位置                             | 父子关系                         | 关键属性                                                                              |
+| --------------------------------- | ------------------------------ | ---------------------------- | --------------------------------------------------------------------------------- |
+| `context.compression.step.{name}` | `compression/pipeline.go` 各步骤  | 父: `context.compression.run` | `step.name`, `messages.before`, `messages.after`, `tokens_before`, `tokens_after` |
+| `context.compression.check`       | `engine.go` `shouldCompress()` | 父: `context.process`         | `messages.count`, `budget.target`, `should_compress`                              |
+
 
 ### 2.5 编排域（D6 Orchestration）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `orchestration.wave.schedule` | `orchestration/wave/scheduler.go` | 父: `context.process` | `wave.task_count`, `wave.worker_count` |
-| `orchestration.wave.task.execute` | `orchestration/wave/scheduler.go` | 父: `orchestration.wave.schedule` | `task.id`, `task.title`, `task.worker_type`, `task.depends_on`, `task.duration_ms` |
-| `orchestration.wave.worker.run` | `orchestration/wave/pool.go` | 父: `orchestration.wave.task.execute` | `worker.type`, `worker.slot` |
-| `orchestration.flow.event.publish` | `orchestration/flow/hub.go` `Publish()` | 父: 按上下文 | `event.type`, `event.session_id` |
-| `orchestration.workplan.record` | `orchestration/workplan/service.go` | 父: `orchestration.flow.event.publish` | `workplan.event_type` |
+
+| 操作名                                | 位置                                      | 父子关系                                  | 关键属性                                                                               |
+| ---------------------------------- | --------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
+| `orchestration.wave.schedule`      | `orchestration/wave/scheduler.go`       | 父: `context.process`                  | `wave.task_count`, `wave.worker_count`                                             |
+| `orchestration.wave.task.execute`  | `orchestration/wave/scheduler.go`       | 父: `orchestration.wave.schedule`      | `task.id`, `task.title`, `task.worker_type`, `task.depends_on`, `task.duration_ms` |
+| `orchestration.wave.worker.run`    | `orchestration/wave/pool.go`            | 父: `orchestration.wave.task.execute`  | `worker.type`, `worker.slot`                                                       |
+| `orchestration.flow.event.publish` | `orchestration/flow/hub.go` `Publish()` | 父: 按上下文                               | `event.type`, `event.session_id`                                                   |
+| `orchestration.workplan.record`    | `orchestration/workplan/service.go`     | 父: `orchestration.flow.event.publish` | `workplan.event_type`                                                              |
+
 
 ### 2.6 Delegate 域（D4）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `agent.delegate.sync` | `multiagent/delegate/service.go` `DelegateSync()` | 父: `agent.run` | `delegate.mode`, `delegate.worker_type`, `delegate.duration_ms`, `delegate.success` |
-| `agent.delegate.subagent.run` | `multiagent/delegate/service.go` | 父: `agent.delegate.sync` | `subagent.id`, `subagent.mode` |
+
+| 操作名                           | 位置                                                | 父子关系                     | 关键属性                                                                                |
+| ----------------------------- | ------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| `agent.delegate.sync`         | `multiagent/delegate/service.go` `DelegateSync()` | 父: `agent.run`           | `delegate.mode`, `delegate.worker_type`, `delegate.duration_ms`, `delegate.success` |
+| `agent.delegate.subagent.run` | `multiagent/delegate/service.go`                  | 父: `agent.delegate.sync` | `subagent.id`, `subagent.mode`                                                      |
+
 
 ### 2.7 记忆域（D2-S6）
 
-| 操作名 | 位置 | 父子关系 | 关键属性 |
-|--------|------|---------|---------|
-| `context.memory.load` | `engine.go` `memory.LoadOrInit()` | 父: `context.process` | `memory.had_snapshot`, `memory.message_count`, `memory.restored` |
-| `context.memory.store` | `engine.go` 持久化步骤 | 父: `context.process` | `memory.session_id`, `memory.message_count` |
+
+| 操作名                    | 位置                                | 父子关系                 | 关键属性                                                             |
+| ---------------------- | --------------------------------- | -------------------- | ---------------------------------------------------------------- |
+| `context.memory.load`  | `engine.go` `memory.LoadOrInit()` | 父: `context.process` | `memory.had_snapshot`, `memory.message_count`, `memory.restored` |
+| `context.memory.store` | `engine.go` 持久化步骤                 | 父: `context.process` | `memory.session_id`, `memory.message_count`                      |
+
 
 ---
 
@@ -269,6 +285,7 @@ func (e *toolExecutor) Execute(ctx context.Context, call ToolCall) (string, stri
 ### 6.2 QueryLoop 回合埋点（方案 B）
 
 在 `loop.go` 的 `Run()` 方法中：
+
 - 进入 for 循环前创建 `query.loop.run` span
 - 每回合开始时创建 `query.loop.turn` span
 - LLM 调用处创建 `query.loop.llm.call` span
@@ -276,12 +293,14 @@ func (e *toolExecutor) Execute(ctx context.Context, call ToolCall) (string, stri
 ### 6.3 添加 ObsBridge 到需要的新组件
 
 QueryLoop 目前不持有 `obsBridge`，需要从上层注入。方式：
+
 - 在 `Loop` 结构体中增加 `Observability *observability.Bridge` 字段
 - 在 `bootstrap/context_engine.go` 装配时注入
 
 ### 6.4 压缩步骤埋点
 
 Pipeline 已有 `StepObserver` 接口，可以：
+
 - 新增一个 `tracingStepObserver` 实现 `StepObserver`
 - 在 `OnStep()` 中创建/结束对应步骤的 span
 - 将 `tracingStepObserver` 在 `newPipelineStepObserver()` 中注入
@@ -289,6 +308,7 @@ Pipeline 已有 `StepObserver` 接口，可以：
 ### 6.5 编排层埋点
 
 WaveScheduler、FlowHub、DelegateService 需要：
+
 - 接受 `*observability.Bridge` 注入
 - 使用 `startSpan()` 辅助模式（与 `engine.go` 一致）
 
@@ -319,16 +339,19 @@ WaveScheduler、FlowHub、DelegateService 需要：
 ## 8. 分阶段实施建议
 
 ### Phase 1（高优先级 — 解决"无法定位问题"的核心痛点）
+
 - `tool.execute.single` — 工具调用入参/出参/耗时
 - `query.loop.turn` — 每回合独立追踪
 - `query.loop.llm.call` — LLM 调用耗时/Token 拆分
 
 ### Phase 2（中优先级 — 补齐任务链路）
+
 - `task.plan.generate` — PlanAgent 规划链路
 - `task.plan_mode.*` — PlanMode 状态流转
 - `task.manager.*` — Task CRUD 操作
 
 ### Phase 3（低优先级 — 完善可观测性）
+
 - `context.compression.step.*` — 压缩管道分步骤
 - `orchestration.*` — 编排层
 - `agent.delegate.*` — Delegate 链路
@@ -339,26 +362,32 @@ WaveScheduler、FlowHub、DelegateService 需要：
 ## 9. Jaeger 查询示例
 
 ### 定位"慢工具调用"
+
 ```
 operation_name = "tool.execute.single" AND tool.duration_ms > 10000
 ```
 
 ### 定位"LLM 响应超时"
+
 ```
 operation_name = "query.loop.llm.call" AND llm.latency_ms > 30000
 ```
 
 ### 定位"规划阶段失败"
+
 ```
 operation_name = "task.plan.generate" AND status = error
 ```
 
 ### 查看完整请求的调用树
+
 ```
 operation_name = "context.process" AND session.id = "xxx"
 ```
 
 ### 定位"压缩过度"场景
+
 ```
 operation_name = "context.compression.step.snip" AND tokens_saved > 5000
 ```
+

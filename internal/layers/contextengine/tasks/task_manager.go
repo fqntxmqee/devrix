@@ -1,11 +1,15 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/google/uuid"
 )
@@ -50,9 +54,10 @@ func NewTask(subject, description string) *Task {
 
 // TaskManager manages task lists for sessions.
 type TaskManager struct {
-	mu    sync.RWMutex
-	tasks map[string]map[string]*Task // sessionID -> taskID -> Task
-	store *DiskStore
+	mu        sync.RWMutex
+	tasks     map[string]map[string]*Task // sessionID -> taskID -> Task
+	store     *DiskStore
+	obsBridge *observability.Bridge
 }
 
 // GlobalTaskManager is the singleton task manager.
@@ -63,8 +68,8 @@ func init() {
 }
 
 // InitGlobalTaskManager reconfigures the singleton from config (disk when mode=v2).
-func InitGlobalTaskManager(cfg config.TasksConfig) {
-	GlobalTaskManager = NewTaskManagerFromConfig(cfg)
+func InitGlobalTaskManager(cfg config.TasksConfig, obsBridge *observability.Bridge) {
+	GlobalTaskManager = NewTaskManagerFromConfig(cfg, obsBridge)
 }
 
 // NewTaskManager creates a new in-memory task manager.
@@ -75,8 +80,9 @@ func NewTaskManager() *TaskManager {
 }
 
 // NewTaskManagerFromConfig creates a task manager with optional disk persistence.
-func NewTaskManagerFromConfig(cfg config.TasksConfig) *TaskManager {
+func NewTaskManagerFromConfig(cfg config.TasksConfig, obsBridge *observability.Bridge) *TaskManager {
 	m := NewTaskManager()
+	m.obsBridge = obsBridge
 	if cfg.Mode == "v2" && cfg.StoreDir != "" {
 		store, err := NewDiskStore(cfg.StoreDir)
 		if err == nil {
@@ -123,8 +129,30 @@ func (m *TaskManager) persistLocked(sessionID string) {
 	_ = m.store.Save(sessionID, tasks)
 }
 
+// startSpan creates a child span for TaskManager operations.
+func (m *TaskManager) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if m.obsBridge == nil || !m.obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return m.obsBridge.Tracer().Start(ctx, operation, opts...)
+}
+
 // Create creates a new task in session.
 func (m *TaskManager) Create(sessionID, subject, description string) *Task {
+	_, span := m.startSpan(context.Background(), telemetry.OpTaskManagerCreate, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "task.session_id", Value: sessionID},
+	)
+	if span != nil {
+		defer span.End()
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ensureSessionLocked(sessionID)
@@ -132,6 +160,12 @@ func (m *TaskManager) Create(sessionID, subject, description string) *Task {
 	task := NewTask(subject, description)
 	m.tasks[sessionID][task.ID] = task
 	m.persistLocked(sessionID)
+	if span != nil {
+		span.SetAttributes(
+			tracer.Attribute{Key: "task.id", Value: task.ID},
+			tracer.Attribute{Key: "task.subject", Value: truncateStr(subject, 200)},
+		)
+	}
 	return task
 }
 
@@ -159,6 +193,15 @@ func (m *TaskManager) List(sessionID string) []*Task {
 
 // UpdateStatus updates task status.
 func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) error {
+	_, span := m.startSpan(context.Background(), telemetry.OpTaskManagerUpdate, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "task.session_id", Value: sessionID},
+		tracer.Attribute{Key: "task.id", Value: taskID},
+		tracer.Attribute{Key: "task.status", Value: string(status)},
+	)
+	if span != nil {
+		defer span.End()
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ensureSessionLocked(sessionID)

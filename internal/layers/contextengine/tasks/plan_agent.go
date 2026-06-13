@@ -2,13 +2,20 @@ package tasks
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
+
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
 // PlanAgent generates task plans via LLM.
 // Inspired by Claude Code's PlanAgent - READ-ONLY exploration and planning.
 type PlanAgent struct {
-	llm LLMCompleter
+	llm       LLMCompleter
+	obsBridge *observability.Bridge
 }
 
 // LLMCompleter interface for LLM calls.
@@ -17,8 +24,38 @@ type LLMCompleter interface {
 }
 
 // NewPlanAgent creates a new PlanAgent.
-func NewPlanAgent(llm LLMCompleter) *PlanAgent {
-	return &PlanAgent{llm: llm}
+func NewPlanAgent(llm LLMCompleter, obsBridge *observability.Bridge) *PlanAgent {
+	return &PlanAgent{llm: llm, obsBridge: obsBridge}
+}
+
+// startSpan creates a child span for plan operations.
+func (a *PlanAgent) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if a.obsBridge == nil || !a.obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return a.obsBridge.Tracer().Start(ctx, operation, opts...)
+}
+
+// planStartSpan is a simpler helper for PlanAgent methods that hold the bridge directly.
+func planStartSpan(ctx context.Context, obsBridge *observability.Bridge, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if obsBridge == nil || !obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 // PlanRequest is the input for plan generation.
@@ -40,17 +77,51 @@ type PlanResult struct {
 // Plan generates a plan for the given goal.
 // This is READ-ONLY - only explores and plans, never modifies files.
 func (a *PlanAgent) Plan(ctx context.Context, req PlanRequest) *PlanResult {
+	start := time.Now()
+	ctx, planSpan := a.startSpan(ctx, telemetry.OpTaskPlanGenerate, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "task.user_goal", Value: truncateStr(req.UserGoal, 200)},
+		tracer.Attribute{Key: "task.tool_count", Value: fmt.Sprintf("%d", len(req.Tools))},
+	)
+
 	if a.llm == nil {
+		if planSpan != nil {
+			planSpan.End()
+		}
 		return &PlanResult{Err: ErrLLMNotConfigured}
 	}
 
 	prompt := buildPlanPrompt(req)
 	response, err := a.llm.Complete(ctx, prompt)
 	if err != nil {
+		if planSpan != nil {
+			planSpan.RecordError(err)
+			planSpan.End()
+		}
 		return &PlanResult{Err: err}
 	}
 
-	return parsePlanResponse(response)
+	result := parsePlanResponse(response)
+	if planSpan != nil {
+		planSpan.SetAttributes(
+			tracer.Attribute{Key: "task.result_count", Value: fmt.Sprintf("%d", len(result.Tasks))},
+			tracer.Attribute{Key: "task.critical_files_count", Value: fmt.Sprintf("%d", len(result.CriticalFiles))},
+			tracer.Attribute{Key: "task.plan_duration_ms", Value: fmt.Sprintf("%d", time.Since(start).Milliseconds())},
+		)
+		if result.Err != nil {
+			planSpan.RecordError(result.Err)
+		}
+		planSpan.End()
+	}
+
+	return result
+}
+
+// truncateStr truncates a string to maxLen characters.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func buildPlanPrompt(req PlanRequest) string {

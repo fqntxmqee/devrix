@@ -13,13 +13,13 @@ import (
 func TestTaskManager_disk_persist_and_list_consistent(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.TasksConfig{Mode: "v2", StoreDir: dir}
-	m1 := tasks.NewTaskManagerFromConfig(cfg)
+	m1 := tasks.NewTaskManagerFromConfig(cfg, nil)
 	created := m1.Create("sess_disk", "Implement QueryLoop", "Wire loop into engine")
 	if created == nil || created.ID == "" {
 		t.Fatal("expected created task")
 	}
 
-	m2 := tasks.NewTaskManagerFromConfig(cfg)
+	m2 := tasks.NewTaskManagerFromConfig(cfg, nil)
 	list := m2.List("sess_disk")
 	if len(list) != 1 {
 		t.Fatalf("expected 1 task from disk, got %d", len(list))

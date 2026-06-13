@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -30,6 +34,8 @@ type Loop struct {
 	WrapToolStreamContext func(ctx context.Context, emit EmitFunc, sessionID, toolName string) context.Context
 	SessionQueue          *queue.SessionQueue
 	StreamingTools        bool
+	// Observability bridge for tracing. When nil, tracing is no-op.
+	Observability *observability.Bridge
 
 	// FallbackLLM (TD-QL-03) is the secondary LLMCaller used when the
 	// primary `LLM` returns an overload / 5xx-class error. nil disables
@@ -61,14 +67,29 @@ func (l *Loop) Run(
 	messages = conversation.StripSystem(messages)
 
 	var (
+		loopSpan   tracer.Span
 		assistantText    string
 		usage            TokenUsage
 		allToolRecords   []types.ToolCallRecord
 		toolRoundResults []ToolRoundResult
+		turn             int
 	)
+	if sc != nil {
+		_, loopSpan = l.startLoopSpan(ctx, telemetry.OpQueryLoopRun, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session.id", Value: sc.SessionID},
+			tracer.Attribute{Key: "max_turns", Value: fmt.Sprintf("%d", params.MaxTurns)},
+		)
+	}
+	if loopSpan != nil {
+		defer func() {
+			loopSpan.SetAttributes(
+				tracer.Attribute{Key: "result.turn_count", Value: fmt.Sprintf("%d", turn)},
+			)
+			loopSpan.End()
+		}()
+	}
 
 	maxTurns := params.MaxTurns
-	turn := 0
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -76,6 +97,20 @@ func (l *Loop) Run(
 		}
 		if maxTurns > 0 && turn >= maxTurns {
 			break
+		}
+
+		turnCtx, turnSpan := l.startLoopSpan(ctx, telemetry.OpQueryLoopTurn, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "turn.number", Value: fmt.Sprintf("%d", turn)},
+		)
+		toolCallCount := 0
+		endTurn := func() {
+			if turnSpan == nil {
+				return
+			}
+			turnSpan.SetAttributes(
+				tracer.Attribute{Key: "turn.tool_count", Value: fmt.Sprintf("%d", toolCallCount)},
+			)
+			turnSpan.End()
 		}
 
 		if l.Compress == nil && l.CompressFactory != nil && sc != nil {
@@ -115,6 +150,11 @@ func (l *Loop) Run(
 			apiMessages = prepend(messages, uc)
 		}
 
+		_, llmSpan := l.startLoopSpan(turnCtx, telemetry.OpQueryLoopLLMCall, tracer.SpanKindClient,
+			tracer.Attribute{Key: "llm.model", Value: sc.Model},
+		)
+		llmStart := time.Now()
+
 		// TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call 一次。
 		// 失败仍按原 error 透传给上层；恢复逻辑在 LLMCaller 协议下是
 		// 透明的（透明 retry，最多 1 次）。
@@ -122,7 +162,7 @@ func (l *Loop) Run(
 		// TD-QL-03: 若 413 recovery 不触发（错误是 5xx / overload 而非
 		// 413），`runWithFallbackRetry` 会切换到 FallbackLLM。
 		chunks, err := runWithContextLengthRecovery(
-			ctx,
+			turnCtx,
 			l.LLM,
 			LLMRequest{
 				Model:        sc.Model,
@@ -142,16 +182,24 @@ func (l *Loop) Run(
 		if err != nil {
 			// Try fallback model (TD-QL-03) before giving up.
 			if l.FallbackLLM != nil && l.FallbackOnErr != nil && l.FallbackOnErr(err) && len(toolRoundResults) == 0 {
-				chunks, err = l.FallbackLLM.Call(ctx, LLMRequest{
+				chunks, err = l.FallbackLLM.Call(turnCtx, LLMRequest{
 					Model:        sc.Model,
 					SystemPrompt: params.SystemPrompt,
 					Messages:     apiMessages,
 					Tools:        params.Tools,
 				})
 				if err != nil {
+					if llmSpan != nil {
+						llmSpan.RecordError(err)
+						llmSpan.End()
+					}
 					return nil, err
 				}
 			} else {
+				if llmSpan != nil {
+					llmSpan.RecordError(err)
+					llmSpan.End()
+				}
 				return nil, err
 			}
 		}
@@ -187,6 +235,15 @@ func (l *Loop) Run(
 		}
 		usage.PromptTokens += iterUsage.PromptTokens
 		usage.CompletionTokens += iterUsage.CompletionTokens
+
+		if llmSpan != nil {
+			llmSpan.SetAttributes(
+				tracer.Attribute{Key: "llm.prompt_tokens", Value: fmt.Sprintf("%d", iterUsage.PromptTokens)},
+				tracer.Attribute{Key: "llm.completion_tokens", Value: fmt.Sprintf("%d", iterUsage.CompletionTokens)},
+				tracer.Attribute{Key: "llm.latency_ms", Value: fmt.Sprintf("%d", time.Since(llmStart).Milliseconds())},
+			)
+			llmSpan.End()
+		}
 
 		if len(pending) == 0 {
 			if l.Hooks.BeforeComplete != nil {
@@ -238,17 +295,18 @@ func (l *Loop) Run(
 			}
 		} else {
 			for _, ref := range refs {
-				if l.Permission != nil && !l.Permission.Request(ctx, sc.SessionID, ref.Name, ref.Input) {
-					return nil, fmt.Errorf("permission denied for tool %s", ref.Name)
+				if l.Permission != nil && !l.Permission.Request(turnCtx, sc.SessionID, ref.Name, ref.Input) {
+					endTurn()
+						return nil, fmt.Errorf("permission denied for tool %s", ref.Name)
 				}
 				if emit != nil {
 					emitToolCall(emit, sc, ref)
 				}
 				out, errMsg, execErr := "", "", error(nil)
 				if l.Tools != nil {
-					toolCtx := ctx
+					toolCtx := turnCtx
 					if l.WrapToolContext != nil {
-						toolCtx = l.WrapToolContext(ctx, sc)
+						toolCtx = l.WrapToolContext(turnCtx, sc)
 					}
 					if emit != nil && l.WrapToolStreamContext != nil {
 						toolCtx = l.WrapToolStreamContext(toolCtx, emit, sc.SessionID, ref.Name)
@@ -328,4 +386,29 @@ func emitToolResult(emit EmitFunc, sessionID, name, content, errMsg string) {
 		Type: "tool_result", Content: content, ToolName: name, SessionID: sessionID,
 		Metadata: map[string]string{"tool_name": name, "error": errMsg},
 	})
+}
+
+// startLoopSpan creates a child span for Loop operations.
+func (l *Loop) startLoopSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if l.Observability == nil || !l.Observability.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return l.Observability.Tracer().Start(ctx, operation, opts...)
+}
+
+// withMinDuration returns the duration in milliseconds if it exceeds minMs, else empty string.
+// This prevents flooding span attributes with trivial durations.
+func withMinDuration(d time.Duration, minMs int64) string {
+	ms := d.Milliseconds()
+	if ms < minMs {
+		return ""
+	}
+	return fmt.Sprintf("%d", ms)
 }

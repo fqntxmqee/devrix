@@ -14,7 +14,30 @@ const (
 
 // CompressionConfig holds compression sub-settings.
 type CompressionConfig struct {
-	Autocompact AutocompactConfig `yaml:"autocompact"`
+	MaxMessages      int               `yaml:"max_messages"`
+	KeepTailMessages int               `yaml:"keep_tail_messages"`
+	Autocompact      AutocompactConfig `yaml:"autocompact"`
+	Microcompact     MicrocompactConfig `yaml:"microcompact"`
+}
+
+// MicrocompactConfig controls clearing stale tool-result content in the LLM view.
+type MicrocompactConfig struct {
+	KeepRecentToolResults int `yaml:"keep_recent_tool_results"`
+}
+
+// DefaultMicrocompactConfig returns microcompact defaults.
+func DefaultMicrocompactConfig() MicrocompactConfig {
+	return MicrocompactConfig{KeepRecentToolResults: 3}
+}
+
+// DefaultCompressionConfig returns compression defaults.
+func DefaultCompressionConfig() CompressionConfig {
+	return CompressionConfig{
+		MaxMessages:      50,
+		KeepTailMessages: 40,
+		Autocompact:      DefaultAutocompactConfig(),
+		Microcompact:     DefaultMicrocompactConfig(),
+	}
 }
 
 // AutocompactConfig holds step-6 autocompact settings.

@@ -39,8 +39,8 @@ rate_limit:
 cli:
   welcome_message: |
     ╔═══════════════════════════════════════════════════════════════╗
-    ║                    Devrix v2.0 - 开发大脑                    ║
-    ║            多智能协同开发助手 (Multi-Agent CLI)               ║
+    ║                       Devrix v2.0                             ║
+    ║        超级个体开发助手 (Super Individual Developer)             ║
     ╚═══════════════════════════════════════════════════════════════╝
   prompt: "> "
   ansi:
@@ -149,6 +149,10 @@ context_engine:
 
   # V2 新增: 压缩管道配置
   compression:
+    max_messages: 50
+    keep_tail_messages: 40
+    microcompact:
+      keep_recent_tool_results: 3
     autocompact:
       enabled: true
       model: "deepseek-v4-flash"       # 直接指定模型名，映射至 LLMRequest.Model
@@ -168,8 +172,8 @@ context_engine:
     backup_dir: "~/.devrix/context"
   system_prompt:
     sources:
-      - "AGENTS.md"
       - ".devrix/AGENTS.md"
+      - "AGENTS.md"
     fallback: "You are Devrix, a multi-agent development assistant."
 
 
@@ -252,6 +256,12 @@ context_engine:
     max_context_tokens: 8000
     agent_name: Devrix
     embed_core_template: true
+    prompt:
+      use_sections: true
+      enable_dynamic_boundary: true
+      dynamic_sections:
+        - git_status
+        - env_info
 
 # 工具执行安全 (Tool Security)
 tool:

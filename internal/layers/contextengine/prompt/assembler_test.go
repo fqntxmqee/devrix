@@ -81,20 +81,89 @@ func TestSystemPromptAssembler_should_produce_stable_template_hash(t *testing.T)
 	}
 }
 
-func TestSystemPromptAssembler_BuildLegacy_should_match_v4_shape(t *testing.T) {
+func TestSystemPromptAssembler_should_insert_dynamic_boundary(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
-	appendix := memory.FormatLongTermAppendix([]memory.MemoryEntry{
-		{Topic: "bugs", Content: "fix race"},
-	}, 2000)
-	legacy := assembler.BuildLegacy("Agents body", appendix)
-	disabled, _ := assembler.Build(SystemPromptBuildInput{
-		HarnessEnabled: false,
-		AgentsRaw:      "Agents body",
-		MemoryEntries: []memory.MemoryEntry{
-			{Topic: "bugs", Content: "fix race"},
-		},
+	prompt, report := assembler.Build(SystemPromptBuildInput{
+		Session: types.NewSession("sess_boundary", "cli", "/tmp/proj"),
+		Runtime: ProcessRuntimeContext{SessionID: "sess_boundary"},
 	})
-	if legacy != disabled {
-		t.Fatalf("legacy mismatch:\nlegacy=%q\ndisabled=%q", legacy, disabled)
+	if !report.HasDynamicBoundary {
+		t.Fatal("expected dynamic boundary enabled in default config")
+	}
+	idx := strings.Index(prompt, DynamicBoundary)
+	if idx < 0 {
+		t.Fatal("expected dynamic boundary marker in prompt")
+	}
+	staticPrefix := prompt[:idx]
+	if !strings.Contains(staticPrefix, "Workspace Guidance") {
+		t.Fatal("guidance should appear before boundary")
+	}
+	if !strings.Contains(staticPrefix, "You are an interactive agent") &&
+		!strings.Contains(staticPrefix, "Devrix") {
+		t.Fatal("core static content should appear before boundary")
+	}
+	dynamicSuffix := prompt[idx+len(DynamicBoundary):]
+	if !strings.Contains(dynamicSuffix, "Session Context") {
+		t.Fatal("session context should appear after boundary")
+	}
+	if !strings.Contains(report.DynamicSectionNames[0], "session_context") {
+		t.Fatalf("expected session_context in dynamic sections, got %v", report.DynamicSectionNames)
+	}
+}
+
+func TestSystemPromptAssembler_should_disable_boundary_when_config_off(t *testing.T) {
+	cfg := config.DefaultWorkspacePromptConfig()
+	cfg.PromptConfig.EnableDynamicBoundary = false
+	assembler := NewSystemPromptAssembler(cfg)
+	prompt, report := assembler.Build(SystemPromptBuildInput{
+		Session: types.NewSession("sess_noboundary", "cli", "/tmp"),
+		Runtime: ProcessRuntimeContext{SessionID: "sess_noboundary"},
+	})
+	if report.HasDynamicBoundary {
+		t.Fatal("boundary should be disabled")
+	}
+	if strings.Contains(prompt, DynamicBoundary) {
+		t.Fatal("prompt must not contain boundary marker")
+	}
+	if !strings.Contains(prompt, "Session Context") {
+		t.Fatal("session context should remain inline without boundary mode")
+	}
+}
+
+func TestSystemPromptAssembler_should_use_core_when_harness_disabled(t *testing.T) {
+	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	prompt, report := assembler.Build(SystemPromptBuildInput{
+		HarnessEnabled:       false,
+		AgentsRaw:            "Project agents content",
+		OmitAgentsFromSystem: true,
+		MemoryEntries: []memory.MemoryEntry{
+			{Topic: "architecture", Content: "use DDD"},
+		},
+		Session: types.NewSession("sess_1", "cli", "/tmp/proj"),
+		Runtime: ProcessRuntimeContext{SessionID: "sess_1"},
+	})
+	if !strings.Contains(prompt, "Devrix") {
+		t.Fatal("expected embedded core template in system prompt")
+	}
+	if strings.Contains(prompt, "Project agents content") {
+		t.Fatal("agents content should be omitted when OmitAgentsFromSystem")
+	}
+	if !strings.Contains(prompt, "<memory_context>") {
+		t.Fatal("expected memory_context block")
+	}
+	if report.SectionCount <= 0 {
+		t.Fatal("expected core layer sections")
+	}
+}
+
+func TestSystemPromptAssembler_should_embed_agents_when_system_mode(t *testing.T) {
+	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	prompt, _ := assembler.Build(SystemPromptBuildInput{
+		HarnessEnabled:       false,
+		AgentsRaw:            "Project agents content",
+		OmitAgentsFromSystem: false,
+	})
+	if !strings.Contains(prompt, "<agents_context>") || !strings.Contains(prompt, "Project agents content") {
+		t.Fatal("expected agents in system prompt when not omitted")
 	}
 }

@@ -71,7 +71,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		return nil
 	}
 	longTerm := WireContextV3(b.ctxCfg)
-	tasks.InitGlobalTaskManager(b.ctxCfg.Tasks)
+	tasks.InitGlobalTaskManager(b.ctxCfg.Tasks, b.obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)

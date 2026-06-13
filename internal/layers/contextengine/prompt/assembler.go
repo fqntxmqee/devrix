@@ -41,6 +41,7 @@ type SystemPromptBuildInput struct {
 	Preflight            *types.PreflightResult
 	HarnessEnabled       bool
 	OmitAgentsFromSystem bool
+	RecallMaxTokens      int
 }
 
 // SystemPromptBuildReport describes assembly observability metadata.
@@ -49,9 +50,11 @@ type SystemPromptBuildReport struct {
 	LayerTokens     [4]int
 	MemoryTruncated bool
 	BlocksIncluded  []string
-	TemplateHash    string
-	AgentsMDHash    string
-	SectionCount    int
+	TemplateHash        string
+	AgentsMDHash        string
+	SectionCount        int
+	HasDynamicBoundary  bool
+	DynamicSectionNames []string
 }
 
 // SystemPromptAssembler builds the final system prompt per §十 spec.
@@ -85,77 +88,164 @@ func NewSystemPromptAssembler(cfg config.WorkspacePromptConfig) *SystemPromptAss
 	}
 }
 
-// Build assembles the four-layer system prompt.
+// Build assembles the four-layer system prompt (ClawCode-aligned: core always
+// in system; AGENTS.md via agents_context only when not omitted for prepend).
 func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, SystemPromptBuildReport) {
-	if !in.HarnessEnabled {
-		appendix := memory.FormatLongTermAppendix(in.MemoryEntries, 0)
-		legacy := a.BuildLegacy(in.AgentsRaw, appendix)
-		return legacy, SystemPromptBuildReport{
-			TotalTokens:  estimateTokens(legacy),
-			TemplateHash: a.templateFingerprint(),
-			AgentsMDHash: contentHash(in.AgentsRaw),
-		}
-	}
-
 	report := SystemPromptBuildReport{
 		TemplateHash: a.templateFingerprint(),
 		AgentsMDHash: contentHash(in.AgentsRaw),
 	}
 
-	// Layer 0: Core system prompt (from template or sections)
 	layer0, sectionCount := a.buildCoreLayer(in)
 	report.LayerTokens[0] = estimateTokens(layer0)
 	report.SectionCount = sectionCount
 
-	// Layer 1: Session context
-	layer1 := a.buildSessionContext(in)
-	report.LayerTokens[1] = estimateTokens(layer1)
-
-	// Layer 2: Guidance template
 	layer2 := strings.TrimSpace(a.guidanceTemplate)
 	report.LayerTokens[2] = estimateTokens(layer2)
 
-	// Layer 3: Dynamic blocks
 	blocks, blockReport := a.buildLayer3Blocks(in)
 	report.MemoryTruncated = blockReport.MemoryTruncated
 	report.BlocksIncluded = blockReport.BlocksIncluded
 
-	loaded := buildLoadedContext(blocks)
-	layer3Header := "## Workspace Files (Injected)\nThe following <loaded_context> was loaded from workspace and harness runtime.\n\n"
-	layer3 := layer3Header + loaded
-	report.LayerTokens[3] = estimateTokens(layer3)
-
-	// Assemble final prompt
-	parts := make([]string, 0, 4)
-	for _, p := range []string{layer0, layer1, layer2, layer3} {
-		if strings.TrimSpace(p) != "" {
-			parts = append(parts, p)
-		}
+	layer3 := ""
+	if layer3HasContent(blocks) {
+		loaded := buildLoadedContext(blocks)
+		layer3Header := "## Workspace Files (Injected)\nThe following <loaded_context> was loaded from workspace and harness runtime.\n\n"
+		layer3 = layer3Header + loaded
+		report.LayerTokens[3] = estimateTokens(layer3)
 	}
-	out := strings.Join(parts, "\n\n")
+
+	sessionID := in.Runtime.SessionID
+	if in.Session != nil && sessionID == "" {
+		sessionID = in.Session.SessionID
+	}
+
+	if a.enableDynamicBoundary() {
+		report.HasDynamicBoundary = true
+		staticParts := joinNonEmptyParts(layer0, layer2)
+		dynamicParts, dynNames := a.buildDynamicSections(sessionID, in, layer3)
+		report.DynamicSectionNames = dynNames
+		report.LayerTokens[1] = estimateTokens(strings.Join(dynamicParts, "\n\n"))
+
+		out := joinNonEmptyParts(staticParts, DynamicBoundary, strings.Join(dynamicParts, "\n\n"))
+		report.TotalTokens = estimateTokens(out)
+		return out, report
+	}
+
+	layer1 := a.buildSessionContext(in)
+	report.LayerTokens[1] = estimateTokens(layer1)
+
+	out := joinNonEmptyParts(layer0, layer1, layer2, layer3)
 	report.TotalTokens = estimateTokens(out)
 	return out, report
 }
 
-// buildCoreLayer builds layer 0 from sections or template.
-func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (string, int) {
-	// Check if section-based loader is available
-	if a.promptLoader != nil {
-		// Check for custom prompt file first
-		if a.promptLoader.IsCustomPromptAvailable(in.WorkDir) {
-			if custom := a.promptLoader.LoadCustom(in.WorkDir); custom != "" {
-				return custom, 0
-			}
-		}
+func (a *SystemPromptAssembler) enableDynamicBoundary() bool {
+	return a.cfg.PromptConfig != nil && a.cfg.PromptConfig.EnableDynamicBoundary
+}
 
-		// Use section-based prompts
-		sections := a.promptLoader.LoadAsSections(in.WorkDir)
+func (a *SystemPromptAssembler) wantsDynamicSection(name string) bool {
+	if a.cfg.PromptConfig == nil {
+		return false
+	}
+	for _, n := range a.cfg.PromptConfig.DynamicSections {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in SystemPromptBuildInput, layer3 string) ([]string, []string) {
+	var parts []string
+	var names []string
+
+	sessionCtx := resolveCachedSection(sessionID, "session_context", false, func() string {
+		return a.buildSessionContext(in)
+	})
+	if strings.TrimSpace(sessionCtx) != "" {
+		parts = append(parts, sessionCtx)
+		names = append(names, "session_context")
+	}
+
+	if a.wantsDynamicSection("git_status") {
+		workDir := in.WorkDir
+		if in.Session != nil && in.Session.WorkDir != "" {
+			workDir = in.Session.WorkDir
+		}
+		if gitCtx, ok := resolveGitStatusSection(sessionID, workDir); ok {
+			parts = append(parts, gitCtx)
+			names = append(names, "git_status")
+		}
+	}
+
+	if a.wantsDynamicSection("env_info") {
+		if env := a.buildEnvInfo(in); env != "" {
+			parts = append(parts, env)
+			names = append(names, "env_info")
+		}
+	}
+
+	if strings.TrimSpace(layer3) != "" {
+		parts = append(parts, layer3)
+		names = append(names, "loaded_context")
+	}
+
+	return parts, names
+}
+
+func resolveGitStatusSection(sessionID, workDir string) (string, bool) {
+	raw := resolveCachedSection(sessionID, "git_status", false, func() string {
+		s, ok := computeGitStatus(workDir)
+		if !ok {
+			return ""
+		}
+		return s
+	})
+	if strings.TrimSpace(raw) == "" {
+		return "", false
+	}
+	return raw, true
+}
+
+func (a *SystemPromptAssembler) buildEnvInfo(in SystemPromptBuildInput) string {
+	workDir := in.WorkDir
+	model := ""
+	if in.Session != nil {
+		if in.Session.WorkDir != "" {
+			workDir = in.Session.WorkDir
+		}
+		model = in.Session.Model
+	}
+	if workDir == "" && model == "" {
+		return ""
+	}
+	return fmt.Sprintf(`## Environment
+Workspace directory: %s
+Model: %s
+`, workDir, model)
+}
+
+func joinNonEmptyParts(parts ...string) string {
+	nonEmpty := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if strings.TrimSpace(p) != "" {
+			nonEmpty = append(nonEmpty, p)
+		}
+	}
+	return strings.Join(nonEmpty, "\n\n")
+}
+
+// buildCoreLayer builds layer 0 from embedded sections or template.
+// Workspace AGENTS.md is not Layer 0 (ClawCode: CLAUDE.md → user prepend / Layer 3).
+func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (string, int) {
+	if a.promptLoader != nil && a.cfg.PromptConfig != nil {
+		names := a.cfg.PromptConfig.GetStaticSections()
+		sections := a.promptLoader.LoadStaticSections(names)
 		if len(sections) > 0 {
 			return strings.Join(sections, "\n\n"), len(sections)
 		}
 	}
-
-	// Fallback to embedded template
 	return a.coreTemplate, 1
 }
 
@@ -218,19 +308,27 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 		budget = 8000
 	}
 
-	memoryRaw, truncated := memory.FormatMemoryContext(in.MemoryEntries, 0)
+	memoryBudget := in.RecallMaxTokens
+	if memoryBudget <= 0 {
+		memoryBudget = 2000
+	}
+	memoryRaw, truncated := memory.FormatMemoryContext(in.MemoryEntries, memoryBudget)
 	report.MemoryTruncated = truncated
 
 	harnessInit := ""
-	if in.Bootstrap != nil {
-		harnessInit = formatHarnessInit(*in.Bootstrap)
-	}
 	workspaceSnap := ""
-	if in.Workspace != nil {
-		workspaceSnap = formatWorkspaceSnapshot(*in.Workspace)
+	routing := ""
+	preflight := ""
+	if in.HarnessEnabled {
+		if in.Bootstrap != nil {
+			harnessInit = formatHarnessInit(*in.Bootstrap)
+		}
+		if in.Workspace != nil {
+			workspaceSnap = formatWorkspaceSnapshot(*in.Workspace)
+		}
+		routing = formatRoutingHints(in.Routing)
+		preflight = formatPreflightWarnings(in.Preflight)
 	}
-	routing := formatRoutingHints(in.Routing)
-	preflight := formatPreflightWarnings(in.Preflight)
 
 	fixedTokens := estimateTokens(harnessInit) + estimateTokens(workspaceSnap) +
 		estimateTokens(routing) + estimateTokens(preflight)
@@ -248,8 +346,12 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 	}
 	memoryRaw = truncateToTokenBudget(memoryRaw, budget)
 
-	blocks["agents_context"] = agentsRaw
-	blocks["memory_context"] = memoryRaw
+	if agentsRaw != "" {
+		blocks["agents_context"] = agentsRaw
+	}
+	if memoryRaw != "" {
+		blocks["memory_context"] = memoryRaw
+	}
 	if harnessInit != "" {
 		blocks["harness_init"] = harnessInit
 	}
@@ -267,6 +369,15 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 		report.BlocksIncluded = append(report.BlocksIncluded, tag)
 	}
 	return blocks, report
+}
+
+func layer3HasContent(blocks map[string]string) bool {
+	for _, v := range blocks {
+		if strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func buildLoadedContext(blocks map[string]string) string {

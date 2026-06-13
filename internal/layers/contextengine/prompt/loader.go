@@ -93,21 +93,24 @@ func NewLoader(cfg *config.SystemPromptConfig) *Loader {
 	return loader
 }
 
-// LoadAsSections loads prompt and returns it as a list of sections.
+// LoadAsSections loads all registered static sections in default order.
 func (l *Loader) LoadAsSections(workDir string) []string {
-	sections := make([]string, 0, len(l.staticMap))
-
-	for _, name := range []string{
+	return l.LoadStaticSections([]string{
 		"intro", "system", "doing_tasks", "actions",
 		"using_tools", "output_efficiency", "tone_and_style",
 		"safety_guidelines", "knowledge_boundaries",
 		"todo_write", "delegate_strategy", "glob", "grep", "edit_file",
-	} {
-		if content, ok := l.cache.Get(name); ok {
+	})
+}
+
+// LoadStaticSections loads named static sections from cache.
+func (l *Loader) LoadStaticSections(names []string) []string {
+	sections := make([]string, 0, len(names))
+	for _, name := range names {
+		if content, ok := l.cache.Get(name); ok && strings.TrimSpace(content) != "" {
 			sections = append(sections, content)
 		}
 	}
-
 	return sections
 }
 

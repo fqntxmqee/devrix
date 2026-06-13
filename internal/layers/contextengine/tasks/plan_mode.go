@@ -4,6 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
 // PlanModeState represents the current plan mode state.
@@ -22,14 +27,31 @@ type PlanMode struct {
 	userGoal   string
 	planResult *PlanResult
 	planAgent  *PlanAgent
+	obsBridge  *observability.Bridge
 }
 
 // NewPlanMode creates a new plan mode manager.
-func NewPlanMode(llm LLMCompleter) *PlanMode {
+func NewPlanMode(llm LLMCompleter, obsBridge *observability.Bridge) *PlanMode {
 	return &PlanMode{
 		state:     PlanModeInactive,
-		planAgent: NewPlanAgent(llm),
+		planAgent: NewPlanAgent(llm, obsBridge),
+		obsBridge: obsBridge,
 	}
+}
+
+// startSpan creates a child span for PlanMode operations.
+func (p *PlanMode) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if p.obsBridge == nil || !p.obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return p.obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 // IsActive returns true if plan mode is active.
@@ -39,7 +61,14 @@ func (p *PlanMode) IsActive() bool {
 
 // Enter enters plan mode for a goal.
 func (p *PlanMode) Enter(ctx context.Context, sessionID, userGoal string) error {
+	_, span := p.startSpan(ctx, telemetry.OpTaskPlanModeEnter, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "plan_mode.state", Value: string(PlanModeActive)},
+	)
+
 	if p.planAgent == nil {
+		if span != nil {
+			span.End()
+		}
 		return ErrLLMNotConfigured
 	}
 
@@ -47,12 +76,24 @@ func (p *PlanMode) Enter(ctx context.Context, sessionID, userGoal string) error 
 	p.userGoal = userGoal
 	p.state = PlanModeActive
 
+	if span != nil {
+		span.End()
+	}
 	return nil
 }
 
 // Execute runs the plan agent to explore and plan.
 func (p *PlanMode) Execute(ctx context.Context, workDir string, tools []string) error {
+	start := time.Now()
+	_, span := p.startSpan(ctx, telemetry.OpTaskPlanModeExecute, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "plan_mode.state", Value: string(p.state)},
+		tracer.Attribute{Key: "plan_mode.tool_count", Value: fmt.Sprintf("%d", len(tools))},
+	)
+
 	if !p.IsActive() {
+		if span != nil {
+			span.End()
+		}
 		return nil
 	}
 
@@ -64,12 +105,23 @@ func (p *PlanMode) Execute(ctx context.Context, workDir string, tools []string) 
 
 	result := p.planAgent.Plan(ctx, req)
 	if result.Err != nil {
+		if span != nil {
+			span.RecordError(result.Err)
+			span.End()
+		}
 		return result.Err
 	}
 
 	p.planResult = result
 	p.state = PlanModePending
 
+	if span != nil {
+		span.SetAttributes(
+			tracer.Attribute{Key: "plan_mode.result_tasks", Value: fmt.Sprintf("%d", len(result.Tasks))},
+			tracer.Attribute{Key: "plan_mode.duration_ms", Value: fmt.Sprintf("%d", time.Since(start).Milliseconds())},
+		)
+		span.End()
+	}
 	return nil
 }
 
@@ -80,16 +132,30 @@ func (p *PlanMode) GetPlan() *PlanResult {
 
 // Approve approves the plan and returns tasks.
 func (p *PlanMode) Approve() []*Task {
+	_, span := p.startSpan(context.Background(), telemetry.OpTaskPlanModeApprove, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "plan_mode.task_count", Value: fmt.Sprintf("%d", len(p.planResult.Tasks))},
+	)
 	if p.planResult == nil {
+		if span != nil {
+			span.End()
+		}
 		return nil
 	}
-	return p.planResult.Tasks
+	tasks := p.planResult.Tasks
+	if span != nil {
+		span.End()
+	}
+	return tasks
 }
 
 // Reject rejects the plan.
 func (p *PlanMode) Reject() {
+	_, span := p.startSpan(context.Background(), telemetry.OpTaskPlanModeReject, tracer.SpanKindInternal)
 	p.state = PlanModeInactive
 	p.planResult = nil
+	if span != nil {
+		span.End()
+	}
 }
 
 // Exit exits plan mode.

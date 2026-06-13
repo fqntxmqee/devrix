@@ -51,9 +51,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		CompressionEnabled: true,
 		CompressionRatio:   0.6,
 		SnipRatio:          0.8,
-		Compression: CompressionConfig{
-			Autocompact: DefaultAutocompactConfig(),
-		},
+		Compression: DefaultCompressionConfig(),
 		TokenCounter: TokenCounterConfig{
 			Source: TokenCounterSourceGateway,
 		},

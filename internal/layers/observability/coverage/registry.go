@@ -26,6 +26,7 @@ func AllOperations() []OperationMeta {
 		{Name: "agent.tool.call", Layer: "agent", Component: "agent_tool", SinceVersion: "2.0.0", Instrumented: true},
 
 		{Name: "context.compression.run", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
+			{Name: "context.compression.step", Layer: "context", Component: "context_engine", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "context.harness.bootstrap.run", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
 		{Name: "context.harness.bootstrap.stage", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
 		{Name: "context.harness.preflight", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
@@ -58,6 +59,29 @@ func AllOperations() []OperationMeta {
 		{Name: "llm.provider.route", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "llm.retry", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "llm.stream", Layer: "llm", Component: "llm_gateway", SinceVersion: "1.2.0", Instrumented: true},
+
+		// QueryLoop (D2-S10)
+		{Name: "query.loop.run", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "query.loop.turn", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "query.loop.llm.call", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},
+
+		// Orchestration (D5)
+		{Name: "orchestration.flow.event.publish", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "orchestration.wave.schedule", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "orchestration.wave.task.execute", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.1.0", Instrumented: true},
+
+		// Tool Execution (D2-S5)
+		{Name: "tool.execute.single", Layer: "context", Component: "tool_runner", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "tool.execute.permission", Layer: "context", Component: "tool_runner", SinceVersion: "2.1.0", Instrumented: true},
+
+		// Task / Plan (D2-S8)
+		{Name: "task.plan.generate", Layer: "context", Component: "plan_agent", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.plan_mode.enter", Layer: "context", Component: "plan_mode", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.plan_mode.execute", Layer: "context", Component: "plan_mode", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.plan_mode.approve", Layer: "context", Component: "plan_mode", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.plan_mode.reject", Layer: "context", Component: "plan_mode", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.manager.create", Layer: "context", Component: "task_manager", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "task.manager.update", Layer: "context", Component: "task_manager", SinceVersion: "2.1.0", Instrumented: true},
 	}
 	sort.Slice(ops, func(i, j int) bool { return ops[i].Name < ops[j].Name })
 	return ops

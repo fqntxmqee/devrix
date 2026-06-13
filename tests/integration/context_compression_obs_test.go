@@ -59,7 +59,7 @@ type pipelineObsAdapter struct {
 	obs *recordingCompressionObserver
 }
 
-func (a *pipelineObsAdapter) OnStep(step string, before, after int) {
+func (a *pipelineObsAdapter) OnStep(_ context.Context, step string, before, after int) {
 	a.obs.EmitCompressionStep("", step, before, after)
 }
 

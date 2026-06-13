@@ -6,6 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/gateway"
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/imsink"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -13,7 +14,7 @@ import (
 )
 
 // WireExecutionFlow configures the global ExecutionFlowHub (Hub-Spoke v2).
-func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *gateway.CommunicationGateway) {
+func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *gateway.CommunicationGateway, obsBridge *observability.Bridge) {
 	if ctxCfg == nil {
 		return
 	}

@@ -26,7 +26,7 @@ func NewContextEngine(
 	agentToolReg *tool.Registry,
 ) *contextengine.ContextEngine {
 	longTerm := WireContextV3(ctxCfg)
-	tasks.InitGlobalTaskManager(ctxCfg.Tasks)
+	tasks.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)

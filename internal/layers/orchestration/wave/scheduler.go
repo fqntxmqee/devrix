@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/google/uuid"
 )
 
@@ -40,6 +43,7 @@ type WaveScheduler struct {
 	resolver  ContextResolverIface
 	artifacts *ArtifactStore
 	runners   map[WorkerType]WorkerRunner
+	obsBridge *observability.Bridge
 
 	// Per-wave runtime state. A wave is uniquely identified by sessionID —
 	// v1.0 supports one active wave per session.
@@ -79,11 +83,12 @@ type workerHandle struct {
 
 // SchedulerDeps wires the scheduler.
 type SchedulerDeps struct {
-	Pool      *WorkerPool
-	Guard     *ConflictGuard
-	Resolver  ContextResolverIface
-	Artifacts *ArtifactStore
-	Runners   map[WorkerType]WorkerRunner
+	Pool          *WorkerPool
+	Guard         *ConflictGuard
+	Resolver      ContextResolverIface
+	Artifacts     *ArtifactStore
+	Runners       map[WorkerType]WorkerRunner
+	Observability *observability.Bridge
 }
 
 // NewWaveScheduler constructs a scheduler.
@@ -98,8 +103,24 @@ func NewWaveScheduler(deps SchedulerDeps) *WaveScheduler {
 		resolver:  deps.Resolver,
 		artifacts: deps.Artifacts,
 		runners:   runners,
+		obsBridge: deps.Observability,
 		waves:     make(map[string]*schedulerWaveState),
 	}
+}
+
+// startOrchSpan creates a child span for orchestration operations.
+func (s *WaveScheduler) startOrchSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if s.obsBridge == nil || !s.obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(kind),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return s.obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 // Metrics returns a snapshot of the scheduler's aggregate counters.
@@ -146,6 +167,16 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 			return err
 		}
 	}
+
+	_, span := s.startOrchSpan(ctx, telemetry.OpOrchWaveSchedule, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "wave.session_id", Value: sessionID},
+		tracer.Attribute{Key: "wave.task_count", Value: fmt.Sprintf("%d", len(graph.nodes))},
+	)
+	defer func() {
+		if span != nil {
+			span.End()
+		}
+	}()
 
 	s.mu.Lock()
 	existing, hasExisting := s.waves[sessionID]
@@ -314,6 +345,11 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 
 	// Spawn worker goroutine.
 	go func() {
+		_, taskSpan := s.startOrchSpan(taskCtx, telemetry.OpOrchWaveTaskExecute, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "wave.session_id", Value: sessionID},
+			tracer.Attribute{Key: "wave.task_id", Value: node.ID},
+			tracer.Attribute{Key: "wave.worker_type", Value: string(node.WorkerType)},
+		)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("wave: worker panic",
@@ -326,6 +362,9 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 					StartedAt: handle.startedAt,
 					EndedAt:   time.Now(),
 				})
+			}
+			if taskSpan != nil {
+				taskSpan.End()
 			}
 		}()
 		runnerErr := runner.Run(taskCtx, spec)

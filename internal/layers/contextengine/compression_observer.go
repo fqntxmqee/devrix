@@ -1,6 +1,8 @@
 package contextengine
 
 import (
+	"context"
+
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -17,7 +19,7 @@ func newPipelineStepObserver(sessionID string, observer ICompressionObserver) co
 	return &pipelineStepObserver{sessionID: sessionID, observer: observer}
 }
 
-func (o *pipelineStepObserver) OnStep(step string, before, after int) {
+func (o *pipelineStepObserver) OnStep(_ context.Context, step string, before, after int) {
 	o.observer.EmitCompressionStep(o.sessionID, step, before, after)
 }
 

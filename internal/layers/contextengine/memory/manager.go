@@ -188,14 +188,23 @@ func (m *Manager) RemoveLastUserMessage(sc *types.SessionContext) {
 	}
 }
 
-// TrimMessages trims sc.Messages to keep only the last N messages,
-// then repairs the chain to remove orphaned tool results.
-// Prevents unbounded growth of the persistent message history across interactions.
-func (m *Manager) TrimMessages(sc *types.SessionContext, keep int) {
+// TrimMessages trims sc.Messages using head+tail retention, then repairs tool chains.
+func (m *Manager) TrimMessages(sc *types.SessionContext) {
 	m.messagesMu.Lock()
 	defer m.messagesMu.Unlock()
-	if len(sc.Messages) > keep {
-		sc.Messages = sc.Messages[len(sc.Messages)-keep:]
+
+	max := m.cfg.Compression.MaxMessages
+	if max <= 0 {
+		max = 50
+	}
+	tail := m.cfg.Compression.KeepTailMessages
+	headTurns := m.cfg.Compression.Autocompact.PreserveHeadTurns
+	if headTurns <= 0 {
+		headTurns = 1
+	}
+
+	if len(sc.Messages) > max {
+		sc.Messages = conversation.HeadTailTrim(sc.Messages, max, headTurns, tail)
 	}
 	sc.Messages = conversation.RepairToolMessageChain(sc.Messages)
 	sc.UpdatedAt = time.Now()

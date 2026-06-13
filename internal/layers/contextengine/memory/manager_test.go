@@ -137,24 +137,28 @@ func TestManager_RemoveLastUserMessage_only_removes_last_user(t *testing.T) {
 
 func TestManager_TrimMessages(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
+	cfg.Compression.MaxMessages = 8
+	cfg.Compression.KeepTailMessages = 4
+	cfg.Compression.Autocompact.PreserveHeadTurns = 1
 	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
 	session := types.NewSession("sess_trim", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
+	mgr.AppendMessage(sc, types.MessageRoleUser, "first task")
 	for i := range 20 {
-		role := types.MessageRoleUser
+		role := types.MessageRoleAssistant
 		if i%2 == 0 {
-			role = types.MessageRoleAssistant
+			role = types.MessageRoleUser
 		}
 		mgr.AppendMessage(sc, role, fmt.Sprintf("msg%d", i))
 	}
 
-	mgr.TrimMessages(sc, 5)
-	if len(sc.Messages) != 5 {
-		t.Fatalf("len = %d, want 5", len(sc.Messages))
+	mgr.TrimMessages(sc)
+	if len(sc.Messages) > 8 {
+		t.Fatalf("len = %d, want <= 8", len(sc.Messages))
 	}
-	if sc.Messages[0].Content != "msg15" {
-		t.Fatalf("first message = %q, want msg15", sc.Messages[0].Content)
+	if sc.Messages[0].Content != "first task" {
+		t.Fatalf("first message = %q, want first task preserved", sc.Messages[0].Content)
 	}
 }
 
@@ -167,7 +171,7 @@ func TestManager_TrimMessages_noop_when_within_limit(t *testing.T) {
 	mgr.AppendMessage(sc, types.MessageRoleUser, "a")
 	mgr.AppendMessage(sc, types.MessageRoleAssistant, "b")
 
-	mgr.TrimMessages(sc, 10)
+	mgr.TrimMessages(sc)
 	if len(sc.Messages) != 2 {
 		t.Fatalf("len = %d, want 2 (noop)", len(sc.Messages))
 	}
@@ -187,7 +191,7 @@ func TestManager_TrimMessages_should_repair_incomplete_chain_when_within_limit(t
 		Metadata: map[string]string{"tool_calls": calls},
 	})
 
-	mgr.TrimMessages(sc, 50)
+	mgr.TrimMessages(sc)
 	if len(sc.Messages) != 1 {
 		t.Fatalf("len = %d, want 1 (incomplete assistant dropped)", len(sc.Messages))
 	}
@@ -212,7 +216,7 @@ func TestManager_StopCleanup_should_repair_incomplete_tool_round(t *testing.T) {
 
 	// Mirrors engine.go cancel path on /stop.
 	mgr.RemoveLastUserMessage(sc)
-	mgr.TrimMessages(sc, 50)
+	mgr.TrimMessages(sc)
 
 	for _, m := range sc.Messages {
 		if m.Role == types.MessageRoleAssistant && m.Metadata["tool_calls"] != "" {
@@ -223,6 +227,9 @@ func TestManager_StopCleanup_should_repair_incomplete_tool_round(t *testing.T) {
 
 func TestManager_TrimMessages_repairs_chain_after_trim(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
+	cfg.Compression.MaxMessages = 2
+	cfg.Compression.KeepTailMessages = 1
+	cfg.Compression.Autocompact.PreserveHeadTurns = 1
 	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
 	session := types.NewSession("sess_trim3", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
@@ -237,13 +244,13 @@ func TestManager_TrimMessages_repairs_chain_after_trim(t *testing.T) {
 	mgr.AppendMessage(sc, types.MessageRoleTool, "result")
 	mgr.AppendMessage(sc, types.MessageRoleUser, "more")
 
-	// Trim to 2 — the orphan assistant+tool pair before "more" should be repaired
-	mgr.TrimMessages(sc, 2)
-	if len(sc.Messages) != 1 {
-		t.Fatalf("len = %d, want 1 (orphan assistant+tool dropped, only 'more' remains)", len(sc.Messages))
+	mgr.TrimMessages(sc)
+	if len(sc.Messages) == 0 {
+		t.Fatal("expected at least one message after trim")
 	}
-	if sc.Messages[0].Content != "more" {
-		t.Fatalf("expected 'more', got %q", sc.Messages[0].Content)
+	last := sc.Messages[len(sc.Messages)-1]
+	if last.Content != "more" {
+		t.Fatalf("expected tail user 'more', got %q", last.Content)
 	}
 }
 

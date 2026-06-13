@@ -8,6 +8,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/workplan"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -25,6 +28,7 @@ type Hub struct {
 	workPlan *workplan.Service
 	tasks    *tasks.TaskManager
 	im       IMSink
+	obsBridge *observability.Bridge
 
 	mu           sync.Mutex
 	lastToolEmit map[string]time.Time
@@ -32,11 +36,12 @@ type Hub struct {
 
 // HubDeps wires Hub dependencies.
 type HubDeps struct {
-	Config   config.ExecutionFlowConfig
-	Queue    *queue.SessionQueue
-	WorkPlan *workplan.Service
-	Tasks    *tasks.TaskManager
-	IM       IMSink
+	Config    config.ExecutionFlowConfig
+	Queue     *queue.SessionQueue
+	WorkPlan  *workplan.Service
+	Tasks     *tasks.TaskManager
+	IM        IMSink
+	ObsBridge *observability.Bridge
 }
 
 // NewHub creates an ExecutionFlowHub.
@@ -56,6 +61,7 @@ func NewHub(deps HubDeps) *Hub {
 		workPlan:     wp,
 		tasks:        deps.Tasks,
 		im:           deps.IM,
+		obsBridge:    deps.ObsBridge,
 		lastToolEmit: make(map[string]time.Time),
 	}
 }
@@ -76,6 +82,14 @@ func SetGlobalHub(h contracts.ExecutionFlowHub) {
 func (h *Hub) Publish(ctx context.Context, ev contracts.FlowEvent) {
 	if h == nil || !h.cfg.Enabled {
 		return
+	}
+	_, span := h.startSpan(ctx, telemetry.OpOrchFlowEventPublish,
+		tracer.Attribute{Key: "flow.session_id", Value: ev.SessionID},
+		tracer.Attribute{Key: "flow.kind", Value: string(ev.Kind)},
+		tracer.Attribute{Key: "flow.worker_id", Value: ev.WorkerID},
+	)
+	if span != nil {
+		defer span.End()
 	}
 	if ev.At.IsZero() {
 		ev.At = time.Now()
@@ -121,6 +135,20 @@ func (h *Hub) allowToolEmit(ev contracts.FlowEvent) bool {
 	}
 	h.lastToolEmit[key] = time.Now()
 	return true
+}
+
+func (h *Hub) startSpan(ctx context.Context, operation string, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
+	if h.obsBridge == nil || !h.obsBridge.IsEnabled() {
+		return ctx, nil
+	}
+	opts := []tracer.SpanStartOption{
+		tracer.WithSpanKind(tracer.SpanKindInternal),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(operation, attrs...)...),
+	}
+	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
+		opts = append(opts, tracer.WithParent(*parentSC))
+	}
+	return h.obsBridge.Tracer().Start(ctx, operation, opts...)
 }
 
 func (h *Hub) linkTask(ev contracts.FlowEvent) {

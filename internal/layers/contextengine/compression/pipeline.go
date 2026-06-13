@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
@@ -11,6 +12,8 @@ import (
 )
 
 const (
+	stepClearToolResults = "clear_tool_results"
+	stepMessageBudget    = "message_budget"
 	stepToolResultBudget = "tool_result_budget"
 	stepSnip             = "snip"
 	stepMicrocompact     = "microcompact"
@@ -22,14 +25,18 @@ const (
 
 // Pipeline runs the seven-step compression chain.
 type Pipeline struct {
-	counter        contracts.ITokenCounter
-	enabled        bool
-	autocompactCfg config.AutocompactConfig
-	summarizer     Summarizer
-	stepObserver   StepObserver
-	asyncCompact   *AsyncAutocompacter
-	sessionID      string
-	skipAssembly   bool
+	counter            contracts.ITokenCounter
+	enabled            bool
+	autocompactCfg     config.AutocompactConfig
+	microcompactCfg    config.MicrocompactConfig
+	maxMessages        int
+	keepTailMessages   int
+	preserveHeadTurns  int
+	summarizer         Summarizer
+	stepObserver       StepObserver
+	asyncCompact       *AsyncAutocompacter
+	sessionID          string
+	skipAssembly       bool
 }
 
 // NewPipeline creates a compression pipeline with functional options.
@@ -62,6 +69,31 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 
 	current := append([]types.Message(nil), msgs...)
 
+	if cleared, applied := clearStaleToolResults(current, p.microcompactCfg.KeepRecentToolResults); applied {
+		before := p.counter.CountMessages(current)
+		current = cleared
+		p.emitStep(ctx, stepClearToolResults, before, p.counter.CountMessages(current))
+		report.StepsApplied = append(report.StepsApplied, stepClearToolResults)
+		report.Truncated = true
+	}
+
+	if p.maxMessages > 0 && len(current) > p.maxMessages {
+		beforeCount := len(current)
+		headTurns := p.preserveHeadTurns
+		if headTurns <= 0 {
+			headTurns = 1
+		}
+		tail := p.keepTailMessages
+		if tail <= 0 {
+			tail = p.maxMessages - 2
+		}
+		current = conversation.HeadTailTrim(current, p.maxMessages, headTurns, tail)
+		if len(current) != beforeCount {
+			report.StepsApplied = append(report.StepsApplied, stepMessageBudget)
+			report.Truncated = true
+		}
+	}
+
 	type namedStep struct {
 		name string
 		fn   func([]types.Message, types.TokenBudget) ([]types.Message, bool)
@@ -71,7 +103,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 			before := p.counter.CountMessages(m)
 			next := toolResultBudget(p.counter, m, b.ToolResultBudget)
 			after := p.counter.CountMessages(next)
-			p.emitStep(stepToolResultBudget, before, after)
+			p.emitStep(ctx, stepToolResultBudget, before, after)
 			return next, before != after
 		}},
 		{stepSnip, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
@@ -82,7 +114,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 				}
 				next := snip(p.counter, m, snipTarget, p.minKeepForAutocompact())
 			after := p.counter.CountMessages(next)
-			p.emitStep(stepSnip, before, after)
+			p.emitStep(ctx, stepSnip, before, after)
 			return next, before != after
 		}},
 		{stepMicrocompact, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
@@ -90,7 +122,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 			next, applied := microcompact(m, b)
 			after := p.counter.CountMessages(next)
 			if applied {
-				p.emitStep(stepMicrocompact, before, after)
+				p.emitStep(ctx, stepMicrocompact, before, after)
 			}
 			return next, applied
 		}},
@@ -99,7 +131,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 			next, applied := collapse(m, b)
 			after := p.counter.CountMessages(next)
 			if applied {
-				p.emitStep(stepCollapse, before, after)
+				p.emitStep(ctx, stepCollapse, before, after)
 			}
 			return next, applied
 		}},
@@ -127,7 +159,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 		current = assemble(systemPrompt, current)
 	}
 	afterAsm := p.counter.CountMessages(current)
-	p.emitStep(stepAssembly, beforeAsm, afterAsm)
+	p.emitStep(ctx, stepAssembly, beforeAsm, afterAsm)
 	report.CompressedTokens = afterAsm
 
 	if p.counter.CountMessages(current) > budget.MaxContextTokens-budget.ReservedOutput {
@@ -137,9 +169,9 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 	return current, report, nil
 }
 
-func (p *Pipeline) emitStep(step string, before, after int) {
+func (p *Pipeline) emitStep(ctx context.Context, step string, before, after int) {
 	if p.stepObserver != nil {
-		p.stepObserver.OnStep(step, before, after)
+		p.stepObserver.OnStep(ctx, step, before, after)
 	}
 }
 
@@ -199,6 +231,9 @@ func assemble(systemPrompt string, msgs []types.Message) []types.Message {
 
 // ShouldCompress returns true if compression should run.
 func (p *Pipeline) ShouldCompress(msgs []types.Message, budget types.TokenBudget) bool {
+	if p.maxMessages > 0 && len(msgs) > p.maxMessages {
+		return true
+	}
 	return p.counter.CountMessages(msgs) > budget.CompressionTarget
 }
 

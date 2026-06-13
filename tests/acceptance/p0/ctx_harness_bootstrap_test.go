@@ -47,7 +47,7 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("disabled matches legacy system prompt", func(t *testing.T) {
+	t.Run("query loop uses core template not raw agents in system", func(t *testing.T) {
 		ctxCfg := config.DefaultContextEngineConfig()
 		ctxCfg.LongTerm.Enabled = false
 		toolsReg, err := registry.NewBuiltinRegistry()
@@ -67,11 +67,11 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		if !ok {
 			t.Fatal("missing session context")
 		}
-		if strings.Contains(sc.SystemPrompt, "<loaded_context>") {
-			t.Fatal("disabled path must not use harness XML assembly")
+		if !strings.Contains(sc.SystemPrompt, "Devrix") {
+			t.Fatal("system prompt must include embedded core template")
 		}
-		if !strings.Contains(sc.SystemPrompt, "Project agents rule") {
-			t.Fatal("disabled path must still load AGENTS.md")
+		if strings.Contains(sc.SystemPrompt, "Project agents rule") {
+			t.Fatal("AGENTS.md must not be in system prompt when user_context.mode=prepend")
 		}
 	})
 
@@ -110,11 +110,14 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		if sc.Harness.Report.VisibleTools != 3 {
 			t.Fatalf("simple_mode visible tools: got %d want 3", sc.Harness.Report.VisibleTools)
 		}
-		if !strings.Contains(sc.SystemPrompt, "<agents_context>") {
-			t.Fatal("assembled prompt missing agents_context")
+		if !strings.Contains(sc.SystemPrompt, "<loaded_context>") {
+			t.Fatal("harness path should include loaded_context when bootstrap ran")
 		}
-		if !strings.Contains(sc.SystemPrompt, "Project agents rule") {
-			t.Fatal("agents body missing from assembled prompt")
+		if strings.Contains(sc.SystemPrompt, "Project agents rule") {
+			t.Fatal("agents body must not be in system when user_context.mode=prepend")
+		}
+		if !strings.Contains(sc.SystemPrompt, "Devrix") {
+			t.Fatal("assembled prompt missing core template")
 		}
 		if len(llm.lastTools) != 3 {
 			t.Fatalf("visible tool count: got %d want 3", len(llm.lastTools))
@@ -128,18 +131,24 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		}
 	})
 
-	t.Run("build legacy equals disabled build path", func(t *testing.T) {
+	t.Run("assembler omits agents in prepend mode", func(t *testing.T) {
 		assembler := prompt.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 		entries := []memory.MemoryEntry{{Topic: "bugs", Content: "race fix"}}
-		appendix := memory.FormatLongTermAppendix(entries, 2000)
-		legacy := assembler.BuildLegacy("Agents", appendix)
-		disabled, _ := assembler.Build(prompt.SystemPromptBuildInput{
-			HarnessEnabled: false,
-			AgentsRaw:      "Agents",
-			MemoryEntries:  entries,
+		built, _ := assembler.Build(prompt.SystemPromptBuildInput{
+			HarnessEnabled:       false,
+			AgentsRaw:            "Agents-only legacy body",
+			OmitAgentsFromSystem: true,
+			MemoryEntries:        entries,
 		})
-		if legacy != disabled {
-			t.Fatalf("BuildLegacy drift: %q vs %q", legacy, disabled)
+		if !strings.Contains(built, "Devrix") {
+			preview := built
+			if len(preview) > 80 {
+				preview = preview[:80]
+			}
+			t.Fatalf("expected core template, got: %q", preview)
+		}
+		if strings.Contains(built, "Agents-only legacy body") {
+			t.Fatal("agents raw should not appear in system when prepend mode")
 		}
 	})
 }
