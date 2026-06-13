@@ -1,6 +1,6 @@
 # 飞书任务规划功能验收指南
 
-**目标:** 在飞书上验证任务规划功能
+**目标:** 在飞书上验证 Devrix 任务规划和命令功能
 
 ---
 
@@ -26,21 +26,22 @@ cat devrix.yaml | grep -A 10 "feishu:"
 
 **基础命令：**
 /new - 开始新会话
-/task - 任务管理
-/plan - 规划模式
 /help - 显示帮助信息
 /stop - 停止当前生成
 
-**任务命令 (/task)：**
-/task create <任务> - 创建任务
-/task list - 列出所有任务
-/task ready - 显示就绪任务
+**功能说明：**
+Devrix 是一个多智能体 AI 编程助手，可以通过飞书与你对话。
 
-**规划命令 (/plan)：**
-/plan <目标> - 进入规划模式
-/plan approve - 审批计划
-/plan show - 显示计划
-/plan reject - 拒绝计划
+**使用方式：**
+直接发送消息即可与我对话。我会帮助你：
+• 编写和调试代码
+• 分析项目结构
+• 执行开发任务
+• 回答技术问题
+
+**权限说明：**
+YOLO 模式已启用：工具调用自动批准；WorkDir 内文件可写。
+沙箱安全策略（命令白名单、危险模式）仍会生效，与 YOLO 无关。
 ```
 
 ---
@@ -51,28 +52,35 @@ cat devrix.yaml | grep -A 10 "feishu:"
 
 | 步骤 | 输入 | 预期输出 |
 |------|------|----------|
-| 1 | `/task` | 显示任务命令帮助 |
-| 2 | `/task create 添加单元测试` | `✓ Task created: task_xxx` |
-| 3 | `/task list` | `Tasks (1):` + 任务列表 |
-| 4 | `/task ready` | `Ready tasks (1):` 或 `No ready tasks` |
+| 1 | `/task` | 显示任务命令帮助（/task create, /task list, /task ready） |
+| 2 | `/task create 添加单元测试` | 确认任务创建成功 |
+| 3 | `/task list` | 显示任务列表 |
+| 4 | `/task ready` | 显示就绪任务 或 "无就绪任务" |
 
 ### 测试 2: 规划命令 `/plan`
 
 | 步骤 | 输入 | 预期输出 |
 |------|------|----------|
-| 1 | `/plan` | 显示规划命令帮助 |
-| 2 | `/plan Add user authentication` | `📝 **规划模式**` + 已收到目标 |
-| 3 | `/plan show` | 显示计划内容（开发中） |
-| 4 | `/plan approve` | 审批或提示功能开发中 |
-| 5 | `/plan reject` | `Plan rejected` |
+| 1 | `/plan Add user authentication` | `📝 **规划模式**` + 已收到目标 |
+| 2 | `/plan show` | 显示当前计划内容 |
+| 3 | `/plan approve` | 审批通过 |
+| 4 | `/plan reject` | `Plan rejected` |
 
 ### 测试 3: 基础命令
 
 | 步骤 | 输入 | 预期输出 |
 |------|------|----------|
-| 1 | `/help` | 显示完整帮助 |
-| 2 | `/new` | `✅ 新会话已创建` |
-| 3 | `/stop` | `⏸️ 停止功能开发中` |
+| 1 | `/help` | 显示完整帮助（基础命令 + 功能说明 + 权限说明） |
+| 2 | `/new` | 保留当前会话映射，后续消息使用新会话 |
+| 3 | `/stop` | 停止当前 LLM 生成，session 映射保留可复用 |
+
+### 测试 4: CardKit 流式卡片（可选）
+
+| 步骤 | 输入 | 预期输出 |
+|------|------|----------|
+| 1 | 发送任意编程问题 | 飞书卡片出现并逐字流式更新（打字机效果） |
+| 2 | 等待回复完成 | 卡片显示完整回复内容 |
+| 3 | 发送另一个问题 | 新卡片独立出现不影响旧卡片 |
 
 ---
 
@@ -83,19 +91,23 @@ cat devrix.yaml | grep -A 10 "feishu:"
          ↓
 2. 发送 /help
          ↓
-3. 确认帮助信息包含 /task 和 /plan
+3. 确认帮助信息包含基础命令和功能说明
          ↓
-4. 发送 /task create 测试任务
+4. 发送 /task 查看任务帮助
          ↓
-5. 发送 /task list 确认任务已创建
+5. 发送 /task create 测试任务
          ↓
-6. 发送 /plan 添加用户认证
+6. 发送 /task list 确认任务已创建
          ↓
-7. 发送 /plan show 查看计划
+7. 发送 /plan 添加用户认证
          ↓
-8. 发送 /plan approve 或 /plan reject
+8. 发送 /plan show 查看计划
          ↓
-9. 验收完成 ✓
+9. 发送 /plan approve 或 /plan reject
+         ↓
+10. 发送普通编程问题测试流式卡片
+         ↓
+11. 验收完成 ✓
 ```
 
 ---
@@ -104,21 +116,26 @@ cat devrix.yaml | grep -A 10 "feishu:"
 
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
-| 命令无响应 | 飞书连接断开 | 重启机器人 |
-| 帮助信息不更新 | 缓存问题 | 发送 `/new` 后重试 |
-| 任务命令无法识别 | CommandTask 未定义 | 检查 command.go |
+| 命令无响应 | 飞书 WebSocket 连接断开 | 检查 FeishuAdapter 日志，重启机器人 |
+| 流式卡片不显示 | CardKit 不可用或限流 | 检查日志中的 cardkit 错误，系统会自动降级为 Patch 模式 |
+| /task 命令无效 | `CommandTask` 未在 types.ParseCommand 中注册 | 检查 `internal/shared/types/` 中的命令解析逻辑 |
+| 卡片重复 | 消息去重失效 | 检查 dedupMap 是否正常清理 |
+| 飞书连接失败 | AppID/AppSecret 配置错误 | 检查 `devrix.yaml` 中 feishu 配置段 |
 
 ---
 
 ## 验收确认清单
 
-- [ ] `/help` 显示 `/task` 和 `/plan` 命令
+- [ ] `/help` 显示基础命令和功能说明
 - [ ] `/task` 显示任务命令帮助
 - [ ] `/task create <任务>` 创建成功
 - [ ] `/task list` 显示任务列表
 - [ ] `/plan <目标>` 进入规划模式
-- [ ] `/plan show` 显示计划（开发中）
-- [ ] `/new` 创建新会话
+- [ ] `/plan show` 显示计划
+- [ ] `/new` 保留 session 映射
+- [ ] `/stop` 停止生成
+- [ ] 流式卡片正常显示（如 cardkit 启用）
+- [ ] YOLO 模式权限说明清晰
 
 ---
 

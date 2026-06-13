@@ -17,7 +17,7 @@
 
 | 域 | 路径 | Activities with F | Total F Points |
 |----|------|-------------------|----------------|
-| D1 Communication | `openspec/specs/d1-communication/f-registry.md` | 8 | 21 |
+| D1 Communication | `openspec/specs/d1-communication/f-registry.md` | 12 | 43 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/f-registry.md` | 10 | 27 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/f-registry.md` | 4 | 10 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/f-registry.md` | 6 | 14 |
@@ -25,7 +25,7 @@
 | D6 Evolution | `openspec/specs/d6-evolution/f-registry.md` | 2 | 6 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/f-registry.md` | 15 | 38 |
 
-**总计**: 53 Activities with F · 136 F Points
+**总计**: 57 Activities with F · 158 F Points
 
 ---
 

@@ -19,7 +19,7 @@
 
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
-| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 22 | 22 | 0 | 8 |
+| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 44 | 44 | 0 | 19 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 41 | 41 | 0 | 15 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 21 | 20 | 1 | 0 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 24 | 24 | 0 | 9 |
@@ -27,7 +27,7 @@
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 15 | 13 | 2 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 13 | 12 | 0 | 8 |
 
-**总计**: 155 · IMPLEMENTED 147 · PLANNED 7 · P0 45
+**总计**: 177 · IMPLEMENTED 169 · PLANNED 7 · P0 56
 
 ---
 

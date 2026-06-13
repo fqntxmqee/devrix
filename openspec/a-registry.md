@@ -17,7 +17,7 @@
 
 | 域 | 路径 | Scenarios | Activities |
 |----|------|-----------|------------|
-| D1 Communication | `openspec/specs/d1-communication/a-registry.md` | 12 | 17 |
+| D1 Communication | `openspec/specs/d1-communication/a-registry.md` | 12 | 21 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/a-registry.md` | 14 | 18 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/a-registry.md` | 6 | 6 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/a-registry.md` | 10 | 14 |
@@ -25,7 +25,7 @@
 | D6 Evolution | `openspec/specs/d6-evolution/a-registry.md` | 4 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/a-registry.md` | 5 | 15 |
 
-**总计**: 63 Scenarios · 86 Activities · 6 PLANNED
+**总计**: 63 Scenarios · 90 Activities · 5 PLANNED
 
 ---
 
