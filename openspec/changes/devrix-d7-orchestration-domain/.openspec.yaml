@@ -1,7 +1,7 @@
 change_id: devrix-d7-orchestration-domain
 priority: P0
 demand_id: DM-20260613-001
-status: s2_clarified
+status: s5_accepted
 domains: [D7, D2, D4, D1]
 dsaft_scenarios:
   - D7-S1   # Work Model
