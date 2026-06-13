@@ -1,5 +1,9 @@
 # Devrix 可观察层深度分析
 
+> **架构入口:** [architecture/contracts-and-boundaries.md](./architecture/contracts-and-boundaries.md)  
+> **Operation 常量:** `internal/layers/observability/telemetry/names.go`  
+> **注意:** 下文 `pev_engine` 组件名已退役；生产路径以 `context.process` + `llm.stream` 为主。
+
 ## 一、架构总览
 
 ```
@@ -42,7 +46,7 @@ type Span struct {
 // Span 属性结构
 Attributes = {
     "devrix.layer":        "context|llm|communication|agent",
-    "devrix.component":     "pev_engine|context_engine|llm_gateway|...",
+    "devrix.component":     "context_engine|harness|llm_gateway|gateway|agent_tool|...",
     "session.id":          "sess_xxx",
     "llm.provider":        "openai|anthropic",
     "llm.model":           "gpt-4|claude-3",

@@ -2,8 +2,8 @@
 
 **Capability:** code-atlas
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-10
+**Version:** 1.1.0
+**Last Updated:** 2026-06-13
 **Parent:** `openspec/specs/architecture/layering.md`
 **Demand:** DM-20260610-012 (QueryLoop v2)
 
@@ -11,7 +11,9 @@
 
 ## Overview
 
-Devrix 代码图谱：L4 功能点到包路径的快速索引。新建文件时 MUST 先查 D-S 归属，再落盘到对应目录。
+Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先查 D-S 归属，再落盘到对应目录。
+
+**可读版：** `docs/architecture/code-map.md`
 
 ---
 
@@ -20,6 +22,7 @@ Devrix 代码图谱：L4 功能点到包路径的快速索引。新建文件时 
 | L4 ID | 名称 | D-S | 包路径 | 关键类型 |
 |-------|------|-----|--------|----------|
 | query_loop | QueryLoop 主循环 | D2-S10 | `contextengine/query/` | `Loop`, `SubQuery`, `FlowTap` |
+| toolrunner | 工具执行与沙箱 | D2-S5/D2-S8 | `contextengine/toolrunner/` | `ToolRunner`, `Sandbox`, builtins |
 | user_context | UserContext prepend | D2-S10 | `contextengine/usercontext/` | `Provider`, `PrependForAPI` |
 | attachments | Plan mode 附件 | D2-S10 | `contextengine/attachments/` | `Registry` |
 | permission_mode | Plan 写过滤 | D2-S10 | `contextengine/permission/` | `Mode`, `PlanFilePath` |
@@ -95,3 +98,4 @@ D4 Delegate ──fork──► D2 WorkerEngine ──► QueryLoop
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-10 | QueryLoop v2 module index (DM-20260610-012) |
+| 1.1.0 | 2026-06-13 | +toolrunner; docs/architecture 可读版同步 |

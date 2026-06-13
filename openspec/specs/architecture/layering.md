@@ -260,7 +260,7 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 示例:
 
 - `D1-S1-A01-T01` = D1 (Communication) S1 (Gateway) A01 (ManageSession) 测试点 01
-- `D2-S1-A01-T01` = D2 (Context Engine) S1 (PEV) A01 (ExecutePEV) 测试点 01
+- `D2-S10-A01-T34` = D2 (Context Engine) S10 (QueryLoop) A01 测试点 34（原 PEV Execute 能力）
 - `D3-S3-A01-T01` = D3 (LLM Gateway) S3 (Breaker) A01 (ManageCircuitBreaker) 测试点 01
 
 完整注册表见 `openspec/t-registry.md`。

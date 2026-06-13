@@ -5,8 +5,8 @@
 **Change ID:** devrix-llm-gateway
 **Demand:** DM-20260607-004
 **Layer:** 3 - LLM Gateway
-**Status:** S7 Archived (2026-06-07)
-**Version:** 1.0.0
+**Status:** S7 Archived (2026-06-07) — 层边界仍有效；Process 调用方现为 **QueryLoop**（非 PEVEngine）  
+**架构入口:** [architecture/request-flow.md](./architecture/request-flow.md)
 
 ---
 
@@ -36,7 +36,7 @@
 ```
 Layer 2 (Context Engine)        Layer 3 (LLM Gateway)
 ─────────────────────────      ──────────────────────
-PEVEngine.Run()
+QueryLoop.Run() / adapters
     │
     └──▶ ILLMGateway.ChatStream() ──▶ LLMGateway
                                       ├─ AdapterRegistry

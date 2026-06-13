@@ -4,8 +4,9 @@
 **Change ID:** devrix-multi-agent
 **Demand ID:** DM-20260608-005
 **版本:** 1.0.0
-**状态:** Design Review（Grill 审查通过，6 决策已合入，2026-06-08）
-**关联 OpenSpec:** `openspec/specs/multi_agent_layer_delta.md`
+**状态:** Design Review（Grill 审查通过，6 决策已合入，2026-06-08）  
+**架构入口:** [architecture/code-map.md](./architecture/code-map.md) · D4-S10 Delegate  
+**注意:** 下文部分仍写 PEVEngine；现行 Agent 通过 `IEngine.Process` 驱动 **QueryLoop**。
 
 > **Grill 审查关键修正（详见 `openspec/changes/devrix-multi-agent/design.md`）：**
 > 1. 权限模型：同步 PermissionManager → 异步 AgentPermissionGate（Agent 实现 IPermissionGate）
@@ -64,13 +65,13 @@
 | 类型 | 约束 | 设计响应 |
 |------|------|----------|
 | **架构** | 不得反向依赖 L1 Communication | 仅通过 `IContextEngine` 接口与 L2 交互 |
-| **架构** | 不得直接调用 LLM | 委托 `IContextEngine.Process()` 驱动 PEVEngine |
+| **架构** | 不得直接调用 LLM | 委托 `IContextEngine.Process()` 驱动 QueryLoop |
 | **复用** | 不复建 Tool Registry | 复用 `contextengine/registry` |
 | **复用** | 不复建 Permission 管线 | 委托 `gateway.PermissionManager` |
 | **复用** | 不复建 Observer 体系 | 适配器桥接到 `contextengine.IObserver` |
 | **版本** | V1 不实现 Supervisor-Worker、Peer-Review | 明确 FeatureNotImplemented |
 | **测试** | 遵守测试框架规约 | {T}-AGENT-* 测试点 + `tests/` 分层 |
-| **安全** | Agent 沙箱不可逃逸 | 工具执行复用 `contextengine/sandbox` |
+| **安全** | Agent 沙箱不可逃逸 | 工具执行复用 `contextengine/toolrunner` 沙箱 |
 
 ---
 
