@@ -1,6 +1,6 @@
 # LLM Gateway Layer Design (Layer 3)
 
-> **Source of Truth:** `openspec/specs/llm-gateway/spec.md`（设计历史见 `openspec/archive/2026-06-07-devrix-llm-gateway/design.md`）
+> **Source of Truth:** `openspec/specs/d3-llm-gateway/spec.md`（设计历史见 `openspec/archive/2026-06-07-devrix-llm-gateway/design.md`）
 
 **Change ID:** devrix-llm-gateway
 **Demand:** DM-20260607-004

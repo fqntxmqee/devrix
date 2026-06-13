@@ -16,7 +16,7 @@ Devrix 测试框架将 OpenSpec T 层测试点、Go 测试金字塔与 S5 自动
 
 | 文档 | 路径 |
 |------|------|
-| T 层注册表 | `openspec/t-registry.md` |
+| T 层注册表 | `openspec/t-registry.md`（根索引），各域 `openspec/specs/d{N}-*/t-registry.md` |
 | 域分段测试 | `openspec/specs/testing-framework/domain-segmentation.md` |
 | 项目元数据 | `openspec/project.md` |
 | 交付流程 | `specs/05-delivery-process.md`（工作区） |

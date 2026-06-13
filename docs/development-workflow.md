@@ -1,5 +1,7 @@
 # Devrix 研发流程规范
 
+> **规范权威来源：** `openspec/specs/project/master.md` — 本文件为辅助阅读，冲突时以 master.md 为准。
+
 **版本:** 1.0.0
 **最后更新:** 2026-06-08
 
@@ -608,6 +610,11 @@ cp -r openspec/changes/devrix-tool-security/* openspec/archive/2026-06-08-devrix
 git rm -r openspec/changes/devrix-tool-security/
 git add openspec/archive/
 git add openspec/demand-archive-index.md
+
+# 域文档同步（如变更影响域架构）
+# 更新 openspec/specs/d{N}-*/ 下的 spec.md / design.md / 注册表
+git add openspec/specs/d{N}-*/
+
 git commit -m "archive: devrix-tool-security 归档"
 git push
 ```

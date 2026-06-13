@@ -6,10 +6,10 @@
 |------|----------|------------|
 | 分层编号、目录映射 | `openspec/specs/architecture/layering.md` | 提炼 + 结合代码解读 |
 | 代码落盘索引 | `openspec/specs/architecture/code-atlas.md` | 人类可读版 `code-map.md` |
-| A/F/T 注册表 | `openspec/a-registry.md` / `f-registry.md` / `t-registry.md` | 引用，不重复维护 |
-| 验收规格 | `openspec/specs/*/spec.md` | Gherkin Scenario → T 层 |
+| A/F/T 注册表 | `openspec/specs/d{N}-*/{a,f,t}-registry.md` | 引用，不重复维护 |
+| 验收规格 | `openspec/specs/d{N}-*/spec.md` | Gherkin Scenario → T 层 |
 
-**最后同步代码基线：** 2026-06-13（QueryLoop 生产路径、PEV 退役、toolrunner 子包、契约分层）
+**最后同步代码基线：** 2026-06-13（QueryLoop 生产路径、PEV 退役、D7 编排域）
 
 ---
 
@@ -24,28 +24,27 @@
 
 ---
 
-## 域级详细设计（六段式）
+## 域级架构归档
 
-遵循 `docs/detail design framework.md` 的模块级深描，部分章节为历史版本（PEV 时代），阅读时注意文首状态标记。
+域级详细设计、A/F/T 注册表已迁移至 `openspec/specs/d{N}-*/`：
 
-| 域 | 文档 | 状态 |
-|----|------|------|
-| D2 Context Engine | [../context-engine-design.md](../context-engine-design.md) | **Historical** — 现行路径见 [request-flow.md](./request-flow.md) |
-| D3 LLM Gateway | [../llm-gateway-design.md](../llm-gateway-design.md) | Archived S7，层边界仍有效 |
-| D4 Multi-Agent | [../multi-agent-design.md](../multi-agent-design.md) | Design Review，Delegate/Worker 见 code-map |
-| D5 Observability | [../observability-design.md](../observability-design.md) | 分析文档，span 族以 telemetry/names.go 为准 |
+| 域 | 路径 |
+|----|------|
+| D1 Communication | `openspec/specs/d1-communication/` |
+| D2 Context Engine | `openspec/specs/d2-context-engine/` |
+| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/` |
+| D4 Multi-Agent | `openspec/specs/d4-multi-agent/` |
+| D5 Observability | `openspec/specs/d5-observability/` |
+| D6 Evolution | `openspec/specs/d6-evolution/` |
+| D7 Orchestration | `openspec/specs/d7-orchestration/` |
 
 ---
 
-## 专题文档
+## 专题文档（稳定态）
 
 | 文档 | 说明 |
 |------|------|
 | [../config.md](../config.md) | 配置项与热重载 |
-| [../prompt-system-design.md](../prompt-system-design.md) | System Prompt 与 Harness 装配 |
-| [../task-planning-design.md](../task-planning-design.md) | Task 磁盘工具与 plan mode |
-| [../llm-gateway-model-resolution-trace.md](../llm-gateway-model-resolution-trace.md) | 模型/Tier 解析链路 |
-| [../coverage.md](../coverage.md) | Operation 级代码染色 |
 | [../development-workflow.md](../development-workflow.md) | OpenSpec S1–S7 + GitHub Flow |
 
 ---
@@ -56,4 +55,4 @@
 2. [request-flow.md](./request-flow.md) — 理解一次用户消息的完整路径
 3. [code-map.md](./code-map.md) — 改代码前先查 D-S 归属
 4. [contracts-and-boundaries.md](./contracts-and-boundaries.md) — 跨层改动时的红线
-5. 按需深入域级 `*-design.md` 或 OpenSpec `spec.md`
+5. 按需深入 `openspec/specs/d{N}-*/` 的域 spec 和注册表

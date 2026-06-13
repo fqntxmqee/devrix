@@ -24,7 +24,7 @@
 | 检查项 | 说明 |
 |--------|------|
 | Change 文件齐全 | `.openspec.yaml`、`proposal.md`、`design.md`、`tasks.md`、`specs/` |
-| T 层已登记 | `t-registry.md` 中有对应条目 |
+| T 层已登记 | T 层注册表（根索引 + 域 `openspec/specs/d{N}-*/t-registry.md`）中有对应条目 |
 | 文档状态一致 | `.openspec.yaml` 和 `proposal.md` 中的 status 一致 |
 
 ### 2.2 代码质量
@@ -109,7 +109,7 @@ gh pr review --comment --body "建议: ..."
 Review 完成时确认：
 
 - [ ] OpenSpec 文档齐全且状态一致
-- [ ] T 层注册表已更新
+- [ ] T 层注册表已更新（根索引 + 域注册表）
 - [ ] 代码在正确的 D-S 包中
 - [ ] 无 CRITICAL 安全问题
 - [ ] `go vet` 和 `./scripts/test-unit.sh` 通过

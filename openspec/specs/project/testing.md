@@ -52,7 +52,7 @@
 
 ### 3.1 注册
 
-S2 阶段在 `openspec/t-registry.md` 预登记（状态：PLANNED）。编号使用 DSAFT T 层标准格式。
+S2 阶段在 T 层注册表预登记（状态：PLANNED）。根索引 `openspec/t-registry.md`，各域明细 `openspec/specs/d{N}-*/t-registry.md`。编号使用 DSAFT T 层标准格式。
 
 ### 3.2 代码标注
 
@@ -143,5 +143,5 @@ S5 验收前：
 - [ ] `./scripts/test-all.sh` 通过
 - [ ] 覆盖率 >= 80%
 - [ ] `acceptance-report.md` 已生成，状态 PASS
-- [ ] `t-registry.md` 对应条目更新为 IMPLEMENTED
+- [ ] `t-registry.md` 对应条目更新为 IMPLEMENTED（根索引 + 域注册表）
 - [ ] P0 T 层测试 100% PASS（阻断交付）

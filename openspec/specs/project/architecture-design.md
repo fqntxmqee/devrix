@@ -3,7 +3,7 @@
 **版本:** 1.1.0
 **状态:** Active
 **所属阶段:** S2、S3
-**关联规范:** `requirements.md`、`review-design.md`、`dsaft-methodology.md`
+**关联规范:** `requirements.md`、`review-design.md`、`../../docs/methodology/dsaft-methodology.md`
 
 ---
 
@@ -11,7 +11,7 @@
 
 ### 1.1 DSAFT 五层架构（强制）
 
-所有架构设计必须遵循 DSAFT 方法论（详见 `dsaft-methodology.md`）：
+所有架构设计必须遵循 DSAFT 方法论（详见 `../../docs/methodology/dsaft-methodology.md`）：
 
 ```
 D 领域 → S 场景 → A 活动 → F 功能点 → T 测试点
@@ -33,7 +33,7 @@ S3 设计文档必须包含：
 
 ### 1.2 六段式框架
 
-复杂架构文档（`docs/<module>-design.md`）应参照 `docs/detail design framework.md` 六段式：
+复杂架构文档应参照 `../../docs/methodology/detail-design-framework.md` 六段式：
 1. 架构目标 — 业务与技术目标、约束
 2. 架构原则 — 设计原则、命名规范
 3. 业务流程 — 核心用例、异常补偿
@@ -190,7 +190,7 @@ S2 完成前：
 - [ ] `.openspec.yaml` 所有字段已填写
 - [ ] `dsaft_scenarios` 已标注涉及的 DSAFT 场景 ID
 - [ ] `proposal.md` 包含方案对比与风险评估
-- [ ] T 层测试点在 `t-registry.md` 预登记（PLANNED）
+- [ ] T 层测试点在 T 层注册表预登记（PLANNED）— 根索引 `openspec/t-registry.md`，域明细 `openspec/specs/d{N}-*/t-registry.md`
 
 S3 完成前：
 - [ ] `design.md` 包含根因、方案、文件清单、回归风险

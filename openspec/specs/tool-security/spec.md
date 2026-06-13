@@ -2,7 +2,7 @@
 
 **Capability:** tool-security
 **Change ID:** devrix-tool-security (archived 2026-06-08)
-**Layer:** Context Engine (Layer 2)
+**Layer:** Cross-cutting（横切 — 涉及 D2 Context Engine / D4 Multi-Agent）
 **Version:** 1.0.0
 **Status:** Canonical — source of truth
 

@@ -105,7 +105,7 @@ created: YYYY-MM-DD
 ## 5. 需求与 T 层映射
 
 - S1 阶段不需要完成 T 层注册，但应在 demand.md 中标注关联的 DSAFT 域
-- S2 阶段必须在 `openspec/t-registry.md` 预登记 T 层测试点（状态：PLANNED）
+- S2 阶段必须在 T 层注册表预登记测试点（状态：PLANNED）—— 根索引 `openspec/t-registry.md`，域明细 `openspec/specs/d{N}-*/t-registry.md`
 
 ---
 

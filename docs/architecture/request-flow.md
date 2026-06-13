@@ -170,4 +170,4 @@ D4 Delegate → WorkerEngine.ProcessOverlay
 
 - DSAFT 编号：[dsaft-overview.md](./dsaft-overview.md)
 - 契约与 import 红线：[contracts-and-boundaries.md](./contracts-and-boundaries.md)
-- OpenSpec 验收：`openspec/specs/context-engine/spec.md` V6
+- OpenSpec 验收：`openspec/specs/d2-context-engine/spec.md` V6

@@ -21,7 +21,7 @@
 | 子规范 | 文件 | 用途 |
 |--------|------|------|
 | 需求规范 | `requirements.md` | DM ID 分配、demand.md 模板、验收标准格式 |
-| DSAFT 方法论 | `dsaft-methodology.md` | 五层架构体系、领域类型、ID 格式、追溯规则（所有阶段基础） |
+| DSAFT 方法论 | `../../docs/methodology/dsaft-methodology.md` | 五层架构体系、领域类型、ID 格式、追溯规则（所有阶段基础） |
 | 架构设计规范 | `architecture-design.md` | .openspec.yaml、proposal/design/spec 模板与设计原则 |
 | 设计 Review 规范 | `review-design.md` | S3 门禁：设计审查清单与通过标准 |
 | 编码规范 | `coding.md` | Go 编码规则（引全局规则 + 项目补充） |
@@ -57,7 +57,7 @@ Agent 或开发者进入任一阶段时，**必须**加载对应的子规范。�
 | S4 实现 | 开发者 | `coding.md`、`testing.md` | 代码 + 测试 + `tasks.md` | `go vet` + `test-unit` 通过 |
 | **S4-Gate** | **Reviewer** | **`review-code.md`** | **Review 结论** | **代码审查通过** |
 | S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 T 层 100% PASS、覆盖率 ≥ 80% |
-| S6 归档 | 维护者 | `archiving.md` | `archive/` 目录 | 归档检查清单通过 |
+| S6 归档 | 维护者 | `archiving.md` | `archive/` 目录 + 域文档同步（如需要） | 归档检查清单 + 域文档同步评估通过 |
 
 ### 2.3 如何使用
 
@@ -133,7 +133,7 @@ openspec/archive/<YYYY-MM-DD>-<change-id>/
 
 ### 4.3 T 层测试点注册
 
-所有能力变更必须在 `openspec/t-registry.md` 预登记 T 层测试点。编号格式：`D{X}-S{X}-A{XX}-T{XX}`（T 归属 A）或 `D{X}-S{X}-A{XX}-F{XX}-T{XX}`（T 归属 F）。
+所有能力变更必须在 T 层注册表预登记测试点。根索引：`openspec/t-registry.md`；各域注册表：`openspec/specs/d{N}-*/t-registry.md`。编号格式：`D{X}-S{X}-A{XX}-T{XX}`（T 归属 A）或 `D{X}-S{X}-A{XX}-F{XX}-T{XX}`（T 归属 F）。
 
 ---
 
@@ -142,7 +142,7 @@ openspec/archive/<YYYY-MM-DD>-<change-id>/
 | 目录 | 角色 | 读者 |
 |------|------|------|
 | `openspec/specs/project/` | 项目规范（本目录）— 权威 | Agent + 人类 |
-| `openspec/specs/<module>/` | 模块规格（Gherkin）— 权威 | Agent + 人类 |
+| `openspec/specs/d{N}-*/` | 域架构归档（spec.md + A/F/T 注册表）— 权威 | Agent + 人类 |
 | `docs/` | 架构概述、设计说明 — 辅助阅读 | 人类 |
 | `internal/` | 代码 — 唯一可执行事实 | 编译器 |
 

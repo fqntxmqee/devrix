@@ -26,11 +26,12 @@
 | Domain ID | 名称 | 缩写 | Responsibility |
 |-----------|------|------|----------------|
 | **D1** | Communication Domain | COMM | IM Gateway, WebSocket, CLI adapter |
-| **D2** | Context Engine Domain | CTX | QueryLoop, 7-step compression, layered memory |
+| **D2** | Context Engine Domain | CTX | QueryLoop (thin), 7-step compression, layered memory |
 | **D3** | LLM Gateway Domain | LLM | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain | AGENT | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain | OBS | Tracing, metrics, logging |
 | **D6** | Evolution Domain | EVO | Eval engine, quality probes, runtime orchestration validation |
+| **D7** | Orchestration Domain | ORCH | Task/Plan model, session orchestration, DAG scheduling, decision & planning |
 
 ---
 
@@ -133,7 +134,23 @@
 | D6-S3 | Eval | 评测引擎：EvalRun、Judge、探针、Delta、Tune、`devrix eval run` | IMPLEMENTED |
 | D6-S4 | Orchestration | 运行时决策校验：跨模型判官、干预、Observer | IMPLEMENTED |
 
-Spec: `openspec/specs/eval/spec.md` (D6-S3)
+Spec: `openspec/specs/d6-evolution/spec.md` (D6-S3)
+
+### D7 Orchestration Domain
+
+> **2026-06-13**: 升格自 ORCH v2 读模型包。D7 作为编排域，位于 D1-D6 之上协调跨域执行。
+
+| Module ID | Scenario | Responsibility | Status | 来源 |
+|-----------|----------|----------------|--------|------|
+| D7-S1 | Work Model | Task/Plan 数据模型单一权威来源，生命周期管理 | DESIGN | D2 tasks/ + 新增 |
+| D7-S2 | Session Orchestrator | 用户消息主入口，快速路径 + 编排路径路由 | DESIGN | D2 engine.go 入口上移 |
+| D7-S3 | Wave Scheduler | DAG 调度、WorkerPool、ConflictGuard、ContextPolicy | DESIGN | ORCH-S3 升格 |
+| D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 进度广播 | DESIGN | ORCH-S1/S2 升格 |
+| D7-S5 | Decision & Planning | 意图分类（规则+LLM）、任务拆解、执行器选择 | DESIGN | 新增 |
+
+Spec: `openspec/specs/d7-orchestration/d7-domain.md` (D7)
+
+> **迁移说明（ORCH → D7）**: ORCH-S3 → D7-S3, ORCH-S1/S2 → D7-S4。迁移期间 `internal/layers/orchestration/` 保留作为 re-export 桥接包，D7 稳定后移除。
 
 ---
 
@@ -177,11 +194,33 @@ layers/
 │   └── mock/                      # D2-S14 Mock Engine
 │   # PLANNED: sandbox/ (D2-S8)
 │
-├── orchestration/                 # ORCH (v2 read model)
-│   ├── workplan/                  # ORCH-S1 WorkPlan
-│   ├── flow/                      # ORCH-S2 ExecutionFlowHub
-│   ├── imsink/                    # ORCH-S2 → D1 Gateway bridge
-│   └── wave/                      # ORCH-S3 WaveScheduler
+├── d7/                           # D7 Orchestration (v1.0 — DESIGN)
+│   ├── orchestrator.go           # D7-S1/S2 核心编排
+│   ├── workmodel.go              # D7-S1 Task/Plan 数据模型
+│   ├── classifier.go             # D7-S5 意图分类
+│   ├── decomposer.go             # D7-S5 任务拆解
+│   ├── executor.go               # D7-S5 执行器选择
+│   ├── fastpath.go               # D7-S2 快速路径
+│   ├── wave/                     # D7-S3 Wave Scheduler (from ORCH-S3)
+│   │   ├── scheduler.go
+│   │   ├── pool.go
+│   │   ├── taskgraph.go
+│   │   ├── context.go
+│   │   ├── conflict.go
+│   │   ├── artifact.go
+│   │   └── runners/
+│   │       ├── subagent.go
+│   │       └── agent_tool.go
+│   └── flow/                     # D7-S4 Execution Flow (from ORCH-S1/S2)
+│       ├── hub.go
+│       ├── imsink.go
+│       └── workplan.go
+│
+├── orchestration/                 # ORCH (v2 read model — 迁移期内保留)
+│   ├── workplan/                  # → D7-S4 (迁移中)
+│   ├── flow/                      # → D7-S4 (迁移中)
+│   ├── imsink/                    # → D7-S4 (迁移中)
+│   └── wave/                      # → D7-S3 (迁移中)
 │
 ├── llmgateway/                    # D3
 │   ├── adapter/                   # D3-S1

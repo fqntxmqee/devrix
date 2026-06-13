@@ -14,7 +14,7 @@ S6 归档在以下条件**全部满足**后执行：
 - [ ] PR 已合并到 `main` 分支
 - [ ] S5 验收报告状态为 PASS
 - [ ] 所有 P0 T 层测试 100% PASS
-- [ ] `t-registry.md` 对应条目已更新为 IMPLEMENTED
+- [ ] T 层注册表对应条目已更新为 IMPLEMENTED（根索引 `openspec/t-registry.md` + 域注册表 `openspec/specs/d{N}-*/t-registry.md`）
 
 ---
 
@@ -39,8 +39,51 @@ S6 归档在以下条件**全部满足**后执行：
 
 ### 2.3 索引更新
 
-- [ ] `openspec/t-registry.md` 对应 T 层条目状态为 IMPLEMENTED
+- [ ] T 层注册表对应条目状态为 IMPLEMENTED（根索引 + 域注册表 `openspec/specs/d{N}-*/t-registry.md`）
 - [ ] `openspec/demand-archive-index.md` 将新增记录
+- [ ] 域架构文档已评估是否需要同步更新（见 §2.4）
+
+### 2.4 域文档同步
+
+归档前，**必须评估**本次变更是否影响 `openspec/specs/d{N}-*/` 下的域架构文档。判断标准：
+
+**需要同步的情况：**
+
+| 变更类型 | 需更新的域文档 | 说明 |
+|---------|---------------|------|
+| 新增/修改 A（活动） | `a-registry.md` | 新增活动条目或修改活动描述 |
+| 新增/修改 F（功能点） | `f-registry.md` | 新增功能点条目或修改代码位置 |
+| 新增 T 层测试点 | `t-registry.md` | 状态从 PLANNED → IMPLEMENTED |
+| 架构设计变更 | `design.md` | 领域模型、接口、业务流程变更 |
+| 新增/修改 Gherkin 规格 | `spec.md` | 将 changes 下的 Scenario 合并到域 spec.md |
+| 跨域影响 | 所有受影响域的上述文档 | 每个域独立评估 |
+
+**不需要同步的情况：**
+
+| 变更类型 | 原因 |
+|---------|------|
+| Bug 修复（无接口变更） | 不改变架构契约 |
+| 纯重构（无行为变更） | 不改变架构契约 |
+| 配置调整 | 不改变架构文档 |
+| 测试补充（已有 T 层预登记） | 仅更新 t-registry 状态 |
+
+**同步操作：**
+
+```bash
+# 1. 评估受影响域
+# 查看 .openspec.yaml 中的 domains 字段
+cat openspec/changes/<change-id>/.openspec.yaml | grep domains
+
+# 2. 对于每个受影响域，检查是否需要更新
+# - spec.md: 合并 changes/<id>/specs/ 下的 Gherkin Scenario
+# - design.md: 更新领域模型/接口/流程图
+# - a-registry.md: 新增/修改活动条目
+# - f-registry.md: 新增/修改功能点条目
+# - t-registry.md: 更新测试点状态
+
+# 3. 在归档 commit 中包含域文档更新
+git add openspec/specs/d{N}-*/
+```
 
 ---
 
@@ -64,7 +107,14 @@ git rm -r openspec/changes/<change-id>/
 
 git add openspec/demand-archive-index.md
 
-# 4. 提交归档
+# 4. 同步域架构文档（按 §2.4 评估）
+# 如果变更影响域架构，更新对应的 openspec/specs/d{N}-*/ 文件
+# - spec.md: 合并 Gherkin Scenario
+# - design.md: 更新领域模型/接口/流程图
+# - a-registry.md / f-registry.md / t-registry.md: 更新条目
+git add openspec/specs/d{N}-*/ 2>/dev/null || true
+
+# 5. 提交归档
 git commit -m "$(cat <<'EOF'
 archive: <change-id> 归档
 

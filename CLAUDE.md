@@ -4,7 +4,7 @@
 
 ## 架构
 
-Devrix 遵循 DSAFT 五层架构方法论（详见 `openspec/specs/project/dsaft-methodology.md`）。
+Devrix 遵循 DSAFT 五层架构方法论（详见 `docs/methodology/dsaft-methodology.md`）。
 
 | Domain | 域 | 目录 | DSAFT 类型 |
 |----|-----|------|-------------|
@@ -14,6 +14,9 @@ Devrix 遵循 DSAFT 五层架构方法论（详见 `openspec/specs/project/dsaft
 | D4 | 多智能体 | `internal/layers/multiagent/` | 核心 |
 | D5 | 可观测性 | `internal/layers/observability/` | 公共 |
 | D6 | 演化层 | `internal/layers/evolution/` | 支撑 |
+| D7 | 编排层 | `internal/layers/orchestration/` | 核心 |
+
+域架构归档：`openspec/specs/d{N}-*/`（spec.md + A/F/T 注册表）
 
 ## 研发流程
 
@@ -47,5 +50,5 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 - **不可变性**: 值对象不可变（`With*` 返回新副本）；实体通过 method 加锁变更状态。详见 `openspec/specs/project/coding.md` §9
 - **文件规模**: 函数 < 50 行，文件 < 800 行
 - **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge
-- **T 层测试点**: 编号 `D{X}-S{X}-A{XX}-T{XX}`（DSAFT 标准），注册在 `openspec/t-registry.md`
+- **T 层测试点**: 编号 `D{X}-S{X}-A{XX}-T{XX}`（DSAFT 标准），索引 `openspec/t-registry.md`，各域 `openspec/specs/d{N}-*/t-registry.md`
 - **Change 目录**: `openspec/changes/<change-id>/`，归档到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`

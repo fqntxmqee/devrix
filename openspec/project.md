@@ -4,7 +4,8 @@
 **Project Type:** Go CLI Application
 **Spec Version:** 1.0.0
 **Layering Spec:** `openspec/specs/architecture/layering.md`
-**T Registry:** `openspec/t-registry.md`
+**Methodology:** `docs/methodology/dsaft-methodology.md`
+**T Registry Index:** `openspec/t-registry.md` (各域: `openspec/specs/d{N}-*/t-registry.md`)
 **Created:** 2026-06-06
 **Status:** Active
 
@@ -203,14 +204,30 @@ devrix/
 │       └── utils/
 ├── pkg/
 │   └── i18n/
+├── docs/
+│   ├── methodology/           # DSAFT 方法论 + 详细设计框架
+│   ├── architecture/          # 可读版架构入口
+│   ├── config.md             # 配置说明
+│   └── development-workflow.md
 ├── openspec/
 │   ├── project.md             # This file
-│   ├── t-registry.md         # T 层测试点注册表
+│   ├── a-registry.md         # A 层索引入口
+│   ├── f-registry.md         # F 层索引入口
+│   ├── t-registry.md         # T 层索引入口
 │   ├── specs/
-│   │   ├── architecture/
-│   │   │   └── layering.md    # 分层架构规范
+│   │   ├── architecture/      # 横切架构规范
+│   │   ├── project/           # 流程规范 (coding/testing/review/...)
+│   │   ├── d1-communication/  # 域架构归档 (spec + A/F/T 注册表)
+│   │   ├── d2-context-engine/
+│   │   ├── d3-llm-gateway/
+│   │   ├── d4-multi-agent/
+│   │   ├── d5-observability/
+│   │   ├── d6-evolution/
+│   │   ├── d7-orchestration/
 │   │   ├── testing-framework/
-│   │   └── testing-quality/
+│   │   ├── testing-quality/
+│   │   └── tool-security/
+│   ├── archive/
 │   └── changes/
 ├── tests/
 │   ├── testutil/
