@@ -48,9 +48,9 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 | S1 需求       | `requirements.md`                            | DM ID 合法                |
 | S2 提案       | `requirements.md` + `architecture-design.md` | 文件完整性                   |
 | S3 设计       | `architecture-design.md`                     | —                       |
-| **S3-Gate** | `**review-design.md`**                       | 设计审查通过                  |
+| **S3-Gate** | **`review-design.md`** | 设计审查通过 |
 | S4 实现       | `coding.md` + `testing.md`                   | go vet + test-unit      |
-| **S4-Gate** | `**review-code.md`**                         | 代码审查通过                  |
+| **S4-Gate** | **`review-code.md`**                         | 代码审查通过                  |
 | S5 验收       | `testing.md`                                 | P0 T 层 100% + 覆盖率 ≥ 80% |
 | S6 归档       | `archiving.md`                               | 归档检查清单                  |
 
