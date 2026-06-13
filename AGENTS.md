@@ -1,4 +1,4 @@
-# Devrix — 开放的大脑
+# Devrix
 
 > 本文件供贡献者与 IDE 工具阅读；Devrix 运行时默认只加载 `.devrix/AGENTS.md` 作为 Agent 规约。
 
@@ -6,23 +6,27 @@
 
 ## 架构
 
-| Domain | 域 | 目录 |
-|----|-----|------|
-| D1 | 通信层 | `internal/layers/communication/` |
-| D2 | 上下文引擎 | `internal/layers/contextengine/` |
-| D3 | LLM 网关 | `internal/layers/llmgateway/` |
-| D4 | 多智能体 | `internal/layers/multiagent/` |
-| D5 | 可观测性 | `internal/layers/observability/` |
-| D6 | 演化层 | `internal/layers/evolution/` |
+
+| Domain | 域      | 目录                               |
+| ------ | ------ | -------------------------------- |
+| D1     | 通信层    | `internal/layers/communication/` |
+| D2     | 上下文引擎  | `internal/layers/contextengine/` |
+| D3     | LLM 网关 | `internal/layers/llmgateway/`    |
+| D4     | 多智能体   | `internal/layers/multiagent/`    |
+| D5     | 可观测性   | `internal/layers/observability/` |
+| D6     | 演化层    | `internal/layers/evolution/`     |
+
 
 ### D6 演化层子模块
 
-| 场景 | 目录 | 说明 |
-|------|------|------|
-| D6-S3 Eval | `evolution/eval/` | 评测引擎：EvalRun、Judge、探针、Delta、调优；CLI `devrix eval run` |
-| D6-S4 Orchestration | `evolution/orchestration/` | 运行时决策校验：跨模型判官、干预、Observer |
-| D6-S1 Version | `evolution/version/` | 规划中 (PlannedVersion v2.1.0) |
-| D6-S2 Config | `evolution/config/` | 规划中 (PlannedVersion v2.2.0) |
+
+| 场景                  | 目录                         | 说明                                                   |
+| ------------------- | -------------------------- | ---------------------------------------------------- |
+| D6-S3 Eval          | `evolution/eval/`          | 评测引擎：EvalRun、Judge、探针、Delta、调优；CLI `devrix eval run` |
+| D6-S4 Orchestration | `evolution/orchestration/` | 运行时决策校验：跨模型判官、干预、Observer                            |
+| D6-S1 Version       | `evolution/version/`       | 规划中 (PlannedVersion v2.1.0)                          |
+| D6-S2 Config        | `evolution/config/`        | 规划中 (PlannedVersion v2.2.0)                          |
+
 
 规范：`openspec/specs/eval/spec.md`、`openspec/specs/architecture/layering.md`
 
@@ -38,16 +42,18 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 
 执行任何开发任务前，先读 `openspec/specs/project/master.md` 确定当前阶段，再加载对应子规范：
 
-| 阶段 | 加载规范 | 门禁 |
-|------|---------|------|
-| S1 需求 | `requirements.md` | DM ID 合法 |
-| S2 提案 | `requirements.md` + `architecture-design.md` | 文件完整性 |
-| S3 设计 | `architecture-design.md` | — |
-| **S3-Gate** | **`review-design.md`** | 设计审查通过 |
-| S4 实现 | `coding.md` + `testing.md` | go vet + test-unit |
-| **S4-Gate** | **`review-code.md`** | 代码审查通过 |
-| S5 验收 | `testing.md` | P0 T 层 100% + 覆盖率 ≥ 80% |
-| S6 归档 | `archiving.md` | 归档检查清单 |
+
+| 阶段          | 加载规范                                         | 门禁                      |
+| ----------- | -------------------------------------------- | ----------------------- |
+| S1 需求       | `requirements.md`                            | DM ID 合法                |
+| S2 提案       | `requirements.md` + `architecture-design.md` | 文件完整性                   |
+| S3 设计       | `architecture-design.md`                     | —                       |
+| **S3-Gate** | `**review-design.md`**                       | 设计审查通过                  |
+| S4 实现       | `coding.md` + `testing.md`                   | go vet + test-unit      |
+| **S4-Gate** | `**review-code.md`**                         | 代码审查通过                  |
+| S5 验收       | `testing.md`                                 | P0 T 层 100% + 覆盖率 ≥ 80% |
+| S6 归档       | `archiving.md`                               | 归档检查清单                  |
+
 
 所有子规范路径：`openspec/specs/project/<规范名>`
 
@@ -60,3 +66,4 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 - **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge
 - **T 层测试点**: 编号 `D{X}-S{X}-T{NN}`（DSAFT 标准），注册在 `openspec/t-registry.md`
 - **Change 目录**: `openspec/changes/<change-id>/`，归档到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`
+
