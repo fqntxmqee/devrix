@@ -55,7 +55,7 @@
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D4-S6-A01-T01 | Agent Tool Registry 注册/查找/按能力查询 | AgentTool | `internal/layers/multiagent/tool/registry_test.go` | IMPLEMENTED | P0 |
+| D4-S6-A01-T01 | Agent Tool Registry 注册/查找/按能力查询 | AgentTool | `tests/acceptance/p0/agent_tool_test.go` | IMPLEMENTED | P0 |
 | D4-S6-A02-T02 | CLI 适配器正常启动子进程并解析 stream-json | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
 | D4-S6-A02-T03 | CLI 适配器超时正确终止子进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P1 |
 | D4-S6-A02-T04 | Session 首次创建子进程，后续调用复用同一进程 | AgentTool | `internal/layers/multiagent/tool/cli_adapter_test.go` | IMPLEMENTED | P0 |
