@@ -1,27 +1,25 @@
-// Package config 提供配置热重载功能
+// Package config provides configuration hot-reload primitives (watcher, notifier).
 package config
 
 import (
-	"context"
+	stderrors "errors"
 	"time"
-
-	"github.com/fukaiyi/devrix/internal/shared/errors"
 )
 
-// ErrAlreadyStarted 热重载服务已启动
-var ErrAlreadyStarted = errors.NewSentinel("config: hotreload service already started")
+// ErrAlreadyStarted indicates the hot-reload service is already running.
+var ErrAlreadyStarted = stderrors.New("config: hotreload service already started")
 
-// ErrAlreadyStopped 热重载服务已停止
-var ErrAlreadyStopped = errors.NewSentinel("config: hotreload service already stopped")
+// ErrAlreadyStopped indicates the hot-reload service is not running.
+var ErrAlreadyStopped = stderrors.New("config: hotreload service already stopped")
 
-// ErrMaxSubscribers 订阅者数量已达上限
-var ErrMaxSubscribers = errors.NewSentinel("config: max subscribers reached")
+// ErrMaxSubscribers indicates the subscriber limit was reached.
+var ErrMaxSubscribers = stderrors.New("config: max subscribers reached")
 
-// ErrNilSubscriber 订阅者为 nil
-var ErrNilSubscriber = errors.NewSentinel("config: nil subscriber")
+// ErrNilSubscriber indicates a nil subscriber was passed.
+var ErrNilSubscriber = stderrors.New("config: nil subscriber")
 
-// DefaultDebounce 默认防抖延迟
+// DefaultDebounce is the default debounce delay for file change events.
 const DefaultDebounce = 500 * time.Millisecond
 
-// DefaultMaxSubscribers 默认最大订阅者数量
+// DefaultMaxSubscribers is the default maximum number of config change subscribers.
 const DefaultMaxSubscribers = 10

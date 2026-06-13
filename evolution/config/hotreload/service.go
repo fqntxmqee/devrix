@@ -7,21 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fukaiyi/devrix/evolution/config"
-	"github.com/fukaiyi/devrix/internal/shared/errors"
+	"github.com/devrix/devrix/evolution/config"
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the application configuration
-type Config struct {
-	Log struct {
-		Level string `yaml:"level"`
-	} `yaml:"log"`
-	LLM struct {
-		Provider string `yaml:"provider"`
-		Model    string `yaml:"model"`
-	} `yaml:"llm"`
-}
+// Config is an alias for the shared hot-reload config snapshot type.
+type Config = config.Config
 
 // Options contains options for the Service
 type Options struct {
@@ -194,12 +185,12 @@ func (s *Service) loadConfig() error {
 func (s *Service) parseConfig() (*Config, error) {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
-		return nil, errors.NewConfigNotFoundError(s.path)
+		return nil, config.NewConfigNotFoundError(s.path)
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, errors.NewConfigParseError(s.path, err)
+		return nil, config.NewConfigParseError(s.path, err)
 	}
 
 	return &cfg, nil

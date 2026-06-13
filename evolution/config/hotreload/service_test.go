@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fukaiyi/devrix/evolution/config"
+	"github.com/devrix/devrix/evolution/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

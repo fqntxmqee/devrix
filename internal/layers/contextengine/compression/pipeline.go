@@ -292,7 +292,9 @@ func collapse(msgs []types.Message, _ types.TokenBudget) ([]types.Message, bool)
 			changed = true
 			continue
 		}
-		out = append(out, msgs[i])
+		for j := runStart; j <= i; j++ {
+			out = append(out, msgs[j])
+		}
 	}
 	return out, changed
 }

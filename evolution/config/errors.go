@@ -1,15 +1,15 @@
-package errors
+package config
 
 import (
-	"errors"
+	stderrors "errors"
 	"fmt"
 )
 
 // Config errors (6000-6999)
 var (
-	ErrConfigNotFound      = errors.New("config file not found")
-	ErrConfigParseFailed   = errors.New("config parse failed")
-	ErrConfigValidationErr = errors.New("config validation error")
+	ErrConfigNotFound      = stderrors.New("config file not found")
+	ErrConfigParseFailed   = stderrors.New("config parse failed")
+	ErrConfigValidationErr = stderrors.New("config validation error")
 )
 
 // ConfigError wraps a config error with code and message
@@ -66,7 +66,7 @@ func NewConfigValidationError(field string, reason string) *ConfigError {
 // ErrorCode extracts the error code from an error
 func ErrorCode(err error) string {
 	var ce *ConfigError
-	if errors.As(err, &ce) {
+	if stderrors.As(err, &ce) {
 		return ce.Code
 	}
 	return ""
