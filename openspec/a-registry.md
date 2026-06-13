@@ -19,13 +19,13 @@
 |----|------|-----------|------------|
 | D1 Communication | `openspec/specs/d1-communication/a-registry.md` | 12 | 21 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/a-registry.md` | 14 | 22 |
-| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/a-registry.md` | 6 | 6 |
+| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/a-registry.md` | 7 | 7 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/a-registry.md` | 10 | 17 |
-| D5 Observability | `openspec/specs/d5-observability/a-registry.md` | 9 | 9 |
+| D5 Observability | `openspec/specs/d5-observability/a-registry.md` | 9 | 24 |
 | D6 Evolution | `openspec/specs/d6-evolution/a-registry.md` | 4 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/a-registry.md` | 5 | 15 |
 
-**总计**: 63 Scenarios · 97 Activities · 3 RETIRED (D2-S1 PEV)
+**总计**: 64 Scenarios · 113 Activities · 3 RETIRED (D2-S1 PEV)
 
 ---
 

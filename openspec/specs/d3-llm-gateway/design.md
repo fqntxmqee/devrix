@@ -1,12 +1,13 @@
-# LLM Gateway Layer Design (Layer 3)
+# LLM Gateway Domain Design (D3)
 
-> **Source of Truth:** `openspec/specs/d3-llm-gateway/spec.md`（设计历史见 `openspec/archive/2026-06-07-devrix-llm-gateway/design.md`）
+> **Source of Truth:** `openspec/specs/d3-llm-gateway/spec.md`
+> **设计历史:** `openspec/archive/2026-06-07-devrix-llm-gateway/design.md`, `openspec/archive/2026-06-08-devrix-llm-gateway-v2/`
 
-**Change ID:** devrix-llm-gateway
-**Demand:** DM-20260607-004
-**Layer:** 3 - LLM Gateway
-**Status:** S7 Archived (2026-06-07) — 层边界仍有效；Process 调用方现为 **QueryLoop**（非 PEVEngine）  
-**架构入口:** [architecture/request-flow.md](./architecture/request-flow.md)
+**Domain:** D3 - LLM Gateway
+**DSAFT Type:** 公共域 (Common Domain)
+**Version:** 2.1.0
+**Status:** Active (2026-06-14)
+**Last Updated:** 2026-06-14
 
 ---
 
@@ -19,32 +20,37 @@
 | LLM 调用无熔断保护 | Circuit Breaker 保护 | 模型故障时降级，不阻塞用户 |
 | 多模型切换耦合业务 | 统一模型适配器接口 | 支持 DeepSeek / MiniMax |
 | Token 预算失控 | Token 计数与预算检查 | 上下文压缩触发准确 |
-| 模型调用无观测 | Tracing + Metrics 内建 | 问题可诊断 |
+| 模型调用无观测 | OpenTelemetry Tracing + Metrics 内建 | 问题可诊断 |
+| 恶意内容注入 LLM 请求 | Safety Filter 内容过滤 | 风险内容被拦截 |
 
 ### 1.2 技术指标
 
-| 指标 | V1 目标 | 测量方式 |
-|------|---------|----------|
-| LLM 调用延迟 | P99 < 5s | span duration |
+| 指标 | 目标 | 测量方式 |
+|------|------|----------|
+| LLM 调用延迟 | P99 < 5s | span duration (llm_latency_seconds) |
 | 熔断器切换延迟 | < 10ms | circuit state event |
 | Token 计数准确性 | cl100k_base ± 5% | 单元测试 |
-| 并发模型调用 | 单进程 100 实例 | 压力测试 |
 | Provider 故障恢复 | 半开→关闭 30s | 集成测试 |
+| Safety 过滤延迟 | < 1ms | Filter.Check duration |
 
 ### 1.3 层间边界
 
 ```
-Layer 2 (Context Engine)        Layer 3 (LLM Gateway)
-─────────────────────────      ──────────────────────
-QueryLoop.Run() / adapters
+Layer 2 (Context Engine)              Layer 3 (LLM Gateway)
+─────────────────────────            ──────────────────────
+QueryLoop / adapters
     │
-    └──▶ ILLMGateway.ChatStream() ──▶ LLMGateway
-                                      ├─ AdapterRegistry
-                                      │   ├─ DeepSeekAdapter
-                                      │   └─ MiniMaxAdapter
-                                      ├─ CircuitBreaker
-                                      ├─ TokenCounter
-                                      └─ ConfigLoader
+    └──▶ ILLMGateway.ChatStream() ──▶ Bridge (bridges/llm)
+                                         │
+                                         └──▶ IGateway.Stream() ──▶ Gateway
+                                              ├─ Router (model→provider)
+                                              ├─ ICircuitBreaker
+                                              ├─ Retry.Executor
+                                              ├─ adapter.Registry
+                                              │   ├─ DeepSeekAdapter → OpenAIStreamClient
+                                              │   └─ MiniMaxAdapter  → OpenAIStreamClient
+                                              ├─ token.Counter
+                                              └─ observability.Bridge (spans + metrics)
 ```
 
 **禁止：LLM Gateway 不得 import contextengine/ 或 communication/ 包**
@@ -53,14 +59,13 @@ QueryLoop.Run() / adapters
 
 ## 二、领域模型
 
-### 2.1 核心类型
+### 2.1 核心类型 (contracts.go)
 
 ```go
-// contracts.go
-
-type LLMRequest struct {
-    Model        string            // 用户配置的模型名
-    Provider     string            // deepseek | minimax
+// Request is the L3 internal chat completion input.
+type Request struct {
+    Provider     string
+    Model        string
     SystemPrompt string
     Messages     []types.Message
     Tools        []ToolSchema
@@ -69,7 +74,8 @@ type LLMRequest struct {
     Stream       bool
 }
 
-type LLMChunk struct {
+// Chunk is a streaming LLM response fragment.
+type Chunk struct {
     Content   string
     Thinking  string
     ToolCalls []ToolCall
@@ -77,76 +83,97 @@ type LLMChunk struct {
     Usage     TokenUsage
 }
 
+// TokenUsage reports token consumption from the provider.
 type TokenUsage struct {
     PromptTokens     int
     CompletionTokens int
     TotalTokens      int
+    CacheReadTokens  int // prompt_tokens_details.cached_tokens
+    ReasoningTokens  int // completion_tokens_details.reasoning_tokens
 }
 
-type ToolSchema struct {
-    Name        string
-    Description string
-    Parameters  string // JSON Schema
-}
-
+// ToolCall is an LLM-requested tool invocation (no RiskLevel; L2 fills it).
 type ToolCall struct {
     ID    string
     Name  string
-    Input string // JSON string
+    Input string
 }
 
 type CircuitState string
 
 const (
     CircuitClosed   CircuitState = "closed"
-    CircuitOpen    CircuitState = "open"
+    CircuitOpen     CircuitState = "open"
     CircuitHalfOpen CircuitState = "half-open"
 )
 
+// CircuitBreakerConfig holds circuit breaker thresholds.
 type CircuitBreakerConfig struct {
     FailureThreshold  int
     SuccessThreshold  int
-    OpenDuration     time.Duration
+    OpenDuration      time.Duration
+    HalfOpenMaxProbes int
+    Scope             string
 }
 
+// RetryConfig holds retry/backoff settings.
 type RetryConfig struct {
     MaxAttempts  int
     InitialDelay time.Duration
     MaxDelay     time.Duration
     Backoff      float64
 }
+
+type AdapterChunk struct {
+    Raw    []byte
+    Parsed *Chunk
+    Error  error
+}
 ```
 
 ---
 
-## 三、Provider 配置
+## 二点五、Provider 配置
 
-### 3.1 支持的 Provider
+### 支持的 Provider
 
 | Provider | Adapter | API 类型 | Base URL |
 |----------|---------|----------|----------|
 | `deepseek` | DeepSeekAdapter | OpenAI-compatible | `https://api.deepseek.com/v1` |
-| `minimax` | MiniMaxAdapter | OpenAI-compatible | `https://api.minimax.io/v1` |
+| `minimax` | MiniMaxAdapter | OpenAI-compatible | `https://api.minimaxi.com/v1` |
 
-**注意**: MiniMax 国内站可配置为 `https://api.minimaxi.chat/v1`
-
-### 3.2 配置契约
+### 配置契约 (devrix.yaml)
 
 ```yaml
 llm_gateway:
   default_provider: "minimax"
-  default_model: ""  # 用户配置
-  
+  default_model: "MiniMax-M2.7-highspeed"
+  default_tier: "default"
+
+  model_tiers:
+    fast: "MiniMax-M2.7-highspeed"
+    default: "MiniMax-M2.7-highspeed"
+    powerful: "deepseek-v4-latest"
+
+  model_routing:
+    "deepseek-*": deepseek
+    "minimax-*": minimax
+    "MiniMax-*": minimax
+
   circuit_breaker:
     failure_threshold: 5
     success_threshold: 2
     open_duration: "30s"
-  
+    half_open_max_probes: 1
+    scope: "provider"
+
   providers:
     deepseek:
       type: "deepseek"
       base_url: "https://api.deepseek.com/v1"
       api_key_env: "DEEPSEEK_API_KEY"
+      default_model: "deepseek-v4-flash"
+      fallback_model: "deepseek-v4-pro"
       timeout: "60s"
       max_tokens: 8192
       temperature: 0.7
@@ -155,11 +182,13 @@ llm_gateway:
         initial_delay: "1s"
         max_delay: "10s"
         backoff: 2.0
-    
+
     minimax:
       type: "minimax"
-      base_url: "https://api.minimax.io/v1"
+      base_url: "https://api.minimaxi.com/v1"
       api_key_env: "MINIMAX_API_KEY"
+      default_model: "MiniMax-M2.7-highspeed"
+      fallback_model: "MiniMax-M2.5-highspeed"
       timeout: "60s"
       max_tokens: 8192
       temperature: 0.7
@@ -172,342 +201,292 @@ llm_gateway:
 
 ---
 
-## 四、接口设计
+## 三、接口设计
 
-### 4.1 核心接口
+### 3.1 核心接口
 
 ```go
-// ILLMGateway LLM 网关接口 (被 L2 依赖)
-type ILLMGateway interface {
-    ChatStream(ctx context.Context, req *LLMRequest) (<-chan LLMChunk, error)
-    ChatComplete(ctx context.Context, req *LLMRequest) (*LLMChunk, error)
+// IGateway streams chat completions (L3 internal API).
+type IGateway interface {
+    Stream(ctx context.Context, req *Request) (<-chan Chunk, error)
+    ResolveTier(tier string) string
     Close() error
 }
 
-// IAdapter 模型适配器接口
+// ILLMGateway is the D2 Context Engine consumer contract.
+// DSAFT: D3-S2-A01-F01 (AdaptToContextEngine)
+type ILLMGateway interface {
+    ChatStream(ctx context.Context, req *Request) (<-chan Chunk, error)
+}
+
+// ITierResolver resolves tier aliases to concrete model names.
+// DSAFT: D3-S2-A01-F02 (ResolveTier)
+type ITierResolver interface {
+    ResolveTier(tier string) (string, error)
+}
+
+// IAdapter streams provider-specific responses.
 type IAdapter interface {
-    Stream(ctx context.Context, req *LLMRequest) (<-chan *AdapterChunk, error)
+    Stream(ctx context.Context, req *Request) (<-chan *AdapterChunk, error)
     Provider() string
-    Supports(provider string) bool
 }
 
-type AdapterChunk struct {
-    Raw    []byte
-    Parsed *LLMChunk
-    Error  error
-}
-
-// ICircuitBreaker 熔断器接口
+// ICircuitBreaker protects providers from cascading failures.
 type ICircuitBreaker interface {
     Allow(circuitKey string) (bool, error)
     RecordSuccess(circuitKey string)
     RecordFailure(circuitKey string)
     State(circuitKey string) CircuitState
-    Reset(circuitKey string)
-}
-
-// ITokenCounter Token 计数接口
-type ITokenCounter interface {
-    Count(messages []types.Message) int
-    CountWithPrompt(prompt string, messages []types.Message) int
-    EstimateRemaining(current, max int) int
-}
-
-// ILLMObserver LLM 可观测接口
-type ILLMObserver interface {
-    EmitLLMCall(provider, model string, duration time.Duration, success bool)
-    EmitTokenUsage(provider, model string, usage TokenUsage)
-    EmitCircuitState(provider string, state CircuitState)
-}
-
-// IHealthCheck 健康检查接口
-type IHealthCheck interface {
-    Check(ctx context.Context, provider string) error
-    CheckAll(ctx context.Context) map[string]error
 }
 ```
 
-### 4.2 配置接口
+### 3.2 配置类型 (shared/config/llmgateway.go)
 
 ```go
-type LLMConfig struct {
+type LLMGatewayConfig struct {
     DefaultProvider string
-    Providers       map[string]ProviderConfig
-    TokenLimit     int
-    CircuitBreaker CircuitBreakerConfig
+    DefaultModel    string
+    DefaultTier     string
+    ModelTiers      map[string]string
+    ModelRouting    map[string]string
+    CircuitBreaker  LLMCircuitBreakerConfig
+    Providers       map[string]LLMProviderRuntimeConfig
 }
 
-type ProviderConfig struct {
-    Type        string
-    BaseURL     string
-    APIKeyEnv   string
-    Timeout     time.Duration
-    MaxTokens   int
-    Temperature float64
-    Retry       RetryConfig
-    Headers     map[string]string
+type LLMProviderRuntimeConfig struct {
+    Type          string
+    BaseURL       string
+    APIKeyEnv     string
+    DefaultModel  string
+    FallbackModel string
+    Timeout       time.Duration
+    MaxTokens     int
+    Temperature   float64
+    Retry         LLMRetryConfig
+    Headers       map[string]string
 }
 ```
 
 ---
 
-## 五、业务流程
+## 四、业务流程
 
-### 5.1 流式对话时序
+### 4.1 流式对话时序 (Gateway.Stream)
 
 ```
-ContextEngine → LLMGateway.ChatStream()
-    → TokenCounter.Count() [检查预算]
-    → CircuitBreaker.Allow(provider) [检查熔断]
-    → AdapterRegistry.GetAdapter(provider)
-    → Adapter.Stream()
-        loop: chunk → emit → yield
-    → CircuitBreaker.RecordResult()
-    → TokenCounter.UpdateUsage()
+D2 Consumer → Bridge.ChatStream()
+    → IGateway.Stream()
+        ├─ [span: llm.stream] 主 span
+        ├─ [span: llm.provider.route] Router.Resolve(model)
+        │   ├─ Tier alias → ModelTiers lookup
+        │   └─ Model → model_routing pattern match → provider
+        ├─ Counter.CheckBudget() [Token 预算检查]
+        ├─ [span: llm.circuit_breaker] Breaker.Allow(provider)
+        ├─ Registry.Get(provider) → IAdapter
+        ├─ Context deadline injection (若父 ctx 无 deadline → provider.Timeout)
+        ├─ [span: llm.retry] Retry.Stream()
+        │   └─ For each attempt:
+        │       ├─ [span: llm.adapter.stream] ad.Stream()
+        │       │   ├─ buildOpenAIChatRequest → JSON body
+        │       │   ├─ POST /chat/completions (SSE)
+        │       │   └─ streamOpenAISSE → parse SSE → emit AdapterChunk
+        │       └─ On failure: IsRetryable check → Full Jitter delay → retry/fallback
+        ├─ Stream goroutine:
+        │   ├─ Forward chunks to out channel
+        │   ├─ Handle ctx.Done() → graceful close
+        │   └─ On success: Breaker.RecordSuccess / metrics
+        │   └─ On error: shouldRecordBreakerFailure? → Breaker.RecordFailure
+        └─ finishStream: span end + GenAI token usage recording
 ```
 
-### 5.2 熔断器状态机
+### 4.2 熔断器状态机
 
 ```
 [Initial] → Closed (正常)
-    ↓ failure >= threshold
-    Open (熔断开启，30s 后)
+    ↓ failure >= FailureThreshold (default: 5)
+    Open (熔断开启，OpenDuration 后)
     ↓
-    HalfOpen (探测)
-    ↓ success >= 2 → Closed
+    HalfOpen (探测，最多 HalfOpenMaxProbes 并发)
+    ↓ success >= SuccessThreshold (default: 2) → Closed
     ↓ failure → Open
 ```
 
+Key: context.Canceled 和 context.DeadlineExceeded 不触发 RecordFailure。
+
+### 4.3 Model Tier 解析链
+
+```
+User input → Router.Resolve(model)
+    ├─ model = "" → DefaultProvider + DefaultModel → ResolveTier(defaultModel)
+    ├─ model = "fast" → ResolveTier("fast") → "MiniMax-M2.7-highspeed" → provider routing
+    └─ model = "deepseek-v4-flash" → ResolveTier("deepseek-v4-flash") → no match → provider routing
+```
+
 ---
 
-## 六、目录结构
+## 五、目录结构
 
 ```
 internal/layers/llmgateway/
-├── contracts.go              # 接口与类型定义
+├── contracts.go                 # 接口与核心类型定义
 ├── gateway/
-│   ├── gateway.go           # LLMGateway 主实现
-│   ├── options.go            # Gateway 选项模式
+│   ├── gateway.go              # Gateway 主实现 (Stream, startSpan, metrics)
+│   ├── router.go               # Router (Resolve, ResolveTier, model_routing)
+│   ├── router_test.go
+│   ├── factory.go              # NewFromConfig (装配完整 stack)
 │   └── gateway_test.go
 ├── adapter/
-│   ├── registry.go           # AdapterRegistry
-│   ├── adapter.go            # IAdapter 接口
-│   ├── deepseek.go           # DeepSeek 适配器
+│   ├── registry.go             # AdapterRegistry (Register/Get)
+│   ├── registry_test.go
+│   ├── errors.go               # Sentinel errors
+│   ├── deepseek.go             # DeepSeekAdapter
 │   ├── deepseek_test.go
-│   ├── minimax.go            # MiniMax 适配器
-│   └── minimax_test.go
+│   ├── minimax.go              # MiniMaxAdapter
+│   ├── minimax_test.go
+│   ├── openai_stream.go        # OpenAIStreamClient (HTTP POST + SSE)
+│   ├── openai_request.go       # buildOpenAIChatRequest (消息映射)
+│   ├── openai_request_test.go
+│   ├── openai_types.go         # OpenAI API 类型定义
+│   ├── sse_parser.go           # SSE 流解析 + streamAccumulator
+│   └── sse_parser_test.go
 ├── breaker/
-│   ├── circuit_breaker.go    # CircuitBreaker 实现
+│   ├── circuit_breaker.go      # CircuitBreaker 实现
 │   ├── circuit_breaker_test.go
-│   └── state.go              # 状态机
+│   └── state.go                # circuitRecord 状态结构
 ├── token/
-│   ├── counter.go           # Token 计数器
+│   ├── counter.go              # Counter (CountText, CountMessages, CountWithSystemPrompt, TruncateToTokens, CheckBudget)
 │   ├── counter_test.go
-│   └── estimator.go         # Token 估算器
+│   └── bpe_loader.go           # Embedded cl100k_base BPE 加载器
 ├── config/
-│   ├── loader.go            # 配置加载器
-│   ├── loader_test.go
-│   └── provider.go          # Provider 配置
+│   ├── loader.go               # Config Loader (validate + APIKey)
+│   └── loader_test.go
 ├── retry/
-│   ├── retry.go             # 重试策略
-│   └── retry_test.go
-└── observer/
-    ├── observer.go          # ILLMObserver 接口
-    └── noop.go              # NoOp 实现
+│   ├── retry.go                # Retry Executor (Full Jitter + fallback)
+│   ├── retry_test.go
+│   └── retry_jitter_test.go
+└── safety/
+    ├── filter.go               # Safety Filter (Check, AddPattern)
+    ├── filter_test.go
+    └── patterns.go             # Default safety patterns (malware, exploit, injection, etc.)
+
+internal/bridges/llm/
+├── bridge.go                   # Bridge (IGateway → ILLMGateway + ITierResolver)
+├── bridge_test.go
+├── context_wiring.go           # WireContextLLM (从 yaml 到 ContextLLMStack)
+├── wire.go                     # WireFromConfig (gateway.NewFromConfig + Bridge)
+└── readiness.go                # Readiness probe
 ```
 
 ---
 
-## 七、错误处理
+## 六、错误处理
 
-| 错误码 | 类型 | 说明 | 可恢复 |
+| 错误码 | 类型 | 说明 | 可重试 |
 |--------|------|------|--------|
-| LLM_PROVIDER_1001 | ProviderUnavailable | Provider 不可用 | ✅ |
-| LLM_CIRCUIT_1002 | CircuitOpen | 熔断器开启 | ✅ |
+| LLM_PROVIDER_1001 | ProviderUnavailable | Provider 不可用（HTTP >=300 或非 401/403） | ✅ |
+| LLM_CIRCUIT_1002 | CircuitOpen | 熔断器开启 | ✅ (自动恢复) |
 | LLM_TIMEOUT_1003 | Timeout | 请求超时 | ✅ |
-| LLM_AUTH_1004 | AuthFailed | 认证失败 | ❌ |
+| LLM_AUTH_1004 | AuthFailed | 认证失败 (401/403) | ❌ |
 | LLM_TOKEN_1005 | TokenBudgetExceeded | Token 超限 | ❌ |
-| LLM_PARSE_1006 | ParseError | 响应解析错误 | ✅ |
+| LLM_PARSE_1006 | ParseError | SSE 响应解析错误 | ✅ |
 | LLM_UNSUPPORTED_1007 | UnsupportedProvider | 不支持的 Provider | ❌ |
+| LLM_UNSUPPORTED_1008 | UnsupportedModel | 不支持的 Model | ❌ |
 
-### 7.1 错误可重试性
+### 可重试性判断
 
 ```go
-func IsRetryable(err error) bool {
-    switch e := err.(type) {
-    case *LLMError:
-        switch e.Code {
-        case "LLM_TIMEOUT_1003", "LLM_PROVIDER_1001", "LLM_PARSE_1006":
-            return true
-        default:
-            return false
-        }
-    }
-    return true // 网络错误默认可重试
-}
+func IsRetryable(err error) bool - 通过 SentinelError 类型判断：
+  - ProviderUnavailable → true
+  - Timeout → true
+  - ParseError → true
+  - AuthFailed → false
+  - 其余 → false
 ```
 
 ---
 
-## 八、测试策略
+## 七、Safety Filter 设计
 
-| T 层 ID | 描述 | 优先级 |
-|-------|------|--------|
-| D3-LLM-T01 | DeepSeek 适配器流式响应 | P0 |
-| D3-LLM-T02 | MiniMax 适配器流式响应 | P0 |
-| D3-LLM-T03 | Circuit breaker 正常关闭 | P0 |
-| D3-LLM-T04 | Circuit breaker 触发开启 | P0 |
-| D3-LLM-T05 | Circuit breaker 半开→关闭 | P0 |
-| D3-LLM-T06 | Circuit breaker 半开→开启 | P0 |
-| D3-LLM-T07 | Token 计数准确性 | P0 |
-| D3-LLM-T08 | Token 预算检查 | P0 |
-| D3-LLM-T09 | Provider 配置加载 | P0 |
-| D3-LLM-T10 | 未知 Provider 报错 | P1 |
-| D3-LLM-T11 | 重试策略执行 | P1 |
-| D3-LLM-T12 | Fallback 模型切换 | P1 |
-| D3-LLM-T13 | LLM 调用可观测事件 | P1 |
+### 7.1 默认模式
+
+安全过滤器基于模式匹配（大小写不敏感）检查 system prompt 和 messages：
+
+| 模式 | 严重级别 | 动作 | 位置 |
+|------|---------|------|------|
+| malware_generation | critical | reject | all |
+| exploit_generation | critical | reject | all |
+| unauthorized_access | high | reject | all |
+| hardcoded_credential | medium | warn | message |
+| prompt_injection | medium | warn | message |
+| data_exfiltration | medium | warn | message |
+
+### 7.2 Filter 接口
+
+```go
+type Filter struct { ... }
+func NewFilter() *Filter
+func (f *Filter) Check(ctx context.Context, systemPrompt string, messages []string) *Result
+func (f *Filter) AddPattern(p Pattern)
+```
 
 ---
 
-## 九、版本分期
+## 八、可观测性
+
+Gateway 通过 `observability.Bridge` 集成 OpenTelemetry：
+
+**Spans (hierarchical):**
+- `llm.stream` (Client) — 主 span，记录 request/response payload + token usage
+- `llm.provider.route` (Internal) — 模型路由解析
+- `llm.circuit_breaker` (Internal) — 熔断器检查
+- `llm.retry` (Internal) — 重试编排
+- `llm.adapter.stream` (Client) — HTTP 流式调用
+
+**Metrics:**
+- `llm_requests_total` (Int64Counter) — 成功调用计数
+- `llm_errors_total` (Int64Counter) — 失败调用计数
+- `llm_latency_seconds` (Float64Histogram) — 调用延迟分布
+
+**GenAI Token Recording:**
+- `observability.RecordGenAITokenUsage` — 记录 input/output/cache_read/reasoning tokens
+
+---
+
+## 九、测试策略
+
+| T 层 ID | 描述 | 优先级 | 场景 |
+|---------|------|--------|------|
+| D3-S1-A01-T01 | DeepSeek 适配器流式响应 | P0 | Adapter |
+| D3-S1-A01-T02 | MiniMax 适配器流式响应 | P0 | Adapter |
+| D3-S1-A01-T03 | SSE parse error handling | P1 | Adapter |
+| D3-S3-A01-T01 | Circuit breaker 正常关闭 | P0 | Breaker |
+| D3-S3-A01-T02 | Circuit breaker 触发开启 | P0 | Breaker |
+| D3-S3-A01-T03 | Circuit breaker 半开→关闭 | P0 | Breaker |
+| D3-S3-A01-T04 | Circuit breaker 半开→开启 | P0 | Breaker |
+| D3-S3-A01-T05 | 熔断器状态持久化 | P2 | Breaker (PLANNED) |
+| D3-S5-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | Token |
+| D3-S5-A01-T02 | Token 预算检查 | P0 | Token |
+| D3-S5-A01-T03 | Token counter 中文准确性 | P1 | Token |
+| D3-S6-A01-T01 | Provider 配置加载 | P0 | Config |
+| D3-S4-A01-T01 | 重试策略执行 (Full Jitter) | P0 | Retry |
+| D3-S4-A01-T02 | DeepSeek Fallback 模型切换 | P1 | Retry |
+| D3-S4-A01-T03 | MiniMax Fallback 模型切换 | P1 | Retry |
+| D3-S2-A01-T01 | LLM 调用可观测事件 | P1 | Gateway |
+| D3-S2-A01-T02 | 未知 Provider/Model 报错 | P1 | Gateway |
+| D3-S2-A01-T03 | 多 Provider 并发调用 | P1 | Gateway |
+| D3-S2-A01-T04 | Retry 与 CB 联动，context 取消不触发 CB | P0 | Gateway |
+| D3-S2-A01-T05 | Half-Open 并发探测限制 | P0 | Gateway |
+| D3-S2-A01-T06 | LLM 429 rate limit handling | P1 | Gateway |
+| D3-S7-A01-T01 | Safety filter critical rejection | P0 | Safety |
+| D3-S7-A01-T02 | Safety filter warning matches | P1 | Safety |
+
+---
+
+## 十、版本分期
 
 | 版本 | 能力 |
 |------|------|
-| V1 | DeepSeek + MiniMax 适配器 + Circuit Breaker + Token Counter |
-| V2 | Anthropic/OpenAI 适配器 + Rate Limiter |
-| V3 | 多模型负载均衡 + A/B Testing |
-
----
-
-## 十、L2-L3 接口协议（关键）
-
-### 10.1 接口契约
-
-Context Engine 定义的接口：
-
-```go
-// internal/layers/contextengine/contracts.go
-
-type ILLMGateway interface {
-    ChatStream(ctx context.Context, req *LLMRequest) (<-chan LLMChunk, error)
-}
-
-type LLMRequest struct {
-    Model        string
-    SystemPrompt string
-    Messages     []types.Message
-    Tools        []ToolSchema
-}
-
-type LLMChunk struct {
-    Content   string
-    Thinking  string
-    ToolCalls []ToolCall
-    Done      bool
-    Usage     TokenUsage
-}
-
-type ToolCall struct {
-    ID       string
-    Name     string
-    Input    string
-    RiskLevel types.RiskLevel  // ⚠️ 必需
-}
-```
-
-### 10.2 LLM Gateway 实现要点
-
-```go
-// LLM Gateway 实现时，必须适配 Context Engine 的接口
-
-func (g *LLMGateway) ChatStream(ctx context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
-    out := make(chan contextengine.LLMChunk, 32)
-    
-    go func() {
-        defer close(out)
-        
-        // 1. 获取适配器（根据配置的 provider）
-        adapter := g.registry.Get(req.Provider)
-        
-        // 2. 构建 Provider 特定的请求
-        providerReq := g.buildProviderRequest(req)
-        
-        // 3. 流式调用
-        for chunk := range adapter.Stream(ctx, providerReq) {
-            // 4. 转换 ToolCall，填充 RiskLevel
-            for i := range chunk.ToolCalls {
-                chunk.ToolCalls[i].RiskLevel = g.toolsReg.RiskLevel(chunk.ToolCalls[i].Name)
-            }
-            
-            // 5. 转换为 Context Engine 类型
-            out <- contextengine.LLMChunk{
-                Content:   chunk.Content,
-                Thinking:  chunk.Thinking,
-                ToolCalls: chunk.ToolCalls,
-                Done:      chunk.Done,
-                Usage: contextengine.TokenUsage{
-                    PromptTokens:     chunk.Usage.PromptTokens,
-                    CompletionTokens: chunk.Usage.CompletionTokens,
-                },
-            }
-        }
-    }()
-    
-    return out, nil
-}
-```
-
-### 10.3 RiskLevel 填充逻辑
-
-```go
-// ToolCall 的 RiskLevel 不来自 LLM API，而是从 IToolRegistry 获取
-// 这在 Context Engine 层通过 IToolRegistry 接口实现
-
-// LLM Gateway 需要注入 IToolRegistry
-type LLMGateway struct {
-    registry IToolRegistry  // 从 Context Engine 传入
-    // ...
-}
-```
-
-### 10.4 Provider 信息传递
-
-由于 Context Engine 的 `LLMRequest` 没有 `Provider` 字段，Provider 信息需要通过其他方式传递：
-
-**方案 A**: 通过 `EngineDeps` 配置默认 Provider
-```go
-type EngineDeps struct {
-    LLM        ILLMGateway
-    DefaultProvider string  // 新增
-    // ...
-}
-```
-
-**方案 B**: 在 `LLMRequest` 中扩展（需同步修改 Context Engine）
-
-**建议采用方案 A**，保持 Context Engine 不变。
-
-### 10.5 类型转换表
-
-| Context Engine 类型 | LLM Gateway 内部类型 | 说明 |
-|-------------------|---------------------|------|
-| `contextengine.LLMRequest` | `llmgateway.LLMRequest` | LLM Gateway 添加 Provider/MaxTokens 等 |
-| `contextengine.LLMChunk` | `llmgateway.LLMChunk` | 直接复用 |
-| `contextengine.TokenUsage` | `llmgateway.TokenUsage` | LLM Gateway 多 `TotalTokens` |
-| `contextengine.ToolCall` | `llmgateway.ToolCall` | LLM Gateway 多 `RiskLevel` 填充 |
-
-### 10.6 配置传递链
-
-```
-devrix.yaml
-    ↓
-LLMGateway 配置 (Provider/BaseURL/APIKey)
-    ↓
-Adapter 构建 HTTP 请求
-    ↓
-Context Engine 传入 LLMRequest (Model/Messages/Tools)
-    ↓
-LLM Gateway 组合: Provider 配置 + LLMRequest
-    ↓
-调用 Adapter.Stream()
-```
+| V1 | DeepSeek + MiniMax 适配器 + Circuit Breaker + Token Counter + Retry |
+| V2 | CB+Retry 协调 + Half-Open 并发限制 + Context 超时传播 + Full Jitter + CJK 补偿 |
+| V2.1 | Safety Filter 内容安全 + ModelTier 层级别名 + CacheRead/Reasoning Token 分解 |
+| V3 (planned) | Anthropic/OpenAI 适配器 + Rate Limiter + 多模型负载均衡 |
