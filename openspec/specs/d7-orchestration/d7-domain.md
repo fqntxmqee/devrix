@@ -441,16 +441,32 @@ D2.Process MUST remain available for backward compatibility but SHOULD NOT be th
 ## Configuration
 
 ```yaml
-orchestration:
-  d7_enabled: true                          # 主开关；false 时回退 V6 行为
-  fast_path:
-    confidence_threshold: 0.9               # 快速路径置信度阈值
-  decision:
-    rules_enabled: true                     # 规则分类启用
-    llm_fallback: true                      # LLM 分类兜底
+# 现行配置（已实现）
+context_engine:
+  execution_flow:
+    enabled: false              # 默认关闭
+    link_tasks: true
+    im_progress: true
+    tool_summary_throttle_ms: 500
+    event_buffer_size: 32
+  tasks:
+    mode: v2
+    store_dir: "~/.devrix/tasks/"
   plan:
-    max_tasks_per_plan: 20                  # 单 Plan 最大 Task 数
-    max_depth: 5                            # DAG 最大深度
+    enabled: false
+    auto_detect: false
+
+# D7 v1.0 规划配置（未实现）
+orchestration:
+  d7_enabled: false             # false 时保持 D1→D2.Process
+  fast_path:
+    confidence_threshold: 0.9
+  decision:
+    rules_enabled: true
+    llm_fallback: true
+  plan:
+    max_tasks_per_plan: 20
+    max_depth: 5
   task:
     persistence_enabled: true
     store_dir: "~/.devrix/tasks/"
@@ -460,35 +476,16 @@ orchestration:
 
 ## T 层测试点索引
 
-| T ID | 名称 | 归属层次 | 优先级 |
-|------|------|----------|--------|
-| D7-IDENTITY-T01 | D7 package exists | Project | P0 |
-| D7-S1-T01 | Task create and persist | A | P0 |
-| D7-S1-T02 | Task lifecycle state machine | F | P0 |
-| D7-S1-T03 | Plan with DAG validation | F | P0 |
-| D7-S1-T04 | Background task lifecycle | F | P1 |
-| D7-S1-T05 | Snapshot includes tasks and flows | A | P1 |
-| D7-S1-T06 | Task persistence survives restart | A | P1 |
-| D7-S2-T01 | ProcessMessage is D1 entry point | A | P0 |
-| D7-S2-T02 | Fast path latency ≤ 2ms | F | P0 |
-| D7-S2-T03 | Orchestrate path creates plan | A | P0 |
-| D7-S2-T04 | Interrupt cancels active tasks | A | P0 |
-| D7-S3-T01 | Wave scheduler bit-identical migration | A | P0 |
-| D7-S3-T02 | Worker pool capacity unchanged | F | P0 |
-| D7-S4-T01 | Flow event publication unchanged | A | P0 |
-| D7-S4-T02 | Event lifecycle kinds | F | P0 |
-| D7-S5-T01 | Rule-based classification | F | P0 |
-| D7-S5-T02 | LLM fallback classification | F | P0 |
-| D7-S5-T03 | Task DAG decomposition | A | P0 |
-| D7-S5-T04 | Executor selection | F | P0 |
-| D7-S5-T05 | Empty message skip | F | P1 |
-| D7-THIN-T01 | Loop fields removed | F | P0 |
-| D7-THIN-T02 | Loop line count ≤ 200 | F | P0 |
-| D7-THIN-T03 | Loop no D4 import | F | P0 |
-| D7-THIN-T04 | Loop Run I/O preserved | A | P0 |
-| D7-D1-T01 | D1 calls D7, not D2 | A | P0 |
-| D7-D4-T01 | No delegate hooks in D2 loop | A | P0 |
-| D7-D6-T01 | D6 validates orchestration decision | A | P1 |
+完整注册表见 `t-registry.md`。摘要：
+
+| 范围 | IMPLEMENTED | PLANNED | P0 |
+|------|-------------|---------|-----|
+| D7-S3 Wave | 10 | 1 (PARTIAL) | 8 |
+| D7-S4 Flow | 7 | 0 | 6 |
+| D7-S1 Work | 5 | 1 | 3 |
+| D7-S5 Decision | 1 | 4 | 3 |
+| D7-S2 Orchestrator | 0 | 4 | 4 |
+| 契约/瘦身 | 0 | 5 | 4 |
 
 ---
 
@@ -497,3 +494,4 @@ orchestration:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | Initial D7 domain spec: 5 scenarios, 15 activities, 28 function points |
+| 2.0.0 | 2026-06-14 | 代码审计对齐：实现状态标注、配置同步、T 层索引指向 t-registry.md |

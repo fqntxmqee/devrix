@@ -1,10 +1,30 @@
 # 任务规划系统设计
 
 **文档类型:** 详细架构设计
+**Domain:** D7-S1 / D7-S5（现行托管 D2 `contextengine/tasks/`）
 **Change ID:** devrix-task-planning
-**版本:** 2.0.0
-**状态:** Ready
+**版本:** 2.1.0
+**状态:** Active — IMPLEMENTED (PlanMode + TaskManager)
+**Last Updated:** 2026-06-14
 **对标:** Claude Code Plan Mode
+**关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`
+
+---
+
+## 实现状态（2026-06-14）
+
+| 组件 | 状态 | 代码位置 |
+|------|------|----------|
+| TaskManager | ✅ | `contextengine/tasks/task_manager.go` |
+| DiskStore (v2) | ✅ | `contextengine/tasks/disk_store.go` |
+| PlanMode 状态机 | ✅ | `contextengine/tasks/plan_mode.go` |
+| PlanAgent 只读探索 | ✅ | `contextengine/tasks/plan_agent.go` |
+| VerificationAgent | 🔶 设计完成 | `contextengine/tasks/verification_agent.go`（若存在） |
+| CLI `/task` `/plan` | ✅ | `contextengine/tasks/cli_commands.go` |
+| D7-S5 ClassifyIntent | ⬜ | 未实现 |
+| D7-S1 CreateWorkPlan | ⬜ | 未实现 |
+
+> **迁移说明：** 本模块目标迁入 `internal/layers/d7/`（D7-S1 Work Model + D7-S5 PlanMode），迁移期间保持 D2 包路径。
 
 ---
 
@@ -12,21 +32,27 @@
 
 ### 与 Claude Code 对齐
 
-| Claude Code | Devrix |
-|-------------|--------|
-| `/plan` 命令 | `/plan` 命令 |
-| EnterPlanMode Tool | EnterPlanMode (规划中) |
-| ExitPlanMode Tool | ExitPlanMode (规划中) |
-| PlanAgent (只读探索) | PlanAgent |
-| VerificationAgent | VerificationAgent |
-| 任务列表 | TaskManager |
+| Claude Code | Devrix | 状态 |
+|-------------|--------|------|
+| `/plan` 命令 | `/plan` 命令 | ✅ |
+| EnterPlanMode Tool | PlanMode.Enter | ✅ |
+| ExitPlanMode Tool | PlanMode.Reject / 完成回 inactive | ✅ |
+| PlanAgent (只读探索) | PlanAgent | ✅ |
+| VerificationAgent | VerificationAgent | 🔶 |
+| 任务列表 | TaskManager | ✅ |
 
 ### 触发方式
 
-| 方式 | Claude Code | Devrix |
-|------|-------------|--------|
-| 显式命令 | `/plan` | `/plan` |
-| 自动检测 | 无 | 可选 `auto_detect` |
+| 方式 | Claude Code | Devrix | 状态 |
+|------|-------------|--------|------|
+| 显式命令 | `/plan` | `/plan` | ✅ |
+| 自动检测 | 无 | 可选 `auto_detect` | ⬜ 默认关闭 |
+
+### 业务目标
+
+- 将"规划"与"执行"阶段显式分离，避免 QueryLoop 内隐式规划
+- Task 作为可追踪工作单元，支持依赖 DAG 与持久化
+- PlanAgent 只读探索，审批后才创建 Task 并执行
 
 ---
 
@@ -46,11 +72,12 @@ PlanAgent 执行（只读模式）
     ↓
 探索代码库 + 设计实现方案
     ↓
-生成任务列表
+生成 PlanResult（含任务列表草案）
     ↓
 用户审批 (/plan approve / /plan reject)
     ↓
-执行 → Verify → VerificationAgent
+approve → TaskManager 批量创建 Task
+reject  → 回到 inactive
 ```
 
 ### 状态机
@@ -74,6 +101,18 @@ PlanAgent 执行（只读模式）
     (返回 Inactive) ───────────────────────┘
 ```
 
+### Task 与 ExecutionFlow 联动
+
+当 `execution_flow.link_tasks=true` 时：
+
+```
+FlowStarted(task_id) → TaskManager.SetOwner + status=in_progress
+FlowCompleted       → TaskManager.status=completed
+FlowFailed          → TaskManager.status=failed
+```
+
+实现：`orchestration/flow/hub.go` linkTask()
+
 ---
 
 ## ③ CLI 命令
@@ -90,6 +129,8 @@ PlanAgent 执行（只读模式）
 /task dep <task_id> <blocked_by>   # 添加依赖
 ```
 
+**实现：** `contextengine/tasks/cli_commands.go`
+
 ### 规划命令 (`/plan`)
 
 ```bash
@@ -101,44 +142,7 @@ PlanAgent 执行（只读模式）
 /plan show     # 显示当前计划
 ```
 
-### 使用示例
-
-```bash
-# 1. 进入规划模式
-> /plan Add user authentication
-Entered plan mode.
-Goal: Add user authentication
-
-# 2. 查看计划
-> /plan show
-# Implementation Plan
-
-## Exploration Findings
-- Found existing auth module at auth/
-- Uses JWT for token management
-- No existing user model
-
-## Tasks
-1. Create User model
-   - Add username, email, password_hash fields
-2. Add JWT generation
-   - Use existing jwt-go package
-3. Create login endpoint
-   - POST /auth/login
-
-## Critical Files
-- auth/handler.go
-- models/user.go
----
-Use `/plan approve` to proceed or `/plan reject` to cancel.
-
-# 3. 审批执行
-> /plan approve
-Plan approved. Creating tasks:
-✓ task_abc123: Create User model
-✓ task_def456: Add JWT generation
-✓ task_ghi789: Create login endpoint
-```
+**实现：** `contextengine/tasks/cli_commands.go` + `plan_mode.go`
 
 ---
 
@@ -155,28 +159,15 @@ Plan approved. Creating tasks:
 - 不能运行会修改状态的命令
 ```
 
-### 提示词模板
+### 实现要点
 
-```markdown
-=== CRITICAL: READ-ONLY MODE ===
-You are STRICTLY PROHIBITED from:
-- Creating new files
-- Modifying existing files
-- Deleting files
-- Running commands that change system state
+- **包路径：** `contextengine/tasks/plan_agent.go`
+- **可观测性：** span `task.plan.generate`（D5 Operation Registry）
+- **输出：** `PlanResult` 含 ExplorationFindings、Tasks 列表、CriticalFiles
 
-You CAN:
-- Read files
-- Search using grep/find
-- Run read-only commands (ls, git status, git log)
+### 提示词约束
 
-## Your Process
-
-1. **Understand Requirements**: Focus on the user's goal
-2. **Explore Codebase**: Find patterns, understand architecture
-3. **Design Solution**: Consider trade-offs
-4. **Detail the Plan**: Break down into tasks
-```
+PlanAgent system prompt 强制只读模式，允许 read/grep/ls/git status 等只读操作。
 
 ---
 
@@ -196,77 +187,102 @@ You CAN:
 | 验证规避 | 每个检查必须有 Command run |
 | 80% 陷阱 | 必须尝试对抗性探测 |
 
-### 验证探针
-
-```markdown
-## Required Adversarial Probes
-
-1. **Boundary values**: 0, -1, empty, very long strings
-2. **Idempotency**: same request twice
-3. **Orphan operations**: delete/reference non-existent IDs
-```
+> **状态：** 设计完成，集成测试覆盖待补全（D7-S5-T02 PLANNED）。
 
 ---
 
 ## ⑥ 配置
 
-### YAML 配置
+### YAML 配置（现行）
 
 ```yaml
 context_engine:
+  tasks:
+    mode: v2                  # v1=todo, v2=task（带 DiskStore）
+    store_dir: "~/.devrix/tasks/"
   plan:
-    enabled: true           # 启用规划功能
-    auto_detect: false     # 默认关闭，需要显式 /plan
+    enabled: false            # 默认关闭，需显式启用
+    auto_detect: false        # 默认关闭
     min_chars_for_plan: 200
     model: "deepseek-v4"
     max_milestones: 10
     timeout: 15s
     on_milestone_fail: "fail_fast"
+  execution_flow:
+    enabled: false
+    link_tasks: true          # Task-Flow 状态联动
 ```
 
 ### 默认配置
 
 ```go
+// contextengine/tasks — plan 默认关闭
 func DefaultPlanConfig() PlanConfig {
     return PlanConfig{
-        Enabled:         false,  // 显式启用
-        AutoDetect:      false,  // 默认关闭
+        Enabled:         false,
+        AutoDetect:      false,
         MinCharsForPlan: 200,
-        // ...
     }
 }
 ```
 
 ---
 
-## ⑦ 文件清单
+## ⑦ 文件清单（现行）
 
 ```
 internal/layers/contextengine/tasks/
-├── task_manager.go          # 任务管理器
-├── task_manager_test.go   # 单元测试
-├── plan_agent.go          # PlanAgent
-├── verification_agent.go   # VerificationAgent
-├── plan_mode.go           # PlanMode 状态机
-├── tool_suite.go          # 工具套件
-└── cli_commands.go        # CLI 命令处理
+├── task_manager.go          # D7-S1-A02 ManageTask
+├── task_manager_test.go     # D7-S1-T01/T02/T04
+├── disk_store.go            # D7-S1-A02-F05 持久化
+├── disk_store_test.go       # D7-S1-T03
+├── plan_mode.go             # D7-S1-A04/A05 PlanMode 状态机
+├── plan_agent.go            # D7-S5-A04 RunPlanAgent
+├── verification_agent.go      # VerificationAgent（若存在）
+├── tool_suite.go            # Task/Plan 工具注册
+└── cli_commands.go          # /task /plan CLI
 
-internal/shared/types/
-└── command.go             # CommandType 更新
+internal/layers/orchestration/flow/
+└── hub.go                   # linkTask → TaskManager 联动
 
-internal/layers/communication/adapters/
-└── cli.go                # CLI 适配器（集成）
+internal/shared/config/
+├── queryloop.go             # TasksConfig
+└── execution_flow.go        # ExecutionFlowConfig
+```
+
+### 目标迁移（D7 v1.0）
+
+```
+internal/layers/d7/
+├── workmodel.go             # ← task_manager.go
+├── plan_mode.go             # ← plan_mode.go
+├── plan_agent.go            # ← plan_agent.go
+└── workmodel_store.go       # ← disk_store.go
 ```
 
 ---
 
-## ⑧ 验收测试
+## ⑧ DSAFT 映射
+
+| DSAFT ID | 组件 | 状态 |
+|----------|------|------|
+| D7-S1-A02 | ManageTask | ✅ |
+| D7-S1-A04 | EnterPlanMode | ✅ |
+| D7-S1-A05 | ApprovePlan | ✅ |
+| D7-S5-A04 | RunPlanAgent | ✅ |
+| D7-S1-A01 | CreateWorkPlan | ⬜ |
+| D7-S5-A01 | ClassifyIntent | ⬜ |
+
+---
+
+## ⑨ 验收测试
 
 ```bash
-# 构建
-go build ./...
+# 单元测试
+go test ./internal/layers/contextengine/tasks/...
+go test ./internal/layers/orchestration/flow/...
 
-# CLI 测试
+# CLI 手动验收
 # 启动 devrix 后：
 > /plan Add user authentication
 > /plan show
@@ -274,6 +290,8 @@ go build ./...
 > /task list
 ```
 
+关联 T 测试点：`t-registry.md` D7-S1-T* / D7-S5-T*
+
 ---
 
-**维护：** 功能变更需同步更新本文档和 `openspec/` 相关规格。
+**维护：** 功能变更需同步更新 `spec.md`、`a-registry.md`、`f-registry.md`、`t-registry.md` 与本文档。

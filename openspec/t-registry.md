@@ -25,7 +25,7 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 13 | 12 | 0 | 8 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 33 | 22 | 1 | 22 |
 
 **总计**: 239 · IMPLEMENTED 231 · PLANNED 6 · PARTIAL 1 · P0 100
 
