@@ -14,11 +14,12 @@ import (
 
 // Manager manages in-memory session contexts and persistence.
 type Manager struct {
-	mu       sync.RWMutex
-	contexts map[string]*types.SessionContext
-	store    *snapshot.Store
-	cfg      *config.ContextEngineConfig
-	longTerm ILongTermMemory
+	mu          sync.RWMutex
+	messagesMu  sync.RWMutex // protects sc.Messages concurrent reads/writes
+	contexts    map[string]*types.SessionContext
+	store       *snapshot.Store
+	cfg         *config.ContextEngineConfig
+	longTerm    ILongTermMemory
 }
 
 // NewManager creates a memory manager.
@@ -85,6 +86,11 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 	defer m.mu.Unlock()
 
 	if sc, ok := m.contexts[session.SessionID]; ok {
+		// Always repair on load — even cached in-memory data may have
+		// orphaned tool results from process interruptions or old
+		// snapshot corruption. Without this, MiniMax rejects the chain
+		// with error 2013.
+		sc.Messages = conversation.RepairToolMessageChain(sc.Messages)
 		return sc, nil
 	}
 
@@ -127,18 +133,22 @@ func (m *Manager) AppendUserMessage(sc *types.SessionContext, requestID, content
 	if requestID != "" && requestID == sc.LastRequestID {
 		return false
 	}
+	m.messagesMu.Lock()
 	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, types.MessageRoleUser, content)
 	sc.Messages = append(sc.Messages, *msg)
 	sc.LastRequestID = requestID
 	sc.UpdatedAt = time.Now()
+	m.messagesMu.Unlock()
 	return true
 }
 
 // AppendMessage appends a plain text message (no metadata).
 func (m *Manager) AppendMessage(sc *types.SessionContext, role types.MessageRole, content string) {
+	m.messagesMu.Lock()
 	msg := types.NewMessage(fmt.Sprintf("msg_%d", time.Now().UnixNano()), sc.SessionID, role, content)
 	sc.Messages = append(sc.Messages, *msg)
 	sc.UpdatedAt = time.Now()
+	m.messagesMu.Unlock()
 }
 
 // AppendFullMessage appends a message preserving metadata (tool_calls, tool_call_id).
@@ -152,8 +162,10 @@ func (m *Manager) AppendFullMessage(sc *types.SessionContext, msg types.Message)
 	if msg.Timestamp.IsZero() {
 		msg.Timestamp = time.Now()
 	}
+	m.messagesMu.Lock()
 	sc.Messages = append(sc.Messages, msg)
 	sc.UpdatedAt = time.Now()
+	m.messagesMu.Unlock()
 }
 
 // SetCompressedView updates the LLM-facing view.
@@ -162,8 +174,37 @@ func (m *Manager) SetCompressedView(sc *types.SessionContext, view []types.Messa
 	sc.UpdatedAt = time.Now()
 }
 
+// RemoveLastUserMessage removes the last user message from sc.Messages.
+// Used on stop to discard the unanswered user message.
+func (m *Manager) RemoveLastUserMessage(sc *types.SessionContext) {
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	for i := len(sc.Messages) - 1; i >= 0; i-- {
+		if sc.Messages[i].Role == types.MessageRoleUser {
+			sc.Messages = append(sc.Messages[:i], sc.Messages[i+1:]...)
+			sc.UpdatedAt = time.Now()
+			return
+		}
+	}
+}
+
+// TrimMessages trims sc.Messages to keep only the last N messages,
+// then repairs the chain to remove orphaned tool results.
+// Prevents unbounded growth of the persistent message history across interactions.
+func (m *Manager) TrimMessages(sc *types.SessionContext, keep int) {
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	if len(sc.Messages) > keep {
+		sc.Messages = sc.Messages[len(sc.Messages)-keep:]
+	}
+	sc.Messages = conversation.RepairToolMessageChain(sc.Messages)
+	sc.UpdatedAt = time.Now()
+}
+
 // PersistSnapshot serializes and returns snapshot bytes.
 func (m *Manager) PersistSnapshot(sc *types.SessionContext) ([]byte, error) {
+	m.messagesMu.RLock()
+	defer m.messagesMu.RUnlock()
 	data, err := m.store.Serialize(sc)
 	if err != nil {
 		return nil, err

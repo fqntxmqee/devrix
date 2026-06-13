@@ -51,6 +51,13 @@ type openAIFunction struct {
 type openAIStreamEvent struct {
 	Choices []openAIStreamChoice `json:"choices"`
 	Usage   *openAIUsage         `json:"usage,omitempty"`
+	Error   *openAIStreamError   `json:"error,omitempty"`
+}
+
+type openAIStreamError struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Code    string `json:"code,omitempty"`
 }
 
 type openAIStreamChoice struct {

@@ -37,6 +37,15 @@ func RepairToolMessageChain(msgs []types.Message) []types.Message {
 			}
 			delete(pending, id)
 			out = append(out, m)
+		case types.MessageRoleUser:
+			// Reset pending on user messages so tool results from prior
+			// rounds don't "leak through" and get paired with a stale
+			// assistant tool call across the user boundary. MiniMax
+			// rejects such cross-boundary pairs with error 2013.
+			if len(pending) > 0 {
+				pending = map[string]struct{}{}
+			}
+			out = append(out, m)
 		default:
 			out = append(out, m)
 		}

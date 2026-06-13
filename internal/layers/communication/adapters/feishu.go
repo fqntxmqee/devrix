@@ -141,6 +141,11 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		a.clearSessionStream(msg.SessionID)
 
 	case "error":
+		// /stop 触发的 context cancellation, 不做错误展示
+		if strings.Contains(content, "context canceled") {
+			a.clearSessionStream(msg.SessionID)
+			return
+		}
 		card := NewCard().
 			Title("错误", "red").
 			Markdown(content).
@@ -355,8 +360,12 @@ YOLO 模式已启用：工具调用自动批准；WorkDir 内文件可写。
 			}
 			return true
 		}
-		// Clear the session mapping so the next message starts fresh.
-		a.sessionMap.Delete(sessionKey)
+		// Drop stale cardkit/agent stream state from the interrupted turn so the
+		// next user message creates a fresh reply card instead of writing to the
+		// old one (which only shows Done on the new message).
+		a.clearSessionStream(sid)
+		// Keep sessionMap entry so the next message reuses this session instead of
+		// ResolveSessionByChatID picking an older polluted snapshot from disk.
 		if err := a.replyAckToUser(ctx, userMessageID, sessionKey, "⏸️ 已停止当前任务"); err != nil {
 			slog.Error("feishu: failed to send stop ack", "error", err)
 		}
@@ -734,6 +743,10 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		slog.Info("feishu: duplicate message ignored", "messageID", messageID, "text", text)
 		return nil
 	}
+
+	// Each inbound user message starts a new reply turn — reset card/stream
+	// state so cardkit writes attach to this message, not a prior interrupted turn.
+	a.clearSessionStream(session.SessionID)
 
 	chatType := ""
 	if msg.ChatType != nil {

@@ -546,6 +546,8 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			e.memory.AppendMessage(sc, types.MessageRoleAssistant, text)
 			assistantSummary = text
 		}
+		// 压缩消息历史到最近 N 条，防止无界增长
+		e.memory.TrimMessages(sc, 50)
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
@@ -564,6 +566,18 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if storeErr != nil {
 			slog.Warn("contextengine: longterm auto_store failed", "error", storeErr)
 		}
+	} else if stderrors.Is(runErr, context.Canceled) {
+		// /stop 命令触发 context 取消, 不向用户展示错误, 干净退出
+		slog.Info("contextengine: process stopped by user", "sessionID", session.SessionID)
+		// 移除本轮未回复的用户消息，避免污染下次交互
+		e.memory.RemoveLastUserMessage(sc)
+		// 清理消息历史到最近 N 条，防止无界增长
+		e.memory.TrimMessages(sc, 50)
+		// Direct send to ch bypasses emit which may drop events on ctx.Done().
+		// Even if consumer has returned, this reliably fills the buffer; the
+		// gateway handleEngineEvents (after ctx.Done) can drain it.
+		ch <- infoEvent(session.SessionID, "⏸️ 已停止")
+		runErr = nil // 让后续路径透过 runErr == nil emit complete 事件
 	} else {
 		if processSpan != nil {
 			processSpan.RecordError(runErr)

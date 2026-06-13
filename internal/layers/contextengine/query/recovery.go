@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -68,6 +69,7 @@ func runWithContextLengthRecovery(
 		// (it's the more useful signal for the upstream caller).
 		return nil, err
 	}
+	compressed = conversation.RepairToolMessageChain(compressed)
 	*messagesRef = compressed
 	req.Messages = compressed
 	return llm.Call(ctx, req)

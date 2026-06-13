@@ -187,7 +187,7 @@ func TestCommunicationGateway_ResolveSessionByChatID_should_restore_idle_with_sn
 	}
 }
 
-func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_snapshot_over_empty(t *testing.T) {
+func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_recent_over_stale_snapshot(t *testing.T) {
 	dir := t.TempDir()
 	store, err := NewFileSessionStore(dir)
 	if err != nil {
@@ -222,8 +222,65 @@ func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_snapshot_over
 	if err != nil {
 		t.Fatalf("ResolveSessionByChatID() error = %v", err)
 	}
+	if got == nil || got.SessionID != empty.SessionID {
+		t.Fatalf("sessionID = %v, want %s (recent session)", got, empty.SessionID)
+	}
+}
+
+func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_snapshot_on_same_timestamp(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := config.DefaultConfig()
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+
+	chatKey := "feishu_oc_ctx_ou_456"
+	ts := time.Now().Add(-1 * time.Minute)
+
+	rich, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	rich.LastMessageAt = ts
+	rich.ContextSnapshot = []byte("large-context-snapshot")
+
+	empty, err := gw.CreateSession(chatKey, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	empty.LastMessageAt = ts
+
+	if err := store.Update(rich); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if err := store.Update(empty); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	got, err := gw.ResolveSessionByChatID(chatKey)
+	if err != nil {
+		t.Fatalf("ResolveSessionByChatID() error = %v", err)
+	}
 	if got == nil || got.SessionID != rich.SessionID {
-		t.Fatalf("sessionID = %v, want %s", got, rich.SessionID)
+		t.Fatalf("sessionID = %v, want %s (snapshot tiebreaker)", got, rich.SessionID)
+	}
+}
+
+func TestSessionRestoreScore_should_prefer_recency_over_large_snapshot(t *testing.T) {
+	staleLarge := &types.Session{
+		LastMessageAt:   time.Now().Add(-2 * time.Hour),
+		ContextSnapshot: make([]byte, 531_678),
+	}
+	recent := &types.Session{
+		LastMessageAt: time.Now().Add(-1 * time.Minute),
+	}
+
+	if sessionRestoreScore(staleLarge) >= sessionRestoreScore(recent) {
+		t.Fatalf("stale large score %d should lose to recent score %d",
+			sessionRestoreScore(staleLarge), sessionRestoreScore(recent))
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -156,6 +157,15 @@ func streamOpenAISSE(reader io.Reader, emit func(*llmgateway.Chunk) error) error
 		var event openAIStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
 			return err
+		}
+		if event.Error != nil {
+			slog.Warn("llm: provider SSE error",
+				"message", event.Error.Message,
+				"type", event.Error.Type,
+				"code", event.Error.Code,
+			)
+			return fmt.Errorf("provider SSE error: %s (type=%s, code=%s)",
+				event.Error.Message, event.Error.Type, event.Error.Code)
 		}
 		chunk := acc.apply(event)
 		if chunk == nil {

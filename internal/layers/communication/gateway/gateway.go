@@ -49,6 +49,7 @@ type CommunicationGateway struct {
 	sessions             map[string]*types.Session
 	activeProcesses      map[string]context.CancelFunc
 	processes            sync.WaitGroup
+	stoppedSessions      sync.Map // sessionID → struct{}, set by Stop() to suppress post-stop errors
 	agentFactory         multiagent.IAgentFactory
 	agentObserverFactory func(ctx context.Context, session *types.Session) multiagent.AgentObserver
 	sessionAgents        map[string]multiagent.Agent
@@ -98,6 +99,7 @@ func (g *CommunicationGateway) Stop(sessionID string) error {
 		cancel()
 		delete(g.activeProcesses, sessionID)
 	}
+	g.stoppedSessions.Store(sessionID, struct{}{})
 	return nil
 }
 
@@ -314,7 +316,20 @@ func (g *CommunicationGateway) handleEngineEvents(ctx context.Context, session *
 		select {
 		case <-ctx.Done():
 			slog.Info("gateway: handleEngineEvents ctx done", "sessionID", session.SessionID)
-			return
+
+			// Drain remaining buffered events so stop notification and
+			// final events from the engine are still processed.
+			for {
+				select {
+				case ev, ok := <-events:
+					if !ok {
+						return
+					}
+					g.handleEngineEvent(ctx, session, ev)
+				default:
+					return
+				}
+			}
 		case event, ok := <-events:
 			if !ok {
 				slog.Info("gateway: handleEngineEvents channel closed", "sessionID", session.SessionID)
@@ -376,7 +391,19 @@ func (g *CommunicationGateway) handleEngineEventsViaBus(ctx context.Context, ses
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				// Drain remaining buffered events so stop notification and
+				// final events from the engine are still processed.
+				for {
+					select {
+					case ev, ok := <-events:
+						if !ok {
+							return
+						}
+						g.handleEngineEvent(ctx, session, ev)
+					default:
+						return
+					}
+				}
 			case event, ok := <-events:
 				if !ok {
 					return
@@ -450,6 +477,7 @@ func (g *CommunicationGateway) handleEngineEventsBusConsumer(
 		select {
 		case <-ctx.Done():
 			return
+
 		case <-doneSub:
 			// Bus cancelled the subscription. Poll for up to
 			// 1 second to give any in-flight monitor fanout a
@@ -675,6 +703,19 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		g.eventHandler.OnStatus(session.SessionID, types.SessionStateCompleted)
 
 	case "error":
+		// Suppress error events for sessions stopped via /stop.
+		// The engine's context.Canceled catch in runProcess sends an
+		// info event instead, but a concurrent error event may have
+		// been buffered before the drain — or delivered through the
+		// PublishEngineEvent path (context.Background).
+		if _, stopped := g.stoppedSessions.LoadAndDelete(session.SessionID); stopped {
+			slog.Debug("gateway: suppressing error event for stopped session",
+				"sessionID", session.SessionID,
+				"content", event.Content,
+			)
+			session.SetState(types.SessionStateCompleted)
+			return
+		}
 		session.SetState(types.SessionStateFailed)
 		outMsg := &types.OutboundMessage{
 			MessageID:  generateMessageID(),
@@ -807,16 +848,18 @@ func (g *CommunicationGateway) ResolveSessionByChatID(chatID string) (*types.Ses
 }
 
 // sessionRestoreScore ranks sessions for post-restart recovery.
-// Sessions with persisted context outrank empty ones even if they are idle.
+// Recency is primary; snapshot size is a tiebreaker within the same second so we
+// don't resurrect a stale large snapshot over a newer empty session.
 func sessionRestoreScore(session *types.Session) int64 {
 	if session == nil {
 		return 0
 	}
-	snapshotLen := int64(len(session.ContextSnapshot))
-	if snapshotLen > 0 {
-		return snapshotLen*1_000_000_000_000 + session.LastMessageAt.Unix()
+	const maxSnapshotBoost = 1_000_000
+	snapshotBoost := int64(len(session.ContextSnapshot))
+	if snapshotBoost > maxSnapshotBoost {
+		snapshotBoost = maxSnapshotBoost
 	}
-	return session.LastMessageAt.Unix()
+	return session.LastMessageAt.Unix()*1_000_000 + snapshotBoost
 }
 
 // ExpireSession marks a session as expired

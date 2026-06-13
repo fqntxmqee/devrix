@@ -13,6 +13,7 @@ type mockGatewayAPI struct {
 	createSessionFunc          func(chatID, workDir string) (*types.Session, error)
 	routeInboundFunc           func(ctx context.Context, msg *types.InboundMessage) error
 	routeOutboundFunc          func(msg *types.OutboundMessage) error
+	stopProcessFunc            func(sessionID string) error
 }
 
 var _ gateway.GatewayAPI = (*mockGatewayAPI)(nil)
@@ -53,5 +54,8 @@ func (m *mockGatewayAPI) RouteOutbound(msg *types.OutboundMessage) error {
 }
 
 func (m *mockGatewayAPI) StopProcess(sessionID string) error {
+	if m.stopProcessFunc != nil {
+		return m.stopProcessFunc(sessionID)
+	}
 	return nil
 }

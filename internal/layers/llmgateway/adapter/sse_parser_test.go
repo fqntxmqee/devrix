@@ -99,6 +99,49 @@ func TestStreamOpenAISSE_should_merge_tool_call_deltas(t *testing.T) {
 	}
 }
 
+func TestStreamOpenAISSE_should_return_error_on_error_event(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"error":{"message":"tool call result does not follow tool call (2013)","type":"invalid_request_error","code":"2013"}}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected error from SSE error event")
+	}
+	if !strings.Contains(err.Error(), "2013") {
+		t.Fatalf("error should contain error code: %v", err)
+	}
+	if !strings.Contains(err.Error(), "tool call result does not follow") {
+		t.Fatalf("error should contain error message: %v", err)
+	}
+}
+
+func TestStreamOpenAISSE_should_ignore_error_when_event_has_no_error_field(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"ok"}}]}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var content string
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		content += chunk.Content
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if content != "ok" {
+		t.Fatalf("content = %q", content)
+	}
+}
+
 func TestStreamOpenAISSE_should_parse_reasoning_content(t *testing.T) {
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"think\"}}]}\n\ndata: [DONE]\n\n"
 	var thinking string
