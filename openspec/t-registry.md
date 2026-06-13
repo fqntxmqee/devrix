@@ -24,10 +24,10 @@
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 26 | 25 | 1 | 11 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
-| D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 15 | 13 | 2 | 5 |
+| D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 13 | 12 | 0 | 8 |
 
-**总计**: 233 · IMPLEMENTED 225 · PLANNED 6 · PARTIAL 1 · P0 100
+**总计**: 239 · IMPLEMENTED 231 · PLANNED 6 · PARTIAL 1 · P0 100
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 

@@ -22,10 +22,10 @@
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/f-registry.md` | 8 | 22 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/f-registry.md` | 16 | 37 |
 | D5 Observability | `openspec/specs/d5-observability/f-registry.md` | 18 | 39 |
-| D6 Evolution | `openspec/specs/d6-evolution/f-registry.md` | 2 | 6 |
+| D6 Evolution | `openspec/specs/d6-evolution/f-registry.md` | 8 | 27 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/f-registry.md` | 15 | 38 |
 
-**总计**: 94 Activities with F · 236 F Points
+**总计**: 100 Activities with F · 257 F Points
 
 ---
 
