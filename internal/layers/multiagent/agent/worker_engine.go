@@ -15,6 +15,7 @@ type WorkerEngine struct {
 	agentID      string
 	workerRole   string
 	systemPrompt string
+	modelTier    string
 }
 
 // NewWorkerEngine wraps inner when the agent is a forked worker.
@@ -27,6 +28,7 @@ func NewWorkerEngine(inner contracts.IEngine, cfg multiagent.AgentConfig, agentI
 		agentID:      agentID,
 		workerRole:   cfg.WorkerRole,
 		systemPrompt: cfg.SystemPrompt,
+		modelTier:    cfg.ModelTier,
 	}
 }
 
@@ -37,6 +39,7 @@ func (w *WorkerEngine) Process(ctx context.Context, session *types.Session, mess
 		IsWorker:     true,
 		WorkerRole:   w.workerRole,
 		SystemPrompt: w.systemPrompt,
+		ModelTier:    w.modelTier,
 	}
 	return w.inner.Process(contextengine.WithProcessOverlay(ctx, ov), session, message)
 }

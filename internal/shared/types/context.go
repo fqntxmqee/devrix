@@ -80,6 +80,7 @@ type SessionContext struct {
 	SessionID      string
 	WorkDir        string
 	Model          string
+	ModelTier      string
 	Messages       []Message
 	CompressedView []Message
 	TokenBudget    TokenBudget

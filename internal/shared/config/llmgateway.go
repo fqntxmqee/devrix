@@ -6,6 +6,8 @@ import "time"
 type LLMGatewayFileConfig struct {
 	DefaultProvider string                       `yaml:"default_provider"`
 	DefaultModel    string                       `yaml:"default_model"`
+	DefaultTier     string                       `yaml:"default_tier"`
+	ModelTiers      map[string]string            `yaml:"model_tiers"`
 	ModelRouting    map[string]string            `yaml:"model_routing"`
 	CircuitBreaker  LLMCircuitBreakerFileConfig  `yaml:"circuit_breaker"`
 	Providers       map[string]LLMProviderConfig `yaml:"providers"`
@@ -46,6 +48,8 @@ type LLMRetryFileConfig struct {
 type LLMGatewayConfig struct {
 	DefaultProvider string
 	DefaultModel    string
+	DefaultTier     string
+	ModelTiers      map[string]string
 	ModelRouting    map[string]string
 	CircuitBreaker  LLMCircuitBreakerConfig
 	Providers       map[string]LLMProviderRuntimeConfig
@@ -87,6 +91,12 @@ func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 	return &LLMGatewayConfig{
 		DefaultProvider: "minimax",
 		DefaultModel:    "MiniMax-M2.7-highspeed",
+		DefaultTier:     "default",
+		ModelTiers: map[string]string{
+			"fast":     "MiniMax-M2.7-highspeed",
+			"default":  "MiniMax-M2.7-highspeed",
+			"powerful": "deepseek-v4-latest",
+		},
 		ModelRouting: map[string]string{
 			"deepseek-*": "deepseek",
 			"minimax-*":  "minimax",
@@ -147,6 +157,12 @@ func BuildLLMGatewayConfig(file *LLMGatewayFileConfig) *LLMGatewayConfig {
 	}
 	if file.DefaultModel != "" {
 		cfg.DefaultModel = file.DefaultModel
+	}
+	if file.DefaultTier != "" {
+		cfg.DefaultTier = file.DefaultTier
+	}
+	if len(file.ModelTiers) > 0 {
+		cfg.ModelTiers = file.ModelTiers
 	}
 	if len(file.ModelRouting) > 0 {
 		cfg.ModelRouting = file.ModelRouting

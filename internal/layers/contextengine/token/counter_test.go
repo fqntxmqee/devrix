@@ -8,12 +8,12 @@ import (
 	"github.com/pkoukk/tiktoken-go"
 )
 
-// Covers: L5-CTX-16
+// T: D2-S4-A01-T01
 func TestCounter_should_implement_shared_contract(t *testing.T) {
 	var _ interface{ CountText(string) int } = token.NewCounter()
 }
 
-// Covers: L5-CTX-16
+// T: D2-S4-A01-T01
 func TestCounter_should_align_with_gateway_within_tolerance(t *testing.T) {
 	heuristic := token.NewCounter()
 	gateway, err := llmtoken.NewCounter()

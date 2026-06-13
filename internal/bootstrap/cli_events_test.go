@@ -15,7 +15,7 @@ func (noopHandler) OnPermissionRequest(*types.PermissionRequest) bool     { retu
 func (noopHandler) OnError(error, string)                                {}
 func (noopHandler) OnStatus(string, types.SessionState)                  {}
 
-// Covers: L5-4-10-09 (single session — progress stays in same handler, no second chat)
+// T: D4-S10-A01-T09 (single session — progress stays in same handler, no second chat)
 func TestCLIProgressHandler_should_render_worker_progress_only(t *testing.T) {
 	ansi := config.DefaultConfig().CLI.ANSI
 	h := bootstrap.NewCLIProgressHandler(noopHandler{}, ansi)

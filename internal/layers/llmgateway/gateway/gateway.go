@@ -71,6 +71,11 @@ func (g *Gateway) TokenCounter() contracts.ITokenCounter {
 	return g.counter
 }
 
+// ResolveTier resolves a tier alias to a concrete model name.
+func (g *Gateway) ResolveTier(tier string) string {
+	return g.router.ResolveTier(tier)
+}
+
 // Stream performs a streaming LLM call.
 func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
 	if req == nil {

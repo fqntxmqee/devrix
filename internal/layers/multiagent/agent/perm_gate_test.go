@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-2-02, L5-4-2-03
+// T: D4-S2-A02-T02, D4-S2-A02-T03
 func TestAgentPermissionGate_should_auto_approve_non_critical(t *testing.T) {
 	a := agent.New(multiagent.AgentConfig{
 		SessionID:         "sess_perm",

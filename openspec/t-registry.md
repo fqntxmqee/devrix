@@ -266,17 +266,17 @@
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
 | ORCH-S2-T10 | DAG 6 ready subagent + 1 cursor 持续调度峰值并发=5 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
-| ORCH-S2-T11 | upstream policy 收到 A artifact，无 Leader 全量 | ContextPolicy | `internal/layers/orchestration/wave/scheduler_l5_test.go` | IMPLEMENTED | P0 |
+| ORCH-S2-T11 | upstream policy 收到 A artifact，无 Leader 全量 | ContextPolicy | `internal/layers/orchestration/wave/scheduler_orch_test.go` | IMPLEMENTED | P0 |
 | ORCH-S2-T12 | fresh policy SubAgent 启动 Messages 仅含 directive | ContextPolicy | `internal/layers/orchestration/wave/context_test.go` | IMPLEMENTED | P0 |
-| ORCH-S2-T13 | 同 conflict_group Task 不并行 | ConflictGuard | `internal/layers/orchestration/wave/scheduler_l5_test.go` | IMPLEMENTED | P0 |
+| ORCH-S2-T13 | 同 conflict_group Task 不并行 | ConflictGuard | `internal/layers/orchestration/wave/scheduler_orch_test.go` | IMPLEMENTED | P0 |
 | ORCH-S2-T14 | 每 Task 独立双区块 IM 卡流式 | WorkerCard | `internal/layers/communication/adapters/feishu_worker_card_test.go` | IMPLEMENTED | P0 |
 | ORCH-S2-T15 | 槽位释放后 ready Task 立即派发 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
-| ORCH-S2-T16 | cursor + claude-code 并行 file_scope 不交 | ConflictGuard | `internal/layers/orchestration/wave/scheduler_l5_test.go` | IMPLEMENTED | P1 |
+| ORCH-S2-T16 | cursor + claude-code 并行 file_scope 不交 | ConflictGuard | `internal/layers/orchestration/wave/scheduler_orch_test.go` | IMPLEMENTED | P1 |
 | ORCH-S2-T17 | Plan 产出 DAG 仅 ready 节点被派发 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
-| ORCH-S2-T18 | wave 全完成 Leader 收到 wave_completed 汇总 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_l5_test.go` | IMPLEMENTED | P1 |
+| ORCH-S2-T18 | wave 全完成 Leader 收到 wave_completed 汇总 | WaveScheduler | `internal/layers/orchestration/wave/scheduler_orch_test.go` | IMPLEMENTED | P1 |
 | ORCH-S2-T19 | CancelWorker 槽位释放 status=cancelled | WorkerLifecycle | `internal/layers/orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
 | ORCH-S2-T20 | CancelAll 5 running 全部 terminal pool 全释放 | WorkerLifecycle | `internal/layers/orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
-| ORCH-S2-T21 | CLI Worker cancel 进程终止 IM 卡 cancelled | WorkerLifecycle | `internal/layers/orchestration/wave/runners/agent_tool_l5_21_test.go` | PARTIAL | P1 |
+| ORCH-S2-T21 | CLI Worker cancel 进程终止 IM 卡 cancelled | WorkerLifecycle | `internal/layers/orchestration/wave/runners/agent_tool_orch_test.go` | PARTIAL | P1 |
 
 ---
 
@@ -527,7 +527,7 @@
 | D0-S1-A01-T06 | 新会话创建被拒绝 | `tests/acceptance/p0/comm_gateway_flow_test.go` | IMPLEMENTED | P0 |
 | D0-S1-A01-T07 | /new /help /stop 命令解析正确 | `tests/acceptance/p0/comm_commands_test.go` | IMPLEMENTED | P0 |
 | D0-S1-A01-T08 | 飞书消息解析正确 | `internal/layers/communication/adapters/feishu_test.go` | IMPLEMENTED | P1 |
-| D0-S1-A01-T09 | D6 L5 注册表条目包含目标版本 | `openspec/t-registry.md` | IMPLEMENTED | P1 |
+| D0-S1-A01-T09 | D6 T 注册表条目包含目标版本 | `openspec/t-registry.md` | IMPLEMENTED | P1 |
 
 ---
 
@@ -578,6 +578,19 @@
 | D6-S3-T02 | D6-S3-A02-T02 | JudgeResult 活动 |
 | CROSS-T03 | CROSS-A02-T03 | CheckContracts 活动 |
 | D4-S12-T01 | D2-S12-A01-T01 | 修正域编号（D4→D2） |
+
+### L5 遗留 ID → DSAFT T（2026-06-13 代码注释迁移）
+
+> 完整映射由 `scripts/migrate_l5_to_t.py` 维护；归档 L5 注册表见 git 历史 / worktree `openspec/l5-registry.md`。
+
+| 遗留格式 | DSAFT T 格式 | 说明 |
+|----------|--------------|------|
+| `L5-{D}-{S}-{NN}` | `D{D}-S{S}-A{XX}-T{NN}` | 按域/场景自动插入 A 段（见上表规则） |
+| `L5-CTX-{NN}` | `D2-S10-A01-T{NN}`（34–42）或 D2 各模块 T | 语义 ID，见 `openspec/l5-to-t-legacy-mapping.md` |
+| `L5-2-3-{NN}` | `D1-S9-A0*-T{NN}` | EventBus（非 D2 Memory） |
+| `L5-ORCH-{NN}` | `ORCH-S2-T{NN}` | Wave Scheduler |
+| `L5-0-0-{NN}` | `CROSS-A0*-T{NN}` | 跨域分层 lint / 契约 |
+| 测试注释 | `// T: D*-S*-A*-T*` | 取代 `// Covers: L5-*` |
 
 ---
 

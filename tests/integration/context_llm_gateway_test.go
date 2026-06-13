@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-CTX-18
+// T: D2-S0-A01-T02
 func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.TokenCounter.Source = config.TokenCounterSourceGateway
@@ -32,7 +32,7 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 	}
 }
 
-// Covers: L5-CTX-18
+// T: D2-S0-A01-T02
 func TestIntegration_WireContextLLMFallsBackToMock(t *testing.T) {
 	stack := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil)
 	if stack.Gateway == nil {

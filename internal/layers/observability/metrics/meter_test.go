@@ -6,7 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 )
 
-// Covers: L5-OBS-FIX-05
+// T: D5-S2-A01-T05
 func TestMeter_Int64UpDownCounter_should_behave_as_gauge(t *testing.T) {
 	mp := NewMeterProvider(&settings.MetricsConfig{})
 	m := mp.Meter("devrix")

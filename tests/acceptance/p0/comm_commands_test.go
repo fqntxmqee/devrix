@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-1-3-01, L5-1-3-02, L5-1-3-03, L5-0-1-07, L5-COMM-04, L5-COMM-05, L5-COMM-06
+// T: D1-S3-A01-T01, D1-S3-A01-T02, D1-S3-A01-T03, D0-S1-A01-T07, D1-S3-A01-T01, D1-S3-A01-T02, D1-S3-A01-T03
 func TestL5_COMM_Commands_Parse(t *testing.T) {
 	tests := []struct {
 		name     string

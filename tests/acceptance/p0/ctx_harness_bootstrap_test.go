@@ -35,7 +35,7 @@ func (l *harnessCaptureLLM) ChatStream(_ context.Context, req *contextengine.LLM
 	return ch, nil
 }
 
-// Covers: L5-2-9-01, L5-2-9-04, L5-2-9-05, L5-2-9-10, L5-2-9-12, L5-2-9-14
+// T: D2-S9-A01-T01, D2-S9-A01-T04, D2-S9-A03-T05, D2-S9-A02-T10, D2-S9-A02-T12, D2-S9-A03-T14
 func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 	workDir := t.TempDir()
 	agentsPath := filepath.Join(workDir, "AGENTS.md")

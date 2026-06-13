@@ -15,7 +15,7 @@ import (
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// Covers: L5-CTX-05, L5-CTX-06, L5-CTX-09, L5-CTX-11
+// T: D2-S3-A01-T02, D2-S1-A01-T01, D2-S1-A01-T03, D2-S1-A01-T11
 func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)
@@ -61,7 +61,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-11
+// T: D2-S1-A01-T11
 func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	dir := t.TempDir()
 	store, _ := gateway.NewFileSessionStore(dir)

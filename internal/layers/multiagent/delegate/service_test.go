@@ -18,7 +18,7 @@ func (s *stubFallback) RunSubQuery(_ context.Context, _ *types.SessionContext, _
 	return "subquery summary", nil
 }
 
-// Covers: L5-4-10-01 (fallback path when D4 disabled)
+// T: D4-S10-A01-T01 (fallback path when D4 disabled)
 func TestService_should_fallback_to_subquery_when_delegate_disabled(t *testing.T) {
 	fallback := &stubFallback{}
 	svc := delegate.NewService(config.DelegateConfig{Enabled: false}, fallback, nil, nil)
@@ -38,7 +38,7 @@ func TestService_should_fallback_to_subquery_when_delegate_disabled(t *testing.T
 	}
 }
 
-// Covers: L5-4-10-01
+// T: D4-S10-A01-T01
 func TestService_should_report_disabled_when_not_configured(t *testing.T) {
 	svc := delegate.NewService(config.DelegateConfig{Enabled: false}, nil, nil, nil)
 	if svc.Enabled() {

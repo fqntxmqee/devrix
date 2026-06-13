@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// Covers: L5-COMM-01, L5-COMM-03
+// T: D1-S1-A01-T01, D1-S1-A01-T02
 func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)
@@ -75,7 +75,7 @@ func (resumeEngine) Process(context.Context, *types.Session, string) <-chan *gat
 	return ch
 }
 
-// Covers: L5-COMM-03
+// T: D1-S1-A01-T02
 func TestIntegration_SessionExpiration(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)

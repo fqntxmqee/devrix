@@ -25,6 +25,7 @@ func (stubGW) Stream(ctx context.Context, req *llmgateway.Request) (<-chan llmga
 }
 
 func (stubGW) Close() error { return nil }
+func (stubGW) ResolveTier(tier string) string { return tier }
 
 func TestBridge_should_map_chunks_to_context_engine(t *testing.T) {
 	b := llmbridge.New(stubGW{})

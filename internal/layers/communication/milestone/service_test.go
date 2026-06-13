@@ -319,7 +319,7 @@ func TestMilestoneService_CalculateOverallProgress(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-5-01
+// T: D1-S5-A01-T01
 func TestMilestoneService_AddDependency_CycleRejected(t *testing.T) {
 	svc := NewMilestoneService(nil)
 

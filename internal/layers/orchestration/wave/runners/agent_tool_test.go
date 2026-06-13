@@ -91,7 +91,7 @@ func TestAgentToolRunner_StreamEvents(t *testing.T) {
 }
 
 func TestAgentToolRunner_CancelEmitsCancelled(t *testing.T) {
-	// L5-ORCH-21 (stub): cancellation must produce a 'cancelled' event so the
+	// ORCH-S2-T21 (stub): cancellation must produce a 'cancelled' event so the
 	// IM card footer can show the reason. Full process-kill testing requires
 	// OS-level integration; this test covers the runner-bridge half.
 	fake := &fakeAgentTool{

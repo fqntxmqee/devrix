@@ -1,6 +1,6 @@
 // Tests for the cross-layer contract registry.
 //
-// Covers: L5-0-0-02  (contract registry resolves every cross-layer interface)
+// T: CROSS-A02-T03  (contract registry resolves every cross-layer interface)
 // Domain: shared/contracts
 // Stage: s0_unit
 package contracts

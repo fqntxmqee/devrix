@@ -28,7 +28,7 @@ func (o *recordingCompressionObserver) EmitAutocompact(_ string, _ contextengine
 
 func (o *recordingCompressionObserver) EmitAutocompactComplete(_ string, _ types.Message, _ string) {}
 
-// Covers: L5-CTX-17
+// T: D2-S0-A01-T01
 func TestIntegration_CompressionObserverReceivesSteps(t *testing.T) {
 	obs := &recordingCompressionObserver{}
 	cfg := config.DefaultContextEngineConfig()

@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 )
 
-// Covers: L5-4-6-01
+// T: D4-S6-A01-T01
 func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
 	reg := tool.NewRegistry()
 
@@ -75,7 +75,7 @@ func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-6-02, L5-4-6-04
+// T: D4-S6-A02-T02, D4-S6-A02-T04
 func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 	agt := tool.NewCLIAgentTool(tool.CLIConfig{
 		Name:    "echo-stream",
@@ -86,7 +86,7 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 
 	ctx := context.Background()
 
-	// L5-4-6-02: CLI adapter parses stream-json correctly
+	// D4-S6-A02-T02: CLI adapter parses stream-json correctly
 	ch, err := agt.Execute(ctx, "sess_reuse", tool.Request{Task: "ping"})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -108,7 +108,7 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 		t.Errorf("event[2].Type = %q, want 'complete'", events[2].Type)
 	}
 
-	// L5-4-6-04: Session reuse — same sessionID reuses subprocess
+	// D4-S6-A02-T04: Session reuse — same sessionID reuses subprocess
 	ch2, err := agt.Execute(ctx, "sess_reuse", tool.Request{Task: "ping2"})
 	if err != nil {
 		t.Fatalf("second Execute: %v", err)
@@ -120,7 +120,7 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-6-07
+// T: D4-S6-A02-T07
 func TestAcceptance_AgentToolSessionIsolation_P0(t *testing.T) {
 	// Use a stateful subprocess that tracks state per session
 	agt := tool.NewCLIAgentTool(tool.CLIConfig{
@@ -161,7 +161,7 @@ func TestAcceptance_AgentToolSessionIsolation_P0(t *testing.T) {
 	wg.Wait()
 }
 
-// Covers: L5-4-6-02 (non-JSON fallback), L5-4-6-03 (timeout)
+// T: D4-S6-A02-T02 (non-JSON fallback), D4-S6-A02-T03 (timeout)
 func TestAcceptance_CLIAgentTool_EdgeCases_P1(t *testing.T) {
 	t.Run("non-json line falls back to text event", func(t *testing.T) {
 		agt := tool.NewCLIAgentTool(tool.CLIConfig{

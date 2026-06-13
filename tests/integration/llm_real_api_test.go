@@ -68,7 +68,7 @@ func minimaxAdapterWithFixture(t *testing.T, fixture string) *adapter.MiniMaxAda
 	return adapter.NewMiniMaxAdapter(cfg).WithHTTPClient(client)
 }
 
-// Covers: L5-LLM-18
+// T: D3-S1-A01-T03
 func TestIntegration_DeepSeekVCR_SSEParseError(t *testing.T) {
 	ad := deepseekAdapterWithFixture(t, "deepseek/truncated_frame.json")
 	ch, err := ad.Stream(context.Background(), &llmgateway.Request{
@@ -94,7 +94,7 @@ func TestIntegration_DeepSeekVCR_SSEParseError(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-17
+// T: D3-S1-A01-T01
 func TestIntegration_MiniMaxVCR_RateLimit429(t *testing.T) {
 	ad := minimaxAdapterWithFixture(t, "minimax/rate_limit_429.json")
 	_, err := ad.Stream(context.Background(), &llmgateway.Request{
@@ -114,7 +114,7 @@ func TestIntegration_MiniMaxVCR_RateLimit429(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-17
+// T: D3-S1-A01-T01
 func TestIntegration_MiniMaxVCR_ServerError500(t *testing.T) {
 	ad := minimaxAdapterWithFixture(t, "minimax/error_500.json")
 	_, err := ad.Stream(context.Background(), &llmgateway.Request{

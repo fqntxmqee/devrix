@@ -31,7 +31,7 @@ func TestParseDingTalkPayload(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-2-02
+// T: D1-S2-A01-T02
 func TestDingTalkWebhookHandler_routesInbound(t *testing.T) {
 	var routed bool
 	mockGW := &mockGatewayAPI{
@@ -71,7 +71,7 @@ func TestDingTalkWebhookHandler_routesInbound(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-2-02
+// T: D1-S2-A01-T02
 func TestDingTalkAdapter_OnMessage_sendsViaWebhook(t *testing.T) {
 	mockAPI := &mockDingTalkAPI{}
 	adapter := NewDingTalkAdapter(nil, &DingTalkConfig{}, config.DefaultConfig(), WithDingTalkAPI(mockAPI))
@@ -107,7 +107,7 @@ func TestDingTalkAdapter_Start_prefetchesToken(t *testing.T) {
 	_ = adapter.Stop()
 }
 
-// Covers: L5-1-2-03
+// T: D1-S2-A02-T03
 func TestDingTalkAdapter_OnMessage_milestoneRender(t *testing.T) {
 	mockAPI := &mockDingTalkAPI{}
 	adapter := NewDingTalkAdapter(nil, &DingTalkConfig{}, config.DefaultConfig(), WithDingTalkAPI(mockAPI))

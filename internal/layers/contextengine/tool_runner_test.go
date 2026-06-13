@@ -18,7 +18,7 @@ func mustBuiltinToolRunner(t *testing.T) contextengine.IToolRunner {
 	return runner
 }
 
-// Covers: L5-CTX-06
+// T: D2-S1-A01-T01
 func TestBuiltinToolRunner_should_run_bash_pwd_when_workdir_set(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
@@ -80,7 +80,7 @@ func TestBuiltinToolRunner_should_reject_path_escape(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-01
+// T: D2-S8-A01-T01
 func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
@@ -101,7 +101,7 @@ func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-01
+// T: D2-S8-A01-T01
 func TestBuiltinToolRunner_should_accept_bash_with_workdir_absolute_path(t *testing.T) {
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "pkg")

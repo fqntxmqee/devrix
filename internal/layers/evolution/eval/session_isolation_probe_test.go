@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/observability"
 )
 
-// Covers: L5-4-3-05 (SessionIsolationProbe registration + scoring)
+// T: D4-S3-A02-T05 (SessionIsolationProbe registration + scoring)
 func TestSessionIsolationProbe_is_registered(t *testing.T) {
 	p := GetProbe("session_isolation")
 	if p == nil {

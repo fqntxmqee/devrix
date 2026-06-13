@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-03, L5-CTX-04
+// T: D2-S2-A01-T01, D2-S2-A01-T02
 func TestAcceptance_CompressionPipelineP0(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
@@ -32,7 +32,7 @@ func TestAcceptance_CompressionPipelineP0(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-04
+// T: D2-S2-A01-T02
 func TestAcceptance_TokenBlockP0(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.TokenBudget{MaxContextTokens: 30, ReservedOutput: 5, CompressionTarget: 5}

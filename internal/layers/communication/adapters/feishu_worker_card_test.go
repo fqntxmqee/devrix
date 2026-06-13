@@ -68,7 +68,7 @@ func itoaInt(n int) string {
 }
 
 func TestWorkerCardRenderer_StreamsTwoBlocksPerTask(t *testing.T) {
-	// L5-ORCH-14: per-task independent card with two streaming blocks.
+	// ORCH-S2-T14: per-task independent card with two streaming blocks.
 	fake := newFakeCardkit()
 	r := NewWorkerCardRenderer(nil) // bypass public constructor
 	r.cardkit = fake                // inject fake

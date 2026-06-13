@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-COMM-07
+// T: D1-S1-A01-T04
 func TestIntegration_PermissionRequestTimeout(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)

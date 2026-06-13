@@ -101,7 +101,7 @@ func autocompactTestMessages(n int) []types.Message {
 	return msgs
 }
 
-// Covers: L5-CTX-31
+// T: D2-S2-A01-T06
 func TestAsyncAutocompact_should_return_placeholder_without_blocking(t *testing.T) {
 	counter := &highTokenCounter{inner: token.NewCounter()}
 	cfg := config.DefaultAutocompactConfig()
@@ -167,7 +167,7 @@ func TestAsyncAutocompact_should_return_placeholder_without_blocking(t *testing.
 	}
 }
 
-// Covers: L5-CTX-33
+// T: D2-S2-A01-T07
 func TestAsyncAutocompact_should_degrade_without_losing_head_tail_on_failure(t *testing.T) {
 	counter := &highTokenCounter{inner: token.NewCounter()}
 	cfg := config.DefaultAutocompactConfig()

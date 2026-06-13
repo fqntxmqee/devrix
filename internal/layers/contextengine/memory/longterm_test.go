@@ -20,7 +20,7 @@ func tempSQLiteDB(t *testing.T) string {
 	return filepath.Join(dir, "memory.db")
 }
 
-// Covers: L5-CTX-10
+// T: D2-S3-A01-T05
 func TestLongTermMemory_should_return_not_implemented_when_disabled(t *testing.T) {
 	lt := memory.NewDisabledLongTermMemory()
 	_, err := lt.Recall(context.Background(), "query", 5)
@@ -32,7 +32,7 @@ func TestLongTermMemory_should_return_not_implemented_when_disabled(t *testing.T
 	}
 }
 
-// Covers: L5-CTX-23
+// T: D2-S3-A01-T04
 func TestSQLiteLongTermMemory_should_store_and_recall_entries(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
 	lt, err := memory.OpenSQLiteLongTerm(dbPath)
@@ -63,7 +63,7 @@ func TestSQLiteLongTermMemory_should_store_and_recall_entries(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-22
+// T: D2-S3-A01-T03
 func TestManager_should_inject_longterm_recall_into_system_prompt(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
 	lt, err := memory.OpenSQLiteLongTerm(dbPath)
@@ -103,7 +103,7 @@ func TestManager_should_inject_longterm_recall_into_system_prompt(t *testing.T) 
 	}
 }
 
-// Covers: L5-CTX-23
+// T: D2-S3-A01-T04
 func TestManager_should_auto_store_when_enabled(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
 	lt, err := memory.OpenSQLiteLongTerm(dbPath)

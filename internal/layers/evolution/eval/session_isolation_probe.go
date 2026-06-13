@@ -13,7 +13,7 @@ func init() {
 
 // SessionIsolationProbe measures the SessionView COW invariants in
 // the multi-agent layer. It is the D6 (evolution/eval) counterpart
-// of the L5-4-3-02 (metadata isolation) and L5-4-3-03 (concurrent
+// of the D4-S3-A01-T02 (metadata isolation) and D4-S3-A01-T03 (concurrent
 // Fork + Join) test points.
 //
 // Inputs expected on EvalItem.Input:

@@ -299,9 +299,10 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 		WorkerID:  workerID,
 		WorkDir:   node.WorkspaceDir(), // empty for now; tests pass workdir via Directive
 		Directive: node.Directive,
+		ModelTier: node.ModelTier,
 		Context:   resolved,
 		Emit: func(ev WorkerEvent) {
-			// Hook for IM card renderer (L5-ORCH-14).
+			// Hook for IM card renderer (ORCH-S2-T14).
 			slog.Debug("wave: worker event",
 				"session", sessionID,
 				"task", node.ID,

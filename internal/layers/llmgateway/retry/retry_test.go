@@ -12,7 +12,7 @@ import (
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
-// Covers: L5-LLM-12
+// T: D3-S4-A01-T01
 func TestExecutor_should_retry_retryable_errors(t *testing.T) {
 	exec := retry.NewExecutor()
 	cfg := sharedconfig.LLMRetryConfig{
@@ -41,7 +41,7 @@ func TestExecutor_should_retry_retryable_errors(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-12
+// T: D3-S4-A01-T01
 func TestExecutor_should_not_retry_auth_errors(t *testing.T) {
 	exec := retry.NewExecutor()
 	cfg := sharedconfig.LLMRetryConfig{MaxAttempts: 3, InitialDelay: time.Millisecond}
@@ -58,7 +58,7 @@ func TestExecutor_should_not_retry_auth_errors(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-10, L5-LLM-11
+// T: D3-S4-A01-T02, D3-S4-A01-T03
 func TestExecutor_should_fallback_to_secondary_model(t *testing.T) {
 	exec := retry.NewExecutor()
 	cfg := sharedconfig.LLMRetryConfig{MaxAttempts: 1, InitialDelay: time.Millisecond}

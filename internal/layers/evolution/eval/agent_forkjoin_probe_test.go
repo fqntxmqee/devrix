@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Covers: L5-6-3-10
+// T: D6-S3-A01-T10
 
 func TestAgentForkJoinProbe_IsolationCorrect(t *testing.T) {
 	probe := &AgentForkJoinProbe{}

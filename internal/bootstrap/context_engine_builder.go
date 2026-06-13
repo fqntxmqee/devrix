@@ -122,5 +122,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate)
 		LongTerm:     longTerm,
 		Config:       b.ctxCfg,
 		ObsBridge:    b.obsBridge,
+		DefaultModel: b.stack.DefaultModel,
+		TierResolver: b.stack.TierResolver,
 	})
 }

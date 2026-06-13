@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-01, L5-CTX-02
+// T: D2-S3-A01-T01, D2-S3-A01-T01
 func TestManager_should_initialize_new_session_context(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
@@ -29,7 +29,7 @@ func TestManager_should_initialize_new_session_context(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-02
+// T: D2-S3-A01-T01
 func TestManager_should_append_user_message_and_dedupe_request_id(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
@@ -47,7 +47,7 @@ func TestManager_should_append_user_message_and_dedupe_request_id(t *testing.T) 
 	}
 }
 
-// Covers: L5-CTX-05
+// T: D2-S3-A01-T02
 func TestManager_should_restore_from_backup_when_session_snapshot_empty(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Snapshot.Enabled = true

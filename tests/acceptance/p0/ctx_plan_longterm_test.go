@@ -30,7 +30,7 @@ func (p *accPlanLLM) ChatStream(_ context.Context, req *contextengine.LLMRequest
 	return ch, nil
 }
 
-// Covers: L5-CTX-22
+// T: D2-S3-A01-T03
 func TestAcceptance_LongTermRecallP0(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "memory.db")
 	lt, err := memory.OpenSQLiteLongTerm(dbPath)

@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-40
+// T: D2-S10-A01-T40
 func TestSubQuery_should_filter_read_only_tools_and_set_agent_id(t *testing.T) {
 	llm := &query.SequentialLLM{Responses: []query.LLMScript{{Content: "explored"}}}
 	loop := &query.Loop{LLM: llm, Permission: query.AllowPermission{}}
@@ -41,7 +41,7 @@ func TestSubQuery_should_filter_read_only_tools_and_set_agent_id(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-42
+// T: D2-S10-A01-T42
 func TestSubQuery_resume_should_load_sidechain_messages(t *testing.T) {
 	store, err := transcript.NewSidechainStore(t.TempDir())
 	if err != nil {

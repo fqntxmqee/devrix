@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// L5-2-11-TD03: 第一次 LLM.Call 返回 overload → loop 切换 fallback model
+// D2-S11-A01-TD03: 第一次 LLM.Call 返回 overload → loop 切换 fallback model
 // → 重试成功。
 func TestLoop_FallbackModel_OverloadRetry(t *testing.T) {
 	primary := &fallbackLLM{

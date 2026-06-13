@@ -6,7 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-10-02
+// T: D4-S10-A01-T02
 func TestForkWorkerSessionContext_should_isolate_worker_identity(t *testing.T) {
 	parent := &types.SessionContext{
 		SessionID:    "sess_1",
@@ -36,7 +36,7 @@ func TestForkWorkerSessionContext_should_isolate_worker_identity(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-10-03
+// T: D4-S10-A01-T03
 func TestFilterToolsForAgentRole_should_hide_delegate_from_worker(t *testing.T) {
 	tools := []ToolSchema{
 		{Name: "read_file"},

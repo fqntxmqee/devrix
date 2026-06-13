@@ -121,7 +121,7 @@ func labelSubset(actual, want metrics.LabelMap) bool {
 	return true
 }
 
-// Covers: L5-TOOL-02
+// T: D2-S1-A01-T04
 func TestPermissionManager_should_never_auto_approve_critical_in_yolo(t *testing.T) {
 	cfg := &config.PermissionConfig{
 		DefaultTimeout: time.Second,

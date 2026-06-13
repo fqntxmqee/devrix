@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
-// L5-ORCH-21 (stub): the runner bridge half is fully covered. The
+// ORCH-S2-T21 (stub): the runner bridge half is fully covered. The
 // process-kill half (OS-level SIGTERM on the actual cursor / claude-code
 // subprocess) is verified by cursor_adapter_test.go and cli_adapter_test.go
 // in the multiagent package. This test pins the contract that the

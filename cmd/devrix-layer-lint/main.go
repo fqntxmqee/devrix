@@ -2,8 +2,8 @@
 // (N>M) imports. The default output is text; --format=json emits a parseable
 // report. --strict exits 1 on any violation, which CI uses as a gate.
 //
-// Covers: L5-0-0-01  (layer-lint detects reverse D{N}→D{N} imports)
-// Covers: L5-0-0-03  (CI gate uses this scanner to block violations)
+// T: CROSS-A01-T01  (layer-lint detects reverse D{N}→D{N} imports)
+// T: CROSS-A01-T02  (CI gate uses this scanner to block violations)
 package main
 
 import (

@@ -58,7 +58,7 @@ func drainSubs(t *testing.T, ch <-chan Event, want int, timeout time.Duration) [
 	return out
 }
 
-// L5-2-3-01: 正常事件流不丢
+// D1-S9-A01-T01: 正常事件流不丢
 func TestL5_2_3_01_NormalEventFlow_NoLoss(t *testing.T) {
 	b, _ := newTestBus(t, func(c *config.EventBusConfig) {
 		c.SubscribeBuffer = 256
@@ -102,7 +102,7 @@ func TestL5_2_3_01_NormalEventFlow_NoLoss(t *testing.T) {
 	}
 }
 
-// L5-2-3-05: Complete 事件必达
+// D1-S9-A01-T05: Complete 事件必达
 func TestL5_2_3_05_CompleteEventNeverDropped(t *testing.T) {
 	b, _ := newTestBus(t, func(c *config.EventBusConfig) {
 		c.ChannelBuffer = 4
@@ -142,7 +142,7 @@ func TestL5_2_3_05_CompleteEventNeverDropped(t *testing.T) {
 	}
 }
 
-// L5-2-3-06: Error 事件必达
+// D1-S9-A01-T06: Error 事件必达
 func TestL5_2_3_06_ErrorEventNeverDropped(t *testing.T) {
 	b, _ := newTestBus(t, nil)
 	_, ch, _, cancel := b.Subscribe("sess_err")
@@ -176,7 +176,7 @@ func TestL5_2_3_06_ErrorEventNeverDropped(t *testing.T) {
 	}
 }
 
-// L5-2-3-07: 通道满时回压到上游
+// D1-S9-A01-T07: 通道满时回压到上游
 //
 // Verifies the backpressure contract: when the bus is in StateDraining
 // (operator-triggered), Publish must block the caller because the

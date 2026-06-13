@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-10-03
+// T: D4-S10-A01-T03
 func TestAgent_should_reject_fork_from_worker(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	session := types.NewSession("sess_worker_fork", "cli", "/tmp")
@@ -34,7 +34,7 @@ func TestAgent_should_reject_fork_from_worker(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-10-02
+// T: D4-S10-A01-T02
 func TestWorkerEngine_should_inject_process_overlay(t *testing.T) {
 	var gotOverlay contextengine.ProcessOverlay
 	inner := &overlayCaptureEngine{capture: func(ctx context.Context) {

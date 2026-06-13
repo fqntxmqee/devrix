@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-OBS-18
+// T: D5-S1-A01-T01
 func TestGateway_should_track_active_sessions_via_session_bridge(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)

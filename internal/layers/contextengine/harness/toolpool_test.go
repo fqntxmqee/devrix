@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-2-9-05
+// T: D2-S9-A03-T05
 func TestToolPoolFilter_should_apply_simple_mode(t *testing.T) {
 	all := []harness.ToolDesc{
 		{Name: "bash"},
@@ -22,7 +22,7 @@ func TestToolPoolFilter_should_apply_simple_mode(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-05
+// T: D2-S9-A03-T05
 func TestToolPoolFilter_should_exclude_mcp_when_disabled(t *testing.T) {
 	all := []harness.ToolDesc{
 		{Name: "bash"},

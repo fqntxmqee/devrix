@@ -19,7 +19,7 @@ func (s stubToolLister) ListTools(_ context.Context, _ string) ([]harness.ToolDe
 	return s.tools, nil
 }
 
-// Covers: L5-2-9-01, L5-2-9-03, L5-2-9-04
+// T: D2-S9-A01-T01, D2-S9-A01-T03, D2-S9-A01-T04
 func TestBootstrap_should_run_stages_in_order(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0o644); err != nil {
@@ -79,7 +79,7 @@ func TestBootstrap_should_run_stages_in_order(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-04
+// T: D2-S9-A01-T04
 func TestBootstrap_should_skip_deferred_flags_when_untrusted(t *testing.T) {
 	dir := t.TempDir()
 	boot := harness.NewBootstrap(harness.BootstrapDeps{

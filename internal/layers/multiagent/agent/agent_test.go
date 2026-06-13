@@ -24,7 +24,7 @@ func newTestFactory(engine contracts.IEngine) *factory.AgentFactory {
 	}, sharedconfig.DefaultMultiAgentConfig())
 }
 
-// Covers: L5-4-2-01
+// T: D4-S2-A01-T01
 func TestAgent_should_transition_created_to_terminated_on_run(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{
 		Events: []*contracts.EngineEvent{
@@ -107,7 +107,7 @@ func TestAgent_should_reject_run_when_already_terminated(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-01, L5-4-0-01, L5-4-0-02
+// T: D4-S3-A01-T01, D4-S0-A01-T01, D4-S0-A01-T02
 func TestAgent_should_fork_join_with_isolated_buffers(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{
 		Events: []*contracts.EngineEvent{{Type: "complete", Content: "child-done"}},
@@ -175,7 +175,7 @@ func TestAgent_should_reject_join_before_child_completes(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-03
+// T: D4-S3-A01-T03
 func TestAgent_should_timeout_when_exceeded(t *testing.T) {
 	block := make(chan struct{})
 	f := newTestFactory(&blockingEngine{block: block})
@@ -204,7 +204,7 @@ func TestAgent_should_timeout_when_exceeded(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-04
+// T: D4-S3-A01-T04
 func TestAgent_should_terminate_children_on_parent_terminate(t *testing.T) {
 	block := make(chan struct{})
 	f := newTestFactory(&blockingEngine{block: block})

@@ -16,7 +16,7 @@ func newNode(id string, deps ...string) TaskNode {
 }
 
 func TestTaskGraph_ReadyNodes(t *testing.T) {
-	// L5-ORCH-17: only ready (deps all completed) nodes are dispatchable.
+	// ORCH-S2-T17: only ready (deps all completed) nodes are dispatchable.
 	g := NewTaskGraph([]TaskNode{
 		newNode("a"),
 		newNode("b", "a"),

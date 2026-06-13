@@ -75,7 +75,7 @@ func TestHub_should_link_task_owner_on_started(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-10-07
+// T: D4-S10-A02-T07
 func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	tm := tasks.NewTaskManager()
 	task := tm.Create("sess1", "implement feature", "")
@@ -109,7 +109,7 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-10-04 (WorkPlan includes task projection)
+// T: D4-S10-A02-T04 (WorkPlan includes task projection)
 func TestHub_snapshot_should_include_tasks(t *testing.T) {
 	tm := tasks.NewTaskManager()
 	task := tm.Create("sess1", "auth audit", "")

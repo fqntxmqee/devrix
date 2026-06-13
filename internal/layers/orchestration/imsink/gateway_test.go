@@ -15,7 +15,7 @@ func (c *captureSink) Emit(ev *contracts.EngineEvent) {
 	c.last = ev
 }
 
-// Covers: L5-4-10-05
+// T: D4-S10-A02-T05
 func TestGatewaySink_should_emit_worker_progress_with_task_id(t *testing.T) {
 	sink := &captureSink{}
 	gw := imsink.NewGatewaySink(sink)

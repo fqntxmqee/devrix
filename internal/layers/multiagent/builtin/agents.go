@@ -57,6 +57,7 @@ func RunImplement(ctx context.Context, deps query.LoopDeps, parent *types.Sessio
 		MaxTurns:       maxTurns,
 		OmitClaudeMd:   false,
 		ReadOnlyTools:  false,
+		ModelTier:      parent.ModelTier,
 	})
 }
 
@@ -86,5 +87,6 @@ func runBuiltin(
 		MaxTurns:       maxTurns,
 		OmitClaudeMd:   true,
 		ReadOnlyTools:  readOnly,
+		ModelTier:      parent.ModelTier,
 	})
 }

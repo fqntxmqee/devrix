@@ -11,6 +11,7 @@ type processOverlayKey struct{}
 // ProcessOverlay carries per-Process worker identity for D4 agents.
 type ProcessOverlay struct {
 	AgentID      string
+	ModelTier    string
 	IsWorker     bool
 	WorkerRole   string
 	SystemPrompt string
@@ -43,6 +44,7 @@ func forkWorkerSessionContext(parent *types.SessionContext, ov ProcessOverlay) *
 		SessionID:      parent.SessionID,
 		WorkDir:        parent.WorkDir,
 		Model:          parent.Model,
+		ModelTier:      parent.ModelTier,
 		PermissionMode: parent.PermissionMode,
 		PlanFilePath:   parent.PlanFilePath,
 		TokenBudget:    parent.TokenBudget,
@@ -56,6 +58,9 @@ func forkWorkerSessionContext(parent *types.SessionContext, ov ProcessOverlay) *
 	}
 	if ov.SystemPrompt != "" {
 		sc.SystemPrompt = ov.SystemPrompt
+	}
+	if ov.ModelTier != "" {
+		sc.ModelTier = ov.ModelTier
 	}
 	return sc
 }

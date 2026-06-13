@@ -2,7 +2,7 @@ package metrics
 
 import "testing"
 
-// Covers: L5-OBS-FIX-01
+// T: D5-S2-A01-T03
 func TestGauge_should_set_inc_dec_precisely(t *testing.T) {
 	g := NewGauge("sessions", nil)
 	g.Set(10)
@@ -15,7 +15,7 @@ func TestGauge_should_set_inc_dec_precisely(t *testing.T) {
 	}
 }
 
-// Covers: L5-OBS-FIX-01
+// T: D5-S2-A01-T03
 func TestGauge_should_handle_negative_values(t *testing.T) {
 	g := NewGauge("balance", nil)
 	g.Set(-3)

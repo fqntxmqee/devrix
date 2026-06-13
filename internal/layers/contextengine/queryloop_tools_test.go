@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-37
+// T: D2-S10-A01-T37
 func TestWriteFile_plan_mode_denies_non_plan_path(t *testing.T) {
 	reg, err := contextengine.NewBuiltinToolRegistry(nil)
 	if err != nil {

@@ -64,7 +64,7 @@ func (w *stubWorker) GetMessages() []types.Message                   { return ni
 func (w *stubWorker) SetAgentObserver(multiagent.AgentObserver)      {}
 func (w *stubWorker) SetEngineEventSink(func(*contracts.EngineEvent)) {}
 
-// Covers: L5-4-12-01 (delegate path uses worktree WorkDir)
+// T: D2-S12-A01-T01 (delegate path uses worktree WorkDir)
 func TestDelegateSync_should_run_worker_in_worktree_sandbox(t *testing.T) {
 	mainDir := t.TempDir()
 	baseDir := filepath.Join(t.TempDir(), "wt")

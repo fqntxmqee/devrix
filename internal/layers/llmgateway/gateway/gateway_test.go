@@ -45,7 +45,7 @@ func testGateway(t *testing.T, handler func(model string) (<-chan *llmgateway.Ad
 	})
 }
 
-// Covers: L5-LLM-14
+// T: D3-S2-A01-T03
 func TestGateway_should_stream_via_adapter(t *testing.T) {
 	gw := testGateway(t, func(model string) (<-chan *llmgateway.AdapterChunk, error) {
 		ch := make(chan *llmgateway.AdapterChunk, 1)
@@ -71,7 +71,7 @@ func TestGateway_should_stream_via_adapter(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-10
+// T: D3-S4-A01-T02
 func TestGateway_should_fallback_model_on_primary_failure(t *testing.T) {
 	var models []string
 	gw := testGateway(t, func(model string) (<-chan *llmgateway.AdapterChunk, error) {
@@ -95,7 +95,7 @@ func TestGateway_should_fallback_model_on_primary_failure(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-20
+// T: D3-S2-A01-T04
 func TestGateway_should_not_open_circuit_on_context_cancel(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
 	cfg.CircuitBreaker.FailureThreshold = 1
@@ -132,7 +132,7 @@ func TestGateway_should_not_open_circuit_on_context_cancel(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-21
+// T: D3-S2-A01-T05
 func TestGateway_should_inject_provider_timeout_when_no_deadline(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
 	cfg.Providers["deepseek"] = sharedconfig.LLMProviderRuntimeConfig{
@@ -173,7 +173,7 @@ func TestGateway_should_inject_provider_timeout_when_no_deadline(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-21
+// T: D3-S2-A01-T05
 func TestGateway_should_respect_existing_context_deadline(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
 	cfg.Providers["deepseek"] = sharedconfig.LLMProviderRuntimeConfig{

@@ -66,5 +66,6 @@ func NewContextEngine(
 		Config:       ctxCfg,
 		ObsBridge:    obsBridge,
 		DefaultModel: stack.DefaultModel,
+		TierResolver: stack.TierResolver,
 	})
 }

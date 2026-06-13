@@ -94,6 +94,11 @@ metrics:
 llm_gateway:
   default_provider: "minimax"
   default_model: "MiniMax-M2.7-highspeed"
+  default_tier: "default"
+  model_tiers:
+    fast: "MiniMax-M2.7-highspeed"
+    default: "MiniMax-M2.7-highspeed"
+    powerful: "deepseek-v4-latest"
   model_routing:
     "deepseek-*": deepseek
     "minimax-*": minimax

@@ -15,7 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-2-9-08, L5-2-9-12
+// T: D2-S9-A01-T08, D2-S9-A02-T12
 func TestIntegration_HarnessBootstrap_disabled_v4_regression(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	if ctxCfg.Harness.Enabled {
@@ -52,7 +52,7 @@ func TestIntegration_HarnessBootstrap_disabled_v4_regression(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-01, L5-2-9-03, L5-2-9-08, L5-2-9-10, L5-2-9-13
+// T: D2-S9-A01-T01, D2-S9-A01-T03, D2-S9-A01-T08, D2-S9-A02-T10, D2-S9-A02-T13
 func TestIntegration_HarnessBootstrap_enabled_flow(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.Harness.Enabled = true

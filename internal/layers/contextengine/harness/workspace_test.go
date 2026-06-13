@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-2-9-02
+// T: D2-S9-A01-T02
 func TestScanWorkspace_should_count_go_files(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0o644); err != nil {
@@ -37,7 +37,7 @@ func TestScanWorkspace_should_count_go_files(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-02
+// T: D2-S9-A01-T02
 func TestCheckGuards_should_require_writable_workdir(t *testing.T) {
 	dir := t.TempDir()
 	if err := harness.CheckGuards(dir); err != nil {

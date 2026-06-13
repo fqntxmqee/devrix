@@ -10,7 +10,7 @@ import (
 // the given session. After Reconnect returns successfully, the bus is
 // back in StateRunning with the backlog ≤ lowWatermark.
 //
-// L5-2-3-04: Reconnect recovery.
+// D1-S9-A02-T04: Reconnect recovery.
 func (b *Bus) Reconnect(ctx context.Context, sessionID string) (ReconnectReport, error) {
 	if b.closed.Load() {
 		return ReconnectReport{}, ErrBusClosed

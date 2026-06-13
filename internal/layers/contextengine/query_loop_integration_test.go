@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-34 (engine integration)
+// T: D2-S10-A01-T34 (engine integration)
 func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Harness.Enabled = false

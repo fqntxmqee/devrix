@@ -15,7 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-0-04
+// T: D4-S0-A01-T04
 func TestE2E_AgentForkParallelJoin(t *testing.T) {
 	factory := multiagentfactory.NewAgentFactory(multiagent.AgentDeps{
 		Engine: &agent.StubEngine{

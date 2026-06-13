@@ -21,6 +21,18 @@ func NewRouter(cfg *sharedconfig.LLMGatewayConfig) *Router {
 	return &Router{cfg: cfg}
 }
 
+// ResolveTier resolves a tier alias to a concrete model name.
+// Returns the input unchanged if not a known tier.
+func (r *Router) ResolveTier(tier string) string {
+	if tier == "" || r.cfg.ModelTiers == nil {
+		return tier
+	}
+	if concrete, ok := r.cfg.ModelTiers[tier]; ok {
+		return concrete
+	}
+	return tier
+}
+
 // Resolve returns provider and model using routing rules.
 func (r *Router) Resolve(model string) (provider string, resolvedModel string, err error) {
 	model = strings.TrimSpace(model)
@@ -31,8 +43,13 @@ func (r *Router) Resolve(model string) (provider string, resolvedModel string, e
 		if resolvedModel == "" {
 			return "", "", sharederrors.NewUnsupportedModelError(model)
 		}
+		// Resolve default model tier alias before returning
+		resolvedModel = r.ResolveTier(resolvedModel)
 		return provider, resolvedModel, nil
 	}
+
+	// Resolve tier alias to concrete model before provider routing
+	model = r.ResolveTier(model)
 
 	if provider, ok := r.matchRouting(model); ok {
 		if _, exists := r.cfg.Providers[provider]; !exists {

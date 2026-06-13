@@ -6,7 +6,7 @@
 // explicit DefaultCatalog seed below). SelfCheck() then guarantees that no
 // consumer references a contract that the registry does not know about.
 //
-// Covers: L5-0-0-02  (contract registry resolves every cross-layer interface)
+// T: CROSS-A02-T03  (contract registry resolves every cross-layer interface)
 package contracts
 
 import "sort"

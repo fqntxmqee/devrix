@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-35
+// T: D2-S10-A01-T35
 func TestSystemPromptAssembler_should_omit_agents_when_prepend_mode(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, _ := assembler.Build(SystemPromptBuildInput{
@@ -22,7 +22,7 @@ func TestSystemPromptAssembler_should_omit_agents_when_prepend_mode(t *testing.T
 	}
 }
 
-// Covers: L5-2-9-10
+// T: D2-S9-A02-T10
 func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, report := assembler.Build(SystemPromptBuildInput{
@@ -61,7 +61,7 @@ func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.
 	}
 }
 
-// Covers: L5-2-9-10
+// T: D2-S9-A02-T10
 func TestSystemPromptAssembler_should_produce_stable_template_hash(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	in := SystemPromptBuildInput{

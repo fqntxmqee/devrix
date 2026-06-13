@@ -2,7 +2,7 @@ package types
 
 import "testing"
 
-// Covers: L5-1-3-01, L5-1-3-02, L5-1-3-03
+// T: D1-S3-A01-T01, D1-S3-A01-T02, D1-S3-A01-T03
 func TestParseCommand(t *testing.T) {
 	tests := []struct {
 		name     string

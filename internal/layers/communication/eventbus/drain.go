@@ -20,7 +20,7 @@ import (
 // flip from Running). If the bus is in another state, Drain still works
 // but is a no-op (returns zero report).
 //
-// L5-2-3-02: Backpressure triggers Drain.
+// D1-S9-A02-T02: Backpressure triggers Drain.
 func (b *Bus) Drain(ctx context.Context, sessionID string, timeout time.Duration) (DrainReport, error) {
 	if b.closed.Load() {
 		return DrainReport{}, ErrBusClosed

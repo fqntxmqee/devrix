@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-2-9-07
+// T: D2-S9-A01-T07
 func TestTranscriptManager_should_append_and_compact(t *testing.T) {
 	mgr := harness.NewTranscriptManager(config.TranscriptConfig{
 		Enabled:           true,

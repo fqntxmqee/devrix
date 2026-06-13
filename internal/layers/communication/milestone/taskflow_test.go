@@ -36,7 +36,7 @@ func TestTaskFlowService_CreateStartComplete(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-5-02
+// T: D1-S5-A01-T02
 func TestTaskFlowService_MultiMilestoneChain(t *testing.T) {
 	dag := types.NewMilestoneDAG("task-1", "m1")
 	m1 := types.NewMilestone("m1", "task-1", "step-1")

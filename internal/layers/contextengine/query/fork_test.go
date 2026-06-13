@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-41
+// T: D2-S10-A01-T41
 func TestBuildForkedMessages_should_use_identical_placeholder_results(t *testing.T) {
 	calls := `[{"id":"c1","type":"function","function":{"name":"bash","arguments":"{}"}},{"id":"c2","type":"function","function":{"name":"read_file","arguments":"{}"}}]`
 	parent := []types.Message{

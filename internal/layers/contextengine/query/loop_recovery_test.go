@@ -30,7 +30,7 @@ func (m *errLLM) Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, err
 	return ch, nil
 }
 
-// L5-2-11-TD01: 第一次 LLM.Call 返回 413 → loop 触发 CompressFn 一次
+// D2-S11-A01-TD01: 第一次 LLM.Call 返回 413 → loop 触发 CompressFn 一次
 // → 重试成功，且不返回错误。
 func TestLoop_ContextLengthRecovery(t *testing.T) {
 	compressorCalled := atomic.Int32{}
@@ -71,7 +71,7 @@ func TestLoop_ContextLengthRecovery(t *testing.T) {
 	}
 }
 
-// L5-2-11-TD01 副: 非超长错误不应触发 recovery；错误原样透传。
+// D2-S11-A01-TD01 副: 非超长错误不应触发 recovery；错误原样透传。
 func TestLoop_NonContextError_NoRecovery(t *testing.T) {
 	stubLLM := &errLLM{err: stderrors.New("rate limit 429")}
 

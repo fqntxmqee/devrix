@@ -23,7 +23,7 @@ func (s *slowToolRunner) Execute(ctx context.Context, call ToolCall) (*ToolResul
 	}
 }
 
-// Covers: L5-TOOL-04
+// T: D2-S8-A01-T01
 func TestToolLimiter_should_queue_excess_concurrent_calls(t *testing.T) {
 	inner := &slowToolRunner{delay: 200 * time.Millisecond}
 	limiter := NewToolLimiter(2)
@@ -48,7 +48,7 @@ func TestToolLimiter_should_queue_excess_concurrent_calls(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-04
+// T: D2-S8-A01-T01
 func TestToolLimiter_should_respect_context_cancellation(t *testing.T) {
 	inner := &slowToolRunner{delay: 2 * time.Second}
 	limiter := NewToolLimiter(1)

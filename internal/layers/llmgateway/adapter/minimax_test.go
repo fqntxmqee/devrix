@@ -28,7 +28,7 @@ func minimaxTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server
 	return srv, cfg
 }
 
-// Covers: L5-LLM-02
+// T: D3-S1-A01-T02
 func TestMiniMaxAdapter_should_stream_minimax_3_response(t *testing.T) {
 	srv, cfg := minimaxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
@@ -58,7 +58,7 @@ func TestMiniMaxAdapter_should_stream_minimax_3_response(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-02
+// T: D3-S1-A01-T02
 func TestMiniMaxAdapter_should_stream_highspeed_response(t *testing.T) {
 	srv, cfg := minimaxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any

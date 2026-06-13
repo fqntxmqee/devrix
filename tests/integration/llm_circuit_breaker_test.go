@@ -13,7 +13,7 @@ import (
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
-// Covers: L5-LLM-03, L5-LLM-04, L5-LLM-05, L5-LLM-06
+// T: D3-S3-A01-T01, D3-S3-A01-T02, D3-S3-A01-T03, D3-S3-A01-T04
 func TestIntegration_LLMCircuitBreaker_state_transitions(t *testing.T) {
 	start := time.Unix(1_700_000_000, 0)
 	now := start

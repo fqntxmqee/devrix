@@ -20,6 +20,19 @@ func New(gw llmgateway.IGateway) *Bridge {
 	return &Bridge{gw: gw}
 }
 
+// ResolveTier resolves a tier alias to a concrete model name.
+// Implements contextengine.ITierResolver.
+func (b *Bridge) ResolveTier(tier string) (string, error) {
+	if b.gw == nil {
+		return "", fmt.Errorf("llm gateway is nil")
+	}
+	resolved := b.gw.ResolveTier(tier)
+	if resolved == "" {
+		return "", fmt.Errorf("tier %q resolved to empty model", tier)
+	}
+	return resolved, nil
+}
+
 // ChatStream implements contextengine.ILLMGateway.
 func (b *Bridge) ChatStream(ctx context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
 	if b.gw == nil {

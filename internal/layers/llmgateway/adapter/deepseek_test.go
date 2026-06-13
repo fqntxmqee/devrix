@@ -50,7 +50,7 @@ func collectChunks(t *testing.T, ch <-chan *llmgateway.AdapterChunk) (text strin
 	return text, usage, tools
 }
 
-// Covers: L5-LLM-01
+// T: D3-S1-A01-T01
 func TestDeepSeekAdapter_should_stream_v4_pro_response(t *testing.T) {
 	srv, cfg := deepseekTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
@@ -91,7 +91,7 @@ func TestDeepSeekAdapter_should_stream_v4_pro_response(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-01
+// T: D3-S1-A01-T01
 func TestDeepSeekAdapter_should_stream_v4_flash_response(t *testing.T) {
 	srv, cfg := deepseekTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
@@ -122,7 +122,7 @@ func TestDeepSeekAdapter_should_stream_v4_flash_response(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-01
+// T: D3-S1-A01-T01
 func TestDeepSeekAdapter_should_stream_tool_calls(t *testing.T) {
 	srv, cfg := deepseekTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

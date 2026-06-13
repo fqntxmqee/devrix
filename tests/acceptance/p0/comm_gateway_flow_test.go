@@ -14,7 +14,7 @@ import (
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// Covers: L5-1-1-01, L5-0-1-06
+// T: D1-S1-A01-T01, D0-S1-A01-T06
 func TestL5_COMM_Gateway_CreateSessionRejected(t *testing.T) {
 	store := &rejectSessionStore{createErr: fmt.Errorf("storage unavailable")}
 	cfg := config.DefaultConfig()
@@ -50,7 +50,7 @@ func (s *rejectSessionStore) GetIdleSessions(time.Duration) ([]*types.Session, e
 	return nil, nil
 }
 
-// Covers: L5-COMM-02, L5-COMM-08
+// T: D1-S1-A01-T01, D1-S1-A01-T03
 func TestL5_COMM_Gateway_InboundOutboundFlow(t *testing.T) {
 	dir := t.TempDir()
 	store, err := gateway.NewFileSessionStore(dir)

@@ -83,7 +83,7 @@ func (s *echoContextStub) AllRequests() []*llmgateway.Request {
 // same session and verifies the D2 context engine accumulates message history
 // across all rounds. Each round the LLM sees the full prior context.
 //
-// Covers: L5-CTX-05, L5-CTX-06, L5-CTX-11, L5-LLM-14
+// T: D2-S3-A01-T02, D2-S1-A01-T01, D2-S1-A01-T11, D3-S2-A01-T03
 func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	obs, err := observability.New(&observability.Config{
 		Enabled: true,

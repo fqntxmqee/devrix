@@ -25,6 +25,7 @@ func (m *mockGateway) Stream(_ context.Context, _ *llmgateway.Request) (<-chan l
 	return ch, nil
 }
 func (m *mockGateway) Close() error { return nil }
+func (m *mockGateway) ResolveTier(tier string) string { return tier }
 
 type mockAgentCtrl struct {
 	agents map[string]multiagent.Agent

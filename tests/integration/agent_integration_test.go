@@ -61,7 +61,7 @@ func (b *integrationEngineBuilder) Build(perm multiagent.PermissionGate) contrac
 	})
 }
 
-// Covers: L5-4-0-03
+// T: D4-S0-A01-T03
 func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()
@@ -109,7 +109,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-0-03 (direct resolve path)
+// T: D4-S0-A01-T03 (direct resolve path)
 func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()

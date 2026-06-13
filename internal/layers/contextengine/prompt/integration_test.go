@@ -17,11 +17,15 @@ func TestStaticSectionsContent(t *testing.T) {
 		"using_tools":        {"dedicated read tool", "parallel"},
 		"output_efficiency":  {"Go straight to the point", "brief"},
 		"tone_and_style":     {"emojis", "file_path:line_number"},
+		"todo_write":         {"Todo List Management", "Complex multi-step tasks"},
+		"delegate_strategy":  {"Autonomous Task Strategy", "delegate_explore", "Context budget"},
 	}
 
 	sectionNames := []string{
 		"intro", "system", "doing_tasks", "actions",
 		"using_tools", "output_efficiency", "tone_and_style",
+		"safety_guidelines", "knowledge_boundaries",
+		"todo_write", "delegate_strategy",
 	}
 
 	for i, name := range sectionNames {

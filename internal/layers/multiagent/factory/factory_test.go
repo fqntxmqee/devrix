@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-1-01
+// T: D4-S1-A01-T01
 func TestAgentFactory_should_create_agent_in_created_state(t *testing.T) {
 	f := NewAgentFactory(multiagent.AgentDeps{
 		Engine: &agent.StubEngine{
@@ -48,7 +48,7 @@ func TestAgentFactory_should_reject_missing_session_id(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-02
+// T: D4-S3-A01-T02
 type countingEngineBuilder struct {
 	builds int
 }
@@ -112,7 +112,7 @@ func TestAgentFactory_should_enforce_max_total_agents_per_session(t *testing.T) 
 	}
 }
 
-// Covers: L5-4-3-04 (ForkSessionView API injection via factory)
+// T: D4-S3-A01-T04 (ForkSessionView API injection via factory)
 func TestAgentFactory_CreateWithView_should_bind_view_to_agent(t *testing.T) {
 	f := NewAgentFactory(multiagent.AgentDeps{
 		Engine: &agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},

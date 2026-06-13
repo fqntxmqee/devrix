@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
-// Covers: L5-OBS-FIX-08
+// T: D5-S1-A01-T02
 func TestConsoleExporter_should_implement_span_exporter(t *testing.T) {
 	var exp tracer.SpanExporter = NewConsoleExporter()
 	if exp == nil {
@@ -18,7 +18,7 @@ func TestConsoleExporter_should_implement_span_exporter(t *testing.T) {
 	}
 }
 
-// Covers: L5-OBS-FIX-08
+// T: D5-S1-A01-T02
 func TestConsoleExporter_should_export_span_json(t *testing.T) {
 	reader, writer, err := os.Pipe()
 	if err != nil {

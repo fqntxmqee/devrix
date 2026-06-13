@@ -1,6 +1,6 @@
 // Tests for the layer-lint scanner.
 //
-// Covers: L5-0-0-01  (layer-lint detects reverse D{N}→D{N} imports)
+// T: CROSS-A01-T01  (layer-lint detects reverse D{N}→D{N} imports)
 // Domain: shared/lint
 // Stage: s0_unit
 package layer
@@ -30,7 +30,7 @@ func TestDefaultMatrix_DepictsReverseImport(t *testing.T) {
 // TestDefaultMatrix_DepictsHigherToLower verifies the rest of the matrix:
 // higher-numbered layers may NOT depend on lower-numbered ones.
 //
-// L5-0-0-01: every D{N}→D{M} with N>M must be a violation.
+// CROSS-A01-T01: every D{N}→D{M} with N>M must be a violation.
 func TestDefaultMatrix_DepictsHigherToLower(t *testing.T) {
 	matrix := DefaultMatrix()
 	order := []Layer{D1, D2, D3, D4, D5, D6}

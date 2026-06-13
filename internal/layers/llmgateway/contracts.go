@@ -85,6 +85,9 @@ type AdapterChunk struct {
 // IGateway streams chat completions (L3 internal API).
 type IGateway interface {
 	Stream(ctx context.Context, req *Request) (<-chan Chunk, error)
+	// ResolveTier resolves a tier alias to a concrete model name.
+	// Returns the input unchanged if not a known tier.
+	ResolveTier(tier string) string
 	Close() error
 }
 

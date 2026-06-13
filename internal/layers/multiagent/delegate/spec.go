@@ -22,6 +22,7 @@ type WorkerSpec struct {
 	WorktreeSlug string
 	MaxTurns     int
 	Async        bool
+	ModelTier    string
 }
 
 // DelegateResult is returned after a synchronous delegate completes.

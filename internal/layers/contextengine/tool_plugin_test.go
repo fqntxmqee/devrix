@@ -25,7 +25,7 @@ func (s *stubPluginRunner) Execute(ctx context.Context, workDir, input string) (
 	return &ToolResult{Output: workDir + ":" + input}, nil
 }
 
-// Covers: L5-TOOL-03
+// T: D2-S9-A03-T05
 func TestToolRegistry_should_invoke_registered_plugin(t *testing.T) {
 	reg := NewToolRegistry()
 	if err := reg.Register(&stubPluginRunner{name: "grep_search"}); err != nil {
@@ -42,7 +42,7 @@ func TestToolRegistry_should_invoke_registered_plugin(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-03
+// T: D2-S9-A03-T05
 func TestToolRegistry_should_reject_duplicate_registration(t *testing.T) {
 	reg := NewToolRegistry()
 	if err := reg.Register(&stubPluginRunner{name: "bash"}); err != nil {
@@ -57,7 +57,7 @@ func TestToolRegistry_should_reject_duplicate_registration(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-03
+// T: D2-S9-A03-T05
 func TestToolRegistry_should_return_unknown_tool_error(t *testing.T) {
 	reg, err := NewBuiltinToolRegistry(nil)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestToolRegistry_should_return_unknown_tool_error(t *testing.T) {
 	}
 }
 
-// Covers: L5-TOOL-03
+// T: D2-S9-A03-T05
 func TestNewBuiltinToolRegistry_should_register_builtin_tools(t *testing.T) {
 	reg, err := NewBuiltinToolRegistry(nil)
 	if err != nil {

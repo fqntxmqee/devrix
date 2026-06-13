@@ -37,7 +37,7 @@ func newHarnessObs(t *testing.T) (*observability.Observability, *observability.B
 	return obs, observability.NewBridge(obs)
 }
 
-// Covers: L5-2-9-11, L5-2-9-15
+// T: D2-S9-A01-T11, D2-S9-A01-T15
 func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	obs, bridge := newHarnessObs(t)
 
@@ -112,7 +112,7 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-11
+// T: D2-S9-A01-T11
 func TestIntegration_HarnessObs_disabled_no_harness_spans(t *testing.T) {
 	obs, bridge := newHarnessObs(t)
 
@@ -140,7 +140,7 @@ func TestIntegration_HarnessObs_disabled_no_harness_spans(t *testing.T) {
 	}
 }
 
-// Covers: L5-5-5-02
+// T: D5-S5-A01-T02
 func TestIntegration_HarnessObs_coverage_hits_harness_operations(t *testing.T) {
 	obs, bridge := newHarnessObs(t)
 

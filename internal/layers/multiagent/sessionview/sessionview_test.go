@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-3-04 (ForkSessionView API injection)
+// T: D4-S3-A01-T04 (ForkSessionView API injection)
 func TestFork_should_share_readonly_fields(t *testing.T) {
 	parent := types.NewSession("sess_fork_view", "cli", "/tmp")
 	parent.Model = "claude-opus-4-5"
@@ -89,7 +89,7 @@ func TestMergeToParent_should_reject_nil_parent(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-02 (metadata write isolation under concurrency)
+// T: D4-S3-A01-T02 (metadata write isolation under concurrency)
 func TestFork_concurrent_writes_should_not_race(t *testing.T) {
 	parent := types.NewSession("sess_concurrent", "cli", "/tmp")
 	view := sessionview.Fork(parent)

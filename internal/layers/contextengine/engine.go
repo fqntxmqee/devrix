@@ -49,6 +49,9 @@ type EngineDeps struct {
 	// 回填展示用字段（例：飞书任务完成卡片"模型: xxx"）。LLM 路由仍由
 	// 网关自身处理，与该字段无关。
 	DefaultModel string
+	// TierResolver resolves model tier aliases to concrete model names.
+	// Optional; when nil, tier-based model selection is disabled.
+	TierResolver ITierResolver
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -74,6 +77,7 @@ type ContextEngine struct {
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
 	defaultModel string
+	tierResolver ITierResolver
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -157,6 +161,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
 		defaultModel: deps.DefaultModel,
+		tierResolver: deps.TierResolver,
 	}
 }
 
@@ -275,6 +280,18 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	InitSessionPermission(sc, e.cfg.Permission)
 	if sc.Model == "" && e.defaultModel != "" {
 		sc.Model = e.defaultModel
+	}
+	// Resolve ModelTier to a concrete model name if a tier resolver is available.
+	if sc.ModelTier != "" && e.tierResolver != nil {
+		if resolved, err := e.tierResolver.ResolveTier(sc.ModelTier); err == nil && resolved != "" {
+			sc.Model = resolved
+		}
+	}
+	// If no model set yet, try resolving the default tier.
+	if sc.Model == "" && e.tierResolver != nil && e.defaultModel != "" {
+		if resolved, err := e.tierResolver.ResolveTier(e.defaultModel); err == nil && resolved != "" {
+			sc.Model = resolved
+		}
 	}
 
 	// #deprecated: legacy fallback (see harnessEnabled declaration above)

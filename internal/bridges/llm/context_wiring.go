@@ -21,6 +21,8 @@ type ContextLLMStack struct {
 	// SessionContext.Model 为空时回填，用于"任务完成卡片显示模型"等
 	// 仅展示用途，不参与路由（路由仍由 LLM 网关执行）。
 	DefaultModel string
+	// TierResolver resolves model tier aliases to concrete model names.
+	TierResolver contextengine.ITierResolver
 }
 
 // WireContextLLM loads and wires the LLM stack; falls back to mock on error.
@@ -41,5 +43,6 @@ func WireContextLLM(configFile string, obsBridge *observability.Bridge) ContextL
 		RawGateway:   wired.Gateway,
 		TokenCounter: wired.TokenCounter,
 		DefaultModel: llmCfg.DefaultModel,
+		TierResolver: wired.Bridge.(contextengine.ITierResolver),
 	}
 }

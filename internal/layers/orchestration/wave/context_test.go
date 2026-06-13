@@ -7,7 +7,7 @@ import (
 )
 
 func TestContextResolver_Fresh(t *testing.T) {
-	// L5-ORCH-12: fresh policy => Messages only contain directive.
+	// ORCH-S2-T12: fresh policy => Messages only contain directive.
 	store := NewArtifactStore()
 	rec := &stubSidechain{}
 	r := NewContextResolver(ContextResolverDeps{
@@ -47,7 +47,7 @@ func TestContextResolver_Fresh(t *testing.T) {
 }
 
 func TestContextResolver_Upstream(t *testing.T) {
-	// L5-ORCH-11: upstream policy => consume artifact, no Leader history.
+	// ORCH-S2-T11: upstream policy => consume artifact, no Leader history.
 	store := NewArtifactStore()
 	store.Put(Artifact{
 		TaskID:       "upstream-1",

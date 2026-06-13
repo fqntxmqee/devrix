@@ -69,7 +69,7 @@ func newTestScheduler(t *testing.T, cap map[WorkerType]int, runners map[WorkerTy
 }
 
 func TestWaveScheduler_StartDispatchesReady(t *testing.T) {
-	// L5-ORCH-17: only ready nodes are dispatched.
+	// ORCH-S2-T17: only ready nodes are dispatched.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 50 * time.Millisecond},
 	}
@@ -97,7 +97,7 @@ func TestWaveScheduler_StartDispatchesReady(t *testing.T) {
 }
 
 func TestWaveScheduler_PeakConcurrency5(t *testing.T) {
-	// L5-ORCH-10: 6 ready subagent + 1 cursor → peak≤5 with caps respected.
+	// ORCH-S2-T10: 6 ready subagent + 1 cursor → peak≤5 with caps respected.
 	sub := &stubRunner{kind: WorkerSubAgent, delay: 80 * time.Millisecond}
 	cur := &stubRunner{kind: WorkerCursor, delay: 80 * time.Millisecond}
 	runners := map[WorkerType]WorkerRunner{WorkerSubAgent: sub, WorkerCursor: cur}
@@ -161,7 +161,7 @@ func TestWaveScheduler_PeakConcurrency5(t *testing.T) {
 }
 
 func TestWaveScheduler_CancelWorker(t *testing.T) {
-	// L5-ORCH-19: CancelWorker releases slot and marks status=cancelled.
+	// ORCH-S2-T19: CancelWorker releases slot and marks status=cancelled.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 5 * time.Second},
 	}
@@ -209,7 +209,7 @@ func TestWaveScheduler_CancelWorker(t *testing.T) {
 }
 
 func TestWaveScheduler_CancelAll(t *testing.T) {
-	// L5-ORCH-20: 5 running → CancelAll → all terminal.
+	// ORCH-S2-T20: 5 running → CancelAll → all terminal.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent:   &stubRunner{kind: WorkerSubAgent, delay: 5 * time.Second},
 		WorkerCursor:     &stubRunner{kind: WorkerCursor, delay: 5 * time.Second},
@@ -264,7 +264,7 @@ func TestWaveScheduler_CancelAll(t *testing.T) {
 }
 
 func TestWaveScheduler_SlotReleaseDispatchesNext(t *testing.T) {
-	// L5-ORCH-15: slot release immediately dispatches next ready task.
+	// ORCH-S2-T15: slot release immediately dispatches next ready task.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 30 * time.Millisecond},
 	}

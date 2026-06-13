@@ -8,7 +8,7 @@ import (
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-LLM-09
+// T: D3-S6-A01-T01
 func TestLoadLLMGatewayConfig_should_parse_devrix_yaml(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "devrix.yaml")
 	if _, err := os.Stat(path); err != nil {

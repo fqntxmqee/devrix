@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// L5-2-3-04: Reconnect 恢复
+// D1-S9-A02-T04: Reconnect 恢复
 func TestL5_2_3_04_ReconnectRecovery(t *testing.T) {
 	b, _ := newTestBus(t, func(c *config.EventBusConfig) {
 		c.ChannelBuffer = 32

@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Covers: L5-OBS-20
+// T: D5-S2-A01-T07
 func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 	runtime.GC()
 	var before runtime.MemStats

@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 )
 
-// Covers: L5-OBS-15 (adapter → gateway trace inheritance)
+// T: D5-S4-A01-T03 (adapter → gateway trace inheritance)
 func TestAdapterToGateway_should_share_trace_id(t *testing.T) {
 	cfg := observability.DefaultConfig()
 	obs, err := observability.New(cfg)

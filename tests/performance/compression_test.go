@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-OBS-19
+// T: D5-S2-A01-T06
 func TestCompression_P99LatencyUnder500ms(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()

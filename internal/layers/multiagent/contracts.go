@@ -71,6 +71,7 @@ type AgentConfig struct {
 	InitialInput      string
 	WorkerRole        string // explore|plan|implement (worker agents)
 	TaskID            string
+	ModelTier         string
 }
 
 // AgentResult is produced when an agent terminates.

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Covers: L5-6-3-06
+// T: D6-S3-A01-T06
 
 func TestPEVToolAccuracyProbe_AllCorrect(t *testing.T) {
 	probe := &PEVToolAccuracyProbe{}

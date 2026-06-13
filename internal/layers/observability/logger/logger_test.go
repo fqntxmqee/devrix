@@ -46,7 +46,7 @@ func TestNewStructuredLogger(t *testing.T) {
 	}
 }
 
-// Covers: L5-OBS-FIX-06
+// T: D5-S3-A01-T02
 func TestStructuredLogger_should_include_stack_on_error(t *testing.T) {
 	h := &captureHandler{}
 	l := &StructuredLogger{handler: h}
@@ -65,7 +65,7 @@ func TestStructuredLogger_should_include_stack_on_error(t *testing.T) {
 	}
 }
 
-// Covers: L5-OBS-FIX-04
+// T: D5-S3-A01-T03
 func TestStructuredLogger_Close_should_reset_sampler_state(t *testing.T) {
 	l := &StructuredLogger{
 		handler: &captureHandler{},

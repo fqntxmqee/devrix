@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/cli/debug"
 )
 
-// Covers: L5-OBS-EXPORT-02
+// T: D5-S4-A01-T02
 func TestRunExport_should_write_incident_bundle(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "sess_cli.jsonl")

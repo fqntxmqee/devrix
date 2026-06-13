@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// L5-2-3-03: Compact 降采样 — 相邻同 type 事件合并
+// D1-S9-A02-T03: Compact 降采样 — 相邻同 type 事件合并
 func TestL5_2_3_03_CompactConsecutiveEvents(t *testing.T) {
 	b, _ := newTestBus(t, func(c *config.EventBusConfig) {
 		c.ChannelBuffer = 32

@@ -79,6 +79,7 @@ func NewLoader(cfg *config.SystemPromptConfig) *Loader {
 		"safety_guidelines":   sectionSafetyGuidelines,
 		"knowledge_boundaries": sectionKnowledgeBoundaries,
 		"todo_write":          sectionTodoWrite,
+		"delegate_strategy":   sectionDelegateStrategy,
 		"glob":                sectionGlob,
 		"grep":                sectionGrep,
 		"edit_file":           sectionEditFile,
@@ -100,7 +101,7 @@ func (l *Loader) LoadAsSections(workDir string) []string {
 		"intro", "system", "doing_tasks", "actions",
 		"using_tools", "output_efficiency", "tone_and_style",
 		"safety_guidelines", "knowledge_boundaries",
-		"todo_write", "glob", "grep", "edit_file",
+		"todo_write", "delegate_strategy", "glob", "grep", "edit_file",
 	} {
 		if content, ok := l.cache.Get(name); ok {
 			sections = append(sections, content)
@@ -276,6 +277,41 @@ Use the todo_write tool to create and manage a structured task list. This helps 
 - Remove tasks that are no longer relevant
 - ONLY mark completed when fully accomplished; if blocked, create a task describing what to resolve
 - Never mark completed if tests are failing, implementation is partial, or errors are unresolved`
+
+	sectionDelegateStrategy = `## Autonomous Task Strategy (delegate_* + todo_write)
+
+You decide when to explore, plan, or implement — there is no /plan command gate. Use workers to keep your own context lean.
+
+### Decision guide
+
+| Situation | Prefer |
+|-----------|--------|
+| Single-file fix, known location, user wants it done now | Direct read/grep/edit tools |
+| Unfamiliar module, cross-cutting change, or 3+ files | delegate_explore first |
+| Multi-step feature, unclear approach, or user asks for design | explore → delegate_plan → todo_write → delegate_implement |
+| User only wants analysis / answer | explore (or direct read); do not implement |
+| Parallel independent subtasks | todo_write with separate task_ids; delegate_implement per item (async when long) |
+
+### Context budget (Leader)
+
+- After ~5 read/grep/glob calls without a clear edit target → stop digging yourself; delegate_explore
+- After plan spans 3+ implement steps → todo_write + delegate_implement per step; do not inline all edits
+- Worker returns summaries only — do not ask workers to paste full file contents into your reply
+- Poll delegate_status for async workers; do not spawn duplicate explore/plan workers for the same question
+
+### Typical flow (complex work)
+
+1. Brief the user what you will do (one sentence).
+2. delegate_explore (async if broad) → read summary.
+3. todo_write: 3–8 tasks with clear scope; one in_progress at a time.
+4. delegate_implement per task with task_id; verify each step before marking todo completed.
+5. Run targeted tests; report what changed and what remains.
+
+### When NOT to delegate
+
+- Trivial one-line fixes where you already know the file and line
+- Pure conversation, status checks, or explaining existing code you have in context
+- Retrying the same explore directive after a worker already returned findings (use delegate_status or refine the directive)`
 
 	sectionGlob = `## Glob Tool
 

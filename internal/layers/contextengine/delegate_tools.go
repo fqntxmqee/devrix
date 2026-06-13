@@ -113,8 +113,35 @@ func (r *delegateToolRunner) RiskLevel() types.RiskLevel { return types.RiskLeve
 func (r *delegateToolRunner) Schema() ToolSchema {
 	return ToolSchema{
 		Name:        r.name,
-		Description: "Delegate a task to a worker agent (" + string(r.role) + ")",
-		Parameters:  `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string"},"task_id":{"type":"string"},"worktree_slug":{"type":"string"},"async":{"type":"boolean"}}}`,
+		Description: delegateToolDescription(r.role),
+		Parameters:  delegateToolParameters(),
+	}
+}
+
+func delegateToolParameters() string {
+	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"worktree_slug":{"type":"string","description":"Optional isolated worktree slug for parallel implement tasks."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."}}}`
+}
+
+func delegateToolDescription(role delegate.WorkerRole) string {
+	switch role {
+	case delegate.WorkerRoleExplore:
+		return "Spawn a read-only Explore worker to investigate the codebase (grep, read, list — no writes). " +
+			"Use when you lack context, must verify assumptions across modules, or the task likely touches 3+ files. " +
+			"Do NOT use for trivial single-file edits or pure Q&A you can answer from known context. " +
+			"Returns a concise summary — prefer async=true for broad exploration. " +
+			"After explore, use todo_write to capture tasks or delegate_plan if the approach is still unclear."
+	case delegate.WorkerRolePlan:
+		return "Spawn a read-only Plan worker to produce a structured implementation plan from research context. " +
+			"Use after explore (or when the user asks for a design) and before multi-step implement work. " +
+			"Do NOT use for single obvious edits; do NOT use plan instead of implement when the user wants code changed now. " +
+			"Returns phases, files, dependencies, and test notes — then break into todo_write items and delegate_implement per task."
+	case delegate.WorkerRoleImplement:
+		return "Spawn an Implement worker to execute one scoped task (create/edit files, run tests). " +
+			"Use for concrete coding work; pass one task per call with file paths and acceptance criteria in directive. " +
+			"Do NOT bundle unrelated features; do NOT implement before exploring unfamiliar areas. " +
+			"Link task_id from todo_write when available. Prefer async=true when changing many files or running long test suites."
+	default:
+		return "Delegate a task to a worker agent (" + string(role) + ")"
 	}
 }
 
@@ -167,9 +194,11 @@ func (r *delegateStatusRunner) RiskLevel() types.RiskLevel { return types.RiskLe
 
 func (r *delegateStatusRunner) Schema() ToolSchema {
 	return ToolSchema{
-		Name:        "delegate_status",
-		Description: "Read WorkPlan execution flow snapshot for the session",
-		Parameters:  `{"type":"object","properties":{}}`,
+		Name: "delegate_status",
+		Description: "Read the WorkPlan snapshot for this session (running/completed workers, summaries, errors). " +
+			"Use after async delegate_* calls instead of re-delegating blindly; use when the user asks for progress " +
+			"or before starting the next implement task that depends on a prior worker.",
+		Parameters: `{"type":"object","properties":{}}`,
 	}
 }
 

@@ -39,7 +39,7 @@ func (b *blockingLLM) Call(ctx context.Context, _ query.LLMRequest) (<-chan quer
 	return ch, nil
 }
 
-// L5-2-9-16: stop running task → cancelled (idempotent).
+// D2-S9-A01-T16: stop running task → cancelled (idempotent).
 func TestBackgroundRegistry_Cancel_running_task_marks_cancelled(t *testing.T) {
 	reg := query.NewBackgroundRegistry()
 	cancel, _ := reg.RegisterWithCancel("sess_a", "explore", "Explore", "explore_a")
@@ -67,7 +67,7 @@ func TestBackgroundRegistry_Cancel_running_task_marks_cancelled(t *testing.T) {
 	}
 }
 
-// L5-2-9-19: cancel 后 SessionQueue 不发 completed notification (tombstone 协议).
+// D2-S9-A01-T19: cancel 后 SessionQueue 不发 completed notification (tombstone 协议).
 func TestRunBackground_cancel_suppresses_completed_notification(t *testing.T) {
 	llm := newBlockingLLM()
 	loop := &query.Loop{LLM: llm, Permission: query.AllowPermission{}}
@@ -117,7 +117,7 @@ func TestRunBackground_cancel_suppresses_completed_notification(t *testing.T) {
 	}
 }
 
-// L5-2-9-17: output block=false on running/completed task.
+// D2-S9-A01-T17: output block=false on running/completed task.
 func TestBackgroundRegistry_Get_returns_partial_for_block_false(t *testing.T) {
 	reg := query.NewBackgroundRegistry()
 	cancel, _ := reg.RegisterWithCancel("sess_b", "explore", "Explore", "explore_b")
@@ -143,7 +143,7 @@ func TestBackgroundRegistry_Get_returns_partial_for_block_false(t *testing.T) {
 	}
 }
 
-// L5-2-9-18: output block=true waits until terminal or timeout.
+// D2-S9-A01-T18: output block=true waits until terminal or timeout.
 func TestBackgroundRegistry_Wait_terminal_returns_immediately(t *testing.T) {
 	reg := query.NewBackgroundRegistry()
 	cancel, _ := reg.RegisterWithCancel("sess_c", "explore", "Explore", "explore_c")

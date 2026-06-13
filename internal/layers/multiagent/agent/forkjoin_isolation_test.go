@@ -16,7 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-4-3-02 (Fork metadata write does not pollute parent)
+// T: D4-S3-A01-T02 (Fork metadata write does not pollute parent)
 func TestFork_metadata_writes_should_not_pollute_parent_session(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete", Content: "ok"}}})
 	session := types.NewSession("sess_meta_parent", "cli", "/tmp")
@@ -64,7 +64,7 @@ func TestFork_metadata_writes_should_not_pollute_parent_session(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-03 (concurrent 3 Fork + Join consistency under -race)
+// T: D4-S3-A01-T03 (concurrent 3 Fork + Join consistency under -race)
 func TestFork_concurrent_three_children_should_join_consistently(t *testing.T) {
 	f := newTestFactory(&agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete", Content: "ok"}}})
 	session := types.NewSession("sess_concurrent_3", "cli", "/tmp")
@@ -122,7 +122,7 @@ func TestFork_concurrent_three_children_should_join_consistently(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-3-01 (Join sort + tool_call ID dedup)
+// T: D4-S3-A01-T01 (Join sort + tool_call ID dedup)
 func TestJoin_should_dedup_tool_call_ids(t *testing.T) {
 	// Two children emit `complete` with a tool_call id "call_shared".
 	// The third child emits a different id "call_unique".

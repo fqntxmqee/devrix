@@ -29,7 +29,7 @@ type compactGroup struct {
 //  6. Return to prior state (Draining or Running) so the caller can
 //     continue the lifecycle.
 //
-// L5-2-3-03: Compact consecutive same-type events.
+// D1-S9-A02-T03: Compact consecutive same-type events.
 func (b *Bus) Compact(ctx context.Context, sessionID string) (CompactReport, error) {
 	if b.closed.Load() {
 		return CompactReport{}, ErrBusClosed

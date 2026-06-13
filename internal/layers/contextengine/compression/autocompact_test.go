@@ -50,7 +50,7 @@ func (m *mockSummarizer) Summarize(ctx context.Context, model, prompt string, ma
 	return `{"topics":["auth"],"decisions":["use jwt"],"open_items":[]}`, nil
 }
 
-// Covers: L5-CTX-12
+// T: D2-S2-A01-T03
 func TestPipeline_should_autocompact_when_enabled_and_over_budget(t *testing.T) {
 	counter := &highTokenCounter{inner: token.NewCounter()}
 	cfg := config.DefaultAutocompactConfig()
@@ -95,7 +95,7 @@ func TestPipeline_should_autocompact_when_enabled_and_over_budget(t *testing.T) 
 	}
 }
 
-// Covers: L5-CTX-13, L5-CTX-30
+// T: D2-S2-A01-T04, D2-S2-A01-T07
 func TestPipeline_should_degrade_autocompact_on_llm_failure(t *testing.T) {
 	counter := &highTokenCounter{inner: token.NewCounter()}
 	cfg := config.DefaultAutocompactConfig()

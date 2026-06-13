@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-03, L5-CTX-04
+// T: D2-S2-A01-T01, D2-S2-A01-T02
 func TestPipeline_should_compress_when_over_target(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
@@ -33,7 +33,7 @@ func TestPipeline_should_compress_when_over_target(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-04
+// T: D2-S2-A01-T02
 func TestPipeline_should_return_context_exceeded_when_still_over_budget(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.TokenBudget{
@@ -56,7 +56,7 @@ func TestPipeline_should_return_context_exceeded_when_still_over_budget(t *testi
 	}
 }
 
-// Covers: L5-CTX-08
+// T: D2-S2-A01-T05
 func TestPipeline_should_skip_autocompact_in_v1(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()
@@ -76,7 +76,7 @@ func TestPipeline_should_skip_autocompact_in_v1(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-30
+// T: D2-S2-A01-T07
 func TestPipeline_should_handle_empty_messages_without_error(t *testing.T) {
 	p := compression.NewPipelineEnabled(true)
 	budget := types.DefaultTokenBudget()

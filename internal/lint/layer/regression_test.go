@@ -1,5 +1,5 @@
 // Regression test: scanning the real internal/layers/ tree must NOT report
-// the canonical D2→D1 reverse import (DM-20260611-002 / L5-0-0-01). Any
+// the canonical D2→D1 reverse import (DM-20260611-002 / CROSS-A01-T01). Any
 // regression here would re-introduce the layering violation that the
 // S4 implementation eliminated.
 package layer
@@ -13,7 +13,7 @@ import (
 // TestScan_RealCodebase_NoD2ToD1 verifies that after the layer-isolation
 // refactor, no source file in internal/layers/contextengine/ imports
 // internal/layers/communication/. This is the load-bearing assertion for
-// L5-0-0-01.
+// CROSS-A01-T01.
 func TestScan_RealCodebase_NoD2ToD1(t *testing.T) {
 	// Walk relative to this test file so the test is location-independent.
 	_, thisFile, _, _ := runtime.Caller(0)

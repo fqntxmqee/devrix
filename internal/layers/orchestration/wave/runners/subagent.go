@@ -52,7 +52,8 @@ type SubAgentParams struct {
 	// MaxTurns caps the LLM loop.
 	MaxTurns int
 	// Model overrides the inherited model.
-	Model string
+	Model     string
+	ModelTier string
 }
 
 // SubAgentRunner implements wave.WorkerRunner for SubQuery-backed workers.
@@ -103,6 +104,7 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) error
 		SystemPrompt:   spec.Context.SystemPrompt,
 		PromptMessages: spec.Context.Messages,
 		MaxTurns:       30,
+		ModelTier:      spec.ModelTier,
 	}
 
 	taskID, err := r.deps.Start(ctx, params)

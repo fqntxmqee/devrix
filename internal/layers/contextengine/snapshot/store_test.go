@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-05
+// T: D2-S3-A01-T02
 func TestStore_should_roundtrip_snapshot_v1(t *testing.T) {
 	store := snapshot.NewStore(nil)
 	sc := &types.SessionContext{
@@ -56,7 +56,7 @@ func TestStore_should_roundtrip_snapshot_v1(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-32
+// T: D2-S3-A01-T06
 func TestStore_should_compress_large_snapshots_with_snappy(t *testing.T) {
 	cfg := &config.SnapshotConfig{
 		Enabled:              true,

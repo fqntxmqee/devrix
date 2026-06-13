@@ -17,7 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-LLM-10, L5-LLM-11
+// T: D3-S4-A01-T02, D3-S4-A01-T03
 func TestIntegration_LLMGateway_fallback_models(t *testing.T) {
 	counter, err := token.NewCounter()
 	if err != nil {

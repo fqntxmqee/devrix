@@ -57,6 +57,13 @@ type ILLMGateway interface {
 	ChatStream(ctx context.Context, req *LLMRequest) (<-chan LLMChunk, error)
 }
 
+// ITierResolver resolves tier aliases to concrete model names.
+type ITierResolver interface {
+	// ResolveTier resolves a tier alias (e.g. "fast", "default", "powerful")
+	// to a concrete model name. Returns an error if resolution fails.
+	ResolveTier(tier string) (string, error)
+}
+
 // IToolRunner executes tool calls.
 type IToolRunner interface {
 	Execute(ctx context.Context, call ToolCall) (*ToolResult, error)

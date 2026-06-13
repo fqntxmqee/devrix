@@ -14,7 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-2-9-01, L5-2-9-03
+// T: D2-S9-A01-T01, D2-S9-A01-T03
 func TestIntegration_HarnessBootstrapSmoke_disabled_zero_change(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	if ctxCfg.Harness.Enabled {
@@ -32,7 +32,7 @@ func TestIntegration_HarnessBootstrapSmoke_disabled_zero_change(t *testing.T) {
 	waitProcess(t, ch)
 }
 
-// Covers: L5-2-9-01, L5-2-9-03
+// T: D2-S9-A01-T01, D2-S9-A01-T03
 func TestIntegration_HarnessBootstrapSmoke_enabled_bootstrap(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.Harness.Enabled = true

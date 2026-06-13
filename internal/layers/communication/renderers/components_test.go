@@ -30,7 +30,7 @@ func TestDingTalkCardRenderer_RenderMilestone(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-8-02
+// T: D1-S8-A01-T02
 func TestProgressBar_Render(t *testing.T) {
 	out := NewProgressBar(0.5, 10).Render()
 	if out == "" {
@@ -41,7 +41,7 @@ func TestProgressBar_Render(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-8-02
+// T: D1-S8-A01-T02
 func TestStatusBadge_Render(t *testing.T) {
 	out := NewStatusBadge("in_progress").Render()
 	if out == "" {

@@ -30,7 +30,7 @@ func TestGenerateShortId(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-8-01
+// T: D1-S8-A01-T01
 func TestGenerateShortId_Uniqueness(t *testing.T) {
 	const iterations = 1000
 	generated := make(map[string]bool, iterations)

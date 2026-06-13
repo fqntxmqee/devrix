@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Covers: L5-6-3-09
+// T: D6-S3-A01-T09
 
 func TestProviderQualityProbe_SameProviderConsistent(t *testing.T) {
 	probe := &ProviderQualityProbe{}

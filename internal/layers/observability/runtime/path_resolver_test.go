@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// L5-2-9-03: 旧路径调用计数基线 = 0；QueryLoop 路径应被记录，
+// D2-S9-A01-T03: 旧路径调用计数基线 = 0；QueryLoop 路径应被记录，
 // 且不变量：Snapshot 内部一致性。
 func TestPathResolver_Record_AndSnapshot(t *testing.T) {
 	Reset()
@@ -25,7 +25,7 @@ func TestPathResolver_Record_AndSnapshot(t *testing.T) {
 	}
 }
 
-// L5-2-9-03: 并发 Record 不丢更新。
+// D2-S9-A01-T03: 并发 Record 不丢更新。
 func TestPathResolver_ConcurrentRecord(t *testing.T) {
 	Reset()
 	const goroutines = 16

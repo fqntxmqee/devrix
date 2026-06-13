@@ -1,6 +1,6 @@
 // Tests for the D6 LayerViolationProbe.
 //
-// Covers: L5-0-0-04  (D6 LayerViolationProbe registered and returns a score)
+// T: CROSS-A01-T04  (D6 LayerViolationProbe registered and returns a score)
 // Domain: D6
 // Stage: s0_unit
 package eval

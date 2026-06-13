@@ -35,7 +35,7 @@ func (h *accHighCounter) CountWithSystemPrompt(s string, m []types.Message) int 
 func (h *accHighCounter) TruncateToTokens(text string, max int) string { return h.inner.TruncateToTokens(text, max) }
 func (h *accHighCounter) EncodingForModel(model string) string         { return h.inner.EncodingForModel(model) }
 
-// Covers: L5-CTX-12
+// T: D2-S2-A01-T03
 func TestAcceptance_AutocompactP0(t *testing.T) {
 	cfg := config.DefaultAutocompactConfig()
 	cfg.Enabled = true

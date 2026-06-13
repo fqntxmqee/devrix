@@ -8,8 +8,8 @@ func TestLoaderLoadAsSections(t *testing.T) {
 	loader := NewLoader(nil)
 	sections := loader.LoadAsSections("/tmp")
 
-	if len(sections) != 13 {
-		t.Errorf("expected 13 sections, got %d", len(sections))
+	if len(sections) != 14 {
+		t.Errorf("expected 14 sections, got %d", len(sections))
 	}
 
 	if len(sections) > 0 && !contains(sections[0], "You are an interactive agent") {
@@ -23,8 +23,8 @@ func TestLoaderLoadWithDynamic(t *testing.T) {
 	dynamic := []string{"# Dynamic Section\nDynamic content here"}
 	sections := loader.LoadWithDynamic("/tmp", dynamic)
 
-	if len(sections) != 15 {
-		t.Errorf("expected 15 sections, got %d", len(sections))
+	if len(sections) != 16 {
+		t.Errorf("expected 16 sections, got %d", len(sections))
 	}
 
 	found := false

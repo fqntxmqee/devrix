@@ -9,7 +9,7 @@ import (
 )
 
 func TestWaveScheduler_ConflictGroup(t *testing.T) {
-	// L5-ORCH-13: two Tasks with same conflict_group should not run in parallel.
+	// ORCH-S2-T13: two Tasks with same conflict_group should not run in parallel.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 50 * time.Millisecond},
 	}
@@ -51,7 +51,7 @@ func TestWaveScheduler_ConflictGroup(t *testing.T) {
 }
 
 func TestWaveScheduler_UpstreamArtifact(t *testing.T) {
-	// L5-ORCH-11: downstream with policy=upstream receives upstream artifact,
+	// ORCH-S2-T11: downstream with policy=upstream receives upstream artifact,
 	// not Leader history.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 30 * time.Millisecond},
@@ -116,7 +116,7 @@ func TestWaveScheduler_UpstreamArtifact(t *testing.T) {
 }
 
 func TestWaveScheduler_CursorAndClaudeCodeParallel(t *testing.T) {
-	// L5-ORCH-16: cursor + claude-code can run in parallel when file_scope
+	// ORCH-S2-T16: cursor + claude-code can run in parallel when file_scope
 	// is disjoint.
 	cur := &stubRunner{kind: WorkerCursor, delay: 30 * time.Millisecond}
 	cc := &stubRunner{kind: WorkerClaudeCode, delay: 30 * time.Millisecond}
@@ -175,7 +175,7 @@ func TestWaveScheduler_CursorAndClaudeCodeParallel(t *testing.T) {
 }
 
 func TestWaveScheduler_WaveCompletedSummary(t *testing.T) {
-	// L5-ORCH-18: wave fully completes → WaitForCompletion returns all artifacts.
+	// ORCH-S2-T18: wave fully completes → WaitForCompletion returns all artifacts.
 	runners := map[WorkerType]WorkerRunner{
 		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 20 * time.Millisecond},
 	}

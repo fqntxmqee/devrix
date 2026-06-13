@@ -24,7 +24,7 @@ import (
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// Covers: L5-CTX-05, L5-4-0-03
+// T: D2-S3-A01-T02, D4-S0-A01-T03
 func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	commCfg := config.DefaultConfig()

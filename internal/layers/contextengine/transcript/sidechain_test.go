@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-42
+// T: D2-S10-A01-T42
 func TestSidechainStore_append_and_load_rebuilds_messages(t *testing.T) {
 	dir := t.TempDir()
 	store, err := transcript.NewSidechainStore(dir)

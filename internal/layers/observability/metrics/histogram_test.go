@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Covers: L5-OBS-FIX-02
+// T: D5-S2-A01-T04
 func TestHistogram_golden_prometheus_output(t *testing.T) {
 	h := NewHistogram("request_latency", LabelMap{"service": "devrix"}, []float64{0.1, 0.5, 1.0})
 	h.Observe(0.05)

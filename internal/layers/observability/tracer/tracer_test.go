@@ -26,7 +26,7 @@ func (e *recordingExporter) count() int {
 	return e.exports
 }
 
-// Covers: L5-OBS-FIX-03
+// T: D5-S1-A01-T01
 func TestTracerProvider_should_flush_pending_spans_on_shutdown(t *testing.T) {
 	exp := &recordingExporter{}
 	tp := NewTracerProvider(nil, exp)

@@ -69,6 +69,7 @@ type TaskNode struct {
 	ConflictGroup     string         `json:"conflict_group,omitempty"`
 	SystemPromptExtra string         `json:"system_prompt_extra,omitempty"`
 	ReadOnly          bool           `json:"read_only,omitempty"`
+	ModelTier         string         `json:"model_tier,omitempty"`
 	Metadata          map[string]any `json:"metadata,omitempty"`
 }
 
@@ -176,6 +177,7 @@ type WorkerRunSpec struct {
 	WorkDir      string
 	Directive    string
 	Context      ResolvedContext
+	ModelTier    string
 	Emit         func(WorkerEvent)
 	BackgroundID string // SubQuery background id; "" for non-subagent workers
 }

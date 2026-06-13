@@ -9,7 +9,7 @@ import (
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-LLM-22
+// T: D3-S4-A01-T01
 func TestExecutor_should_apply_full_jitter_within_cap(t *testing.T) {
 	exec := NewExecutor().WithRNG(rand.New(rand.NewSource(42)))
 	cfg := sharedconfig.LLMRetryConfig{
@@ -30,7 +30,7 @@ func TestExecutor_should_apply_full_jitter_within_cap(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-22
+// T: D3-S4-A01-T01
 func TestExecutor_should_be_deterministic_with_fixed_rng(t *testing.T) {
 	cfg := sharedconfig.LLMRetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Second, Backoff: 2.0}
 	a := NewExecutor().WithRNG(rand.New(rand.NewSource(7)))

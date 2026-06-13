@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/incident"
 )
 
-// Covers: L5-OBS-EXPORT-01
+// T: D5-S4-A01-T01
 func TestBuildBundle_should_export_valid_json_schema_v1(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "sess_test.jsonl")

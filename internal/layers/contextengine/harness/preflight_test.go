@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-2-9-09
+// T: D2-S9-A01-T09
 func TestPreflightEvaluator_should_warn_on_empty_message(t *testing.T) {
 	eval := harness.NewPreflightEvaluator(config.PreflightConfig{
 		Enabled:     true,
@@ -24,7 +24,7 @@ func TestPreflightEvaluator_should_warn_on_empty_message(t *testing.T) {
 	}
 }
 
-// Covers: L5-2-9-09
+// T: D2-S9-A01-T09
 func TestPreflightEvaluator_should_filter_irrelevant_tools(t *testing.T) {
 	eval := harness.NewPreflightEvaluator(config.PreflightConfig{
 		Enabled: true,

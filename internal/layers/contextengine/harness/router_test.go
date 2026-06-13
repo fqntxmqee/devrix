@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-2-9-06
+// T: D2-S9-A01-T06
 func TestPromptRouter_should_score_matching_tools(t *testing.T) {
 	router := harness.NewPromptRouter(config.RoutingConfig{Enabled: true, MaxMatches: 3})
 	tools := []harness.ToolDesc{

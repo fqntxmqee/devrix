@@ -20,7 +20,7 @@ func TestRenderNotifications_should_format_delegate_progress(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-10-04
+// T: D4-S10-A02-T04
 func TestDrain_should_only_give_delegate_progress_to_leader_main_thread(t *testing.T) {
 	q := queue.NewSessionQueue()
 	q.Enqueue("sess1", queue.QueuedCommand{

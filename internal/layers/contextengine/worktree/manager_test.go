@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-4-12-01
+// T: D2-S12-A01-T01
 func TestManager_should_isolate_writes_from_main_workdir(t *testing.T) {
 	mainDir := t.TempDir()
 	baseDir := filepath.Join(t.TempDir(), "worktrees")

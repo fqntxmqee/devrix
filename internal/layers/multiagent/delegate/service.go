@@ -157,6 +157,7 @@ func (s *Service) forkWorker(ctx context.Context, leader multiagent.Agent, spec 
 		MaxChildren:  0,
 		WorkerRole:   string(spec.Role),
 		TaskID:       spec.TaskID,
+		ModelTier:    spec.ModelTier,
 	}
 	child, err := leader.Fork(ctx, childCfg)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Covers: L5-OBS-METRICS-01
+// T: D5-S2-A01-T03
 func TestToolBridge_InitLatencyMetrics_should_register_tool_latency(t *testing.T) {
 	cfg := DefaultConfig()
 	obs, err := New(cfg)

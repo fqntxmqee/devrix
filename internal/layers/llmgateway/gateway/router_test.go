@@ -9,7 +9,7 @@ import (
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
-// Covers: L5-LLM-16
+// T: D3-S2-A01-T02
 func TestRouter_should_resolve_deepseek_model(t *testing.T) {
 	r := gateway.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
 	provider, model, err := r.Resolve("deepseek-v4-flash")
@@ -21,7 +21,7 @@ func TestRouter_should_resolve_deepseek_model(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-16
+// T: D3-S2-A01-T02
 func TestRouter_should_resolve_minimax_model(t *testing.T) {
 	r := gateway.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
 	provider, model, err := r.Resolve("minimax-3")
@@ -33,7 +33,7 @@ func TestRouter_should_resolve_minimax_model(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-16
+// T: D3-S2-A01-T02
 func TestRouter_should_use_provider_default_when_model_empty(t *testing.T) {
 	r := gateway.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
 	provider, model, err := r.Resolve("")
@@ -48,7 +48,7 @@ func TestRouter_should_use_provider_default_when_model_empty(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-16
+// T: D3-S2-A01-T02
 func TestRouter_should_return_error_for_unknown_model(t *testing.T) {
 	r := gateway.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
 	_, _, err := r.Resolve("gpt-4o")

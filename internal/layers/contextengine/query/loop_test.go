@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-34
+// T: D2-S10-A01-T34
 func TestQueryLoop_should_continue_until_no_tool_use(t *testing.T) {
 	llm := &query.SequentialLLM{Responses: []query.LLMScript{
 		{ToolCalls: []query.ToolCall{{ID: "c1", Name: "bash", Input: "ls"}}},
@@ -45,7 +45,7 @@ func TestQueryLoop_should_continue_until_no_tool_use(t *testing.T) {
 	}
 }
 
-// Covers: L5-CTX-35
+// T: D2-S10-A01-T35
 func TestUserContextPrepend_should_not_persist_in_snapshot_messages(t *testing.T) {
 	msgs := []types.Message{{Role: types.MessageRoleUser, Content: "hi"}}
 	prepend := conversation.PrependMetaUser(msgs, "<system-reminder>agents</system-reminder>")
@@ -60,7 +60,7 @@ func TestUserContextPrepend_should_not_persist_in_snapshot_messages(t *testing.T
 	}
 }
 
-// Covers: L5-CTX-36
+// T: D2-S10-A01-T36
 func TestPlanModeAttachment_should_alternate_full_and_sparse(t *testing.T) {
 	reg := attachments.NewRegistry(config.AttachmentsConfig{Enabled: true, PlanModeFullEvery: 5})
 	sc := &types.SessionContext{SessionID: "s1", PermissionMode: types.PermissionPlan, PlanFilePath: "/tmp/plan.md"}

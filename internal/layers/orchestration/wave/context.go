@@ -36,7 +36,7 @@ func NewContextResolver(deps ContextResolverDeps) *ContextResolver {
 
 // Resolve applies the policy and returns the worker's input context.
 //
-// Semantics (L5-ORCH-11/12):
+// Semantics (ORCH-S2-T11/12):
 //   - fresh:     Messages = [user(directive)]; System = base + extra + file_scope
 //   - resume:    Messages = sidechain.Load(...) + [user(directive)]
 //   - upstream:  Messages = [user(directive)]; System = base + upstream summary

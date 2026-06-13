@@ -23,7 +23,7 @@ func (h *captureFlowHub) Snapshot(string) contracts.WorkPlanSnapshot {
 	return contracts.WorkPlanSnapshot{}
 }
 
-// Covers: L5-4-10-08
+// T: D4-S10-A01-T08
 func TestSubQueryFallback_should_publish_flow_events_when_d4_disabled(t *testing.T) {
 	hub := &captureFlowHub{}
 	prev := flow.GlobalHub

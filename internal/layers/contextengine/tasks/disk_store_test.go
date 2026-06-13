@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-CTX-38
+// T: D2-S10-A01-T38
 func TestTaskManager_disk_persist_and_list_consistent(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.TasksConfig{Mode: "v2", StoreDir: dir}

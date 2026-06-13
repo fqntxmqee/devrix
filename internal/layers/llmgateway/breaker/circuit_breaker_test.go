@@ -31,7 +31,7 @@ func (c *fakeClock) Now() time.Time { return c.t }
 
 func (c *fakeClock) Advance(d time.Duration) { c.t = c.t.Add(d) }
 
-// Covers: L5-LLM-03
+// T: D3-S3-A01-T01
 func TestCircuitBreaker_should_stay_closed_on_success(t *testing.T) {
 	cb, _ := newTestBreaker()
 	const key = "deepseek"
@@ -46,7 +46,7 @@ func TestCircuitBreaker_should_stay_closed_on_success(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-04
+// T: D3-S3-A01-T02
 func TestCircuitBreaker_should_open_after_failure_threshold(t *testing.T) {
 	cb, _ := newTestBreaker()
 	const key = "deepseek"
@@ -67,7 +67,7 @@ func TestCircuitBreaker_should_open_after_failure_threshold(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-05
+// T: D3-S3-A01-T03
 func TestCircuitBreaker_should_close_after_half_open_successes(t *testing.T) {
 	cb, clock := newTestBreaker()
 	const key = "minimax"
@@ -95,7 +95,7 @@ func TestCircuitBreaker_should_close_after_half_open_successes(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-06
+// T: D3-S3-A01-T04
 func TestCircuitBreaker_should_reopen_when_half_open_probe_fails(t *testing.T) {
 	cb, clock := newTestBreaker()
 	const key = "minimax"
@@ -119,7 +119,7 @@ func TestCircuitBreaker_should_reopen_when_half_open_probe_fails(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-23
+// T: D3-S3-A01-T05
 func TestCircuitBreaker_should_limit_half_open_concurrent_probes(t *testing.T) {
 	clock := &fakeClock{t: time.Unix(0, 0)}
 	cfg := sharedconfig.LLMCircuitBreakerConfig{

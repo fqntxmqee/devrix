@@ -1,6 +1,6 @@
 // Tests for shared/contracts cross-layer helpers.
 //
-// Covers: L5-0-0-02  (cross-layer contract surface available for any D)
+// T: CROSS-A02-T03  (cross-layer contract surface available for any D)
 // Domain: shared/contracts
 // Stage: s0_unit
 package contracts

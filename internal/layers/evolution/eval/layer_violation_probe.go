@@ -5,7 +5,7 @@
 // and emits a 0-1 score: 1.0 = zero violations, 0.5 = one violation, ≤ 0
 // for two or more. The probe is registered automatically in init().
 //
-// Covers: L5-0-0-04  (D6 LayerViolationProbe registered and reports a score)
+// T: CROSS-A01-T04  (D6 LayerViolationProbe registered and reports a score)
 package eval
 
 import (

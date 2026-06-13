@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/settings"
 )
 
-// Covers: L5-OBS-METRICS-03
+// T: D5-S2-A01-T05
 func TestRecordGenAITokenUsage_should_register_token_usage_counter(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Metrics.Enabled = true

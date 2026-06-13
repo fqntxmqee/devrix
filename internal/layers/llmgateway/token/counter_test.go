@@ -11,7 +11,7 @@ import (
 	"github.com/pkoukk/tiktoken-go"
 )
 
-// Covers: L5-LLM-07
+// T: D3-S5-A01-T01
 func TestCounter_should_count_known_text_within_tolerance(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -39,7 +39,7 @@ func TestCounter_should_count_known_text_within_tolerance(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-07
+// T: D3-S5-A01-T01
 func TestCounter_should_count_messages_with_role_overhead(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -56,7 +56,7 @@ func TestCounter_should_count_messages_with_role_overhead(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-07
+// T: D3-S5-A01-T01
 func TestCounter_should_include_system_prompt(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -71,7 +71,7 @@ func TestCounter_should_include_system_prompt(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-08
+// T: D3-S5-A01-T02
 func TestCounter_should_pass_budget_when_within_limit(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -82,7 +82,7 @@ func TestCounter_should_pass_budget_when_within_limit(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-08
+// T: D3-S5-A01-T02
 func TestCounter_should_fail_budget_when_over_limit(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -101,7 +101,7 @@ func TestCounter_should_fail_budget_when_over_limit(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-07
+// T: D3-S5-A01-T01
 func TestCounter_should_truncate_to_max_tokens(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -146,7 +146,7 @@ func max(a, b int) int {
 	return b
 }
 
-// Covers: L5-LLM-19
+// T: D3-S5-A01-T03
 func TestCounter_should_count_chinese_within_tolerance(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {
@@ -165,7 +165,7 @@ func TestCounter_should_count_chinese_within_tolerance(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-19
+// T: D3-S5-A01-T03
 func TestCounter_should_count_mixed_cjk_ascii(t *testing.T) {
 	c, err := token.NewCounter()
 	if err != nil {

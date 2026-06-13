@@ -17,7 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-LLM-13
+// T: D3-S2-A01-T01
 func TestIntegration_LLMGateway_emits_observability_span(t *testing.T) {
 	obs := observability.NewNoOp()
 	obsBridge := observability.NewBridge(obs)

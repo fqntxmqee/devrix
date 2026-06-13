@@ -30,7 +30,7 @@ var dangerousCommands = []struct {
 	{"backtick", "echo `cat /etc/shadow`"},
 }
 
-// Covers: L5-CTX-27
+// T: D2-S1-A02-T10
 func TestShellInjection_AllPatternsBlocked(t *testing.T) {
 	policy := contextengine.DefaultCommandPolicy()
 	for _, tc := range dangerousCommands {

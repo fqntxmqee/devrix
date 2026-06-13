@@ -28,7 +28,7 @@ func TestInstanceRegistry_RegisterHealthCheck(t *testing.T) {
 	}
 }
 
-// Covers: L5-1-1-02
+// T: D1-S1-A01-T02
 func TestInstanceRegistry_RegisterUnregister(t *testing.T) {
 	reg := NewInstanceRegistry(time.Minute)
 	ctx := context.Background()

@@ -9,7 +9,7 @@ import (
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 )
 
-// Covers: L5-LLM-09
+// T: D3-S6-A01-T01
 func TestLoader_should_load_default_provider_config(t *testing.T) {
 	loader := llmconfig.NewLoader()
 	cfg, err := loader.Load(sharedconfig.DefaultLLMGatewayConfig())
@@ -31,7 +31,7 @@ func TestLoader_should_load_default_provider_config(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-09
+// T: D3-S6-A01-T01
 func TestLoader_should_merge_file_config(t *testing.T) {
 	file := &sharedconfig.LLMGatewayFileConfig{
 		DefaultProvider: "deepseek",
@@ -58,7 +58,7 @@ func TestLoader_should_merge_file_config(t *testing.T) {
 	}
 }
 
-// Covers: L5-LLM-09
+// T: D3-S6-A01-T01
 func TestLoader_should_reject_unknown_default_provider(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
 	cfg.DefaultProvider = "unknown"

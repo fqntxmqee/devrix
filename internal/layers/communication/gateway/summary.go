@@ -12,7 +12,7 @@ const usageSplitSep = "/"
 
 // ComputeCtxPct is a thin shim kept for backward compatibility with any caller
 // that still imports the function from D1. The canonical implementation lives
-// in shared/contracts (L5-0-0-02: cross-layer contract surface must be free of
+// in shared/contracts (CROSS-A02-T03: cross-layer contract surface must be free of
 // D{N}→D{N} imports). D2 PEV/QueryLoop has been migrated to call contracts.ComputeCtxPct
 // directly. New code should import the shared helper.
 func ComputeCtxPct(promptTokens, maxContextTokens int) int {

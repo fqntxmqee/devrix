@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Covers: L5-CTX-37
+// T: D2-S10-A01-T37
 func TestIsPlanModeAllowedToolName_should_filter_unknown_tools(t *testing.T) {
 	if !permission.IsPlanModeAllowedToolName("read_file", "/tmp/plan.md") {
 		t.Fatal("read_file should be allowed")

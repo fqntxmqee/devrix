@@ -54,7 +54,7 @@ func (p *testAgentToolPlugin) Execute(ctx context.Context, workDir, input string
 	return &contextengine.ToolResult{Output: parts[0]}, nil
 }
 
-// Covers: L5-4-6-01, L5-4-6-02, L5-4-6-07
+// T: D4-S6-A01-T01, D4-S6-A02-T02, D4-S6-A02-T07
 func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 	reg := tool.NewRegistry()
 	echoTool := tool.NewCLIAgentTool(tool.CLIConfig{
@@ -106,7 +106,7 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-6-04, L5-4-6-07
+// T: D4-S6-A02-T04, D4-S6-A02-T07
 func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 	stateful := tool.NewCLIAgentTool(tool.CLIConfig{
 		Name:    "stateful-agent",
@@ -154,7 +154,7 @@ func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 	}
 }
 
-// Covers: L5-4-6-06
+// T: D4-S6-A02-T06
 func TestIntegration_AgentTool_CleanupOtherSession(t *testing.T) {
 	agent := tool.NewCLIAgentTool(tool.CLIConfig{
 		Name:    "cleanup-agent",

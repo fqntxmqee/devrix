@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// L5-2-3-02: 背压触发 Drain
+// D1-S9-A02-T02: 背压触发 Drain
 func TestL5_2_3_02_BackpressureTriggersDrain(t *testing.T) {
 	b, cfg := newTestBus(t, func(c *config.EventBusConfig) {
 		c.ChannelBuffer = 256

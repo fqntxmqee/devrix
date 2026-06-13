@@ -5,8 +5,8 @@
 // N > M (i.e. a higher layer reaching down to a lower one). The default
 // dependency direction is strictly upward (D1 is the lowest).
 //
-// Covers: L5-0-0-01  (layer-lint detects reverse D{N}→D{N} imports)
-// Covers: L5-0-0-03  (CI gate uses this scanner to block violations)
+// T: CROSS-A01-T01  (layer-lint detects reverse D{N}→D{N} imports)
+// T: CROSS-A01-T02  (CI gate uses this scanner to block violations)
 package layer
 
 import (

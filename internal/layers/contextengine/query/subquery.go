@@ -28,6 +28,7 @@ type SubQueryParams struct {
 	Tools          []ToolSchema
 	MaxTurns       int
 	Model          string
+		ModelTier      string
 	OmitClaudeMd   bool
 	ReadOnlyTools  bool
 	Resume         bool
@@ -70,6 +71,10 @@ func Run(ctx context.Context, deps LoopDeps, params SubQueryParams) (*SubQueryRe
 		model = child.Model
 	}
 	child.Model = model
+
+	if params.ModelTier != "" {
+		child.ModelTier = params.ModelTier
+	}
 
 	if deps.Sidechain != nil {
 		for _, m := range params.PromptMessages {
@@ -116,6 +121,7 @@ func forkChildContext(params SubQueryParams) *types.SessionContext {
 		SessionID:      parent.SessionID,
 		WorkDir:        parent.WorkDir,
 		Model:          parent.Model,
+		ModelTier:      parent.ModelTier,
 		PermissionMode: parent.PermissionMode,
 		PlanFilePath:   parent.PlanFilePath,
 		AgentID:        params.AgentID,
