@@ -17,6 +17,7 @@
 | `openspec/specs/d2-context-engine/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
 | `openspec/specs/d2-context-engine/layer-delta.md` | 层能力 Delta SoT |
 | `openspec/specs/d2-context-engine/prompt-system-design.md` | 提示词系统专项设计 |
+| `openspec/specs/d2-context-engine/span-registry.md` | Span 注册表（27 ops，5 components） |
 | `openspec/archive/2026-06-07-devrix-context-engine/` | V1 PEV 实施设计（历史归档） |
 
 ---

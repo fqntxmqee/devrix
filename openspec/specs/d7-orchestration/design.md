@@ -24,6 +24,7 @@
 | `layer-delta.md` | 层能力 Delta（现行 vs 目标） |
 | `task-planning-design.md` | PlanMode / PlanAgent 专项设计 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
+| `span-registry.md` | Span 注册表（3 ops，orchestrator） |
 
 ---
 

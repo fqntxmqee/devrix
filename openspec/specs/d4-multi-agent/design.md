@@ -33,6 +33,7 @@
 | `openspec/specs/multi_agent_layer_delta.md` | 层能力 Delta SoT（Gherkin Scenario） |
 | `openspec/changes/devrix-multi-agent/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
 | `openspec/t-registry.md` | {T}-AGENT 测试点注册（P0/P1/P2 优先级） |
+| `openspec/specs/d4-multi-agent/span-registry.md` | Span 注册表（6 ops，agent_tool） |
 
 ---
 
@@ -900,77 +901,12 @@ func BuildMultiAgentConfig(file MultiAgentFileConfig) MultiAgentConfig {
 
 ## ⑨ 可观测性集成
 
-### 9.1 Telemetry 操作名常量
+完整的 Span 注册表、Trace Tree、Metrics 定义见独立文件：
+`openspec/specs/d4-multi-agent/span-registry.md`
 
-```go
-// 新增于 internal/layers/observability/telemetry/names.go
+Multi-Agent 层通过 `observability.Bridge` 集成 OpenTelemetry，包含 6 个 Operation（agent_tool）、8 个 Metrics。
 
-const (
-    OpAgentCreate            = "agent.create"
-    OpAgentRun               = "agent.run"
-    OpAgentIterate           = "agent.iterate"
-    OpAgentFork              = "agent.fork"
-    OpAgentJoin              = "agent.join"
-    OpAgentTerminate         = "agent.terminate"
-    OpAgentPermissionCheck   = "agent.permission_check"
-    OpAgentStateTransition   = "agent.state_transition"
-)
-```
-
-### 9.2 Span 覆盖
-
-| 操作 | Span 名 | 关键属性 |
-|------|---------|---------|
-| AgentFactory.Create | `agent.create` | session_id, mode, parent_id |
-| Agent.Run 启动 | `agent.run` | agent_id, mode, max_iter |
-| 每次 PEV 迭代 | `agent.iterate` | agent_id, iteration_n, tool_count |
-| Fork | `agent.fork` | agent_id, child_id, child_count |
-| Join | `agent.join` | agent_id, child_id |
-| Terminate | `agent.terminate` | agent_id, reason, duration_ms |
-| 权限确认 | `agent.permission_check` | agent_id, tool_name, risk_level, result |
-| 状态转换 | `agent.state_transition` | agent_id, from_state, to_state |
-
-### 9.3 Metrics
-
-| 指标 | 类型 | 描述 |
-|------|------|------|
-| `agent.created_total` | Counter | Agent 创建总数 |
-| `agent.active` | Gauge | 当前活跃 Agent 数 |
-| `agent.duration_ms` | Histogram | Agent 执行耗时分布 |
-| `agent.fork.created_total` | Counter | Fork 创建子 Agent 总数 |
-| `agent.permission.requests_total` | Counter | 权限请求总数 |
-| `agent.permission.granted_total` | Counter | 权限批准总数 |
-| `agent.permission.denied_total` | Counter | 权限拒绝总数 |
-| `agent.errors_total` | Counter | Agent 错误总数（按 error_code 分桶） |
-
-### 9.4 Agent.Run 内部 Span 示例
-
-```go
-// agent/lifecycle.go（摘录）
-func (a *agentImpl) Run(ctx context.Context) (*AgentResult, error) {
-    ctx, span := a.tracer.Start(ctx, telemetry.OpAgentRun)
-    defer span.End()
-
-    span.SetAttributes(
-        attribute.String("agent_id", a.id),
-        attribute.String("mode", string(a.config.Mode)),
-    )
-
-    // 状态转换
-    a.transition(AgentStateCreated, AgentStateRunning)
-    a.emitEvent("agent.started")
-
-    // 委托 ContextEngine...
-    events, err := a.engine.Process(ctx, session, userContent)
-    // ...
-
-    a.transition(AgentStateRunning, AgentStateTerminated)
-    a.emitEvent("agent.terminated")
-    span.SetAttributes(attribute.Int64("duration_ms", result.Duration.Milliseconds()))
-
-    return result, nil
-}
-```
+> **注意：** 本文档旧版内联的 `agent.create`、`agent.iterate`、`agent.permission_check` 常量已不再存在于代码中。以 `span-registry.md` 和 `telemetry/names.go` 为权威来源。
 
 ---
 

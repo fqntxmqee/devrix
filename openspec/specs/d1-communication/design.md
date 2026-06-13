@@ -20,6 +20,7 @@
 | `openspec/specs/d1-communication/a-registry.md` | A 层活动注册表（21 Activities） |
 | `openspec/specs/d1-communication/f-registry.md` | F 层功能点注册表（43 Function Points） |
 | `openspec/specs/d1-communication/t-registry.md` | T 层测试点注册表（44 / 44 IMPLEMENTED） |
+| `openspec/specs/d1-communication/span-registry.md` | Span 注册表（15 ops，gateway + adapter） |
 | `openspec/specs/architecture/layering.md` | Devrix 分层架构与 D/S/A/F/T 编号规则 |
 
 ---

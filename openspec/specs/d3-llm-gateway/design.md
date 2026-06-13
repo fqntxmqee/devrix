@@ -433,22 +433,10 @@ func (f *Filter) AddPattern(p Pattern)
 
 ## 八、可观测性
 
-Gateway 通过 `observability.Bridge` 集成 OpenTelemetry：
+完整的 Span 注册表、Trace Tree、Metrics 定义见独立文件：
+`openspec/specs/d3-llm-gateway/span-registry.md`
 
-**Spans (hierarchical):**
-- `llm.stream` (Client) — 主 span，记录 request/response payload + token usage
-- `llm.provider.route` (Internal) — 模型路由解析
-- `llm.circuit_breaker` (Internal) — 熔断器检查
-- `llm.retry` (Internal) — 重试编排
-- `llm.adapter.stream` (Client) — HTTP 流式调用
-
-**Metrics:**
-- `llm_requests_total` (Int64Counter) — 成功调用计数
-- `llm_errors_total` (Int64Counter) — 失败调用计数
-- `llm_latency_seconds` (Float64Histogram) — 调用延迟分布
-
-**GenAI Token Recording:**
-- `observability.RecordGenAITokenUsage` — 记录 input/output/cache_read/reasoning tokens
+Gateway 通过 `observability.Bridge` 集成 OpenTelemetry，包含 5 个 Operation（llm_gateway 4 + llm_adapter 1）、3 个 Metrics 及 GenAI Token Recording。
 
 ---
 

@@ -23,6 +23,7 @@
 | `layer-delta.md` | 层能力 Delta（Gherkin Scenario） |
 | `coverage.md` | 代码染色操作手册 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
+| `span-registry.md` | Span 注册表（56 ops，全局 Trace Tree） |
 
 ---
 
