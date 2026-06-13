@@ -75,17 +75,17 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ---
 
-## D7-S2: Session Orchestrator (PLANNED)
+## D7-S2: Session Orchestrator
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | — | PLANNED | P0 |
-| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | — | PLANNED (v1.0) | P0 |
-| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | — | PLANNED (v1.0) | P0 |
-| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | — | PLANNED (v1.0) | P0 |
-| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | — | PLANNED (v1.0) | P0 |
-| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | — | PLANNED (v1.0) | P0 |
-| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | — | PLANNED (v1.0) | P0 |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -93,13 +93,13 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|------|------|-----------|--------|----------|
-| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | — | PLANNED | P0 |
-| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED | P0 |
-| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | — | PLANNED (P1) | P1 |
-| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | — | PLANNED | P2 |
-| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | — | PLANNED (v1.0) | P0 |
-| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED | P0 |
-| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED | P0 |
+| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/gateway/d7_integration_test.go` | IMPLEMENTED | P0 |
+| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | — | PLANNED (R2 P1 — release 后补) | P1 |
+| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/d7/entry_test.go` | IMPLEMENTED | P2 |
+| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/gateway/d7_matrix_test.go` | IMPLEMENTED | P0 |
+| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 
 ---
 
@@ -115,7 +115,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 41 | 22 | 2 | 17 | 21 |
+| 41 | 30 | 2 | 9 | 21 |
 
 ### 按 Scenario
 
