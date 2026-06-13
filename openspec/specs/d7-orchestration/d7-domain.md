@@ -4,8 +4,10 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 1.0.0
-**Status:** S3 — Design
+**Version:** 2.0.0
+**Status:** Active — IMPLEMENTED (S3/S4) + PLANNED (S1/S2/S5 migration)
+**Last Updated:** 2026-06-14
+**Implementation Audit:** `layer-delta.md`
 **Depends On:** D2-S10 (QueryLoop), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)
 
 ---
@@ -16,18 +18,35 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，位于 D1-D6 之上，作
 
 **域职责**：回答"做什么、按什么顺序做、谁来做、做得怎么样了"。
 
+### 实现状态（2026-06-14 代码审计）
+
+| Scenario | 状态 | 现行代码位置 |
+|----------|------|-------------|
+| D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wave/` |
+| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/` |
+| D7-S1 Work Model | 🔶 PARTIAL | `internal/layers/contextengine/tasks/`（写模型仍在 D2） |
+| D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类/拆解未实现 |
+| D7-S2 Session Orchestrator | ⬜ PLANNED | D1 仍调用 `D2.Process`（`gateway.go:286`） |
+| `internal/layers/d7/` 包 | ⬜ PLANNED | 目录不存在 |
+
 **域边界**：
-- D7 **拥有**：Task/Plan 数据模型（D7-S1）、编排路线决策（D7-S2/S5）
+- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）
 - D7 **编排**：D2（LLM↔Tool 执行）、D4（Agent 委托）
+- D7 **暂托管（D2）**：Task 写模型、PlanMode（目标迁入 D7-S1/S5）
 - D7 **不拥有**：会话上下文（D2）、agent 生命周期（D4）、LLM 调用（D3）
 
-**和 D1-D6 的关系**：
+**和 D1-D6 的关系（现行 vs 目标）**：
 ```
-D7 编排 D2（执行原语）和 D4（agent 原语）
+【现行】
+D1 → D2.Process → delegate_tools → D4 + flow.GlobalHub
+ORCH wave/ 由 delegate_tools 独立触发
+
+【目标 D7 v1.0】
+D1 → D7.ProcessMessage (替代 D1→D2.Process)
+D7 编排 D2 RunQueryLoop + D4 RunAgent
 D7 将进度事件发布到 D1（通信层）
-D1 → D7.ProcessMessage (新入口, 替代 D1→D2.Process)
-D6 → D7 ValidateOrchestration (元决策校验)
-D5 观测 D7 (tracing/metrics)
+D6 → D7 ValidateOrchestration (元决策校验, advisory)
+D5 观测 D7 (orchestration.wave.* / orchestration.flow.*)
 D3 不直接和 D7 交互
 ```
 
@@ -43,7 +62,9 @@ D3 不直接和 D7 交互
 
 D7 MUST exist as a top-level domain package at `internal/layers/d7/` with defined DSAFT S/A/F/T mapping. Domain type MUST be "核心".
 
-<!-- T: D7-IDENTITY-T01, D7-IDENTITY-F01-T01 -->
+**Implementation Status (2026-06-14):** ⬜ PLANNED — `internal/layers/d7/` 不存在；现行能力分布在 `orchestration/` 与 `contextengine/tasks/`。
+
+<!-- T: D7-IDENTITY-T01 (PLANNED) -->
 
 #### Scenario: D7 package exists
 
@@ -168,9 +189,11 @@ D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request ent
 
 ### Requirement: D7-S3 Wave Scheduler (升格自 ORCH-S3)
 
-D7-S3 MUST provide DAG-based multi-agent scheduling, worker pool management, conflict guarding, and context resolution. Behavior MUST remain bit-identical to ORCH-S3 V1.0.0 after migration.
+D7-S3 MUST provide DAG-based multi-agent scheduling, worker pool management, conflict guarding, and context resolution.
 
-<!-- T: D7-S3-T01, D7-S3-T02 -->
+**Implementation Status (2026-06-14):** ✅ IMPLEMENTED at `internal/layers/orchestration/wave/`. 12/11 T 测试点 IMPLEMENTED（D7-S3-T01…T10, T11 PARTIAL）。
+
+<!-- T: D7-S3-T01 … D7-S3-T11 -->
 
 #### Scenario: DAG scheduling unchanged after migration
 
@@ -190,9 +213,11 @@ D7-S3 MUST provide DAG-based multi-agent scheduling, worker pool management, con
 
 ### Requirement: D7-S4 Execution Flow (升格自 ORCH-S1/S2)
 
-D7-S4 MUST aggregate FlowEvent from D2 SubQuery and D4 Delegate into WorkPlan snapshots, and publish to D1 Gateway. Behavior MUST remain bit-identical to ORCH-S1/S2 V1.0.0 after migration.
+D7-S4 MUST aggregate FlowEvent from D2 SubQuery and D4 Delegate into WorkPlan snapshots, and publish to D1 Gateway.
 
-<!-- T: D7-S4-T01, D7-S4-T02 -->
+**Implementation Status (2026-06-14):** ✅ IMPLEMENTED at `orchestration/flow/hub.go`, `workplan/service.go`, `imsink/gateway.go`. 7 T 测试点 IMPLEMENTED。
+
+<!-- T: D7-S4-T01 … D7-S4-T07 -->
 
 #### Scenario: Event publication unchanged
 
