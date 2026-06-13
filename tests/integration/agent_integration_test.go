@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/agent"
 	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -40,15 +41,15 @@ func (a testPermGateAdapter) Request(ctx context.Context, sessionID, toolName, i
 }
 
 type integrationEngineBuilder struct {
-	llm     contextengine.ILLMGateway
-	tools   contextengine.IToolRunner
+	llm      llmgateway.ILLMGateway
+	tools    contextengine.IToolRunner
 	toolsReg contextengine.IToolRegistry
-	ctxCfg  *config.ContextEngineConfig
-	toolCfg *config.ToolConfig
+	ctxCfg   *config.ContextEngineConfig
+	toolCfg  *config.ToolConfig
 }
 
 func (b *integrationEngineBuilder) Build(perm multiagent.PermissionGate) contracts.IEngine {
-	var gate contextengine.IPermissionGate
+	var gate contracts.IPermissionGate
 	if perm != nil {
 		gate = testPermGateAdapter{fn: perm.Request}
 	}

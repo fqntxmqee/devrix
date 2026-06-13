@@ -6,7 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// PermissionGateAdapter bridges PermissionManager to contextengine.IPermissionGate.
+// PermissionGateAdapter bridges PermissionManager to contracts.IPermissionGate.
 type PermissionGateAdapter struct {
 	mgr *PermissionManager
 }

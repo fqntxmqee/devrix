@@ -12,6 +12,7 @@ import (
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -20,11 +21,11 @@ type accPlanLLM struct {
 	lastSystemPrompt string
 }
 
-func (p *accPlanLLM) ChatStream(_ context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
+func (p *accPlanLLM) ChatStream(_ context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
 	p.lastSystemPrompt = req.SystemPrompt
-	ch := make(chan contextengine.LLMChunk, 2)
+	ch := make(chan llmgateway.Chunk, 2)
 	go func() {
-		ch <- contextengine.LLMChunk{Content: "Done.", Done: true}
+		ch <- llmgateway.Chunk{Content: "Done.", Done: true}
 		close(ch)
 	}()
 	return ch, nil

@@ -4,7 +4,7 @@
 **Change ID:** devrix-context-engine
 **Demand ID:** DM-20260607-002
 **版本:** 1.0.0
-**状态:** Ready for S4
+**状态:** Historical — PEV 章节已归档；现行主路径见 QueryLoop（`openspec/specs/context-engine/spec.md` V6+）
 **关联 OpenSpec:** `openspec/archive/2026-06-07-devrix-context-engine/`（已归档）；规格 SoT：`openspec/specs/context-engine/spec.md`
 
 ---

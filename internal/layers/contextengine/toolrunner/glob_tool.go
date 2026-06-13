@@ -1,4 +1,4 @@
-package contextengine
+package toolrunner
 
 import (
 	"context"
@@ -32,7 +32,7 @@ func (r *globRunner) Schema() ToolSchema {
 func (r *globRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
 func (r *globRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
-	fields := parseToolInput(input)
+	fields := ParseToolInput(input)
 	pattern := fields["pattern"]
 	if pattern == "" {
 		return &ToolResult{Error: "glob: pattern is required"}, nil

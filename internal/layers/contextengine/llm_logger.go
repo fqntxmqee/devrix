@@ -6,6 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -155,8 +156,12 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-func buildRequestInfo(iter int, model string, req *LLMRequest, full bool, spanPreview bool) LLMCallInfo {
+func buildRequestInfo(iter int, model string, req *llmgateway.Request, full bool, spanPreview bool) LLMCallInfo {
 	msgLimit := contentLimit(full, spanPreview)
+	tools := make([]ToolSchema, len(req.Tools))
+	for i, t := range req.Tools {
+		tools[i] = ToolSchema{Name: t.Name, Description: t.Description, Parameters: t.Parameters}
+	}
 	info := LLMCallInfo{
 		Iteration:    iter,
 		Model:        model,
@@ -164,7 +169,7 @@ func buildRequestInfo(iter int, model string, req *LLMRequest, full bool, spanPr
 		ToolCount:    len(req.Tools),
 		SystemLen:    len(req.SystemPrompt),
 		Messages:     formatMessages(req.Messages, msgLimit),
-		Tools:        formatToolSchemas(req.Tools, toolDescLimit(full)),
+		Tools:        formatToolSchemas(tools, toolDescLimit(full)),
 	}
 	if full {
 		info.SystemPrompt = req.SystemPrompt
@@ -203,7 +208,7 @@ func buildResponseInfo(
 }
 
 // AddLLMRequestEvent records LLM request info on the span and optionally to a local file.
-func AddLLMRequestEvent(span tracer.Span, sessionID string, iter int, model string, req *LLMRequest) {
+func AddLLMRequestEvent(span tracer.Span, sessionID string, iter int, model string, req *llmgateway.Request) {
 	settings := currentLLMLogSettings()
 	fullForSpan := settings.LogContent
 	info := buildRequestInfo(iter, model, req, fullForSpan, !fullForSpan)

@@ -3,17 +3,17 @@ package eval
 import "context"
 
 func init() {
-	RegisterProbe(&PEVToolAccuracyProbe{})
+	RegisterProbe(&ToolAccuracyProbe{})
 }
 
-// PEVToolAccuracyProbe 评测 PEV tool 选择的 precision/recall/F1（确定性，不依赖 Judge）。
-type PEVToolAccuracyProbe struct{}
+// ToolAccuracyProbe evaluates tool-selection precision/recall/F1 (deterministic, no Judge).
+type ToolAccuracyProbe struct{}
 
-func (p *PEVToolAccuracyProbe) ID() string {
-	return "pev_tool_accuracy"
+func (p *ToolAccuracyProbe) ID() string {
+	return "tool_accuracy"
 }
 
-func (p *PEVToolAccuracyProbe) Run(_ context.Context, item EvalItem, _ Judge) (*DomainScore, error) {
+func (p *ToolAccuracyProbe) Run(_ context.Context, item EvalItem, _ Judge) (*DomainScore, error) {
 	expected := stringSliceFromInput(item.Input, "expected_tools")
 	actual := stringSliceFromInput(item.Input, "actual_tools")
 

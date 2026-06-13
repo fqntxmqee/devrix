@@ -4,7 +4,6 @@ sequenceDiagram
     participant GW as D1: Gateway
     participant H as D2: Harness
     participant QL as D2: QueryLoop
-    participant PEV as D2: PEV Engine
     participant CMP as D2: Compression
     participant MEM as D2: Memory
     participant LLM as D3: LLM Gateway
@@ -26,12 +25,9 @@ sequenceDiagram
         H->>QL: RunQueryLoop (D2-S10-A01)
         QL->>MEM: LoadOrInit (D2-S3-A01)
         QL->>CMP: RunPipeline (D2-S2-A01)
-        QL->>PEV: ExecutePEV (D2-S1-A01)
-        PEV->>LLM: StreamChat (D3-S1-A01)
-        LLM-->>PEV: <-chan chunk
-        PEV->>PEV: VerifyExecution (D2-S1-A02)
-        PEV-->>QL: <-chan *EngineEvent
-        QL-->>GW: routing_result
+        QL->>LLM: StreamChat (D3-S1-A01)
+        LLM-->>QL: <-chan chunk
+        QL-->>GW: <-chan *EngineEvent
         GW->>IM: SendOutbound (D1-S2-A02)
         IM-->>User: 飞书卡片 / CLI 输出
     end
@@ -41,9 +37,9 @@ sequenceDiagram
         GW->>DLG: DelegateTask (D4-S10-A01)
         DLG->>DLG: ForkAgent (D4-S3-A01)
         DLG->>WK: CreateWorker(spec)
-        WK->>PEV: ExecutePEV (独立 session)
-        PEV->>LLM: StreamChat (独立 context)
-        LLM-->>PEV: chunk stream
+        WK->>QL: RunQueryLoop (独立 session)
+        QL->>LLM: StreamChat (独立 context)
+        LLM-->>QL: chunk stream
         WK->>FL: PublishFlow (ORCH-S2-A01)
         FL->>GW: DispatchToIM (进度卡片)
         GW-->>User: Worker 进度更新
@@ -59,9 +55,9 @@ sequenceDiagram
         loop 每轮调度 (Dispatch Loop)
             WV->>WV: GuardConflict (ORCH-S3-A03)
             WV->>WV: ResolveContext (ORCH-S3-A02)
-            WV->>WK: DispatchWorker(task_node)
-            WK->>PEV: ExecutePEV
-            PEV->>LLM: StreamChat
+            WV->>WV: DispatchWorker(task_node)
+            WK->>QL: RunQueryLoop
+            QL->>LLM: StreamChat
             WK->>FL: PublishFlow (ORCH-S2-A01)
             FL->>GW: DispatchToIM (双区块卡片)
             WK-->>WV: Artifact
@@ -73,25 +69,25 @@ sequenceDiagram
 
     rect rgb(255, 235, 238)
         Note over LLM,OBS: 链路4: 熔断与重试
-        PEV->>LLM: StreamWithBreaker (D3-S2-A01)
+        QL->>LLM: StreamWithBreaker (D3-S2-A01)
         LLM->>LLM: BeforeCall (D3-S3-A01)
         alt 熔断器关闭
             LLM->>LLM: CallModel (D3-S1-A01)
         else 熔断器打开
-            LLM-->>PEV: CircuitOpen error
+            LLM-->>QL: CircuitOpen error
             LLM->>LLM: ExecuteRetry (D3-S4-A01)
         end
         LLM->>LLM: AfterCall (D3-S3-A02)
-        LLM-->>PEV: response / error
+        LLM-->>QL: response / error
     end
 
     rect rgb(243, 229, 245)
         Note over OBS,D6: 链路5: 全链路观测 + 演化探针
-        OBS->>PEV: CreateSpan (D5-S1-A01)
+        OBS->>QL: CreateSpan (D5-S1-A01)
         OBS->>GW: RecordMetric (D5-S2-A01)
         OBS->>LLM: LogRecord (D5-S3-A01)
-        D6->>PEV: CompressionRecallProbe
-        D6->>PEV: PEVToolAccuracyProbe
+        D6->>QL: CompressionRecallProbe
+        D6->>QL: ToolAccuracyProbe
         D6->>WV: PathRegressionProbe
         D6->>GW: LayerViolationProbe
     end

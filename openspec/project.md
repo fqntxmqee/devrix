@@ -41,7 +41,7 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | Domain ID | Domain Name | Responsibility |
 |-----------|-------------|----------------|
 | **D1** | Communication Domain (COMM) | IM Gateway, WebSocket, CLI adapter |
-| **D2** | Context Engine Domain (CTX) | PEV Engine, 7-step compression, layered memory |
+| **D2** | Context Engine Domain (CTX) | QueryLoop, 7-step compression, layered memory |
 | **D3** | LLM Gateway Domain (LLM) | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain (AGENT) | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain (OBS) | Tracing, metrics, logging |
@@ -68,7 +68,8 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 
 | Module ID | Module | Responsibility |
 |-------|--------|----------------|
-| D2-S1 | PEV | Plan-Execute-Verify 循环引擎 |
+| D2-S1 | PEV | Plan-Execute-Verify（**已退役**，D2-S10 替代） |
+| D2-S10 | QueryLoop | 多轮 LLM↔Tool 主循环（V6 生产路径） |
 | D2-S2 | Compression | 七步压缩管道 |
 | D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) |
 | D2-S4 | Token | Token 计数与预算管理 |

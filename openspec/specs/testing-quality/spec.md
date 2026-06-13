@@ -28,7 +28,7 @@
 
 | D-S | Module | Missing Tests |
 |--------|--------|---------------|
-| D2-S1 | PEV | timeout, shell injection, concurrent isolation |
+| D2-S8 | Sandbox | shell injection (migrated from retired D2-S1) |
 | D2-S2 | Compression | autocompact timeout fallback |
 | D2-S3 | Memory | longterm failure handling |
 | D3-S1 | Adapter | SSE parse errors |
@@ -52,49 +52,19 @@
 
 ## ADDED Requirements
 
-### Requirement: D2-S1 PEV Boundary Testing
+### Requirement: D2-S8 Sandbox Boundary Testing (shell injection)
+
+> D2-S1 PEV Verify 已退役；shell injection 测试迁移至 D2-S8。
 
 **Priority**: P0
-
-#### Scenario: Verify timeout handling
-
-- GIVEN a command takes longer than configured timeout
-- WHEN `VerifyCommands` is invoked
-- THEN it MUST return error with code `CodeVerifyTimeout`
-- AND the error message MUST include elapsed time
 
 #### Scenario: Shell injection prevention
 
-- GIVEN malicious input with shell metacharacters
-- WHEN `VerifyCommands` processes the input
-- THEN it MUST reject: `;`, `$()`, `` ``, `|`, `&&`
-- AND MUST NOT execute injected command
+- GIVEN malicious bash command patterns
+- WHEN `DefaultCommandPolicy().Validate` is invoked
+- THEN dangerous commands MUST be rejected
 
-#### Scenario: WorkDir validation
-
-- GIVEN a non-existent or inaccessible WorkDir
-- WHEN `VerifyCommands` is invoked
-- THEN it MUST return error `CodeVerifyWorkDirInvalid`
-
----
-
-### Requirement: D2-S1 PEV Concurrent Safety
-
-**Priority**: P0
-
-#### Scenario: Concurrent session isolation
-
-- GIVEN 10+ sessions processed concurrently
-- WHEN `PEVEngine.Process` is called from multiple goroutines
-- THEN each session MUST produce correct isolated results
-- AND sessions MUST NOT interfere with each other's message history
-
-#### Scenario: Context cancellation cleanup
-
-- GIVEN a request is in progress
-- WHEN the context is cancelled
-- THEN `PEVEngine.Process` MUST return within 100ms
-- AND MUST NOT leave goroutines hanging
+<!-- RETIRED: D2-S1 PEV Verify timeout / WorkDir / concurrent isolation requirements removed with PEV engine -->
 
 ---
 
@@ -175,10 +145,7 @@
 
 | T 层 ID | 描述 | L2 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S1-T09 | Verify timeout returns CodeVerifyTimeout | PEV | `tests/integration/context_verify_commands_test.go` | PLANNED |
-| D2-S1-T10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | PLANNED |
-| D2-S1-T11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
-| D2-S1-T12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | PLANNED |
+| D2-S8-A01-T02 | Shell injection attack prevention | Sandbox | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 | D2-S2-T08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | PLANNED |
 
 ### D3 LLM Gateway Extensions
@@ -203,7 +170,7 @@
 ```
 tests/
 ├── security/
-│   └── shell_injection_test.go     # D2-S1-T10
+│   └── shell_injection_test.go     # D2-S8-A01-T02
 ├── performance/
 │   ├── compression_test.go         # D5-S2-T06
 │   └── memory_test.go              # D5-S2-T07
@@ -227,9 +194,9 @@ tests/
 
 | ID | 描述 | 验证方法 |
 |----|------|----------|
-| AC-01 | D2-S1-T09 到 D2-S1-T12 实现并通过 | `./scripts/test-acceptance.sh` |
-| AC-02 | Shell injection 测试覆盖 5+ 危险模式 | `grep -c dangerous tests/security/` |
-| AC-03 | PEV 并发测试验证 10+ 并发 session | `TestPEVEngine_concurrent_sessions` |
+| AC-01 | D2-S8 shell injection + D2-S10 QueryLoop 核心 T 点通过 | `./scripts/test-unit.sh` |
+| AC-02 | Shell injection 测试覆盖 15+ 危险模式 | `tests/security/shell_injection_test.go` |
+| AC-03 | QueryLoop 多 session 隔离（integration） | `tests/integration/query_loop_*` |
 | AC-04 | 压缩超时测试验证降级到 truncation | `TestPipeline_autocompact_timeout_skips_and_fallback` |
 | AC-05 | Token counter 中文准确性误差 < 5% | `TestCounter_chinese_text_accuracy` |
 | AC-06 | 性能测试 P99 < 500ms | `go test -tags=performance -bench=BenchmarkCompressionPipeline` |

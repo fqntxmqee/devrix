@@ -100,13 +100,15 @@ A 层编号格式: `D{X}-S{X}-A{XX}`，归属于对应的 D-S 场景。
 
 ## D2: Context Engine Domain (上下文引擎域)
 
-### D2-S1: PEV
+### D2-S1: PEV (RETIRED)
 
-| A ID | Name | Type | Input | Output | State Change | Code Location |
-|------|------|------|-------|--------|--------------|---------------|
-| D2-S1-A01 | ExecutePEV | A-BE | ctx, session, message | <-chan *EngineEvent | session.processing | `contextengine/engine.go` |
-| D2-S1-A02 | VerifyExecution | A-BE | tool_results | verify_report | verification.{passed,failed} | `contextengine/verify_runner.go` |
-| D2-S1-A03 | PlanExecution | A-BE | user_goal | plan_document | plan.created (milestone DAG) | `contextengine/pev/plan.go` |
+> **2026-06-13**：PEV 引擎已下线。Execute / Verify / Plan 活动由 **D2-S10 QueryLoop** 承接。
+
+| A ID | Name | Type | Status | Successor |
+|------|------|------|--------|-----------|
+| D2-S1-A01 | ExecutePEV | A-BE | RETIRED | D2-S10-A01 RunQueryLoop |
+| D2-S1-A02 | VerifyExecution | A-BE | RETIRED | — |
+| D2-S1-A03 | PlanExecution | A-BE | RETIRED | — |
 
 ### D2-S2: Compression
 

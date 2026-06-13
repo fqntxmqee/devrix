@@ -5,6 +5,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -15,7 +16,7 @@ func newCompressFn(
 	enabled bool,
 	cfg *config.ContextEngineConfig,
 	counter contracts.ITokenCounter,
-	llm ILLMGateway,
+	llm llmgateway.ILLMGateway,
 	async *compression.AsyncAutocompacter,
 	compObserver ICompressionObserver,
 ) func(sessionID string) query.CompressFunc {

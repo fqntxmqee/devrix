@@ -52,7 +52,7 @@
 | L5-CTX-01/02 | D2-S3-A01-T01 | Memory |
 | L5-CTX-03/04 | D2-S2-A01-T01/T02 | Compression |
 | L5-CTX-05 | D2-S3-A01-T02 | Snapshot |
-| L5-CTX-06 | D2-S1-A01-T01 | PEV |
+| L5-CTX-06 | D2-S10-A01-T34 | QueryLoop（原 PEV Execute） |
 | L5-CTX-34–42 | D2-S10-A01-T34–T42 | QueryLoop |
 | L5-TOOL-01 | D2-S8-A01-T01 | Sandbox |
 | L5-TOOL-03 | D2-S9-A03-T05 | ToolPool |

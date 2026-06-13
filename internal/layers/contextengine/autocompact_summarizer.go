@@ -5,12 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// AutocompactSummarizer adapts ILLMGateway for compression autocompact.
+// AutocompactSummarizer adapts llmgateway.ILLMGateway for compression autocompact.
 type AutocompactSummarizer struct {
-	LLM     ILLMGateway
+	LLM     llmgateway.ILLMGateway
 	Timeout time.Duration
 }
 
@@ -25,9 +26,10 @@ func (s *AutocompactSummarizer) Summarize(ctx context.Context, model, prompt str
 		runCtx, cancel = context.WithTimeout(ctx, s.Timeout)
 		defer cancel()
 	}
-	ch, err := s.LLM.ChatStream(runCtx, &LLMRequest{
+	ch, err := s.LLM.ChatStream(runCtx, &llmgateway.Request{
 		Model:    model,
 		Messages: []types.Message{{Role: types.MessageRoleUser, Content: prompt}},
+		Stream:   true,
 	})
 	if err != nil {
 		return "", err

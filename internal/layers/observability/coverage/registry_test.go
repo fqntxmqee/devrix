@@ -35,7 +35,6 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 	telemetry.OpContextSystemPromptLoad,
 		telemetry.OpContextSystemPromptBuild,
 	telemetry.OpContextToolsRegister,
-		telemetry.OpContextVerifyCommand,
 
 		telemetry.OpGatewayAgentCreate,
 		telemetry.OpGatewayEngineEvent,

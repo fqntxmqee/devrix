@@ -7,6 +7,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability/runtime"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -129,19 +130,19 @@ func sessionIDFor(i int) string {
 // 用以驱动 QueryLoop 多轮 + 触发 Compress 路径。
 type multiTurnQueryLLM struct{ n int }
 
-func (m *multiTurnQueryLLM) ChatStream(_ context.Context, _ *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
+func (m *multiTurnQueryLLM) ChatStream(_ context.Context, _ *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
 	m.n++
-	ch := make(chan contextengine.LLMChunk, 1)
+	ch := make(chan llmgateway.Chunk, 1)
 	go func() {
 		defer close(ch)
 		if m.n == 1 {
-			ch <- contextengine.LLMChunk{
-				ToolCalls: []contextengine.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo a"}`}},
+			ch <- llmgateway.Chunk{
+				ToolCalls: []llmgateway.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo a"}`}},
 				Done:      true,
 			}
 			return
 		}
-		ch <- contextengine.LLMChunk{Content: "done", Done: true}
+		ch <- llmgateway.Chunk{Content: "done", Done: true}
 	}()
 	return ch, nil
 }

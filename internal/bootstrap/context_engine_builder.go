@@ -59,14 +59,14 @@ func (b *ContextEngineBuilder) WithMultiAgentConfig(maCfg *config.MultiAgentConf
 
 // Build returns a context engine using the agent permission gate.
 func (b *ContextEngineBuilder) Build(perm multiagent.PermissionGate) contracts.IEngine {
-	var gate contextengine.IPermissionGate
+	var gate contracts.IPermissionGate
 	if perm != nil {
 		gate = permissionGateFunc(perm.Request)
 	}
 	return b.buildWithGate(gate)
 }
 
-func (b *ContextEngineBuilder) buildWithGate(perm contextengine.IPermissionGate) contracts.IEngine {
+func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) contracts.IEngine {
 	if b == nil {
 		return nil
 	}

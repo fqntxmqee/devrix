@@ -1,4 +1,4 @@
-dimension: pev_tool_accuracy
+dimension: tool_accuracy
 instruction: >
   Compare expected tool invocations against actual tool invocations.
   Score is deterministic precision/recall/F1 over tool name sets.

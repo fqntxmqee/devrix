@@ -1,4 +1,4 @@
-package contextengine
+package toolrunner
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func (r *grepRunner) Schema() ToolSchema {
 func (r *grepRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
 func (r *grepRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
-	fields := parseToolInput(input)
+	fields := ParseToolInput(input)
 	pattern := fields["pattern"]
 	if pattern == "" {
 		return &ToolResult{Error: "grep: pattern is required"}, nil

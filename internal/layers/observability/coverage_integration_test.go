@@ -34,9 +34,8 @@ func TestCoverageIntegration_染色是否工作(t *testing.T) {
 	// 创建一些 span，触发染色
 	testOps := []string{
 		"context.process",
-		"context.pev.run",
-		"context.pev.llm_call",
-		"context.pev.verify",
+		"context.compression.run",
+		"llm.stream",
 		"unknown.operation", // 测试 unknown
 	}
 
@@ -99,12 +98,9 @@ func TestCoverageReport_查看完整报告(t *testing.T) {
 	if tracer != nil {
 		ops := []string{
 			"context.process",
-			"context.pev.run",
-			"context.pev.llm_call",
-			"context.pev.tool_execute",
-			"context.pev.verify",
 			"context.compression.run",
 			"llm.stream",
+			"gateway.message.receive",
 		}
 		for _, op := range ops {
 			_, span := tracer.Start(ctx, op)

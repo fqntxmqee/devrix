@@ -94,28 +94,15 @@ F 层编号格式: `D{X}-S{X}-A{XX}-F{NN}`，归属于对应的 D-S-A 活动。
 
 ## D2: Context Engine Domain
 
-### D2-S1-A01 ExecutePEV
+### D2-S1 (RETIRED): ExecutePEV / Verify / Plan
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S1-A01-F01 | Process | F-BE | ctx, session, message | <-chan *EngineEvent | `contracts/engine.go` |
-| D2-S1-A01-F02 | EmitEngineEvent | F-BE | *EngineEvent | — | `engine.go` |
-| D2-S1-A01-F03 | RunPEVCycle | F-BE | session, llm | messages, usage | `pev_engine.go` |
+> **2026-06-13**：PEV 功能点已移除。QueryLoop 见 D2-S10。
 
-### D2-S1-A02 VerifyExecution
-
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S1-A02-F01 | VerifyCommands | F-BE | commands, workdir | verify_report | `verify_runner.go` |
-| D2-S1-A02-F02 | ShouldRetry | F-BE | verify_result | bool | `verify_runner.go` |
-
-### D2-S1-A03 PlanExecution
-
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S1-A03-F01 | ShouldPlan | F-BE | cfg, state, message | bool | `pev/should_plan.go` |
-| D2-S1-A03-F02 | GeneratePlan | F-BE | user_goal, llm | *PlanDocument | `pev/plan.go` |
-| D2-S1-A03-F03 | RunMilestones | F-BE | ctx, session, view, taskID | passed, err | `pev/milestone_runner.go` |
+| F ID | Name | Status | Successor |
+|------|------|--------|-----------|
+| D2-S1-A01-F03 | RunPEVCycle | RETIRED | D2-S10 QueryLoop |
+| D2-S1-A02-F01 | VerifyCommands | RETIRED | — |
+| D2-S1-A03-F01–F03 | Plan/Milestone | RETIRED | — |
 
 ### D2-S2-A01 CompressContext
 

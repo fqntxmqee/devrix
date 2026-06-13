@@ -1,4 +1,4 @@
-package contextengine
+package toolrunner
 
 import (
 	"fmt"
@@ -139,9 +139,8 @@ func containsAbsPath(command string) bool {
 	return strings.Contains(command, " /") || strings.Contains(command, "\t/")
 }
 
-// normalizeWorkspacePaths rewrites absolute paths under workDir to workspace-relative
-// paths so bash commands that use the full project path can pass WorkDirLock checks.
-func normalizeWorkspacePaths(workDir, command string) string {
+// NormalizeWorkspacePaths rewrites absolute paths under workDir to workspace-relative paths.
+func NormalizeWorkspacePaths(workDir, command string) string {
 	workDir = filepath.Clean(workDir)
 	if workDir == "" {
 		return command

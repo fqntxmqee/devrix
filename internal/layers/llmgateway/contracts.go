@@ -91,6 +91,20 @@ type IGateway interface {
 	Close() error
 }
 
+// ILLMGateway is the D2 Context Engine consumer contract for streaming chat.
+//
+// DSAFT: D3-S2-A01-F01 (AdaptToContextEngine)
+type ILLMGateway interface {
+	ChatStream(ctx context.Context, req *Request) (<-chan Chunk, error)
+}
+
+// ITierResolver resolves tier aliases to concrete model names.
+//
+// DSAFT: D3-S2-A01-F02 (ResolveTier)
+type ITierResolver interface {
+	ResolveTier(tier string) (string, error)
+}
+
 // IAdapter streams provider-specific responses.
 type IAdapter interface {
 	Stream(ctx context.Context, req *Request) (<-chan *AdapterChunk, error)

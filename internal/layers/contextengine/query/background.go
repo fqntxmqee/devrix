@@ -47,7 +47,7 @@ func NewBackgroundRegistry() *BackgroundRegistry {
 
 // SetGlobalBackgroundRegistry creates a registry and installs it as the
 // process-wide singleton consumed by the task_stop / task_output LLM
-// tools. Returns the new registry so callers can wire it into PEV.
+// tools. Returns the new registry for callers to wire into the query loop.
 func SetGlobalBackgroundRegistry() *BackgroundRegistry {
 	GlobalBackgroundRegistry = NewBackgroundRegistry()
 	return GlobalBackgroundRegistry

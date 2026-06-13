@@ -153,11 +153,11 @@ Agent 支持不同的推理策略，通过 CollaborationMode 配置生效。
 
 ## Feature: AgentPermissionGate（异步权限）
 
-Agent 实现 contextengine.IPermissionGate 注入 PEVEngine。CRITICAL 工具触发时，AgentPermissionGate 通过 channel 阻塞等待 Gateway 注入用户响应。
+Agent 实现 `shared/contracts.IPermissionGate` 注入 QueryLoop 工具执行路径。CRITICAL 工具触发时，AgentPermissionGate 通过 channel 阻塞等待 Gateway 注入用户响应。
 
 ### Scenario: CRITICAL tool triggers permission via AgentPermissionGate
-- GIVEN PEVEngine 内部 tool execution
-- AND Agent 作为 IPermissionGate 注入 PEVEngine
+- GIVEN QueryLoop 内部 tool execution
+- AND Agent 作为 IPermissionGate 注入 ContextEngine
 - WHEN 工具 riskLevel = CRITICAL
 - THEN AgentPermissionGate.Request() 被调用
 - AND 非 CRITICAL 工具直接返回 true
@@ -172,7 +172,7 @@ Agent 实现 contextengine.IPermissionGate 注入 PEVEngine。CRITICAL 工具触
 - THEN channel 收到 true
 - AND AgentPermissionGate.Request() 返回 true
 - AND Agent 状态: WAITING_PERMISSION → ITERATING
-- AND PEVEngine 继续执行工具
+- AND QueryLoop 继续执行工具
 
 ### Scenario: Gateway resolves permission — denied
 - GIVEN Agent 状态 = WAITING_PERMISSION
@@ -180,7 +180,7 @@ Agent 实现 contextengine.IPermissionGate 注入 PEVEngine。CRITICAL 工具触
 - THEN channel 收到 false
 - AND AgentPermissionGate.Request() 返回 false
 - AND Agent 状态: WAITING_PERMISSION → TERMINATED
-- AND PEVEngine 收到 permission denied
+- AND QueryLoop 收到 permission denied
 
 ### Scenario: Permission timeout
 - GIVEN Agent 状态 = WAITING_PERMISSION
@@ -190,7 +190,7 @@ Agent 实现 contextengine.IPermissionGate 注入 PEVEngine。CRITICAL 工具触
 - AND 返回 `AGT_PERMISSION_5007` 错误
 
 ### Scenario: Non-CRITICAL tools auto-authorize
-- GIVEN PEVEngine 调用 AgentPermissionGate.Request()
+- GIVEN QueryLoop 调用 AgentPermissionGate.Request()
 - WHEN riskLevel = LOW / MEDIUM / HIGH
 - THEN 直接返回 true（不阻塞）
 - AND Agent 状态保持 ITERATING

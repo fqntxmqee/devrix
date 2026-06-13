@@ -40,10 +40,10 @@ func suggestForRegression(reg DeltaEntry) *TuneSuggestion {
 			SuggestedVal: "increase by 20%",
 			Confidence:   confidenceForDelta(reg.Delta),
 		}
-	case strings.HasSuffix(dim, ".pev_tool_accuracy"):
+	case strings.HasSuffix(dim, ".tool_accuracy"):
 		return &TuneSuggestion{
 			Target:       "context_engine.harness.tool_pool.simple_mode",
-			Reason:       fmt.Sprintf("PEV tool accuracy regressed by %.2f (%.2f → %.2f)", drop, reg.Previous, reg.Current),
+			Reason:       fmt.Sprintf("tool accuracy regressed by %.2f (%.2f → %.2f)", drop, reg.Previous, reg.Current),
 			CurrentVal:   "false",
 			SuggestedVal: "true",
 			Confidence:   confidenceForDelta(reg.Delta),

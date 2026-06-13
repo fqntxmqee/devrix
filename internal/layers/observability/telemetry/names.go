@@ -36,7 +36,6 @@ const (
 	OpContextCompressionRun = "context.compression.run"
 	OpContextLongTermRecall = "context.longterm.recall"
 	OpContextLongTermStore  = "context.longterm.store"
-	OpContextVerifyCommand  = "context.verify.command"
 	OpContextToolsRegister   = "context.tools.register"
 	OpContextMemorySnapshotSave = "context.memory.snapshot.save"
 
@@ -89,8 +88,6 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerContext, "harness"
 	case operation == OpContextSystemPromptBuild:
 		return LayerContext, "harness"
-	case strings.HasPrefix(operation, "context.verify."):
-		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "context."):
 		return LayerContext, "context_engine"
 	case strings.HasPrefix(operation, "llm.provider."):

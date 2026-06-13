@@ -7,12 +7,12 @@ import (
 
 // T: D6-S3-A01-T06
 
-func TestPEVToolAccuracyProbe_AllCorrect(t *testing.T) {
-	probe := &PEVToolAccuracyProbe{}
+func TestToolAccuracyProbe_AllCorrect(t *testing.T) {
+	probe := &ToolAccuracyProbe{}
 	item := EvalItem{
-		ID:        "pev-1",
+		ID:        "tool-acc-1",
 		Bucket:    "production",
-		Dimension: "pev_tool_accuracy",
+		Dimension: "tool_accuracy",
 		Input: map[string]any{
 			"expected_tools": []any{"read_file", "grep"},
 			"actual_tools":   []any{"read_file", "grep"},
@@ -34,12 +34,12 @@ func TestPEVToolAccuracyProbe_AllCorrect(t *testing.T) {
 	}
 }
 
-func TestPEVToolAccuracyProbe_PartialWrong(t *testing.T) {
-	probe := &PEVToolAccuracyProbe{}
+func TestToolAccuracyProbe_PartialWrong(t *testing.T) {
+	probe := &ToolAccuracyProbe{}
 	item := EvalItem{
-		ID:        "pev-2",
+		ID:        "tool-acc-2",
 		Bucket:    "adversarial",
-		Dimension: "pev_tool_accuracy",
+		Dimension: "tool_accuracy",
 		Input: map[string]any{
 			"expected_tools": []any{"read_file"},
 			"actual_tools":   []any{"write_file"},
@@ -61,12 +61,12 @@ func TestPEVToolAccuracyProbe_PartialWrong(t *testing.T) {
 	}
 }
 
-func TestPEVToolAccuracyProbe_PartialMatch(t *testing.T) {
-	probe := &PEVToolAccuracyProbe{}
+func TestToolAccuracyProbe_PartialMatch(t *testing.T) {
+	probe := &ToolAccuracyProbe{}
 	item := EvalItem{
-		ID:        "pev-3",
+		ID:        "tool-acc-3",
 		Bucket:    "edge",
-		Dimension: "pev_tool_accuracy",
+		Dimension: "tool_accuracy",
 		Input: map[string]any{
 			"expected_tools": []any{"read_file", "grep"},
 			"actual_tools":   []any{"read_file", "write_file"},

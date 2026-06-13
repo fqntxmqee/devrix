@@ -26,7 +26,7 @@
 | Domain ID | 名称 | 缩写 | Responsibility |
 |-----------|------|------|----------------|
 | **D1** | Communication Domain | COMM | IM Gateway, WebSocket, CLI adapter |
-| **D2** | Context Engine Domain | CTX | PEV Engine, 7-step compression, layered memory |
+| **D2** | Context Engine Domain | CTX | QueryLoop, 7-step compression, layered memory |
 | **D3** | LLM Gateway Domain | LLM | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain | AGENT | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain | OBS | Tracing, metrics, logging |
@@ -59,7 +59,7 @@
 
 | Module ID | Scenario | Responsibility | Status |
 |-----------|----------|----------------|--------|
-| D2-S1 | PEV | Plan-Execute-Verify 循环引擎 | IMPLEMENTED |
+| D2-S1 | PEV | Plan-Execute-Verify 循环引擎（**已退役**，由 D2-S10 替代） | RETIRED |
 | D2-S2 | Compression | 七步压缩管道 | IMPLEMENTED |
 | D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) | IMPLEMENTED |
 | D2-S4 | Token | Token 计数与预算管理 | IMPLEMENTED |
@@ -72,7 +72,7 @@
 | D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） | IMPLEMENTED |
 | D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） | IMPLEMENTED |
 | D2-S13 | Conversation | 会话对话管理 | IMPLEMENTED |
-| D2-S14 | Mock | PEV Engine Mock（测试辅助） | IMPLEMENTED |
+| D2-S14 | Mock | Context Engine Mock（测试辅助） | IMPLEMENTED |
 
 ### ORCH Orchestration (Cross-Domain, v2)
 
@@ -157,13 +157,13 @@ layers/
 │   # PLANNED: commands/ (D1-S3), auth/ (D1-S4)
 │
 ├── contextengine/                 # D2
-│   ├── pev/                       # D2-S1
 │   ├── compression/               # D2-S2
 │   ├── memory/                    # D2-S3
 │   ├── token/                     # D2-S4
 │   ├── registry/                  # D2-S5
 │   ├── snapshot/                  # D2-S6
 │   ├── prompt/                    # D2-S7
+│   ├── toolrunner/                # D2-S5/D2-S8 工具执行与沙箱
 │   ├── harness/                   # D2-S9 (V5)
 │   ├── query/                     # D2-S10 QueryLoop
 │   ├── usercontext/               # D2-S10 UserContext

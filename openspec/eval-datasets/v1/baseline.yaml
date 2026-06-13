@@ -89,7 +89,7 @@ scores:
             completiontokens: 10
             totaltokens: 30
     - domain: d2
-      dimension: pev_tool_accuracy
+      dimension: tool_accuracy
       score: 0.5555555555555555
       confidence: 1
       buckets:

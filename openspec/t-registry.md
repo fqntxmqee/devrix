@@ -138,24 +138,18 @@
 | D2-S2-A01-T07 | 异步压缩失败降级不丢失数据 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
 | D2-S2-A01-T08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
 
-### D2-S1: PEV Module
+### D2-S1: PEV Module (RETIRED)
 
-| T ID | 描述 | S 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| D2-S1-A01-T01 | PEV Execute 调用 LLM 并流输出 | PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
-| D2-S1-A02-T02 | 工具执行 Verify basic 模式 | PEV | `internal/layers/contextengine/verify_runner_test.go` | IMPLEMENTED |
-| D2-S1-A01-T03 | EngineEvent 与通信层四握约定一致 | PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
-| D2-S1-A01-T04 | 批准/拒绝 PEV 行为正确 | PEV | `tests/integration/context_gateway_flow_test.go` | IMPLEMENTED |
-| D2-S1-A02-T05 | Verify commands 全部通过 | PEV | `tests/integration/context_verify_commands_test.go` | IMPLEMENTED |
-| D2-S1-A02-T06 | Verify 命令失败触发重试 | PEV | `internal/layers/contextengine/verify_runner_test.go` | IMPLEMENTED |
-| D2-S1-A03-T07 | Milestone 按序执行 | PEV | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED |
-| D2-S1-A03-T08 | milestone_progress 事件正确投射 | PEV | `tests/acceptance/p0/ctx_plan_longterm_test.go` | IMPLEMENTED |
-| D2-S1-A02-T09 | Verify timeout kills command (DeadlineExceeded) | PEV | `tests/integration/context_verify_commands_test.go` | IMPLEMENTED |
-| D2-S1-A02-T10 | Shell injection attack prevention | PEV | `tests/security/shell_injection_test.go` | IMPLEMENTED |
-| D2-S1-A01-T11 | PEV concurrent session isolation | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
-| D2-S1-A01-T12 | PEV context cancellation cleanup | PEV | `internal/layers/contextengine/pev_engine_test.go` | IMPLEMENTED |
-| D2-S1-A01-T13 | PEV emit complete 透传 ctx_pct + llm_called（主路径/milestone-only 区分） | PEV | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED | P1 |
-| D2-S1-A01-T14 | query loop runSpan 含 pev.prompt_tokens / pev.completion_tokens / pev.ctx_pct | PEV | `internal/layers/contextengine/query_loop_run.go` | IMPLEMENTED | P1 |
+> **2026-06-13**：PEV（Plan-Execute-Verify）引擎已下线，主路径由 **D2-S10 QueryLoop** 承接。
+> 下列 T 点已退役；等价或迁移后的覆盖见 §D2-S8 / §D2-S10。
+
+| T ID | 描述 | 迁移 / 备注 | Status |
+|-------|------|-------------|--------|
+| D2-S1-A01-T01–T04 | PEV Execute / Gateway 四握 | → `D2-S10-A01-T34` + `tests/integration/context_gateway_flow_test.go` | RETIRED |
+| D2-S1-A02-T02,T05,T06,T09 | Verify commands | PEV Verify 已移除 | RETIRED |
+| D2-S1-A02-T10 | Shell injection | → `D2-S8-A01-T01` `tests/security/shell_injection_test.go` | MIGRATED |
+| D2-S1-A03-T07,T08 | Milestone Plan | PEV Plan 已移除；D1 Milestone 保留 | RETIRED |
+| D2-S1-A01-T11–T14 | PEV 并发/span/complete | QueryLoop 路径替代 | RETIRED |
 
 ### D2-S4: Token Module
 
@@ -167,7 +161,8 @@
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/sandbox_test.go` | IMPLEMENTED |
+| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/toolrunner/sandbox_test.go` | IMPLEMENTED |
+| D2-S8-A01-T02 | Shell injection attack prevention | Sandbox | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 
 ### D2-S9: Harness Module
 
@@ -188,7 +183,7 @@
 | D2-S9-A01-T11 | Jaeger span 树（enabled/disabled） | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T12 | disabled 与 BuildLegacy 字节级一致 | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T13 | CompressedView system = Build 输出 | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
-| D2-S9-A03-T14 | PEV 可见工具 ⊆ VisibleTools | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A03-T14 | QueryLoop 可见工具 ⊆ VisibleTools | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T15 | bootstrap.stage parent = bootstrap.run | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 
 ### D2-S9.BG: Background SubQuery Task Tools
@@ -456,7 +451,7 @@
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | D5-S4-A01-T01 | LongTerm recall/store 产生 canonical Operation span | Exporter | `internal/layers/contextengine/engine.go` | IMPLEMENTED |
-| D5-S4-A01-T02 | Plan 产生 Milestone Run 产生 canonical Operation span | Exporter | `internal/layers/contextengine/pev_engine.go` | IMPLEMENTED |
+| D5-S4-A01-T02 | QueryLoop 产生 canonical Operation span | Exporter | `internal/layers/contextengine/query/loop.go` | IMPLEMENTED |
 | D5-S4-A01-T03 | Feishu 入站产生 adapter.message.receive span | Exporter | `tests/integration/obs_trace_propagation_test.go` | IMPLEMENTED |
 
 ### D5-S5: Coverage Module
@@ -499,7 +494,7 @@
 | D6-S3-A01-T03 | Compression Recall Probe F1 | Eval | `internal/layers/evolution/eval/compression_recall_probe_test.go` | IMPLEMENTED | P0 |
 | D6-S3-A01-T04 | Delta 报告对比 | Eval | `internal/layers/evolution/eval/delta_test.go` | IMPLEMENTED | P0 |
 | D6-S3-A01-T07 | eval.enabled=false 零行为 | Eval | `internal/layers/evolution/eval/engine_test.go` | IMPLEMENTED | P0 |
-| D6-S3-A01-T06 | PEV Tool 选择准确率探针 | Eval | `internal/layers/evolution/eval/pev_tool_accuracy_probe_test.go` | IMPLEMENTED | P1 |
+| D6-S3-A01-T06 | Tool 选择准确率探针 | Eval | `internal/layers/evolution/eval/tool_accuracy_probe_test.go` | IMPLEMENTED | P1 |
 | D6-S3-A01-T11 | devrix eval run 子命令 | Eval | `internal/cli/eval/run_test.go` | IMPLEMENTED | P1 |
 | D6-S3-A01-T12 | 调优建议生成 | Eval | `internal/layers/evolution/eval/tune_test.go` | IMPLEMENTED | P2 |
 | D6-S3-A01-T13 | eval run 真实 Judge 接入 | Eval | `internal/cli/eval/judge.go` | IMPLEMENTED | P1 |

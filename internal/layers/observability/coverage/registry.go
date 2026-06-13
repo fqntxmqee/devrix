@@ -39,7 +39,6 @@ func AllOperations() []OperationMeta {
 		{Name: "context.snapshot.load", Layer: "context", Component: "context_engine", SinceVersion: "1.2.0", Instrumented: true},
 			{Name: "context.system_prompt.load", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 			{Name: "context.tools.register", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
-		{Name: "context.verify.command", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
 		{Name: "gateway.agent.create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "gateway.engine_event.handle", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},

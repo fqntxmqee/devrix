@@ -98,6 +98,11 @@ func DefaultCatalog() []Contract {
 		{Name: "ExecutionFlowHub", Owner: "shared/contracts", Source: "execution_flow.go"},
 		{Name: "FlowEvent", Owner: "shared/contracts", Source: "execution_flow.go"},
 		{Name: "ComputeCtxPct", Owner: "shared/contracts", Source: "ctxutil.go"},
+		{Name: "IPermissionGate", Owner: "shared/contracts", Source: "permission.go"},
+		{Name: "ILLMGateway", Owner: "llmgateway", Source: "contracts.go"},
+		{Name: "ITierResolver", Owner: "llmgateway", Source: "contracts.go"},
+		{Name: "IToolRunner", Owner: "contextengine/toolrunner", Source: "contracts.go"},
+		{Name: "IToolRegistry", Owner: "contextengine/toolrunner", Source: "contracts.go"},
 	}
 }
 

@@ -3,7 +3,6 @@ package llmbridge
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -13,7 +12,7 @@ import (
 
 // ContextLLMStack holds LLM gateway wiring for the context engine.
 type ContextLLMStack struct {
-	Gateway      contextengine.ILLMGateway
+	Gateway      llmgateway.ILLMGateway
 	RawGateway   llmgateway.IGateway
 	TokenCounter contracts.ITokenCounter
 	// DefaultModel 是 LLM 网关解析后的全局默认模型名（来自
@@ -22,7 +21,7 @@ type ContextLLMStack struct {
 	// 仅展示用途，不参与路由（路由仍由 LLM 网关执行）。
 	DefaultModel string
 	// TierResolver resolves model tier aliases to concrete model names.
-	TierResolver contextengine.ITierResolver
+	TierResolver llmgateway.ITierResolver
 }
 
 // WireContextLLM loads and wires the LLM stack; falls back to mock on error.
@@ -43,6 +42,6 @@ func WireContextLLM(configFile string, obsBridge *observability.Bridge) ContextL
 		RawGateway:   wired.Gateway,
 		TokenCounter: wired.TokenCounter,
 		DefaultModel: llmCfg.DefaultModel,
-		TierResolver: wired.Bridge.(contextengine.ITierResolver),
+		TierResolver: wired.Bridge.(llmgateway.ITierResolver),
 	}
 }

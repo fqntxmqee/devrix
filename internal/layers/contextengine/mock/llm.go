@@ -3,22 +3,23 @@ package mockctx
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/toolrunner"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// LLMGateway is a test double for ILLMGateway.
+// LLMGateway is a test double for llmgateway.ILLMGateway.
 type LLMGateway struct {
 	Response string
 	Err      error
 }
 
 // ChatStream returns a single text response.
-func (m *LLMGateway) ChatStream(ctx context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
+func (m *LLMGateway) ChatStream(ctx context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
 	if m.Err != nil {
 		return nil, m.Err
 	}
-	ch := make(chan contextengine.LLMChunk, 2)
+	ch := make(chan llmgateway.Chunk, 2)
 	go func() {
 		defer close(ch)
 		select {
@@ -30,7 +31,11 @@ func (m *LLMGateway) ChatStream(ctx context.Context, req *contextengine.LLMReque
 		if text == "" {
 			text = "I can help you with that."
 		}
-		ch <- contextengine.LLMChunk{Content: text, Done: true, Usage: contextengine.TokenUsage{PromptTokens: 10, CompletionTokens: 5}}
+		ch <- llmgateway.Chunk{
+			Content: text,
+			Done:    true,
+			Usage:   llmgateway.TokenUsage{PromptTokens: 10, CompletionTokens: 5},
+		}
 	}()
 	return ch, nil
 }
@@ -42,7 +47,7 @@ type ToolRunner struct {
 }
 
 // Execute returns configured output.
-func (t *ToolRunner) Execute(ctx context.Context, call contextengine.ToolCall) (*contextengine.ToolResult, error) {
+func (t *ToolRunner) Execute(ctx context.Context, call toolrunner.ToolCall) (*toolrunner.ToolResult, error) {
 	if t.Err != nil {
 		return nil, t.Err
 	}
@@ -50,7 +55,7 @@ func (t *ToolRunner) Execute(ctx context.Context, call contextengine.ToolCall) (
 	if out == "" {
 		out = "ok"
 	}
-	return &contextengine.ToolResult{Output: out}, nil
+	return &toolrunner.ToolResult{Output: out}, nil
 }
 
 // AllowAllPermission always approves.
@@ -71,8 +76,8 @@ func (DenyAllPermission) Request(context.Context, string, string, string, types.
 type LLMGatewayWithTools struct{}
 
 // ChatStream emits a tool call then completes.
-func (m *LLMGatewayWithTools) ChatStream(ctx context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
-	ch := make(chan contextengine.LLMChunk, 2)
+func (m *LLMGatewayWithTools) ChatStream(ctx context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
+	ch := make(chan llmgateway.Chunk, 2)
 	go func() {
 		defer close(ch)
 		select {
@@ -80,8 +85,8 @@ func (m *LLMGatewayWithTools) ChatStream(ctx context.Context, req *contextengine
 			return
 		default:
 		}
-		ch <- contextengine.LLMChunk{
-			ToolCalls: []contextengine.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
 			Done:      true,
 		}
 	}()

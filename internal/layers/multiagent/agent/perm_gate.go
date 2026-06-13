@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// agentPermissionGate implements contextengine.IPermissionGate for a single agent.
+// agentPermissionGate implements contracts.IPermissionGate for a single agent.
 type agentPermissionGate struct {
 	agent *Impl
 	mu    sync.Mutex

@@ -137,11 +137,6 @@ Span name（Jaeger Operation）MUST 使用 `{layer}.{module}.{action}` 格式，
 | `context.process` | context | INTERNAL | `session.id`, `message.len` |
 | `context.snapshot.load` | context | INTERNAL | — |
 | `context.compression.run` | context | INTERNAL | `context.tokens_before`, `context.tokens_after` |
-| `context.pev.run` | context | INTERNAL | `pev.max_iterations` |
-| `context.pev.llm_call` | context | CLIENT | `pev.iteration`, `llm.model`, `llm.tokens.*`, `llm.latency_ms` |
-| `context.pev.tool_execute` | context | INTERNAL | `tool.name`, `tool.input`, `tool.output`, `tool.duration_ms` |
-| `context.pev.permission_check` | context | INTERNAL | `tool.name`, `permission.result` |
-| `context.pev.verify` | context | INTERNAL | `verify.mode`, `verify.passed`, `verify.deviation` |
 | `llm.stream` | llm | CLIENT | `llm.provider`, `llm.model`, `llm.tokens.*`, `llm.latency_ms`, `llm.status` |
 | `adapter.message.receive` | communication | SERVER | `adapter`, `message.len` |
 | `context.plan.generate` | context | INTERNAL | `plan.task_id`, `plan.milestone_count` |
@@ -154,7 +149,9 @@ Span name（Jaeger Operation）MUST 使用 `{layer}.{module}.{action}` 格式，
 
 ### Requirement: Devrix Layer Attributes
 
-每个 span MUST 包含 `devrix.layer`（`communication` \| `context` \| `llm`）与 `devrix.component`（`gateway` \| `context_engine` \| `pev_engine` \| `llm_gateway`），由 `telemetry.SpanAttrs` 注入。
+每个 span MUST 包含 `devrix.layer`（`communication` \| `context` \| `llm`）与 `devrix.component`（`gateway` \| `context_engine` \| `harness` \| `llm_gateway`），由 `telemetry.SpanAttrs` 注入。
+
+> **RETIRED（2026-06-13）**：`context.pev.*` operation 族随 PEV 引擎下线，不再注册于 coverage registry。
 
 **Priority**: P0
 
@@ -323,9 +320,11 @@ Bootstrap 各阶段 MUST 产生 info 事件（与 span 双写），供 Adapter �
 
 ## ADDED Requirements (V1.5 AI Debug Readiness — P0)
 
-### Requirement: Canonical PEV Span Hierarchy
+### Requirement: Canonical PEV Span Hierarchy (RETIRED)
 
-PEV 执行链 MUST 满足 Canonical Trace Tree：`context.pev.iteration` → `context.pev.llm_call` → `llm.stream` 父子关系正确；禁止 loop 内 `defer iterSpan.End()`。
+> **2026-06-13**：PEV 引擎与 `context.pev.*` span 族已下线。现行 QueryLoop 路径以 `context.process` + `llm.stream` 为主。
+
+PEV 执行链曾要求 Canonical Trace Tree：`context.pev.iteration` → `context.pev.llm_call` → `llm.stream`。**本 requirement 不再适用于生产路径。**
 
 **Priority**: P0
 **L4 映射**: L4-OBS-SPAN-TREE

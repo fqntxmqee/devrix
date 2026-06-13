@@ -111,14 +111,14 @@ func TestDeltaAnalyzer_MultipleDimensions(t *testing.T) {
 		ID: "baseline",
 		Scores: []DomainScore{
 			{Domain: "d2", Dimension: "compression_recall", Score: 0.85},
-			{Domain: "d2", Dimension: "pev_tool_accuracy", Score: 0.90},
+			{Domain: "d2", Dimension: "tool_accuracy", Score: 0.90},
 		},
 	}
 	current := &EvalReport{
 		ID: "current",
 		Scores: []DomainScore{
 			{Domain: "d2", Dimension: "compression_recall", Score: 0.80},
-			{Domain: "d2", Dimension: "pev_tool_accuracy", Score: 0.95},
+			{Domain: "d2", Dimension: "tool_accuracy", Score: 0.95},
 		},
 	}
 

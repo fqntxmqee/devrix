@@ -325,7 +325,7 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	if cvLen > 0 && cvNoSys[0].Role == types.MessageRoleSystem {
 		cvNoSys = cvNoSys[1:]
 	}
-	// Compressed view is set BEFORE PEV, so it doesn't include the current
+	// Compressed view is set before QueryLoop runs, so it doesn't include the current
 	// round's assistant message. After 3 rounds: 5 non-system messages.
 	if len(cvNoSys) != 5 {
 		t.Errorf("expected 5 messages in compressed view (excluding system), got %d", len(cvNoSys))

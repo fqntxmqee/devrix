@@ -1,4 +1,4 @@
-package contextengine
+package toolrunner
 
 import (
 	"context"
@@ -32,7 +32,7 @@ func (r *editFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelMed
 
 func (r *editFileRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
 	_ = ctx
-	fields := parseToolInput(input)
+	fields := ParseToolInput(input)
 	filePath := firstNonEmpty(fields, "file_path", "path", "file")
 	oldString := fields["old_string"]
 	newString := fields["new_string"]

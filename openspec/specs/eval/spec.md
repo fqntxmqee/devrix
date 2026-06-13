@@ -10,7 +10,7 @@
 
 ## Overview
 
-D6-S3 评测引擎：EvalRun 编排、JudgeManager、四类探针（compression / PEV / provider / forkjoin）、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
+D6-S3 评测引擎：EvalRun 编排、JudgeManager、四类探针（compression / tool_accuracy / provider / forkjoin）、DeltaAnalyzer、TuneGenerator、YAML 评测集 v1、`devrix eval run` CLI。
 
 **已实现：** D6-S3-T01/02/03/04/06/07/09/10/11/12/13/14/15
 
@@ -64,9 +64,9 @@ Delta 分析器必须能对比当前评分与基线，标记 regression。
 ---
 
 <!-- T: D6-S3-T06 -->
-### Requirement: PEV Tool 选择准确率探针
+### Requirement: Tool 选择准确率探针
 
-PEV Tool 准确率探针必须能评估 tool 选择的 precision/recall/F1（确定性，基于 expected_tools / actual_tools）。
+Tool 准确率探针必须能评估 tool 选择的 precision/recall/F1（确定性，基于 expected_tools / actual_tools）。
 
 <!-- T: D6-S3-T12 -->
 ### Requirement: 调优建议生成

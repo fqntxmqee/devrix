@@ -1,9 +1,8 @@
-package contextengine
+package toolrunner
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -127,14 +126,14 @@ func (r *writeFileRunner) Schema() ToolSchema {
 func (r *writeFileRunner) RiskLevel() types.RiskLevel { return types.RiskLevelMedium }
 
 func (r *writeFileRunner) Execute(ctx context.Context, workDir, input string) (*ToolResult, error) {
-	fields := parseToolInput(input)
+	fields := ParseToolInput(input)
 	path := firstNonEmpty(fields, "path", "file", "file_path")
 	if path != "" {
 		target := path
 		if workDir != "" && !filepath.IsAbs(path) {
 			target = filepath.Join(workDir, path)
 		}
-		if denied := enforcePlanModeWrite(ctx, target); denied != nil {
+		if denied := EnforcePlanModeWrite(ctx, target); denied != nil {
 			return denied, nil
 		}
 	}
@@ -142,7 +141,7 @@ func (r *writeFileRunner) Execute(ctx context.Context, workDir, input string) (*
 }
 
 func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
-	command := toolInputString(input, "command", "cmd")
+	command := ToolInputString(input, "command", "cmd")
 	if command == "" {
 		command = strings.TrimSpace(input)
 	}
@@ -154,7 +153,7 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 	}
 
 	if workDir != "" {
-		command = normalizeWorkspacePaths(workDir, command)
+		command = NormalizeWorkspacePaths(workDir, command)
 	}
 
 	if cfg.policy != nil {
@@ -209,7 +208,7 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 }
 
 func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
-	path := toolInputString(input, "path", "file", "file_path")
+	path := ToolInputString(input, "path", "file", "file_path")
 	if path == "" {
 		path = strings.TrimSpace(input)
 	}
@@ -226,7 +225,7 @@ func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error
 }
 
 func runWriteFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
-	fields := parseToolInput(input)
+	fields := ParseToolInput(input)
 	path := firstNonEmpty(fields, "path", "file", "file_path")
 	content := fields["content"]
 	if path == "" {
@@ -245,46 +244,6 @@ func runWriteFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, erro
 		return &ToolResult{Error: err.Error()}, nil
 	}
 	return &ToolResult{Output: fmt.Sprintf("wrote %d bytes to %s", len(content), path)}, nil
-}
-
-func parseToolInput(input string) map[string]string {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil
-	}
-	if !strings.HasPrefix(input, "{") {
-		return map[string]string{"command": input, "path": input}
-	}
-
-	var generic map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(input), &generic); err != nil {
-		return map[string]string{"command": input, "path": input}
-	}
-
-	out := make(map[string]string, len(generic))
-	for k, raw := range generic {
-		var s string
-		if err := json.Unmarshal(raw, &s); err == nil {
-			out[k] = s
-			continue
-		}
-		out[k] = strings.TrimSpace(string(raw))
-	}
-	return out
-}
-
-func toolInputString(input string, keys ...string) string {
-	fields := parseToolInput(input)
-	return firstNonEmpty(fields, keys...)
-}
-
-func firstNonEmpty(fields map[string]string, keys ...string) string {
-	for _, key := range keys {
-		if v := strings.TrimSpace(fields[key]); v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func resolveWorkspacePath(workDir, relPath string) (string, error) {
@@ -335,10 +294,10 @@ func bashWrongToolHint(rawInput, command string) string {
 	if !strings.HasPrefix(strings.TrimSpace(rawInput), "{") {
 		return ""
 	}
-	if toolInputString(rawInput, "command", "cmd") != "" {
+	if ToolInputString(rawInput, "command", "cmd") != "" {
 		return ""
 	}
-	fields := parseToolInput(rawInput)
+	fields := ParseToolInput(rawInput)
 	switch {
 	case fields["pattern"] != "":
 		return "bash: use the glob tool for file pattern search, not bash"

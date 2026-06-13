@@ -31,9 +31,9 @@ Agent 生命周期严格遵循状态机驱动的转换规则。
 - GIVEN Agent 状态 = CREATED
 - WHEN `Agent.Run(ctx)` 被调用
 - THEN 状态转换: CREATED → RUNNING
-- AND 调用 `IContextEngine.Process()` 驱动 PEVEngine
-- AND 每次 PEV 迭代时状态 = ITERATING
-- AND PEVEngine 返回 complete event 后状态转换: ITERATING → TERMINATED
+- AND 调用 `IContextEngine.Process()` 驱动 QueryLoop
+- AND 每次 QueryLoop 工具轮次时状态 = ITERATING
+- AND QueryLoop 返回 complete event 后状态转换: ITERATING → TERMINATED
 - AND 返回 `AgentResult{Messages, ExitCode=0}`
 
 #### Scenario: Agent iteration loop with tool calls
@@ -159,7 +159,7 @@ Agent 支持不同的推理策略，通过 CollaborationMode 配置生效。
 CRITICAL 风险等级工具的执行必须经用户确认，委托给 gateway.PermissionManager。
 
 #### Scenario: CRITICAL tool triggers permission
-- GIVEN PEVEngine 返回 tool_call event，工具风险等级 = CRITICAL
+- GIVEN QueryLoop 返回 tool_call event，工具风险等级 = CRITICAL
 - WHEN Agent 处理 tool_call
 - THEN 调用 `PermissionManager.Request(ctx, sessionID, toolName, input, risk)`
 - AND Agent 状态 = WAITING_PERMISSION
@@ -187,7 +187,7 @@ CRITICAL 风险等级工具的执行必须经用户确认，委托给 gateway.Pe
 - AND 返回 `AGT_PERMISSION_5007` 错误
 
 #### Scenario: LOW/MEDIUM/HIGH risk tools — auto-authorize
-- GIVEN PEVEngine 返回 tool_call event，工具风险等级 != CRITICAL
+- GIVEN QueryLoop 返回 tool_call event，工具风险等级 != CRITICAL
 - WHEN Agent 处理 tool_call
 - THEN PermissionManager 不触发用户交互
 - AND 工具自动授权执行

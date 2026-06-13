@@ -3,7 +3,7 @@ package llmbridge
 import (
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/gateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
@@ -13,7 +13,7 @@ import (
 // WireResult holds the wired LLM stack.
 type WireResult struct {
 	Gateway      *gateway.Gateway
-	Bridge       contextengine.ILLMGateway
+	Bridge       llmgateway.ILLMGateway
 	TokenCounter contracts.ITokenCounter
 }
 

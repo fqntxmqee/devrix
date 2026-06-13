@@ -1,4 +1,4 @@
-package contextengine
+package toolrunner
 
 import (
 	"context"
@@ -9,14 +9,6 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
-
-// PluginRunner is a single pluggable tool implementation.
-type PluginRunner interface {
-	Name() string
-	Schema() ToolSchema
-	RiskLevel() types.RiskLevel
-	Execute(ctx context.Context, workDir, input string) (*ToolResult, error)
-}
 
 // ToolRegistry manages plugin registration and implements IToolRunner + IToolRegistry.
 type ToolRegistry struct {

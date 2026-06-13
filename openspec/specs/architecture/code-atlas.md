@@ -42,6 +42,10 @@ Devrix 代码图谱：L4 功能点到包路径的快速索引。新建文件时 
 |------|------|--------|
 | `FlowEvent`, `ExecutionFlowHub` | `shared/contracts/execution_flow.go` | D2 SubQuery, D4 Delegate, ORCH Hub |
 | `WorkPlanSnapshot` | `shared/contracts/execution_flow.go` | ORCH WorkPlan, delegate_status |
+| `IPermissionGate`, `FileAutoApprover` | `shared/contracts/permission.go` | D2 ContextEngine, D1 Gateway, D4 Agent |
+| `ILLMGateway`, `ITierResolver` | `llmgateway/contracts.go` | D2 ContextEngine (via bridges/llm) |
+| `IToolRunner`, `IToolRegistry` | `contextengine/toolrunner/` | D2 QueryLoop, registry |
+| `ToolRegistry`, builtins | `contextengine/toolrunner/` | bash, read_file, glob, grep, edit |
 | `ExecutionFlowConfig` | `shared/config/execution_flow.go` | bootstrap, Hub |
 | `WorktreeConfig` | `shared/config/worktree.go` | delegate, worktree |
 | `DelegateConfig` | `shared/config/` (multi_agent) | delegate Service |

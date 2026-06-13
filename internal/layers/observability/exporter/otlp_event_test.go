@@ -14,7 +14,7 @@ func TestSpanToOTLP_should_include_event_attributes(t *testing.T) {
 	}
 
 	tp := tracer.NewTracerProvider(nil, nil)
-	_, sp := tp.Tracer("test").Start(context.Background(), "context.pev.llm_call",
+	_, sp := tp.Tracer("test").Start(context.Background(), "llm.stream",
 		tracer.WithTraceID(traceID),
 	)
 	sp.AddEvent("llm.request", tracer.WithEventAttributes(

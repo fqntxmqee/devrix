@@ -20,6 +20,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/runtime"
@@ -34,11 +35,11 @@ import (
 
 // EngineDeps holds dependencies for ContextEngine.
 type EngineDeps struct {
-	LLM                 ILLMGateway
+	LLM                 llmgateway.ILLMGateway
 	TokenCounter        contracts.ITokenCounter
 	Tools               IToolRunner
 	ToolsReg            IToolRegistry
-	Permission          IPermissionGate
+	Permission          contracts.IPermissionGate
 	Observer            IObserver
 	CompressionObserver ICompressionObserver
 	LongTerm            memory.ILongTermMemory
@@ -51,7 +52,7 @@ type EngineDeps struct {
 	DefaultModel string
 	// TierResolver resolves model tier aliases to concrete model names.
 	// Optional; when nil, tier-based model selection is disabled.
-	TierResolver ITierResolver
+	TierResolver llmgateway.ITierResolver
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -61,10 +62,10 @@ type ContextEngine struct {
 	memory       *memory.Manager
 	counter      contracts.ITokenCounter
 	queryLoop    *query.Loop
-	llm          ILLMGateway
+	llm          llmgateway.ILLMGateway
 	tools        IToolRunner
 	toolsReg     IToolRegistry
-	permission   IPermissionGate
+	permission   contracts.IPermissionGate
 	prompt       *prompt.Loader
 	cfg          *config.ContextEngineConfig
 	observer     IObserver
@@ -77,7 +78,7 @@ type ContextEngine struct {
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
 	defaultModel string
-	tierResolver ITierResolver
+	tierResolver llmgateway.ITierResolver
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -116,9 +117,9 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	attachReg := attachments.NewRegistry(cfg.Attachments)
 
 	loop := &query.Loop{
-		LLM:             &llmCaller{llm: deps.LLM},
-		Tools:           &toolExecutor{tools: deps.Tools, toolsReg: toolsReg},
-		Permission:      &permChecker{gate: deps.Permission, reg: toolsReg},
+		LLM:             query.NewLLMCaller(deps.LLM),
+		Tools:           query.NewToolExecutor(deps.Tools, toolsReg),
+		Permission:      query.NewPermChecker(deps.Permission, toolsReg),
 		Attachments:     attachReg,
 		UserContext:     ucProvider,
 		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
@@ -505,7 +506,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	res, runErr := e.queryLoop.Run(ctx, sc, query.Params{
 		SystemPrompt: sc.SystemPrompt,
 		Messages:     messages,
-		Tools:        toolSchemasToQuery(tools),
+		Tools:        query.ToolSchemasFromRunner(tools),
 		MaxTurns:     e.cfg.QueryLoop.MaxTurns,
 	}, func(ev *contracts.EngineEvent) {
 		if ev.Type == "complete" {
@@ -631,10 +632,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	if pendingComplete != nil {
 		emit(pendingComplete)
 	} else if runErr == nil {
-		// The query loop path does not emit "complete" natively — only the
-		// PEV engine does (via pendingComplete at L471). Emit the final
-		// completion event here so gateway can finalize the session (persist,
-		// Feishu reaction, stream cleanup, etc.).
+		// QueryLoop does not emit "complete" natively. Emit the final completion
+		// event here so gateway can finalize the session (persist, Feishu reaction,
+		// stream cleanup, etc.).
 		// Metadata shape must match gateway.buildCompletionSummary: duration in
 		// milliseconds, usage as total token count (not prompt/completion split).
 		meta := map[string]string{

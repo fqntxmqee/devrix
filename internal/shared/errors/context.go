@@ -2,31 +2,24 @@ package errors
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
 // Context engine sentinel errors.
 var (
-	ErrContextExceeded      = errors.New("context token budget exceeded")
-	ErrSnapshotCorrupt      = errors.New("context snapshot corrupt")
-	ErrPEVMaxIterations     = errors.New("pev max iterations exceeded")
-	ErrLLMUnavailable       = errors.New("llm unavailable")
+	ErrContextExceeded       = errors.New("context token budget exceeded")
+	ErrSnapshotCorrupt       = errors.New("context snapshot corrupt")
+	ErrLLMUnavailable        = errors.New("llm unavailable")
 	ErrFeatureNotImplemented = errors.New("feature not implemented")
 )
 
 const (
 	CodeContextExceeded      = "CTX_EXCEEDED_4001"
 	CodeSnapshotCorrupt      = "CTX_SNAPSHOT_4002"
-	CodePEVMaxIterations     = "CTX_PEV_4003"
 	CodeLLMUnavailable       = "CTX_LLM_4004"
 	CodeMemoryNotImplemented = "CTX_MEMORY_4005"
 	CodePermissionDenied     = "CTX_PERMISSION_4006"
 	CodeAutocompactFailed    = "CTX_AUTOCOMPACT_4010"
-	CodeVerifyCommandFailed  = "CTX_VERIFY_CMD_4011"
-	CodeVerifyCommandReject  = "CTX_VERIFY_CMD_4012"
-	CodePlanValidationFailed = "CTX_PLAN_4020"
-	CodePlanLLMTimeout       = "CTX_PLAN_4021"
 	CodeLongTermDBError      = "CTX_MEMORY_4022"
 )
 
@@ -38,11 +31,6 @@ func NewContextExceededError() *SentinelError {
 // NewSnapshotCorruptError returns a snapshot corrupt error.
 func NewSnapshotCorruptError(err error) *SentinelError {
 	return WithCode(CodeSnapshotCorrupt, "context snapshot corrupt or unsupported version", err)
-}
-
-// NewPEVMaxIterationsError returns a PEV max iterations error.
-func NewPEVMaxIterationsError() *SentinelError {
-	return WithCode(CodePEVMaxIterations, "pev max iterations exceeded", ErrPEVMaxIterations)
 }
 
 // NewLLMUnavailableError returns an LLM unavailable error.
@@ -104,26 +92,6 @@ func NewContextPermissionDeniedError(toolName string) *SentinelError {
 // NewAutocompactFailedError returns an autocompact degradation error.
 func NewAutocompactFailedError(reason string, err error) *SentinelError {
 	return WithCode(CodeAutocompactFailed, "autocompact degraded: "+reason, err)
-}
-
-// NewVerifyCommandFailedError returns a verify command non-zero exit error.
-func NewVerifyCommandFailedError(name string, exitCode int) *SentinelError {
-	return WithCode(CodeVerifyCommandFailed, fmt.Sprintf("verify command %s failed with exit %d", name, exitCode), ErrPEVMaxIterations)
-}
-
-// NewVerifyCommandRejectedError returns a verify command configuration/runtime rejection.
-func NewVerifyCommandRejectedError(reason string) *SentinelError {
-	return WithCode(CodeVerifyCommandReject, "verify command rejected: "+reason, ErrPEVMaxIterations)
-}
-
-// NewPlanValidationFailedError returns a plan DAG/JSON validation error (degraded path).
-func NewPlanValidationFailedError(reason string) *SentinelError {
-	return WithCode(CodePlanValidationFailed, "plan validation failed: "+reason, ErrFeatureNotImplemented)
-}
-
-// NewPlanLLMTimeoutError returns a plan LLM timeout error.
-func NewPlanLLMTimeoutError(err error) *SentinelError {
-	return WithCode(CodePlanLLMTimeout, "plan llm timeout", err)
 }
 
 // NewLongTermDBError returns a long-term memory persistence error.

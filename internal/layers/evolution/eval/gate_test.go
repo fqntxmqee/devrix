@@ -35,8 +35,8 @@ func TestFormatDeltaSummary_IncludesImprovement(t *testing.T) {
 	delta := &EvalDelta{
 		BaselineID: "b1",
 		ByDimension: map[string]DeltaEntry{
-			"d2.pev_tool_accuracy": {
-				Dimension: "d2.pev_tool_accuracy",
+			"d2.tool_accuracy": {
+				Dimension: "d2.tool_accuracy",
 				Previous:  0.80,
 				Current:   0.95,
 				Delta:     0.15,
@@ -45,7 +45,7 @@ func TestFormatDeltaSummary_IncludesImprovement(t *testing.T) {
 		},
 	}
 	summary := FormatDeltaSummary(delta)
-	if !stringContains(summary, "pev_tool_accuracy") {
+	if !stringContains(summary, "tool_accuracy") {
 		t.Errorf("summary = %q", summary)
 	}
 }

@@ -204,7 +204,7 @@ items: []
 }
 
 func TestProbeRegistry(t *testing.T) {
-	for _, id := range []string{"compression_recall", "pev_tool_accuracy", "provider_quality", "agent_forkjoin"} {
+	for _, id := range []string{"compression_recall", "tool_accuracy", "provider_quality", "agent_forkjoin"} {
 		p := GetProbe(id)
 		if p == nil {
 			t.Fatalf("%s probe not registered", id)

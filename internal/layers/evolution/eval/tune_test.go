@@ -29,12 +29,12 @@ func TestTuneGenerator_SuggestCompressionRegression(t *testing.T) {
 	}
 }
 
-func TestTuneGenerator_SuggestPEVRegression(t *testing.T) {
+func TestTuneGenerator_SuggestToolAccuracyRegression(t *testing.T) {
 	gen := NewTuneGenerator()
 	delta := &EvalDelta{
 		Regressions: []DeltaEntry{
 			{
-				Dimension: "d2.pev_tool_accuracy",
+				Dimension: "d2.tool_accuracy",
 				Previous:  0.95,
 				Current:   0.80,
 				Delta:     -0.15,

@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -25,11 +26,14 @@ type harnessCaptureLLM struct {
 	response  string
 }
 
-func (l *harnessCaptureLLM) ChatStream(_ context.Context, req *contextengine.LLMRequest) (<-chan contextengine.LLMChunk, error) {
-	l.lastTools = append([]contextengine.ToolSchema(nil), req.Tools...)
-	ch := make(chan contextengine.LLMChunk, 1)
+func (l *harnessCaptureLLM) ChatStream(_ context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
+	l.lastTools = make([]contextengine.ToolSchema, len(req.Tools))
+	for i, t := range req.Tools {
+		l.lastTools[i] = contextengine.ToolSchema{Name: t.Name, Description: t.Description, Parameters: t.Parameters}
+	}
+	ch := make(chan llmgateway.Chunk, 1)
 	go func() {
-		ch <- contextengine.LLMChunk{Content: l.response, Done: true}
+		ch <- llmgateway.Chunk{Content: l.response, Done: true}
 		close(ch)
 	}()
 	return ch, nil

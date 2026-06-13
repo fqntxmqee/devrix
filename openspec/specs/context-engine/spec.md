@@ -10,7 +10,9 @@
 
 ## Overview
 
-上下文引擎负责会话级消息历史、Token 预算、七步压缩与 PEV 执行循环，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
+上下文引擎负责会话级消息历史、Token 预算、七步压缩与 **QueryLoop** 多轮工具执行，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
+
+> **V7（2026-06-13）**：PEV（Plan-Execute-Verify）引擎已退役；主路径为 QueryLoop（D2-S10）。下文仍含 PEV 历史 requirement，仅供归档对照。
 
 V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。
 
@@ -30,12 +32,12 @@ V6（DM-20260610-012）增强：QueryLoop 运行时（`query_loop.enabled`）、
 
 ### Requirement: Context Engine Core
 
-The system MUST provide a real context engine implementation. When harness is enabled, Process MUST follow: LoadOrInit → Bootstrap (first Process) → LongTerm recall → compress messages only → SystemPromptAssembler.Build → PEV.Run. When `harness.enabled=false`, behavior MUST remain bit-identical to V4.
+The system MUST provide a real context engine implementation. When harness is enabled, Process MUST follow: LoadOrInit → Bootstrap (first Process) → LongTerm recall → compress messages only → SystemPromptAssembler.Build → QueryLoop.Run. When `harness.enabled=false`, behavior MUST remain bit-identical to V4.
 
 系统 MUST 提供可替换 `StubContextEngine` 的真实上下文引擎；harness 启用时 MUST 按 design §1.3 时序执行。
 
 **Priority**: P0
-**Rationale**: Harness 正交注入不改变 PEV 推理核，但需明确与压缩/组装的时序
+**Rationale**: Harness 正交注入不改变 QueryLoop 推理核，但需明确与压缩/组装的时序
 **L3 映射**: L3-BE-CTX-01
 
 #### Scenario: V4 compatibility with harness disabled
@@ -48,7 +50,7 @@ The system MUST provide a real context engine implementation. When harness is en
 
 - GIVEN `context_engine.harness.enabled=true`
 - WHEN Process runs one turn
-- THEN execution order is LoadOrInit → Bootstrap (first time) → LongTerm Recall → append user message → compress messages → SystemPromptAssembler.Build → PEV.Run → transcript append
+- THEN execution order is LoadOrInit → Bootstrap (first time) → LongTerm Recall → append user message → compress messages → SystemPromptAssembler.Build → QueryLoop.Run → transcript append
 - AND LongTerm recall MUST NOT mutate sc.SystemPrompt via string append (entries passed to Assembler)
 
 #### Scenario: Process user message
@@ -175,7 +177,9 @@ The system MUST provide a real context engine implementation. When harness is en
 
 ---
 
-### Requirement: PEV Verify Commands Mode
+### Requirement: PEV Verify Commands Mode (RETIRED)
+
+> PEV Verify 已随 D2-S1 退役。QueryLoop 不使用 verify commands 模式。
 
 系统 MUST 支持 `verify_mode: commands`，运行白名单 `executable`+`args[]` 命令（禁止 shell）。
 
@@ -195,7 +199,9 @@ The system MUST provide a real context engine implementation. When harness is en
 
 ---
 
-### Requirement: PEV Engine (V3 Enhanced)
+### Requirement: PEV Engine (V3 Enhanced) (RETIRED)
+
+> PEV 循环已移除；`query_loop.enabled=true`（默认）时使用 QueryLoop。
 
 系统 MUST 实现 PEV 循环。`plan.enabled=true` 时支持 Plan → Execute → Verify（按 Milestone 拓扑序）；否则保持 V2 Execute → Verify。支持 `verify_mode: basic | commands | none`。
 
@@ -230,7 +236,9 @@ The system MUST provide a real context engine implementation. When harness is en
 
 ---
 
-### Requirement: PEV Plan Phase
+### Requirement: PEV Plan Phase (RETIRED)
+
+> PEV Plan / Milestone DAG 已移除。D1 Milestone 模块仍独立存在。
 
 系统 MUST 在 `plan.enabled=true` 时支持 PEV Plan 阶段，将用户意图分解为 Milestone DAG。
 
