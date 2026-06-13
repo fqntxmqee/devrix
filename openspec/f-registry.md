@@ -1,7 +1,7 @@
 # Devrix F 层功能点注册表（索引）
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Last Updated:** 2026-06-13
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -18,14 +18,14 @@
 | 域 | 路径 | Activities with F | Total F Points |
 |----|------|-------------------|----------------|
 | D1 Communication | `openspec/specs/d1-communication/f-registry.md` | 12 | 43 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/f-registry.md` | 10 | 27 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/f-registry.md` | 18 | 38 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/f-registry.md` | 4 | 10 |
-| D4 Multi-Agent | `openspec/specs/d4-multi-agent/f-registry.md` | 6 | 14 |
+| D4 Multi-Agent | `openspec/specs/d4-multi-agent/f-registry.md` | 16 | 37 |
 | D5 Observability | `openspec/specs/d5-observability/f-registry.md` | 3 | 7 |
 | D6 Evolution | `openspec/specs/d6-evolution/f-registry.md` | 2 | 6 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/f-registry.md` | 15 | 38 |
 
-**总计**: 57 Activities with F · 158 F Points
+**总计**: 75 Activities with F · 192 F Points
 
 ---
 

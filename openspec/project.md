@@ -70,15 +70,18 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 | Module ID | Module | Responsibility |
 |-------|--------|----------------|
 | D2-S1 | PEV | Plan-Execute-Verify（**已退役**，D2-S10 替代） |
-| D2-S10 | QueryLoop | 多轮 LLM↔Tool 主循环（V6 生产路径） |
-| D2-S2 | Compression | 七步压缩管道 |
+| D2-S10 | QueryLoop | 多轮 LLM↔Tool 主循环（**默认** `query_loop.enabled=true`） |
+| D2-S2 | Compression | 七步压缩管道（messages-only；per-turn `commitActiveWindow`） |
 | D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) |
 | D2-S4 | Token | Token 计数与预算管理 |
 | D2-S5 | Registry | 操作注册表 |
-| D2-S6 | Snapshot | 上下文快照 |
-| D2-S7 | Prompt | Prompt 模板管理 |
-| D2-S8 | Sandbox | 工具沙箱隔离 |
-| D2-S9 | Harness | 会话 Bootstrap、ToolPool、System Prompt 装配（V5，灰度 `harness.enabled`） |
+| D2-S6 | Snapshot | 上下文快照 + Main transcript JSONL |
+| D2-S7 | Prompt | Section 加载 + `prompt/assembler` 四层装配 |
+| D2-S8 | Sandbox | 工具沙箱隔离（`toolrunner/sandbox`） |
+| D2-S9 | Harness | Bootstrap / Preflight / ToolPool（legacy fallback） |
+| D2-S11 | Queue | SessionQueue、delegate-progress drain |
+| D2-S12 | Worktree | Delegate 沙箱工作目录 |
+| D2-S13 | Conversation | Tool chain repair、compact boundary |
 
 ### D3 LLM Gateway Domain Scenarios
 
@@ -129,7 +132,7 @@ Devrix is a multi-agent collaborative development assistant - "第二大脑" - t
 ```
 User → Communication → Context Engine → LLM Gateway → Multi-Agent → Observability → Evolution → User
            ↓              ↓              ↓            ↓            ↓
-         Session       PEV           Model        Tool        Trace
+         Session       QueryLoop      Model        Tool        Trace
          Store       Compress       Breaker     Permission  Metrics
 ```
 
@@ -166,15 +169,18 @@ devrix/
 │   │   │   ├── metrics/       # D1-S7
 │   │   │   └── renderers/     # D1-S8
 │   │   ├── contextengine/     # D2
-│   │   │   ├── pev/           # D2-S1
 │   │   │   ├── compression/   # D2-S2
 │   │   │   ├── memory/        # D2-S3
 │   │   │   ├── token/         # D2-S4
 │   │   │   ├── registry/      # D2-S5
 │   │   │   ├── snapshot/      # D2-S6
-│   │   │   ├── prompt/        # D2-S7
-│   │   │   ├── sandbox/       # D2-S8
-│   │   │   └── harness/       # D2-S9 (V5)
+│   │   │   ├── prompt/        # D2-S7 (+ assembler)
+│   │   │   ├── toolrunner/    # D2-S5/S8 工具与沙箱
+│   │   │   ├── harness/       # D2-S9 legacy fallback
+│   │   │   ├── query/         # D2-S10 QueryLoop
+│   │   │   ├── transcript/    # D2-S6/S10
+│   │   │   ├── conversation/  # D2-S13
+│   │   │   └── engine.go      # Process 编排
 │   │   ├── llmgateway/        # D3
 │   │   │   ├── adapter/       # D3-S1
 │   │   │   ├── gateway/       # D3-S2
@@ -293,15 +299,16 @@ devrix/
 
 See `openspec/t-registry.md` for full details.
 
-| Domain | Domain Name | Total | IMPLEMENTED | PLANNED |
-|----|------------|-------|-------------|---------|
-| D1 | Communication | 5 | 0 | 5 |
-| D2 | Context Engine | 21 | 16 | 5 |
-| D3 | LLM Gateway | 17 | 13 | 4 |
-| D4 | Multi-Agent | 8 | 0 | 8 |
-| D5 | Observability | 16 | 11 | 5 |
-| D6 | Evolution | 2 | 0 | 2 |
-| **Total** | | **69** | **40** | **29** |
+| Domain | Domain Name | Total | IMPLEMENTED | PLANNED / PARTIAL |
+|----|------------|-------|-------------|-------------------|
+| D1 | Communication | 44 | 44 | 0 |
+| D2 | Context Engine | 59 | 58 | 1 PARTIAL |
+| D3 | LLM Gateway | 21 | 20 | 1 PLANNED |
+| D4 | Multi-Agent | 24 | 24 | 0 |
+| D5 | Observability | 19 | 15 | 4 PLANNED |
+| D6 | Evolution | 15 | 13 | 2 PLANNED |
+| D7 | Orchestration | 13 | 12 | 0 |
+| **Total** | | **195** | **186** | **7 PLANNED + 1 PARTIAL** |
 
 ---
 

@@ -1,366 +1,94 @@
-# Multi-Agent Layer Specification
+# D4 Multi-Agent Layer Specification
 
 **Capability:** multi-agent
-**Change ID:** devrix-multi-agent (archived 2026-06-08)
-**Demand:** DM-20260608-005
-**Layer:** 4
-**Version:** 1.1.0
+**Version:** 2.0.0
 **Status:** Canonical — source of truth
-**Parent Design:** `docs/multi-agent-design.md`
+**Last Updated:** 2026-06-13
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 
 ---
 
-## Feature: Agent Lifecycle State Machine
+## Overview
 
-Agent 遵循严格的状态机驱动的生命周期管理。
+D4 多智能体域负责 Agent 生命周期状态机、Fork/Join 并行子 Agent、协作模式提示词增强、异步权限门（AgentPermissionGate）、Hub-Spoke 委托编排（Delegate Service）、Agent Tool 注册与执行、SessionView COW 隔离和 Agent 可观测性指标。
 
-### Scenario: Create agent via factory
-- GIVEN CommunicationGateway 收到用户消息
-- WHEN `AgentFactory.Create(ctx, cfg, sessionCtx)` 被调用
-- THEN 返回 Agent 实例，状态 = CREATED
-- AND Agent.ID 为非空 UUID
-- AND Agent.Config 已正确设置
-- AND Agent.SessionCtx 指向传入的指针
+## Scenarios
 
-### Scenario: Run agent through full lifecycle
-- GIVEN Agent 状态 = CREATED
-- WHEN `Agent.Run(ctx)` 被调用
-- THEN 状态转换: CREATED → RUNNING
-- AND 调用 `IContextEngine.Process()`
-- AND Process 返回 event channel
-- AND 逐条消费 event
-- AND `complete` event 后状态: → TERMINATED
-- AND 返回 `AgentResult{Messages, ExitCode=0}`
+| ID | Scenario | Responsibility | Status |
+|----|----------|----------------|--------|
+| D4-S1 | Factory | Agent 工厂创建与会话配额管理 | IMPLEMENTED |
+| D4-S2 | Agent | 生命周期状态机、Run/Wait/Terminate | IMPLEMENTED |
+| D4-S3 | ForkJoin | Fork/Join 并行子 Agent + 消息隔离 | IMPLEMENTED |
+| D4-S4 | Collaboration | 推理模式校验与提示词增强（CoT/IR） | IMPLEMENTED |
+| D4-S5 | Observer | Agent 事件桥接到 IObserver / AgentObserverChain | IMPLEMENTED |
+| D4-S6 | AgentTool | CLI/Cursor Agent Tool 注册与 session 管理 | IMPLEMENTED |
+| D4-S7 | Builtin | SubQuery 内置 Agent (Explore/Plan/Implement) | IMPLEMENTED |
+| D4-S8 | Observability | Fork SessionView 策略计数器 + D5Sink | IMPLEMENTED |
+| D4-S9 | SessionView | COW Fork 隔离 View（DM-20260611-005） | IMPLEMENTED |
+| D4-S10 | Delegate | Hub-Spoke 委托编排（同步/异步/回退） | IMPLEMENTED |
 
-### Scenario: Run agent — iteration with tool calls
-- GIVEN Agent 状态 = ITERATING
-- WHEN `IContextEngine.Process()` 返回 `tool_call` event
-- THEN 工具风险等级被检查
-- AND LOW/MEDIUM 等级工具自动执行，状态保持 ITERATING
-- AND CRITICAL 等级工具状态: ITERATING → WAITING_PERMISSION
-
-### Scenario: State transition — all valid paths
-- GIVEN 状态机 5 个状态
-- WHEN 遍历所有合法状态转换对
-- THEN 所有合法转换成功
-- AND CREATED→RUNNING, RUNNING→ITERATING, ITERATING→ITERATING
-- AND ITERATING→WAITING_PERMISSION, ITERATING→TERMINATED
-- AND WAITING_PERMISSION→ITERATING, WAITING_PERMISSION→TERMINATED
-- AND any→TERMINATED (Terminate/Cancel)
-
-### Scenario: State transition — invalid transition rejected
-- GIVEN Agent 状态 = TERMINATED
-- WHEN `Run()` 被再次调用
-- THEN 返回 `AGT_LIFECYCLE_5003` 错误
-- AND Agent 状态保持 TERMINATED
-
-### Scenario: Agent terminates gracefully
-- GIVEN Agent 处于 RUNNING 或 ITERATING
-- WHEN `Terminate(ctx)` 被调用
-- THEN 状态: → TERMINATED
-- AND context 取消传播到 ContextEngine
-- AND 子 Agent 全部被取消
-- AND 发送 `agent.terminated` 事件
-
-### Scenario: Agent timeout
-- GIVEN Agent Config.Timeout = 1s
-- WHEN Agent 执行超过 1s
-- THEN 状态: → TERMINATED
-- AND 返回 `AGT_LIFECYCLE_5005` 错误
-
-### Scenario: Context cancellation
-- GIVEN Agent 正在 RUNNING
-- WHEN 外部 context 被取消
-- THEN Agent 终止循环
-- AND 状态: → TERMINATED
-- AND 返回 `AGT_CONTEXT_5009` 错误
-
----
-
-## Feature: Fork/Join Parallel Sub-Agents
-
-父 Agent 可创建并行子 Agent 执行独立子任务。
-
-### Scenario: Fork creates child agent with isolated message buffer
-- GIVEN 父 Agent 需要并行子任务
-- WHEN `Agent.Fork(ctx, childCfg)` 被调用
-- THEN 子 Agent 状态 = CREATED
-- AND 子 Agent 拥有独立的消息缓冲区（GetMessages() 仅返回自己的消息）
-- AND 子 Agent 加入 `childAgents` map
-- AND 发送 `agent.forked` 事件
-
-### Scenario: Fork respects double limits
-- GIVEN 父 Agent 已有 3 个子 Agent（MaxChildren=3）
-- WHEN `Fork()` 被再次调用
-- THEN 返回 `AGT_FACTORY_5002` 错误
-- GIVEN Session 已有 5 个 Agent（MaxTotalAgents=5）
-- WHEN `Fork()` 被调用
-- THEN 返回 `AGT_FACTORY_5010` 错误
-
-### Scenario: Join merges child message buffer into parent
-- GIVEN 子 Agent 状态 = TERMINATED
-- WHEN `Join(ctx, child)` 被调用
-- THEN 子 Agent 的独立消息缓冲区追加到父 Agent 的 messageBuffer
-- AND 子 Agent 从 `childAgents` 中移除
-- AND 发送 `agent.joined` 事件
-
-### Scenario: Join before child complete returns error
-- GIVEN 子 Agent 状态 != TERMINATED
-- WHEN `Join(ctx, child)` 被调用
-- THEN 返回 `AGT_FORK_5004` 错误
-- AND 子 Agent 状态不受影响
-
-### Scenario: Parallel child agents execute with isolated buffers
-- GIVEN 父 Agent 创建 2 个子 Agent（各自独立消息缓冲区）
-- WHEN 父 Agent 调用子 Agent.Run()（分别在 goroutine 中）
-- THEN 两个子 Agent 并行执行，消息写入各自缓冲区
-- AND 通过 `-race` 检测，无 data race（不需要共享锁）
-
-### Scenario: Wait blocks until child terminal
-- GIVEN 子 Agent 正在 RUNNING
-- WHEN `Wait(ctx)` 被调用
-- THEN 阻塞直到子 Agent 进入 TERMINATED
-- AND 返回子 Agent 的 AgentResult
-
----
-
-## Feature: Collaboration Modes
-
-Agent 支持不同的推理策略，通过 CollaborationMode 配置生效。
-
-### Scenario: Chain-of-Thought prompt enhancement
-- GIVEN AgentConfig.Mode = "chain-of-thought"
-- WHEN BuildPromptForMode 被调用
-- THEN 返回增强 prompt，包含 "请逐步推理，每一步都要明确说明你的理由"
-
-### Scenario: Iterative-Refinement prompt enhancement
-- GIVEN AgentConfig.Mode = "iterative-refinement"
-- WHEN BuildPromptForMode 被调用
-- THEN 返回增强 prompt，包含 "请先给出初始答案，然后进行自我批判"
-
-### Scenario: Default mode — no enhancement
-- GIVEN AgentConfig.Mode = "default" 或空字符串
-- WHEN BuildPromptForMode 被调用
-- THEN 返回原始 basePrompt 不做修改
-
-### Scenario: Invalid mode rejected
-- GIVEN AgentConfig.Mode = "invalid-mode"
-- WHEN AgentFactory.Create 被调用
-- THEN 返回 `AGT_FACTORY_5006` 错误
-
----
-
-## Feature: AgentPermissionGate（异步权限）
-
-Agent 实现 `shared/contracts.IPermissionGate` 注入 QueryLoop 工具执行路径。CRITICAL 工具触发时，AgentPermissionGate 通过 channel 阻塞等待 Gateway 注入用户响应。
-
-### Scenario: CRITICAL tool triggers permission via AgentPermissionGate
-- GIVEN QueryLoop 内部 tool execution
-- AND Agent 作为 IPermissionGate 注入 ContextEngine
-- WHEN 工具 riskLevel = CRITICAL
-- THEN AgentPermissionGate.Request() 被调用
-- AND 非 CRITICAL 工具直接返回 true
-- AND CRITICAL 工具创建 channel 并阻塞
-- AND Agent 状态: → WAITING_PERMISSION
-- AND 发送 `permission_required` 事件（Gateway → Adapter → 用户 UI）
-
-### Scenario: Gateway resolves permission — granted
-- GIVEN Agent 状态 = WAITING_PERMISSION
-- AND AgentPermissionGate.Request() 阻塞在 channel read
-- WHEN Gateway 调用 `Agent.ResolvePermission(toolName, true)`
-- THEN channel 收到 true
-- AND AgentPermissionGate.Request() 返回 true
-- AND Agent 状态: WAITING_PERMISSION → ITERATING
-- AND QueryLoop 继续执行工具
-
-### Scenario: Gateway resolves permission — denied
-- GIVEN Agent 状态 = WAITING_PERMISSION
-- WHEN Gateway 调用 `Agent.ResolvePermission(toolName, false)`
-- THEN channel 收到 false
-- AND AgentPermissionGate.Request() 返回 false
-- AND Agent 状态: WAITING_PERMISSION → TERMINATED
-- AND QueryLoop 收到 permission denied
-
-### Scenario: Permission timeout
-- GIVEN Agent 状态 = WAITING_PERMISSION
-- WHEN AgentConfig.PermissionTimeout（默认 60s）超时
-- THEN AgentPermissionGate.Request() 返回 false
-- AND Agent 状态: WAITING_PERMISSION → TERMINATED
-- AND 返回 `AGT_PERMISSION_5007` 错误
-
-### Scenario: Non-CRITICAL tools auto-authorize
-- GIVEN QueryLoop 调用 AgentPermissionGate.Request()
-- WHEN riskLevel = LOW / MEDIUM / HIGH
-- THEN 直接返回 true（不阻塞）
-- AND Agent 状态保持 ITERATING
-- AND 不触发 `permission_required` 事件
-
----
-
-## Feature: Observer Adapter
-
-Agent 生命周期事件通过适配器桥接到 contextengine.IObserver。
-
-### Scenario: Agent lifecycle events forwarded to IObserver
-- GIVEN AgentDeps.Observer 非 nil
-- WHEN Agent 经历 CREATED → RUNNING → ITERATING → TERMINATED
-- THEN 每个状态转换触发对应 AgentEvent
-- AND IObserver 被调用（验证 mock observer 收到事件）
-
-### Scenario: NoOp observer — no panic
-- GIVEN AgentDeps.Observer = NoOpObserverAdapter
-- WHEN Agent 经历完整生命周期
-- THEN 不 panic
-- AND 事件被静默丢弃
-
----
-
-## Feature: Bootstrap Integration
-
-WireMultiAgent 正确构建依赖并注入到 CommunicationGateway。
-
-### Scenario: WireMultiAgent returns IAgentFactory
-- GIVEN 所有依赖可用（IContextEngine, PermissionManager, IObserver, ObservabilityBridge, MultiAgentConfig）
-- WHEN `WireMultiAgent(...)` 被调用
-- THEN 返回非 nil 的 IAgentFactory 实例
-- AND Factory 可正常创建 Agent
-
-### Scenario: Gateway injects AgentFactory
-- GIVEN CommunicationGateway 构造时注入 IAgentFactory
-- WHEN Gateway 处理用户消息
-- THEN 可通过 AgentFactory 创建 Agent（V1 由 `/fork` 命令触发）
-
----
-
-## Feature: Error Codes
-
-所有错误使用 AGT_* 前缀错误码体系。
-
-### Scenario: Error wrapped with SentinelError
-- GIVEN 任何 AGT_* 错误被创建
-- WHEN 调用 `errors.Is(err, ErrAgentXxx)`
-- THEN 返回 true
-- AND `err.(*SentinelError).Code` 返回正确的 AGT_* 错误码
-
----
-
-## Golden Test Cases
-
-### State Transition Matrix
+## Architecture
 
 ```
-From          → To                     Expected
-CREATED       → RUNNING                OK
-CREATED       → ITERATING              REJECT (AGT_LIFECYCLE_5001)
-CREATED       → WAITING_PERMISSION     REJECT (AGT_LIFECYCLE_5001)
-CREATED       → TERMINATED             REJECT (AGT_LIFECYCLE_5001)
-RUNNING       → ITERATING              OK
-RUNNING       → TERMINATED             OK (Terminate)
-RUNNING       → CREATED                REJECT (AGT_LIFECYCLE_5001)
-ITERATING     → ITERATING              OK
-ITERATING     → WAITING_PERMISSION     OK
-ITERATING     → TERMINATED             OK
-WAITING_PERMISSION → ITERATING         OK
-WAITING_PERMISSION → TERMINATED        OK
-TERMINATED    → RUNNING                REJECT (AGT_LIFECYCLE_5003)
-TERMINATED    → ITERATING              REJECT (AGT_LIFECYCLE_5003)
+Gateway (D1) ──→ AgentFactory (D4-S1)
+                      │
+                      ├─→ Agent (D4-S2): lifecycle state machine
+                      │     ├─ Fork/Join (D4-S3): child agent creation
+                      │     ├─ PermissionGate (D4-S2): async permission via channel
+                      │     ├─ WorkerEngine (D4-S2): sidechain context overlay
+                      │     └─ SessionView (D4-S9): COW fork isolation
+                      │
+                      ├─→ Delegate Service (D4-S10): Hub-Spoke orchestration
+                      │     ├─ FlowBridge → ExecutionFlowHub (D7)
+                      │     ├─ Worktree isolation
+                      │     └─ Async notification → SessionQueue (D2)
+                      │
+                      ├─→ Collaboration (D4-S4): prompt enhancement
+                      ├─→ Agent Tools (D4-S6): CLI/Cursor subprocess
+                      ├─→ Builtin Agents (D4-S7): SubQuery fallback
+                      ├─→ Observer (D4-S5): event bridge → IObserver
+                      └─→ Observability (D4-S8): metrics counters
 ```
 
-### Fork/Join Integration Flow
+## Cross-Domain Dependencies
 
-```
-1. Factory.Create(parentCfg, sessionCtx) → parentAgent(CREATED)
-2. parentAgent.Run() → RUNNING → ITERATING
-3. parentAgent.Fork(childCfg) → childAgent(CREATED)
-4. parentAgent.Fork(childCfg2) → childAgent2(CREATED)
-5. go childAgent.Run()  ┐
-6. go childAgent2.Run() ┤ 并行执行
-7. parentAgent.Wait(child) → blocks
-8. parentAgent.Wait(child2) → blocks
-9. parentAgent.Join(child) → merge messages
-10. parentAgent.Join(child2) → merge messages
-11. parentAgent.Terminate() → TERMINATED
-```
+| Domain | 依赖内容 | 使用位置 |
+|--------|---------|---------|
+| D1 Communication | `PermissionManager` → `PermissionGateAdapter` | agent/perm_gate → gateway |
+| D2 Context Engine | `contracts.IEngine`, `query.LoopDeps`, `queue.SessionQueue`, SubQuery | agent, delegate, builtin |
+| D5 Observability | `observability.Bridge` (tracer) | factory, agent |
+| D7 Orchestration | `contracts.ExecutionFlowHub`, `flow.GlobalHub` | delegate/bridge |
+| Shared | `contracts`, `config`, `errors`, `types` | 全子包 |
 
----
+## Package Map
 
-## ADDED Requirements (V2 Delegate — D4-S10)
+| 子包 | 场景 | 职责 |
+|------|------|------|
+| `contracts.go` (root) | D4-S1~S5 | 核心接口与类型: Agent, IAgentFactory, AgentState, AgentConfig, AgentEvent, PermissionGate, AgentObserver |
+| `agent/` | D4-S2, D4-S3 | Impl (Agent 实现), 状态机, Fork/Join, WorkerEngine, PermissionGate |
+| `factory/` | D4-S1 | AgentFactory (Create/CreateWithView/ReleaseSession), 配额管理, 配置校验 |
+| `collaboration/` | D4-S4 | ValidateMode, BuildPromptForMode (CoT/IR 提示词增强) |
+| `delegate/` | D4-S10 | Service (Hub-Spoke 委托), FlowBridge, WorkerSpec, DelegateResult |
+| `tool/` | D4-S6 | AgentTool 接口, CLI/Cursor 适配器, Registry, stream-json 解析 |
+| `builtin/` | D4-S7 | SubQuery 内置 Agent: RunExplore/RunPlan/RunImplement |
+| `observer/` | D4-S5 | NoOpAgentObserver, AgentObserverChain (contracts.go) |
+| `sessionview/` | D4-S9 | COW Fork 隔离 View (Fork/Create/SetMetadata/SetSnapshot/MergeToParent) |
+| `observability/` | D4-S8 | ForkSessionView 策略计数器, D5Sink, Policy 常量 |
 
-**Change:** devrix-queryloop-context (DM-20260610-012)  
-**Design:** `openspec/archive/2026-06-10-devrix-queryloop-context/design-d4-v2.md`
+## Key Design Patterns
 
-### Requirement: Delegate Service Hub-Spoke
+1. **Agent 状态机**: `CREATED → RUNNING → ITERATING → WAITING_PERMISSION → TERMINATED`，严格的状态转换表 (`agent/state.go`)，非法转换返回 `AgentInvalidTransitionError`。
+2. **Fork/Join 消息隔离**: 子 Agent 独立消息缓冲区，Join 时合并到父 Agent，通过 `tool_call_id` 去重。SessionView COW 模式确保子 Agent 写入不污染父 Session。
+3. **AgentPermissionGate**: Agent 实现 `PermissionGate` 接口，CRITICAL 工具通过 channel 阻塞等待 Gateway 注入用户响应，非 CRITICAL 工具直接返回 true。
+4. **WorkerEngine**: `agent.NewWorkerEngine` 包装 `contracts.IEngine`，通过 `ProcessOverlay` 为 worker 注入 sidechain context（AgentID/WorkerRole/SystemPrompt/ModelTier）。
+5. **Hub-Spoke Delegate**: Leader Agent 调用 `delegate_explore/plan/implement` 工具 → `Service.DelegateOrFallback` → Fork Worker → FlowBridge 发布生命周期事件到 `ExecutionFlowHub`。
+6. **SessionView COW**: `sessionview.Fork(parent)` 创建子 View，不可变字段共享，可变字段（metadata/snapshot）隔离，`MergeToParent` 时写入父 Session。
 
-When `multi_agent.delegate.enabled=true`, Leader MUST invoke `delegate_explore`, `delegate_plan`, `delegate_implement`, and `delegate_status` tools. Worker agents MUST be forked in-process with isolated sidechain context and MUST report lifecycle via `DelegateFlowBridge` → `ExecutionFlowHub`.
+## Registries
 
-When `multi_agent.delegate.enabled=false`, delegate tools MUST fall back to D2 SubQuery while preserving FlowEvent visibility.
-
-**Priority:** P0  
-**L4:** delegate  
-**T:** D4-S10-T01, D4-S10-T08
-
-#### Scenario: Delegate explore creates worker
-
-- GIVEN delegate enabled and under MaxWorkers limit
-- WHEN Leader calls delegate_explore
-- THEN a Worker agent is forked with WorkerSpec role explore
-- AND FlowStarted is published to ExecutionFlowHub
-
-#### Scenario: Delegate disabled uses SubQuery fallback
-
-- GIVEN `multi_agent.delegate.enabled=false`
-- WHEN Leader calls delegate_explore
-- THEN SubQuery fallback runs
-- AND summary is returned without forking D4 Worker
-
----
-
-### Requirement: Worker Isolation Constraints
-
-Delegated Worker agents MUST set `SessionContext.AgentID` for sidechain isolation. Workers MUST NOT register `delegate_*` tools or call Fork.
-
-**Priority:** P0  
-**L4:** delegate, worker_engine  
-**T:** D4-S10-T02, D4-S10-T03
-
-#### Scenario: Worker cannot re-delegate
-
-- GIVEN an active Worker agent
-- WHEN tool registry is built for Worker Process
-- THEN delegate_* tools are excluded
-- AND Fork returns permission error
-
----
-
-### Requirement: Async Delegate Completion
-
-When `multi_agent.delegate.allow_async=true`, delegate MAY return before Worker completes. On completion, Service MUST publish FlowJoined and enqueue Leader `ModeTaskNotification` for QueryLoop drain.
-
-**Priority:** P1  
-**L4:** delegate
-
-#### Scenario: Async notify Leader main thread
-
-- GIVEN async delegate in flight
-- WHEN Worker completes
-- THEN Leader session queue receives task-notification with empty AgentID
-- AND WorkPlan reflects completed flow status
-
----
-
-## Configuration (Delegate)
-
-```yaml
-multi_agent:
-  enabled: true
-  delegate:
-    enabled: true
-    allow_async: true
-    max_workers: 4
-```
-
----
+- **A 层**: `a-registry.md` — 16 Activities
+- **F 层**: `f-registry.md` — 30 Function Points
+- **T 层**: `t-registry.md` — Test Points (IMPLEMENTED)
 
 ## Revision History
 
@@ -368,3 +96,4 @@ multi_agent:
 |---------|------|---------|
 | 1.0.0 | 2026-06-08 | Initial Multi-Agent V1 (DM-20260608-005) |
 | 1.1.0 | 2026-06-10 | D4-S10 Hub-Spoke Delegate (DM-20260610-012) |
+| 2.0.0 | 2026-06-13 | SessionView COW (DM-20260611-005), Agent Tools, Observability counters, 全文档同步 |

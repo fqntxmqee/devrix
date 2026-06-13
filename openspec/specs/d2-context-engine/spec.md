@@ -3,8 +3,9 @@
 **Capability:** context-engine
 **Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-queryloop-context (archived 2026-06-10)
 **Layer:** 2
-**Version:** 6.0.0
+**Version:** 7.1.0
 **Status:** Canonical — source of truth
+**Last Updated:** 2026-06-13
 
 ---
 
@@ -12,7 +13,7 @@
 
 上下文引擎负责会话级消息历史、Token 预算、七步压缩与 **QueryLoop** 多轮工具执行，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
 
-> **V7（2026-06-13）**：PEV（Plan-Execute-Verify）引擎已退役；主路径为 QueryLoop（D2-S10）。下文仍含 PEV 历史 requirement，仅供归档对照。
+> **V7（2026-06-13，DM-20260611-004）**：`query_loop.enabled` 默认 `true`；Harness Bootstrap 降为 legacy fallback（仅 `query_loop.enabled=false` 时）。PEV（D2-S1）已退役。主路径为 QueryLoop（D2-S10）+ per-turn `commitActiveWindow` 压缩 + `conversation.RepairToolMessageChain`。
 
 V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。
 
@@ -684,14 +685,14 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 - WHEN provisional context (agentsRaw + memory entries) exceeds warn_ratio of token_budget
 - THEN PreflightScores include degraded tokenBudget score
 - AND warnings are emitted via info event
-- AND Process continues to PEV
+- AND Process continues to QueryLoop
 
 #### Scenario: Tool filter auto-repair
 
 - GIVEN `preflight.tool_filter.mode=auto-repair`
 - AND user message is unrelated to tool "bash"
 - WHEN preflight evaluates visible tools
-- THEN bash is excluded from PEV ToolSchema list
+- THEN bash is excluded from QueryLoop ToolSchema list
 - AND info event records excluded tool names
 - AND visible tool count MUST NOT drop below configured `preflight.tool_filter.min_tools` (default 1)
 
@@ -719,7 +720,7 @@ The system MUST support optional pre-LLM command/tool matching when routing is e
 - WHEN SystemPromptAssembler.Build runs after message compression
 - THEN output includes Layer 0 devrix_core, Layer 1 session_context, Layer 2 workspace_guidance
 - AND Layer 3 contains `<loaded_context>` with non-empty `<agents_context>`
-- AND sc.SystemPrompt is set before PEVEngine.Run
+- AND sc.SystemPrompt is set before QueryLoop.Run
 
 #### Scenario: Session context dynamic fields
 
@@ -955,6 +956,56 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 - WHEN Worker runs write tools
 - THEN files are created under worktree path only
 - AND primary session WorkDir is unchanged after Worker completes
+
+---
+
+## ADDED Requirements (V7 Harness Unification)
+
+### Requirement: QueryLoop Default Primary Path
+
+`context_engine.query_loop.enabled` MUST default to `true`. Production Process MUST record `obsruntime.PathQueryLoop` unless operator explicitly sets `query_loop.enabled=false`.
+
+**Priority:** P0  
+**L4:** query_loop  
+**T:** D2-S11-A01-T01, D2-S11-A01-T02, D2-S11-A01-D6PR
+
+#### Scenario: Legacy harness path not taken by default
+
+- GIVEN default `ContextEngineConfig`
+- WHEN Process runs
+- THEN legacy harness bootstrap branch is not executed
+- AND PathRegressionProbe legacy_harness counter remains 0
+
+### Requirement: Per-Turn Active Window Compression
+
+When `query_loop.compress_per_turn=true`, Process MUST skip entry compression and MUST run `commitActiveWindow` after successful turns when message count or token budget exceeds limits.
+
+**Priority:** P1  
+**L4:** compression  
+**T:** D2-S11-A01-T04
+
+### Requirement: Conversation Tool Chain Repair
+
+Before LLM API calls, Process MUST run `conversation.RepairToolMessageChain` on messages after the last compact boundary.
+
+**Priority:** P0  
+**L4:** conversation  
+**T:** D2-S13-A01-T01
+
+### Requirement: Main Thread Transcript
+
+When `main_transcript.enabled=true`, Process MUST append message deltas to append-only JSONL at `{base_dir}/{sessionId}/transcript.jsonl` after successful turns (excluding worker overlay sessions).
+
+**Priority:** P1  
+**L4:** transcript  
+**T:** D2-S6-A02-T01
+
+### Requirement: Deferred Complete Event
+
+Process MUST emit `complete` only after `sc.Messages` and `session.ContextSnapshot` persistence completes (or after user cancel clean exit).
+
+**Priority:** P0  
+**L4:** query_loop
 
 ---
 

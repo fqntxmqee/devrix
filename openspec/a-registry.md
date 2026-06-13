@@ -1,7 +1,7 @@
 # Devrix A 层活动注册表（索引）
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Last Updated:** 2026-06-13
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -18,14 +18,14 @@
 | 域 | 路径 | Scenarios | Activities |
 |----|------|-----------|------------|
 | D1 Communication | `openspec/specs/d1-communication/a-registry.md` | 12 | 21 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/a-registry.md` | 14 | 18 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/a-registry.md` | 14 | 22 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/a-registry.md` | 6 | 6 |
-| D4 Multi-Agent | `openspec/specs/d4-multi-agent/a-registry.md` | 10 | 14 |
+| D4 Multi-Agent | `openspec/specs/d4-multi-agent/a-registry.md` | 10 | 17 |
 | D5 Observability | `openspec/specs/d5-observability/a-registry.md` | 9 | 9 |
 | D6 Evolution | `openspec/specs/d6-evolution/a-registry.md` | 4 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/a-registry.md` | 5 | 15 |
 
-**总计**: 63 Scenarios · 90 Activities · 5 PLANNED
+**总计**: 63 Scenarios · 97 Activities · 3 RETIRED (D2-S1 PEV)
 
 ---
 

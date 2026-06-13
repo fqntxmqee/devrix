@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-12
+**Version:** 3.2.0
+**Last Updated:** 2026-06-13
 
 ---
 
@@ -26,7 +26,7 @@
 | Domain ID | 名称 | 缩写 | Responsibility |
 |-----------|------|------|----------------|
 | **D1** | Communication Domain | COMM | IM Gateway, WebSocket, CLI adapter |
-| **D2** | Context Engine Domain | CTX | QueryLoop (thin), 7-step compression, layered memory |
+| **D2** | Context Engine Domain | CTX | QueryLoop 主路径、七步压缩、分层记忆、会话修复 |
 | **D3** | LLM Gateway Domain | LLM | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain | AGENT | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain | OBS | Tracing, metrics, logging |
@@ -65,10 +65,10 @@
 | D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) | IMPLEMENTED |
 | D2-S4 | Token | Token 计数与预算管理 | IMPLEMENTED |
 | D2-S5 | Registry | 操作注册表 | IMPLEMENTED |
-| D2-S6 | Snapshot | 上下文快照 | IMPLEMENTED |
-| D2-S7 | Prompt | Prompt 模板管理 | IMPLEMENTED |
-| D2-S8 | Sandbox | 工具沙箱隔离 | PLANNED (test only) |
-| D2-S9 | Harness | 会话 Bootstrap、ToolPool、Preflight、System Prompt 装配（V5） | IMPLEMENTED |
+| D2-S6 | Snapshot | 上下文快照 + Main transcript JSONL | IMPLEMENTED |
+| D2-S7 | Prompt | Section 加载 + `prompt/assembler` 四层装配 | IMPLEMENTED |
+| D2-S8 | Sandbox | 工具沙箱隔离（`toolrunner/sandbox`） | IMPLEMENTED |
+| D2-S9 | Harness | Bootstrap、Preflight、ToolPool（**legacy fallback**，`query_loop.enabled=false`） | IMPLEMENTED |
 | D2-S10 | QueryLoop | QueryLoop 运行时、UserContext、Attachments、PermissionMode、TaskTools（V6） | IMPLEMENTED |
 | D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） | IMPLEMENTED |
 | D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） | IMPLEMENTED |
@@ -187,12 +187,12 @@ layers/
 │   ├── attachments/               # D2-S10 Attachments
 │   ├── permission/                # D2-S10 PermissionMode
 │   ├── tasks/                     # D2-S10 TaskTools
-│   ├── transcript/                # D2-S10 Sidechain
+│   ├── transcript/                # D2-S6 Main + D2-S10 Sidechain
 │   ├── queue/                     # D2-S11 SessionQueue
 │   ├── worktree/                  # D2-S12 Worktree
-│   ├── conversation/              # D2-S13 Conversation
+│   ├── conversation/              # D2-S13 Conversation repair / compact boundary
 │   └── mock/                      # D2-S14 Mock Engine
-│   # PLANNED: sandbox/ (D2-S8)
+│   # engine.go 根包：Process 编排、commitActiveWindow、delegate_tools
 │
 ├── d7/                           # D7 Orchestration (v1.0 — DESIGN)
 │   ├── orchestrator.go           # D7-S1/S2 核心编排
@@ -269,7 +269,7 @@ A 层定义每个场景下调用方可发起的**具体业务动作**。编号�
 
 **A 层注册表权威来源**: `openspec/a-registry.md`
 
-当前注册: **77 个活动**，覆盖 7 个领域 + CROSS 跨域活动。
+当前注册: **94 个活动**（含 3 个 D2-S1 RETIRED），覆盖 7 个领域 + CROSS 跨域活动。
 
 ---
 
@@ -281,7 +281,7 @@ F 层定义可被 A 层活动编排的最小业务/技术逻辑单元。编号�
 
 **F 层注册表权威来源**: `openspec/f-registry.md`
 
-当前注册: **98 个功能点**，覆盖 7 个领域 + CROSS + Bridges。
+当前注册: **169 个功能点**，覆盖 7 个领域 + CROSS + Bridges。
 
 ---
 
@@ -294,7 +294,7 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 - **A** = 活动编号 (01-99)
 - **NN** = 测试序号 (01-99)
 
-> **迁移状态**: ✅ 已完成 (2026-06-12)。所有 130+ 条目已升级为标准格式。遗留 ID 映射见 `openspec/t-registry.md` 文末。
+> **迁移状态**: ✅ 已完成 (2026-06-12)。域级合计 **195** 条 T 点（186 IMPLEMENTED · 7 PLANNED · 1 PARTIAL）。遗留 ID 映射见 `openspec/t-registry.md` 文末。
 
 示例:
 
@@ -334,8 +334,9 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | L4-CTX-TOOLPOOL | D2-S9 (Harness) | 可见工具集裁剪 |
 | L4-CTX-ROUTER | D2-S9 (Harness) | Advisory 路由 hints |
 | L4-CTX-PREFLIGHT | D2-S9 (Harness) | Pre-LLM 上下文评分 |
-| L4-CTX-WORKSPACE | D2-S9 (Harness) | System Prompt 四层装配 |
-| L4-CTX-TRANSCRIPT | D2-S9 (Harness) | Transcript / SessionLog |
+| L4-CTX-WORKSPACE | D2-S7 (Prompt) | System Prompt 四层装配（`prompt/assembler.go`） |
+| L4-CTX-TRANSCRIPT | D2-S6 / D2-S9 | Main JSONL + Harness Transcript |
+| L4-CTX-CONV | D2-S13 (Conversation) | Tool chain repair / compact boundary |
 | L4-CTX-QUERYLOOP | D2-S10 (QueryLoop) | QueryLoop 主循环 |
 | L4-CTX-USERCTX | D2-S10 (QueryLoop) | UserContext prepend |
 | L4-CTX-ATTACH | D2-S10 (QueryLoop) | Plan mode attachments |
@@ -375,3 +376,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | 2.1.0 | 2026-06-10 | D2-S10~S12, D4-S10, ORCH-S1/S2 QueryLoop v2 (DM-20260610-012) |
 | 3.0.0 | 2026-06-12 | DSAFT full A/F layer definition; A-registry (77 activities), F-registry (98 function points) |
 | 3.1.0 | 2026-06-12 | Directory/spec sync: +14 new S-IDs, D4 conflict resolution (Permission→ForkJoin, Fork→Collaboration), +Status column on all S tables |
+| 3.2.0 | 2026-06-13 | D2 文档与代码对齐：QueryLoop 默认主路径、PEV 退役、`prompt/assembler`、Main transcript、conversation repair；A 94 / F 169 / T 195 |

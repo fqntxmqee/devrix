@@ -1,11 +1,11 @@
 # 上下文引擎详细设计（Layer 2）
 
-**文档类型:** 详细架构设计（遵循 `docs/detail design framework.md`）
-**Change ID:** devrix-context-engine
-**Demand ID:** DM-20260607-002
-**版本:** 1.0.0
-**状态:** Historical — PEV 章节已归档；现行主路径见 QueryLoop（`openspec/specs/context-engine/spec.md` V6+）
-**关联 OpenSpec:** `openspec/archive/2026-06-07-devrix-context-engine/`（已归档）；规格 SoT：`openspec/specs/context-engine/spec.md`
+**文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
+**Change ID:** devrix-context-engine → devrix-queryloop-context → devrix-unified-task-registry
+**Demand ID:** DM-20260607-002, DM-20260610-012, DM-20260611-004
+**版本:** 2.0.0
+**状态:** Active — 主路径 **QueryLoop**（D2-S10）；PEV（D2-S1）已退役
+**关联 OpenSpec:** 规格 SoT：`openspec/specs/d2-context-engine/spec.md` · Delta：`layer-delta.md`
 
 ---
 
@@ -14,9 +14,10 @@
 | 文档 | 用途 |
 |------|------|
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
-| `openspec/archive/2026-06-07-devrix-context-engine/design.md` | OpenSpec 实施设计（包结构、代码骨架、版本分期） |
-| `openspec/specs/context-engine/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
-| `openspec/specs/context_engine_layer_delta.md` | 层能力 Delta SoT |
+| `openspec/specs/d2-context-engine/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
+| `openspec/specs/d2-context-engine/layer-delta.md` | 层能力 Delta SoT |
+| `openspec/specs/d2-context-engine/prompt-system-design.md` | 提示词系统专项设计 |
+| `openspec/archive/2026-06-07-devrix-context-engine/` | V1 PEV 实施设计（历史归档） |
 
 ---
 
@@ -29,7 +30,7 @@
 | Stub 引擎仅 Echo，无法真正「开发助手」 | 真实对话循环 + 工具调用 | 用户提问后获得 LLM 推理与工具执行结果 |
 | 长对话 Token 爆炸、LLM 调用失败 | 七步压缩管道 | 超长会话仍可继续，不丢最近关键上下文 |
 | 会话重启丢失历史 | ContextSnapshot 持久化 | `/new` 之前的历史可恢复（同 Session） |
-| 工具执行结果不可信 | PEV Execute→Verify | 工具失败后自动重试或明确报错 |
+| 工具执行结果不可信 | QueryLoop 多轮 tool_use + 权限门 | 工具失败可重试；权限拒绝明确报错 |
 | 通信层四流无内容源 | 引擎统一产出 EngineEvent | CLI/飞书可见 thinking、进度、错误 |
 
 ### 技术目标（量化）
@@ -62,12 +63,12 @@
 
 | 原则 | 上下文引擎落地 |
 |------|----------------|
-| **高内聚低耦合** | `contextengine` 包内聚 PEV/压缩/记忆；对外仅 `Process` + 依赖接口 |
-| **面向失败设计** | Token 超限 → `CTX_EXCEEDED`；快照损坏 → 降级空上下文；PEV 超限 → 保留 partial |
+| **高内聚低耦合** | `contextengine` 包内聚 QueryLoop/压缩/记忆；对外仅 `Process` + 依赖接口 |
+| **面向失败设计** | Token 超限 → `CTX_EXCEEDED`；快照损坏 → 降级空上下文；QueryLoop max_turns → 保留 partial |
 | **数据所有权** | 消息历史归 `SessionContext`；`Session` 只持快照字节；通信层不直接改 history |
 | **单向依赖** | L2 → L3/L4/L5 接口；L1 → L2 接口；禁止 L2 import `adapters` |
 | **Accept Interfaces, Return Structs** | Go 惯例：依赖注入接口，返回具体 Engine/Memory 结构 |
-| **可观测内建** | 每步压缩、PEV 相位通过 `IObserver` 上报 |
+| **可观测内建** | 每步压缩、QueryLoop span 通过 `IObserver` / Jaeger 上报 |
 
 ### 命名规范
 
@@ -91,7 +92,9 @@
 
 ## ③ 业务流程
 
-### 3.1 核心用例：处理用户消息（Happy Path）
+### 3.1 核心用例：处理用户消息（Happy Path — QueryLoop）
+
+> **默认配置**（`query_loop.enabled=true`）：Harness Bootstrap / Preflight / Routing 仅在显式 `query_loop.enabled=false` 时作为 legacy fallback 执行。
 
 ```mermaid
 sequenceDiagram
@@ -101,45 +104,39 @@ sequenceDiagram
     participant C as ContextEngine
     participant M as MemoryManager
     participant P as CompressionPipeline
-    participant V as PEVEngine
+    participant A2 as SystemPromptAssembler
+    participant Q as QueryLoop
     participant L as ILLMGateway
 
     U->>A: 输入消息
     A->>G: RouteInbound(InboundMessage)
-    Note over G: 校验/会话/权限 已完成
     G->>C: Process(ctx, session, content)
 
     C->>M: LoadOrInit(session)
     M-->>C: SessionContext
     C->>M: AppendUserMessage
-    C->>P: CompressIfNeeded
-    P-->>C: CompressedView
-
-    loop PEV max_iterations
-        C->>V: Execute(compressedView)
-        V->>L: ChatStream
-        L-->>V: chunks
-        V-->>C: EngineEvent(thinking/text)
+    Note over C: RepairToolMessageChain + MessagesAfterCompactBoundary
+    opt compress_per_turn=false 且超预算
+        C->>P: Run(messages-only)
+        P-->>C: compressed messages
+    end
+    C->>A2: Build(Layer 0–3)
+    A2-->>C: sc.SystemPrompt
+    C->>Q: Run(system, messages, tools)
+    loop max_turns
+        Q->>L: ChatStream
+        L-->>Q: chunks
+        Q-->>C: EngineEvent(thinking/text)
         C-->>G: event stream
-        G-->>A: OnMessage / OnStatus
-        A-->>U: 流式渲染
-
         opt tool_calls
-            V-->>C: tool_call event（通知）
-            C-->>G: tool_call（Gateway 仅展示）
-            V->>V: IPermissionGate.Request
-            alt approved
-                V->>V: IToolRunner.Execute
-                V-->>C: tool_result event
-                C->>V: Verify
-            else denied
-                V-->>C: error(permission_denied)
-            end
+            Q->>Q: Permission + ExecuteTools
+            Q-->>C: tool_call / tool_result
         end
     end
-
+    C->>M: AppendFullMessage / TrimMessages
+    C->>M: commitActiveWindow (per-turn 压缩)
     C->>M: PersistSnapshot
-    C-->>G: complete event
+    C-->>G: complete (deferred)
     G-->>A: 完成
 ```
 
@@ -179,9 +176,9 @@ sequenceDiagram
 |------|--------|----------|------|
 | Token 超限 | TokenBlock | 返回 `CTX_EXCEEDED`，不发 LLM | 同消息重试结果一致 |
 | LLM 熔断 | ILLMGateway | `CTX_LLM_4004`，recoverable | 用户重发消息 |
-| 工具执行失败 | IToolRunner | Verify fail → PEV 重试 | 工具需幂等设计 |
+| 工具执行失败 | IToolRunner | Loop 下一轮或 max_turns 终止 | 工具需幂等设计 |
 | 权限拒绝 | IPermissionGate | `error` + `recoverable=false` | 用户换指令重试 |
-| PEV 超限 | iteration == max | `CTX_PEV_4003`，保留 partial 回复 | — |
+| QueryLoop max_turns | turn == max | 保留 partial 回复 | — |
 | context 取消 | ctx.Done / `/stop` | Gateway.Stop → cancel，不发 complete | — |
 | 快照写入失败 | PersistSnapshot | 日志告警，内存态仍可用 | 下次消息重试持久化 |
 
@@ -189,11 +186,11 @@ sequenceDiagram
 
 ```
 用户消息到达
-  → Count(tokens) > CompressionTarget?
-       否 → 直接进入 PEV
-       是 → 执行步骤 1→5 → Count仍超?
-                是 → 步骤 7 TokenBlock → error
-                否 → 进入 PEV
+  → RepairToolMessageChain(MessagesAfterCompactBoundary)
+  → compress_per_turn=false 且 Count(tokens) > CompressionTarget?
+       否 → SystemPromptAssembler.Build → QueryLoop.Run
+       是 → 七步管道(messages-only) → Build → QueryLoop.Run
+  → 成功后 commitActiveWindow（per-turn 压缩 + compact_boundary 可选）
 ```
 
 ### 3.5 与通信层四流映射
@@ -202,7 +199,7 @@ sequenceDiagram
 |----|----------|----------|
 | ① 指令流 | 不解析 `/new` 等（Gateway 已处理） | — |
 | ② 事件流 | LLM/工具主输出 | thinking, text, tool_call, tool_result, complete, error |
-| ③ 任务流 | V3 Plan+Milestone | milestone_progress |
+| ③ 任务流 | D4 Delegate / SubQuery milestone | milestone_progress（D1 Milestone 模块） |
 | ④ 信息流 | 压缩/恢复提示 | info |
 
 ---
@@ -216,7 +213,7 @@ sequenceDiagram
 │  Devrix 系统                                                 │
 │  ┌─────────────────┐    ┌─────────────────────────────┐   │
 │  │ Communication   │    │ Context Engine (本上下文)    │   │
-│  │ 会话/适配/路由   │───▶│ 历史/压缩/PEV/快照          │   │
+│  │ 会话/适配/路由   │───▶│ 历史/压缩/QueryLoop/快照      │   │
 │  └─────────────────┘    └───────────┬─────────────────┘   │
 │                                        │                     │
 │         ┌──────────────────────────────┼──────────────┐     │
@@ -232,7 +229,7 @@ sequenceDiagram
 
 | 聚合根 | 职责 | 持久化 |
 |--------|------|--------|
-| **SessionContext** | 消息历史、PEV 状态、Token 预算、压缩视图 | ContextSnapshot |
+| **SessionContext** | 消息历史、Token 预算、压缩视图、Harness 状态 | ContextSnapshot |
 | Session（通信层） | 会话身份、生命周期、WorkDir | FileSessionStore |
 
 关系：`Session` 1:1 `SessionContext`（引擎域）；通过 `ContextSnapshot` 弱耦合同步。
@@ -243,22 +240,20 @@ sequenceDiagram
 SessionContext (聚合根)
 ├── Messages[]          (实体 Message，复用 types.Message)
 ├── CompressedView[]    (值对象快照)
-├── PEVState            (值对象)
 ├── TokenBudget         (值对象)
 ├── SystemPrompt        (值对象)
 └── CompressionReport   (值对象，最近一次)
 
 WorkingMemory (实体，Process 内)
 ├── StreamBuffer
-├── ActiveTools[]
-└── CurrentPEV          (引用)
+└── ActiveTools[]（流式 text 缓冲）
 
 ShortTermMemory (实体)
 ├── 与 SessionContext 同构子集
-└── 负责序列化
+└── 负责序列化 + Snappy 压缩
 
-LongTermMemory (V3 聚合，V1 stub)
-└── Recall / Store → NotImplemented
+LongTermMemory (SQLite)
+└── Recall / Store / auto_store
 ```
 
 ### 4.4 领域事件（引擎内）
@@ -268,7 +263,7 @@ LongTermMemory (V3 聚合，V1 stub)
 | `context.initialized` | 新会话 | Observer |
 | `context.restored` | 快照加载成功 | Observer |
 | `context.compressed` | 压缩管道完成 | Observer / Metrics |
-| `pev.phase_changed` | Execute/Verify 切换 | Observer |
+| `pev.phase_changed` | （历史）PEV 相位 | — |
 | `context.snapshot_persisted` | Process 结束 | Observer |
 | `context.exceeded` | TokenBlock | Gateway → Adapter 错误展示 |
 
@@ -311,10 +306,11 @@ CommunicationGateway.RouteInbound
   ▼        │ 引擎域（本层 SLA）
 ContextEngine.Process ─────────────────────────────┐
   ├─ MemoryManager.LoadOrInit          <10ms      │
-  ├─ CompressionPipeline.Run           <100ms     │ P99 <200ms
-  ├─ PEVEngine.Execute ────────────────────────────┤ (不含 LLM)
+  ├─ CompressionPipeline.Run (可选)    <100ms     │ P99 <200ms
+  ├─ SystemPromptAssembler.Build       <20ms      │ (不含 LLM)
+  ├─ QueryLoop.Run ────────────────────────────────┤
   │     └─ ILLMGateway.ChatStream      【外部】   │
-  ├─ PEVEngine.Verify                  <20ms      │
+  ├─ commitActiveWindow (per-turn)     <100ms     │
   └─ SnapshotStore.Persist               <20ms      │
   │ <5ms                                         ┘
   ▼
@@ -528,7 +524,8 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 |------|-----------|-----------|-----------|
 | V1 | 替换 Stub，压缩 1-5+7 | Execute→Verify | Working+ShortTerm |
 | V2 | Autocompact + Token 统一 | Verify commands（executable+args） | 管道 1-4→6→5→7；OpenSpec: `openspec/archive/2026-06-07-devrix-context-engine-v2/` |
-| V3 | 跨会话记忆 | Plan+Milestone | LongTerm SQLite；OpenSpec: `openspec/changes/devrix-context-engine-v3/` |
+| V6 | QueryLoop + UserContext + Task v2 + SubQuery | QueryLoop.Run | D2-S10 |
+| V7 | Harness 退役主路径；`query_loop.enabled` 默认 true；per-turn 压缩；main transcript；conversation repair | `commitActiveWindow` | DM-20260611-004 |
 
 ### V2 增量摘要（DM-20260607-003，Grill 2026-06-07）
 
@@ -606,7 +603,32 @@ go test -tags='acceptance && p0 && d2' ./tests/acceptance/p0/ -run Harness -coun
 
 ---
 
-**维护：** 实现阶段变更须同步更新本文档、`openspec/specs/context-engine/spec.md` 与归档包内 `design.md`。
+**维护：** 实现阶段变更须同步更新本文档、`openspec/specs/d2-context-engine/spec.md` 与 `layer-delta.md`。
+
+---
+
+## 附录 V7：Harness Unification（D2-S11）
+
+**Change ID:** devrix-unified-task-registry · **Demand:** DM-20260611-004 · **L3:** D2-S11
+
+| 能力 | 说明 |
+|------|------|
+| 主路径 | `query_loop.enabled=true`（默认）；`obsruntime.PathQueryLoop` 计数 |
+| Legacy fallback | 仅当 `query_loop.enabled=false` 时走 Harness Bootstrap + 入口压缩旧路径 |
+| Per-turn 压缩 | `compress_per_turn=true`（默认）跳过 Process 入口压缩；`commitActiveWindow` 在回合结束后压缩 active window |
+| Conversation | `RepairToolMessageChain` + `MessagesAfterCompactBoundary` 保证 API 消息合法 |
+| Main transcript | `main_transcript.enabled` → `{base_dir}/{sessionId}/transcript.jsonl` append-only |
+| Complete 延迟 | QueryLoop 拦截 `complete`；快照与 `sc.Messages` 落盘后再 emit |
+| D6 探针 | `PathRegressionProbe`：`legacy_harness > 0` ⇒ score 0 |
+
+**源码锚点：** `internal/layers/contextengine/engine.go`（`runProcess`）、`conversation/repair.go`、`transcript/main_thread.go`
+
+**验收命令：**
+
+```bash
+./scripts/test-domain.sh d2
+go test ./internal/layers/contextengine/... -run 'PathRegression|CompressUnified|RepairTool' -count=1
+```
 
 ---
 
@@ -692,10 +714,10 @@ ContextEngine.Process()
 | 文件 | 职责 |
 |------|------|
 | `prompt/loader.go` | Section 加载、缓存管理 |
-| `prompt/templates/static.go` | 静态内容常量 |
-| `harness/system_prompt_assembler.go` | 4-Layer 组装 |
-| `harness/templates/devrix_core.zh.md` | 中文默认模板 |
-| `shared/config/contextengine_harness.go` | PromptConfig |
+| `prompt/templates/static.go` | 静态 Section 内容常量 |
+| `prompt/assembler.go` | 4-Layer SystemPromptAssembler |
+| `prompt/templates/devrix_core.zh.md` | 中文默认模板（embed） |
+| `shared/config/contextengine.go` | ContextEngineConfig |
 
 ### D.6 验收命令
 
@@ -704,7 +726,7 @@ ContextEngine.Process()
 go test ./internal/layers/contextengine/prompt/... -v
 
 # 集成测试
-go test ./internal/layers/contextengine/harness/... -v -run SystemPromptAssembler
+go test ./internal/layers/contextengine/prompt/... -v -run SystemPromptAssembler
 
 # 查看生成的提示词
 go run scripts/show_prompts.go

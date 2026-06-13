@@ -69,7 +69,7 @@
 | D2-S9-A01-T07 | Transcript 内存分离与 compact | Harness | `internal/layers/contextengine/harness/transcript_test.go` | IMPLEMENTED | P1 |
 | D2-S9-A01-T08 | harness.enabled=false V4 回归 + 无 bootstrap info | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T09 | Preflight warn-only 规则评分与 tool filter | Harness | `internal/layers/contextengine/harness/preflight_test.go` | IMPLEMENTED | P1 |
-| D2-S9-A02-T10 | System Prompt Assembly §十 XML 块 | Harness | `internal/layers/contextengine/harness/system_prompt_assembler_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A02-T10 | System Prompt Assembly §十 XML 块 | Harness | `internal/layers/contextengine/prompt/assembler_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T11 | Jaeger span 树（enabled/disabled） | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T12 | disabled 与 BuildLegacy 字节级一致 | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T13 | CompressedView system = Build 输出 | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
@@ -117,18 +117,31 @@
 |-------|------|---------|-----------|--------|----------|
 | D2-S12-A01-T01 | Worktree enter 后 write 不污染主 WorkDir | Worktree | `internal/layers/contextengine/worktree/manager_test.go` | IMPLEMENTED | P0 |
 
+## D2-S6: Snapshot & Main Transcript
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| D2-S6-A02-T01 | Main transcript append-only JSONL 读写 | Transcript | `internal/layers/contextengine/transcript/main_thread_test.go` | IMPLEMENTED | P1 |
+
+## D2-S13: Conversation Module
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| D2-S13-A01-T01 | RepairToolMessageChain 剔除 orphan tool results | Conversation | `internal/layers/contextengine/conversation/repair_test.go` | IMPLEMENTED | P0 |
+| D2-S13-A02-T01 | MessagesAfterCompactBoundary 仅保留尾部 | Conversation | `internal/layers/contextengine/conversation/boundary_test.go` | IMPLEMENTED | P1 |
+
 ## D2: Cross-Scenario Tests
 
 | T ID | 描述 | Test 位置 | Status |
 |-------|------|-----------|--------|
 | D2-S0-A01-T01 | 压缩/Verify 步骤可观事务 | `tests/integration/context_compression_obs_test.go` | IMPLEMENTED |
 | D2-S0-A01-T02 | 主路径接入真实 LLM Gateway | `tests/integration/context_llm_gateway_test.go` | IMPLEMENTED |
-| D2-S0-A01-T03 | plan.enabled=false 时回退 V2 路径 | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED |
+| D2-S0-A01-T03 | plan.enabled=false 时回退 V2 路径 | `tests/integration/context_plan_milestone_test.go` | IMPLEMENTED | (历史 PEV 回归，legacy) |
 
 ---
 
 ## Statistics
 
-| Total | IMPLEMENTED | P0 |
-|-------|-------------|-----|
-| 41 | 41 | 15 |
+| Total | IMPLEMENTED | PARTIAL | P0 |
+|-------|-------------|---------|-----|
+| 59 | 58 | 1 | 17 |

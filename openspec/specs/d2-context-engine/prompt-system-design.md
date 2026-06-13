@@ -2,13 +2,11 @@
 
 **文档类型:** 详细架构设计
 **Change ID:** devrix-prompt-system
-**版本:** 1.0.0
-**状态:** Ready
-**基于:** Claude Code Prompt System Design
+**版本:** 1.1.0
+**状态:** Active
+**基于:** Claude Code Prompt System Design · 组装实现：`prompt/assembler.go`（自 harness 包迁移）
 
----
-
-## ① 设计目标
+> **与运行时关系：** `ContextEngine.Process` 在 QueryLoop 之前调用 `SystemPromptAssembler.Build`；`user_context.mode=prepend` 时 AGENTS.md 经 `usercontext.PrependForAPI` 注入 API 消息，不写入 snapshot。
 
 ### 痛点与解决方案
 
@@ -180,9 +178,9 @@ const DynamicBoundary = "<!-- DYNAMIC_CONTENT_BOUNDARY -->"
           │
           ▼
 ┌─────────────────────┐
-│   LLM Request       │
-│  SystemPrompt:      │
-│  "你是 Devrix..."   │
+│   QueryLoop.Run()   │
+│  SystemPrompt +     │
+│  prepend UserContext│
 └─────────────────────┘
 ```
 
@@ -191,8 +189,10 @@ const DynamicBoundary = "<!-- DYNAMIC_CONTENT_BOUNDARY -->"
 | 文件 | 职责 |
 |------|------|
 | `prompt/loader.go` | Section 加载、缓存管理 |
-| `harness/system_prompt_assembler.go` | 4-Layer 组装 |
-| `harness/templates/devrix_core.zh.md` | 默认核心模板 |
+| `prompt/assembler.go` | 4-Layer SystemPromptAssembler |
+| `prompt/templates/devrix_core.zh.md` | 默认核心模板（embed） |
+| `prompt/templates/workspace_guidance.zh.md` | 工作区引导模板（embed） |
+| `harness/workspace.go` | WorkspaceContext 扫描（Bootstrap prefetch） |
 
 ---
 
@@ -350,7 +350,7 @@ go test ./internal/layers/contextengine/prompt/... -v
 ### 7.2 集成测试
 
 ```bash
-go test ./internal/layers/contextengine/harness/... -v -run "SystemPromptAssembler"
+go test ./internal/layers/contextengine/prompt/... -v -run "SystemPromptAssembler|Loader"
 ```
 
 ### 7.3 验证脚本
