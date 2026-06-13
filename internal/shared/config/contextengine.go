@@ -36,10 +36,72 @@ type SnapshotConfig struct {
 	CompressionThreshold int    `yaml:"compression_threshold"`
 }
 
-// SystemPromptConfig holds system prompt source paths.
+// SystemPromptConfig holds system prompt source paths and AGENTS.md discovery.
 type SystemPromptConfig struct {
-	Sources  []string `yaml:"sources"`
-	Fallback string   `yaml:"fallback"`
+	Sources       []string `yaml:"sources"`
+	Fallback      string   `yaml:"fallback"`
+	WalkUp        *bool    `yaml:"walk_up"`
+	UserGlobal    string   `yaml:"user_global"`
+	RulesGlob     string   `yaml:"rules_glob"`
+	MaxChars      int      `yaml:"max_chars"`
+	EnableInclude *bool    `yaml:"enable_include"`
+}
+
+// DefaultSystemPromptConfig returns AGENTS.md discovery defaults (ClawCode claudemd aligned).
+func DefaultSystemPromptConfig() SystemPromptConfig {
+	return SystemPromptConfig{
+		Sources:       []string{".devrix/AGENTS.md", "AGENTS.md"},
+		Fallback:      "You are Devrix, a multi-agent development assistant.",
+		WalkUp:        boolPtr(true),
+		UserGlobal:    "~/.devrix/AGENTS.md",
+		RulesGlob:     ".devrix/rules/*.md",
+		MaxChars:      40000,
+		EnableInclude: boolPtr(true),
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+// Normalized returns a copy with defaults applied for unset fields.
+func (c SystemPromptConfig) Normalized() SystemPromptConfig {
+	def := DefaultSystemPromptConfig()
+	out := c
+	if len(out.Sources) == 0 {
+		out.Sources = def.Sources
+	}
+	if out.Fallback == "" {
+		out.Fallback = def.Fallback
+	}
+	if out.WalkUp == nil {
+		out.WalkUp = def.WalkUp
+	}
+	if out.UserGlobal == "" {
+		out.UserGlobal = def.UserGlobal
+	}
+	if out.RulesGlob == "" {
+		out.RulesGlob = def.RulesGlob
+	}
+	if out.MaxChars <= 0 {
+		out.MaxChars = def.MaxChars
+	}
+	if out.EnableInclude == nil {
+		out.EnableInclude = def.EnableInclude
+	}
+	return out
+}
+
+func (c SystemPromptConfig) WalkUpEnabled() bool {
+	if c.WalkUp == nil {
+		return true
+	}
+	return *c.WalkUp
+}
+
+func (c SystemPromptConfig) IncludeEnabled() bool {
+	if c.EnableInclude == nil {
+		return true
+	}
+	return *c.EnableInclude
 }
 
 // DefaultContextEngineConfig returns V1 defaults.
@@ -59,10 +121,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 			Enabled:   true,
 			BackupDir: "~/.devrix/context",
 		},
-		SystemPrompt: SystemPromptConfig{
-			Sources:  []string{"AGENTS.md", ".devrix/AGENTS.md"},
-			Fallback: "You are Devrix, a multi-agent development assistant.",
-		},
+		SystemPrompt: DefaultSystemPromptConfig(),
 		Prompt:     DefaultPromptConfig(),
 		LongTerm:   DefaultLongTermConfig(),
 		Harness:    DefaultHarnessConfig(),

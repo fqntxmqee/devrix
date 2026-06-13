@@ -257,6 +257,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		emit(infoEvent(session.SessionID, "快照已重置，开始新上下文"))
 		session.ContextSnapshot = nil
 		prompt.ClearDynamicSectionCache(session.SessionID)
+		prompt.ClearAgentsCache()
 		sc, err = e.memory.LoadOrInit(session, "")
 		if err != nil {
 			if loadSpan != nil {

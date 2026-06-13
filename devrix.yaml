@@ -173,8 +173,12 @@ context_engine:
   system_prompt:
     sources:
       - ".devrix/AGENTS.md"
-      - "AGENTS.md"
-    fallback: "You are Devrix, a multi-agent development assistant."
+    fallback: "You are Devrix, a Super Individual Developer assistant."
+    walk_up: true
+    user_global: "~/.devrix/AGENTS.md"
+    rules_glob: ".devrix/rules/*.md"
+    max_chars: 40000
+    enable_include: true
 
 
   # V3 新增: 跨 Session 长期记忆（SQLite）

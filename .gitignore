@@ -22,8 +22,11 @@ bin/
 coverage-reports/
 .understand-anything/
 
-# Devrix data
-.devrix/
+# Devrix data (track agent rules under .devrix/)
+.devrix/*
+!.devrix/AGENTS.md
+!.devrix/rules/
+!.devrix/rules/**
 
 # Logs
 *.log

@@ -1,8 +1,6 @@
 package prompt
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -47,22 +45,22 @@ func (c *Cache) Set(name, content string) {
 
 // Loader loads system prompts from configured sources.
 type Loader struct {
-	cfg       *config.SystemPromptConfig
+	cfg       config.SystemPromptConfig
 	cache     *Cache
 	staticMap map[string]string
 }
 
 // NewLoader creates a prompt loader.
 func NewLoader(cfg *config.SystemPromptConfig) *Loader {
-	if cfg == nil {
-		cfg = &config.SystemPromptConfig{
-			Sources:  []string{"AGENTS.md", ".devrix/AGENTS.md"},
-			Fallback: "You are Devrix, a multi-agent development assistant.",
-		}
+	base := config.DefaultSystemPromptConfig()
+	if cfg != nil {
+		base = cfg.Normalized()
+	} else {
+		base = base.Normalized()
 	}
 
 	loader := &Loader{
-		cfg:       cfg,
+		cfg:       base,
 		cache:     GetCache(),
 		staticMap: make(map[string]string),
 	}
@@ -114,41 +112,22 @@ func (l *Loader) LoadStaticSections(names []string) []string {
 	return sections
 }
 
-// LoadCustom loads custom prompt from workdir.
+// LoadCustom loads merged AGENTS.md context for a work directory.
 func (l *Loader) LoadCustom(workDir string) string {
-	for _, src := range l.cfg.Sources {
-		path := src
-		if !filepath.IsAbs(src) && workDir != "" {
-			path = filepath.Join(workDir, src)
-		}
-		data, err := os.ReadFile(path)
-		if err == nil && len(strings.TrimSpace(string(data))) > 0 {
-			return strings.TrimSpace(string(data))
-		}
-	}
-	return ""
+	return l.loadAgentsContext(workDir)
 }
 
-// IsCustomPromptAvailable checks if a custom prompt exists.
+// IsCustomPromptAvailable checks if any AGENTS.md source exists for the work directory.
 func (l *Loader) IsCustomPromptAvailable(workDir string) bool {
-	for _, src := range l.cfg.Sources {
-		path := src
-		if !filepath.IsAbs(src) && workDir != "" {
-			path = filepath.Join(workDir, src)
-		}
-		if _, err := os.Stat(path); err == nil {
-			return true
-		}
-	}
-	return false
+	return len(l.discoverAgentsDocuments(workDir)) > 0
 }
 
-// ClearCache clears the prompt cache.
+// ClearCache clears static section cache and discovered AGENTS context.
 func (l *Loader) ClearCache() {
-	// Re-populate static content
 	for name, content := range l.staticMap {
 		l.cache.Set(name, content)
 	}
+	ClearAgentsCache()
 }
 
 // GetCacheStats returns cache statistics.

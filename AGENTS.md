@@ -1,5 +1,7 @@
 # Devrix — 开放的大脑
 
+> 本文件供贡献者与 IDE 工具阅读；Devrix 运行时默认只加载 `.devrix/AGENTS.md` 作为 Agent 规约。
+
 多智能体协作开发助手。6 域架构，OpenSpec S1-S6 驱动开发。
 
 ## 架构
