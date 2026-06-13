@@ -86,7 +86,9 @@ D7 MUST exist as a top-level domain package at `internal/layers/d7/` with define
 
 D7-S1 MUST own the unified Task data model as the single source of truth. Task CRUD MUST only go through D7-S1 activities.
 
-<!-- T: D7-S1-T01, D7-S1-T02, D7-S1-T03 -->
+**Implementation Status (2026-06-14):** 🔶 PARTIAL — TaskManager 在 `contextengine/tasks/`，WorkPlan 读投影在 `orchestration/`。`CreateWorkPlan` Activity 未实现。
+
+<!-- T: D7-S1-T01 … D7-S1-T06 -->
 
 #### Scenario: Task created through D7-S1
 
@@ -141,7 +143,9 @@ D7-S1 MUST own the unified Task data model as the single source of truth. Task C
 
 D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request entry point. It MUST support fast-path (direct D2 proxy) and orchestrate-path (multi-step plan).
 
-<!-- T: D7-S2-T01, D7-S2-T02, D7-S2-T03, D7-S2-T04 -->
+**Implementation Status (2026-06-14):** ⬜ PLANNED — D1 `gateway.go:286` 仍调用 `contextEngine.Process`。
+
+<!-- T: D7-S2-T01 … D7-S2-T04 (PLANNED) -->
 
 #### Scenario: ProcessMessage is the entry point
 
@@ -240,7 +244,9 @@ D7-S4 MUST aggregate FlowEvent from D2 SubQuery and D4 Delegate into WorkPlan sn
 
 D7-S5 MUST provide structured intent classification and task decomposition. Classification MUST use a layered approach: rules first, LLM fallback, merged result.
 
-<!-- T: D7-S5-T01, D7-S5-T02, D7-S5-T03, D7-S5-T04 -->
+**Implementation Status (2026-06-14):** 🔶 PARTIAL — PlanMode/PlanAgent 已实现（`/plan` 工作流）；ClassifyIntent/SynthesizeTaskGraph/SelectExecutor 未实现。
+
+<!-- T: D7-S5-T01 … D7-S5-T05 -->
 
 #### Scenario: Rule-based classification
 
@@ -288,7 +294,9 @@ D7-S5 MUST provide structured intent classification and task decomposition. Clas
 
 After D7 migration, `query.Loop.Run` MUST only handle LLM↔Tool interaction. All orchestration-side responsibilities MUST be removed from Loop.
 
-<!-- T: D7-THIN-T01, D7-THIN-T02 -->
+**Implementation Status (2026-06-14):** ⬜ NOT STARTED — `loop.go` 414 行，仍 import `multiagent/delegate`。
+
+<!-- T: D7-THIN-T01 … D7-THIN-T04 (PLANNED) -->
 
 #### Scenario: Orchestration fields removed from Loop
 
