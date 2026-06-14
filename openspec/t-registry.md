@@ -25,9 +25,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 45 | 35 | 8 | 25 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 45 | 36 | 7 | 25 |
 
-**总计**: 271 · IMPLEMENTED 254 · PLANNED 14 · PARTIAL 2 · P0 117
+**总计**: 271 · IMPLEMENTED 255 · PLANNED 13 · PARTIAL 2 · P0 117
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 
