@@ -15,7 +15,6 @@ D7 编排域 **v1.0 核心目标已完成**：WaveScheduler（D7-S3）+ Executio
 D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue 保留）；委托工具保持在 `contextengine/delegate_tools.go`（避免循环依赖）。
 
 **v1.1 待完成：**
-- D2 Loop 达到≤200行目标（当前~203行，差3行）
 - Task 写模型迁入 `orchestration/coordinator/`
 - SynthesizeTaskGraph + CreateWorkPlan
 
@@ -205,7 +204,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | B | D7 骨架 + contracts + re-export + bootstrap | ✅ |
 | C | S5-P2 Classify + S2 ProcessMessage | ✅ |
 | D | 入口切换（WireD7 + SetOrchestrationEntry） | ✅ |
-| E | D2 Loop 精简（emit/executor分流，Loop.Run ~203行，≤200目标 v1.1） | ✅ 分流完成 |
+| E | D2 Loop 精简（emit/executor分流，Loop.Run 196行） | ✅ |
 | F | S3/S4 包路径迁移 | ✅ |
 | G | 回归 + D7-MIG-T01 四组合矩阵 | ✅ |
 | H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ⬜ PLANNED |

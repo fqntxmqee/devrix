@@ -71,24 +71,21 @@ func (l *Loop) Run(
 	messages = conversation.StripSystem(messages)
 
 	var (
-		loopSpan       tracer.Span
-		assistantText  string
-		usage         TokenUsage
-		allToolRecords []types.ToolCallRecord
+		loopSpan         tracer.Span
+		assistantText    string
+		usage            TokenUsage
+		allToolRecords   []types.ToolCallRecord
 		toolRoundResults []ToolRoundResult
-		turn           int
+		turn             int
 	)
 	if sc != nil {
 		_, loopSpan = l.startLoopSpan(ctx, telemetry.OpQueryLoopRun, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session.id", Value: sc.SessionID},
-			tracer.Attribute{Key: "max_turns", Value: fmt.Sprintf("%d", params.MaxTurns)},
-		)
+			tracer.Attribute{Key: "max_turns", Value: fmt.Sprintf("%d", params.MaxTurns)})
 	}
 	if loopSpan != nil {
 		defer func() {
-			loopSpan.SetAttributes(
-				tracer.Attribute{Key: "result.turn_count", Value: fmt.Sprintf("%d", turn)},
-			)
+			loopSpan.SetAttributes(tracer.Attribute{Key: "result.turn_count", Value: fmt.Sprintf("%d", turn)})
 			loopSpan.End()
 		}()
 	}
@@ -104,16 +101,13 @@ func (l *Loop) Run(
 		}
 
 		turnCtx, turnSpan := l.startLoopSpan(ctx, telemetry.OpQueryLoopTurn, tracer.SpanKindInternal,
-			tracer.Attribute{Key: "turn.number", Value: fmt.Sprintf("%d", turn)},
-		)
+			tracer.Attribute{Key: "turn.number", Value: fmt.Sprintf("%d", turn)})
 		toolCallCount := 0
 		endTurn := func() {
 			if turnSpan == nil {
 				return
 			}
-			turnSpan.SetAttributes(
-				tracer.Attribute{Key: "turn.tool_count", Value: fmt.Sprintf("%d", toolCallCount)},
-			)
+			turnSpan.SetAttributes(tracer.Attribute{Key: "turn.tool_count", Value: fmt.Sprintf("%d", toolCallCount)})
 			turnSpan.End()
 		}
 
@@ -121,11 +115,11 @@ func (l *Loop) Run(
 			l.Compress = l.CompressFactory(sc.SessionID)
 		}
 		if l.Compress != nil {
-			compressed, err := l.Compress(ctx, messages)
-			if err != nil {
+			if compressed, err := l.Compress(ctx, messages); err != nil {
 				return nil, err
+			} else {
+				messages = compressed
 			}
-			messages = compressed
 		}
 
 		if l.Attachments != nil && sc != nil {
@@ -142,9 +136,7 @@ func (l *Loop) Run(
 		uc := params.UserContext
 		if l.UserContext != nil && sc != nil {
 			uc = l.UserContext.Get(ctx, sc)
-			if sc.AgentID != "" {
-				uc = usercontext.OmitClaudeMd(uc)
-			}
+			if sc.AgentID != "" { uc = usercontext.OmitClaudeMd(uc) }
 		}
 
 		messages = conversation.RepairToolMessageChain(messages)
@@ -155,21 +147,13 @@ func (l *Loop) Run(
 		}
 
 		_, llmSpan := l.startLoopSpan(turnCtx, telemetry.OpQueryLoopLLMCall, tracer.SpanKindClient,
-			tracer.Attribute{Key: "llm.model", Value: sc.Model},
-		)
+			tracer.Attribute{Key: "llm.model", Value: sc.Model})
 		llmStart := time.Now()
 
 		chunks, err := runWithContextLengthRecovery(
-			turnCtx,
-			l.LLM,
-			LLMRequest{
-				Model:        sc.Model,
-				SystemPrompt: params.SystemPrompt,
-				Messages:     apiMessages,
-				Tools:        params.Tools,
-			},
-			l.Compress,
-			&messages,
+			turnCtx, l.LLM,
+			LLMRequest{Model: sc.Model, SystemPrompt: params.SystemPrompt, Messages: apiMessages, Tools: params.Tools},
+			l.Compress, &messages,
 		)
 		apiMessages = messages
 		if prepend != nil && len(uc) > 0 {
@@ -177,12 +161,7 @@ func (l *Loop) Run(
 		}
 		if err != nil {
 			if l.FallbackLLM != nil && l.FallbackOnErr != nil && l.FallbackOnErr(err) && len(toolRoundResults) == 0 {
-				chunks, err = l.FallbackLLM.Call(turnCtx, LLMRequest{
-					Model:        sc.Model,
-					SystemPrompt: params.SystemPrompt,
-					Messages:     apiMessages,
-					Tools:        params.Tools,
-				})
+				chunks, err = l.FallbackLLM.Call(turnCtx, LLMRequest{Model: sc.Model, SystemPrompt: params.SystemPrompt, Messages: apiMessages, Tools: params.Tools})
 			}
 			if err != nil {
 				if llmSpan != nil {
@@ -226,18 +205,15 @@ func (l *Loop) Run(
 			llmSpan.SetAttributes(
 				tracer.Attribute{Key: "llm.prompt_tokens", Value: fmt.Sprintf("%d", iterUsage.PromptTokens)},
 				tracer.Attribute{Key: "llm.completion_tokens", Value: fmt.Sprintf("%d", iterUsage.CompletionTokens)},
-				tracer.Attribute{Key: "llm.latency_ms", Value: fmt.Sprintf("%d", time.Since(llmStart).Milliseconds())},
-			)
+				tracer.Attribute{Key: "llm.latency_ms", Value: fmt.Sprintf("%d", time.Since(llmStart).Milliseconds())})
 			llmSpan.End()
 		}
 
 		if len(pending) == 0 {
 			if l.Hooks.BeforeComplete != nil {
-				stop, err := l.Hooks.BeforeComplete(ctx, sc)
-				if err != nil {
+				if stop, err := l.Hooks.BeforeComplete(ctx, sc); err != nil {
 					return nil, err
-				}
-				if stop {
+				} else if stop {
 					break
 				}
 			}
@@ -245,9 +221,7 @@ func (l *Loop) Run(
 		}
 
 		refs := make([]conversation.ToolCallRef, len(pending))
-		for i, tc := range pending {
-			refs[i] = conversation.ToolCallRef{ID: tc.ID, Name: tc.Name, Input: tc.Input}
-		}
+		for i, tc := range pending { refs[i] = conversation.ToolCallRef{ID: tc.ID, Name: tc.Name, Input: tc.Input} }
 		refs = conversation.DedupeToolCalls(refs)
 
 		messages = append(messages, conversation.BuildAssistantToolCallsMessage(sc.SessionID, assistantText, refs))
@@ -257,11 +231,9 @@ func (l *Loop) Run(
 		toolRoundResults = append(toolRoundResults[:0], newResults...)
 
 		if l.Hooks.AfterToolRound != nil {
-			stop, err := l.Hooks.AfterToolRound(ctx, sc, toolRoundResults)
-			if err != nil {
+			if stop, err := l.Hooks.AfterToolRound(ctx, sc, toolRoundResults); err != nil {
 				return nil, err
-			}
-			if stop {
+			} else if stop {
 				break
 			}
 		}
@@ -275,17 +247,8 @@ func (l *Loop) Run(
 
 	assistantText = strings.TrimSpace(assistantText)
 	var outMsgs []types.Message
-	if assistantText != "" {
-		outMsgs = []types.Message{{Role: types.MessageRoleAssistant, Content: assistantText, SessionID: sc.SessionID}}
-	}
-
-	return &Result{
-		Messages:        outMsgs,
-		AssistantText:   assistantText,
-		Usage:           usage,
-		TurnCount:       turn,
-		ToolCallHistory: allToolRecords,
-	}, nil
+	if assistantText != "" { outMsgs = []types.Message{{Role: types.MessageRoleAssistant, Content: assistantText, SessionID: sc.SessionID}} }
+	return &Result{Messages: outMsgs, AssistantText: assistantText, Usage: usage, TurnCount: turn, ToolCallHistory: allToolRecords}, nil
 }
 
 // startLoopSpan creates a child span for Loop operations.
