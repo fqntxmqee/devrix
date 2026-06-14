@@ -132,7 +132,7 @@ type PlanResult struct {
 // This is READ-ONLY - only explores and plans, never modifies files.
 func (a *PlanAgent) Plan(ctx context.Context, req PlanRequest) *PlanResult {
 	start := time.Now()
-	ctx, planSpan := a.startSpan(ctx, telemetry.OpTaskPlanGenerate, tracer.SpanKindInternal,
+	ctx, planSpan := a.startSpan(ctx, telemetry.OpD2_S8_Task_Plan_Generate, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "task.user_goal", Value: truncateStr(req.UserGoal, 200)},
 		tracer.Attribute{Key: "task.tool_count", Value: fmt.Sprintf("%d", len(req.Tools))},
 	)

@@ -1,9 +1,27 @@
 # Devrix Spans 注册表（全局索引）
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 3.0.0
 **Last Updated:** 2026-06-14
 **Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+
+---
+
+## 命名规范 {D}{S}{A}_{F}
+
+所有 Span Operation 名称遵循 `{D}{S}_{A}_{F}` 格式：
+
+| 组件 | 说明 | 示例 |
+|------|------|------|
+| D | 域编号 | D1, D2, D3, D4, D7 |
+| S | Scenario 场景名 | Capture, Context, LLM, Agent, Orchestration |
+| A | Activity 活动名 | Process, Stream, Route, Execute |
+| F | Function 功能名（可选） | Receive, Load, Schedule |
+
+**格式规则：**
+- 全部大写
+- 组件间用下划线分隔
+- 示例：`D1_Capture_Message_Receive` → D1 + Capture + Message + Receive
 
 ---
 
@@ -28,21 +46,7 @@
 | D7 Orchestration  | `openspec/specs/d7-orchestration/span-registry.md`  | 3          | orchestrator(3)                                                         |
 
 
----
 
-## 快速索引（按 领域）
-
-
-| Layer           | Operations                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `communication` | `gateway.message.receive`, `gateway.session.lifecycle`, `gateway.session.create`, `gateway.session.get`, `gateway.session.expire`, `gateway.store.create`, `gateway.store.get`, `gateway.store.update`, `gateway.store.delete`, `gateway.permission.check`, `gateway.agent.create`, `gateway.engine_event.handle`, `adapter.message.receive`, `adapter.cli.send`, `adapter.feishu.outbound`                                                                                                                                                                                                                                                                                                                                 |
-| `context`       | `context.process`, `context.snapshot.load`, `context.system_prompt.load`, `context.compression.run`, `context.compression.step`, `context.longterm.recall`, `context.longterm.store`, `context.tools.register`, `context.memory.snapshot.save`, `context.harness.bootstrap.run`, `context.harness.bootstrap.stage`, `context.harness.tool_pool`, `context.harness.preflight`, `context.harness.route`, `context.system_prompt.build`, `query.loop.run`, `query.loop.turn`, `query.loop.llm.call`, `tool.execute.single`, `tool.execute.permission`, `task.plan.generate`, `task.plan_mode.enter`, `task.plan_mode.execute`, `task.plan_mode.approve`, `task.plan_mode.reject`, `task.manager.create`, `task.manager.update` |
-| `llm`           | `llm.stream`, `llm.provider.route`, `llm.circuit_breaker`, `llm.retry`, `llm.adapter.stream`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `agent`         | `agent.tool.call`, `agent.run`, `agent.fork`, `agent.join`, `agent.terminate`, `agent.state.transition`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `orchestration` | `orchestration.wave.schedule`, `orchestration.wave.task.execute`, `orchestration.flow.event.publish`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-
-
----
 
 ## 全局 Metrics 索引
 
@@ -55,12 +59,4 @@
 | `devrix_active_sessions`             | Gauge     | adapter                  | D1  |
 | `devrix_runtime_path_resolved_total` | Counter   | path                     | D5  |
 
-
----
-
-## 关联文档
-
-- Operation 常量定义：`internal/layers/observability/telemetry/names.go`
-- Coverage Registry：`internal/layers/observability/coverage/registry.go`
-- D5 全局 Trace Tree：`openspec/specs/d5-observability/span-registry.md`
 

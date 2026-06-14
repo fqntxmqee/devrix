@@ -28,9 +28,9 @@ func (g *CommunicationGateway) recordConclusionFeedback(ctx context.Context, ses
 	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
 		return
 	}
-	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpUserFeedbackConclusionRejected,
+	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S16_UserFeedback_ConclusionRejected,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpUserFeedbackConclusionRejected,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S16_UserFeedback_ConclusionRejected,
 			tracer.Attribute{Key: "session.id", Value: session.SessionID},
 			tracer.Attribute{Key: "feedback.reason", Value: reason},
 		)...),
@@ -74,9 +74,9 @@ func (g *CommunicationGateway) emitOutboundSignalSpans(
 		intact = "false"
 		breakAt = string(chain.BreakAt)
 	}
-	_, chainSpan := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1SignalChainIntegrity,
+	_, chainSpan := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S14_Signal_ChainIntegrity,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1SignalChainIntegrity,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S14_Signal_ChainIntegrity,
 			tracer.Attribute{Key: "session.id", Value: session.SessionID},
 			tracer.Attribute{Key: "chain.intact", Value: intact},
 			tracer.Attribute{Key: "chain.break_at_kind", Value: breakAt},
@@ -95,9 +95,9 @@ func (g *CommunicationGateway) emitOutboundSignalSpans(
 		if toolName == "" && event.Metadata != nil {
 			toolName = event.Metadata["tool_name"]
 		}
-		_, wpSpan := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1SignalTaskWorkProof,
+		_, wpSpan := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S15_Signal_TaskWorkProof,
 			tracer.WithSpanKind(tracer.SpanKindInternal),
-			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1SignalTaskWorkProof,
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S15_Signal_TaskWorkProof,
 				tracer.Attribute{Key: "session.id", Value: session.SessionID},
 				tracer.Attribute{Key: "tool.name", Value: toolName},
 				tracer.Attribute{Key: "event.type", Value: event.Type},
@@ -112,13 +112,13 @@ func (g *CommunicationGateway) emitOutboundSignalSpans(
 func signalSpanOp(kind contracts.SignalKind) string {
 	switch kind {
 	case contracts.SignalThinking:
-		return telemetry.OpD1SignalThinking
+		return telemetry.OpD1_S14_Signal_Thinking
 	case contracts.SignalTask:
-		return telemetry.OpD1SignalTask
+		return telemetry.OpD1_S15_Signal_Task
 	case contracts.SignalConclusion:
-		return telemetry.OpD1SignalConclusion
+		return telemetry.OpD1_S16_Signal_Conclusion
 	default:
-		return telemetry.OpD1SignalConclusion
+		return telemetry.OpD1_S16_Signal_Conclusion
 	}
 }
 
@@ -126,9 +126,9 @@ func (g *CommunicationGateway) startCapturePersistSpan(ctx context.Context, sess
 	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
 		return
 	}
-	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1CapturePersist,
+	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Persist,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1CapturePersist,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Persist,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 		)...),
 	)
@@ -141,9 +141,9 @@ func (g *CommunicationGateway) startDispatchRouteSpan(ctx context.Context, sessi
 	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
 		return
 	}
-	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1DispatchRoute,
+	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Dispatch_Route,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1DispatchRoute,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Dispatch_Route,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 			tracer.Attribute{Key: "dispatch.target", Value: target},
 		)...),

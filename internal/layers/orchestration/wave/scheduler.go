@@ -168,7 +168,7 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		}
 	}
 
-	_, span := s.startOrchSpan(ctx, telemetry.OpOrchWaveSchedule, tracer.SpanKindInternal,
+	_, span := s.startOrchSpan(ctx, telemetry.OpD7_S3_Orchestration_Wave_Schedule, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "wave.session_id", Value: sessionID},
 		tracer.Attribute{Key: "wave.task_count", Value: fmt.Sprintf("%d", len(graph.nodes))},
 	)
@@ -345,7 +345,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 
 	// Spawn worker goroutine.
 	go func() {
-		_, taskSpan := s.startOrchSpan(taskCtx, telemetry.OpOrchWaveTaskExecute, tracer.SpanKindInternal,
+		_, taskSpan := s.startOrchSpan(taskCtx, telemetry.OpD7_S3_Orchestration_Wave_Task_Execute, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "wave.session_id", Value: sessionID},
 			tracer.Attribute{Key: "wave.task_id", Value: node.ID},
 			tracer.Attribute{Key: "wave.worker_type", Value: string(node.WorkerType)},

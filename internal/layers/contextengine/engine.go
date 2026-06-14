@@ -229,7 +229,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	e.initMetrics()
 
 	// Create "context_engine.process" span as child of gateway span.
-	ctx, processSpan := e.startSpan(ctx, telemetry.OpContextProcess, tracer.SpanKindInternal,
+	ctx, processSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session.id", Value: session.SessionID},
 		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(message))},
 	)
@@ -255,7 +255,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	agentsRaw := e.prompt.Load(session.WorkDir)
 	// System prompt load observability (agents file for prepend / optional Layer 3).
 	{
-		_, spSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptLoad, tracer.SpanKindInternal,
+		_, spSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_SystemPrompt_Load, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "agents_raw.length", Value: fmt.Sprintf("%d", len(agentsRaw))},
 			tracer.Attribute{Key: "system_prompt.sources_count", Value: fmt.Sprintf("%d", len(e.cfg.SystemPrompt.Sources))},
 			tracer.Attribute{Key: "harness.enabled", Value: fmt.Sprintf("%t", harnessEnabled)},
@@ -266,7 +266,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	// Load or init snapshot — with child span.
-	_, loadSpan := e.startSpan(ctx, telemetry.OpContextSnapshotLoad, tracer.SpanKindInternal)
+	_, loadSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Snapshot_Load, tracer.SpanKindInternal)
 	hadSnapshot := session.ContextSnapshot != nil
 	sc, err := e.memory.LoadOrInit(session, "")
 	if err != nil {
@@ -328,7 +328,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	var memoryEntries []memory.MemoryEntry
-	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpContextLongTermRecall, tracer.SpanKindInternal,
+	recallCtx, recallSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Longterm_Recall, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "longterm.enabled", Value: fmt.Sprintf("%t", e.cfg.LongTerm.Enabled)},
 		tracer.Attribute{Key: "longterm.recall_topics", Value: strings.Join(e.cfg.LongTerm.Topics, ",")},
 	)
@@ -369,7 +369,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 	skipEntryCompress := e.cfg.QueryLoop.Enabled && e.cfg.QueryLoop.CompressPerTurn
 	if !skipEntryCompress && e.shouldCompress(msgs, sc.TokenBudget) {
-		compCtx, compSpan := e.startSpan(ctx, telemetry.OpContextCompressionRun, tracer.SpanKindInternal,
+		compCtx, compSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Run, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(msgs))},
 		)
 		compressed, report, compErr := e.compressionPipeline(session.SessionID).Run(compCtx, msgs, compSystemPrompt, sc.TokenBudget)
@@ -418,7 +418,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			provisionalContext += "\n" + memCtx
 		}
 		if e.cfg.Preflight.Enabled {
-			pfCtx, pfSpan := e.startSpan(ctx, telemetry.OpContextHarnessPreflight, tracer.SpanKindInternal)
+			pfCtx, pfSpan := e.startSpan(ctx, telemetry.OpD2_S5_Context_Harness_Preflight, tracer.SpanKindInternal)
 			result := e.preflight.Evaluate(sc, message, visibleTools, provisionalContext)
 			preflightResult = &result
 			filtered, _ := e.preflight.FilterVisibleTools(message, visibleTools)
@@ -434,7 +434,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			_ = pfCtx
 		}
 		if e.cfg.Harness.Routing.Enabled {
-			routeCtx, routeSpan := e.startSpan(ctx, telemetry.OpContextHarnessRoute, tracer.SpanKindInternal)
+			routeCtx, routeSpan := e.startSpan(ctx, telemetry.OpD2_S5_Context_Harness_Route, tracer.SpanKindInternal)
 			hint := e.router.Route(message, visibleTools, e.cfg.Harness.Routing.MaxMatches)
 			if len(hint.Tools) > 0 {
 				routingHint = &hint
@@ -473,7 +473,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			OmitAgentsFromSystem: omitAgents,
 			RecallMaxTokens:      e.cfg.LongTerm.RecallMaxTokens,
 		}
-		_, buildSpan := e.startSpan(ctx, telemetry.OpContextSystemPromptBuild, tracer.SpanKindInternal)
+		_, buildSpan := e.startSpan(ctx, telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build, tracer.SpanKindInternal)
 		builtPrompt, buildReport := e.assembler.Build(buildInput)
 		if buildSpan != nil {
 			buildSpan.SetAttributes(
@@ -596,7 +596,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		if harnessEnabled && !workerLocal {
 			e.transcript.AppendTurn(sc, message, assistantSummary)
 		}
-		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpContextLongTermStore, tracer.SpanKindInternal)
+		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Longterm_Store, tracer.SpanKindInternal)
 		storeErr := e.memory.AutoStoreLongTerm(storeCtx, sc, message, assistantSummary)
 		if storeSpan != nil {
 			if storeErr != nil {
@@ -627,7 +627,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		emit(mapProcessError(session.SessionID, runErr))
 	}
 
-	_, saveSpan := e.startSpan(ctx, telemetry.OpContextMemorySnapshotSave, tracer.SpanKindInternal,
+	_, saveSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "snapshot.message_count", Value: fmt.Sprintf("%d", len(sc.Messages))},
 	)
 	if !workerLocal {

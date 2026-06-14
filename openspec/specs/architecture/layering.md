@@ -80,22 +80,37 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 
 ### D2 Context Engine Domain
 
-| Module ID | Scenario | Responsibility | Status |
-|-----------|----------|----------------|--------|
-| D2-S1 | PEV | Plan-Execute-Verify 循环引擎（**已退役**，由 D2-S10 替代） | RETIRED |
-| D2-S2 | Compression | 七步压缩管道 | IMPLEMENTED |
-| D2-S3 | Memory | 分层记忆管理 (Working/LongTerm) | IMPLEMENTED |
-| D2-S4 | Token | Token 计数与预算管理 | IMPLEMENTED |
-| D2-S5 | Registry | 操作注册表 | IMPLEMENTED |
-| D2-S6 | Snapshot | 上下文快照 + Main transcript JSONL | IMPLEMENTED |
-| D2-S7 | Prompt | Section 加载 + `prompt/assembler` 四层装配 | IMPLEMENTED |
-| D2-S8 | Sandbox | 工具沙箱隔离（`toolrunner/sandbox`） | IMPLEMENTED |
-| D2-S9 | Harness | Bootstrap、Preflight、ToolPool（**legacy fallback**，`query_loop.enabled=false`） | IMPLEMENTED |
-| D2-S10 | QueryLoop | QueryLoop 运行时、UserContext、Attachments、PermissionMode、TaskTools（V6） | IMPLEMENTED |
-| D2-S11 | Queue | SessionQueue、delegate-progress、task-notification drain（V6） | IMPLEMENTED |
-| D2-S12 | Worktree | Delegate 沙箱工作目录 enter/exit（V6） | IMPLEMENTED |
-| D2-S13 | Conversation | 会话对话管理 | IMPLEMENTED |
-| D2-S14 | Mock | Context Engine Mock（测试辅助） | IMPLEMENTED |
+> **Canonical SoT（价值流）：** D2-S15–S20（DM-20260614-009）。**Legacy Module Index：** D2-S1–S14 冻结追溯。详见 `openspec/specs/d2-context-engine/d2-domain.md`。
+
+#### Canonical 价值流 — D2-S15–S20
+
+| Scenario ID | Scenario | 用户/系统目标 | Status |
+|-------------|----------|---------------|--------|
+| D2-S15 | PrepareExecutionContext | Turn 前：加载、修复、压缩、组装 Prompt | REGISTRY |
+| D2-S16 | RunQueryLoop | LLM↔Tool 多轮执行原语（D2 Thin） | REGISTRY |
+| D2-S17 | PersistSessionState | Turn 后：快照/transcript durable + deferred complete | REGISTRY |
+| D2-S18 | EnforceExecutionPolicy | 权限、沙箱、工具面、Plan 写限制 | REGISTRY |
+| D2-S19 | NestedExecution | SubQuery / Background / Fork / Sidechain | REGISTRY |
+| D2-S20 | LegacyHarnessFallback | 显式 `query_loop.enabled=false` Harness 路径 | REGISTRY |
+
+#### Legacy Module Index — 冻结（D2-S1–S14）
+
+| Module ID | Scenario | Responsibility | Status | Canonical |
+|-----------|----------|----------------|--------|-----------|
+| D2-S1 | PEV | Plan-Execute-Verify（**已退役**） | RETIRED | — |
+| D2-S2 | Compression | 七步压缩管道 | IMPLEMENTED | → S15 |
+| D2-S3 | Memory | 分层记忆管理 | IMPLEMENTED | → S15, S17 |
+| D2-S4 | Token | Token 计数与预算 | IMPLEMENTED | → S15 |
+| D2-S5 | Registry | 操作注册表 | IMPLEMENTED | → S18 |
+| D2-S6 | Snapshot | 快照 + Main transcript | IMPLEMENTED | → S17 |
+| D2-S7 | Prompt | Section 加载 + assembler | IMPLEMENTED | → S15 |
+| D2-S8 | Sandbox | 工具沙箱隔离 | IMPLEMENTED | → S18 |
+| D2-S9 | Harness | Bootstrap（legacy fallback） | IMPLEMENTED | → S20 |
+| D2-S10 | QueryLoop | QueryLoop + TaskTools + SubQuery 等 | IMPLEMENTED | → S16/S18/S19 |
+| D2-S11 | Queue | SessionQueue、delegate-progress | IMPLEMENTED | → **D7-S4** |
+| D2-S12 | Worktree | 沙箱工作目录 | IMPLEMENTED | → S18 |
+| D2-S13 | Conversation | Tool chain repair / compact | IMPLEMENTED | → S15 |
+| D2-S14 | Mock | 测试辅助 | IMPLEMENTED | Legacy only |
 
 ### ORCH Orchestration (Cross-Domain, v2)
 

@@ -21,11 +21,11 @@ func TestTracer_should_record_coverage_when_sampling_off(t *testing.T) {
 	tp := tracer.NewTracerProvider(cfg, nil)
 	tr := tp.Tracer("test")
 
-	_, span := tr.Start(context.Background(), telemetry.OpLLMStream)
+	_, span := tr.Start(context.Background(), telemetry.OpD3_S3_LLM_Stream)
 	span.End()
 
 	report := counter.Report(coverage.AllOperations(), true)
-	if report.Hits[telemetry.OpLLMStream] != 1 {
+	if report.Hits[telemetry.OpD3_S3_LLM_Stream] != 1 {
 		t.Fatalf("hits: %+v", report.Hits)
 	}
 }

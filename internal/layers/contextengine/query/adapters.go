@@ -95,7 +95,7 @@ func (e *toolExecutor) Execute(ctx context.Context, call ToolCall) (string, stri
 	}
 
 	// [trace] tool.execute.single
-	ctx, toolSpan := startToolSpan(ctx, e.obsBridge, telemetry.OpToolExecuteSingle,
+	ctx, toolSpan := startToolSpan(ctx, e.obsBridge, telemetry.OpD2_S5_Tool_Execute_Single,
 		tracer.Attribute{Key: "tool.name", Value: call.Name},
 		tracer.Attribute{Key: "tool.input", Value: truncateStr(call.Input, 500)},
 		tracer.Attribute{Key: "tool.risk_level", Value: string(tc.RiskLevel)},
@@ -159,7 +159,7 @@ type permChecker struct {
 }
 
 func (p *permChecker) Request(ctx context.Context, sessionID, toolName, input string) bool {
-	_, span := startToolSpan(ctx, p.obsBridge, telemetry.OpToolExecutePermission,
+	_, span := startToolSpan(ctx, p.obsBridge, telemetry.OpD2_S5_Tool_Execute_Permission,
 		tracer.Attribute{Key: "tool.name", Value: toolName},
 		tracer.Attribute{Key: "tool.session_id", Value: sessionID},
 	)

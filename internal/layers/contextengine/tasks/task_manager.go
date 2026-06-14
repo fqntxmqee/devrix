@@ -146,7 +146,7 @@ func (m *TaskManager) startSpan(ctx context.Context, operation string, kind trac
 
 // Create creates a new task in session.
 func (m *TaskManager) Create(sessionID, subject, description string) *Task {
-	_, span := m.startSpan(context.Background(), telemetry.OpTaskManagerCreate, tracer.SpanKindInternal,
+	_, span := m.startSpan(context.Background(), telemetry.OpD2_S8_Task_Manager_Create, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "task.session_id", Value: sessionID},
 	)
 	if span != nil {
@@ -193,7 +193,7 @@ func (m *TaskManager) List(sessionID string) []*Task {
 
 // UpdateStatus updates task status.
 func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) error {
-	_, span := m.startSpan(context.Background(), telemetry.OpTaskManagerUpdate, tracer.SpanKindInternal,
+	_, span := m.startSpan(context.Background(), telemetry.OpD2_S8_Task_Manager_Update, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "task.session_id", Value: sessionID},
 		tracer.Attribute{Key: "task.id", Value: taskID},
 		tracer.Attribute{Key: "task.status", Value: string(status)},

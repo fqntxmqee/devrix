@@ -62,7 +62,7 @@ func (b *Bootstrap) Run(ctx context.Context, session *types.Session) (state *typ
 		Trusted: b.cfg.Trusted,
 	}
 
-	ctx, runSpan := startHarnessSpan(ctx, b.obsBridge, telemetry.OpContextHarnessBootstrapRun, tracer.SpanKindInternal,
+	ctx, runSpan := startHarnessSpan(ctx, b.obsBridge, telemetry.OpD2_S5_Context_Harness_Bootstrap_Run, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "harness.trusted", Value: fmt.Sprintf("%t", b.cfg.Trusted)},
 	)
 	if runSpan != nil {
@@ -128,7 +128,7 @@ func (b *Bootstrap) Run(ctx context.Context, session *types.Session) (state *typ
 	}
 
 	{
-		poolCtx, poolSpan := startHarnessSpan(ctx, b.obsBridge, telemetry.OpContextHarnessToolPool, tracer.SpanKindInternal,
+		poolCtx, poolSpan := startHarnessSpan(ctx, b.obsBridge, telemetry.OpD2_S5_Context_Harness_ToolPool, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "tools.before", Value: fmt.Sprintf("%d", len(allTools))},
 		)
 		stageCtx, stageSpan := b.stageSpan(poolCtx, types.BootstrapStageToolPool)
@@ -159,7 +159,7 @@ func (b *Bootstrap) emit(stage types.BootstrapStage, metadata map[string]string)
 }
 
 func (b *Bootstrap) stageSpan(ctx context.Context, stage types.BootstrapStage) (context.Context, tracer.Span) {
-	return startHarnessSpan(ctx, b.obsBridge, telemetry.OpContextHarnessBootstrapStage, tracer.SpanKindInternal,
+	return startHarnessSpan(ctx, b.obsBridge, telemetry.OpD2_S5_Context_Harness_Bootstrap_Stage, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "harness.stage", Value: string(stage)},
 	)
 }

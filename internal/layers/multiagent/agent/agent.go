@@ -134,9 +134,9 @@ func (a *Impl) setState(to multiagent.AgentState) error {
 
 	// Non-blocking state transition trace.
 	if a.deps.ObsBridge != nil && a.deps.ObsBridge.Tracer() != nil {
-		_, stSpan := a.deps.ObsBridge.Tracer().Start(context.Background(), telemetry.OpAgentStateTransition,
+		_, stSpan := a.deps.ObsBridge.Tracer().Start(context.Background(), telemetry.OpD4_S4_Agent_State_Transition,
 			tracer.WithSpanKind(tracer.SpanKindInternal),
-			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAgentStateTransition,
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD4_S4_Agent_State_Transition,
 				tracer.Attribute{Key: "agent.id", Value: a.id},
 				tracer.Attribute{Key: "from", Value: from.String()},
 				tracer.Attribute{Key: "to", Value: to.String()},

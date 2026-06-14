@@ -79,7 +79,7 @@ func (l *Loop) Run(
 		turn             int
 	)
 	if sc != nil {
-		_, loopSpan = l.startLoopSpan(ctx, telemetry.OpQueryLoopRun, tracer.SpanKindInternal,
+		_, loopSpan = l.startLoopSpan(ctx, telemetry.OpD2_S10_Query_Loop_Run, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session.id", Value: sc.SessionID},
 			tracer.Attribute{Key: "max_turns", Value: fmt.Sprintf("%d", params.MaxTurns)})
 	}
@@ -100,7 +100,7 @@ func (l *Loop) Run(
 			break
 		}
 
-		turnCtx, turnSpan := l.startLoopSpan(ctx, telemetry.OpQueryLoopTurn, tracer.SpanKindInternal,
+		turnCtx, turnSpan := l.startLoopSpan(ctx, telemetry.OpD2_S10_Query_Loop_Turn, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "turn.number", Value: fmt.Sprintf("%d", turn)})
 		toolCallCount := 0
 		endTurn := func() {
@@ -146,7 +146,7 @@ func (l *Loop) Run(
 			apiMessages = prepend(messages, uc)
 		}
 
-		_, llmSpan := l.startLoopSpan(turnCtx, telemetry.OpQueryLoopLLMCall, tracer.SpanKindClient,
+		_, llmSpan := l.startLoopSpan(turnCtx, telemetry.OpD2_S10_Query_Loop_LLM_Call, tracer.SpanKindClient,
 			tracer.Attribute{Key: "llm.model", Value: sc.Model})
 		llmStart := time.Now()
 

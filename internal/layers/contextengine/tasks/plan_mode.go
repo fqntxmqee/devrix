@@ -61,7 +61,7 @@ func (p *PlanMode) IsActive() bool {
 
 // Enter enters plan mode for a goal.
 func (p *PlanMode) Enter(ctx context.Context, sessionID, userGoal string) error {
-	_, span := p.startSpan(ctx, telemetry.OpTaskPlanModeEnter, tracer.SpanKindInternal,
+	_, span := p.startSpan(ctx, telemetry.OpD2_S8_Task_PlanMode_Enter, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "plan_mode.state", Value: string(PlanModeActive)},
 	)
 
@@ -85,7 +85,7 @@ func (p *PlanMode) Enter(ctx context.Context, sessionID, userGoal string) error 
 // Execute runs the plan agent to explore and plan.
 func (p *PlanMode) Execute(ctx context.Context, workDir string, tools []string) error {
 	start := time.Now()
-	_, span := p.startSpan(ctx, telemetry.OpTaskPlanModeExecute, tracer.SpanKindInternal,
+	_, span := p.startSpan(ctx, telemetry.OpD2_S8_Task_PlanMode_Execute, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "plan_mode.state", Value: string(p.state)},
 		tracer.Attribute{Key: "plan_mode.tool_count", Value: fmt.Sprintf("%d", len(tools))},
 	)
@@ -132,7 +132,7 @@ func (p *PlanMode) GetPlan() *PlanResult {
 
 // Approve approves the plan and returns tasks.
 func (p *PlanMode) Approve() []*Task {
-	_, span := p.startSpan(context.Background(), telemetry.OpTaskPlanModeApprove, tracer.SpanKindInternal,
+	_, span := p.startSpan(context.Background(), telemetry.OpD2_S8_Task_PlanMode_Approve, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "plan_mode.task_count", Value: fmt.Sprintf("%d", len(p.planResult.Tasks))},
 	)
 	if p.planResult == nil {
@@ -150,7 +150,7 @@ func (p *PlanMode) Approve() []*Task {
 
 // Reject rejects the plan.
 func (p *PlanMode) Reject() {
-	_, span := p.startSpan(context.Background(), telemetry.OpTaskPlanModeReject, tracer.SpanKindInternal)
+	_, span := p.startSpan(context.Background(), telemetry.OpD2_S8_Task_PlanMode_Reject, tracer.SpanKindInternal)
 	p.state = PlanModeInactive
 	p.planResult = nil
 	if span != nil {

@@ -2,16 +2,28 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 1.1.0
-**Last Updated:** 2026-06-13
+**Version:** 2.0.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d2-context-engine/a-registry.md`
+**Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 
 ---
 
 ## Overview
 
-D2 上下文引擎域 F 层功能点注册表。
+D2 F 层注册表。**Canonical SoT：** 随 D2-S15–S20 A 层（DM-20260614-009）。Legacy F 见各 Legacy S 节。
+
+### Canonical F 摘要
+
+| Canonical S | 关键 F | Legacy 来源 |
+|-------------|--------|-------------|
+| S15 | RunPipeline, RepairChain, BuildPrompt, CountTokens | S2/S7/S13/S4 |
+| S16 | LoopRun, ExecuteToolBatch, StreamEmit | S10 core |
+| S17 | Serialize, AppendTranscript, CommitWindow | S6/S3 |
+| S18 | SandboxExec, PlanWriteGate, ToolPoolFilter | S8/S5/S9 |
+| S19 | SubQueryRun, ForkBuild, SidechainAppend | S10 nested |
+| S20 | BootstrapStages, PreflightScore | S9 |
 
 ---
 

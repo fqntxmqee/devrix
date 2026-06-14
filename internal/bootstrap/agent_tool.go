@@ -105,7 +105,7 @@ func (p *agentToolPlugin) startSpan(ctx context.Context, operation string, kind 
 }
 
 func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*contextengine.ToolResult, error) {
-	ctx, span := p.startSpan(ctx, telemetry.OpAgentToolCall, tracer.SpanKindInternal,
+	ctx, span := p.startSpan(ctx, telemetry.OpD4_S4_Agent_Tool_Call, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.name", Value: p.info.Name},
 		tracer.Attribute{Key: "agent.tool", Value: p.toolName()},
 		tracer.Attribute{Key: "task.len", Value: len(input)},

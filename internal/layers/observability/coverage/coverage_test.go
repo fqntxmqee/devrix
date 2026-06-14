@@ -13,14 +13,14 @@ func TestCounter_should_record_hits_independently_of_sampling(t *testing.T) {
 	ops := coverage.AllOperations()
 	counter := coverage.NewCounter(ops)
 
-	counter.RecordHit(telemetry.OpGatewayMessageReceive)
-	counter.RecordHit(telemetry.OpGatewayMessageReceive)
+	counter.RecordHit(telemetry.OpD1_S13_Capture_Message_Receive)
+	counter.RecordHit(telemetry.OpD1_S13_Capture_Message_Receive)
 
 	report := counter.Report(ops, true)
 	if report.OperationsHit < 1 {
 		t.Fatalf("expected gateway hit, report: %+v", report)
 	}
-	if report.Hits[telemetry.OpGatewayMessageReceive] != 2 {
+	if report.Hits[telemetry.OpD1_S13_Capture_Message_Receive] != 2 {
 		t.Fatalf("hits: %+v", report.Hits)
 	}
 }
@@ -29,7 +29,7 @@ func TestCounter_should_list_zero_hit_operations(t *testing.T) {
 	t.Helper()
 	ops := coverage.AllOperations()
 	counter := coverage.NewCounter(ops)
-	counter.RecordHit(telemetry.OpContextProcess)
+	counter.RecordHit(telemetry.OpD2_S2_Context_Process)
 
 	report := counter.Report(ops, false)
 	if report.OperationsTotal != len(ops) {
@@ -54,13 +54,13 @@ func TestCounter_should_be_concurrent_safe(t *testing.T) {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			counter.RecordHit(telemetry.OpLLMStream)
+			counter.RecordHit(telemetry.OpD3_S3_LLM_Stream)
 		}()
 	}
 	wg.Wait()
 
 	report := counter.Report(ops, true)
-	if report.Hits[telemetry.OpLLMStream] != workers {
-		t.Fatalf("hits %d, want %d", report.Hits[telemetry.OpLLMStream], workers)
+	if report.Hits[telemetry.OpD3_S3_LLM_Stream] != workers {
+		t.Fatalf("hits %d, want %d", report.Hits[telemetry.OpD3_S3_LLM_Stream], workers)
 	}
 }

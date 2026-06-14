@@ -3,9 +3,11 @@
 **Capability:** context-engine
 **Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-queryloop-context (archived 2026-06-10)
 **Layer:** 2
-**Version:** 7.1.0
+**Version:** 7.2.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-13
+**Last Updated:** 2026-06-14
+**Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md` (D2-S15–S20, DM-20260614-009)  
+**D7 Boundary:** `openspec/specs/d2-context-engine/d7-boundary.md`
 
 ---
 

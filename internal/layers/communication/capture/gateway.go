@@ -822,14 +822,14 @@ func (g *CommunicationGateway) startSessionExpireSpan(ctx context.Context, sessi
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionExpire,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Session_Expire,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 		)...),
 	}
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionExpire, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Session_Expire, opts...)
 }
 
 // getOrCreateSession gets an existing session or creates a new one
@@ -857,14 +857,14 @@ func (g *CommunicationGateway) startSessionGetSpan(ctx context.Context, sessionI
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionGet,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Session_Get,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 		)...),
 	}
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionGet, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Session_Get, opts...)
 }
 
 // generateSessionID generates a unique session ID
@@ -907,9 +907,9 @@ func (g *CommunicationGateway) recordSessionLifecycle(sessionID, adapter, action
 	if adapter == "" {
 		adapter = "unknown"
 	}
-	_, span := g.obsBridge.Tracer().Start(context.Background(), telemetry.OpGatewaySessionLifecycle,
+	_, span := g.obsBridge.Tracer().Start(context.Background(), telemetry.OpD1_S13_Capture_Session_Lifecycle,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionLifecycle,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Session_Lifecycle,
 			tracer.Attribute{Key: "session.action", Value: action},
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 			tracer.Attribute{Key: "adapter", Value: adapter},
@@ -924,7 +924,7 @@ func (g *CommunicationGateway) startEngineEventSpan(ctx context.Context, session
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayEngineEvent,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_EngineEvent_Handle,
 			tracer.Attribute{Key: "session.id", Value: session.SessionID},
 			tracer.Attribute{Key: "event.type", Value: eventType},
 		)...),
@@ -932,7 +932,7 @@ func (g *CommunicationGateway) startEngineEventSpan(ctx context.Context, session
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayEngineEvent, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_EngineEvent_Handle, opts...)
 }
 
 func (g *CommunicationGateway) startStoreUpdateSpan(ctx context.Context, sessionID string) (context.Context, tracer.Span) {
@@ -941,14 +941,14 @@ func (g *CommunicationGateway) startStoreUpdateSpan(ctx context.Context, session
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayStoreUpdate,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Store_Update,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 		)...),
 	}
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayStoreUpdate, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Store_Update, opts...)
 }
 
 func (g *CommunicationGateway) startSessionCreateSpan(ctx context.Context, chatID, workDir string) (context.Context, tracer.Span) {
@@ -957,7 +957,7 @@ func (g *CommunicationGateway) startSessionCreateSpan(ctx context.Context, chatI
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewaySessionCreate,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Session_Create,
 			tracer.Attribute{Key: "adapter", Value: "cli"},
 			tracer.Attribute{Key: "work_dir", Value: workDir},
 		)...),
@@ -965,7 +965,7 @@ func (g *CommunicationGateway) startSessionCreateSpan(ctx context.Context, chatI
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewaySessionCreate, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Session_Create, opts...)
 }
 
 func (g *CommunicationGateway) startPermissionSpan(ctx context.Context, req *types.PermissionRequest) (context.Context, tracer.Span) {
@@ -974,7 +974,7 @@ func (g *CommunicationGateway) startPermissionSpan(ctx context.Context, req *typ
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayPermissionCheck,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Permission_Check,
 			tracer.Attribute{Key: "session.id", Value: req.SessionID},
 			tracer.Attribute{Key: "tool.name", Value: req.ToolName},
 			tracer.Attribute{Key: "risk_level", Value: string(req.RiskLevel)},
@@ -983,7 +983,7 @@ func (g *CommunicationGateway) startPermissionSpan(ctx context.Context, req *typ
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return g.obsBridge.Tracer().Start(ctx, telemetry.OpGatewayPermissionCheck, opts...)
+	return g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Permission_Check, opts...)
 }
 
 func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.InboundMessage) (context.Context, func()) {
@@ -992,9 +992,9 @@ func (g *CommunicationGateway) startInboundSpan(ctx context.Context, msg *types.
 	}
 
 	tr := g.obsBridge.Tracer()
-	ctx, span := tr.Start(ctx, telemetry.OpGatewayMessageReceive,
+	ctx, span := tr.Start(ctx, telemetry.OpD1_S13_Capture_Message_Receive,
 		tracer.WithSpanKind(tracer.SpanKindServer),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayMessageReceive,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Message_Receive,
 			tracer.Attribute{Key: "session.id", Value: msg.SessionID},
 			tracer.Attribute{Key: "message.adapter_id", Value: msg.AdapterID},
 			tracer.Attribute{Key: "message.chat_id", Value: msg.ChatID},

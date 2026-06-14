@@ -83,7 +83,7 @@ func (h *Hub) Publish(ctx context.Context, ev contracts.FlowEvent) {
 	if h == nil || !h.cfg.Enabled {
 		return
 	}
-	_, span := h.startSpan(ctx, telemetry.OpOrchFlowEventPublish,
+	_, span := h.startSpan(ctx, telemetry.OpD7_S3_Orchestration_Flow_Event_Publish,
 		tracer.Attribute{Key: "flow.session_id", Value: ev.SessionID},
 		tracer.Attribute{Key: "flow.kind", Value: string(ev.Kind)},
 		tracer.Attribute{Key: "flow.worker_id", Value: ev.WorkerID},

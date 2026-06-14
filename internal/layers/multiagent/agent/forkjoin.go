@@ -37,7 +37,7 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 		childCfg.PermissionTimeout = a.cfg.PermissionTimeout
 	}
 
-	ctx, forkSpan := a.startSpan(ctx, telemetry.OpAgentFork, tracer.SpanKindInternal,
+	ctx, forkSpan := a.startSpan(ctx, telemetry.OpD4_S4_Agent_Fork, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.id", Value: a.id},
 		tracer.Attribute{Key: "child.mode", Value: string(childCfg.Mode)},
 	)
@@ -80,7 +80,7 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 // The dedup is intentionally per-call; in v1.1 a v2.0 policy hook can
 // override (e.g. shared→last-write-wins, snapshot→preserve-all).
 func (a *Impl) Join(ctx context.Context, child multiagent.Agent) error {
-	_, joinSpan := a.startSpan(ctx, telemetry.OpAgentJoin, tracer.SpanKindInternal,
+	_, joinSpan := a.startSpan(ctx, telemetry.OpD4_S4_Agent_Join, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.id", Value: a.id},
 		tracer.Attribute{Key: "child.id", Value: child.ID()},
 	)

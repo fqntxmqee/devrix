@@ -16,87 +16,97 @@ const (
 	LayerOrchestration = "orchestration"
 )
 
-// Canonical Jaeger / OTLP operation names: {layer}.{module}.{action}
+// Canonical Jaeger / OTLP operation names: D{X}_{S}_{A}_{F}
 const (
-	OpGatewayMessageReceive = "capture.message.receive"
-	OpGatewaySessionLifecycle = "capture.session.lifecycle"
-	OpGatewaySessionCreate = "capture.session.create"
-	OpGatewaySessionGet     = "capture.session.get"
-	OpGatewaySessionExpire  = "capture.session.expire"
-	OpGatewayStoreCreate    = "capture.store.create"
-	OpGatewayStoreGet       = "capture.store.get"
-	OpGatewayStoreUpdate    = "capture.store.update"
-	OpGatewayStoreDelete    = "capture.store.delete"
-	OpGatewayPermissionCheck = "capture.permission.check"
-	OpGatewayAgentCreate    = "capture.agent.create"
-	OpGatewayEngineEvent    = "capture.engine_event.handle"
+	// D1 Communication - Gateway / Capture (D1-S13)
+	OpD1_S13_Capture_Message_Receive = "D1_S13_Capture_Message_Receive"
+	OpD1_S13_Capture_Session_Lifecycle = "D1_S13_Capture_Session_Lifecycle"
+	OpD1_S13_Capture_Session_Create = "D1_S13_Capture_Session_Create"
+	OpD1_S13_Capture_Session_Get = "D1_S13_Capture_Session_Get"
+	OpD1_S13_Capture_Session_Expire = "D1_S13_Capture_Session_Expire"
+	OpD1_S13_Capture_Store_Create = "D1_S13_Capture_Store_Create"
+	OpD1_S13_Capture_Store_Get = "D1_S13_Capture_Store_Get"
+	OpD1_S13_Capture_Store_Update = "D1_S13_Capture_Store_Update"
+	OpD1_S13_Capture_Store_Delete = "D1_S13_Capture_Store_Delete"
+	OpD1_S13_Capture_Permission_Check = "D1_S13_Capture_Permission_Check"
+	OpD1_S13_Capture_Agent_Create = "D1_S13_Capture_Agent_Create"
+	OpD1_S13_Capture_EngineEvent_Handle = "D1_S13_Capture_EngineEvent_Handle"
 
-	OpD1CapturePersist           = "d1.capture.persist"
-	OpD1DispatchRoute            = "d1.dispatch.route"
-	OpD1SignalThinking           = "d1.signal.thinking"
-	OpD1SignalTask               = "d1.signal.task"
-	OpD1SignalConclusion         = "d1.signal.conclusion"
-	OpD1SignalChainIntegrity     = "d1.signal.chain_integrity"
-	OpD1SignalTaskWorkProof      = "d1.signal.task.work_proof"
-	OpUserFeedbackConclusionRejected = "user.feedback.conclusion_rejected"
+	// D1 Communication - Signal (D1-S14~S16)
+	OpD1_S13_Capture_Persist = "D1_S13_Capture_Persist"
+	OpD1_S13_Dispatch_Route = "D1_S13_Dispatch_Route"
+	OpD1_S14_Signal_Thinking = "D1_S14_Signal_Thinking"
+	OpD1_S15_Signal_Task = "D1_S15_Signal_Task"
+	OpD1_S16_Signal_Conclusion = "D1_S16_Signal_Conclusion"
+	OpD1_S14_Signal_ChainIntegrity = "D1_S14_Signal_ChainIntegrity"
+	OpD1_S15_Signal_TaskWorkProof = "D1_S15_Signal_TaskWorkProof"
+	OpD1_S16_UserFeedback_ConclusionRejected = "D1_S16_UserFeedback_ConclusionRejected"
 
-	OpContextProcess        = "context.process"
-	OpContextSnapshotLoad   = "context.snapshot.load"
-	OpContextSystemPromptLoad = "context.system_prompt.load"
-	OpContextCompressionRun  = "context.compression.run"
-	OpContextCompressionStep = "context.compression.step"
-	OpContextLongTermRecall = "context.longterm.recall"
-	OpContextLongTermStore  = "context.longterm.store"
-	OpContextToolsRegister   = "context.tools.register"
-	OpContextMemorySnapshotSave = "context.memory.snapshot.save"
+	// D1 Communication - Adapter (D1-S17)
+	OpD1_S17_Adapter_Message_Receive = "D1_S17_Adapter_Message_Receive"
+	OpD1_S17_Adapter_CLI_Send = "D1_S17_Adapter_CLI_Send"
+	OpD1_S17_Adapter_Feishu_Outbound = "D1_S17_Adapter_Feishu_Outbound"
 
-	OpContextHarnessBootstrapRun = "context.harness.bootstrap.run"
-	OpContextHarnessBootstrapStage = "context.harness.bootstrap.stage"
-	OpContextHarnessToolPool       = "context.harness.tool_pool"
-	OpContextHarnessPreflight      = "context.harness.preflight"
-	OpContextHarnessRoute          = "context.harness.route"
-	OpContextSystemPromptBuild     = "context.system_prompt.build"
+	// D2 Context Engine - Core (D2-S2)
+	OpD2_S2_Context_Process = "D2_S2_Context_Process"
+	OpD2_S2_Context_Snapshot_Load = "D2_S2_Context_Snapshot_Load"
+	OpD2_S2_Context_SystemPrompt_Load = "D2_S2_Context_SystemPrompt_Load"
+	OpD2_S2_Context_Compression_Run = "D2_S2_Context_Compression_Run"
+	OpD2_S2_Context_Compression_Step = "D2_S2_Context_Compression_Step"
+	OpD2_S2_Context_Longterm_Recall = "D2_S2_Context_Longterm_Recall"
+	OpD2_S2_Context_Longterm_Store = "D2_S2_Context_Longterm_Store"
+	OpD2_S2_Context_Tools_Register = "D2_S2_Context_Tools_Register"
+	OpD2_S2_Context_Memory_Snapshot_Save = "D2_S2_Context_Memory_Snapshot_Save"
 
-	OpLLMStream         = "llm.stream"
-	OpLLMProviderRoute  = "llm.provider.route"
-	OpLLMCircuitBreaker = "llm.circuit_breaker"
-	OpLLMRetry          = "llm.retry"
-	OpLLMAdapterStream  = "llm.adapter.stream"
+	// D2 Context Engine - Harness (D2-S5)
+	OpD2_S5_Context_Harness_Bootstrap_Run = "D2_S5_Context_Harness_Bootstrap_Run"
+	OpD2_S5_Context_Harness_Bootstrap_Stage = "D2_S5_Context_Harness_Bootstrap_Stage"
+	OpD2_S5_Context_Harness_ToolPool = "D2_S5_Context_Harness_ToolPool"
+	OpD2_S5_Context_Harness_Preflight = "D2_S5_Context_Harness_Preflight"
+	OpD2_S5_Context_Harness_Route = "D2_S5_Context_Harness_Route"
+	OpD2_S5_Context_Harness_SystemPrompt_Build = "D2_S5_Context_Harness_SystemPrompt_Build"
 
-	OpAdapterMessageReceive = "adapter.message.receive"
-	OpAdapterCLISend       = "adapter.cli.send"
-	OpAdapterFeishuOutbound = "adapter.feishu.outbound"
+	// D2 Context Engine - QueryLoop (D2-S10)
+	OpD2_S10_Query_Loop_Run = "D2_S10_Query_Loop_Run"
+	OpD2_S10_Query_Loop_Turn = "D2_S10_Query_Loop_Turn"
+	OpD2_S10_Query_Loop_LLM_Call = "D2_S10_Query_Loop_LLM_Call"
 
-	// D4 multi-agent layer
-	OpAgentToolCall        = "agent.tool.call"
-	OpAgentRun             = "agent.run"
-	OpAgentFork            = "agent.fork"
-	OpAgentJoin            = "agent.join"
-	OpAgentTerminate       = "agent.terminate"
-	OpAgentStateTransition = "agent.state.transition"
+	// D2 Context Engine - Tool Execution (D2-S5)
+	OpD2_S5_Tool_Execute_Single = "D2_S5_Tool_Execute_Single"
+	OpD2_S5_Tool_Execute_Permission = "D2_S5_Tool_Execute_Permission"
 
-	// QueryLoop (D2-S10)
-	OpQueryLoopRun     = "query.loop.run"
-	OpQueryLoopTurn    = "query.loop.turn"
-	OpQueryLoopLLMCall = "query.loop.llm.call"
+	// D2 Context Engine - Task / Plan (D2-S8)
+	OpD2_S8_Task_Plan_Generate = "D2_S8_Task_Plan_Generate"
+	OpD2_S8_Task_PlanMode_Enter = "D2_S8_Task_PlanMode_Enter"
+	OpD2_S8_Task_PlanMode_Execute = "D2_S8_Task_PlanMode_Execute"
+	OpD2_S8_Task_PlanMode_Approve = "D2_S8_Task_PlanMode_Approve"
+	OpD2_S8_Task_PlanMode_Reject = "D2_S8_Task_PlanMode_Reject"
+	OpD2_S8_Task_Manager_Create = "D2_S8_Task_Manager_Create"
+	OpD2_S8_Task_Manager_Update = "D2_S8_Task_Manager_Update"
 
-	// Tool Execution (D2-S5)
-	OpToolExecuteSingle     = "tool.execute.single"
-	OpToolExecutePermission = "tool.execute.permission"
+	// D3 LLM Gateway (D3-S3)
+	OpD3_S3_LLM_Stream = "D3_S3_LLM_Stream"
+	OpD3_S3_LLM_Provider_Route = "D3_S3_LLM_Provider_Route"
+	OpD3_S3_LLM_CircuitBreaker = "D3_S3_LLM_CircuitBreaker"
+	OpD3_S3_LLM_Retry = "D3_S3_LLM_Retry"
+	OpD3_S3_LLM_Adapter_Stream = "D3_S3_LLM_Adapter_Stream"
 
-	// Task / Plan (D2-S8)
-	OpTaskPlanGenerate    = "task.plan.generate"
-	OpTaskPlanModeEnter   = "task.plan_mode.enter"
-	OpTaskPlanModeExecute = "task.plan_mode.execute"
-	OpTaskPlanModeApprove = "task.plan_mode.approve"
-	OpTaskPlanModeReject  = "task.plan_mode.reject"
-	OpTaskManagerCreate   = "task.manager.create"
-	OpTaskManagerUpdate   = "task.manager.update"
+	// D4 MultiAgent (D4-S4)
+	OpD4_S4_Agent_Run = "D4_S4_Agent_Run"
+	OpD4_S4_Agent_Tool_Call = "D4_S4_Agent_Tool_Call"
+	OpD4_S4_Agent_Fork = "D4_S4_Agent_Fork"
+	OpD4_S4_Agent_Join = "D4_S4_Agent_Join"
+	OpD4_S4_Agent_Terminate = "D4_S4_Agent_Terminate"
+	OpD4_S4_Agent_State_Transition = "D4_S4_Agent_State_Transition"
 
-	// Orchestration (D5 orchestration layer)
-	OpOrchWaveSchedule   = "orchestration.wave.schedule"
-	OpOrchWaveTaskExecute = "orchestration.wave.task.execute"
-	OpOrchFlowEventPublish = "orchestration.flow.event.publish"
+	// D7 Orchestration (D7-S3)
+	OpD7_S3_Orchestration_Wave_Schedule = "D7_S3_Orchestration_Wave_Schedule"
+	OpD7_S3_Orchestration_Wave_Task_Execute = "D7_S3_Orchestration_Wave_Task_Execute"
+	OpD7_S3_Orchestration_Flow_Event_Publish = "D7_S3_Orchestration_Flow_Event_Publish"
+
+	// D7 Task Manager (D7-S1)
+	OpD7_S1_Task_Manager_Create = "D7_S1_Task_Manager_Create"
+	OpD7_S1_Task_Manager_Update = "D7_S1_Task_Manager_Update"
 )
 
 // SpanAttrs returns standard devrix.layer / devrix.component attributes plus extras.
@@ -112,50 +122,50 @@ func SpanAttrs(operation string, extra ...tracer.Attribute) []tracer.Attribute {
 // LayerAndComponent maps an operation name to Jaeger filter dimensions.
 func LayerAndComponent(operation string) (layer, component string) {
 	switch {
-	case strings.HasPrefix(operation, "capture."):
+	// D1 Communication
+	case strings.HasPrefix(operation, "D1_S13_"):
+		if strings.Contains(operation, "_Adapter_") {
+			return LayerCommunication, "adapter"
+		}
 		return LayerCommunication, "gateway"
-	case strings.HasPrefix(operation, "d1."):
+	case strings.HasPrefix(operation, "D1_S14_"), strings.HasPrefix(operation, "D1_S15_"), strings.HasPrefix(operation, "D1_S16_"):
 		return LayerCommunication, "gateway"
-	case strings.HasPrefix(operation, "user.feedback."):
-		return LayerCommunication, "gateway"
-	case strings.HasPrefix(operation, "adapter."):
+	case strings.HasPrefix(operation, "D1_S17_"):
 		return LayerCommunication, "adapter"
-	case strings.HasPrefix(operation, "context.longterm."):
+
+	// D2 Context Engine
+	case strings.HasPrefix(operation, "D2_S2_Context_"):
 		return LayerContext, "context_engine"
-	case strings.HasPrefix(operation, "context.harness."):
+	case strings.HasPrefix(operation, "D2_S5_Context_Harness_"):
 		return LayerContext, "harness"
-	case operation == OpContextSystemPromptBuild:
-		return LayerContext, "harness"
-	case strings.HasPrefix(operation, "context."):
-		return LayerContext, "context_engine"
-	case strings.HasPrefix(operation, "llm.provider."):
-		return LayerLLM, "llm_gateway"
-	case strings.HasPrefix(operation, "llm.circuit_breaker"):
-		return LayerLLM, "llm_gateway"
-	case strings.HasPrefix(operation, "llm.retry"):
-		return LayerLLM, "llm_gateway"
-	case strings.HasPrefix(operation, "llm.adapter."):
-		return LayerLLM, "llm_adapter"
-	case strings.HasPrefix(operation, "llm."):
-		return LayerLLM, "llm_gateway"
-	case strings.HasPrefix(operation, "agent."):
-		return LayerAgent, "agent_tool"
-	case strings.HasPrefix(operation, "query."):
-		return LayerContext, "query_loop"
-	case strings.HasPrefix(operation, "tool.execute."):
+	case strings.HasPrefix(operation, "D2_S5_Tool_"):
 		return LayerContext, "tool_runner"
-	case strings.HasPrefix(operation, "tool."):
-		return LayerContext, "tool_runner"
-	case strings.HasPrefix(operation, "task.plan_mode."):
+	case strings.HasPrefix(operation, "D2_S8_Task_PlanMode_"):
 		return LayerContext, "plan_mode"
-	case strings.HasPrefix(operation, "task.plan."):
+	case strings.HasPrefix(operation, "D2_S8_Task_Plan_"):
 		return LayerContext, "plan_agent"
-	case strings.HasPrefix(operation, "task.manager."):
+	case strings.HasPrefix(operation, "D2_S8_Task_Manager_"):
 		return LayerContext, "task_manager"
-	case strings.HasPrefix(operation, "task."):
-		return LayerContext, "task_manager"
-	case strings.HasPrefix(operation, "orchestration."):
+	case strings.HasPrefix(operation, "D2_S10_Query_"):
+		return LayerContext, "query_loop"
+
+	// D3 LLM Gateway
+	case strings.HasPrefix(operation, "D3_S3_LLM_"):
+		if strings.HasSuffix(operation, "_Adapter_Stream") {
+			return LayerLLM, "llm_adapter"
+		}
+		return LayerLLM, "llm_gateway"
+
+	// D4 MultiAgent
+	case strings.HasPrefix(operation, "D4_S4_Agent_"):
+		return LayerAgent, "agent_tool"
+
+	// D7 Orchestration
+	case strings.HasPrefix(operation, "D7_S3_Orchestration_"):
 		return LayerOrchestration, "orchestrator"
+	case strings.HasPrefix(operation, "D7_S1_Task_Manager_"):
+		return LayerOrchestration, "task_manager"
+
 	default:
 		return LayerContext, "devrix"
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
-	layer, component := telemetry.LayerAndComponent(telemetry.OpGatewayMessageReceive)
+	layer, component := telemetry.LayerAndComponent(telemetry.OpD1_S13_Capture_Message_Receive)
 	if layer != telemetry.LayerCommunication || component != "gateway" {
 		t.Fatalf("got layer=%q component=%q", layer, component)
 	}
@@ -16,7 +16,7 @@ func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
 
 
 func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
-	attrs := telemetry.SpanAttrs(telemetry.OpLLMStream)
+	attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream)
 	if len(attrs) < 2 {
 		t.Fatalf("attrs: %+v", attrs)
 	}

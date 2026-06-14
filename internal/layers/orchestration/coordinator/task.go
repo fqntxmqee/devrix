@@ -101,7 +101,7 @@ func (m *TaskManager) ensureSessionLocked(sessionID string) {
 
 // Create creates a new task in session.
 func (m *TaskManager) Create(sessionID, subject, description string) *Task {
-	_, span := m.startSpan(telemetry.OpTaskManagerCreate)
+	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
 	if span != nil {
 		defer span.End()
 	}
@@ -152,7 +152,7 @@ func (m *TaskManager) List(sessionID string) []*Task {
 
 // UpdateStatus updates task status.
 func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) error {
-	_, span := m.startSpan(telemetry.OpTaskManagerUpdate)
+	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Update)
 	if span != nil {
 		defer span.End()
 	}

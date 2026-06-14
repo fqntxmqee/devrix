@@ -11,7 +11,8 @@
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
-**Depends On:** D2-S10 (QueryLoop), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)
+**Depends On:** D2-S15–S16 (QueryLoop Follower), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)  
+**D2 Boundary SoT:** `openspec/specs/d2-context-engine/d7-boundary.md` (DM-20260614-009)
 
 ---
 
@@ -50,7 +51,18 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）
 - D7 **编排**：D2（LLM↔Tool 执行）、D4（Agent 委托）
 - D7 **暂托管（D2）**：Task 写模型、PlanMode（目标迁入 D7-S1/S5）
-- D7 **不拥有**：会话上下文（D2）、agent 生命周期（D4）、LLM 调用（D3）
+- D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）、LLM 调用（D3）
+
+**D2 Follower 契约（DM-20260614-009）：**
+
+| D7 动作 | D2 响应 |
+|---------|---------|
+| `d2Executor.RunQueryLoop` | `IEngine.Process` → S15→S16→S17 |
+| Wave 调度 D2 Worker | S16 Loop + S18 policy |
+| SubQuery / Background | S19 NestedExecution |
+| FlowEvent 聚合 | D7-S4 SoT；D2 仅 publish |
+
+详见 `openspec/specs/d2-context-engine/d7-boundary.md`。
 
 **和 D1-D6 的关系（现行 vs 目标）**：
 ```

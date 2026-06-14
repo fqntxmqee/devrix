@@ -162,3 +162,19 @@ Physical order: 1 → 2 → 3 → 4 → [6] → 5 → 7. Operates on **messages 
 | PEVEngine.Run in Process hot path | DM-20260611-004 | `query.Loop.Run` |
 | `harness/system_prompt_assembler.go` | Moved to `prompt/assembler.go` | `prompt.SystemPromptAssembler` |
 | Entry compression on every Process when QueryLoop enabled | `compress_per_turn` defers to post-turn `commitActiveWindow` | D2-S11 harness unification |
+
+---
+
+## ADDED (DM-20260614-009 — devrix-d2-sa-refine)
+
+### Requirement: D2 Canonical Value Stream S15–S20
+
+D2 MUST register canonical scenarios by execution lifecycle (Prepare → Execute → Persist → Policy → Nested → Legacy). Legacy S1–S14 MUST remain frozen.
+
+See: `openspec/specs/d2-context-engine/d2-domain.md`, `d7-boundary.md`.
+
+### Requirement: D2↔D7 Leader/Follower Boundary
+
+D2 MUST be Execution Follower; D7 MUST be sole ingress orchestrator to D2 Process in production. Cross-domain drift (tasks/, delegate_tools, queue delegate-progress) MUST be documented with D7 migration targets.
+
+See: `openspec/changes/devrix-d2-sa-refine/specs/d2-context-engine/layer-delta.md`.

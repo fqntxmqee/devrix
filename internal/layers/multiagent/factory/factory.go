@@ -135,9 +135,9 @@ func (f *AgentFactory) startCreateSpan(ctx context.Context, cfg multiagent.Agent
 	if f.deps.ObsBridge == nil || f.deps.ObsBridge.Tracer() == nil {
 		return ctx, nil
 	}
-	ctx, span := f.deps.ObsBridge.Tracer().Start(ctx, telemetry.OpGatewayAgentCreate,
+	ctx, span := f.deps.ObsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Agent_Create,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayAgentCreate,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Agent_Create,
 			tracer.Attribute{Key: "session.id", Value: cfg.SessionID},
 			tracer.Attribute{Key: "agent.mode", Value: string(cfg.Mode)},
 		)...),

@@ -1,11 +1,37 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-13
+**Version:** 2.0.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 
 ---
+
+## Canonical T 映射（DM-20260614-009）
+
+v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登记。
+
+| Canonical T ID | Legacy T ID | Canonical S | 描述 | Status |
+|----------------|-------------|-------------|------|--------|
+| D2-S15-A01-T01 | D2-S3-A01-T01 | S15 | 新会话历史正确追加 | IMPLEMENTED |
+| D2-S15-A02-T01 | D2-S13-A01-T01 | S15 | RepairToolChain 修复 orphan | PLANNED |
+| D2-S15-A03-T01 | D2-S2-A01-T01 | S15 | 超阈值触发压缩 | IMPLEMENTED |
+| D2-S16-A01-T01 | D2-S10-A01-T34 | S16 | Multi-turn tool loop | IMPLEMENTED |
+| D2-S16-A01-T02 | D2-CTX-T01 | S16 | Process cancel 无 panic | IMPLEMENTED |
+| D2-S16-A01-T03 | — | S16 | query 包无 D4 import | PLANNED (v1.1) |
+| D2-S17-A01-T01 | D2-S3-A01-T02 | S17 | Deferred complete 后快照 | IMPLEMENTED |
+| D2-S17-A02-T01 | D2-S6-A02-T01 | S17 | Main transcript append | IMPLEMENTED |
+| D2-S18-A01-T01 | D2-CTX-T36 | S18 | Plan mode write deny | IMPLEMENTED |
+| D2-S18-A02-T01 | D2-S8-A01-T01 | S18 | Bash sandbox workdir | IMPLEMENTED |
+| D2-S19-A01-T01 | D2-CTX-T40 | S19 | Explore read-only | IMPLEMENTED |
+| D2-S19-A02-T01 | D2-CTX-T41 | S19 | Fork identical prefix | IMPLEMENTED |
+| D2-S20-A01-T01 | D2-S11-A01-T02 | S20 | 默认跳过 harness | IMPLEMENTED |
+| D2-S20-A02-T01 | D2-S9-A01-T01 | S20 | Legacy bootstrap 一次 | IMPLEMENTED |
+
+---
+
+## Legacy Module T（冻结追溯）
 
 ## D2-S3: Memory Module
 

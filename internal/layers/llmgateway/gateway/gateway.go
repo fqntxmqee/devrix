@@ -83,7 +83,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	}
 
 	// Main llm.stream span (parent for all sub-operations)
-	streamCtx, streamSpan := g.startSpan(ctx, telemetry.OpLLMStream, tracer.SpanKindClient)
+	streamCtx, streamSpan := g.startSpan(ctx, telemetry.OpD3_S3_LLM_Stream, tracer.SpanKindClient)
 	streamStart := time.Now()
 	if streamSpan != nil {
 		g.recordStreamRequest(streamSpan, req)
@@ -93,7 +93,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			return
 		}
 		g.recordStreamResponse(streamSpan, err, usage, provider, model)
-		attrs := telemetry.SpanAttrs(telemetry.OpLLMStream,
+		attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream,
 			tracer.Attribute{Key: "llm.provider", Value: provider},
 			tracer.Attribute{Key: "llm.model", Value: model},
 		)
@@ -123,7 +123,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 
 	// llm.provider.route child span
 	{
-		_, routeSpan := g.startSpan(streamCtx, telemetry.OpLLMProviderRoute, tracer.SpanKindInternal,
+		_, routeSpan := g.startSpan(streamCtx, telemetry.OpD3_S3_LLM_Provider_Route, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "llm.model_requested", Value: req.Model},
 		)
 		p, m, err := g.router.Resolve(req.Model)
@@ -156,7 +156,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 
 	// llm.circuit_breaker child span
 	{
-		_, cbSpan := g.startSpan(streamCtx, telemetry.OpLLMCircuitBreaker, tracer.SpanKindInternal,
+		_, cbSpan := g.startSpan(streamCtx, telemetry.OpD3_S3_LLM_CircuitBreaker, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "llm.provider", Value: provider},
 		)
 		allowed, err := g.breaker.Allow(provider)
@@ -191,7 +191,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	}
 
 	// llm.retry span (wraps retry + stream lifecycle)
-	retryCtx, retrySpan := g.startSpan(streamCtx, telemetry.OpLLMRetry, tracer.SpanKindInternal,
+	retryCtx, retrySpan := g.startSpan(streamCtx, telemetry.OpD3_S3_LLM_Retry, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "llm.provider", Value: provider},
 		tracer.Attribute{Key: "llm.model_primary", Value: model},
 	)
@@ -205,7 +205,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 
 	streamCall := func(callCtx context.Context, callModel string) (<-chan *llmgateway.AdapterChunk, error) {
 		// llm.adapter.stream child span (child of llm.retry via retryCtx)
-		_, adSpan := g.startSpan(callCtx, telemetry.OpLLMAdapterStream, tracer.SpanKindClient,
+		_, adSpan := g.startSpan(callCtx, telemetry.OpD3_S3_LLM_Adapter_Stream, tracer.SpanKindClient,
 			tracer.Attribute{Key: "llm.provider", Value: provider},
 			tracer.Attribute{Key: "llm.model", Value: callModel},
 		)

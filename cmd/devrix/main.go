@@ -24,6 +24,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
+
+	// Spans self-registration (trigger init() to register domain spans)
+	_ "github.com/devrix/devrix/internal/layers/communication"
+	_ "github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

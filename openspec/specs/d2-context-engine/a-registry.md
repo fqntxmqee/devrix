@@ -2,15 +2,71 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 1.1.0
-**Last Updated:** 2026-06-13
+**Version:** 2.0.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 
 ---
 
 ## Overview
 
-D2 上下文引擎域 A 层活动注册表。主路径：**D2-S10 QueryLoop**（`query_loop.enabled` 默认 true）。D2-S1 PEV 已退役。
+D2 上下文引擎域 A 层注册表。**Canonical SoT：** D2-S15–S20（DM-20260614-009）。Legacy D2-S1–S14 冻结追溯。
+
+---
+
+## Canonical A 层 — D2-S15–S20
+
+### D2-S15: PrepareExecutionContext
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S15-A01 | LoadSession | A-BE | session | SessionContext | S3-A01 | `memory/manager.go` |
+| D2-S15-A02 | RepairToolChain | A-BE | messages | valid_messages | S13-A01 | `conversation/repair.go` |
+| D2-S15-A03 | CompressIfNeeded | A-BE | messages, budget | compressed | S2-A01 | `compression/pipeline.go` |
+| D2-S15-A04 | AssemblePrompt | A-BE | build_input | system_prompt | S7-A02 | `prompt/assembler.go` |
+
+### D2-S16: RunQueryLoop
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S16-A01 | RunQueryLoop | A-BE | session, params | loop_result | S10-A01 | `query/loop.go` |
+
+### D2-S17: PersistSessionState
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S17-A01 | PersistSnapshot | A-BE | session | snapshot_bytes | S6-A01 | `snapshot/store.go` |
+| D2-S17-A02 | PersistMainTranscript | A-BE | session_id, delta | jsonl | S6-A02 | `transcript/main_thread.go` |
+| D2-S17-A03 | CommitActiveWindow | A-BE | session, budget | trimmed | S3 F | `engine.go` |
+
+### D2-S18: EnforceExecutionPolicy
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S18-A01 | CheckPermission | A-BE | tool_call | allow/deny | S10 perm | `permission/mode.go` |
+| D2-S18-A02 | IsolateToolExecution | A-BE | tool_call | sandboxed | S8-A01 | `toolrunner/sandbox.go` |
+| D2-S18-A03 | FilterToolSurface | A-BE | all_tools | visible | S9-A03 | `harness/toolpool.go` |
+
+### D2-S19: NestedExecution
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S19-A01 | RunSubQuery | A-BE | subquery_spec | result | S10 | `query/subquery.go` |
+| D2-S19-A02 | RunBackgroundTask | A-BE | task_spec | task_id | S10-A03 | `query/background.go` |
+
+### D2-S20: LegacyHarnessFallback
+
+| A ID | Name | Type | Input | Output | Legacy | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D2-S20-A01 | BootstrapLegacyHarness | A-BE | session | bootstrap_result | S9-A01 | `harness/bootstrap.go` |
+| D2-S20-A02 | EvaluatePreflight | A-BE | context | scores | S9-A02 | `harness/preflight.go` |
+
+---
+
+## Legacy Module Index — D2-S1–S14（冻结）
+
+> 主路径：**D2-S10 QueryLoop**（`query_loop.enabled` 默认 true）。D2-S1 PEV 已退役。
 
 ---
 
@@ -116,6 +172,6 @@ D2 上下文引擎域 A 层活动注册表。主路径：**D2-S10 QueryLoop**（
 
 ## Statistics
 
-| Scenarios | Activities | RETIRED |
-|-----------|------------|---------|
-| 14 | 22 | 3 |
+| Canonical Scenarios | Canonical Activities | Legacy Scenarios | Legacy Activities |
+|---------------------|---------------------|------------------|-------------------|
+| 6 (S15–S20) | 14 | 14 (S1–S14) | 22 |

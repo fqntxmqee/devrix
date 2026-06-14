@@ -33,7 +33,7 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	}
 	a.emit("agent.started", nil)
 
-	ctx, runSpan := a.startSpan(ctx, telemetry.OpAgentRun, tracer.SpanKindInternal,
+	ctx, runSpan := a.startSpan(ctx, telemetry.OpD4_S4_Agent_Run, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.id", Value: a.id},
 		tracer.Attribute{Key: "agent.mode", Value: string(a.cfg.Mode)},
 		tracer.Attribute{Key: "session.id", Value: a.cfg.SessionID},
@@ -196,7 +196,7 @@ func (a *Impl) Terminate(ctx context.Context) error {
 	if a.State() == multiagent.AgentStateTerminated {
 		return sharedTerminated(a.id)
 	}
-	_, termSpan := a.startSpan(ctx, telemetry.OpAgentTerminate, tracer.SpanKindInternal,
+	_, termSpan := a.startSpan(ctx, telemetry.OpD4_S4_Agent_Terminate, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.id", Value: a.id},
 	)
 	a.mu.Lock()

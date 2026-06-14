@@ -800,9 +800,9 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 	routeCtx := ctx
 	if a.obsBridge != nil && a.obsBridge.Tracer() != nil {
 		var span tracer.Span
-		routeCtx, span = a.obsBridge.Tracer().Start(ctx, telemetry.OpAdapterMessageReceive,
+		routeCtx, span = a.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S17_Adapter_Message_Receive,
 			tracer.WithSpanKind(tracer.SpanKindServer),
-			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAdapterMessageReceive,
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S17_Adapter_Message_Receive,
 				tracer.Attribute{Key: "adapter", Value: "feishu"},
 				tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(text))},
 			)...),

@@ -300,7 +300,7 @@ func (a *CLIAdapter) startCLISendSpan(ctx context.Context, sessionID, content st
 	}
 	opts := []tracer.SpanStartOption{
 		tracer.WithSpanKind(tracer.SpanKindProducer),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAdapterCLISend,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S17_Adapter_CLI_Send,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 			tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(content))},
 		)...),
@@ -308,7 +308,7 @@ func (a *CLIAdapter) startCLISendSpan(ctx context.Context, sessionID, content st
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return a.obsBridge.Tracer().Start(ctx, telemetry.OpAdapterCLISend, opts...)
+	return a.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S17_Adapter_CLI_Send, opts...)
 }
 
 // showHelp displays the help message

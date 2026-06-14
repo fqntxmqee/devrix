@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.2.0  
-**Last Updated:** 2026-06-14  
+**Version:** 1.3.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -96,14 +96,34 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D7-S5 | Decision & Planning | `decisionplanning` | `orchestration/decisionplanning/` | `coordinator/classifier*` |
 | — | Milestone DAG | `milestone` | `orchestration/milestone/` | ✅ 已迁入 |
 
-### 4.3 D2 Context Engine（节选 — 已基本对齐）
+### 4.3 D2 Context Engine
 
-| S ID | Scenario | scenario-slug | 路径 |
-|------|----------|---------------|------|
-| D2-S2 | Compression | `compression` | `contextengine/compression/` |
-| D2-S10 | QueryLoop | `query` | `contextengine/query/` |
-| D2-S11 | Queue | `queue` | `contextengine/queue/` |
-| … | … | … | 见 `layering.md` D2 表 |
+> **Canonical S15–S20**（DM-20260614-009）。Legacy module 路径仍有效；v2.0 按 scenario-slug 收敛。
+
+| S ID | Scenario | scenario-slug | 当前路径 | v2.0 目标 |
+|------|----------|---------------|----------|-----------|
+| D2-S15 | PrepareExecutionContext | `prepare` | `engine.go` + `memory/` `compression/` `prompt/` `conversation/` | `contextengine/prepare/` |
+| D2-S16 | RunQueryLoop | `query` | `contextengine/query/` | 保持（loop 瘦身） |
+| D2-S17 | PersistSessionState | `persist` | `snapshot/`, `transcript/`, `engine.go` | `contextengine/persist/` |
+| D2-S18 | EnforceExecutionPolicy | `policy` | `permission/`, `toolrunner/`, `harness/toolpool.go` | `contextengine/policy/` |
+| D2-S19 | NestedExecution | `nested` | `query/subquery.go`, `query/background.go` | `contextengine/nested/` |
+| D2-S20 | LegacyHarnessFallback | `legacyharness` | `harness/` | 保持或 `legacy/` |
+
+**Legacy module 路径（冻结追溯）：**
+
+| Legacy S | scenario-slug | 路径 |
+|----------|---------------|------|
+| D2-S2 | `compression` | `contextengine/compression/` |
+| D2-S3 | `memory` | `contextengine/memory/` |
+| D2-S11 | `queue` | `contextengine/queue/` → v2.0 迁 D7-S4 |
+| D2-S12 | `worktree` | `contextengine/worktree/` |
+
+**跨域漂移（v2.0 迁出 D2）：**
+
+| 组件 | 当前路径 | 目标 |
+|------|----------|------|
+| TaskManager | `contextengine/tasks/` | `orchestration/workmodel/` (D7-S1) |
+| delegate_tools | `contextengine/delegate_tools.go` | D7 orchestration F |
 
 ---
 
