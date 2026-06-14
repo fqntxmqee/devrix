@@ -123,7 +123,7 @@
 | E-e4 | 删除旧路径 dead code + re-export | E-e1 | cleanup PR | — | ⚠️ re-export shim 5/5 已删除（commit e30fe72）；delegate/ 仍保留等待确认 |
 | E-e5 | 更新 `layering.md` Domain Layout + code-layout §4.4 状态 | E-d7 | specs | — | ✅ |
 | E-e6 | 写 `acceptance-report（v2.0）` | E-e1–E-e5 | ACCEPTED | — | ✅ |
-| E-e7 | S7 归档 + `demand-archive-index.md` | E-e6 | archive | — | 🔲 v2.0-e |
+| E-e7 | S7 归档 + `demand-archive-index.md` | E-e6 | archive | — | ⚠️ index 已更新；物理归档待 v2.0-e |
 
 ---
 
