@@ -5,7 +5,9 @@ meta:
   change_id: devrix-event-channel
   demand_id: DM-20260611-003
   title: "事件通道与背压机制 — Channel Drain/Compact/Reconnect"
-  status: s5_acceptance
+  status: s7_archived
+  archived_at: "2026-06-14"
+  archive_path: openspec/archive/2026-06-14-devrix-event-channel/
   priority: P0
   owner: devrix-team
   created_at: "2026-06-11"

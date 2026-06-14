@@ -5,7 +5,9 @@ meta:
   change_id: devrix-wave-scheduler
   demand_id: DM-20260611-007
   title: "Wave Scheduler — DAG 调度 + ContextPolicy + ConflictGuard"
-  status: s5_acceptance
+  status: s7_archived
+  archived_at: "2026-06-14"
+  archive_path: openspec/archive/2026-06-14-devrix-wave-scheduler/
   priority: P0
   owner: devrix-team
   created_at: "2026-06-11"
