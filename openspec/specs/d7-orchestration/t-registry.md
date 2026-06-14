@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 2.3.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -56,7 +56,9 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `contextengine/tasks/disk_store_test.go` | IMPLEMENTED | P0 |
 | D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P1 |
 | D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
-| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | — | PLANNED | P0 |
+| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | — | PLANNED (v1.1) | P1 |
+| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `contextengine/query/background_*_test.go` | PARTIAL | P1 |
+| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | — | PLANNED (v1.1) | P2 |
 
 ---
 
@@ -64,22 +66,27 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
-| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P1 |
-| D7-S5-T02 | PlanAgent 只读模式拒绝写操作 | D7-S5-A04 | — | PLANNED | P0 |
-| D7-S5-T03 | ClassifyIntent 规则高置信跳过 LLM | D7-S5-A01 | — | PLANNED | P0 |
-| D7-S5-T04 | SynthesizeTaskGraph 产出有效 DAG | D7-S5-A02 | — | PLANNED | P0 |
-| D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED | P0 |
+| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `contextengine/tasks/plan_mode_test.go` 或 task_manager_test | IMPLEMENTED | P1 |
+| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `contextengine/tasks/plan_agent_whitelist_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T04 | SynthesizeTaskGraph 产出有效 DAG | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
+| D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED (v1.1) | P1 |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/d7/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
+| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/d7/shadow_classifier_test.go` | IMPLEMENTED | P0 |
 
 ---
 
-## D7-S2: Session Orchestrator (PLANNED)
+## D7-S2: Session Orchestrator
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | — | PLANNED | P0 |
-| D7-S2-T02 | FastPath 延迟增量≤2ms | D7-S2-A01-F02 | — | PLANNED | P0 |
-| D7-S2-T03 | OrchestratePath 创建 Plan | D7-S2-A01-F03 | — | PLANNED | P0 |
-| D7-S2-T04 | HandleInterrupt 取消活跃任务 | D7-S2-A03 | — | PLANNED | P0 |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -87,11 +94,17 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|------|------|-----------|--------|----------|
-| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | — | PLANNED | P0 |
-| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED | P0 |
-| D7-D6-T01 | D6 校验编排决策（advisory） | D7-S5 | — | PLANNED | P1 |
-| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED | P0 |
-| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED | P0 |
+| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/gateway/d7_integration_test.go` | IMPLEMENTED | P0 |
+| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P1 |
+| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/d7/entry_test.go` | IMPLEMENTED | P2 |
+| D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/gateway/d7_matrix_test.go` | IMPLEMENTED | P0 |
+| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 
 ---
 
@@ -107,17 +120,18 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 33 | 22 | 1 | 10 | 22 |
+| 46 | 39 | 2 | 5 | 26 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
-| D7-S1 | 6 | 5 | 1 |
-| D7-S2 | 4 | 0 | 4 |
+| D7-S1 | 8 | 5 | 3 |
+| D7-S2 | 7 | 0 | 7 |
 | D7-S3 | 11 | 10 | 1 |
 | D7-S4 | 7 | 7 | 0 |
-| D7-S5 | 5 | 1 | 4 |
+| D7-S5 | 7 | 5 | 2 |
+| 契约/迁移 | 6 | 0 | 6 |
 
 ---
 
@@ -127,3 +141,6 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | 初始（仅 ORCH-S2-T* 遗留 ID） |
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
+| 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
+| 2.2.0 | 2026-06-14 | Review R2：T02c 端到端 SLA、T04 中断顺序、D7-D6-T01 metric、S5-T02 白名单 |
+| 2.3.0 | 2026-06-14 | DM-20260614-005：D7-S5-T03 / T06 闭环（端到端测试 + CommandFirst=false 回归） |

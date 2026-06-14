@@ -1,0 +1,15 @@
+change_id: devrix-d7-s5-t02-planagent-whitelist
+priority: P1
+demand_id: DM-20260614-003
+status: s7_archived
+domains: [D7, D2]
+dsaft_scenarios:
+  - D7-S5  # Decision & Planning
+dsaft_activities:
+  - D7-S5-A04  # PlanAgentWhitelist
+review:
+  r1_date: 2026-06-14
+  r1_docs: [demand.md, proposal.md, design.md, tasks.md]
+  open_questions: []
+t_point_targets:
+  - D7-S5-T02  # PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash

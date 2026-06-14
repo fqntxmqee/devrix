@@ -18,6 +18,60 @@ type PlanAgent struct {
 	obsBridge *observability.Bridge
 }
 
+// PlanAgentReadOnlyTools is the whitelist of tools that PlanAgent allows
+// the LLM to invoke during read-only exploration. Tools NOT in this list
+// are not part of the read-only contract.
+//
+// Contract (enforced by D7-S5-T02):
+//   - non-empty
+//   - disjoint from PlanAgentForbiddenTools
+//   - injected into buildPlanPrompt's "Available tools" hint
+var PlanAgentReadOnlyTools = []string{
+	"read",       // file read
+	"grep",       // code search
+	"find",       // file finder
+	"ls",         // directory listing
+	"git_status", // git status (read-only)
+	"git_log",    // git history (read-only)
+	"git_diff",   // git diff (read-only)
+}
+
+// PlanAgentForbiddenTools is the blacklist of tools that MUST NOT appear
+// in the read-only whitelist. This slice is contract-only: it does not
+// participate in runtime logic, but its presence enables the test point
+// D7-S5-T02 to assert "these tools must never be in the whitelist".
+var PlanAgentForbiddenTools = []string{
+	"write",  // file write
+	"edit",   // file edit
+	"bash",   // shell exec
+	"delete", // file delete
+	"mkdir",  // create dir
+	"rm",     // remove
+	"mv",     // rename
+	"cp",     // copy (may have side effects)
+}
+
+// AllowedTools returns the read-only tool whitelist for this PlanAgent.
+// Currently returns the package-level constant; the method signature is
+// stable so future per-session injection is a no-op for callers.
+func (a *PlanAgent) AllowedTools() []string {
+	return PlanAgentReadOnlyTools
+}
+
+// IsReadOnlyTool reports whether the named tool is in the read-only
+// whitelist. nil-receiver safe: returns false instead of panicking.
+func (a *PlanAgent) IsReadOnlyTool(name string) bool {
+	if a == nil {
+		return false
+	}
+	for _, t := range PlanAgentReadOnlyTools {
+		if t == name {
+			return true
+		}
+	}
+	return false
+}
+
 // LLMCompleter interface for LLM calls.
 type LLMCompleter interface {
 	Complete(ctx context.Context, prompt string) (string, error)
@@ -60,18 +114,18 @@ func planStartSpan(ctx context.Context, obsBridge *observability.Bridge, operati
 
 // PlanRequest is the input for plan generation.
 type PlanRequest struct {
-	UserGoal      string   // 用户目标描述
-	WorkDir      string   // 工作目录
-	Context      string   // 额外上下文（如 CLAUDE.md 内容）
-	Tools        []string // 可用工具列表
+	UserGoal string   // 用户目标描述
+	WorkDir  string   // 工作目录
+	Context  string   // 额外上下文（如 CLAUDE.md 内容）
+	Tools    []string // 可用工具列表
 }
 
 // PlanResult is the output from plan generation.
 type PlanResult struct {
-	Tasks       []*Task  // 计划的任务列表
-	Exploration string   // 探索发现
+	Tasks         []*Task  // 计划的任务列表
+	Exploration   string   // 探索发现
 	CriticalFiles []string // 关键文件列表
-	Err         error
+	Err           error
 }
 
 // Plan generates a plan for the given goal.
@@ -125,10 +179,26 @@ func truncateStr(s string, maxLen int) string {
 }
 
 func buildPlanPrompt(req PlanRequest) string {
-	var toolsHint string
-	if len(req.Tools) > 0 {
-		toolsHint = "Available tools: " + strings.Join(req.Tools, ", ")
+	// Always include the PlanAgent read-only whitelist (D7-S5-T02 contract).
+	// Merge with caller's req.Tools: whitelist first, then caller's additions
+	// de-duplicated. Caller-supplied write tools are kept in the merged list
+	// for transparency but the whitelist prefix signals the read-only intent.
+	allowed := PlanAgentReadOnlyTools
+	merged := make([]string, 0, len(allowed)+len(req.Tools))
+	merged = append(merged, allowed...)
+	for _, t := range req.Tools {
+		dup := false
+		for _, m := range merged {
+			if m == t {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			merged = append(merged, t)
+		}
 	}
+	toolsHint := "Available tools (read-only whitelist + extras): " + strings.Join(merged, ", ")
 
 	return `You are a software architect and planning specialist. Your role is to explore the codebase and design implementation plans.
 
@@ -217,7 +287,7 @@ func parsePlanResponse(response string) *PlanResult {
 
 // Errors
 var (
-	ErrLLMNotConfigured = &PlanError{Message: "LLM not configured"}
+	ErrLLMNotConfigured  = &PlanError{Message: "LLM not configured"}
 	ErrInvalidPlanFormat = &PlanError{Message: "Invalid plan format"}
 )
 

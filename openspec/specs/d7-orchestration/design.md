@@ -3,10 +3,11 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 2.0.0
+**Version:** 2.2.0
 **Status:** Active
 **Last Updated:** 2026-06-14
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
+**需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
 **Wave 设计参考:** `openspec/changes/devrix-wave-scheduler/design.md`
 
@@ -25,10 +26,64 @@
 | `task-planning-design.md` | PlanMode / PlanAgent 专项设计 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
 | `span-registry.md` | Span 注册表（3 ops，orchestrator） |
+| `demand.md` | Review R1 需求澄清 SoT |
+| `review-r1.md` | Review 决议索引与二次评审清单 |
+| `review-r2.md` | Review R2 结构层命题与 OQ 最终决议 |
+
+---
+
+## Review R1 设计决议（2026-06-14）
+
+### 编排路由矩阵
+
+| 路由 | 触发 | 调度 | 执行 |
+|------|------|------|------|
+| FastPath | Classify=simple | D7-S2 | D2 QueryLoop |
+| CommandPath | `/plan` `/task` `/stop` | D7-S2（优先于 Classify） | 命令处理器 |
+| PlanPath | `/plan` 或 PlanMode active | D7-S2 → S5-P1 | PlanAgent → PlanTask |
+| SerialExplore | orchestrate + 单步 | D7-S2 串行 | D2 readonly |
+| WaveExecute | orchestrate + 并行 | **D7-S3** | runners → D2/D4 |
+| BackgroundRun | SubQuery async | D7-S1 | D2 SubQuery |
+
+### Task Model Trinity
+
+```mermaid
+graph LR
+    subgraph D7_S1["D7-S1 Work Model"]
+        PT["PlanTask task_"]
+        BR["BackgroundRun bg_"]
+    end
+    subgraph D7_S3["D7-S3 Wave"]
+        WN["WaveTaskNode"]
+    end
+    subgraph D7_S4["D7-S4 Flow"]
+        WP["WorkPlanSnapshot"]
+    end
+    PT -->|"blocked_by DAG"| PT
+    WN -->|"TaskNode.ID"| PT
+    BR -->|"FlowEvent.TaskID"| PT
+    PT --> WP
+    WN --> WP
+    BR --> WP
+```
+
+v1.0：**不合并存储**；`QueryWorkPlan` 统一查询。BackgroundRun 可先保留 `query/background.go` + D7 facade。
+
+### 迁移共存
+
+```
+d7_enabled=false  →  D1 → D2.Process（现网，默认）
+d7_enabled=true   →  D1 → D7.ProcessMessage → contracts → D2/D4
+                      （禁止 D2.Process 内嵌编排逻辑）
+```
+
+Phase D（入口切换）与 Phase E（loop 瘦身）应同 release 或相邻 release 交付。
 
 ---
 
 ## ① 架构目标
+
+D7 是**横向协调层**：D1 拥有 ingress，D7 拥有 routing decision；通过 `d7_enabled` D1 保留最终否决权（Review R2 §D7-D1 Contract）。
 
 ### 业务目标
 
@@ -47,7 +102,7 @@
 | WorkerPool 峰值并发 | ≤5（1+1+3 slots） | `scheduler_test.go` ORCH-S2-T10 ✅ |
 | 槽位释放后立即重派发 | <1 dispatch loop tick | `scheduler_test.go` ORCH-S2-T15 ✅ |
 | FlowEvent 双通道延迟 | 同步 Apply + 异步 IM | `hub_test.go` ✅ |
-| D7 快速路径开销（规划） | ≤2ms vs 直连 D2 | 未实现 |
+| D7 快速路径开销（规划） | ≤2ms vs 直连 D2 | 未实现（T02a+T02b+T02c） |
 | QueryLoop 行数（规划） | ≤200 行 | 当前 414 行 |
 
 ### 约束条件

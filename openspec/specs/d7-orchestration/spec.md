@@ -3,11 +3,14 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 2.0.0
+**Version:** 2.2.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-14
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
+**Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
+**Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
+**Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
 **Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler)
 
@@ -15,7 +18,7 @@
 
 ## Overview
 
-D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。在 DSAFT 体系中位于 D1–D6 之上，协调 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并将进度事件发布到 D1 通信层。
+D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
 
 **现行实现路径（2026-06-14）：** 代码仍位于 `internal/layers/orchestration/`（ORCH v2）与 `internal/layers/contextengine/tasks/`（Task/Plan 写模型）。D1 主入口仍为 `D2.ContextEngine.Process`，D7 域包 `internal/layers/d7/` **尚未创建**。
 
@@ -24,7 +27,38 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | ORCH v1.0 (2026-06-10) | Hub-Spoke 读模型：WorkPlan + ExecutionFlowHub |
 | ORCH v1.1 (2026-06-10) | WaveScheduler：DAG 调度、5-slot WorkerPool、ConflictGuard |
 | D7 v0.5 (2026-06-13) | DSAFT 域定义、A/F/T 注册表、迁移设计（S3 规划） |
-| D7 v1.0 (目标) | 入口上移、D2 瘦身、Task 模型归 D7-S1、决策层 D7-S5 |
+| D7 v1.0 (目标) | 入口上移、D2 瘦身、Task 模型归 D7-S1、S5-P2 分类 |
+| D7 v2.1.0 (文档) | Review R1 澄清：三模型、路由矩阵、迁移契约 |
+| D7 v2.2.0 (文档) | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、T02c |
+
+---
+
+## Review R1 澄清摘要（2026-06-14）
+
+完整条文见 `d7-domain.md` §Requirements Clarifications 与 `demand.md`。
+
+| 主题 | 决议 |
+|------|------|
+| Task 模型 | 三模型职责分离（PlanTask / WaveTaskNode / BackgroundRun），v1.0 不合并存储 |
+| S2 vs S3 | 编排路由矩阵：并行 execute 归 S3 Wave，S2 不串行替代 |
+| S5 | 分阶段：v1.0 仅 P1(PlanMode)+P2(Classify)；自动拆解 v1.1 |
+| 迁移 | `d7_enabled` 默认 false；4 组合回归矩阵 |
+| 性能 | FastPath 拆 T02a(proxy≤2ms) + T02b(classify≤1ms) + T02c(端到端≤2ms) |
+| 配置 | 单一 SoT：`context_engine.tasks.store_dir` |
+
+---
+
+## Review R2 结构层决议（2026-06-14）
+
+完整条文见 `review-r2.md`。
+
+| 主题 | 决议 |
+|------|------|
+| D7-D1 权力 | D1 ingress owner；D7 routing decision owner；`d7_enabled` 否决权 |
+| HandleInterrupt | /stop：Wave→D4→Process→stopped→TaskCancel；正常 Process 结束不杀 Wave |
+| OQ-1~4 | 全部闭合（见 review-r1.md §2） |
+| D6 advisory | P1 补 `orchestration.d6.validation.*` metric |
+| S5 shadow | P1 tail-only LLM classify（规则未命中），为 v1.1 兜底准备 |
 
 ---
 
@@ -215,14 +249,15 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 
 以下需求已在 `d7-domain.md` 定义，**代码尚未实现**：
 
-| Requirement | 目标 | 阻塞项 |
-|-------------|------|--------|
-| D7-S2 ProcessMessage | D1→D7 入口上移 | `orchestrator.go` 未创建 |
-| D7-S5 ClassifyIntent | 规则+LLM 意图分类 | `classifier.go` 未创建 |
-| D7-S5 SynthesizeTaskGraph | 目标拆解为 DAG | `decomposer.go` 未创建 |
-| D7-S5 SelectExecutor | D2/D4 执行器选择 | `executor.go` 未创建 |
-| D2 Thin QueryLoop | loop.go ≤200 行、无 D4 import | 当前 414 行，仍 import delegate |
-| D7 package identity | `internal/layers/d7/` | 目录不存在 |
+| Requirement | 目标 | v1.0 范围 |
+|-------------|------|-----------|
+| D7-S2 ProcessMessage | D1→D7 入口上移 | ✅ 必须 |
+| D7-S5-P2 ClassifyIntent | 规则 + command-first | ✅ 必须 |
+| D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG | ⬜ v1.1 |
+| D7-S5 SelectExecutor | D2/D4 执行器选择 | ⬜ v1.1（矩阵硬编码可先） |
+| D2 Thin QueryLoop | loop.go ≤200 行、无 D4 import | ✅ 必须 |
+| D7 package identity | `internal/layers/d7/` | ✅ 必须 |
+| D7 Migration Coexistence | 4 组合回归 | ✅ 必须 |
 
 ---
 
@@ -274,3 +309,5 @@ orchestration:
 | 1.0.0 | 2026-06-10 | ORCH v2 read model spec (DM-20260610-012) |
 | 1.0.0 | 2026-06-13 | D7 domain spec draft (DM-20260613-001, S3 design) |
 | 2.0.0 | 2026-06-14 | 对齐最新代码：实现状态标注、DSAFT 结构、T 层映射、配置同步 |
+| 2.1.0 | 2026-06-14 | Review R1 澄清写入 spec 摘要，指向 demand.md / d7-domain.md |
+| 2.2.0 | 2026-06-14 | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、OQ 闭合 |

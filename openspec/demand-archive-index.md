@@ -47,6 +47,11 @@
 | DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-11 | — | S5_Acceptance（单测 PASS，待真机） |
 | DM-20260611-007 | Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块 | devrix-wave-scheduler | 2026-06-11 | — | S4_Implemented (合并至 `fix/remaining-critical`，含 completeTask race fix) |
 | DM-20260611-008 | 飞书 IM 完成卡 — ctx 比例 + token 链路埋点 | devrix-im-card-ctx | 2026-06-11 | [#27](https://github.com/fqntxmqee/devrix/pull/27) | ACCEPTED (P1) |
+| DM-20260613-001 | D7 Orchestration Domain — 入口迁移与共存契约 | devrix-d7-orchestration-domain | 2026-06-14 | — | ACCEPTED (P0) |
+| DM-20260614-002 | D6 Validation Metric — 4 counter + 滑窗告警 (P1 #6) | devrix-d6-validation-metric | 2026-06-14 | — | ACCEPTED (P1) |
+| DM-20260614-003 | PlanAgent 工具白名单契约 — 只读探索可断言 (P1 #7) | devrix-d7-s5-t02-planagent-whitelist | 2026-06-14 | — | ACCEPTED (P1) |
+| DM-20260614-004 | S5-P2 Tail-only LLM Classify Shadow — v1.1 兜底冷启动 (P1 #8) | devrix-s5-p2-shadow-classifier | 2026-06-14 | — | ACCEPTED (P1) |
+| DM-20260614-005 | D7-S5-T03/T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环 | devrix-d7-classify-command-first | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -90,6 +95,11 @@
 | devrix-d6-eval-phase3 | `openspec/archive/2026-06-10-devrix-d6-eval-phase3/` |
 | devrix-queryloop-context | `openspec/archive/2026-06-10-devrix-queryloop-context/` |
 | devrix-im-card-ctx | `openspec/archive/2026-06-11-devrix-im-card-ctx/` |
+| devrix-d7-orchestration-domain | `openspec/archive/2026-06-14-devrix-d7-orchestration-domain/` |
+| devrix-d6-validation-metric | `openspec/archive/2026-06-14-devrix-d6-validation-metric/` |
+| devrix-d7-s5-t02-planagent-whitelist | `openspec/archive/2026-06-14-devrix-d7-s5-t02-planagent-whitelist/` |
+| devrix-s5-p2-shadow-classifier | `openspec/archive/2026-06-14-devrix-s5-p2-shadow-classifier/` |
+| devrix-d7-classify-command-first | `openspec/archive/2026-06-14-devrix-d7-classify-command-first/` |
 | devrix-agentic-loop | `openspec/archive/2026-06-11-devrix-agentic-loop/`（Superseded → DM-012 + tech-debt） |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |

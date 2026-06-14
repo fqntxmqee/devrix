@@ -1,0 +1,34 @@
+change_id: devrix-d6-validation-metric
+priority: P1
+demand_id: DM-20260614-002
+status: s7_archived
+domains: [D7, D5]
+dsaft_scenarios:
+  - D7-S2  # Session Orchestrator
+  - D5-S2  # Metrics
+dsaft_activities:
+  - D7-S2-A04  # ObserveD6Validation
+  - D5-S2-A02  # RecordValidationOutcome
+review:
+  r1_date: 2026-06-14
+  r1_docs: [demand.md, proposal.md, design.md, tasks.md]
+  open_questions: []
+metrics_definitions:
+  - name: orchestration.d6.validation.pass
+    type: counter
+    description: "Count of D6 advisory validations that returned Pass=true within timeout"
+  - name: orchestration.d6.validation.fail
+    type: counter
+    description: "Count of D6 advisory validations that returned Pass=false within timeout"
+  - name: orchestration.d6.validation.timeout
+    type: counter
+    description: "Count of D6 advisory validations that exceeded the configured timeout (advisory treated as pass per contract, but observed here)"
+  - name: orchestration.d6.validation.error
+    type: counter
+    description: "Count of D6 advisory validations that panicked or exceeded 2x timeout (gross error)"
+alert_rules:
+  - name: orchestration.d6.validation.timeout_rate
+    description: "5min sliding window; ratio of (timeout+error) / total. WARN if > 5% with >= 20 samples."
+    threshold: 0.05
+    window: 5m
+    min_samples: 20

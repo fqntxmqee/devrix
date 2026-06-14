@@ -138,7 +138,7 @@ Spec: `openspec/specs/d6-evolution/spec.md` (D6-S3)
 
 ### D7 Orchestration Domain
 
-> **2026-06-13**: 升格自 ORCH v2 读模型包。D7 作为编排域，位于 D1-D6 之上协调跨域执行。
+> **2026-06-13**: 升格自 ORCH v2 读模型包。D7 作为编排域，是**横向协调层**，编排 D2+D4 跨域执行；**D1 仍拥有 ingress**，D7 不替代 D1 Gateway。
 
 | Module ID | Scenario | Responsibility | Status | 来源 |
 |-----------|----------|----------------|--------|------|

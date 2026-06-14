@@ -1,14 +1,14 @@
 change_id: devrix-d7-orchestration-domain
 priority: P0
 demand_id: DM-20260613-001
-status: s3_design
+status: s7_archived
 domains: [D7, D2, D4, D1]
 dsaft_scenarios:
   - D7-S1   # Work Model
   - D7-S2   # Session Orchestrator
-  - D7-S3   # Wave Scheduler
-  - D7-S4   # Execution Flow
-  - D7-S5   # Decision & Planning
+  - D7-S3   # Wave Scheduler (IMPLEMENTED)
+  - D7-S4   # Execution Flow (IMPLEMENTED)
+  - D7-S5   # Decision & Planning (P1+P2 partial)
 dsaft_activities:
   - D7-S1-A01
   - D7-S1-A02
@@ -26,8 +26,14 @@ dsaft_activities:
   - D7-S5-A02
   - D7-S5-A03
 version_scope:
-  v1.0: "D7 domain establishment: D7-S1 Work Model, D7-S2 Session Orchestrator, D7-S5 Decision & Planning"
-  v1.1: "D7-S3 Wave Scheduler migration from ORCH-S3, D7-S4 Execution Flow migration from ORCH-S1/S2"
+  v0.5: "ORCH v2 + Wave + Flow Hub (IMPLEMENTED 2026-06-10~11)"
+  v1.0: "D7-S2 entry + S5-P2 classify + D2 thin + migration coexistence"
+  v1.1: "S5-P3 SynthesizeTaskGraph + CreateWorkPlan DAG + LLM classify fallback"
+  v1.2: "S5-P4 auto_detect + strict task state machine"
+review:
+  r1_date: 2026-06-14
+  r1_docs: [demand.md, review-r1.md, tasks.md, d7-domain.md v2.1.0]
+  open_questions: [OQ-1, OQ-2, OQ-3, OQ-4]
 metrics_definitions:
   - name: orchestration.fast_path.count
     type: counter
@@ -42,13 +48,13 @@ metrics_definitions:
     type: histogram
     description: "Intent classification confidence score (0-100)"
 span_naming:
+  - operation: orchestration.wave.schedule
+    description: "D7-S3-A01 ScheduleWave (IMPLEMENTED)"
+  - operation: orchestration.wave.task.execute
+    description: "D7-S3 worker execute (IMPLEMENTED)"
+  - operation: orchestration.flow.event.publish
+    description: "D7-S4-A01 PublishFlowEvent (IMPLEMENTED)"
   - operation: d7.session.process
-    description: "D7-S2-A01 ProcessMessage entry span"
+    description: "D7-S2-A01 ProcessMessage entry span (PLANNED)"
   - operation: d7.intent.classify
-    description: "D7-S5-A01 ClassifyIntent span"
-  - operation: d7.plan.synthesize
-    description: "D7-S5-A02 SynthesizeTaskGraph span"
-  - operation: d7.task.dispatch
-    description: "D7-S1-A02-F01 DispatchTask span"
-  - operation: d7.flow.publish
-    description: "D7-S4-A01 PublishFlowEvent span"
+    description: "D7-S5-A01 ClassifyIntent span (PLANNED)"

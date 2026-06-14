@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.1.0
-**Last Updated:** 2026-06-13
+**Version:** 4.2.0
+**Last Updated:** 2026-06-14
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -25,9 +25,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 33 | 22 | 1 | 22 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 46 | 39 | 5 | 26 |
 
-**总计**: 239 · IMPLEMENTED 231 · PLANNED 6 · PARTIAL 1 · P0 100
+**总计**: 272 · IMPLEMENTED 258 · PLANNED 11 · PARTIAL 2 · P0 118
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 

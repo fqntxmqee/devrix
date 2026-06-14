@@ -31,6 +31,7 @@ type ConfigFile struct {
 	MultiAgent     MultiAgentFileConfig  `yaml:"multi_agent"`
 	AgentTools     AgentToolsFileConfig  `yaml:"agent_tools"`
 	Orchestration  OrchestrationFileConfig `yaml:"orchestration"`
+	D7             D7FileConfig            `yaml:"d7"`
 }
 
 // AppConfig 应用配置
@@ -102,6 +103,18 @@ type OrchestrationFileConfig struct {
 	TrustedToolAllowlist   []string `yaml:"trusted_tool_allowlist"`
 	InterventionThreshold  float64  `yaml:"intervention_threshold"`
 	AutoIntervene          bool     `yaml:"auto_intervene"`
+}
+
+// D7FileConfig is the YAML deserialization target for the D7 orchestration
+// domain. See internal/layers/d7/config.go for the runtime Config.
+type D7FileConfig struct {
+	Enabled               *bool    `yaml:"enabled"`
+	FastPathThreshold     *int     `yaml:"fast_path_threshold"`
+	CommandFirst          *bool    `yaml:"command_first"`
+	LLMFallback           *bool    `yaml:"llm_fallback"`
+	D6ValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
+	PlanModeApproveGate   *bool    `yaml:"plan_mode_approve_gate"`
+	CommandWhitelist      []string `yaml:"command_whitelist"`
 }
 
 // LoadConfigFile loads configuration from a YAML file

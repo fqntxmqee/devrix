@@ -4,17 +4,20 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.0.0
+**Version:** 2.2.0
 **Status:** Active — IMPLEMENTED (S3/S4) + PLANNED (S1/S2/S5 migration)
 **Last Updated:** 2026-06-14
 **Implementation Audit:** `layer-delta.md`
+**Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
+**Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
+**Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 **Depends On:** D2-S10 (QueryLoop), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)
 
 ---
 
 ## Overview
 
-D7 Orchestration Domain 是 DSAFT 架构的第七域，位于 D1-D6 之上，作为跨域编排层。
+D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**编排 D2（执行原语）与 D4（委托原语），并向 D1 发布进度事件。D1 仍拥有 ingress，D7 不替代 D1 Gateway。
 
 **域职责**：回答"做什么、按什么顺序做、谁来做、做得怎么样了"。
 
@@ -56,6 +59,87 @@ D3 不直接和 D7 交互
 
 ---
 
+## Requirements Clarifications (Review R1, 2026-06-14)
+
+> 本节收录架构 Review 决议，供二次评审。详见 `demand.md` §2 澄清记录。
+
+### Task Model Trinity（三模型职责分离）
+
+v1.0 **不合并**数据结构，通过统一查询入口 `QueryWorkPlan` 聚合：
+
+| 模型 | ID 前缀 | Scenario | 职责 |
+|------|---------|----------|------|
+| PlanTask | `task_` | D7-S1 | Plan 任务：subject、blocked_by、DiskStore |
+| WaveTaskNode | Plan 节点 ID | D7-S3 | DAG 调度：worker_type、context_policy、depends_on |
+| BackgroundRun | `bg_` | D7-S1 | SubQuery 异步句柄：output、cancel（目标迁入 D7-S1） |
+
+**映射：** `WaveTaskNode.ID` 可关联 `PlanTask.ID`；`FlowEvent.TaskID` + `link_tasks` 联动 PlanTask 状态。对齐 DM-20260612-011：PlanTask 与 BackgroundRun **分离**，Registry 作 D7-S1 facade。
+
+### Task Status Vocabulary（现行 SoT）
+
+| 需求别名 | 代码 SoT (`TaskStatus`) | 触发 |
+|----------|------------------------|------|
+| created | `pending` | TaskManager.Create |
+| assigned | `pending` + owner≠"" | FlowStarted + link_tasks |
+| running | `in_progress` | FlowStarted / UpdateStatus |
+| completed | `completed` | FlowCompleted |
+| failed | `failed` | FlowFailed |
+
+v1.0 不强制非法转换拒绝；v1.1 引入 `TransitionTaskState` 校验（D7-S1-T08 PLANNED）。
+
+### Orchestration Routing Matrix（S2 vs S3 分工）
+
+| 路由 | 条件 | 调度者 | 执行者 |
+|------|------|--------|--------|
+| FastPath | ClassifyIntent=simple, confidence≥threshold | D7-S2 | D2 QueryLoop |
+| CommandPath | `/plan` `/task` `/stop` 等 | D7-S2（command-first，优先于 Classify） | 各命令处理器 |
+| PlanPath | PlanMode active 或用户 `/plan` | D7-S2 → S5-P1 | PlanAgent → approve → PlanTask |
+| SerialExplore | orchestrate + 单步 explore/plan | D7-S2 串行 | D2 QueryLoop（只读工具） |
+| WaveExecute | orchestrate + 多 Worker 并行 | **D7-S3** WaveScheduler | D2/D4 via runners |
+| BackgroundRun | SubQuery async | D7-S1 | D2 SubQuery（不经 Wave） |
+
+**约束：** D7-S2 **不得**替代 D7-S3 做并行 DAG 调度；S2 OrchestratePath 在需并行时 **委托** `WaveScheduler.Start`。
+
+### S5 Decision Layer — Phased Roadmap
+
+| 阶段 | 能力 | v1.0 范围 |
+|------|------|-----------|
+| S5-P1 | PlanMode + PlanAgent | ✅ 已实现 |
+| S5-P2 | ClassifyIntent（规则 + command-first） | ✅ v1.0 必须 |
+| S5-P3 | SynthesizeTaskGraph 自动拆解 | ⬜ v1.1 |
+| S5-P4 | auto_detect → PlanMode | ⬜ v1.2 |
+
+v1.0 OrchestratePath：**不依赖** S5-P3；可路由至 PlanMode 或已有 delegate/wave 触发路径。
+
+### Migration Coexistence Contract
+
+| d7_enabled | plan.enabled | 入口 | 编排逻辑位置 |
+|------------|--------------|------|-------------|
+| false | * | D1→D2.Process | D2（现行） |
+| true | false | D1→D7.ProcessMessage | D7 contracts → D2/D4 |
+| true | true | D1→D7.ProcessMessage | D7 + PlanMode |
+
+**约束：**
+- `d7_enabled=true` 时 D7 **禁止**回退调用含编排逻辑的 D2.Process 主路径
+- 迁移窗口 ≤ 2 release；上表 4 组合须全量回归（D7-MIG-T01 PLANNED）
+- `d7_enabled` 默认 `false` 直至 acceptance-report P0 全绿
+
+### Performance Acceptance（拆分 WHAT）
+
+| T ID | WHAT | 优先级 |
+|------|------|--------|
+| D7-S2-T02a | FastPath proxy 在 Classify 完成后额外开销 P99 ≤ 2ms | P0 |
+| D7-S2-T02b | 规则 ClassifyIntent（无 LLM）P99 ≤ 1ms | P0 |
+
+简单消息 FastPath **不得**调用 LLM Classify（D7-S5-T06）。
+
+### Configuration SoT
+
+- **唯一** Task 持久化路径：`context_engine.tasks.store_dir`
+- `orchestration.task.store_dir` 标记 **DEPRECATED**，实现时不新增
+
+---
+
 ## ADDED Requirements
 
 ### Requirement: D7 Domain Identity
@@ -94,16 +178,17 @@ D7-S1 MUST own the unified Task data model as the single source of truth. Task C
 
 - GIVEN a session and a task goal
 - WHEN D7-S1-A02 ManageTask is called with Create action
-- THEN a Task is created with unique ID and status "created"
-- AND the Task is persisted to durable storage
+- THEN a Task is created with unique ID and status `pending` (alias: created)
+- AND the Task is persisted to durable storage when `tasks.mode=v2`
 - AND the Task is queryable via D7-S1-A03 QueryWorkPlan
 
 #### Scenario: Task lifecycle state machine
 
-- GIVEN a Task in status "created"
-- WHEN D7-S1-A02 ManageTask transitions to "assigned"
-- THEN the Task status is updated
-- AND validation rejects invalid transitions (e.g. "created" → "completed" without "running")
+- GIVEN a Task in status `pending`
+- WHEN D7-S1-A02 ManageTask sets owner via FlowStarted (link_tasks)
+- THEN the Task owner field is updated (alias: assigned)
+- AND status becomes `in_progress` (alias: running)
+- AND v1.0 does NOT reject invalid transitions (deferred to v1.1 D7-S1-T08)
 
 #### Scenario: Plan contains DAG of tasks
 
@@ -124,11 +209,12 @@ D7-S1 MUST own the unified Task data model as the single source of truth. Task C
 #### Scenario: Background task registration
 
 - GIVEN a session and a sub-query specification
-- WHEN D7-S1-A02 ManageTask registers a background task
+- WHEN D7-S1 registers a BackgroundRun (`bg_*` prefix)
 - THEN a task ID is returned
-- AND the task status is "running"
-- AND on completion the task status transitions to "completed"
-- AND the result is available via QueryWorkPlan
+- AND the run status is `running`
+- AND on completion the status transitions to terminal (`completed` / `failed` / `cancelled`)
+- AND the result is available via task_output tool and QueryWorkPlan Flow projection
+- AND v1.0 implementation may remain in `query/background.go` with D7-S1 facade (D7-S1-T07)
 
 #### Scenario: Task persistence survives restart
 
@@ -158,36 +244,54 @@ D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request ent
 #### Scenario: Fast path routes directly to D2
 
 - GIVEN a simple user message (e.g. "hello", "what time is it")
-- WHEN D7-S2-A02 EvaluateIntent returns "simple" with confidence ≥ 90%
+- WHEN D7-S2-A02 EvaluateIntent returns "simple" with confidence ≥ 90% (rules only, no LLM)
 - WHEN D7-S2-A01 routes through fast path
 - THEN D2.RunQueryLoop is called directly
-- AND no Plan or Task is created
-- AND total added latency is ≤ 2ms compared to direct D2.Process call
+- AND no Plan or Wave Task is created
+- AND FastPath proxy overhead P99 ≤ 2ms after classify (D7-S2-T02a)
+- AND rule classify P99 ≤ 1ms (D7-S2-T02b)
 
-#### Scenario: Orchestrate path creates Plan
+#### Scenario: Orchestrate path routes per matrix
 
 - GIVEN a complex user message (e.g. "explore the module and refactor it")
-- WHEN D7-S2-A02 EvaluateIntent returns "complex" or confidence < 90%
+- WHEN D7-S2-A02 EvaluateIntent returns "orchestrate" with confidence < 90%
 - WHEN D7-S2-A01 routes through orchestrate path
-- THEN D7-S5-A02 SynthesizeTaskGraph is called
-- AND D7-S1-A01 CreateWorkPlan creates a Plan
-- AND tasks are dispatched sequentially with dependency ordering
+- THEN v1.0 MUST NOT require SynthesizeTaskGraph (S5-P3 deferred)
+- AND v1.0 routes to PlanMode entry OR existing Wave/delegate trigger per Routing Matrix
+- AND parallel multi-worker execute MUST delegate to D7-S3 WaveScheduler (not S2 serial loop)
 
-#### Scenario: Interrupt handler cancels active orchestration
+#### Scenario: Command-first routing takes precedence
+
+- GIVEN a user message starting with `/plan`, `/task`, or `/stop`
+- WHEN D7-S2-A01 ProcessMessage runs
+- THEN command handler is invoked before ClassifyIntent
+- AND LLM classification is NOT invoked for routing (D7-S5-T06)
+
+#### Scenario: Interrupt handler cancels active orchestration (/stop)
 
 - GIVEN a user sends /stop during active orchestration
 - WHEN D7-S2-A03 HandleInterrupt is called
-- THEN all running tasks for the session are cancelled
-- AND D2 RunQueryLoop contexts are cancelled
-- AND D4 agent runs are cancelled
-- AND a "stopped" event is emitted
+- THEN sub-capabilities execute in order:
+  1. `WaveScheduler.CancelAll(sessionID)` — explicit; Wave task ctx is detached from Process (`wave/scheduler.go`)
+  2. D4 active delegate workers for the session are cancelled
+  3. D2 Process context is cancelled (`gateway.StopProcess`)
+  4. a `stopped` EngineEvent is emitted to D1
+  5. TaskCancel propagates to WorkerCancel for any in-flight worker handles
+- AND this order MUST NOT rely on Process context propagation to Wave (Wave survives normal Process cancel by design)
+
+#### Scenario: Normal Process end does not cancel Wave
+
+- GIVEN a leader Process context ends without `/stop`
+- WHEN Wave workers are in-flight with detached task context
+- THEN Wave workers continue until completion or explicit `CancelAll`
+- AND only HandleInterrupt (`/stop`) triggers step 1 above
 
 #### Scenario: Interrupt idempotency
 
-- GIVEN no active tasks for a session
+- GIVEN no active tasks or workers for a session
 - WHEN D7-S2-A03 HandleInterrupt is called
 - THEN no error is returned
-- AND cleanup is idempotent
+- AND cleanup is idempotent (D7-S2-T05)
 
 ---
 
@@ -271,6 +375,8 @@ D7-S5 MUST provide structured intent classification and task decomposition. Clas
 - AND TaskSpec dependencies form a valid, acyclic DAG
 - AND each TaskSpec has a defined type (explore | plan | execute | background)
 
+> **Scope:** S5-P3 — **v1.1 only**；v1.0 使用 PlanMode 或手动 Task 创建替代。
+
 #### Scenario: Executor selection by task type
 
 - GIVEN a TaskSpec with type "explore"
@@ -330,6 +436,15 @@ After D7 migration, `query.Loop.Run` MUST only handle LLM↔Tool interaction. Al
 ### Requirement: D7-D1 Contract
 
 D1 Gateway MUST route inbound messages to D7 ProcessMessage instead of D2 Process.
+
+**Power allocation (Review R2):**
+
+| Role | Ownership |
+|------|-----------|
+| D1 | ingress owner — `RouteInbound` invocation |
+| D7 | routing decision owner — FastPath vs OrchestratePath |
+| D1 | final veto — `orchestration.d7_enabled=false` restores legacy path |
+| D7 | FastPath SLA — P99 ≤2ms (T02a+T02b+T02c) |
 
 <!-- T: D7-D1-T01 -->
 
@@ -391,6 +506,37 @@ D6 MAY validate orchestration decisions made by D7.
 - WHEN D7 continues with the decision
 - THEN D7 does NOT panic or crash
 - AND D6 validation failure is logged
+- AND validation call timeout defaults to 50ms; timeout treated as pass (D7-D6-T02)
+
+---
+
+### Requirement: D7 Migration Coexistence
+
+During D7 rollout, dual-entry behavior MUST be explicitly defined and regression-tested.
+
+<!-- T: D7-MIG-T01 -->
+
+#### Scenario: Four-combination regression matrix
+
+- GIVEN combinations of `d7_enabled` × `plan.enabled`
+- WHEN RouteInbound processes a representative message set
+- THEN each combination produces documented routing per Migration Coexistence Contract
+- AND `d7_enabled=false` is bit-identical to pre-migration behavior
+
+---
+
+### Requirement: D7 Task Model Trinity
+
+D7-S1 and D7-S3 MUST document and preserve three task representations with explicit mapping; v1.0 MUST NOT silently merge storage.
+
+<!-- T: D7-S1-T07 -->
+
+#### Scenario: QueryWorkPlan aggregates all representations
+
+- GIVEN a session with PlanTasks, active Wave workers, and BackgroundRuns
+- WHEN D7-S1-A03 QueryWorkPlan is called
+- THEN WorkPlanSnapshot includes TaskSnapshots (PlanTask) and ExecutionFlows (workers)
+- AND BackgroundRun progress is visible via FlowEvent or task_output
 
 ---
 
@@ -456,20 +602,17 @@ context_engine:
     enabled: false
     auto_detect: false
 
-# D7 v1.0 规划配置（未实现）
+# D7 v1.0 规划配置（未实现；task.store_dir DEPRECATED）
 orchestration:
   d7_enabled: false             # false 时保持 D1→D2.Process
   fast_path:
     confidence_threshold: 0.9
   decision:
     rules_enabled: true
-    llm_fallback: true
+    llm_fallback: false         # v1.1；v1.0 仅规则+command-first
   plan:
     max_tasks_per_plan: 20
     max_depth: 5
-  task:
-    persistence_enabled: true
-    store_dir: "~/.devrix/tasks/"
 ```
 
 ---
@@ -484,8 +627,8 @@ orchestration:
 | D7-S4 Flow | 7 | 0 | 6 |
 | D7-S1 Work | 5 | 1 | 3 |
 | D7-S5 Decision | 1 | 4 | 3 |
-| D7-S2 Orchestrator | 0 | 4 | 4 |
-| 契约/瘦身 | 0 | 5 | 4 |
+| D7-S2 Orchestrator | 0 | 7 | 7 |
+| 契约/瘦身/迁移 | 0 | 6 | 4 |
 
 ---
 
@@ -495,3 +638,5 @@ orchestration:
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | Initial D7 domain spec: 5 scenarios, 15 activities, 28 function points |
 | 2.0.0 | 2026-06-14 | 代码审计对齐：实现状态标注、配置同步、T 层索引指向 t-registry.md |
+| 2.1.0 | 2026-06-14 | Review R1：三模型、路由矩阵、S5 分阶段、迁移契约、性能指标拆分 |
+| 2.2.0 | 2026-06-14 | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、T02c、D6 metric |
