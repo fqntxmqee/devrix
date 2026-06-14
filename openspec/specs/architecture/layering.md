@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.9.0
+**Version:** 4.0.0
 **Last Updated:** 2026-06-15
 
 ---
@@ -586,3 +586,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | 3.7.0 | 2026-06-14 | **D3 5+1 S 价值流化**（DM-20260614-016 / devrix-d3-sa-refine）：D3-S1~S7 旧技术角色词 → D3-S1~S6 新 5+1 价值流承诺（RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway）；Legacy Index 冻结追溯；v1.0 物理路径保留 + v2.0 物理迁移目标 scenario-slug 注册（`route/` `stream/` `protect/` `budget/` `guard/` `configure/`）；D3 CROSS 锚点声明 `internal/bridges/llm/` |
 | **3.8.0** | **2026-06-14** | **D3 v2.0 物理路径迁移完成**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个价值流 slug 物理迁移完成（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）；8 个 re-export 桥接文件（旧路径保留 1 发布周期）；build/vet/test 全绿；contracts.go 145 行 AC-09 达成 |
 | **3.9.0** | **2026-06-15** | **D4 v2.0-d 物理路径迁移完成**（commit 3905c6a）：S11–S16 + Kernel 物理迁移（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；D7 Hub-Spoke bridge/dispatch/subquery 搬迁（`hubspoke/agent_bridge.go` `hubspoke/dispatch.go` `hubspoke/subquery_bridge.go`）；旧路径保留 re-export legacy.go；execute(9)+hubspoke(23) 测试新增；build/vet/test(71包) 全绿 |
+| **4.0.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 `kernel.NoOpAgentObserver`；根 `contracts.go` + `shared/config/multiagent.go` re-export 保留 |

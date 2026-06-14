@@ -120,7 +120,7 @@
 | E-e1 | 38 T + Hub-Spoke 跨域 T 全绿 | E-b–E-d | test report | P0 19 | ✅ |
 | E-e2 | `-race` agent 测试 | E-e1 | D4-S0-T01/T02 | P0 | ✅ |
 | E-e3 | E2E agent_fork + delegate 回归 | E-e1 | D4-S0-T04 | P0 | ⚠️ 3 预存错误 + 1 迁移 bug (4e48f83 已修复) |
-| E-e4 | 删除旧路径 dead code + re-export | E-e1 | cleanup PR | — | 🔲 v2.0-e |
+| E-e4 | 删除旧路径 dead code + re-export | E-e1 | cleanup PR | — | ⚠️ re-export shim 5/5 已删除（commit e30fe72）；delegate/ 仍保留等待确认 |
 | E-e5 | 更新 `layering.md` Domain Layout + code-layout §4.4 状态 | E-d7 | specs | — | ✅ |
 | E-e6 | 写 `acceptance-report（v2.0）` | E-e1–E-e5 | ACCEPTED | — | ✅ |
 | E-e7 | S7 归档 + `demand-archive-index.md` | E-e6 | archive | — | 🔲 v2.0-e |

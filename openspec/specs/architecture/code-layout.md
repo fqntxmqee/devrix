@@ -2,7 +2,7 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.6.0
+**Version:** 1.7.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -173,7 +173,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 ### 4.5 D4 Multi-Agent（canonical S11–S16 / 5+1 价值流）
 
-> **Canonical S11–S16**（DM-20260614-018 / devrix-d4-sa-refine）。v1.0 物理路径保留；Hub-Spoke 编排代码 v2.0 迁 D7 `hubspoke/`。
+> **Canonical S11–S16**（DM-20260614-018 / devrix-d4-sa-refine）。v2.0-d 物理迁移完成；v2.0-e re-export shim 已删除（`factory/` `agent/` `sessionview/` `observer/` `tool/`）；Hub-Spoke 编排代码 v2.0 迁 D7 `hubspoke/`。
 
 | S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
 |------|----------|----------------------|--------------|-----------|------|
@@ -273,4 +273,5 @@ internal/layers/communication/
 | 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |
 | 1.4.0 | 2026-06-14 | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位 |
 | **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成 |
-| **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；旧路径 re-export legacy.go 保留；execute(9) + hubspoke(23) 测试新增；71 包全绿 |
+| **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；execute(9) + hubspoke(23) 测试新增；71 包全绿 |
+| **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿 |

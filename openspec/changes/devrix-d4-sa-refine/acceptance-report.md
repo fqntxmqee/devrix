@@ -160,8 +160,8 @@ go test -tags "integration cross" ./tests/integration/...  → 3 pre-existing bu
 | ID | 项目 | 原因 | 计划 |
 |----|------|------|------|
 | E-e3 | E2E + 集成测试回归（tagged `-tags "integration cross"`） | 3 个预存构建错误与 D4 无关（D3 `IAdapter.Protocol` 缺失 ×2 + D2 `WireContextLLM` 双返回值 API 变更）；1 个迁移引入的 `provision.Create` 误改已于 commit 4e48f83 修复 | v2.0-e 准出前补跑（待 D2/D3 API 修复后） |
-| E-e4 | 旧路径 dead code + re-export 删除 | 跨 38 个 importer 文件改引，需单独发布周期 | v2.0-e（下一个 PR） |
-| E-e7 | S7 归档 | 待 E-e3/E-e4 完成后执行 | v2.0-e 准出 |
+| E-e4 | 旧路径 dead code + re-export 删除 | 5/5 re-export shim 已删除（commit e30fe72）：`factory/` `agent/` `sessionview/` `observer/` `tool/`；`observer` 引用已迁移至 `kernel`；`delegate/` 保留等待确认 | ✅ re-export 完成 |
+| E-e7 | S7 归档 | 待 E-e3 预存错误修复后执行 | v2.0-e 准出 |
 
 ### 6.5 裁决
 
