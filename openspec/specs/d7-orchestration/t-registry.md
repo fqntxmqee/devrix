@@ -73,6 +73,9 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED (v1.1) | P1 |
 | D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/orchestration/coordinator/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
 | D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/orchestration/coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | — | PLANNED (v1.1) | P0 |
+| D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-A02-T01 | SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG（结构决策验证） | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
 
 ---
 
@@ -87,6 +90,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | — | PLANNED (v1.1) | P0 |
+| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -120,18 +125,18 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 46 | 39 | 2 | 5 | 26 |
+| 49 | 40 | 2 | 7 | 28 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
 | D7-S1 | 8 | 5 | 3 |
-| D7-S2 | 7 | 0 | 7 |
+| D7-S2 | 9 | 7 | 2 |
 | D7-S3 | 11 | 10 | 1 |
 | D7-S4 | 7 | 7 | 0 |
-| D7-S5 | 7 | 5 | 2 |
-| 契约/迁移 | 6 | 0 | 6 |
+| D7-S5 | 10 | 7 | 3 |
+| 契约/迁移 | 6 | 4 | 2 |
 
 ---
 
@@ -144,3 +149,4 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
 | 2.2.0 | 2026-06-14 | Review R2：T02c 端到端 SLA、T04 中断顺序、D7-D6-T01 metric、S5-T02 白名单 |
 | 2.3.0 | 2026-06-14 | DM-20260614-005：D7-S5-T03 / T06 闭环（端到端测试 + CommandFirst=false 回归） |
+| 2.4.0 | 2026-06-14 | devrix-d7-sa-refine (DM-20260614-008)：T03 anti-fabrication、D7-S5-A01-T01/T02、S5-A02-T01 新增 |

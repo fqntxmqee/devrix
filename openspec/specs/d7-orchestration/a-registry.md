@@ -19,7 +19,28 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
-## D7-S1: Work Model 🔶
+## Legacy 双轨方案（v1.0+）
+
+> 根据 `devrix-d7-sa-refine` (DM-20260614-008) §7 设计决策：
+> - **Legacy** — 旧编号冻结追溯，路径：`internal/layers/orchestration/coordinator/`（旧包结构）
+> - **Canonical** — 新编号按用户价值流，路径：`internal/layers/orchestration/`（新包结构）
+
+### 追溯规则
+
+```
+Legacy ID（如 D7-S2-A01-LEGACY）→ 新 Canonical（D7-S2-A01）
+Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
+```
+
+### 禁止约束
+
+- **禁止** 在 Legacy 语义上新增 T
+- **禁止** 在 Legacy 路径下开发新功能
+- **强制** 新功能走 Canonical S
+
+---
+
+## D7-S1: Work Model 🔶 LEGACY
 
 > 写模型现行托管于 D2 `contextengine/tasks/`，v1.1 迁移至 `internal/layers/orchestration/coordinator/workmodel.go`。
 
@@ -39,7 +60,7 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
-## D7-S2: Session Orchestrator ✅
+## D7-S2: Session Orchestrator ✅ LEGACY
 
 > D1 经 `gateway.d7Entry` 路由至 `coordinator.Entry.ProcessMessage`，由 SessionOrchestrator 编排 D2/D4/D7。
 
@@ -51,7 +72,7 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
-## D7-S3: Wave Scheduler ✅
+## D7-S3: Wave Scheduler ✅ LEGACY
 
 > 升格自 ORCH-S3，完整实现于 `internal/layers/orchestration/wave/`。
 
@@ -63,7 +84,7 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
-## D7-S4: Execution Flow ✅
+## D7-S4: Execution Flow ✅ LEGACY
 
 > 升格自 ORCH-S1/S2，实现于 `orchestration/flow/`, `workplan/`, `imsink/`。
 
@@ -75,7 +96,7 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
-## D7-S5: Decision & Planning 🔶
+## D7-S5: Decision & Planning 🔶 LEGACY
 
 > PlanMode/PlanAgent 已实现；ClassifyIntent/Rule 分类已实现（coordinator）；SynthesizeTaskGraph/SelectExecutor 推迟至 v1.1。
 
@@ -89,11 +110,62 @@ D7 编排域 A 层活动注册表。代码分布：
 
 ---
 
+## Canonical S 层定义（切法 A — 按用户价值流）
+
+> 以下为 `devrix-d7-sa-refine` v1.0 Canonical 定义。按用户价值流划分 S 层，Legacy 双轨可追溯。
+
+### D7-S2: 会话编排入口 ✅ Canonical
+
+> North Star: 用户消息统一入口，决定走快速路径还是编排路径
+> 博弈角色: Screening Mechanism（筛路径）
+
+| A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
+|------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
+| D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
+
+### D7-S3: Wave 调度 ✅ Canonical
+
+> North Star: 多任务并行执行，冲突避免，上下文隔离
+> 博弈角色: Mechanism Designer（定执行规则）
+
+| A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
+|------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| D7-S3-A01 | ScheduleWave | D7-S3-A01-LEGACY | A-BE | session_id, task_graph | artifact_list | wave.* | ✅ | `orchestration/wave/scheduler.go` |
+| D7-S3-A02 | ResolveWorkerContext | D7-S3-A02-LEGACY | A-BE | task_node, session | resolved_context | — | ✅ | `orchestration/wave/context.go` |
+| D7-S3-A03 | GuardConflict | D7-S3-A03-LEGACY | A-BE | candidate, running_tasks | allowed/blocked | — | ✅ | `orchestration/wave/conflict.go` |
+
+### D7-S4: 执行流 ✅ Canonical
+
+> North Star: 执行进度透明，WorkPlan 可追溯
+> 博弈角色: Costly Signaler（向用户广播成本）
+
+| A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
+|------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| D7-S4-A01 | PublishFlowEvent | D7-S4-A01-LEGACY | A-BE | flow_event | — | flow.event_published | ✅ | `orchestration/flow/hub.go` Publish |
+| D7-S4-A02 | SnapshotWorkPlan | D7-S4-A02-LEGACY | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
+| D7-S4-A03 | NotifyGateway | D7-S4-A03-LEGACY | A-BE | event, session | — | — | ✅ | `orchestration/imsink/gateway.go` |
+
+### D7-S5: 决策规划 🔶 Canonical
+
+> North Star: 把用户 goal 转化为可执行的任务结构（结构路径，非内容质量）
+> 博弈角色: Information Producer（产私有信息）
+> **Explore 输入:** SynthesizeTaskGraph 吸收 Explore Workers（并行 read-only）通过 D7-S4 广播的 FlowEvent
+
+| A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
+|------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| D7-S5-A01 | ClassifyIntent | D7-S5-A01-LEGACY | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ⬜ | `coordinator/decomposer.go` (planned v1.1) |
+| D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ⬜ | `coordinator/executor.go` (planned v1.1) |
+
+---
+
 ## Statistics
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 | 19 | 14 | 1 | 4 |
+| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 11 (Canonical) | 14 + 8 | 1 + 0 | 4 + 3 |
 
 ---
 
@@ -104,3 +176,4 @@ D7 编排域 A 层活动注册表。代码分布：
 | 1.0.0 | 2026-06-13 | 初始注册表（全 PLANNED 路径） |
 | 2.0.0 | 2026-06-14 | 对齐代码：真实路径、实现状态、PlanMode 活动 |
 | 2.1.0 | 2026-06-14 | 包路径迁移 `internal/layers/d7/` → `internal/layers/orchestration/coordinator/`；D7-S2/S5-A01/S5-A05 标记 ✅ |
+| 3.0.0 | 2026-06-14 | Legacy 双轨建立（devrix-d7-sa-refine）；Canonical S2/S3/S4/S5 按用户价值流重编号；v1.0 registry-only |

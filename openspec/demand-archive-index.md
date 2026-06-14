@@ -128,7 +128,11 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
-| devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S3-Gate_Approved |
+| devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
+
+**2026-06-14 归档（S6）**：
+
+- `devrix-d7-sa-refine` → `openspec/archive/2026-06-14-devrix-d7-sa-refine/`（DM-20260614-008 S5_PASS; v1.0 registry 重构; Legacy 双轨 + Canonical S 层）
 
 **2026-06-14 归档（S7）**：
 

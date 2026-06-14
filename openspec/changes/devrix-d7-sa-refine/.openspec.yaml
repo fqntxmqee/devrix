@@ -1,7 +1,7 @@
 change_id: devrix-d7-sa-refine
 priority: P0
 demand_id: DM-20260614-008
-status: s3_design
+status: s4_implementation
 domains: [D7, ARCH]
 
 # 切法 A：S 按「用户价值流」划分；旧 S2/S5 冻结为 Legacy Module Index
@@ -26,10 +26,13 @@ dsaft_activities:
   - D7-S5-A03  # SelectExecutor
 
 t_points:
-  - D7-S2-A01-T01       # ProcessMessage 入口验证
+  - D7-S2-A01-T01       # ProcessMessage 端到端延迟 ≤ 2ms
+  - D7-S2-A01-T02       # FastPath 命中时无 Wave 创建
+  - D7-S2-A01-T03       # 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication）
   - D7-S2-A03-T01       # HandleInterrupt 中断顺序
-  - D7-S5-A01-T01       # ClassifyIntent 规则
-  - D7-S5-A01-T02       # Command-first
+  - D7-S5-A01-T01       # 规则分类置信度阈值验证
+  - D7-S5-A01-T02       # Command-first 优先于 LLM 分类
+  - D7-S5-A02-T01       # SynthesizeTaskGraph 产出有效 DAG（吸收 Explore 结果）
 
 version_scope:
   v1.0: Registry 重构（S2/S5 重编号 + Legacy 双轨）
