@@ -21,6 +21,13 @@ type Config struct {
 	D6ValidationTimeoutMs int
 	PlanModeApproveGate   bool
 	CommandWhitelist      []string
+	// ShadowLLMClassify enables the async LLM classify shadow on the
+	// IntentOrchestrate tail (R2 §5 命题 C). Default false; enable per
+	// deployment to gather v1.1 cold-start samples.
+	ShadowLLMClassify bool
+	// ShadowLLMTimeoutMs is the LLM call timeout for the shadow in
+	// milliseconds. Default 500. Only used when ShadowLLMClassify=true.
+	ShadowLLMTimeoutMs int
 }
 
 // DefaultConfig returns the v1.0 default. This is what D1 routes against
@@ -36,6 +43,8 @@ func DefaultConfig() *Config {
 		CommandWhitelist: []string{
 			"/plan", "/stop", "/task", "/help",
 		},
+		ShadowLLMClassify:  false,
+		ShadowLLMTimeoutMs: 500,
 	}
 }
 
@@ -49,6 +58,8 @@ type FileConfig struct {
 	D6ValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
 	PlanModeApproveGate   *bool    `yaml:"plan_mode_approve_gate"`
 	CommandWhitelist      []string `yaml:"command_whitelist"`
+	ShadowLLMClassify     *bool    `yaml:"shadow_llm_classify"`
+	ShadowLLMTimeoutMs    *int     `yaml:"shadow_llm_timeout_ms"`
 }
 
 // BuildConfig merges file over default. nil fields in file keep default.
@@ -77,6 +88,12 @@ func BuildConfig(file *FileConfig) *Config {
 	}
 	if len(file.CommandWhitelist) > 0 {
 		cfg.CommandWhitelist = file.CommandWhitelist
+	}
+	if file.ShadowLLMClassify != nil {
+		cfg.ShadowLLMClassify = *file.ShadowLLMClassify
+	}
+	if file.ShadowLLMTimeoutMs != nil {
+		cfg.ShadowLLMTimeoutMs = *file.ShadowLLMTimeoutMs
 	}
 	return cfg
 }

@@ -27,6 +27,9 @@ type SessionOrchestrator struct {
 	validator  D6Validator
 	sink       D1EventSink
 	d6Metrics  *D6ValidationMetrics
+	// shadowClassifier wraps classifier (when wired) with an async LLM
+	// shadow on the IntentOrchestrate tail. nil → behavior unchanged.
+	shadowClassifier *ShadowClassifier
 
 	// activeSessions tracks the running ProcessRequest per sessionID so
 	// HandleInterrupt can cancel them. Protected by mu.
@@ -62,6 +65,15 @@ func WithWorkModel(w WorkModel) OrchestratorOption {
 // timeout_rate; nil metric is treated as no-op.
 func WithMetrics(m *D6ValidationMetrics) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.d6Metrics = m }
+}
+
+// WithShadowClassifier wires the optional LLM classify shadow. The
+// shadow runs asynchronously on the IntentOrchestrate tail (~20% of
+// messages the rule does not fast-match); v1.0 decision path is the
+// rule + command-first matrix, so the shadow never affects the
+// ProcessMessage return value. See R2 §5 命题 C.
+func WithShadowClassifier(s *ShadowClassifier) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.shadowClassifier = s }
 }
 
 // NewSessionOrchestrator builds the orchestrator with the given D2 executor
@@ -101,7 +113,15 @@ func NewSessionOrchestrator(cfg *Config, executor D2Executor, opts ...Orchestrat
 //   - orchestrate → OrchestratePath (v1.0: route to PlanMode if active,
 //     else to a single-task D2 call; Wave is a v1.1+
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) (<-chan *contracts.EngineEvent, error) {
-	intent, err := o.classifier.Classify(ctx, req.Message)
+	var (
+		intent IntentClassification
+		err    error
+	)
+	if o.shadowClassifier != nil {
+		intent, err = o.shadowClassifier.Classify(ctx, req.Message)
+	} else {
+		intent, err = o.classifier.Classify(ctx, req.Message)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("d7: classify: %w", err)
 	}
