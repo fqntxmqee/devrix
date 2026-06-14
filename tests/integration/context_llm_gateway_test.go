@@ -34,7 +34,10 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 
 // T: D2-S0-A01-T02
 func TestIntegration_WireContextLLMFallsBackToMock(t *testing.T) {
-	stack := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil)
+	stack, err := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil)
+	if err != nil {
+		t.Fatalf("WireContextLLM: %v", err)
+	}
 	if stack.Gateway == nil {
 		t.Fatal("expected gateway")
 	}

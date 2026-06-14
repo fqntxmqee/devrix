@@ -62,6 +62,8 @@ func (s *echoContextStub) Stream(_ context.Context, req *llmgateway.Request) (<-
 
 func (s *echoContextStub) Provider() string { return "deepseek" }
 
+func (s *echoContextStub) Protocol() string { return "openai-compatible" }
+
 func (s *echoContextStub) LastRequest() *llmgateway.Request {
 	s.mu.Lock()
 	defer s.mu.Unlock()
