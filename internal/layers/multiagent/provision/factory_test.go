@@ -6,7 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
-	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent/isolate"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -19,7 +19,7 @@ func TestAgentFactory_should_create_agent_in_created_state(t *testing.T) {
 		Engine: &run.StubEngine{
 			Events: []*contracts.EngineEvent{{Type: "complete", Content: "ok"}},
 		},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, config.DefaultMultiAgentConfig())
 
 	session := types.NewSession("sess_factory", "cli", "/tmp/work")

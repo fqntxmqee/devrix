@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	
 	"github.com/devrix/devrix/internal/layers/multiagent/provision"
-	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent/isolate"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -140,7 +140,7 @@ func TestJoin_should_dedup_tool_call_ids(t *testing.T) {
 
 	f := provision.NewAgentFactory(multiagent.AgentDeps{
 		Engine:        &run.StubEngine{Events: mkEvents("call_shared", "ok-1")},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, sharedconfig.DefaultMultiAgentConfig())
 
 	session := types.NewSession("sess_dedup", "cli", "/tmp")

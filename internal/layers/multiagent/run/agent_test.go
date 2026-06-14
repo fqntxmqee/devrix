@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	
 	"github.com/devrix/devrix/internal/layers/multiagent/provision"
-	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/kernel"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
@@ -21,7 +21,7 @@ import (
 func newTestFactory(engine contracts.IEngine) *provision.AgentFactory {
 	return provision.NewAgentFactory(multiagent.AgentDeps{
 		Engine:        engine,
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, sharedconfig.DefaultMultiAgentConfig())
 }
 

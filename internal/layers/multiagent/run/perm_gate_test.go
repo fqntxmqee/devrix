@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	
-	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/kernel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -20,7 +20,7 @@ func TestAgentPermissionGate_should_auto_approve_non_critical(t *testing.T) {
 		PermissionTimeout: time.Second,
 	}, types.NewSession("sess_perm", "cli", "/tmp"), multiagent.AgentDeps{
 		Engine:        &run.StubEngine{},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, nil)
 
 	gate := a.PermissionGate()
@@ -37,7 +37,7 @@ func TestAgentPermissionGate_should_grant_on_resolve(t *testing.T) {
 		PermissionTimeout: 2 * time.Second,
 	}, types.NewSession("sess_grant", "cli", "/tmp"), multiagent.AgentDeps{
 		Engine:        &run.StubEngine{},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, nil)
 
 	gate := a.PermissionGate()
@@ -66,7 +66,7 @@ func TestAgentPermissionGate_should_deny_on_resolve_false(t *testing.T) {
 		PermissionTimeout: 2 * time.Second,
 	}, types.NewSession("sess_deny", "cli", "/tmp"), multiagent.AgentDeps{
 		Engine:        &run.StubEngine{},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, nil)
 
 	gate := a.PermissionGate()
@@ -98,7 +98,7 @@ func TestAgentPermissionGate_should_timeout_when_unresolved(t *testing.T) {
 		PermissionTimeout: 50 * time.Millisecond,
 	}, types.NewSession("sess_timeout", "cli", "/tmp"), multiagent.AgentDeps{
 		Engine:        &run.StubEngine{},
-		AgentObserver: observer.NoOpAgentObserver{},
+		AgentObserver: kernel.NoOpAgentObserver{},
 	}, nil)
 
 	gate := a.PermissionGate()

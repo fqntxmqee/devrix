@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/observer"
+	"github.com/devrix/devrix/internal/layers/multiagent/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent/isolate"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
@@ -55,7 +55,7 @@ func New(
 	creator Creator,
 ) *Impl {
 	if deps.AgentObserver == nil {
-		deps.AgentObserver = observer.NoOpAgentObserver{}
+		deps.AgentObserver = kernel.NoOpAgentObserver{}
 	}
 	deps.AgentObserver = multiagent.NewAgentObserverChain(deps.AgentObserver)
 	a := &Impl{
@@ -255,7 +255,7 @@ func (a *Impl) SetEngine(engine contracts.IEngine) {
 // SetAgentObserver adds an observer to the agent lifecycle observer chain.
 func (a *Impl) SetAgentObserver(obs multiagent.AgentObserver) {
 	if obs == nil {
-		obs = observer.NoOpAgentObserver{}
+		obs = kernel.NoOpAgentObserver{}
 	}
 	if chain, ok := a.deps.AgentObserver.(*multiagent.AgentObserverChain); ok {
 		chain.Add(obs)
