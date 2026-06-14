@@ -148,7 +148,7 @@
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
 | devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S7_Archived（v1.0 ACCEPTED 15/15 AC ✅；v1.1 子 change 已归档 ✅；v2.0 子 change 已归档 ✅） |
-| devrix-d4-sa-refine | DM-20260614-018 | `openspec/changes/devrix-d4-sa-refine/` | S5_Accepted（v1.0 registry ACCEPTED ✅；v2.0-d 物理迁移 + Hub-Spoke 搬迁 ACCEPTED ✅ 5 commits；v2.0-e re-export 5/5 删除 ✅；E-e3 tagged test 待 D2/D3 API 修复；S7 物理归档待 v2.0-e 全部收尾） |
+| devrix-d4-sa-refine | DM-20260614-018 | `openspec/archive/2026-06-15-devrix-d4-sa-refine/` | S7_Archived（v1.0 registry ACCEPTED ✅；v2.0-d 物理迁移 + Hub-Spoke 搬迁 ACCEPTED ✅；v2.0-e re-export 6/6 删除 + delegate/ 清理 + E-e3 修复；8 commits；71 包全绿） |
 | devrix-d7-turn-orchestration | DM-20260614-020 | `openspec/changes/devrix-d7-turn-orchestration/` | S3_Design（R1 闭合；proposal/design/tasks 草稿；待 S3-Gate + v1.0 registry） |
 
 **2026-06-14 归档（S7 — D3 SA Refine v2.0）**：
@@ -179,6 +179,7 @@
 - `devrix-d7-sa-refine` → `openspec/archive/2026-06-14-devrix-d7-sa-refine/`（DM-20260614-008 S5_PASS; v1.0 registry 重构; Legacy 双轨 + Canonical S 层）
 - `devrix-multiagent-isolation` → `openspec/archive/2026-06-14-devrix-multiagent-isolation/`（DM-005 S5_PASS）
 - `devrix-event-channel` → `openspec/archive/2026-06-14-devrix-event-channel/`（DM-003 S5_PASS）
+- `devrix-d4-sa-refine` → `openspec/archive/2026-06-15-devrix-d4-sa-refine/`（DM-20260614-018 S7_ARCHIVED; v1.0 registry + v2.0-d 物理迁移 + v2.0-e cleanup; 8 commits; 71 包全绿）
 - `devrix-wave-scheduler` → `openspec/archive/2026-06-14-devrix-wave-scheduler/`（DM-007 S5_PASS v1.0）
 - `devrix-layer-isolation` → `openspec/archive/2026-06-14-devrix-layer-isolation/`（DM-002 S5_PASS v1.0；v1.1 留 `devrix-layer-isolation-v1.1`）
 
