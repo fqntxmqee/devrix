@@ -114,6 +114,100 @@ type ProcessMessageResult struct {
 | 承诺装置 | S2 T 锚点 = 入口行为可验证 |
 | 信息不对称缓解 | S4 进度广播 = D7→用户信息透明 |
 
+---
+
+## 2.2 Clawcode 编排设计参考
+
+参考 `clawcode/src/coordinator/coordinatorMode.ts` 与 `clawcode/src/utils/swarm/` 实现。
+
+### 2.2.1 Coordinator 角色定义
+
+```typescript
+// clawcode: coordinatorMode.ts
+You are a **coordinator**. Your job is to:
+- Help the user achieve their goal
+- Direct workers to research, implement and verify code changes
+- Synthesize results and communicate with the user
+- Answer questions directly when possible — don't delegate work that you can handle without tools
+```
+
+**关键洞察：Coordinator 不做执行，只协调。**
+
+| 角色 | 职责 | 类比 D7 |
+|------|------|---------|
+| Coordinator | 理解用户目标、分工、指导、合成结果 | D7-S2（入口）+ D7-S5（决策）|
+| Worker | 执行具体任务（research/implementation/verification） | D7-S3（调度）+ D7-S4（执行） |
+
+### 2.2.2 委托代理分离
+
+```typescript
+// Phase 分离（clawcode 的工作流）
+| Phase | Who | Purpose |
+|-------|-----|---------|
+| Research | Workers (并行) | 研究代码库、理解问题 |
+| Synthesis | Coordinator | 阅读发现、理解问题、制定规格 |
+| Implementation | Workers | 按规格实施变更 |
+| Verification | Workers | 测试变更是否有效 |
+```
+
+**关键洞察：Synthesis（综合）必须由 Coordinator 做，不能委托给 Worker。**
+
+### 2.2.3 承诺机制：Task 状态机
+
+```typescript
+// clawcode: Task.ts
+export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'killed'
+
+export function isTerminalTaskStatus(status: TaskStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'killed'
+}
+```
+
+**关键洞察：**
+- Task 有明确的生命周期状态
+- Terminal 状态不可逆
+- Coordinator 可以继续（SendMessage）或停止（TaskStop）Worker
+
+### 2.2.4 信息不对称缓解
+
+```typescript
+// clawcode: Coordinator 不能说 "based on your findings"
+"Workers can't see your conversation. Every prompt must be self-contained with everything the worker needs."
+```
+
+**关键洞察：**
+- Coordinator 必须自己综合理解 Worker 的发现
+- 不能把"理解"委托出去
+- Worker prompts 必须自包含（self-contained）
+
+### 2.2.5 并行化激励
+
+```typescript
+// clawcode: Phase 并行化
+"Parallelism is your superpower. Workers are async.
+Launch independent workers concurrently whenever possible."
+
+| Situation | 机制 | Why |
+|-----------|------|-----|
+| Read-only tasks (research) | 并行 | 独立 |
+| Write-heavy tasks (implementation) | 串行 | 避免冲突 |
+| Verification | 可并行 | 不同文件区域 |
+```
+
+**关键洞察：不同阶段有不同并行策略。**
+
+### 2.2.6 对 D7 重构的启示
+
+| Clawcode 设计 | D7 对应 | 改进方向 |
+|--------------|---------|---------|
+| Coordinator synthesis 必须自己做 | D7-S5 ClassifyIntent 结果应由 D7 综合 | 不能把决策委托给外部 Judge |
+| Task 状态机 + 通知 | D7-S4 FlowEvent 广播 | 已实现，需要加强 |
+| Phase 分离 | D7-S2/S3/S4/S5 分离 | 切法 A 已对齐 |
+| 并行 research，串行 write | D7-S3 ConflictGuard | 已实现 |
+| SendMessage 继续 Worker | D7 HandleInterrupt | 已实现 |
+
+**参考总结：** Clawcode 的 Coordinator 模式验证了 D7 切法 A 的方向——Coordinator（入口+决策）与 Worker（执行）分离是经过验证的设计。|
+
 **切法 A 的博弈价值：**
 - S2 有 T 锚点 → 入口承诺可验证
 - S5 决策独立 → 分类错误可追溯
