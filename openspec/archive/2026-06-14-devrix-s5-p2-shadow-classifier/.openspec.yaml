@@ -1,0 +1,15 @@
+change_id: devrix-s5-p2-shadow-classifier
+priority: P1
+demand_id: DM-20260614-004
+status: s7_archived
+domains: [D7, D3]
+dsaft_scenarios:
+  - D7-S5  # Decision & Planning
+dsaft_activities:
+  - D7-S5-A05  # LLMClassifyShadow
+review:
+  r1_date: 2026-06-14
+  r1_docs: [demand.md, proposal.md, design.md, tasks.md]
+  open_questions: []
+t_point_targets:
+  - D7-S5-T07  # Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric）
