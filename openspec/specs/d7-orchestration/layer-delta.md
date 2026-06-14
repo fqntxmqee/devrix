@@ -18,6 +18,17 @@ D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue
 - Task 写模型迁入 `orchestration/coordinator/`
 - SynthesizeTaskGraph + CreateWorkPlan
 
+### S 层博弈角色（切法 A — 按用户价值流）
+
+> **基于 `devrix-d7-sa-refine` (DM-20260614-008)**
+
+| S 层 | 博弈角色 | North Star |
+|------|---------|------------|
+| D7-S2 | **Screening Mechanism** | 用户消息统一入口，决定走快速路径还是编排路径 |
+| D7-S3 | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 |
+| D7-S4 | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 |
+| D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
+
 ---
 
 ## IMPLEMENTED (现行代码)

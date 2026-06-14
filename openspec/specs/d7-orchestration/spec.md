@@ -22,6 +22,17 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 
 **现行实现路径（2026-06-14）：** Session Orchestrator（D7-S2）+ ClassifyIntent/Shadow（D7-S5 A01/A05）位于 `internal/layers/orchestration/coordinator/`（package `coordinator`）；Wave/Flow/IMSink/WorkPlan（D7-S3/S4）位于 `internal/layers/orchestration/{wave,flow,workplan,imsink}/`；Task/Plan 写模型与 PlanMode（D7-S1/S5 A04）托管于 `internal/layers/contextengine/tasks/`（v1.1 迁入 coordinator）。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（经 `d7_enabled` 路由开关）。
 
+### S 层博弈角色定义（切法 A — 按用户价值流）
+
+> **基于 `devrix-d7-sa-refine` (DM-20260614-008)**
+
+| S 层 | 博弈角色 | North Star |
+|------|---------|------------|
+| D7-S2 | **Screening Mechanism** | 用户消息统一入口，决定走快速路径还是编排路径 |
+| D7-S3 | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 |
+| D7-S4 | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 |
+| D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
+
 | 版本里程碑 | 能力 |
 |-----------|------|
 | ORCH v1.0 (2026-06-10) | Hub-Spoke 读模型：WorkPlan + ExecutionFlowHub |

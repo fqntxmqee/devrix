@@ -16,6 +16,19 @@
 > 当前实现仍部分位于 legacy 技术目录，见 §6 迁移表。
 > **博弈定位：** D1 = **Trusted Intermediary** — 可信送达 + 客观锚点；质量评级与信誉见 D5/D6（DM-20260614-007）。
 
+### 信号分层博弈论（切法 A）
+
+> **基于 `devrix-d1-sa-refine` (DM-20260614-006)**
+
+| 概念 | 定义 | D1 对应 |
+|------|------|---------|
+| **Separating Equilibrium** | 不同类型发送者选择不同信号，使接收者能推断类型 | D1-S13 ClassifyIntent |
+| **Costly Signal** | 信号发送者承担真实成本，不可伪造 | D1-S14 Thinking、D1-S16 Conclusion |
+| **Commitment Device** | 发送者通过信号约束自身未来行为 | D1-S15 Task Progress、D1-S16 Error |
+| **Screening Mechanism** | 接收者设计契约让发送者自我选择 | D1-S12 Permission YOLO |
+
+**禁止约束：** 禁止伪造进度信号（anti-fabrication commitment device）。
+
 ## Scenarios — Canonical（价值流）
 
 | ID | Scenario | 用户目标 | Status |

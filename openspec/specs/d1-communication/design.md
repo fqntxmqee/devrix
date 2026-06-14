@@ -27,6 +27,37 @@
 
 ## ① 架构目标
 
+### 信号分层博弈论语义（切法 A — 按用户价值流）
+
+> **基于 `devrix-d1-sa-refine` (DM-20260614-006)**
+> D1 信号系统是一个**博弈系统**，用户通过消息发送信号，D1 通过信号分类引导后续行为。
+
+#### 核心博弈概念
+
+| 概念 | 定义 | D1 对应 |
+|------|------|---------|
+| **Separating Equilibrium**（分离均衡） | 不同类型的发送者选择不同信号，使接收者能推断类型 | D1-S2/D7-S5 ClassifyIntent 按规则分类 |
+| **Costly Signal**（成本信号） | 信号发送者承担真实成本，不可伪造 | D1-S13 `thinking` / `task_work_proof` |
+| **Commitment Device**（承诺机制） | 发送者通过信号约束自身未来行为 | D1-S14 `complete` / D1-S16 `error` |
+| **Screening Mechanism**（筛选机制） | 接收者设计契约让发送者自我选择 | D1-S12 Permission YOLO 模式 |
+
+#### 信号分类与博弈角色
+
+| 信号类型 | D1 S 层 | 博弈含义 | 可验证性 |
+|---------|---------|---------|---------|
+| **Critical 必达信号** | D1-S9 | Commitment Device：必须送达，不可丢失 | ✅ 独立通道保证 |
+| **Thinking 信号** | D1-S13 | Costly Signal：LLM 推理过程，用户可感知成本 | ✅ 有代价 |
+| **Task 进度信号** | D1-S14 | Separating Equilibrium：任务完成状态可验证 | ✅ 原子性 |
+| **Conclusion 信号** | D1-S15 | Costly Signal：最终结论，用户决策依据 | ✅ 不可伪造 |
+
+#### 博弈约束
+
+- **禁止伪造进度**：Worker 不得在 terminal FlowEvent 前发送 synthetic task progress
+- **信号原子性**：complete/error 是原子状态，不可分割
+- **Critical 独立通道**：必须与常规事件通道分离，保证必达
+
+---
+
 ### 1.1 业务目标
 
 | 痛点 | 目标能力 | 用户可感知结果 |

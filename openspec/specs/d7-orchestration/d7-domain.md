@@ -21,6 +21,19 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 
 **域职责**：回答"做什么、按什么顺序做、谁来做、做得怎么样了"。
 
+### S 层博弈角色定义（切法 A — 按用户价值流）
+
+> **基于 `devrix-d7-sa-refine` (DM-20260614-008)**
+
+| S 层 | 博弈角色 | North Star |
+|------|---------|------------|
+| D7-S2 | **Screening Mechanism** | 用户消息统一入口，决定走快速路径还是编排路径 |
+| D7-S3 | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 |
+| D7-S4 | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 |
+| D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
+
+**注：** D7-S5 决策的是**结构路径**（goal → TaskNode DAG），不是**内容质量**。Explore Workers 的 FlowEvent 通过 D7-S4 广播后被 D7-S5 吸收。
+
 ### 实现状态（2026-06-15 代码审计）
 
 | Scenario | 状态 | 现行代码位置 |
