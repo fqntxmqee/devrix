@@ -1,4 +1,4 @@
-package d7
+package coordinator
 
 // Config is the runtime configuration for the D7 orchestration domain.
 //

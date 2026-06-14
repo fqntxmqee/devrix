@@ -1,4 +1,4 @@
-package d7
+package coordinator
 
 import (
 	"context"

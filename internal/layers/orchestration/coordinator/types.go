@@ -14,7 +14,7 @@
 // disabled, D1 Gateway routes directly to D2.ContextEngine.Process (legacy).
 // When enabled, D1 routes to D7.SessionOrchestrator.ProcessMessage, which
 // dispatches to FastPath (D2) or OrchestratePath (Plan / Wave).
-package d7
+package coordinator
 
 import (
 	"time"
