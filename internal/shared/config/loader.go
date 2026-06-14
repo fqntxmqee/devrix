@@ -31,7 +31,7 @@ type ConfigFile struct {
 	MultiAgent    MultiAgentFileConfig    `yaml:"multi_agent"`
 	AgentTools    AgentToolsFileConfig    `yaml:"agent_tools"`
 	Orchestration OrchestrationFileConfig `yaml:"orchestration"`
-	D7            D7FileConfig            `yaml:"d7"`
+	Coordinator   CoordinatorFileConfig   `yaml:"d7"`
 }
 
 // AppConfig 应用配置
@@ -105,17 +105,21 @@ type OrchestrationFileConfig struct {
 	AutoIntervene            bool     `yaml:"auto_intervene"`
 }
 
-// D7FileConfig is the YAML deserialization target for the D7 orchestration
-// domain. See internal/layers/orchestration/coordinator/config.go for the
-// runtime Config.
-type D7FileConfig struct {
-	Enabled               *bool    `yaml:"enabled"`
-	FastPathThreshold     *int     `yaml:"fast_path_threshold"`
-	CommandFirst          *bool    `yaml:"command_first"`
-	LLMFallback           *bool    `yaml:"llm_fallback"`
-	D6ValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
-	PlanModeApproveGate   *bool    `yaml:"plan_mode_approve_gate"`
-	CommandWhitelist      []string `yaml:"command_whitelist"`
+// CoordinatorFileConfig is the YAML deserialization target for the
+// SessionCoordinator (D7 orchestration domain). See
+// internal/layers/orchestration/coordinator/config.go for the runtime
+// Config.
+//
+// The yaml tag remains `d7` for backward compatibility with existing
+// config files; v1.1 may rename it to `coordinator`.
+type CoordinatorFileConfig struct {
+	Enabled                     *bool    `yaml:"enabled"`
+	FastPathThreshold           *int     `yaml:"fast_path_threshold"`
+	CommandFirst                *bool    `yaml:"command_first"`
+	LLMFallback                 *bool    `yaml:"llm_fallback"`
+	AdvisoryValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
+	PlanModeApproveGate         *bool    `yaml:"plan_mode_approve_gate"`
+	CommandWhitelist            []string `yaml:"command_whitelist"`
 }
 
 // LoadConfigFile loads configuration from a YAML file

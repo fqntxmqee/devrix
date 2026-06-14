@@ -80,8 +80,8 @@ D5 可观测性域 A 层活动注册表。每个 Activity 为调用方可发起�
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| D5-S9-A01 | RecordRuntimePath | A-BE | path_kind | — | path_counter.inc | `runtime/path_resolver.go` (Record), `runtime/d5_metric.go` (IncD5) |
-| D5-S9-A02 | RegisterRuntimeMetric | A-BE | meter | error | metric.registered | `runtime/d5_metric.go` (RegisterD5) |
+| D5-S9-A01 | RecordRuntimePath | A-BE | path_kind | — | path_counter.inc | `runtime/path_resolver.go` (Record), `runtime/runtime_metric.go` (IncRuntimeMetric) |
+| D5-S9-A02 | RegisterRuntimeMetric | A-BE | meter | error | metric.registered | `runtime/runtime_metric.go` (RegisterRuntimeMetric) |
 
 ## Root Facade (跨场景)
 

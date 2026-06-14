@@ -139,7 +139,7 @@ func TestSessionOrchestrator_FastPath_EndToEnd_Latency(t *testing.T) {
 	}
 }
 
-// fakeSink is a D1EventSink for testing. It records all published events.
+// fakeSink is a EventPublisher for testing. It records all published events.
 type fakeSink struct {
 	mu     sync.Mutex
 	events []*contracts.EngineEvent
@@ -172,7 +172,7 @@ func TestSessionOrchestrator_FastPath_SinkMirror(t *testing.T) {
 	}
 }
 
-// T: D7-S2-T03 — D2Executor returns an error; orchestrator propagates.
+// T: D7-S2-T03 — QueryLoopExecutor returns an error; orchestrator propagates.
 func TestSessionOrchestrator_FastPath_D2Error(t *testing.T) {
 	exec := &errD2{}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec)
@@ -207,7 +207,7 @@ func TestInterruptHandler_Handle_SequenceAndEvent(t *testing.T) {
 		mu.Unlock()
 		return nil
 	}
-	d4Cancel := func(_ string) error {
+	DelegateCanceler := func(_ string) error {
 		mu.Lock()
 		d4Order = append(d4Order, "d4")
 		mu.Unlock()
@@ -221,10 +221,10 @@ func TestInterruptHandler_Handle_SequenceAndEvent(t *testing.T) {
 	}
 
 	h := NewInterruptHandler(orch, InterruptOptions{
-		WaveCanceler:    waveCancel,
-		D4Canceler:      d4Cancel,
-		ProcessCanceler: procCancel,
-		Sink:            sink,
+		WaveCanceler:     waveCancel,
+		DelegateCanceler: DelegateCanceler,
+		ProcessCanceler:  procCancel,
+		Sink:             sink,
 	})
 	if err := h.Handle(context.Background(), "sess-int"); err != nil {
 		t.Fatalf("Handle returned err: %v", err)

@@ -72,7 +72,7 @@ QueryLoop 主路径 MUST 注册并创建以下 canonical Operation span：
 
 #### Scenario: Path counter increments on Process
 
-- GIVEN observability metrics enabled and RegisterD5 called
+- GIVEN observability metrics enabled and RegisterRuntimeMetric called
 - WHEN ContextEngine routes to QueryLoop path
 - THEN `devrix_runtime_path_resolved_total{path="query_loop"}` increments by 1
 

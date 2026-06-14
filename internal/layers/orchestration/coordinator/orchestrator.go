@@ -19,14 +19,14 @@ import (
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
-	cfg        *Config
-	classifier IntentClassifier
-	executor   D2Executor
-	fastPath   *FastPath
-	workModel  WorkModel
-	validator  D6Validator
-	sink       D1EventSink
-	d6Metrics  *D6ValidationMetrics
+	cfg              *Config
+	classifier       IntentClassifier
+	executor         QueryLoopExecutor
+	fastPath         *FastPath
+	workModel        WorkModel
+	validator        AdvisoryValidator
+	sink             EventPublisher
+	validationMetric *ValidationMetrics
 	// shadowClassifier wraps classifier (when wired) with an async LLM
 	// shadow on the IntentOrchestrate tail. nil → behavior unchanged.
 	shadowClassifier *ShadowClassifier
@@ -44,13 +44,13 @@ type SessionOrchestrator struct {
 // OrchestratorOption is the functional-options constructor pattern.
 type OrchestratorOption func(*SessionOrchestrator)
 
-// WithSink wires a D1 event sink.
-func WithSink(s D1EventSink) OrchestratorOption {
+// WithSink wires a communication event publisher.
+func WithSink(s EventPublisher) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.sink = s }
 }
 
-// WithValidator wires the optional D6 advisory validator.
-func WithValidator(v D6Validator) OrchestratorOption {
+// WithValidator wires the optional advisory validator.
+func WithValidator(v AdvisoryValidator) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.validator = v }
 }
 
@@ -60,11 +60,11 @@ func WithWorkModel(w WorkModel) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.workModel = w }
 }
 
-// WithMetrics wires the D6 validation metrics sink. The metrics record
+// WithMetrics wires the validation metrics sink. The metrics record
 // the 4 outcomes (pass / fail / timeout / error) and a sliding-window
 // timeout_rate; nil metric is treated as no-op.
-func WithMetrics(m *D6ValidationMetrics) OrchestratorOption {
-	return func(o *SessionOrchestrator) { o.d6Metrics = m }
+func WithMetrics(m *ValidationMetrics) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.validationMetric = m }
 }
 
 // WithShadowClassifier wires the optional LLM classify shadow. The
@@ -76,15 +76,16 @@ func WithShadowClassifier(s *ShadowClassifier) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.shadowClassifier = s }
 }
 
-// NewSessionOrchestrator builds the orchestrator with the given D2 executor
-// and options. The classifier is built from cfg via NewRuleClassifier.
+// NewSessionOrchestrator builds the orchestrator with the given
+// query-loop executor and options. The classifier is built from cfg via
+// NewRuleClassifier.
 //
 // Options are applied in order. WithSink and WithValidator must be passed
 // before the orchestrator constructs the FastPath (i.e. via the returned
 // instance), so the FastPath is built lazily on first ProcessMessage.
 // This avoids the bug where WithSink would have been ignored because the
 // FastPath was constructed before the option was applied.
-func NewSessionOrchestrator(cfg *Config, executor D2Executor, opts ...OrchestratorOption) *SessionOrchestrator {
+func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...OrchestratorOption) *SessionOrchestrator {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
@@ -123,12 +124,12 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 		intent, err = o.classifier.Classify(ctx, req.Message)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("d7: classify: %w", err)
+		return nil, fmt.Errorf("orchestrator: classify: %w", err)
 	}
-	// Advisory D6 validation; outcome is observed (per R2 §5 P1 #6) but
+	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but
 	// does not block the request — pass/fail is informational, timeout
 	// and panic are surfaced via the 4-counter + alert hook.
-	o.callD6Validator(ctx, intent, req.SessionID)
+	o.callAdvisoryValidator(ctx, intent, req.SessionID)
 	switch intent.Kind {
 	case IntentSkip:
 		ch := make(chan *contracts.EngineEvent)
@@ -141,12 +142,12 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 	case IntentOrchestrate:
 		return o.orchestrate(ctx, req, intent)
 	default:
-		return nil, fmt.Errorf("d7: unknown intent kind %q", intent.Kind)
+		return nil, fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
 	}
 }
 
-// callD6Validator invokes the optional D6 advisory validator, times the
-// call, and dispatches the outcome to the D6 metrics sink.
+// callAdvisoryValidator invokes the optional advisory validator, times
+// the call, and dispatches the outcome to the validation metrics sink.
 //
 // Outcomes:
 //   - elapsed > 2*timeout → error counter (gross fault)
@@ -155,13 +156,13 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 //   - else                → fail counter
 //
 // A panic inside the validator is recovered and recorded as error.
-// If validator or d6Metrics is nil, the call is a no-op (backward
-// compatible with the v1.0 pre-metric orchestrator).
-func (o *SessionOrchestrator) callD6Validator(ctx context.Context, intent IntentClassification, sessionID string) {
+// If validator or validationMetric is nil, the call is a no-op
+// (backward compatible with the v1.0 pre-metric orchestrator).
+func (o *SessionOrchestrator) callAdvisoryValidator(ctx context.Context, intent IntentClassification, sessionID string) {
 	if o.validator == nil {
 		return
 	}
-	timeoutMs := o.cfg.D6ValidationTimeoutMs
+	timeoutMs := o.cfg.AdvisoryValidationTimeoutMs
 	if timeoutMs <= 0 {
 		timeoutMs = 50
 	}
@@ -176,8 +177,8 @@ func (o *SessionOrchestrator) callD6Validator(ctx context.Context, intent Intent
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				if o.d6Metrics != nil {
-					o.d6Metrics.RecordError(start.Add(time.Since(start)))
+				if o.validationMetric != nil {
+					o.validationMetric.RecordError(start.Add(time.Since(start)))
 				}
 			}
 		}()
@@ -188,18 +189,18 @@ func (o *SessionOrchestrator) callD6Validator(ctx context.Context, intent Intent
 	}()
 	elapsed := time.Since(start)
 
-	if o.d6Metrics == nil {
+	if o.validationMetric == nil {
 		return
 	}
 	switch {
 	case elapsed > 2*timeout:
-		o.d6Metrics.RecordError(start.Add(elapsed))
+		o.validationMetric.RecordError(start.Add(elapsed))
 	case elapsed > timeout:
-		o.d6Metrics.RecordTimeout(start.Add(elapsed))
+		o.validationMetric.RecordTimeout(start.Add(elapsed))
 	case result.Pass:
-		o.d6Metrics.RecordPass(start.Add(elapsed))
+		o.validationMetric.RecordPass(start.Add(elapsed))
 	default:
-		o.d6Metrics.RecordFail(start.Add(elapsed))
+		o.validationMetric.RecordFail(start.Add(elapsed))
 	}
 }
 

@@ -45,13 +45,13 @@ type CommunicationGateway struct {
 	config        *config.CommunicationConfig
 	obsBridge     *observability.Bridge
 
-	// d7Entry is the optional D7 orchestration entry. When non-nil and
-	// d7Enabled is true, RouteInbound routes to d7Entry.ProcessMessage
+	// orchestrationEntry is the optional D7 orchestration entry. When non-nil and
+	// orchestrationEnabled is true, RouteInbound routes to orchestrationEntry.ProcessMessage
 	// instead of contextEngine.Process. Per R2 命题 A: D1 owns ingress
 	// owner (route-or-not decision via feature flag); D7 owns routing
 	// decision owner (FastPath vs OrchestratePath).
-	d7Entry   contracts.IOrchestrationEntry
-	d7Enabled bool
+	orchestrationEntry   contracts.IOrchestrationEntry
+	orchestrationEnabled bool
 
 	mu                   sync.RWMutex
 	sessions             map[string]*types.Session
@@ -94,18 +94,18 @@ func NewCommunicationGateway(
 	return gw
 }
 
-// SetD7Entry wires the optional D7 orchestration entry. When d7Enabled is
+// SetOrchestrationEntry wires the optional D7 orchestration entry. When orchestrationEnabled is
 // true, RouteInbound calls entry.ProcessMessage instead of
 // contextEngine.Process. Per R2 命题 A: D1 has ingress owner (whether to
 // route to D7); D7 has routing decision owner (FastPath vs OrchestratePath).
 //
 // This setter exists so existing call sites (e.g. bootstrap) that pass a
 // fixed argument list to NewCommunicationGateway do not need to be
-// modified. Callers that want D7 must call SetD7Entry before the gateway
+// modified. Callers that want D7 must call SetOrchestrationEntry before the gateway
 // starts processing inbound messages.
-func (g *CommunicationGateway) SetD7Entry(entry contracts.IOrchestrationEntry, enabled bool) {
-	g.d7Entry = entry
-	g.d7Enabled = enabled
+func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrationEntry, enabled bool) {
+	g.orchestrationEntry = entry
+	g.orchestrationEnabled = enabled
 	if !enabled {
 		slog.Info("gateway: D7 disabled, legacy D1→D2.Process path active")
 		return
@@ -120,7 +120,7 @@ func (g *CommunicationGateway) StopProcess(sessionID string) error {
 
 // Stop implements commands.Stopper — cancels the active context engine Process.
 //
-// When D7 is enabled, Stop also calls d7Entry.Cancel which runs the
+// When D7 is enabled, Stop also calls orchestrationEntry.Cancel which runs the
 // full Wave→D4→Process sequence plus the stopped event (per R2 命题 E).
 func (g *CommunicationGateway) Stop(sessionID string) error {
 	g.mu.Lock()
@@ -131,11 +131,11 @@ func (g *CommunicationGateway) Stop(sessionID string) error {
 	}
 	g.stoppedSessions.Store(sessionID, struct{}{})
 	// D7 cancel is best-effort. The interrupt handler is idempotent.
-	if g.d7Enabled && g.d7Entry != nil {
+	if g.orchestrationEnabled && g.orchestrationEntry != nil {
 		// Use a fresh context with a short timeout to avoid blocking Stop.
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		if err := g.d7Entry.Cancel(ctx, sessionID); err != nil {
+		if err := g.orchestrationEntry.Cancel(ctx, sessionID); err != nil {
 			slog.Warn("gateway: d7 Cancel failed", "sessionID", sessionID, "err", err)
 		}
 	}
@@ -314,7 +314,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
 	}
 
-	if g.contextEngine == nil && (g.d7Entry == nil || !g.d7Enabled) {
+	if g.contextEngine == nil && (g.orchestrationEntry == nil || !g.orchestrationEnabled) {
 		return fmt.Errorf("context engine not configured")
 	}
 
@@ -322,11 +322,11 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	g.registerProcess(session.SessionID, cancel)
 
 	var eventChan <-chan *EngineEvent
-	if g.d7Enabled && g.d7Entry != nil {
+	if g.orchestrationEnabled && g.orchestrationEntry != nil {
 		// D7 path: D1 ingress routes to D7 orchestrator, which fans out
 		// to D2 RunQueryLoop (FastPath) or Wave/Plan (OrchestratePath).
 		// See d7-domain.md §D7-D1 Contract.
-		ch, err := g.d7Entry.ProcessMessage(processCtx, session.SessionID, msg.Content)
+		ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
 		if err != nil {
 			cancel()
 			g.unregisterProcess(session.SessionID)

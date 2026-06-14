@@ -12,8 +12,8 @@ import (
 
 // T: D7-Migration-4-combination matrix (per d7-domain.md §D7-D1 Coexistence
 // Contract). The matrix is d7_enabled × plan_mode_active. We assert that:
-//   - d7=false routes do NOT call d7Entry.ProcessMessage (legacy path).
-//   - d7=true routes DO call d7Entry.ProcessMessage (new path).
+//   - d7=false routes do NOT call orchestrationEntry.ProcessMessage (legacy path).
+//   - d7=true routes DO call orchestrationEntry.ProcessMessage (new path).
 //   - Cancel always works regardless of plan_mode (StopProcess is a
 //     gate-level concern; it shouldn't depend on whether the user is in
 //     a plan).
@@ -24,7 +24,7 @@ import (
 // matrixEntry is a PlanMode-aware fake that records the system-prompt
 // hint so we can assert whether the plan path was engaged.
 type matrixEntry struct {
-	calls int32
+	calls            int32
 	lastSystemPrompt string
 	planModeHint     string
 }
@@ -49,33 +49,33 @@ func (m *matrixEntry) Cancel(_ context.Context, _ string) error {
 }
 
 // T: Combination 1 — d7=false, plan_mode=false. Legacy D1→D2 path.
-// Expects d7Entry NOT invoked. We don't have a real contextEngine, so we
+// Expects orchestrationEntry NOT invoked. We don't have a real contextEngine, so we
 // expect an error from the legacy nil-engine path. The d7 entry counter
 // must remain 0.
 func TestMatrix_D7False_PlanModeFalse_Legacy(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &matrixEntry{}
-	gw.SetD7Entry(entry, false) // d7 disabled
-	_ = entry.planModeHint     // plan_mode is OFF — legacy
+	gw.SetOrchestrationEntry(entry, false) // d7 disabled
+	_ = entry.planModeHint                 // plan_mode is OFF — legacy
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-m1", ChatID: "c1", MessageID: "m1",
 		Content: "hello", UserID: "u1",
 	}
 	_ = gw.RouteInbound(context.Background(), msg)
-	// Wait briefly to ensure no async goroutine invokes d7Entry.
+	// Wait briefly to ensure no async goroutine invokes orchestrationEntry.
 	time.Sleep(50 * time.Millisecond)
 	if got := atomic.LoadInt32(&entry.calls); got != 0 {
-		t.Fatalf("d7 disabled must not call d7Entry; got %d calls", got)
+		t.Fatalf("d7 disabled must not call orchestrationEntry; got %d calls", got)
 	}
 }
 
 // T: Combination 2 — d7=false, plan_mode=true. Legacy path; plan_mode
-// is handled by D2 internally. d7Entry must still not be invoked.
+// is handled by D2 internally. orchestrationEntry must still not be invoked.
 func TestMatrix_D7False_PlanModeTrue_Legacy(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &matrixEntry{planModeHint: "[plan_mode]"}
-	gw.SetD7Entry(entry, false) // d7 disabled
+	gw.SetOrchestrationEntry(entry, false) // d7 disabled
 	// plan_mode is a runtime concern of D2 (legacy path), not the
 	// gateway. Gateway should not be affected.
 
@@ -86,15 +86,15 @@ func TestMatrix_D7False_PlanModeTrue_Legacy(t *testing.T) {
 	_ = gw.RouteInbound(context.Background(), msg)
 	time.Sleep(50 * time.Millisecond)
 	if got := atomic.LoadInt32(&entry.calls); got != 0 {
-		t.Fatalf("d7 disabled + plan_mode must not call d7Entry; got %d", got)
+		t.Fatalf("d7 disabled + plan_mode must not call orchestrationEntry; got %d", got)
 	}
 }
 
-// T: Combination 3 — d7=true, plan_mode=false. d7Entry is invoked.
+// T: Combination 3 — d7=true, plan_mode=false. orchestrationEntry is invoked.
 func TestMatrix_D7True_PlanModeFalse_D7Path(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &matrixEntry{}
-	gw.SetD7Entry(entry, true) // d7 enabled
+	gw.SetOrchestrationEntry(entry, true) // d7 enabled
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-m3", ChatID: "c3", MessageID: "m3",
@@ -112,18 +112,18 @@ func TestMatrix_D7True_PlanModeFalse_D7Path(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if got := atomic.LoadInt32(&entry.calls); got != 1 {
-		t.Fatalf("d7 enabled must call d7Entry once; got %d", got)
+		t.Fatalf("d7 enabled must call orchestrationEntry once; got %d", got)
 	}
 }
 
-// T: Combination 4 — d7=true, plan_mode=true. d7Entry is invoked. The
+// T: Combination 4 — d7=true, plan_mode=true. orchestrationEntry is invoked. The
 // plan_mode awareness lives inside the orchestrator (system-prompt
-// hint), not at the gateway. Gateway contract: d7Entry.ProcessMessage
+// hint), not at the gateway. Gateway contract: orchestrationEntry.ProcessMessage
 // gets the raw message; orchestrator decides intent.
 func TestMatrix_D7True_PlanModeTrue_D7Path(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &matrixEntry{planModeHint: "[plan_mode]"}
-	gw.SetD7Entry(entry, true) // d7 enabled
+	gw.SetOrchestrationEntry(entry, true) // d7 enabled
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-m4", ChatID: "c4", MessageID: "m4",
@@ -140,7 +140,7 @@ func TestMatrix_D7True_PlanModeTrue_D7Path(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if got := atomic.LoadInt32(&entry.calls); got != 1 {
-		t.Fatalf("d7 enabled + plan_mode must call d7Entry; got %d", got)
+		t.Fatalf("d7 enabled + plan_mode must call orchestrationEntry; got %d", got)
 	}
 }
 
@@ -149,12 +149,12 @@ func TestMatrix_D7True_PlanModeTrue_D7Path(t *testing.T) {
 func TestMatrix_StopProcess_D7True(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &matrixEntry{}
-	gw.SetD7Entry(entry, true)
+	gw.SetOrchestrationEntry(entry, true)
 	var cancels int32
 	// We need a stub entry that records cancels.
 	rec := &cancelRecorder{calls: &cancels}
 	// Replace the entry with a cancel-recording one.
-	gw.SetD7Entry(rec, true)
+	gw.SetOrchestrationEntry(rec, true)
 	if err := gw.StopProcess("sess-stop-mat"); err != nil {
 		t.Fatalf("StopProcess err: %v", err)
 	}
