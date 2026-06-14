@@ -391,8 +391,8 @@ Agent 可观测性计数器与 D5 集成。
 
 #### Scenario: D5 sink integration
 - GIVEN D5 observability.Bridge 已初始化
-- WHEN `observability.SetD5Sink(sink)` 被调用
-- THEN 指标可通过 D5Sink 导出到外部可观测性系统
+- WHEN `observability.SetObservabilitySink(sink)` 被调用
+- THEN 指标可通过 ObservabilitySink 导出到外部可观测性系统
 
 ---
 
@@ -442,7 +442,7 @@ Agent 生命周期事件通过 Observer 桥接到外部系统。
 | Builtin Agents | — | Explore / Plan / Implement SubQuery |
 | Worker Engine | — | NewWorkerEngine + ProcessOverlay sidechain |
 | SessionView COW | — | Fork / SetMetadata / SetSnapshot / MergeToParent |
-| Observability | — | IncForkSessionView + D5Sink |
+| Observability | — | IncForkSessionView + ObservabilitySink |
 | 跨域依赖 | D1, D2, D5 | +D7 (ExecutionFlowHub) |
 
 ## Revision History

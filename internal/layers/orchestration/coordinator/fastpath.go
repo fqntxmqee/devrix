@@ -18,13 +18,13 @@ import (
 // v1.0 metrics: orchestration.fast_path.count (counter).
 type FastPath struct {
 	cfg      *Config
-	executor D2Executor
-	sink     D1EventSink
+	executor QueryLoopExecutor
+	sink     EventPublisher
 }
 
 // NewFastPath builds the proxy. executor is required; sink is optional
 // (nil sink → events flow only to the returned channel).
-func NewFastPath(cfg *Config, executor D2Executor, sink D1EventSink) *FastPath {
+func NewFastPath(cfg *Config, executor QueryLoopExecutor, sink EventPublisher) *FastPath {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
@@ -32,7 +32,7 @@ func NewFastPath(cfg *Config, executor D2Executor, sink D1EventSink) *FastPath {
 }
 
 // Run executes the fast path: build a minimal QueryRequest, invoke D2, and
-// return the streaming channel. The D1EventSink, if present, receives a
+// return the streaming channel. The EventPublisher, if present, receives a
 // mirrored copy of every event.
 //
 // Run does NOT call ClassifyIntent — the orchestrator does that. The
@@ -40,7 +40,7 @@ func NewFastPath(cfg *Config, executor D2Executor, sink D1EventSink) *FastPath {
 // the decision.
 func (fp *FastPath) Run(ctx context.Context, req ProcessRequest, systemPrompt string) (<-chan *contracts.EngineEvent, error) {
 	if fp.executor == nil {
-		return nil, fmt.Errorf("d7: FastPath requires a D2Executor")
+		return nil, fmt.Errorf("orchestrator: FastPath requires a QueryLoopExecutor")
 	}
 	qreq := QueryRequest{
 		SessionID:    req.SessionID,
@@ -50,7 +50,7 @@ func (fp *FastPath) Run(ctx context.Context, req ProcessRequest, systemPrompt st
 	}
 	out, err := fp.executor.RunQueryLoop(ctx, qreq)
 	if err != nil {
-		return nil, fmt.Errorf("d7: FastPath.RunQueryLoop: %w", err)
+		return nil, fmt.Errorf("orchestrator: FastPath.RunQueryLoop: %w", err)
 	}
 	if fp.sink == nil {
 		return out, nil

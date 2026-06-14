@@ -107,7 +107,7 @@ D4 多智能体域 F 层功能点注册表。
 | F ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
 | D4-S8-A01-F01 | IncForkSessionView | F-BE | policy_label | — | `observability/metrics.go` (IncForkSessionView) |
-| D4-S8-A01-F02 | SetD5Sink | F-BE | sink | — | `observability/metrics.go` (SetD5Sink) |
+| D4-S8-A01-F02 | SetObservabilitySink | F-BE | sink | — | `observability/metrics.go` (SetObservabilitySink) |
 
 ## D4-S9-A01 ManageSessionView
 

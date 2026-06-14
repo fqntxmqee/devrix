@@ -20,9 +20,9 @@ func newTestMeter(t *testing.T) *metrics.Meter {
 }
 
 // T: D7-D6-T03 — 4 counter 注入并按 result.Pass 分流。
-func TestD6ValidationMetrics_Record_PassFail(t *testing.T) {
+func TestValidationMetrics_Record_PassFail(t *testing.T) {
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	if m == nil {
 		t.Fatalf("metrics should not be nil")
 	}
@@ -49,15 +49,15 @@ func TestD6ValidationMetrics_Record_PassFail(t *testing.T) {
 }
 
 // T: D7-D6-T03 — nil meter returns nil metrics.
-func TestD6ValidationMetrics_NilMeter(t *testing.T) {
-	if m := NewD6ValidationMetrics(MetricsConfig{}); m != nil {
+func TestValidationMetrics_NilMeter(t *testing.T) {
+	if m := NewValidationMetrics(MetricsConfig{}); m != nil {
 		t.Fatalf("nil meter should yield nil metrics")
 	}
 }
 
 // T: D7-D6-T03 — nil receiver is no-op (defensive).
-func TestD6ValidationMetrics_NilReceiver(t *testing.T) {
-	var m *D6ValidationMetrics
+func TestValidationMetrics_NilReceiver(t *testing.T) {
+	var m *ValidationMetrics
 	now := time.Now()
 	m.RecordPass(now)
 	m.RecordFail(now)
@@ -70,7 +70,7 @@ func TestD6ValidationMetrics_NilReceiver(t *testing.T) {
 
 // T: D7-D6-T04 — timeout_rate > 5% 触发 AlertHook。
 // 使用 25 个样本中 2 个 timeout，rate = 8% > 5% 阈值。
-func TestD6ValidationMetrics_TimeoutRate_Alert(t *testing.T) {
+func TestValidationMetrics_TimeoutRate_Alert(t *testing.T) {
 	mtr := newTestMeter(t)
 	var (
 		mu        sync.Mutex
@@ -83,7 +83,7 @@ func TestD6ValidationMetrics_TimeoutRate_Alert(t *testing.T) {
 		alertRate = rate
 		alertN = samples
 	}
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
 	now := time.Now()
 	// 23 pass, 2 timeout → rate = 2/25 = 0.08 > 0.05
 	for i := 0; i < 23; i++ {
@@ -102,11 +102,11 @@ func TestD6ValidationMetrics_TimeoutRate_Alert(t *testing.T) {
 }
 
 // T: D7-D6-T04 — 冷启动 (< d6MinSamples) 不触发告警。
-func TestD6ValidationMetrics_ColdStart_NoAlert(t *testing.T) {
+func TestValidationMetrics_ColdStart_NoAlert(t *testing.T) {
 	mtr := newTestMeter(t)
 	var called int32
 	hook := func(_ float64, _ uint64) { atomic.AddInt32(&called, 1) }
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
 	now := time.Now()
 	// 19 timeouts (below min samples 20).
 	for i := 0; i < 19; i++ {
@@ -118,9 +118,9 @@ func TestD6ValidationMetrics_ColdStart_NoAlert(t *testing.T) {
 }
 
 // T: D7-D6-T04 — 滑窗外样本被剪枝。
-func TestD6ValidationMetrics_WindowPrune(t *testing.T) {
+func TestValidationMetrics_WindowPrune(t *testing.T) {
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	old := time.Now().Add(-10 * time.Minute) // outside 5min window
 	recent := time.Now()
 	for i := 0; i < 10; i++ {
@@ -138,7 +138,7 @@ func TestD6ValidationMetrics_WindowPrune(t *testing.T) {
 }
 
 // T: D7-D6-T03 — error + timeout 都计入 rate numerator。
-func TestD6ValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
+func TestValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
 	mtr := newTestMeter(t)
 	var (
 		mu   sync.Mutex
@@ -151,7 +151,7 @@ func TestD6ValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
 		rate = r
 		samp = n
 	}
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr, OnAlert: hook})
 	now := time.Now()
 	// 18 pass, 1 timeout, 1 error → bad=2/total=20 = 0.10 > 0.05 (≥ 20 samples)
 	for i := 0; i < 18; i++ {
@@ -198,10 +198,10 @@ func (p *panickingValidator) ValidateOrchestration(_ context.Context, _ Orchestr
 	panic("simulated D6 validator failure")
 }
 
-func TestOrchestrator_D6Validator_Panic_RecordsError(t *testing.T) {
+func TestOrchestrator_AdvisoryValidator_Panic_RecordsError(t *testing.T) {
 	exec := &fakeD2{}
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &panickingValidator{}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec,
 		WithValidator(v), WithMetrics(m))
@@ -233,13 +233,13 @@ func (g *grossErrorValidator) ValidateOrchestration(_ context.Context, _ Orchest
 	return ValidationResult{Pass: true}
 }
 
-func TestOrchestrator_D6Validator_Slow_RecordsError(t *testing.T) {
+func TestOrchestrator_AdvisoryValidator_Slow_RecordsError(t *testing.T) {
 	exec := &fakeD2{}
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &grossErrorValidator{delay: 30 * time.Millisecond}
 	cfg := DefaultConfig()
-	cfg.D6ValidationTimeoutMs = 10 // 10ms timeout; 30ms delay > 2x = 20ms → error
+	cfg.AdvisoryValidationTimeoutMs = 10 // 10ms timeout; 30ms delay > 2x = 20ms → error
 	orch := NewSessionOrchestrator(cfg, exec,
 		WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
@@ -267,10 +267,10 @@ func (p *passingValidator) ValidateOrchestration(_ context.Context, _ Orchestrat
 	return ValidationResult{Pass: true, Reason: "ok"}
 }
 
-func TestOrchestrator_D6Validator_Pass_RecordsPass(t *testing.T) {
+func TestOrchestrator_AdvisoryValidator_Pass_RecordsPass(t *testing.T) {
 	exec := &fakeD2{}
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &passingValidator{}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec,
 		WithValidator(v), WithMetrics(m))
@@ -296,10 +296,10 @@ func (failingValidator) ValidateOrchestration(_ context.Context, _ Orchestration
 	return ValidationResult{Pass: false, Reason: "advisory fail"}
 }
 
-func TestOrchestrator_D6Validator_Fail_RecordsFail(t *testing.T) {
+func TestOrchestrator_AdvisoryValidator_Fail_RecordsFail(t *testing.T) {
 	exec := &fakeD2{}
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	orch := NewSessionOrchestrator(DefaultConfig(), exec,
 		WithValidator(failingValidator{}), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
@@ -334,13 +334,13 @@ func (s *slowValidator) ValidateOrchestration(ctx context.Context, _ Orchestrati
 
 // T: D7-D6-T05 — orphan error path: when elapsed > timeout (1ms<elapsed<2ms)
 // → timeout counter.
-func TestOrchestrator_D6Validator_Timeout_RecordsTimeout(t *testing.T) {
+func TestOrchestrator_AdvisoryValidator_Timeout_RecordsTimeout(t *testing.T) {
 	exec := &fakeD2{}
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &slowValidator{delay: 30 * time.Millisecond}
 	cfg := DefaultConfig()
-	cfg.D6ValidationTimeoutMs = 10 // 10ms timeout; 30ms > 10ms but < 20ms = timeout
+	cfg.AdvisoryValidationTimeoutMs = 10 // 10ms timeout; 30ms > 10ms but < 20ms = timeout
 	orch := NewSessionOrchestrator(cfg, exec,
 		WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
@@ -369,12 +369,12 @@ func TestOrchestrator_D6Validator_Timeout_RecordsTimeout(t *testing.T) {
 // on different Meters are independent. (Same Meter would conflict at
 // registration time, which is correct — the meter is the metric
 // namespace.)
-func TestD6ValidationMetrics_TwoInstances_DifferentMeters(t *testing.T) {
+func TestValidationMetrics_TwoInstances_DifferentMeters(t *testing.T) {
 	mp := metrics.NewMeterProvider(&settings.MetricsConfig{})
 	mtr1 := mp.Meter("d7-test-1")
 	mtr2 := mp.Meter("d7-test-2")
-	m1 := NewD6ValidationMetrics(MetricsConfig{Meter: mtr1})
-	m2 := NewD6ValidationMetrics(MetricsConfig{Meter: mtr2})
+	m1 := NewValidationMetrics(MetricsConfig{Meter: mtr1})
+	m2 := NewValidationMetrics(MetricsConfig{Meter: mtr2})
 	if m1 == nil || m2 == nil {
 		t.Fatalf("both should be non-nil")
 	}
@@ -389,9 +389,9 @@ func TestD6ValidationMetrics_TwoInstances_DifferentMeters(t *testing.T) {
 }
 
 // T: default WARN log hook is wired when no OnAlert is provided.
-func TestD6ValidationMetrics_DefaultHook(t *testing.T) {
+func TestValidationMetrics_DefaultHook(t *testing.T) {
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr}) // no hook
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr}) // no hook
 	if m == nil {
 		t.Fatalf("metrics should not be nil")
 	}
@@ -404,9 +404,9 @@ func TestD6ValidationMetrics_DefaultHook(t *testing.T) {
 }
 
 // T: recording outcomes concurrently is race-free.
-func TestD6ValidationMetrics_Concurrent(t *testing.T) {
+func TestValidationMetrics_Concurrent(t *testing.T) {
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -433,9 +433,9 @@ func TestD6ValidationMetrics_Concurrent(t *testing.T) {
 }
 
 // T: error counter + sliding window with deliberate age advance.
-func TestD6ValidationMetrics_RateRecomputed(t *testing.T) {
+func TestValidationMetrics_RateRecomputed(t *testing.T) {
 	mtr := newTestMeter(t)
-	m := NewD6ValidationMetrics(MetricsConfig{Meter: mtr})
+	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	t0 := time.Now()
 	// 10 pass at t0
 	for i := 0; i < 10; i++ {

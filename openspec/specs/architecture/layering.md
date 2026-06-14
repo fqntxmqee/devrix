@@ -154,7 +154,102 @@ Spec: `openspec/specs/d7-orchestration/d7-domain.md` (D7)
 
 ---
 
-## Directory Structure Mapping
+## Naming Policy (Mandatory)
+
+> **原则**：包名、文件名、导出类型/函数名 **一律使用语义命名**，**禁止**用领域 ID（D1–D7）作为代码标识符。`D{N}` 仅用于 DSAFT 跨团队架构对齐、文档与评审沟通，不进入代码命名空间。
+
+### 命名映射表
+
+| 域 ID | 语义名（用于包/文件/类型） | 严禁出现的位置 |
+|-------|--------------------------|----------------|
+| D1 | `communication` | ❌ `package d1` / `d1.go` / `type D1Config` |
+| D2 | `contextengine` | ❌ `package d2` / `d2.go` / `type D2Config` |
+| D3 | `llmgateway` | ❌ `package d3` / `d3.go` / `type D3Config` |
+| D4 | `multiagent` | ❌ `package d4` / `d4.go` / `type D4Config` |
+| D5 | `observability` | ❌ `package d5` / `d5.go` / `RegisterD5` / `D5Registered` |
+| D6 | `evolution` | ❌ `package d6` / `d6.go` / `D6ValidationMetrics` |
+| D7 | `orchestration`（协调层）/ `coordinator`（D7 入口子包） | ❌ `package d7` / `d7.go` / `D7Config` |
+
+### 正例（Recommended）
+
+```go
+// 域 D7 — semantic path + semantic type
+package coordinator                       // ✓ package = semantic role
+
+type CoordinatorConfig struct { ... }      // ✓ type = semantic role
+func NewSessionOrchestrator(...) ...       // ✓ function = semantic action
+
+// 域 D5 — semantic file + semantic function
+package runtime
+
+type RuntimeMetric struct { ... }         // ✓ not "D5"
+func RegisterRuntimeMetric(...) error      // ✓ not "RegisterD5"
+func IncRuntimeMetric(p PathKind)          // ✓ not "IncD5"
+
+// 域 D6 — semantic struct
+package coordinator
+
+type ValidationMetrics struct { ... }     // ✓ not "D6ValidationMetrics"
+func NewValidationMetrics(...) *ValidationMetrics
+
+// 域 D5 — semantic registry function
+package metrics
+
+func RegisterMultiAgentMetrics(...) *MultiAgentMetrics  // ✓ not "RegisterD5MultiAgent"
+```
+
+### 反例（Anti-Examples — 已废弃）
+
+> 以下写法在历史归档与变更前出现过，**均已迁移**。未来代码评审见到任一项应直接拒绝。
+
+| ❌ 反例 | ✅ 修正 | 说明 |
+|---------|---------|------|
+| `package d7` | `package coordinator` | 包名带域 ID，无法体现「coordinator of orchestration」语义 |
+| `internal/layers/d7/` | `internal/layers/orchestration/coordinator/` | 路径带域 ID，与同层 `communication/contextengine/...` 不一致 |
+| `d7.go`（共享配置） | `coordinator.go` | 文件名带域 ID，掩盖其作为「coordinator 包配置」的语义 |
+| `d6_metrics.go` | `validation_metrics.go` | 文件名带域 ID，未体现 D6 validation metrics 的语义 |
+| `d5_metric.go` | `runtime_metric.go` | 文件名带域 ID，应直接表达 runtime path metric 角色 |
+| `d7_integration_test.go` | `coordinator_integration_test.go` | 测试文件名带域 ID，应表述其测试对象 |
+| `type D7Config struct` | `type CoordinatorConfig struct` | 类型名带域 ID，Go 标识符严禁 D{N} 前缀 |
+| `type D6ValidationMetrics struct` | `type ValidationMetrics struct` | 类型名带域 ID，应使用语义角色 |
+| `func RegisterD5(...)` | `func RegisterRuntimeMetric(...)` | 函数名带域 ID，调用方应直接看到对象 |
+| `func NewD6ValidationMetrics(...)` | `func NewValidationMetrics(...)` | 构造函数带域 ID |
+| `func IncD5(...)` | `func IncRuntimeMetric(...)` | 公开函数带域 ID |
+| `ConfigFile.D7` 字段 | `ConfigFile.Coordinator` 字段 | 字段名带域 ID（YAML tag 保持 `d7` 以兼容存量配置） |
+| `type D2Executor interface` | `type QueryLoopExecutor interface` | D2 契约名带域 ID；语义「query loop 入口」更清晰 |
+| `type D4Executor interface` | `type DelegateExecutor interface` | D4 契约名带域 ID；语义「delegate 委派」更清晰 |
+| `type D1EventSink interface` | `type EventPublisher interface` | D1 契约名带域 ID；语义「事件发布者」已足够 |
+| `type D6Validator interface` | `type AdvisoryValidator interface` | D6 契约名带域 ID；语义「advisory 验证器」更清晰 |
+| `type D5Sink func(...)` | `type ObservabilitySink func(...)` | 包已经在 `observability/`，前缀 D5 冗余 |
+| `func SetD7Entry(...)` | `func SetOrchestrationEntry(...)` | 网关 setter 名带域 ID；语义「orchestration entry」更清晰 |
+| `func SetD5Sink(...)` | `func SetObservabilitySink(...)` | setter 名带域 ID |
+| `func callD6Validator(...)` | `func callAdvisoryValidator(...)` | 内部方法名带域 ID |
+| `field d6Metrics *ValidationMetrics` | `field validationMetric *ValidationMetrics` | 结构体字段名带域 ID |
+| `field d7Entry / d7Enabled` | `field orchestrationEntry / orchestrationEnabled` | 字段名带域 ID |
+| `InterruptOptions.D4Canceler` | `InterruptOptions.DelegateCanceler` | 字段名带域 ID |
+| `Config.D6ValidationTimeoutMs` | `Config.AdvisoryValidationTimeoutMs` | 字段名带域 ID（YAML tag 保持 `d6_validation_timeout_ms`） |
+
+### 例外（YAML tag / 运行时契约）
+
+为兼容存量用户配置文件与 Prometheus 仪表盘，**运行时序列化字符串**可以保留 `D{N}` 前缀：
+
+| 例外项 | 保留形式 | 原因 |
+|--------|---------|------|
+| `ConfigFile.D7 yaml:"d7"` 字段 yaml tag | `yaml:"d7"` | 存量 `devrix.yaml` 的 `d7:` 段不能改；v1.1 可迁移到 `coordinator:` |
+| `orchestration.d6.validation.{pass,fail,timeout,error}` metric 名 | 完整 metric 名 | 仪表盘 / 告警规则已 grep 在该名 |
+| `runtime_path_resolved_total` 等 metric 名 | 完整 metric 名 | 同上 |
+
+> Go 标识符**总是**语义化；运行时字符串**暂时**可以保留 `D{N}`，并在迁移窗口关闭后清理。
+
+### 历史反例归档
+
+| Change | 反例文件/标识符 | 修正 | PR |
+|--------|----------------|------|-----|
+| `refactor/naming-semantic-no-domain-ids` | `d5_metric.go`, `d6_metrics.go`, `d7.go`, `d7_*_test.go` + `D5/D6/D7*` 标识符 | → `runtime_metric.go`, `validation_metrics.go`, `coordinator.go`, `coordinator_*_test.go` + `RuntimeMetric/ValidationMetrics/Coordinator*` | (本 PR) |
+| `refactor/d7-to-orchestration-coordinator` | `internal/layers/d7/`, `package d7` | → `internal/layers/orchestration/coordinator/`, `package coordinator` | #31 |
+| `fix/d7-package-coordinator-rename` | PR #31 的 sed 回退 | → 恢复 `package coordinator` | #32 |
+
+---
 
 ```
 devrix/

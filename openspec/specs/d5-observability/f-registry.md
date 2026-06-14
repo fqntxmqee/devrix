@@ -126,7 +126,7 @@ D5 可观测性域 F 层功能点注册表。每个 F 为 A 层活动编排的�
 | F ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
 | D5-S9-A01-F01 | IncPathCounter | F-BE | PathKind | — | `runtime/path_resolver.go` (Record) |
-| D5-S9-A01-F02 | BridgeToD5Metric | F-BE | PathKind | — | `runtime/d5_metric.go` (IncD5) |
+| D5-S9-A01-F02 | BridgeToD5Metric | F-BE | PathKind | — | `runtime/runtime_metric.go` (IncRuntimeMetric) |
 
 ## D5-S0-A01 InitObservability
 

@@ -98,9 +98,9 @@ func TestSessionOrchestrator_ProcessMessageContract(t *testing.T) {
 
 // T: D6 validator is invoked when wired, and the result is consumed
 // (timeout → pass per the contract).
-func TestSessionOrchestrator_D6Validator_Pass(t *testing.T) {
+func TestSessionOrchestrator_AdvisoryValidator_Pass(t *testing.T) {
 	exec := &fakeD2{}
-	v := &fakeD6Validator{pass: true, reason: "ok"}
+	v := &fakeAdvisoryValidator{pass: true, reason: "ok"}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithValidator(v))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
 		SessionID: "sess-v",
@@ -118,9 +118,9 @@ func TestSessionOrchestrator_D6Validator_Pass(t *testing.T) {
 
 // T: D6 validator pass=false still lets the request through (advisory).
 // Per R1 Q11, validation is advisory; failure is logged but does not block.
-func TestSessionOrchestrator_D6Validator_AdvisoryFail(t *testing.T) {
+func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
 	exec := &fakeD2{}
-	v := &fakeD6Validator{pass: false, reason: "risky"}
+	v := &fakeAdvisoryValidator{pass: false, reason: "risky"}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithValidator(v))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
 		SessionID: "sess-vfail",
@@ -136,13 +136,13 @@ func TestSessionOrchestrator_D6Validator_AdvisoryFail(t *testing.T) {
 	}
 }
 
-type fakeD6Validator struct {
+type fakeAdvisoryValidator struct {
 	calls  int
 	pass   bool
 	reason string
 }
 
-func (f *fakeD6Validator) ValidateOrchestration(_ context.Context, _ OrchestrationDecision) ValidationResult {
+func (f *fakeAdvisoryValidator) ValidateOrchestration(_ context.Context, _ OrchestrationDecision) ValidationResult {
 	f.calls++
 	return ValidationResult{Pass: f.pass, Reason: f.reason}
 }
@@ -287,8 +287,8 @@ func TestBuildConfig_Overrides(t *testing.T) {
 func TestBuildConfig_NilFieldKeepsDefault(t *testing.T) {
 	yes := true
 	cfg := BuildConfig(&FileConfig{Enabled: &yes})
-	if cfg.D6ValidationTimeoutMs != 50 {
-		t.Fatalf("untouched D6ValidationTimeoutMs should keep default 50, got %d", cfg.D6ValidationTimeoutMs)
+	if cfg.AdvisoryValidationTimeoutMs != 50 {
+		t.Fatalf("untouched AdvisoryValidationTimeoutMs should keep default 50, got %d", cfg.AdvisoryValidationTimeoutMs)
 	}
 }
 

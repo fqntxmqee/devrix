@@ -82,8 +82,8 @@
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D5-S9-A01-T01 | RegisterD5 幂等注册 path counter | Runtime | `internal/layers/observability/runtime/d5_metric_test.go` | IMPLEMENTED | P1 |
-| D5-S9-A01-T02 | IncD5 桥接 query_loop/legacy_harness 计数 | Runtime | `internal/layers/observability/runtime/d5_metric_test.go` | IMPLEMENTED | P1 |
+| D5-S9-A01-T01 | RegisterRuntimeMetric 幂等注册 path counter | Runtime | `internal/layers/observability/runtime/runtime_metric_test.go` | IMPLEMENTED | P1 |
+| D5-S9-A01-T02 | IncRuntimeMetric 桥接 query_loop/legacy_harness 计数 | Runtime | `internal/layers/observability/runtime/runtime_metric_test.go` | IMPLEMENTED | P1 |
 | D5-S9-A01-T03 | PathResolver 并发 Record 安全 | Runtime | `internal/layers/observability/runtime/path_resolver_test.go` | IMPLEMENTED | P1 |
 
 ## D5-S0: Cross-Scenario

@@ -5,7 +5,7 @@ import "testing"
 // Covers: D5 runtime.fork_session_view_total{policy=cow|snapshot|shared}
 func TestMultiAgentMetrics_ForkSessionView_should_count_per_policy(t *testing.T) {
 	registry := NewRegistry(nil, nil)
-	m := RegisterD5MultiAgent(registry)
+	m := RegisterMultiAgentMetrics(registry)
 
 	m.ForkSessionView.Inc("cow")
 	m.ForkSessionView.Inc("cow")
@@ -32,7 +32,7 @@ func TestMultiAgentMetrics_ForkSessionView_nil_safe(t *testing.T) {
 
 func TestMultiAgentMetrics_ForkSessionView_registered_in_registry(t *testing.T) {
 	registry := NewRegistry(nil, nil)
-	m := RegisterD5MultiAgent(registry)
+	m := RegisterMultiAgentMetrics(registry)
 	m.ForkSessionView.Inc("cow")
 	if c, ok := registry.GetCounter("runtime.fork_session_view_total", LabelMap{"policy": "cow"}); !ok {
 		t.Error("runtime.fork_session_view_total{policy=cow} not found in registry")

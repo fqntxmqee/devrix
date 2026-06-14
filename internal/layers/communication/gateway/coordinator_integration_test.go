@@ -44,11 +44,11 @@ func (f *fakeEntry) Cancel(_ context.Context, sessionID string) error {
 	return nil
 }
 
-// T: D7-D1-T01 — d7Enabled=true routes to d7Entry.ProcessMessage.
+// T: D7-D1-T01 — orchestrationEnabled=true routes to orchestrationEntry.ProcessMessage.
 func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &fakeEntry{}
-	gw.SetD7Entry(entry, true)
+	gw.SetOrchestrationEntry(entry, true)
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-d7",
@@ -74,7 +74,7 @@ func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 	if entry.processes != 1 {
-		t.Fatalf("d7Entry.ProcessMessage calls = %d, want 1", entry.processes)
+		t.Fatalf("orchestrationEntry.ProcessMessage calls = %d, want 1", entry.processes)
 	}
 	if entry.lastSession != "sess-d7" {
 		t.Fatalf("last session = %q, want sess-d7", entry.lastSession)
@@ -84,11 +84,11 @@ func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	}
 }
 
-// T: D7-D1-T01 (negative) — d7Enabled=false keeps legacy D1→D2 path.
+// T: D7-D1-T01 (negative) — orchestrationEnabled=false keeps legacy D1→D2 path.
 func TestGateway_D7Disabled_LegacyPath(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &fakeEntry{}
-	gw.SetD7Entry(entry, false) // enabled=false
+	gw.SetOrchestrationEntry(entry, false) // enabled=false
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-legacy",
@@ -98,24 +98,24 @@ func TestGateway_D7Disabled_LegacyPath(t *testing.T) {
 		UserID:    "user1",
 	}
 	// legacy path requires contextEngine. We don't wire one; the gateway
-	// should NOT call d7Entry.
+	// should NOT call orchestrationEntry.
 	if err := gw.RouteInbound(context.Background(), msg); err == nil {
 		t.Fatalf("expected error when context engine is nil and d7 disabled")
 	}
-	// Wait a moment to make sure no goroutine calls d7Entry.
+	// Wait a moment to make sure no goroutine calls orchestrationEntry.
 	time.Sleep(100 * time.Millisecond)
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 	if entry.processes != 0 {
-		t.Fatalf("d7Entry.ProcessMessage calls = %d, want 0 (legacy path)", entry.processes)
+		t.Fatalf("orchestrationEntry.ProcessMessage calls = %d, want 0 (legacy path)", entry.processes)
 	}
 }
 
-// T: D1 StopProcess with D7 enabled also calls d7Entry.Cancel.
+// T: D1 StopProcess with D7 enabled also calls orchestrationEntry.Cancel.
 func TestGateway_StopProcess_D7Cancel(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &fakeEntry{}
-	gw.SetD7Entry(entry, true)
+	gw.SetOrchestrationEntry(entry, true)
 
 	if err := gw.StopProcess("sess-stop"); err != nil {
 		t.Fatalf("StopProcess err: %v", err)
@@ -123,7 +123,7 @@ func TestGateway_StopProcess_D7Cancel(t *testing.T) {
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 	if entry.cancels != 1 {
-		t.Fatalf("d7Entry.Cancel calls = %d, want 1", entry.cancels)
+		t.Fatalf("orchestrationEntry.Cancel calls = %d, want 1", entry.cancels)
 	}
 	if entry.lastSession != "sess-stop" {
 		t.Fatalf("last session = %q, want sess-stop", entry.lastSession)

@@ -7,10 +7,11 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// D2Executor is the D2 contract consumed by D7. It runs a single LLM↔Tool
-// loop and streams EngineEvent. D7 must NOT call into D2 internals (no
+// QueryLoopExecutor is the context-engine contract consumed by the
+// orchestrator. It runs a single LLM↔Tool loop and streams EngineEvent.
+// The orchestrator must NOT call into contextengine internals (no
 // import of contextengine/queue/attachments/usercontext).
-type D2Executor interface {
+type QueryLoopExecutor interface {
 	// RunQueryLoop runs a single LLM↔Tool interaction and returns a
 	// streaming channel of EngineEvent. The channel is closed on terminal
 	// (completed | failed | cancelled).
@@ -33,10 +34,11 @@ type ToolSpec struct {
 	Schema      map[string]any
 }
 
-// D4Executor is the D4 contract for delegating an execute-type task to a
-// worker (cursor / claude_code / subagent). D7 must NOT import
-// multiagent/delegate; it goes through this interface.
-type D4Executor interface {
+// DelegateExecutor is the multi-agent contract for delegating an
+// execute-type task to a worker (cursor / claude_code / subagent). The
+// orchestrator must NOT import multiagent/delegate; it goes through
+// this interface.
+type DelegateExecutor interface {
 	CreateAgent(ctx context.Context, spec AgentSpec) (AgentHandle, error)
 	RunAgent(ctx context.Context, handle AgentHandle) (<-chan *contracts.EngineEvent, error)
 	CancelAgent(ctx context.Context, handle AgentHandle) error
@@ -56,26 +58,27 @@ type AgentHandle interface {
 	ID() string
 }
 
-// D1EventSink publishes EngineEvent to the communication layer.
-type D1EventSink interface {
+// EventPublisher publishes EngineEvent to the communication layer.
+type EventPublisher interface {
 	Publish(ctx context.Context, ev *contracts.EngineEvent)
 }
 
-// D6Validator is the optional advisory D6 layer. Implementations must return
-// within the configured timeout (default 50ms); a timeout is treated as
-// "pass" by the orchestrator and recorded by the D5 timeout counter.
-type D6Validator interface {
+// AdvisoryValidator is the optional evolution-layer advisory. Implementations
+// must return within the configured timeout (default 50ms); a timeout is
+// treated as "pass" by the orchestrator and recorded by the
+// validation timeout counter.
+type AdvisoryValidator interface {
 	ValidateOrchestration(ctx context.Context, decision OrchestrationDecision) ValidationResult
 }
 
-// OrchestrationDecision is the input to D6 advisory validation.
+// OrchestrationDecision is the input to advisory validation.
 type OrchestrationDecision struct {
 	Intent    IntentClassification
 	SessionID string
 	Plan      *Plan
 }
 
-// ValidationResult is the D6 advisory output.
+// ValidationResult is the advisory output.
 type ValidationResult struct {
 	Pass   bool
 	Reason string

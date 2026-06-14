@@ -2,10 +2,10 @@ package metrics
 
 import "sync"
 
-// MultiAgentMetrics owns the D5 metric instruments emitted by the
-// multi-agent layer. It is registered through RegisterD5MultiAgent and
-// counters are wired into the local observability sink in the
-// multi-agent package.
+// MultiAgentMetrics owns the observability (D5) metric instruments emitted
+// by the multi-agent layer. It is registered through
+// RegisterMultiAgentMetrics and counters are wired into the local
+// observability sink in the multi-agent package.
 //
 // DM-20260611-005.
 type MultiAgentMetrics struct {
@@ -66,13 +66,14 @@ func (p *PolicyCounter) ensureCounter(policy string) Counter {
 	return c
 }
 
-// RegisterD5MultiAgent creates the multi-agent D5 metrics bound to the
-// given registry. The returned struct is the source of truth for the
-// runtime.fork_session_view_total{policy=...} metric.
+// RegisterMultiAgentMetrics creates the multi-agent observability (D5)
+// metrics bound to the given registry. The returned struct is the
+// source of truth for the runtime.fork_session_view_total{policy=...}
+// metric.
 //
 // Idempotent at the policy-counter level; safe to call multiple times
 // from different init paths.
-func RegisterD5MultiAgent(registry *Registry) *MultiAgentMetrics {
+func RegisterMultiAgentMetrics(registry *Registry) *MultiAgentMetrics {
 	return &MultiAgentMetrics{
 		ForkSessionView: &PolicyCounter{
 			registry: registry,

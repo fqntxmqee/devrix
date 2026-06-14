@@ -69,7 +69,7 @@ func NewDelegatedWorkModel() WorkModel {
 // migration.
 func (d *DelegatedWorkModel) CreateTask(ctx context.Context, spec TaskSpec) (string, error) {
 	if d.createTask == nil {
-		return "", fmt.Errorf("d7: DelegatedWorkModel.CreateTask not wired (bootstrap missing)")
+		return "", fmt.Errorf("orchestrator: DelegatedWorkModel.CreateTask not wired (bootstrap missing)")
 	}
 	return d.createTask(ctx, spec.Subject, spec.Goal)
 }
@@ -77,7 +77,7 @@ func (d *DelegatedWorkModel) CreateTask(ctx context.Context, spec TaskSpec) (str
 // UpdateStatus is a no-op stub in v1.0.
 func (d *DelegatedWorkModel) UpdateStatus(ctx context.Context, taskID string, status TaskStatus) error {
 	if d.updateStat == nil {
-		return fmt.Errorf("d7: DelegatedWorkModel.UpdateStatus not wired (bootstrap missing)")
+		return fmt.Errorf("orchestrator: DelegatedWorkModel.UpdateStatus not wired (bootstrap missing)")
 	}
 	return d.updateStat(ctx, taskID, status)
 }

@@ -30,10 +30,10 @@ import (
 // 子能力 5 (TaskCancel→WorkerCancel 反向链路) 在 v1.0 由 HandleInterrupt
 // 的 d4 step 隐式覆盖；v1.1 可显式拆出。
 type InterruptOptions struct {
-	WaveCanceler    func(sessionID string) error
-	D4Canceler      func(sessionID string) error
-	ProcessCanceler func(sessionID string) error
-	Sink            D1EventSink
+	WaveCanceler     func(sessionID string) error
+	DelegateCanceler func(sessionID string) error
+	ProcessCanceler  func(sessionID string) error
+	Sink             EventPublisher
 }
 
 // InterruptHandler is the v1.0 HandleInterrupt entry point.
@@ -43,7 +43,7 @@ type InterruptHandler struct {
 	orchestrator *SessionOrchestrator
 }
 
-// NewInterruptHandler builds the handler. waveCancel and d4Cancel are
+// NewInterruptHandler builds the handler. waveCancel and DelegateCanceler are
 // optional (v1.0 may not have a running Wave/D4 for a simple FastPath).
 func NewInterruptHandler(orch *SessionOrchestrator, opts InterruptOptions) *InterruptHandler {
 	return &InterruptHandler{opts: opts, orchestrator: orch}
@@ -61,19 +61,19 @@ func (h *InterruptHandler) Handle(ctx context.Context, sessionID string) error {
 	// the parent ctx, so we must call its public CancelAll.
 	if h.opts.WaveCanceler != nil {
 		if err := h.opts.WaveCanceler(sessionID); err != nil {
-			slog.Warn("d7: HandleInterrupt wave cancel failed", "sessionID", sessionID, "err", err)
+			slog.Warn("orchestrator: HandleInterrupt wave cancel failed", "sessionID", sessionID, "err", err)
 		}
 	}
 	// Step 2: D4 delegate cancel. Best-effort; d4 may have no worker.
-	if h.opts.D4Canceler != nil {
-		if err := h.opts.D4Canceler(sessionID); err != nil {
-			slog.Warn("d7: HandleInterrupt d4 cancel failed", "sessionID", sessionID, "err", err)
+	if h.opts.DelegateCanceler != nil {
+		if err := h.opts.DelegateCanceler(sessionID); err != nil {
+			slog.Warn("orchestrator: HandleInterrupt delegate cancel failed", "sessionID", sessionID, "err", err)
 		}
 	}
 	// Step 3: orchestrator (D2 RunQueryLoop) cancel.
 	if h.opts.ProcessCanceler != nil {
 		if err := h.opts.ProcessCanceler(sessionID); err != nil {
-			slog.Warn("d7: HandleInterrupt process cancel failed", "sessionID", sessionID, "err", err)
+			slog.Warn("orchestrator: HandleInterrupt process cancel failed", "sessionID", sessionID, "err", err)
 		}
 	}
 	// Step 4: emit stopped event. EngineEvent.Type is an open string in the

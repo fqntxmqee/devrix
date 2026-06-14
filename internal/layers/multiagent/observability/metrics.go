@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 )
 
-// D5Sink is a typed callback that mirrors a Policy's counter value to a
+// ObservabilitySink is a typed callback that mirrors a Policy's counter value to a
 // D5 metric registry. Implementations should be allocation-free; the
 // sink is invoked on every counter bump.
 //
@@ -20,7 +20,7 @@ import (
 // source of truth for the in-process probe). The signature is part of
 // the public API so external wiring (e.g. the D5 observability init
 // path) can plug in without changing Fork's call shape.
-type D5Sink func(p Policy, delta int64)
+type ObservabilitySink func(p Policy, delta int64)
 
 // Policy is the SessionView fork policy label. v1.0 ships cow only;
 // snapshot/shared are reserved for v2.0 (DM-20260611-005).
@@ -35,7 +35,7 @@ const (
 var (
 	policyMu sync.RWMutex
 	counters = map[Policy]*int64{}
-	d5Sink   D5Sink
+	observabilitySink   ObservabilitySink
 )
 
 // IncForkSessionView bumps the counter for the given policy label.
@@ -53,17 +53,17 @@ func IncForkSessionViewPolicy(p Policy) {
 	}
 }
 
-// SetD5Sink installs (or clears, when nil) the D5 sink used to mirror
+// SetObservabilitySink installs (or clears, when nil) the D5 sink used to mirror
 // counter bumps to the global D5 metric registry. Idempotent.
-func SetD5Sink(s D5Sink) {
+func SetObservabilitySink(s ObservabilitySink) {
 	policyMu.Lock()
-	d5Sink = s
+	observabilitySink = s
 	policyMu.Unlock()
 }
 
-func currentSink() D5Sink {
+func currentSink() ObservabilitySink {
 	policyMu.RLock()
-	s := d5Sink
+	s := observabilitySink
 	policyMu.RUnlock()
 	return s
 }

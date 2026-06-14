@@ -66,7 +66,7 @@ D4 多智能体域 A 层活动注册表。
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| D4-S8-A01 | RecordForkPolicyMetrics | A-BE | policy_label | — | counter.inc | `observability/metrics.go` (IncForkSessionView / SetD5Sink) |
+| D4-S8-A01 | RecordForkPolicyMetrics | A-BE | policy_label | — | counter.inc | `observability/metrics.go` (IncForkSessionView / SetObservabilitySink) |
 
 ## D4-S9: SessionView
 
