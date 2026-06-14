@@ -124,6 +124,8 @@ Scenario: 禁止伪造进度信号
 
 **注：** D7-S5 决策的是**结构路径**（goal → TaskNode DAG），不是**内容质量**（Tool 选择、结论对错）。
 
+**Explore 输入：** D7-S5-A02 SynthesizeTaskGraph 的输入包含 Explore Workers（并行 read-only）通过 D7-S4 广播的 FlowEvent。D7 作为 Information Producer 吸收这些私有信息后产出结构化 TaskGraph DAG。
+
 ---
 
 ## 4. A 层重编号（Canonical）
@@ -157,7 +159,7 @@ Scenario: 禁止伪造进度信号
 | A ID | 名称 | 旧 Legacy ID | 说明 |
 |------|------|-------------|------|
 | D7-S5-A01 | ClassifyIntent | D7-S5-A01-LEGACY | 意图分类（规则 + Command-first） |
-| D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | 任务图合成 |
+| D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | 任务图合成（吸收 Explore Workers 的 FlowEvent 输出） |
 | D7-S5-A03 | SelectExecutor | — | 新增（v1.1）：执行器选择 |
 
 ---

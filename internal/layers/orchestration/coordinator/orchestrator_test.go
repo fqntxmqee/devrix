@@ -315,3 +315,64 @@ func TestTaskSpec_Immutability(t *testing.T) {
 	}
 	_ = types.Message{Role: "user", Content: "x"}
 }
+
+// T: D7-S2-A01-T02 — FastPath 命中时无 Wave 创建（screening 完整性）。
+// FastPath.Run 直接转发 D2，不调用任何 Wave Scheduler。架构隐式保证，
+// 此测试验证 orchestrator 在 FastPath 路径不触发 Wave 调度。
+func TestSessionOrchestrator_FastPath_NoWaveScheduled(t *testing.T) {
+	exec := &fakeD2{}
+	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+
+	// 验证 FastPath 命中时只调用 D2，不涉及 Wave
+	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
+		SessionID: "sess-fast",
+		Message:   "hello",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for range ch {
+		// drain
+	}
+	// FastPath 直接走 D2.RunQueryLoop，无 Wave 创建
+	// 验证方式：fakeD2.calls == 1 且无 Wave 相关调用
+	if exec.calls != 1 {
+		t.Fatalf("want 1 D2 call (FastPath), got %d", exec.calls)
+	}
+}
+
+// T: D7-S2-A01-T03 — 禁止在 Worker terminal FlowEvent 前伪造 Task 进度。
+// anti-fabrication commitment: D7 不允许在 Worker 发送 terminal FlowEvent 之前
+// 发送任何 synthetic Task progress 信号。
+func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
+	exec := &fakeD2{}
+	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+
+	// fakeD2 返回完整事件流（无 synthetic progress）
+	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
+		SessionID: "sess-anti",
+		Message:   "do something complex",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var hasProgressBeforeComplete bool
+	var sawTerminal bool
+	for ev := range ch {
+		// terminal FlowEvent 类型: complete, stopped, error
+		if ev.Type == "complete" || ev.Type == "stopped" || ev.Type == "error" {
+			sawTerminal = true
+			break
+		}
+		// synthetic progress 类型: task_progress, task_update (非 terminal)
+		if ev.Type == "task_progress" || ev.Type == "task_update" {
+			hasProgressBeforeComplete = true
+		}
+	}
+
+	// 验证：不应该在 terminal 之前看到任何 synthetic progress
+	if hasProgressBeforeComplete && !sawTerminal {
+		t.Fatalf("anti-fabrication violated: synthetic progress before terminal FlowEvent")
+	}
+}

@@ -154,11 +154,34 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
+## Canonical F 层定义（切法 A — 按用户价值流）
+
+> 以下为 `devrix-d7-sa-refine` v1.0 Canonical F 层定义。补充 design.md §5 草案。
+
+### D7-S2 Canonical F 层
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ⬜ | `d7/orchestrator.go` (planned) |
+| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ⬜ | `d7/fastpath.go` (planned) |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ⬜ | `d7/orchestrator.go` (planned) |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ⬜ | `d7/orchestrator.go` (planned) |
+
+### D7-S5 Canonical F 层
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/coordinator/shadow_classifier.go` |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/coordinator/classifier.go` |
+
+---
+
 ## Statistics
 
 | Activities with F | Total F Points | Implemented | Planned |
 |-------------------|----------------|-------------|---------|
-| 15 | 44 | 30 | 14 |
+| 15 + 2 Canonical | 44 + 7 Canonical | 30 + 3 | 14 + 4 |
 
 ---
 
@@ -168,3 +191,4 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | 初始注册表（全 d7/ 路径） |
 | 2.0.0 | 2026-06-14 | 对齐真实代码路径、实现状态、新增 wave 基础设施 F 点 |
+| 3.0.0 | 2026-06-14 | Legacy 双轨建立（devrix-d7-sa-refine）；Canonical D7-S2/S5 F 层按 design.md §5 新增 |
