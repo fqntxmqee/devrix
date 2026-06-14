@@ -141,9 +141,9 @@ func TestD6ValidationMetrics_WindowPrune(t *testing.T) {
 func TestD6ValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
 	mtr := newTestMeter(t)
 	var (
-		mu     sync.Mutex
-		rate   float64
-		samp   uint64
+		mu   sync.Mutex
+		rate float64
+		samp uint64
 	)
 	hook := func(r float64, n uint64) {
 		mu.Lock()
