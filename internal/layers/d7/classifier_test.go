@@ -108,3 +108,19 @@ func TestRuleClassifier_Classify_ShortDefaultsFast(t *testing.T) {
 		t.Fatalf("want 70 confidence for short default, got %d", got.Confidence)
 	}
 }
+
+// T: D7-S5-T06 (negative) — CommandFirst=false 时 /plan 不再匹配 IntentCommand。
+// 断言不限定具体回退 Kind，避免规则微调时回归脆弱。
+func TestRuleClassifier_Classify_CommandFirst_Disabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CommandFirst = false
+	c := NewRuleClassifier(cfg)
+	got, err := c.Classify(context.Background(), "/plan add auth")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Kind == IntentCommand {
+		t.Fatalf("CommandFirst=false should not match IntentCommand, got kind=%q reason=%q",
+			got.Kind, got.Reason)
+	}
+}

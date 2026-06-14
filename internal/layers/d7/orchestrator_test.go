@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -264,6 +265,39 @@ func TestInterruptHandler_Handle_Idempotent(t *testing.T) {
 	}
 	if len(sink.events) != 1 {
 		t.Fatalf("want 1 stopped event, got %d", len(sink.events))
+	}
+}
+
+// T: D7-S5-T06 — Command-first 路径在 ShadowClassifier 启用时不触发 LLM
+// classify。 ShadowClassifier 内部 tail-only 短路（rule != IntentOrchestrate
+// 直接返回，不启 goroutine），命令路径自然零 LLM 成本。
+func TestSessionOrchestrator_CommandFirst_ShadowNotCalled(t *testing.T) {
+	exec := &fakeD2{}
+	rule := NewRuleClassifier(DefaultConfig())
+	llm := &stubLLM{result: IntentClassification{Kind: IntentOrchestrate, Confidence: 80}}
+	mtr := newShadowTestMeter(t)
+	m := NewShadowMetrics(mtr)
+	shadow := NewShadowClassifier(rule, llm, m, 500)
+	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithShadowClassifier(shadow))
+	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
+		SessionID: "sess-cmd-shadow",
+		Message:   "/plan add auth",
+	})
+	if err != nil {
+		t.Fatalf("ProcessMessage err: %v", err)
+	}
+	for range ch {
+	}
+	// Allow any errant async shadow path a window to fire (it must NOT).
+	time.Sleep(30 * time.Millisecond)
+	if calls := atomic.LoadInt32(&llm.calls); calls != 0 {
+		t.Fatalf("LLM called on command path: calls=%d (must be 0)", calls)
+	}
+	if exec.calls != 1 {
+		t.Fatalf("D2 must be called once for command path, got %d", exec.calls)
+	}
+	if exec.executedMsgs[0] != "/plan add auth" {
+		t.Fatalf("command not forwarded, got %q", exec.executedMsgs[0])
 	}
 }
 

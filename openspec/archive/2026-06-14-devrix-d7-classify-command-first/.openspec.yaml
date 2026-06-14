@@ -1,0 +1,22 @@
+change-id: devrix-d7-classify-command-first
+demand-id: DM-20260614-005
+title: D7-S5-T03 + T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环
+priority: P0
+status: S6_Archived
+domain: D7
+scope:
+  - internal/layers/d7/classifier_test.go
+  - internal/layers/d7/orchestrator_test.go
+  - openspec/specs/d7-orchestration/t-registry.md
+  - openspec/t-registry.md
+related-t:
+  - D7-S5-T03
+  - D7-S5-T06
+related-changes:
+  - devrix-d7-orchestration-domain (DM-20260614-001) archived
+  - devrix-s5-p2-shadow-classifier (DM-20260614-004) archived
+branch: feat/devrix-d7-classify-command-first
+archived-at: 2026-06-14
+archive-path: openspec/archive/2026-06-14-devrix-d7-classify-command-first/
+created: 2026-06-14
+last-updated: 2026-06-14

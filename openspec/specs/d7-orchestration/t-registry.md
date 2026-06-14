@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -68,10 +68,10 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |------|------|----------|-----------|--------|----------|
 | D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `contextengine/tasks/plan_mode_test.go` 或 task_manager_test | IMPLEMENTED | P1 |
 | D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `contextengine/tasks/plan_agent_whitelist_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | — | PLANNED (v1.0) | P0 |
+| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
 | D7-S5-T04 | SynthesizeTaskGraph 产出有效 DAG | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
 | D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED (v1.1) | P1 |
-| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | — | PLANNED (v1.0) | P0 |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/d7/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
 | D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/d7/shadow_classifier_test.go` | IMPLEMENTED | P0 |
 
 ---
@@ -120,7 +120,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 46 | 37 | 2 | 7 | 26 |
+| 46 | 39 | 2 | 5 | 26 |
 
 ### 按 Scenario
 
@@ -130,7 +130,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2 | 7 | 0 | 7 |
 | D7-S3 | 11 | 10 | 1 |
 | D7-S4 | 7 | 7 | 0 |
-| D7-S5 | 7 | 3 | 4 |
+| D7-S5 | 7 | 5 | 2 |
 | 契约/迁移 | 6 | 0 | 6 |
 
 ---
@@ -143,3 +143,4 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
 | 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
 | 2.2.0 | 2026-06-14 | Review R2：T02c 端到端 SLA、T04 中断顺序、D7-D6-T01 metric、S5-T02 白名单 |
+| 2.3.0 | 2026-06-14 | DM-20260614-005：D7-S5-T03 / T06 闭环（端到端测试 + CommandFirst=false 回归） |
