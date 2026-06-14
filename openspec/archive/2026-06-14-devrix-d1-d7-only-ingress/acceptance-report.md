@@ -1,9 +1,17 @@
-# Acceptance Report: D1 D7-Only Ingress
+---
+acceptance-id: devrix-d1-d7-only-ingress
+phase: S5_Acceptance
+demand-id: DM-20260614-007
+status: ACCEPTED
+created: 2026-06-14
+archived: 2026-06-14
+---
 
-**Change ID:** `devrix-d1-d7-only-ingress`  
+# Acceptance Report — devrix-d1-d7-only-ingress
+
+**Change:** D1 入站仅路由 D7 — 退役 D1→D2 legacy 路径  
 **Demand:** DM-20260614-007  
-**Date:** 2026-06-14  
-**Status:** S5 Ready
+**Commit:** `d4ab93b`
 
 ---
 
@@ -39,3 +47,7 @@ go test -tags='acceptance d1' ./tests/acceptance/p0/ -count=1
 - `NewCommunicationGateway` 移除 `contextEngine` 参数
 - `SetOrchestrationEntry(entry)` 移除 `enabled` 参数
 - `d7.enabled=false` 不再回退 D1→D2
+
+## Verdict
+
+**ACCEPTED** — P0 测试点全绿，BREAKING 变更已文档化。

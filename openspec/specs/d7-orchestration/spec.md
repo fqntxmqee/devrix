@@ -280,7 +280,7 @@ context_engine:
 
 # D7 v1.0 规划配置（未实现）
 orchestration:
-  d7_enabled: false             # false 时保持 D1→D2.Process
+  d7_enabled: true              # false 时 WireD7 失败，进程不启动（DM-007）
   fast_path:
     confidence_threshold: 0.9
   plan:

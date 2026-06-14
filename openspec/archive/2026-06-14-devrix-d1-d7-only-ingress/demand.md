@@ -2,7 +2,7 @@
 demand-id: DM-20260614-007
 title: D1 入站仅路由 D7 — 退役 D1→D2 legacy 路径
 priority: P0
-status: S3_Approved
+status: S7_Archived
 dsaft_domain: [communication, orchestration]
 created: 2026-06-14
 depends_on: DM-20260614-006

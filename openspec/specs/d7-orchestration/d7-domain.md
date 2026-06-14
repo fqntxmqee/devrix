@@ -446,7 +446,7 @@ D1 Gateway MUST route inbound messages to D7 ProcessMessage instead of D2 Proces
 |------|-----------|
 | D1 | ingress owner — `RouteInbound` invocation |
 | D7 | routing decision owner — FastPath vs OrchestratePath |
-| D1 | final veto — `orchestration.d7_enabled=false` restores legacy path |
+| D7 | startup gate — `d7.enabled=false` 时 WireD7 失败（DM-20260614-007） |
 | D7 | FastPath SLA — P99 ≤2ms (T02a+T02b+T02c) |
 
 <!-- T: D7-D1-T01 -->
@@ -458,12 +458,12 @@ D1 Gateway MUST route inbound messages to D7 ProcessMessage instead of D2 Proces
 - THEN D7-S2-A01 ProcessMessage is called (not D2.Process)
 - AND D2.Process is NOT called directly by D1
 
-#### Scenario: Feature flag fallback
+#### Scenario: D7 disabled fails startup
 
-- GIVEN `orchestration.d7_enabled=false` (feature flag)
-- WHEN D1 Gateway RouteInbound runs
-- THEN the legacy path D1→D2.Process is used
-- AND behavior matches pre-D7 V6
+- GIVEN `orchestration.d7_enabled=false`
+- WHEN bootstrap WireD7 runs
+- THEN startup returns an error
+- AND D1 does NOT fall back to D2.Process
 
 ---
 
@@ -515,16 +515,16 @@ D6 MAY validate orchestration decisions made by D7.
 
 ### Requirement: D7 Migration Coexistence
 
-During D7 rollout, dual-entry behavior MUST be explicitly defined and regression-tested.
+D7-only ingress is mandatory; legacy D1→D2 path is retired (DM-20260614-007).
 
 <!-- T: D7-MIG-T01 -->
 
-#### Scenario: Four-combination regression matrix
+#### Scenario: Two-combination regression matrix
 
-- GIVEN combinations of `d7_enabled` × `plan.enabled`
+- GIVEN combinations of `plan.enabled` (with D7 always enabled at startup)
 - WHEN RouteInbound processes a representative message set
 - THEN each combination produces documented routing per Migration Coexistence Contract
-- AND `d7_enabled=false` is bit-identical to pre-migration behavior
+- AND D1 never invokes D2.Process directly
 
 ---
 
@@ -547,28 +547,28 @@ D7-S1 and D7-S3 MUST document and preserve three task representations with expli
 
 ### Requirement: D1 Gateway Entry Point
 
-D1-S1-A02 RouteInbound MUST support routing to D7 (preferred) or D2 (legacy fallback).
+D1-S1-A02 RouteInbound MUST route non-agent inbound messages exclusively to D7 via `IOrchestrationEntry.ProcessMessage`. D1 MUST NOT invoke D2.Process directly.
 
-<!-- T: D1-S1-T01 (modified) -->
+<!-- T: D1-S1-T01 (modified); D7-D1-T01 -->
 
 #### Scenario: RouteInbound routes to D7
 
-- GIVEN D7 is enabled
+- GIVEN D7 is enabled and wired
 - WHEN RouteInbound processes a message
 - THEN it extracts session and message
 - AND calls `D7.ProcessMessage`
-- AND D2.Process is NOT called
+- AND D2.Process is NOT called from D1
 
-#### Scenario: RouteInbound fallback to D2
+#### Scenario: RouteInbound without orchestration entry fails
 
-- GIVEN `orchestration.d7_enabled=false`
-- WHEN RouteInbound processes a message
-- THEN it calls `D2.Process` as before
-- AND D7.ProcessMessage is NOT called
+- GIVEN no `IOrchestrationEntry` on gateway
+- WHEN RouteInbound processes a non-agent message
+- THEN an error is returned
+- AND D2.Process is NOT called from D1
 
 ### Requirement: D2 Context Engine Process
 
-D2.Process MUST remain available for backward compatibility but SHOULD NOT be the primary entry point when D7 is active.
+D2.Process remains the execution engine invoked by D7 (via d2Executor), not by D1 ingress.
 
 <!-- T: D2-CTX-T01 (modified) -->
 
@@ -607,7 +607,7 @@ context_engine:
 
 # D7 v1.0 规划配置（未实现；task.store_dir DEPRECATED）
 orchestration:
-  d7_enabled: false             # false 时保持 D1→D2.Process
+  d7_enabled: true              # false 时 WireD7 失败（DM-20260614-007）
   fast_path:
     confidence_threshold: 0.9
   decision:

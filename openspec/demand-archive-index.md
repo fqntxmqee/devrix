@@ -53,6 +53,7 @@
 | DM-20260614-004 | S5-P2 Tail-only LLM Classify Shadow — v1.1 兜底冷启动 (P1 #8) | devrix-s5-p2-shadow-classifier | 2026-06-14 | — | ACCEPTED (P1) |
 | DM-20260614-005 | D7-S5-T03/T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环 | devrix-d7-classify-command-first | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260614-006 | D1 Communication — 切法 A 信号分层与 IM 友好通信 registry 对齐 | devrix-d1-sa-refine | 2026-06-14 | — | ACCEPTED (S5; v1.0 registry-only; v1.1 代码待 Phase 2) |
+| DM-20260614-007 | D1 入站仅路由 D7 — 退役 D1→D2 legacy 路径 | devrix-d1-d7-only-ingress | 2026-06-14 | — | ACCEPTED (P0; BREAKING) |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -107,6 +108,7 @@
 | devrix-s5-p2-shadow-classifier | `openspec/archive/2026-06-14-devrix-s5-p2-shadow-classifier/` |
 | devrix-d7-classify-command-first | `openspec/archive/2026-06-14-devrix-d7-classify-command-first/` |
 | devrix-d1-sa-refine | `openspec/archive/2026-06-14-devrix-d1-sa-refine/` |
+| devrix-d1-d7-only-ingress | `openspec/archive/2026-06-14-devrix-d1-d7-only-ingress/` |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -125,7 +127,11 @@
 | devrix-queryloop-spans-v1.1 | DM-20260612-014 | `openspec/changes/devrix-queryloop-spans-v1.1/` | S1 未开始 |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
-| devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | 待确认 |
+| devrix-reputation-feedback-loop | DM-20260614-008 | `openspec/changes/devrix-reputation-feedback-loop/` | S1_Proposal |
+
+**2026-06-14 归档（S7）**：
+
+- `devrix-d1-d7-only-ingress` → `openspec/archive/2026-06-14-devrix-d1-d7-only-ingress/`（DM-007 S5_PASS; D1→D2 legacy 退役; commit `d4ab93b`）
 
 **2026-06-14 归档（S6）**：
 

@@ -3,7 +3,7 @@
 **Domain:** D1 Communication
 **Version:** 3.0.0
 **Status:** Active (2026-06-14)
-**Change:** DM-20260614-006 — 切法 A
+**Change:** DM-20260614-006 — 切法 A; DM-20260614-007 — D7-only ingress
 **Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
 
 ---
@@ -13,7 +13,7 @@
 | Operation | Kind | S | Bind T | Key Attributes |
 |-----------|------|---|--------|----------------|
 | `d1.capture.persist` | INTERNAL | S13 | D1-S13-A02-T01 | session_id, adapter |
-| `d1.dispatch.route` | INTERNAL | S13 | D1-S13-A03-T01/T02 | route_target (d7/legacy/agent) |
+| `d1.dispatch.route` | INTERNAL | S13 | D1-S13-A03-T01/T02 | route_target (d7/agent) |
 | `d1.signal.thinking` | INTERNAL | S14 | D1-S14-A01-F01-T01 | session_id, sequence |
 | `d1.signal.task` | INTERNAL | S15 | D1-S15-A02-F01-T01 | session_id, tool_name, worker_id |
 | `d1.signal.conclusion` | INTERNAL | S16 | D1-S16-A02-T01 | session_id, is_terminal |

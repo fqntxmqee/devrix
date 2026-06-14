@@ -1,7 +1,7 @@
 change_id: devrix-d1-d7-only-ingress
 priority: P0
 demand_id: DM-20260614-007
-status: s4_in_progress
+status: s7_archived
 domains: [D1, D7, ARCH]
 
 dsaft_scenarios:

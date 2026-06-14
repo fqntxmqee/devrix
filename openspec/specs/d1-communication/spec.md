@@ -35,7 +35,7 @@
 
 ```
 [User IM]
-  → S17 Parse* → S13 Accept → Persist → Dispatch (D7|Agent|D2)
+  → S17 Parse* → S13 Accept → Persist → Dispatch (D7|Agent)
   → Agent events → S18 EventBus → present/ (S14|S15|S16)
   → S17 Encode* → [User IM]
   S18 overlay: Critical Conclusion 永不 Drain
@@ -107,8 +107,8 @@ User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context E
 
 - **入站持久化（happy）：** GIVEN 飞书非空消息 → WHEN Accept+Persist → THEN session 更新且 turn 可追溯
 - **入站空消息（sad）：** GIVEN 空 content → WHEN Accept 校验 → THEN 错误且不 Dispatch
-- **Dispatch D7：** GIVEN d7_enabled → WHEN Dispatch → THEN F02 ProcessMessage，不走 Legacy D2
-- **Dispatch Legacy：** GIVEN d7 关闭且无 AgentFactory → WHEN Dispatch → THEN F01 contextEngine.Process
+- **Dispatch D7：** GIVEN 已配置 IOrchestrationEntry → WHEN Dispatch → THEN F02 ProcessMessage，D1 不调用 IEngine.Process
+- **Missing entry（sad）：** GIVEN 未配置 IOrchestrationEntry → WHEN Dispatch → THEN 返回错误，不 silent fallback
 - **权限门控：** GIVEN CRITICAL + yolo → WHEN ResolvePermissionGate → THEN denied 直至用户确认
 
 ### PresentThinking（D1-S14）

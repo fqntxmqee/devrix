@@ -21,7 +21,7 @@ D1 通信域 F 层功能点注册表。**Canonical SoT：S13–S18 下 F**（见
 
 | F ID | Name | Type | 职责 | Legacy 映射 |
 |------|------|------|------|-------------|
-| D1-S13-A03-F01 | routeLegacyD2 | F-BE | contextEngine.Process | S1-A02-F01 RouteInbound |
+| D1-S13-A03-F01 | routeLegacyD2 | F-BE | ~~contextEngine.Process~~ | S1-A02-F01 RouteInbound — **RETIRED** (DM-20260614-007) |
 | D1-S13-A03-F02 | routeD7 | F-BE | IOrchestrationEntry.ProcessMessage | （新增） |
 | D1-S13-A03-F03 | routeAgent | F-BE | AgentFactory 路径 | S1-A04 RouteAgent |
 
