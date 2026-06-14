@@ -54,6 +54,13 @@
 | DM-20260614-005 | D7-S5-T03/T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环 | devrix-d7-classify-command-first | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260614-006 | D1 Communication — 切法 A 信号分层与 IM 友好通信 registry 对齐 | devrix-d1-sa-refine | 2026-06-14 | — | ACCEPTED (S5; v1.0 registry-only; v1.1 代码待 Phase 2) |
 | DM-20260614-007 | D1 入站仅路由 D7 — 退役 D1→D2 legacy 路径 | devrix-d1-d7-only-ingress | 2026-06-14 | — | ACCEPTED (P0; BREAKING) |
+| DM-20260614-009 | D2 Context Engine SA Refine — S15–S20 Canonical + D7 边界 | devrix-d2-sa-refine | 2026-06-14 | — | ACCEPTED (v1.0 registry) |
+| DM-20260614-010 | D2 SA Refine v1.1 — D2 Thin 契约测试 + Canonical Span | devrix-d2-sa-refine-v1.1 | 2026-06-14 | — | ACCEPTED |
+| DM-20260614-011 | D2 v2.0 — delegate_tools → D7 delegatetools | devrix-d2-sa-refine-v2.0-delegate | 2026-06-14 | — | ACCEPTED |
+| DM-20260614-012 | D2 v2.0 — tasks/ → orchestration/workmodel | devrix-d2-sa-refine-v2.0-workmodel | 2026-06-14 | — | ACCEPTED |
+| DM-20260614-013 | D2 v2.0 — queue/ → orchestration/sessionqueue | devrix-d2-sa-refine-v2.0-sessionqueue | 2026-06-14 | — | ACCEPTED |
+| DM-20260614-014 | D2 v2.0 — 物理目录 prepare/persist/policy/nested | devrix-d2-sa-refine-v2.0-physical-dirs | 2026-06-14 | — | ACCEPTED |
+| DM-20260614-015 | D2 v2.0 — worker_tools → orchestration/toolpolicy | devrix-d2-sa-refine-v2.0-toolpolicy | 2026-06-14 | — | ACCEPTED |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -109,6 +116,13 @@
 | devrix-d7-classify-command-first | `openspec/archive/2026-06-14-devrix-d7-classify-command-first/` |
 | devrix-d1-sa-refine | `openspec/archive/2026-06-14-devrix-d1-sa-refine/` |
 | devrix-d1-d7-only-ingress | `openspec/archive/2026-06-14-devrix-d1-d7-only-ingress/` |
+| devrix-d2-sa-refine | `openspec/archive/2026-06-14-devrix-d2-sa-refine/` |
+| devrix-d2-sa-refine-v1.1 | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v1.1/` |
+| devrix-d2-sa-refine-v2.0-delegate | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-delegate/` |
+| devrix-d2-sa-refine-v2.0-workmodel | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-workmodel/` |
+| devrix-d2-sa-refine-v2.0-sessionqueue | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-sessionqueue/` |
+| devrix-d2-sa-refine-v2.0-physical-dirs | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-physical-dirs/` |
+| devrix-d2-sa-refine-v2.0-toolpolicy | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/` |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -129,6 +143,16 @@
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
+
+**2026-06-14 归档（S7 — D2 SA Refine 系列）**：
+
+- `devrix-d2-sa-refine` → `openspec/archive/2026-06-14-devrix-d2-sa-refine/`（DM-009 S5_ACCEPTED; v1.0 registry + D7 边界 SoT）
+- `devrix-d2-sa-refine-v1.1` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v1.1/`（DM-010; D2 Thin + ingress lint）
+- `devrix-d2-sa-refine-v2.0-delegate` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-delegate/`（DM-011）
+- `devrix-d2-sa-refine-v2.0-workmodel` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-workmodel/`（DM-012）
+- `devrix-d2-sa-refine-v2.0-sessionqueue` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-sessionqueue/`（DM-013）
+- `devrix-d2-sa-refine-v2.0-physical-dirs` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-physical-dirs/`（DM-014; prepare/persist/policy/nested）
+- `devrix-d2-sa-refine-v2.0-toolpolicy` → `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/`（DM-015）
 
 **2026-06-14 归档（S7）**：
 

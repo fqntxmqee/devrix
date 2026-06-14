@@ -134,7 +134,7 @@ Score(ctx, item, rubric)
 ```
 RuntimeOrchestrationValidator.OnDecision(ctx, rec, session)
   ├─ enabled=false: return immediately
-  ├─ Start tracing span ("orch.OnDecision")
+  ├─ Start tracing span (`D6_S4_Validation_Decision`)
   ├─ Record metrics (orch_decisions_total)
   ├─ preFilter(rec):
   │   ├─ Trusted tool allowlist match → skip (orch_decisions_by_stage: prefilter_skip)

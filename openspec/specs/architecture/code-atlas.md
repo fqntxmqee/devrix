@@ -22,13 +22,13 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | L4 ID | 名称 | D-S | 包路径 | 关键类型 |
 |-------|------|-----|--------|----------|
 | query_loop | QueryLoop 主循环 | D2-S10 | `contextengine/query/` | `Loop`, `SubQuery`, `FlowTap` |
-| toolrunner | 工具执行与沙箱 | D2-S5/D2-S8 | `contextengine/toolrunner/` | `ToolRunner`, `Sandbox`, builtins |
+| toolrunner | 工具执行与沙箱 | D2-S5/D2-S8 | `contextengine/policy/toolrunner/` | `ToolRunner`, `Sandbox`, builtins |
 | user_context | UserContext prepend | D2-S10 | `contextengine/usercontext/` | `Provider`, `PrependForAPI` |
 | attachments | Plan mode 附件 | D2-S10 | `contextengine/attachments/` | `Registry` |
-| permission_mode | Plan 写过滤 | D2-S10 | `contextengine/permission/` | `Mode`, `PlanFilePath` |
+| permission_mode | Plan 写过滤 | D2-S10 | `contextengine/policy/permission/` | `Mode`, `PlanFilePath` |
 | task_tools | Task 磁盘工具 | D2-S10 | `contextengine/tasks/` | `Manager`, `DiskStore` |
 | subquery | SubQuery / Fork | D2-S10 | `contextengine/query/` | `Run`, `BuildForkedMessages` |
-| sidechain_transcript | Sidechain JSONL | D2-S10 | `contextengine/transcript/` | `SidechainStore` |
+| sidechain_transcript | Sidechain JSONL | D2-S10 | `contextengine/persist/transcript/` | `SidechainStore` |
 | background_tasks | Background 通知 | D2-S11 | `contextengine/queue/` | `SessionQueue`, `ModeTaskNotification` |
 | execution_flow | FlowEvent 双通道 | ORCH-S2 | `orchestration/flow/` | `Hub`, `Publish` |
 | workplan | WorkPlan 读模型 | ORCH-S1 | `orchestration/workplan/` | `Service`, `Snapshot` |
@@ -47,8 +47,8 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | `WorkPlanSnapshot` | `shared/contracts/execution_flow.go` | ORCH WorkPlan, delegate_status |
 | `IPermissionGate`, `FileAutoApprover` | `shared/contracts/permission.go` | D2 ContextEngine, D1 Gateway, D4 Agent |
 | `ILLMGateway`, `ITierResolver` | `llmgateway/contracts.go` | D2 ContextEngine (via bridges/llm) |
-| `IToolRunner`, `IToolRegistry` | `contextengine/toolrunner/` | D2 QueryLoop, registry |
-| `ToolRegistry`, builtins | `contextengine/toolrunner/` | bash, read_file, glob, grep, edit |
+| `IToolRunner`, `IToolRegistry` | `contextengine/policy/toolrunner/` | D2 QueryLoop, registry |
+| `ToolRegistry`, builtins | `contextengine/policy/toolrunner/` | bash, read_file, glob, grep, edit |
 | `ExecutionFlowConfig` | `shared/config/execution_flow.go` | bootstrap, Hub |
 | `WorktreeConfig` | `shared/config/worktree.go` | delegate, worktree |
 | `DelegateConfig` | `shared/config/` (multi_agent) | delegate Service |

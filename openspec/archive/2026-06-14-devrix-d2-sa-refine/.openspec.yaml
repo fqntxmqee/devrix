@@ -1,0 +1,19 @@
+change_id: devrix-d2-sa-refine
+demand_id: DM-20260614-009
+status: s7_archived
+phase: v1.0_registry
+archived: 2026-06-14
+
+domains:
+  - id: D2
+    name: Context Engine
+    slug: contextengine
+    type: core
+
+related:
+  - DM-20260614-010
+  - DM-20260614-011
+  - DM-20260614-012
+  - DM-20260614-013
+  - DM-20260614-014
+  - DM-20260614-015

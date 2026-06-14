@@ -19,6 +19,7 @@ package coordinator
 import (
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -57,14 +58,14 @@ type IntentClassification struct {
 // In v1.0, status transitions are not strictly validated (see R1 Q3). v1.1
 // introduces a state-machine guard. Aliases for the v1.0 target names from
 // the spec are documented in d7-domain.md.
-type TaskStatus string
+type TaskStatus = workmodel.TaskStatus
 
 const (
-	TaskStatusPending    TaskStatus = "pending"
-	TaskStatusInProgress TaskStatus = "in_progress"
-	TaskStatusCompleted  TaskStatus = "completed"
-	TaskStatusFailed     TaskStatus = "failed"
-	TaskStatusCancelled  TaskStatus = "cancelled"
+	TaskStatusPending    = workmodel.TaskStatusPending
+	TaskStatusInProgress = workmodel.TaskStatusInProgress
+	TaskStatusCompleted  = workmodel.TaskStatusCompleted
+	TaskStatusFailed     = workmodel.TaskStatusFailed
+	TaskStatusCancelled  = workmodel.TaskStatusCancelled
 )
 
 // TaskType is the work-class used by SynthesizeTaskGraph (v1.1) and executor

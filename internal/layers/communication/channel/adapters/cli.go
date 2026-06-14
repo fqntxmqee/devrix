@@ -13,7 +13,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/renderers"
-	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
@@ -29,8 +29,8 @@ type CLIAdapter struct {
 	reader       *bufio.Reader
 	writer       io.Writer
 	obsBridge    *observability.Bridge
-	taskCommands *tasks.CLICommands
-	planMode     *tasks.PlanMode
+	taskCommands *workmodel.CLICommands
+	planMode     *workmodel.PlanMode
 
 	mu               sync.RWMutex
 	running          bool
@@ -50,17 +50,17 @@ func NewCLIAdapter(
 		cfg:          cfg,
 		reader:       bufio.NewReader(os.Stdin),
 		writer:       os.Stdout,
-		taskCommands: tasks.NewCLICommands(tasks.GlobalTaskManager),
-		planMode:     tasks.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
+		taskCommands: workmodel.NewCLICommands(workmodel.GlobalTaskManager),
+		planMode:     workmodel.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
 	}
 }
 
 // SetPlanModeLLM sets the LLM for plan mode.
-func (a *CLIAdapter) SetPlanModeLLM(llm tasks.LLMCompleter) {
+func (a *CLIAdapter) SetPlanModeLLM(llm workmodel.LLMCompleter) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.planMode != nil {
-		a.planMode = tasks.NewPlanMode(llm, a.obsBridge)
+		a.planMode = workmodel.NewPlanMode(llm, a.obsBridge)
 	}
 }
 
@@ -234,7 +234,7 @@ func (a *CLIAdapter) handleTaskCommand(args []string) {
 	a.mu.RUnlock()
 
 	raw := "/task " + strings.Join(args, " ")
-	cmd := tasks.ParseCommand(raw)
+	cmd := workmodel.ParseCommand(raw)
 	if cmd == nil {
 		a.writer.Write([]byte("Invalid task command\n"))
 		return
@@ -255,7 +255,7 @@ func (a *CLIAdapter) handlePlanCommand(args []string) {
 	}
 	a.mu.RUnlock()
 
-	planCommands := tasks.NewPlanCLICommands(a.planMode)
+	planCommands := workmodel.NewPlanCLICommands(a.planMode)
 	output := planCommands.Handle(args, sessionID, workDir, nil)
 	a.writer.Write([]byte(output + "\n"))
 }

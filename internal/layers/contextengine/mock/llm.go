@@ -3,7 +3,7 @@ package mockctx
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/types"
 )

@@ -3,17 +3,18 @@ package delegate
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // Covers: async delegate Leader drain notification
 func TestNotifyLeaderAsyncComplete_should_enqueue_main_thread(t *testing.T) {
-	q := queue.NewSessionQueue()
+	q := sessionqueue.NewSessionQueue()
 	s := &Service{queue: q}
 	s.notifyLeaderAsyncComplete("sess_async", "worker-1", WorkerSpec{Role: WorkerRoleExplore}, "explore done", nil)
 
 	drained := q.Drain("sess_async", "", true)
-	if len(drained) != 1 || drained[0].Mode != queue.ModeTaskNotification {
+	if len(drained) != 1 || drained[0].Mode != contracts.ModeTaskNotification {
 		t.Fatalf("drain = %+v", drained)
 	}
 	if drained[0].AgentID != "" {

@@ -32,7 +32,7 @@
 | IM ingress / 信号语义 | D1 | EngineEvent 产出，展示归 D1 |
 | ProcessMessage / Wave / ClassifyIntent | D7 | Leader |
 | Task 写模型 / PlanMode | D7-S1/S5 | 代码暂在 `tasks/` |
-| delegate_* 路由 | D7 + D4 | `delegate_tools.go` |
+| delegate_* 路由 | ✅ D7 `delegatetools/` | ~~`delegate_tools.go`~~ 已迁出 |
 | FlowEvent / WorkPlan | D7-S4 | `queue/` delegate-progress |
 | 结论质量 / 信誉 | D6 | Judge |
 
@@ -70,7 +70,7 @@
 | D2-S13 | Conversation | Legacy | → S15 |
 | D2-S14 | Mock | Legacy | 测试辅助 |
 
-> **Change:** `openspec/changes/devrix-d2-sa-refine/` (DM-20260614-009)
+> **Change:** `openspec/archive/2026-06-14-devrix-d2-sa-refine/` (DM-20260614-009)
 
 ---
 
@@ -141,9 +141,10 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | QueryLoop 主路径 | ✅ IMPLEMENTED |
 | Per-turn compression | ✅ IMPLEMENTED |
 | Deferred complete | ✅ IMPLEMENTED |
-| D2 Thin（无 D4 import in query） | 🔶 代码满足；v1.1 加测试 |
+| D2 Thin（query 无 orchestration/multiagent） | ✅ IMPLEMENTED | `d2_thin_test.go` |
+| D7 ingress（capture 无 contextengine） | ✅ IMPLEMENTED | `d7_boundary_test.go` |
 | tasks/ 归 D7 | ⬜ v2.0 |
-| delegate_tools 移除 | ⬜ v2.0 |
+| ~~delegate_tools 移除~~ | ✅ `orchestration/delegatetools/` (DM-011) |
 | scenario 物理路径 S15/S17/S18 | ⬜ v2.0 |
 
 ---

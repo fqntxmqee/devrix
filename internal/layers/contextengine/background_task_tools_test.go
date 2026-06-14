@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/contextengine/nested"
 )
 
 // withToolSession sets the session id into ctx for the duration of the call.
@@ -16,11 +16,11 @@ func withToolSession(ctx context.Context, sessionID string) context.Context {
 
 // task_stop integration test
 func TestTaskStopRunner_cancels_running_task(t *testing.T) {
-	reg := query.NewBackgroundRegistry()
+	reg := nested.NewBackgroundRegistry()
 	handle, _ := reg.RegisterWithCancel("sess_ts", "explore", "Explore", "explore_ts")
 	defer handle.Cancel()
 
-	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: query.NewBackgroundWaiter(reg)})
+	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: nested.NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
 	reg2 := NewToolRegistry()
@@ -49,11 +49,11 @@ func TestTaskStopRunner_cancels_running_task(t *testing.T) {
 }
 
 func TestTaskStopRunner_rejects_cross_session(t *testing.T) {
-	reg := query.NewBackgroundRegistry()
+	reg := nested.NewBackgroundRegistry()
 	handle, _ := reg.RegisterWithCancel("sess_a", "explore", "Explore", "explore_a")
 	defer handle.Cancel()
 
-	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: query.NewBackgroundWaiter(reg)})
+	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: nested.NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
 	reg2 := NewToolRegistry()
@@ -68,11 +68,11 @@ func TestTaskStopRunner_rejects_cross_session(t *testing.T) {
 
 // task_output integration test (block=false on running)
 func TestTaskOutputRunner_block_false_returns_running(t *testing.T) {
-	reg := query.NewBackgroundRegistry()
+	reg := nested.NewBackgroundRegistry()
 	handle, _ := reg.RegisterWithCancel("sess_out", "explore", "Explore", "explore_out")
 	defer handle.Cancel()
 
-	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: query.NewBackgroundWaiter(reg)})
+	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: nested.NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
 	reg2 := NewToolRegistry()
@@ -92,10 +92,10 @@ func TestTaskOutputRunner_block_false_returns_running(t *testing.T) {
 
 // task_output block=true waits for terminal
 func TestTaskOutputRunner_block_true_waits_until_terminal(t *testing.T) {
-	reg := query.NewBackgroundRegistry()
+	reg := nested.NewBackgroundRegistry()
 	handle, _ := reg.RegisterWithCancel("sess_wait", "explore", "Explore", "explore_wait")
 
-	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: query.NewBackgroundWaiter(reg)})
+	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: nested.NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
 	reg2 := NewToolRegistry()
@@ -129,7 +129,7 @@ func TestTaskOutputRunner_block_true_waits_until_terminal(t *testing.T) {
 
 // task_list_background integration
 func TestTaskListBackgroundRunner_returns_session_tasks(t *testing.T) {
-	reg := query.NewBackgroundRegistry()
+	reg := nested.NewBackgroundRegistry()
 	c1, _ := reg.RegisterWithCancel("sess_l", "explore", "Explore", "e1")
 	c2, _ := reg.RegisterWithCancel("sess_l", "implement", "Implement", "i1")
 	c3, _ := reg.RegisterWithCancel("sess_other", "explore", "Explore", "e2")
@@ -137,7 +137,7 @@ func TestTaskListBackgroundRunner_returns_session_tasks(t *testing.T) {
 	defer c2.Cancel()
 	defer c3.Cancel()
 
-	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: query.NewBackgroundWaiter(reg)})
+	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: nested.NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
 	reg2 := NewToolRegistry()

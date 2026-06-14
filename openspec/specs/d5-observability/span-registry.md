@@ -5,7 +5,7 @@
 **Status:** Active (2026-06-14)
 **Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
 
-> D5 是可观测性元域。本文件为全局 Span/Operation 注册表的权威索引，汇总所有 56 个已注册 Operation 及其按域/组件的分布。
+> D5 是可观测性元域。本文件为全局 Span/Operation 注册表的权威索引，汇总所有 57 个已注册 Operation 及其按域/组件的分布。
 
 ---
 
@@ -45,17 +45,18 @@ context.process
 └── context.system_prompt.build
 ```
 
-## 跨域 Agent / Orchestration
+## 跨域 Agent / Orchestration / Evolution
 
 ```
 agent.run → agent.tool.call → agent.fork|join|terminate
+  └── D6_S4_Validation_Decision              [if evolution.orchestration.enabled]
 orchestration.wave.schedule → orchestration.wave.task.execute
 orchestration.flow.event.publish
 ```
 
 ---
 
-## Operation 注册表（56 ops，按 Layer 分组）
+## Operation 注册表（57 ops，按 Layer 分组）
 
 | Layer | Component | Count | Operations |
 |-------|-----------|-------|------------|
@@ -70,6 +71,7 @@ orchestration.flow.event.publish
 | llm | llm_adapter | 1 | `llm.adapter.stream` |
 | agent | agent_tool | 6 | `agent.tool.call`, `agent.run`, `agent.fork`, `agent.join`, `agent.terminate`, `agent.state.transition` |
 | orchestration | orchestrator | 3 | `orchestration.wave.schedule`, `orchestration.wave.task.execute`, `orchestration.flow.event.publish` |
+| evolution | validation | 1 | `D6_S4_Validation_Decision` |
 
 ---
 
@@ -109,8 +111,9 @@ Span 属性通过 `telemetry.SpanAttrs()` 自动注入 `devrix.layer` 和 `devri
 | D2 Context Engine | `openspec/specs/d2-context-engine/span-registry.md` | 27 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/span-registry.md` | 5 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/span-registry.md` | 6 |
+| D6 Evolution | `openspec/specs/d6-evolution/span-registry.md` | 1 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/span-registry.md` | 3 |
-| **D5 (本文件)** | — | **56 (全部)** |
+| **D5 (本文件)** | — | **57 (全部)** |
 
 ---
 

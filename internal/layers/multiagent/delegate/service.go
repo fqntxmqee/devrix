@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -32,13 +32,13 @@ type Service struct {
 	cfg      config.DelegateConfig
 	fallback SubQueryFallback
 	worktree *worktree.Manager
-	queue    *queue.SessionQueue
+	queue    *sessionqueue.SessionQueue
 }
 
 // NewService creates a DelegateService.
-func NewService(cfg config.DelegateConfig, fallback SubQueryFallback, wt *worktree.Manager, q *queue.SessionQueue) *Service {
+func NewService(cfg config.DelegateConfig, fallback SubQueryFallback, wt *worktree.Manager, q *sessionqueue.SessionQueue) *Service {
 	if q == nil {
-		q = queue.GlobalSessionQueue
+		q = sessionqueue.GlobalSessionQueue
 	}
 	return &Service{cfg: cfg, fallback: fallback, worktree: wt, queue: q}
 }
@@ -220,9 +220,9 @@ func (s *Service) notifyLeaderAsyncComplete(sessionID, workerID string, spec Wor
 	} else {
 		body = fmt.Sprintf("async worker %s (%s) completed: %s", workerID, spec.Role, summary)
 	}
-	s.queue.Enqueue(sessionID, queue.QueuedCommand{
+	s.queue.Enqueue(sessionID, contracts.QueuedCommand{
 		Value: body,
-		Mode:  queue.ModeTaskNotification,
+		Mode:  contracts.ModeTaskNotification,
 	})
 }
 

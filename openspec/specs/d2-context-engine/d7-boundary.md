@@ -109,13 +109,18 @@ D1.Gateway.RouteInbound
 
 | # | 路径 | 行为 | 目标 | Phase |
 |---|------|------|------|-------|
-| 1 | `contextengine/tasks/` | Task CRUD | D7-S1 `workmodel/` | v2.0 |
-| 2 | `contextengine/tasks/plan_*.go` | Plan 策略 | D7-S5 | v2.0 |
-| 3 | `contextengine/delegate_tools.go` | D4 路由 | D7 orchestration F | v2.0 |
-| 4 | `contextengine/queue/` delegate-progress | Flow drain | D7-S4 | v2.0 |
-| 5 | `contextengine/worker_tools.go` | Worker 编排面 | D7 + D4 | v2.0 |
+| 1 | ~~`contextengine/tasks/`~~ | Task CRUD | D7-S1 `workmodel/` | ✅ DM-012 |
+| 2 | ~~`contextengine/tasks/plan_*.go`~~ | Plan 策略 | D7-S5 `workmodel/plan_*.go` | ✅ DM-012 |
+| 3 | ~~`contextengine/delegate_tools.go`~~ | D4 路由 | `orchestration/delegatetools/` | ✅ DM-011 |
+| 4 | ~~`contextengine/queue/`~~ delegate-progress | Flow drain | D7-S4 `sessionqueue/` | ✅ DM-013 |
+| 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `toolpolicy/` | ✅ DM-015 |
 
-v1.0：**仅登记**，不移动代码。
+v1.0：**仅登记**，不移动代码。  
+v2.0 slice-1（DM-011）：`delegate_tools` **已迁移**。  
+v2.0 slice-2（DM-012）：`contextengine/tasks/` → `orchestration/workmodel/` **已迁移**。  
+v2.0 slice-3（DM-013）：`contextengine/queue/` → `orchestration/sessionqueue/` **已迁移**。  
+v2.0 slice-4（DM-015）：`worker_tools.go` → `orchestration/toolpolicy/` **已迁移**。  
+v2.0 slice-5（DM-014）：D2 物理目录 `prepare/` `persist/` `policy/` `nested/` **已收敛**。
 
 ---
 
@@ -141,6 +146,14 @@ D2 `query` package MUST NOT import D4 multi-agent orchestration packages. Orches
 - GIVEN `internal/layers/contextengine/query/` sources
 - WHEN package import graph is analyzed
 - THEN `multiagent` and `orchestration` packages are not imported
+- AND regression test `internal/lint/layer/d2_thin_test.go` passes (DM-20260614-010)
+
+#### Scenario: D1 capture does not import D2 directly
+
+- GIVEN `internal/layers/communication/capture/` sources
+- WHEN package import graph is analyzed
+- THEN `contextengine` package is not imported
+- AND regression test `internal/lint/layer/d7_boundary_test.go` passes
 
 ### Requirement: FlowEvent Ownership
 
@@ -159,8 +172,8 @@ Unified `FlowEvent` aggregation and delegate-progress drain Canonical ownership 
 
 | 文档 | 用途 |
 |------|------|
-| `changes/devrix-d2-sa-refine/gaming-analysis.md` | 博弈推导 |
-| `changes/devrix-d2-sa-refine/design.md` §12 | 设计 Decision |
-| `openspec/changes/devrix-d2-sa-refine/` | Change 包 |
+| `archive/2026-06-14-devrix-d2-sa-refine/gaming-analysis.md` | 博弈推导 |
+| `archive/2026-06-14-devrix-d2-sa-refine/design.md` §12 | 设计 Decision |
+| `openspec/archive/2026-06-14-devrix-d2-sa-refine/` | Change 包（S7 已归档） |
 | DM-20260614-008 | D7 Leader 规格 |
 | DM-20260614-007 | D1→D7 ingress |

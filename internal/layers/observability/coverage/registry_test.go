@@ -9,6 +9,7 @@ import (
 	// Import domain spans packages to trigger self-registration via init()
 	_ "github.com/devrix/devrix/internal/layers/communication"
 	_ "github.com/devrix/devrix/internal/layers/contextengine"
+	_ "github.com/devrix/devrix/internal/layers/evolution"
 	_ "github.com/devrix/devrix/internal/layers/llmgateway"
 	_ "github.com/devrix/devrix/internal/layers/multiagent"
 	_ "github.com/devrix/devrix/internal/layers/orchestration/coordinator"
@@ -106,6 +107,9 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		// D7 Task Manager (D7-S1)
 		telemetry.OpD7_S1_Task_Manager_Create,
 		telemetry.OpD7_S1_Task_Manager_Update,
+
+		// D6 Evolution - Runtime Validation (D6-S4)
+		telemetry.OpD6_S4_Validation_Decision,
 	}
 
 	registry := coverage.AllOperations()

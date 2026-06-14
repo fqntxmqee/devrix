@@ -1,7 +1,7 @@
 package delegate
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/prompt/agent"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 

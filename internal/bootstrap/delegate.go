@@ -5,10 +5,11 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/contextengine/nested"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/delegate"
+	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -37,7 +38,7 @@ func WireDelegate(
 	}
 	var fallback delegate.SubQueryFallback
 	if engine != nil && ctxCfg.QueryLoop.Enabled {
-		fallback = contextengine.BuildSubQueryFallback(query.LoopDeps{
+		fallback = delegatetools.BuildSubQueryFallback(nested.LoopDeps{
 			Loop: engine.QueryLoop(),
 		})
 	}
@@ -46,12 +47,12 @@ func WireDelegate(
 		wt = worktree.NewManager(ctxCfg.Worktree)
 	}
 	svc := delegate.NewService(maCfg.Delegate, fallback, wt, nil)
-	contextengine.SetDelegateToolsDeps(contextengine.DelegateToolsDeps{
+	delegatetools.SetDeps(delegatetools.Deps{
 		Service: svc,
 		Leader:  gatewayLeaderResolver{gw: gw},
 	})
 	if reg, ok := toolReg.(*contextengine.ToolRegistry); ok {
-		if err := contextengine.RegisterDelegateTools(reg, maCfg); err != nil {
+		if err := delegatetools.RegisterTools(reg, maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)
 		}
 	}

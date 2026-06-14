@@ -799,7 +799,7 @@ orchestration:
 | `orch_judge_latency_seconds` | Histogram | provider, model | 判官 LLM 调用延迟分布 |
 | `orch_observer_active` | Gauge | session_id | Observer 存活信号（=1 表示已注册） |
 
-**Tracing span**: `orch.OnDecision` — 每次决策验证创建一个 span，包含 preFilter/judge/intervention 阶段事件，在 Jaeger 中可追踪单次决策全链路。
+**Tracing span**: `D6_S4_Validation_Decision`（别名 `evolution.decision.validate`）— 每次决策验证创建一个 span，包含 preFilter/judge/intervention 阶段事件，在 Jaeger 中可追踪单次决策全链路。
 
 **代码**:
 - `internal/shared/config/orchestration.go` — `OrchestrationConfig`, `BuildOrchestrationConfig()`, `DefaultOrchestrationConfig()`

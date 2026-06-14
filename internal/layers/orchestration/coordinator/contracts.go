@@ -10,7 +10,7 @@ import (
 // QueryLoopExecutor is the context-engine contract consumed by the
 // orchestrator. It runs a single LLM↔Tool loop and streams EngineEvent.
 // The orchestrator must NOT call into contextengine internals (no
-// import of contextengine/queue/attachments/usercontext).
+// import of contextengine/attachments/usercontext).
 type QueryLoopExecutor interface {
 	// RunQueryLoop runs a single LLM↔Tool interaction and returns a
 	// streaming channel of EngineEvent. The channel is closed on terminal

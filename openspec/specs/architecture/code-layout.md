@@ -89,11 +89,14 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 | S ID | Scenario | scenario-slug | 目标路径 | 当前路径（迁移中） |
 |------|----------|---------------|----------|-------------------|
-| D7-S1 | Work Model | `workmodel` | `orchestration/workmodel/` | `contextengine/tasks/`（部分） |
+| D7-S1 | Work Model | `workmodel` | `orchestration/workmodel/` | ✅ DM-012 |
 | D7-S2 | Session Orchestrator | `sessionorchestrator` | `orchestration/sessionorchestrator/` | `orchestration/coordinator/` |
 | D7-S3 | Wave Scheduler | `wavescheduler` | `orchestration/wavescheduler/` | `orchestration/wave/` |
 | D7-S4 | Execution Flow | `executionflow` | `orchestration/executionflow/` | `flow/`, `workplan/`, `imsink/` |
 | D7-S5 | Decision & Planning | `decisionplanning` | `orchestration/decisionplanning/` | `coordinator/classifier*` |
+| — | Worker tool policy F | `toolpolicy` | `orchestration/toolpolicy/` | ✅ DM-015 |
+| — | Delegate routing F | `delegatetools` | `orchestration/delegatetools/` | ✅ DM-011 |
+| — | Session command queue F | `sessionqueue` | `orchestration/sessionqueue/` | ✅ DM-013 |
 | — | Milestone DAG | `milestone` | `orchestration/milestone/` | ✅ 已迁入 |
 
 ### 4.3 D2 Context Engine
@@ -102,28 +105,29 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 | S ID | Scenario | scenario-slug | 当前路径 | v2.0 目标 |
 |------|----------|---------------|----------|-----------|
-| D2-S15 | PrepareExecutionContext | `prepare` | `engine.go` + `memory/` `compression/` `prompt/` `conversation/` | `contextengine/prepare/` |
+| D2-S15 | PrepareExecutionContext | `prepare` | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014 |
 | D2-S16 | RunQueryLoop | `query` | `contextengine/query/` | 保持（loop 瘦身） |
-| D2-S17 | PersistSessionState | `persist` | `snapshot/`, `transcript/`, `engine.go` | `contextengine/persist/` |
-| D2-S18 | EnforceExecutionPolicy | `policy` | `permission/`, `toolrunner/`, `harness/toolpool.go` | `contextengine/policy/` |
-| D2-S19 | NestedExecution | `nested` | `query/subquery.go`, `query/background.go` | `contextengine/nested/` |
+| D2-S17 | PersistSessionState | `persist` | `persist/snapshot/`, `persist/transcript/` | ✅ DM-014 |
+| D2-S18 | EnforceExecutionPolicy | `policy` | `policy/permission/`, `policy/toolrunner/` | ✅ DM-014 |
+| D2-S19 | NestedExecution | `nested` | `nested/subquery.go`, `nested/background.go`, `nested/fork.go` | ✅ DM-014 |
 | D2-S20 | LegacyHarnessFallback | `legacyharness` | `harness/` | 保持或 `legacy/` |
 
 **Legacy module 路径（冻结追溯）：**
 
 | Legacy S | scenario-slug | 路径 |
 |----------|---------------|------|
-| D2-S2 | `compression` | `contextengine/compression/` |
-| D2-S3 | `memory` | `contextengine/memory/` |
-| D2-S11 | `queue` | `contextengine/queue/` → v2.0 迁 D7-S4 |
+| D2-S2 | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` | ✅ DM-014 |
+| D2-S3 | `memory` | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/` | ✅ DM-014 |
+| D2-S11 | `queue` | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4) | ✅ DM-013 |
 | D2-S12 | `worktree` | `contextengine/worktree/` |
 
 **跨域漂移（v2.0 迁出 D2）：**
 
-| 组件 | 当前路径 | 目标 |
-|------|----------|------|
-| TaskManager | `contextengine/tasks/` | `orchestration/workmodel/` (D7-S1) |
-| delegate_tools | `contextengine/delegate_tools.go` | D7 orchestration F |
+| 组件 | 当前路径 | 目标 | 状态 |
+|------|----------|------|------|
+| ~~delegate_tools~~ | ~~`contextengine/delegate_tools.go`~~ | `orchestration/delegatetools/` | ✅ DM-011 |
+| TaskManager | ~~`contextengine/tasks/`~~ | `orchestration/workmodel/` (D7-S1) | ✅ DM-012 |
+| queue delegate-progress | ~~`contextengine/queue/`~~ | D7-S4 `sessionqueue/` | ✅ DM-013 |
 
 ---
 
@@ -193,4 +197,4 @@ internal/layers/communication/
 |------|------|------|
 | 1.0.0 | 2026-06-14 | 初版：D1/D7 scenario-slug 注册表 + D1 迁移矩阵 |
 | 1.1.0 | 2026-06-14 | D1 物理路径迁移完成（capture/channel/delivery/kernel） |
-| 1.2.0 | 2026-06-14 | 对齐 `coding.md` §2.2：S14–S16 目录改为 thinking/taskprogress/conclusion；删除包名可与目录不一致的条款 |
+| 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |

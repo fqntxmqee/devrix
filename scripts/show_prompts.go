@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 )
 
 func main() {

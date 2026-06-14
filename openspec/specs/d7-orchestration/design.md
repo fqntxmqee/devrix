@@ -83,7 +83,7 @@ graph LR
     BR --> WP
 ```
 
-v1.0：**不合并存储**；`QueryWorkPlan` 统一查询。BackgroundRun 可先保留 `query/background.go` + D7 facade。
+v1.0：**不合并存储**；`QueryWorkPlan` 统一查询。BackgroundRun 可先保留 `nested/background.go` + D7 facade。
 
 ### 迁移共存
 

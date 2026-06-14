@@ -29,7 +29,7 @@ DM-012 QueryLoop v6 已于 2026-06-10 交付，并在生产配置 `query_loop.en
 ### 3.2 阶段 2：统一压缩入口
 
 - QueryLoop 迭代前走 messages-only 七步管道（已存在）
-- 删除 harness 专用压缩分叉（位于 `contextengine/compression/pipeline.go`）
+- 删除 harness 专用压缩分叉（位于 `contextengine/prepare/compression/pipeline.go`）
 - 验证：所有 `harnessEnabled` 触发的压缩路径改为 QueryLoop 路径
 
 ### 3.3 阶段 3：PathRegressionProbe

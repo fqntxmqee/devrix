@@ -57,7 +57,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P1 |
 | D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
 | D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | — | PLANNED (v1.1) | P1 |
-| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `contextengine/query/background_*_test.go` | PARTIAL | P1 |
+| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `contextengine/nested/background_*_test.go` | PARTIAL | P1 |
 | D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | — | PLANNED (v1.1) | P2 |
 
 ---

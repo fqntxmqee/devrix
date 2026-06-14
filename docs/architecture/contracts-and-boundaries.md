@@ -41,8 +41,8 @@ Layer lint `--strict` 与 D6 **LayerViolationProbe** 在 CI 强制执行。
 | `IPermissionGate` | **`shared/contracts/permission.go`** | D2 QueryLoop、D4 Agent、D1 Gateway |
 | `ILLMGateway` | **`llmgateway/contracts.go`** | D2（经 bridges/llm） |
 | `ITierResolver` | **`llmgateway/contracts.go`** | D2 模型/Tier 解析 |
-| `IToolRunner` | **`contextengine/toolrunner/contracts.go`** | D2 QueryLoop |
-| `IToolRegistry` | **`contextengine/toolrunner/contracts.go`** | D2 registry/bootstrap |
+| `IToolRunner` | **`contextengine/policy/toolrunner/contracts.go`** | D2 QueryLoop |
+| `IToolRegistry` | **`contextengine/policy/toolrunner/contracts.go`** | D2 registry/bootstrap |
 | `ExecutionFlowHub` | `shared/contracts/execution_flow.go` | D2 SubQuery、D4 Delegate、ORCH |
 | `FlowEvent` | `shared/contracts/execution_flow.go` | 进度双写 IM + Leader Queue |
 | `WorkPlanSnapshot` | `shared/contracts/execution_flow.go` | ORCH、delegate_status |

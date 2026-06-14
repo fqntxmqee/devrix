@@ -242,7 +242,7 @@ D7-S1 MUST own the unified Task data model as the single source of truth. Task C
 - AND the run status is `running`
 - AND on completion the status transitions to terminal (`completed` / `failed` / `cancelled`)
 - AND the result is available via task_output tool and QueryWorkPlan Flow projection
-- AND v1.0 implementation may remain in `query/background.go` with D7-S1 facade (D7-S1-T07)
+- AND v1.0 implementation may remain in `nested/background.go` with D7-S1 facade (D7-S1-T07)
 
 #### Scenario: Task persistence survives restart
 

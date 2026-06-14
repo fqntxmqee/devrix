@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
-	"github.com/devrix/devrix/internal/layers/contextengine/compression"
-	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/harness"
-	"github.com/devrix/devrix/internal/layers/contextengine/memory"
-	"github.com/devrix/devrix/internal/layers/contextengine/prompt"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
-	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
-	"github.com/devrix/devrix/internal/layers/contextengine/transcript"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
+	"github.com/devrix/devrix/internal/layers/contextengine/token"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -54,6 +54,10 @@ type EngineDeps struct {
 	// TierResolver resolves model tier aliases to concrete model names.
 	// Optional; when nil, tier-based model selection is disabled.
 	TierResolver llmgateway.ITierResolver
+	// SessionCommandQueue drains Hub-Spoke notifications into QueryLoop (wired from bootstrap).
+	SessionCommandQueue contracts.SessionCommandQueue
+	// AgentRoleToolFilter hides delegate/worker tools (wired from orchestration/toolpolicy).
+	AgentRoleToolFilter AgentRoleToolFilter
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -81,6 +85,7 @@ type ContextEngine struct {
 	mainTranscript *transcript.MainThreadStore
 	defaultModel string
 	tierResolver llmgateway.ITierResolver
+	agentRoleToolFilter AgentRoleToolFilter
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -100,11 +105,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	if compObserver == nil {
 		compObserver = NoOpCompressionObserver{}
 	}
-	counter := ResolveTokenCounter(cfg, deps.TokenCounter)
+	counter := token.ResolveCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)
 	var asyncCompact *compression.AsyncAutocompacter
 	if cfg.Compression.Autocompact.Enabled {
-		asyncCompact = compression.NewAsyncAutocompacter(&AutocompactSummarizer{
+		asyncCompact = compression.NewAsyncAutocompacter(&compression.LLMSummarizer{
 			LLM:     deps.LLM,
 			Timeout: cfg.Compression.Autocompact.Timeout,
 		})
@@ -130,12 +135,12 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		WrapToolStreamContext: func(ctx context.Context, emit query.EmitFunc, sessionID, toolName string) context.Context {
 			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
 		},
-		SessionQueue:   queue.GlobalSessionQueue,
+		SessionQueue:   deps.SessionCommandQueue,
 		StreamingTools:    cfg.QueryLoop.StreamingTools,
 		Observability:     deps.ObsBridge,
 	}
 	if cfg.QueryLoop.CompressPerTurn {
-		loop.CompressFactory = newCompressFn(
+		loop.CompressFactory = compression.NewQueryLoopCompressFactory(
 			cfg.QueryLoop.CompressPerTurn,
 			cfg,
 			counter,
@@ -181,6 +186,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		mainTranscript: mainTranscript,
 		defaultModel: deps.DefaultModel,
 		tierResolver: deps.TierResolver,
+		agentRoleToolFilter: deps.AgentRoleToolFilter,
 	}
 }
 
@@ -517,7 +523,9 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		tools, _ = e.toolsReg.ListTools(ctx, sc.WorkDir)
 	}
 	tools = FilterToolsByPermissionMode(sc.PermissionMode, tools, sc.PlanFilePath)
-	tools = FilterToolsForAgentRole(sc, tools)
+	if e.agentRoleToolFilter != nil {
+		tools = e.agentRoleToolFilter.Filter(sc, tools)
+	}
 
 	res, runErr := e.queryLoop.Run(ctx, sc, query.Params{
 		SystemPrompt: sc.SystemPrompt,
@@ -734,14 +742,14 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		compression.WithCounter(e.counter),
 		compression.WithAutocompactConfig(e.cfg.Compression.Autocompact),
 		compression.WithCompressionConfig(e.cfg.Compression),
-		compression.WithSummarizer(&AutocompactSummarizer{
+		compression.WithSummarizer(&compression.LLMSummarizer{
 			LLM:     e.llm,
 			Timeout: e.cfg.Compression.Autocompact.Timeout,
 		}),
 	}
 	if sessionID != "" {
 		opts = append(opts,
-			compression.WithStepObserver(newTracingStepObserver(sessionID, e.obsBridge, e.compObserver)),
+			compression.WithStepObserver(compression.NewTracingStepObserver(sessionID, e.obsBridge, e.compObserver)),
 			compression.WithSessionID(sessionID),
 		)
 	}

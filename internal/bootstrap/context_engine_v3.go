@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 

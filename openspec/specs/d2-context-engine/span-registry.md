@@ -1,8 +1,8 @@
 # D2 Context Engine Span 注册表
 
 **Domain:** D2 Context Engine
-**Version:** 2.0.0
-**Status:** Active (2026-06-14)
+**Version:** 2.1.0
+**Status:** Active (2026-06-14) — Canonical S mapping (DM-20260614-009/010)
 **Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
 
 ---
@@ -11,17 +11,17 @@
 
 ### Context Engine（10 ops）
 
-| Operation | Kind | Component | Since | Key Attributes |
-|-----------|------|-----------|-------|----------------|
-| `context.process` | INTERNAL | context_engine | 1.2.0 | session_id |
-| `context.snapshot.load` | INTERNAL | context_engine | 1.2.0 | session_id |
-| `context.system_prompt.load` | INTERNAL | context_engine | 2.0.0 | — |
-| `context.compression.run` | INTERNAL | context_engine | 1.2.0 | — |
-| `context.compression.step` | INTERNAL | context_engine | 2.1.0 | step_name |
-| `context.longterm.recall` | INTERNAL | context_engine | 1.3.0 | — |
-| `context.longterm.store` | INTERNAL | context_engine | 1.3.0 | — |
-| `context.tools.register` | INTERNAL | context_engine | 2.0.0 | tool_count |
-| `context.memory.snapshot.save` | INTERNAL | context_engine | 2.0.0 | session_id |
+| Operation | Kind | Component | Canonical S | Since |
+|-----------|------|-----------|-------------|-------|
+| `context.process` | INTERNAL | context_engine | S15–S17 | 1.2.0 |
+| `context.snapshot.load` | INTERNAL | context_engine | S15 | 1.2.0 |
+| `context.system_prompt.load` | INTERNAL | context_engine | S15 | 2.0.0 |
+| `context.compression.run` | INTERNAL | context_engine | S15 | 1.2.0 |
+| `context.compression.step` | INTERNAL | context_engine | S15 | 2.1.0 |
+| `context.longterm.recall` | INTERNAL | context_engine | S15 | 1.3.0 |
+| `context.longterm.store` | INTERNAL | context_engine | S17 | 1.3.0 |
+| `context.tools.register` | INTERNAL | context_engine | S18 | 2.0.0 |
+| `context.memory.snapshot.save` | INTERNAL | context_engine | S17 | 2.0.0 |
 
 ### Harness Bootstrap（5 ops）
 
@@ -36,11 +36,11 @@
 
 ### QueryLoop（3 ops）
 
-| Operation | Kind | Component | Since | Key Attributes |
-|-----------|------|-----------|-------|----------------|
-| `query.loop.run` | INTERNAL | query_loop | 2.1.0 | session_id |
-| `query.loop.turn` | INTERNAL | query_loop | 2.1.0 | turn_n |
-| `query.loop.llm.call` | CLIENT | query_loop | 2.1.0 | model, turn_n |
+| Operation | Kind | Component | Canonical S | Since |
+|-----------|------|-----------|-------------|-------|
+| `query.loop.run` | INTERNAL | query_loop | **S16** | 2.1.0 |
+| `query.loop.turn` | INTERNAL | query_loop | **S16** | 2.1.0 |
+| `query.loop.llm.call` | CLIENT | query_loop | **S16** | 2.1.0 |
 
 ### Tool Execution（2 ops）
 

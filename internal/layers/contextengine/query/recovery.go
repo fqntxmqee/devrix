@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )

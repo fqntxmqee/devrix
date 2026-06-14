@@ -10,7 +10,7 @@
 
 ## Overview
 
-工具执行安全能力为 QueryLoop / ToolRunner 提供 bash 命令沙箱、插件化工具注册表、并发执行隔离与权限风险分级。实现于 `internal/layers/contextengine/toolrunner/` 与 `internal/shared/config/tool_config.go`。
+工具执行安全能力为 QueryLoop / ToolRunner 提供 bash 命令沙箱、插件化工具注册表、并发执行隔离与权限风险分级。实现于 `internal/layers/contextengine/policy/toolrunner/` 与 `internal/shared/config/tool_config.go`。
 
 **Demand:** DM-20260608-001  
 **Archive:** `openspec/archive/2026-06-08-devrix-tool-security/`

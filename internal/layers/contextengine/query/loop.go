@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
-	"github.com/devrix/devrix/internal/layers/contextengine/conversation"
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -37,7 +37,7 @@ type Loop struct {
 	// WrapToolStreamContext wraps the tool execution context with a stream emitter
 	// so agent tools (call_claude-code etc.) can stream mid-execution events.
 	WrapToolStreamContext func(ctx context.Context, emit EmitFunc, sessionID, toolName string) context.Context
-	SessionQueue          *queue.SessionQueue
+	SessionQueue          contracts.SessionCommandQueue
 	StreamingTools        bool
 	// Observability bridge for tracing. When nil, tracing is no-op.
 	Observability *observability.Bridge
@@ -130,7 +130,7 @@ func (l *Loop) Run(
 		if l.SessionQueue != nil && sc != nil {
 			mainThread := sc.AgentID == ""
 			drained := l.SessionQueue.Drain(sc.SessionID, sc.AgentID, mainThread)
-			messages = append(messages, queue.RenderNotifications(sc.SessionID, drained)...)
+			messages = append(messages, contracts.RenderQueueNotifications(sc.SessionID, drained)...)
 		}
 
 		uc := params.UserContext

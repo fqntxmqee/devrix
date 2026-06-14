@@ -7,10 +7,13 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -71,14 +74,17 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		return nil
 	}
 	longTerm := WireContextV3(b.ctxCfg)
-	tasks.InitGlobalTaskManager(b.ctxCfg.Tasks, b.obsBridge)
+	workmodel.InitGlobalTaskManager(b.ctxCfg.Tasks, b.obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
 		toolReg = contextengine.NewToolRegistry()
 	}
-	if err := contextengine.RegisterQueryLoopTools(toolReg, b.ctxCfg, tasks.GlobalTaskManager); err != nil {
+	if err := contextengine.RegisterQueryLoopTools(toolReg, b.ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
+	}
+	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, workmodel.GlobalTaskManager); err != nil {
+		slog.Error("register task tools", "error", err)
 	}
 	if err := contextengine.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
@@ -89,7 +95,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		}
 	}
 	if b.maCfg != nil && b.maCfg.Delegate.Enabled {
-		if err := contextengine.RegisterDelegateTools(toolReg, b.maCfg); err != nil {
+		if err := delegatetools.RegisterTools(toolReg, b.maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)
 		}
 	}
@@ -113,16 +119,18 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		perm = capture.NewPermissionGateAdapter(nil)
 	}
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          b.stack.Gateway,
-		TokenCounter: b.stack.TokenCounter,
-		Tools:        tools,
-		ToolsReg:     toolReg,
-		Permission:   perm,
-		Observer:     contextengine.NoOpObserver{},
-		LongTerm:     longTerm,
-		Config:       b.ctxCfg,
-		ObsBridge:    b.obsBridge,
-		DefaultModel: b.stack.DefaultModel,
-		TierResolver: b.stack.TierResolver,
+		LLM:                 b.stack.Gateway,
+		TokenCounter:        b.stack.TokenCounter,
+		Tools:               tools,
+		ToolsReg:            toolReg,
+		Permission:          perm,
+		Observer:            contextengine.NoOpObserver{},
+		LongTerm:            longTerm,
+		Config:              b.ctxCfg,
+		ObsBridge:           b.obsBridge,
+		DefaultModel:        b.stack.DefaultModel,
+		TierResolver:        b.stack.TierResolver,
+		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		AgentRoleToolFilter: toolpolicy.NewFilter(),
 	})
 }

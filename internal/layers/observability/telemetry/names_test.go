@@ -15,6 +15,13 @@ func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
 }
 
 
+func TestLayerAndComponent_should_map_evolution_validation_operation(t *testing.T) {
+	layer, component := telemetry.LayerAndComponent(telemetry.OpD6_S4_Validation_Decision)
+	if layer != telemetry.LayerEvolution || component != "validation" {
+		t.Fatalf("got layer=%q component=%q", layer, component)
+	}
+}
+
 func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
 	attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream)
 	if len(attrs) < 2 {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
-	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -20,7 +20,7 @@ func (c *captureIM) EmitWorkerProgress(ev contracts.FlowEvent) {
 }
 
 func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
-	q := queue.NewSessionQueue()
+	q := sessionqueue.NewSessionQueue()
 	im := &captureIM{}
 	hub := flow.NewHub(flow.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: false, IMProgress: true},
@@ -39,7 +39,7 @@ func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
 	})
 
 	drained := q.Drain("sess1", "", true)
-	if len(drained) != 1 || drained[0].Mode != queue.ModeDelegateProgress {
+	if len(drained) != 1 || drained[0].Mode != contracts.ModeDelegateProgress {
 		t.Fatalf("leader queue drain = %+v", drained)
 	}
 	if len(im.events) != 1 || im.events[0].Kind != contracts.FlowStarted {
@@ -48,8 +48,8 @@ func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
 }
 
 func TestHub_should_link_task_owner_on_started(t *testing.T) {
-	q := queue.NewSessionQueue()
-	tm := tasks.NewTaskManager()
+	q := sessionqueue.NewSessionQueue()
+	tm := workmodel.NewTaskManager()
 	task := tm.Create("sess1", "explore auth", "")
 	hub := flow.NewHub(flow.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true, IMProgress: false},
@@ -70,18 +70,18 @@ func TestHub_should_link_task_owner_on_started(t *testing.T) {
 	if !ok {
 		t.Fatal("task not found")
 	}
-	if got.Owner != "w1" || got.Status != tasks.TaskStatusInProgress {
+	if got.Owner != "w1" || got.Status != workmodel.TaskStatusInProgress {
 		t.Fatalf("task = %+v", got)
 	}
 }
 
 // T: D4-S10-A02-T07
 func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
-	tm := tasks.NewTaskManager()
+	tm := workmodel.NewTaskManager()
 	task := tm.Create("sess1", "implement feature", "")
 	hub := flow.NewHub(flow.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
-		Queue:  queue.NewSessionQueue(),
+		Queue:  sessionqueue.NewSessionQueue(),
 		Tasks:  tm,
 	})
 
@@ -104,18 +104,18 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	if !ok {
 		t.Fatal("task not found")
 	}
-	if got.Status != tasks.TaskStatusCompleted {
+	if got.Status != workmodel.TaskStatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 }
 
 // T: D4-S10-A02-T04 (WorkPlan includes task projection)
 func TestHub_snapshot_should_include_tasks(t *testing.T) {
-	tm := tasks.NewTaskManager()
+	tm := workmodel.NewTaskManager()
 	task := tm.Create("sess1", "auth audit", "")
 	hub := flow.NewHub(flow.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
-		Queue:  queue.NewSessionQueue(),
+		Queue:  sessionqueue.NewSessionQueue(),
 		Tasks:  tm,
 	})
 	hub.Publish(context.Background(), contracts.FlowEvent{
@@ -137,7 +137,7 @@ func TestHub_snapshot_should_include_tasks(t *testing.T) {
 
 func TestHub_should_not_emit_tool_call_to_im(t *testing.T) {
 	im := &captureIM{}
-	q := queue.NewSessionQueue()
+	q := sessionqueue.NewSessionQueue()
 	hub := flow.NewHub(flow.HubDeps{
 		Config: config.ExecutionFlowConfig{
 			Enabled:               true,

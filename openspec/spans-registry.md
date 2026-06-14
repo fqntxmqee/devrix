@@ -29,7 +29,7 @@
 
 本文档为 Devrix 全局 Span / Operation 注册表的索引入口。各域的 Span 注册表已拆分为独立文件。
 
-**总计：56 Operations，5 Layers，11 Components**
+**总计：57 Operations，6 Layers，12 Components**
 
 ---
 
@@ -42,7 +42,8 @@
 | D2 Context Engine | `openspec/specs/d2-context-engine/span-registry.md` | 27         | context_engine(9), harness(6), query_loop(3), tool_runner(2), plan_*(7) |
 | D3 LLM Gateway    | `openspec/specs/d3-llm-gateway/span-registry.md`    | 5          | llm_gateway(4), llm_adapter(1)                                          |
 | D4 Multi-Agent    | `openspec/specs/d4-multi-agent/span-registry.md`    | 6          | agent_tool(6)                                                           |
-| D5 Observability  | `openspec/specs/d5-observability/span-registry.md`  | 56 (全部)    | all                                                                     |
+| D5 Observability  | `openspec/specs/d5-observability/span-registry.md`  | 57 (全部)    | all                                                                     |
+| D6 Evolution      | `openspec/specs/d6-evolution/span-registry.md`      | 1          | validation(1)                                                           |
 | D7 Orchestration  | `openspec/specs/d7-orchestration/span-registry.md`  | 3          | orchestrator(3)                                                         |
 
 

@@ -1,31 +1,20 @@
 package contextengine
 
 import (
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // AutocompactMeta describes autocompact observability metadata.
-type AutocompactMeta struct {
-	Degraded      bool
-	SummaryTokens int
-	Model         string
-}
+type AutocompactMeta = compression.AutocompactMeta
 
 // ICompressionObserver emits compression pipeline events.
 //
 // DSAFT: D2-S2-A03-F01 (EmitCompressionEvents)
-type ICompressionObserver interface {
-	EmitCompressionStep(sessionID, step string, before, after int)
-	EmitAutocompact(sessionID string, meta AutocompactMeta)
-	EmitAutocompactComplete(sessionID string, summary types.Message, asyncToken string)
-}
+type ICompressionObserver = compression.CompressionEventSink
 
 // NoOpCompressionObserver discards compression observer events.
-type NoOpCompressionObserver struct{}
-
-func (NoOpCompressionObserver) EmitCompressionStep(string, string, int, int)          {}
-func (NoOpCompressionObserver) EmitAutocompact(string, AutocompactMeta)               {}
-func (NoOpCompressionObserver) EmitAutocompactComplete(string, types.Message, string) {}
+type NoOpCompressionObserver = compression.NoOpCompressionEventSink
 
 // IObserver emits context engine observability events.
 //

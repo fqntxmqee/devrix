@@ -1,7 +1,7 @@
 package contextengine
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/permission"
+	"github.com/devrix/devrix/internal/layers/contextengine/policy/permission"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 

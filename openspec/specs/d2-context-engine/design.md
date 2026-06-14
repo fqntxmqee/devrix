@@ -724,10 +724,10 @@ ContextEngine.Process()
 
 ```bash
 # 单元测试
-go test ./internal/layers/contextengine/prompt/... -v
+go test ./internal/layers/contextengine/prepare/prompt/... -v
 
 # 集成测试
-go test ./internal/layers/contextengine/prompt/... -v -run SystemPromptAssembler
+go test ./internal/layers/contextengine/prepare/prompt/... -v -run SystemPromptAssembler
 
 # 查看生成的提示词
 go run scripts/show_prompts.go

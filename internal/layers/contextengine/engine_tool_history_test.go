@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/memory"
-	"github.com/devrix/devrix/internal/layers/contextengine/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

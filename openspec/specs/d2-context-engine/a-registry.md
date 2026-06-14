@@ -52,8 +52,8 @@ D2 上下文引擎域 A 层注册表。**Canonical SoT：** D2-S15–S20（DM-20
 
 | A ID | Name | Type | Input | Output | Legacy | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D2-S19-A01 | RunSubQuery | A-BE | subquery_spec | result | S10 | `query/subquery.go` |
-| D2-S19-A02 | RunBackgroundTask | A-BE | task_spec | task_id | S10-A03 | `query/background.go` |
+| D2-S19-A01 | RunSubQuery | A-BE | subquery_spec | result | S10 | `nested/subquery.go` |
+| D2-S19-A02 | RunBackgroundTask | A-BE | task_spec | task_id | S10-A03 | `nested/background.go` |
 
 ### D2-S20: LegacyHarnessFallback
 
@@ -140,7 +140,7 @@ D2 上下文引擎域 A 层注册表。**Canonical SoT：** D2-S15–S20（DM-20
 |------|------|------|-------|--------|--------------|---------------|
 | D2-S10-A01 | RunQueryLoop | A-BE | session, params | result (messages, usage) | loop.{iterating,completed,failed} | `query/loop.go` |
 | D2-S10-A02 | AttachUserContext | A-BE | session | enriched_messages | session.user_context_set | `usercontext/provider.go` |
-| D2-S10-A03 | ExecuteBackgroundTask | A-BE | task_spec | task_id | task.{registered,running,completed} | `query/background.go` |
+| D2-S10-A03 | ExecuteBackgroundTask | A-BE | task_spec | task_id | task.{registered,running,completed} | `nested/background.go` |
 
 ## D2-S11: Queue
 

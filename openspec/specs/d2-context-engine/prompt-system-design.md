@@ -344,13 +344,13 @@ If you can say it in one sentence, don't use three.
 ### 7.1 单元测试
 
 ```bash
-go test ./internal/layers/contextengine/prompt/... -v
+go test ./internal/layers/contextengine/prepare/prompt/... -v
 ```
 
 ### 7.2 集成测试
 
 ```bash
-go test ./internal/layers/contextengine/prompt/... -v -run "SystemPromptAssembler|Loader"
+go test ./internal/layers/contextengine/prepare/prompt/... -v -run "SystemPromptAssembler|Loader"
 ```
 
 ### 7.3 验证脚本

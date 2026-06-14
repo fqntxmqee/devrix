@@ -19,7 +19,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S15-A03-T01 | D2-S2-A01-T01 | S15 | 超阈值触发压缩 | IMPLEMENTED |
 | D2-S16-A01-T01 | D2-S10-A01-T34 | S16 | Multi-turn tool loop | IMPLEMENTED |
 | D2-S16-A01-T02 | D2-CTX-T01 | S16 | Process cancel 无 panic | IMPLEMENTED |
-| D2-S16-A01-T03 | — | S16 | query 包无 D4 import | PLANNED (v1.1) |
+| D2-S16-A01-T03 | — | S16 | query 包无 D4/D7 import | IMPLEMENTED | `internal/lint/layer/d2_thin_test.go` |
 | D2-S17-A01-T01 | D2-S3-A01-T02 | S17 | Deferred complete 后快照 | IMPLEMENTED |
 | D2-S17-A02-T01 | D2-S6-A02-T01 | S17 | Main transcript append | IMPLEMENTED |
 | D2-S18-A01-T01 | D2-CTX-T36 | S18 | Plan mode write deny | IMPLEMENTED |
@@ -37,25 +37,25 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S3-A01-T01 | 新会话历史正确追加 | Memory | `internal/layers/contextengine/memory/manager_test.go` | IMPLEMENTED |
-| D2-S3-A01-T02 | ContextSnapshot 备份 | Memory | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
+| D2-S3-A01-T01 | 新会话历史正确追加 | Memory | `internal/layers/contextengine/prepare/memory/manager_test.go` | IMPLEMENTED |
+| D2-S3-A01-T02 | ContextSnapshot 备份 | Memory | `internal/layers/contextengine/persist/snapshot/store_test.go` | IMPLEMENTED |
 | D2-S3-A01-T03 | LongTerm Recall 注入上下文 | Memory | `tests/acceptance/p0/ctx_plan_longterm_test.go` | IMPLEMENTED |
-| D2-S3-A01-T04 | LongTerm Store 持久化写入 | Memory | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
-| D2-S3-A01-T05 | L3 长期记忆返回 NotImplemented | Memory | `internal/layers/contextengine/memory/longterm_test.go` | IMPLEMENTED |
-| D2-S3-A01-T06 | 快照使用 snappy 压缩体积显著缩减 | Memory | `internal/layers/contextengine/snapshot/store_test.go` | IMPLEMENTED |
+| D2-S3-A01-T04 | LongTerm Store 持久化写入 | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
+| D2-S3-A01-T05 | L3 长期记忆返回 NotImplemented | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
+| D2-S3-A01-T06 | 快照使用 snappy 压缩体积显著缩减 | Memory | `internal/layers/contextengine/persist/snapshot/store_test.go` | IMPLEMENTED |
 
 ## D2-S2: Compression Module
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | D2-S2-A01-T01 | 超 Token 阈值触发七步压缩 | Compression | `tests/acceptance/p0/ctx_compression_test.go` | IMPLEMENTED |
-| D2-S2-A01-T02 | TokenBlock 超限返回 ContextExceeded | Compression | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
-| D2-S2-A01-T03 | Autocompact 触发并降低 token | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
-| D2-S2-A01-T04 | Autocompact LLM 失败降级跳过 | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
-| D2-S2-A01-T05 | Autocompact 禁用时跳过步骤 6 | Compression | `internal/layers/contextengine/compression/pipeline_test.go` | IMPLEMENTED |
-| D2-S2-A01-T06 | 异步压缩占位不阻塞主路径 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
-| D2-S2-A01-T07 | 异步压缩失败降级不丢失数据 | Compression | `internal/layers/contextengine/compression/async_compact_test.go` | IMPLEMENTED |
-| D2-S2-A01-T08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/compression/autocompact_test.go` | IMPLEMENTED |
+| D2-S2-A01-T02 | TokenBlock 超限返回 ContextExceeded | Compression | `internal/layers/contextengine/prepare/compression/pipeline_test.go` | IMPLEMENTED |
+| D2-S2-A01-T03 | Autocompact 触发并降低 token | Compression | `internal/layers/contextengine/prepare/compression/autocompact_test.go` | IMPLEMENTED |
+| D2-S2-A01-T04 | Autocompact LLM 失败降级跳过 | Compression | `internal/layers/contextengine/prepare/compression/autocompact_test.go` | IMPLEMENTED |
+| D2-S2-A01-T05 | Autocompact 禁用时跳过步骤 6 | Compression | `internal/layers/contextengine/prepare/compression/pipeline_test.go` | IMPLEMENTED |
+| D2-S2-A01-T06 | 异步压缩占位不阻塞主路径 | Compression | `internal/layers/contextengine/prepare/compression/async_compact_test.go` | IMPLEMENTED |
+| D2-S2-A01-T07 | 异步压缩失败降级不丢失数据 | Compression | `internal/layers/contextengine/prepare/compression/async_compact_test.go` | IMPLEMENTED |
+| D2-S2-A01-T08 | Autocompact timeout fallback | Compression | `internal/layers/contextengine/prepare/compression/autocompact_test.go` | IMPLEMENTED |
 
 ## D2-S1: PEV Module (RETIRED)
 
@@ -79,7 +79,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/toolrunner/sandbox_test.go` | IMPLEMENTED |
+| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/policy/toolrunner/sandbox_test.go` | IMPLEMENTED |
 | D2-S8-A01-T02 | Shell injection attack prevention | Sandbox | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 
 ## D2-S9: Harness Module
@@ -95,7 +95,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S9-A01-T07 | Transcript 内存分离与 compact | Harness | `internal/layers/contextengine/harness/transcript_test.go` | IMPLEMENTED | P1 |
 | D2-S9-A01-T08 | harness.enabled=false V4 回归 + 无 bootstrap info | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T09 | Preflight warn-only 规则评分与 tool filter | Harness | `internal/layers/contextengine/harness/preflight_test.go` | IMPLEMENTED | P1 |
-| D2-S9-A02-T10 | System Prompt Assembly §十 XML 块 | Harness | `internal/layers/contextengine/prompt/assembler_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A02-T10 | System Prompt Assembly §十 XML 块 | Harness | `internal/layers/contextengine/prepare/prompt/assembler_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T11 | Jaeger span 树（enabled/disabled） | Harness | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T12 | disabled 与 BuildLegacy 字节级一致 | Harness | `tests/acceptance/p0/ctx_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A02-T13 | CompressedView system = Build 输出 | Harness | `tests/integration/context_harness_bootstrap_test.go` | IMPLEMENTED | P0 |
@@ -106,10 +106,10 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S9-A01-T16 | stop running task → cancelled (idempotent) | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
-| D2-S9-A01-T17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
-| D2-S9-A01-T18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
-| D2-S9-A01-T19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/query/background_cancel_test.go` | IMPLEMENTED | P1 |
+| D2-S9-A01-T16 | stop running task → cancelled (idempotent) | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A01-T17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A01-T18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
+| D2-S9-A01-T19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` | IMPLEMENTED | P1 |
 
 ## D2-S10: QueryLoop Module
 
@@ -118,12 +118,12 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | QueryLoop | `internal/layers/contextengine/query/loop_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/usercontext/` | IMPLEMENTED | P0 |
 | D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/permission/mode_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/policy/permission/mode_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/contextengine/tasks/disk_store_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T39 | query_loop.enabled=false V4 回归 | QueryLoop | `tests/integration/query_loop_integration_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/query/subquery_test.go` | IMPLEMENTED | P1 |
-| D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/query/fork_test.go` | IMPLEMENTED | P1 |
-| D2-S10-A01-T42 | sidechain transcript resume 重建 messages | QueryLoop | `internal/layers/contextengine/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/nested/subquery_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/nested/fork_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T42 | sidechain transcript resume 重建 messages | QueryLoop | `internal/layers/contextengine/persist/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
 
 ## D2-S11: Harness Unification
 
@@ -147,14 +147,14 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S6-A02-T01 | Main transcript append-only JSONL 读写 | Transcript | `internal/layers/contextengine/transcript/main_thread_test.go` | IMPLEMENTED | P1 |
+| D2-S6-A02-T01 | Main transcript append-only JSONL 读写 | Transcript | `internal/layers/contextengine/persist/transcript/main_thread_test.go` | IMPLEMENTED | P1 |
 
 ## D2-S13: Conversation Module
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S13-A01-T01 | RepairToolMessageChain 剔除 orphan tool results | Conversation | `internal/layers/contextengine/conversation/repair_test.go` | IMPLEMENTED | P0 |
-| D2-S13-A02-T01 | MessagesAfterCompactBoundary 仅保留尾部 | Conversation | `internal/layers/contextengine/conversation/boundary_test.go` | IMPLEMENTED | P1 |
+| D2-S13-A01-T01 | RepairToolMessageChain 剔除 orphan tool results | Conversation | `internal/layers/contextengine/prepare/conversation/repair_test.go` | IMPLEMENTED | P0 |
+| D2-S13-A02-T01 | MessagesAfterCompactBoundary 仅保留尾部 | Conversation | `internal/layers/contextengine/prepare/conversation/boundary_test.go` | IMPLEMENTED | P1 |
 
 ## D2: Cross-Scenario Tests
 

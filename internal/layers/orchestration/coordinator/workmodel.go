@@ -24,9 +24,8 @@ func SessionIDFromCtx(ctx context.Context) string {
 	return ""
 }
 
-// WorkModel is the D7-S1 unified facade. v1.0 preserves the v0.5 storage
-// location (D2 contextengine/tasks) and exposes a thin facade. v1.1 will
-// migrate the storage into internal/layers/d7/ (per R2 保留项 4.3 resolution C).
+// WorkModel is the D7-S1 unified facade. Storage lives in
+// orchestration/workmodel (v2.0 Slice-2 migration from D2 contextengine/tasks).
 //
 // See R1 Q2 三模型 + 统一查询入口 decision and R2 命题 B.
 type WorkModel interface {

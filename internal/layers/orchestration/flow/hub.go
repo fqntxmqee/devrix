@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
-	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/orchestration/workplan"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -24,9 +24,9 @@ type IMSink interface {
 // Hub implements contracts.ExecutionFlowHub with dual-channel dispatch.
 type Hub struct {
 	cfg      config.ExecutionFlowConfig
-	q        *queue.SessionQueue
+	q        *sessionqueue.SessionQueue
 	workPlan *workplan.Service
-	tasks    *tasks.TaskManager
+	tasks    *workmodel.TaskManager
 	im       IMSink
 	obsBridge *observability.Bridge
 
@@ -37,9 +37,9 @@ type Hub struct {
 // HubDeps wires Hub dependencies.
 type HubDeps struct {
 	Config    config.ExecutionFlowConfig
-	Queue     *queue.SessionQueue
+	Queue     *sessionqueue.SessionQueue
 	WorkPlan  *workplan.Service
-	Tasks     *tasks.TaskManager
+	Tasks     *workmodel.TaskManager
 	IM        IMSink
 	ObsBridge *observability.Bridge
 }
@@ -53,7 +53,7 @@ func NewHub(deps HubDeps) *Hub {
 	}
 	q := deps.Queue
 	if q == nil {
-		q = queue.GlobalSessionQueue
+		q = sessionqueue.GlobalSessionQueue
 	}
 	return &Hub{
 		cfg:          cfg,
@@ -105,9 +105,9 @@ func (h *Hub) Publish(ctx context.Context, ev contracts.FlowEvent) {
 	h.linkTask(ev)
 
 	body, _ := json.Marshal(ev)
-	h.q.Enqueue(ev.SessionID, queue.QueuedCommand{
+	h.q.Enqueue(ev.SessionID, contracts.QueuedCommand{
 		Value: string(body),
-		Mode:  queue.ModeDelegateProgress,
+		Mode:  contracts.ModeDelegateProgress,
 	})
 
 	if h.cfg.IMProgress && h.im != nil && shouldEmitFlowEventToIM(ev) {
@@ -159,11 +159,11 @@ func (h *Hub) linkTask(ev contracts.FlowEvent) {
 	switch ev.Kind {
 	case contracts.FlowStarted:
 		_ = h.tasks.SetOwner(sessionID, ev.TaskID, ev.WorkerID)
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, tasks.TaskStatusInProgress)
+		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusInProgress)
 	case contracts.FlowCompleted, contracts.FlowJoined:
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, tasks.TaskStatusCompleted)
+		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusCompleted)
 	case contracts.FlowFailed:
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, tasks.TaskStatusFailed)
+		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusFailed)
 	}
 }
 

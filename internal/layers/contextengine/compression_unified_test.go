@@ -25,7 +25,7 @@ import (
 //     （带 system prompt）
 //
 // 测试要点：QueryLoop 路径在 Loop.Run() 内部调 `loop.Compress`，
-// 实现的 `newCompressFn` 显式调用 `compression.WithSkipAssembly(true)`，
+// 实现的 `compression.NewQueryLoopCompressFactory` 显式调用 `WithSkipAssembly(true)`，
 // 这就是 messages-only 入口的标志。
 func TestContextEngine_QueryLoop_UsesMessagesOnlyCompression(t *testing.T) {
 	runtime.Reset()
@@ -57,8 +57,9 @@ func TestContextEngine_QueryLoop_UsesMessagesOnlyCompression(t *testing.T) {
 // 路径的前提下会重复 inject。
 func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
 	runtime.Reset()
-	// 这是对 implementation 的轻量 contract 测试：我们打开 engine.go
-	// 的源码，检查 `newCompressFn` 内 `WithSkipAssembly(true)` 出现。
+	// 这是对 implementation 的轻量 contract 测试：我们打开
+	// prepare/compression/query_loop_factory.go 的源码，检查
+	// `NewQueryLoopCompressFactory` 内 `WithSkipAssembly(true)` 出现。
 	// 由于 Go 不允许 import-time 检查源码，这里退化为集成测试：
 	// 运行一次真实压缩，确认无 system prompt 被再次 inject 到 messages。
 	cfg := config.DefaultContextEngineConfig()

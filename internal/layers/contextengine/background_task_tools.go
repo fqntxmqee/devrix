@@ -8,30 +8,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/contextengine/nested"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // BackgroundTaskToolsDeps wires dependencies for task_stop / task_output.
-// All fields are optional; the tools fall back to query.GlobalBackgroundRegistry
+// All fields are optional; the tools fall back to nested.GlobalBackgroundRegistry
 // when nil so the engine bootstrap stays simple.
 type BackgroundTaskToolsDeps struct {
-	Registry *query.BackgroundRegistry
-	Waiter   *query.BackgroundWaiter
+	Registry *nested.BackgroundRegistry
+	Waiter   *nested.BackgroundWaiter
 }
 
 // globalBackgroundTaskTools is the singleton dependency holder for the
 // background task LLM tools. It is configured by SetBackgroundTaskToolsDeps
-// at engine bootstrap, paralleling SetDelegateToolsDeps.
+// at engine bootstrap, paralleling delegatetools.SetDeps.
 var globalBackgroundTaskTools BackgroundTaskToolsDeps
 
 // SetBackgroundTaskToolsDeps configures task_stop / task_output handlers.
 func SetBackgroundTaskToolsDeps(deps BackgroundTaskToolsDeps) {
 	if deps.Registry == nil {
-		deps.Registry = query.GlobalBackgroundRegistry
+		deps.Registry = nested.GlobalBackgroundRegistry
 	}
 	if deps.Waiter == nil && deps.Registry != nil {
-		deps.Waiter = query.NewBackgroundWaiter(deps.Registry)
+		deps.Waiter = nested.NewBackgroundWaiter(deps.Registry)
 	}
 	globalBackgroundTaskTools = deps
 }
@@ -149,7 +149,7 @@ func (r *taskOutputRunner) Execute(ctx context.Context, _, input string) (*ToolR
 	}
 	waiter := backgroundWaiter()
 	if waiter == nil {
-		waiter = query.NewBackgroundWaiter(reg)
+		waiter = nested.NewBackgroundWaiter(reg)
 	}
 
 	task, ok := reg.Get(taskID)
@@ -225,14 +225,14 @@ func (r *taskListBackgroundRunner) Execute(ctx context.Context, _, _ string) (*T
 
 // --- helpers ------------------------------------------------------------------
 
-func backgroundRegistry() *query.BackgroundRegistry {
+func backgroundRegistry() *nested.BackgroundRegistry {
 	if globalBackgroundTaskTools.Registry != nil {
 		return globalBackgroundTaskTools.Registry
 	}
-	return query.GlobalBackgroundRegistry
+	return nested.GlobalBackgroundRegistry
 }
 
-func backgroundWaiter() *query.BackgroundWaiter {
+func backgroundWaiter() *nested.BackgroundWaiter {
 	return globalBackgroundTaskTools.Waiter
 }
 

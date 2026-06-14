@@ -177,4 +177,14 @@ See: `openspec/specs/d2-context-engine/d2-domain.md`, `d7-boundary.md`.
 
 D2 MUST be Execution Follower; D7 MUST be sole ingress orchestrator to D2 Process in production. Cross-domain drift (tasks/, delegate_tools, queue delegate-progress) MUST be documented with D7 migration targets.
 
-See: `openspec/changes/devrix-d2-sa-refine/specs/d2-context-engine/layer-delta.md`.
+See: `openspec/archive/2026-06-14-devrix-d2-sa-refine/specs/d2-context-engine/layer-delta.md`.
+
+### Requirement: D2 Thin Query Package (v1.1)
+
+`contextengine/query` MUST NOT import `orchestration` or `multiagent`. FlowHub MUST be injected via `LoopDeps` / `SubQueryParams`, not resolved from `flow.GlobalHub` inside query.
+
+#### Scenario: D2 Thin regression test green
+
+- GIVEN `go test ./internal/lint/layer/...`
+- WHEN D2 Thin tests run
+- THEN zero import violations in query package

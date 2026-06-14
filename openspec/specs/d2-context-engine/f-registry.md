@@ -141,9 +141,9 @@ D2 F 层注册表。**Canonical SoT：** 随 D2-S15–S20 A 层（DM-20260614-00
 
 | F ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| D2-S10-A03-F01 | RegisterTask | F-BE | session_id, agent_id | task_id | `query/background.go` |
-| D2-S10-A03-F02 | WaitForTask | F-BE | task_id, timeout | terminal_state | `query/background.go` |
-| D2-S10-A03-F03 | CancelTask | F-BE | task_id | — | `query/background.go` |
+| D2-S10-A03-F01 | RegisterTask | F-BE | session_id, agent_id | task_id | `nested/background.go` |
+| D2-S10-A03-F02 | WaitForTask | F-BE | task_id, timeout | terminal_state | `nested/background.go` |
+| D2-S10-A03-F03 | CancelTask | F-BE | task_id | — | `nested/background.go` |
 
 ## D2-S13-A01 RepairToolChain
 

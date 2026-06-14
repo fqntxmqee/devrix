@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -62,14 +63,15 @@ func (v *RuntimeOrchestrationValidator) OnDecision(ctx context.Context, rec Deci
 	// Start a tracing span for the full validation pipeline.
 	var span tracer.Span
 	if v.obs != nil && v.obs.Tracer() != nil {
-		ctx, span = v.obs.Tracer().Start(ctx, "orch.OnDecision",
-			tracer.WithSpanAttributes(
+		ctx, span = v.obs.Tracer().Start(ctx, telemetry.OpD6_S4_Validation_Decision,
+			tracer.WithSpanKind(tracer.SpanKindInternal),
+			tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD6_S4_Validation_Decision,
 				tracer.Attribute{Key: "decision_id", Value: rec.ID},
 				tracer.Attribute{Key: "category", Value: string(rec.Category)},
 				tracer.Attribute{Key: "risk_class", Value: int(rec.RiskClass)},
 				tracer.Attribute{Key: "session_id", Value: rec.SessionID},
 				tracer.Attribute{Key: "agent_id", Value: rec.AgentID},
-			),
+			)...),
 		)
 		defer span.End()
 	}

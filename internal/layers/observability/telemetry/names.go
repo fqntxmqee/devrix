@@ -14,6 +14,7 @@ const (
 	LayerLLM           = "llm"
 	LayerAgent         = "agent" // D4 multi-agent layer
 	LayerOrchestration = "orchestration"
+	LayerEvolution     = "evolution"
 )
 
 // Canonical Jaeger / OTLP operation names: D{X}_{S}_{A}_{F}
@@ -107,6 +108,9 @@ const (
 	// D7 Task Manager (D7-S1)
 	OpD7_S1_Task_Manager_Create = "D7_S1_Task_Manager_Create"
 	OpD7_S1_Task_Manager_Update = "D7_S1_Task_Manager_Update"
+
+	// D6 Evolution - Runtime Validation (D6-S4)
+	OpD6_S4_Validation_Decision = "D6_S4_Validation_Decision"
 )
 
 // SpanAttrs returns standard devrix.layer / devrix.component attributes plus extras.
@@ -165,6 +169,10 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerOrchestration, "orchestrator"
 	case strings.HasPrefix(operation, "D7_S1_Task_Manager_"):
 		return LayerOrchestration, "task_manager"
+
+	// D6 Evolution
+	case strings.HasPrefix(operation, "D6_S4_Validation_"):
+		return LayerEvolution, "validation"
 
 	default:
 		return LayerContext, "devrix"

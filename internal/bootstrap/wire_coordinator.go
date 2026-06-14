@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -53,11 +54,13 @@ func WireD7(
 	if b, ok := obsBridgeArg.(*observability.Bridge); ok {
 		obsBridge = b
 	}
+	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
 		d2Executor,
 		coordinator.WithSink(sink),
 		coordinator.WithObservability(obsBridge),
+		coordinator.WithWorkModel(wm),
 	)
 
 	entry := coordinator.NewEntry(orch)

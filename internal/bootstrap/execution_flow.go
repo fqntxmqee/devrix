@@ -4,11 +4,11 @@ import (
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine/queue"
-	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/imsink"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -29,8 +29,8 @@ func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *capture.Communica
 	}
 	hub := flow.NewHub(flow.HubDeps{
 		Config: cfg,
-		Queue:  queue.GlobalSessionQueue,
-		Tasks:  tasks.GlobalTaskManager,
+		Queue:  sessionqueue.GlobalSessionQueue,
+		Tasks:  workmodel.GlobalTaskManager,
 		IM:     im,
 	})
 	flow.SetGlobalHub(hub)
