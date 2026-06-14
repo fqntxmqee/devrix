@@ -52,6 +52,7 @@
 | DM-20260614-003 | PlanAgent 工具白名单契约 — 只读探索可断言 (P1 #7) | devrix-d7-s5-t02-planagent-whitelist | 2026-06-14 | — | ACCEPTED (P1) |
 | DM-20260614-004 | S5-P2 Tail-only LLM Classify Shadow — v1.1 兜底冷启动 (P1 #8) | devrix-s5-p2-shadow-classifier | 2026-06-14 | — | ACCEPTED (P1) |
 | DM-20260614-005 | D7-S5-T03/T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环 | devrix-d7-classify-command-first | 2026-06-14 | — | ACCEPTED (P0) |
+| DM-20260614-006 | D1 Communication — 切法 A 信号分层与 IM 友好通信 registry 对齐 | devrix-d1-sa-refine | 2026-06-14 | — | ACCEPTED (S5; v1.0 registry-only; v1.1 代码待 Phase 2) |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -105,6 +106,7 @@
 | devrix-d7-s5-t02-planagent-whitelist | `openspec/archive/2026-06-14-devrix-d7-s5-t02-planagent-whitelist/` |
 | devrix-s5-p2-shadow-classifier | `openspec/archive/2026-06-14-devrix-s5-p2-shadow-classifier/` |
 | devrix-d7-classify-command-first | `openspec/archive/2026-06-14-devrix-d7-classify-command-first/` |
+| devrix-d1-sa-refine | `openspec/archive/2026-06-14-devrix-d1-sa-refine/` |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -123,11 +125,11 @@
 | devrix-queryloop-spans-v1.1 | DM-20260612-014 | `openspec/changes/devrix-queryloop-spans-v1.1/` | S1 未开始 |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
-| devrix-d1-sa-refine | — | `openspec/changes/devrix-d1-sa-refine/` | 进行中 |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | 待确认 |
 
 **2026-06-14 归档（S6）**：
 
+- `devrix-d1-sa-refine` → `openspec/archive/2026-06-14-devrix-d1-sa-refine/`（DM-006 S5_PASS; v1.0 registry-only; v1.1 客观锚点+span+chain_integrity E2E 待 Phase 2）
 - `devrix-multiagent-isolation` → `openspec/archive/2026-06-14-devrix-multiagent-isolation/`（DM-005 S5_PASS）
 - `devrix-event-channel` → `openspec/archive/2026-06-14-devrix-event-channel/`（DM-003 S5_PASS）
 - `devrix-wave-scheduler` → `openspec/archive/2026-06-14-devrix-wave-scheduler/`（DM-007 S5_PASS v1.0）
