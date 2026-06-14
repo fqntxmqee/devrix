@@ -21,15 +21,29 @@ D7 作为横向协调层，编排 D2（LLM↔Tool 执行原语）与 D4（Agent 
 
 | 问题 | 根因 |
 |------|------|
-| D7-S2 Session Orchestrator **0 T 实现**，但已是 D1 实际路由目标 | S 切法按模块（coordinator/wave/flow）而非用户价值流 |
+| D7-S2 Session Orchestrator **0 T 实现**，但 D1 已直接路由到 D7.ProcessMessage | S 切法按模块而非用户价值流；S2 入口无生产验证锚点 |
 | D7-S1 Task 写模型在 **D2** `contextengine/tasks/` | S 跨域边界漂移 |
 | A-registry 中 `d7/` 路径大量不存在 | 规格与实现脱节 |
 | D7-S5 ClassifyIntent 部分在 coordinator，部分在 D2 | A 层归属不清 |
 
+### 1.2.1 当前架构
+
+```
+D1 Gateway.RouteInbound
+    └── D7.coordinator.ProcessMessage  ← 已实现（D1→D2 legacy 已退役）
+            ├── D7-S5 ClassifyIntent（部分在 coordinator）
+            ├── D7-S3 Wave（orchestration/wave/）
+            ├── D7-S4 Flow（orchestration/flow/）
+            └── D2 QueryLoop（via delegate_tools，仍在 D2）
+```
+
+**关键变化（DM-20260614-007）：** D1→D2 legacy 路径已退役，D1 现在直接调用 D7.ProcessMessage。但 S2 入口仍缺少 T 锚点。|
+
 ### 1.3 博弈论视角
 
-**S2 入口确定性 > S5 决策准确性**。当前 S2 全 PLANNED 是结构性风险：
-- D1 路由依赖 S2 ProcessMessage，但无生产验证锚点
+**S2 入口确定性 > S5 决策准确性**。当前状态：
+- D1 已直接路由 D7.ProcessMessage ✅
+- 但 S2 ProcessMessage **无 T 锚点** — 生产不可验证
 - 开发者局部最优（先做 wave/flow）≠ 用户全局最优（S2 端到端可验收）
 
 ---
