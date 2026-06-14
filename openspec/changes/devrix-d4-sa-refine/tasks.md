@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d4-sa-refine  
 **Demand ID:** DM-20260614-018  
-**Status:** S5_Accepted（v1.0 Registry 验收通过；v1.1/v2.0 待后续 Phase）  
+**Status:** S5_Accepted（v1.0/v2.0-d 验收通过；E-e3/E-e4/E-e7 待 v2.0-e）  
 **Phases:** v1.0 Registry（B–C）→ v1.1 Traceability（D–E）→ v2.0 Structure（F，含 D7 hubspoke + D2 flow_report）
 
 > **不估时**。任务标注关联 Canonical S / T。v1.0 **零 Go 变更**。
@@ -117,13 +117,13 @@
 
 | ID | Task | 依赖 | 产出 | T |
 |----|------|------|------|---|
-| E-e1 | 38 T + Hub-Spoke 跨域 T 全绿 | E-b–E-d | test report | P0 19 |
-| E-e2 | `-race` agent 测试 | E-e1 | D4-S0-T01/T02 | P0 |
-| E-e3 | E2E agent_fork + delegate 回归 | E-e1 | D4-S0-T04 | P0 |
-| E-e4 | 删除旧路径 dead code + re-export | E-e1 | cleanup PR | — |
-| E-e5 | 更新 `layering.md` Domain Layout + code-layout §4.4 状态 | E-d7 | specs | — |
-| E-e6 | 写 `acceptance-report（v2.0）` | E-e1–E-e5 | ACCEPTED | — |
-| E-e7 | S7 归档 + `demand-archive-index.md` | E-e6 | archive | — |
+| E-e1 | 38 T + Hub-Spoke 跨域 T 全绿 | E-b–E-d | test report | P0 19 | ✅ |
+| E-e2 | `-race` agent 测试 | E-e1 | D4-S0-T01/T02 | P0 | ✅ |
+| E-e3 | E2E agent_fork + delegate 回归 | E-e1 | D4-S0-T04 | P0 | ⚠️ 3 预存错误 + 1 迁移 bug (4e48f83 已修复) |
+| E-e4 | 删除旧路径 dead code + re-export | E-e1 | cleanup PR | — | 🔲 v2.0-e |
+| E-e5 | 更新 `layering.md` Domain Layout + code-layout §4.4 状态 | E-d7 | specs | — | ✅ |
+| E-e6 | 写 `acceptance-report（v2.0）` | E-e1–E-e5 | ACCEPTED | — | ✅ |
+| E-e7 | S7 归档 + `demand-archive-index.md` | E-e6 | archive | — | 🔲 v2.0-e |
 
 ---
 

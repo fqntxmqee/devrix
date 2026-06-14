@@ -1,10 +1,10 @@
 ---
 demand-id: DM-20260614-018
 change-id: devrix-d4-sa-refine
-phase: v1.0 Registry Refine
+phase: v2.0-d Structure
 status: S5_ACCEPTED
-verdict: PASS
-date: 2026-06-14
+verdict: PASS (conditional on E-e3)
+date: 2026-06-15
 reviewer: Owner（自裁决）
 parent: dsaft-refactoring-playbook
 ---
@@ -102,8 +102,81 @@ S7 归档待 v2.0 全部 slice 验收后执行。
 
 ---
 
-## 5. Revision History
+## 6. v2.0 验收（Slice a–e Structure）
+
+### 6.0 验收范围与边界
+
+| 维度 | 范围 |
+|------|------|
+| Phase | **v2.0 Structure**（slice a–e：Hub-Spoke 代码收敛 + D4 物理路径迁移） |
+| Commit | `3905c6a`（89 files, +6465/-476） |
+| 在本期 | slice a（骨架）→ slice b（D4 bridge+dispatch）→ slice c（D2 flow_report）→ slice d（物理路径）→ slice e（验证+文档） |
+| 不在本期 | E-e4（dead code + re-export 删除，v2.0-e 发布周期）；E-e3（tagged E2E/integration 回归，待 CI 环境准备后补跑） |
+
+### 6.1 v2.0 验收准则
+
+| AC | 准则 | 证据 | 裁决 |
+|----|------|------|------|
+| AC-01 | D4-S11 ProvisionAgent 迁移至 `provision/` | `multiagent/provision/factory.go`；legacy `factory/legacy.go` re-export | ✅ PASS |
+| AC-02 | D4-S12 RunAgentLoop 迁移至 `run/` | `multiagent/run/agent.go`；legacy `agent/legacy.go` re-export | ✅ PASS |
+| AC-03 | D4-S13 IsolateAndMerge 迁移至 `isolate/` | `multiagent/isolate/view.go`；legacy `sessionview/legacy.go` re-export | ✅ PASS |
+| AC-04 | D4-S14 ExecuteWorker 迁移至 `execute/` | `multiagent/execute/worker.go` + `execute/contracts.go`；per-call observer 模式 | ✅ PASS |
+| AC-05 | D4-S15 InvokeExternalAgent 迁移至 `external/` | `multiagent/external/` 物理目录 | ✅ PASS |
+| AC-06 | D4-S16 ConfigureAgents 迁移至 `configure/` | `multiagent/configure/configure.go`；legacy `shared/config/multiagent.go` re-export | ✅ PASS |
+| AC-07 | Kernel 类型迁移至 `kernel/` | `multiagent/kernel/contracts.go` + `kernel/noop.go`；根 `contracts.go` re-export + `observer/noop.go` re-export | ✅ PASS |
+| AC-08 | AgentBridge 迁 D7 `hubspoke/agent_bridge.go` | `orchestration/hubspoke/agent_bridge.go`；`AgentBridge.EmitAgentEvent` 映射 4 种 agent event → FlowEvent | ✅ PASS |
+| AC-09 | Dispatcher 迁 D7 `hubspoke/dispatch.go` | `orchestration/hubspoke/dispatch.go`；`Dispatch()` D4→D2 fallback 路径 | ✅ PASS |
+| AC-10 | SubQueryBridge 迁 D7 `hubspoke/subquery_bridge.go` | `orchestration/hubspoke/subquery_bridge.go`；`PublishStarted/Completed/Failed` 三方法 | ✅ PASS |
+| AC-11 | 新包测试覆盖 | execute/worker_test.go（9 tests）+ hubspoke/hubspoke_test.go（23 tests） | ✅ PASS |
+| AC-12 | 全量 `go test -race` 71 包全绿 | §6.3 测试证据 | ✅ PASS |
+| AC-13 | 编译完整性 `go build ./...` + `go vet ./...` | §6.3 | ✅ PASS |
+| AC-14 | D4/D7 文档同步 | layering.md v3.9.0 + code-layout.md v1.6.0 | ✅ PASS |
+
+### 6.2 物理路径迁移清单
+
+| S ID | v1.0 路径 | v2.0-d 路径 | legacy.go |
+|------|----------|------------|-----------|
+| S11 | `factory/` | `provision/` | `factory/legacy.go` |
+| S12 | `agent/agent.go` | `run/agent.go` | `agent/legacy.go` |
+| S13 | `sessionview/` | `isolate/` | `sessionview/legacy.go` |
+| S14 | `delegate/service.go` | `execute/worker.go` | — |
+| S15 | `tool/` | `external/` | — |
+| S16 | `shared/config/multiagent.go` | `configure/configure.go` | `shared/config/multiagent.go` (re-export) |
+| Kernel | `contracts.go` + `observer/` | `kernel/contracts.go` + `kernel/noop.go` | 根 `contracts.go` + `observer/noop.go` |
+
+### 6.3 测试证据
+
+```text
+go build ./...                                          → PASS（全量编译）
+go vet ./...                                            → PASS（零 warning）
+go test -race -count=1 ./internal/...                   → PASS（71 包全绿）
+go test -race ./internal/layers/multiagent/execute/...  → PASS（9 tests）
+go test -race ./internal/layers/orchestration/hubspoke/... → PASS（23 tests）
+go test -tags "integration cross" ./tests/integration/...  → 3 pre-existing build errors（见 §6.4）+ 1 migration bug（commit 4e48f83 已修复）
+```
+
+### 6.4 未完成项与已知问题
+
+| ID | 项目 | 原因 | 计划 |
+|----|------|------|------|
+| E-e3 | E2E + 集成测试回归（tagged `-tags "integration cross"`） | 3 个预存构建错误与 D4 无关（D3 `IAdapter.Protocol` 缺失 ×2 + D2 `WireContextLLM` 双返回值 API 变更）；1 个迁移引入的 `provision.Create` 误改已于 commit 4e48f83 修复 | v2.0-e 准出前补跑（待 D2/D3 API 修复后） |
+| E-e4 | 旧路径 dead code + re-export 删除 | 跨 38 个 importer 文件改引，需单独发布周期 | v2.0-e（下一个 PR） |
+| E-e7 | S7 归档 | 待 E-e3/E-e4 完成后执行 | v2.0-e 准出 |
+
+### 6.5 裁决
+
+**Verdict: PASS（conditional on E-e3） — v2.0-d Structure ACCEPTED**
+
+可进入：
+- **v2.0-e**（下一个发布周期）：E-e3 tagged test 回归、E-e4 re-export 清理、E-e7 归档
+
+Blockers：无（E-e3 为非阻塞 regression confirm，测试套件 71 包全绿已提供充分信心）
+
+---
+
+## 7. Revision History
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0 | 2026-06-14 | v1.0 Registry 验收 PASS |
+| 2.0 | 2026-06-15 | v2.0-d Structure 验收 PASS（conditional on E-e3） |

@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.4.0
-**Last Updated:** 2026-06-14
+**Version:** 1.6.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -180,7 +180,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D4-S11 | ProvisionAgent | `provision` | `factory/` + `collaboration/` + `builtin/` | `multiagent/provision/` | ✅ v2.0-d |
 | D4-S12 | RunAgentLoop | `run` | `agent/`（lifecycle, state, perm_gate） | `multiagent/run/` | ✅ v2.0-d |
 | D4-S13 | IsolateAndMerge | `isolate` | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` + `multiagent/run/` | ✅ v2.0-d |
-| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ✅ v2.0 骨架 |
+| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ✅ v2.0-d |
 | D4-S15 | InvokeExternalAgent | `external` | `tool/` | `multiagent/external/` | ✅ v2.0-d |
 | D4-S16 | ConfigureAgents | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` | ✅ v2.0-d |
 | — | Domain Kernel | `kernel` | `contracts.go` + `observer/` | `multiagent/kernel/` | ✅ v2.0-d |
@@ -189,10 +189,10 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 | 组件 | v1.0 路径 | v2.0 目标 | 状态 |
 |------|----------|-----------|------|
-| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` | ✅ v2.0-b |
-| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` | ✅ v2.0-b |
-| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-c |
-| Dispatcher bootstrap | `bootstrap/delegate.go` | `bootstrap/delegate.go`（重构） | ✅ v2.0-b |
+| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` | ✅ v2.0-d |
+| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` | ✅ v2.0-d |
+| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-d |
+| Dispatcher bootstrap | `bootstrap/delegate.go` | `bootstrap/delegate.go`（重构） | ✅ v2.0-d |
 
 **v2.0-b 里程碑：**
 - `execute/worker.go` — WorkerExecutor 实现（D4-S14 执行面）
@@ -273,3 +273,4 @@ internal/layers/communication/
 | 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |
 | 1.4.0 | 2026-06-14 | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位 |
 | **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成 |
+| **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；旧路径 re-export legacy.go 保留；execute(9) + hubspoke(23) 测试新增；71 包全绿 |

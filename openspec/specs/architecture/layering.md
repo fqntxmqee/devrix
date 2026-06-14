@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.8.0
-**Last Updated:** 2026-06-14
+**Version:** 3.9.0
+**Last Updated:** 2026-06-15
 
 ---
 
@@ -183,12 +183,12 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 
 | Module ID | Scenario | Responsibility | Status |
 |-----------|----------|----------------|--------|
-| D4-S11 | ProvisionAgent | 创建、配额、协作模式、Builtin 注册 | REGISTRY |
-| D4-S12 | RunAgentLoop | 生命周期、PermissionGate、状态机 | REGISTRY |
-| D4-S13 | IsolateAndMerge | Fork/Join、SessionView COW、WorkerEngine | REGISTRY |
-| D4-S14 | ExecuteWorker | Worker fork→run→join（D7 派发） | REGISTRY |
-| D4-S15 | InvokeExternalAgent | CLI/Cursor Agent Tool | REGISTRY |
-| D4-S16 | ConfigureAgents | multi_agent 配置 | REGISTRY |
+| D4-S11 | ProvisionAgent | 创建、配额、协作模式、Builtin 注册 | IMPLEMENTED (v2.0-d) |
+| D4-S12 | RunAgentLoop | 生命周期、PermissionGate、状态机 | IMPLEMENTED (v2.0-d) |
+| D4-S13 | IsolateAndMerge | Fork/Join、SessionView COW、WorkerEngine | IMPLEMENTED (v2.0-d) |
+| D4-S14 | ExecuteWorker | Worker fork→run→join（D7 派发） | IMPLEMENTED (v2.0-d) |
+| D4-S15 | InvokeExternalAgent | CLI/Cursor Agent Tool | IMPLEMENTED (v2.0-d) |
+| D4-S16 | ConfigureAgents | multi_agent 配置 | IMPLEMENTED (v2.0-d) |
 
 #### Legacy Module Index（冻结）
 
@@ -585,3 +585,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | 3.6.0 | 2026-06-14 | D2 价值流化（D2-S15~S20）；D2-S1~S14 冻结追溯；Naming Policy 续补 |
 | 3.7.0 | 2026-06-14 | **D3 5+1 S 价值流化**（DM-20260614-016 / devrix-d3-sa-refine）：D3-S1~S7 旧技术角色词 → D3-S1~S6 新 5+1 价值流承诺（RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway）；Legacy Index 冻结追溯；v1.0 物理路径保留 + v2.0 物理迁移目标 scenario-slug 注册（`route/` `stream/` `protect/` `budget/` `guard/` `configure/`）；D3 CROSS 锚点声明 `internal/bridges/llm/` |
 | **3.8.0** | **2026-06-14** | **D3 v2.0 物理路径迁移完成**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个价值流 slug 物理迁移完成（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）；8 个 re-export 桥接文件（旧路径保留 1 发布周期）；build/vet/test 全绿；contracts.go 145 行 AC-09 达成 |
+| **3.9.0** | **2026-06-15** | **D4 v2.0-d 物理路径迁移完成**（commit 3905c6a）：S11–S16 + Kernel 物理迁移（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；D7 Hub-Spoke bridge/dispatch/subquery 搬迁（`hubspoke/agent_bridge.go` `hubspoke/dispatch.go` `hubspoke/subquery_bridge.go`）；旧路径保留 re-export legacy.go；execute(9)+hubspoke(23) 测试新增；build/vet/test(71包) 全绿 |
