@@ -33,6 +33,17 @@ func (m *cliMockContextEngine) Process(_ context.Context, _ *types.Session, _ st
 	return ch
 }
 
+type cliOrchestrationEntry struct {
+	engine *cliMockContextEngine
+}
+
+func (e *cliOrchestrationEntry) ProcessMessage(ctx context.Context, sessionID, message string) (<-chan *capture.EngineEvent, error) {
+	session := types.NewSession(sessionID, "cli", "")
+	return e.engine.Process(ctx, session, message), nil
+}
+
+func (e *cliOrchestrationEntry) Cancel(context.Context, string) error { return nil }
+
 func newTestGateway(t *testing.T) *capture.CommunicationGateway {
 	t.Helper()
 	return newTestGatewayInDir(t, t.TempDir())
@@ -51,7 +62,9 @@ func newTestGatewayInDir(t *testing.T, dir string) *capture.CommunicationGateway
 			{Type: "complete", Content: ""},
 		},
 	}
-	return capture.NewCommunicationGateway(store, cliMockEventHandler{}, engine, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, cliMockEventHandler{}, nil, config.DefaultConfig())
+	gw.SetOrchestrationEntry(&cliOrchestrationEntry{engine: engine})
+	return gw
 }
 
 // waitGatewayAsync lets RouteInbound background goroutines finish before t.TempDir cleanup.

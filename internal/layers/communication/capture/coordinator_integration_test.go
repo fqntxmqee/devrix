@@ -44,11 +44,11 @@ func (f *fakeEntry) Cancel(_ context.Context, sessionID string) error {
 	return nil
 }
 
-// T: D7-D1-T01 — orchestrationEnabled=true routes to orchestrationEntry.ProcessMessage.
+// T: D7-D1-T01 — routes to orchestrationEntry.ProcessMessage.
 func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &fakeEntry{}
-	gw.SetOrchestrationEntry(entry, true)
+	gw.SetOrchestrationEntry(entry)
 
 	msg := &types.InboundMessage{
 		SessionID: "sess-d7",
@@ -84,30 +84,19 @@ func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	}
 }
 
-// T: D7-D1-T01 (negative) — orchestrationEnabled=false keeps legacy D1→D2 path.
-func TestGateway_D7Disabled_LegacyPath(t *testing.T) {
+// T: D7-D1-T01 — missing orchestration entry fails fast.
+func TestGateway_MissingOrchestrationEntry(t *testing.T) {
 	gw := newTestGateway(t)
-	entry := &fakeEntry{}
-	gw.SetOrchestrationEntry(entry, false) // enabled=false
 
 	msg := &types.InboundMessage{
-		SessionID: "sess-legacy",
-		ChatID:    "chat-legacy",
+		SessionID: "sess-no-d7",
+		ChatID:    "chat-no-d7",
 		MessageID: "m1",
 		Content:   "hello",
 		UserID:    "user1",
 	}
-	// legacy path requires contextEngine. We don't wire one; the gateway
-	// should NOT call orchestrationEntry.
 	if err := gw.RouteInbound(context.Background(), msg); err == nil {
-		t.Fatalf("expected error when context engine is nil and d7 disabled")
-	}
-	// Wait a moment to make sure no goroutine calls orchestrationEntry.
-	time.Sleep(100 * time.Millisecond)
-	entry.mu.Lock()
-	defer entry.mu.Unlock()
-	if entry.processes != 0 {
-		t.Fatalf("orchestrationEntry.ProcessMessage calls = %d, want 0 (legacy path)", entry.processes)
+		t.Fatal("expected error when orchestration entry is nil")
 	}
 }
 
@@ -115,7 +104,7 @@ func TestGateway_D7Disabled_LegacyPath(t *testing.T) {
 func TestGateway_StopProcess_D7Cancel(t *testing.T) {
 	gw := newTestGateway(t)
 	entry := &fakeEntry{}
-	gw.SetOrchestrationEntry(entry, true)
+	gw.SetOrchestrationEntry(entry)
 
 	if err := gw.StopProcess("sess-stop"); err != nil {
 		t.Fatalf("StopProcess err: %v", err)
@@ -141,7 +130,7 @@ func newTestGateway(t *testing.T) *CommunicationGateway {
 	store := &fakeSessionStore{}
 	handler := &fakeEventHandler{}
 	cfg := &config.CommunicationConfig{}
-	gw := NewCommunicationGateway(store, handler, nil, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
 	return gw
 }
 

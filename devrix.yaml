@@ -434,9 +434,9 @@ orchestration:
   auto_intervene: false
 
 # D7 编排域配置
-# 当 enabled: true 时，D1 Gateway 将请求路由到 D7（而非 D2）
+# 当 enabled: true 时，D1 将请求路由到 D7（默认 true；false 时启动失败）
 d7:
-  enabled: true                    # 启用 D7 编排域，所有请求将从 D1 直接到 D7
+  enabled: true                    # D1 入站必需 D7 orchestration entry
   fast_path_threshold: 90          # ClassifyIntent 置信度阈值
   command_first: true             # 命令优先（/plan /stop /task /help）
   plan_mode_approve_gate: true    # Wave 触发需要显式 Plan 批准

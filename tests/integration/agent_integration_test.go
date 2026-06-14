@@ -70,7 +70,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, handler, nil, capture.NewPermissionManager(&cfg.Permission), cfg)
+	gw := capture.NewCommunicationGateway(store, handler, capture.NewPermissionManager(&cfg.Permission), cfg)
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	toolCfg := config.DefaultToolConfig()
@@ -114,7 +114,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()
-	gw := capture.NewCommunicationGateway(nil, handler, nil, nil, cfg)
+	gw := capture.NewCommunicationGateway(nil, handler, nil, cfg)
 
 	session := types.NewSession("sess_bridge", "cli", t.TempDir())
 	factory := multiagentfactory.NewAgentFactory(multiagent.AgentDeps{

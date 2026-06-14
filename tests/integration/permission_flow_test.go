@@ -24,7 +24,7 @@ func TestIntegration_PermissionRequestTimeout(t *testing.T) {
 	cfg.Permission.DefaultTimeout = 100 * time.Millisecond
 
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
-	gw := capture.NewCommunicationGateway(store, nil, nil, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, nil, permMgr, cfg)
 
 	session, err := gw.CreateSession("cli", "/tmp")
 	if err != nil {

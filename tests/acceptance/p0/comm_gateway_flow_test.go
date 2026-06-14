@@ -18,7 +18,7 @@ import (
 func TestL5_COMM_Gateway_CreateSessionRejected(t *testing.T) {
 	store := &rejectSessionStore{createErr: fmt.Errorf("storage unavailable")}
 	cfg := config.DefaultConfig()
-	gw := capture.NewCommunicationGateway(store, testutil.NewMockEventHandler(), nil, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, testutil.NewMockEventHandler(), nil, cfg)
 
 	_, err := gw.CreateSession("cli", t.TempDir())
 	if err == nil {
@@ -67,7 +67,8 @@ func TestL5_COMM_Gateway_InboundOutboundFlow(t *testing.T) {
 		},
 	}
 
-	gw := capture.NewCommunicationGateway(store, eventHandler, engine, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, eventHandler, nil, cfg)
+	testutil.WireGatewayOrchestration(gw, engine)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {

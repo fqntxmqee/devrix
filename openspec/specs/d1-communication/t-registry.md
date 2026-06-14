@@ -22,7 +22,7 @@
 |------|------|---------------|-----------|--------|----------|
 | D1-S13-A02-T01 | 入站用户 turn 持久化成功 | S13-A02 PersistUserTurn | `tests/acceptance/p0/d1_signal_journey_test.go` | IMPLEMENTED | P0 |
 | D1-S13-A03-T01 | Dispatch F02 走 D7 路径 | S13-A03-F02 routeD7 | `capture/coordinator_matrix_test.go` | IMPLEMENTED | P0 |
-| D1-S13-A03-T02 | Dispatch F01 走 Legacy D2 路径 | S13-A03-F01 routeLegacyD2 | `capture/coordinator_matrix_test.go` | IMPLEMENTED | P0 |
+| D1-S13-A03-T02 | 未配置 orchestration entry 时 RouteInbound 失败 | S13-A03 DispatchToAgent | `capture/coordinator_integration_test.go` | IMPLEMENTED | P0 |
 | D1-S13-A04-T01 | YOLO 模式 CRITICAL 风险永不自动审批 | S13-A04 ResolvePermissionGate | `capture/permission_test.go` | IMPLEMENTED | P0 |
 | D1-S14-A01-F01-T01 | thinking 首 chunk（信号映射 + 锚点） | S14-A01-F01 map→Signal(Thinking) | `tests/acceptance/p0/d1_signal_journey_test.go` | IMPLEMENTED | P0 |
 | D1-S15-A01-F01-T01 | tool_call/result 映射为 Task 信号 | S15-A01 EmitToolProgress | `tests/acceptance/p0/d1_signal_journey_test.go` | IMPLEMENTED | P1 |

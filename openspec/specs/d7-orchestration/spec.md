@@ -42,7 +42,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | Task 模型 | 三模型职责分离（PlanTask / WaveTaskNode / BackgroundRun），v1.0 不合并存储 |
 | S2 vs S3 | 编排路由矩阵：并行 execute 归 S3 Wave，S2 不串行替代 |
 | S5 | 分阶段：v1.0 仅 P1(PlanMode)+P2(Classify)；自动拆解 v1.1 |
-| 迁移 | `d7_enabled` 默认 false；4 组合回归矩阵 |
+| 迁移 | `d7.enabled` 默认 true；legacy D1→D2 已退役（DM-20260614-007） |
 | 性能 | FastPath 拆 T02a(proxy≤2ms) + T02b(classify≤1ms) + T02c(端到端≤2ms) |
 | 配置 | 单一 SoT：`context_engine.tasks.store_dir` |
 

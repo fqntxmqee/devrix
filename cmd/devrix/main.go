@@ -158,13 +158,7 @@ func main() {
 		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
 	}
 
-	gw := capture.NewCommunicationGateway(
-		sessionStore,
-		eventHandler,
-		contextEngine,
-		permissionMgr,
-		commCfg,
-	)
+	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg)
 	gw.SetObservability(obs)
 
 	var agentFactory multiagent.IAgentFactory
@@ -180,7 +174,10 @@ func main() {
 		)
 	}
 
-	bootstrap.WireD7(configFile, gw, contextEngine, obsBridge)
+	if err := bootstrap.WireD7(configFile, gw, contextEngine, obsBridge); err != nil {
+		slog.Error("failed to wire D7 orchestration", "error", err)
+		os.Exit(1)
+	}
 
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 

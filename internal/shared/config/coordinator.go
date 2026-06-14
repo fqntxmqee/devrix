@@ -28,7 +28,7 @@ type CoordinatorConfig struct {
 // coordinator.DefaultConfig().
 func DefaultCoordinatorConfig() CoordinatorConfig {
 	return CoordinatorConfig{
-		Enabled:                     false,
+		Enabled:                     true,
 		FastPathThreshold:           90,
 		CommandFirst:                true,
 		LLMFallback:                 false,

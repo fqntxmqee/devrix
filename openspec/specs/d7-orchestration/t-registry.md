@@ -102,7 +102,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/capture/d7_matrix_test.go` | IMPLEMENTED | P0 |
+| D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `internal/layers/communication/capture/coordinator_matrix_test.go` | IMPLEMENTED | P0 |
 | D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 

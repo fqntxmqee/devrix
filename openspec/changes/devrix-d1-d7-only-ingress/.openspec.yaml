@@ -1,0 +1,17 @@
+change_id: devrix-d1-d7-only-ingress
+priority: P0
+demand_id: DM-20260614-007
+status: s4_in_progress
+domains: [D1, D7, ARCH]
+
+dsaft_scenarios:
+  - D1-S13  # DispatchToAgent → D7 only
+  - D7-S2   # Session Orchestrator primary entry
+
+t_points:
+  - D1-S13-A03-T01
+  - D1-S13-A03-T02
+  - D7-D1-T01
+  - D7-MIG-T01
+
+breaking: true

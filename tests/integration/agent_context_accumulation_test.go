@@ -76,7 +76,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		t.Fatalf("store: %v", err)
 	}
 	permMgr := capture.NewPermissionManager(&commCfg.Permission)
-	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, commCfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, commCfg)
 	gw.SetAgentFactory(factory)
 
 	session, err := gw.CreateSession("feishu_chat", "/tmp/work")

@@ -36,24 +36,17 @@ type IContextEngine = contracts.IEngine
 // EngineEvent is the L1 alias for engine events.
 type EngineEvent = contracts.EngineEvent
 
-// CommunicationGateway routes messages between adapters and the context engine.
+// CommunicationGateway routes messages between adapters and D7 orchestration.
 //
-// DSAFT: D1-S1-A02 (RouteMessage)
+// DSAFT: D1-S13-A03 DispatchToAgent
 type CommunicationGateway struct {
-	sessionStore  SessionStore
-	eventHandler  EventHandler
-	contextEngine IContextEngine
-	permissionMgr *PermissionManager
-	config        *config.CommunicationConfig
-	obsBridge     *observability.Bridge
-
-	// orchestrationEntry is the optional D7 orchestration entry. When non-nil and
-	// orchestrationEnabled is true, RouteInbound routes to orchestrationEntry.ProcessMessage
-	// instead of contextEngine.Process. Per R2 命题 A: D1 owns ingress
-	// owner (route-or-not decision via feature flag); D7 owns routing
-	// decision owner (FastPath vs OrchestratePath).
-	orchestrationEntry   contracts.IOrchestrationEntry
-	orchestrationEnabled bool
+	sessionStore     SessionStore
+	eventHandler     EventHandler
+	permissionMgr    *PermissionManager
+	config           *config.CommunicationConfig
+	obsBridge        *observability.Bridge
+	orchestrationEntry contracts.IOrchestrationEntry
+	snapshotExporter contracts.ISessionSnapshotExporter
 
 	mu                   sync.RWMutex
 	sessions             map[string]*types.Session
@@ -84,14 +77,12 @@ type CommunicationGateway struct {
 func NewCommunicationGateway(
 	sessionStore SessionStore,
 	eventHandler EventHandler,
-	contextEngine IContextEngine,
 	permissionMgr *PermissionManager,
 	cfg *config.CommunicationConfig,
 ) *CommunicationGateway {
 	gw := &CommunicationGateway{
 		sessionStore:    sessionStore,
 		eventHandler:    eventHandler,
-		contextEngine:   contextEngine,
 		permissionMgr:   permissionMgr,
 		config:          cfg,
 		sessions:        make(map[string]*types.Session),
@@ -102,23 +93,17 @@ func NewCommunicationGateway(
 	return gw
 }
 
-// SetOrchestrationEntry wires the optional D7 orchestration entry. When orchestrationEnabled is
-// true, RouteInbound calls entry.ProcessMessage instead of
-// contextEngine.Process. Per R2 命题 A: D1 has ingress owner (whether to
-// route to D7); D7 has routing decision owner (FastPath vs OrchestratePath).
-//
-// This setter exists so existing call sites (e.g. bootstrap) that pass a
-// fixed argument list to NewCommunicationGateway do not need to be
-// modified. Callers that want D7 must call SetOrchestrationEntry before the gateway
-// starts processing inbound messages.
-func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrationEntry, enabled bool) {
+// SetOrchestrationEntry wires D7 as the sole non-agent inbound dispatch target.
+func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrationEntry) {
 	g.orchestrationEntry = entry
-	g.orchestrationEnabled = enabled
-	if !enabled {
-		slog.Info("gateway: D7 disabled, legacy D1→D2.Process path active")
-		return
+	if entry != nil {
+		slog.Info("gateway: D1→D7.ProcessMessage path active")
 	}
-	slog.Info("gateway: D7 enabled, D1→D7.ProcessMessage path active")
+}
+
+// SetSessionSnapshotExporter wires optional session context export after process.
+func (g *CommunicationGateway) SetSessionSnapshotExporter(exp contracts.ISessionSnapshotExporter) {
+	g.snapshotExporter = exp
 }
 
 // StopProcess cancels the active context engine process for the given session.
@@ -139,7 +124,7 @@ func (g *CommunicationGateway) Stop(sessionID string) error {
 	}
 	g.stoppedSessions.Store(sessionID, struct{}{})
 	// D7 cancel is best-effort. The interrupt handler is idempotent.
-	if g.orchestrationEnabled && g.orchestrationEntry != nil {
+	if g.orchestrationEntry != nil {
 		// Use a fresh context with a short timeout to avoid blocking Stop.
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -332,31 +317,21 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
 	}
 
-	if g.contextEngine == nil && (g.orchestrationEntry == nil || !g.orchestrationEnabled) {
-		return fmt.Errorf("context engine not configured")
+	if g.orchestrationEntry == nil {
+		return fmt.Errorf("orchestration entry not configured")
 	}
 
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
 
-	var eventChan <-chan *EngineEvent
-	if g.orchestrationEnabled && g.orchestrationEntry != nil {
-		g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
-		// D7 path: D1 ingress routes to D7 orchestrator, which fans out
-		// to D2 RunQueryLoop (FastPath) or Wave/Plan (OrchestratePath).
-		// See d7-domain.md §D7-D1 Contract.
-		ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
-		if err != nil {
-			cancel()
-			g.unregisterProcess(session.SessionID)
-			return fmt.Errorf("d7 entry ProcessMessage: %w", err)
-		}
-		eventChan = ch
-	} else {
-		g.startDispatchRouteSpan(ctx, session.SessionID, "legacy_d2")
-		// Legacy path: D1 → D2.ContextEngine.Process.
-		eventChan = g.contextEngine.Process(processCtx, session, msg.Content)
+	g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
+	ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
+	if err != nil {
+		cancel()
+		g.unregisterProcess(session.SessionID)
+		return fmt.Errorf("d7 entry ProcessMessage: %w", err)
 	}
+	eventChan := ch
 
 	// Handle events from context engine
 	g.processes.Add(1)

@@ -59,10 +59,27 @@ type mockContextEngine struct {
 func (m *mockContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *EngineEvent {
 	ch := make(chan *EngineEvent, len(m.events))
 	for _, e := range m.events {
-		ch <- e
+		ev := *e
+		ev.SessionID = session.SessionID
+		ch <- &ev
 	}
 	close(ch)
 	return ch
+}
+
+type engineOrchestrationEntry struct {
+	engine *mockContextEngine
+}
+
+func (e *engineOrchestrationEntry) ProcessMessage(ctx context.Context, sessionID, message string) (<-chan *EngineEvent, error) {
+	session := types.NewSession(sessionID, "test", "")
+	return e.engine.Process(ctx, session, message), nil
+}
+
+func (e *engineOrchestrationEntry) Cancel(context.Context, string) error { return nil }
+
+func wireMockEngine(gw *CommunicationGateway, engine *mockContextEngine) {
+	gw.SetOrchestrationEntry(&engineOrchestrationEntry{engine: engine})
 }
 
 func TestCommunicationGateway_CreateSession(t *testing.T) {
@@ -73,7 +90,7 @@ func TestCommunicationGateway_CreateSession(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	session, err := gw.CreateSession("chat_123", "/tmp")
 	if err != nil {
@@ -101,7 +118,7 @@ func TestCommunicationGateway_GetSession(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	created, _ := gw.CreateSession("chat_123", "/tmp")
 
@@ -123,7 +140,7 @@ func TestCommunicationGateway_ResolveSessionByChatID(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	chatKey := "feishu_oc_123_ou_456"
 	older, err := gw.CreateSession(chatKey, "/tmp")
@@ -165,7 +182,7 @@ func TestCommunicationGateway_ResolveSessionByChatID_should_restore_idle_with_sn
 
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = 5 * time.Minute
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	chatKey := "feishu_oc_idle_ou_456"
 	stale, err := gw.CreateSession(chatKey, "/tmp")
@@ -195,7 +212,7 @@ func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_recent_over_s
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	chatKey := "feishu_oc_ctx_ou_456"
 	rich, err := gw.CreateSession(chatKey, "/tmp")
@@ -235,7 +252,7 @@ func TestCommunicationGateway_ResolveSessionByChatID_should_prefer_snapshot_on_s
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	chatKey := "feishu_oc_ctx_ou_456"
 	ts := time.Now().Add(-1 * time.Minute)
@@ -292,7 +309,7 @@ func TestCommunicationGateway_ExpireSession(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	session, _ := gw.CreateSession("chat_123", "/tmp")
 
@@ -315,7 +332,7 @@ func TestCommunicationGateway_RouteInbound_EmptyMessage(t *testing.T) {
 	}
 
 	cfg := config.DefaultConfig()
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	msg := &types.InboundMessage{
 		Content: "",
@@ -346,7 +363,8 @@ func TestCommunicationGateway_RouteInbound_ResumesIdleSession(t *testing.T) {
 	mockEngine := &mockContextEngine{
 		events: []*EngineEvent{{Type: "complete"}},
 	}
-	gw := NewCommunicationGateway(store, handler, mockEngine, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
+	wireMockEngine(gw, mockEngine)
 
 	session, _ := gw.CreateSession("feishu_chat", "/tmp")
 	session.LastMessageAt = time.Now().Add(-2 * time.Hour)
@@ -391,7 +409,8 @@ func TestCommunicationGateway_RouteInbound_NormalMessage(t *testing.T) {
 		},
 	}
 
-	gw := NewCommunicationGateway(store, handler, mockEngine, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
+	wireMockEngine(gw, mockEngine)
 
 	session, _ := gw.CreateSession("feishu_oc_123_ou_456", "/tmp")
 
@@ -431,7 +450,7 @@ func TestCommunicationGateway_RouteOutbound(t *testing.T) {
 	handler := newMockEventHandler()
 	cfg := config.DefaultConfig()
 
-	gw := NewCommunicationGateway(store, handler, nil, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
 
 	msg := &types.OutboundMessage{
 		SessionID: "sess_123",
@@ -464,7 +483,7 @@ func TestCommunicationGateway_RouteError(t *testing.T) {
 	handler := newMockEventHandler()
 	cfg := config.DefaultConfig()
 
-	gw := NewCommunicationGateway(store, handler, nil, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
 
 	testErr := context.DeadlineExceeded
 	gw.RouteError(testErr, "sess_123")
@@ -486,7 +505,7 @@ func TestCommunicationGateway_CleanupExpiredSessions_SkipsActiveProcess(t *testi
 
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = time.Millisecond
-	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, nil, cfg)
+	gw := NewCommunicationGateway(store, newMockEventHandler(), nil, cfg)
 
 	session, err := gw.CreateSession("chat_active", "/tmp")
 	if err != nil {
@@ -520,7 +539,7 @@ func TestCommunicationGateway_StartCleanupRoutine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = 100 * time.Millisecond
 
-	gw := NewCommunicationGateway(store, handler, nil, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -551,7 +570,7 @@ func TestCommunicationGateway_GetOrCreateSession(t *testing.T) {
 	handler := newMockEventHandler()
 	cfg := config.DefaultConfig()
 
-	gw := NewCommunicationGateway(store, handler, nil, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
 
 	// Create a session first
 	existingSession, _ := gw.CreateSession("feishu_oc_123_ou_456", "/tmp")
@@ -611,7 +630,8 @@ func TestCommunicationGateway_WithEventBus_RoutesThroughBus(t *testing.T) {
 			{Type: "complete", Content: ""},
 		},
 	}
-	gw := NewCommunicationGateway(store, handler, mockEngine, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg)
+	wireMockEngine(gw, mockEngine)
 
 	// Wire a real BackpressureEventBus.
 	busCfg := config.DefaultEventBusConfig()

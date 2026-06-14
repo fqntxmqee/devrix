@@ -114,16 +114,17 @@ v1.0 OrchestratePath：**不依赖** S5-P3；可路由至 PlanMode 或已有 del
 
 ### Migration Coexistence Contract
 
-| d7_enabled | plan.enabled | 入口 | 编排逻辑位置 |
+> **RETIRED (DM-20260614-007):** D1→D2 legacy ingress 已移除。`d7.enabled=false` 时进程启动失败，不再 silent fallback。
+
+| d7.enabled | plan.enabled | 入口 | 编排逻辑位置 |
 |------------|--------------|------|-------------|
-| false | * | D1→D2.Process | D2（现行） |
-| true | false | D1→D7.ProcessMessage | D7 contracts → D2/D4 |
+| true（默认） | false | D1→D7.ProcessMessage | D7 → D2/D4 |
 | true | true | D1→D7.ProcessMessage | D7 + PlanMode |
 
 **约束：**
-- `d7_enabled=true` 时 D7 **禁止**回退调用含编排逻辑的 D2.Process 主路径
-- 迁移窗口 ≤ 2 release；上表 4 组合须全量回归（D7-MIG-T01 PLANNED）
-- `d7_enabled` 默认 `false` 直至 acceptance-report P0 全绿
+- D1 **禁止**直接调用 `IEngine.Process`（Agent 路径除外）
+- D7 FastPath **禁止**回退到 D1 侧 legacy 分支
+- `d7.enabled` 默认 **true**；设为 false 时 `WireD7` 返回错误
 
 ### Performance Acceptance（拆分 WHAT）
 

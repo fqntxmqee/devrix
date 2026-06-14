@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
@@ -50,8 +51,11 @@ func main() {
 		ObsBridge:  obsBridge,
 	})
 
-	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
 	gw.SetObservability(obs)
+	if err := bootstrap.WireD7("", gw, engine, obsBridge); err != nil {
+		log.Fatal(err)
+	}
 
 	session, _ := gw.CreateSession("cli", "/tmp")
 	ctx := context.Background()

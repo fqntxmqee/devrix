@@ -143,8 +143,9 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	}
 	handler := testutil.NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
-	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig())
 	gw.SetObservability(obs)
+	testutil.WireGatewayOrchestration(gw, engine)
 
 	// --- Print registered tool schemas ---
 	{

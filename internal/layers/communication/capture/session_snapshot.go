@@ -6,19 +6,11 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-type sessionSnapshotExporter interface {
-	ExportSessionSnapshot(sessionID string) ([]byte, error)
-}
-
 func (g *CommunicationGateway) syncSnapshotFromEngine(session *types.Session) {
-	if g == nil || g.contextEngine == nil || session == nil {
+	if g == nil || g.snapshotExporter == nil || session == nil {
 		return
 	}
-	exp, ok := g.contextEngine.(sessionSnapshotExporter)
-	if !ok {
-		return
-	}
-	data, err := exp.ExportSessionSnapshot(session.SessionID)
+	data, err := g.snapshotExporter.ExportSessionSnapshot(session.SessionID)
 	if err != nil {
 		slog.Debug("gateway: snapshot export skipped", "sessionID", session.SessionID, "error", err)
 		return
