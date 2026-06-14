@@ -207,7 +207,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | E | D2 Loop 精简（emit/executor分流，Loop.Run 196行） | ✅ |
 | F | S3/S4 包路径迁移 | ✅ |
 | G | 回归 + D7-MIG-T01 四组合矩阵 | ✅ |
-| H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | 🔶 IN PROGRESS |
+| H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ✅ DONE |
 | I (v1.1) | Task 写模型迁入 coordinator | ✅ DONE |
 
 ---
@@ -221,3 +221,4 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 2.1.0 | 2026-06-14 | Review R1 决议同步：路由矩阵、三模型、迁移契约 |
 | 2.2.0 | 2026-06-15 | WireD7 bootstrap 实现完成；D2 Loop 瘦身待进行 |
 | 2.3.0 | 2026-06-14 | Task 写模型迁入 coordinator (Phase I 完成)；CreateWorkPlan 基础版 (Phase H 进行中) |
+| 2.4.0 | 2026-06-14 | SynthesizeTaskGraph 规则版实现 (D7-S5-A02)；Phase H 全部完成 |
