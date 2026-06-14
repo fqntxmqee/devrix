@@ -127,7 +127,8 @@
 | devrix-queryloop-spans-v1.1 | DM-20260612-014 | `openspec/changes/devrix-queryloop-spans-v1.1/` | S1 未开始 |
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
-| devrix-reputation-feedback-loop | DM-20260614-008 | `openspec/changes/devrix-reputation-feedback-loop/` | S1_Proposal |
+| devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+| devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S1_Proposal |
 
 **2026-06-14 归档（S7）**：
 
