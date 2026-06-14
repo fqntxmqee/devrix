@@ -290,4 +290,10 @@ D2（用户领域 / 公共域）
 
 ---
 
+## 十一、架构重构 Playbook
+
+对已有域做**结构性重构**（S 重组、双轨迁移、规格与物理路径对齐）时，参见 [dsaft-refactoring-playbook.md](./dsaft-refactoring-playbook.md)。
+
+---
+
 *DSAFT 架构方法论 v4.0.0 — D 领域 / S 场景 / A 活动 / F 功能点 / T 测试点*
