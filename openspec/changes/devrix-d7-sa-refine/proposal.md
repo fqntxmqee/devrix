@@ -135,8 +135,11 @@ You are a **coordinator**. Your job is to:
 
 | 角色 | 职责 | 类比 D7 |
 |------|------|---------|
-| Coordinator | 理解用户目标、分工、指导、合成结果 | D7-S2（入口）+ D7-S5（决策）|
-| Worker | 执行具体任务（research/implementation/verification） | D7-S3（调度）+ D7-S4（执行） |
+| Coordinator | 理解用户目标、分工、综合结构、对用户说话 | **D7-S2（入口）+ D7-S5（结构决策）** |
+| Worker | 执行具体任务（research/implementation/verification） | **D2 QueryLoop + D4 Agent**（执行 Follower） |
+| 调度 / 进度 | Phase 并行策略、task-notification | **D7-S3（Wave/ConflictGuard）+ D7-S4（FlowEvent→D1 Task）** |
+
+> **映射修订（Cursor §10.3）：** Worker ≠ D7-S3/S4；S3/S4 是 Mechanism + Costly Signal，执行者在 D2/D4。
 
 ### 2.2.2 委托代理分离
 
@@ -200,18 +203,17 @@ Launch independent workers concurrently whenever possible."
 
 | Clawcode 设计 | D7 对应 | 改进方向 |
 |--------------|---------|---------|
-| Coordinator synthesis 必须自己做 | D7-S5 ClassifyIntent 结果应由 D7 综合 | 不能把决策委托给外部 Judge |
-| Task 状态机 + 通知 | D7-S4 FlowEvent 广播 | 已实现，需要加强 |
-| Phase 分离 | D7-S2/S3/S4/S5 分离 | 切法 A 已对齐 |
+| Coordinator synthesis 不可外包（禁 "based on findings"） | D7-S5 结构 + S3-A02 WorkerContext 自包含 | v1.1 WorkerContext 契约 + 模糊指代 lint |
+| Task 状态机 + task-notification | D7-S1 + S4 FlowEvent（含 usage 客观锚点） | 加强 chain_consistency metric |
+| Phase 分离 | D7-S2/S3/S4/S5 切法 A | 已对齐 |
 | 并行 research，串行 write | D7-S3 ConflictGuard | 已实现 |
-| SendMessage 继续 Worker | D7 HandleInterrupt | 已实现 |
+| Never fabricate agent results | D7-S2 anti-fabrication T（T03 候选） | v1.1 P0 |
+| TaskStop / SendMessage | D7-S2-A03 HandleInterrupt + runner continue | 已实现 |
+| matchSessionMode | PlanMode 会话一致性 span | v1.1 P1 |
 
-**参考总结：** Clawcode 的 Coordinator 模式验证了 D7 切法 A 的方向——Coordinator（入口+决策）与 Worker（执行）分离是经过验证的设计。|
+**参考总结：** Clawcode Coordinator 验证了切法 A；Devrix 需将 prompt 层约束落实为 **span/T/契约**（见 `gaming-analysis.md` §10）。
 
-**切法 A 的博弈价值：**
-- S2 有 T 锚点 → 入口承诺可验证
-- S5 决策独立 → 分类错误可追溯
-- S3/S4 执行透明 → 调度/结果可观测
+> **完整博弈论 + 双边共识：** [`gaming-analysis.md`](gaming-analysis.md) §7（Claude）§8（共识）§10（Cursor 回应 Clawcode）。
 
 ---
 

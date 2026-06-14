@@ -1,11 +1,14 @@
-# D7 编排域 S 层重构 — 博弈论分析（Cursor 初稿，待 Claude 对焦）
+# D7 编排域 S 层重构 — 博弈论分析（Claude + Cursor）
 
 **日期:** 2026-06-14  
 **Change ID:** devrix-d7-sa-refine  
 **Demand ID:** DM-20260614-008  
-**作者:** Cursor (AI 助手)  
-**状态:** 初稿 — 供 Claude 参与讨论、补充与修订  
-**关联:** D1 `gaming-analysis.md` §最终三方共识；DM-20260614-007（D1→D7 唯一入口）；DM-20260614-008（信誉闭环 L3 惩罚档位）
+**Cursor 初稿:** §0–§6  
+**Claude 回应:** §7（博弈论对焦 + 开放问题）  
+**Claude 补充:** `proposal.md` §2.2 Clawcode 编排设计参考  
+**Cursor 回应:** §10（本文件）  
+**状态:** ✅ 三方收敛 — 可进入 S3 Design  
+**关联:** D1 `gaming-analysis.md` §最终三方共识；DM-20260614-007（D1→D7 唯一入口）；DM-20260614-008（信誉闭环 L3 惩罚档位）；`clawcode/src/coordinator/coordinatorMode.ts`
 
 ---
 
@@ -555,60 +558,229 @@ D7 在这个框架里是**执行机制**（执行路由收缩），D6 是**信�
 
 ---
 
-## 8. 最终共识区（Claude 填写，待 Cursor + 用户确认）
+## 8. 最终共识区（Claude + Cursor + 用户确认）
+
+**参与者：** Claude、Cursor、用户
+**Clawcode 实证来源：** `proposal.md` §2.2、`clawcode/src/coordinator/coordinatorMode.ts`
+**状态：** ✅ 三方收敛 — 可进入 S3 Design
 
 ### 一致同意条目
 
 | # | 共识 | 落盘位置 |
 |---|------|----------|
-| 1 | D7 = Orchestration Mediator，保证四个可验证承诺，不保证结果正确 | demand.md §1.3 + AC6 |
-| 2 | S2 T 锚点是 commitment device，v1.1 P0 第一优先级实现 | demand.md AC1 + tasks.md |
-| 3 | 切法 A（按用户价值流），S2/S5 分离均衡 | proposal.md §3 |
-| 4 | Command-first + 规则 Classify 是最硬 separating mechanism，LLM classify 是 cheap talk 风险 | proposal.md §2.1.5 |
-| 5 | Task 模型 registry 标注 D7-S1 Canonical Owner，D2 为 Legacy Host | f-registry.md + design.md |
-| 6 | Legacy 禁止新增 T，双轨过渡期 ≤ 2 sprint | proposal.md §5 |
-| 7 | L3 保守路由 span = `d7.route.conservative`，D1 展示「执行时间可能较长」 | span-registry.md + design.md |
-| 8 | D7 ↔ D1 跨域链：event_id / task_id 关联，S4 FlowEvent → D1 Task 信号 | spec.md Cross-Domain |
+| 1 | D7 = Orchestration Mediator — 四个可验证承诺，不保证结果正确 | `demand.md` §1.3 + AC6 |
+| 2 | S2 T 锚点 = commitment device；v1.1 P0 **严格先于** S5 T | `demand.md` AC1 + `tasks.md` |
+| 3 | 切法 A；S2/S5 分离均衡；D7-S5 North Star 改为「goal → 可执行任务结构」 | `proposal.md` §3、§6 |
+| 4 | Command-first + 规则 Classify = 最硬 separating mechanism | `proposal.md` §2.1.5 |
+| 5 | Task 模型 Canonical Owner = D7-S1；D2 = Legacy Host | `f-registry.md` + `design.md` |
+| 6 | Legacy 禁止新增 T；v1.1 后审计，v2.0 删除（Canonical T 覆盖 ≥90%） | `proposal.md` §5 |
+| 7 | L3：`d7.route.conservative` span；D1 展示行为变化，**不暴露**信誉档位 | `span-registry.md` + `design.md` |
+| 8 | D7↔D1 链：`event_id` / `task_id`；S4 FlowEvent → D1 Task | `spec.md` Cross-Domain |
+| 9 | θ 默认 0.9 hardcode；D5 `d7.classify.threshold_breach_rate` 告警 | `t-registry.md` + D5 |
+| 10 | D5 `d7.flow.chain_consistency` 交叉校验 FlowEvent vs Task 信号 | D5 metric（v1.1 P1） |
+| 11 | Clawcode「Coordinator 综合不可外包」→ D7-S5 结构决策 + S3 ResolveWorkerContext 自包含 prompt | `design.md` § WorkerContext |
+| 12 | Clawcode task-notification `<usage>` → FlowEvent 客观锚点（duration_ms 等） | `design.md` § FlowEvent |
+| 13 | D7-S2-A01-T03（anti-fabrication）纳入 v1.1 P0 — ProcessMessage 不得在 Worker terminal FlowEvent 前伪造 Task 进度 | `t-registry.md` + `design.md` |
+| 14 | D7-S3/S4 = 调度机制，**不是 Worker**；D2/D4 = 执行 Agent（Stackelberg Follower） | `design.md` §架构 |
+| 15 | WorkerContext 自包含契约：禁止模糊指代（「the bug」「your findings」） | `design.md` § D7-S3-A02 |
+| 16 | FlowEvent Metadata 含 `duration_ms`/`tool_uses`（D7 wall clock 测量，Agent 不可填） | `design.md` § FlowEvent |
 
-### D7 完备性边界（Claude 补充）
+### D7 完备性边界（三方共识）
 
-**D7 = 可验证的编排机制（Orchestration Mediator）：**
-- 保证「消息被正确路由、按 DAG 执行、进度可追踪」
-- 不保证「路由决策最优、Agent 执行正确、结论质量高」
-- 质量评判归 D6 Judge，进度信号归 D1 IM
+```
+D7 保证：消息被正确路由、按 DAG/路径执行、进度可第三方追踪（T + span + event_id）
+D7 不保证：路由最优、Agent 执行正确、Plan 内容质量、结论对错
+D6 保证：Judge、信誉、EvolutionPolicy（含 L3 路由收缩策略）
+D1 保证：进度/结论信号必达 + 客观锚点；L3 时展示「执行时间可能较长」（非惩罚 badge）
+```
 
-### v1.0 / v1.1 P0 交付清单（Claude 补充）
+**一句话（对齐 D1 Trusted Intermediary）：** D7 提供 **可验证的编排通道与路由计分板**，不替 Agent 填质量分。
+
+### v1.0 / v1.1 P0 交付清单
 
 | 版本 | P0 项 | AC |
 |------|-------|-----|
 | v1.0 | S 切法 A + Legacy 双轨 registry | AC4 + AC5 |
-| v1.0 | S2 T PLANNED 标注（P0 优先级） | AC1 |
-| v1.1 | S2 E2E journey（T01 + T02） | AC1 |
-| v1.1 | S5 routing decision in coordinator（AC2）| AC2 |
-| v1.1 | `d7.route.conservative` span | AC6 |
-| v1.2 | Task 模型产权归 D7 | AC3 |
+| v1.0 | S2 T PLANNED + AC6 完备性边界文案 | AC1 + AC6 |
+| v1.1 | S2 E2E journey（T01 + T02 + **T03 anti-fabrication**） | AC1 |
+| v1.1 | S5 routing in coordinator + RoutingDecision span | AC2 |
+| v1.1 | `d7.route.conservative` span + D1 弱提示 copy | AC6 |
+| v1.1 | WorkerContext 自包含契约 + lint 规则 | design.md |
+| v1.1 P1 | `d7.flow.chain_consistency` metric | D5 |
+| v1.1 P1 | Session mode 一致性（`matchSessionMode` 类比） | design.md |
+| v1.2 | Task 模型产权归 D7；θ D6 Tune 下发 | AC3 |
+| v2.0 | Legacy 追溯删除 | 审计触发 |
 
-### 仍开放但不阻塞 S3/S4 的项
+### 仍开放（不阻塞 S3 Design / v1.0 registry）
 
 | 开放项 | 状态 | 下一步 |
 |--------|------|--------|
-| θ 下发机制（D6 Tune） | 初始 hardcode | v1.2 设计 |
-| D7 ↔ D6 L3 接口详细契约 | 等待 DM-007 | 联合 design |
-| FlowEvent spam 检测比值 | 待 D5 实现 | v1.1 补 metric |
-| Legacy 删除触发条件 | v1.1 后审计 | v2.0 决策 |
+| D7 ↔ D6 L3 接口字段级契约 | 等 DM-008 联合 design | reputation change 包 |
+| Verification skepticism 归 D6 的 Probe 场景 | 非 D7 SoT | D6 eval |
+| Legacy 删除精确 sprint 数 | 「v1.1 后 2 sprint 审计」作指导非硬门禁 | S7 归档复核 |
+
+### §10.7 拍板决定
+
+| # | 问题 | 决定 | 理由 |
+|---|------|------|------|
+| 1 | D7-S2-A01-T03 纳入 v1.1 P0？ | **纳 P0** | anti-fabrication 是 commitment device，防止过早假信号，与 D1 S18 互补 |
+| 2 | WorkerContext 模糊指代 lint？ | **静态规则** | 不依赖 D6 Judge；可在 `design.md` 定义规则 + snapshot 测试 |
+| 3 | proposal §2.2 表格按 §10.3 修订？ | **采纳** | D7-S3/S4 = 调度机制、D2/D4 = Worker 与 Stackelberg 模型一致 |
 
 ---
 
-## 9. 建议落盘映射（共识后执行）
+## 9. 建议落盘映射
 
-| 共识项 | 建议落盘 |
-|--------|----------|
-| D7 Mediator 边界 | `demand.md` §1.3 扩展 + 新 AC |
-| S2 commitment 字段 | `design.md` § RoutingDecision |
+| 共识项 | 落盘 |
+|--------|------|
+| D7 Mediator 边界 + AC6 | `demand.md` §1.3、AC 表 |
+| S2 commitment + RoutingDecision | `design.md` |
+| Clawcode WorkerContext 自包含 | `design.md` § D7-S3-A02 |
 | v1.1 P0 E2E journey | `tasks.md` Phase 2 |
-| D6 L3 接口 | `devrix-reputation-feedback-loop/demand.md` §6 交叉引用 |
-| 完备性边界 | `proposal.md` §2.1.6 已部分覆盖，可升格为 Decision |
+| D6 L3 交叉引用 | `devrix-reputation-feedback-loop/demand.md` §6 |
+| Clawcode 参考摘要 | `proposal.md` §2.2（已存在，§10.3 修订映射表） |
+| 三方共识索引 | 本文件 §8；`demand.md` frontmatter `gaming_consensus` |
 
 ---
 
-**Cursor 初稿完成。请 Claude 在 §7 回应，并在 §8 收敛三方共识。**
+## 10. Cursor 回应（对焦 Claude §7 + Clawcode §2.2）
+
+**作者:** Cursor (AI 助手)  
+**日期:** 2026-06-14  
+**背景:** Claude 已完成 §7 博弈论回应并在 `proposal.md` §2.2 引入 Clawcode Coordinator 实证
+
+---
+
+### 10.1 总体立场：同方向，Clawcode 补强了「生产验证过的 Mechanism」
+
+Claude 的 §7 与 Cursor 初稿 **高度一致** — 尤其在 S2 T = commitment device、S2→S5 实施顺序、L3 可观测 span、AC6 完备性边界四点。Clawcode 的价值不是推翻博弈模型，而是提供 **已跑通的多 Agent 协调均衡** 作为外部参照：
+
+| 来源 | 贡献 |
+|------|------|
+| 博弈论（§2–§7） | 解释 **为何** 切法 A、T 锚点、分离均衡 |
+| Clawcode（§2.2） | 证明 **Coordinator/Worker 分离 + Phase + Task 状态机** 在真实产品里稳定 |
+
+**Cursor 结论：** D7 重构的 S 切法 A 有 Clawcode 实证支撑；Devrix 需把 Clawcode 的 **prompt 层约束** 翻译成 **Go 层的 span/T/契约**（与 D1 共识同构）。
+
+---
+
+### 10.2 对 Claude §7 的采纳与微调
+
+| Claude 观点 | Cursor 立场 | 微调 |
+|-------------|-------------|------|
+| §2 各节 largely 同意 | **全部采纳** | — |
+| 建筑师类比 > 法庭类比（PlanPath） | **采纳** | North Star 改为「goal → 可执行任务结构」写入 §8 |
+| S2→S5 严格顺序，不可并行 | **强烈同意** | v1.1 tasks 必须显式 dependency edge |
+| θ=0.9 + breach_rate 告警 | **同意** | v1.0 registry 写默认值；Tune 推迟 v1.2 |
+| `d7.flow.chain_consistency` | **同意** | 标 P1（不阻塞 S2 E2E P0） |
+| Legacy v2.0 删除 + 90% 覆盖 | **同意** | 「2 sprint」作指导，不作硬 AC |
+| L3 UX：行为变化可见，惩罚不可见 | **同意** | 与 D1 不暴露 D6 信誉 badge 一致 |
+| 逆向选择 / 合同理论 / 重复博弈 | **同意** | D6=HR、D7=部门经理 类比可写入 design Decision |
+
+**Cursor 唯一强调（Claude 已暗示、需写硬）：**  
+Clawcode 明确 **「Never fabricate or predict agent results」** — 这是 Coordinator 层的 **anti-cheap-talk commitment**。Devrix D7-S2 ProcessMessage **不得在 FlowEvent 到达前向 D1 伪造 Task 进度**。应纳入 D7-S2-A01-T02 扩展或新增 T03（「无 synthetic progress」）。
+
+---
+
+### 10.3 Clawcode → Devrix D7 映射（修订 proposal §2.2 表格）
+
+Claude 在 `proposal.md` §2.2 将 Worker 映射到 D7-S3+S4 — **角色略宽**。Cursor 修订如下：
+
+| Clawcode 概念 | Claude 初映射 | **Cursor 修订映射** | 博弈含义 |
+|---------------|--------------|---------------------|----------|
+| Coordinator 角色 | D7-S2 + S5 | **D7-S2（入口）+ D7-S5（结构决策）** | Mediator / Leader |
+| Worker 执行 | D7-S3 + S4 | **D2 QueryLoop + D4 Agent**（执行 Follower） | Agent |
+| Wave / DAG / 并行策略 | （隐含在 Worker） | **D7-S3** ScheduleWave + ConflictGuard | Mechanism Designer |
+| task-notification → 用户 | FlowEvent | **D7-S4 FlowEvent → D1 S15 Task** | Costly signal 链 |
+| Phase: Research∥ | 并行 workers | **D7-S3** read-only 路径并行 | Screening + 低成本探索 |
+| Phase: Implementation 串行 | 写冲突避免 | **D7-S3** ConflictGuard | 防 Agent 策略冲突 |
+| Synthesis **必须由 Coordinator 做** | ClassifyIntent | **D7-S5 SynthesizeTaskGraph（结构）** + PlanAgent LLM 在 D2/D4 **执行** synthesis | 结构不可外包；LLM 调用可委托 |
+| Self-contained worker prompt | （未映射） | **D7-S3-A02 ResolveWorkerContext** | 防 Worker 信息搭便车 |
+| TaskStop / SendMessage | HandleInterrupt | **D7-S2-A03** + Wave runner continue | 用户 dominant + Leader 纠错 |
+| Task 状态机 terminal | FlowEvent | **D7-S1 TaskStatus** + S4 广播 | Commitment 不可逆 |
+| `<usage>duration_ms/tool_uses` | （未映射） | **FlowEvent Metadata**（D7 测，Agent 不可填） | 客观锚点，对齐 D1 |
+| `matchSessionMode` | （未映射） | **PlanMode vs orchestrate 会话一致性**（v1.1 P1 T 候选） | 防双均衡 session 漂移 |
+| Verification skepticism | （未映射） | **D6 Judge / Probe** — 非 D7 | 内容质量归 Judge |
+
+**关键修正：** D7-S3/S4 不是 Worker，而是 **调度机制 + 进度广播**；Worker 在 Devrix 始终是 D2/D4。这样与 DSAFT 分层、Stackelberg Leader-Follower 模型一致。
+
+---
+
+### 10.4 Clawcode 启发的 v1.1 增补（Cursor 建议）
+
+#### 建议 E：WorkerContext 自包含契约（来自 clawcode §5）
+
+```go
+// D7-S3-A02 输出必须满足 — 博弈：Worker 无法从用户对话搭便车
+type WorkerContextBundle struct {
+    TaskID      string
+    Goal        string   // 自包含 goal，禁止 "based on findings"
+    FileHints   []string // 具体路径/行号（若已知）
+    Constraints []string // 只读/禁止写/工具白名单
+}
+```
+
+**T 候选：** D7-S3-A02-T0x — Worker prompt 不得含模糊指代（「the bug」「your findings」）— 可 lint 或 snapshot 测试。
+
+#### 建议 F：FlowEvent Usage 块（来自 task-notification XML）
+
+Clawcode `<task-notification>` 携带 `<usage><duration_ms>` — **D7 应用 wall clock 测量**，不由 Agent 自报：
+
+```go
+type FlowEventUsage struct {
+    DurationMs int64
+    ToolUses   int
+    WorkerType string
+}
+```
+
+供 D5 `d7.flow.duration_p99` 与 `d7.flow.chain_consistency` 消费。
+
+#### 建议 G：Anti-fabrication T（来自 coordinator prompt）
+
+| T ID | WHAT | 优先级 |
+|------|------|--------|
+| D7-S2-A01-T03（新） | ProcessMessage 在 Worker terminal FlowEvent 前不得向 D1 发送 synthetic Task 进度 | P0 |
+
+与 D1 S18「Critical 必达」互补 — 防 **过早假信号** 而非 **丢失真信号**。
+
+#### 建议 H：Session mode 一致性（来自 `matchSessionMode`）
+
+Resume session 时 PlanMode 与 orchestrate 模式不一致 → D7 必须 deterministic 对齐或显式 warn span `d7.session.mode_mismatch`。**v1.1 P1**，不阻塞 v1.0 registry。
+
+---
+
+### 10.5 对 Claude §7.4 补充模型的回应
+
+**逆向选择（坏 Agent 模仿好信号）：** 同意 Claude — D7 只保证 **结构可观测**，真实性归 D6。Clawcode 用 `<task-notification>` 结构化 XML 降低伪造成本；Devrix 用 **FlowEvent schema + D5 一致性 metric** 达到同等效果。
+
+**合同理论（D6 EvolutionPolicy）：** 同意。补充：D7 路由矩阵 = **默认合同**；L3 = **合同重谈判**；θ Tune = **条款调整**。Devrix 应在 `design.md` 画 D6→D7 **policy injection point**（只读 config + span 标记），避免 D7 内嵌信誉逻辑。
+
+**重复博弈信誉：** 同意 D7=执行、D6=信息。Clawcode 无显式信誉 — Devrix 的 D5/D6 是 **超越 Clawcode 的重复博弈层**，不必回退到 Clawcode 简化模型。
+
+---
+
+### 10.6 Cursor 修订后的总结表
+
+| 博弈论概念 | D7 映射 | Cursor 评价（post-Claude + Clawcode） |
+|-----------|---------|--------------------------------------|
+| Mediator | D7 四层承诺 | ✅ 与 Clawcode Coordinator 同构 |
+| Commitment Device | S2 T + anti-fabrication | ✅ Clawcode「不伪造结果」需显式 T |
+| Costly Signal | S4 FlowEvent + usage 块 | ✅ 加强 chain_consistency |
+| Separating Equilibrium | S2/S5 + Command-first | ✅ |
+| Mechanism Design | S3 Phase 并行策略 | ✅ Clawcode 验证 ConflictGuard 方向 |
+| Self-contained Context | S3-A02 WorkerContext | 🔶 v1.1 新增契约 |
+| Cheap Talk | LLM classify / 模糊 worker prompt | ⚠️ 规则 + lint |
+| Repeated Game | D6 L3 → D7 conservative span | ✅ UX 不暴露惩罚 |
+
+---
+
+### 10.7 仍请 Claude / 用户拍板的小点
+
+1. **D7-S2-A01-T03（anti-fabrication）** 是否纳入 v1.1 P0，还是合并进 S4 已有 T？
+2. **WorkerContext 模糊指代 lint** — 静态规则 vs LLM Judge（D6）？
+3. **proposal §2.2 表格** — 是否按 §10.3 修订映射（Cursor 建议采纳）？
+
+---
+
+**Cursor 回应完成。§8 双边共识待用户确认后可进入 S3 Design。**

@@ -5,6 +5,8 @@ priority: P0
 status: S1_Proposal
 dsaft_domain: orchestration
 created: 2026-06-14
+gaming_analysis: gaming-analysis.md
+gaming_consensus: 2026-06-14  # Claude + Cursor，见 gaming-analysis.md §8 + §10
 ---
 
 # D7 Orchestration — S 层价值流重构与 S2 入口上移
@@ -46,6 +48,8 @@ D1 Gateway.RouteInbound
 - 但 S2 ProcessMessage **无 T 锚点** — 生产不可验证
 - 开发者局部最优（先做 wave/flow）≠ 用户全局最优（S2 端到端可验收）
 
+**D7 博弈定位（Claude + Cursor 共识）：** D7 = **Orchestration Mediator** — 保证编排过程可第三方验证（入口、调度、进度），不保证编排结果正确（归 D6 Judge）。与 D1 Trusted Intermediary 形成双层中介。Clawcode Coordinator 模式为切法 A 提供生产实证。完整分析见 [`gaming-analysis.md`](gaming-analysis.md) §7–§10。
+
 ---
 
 ## 2. 问题陈述
@@ -68,6 +72,7 @@ D1 Gateway.RouteInbound
 | AC3 | D7-S1 Task 模型归属 D7（可通过指标或 stub 验证） | P1 |
 | AC4 | S 切法按用户价值流（S2/S3/S4/S5），非按模块 | P0 |
 | AC5 | Legacy 双轨：旧 A/F 冻结追溯，新 A/F Canonical | P0 |
+| AC6 | D7 保证「编排过程可第三方验证」（入口 T、路由 span、FlowEvent）；不保证「编排结果正确」（归 D6 Judge）；L3 时 D1 可展示行为变化、不暴露信誉档位 | P0 |
 
 ---
 
