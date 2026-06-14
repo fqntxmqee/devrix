@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.1.0
-**Last Updated:** 2026-06-14
+**Version:** 3.1.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -114,10 +114,10 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 > 以下为 `devrix-d7-sa-refine` v1.0 Canonical 定义。按用户价值流划分 S 层，Legacy 双轨可追溯。
 
-### D7-S2: 会话编排入口 ✅ Canonical
+### D7-S2: 会话编排入口 + Turn Leader ✅ Canonical
 
-> North Star: 用户消息统一入口，决定走快速路径还是编排路径
-> 博弈角色: Screening Mechanism（筛路径）
+> North Star: 用户消息统一入口，决定走快速路径还是编排路径；**拥有 LLM 调用权与 Turn 主循环（DM-020）**
+> 博弈角色: Screening Mechanism（筛路径）+ **Turn Leader（Stackelberg 先手）**
 
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
@@ -125,6 +125,8 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 | D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | 🔶 | `delegatetools/delegate_tools.go` (v1.0) → v2.0 `hubspoke/dispatch.go` |
+| **D7-S2-A06** | **RunTurnLoop** | — | **A-BE** | **session, TurnRequest** | **<-chan EngineEvent** | **turn.{started,completed,failed}** | **⬜ v2.0** | **`orchestration/turn/orchestrator.go`（DM-020 v1.0 Registry）** |
+| **D7-S2-A07** | **InvokeLLM** | — | **A-BE** | **LLMInvokeRequest** | **<-chan Chunk** | **llm.{invoked,streaming,completed}** | **⬜ v2.0** | **`orchestration/turn/llm.go`（DM-020 v1.0 Registry）** |
 
 > **D7-S2-A04**（DM-20260614-018）：Hub-Spoke 派发矩阵 + fallback 路由。v1.0 逻辑在 D4 `delegate/service.go`；v2.0 迁 `hubspoke/dispatch.go`。
 
@@ -172,7 +174,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 14 (Canonical) | 14 + 8 | 1 + 3 | 4 + 3 |
+| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 16 (Canonical) | 14 + 8 | 1 + 3 | 4 + 5 |
 
 ---
 
@@ -184,3 +186,4 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | 2.0.0 | 2026-06-14 | 对齐代码：真实路径、实现状态、PlanMode 活动 |
 | 2.1.0 | 2026-06-14 | 包路径迁移 `internal/layers/d7/` → `internal/layers/orchestration/coordinator/`；D7-S2/S5-A01/S5-A05 标记 ✅ |
 | 3.0.0 | 2026-06-14 | Hub-Spoke A 增量：D7-S2-A04 DispatchWorker + D7-S4-A04/A05 SpokeBridge（DM-20260614-018） |
+| 3.1.0 | 2026-06-15 | Turn Leader A 增量：D7-S2-A06 RunTurnLoop + D7-S2-A07 InvokeLLM（DM-020 v1.0 Registry） |

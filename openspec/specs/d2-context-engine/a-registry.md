@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-14
+**Version:** 2.1.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 
@@ -26,11 +26,13 @@ D2 上下文引擎域 A 层注册表。**Canonical SoT：** D2-S15–S20（DM-20
 | D2-S15-A03 | CompressIfNeeded | A-BE | messages, budget | compressed | S2-A01 | `compression/pipeline.go` |
 | D2-S15-A04 | AssemblePrompt | A-BE | build_input | system_prompt | S7-A02 | `prompt/assembler.go` |
 
-### D2-S16: RunQueryLoop
+### D2-S16: RunQueryLoop（LEGACY FREEZE — DM-020）
+
+> **DM-020 v1.0 Registry：** D2-S16-A01 RunQueryLoop 冻结为 Legacy。Turn 主循环迁至 D7-S2-A06 RunTurnLoop。v2.0-d 前保留向后兼容 adapter。D2 不再持有 LLM 调用权。
 
 | A ID | Name | Type | Input | Output | Legacy | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D2-S16-A01 | RunQueryLoop | A-BE | session, params | loop_result | S10-A01 | `query/loop.go` |
+| D2-S16-A01 | RunQueryLoop | A-BE | session, params | loop_result | S10-A01 | `query/loop.go`（Legacy freeze → D7-S2-A06） |
 
 ### D2-S17: PersistSessionState
 
@@ -40,13 +42,14 @@ D2 上下文引擎域 A 层注册表。**Canonical SoT：** D2-S15–S20（DM-20
 | D2-S17-A02 | PersistMainTranscript | A-BE | session_id, delta | jsonl | S6-A02 | `transcript/main_thread.go` |
 | D2-S17-A03 | CommitActiveWindow | A-BE | session, budget | trimmed | S3 F | `engine.go` |
 
-### D2-S18: EnforceExecutionPolicy
+### D2-S18: EnforceExecutionPolicy（自 S16 拆出 tool 面 — DM-020）
 
 | A ID | Name | Type | Input | Output | Legacy | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D2-S18-A01 | CheckPermission | A-BE | tool_call | allow/deny | S10 perm | `permission/mode.go` |
 | D2-S18-A02 | IsolateToolExecution | A-BE | tool_call | sandboxed | S8-A01 | `toolrunner/sandbox.go` |
 | D2-S18-A03 | FilterToolSurface | A-BE | all_tools | visible | S9-A03 | `harness/toolpool.go` |
+| **D2-S18-A04** | **ExecuteToolRound** | **A-BE** | **ToolRoundRequest** | **ToolRoundResult** | **S10 tool round** | **`query/loop.go` → v2.0 `policy/toolround.go`（DM-020 v1.0 Registry）** |
 
 ### D2-S19: NestedExecution
 

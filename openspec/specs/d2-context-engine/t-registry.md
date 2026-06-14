@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-14
+**Version:** 2.1.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 
@@ -166,8 +166,28 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 ---
 
+## DM-020 Legacy T 映射（v1.0 Registry）
+
+> **DM-020（D7 Turn 编排上移）：** D2-S16 Legacy Freeze。v1.0 **不修改**现有测试 `// T:` 注释。下表供追溯与新测试登记。
+
+| Legacy T ID | Canonical T ID | Canonical S | 域 | 描述 |
+|-------------|----------------|-------------|-----|------|
+| D2-S16-A01-T01 | D7-S2-A06-T01 | S2 Turn | D7 | FastPath turn D2 then D3 |
+| D2-S16-A01-T02 | D7-S2-A06-T02 | S2 Turn cancel | D7 | Cancel propagates |
+| D2-S16-A01-T03 | D2-THIN-T01 | import lint | D2 | D2→D3 import 禁止（v2.0-d CI 硬阻断） |
+| D2-S10-A01-T34 | D7-S2-A06-T03 | multi-turn loop | D7 | Multi-turn tool_use |
+| D2-S10-A01-T35 | D2-S15-A01-T* | S15 Prepare | D2 | UserContext prepend |
+| D2-S10-A01-T36 | D2-S18-A01-T* | S18 Policy | D2 | plan_mode attachment throttle |
+| D2-S10-A01-T37 | D2-S18-A01-T* | S18 Policy | D2 | plan mode write deny |
+| D2-S10-A01-T40 | D2-S19-A01-T* | S19 Nested | D2 | SubQuery Explore read-only |
+| D2-S10-A01-T41 | D2-S19-A01-T* | S19 Nested | D2 | Fork subagent placeholder |
+| D2-S10-A01-T42 | D2-S19-A02-T* | S19 Nested | D2 | Sidechain transcript resume |
+| （新增） | D2-S15-A01-T10 | S15 Prepare | D2 | CompressHint no LLM（D2 不调 D3 摘要） |
+
+---
+
 ## Statistics
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 59 | 58 | 1 | 17 |
+| 60 | 58 | 1 | 18 |

@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.0.0
+**Version:** 4.1.0
 **Last Updated:** 2026-06-15
 
 ---
@@ -245,6 +245,27 @@ Spec: `openspec/specs/d6-evolution/spec.md` (D6-S3)
 Spec: `openspec/specs/d7-orchestration/d7-domain.md` (D7)
 
 > **迁移说明（ORCH → D7）**: ORCH-S3 → D7-S3, ORCH-S1/S2 → D7-S4。迁移期间 `internal/layers/orchestration/` 保留作为 re-export 桥接包，D7 稳定后移除。
+
+### D2/D7 Turn 双轨（DM-020 v1.0 Registry）
+
+> **DM-020（D7 Turn 编排上移）：** Turn 主循环 SoT 从 D2-S16 迁移至 D7-S2-A06。v1.0 仅规格登记（零 Go 变更）；v2.0 物理迁移。
+
+| 概念 | v1.0 Legacy（现行） | v2.0 Target（DM-020） |
+|------|---------------------|----------------------|
+| Turn 主循环 | D2-S16-A01 RunQueryLoop | **D7-S2-A06 RunTurnLoop** |
+| LLM 调用 | D2 → D3（via bridges/llm） | **D7-S2-A07 InvokeLLM → D3**（D7 直调） |
+| D2 角色 | Context Engine（含 LLM 调用） | **Context Follower**（Prepare / ToolRound / Persist） |
+| D7 角色 | Session Orchestrator（路由 + Wave） | **Session Orchestrator + Turn Leader**（LLM 调用权 + Hub-Spoke） |
+| D2→D3 import | ✅（现行） | **❌ 禁止**（v2.0-d CI 硬阻断） |
+| Autocompact | D2 调 D3 摘要 | **D7 调 D3**，D2 发出 CompressHint + 合并结果 |
+| SubQuery LLM | D2 nested 内循环 | **D7 包装 TurnScopeSubQuery** |
+
+**Stackelberg 博弈角色：**
+- **D7 = Leader（先手）**：拥有 LLM 调用权 + Hub-Spoke 编排权，先选路径与 executor
+- **D2 = Follower（后手）**：在给定参数下执行 Prepare / ToolRound / Persist，不拥有 LLM 调用权
+- **D4 = Follower（后手，对称）**：执行 Worker，不拥有 Spoke 派发决策权
+
+**Legacy 兼容（v2.0-f，1 发布周期）：** `QueryLoopExecutor` adapter 委托至 `TurnOrchestrator`，旧 T 层注释不改。
 
 ---
 
@@ -587,3 +608,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | **3.8.0** | **2026-06-14** | **D3 v2.0 物理路径迁移完成**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个价值流 slug 物理迁移完成（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）；8 个 re-export 桥接文件（旧路径保留 1 发布周期）；build/vet/test 全绿；contracts.go 145 行 AC-09 达成 |
 | **3.9.0** | **2026-06-15** | **D4 v2.0-d 物理路径迁移完成**（commit 3905c6a）：S11–S16 + Kernel 物理迁移（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；D7 Hub-Spoke bridge/dispatch/subquery 搬迁（`hubspoke/agent_bridge.go` `hubspoke/dispatch.go` `hubspoke/subquery_bridge.go`）；旧路径保留 re-export legacy.go；execute(9)+hubspoke(23) 测试新增；build/vet/test(71包) 全绿 |
 | **4.0.0** | **2026-06-15** | **D4 v2.0-e 最终**（commits e30fe72..ffd6c56）：5 个 re-export shim 删除 + delegate/ 死代码删除（720a4b1）；E-e3 预存集成测试错误修复（60939db）；observer 引用迁移至 `kernel.NoOpAgentObserver`；根 `contracts.go` + `shared/config/multiagent.go` re-export 保留；S7 归档至 `openspec/archive/2026-06-15-devrix-d4-sa-refine/` |
+| **4.1.0** | **2026-06-15** | **D7 Turn 编排上移 v1.0 Registry（DM-020）：** D2/D7 Turn 双轨声明；D2-S16 Legacy Freeze → D7-S2-A06 RunTurnLoop；LLM 调用权 D2→D7 产权转移；D2→D3 禁止；Follower 对称性（D2 Context / D4 Execution） |

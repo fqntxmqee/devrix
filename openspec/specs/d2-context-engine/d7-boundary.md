@@ -2,10 +2,10 @@
 
 **Capability:** d2-d7-boundary  
 **Status:** Active  
-**Version:** 1.0.0  
-**Last Updated:** 2026-06-14  
-**Change ID:** devrix-d2-sa-refine  
-**Demand ID:** DM-20260614-009  
+**Version:** 1.1.0  
+**Last Updated:** 2026-06-15  
+**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）  
+**Demand ID:** DM-20260614-009 / DM-20260614-020  
 **Parent (D2):** `openspec/specs/d2-context-engine/d2-domain.md`  
 **Parent (D7):** `openspec/specs/d7-orchestration/d7-domain.md`
 
@@ -22,18 +22,23 @@
 
 ---
 
-## 2. 调用链 SoT
+## 2. 调用链 SoT（DM-020 修订）
 
 ```text
 D1.Gateway.RouteInbound
     └── D7.IOrchestrationEntry.ProcessMessage
             ├── [S2/S5] 路由 / 分类 / TaskGraph
+            ├── [S2-A06] RunTurnLoop（D7 Turn Leader）
+            │       ├── D2.Prepare（D2-S15）
+            │       ├── D7.InvokeLLM → D3.StreamChat（D7 直调 D3）
+            │       ├── D2.ExecuteToolRound（D2-S18）
+            │       └── D2.PersistTurn（D2-S17）
             ├── [S3] WaveScheduler → Worker(D2|D4)
             ├── [S4] ExecutionFlowHub → D1 IM
-            └── d2Executor.RunQueryLoop (bootstrap)
+            └── d2Executor.RunQueryLoop (bootstrap, Legacy freeze)
                     └── D2.IEngine.Process
                             ├── D2-S15 PrepareExecutionContext
-                            ├── D2-S16 RunQueryLoop
+                            ├── D2-S16 RunQueryLoop（Legacy freeze → D7-S2-A06）
                             └── D2-S17 PersistSessionState
 ```
 
@@ -53,7 +58,8 @@ D1.Gateway.RouteInbound
 | PlanMode / PlanAgent | ✅ S5（目标） | 🔶 暂托管 | — | — | — |
 | delegate_* 路由 | ✅ F（目标） | 🔶 暂存 | — | ✅ 执行 | — |
 | Session 上下文 / 压缩 | ❌ | ✅ S15/S17 | — | — | — |
-| QueryLoop LLM↔Tool | 编排调用 | ✅ S16 | — | — | — |
+| QueryLoop LLM↔Tool | 编排调用（Turn Leader） | ✅ S16（Legacy freeze → D7-S2-A06） | — | — | — |
+| LLM 调用（StreamChat） | ✅ S2-A07 InvokeLLM → D3 | ❌（禁止 D2→D3） | — | — | — |
 | Permission / Sandbox | 策略下发 | ✅ S18 机制 | — | — | — |
 | SubQuery / Background | 触发 | ✅ S19 | — | — | — |
 | EngineEvent | 转发 | ✅ 产出 | ✅ 展示 | — | — |
@@ -73,11 +79,13 @@ D1.Gateway.RouteInbound
 | `LoopHooks` | `query/loop.go` | D7 注入 | D2 Loop |
 | `ExecutionFlowHub` | `shared/contracts` | D7 flow | D2/D4 发布 |
 
-### 4.1 依赖规则
+### 4.1 依赖规则（DM-020 修订）
 
 ```text
-✅ D7 → D2（IEngine / QueryLoopExecutor）
-✅ D2 → D3, shared/contracts, toolrunner…
+✅ D7 → D2（ContextPreparer / ToolRoundExecutor / SessionPersister）
+✅ D7 → D3（ILLMGateway via bridges/llm）— D7 拥有 LLM 调用权
+✅ D2 → shared/contracts, toolrunner…
+❌ D2 → D3（禁止：llmgateway, bridges/llm — DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 ❌ D2 → orchestration（禁止）
 ❌ D2 → communication/adapters（禁止）
 ```
@@ -179,3 +187,5 @@ Unified `FlowEvent` aggregation and delegate-progress drain Canonical ownership 
 | `openspec/archive/2026-06-14-devrix-d2-sa-refine/` | Change 包（S7 已归档） |
 | DM-20260614-008 | D7 Leader 规格 |
 | DM-20260614-007 | D1→D7 ingress |
+| **DM-20260614-020** | **D7 Turn 编排上移（D2→D3 禁止、D2-S16 Legacy Freeze）** |
+| `openspec/specs/d7-orchestration/d3-boundary.md` | **D7↔D3 边界 SoT（DM-020 v1.0 Registry）** |

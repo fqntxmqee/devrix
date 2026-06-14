@@ -4,7 +4,8 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S20 (v1.0 registry, DM-20260614-009)
-**Depends On:** D3 (ILLMGateway), D5 (Observability), **D7 (invocation only — Leader)**
+**Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
+**Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
 **Cross-Domain SoT:** `d7-boundary.md`
 
@@ -12,14 +13,14 @@
 
 ## North Star
 
-**在会话边界内，可靠地准备上下文、执行 LLM↔Tool 多轮循环，并持久化会话状态——作为被 D7 调度的纯执行原语（Follower）。**
+**在会话边界内，可靠地准备上下文、执行工具轮次，并持久化会话状态——作为被 D7 调度的纯执行原语（Context Follower）。D7 拥有 LLM 调用权与 Turn 主循环；D2 仅负责 Prepare / ToolRound / Persist。**
 
 | 可验证承诺 | Canonical S |
 |-----------|-------------|
 | Turn 前上下文合法、在预算内 | D2-S15 PrepareExecutionContext |
-| LLM↔Tool 多轮有序完成 | D2-S16 RunQueryLoop |
+| LLM↔Tool 多轮（Legacy 冻结 → D7-S2-A06） | ~~D2-S16 RunQueryLoop~~ |
+| Tool 权限/沙箱先于执行 | D2-S18 EnforceExecutionPolicy |
 | Turn 后状态 durable + deferred complete | D2-S17 PersistSessionState |
-| 工具权限/沙箱先于执行 | D2-S18 EnforceExecutionPolicy |
 | 嵌套 SubQuery/Background 有边界 | D2-S19 NestedExecution |
 | Legacy Harness 仅显式配置 | D2-S20 LegacyHarnessFallback |
 
@@ -45,9 +46,9 @@
 | S ID | Scenario | Responsibility | Status |
 |------|----------|----------------|--------|
 | D2-S15 | PrepareExecutionContext | Load, repair, compress, assemble prompt | REGISTRY |
-| D2-S16 | RunQueryLoop | LLM↔Tool 执行原语（Thin Loop） | REGISTRY |
+| D2-S16 | RunQueryLoop | LLM↔Tool 执行原语（Thin Loop） | **LEGACY FREEZE（DM-020）** |
 | D2-S17 | PersistSessionState | Snapshot, transcript, commit window | REGISTRY |
-| D2-S18 | EnforceExecutionPolicy | Permission, sandbox, tool surface | REGISTRY |
+| D2-S18 | EnforceExecutionPolicy | Permission, sandbox, tool surface | **REGISTRY（自 S16 拆出 tool 面，DM-020）** |
 | D2-S19 | NestedExecution | SubQuery, background, fork, sidechain | REGISTRY |
 | D2-S20 | LegacyHarnessFallback | `query_loop.enabled=false` 路径 | REGISTRY |
 
@@ -86,16 +87,20 @@
 | 回答 | 做什么、顺序、谁做、进度广播 | 上下文如何准备、Loop 如何跑、状态如何持久化 |
 | 不保证 | 结论质量（D6） | 编排决策正确（D7-S5） |
 
-### 调用链
+### 调用链（DM-020 修订）
 
 ```text
-D1 → D7.ProcessMessage → d2Executor.RunQueryLoop → D2.Process
-                              ↓
-                         D2-S15 → S16 → S17
+D1 → D7.ProcessMessage → D7.RunTurnLoop（D7-S2-A06）
+                              ├── D2.Prepare（D2-S15）
+                              ├── D7.InvokeLLM → D3.StreamChat（D7 直调，D2 不参与）
+                              ├── D2.ExecuteToolRound（D2-S18）
+                              └── D2.PersistTurn（D2-S17）
                               ↓
                          EngineEvent → D7 → D1
                          FlowEvent（SubQuery）→ D7-S4 → D1
 ```
+
+> **DM-020 修订：** D7 不再通过黑盒 `d2Executor.RunQueryLoop` 调用 D2。Turn 主循环归 D7-S2-A06，LLM 调用归 D7-S2-A07（D7→D3），D2 拆面为 Prepare / ToolRound / Persist 三个独立契约。
 
 ### D7 路径 × D2 参与
 
@@ -127,14 +132,20 @@ D1 → D7.ProcessMessage → d2Executor.RunQueryLoop → D2.Process
 ## 与 D7 接口（实现锚点）
 
 ```text
-wire_coordinator.go: d2Executor.RunQueryLoop → engine.Process
+v2.0 目标（DM-020）:
+  wire_coordinator.go: ContextPreparer / ToolRoundExecutor / SessionPersister → D2
+  D7-S2-A07 InvokeLLM → bridges/llm → D3（D7 直调，D2 不参与）
+
+v1.0 Legacy（现行）:
+  wire_coordinator.go: d2Executor.RunQueryLoop → engine.Process
 ```
 
 D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包。
+**D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）。**
 
 ---
 
-## 实现状态（2026-06-14）
+## 实现状态（2026-06-15）
 
 | 项 | 状态 |
 |----|------|
@@ -146,6 +157,9 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | tasks/ 归 D7 | ⬜ v2.0 |
 | ~~delegate_tools 移除~~ | ✅ `orchestration/delegatetools/` (DM-011) |
 | scenario 物理路径 S15/S17/S18 | ⬜ v2.0 |
+| **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ⬜ v1.0 Registry（DM-020） |
+| **D2→D3 import lint（CI 硬阻断）** | ⬜ v2.0-d（DM-020） |
+| **S18 ExecuteToolRound 拆面** | ⬜ v2.0-d（DM-020） |
 
 ---
 

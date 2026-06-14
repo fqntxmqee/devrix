@@ -5,9 +5,9 @@
 **Demand:** DM-20260607-004 (V1), DM-20260608-002 (V2), DM-20260614-016 (V3), **DM-20260614-017 (V3.1)**
 **Domain:** D3
 **DSAFT Type:** 公共域 (Common Domain)
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-15
 
 ---
 
@@ -487,7 +487,7 @@
 - **When** `Bridge.ChatStream()` is called with `llmgateway.Request`
 - **Then** request.Stream is forced to true
 - **And** delegates to `IGateway.Stream()`
-- **And** returns `<-chan llmgateway.Chunk` for D2 consumers
+- **And** returns `<-chan llmgateway.Chunk` for **D7 consumers** (DM-020: primary consumer migrated D2→D7)
 
 #### Scenario: Bridge resolves tier aliases (delegation)
 

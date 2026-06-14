@@ -149,7 +149,7 @@
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
 | devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S7_Archived（v1.0 ACCEPTED 15/15 AC ✅；v1.1 子 change 已归档 ✅；v2.0 子 change 已归档 ✅） |
 | devrix-d4-sa-refine | DM-20260614-018 | `openspec/archive/2026-06-15-devrix-d4-sa-refine/` | S7_Archived（v1.0 registry ACCEPTED ✅；v2.0-d 物理迁移 + Hub-Spoke 搬迁 ACCEPTED ✅；v2.0-e re-export 6/6 删除 + delegate/ 清理 + E-e3 修复；8 commits；71 包全绿） |
-| devrix-d7-turn-orchestration | DM-20260614-020 | `openspec/changes/devrix-d7-turn-orchestration/` | S3_Design（R1 闭合；proposal/design/tasks 草稿；待 S3-Gate + v1.0 registry） |
+| devrix-d7-turn-orchestration | DM-20260614-020 | `openspec/changes/devrix-d7-turn-orchestration/` | S5_Accepted（v1.0 Registry ACCEPTED ✅：Phase B 11 项文档/注册表更新 + Phase C 5 项验证全 PASS；零 Go 变更；71 包全绿；待 v2.0 Phase D slice a–f） |
 
 **2026-06-14 归档（S7 — D3 SA Refine v2.0）**：
 

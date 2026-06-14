@@ -180,11 +180,14 @@ D3-S6-A01 LoadAndValidateLLMConfig
 ## 3. CROSS — 跨域锚点（Bridge / Bootstrap）
 
 > **R1 D2 决议**：D3 内部 A 不含 Bridge / Bootstrap；它们是 D3 → D2 的契约实现，归属跨域锚点 `internal/bridges/llm/`。本段仅作"占位声明"，完整 A/F/T 注册见 `internal/bridges/llm/`。
+> 
+> **DM-020（D7 Turn 编排上移）修订：** ILLMGateway 主消费方从 D2 变更为 **D7**。v1.0 保留 Legacy 别名 `AdaptToContextEngine`；v2.0 增 `AdaptToOrchestrator`。
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| **D3-X-A01** | **AdaptToContextEngine** | A-BE | llmgateway.Request | <-chan Chunk (via ILLMGateway) | `internal/bridges/llm/bridge.go`（`Bridge.ChatStream`） |
+| **D3-X-A01** | **AdaptToContextEngine**（Legacy 别名） | A-BE | llmgateway.Request | <-chan Chunk (via ILLMGateway) | `internal/bridges/llm/bridge.go`（`Bridge.ChatStream`） |
 | **D3-X-A02** | **WireLLMStack** | A-BE | config_file, obs | ContextLLMStack | `internal/bridges/llm/context_wiring.go`（`WireContextLLM` + `WireFromConfig`） |
+| **D3-X-A03** | **AdaptToOrchestrator** | **A-BE** | **llmgateway.Request** | **<-chan Chunk (via ILLMGateway)** | **`internal/bridges/llm/bridge.go`（v2.0-b 新增，DM-020）** |
 
 > **F 编排**（详见 `internal/bridges/llm/` 内部）：
 > ```

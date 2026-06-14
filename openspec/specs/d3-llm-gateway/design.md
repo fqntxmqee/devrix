@@ -530,8 +530,12 @@ type IGateway interface {
     Close() error
 }
 
-// ILLMGateway is the D2 Context Engine consumer contract.
-// DSAFT: D3-X-A01 AdaptToContextEngine (CROSS 段)
+// ILLMGateway is the primary LLM consumer contract.
+// DSAFT: D3-X-A01 AdaptToOrchestrator (CROSS 段)
+//
+// DM-020 (D7 Turn 编排上移): Primary consumer migrated from D2 to D7.
+// D7-S2-A07 InvokeLLM is the canonical consumer; D2→D3 is banned (import lint).
+// Legacy alias AdaptToContextEngine kept for backward compat, 1 release cycle.
 type ILLMGateway interface {
     ChatStream(ctx context.Context, req *Request) (<-chan Chunk, error)
 }

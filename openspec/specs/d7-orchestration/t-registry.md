@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.3.0
-**Last Updated:** 2026-06-14
+**Version:** 2.5.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
 
@@ -121,18 +121,49 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ---
 
+## D7-S2 Turn Leader（DM-020 v1.0 Registry）
+
+> **v1.0：** 仅规格登记。v2.0 slice a–f 逐 slice 实现。
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| D7-S2-A06-T01 | FastPath turn D2 then D3 in order | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
+| D7-S2-A06-T02 | Cancel propagates to D3 stream and D2 tools | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
+| D7-S2-A06-T03 | Multi-turn tool_use loops under D7 | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
+| D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-f) | P0 |
+| D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/turn/llm_test.go` | PLANNED (v2.0-b) | P0 |
+| D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/turn/llm_test.go` | PLANNED (v2.0-b) | P0 |
+
+### Legacy T 映射（DM-020 — v1.0 Registry，v2.0 实施）
+
+> v1.0：**不改**现有测试 `// T:` 注释。下表供追溯与新测试登记。
+
+| Legacy T ID | Canonical T ID | Canonical S | 域 | 描述 |
+|-------------|----------------|-------------|-----|------|
+| D2-S16-A01-T01 | D7-S2-A06-T01 | S2 Turn | D7 | FastPath turn D2 then D3 |
+| D2-S16-A01-T02 | D7-S2-A06-T02 | S2 Turn cancel | D7 | Cancel propagates |
+| D2-S16-A01-T03 | D2-THIN-T01 | import lint | D2 | D2→D3 import 禁止 |
+| D2-S10-A01-T34 | D7-S2-A06-T03 | multi-turn loop | D7 | Multi-turn tool_use |
+| D2-S10-A01-T35~T42 | D2-S15/S18/S19-T* | 按机制拆分 | D2 | 保留 D2 域内 |
+| （新增） | D7-S2-A07-T01 | RouteModel+Stream | D7 | Breaker sad path |
+| （新增） | D7-S2-A07-T02 | StreamChat timeout | D7 | Timeout propagate |
+| （新增） | D7-S2-A06-T04 | SubQuery nested | D7 | Nested turn |
+| （新增） | D2-S15-A01-T10 | CompressHint no LLM | D2 | D2 不调 LLM |
+
+---
+
 ## Statistics
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 49 | 40 | 2 | 7 | 28 |
+| 55 | 40 | 2 | 13 | 34 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
 | D7-S1 | 8 | 5 | 3 |
-| D7-S2 | 9 | 7 | 2 |
+| D7-S2 | 15 | 7 | 8 |
 | D7-S3 | 11 | 10 | 1 |
 | D7-S4 | 7 | 7 | 0 |
 | D7-S5 | 10 | 7 | 3 |
@@ -150,3 +181,4 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | 2.2.0 | 2026-06-14 | Review R2：T02c 端到端 SLA、T04 中断顺序、D7-D6-T01 metric、S5-T02 白名单 |
 | 2.3.0 | 2026-06-14 | DM-20260614-005：D7-S5-T03 / T06 闭环（端到端测试 + CommandFirst=false 回归） |
 | 2.4.0 | 2026-06-14 | devrix-d7-sa-refine (DM-20260614-008)：T03 anti-fabrication、D7-S5-A01-T01/T02、S5-A02-T01 新增 |
+| 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 T 点（6 个 PLANNED）+ Legacy T 映射表 |

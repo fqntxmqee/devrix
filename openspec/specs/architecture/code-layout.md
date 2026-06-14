@@ -2,7 +2,7 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.7.0
+**Version:** 1.8.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -98,6 +98,15 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | — | Delegate routing F | `delegatetools` | `orchestration/delegatetools/` | ✅ DM-011 |
 | — | Session command queue F | `sessionqueue` | `orchestration/sessionqueue/` | ✅ DM-013 |
 | — | Milestone DAG | `milestone` | `orchestration/milestone/` | ✅ 已迁入 |
+| **D7-S2-A06** | **RunTurnLoop** | `turn` | `orchestration/turn/orchestrator.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
+| **D7-S2-A07** | **InvokeLLM** | `turn` | `orchestration/turn/llm.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
+
+> **DM-020 bootstrap 注释（v1.0 Registry / v2.0-b 实施）：** `bootstrap/main.go` 目标接线：
+> ```text
+> WireContextLLM(obs) → TurnOrchestrator deps  # 迁出 context_engine，D7 持有 ILLMGateway
+> WireContextEngine() → ContextPreparer only   # 无 LLM 字段
+> WireCoordinator(turnOrch, ctxPrep, ...)      # D7 持有 Turn Leader + Hub-Spoke
+> ```
 
 ### 4.3 D2 Context Engine
 
@@ -111,6 +120,9 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S18 | EnforceExecutionPolicy | `policy` | `policy/permission/`, `policy/toolrunner/` | ✅ DM-014 |
 | D2-S19 | NestedExecution | `nested` | `nested/subquery.go`, `nested/background.go`, `nested/fork.go` | ✅ DM-014 |
 | D2-S20 | LegacyHarnessFallback | `legacyharness` | `harness/` | 保持或 `legacy/` |
+| **D2-S16** | **RunQueryLoop（Legacy Freeze）** | **`query`** | **`contextengine/query/`** | **Legacy freeze（DM-020）；Turn 主循环迁 D7-S2-A06** |
+
+> **DM-020 bootstrap 注释（v1.0 Registry）：** `WireContextLLM` 当前在 `internal/bootstrap/` 为 D2 接线 ILLMGateway。v2.0-b 迁移后，D7 持有 ILLMGateway（`WireContextLLM → TurnOrchestrator deps`），D2 仅保留 ContextPreparer（`WireContextEngine → ContextPreparer only，无 LLM 字段`）。
 
 **Legacy module 路径（冻结追溯）：**
 
@@ -275,3 +287,4 @@ internal/layers/communication/
 | **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成 |
 | **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；execute(9) + hubspoke(23) 测试新增；71 包全绿 |
 | **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿 |
+| **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator） |

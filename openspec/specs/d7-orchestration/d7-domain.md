@@ -4,8 +4,8 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.4.0
-**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration) + D7 Turn Leader + Hub-Spoke SoT (DM-020/DM-018 SPEC)
+**Version:** 2.5.0
+**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration) + D7 Turn Leader (DM-020 v1.0 Registry) + Hub-Spoke SoT (DM-018 SPEC)
 **Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -47,24 +47,32 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类已实现 |
 | D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` + `bootstrap/wire_coordinator.go` |
 | D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,shadow_classifier}.go` |
+| **D7-S2-A06 RunTurnLoop** | ⬜ v2.0 PLANNED | `orchestration/turn/orchestrator.go`（DM-020 v1.0 Registry） |
+| **D7-S2-A07 InvokeLLM** | ⬜ v2.0 PLANNED | `orchestration/turn/llm.go`（DM-020 v1.0 Registry） |
 | D2 Loop 瘦身 | ⬜ IN PROGRESS | `query/loop.go` 414行，需移除编排字段 |
 
 **域边界**：
-- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**
-- D7 **编排**：D2（Context Follower）、D4（Execution Follower）
+- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**
+- D7 **编排**：D2（Context Follower — PrepareContext / ToolRound / PersistTurn）、D4（Execution Follower）
+- D7 **直调**：D3（ILLMGateway via bridges/llm，替代 D2→D3 旧路径）
 - D7 **暂托管（D2）**：Task 写模型、PlanMode（目标迁入 D7-S1/S5）
 - D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）
 
 > **LLM 调用权产权声明（DM-020 — 双边共识 G-07）：** D7 是唯一有权决定何时、以何种参数调用 D3 的域。D2 拥有"请求 LLM 结果"的权利（通过 CompressHint），但不拥有"执行 LLM 调用"的权利。该产权通过 import lint（D2→D3 硬阻断）强制执行。
 
-**D2 Follower 契约（DM-20260614-009）：**
+**D2 Follower 契约（DM-20260614-009 / DM-020 修订）：**
 
-| D7 动作 | D2 响应 |
-|---------|---------|
-| `d2Executor.RunQueryLoop` | `IEngine.Process` → S15→S16→S17 |
-| Wave 调度 D2 Worker | S16 Loop + S18 policy |
-| SubQuery / Background | S19 NestedExecution |
-| FlowEvent 聚合 | D7-S4 SoT；D2 仅 publish |
+| D7 动作 | D2 响应 | D2 Canonical S |
+|---------|---------|----------------|
+| `ContextPreparer.Prepare` | 组装合法上下文 + CompressHint（若需压缩） | D2-S15 |
+| `TurnOrchestrator.RunTurn` | —（D7 主循环） | D7-S2-A06 |
+| `LLMInvoker.InvokeStream` | —（D7 直调 D3） | D7-S2-A07 |
+| `ToolRoundExecutor.ExecuteRound` | 权限门控 + 沙箱执行 | D2-S18 |
+| `SessionPersister.PersistTurn` | 快照 + transcript + commit | D2-S17 |
+| Wave 调度 D2 Worker | S16 Loop + S18 policy | D2-S16 |
+| SubQuery / Background | S19 NestedExecution | D2-S19 |
+
+> **DM-020 修订：** D7 不再通过黑盒 `d2Executor.RunQueryLoop` 调用 D2，而是拆面调用 `ContextPreparer` / `ToolRoundExecutor` / `SessionPersister`。D7 自己持有 LLM 调用权（D7-S2-A07 InvokeLLM → D3），D2 不再接触 ILLMGateway。
 
 详见 `openspec/specs/d2-context-engine/d7-boundary.md`。
 
@@ -81,7 +89,7 @@ D7 统一 Hub-Spoke：DispatchWorker → SpokeBridge.Publish（唯一 Flow 出�
 D7 将进度事件发布到 D1（通信层）
 D6 → D7 ValidateOrchestration (元决策校验, advisory)
 D5 观测 D7 (orchestration.turn.* / orchestration.flow.* / orchestration.hubspoke.*)
-D3 直连 D7（D7-S2-A07 InvokeLLM 经 bridges/llm）；D2→D3 禁止
+D3 直连 D7（D7-S2-A07 InvokeLLM 经 bridges/llm）；**D2→D3 禁止（import lint CI 硬阻断 v2.0-d）**
 ```
 
 | DSAFT ID | 名称 | 来源 | 域类型 |
@@ -674,3 +682,5 @@ orchestration:
 | 2.1.0 | 2026-06-14 | Review R1：三模型、路由矩阵、S5 分阶段、迁移契约、性能指标拆分 |
 | 2.2.0 | 2026-06-14 | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、T02c、D6 metric |
 | 2.3.0 | 2026-06-15 | WireCoordinator bootstrap 实现完成；D2 Loop 瘦身进行中 |
+| 2.4.0 | 2026-06-15 | Hub-Spoke SoT + D7 Turn Leader 产权声明（DM-020/DM-018 SPEC） |
+| 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 登记；D2 Follower 拆面契约（ContextPreparer/ToolRoundExecutor/SessionPersister）；D7→D3 边界声明 |
