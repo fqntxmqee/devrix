@@ -3,6 +3,9 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 // sessionIDKey is the context key for session ID extraction.
@@ -120,6 +123,47 @@ func (m *LocalWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (W
 	}
 
 	return snapshot, nil
+}
+
+// CreateWorkPlan implements D7-S1-A01. v1.1 creates a single Task from the goal.
+// Future versions will call SynthesizeTaskGraph (D7-S5-A02) to decompose
+// the goal into a DAG of tasks.
+func (m *LocalWorkModel) CreateWorkPlan(ctx context.Context, sessionID, goal string) (*Plan, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("CreateWorkPlan: sessionID is required")
+	}
+	if goal == "" {
+		return nil, fmt.Errorf("CreateWorkPlan: goal is required")
+	}
+
+	plan := &Plan{
+		ID:        "plan_" + uuid.New().String()[:8],
+		SessionID: sessionID,
+		Tasks:     []TaskSpec{},
+		CreatedAt: time.Now(),
+	}
+
+	// v1.1: single task from goal (SynthesizeTaskGraph deferred to future)
+	task := m.tasks.Create(sessionID, goal, goal)
+	if task == nil {
+		return nil, fmt.Errorf("CreateWorkPlan: failed to create task")
+	}
+	taskID := task.ID
+
+	// Build TaskSpec for the created task
+	tasks := m.tasks.List(sessionID)
+	for _, t := range tasks {
+		if t.ID == taskID {
+			plan.Tasks = append(plan.Tasks, TaskSpec{
+				ID:      t.ID,
+				Subject: t.Subject,
+				Goal:    t.Description,
+			})
+			break
+		}
+	}
+
+	return plan, nil
 }
 
 // DelegatedWorkModel is the v1.0 implementation: it forwards to D2
