@@ -49,6 +49,7 @@
 | DM-20260611-008 | 飞书 IM 完成卡 — ctx 比例 + token 链路埋点 | devrix-im-card-ctx | 2026-06-11 | [#27](https://github.com/fqntxmqee/devrix/pull/27) | ACCEPTED (P1) |
 | DM-20260613-001 | D7 Orchestration Domain — 入口迁移与共存契约 | devrix-d7-orchestration-domain | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260614-002 | D6 Validation Metric — 4 counter + 滑窗告警 (P1 #6) | devrix-d6-validation-metric | 2026-06-14 | — | ACCEPTED (P1) |
+| DM-20260614-003 | PlanAgent 工具白名单契约 — 只读探索可断言 (P1 #7) | devrix-d7-s5-t02-planagent-whitelist | 2026-06-14 | — | ACCEPTED (P1) |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -94,6 +95,7 @@
 | devrix-im-card-ctx | `openspec/archive/2026-06-11-devrix-im-card-ctx/` |
 | devrix-d7-orchestration-domain | `openspec/archive/2026-06-14-devrix-d7-orchestration-domain/` |
 | devrix-d6-validation-metric | `openspec/archive/2026-06-14-devrix-d6-validation-metric/` |
+| devrix-d7-s5-t02-planagent-whitelist | `openspec/archive/2026-06-14-devrix-d7-s5-t02-planagent-whitelist/` |
 | devrix-agentic-loop | `openspec/archive/2026-06-11-devrix-agentic-loop/`（Superseded → DM-012 + tech-debt） |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
