@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 4.1.0
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-15
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -25,9 +25,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 41 | 30 | 9 | 21 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 45 | 35 | 8 | 25 |
 
-**总计**: 267 · IMPLEMENTED 249 · PLANNED 15 · PARTIAL 2 · P0 113
+**总计**: 271 · IMPLEMENTED 254 · PLANNED 14 · PARTIAL 2 · P0 117
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 
