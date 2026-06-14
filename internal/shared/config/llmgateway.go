@@ -1,260 +1,58 @@
+// Package config provides shared configuration types for devrix.
+//
+// LLM Gateway types below are re-exports from llmgateway/configure.
+// Deprecated: import llmgateway/configure directly. These aliases will be
+// removed in the next release cycle.
 package config
 
-import "time"
+import "github.com/devrix/devrix/internal/layers/llmgateway/configure"
 
 // LLMGatewayFileConfig is the YAML shape for llm_gateway.
-type LLMGatewayFileConfig struct {
-	DefaultProvider string                       `yaml:"default_provider"`
-	DefaultModel    string                       `yaml:"default_model"`
-	DefaultTier     string                       `yaml:"default_tier"`
-	ModelTiers      map[string]string            `yaml:"model_tiers"`
-	ModelRouting    map[string]string            `yaml:"model_routing"`
-	CircuitBreaker  LLMCircuitBreakerFileConfig  `yaml:"circuit_breaker"`
-	Providers       map[string]LLMProviderConfig `yaml:"providers"`
-}
-
-// LLMCircuitBreakerFileConfig holds circuit breaker YAML fields.
-type LLMCircuitBreakerFileConfig struct {
-	FailureThreshold  int           `yaml:"failure_threshold"`
-	SuccessThreshold  int           `yaml:"success_threshold"`
-	OpenDuration      time.Duration `yaml:"open_duration"`
-	HalfOpenMaxProbes int           `yaml:"half_open_max_probes"`
-	Scope             string        `yaml:"scope"`
-}
-
-// LLMProviderConfig holds per-provider YAML fields.
-type LLMProviderConfig struct {
-	Type          string             `yaml:"type"`
-	BaseURL       string             `yaml:"base_url"`
-	APIKeyEnv     string             `yaml:"api_key_env"`
-	DefaultModel  string             `yaml:"default_model"`
-	FallbackModel string             `yaml:"fallback_model"`
-	Timeout       time.Duration      `yaml:"timeout"`
-	MaxTokens     int                `yaml:"max_tokens"`
-	Temperature   float64            `yaml:"temperature"`
-	Retry         LLMRetryFileConfig `yaml:"retry"`
-	Headers       map[string]string  `yaml:"headers"`
-}
-
-// LLMRetryFileConfig holds retry YAML fields.
-type LLMRetryFileConfig struct {
-	MaxAttempts  int           `yaml:"max_attempts"`
-	InitialDelay time.Duration `yaml:"initial_delay"`
-	MaxDelay     time.Duration `yaml:"max_delay"`
-	Backoff      float64       `yaml:"backoff"`
-}
+type LLMGatewayFileConfig = configure.LLMGatewayFileConfig
 
 // LLMGatewayConfig is the resolved Layer 3 configuration.
-type LLMGatewayConfig struct {
-	DefaultProvider string
-	DefaultModel    string
-	DefaultTier     string
-	ModelTiers      map[string]string
-	ModelRouting    map[string]string
-	CircuitBreaker  LLMCircuitBreakerConfig
-	Providers       map[string]LLMProviderRuntimeConfig
-	// FeatureFlags — v1.1 D4-B 决议固化的运行时开关 (D3-S6-A01-F05)。
-	// 默认值见 DefaultLLMGatewayConfig 与 DefaultFeatureFlags。
-	FeatureFlags LLMFeatureFlags
-}
+type LLMGatewayConfig = configure.LLMGatewayConfig
 
-// LLMFeatureFlags 是一组 v1.1 引入的运行时开关。
-//
-// DSAFT: D3-S6-A01-F05 FeatureFlagDefaults (v1.1 F9, D4-B 决议)。
-// - D3ResilienceEmitEnabled: ON 时 attach breaker observer
-//   (emit llm_breaker_state metric + flow.breaker.* EngineEvent)
-// - D3SafetyLatencyEventEnabled: ON 时 emit span event safety.check.duration_ms
-// - D3MetricEmitWarn: ON 时 emit 失败写 warn 日志（OFF 时走 D5 健康检查）
-//
-// 8 组合 (2^3) 单元测试见 llmgateway_features_test.go (D3-S6-A01-T02)。
-type LLMFeatureFlags struct {
-	D3ResilienceEmitEnabled      bool
-	D3SafetyLatencyEventEnabled  bool
-	D3MetricEmitWarn             bool
-}
-
-// DefaultFeatureFlags 返回 v1.1 D4-B 决议固化的默认值。
-//
-// ON  : D3ResilienceEmitEnabled, D3SafetyLatencyEventEnabled (cardinality 受控)
-// OFF : D3MetricEmitWarn (避免污染日志；走 D5 健康检查)
-func DefaultFeatureFlags() LLMFeatureFlags {
-	return LLMFeatureFlags{
-		D3ResilienceEmitEnabled:     true,
-		D3SafetyLatencyEventEnabled: true,
-		D3MetricEmitWarn:            false,
-	}
-}
+// LLMFeatureFlags is a set of v1.1 runtime feature switches.
+type LLMFeatureFlags = configure.LLMFeatureFlags
 
 // LLMCircuitBreakerConfig holds resolved circuit breaker settings.
-type LLMCircuitBreakerConfig struct {
-	FailureThreshold  int
-	SuccessThreshold  int
-	OpenDuration      time.Duration
-	HalfOpenMaxProbes int
-	Scope             string
-}
+type LLMCircuitBreakerConfig = configure.LLMCircuitBreakerConfig
 
 // LLMProviderRuntimeConfig holds resolved provider settings.
-type LLMProviderRuntimeConfig struct {
-	Type          string
-	BaseURL       string
-	APIKeyEnv     string
-	DefaultModel  string
-	FallbackModel string
-	Timeout       time.Duration
-	MaxTokens     int
-	Temperature   float64
-	Retry         LLMRetryConfig
-	Headers       map[string]string
-}
+type LLMProviderRuntimeConfig = configure.LLMProviderRuntimeConfig
 
 // LLMRetryConfig holds resolved retry settings.
-type LLMRetryConfig struct {
-	MaxAttempts  int
-	InitialDelay time.Duration
-	MaxDelay     time.Duration
-	Backoff      float64
-}
+type LLMRetryConfig = configure.LLMRetryConfig
+
+// LLMCircuitBreakerFileConfig holds circuit breaker YAML fields.
+type LLMCircuitBreakerFileConfig = configure.LLMCircuitBreakerFileConfig
+
+// LLMProviderConfig holds per-provider YAML fields.
+type LLMProviderConfig = configure.LLMProviderConfig
+
+// LLMRetryFileConfig holds retry YAML fields.
+type LLMRetryFileConfig = configure.LLMRetryFileConfig
 
 // DefaultLLMGatewayConfig returns V1 defaults.
+//
+// Deprecated: use configure.DefaultLLMGatewayConfig directly.
 func DefaultLLMGatewayConfig() *LLMGatewayConfig {
-	return &LLMGatewayConfig{
-		DefaultProvider: "minimax",
-		DefaultModel:    "MiniMax-M2.7-highspeed",
-		DefaultTier:     "default",
-		FeatureFlags:    DefaultFeatureFlags(),
-		ModelTiers: map[string]string{
-			"fast":     "MiniMax-M2.7-highspeed",
-			"default":  "MiniMax-M2.7-highspeed",
-			"powerful": "deepseek-v4-latest",
-		},
-		ModelRouting: map[string]string{
-			"deepseek-*": "deepseek",
-			"minimax-*":  "minimax",
-			"MiniMax-*":  "minimax",
-		},
-		CircuitBreaker: LLMCircuitBreakerConfig{
-			FailureThreshold:  5,
-			SuccessThreshold:  2,
-			OpenDuration:      30 * time.Second,
-			HalfOpenMaxProbes: 1,
-			Scope:             "provider",
-		},
-		Providers: map[string]LLMProviderRuntimeConfig{
-			"deepseek": {
-				Type:          "deepseek",
-				BaseURL:       "https://api.deepseek.com/v1",
-				APIKeyEnv:     "DEEPSEEK_API_KEY",
-				DefaultModel:  "deepseek-v4-flash",
-				FallbackModel: "deepseek-v4-pro",
-				Timeout:       60 * time.Second,
-				MaxTokens:     8192,
-				Temperature:   0.7,
-				Retry: LLMRetryConfig{
-					MaxAttempts:  3,
-					InitialDelay: time.Second,
-					MaxDelay:     10 * time.Second,
-					Backoff:      2.0,
-				},
-			},
-			"minimax": {
-				Type:          "minimax",
-				BaseURL:       "https://api.minimaxi.com/v1",
-				APIKeyEnv:     "MINIMAX_API_KEY",
-				DefaultModel:  "MiniMax-M2.7-highspeed",
-				FallbackModel: "MiniMax-M2.5-highspeed",
-				Timeout:       60 * time.Second,
-				MaxTokens:     8192,
-				Temperature:   0.7,
-				Retry: LLMRetryConfig{
-					MaxAttempts:  3,
-					InitialDelay: time.Second,
-					MaxDelay:     10 * time.Second,
-					Backoff:      2.0,
-				},
-			},
-		},
-	}
+	return configure.DefaultLLMGatewayConfig()
+}
+
+// DefaultFeatureFlags returns v1.1 D4-B defaults.
+//
+// Deprecated: use configure.DefaultFeatureFlags directly.
+func DefaultFeatureFlags() LLMFeatureFlags {
+	return configure.DefaultFeatureFlags()
 }
 
 // BuildLLMGatewayConfig merges file config over defaults.
+//
+// Deprecated: use configure.BuildLLMGatewayConfig directly.
 func BuildLLMGatewayConfig(file *LLMGatewayFileConfig) *LLMGatewayConfig {
-	cfg := DefaultLLMGatewayConfig()
-	if file == nil {
-		return cfg
-	}
-	if file.DefaultProvider != "" {
-		cfg.DefaultProvider = file.DefaultProvider
-	}
-	if file.DefaultModel != "" {
-		cfg.DefaultModel = file.DefaultModel
-	}
-	if file.DefaultTier != "" {
-		cfg.DefaultTier = file.DefaultTier
-	}
-	if len(file.ModelTiers) > 0 {
-		cfg.ModelTiers = file.ModelTiers
-	}
-	if len(file.ModelRouting) > 0 {
-		cfg.ModelRouting = file.ModelRouting
-	}
-	if file.CircuitBreaker.FailureThreshold != 0 {
-		cfg.CircuitBreaker.FailureThreshold = file.CircuitBreaker.FailureThreshold
-	}
-	if file.CircuitBreaker.SuccessThreshold != 0 {
-		cfg.CircuitBreaker.SuccessThreshold = file.CircuitBreaker.SuccessThreshold
-	}
-	if file.CircuitBreaker.OpenDuration != 0 {
-		cfg.CircuitBreaker.OpenDuration = file.CircuitBreaker.OpenDuration
-	}
-	if file.CircuitBreaker.Scope != "" {
-		cfg.CircuitBreaker.Scope = file.CircuitBreaker.Scope
-	}
-	if file.CircuitBreaker.HalfOpenMaxProbes != 0 {
-		cfg.CircuitBreaker.HalfOpenMaxProbes = file.CircuitBreaker.HalfOpenMaxProbes
-	}
-	for name, p := range file.Providers {
-		existing := cfg.Providers[name]
-		if p.Type != "" {
-			existing.Type = p.Type
-		}
-		if p.BaseURL != "" {
-			existing.BaseURL = p.BaseURL
-		}
-		if p.APIKeyEnv != "" {
-			existing.APIKeyEnv = p.APIKeyEnv
-		}
-		if p.DefaultModel != "" {
-			existing.DefaultModel = p.DefaultModel
-		}
-		if p.FallbackModel != "" {
-			existing.FallbackModel = p.FallbackModel
-		}
-		if p.Timeout != 0 {
-			existing.Timeout = p.Timeout
-		}
-		if p.MaxTokens != 0 {
-			existing.MaxTokens = p.MaxTokens
-		}
-		if p.Temperature != 0 {
-			existing.Temperature = p.Temperature
-		}
-		if p.Retry.MaxAttempts != 0 {
-			existing.Retry.MaxAttempts = p.Retry.MaxAttempts
-		}
-		if p.Retry.InitialDelay != 0 {
-			existing.Retry.InitialDelay = p.Retry.InitialDelay
-		}
-		if p.Retry.MaxDelay != 0 {
-			existing.Retry.MaxDelay = p.Retry.MaxDelay
-		}
-		if p.Retry.Backoff != 0 {
-			existing.Retry.Backoff = p.Retry.Backoff
-		}
-		if len(p.Headers) > 0 {
-			existing.Headers = p.Headers
-		}
-		cfg.Providers[name] = existing
-	}
-	return cfg
+	return configure.BuildLLMGatewayConfig(file)
 }
+
+// LoadLLMGatewayConfig is defined in loader.go (this package).

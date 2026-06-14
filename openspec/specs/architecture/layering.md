@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.6.0
+**Version:** 3.8.0
 **Last Updated:** 2026-06-14
 
 ---
@@ -124,29 +124,86 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 
 ### D3 LLM Gateway Domain
 
-| Module ID | Scenario | Responsibility |
-|-----------|----------|----------------|
-| D3-S1 | Adapter | 模型适配器 (DeepSeek, MiniMax) |
-| D3-S2 | Gateway | LLM 路由与聚合 |
-| D3-S3 | Breaker | 熔断器 |
-| D3-S4 | Retry | 重试策略 |
-| D3-S5 | Token | Token 计数 |
-| D3-S6 | Config | 配置加载 |
+> **Canonical SoT（v3.8+）：** 价值流 Scenario 以 **D3-S1–S6** 为准（切法 A，5+1 S，DM-20260614-016 / DM-20260614-019 v2.0）。
+> **v1.0：** 代码包保留技术角色词目录（`adapter/` `gateway/` `breaker/` `retry/` `token/` `config/` `safety/`）；运行时字符串、配置 key、metric 名 0 行为变更（ACCEPTED commit 199ad18）。
+> **v1.1：** 韧性可见性（`llm_breaker_state` metric + D6 3 probe + IAdapter.Protocol() + obs nil fail-fast）ACCEPTED commit 3a6970b。
+> **v2.0：** 物理目录 1:1 对齐 5+1 S（DM-20260614-019 / devrix-d3-sa-refine-v2.0 启动中）；7 个旧路径保留 re-export 桥接 1 发布周期；scenario-slug 见 `code-layout.md §4.4`。
+> **Legacy Index：** D3-S7（Safety）已并入 D3-S5（GuardContent）；历史 T ID 追溯见 `openspec/specs/d3-llm-gateway/t-registry.md §Legacy Archive`。
+> 详见 `openspec/changes/devrix-d3-sa-refine-v2.0/{proposal.md,tasks.md,design.md v3.2.0}`。
+
+#### Canonical 价值流 — D3-S1–S6（5+1 承诺型）
+
+| Module ID | Scenario | 用户/系统目标 | scenario-slug (v2.0) | Status |
+|-----------|----------|---------------|----------------------|--------|
+| **D3-S1** | **RouteModel** | C1：用户给 model 名（含 tier alias），D3 返回正确 provider + 实际 model | `route/` | IMPLEMENTED（v2.0 🚧 F3） |
+| **D3-S2** | **StreamChat** | C2：用户发起流式聊天，D3 返回 OpenAI SSE 协议 chunk 流 | `stream/`（含 `stream/adapter/`） | IMPLEMENTED（v2.0 🚧 F2/F4） |
+| **D3-S3** | **ProtectCall** | C3：Provider 故障（5xx/网络/限流），D3 不阻塞用户（Breaker + Retry + Fallback 合并） | `protect/`（两机制独立 .go） | IMPLEMENTED（v2.0 🚧 F5） |
+| **D3-S4** | **BudgetTokens** | C4：Token 超预算，D3 截断或报错，不超额调用 | `budget/` | IMPLEMENTED（v2.0 🚧 F6） |
+| **D3-S5** | **GuardContent** | C5：用户 prompt 命中危险模式，D3 拒绝（critical）或告警（warning） | `guard/` | IMPLEMENTED（v2.0 🚧 F7） |
+| **D3-S6** | **ConfigureGateway** | （横切）配置加载与验证；含 v1.1 3 feature flag | `configure/`（合并 `shared/config/llmgateway.go`） | IMPLEMENTED（v2.0 🚧 F8） |
+
+**Domain Kernel（非 S）：** `contracts.go`（拆分后 < 200 行；仅 ILLMGateway/ITierResolver/IEngineEvent/SentinelError + re-export type alias）
+**CROSS 锚点：** `internal/bridges/llm/`（D3-X 跨域锚点；R1 D2 决议；v2.0 ✅ 不动）
+
+#### Package Map（v1.0 保留 → v2.0 迁移中）
+
+> **v1.0 收尾**时物理路径不变（0 行为变更）；**v2.0** 6 个 slug 🚧 物理迁移中；7 个旧路径保留 re-export 桥接 1 发布周期。
+
+| v1.0 当前路径 | v2.0 目标 scenario-slug | Canonical S | v2.0 状态 |
+|--------------|------------------------|-------------|----------|
+| `gateway/router.go` (路由解析部分) | `route/router.go` | S1 RouteModel | 🚧 F3 迁移中 |
+| `adapter/` (全部) | `stream/adapter/` | S2 StreamChat | 🚧 F2 迁移中 |
+| `gateway/gateway.go` Stream 主实现 | `stream/gateway.go` | S2 StreamChat | 🚧 F4 迁移中 |
+| `gateway/breaker_observer.go` (v1.1 observer) | `protect/breaker_observer.go` | S3 ProtectCall | 🚧 F5 迁移中 |
+| `breaker/` + `retry/` | `protect/{circuit_breaker,state,observer,retry,retry_jitter}.go` | S3 ProtectCall | 🚧 F5 迁移中（两机制独立 .go） |
+| `token/` | `budget/{counter,bpe_loader}.go` | S4 BudgetTokens | 🚧 F6 迁移中 |
+| `safety/` | `guard/{filter,patterns}.go` | S5 GuardContent | 🚧 F7 迁移中 |
+| `config/` + `shared/config/llmgateway*.go` | `configure/{loader,shared_config}.go` + `llmgateway_features_test.go` | S6 ConfigureGateway | 🚧 F8 迁移中（跨包合并） |
+| 根 `contracts.go` 部分类型 | 根 kernel 保留（< 200 行）+ re-export | Domain Kernel | 🚧 F9 拆分中 |
+
+#### Legacy Module Index — 冻结（D3-S1–S7 旧 7 S）
+
+| Module ID | Scenario | Responsibility | Status | Canonical |
+|-----------|----------|----------------|--------|-----------|
+| D3-S1 (旧) | Adapter | 模型适配器 (DeepSeek, MiniMax) | IMPLEMENTED | → S2 StreamChat |
+| D3-S2 (旧) | Gateway | LLM 路由与聚合 | IMPLEMENTED | → S1 RouteModel + S2 StreamChat |
+| D3-S3 (旧) | Breaker | 熔断器 | IMPLEMENTED | → S3 ProtectCall |
+| D3-S4 (旧) | Retry | 重试策略 | IMPLEMENTED | → S3 ProtectCall |
+| D3-S5 (旧) | Token | Token 计数 | IMPLEMENTED | → S4 BudgetTokens |
+| D3-S6 (旧) | Config | 配置加载 | IMPLEMENTED | → S6 ConfigureGateway |
+| D3-S7 (旧) | Safety | 内容安全过滤 | IMPLEMENTED | → S5 GuardContent |
+
+> **D3-S7 备注**：v2.1 spec.md 中 D3-S7 存在但 layering.md v3.6.0 未登记；v3.7.0 显式归档并指向新 D3-S5。
 
 ### D4 Multi-Agent Domain
 
+> **Canonical S11–S16**（DM-20260614-018）。Legacy S1–S10 冻结追溯。Hub-Spoke 归 D7，见 `d4-multi-agent/d7-boundary.md`。
+
+#### Canonical 价值流（SoT）
+
 | Module ID | Scenario | Responsibility | Status |
 |-----------|----------|----------------|--------|
-| D4-S1 | Factory | Agent 工厂 | IMPLEMENTED |
-| D4-S2 | Agent | Agent 生命周期管理 | IMPLEMENTED |
-| D4-S3 | ForkJoin | Agent Fork/Join、子 Agent 隔离、结果合并 | IMPLEMENTED |
-| D4-S4 | Collaboration | CoT/Iterative-Refinement Prompt 增强 | IMPLEMENTED |
-| D4-S5 | Observer | 事件观察者桥接 | IMPLEMENTED |
-| D4-S6 | AgentTool | Agent 工具注册表 + CLI 适配器 | IMPLEMENTED |
-| D4-S7 | Builtin | 内建 Agent 加载 | IMPLEMENTED |
-| D4-S8 | AgentObservability | Agent 可观测性指标 | IMPLEMENTED |
-| D4-S9 | SessionView | 会话视图 COW 快照 | IMPLEMENTED |
-| D4-S10 | Delegate | Hub-Spoke 委派 Worker、delegate_* 工具、FlowBridge（V6） | IMPLEMENTED |
+| D4-S11 | ProvisionAgent | 创建、配额、协作模式、Builtin 注册 | REGISTRY |
+| D4-S12 | RunAgentLoop | 生命周期、PermissionGate、状态机 | REGISTRY |
+| D4-S13 | IsolateAndMerge | Fork/Join、SessionView COW、WorkerEngine | REGISTRY |
+| D4-S14 | ExecuteWorker | Worker fork→run→join（D7 派发） | REGISTRY |
+| D4-S15 | InvokeExternalAgent | CLI/Cursor Agent Tool | REGISTRY |
+| D4-S16 | ConfigureAgents | multi_agent 配置 | REGISTRY |
+
+#### Legacy Module Index（冻结）
+
+| Module ID | Scenario | Status | Canonical |
+|-----------|----------|--------|-----------|
+| D4-S1 | Factory | IMPLEMENTED | → S11 |
+| D4-S2 | Agent | IMPLEMENTED | → S12, S13 |
+| D4-S3 | ForkJoin | IMPLEMENTED | → S13 |
+| D4-S4 | Collaboration | IMPLEMENTED | → S11 |
+| D4-S5 | Observer | IMPLEMENTED | → kernel |
+| D4-S6 | AgentTool | IMPLEMENTED | → S15 |
+| D4-S7 | Builtin | IMPLEMENTED | → S11 + D7 |
+| D4-S8 | AgentObservability | IMPLEMENTED | → D5 |
+| D4-S9 | SessionView | IMPLEMENTED | → S13 |
+| D4-S10 | Delegate | IMPLEMENTED | S14 + **D7 Hub-Spoke** |
 
 ### D5 Observability Domain
 
@@ -363,12 +420,17 @@ layers/
 │       └── service.go
 │
 ├── llmgateway/                    # D3
-│   ├── adapter/                   # D3-S1
-│   ├── gateway/                   # D3-S2
-│   ├── breaker/                   # D3-S3
-│   ├── retry/                     # D3-S4
-│   ├── token/                     # D3-S5
-│   └── config/                    # D3-S6
+│   ├── contracts.go              # Domain Kernel (Request/Chunk/TokenUsage/ToolCall)
+│   ├── adapter/                   # D3-S1 旧 / S2 新 (v1.0 保留；v2.0 → stream/)
+│   ├── gateway/                   # D3-S2 旧 (routing 部分 → S1 新；stream 部分 → S2 新)
+│   ├── breaker/                   # D3-S3 旧 / S3 新 (v1.0 保留；v2.0 → protect/)
+│   ├── retry/                     # D3-S4 旧 / S3 新 (v1.0 保留；v2.0 → protect/)
+│   ├── token/                     # D3-S5 旧 / S4 新 (v1.0 保留；v2.0 → budget/)
+│   ├── config/                    # D3-S6 旧 / S6 新 (v1.0 保留；v2.0 → configure/)
+│   └── safety/                    # D3-S7 旧 / S5 新 (v1.0 保留；v2.0 → guard/)
+│
+├── bridges/                       # 跨域锚点
+│   └── llm/                       # D3 → D2 Bridge (D3-X)
 │
 ├── multiagent/                    # D4
 │   ├── factory/                   # D4-S1
@@ -517,3 +579,8 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | 3.0.0 | 2026-06-12 | DSAFT full A/F layer definition; A-registry (77 activities), F-registry (98 function points) |
 | 3.1.0 | 2026-06-12 | Directory/spec sync: +14 new S-IDs, D4 conflict resolution (Permission→ForkJoin, Fork→Collaboration), +Status column on all S tables |
 | 3.2.0 | 2026-06-13 | D2 文档与代码对齐：QueryLoop 默认主路径、PEV 退役、`prompt/assembler`、Main transcript、conversation repair；A 94 / F 169 / T 195 |
+| 3.3.0 | 2026-06-13 | D7 Orchestration 升格自 ORCH v2 读模型包；D7-S1~S5 编排域 |
+| 3.4.0 | 2026-06-14 | D1 价值流化（D1-S13~S18）；A/F/T 注册表增量 |
+| 3.5.0 | 2026-06-14 | Naming Policy 增补：包名/文件名/导出类型/函数名禁用 D{N} 前缀（PR #33 反例表落地） |
+| 3.6.0 | 2026-06-14 | D2 价值流化（D2-S15~S20）；D2-S1~S14 冻结追溯；Naming Policy 续补 |
+| 3.7.0 | 2026-06-14 | **D3 5+1 S 价值流化**（DM-20260614-016 / devrix-d3-sa-refine）：D3-S1~S7 旧技术角色词 → D3-S1~S6 新 5+1 价值流承诺（RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway）；Legacy Index 冻结追溯；v1.0 物理路径保留 + v2.0 物理迁移目标 scenario-slug 注册（`route/` `stream/` `protect/` `budget/` `guard/` `configure/`）；D3 CROSS 锚点声明 `internal/bridges/llm/` |

@@ -114,13 +114,15 @@ D1.Gateway.RouteInbound
 | 3 | ~~`contextengine/delegate_tools.go`~~ | D4 路由 | `orchestration/delegatetools/` | ✅ DM-011 |
 | 4 | ~~`contextengine/queue/`~~ delegate-progress | Flow drain | D7-S4 `sessionqueue/` | ✅ DM-013 |
 | 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `toolpolicy/` | ✅ DM-015 |
+| 6 | `contextengine/nested/flow_report.go` | SubQuery FlowEvent 发布 | D7-S4 `hubspoke/subquery_bridge.go` | ⬜ DM-018 slice-c |
 
 v1.0：**仅登记**，不移动代码。  
 v2.0 slice-1（DM-011）：`delegate_tools` **已迁移**。  
 v2.0 slice-2（DM-012）：`contextengine/tasks/` → `orchestration/workmodel/` **已迁移**。  
 v2.0 slice-3（DM-013）：`contextengine/queue/` → `orchestration/sessionqueue/` **已迁移**。  
 v2.0 slice-4（DM-015）：`worker_tools.go` → `orchestration/toolpolicy/` **已迁移**。  
-v2.0 slice-5（DM-014）：D2 物理目录 `prepare/` `persist/` `policy/` `nested/` **已收敛**。
+v2.0 slice-5（DM-014）：D2 物理目录 `prepare/` `persist/` `policy/` `nested/` **已收敛**。  
+v2.0 slice-c（DM-018）：`nested/flow_report.go` SubQuery Flow 发布 **待迁** D7 `hubspoke/subquery_bridge.go`（D2-S19 仅保留嵌套 QueryLoop 执行机制）。
 
 ---
 

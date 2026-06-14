@@ -89,9 +89,10 @@ func TestIntegration_ContextLLMGateway(t *testing.T) { ... }
 ```go
 //go:build integration && d3 && live
 
-// Covers: D3-S1-T03
+// Covers: D3-S2-A01-T03 (SSE parse error handling)
 // Domain: D3
 // Stage: s3_live
+// Legacy alias: D3-S1-A01-T03 (旧 7 S 切法)
 func TestIntegration_LLMRealAPI(t *testing.T) { ... }
 ```
 

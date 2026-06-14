@@ -3,7 +3,7 @@ package llmbridge
 import (
 	"log/slog"
 
-	llmconfig "github.com/devrix/devrix/internal/layers/llmgateway/config"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -21,7 +21,7 @@ func LogLLMReadiness(configFile string) {
 		slog.Warn("llm default provider not configured", "provider", providerName)
 		return
 	}
-	if key, hasKey := llmconfig.APIKey(p); hasKey {
+	if key, hasKey := configure.APIKey(p); hasKey {
 		slog.Info("llm provider ready",
 			"provider", providerName,
 			"model", p.DefaultModel,

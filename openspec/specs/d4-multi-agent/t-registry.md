@@ -1,9 +1,27 @@
 # D4 Multi-Agent Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 3.0.0
 **Last Updated:** 2026-06-14
+**Change ID:** devrix-d4-sa-refine
 **Parent:** `openspec/specs/architecture/layering.md`
+
+---
+
+## Canonical 索引（S11–S16）
+
+| Canonical S | Legacy S 来源 | T 数量 |
+|-------------|--------------|--------|
+| D4-S11 ProvisionAgent | S1, S4 | 7 |
+| D4-S12 RunAgentLoop | S2 | 4 |
+| D4-S13 IsolateAndMerge | S3, S9 | 8 |
+| D4-S14 ExecuteWorker | S10（执行面） | 8 |
+| D4-S15 InvokeExternalAgent | S6 | 14 |
+| D4-S16 ConfigureAgents | config | 0（v1.1 补） |
+| D4-S0 Cross | — | 4 |
+| **D7-S2/S4**（Hub-Spoke） | S10（编排面） | 5 |
+
+> v1.0：**不修改**测试 `// T:` 注释；下表保留 Legacy ID，§Legacy Archive 供追溯。
 
 ---
 
@@ -111,9 +129,45 @@
 |-------|-------------|-----|
 | 38 | 38 | 19 |
 
+---
+
+## §Legacy Archive — Canonical 映射
+
+| Legacy T ID | Canonical T ID | Canonical S | 域 |
+|-------------|----------------|-------------|-----|
+| D4-S1-A01-T01 | D4-S11-A01-T01 | S11 | D4 |
+| D4-S1-A01-T02 | D4-S11-A01-T02 | S11 | D4 |
+| D4-S1-A01-T03 | D4-S11-A01-T03 | S11 | D4 |
+| D4-S1-A01-T04 | D4-S11-A01-T04 | S11 | D4 |
+| D4-S1-A01-T05 | D4-S11-A01-T05 | S11 | D4 |
+| D4-S2-A01-T01 | D4-S12-A01-T01 | S12 | D4 |
+| D4-S2-A02-T02 | D4-S12-A02-T02 | S12 | D4 |
+| D4-S2-A02-T03 | D4-S12-A02-T03 | S12 | D4 |
+| D4-S3-A01-T01 | D4-S13-A01-T01 | S13 | D4 |
+| D4-S3-A01-T02 | D4-S13-A01-T02 | S13 | D4 |
+| D4-S3-A01-T03 | D4-S12-A01-T03 | S12 | D4 |
+| D4-S3-A01-T04 | D4-S12-A01-T04 | S12 | D4 |
+| D4-S3-A01-T05 | D4-S13-A01-T05 | S13 | D4 |
+| D4-S3-A01-T06 | D4-S13-A01-T06 | S13 | D4 |
+| D4-S3-A02-T07 | D4-S13-A02-T07 | S13 | D4 |
+| D4-S3-A02-T08 | D4-S13-A02-T08 | S13 | D4 |
+| D4-S4-A01-T01 | D4-S11-A02-T01 | S11 | D4 |
+| D4-S4-A01-T02 | D4-S11-A02-T02 | S11 | D4 |
+| D4-S5-A01-T01 | D4-S0-A02-T01 | kernel | D4 |
+| D4-S6-A01-T01 | D4-S15-A01-T01 | S15 | D4 |
+| D4-S6-A02-T02~T14 | D4-S15-A02-T02~T14 | S15 | D4 |
+| D4-S8-A01-T01~T02 | D5-AGENT-METRIC-T01~T02 | D5 | D5 |
+| D4-S10-A01-T01~T06,T12 | D4-S14-A01-T01~T07 | S14 | D4 |
+| D4-S10-A01-T07 | D7-S2-A04-T01 | D7-S2 | D7 |
+| D4-S10-A02-T08~T11 | D7-S4-A04-T01~T04 | D7-S4 | D7 |
+| D4-S0-A01-T01~T04 | D4-S0-A01-T01~T04 | CROSS | D4 |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-06-13 | Initial T registry (24 test points, 9 P0) |
-| 2.0.0 | 2026-06-14 | Fixed D4-S5-A01-T01 path (observer/adapter.go→observer/noop.go); added forkjoin_isolation tests (T05/T06/T08); added cursor_adapter tests (T08-T11); added stream_json tests (T12-T14); added observability metrics tests (S8); added delegate async/worktree tests (T04-T06); added factory validation tests (T02-T04); 38 total, 19 P0 |
+| 1.0.0 | 2026-06-13 | Initial T registry (24 test points) |
+| 2.0.0 | 2026-06-14 | 38 total, 19 P0 |
+| 3.0.0 | 2026-06-14 | Canonical 索引 + §Legacy Archive；Hub-Spoke T 重归属 D7（DM-20260614-018） |

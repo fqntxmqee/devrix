@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"

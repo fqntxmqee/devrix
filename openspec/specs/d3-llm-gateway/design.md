@@ -2,28 +2,42 @@
 
 > **Source of Truth:** `openspec/specs/d3-llm-gateway/spec.md` (v3.1.0)
 > **设计历史:** `openspec/archive/2026-06-07-devrix-llm-gateway/design.md`, `openspec/archive/2026-06-08-devrix-llm-gateway-v2/`, `openspec/changes/devrix-d3-sa-refine/design.md` (v3.0.0)
-> **Change:** devrix-d3-sa-refine（R1+R2+R3 全部决议）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议）
+> **Change:** devrix-d3-sa-refine（R1+R2+R3 全部决议）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议）+ devrix-d3-sa-refine-v2.0（DM-019 物理路径迁移）
 
 **Domain:** D3 - LLM Gateway
 **DSAFT Type:** 公共域 (Common Domain)
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Status:** Active (2026-06-14)
 **Last Updated:** 2026-06-14
 
 ---
 
-## 0. 变更摘要（V3.0.0 → V3.1.0，v1.1 子 change）
+## 0. 变更摘要（V3.1.0 → V3.2.0，v2.0 子 change）
 
-| 维度 | V3.0.0 | V3.1.0 |
+| 维度 | V3.1.0 | **V3.2.0** |
 |------|--------|--------|
-| F 编排 | 24 F（域内） + 2 F（CROSS） | **30 F 域内** + **3 F CROSS**（+6 域内 + 1 CROSS = 7 F 新增） |
-| 运行时新增 | — | 3 metric（`llm_breaker_state` / `llm_breaker_transitions_total` / `llm_tier_resolve_total`）+ 1 span event（`safety.check.duration_ms`）+ 3 EngineEvent（`flow.breaker.*`） |
-| 启动顺序 | silent fallback | **fail-fast 实施**：F02 FailFastOnObsNil 在 `WireContextLLM` 实施 obs nil → `ErrObservabilityRequired`（R3 P0 #8 占位 → v1.1 实施） |
-| Breaker 状态可见性 | 内部 state.go | **外部可观测**：F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit + F09 ReuseEngineEvent |
-| IAdapter 扩展 | 占位声明 | **F04 AdapterProtocolMethod 实施**：`Protocol() string` 方法 + 3 处实现（BREAKING） |
-| Safety 时延 | 占位声明 | **F04 EmitSafetyLatencyEvent 实施**：`Filter.Check` 内部计时 + span event `safety.check.duration_ms` + D6 probe #4 |
-| Feature flag 默认值 | 3 flag 默认 `false` | **D4-B 决议**：`d3_resilience_emit_enabled` ON + `d3_safety_latency_event_enabled` ON + `d3_metric_emit_warn` OFF |
-| 跨域契约新增 | — | D3→D6 探针接入（3 probe：Tier / Breaker / Safety latency）+ D3→D7 EngineEvent 复用（3 事件） |
+| 物理目录 | 7 个技术角色词目录（`adapter/` `gateway/` `breaker/` `retry/` `token/` `safety/` `config/`） | **6 个价值流 slug 目录**（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）+ 7 个 re-export 桥接 |
+| `contracts.go` | 单文件 ~450 行（kernel 性质保留） | **按价值流拆分到子包**，根 < 200 行（仅 ILLMGateway/ITierResolver/EngineEvent/SentinelError + re-export） |
+| 跨包配置 | `internal/shared/config/llmgateway.go` 与 `internal/layers/llmgateway/config/loader.go` 分属两包 | **合并到 `configure/`**（llmgateway_features_test.go 跨包迁移） |
+| Bridge 跨域锚点 | `internal/bridges/llm/` | **不变**（R1 D2 决议） |
+| F 编排 / T 映射 | v1.0 + v1.1 30 F 域内 + 3 F CROSS + 26 T + 9 v1.1 T = 35 T | **不变**（F 编排 + T 映射仅 import 路径同步） |
+| runtime span / metric / YAML config key 字面量 | 5 span + 5 metric + 3 YAML key | **不变**（v1.0 不变性承诺） |
+| §10.2 物理路径计划 | "v2.0 启动时执行"占位 | **详细 F2–F9 步骤 + re-export 桥接契约 + contracts.go 拆分步骤 C1–C5** |
+
+**v2.0 核心承诺（继承 + 新增）**：
+
+| 承诺 | 状态 |
+|------|------|
+| 物理路径与 5+1 S 1:1 对齐 | ✅ F2-F8 |
+| Bridge 跨域锚点稳定 | ✅ F10 不变 |
+| 旧路径 1 发布周期兼容 | ✅ re-export 桥接 |
+| v1.0 + v1.1 行为 bit-identical | ✅ 仅动路径，不动行为 |
+| 11 P0 T + 26 T 回归 100% 绿 | ✅ G5 强制 |
+| runtime span/metric/config key 字面量未改 | ✅ G8 强制 |
+
+---
+
+## 0a. 变更摘要（V3.0.0 → V3.1.0，v1.1 子 change）
 
 ---
 
@@ -755,42 +769,233 @@ internal/bridges/llm/
 └── readiness.go                # Readiness probe
 ```
 
-### 10.2 v2.0 物理路径计划（Phase F 启动时执行）
+### 10.2 v2.0 物理路径（Phase F 实施中）
 
 > **v1.0 不动**；v2.0 物理路径 1:1 对齐 5+1 S：
 
 ```
 internal/layers/llmgateway/
-├── contracts.go                 # Request/Chunk/TokenUsage/ToolCall/AdapterChunk (kernel)
-├── route/                       # 旧 gateway/router.go（仅路由解析部分）
+├── contracts.go                 # < 200 行；仅 ILLMGateway/ITierResolver/EngineEvent/SentinelError + re-export
+├── route/                       # F3：旧 gateway/router.go
 │   └── router.go
-├── stream/                      # 旧 adapter/ 全部
-│   ├── openai_stream.go
-│   ├── openai_request.go
-│   ├── sse_parser.go
-│   ├── deepseek.go
-│   ├── minimax.go
-│   └── registry.go
-├── protect/                     # 旧 breaker/ + retry/ + 拆出的 contracts
+├── stream/                      # F4：旧 gateway/gateway.go Stream 主实现
+│   ├── gateway.go
+│   └── adapter/                 # F2：旧 adapter/ 全部
+│       ├── deepseek.go
+│       ├── minimax.go
+│       ├── openai_stream.go
+│       ├── openai_request.go
+│       ├── openai_types.go
+│       ├── protocol.go          # v1.1 F5 IAdapter.Protocol()
+│       ├── registry.go
+│       ├── sse_parser.go
+│       └── *_test.go (3 test files)
+├── protect/                     # F5：旧 breaker/ + retry/ 合并（独立 .go）
 │   ├── circuit_breaker.go
 │   ├── state.go
+│   ├── observer.go              # v1.1 F07/F08 metric + counter
 │   ├── retry.go
-│   ├── circuit_state.go         # 旧根 contracts.go: CircuitState
-│   ├── circuit_breaker_config.go # 旧根 contracts.go: CircuitBreakerConfig
-│   └── retry_config.go          # 旧根 contracts.go: RetryConfig
-├── budget/                      # 旧 token/
+│   ├── retry_jitter.go
+│   ├── breaker_observer.go      # v1.1 wiring（从 gateway/breaker_observer.go 迁入）
+│   └── *_test.go
+├── budget/                      # F6：旧 token/
 │   ├── counter.go
-│   └── bpe_loader.go
-├── guard/                       # 旧 safety/
+│   ├── bpe_loader.go
+│   └── counter_test.go
+├── guard/                       # F7：旧 safety/
 │   ├── filter.go
-│   └── patterns.go
-└── configure/                   # 旧 config/ + shared/config/llmgateway.go
+│   ├── patterns.go
+│   └── filter_test.go
+└── configure/                   # F8：旧 config/ + shared/config/llmgateway.go
     ├── loader.go
-    └── llmgateway.go
+    ├── loader_test.go
+    ├── shared_config.go         # 旧 shared/config/llmgateway.go
+    └── llmgateway_features_test.go  # 旧 shared/config/llmgateway_features_test.go
 ```
 
-> **R2 §4.3 决议回顾**：`CircuitState` / `CircuitBreakerConfig` / `RetryConfig` 拆到 `protect/`；`Request` / `Chunk` / `TokenUsage` / `ToolCall` 留根（kernel 性质，跨域共享）。**R3 NQ-6 决议**：v2.0 不引入 `kernel/` 子包。
+**re-export 桥接（1 发布周期）**：
+
+```
+internal/layers/llmgateway/
+├── adapter/                     # F2 桥接：re-export → stream/adapter
+│   └── (桥接文件，// Deprecated)
+├── gateway/                     # F3/F4 桥接：re-export → route/ + stream/
+│   ├── router.go                # F3 桥接
+│   ├── gateway.go               # F4 桥接
+│   └── breaker_observer.go      # v1.1 observer 桥接 → protect/breaker_observer
+├── breaker/                     # F5 桥接：re-export → protect/circuit_breaker 等
+│   └── (桥接文件)
+├── retry/                       # F5 桥接：re-export → protect/retry
+│   └── (桥接文件)
+├── token/                       # F6 桥接：re-export → budget/
+│   └── (桥接文件)
+├── safety/                      # F7 桥接：re-export → guard/
+│   └── (桥接文件)
+└── config/                      # F8 桥接：re-export → configure/
+    └── (桥接文件)
+
+internal/shared/config/
+├── llmgateway.go                # F8 桥接：re-export → llmgateway/configure/shared_config
+└── llmgateway_features_test.go  # F8 桥接：re-export → llmgateway/configure/llmgateway_features_test
+```
+
+**根 `contracts.go` re-export 模板**：
+
+```go
+// contracts.go（v2.0 拆分后 < 200 行）
+package llmgateway
+
+import (
+    "github.com/devrix/devrix/internal/shared/errors"
+    stream_adapter "github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
+    route_pkg "github.com/devrix/devrix/internal/layers/llmgateway/route"
+    protect_pkg "github.com/devrix/devrix/internal/layers/llmgateway/protect"
+    budget_pkg "github.com/devrix/devrix/internal/layers/llmgateway/budget"
+    guard_pkg "github.com/devrix/devrix/internal/layers/llmgateway/guard"
+    configure_pkg "github.com/devrix/devrix/internal/layers/llmgateway/configure"
+)
+
+// Deprecated: 将在 v2.1 物理清理时删除；请迁移至子包。
+type (
+    Adapter             = stream_adapter.Adapter
+    IAdapter            = stream_adapter.IAdapter
+    Request             = stream_adapter.Request
+    Chunk               = stream_adapter.Chunk
+    Protocol            = stream_adapter.Protocol
+
+    Tier                = route_pkg.Tier
+    TierAlias           = route_pkg.TierAlias
+    RoutingTable        = route_pkg.RoutingTable
+
+    CircuitState        = protect_pkg.CircuitState
+    BreakerConfig       = protect_pkg.BreakerConfig
+    BreakerObserver     = protect_pkg.BreakerObserver
+    RetryPolicy         = protect_pkg.RetryPolicy
+
+    TokenUsage          = budget_pkg.TokenUsage
+    BudgetCheckResult   = budget_pkg.BudgetCheckResult
+
+    SafetyCheckResult   = guard_pkg.SafetyCheckResult
+    SafetyLevel         = guard_pkg.SafetyLevel
+
+    LLMConfig           = configure_pkg.LLMConfig
+    LLMFeatureFlags     = configure_pkg.LLMFeatureFlags
+    ProviderConfig      = configure_pkg.ProviderConfig
+)
+
+// 跨域契约（根保留）
+type ILLMGateway interface { /* ... */ }
+type ITierResolver interface { /* ... */ }
+type IEngineEvent = eventbus.EngineEvent
+
+// SentinelError（根保留）
+var (
+    ErrObservabilityRequired = errors.ErrObservabilityRequired
+)
+```
+
+> **R2 §4.3 决议回顾**：`CircuitState` / `CircuitBreakerConfig` / `RetryConfig` 拆到 `protect/`；`Request` / `Chunk` / `TokenUsage` / `ToolCall` 通过 type alias 仍可从根访问（kernel 性质，跨域共享）。**R3 NQ-6 决议**：v2.0 不引入 `kernel/` 子包。
 > **re-export 桥接**（v2.0 实施细节）：根包保留 `contracts.go` 中对 `protect.CircuitState` 的 type alias，确保旧 import 路径不破坏。
+
+---
+
+## 十三、v2.0 实施步骤（Phase F 详细）
+
+### 13.1 F2 — `stream/adapter/` 迁移步骤
+
+| 步骤 | 操作 | 验证 |
+|------|------|------|
+| F2.1 | `git mv internal/layers/llmgateway/adapter/ internal/layers/llmgateway/stream/adapter/` | 物理移动完成 |
+| F2.2 | 更新 `stream/adapter/*.go` 的内部 import（如 `gateway` → `stream`） | `go build ./internal/layers/llmgateway/stream/adapter/` |
+| F2.3 | 创建 `internal/layers/llmgateway/adapter/` 桥接文件（re-export） | `go build ./internal/layers/llmgateway/adapter/` |
+| F2.4 | 更新所有外部 import：`grep -r "llmgateway/adapter" --include="*.go"` | 替换为 `stream/adapter` |
+| F2.5 | 验证 v1.1 `Protocol()` 在新路径仍工作（`adapter/protocol_test.go` 迁移到 `stream/adapter/protocol_test.go`） | `go test ./internal/layers/llmgateway/stream/adapter/` |
+| F2.6 | Bridge 调用方：`internal/bridges/llm/bridge.go` 同步更新 | 11 P0 T + v1.1 9 T 全绿 |
+
+### 13.2 F3 — `route/` 迁移步骤
+
+| 步骤 | 操作 | 验证 |
+|------|------|------|
+| F3.1 | 创建 `internal/layers/llmgateway/route/` 目录 | 目录 |
+| F3.2 | `git mv internal/layers/llmgateway/gateway/router.go internal/layers/llmgateway/route/router.go` | 物理移动 |
+| F3.3 | 创建 `gateway/router.go` 桥接文件（re-export） | 旧路径编译通过 |
+| F3.4 | 同步 `router_test.go` | 测试绿 |
+| F3.5 | 验证 v1.1 T03 (D3-S1-A01 Tier resolution probe) 仍工作 | D6 probe #1 绿 |
+
+### 13.4 F5 — `protect/` 合并迁移步骤（高风险）
+
+| 步骤 | 操作 | 验证 |
+|------|------|------|
+| F5.1 | `git mv internal/layers/llmgateway/breaker/ internal/layers/llmgateway/protect/_breaker_legacy/`（临时） | 占位 |
+| F5.2 | `git mv internal/layers/llmgateway/retry/ internal/layers/llmgateway/protect/_retry_legacy/`（临时） | 占位 |
+| F5.3 | 在 `protect/` 下重命名：`_breaker_legacy/*.go → protect/circuit_breaker.go / state.go / observer.go` | 重命名 |
+| F5.4 | 在 `protect/` 下重命名：`_retry_legacy/*.go → protect/retry.go / retry_jitter.go` | 重命名 |
+| F5.5 | `git mv internal/layers/llmgateway/gateway/breaker_observer.go internal/layers/llmgateway/protect/breaker_observer.go` | v1.1 observer 物理归位 |
+| F5.6 | 创建 `breaker/` 桥接 + `retry/` 桥接 | 旧路径编译通过 |
+| F5.7 | 完整 P0 回归：D3-S3 12 T（Breaker 4 + Retry 2 + 5 Cross + 1 PLANNED）+ v1.1 3 T（T13/T14/T15） | 14/14 绿（除 T08 PLANNED） |
+
+### 13.5 F8 — `configure/` 跨包迁移步骤
+
+| 步骤 | 操作 | 验证 |
+|------|------|------|
+| F8.1 | 创建 `internal/layers/llmgateway/configure/` 目录 | 目录 |
+| F8.2 | `git mv internal/layers/llmgateway/config/loader.go internal/layers/llmgateway/configure/loader.go` | 物理移动 |
+| F8.3 | `git mv internal/layers/llmgateway/config/loader_test.go internal/layers/llmgateway/configure/loader_test.go` | 测试迁移 |
+| F8.4 | `git mv internal/shared/config/llmgateway.go internal/layers/llmgateway/configure/shared_config.go` | 跨包合并 |
+| F8.5 | `git mv internal/shared/config/llmgateway_features_test.go internal/layers/llmgateway/configure/llmgateway_features_test.go` | 跨包测试合并 |
+| F8.6 | 创建 `internal/layers/llmgateway/config/` 桥接 + `internal/shared/config/llmgateway*.go` 桥接 | 旧路径编译 |
+| F8.7 | 更新所有 `import "internal/shared/config"` 引用方（仅 D3 范围内；其它域如有引用保持） | `goimports` 通过 |
+| F8.8 | F9 v1.1 T02 回归（feature flag 8 组合） | T02 绿 |
+
+### 13.6 F9 — `contracts.go` 拆分步骤（必须 F2-F8 完成）
+
+| 步骤 | 操作 | 验证 |
+|------|------|------|
+| F9.1 | 在各子包创建 `contracts.go`（子包内）：stream/adapter、route、protect、budget、guard、configure | 子包 contracts |
+| F9.2 | 根 `contracts.go` 移除已迁类型，添加 `// Deprecated:` 类型别名指向新位置 | 根 < 200 行；`go build` 全绿 |
+| F9.3 | 同步更新所有 `import "internal/layers/llmgateway"` 引用方（自底向上：子包 → 子包） | `goimports` 通过 |
+| F9.4 | 旧 import 路径兼容（re-export 类型别名） | G2 测试全绿 |
+| F9.5 | v1.0 + v1.1 26 T + 9 T 测试 import 同步 | G5 11 P0 T + 26 T 回归 |
+| F9.6 | `go build ./...` 全绿 | 整体编译 |
+
+### 13.7 实施顺序
+
+```
+F2 stream/adapter ──┐
+F3 route             │
+F4 stream/gateway    ├── 并行
+F6 budget            │
+F7 guard             │
+F8 configure         │
+                     │
+F5 protect (高风险) ── 需 F2-F4 完成
+                     │
+                     ▼
+F9 contracts.go 拆分 ── 需 F2-F8 全完成
+                     │
+                     ▼
+F11 layering.md + code-layout.md 同步
+```
+
+---
+
+## 十四、v2.0 验收（Phase G 13 项）
+
+| ID | 检查 | 验证方式 |
+|----|------|----------|
+| G1 | 6 个新价值流 slug 目录存在 | `ls internal/layers/llmgateway/{route,stream,protect,budget,guard,configure}/` |
+| G2 | 7 个旧技术角色词目录仅含桥接 | `ls internal/layers/llmgateway/{adapter,gateway,breaker,retry,token,safety,config}/` |
+| G3 | `internal/bridges/llm/` 路径未变 | `ls internal/bridges/llm/` |
+| G4 | 根 `contracts.go` < 200 行 | `wc -l internal/layers/llmgateway/contracts.go` |
+| G5 | `go build ./...` 全绿 | `go build ./...` 退出码 0 |
+| G6 | `go test -race ./internal/layers/llmgateway/... ./internal/bridges/llm/...` 全绿 | 测试 100% 绿 |
+| G7 | 11 P0 T 100% IMPLEMENTED 状态保持 | `t-registry.md` IMPLEMENTED 列 |
+| G8 | 26 T + 9 v1.1 T 全量绿 | 测试报告 |
+| G9 | `scripts/check_t_aliases.py` 退出码 0 | 26 alias 100% 覆盖 |
+| G10 | `grep -r "D3-S[1-7]" openspec/specs/` 无新增失同步 | 一致性扫描 |
+| G11 | runtime span / metric / YAML config key 字面量未改 | `grep` 验证 5 span + 5 metric + 3 YAML key |
+| G12 | `layering.md` v3.8.0 D3 章节更新 | 版本号 |
+| G13 | `code-layout.md §4.4` 7 个新 slug 注册 | slug 列表 |
 
 ---
 
@@ -813,10 +1018,10 @@ internal/layers/llmgateway/
 | V1 | DeepSeek + MiniMax 适配器 + Circuit Breaker + Token Counter + Retry | Archive |
 | V2 | CB+Retry 协调 + Half-Open 并发限制 + Context 超时传播 + Full Jitter + CJK 补偿 | Archive |
 | V2.1 | Safety Filter + ModelTier + CacheRead/Reasoning Token 分解 | Archive |
-| **V3.0.0 (current)** | **5+1 S 价值流化 + Legacy Archive + Breaker/Retry 合并 + Fail-Fast 启动 + 灰区声明** | **Active** |
-| V1.1 (planned) | `llm_breaker_state` metric + D6 3 probe + EngineEvent 命名 | P1 路线图 |
-| V2.0 (planned) | 物理路径迁移 (`route/` `stream/` `protect/` `budget/` `guard/` `configure/`) + contracts.go 拆分 | Phase F |
-| V3+ (planned) | Anthropic native API + Rate Limiter + 多模型负载均衡 | P2 路线图 |
+| V3.0.0 | 5+1 S 价值流化 + Legacy Archive + Breaker/Retry 合并 + Fail-Fast 启动 + 灰区声明 | Archive (commit 199ad18 之前) |
+| V3.1.0 (v1.1) | `llm_breaker_state` metric + D6 3 probe + EngineEvent 命名 + IAdapter.Protocol() BREAKING + obs nil fail-fast | Archive (commit 3a6970b) |
+| **V3.2.0 (v2.0)** | **物理路径迁移** (`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`) + **contracts.go 拆分** + re-export 桥接 1 发布周期 | **In Progress** (DM-019) |
+| V3.3+ (planned) | Anthropic native API + Rate Limiter + 多模型负载均衡 | P2 路线图 |
 
 ---
 
@@ -826,4 +1031,5 @@ internal/layers/llmgateway/
 |------|------|------|
 | 2.1.0 | 2026-06-14 | 7 S 技术角色词版 |
 | 3.0.0 | 2026-06-14 | 5+1 S 价值流化；A + F 编排时序图（§3）；R2 §4.3 contracts.go 拆分粒度占位（§2.1）；R3 P0 #8 fail-fast（§2.2 + §10.1）；R3 P1 #11 Breaker scope 扩展（§6）；R3 P1 #15 IAdapter.Protocol()（§5.1）；R3 P1 #16 Safety 时延（§8.2）；v2.0 物理路径计划（§10.2） |
-| 3.1.0 | 2026-06-14 | v1.1 子 change 落地：§3.5 新增 F1-F9 时序图（F1/F2/F3 emit metric + state hook + engine event；F4 fail-fast；F5 IAdapter Protocol BREAKING；F6 Tier probe；F7 Breaker probe；F8 Safety latency；F9 flag defaults）；§9 Feature flag 表更新为 D4-B 决议；§8.4 Safety F04 实施细节；R3 P0 #8 fail-fast 占位 → 实施；R3 P1 #15/#16 占位 → 实施 |
+| 3.1.0 | 2026-06-14 | v1.1 子 change 落地：§3.5 新增 F1-F9 时序图；§9 Feature flag 表更新为 D4-B 决议；§8.4 Safety F04 实施细节；R3 P0 #8 fail-fast 占位 → 实施；R3 P1 #15/#16 占位 → 实施 |
+| **3.2.0** | **2026-06-14** | **v2.0 子 change 落地**：§0 V3.1.0→V3.2.0 变更摘要 + 不变性承诺表；§10.2 物理路径 1:1 对齐 5+1 S 详细目录树 + 7 桥接目录 + 根 contracts.go re-export 模板；§13 v2.0 实施步骤（F2-F8 + F9 + F11 详细步骤表）；§14 Phase G 13 项验收 |

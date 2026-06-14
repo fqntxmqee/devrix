@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/breaker"
+	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )

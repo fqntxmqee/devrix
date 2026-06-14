@@ -5,16 +5,16 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/gateway"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/observability"
-	sharedconfig "github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 // WireResult holds the wired LLM stack.
 type WireResult struct {
-	Gateway      *gateway.Gateway
+	Gateway      *stream.Gateway
 	Bridge       llmgateway.ILLMGateway
 	TokenCounter contracts.ITokenCounter
 }
@@ -26,11 +26,11 @@ type WireResult struct {
 // construct one (typically via observability.New + observability.NewBridge)
 // before wiring the LLM stack. We fail fast with ErrObservabilityRequired
 // rather than degrading silently to a no-op telemetry path.
-func WireFromConfig(cfg *sharedconfig.LLMGatewayConfig, obs *observability.Bridge) (*WireResult, error) {
+func WireFromConfig(cfg *configure.LLMGatewayConfig, obs *observability.Bridge) (*WireResult, error) {
 	if obs == nil {
 		return nil, sharederrors.ErrObservabilityRequired
 	}
-	gw, err := gateway.NewFromConfig(cfg, obs)
+	gw, err := stream.NewFromConfig(cfg, obs)
 	if err != nil {
 		return nil, fmt.Errorf("llm gateway: %w", err)
 	}

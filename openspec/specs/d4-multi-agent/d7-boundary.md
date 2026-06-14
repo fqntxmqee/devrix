@@ -1,0 +1,150 @@
+# D4 ↔ D7 跨域边界规范
+
+**Capability:** d4-d7-boundary
+**Status:** Active
+**Version:** 1.0.0
+**Last Updated:** 2026-06-14
+**Change ID:** devrix-d4-sa-refine
+**Demand ID:** DM-20260614-018
+**Parent (D4):** `openspec/specs/d4-multi-agent/d4-domain.md`
+**Parent (D7):** `openspec/specs/d7-orchestration/d7-domain.md`
+**Related (D2):** `openspec/specs/d2-context-engine/d7-boundary.md`
+
+---
+
+## 1. 关系摘要
+
+| 域 | 角色 | 一句话 |
+|----|------|--------|
+| **D7** | Orchestration Leader + **Hub-Spoke SoT** | 决定派哪个 Spoke、发布 FlowEvent、聚合 WorkPlan |
+| **D4** | Agent Execution Follower | 在 WorkerSpec 下 fork→run→join，不 Publish |
+
+**ingress：** D1 → D7 `ProcessMessage` only。D4 **不被** D1 直接调用。
+
+---
+
+## 2. Hub-Spoke 归属（R1 D7-1）
+
+| 组件 | v1.0 代码位置 | Canonical 归属 | v2.0 目标 |
+|------|--------------|---------------|----------|
+| delegate_* 工具 | D7 `delegatetools/` | D7-S2 | 保持 |
+| Spoke 派发 / fallback | D4 `delegate/service.go` | **D7-S2** | `hubspoke/dispatch.go` |
+| Agent FlowBridge | D4 `delegate/bridge.go` | **D7-S4** | `hubspoke/agent_bridge.go` |
+| SubQuery Flow 发布 | D2 `nested/flow_report.go` | **D7-S4** | `hubspoke/subquery_bridge.go` |
+| WorkPlan | D7 `workplan/` | D7-S4 | 保持 |
+| sessionqueue drain | D7 `sessionqueue/` | D7-S4 | 保持 |
+
+**唯一 `hub.Publish` 出口：** D7 `SpokeBridge`（v2.0 目标态）。
+
+---
+
+## 3. 调用链 SoT
+
+```text
+D1.Gateway.RouteInbound
+    └── D7.IOrchestrationEntry.ProcessMessage
+            ├── D7-S2 delegatetools / DispatchWorker
+            │       ├── Spoke=D4Worker → D4.WorkerExecutor.Execute
+            │       └── Spoke=D2SubQuery → D2.NestedExecutor.Run
+            ├── D7-S4 SpokeBridge.Publish(FlowEvent)
+            │       └── WorkPlan + sessionqueue + imsink → D1
+            └── [optional] D4-S12 RunAgentLoop（Leader Agent 本体）
+```
+
+**代码锚点（v1.0）：** `internal/layers/orchestration/delegatetools/delegate_tools.go` → `multiagent/delegate/service.go`
+
+---
+
+## 4. 职责矩阵
+
+| 能力 | D7 | D4 | D2 | D1 | D5 |
+|------|----|----|----|----|-----|
+| delegate_* 路由 | ✅ S2 | ❌ | ❌ | — | — |
+| Spoke 选择 / fallback | ✅ S2 | ❌ | ❌ | — | — |
+| Worker fork/run/join | 派发 | ✅ S14 | ❌ | — | — |
+| Agent 生命周期 | 可选 Leader | ✅ S12 | ❌ | — | — |
+| PermissionGate 机制 | — | ✅ S12 | ❌ | ✅ UI | — |
+| SessionView COW | — | ✅ S13 | ❌ | — | — |
+| FlowEvent 发布 | ✅ S4 | 🔶 v1.0 临时 bridge | 🔶 v1.0 flow_report | 展示 | 观测 |
+| SubQuery 嵌套执行 | 派发 | ❌ | ✅ S19 | — | — |
+| WorkPlan 读模型 | ✅ S4 | ❌ | ❌ | 展示 | — |
+| Agent metric 定义 | — | 🔶 emit | — | — | ✅ SoT |
+
+图例：✅ SoT · 🔶 代码暂存、规格已迁出 · ❌ Out of Scope
+
+---
+
+## 5. 契约接口
+
+| 接口 | 定义位置 | 实现 | 消费 |
+|------|----------|------|------|
+| `WorkerExecutor` | `shared/contracts`（v2.0） | D4 `execute/worker.go` | D7 Dispatcher |
+| `NestedExecutor` | `shared/contracts`（v2.0） | D2 `nested/subquery.go` | D7 Dispatcher |
+| `SpokeDispatcher` | D7 `hubspoke` | D7 bootstrap | delegatetools |
+| `ExecutionFlowHub` | `shared/contracts` | D7 `flow` | D7 内部 |
+| `AgentObserver` | D4 `contracts` | D7 Bridge（v2.0） | 进度映射 |
+
+### 5.1 依赖规则
+
+```text
+✅ D7 → D4（WorkerExecutor）
+✅ D7 → D2（NestedExecutor）
+✅ D4 → D2（IEngine.Process）
+✅ D4 → shared/contracts, D1 PermissionManager
+❌ D4 → orchestration/flow（v2.0-b 后禁止）
+❌ D2 nested → hub.Publish 直连（v2.0-c 后禁止）
+```
+
+---
+
+## 6. Canonical S 对照
+
+| D7 Canonical S | 与 D4 关系 | D4 Canonical |
+|----------------|-----------|--------------|
+| D7-S2 Session Orchestrator | 派发 Worker | S14 ExecuteWorker |
+| D7-S2 DispatchWorker | 选 Spoke | S14 或 D2-S19 |
+| D7-S3 Wave Scheduler | 可调度 D4 Worker | S14 per worker |
+| D7-S4 Execution Flow | 聚合 D4 AgentEvent | S12 产出事件经 D7 Bridge |
+| D7-S5 Decision & Planning | 不下发 Hub-Spoke 实现 | Out of Scope |
+
+| D4 Canonical S | 与 D7 关系 |
+|----------------|-----------|
+| S11 ProvisionAgent | bootstrap / Factory |
+| S12 RunAgentLoop | Leader Agent 或 Worker 内循环 |
+| S13 IsolateAndMerge | Worker 隔离；D7 不替代 |
+| S14 ExecuteWorker | **D7 主要调用点** |
+| S15 InvokeExternalAgent | 独立 Tool 面，不经 Hub-Spoke |
+| S16 ConfigureAgents | D7 读 `multi_agent.delegate` 配置 |
+
+---
+
+## 7. T 层跨域重归属（规格层）
+
+| Legacy T ID | Canonical 归属 | 域 |
+|-------------|---------------|-----|
+| D4-S10-A01-T01~T06, T12 | D4-S14-A01-T01~T07 | D4 执行面 |
+| D4-S10-A01-T07 | D7-S2-A04-T01 | fallback 路由 |
+| D4-S10-A02-T08~T11 | D7-S4-A04-T01~T04 | Flow / IM |
+| D4-S8-A01-T01~T02 | D5-AGENT-METRIC-T01~T02 | D5 |
+
+> v1.0：**不修改**测试文件 `// T:` 注释。
+
+---
+
+## 8. 跨域迁移表（v2.0，并入 DM-20260614-018）
+
+| # | 路径 | 行为 | 目标 | Slice |
+|---|------|------|------|-------|
+| 1 | `multiagent/delegate/bridge.go` | Agent→FlowEvent | D7 `hubspoke/agent_bridge.go` | b |
+| 2 | `delegate/service.go` Dispatch 逻辑 | Spoke 选择 | D7 `hubspoke/dispatch.go` | b |
+| 3 | `delegate/service.go` 执行逻辑 | fork/run/join | D4 `execute/worker.go` | b |
+| 4 | `nested/flow_report.go` | SubQuery Publish | D7 `hubspoke/subquery_bridge.go` | c |
+| 5 | `SubQueryParams.FlowHub` | 直连 Hub | 删除；D7 包装 | c |
+
+---
+
+## 9. Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-14 | 初版：Hub-Spoke 全归 D7 + D4 Follower 契约 + v2.0 迁移表 |

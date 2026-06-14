@@ -124,6 +124,9 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
 | D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
+| D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | 🔶 | `delegatetools/delegate_tools.go` (v1.0) → v2.0 `hubspoke/dispatch.go` |
+
+> **D7-S2-A04**（DM-20260614-018）：Hub-Spoke 派发矩阵 + fallback 路由。v1.0 逻辑在 D4 `delegate/service.go`；v2.0 迁 `hubspoke/dispatch.go`。
 
 ### D7-S3: Wave 调度 ✅ Canonical
 
@@ -146,6 +149,10 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | D7-S4-A01 | PublishFlowEvent | D7-S4-A01-LEGACY | A-BE | flow_event | — | flow.event_published | ✅ | `orchestration/flow/hub.go` Publish |
 | D7-S4-A02 | SnapshotWorkPlan | D7-S4-A02-LEGACY | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
 | D7-S4-A03 | NotifyGateway | D7-S4-A03-LEGACY | A-BE | event, session | — | — | ✅ | `orchestration/imsink/gateway.go` |
+| D7-S4-A04 | BridgeAgentSpoke | D4-S10-A02 | A-BE | agent_event, engine_event | — | flow.published | 🔶 | `multiagent/delegate/bridge.go` (v1.0) → v2.0 `hubspoke/agent_bridge.go` |
+| D7-S4-A05 | BridgeSubQuerySpoke | D2-S19（Flow 面） | A-BE | subquery_result | flow_event | flow.published | 🔶 | `contextengine/nested/flow_report.go` (v1.0) → v2.0 `hubspoke/subquery_bridge.go` |
+
+> **D7-S4-A04/A05**（DM-20260614-018）：统一三 Spoke 写侧（D4 Delegate / D2 SubQuery / D7 Wave）→ `ExecutionFlowHub`。
 
 ### D7-S5: 决策规划 🔶 Canonical
 
@@ -165,7 +172,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 11 (Canonical) | 14 + 8 | 1 + 0 | 4 + 3 |
+| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 14 (Canonical) | 14 + 8 | 1 + 3 | 4 + 3 |
 
 ---
 
@@ -176,4 +183,4 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | 1.0.0 | 2026-06-13 | 初始注册表（全 PLANNED 路径） |
 | 2.0.0 | 2026-06-14 | 对齐代码：真实路径、实现状态、PlanMode 活动 |
 | 2.1.0 | 2026-06-14 | 包路径迁移 `internal/layers/d7/` → `internal/layers/orchestration/coordinator/`；D7-S2/S5-A01/S5-A05 标记 ✅ |
-| 3.0.0 | 2026-06-14 | Legacy 双轨建立（devrix-d7-sa-refine）；Canonical S2/S3/S4/S5 按用户价值流重编号；v1.0 registry-only |
+| 3.0.0 | 2026-06-14 | Hub-Spoke A 增量：D7-S2-A04 DispatchWorker + D7-S4-A04/A05 SpokeBridge（DM-20260614-018） |

@@ -31,8 +31,8 @@
 | D2-S8 | Sandbox | shell injection (migrated from retired D2-S1) |
 | D2-S2 | Compression | autocompact timeout fallback |
 | D2-S3 | Memory | longterm failure handling |
-| D3-S1 | Adapter | SSE parse errors |
-| D3-S2 | Gateway | 429 rate limit, network timeout |
+| D3-S2 | StreamChat | SSE parse errors |
+| D3-S1+D3-S2+D3-S3 | RouteModel/StreamChat/ProtectCall | 429 rate limit, network timeout |
 
 ### 2. Mock Overuse Issues
 
@@ -82,7 +82,9 @@
 
 ---
 
-### Requirement: D3-S1 Adapter Real API Testing
+### Requirement: D3-S2 StreamChat Real API Testing
+
+> **V3.0.0 重命名**：原"D3-S1 Adapter Real API Testing"（S 切法 7 段时）→ 现"D3-S2 StreamChat Real API Testing"（5+1 S 价值流化后；devrix-d3-sa-refine / DM-20260614-013）。
 
 **Priority**: P1
 
@@ -101,7 +103,9 @@
 
 ---
 
-### Requirement: D3-S2 Gateway Rate Limit
+### Requirement: D3-S3 ProtectCall Rate Limit
+
+> **V3.0.0 重命名**：原"D3-S2 Gateway Rate Limit"（S 切法 7 段时）→ 现"D3-S3 ProtectCall Rate Limit"（Breaker+Retry 合并后，429 属 ProtectCall 韧性保护职责；devrix-d3-sa-refine / DM-20260614-013）。
 
 **Priority**: P1
 
@@ -150,11 +154,13 @@
 
 ### D3 LLM Gateway Extensions
 
-| T 层 ID | 描述 | L2 映射 | Test 位置 | Status |
-|-------|------|---------|-----------|--------|
-| D3-S1-T03 | SSE parse error handling | Adapter | `tests/integration/llm_real_api_test.go` | PLANNED |
-| D3-S2-T06 | LLM 429 rate limit handling | Gateway | `tests/integration/llm_real_api_test.go` | PLANNED |
-| D3-S5-T03 | Token counter 中文准确性 | Token | `internal/layers/llmgateway/token/counter_test.go` | PLANNED |
+| T 层 ID | 描述 | L2 映射 | Test 位置 | Status | Legacy Alias |
+|-------|------|---------|-----------|--------|--------------|
+| **D3-S2-A01-T03** | SSE parse error handling | StreamChat F02 ParseSSE | `tests/integration/llm_real_api_test.go` | PLANNED | 旧 D3-S1-A01-T03 |
+| **D3-S3-A01-T07** | LLM 429 rate limit handling | ProtectCall F05 StreamWithFallback | `tests/integration/llm_real_api_test.go` | PLANNED | 旧 D3-S2-A01-T06 |
+| **D3-S4-A01-T03** | Token counter 中文准确性 | BudgetTokens F01 CountText (CJK) | `internal/layers/llmgateway/token/counter_test.go` | PLANNED | 旧 D3-S5-A01-T03 |
+
+> **V3.0.0 重映射**（devrix-d3-sa-refine / DM-20260614-013）：T ID 按 5+1 S 价值流重排；旧 ID 100% alias 追溯见 `openspec/specs/d3-llm-gateway/t-registry.md §Legacy Archive`。L2 映射列由"技术角色词"（Adapter / Gateway / Token）改为"价值流 + F"（StreamChat F02 / ProtectCall F05 / BudgetTokens F01）。
 
 ### D5 Observability Extensions
 

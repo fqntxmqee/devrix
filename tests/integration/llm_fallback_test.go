@@ -7,23 +7,22 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
-	"github.com/devrix/devrix/internal/layers/llmgateway/breaker"
-	"github.com/devrix/devrix/internal/layers/llmgateway/gateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/retry"
-	"github.com/devrix/devrix/internal/layers/llmgateway/token"
-	sharedconfig "github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
+	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // T: D3-S4-A01-T02, D3-S4-A01-T03
 func TestIntegration_LLMGateway_fallback_models(t *testing.T) {
-	counter, err := token.NewCounter()
+	counter, err := budget.NewCounter()
 	if err != nil {
 		t.Fatalf("counter: %v", err)
 	}
-	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg := configure.DefaultLLMGatewayConfig()
 	reg := adapter.NewRegistry()
 
 	var seen []string
@@ -42,11 +41,11 @@ func TestIntegration_LLMGateway_fallback_models(t *testing.T) {
 	}
 	_ = reg.Register(stub)
 
-	gw := gateway.New(gateway.Deps{
+	gw := stream.New(stream.Deps{
 		Config:   cfg,
 		Registry: reg,
-		Breaker:  breaker.New(cfg.CircuitBreaker),
-		Retry:    retry.NewExecutor(),
+		Breaker:  protect.New(cfg.CircuitBreaker),
+		Retry:    protect.NewExecutor(),
 		Counter:  counter,
 	})
 

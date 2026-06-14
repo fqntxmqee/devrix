@@ -12,11 +12,11 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
-	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/gateway"
-	"github.com/devrix/devrix/internal/layers/llmgateway/breaker"
-	"github.com/devrix/devrix/internal/layers/llmgateway/retry"
-	"github.com/devrix/devrix/internal/layers/llmgateway/token"
+	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
+	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
+	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -29,11 +29,11 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	commCfg := config.DefaultConfig()
 
-	counter, err := token.NewCounter()
+	counter, err := budget.NewCounter()
 	if err != nil {
 		t.Fatalf("counter: %v", err)
 	}
-	llmCfg := config.DefaultLLMGatewayConfig()
+	llmCfg := configure.DefaultLLMGatewayConfig()
 	llmCfg.DefaultProvider = "deepseek"
 	reg := adapter.NewRegistry()
 	ech := &echoContextStub{}
@@ -41,8 +41,8 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	llmGW := llmgw.New(llmgw.Deps{
 		Config:   llmCfg,
 		Registry: reg,
-		Breaker:  breaker.New(llmCfg.CircuitBreaker),
-		Retry:    retry.NewExecutor(),
+		Breaker:  protect.New(llmCfg.CircuitBreaker),
+		Retry:    protect.NewExecutor(),
 		Counter:  counter,
 	})
 	llmBridge := llmbridge.New(llmGW)

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/token"
-	llmtoken "github.com/devrix/devrix/internal/layers/llmgateway/token"
+	llmtoken "github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/pkoukk/tiktoken-go"
 )
 

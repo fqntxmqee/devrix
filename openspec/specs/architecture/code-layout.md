@@ -2,7 +2,7 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.3.0
+**Version:** 1.4.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -121,6 +121,49 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S11 | `queue` | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4) | ✅ DM-013 |
 | D2-S12 | `worktree` | `contextengine/worktree/` |
 
+### 4.4 D3 LLM Gateway（canonical S1–S6 / 5+1 价值流）
+
+> **Canonical S1–S6**（DM-20260614-016 / devrix-d3-sa-refine / DM-20260614-019 v2.0）。
+> v1.0 注册表重排，0 行为变更（已 ACCEPTED commit 199ad18）。
+> **v1.1** 韧性可见性 + D6 3 probe + IAdapter.Protocol() + obs nil fail-fast（已 ACCEPTED commit 3a6970b）。
+> **v2.0** 物理路径按 scenario-slug 迁移（DM-20260614-019 / devrix-d3-sa-refine-v2.0 启动中）。
+> 详见 `openspec/changes/devrix-d3-sa-refine/proposal.md` + `openspec/changes/devrix-d3-sa-refine-v2.0/proposal.md`。
+
+| S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
+|------|----------|----------------------|--------------|-----------|------|
+| D3-S1 | RouteModel | `route` | `gateway/router.go` (路由解析部分) | `llmgateway/route/` | 🚧 F3 迁移中 |
+| D3-S2 | StreamChat | `stream` | `adapter/` (全部) + `gateway/gateway.go` Stream 主实现 | `llmgateway/stream/`（含 `stream/adapter/` 子目录） | 🚧 F2/F4 迁移中 |
+| D3-S3 | ProtectCall | `protect` | `breaker/` + `retry/` + `gateway/breaker_observer.go` | `llmgateway/protect/`（两机制独立 .go） | 🚧 F5 迁移中 |
+| D3-S4 | BudgetTokens | `budget` | `token/` | `llmgateway/budget/` | 🚧 F6 迁移中 |
+| D3-S5 | GuardContent | `guard` | `safety/` | `llmgateway/guard/` | 🚧 F7 迁移中 |
+| D3-S6 | ConfigureGateway | `configure` | `config/` + `shared/config/llmgateway.go` | `llmgateway/configure/`（合并 shared） | 🚧 F8 迁移中 |
+| — | Domain Kernel | (根 `contracts.go` 拆分后 < 200 行) | `llmgateway/contracts.go` | `llmgateway/contracts.go` (re-export) | 🚧 F9 拆分中 |
+| D3-X | CROSS 跨域锚点 | (Bridge 不变) | `internal/bridges/llm/` | `internal/bridges/llm/` | ✅ 不动 |
+
+**Scenario-slug 命名依据**（与 code-layout §2 规则一致）：
+
+- `route` — 路由解析（语义：用户给 model 名 → 返回 provider+实际 model）
+- `stream` — 流式调用（语义：流式 chat completion；非 `adapter`/`gateway` 等技术角色词）
+- `protect` — 韧性保护（语义：Breaker + Retry + Fallback 合并后承诺；非 `breaker`/`retry`）
+- `budget` — 预算控制（语义：Token 预算检查 + 截断；非 `token`）
+- `guard` — 内容守卫（语义：Safety 内容过滤；非 `safety`/`filter`）
+- `configure` — 配置加载（语义：横切配置；非 `config`/`loader`）
+
+**v1.0 兼容性约束**：
+
+1. **运行时字符串不变**：`llm.stream` / `llm.provider.route` / `llm.circuit_breaker` / `llm.retry` / `llm.adapter.stream` 5 个 span 名保持字面量（R1 Q3 决议）
+2. **配置 key 不变**：`llm_gateway:` / `circuit_breaker:` / `model_tiers:` 等 YAML key 在 v1.0 / v2.0 都不变
+3. **metric 名不变**：`llm_requests_total` / `llm_errors_total` / `llm_latency_seconds` 在 v1.0 / v2.0 都不变
+4. **Bridge 路径不变**：`internal/bridges/llm/` 是 D3 → D2 的跨域锚点（R1 D2 决议），v1.0 / v2.0 都不迁移到 D3 内部
+
+**contracts.go 拆分粒度**（R2 §4.3 决策占位；v2.0 实施）：
+
+- **留根**（kernel 性质，跨 S / 跨域共享）：`Request` / `Chunk` / `TokenUsage` / `ToolCall` / `AdapterChunk`
+- **移 `protect/`**（S 内部私有）：`CircuitState` / `CircuitBreakerConfig` / `RetryConfig`
+- **re-export 桥接**：v2.0 迁移时根 `contracts.go` 保留 type alias，旧 import 路径不破坏
+
+**R3 NQ-6 决策**（v2.0）：不引入 `kernel/` 子包；上述 kernel 类型继续留根 `contracts.go` 中。
+
 **跨域漂移（v2.0 迁出 D2）：**
 
 | 组件 | 当前路径 | 目标 | 状态 |
@@ -128,6 +171,28 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | ~~delegate_tools~~ | ~~`contextengine/delegate_tools.go`~~ | `orchestration/delegatetools/` | ✅ DM-011 |
 | TaskManager | ~~`contextengine/tasks/`~~ | `orchestration/workmodel/` (D7-S1) | ✅ DM-012 |
 | queue delegate-progress | ~~`contextengine/queue/`~~ | D7-S4 `sessionqueue/` | ✅ DM-013 |
+
+### 4.5 D4 Multi-Agent（canonical S11–S16 / 5+1 价值流）
+
+> **Canonical S11–S16**（DM-20260614-018 / devrix-d4-sa-refine）。v1.0 物理路径保留；Hub-Spoke 编排代码 v2.0 迁 D7 `hubspoke/`。
+
+| S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
+|------|----------|----------------------|--------------|-----------|------|
+| D4-S11 | ProvisionAgent | `provision` | `factory/` + `collaboration/` + `builtin/` | `multiagent/provision/` | ⬜ v2.0-d |
+| D4-S12 | RunAgentLoop | `run` | `agent/`（lifecycle, state, perm_gate） | `multiagent/run/` | ⬜ v2.0-d |
+| D4-S13 | IsolateAndMerge | `isolate` | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` | ⬜ v2.0-d |
+| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ⬜ v2.0-d |
+| D4-S15 | InvokeExternalAgent | `external` | `tool/` | `multiagent/external/` | ⬜ v2.0-d |
+| D4-S16 | ConfigureAgents | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` | ⬜ v2.0-d |
+| — | Domain Kernel | `kernel` | `contracts.go` + `observer/` | `multiagent/kernel/` | ⬜ v2.0-d |
+
+**Hub-Spoke 迁 D7（v2.0-b/c，非 D4 目录）：**
+
+| 组件 | v1.0 路径 | v2.0 目标 |
+|------|----------|-----------|
+| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` |
+| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` |
+| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` |
 
 ---
 
@@ -198,3 +263,5 @@ internal/layers/communication/
 | 1.0.0 | 2026-06-14 | 初版：D1/D7 scenario-slug 注册表 + D1 迁移矩阵 |
 | 1.1.0 | 2026-06-14 | D1 物理路径迁移完成（capture/channel/delivery/kernel） |
 | 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |
+| 1.4.0 | 2026-06-14 | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位 |
+| **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0）：6 个 slug 全部 🚧 迁移中（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；F 编排与运行时字符串不变（v1.0 不变性承诺） |

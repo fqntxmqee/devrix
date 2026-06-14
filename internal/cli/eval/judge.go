@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/evolution/eval"
-	"github.com/devrix/devrix/internal/layers/llmgateway/gateway"
-	sharedconfig "github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/layers/llmgateway/stream"
+	"github.com/devrix/devrix/internal/shared/config"
 )
 
 type judgeStack struct {
@@ -23,14 +23,14 @@ func buildJudgeStack(mockJudge bool, configPath, judgeModel string) (judgeStack,
 
 	path := configPath
 	if path == "" {
-		path = sharedconfig.FindConfigFile()
+		path = config.FindConfigFile()
 	}
-	llmCfg, err := sharedconfig.LoadLLMGatewayConfig(path)
+	llmCfg, err := config.LoadLLMGatewayConfig(path)
 	if err != nil {
 		return judgeStack{}, fmt.Errorf("load llm gateway config: %w", err)
 	}
 
-	gw, err := gateway.NewFromConfig(llmCfg, nil)
+	gw, err := stream.NewFromConfig(llmCfg, nil)
 	if err != nil {
 		return judgeStack{}, fmt.Errorf("create llm gateway: %w", err)
 	}
