@@ -1,7 +1,7 @@
 change_id: devrix-d7-sa-refine
 priority: P0
 demand_id: DM-20260614-008
-status: s1_proposal
+status: s3_design
 domains: [D7, ARCH]
 
 # 切法 A：S 按「用户价值流」划分；旧 S2/S5 冻结为 Legacy Module Index
