@@ -110,25 +110,25 @@ PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
 ### Requirement: D7-S1 Unified Work Model
 
-**Gap:** Task 写模型在 D2，WorkPlan 读模型在 ORCH；无统一 `Plan` 聚合根与 `CreateWorkPlan` Activity。
+**Gap:** DiskStore 持久化在 D2，BackgroundTask 注册未迁入 D7。
 
 | 已有 | 缺失 |
 |------|------|
-| Task CRUD + 依赖 | Plan 实体与 DAG 校验 Activity |
-| DiskStore 持久化 | D7-S1-A01 CreateWorkPlan |
-| PlanMode 状态机 | BackgroundTask 注册迁入 D7 |
+| Task CRUD + 依赖（coordinator/task.go） | DiskStore 持久化迁入 D7 |
+| Plan 实体 + CreateWorkPlan（workmodel.go） | BackgroundTask 注册迁入 D7 |
+| v1.1 LocalWorkModel | |
 
 ---
 
 ### Requirement: D7-S5 Decision Layer
 
-**Gap:** 仅有 PlanAgent 只读探索，无意图分类与自动任务拆解。
+**Gap:** ClassifyIntent 已有规则版；SynthesizeTaskGraph 规则版已完成；LLM-based 拆解和 SelectExecutor 未实现。
 
 | 已有 | 缺失 |
 |------|------|
-| PlanAgent + VerificationAgent 设计 | ClassifyIntent 规则+LLM |
-| `/plan` CLI 命令 | SynthesizeTaskGraph |
-| TaskManager 手动创建 | SelectExecutor (D2/D4 路由) |
+| ClassifyIntent 规则版（classifier.go） | ClassifyIntent LLM fallback |
+| SynthesizeTaskGraph 规则版（decomposer.go） | SynthesizeTaskGraph LLM-based 拆解 |
+| | SelectExecutor (D2/D4 路由) |
 
 ---
 
@@ -209,6 +209,8 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | G | 回归 + D7-MIG-T01 四组合矩阵 | ✅ |
 | H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ✅ DONE |
 | I (v1.1) | Task 写模型迁入 coordinator | ✅ DONE |
+| J (v1.1) | DiskStore 持久化迁入 D7 | ⬜ PLANNED |
+| K (v1.1) | SelectExecutor D2/D4 路由 | ⬜ PLANNED |
 
 ---
 
