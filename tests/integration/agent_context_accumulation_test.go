@@ -18,7 +18,7 @@ import (
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -64,7 +64,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		toolsReg: mustBuiltinRegistry(t),
 		ctxCfg:   ctxCfg,
 	}
-	factory := multiagentfactory.NewAgentFactoryWithBuilder(
+	factory := multiagentprovision.NewAgentFactoryWithBuilder(
 		multiagent.AgentDeps{Engine: engine},
 		builder,
 		config.DefaultMultiAgentConfig(),

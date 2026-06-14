@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
@@ -21,8 +21,8 @@ import (
 // agentToolPlugin wraps a single AgentTool from D4's Registry as a D2 PluginRunner.
 // Each registered agent becomes a separate "call_<name>" tool for the LLM.
 type agentToolPlugin struct {
-	agent  tool.AgentTool
-	info   tool.Info
+	agent  external.AgentTool
+	info   external.Info
 	bridge *observability.Bridge
 }
 
@@ -31,8 +31,8 @@ func (p *agentToolPlugin) toolName() string {
 	return "call_" + p.info.Name
 }
 
-// newAgentToolPlugins creates one PluginRunner per registered agent tool.
-func newAgentToolPlugins(registry *tool.Registry, bridge *observability.Bridge) []contextengine.PluginRunner {
+// newAgentToolPlugins creates one PluginRunner per registered agent external.
+func newAgentToolPlugins(registry *external.Registry, bridge *observability.Bridge) []contextengine.PluginRunner {
 	infos := registry.List()
 	plugins := make([]contextengine.PluginRunner, 0, len(infos))
 	for _, info := range infos {
@@ -84,7 +84,7 @@ func (p *agentToolPlugin) Schema() contextengine.ToolSchema {
 
 func (p *agentToolPlugin) RiskLevel() types.RiskLevel { return types.RiskLevelHigh }
 
-// callAgentInput is the JSON shape LLM sends to a call_<name> tool.
+// callAgentInput is the JSON shape LLM sends to a call_<name> external.
 type callAgentInput struct {
 	Task    string `json:"task"`
 	WorkDir string `json:"work_dir,omitempty"`
@@ -139,7 +139,7 @@ func (p *agentToolPlugin) Execute(ctx context.Context, workDir, input string) (*
 	execCtx, cancel := context.WithTimeout(ctx, execTimeout)
 	defer cancel()
 
-	evtCh, err := p.agent.Execute(execCtx, sessionID, tool.Request{
+	evtCh, err := p.agent.Execute(execCtx, sessionID, external.Request{
 		Task:    args.Task,
 		WorkDir: args.WorkDir,
 	})

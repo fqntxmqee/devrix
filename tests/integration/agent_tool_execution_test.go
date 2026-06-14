@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -16,7 +16,7 @@ import (
 // testAgentToolPlugin implements contextengine.PluginRunner to simulate
 // the bootstrap-level per-agent call_<name> plugin pattern.
 type testAgentToolPlugin struct {
-	agt  tool.AgentTool
+	agt  external.AgentTool
 	name string
 }
 
@@ -34,7 +34,7 @@ func (p *testAgentToolPlugin) RiskLevel() types.RiskLevel { return types.RiskLev
 
 func (p *testAgentToolPlugin) Execute(ctx context.Context, workDir, input string) (*contextengine.ToolResult, error) {
 	sessionID := "integration-session"
-	evtCh, err := p.agt.Execute(ctx, sessionID, tool.Request{Task: input, WorkDir: workDir})
+	evtCh, err := p.agt.Execute(ctx, sessionID, external.Request{Task: input, WorkDir: workDir})
 	if err != nil {
 		return &contextengine.ToolResult{Error: err.Error()}, nil
 	}
@@ -56,8 +56,8 @@ func (p *testAgentToolPlugin) Execute(ctx context.Context, workDir, input string
 
 // T: D4-S6-A01-T01, D4-S6-A02-T02, D4-S6-A02-T07
 func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
-	reg := tool.NewRegistry()
-	echoTool := tool.NewCLIAgentTool(tool.CLIConfig{
+	reg := external.NewRegistry()
+	echoTool := external.NewCLIAgentTool(external.CLIConfig{
 		Name:    "echo-agent",
 		Command: "bash",
 		Args:    []string{"-c", `echo '{"type":"text","content":"hello from agent"}'; echo '{"type":"complete","content":""}'`},
@@ -74,7 +74,7 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 		t.Fatalf("List len = %d, want 1", len(reg.List()))
 	}
 
-	// Simulate the per-agent plugin pattern: each agent gets a call_<name> tool.
+	// Simulate the per-agent plugin pattern: each agent gets a call_<name> external.
 	plugin := &testAgentToolPlugin{agt: echoTool, name: "call_echo-agent"}
 	cfg := config.DefaultToolConfig()
 	builtinReg, err := contextengine.NewBuiltinToolRegistry(cfg)
@@ -108,7 +108,7 @@ func TestIntegration_AgentTool_RegistryToExecutionChain(t *testing.T) {
 
 // T: D4-S6-A02-T04, D4-S6-A02-T07
 func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
-	stateful := tool.NewCLIAgentTool(tool.CLIConfig{
+	stateful := external.NewCLIAgentTool(external.CLIConfig{
 		Name:    "stateful-agent",
 		Command: "bash",
 		Args:    []string{"-c", `while read line; do echo '{"type":"text","content":"ok"}'; echo '{"type":"complete","content":""}'; done`},
@@ -118,7 +118,7 @@ func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	// First call creates session
-	ch1, err := stateful.Execute(ctx, "sess_1", tool.Request{Task: "first"})
+	ch1, err := stateful.Execute(ctx, "sess_1", external.Request{Task: "first"})
 	if err != nil {
 		t.Fatalf("first Execute: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 	}
 
 	// Reuse session
-	ch2, err := stateful.Execute(ctx, "sess_1", tool.Request{Task: "second"})
+	ch2, err := stateful.Execute(ctx, "sess_1", external.Request{Task: "second"})
 	if err != nil {
 		t.Fatalf("reuse Execute: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 	stateful.CloseSession("sess_1")
 
 	// New session after cleanup still works
-	ch3, err := stateful.Execute(ctx, "sess_2", tool.Request{Task: "third"})
+	ch3, err := stateful.Execute(ctx, "sess_2", external.Request{Task: "third"})
 	if err != nil {
 		t.Fatalf("new session Execute: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestIntegration_AgentTool_SessionLifecycle(t *testing.T) {
 
 // T: D4-S6-A02-T06
 func TestIntegration_AgentTool_CleanupOtherSession(t *testing.T) {
-	agent := tool.NewCLIAgentTool(tool.CLIConfig{
+	agent := external.NewCLIAgentTool(external.CLIConfig{
 		Name:    "cleanup-agent",
 		Command: "bash",
 		Args:    []string{"-c", `while read line; do echo '{"type":"text","content":"ok"}'; echo '{"type":"complete","content":""}'; done`},
@@ -165,13 +165,13 @@ func TestIntegration_AgentTool_CleanupOtherSession(t *testing.T) {
 
 	ctx := context.Background()
 
-	ch1, _ := agent.Execute(ctx, "sess_a", tool.Request{Task: "a"})
+	ch1, _ := agent.Execute(ctx, "sess_a", external.Request{Task: "a"})
 	for evt := range ch1 {
 		if evt.Type == "complete" {
 			break
 		}
 	}
-	ch2, _ := agent.Execute(ctx, "sess_b", tool.Request{Task: "b"})
+	ch2, _ := agent.Execute(ctx, "sess_b", external.Request{Task: "b"})
 	for evt := range ch2 {
 		if evt.Type == "complete" {
 			break
@@ -180,7 +180,7 @@ func TestIntegration_AgentTool_CleanupOtherSession(t *testing.T) {
 
 	agent.CloseSession("sess_a")
 
-	ch3, err := agent.Execute(ctx, "sess_b", tool.Request{Task: "c"})
+	ch3, err := agent.Execute(ctx, "sess_b", external.Request{Task: "c"})
 	if err != nil {
 		t.Fatalf("Execute sess_b after cleanup: %v", err)
 	}

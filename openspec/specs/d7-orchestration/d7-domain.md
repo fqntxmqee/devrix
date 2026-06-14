@@ -4,13 +4,15 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.3.0
-**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration)
+**Version:** 2.4.0
+**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration) + D7 Turn Leader + Hub-Spoke SoT (DM-020/DM-018 SPEC)
 **Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
+**D7 Turn Leader:** `openspec/changes/devrix-d7-turn-orchestration/` (DM-20260614-020)
+**Hub-Spoke SoT:** `openspec/changes/devrix-d4-sa-refine/` (DM-20260614-018)
 **Depends On:** D2-S15–S16 (QueryLoop Follower), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)  
 **D2 Boundary SoT:** `openspec/specs/d2-context-engine/d7-boundary.md` (DM-20260614-009)
 
@@ -48,10 +50,12 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | D2 Loop 瘦身 | ⬜ IN PROGRESS | `query/loop.go` 414行，需移除编排字段 |
 
 **域边界**：
-- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）
-- D7 **编排**：D2（LLM↔Tool 执行）、D4（Agent 委托）
+- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**
+- D7 **编排**：D2（Context Follower）、D4（Execution Follower）
 - D7 **暂托管（D2）**：Task 写模型、PlanMode（目标迁入 D7-S1/S5）
-- D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）、LLM 调用（D3）
+- D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）
+
+> **LLM 调用权产权声明（DM-020 — 双边共识 G-07）：** D7 是唯一有权决定何时、以何种参数调用 D3 的域。D2 拥有"请求 LLM 结果"的权利（通过 CompressHint），但不拥有"执行 LLM 调用"的权利。该产权通过 import lint（D2→D3 硬阻断）强制执行。
 
 **D2 Follower 契约（DM-20260614-009）：**
 
@@ -70,13 +74,14 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 D1 → D2.Process → delegate_tools → D4 + flow.GlobalHub
 ORCH wave/ 由 delegate_tools 独立触发
 
-【目标 D7 v1.0】
+【目标 D7 v2.0（DM-020 + DM-018 联合）】
 D1 → D7.ProcessMessage (替代 D1→D2.Process)
-D7 编排 D2 RunQueryLoop + D4 RunAgent
+D7 编排 D2 PrepareContext + D3 StreamChat（D7 直调）+ D2 ExecuteToolRound + D2 PersistTurn
+D7 统一 Hub-Spoke：DispatchWorker → SpokeBridge.Publish（唯一 Flow 出口）
 D7 将进度事件发布到 D1（通信层）
 D6 → D7 ValidateOrchestration (元决策校验, advisory)
-D5 观测 D7 (orchestration.wave.* / orchestration.flow.*)
-D3 不直接和 D7 交互
+D5 观测 D7 (orchestration.turn.* / orchestration.flow.* / orchestration.hubspoke.*)
+D3 直连 D7（D7-S2-A07 InvokeLLM 经 bridges/llm）；D2→D3 禁止
 ```
 
 | DSAFT ID | 名称 | 来源 | 域类型 |

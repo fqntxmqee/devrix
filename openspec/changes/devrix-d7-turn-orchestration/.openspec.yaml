@@ -1,0 +1,19 @@
+change-id: devrix-d7-turn-orchestration
+demand-id: DM-20260614-020
+status: S3_Design
+review-round: R1
+dsaft_domain: orchestration
+dsaft_scenarios:
+  - D7-S2
+  - D2-S15
+  - D2-S17
+  - D2-S18
+  - D3-S2
+cross_domain:
+  - D2-S15
+  - D2-S16
+  - D2-S17
+  - D2-S18
+  - D3-S2
+  - D3-S3
+phase_scope: v1.0_registry_first

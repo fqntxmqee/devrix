@@ -2,8 +2,8 @@
 
 **Capability:** architecture-cross-domain
 **Status:** Active
-**Version:** 1.1.0
-**Last Updated:** 2026-06-14
+**Version:** 1.3.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d3-sa-refine（DM-20260614-016 / R2 命题 E 决议落地）+ devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6-A 决议固化 Breaker 事件命名 + §2.4.4 新增 D3→D5 metric 命名边界）
 
@@ -38,25 +38,30 @@
 
 > D3 作为**公共域**（horizontal capability），被 D1/D2/D4/D5/D6/D7 任意域消费；本节明确 D3 与其他域的 SoT 划分。
 
-### 2.1 D3 vs D2 (Context Engine)
+### 2.1 D3 vs D2 (Context Engine) — DM-020 修订
 
 #### 2.1.1 跨域锚点
 
 | 锚点 | 路径 | D3 责任 | D2 责任 |
 |------|------|---------|--------|
-| `internal/bridges/llm/bridge.go` | D3 → D2 契约实现 | D3 暴露 `IGateway` / `Request` / `Chunk` 类型 | D2 暴露 `ILLMGateway` 契约（消费者视角） |
+| `internal/bridges/llm/bridge.go` | D3 → **D7** 契约实现（DM-020） | D3 暴露 `IGateway` / `Request` / `Chunk` 类型 | — |
 
-> **R1 D2 决议**：Bridge 留 `internal/bridges/llm/`，不挂 D3 内部 S，也不在 D2 内部。理由是 Bridge 是"D3 对 D2 的契约实现"，跨域问题在 D 边界决策。
+> **DM-020（D7 Turn 编排上移）修订：** `ILLMGateway` 主消费方从 D2 变更为 **D7**。D2 不再持有 `ILLMGateway` 依赖。Bridge 仍留 `internal/bridges/llm/`，跨域问题在 D 边界决策。
 
 #### 2.1.2 SoT 划分
 
 | 概念 | D3 SoT | D2 SoT | 备注 |
 |------|--------|--------|------|
 | `Request` / `Chunk` 类型 | **D3**（根 `contracts.go`） | D2 不重复定义，import 即可 | kernel 性质，跨域共享 |
-| `ILLMGateway` 接口 | D3 实现（`bridge.go`） | **D2 定义**（`D2-S16` 消费契约） | 跨域锚点 |
-| `QueryLoop` 主循环 | D3 不参与 | **D2**（`D2-S16 RunQueryLoop`） | D3 是被调用方 |
-| LLM 调用编排 | **D3**（`D3-S2 StreamChat` + `D3-S3 ProtectCall`） | D2 不直接编排 LLM 调用 | D3 是编排者 |
-| 上下文组装 / 压缩 | D3 不参与 | **D2**（`D2-S15 PrepareExecutionContext`） | D2 SoT |
+| `ILLMGateway` 接口 | D3 实现（`bridge.go`） | ~~D2 定义~~ → **D7 定义**（DM-020） | 消费方迁移 |
+| Turn 主循环 | D3 不参与 | ~~D2-S16 RunQueryLoop~~ → **D7-S2-A06 RunTurnLoop**（DM-020） | Turn SoT 归 D7 |
+| LLM 调用编排 | **D3**（`D3-S2 StreamChat` + `D3-S3 ProtectCall`） | D2 **禁止** 调用 LLM（DM-020 import lint） | D7 编排 D3 调用 |
+| 上下文组装 / 压缩 | D3 不参与 | **D2**（`D2-S15 PrepareExecutionContext`） | D2 SoT（保留） |
+| CompressHint | D3 不参与 | **D2** 发出提议 | **D7** 执行压缩（调 D3），D2 合并 |
+| 工具执行 | D3 不参与 | **D2**（`D2-S18 ExecuteToolRound`） | D2 SoT（保留） |
+| 会话持久化 | D3 不参与 | **D2**（`D2-S17 PersistSessionState`） | D2 SoT（保留） |
+
+> **禁止边（DM-020）：** `D2 → D3` 任何 import 或调用。v1.0 规格登记，v2.0 import lint CI 硬阻断。
 
 #### 2.1.3 灰区声明：D3-S5 GuardContent vs D2-S18 PermissionMode（R2 命题 E 决议 / P0 #5）
 
@@ -179,21 +184,27 @@
 - D3 仅暴露**稳定的 metric / span attribute**（R1 Q3 + R3 命题 B 衍生）
 - D6 probe 接入需要 D3 配合时（如 v1.1 翻 `d3_resilience_emit_enabled`），**通过 D6 change 包**申请，不在 D3 域内
 
-### 2.4 D3 vs D7 (Orchestration)
+### 2.4 D3 vs D7 (Orchestration) — DM-020 修订
 
-#### 2.4.1 跨域锚点
+#### 2.4.1 D3 消费方迁移
+
+> **DM-020（D7 Turn 编排上移）修订：** D7 替代 D2 成为 ILLMGateway 的**主消费方**。D7 直调 D3 进行 LLM 推理，D2→D3 禁止。
 
 | 锚点 | 路径 | D3 责任 | D7 责任 |
 |------|------|---------|--------|
+| `internal/bridges/llm/bridge.go` | D3↔D7 契约实现 | D3 暴露 `IGateway` / `Request` / `Chunk` 类型 | D7-S2-A07 InvokeLLM 消费；D7-S2-A06 RunTurnLoop 编排 |
 | D7 EngineEvent 复用 | `internal/layers/orchestration/coordinator/contracts.go` | D3 复用 `FlowStarted` / `FlowFailed` | D7 维护 EngineEvent 类型 |
 
 #### 2.4.2 SoT 划分
 
 | 概念 | D3 SoT | D7 SoT | 备注 |
 |------|--------|--------|------|
+| **LLM 调用权** | D3 提供 LLM 能力 | **D7** 唯一有权决定何时/如何调 D3（DM-020） | D2→D3 禁止（import lint） |
 | 编排决策 | D3 不参与 | **D7**（`D7-S5 Decision & Planning`） | D7 SoT |
-| Breaker 状态通知 D7 | D3 emit `flow.breaker.opened` / `closed` / `halfopened`（D6-A 决议） | D7 订阅 | **不新增 D3→D7 直接契约**（R1 Q6）；v1.1 实施 F09 ReuseEngineEvent |
+| RouteModel (tier 选择) | D3-S1 暴露 `ITierResolver` | **D7** InvokeLLM 前调用（DM-020 OQ4） | D7 决策，D3 执行 |
+| Breaker 状态通知 D7 | D3 emit `flow.breaker.opened` / `closed` / `halfopened`（D6-A 决议） | D7 订阅并根据 Breaker 状态选择路由/fallback | DM-020 后 D7 是第一知情者 |
 | 编排调度 | D3 不参与 | **D7**（`D7-S3 Wave Scheduler`） | D7 SoT |
+| Turn 循环 | D3 不参与 | **D7-S2-A06** RunTurnLoop（DM-020） | D7 SoT |
 
 #### 2.4.3 灰区声明：Breaker 事件命名（D6-A 决议固化 / v1.1 实施）
 
@@ -279,6 +290,21 @@
 | D2 flow_report vs D7 Hub | D2 直接 Publish | 迁 D7 `subquery_bridge` |
 | DelegateOrFallback 在 D4 | D4 选 Spoke | 迁 D7 `dispatch` |
 
+### 3.6 Follower 对称性声明（双边共识 G-02）
+
+> **D2 和 D4 作为 Stackelberg Follower，享有对等的角色约束。** 该声明确保两个 Follower 的"瘦身"程度在每次架构审计中对称评估。
+
+| 对称轴 | D2 Context Follower | D4 Execution Follower |
+|--------|-------------------|---------------------|
+| **不拥有编排决策权** | 不选 LLM 路径（DM-020） | 不选 Spoke 路径（DM-018） |
+| **不直接 Publish FlowEvent** | 经 D7 PersistTurn 后 emit | 经 D7 SpokeBridge |
+| **保留域内执行比较优势** | Prepare / ToolRound / Persist | Provision / Run / Isolate / ExecuteWorker |
+| **硬约束（v2.0）** | import lint D2→D3 | import lint D4→orchestration/flow |
+| **Follower Veto（合理拒绝权）** | D2-S18 Tool Permission Gate | D4-S12 PermissionGate |
+| **禁止** | 直连 D3（ILLMGateway） | 直连 Hub（hub.Publish）/ 选择 Spoke |
+
+> **影子编排风险**：即使 Hub-Spoke 归 D7，D4 仍可通过 Prompt 注入、Builtin 选择性注册、错误吞掉等方式间接影响编排。详表见 `openspec/specs/d4-multi-agent/d7-boundary.md` §9。
+
 ---
 
 ## 3. 跨域 SoT 决策原则
@@ -330,3 +356,4 @@
 | 1.0.0 | 2026-06-14 | 初版：v3.7.0 layering.md 配套；D3 vs D1/D2/D4/D5/D6/D7 跨域 SoT 划分；4 项灰区契约化（D3-S5/D2-S18 / Breaker 状态 / D6 probe / Breaker 事件命名）；D3-X 跨域锚点声明 `internal/bridges/llm/` |
 | 1.1.0 | 2026-06-14 | v1.1 子 change 落地：§2.4.3 Breaker 事件命名 D6-A 决议固化；§2.4.4 D3→D5 metric；§2.3.2 D6 probe；§4 灰区第 5 项 |
 | 1.2.0 | 2026-06-14 | §3 D4 跨域边界（Hub-Spoke 全归 D7；D4 vs D7/D2/D1/D5）；灰区 Hub-Spoke 双头收敛表（DM-20260614-018） |
+| 1.3.0 | 2026-06-15 | 双边共识落盘：§2.1 D3 vs D2 DM-020 修订（D2→D3 禁止、ILLMGateway 消费方 D7）；§2.4 D3 vs D7 DM-020 修订（D7 直调 D3）；§3.6 Follower 对称性声明 + 影子编排风险交叉引用 |

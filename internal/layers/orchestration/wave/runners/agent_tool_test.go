@@ -7,21 +7,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
 type fakeAgentTool struct {
-	events []tool.Event
+	events []external.Event
 	mu     sync.Mutex
 	// blockUntilCancel makes Execute block on ctx.Done() after sending the
 	// first event so the runner observes cancellation while still streaming.
 	blockUntilCancel bool
 }
 
-func (f *fakeAgentTool) Info() tool.Info { return tool.Info{Name: "cursor", DisplayName: "Cursor"} }
-func (f *fakeAgentTool) Execute(ctx context.Context, sessionID string, req tool.Request) (<-chan tool.Event, error) {
-	ch := make(chan tool.Event, 16)
+func (f *fakeAgentTool) Info() external.Info { return external.Info{Name: "cursor", DisplayName: "Cursor"} }
+func (f *fakeAgentTool) Execute(ctx context.Context, sessionID string, req external.Request) (<-chan external.Event, error) {
+	ch := make(chan external.Event, 16)
 	go func() {
 		defer close(ch)
 		for _, e := range f.events {
@@ -40,13 +40,13 @@ func (f *fakeAgentTool) Execute(ctx context.Context, sessionID string, req tool.
 
 func TestAgentToolRunner_StreamEvents(t *testing.T) {
 	fake := &fakeAgentTool{
-		events: []tool.Event{
+		events: []external.Event{
 			{Type: "thinking", Content: "thinking…"},
 			{Type: "text", Content: "hello"},
 			{Type: "complete", Content: "done"},
 		},
 	}
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 	if err := reg.Register(fake); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -95,12 +95,12 @@ func TestAgentToolRunner_CancelEmitsCancelled(t *testing.T) {
 	// IM card footer can show the reason. Full process-kill testing requires
 	// OS-level integration; this test covers the runner-bridge half.
 	fake := &fakeAgentTool{
-		events: []tool.Event{
+		events: []external.Event{
 			{Type: "thinking", Content: "start"},
 		},
 		blockUntilCancel: true,
 	}
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 	_ = reg.Register(fake)
 
 	r := NewAgentToolRunner(wave.WorkerCursor, AgentToolDeps{Registry: reg})

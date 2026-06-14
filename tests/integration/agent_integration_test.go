@@ -12,8 +12,8 @@ import (
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/agent"
-	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
+	"github.com/devrix/devrix/internal/layers/multiagent/run"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -82,7 +82,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 		ctxCfg:   ctxCfg,
 		toolCfg:  toolCfg,
 	}
-	factory := multiagentfactory.NewAgentFactoryWithBuilder(multiagent.AgentDeps{}, builder, config.DefaultMultiAgentConfig())
+	factory := multiagentprovision.NewAgentFactoryWithBuilder(multiagent.AgentDeps{}, builder, config.DefaultMultiAgentConfig())
 	gw.SetAgentFactory(factory)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
@@ -117,10 +117,10 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	gw := capture.NewCommunicationGateway(nil, handler, nil, cfg)
 
 	session := types.NewSession("sess_bridge", "cli", t.TempDir())
-	factory := multiagentfactory.NewAgentFactory(multiagent.AgentDeps{
-		Engine: &agent.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
+	factory := multiagentprovision.NewAgentFactory(multiagent.AgentDeps{
+		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
 	}, config.DefaultMultiAgentConfig())
-	ag, err := factory.Create(context.Background(), multiagent.AgentConfig{
+	ag, err := provision.Create(context.Background(), multiagent.AgentConfig{
 		SessionID:         session.SessionID,
 		WorkDir:           session.WorkDir,
 		PermissionTimeout: 2 * time.Second,
@@ -130,9 +130,9 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	}
 	gw.RegisterSessionAgent(session.SessionID, ag)
 
-	impl, ok := ag.(*agent.Impl)
+	impl, ok := ag.(*run.Impl)
 	if !ok {
-		t.Fatal("expected *agent.Impl")
+		t.Fatal("expected *run.Impl")
 	}
 	impl.SetAgentObserver(&gatewayBridgeObserver{gw: gw, session: session})
 

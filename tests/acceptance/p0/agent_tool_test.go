@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 )
 
 // T: D4-S6-A01-T01
 func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 
 	// Register P0 tools
-	alpha := tool.NewCLIAgentTool(tool.CLIConfig{
+	alpha := external.NewCLIAgentTool(external.CLIConfig{
 		Name:         "alpha",
 		DisplayName:  "Alpha",
 		Description:  "First tool",
@@ -25,7 +25,7 @@ func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
 		Command:      "bash",
 		Args:         []string{"-c", `echo '{"type":"complete","content":""}'`},
 	})
-	beta := tool.NewCLIAgentTool(tool.CLIConfig{
+	beta := external.NewCLIAgentTool(external.CLIConfig{
 		Name:         "beta",
 		DisplayName:  "Beta",
 		Description:  "Second tool",
@@ -77,7 +77,7 @@ func TestAcceptance_AgentToolRegistry_P0(t *testing.T) {
 
 // T: D4-S6-A02-T02, D4-S6-A02-T04
 func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
-	agt := tool.NewCLIAgentTool(tool.CLIConfig{
+	agt := external.NewCLIAgentTool(external.CLIConfig{
 		Name:    "echo-stream",
 		Command: "bash",
 		Args:    []string{"-c", `echo '{"type":"text","content":"msg1"}'; echo '{"type":"text","content":"msg2"}'; echo '{"type":"complete","content":""}'`},
@@ -87,11 +87,11 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 	ctx := context.Background()
 
 	// D4-S6-A02-T02: CLI adapter parses stream-json correctly
-	ch, err := agt.Execute(ctx, "sess_reuse", tool.Request{Task: "ping"})
+	ch, err := agt.Execute(ctx, "sess_reuse", external.Request{Task: "ping"})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var events []tool.Event
+	var events []external.Event
 	for evt := range ch {
 		events = append(events, evt)
 	}
@@ -109,7 +109,7 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 	}
 
 	// D4-S6-A02-T04: Session reuse — same sessionID reuses subprocess
-	ch2, err := agt.Execute(ctx, "sess_reuse", tool.Request{Task: "ping2"})
+	ch2, err := agt.Execute(ctx, "sess_reuse", external.Request{Task: "ping2"})
 	if err != nil {
 		t.Fatalf("second Execute: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestAcceptance_CLIAgentTool_StreamJSONAndSessionReuse_P0(t *testing.T) {
 // T: D4-S6-A02-T07
 func TestAcceptance_AgentToolSessionIsolation_P0(t *testing.T) {
 	// Use a stateful subprocess that tracks state per session
-	agt := tool.NewCLIAgentTool(tool.CLIConfig{
+	agt := external.NewCLIAgentTool(external.CLIConfig{
 		Name:    "stateful",
 		Command: "bash",
 		Args:    []string{"-c", `while read line; do echo '{"type":"text","content":"ok"}'; echo '{"type":"complete","content":""}'; done`},
@@ -139,7 +139,7 @@ func TestAcceptance_AgentToolSessionIsolation_P0(t *testing.T) {
 		sid := sid
 		go func() {
 			defer wg.Done()
-			ch, err := agt.Execute(ctx, sid, tool.Request{Task: "test"})
+			ch, err := agt.Execute(ctx, sid, external.Request{Task: "test"})
 			if err != nil {
 				t.Errorf("Execute(%s): %v", sid, err)
 				return
@@ -164,18 +164,18 @@ func TestAcceptance_AgentToolSessionIsolation_P0(t *testing.T) {
 // T: D4-S6-A02-T02 (non-JSON fallback), D4-S6-A02-T03 (timeout)
 func TestAcceptance_CLIAgentTool_EdgeCases_P1(t *testing.T) {
 	t.Run("non-json line falls back to text event", func(t *testing.T) {
-		agt := tool.NewCLIAgentTool(tool.CLIConfig{
+		agt := external.NewCLIAgentTool(external.CLIConfig{
 			Name:    "plain",
 			Command: "bash",
 			Args:    []string{"-c", `echo "raw line"; echo '{"type":"complete","content":""}'`},
 		})
 		defer agt.Stop()
 
-		ch, err := agt.Execute(context.Background(), "sess_nonjson_acc", tool.Request{Task: "t"})
+		ch, err := agt.Execute(context.Background(), "sess_nonjson_acc", external.Request{Task: "t"})
 		if err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
-		var events []tool.Event
+		var events []external.Event
 		for evt := range ch {
 			events = append(events, evt)
 		}
@@ -185,7 +185,7 @@ func TestAcceptance_CLIAgentTool_EdgeCases_P1(t *testing.T) {
 	})
 
 	t.Run("context timeout stops subprocess", func(t *testing.T) {
-		agt := tool.NewCLIAgentTool(tool.CLIConfig{
+		agt := external.NewCLIAgentTool(external.CLIConfig{
 			Name:    "slow",
 			Command: "bash",
 			Args:    []string{"-c", `echo '{"type":"text","content":"start"}'; sleep 30; echo '{"type":"complete","content":""}'`},
@@ -195,7 +195,7 @@ func TestAcceptance_CLIAgentTool_EdgeCases_P1(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 		defer cancel()
 
-		ch, err := agt.Execute(ctx, "sess_timeout_acc", tool.Request{Task: "t"})
+		ch, err := agt.Execute(ctx, "sess_timeout_acc", external.Request{Task: "t"})
 		if err != nil {
 			t.Fatalf("Execute: %v", err)
 		}

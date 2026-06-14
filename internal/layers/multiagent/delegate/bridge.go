@@ -10,6 +10,12 @@ import (
 )
 
 // FlowBridge publishes D4 worker lifecycle and engine events to ExecutionFlowHub.
+//
+// Deprecated: migrated to D7 hubspoke.AgentBridge (v2.0-b).
+// New code should wire AgentBridge via hubspoke.Dispatcher instead of
+// constructing FlowBridge directly.
+// Existing callers in delegate.Service are preserved for backward compat
+// and will be removed in the re-export cleanup cycle (v2.0-e).
 type FlowBridge struct {
 	hub      contracts.ExecutionFlowHub
 	session  string

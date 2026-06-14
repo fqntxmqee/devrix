@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/agent"
-	multiagentfactory "github.com/devrix/devrix/internal/layers/multiagent/factory"
+	"github.com/devrix/devrix/internal/layers/multiagent/run"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -17,14 +17,14 @@ import (
 
 // T: D4-S0-A01-T04
 func TestE2E_AgentForkParallelJoin(t *testing.T) {
-	factory := multiagentfactory.NewAgentFactory(multiagent.AgentDeps{
-		Engine: &agent.StubEngine{
+	factory := multiagentprovision.NewAgentFactory(multiagent.AgentDeps{
+		Engine: &run.StubEngine{
 			Events: []*contracts.EngineEvent{{Type: "complete", Content: "done"}},
 		},
 	}, config.DefaultMultiAgentConfig())
 
 	session := types.NewSession("sess_e2e_fork", "cli", t.TempDir())
-	parent, err := factory.Create(context.Background(), multiagent.AgentConfig{
+	parent, err := provision.Create(context.Background(), multiagent.AgentConfig{
 		SessionID:   session.SessionID,
 		WorkDir:     session.WorkDir,
 		MaxChildren: 2,

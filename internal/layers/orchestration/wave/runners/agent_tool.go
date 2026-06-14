@@ -6,19 +6,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
 // AgentToolDeps wires AgentToolRunner.
 type AgentToolDeps struct {
 	// Registry maps worker kind → underlying AgentTool (cursor / claude-code).
-	Registry *tool.Registry
+	Registry *external.Registry
 }
 
 // AgentToolRunner implements wave.WorkerRunner for CLI Agent Tools (cursor /
-// claude-code). It uses the existing D4 tool.AgentTool interface and bridges
-// tool.Event to wave.WorkerEvent.
+// claude-code). It uses the existing D4 external.AgentTool interface and bridges
+// external.Event to wave.WorkerEvent.
 type AgentToolRunner struct {
 	kind wave.WorkerType
 	deps AgentToolDeps
@@ -60,7 +60,7 @@ func (r *AgentToolRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) erro
 		workDir = "."
 	}
 
-	evtCh, err := agt.Execute(ctx, spec.SessionID, tool.Request{
+	evtCh, err := agt.Execute(ctx, spec.SessionID, external.Request{
 		Task:    spec.Directive,
 		WorkDir: workDir,
 	})

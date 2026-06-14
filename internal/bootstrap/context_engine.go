@@ -14,7 +14,7 @@ import (
 
 	// tool package is imported via the agentToolReg parameter; the bridge plugin
 	// is created here at the composition root.
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 )
 
 // NewContextEngine wires Layer 2 to a pre-built LLM stack (L3 bridge).
@@ -25,7 +25,7 @@ func NewContextEngine(
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
-	agentToolReg *tool.Registry,
+	agentToolReg *external.Registry,
 ) *contextengine.ContextEngine {
 	longTerm := WireContextV3(ctxCfg)
 	workmodel.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)

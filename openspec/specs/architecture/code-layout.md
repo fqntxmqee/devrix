@@ -177,21 +177,30 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 | S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
 |------|----------|----------------------|--------------|-----------|------|
-| D4-S11 | ProvisionAgent | `provision` | `factory/` + `collaboration/` + `builtin/` | `multiagent/provision/` | ⬜ v2.0-d |
-| D4-S12 | RunAgentLoop | `run` | `agent/`（lifecycle, state, perm_gate） | `multiagent/run/` | ⬜ v2.0-d |
-| D4-S13 | IsolateAndMerge | `isolate` | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` | ⬜ v2.0-d |
-| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ⬜ v2.0-d |
-| D4-S15 | InvokeExternalAgent | `external` | `tool/` | `multiagent/external/` | ⬜ v2.0-d |
-| D4-S16 | ConfigureAgents | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` | ⬜ v2.0-d |
-| — | Domain Kernel | `kernel` | `contracts.go` + `observer/` | `multiagent/kernel/` | ⬜ v2.0-d |
+| D4-S11 | ProvisionAgent | `provision` | `factory/` + `collaboration/` + `builtin/` | `multiagent/provision/` | ✅ v2.0-d |
+| D4-S12 | RunAgentLoop | `run` | `agent/`（lifecycle, state, perm_gate） | `multiagent/run/` | ✅ v2.0-d |
+| D4-S13 | IsolateAndMerge | `isolate` | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` + `multiagent/run/` | ✅ v2.0-d |
+| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ✅ v2.0 骨架 |
+| D4-S15 | InvokeExternalAgent | `external` | `tool/` | `multiagent/external/` | ✅ v2.0-d |
+| D4-S16 | ConfigureAgents | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` | ✅ v2.0-d |
+| — | Domain Kernel | `kernel` | `contracts.go` + `observer/` | `multiagent/kernel/` | ✅ v2.0-d |
 
 **Hub-Spoke 迁 D7（v2.0-b/c，非 D4 目录）：**
 
-| 组件 | v1.0 路径 | v2.0 目标 |
-|------|----------|-----------|
-| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` |
-| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` |
-| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` |
+| 组件 | v1.0 路径 | v2.0 目标 | 状态 |
+|------|----------|-----------|------|
+| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` | ✅ v2.0-b |
+| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` | ✅ v2.0-b |
+| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-c |
+| Dispatcher bootstrap | `bootstrap/delegate.go` | `bootstrap/delegate.go`（重构） | ✅ v2.0-b |
+
+**v2.0-b 里程碑：**
+- `execute/worker.go` — WorkerExecutor 实现（D4-S14 执行面）
+- `execute/contracts.go` — WorkerExecutor 接口 + WorkerRunSpec
+- `hubspoke/agent_bridge.go` — Agent FlowBridge（从 D4 迁入）
+- `hubspoke/dispatch.go` — SpokeDispatcher（从 D4 delegate/service.go 编排逻辑迁入）
+- `hubspoke/doc.go` — 包文档
+- `delegatetools/` — 重构使用 Dispatcher.Dispatch()；WorkerRole 常量本地化
 
 ---
 

@@ -1,6 +1,6 @@
 // Package delegatetools — D7 orchestration F: delegate_* tool routing (DM-20260614-011).
 //
-// DSAFT: D7-S2/S5 F — routes Leader tool calls to D4 delegate service or D2 SubQuery fallback.
+// DSAFT: D7-S2/S5 F — routes Leader tool calls through hubspoke.Dispatcher.
 // Moved from contextengine (v2.0) to keep D2 as Execution Follower only.
 package delegatetools
 
@@ -9,27 +9,22 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
-	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/delegate"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
+	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Deps wires delegate tool handlers.
-type Deps struct {
-	Service *delegate.Service
-	Leader  delegate.LeaderResolver
-}
+// WorkerRole identifies the delegated worker specialization.
+type WorkerRole string
 
-var globalDeps Deps
-
-// SetDeps configures delegate_* tool handlers.
-func SetDeps(deps Deps) {
-	globalDeps = deps
-}
+const (
+	WorkerRoleExplore   WorkerRole = "explore"
+	WorkerRolePlan      WorkerRole = "plan"
+	WorkerRoleImplement WorkerRole = "implement"
+)
 
 // RegisterTools registers hub-spoke delegate tools when enabled.
 func RegisterTools(reg *toolrunner.ToolRegistry, maCfg *config.MultiAgentConfig) error {
@@ -37,9 +32,9 @@ func RegisterTools(reg *toolrunner.ToolRegistry, maCfg *config.MultiAgentConfig)
 		return nil
 	}
 	for _, runner := range []toolrunner.PluginRunner{
-		&delegateToolRunner{name: "delegate_explore", role: delegate.WorkerRoleExplore},
-		&delegateToolRunner{name: "delegate_plan", role: delegate.WorkerRolePlan},
-		&delegateToolRunner{name: "delegate_implement", role: delegate.WorkerRoleImplement},
+		&delegateToolRunner{name: "delegate_explore", role: WorkerRoleExplore},
+		&delegateToolRunner{name: "delegate_plan", role: WorkerRolePlan},
+		&delegateToolRunner{name: "delegate_implement", role: WorkerRoleImplement},
 		newDelegateStatusRunner(),
 	} {
 		if err := reg.Register(runner); err != nil {
@@ -51,7 +46,7 @@ func RegisterTools(reg *toolrunner.ToolRegistry, maCfg *config.MultiAgentConfig)
 
 type delegateToolRunner struct {
 	name string
-	role delegate.WorkerRole
+	role WorkerRole
 }
 
 func (r *delegateToolRunner) Name() string { return r.name }
@@ -70,20 +65,18 @@ func delegateToolParameters() string {
 	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"worktree_slug":{"type":"string","description":"Optional isolated worktree slug for parallel implement tasks."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."}}}`
 }
 
-func delegateToolDescription(role delegate.WorkerRole) string {
+func delegateToolDescription(role WorkerRole) string {
 	switch role {
-	case delegate.WorkerRoleExplore:
+	case WorkerRoleExplore:
 		return "Spawn a read-only Explore worker to investigate the codebase (grep, read, list — no writes). " +
-			"Use when you lack context, must verify assumptions across modules, or the task likely touches 3+ files. " +
 			"Do NOT use for trivial single-file edits or pure Q&A you can answer from known context. " +
 			"Returns a concise summary — prefer async=true for broad exploration. " +
 			"After explore, use todo_write to capture tasks or delegate_plan if the approach is still unclear."
-	case delegate.WorkerRolePlan:
+	case WorkerRolePlan:
 		return "Spawn a read-only Plan worker to produce a structured implementation plan from research context. " +
-			"Use after explore (or when the user asks for a design) and before multi-step implement work. " +
 			"Do NOT use for single obvious edits; do NOT use plan instead of implement when the user wants code changed now. " +
 			"Returns phases, files, dependencies, and test notes — then break into todo_write items and delegate_implement per task."
-	case delegate.WorkerRoleImplement:
+	case WorkerRoleImplement:
 		return "Spawn an Implement worker to execute one scoped task (create/edit files, run tests). " +
 			"Use for concrete coding work; pass one task per call with file paths and acceptance criteria in directive. " +
 			"Do NOT bundle unrelated features; do NOT implement before exploring unfamiliar areas. " +
@@ -101,30 +94,38 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 	if sc.IsWorker || sc.AgentID != "" {
 		return &toolrunner.ToolResult{Error: r.name + ": not allowed from worker context"}, nil
 	}
-	svc := globalDeps.Service
-	if svc == nil {
-		return &toolrunner.ToolResult{Error: r.name + ": delegate service not configured"}, nil
+	disp := globalDeps.Dispatcher
+	if disp == nil {
+		return &toolrunner.ToolResult{Error: r.name + ": dispatcher not configured"}, nil
 	}
 	fields := toolrunner.ParseToolInput(input)
 	directive := fields["directive"]
 	if directive == "" {
 		return &toolrunner.ToolResult{Error: r.name + ": directive is required"}, nil
 	}
-	spec := delegate.WorkerSpec{
-		Role:         r.role,
+
+	sessionID := sc.SessionID
+	if globalDeps.Leader != nil {
+		if leader, ok := globalDeps.Leader.Leader(sessionID); ok {
+			sessionID = leader.Config().SessionID
+		}
+	}
+
+	req := hubspoke.DispatchRequest{
+		SessionID:    sessionID,
+		ParentSC:     sc,
+		Role:         string(r.role),
 		Directive:    directive,
 		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive),
 		WorktreeSlug: fields["worktree_slug"],
 		Async:        fields["async"] == "true",
 	}
-	var leader multiagent.Agent
-	if globalDeps.Leader != nil {
-		leader, _ = globalDeps.Leader.Leader(sc.SessionID)
-	}
-	res, err := svc.DelegateOrFallback(ctx, leader, sc, spec)
+
+	res, err := disp.Dispatch(ctx, req)
 	if err != nil {
 		return &toolrunner.ToolResult{Error: err.Error()}, nil
 	}
+
 	out := strings.TrimSpace(res.Summary)
 	if out == "" && res.Error == nil {
 		out = "(subagent completed without a textual summary)"

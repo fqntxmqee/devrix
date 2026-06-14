@@ -1,0 +1,24 @@
+change-id: devrix-d4-sa-refine
+demand-id: DM-20260614-018
+status: S5_Accepted
+review-round: R1
+dsaft_domain: multi-agent
+dsaft_scenarios:
+  - D4-S11
+  - D4-S12
+  - D4-S13
+  - D4-S14
+  - D4-S15
+  - D4-S16
+cross_domain:
+  - D7-S2
+  - D7-S4
+  - D2-S19
+t_points: 38
+phase_scope: v1.0_registry_only
+v2.0_slices:
+  - v2.0-a: D7 hubspoke skeleton
+  - v2.0-b: D4 bridge/dispatch to D7
+  - v2.0-c: D2 flow_report to D7
+  - v2.0-d: D4 physical paths
+  - v2.0-e: T green + re-export cleanup

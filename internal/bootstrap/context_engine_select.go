@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -20,7 +20,7 @@ func SelectContextEngine(
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	llmStack llmbridge.ContextLLMStack,
-	agentToolReg *tool.Registry,
+	agentToolReg *external.Registry,
 ) capture.IContextEngine {
 	engine := strings.ToLower(strings.TrimSpace(name))
 	switch engine {

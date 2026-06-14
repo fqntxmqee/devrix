@@ -6,7 +6,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/nested"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
-	"github.com/devrix/devrix/internal/layers/multiagent/delegate"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -24,8 +23,8 @@ func (h *captureFlowHub) Snapshot(string) contracts.WorkPlanSnapshot {
 	return contracts.WorkPlanSnapshot{}
 }
 
-// T: D4-S10-A01-T08
-func TestSubQueryFallback_should_publish_flow_events_when_d4_disabled(t *testing.T) {
+// T: D4-S10-A01-T08 (legacy; canonical → D7-S4)
+func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T) {
 	hub := &captureFlowHub{}
 	prev := flow.GlobalHub
 	flow.SetGlobalHub(hub)
@@ -35,14 +34,10 @@ func TestSubQueryFallback_should_publish_flow_events_when_d4_disabled(t *testing
 		LLM:        &query.SequentialLLM{Responses: []query.LLMScript{{Content: "fallback summary"}}},
 		Permission: query.AllowPermission{},
 	}
-	adapter := &SubQueryFallback{LoopDeps: nested.LoopDeps{Loop: loop}}
+	adapter := &SubQueryRunner{LoopDeps: nested.LoopDeps{Loop: loop}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}
 
-	_, err := adapter.RunSubQuery(context.Background(), parent, delegate.WorkerSpec{
-		Role:      delegate.WorkerRoleExplore,
-		Directive: "scan repo",
-		TaskID:    "task_fb",
-	})
+	_, err := adapter.RunSubQuery(context.Background(), parent, "explore", "scan repo", "task_fb", 0)
 	if err != nil {
 		t.Fatalf("RunSubQuery: %v", err)
 	}

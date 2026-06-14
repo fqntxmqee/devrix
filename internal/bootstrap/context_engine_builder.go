@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
@@ -32,7 +32,7 @@ type ContextEngineBuilder struct {
 	toolCfg      *config.ToolConfig
 	maCfg        *config.MultiAgentConfig
 	obsBridge    *observability.Bridge
-	agentToolReg *tool.Registry
+	agentToolReg *external.Registry
 }
 
 // NewContextEngineBuilder creates a reusable engine builder.
@@ -41,7 +41,7 @@ func NewContextEngineBuilder(
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
-	agentToolReg *tool.Registry,
+	agentToolReg *external.Registry,
 ) *ContextEngineBuilder {
 	return &ContextEngineBuilder{
 		stack:        stack,

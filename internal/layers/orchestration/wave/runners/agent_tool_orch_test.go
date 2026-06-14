@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
@@ -18,10 +18,10 @@ import (
 // WorkerEvent channel sees a 'cancelled' event with the right content.
 func TestAgentToolRunner_L5_ORCH_21_CancelledEmitted(t *testing.T) {
 	fake := &fakeAgentTool{
-		events:           []tool.Event{{Type: "thinking", Content: "start"}},
+		events:           []external.Event{{Type: "thinking", Content: "start"}},
 		blockUntilCancel: true,
 	}
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 	_ = reg.Register(fake)
 
 	r := NewAgentToolRunner(wave.WorkerCursor, AgentToolDeps{Registry: reg})

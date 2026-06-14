@@ -3,13 +3,11 @@ package delegatetools
 import (
 	"strings"
 	"testing"
-
-	"github.com/devrix/devrix/internal/layers/multiagent/delegate"
 )
 
 func TestDelegateToolDescription_explore_should_discourage_trivial_use(t *testing.T) {
-	desc := delegateToolDescription(delegate.WorkerRoleExplore)
-	for _, kw := range []string{"read-only", "3+ files", "Do NOT use for trivial", "async=true"} {
+	desc := delegateToolDescription(WorkerRoleExplore)
+	for _, kw := range []string{"read-only", "Do NOT use for trivial", "async=true"} {
 		if !strings.Contains(desc, kw) {
 			t.Fatalf("explore description missing %q: %s", kw, desc)
 		}
@@ -17,7 +15,7 @@ func TestDelegateToolDescription_explore_should_discourage_trivial_use(t *testin
 }
 
 func TestDelegateToolDescription_plan_should_require_read_only_planning(t *testing.T) {
-	desc := delegateToolDescription(delegate.WorkerRolePlan)
+	desc := delegateToolDescription(WorkerRolePlan)
 	for _, kw := range []string{"read-only", "todo_write", "delegate_implement"} {
 		if !strings.Contains(desc, kw) {
 			t.Fatalf("plan description missing %q: %s", kw, desc)
@@ -26,7 +24,7 @@ func TestDelegateToolDescription_plan_should_require_read_only_planning(t *testi
 }
 
 func TestDelegateToolDescription_implement_should_scope_single_task(t *testing.T) {
-	desc := delegateToolDescription(delegate.WorkerRoleImplement)
+	desc := delegateToolDescription(WorkerRoleImplement)
 	for _, kw := range []string{"one scoped task", "task_id", "Do NOT bundle"} {
 		if !strings.Contains(desc, kw) {
 			t.Fatalf("implement description missing %q: %s", kw, desc)
@@ -35,7 +33,7 @@ func TestDelegateToolDescription_implement_should_scope_single_task(t *testing.T
 }
 
 func TestDelegateToolRunner_schema_should_use_rich_description(t *testing.T) {
-	runner := &delegateToolRunner{name: "delegate_explore", role: delegate.WorkerRoleExplore}
+	runner := &delegateToolRunner{name: "delegate_explore", role: WorkerRoleExplore}
 	schema := runner.Schema()
 	if schema.Name != "delegate_explore" {
 		t.Fatalf("name = %q", schema.Name)

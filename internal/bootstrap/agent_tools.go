@@ -3,13 +3,13 @@ package bootstrap
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
 // WireAgentToolRegistry loads agent_tools from config and registers CLI/Cursor agents.
 // Returns nil when disabled or on load error (caller may still start without agent tools).
-func WireAgentToolRegistry(configFile string) *tool.Registry {
+func WireAgentToolRegistry(configFile string) *external.Registry {
 	agentToolsCfg, err := config.LoadAgentToolsConfig(configFile)
 	if err != nil {
 		slog.Warn("failed to load agent tools config", "error", err)
@@ -18,12 +18,12 @@ func WireAgentToolRegistry(configFile string) *tool.Registry {
 	if !agentToolsCfg.Enabled {
 		return nil
 	}
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 	for _, tCfg := range agentToolsCfg.Tools {
-		var agt tool.AgentTool
+		var agt external.AgentTool
 		switch tCfg.Type {
 		case "cursor":
-			agt = tool.NewCursorAgentTool(tool.CursorConfig{
+			agt = external.NewCursorAgentTool(external.CursorConfig{
 				Name:         tCfg.Name,
 				DisplayName:  tCfg.DisplayName,
 				Description:  tCfg.Description,
@@ -36,7 +36,7 @@ func WireAgentToolRegistry(configFile string) *tool.Registry {
 				Timeout:      tCfg.Timeout,
 			})
 		default:
-			agt = tool.NewCLIAgentTool(tool.CLIConfig{
+			agt = external.NewCLIAgentTool(external.CLIConfig{
 				Name:         tCfg.Name,
 				DisplayName:  tCfg.DisplayName,
 				Description:  tCfg.Description,

@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/multiagent/tool"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 )
 
 func TestAgentToolPlugin_Execute_should_emit_stream_events(t *testing.T) {
 	script := `echo '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"plan step"},{"type":"text","text":"hello"}]}}'
 echo '{"type":"result","subtype":"success","result":"hello"}'`
 
-	agt := tool.NewCLIAgentTool(tool.CLIConfig{
+	agt := external.NewCLIAgentTool(external.CLIConfig{
 		Name:        "claude-mock",
 		DisplayName: "Claude Code",
 		Command:     "bash",
@@ -21,7 +21,7 @@ echo '{"type":"result","subtype":"success","result":"hello"}'`
 	})
 	defer agt.Stop()
 
-	reg := tool.NewRegistry()
+	reg := external.NewRegistry()
 	if err := reg.Register(agt); err != nil {
 		t.Fatalf("Register: %v", err)
 	}

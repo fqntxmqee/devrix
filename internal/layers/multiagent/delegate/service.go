@@ -27,7 +27,16 @@ type SubQueryFallback interface {
 
 // Service implements D4-S10 delegate orchestration.
 //
-// DSAFT: D4-S10-A01 (DelegateTask)
+// Deprecated: Hub-Spoke orchestration (DelegateOrFallback, FlowBridge wiring)
+// has migrated to D7 hubspoke.Dispatcher (v2.0-b). The execution logic
+// (forkWorker, run, join) is now in execute.Executor (D4-S14).
+//
+// This type is preserved for backward compatibility during the v2.0
+// migration cycle and will be removed in the re-export cleanup (v2.0-e).
+// New code should use hubspoke.Dispatcher for orchestration and
+// execute.WorkerExecutor for execution.
+//
+// DSAFT: D4-S10-A01 (DelegateTask) — Legacy, canonical → D7-S2/D4-S14
 type Service struct {
 	cfg      config.DelegateConfig
 	fallback SubQueryFallback
