@@ -20,7 +20,7 @@
 
 D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
 
-**现行实现路径（2026-06-14）：** 代码仍位于 `internal/layers/orchestration/`（ORCH v2）与 `internal/layers/contextengine/tasks/`（Task/Plan 写模型）。D1 主入口仍为 `D2.ContextEngine.Process`，D7 域包 `internal/layers/d7/` **尚未创建**。
+**现行实现路径（2026-06-14）：** Session Orchestrator（D7-S2）+ ClassifyIntent/Shadow（D7-S5 A01/A05）位于 `internal/layers/orchestration/coordinator/`（package `coordinator`）；Wave/Flow/IMSink/WorkPlan（D7-S3/S4）位于 `internal/layers/orchestration/{wave,flow,workplan,imsink}/`；Task/Plan 写模型与 PlanMode（D7-S1/S5 A04）托管于 `internal/layers/contextengine/tasks/`（v1.1 迁入 coordinator）。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（经 `d7_enabled` 路由开关）。
 
 | 版本里程碑 | 能力 |
 |-----------|------|
@@ -207,7 +207,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `TaskManager` MUST provide session-scoped Task CRUD with optional disk persistence and dependency tracking. PlanMode MUST support inactive → active → pending_approval lifecycle.
 
 **Priority:** P0  
-**Package:** `internal/layers/contextengine/tasks/`（目标迁移至 `internal/layers/d7/`）  
+**Package:** `internal/layers/contextengine/tasks/`（v1.1 目标迁入 `internal/layers/orchestration/coordinator/`）  
 **T:** D7-S1-T01 … D7-S1-T06
 
 #### Scenario: Task create and persist
@@ -256,7 +256,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 | D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG | ⬜ v1.1 |
 | D7-S5 SelectExecutor | D2/D4 执行器选择 | ⬜ v1.1（矩阵硬编码可先） |
 | D2 Thin QueryLoop | loop.go ≤200 行、无 D4 import | ✅ 必须 |
-| D7 package identity | `internal/layers/d7/` | ✅ 必须 |
+| D7 package identity | `internal/layers/orchestration/coordinator/` (package `coordinator`) | ✅ 必须 |
 | D7 Migration Coexistence | 4 组合回归 | ✅ 必须 |
 
 ---

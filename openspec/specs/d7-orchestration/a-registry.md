@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -10,7 +10,10 @@
 
 ## Overview
 
-D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orchestration/`（S3/S4）与 `internal/layers/contextengine/tasks/`（S1/S5 部分）。`internal/layers/d7/` 目标包尚未创建。
+D7 编排域 A 层活动注册表。代码分布：
+- `internal/layers/orchestration/coordinator/`（D7-S2 Session Orchestrator + D7-S5 Intent/Decision）— D7 包命名为 `coordinator`
+- `internal/layers/orchestration/wave|flow|workplan|imsink/`（D7-S3 Wave Scheduler + D7-S4 Execution Flow）— 下层原语
+- `internal/layers/contextengine/tasks/`（D7-S1 部分 + D7-S5 PlanMode）— 写模型与 PlanMode 仍托管于 D2（v1.1 迁入 coordinator）
 
 **状态图例：** ✅ IMPLEMENTED · 🔶 PARTIAL · ⬜ PLANNED
 
@@ -18,11 +21,11 @@ D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orche
 
 ## D7-S1: Work Model 🔶
 
-> 写模型现行托管于 D2 `contextengine/tasks/`，目标迁移至 `internal/layers/d7/workmodel.go`。
+> 写模型现行托管于 D2 `contextengine/tasks/`，v1.1 迁移至 `internal/layers/orchestration/coordinator/workmodel.go`。
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S1-A01 | CreateWorkPlan | A-BE | session_id, goal, context | Plan (Task 列表 + DAG) | work_plan.created | ⬜ | `d7/workmodel.go` (planned) |
+| D7-S1-A01 | CreateWorkPlan | A-BE | session_id, goal, context | Plan (Task 列表 + DAG) | work_plan.created | ⬜ | `coordinator/workmodel.go` (planned v1.1) |
 | D7-S1-A02 | ManageTask | A-BE | task_id, action (create/update/delete/dep) | task_state | task.* | ✅ | `contextengine/tasks/task_manager.go` |
 | D7-S1-A03 | QueryWorkPlan | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
 
@@ -36,15 +39,15 @@ D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orche
 
 ---
 
-## D7-S2: Session Orchestrator ⬜
+## D7-S2: Session Orchestrator ✅
 
-> D1 现行仍调用 `D2.ContextEngine.Process`（`gateway.go:286`）。
+> D1 经 `gateway.d7Entry` 路由至 `coordinator.Entry.ProcessMessage`，由 SessionOrchestrator 编排 D2/D4/D7。
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S2-A01 | ProcessMessage | A-BE | message, session | events stream | session.orchestrating | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A02 | EvaluateIntent | A-BE | message, context | IntentClassification | — | ⬜ | `d7/classifier.go` (planned) |
-| D7-S2-A03 | HandleInterrupt | A-BE | session_id, reason | — | session.interrupted | 🔶 | `communication/gateway/gateway.go` StopProcess |
+| D7-S2-A01 | ProcessMessage | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
+| D7-S2-A02 | EvaluateIntent | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S2-A03 | HandleInterrupt | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 
 ---
 
@@ -74,14 +77,15 @@ D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orche
 
 ## D7-S5: Decision & Planning 🔶
 
-> PlanMode/PlanAgent 已实现；意图分类与任务拆解尚未实现。
+> PlanMode/PlanAgent 已实现；ClassifyIntent/Rule 分类已实现（coordinator）；SynthesizeTaskGraph/SelectExecutor 推迟至 v1.1。
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S5-A01 | ClassifyIntent | A-BE | message, session, context | IntentClassification | — | ⬜ | `d7/classifier.go` (planned) |
-| D7-S5-A02 | SynthesizeTaskGraph | A-BE | goal, constraints | []TaskNode | plan.formulated | ⬜ | `d7/decomposer.go` (planned) |
-| D7-S5-A03 | SelectExecutor | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ⬜ | `d7/executor.go` (planned) |
+| D7-S5-A01 | ClassifyIntent | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S5-A02 | SynthesizeTaskGraph | A-BE | goal, constraints | []TaskNode | plan.formulated | ⬜ | `coordinator/decomposer.go` (planned v1.1) |
+| D7-S5-A03 | SelectExecutor | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ⬜ | `coordinator/executor.go` (planned v1.1) |
 | D7-S5-A04 | RunPlanAgent | A-BE | goal, readonly context | PlanResult | plan.generated | ✅ | `contextengine/tasks/plan_agent.go` |
+| D7-S5-A05 | TailShadowClassify | A-BE | message, rule_result | — | metric only | ✅ | `orchestration/coordinator/shadow_classifier.go` |
 
 ---
 
@@ -89,7 +93,7 @@ D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orche
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 | 18 | 10 | 4 | 4 |
+| 5 | 19 | 14 | 1 | 4 |
 
 ---
 
@@ -99,3 +103,4 @@ D7 编排域 A 层活动注册表。现行代码分布在 `internal/layers/orche
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | 初始注册表（全 PLANNED 路径） |
 | 2.0.0 | 2026-06-14 | 对齐代码：真实路径、实现状态、PlanMode 活动 |
+| 2.1.0 | 2026-06-14 | 包路径迁移 `internal/layers/d7/` → `internal/layers/orchestration/coordinator/`；D7-S2/S5-A01/S5-A05 标记 ✅ |

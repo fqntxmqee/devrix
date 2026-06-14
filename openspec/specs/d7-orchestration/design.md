@@ -11,7 +11,7 @@
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
 **Wave 设计参考:** `openspec/changes/devrix-wave-scheduler/design.md`
 
-> **实现说明（2026-06-14）：** D7-S3/S4 已在 `internal/layers/orchestration/` 完整实现；D7-S1/S5 部分实现在 `contextengine/tasks/`；D7-S2 与 `internal/layers/d7/` 包尚未落地。本文档同时描述**现行架构**与**目标架构**。
+> **实现说明（2026-06-14）：** D7-S3/S4 在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；D7-S2 SessionOrchestrator + D7-S5 ClassifyIntent/ShadowClassifier 在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；D7-S1 WorkModel 与 D7-S5 PlanMode 仍托管于 `contextengine/tasks/`（v1.1 迁入 coordinator）。
 
 ---
 

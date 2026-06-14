@@ -10,7 +10,7 @@
 
 ## Current State Summary
 
-D7 编排域处于 **PARTIAL** 状态：WaveScheduler（D7-S3）与 ExecutionFlowHub（D7-S4）已在 `internal/layers/orchestration/` 完整实现并通过 13 个 T 测试点验证；Task/Plan 写模型（D7-S1）与 PlanMode（D7-S5 部分）仍托管在 `contextengine/tasks/`；Session Orchestrator（D7-S2）与 `internal/layers/d7/` 包尚未创建。D1 主入口仍为 `D2.ContextEngine.Process`。
+D7 编排域处于 **PARTIAL** 状态：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier（D7-S5 A01/A05）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；Task/Plan 写模型（D7-S1）与 PlanMode（D7-S5 A04）仍托管在 `contextengine/tasks/`（v1.1 迁入 coordinator）。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（`d7_enabled` 路由）。
 
 ---
 
@@ -174,9 +174,9 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 ### Requirement: D7 Package Identity
 
-`internal/layers/d7/` MUST exist as top-level domain package.
+`internal/layers/orchestration/coordinator/` MUST exist as D7 coordinator sub-package.
 
-**Current:** Directory does not exist; code at `internal/layers/orchestration/`
+**Current:** IMPLEMENTED 2026-06-14 — package `coordinator` lives at `internal/layers/orchestration/coordinator/` (16 files: types/contracts/config/classifier/fastpath/orchestrator/interrupt/workmodel/helpers/shadow_classifier/d6_metrics + tests).
 
 ---
 

@@ -21,10 +21,10 @@
 | PlanAgent 只读探索 | ✅ | `contextengine/tasks/plan_agent.go` |
 | VerificationAgent | 🔶 设计完成 | `contextengine/tasks/verification_agent.go`（若存在） |
 | CLI `/task` `/plan` | ✅ | `contextengine/tasks/cli_commands.go` |
-| D7-S5 ClassifyIntent | ⬜ | 未实现 |
-| D7-S1 CreateWorkPlan | ⬜ | 未实现 |
+| D7-S5 ClassifyIntent | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S1 CreateWorkPlan | ⬜ | v1.1 计划（v1.0 仍由 `contextengine/tasks/` 托管） |
 
-> **迁移说明：** 本模块目标迁入 `internal/layers/d7/`（D7-S1 Work Model + D7-S5 PlanMode），迁移期间保持 D2 包路径。
+> **迁移说明：** 本模块目标迁入 `internal/layers/orchestration/coordinator/`（D7-S1 Work Model + D7-S5 PlanMode），迁移期间保持 D2 包路径。
 
 ---
 
@@ -250,10 +250,10 @@ internal/shared/config/
 └── execution_flow.go        # ExecutionFlowConfig
 ```
 
-### 目标迁移（D7 v1.0）
+### 目标迁移（D7 v1.1）
 
 ```
-internal/layers/d7/
+internal/layers/orchestration/coordinator/
 ├── workmodel.go             # ← task_manager.go
 ├── plan_mode.go             # ← plan_mode.go
 ├── plan_agent.go            # ← plan_agent.go
