@@ -41,10 +41,12 @@ func NewTask(subject, description string) *Task {
 }
 
 // TaskManager manages task lists for sessions in D7.
+// It supports optional disk persistence via a TaskStore.
 type TaskManager struct {
 	mu        sync.RWMutex
 	tasks     map[string]map[string]*Task // sessionID -> taskID -> Task
 	obsBridge *observability.Bridge
+	store     TaskStore
 }
 
 // NewTaskManager creates a new in-memory task manager for D7.
@@ -57,6 +59,12 @@ func NewTaskManager() *TaskManager {
 // SetObservability wires the observability bridge.
 func (m *TaskManager) SetObservability(obs *observability.Bridge) {
 	m.obsBridge = obs
+}
+
+// SetStore wires the optional disk store for persistence.
+// When a store is set, EnsureSession will load persisted tasks from disk.
+func (m *TaskManager) SetStore(store TaskStore) {
+	m.store = store
 }
 
 // startSpan creates a child span for TaskManager operations.
@@ -80,6 +88,15 @@ func (m *TaskManager) ensureSessionLocked(sessionID string) {
 		return
 	}
 	m.tasks[sessionID] = make(map[string]*Task)
+
+	// Load persisted tasks from disk if store is configured
+	if m.store != nil {
+		if tasks, err := m.store.Load(sessionID); err == nil && tasks != nil {
+			for _, task := range tasks {
+				m.tasks[sessionID][task.ID] = task
+			}
+		}
+	}
 }
 
 // Create creates a new task in session.
@@ -102,6 +119,12 @@ func (m *TaskManager) Create(sessionID, subject, description string) *Task {
 			tracer.Attribute{Key: "task.subject", Value: truncate(subject, 200)},
 		)
 	}
+
+	// Auto-persist if store is configured
+	if m.store != nil {
+		m.persistLocked(sessionID)
+	}
+
 	return task
 }
 
@@ -144,6 +167,12 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 	}
 	task.Status = status
 	task.UpdatedAt = time.Now()
+
+	// Auto-persist if store is configured
+	if m.store != nil {
+		m.persistLocked(sessionID)
+	}
+
 	return nil
 }
 
@@ -159,6 +188,12 @@ func (m *TaskManager) SetOwner(sessionID, taskID, owner string) error {
 	}
 	task.Owner = owner
 	task.UpdatedAt = time.Now()
+
+	// Auto-persist if store is configured
+	if m.store != nil {
+		m.persistLocked(sessionID)
+	}
+
 	return nil
 }
 
@@ -179,6 +214,12 @@ func (m *TaskManager) AddDependency(sessionID, taskID, blockedByID string) error
 	}
 
 	task.UpdatedAt = time.Now()
+
+	// Auto-persist if store is configured
+	if m.store != nil {
+		m.persistLocked(sessionID)
+	}
+
 	return nil
 }
 
@@ -212,6 +253,35 @@ func (m *TaskManager) ClearSession(sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.tasks, sessionID)
+}
+
+// Persist saves all tasks for a session to disk.
+// Called after Create/UpdateStatus/etc to sync changes to persistent storage.
+func (m *TaskManager) Persist(sessionID string) error {
+	if m.store == nil {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	tasks := make([]*Task, 0, len(m.tasks[sessionID]))
+	for _, t := range m.tasks[sessionID] {
+		tasks = append(tasks, t)
+	}
+	return m.store.Save(sessionID, tasks)
+}
+
+// persistLocked saves tasks to disk. Caller must hold m.mu.
+func (m *TaskManager) persistLocked(sessionID string) {
+	if m.store == nil {
+		return
+	}
+	tasks := make([]*Task, 0, len(m.tasks[sessionID]))
+	for _, t := range m.tasks[sessionID] {
+		tasks = append(tasks, t)
+	}
+	// Best effort save - ignore errors in auto-persist path
+	_ = m.store.Save(sessionID, tasks)
 }
 
 func truncate(s string, max int) string {
