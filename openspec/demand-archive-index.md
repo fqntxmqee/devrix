@@ -130,10 +130,6 @@
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
 
-**2026-06-14 归档（S6）**：
-
-- `devrix-d7-sa-refine` → `openspec/archive/2026-06-14-devrix-d7-sa-refine/`（DM-20260614-008 S5_PASS; v1.0 registry 重构; Legacy 双轨 + Canonical S 层）
-
 **2026-06-14 归档（S7）**：
 
 - `devrix-d1-d7-only-ingress` → `openspec/archive/2026-06-14-devrix-d1-d7-only-ingress/`（DM-007 S5_PASS; D1→D2 legacy 退役; commit `d4ab93b`）
@@ -141,6 +137,7 @@
 **2026-06-14 归档（S6）**：
 
 - `devrix-d1-sa-refine` → `openspec/archive/2026-06-14-devrix-d1-sa-refine/`（DM-006 S5_PASS; v1.0 registry-only; v1.1 客观锚点+span+chain_integrity E2E 待 Phase 2）
+- `devrix-d7-sa-refine` → `openspec/archive/2026-06-14-devrix-d7-sa-refine/`（DM-20260614-008 S5_PASS; v1.0 registry 重构; Legacy 双轨 + Canonical S 层）
 - `devrix-multiagent-isolation` → `openspec/archive/2026-06-14-devrix-multiagent-isolation/`（DM-005 S5_PASS）
 - `devrix-event-channel` → `openspec/archive/2026-06-14-devrix-event-channel/`（DM-003 S5_PASS）
 - `devrix-wave-scheduler` → `openspec/archive/2026-06-14-devrix-wave-scheduler/`（DM-007 S5_PASS v1.0）
