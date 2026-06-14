@@ -7,12 +7,6 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// LoopHooks optional extension points (stop hooks, post-tool-round callbacks).
-type LoopHooks struct {
-	AfterToolRound func(ctx context.Context, sc *types.SessionContext, toolResults []ToolRoundResult) (stopLoop bool, err error)
-	BeforeComplete func(ctx context.Context, sc *types.SessionContext) (preventContinue bool, err error)
-}
-
 // ToolRoundResult summarizes one tool execution in a batch.
 type ToolRoundResult struct {
 	Name   string

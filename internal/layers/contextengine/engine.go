@@ -132,7 +132,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		},
 		SessionQueue:   queue.GlobalSessionQueue,
 		StreamingTools:    cfg.QueryLoop.StreamingTools,
-			Observability:     deps.ObsBridge,
+		Observability:     deps.ObsBridge,
 	}
 	if cfg.QueryLoop.CompressPerTurn {
 		loop.CompressFactory = newCompressFn(

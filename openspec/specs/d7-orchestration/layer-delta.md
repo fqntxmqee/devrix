@@ -2,15 +2,22 @@
 
 **Change ID:** devrix-d7-orchestration-domain → current
 **Affects:** orchestration, contextengine/tasks, gateway entry, query loop
-**Version:** 2.0.0
+**Version:** 2.6.0
 **Status:** Active
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-15
 
 ---
 
 ## Current State Summary
 
-D7 编排域处于 **PARTIAL** 状态：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier（D7-S5 A01/A05）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；Task/Plan 写模型（D7-S1）与 PlanMode（D7-S5 A04）仍托管在 `contextengine/tasks/`（v1.1 迁入 coordinator）。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（`d7_enabled` 路由）。
+D7 编排域 **v1.0 核心目标已完成**：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier（D7-S5 A01/A05）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；D1 主入口通过 `bootstrap/wire_coordinator.go` 的 `WireD7` 函数切换至 `coordinator.Entry.ProcessMessage`（`d7.enabled=true` 激活）。
+
+D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue 保留）；委托工具保持在 `contextengine/delegate_tools.go`（避免循环依赖）。
+
+**v1.1 待完成：**
+- D2 Loop 达到≤200行目标（当前~203行，差3行）
+- Task 写模型迁入 `orchestration/coordinator/`
+- SynthesizeTaskGraph + CreateWorkPlan
 
 ---
 
@@ -168,7 +175,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 - GIVEN post-migration loop.go
 - THEN EnsureParallelAsyncBatch, WaitPendingAsyncBatch, SessionQueue, AfterToolRound MUST NOT exist
 
-**Current:** 414 lines, imports `multiagent/delegate`
+**Current:** Loop.Run ~203 lines (target ≤200), Attachments/Hooks/SessionQueue removed, no multiagent/queue imports. Refactored into loop.go (264 lines) + emit.go (33 lines) + executor.go (81 lines).
 
 ---
 
@@ -194,13 +201,15 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | Phase | 内容 | 状态 |
 |-------|------|------|
 | 1 / A | 域定义 + Review R1 澄清（demand/review-r1/tasks） | ✅ |
-| 5 | D7-S3/S4 实现（ORCH 代码） | ✅ 待路径迁移 |
-| B | D7 骨架 + contracts + re-export | ⬜ |
-| C | S5-P2 Classify + S2 ProcessMessage | ⬜ |
-| D+E | 入口切换 + D2 瘦身（同 release） | ⬜ |
-| F | S3/S4 包路径迁移 | ⬜ |
-| G | 回归 + D7-MIG-T01 四组合矩阵 | ⬜ |
-| H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ⬜ |
+| 5 | D7-S3/S4 实现（ORCH 代码） | ✅ |
+| B | D7 骨架 + contracts + re-export + bootstrap | ✅ |
+| C | S5-P2 Classify + S2 ProcessMessage | ✅ |
+| D | 入口切换（WireD7 + SetOrchestrationEntry） | ✅ |
+| E | D2 Loop 精简（emit/executor分流，Loop.Run ~203行，≤200目标 v1.1） | ✅ 分流完成 |
+| F | S3/S4 包路径迁移 | ✅ |
+| G | 回归 + D7-MIG-T01 四组合矩阵 | ✅ |
+| H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ⬜ PLANNED |
+| I (v1.1) | Task 写模型迁入 coordinator | ⬜ PLANNED |
 
 ---
 
@@ -211,3 +220,4 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 1.0.0 | 2026-06-13 | 初始 D7 delta（设计阶段） |
 | 2.0.0 | 2026-06-14 | 对齐代码审计：IMPLEMENTED/PARTIAL/PLANNED 三分 |
 | 2.1.0 | 2026-06-14 | Review R1 决议同步：路由矩阵、三模型、迁移契约 |
+| 2.2.0 | 2026-06-15 | WireD7 bootstrap 实现完成；D2 Loop 瘦身待进行 |

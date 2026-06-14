@@ -39,3 +39,33 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 		},
 	}
 }
+
+// BuildCoordinatorConfig merges file over defaults. Nil fields in file keep defaults.
+func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
+	cfg := DefaultCoordinatorConfig()
+	if file == nil {
+		return cfg
+	}
+	if file.Enabled != nil {
+		cfg.Enabled = *file.Enabled
+	}
+	if file.FastPathThreshold != nil {
+		cfg.FastPathThreshold = *file.FastPathThreshold
+	}
+	if file.CommandFirst != nil {
+		cfg.CommandFirst = *file.CommandFirst
+	}
+	if file.LLMFallback != nil {
+		cfg.LLMFallback = *file.LLMFallback
+	}
+	if file.AdvisoryValidationTimeoutMs != nil {
+		cfg.AdvisoryValidationTimeoutMs = *file.AdvisoryValidationTimeoutMs
+	}
+	if file.PlanModeApproveGate != nil {
+		cfg.PlanModeApproveGate = *file.PlanModeApproveGate
+	}
+	if len(file.CommandWhitelist) > 0 {
+		cfg.CommandWhitelist = file.CommandWhitelist
+	}
+	return cfg
+}

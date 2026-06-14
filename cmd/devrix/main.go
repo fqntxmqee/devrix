@@ -180,6 +180,8 @@ func main() {
 		)
 	}
 
+	bootstrap.WireD7(configFile, gw, contextEngine, obsBridge)
+
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 
 	bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)

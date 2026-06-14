@@ -9,10 +9,12 @@
 
 ## Operations
 
-### Orchestrator（3 ops）
+### Orchestrator（5 ops）
 
 | Operation | Kind | Component | Since | Key Attributes |
 |-----------|------|-----------|-------|----------------|
+| `orchestration.session.process` | INTERNAL | orchestrator | 2.1.0 | session_id, message.len, orchestration.route |
+| `orchestration.intent.classify` | INTERNAL | orchestrator | 2.1.0 | orchestration.intent.kind, orchestration.intent.confidence, orchestration.classify.source, orchestration.command |
 | `orchestration.wave.schedule` | INTERNAL | orchestrator | 2.1.0 | session_id, wave_id |
 | `orchestration.wave.task.execute` | INTERNAL | orchestrator | 2.1.0 | task_id, worker_type |
 | `orchestration.flow.event.publish` | INTERNAL | orchestrator | 2.1.0 | event_kind, worker_id, source |
@@ -22,6 +24,14 @@
 ## Trace Tree
 
 ```
+gateway.message.receive
+└── orchestration.session.process
+    ├── orchestration.intent.classify
+    └── context.process
+        └── query.loop.run
+            └── query.loop.turn
+                └── query.loop.llm.call
+
 orchestration.wave.schedule
 └── orchestration.wave.task.execute
     └── orchestration.flow.event.publish

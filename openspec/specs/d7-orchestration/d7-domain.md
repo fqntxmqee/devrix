@@ -4,9 +4,9 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.2.0
-**Status:** Active — IMPLEMENTED (S3/S4) + PLANNED (S1/S2/S5 migration)
-**Last Updated:** 2026-06-14
+**Version:** 2.3.0
+**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration)
+**Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
@@ -21,16 +21,17 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 
 **域职责**：回答"做什么、按什么顺序做、谁来做、做得怎么样了"。
 
-### 实现状态（2026-06-14 代码审计）
+### 实现状态（2026-06-15 代码审计）
 
 | Scenario | 状态 | 现行代码位置 |
 |----------|------|-------------|
 | D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wave/` |
 | D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/` |
 | D7-S1 Work Model | 🔶 PARTIAL | `internal/layers/contextengine/tasks/`（写模型仍在 D2） |
-| D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类/拆解未实现 |
-| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` |
+| D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类已实现 |
+| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` + `bootstrap/wire_coordinator.go` |
 | D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,shadow_classifier}.go` |
+| D2 Loop 瘦身 | ⬜ IN PROGRESS | `query/loop.go` 414行，需移除编排字段 |
 
 **域边界**：
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）
@@ -230,9 +231,9 @@ D7-S1 MUST own the unified Task data model as the single source of truth. Task C
 
 D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request entry point. It MUST support fast-path (direct D2 proxy) and orchestrate-path (multi-step plan).
 
-**Implementation Status (2026-06-14):** ⬜ PLANNED — D1 `gateway.go:286` 仍调用 `contextEngine.Process`。
+**Implementation Status (2026-06-14, updated 2026-06-15):** ✅ IMPLEMENTED — D1 `gateway.go:325` 已有 D7 条件分支；`bootstrap/wire_coordinator.go` 提供 `WireD7` bootstrap 函数；`SetOrchestrationEntry` 切换路由。
 
-<!-- T: D7-S2-T01 … D7-S2-T04 (PLANNED) -->
+<!-- T: D7-S2-T01 … D7-S2-T04 (IMPLEMENTED) -->
 
 #### Scenario: ProcessMessage is the entry point
 
@@ -401,7 +402,7 @@ D7-S5 MUST provide structured intent classification and task decomposition. Clas
 
 After D7 migration, `query.Loop.Run` MUST only handle LLM↔Tool interaction. All orchestration-side responsibilities MUST be removed from Loop.
 
-**Implementation Status (2026-06-14):** ⬜ NOT STARTED — `loop.go` 414 行，仍 import `multiagent/delegate`。
+**Implementation Status (2026-06-14, updated 2026-06-15):** ⬜ IN PROGRESS — `loop.go` 414行含编排字段（Attachments/Hooks/SessionQueue）待移除，目标≤200行。`delegate_tools.go`含`multiagent/delegate` import待迁移。
 
 <!-- T: D7-THIN-T01 … D7-THIN-T04 (PLANNED) -->
 
@@ -641,3 +642,4 @@ orchestration:
 | 2.0.0 | 2026-06-14 | 代码审计对齐：实现状态标注、配置同步、T 层索引指向 t-registry.md |
 | 2.1.0 | 2026-06-14 | Review R1：三模型、路由矩阵、S5 分阶段、迁移契约、性能指标拆分 |
 | 2.2.0 | 2026-06-14 | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、T02c、D6 metric |
+| 2.3.0 | 2026-06-15 | WireCoordinator bootstrap 实现完成；D2 Loop 瘦身进行中 |

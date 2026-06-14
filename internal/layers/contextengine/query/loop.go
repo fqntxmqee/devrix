@@ -13,9 +13,14 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/tracer"
-	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// LoopHooks defines callbacks at loop lifecycle points.
+type LoopHooks struct {
+	BeforeComplete func(ctx context.Context, sc *types.SessionContext) (stop bool, err error)
+	AfterToolRound func(ctx context.Context, sc *types.SessionContext, results []ToolRoundResult) (stop bool, err error)
+}
 
 // Loop runs the Claude Code-aligned query loop (while tool_use continue).
 type Loop struct {
@@ -62,17 +67,16 @@ func (l *Loop) Run(
 	if prepend == nil && l.UserContext != nil {
 		prepend = usercontext.PrependForAPI
 	}
-
 	messages := append([]types.Message(nil), params.Messages...)
 	messages = conversation.StripSystem(messages)
 
 	var (
-		loopSpan   tracer.Span
-		assistantText    string
-		usage            TokenUsage
-		allToolRecords   []types.ToolCallRecord
+		loopSpan       tracer.Span
+		assistantText  string
+		usage         TokenUsage
+		allToolRecords []types.ToolCallRecord
 		toolRoundResults []ToolRoundResult
-		turn             int
+		turn           int
 	)
 	if sc != nil {
 		_, loopSpan = l.startLoopSpan(ctx, telemetry.OpQueryLoopRun, tracer.SpanKindInternal,
@@ -155,12 +159,6 @@ func (l *Loop) Run(
 		)
 		llmStart := time.Now()
 
-		// TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 LLM.Call 一次。
-		// 失败仍按原 error 透传给上层；恢复逻辑在 LLMCaller 协议下是
-		// 透明的（透明 retry，最多 1 次）。
-		//
-		// TD-QL-03: 若 413 recovery 不触发（错误是 5xx / overload 而非
-		// 413），`runWithFallbackRetry` 会切换到 FallbackLLM。
 		chunks, err := runWithContextLengthRecovery(
 			turnCtx,
 			l.LLM,
@@ -173,14 +171,11 @@ func (l *Loop) Run(
 			l.Compress,
 			&messages,
 		)
-		// 同步压缩后副本到 apiMessages 引用（如果 recovery 替换了
-		// messages，则下一轮 prepend 也会自然拿到压缩后版本）。
 		apiMessages = messages
 		if prepend != nil && len(uc) > 0 {
 			apiMessages = prepend(messages, uc)
 		}
 		if err != nil {
-			// Try fallback model (TD-QL-03) before giving up.
 			if l.FallbackLLM != nil && l.FallbackOnErr != nil && l.FallbackOnErr(err) && len(toolRoundResults) == 0 {
 				chunks, err = l.FallbackLLM.Call(turnCtx, LLMRequest{
 					Model:        sc.Model,
@@ -188,14 +183,8 @@ func (l *Loop) Run(
 					Messages:     apiMessages,
 					Tools:        params.Tools,
 				})
-				if err != nil {
-					if llmSpan != nil {
-						llmSpan.RecordError(err)
-						llmSpan.End()
-					}
-					return nil, err
-				}
-			} else {
+			}
+			if err != nil {
 				if llmSpan != nil {
 					llmSpan.RecordError(err)
 					llmSpan.End()
@@ -223,9 +212,6 @@ func (l *Loop) Run(
 			if len(chunk.ToolCalls) > 0 {
 				pending = chunk.ToolCalls
 			}
-			// Usage 可能出现在 finish_reason 帧或独立 usage 帧，亦可能由
-			// [DONE] 哨兵帧带回（参见 sse_parser 的 lastUsage 处理）。
-			// 用"最后一次非零值覆盖"语义，避免被多次累加。
 			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
 				iterUsage = TokenUsage{
 					PromptTokens:     chunk.Usage.PromptTokens,
@@ -266,69 +252,9 @@ func (l *Loop) Run(
 
 		messages = append(messages, conversation.BuildAssistantToolCallsMessage(sc.SessionID, assistantText, refs))
 
-		toolRoundResults = toolRoundResults[:0]
-		if l.StreamingTools && len(refs) > 1 {
-			exec := &StreamingToolExecutor{
-				Tools:                 l.Tools,
-				Permission:            l.Permission,
-				WrapToolContext:       l.WrapToolContext,
-				Emit:                  emit,
-				WrapToolStreamEmitter: l.WrapToolStreamContext,
-			}
-			batchRefs := make([]BatchToolRef, len(refs))
-			for i, ref := range refs {
-				batchRefs[i] = BatchToolRef{ID: ref.ID, Name: ref.Name, Input: ref.Input}
-			}
-			batch := exec.ExecuteBatch(ctx, sc, batchRefs)
-			for i, res := range batch {
-				ref := refs[i]
-				content := conversation.FormatToolResultContent(ref.Name, res.Output, res.Error)
-				if emit != nil {
-					emitToolCall(emit, sc, ref)
-					emitToolResult(emit, sc.SessionID, ref.Name, content, res.Error)
-				}
-				messages = append(messages, conversation.BuildToolResultMessage(sc.SessionID, ref.ID, content))
-				allToolRecords = append(allToolRecords, types.ToolCallRecord{
-					CallID: ref.ID, ToolName: ref.Name, Input: ref.Input, Output: res.Output, Error: res.Error,
-				})
-				toolRoundResults = append(toolRoundResults, ToolRoundResult{Name: ref.Name, Output: res.Output, Error: res.Error})
-			}
-		} else {
-			for _, ref := range refs {
-				if l.Permission != nil && !l.Permission.Request(turnCtx, sc.SessionID, ref.Name, ref.Input) {
-					endTurn()
-						return nil, fmt.Errorf("permission denied for tool %s", ref.Name)
-				}
-				if emit != nil {
-					emitToolCall(emit, sc, ref)
-				}
-				out, errMsg, execErr := "", "", error(nil)
-				if l.Tools != nil {
-					toolCtx := turnCtx
-					if l.WrapToolContext != nil {
-						toolCtx = l.WrapToolContext(turnCtx, sc)
-					}
-					if emit != nil && l.WrapToolStreamContext != nil {
-						toolCtx = l.WrapToolStreamContext(toolCtx, emit, sc.SessionID, ref.Name)
-					}
-					out, errMsg, execErr = l.Tools.Execute(toolCtx, ToolCall{ID: ref.ID, Name: ref.Name, Input: ref.Input})
-				}
-				if execErr != nil && errMsg == "" {
-					errMsg = execErr.Error()
-				}
-				content := conversation.FormatToolResultContent(ref.Name, out, errMsg)
-				if emit != nil {
-					emitToolResult(emit, sc.SessionID, ref.Name, content, errMsg)
-				}
-				messages = append(messages, conversation.BuildToolResultMessage(sc.SessionID, ref.ID, content))
-				rec := types.ToolCallRecord{
-					CallID: ref.ID, ToolName: ref.Name, Input: ref.Input,
-					Output: out, Error: errMsg,
-				}
-				allToolRecords = append(allToolRecords, rec)
-				toolRoundResults = append(toolRoundResults, ToolRoundResult{Name: ref.Name, Output: out, Error: errMsg})
-			}
-		}
+		newRecords, newResults := l.executeToolRefs(turnCtx, sc, refs, emit, endTurn)
+		allToolRecords = append(allToolRecords, newRecords...)
+		toolRoundResults = append(toolRoundResults[:0], newResults...)
 
 		if l.Hooks.AfterToolRound != nil {
 			stop, err := l.Hooks.AfterToolRound(ctx, sc, toolRoundResults)
@@ -350,7 +276,7 @@ func (l *Loop) Run(
 	assistantText = strings.TrimSpace(assistantText)
 	var outMsgs []types.Message
 	if assistantText != "" {
-		outMsgs = append(outMsgs, types.Message{Role: types.MessageRoleAssistant, Content: assistantText, SessionID: sc.SessionID})
+		outMsgs = []types.Message{{Role: types.MessageRoleAssistant, Content: assistantText, SessionID: sc.SessionID}}
 	}
 
 	return &Result{
@@ -360,32 +286,6 @@ func (l *Loop) Run(
 		TurnCount:       turn,
 		ToolCallHistory: allToolRecords,
 	}, nil
-}
-
-func emitThinking(emit EmitFunc, sessionID, content string) {
-	emit(&contracts.EngineEvent{Type: "thinking", Content: content, SessionID: sessionID})
-}
-
-func emitText(emit EmitFunc, sessionID, content string, complete bool) {
-	meta := map[string]string{"is_complete": "false"}
-	if complete {
-		meta["is_complete"] = "true"
-	}
-	emit(&contracts.EngineEvent{Type: "text", Content: content, SessionID: sessionID, Metadata: meta})
-}
-
-func emitToolCall(emit EmitFunc, sc *types.SessionContext, ref conversation.ToolCallRef) {
-	emit(&contracts.EngineEvent{
-		Type: "tool_call", ToolName: ref.Name, ToolInput: ref.Input, SessionID: sc.SessionID,
-		Metadata: map[string]string{"tool_name": ref.Name, "input": ref.Input},
-	})
-}
-
-func emitToolResult(emit EmitFunc, sessionID, name, content, errMsg string) {
-	emit(&contracts.EngineEvent{
-		Type: "tool_result", Content: content, ToolName: name, SessionID: sessionID,
-		Metadata: map[string]string{"tool_name": name, "error": errMsg},
-	})
 }
 
 // startLoopSpan creates a child span for Loop operations.
@@ -401,14 +301,4 @@ func (l *Loop) startLoopSpan(ctx context.Context, operation string, kind tracer.
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
 	return l.Observability.Tracer().Start(ctx, operation, opts...)
-}
-
-// withMinDuration returns the duration in milliseconds if it exceeds minMs, else empty string.
-// This prevents flooding span attributes with trivial durations.
-func withMinDuration(d time.Duration, minMs int64) string {
-	ms := d.Milliseconds()
-	if ms < minMs {
-		return ""
-	}
-	return fmt.Sprintf("%d", ms)
 }
