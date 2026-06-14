@@ -68,12 +68,12 @@ internal/
 | S ID | 包 | 关键类型 |
 |------|-----|----------|
 | — | `llmgateway/contracts.go` | **`ILLMGateway`**, **`ITierResolver`**（契约归属 D3） |
-| D3-S1 | `llmgateway/adapter/` | DeepSeek / MiniMax / OpenAI 兼容 |
-| D3-S2 | `llmgateway/gateway/` | 路由、`ChatStream` |
-| D3-S3 | `llmgateway/breaker/` | 熔断 |
-| D3-S4 | `llmgateway/retry/` | 重试 + jitter |
-| D3-S5 | `llmgateway/token/` | cl100k_base 计数 |
-| D3-S6 | `llmgateway/config/` | Provider 配置 |
+| D3-S1 | `llmgateway/route/` | RouteModel — 路由解析 |
+| D3-S2 | `llmgateway/stream/`（含 `stream/adapter/`） | StreamChat — 流式调用 + DeepSeek/MiniMax 适配器 |
+| D3-S3 | `llmgateway/protect/` | ProtectCall — 熔断 + 重试 + Full Jitter |
+| D3-S4 | `llmgateway/budget/` | BudgetTokens — cl100k_base 计数 |
+| D3-S5 | `llmgateway/guard/` | GuardContent — 内容安全过滤 |
+| D3-S6 | `llmgateway/configure/` | ConfigureGateway — Provider 配置 |
 
 **Bridge：** `internal/bridges/llm/` — 将 D3 实现注入 D2 `EngineDeps`。
 

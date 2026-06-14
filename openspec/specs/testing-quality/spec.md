@@ -158,7 +158,7 @@
 |-------|------|---------|-----------|--------|--------------|
 | **D3-S2-A01-T03** | SSE parse error handling | StreamChat F02 ParseSSE | `tests/integration/llm_real_api_test.go` | PLANNED | 旧 D3-S1-A01-T03 |
 | **D3-S3-A01-T07** | LLM 429 rate limit handling | ProtectCall F05 StreamWithFallback | `tests/integration/llm_real_api_test.go` | PLANNED | 旧 D3-S2-A01-T06 |
-| **D3-S4-A01-T03** | Token counter 中文准确性 | BudgetTokens F01 CountText (CJK) | `internal/layers/llmgateway/token/counter_test.go` | PLANNED | 旧 D3-S5-A01-T03 |
+| **D3-S4-A01-T03** | Token counter 中文准确性 | BudgetTokens F01 CountText (CJK) | `internal/layers/llmgateway/budget/counter_test.go` | PLANNED | 旧 D3-S5-A01-T03 |
 
 > **V3.0.0 重映射**（devrix-d3-sa-refine / DM-20260614-013）：T ID 按 5+1 S 价值流重排；旧 ID 100% alias 追溯见 `openspec/specs/d3-llm-gateway/t-registry.md §Legacy Archive`。L2 映射列由"技术角色词"（Adapter / Gateway / Token）改为"价值流 + F"（StreamChat F02 / ProtectCall F05 / BudgetTokens F01）。
 

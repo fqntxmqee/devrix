@@ -105,7 +105,7 @@ emit complete（或由 engine 补发）
 
 ## 5. D3 LLM 调用
 
-D2 **不得** import `llmgateway/adapter` 实现包。边界：
+D2 **不得** import `llmgateway/stream/adapter` 实现包。边界：
 
 ```
 query/adapters.go  →  llmgateway.ILLMGateway.ChatStream

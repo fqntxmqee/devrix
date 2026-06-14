@@ -127,39 +127,39 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 > **Canonical SoT（v3.8+）：** 价值流 Scenario 以 **D3-S1–S6** 为准（切法 A，5+1 S，DM-20260614-016 / DM-20260614-019 v2.0）。
 > **v1.0：** 代码包保留技术角色词目录（`adapter/` `gateway/` `breaker/` `retry/` `token/` `config/` `safety/`）；运行时字符串、配置 key、metric 名 0 行为变更（ACCEPTED commit 199ad18）。
 > **v1.1：** 韧性可见性（`llm_breaker_state` metric + D6 3 probe + IAdapter.Protocol() + obs nil fail-fast）ACCEPTED commit 3a6970b。
-> **v2.0：** 物理目录 1:1 对齐 5+1 S（DM-20260614-019 / devrix-d3-sa-refine-v2.0 启动中）；7 个旧路径保留 re-export 桥接 1 发布周期；scenario-slug 见 `code-layout.md §4.4`。
+> **v2.0：** 物理目录 1:1 对齐 5+1 S（DM-20260614-019 / devrix-d3-sa-refine-v2.0 **ACCEPTED** commit d222328）；7 个旧路径保留 re-export 桥接 1 发布周期；scenario-slug 见 `code-layout.md §4.4`。
 > **Legacy Index：** D3-S7（Safety）已并入 D3-S5（GuardContent）；历史 T ID 追溯见 `openspec/specs/d3-llm-gateway/t-registry.md §Legacy Archive`。
-> 详见 `openspec/changes/devrix-d3-sa-refine-v2.0/{proposal.md,tasks.md,design.md v3.2.0}`。
+> 详见 `openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/acceptance-report.md`。
 
 #### Canonical 价值流 — D3-S1–S6（5+1 承诺型）
 
 | Module ID | Scenario | 用户/系统目标 | scenario-slug (v2.0) | Status |
 |-----------|----------|---------------|----------------------|--------|
-| **D3-S1** | **RouteModel** | C1：用户给 model 名（含 tier alias），D3 返回正确 provider + 实际 model | `route/` | IMPLEMENTED（v2.0 🚧 F3） |
-| **D3-S2** | **StreamChat** | C2：用户发起流式聊天，D3 返回 OpenAI SSE 协议 chunk 流 | `stream/`（含 `stream/adapter/`） | IMPLEMENTED（v2.0 🚧 F2/F4） |
-| **D3-S3** | **ProtectCall** | C3：Provider 故障（5xx/网络/限流），D3 不阻塞用户（Breaker + Retry + Fallback 合并） | `protect/`（两机制独立 .go） | IMPLEMENTED（v2.0 🚧 F5） |
-| **D3-S4** | **BudgetTokens** | C4：Token 超预算，D3 截断或报错，不超额调用 | `budget/` | IMPLEMENTED（v2.0 🚧 F6） |
-| **D3-S5** | **GuardContent** | C5：用户 prompt 命中危险模式，D3 拒绝（critical）或告警（warning） | `guard/` | IMPLEMENTED（v2.0 🚧 F7） |
-| **D3-S6** | **ConfigureGateway** | （横切）配置加载与验证；含 v1.1 3 feature flag | `configure/`（合并 `shared/config/llmgateway.go`） | IMPLEMENTED（v2.0 🚧 F8） |
+| **D3-S1** | **RouteModel** | C1：用户给 model 名（含 tier alias），D3 返回正确 provider + 实际 model | `route/` | ✅ IMPLEMENTED（v2.0） |
+| **D3-S2** | **StreamChat** | C2：用户发起流式聊天，D3 返回 OpenAI SSE 协议 chunk 流 | `stream/`（含 `stream/adapter/`） | ✅ IMPLEMENTED（v2.0） |
+| **D3-S3** | **ProtectCall** | C3：Provider 故障（5xx/网络/限流），D3 不阻塞用户（Breaker + Retry + Fallback 合并） | `protect/`（两机制独立 .go） | ✅ IMPLEMENTED（v2.0） |
+| **D3-S4** | **BudgetTokens** | C4：Token 超预算，D3 截断或报错，不超额调用 | `budget/` | ✅ IMPLEMENTED（v2.0） |
+| **D3-S5** | **GuardContent** | C5：用户 prompt 命中危险模式，D3 拒绝（critical）或告警（warning） | `guard/` | ✅ IMPLEMENTED（v2.0） |
+| **D3-S6** | **ConfigureGateway** | （横切）配置加载与验证；含 v1.1 3 feature flag | `configure/`（合并 `shared/config/llmgateway.go`） | ✅ IMPLEMENTED（v2.0） |
 
-**Domain Kernel（非 S）：** `contracts.go`（拆分后 < 200 行；仅 ILLMGateway/ITierResolver/IEngineEvent/SentinelError + re-export type alias）
+**Domain Kernel（非 S）：** `contracts.go`（145 行 < 200 行 ✅ AC-09；F9 完整拆分 deferred 至下 release）
 **CROSS 锚点：** `internal/bridges/llm/`（D3-X 跨域锚点；R1 D2 决议；v2.0 ✅ 不动）
 
-#### Package Map（v1.0 保留 → v2.0 迁移中）
+#### Package Map（v2.0 迁移完成 ✅）
 
-> **v1.0 收尾**时物理路径不变（0 行为变更）；**v2.0** 6 个 slug 🚧 物理迁移中；7 个旧路径保留 re-export 桥接 1 发布周期。
+> **v2.0** 6 个 slug 物理迁移完成（ACCEPTED commit d222328）；7 个旧路径保留 re-export 桥接 1 发布周期。
 
 | v1.0 当前路径 | v2.0 目标 scenario-slug | Canonical S | v2.0 状态 |
 |--------------|------------------------|-------------|----------|
-| `gateway/router.go` (路由解析部分) | `route/router.go` | S1 RouteModel | 🚧 F3 迁移中 |
-| `adapter/` (全部) | `stream/adapter/` | S2 StreamChat | 🚧 F2 迁移中 |
-| `gateway/gateway.go` Stream 主实现 | `stream/gateway.go` | S2 StreamChat | 🚧 F4 迁移中 |
-| `gateway/breaker_observer.go` (v1.1 observer) | `protect/breaker_observer.go` | S3 ProtectCall | 🚧 F5 迁移中 |
-| `breaker/` + `retry/` | `protect/{circuit_breaker,state,observer,retry,retry_jitter}.go` | S3 ProtectCall | 🚧 F5 迁移中（两机制独立 .go） |
-| `token/` | `budget/{counter,bpe_loader}.go` | S4 BudgetTokens | 🚧 F6 迁移中 |
-| `safety/` | `guard/{filter,patterns}.go` | S5 GuardContent | 🚧 F7 迁移中 |
-| `config/` + `shared/config/llmgateway*.go` | `configure/{loader,shared_config}.go` + `llmgateway_features_test.go` | S6 ConfigureGateway | 🚧 F8 迁移中（跨包合并） |
-| 根 `contracts.go` 部分类型 | 根 kernel 保留（< 200 行）+ re-export | Domain Kernel | 🚧 F9 拆分中 |
+| `gateway/router.go` (路由解析部分) | `route/router.go` | S1 RouteModel | ✅ 完成 |
+| `adapter/` (全部) | `stream/adapter/` | S2 StreamChat | ✅ 完成 |
+| `gateway/gateway.go` Stream 主实现 | `stream/gateway.go` | S2 StreamChat | ✅ 完成 |
+| `gateway/breaker_observer.go` (v1.1 observer) | `protect/breaker_observer.go` | S3 ProtectCall | ✅ 完成 |
+| `breaker/` + `retry/` | `protect/{circuit_breaker,state,observer,retry,retry_jitter}.go` | S3 ProtectCall | ✅ 完成（两机制独立 .go） |
+| `token/` | `budget/{counter,bpe_loader}.go` | S4 BudgetTokens | ✅ 完成 |
+| `safety/` | `guard/{filter,patterns}.go` | S5 GuardContent | ✅ 完成 |
+| `config/` + `shared/config/llmgateway*.go` | `configure/{loader,shared_config}.go` + `llmgateway_features_test.go` | S6 ConfigureGateway | ✅ 完成（跨包合并） |
+| 根 `contracts.go` 部分类型 | 根 kernel 保留（145 行 < 200）+ re-export | Domain Kernel | ✅ AC-09 达成（F9 完整拆分 deferred） |
 
 #### Legacy Module Index — 冻结（D3-S1–S7 旧 7 S）
 
@@ -584,3 +584,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | 3.5.0 | 2026-06-14 | Naming Policy 增补：包名/文件名/导出类型/函数名禁用 D{N} 前缀（PR #33 反例表落地） |
 | 3.6.0 | 2026-06-14 | D2 价值流化（D2-S15~S20）；D2-S1~S14 冻结追溯；Naming Policy 续补 |
 | 3.7.0 | 2026-06-14 | **D3 5+1 S 价值流化**（DM-20260614-016 / devrix-d3-sa-refine）：D3-S1~S7 旧技术角色词 → D3-S1~S6 新 5+1 价值流承诺（RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway）；Legacy Index 冻结追溯；v1.0 物理路径保留 + v2.0 物理迁移目标 scenario-slug 注册（`route/` `stream/` `protect/` `budget/` `guard/` `configure/`）；D3 CROSS 锚点声明 `internal/bridges/llm/` |
+| **3.8.0** | **2026-06-14** | **D3 v2.0 物理路径迁移完成**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个价值流 slug 物理迁移完成（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）；8 个 re-export 桥接文件（旧路径保留 1 发布周期）；build/vet/test 全绿；contracts.go 145 行 AC-09 达成 |

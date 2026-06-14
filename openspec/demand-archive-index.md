@@ -149,6 +149,7 @@
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
 | devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S7_Archived（v1.0 ACCEPTED 15/15 AC ✅；v1.1 子 change 已归档 ✅；v2.0 子 change 已归档 ✅） |
 | devrix-d4-sa-refine | DM-20260614-018 | `openspec/changes/devrix-d4-sa-refine/` | S5_Accepted（v1.0 registry；S11–S16 + Hub-Spoke 归 D7 规格层；零 Go 变更；v1.1/v2.0 待后续） |
+| devrix-d7-turn-orchestration | DM-20260614-020 | `openspec/changes/devrix-d7-turn-orchestration/` | S1_Proposal（D7 Turn Leader；禁止 D2→D3；v1.0 registry 先行） |
 
 **2026-06-14 归档（S7 — D3 SA Refine v2.0）**：
 

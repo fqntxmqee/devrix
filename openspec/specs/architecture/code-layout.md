@@ -126,18 +126,18 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 > **Canonical S1–S6**（DM-20260614-016 / devrix-d3-sa-refine / DM-20260614-019 v2.0）。
 > v1.0 注册表重排，0 行为变更（已 ACCEPTED commit 199ad18）。
 > **v1.1** 韧性可见性 + D6 3 probe + IAdapter.Protocol() + obs nil fail-fast（已 ACCEPTED commit 3a6970b）。
-> **v2.0** 物理路径按 scenario-slug 迁移（DM-20260614-019 / devrix-d3-sa-refine-v2.0 启动中）。
-> 详见 `openspec/changes/devrix-d3-sa-refine/proposal.md` + `openspec/changes/devrix-d3-sa-refine-v2.0/proposal.md`。
+> **v2.0** 物理路径按 scenario-slug 迁移（DM-20260614-019 / devrix-d3-sa-refine-v2.0 **ACCEPTED** commit d222328）。
+> 详见 `openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/acceptance-report.md`。
 
 | S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
 |------|----------|----------------------|--------------|-----------|------|
-| D3-S1 | RouteModel | `route` | `gateway/router.go` (路由解析部分) | `llmgateway/route/` | 🚧 F3 迁移中 |
-| D3-S2 | StreamChat | `stream` | `adapter/` (全部) + `gateway/gateway.go` Stream 主实现 | `llmgateway/stream/`（含 `stream/adapter/` 子目录） | 🚧 F2/F4 迁移中 |
-| D3-S3 | ProtectCall | `protect` | `breaker/` + `retry/` + `gateway/breaker_observer.go` | `llmgateway/protect/`（两机制独立 .go） | 🚧 F5 迁移中 |
-| D3-S4 | BudgetTokens | `budget` | `token/` | `llmgateway/budget/` | 🚧 F6 迁移中 |
-| D3-S5 | GuardContent | `guard` | `safety/` | `llmgateway/guard/` | 🚧 F7 迁移中 |
-| D3-S6 | ConfigureGateway | `configure` | `config/` + `shared/config/llmgateway.go` | `llmgateway/configure/`（合并 shared） | 🚧 F8 迁移中 |
-| — | Domain Kernel | (根 `contracts.go` 拆分后 < 200 行) | `llmgateway/contracts.go` | `llmgateway/contracts.go` (re-export) | 🚧 F9 拆分中 |
+| D3-S1 | RouteModel | `route` | `gateway/router.go` (路由解析部分) | `llmgateway/route/` | ✅ 完成 |
+| D3-S2 | StreamChat | `stream` | `adapter/` (全部) + `gateway/gateway.go` Stream 主实现 | `llmgateway/stream/`（含 `stream/adapter/` 子目录） | ✅ 完成 |
+| D3-S3 | ProtectCall | `protect` | `breaker/` + `retry/` + `gateway/breaker_observer.go` | `llmgateway/protect/`（两机制独立 .go） | ✅ 完成 |
+| D3-S4 | BudgetTokens | `budget` | `token/` | `llmgateway/budget/` | ✅ 完成 |
+| D3-S5 | GuardContent | `guard` | `safety/` | `llmgateway/guard/` | ✅ 完成 |
+| D3-S6 | ConfigureGateway | `configure` | `config/` + `shared/config/llmgateway.go` | `llmgateway/configure/`（合并 shared） | ✅ 完成 |
+| — | Domain Kernel | (根 `contracts.go` 拆分后 < 200 行) | `llmgateway/contracts.go` | `llmgateway/contracts.go` (145 行) | ✅ AC-09 达成 |
 | D3-X | CROSS 跨域锚点 | (Bridge 不变) | `internal/bridges/llm/` | `internal/bridges/llm/` | ✅ 不动 |
 
 **Scenario-slug 命名依据**（与 code-layout §2 规则一致）：
@@ -156,13 +156,12 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 3. **metric 名不变**：`llm_requests_total` / `llm_errors_total` / `llm_latency_seconds` 在 v1.0 / v2.0 都不变
 4. **Bridge 路径不变**：`internal/bridges/llm/` 是 D3 → D2 的跨域锚点（R1 D2 决议），v1.0 / v2.0 都不迁移到 D3 内部
 
-**contracts.go 拆分粒度**（R2 §4.3 决策占位；v2.0 实施）：
+**contracts.go 拆分粒度**（v2.0 ACCEPTED；F9 完整拆分 deferred 至下 release）：
 
-- **留根**（kernel 性质，跨 S / 跨域共享）：`Request` / `Chunk` / `TokenUsage` / `ToolCall` / `AdapterChunk`
-- **移 `protect/`**（S 内部私有）：`CircuitState` / `CircuitBreakerConfig` / `RetryConfig`
-- **re-export 桥接**：v2.0 迁移时根 `contracts.go` 保留 type alias，旧 import 路径不破坏
+- **留根**（kernel 性质，跨 S / 跨域共享）：`Request` / `Chunk` / `TokenUsage` / `ToolCall` / `AdapterChunk` / `CircuitState` / `BreakerStateObserver` 等
+- **re-export 桥接**：v2.0 迁移时 8 个旧路径 `bridge.go` 保留 type alias，1 发布周期后物理删除
 
-**R3 NQ-6 决策**（v2.0）：不引入 `kernel/` 子包；上述 kernel 类型继续留根 `contracts.go` 中。
+**R3 NQ-6 决策**（v2.0）：不引入 `kernel/` 子包；kernel 类型继续留根 `contracts.go` 中。
 
 **跨域漂移（v2.0 迁出 D2）：**
 
@@ -264,4 +263,4 @@ internal/layers/communication/
 | 1.1.0 | 2026-06-14 | D1 物理路径迁移完成（capture/channel/delivery/kernel） |
 | 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |
 | 1.4.0 | 2026-06-14 | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位 |
-| **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0）：6 个 slug 全部 🚧 迁移中（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；F 编排与运行时字符串不变（v1.0 不变性承诺） |
+| **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成 |

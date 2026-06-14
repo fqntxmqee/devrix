@@ -49,9 +49,9 @@
 
 | T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
 |-------|------|--------|--------|-----------|--------|
-| D3-S1-A01-T01 | 多 Provider 并发调用（MatchRouting 路径） | P1 | F01 MatchRouting | `internal/layers/llmgateway/gateway/router_test.go` | IMPLEMENTED |
-| D3-S1-A01-T02 | 未知 Provider/Model 报错（ResolveDefault F02a+F02b 联动） | P1 | F02a ResolveTierAlias + F02b ResolveDefault | `internal/layers/llmgateway/gateway/router_test.go` | IMPLEMENTED |
-| **D3-S1-A01-T03** | **Tier 解析正确性 ≥ 99%（D6 probe #1）** `<!-- v1.1 F6 -->` | **P1** | F01 + F02a（routing 暴露调用次数 + 错误率） | `internal/layers/llmgateway/gateway/router_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T20 配套） |
+| D3-S1-A01-T01 | 多 Provider 并发调用（MatchRouting 路径） | P1 | F01 MatchRouting | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
+| D3-S1-A01-T02 | 未知 Provider/Model 报错（ResolveDefault F02a+F02b 联动） | P1 | F02a ResolveTierAlias + F02b ResolveDefault | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
+| **D3-S1-A01-T03** | **Tier 解析正确性 ≥ 99%（D6 probe #1）** `<!-- v1.1 F6 -->` | **P1** | F01 + F02a（routing 暴露调用次数 + 错误率） | `internal/layers/llmgateway/route/router_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T20 配套） |
 
 **F 覆盖**：
 
@@ -74,12 +74,12 @@ D3-S1-A01 ResolveModelRoute
 
 | T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
 |-------|------|--------|--------|-----------|--------|
-| D3-S2-A01-T01 | DeepSeek 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/adapter/deepseek_test.go` | IMPLEMENTED |
-| D3-S2-A01-T02 | MiniMax 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/adapter/minimax_test.go` | IMPLEMENTED |
-| D3-S2-A01-T03 | SSE parse error handling | P1 | F02 ParseSSE | `internal/layers/llmgateway/adapter/sse_parser_test.go` | IMPLEMENTED |
-| D3-S2-A01-T04 | OpenAI request body construction | P1 | F03 BuildOpenAIRequest | `internal/layers/llmgateway/adapter/openai_request_test.go` | IMPLEMENTED |
+| D3-S2-A01-T01 | DeepSeek 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/deepseek_test.go` | IMPLEMENTED |
+| D3-S2-A01-T02 | MiniMax 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/minimax_test.go` | IMPLEMENTED |
+| D3-S2-A01-T03 | SSE parse error handling | P1 | F02 ParseSSE | `internal/layers/llmgateway/stream/adapter/sse_parser_test.go` | IMPLEMENTED |
+| D3-S2-A01-T04 | OpenAI request body construction | P1 | F03 BuildOpenAIRequest | `internal/layers/llmgateway/stream/adapter/openai_request_test.go` | IMPLEMENTED |
 | D3-S2-A01-T05 | LLM 调用可观测事件 (spans + metrics) | P1 | F01 + F02（跨 A 验证 emit） | `tests/integration/llm_observer_test.go` | IMPLEMENTED |
-| **D3-S2-A01-T06** | **`IAdapter.Protocol() string` 接口扩展 + 3 实现** `<!-- v1.1 F5 -->` | **P0** | F04 AdapterProtocolMethod | `internal/layers/llmgateway/adapter/iadapter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 接口，DeepSeek + MiniMax + Mock 全部实施） |
+| **D3-S2-A01-T06** | **`IAdapter.Protocol() string` 接口扩展 + 3 实现** `<!-- v1.1 F5 -->` | **P0** | F04 AdapterProtocolMethod | `internal/layers/llmgateway/stream/adapter/iadapter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 接口，DeepSeek + MiniMax + Mock 全部实施） |
 
 **F 覆盖**：
 
@@ -101,20 +101,20 @@ D3-S2-A01 StreamChatCompletion
 
 | T ID | 描述 | 优先级 | F 编排 | Mechanism | Test 位置 | Status |
 |-------|------|--------|--------|-----------|-----------|--------|
-| D3-S3-A01-T01 | Circuit breaker 正常关闭 (Closed) | P0 | F01 AllowCircuit + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T02 | Circuit breaker 触发开启 (Open) | P0 | F01 + F02 RecordOutcome + F03 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T03 | Circuit breaker 半开→关闭 (HalfOpen→Closed) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T04 | Circuit breaker 半开→开启 (HalfOpen→Open) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/breaker/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T05 | Retry 与 CB 联动（Cancel/Deadline 不触发 CB） | P0 | F01 + F05 StreamWithFallback + F06 ShouldRecordBreakerFailure | Cross | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
-| D3-S3-A01-T06 | Half-Open 并发探测限制 | P0 | F01 + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/gateway/gateway_test.go` | IMPLEMENTED |
+| D3-S3-A01-T01 | Circuit breaker 正常关闭 (Closed) | P0 | F01 AllowCircuit + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
+| D3-S3-A01-T02 | Circuit breaker 触发开启 (Open) | P0 | F01 + F02 RecordOutcome + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
+| D3-S3-A01-T03 | Circuit breaker 半开→关闭 (HalfOpen→Closed) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
+| D3-S3-A01-T04 | Circuit breaker 半开→开启 (HalfOpen→Open) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
+| D3-S3-A01-T05 | Retry 与 CB 联动（Cancel/Deadline 不触发 CB） | P0 | F01 + F05 StreamWithFallback + F06 ShouldRecordBreakerFailure | Cross | `internal/layers/llmgateway/stream/gateway_test.go` | IMPLEMENTED |
+| D3-S3-A01-T06 | Half-Open 并发探测限制 | P0 | F01 + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/stream/gateway_test.go` | IMPLEMENTED |
 | D3-S3-A01-T07 | LLM 429 rate limit handling | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
 | D3-S3-A01-T08 | 熔断器状态持久化（重启后 Closed 状态恢复） | P2 | F03 + 持久化层（v1.1 候选） | Breaker | — | PLANNED |
-| D3-S3-A01-T09 | 重试策略执行（Full Jitter 退避） | P0 | F04 ComputeBackoff + F05 | Retry | `internal/layers/llmgateway/retry/retry_test.go` | IMPLEMENTED |
-| D3-S3-A01-T10 | Full Jitter 随机化验证 | P1 | F04 ComputeBackoff | Retry | `internal/layers/llmgateway/retry/retry_jitter_test.go` | IMPLEMENTED |
+| D3-S3-A01-T09 | 重试策略执行（Full Jitter 退避） | P0 | F04 ComputeBackoff + F05 | Retry | `internal/layers/llmgateway/protect/retry_test.go` | IMPLEMENTED |
+| D3-S3-A01-T10 | Full Jitter 随机化验证 | P1 | F04 ComputeBackoff | Retry | `internal/layers/llmgateway/protect/retry_jitter_test.go` | IMPLEMENTED |
 | D3-S3-A01-T11 | DeepSeek Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
 | D3-S3-A01-T12 | MiniMax Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
-| **D3-S3-A01-T13** | **Breaker 状态切换 emit `llm_breaker_state{provider,state}`** `<!-- v1.1 F1 + F2 -->` | **P0** | F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit | Metric | `internal/layers/llmgateway/breaker/circuit_breaker_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，2 provider × 3 state = 6 series） |
-| **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/breaker/events_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
+| **D3-S3-A01-T13** | **Breaker 状态切换 emit `llm_breaker_state{provider,state}`** `<!-- v1.1 F1 + F2 -->` | **P0** | F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit | Metric | `internal/layers/llmgateway/protect/circuit_breaker_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，2 provider × 3 state = 6 series） |
+| **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/protect/events_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
 | **D3-S3-A01-T15** | **D6 probe #2 Breaker 异常切换告警** `<!-- v1.1 F7 -->` | **P1** | F07 + F08（D6 探针统计 `llm_breaker_transitions_total`） | Probe | `tests/integration/d6_breaker_probe_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T21 配套） |
 
 **F 覆盖**：
@@ -144,9 +144,9 @@ D3-S3-A01 ShieldAndRetry
 
 | T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
 |-------|------|--------|--------|-----------|--------|
-| D3-S4-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | F01 CountText | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
-| D3-S4-A01-T02 | Token 预算检查 (CheckBudget) | P0 | F03 CheckBudget | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
-| D3-S4-A01-T03 | Token counter 中文准确性 (CJK) | P1 | F01 CountText | `internal/layers/llmgateway/token/counter_test.go` | IMPLEMENTED |
+| D3-S4-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
+| D3-S4-A01-T02 | Token 预算检查 (CheckBudget) | P0 | F03 CheckBudget | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
+| D3-S4-A01-T03 | Token counter 中文准确性 (CJK) | P1 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
 
 ---
 
@@ -157,9 +157,9 @@ D3-S3-A01 ShieldAndRetry
 
 | T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
 |-------|------|--------|--------|-----------|--------|
-| D3-S5-A01-T01 | Safety filter critical 拒绝 (malware/exploit) | P0 | F01 CheckContent | `internal/layers/llmgateway/safety/filter_test.go` | IMPLEMENTED |
-| D3-S5-A01-T02 | Safety filter warning 匹配 (injection/credential) | P1 | F01 CheckContent | `internal/layers/llmgateway/safety/filter_test.go` | IMPLEMENTED |
-| **D3-S5-A01-T03** | **Safety filter span event `safety.check.duration_ms` + D6 probe #4 P99 < 1ms** `<!-- v1.1 F8 -->` | **P0** | F04 EmitSafetyLatencyEvent | `internal/layers/llmgateway/safety/filter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，LatencySink 接口 + WithLatencySink，D6-S3-A01-T22 配套） |
+| D3-S5-A01-T01 | Safety filter critical 拒绝 (malware/exploit) | P0 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | IMPLEMENTED |
+| D3-S5-A01-T02 | Safety filter warning 匹配 (injection/credential) | P1 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | IMPLEMENTED |
+| **D3-S5-A01-T03** | **Safety filter span event `safety.check.duration_ms` + D6 probe #4 P99 < 1ms** `<!-- v1.1 F8 -->` | **P0** | F04 EmitSafetyLatencyEvent | `internal/layers/llmgateway/guard/filter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，LatencySink 接口 + WithLatencySink，D6-S3-A01-T22 配套） |
 
 > **跨域灰区声明**（R2 命题 E / P0 #5）：D3-S5 与 D2-S18 PermissionMode 灰区 — 当 prompt 内容与 tool execution 存在交叉时，**D3 优先拒**（前置过滤），D2 兜底；详见 `openspec/specs/architecture/cross-domain-boundaries.md` §D3-S5。
 
@@ -172,8 +172,8 @@ D3-S3-A01 ShieldAndRetry
 
 | T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
 |-------|------|--------|--------|-----------|--------|
-| D3-S6-A01-T01 | Provider 配置加载与验证 | P0 | F01 LoadConfig + F03 ValidateProviders | `internal/layers/llmgateway/config/loader_test.go` | IMPLEMENTED |
-| **D3-S6-A01-T02** | **3 feature flag schema + 默认值；OFF 时 v1.0 行为保持** `<!-- v1.1 F9 -->` | **P0** | F05 FeatureFlagDefaults | `internal/layers/llmgateway/config/loader_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，resilience+latency ON / warn OFF 默认；8 组合单测） |
+| D3-S6-A01-T01 | Provider 配置加载与验证 | P0 | F01 LoadConfig + F03 ValidateProviders | `internal/layers/llmgateway/configure/loader_test.go` | IMPLEMENTED |
+| **D3-S6-A01-T02** | **3 feature flag schema + 默认值；OFF 时 v1.0 行为保持** `<!-- v1.1 F9 -->` | **P0** | F05 FeatureFlagDefaults | `internal/layers/llmgateway/configure/loader_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，resilience+latency ON / warn OFF 默认；8 组合单测） |
 
 ---
 

@@ -18,7 +18,7 @@
 |------|--------|--------|
 | 物理目录 | 7 个技术角色词目录（`adapter/` `gateway/` `breaker/` `retry/` `token/` `safety/` `config/`） | **6 个价值流 slug 目录**（`route/` `stream/` `stream/adapter/` `protect/` `budget/` `guard/` `configure/`）+ 7 个 re-export 桥接 |
 | `contracts.go` | 单文件 ~450 行（kernel 性质保留） | **按价值流拆分到子包**，根 < 200 行（仅 ILLMGateway/ITierResolver/EngineEvent/SentinelError + re-export） |
-| 跨包配置 | `internal/shared/config/llmgateway.go` 与 `internal/layers/llmgateway/config/loader.go` 分属两包 | **合并到 `configure/`**（llmgateway_features_test.go 跨包迁移） |
+| 跨包配置 | `internal/shared/config/llmgateway.go` 与 `internal/layers/llmgateway/configure/loader.go` 分属两包 | **合并到 `configure/`**（llmgateway_features_test.go 跨包迁移） |
 | Bridge 跨域锚点 | `internal/bridges/llm/` | **不变**（R1 D2 决议） |
 | F 编排 / T 映射 | v1.0 + v1.1 30 F 域内 + 3 F CROSS + 26 T + 9 v1.1 T = 35 T | **不变**（F 编排 + T 映射仅 import 路径同步） |
 | runtime span / metric / YAML config key 字面量 | 5 span + 5 metric + 3 YAML key | **不变**（v1.0 不变性承诺） |
@@ -905,9 +905,9 @@ var (
 
 | 步骤 | 操作 | 验证 |
 |------|------|------|
-| F2.1 | `git mv internal/layers/llmgateway/adapter/ internal/layers/llmgateway/stream/adapter/` | 物理移动完成 |
+| F2.1 | `git mv internal/layers/llmgateway/stream/adapter/ internal/layers/llmgateway/stream/adapter/` | 物理移动完成 |
 | F2.2 | 更新 `stream/adapter/*.go` 的内部 import（如 `gateway` → `stream`） | `go build ./internal/layers/llmgateway/stream/adapter/` |
-| F2.3 | 创建 `internal/layers/llmgateway/adapter/` 桥接文件（re-export） | `go build ./internal/layers/llmgateway/adapter/` |
+| F2.3 | 创建 `internal/layers/llmgateway/stream/adapter/` 桥接文件（re-export） | `go build ./internal/layers/llmgateway/stream/adapter/` |
 | F2.4 | 更新所有外部 import：`grep -r "llmgateway/adapter" --include="*.go"` | 替换为 `stream/adapter` |
 | F2.5 | 验证 v1.1 `Protocol()` 在新路径仍工作（`adapter/protocol_test.go` 迁移到 `stream/adapter/protocol_test.go`） | `go test ./internal/layers/llmgateway/stream/adapter/` |
 | F2.6 | Bridge 调用方：`internal/bridges/llm/bridge.go` 同步更新 | 11 P0 T + v1.1 9 T 全绿 |
@@ -917,7 +917,7 @@ var (
 | 步骤 | 操作 | 验证 |
 |------|------|------|
 | F3.1 | 创建 `internal/layers/llmgateway/route/` 目录 | 目录 |
-| F3.2 | `git mv internal/layers/llmgateway/gateway/router.go internal/layers/llmgateway/route/router.go` | 物理移动 |
+| F3.2 | `git mv internal/layers/llmgateway/route/router.go internal/layers/llmgateway/route/router.go` | 物理移动 |
 | F3.3 | 创建 `gateway/router.go` 桥接文件（re-export） | 旧路径编译通过 |
 | F3.4 | 同步 `router_test.go` | 测试绿 |
 | F3.5 | 验证 v1.1 T03 (D3-S1-A01 Tier resolution probe) 仍工作 | D6 probe #1 绿 |
@@ -926,11 +926,11 @@ var (
 
 | 步骤 | 操作 | 验证 |
 |------|------|------|
-| F5.1 | `git mv internal/layers/llmgateway/breaker/ internal/layers/llmgateway/protect/_breaker_legacy/`（临时） | 占位 |
-| F5.2 | `git mv internal/layers/llmgateway/retry/ internal/layers/llmgateway/protect/_retry_legacy/`（临时） | 占位 |
+| F5.1 | `git mv internal/layers/llmgateway/protect/ internal/layers/llmgateway/protect/_breaker_legacy/`（临时） | 占位 |
+| F5.2 | `git mv internal/layers/llmgateway/protect/ internal/layers/llmgateway/protect/_retry_legacy/`（临时） | 占位 |
 | F5.3 | 在 `protect/` 下重命名：`_breaker_legacy/*.go → protect/circuit_breaker.go / state.go / observer.go` | 重命名 |
 | F5.4 | 在 `protect/` 下重命名：`_retry_legacy/*.go → protect/retry.go / retry_jitter.go` | 重命名 |
-| F5.5 | `git mv internal/layers/llmgateway/gateway/breaker_observer.go internal/layers/llmgateway/protect/breaker_observer.go` | v1.1 observer 物理归位 |
+| F5.5 | `git mv internal/layers/llmgateway/stream/breaker_observer.go internal/layers/llmgateway/protect/breaker_observer.go` | v1.1 observer 物理归位 |
 | F5.6 | 创建 `breaker/` 桥接 + `retry/` 桥接 | 旧路径编译通过 |
 | F5.7 | 完整 P0 回归：D3-S3 12 T（Breaker 4 + Retry 2 + 5 Cross + 1 PLANNED）+ v1.1 3 T（T13/T14/T15） | 14/14 绿（除 T08 PLANNED） |
 
@@ -939,11 +939,11 @@ var (
 | 步骤 | 操作 | 验证 |
 |------|------|------|
 | F8.1 | 创建 `internal/layers/llmgateway/configure/` 目录 | 目录 |
-| F8.2 | `git mv internal/layers/llmgateway/config/loader.go internal/layers/llmgateway/configure/loader.go` | 物理移动 |
-| F8.3 | `git mv internal/layers/llmgateway/config/loader_test.go internal/layers/llmgateway/configure/loader_test.go` | 测试迁移 |
+| F8.2 | `git mv internal/layers/llmgateway/configure/loader.go internal/layers/llmgateway/configure/loader.go` | 物理移动 |
+| F8.3 | `git mv internal/layers/llmgateway/configure/loader_test.go internal/layers/llmgateway/configure/loader_test.go` | 测试迁移 |
 | F8.4 | `git mv internal/shared/config/llmgateway.go internal/layers/llmgateway/configure/shared_config.go` | 跨包合并 |
 | F8.5 | `git mv internal/shared/config/llmgateway_features_test.go internal/layers/llmgateway/configure/llmgateway_features_test.go` | 跨包测试合并 |
-| F8.6 | 创建 `internal/layers/llmgateway/config/` 桥接 + `internal/shared/config/llmgateway*.go` 桥接 | 旧路径编译 |
+| F8.6 | 创建 `internal/layers/llmgateway/configure/` 桥接 + `internal/shared/config/llmgateway*.go` 桥接 | 旧路径编译 |
 | F8.7 | 更新所有 `import "internal/shared/config"` 引用方（仅 D3 范围内；其它域如有引用保持） | `goimports` 通过 |
 | F8.8 | F9 v1.1 T02 回归（feature flag 8 组合） | T02 绿 |
 

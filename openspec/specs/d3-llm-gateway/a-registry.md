@@ -74,7 +74,7 @@ D3-S1-A01 ResolveModelRoute
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S2-A01** | **StreamChatCompletion** | A-BE | ctx, llmgateway.Request | <-chan *AdapterChunk | — | `internal/layers/llmgateway/adapter/openai_stream.go`（`OpenAIStreamClient.Stream`） |
+| **D3-S2-A01** | **StreamChatCompletion** | A-BE | ctx, llmgateway.Request | <-chan *AdapterChunk | — | `internal/layers/llmgateway/stream/adapter/openai_stream.go`（`OpenAIStreamClient.Stream`） |
 
 **F 编排**（详见 `f-registry.md` §3.2）：
 
@@ -121,7 +121,7 @@ D3-S3-A01 ShieldAndRetry
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S4-A01** | **CountAndCheckLLMTokens** | A-BE | text / []Message / system_prompt | token_count, error/nil | — | `internal/layers/llmgateway/token/counter.go` + `bpe_loader.go` |
+| **D3-S4-A01** | **CountAndCheckLLMTokens** | A-BE | text / []Message / system_prompt | token_count, error/nil | — | `internal/layers/llmgateway/budget/counter.go` + `bpe_loader.go` |
 
 **F 编排**（详见 `f-registry.md` §3.4）：
 
@@ -142,7 +142,7 @@ D3-S4-A01 CountAndCheckLLMTokens
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S5-A01** | **FilterAndMatchContent** | A-BE | ctx, system_prompt, []messages | *safety.Result | — | `internal/layers/llmgateway/safety/filter.go` + `patterns.go` |
+| **D3-S5-A01** | **FilterAndMatchContent** | A-BE | ctx, system_prompt, []messages | *safety.Result | — | `internal/layers/llmgateway/guard/filter.go` + `patterns.go` |
 
 **F 编排**（详见 `f-registry.md` §3.5）：
 
