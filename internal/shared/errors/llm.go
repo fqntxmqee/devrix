@@ -8,14 +8,18 @@ import (
 
 // LLM layer sentinel errors.
 var (
-	ErrProviderUnavailable  = errors.New("llm provider unavailable")
-	ErrCircuitOpen          = errors.New("llm circuit breaker open")
-	ErrLLMTimeout           = errors.New("llm request timeout")
-	ErrLLMAuthFailed        = errors.New("llm authentication failed")
-	ErrTokenBudgetExceeded  = errors.New("llm token budget exceeded")
-	ErrLLMParseError        = errors.New("llm response parse error")
-	ErrUnsupportedProvider  = errors.New("unsupported llm provider")
-	ErrUnsupportedModel     = errors.New("unsupported llm model")
+	ErrProviderUnavailable     = errors.New("llm provider unavailable")
+	ErrCircuitOpen             = errors.New("llm circuit breaker open")
+	ErrLLMTimeout              = errors.New("llm request timeout")
+	ErrLLMAuthFailed           = errors.New("llm authentication failed")
+	ErrTokenBudgetExceeded     = errors.New("llm token budget exceeded")
+	ErrLLMParseError           = errors.New("llm response parse error")
+	ErrUnsupportedProvider     = errors.New("unsupported llm provider")
+	ErrUnsupportedModel        = errors.New("unsupported llm model")
+	// ErrObservabilityRequired — D3-X-A02-F02 FailFastOnObsNil (v1.1 F4).
+	// Returned by llmbridge.WireFromConfig when the observability bridge
+	// is nil; callers MUST fail-fast instead of silent fallback (R3 P0 #8).
+	ErrObservabilityRequired   = errors.New("observability bridge is required for llm gateway wiring")
 )
 
 const (

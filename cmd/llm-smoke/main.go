@@ -28,7 +28,15 @@ func main() {
 
 	obs := observability.NewNoOp()
 	obsBridge := observability.NewBridge(obs)
-	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
+	llmStack, err := llmbridge.WireContextLLM(configFile, obsBridge)
+	if err != nil {
+		if llmbridge.IsObservabilityRequiredError(err) {
+			fmt.Fprintln(os.Stderr, "llm gateway wiring failed: observability bridge is required")
+		} else {
+			fmt.Fprintf(os.Stderr, "llm gateway wiring failed: %v\n", err)
+		}
+		os.Exit(1)
+	}
 	if llmbridge.IsMockGateway(llmStack) {
 		fmt.Fprintln(os.Stderr, "LLM gateway fell back to mock — check devrix.yaml llm_gateway section")
 		os.Exit(1)

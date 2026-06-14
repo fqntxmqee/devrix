@@ -7,6 +7,7 @@ import (
 )
 
 type circuitRecord struct {
+	providerKey       string
 	state             llmgateway.CircuitState
 	failureCount      int
 	halfOpenSuccesses int
@@ -14,6 +15,6 @@ type circuitRecord struct {
 	openedAt          time.Time
 }
 
-func newCircuitRecord() *circuitRecord {
-	return &circuitRecord{state: llmgateway.CircuitClosed}
+func newCircuitRecord(providerKey string) *circuitRecord {
+	return &circuitRecord{providerKey: providerKey, state: llmgateway.CircuitClosed}
 }

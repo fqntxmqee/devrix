@@ -81,6 +81,8 @@ func DefaultConfig() *Config {
 					"provider", "model", "adapter", "tool",
 					"risk_level", "status", "direction", "decision", "error_type",
 					"token_type",
+					// DSAFT: D3-S3-A01 v1.1 — F1/F2 韧性可见性 metric 新增标签
+					"state", "from", "to",
 				},
 				Blocklist: []string{
 					"session_id", "user_id", "api_key",

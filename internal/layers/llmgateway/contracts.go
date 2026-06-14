@@ -106,9 +106,15 @@ type ITierResolver interface {
 }
 
 // IAdapter streams provider-specific responses.
+//
+// DSAFT: D3-S2-A01-F01 (StreamChatCompletion) + D3-S2-A01-F04 (AdapterProtocolMethod, v1.1)
 type IAdapter interface {
 	Stream(ctx context.Context, req *Request) (<-chan *AdapterChunk, error)
 	Provider() string
+	// Protocol returns the adapter's wire protocol identifier (v1.1 BREAKING).
+	// Current implementations return "openai-compatible".
+	// Reserved for V3: "anthropic-native" for Anthropic adapter.
+	Protocol() string
 }
 
 // ICircuitBreaker protects providers from cascading failures.
@@ -117,4 +123,23 @@ type ICircuitBreaker interface {
 	RecordSuccess(circuitKey string)
 	RecordFailure(circuitKey string)
 	State(circuitKey string) CircuitState
+}
+
+// ICircuitBreakerWithObserver is the optional observer-attachment interface.
+//
+// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1).
+// Implementations may satisfy this to receive state-transition callbacks.
+// The gateway uses a runtime type-assertion; non-observing breakers simply
+// skip the callback path.
+type ICircuitBreakerWithObserver interface {
+	ICircuitBreaker
+	WithObserver(observer BreakerStateObserver) ICircuitBreaker
+}
+
+// BreakerStateObserver receives notifications when a circuit transitions state.
+//
+// DSAFT: D3-S3-A01-F02.
+// Implementations may emit metrics, counters, span events, or engine events.
+type BreakerStateObserver interface {
+	OnBreakerStateChange(provider string, from, to CircuitState)
 }

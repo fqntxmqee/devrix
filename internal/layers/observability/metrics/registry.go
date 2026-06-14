@@ -143,9 +143,32 @@ func (r *Registry) GetCounter(name string, labels LabelMap) (Counter, bool) {
 	key := metricKey(name, labels)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	c, ok := r.counters[key]
 	return c, ok
+}
+
+// GetGauge gets a gauge by name and labels.
+//
+// DSAFT: D3-S3-A01 v1.1 F1 — required by the meter's lookup-or-create
+// semantics so repeated observer callbacks update the same gauge instance.
+func (r *Registry) GetGauge(name string, labels LabelMap) (Gauge, bool) {
+	key := metricKey(name, labels)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	g, ok := r.gauges[key]
+	return g, ok
+}
+
+// GetHistogram gets a histogram by name and labels.
+func (r *Registry) GetHistogram(name string, labels LabelMap) (Histogram, bool) {
+	key := metricKey(name, labels)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	h, ok := r.histos[key]
+	return h, ok
 }
 
 // RegisterHistogram registers a histogram metric

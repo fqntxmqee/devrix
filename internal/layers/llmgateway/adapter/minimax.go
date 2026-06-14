@@ -34,6 +34,14 @@ func (a *MiniMaxAdapter) Provider() string {
 	return minimaxProvider
 }
 
+// Protocol returns the wire protocol identifier.
+//
+// DSAFT: D3-S2-A01-F04 (AdapterProtocolMethod, v1.1).
+// MiniMax uses an OpenAI-compatible API.
+func (a *MiniMaxAdapter) Protocol() string {
+	return ProtocolOpenAICompatible
+}
+
 // Stream performs a streaming chat completion.
 func (a *MiniMaxAdapter) Stream(ctx context.Context, req *llmgateway.Request) (<-chan *llmgateway.AdapterChunk, error) {
 	if req != nil && !req.Stream {

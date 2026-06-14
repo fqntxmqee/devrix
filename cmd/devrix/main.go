@@ -128,7 +128,15 @@ func main() {
 	permissionMgr.SetUserConfig(userCfg)
 
 	obsBridge := observability.NewBridge(obs)
-	llmStack := llmbridge.WireContextLLM(configFile, obsBridge)
+	llmStack, err := llmbridge.WireContextLLM(configFile, obsBridge)
+	if err != nil {
+		if llmbridge.IsObservabilityRequiredError(err) {
+			slog.Error("llm gateway wiring failed: observability bridge is required", "error", err)
+		} else {
+			slog.Error("llm gateway wiring failed", "error", err)
+		}
+		os.Exit(1)
+	}
 	llmbridge.LogLLMReadiness(configFile)
 	if llmbridge.IsMockGateway(llmStack) {
 		slog.Warn("llm gateway using mock — set MINIMAX_API_KEY and check devrix.yaml")

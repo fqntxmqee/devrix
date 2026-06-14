@@ -20,6 +20,8 @@ func (s stubAdapter) Stream(ctx context.Context, req *llmgateway.Request) (<-cha
 
 func (s stubAdapter) Provider() string { return s.provider }
 
+func (s stubAdapter) Protocol() string { return adapter.ProtocolStub }
+
 func TestRegistry_should_register_and_get_adapter(t *testing.T) {
 	reg := adapter.NewRegistry()
 	if err := reg.Register(stubAdapter{provider: "deepseek"}); err != nil {

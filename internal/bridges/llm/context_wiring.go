@@ -3,11 +3,11 @@ package llmbridge
 import (
 	"log/slog"
 
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 // ContextLLMStack holds LLM gateway wiring for the context engine.
@@ -24,17 +24,25 @@ type ContextLLMStack struct {
 	TierResolver llmgateway.ITierResolver
 }
 
-// WireContextLLM loads and wires the LLM stack; falls back to mock on error.
-func WireContextLLM(configFile string, obsBridge *observability.Bridge) ContextLLMStack {
+// WireContextLLM loads and wires the LLM stack.
+//
+// DSAFT: D3-X-A02-F02 FailFastOnObsNil (v1.1 F4, R3 P0 #8).
+// BREAKING change vs v1.0: this function no longer swallows wiring errors
+// or falls back to a mock gateway. A nil obs bridge or a config/parse error
+// is returned to the caller, which is expected to surface it to the user
+// at startup. Use llmgateway.NewFromConfig directly if you need a different
+// recovery strategy.
+func WireContextLLM(configFile string, obsBridge *observability.Bridge) (ContextLLMStack, error) {
+	if obsBridge == nil {
+		return ContextLLMStack{}, sharederrors.ErrObservabilityRequired
+	}
 	llmCfg, err := config.LoadLLMGatewayConfig(configFile)
 	if err != nil {
-		slog.Warn("failed to load llm gateway config, using mock", "error", err)
-		return ContextLLMStack{Gateway: &mockctx.LLMGateway{}, RawGateway: nil, TokenCounter: nil}
+		return ContextLLMStack{}, err
 	}
 	wired, err := WireFromConfig(llmCfg, obsBridge)
 	if err != nil {
-		slog.Warn("failed to wire llm gateway, using mock", "error", err)
-		return ContextLLMStack{Gateway: &mockctx.LLMGateway{}, RawGateway: nil, TokenCounter: nil}
+		return ContextLLMStack{}, err
 	}
 	slog.Info("llm gateway wired", "default_provider", llmCfg.DefaultProvider, "default_model", llmCfg.DefaultModel)
 	return ContextLLMStack{
@@ -43,5 +51,5 @@ func WireContextLLM(configFile string, obsBridge *observability.Bridge) ContextL
 		TokenCounter: wired.TokenCounter,
 		DefaultModel: llmCfg.DefaultModel,
 		TierResolver: wired.Bridge.(llmgateway.ITierResolver),
-	}
+	}, nil
 }

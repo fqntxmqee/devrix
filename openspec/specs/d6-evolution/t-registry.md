@@ -1,10 +1,11 @@
 # D6 Evolution Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.0.0
+**Version:** 2.2.1
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec Reference:** `openspec/specs/d6-evolution/spec.md`
+**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；T20/T21/T22 新增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）
 
 ---
 
@@ -40,6 +41,9 @@
 | D6-S3-A01-T17 | Layer Violation Probe (分层违规扫描) | P1 | Eval | `internal/layers/evolution/eval/layer_violation_probe_test.go` | IMPLEMENTED |
 | D6-S3-A01-T18 | Session Isolation Probe (COW 隔离) | P1 | Eval | `internal/layers/evolution/eval/session_isolation_probe_test.go` | IMPLEMENTED |
 | D6-S3-A01-T19 | Probe 辅助函数 (wordJaccard 等) | P2 | Eval | `internal/layers/evolution/eval/probe_helpers_test.go` | IMPLEMENTED |
+| D6-S3-A01-T20 | Tier Resolution Probe (D3 Tier 解析正确性 ≥ 99%) | P1 | Eval | `internal/layers/evolution/eval/tier_resolution_probe_test.go` | **IMPLEMENTED**（v1.1 S5 验收通过，hit≥99% / <99% yellow / error red 4 例） |
+| D6-S3-A01-T21 | Breaker Anomaly Transition Probe (状态切换异常告警) | P1 | Eval | `internal/layers/evolution/eval/breaker_anomaly_transition_probe_test.go` | **IMPLEMENTED**（v1.1 S5 验收通过，frequent-flip / rapid-alternate / half_open→open streak 5 例） |
+| D6-S3-A01-T22 | Safety Filter Latency Probe (P99 < 1ms) | P0 | Eval | `internal/layers/evolution/eval/safety_latency_probe_test.go` | **IMPLEMENTED**（v1.1 S5 验收通过，<1ms pass / [1,2) yellow / ≥2ms red / 5 例） |
 
 ## D6-S3-A02: JudgeResult
 
@@ -65,10 +69,21 @@
 
 | Total | IMPLEMENTED | PLANNED |
 |-------|-------------|---------|
-| 21 | 19 | 2 |
+| 24 | 19 | 5 |
 
 ## P0 Count
 
 | P0 |
 |----|
-| 5 |
+| 6 |
+
+---
+
+## Revision History
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| 2.0.0 | 2026-06-14 | 初版：19 IMPLEMENTED + 2 PLANNED（T01 S1/S2 + 余 17） |
+| 2.1.0 | 2026-06-14 | Path Regression / Layer Violation / Session Isolation 3 探针（T16/T17/T18，IMPLEMENTED） |
+| 2.2.0 | 2026-06-14 | v1.1 落地：D6 探针 #1 / #2 / #4 → T20/T21/T22（PLANNED v1.1 实施）；T19 = Probe 辅助函数 保持；Total 21 → 24（P0 5 → 6，PLANNED 2 → 5）；probe #3 Token 预算触发率 推迟至 v1.2 |
+| **2.2.1** | 2026-06-14 | **v1.1 S5 验收后**：T20/T21/T22 PLANNED→IMPLEMENTED；Total IMPLEMENTED 19 → 22，PLANNED 5 → 2（仅 T01 S1 + T01 S2） |

@@ -37,7 +37,8 @@ func (mp *MeterProvider) Meter(name string) *Meter {
 	}
 }
 
-// Int64Counter creates a new counter
+// Int64Counter creates or fetches a counter. OTel semantics: the same
+// name+labels combination always returns the same instrument.
 func (m *Meter) Int64Counter(name string, opts ...CounterOption) (Counter, error) {
 	cfg := &CounterConfig{Labels: make(LabelMap)}
 	for _, opt := range opts {
@@ -46,20 +47,19 @@ func (m *Meter) Int64Counter(name string, opts ...CounterOption) (Counter, error
 		}
 	}
 
-	counter := NewCounter(fullMetricName(m.name, name), cfg.Labels)
-	
-	if err := m.provider.registry.RegisterCounter(
-		fullMetricName(m.name, name),
-		cfg.Labels,
-		counter,
-	); err != nil {
+	fullName := fullMetricName(m.name, name)
+	if c, ok := m.provider.registry.GetCounter(fullName, cfg.Labels); ok && c != nil {
+		return c, nil
+	}
+
+	counter := NewCounter(fullName, cfg.Labels)
+	if err := m.provider.registry.RegisterCounter(fullName, cfg.Labels, counter); err != nil {
 		return nil, err
 	}
-	
 	return counter, nil
 }
 
-// Float64Histogram creates a new histogram
+// Float64Histogram creates or fetches a histogram.
 func (m *Meter) Float64Histogram(name string, opts ...HistogramOption) (Histogram, error) {
 	cfg := &HistogramConfig{
 		Labels: make(LabelMap),
@@ -71,20 +71,23 @@ func (m *Meter) Float64Histogram(name string, opts ...HistogramOption) (Histogra
 		}
 	}
 
-	histo := NewHistogram(fullMetricName(m.name, name), cfg.Labels, cfg.Bounds)
-	
-	if err := m.provider.registry.RegisterHistogram(
-		fullMetricName(m.name, name),
-		cfg.Labels,
-		histo,
-	); err != nil {
+	fullName := fullMetricName(m.name, name)
+	if h, ok := m.provider.registry.GetHistogram(fullName, cfg.Labels); ok && h != nil {
+		return h, nil
+	}
+
+	histo := NewHistogram(fullName, cfg.Labels, cfg.Bounds)
+	if err := m.provider.registry.RegisterHistogram(fullName, cfg.Labels, histo); err != nil {
 		return nil, err
 	}
-	
 	return histo, nil
 }
 
-// Int64UpDownCounter creates a gauge-backed up-down counter.
+// Int64UpDownCounter creates or fetches a gauge-backed up-down counter.
+//
+// DSAFT: D3-S3-A01 v1.1 F1 — without lookup-or-create the breaker
+// observer would create a fresh zero-valued gauge on every transition,
+// silently losing gauge updates.
 func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Gauge, error) {
 	cfg := &CounterConfig{Labels: make(LabelMap)}
 	for _, opt := range opts {
@@ -93,16 +96,15 @@ func (m *Meter) Int64UpDownCounter(name string, opts ...CounterOption) (Gauge, e
 		}
 	}
 
-	gauge := NewGauge(fullMetricName(m.name, name), cfg.Labels)
-
-	if err := m.provider.registry.RegisterGauge(
-		fullMetricName(m.name, name),
-		cfg.Labels,
-		gauge,
-	); err != nil {
-		return nil, err
+	fullName := fullMetricName(m.name, name)
+	if g, ok := m.provider.registry.GetGauge(fullName, cfg.Labels); ok && g != nil {
+		return g, nil
 	}
 
+	gauge := NewGauge(fullName, cfg.Labels)
+	if err := m.provider.registry.RegisterGauge(fullName, cfg.Labels, gauge); err != nil {
+		return nil, err
+	}
 	return gauge, nil
 }
 

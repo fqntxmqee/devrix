@@ -2,10 +2,11 @@
 
 **Domain:** D6 Evolution
 **DSAFT Type:** Supporting
-**Version:** 2.1.0
+**Version:** 2.2.0
 **Last Updated:** 2026-06-14
 **Status:** Canonical — source of truth
 **Parent:** `openspec/specs/architecture/layering.md`
+**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；D2-B 决议 probe #3 推迟 v1.2）
 
 ---
 
@@ -13,7 +14,7 @@
 
 D6 演化域负责 Devrix 系统的自我评估与运行时行为校验。包含两大子系统：
 
-- **D6-S3 评测引擎**：离线评测管道，7 类探针覆盖各域质量维度，LLM-as-Judge 评分，Delta 回归检测，CI 门禁
+- **D6-S3 评测引擎**：离线评测管道，10 类探针覆盖各域质量维度（v2.2.0 新增 3 个 D3 探针），LLM-as-Judge 评分，Delta 回归检测，CI 门禁
 - **D6-S4 编排校验**：运行时校验智能体路由决策（tool_call / permit / fork），LLM Judge 交叉验证，自动干预执行
 
 D6-S1（版本检测）与 D6-S2（配置热更新）仍处于规划阶段。
@@ -57,7 +58,7 @@ LoadDataset → StratifiedSample → RunProbes(×N) → AggregateReport → Delt
 | GatewayLLMClient | `eval/gateway_llm.go` | 经 D3 LLM Gateway 的真实 Judge 调用 |
 | StaticLLMClient | `eval/mock_llm.go` | 固定响应 Judge，用于测试/CLI |
 
-### 7 类探针
+### 10 类探针（v2.2.0：7 + 3）
 
 | Probe ID | 文件 | 目标域 | 评分方式 | 说明 |
 |----------|------|--------|----------|------|
@@ -68,6 +69,11 @@ LoadDataset → StratifiedSample → RunProbes(×N) → AggregateReport → Delt
 | path_regression | `eval/path_regression_probe.go` | D2 | 确定性 | 代码路径快照对比（runtime.Snapshot() LegacyHarness=0） |
 | layer_violation | `eval/layer_violation_probe.go` | D6 | 确定性 | 分层违规扫描（0 违规→1.0, 1→0.5, 2+→0.0） |
 | session_isolation | `eval/session_isolation_probe.go` | D6 | 确定性 | COW 隔离评估（fork/join/metadata 计数 + D5 交叉校验） |
+| **tier_resolution** _(v2.2.0)_ | `eval/tier_resolution_probe.go` | D3 | 确定性 | Tier 解析正确性 ≥ 99%（D2-B 决议；接 `llm_tier_resolve_total{outcome=hit/fallback/error}` 桶） |
+| **breaker_anomaly_transition** _(v2.2.0)_ | `eval/breaker_anomaly_transition_probe.go` | D3 | 确定性 | Breaker 状态切换异常告警（frequent-flip / 异常 open 序列；接 `llm_breaker_transitions_total{from,to}`） |
+| **safety_latency** _(v2.2.0)_ | `eval/safety_latency_probe.go` | D3 | 确定性 | Safety filter P99 < 1ms（D5-A 决议；接 `safety.check.duration_ms` span event） |
+
+> **probe #3 Token 预算触发率**：D2-B 决议推迟至 v1.2（依赖 D3-S4 BudgetTokens 注入 span event `budget.check.exceeded`，需先期落地）。v2.2.0 不实施。
 
 ### Judge 评分机制
 
@@ -316,6 +322,66 @@ Session Isolation Probe 必须评估 COW 隔离正确性。
 - THEN 验证 fork/join 一致性
 - AND 交叉校验 D5 observability 计数器
 
+### 新增探针 (v2.2.0)
+
+<!-- D6-S3-A01-T20 -->
+#### Requirement: Tier Resolution Probe
+Tier Resolution Probe 必须评估 D3 Tier 解析正确性 ≥ 99%。
+
+**Scenario: Tier 解析覆盖率**
+- GIVEN D3 Gateway 路由决策序列（带 `tier` 属性）
+- WHEN TierResolutionProbe.Run 被调用
+- THEN 统计 `llm_tier_resolve_total{outcome=hit}` 占比
+- AND `hit / (hit + fallback + error) ≥ 99%` 时 Score = 1.0
+- AND `< 99%` 时 Score = hit_ratio，标记 Yellow（轻微回归）
+- AND `error > 0` 时触发 Red（严重回归）
+
+**Scenario: 桶分布校验**
+- GIVEN `llm_tier_resolve_total` 三桶计数（hit / fallback / error）
+- WHEN Probe 跨 bucket 聚合
+- THEN 记录 `tier.fallback_ratio` 与 `tier.error_ratio` 到 DomainReport
+- AND 上报到 D5 dashboard `d3_tier_resolution` 面板
+
+> **依赖**：D3-S1-A01 F06 `ProbeTierResolution` emit `llm_tier_resolve_total`（D2-B 决议，v1.1 落地）。
+
+<!-- D6-S3-A01-T21 -->
+#### Requirement: Breaker Anomaly Transition Probe
+Breaker Anomaly Transition Probe 必须检测 Breaker 状态切换异常模式。
+
+**Scenario: 频繁翻转告警**
+- GIVEN `llm_breaker_transitions_total{from, to}` 时间序列
+- WHEN BreakerAnomalyTransitionProbe.Run 被调用
+- THEN 滚动窗口（默认 5min）内翻转次数 > 3 标记 Yellow
+- AND 同一 provider `open→closed` 与 `closed→open` 在 30s 内交替 2 次以上标记 Red
+
+**Scenario: 异常状态序列**
+- GIVEN Breaker 状态序列
+- WHEN 解析状态转移图
+- THEN `open→open`（自环，异常）或 `half_open→open` 连续 2 次无 `closed` 介入标记 Red
+- AND 异常事件写入 `breaker.anomaly_events` DomainReport 字段
+
+> **依赖**：D3-S3-A01 F07 `OnStateTransitionEmit` emit `llm_breaker_transitions_total{provider, from, to}`（v1.1 新增）。
+
+<!-- D6-S3-A01-T22 -->
+#### Requirement: Safety Filter Latency Probe
+Safety Filter Latency Probe 必须验证 D3-S5 safety filter P99 < 1ms。
+
+**Scenario: P99 延迟分布**
+- GIVEN `safety.check.duration_ms` span event 时间序列
+- WHEN SafetyLatencyProbe.Run 被调用
+- THEN 计算 P50 / P95 / P99 / max 四个分位数
+- AND P99 < 1ms（目标 1000µs）时 Score = 1.0
+- AND P99 ∈ [1ms, 2ms) 标记 Yellow（轻微回归）
+- AND P99 ≥ 2ms 标记 Red（严重回归）
+
+**Scenario: 延迟趋势告警**
+- GIVEN P99 时间序列（至少 100 样本）
+- WHEN Probe 检测上升趋势
+- THEN 连续 3 个滚动窗口 P99 上升 > 10% 触发 pre-Red 告警（写入 DomainReport.warning）
+- AND 不计入 Delta 回归（pre-Red 仅为预警）
+
+> **依赖**：D3-S5-A01 F04 `EmitSafetyLatencyEvent` 在 `llm.stream` span 上 emit `safety.check.duration_ms`（D5-A 决议，v1.1 落地，默认 `d3_safety_latency_event_enabled` ON）。
+
 ### D6-S4: Orchestration
 
 <!-- D6-S4-A01-T01 -->
@@ -402,3 +468,13 @@ evolution:
 - [t-registry.md](./t-registry.md) — T 层测试点注册表
 - [../d3-llm-gateway/spec.md](../d3-llm-gateway/spec.md) — D3 LLM Gateway（Judge 依赖）
 - [../d4-multi-agent/spec.md](../d4-multi-agent/spec.md) — D4 Multi-Agent（Orchestration 观测源）
+
+---
+
+## Revision History
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| 2.0.0 | 2026-06-14 | 初版：7 类探针 + S4 Orchestration |
+| 2.1.0 | 2026-06-14 | 新增 Path Regression / Layer Violation / Session Isolation 3 类探针（T16/T17/T18） |
+| 2.2.0 | 2026-06-14 | 落地 devrix-d3-sa-refine-v1.1 D6 探针 #1 / #2 / #4：Tier Resolution ≥ 99%（T19，D2-B 决议）+ Breaker Anomaly Transition（T20）+ Safety Latency P99 < 1ms（T21，D5-A 决议）；probe #3 Token 预算触发率 推迟至 v1.2（D2-B 决议） |

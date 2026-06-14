@@ -53,6 +53,36 @@ type LLMGatewayConfig struct {
 	ModelRouting    map[string]string
 	CircuitBreaker  LLMCircuitBreakerConfig
 	Providers       map[string]LLMProviderRuntimeConfig
+	// FeatureFlags — v1.1 D4-B 决议固化的运行时开关 (D3-S6-A01-F05)。
+	// 默认值见 DefaultLLMGatewayConfig 与 DefaultFeatureFlags。
+	FeatureFlags LLMFeatureFlags
+}
+
+// LLMFeatureFlags 是一组 v1.1 引入的运行时开关。
+//
+// DSAFT: D3-S6-A01-F05 FeatureFlagDefaults (v1.1 F9, D4-B 决议)。
+// - D3ResilienceEmitEnabled: ON 时 attach breaker observer
+//   (emit llm_breaker_state metric + flow.breaker.* EngineEvent)
+// - D3SafetyLatencyEventEnabled: ON 时 emit span event safety.check.duration_ms
+// - D3MetricEmitWarn: ON 时 emit 失败写 warn 日志（OFF 时走 D5 健康检查）
+//
+// 8 组合 (2^3) 单元测试见 llmgateway_features_test.go (D3-S6-A01-T02)。
+type LLMFeatureFlags struct {
+	D3ResilienceEmitEnabled      bool
+	D3SafetyLatencyEventEnabled  bool
+	D3MetricEmitWarn             bool
+}
+
+// DefaultFeatureFlags 返回 v1.1 D4-B 决议固化的默认值。
+//
+// ON  : D3ResilienceEmitEnabled, D3SafetyLatencyEventEnabled (cardinality 受控)
+// OFF : D3MetricEmitWarn (避免污染日志；走 D5 健康检查)
+func DefaultFeatureFlags() LLMFeatureFlags {
+	return LLMFeatureFlags{
+		D3ResilienceEmitEnabled:     true,
+		D3SafetyLatencyEventEnabled: true,
+		D3MetricEmitWarn:            false,
+	}
 }
 
 // LLMCircuitBreakerConfig holds resolved circuit breaker settings.
@@ -92,6 +122,7 @@ func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 		DefaultProvider: "minimax",
 		DefaultModel:    "MiniMax-M2.7-highspeed",
 		DefaultTier:     "default",
+		FeatureFlags:    DefaultFeatureFlags(),
 		ModelTiers: map[string]string{
 			"fast":     "MiniMax-M2.7-highspeed",
 			"default":  "MiniMax-M2.7-highspeed",

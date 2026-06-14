@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Action defines what happens when a pattern matches.
@@ -46,22 +47,75 @@ type Pattern struct {
 	Locations   []string // where to check: "system_prompt", "message", or both
 }
 
+// LatencySink receives safety check durations for observability.
+//
+// DSAFT: D3-S5-A01-F04 EmitSafetyLatencyEvent (v1.1 F8, D5-A 决议 P99 < 1ms).
+// The sink is the seam between safety and observability; the safety package
+// stays decoupled from tracer/metrics. A no-op sink is used when the feature
+// flag `d3_safety_latency_event_enabled` is off.
+type LatencySink interface {
+	RecordSafetyCheckDuration(durationMs int64)
+}
+
+// noopLatencySink is the default sink when no wiring is provided.
+type noopLatencySink struct{}
+
+func (noopLatencySink) RecordSafetyCheckDuration(int64) {}
+
 // Filter performs safety checks on LLM request content.
 type Filter struct {
 	mu       sync.RWMutex
 	patterns []Pattern
+	sink     LatencySink
+	emit     bool
 }
 
 // NewFilter creates a safety filter with the default patterns.
 func NewFilter() *Filter {
 	return &Filter{
 		patterns: defaultPatterns(),
+		sink:     noopLatencySink{},
+		emit:     false,
 	}
+}
+
+// WithLatencySink attaches a sink and the emit flag.
+//
+// DSAFT: D3-S5-A01-F04 (v1.1 F8). Pass emit=false to keep the v1.0
+// no-emit behavior (feature flag `d3_safety_latency_event_enabled=OFF`).
+func (f *Filter) WithLatencySink(sink LatencySink, emit bool) *Filter {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if sink == nil {
+		f.sink = noopLatencySink{}
+	} else {
+		f.sink = sink
+	}
+	f.emit = emit
+	return f
 }
 
 // Check evaluates system prompt and messages against safety patterns.
 // Returns a Result indicating whether the request is allowed.
+//
+// DSAFT: D3-S5-A01-F04 — every check is timed; the duration is forwarded
+// to the sink only when emit=true. Timing itself is O(1) and lock-free on
+// the hot path (time.Now + arithmetic), so the v1.1 F8 budget stays under
+// the D5-A P99 < 1ms target.
 func (f *Filter) Check(ctx context.Context, systemPrompt string, messages []string) *Result {
+	start := time.Now()
+	result := f.check(ctx, systemPrompt, messages)
+
+	f.mu.RLock()
+	emit, sink := f.emit, f.sink
+	f.mu.RUnlock()
+	if emit && sink != nil {
+		sink.RecordSafetyCheckDuration(time.Since(start).Milliseconds())
+	}
+	return result
+}
+
+func (f *Filter) check(ctx context.Context, systemPrompt string, messages []string) *Result {
 	f.mu.RLock()
 	patterns := f.patterns
 	f.mu.RUnlock()

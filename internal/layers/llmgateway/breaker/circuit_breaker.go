@@ -18,6 +18,9 @@ type CircuitBreaker struct {
 	circuits map[string]*circuitRecord
 	mu       sync.Mutex
 	now      Clock
+	// observer is called outside the breaker's lock when state transitions occur.
+	// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1). Nil-safe.
+	observer llmgateway.BreakerStateObserver
 }
 
 // New creates a circuit breaker with the given configuration.
@@ -52,12 +55,30 @@ func (b *CircuitBreaker) WithClock(clock Clock) *CircuitBreaker {
 	return b
 }
 
+// WithObserver attaches a state-change observer.
+//
+// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1).
+// Returns the receiver for chaining. Passing nil clears the observer.
+func (b *CircuitBreaker) WithObserver(observer llmgateway.BreakerStateObserver) *CircuitBreaker {
+	b.observer = observer
+	return b
+}
+
 // Allow reports whether a request may proceed for the circuit key.
 func (b *CircuitBreaker) Allow(circuitKey string) (bool, error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	rec := b.circuit(circuitKey)
+	from := rec.state
+	allowed, err := b.allowLocked(rec)
+	b.mu.Unlock()
+
+	// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1).
+	// Observer called outside lock to avoid re-entering the breaker mutex.
+	NotifyStateChange(b.observer, circuitKey, from, rec.state)
+	return allowed, err
+}
+
+func (b *CircuitBreaker) allowLocked(rec *circuitRecord) (bool, error) {
 	switch rec.state {
 	case llmgateway.CircuitClosed:
 		return true, nil
@@ -67,12 +88,12 @@ func (b *CircuitBreaker) Allow(circuitKey string) (bool, error) {
 			rec.halfOpenSuccesses = 0
 			rec.halfOpenInFlight = 0
 		} else {
-			return false, sharederrors.NewCircuitOpenError(circuitKey)
+			return false, sharederrors.NewCircuitOpenError(rec.providerKey)
 		}
 		fallthrough
 	case llmgateway.CircuitHalfOpen:
 		if rec.halfOpenInFlight >= b.cfg.HalfOpenMaxProbes {
-			return false, sharederrors.NewCircuitOpenError(circuitKey)
+			return false, sharederrors.NewCircuitOpenError(rec.providerKey)
 		}
 		rec.halfOpenInFlight++
 		return true, nil
@@ -84,9 +105,16 @@ func (b *CircuitBreaker) Allow(circuitKey string) (bool, error) {
 // RecordSuccess records a successful call.
 func (b *CircuitBreaker) RecordSuccess(circuitKey string) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	rec := b.circuit(circuitKey)
+	from := rec.state
+	b.recordSuccessLocked(rec)
+	b.mu.Unlock()
+
+	// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1).
+	NotifyStateChange(b.observer, circuitKey, from, rec.state)
+}
+
+func (b *CircuitBreaker) recordSuccessLocked(rec *circuitRecord) {
 	switch rec.state {
 	case llmgateway.CircuitClosed:
 		rec.failureCount = 0
@@ -105,9 +133,16 @@ func (b *CircuitBreaker) RecordSuccess(circuitKey string) {
 // RecordFailure records a failed call.
 func (b *CircuitBreaker) RecordFailure(circuitKey string) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	rec := b.circuit(circuitKey)
+	from := rec.state
+	b.recordFailureLocked(rec)
+	b.mu.Unlock()
+
+	// DSAFT: D3-S3-A01-F02 (OnStateTransitionEmit, v1.1).
+	NotifyStateChange(b.observer, circuitKey, from, rec.state)
+}
+
+func (b *CircuitBreaker) recordFailureLocked(rec *circuitRecord) {
 	switch rec.state {
 	case llmgateway.CircuitClosed:
 		rec.failureCount++
@@ -130,7 +165,7 @@ func (b *CircuitBreaker) State(circuitKey string) llmgateway.CircuitState {
 func (b *CircuitBreaker) circuit(key string) *circuitRecord {
 	rec, ok := b.circuits[key]
 	if !ok {
-		rec = newCircuitRecord()
+		rec = newCircuitRecord(key)
 		b.circuits[key] = rec
 	}
 	return rec

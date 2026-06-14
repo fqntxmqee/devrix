@@ -63,6 +63,15 @@ func New(deps Deps) *Gateway {
 	if deps.Retry == nil {
 		g.retry = retry.NewExecutor()
 	}
+
+	// DSAFT: D3-S3-A01-F01 + F02 + F03 (v1.1).
+	// Attach a state-change observer if the breaker implementation supports it.
+	// The observer emits llm_breaker_state gauge, llm_breaker_transitions_total
+	// counter, and (optionally) an EngineEvent for D7 to subscribe to.
+	if obsBreaker, ok := deps.Breaker.(llmgateway.ICircuitBreakerWithObserver); ok {
+		obsBreaker.WithObserver(NewBreakerObserver(deps.Obs, PublishBreakerStateDefault{}))
+	}
+
 	return g
 }
 

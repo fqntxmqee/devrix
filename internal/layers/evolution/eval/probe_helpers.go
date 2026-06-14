@@ -20,6 +20,50 @@ func stringFromInput(input map[string]any, key string) string {
 	return s
 }
 
+// int64FromInput reads an int64 value from the EvalItem input map.
+// Returns 0 if missing or wrong type. v1.1 deterministic probes
+// (T20/T21/T22) feed in pre-aggregated counters this way.
+func int64FromInput(input map[string]any, key string) int64 {
+	if input == nil {
+		return 0
+	}
+	v, ok := input[key]
+	if !ok {
+		return 0
+	}
+	switch n := v.(type) {
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	case float64:
+		return int64(n)
+	default:
+		return 0
+	}
+}
+
+// float64FromInput reads a float64 value from the EvalItem input map.
+func float64FromInput(input map[string]any, key string) float64 {
+	if input == nil {
+		return 0
+	}
+	v, ok := input[key]
+	if !ok {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
+	default:
+		return 0
+	}
+}
+
 func stringSliceFromInput(input map[string]any, key string) []string {
 	if input == nil {
 		return nil

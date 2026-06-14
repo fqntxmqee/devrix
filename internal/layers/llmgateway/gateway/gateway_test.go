@@ -27,6 +27,8 @@ func (s stubAdapter) Stream(ctx context.Context, req *llmgateway.Request) (<-cha
 
 func (s stubAdapter) Provider() string { return s.provider }
 
+func (s stubAdapter) Protocol() string { return adapter.ProtocolStub }
+
 func testGateway(t *testing.T, handler func(model string) (<-chan *llmgateway.AdapterChunk, error)) *gateway.Gateway {
 	t.Helper()
 	counter, err := token.NewCounter()

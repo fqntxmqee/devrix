@@ -61,6 +61,7 @@
 | DM-20260614-013 | D2 v2.0 — queue/ → orchestration/sessionqueue | devrix-d2-sa-refine-v2.0-sessionqueue | 2026-06-14 | — | ACCEPTED |
 | DM-20260614-014 | D2 v2.0 — 物理目录 prepare/persist/policy/nested | devrix-d2-sa-refine-v2.0-physical-dirs | 2026-06-14 | — | ACCEPTED |
 | DM-20260614-015 | D2 v2.0 — worker_tools → orchestration/toolpolicy | devrix-d2-sa-refine-v2.0-toolpolicy | 2026-06-14 | — | ACCEPTED |
+| **DM-20260614-017** | **D3 LLM Gateway v1.1 — 韧性可见性 + 评测探针 + 适配扩展** | **devrix-d3-sa-refine-v1.1** | **2026-06-14** | **—** | **ACCEPTED (v1.1; 9 F + 10 T + 2 旁路修复; T08 持久化仍 PLANNED; probe #3 推迟 v1.2)** |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
 
 ## Archive Locations
@@ -123,6 +124,7 @@
 | devrix-d2-sa-refine-v2.0-sessionqueue | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-sessionqueue/` |
 | devrix-d2-sa-refine-v2.0-physical-dirs | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-physical-dirs/` |
 | devrix-d2-sa-refine-v2.0-toolpolicy | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/` |
+| **devrix-d3-sa-refine-v1.1** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v1.1/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -143,6 +145,12 @@
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
 | devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
+| devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S5_Pending（v1.0 registry 重排完成，Phase C 验收中；v1.1/v2.0 子 change 待启动） |
+| devrix-d4-sa-refine | DM-20260614-018 | `openspec/changes/devrix-d4-sa-refine/` | S5_Accepted（v1.0 registry；S11–S16 + Hub-Spoke 归 D7 规格层；零 Go 变更；v1.1/v2.0 待后续） |
+
+**2026-06-14 归档（S7 — D3 SA Refine v1.1）**：
+
+- `devrix-d3-sa-refine-v1.1` → `openspec/archive/2026-06-14-devrix-d3-sa-refine-v1.1/`（DM-017 S5_ACCEPTED; 9 F (F1–F9) + 10 T 实施 (D3 v1.1 7 + D6 v1.1 3); 2 旁路修复 (Meter lookup-or-create + 标签 allowlist); T08 持久化仍 PLANNED; probe #3 Token 预算触发率 推迟 v1.2）
 
 **2026-06-14 归档（S7 — D2 SA Refine 系列）**：
 
