@@ -4,18 +4,36 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
+// LLMTaskDecomposer defines the interface for LLM-based task decomposition.
+// Implementations should use an LLM to analyze the goal and produce task nodes.
+type LLMTaskDecomposer interface {
+	// Decompose uses an LLM to decompose a goal into task nodes.
+	Decompose(ctx context.Context, sessionID, goal string) ([]wave.TaskNode, error)
+}
+
 // TaskDecomposer implements D7-S5-A02 SynthesizeTaskGraph.
 // v1.1 provides a simple rule-based decomposition. LLM-based decomposition
-// will be added in a future version.
-type TaskDecomposer struct{}
+// is available via SetLLMDecomposer.
+type TaskDecomposer struct {
+	llmDecomposer LLMTaskDecomposer
+	timeout       time.Duration
+}
 
 // NewTaskDecomposer creates a new TaskDecomposer.
 func NewTaskDecomposer() *TaskDecomposer {
-	return &TaskDecomposer{}
+	return &TaskDecomposer{
+		timeout: 5 * time.Second,
+	}
+}
+
+// SetLLMDecomposer wires an LLM-based decomposer for enhanced task synthesis.
+func (d *TaskDecomposer) SetLLMDecomposer(llm LLMTaskDecomposer) {
+	d.llmDecomposer = llm
 }
 
 // DecompositionResult contains the output of SynthesizeTaskGraph.
@@ -32,10 +50,10 @@ type ValidationReport struct {
 }
 
 // SynthesizeTaskGraph implements D7-S5-A02. It decomposes a goal into a DAG
-// of TaskNode using simple rule-based heuristics.
+// of TaskNode.
 //
-// v1.1: rule-based decomposition only.
-// Future: LLM-based decomposition with context awareness.
+// If an LLM decomposer is configured, it uses LLM-based decomposition.
+// Otherwise, it falls back to rule-based heuristics.
 func (d *TaskDecomposer) SynthesizeTaskGraph(ctx context.Context, sessionID, goal string) (*DecompositionResult, error) {
 	if goal == "" {
 		return nil, fmt.Errorf("SynthesizeTaskGraph: goal is required")
@@ -44,11 +62,26 @@ func (d *TaskDecomposer) SynthesizeTaskGraph(ctx context.Context, sessionID, goa
 		return nil, fmt.Errorf("SynthesizeTaskGraph: sessionID is required")
 	}
 
-	// v1.1: simple rule-based decomposition
-	subGoals := d.decomposeGoal(goal)
+	var nodes []wave.TaskNode
 
-	// Build TaskNodes from sub-goals
-	nodes := d.buildNodes(sessionID, subGoals)
+	// Try LLM decomposition first if available
+	if d.llmDecomposer != nil {
+		ctx, cancel := context.WithTimeout(ctx, d.timeout)
+		defer cancel()
+
+		var err error
+		nodes, err = d.llmDecomposer.Decompose(ctx, sessionID, goal)
+		if err != nil {
+			// LLM decomposition failed, fall back to rule-based
+			nodes = nil
+		}
+	}
+
+	// Fall back to rule-based decomposition
+	if nodes == nil {
+		subGoals := d.decomposeGoal(goal)
+		nodes = d.buildNodes(sessionID, subGoals)
+	}
 
 	// Validate the graph
 	validation := d.validateGraph(nodes)
