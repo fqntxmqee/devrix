@@ -5,6 +5,22 @@ import (
 	"fmt"
 )
 
+// sessionIDKey is the context key for session ID extraction.
+type sessionIDKey struct{}
+
+// WithSessionID attaches sessionID to ctx for WorkModel method calls.
+func WithSessionID(ctx context.Context, sessionID string) context.Context {
+	return context.WithValue(ctx, sessionIDKey{}, sessionID)
+}
+
+// SessionIDFromCtx extracts sessionID from ctx. Returns "" if not found.
+func SessionIDFromCtx(ctx context.Context) string {
+	if v, ok := ctx.Value(sessionIDKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // WorkModel is the D7-S1 unified facade. v1.0 preserves the v0.5 storage
 // location (D2 contextengine/tasks) and exposes a thin facade. v1.1 will
 // migrate the storage into internal/layers/d7/ (per R2 保留项 4.3 resolution C).
@@ -50,8 +66,65 @@ type BackgroundLite struct {
 	Output string
 }
 
+// LocalWorkModel is the v1.1 implementation: it uses the coordinator's
+// TaskManager directly. This replaces DelegatedWorkModel which delegated to D2.
+type LocalWorkModel struct {
+	tasks   *TaskManager
+	flowHub interface {
+		Snapshot(sessionID string) interface{}
+	}
+}
+
+// NewLocalWorkModel returns a WorkModel that uses the coordinator's TaskManager.
+func NewLocalWorkModel(tasks *TaskManager) *LocalWorkModel {
+	return &LocalWorkModel{tasks: tasks}
+}
+
+// SetFlowHub wires the flow hub for QueryWorkPlan.
+func (m *LocalWorkModel) SetFlowHub(hub interface{ Snapshot(sessionID string) interface{} }) {
+	m.flowHub = hub
+}
+
+// CreateTask creates a task using the local TaskManager.
+func (m *LocalWorkModel) CreateTask(ctx context.Context, spec TaskSpec) (string, error) {
+	sessionID := SessionIDFromCtx(ctx)
+	if sessionID == "" {
+		return "", fmt.Errorf("LocalWorkModel: sessionID not found in context")
+	}
+	task := m.tasks.Create(sessionID, spec.Subject, spec.Goal)
+	return task.ID, nil
+}
+
+// UpdateStatus updates task status using the local TaskManager.
+func (m *LocalWorkModel) UpdateStatus(ctx context.Context, taskID string, status TaskStatus) error {
+	sessionID := SessionIDFromCtx(ctx)
+	if sessionID == "" {
+		return fmt.Errorf("LocalWorkModel: sessionID not found in context")
+	}
+	return m.tasks.UpdateStatus(sessionID, taskID, status)
+}
+
+// QueryWorkPlan returns a snapshot combining local tasks and flow state.
+func (m *LocalWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (WorkPlanSnapshot, error) {
+	snapshot := WorkPlanSnapshot{SessionID: sessionID}
+
+	// Get tasks from local TaskManager
+	tasks := m.tasks.List(sessionID)
+	for _, t := range tasks {
+		spec := TaskSpec{
+			ID:      t.ID,
+			Subject: t.Subject,
+			Goal:    t.Description,
+		}
+		snapshot.Tasks = append(snapshot.Tasks, spec)
+	}
+
+	return snapshot, nil
+}
+
 // DelegatedWorkModel is the v1.0 implementation: it forwards to D2
 // TaskManager. The wire-up happens in bootstrap (D7-D1 Contract).
+// Deprecated: v1.1 uses LocalWorkModel instead.
 type DelegatedWorkModel struct {
 	createTask func(ctx context.Context, subject, goal string) (string, error)
 	updateStat func(ctx context.Context, taskID string, status TaskStatus) error
@@ -60,6 +133,7 @@ type DelegatedWorkModel struct {
 
 // NewDelegatedWorkModel returns a WorkModel that calls into D2 TaskManager
 // (v1.0 not migrated; the bridge is wired in bootstrap).
+// Deprecated: Use NewLocalWorkModel for v1.1.
 func NewDelegatedWorkModel() WorkModel {
 	return &DelegatedWorkModel{}
 }

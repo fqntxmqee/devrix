@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -27,6 +28,7 @@ type SessionOrchestrator struct {
 	validator        AdvisoryValidator
 	sink             EventPublisher
 	validationMetric *ValidationMetrics
+	obsBridge        *observability.Bridge
 	// shadowClassifier wraps classifier (when wired) with an async LLM
 	// shadow on the IntentOrchestrate tail. nil → behavior unchanged.
 	shadowClassifier *ShadowClassifier
