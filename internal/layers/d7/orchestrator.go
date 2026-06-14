@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -25,6 +26,7 @@ type SessionOrchestrator struct {
 	workModel  WorkModel
 	validator  D6Validator
 	sink       D1EventSink
+	d6Metrics  *D6ValidationMetrics
 
 	// activeSessions tracks the running ProcessRequest per sessionID so
 	// HandleInterrupt can cancel them. Protected by mu.
@@ -53,6 +55,13 @@ func WithValidator(v D6Validator) OrchestratorOption {
 // which forwards to D2 TaskManager.
 func WithWorkModel(w WorkModel) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.workModel = w }
+}
+
+// WithMetrics wires the D6 validation metrics sink. The metrics record
+// the 4 outcomes (pass / fail / timeout / error) and a sliding-window
+// timeout_rate; nil metric is treated as no-op.
+func WithMetrics(m *D6ValidationMetrics) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.d6Metrics = m }
 }
 
 // NewSessionOrchestrator builds the orchestrator with the given D2 executor
@@ -96,18 +105,10 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 	if err != nil {
 		return nil, fmt.Errorf("d7: classify: %w", err)
 	}
-	// Advisory D6 validation; timeout is treated as pass (D6 contract).
-	if o.validator != nil {
-		vctx, cancel := context.WithTimeout(ctx, durationOrDefault(o.cfg.D6ValidationTimeoutMs))
-		_ = vctx
-		cancel()
-		// Per R2 P1, the D5 timeout counter is the observability hook.
-		// Recording happens in the validator implementation.
-		_ = o.validator.ValidateOrchestration(vctx, OrchestrationDecision{
-			Intent:    intent,
-			SessionID: req.SessionID,
-		})
-	}
+	// Advisory D6 validation; outcome is observed (per R2 §5 P1 #6) but
+	// does not block the request — pass/fail is informational, timeout
+	// and panic are surfaced via the 4-counter + alert hook.
+	o.callD6Validator(ctx, intent, req.SessionID)
 	switch intent.Kind {
 	case IntentSkip:
 		ch := make(chan *contracts.EngineEvent)
@@ -121,6 +122,64 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 		return o.orchestrate(ctx, req, intent)
 	default:
 		return nil, fmt.Errorf("d7: unknown intent kind %q", intent.Kind)
+	}
+}
+
+// callD6Validator invokes the optional D6 advisory validator, times the
+// call, and dispatches the outcome to the D6 metrics sink.
+//
+// Outcomes:
+//   - elapsed > 2*timeout → error counter (gross fault)
+//   - elapsed > timeout   → timeout counter (advisory pass per contract)
+//   - result.Pass         → pass counter
+//   - else                → fail counter
+//
+// A panic inside the validator is recovered and recorded as error.
+// If validator or d6Metrics is nil, the call is a no-op (backward
+// compatible with the v1.0 pre-metric orchestrator).
+func (o *SessionOrchestrator) callD6Validator(ctx context.Context, intent IntentClassification, sessionID string) {
+	if o.validator == nil {
+		return
+	}
+	timeoutMs := o.cfg.D6ValidationTimeoutMs
+	if timeoutMs <= 0 {
+		timeoutMs = 50
+	}
+	timeout := durationOrDefault(timeoutMs)
+	vctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	start := time.Now()
+	var (
+		result ValidationResult
+	)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if o.d6Metrics != nil {
+					o.d6Metrics.RecordError(start.Add(time.Since(start)))
+				}
+			}
+		}()
+		result = o.validator.ValidateOrchestration(vctx, OrchestrationDecision{
+			Intent:    intent,
+			SessionID: sessionID,
+		})
+	}()
+	elapsed := time.Since(start)
+
+	if o.d6Metrics == nil {
+		return
+	}
+	switch {
+	case elapsed > 2*timeout:
+		o.d6Metrics.RecordError(start.Add(elapsed))
+	case elapsed > timeout:
+		o.d6Metrics.RecordTimeout(start.Add(elapsed))
+	case result.Pass:
+		o.d6Metrics.RecordPass(start.Add(elapsed))
+	default:
+		o.d6Metrics.RecordFail(start.Add(elapsed))
 	}
 }
 
