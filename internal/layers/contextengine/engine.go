@@ -658,7 +658,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		// QueryLoop does not emit "complete" natively. Emit the final completion
 		// event here so gateway can finalize the session (persist, Feishu reaction,
 		// stream cleanup, etc.).
-		// Metadata shape must match gateway.buildCompletionSummary: duration in
+		// Metadata shape must match capture.buildCompletionSummary: duration in
 		// milliseconds, usage as total token count (not prompt/completion split).
 		meta := map[string]string{
 			"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),

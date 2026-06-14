@@ -27,7 +27,7 @@ func TestCounter_should_align_with_gateway_within_tolerance(t *testing.T) {
 
 	text := "package main\n\nfunc main() { println(\"hello\") }"
 	expected := len(enc.Encode(text, nil, nil))
-	got := gateway.CountText(text)
+	got := capture.CountText(text)
 	delta := abs(got-expected) * 100 / max(1, expected)
 	if delta > 5 {
 		t.Fatalf("gateway count delta %d%% for %q", delta, text)

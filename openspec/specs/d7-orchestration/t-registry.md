@@ -94,7 +94,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|------|------|-----------|--------|----------|
-| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/gateway/d7_integration_test.go` | IMPLEMENTED | P0 |
+| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/capture/d7_integration_test.go` | IMPLEMENTED | P0 |
 | D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P1 |
 | D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/coordinator/entry_test.go` | IMPLEMENTED | P2 |
@@ -102,7 +102,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/gateway/d7_matrix_test.go` | IMPLEMENTED | P0 |
+| D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/capture/d7_matrix_test.go` | IMPLEMENTED | P0 |
 | D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 
@@ -112,7 +112,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | Legacy ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|-----------|------|------|-----------|--------|----------|
-| D7-S4-T07 | ORCH-S2-T14 | 每 Task 独立双区块 IM 卡流式 | D1-S8 + D7-S4 | `communication/adapters/feishu_worker_card_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T07 | ORCH-S2-T14 | 每 Task 独立双区块 IM 卡流式 | D1-S8 + D7-S4 | `communication/channel/adapters/feishu_worker_card_test.go` | IMPLEMENTED | P0 |
 
 ---
 

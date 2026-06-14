@@ -3,11 +3,11 @@ package testutil
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// MockGatewayAPI is a test double for gateway.GatewayAPI.
+// MockGatewayAPI is a test double for capture.GatewayAPI.
 type MockGatewayAPI struct {
 	GetSessionFunc             func(sessionID string) (*types.Session, error)
 	ResolveSessionByChatIDFunc func(chatID string) (*types.Session, error)
@@ -16,7 +16,7 @@ type MockGatewayAPI struct {
 	RouteOutboundFunc          func(msg *types.OutboundMessage) error
 }
 
-var _ gateway.GatewayAPI = (*MockGatewayAPI)(nil)
+var _ capture.GatewayAPI = (*MockGatewayAPI)(nil)
 
 func (m *MockGatewayAPI) GetSession(sessionID string) (*types.Session, error) {
 	if m.GetSessionFunc != nil {

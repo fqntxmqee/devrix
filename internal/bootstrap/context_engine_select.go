@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/multiagent/tool"
@@ -15,13 +15,13 @@ import (
 // SelectContextEngine builds the gateway-facing context engine for the given mode name.
 func SelectContextEngine(
 	name string,
-	permMgr *gateway.PermissionManager,
+	permMgr *capture.PermissionManager,
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
 	llmStack llmbridge.ContextLLMStack,
 	agentToolReg *tool.Registry,
-) gateway.IContextEngine {
+) capture.IContextEngine {
 	engine := strings.ToLower(strings.TrimSpace(name))
 	switch engine {
 	case "four_flow", "fourflow", "four-flow":
@@ -36,7 +36,7 @@ func SelectContextEngine(
 }
 
 // ContextEngineKind returns a short label for logs.
-func ContextEngineKind(engine gateway.IContextEngine) string {
+func ContextEngineKind(engine capture.IContextEngine) string {
 	switch engine.(type) {
 	case *contextengine.ContextEngine:
 		return "context"

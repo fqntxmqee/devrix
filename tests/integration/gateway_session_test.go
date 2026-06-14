@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -16,7 +16,7 @@ import (
 // T: D1-S1-A01-T01, D1-S1-A01-T02
 func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 	cfg := config.DefaultConfig()
 	eventHandler := testutil.NewMockEventHandler()
 
-	gw := gateway.NewCommunicationGateway(
+	gw := capture.NewCommunicationGateway(
 		store,
 		eventHandler,
 		nil,
@@ -68,9 +68,9 @@ func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 // resumeEngine completes immediately for idle-resume integration checks.
 type resumeEngine struct{}
 
-func (resumeEngine) Process(context.Context, *types.Session, string) <-chan *gateway.EngineEvent {
-	ch := make(chan *gateway.EngineEvent, 1)
-	ch <- &gateway.EngineEvent{Type: "complete"}
+func (resumeEngine) Process(context.Context, *types.Session, string) <-chan *capture.EngineEvent {
+	ch := make(chan *capture.EngineEvent, 1)
+	ch <- &capture.EngineEvent{Type: "complete"}
 	close(ch)
 	return ch
 }
@@ -78,7 +78,7 @@ func (resumeEngine) Process(context.Context, *types.Session, string) <-chan *gat
 // T: D1-S1-A01-T02
 func TestIntegration_SessionExpiration(t *testing.T) {
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestIntegration_SessionExpiration(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = 2 * time.Second
 
-	gw := gateway.NewCommunicationGateway(store, nil, resumeEngine{}, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, nil, resumeEngine{}, nil, cfg)
 
 	session, err := gw.CreateSession("cli", "/tmp")
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -102,9 +102,9 @@ func TestIntegration_HarnessBootstrap_enabled_flow(t *testing.T) {
 	}
 }
 
-func drainHarnessEvents(t *testing.T, ch <-chan *gateway.EngineEvent) []*gateway.EngineEvent {
+func drainHarnessEvents(t *testing.T, ch <-chan *capture.EngineEvent) []*capture.EngineEvent {
 	t.Helper()
-	var events []*gateway.EngineEvent
+	var events []*capture.EngineEvent
 	deadline := time.After(5 * time.Second)
 	for {
 		select {
@@ -119,7 +119,7 @@ func drainHarnessEvents(t *testing.T, ch <-chan *gateway.EngineEvent) []*gateway
 	}
 }
 
-func hasHarnessBootstrapInfo(events []*gateway.EngineEvent) bool {
+func hasHarnessBootstrapInfo(events []*capture.EngineEvent) bool {
 	for _, ev := range events {
 		if ev.Type == "info" && strings.Contains(ev.Content, "Harness bootstrap") {
 			return true

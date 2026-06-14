@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -18,7 +18,7 @@ import (
 // T: D2-S3-A01-T02, D2-S1-A01-T01, D2-S1-A01-T03, D2-S1-A01-T11
 func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
@@ -26,7 +26,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	cfg := config.DefaultConfig()
 	ctxCfg := config.DefaultContextEngineConfig()
 	handler := testutil.NewMockEventHandler()
-	permMgr := gateway.NewPermissionManager(&cfg.Permission)
+	permMgr := capture.NewPermissionManager(&cfg.Permission)
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
 		Tools:      &mockctx.ToolRunner{},
@@ -35,7 +35,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 		Config:     ctxCfg,
 	})
 
-	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
 
 	session, err := gw.CreateSession("cli", "/tmp")
 	if err != nil {
@@ -64,11 +64,11 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 // T: D2-S1-A01-T11
 func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	dir := t.TempDir()
-	store, _ := gateway.NewFileSessionStore(dir)
+	store, _ := capture.NewFileSessionStore(dir)
 	cfg := config.DefaultConfig()
 	ctxCfg := config.DefaultContextEngineConfig()
 	handler := testutil.NewMockEventHandler()
-	permMgr := gateway.NewPermissionManager(&cfg.Permission)
+	permMgr := capture.NewPermissionManager(&cfg.Permission)
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM: &mockctx.LLMGatewayWithTools{},
@@ -78,7 +78,7 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 		Config: ctxCfg,
 	})
 
-	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
 	session, _ := gw.CreateSession("cli", "/tmp")
 
 	_ = gw.RouteInbound(context.Background(), &types.InboundMessage{

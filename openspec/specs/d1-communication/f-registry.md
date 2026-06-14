@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-13
+**Version:** 3.0.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d1-communication/a-registry.md`
 
@@ -11,9 +11,66 @@
 
 ## Overview
 
-D1 通信域 F 层功能点注册表。
+D1 通信域 F 层功能点注册表。**Canonical SoT：S13–S18 下 F**（见 §Canonical）。Legacy F 表保留于 §Legacy。
 
 ---
+
+## Canonical — S13–S18 F 点
+
+### D1-S13-A03 DispatchToAgent
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S13-A03-F01 | routeLegacyD2 | F-BE | contextEngine.Process | S1-A02-F01 RouteInbound |
+| D1-S13-A03-F02 | routeD7 | F-BE | IOrchestrationEntry.ProcessMessage | （新增） |
+| D1-S13-A03-F03 | routeAgent | F-BE | AgentFactory 路径 | S1-A04 RouteAgent |
+
+### D1-S14-A01 EmitThinkingDelta
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S14-A01-F01 | mapEngineEventToThinking | F-BE | thinking→Signal(Thinking) | S1-A02-F03 PublishEngineEvent |
+| D1-S14-A01-F02 | encodeThinkingFeishuCLI | F-BE | 平台 Encode | S2-A02/S8-A01 |
+
+### D1-S15-A01 / A02 EmitTaskProgress
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S15-A01-F01 | mapToolToTaskSignal | F-BE | tool_call/result→Task | S2-A02 SendOutbound |
+| D1-S15-A02-F01 | mapWorkerEventToTask | F-BE | WorkerEvent→Task | S2-A03-F01 EmitWorkerEvent |
+| D1-S15-A02-F02 | encodeFeishuWorkerCard | F-BE | Worker 双卡 Encode | S2-A03 RenderWorkerCard |
+| D1-S15-A01-F03 | emitMilestoneCardProgress | F-BE | milestone IM 展示 | S5-A01 TrackMilestone |
+
+### D1-S16-A01 / A02 DeliverConclusion
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S16-A01-F01 | mapTextDeltaToConclusion | F-BE | text stream→Conclusion | S2-A04 StreamCardContent |
+| D1-S16-A02-F01 | mapTerminalToConclusion | F-BE | complete/error Critical | S2-A02 complete |
+| D1-S16-A02-F02 | closeStreamMode | F-BE | 关闭 streaming_mode | S2-A04-F03 |
+
+### D1-S17 Encode F
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S17-F01 | EncodeFeishuCardKit | F-BE | Thinking/Conclusion 流式 | S2-A04 StreamCardContent |
+| D1-S17-F02 | EncodeFeishuWorkerCard | F-BE | Task Worker 双卡 | S2-A03 RenderWorkerCard |
+| D1-S17-F03 | EncodeDingTalkMarkdown | F-BE | 全 Kind 钉钉 | S2-A02-F03, S8-A01 |
+| D1-S17-F04 | EncodeCLIANSI | F-BE | CLI 输出 | S8-A01-F01 |
+
+### D1-S18-A01 DeliverOutboundSignal
+
+| F ID | Name | Type | 职责 | Legacy 映射 |
+|------|------|------|------|-------------|
+| D1-S18-A01-F01 | Publish | F-BE | 普通优先级入队 | S9-A01-F01 |
+| D1-S18-A01-F02 | PublishCritical | F-BE | Critical 必达 | S9-A01-F02 |
+| D1-S18-A01-F03 | Drain | F-BE | 背压排空非 Critical | S9-A01-F03 |
+| D1-S18-A01-F04 | Compact | F-BE | 同类合并 | S9-A01-F04 |
+| D1-S18-A01-F05 | Reconnect | F-BE | 重建通道 | S9-A02-F01 |
+
+---
+
+## Legacy — D1-S1–S12 F 点
 
 ## D1-S1-A01 ManageSession
 
@@ -144,6 +201,8 @@ D1 通信域 F 层功能点注册表。
 
 ## Statistics
 
-| Activities with F | Total F Points | Cross-Domain Bridges |
-|-------------------|----------------|---------------------|
-| 12 | 43 | 2 |
+| Track | Activities with F | Total F Points |
+|-------|-------------------|----------------|
+| Canonical S13–S18 | 8 | 18 |
+| Legacy S1–S12 | 12 | 43 |
+| Cross-Domain Bridges | — | 2 |

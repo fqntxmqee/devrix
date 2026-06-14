@@ -3,7 +3,7 @@ package testutil
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/communication/adapters"
+	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"

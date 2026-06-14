@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/adapters"
+	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 

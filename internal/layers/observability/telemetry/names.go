@@ -18,18 +18,27 @@ const (
 
 // Canonical Jaeger / OTLP operation names: {layer}.{module}.{action}
 const (
-	OpGatewayMessageReceive = "gateway.message.receive"
-	OpGatewaySessionLifecycle = "gateway.session.lifecycle"
-	OpGatewaySessionCreate = "gateway.session.create"
-	OpGatewaySessionGet     = "gateway.session.get"
-	OpGatewaySessionExpire  = "gateway.session.expire"
-	OpGatewayStoreCreate    = "gateway.store.create"
-	OpGatewayStoreGet       = "gateway.store.get"
-	OpGatewayStoreUpdate    = "gateway.store.update"
-	OpGatewayStoreDelete    = "gateway.store.delete"
-	OpGatewayPermissionCheck = "gateway.permission.check"
-	OpGatewayAgentCreate    = "gateway.agent.create"
-	OpGatewayEngineEvent    = "gateway.engine_event.handle"
+	OpGatewayMessageReceive = "capture.message.receive"
+	OpGatewaySessionLifecycle = "capture.session.lifecycle"
+	OpGatewaySessionCreate = "capture.session.create"
+	OpGatewaySessionGet     = "capture.session.get"
+	OpGatewaySessionExpire  = "capture.session.expire"
+	OpGatewayStoreCreate    = "capture.store.create"
+	OpGatewayStoreGet       = "capture.store.get"
+	OpGatewayStoreUpdate    = "capture.store.update"
+	OpGatewayStoreDelete    = "capture.store.delete"
+	OpGatewayPermissionCheck = "capture.permission.check"
+	OpGatewayAgentCreate    = "capture.agent.create"
+	OpGatewayEngineEvent    = "capture.engine_event.handle"
+
+	OpD1CapturePersist           = "d1.capture.persist"
+	OpD1DispatchRoute            = "d1.dispatch.route"
+	OpD1SignalThinking           = "d1.signal.thinking"
+	OpD1SignalTask               = "d1.signal.task"
+	OpD1SignalConclusion         = "d1.signal.conclusion"
+	OpD1SignalChainIntegrity     = "d1.signal.chain_integrity"
+	OpD1SignalTaskWorkProof      = "d1.signal.task.work_proof"
+	OpUserFeedbackConclusionRejected = "user.feedback.conclusion_rejected"
 
 	OpContextProcess        = "context.process"
 	OpContextSnapshotLoad   = "context.snapshot.load"
@@ -103,7 +112,11 @@ func SpanAttrs(operation string, extra ...tracer.Attribute) []tracer.Attribute {
 // LayerAndComponent maps an operation name to Jaeger filter dimensions.
 func LayerAndComponent(operation string) (layer, component string) {
 	switch {
-	case strings.HasPrefix(operation, "gateway."):
+	case strings.HasPrefix(operation, "capture."):
+		return LayerCommunication, "gateway"
+	case strings.HasPrefix(operation, "d1."):
+		return LayerCommunication, "gateway"
+	case strings.HasPrefix(operation, "user.feedback."):
 		return LayerCommunication, "gateway"
 	case strings.HasPrefix(operation, "adapter."):
 		return LayerCommunication, "adapter"

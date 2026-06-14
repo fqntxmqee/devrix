@@ -48,7 +48,7 @@ sequenceDiagram
 
 ## 2. D1 Gateway 阶段
 
-**入口：** `internal/layers/communication/gateway/gateway.go`
+**入口：** `internal/layers/communication/capture/gateway.go`
 
 1. 适配器将 IM/CLI 消息转为 `InboundMessage`
 2. Gateway 解析会话、注入 `RequestID`、创建 **SERVER** span `gateway.message.receive`

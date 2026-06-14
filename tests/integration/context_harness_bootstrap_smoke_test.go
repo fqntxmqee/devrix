@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -63,9 +63,9 @@ func TestIntegration_HarnessBootstrapSmoke_enabled_bootstrap(t *testing.T) {
 	}
 }
 
-func waitProcess(t *testing.T, ch <-chan *gateway.EngineEvent) []*gateway.EngineEvent {
+func waitProcess(t *testing.T, ch <-chan *capture.EngineEvent) []*capture.EngineEvent {
 	t.Helper()
-	var events []*gateway.EngineEvent
+	var events []*capture.EngineEvent
 	deadline := time.After(5 * time.Second)
 	for {
 		select {

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/bootstrap"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	userCfg, _ := config.LoadUserConfig()
-	permMgr := gateway.NewPermissionManager(&commCfg.Permission)
+	permMgr := capture.NewPermissionManager(&commCfg.Permission)
 	if userCfg != nil {
 		permMgr.SetUserConfig(userCfg)
 	}

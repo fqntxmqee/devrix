@@ -1,6 +1,6 @@
 // Package contracts exposes the cross-layer contract surface used by all D{N} layers.
 //
-// ComputeCtxPct was previously defined in D1 (communication/gateway) but is a pure
+// ComputeCtxPct was previously defined in D1 (communication/capture) but is a pure
 // arithmetic helper that D2 QueryLoop also needs. It lives here so that no D{N}
 // has to import another D{N} just to compute a context-window percentage.
 //

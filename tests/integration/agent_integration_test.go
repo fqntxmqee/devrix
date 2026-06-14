@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
@@ -66,11 +66,11 @@ func (b *integrationEngineBuilder) Build(perm multiagent.PermissionGate) contrac
 func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()
-	store, err := gateway.NewFileSessionStore(t.TempDir())
+	store, err := capture.NewFileSessionStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	gw := gateway.NewCommunicationGateway(store, handler, nil, gateway.NewPermissionManager(&cfg.Permission), cfg)
+	gw := capture.NewCommunicationGateway(store, handler, nil, capture.NewPermissionManager(&cfg.Permission), cfg)
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	toolCfg := config.DefaultToolConfig()
@@ -114,7 +114,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()
-	gw := gateway.NewCommunicationGateway(nil, handler, nil, nil, cfg)
+	gw := capture.NewCommunicationGateway(nil, handler, nil, nil, cfg)
 
 	session := types.NewSession("sess_bridge", "cli", t.TempDir())
 	factory := multiagentfactory.NewAgentFactory(multiagent.AgentDeps{
@@ -162,7 +162,7 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 }
 
 type gatewayBridgeObserver struct {
-	gw      *gateway.CommunicationGateway
+	gw      *capture.CommunicationGateway
 	session *types.Session
 }
 

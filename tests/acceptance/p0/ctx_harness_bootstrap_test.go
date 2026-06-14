@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/memory"
@@ -153,7 +153,7 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 	})
 }
 
-func drainAcceptance(t *testing.T, ch <-chan *gateway.EngineEvent) {
+func drainAcceptance(t *testing.T, ch <-chan *capture.EngineEvent) {
 	t.Helper()
 	deadline := time.After(5 * time.Second)
 	for {

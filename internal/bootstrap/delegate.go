@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
@@ -13,7 +13,7 @@ import (
 )
 
 type gatewayLeaderResolver struct {
-	gw *gateway.CommunicationGateway
+	gw *capture.CommunicationGateway
 }
 
 func (r gatewayLeaderResolver) Leader(sessionID string) (multiagent.Agent, bool) {
@@ -28,7 +28,7 @@ func (r gatewayLeaderResolver) Leader(sessionID string) (multiagent.Agent, bool)
 func WireDelegate(
 	ctxCfg *config.ContextEngineConfig,
 	maCfg *config.MultiAgentConfig,
-	gw *gateway.CommunicationGateway,
+	gw *capture.CommunicationGateway,
 	engine *contextengine.ContextEngine,
 	toolReg contextengine.IToolRegistry,
 ) {

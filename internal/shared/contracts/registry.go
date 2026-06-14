@@ -94,6 +94,8 @@ func DefaultCatalog() []Contract {
 	return []Contract{
 		{Name: "IEngine", Owner: "shared/contracts", Source: "engine.go"},
 		{Name: "EngineEvent", Owner: "shared/contracts", Source: "engine.go"},
+		{Name: "IMOutboundSignal", Owner: "shared/contracts", Source: "im_outbound_signal.go"},
+		{Name: "SignalKind", Owner: "shared/contracts", Source: "im_outbound_signal.go"},
 		{Name: "ITokenCounter", Owner: "shared/contracts", Source: "tokencounter.go"},
 		{Name: "ExecutionFlowHub", Owner: "shared/contracts", Source: "execution_flow.go"},
 		{Name: "FlowEvent", Owner: "shared/contracts", Source: "execution_flow.go"},

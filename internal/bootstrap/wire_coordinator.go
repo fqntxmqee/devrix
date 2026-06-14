@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -13,11 +13,11 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// WireD7 initializes the D7 SessionOrchestrator and wires it into the gateway.
+// WireD7 initializes the D7 SessionOrchestrator and wires it into the capture.
 // When d7.enabled=true, RouteInbound routes to D7.ProcessMessage instead of D2.Process.
 func WireD7(
 	configFile string,
-	gw *gateway.CommunicationGateway,
+	gw *capture.CommunicationGateway,
 	ctxEngine contracts.IEngine,
 	obsBridgeArg interface{},
 ) {
@@ -53,7 +53,7 @@ func WireD7(
 	// D7 must NOT call contextengine internals; we go through contracts.IEngine interface.
 	d2Executor := newD2Executor(gw, ctxEngine)
 
-	// Create the event publisher that forwards events to the gateway.
+	// Create the event publisher that forwards events to the capture.
 	// This implements coordinator.EventPublisher for D1 event delivery.
 	sink := newD1EventPublisher(gw)
 
@@ -81,12 +81,12 @@ func WireD7(
 // d2Executor adapts D2 ContextEngine to the D7 QueryLoopExecutor interface.
 // D7 calls RunQueryLoop; this adapter translates to D2's Process method.
 type d2Executor struct {
-	gw     *gateway.CommunicationGateway
+	gw     *capture.CommunicationGateway
 	engine contracts.IEngine
 }
 
 // newD2Executor creates an executor that bridges D7→D2 via contracts.IEngine.
-func newD2Executor(gw *gateway.CommunicationGateway, engine contracts.IEngine) *d2Executor {
+func newD2Executor(gw *capture.CommunicationGateway, engine contracts.IEngine) *d2Executor {
 	return &d2Executor{gw: gw, engine: engine}
 }
 
@@ -124,13 +124,13 @@ func (e *d2Executor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequ
 	return e.engine.Process(ctx, session, message), nil
 }
 
-// d1EventPublisher implements coordinator.EventPublisher by forwarding events to the gateway.
+// d1EventPublisher implements coordinator.EventPublisher by forwarding events to the capture.
 type d1EventPublisher struct {
-	gw *gateway.CommunicationGateway
+	gw *capture.CommunicationGateway
 }
 
-// newD1EventPublisher creates a publisher that forwards D7 events to the D1 gateway.
-func newD1EventPublisher(gw *gateway.CommunicationGateway) *d1EventPublisher {
+// newD1EventPublisher creates a publisher that forwards D7 events to the D1 capture.
+func newD1EventPublisher(gw *capture.CommunicationGateway) *d1EventPublisher {
 	return &d1EventPublisher{gw: gw}
 }
 

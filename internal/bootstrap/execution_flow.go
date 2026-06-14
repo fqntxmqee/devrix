@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine/queue"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -14,7 +14,7 @@ import (
 )
 
 // WireExecutionFlow configures the global ExecutionFlowHub (Hub-Spoke v2).
-func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *gateway.CommunicationGateway, obsBridge *observability.Bridge) {
+func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *capture.CommunicationGateway, obsBridge *observability.Bridge) {
 	if ctxCfg == nil {
 		return
 	}
@@ -41,7 +41,7 @@ func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *gateway.Communica
 }
 
 type gatewayEngineSink struct {
-	gw *gateway.CommunicationGateway
+	gw *capture.CommunicationGateway
 }
 
 func (s gatewayEngineSink) Emit(ev *contracts.EngineEvent) {

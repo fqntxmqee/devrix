@@ -5,7 +5,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -14,7 +14,7 @@ import (
 // T: D5-S1-A01-T01
 func TestGateway_should_track_active_sessions_via_session_bridge(t *testing.T) {
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
@@ -25,7 +25,7 @@ func TestGateway_should_track_active_sessions_via_session_bridge(t *testing.T) {
 		t.Fatalf("observability: %v", err)
 	}
 
-	gw := gateway.NewCommunicationGateway(store, nil, nil, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, config.DefaultConfig())
 	gw.SetObservability(obs)
 
 	session, err := gw.CreateSession("feishu_chat", "/tmp")

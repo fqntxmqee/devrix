@@ -24,18 +24,15 @@ internal/
 
 | S ID | 包 | 入口/关键类型 |
 |------|-----|----------------|
-| D1-S1 | `communication/gateway/` | `Gateway`, `ProcessMessage`, `buildCompletionSummary` |
-| D1-S2 | `communication/adapters/` | CLI / Feishu / WebSocket 适配 |
-| D1-S5 | `communication/milestone/` | Milestone DAG（D1 侧，非 PEV Plan） |
-| D1-S6 | `communication/ratelimit/` | 限流 |
-| D1-S7 | `communication/metrics/` | 通信层指标 |
-| D1-S8 | `communication/renderers/` | 卡片渲染 |
-| D1-S9 | `communication/eventbus/` | 背压、Drain、Reconnect |
-| D1-S10 | `communication/connection/` | IM 连接 |
-| D1-S11 | `communication/core/` | 核心配置 |
-| D1-S12 | `communication/instance/` | 实例注册 |
+| D1-S13 | `communication/capture/` | `CommunicationGateway`, `RouteInbound`, session store |
+| D1-S14 | `communication/thinking/` | Thinking 信号 emit |
+| D1-S15 | `communication/taskprogress/` | Task/Tool/Worker 展示 |
+| D1-S16 | `communication/conclusion/` | Conclusion 流式/终态/摘要 |
+| D1-S17 | `communication/channel/` | adapters / connection / renderers / ratelimit |
+| D1-S18 | `communication/delivery/eventbus/` | 背压、Drain、Reconnect |
+| — | `communication/kernel/` | Card、OutboundMetadata |
 
-**PLANNED：** `commands/`（D1-S3）、`auth/`（D1-S4）— 逻辑暂在 gateway 内。
+**Legacy 映射：** 原 `gateway/`→`capture/`、`adapters/`→`channel/adapters/`、`eventbus/`→`delivery/eventbus/`、`core/`→`kernel/`。详见 `openspec/specs/architecture/code-layout.md`。
 
 ---
 

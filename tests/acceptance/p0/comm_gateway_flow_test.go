@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -18,7 +18,7 @@ import (
 func TestL5_COMM_Gateway_CreateSessionRejected(t *testing.T) {
 	store := &rejectSessionStore{createErr: fmt.Errorf("storage unavailable")}
 	cfg := config.DefaultConfig()
-	gw := gateway.NewCommunicationGateway(store, testutil.NewMockEventHandler(), nil, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, testutil.NewMockEventHandler(), nil, nil, cfg)
 
 	_, err := gw.CreateSession("cli", t.TempDir())
 	if err == nil {
@@ -53,7 +53,7 @@ func (s *rejectSessionStore) GetIdleSessions(time.Duration) ([]*types.Session, e
 // T: D1-S1-A01-T01, D1-S1-A01-T03
 func TestL5_COMM_Gateway_InboundOutboundFlow(t *testing.T) {
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
@@ -61,13 +61,13 @@ func TestL5_COMM_Gateway_InboundOutboundFlow(t *testing.T) {
 	cfg := config.DefaultConfig()
 	eventHandler := testutil.NewMockEventHandler()
 	engine := &testutil.MockContextEngine{
-		Events: []*gateway.EngineEvent{
+		Events: []*capture.EngineEvent{
 			{Type: "text", Content: "hello from engine"},
 			{Type: "complete"},
 		},
 	}
 
-	gw := gateway.NewCommunicationGateway(store, eventHandler, engine, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, eventHandler, engine, nil, cfg)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {

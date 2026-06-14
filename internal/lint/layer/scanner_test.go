@@ -52,7 +52,7 @@ func TestDefaultMatrix_DepictsHigherToLower(t *testing.T) {
 func TestScan_ParsesImportsOnSyntheticFile(t *testing.T) {
 	src := `package foo
 import (
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 )
 func _() {}
@@ -75,12 +75,12 @@ func _() {}
 	}
 	foundComm := false
 	for _, imp := range p.Imports {
-		if strings.Contains(imp, "communication/gateway") {
+		if strings.Contains(imp, "communication/capture") {
 			foundComm = true
 		}
 	}
 	if !foundComm {
-		t.Fatal("expected scanner to capture communication/gateway import")
+		t.Fatal("expected scanner to capture communication/capture import")
 	}
 }
 
@@ -89,7 +89,7 @@ func _() {}
 func TestScan_ReportsViolationForReverseImport(t *testing.T) {
 	src := `package foo
 import (
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 )
 func _() {}
 `
@@ -123,7 +123,7 @@ import (
 func _() {}
 `
 	pkgs, err := parseImportGraphFromSources(map[string]string{
-		"internal/layers/communication/gateway/gateway.go": src,
+		"internal/layers/communication/capture/capture.go": src,
 	})
 	if err != nil {
 		t.Fatalf("parse: %v", err)

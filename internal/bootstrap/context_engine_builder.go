@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -110,7 +110,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		contextengine.NewToolLimiter(b.toolCfg.ConcurrentMax),
 	)
 	if perm == nil {
-		perm = gateway.NewPermissionGateAdapter(nil)
+		perm = capture.NewPermissionGateAdapter(nil)
 	}
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		LLM:          b.stack.Gateway,

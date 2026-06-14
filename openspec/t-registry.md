@@ -1,7 +1,7 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.2.0
+**Version:** 4.3.0
 **Last Updated:** 2026-06-14
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
@@ -19,7 +19,7 @@
 
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
-| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 44 | 44 | 0 | 19 |
+| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 56 | 56 | 0 | 26 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 59 | 58 | 0 | 27 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 26 | 25 | 1 | 11 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
@@ -27,7 +27,7 @@
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 46 | 39 | 5 | 26 |
 
-**总计**: 272 · IMPLEMENTED 258 · PLANNED 11 · PARTIAL 2 · P0 118
+**总计**: 284 · IMPLEMENTED 270 · PLANNED 11 · PARTIAL 2 · P0 125
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 

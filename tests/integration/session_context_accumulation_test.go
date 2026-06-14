@@ -11,7 +11,7 @@ import (
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -137,13 +137,13 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 
 	// --- D1: Communication Gateway ---
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
 	handler := testutil.NewMockEventHandler()
-	permMgr := gateway.NewPermissionManager(&config.DefaultConfig().Permission)
-	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, config.DefaultConfig())
+	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
+	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, config.DefaultConfig())
 	gw.SetObservability(obs)
 
 	// --- Print registered tool schemas ---

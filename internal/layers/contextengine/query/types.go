@@ -45,7 +45,7 @@ type TokenUsage struct {
 	CompletionTokens int
 }
 
-// EmitFunc streams engine events to the gateway.
+// EmitFunc streams engine events to the capture.
 type EmitFunc func(*contracts.EngineEvent)
 
 // CompressFunc runs messages-only compression for one iteration.

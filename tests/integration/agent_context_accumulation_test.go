@@ -9,7 +9,7 @@ import (
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway/adapter"
@@ -71,12 +71,12 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	)
 
 	dir := t.TempDir()
-	store, err := gateway.NewFileSessionStore(dir)
+	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	permMgr := gateway.NewPermissionManager(&commCfg.Permission)
-	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, commCfg)
+	permMgr := capture.NewPermissionManager(&commCfg.Permission)
+	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, commCfg)
 	gw.SetAgentFactory(factory)
 
 	session, err := gw.CreateSession("feishu_chat", "/tmp/work")

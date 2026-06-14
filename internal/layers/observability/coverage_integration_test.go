@@ -100,7 +100,7 @@ func TestCoverageReport_查看完整报告(t *testing.T) {
 			"context.process",
 			"context.compression.run",
 			"llm.stream",
-			"gateway.message.receive",
+			"capture.message.receive",
 		}
 		for _, op := range ops {
 			_, span := tracer.Start(ctx, op)

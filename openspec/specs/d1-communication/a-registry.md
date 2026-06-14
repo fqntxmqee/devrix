@@ -2,17 +2,71 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-13
+**Version:** 3.0.0
+**Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
 
 ## Overview
 
-D1 通信域 A 层活动注册表。每个 Activity 代表调用方发起的具体业务动作。
+D1 通信域 A 层活动注册表。**Canonical SoT：D1-S13–S18**（DM-20260614-006）。  
+Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力只登记 canonical A。
 
 ---
+
+## Canonical — D1-S13–S18（价值流）
+
+### D1-S13: CaptureUserIntent
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S13-A01 | AcceptInboundMessage | USER | raw IM/CLI | InboundMessage | S2-A01 ParseInbound |
+| D1-S13-A02 | PersistUserTurn | SYSTEM | InboundMessage | persisted | S1-A01 ManageSession |
+| D1-S13-A03 | DispatchToAgent | USER | session, content | event_chan | S1-A02 RouteMessage, S1-A04 RouteAgent |
+| D1-S13-A04 | ResolvePermissionGate | USER | tool, risk | approved | S1-A03 ResolvePermission |
+| D1-S13-A05 | ParseCommand | USER | /new /stop /help | command | S3-A01 ParseCommand |
+
+### D1-S14: PresentThinking
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S14-A01 | EmitThinkingDelta | SYSTEM | EngineEvent | IMOutboundSignal(Thinking) | S2-A02 SendOutbound (thinking 区) |
+
+### D1-S15: PresentTaskProgress
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S15-A01 | EmitToolProgress | SYSTEM | tool_call/result | IMOutboundSignal(Task) | S2-A02 SendOutbound (tools) |
+| D1-S15-A02 | EmitWorkerProgress | SYSTEM | WorkerEvent | IMOutboundSignal(Task) | S2-A03 RenderWorkerCard, S5-A01 TrackMilestone |
+
+### D1-S16: DeliverConclusion
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S16-A01 | EmitSummaryChunk | SYSTEM | text delta | IMOutboundSignal(Conclusion) | S2-A02/S2-A04 StreamCardContent |
+| D1-S16-A02 | FinalizeReply | SYSTEM | complete/error | IMOutboundSignal(Conclusion) | S1-A01 summary, S2-A02 complete |
+
+### D1-S17: ConnectChannel
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S17-A01 | ParseFeishuInbound | USER | raw_card | InboundMessage | S2-A01-F01 |
+| D1-S17-A02 | ParseDingTalkInbound | USER | webhook_body | InboundMessage | S2-A01-F03 |
+| D1-S17-A03 | ParseCLIInbound | USER | stdin_line | InboundMessage | S2-A01-F02 |
+| D1-S17-A04 | ManageConnection | INTERNAL | instance_id | connection_state | S10-A01 ManageConnection |
+| D1-S17-A05 | RegisterInstance | INTERNAL | instance_spec | instance_id | S12-A01 RegisterInstance |
+| D1-S17-A06 | CheckRateLimit | INTERNAL | adapter_id | allowed/denied | S6-A01 CheckRateLimit |
+
+### D1-S18: GuaranteeDelivery
+
+| A ID | Name | Kind | Input | Output | Legacy 映射 |
+|------|------|------|-------|--------|-------------|
+| D1-S18-A01 | DeliverOutboundSignal | SYSTEM | *Event | queued/delivered | S9-A01 PublishEvent, S9-A02 ManageBusLifecycle |
+
+---
+
+## Legacy Module Index — D1-S1–S12（FROZEN）
 
 ## D1-S1: Gateway
 
@@ -99,6 +153,7 @@ D1 通信域 A 层活动注册表。每个 Activity 代表调用方发起的具�
 
 ## Statistics
 
-| Scenarios | Activities | IMPLEMENTED | PLANNED | DEPRECATED |
-|-----------|------------|-------------|---------|------------|
-| 12 | 21 | 19 | 1 | 1 |
+| Track | Scenarios | Activities |
+|-------|-----------|------------|
+| Canonical S13–S18 | 6 | 16 |
+| Legacy S1–S12 | 12 | 21 |

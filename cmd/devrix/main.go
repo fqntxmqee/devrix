@@ -13,12 +13,12 @@ import (
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/adapters"
-	"github.com/devrix/devrix/internal/layers/communication/connection"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/communication/instance"
-	"github.com/devrix/devrix/internal/layers/communication/metrics"
-	"github.com/devrix/devrix/internal/layers/communication/milestone"
+	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
+	"github.com/devrix/devrix/internal/layers/communication/channel/connection"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/communication/channel/instance"
+	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
+	"github.com/devrix/devrix/internal/layers/orchestration/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/evolution/orchestration"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -109,7 +109,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sessionStore, err := gateway.NewFileSessionStore(commCfg.Session.StorageDir)
+	sessionStore, err := capture.NewFileSessionStore(commCfg.Session.StorageDir)
 	if err != nil {
 		slog.Error("failed to create session store", "error", err)
 		os.Exit(1)
@@ -120,7 +120,7 @@ func main() {
 	instanceRegistry := instance.NewInstanceRegistry(60 * time.Second)
 	milestoneService := milestone.NewMilestoneService(nil)
 
-	permissionMgr := gateway.NewPermissionManager(&commCfg.Permission)
+	permissionMgr := capture.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
 
 	obsBridge := observability.NewBridge(obs)
@@ -158,7 +158,7 @@ func main() {
 		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
 	}
 
-	gw := gateway.NewCommunicationGateway(
+	gw := capture.NewCommunicationGateway(
 		sessionStore,
 		eventHandler,
 		contextEngine,
@@ -276,7 +276,7 @@ func initOrchestration(
 	configFile string,
 	multiAgentEnabled bool,
 	rawGateway llmgateway.IGateway,
-	gw *gateway.CommunicationGateway,
+	gw *capture.CommunicationGateway,
 	milestoneSvc *milestone.MilestoneService,
 	agentFactory multiagent.IAgentFactory,
 	obs *observability.Observability,

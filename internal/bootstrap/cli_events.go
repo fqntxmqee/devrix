@@ -1,20 +1,20 @@
 package bootstrap
 
 import (
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
-	"github.com/devrix/devrix/internal/layers/communication/renderers"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/communication/channel/renderers"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // CLIProgressHandler renders worker_progress to stdout and delegates other events.
 type CLIProgressHandler struct {
-	Base     gateway.EventHandler
+	Base     capture.EventHandler
 	Renderer *renderers.CLIRenderer
 }
 
 // NewCLIProgressHandler wraps base with CLI worker progress rendering.
-func NewCLIProgressHandler(base gateway.EventHandler, ansi config.ANSIConfig) *CLIProgressHandler {
+func NewCLIProgressHandler(base capture.EventHandler, ansi config.ANSIConfig) *CLIProgressHandler {
 	return &CLIProgressHandler{
 		Base:     base,
 		Renderer: renderers.NewCLIRenderer(ansi),

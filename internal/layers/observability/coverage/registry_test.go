@@ -50,6 +50,15 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpGatewayStoreGet,
 		telemetry.OpGatewayStoreUpdate,
 
+		telemetry.OpD1CapturePersist,
+		telemetry.OpD1DispatchRoute,
+		telemetry.OpD1SignalThinking,
+		telemetry.OpD1SignalTask,
+		telemetry.OpD1SignalConclusion,
+		telemetry.OpD1SignalChainIntegrity,
+		telemetry.OpD1SignalTaskWorkProof,
+		telemetry.OpUserFeedbackConclusionRejected,
+
 		telemetry.OpLLMAdapterStream,
 		telemetry.OpLLMCircuitBreaker,
 		telemetry.OpLLMProviderRoute,

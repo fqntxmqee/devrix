@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
@@ -31,11 +31,11 @@ func main() {
 	dir, _ := os.MkdirTemp("", "devrix-obs-verify")
 	defer os.RemoveAll(dir)
 
-	store, _ := gateway.NewFileSessionStore(dir)
+	store, _ := capture.NewFileSessionStore(dir)
 	cfg := config.DefaultConfig()
 	ctxCfg := config.DefaultContextEngineConfig()
 	handler := testutil.NewMockEventHandler()
-	permMgr := gateway.NewPermissionManager(&cfg.Permission)
+	permMgr := capture.NewPermissionManager(&cfg.Permission)
 
 	toolsReg, err := registry.NewBuiltinRegistry()
 	if err != nil {
@@ -50,7 +50,7 @@ func main() {
 		ObsBridge:  obsBridge,
 	})
 
-	gw := gateway.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, engine, permMgr, cfg)
 	gw.SetObservability(obs)
 
 	session, _ := gw.CreateSession("cli", "/tmp")

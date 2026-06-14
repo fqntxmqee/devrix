@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
-**Last Updated:** 2026-06-13
+**Version:** 3.6.0
+**Last Updated:** 2026-06-14
 
 ---
 
@@ -12,7 +12,9 @@
 本文档定义 Devrix 的正式分层架构，使用 **DSAFT 五层编号系统**：
 
 - **D (Domain)** — 顶层领域，对应 `internal/layers/` 下的一级目录
-- **S (Scenario)** — 域内场景/模块，对应二级包目录
+- **S (Scenario)** — 域内场景，对应 **`{domain-slug}/{scenario-slug}/`** 二级目录（见 `code-layout.md` §4 注册表）
+
+> **代码路径 SoT：** `openspec/specs/architecture/code-layout.md` — 领域名 / 场景名 → 目录映射、迁移状态、新文件决策树。
 - **A (Activity)** — 可发起的业务动作，归属于 D-S 场景
 - **F (Function Point)** — 最小业务/技术逻辑单元，被 A 层活动编排
 - **T (Test Point)** — 测试点，标准格式 `D{X}-S{X}-A{XX}-T{NN}`
@@ -41,20 +43,40 @@
 
 ### D1 Communication Domain
 
-| Module ID | Scenario | Responsibility | Status |
-|-----------|----------|----------------|--------|
-| D1-S1 | Gateway | 消息网关、路由、会话管理 | IMPLEMENTED |
-| D1-S2 | Adapters | 飞书、WebSocket、CLI 适配器 | IMPLEMENTED |
-| D1-S3 | Commands | CLI 命令解析 (/new, /stop, /help) | PLANNED (code in gateway) |
-| D1-S4 | Auth | 认证与授权 | PLANNED |
-| D1-S5 | Milestone | 里程碑跟踪 | IMPLEMENTED |
-| D1-S6 | RateLimit | 限流控制 | IMPLEMENTED |
-| D1-S7 | Metrics | 通信层指标 | IMPLEMENTED |
-| D1-S8 | Renderers | 消息渲染器 | IMPLEMENTED |
-| D1-S9 | EventBus | 事件总线：背压、Drain、Compact、Reconnect | IMPLEMENTED |
-| D1-S10 | Connection | IM 实例连接管理 | IMPLEMENTED |
-| D1-S11 | Core | 核心配置解析 | IMPLEMENTED |
-| D1-S12 | Instance | 实例注册/注销 | IMPLEMENTED |
+> **SoT（v3.4+）：** 价值流 Scenario 以 **D1-S13–S18** 为准（切法 A，DM-20260614-006）。  
+> **v2.0（v3.5+）：** 代码包按价值流对齐；Legacy D1-S1–S12 索引已退役，见下方 Package Map。  
+> 详见 `openspec/changes/devrix-d1-sa-refine/design.md` §2.2。
+
+#### Canonical — 价值流（D1-S13–S18）
+
+| Module ID | Scenario | 用户目标 | Status |
+|-----------|----------|----------|--------|
+| D1-S13 | CaptureUserIntent | 我的指令一定进系统、查得到、能接着聊 | IMPLEMENTED |
+| D1-S14 | PresentThinking | 我能看到它在想什么（信号①） | IMPLEMENTED |
+| D1-S15 | PresentTaskProgress | 我能看到它在做什么任务（信号②） | IMPLEMENTED |
+| D1-S16 | DeliverConclusion | 我能拿到针对我指令的总结（信号③ costly） | IMPLEMENTED |
+| D1-S17 | ConnectChannel | 换 IM 平台，三类信息结构一致 | IMPLEMENTED |
+| D1-S18 | GuaranteeDelivery | 弱网也不丢结论和错误 | IMPLEMENTED |
+
+**Domain Kernel（非 S）：** `core.Card`、`types.Session`、`types.InboundMessage`
+
+#### Package Map（v2.0 — 迁移中）
+
+> **目标布局** 见 `code-layout.md` §5–§6。下表为 **当前实现路径** → **目标 scenario-slug** 速查。
+
+| 当前路径 | 目标 scenario-slug | Canonical S |
+|----------|-------------------|-------------|
+| `gateway/` | `capture/` | S13, S18 overlay |
+| `present/` | `thinking/` `taskprogress/` `conclusion/` | S14–S16 |
+| `signal/` | `capture/signal/` | S14–S16 锚点 |
+| `adapters/` … `renderers/` | `channel/` | S17 |
+| `eventbus/` | `delivery/` | S18 |
+| `core/` | `kernel/` | Domain Kernel |
+| `orchestration/milestone/` | `orchestration/milestone/` | D7-S1 + S15-F03 |
+
+#### Legacy Module Index — RETIRED（v2.0）
+
+D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `openspec/specs/d1-communication/t-registry.md` §Legacy Archive。
 
 ### D2 Context Engine Domain
 
@@ -256,17 +278,21 @@ devrix/
 internal/
 layers/
 ├── communication/                  # D1
-│   ├── gateway/                   # D1-S1
-│   ├── adapters/                  # D1-S2
-│   ├── milestone/                 # D1-S5
-│   ├── ratelimit/                 # D1-S6
-│   ├── metrics/                   # D1-S7
-│   ├── renderers/                 # D1-S8
-│   ├── eventbus/                  # D1-S9
-│   ├── connection/                # D1-S10
-│   ├── core/                      # D1-S11
-│   └── instance/                  # D1-S12
-│   # PLANNED: commands/ (D1-S3), auth/ (D1-S4)
+│   ├── kernel/                    # Domain Kernel (Card, metadata)
+│   ├── capture/                   # S13 CaptureUserIntent
+│   │   └── signal/                # turn tracker
+│   ├── thinking/                  # S14
+│   ├── taskprogress/              # S15
+│   ├── conclusion/                # S16
+│   ├── channel/                   # S17 ConnectChannel
+│   │   ├── adapters/
+│   │   ├── connection/
+│   │   ├── instance/
+│   │   ├── ratelimit/
+│   │   ├── renderers/
+│   │   └── metrics/
+│   └── delivery/                  # S18 GuaranteeDelivery
+│       └── eventbus/
 │
 ├── contextengine/                 # D2
 │   ├── compression/               # D2-S2

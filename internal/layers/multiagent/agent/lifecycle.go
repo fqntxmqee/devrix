@@ -156,7 +156,7 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 			// Drain the channel so the engine goroutine fully exits before
 			// we return. The engine writes to session.ContextSnapshot AFTER
 			// emitting "complete" (snapshot persist happens at the tail of
-			// runProcess); gateway.persistSessionAfterProcess then races
+			// runProcess); capture.persistSessionAfterProcess then races
 			// with that write under -race. Channel close establishes the
 			// happens-before edge we need.
 			for range eventCh {

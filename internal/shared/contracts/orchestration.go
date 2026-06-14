@@ -2,7 +2,7 @@ package contracts
 
 import "context"
 
-// IOrchestrationEntry is the contract D7 implements for the D1 gateway.
+// IOrchestrationEntry is the contract D7 implements for the D1 capture.
 //
 // D1 RouteInbound (when orchestration.d7_enabled=true) calls ProcessMessage
 // and routes the returned event channel to the existing gateway

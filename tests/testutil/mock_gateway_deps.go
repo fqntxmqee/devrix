@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// MockEventHandler implements gateway.EventHandler for integration and acceptance tests.
+// MockEventHandler implements capture.EventHandler for integration and acceptance tests.
 type MockEventHandler struct {
 	mu              sync.Mutex
 	Messages        []*types.OutboundMessage
@@ -64,6 +64,15 @@ func (h *MockEventHandler) MessageCount() int {
 	return len(h.Messages)
 }
 
+// OutboundMessages returns a snapshot of received messages.
+func (h *MockEventHandler) OutboundMessages() []*types.OutboundMessage {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]*types.OutboundMessage, len(h.Messages))
+	copy(out, h.Messages)
+	return out
+}
+
 // WaitForMessages blocks until at least n messages arrive or timeout elapses.
 func (h *MockEventHandler) WaitForMessages(n int, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
@@ -76,13 +85,13 @@ func (h *MockEventHandler) WaitForMessages(n int, timeout time.Duration) bool {
 	return h.MessageCount() >= n
 }
 
-// MockContextEngine implements gateway.IContextEngine for integration and acceptance tests.
+// MockContextEngine implements capture.IContextEngine for integration and acceptance tests.
 type MockContextEngine struct {
-	Events []*gateway.EngineEvent
+	Events []*capture.EngineEvent
 }
 
-func (m *MockContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *gateway.EngineEvent {
-	ch := make(chan *gateway.EngineEvent, len(m.Events))
+func (m *MockContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *capture.EngineEvent {
+	ch := make(chan *capture.EngineEvent, len(m.Events))
 	for _, e := range m.Events {
 		event := *e
 		event.SessionID = session.SessionID

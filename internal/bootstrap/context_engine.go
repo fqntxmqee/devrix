@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/tasks"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -19,7 +19,7 @@ import (
 // agentToolReg is nil when agent tools are disabled.
 func NewContextEngine(
 	stack llmbridge.ContextLLMStack,
-	permMgr *gateway.PermissionManager,
+	permMgr *capture.PermissionManager,
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
 	obsBridge *observability.Bridge,
@@ -60,7 +60,7 @@ func NewContextEngine(
 		TokenCounter: stack.TokenCounter,
 		Tools:        tools,
 		ToolsReg:     toolReg,
-		Permission:   gateway.NewPermissionGateAdapter(permMgr),
+		Permission:   capture.NewPermissionGateAdapter(permMgr),
 		Observer:     contextengine.NoOpObserver{},
 		LongTerm:     longTerm,
 		Config:       ctxCfg,

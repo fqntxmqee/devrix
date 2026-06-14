@@ -17,7 +17,7 @@ type RuntimeJudge struct {
 	config OrchestrationConfig
 }
 
-// NewRuntimeJudge creates a judge that routes validation prompts through the LLM gateway.
+// NewRuntimeJudge creates a judge that routes validation prompts through the LLM capture.
 func NewRuntimeJudge(gw llmgateway.IGateway, config OrchestrationConfig) *RuntimeJudge {
 	return &RuntimeJudge{gw: gw, config: config}
 }

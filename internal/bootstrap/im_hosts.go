@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/communication/adapters"
-	"github.com/devrix/devrix/internal/layers/communication/gateway"
+	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
+	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -41,8 +41,8 @@ func (h *IMHosts) Stop() {
 func WireIM(
 	userCfg *config.UserConfig,
 	commCfg *config.CommunicationConfig,
-	defaultHandler gateway.EventHandler,
-) (*IMHosts, gateway.EventHandler) {
+	defaultHandler capture.EventHandler,
+) (*IMHosts, capture.EventHandler) {
 	if userCfg == nil || !userCfg.IM.Enabled {
 		return nil, defaultHandler
 	}
@@ -105,7 +105,7 @@ func WireIM(
 }
 
 // StartIM connects adapters to the gateway and starts listeners.
-func StartIM(ctx context.Context, gw *gateway.CommunicationGateway, hosts *IMHosts) error {
+func StartIM(ctx context.Context, gw *capture.CommunicationGateway, hosts *IMHosts) error {
 	if hosts == nil {
 		return nil
 	}
