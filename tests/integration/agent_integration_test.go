@@ -120,7 +120,7 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	factory := multiagentprovision.NewAgentFactory(multiagent.AgentDeps{
 		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
 	}, config.DefaultMultiAgentConfig())
-	ag, err := provision.Create(context.Background(), multiagent.AgentConfig{
+	ag, err := factory.Create(context.Background(), multiagent.AgentConfig{
 		SessionID:         session.SessionID,
 		WorkDir:           session.WorkDir,
 		PermissionTimeout: 2 * time.Second,
