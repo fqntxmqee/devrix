@@ -68,11 +68,11 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |------|------|----------|-----------|--------|----------|
 | D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `contextengine/tasks/plan_mode_test.go` 或 task_manager_test | IMPLEMENTED | P1 |
 | D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `contextengine/tasks/plan_agent_whitelist_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
 | D7-S5-T04 | SynthesizeTaskGraph 产出有效 DAG | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
 | D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED (v1.1) | P1 |
-| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/d7/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
-| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/d7/shadow_classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/orchestration/coordinator/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
+| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/orchestration/coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -80,13 +80,13 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `internal/layers/d7/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/d7/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -96,12 +96,12 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |------|------|------|-----------|--------|----------|
 | D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/gateway/d7_integration_test.go` | IMPLEMENTED | P0 |
 | D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
-| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P1 |
-| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/d7/entry_test.go` | IMPLEMENTED | P2 |
-| D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/d7/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P1 |
+| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/coordinator/entry_test.go` | IMPLEMENTED | P2 |
+| D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
+| D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-MIG-T01 | d7_enabled × plan.enabled 四组合回归 | D7-S2 | `internal/layers/communication/gateway/d7_matrix_test.go` | IMPLEMENTED | P0 |
 | D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/d7"
+	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -130,8 +130,8 @@ func TestGateway_StopProcess_D7Cancel(t *testing.T) {
 	}
 }
 
-// Compile-time check: d7.Entry satisfies contracts.IOrchestrationEntry.
-var _ contracts.IOrchestrationEntry = (*d7.Entry)(nil)
+// Compile-time check: coordinator.Entry satisfies contracts.IOrchestrationEntry.
+var _ contracts.IOrchestrationEntry = (*coordinator.Entry)(nil)
 
 // newTestGateway is a minimal helper that builds a gateway without a
 // real context engine. The d7-enabled tests don't need one; the
@@ -174,7 +174,7 @@ func (f *fakeSessionStore) Get(sessionID string) (*types.Session, error) {
 	return s, nil
 }
 func (f *fakeSessionStore) Update(s *types.Session) error { return nil }
-func (f *fakeSessionStore) Delete(_ string) error          { return nil }
+func (f *fakeSessionStore) Delete(_ string) error         { return nil }
 func (f *fakeSessionStore) List() ([]*types.Session, error) {
 	return nil, nil
 }
@@ -185,9 +185,9 @@ func (f *fakeSessionStore) GetIdleSessions(_ time.Duration) ([]*types.Session, e
 // fakeEventHandler implements EventHandler with no-op methods.
 type fakeEventHandler struct{}
 
-func (f *fakeEventHandler) OnMessage(_ *types.OutboundMessage)                {}
+func (f *fakeEventHandler) OnMessage(_ *types.OutboundMessage) {}
 func (f *fakeEventHandler) OnPermissionRequest(_ *types.PermissionRequest) bool {
 	return true
 }
-func (f *fakeEventHandler) OnError(_ error, _ string)                          {}
-func (f *fakeEventHandler) OnStatus(_ string, _ types.SessionState)            {}
+func (f *fakeEventHandler) OnError(_ error, _ string)               {}
+func (f *fakeEventHandler) OnStatus(_ string, _ types.SessionState) {}

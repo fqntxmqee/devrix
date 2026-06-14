@@ -194,33 +194,37 @@ layers/
 │   └── mock/                      # D2-S14 Mock Engine
 │   # engine.go 根包：Process 编排、commitActiveWindow、delegate_tools
 │
-├── d7/                           # D7 Orchestration (v1.0 — DESIGN)
-│   ├── orchestrator.go           # D7-S1/S2 核心编排
-│   ├── workmodel.go              # D7-S1 Task/Plan 数据模型
-│   ├── classifier.go             # D7-S5 意图分类
-│   ├── decomposer.go             # D7-S5 任务拆解
-│   ├── executor.go               # D7-S5 执行器选择
-│   ├── fastpath.go               # D7-S2 快速路径
-│   ├── wave/                     # D7-S3 Wave Scheduler (from ORCH-S3)
+├── orchestration/                # D7 Orchestration
+│   ├── coordinator/               # D7 Session Orchestrator (package coordinator)
+│   │   ├── orchestrator.go        # D7-S2 SessionOrchestrator + ProcessMessage
+│   │   ├── workmodel.go           # D7-S1 WorkModel facade (v1.1 接管 storage)
+│   │   ├── classifier.go          # D7-S5 RuleClassifier
+│   │   ├── shadow_classifier.go   # D7-S5 Tail-only LLM Shadow (v1.1 兜底)
+│   │   ├── fastpath.go            # D7-S2 FastPath proxy
+│   │   ├── interrupt.go           # D7-S2 HandleInterrupt (Wave→D4→Process→stopped)
+│   │   ├── contracts.go           # D7 Shared contracts (D7Entry seam)
+│   │   ├── types.go               # D7 Intent/Event types
+│   │   ├── config.go              # D7 Config (v1.0 defaults)
+│   │   ├── d6_metrics.go          # D7-D6 4-counter + 滑窗告警
+│   │   └── helpers.go             # D7 内部工具
+│   ├── wave/                      # D7-S3 Wave Scheduler (升格自 ORCH-S3)
 │   │   ├── scheduler.go
 │   │   ├── pool.go
 │   │   ├── taskgraph.go
 │   │   ├── context.go
 │   │   ├── conflict.go
 │   │   ├── artifact.go
+│   │   ├── types.go
+│   │   ├── errors.go
 │   │   └── runners/
 │   │       ├── subagent.go
 │   │       └── agent_tool.go
-│   └── flow/                     # D7-S4 Execution Flow (from ORCH-S1/S2)
-│       ├── hub.go
-│       ├── imsink.go
-│       └── workplan.go
-│
-├── orchestration/                 # ORCH (v2 read model — 迁移期内保留)
-│   ├── workplan/                  # → D7-S4 (迁移中)
-│   ├── flow/                      # → D7-S4 (迁移中)
-│   ├── imsink/                    # → D7-S4 (迁移中)
-│   └── wave/                      # → D7-S3 (迁移中)
+│   ├── flow/                      # D7-S4 ExecutionFlowHub (升格自 ORCH-S1/S2)
+│   │   └── hub.go
+│   ├── imsink/                    # D7-S4 IM 卡渲染 sink
+│   │   └── gateway.go
+│   └── workplan/                  # D7-S4 WorkPlan 快照
+│       └── service.go
 │
 ├── llmgateway/                    # D3
 │   ├── adapter/                   # D3-S1

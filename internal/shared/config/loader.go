@@ -13,25 +13,25 @@ import (
 
 // ConfigFile represents the YAML configuration structure
 type ConfigFile struct {
-	App         AppConfig         `yaml:"app"`
-	Session     SessionConfig     `yaml:"session"`
-	Auth        AuthFileConfig    `yaml:"auth"`
-	Permission  PermissionConfig  `yaml:"permission"`
-	Connection  ConnectionConfig  `yaml:"connection"`
-	RateLimit   RateLimitConfig  `yaml:"rate_limit"`
-	CLI         CLIConfig        `yaml:"cli"`
-	Commands    CommandsConfig    `yaml:"commands"`
-	Feishu      FeishuFileConfig `yaml:"feishu"`
-	Instance    InstanceConfig    `yaml:"instance"`
-	Logging     LoggingConfig     `yaml:"logging"`
-	Metrics        MetricsConfig        `yaml:"metrics"`
-	ContextEngine  ContextEngineConfig  `yaml:"context_engine"`
-	LLMGateway     LLMGatewayFileConfig `yaml:"llm_gateway"`
-	Tool           ToolConfig            `yaml:"tool"`
-	MultiAgent     MultiAgentFileConfig  `yaml:"multi_agent"`
-	AgentTools     AgentToolsFileConfig  `yaml:"agent_tools"`
-	Orchestration  OrchestrationFileConfig `yaml:"orchestration"`
-	D7             D7FileConfig            `yaml:"d7"`
+	App           AppConfig               `yaml:"app"`
+	Session       SessionConfig           `yaml:"session"`
+	Auth          AuthFileConfig          `yaml:"auth"`
+	Permission    PermissionConfig        `yaml:"permission"`
+	Connection    ConnectionConfig        `yaml:"connection"`
+	RateLimit     RateLimitConfig         `yaml:"rate_limit"`
+	CLI           CLIConfig               `yaml:"cli"`
+	Commands      CommandsConfig          `yaml:"commands"`
+	Feishu        FeishuFileConfig        `yaml:"feishu"`
+	Instance      InstanceConfig          `yaml:"instance"`
+	Logging       LoggingConfig           `yaml:"logging"`
+	Metrics       MetricsConfig           `yaml:"metrics"`
+	ContextEngine ContextEngineConfig     `yaml:"context_engine"`
+	LLMGateway    LLMGatewayFileConfig    `yaml:"llm_gateway"`
+	Tool          ToolConfig              `yaml:"tool"`
+	MultiAgent    MultiAgentFileConfig    `yaml:"multi_agent"`
+	AgentTools    AgentToolsFileConfig    `yaml:"agent_tools"`
+	Orchestration OrchestrationFileConfig `yaml:"orchestration"`
+	D7            D7FileConfig            `yaml:"d7"`
 }
 
 // AppConfig 应用配置
@@ -92,21 +92,22 @@ type MetricsConfig struct {
 
 // OrchestrationFileConfig 编排验证配置（文件格式）
 type OrchestrationFileConfig struct {
-	Enabled                bool     `yaml:"enabled"`
-	JudgeProvider          string   `yaml:"judge_provider"`
-	JudgeModel             string   `yaml:"judge_model"`
-	FallbackJudgeProvider  string   `yaml:"fallback_judge_provider"`
-	FallbackJudgeModel     string   `yaml:"fallback_judge_model"`
-	PreFilterEnabled       bool     `yaml:"pre_filter_enabled"`
-	MinIntervalBetweenJudges string `yaml:"min_interval_between_judges"`
-	MaxJudgeCallsPerMinute int      `yaml:"max_judge_calls_per_minute"`
-	TrustedToolAllowlist   []string `yaml:"trusted_tool_allowlist"`
-	InterventionThreshold  float64  `yaml:"intervention_threshold"`
-	AutoIntervene          bool     `yaml:"auto_intervene"`
+	Enabled                  bool     `yaml:"enabled"`
+	JudgeProvider            string   `yaml:"judge_provider"`
+	JudgeModel               string   `yaml:"judge_model"`
+	FallbackJudgeProvider    string   `yaml:"fallback_judge_provider"`
+	FallbackJudgeModel       string   `yaml:"fallback_judge_model"`
+	PreFilterEnabled         bool     `yaml:"pre_filter_enabled"`
+	MinIntervalBetweenJudges string   `yaml:"min_interval_between_judges"`
+	MaxJudgeCallsPerMinute   int      `yaml:"max_judge_calls_per_minute"`
+	TrustedToolAllowlist     []string `yaml:"trusted_tool_allowlist"`
+	InterventionThreshold    float64  `yaml:"intervention_threshold"`
+	AutoIntervene            bool     `yaml:"auto_intervene"`
 }
 
 // D7FileConfig is the YAML deserialization target for the D7 orchestration
-// domain. See internal/layers/d7/config.go for the runtime Config.
+// domain. See internal/layers/orchestration/coordinator/config.go for the
+// runtime Config.
 type D7FileConfig struct {
 	Enabled               *bool    `yaml:"enabled"`
 	FastPathThreshold     *int     `yaml:"fast_path_threshold"`
@@ -156,7 +157,6 @@ func LoadMultiAgentConfig(path string) (*MultiAgentConfig, error) {
 	return BuildMultiAgentConfig(&fileCfg.MultiAgent), nil
 }
 
-
 // LoadAgentToolsConfig loads agent tools configuration from a YAML file path.
 func LoadAgentToolsConfig(path string) (*AgentToolsConfig, error) {
 	if path == "" {
@@ -168,7 +168,6 @@ func LoadAgentToolsConfig(path string) (*AgentToolsConfig, error) {
 	}
 	return BuildAgentToolsConfig(&fileCfg.AgentTools), nil
 }
-
 
 // LoadLLMGatewayConfig loads Layer 3 config from a YAML file path.
 func LoadLLMGatewayConfig(path string) (*LLMGatewayConfig, error) {
@@ -495,8 +494,8 @@ func buildAuthConfig(fileCfg *ConfigFile) *types.AuthConfig {
 func buildRateLimitConfig(fileCfg *ConfigFile) *RateLimitConfig {
 	rateCfg := &RateLimitConfig{
 		RequestsPerMinute: 100,
-		BurstSize:        10,
-		Enabled:          true,
+		BurstSize:         10,
+		Enabled:           true,
 	}
 
 	if fileCfg == nil {

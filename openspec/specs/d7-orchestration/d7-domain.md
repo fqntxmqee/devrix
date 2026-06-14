@@ -29,8 +29,8 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/` |
 | D7-S1 Work Model | 🔶 PARTIAL | `internal/layers/contextengine/tasks/`（写模型仍在 D2） |
 | D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类/拆解未实现 |
-| D7-S2 Session Orchestrator | ⬜ PLANNED | D1 仍调用 `D2.Process`（`gateway.go:286`） |
-| `internal/layers/d7/` 包 | ⬜ PLANNED | 目录不存在 |
+| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` |
+| D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,shadow_classifier}.go` |
 
 **域边界**：
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）
@@ -144,18 +144,19 @@ v1.0 OrchestratePath：**不依赖** S5-P3；可路由至 PlanMode 或已有 del
 
 ### Requirement: D7 Domain Identity
 
-D7 MUST exist as a top-level domain package at `internal/layers/d7/` with defined DSAFT S/A/F/T mapping. Domain type MUST be "核心".
+D7 MUST exist as a top-level domain under `internal/layers/orchestration/coordinator/` with defined DSAFT S/A/F/T mapping. Domain type MUST be "核心".
 
-**Implementation Status (2026-06-14):** ⬜ PLANNED — `internal/layers/d7/` 不存在；现行能力分布在 `orchestration/` 与 `contextengine/tasks/`。
+**Implementation Status (2026-06-14):** ✅ IMPLEMENTED — `internal/layers/orchestration/coordinator/` 已落地（package `coordinator`）；与 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 协同构成 D7 完整实现。
 
-<!-- T: D7-IDENTITY-T01 (PLANNED) -->
+<!-- T: D7-IDENTITY-T01 (IMPLEMENTED) — covered by repo tree existence check + t-registry -->
 
-#### Scenario: D7 package exists
+#### Scenario: D7 coordinator package exists
 
 - GIVEN the Devrix project structure
-- WHEN checking `internal/layers/` directory
-- THEN a `d7/` directory exists
-- AND its import path is `github.com/devrix/devrix/internal/layers/d7`
+- WHEN checking `internal/layers/orchestration/` directory
+- THEN a `coordinator/` directory exists
+- AND its import path is `github.com/devrix/devrix/internal/layers/orchestration/coordinator`
+- AND its package declaration is `coordinator`
 
 #### Scenario: D7 domain registered in DSAFT mapping
 
