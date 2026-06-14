@@ -110,25 +110,28 @@ PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
 ### Requirement: D7-S1 Unified Work Model
 
-**Gap:** DiskStore 持久化在 D2，BackgroundTask 注册未迁入 D7。
+**状态:** v1.1 大部分完成。
 
 | 已有 | 缺失 |
 |------|------|
-| Task CRUD + 依赖（coordinator/task.go） | DiskStore 持久化迁入 D7 |
-| Plan 实体 + CreateWorkPlan（workmodel.go） | BackgroundTask 注册迁入 D7 |
+| Task CRUD + 依赖（coordinator/task.go） | BackgroundTask 注册迁入 D7 |
+| DiskStore 持久化（coordinator/task_store.go） | |
+| Plan 实体 + CreateWorkPlan（workmodel.go） | |
 | v1.1 LocalWorkModel | |
 
 ---
 
 ### Requirement: D7-S5 Decision Layer
 
-**Gap:** ClassifyIntent 已有规则版；SynthesizeTaskGraph 规则版已完成；LLM-based 拆解和 SelectExecutor 未实现。
+**状态:** v1.1 全部完成。
 
-| 已有 | 缺失 |
+| 已有 | 状态 |
 |------|------|
-| ClassifyIntent 规则版（classifier.go） | ClassifyIntent LLM fallback |
-| SynthesizeTaskGraph 规则版（decomposer.go） | SynthesizeTaskGraph LLM-based 拆解 |
-| | SelectExecutor (D2/D4 路由) |
+| ClassifyIntent 规则版（classifier.go） | ✅ |
+| ClassifyIntent LLM fallback（classifier_fallback.go） | ✅ |
+| SynthesizeTaskGraph 规则版（decomposer.go） | ✅ |
+| SynthesizeTaskGraph LLM-based 拆解（decomposer.go） | ✅ |
+| SelectExecutor D2/D4 路由（executor.go） | ✅ |
 
 ---
 
@@ -209,8 +212,10 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | G | 回归 + D7-MIG-T01 四组合矩阵 | ✅ |
 | H (v1.1) | S5-P3 SynthesizeTaskGraph + CreateWorkPlan | ✅ DONE |
 | I (v1.1) | Task 写模型迁入 coordinator | ✅ DONE |
-| J (v1.1) | DiskStore 持久化迁入 D7 | ⬜ PLANNED |
-| K (v1.1) | SelectExecutor D2/D4 路由 | ⬜ PLANNED |
+| J (v1.1) | DiskStore 持久化迁入 D7 | ✅ DONE |
+| K (v1.1) | SelectExecutor D2/D4 路由 | ✅ DONE |
+| L (v1.1) | ClassifyIntent LLM fallback | ✅ DONE |
+| M (v1.1) | SynthesizeTaskGraph LLM-based 拆解 | ✅ DONE |
 
 ---
 
@@ -224,3 +229,4 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 2.2.0 | 2026-06-15 | WireD7 bootstrap 实现完成；D2 Loop 瘦身待进行 |
 | 2.3.0 | 2026-06-14 | Task 写模型迁入 coordinator (Phase I 完成)；CreateWorkPlan 基础版 (Phase H 进行中) |
 | 2.4.0 | 2026-06-14 | SynthesizeTaskGraph 规则版实现 (D7-S5-A02)；Phase H 全部完成 |
+| 2.5.0 | 2026-06-14 | v1.1 全部完成：DiskStore 持久化、SelectExecutor、LLM fallback、LLM-based 拆解 |
