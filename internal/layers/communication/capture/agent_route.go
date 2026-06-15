@@ -73,27 +73,8 @@ func (g *CommunicationGateway) routeInboundViaAgent(
 		return fmt.Errorf("agent create: %w", err)
 	}
 
-	g.mu.Lock()
-	g.sessionAgents[session.SessionID] = ag
-	g.mu.Unlock()
-
-	ag.SetAgentObserver(&gatewayAgentObserver{gw: g, session: session})
-	if g.agentObserverFactory != nil {
-		obs := g.agentObserverFactory(ctx, session)
-		if obs != nil {
-			ag.SetAgentObserver(obs)
-			slog.Info("gateway: orchestration observer attached",
-				"session_id", session.SessionID,
-			)
-		} else {
-			slog.Warn("gateway: agentObserverFactory returned nil",
-				"session_id", session.SessionID,
-			)
-		}
-	}
-	ag.SetEngineEventSink(func(ev *contracts.EngineEvent) {
-		g.handleEngineEvent(ctx, session, ev)
-	})
+	g.RegisterSessionAgent(session.SessionID, ag)
+	g.attachSessionAgent(ctx, session, ag)
 
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
@@ -116,6 +97,55 @@ func (g *CommunicationGateway) routeInboundViaAgent(
 		g.persistSessionAfterProcess(session)
 	}()
 	return nil
+}
+
+// ensureSessionLeaderAgent provisions a session leader for D4 delegate/fork without
+// running Agent.Run on inbound. D7 owns ingress; the leader is the execution anchor.
+func (g *CommunicationGateway) ensureSessionLeaderAgent(ctx context.Context, session *types.Session) error {
+	if g.agentFactory == nil {
+		return nil
+	}
+	if g.SessionAgent(session.SessionID) != nil {
+		return nil
+	}
+	ag, err := g.agentFactory.Create(ctx, multiagent.AgentConfig{
+		SessionID: session.SessionID,
+		WorkDir:   session.WorkDir,
+	}, session)
+	if err != nil {
+		return fmt.Errorf("agent create: %w", err)
+	}
+	g.RegisterSessionAgent(session.SessionID, ag)
+	g.attachSessionAgent(ctx, session, ag)
+	slog.Info("gateway: session leader provisioned",
+		"session_id", session.SessionID,
+		"agent_id", ag.ID(),
+	)
+	return nil
+}
+
+func (g *CommunicationGateway) attachSessionAgent(
+	ctx context.Context,
+	session *types.Session,
+	ag multiagent.Agent,
+) {
+	ag.SetAgentObserver(&gatewayAgentObserver{gw: g, session: session})
+	if g.agentObserverFactory != nil {
+		obs := g.agentObserverFactory(ctx, session)
+		if obs != nil {
+			ag.SetAgentObserver(obs)
+			slog.Info("gateway: orchestration observer attached",
+				"session_id", session.SessionID,
+			)
+		} else {
+			slog.Warn("gateway: agentObserverFactory returned nil",
+				"session_id", session.SessionID,
+			)
+		}
+	}
+	ag.SetEngineEventSink(func(ev *contracts.EngineEvent) {
+		g.handleEngineEvent(ctx, session, ev)
+	})
 }
 
 func (g *CommunicationGateway) clearSessionAgent(sessionID string) {

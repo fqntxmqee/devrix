@@ -321,39 +321,40 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 	g.beginInboundTurn(session.SessionID, msg.MessageID)
 
+	if g.orchestrationEntry != nil {
+		if err := g.ensureSessionLeaderAgent(ctx, session); err != nil {
+			return err
+		}
+		processCtx, cancel := context.WithCancel(ctx)
+		g.registerProcess(session.SessionID, cancel)
+
+		g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
+		ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
+		if err != nil {
+			cancel()
+			g.unregisterProcess(session.SessionID)
+			return fmt.Errorf("d7 entry ProcessMessage: %w", err)
+		}
+		eventChan := ch
+
+		g.processes.Add(1)
+		go func() {
+			defer g.processes.Done()
+			defer endSpan()
+			defer cancel()
+			defer g.endInboundTurn(session.SessionID)
+			g.handleEngineEvents(processCtx, session, eventChan)
+			g.unregisterProcess(session.SessionID)
+			g.persistSessionAfterProcess(session)
+		}()
+		return nil
+	}
+
 	if g.agentFactory != nil {
 		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
 	}
 
-	if g.orchestrationEntry == nil {
-		return fmt.Errorf("orchestration entry not configured")
-	}
-
-	processCtx, cancel := context.WithCancel(ctx)
-	g.registerProcess(session.SessionID, cancel)
-
-	g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
-	ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
-	if err != nil {
-		cancel()
-		g.unregisterProcess(session.SessionID)
-		return fmt.Errorf("d7 entry ProcessMessage: %w", err)
-	}
-	eventChan := ch
-
-	// Handle events from context engine
-	g.processes.Add(1)
-	go func() {
-		defer g.processes.Done()
-		defer endSpan()
-		defer cancel()
-		defer g.endInboundTurn(session.SessionID)
-		g.handleEngineEvents(processCtx, session, eventChan)
-		g.unregisterProcess(session.SessionID)
-		g.persistSessionAfterProcess(session)
-	}()
-
-	return nil
+	return fmt.Errorf("orchestration entry not configured")
 }
 
 // handleEngineEvents processes events from the context engine.

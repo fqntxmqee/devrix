@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision"
+	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -81,6 +84,49 @@ func TestGateway_D7Enabled_RoutesToEntry(t *testing.T) {
 	}
 	if entry.lastMessage != "hello" {
 		t.Fatalf("last message = %q, want hello", entry.lastMessage)
+	}
+}
+
+// T: D7-D1-T02 — multi_agent factory must not hijack ingress when D7 entry is wired.
+func TestGateway_AgentFactoryWithD7_PrefersD7Path(t *testing.T) {
+	gw := newTestGateway(t)
+	entry := &fakeEntry{}
+	gw.SetOrchestrationEntry(entry)
+	factory := provision.NewAgentFactory(multiagent.AgentDeps{
+		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
+	}, config.DefaultMultiAgentConfig())
+	gw.SetAgentFactory(factory)
+
+	session, err := gw.CreateSession("cli", t.TempDir())
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	msg := &types.InboundMessage{
+		SessionID: session.SessionID,
+		ChatID:    "chat-d7-ma",
+		MessageID: "m1",
+		Content:   "hello",
+		UserID:    "user1",
+	}
+	if err := gw.RouteInbound(context.Background(), msg); err != nil {
+		t.Fatalf("RouteInbound err: %v", err)
+	}
+	gw.WaitForProcesses()
+
+	entry.mu.Lock()
+	processes := entry.processes
+	entry.mu.Unlock()
+	if processes != 1 {
+		t.Fatalf("orchestrationEntry.ProcessMessage calls = %d, want 1", processes)
+	}
+
+	ag := gw.SessionAgent(session.SessionID)
+	if ag == nil {
+		t.Fatal("expected session leader to be provisioned")
+	}
+	if ag.State() != multiagent.AgentStateCreated {
+		t.Fatalf("leader state = %v, want Created (must not Run on ingress)", ag.State())
 	}
 }
 

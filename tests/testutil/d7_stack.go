@@ -14,6 +14,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
+	"github.com/devrix/devrix/internal/layers/multiagent"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -25,6 +27,7 @@ type D7StackOptions struct {
 	LLMStub       *D7LLMStub
 	ExecutionFlow bool
 	Delegate      bool
+	MultiAgent    bool
 
 	// OverrideOrchestratePath replaces the lazy default OrchestratePath
 	// (which uses a zero-deps WaveScheduler that panics on Start). Tests
@@ -131,6 +134,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig())
 	gw.SetObservability(obs)
+
+	if opt.MultiAgent {
+		maCfg := config.DefaultMultiAgentConfig()
+		factory := multiagentprovision.NewAgentFactory(
+			multiagent.AgentDeps{Engine: engine},
+			maCfg,
+		)
+		gw.SetAgentFactory(factory)
+	}
 
 	if opt.ExecutionFlow {
 		bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
