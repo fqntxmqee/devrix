@@ -3,15 +3,15 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Status:** Active
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-16
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
 **Wave 设计参考:** `openspec/changes/devrix-wave-scheduler/design.md`
 
-> **实现说明（2026-06-14）：** D7-S3/S4 在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；D7-S2 SessionOrchestrator + D7-S5 ClassifyIntent/ShadowClassifier 在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；D7-S1 WorkModel 与 D7-S5 PlanMode 仍托管于 `contextengine/tasks/`（v1.1 迁入 coordinator）。
+> **实现说明（2026-06-16）：** D7-S3/S4 在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；D7-S2 SessionOrchestrator + Turn Leader（A06/A07）在 `coordinator/` + `turn/` 落地；D7-S5 ClassifyIntent/ShadowClassifier/LLM Decomposer 在 `coordinator/` 落地；D7-S1 WorkModel + D7-S5 PlanMode 已迁入 `orchestration/workmodel/`（v1.1 完成）。v1.2 + v2.0-b/c/f 全部闭环，t-registry 66/66 IMPLEMENTED。
 
 ---
 

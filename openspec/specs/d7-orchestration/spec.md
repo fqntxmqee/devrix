@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 2.5.0
+**Version:** 3.0.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-15
+**Last Updated:** 2026-06-16
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -142,7 +142,8 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 |---------|------------------|----------|
 | WorkPlan 读模型（D7-S4） | D2 RunQueryLoop | 会话上下文（D2） |
 | Wave DAG 调度（D7-S3） | D4 Delegate RunAgent | Agent 生命周期（D4） |
-| FlowEvent 契约（contracts） | Task 写模型（暂在 D2） | LLM 调用（D3） |
+| FlowEvent 契约（contracts） | — | LLM 调用（D3） |
+| Task/Plan 写模型（D7-S1） | | |
 
 ---
 
@@ -344,3 +345,7 @@ orchestration:
 | 2.3.0 | 2026-06-15 | **v1.0 + v1.1 闭环**：(1) S2 Turn Leader (DM-020) + Meta-Orchestrator 标注；(2) S1 State Authority 标注；(3) DSAFT 结构 + Scenarios 表 5/5 S 层 IMPLEMENTED；(4) Architecture 图更新至 D7-S2 主入口；(5) D7-S1 WorkModel Requirement 状态刷新（Partial → IMPLEMENTED）；(6) PLANNED Requirements 表全 ✅ |
 | **2.4.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：(1) `shared/contracts/llm_facade.go` 新增 `LLMCaller` + `Summarizer` 拆面契约；(2) `turn.QueryLLMCaller` + `turn.CompressionSummarizer` 实现并由 `bootstrap/context_engine.go` 单一注入点 wired 至 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`；(3) D2 production wiring 零 D3 import；(4) Cross-Domain Contracts 表新增两行 DM-020 拆面 IMPLEMENTED |
 | **2.5.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化**：(1) `coordinator.command_handler.go` 新增（IntentCommand 显式分发到 PlanCLI/CLICommands，零 LLM 成本）；(2) `coordinator.orchestrate_path.go` 新增（IntentOrchestrate 显式调 `TaskDecomposer.SynthesizeTaskGraph` + `WaveScheduler.Start` + `WaitForCompletion`）；(3) `coordinator.orchestrator.go::ProcessMessage` switch 4 case 改为 4 独立执行链，删除 v1.0 `handleCommand` / `orchestrate` 占位实现；(4) Architecture 图更新至 v1.1.0+ orthogonal 形态 |
+| **2.7.0** | **2026-06-15** | **D7 Real-Closure Spec Sync**：(1) 实现状态表 4 cell 更新（D7-S1 WorkModel、D7-S5 PlanMode、D7-S2-A06 RunTurnLoop、D7-S2-A07 InvokeLLM 全部 IMPLEMENTED）；(2) 域边界移除 "Task 写模型（暂在 D2）"；(3) D2 Loop 最终状态 sync（loop.go ≤200 行，LoopHooks 已删除）|
+| **2.9.0** | **2026-06-15** | **D2 Loop 瘦身闭环**：(1) `query/loop.go` 239 行→170 行（符合 ≤200 行目标）；(2) `LoopHooks` 结构体删除，4 个编排字段迁出（`PlanMode`/`TaskManager`/`Orchestration`/`Hub`）；(3) D7-D4-T01 / D7-THIN-T01/T02 T 点闭环 |
+| **2.10.0** | **2026-06-15** | **D7-S5 LLM Decomposer 闭环**：(1) `coordinator/llm_decomposer.go` 新增（LLM 增强任务合成，JSON DAG → wave.TaskNode）；(2) `coordinator/llm_decomposer_test.go` 7 T sub-cases（happy/bad JSON/enum coercion/unknown deps/extractJSON/nil LLM/routing）；(3) `WithLLMDecomposer` option wired into SessionOrchestrator |
+| **3.0.0** | **2026-06-16** | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 Task 状态机守卫（`IsLegalTransition` 24 transition + 4 journey）；(2) D7-S5-A01-T01 置信度阈值验证 + `FastPathThreshold` gating；(3) D7-S2-A06-T01..T04 Turn Leader 全部 IMPLEMENTED（含 SubQuery nested turn）；(4) D7-S2-A07-T01/T02 LLM Invoker breaker/timeout 测试（`llm_test.go` 9 tests）；(5) t-registry 3.0.0：66/66 IMPLEMENTED，0 PLANNED |

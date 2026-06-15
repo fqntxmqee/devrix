@@ -2,21 +2,17 @@
 
 **Change ID:** devrix-d7-orchestration-domain → current
 **Affects:** orchestration, contextengine/tasks, gateway entry, query loop
-**Version:** 2.6.0
+**Version:** 3.0.0
 **Status:** Active
-**Last Updated:** 2026-06-15
+**Last Updated:** 2026-06-16
 
 ---
 
 ## Current State Summary
 
-D7 编排域 **v1.0 核心目标已完成**：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier（D7-S5 A01/A05）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；D1 主入口通过 `bootstrap/wire_coordinator.go` 的 `WireD7` 函数切换至 `coordinator.Entry.ProcessMessage`（`d7.enabled=true` 激活）。
+D7 编排域 **v1.0 + v1.1 + v1.2 + v2.0-b/c/f 全部闭环**：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier + LLM Decomposer（D7-S5）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；Turn Leader（D7-S2-A06/A07）在 `internal/layers/orchestration/turn/` 完整实现；D1 主入口通过 `bootstrap/wire_coordinator.go` 的 `WireD7` 函数切换至 `coordinator.Entry.ProcessMessage`（`d7.enabled=true` 激活）。
 
-D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue 保留）；委托工具保持在 `contextengine/delegate_tools.go`（避免循环依赖）。
-
-**v1.1 待完成：**
-- Task 写模型迁入 `orchestration/coordinator/`
-- SynthesizeTaskGraph + CreateWorkPlan
+D2 Loop 已瘦身至 170 行（LoopHooks 结构体删除，4 个编排字段迁出：`PlanMode`/`TaskManager`/`Orchestration`/`Hub`）；Task/Plan 写模型已迁入 `orchestration/workmodel/`；t-registry 3.0.0 全部 66 个 T 点 IMPLEMENTED。
 
 ### S 层博弈角色（切法 A — 按用户价值流）
 
@@ -24,10 +20,11 @@ D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue
 
 | S 层 | 博弈角色 | North Star |
 |------|---------|------------|
-| D7-S2 | **Screening Mechanism** | 用户消息统一入口，决定走快速路径还是编排路径 |
+| D7-S2 | **Screening Mechanism** + **Turn Leader (Stackelberg)** | 用户消息统一入口 + Turn 主循环；S2 = Meta-Orchestrator 跨 S3/S4/S5 |
 | D7-S3 | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 |
 | D7-S4 | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 |
 | D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
+| D7-S1 | **State Authority**（非博弈角色） | Task/Plan 持久化与状态机；产"事实"而非"决策" |
 
 ---
 
@@ -88,11 +85,12 @@ D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue
 
 ---
 
-### Requirement: D7-S1 Task Manager (D2 托管)
+### Requirement: D7-S1 Task Manager (已迁入 D7)
 
-`TaskManager` MUST provide in-memory + optional disk-backed Task CRUD per session.
+`TaskManager` MUST provide in-memory + optional disk-backed Task CRUD per session with state machine guards.
 
-**Package:** `internal/layers/contextengine/tasks/task_manager.go`
+**Package:** `internal/layers/orchestration/workmodel/task_manager.go`
+**DSAFT:** D7-S1-A02
 
 #### Scenario: Disk persistence on v2 mode
 
@@ -100,13 +98,21 @@ D2 Loop 已精简（emit.go、executor.go分流，Attachments/Hooks/SessionQueue
 - WHEN Task is created and process restarts
 - THEN TaskManager.EnsureSession reloads tasks from disk
 
+#### Scenario: Illegal transition rejection
+
+- GIVEN a Task in completed status
+- WHEN UpdateStatus to pending is attempted
+- THEN ErrIllegalTransition is returned
+- AND status is unchanged
+
 ---
 
-### Requirement: D7-S5 Plan Mode (D2 托管)
+### Requirement: D7-S5 Plan Mode (已迁入 D7)
 
 PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
-**Package:** `internal/layers/contextengine/tasks/plan_mode.go`
+**Package:** `internal/layers/orchestration/workmodel/plan_mode.go`
+**DSAFT:** D7-S1-A04
 
 #### Scenario: Plan mode lifecycle
 
@@ -121,14 +127,16 @@ PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
 ### Requirement: D7-S1 Unified Work Model
 
-**状态:** v1.1 大部分完成。
+**状态:** v1.2 全部完成 ✅。
 
-| 已有 | 缺失 |
+| 已有 | 状态 |
 |------|------|
-| Task CRUD + 依赖（coordinator/task.go） | BackgroundTask 注册迁入 D7 |
-| DiskStore 持久化（coordinator/task_store.go） | |
-| Plan 实体 + CreateWorkPlan（workmodel.go） | |
-| v1.1 LocalWorkModel | |
+| Task CRUD + 依赖（workmodel/task_manager.go） | ✅ |
+| DiskStore 持久化（workmodel/disk_store.go） | ✅ |
+| Plan 实体 + CreateWorkPlan（coordinator/workmodel.go） | ✅ |
+| v1.2 LocalWorkModel + BackgroundProvider | ✅ |
+| TaskStatus 状态机守卫（IsLegalTransition） | ✅ |
+| BackgroundTask 注册与 QueryWorkPlan 可见 | ✅ |
 
 ---
 
@@ -183,12 +191,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `query.Loop.Run` MUST be ≤200 lines with no D4/queue imports.
 
-#### Scenario: Orchestration fields removed
-
-- GIVEN post-migration loop.go
-- THEN EnsureParallelAsyncBatch, WaitPendingAsyncBatch, SessionQueue, AfterToolRound MUST NOT exist
-
-**Current:** Loop.Run ~203 lines (target ≤200), Attachments/Hooks/SessionQueue removed, no multiagent/queue imports. Refactored into loop.go (264 lines) + emit.go (33 lines) + executor.go (81 lines).
+**Current:** ✅ IMPLEMENTED. loop.go 170 行（符合 ≤200 行目标），`LoopHooks` 结构体已删除，4 个编排字段已迁出（`PlanMode`/`TaskManager`/`Orchestration`/`Hub`），无 multiagent/queue imports。D7-THIN-T01/T02 闭环。
 
 ---
 
@@ -227,6 +230,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | K (v1.1) | SelectExecutor D2/D4 路由 | ✅ DONE |
 | L (v1.1) | ClassifyIntent LLM fallback | ✅ DONE |
 | M (v1.1) | SynthesizeTaskGraph LLM-based 拆解 | ✅ DONE |
+| N (v1.2 + v2.0) | Task 状态机守卫 + 置信度阈值 + Turn Leader + LLM Invoker | ✅ DONE |
 
 ---
 
@@ -241,3 +245,5 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 2.3.0 | 2026-06-14 | Task 写模型迁入 coordinator (Phase I 完成)；CreateWorkPlan 基础版 (Phase H 进行中) |
 | 2.4.0 | 2026-06-14 | SynthesizeTaskGraph 规则版实现 (D7-S5-A02)；Phase H 全部完成 |
 | 2.5.0 | 2026-06-14 | v1.1 全部完成：DiskStore 持久化、SelectExecutor、LLM fallback、LLM-based 拆解 |
+| 2.6.0 | 2026-06-15 | DM-020 Turn Leader wired + Hub-Spoke SoT + D2 Thin 进行中 |
+| 3.0.0 | 2026-06-16 | **v1.2 + v2.0-b/c/f 全部闭环**：(1) Task 写模型已迁入 `workmodel/`，D2 托管标注清除；(2) S 层表补 D7-S1 State Authority；(3) D7-S2 Turn Leader 角色补登；(4) Task Model Trinity PARTIAL→DONE；(5) D2 Thin 标注 170 行最终态；(6) Phase N 闭环 |
