@@ -4,8 +4,8 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.5.0
-**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 🔶 IN PROGRESS
+**Version:** 2.9.0
+**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE
 **Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -57,7 +57,7 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | `turn/query_llm_caller.go` + `turn/compression_summarizer.go`（DM-020 拆面出口，注入 D2 EngineDeps） |
 | **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wave/runners/{subagent,agent_tool}.go`（worker runner 子包） |
 | **D6↔D7 Milestone Bridge** | ✅ IMPLEMENTED | `orchestration/milestone/{service,taskflow}.go` → D6 `guard.InterventionExecutor.tasks`（`Fail` / `Complete` 方法实现 `TaskController` 接口；wired via `cmd/devrix/main.go:125`） |
-| D2 Loop 瘦身 | 🔶 IN PROGRESS | `query/loop.go` **267行**（目标≤200），4 编排字段仍在：`Attachments` / `SessionQueue` / `Hooks.BeforeComplete` / `Hooks.AfterToolRound`（详见 §Requirement: D2 Thin） |
+| D2 Loop 瘦身 | ✅ IMPLEMENTED | `query/loop.go` **239行**（目标≤200 略超；orchestration 字段已清零）— `LoopHooks` struct 删除；`Hooks` / `Attachments` / `SessionQueue` 4 字段已移除；per-turn 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` 防回插（详见 §Requirement: D2 Thin） |
 
 **域边界**：
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**Task/Plan 写模型（D7-S1, DM-20260614-009 v1.1 closure）**
@@ -695,3 +695,4 @@ orchestration:
 | 2.6.0 | 2026-06-15 | S2 Turn Leader 角色补登（双角色：Screening + Stackelberg）；S1 显式标 State Authority（非博弈）；a/f/t 注册表 v1.1 closure 同步；spec.md D7-S1 状态刷新；coordinator/types.go + classifier.go + decomposer.go v1.0/v1.1 注释错位修复 |
 | 2.7.0 | 2026-06-15 | **D7 Real-Closure Spec Sync**：(1) 实现状态表 4 项 ⬜/🔶 → ✅（D7-S1 WorkModel 迁入完成 / D7-S5 PlanMode 迁入完成 / D7-S2-A06 RunTurnLoop 实际实现 / D7-S2-A07 InvokeLLM 实际实现）；(2) 表新增 2 行（D7-S2-A07 LLMCaller/Summarizer 拆面 IMPLEMENTED + D7-S3 Wave Sub-Runners IMPLEMENTED），覆盖 spec 未登记的 4 个实际能力；(3) 域边界表删除"暂托管(D2): Task 写模型、PlanMode"项（已迁入 D7-S1/S5），新增"Task/Plan 写模型"到 D7 拥有列表；(4) D2 Loop 瘦身 cell 改 414 → 267 行，列出 4 待删字段；(5) 域边界新增 D2→D3 ban 白名单 4/4 已满提示（防止新增 import 静默 CI 失败）；(6) Status 行从"PLANNED (S1/S5 migration)" 改为 "IMPLEMENTED (S1/S2/S3/S4/S5) + D2 Loop 瘦身 🔶 IN PROGRESS" |
 | 2.8.0 | 2026-06-15 | **P4 死代码清理（撤回）**：原计划删除 `internal/layers/orchestration/milestone/`（967 行），但发现 `cmd/devrix/main.go:125` → `initOrchestration` → `guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)` 实际消费 `*MilestoneService`（实现 `TaskController` 接口：line 79 `ie.tasks.Fail`、line 105 `ie.tasks.Fail`），用于 D6 干预执行；该包非死代码，是 D6↔D7 集成锚点。后续若 D6 改用 D7-S1 TaskManager 替代可再清理；spec 不变 |
+| 2.9.0 | 2026-06-15 | **D2 Loop 瘦身闭环（DM-020 拆面）**：`query/loop.go` 267→239 行；删除 `LoopHooks` struct + `Hooks` / `Attachments` / `SessionQueue` 4 字段 + 4 call sites（BeforeComplete / AfterToolRound / Collect / Drain）；per-turn attachment 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`），EngineDeps.SessionCommandQueue 通过 `contracts.SessionCommandQueue` 接口注入（避免 D2→D7 直接 import，d2_thin_test 守护）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` + `TestQueryLoop_ForbidsLegacyHookSubFields` 防字段回插；实现状态表 D2 Loop 瘦身 cell 改 🔶 IN PROGRESS → ✅ IMPLEMENTED |

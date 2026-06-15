@@ -130,7 +130,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		ObsBridge:           b.obsBridge,
 		DefaultModel:        b.stack.DefaultModel,
 		TierResolver:        b.stack.TierResolver,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 	})
 }

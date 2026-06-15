@@ -54,8 +54,6 @@ type EngineDeps struct {
 	// TierResolver resolves model tier aliases to concrete model names.
 	// Optional; when nil, tier-based model selection is disabled.
 	TierResolver llmgateway.ITierResolver
-	// SessionCommandQueue drains Hub-Spoke notifications into QueryLoop (wired from bootstrap).
-	SessionCommandQueue contracts.SessionCommandQueue
 	// AgentRoleToolFilter hides delegate/worker tools (wired from orchestration/toolpolicy).
 	AgentRoleToolFilter AgentRoleToolFilter
 	// QueryLLMCaller performs streaming LLM calls for the query loop.
@@ -66,6 +64,10 @@ type EngineDeps struct {
 	// Production: injected from D7 turn.CompressionSummarizer via shared/contracts.Summarizer.
 	// Optional: when nil, falls back to LLM via compression.LLMSummarizer (Deprecated).
 	Summarizer contracts.Summarizer
+	// SessionCommandQueue drains Hub-Spoke notifications into the LLM context
+	// (D7-S4 → D2-S15 Prepare). Wired from bootstrap (orchestration/sessionqueue).
+	// Optional; when nil, hub-spoke drain is skipped.
+	SessionCommandQueue contracts.SessionCommandQueue
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -91,6 +93,8 @@ type ContextEngine struct {
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
 	mainTranscript *transcript.MainThreadStore
+	attachReg      *attachments.Registry
+	sessionQueue   contracts.SessionCommandQueue
 	defaultModel string
 	tierResolver llmgateway.ITierResolver
 	agentRoleToolFilter AgentRoleToolFilter
@@ -139,13 +143,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		ObsBridge: deps.ObsBridge,
 	})
 	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
-	attachReg := attachments.NewRegistry(cfg.Attachments)
 
 	loop := &query.Loop{
 		LLM:             queryCaller,
 		Tools:           query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
 		Permission:      query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
-		Attachments:     attachReg,
 		UserContext:     ucProvider,
 		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
 			return ToolContextWithGate(ctx, sc, deps.Permission)
@@ -153,7 +155,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		WrapToolStreamContext: func(ctx context.Context, emit query.EmitFunc, sessionID, toolName string) context.Context {
 			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
 		},
-		SessionQueue:   deps.SessionCommandQueue,
 		StreamingTools:    cfg.QueryLoop.StreamingTools,
 		Observability:     deps.ObsBridge,
 	}
@@ -202,6 +203,8 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
 		mainTranscript: mainTranscript,
+		attachReg:      attachments.NewRegistry(cfg.Attachments),
+		sessionQueue:   deps.SessionCommandQueue,
 		defaultModel: deps.DefaultModel,
 		tierResolver: deps.TierResolver,
 		agentRoleToolFilter: deps.AgentRoleToolFilter,
@@ -539,6 +542,19 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	messages := sc.CompressedView
 	if len(messages) > 0 && messages[0].Role == types.MessageRoleSystem {
 		messages = messages[1:]
+	}
+
+	// DM-020 D2 thin closure: per-turn attachment injection and Hub-Spoke
+	// drain now run in D2 Prepare (engine.runProcess), not inside query.Loop.
+	// The loop body is a pure LLM↔Tool execution primitive.
+	if e.attachReg != nil && !workerLocal {
+		payloads := e.attachReg.Collect(ctx, sc, messages, 0)
+		messages = append(messages, attachments.Render(payloads)...)
+	}
+	if e.sessionQueue != nil && !workerLocal {
+		mainThread := sc.AgentID == ""
+		drained := e.sessionQueue.Drain(sc.SessionID, sc.AgentID, mainThread)
+		messages = append(messages, contracts.RenderQueueNotifications(sc.SessionID, drained)...)
 	}
 
 	toolSchemas := harness.VisibleToolsFromState(sc.Harness)
