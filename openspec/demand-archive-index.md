@@ -62,7 +62,9 @@
 | DM-20260614-013 | D2 v2.0 — queue/ → orchestration/sessionqueue | devrix-d2-sa-refine-v2.0-sessionqueue | 2026-06-14 | — | ACCEPTED |
 | DM-20260614-014 | D2 v2.0 — 物理目录 prepare/persist/policy/nested | devrix-d2-sa-refine-v2.0-physical-dirs | 2026-06-14 | — | ACCEPTED |
 | DM-20260614-015 | D2 v2.0 — worker_tools → orchestration/toolpolicy | devrix-d2-sa-refine-v2.0-toolpolicy | 2026-06-14 | — | ACCEPTED |
+| **DM-20260614-016** | **D3 LLM Gateway S/A 重切 — 价值流化** | **devrix-d3-sa-refine** | **2026-06-14** | **—** | **ACCEPTED (v1.0; 15/15 AC; v1.1 + v2.0 子 change 已归档)** |
 | **DM-20260614-017** | **D3 LLM Gateway v1.1 — 韧性可见性 + 评测探针 + 适配扩展** | **devrix-d3-sa-refine-v1.1** | **2026-06-14** | **—** | **ACCEPTED (v1.1; 9 F + 10 T + 2 旁路修复; T08 持久化仍 PLANNED; probe #3 推迟 v1.2)** |
+| **DM-20260614-018** | **D4 Multi-Agent S/A 重切 — 执行原语价值流化 + Hub-Spoke 归位 D7** | **devrix-d4-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry + v2.0-d 物理迁移 + v2.0-e cleanup; 8 commits; 71 包全绿)** |
 | **DM-20260614-019** | **D3 LLM Gateway v2.0 — 价值流物理路径迁移 + contracts.go 拆分** | **devrix-d3-sa-refine-v2.0** | **2026-06-14** | **—** | **ACCEPTED (v2.0; 7 路径迁移 + 8 bridge + build/test/vet 全绿)** |
 | **DM-20260614-020** | **D7 Turn 编排上移 — D7 直调 D3，D2 Thin 上下文面** | **devrix-d7-turn-orchestration** | **2026-06-15** | **—** | **ACCEPTED (v2.0 Structure; Phase D 6 slices; D7→D3 LLM 直达; TurnOrchestrator 状态机; D2→D3 import lint; 全量测试通过)** |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
@@ -127,6 +129,7 @@
 | devrix-d2-sa-refine-v2.0-sessionqueue | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-sessionqueue/` |
 | devrix-d2-sa-refine-v2.0-physical-dirs | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-physical-dirs/` |
 | devrix-d2-sa-refine-v2.0-toolpolicy | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/` |
+| **devrix-d3-sa-refine** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine/`** |
 | **devrix-d3-sa-refine-v1.1** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v1.1/`** |
 | **devrix-d3-sa-refine-v2.0** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/`** |
 | **devrix-d7-sa-refine** | **`openspec/archive/2026-06-14-devrix-d7-sa-refine/`** |
@@ -150,8 +153,6 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
-| devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S7_Archived（v1.0 ACCEPTED 15/15 AC ✅；v1.1 子 change 已归档 ✅；v2.0 子 change 已归档 ✅） |
-| devrix-d4-sa-refine | DM-20260614-018 | `openspec/archive/2026-06-15-devrix-d4-sa-refine/` | S7_Archived（v1.0 registry ACCEPTED ✅；v2.0-d 物理迁移 + Hub-Spoke 搬迁 ACCEPTED ✅；v2.0-e re-export 6/6 删除 + delegate/ 清理 + E-e3 修复；8 commits；71 包全绿） |
 
 **2026-06-14 归档（S7 — D3 SA Refine v2.0）**：
 
