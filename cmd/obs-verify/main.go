@@ -44,7 +44,8 @@ func main() {
 		log.Fatal(err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "Hello from context engine"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   toolsReg,
 		Permission: mockctx.AllowAllPermission{},

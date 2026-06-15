@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -24,12 +24,12 @@ type WorkerObserver interface {
 // DSAFT: D4-S14-A01 (ExecuteWorker)
 type Executor struct {
 	cfg      config.DelegateConfig
-	worktree *worktree.Manager
+	worktree contracts.WorktreeSandbox
 	observer WorkerObserver
 }
 
 // NewExecutor creates a WorkerExecutor.
-func NewExecutor(cfg config.DelegateConfig, wt *worktree.Manager, obs WorkerObserver) *Executor {
+func NewExecutor(cfg config.DelegateConfig, wt contracts.WorktreeSandbox, obs WorkerObserver) *Executor {
 	return &Executor{cfg: cfg, worktree: wt, observer: obs}
 }
 

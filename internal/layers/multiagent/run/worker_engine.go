@@ -3,7 +3,6 @@ package run
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -34,12 +33,12 @@ func NewWorkerEngine(inner contracts.IEngine, cfg multiagent.AgentConfig, agentI
 
 // Process implements contracts.IEngine.
 func (w *WorkerEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
-	ov := contextengine.ProcessOverlay{
+	ov := contracts.ProcessOverlay{
 		AgentID:      w.agentID,
 		IsWorker:     true,
 		WorkerRole:   w.workerRole,
 		SystemPrompt: w.systemPrompt,
 		ModelTier:    w.modelTier,
 	}
-	return w.inner.Process(contextengine.WithProcessOverlay(ctx, ov), session, message)
+	return w.inner.Process(contracts.WithProcessOverlay(ctx, ov), session, message)
 }

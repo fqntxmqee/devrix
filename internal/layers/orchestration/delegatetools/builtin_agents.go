@@ -1,12 +1,12 @@
-package builtin
+package delegatetools
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/nested"
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt/agent"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
 )
@@ -17,29 +17,17 @@ const (
 	AgentImplement = "Implement"
 )
 
-// exploreSystemPrompt is the structured prompt for Explore agents,
-// loaded from the embedded prompts/explore.md.
-var exploreSystemPrompt = agent.ExplorePrompt
-
-// planSystemPrompt is the structured prompt for Plan agents,
-// loaded from the embedded prompts/plan.md.
-var planSystemPrompt = agent.PlanPrompt
-
-// implementSystemPrompt is the structured prompt for Implement agents,
-// loaded from the embedded prompts/implement.md.
-var implementSystemPrompt = agent.ImplementPrompt
-
-// RunExplore runs a read-only exploration sub-query.
+// RunExplore runs a read-only exploration sub-query via D2 nested execution.
 func RunExplore(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
-	return runBuiltin(ctx, deps, parent, AgentExplore, exploreSystemPrompt, prompt, tools, maxTurns, true)
+	return runBuiltin(ctx, deps, parent, AgentExplore, agent.ExplorePrompt, prompt, tools, maxTurns, true)
 }
 
-// RunPlan runs a read-only planning sub-query.
+// RunPlan runs a read-only planning sub-query via D2 nested execution.
 func RunPlan(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
-	return runBuiltin(ctx, deps, parent, AgentPlan, planSystemPrompt, prompt, tools, maxTurns, true)
+	return runBuiltin(ctx, deps, parent, AgentPlan, agent.PlanPrompt, prompt, tools, maxTurns, true)
 }
 
-// RunImplement runs a read-write implementation sub-query.
+// RunImplement runs a read-write implementation sub-query via D2 nested execution.
 func RunImplement(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", AgentImplement)
@@ -52,13 +40,14 @@ func RunImplement(ctx context.Context, deps nested.LoopDeps, parent *types.Sessi
 		ParentSC:       parent,
 		AgentID:        agentID,
 		AgentName:      AgentImplement,
-		SystemPrompt:   implementSystemPrompt,
+		SystemPrompt:   agent.ImplementPrompt,
 		PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: prompt, SessionID: parent.SessionID}},
 		Tools:          tools,
 		MaxTurns:       maxTurns,
 		OmitClaudeMd:   false,
 		ReadOnlyTools:  false,
 		ModelTier:      parent.ModelTier,
+		FlowReporter:   deps.FlowReporter,
 	})
 }
 
@@ -89,5 +78,6 @@ func runBuiltin(
 		OmitClaudeMd:   true,
 		ReadOnlyTools:  readOnly,
 		ModelTier:      parent.ModelTier,
+		FlowReporter:   deps.FlowReporter,
 	})
 }

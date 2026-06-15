@@ -10,8 +10,7 @@ import (
 // Summarizer generates a text summary for autocompact.
 //
 // Re-exported from shared/contracts (DM-020拆面契约). Implemented by
-// D7 turn.CompressionSummarizer; the local LLMSummarizer is a Deprecated
-// fallback that holds llmgateway.ILLMGateway directly.
+// D7 turn.CompressionSummarizer; injected via EngineDeps.Summarizer.
 type Summarizer = contracts.Summarizer
 
 // StepObserver receives compression step notifications.

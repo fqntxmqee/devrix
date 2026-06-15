@@ -112,6 +112,9 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	}
 	cfg := configure.DefaultLLMGatewayConfig()
 	cfg.DefaultProvider = "deepseek"
+	if p, ok := cfg.Providers["deepseek"]; ok && p.DefaultModel != "" {
+		cfg.DefaultModel = p.DefaultModel
+	}
 	reg := adapter.NewRegistry()
 	ech := &echoContextStub{}
 	_ = reg.Register(ech)
@@ -124,19 +127,26 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 		Obs:      obsBridge,
 	})
 	llmBridge := llmbridge.New(llmGW)
+	llmStack := llmbridge.ContextLLMStack{
+		Gateway:      llmBridge,
+		RawGateway:   llmGW,
+		TokenCounter: counter,
+		DefaultModel: cfg.DefaultModel,
+		TierResolver: llmBridge,
+	}
 
 	// --- D2: Context Engine ---
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          llmBridge,
-		TokenCounter: counter,
-		Tools:        &mockctx.ToolRunner{},
-		ToolsReg:     mustBuiltinRegistry(t),
-		Permission:   mockctx.AllowAllPermission{},
-		Config:       ctxCfg,
-		ObsBridge:    obsBridge,
-	})
+	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
+		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
+		contextengine.EngineDeps{
+			Tools:      &mockctx.ToolRunner{},
+			ToolsReg:   mustBuiltinRegistry(t),
+			Permission: mockctx.AllowAllPermission{},
+			ObsBridge:  obsBridge,
+		},
+	))
 
 	// --- D1: Communication Gateway ---
 	dir := t.TempDir()

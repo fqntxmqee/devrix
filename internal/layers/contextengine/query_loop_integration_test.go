@@ -6,8 +6,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -19,7 +19,8 @@ func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
 	cfg.QueryLoop.MaxTurns = 5
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &twoRoundToolLLM{},
+		QueryLLMCaller: &twoRoundToolLLM{},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool output"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -44,20 +45,19 @@ func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
 
 type twoRoundToolLLM struct{ n int }
 
-func (m *twoRoundToolLLM) ChatStream(_ context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
+func (m *twoRoundToolLLM) Call(_ context.Context, _ contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
 	m.n++
-	ch := make(chan llmgateway.Chunk, 1)
+	ch := make(chan contracts.LLMChunk, 1)
 	go func() {
 		defer close(ch)
 		if m.n == 1 {
-			ch <- llmgateway.Chunk{
-				ToolCalls: []llmgateway.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo hi"}`}},
+			ch <- contracts.LLMChunk{
+				ToolCalls: []contracts.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo hi"}`}},
 				Done:      true,
 			}
 			return
 		}
-		ch <- llmgateway.Chunk{Content: "finished", Done: true}
+		ch <- contracts.LLMChunk{Content: "finished", Done: true}
 	}()
-	_ = req
 	return ch, nil
 }

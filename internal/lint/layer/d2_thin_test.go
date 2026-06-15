@@ -38,7 +38,7 @@ func TestD2Thin_ContextEngine_NoOrchestrationOrMultiAgent(t *testing.T) {
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 	ctxRoot := filepath.Join(repoRoot, "internal", "layers", "contextengine")
 
-	pkgs, err := ParseImportGraph(ctxRoot)
+	pkgs, err := ParseProductionImportGraph(ctxRoot)
 	if err != nil {
 		t.Fatalf("ParseImportGraph(%s): %v", ctxRoot, err)
 	}
@@ -65,7 +65,7 @@ func repoRootFromTest(t *testing.T) string {
 
 func assertNoForbiddenImports(t *testing.T, root string) {
 	t.Helper()
-	pkgs, err := ParseImportGraph(root)
+	pkgs, err := ParseProductionImportGraph(root)
 	if err != nil {
 		t.Fatalf("ParseImportGraph(%s): %v", root, err)
 	}

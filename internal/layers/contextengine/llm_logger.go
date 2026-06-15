@@ -6,7 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -156,7 +156,7 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-func buildRequestInfo(iter int, model string, req *llmgateway.Request, full bool, spanPreview bool) LLMCallInfo {
+func buildRequestInfo(iter int, model string, req *contracts.LLMRequest, full bool, spanPreview bool) LLMCallInfo {
 	msgLimit := contentLimit(full, spanPreview)
 	tools := make([]ToolSchema, len(req.Tools))
 	for i, t := range req.Tools {
@@ -208,7 +208,7 @@ func buildResponseInfo(
 }
 
 // AddLLMRequestEvent records LLM request info on the span and optionally to a local file.
-func AddLLMRequestEvent(span tracer.Span, sessionID string, iter int, model string, req *llmgateway.Request) {
+func AddLLMRequestEvent(span tracer.Span, sessionID string, iter int, model string, req *contracts.LLMRequest) {
 	settings := currentLLMLogSettings()
 	fullForSpan := settings.LogContent
 	info := buildRequestInfo(iter, model, req, fullForSpan, !fullForSpan)

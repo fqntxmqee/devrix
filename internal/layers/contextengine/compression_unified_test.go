@@ -7,9 +7,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -35,7 +35,8 @@ func TestContextEngine_QueryLoop_UsesMessagesOnlyCompression(t *testing.T) {
 	cfg.QueryLoop.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &multiTurnQueryLLM{},
+		QueryLLMCaller: &multiTurnQueryLLM{},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool output"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -67,7 +68,8 @@ func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
 	cfg.QueryLoop.CompressPerTurn = true
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -96,7 +98,8 @@ func TestContextEngine_LegacyHarness_HarnessCompressionBranch(t *testing.T) {
 	cfg.Harness.Enabled = true
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -131,19 +134,19 @@ func sessionIDFor(i int) string {
 // 用以驱动 QueryLoop 多轮 + 触发 Compress 路径。
 type multiTurnQueryLLM struct{ n int }
 
-func (m *multiTurnQueryLLM) ChatStream(_ context.Context, _ *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
+func (m *multiTurnQueryLLM) Call(_ context.Context, _ contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
 	m.n++
-	ch := make(chan llmgateway.Chunk, 1)
+	ch := make(chan contracts.LLMChunk, 1)
 	go func() {
 		defer close(ch)
 		if m.n == 1 {
-			ch <- llmgateway.Chunk{
-				ToolCalls: []llmgateway.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo a"}`}},
+			ch <- contracts.LLMChunk{
+				ToolCalls: []contracts.ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"echo a"}`}},
 				Done:      true,
 			}
 			return
 		}
-		ch <- llmgateway.Chunk{Content: "done", Done: true}
+		ch <- contracts.LLMChunk{Content: "done", Done: true}
 	}()
 	return ch, nil
 }

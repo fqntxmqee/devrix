@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
@@ -38,8 +37,8 @@ type bashOnceThenDoneLLM struct {
 	calls atomic.Int32
 }
 
-func (m *bashOnceThenDoneLLM) ChatStream(ctx context.Context, _ *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
-	ch := make(chan llmgateway.Chunk, 2)
+func (m *bashOnceThenDoneLLM) Call(ctx context.Context, _ contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
+	ch := make(chan contracts.LLMChunk, 2)
 	go func() {
 		defer close(ch)
 		select {
@@ -48,11 +47,11 @@ func (m *bashOnceThenDoneLLM) ChatStream(ctx context.Context, _ *llmgateway.Requ
 		default:
 		}
 		if m.calls.Add(1) > 1 {
-			ch <- llmgateway.Chunk{Content: "done", Done: true}
+			ch <- contracts.LLMChunk{Content: "done", Done: true}
 			return
 		}
-		ch <- llmgateway.Chunk{
-			ToolCalls: []llmgateway.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
+		ch <- contracts.LLMChunk{
+			ToolCalls: []contracts.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
 			Done:      true,
 		}
 	}()
@@ -74,7 +73,8 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &bashOnceThenDoneLLM{},
+		QueryLLMCaller: &bashOnceThenDoneLLM{},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   reg,
 		Permission: permMgr,

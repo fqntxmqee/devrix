@@ -46,7 +46,8 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "obs ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "obs ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -119,7 +120,8 @@ func TestIntegration_HarnessObs_disabled_no_harness_spans(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "legacy"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "legacy"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -153,7 +155,8 @@ func TestIntegration_HarnessObs_coverage_hits_harness_operations(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "cov"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "cov"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},

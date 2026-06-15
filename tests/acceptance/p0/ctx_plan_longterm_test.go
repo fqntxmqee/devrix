@@ -12,8 +12,8 @@ import (
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -21,11 +21,11 @@ type accPlanLLM struct {
 	lastSystemPrompt string
 }
 
-func (p *accPlanLLM) ChatStream(_ context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
+func (p *accPlanLLM) Call(_ context.Context, req contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
 	p.lastSystemPrompt = req.SystemPrompt
-	ch := make(chan llmgateway.Chunk, 2)
+	ch := make(chan contracts.LLMChunk, 2)
 	go func() {
-		ch <- llmgateway.Chunk{Content: "Done.", Done: true}
+		ch <- contracts.LLMChunk{Content: "Done.", Done: true}
 		close(ch)
 	}()
 	return ch, nil
@@ -61,7 +61,8 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 	}
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        llm,
+		QueryLLMCaller: llm,
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   toolsReg,
 		Permission: mockctx.AllowAllPermission{},

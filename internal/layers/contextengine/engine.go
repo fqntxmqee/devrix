@@ -21,7 +21,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/token"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
@@ -36,7 +35,6 @@ import (
 
 // EngineDeps holds dependencies for ContextEngine.
 type EngineDeps struct {
-	LLM                 llmgateway.ILLMGateway
 	TokenCounter        contracts.ITokenCounter
 	Tools               IToolRunner
 	ToolsReg            IToolRegistry
@@ -53,16 +51,14 @@ type EngineDeps struct {
 	DefaultModel string
 	// TierResolver resolves model tier aliases to concrete model names.
 	// Optional; when nil, tier-based model selection is disabled.
-	TierResolver llmgateway.ITierResolver
+	TierResolver contracts.TierResolver
 	// AgentRoleToolFilter hides delegate/worker tools (wired from orchestration/toolpolicy).
 	AgentRoleToolFilter AgentRoleToolFilter
 	// QueryLLMCaller performs streaming LLM calls for the query loop.
 	// Production: injected from D7 turn.QueryLLMCaller via shared/contracts.LLMCaller.
-	// Optional: when nil, falls back to LLM via query.NewLLMCaller (Deprecated).
 	QueryLLMCaller contracts.LLMCaller
 	// Summarizer generates compression summaries for autocompact.
 	// Production: injected from D7 turn.CompressionSummarizer via shared/contracts.Summarizer.
-	// Optional: when nil, falls back to LLM via compression.LLMSummarizer (Deprecated).
 	Summarizer contracts.Summarizer
 	// SessionCommandQueue drains Hub-Spoke notifications into the LLM context
 	// (D7-S4 → D2-S15 Prepare). Wired from bootstrap (orchestration/sessionqueue).
@@ -77,7 +73,6 @@ type ContextEngine struct {
 	memory       *memory.Manager
 	counter      contracts.ITokenCounter
 	queryLoop    *query.Loop
-	llm          llmgateway.ILLMGateway
 	tools        IToolRunner
 	toolsReg     IToolRegistry
 	permission   contracts.IPermissionGate
@@ -96,7 +91,7 @@ type ContextEngine struct {
 	attachReg      *attachments.Registry
 	sessionQueue   contracts.SessionCommandQueue
 	defaultModel string
-	tierResolver llmgateway.ITierResolver
+	tierResolver contracts.TierResolver
 	agentRoleToolFilter AgentRoleToolFilter
 	queryCaller contracts.LLMCaller
 	summarizer  contracts.Summarizer
@@ -123,14 +118,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	store := snapshot.NewStore(&cfg.Snapshot)
 	queryCaller := deps.QueryLLMCaller
 	if queryCaller == nil {
-		queryCaller = query.NewLLMCaller(deps.LLM)
+		panic("contextengine: QueryLLMCaller is required (inject D7 turn.QueryLLMCaller)")
 	}
 	summarizer := deps.Summarizer
 	if summarizer == nil {
-		summarizer = &compression.LLMSummarizer{
-			LLM:     deps.LLM,
-			Timeout: cfg.Compression.Autocompact.Timeout,
-		}
+		panic("contextengine: Summarizer is required (inject D7 turn.CompressionSummarizer)")
 	}
 	var asyncCompact *compression.AsyncAutocompacter
 	if cfg.Compression.Autocompact.Enabled {
@@ -193,7 +185,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		compObserver: compObserver,
 		obsBridge:    deps.ObsBridge,
 		asyncCompact: asyncCompact,
-		llm:          deps.LLM,
 		tools:        deps.Tools,
 		toolsReg:     toolsReg,
 		permission:   deps.Permission,
@@ -328,7 +319,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		loadSpan.End()
 	}
 	workerLocal := false
-	if ov, ok := ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
+	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
 		sc = forkWorkerSessionContext(sc, ov)
 		workerLocal = true
 	}

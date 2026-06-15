@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -38,7 +37,7 @@ func LogLLMReadiness(configFile string) {
 
 // IsMockGateway reports whether the stack fell back to the in-process mock.
 func IsMockGateway(stack ContextLLMStack) bool {
-	_, ok := stack.Gateway.(*mockctx.LLMGateway)
+	_, ok := stack.Gateway.(*MockGateway)
 	return ok
 }
 

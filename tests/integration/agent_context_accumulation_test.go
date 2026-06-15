@@ -35,6 +35,9 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	}
 	llmCfg := configure.DefaultLLMGatewayConfig()
 	llmCfg.DefaultProvider = "deepseek"
+	if p, ok := llmCfg.Providers["deepseek"]; ok && p.DefaultModel != "" {
+		llmCfg.DefaultModel = p.DefaultModel
+	}
 	reg := adapter.NewRegistry()
 	ech := &echoContextStub{}
 	_ = reg.Register(ech)
@@ -46,17 +49,24 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		Counter:  counter,
 	})
 	llmBridge := llmbridge.New(llmGW)
+	llmStack := llmbridge.ContextLLMStack{
+		Gateway:      llmBridge,
+		RawGateway:   llmGW,
+		TokenCounter: counter,
+		DefaultModel: llmCfg.DefaultModel,
+		TierResolver: llmBridge,
+	}
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          llmBridge,
-		TokenCounter: counter,
-		Tools:        &mockctx.ToolRunner{},
-		ToolsReg:     mustBuiltinRegistry(t),
-		Permission:   mockctx.AllowAllPermission{},
-		Config:       ctxCfg,
-	})
+	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
+		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
+		contextengine.EngineDeps{
+			Tools:      &mockctx.ToolRunner{},
+			ToolsReg:   mustBuiltinRegistry(t),
+			Permission: mockctx.AllowAllPermission{},
+		},
+	))
 
 	dir := t.TempDir()
 	store, err := capture.NewFileSessionStore(dir)

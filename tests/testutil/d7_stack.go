@@ -116,15 +116,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		toolsReg = MustBuiltinRegistry(t)
 	}
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          bridge,
-		TokenCounter: counter,
-		Tools:        &mockctx.ToolRunner{},
-		ToolsReg:     toolsReg,
-		Permission:   mockctx.AllowAllPermission{},
-		Config:       ctxCfg,
-		ObsBridge:    obsBridge,
-	})
+	engine := contextengine.NewContextEngine(MergeEngineDeps(
+		ContextEngineDepsFromStack(llmStack, ctxCfg),
+		contextengine.EngineDeps{
+			Tools:      &mockctx.ToolRunner{},
+			ToolsReg:   toolsReg,
+			Permission: mockctx.AllowAllPermission{},
+			ObsBridge:  obsBridge,
+		},
+	))
 
 	store, err := capture.NewFileSessionStore(workDir)
 	if err != nil {
