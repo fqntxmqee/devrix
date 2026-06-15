@@ -101,6 +101,14 @@ func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrat
 	}
 }
 
+// OrchestrationEntry returns the wired D7 entry, or nil if D7 is not
+// active. Primarily a test seam: integration tests retrieve the entry
+// after WireD7 to inject custom components (fake WaveScheduler, custom
+// CommandHandler) via SessionOrchestrator setters.
+func (g *CommunicationGateway) OrchestrationEntry() contracts.IOrchestrationEntry {
+	return g.orchestrationEntry
+}
+
 // SetSessionSnapshotExporter wires optional session context export after process.
 func (g *CommunicationGateway) SetSessionSnapshotExporter(exp contracts.ISessionSnapshotExporter) {
 	g.snapshotExporter = exp

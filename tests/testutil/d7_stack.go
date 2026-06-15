@@ -15,6 +15,7 @@ import (
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -24,6 +25,13 @@ type D7StackOptions struct {
 	LLMStub       *D7LLMStub
 	ExecutionFlow bool
 	Delegate      bool
+
+	// OverrideOrchestratePath replaces the lazy default OrchestratePath
+	// (which uses a zero-deps WaveScheduler that panics on Start). Tests
+	// that drive the IntentOrchestrate branch must inject a custom path
+	// backed by a fake scheduler (see D7Stack.OrchestratePath entry in
+	// tests/integration/d7/d7_orthogonal_dispatch_test.go).
+	OverrideOrchestratePath *coordinator.OrchestratePath
 }
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
@@ -139,6 +147,14 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 
 	if err := bootstrap.WireD7("", gw, engine, obsBridge, llmStack); err != nil {
 		t.Fatalf("WireD7: %v", err)
+	}
+
+	if opt.OverrideOrchestratePath != nil {
+		entry, ok := gw.OrchestrationEntry().(*coordinator.Entry)
+		if !ok {
+			t.Fatalf("OverrideOrchestratePath requires *coordinator.Entry, got %T", gw.OrchestrationEntry())
+		}
+		entry.SetOrchestratePath(opt.OverrideOrchestratePath)
 	}
 
 	return &D7TestStack{

@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -13,9 +14,14 @@ type D7LLMStub struct {
 	Response string
 	// Delay blocks Stream until elapsed or ctx is cancelled (interrupt tests).
 	Delay time.Duration
+	// CallCount tracks total Stream invocations across all sessions. Tests
+	// use this to verify orthogonal dispatch (e.g. CommandHandler must not
+	// call LLM; CallCount stays at 0).
+	CallCount atomic.Int64
 }
 
 func (s *D7LLMStub) Stream(ctx context.Context, req *llmgateway.Request) (<-chan *llmgateway.AdapterChunk, error) {
+	s.CallCount.Add(1)
 	if s.Delay > 0 {
 		timer := time.NewTimer(s.Delay)
 		select {

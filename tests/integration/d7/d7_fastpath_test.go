@@ -47,8 +47,15 @@ func TestIntegration_D7FastPath_FullStackTurnLoop(t *testing.T) {
 	}
 }
 
-// T: D7-S5-T06
-func TestIntegration_D7CommandFirst_PlanCommandUsesTurnLoop(t *testing.T) {
+// T: D7-S2-A01-T04 (v1.1.0+ name) — plan command now routes through
+// CommandHandler, NOT TurnOrchestrator. v1.0 closure routed command to
+// FastPath with a "[command:xxx]" system-prompt hint, but the v1.1.0
+// orthogonal dispatch (devrix-d7-orthogonal-intent-paths) eliminates
+// the TurnLoop pass-through. The thin smoke test stays for regression
+// coverage of the D1→D7 path under the command classifier branch;
+// deeper verification of "CommandHandler bypasses LLM" lives in
+// d7_orthogonal_dispatch_test.go.
+func TestIntegration_D7CommandFirst_PlanCommandBypassesTurnLoop(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		LLMStub: &testutil.D7LLMStub{Response: "plan command handled"},
 	})

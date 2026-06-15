@@ -320,6 +320,23 @@ func (o *SessionOrchestrator) SetInterruptHandler(h *InterruptHandler) {
 	o.interruptHandler = h
 }
 
+// SetOrchestratePath replaces the OrchestratePath. v1.1.0+ orthogonal
+// dispatch: by default NewSessionOrchestrator installs a lazy
+// OrchestratePath bound to a zero-deps WaveScheduler (which is unsafe
+// for production). Production bootstrap and integration tests use this
+// setter to inject a fully-wired or fake scheduler.
+func (o *SessionOrchestrator) SetOrchestratePath(p *OrchestratePath) {
+	o.orchestratePath = p
+}
+
+// SetCommandHandler replaces the CommandHandler. Same rationale as
+// SetOrchestratePath — primarily a test seam so integration tests can
+// verify the orthogonal dispatch without depending on the lazy default
+// binding to workmodel.GlobalTaskManager.
+func (o *SessionOrchestrator) SetCommandHandler(h *CommandHandler) {
+	o.commandHandler = h
+}
+
 // registerInterrupt installs a cancel func keyed by sessionID. The same
 // session can only have one active orchestrator process.
 func (o *SessionOrchestrator) registerInterrupt(sessionID string, cancel context.CancelFunc) {
