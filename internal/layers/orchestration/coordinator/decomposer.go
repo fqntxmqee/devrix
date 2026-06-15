@@ -17,8 +17,8 @@ type LLMTaskDecomposer interface {
 }
 
 // TaskDecomposer implements D7-S5-A02 SynthesizeTaskGraph.
-// v1.1 provides a simple rule-based decomposition. LLM-based decomposition
-// is available via SetLLMDecomposer.
+// Default path is rule-based decomposition. LLM-based decomposition is
+// available via SetLLMDecomposer (used when a planning LLM is wired).
 type TaskDecomposer struct {
 	llmDecomposer LLMTaskDecomposer
 	timeout       time.Duration

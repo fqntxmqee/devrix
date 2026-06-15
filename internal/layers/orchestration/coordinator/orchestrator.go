@@ -78,9 +78,23 @@ func WithShadowClassifier(s *ShadowClassifier) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.shadowClassifier = s }
 }
 
+// WithClassifier replaces the default RuleClassifier. The default is
+// NewRuleClassifier(cfg) (rule-only). Tests use this to inject stubs;
+// v1.1+ may inject a LLM-first classifier that satisfies
+// IntentClassifier directly.
+//
+// Invariant: the option must be applied before any ProcessMessage
+// call. Re-invoking replaces the active classifier; if a ShadowClassifier
+// is also wired, WithShadowClassifier takes precedence at the call site
+// (ProcessMessage checks shadow first).
+func WithClassifier(c IntentClassifier) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.classifier = c }
+}
+
 // NewSessionOrchestrator builds the orchestrator with the given
-// query-loop executor and options. The classifier is built from cfg via
-// NewRuleClassifier.
+// query-loop executor and options. The classifier defaults to
+// NewRuleClassifier(cfg) (rule-only) but can be replaced via
+// WithClassifier (tests, LLM-first v1.1+).
 //
 // Options are applied in order. WithSink and WithValidator must be passed
 // before the orchestrator constructs the FastPath (i.e. via the returned

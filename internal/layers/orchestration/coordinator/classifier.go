@@ -8,12 +8,13 @@ import (
 
 // IntentClassifier produces an IntentClassification from a raw user message.
 //
-// v1.0 implementation is rule-only (per R2 OQ-3 resolution B-improved: tail
-// shadow only). LLM-based classification is deferred to v1.1.
+// The v1.0 decision path is rule-only (per R2 OQ-3 resolution B-improved:
+// tail shadow only — see ShadowClassifier). LLM-based classification
+// surfaces via SetLLMClassifier (rule-and-LLM merge) when wired.
 //
 // The classifier must:
 //   - Be safe for the FastPath hot path: no allocations beyond the result;
-//     sub-millisecond on the v1.0 rule set.
+//     sub-millisecond on the rule set.
 //   - Be deterministic: same input → same output (rule order is the source
 //     of priority).
 //   - Honor CommandFirst: recognized commands short-circuit.
@@ -21,8 +22,9 @@ type IntentClassifier interface {
 	Classify(ctx context.Context, message string) (IntentClassification, error)
 }
 
-// RuleClassifier is the v1.0 implementation. It is concurrency-safe (no
-// internal state mutated during Classify).
+// RuleClassifier is the rule-only implementation. It is concurrency-safe
+// (no internal state mutated during Classify). For LLM-augmented paths,
+// see classifier_fallback.go.
 type RuleClassifier struct {
 	cfg            *Config
 	commandRegexes []*regexp.Regexp

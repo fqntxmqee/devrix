@@ -26,14 +26,19 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 
 ### S 层博弈角色定义（切法 A — 按用户价值流）
 
-> **基于 `devrix-d7-sa-refine` (DM-20260614-008)**
+> **基于 `devrix-d7-sa-refine` (DM-20260614-008) + DM-020 D7 Turn 编排上移 (DM-20260614-020)**
 
 | S 层 | 博弈角色 | North Star |
 |------|---------|------------|
-| D7-S2 | **Screening Mechanism** | 用户消息统一入口，决定走快速路径还是编排路径 |
+| D7-S2 | **Screening Mechanism** + **Turn Leader (Stackelberg)** | 用户消息统一入口 + Turn 主循环；S2 = Meta-Orchestrator 跨 S3/S4/S5 |
 | D7-S3 | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 |
 | D7-S4 | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 |
 | D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
+
+> **S2 双角色博弈论说明**：
+> - **Screening Mechanism**（Stag Hunt）：FastPath vs OrchestratePath 二选一，置信度门槛 0.9（`D7-S2-T02b`）。
+> - **Turn Leader (Stackelberg)**：拥有 LLM 调用权（DM-020），是先手；D2/D4 是 follower（通过拆面契约 `ContextPreparer/ToolRoundExecutor/SessionPersister`）。
+> - S2 跨过 S3/S4/S5 的"机制-信号-信息"边界（详见 design.md §S 层 ② 原则），是元层；spec §Scenarios 显式标 D7-S2 = Meta-Orchestrator。
 
 **注：** D7-S5 决策的是**结构路径**（goal → TaskNode DAG），不是**内容质量**。Explore Workers 的 FlowEvent 通过 D7-S4 广播后被 D7-S5 吸收。
 
@@ -684,3 +689,4 @@ orchestration:
 | 2.3.0 | 2026-06-15 | WireCoordinator bootstrap 实现完成；D2 Loop 瘦身进行中 |
 | 2.4.0 | 2026-06-15 | Hub-Spoke SoT + D7 Turn Leader 产权声明（DM-020/DM-018 SPEC） |
 | 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 登记；D2 Follower 拆面契约（ContextPreparer/ToolRoundExecutor/SessionPersister）；D7→D3 边界声明 |
+| 2.6.0 | 2026-06-15 | S2 Turn Leader 角色补登（双角色：Screening + Stackelberg）；S1 显式标 State Authority（非博弈）；a/f/t 注册表 v1.1 closure 同步；spec.md D7-S1 状态刷新；coordinator/types.go + classifier.go + decomposer.go v1.0/v1.1 注释错位修复 |

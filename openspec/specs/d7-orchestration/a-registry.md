@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -40,23 +40,23 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 ---
 
-## D7-S1: Work Model 🔶 LEGACY
+## D7-S1: Work Model ✅ LEGACY
 
-> 写模型现行托管于 D2 `contextengine/tasks/`，v1.1 迁移至 `internal/layers/orchestration/coordinator/workmodel.go`。
+> Task/Plan 写模型已迁入 `internal/layers/orchestration/coordinator/workmodel.go` + `internal/layers/orchestration/workmodel/` 包（v1.1 closure, layer-delta Phase I/J）。`contextengine/tasks/` 保留为兼容 shim。
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S1-A01 | CreateWorkPlan | A-BE | session_id, goal, context | Plan (Task 列表 + DAG) | work_plan.created | ⬜ | `coordinator/workmodel.go` (planned v1.1) |
-| D7-S1-A02 | ManageTask | A-BE | task_id, action (create/update/delete/dep) | task_state | task.* | ✅ | `contextengine/tasks/task_manager.go` |
+| D7-S1-A01 | CreateWorkPlan | A-BE | session_id, goal, context | Plan (Task 列表 + DAG) | work_plan.created | ✅ | `coordinator/workmodel.go` + `workmodel/plan_mode.go` |
+| D7-S1-A02 | ManageTask | A-BE | task_id, action (create/update/delete/dep) | task_state | task.* | ✅ | `workmodel/task_manager.go` + `task_store.go` |
 | D7-S1-A03 | QueryWorkPlan | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
 
 ### D7-S1 附加活动（PlanMode）
 
 | A ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S1-A04 | EnterPlanMode | A-BE | session_id, goal | plan_state | ✅ | `contextengine/tasks/plan_mode.go` |
-| D7-S1-A05 | ApprovePlan | A-BE | session_id | []Task | ✅ | `contextengine/tasks/plan_mode.go` |
-| D7-S1-A06 | ExecutePlanAgent | A-BE | goal, context | PlanResult | ✅ | `contextengine/tasks/plan_agent.go` |
+| D7-S1-A04 | EnterPlanMode | A-BE | session_id, goal | plan_state | ✅ | `workmodel/plan_mode.go` |
+| D7-S1-A05 | ApprovePlan | A-BE | session_id | []Task | ✅ | `workmodel/plan_mode.go` |
+| D7-S1-A06 | ExecutePlanAgent | A-BE | goal, context | PlanResult | ✅ | `workmodel/plan_agent.go` |
 
 ---
 
@@ -67,7 +67,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
 | D7-S2-A01 | ProcessMessage | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
-| D7-S2-A02 | EvaluateIntent | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S2-A02 | EvaluateIntent | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 
 ---
@@ -96,16 +96,16 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 ---
 
-## D7-S5: Decision & Planning 🔶 LEGACY
+## D7-S5: Decision & Planning ✅ LEGACY
 
-> PlanMode/PlanAgent 已实现；ClassifyIntent/Rule 分类已实现（coordinator）；SynthesizeTaskGraph/SelectExecutor 推迟至 v1.1。
+> PlanMode/PlanAgent、ClassifyIntent（规则+LLM fallback）、SynthesizeTaskGraph、SelectExecutor 均已实现（layer-delta Phase H/K/L/M）。
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S5-A01 | ClassifyIntent | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
-| D7-S5-A02 | SynthesizeTaskGraph | A-BE | goal, constraints | []TaskNode | plan.formulated | ⬜ | `coordinator/decomposer.go` (planned v1.1) |
-| D7-S5-A03 | SelectExecutor | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ⬜ | `coordinator/executor.go` (planned v1.1) |
-| D7-S5-A04 | RunPlanAgent | A-BE | goal, readonly context | PlanResult | plan.generated | ✅ | `contextengine/tasks/plan_agent.go` |
+| D7-S5-A01 | ClassifyIntent | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` (LLM merge) |
+| D7-S5-A02 | SynthesizeTaskGraph | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ✅ | `coordinator/decomposer.go` (rule + LLM via SetLLMDecomposer) |
+| D7-S5-A03 | SelectExecutor | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ✅ | `coordinator/executor.go` |
+| D7-S5-A04 | RunPlanAgent | A-BE | goal, readonly context | PlanResult | plan.generated | ✅ | `workmodel/plan_agent.go` |
 | D7-S5-A05 | TailShadowClassify | A-BE | message, rule_result | — | metric only | ✅ | `orchestration/coordinator/shadow_classifier.go` |
 
 ---
@@ -122,11 +122,11 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
 | D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
-| D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
-| D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | 🔶 | `delegatetools/delegate_tools.go` (v1.0) → v2.0 `hubspoke/dispatch.go` |
-| **D7-S2-A06** | **RunTurnLoop** | — | **A-BE** | **session, TurnRequest** | **<-chan EngineEvent** | **turn.{started,completed,failed}** | **⬜ v2.0** | **`orchestration/turn/orchestrator.go`（DM-020 v1.0 Registry）** |
-| **D7-S2-A07** | **InvokeLLM** | — | **A-BE** | **LLMInvokeRequest** | **<-chan Chunk** | **llm.{invoked,streaming,completed}** | **⬜ v2.0** | **`orchestration/turn/llm.go`（DM-020 v1.0 Registry）** |
+| D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | ✅ | `hubspoke/dispatch.go`（v1.0 路径：`bootstrap/delegate.go` 已 wired） |
+| **D7-S2-A06** | **RunTurnLoop** | — | **A-BE** | **session, TurnRequest** | **<-chan EngineEvent** | **turn.{started,completed,failed}** | **✅** | **`orchestration/turn/orchestrator.go`**（DM-020 v1.0-c；wired by `bootstrap/wire_coordinator.go:60`） |
+| **D7-S2-A07** | **InvokeLLM** | — | **A-BE** | **LLMInvokeRequest** | **<-chan Chunk** | **llm.{invoked,streaming,completed}** | **✅** | **`orchestration/turn/llm.go`**（DM-020 v1.0-b；wired by `bootstrap/wire_coordinator.go:59`） |
 
 > **D7-S2-A04**（DM-20260614-018）：Hub-Spoke 派发矩阵 + fallback 路由。v1.0 逻辑在 D4 `delegate/service.go`；v2.0 迁 `hubspoke/dispatch.go`。
 
@@ -151,8 +151,8 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | D7-S4-A01 | PublishFlowEvent | D7-S4-A01-LEGACY | A-BE | flow_event | — | flow.event_published | ✅ | `orchestration/flow/hub.go` Publish |
 | D7-S4-A02 | SnapshotWorkPlan | D7-S4-A02-LEGACY | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
 | D7-S4-A03 | NotifyGateway | D7-S4-A03-LEGACY | A-BE | event, session | — | — | ✅ | `orchestration/imsink/gateway.go` |
-| D7-S4-A04 | BridgeAgentSpoke | D4-S10-A02 | A-BE | agent_event, engine_event | — | flow.published | 🔶 | `multiagent/delegate/bridge.go` (v1.0) → v2.0 `hubspoke/agent_bridge.go` |
-| D7-S4-A05 | BridgeSubQuerySpoke | D2-S19（Flow 面） | A-BE | subquery_result | flow_event | flow.published | 🔶 | `contextengine/nested/flow_report.go` (v1.0) → v2.0 `hubspoke/subquery_bridge.go` |
+| D7-S4-A04 | BridgeAgentSpoke | D4-S10-A02 | A-BE | agent_event, engine_event | — | flow.published | ✅ | `hubspoke/agent_bridge.go`（wired by `bootstrap/delegate.go:52`） |
+| D7-S4-A05 | BridgeSubQuerySpoke | D2-S19（Flow 面） | A-BE | subquery_result | flow_event | flow.published | ✅ | `hubspoke/subquery_bridge.go`（wired by `bootstrap/delegate.go`） |
 
 > **D7-S4-A04/A05**（DM-20260614-018）：统一三 Spoke 写侧（D4 Delegate / D2 SubQuery / D7 Wave）→ `ExecutionFlowHub`。
 
@@ -164,9 +164,9 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
-| D7-S5-A01 | ClassifyIntent | D7-S5-A01-LEGACY | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` |
-| D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ⬜ | `coordinator/decomposer.go` (planned v1.1) |
-| D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ⬜ | `coordinator/executor.go` (planned v1.1) |
+| D7-S5-A01 | ClassifyIntent | D7-S5-A01-LEGACY | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
+| D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ✅ | `coordinator/decomposer.go`（rule + LLM via SetLLMDecomposer） |
+| D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ✅ | `coordinator/executor.go` |
 
 ---
 
@@ -174,7 +174,9 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 16 (Canonical) | 14 + 8 | 1 + 3 | 4 + 5 |
+| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 16 (Canonical) | 19 + 16 | 0 | 0 |
+
+> **v1.0 + v1.1 closure (2026-06-15):** All S-layer activities are now IMPLEMENTED. v2.0-c/f slices (A06/A07 T 层) are still PLANNED at the T level (no test fixtures in `turn/orchestrator_test.go`); the A 层 activities themselves are wired and active in `bootstrap/wire_coordinator.go`.
 
 ---
 
@@ -187,3 +189,4 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | 2.1.0 | 2026-06-14 | 包路径迁移 `internal/layers/d7/` → `internal/layers/orchestration/coordinator/`；D7-S2/S5-A01/S5-A05 标记 ✅ |
 | 3.0.0 | 2026-06-14 | Hub-Spoke A 增量：D7-S2-A04 DispatchWorker + D7-S4-A04/A05 SpokeBridge（DM-20260614-018） |
 | 3.1.0 | 2026-06-15 | Turn Leader A 增量：D7-S2-A06 RunTurnLoop + D7-S2-A07 InvokeLLM（DM-020 v1.0 Registry） |
+| 3.2.0 | 2026-06-15 | **v1.0 + v1.1 闭环对齐**：(1) D7-S1 写模型迁入 coordinator/workmodel.go + workmodel/，A01-A06 全 ✅；(2) D7-S2-A02/D7-S2-A04/D7-S2-A06/D7-S2-A07 wired 至 bootstrap；(3) D7-S4-A04/A05 wired 至 hubspoke；(4) D7-S5-A02/A03 规则+LLM 双路径实装。统计 19+16/19+16/0/0 |

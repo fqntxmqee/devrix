@@ -55,9 +55,10 @@ type IntentClassification struct {
 
 // TaskStatus is the canonical status enum used by the WorkModel facade.
 //
-// In v1.0, status transitions are not strictly validated (see R1 Q3). v1.1
-// introduces a state-machine guard. Aliases for the v1.0 target names from
-// the spec are documented in d7-domain.md.
+// Status transitions are guarded by the workmodel layer's state machine
+// (see workmodel/task_manager.go). Aliases for the v1.0 target names
+// (created/assigned/running) are documented in d7-domain.md §Task Status
+// Vocabulary.
 type TaskStatus = workmodel.TaskStatus
 
 const (

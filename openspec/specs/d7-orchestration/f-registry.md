@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.0.0
+**Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 
@@ -28,13 +28,15 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | D7-S1-A02-F05 | PersistToDisk | F-BE | session_id | — | ✅ | `contextengine/tasks/disk_store.go` |
 | D7-S1-A02-F06 | SetOwner | F-BE | task_id, worker_id | — | ✅ | `contextengine/tasks/task_manager.go` |
 
-## D7-S1-A01 CreateWorkPlan ⬜
+## D7-S1-A01 CreateWorkPlan ✅
+
+> **v1.1 closure:** 写模型已迁入 `coordinator/workmodel.go` + `workmodel/plan_mode.go`。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S1-A01-F01 | SynthesizePlan | F-BE | goal, context | []TaskNode | ⬜ | `d7/workmodel.go` (planned) |
-| D7-S1-A01-F02 | ValidatePlanDAG | F-BE | []TaskNode | valid/invalid | ⬜ | `d7/workmodel.go` (planned) |
-| D7-S1-A01-F03 | EstimateTaskScope | F-BE | goal, context | complexity_score | ⬜ | `d7/workmodel.go` (planned) |
+| D7-S1-A01-F01 | SynthesizePlan | F-BE | goal, context | []TaskNode | ✅ | `coordinator/workmodel.go` SynthesizePlan |
+| D7-S1-A01-F02 | ValidatePlanDAG | F-BE | []TaskNode | valid/invalid | ✅ | `coordinator/workmodel.go` validateDAG + `decomposer.go` validateGraph |
+| D7-S1-A01-F03 | EstimateTaskScope | F-BE | goal, context | complexity_score | ✅ | `coordinator/decomposer.go` decomposeGoal |
 
 ## D7-S1-A03 QueryWorkPlan ✅
 
@@ -46,29 +48,31 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ## D7-S1-A04/A05 PlanMode ✅
 
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| D7-S1-A04-F01 | EnterPlanMode | F-BE | session_id, goal | — | ✅ | `contextengine/tasks/plan_mode.go` |
-| D7-S1-A04-F02 | GeneratePlan | F-BE | goal | PlanResult | ✅ | `contextengine/tasks/plan_agent.go` |
-| D7-S1-A05-F01 | ApprovePlan | F-BE | session_id | []Task | ✅ | `contextengine/tasks/plan_mode.go` |
-| D7-S1-A05-F02 | RejectPlan | F-BE | session_id | — | ✅ | `contextengine/tasks/plan_mode.go` |
-
-## D7-S2-A01 ProcessMessage ⬜
+> **v1.1 closure:** 迁入 `workmodel/plan_mode.go` + `workmodel/plan_agent.go`。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ⬜ | `d7/fastpath.go` (planned) |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A01-F04 | OrchestrateSessionLoop | F-BE | plan, ctx | — | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A01-F05 | EmitSessionEvents | F-BE | event | — | ⬜ | `d7/orchestrator.go` (planned) |
+| D7-S1-A04-F01 | EnterPlanMode | F-BE | session_id, goal | — | ✅ | `workmodel/plan_mode.go` Enter |
+| D7-S1-A04-F02 | GeneratePlan | F-BE | goal | PlanResult | ✅ | `workmodel/plan_agent.go` GeneratePlan |
+| D7-S1-A05-F01 | ApprovePlan | F-BE | session_id | []Task | ✅ | `workmodel/plan_mode.go` Approve |
+| D7-S1-A05-F02 | RejectPlan | F-BE | session_id | — | ✅ | `workmodel/plan_mode.go` Reject |
 
-## D7-S2-A02 EvaluateIntent ⬜
+## D7-S2-A01 ProcessMessage ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A02-F01 | ClassifyByRules | F-BE | message | rules_hint + confidence | ⬜ | `d7/classifier.go` (planned) |
-| D7-S2-A02-F02 | ScoreComplexity | F-BE | message | complexity | ⬜ | `d7/classifier.go` (planned) |
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `coordinator/orchestrator.go` ProcessMessage switch |
+| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `coordinator/fastpath.go` Run |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `coordinator/orchestrator.go` orchestrate (delegates to D2/turn) |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `coordinator/orchestrator.go` + `EventPublisher` |
+| D7-S2-A01-F05 | HandleInterrupt | F-BE | session_id, reason | — | ✅ | `coordinator/interrupt.go` |
+
+## D7-S2-A02 EvaluateIntent ✅
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D7-S2-A02-F01 | ClassifyByRules | F-BE | message | rules_hint + confidence | ✅ | `coordinator/classifier.go` RuleClassifier.Classify |
+| D7-S2-A02-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `coordinator/classifier_fallback.go`（合并 LLM-first 路径） |
 
 ## D7-S2-A03 HandleInterrupt 🔶
 
@@ -129,28 +133,34 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 |------|------|------|-------|--------|--------|---------------|
 | D7-S4-A03-F01 | EmitWorkerProgress | F-BE | FlowEvent | EngineEvent | ✅ | `orchestration/imsink/gateway.go` |
 
-## D7-S5-A01 ClassifyIntent ⬜
+## D7-S5-A01 ClassifyIntent ✅
+
+> **v1.1 closure:** LLM-first 路径通过 `coordinator/classifier_fallback.go` 实现；rule+LLM merge 在 `Classify` 调用链中。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ⬜ | `d7/classifier.go` (planned) |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ⬜ | `d7/classifier.go` (planned) |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ⬜ | `d7/classifier.go` (planned) |
+| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `coordinator/classifier.go` RuleClassifier.Classify |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `coordinator/classifier_fallback.go` LLMClassifier.Classify |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `coordinator/classifier.go` + `classifier_fallback.go` Merge |
 
-## D7-S5-A02 SynthesizeTaskGraph ⬜
+## D7-S5-A02 SynthesizeTaskGraph ✅
 
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| D7-S5-A02-F01 | DecomposeGoal | F-BE | goal | []sub_goal | ⬜ | `d7/decomposer.go` (planned) |
-| D7-S5-A02-F02 | BuildDependencyGraph | F-BE | []sub_goal | []TaskNode | ⬜ | `d7/decomposer.go` (planned) |
-| D7-S5-A02-F03 | ValidateTaskGraph | F-BE | []TaskNode | validation_report | ⬜ | `d7/decomposer.go` (planned) |
-
-## D7-S5-A03 SelectExecutor ⬜
+> **v1.1 closure:** 规则版 + LLM 版（`SetLLMDecomposer`）双路径实装。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | ⬜ | `d7/executor.go` (planned) |
-| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | ⬜ | `d7/executor.go` (planned) |
+| D7-S5-A02-F01 | DecomposeGoal | F-BE | goal | []sub_goal | ✅ | `coordinator/decomposer.go` decomposeGoal |
+| D7-S5-A02-F02 | BuildDependencyGraph | F-BE | []sub_goal | []TaskNode | ✅ | `coordinator/decomposer.go` SynthesizeTaskGraph |
+| D7-S5-A02-F03 | ValidateTaskGraph | F-BE | []TaskNode | validation_report | ✅ | `coordinator/decomposer.go` validateGraph |
+
+## D7-S5-A03 SelectExecutor ✅
+
+> **v1.1 closure:** 规则版 + 黑白名单 worker_type 路由已实装（Phase K）。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | ✅ | `coordinator/executor.go` SelectExecutor |
+| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | ✅ | `coordinator/executor.go` CheckAvailability |
 
 ---
 
@@ -162,18 +172,18 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ⬜ | `d7/fastpath.go` (planned) |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ⬜ | `d7/orchestrator.go` (planned) |
-| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ⬜ | `d7/orchestrator.go` (planned) |
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `coordinator/orchestrator.go` ProcessMessage switch |
+| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `coordinator/fastpath.go` Run |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `coordinator/orchestrator.go` orchestrate |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `coordinator/orchestrator.go` + `EventPublisher` |
 
 ### D7-S5 Canonical F 层
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/coordinator/classifier.go` |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/coordinator/shadow_classifier.go` |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/coordinator/classifier.go` |
+| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/coordinator/classifier.go` RuleClassifier.Classify |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/coordinator/classifier_fallback.go` LLMClassifier.Classify |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/coordinator/classifier_fallback.go` Merge |
 
 ---
 
@@ -181,7 +191,7 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | Activities with F | Total F Points | Implemented | Planned |
 |-------------------|----------------|-------------|---------|
-| 15 + 2 Canonical | 44 + 7 Canonical | 30 + 3 | 14 + 4 |
+| 15 + 2 Canonical | 44 + 7 Canonical | 44 + 7 | 0 |
 
 ---
 
@@ -192,3 +202,4 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | 1.0.0 | 2026-06-13 | 初始注册表（全 d7/ 路径） |
 | 2.0.0 | 2026-06-14 | 对齐真实代码路径、实现状态、新增 wave 基础设施 F 点 |
 | 3.0.0 | 2026-06-14 | Legacy 双轨建立（devrix-d7-sa-refine）；Canonical D7-S2/S5 F 层按 design.md §5 新增 |
+| 3.0.1 | 2026-06-15 | **v1.1 closure 同步**：D7-S1-A01/S1-A04/A05 F 层 ✅；D7-S2-A01/A02 F 层 ✅；D7-S5-A01-F02 路径修正（classifier_fallback.go 而非 shadow_classifier.go）；D7-S5-A02/A03 F 层全 ✅；Canonical D7-S2 F 层全 ✅。统计 44+7/44+7/0 |

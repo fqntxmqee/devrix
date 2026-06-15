@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.5.0
+**Version:** 2.6.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -18,6 +18,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ## D7-S4: Execution Flow
 
+> **v1.1 closure (2026-06-15):** A04/A05 SpokeBridge wired（DM-018）；T 层增补 hubspoke 测试。
+
 | T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|-----------|------|----------|-----------|--------|----------|
 | D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
@@ -26,6 +28,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
+| **D7-S4-T08** | — | **AgentBridge OnWorkerCompleted success/error** | **D7-S4-A04** | **`hubspoke/hubspoke_test.go::TestAgentBridge_OnWorkerCompleted_{success,error}`** | **IMPLEMENTED** | **P0** |
+| **D7-S4-T09** | — | **SubQueryBridge PublishStarted/Completed/Failed** | **D7-S4-A05** | **`hubspoke/hubspoke_test.go::TestSubQueryBridge_Publish{Started,Completed,Failed}`** | **IMPLEMENTED** | **P0** |
 
 ---
 
@@ -49,49 +53,61 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ## D7-S1: Work Model
 
+> **v1.1 closure (2026-06-15):** 写模型迁入 `internal/layers/orchestration/workmodel/`。D7-S1-T01..T05 路径从 `contextengine/tasks/` 更新为 `workmodel/`。
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
-| D7-S1-T01 | Task create 生成唯一 ID | D7-S1-A02-F01 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P0 |
-| D7-S1-T02 | Task 依赖 blocked_by 正确 | D7-S1-A02-F03 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P0 |
-| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `contextengine/tasks/disk_store_test.go` | IMPLEMENTED | P0 |
-| D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `contextengine/tasks/task_manager_test.go` | IMPLEMENTED | P1 |
+| D7-S1-T01 | Task create 生成唯一 ID | D7-S1-A02-F01 | `workmodel/task_manager_test.go::TestTaskManager_Create` | IMPLEMENTED | P0 |
+| D7-S1-T02 | Task 依赖 blocked_by 正确 | D7-S1-A02-F03 | `workmodel/task_manager_test.go::TestTaskManager_Dependency` | IMPLEMENTED | P0 |
+| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `workmodel/disk_store_test.go::TestTaskManager_disk_persist_and_list_consistent` | IMPLEMENTED | P0 |
+| D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `workmodel/task_manager_test.go::TestTaskManager_List` | IMPLEMENTED | P1 |
 | D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
-| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | — | PLANNED (v1.1) | P1 |
+| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | `coordinator/decomposer_test.go::TestTaskDecomposer_validateGraph` | IMPLEMENTED | P1 |
 | D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `contextengine/nested/background_*_test.go` | PARTIAL | P1 |
-| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | — | PLANNED (v1.1) | P2 |
+| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | — | PLANNED (v1.2) | P2 |
 
 ---
 
 ## D7-S5: Decision & Planning
 
+> **v1.1 closure (2026-06-15):** D7-S5-T04/T05 由 PLANNED 升为 IMPLEMENTED（Phase H/K）。
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
-| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `contextengine/tasks/plan_mode_test.go` 或 task_manager_test | IMPLEMENTED | P1 |
-| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `contextengine/tasks/plan_agent_whitelist_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T04 | SynthesizeTaskGraph 产出有效 DAG | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
-| D7-S5-T05 | SelectExecutor explore→D2 execute→D4 | D7-S5-A03 | — | PLANNED (v1.1) | P1 |
-| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `internal/layers/orchestration/coordinator/{classifier_test.go,shadow_classifier_test.go,orchestrator_test.go}` | IMPLEMENTED | P0 |
-| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `internal/layers/orchestration/coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | — | PLANNED (v1.1) | P0 |
-| D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S5-A02-T01 | SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG（结构决策验证） | D7-S5-A02 | — | PLANNED (v1.1) | P1 |
+| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `workmodel/plan_mode_test.go` 或 `task_manager_test` | IMPLEMENTED | P1 |
+| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `workmodel/plan_agent_whitelist_test.go`（10 ACs） | IMPLEMENTED | P0 |
+| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
+| **D7-S5-T04** | **SynthesizeTaskGraph 产出有效 DAG** | **D7-S5-A02** | **`coordinator/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
+| **D7-S5-T05** | **SelectExecutor explore→D2 execute→D4** | **D7-S5-A03** | **`coordinator/executor_test.go::TestExecutorSelector_SelectExecutor`** | **IMPLEMENTED** | **P1** |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `coordinator/{classifier,shadow_classifier,orchestrator}_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | — | PLANNED (v1.2) | P0 |
+| D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
+| **D7-S5-A02-T01** | **SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG** | **D7-S5-A02** | **`coordinator/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
+| **D7-S5-A02-T02** | **decomposeGoal 规则版：goal → sub_goal → DAG** | **D7-S5-A02-F01** | **`coordinator/decomposer_test.go::TestTaskDecomposer_decomposeGoal`** | **IMPLEMENTED** | **P1** |
+| **D7-S5-A03-T01** | **MatchExecutorByTaskType：worker_type → D2/D4** | **D7-S5-A03-F01** | **`coordinator/executor_test.go::TestExecutorSelector_MatchExecutorByTaskType`** | **IMPLEMENTED** | **P1** |
+| **D7-S5-A03-T02** | **CheckExecutorAvailability：executor 状态查询** | **D7-S5-A03-F02** | **`coordinator/executor_test.go::TestExecutorSelector_CheckExecutorAvailability`** | **IMPLEMENTED** | **P1** |
 
 ---
 
 ## D7-S2: Session Orchestrator
 
+> **v1.1 closure (2026-06-15):** D7-S2-A04 DispatchWorker wired（Phase DM-018）；D7-S2-A06/A07 wired（Phase DM-020）。T 层增补 hubspoke 测试。
+
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `internal/layers/orchestration/coordinator/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | — | PLANNED (v1.1) | P0 |
-| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `internal/layers/orchestration/coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | — | PLANNED (v1.2) | P0 |
+| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| **D7-S2-A04-T01** | **DispatchWorker D4 enabled with leader** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_enabled_withLeader`** | **IMPLEMENTED** | **P0** |
+| **D7-S2-A04-T02** | **DispatchWorker D4 disabled falls back to D2 SubQuery** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_disabled_fallsToD2`** | **IMPLEMENTED** | **P0** |
+| **D7-S2-A04-T03** | **DispatchWorker async mode** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_async`** | **IMPLEMENTED** | **P1** |
 
 ---
 
@@ -156,18 +172,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 55 | 40 | 2 | 13 | 34 |
+| 67 | 53 | 1 | 13 | 38 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
-| D7-S1 | 8 | 5 | 3 |
-| D7-S2 | 15 | 7 | 8 |
+| D7-S1 | 8 | 6 | 2 |
+| D7-S2 | 18 | 11 | 7 |
 | D7-S3 | 11 | 10 | 1 |
-| D7-S4 | 7 | 7 | 0 |
-| D7-S5 | 10 | 7 | 3 |
+| D7-S4 | 9 | 9 | 0 |
+| D7-S5 | 14 | 11 | 3 |
 | 契约/迁移 | 6 | 4 | 2 |
+
+> **v1.1 closure (2026-06-15):** 总数 55 → 67（+12：hubspoke A04/A04×3 + S5 A02/A03×4 + S4 T08/T09 + S1 T06 + S2 A01-T03 暂留 PLANNED）。IMPLEMENTED 40 → 53。turn/ A06/A07 T 仍 PLANNED（无 test file，需 v2.0-c/f 切片）。
 
 ---
 
@@ -182,3 +200,4 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | 2.3.0 | 2026-06-14 | DM-20260614-005：D7-S5-T03 / T06 闭环（端到端测试 + CommandFirst=false 回归） |
 | 2.4.0 | 2026-06-14 | devrix-d7-sa-refine (DM-20260614-008)：T03 anti-fabrication、D7-S5-A01-T01/T02、S5-A02-T01 新增 |
 | 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 T 点（6 个 PLANNED）+ Legacy T 映射表 |
+| 2.6.0 | 2026-06-15 | **v1.1 closure 同步**：(1) D7-S1 T01-T05 路径迁入 workmodel/；(2) D7-S1-T06 升 IMPLEMENTED（decomposer_test.go::validateGraph）；(3) D7-S5-T04/T05 升 IMPLEMENTED；(4) D7-S5-A02-T01/T02 + A03-T01/T02 增补；(5) D7-S2-A04-T01/T02/T03 Dispatcher；(6) D7-S4-T08/T09 SpokeBridge。总 55→67，IMPLEMENTED 40→53 |
