@@ -106,7 +106,9 @@ func (p *PermissionManager) Request(ctx context.Context, sessionID, toolName, in
 	if userCfg != nil && userCfg.IsYOLOMode() {
 		approved := p.shouldAutoApprove(toolName, riskLevel)
 		if approved {
+			p.mu.Lock()
 			p.resolveRequest(request, true)
+			p.mu.Unlock()
 			p.recordDecision(true)
 			p.cleanupSignal(request.ID)
 			return true
