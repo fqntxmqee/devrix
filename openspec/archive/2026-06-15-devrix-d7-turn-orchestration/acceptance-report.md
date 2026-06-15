@@ -59,10 +59,10 @@ date: 2026-06-15
 
 | 项 | 归属 | 说明 |
 |----|------|------|
-| D2→D3 已知违规 4 项 | D-d 后续 | engine.go, llm_logger.go, mock/llm.go, query/adapters.go, prepare/compression/ |
-| 旧 d2Executor 移除 | D-f 后续 | 所有路径切到 turnOrchExecutor 后删除 |
+| D2→D3 已知违规 4 项 | D-d 后续 | engine.go, llm_logger.go, mock/llm.go, query/adapters.go, prepare/compression/（需独立 Phase E） |
+| ~~旧 d2Executor 移除~~ | ~~D-f 后续~~ | ✅ 已完成（commit a6356bc） |
 | D2 EngineDeps.LLM 字段移除 | D-d 后续 | 需 D2 内部重构拆分 |
-| runCompress 降级策略 | D-e 后续 | Truncation → 排队重试 → 显式错误 |
+| ~~runCompress 降级策略~~ | ~~D-e 后续~~ | ✅ 已完成：LLM → Truncation → Passthrough 三级降级 |
 
 ## 7. 裁决
 

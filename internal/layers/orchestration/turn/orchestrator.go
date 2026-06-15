@@ -81,16 +81,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 
 	// D-e: handle CompressHint — D7 calls D3 for summarization.
 	if prepared.CompressHint != nil {
-		summary, err := o.runCompress(ctx, req, prepared.CompressHint)
-		if err != nil {
-			o.emitError(out, req.SessionID, fmt.Sprintf("compress failed: %v", err))
-			return
-		}
-		// Replace messages with the summary and re-prepare.
+		result := o.runCompress(ctx, req, prepared.CompressHint)
 		prepared.Messages = []types.Message{{
 			SessionID: req.SessionID,
 			Role:      types.MessageRoleSystem,
-			Content:   summary,
+			Content:   result.Summary,
 		}}
 		prepared.CompressHint = nil
 	}
@@ -234,13 +229,35 @@ func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessi
 	}
 }
 
-// runCompress handles CompressHint by calling D3 for summarization (D-e).
-func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, hint *CompressHint) (string, error) {
+// CompressDegradation is the fallback level used when summarization fails.
+type CompressDegradation int
+
+const (
+	CompressLLM        CompressDegradation = 0 // D3 summarization (primary)
+	CompressTruncation CompressDegradation = 1 // keep recent messages
+	CompressNone       CompressDegradation = 2 // pass through (no compression)
+)
+
+// compressResult wraps the summary with metadata about which strategy was used.
+type compressResult struct {
+	Summary      string
+	Degradation  CompressDegradation
+	TruncatedTo  int // number of messages kept (only for Truncation)
+}
+
+const maxTruncatedMessages = 20
+
+// runCompress handles CompressHint with three-level degradation (D-e):
+//
+//	Level 1: D3 LLM summarization (primary path)
+//	Level 2: Truncation — keep the most recent N messages if LLM fails
+//	Level 3: Passthrough — if truncation is also empty, return the original content as-is
+func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, hint *CompressHint) compressResult {
 	if hint == nil || len(hint.MessagesToSummarize) == 0 {
-		return "", fmt.Errorf("compress: empty hint")
+		return compressResult{Degradation: CompressNone}
 	}
 
-	// Build a summarization prompt.
+	// Level 1: D3 LLM summarization.
 	systemPrompt := "Summarize the following conversation compactly, preserving key decisions, tool outputs, and facts. Keep the summary concise enough to fit within the remaining token budget."
 	var contentBuilder strings.Builder
 	for _, m := range hint.MessagesToSummarize {
@@ -258,17 +275,42 @@ func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, 
 			{Role: types.MessageRoleUser, Content: contentBuilder.String()},
 		},
 	})
-	if err != nil {
-		return "", fmt.Errorf("compress invoke: %w", err)
-	}
-
-	var summaryBuilder strings.Builder
-	for chunk := range chunkCh {
-		if chunk.Content != "" {
-			summaryBuilder.WriteString(chunk.Content)
+	if err == nil {
+		var summaryBuilder strings.Builder
+		for chunk := range chunkCh {
+			if chunk.Content != "" {
+				summaryBuilder.WriteString(chunk.Content)
+			}
+		}
+		if summary := summaryBuilder.String(); summary != "" {
+			return compressResult{Summary: summary, Degradation: CompressLLM}
 		}
 	}
-	return summaryBuilder.String(), nil
+
+	// Level 2: Truncation fallback — keep the most recent messages.
+	msgs := hint.MessagesToSummarize
+	n := len(msgs)
+	if n > maxTruncatedMessages {
+		start := n - maxTruncatedMessages
+		var buf strings.Builder
+		for _, m := range msgs[start:] {
+			buf.WriteString(string(m.Role))
+			buf.WriteString(": ")
+			buf.WriteString(m.Content)
+			buf.WriteString("\n")
+		}
+		return compressResult{
+			Summary:     buf.String(),
+			Degradation: CompressTruncation,
+			TruncatedTo: maxTruncatedMessages,
+		}
+	}
+
+	// Level 3: Passthrough — return the original content (no compression).
+	return compressResult{
+		Summary:     contentBuilder.String(),
+		Degradation: CompressNone,
+	}
 }
 
 // buildAssistantToolCallMsg creates an assistant message containing tool call metadata.
