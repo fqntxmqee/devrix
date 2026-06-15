@@ -54,6 +54,7 @@
 | DM-20260614-005 | D7-S5-T03/T06 ClassifyIntent 规则置信度 + Command-first 端到端闭环 | devrix-d7-classify-command-first | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260614-006 | D1 Communication — 切法 A 信号分层与 IM 友好通信 registry 对齐 | devrix-d1-sa-refine | 2026-06-14 | — | ACCEPTED (S5; v1.0 registry-only; v1.1 代码待 Phase 2) |
 | DM-20260614-007 | D1 入站仅路由 D7 — 退役 D1→D2 legacy 路径 | devrix-d1-d7-only-ingress | 2026-06-14 | — | ACCEPTED (P0; BREAKING) |
+| **DM-20260614-008** | **D7 SA Refine — S 层重新定义 + A/F/T 注册表重构** | **devrix-d7-sa-refine** | **2026-06-14** | **—** | **ACCEPTED (v1.0 registry)** |
 | DM-20260614-009 | D2 Context Engine SA Refine — S15–S20 Canonical + D7 边界 | devrix-d2-sa-refine | 2026-06-14 | — | ACCEPTED (v1.0 registry) |
 | DM-20260614-010 | D2 SA Refine v1.1 — D2 Thin 契约测试 + Canonical Span | devrix-d2-sa-refine-v1.1 | 2026-06-14 | — | ACCEPTED |
 | DM-20260614-011 | D2 v2.0 — delegate_tools → D7 delegatetools | devrix-d2-sa-refine-v2.0-delegate | 2026-06-14 | — | ACCEPTED |
@@ -128,6 +129,7 @@
 | devrix-d2-sa-refine-v2.0-toolpolicy | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/` |
 | **devrix-d3-sa-refine-v1.1** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v1.1/`** |
 | **devrix-d3-sa-refine-v2.0** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/`** |
+| **devrix-d7-sa-refine** | **`openspec/archive/2026-06-14-devrix-d7-sa-refine/`** |
 | **devrix-d7-turn-orchestration** | **`openspec/archive/2026-06-15-devrix-d7-turn-orchestration/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
@@ -148,7 +150,6 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
-| devrix-d7-sa-refine | DM-20260614-008 | `openspec/changes/devrix-d7-sa-refine/` | S5_Pass |
 | devrix-d3-sa-refine | DM-20260614-016 | `openspec/changes/devrix-d3-sa-refine/` | S7_Archived（v1.0 ACCEPTED 15/15 AC ✅；v1.1 子 change 已归档 ✅；v2.0 子 change 已归档 ✅） |
 | devrix-d4-sa-refine | DM-20260614-018 | `openspec/archive/2026-06-15-devrix-d4-sa-refine/` | S7_Archived（v1.0 registry ACCEPTED ✅；v2.0-d 物理迁移 + Hub-Spoke 搬迁 ACCEPTED ✅；v2.0-e re-export 6/6 删除 + delegate/ 清理 + E-e3 修复；8 commits；71 包全绿） |
 
