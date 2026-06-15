@@ -17,6 +17,11 @@ import (
 // NewLLMCaller adapts llmgateway.ILLMGateway to LLMCaller.
 //
 // DSAFT: D2-S10-A01-F01 (WireQueryLoop)
+//
+// Deprecated: Use turn.QueryLLMCaller via EngineDeps.QueryLLMCaller (DM-020).
+// Production wiring must inject the D7-supplied adapter; this local adapter
+// remains only as a fallback when neither EngineDeps.QueryLLMCaller nor
+// EngineDeps.LLM is supplied.
 func NewLLMCaller(llm llmgateway.ILLMGateway) LLMCaller {
 	return &llmCaller{llm: llm}
 }

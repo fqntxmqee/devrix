@@ -58,6 +58,14 @@ type EngineDeps struct {
 	SessionCommandQueue contracts.SessionCommandQueue
 	// AgentRoleToolFilter hides delegate/worker tools (wired from orchestration/toolpolicy).
 	AgentRoleToolFilter AgentRoleToolFilter
+	// QueryLLMCaller performs streaming LLM calls for the query loop.
+	// Production: injected from D7 turn.QueryLLMCaller via shared/contracts.LLMCaller.
+	// Optional: when nil, falls back to LLM via query.NewLLMCaller (Deprecated).
+	QueryLLMCaller contracts.LLMCaller
+	// Summarizer generates compression summaries for autocompact.
+	// Production: injected from D7 turn.CompressionSummarizer via shared/contracts.Summarizer.
+	// Optional: when nil, falls back to LLM via compression.LLMSummarizer (Deprecated).
+	Summarizer contracts.Summarizer
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -86,6 +94,8 @@ type ContextEngine struct {
 	defaultModel string
 	tierResolver llmgateway.ITierResolver
 	agentRoleToolFilter AgentRoleToolFilter
+	queryCaller contracts.LLMCaller
+	summarizer  contracts.Summarizer
 
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
@@ -107,12 +117,20 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 	counter := token.ResolveCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)
-	var asyncCompact *compression.AsyncAutocompacter
-	if cfg.Compression.Autocompact.Enabled {
-		asyncCompact = compression.NewAsyncAutocompacter(&compression.LLMSummarizer{
+	queryCaller := deps.QueryLLMCaller
+	if queryCaller == nil {
+		queryCaller = query.NewLLMCaller(deps.LLM)
+	}
+	summarizer := deps.Summarizer
+	if summarizer == nil {
+		summarizer = &compression.LLMSummarizer{
 			LLM:     deps.LLM,
 			Timeout: cfg.Compression.Autocompact.Timeout,
-		})
+		}
+	}
+	var asyncCompact *compression.AsyncAutocompacter
+	if cfg.Compression.Autocompact.Enabled {
+		asyncCompact = compression.NewAsyncAutocompacter(summarizer)
 	}
 	toolsReg := deps.ToolsReg
 	harnessBoot := harness.NewBootstrap(harness.BootstrapDeps{
@@ -124,7 +142,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	attachReg := attachments.NewRegistry(cfg.Attachments)
 
 	loop := &query.Loop{
-		LLM:             query.NewLLMCaller(deps.LLM),
+		LLM:             queryCaller,
 		Tools:           query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
 		Permission:      query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
 		Attachments:     attachReg,
@@ -144,7 +162,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 			cfg.QueryLoop.CompressPerTurn,
 			cfg,
 			counter,
-			deps.LLM,
+			summarizer,
 			asyncCompact,
 			compObserver,
 			deps.ObsBridge,
@@ -187,6 +205,8 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		defaultModel: deps.DefaultModel,
 		tierResolver: deps.TierResolver,
 		agentRoleToolFilter: deps.AgentRoleToolFilter,
+		queryCaller: queryCaller,
+		summarizer:  summarizer,
 	}
 }
 
@@ -748,10 +768,7 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		compression.WithCounter(e.counter),
 		compression.WithAutocompactConfig(e.cfg.Compression.Autocompact),
 		compression.WithCompressionConfig(e.cfg.Compression),
-		compression.WithSummarizer(&compression.LLMSummarizer{
-			LLM:     e.llm,
-			Timeout: e.cfg.Compression.Autocompact.Timeout,
-		}),
+		compression.WithSummarizer(e.summarizer),
 	}
 	if sessionID != "" {
 		opts = append(opts,

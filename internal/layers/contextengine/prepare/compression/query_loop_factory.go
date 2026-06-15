@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -12,11 +11,15 @@ import (
 )
 
 // NewQueryLoopCompressFactory builds a per-session CompressFactory for QueryLoop.
+//
+// DM-020: summarizer is the D2→D3 拆面 contract; production injects
+// D7 turn.CompressionSummarizer, but the deprecated LLMSummarizer fallback
+// remains valid for internal tests.
 func NewQueryLoopCompressFactory(
 	enabled bool,
 	cfg *config.ContextEngineConfig,
 	counter contracts.ITokenCounter,
-	llm llmgateway.ILLMGateway,
+	summarizer contracts.Summarizer,
 	async *AsyncAutocompacter,
 	sink CompressionEventSink,
 	obsBridge *observability.Bridge,
@@ -32,7 +35,7 @@ func NewQueryLoopCompressFactory(
 				WithCounter(counter),
 				WithAutocompactConfig(cfg.Compression.Autocompact),
 				WithCompressionConfig(cfg.Compression),
-				WithSummarizer(&LLMSummarizer{LLM: llm, Timeout: cfg.Compression.Autocompact.Timeout}),
+				WithSummarizer(summarizer),
 				WithSkipAssembly(true),
 				WithSessionID(sessionID),
 			}

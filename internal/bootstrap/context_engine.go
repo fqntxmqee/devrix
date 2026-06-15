@@ -9,8 +9,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 
 	// tool package is imported via the agentToolReg parameter; the bridge plugin
 	// is created here at the composition root.
@@ -19,6 +21,11 @@ import (
 
 // NewContextEngine wires Layer 2 to a pre-built LLM stack (L3 bridge).
 // agentToolReg is nil when agent tools are disabled.
+//
+// DM-020: D2→D3 拆面 is enforced by constructing D7 turn adapters from llmStack
+// and injecting them via EngineDeps.QueryLLMCaller / EngineDeps.Summarizer.
+// EngineDeps.LLM is left nil so production wiring cannot fall through to the
+// deprecated D2→D3 direct path.
 func NewContextEngine(
 	stack llmbridge.ContextLLMStack,
 	permMgr *capture.PermissionManager,
@@ -60,8 +67,22 @@ func NewContextEngine(
 		toolReg,
 		contextengine.NewToolLimiter(toolCfg.ConcurrentMax),
 	)
+
+	// DM-020: D7-supplied adapters for the two D2 LLM拆面 contracts.
+	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
+		Gateway:      stack.RawGateway,
+		TierResolver: stack.TierResolver,
+		DefaultTier:  stack.DefaultModel,
+	})
+	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+		Gateway:      stack.RawGateway,
+		TierResolver: stack.TierResolver,
+		DefaultTier:  stack.DefaultModel,
+		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:                 stack.Gateway,
+		// LLM deliberately omitted — production must go through DM-020 拆面.
 		TokenCounter:        stack.TokenCounter,
 		Tools:               tools,
 		ToolsReg:            toolReg,
@@ -74,5 +95,13 @@ func NewContextEngine(
 		TierResolver:        stack.TierResolver,
 		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		QueryLLMCaller:      queryCaller,
+		Summarizer:          summarizer,
 	})
 }
+
+// Compile-time assertion that the adapters implement the D2拆面 contracts.
+var (
+	_ contracts.LLMCaller = (*turn.QueryLLMCaller)(nil)
+	_ contracts.Summarizer = (*turn.CompressionSummarizer)(nil)
+)

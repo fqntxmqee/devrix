@@ -22,20 +22,25 @@ var d2ToD3ForbiddenPrefixes = []string{
 }
 
 // d2ToD3KnownViolations lists directories (relative to contextengine/) that
-// currently import D3 and are grandfathered until the respective migration
-// slice removes them.
+// still import D3 in their fallback implementation. DM-020 closes the production
+// path (D-d/D-e/D-f migration complete) — every D2 production call site now
+// routes through shared/contracts.LLMCaller and shared/contracts.Summarizer,
+// both implemented by D7 turn.QueryLLMCaller / turn.CompressionSummarizer.
+// The remaining imports are Deprecated fallback implementations retained so
+// internal tests (mockctx.LLMGateway) continue to compile without forcing
+// every test to construct a D7 adapter.
 //
-//	.                  → engine.go, llm_logger.go (D-d: ILLMGateway from EngineDeps)
-//	mock               → mock/llm.go (D-f: mock adapter for legacy path)
-//	query              → query/adapters.go (D-d: LLMCaller wraps ILLMGateway)
-//	prepare/compression → llm_summarizer.go, query_loop_factory.go (D-e: Autocompact)
+//	.                  → engine.go, llm_logger.go (EngineDeps.LLM / TierResolver fallback + LLM call logger)
+//	mock               → mock/llm.go (D-f: mock for legacy fallback path in tests)
+//	query              → query/adapters.go (NewLLMCaller(llmgateway.ILLMGateway) fallback shim, Deprecated)
+//	prepare/compression → llm_summarizer.go (LLMSummarizer fallback default, Deprecated)
 //
 // Test-only directories (token) are excluded via _test.go skip.
 var d2ToD3KnownViolations = map[string]string{
-	".":                    "D-d: ILLMGateway + ITierResolver in EngineDeps + llm_logger.go",
-	"mock":                 "D-f: mock adapter for legacy ILLMGateway path",
-	"query":                "D-d: LLMCaller adapts ILLMGateway to LLMCaller interface",
-	"prepare/compression":  "D-e: Autocompact LLMSummarizer + CompressFactory move to D7",
+	".":                    "DM-020 fallback: EngineDeps.LLM/TierResolver + llm_logger.go (production path uses QueryLLMCaller/Summarizer)",
+	"mock":                 "D-f: mock for fallback path in tests",
+	"query":                "DM-020 fallback: NewLLMCaller(llmgateway.ILLMGateway) shim, Deprecated",
+	"prepare/compression":  "DM-020 fallback: LLMSummarizer default implementation, Deprecated",
 }
 
 // TestD2_D3Ban_NoNewImports verifies that no new D2 source directories import D3.

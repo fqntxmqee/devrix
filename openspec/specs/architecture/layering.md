@@ -280,7 +280,8 @@ Spec: `openspec/specs/d7-orchestration/d7-domain.md` (D7)
 | LLM 调用 | D2 → D3（via bridges/llm） | **D7-S2-A07 InvokeLLM → D3**（D7 直调） |
 | D2 角色 | Context Engine（含 LLM 调用） | **Context Follower**（Prepare / ToolRound / Persist） |
 | D7 角色 | Session Orchestrator（路由 + Wave） | **Session Orchestrator + Turn Leader**（LLM 调用权 + Hub-Spoke） |
-| D2→D3 import | ✅（现行） | **❌ 禁止**（v2.0-d CI 硬阻断） |
+| D2→D3 import | ✅（现行） | **❌ 禁止**（v2.0-d CI 硬阻断） — **v2.3 已通过拆面闭合** |
+| D2 拆面契约 | n/a | `shared/contracts.LLMCaller` + `shared/contracts.Summarizer`（D7 `turn.QueryLLMCaller` / `turn.CompressionSummarizer` 实现） |
 | Autocompact | D2 调 D3 摘要 | **D7 调 D3**，D2 发出 CompressHint + 合并结果 |
 | SubQuery LLM | D2 nested 内循环 | **D7 包装 TurnScopeSubQuery** |
 
@@ -649,3 +650,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | **4.0.0** | **2026-06-15** | **D4 v2.0-e 最终**（commits e30fe72..ffd6c56）：5 个 re-export shim 删除 + delegate/ 死代码删除（720a4b1）；E-e3 预存集成测试错误修复（60939db）；observer 引用迁移至 `kernel.NoOpAgentObserver`；根 `contracts.go` + `shared/config/multiagent.go` re-export 保留；S7 归档至 `openspec/archive/2026-06-15-devrix-d4-sa-refine/` |
 | **4.1.0** | **2026-06-15** | **D7 Turn 编排上移 v1.0 Registry（DM-020）：** D2/D7 Turn 双轨声明；D2-S16 Legacy Freeze → D7-S2-A06 RunTurnLoop；LLM 调用权 D2→D7 产权转移；D2→D3 禁止；Follower 对称性（D2 Context / D4 Execution） |
 | **4.2.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；目录树更新；11 个 deprecated bridge.go |
+| **4.3.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：D2 拆面契约上提至 `internal/shared/contracts/llm_facade.go`（`LLMCaller` + `Summarizer` 接口 + 辅助类型）；D7 `turn.QueryLLMCaller` / `turn.CompressionSummarizer` 实现并由 `bootstrap/context_engine.go` 单一注入点注入 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`；D2 production wiring 零 D3 import；D2 `query/adapters.go` `NewLLMCaller(llmgateway.ILLMGateway)` 与 `compression/llm_summarizer.go` 标 Deprecated fallback（保留供内部测试用 mockctx.LLMGateway）；D7 turn/ 新增 9 个单元测试；build/vet/test -short 全工程绿；`lint/layer::TestD2_D3Ban` 通过（4 个白名单 = 4 个实际 fallback 路径） |

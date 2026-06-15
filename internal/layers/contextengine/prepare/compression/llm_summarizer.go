@@ -10,6 +10,11 @@ import (
 )
 
 // LLMSummarizer adapts llmgateway.ILLMGateway for autocompact summarization.
+//
+// Deprecated: Use turn.CompressionSummarizer via EngineDeps.Summarizer (DM-020).
+// Production wiring must inject the D7-supplied adapter; this local default
+// remains only as a fallback when neither EngineDeps.Summarizer nor
+// EngineDeps.LLM is supplied.
 type LLMSummarizer struct {
 	LLM     llmgateway.ILLMGateway
 	Timeout time.Duration

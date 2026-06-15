@@ -23,12 +23,8 @@ type Params struct {
 	MaxTurns     int
 }
 
-// ToolSchema mirrors contextengine.ToolSchema to avoid import cycles in tests.
-type ToolSchema struct {
-	Name        string
-	Description string
-	Parameters  string
-}
+// ToolSchema re-exported from shared/contracts.ToolSchema.
+type ToolSchema = contracts.ToolSchema
 
 // Result is the outcome of a QueryLoop run.
 type Result struct {
@@ -40,10 +36,7 @@ type Result struct {
 }
 
 // TokenUsage token counts from LLM responses.
-type TokenUsage struct {
-	PromptTokens     int
-	CompletionTokens int
-}
+type TokenUsage = contracts.TokenUsage
 
 // EmitFunc streams engine events to the capture.
 type EmitFunc func(*contracts.EngineEvent)
@@ -52,33 +45,19 @@ type EmitFunc func(*contracts.EngineEvent)
 type CompressFunc func(ctx context.Context, msgs []types.Message) ([]types.Message, error)
 
 // LLMCaller performs one streaming LLM call with optional user context prepend.
-type LLMCaller interface {
-	Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, error)
-}
+//
+// Re-exported from shared/contracts (DM-020拆面契约). Implemented by
+// D7 turn.QueryLLMCaller; may also be implemented by D2-internal fakes for tests.
+type LLMCaller = contracts.LLMCaller
 
 // LLMRequest is the per-iteration LLM input.
-type LLMRequest struct {
-	Model        string
-	SystemPrompt string
-	Messages     []types.Message
-	Tools        []ToolSchema
-}
+type LLMRequest = contracts.LLMRequest
 
 // LLMChunk streaming fragment.
-type LLMChunk struct {
-	Content   string
-	Thinking  string
-	ToolCalls []ToolCall
-	Done      bool
-	Usage     TokenUsage
-}
+type LLMChunk = contracts.LLMChunk
 
 // ToolCall requested tool invocation.
-type ToolCall struct {
-	ID    string
-	Name  string
-	Input string
-}
+type ToolCall = contracts.ToolCall
 
 // ToolExecutor runs a tool call.
 type ToolExecutor interface {

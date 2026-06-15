@@ -3,13 +3,16 @@ package compression
 import (
 	"context"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // Summarizer generates a text summary for autocompact.
-type Summarizer interface {
-	Summarize(ctx context.Context, model, prompt string, maxTokens int) (string, error)
-}
+//
+// Re-exported from shared/contracts (DM-020拆面契约). Implemented by
+// D7 turn.CompressionSummarizer; the local LLMSummarizer is a Deprecated
+// fallback that holds llmgateway.ILLMGateway directly.
+type Summarizer = contracts.Summarizer
 
 // StepObserver receives compression step notifications.
 type StepObserver interface {
