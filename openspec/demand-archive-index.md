@@ -71,6 +71,7 @@
 | **DM-20260615-001** | **D5 Observability S/A 重切 — 技术模块→价值流化** | **devrix-d5-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；4+1 价值流 S21–S24)** |
 | **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
+| **DM-20260615-004** | **D7 Intent 路径正交化 — 4 IntentKind = 4 独立执行链** | **devrix-d7-orthogonal-intent-paths** | **2026-06-16** | **[#35](https://github.com/fqntxmqee/devrix/pull/35)** | **ACCEPTED (7 T PASS; PR #35 merged `6086259`)** |
 
 ## Archive Locations
 
@@ -143,6 +144,7 @@
 | **devrix-d6-sa-refine** | **`openspec/archive/2026-06-15-devrix-d6-sa-refine/`** |
 | **devrix-background-task-tools** | **`openspec/archive/2026-06-15-devrix-background-task-tools/`** |
 | **devrix-d5-d6-sa-refine-v2.0** | **`openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`** |
+| **devrix-d7-orthogonal-intent-paths** | **`openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -159,6 +161,10 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-16 归档（S7 — D7 Intent 路径正交化）**：
+
+- `devrix-d7-orthogonal-intent-paths` → `openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`（DM-20260615-004 ACCEPTED; 4 IntentKind = 4 独立执行链; CommandPath/OrchestratePath/FastPath/BackgroundPath; 7 T PASS; 6 文件变更; PR #35 merged `6086259`）
 
 **2026-06-15 归档（S7 — D5/D6 SA Refine v2.0 物理路径迁移）**：
 

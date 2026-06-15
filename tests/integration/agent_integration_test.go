@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -32,63 +32,82 @@ func (r *criticalBashRegistry) RiskLevel(tool string) types.RiskLevel {
 	return r.BuiltinRegistry.RiskLevel(tool)
 }
 
-type testPermGateAdapter struct {
-	fn func(context.Context, string, string, string, types.RiskLevel) bool
+// bashOnceThenDoneLLM requests bash once, then completes (avoids infinite loop).
+type bashOnceThenDoneLLM struct {
+	calls atomic.Int32
 }
 
-func (a testPermGateAdapter) Request(ctx context.Context, sessionID, toolName, input string, risk types.RiskLevel) bool {
-	return a.fn(ctx, sessionID, toolName, input, risk)
+func (m *bashOnceThenDoneLLM) Call(ctx context.Context, _ contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
+	ch := make(chan contracts.LLMChunk, 2)
+	go func() {
+		defer close(ch)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		if m.calls.Add(1) > 1 {
+			ch <- contracts.LLMChunk{Content: "done", Done: true}
+			return
+		}
+		ch <- contracts.LLMChunk{
+			ToolCalls: []contracts.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
+			Done:      true,
+		}
+	}()
+	return ch, nil
 }
 
-type integrationEngineBuilder struct {
-	llm      llmgateway.ILLMGateway
-	tools    contextengine.IToolRunner
-	toolsReg contextengine.IToolRegistry
-	ctxCfg   *config.ContextEngineConfig
-	toolCfg  *config.ToolConfig
-}
-
-func (b *integrationEngineBuilder) Build(perm multiagent.PermissionGate) contracts.IEngine {
-	var gate contracts.IPermissionGate
-	if perm != nil {
-		gate = testPermGateAdapter{fn: perm.Request}
-	}
-	return contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        b.llm,
-		Tools:      b.tools,
-		ToolsReg:   b.toolsReg,
-		Permission: gate,
-		Config:     b.ctxCfg,
-	})
-}
-
-// T: D4-S0-A01-T03
+// T: D4-S0-A01-T03 — critical tool permission blocks until PermissionManager.Resolve on D7 ingress.
 func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	cfg := config.DefaultConfig()
+	cfg.Permission.DefaultTimeout = 5 * time.Second
 	store, err := capture.NewFileSessionStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, handler, capture.NewPermissionManager(&cfg.Permission), cfg)
+	permMgr := capture.NewPermissionManager(&cfg.Permission)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
 
 	ctxCfg := config.DefaultContextEngineConfig()
-	toolCfg := config.DefaultToolConfig()
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
-	builder := &integrationEngineBuilder{
-		llm:      &mockctx.LLMGatewayWithTools{},
-		tools:    &mockctx.ToolRunner{},
-		toolsReg: reg,
-		ctxCfg:   ctxCfg,
-		toolCfg:  toolCfg,
-	}
-	factory := multiagentprovision.NewAgentFactoryWithBuilder(multiagent.AgentDeps{}, builder, config.DefaultMultiAgentConfig())
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		QueryLLMCaller: &bashOnceThenDoneLLM{},
+		Summarizer:     &mockctx.StaticSummarizer{},
+		Tools:      &mockctx.ToolRunner{},
+		ToolsReg:   reg,
+		Permission: permMgr,
+		Config:     ctxCfg,
+	})
+	testutil.WireGatewayOrchestration(gw, engine)
+
+	factory := multiagentprovision.NewAgentFactory(
+		multiagent.AgentDeps{Engine: engine},
+		config.DefaultMultiAgentConfig(),
+	)
 	gw.SetAgentFactory(factory)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
+
+	resolved := make(chan struct{})
+	go func() {
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) {
+			for _, req := range permMgr.ListPending() {
+				if err := permMgr.Resolve(req.ID, true); err != nil {
+					t.Errorf("Resolve: %v", err)
+					return
+				}
+				close(resolved)
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
 
 	if err := gw.RouteInbound(context.Background(), &types.InboundMessage{
 		SessionID: session.SessionID,
@@ -99,14 +118,14 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 		t.Fatalf("RouteInbound: %v", err)
 	}
 
-	waitUntil(t, 3*time.Second, func() bool {
-		return handler.PermissionRequestCount() > 0
-	})
-	if handler.PermissionRequestCount() == 0 {
-		t.Fatal("expected gateway permission request via agent observer")
+	select {
+	case <-resolved:
+	case <-time.After(3 * time.Second):
+		t.Fatal("expected pending permission request on D7 ingress path")
 	}
+	gw.WaitForProcesses()
 	if !handler.WaitForMessages(1, 2*time.Second) {
-		t.Fatal("expected outbound messages from agent engine sink")
+		t.Fatal("expected outbound messages from D7 entry → engine path")
 	}
 }
 

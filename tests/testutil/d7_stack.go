@@ -14,17 +14,20 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
+	"github.com/devrix/devrix/internal/layers/multiagent"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// D7StackOptions configures WireD7 integration test wiring.
+// D7StackOptions configures InitOrchestration integration test wiring.
 type D7StackOptions struct {
 	LLMStub       *D7LLMStub
 	ExecutionFlow bool
 	Delegate      bool
+	MultiAgent    bool
 
 	// OverrideOrchestratePath replaces the lazy default OrchestratePath
 	// (which uses a zero-deps WaveScheduler that panics on Start). Tests
@@ -45,7 +48,7 @@ type D7TestStack struct {
 	WorkDir   string
 }
 
-// NewD7TestStack wires bootstrap.WireD7 with mock LLM and context engine.
+// NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
 func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	t.Helper()
 
@@ -113,15 +116,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		toolsReg = MustBuiltinRegistry(t)
 	}
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          bridge,
-		TokenCounter: counter,
-		Tools:        &mockctx.ToolRunner{},
-		ToolsReg:     toolsReg,
-		Permission:   mockctx.AllowAllPermission{},
-		Config:       ctxCfg,
-		ObsBridge:    obsBridge,
-	})
+	engine := contextengine.NewContextEngine(MergeEngineDeps(
+		ContextEngineDepsFromStack(llmStack, ctxCfg),
+		contextengine.EngineDeps{
+			Tools:      &mockctx.ToolRunner{},
+			ToolsReg:   toolsReg,
+			Permission: mockctx.AllowAllPermission{},
+			ObsBridge:  obsBridge,
+		},
+	))
 
 	store, err := capture.NewFileSessionStore(workDir)
 	if err != nil {
@@ -131,6 +134,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig())
 	gw.SetObservability(obs)
+
+	if opt.MultiAgent {
+		maCfg := config.DefaultMultiAgentConfig()
+		factory := multiagentprovision.NewAgentFactory(
+			multiagent.AgentDeps{Engine: engine},
+			maCfg,
+		)
+		gw.SetAgentFactory(factory)
+	}
 
 	if opt.ExecutionFlow {
 		bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
@@ -145,8 +157,8 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		}
 	}
 
-	if err := bootstrap.WireD7("", gw, engine, obsBridge, llmStack); err != nil {
-		t.Fatalf("WireD7: %v", err)
+	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmStack); err != nil {
+		t.Fatalf("InitOrchestration: %v", err)
 	}
 
 	if opt.OverrideOrchestratePath != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -118,8 +119,19 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if perm == nil {
 		perm = capture.NewPermissionGateAdapter(nil)
 	}
+	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
+		Gateway:      b.stack.RawGateway,
+		TierResolver: b.stack.TierResolver,
+		DefaultTier:  b.stack.DefaultModel,
+	})
+	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+		Gateway:      b.stack.RawGateway,
+		TierResolver: b.stack.TierResolver,
+		DefaultTier:  b.stack.DefaultModel,
+		Timeout:      b.ctxCfg.Compression.Autocompact.Timeout,
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:                 b.stack.Gateway,
 		TokenCounter:        b.stack.TokenCounter,
 		Tools:               tools,
 		ToolsReg:            toolReg,
@@ -130,7 +142,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		ObsBridge:           b.obsBridge,
 		DefaultModel:        b.stack.DefaultModel,
 		TierResolver:        b.stack.TierResolver,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		QueryLLMCaller:      queryCaller,
+		Summarizer:          summarizer,
+		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 	})
 }

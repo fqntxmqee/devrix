@@ -93,7 +93,7 @@ func NewCommunicationGateway(
 	return gw
 }
 
-// SetOrchestrationEntry wires D7 as the sole non-agent inbound dispatch target.
+// SetOrchestrationEntry wires D7 as the mandatory sole inbound dispatch target.
 func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrationEntry) {
 	g.orchestrationEntry = entry
 	if entry != nil {
@@ -103,7 +103,7 @@ func (g *CommunicationGateway) SetOrchestrationEntry(entry contracts.IOrchestrat
 
 // OrchestrationEntry returns the wired D7 entry, or nil if D7 is not
 // active. Primarily a test seam: integration tests retrieve the entry
-// after WireD7 to inject custom components (fake WaveScheduler, custom
+// after InitOrchestration to inject custom components (fake WaveScheduler, custom
 // CommandHandler) via SessionOrchestrator setters.
 func (g *CommunicationGateway) OrchestrationEntry() contracts.IOrchestrationEntry {
 	return g.orchestrationEntry
@@ -321,30 +321,29 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 
 	g.beginInboundTurn(session.SessionID, msg.MessageID)
 
-	if g.agentFactory != nil {
-		return g.routeInboundViaAgent(ctx, msg, session, endSpan)
-	}
-
 	if g.orchestrationEntry == nil {
 		return fmt.Errorf("orchestration entry not configured")
 	}
-
+	if err := g.ensureSessionLeaderAgent(ctx, session); err != nil {
+		return err
+	}
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
 
-	g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
+	processCtx, endDispatch := g.startDispatchRouteSpan(processCtx, session.SessionID, "d7")
 	ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
 	if err != nil {
+		endDispatch()
 		cancel()
 		g.unregisterProcess(session.SessionID)
 		return fmt.Errorf("d7 entry ProcessMessage: %w", err)
 	}
 	eventChan := ch
 
-	// Handle events from context engine
 	g.processes.Add(1)
 	go func() {
 		defer g.processes.Done()
+		defer endDispatch()
 		defer endSpan()
 		defer cancel()
 		defer g.endInboundTurn(session.SessionID)
@@ -352,7 +351,6 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 		g.unregisterProcess(session.SessionID)
 		g.persistSessionAfterProcess(session)
 	}()
-
 	return nil
 }
 

@@ -21,7 +21,8 @@ func TestIntegration_HarnessBootstrapSmoke_disabled_zero_change(t *testing.T) {
 		t.Fatal("default harness must be disabled")
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -40,7 +41,8 @@ func TestIntegration_HarnessBootstrapSmoke_enabled_bootstrap(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "harness ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "harness ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},

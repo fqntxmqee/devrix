@@ -81,7 +81,9 @@ func TestEntry_Cancel_LazyHandler(t *testing.T) {
 // T: orchestrator.ProcessMessageContract (string-args seam).
 func TestSessionOrchestrator_ProcessMessageContract(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+	cfg := DefaultConfig()
+	cfg.FastPathThreshold = 0 // allow all fast-path classifications through
+	orch := NewSessionOrchestrator(cfg, exec)
 	ch, err := orch.ProcessMessageContract(context.Background(), "sess-pmc", "ping")
 	if err != nil {
 		t.Fatalf("ProcessMessageContract err: %v", err)
@@ -357,6 +359,43 @@ func TestDelegatedWorkModel_Wired(t *testing.T) {
 	}
 	if len(snap.Tasks) != 1 || snap.Tasks[0].ID != "t-1" {
 		t.Fatalf("snap.Tasks = %+v", snap.Tasks)
+	}
+}
+
+// T: D7-S1-T07 LocalWorkModel.QueryWorkPlan returns Background tasks from provider.
+func TestLocalWorkModel_QueryWorkPlan_Background(t *testing.T) {
+	wm := NewLocalWorkModel(NewTaskManager())
+
+	snap, err := wm.QueryWorkPlan(context.Background(), "sess-bg")
+	if err != nil {
+		t.Fatalf("QueryWorkPlan: %v", err)
+	}
+	if snap.Background != nil {
+		t.Fatalf("Background without provider should be nil, got %+v", snap.Background)
+	}
+
+	wm.SetBackgroundProvider(func(sid string) []BackgroundLite {
+		if sid != "sess-bg" {
+			t.Errorf("provider called with session %q, want sess-bg", sid)
+		}
+		return []BackgroundLite{
+			{RunID: "bg-1", Status: TaskStatusInProgress, Output: ""},
+			{RunID: "bg-2", Status: TaskStatusCompleted, Output: "done"},
+		}
+	})
+
+	snap, err = wm.QueryWorkPlan(context.Background(), "sess-bg")
+	if err != nil {
+		t.Fatalf("QueryWorkPlan: %v", err)
+	}
+	if len(snap.Background) != 2 {
+		t.Fatalf("Background count = %d, want 2: %+v", len(snap.Background), snap.Background)
+	}
+	if snap.Background[0].RunID != "bg-1" || snap.Background[0].Status != TaskStatusInProgress {
+		t.Errorf("Background[0] = %+v", snap.Background[0])
+	}
+	if snap.Background[1].RunID != "bg-2" || snap.Background[1].Status != TaskStatusCompleted || snap.Background[1].Output != "done" {
+		t.Errorf("Background[1] = %+v", snap.Background[1])
 	}
 }
 

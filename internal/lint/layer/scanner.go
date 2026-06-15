@@ -124,6 +124,22 @@ func ParseImportGraph(root string) ([]*PackageRef, error) {
 	return parseImportGraphFromSources(files)
 }
 
+// ParseProductionImportGraph is like ParseImportGraph but skips *_test.go files.
+func ParseProductionImportGraph(root string) ([]*PackageRef, error) {
+	files, err := walkGoFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	prod := make(map[string]string, len(files))
+	for path, src := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		prod[path] = src
+	}
+	return parseImportGraphFromSources(prod)
+}
+
 // ScanPackages runs the matrix against a package graph and returns every
 // violation, sorted by file then by (from,to).
 func ScanPackages(pkgs []*PackageRef, m *Matrix) []Violation {

@@ -10,13 +10,14 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-func (o *SessionOrchestrator) startSpan(
+func startObsSpan(
+	bridge *observability.Bridge,
 	ctx context.Context,
 	operation string,
 	kind tracer.SpanKind,
 	attrs ...tracer.Attribute,
 ) (context.Context, tracer.Span) {
-	if o == nil || o.obsBridge == nil || !o.obsBridge.IsEnabled() {
+	if bridge == nil || !bridge.IsEnabled() {
 		return ctx, nil
 	}
 	opts := []tracer.SpanStartOption{
@@ -26,7 +27,19 @@ func (o *SessionOrchestrator) startSpan(
 	if parentSC := tracer.SpanContextFromContext(ctx); parentSC != nil {
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
-	return o.obsBridge.Tracer().Start(ctx, operation, opts...)
+	return bridge.Tracer().Start(ctx, operation, opts...)
+}
+
+func (o *SessionOrchestrator) startSpan(
+	ctx context.Context,
+	operation string,
+	kind tracer.SpanKind,
+	attrs ...tracer.Attribute,
+) (context.Context, tracer.Span) {
+	if o == nil {
+		return ctx, nil
+	}
+	return startObsSpan(o.obsBridge, ctx, operation, kind, attrs...)
 }
 
 func routeLabel(intent IntentClassification) string {
@@ -92,5 +105,10 @@ func endSpanWhenChannelClosed(ch <-chan *contracts.EngineEvent, span tracer.Span
 
 // WithObservability wires the D5 observability bridge for Jaeger spans.
 func WithObservability(bridge *observability.Bridge) OrchestratorOption {
-	return func(o *SessionOrchestrator) { o.obsBridge = bridge }
+	return func(o *SessionOrchestrator) {
+		o.obsBridge = bridge
+		if o.orchestratePath != nil {
+			o.orchestratePath.SetObsBridge(bridge)
+		}
+	}
 }

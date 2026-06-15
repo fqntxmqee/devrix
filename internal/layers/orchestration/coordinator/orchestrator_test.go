@@ -434,3 +434,78 @@ func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 		t.Fatalf("anti-fabrication violated: synthetic progress before terminal FlowEvent; events=%v", eventTypes)
 	}
 }
+
+// D7-S5-A01-T01: FastPath confidence threshold gating.
+// When the classifier returns IntentFast with confidence below the configured
+// FastPathThreshold, the request is downgraded to IntentOrchestrate.
+
+func TestSessionOrchestrator_FastPathConfidenceBelowThreshold(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.FastPathThreshold = 80 // short message default is 70
+
+	decomp := NewTaskDecomposer()
+	sched := &fakeWaveScheduler{artifacts: nil}
+	op := NewOrchestratePath(decomp, sched, nil)
+	exec := &fakeD2{}
+	orch := NewSessionOrchestrator(cfg, exec,
+		WithOrchestratePath(op),
+	)
+
+	// Short message (≤32 chars, single-line) → classifier returns
+	// IntentFast with confidence=70. With threshold=80, this should
+	// be downgraded to IntentOrchestrate.
+	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
+		SessionID: "sess-thresh",
+		Message:   "how do I test this",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var eventTypes []string
+	for ev := range ch {
+		eventTypes = append(eventTypes, ev.Type)
+	}
+
+	// OrchestratePath emits plan_formed → wave_started → text → complete.
+	foundPlan := false
+	for _, typ := range eventTypes {
+		if typ == "plan_formed" {
+			foundPlan = true
+			break
+		}
+	}
+	if !foundPlan {
+		t.Errorf("expected plan_formed from OrchestratePath (downgrade), got events: %v", eventTypes)
+	}
+}
+
+func TestSessionOrchestrator_FastPathConfidenceAboveThreshold(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.FastPathThreshold = 90 // greeting pattern is 95
+
+	exec := &fakeD2{}
+	orch := NewSessionOrchestrator(cfg, exec)
+
+	// "hello" → classifier returns IntentFast with confidence=95.
+	// With threshold=90, this should stay as FastPath.
+	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
+		SessionID: "sess-thresh2",
+		Message:   "hello",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sawText bool
+	for ev := range ch {
+		if ev.Type == "text" {
+			sawText = true
+		}
+	}
+
+	// FastPath emits text events from the fakeD2 executor.
+	if !sawText {
+		t.Error("expected text event from FastPath (should not be downgraded)")
+	}
+}

@@ -1,7 +1,7 @@
 change_id: devrix-d7-orthogonal-intent-paths
 priority: P0
 demand_id: DM-20260615-004
-status: s3_design
+status: s7_archived
 domains: [D7]
 dsaft_scenarios: [D7-S2, D7-S5]
 dsaft_activities:

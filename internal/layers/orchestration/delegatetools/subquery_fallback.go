@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/nested"
-	"github.com/devrix/devrix/internal/layers/multiagent/builtin"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -28,7 +27,9 @@ func (f *SubQueryRunner) RunSubQuery(
 		return "", fmt.Errorf("subquery fallback: parent context is nil")
 	}
 	deps := f.LoopDeps
-	deps.FlowHub = flow.GlobalHub
+	if deps.FlowReporter == nil && flow.GlobalHub != nil {
+		deps.FlowReporter = hubspoke.NewFlowReporter(flow.GlobalHub)
+	}
 	if maxTurns <= 0 {
 		maxTurns = 50
 	}
@@ -38,11 +39,11 @@ func (f *SubQueryRunner) RunSubQuery(
 	)
 	switch WorkerRole(role) {
 	case WorkerRoleExplore:
-		res, err = builtin.RunExplore(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunExplore(ctx, deps, parent, directive, nil, maxTurns)
 	case WorkerRolePlan:
-		res, err = builtin.RunPlan(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunPlan(ctx, deps, parent, directive, nil, maxTurns)
 	case WorkerRoleImplement:
-		res, err = builtin.RunImplement(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunImplement(ctx, deps, parent, directive, nil, maxTurns)
 	default:
 		res, err = nested.Run(ctx, deps, nested.SubQueryParams{
 			ParentSC:       parent,
@@ -53,7 +54,7 @@ func (f *SubQueryRunner) RunSubQuery(
 			SystemPrompt:   systemPromptForRole(role),
 			PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: directive, SessionID: parent.SessionID}},
 			MaxTurns:       maxTurns,
-			FlowHub:        flow.GlobalHub,
+			FlowReporter:   deps.FlowReporter,
 		})
 	}
 	if err != nil {

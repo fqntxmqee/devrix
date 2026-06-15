@@ -21,7 +21,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/token"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
@@ -36,7 +35,6 @@ import (
 
 // EngineDeps holds dependencies for ContextEngine.
 type EngineDeps struct {
-	LLM                 llmgateway.ILLMGateway
 	TokenCounter        contracts.ITokenCounter
 	Tools               IToolRunner
 	ToolsReg            IToolRegistry
@@ -53,19 +51,19 @@ type EngineDeps struct {
 	DefaultModel string
 	// TierResolver resolves model tier aliases to concrete model names.
 	// Optional; when nil, tier-based model selection is disabled.
-	TierResolver llmgateway.ITierResolver
-	// SessionCommandQueue drains Hub-Spoke notifications into QueryLoop (wired from bootstrap).
-	SessionCommandQueue contracts.SessionCommandQueue
+	TierResolver contracts.TierResolver
 	// AgentRoleToolFilter hides delegate/worker tools (wired from orchestration/toolpolicy).
 	AgentRoleToolFilter AgentRoleToolFilter
 	// QueryLLMCaller performs streaming LLM calls for the query loop.
 	// Production: injected from D7 turn.QueryLLMCaller via shared/contracts.LLMCaller.
-	// Optional: when nil, falls back to LLM via query.NewLLMCaller (Deprecated).
 	QueryLLMCaller contracts.LLMCaller
 	// Summarizer generates compression summaries for autocompact.
 	// Production: injected from D7 turn.CompressionSummarizer via shared/contracts.Summarizer.
-	// Optional: when nil, falls back to LLM via compression.LLMSummarizer (Deprecated).
 	Summarizer contracts.Summarizer
+	// SessionCommandQueue drains Hub-Spoke notifications into the LLM context
+	// (D7-S4 → D2-S15 Prepare). Wired from bootstrap (orchestration/sessionqueue).
+	// Optional; when nil, hub-spoke drain is skipped.
+	SessionCommandQueue contracts.SessionCommandQueue
 }
 
 // ContextEngine implements contracts.IEngine.
@@ -75,7 +73,6 @@ type ContextEngine struct {
 	memory       *memory.Manager
 	counter      contracts.ITokenCounter
 	queryLoop    *query.Loop
-	llm          llmgateway.ILLMGateway
 	tools        IToolRunner
 	toolsReg     IToolRegistry
 	permission   contracts.IPermissionGate
@@ -91,8 +88,10 @@ type ContextEngine struct {
 	router       *harness.PromptRouter
 	transcript   *harness.TranscriptManager
 	mainTranscript *transcript.MainThreadStore
+	attachReg      *attachments.Registry
+	sessionQueue   contracts.SessionCommandQueue
 	defaultModel string
-	tierResolver llmgateway.ITierResolver
+	tierResolver contracts.TierResolver
 	agentRoleToolFilter AgentRoleToolFilter
 	queryCaller contracts.LLMCaller
 	summarizer  contracts.Summarizer
@@ -119,14 +118,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	store := snapshot.NewStore(&cfg.Snapshot)
 	queryCaller := deps.QueryLLMCaller
 	if queryCaller == nil {
-		queryCaller = query.NewLLMCaller(deps.LLM)
+		panic("contextengine: QueryLLMCaller is required (inject D7 turn.QueryLLMCaller)")
 	}
 	summarizer := deps.Summarizer
 	if summarizer == nil {
-		summarizer = &compression.LLMSummarizer{
-			LLM:     deps.LLM,
-			Timeout: cfg.Compression.Autocompact.Timeout,
-		}
+		panic("contextengine: Summarizer is required (inject D7 turn.CompressionSummarizer)")
 	}
 	var asyncCompact *compression.AsyncAutocompacter
 	if cfg.Compression.Autocompact.Enabled {
@@ -139,13 +135,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		ObsBridge: deps.ObsBridge,
 	})
 	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
-	attachReg := attachments.NewRegistry(cfg.Attachments)
 
 	loop := &query.Loop{
 		LLM:             queryCaller,
 		Tools:           query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
 		Permission:      query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
-		Attachments:     attachReg,
 		UserContext:     ucProvider,
 		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
 			return ToolContextWithGate(ctx, sc, deps.Permission)
@@ -153,7 +147,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		WrapToolStreamContext: func(ctx context.Context, emit query.EmitFunc, sessionID, toolName string) context.Context {
 			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
 		},
-		SessionQueue:   deps.SessionCommandQueue,
 		StreamingTools:    cfg.QueryLoop.StreamingTools,
 		Observability:     deps.ObsBridge,
 	}
@@ -192,7 +185,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		compObserver: compObserver,
 		obsBridge:    deps.ObsBridge,
 		asyncCompact: asyncCompact,
-		llm:          deps.LLM,
 		tools:        deps.Tools,
 		toolsReg:     toolsReg,
 		permission:   deps.Permission,
@@ -202,6 +194,8 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		router:       harness.NewPromptRouter(cfg.Harness.Routing),
 		transcript:   harness.NewTranscriptManager(cfg.Harness.Transcript),
 		mainTranscript: mainTranscript,
+		attachReg:      attachments.NewRegistry(cfg.Attachments),
+		sessionQueue:   deps.SessionCommandQueue,
 		defaultModel: deps.DefaultModel,
 		tierResolver: deps.TierResolver,
 		agentRoleToolFilter: deps.AgentRoleToolFilter,
@@ -325,7 +319,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		loadSpan.End()
 	}
 	workerLocal := false
-	if ov, ok := ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
+	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
 		sc = forkWorkerSessionContext(sc, ov)
 		workerLocal = true
 	}
@@ -539,6 +533,19 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	messages := sc.CompressedView
 	if len(messages) > 0 && messages[0].Role == types.MessageRoleSystem {
 		messages = messages[1:]
+	}
+
+	// DM-020 D2 thin closure: per-turn attachment injection and Hub-Spoke
+	// drain now run in D2 Prepare (engine.runProcess), not inside query.Loop.
+	// The loop body is a pure LLM↔Tool execution primitive.
+	if e.attachReg != nil && !workerLocal {
+		payloads := e.attachReg.Collect(ctx, sc, messages, 0)
+		messages = append(messages, attachments.Render(payloads)...)
+	}
+	if e.sessionQueue != nil && !workerLocal {
+		mainThread := sc.AgentID == ""
+		drained := e.sessionQueue.Drain(sc.SessionID, sc.AgentID, mainThread)
+		messages = append(messages, contracts.RenderQueueNotifications(sc.SessionID, drained)...)
 	}
 
 	toolSchemas := harness.VisibleToolsFromState(sc.Harness)

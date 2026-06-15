@@ -34,7 +34,7 @@
 |------|------|------|
 | IM ingress / 信号语义 | D1 | EngineEvent 产出，展示归 D1 |
 | ProcessMessage / Wave / ClassifyIntent | D7 | Leader |
-| Task 写模型 / PlanMode | D7-S1/S5 | 代码暂在 `tasks/` |
+| Task 写模型 / PlanMode | D7-S1/S5 | ✅ 已迁入 `internal/layers/orchestration/workmodel/`（DM-20260614-009 v1.1 closure） |
 | delegate_* 路由 | ✅ D7 `delegatetools/` | ~~`delegate_tools.go`~~ 已迁出 |
 | FlowEvent / WorkPlan | D7-S4 | `queue/` delegate-progress |
 | 结论质量 / 信誉 | D6 | Judge |
@@ -156,7 +156,7 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | Deferred complete | ✅ IMPLEMENTED |
 | D2 Thin（query 无 orchestration/multiagent） | ✅ IMPLEMENTED | `d2_thin_test.go` |
 | D7 ingress（capture 无 contextengine） | ✅ IMPLEMENTED | `d7_boundary_test.go` |
-| tasks/ 归 D7 | ⬜ v2.0 |
+| tasks/ 归 D7 | ✅ 已迁入 `orchestration/workmodel/`（DM-20260614-009 v1.1 closure） |
 | ~~delegate_tools 移除~~ | ✅ `orchestration/delegatetools/` (DM-011) |
 | scenario 物理路径 S15/S17/S18 | ⬜ v2.0 |
 | **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ✅ v1.0 Registry（DM-020, commit 41aec47） |
@@ -170,6 +170,7 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | Version | Date | Changes |
 |---------|------|---------|
 | 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
+| 6.2.0 | 2026-06-15 | **D7 Real-Closure Spec Sync (D2 侧)**：(1) 实现状态表 `tasks/ 归 D7` ⬜ v2.0 → ✅ 已迁入 `orchestration/workmodel/`（DM-20260614-009 v1.1 closure，commit 41aec47 后）；(2) Out of Scope 表 `Task 写模型 / PlanMode` 备注从 `代码暂在 tasks/` 改为 `✅ 已迁入 orchestration/workmodel/` |
 
 ---
 

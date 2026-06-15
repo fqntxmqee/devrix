@@ -128,6 +128,17 @@ const (
 	OpD4_S4_Agent_State_Transition = telemetry.OpD4_S4_Agent_State_Transition
 )
 
+// Constants — D7 Orchestration - Session / Turn (D7-S2)
+
+const (
+	OpD7_S2_Orchestration_Session_Process = telemetry.OpD7_S2_Orchestration_Session_Process
+	OpD7_S2_Orchestration_Intent_Classify = telemetry.OpD7_S2_Orchestration_Intent_Classify
+	OpD7_S2_Orchestration_Turn_Run        = telemetry.OpD7_S2_Orchestration_Turn_Run
+	OpD7_S2_Orchestration_Turn_Iteration  = telemetry.OpD7_S2_Orchestration_Turn_Iteration
+	OpD7_S2_Orchestration_LLM_Invoke      = telemetry.OpD7_S2_Orchestration_LLM_Invoke
+	OpD7_S2_Orchestration_Orchestrate_Run = telemetry.OpD7_S2_Orchestration_Orchestrate_Run
+)
+
 // Constants — D7 Orchestration (D7-S3)
 
 const (

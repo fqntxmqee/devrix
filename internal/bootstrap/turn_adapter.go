@@ -12,12 +12,12 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// d2Adapter implements turn.ContextPreparer, turn.ToolRoundExecutor, and
-// turn.SessionPersister by delegating to the D2 context engine internals.
+// contextEngineAdapter implements turn.ContextPreparer, turn.ToolRoundExecutor,
+// and turn.SessionPersister by delegating to the context engine internals.
 //
-// DM-020 D-c+d+e: temporary adapter that bridges D7 interfaces to existing D2
-// monolith. Token counter (D-e) enables CompressHint generation.
-type d2Adapter struct {
+// DM-020 D-c+d+e: temporary adapter that bridges orchestration interfaces to
+// the existing context engine. Token counter (D-e) enables CompressHint generation.
+type contextEngineAdapter struct {
 	gw       *capture.CommunicationGateway
 	engine   contracts.IEngine
 	tools    contextengine.IToolRunner
@@ -26,8 +26,8 @@ type d2Adapter struct {
 	counter  contracts.ITokenCounter
 }
 
-func newD2Adapter(gw *capture.CommunicationGateway, engine contracts.IEngine, counter contracts.ITokenCounter) *d2Adapter {
-	a := &d2Adapter{gw: gw, engine: engine, counter: counter}
+func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.IEngine, counter contracts.ITokenCounter) *contextEngineAdapter {
+	a := &contextEngineAdapter{gw: gw, engine: engine, counter: counter}
 	if ce, ok := engine.(*contextengine.ContextEngine); ok {
 		a.tools = ce.ToolRunner()
 		a.toolsReg = ce.ToolRegistry()
@@ -41,7 +41,7 @@ const compressThreshold = 4000
 
 // Prepare implements turn.ContextPreparer.
 // D-e: checks token budget and returns CompressHint when exceeded.
-func (a *d2Adapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
+func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
 	session, err := a.gw.GetSession(req.SessionID)
 	if err != nil {
 		session = types.NewSession(req.SessionID, "d7", "")
@@ -93,7 +93,7 @@ func parseToolParams(raw string) map[string]any {
 }
 
 // ExecuteRound implements turn.ToolRoundExecutor.
-func (a *d2Adapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
+func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
 	if a.tools == nil {
 		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
 	}
@@ -122,7 +122,7 @@ func (a *d2Adapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest)
 }
 
 // PersistTurn implements turn.SessionPersister.
-func (a *d2Adapter) PersistTurn(ctx context.Context, req turn.PersistRequest) error {
+func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req turn.PersistRequest) error {
 	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
 		_, err := ce.ExportSessionSnapshot(req.SessionID)
 		return err

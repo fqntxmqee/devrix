@@ -124,3 +124,86 @@ func TestRuleClassifier_Classify_CommandFirst_Disabled(t *testing.T) {
 			got.Kind, got.Reason)
 	}
 }
+
+// D7-S5-A01-T01: 规则分类置信度阈值验证 (v1.2).
+// Verifies exact confidence values for every classification outcome and
+// guarantees screening repeatability (determinism).
+
+func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
+	c := NewRuleClassifier(DefaultConfig())
+	tests := []struct {
+		name       string
+		input      string
+		wantKind   IntentKind
+		wantConf   int
+	}{
+		{"skip empty", "  \n ", IntentSkip, 100},
+		{"skip blank", "", IntentSkip, 100},
+		{"command /plan", "/plan refactor", IntentCommand, 100},
+		{"command /stop", "/stop", IntentCommand, 100},
+		{"command /task", "/task list", IntentCommand, 100},
+		// /help is in the command whitelist
+		{"command /help", "/help", IntentCommand, 100},
+		// /status is NOT in the command whitelist, matches fast pattern
+		{"fast /status", "/status", IntentFast, 95},
+		{"fast greeting en", "hello", IntentFast, 95},
+		// 中文不匹配 \b，回退到 short single-line → confidence=70
+		{"fast greeting zh", "你好", IntentFast, 70},
+		{"fast thanks", "thanks!", IntentFast, 95},
+		{"fast goodbye", "bye", IntentFast, 95},
+		{"fast short default", "what time is it", IntentFast, 70},
+		{"orchestrate complex", "investigate the auth module latency and propose a refactor", IntentOrchestrate, 60},
+		{"orchestrate multiline", "line one\nline two", IntentOrchestrate, 60},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := c.Classify(context.Background(), tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Kind != tt.wantKind {
+				t.Errorf("kind = %q, want %q", got.Kind, tt.wantKind)
+			}
+			if got.Confidence != tt.wantConf {
+				t.Errorf("confidence = %d, want %d", got.Confidence, tt.wantConf)
+			}
+		})
+	}
+}
+
+func TestRuleClassifier_ConfidenceDeterminism(t *testing.T) {
+	c := NewRuleClassifier(DefaultConfig())
+	inputs := []string{
+		"", "/plan build auth", "hello world", "thanks!",
+		"how do I refactor the authentication module to support OAuth2 with PKCE",
+	}
+	for _, in := range inputs {
+		first, _ := c.Classify(context.Background(), in)
+		for i := 0; i < 20; i++ {
+			got, _ := c.Classify(context.Background(), in)
+			if got.Kind != first.Kind || got.Confidence != first.Confidence || got.Reason != first.Reason {
+				t.Errorf("non-deterministic classification for %q:\n  first: kind=%s conf=%d reason=%s\n  run %d: kind=%s conf=%d reason=%s",
+					in, first.Kind, first.Confidence, first.Reason, i, got.Kind, got.Confidence, got.Reason)
+				break
+			}
+		}
+	}
+}
+
+func TestRuleClassifier_ConfidenceRange(t *testing.T) {
+	c := NewRuleClassifier(DefaultConfig())
+	// All possible classification paths must produce confidence in [0, 100].
+	inputs := []string{
+		"",               // skip
+		"/plan build",    // command
+		"hello",          // fast (pattern)
+		"short msg",      // fast (short default)
+		"a longer query about architecture and design patterns for microservices", // orchestrate
+	}
+	for _, in := range inputs {
+		got, _ := c.Classify(context.Background(), in)
+		if got.Confidence < 0 || got.Confidence > 100 {
+			t.Errorf("confidence %d out of range [0,100] for %q (kind=%s)", got.Confidence, in, got.Kind)
+		}
+	}
+}

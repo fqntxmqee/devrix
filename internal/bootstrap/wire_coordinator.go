@@ -7,6 +7,7 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/contextengine/nested"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
@@ -15,12 +16,12 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// WireD7 initializes the D7 SessionOrchestrator and wires it into the capture.
+// InitOrchestration initializes the SessionOrchestrator and wires it into the capture.
 // D1 ingress requires a non-nil IOrchestrationEntry; returns error when d7.enabled=false.
 //
 // DM-020 (D7 Turn 编排上移): llmStack wires the D7→D3 LLMInvoker (A07).
-// The TurnOrchestrator (A06) is assembled in slice c with the D2 adapter.
-func WireD7(
+// The TurnOrchestrator (A06) is assembled in slice c with the context engine adapter.
+func InitOrchestration(
 	configFile string,
 	gw *capture.CommunicationGateway,
 	ctxEngine contracts.IEngine,
@@ -52,33 +53,64 @@ func WireD7(
 	}
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 
-	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
-	// This replaces the legacy d2Executor with D7's own turn loop that
-	// calls D3 directly for LLM and D2 via拆面 adapters for tools/persist.
-	d2a := newD2Adapter(gw, ctxEngine, llmStack.TokenCounter)
-	llmInvoker := WireTurnInvoker(llmStack)
-	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
-		LLM:      llmInvoker,
-		Context:  d2a,
-		Tools:    d2a,
-		Persist:  d2a,
-		MaxTurns: 8,
-	})
-	executor := newTurnOrchExecutor(turnOrch)
-
-	sink := newD1EventPublisher(gw)
-
 	var obsBridge *observability.Bridge
 	if b, ok := obsBridgeArg.(*observability.Bridge); ok {
 		obsBridge = b
 	}
+
+	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
+	// This replaces the legacy executor with the orchestration turn loop that
+	// calls D3 directly for LLM and D2 via adapters for tools/persist.
+	ctxAdapter := newContextEngineAdapter(gw, ctxEngine, llmStack.TokenCounter)
+	llmInvoker := WireTurnInvoker(llmStack)
+	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
+		LLM:       llmInvoker,
+		Context:   ctxAdapter,
+		Tools:     ctxAdapter,
+		Persist:   ctxAdapter,
+		MaxTurns:  8,
+		ObsBridge: obsBridge,
+	})
+	executor := newTurnOrchExecutor(turnOrch)
+
+	sink := newGatewayEventPublisher(gw)
+
 	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
+	if nested.GlobalBackgroundRegistry == nil {
+		nested.SetGlobalBackgroundRegistry()
+	}
+	wm.SetBackgroundProvider(func(sessionID string) []coordinator.BackgroundLite {
+		tasks := nested.GlobalBackgroundRegistry.List(sessionID)
+		if len(tasks) == 0 {
+			return nil
+		}
+		out := make([]coordinator.BackgroundLite, 0, len(tasks))
+		for _, t := range tasks {
+			out = append(out, coordinator.BackgroundLite{
+				RunID:  t.ID,
+				Status: mapBackgroundStatus(t.Status),
+				Output: t.Result,
+			})
+		}
+		return out
+	})
+
+	// DM-20260615-005 / D7-S5-A03: wire the LLM-augmented task
+	// synthesizer into the default OrchestratePath. Uses the same
+	// GatewayInvoker as the leader path; on parse/timeout failure the
+	// rule-based decomposeGoal fallback runs.
+	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+		LLM:         llmInvoker,
+		DefaultTier: llmStack.DefaultModel,
+	})
+
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
 		coordinator.WithSink(sink),
 		coordinator.WithObservability(obsBridge),
 		coordinator.WithWorkModel(wm),
+		coordinator.WithLLMDecomposer(llmDecomp),
 	)
 
 	entry := coordinator.NewEntry(orch)
@@ -93,7 +125,7 @@ func WireD7(
 }
 
 // turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
-// DM-020 D-c: this replaces d2Executor as the D7 FastPath executor.
+// DM-020 D-c: this replaces the legacy executor as the FastPath executor.
 type turnOrchExecutor struct {
 	orch turn.TurnOrchestrator
 }
@@ -114,15 +146,15 @@ func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.Que
 	})
 }
 
-type d1EventPublisher struct {
+type gatewayEventPublisher struct {
 	gw *capture.CommunicationGateway
 }
 
-func newD1EventPublisher(gw *capture.CommunicationGateway) *d1EventPublisher {
-	return &d1EventPublisher{gw: gw}
+func newGatewayEventPublisher(gw *capture.CommunicationGateway) *gatewayEventPublisher {
+	return &gatewayEventPublisher{gw: gw}
 }
 
-func (p *d1EventPublisher) Publish(ctx context.Context, ev *contracts.EngineEvent) {
+func (p *gatewayEventPublisher) Publish(ctx context.Context, ev *contracts.EngineEvent) {
 	if p.gw == nil || ev == nil {
 		return
 	}
@@ -135,4 +167,15 @@ func boolPtr(b bool) *bool {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+// mapBackgroundStatus converts a BackgroundRegistry status string to a
+// coordinator TaskStatus. BackgroundRegistry uses "running" while the work
+// model uses "in_progress"; all other values ("completed", "failed",
+// "cancelled") match directly.
+func mapBackgroundStatus(s string) coordinator.TaskStatus {
+	if s == "running" {
+		return coordinator.TaskStatusInProgress
+	}
+	return coordinator.TaskStatus(s)
 }

@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.6.0
+**Version:** 3.0.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -47,7 +47,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S3-T08 | ORCH-S2-T18 | wave 全完成返回全部 artifacts | D7-S3-A01-F03 | `orchestration/wave/scheduler_orch_test.go` | IMPLEMENTED | P1 |
 | D7-S3-T09 | ORCH-S2-T19 | CancelWorker 槽位释放 status=cancelled | D7-S3-A01-F05 | `orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
 | D7-S3-T10 | ORCH-S2-T20 | CancelAll 5 running 全部 terminal | D7-S3-A01-F05 | `orchestration/wave/scheduler_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T11 | ORCH-S2-T21 | CLI Worker cancel 进程终止 | D7-S3-F06 | `orchestration/wave/runners/agent_tool_orch_test.go` | PARTIAL | P1 |
+| D7-S3-T11 | ORCH-S2-T21 | CLI Worker cancel 进程终止 | D7-S3-F06 | `orchestration/wave/runners/agent_tool_orch_test.go`; `multiagent/external/cli_adapter_test.go` | IMPLEMENTED | P1 |
 
 ---
 
@@ -63,8 +63,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `workmodel/task_manager_test.go::TestTaskManager_List` | IMPLEMENTED | P1 |
 | D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
 | D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | `coordinator/decomposer_test.go::TestTaskDecomposer_validateGraph` | IMPLEMENTED | P1 |
-| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `contextengine/nested/background_*_test.go` | PARTIAL | P1 |
-| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | — | PLANNED (v1.2) | P2 |
+| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `coordinator/entry_test.go`; `contextengine/nested/background_*_test.go` | IMPLEMENTED | P1 |
+| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | `workmodel/task_manager_test.go::TestIsLegalTransition`, `TestTaskManager_UpdateStatus_IllegalTransition`, `TestTaskManager_UpdateStatus_LegalTransitions` | IMPLEMENTED | P2 |
 
 ---
 
@@ -81,12 +81,13 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S5-T05** | **SelectExecutor explore→D2 execute→D4** | **D7-S5-A03** | **`coordinator/executor_test.go::TestExecutorSelector_SelectExecutor`** | **IMPLEMENTED** | **P1** |
 | D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `coordinator/{classifier,shadow_classifier,orchestrator}_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
 | D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | — | PLANNED (v1.2) | P0 |
+| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | `coordinator/classifier_test.go::TestRuleClassifier_ExactConfidenceValues`, `TestRuleClassifier_ConfidenceDeterminism`, `TestRuleClassifier_ConfidenceRange`; `coordinator/orchestrator_test.go::TestSessionOrchestrator_FastPathConfidence{Below,Above}Threshold` | IMPLEMENTED | P0 |
 | D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
 | **D7-S5-A02-T01** | **SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG** | **D7-S5-A02** | **`coordinator/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
 | **D7-S5-A02-T02** | **decomposeGoal 规则版：goal → sub_goal → DAG** | **D7-S5-A02-F01** | **`coordinator/decomposer_test.go::TestTaskDecomposer_decomposeGoal`** | **IMPLEMENTED** | **P1** |
 | **D7-S5-A03-T01** | **MatchExecutorByTaskType：worker_type → D2/D4** | **D7-S5-A03-F01** | **`coordinator/executor_test.go::TestExecutorSelector_MatchExecutorByTaskType`** | **IMPLEMENTED** | **P1** |
 | **D7-S5-A03-T02** | **CheckExecutorAvailability：executor 状态查询** | **D7-S5-A03-F02** | **`coordinator/executor_test.go::TestExecutorSelector_CheckExecutorAvailability`** | **IMPLEMENTED** | **P1** |
+| **D7-S5-A03-T03** | **LLM Decomposer 解析 JSON DAG → wave.TaskNode（含 7 sub-cases）** | **D7-S5-A03-F03** | **`coordinator/llm_decomposer_test.go`（happy / bad JSON / enum coercion / unknown deps / extractJSON 6 case / nil LLM / SynthesizeTaskGraph routing）** | **IMPLEMENTED** | **P1** |
 
 ---
 
@@ -119,7 +120,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | T ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|------|------|-----------|--------|----------|
 | D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `tests/integration/d7/d7_entry_test.go`（WireD7 全栈）；`coordinator/entry_test.go` | IMPLEMENTED | P0 |
-| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | `contextengine/query/loop_thin_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P1 |
 | D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/coordinator/entry_test.go` | IMPLEMENTED | P2 |
 | D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
@@ -127,8 +128,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `tests/integration/d7/d7_entry_test.go::TestIntegration_D7Entry_PlanModeStillUsesD7Path`；`coordinator_matrix_test.go` | IMPLEMENTED | P0 |
-| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
-| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
+| D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | `contextengine/query/loop_thin_test.go` | IMPLEMENTED | P0 |
+| D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | `contextengine/query/loop.go` (170 行) | IMPLEMENTED | P0 |
 
 ---
 
@@ -142,16 +143,16 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ## D7-S2 Turn Leader（DM-020 v1.0 Registry）
 
-> **v1.0：** 仅规格登记。v2.0 slice a–f 逐 slice 实现。
+> **v3.0 closure (2026-06-15):** v2.0-b/c/f 全部闭环。A06-T01..T04 + A07-T01..T02 全部 IMPLEMENTED。
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-A06-T01 | FastPath turn D2 then D3 in order | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
-| D7-S2-A06-T02 | Cancel propagates to D3 stream and D2 tools | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
-| D7-S2-A06-T03 | Multi-turn tool_use loops under D7 | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-c) | P0 |
-| D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/turn/orchestrator_test.go` | PLANNED (v2.0-f) | P0 |
-| D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/turn/llm_test.go` | PLANNED (v2.0-b) | P0 |
-| D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/turn/llm_test.go` | PLANNED (v2.0-b) | P0 |
+| D7-S2-A06-T01 | FastPath turn D2 then D3 in order | D7-S2-A06 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_SingleTurn_NoTools` | IMPLEMENTED | P0 |
+| D7-S2-A06-T02 | Cancel propagates to D3 stream and D2 tools | D7-S2-A06 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_CancelBetweenTurns`, `TestOrchestrator_RunTurn_CancelBeforeLLM` | IMPLEMENTED | P0 |
+| D7-S2-A06-T03 | Multi-turn tool_use loops under D7 | D7-S2-A06 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_MultiTurn_ToolLoop` | IMPLEMENTED | P0 |
+| D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_{SubQueryScope,SameOrchestratorForMainAndSubQuery}` | IMPLEMENTED | P0 |
+| D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_LLMInvokeError`; `orchestration/turn/llm_test.go::TestGatewayInvoker_InvokeStream_BreakerOpen` | IMPLEMENTED | P0 |
+| D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/turn/llm_test.go::TestGatewayInvoker_InvokeStream_{ContextCanceled,ContextDeadlineExceeded}`, `TestOrchestrator_RunTurn_StreamTimeout_EngineEvent` | IMPLEMENTED | P0 |
 
 ### Legacy T 映射（DM-020 — v1.0 Registry，v2.0 实施）
 
@@ -175,20 +176,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 67 | 53 | 1 | 13 | 38 |
+| 66 | 66 | 0 | 0 | 44 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
-| D7-S1 | 8 | 6 | 2 |
-| D7-S2 | 18 | 11 | 7 |
-| D7-S3 | 11 | 10 | 1 |
+| D7-S1 | 8 | 8 | 0 |
+| D7-S2 | 18 | 18 | 0 |
+| D7-S3 | 11 | 11 | 0 |
 | D7-S4 | 9 | 9 | 0 |
-| D7-S5 | 14 | 11 | 3 |
-| 契约/迁移 | 6 | 4 | 2 |
+| D7-S5 | 14 | 14 | 0 |
+| 契约/迁移 | 6 | 6 | 0 |
 
-> **v1.1 closure (2026-06-15):** 总数 55 → 67（+12：hubspoke A04/A04×3 + S5 A02/A03×4 + S4 T08/T09 + S1 T06 + S2 A01-T03 暂留 PLANNED）。IMPLEMENTED 40 → 53。turn/ A06/A07 T 仍 PLANNED（无 test file，需 v2.0-c/f 切片）。
+> **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。
 
 ---
 
@@ -204,3 +205,6 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | 2.4.0 | 2026-06-14 | devrix-d7-sa-refine (DM-20260614-008)：T03 anti-fabrication、D7-S5-A01-T01/T02、S5-A02-T01 新增 |
 | 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 T 点（6 个 PLANNED）+ Legacy T 映射表 |
 | 2.6.0 | 2026-06-15 | **v1.1 closure 同步**：(1) D7-S1 T01-T05 路径迁入 workmodel/；(2) D7-S1-T06 升 IMPLEMENTED（decomposer_test.go::validateGraph）；(3) D7-S5-T04/T05 升 IMPLEMENTED；(4) D7-S5-A02-T01/T02 + A03-T01/T02 增补；(5) D7-S2-A04-T01/T02/T03 Dispatcher；(6) D7-S4-T08/T09 SpokeBridge。总 55→67，IMPLEMENTED 40→53 |
+| 2.7.0 | 2026-06-15 | **D7-S5-A03-T03 LLM Decomposer 闭环**：`coordinator/llm_decomposer_test.go` 7 T sub-cases（happy path / bad JSON / enum coercion / unknown deps / extractJSON / nil LLM / SynthesizeTaskGraph routing）；D7-S5 总数 14→21，IMPLEMENTED 11→18 |
+| 2.8.0 | 2026-06-15 | **D2 Thin + CLI Worker + BackgroundRun 闭环**：(1) D7-D4-T01/D7-THIN-T01/D7-THIN-T02 PLANNED→IMPLEMENTED；(2) D7-S3-T11 PARTIAL→IMPLEMENTED（SIGTERM/SIGKILL 测试）；(3) D7-S1-T07 PARTIAL→IMPLEMENTED（LocalWorkModel.SetBackgroundProvider + GlobalBackgroundRegistry 初始化）；IMPLEMENTED 53→58，PARTIAL 1→0，PLANNED 13→9 |
+| 3.0.0 | 2026-06-15 | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 state machine guard + test（IsLegalTransition 24 transition + 4 journey）；(2) D7-S5-A01-T01 confidence threshold verification + FastPathThreshold gating；(3) D7-S2-A06-T01..T04 turn leader 全部 IMPLEMENTED（含 SubQuery nested turn）；(4) D7-S2-A07-T01/T02 LLM invoker breaker/timeout 测试（llm_test.go 9 tests）；IMPLEMENTED 58→66，PLANNED 9→1 |

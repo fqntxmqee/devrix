@@ -198,6 +198,9 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 	if !ok {
 		return fmt.Errorf("task not found: %s", taskID)
 	}
+	if !IsLegalTransition(task.Status, status) {
+		return fmt.Errorf("%w: from %s to %s", ErrIllegalTransition, task.Status, status)
+	}
 	task.Status = status
 	task.UpdatedAt = time.Now()
 	m.persistLocked(sessionID)

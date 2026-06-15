@@ -6,25 +6,12 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
-
-// NewLLMCaller adapts llmgateway.ILLMGateway to LLMCaller.
-//
-// DSAFT: D2-S10-A01-F01 (WireQueryLoop)
-//
-// Deprecated: Use turn.QueryLLMCaller via EngineDeps.QueryLLMCaller (DM-020).
-// Production wiring must inject the D7-supplied adapter; this local adapter
-// remains only as a fallback when neither EngineDeps.QueryLLMCaller nor
-// EngineDeps.LLM is supplied.
-func NewLLMCaller(llm llmgateway.ILLMGateway) LLMCaller {
-	return &llmCaller{llm: llm}
-}
 
 // NewToolExecutor adapts toolrunner.IToolRunner to ToolExecutor.
 func NewToolExecutor(tools toolrunner.IToolRunner, toolsReg toolrunner.IToolRegistry, obsBridge *observability.Bridge) ToolExecutor {
@@ -43,47 +30,6 @@ func ToolSchemasFromRunner(tools []toolrunner.ToolSchema) []ToolSchema {
 		out[i] = ToolSchema{Name: t.Name, Description: t.Description, Parameters: t.Parameters}
 	}
 	return out
-}
-
-type llmCaller struct {
-	llm llmgateway.ILLMGateway
-}
-
-func (a *llmCaller) Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, error) {
-	tools := make([]llmgateway.ToolSchema, len(req.Tools))
-	for i, t := range req.Tools {
-		tools[i] = llmgateway.ToolSchema{Name: t.Name, Description: t.Description, Parameters: t.Parameters}
-	}
-	ch, err := a.llm.ChatStream(ctx, &llmgateway.Request{
-		Model:        req.Model,
-		SystemPrompt: req.SystemPrompt,
-		Messages:     req.Messages,
-		Tools:        tools,
-		Stream:       true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make(chan LLMChunk, 8)
-	go func() {
-		defer close(out)
-		for c := range ch {
-			chunk := LLMChunk{
-				Content: c.Content, Thinking: c.Thinking, Done: c.Done,
-				Usage: TokenUsage{
-					PromptTokens: c.Usage.PromptTokens, CompletionTokens: c.Usage.CompletionTokens,
-				},
-			}
-			if len(c.ToolCalls) > 0 {
-				chunk.ToolCalls = make([]ToolCall, len(c.ToolCalls))
-				for i, tc := range c.ToolCalls {
-					chunk.ToolCalls[i] = ToolCall{ID: tc.ID, Name: tc.Name, Input: tc.Input}
-				}
-			}
-			out <- chunk
-		}
-	}()
-	return out, nil
 }
 
 type toolExecutor struct {

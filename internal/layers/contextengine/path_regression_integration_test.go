@@ -21,7 +21,8 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	cfg.QueryLoop.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool out"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -52,7 +53,8 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	cfg.QueryLoop.MaxTurns = 2
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool out"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -86,7 +88,8 @@ func TestContextEngine_QueryLoopDisabled_LegacyIncrement(t *testing.T) {
 	cfg.Harness.Enabled = true
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool out"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},

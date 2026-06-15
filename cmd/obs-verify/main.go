@@ -44,7 +44,8 @@ func main() {
 		log.Fatal(err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "Hello from context engine"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "Hello from context engine"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   toolsReg,
 		Permission: mockctx.AllowAllPermission{},
@@ -54,7 +55,7 @@ func main() {
 
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
 	gw.SetObservability(obs)
-	if err := bootstrap.WireD7("", gw, engine, obsBridge, llmbridge.ContextLLMStack{}); err != nil {
+	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmbridge.ContextLLMStack{}); err != nil {
 		log.Fatal(err)
 	}
 

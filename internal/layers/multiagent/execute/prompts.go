@@ -1,6 +1,6 @@
 package execute
 
-import "github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt/agent"
+import "github.com/devrix/devrix/internal/shared/prompts/agent"
 
 var (
 	explorePrompt   = agent.ExplorePrompt

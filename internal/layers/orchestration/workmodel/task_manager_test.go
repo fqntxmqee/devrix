@@ -1,6 +1,7 @@
 package workmodel
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -78,5 +79,103 @@ func TestTaskManager_ClearSession(t *testing.T) {
 	tasks := m.List("session1")
 	if len(tasks) != 0 {
 		t.Errorf("expected 0 tasks after clear, got %d", len(tasks))
+	}
+}
+
+// D7-S1-T08: Task 非法状态转换拒绝 (v1.2).
+
+func TestIsLegalTransition(t *testing.T) {
+	tests := []struct {
+		from, to TaskStatus
+		want     bool
+	}{
+		// Legal transitions
+		{TaskStatusPending, TaskStatusInProgress, true},
+		{TaskStatusPending, TaskStatusCancelled, true},
+		{TaskStatusPending, TaskStatusPending, true}, // same-state idempotent
+		{TaskStatusInProgress, TaskStatusCompleted, true},
+		{TaskStatusInProgress, TaskStatusFailed, true},
+		{TaskStatusInProgress, TaskStatusCancelled, true},
+		{TaskStatusInProgress, TaskStatusInProgress, true},
+
+		// Illegal: terminal → anything
+		{TaskStatusCompleted, TaskStatusPending, false},
+		{TaskStatusCompleted, TaskStatusInProgress, false},
+		{TaskStatusCompleted, TaskStatusFailed, false},
+		{TaskStatusCompleted, TaskStatusCancelled, false},
+		{TaskStatusFailed, TaskStatusPending, false},
+		{TaskStatusFailed, TaskStatusInProgress, false},
+		{TaskStatusFailed, TaskStatusCompleted, false},
+		{TaskStatusFailed, TaskStatusCancelled, false},
+		{TaskStatusCancelled, TaskStatusPending, false},
+		{TaskStatusCancelled, TaskStatusInProgress, false},
+		{TaskStatusCancelled, TaskStatusCompleted, false},
+		{TaskStatusCancelled, TaskStatusFailed, false},
+
+		// Illegal: backward transitions
+		{TaskStatusInProgress, TaskStatusPending, false},
+
+		// Illegal: skip in_progress
+		{TaskStatusPending, TaskStatusCompleted, false},
+		{TaskStatusPending, TaskStatusFailed, false},
+	}
+	for _, tt := range tests {
+		got := IsLegalTransition(tt.from, tt.to)
+		if got != tt.want {
+			t.Errorf("IsLegalTransition(%s, %s) = %v, want %v", tt.from, tt.to, got, tt.want)
+		}
+	}
+}
+
+func TestTaskManager_UpdateStatus_IllegalTransition(t *testing.T) {
+	m := NewTaskManager()
+	task := m.Create("s1", "Task", "Desc")
+
+	// pending → in_progress (legal)
+	if err := m.UpdateStatus("s1", task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("legal transition failed: %v", err)
+	}
+	// in_progress → completed (legal)
+	if err := m.UpdateStatus("s1", task.ID, TaskStatusCompleted); err != nil {
+		t.Fatalf("legal transition failed: %v", err)
+	}
+
+	// completed → pending (illegal)
+	err := m.UpdateStatus("s1", task.ID, TaskStatusPending)
+	if err == nil {
+		t.Fatal("expected error for completed→pending, got nil")
+	}
+	if !errors.Is(err, ErrIllegalTransition) {
+		t.Errorf("expected ErrIllegalTransition, got %v", err)
+	}
+
+	// Verify status unchanged
+	updated, _ := m.Get("s1", task.ID)
+	if updated.Status != TaskStatusCompleted {
+		t.Errorf("status should be unchanged (completed), got %s", updated.Status)
+	}
+}
+
+func TestTaskManager_UpdateStatus_LegalTransitions(t *testing.T) {
+	paths := []struct {
+		name string
+		path []TaskStatus
+	}{
+		{"pending→in_progress→completed", []TaskStatus{TaskStatusInProgress, TaskStatusCompleted}},
+		{"pending→in_progress→failed", []TaskStatus{TaskStatusInProgress, TaskStatusFailed}},
+		{"pending→in_progress→cancelled", []TaskStatus{TaskStatusInProgress, TaskStatusCancelled}},
+		{"pending→cancelled", []TaskStatus{TaskStatusCancelled}},
+	}
+
+	for _, p := range paths {
+		t.Run(p.name, func(t *testing.T) {
+			m := NewTaskManager()
+			task := m.Create("s1", "Task", p.name)
+			for _, target := range p.path {
+				if err := m.UpdateStatus("s1", task.ID, target); err != nil {
+					t.Fatalf("legal transition to %s failed: %v", target, err)
+				}
+			}
+		})
 	}
 }

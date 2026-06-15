@@ -16,28 +16,11 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/registry"
-	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-type harnessCaptureLLM struct {
-	lastTools []contextengine.ToolSchema
-	response  string
-}
-
-func (l *harnessCaptureLLM) ChatStream(_ context.Context, req *llmgateway.Request) (<-chan llmgateway.Chunk, error) {
-	l.lastTools = make([]contextengine.ToolSchema, len(req.Tools))
-	for i, t := range req.Tools {
-		l.lastTools[i] = contextengine.ToolSchema{Name: t.Name, Description: t.Description, Parameters: t.Parameters}
-	}
-	ch := make(chan llmgateway.Chunk, 1)
-	go func() {
-		ch <- llmgateway.Chunk{Content: l.response, Done: true}
-		close(ch)
-	}()
-	return ch, nil
-}
+type harnessCaptureLLM = mockctx.CaptureLLMCaller
 
 // T: D2-S9-A01-T01, D2-S9-A01-T04, D2-S9-A03-T05, D2-S9-A02-T10, D2-S9-A02-T12, D2-S9-A03-T14
 func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
@@ -55,7 +38,8 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 			t.Fatalf("NewBuiltinRegistry: %v", err)
 		}
 		engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-			LLM:        &mockctx.LLMGateway{Response: "ok"},
+			QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 			Tools:      &mockctx.ToolRunner{},
 			ToolsReg:   toolsReg,
 			Permission: mockctx.AllowAllPermission{},
@@ -83,17 +67,18 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		ctxCfg.Harness.Prefetch.Enabled = true
 		ctxCfg.LongTerm.Enabled = false
 
-		llm := &harnessCaptureLLM{response: "done"}
+		llm := &harnessCaptureLLM{Response: "done"}
 		toolsReg, err := registry.NewBuiltinRegistry()
 		if err != nil {
 			t.Fatalf("NewBuiltinRegistry: %v", err)
 		}
 		engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-			LLM:        llm,
-			Tools:      &mockctx.ToolRunner{},
-			ToolsReg:   toolsReg,
-			Permission: mockctx.AllowAllPermission{},
-			Config:     ctxCfg,
+			QueryLLMCaller: llm,
+			Summarizer:     &mockctx.StaticSummarizer{},
+			Tools:          &mockctx.ToolRunner{},
+			ToolsReg:       toolsReg,
+			Permission:     mockctx.AllowAllPermission{},
+			Config:         ctxCfg,
 		})
 		session := types.NewSession("sess_p0_on", "cli", workDir)
 		drainAcceptance(t, engine.Process(context.Background(), session, "run tests"))
@@ -119,10 +104,10 @@ func TestAcceptance_HarnessBootstrapP0(t *testing.T) {
 		if !strings.Contains(sc.SystemPrompt, "Devrix") {
 			t.Fatal("assembled prompt missing core template")
 		}
-		if len(llm.lastTools) != 3 {
-			t.Fatalf("visible tool count: got %d want 3", len(llm.lastTools))
+		if len(llm.LastTools) != 3 {
+			t.Fatalf("visible tool count: got %d want 3", len(llm.LastTools))
 		}
-		for _, tool := range llm.lastTools {
+		for _, tool := range llm.LastTools {
 			switch tool.Name {
 			case "bash", "read_file", "write_file":
 			default:

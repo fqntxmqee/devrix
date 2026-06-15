@@ -1,34 +1,11 @@
 package contextengine
 
 import (
-	"context"
-
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-type processOverlayKey struct{}
-
-// ProcessOverlay carries per-Process worker identity for D4 agents.
-type ProcessOverlay struct {
-	AgentID      string
-	ModelTier    string
-	IsWorker     bool
-	WorkerRole   string
-	SystemPrompt string
-}
-
-// WithProcessOverlay attaches worker metadata to a Process call.
-func WithProcessOverlay(ctx context.Context, ov ProcessOverlay) context.Context {
-	return context.WithValue(ctx, processOverlayKey{}, ov)
-}
-
-// ProcessOverlayFromContext returns worker metadata when present.
-func ProcessOverlayFromContext(ctx context.Context) (ProcessOverlay, bool) {
-	ov, ok := ctx.Value(processOverlayKey{}).(ProcessOverlay)
-	return ov, ok
-}
-
-func forkWorkerSessionContext(parent *types.SessionContext, ov ProcessOverlay) *types.SessionContext {
+func forkWorkerSessionContext(parent *types.SessionContext, ov contracts.ProcessOverlay) *types.SessionContext {
 	if parent == nil {
 		return &types.SessionContext{
 			AgentID:    ov.AgentID,

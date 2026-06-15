@@ -24,7 +24,8 @@ func TestIntegration_HarnessBootstrap_disabled_v4_regression(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "legacy ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "legacy ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},
@@ -60,7 +61,8 @@ func TestIntegration_HarnessBootstrap_enabled_flow(t *testing.T) {
 	ctxCfg.LongTerm.Enabled = false
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "harness ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "harness ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},

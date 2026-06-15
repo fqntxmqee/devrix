@@ -24,7 +24,8 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:        &mockctx.LLMGateway{Response: "ok"},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "ok"},
 		ToolsReg:   mustBuiltinRegistry(t),
 		Permission: mockctx.AllowAllPermission{},

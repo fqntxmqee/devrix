@@ -23,7 +23,8 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 	}
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		LLM:          &mockctx.LLMGateway{},
+		QueryLLMCaller: &mockctx.StaticLLMCaller{},
+		Summarizer:     &mockctx.StaticSummarizer{},
 		TokenCounter: counter,
 		Config:       cfg,
 	})

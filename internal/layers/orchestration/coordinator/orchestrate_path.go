@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -40,6 +43,18 @@ type OrchestratePath struct {
 	decomposer *TaskDecomposer
 	scheduler  WaveSchedulerRunner
 	sink       EventPublisher
+	obsBridge  *observability.Bridge
+}
+
+// SetObsBridge wires tracing for the orchestrate pipeline.
+func (op *OrchestratePath) SetObsBridge(bridge *observability.Bridge) {
+	if op == nil {
+		return
+	}
+	op.obsBridge = bridge
+	if ws, ok := op.scheduler.(*wave.WaveScheduler); ok {
+		ws.SetObsBridge(bridge)
+	}
 }
 
 // NewOrchestratePath builds the path. All args are required; nil →
@@ -76,6 +91,11 @@ func (op *OrchestratePath) Run(ctx context.Context, req ProcessRequest, _ Intent
 	out := make(chan *contracts.EngineEvent, 16)
 	go func() {
 		defer close(out)
+
+		ctx, orchSpan := startObsSpan(op.obsBridge, ctx, telemetry.OpD7_S2_Orchestration_Orchestrate_Run, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		)
+		defer endSpan(orchSpan)
 
 		// 1) SynthesizeTaskGraph (D7-S5-A02)
 		result, err := op.decomposer.SynthesizeTaskGraph(ctx, req.SessionID, req.Message)
@@ -186,17 +206,32 @@ func emitError(ctx context.Context, sink EventPublisher, out chan<- *contracts.E
 }
 
 // newDefaultOrchestratePath builds an OrchestratePath bound to a fresh
-// TaskDecomposer and a fresh WaveScheduler. It is the v1.1.0+ default
-// for NewSessionOrchestrator when no WithOrchestratePath option is
-// supplied.
+// TaskDecomposer and a functional WaveScheduler. It is the v1.1.0+ default
+// for NewSessionOrchestrator when no WithOrchestratePath option is supplied.
 //
-// The default WaveScheduler is constructed with zero-value SchedulerDeps.
-// wave.NewWaveScheduler is nil-safe for Pool / Guard / Resolver /
-// Artifacts (only Runners is initialized to an empty map if nil).
-// Production callers that need a real WorkerPool + WorkerRunner registry
-// should still wire explicitly via WithOrchestratePath.
-func newDefaultOrchestratePath(sink EventPublisher) *OrchestratePath {
+// The default WaveScheduler has a real WorkerPool, ConflictGuard,
+// ArtifactStore, and ContextResolver — so the dispatch loop will not
+// deadlock or panic. Tasks that reach the dispatch phase will fail with
+// "no runner for kind X" errors (clean failure) because no WorkerRunners
+// are registered. Production callers that need real multi-agent execution
+// MUST wire a WaveScheduler with proper runners via WithOrchestratePath.
+func newDefaultOrchestratePath(sink EventPublisher, llmDecomp LLMTaskDecomposer) *OrchestratePath {
 	decomp := NewTaskDecomposer()
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{})
+	if llmDecomp != nil {
+		decomp.SetLLMDecomposer(llmDecomp)
+	}
+	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
+	guard := wave.NewConflictGuard()
+	artifacts := wave.NewArtifactStore()
+	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+		Artifacts:        artifacts,
+		BaseSystemPrompt: "",
+	})
+	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+		Pool:      pool,
+		Guard:     guard,
+		Resolver:  resolver,
+		Artifacts: artifacts,
+	})
 	return NewOrchestratePath(decomp, sched, sink)
 }

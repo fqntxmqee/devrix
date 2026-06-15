@@ -7,27 +7,32 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // OrchestratorDeps holds the dependencies for the TurnOrchestrator.
 type OrchestratorDeps struct {
-	LLM      LLMInvoker
-	Context  ContextPreparer
-	Tools    ToolRoundExecutor
-	Persist  SessionPersister
-	MaxTurns int
+	LLM       LLMInvoker
+	Context   ContextPreparer
+	Tools     ToolRoundExecutor
+	Persist   SessionPersister
+	MaxTurns  int
+	ObsBridge *observability.Bridge
 }
 
 // DefaultOrchestrator implements TurnOrchestrator with the canonical
 // prepare→llm→tools→persist state machine (design.md §3).
 type DefaultOrchestrator struct {
-	llm      LLMInvoker
-	context  ContextPreparer
-	tools    ToolRoundExecutor
-	persist  SessionPersister
-	maxTurns int
+	llm       LLMInvoker
+	context   ContextPreparer
+	tools     ToolRoundExecutor
+	persist   SessionPersister
+	maxTurns  int
+	obsBridge *observability.Bridge
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -36,11 +41,12 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		deps.MaxTurns = 8
 	}
 	return &DefaultOrchestrator{
-		llm:      deps.LLM,
-		context:  deps.Context,
-		tools:    deps.Tools,
-		persist:  deps.Persist,
-		maxTurns: deps.MaxTurns,
+		llm:       deps.LLM,
+		context:   deps.Context,
+		tools:     deps.Tools,
+		persist:   deps.Persist,
+		maxTurns:  deps.MaxTurns,
+		obsBridge: deps.ObsBridge,
 	}
 }
 
@@ -62,18 +68,31 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 	ch := make(chan *contracts.EngineEvent, 32)
 	go func() {
 		defer close(ch)
+		ctx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Run, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+			tracer.Attribute{Key: "turn.max_turns", Value: fmt.Sprintf("%d", req.MaxTurns)},
+		)
+		defer endSpan(turnSpan)
 		o.runLoop(ctx, req, ch)
 	}()
 	return ch, nil
 }
 
 // runLoop is the internal state machine: PREPARE → LLM ↔ TOOL_ROUND → PERSIST.
+// Cross-domain calls: D7→D2 (prepare/tools/persist), D7→D3 (LLM invoke).
 func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) {
-	// Step 1: PREPARE — ask D2 for context assembly
+	// Step 1: PREPARE — D7 calls D2 for context assembly
+	ctx, prepSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "context.phase", Value: "prepare"},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
+	)
 	prepared, err := o.context.Prepare(ctx, PrepareRequest{
 		SessionID: req.SessionID,
 		Message:   req.UserMessage,
 	})
+	endSpan(prepSpan)
 	if err != nil {
 		o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
 		return
@@ -81,7 +100,12 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 
 	// D-e: handle CompressHint — D7 calls D3 for summarization.
 	if prepared.CompressHint != nil {
-		result := o.runCompress(ctx, req, prepared.CompressHint)
+		compressCtx, compressSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "llm.purpose", Value: "compress"},
+		)
+		result := o.runCompress(compressCtx, req, prepared.CompressHint)
+		endSpan(compressSpan)
 		prepared.Messages = []types.Message{{
 			SessionID: req.SessionID,
 			Role:      types.MessageRoleSystem,
@@ -106,14 +130,26 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			return
 		}
 
-		// Invoke LLM (D7→D3 via GatewayInvoker)
-		chunkCh, err := o.llm.InvokeStream(ctx, LLMInvokeRequest{
+		turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
+		)
+
+		// D7→D3 LLM invoke (D7-S2-A07)
+		turnCtx, llmSpan := o.startSpan(turnCtx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
+			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
+		)
+		chunkCh, err := o.llm.InvokeStream(turnCtx, LLMInvokeRequest{
 			SessionID:    req.SessionID,
 			SystemPrompt: prepared.SystemPrompt,
 			Messages:     messages,
 			Tools:        tools,
 		})
 		if err != nil {
+			endSpanWithError(llmSpan, err)
+			endSpan(turnSpan)
 			o.emitError(out, req.SessionID, fmt.Sprintf("llm invoke failed: %v", err))
 			return
 		}
@@ -146,18 +182,25 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				totalUsage.CompletionTokens += chunk.Usage.CompletionTokens
 			}
 		}
+		endSpan(llmSpan)
 
 		finalText = contentBuf.String()
 
 		// No tool calls → final response
 		if len(toolCalls) == 0 {
-			_ = o.persist.PersistTurn(ctx, PersistRequest{
+			_, persistSpan := o.startSpan(turnCtx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
+				tracer.Attribute{Key: "session_id", Value: req.SessionID},
+				tracer.Attribute{Key: "context.caller", Value: "d7"},
+			)
+			_ = o.persist.PersistTurn(turnCtx, PersistRequest{
 				SessionID:  req.SessionID,
 				Messages:   messages,
 				TurnCount:  turn + 1,
 				Usage:      totalUsage,
 				FinalText:  finalText,
 			})
+			endSpan(persistSpan)
+			endSpan(turnSpan)
 			out <- &contracts.EngineEvent{
 				Type:      "complete",
 				SessionID: req.SessionID,
@@ -175,15 +218,23 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			}
 		}
 
-		// Execute tool round (D7→D2)
-		toolResult, err := o.tools.ExecuteRound(ctx, ToolRoundRequest{
+		// D7→D2 tool execution
+		_, toolSpan := o.startSpan(turnCtx, telemetry.OpD2_S5_Tool_Execute_Single, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "tool.count", Value: fmt.Sprintf("%d", len(toolCalls))},
+			tracer.Attribute{Key: "context.caller", Value: "d7"},
+		)
+		toolResult, err := o.tools.ExecuteRound(turnCtx, ToolRoundRequest{
 			SessionID: req.SessionID,
 			ToolCalls: toolCalls,
 		})
 		if err != nil {
+			endSpanWithError(toolSpan, err)
+			endSpan(turnSpan)
 			o.emitError(out, req.SessionID, fmt.Sprintf("tool round failed: %v", err))
 			return
 		}
+		endSpan(toolSpan)
 
 		// Emit tool result events
 		for _, r := range toolResult.Results {
@@ -205,9 +256,14 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		}
 
 		finalText = ""
+		endSpan(turnSpan)
 	}
 
 	// Max turns reached
+	_, persistSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
+	)
 	_ = o.persist.PersistTurn(ctx, PersistRequest{
 		SessionID:  req.SessionID,
 		Messages:   messages,
@@ -215,6 +271,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		Usage:      totalUsage,
 		FinalText:  finalText,
 	})
+	endSpan(persistSpan)
 	out <- &contracts.EngineEvent{
 		Type:      "complete",
 		SessionID: req.SessionID,

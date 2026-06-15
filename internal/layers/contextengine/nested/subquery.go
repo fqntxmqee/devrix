@@ -29,13 +29,13 @@ type SubQueryParams struct {
 	Tools          []query.ToolSchema
 	MaxTurns       int
 	Model          string
-		ModelTier      string
+	ModelTier      string
 	OmitClaudeMd   bool
 	ReadOnlyTools  bool
 	Resume         bool
 	TaskID         string
 	Role           string
-	FlowHub        contracts.ExecutionFlowHub
+	FlowReporter   contracts.SubQueryFlowReporter
 }
 
 // SubQueryResult is the outcome of SubQuery.Run.
@@ -46,9 +46,9 @@ type SubQueryResult struct {
 
 // LoopDeps wires dependencies for SubQuery.
 type LoopDeps struct {
-	Loop      *query.Loop
-	Sidechain SidechainRecorder
-	FlowHub   contracts.ExecutionFlowHub
+	Loop         *query.Loop
+	Sidechain    SidechainRecorder
+	FlowReporter contracts.SubQueryFlowReporter
 }
 
 // Run executes a sub-agent query using the shared QueryLoop.
@@ -83,17 +83,30 @@ func Run(ctx context.Context, deps LoopDeps, params SubQueryParams) (*SubQueryRe
 		}
 	}
 
-	hub := resolveFlowHub(params, deps)
-	publishSubQueryFlow(ctx, hub, params, contracts.FlowStarted, params.AgentName, nil)
+	flowParams := flowParamsFromSubQuery(params)
+	reporter := params.FlowReporter
+	if reporter == nil {
+		reporter = deps.FlowReporter
+	}
+	if reporter != nil {
+		reporter.OnStarted(ctx, flowParams, params.AgentName)
+	}
+
+	emit := contracts.EngineEmitFunc(nil)
+	if reporter != nil {
+		emit = reporter.WrapEmit(ctx, flowParams, nil)
+	}
 
 	res, err := deps.Loop.Run(ctx, child, query.Params{
 		SystemPrompt: params.SystemPrompt,
 		Messages:     initial,
 		Tools:        tools,
 		MaxTurns:     params.MaxTurns,
-	}, subQueryFlowEmit(ctx, hub, params, nil))
+	}, query.EmitFunc(emit))
 	if err != nil {
-		publishSubQueryFlow(ctx, hub, params, contracts.FlowFailed, err.Error(), nil)
+		if reporter != nil {
+			reporter.OnFailed(ctx, flowParams, err.Error())
+		}
 		return nil, err
 	}
 
@@ -107,9 +120,25 @@ func Run(ctx context.Context, deps LoopDeps, params SubQueryParams) (*SubQueryRe
 	if res != nil {
 		summary = res.AssistantText
 	}
-	publishSubQueryFlow(ctx, hub, params, contracts.FlowCompleted, summary, nil)
+	if reporter != nil {
+		reporter.OnCompleted(ctx, flowParams, summary)
+	}
 
 	return &SubQueryResult{Result: res, ChildSC: child}, nil
+}
+
+func flowParamsFromSubQuery(params SubQueryParams) contracts.SubQueryFlowParams {
+	sessionID := ""
+	if params.ParentSC != nil {
+		sessionID = params.ParentSC.SessionID
+	}
+	return contracts.SubQueryFlowParams{
+		SessionID: sessionID,
+		AgentID:   params.AgentID,
+		AgentName: params.AgentName,
+		TaskID:    params.TaskID,
+		Role:      params.Role,
+	}
 }
 
 func forkChildContext(params SubQueryParams) *types.SessionContext {

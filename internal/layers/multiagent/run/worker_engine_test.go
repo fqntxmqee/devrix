@@ -4,10 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
-	
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -37,9 +35,9 @@ func TestAgent_should_reject_fork_from_worker(t *testing.T) {
 
 // T: D4-S10-A01-T02
 func TestWorkerEngine_should_inject_process_overlay(t *testing.T) {
-	var gotOverlay contextengine.ProcessOverlay
+	var gotOverlay contracts.ProcessOverlay
 	inner := &overlayCaptureEngine{capture: func(ctx context.Context) {
-		if ov, ok := contextengine.ProcessOverlayFromContext(ctx); ok {
+		if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok {
 			gotOverlay = ov
 		}
 	}}

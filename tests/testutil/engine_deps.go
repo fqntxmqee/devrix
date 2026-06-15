@@ -1,0 +1,101 @@
+package testutil
+
+import (
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
+	"github.com/devrix/devrix/internal/layers/contextengine"
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
+)
+
+// ContextEngineDepsFromStack builds EngineDeps with D7 turn adapters (production-like).
+func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.ContextEngineConfig) contextengine.EngineDeps {
+	if ctxCfg == nil {
+		ctxCfg = config.DefaultContextEngineConfig()
+	}
+	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
+		Gateway:      stack.RawGateway,
+		TierResolver: stack.TierResolver,
+		DefaultTier:  stack.DefaultModel,
+	})
+	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+		Gateway:      stack.RawGateway,
+		TierResolver: stack.TierResolver,
+		DefaultTier:  stack.DefaultModel,
+		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
+	})
+	return contextengine.EngineDeps{
+		QueryLLMCaller: queryCaller,
+		Summarizer:     summarizer,
+		TokenCounter:   stack.TokenCounter,
+		TierResolver:   stack.TierResolver,
+		DefaultModel:   stack.DefaultModel,
+		Config:         ctxCfg,
+	}
+}
+
+// MergeEngineDeps overlays non-zero fields from patch onto base.
+func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDeps) contextengine.EngineDeps {
+	if patch.QueryLLMCaller != nil {
+		base.QueryLLMCaller = patch.QueryLLMCaller
+	}
+	if patch.Summarizer != nil {
+		base.Summarizer = patch.Summarizer
+	}
+	if patch.TokenCounter != nil {
+		base.TokenCounter = patch.TokenCounter
+	}
+	if patch.Tools != nil {
+		base.Tools = patch.Tools
+	}
+	if patch.ToolsReg != nil {
+		base.ToolsReg = patch.ToolsReg
+	}
+	if patch.Permission != nil {
+		base.Permission = patch.Permission
+	}
+	if patch.LongTerm != nil {
+		base.LongTerm = patch.LongTerm
+	}
+	if patch.Config != nil {
+		base.Config = patch.Config
+	}
+	if patch.ObsBridge != nil {
+		base.ObsBridge = patch.ObsBridge
+	}
+	if patch.DefaultModel != "" {
+		base.DefaultModel = patch.DefaultModel
+	}
+	if patch.TierResolver != nil {
+		base.TierResolver = patch.TierResolver
+	}
+	if patch.AgentRoleToolFilter != nil {
+		base.AgentRoleToolFilter = patch.AgentRoleToolFilter
+	}
+	if patch.SessionCommandQueue != nil {
+		base.SessionCommandQueue = patch.SessionCommandQueue
+	}
+	return base
+}
+
+// EnsureLLMDeps panics if QueryLLMCaller or Summarizer are missing.
+func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
+	if deps.QueryLLMCaller == nil || deps.Summarizer == nil {
+		panic("test EngineDeps missing QueryLLMCaller/Summarizer")
+	}
+	return deps
+}
+
+// EngineDepsWithLLM returns minimal EngineDeps with caller + default summarizer.
+func EngineDepsWithLLM(caller contracts.LLMCaller) contextengine.EngineDeps {
+	return contextengine.EngineDeps{
+		QueryLLMCaller: caller,
+		Summarizer:     &mockctx.StaticSummarizer{},
+	}
+}
+
+// StaticLLMDeps returns deps with only LLM contracts filled (for minimal unit tests).
+func StaticLLMDeps(caller contracts.LLMCaller) contextengine.EngineDeps {
+	return EngineDepsWithLLM(caller)
+}

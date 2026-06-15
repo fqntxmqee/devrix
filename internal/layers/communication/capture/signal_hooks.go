@@ -137,19 +137,22 @@ func (g *CommunicationGateway) startCapturePersistSpan(ctx context.Context, sess
 	}
 }
 
-func (g *CommunicationGateway) startDispatchRouteSpan(ctx context.Context, sessionID, target string) {
+func (g *CommunicationGateway) startDispatchRouteSpan(ctx context.Context, sessionID, target string) (context.Context, func()) {
 	if g.obsBridge == nil || g.obsBridge.Tracer() == nil {
-		return
+		return ctx, func() {}
 	}
-	_, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Dispatch_Route,
+	ctx, span := g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Dispatch_Route,
 		tracer.WithSpanKind(tracer.SpanKindInternal),
 		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Dispatch_Route,
 			tracer.Attribute{Key: "session.id", Value: sessionID},
 			tracer.Attribute{Key: "dispatch.target", Value: target},
 		)...),
 	)
-	if span != nil {
-		span.End()
+	return ctx, func() {
+		if span != nil {
+			span.SetStatus(tracer.StatusCodeOk, "")
+			span.End()
+		}
 	}
 }
 

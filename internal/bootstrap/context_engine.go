@@ -93,10 +93,10 @@ func NewContextEngine(
 		ObsBridge:           obsBridge,
 		DefaultModel:        stack.DefaultModel,
 		TierResolver:        stack.TierResolver,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
+		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 	})
 }
 

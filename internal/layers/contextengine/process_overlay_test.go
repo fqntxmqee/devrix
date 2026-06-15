@@ -3,6 +3,7 @@ package contextengine
 import (
 	"testing"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -16,7 +17,7 @@ func TestForkWorkerSessionContext_should_isolate_worker_identity(t *testing.T) {
 		QueryDepth:   0,
 		Messages:     []types.Message{{Role: types.MessageRoleUser, Content: "leader msg"}},
 	}
-	child := forkWorkerSessionContext(parent, ProcessOverlay{
+	child := forkWorkerSessionContext(parent, contracts.ProcessOverlay{
 		AgentID:      "worker_a",
 		IsWorker:     true,
 		WorkerRole:   "explore",

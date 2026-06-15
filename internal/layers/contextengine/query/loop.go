@@ -6,38 +6,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
-	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// LoopHooks defines callbacks at loop lifecycle points.
-type LoopHooks struct {
-	BeforeComplete func(ctx context.Context, sc *types.SessionContext) (stop bool, err error)
-	AfterToolRound func(ctx context.Context, sc *types.SessionContext, results []ToolRoundResult) (stop bool, err error)
-}
-
 // Loop runs the Claude Code-aligned query loop (while tool_use continue).
+//
+// DM-020 D2 thin closure: orchestration callbacks (LoopHooks), per-turn
+// attachment collection (*attachments.Registry), and Hub-Spoke drain
+// (SessionQueue) have all moved out of D2. D7 owns lifecycle hooks
+// (D7-S2-A06 RunTurnLoop), per-turn context injection (D7 Prepare), and
+// flow event aggregation (D7-S4). The remaining fields are pure D2
+// execution primitives: LLM call, tool execution, permission gate,
+// per-turn compression, user-context prepend, and observability.
 type Loop struct {
 	LLM             LLMCaller
 	Tools           ToolExecutor
 	Permission      PermissionChecker
 	Compress        CompressFunc
 	CompressFactory func(sessionID string) CompressFunc // lazy-init when sessionID is known
-	Attachments     *attachments.Registry
 	UserContext     *usercontext.Provider
-	Hooks           LoopHooks
 	PrependUC       func(msgs []types.Message, uc map[string]string) []types.Message
 	WrapToolContext func(ctx context.Context, sc *types.SessionContext) context.Context
 	// WrapToolStreamContext wraps the tool execution context with a stream emitter
 	// so agent tools (call_claude-code etc.) can stream mid-execution events.
 	WrapToolStreamContext func(ctx context.Context, emit EmitFunc, sessionID, toolName string) context.Context
-	SessionQueue          contracts.SessionCommandQueue
 	StreamingTools        bool
 	// Observability bridge for tracing. When nil, tracing is no-op.
 	Observability *observability.Bridge
@@ -122,17 +119,6 @@ func (l *Loop) Run(
 			}
 		}
 
-		if l.Attachments != nil && sc != nil {
-			payloads := l.Attachments.Collect(ctx, sc, messages, turn)
-			messages = append(messages, attachments.Render(payloads)...)
-		}
-
-		if l.SessionQueue != nil && sc != nil {
-			mainThread := sc.AgentID == ""
-			drained := l.SessionQueue.Drain(sc.SessionID, sc.AgentID, mainThread)
-			messages = append(messages, contracts.RenderQueueNotifications(sc.SessionID, drained)...)
-		}
-
 		uc := params.UserContext
 		if l.UserContext != nil && sc != nil {
 			uc = l.UserContext.Get(ctx, sc)
@@ -210,13 +196,6 @@ func (l *Loop) Run(
 		}
 
 		if len(pending) == 0 {
-			if l.Hooks.BeforeComplete != nil {
-				if stop, err := l.Hooks.BeforeComplete(ctx, sc); err != nil {
-					return nil, err
-				} else if stop {
-					break
-				}
-			}
 			break
 		}
 
@@ -229,14 +208,6 @@ func (l *Loop) Run(
 		newRecords, newResults := l.executeToolRefs(turnCtx, sc, refs, emit, endTurn)
 		allToolRecords = append(allToolRecords, newRecords...)
 		toolRoundResults = append(toolRoundResults[:0], newResults...)
-
-		if l.Hooks.AfterToolRound != nil {
-			if stop, err := l.Hooks.AfterToolRound(ctx, sc, toolRoundResults); err != nil {
-				return nil, err
-			} else if stop {
-				break
-			}
-		}
 
 		assistantText = ""
 		turn++

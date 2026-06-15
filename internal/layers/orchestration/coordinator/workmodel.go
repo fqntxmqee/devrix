@@ -71,10 +71,9 @@ type BackgroundLite struct {
 // LocalWorkModel is the v1.1 implementation: it uses the coordinator's
 // TaskManager directly. This replaces DelegatedWorkModel which delegated to D2.
 type LocalWorkModel struct {
-	tasks   *TaskManager
-	flowHub interface {
-		Snapshot(sessionID string) interface{}
-	}
+	tasks              *TaskManager
+	flowHub            interface{ Snapshot(sessionID string) interface{} }
+	listBackground     func(sessionID string) []BackgroundLite
 }
 
 // NewLocalWorkModel returns a WorkModel that uses the coordinator's TaskManager.
@@ -85,6 +84,13 @@ func NewLocalWorkModel(tasks *TaskManager) *LocalWorkModel {
 // SetFlowHub wires the flow hub for QueryWorkPlan.
 func (m *LocalWorkModel) SetFlowHub(hub interface{ Snapshot(sessionID string) interface{} }) {
 	m.flowHub = hub
+}
+
+// SetBackgroundProvider wires the background task source for QueryWorkPlan.
+// The function must return a slice of BackgroundLite for the given session,
+// or nil/empty if no background tasks exist.
+func (m *LocalWorkModel) SetBackgroundProvider(fn func(sessionID string) []BackgroundLite) {
+	m.listBackground = fn
 }
 
 // CreateTask creates a task using the local TaskManager.
@@ -106,11 +112,12 @@ func (m *LocalWorkModel) UpdateStatus(ctx context.Context, taskID string, status
 	return m.tasks.UpdateStatus(sessionID, taskID, status)
 }
 
-// QueryWorkPlan returns a snapshot combining local tasks and flow state.
+// QueryWorkPlan returns a snapshot combining local tasks, flow state, and
+// background runs.
 func (m *LocalWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (WorkPlanSnapshot, error) {
 	snapshot := WorkPlanSnapshot{SessionID: sessionID}
 
-	// Get tasks from local TaskManager
+	// Tasks
 	tasks := m.tasks.List(sessionID)
 	for _, t := range tasks {
 		spec := TaskSpec{
@@ -119,6 +126,20 @@ func (m *LocalWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (W
 			Goal:    t.Description,
 		}
 		snapshot.Tasks = append(snapshot.Tasks, spec)
+	}
+
+	// Background runs
+	if m.listBackground != nil {
+		snapshot.Background = m.listBackground(sessionID)
+	}
+
+	// Execution flows
+	if m.flowHub != nil {
+		if raw := m.flowHub.Snapshot(sessionID); raw != nil {
+			if flows, ok := raw.([]FlowLite); ok {
+				snapshot.Flows = flows
+			}
+		}
 	}
 
 	return snapshot, nil
