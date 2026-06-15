@@ -2,10 +2,10 @@
 
 **Capability:** architecture-cross-domain
 **Status:** Active
-**Version:** 1.3.0
+**Version:** 1.5.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（DM-20260614-016 / R2 命题 E 决议落地）+ devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6-A 决议固化 Breaker 事件命名 + §2.4.4 新增 D3→D5 metric 命名边界）
+**Change:** devrix-d3-sa-refine（DM-20260614-016 / R2 命题 E 决议落地）+ devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6-A 决议固化 Breaker 事件命名 + §2.4.4 新增 D3→D5 metric 命名边界）+ DM-20260615-004 D7 Intent 路径正交化（§2.4.4 D7 ↔ D1/D2/D4 跨域锚点登记）
 
 ---
 
@@ -220,6 +220,34 @@
 
 **v1.1 R1 议题 D6 决议**：倾向 D6-A（3 事件分开）；Owner 评审通过；不再保留"v1.1 第一个 issue 决定"占位声明。
 
+#### 2.4.4 D7 Intent 路径正交化（DM-20260615-004 跨域锚点登记）
+
+> **场景**：D1 把 `InboundMessage` 路由至 D7 `coordinator.Entry.ProcessMessage` 后，D7 按 `IntentKind` 选择执行链。该选择决定了 **D3 是否被调用** 以及 **D2 / D4 参与方式**。
+
+**4 IntentKind × 跨域 SoT（DM-20260615-004 v1.1.0+ 闭合）：**
+
+| IntentKind | 执行链 | D3 调用 | D2 参与 | D4 参与 | 备注 |
+|------------|--------|---------|---------|---------|------|
+| `IntentSkip` | 内联 `close(ch)` | ❌ 零 LLM | ❌ | ❌ | 空消息或重复消息 |
+| `IntentCommand` | `CommandHandler.Handle` → `PlanCLICommands` / `CLICommands` | ❌ **零 LLM** | ❌（plan 决策通过 D7-S5） | ❌ | `/plan` `/task` `/help` `/stop` 等显式命令 |
+| `IntentFast` | `FastPath.Run` → `TurnOrchestrator` | ✅ 单轮 LLM↔Tool | ✅ Prepare / ToolRound / Persist | ❌ | 普通对话 |
+| `IntentOrchestrate` | `OrchestratePath.Run` → `TaskDecomposer.SynthesizeTaskGraph` + `WaveScheduler.Start` + `WaitForCompletion` | ✅（per-task LLM） | ✅（per-worker Prepare / ToolRound / Persist） | ✅（per-worker ExecuteWorker + WorkerEngine） | 多任务长目标 |
+
+**v1.0 → v1.1.0 关键变化（禁止退化）：**
+
+- v1.0：`ProcessMessage` 4 case 共享 1 个 `FastPath` 占位 + `system_prompt` 字符串 hint（"[command:xxx]" / "[orchestrate]"），LLM 自解释
+- v1.1.0+：4 case = **4 独立执行链**，`IntentCommand` **不调 LLM**（由 `CommandHandler` 显式分发），`IntentOrchestrate` **不经过 FastPath**（由 `OrchestratePath` 显式调 WaveScheduler）
+- **禁止**：合并 case 4 → 1；重启 v1.0 占位 + hint 实现；`IntentFast` 改走 `OrchestratePath`（语义不一致）
+
+**跨域契约影响（v1.1.0+）：**
+
+- **D3 LLM 调用次数 metric**：`intent_kind` 标签必须分别采集 4 IntentKind；v1.0 混在 `intent_kind=fast` 单一桶的 metric 已废弃
+- **D5 metric**：`intent_dispatch_total{kind=skip|command|fast|orchestrate}` 新增（`coordinator/orchestrator.go` 内 emit）
+- **D2 拆面契约**：仅 `IntentFast` 与 `IntentOrchestrate` 触发 `QueryLLMCaller` / `CompressionSummarizer` 调用；`IntentCommand` 与 `IntentSkip` 路径不经过 D2
+- **D4 拆面契约**：仅 `IntentOrchestrate` 触发 D4 worker dispatch；`IntentFast` 路径不直接 dispatch worker
+
+> 详见 `d7-orchestration/spec.md` v2.5.0 §意图分类 + `d7-orchestration/dsaft-architecture.md` §意图分类。
+
 ### 2.5 D3 vs D1 (Communication)
 
 | 概念 | D3 SoT | D1 SoT | 备注 |
@@ -328,6 +356,7 @@
 | 3 | D6 probe 接入 | D3 + D6 | D6 维护 probe 列表；D3 暴露稳定 metric | §2.3.3 |
 | 4 | Breaker 事件命名 | D3 + D7 | **D6-A 决议固化**：`flow.breaker.opened` / `closed` / `halfopened`（v1.1 实施） | §2.4.3 |
 | 5 | D3→D5 metric 命名边界 | D3 + D5 | **v1.1 新增**：D3 定义命名 + 维度；D5 仅持久化 | §2.2.4 |
+| 6 | **D7 Intent 路径正交化（DM-20260615-004）** | D7 + D2 + D4 | **4 IntentKind = 4 独立执行链**：IntentSkip 内联 / IntentCommand 走 `CommandHandler`（零 LLM）/ IntentFast 走 `FastPath.Run` → D3 + D2 / IntentOrchestrate 走 `OrchestratePath.Run` → SynthesizeTaskGraph + WaveScheduler（→D2/D4） | §2.4.4 + `d7-orchestration/spec.md` v2.5.0 + `d7-orchestration/dsaft-architecture.md` §意图分类 |
 
 ---
 
@@ -358,3 +387,4 @@
 | 1.2.0 | 2026-06-14 | §3 D4 跨域边界（Hub-Spoke 全归 D7；D4 vs D7/D2/D1/D5）；灰区 Hub-Spoke 双头收敛表（DM-20260614-018） |
 | 1.3.0 | 2026-06-15 | 双边共识落盘：§2.1 D3 vs D2 DM-020 修订（D2→D3 禁止、ILLMGateway 消费方 D7）；§2.4 D3 vs D7 DM-020 修订（D7 直调 D3）；§3.6 Follower 对称性声明 + 影子编排风险交叉引用 |
 | 1.4.0 | 2026-06-15 | D5 SA Refine v1.0（DM-001 4+1 价值流 S21–S24）+ D6 SA Refine v1.0（DM-002 S11–S14；S4 Orchestration → S12 GuardRuntime）；现有 D5/D6 跨域边界（§2.2/§2.3）已在 D3 视角下覆盖，无需修改 |
+| 1.5.0 | 2026-06-15 | DM-20260615-004 D7 Intent 路径正交化跨域登记：§2.4.4 新增 4 IntentKind × 跨域 SoT 表（D3 调用 / D2 参与 / D4 参与 + v1.0 → v1.1.0 关键变化 + 禁止退化）；§4 灰区新增第 6 项（D7 + D2 + D4 涉及）；意图分类合约化，禁止重启 v1.0 占位 + hint 实现 |

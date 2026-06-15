@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.1.0
+**Version:** 4.5.0
 **Last Updated:** 2026-06-15
 
 ---
@@ -435,7 +435,9 @@ layers/
 │
 ├── orchestration/                # D7 Orchestration
 │   ├── coordinator/               # D7 Session Orchestrator (package coordinator)
-│   │   ├── orchestrator.go        # D7-S2 SessionOrchestrator + ProcessMessage
+│   │   ├── orchestrator.go        # D7-S2 SessionOrchestrator + ProcessMessage (4-case switch → 4 独立执行链, DM-20260615-004)
+│   │   ├── command_handler.go     # D7-S2 IntentCommand 显式分发（零 LLM, DM-20260615-004）
+│   │   ├── orchestrate_path.go    # D7-S2 IntentOrchestrate 显式调 SynthesizeTaskGraph + WaveScheduler (DM-20260615-004)
 │   │   ├── workmodel.go           # D7-S1 WorkModel facade (v1.1 接管 storage)
 │   │   ├── classifier.go          # D7-S5 RuleClassifier
 │   │   ├── shadow_classifier.go   # D7-S5 Tail-only LLM Shadow (v1.1 兜底)
@@ -652,3 +654,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | **4.2.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；目录树更新；11 个 deprecated bridge.go |
 | **4.3.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：D2 拆面契约上提至 `internal/shared/contracts/llm_facade.go`（`LLMCaller` + `Summarizer` 接口 + 辅助类型）；D7 `turn.QueryLLMCaller` / `turn.CompressionSummarizer` 实现并由 `bootstrap/context_engine.go` 单一注入点注入 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`；D2 production wiring 零 D3 import；D2 `query/adapters.go` `NewLLMCaller(llmgateway.ILLMGateway)` 与 `compression/llm_summarizer.go` 标 Deprecated fallback（保留供内部测试用 mockctx.LLMGateway）；D7 turn/ 新增 9 个单元测试；build/vet/test -short 全工程绿；`lint/layer::TestD2_D3Ban` 通过（4 个白名单 = 4 个实际 fallback 路径） |
 | **4.4.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化（v1.1.0 闭合）**：(1) `coordinator.command_handler.go` 新增 — IntentCommand 显式分发到 `PlanCLICommands` / `CLICommands`（零 LLM 成本）；(2) `coordinator.orchestrate_path.go` 新增 — IntentOrchestrate 显式调 `TaskDecomposer.SynthesizeTaskGraph` + `WaveScheduler.Start` + `WaitForCompletion`；(3) `coordinator.orchestrator.go::ProcessMessage` switch 4 case 改为 4 独立执行链（`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip` 内联），删除 v1.0 `handleCommand` / `orchestrate` 占位实现（system_prompt 字符串前缀让 LLM 自解释）；(4) D7 v1.0 "1 fastPath 占位 3 hint 前缀"临时妥协彻底关闭；(5) 9 个 P0 单测覆盖 3 新路径（3 + 5 + 1）；(6) `internal/layers/orchestration/workmodel/cli_commands.go` 导出 `Help()`（被 `CommandHandler.dispatch` 用于 `/help`）；(7) `NewSessionOrchestrator` 增加 lazy default（CommandHandler → `workmodel.GlobalTaskManager` + 新 PlanMode；OrchestratePath → 新 `TaskDecomposer` + 新 `WaveScheduler`），bootstrap 不必显式 wire 仍可启动；(8) build/vet/test -race 全工程绿，`TestD2_D3Ban` 不回归 |
+| **4.5.0** | **2026-06-15** | **DM-20260615-004 跨文档同步**：`d2-context-engine/d2-domain.md` 状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面，commit 41aec47 + `TestD2_D3Ban` 4 whitelist）；D7 目录树新增 `coordinator/command_handler.go` 与 `coordinator/orchestrate_path.go` 两文件（PR #35 引入但目录树尚未登记） |

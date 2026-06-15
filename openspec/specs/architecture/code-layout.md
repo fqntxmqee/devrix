@@ -2,7 +2,7 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.8.0
+**Version:** 1.10.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -328,3 +328,4 @@ internal/layers/communication/
 | **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿                                                                                                                                  |
 | **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator）                                                                                                                                                                                                         |
 | **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除）                                                 |
+| **1.10.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化文档同步**：layering.md v4.4.0 D7 目录树新增 `coordinator/command_handler.go`（IntentCommand 零 LLM 分发）+ `coordinator/orchestrate_path.go`（IntentOrchestrate 显式调 SynthesizeTaskGraph + WaveScheduler）；两文件位于 `internal/layers/orchestration/coordinator/` 包内，PR #35 引入；§3 目录决策树 §6 D1 终态示例同步不需更新（D7 目录树属于 layering.md 职责） |

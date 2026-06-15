@@ -4,6 +4,8 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S20 (v1.0 registry, DM-20260614-009)
+**Version:** 6.1.0
+**Last Updated:** 2026-06-15
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
@@ -157,9 +159,17 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | tasks/ 归 D7 | ⬜ v2.0 |
 | ~~delegate_tools 移除~~ | ✅ `orchestration/delegatetools/` (DM-011) |
 | scenario 物理路径 S15/S17/S18 | ⬜ v2.0 |
-| **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ⬜ v1.0 Registry（DM-020） |
-| **D2→D3 import lint（CI 硬阻断）** | ⬜ v2.0-d（DM-020） |
-| **S18 ExecuteToolRound 拆面** | ⬜ v2.0-d（DM-020） |
+| **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ✅ v1.0 Registry（DM-020, commit 41aec47） |
+| **D2→D3 import lint（CI 硬阻断）** | ✅ v2.0-d（DM-020, `lint/layer::TestD2_D3Ban` 4 whitelist = 4 fallback 路径） |
+| **S18 ExecuteToolRound 拆面** | ✅ v2.0-d（DM-020, D7 → `ContextPreparer` / `ToolRoundExecutor` / `SessionPersister`） |
+
+---
+
+## 修订记录
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
 
 ---
 
