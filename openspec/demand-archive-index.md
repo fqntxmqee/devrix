@@ -145,7 +145,7 @@
 | devrix-harness-unification-v1.1 | DM-20260612-013 | `openspec/changes/devrix-harness-unification-v1.1/` | S5_Accepted（TD-QL-03 兜底接线 + 3 测试 PASS） |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Pending（单测 PASS，待真机 E2E） |
 | devrix-im-card-ctx | DM-20260611-008 | `openspec/changes/devrix-im-card-ctx/` | S5 部分（T11–T13 真机/Jaeger 待做） |
-| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（Wave cancel 接线待做） |
+| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S5_Accepted（Phase 1+2 完成；12 测试 PASS；Phase 3 Wave 对接待做） |
 | devrix-layer-isolation-v1.1 | DM-20260612-012 | `openspec/changes/devrix-layer-isolation-v1.1/` | v1.1 跟进（父需求已归档） |
 | devrix-unified-task-registry | DM-20260612-011 | `openspec/changes/devrix-unified-task-registry/` | S2 未开始 |
 | devrix-wave-worktree-isolation | DM-20260612-010 | `openspec/changes/devrix-wave-worktree-isolation/` | S2 未开始 |
