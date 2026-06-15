@@ -5,7 +5,7 @@
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
 **Version:** 2.5.0
-**Status:** Active — IMPLEMENTED (S3/S4/S2) + PLANNED (S1/S5 migration) + D7 Turn Leader (DM-020 v1.0 Registry) + Hub-Spoke SoT (DM-018 SPEC)
+**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 🔶 IN PROGRESS
 **Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -47,21 +47,24 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | Scenario | 状态 | 现行代码位置 |
 |----------|------|-------------|
 | D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wave/` |
-| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/` |
-| D7-S1 Work Model | 🔶 PARTIAL | `internal/layers/contextengine/tasks/`（写模型仍在 D2） |
-| D7-S5 Decision & Planning | 🔶 PARTIAL | PlanMode/PlanAgent 在 D2；分类已实现 |
-| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` + `bootstrap/wire_coordinator.go` |
-| D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,shadow_classifier}.go` |
-| **D7-S2-A06 RunTurnLoop** | ⬜ v2.0 PLANNED | `orchestration/turn/orchestrator.go`（DM-020 v1.0 Registry） |
-| **D7-S2-A07 InvokeLLM** | ⬜ v2.0 PLANNED | `orchestration/turn/llm.go`（DM-020 v1.0 Registry） |
-| D2 Loop 瘦身 | ⬜ IN PROGRESS | `query/loop.go` 414行，需移除编排字段 |
+| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/`, `sessionqueue/` |
+| D7-S1 Work Model | ✅ IMPLEMENTED | `internal/layers/orchestration/workmodel/{task_manager,task_store,plan_mode,plan_agent}.go` + `coordinator/workmodel.go`（DM-20260614-009 v1.1 closure） |
+| D7-S5 Decision & Planning | ✅ IMPLEMENTED | `coordinator/{classifier,classifier_fallback,shadow_classifier,decomposer,executor}.go` + `workmodel/plan_*.go` |
+| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` + `bootstrap/wire_coordinator.go` + `turn/` |
+| D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,classifier_fallback,shadow_classifier}.go`（80/20 采样 LLM shadow） |
+| **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/turn/orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
+| **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/turn/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
+| **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | `turn/query_llm_caller.go` + `turn/compression_summarizer.go`（DM-020 拆面出口，注入 D2 EngineDeps） |
+| **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wave/runners/{subagent,agent_tool}.go`（worker runner 子包） |
+| **D6↔D7 Milestone Bridge** | ✅ IMPLEMENTED | `orchestration/milestone/{service,taskflow}.go` → D6 `guard.InterventionExecutor.tasks`（`Fail` / `Complete` 方法实现 `TaskController` 接口；wired via `cmd/devrix/main.go:125`） |
+| D2 Loop 瘦身 | 🔶 IN PROGRESS | `query/loop.go` **267行**（目标≤200），4 编排字段仍在：`Attachments` / `SessionQueue` / `Hooks.BeforeComplete` / `Hooks.AfterToolRound`（详见 §Requirement: D2 Thin） |
 
 **域边界**：
-- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**
+- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**Task/Plan 写模型（D7-S1, DM-20260614-009 v1.1 closure）**
 - D7 **编排**：D2（Context Follower — PrepareContext / ToolRound / PersistTurn）、D4（Execution Follower）
 - D7 **直调**：D3（ILLMGateway via bridges/llm，替代 D2→D3 旧路径）
-- D7 **暂托管（D2）**：Task 写模型、PlanMode（目标迁入 D7-S1/S5）
 - D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）
+- D2→D3 import ban **白名单 4/4 已满**（`internal/lint/layer/d2_d3_ban_test.go::d2ToD3KnownViolations` = `{".", "mock", "query", "prepare/compression"}`，全部 Deprecated fallback 路径）；CI 硬阻断任何新增 D2→D3 import
 
 > **LLM 调用权产权声明（DM-020 — 双边共识 G-07）：** D7 是唯一有权决定何时、以何种参数调用 D3 的域。D2 拥有"请求 LLM 结果"的权利（通过 CompressHint），但不拥有"执行 LLM 调用"的权利。该产权通过 import lint（D2→D3 硬阻断）强制执行。
 
@@ -690,3 +693,5 @@ orchestration:
 | 2.4.0 | 2026-06-15 | Hub-Spoke SoT + D7 Turn Leader 产权声明（DM-020/DM-018 SPEC） |
 | 2.5.0 | 2026-06-15 | DM-020 v1.0 Registry：D7-S2-A06/A07 登记；D2 Follower 拆面契约（ContextPreparer/ToolRoundExecutor/SessionPersister）；D7→D3 边界声明 |
 | 2.6.0 | 2026-06-15 | S2 Turn Leader 角色补登（双角色：Screening + Stackelberg）；S1 显式标 State Authority（非博弈）；a/f/t 注册表 v1.1 closure 同步；spec.md D7-S1 状态刷新；coordinator/types.go + classifier.go + decomposer.go v1.0/v1.1 注释错位修复 |
+| 2.7.0 | 2026-06-15 | **D7 Real-Closure Spec Sync**：(1) 实现状态表 4 项 ⬜/🔶 → ✅（D7-S1 WorkModel 迁入完成 / D7-S5 PlanMode 迁入完成 / D7-S2-A06 RunTurnLoop 实际实现 / D7-S2-A07 InvokeLLM 实际实现）；(2) 表新增 2 行（D7-S2-A07 LLMCaller/Summarizer 拆面 IMPLEMENTED + D7-S3 Wave Sub-Runners IMPLEMENTED），覆盖 spec 未登记的 4 个实际能力；(3) 域边界表删除"暂托管(D2): Task 写模型、PlanMode"项（已迁入 D7-S1/S5），新增"Task/Plan 写模型"到 D7 拥有列表；(4) D2 Loop 瘦身 cell 改 414 → 267 行，列出 4 待删字段；(5) 域边界新增 D2→D3 ban 白名单 4/4 已满提示（防止新增 import 静默 CI 失败）；(6) Status 行从"PLANNED (S1/S5 migration)" 改为 "IMPLEMENTED (S1/S2/S3/S4/S5) + D2 Loop 瘦身 🔶 IN PROGRESS" |
+| 2.8.0 | 2026-06-15 | **P4 死代码清理（撤回）**：原计划删除 `internal/layers/orchestration/milestone/`（967 行），但发现 `cmd/devrix/main.go:125` → `initOrchestration` → `guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)` 实际消费 `*MilestoneService`（实现 `TaskController` 接口：line 79 `ie.tasks.Fail`、line 105 `ie.tasks.Fail`），用于 D6 干预执行；该包非死代码，是 D6↔D7 集成锚点。后续若 D6 改用 D7-S1 TaskManager 替代可再清理；spec 不变 |
