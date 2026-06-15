@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d7-turn-orchestration  
 **Demand ID:** DM-20260614-020  
-**Status:** S3_Design  
+**Status:** Archived  
 **Phase Scope:** D + S + 跨域边界（A/F 在 design.md）
 
 ---
