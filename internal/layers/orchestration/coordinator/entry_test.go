@@ -81,7 +81,9 @@ func TestEntry_Cancel_LazyHandler(t *testing.T) {
 // T: orchestrator.ProcessMessageContract (string-args seam).
 func TestSessionOrchestrator_ProcessMessageContract(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+	cfg := DefaultConfig()
+	cfg.FastPathThreshold = 0 // allow all fast-path classifications through
+	orch := NewSessionOrchestrator(cfg, exec)
 	ch, err := orch.ProcessMessageContract(context.Background(), "sess-pmc", "ping")
 	if err != nil {
 		t.Fatalf("ProcessMessageContract err: %v", err)

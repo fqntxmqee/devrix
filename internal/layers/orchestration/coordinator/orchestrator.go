@@ -243,6 +243,16 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 	// and panic are surfaced via the 4-counter + alert hook.
 	o.callAdvisoryValidator(sessionCtx, intent, req.SessionID)
 
+	// D7-S5-A01-T01: FastPath confidence threshold gating.
+	if intent.Kind == IntentFast && intent.Confidence < o.cfg.FastPathThreshold {
+		intent = IntentClassification{
+			Kind:       IntentOrchestrate,
+			Confidence: intent.Confidence,
+			Reason:     fmt.Sprintf("fast confidence %d < threshold %d: %s", intent.Confidence, o.cfg.FastPathThreshold, intent.Reason),
+			Command:    intent.Command,
+		}
+	}
+
 	var ch <-chan *contracts.EngineEvent
 	switch intent.Kind {
 	case IntentSkip:

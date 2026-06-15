@@ -724,3 +724,88 @@ func TestOrchestrator_RunTurn_EventOrdering(t *testing.T) {
 		t.Errorf("last event = %q, want complete", last)
 	}
 }
+// --- D7-S2-A06-T04: SubQuery nested turn ---
+
+func TestOrchestrator_RunTurn_SubQueryScope(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("subquery result"), doneChunk(),
+	}}
+	ctxPrep := &stubContext{prepared: PreparedContext{}}
+	persist := &stubPersist{}
+	tools := &stubTools{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: tools, Persist: persist, MaxTurns: 4,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-subquery",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "scan the repo"},
+		Scope:       TurnScopeSubQuery,
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	if !hasType(evs, "complete") {
+		t.Error("expected complete event for subquery turn")
+	}
+	if hasType(evs, "error") {
+		t.Error("unexpected error event for subquery turn")
+	}
+}
+
+func TestOrchestrator_RunTurn_SameOrchestratorForMainAndSubQuery(t *testing.T) {
+	callCount := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		callCount.Add(1)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- textChunk("done")
+		ch <- doneChunk()
+		close(ch)
+		return ch, nil
+	}
+
+	ctxPrep := &stubContext{prepared: PreparedContext{}}
+	persist := &stubPersist{}
+	tools := &stubTools{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: tools, Persist: persist, MaxTurns: 4,
+	})
+
+	// Run main turn
+	ch1, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-shared",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "main task"},
+		Scope:       TurnScopeMain,
+	})
+	if err != nil {
+		t.Fatalf("RunTurn (main): %v", err)
+	}
+	evs1 := collectEvents(ch1)
+	if !hasType(evs1, "complete") {
+		t.Error("main turn should complete")
+	}
+
+	// Run subquery turn on the SAME orchestrator
+	ch2, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-shared",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "sub task"},
+		Scope:       TurnScopeSubQuery,
+	})
+	if err != nil {
+		t.Fatalf("RunTurn (subquery): %v", err)
+	}
+	evs2 := collectEvents(ch2)
+	if !hasType(evs2, "complete") {
+		t.Error("subquery turn should complete on same orchestrator")
+	}
+
+	if callCount.Load() != 2 {
+		t.Errorf("expected 2 total LLM calls, got %d", callCount.Load())
+	}
+}
+
