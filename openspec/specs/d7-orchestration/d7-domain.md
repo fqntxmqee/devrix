@@ -4,8 +4,8 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.9.0
-**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE
+**Version:** 2.10.0
+**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE + D7-S5 LLM Decomposer (S5-A03 v1.1) ✅ DONE
 **Last Updated:** 2026-06-15
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -55,9 +55,11 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/turn/orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
 | **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/turn/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
 | **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | `turn/query_llm_caller.go` + `turn/compression_summarizer.go`（DM-020 拆面出口，注入 D2 EngineDeps） |
+| **FastPath → turn.RunTurn 切换** | ✅ IMPLEMENTED | `bootstrap/wire_coordinator.go::WireD7` 用 `turn.NewOrchestrator(d2Adapter{Prepare,ToolRound,Persist})` + `turnOrchExecutor` 适配 `coordinator.QueryLoopExecutor`；`FastPath.Run` 走 `turn.RunTurn`（DM-020 D-c 完整闭环，commit a6356bc 移除 legacy `d2Executor`） |
 | **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wave/runners/{subagent,agent_tool}.go`（worker runner 子包） |
 | **D6↔D7 Milestone Bridge** | ✅ IMPLEMENTED | `orchestration/milestone/{service,taskflow}.go` → D6 `guard.InterventionExecutor.tasks`（`Fail` / `Complete` 方法实现 `TaskController` 接口；wired via `cmd/devrix/main.go:125`） |
 | D2 Loop 瘦身 | ✅ IMPLEMENTED | `query/loop.go` **239行**（目标≤200 略超；orchestration 字段已清零）— `LoopHooks` struct 删除；`Hooks` / `Attachments` / `SessionQueue` 4 字段已移除；per-turn 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` 防回插（详见 §Requirement: D2 Thin） |
+| **D7-S5 LLM Decomposer (S5-A03 v1.1)** | ✅ IMPLEMENTED | `orchestration/coordinator/llm_decomposer.go::LLMDecomposer` + `coordinator.WithLLMDecomposer` + `bootstrap/wire_coordinator.go::WireD7` 用同一个 `GatewayInvoker` 注入；JSON DAG 解析 + enum coercion + unknown-dep drop + 5s 超时回退到 rule-based `decomposeGoal` |
 
 **域边界**：
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**Task/Plan 写模型（D7-S1, DM-20260614-009 v1.1 closure）**
@@ -397,7 +399,7 @@ D7-S4 MUST aggregate FlowEvent from D2 SubQuery and D4 Delegate into WorkPlan sn
 
 D7-S5 MUST provide structured intent classification and task decomposition. Classification MUST use a layered approach: rules first, LLM fallback, merged result.
 
-**Implementation Status (2026-06-14):** 🔶 PARTIAL — PlanMode/PlanAgent 已实现（`/plan` 工作流）；ClassifyIntent/SynthesizeTaskGraph/SelectExecutor 未实现。
+**Implementation Status (2026-06-14, updated 2026-06-15):** ✅ IMPLEMENTED — `coordinator/decomposer.go::TaskDecomposer.SynthesizeTaskGraph` 落地；LLM-augmented `coordinator/llm_decomposer.go::LLMDecomposer` 注册 via `WithLLMDecomposer` + 5s 超时 + rule-based fallback；7 T 覆盖（`llm_decomposer_test.go`）。
 
 <!-- T: D7-S5-T01 … D7-S5-T05 -->
 
@@ -696,3 +698,4 @@ orchestration:
 | 2.7.0 | 2026-06-15 | **D7 Real-Closure Spec Sync**：(1) 实现状态表 4 项 ⬜/🔶 → ✅（D7-S1 WorkModel 迁入完成 / D7-S5 PlanMode 迁入完成 / D7-S2-A06 RunTurnLoop 实际实现 / D7-S2-A07 InvokeLLM 实际实现）；(2) 表新增 2 行（D7-S2-A07 LLMCaller/Summarizer 拆面 IMPLEMENTED + D7-S3 Wave Sub-Runners IMPLEMENTED），覆盖 spec 未登记的 4 个实际能力；(3) 域边界表删除"暂托管(D2): Task 写模型、PlanMode"项（已迁入 D7-S1/S5），新增"Task/Plan 写模型"到 D7 拥有列表；(4) D2 Loop 瘦身 cell 改 414 → 267 行，列出 4 待删字段；(5) 域边界新增 D2→D3 ban 白名单 4/4 已满提示（防止新增 import 静默 CI 失败）；(6) Status 行从"PLANNED (S1/S5 migration)" 改为 "IMPLEMENTED (S1/S2/S3/S4/S5) + D2 Loop 瘦身 🔶 IN PROGRESS" |
 | 2.8.0 | 2026-06-15 | **P4 死代码清理（撤回）**：原计划删除 `internal/layers/orchestration/milestone/`（967 行），但发现 `cmd/devrix/main.go:125` → `initOrchestration` → `guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)` 实际消费 `*MilestoneService`（实现 `TaskController` 接口：line 79 `ie.tasks.Fail`、line 105 `ie.tasks.Fail`），用于 D6 干预执行；该包非死代码，是 D6↔D7 集成锚点。后续若 D6 改用 D7-S1 TaskManager 替代可再清理；spec 不变 |
 | 2.9.0 | 2026-06-15 | **D2 Loop 瘦身闭环（DM-020 拆面）**：`query/loop.go` 267→239 行；删除 `LoopHooks` struct + `Hooks` / `Attachments` / `SessionQueue` 4 字段 + 4 call sites（BeforeComplete / AfterToolRound / Collect / Drain）；per-turn attachment 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`），EngineDeps.SessionCommandQueue 通过 `contracts.SessionCommandQueue` 接口注入（避免 D2→D7 直接 import，d2_thin_test 守护）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` + `TestQueryLoop_ForbidsLegacyHookSubFields` 防字段回插；实现状态表 D2 Loop 瘦身 cell 改 🔶 IN PROGRESS → ✅ IMPLEMENTED |
+| 2.10.0 | 2026-06-15 | **D7-S5 LLM Decomposer (S5-A03 v1.1) 闭环**：`orchestration/coordinator/llm_decomposer.go`（新增，~225 行）实现 `LLMDecomposer.Decompose` — LLM JSON DAG 解析 + enum coercion（未知 `worker_type` / `context_policy` 默认到 `cursor` / `fresh`）+ unknown-dep drop + 5s 超时回退到 rule-based `decomposeGoal`；通过 `coordinator.WithLLMDecomposer` 选项 + `bootstrap/wire_coordinator.go::WireD7` 注入（复用 leader path 同一 `GatewayInvoker`）；7 T 覆盖（`llm_decomposer_test.go`：T01 happy path、T02 bad JSON、T03 enum coercion、T04 unknown deps drop、T05 extractJSON 6 case、T06 nil-LLM 守卫、T07 SynthesizeTaskGraph 路由）；D7-S5 Implementation Status cell 改 🔶 PARTIAL → ✅ IMPLEMENTED；D7-S2-A07（InvokeLLM）兼作 S5 LLM Decomposer LLM 入口 |

@@ -45,6 +45,11 @@ type SessionOrchestrator struct {
 	commandHandler  *CommandHandler
 	orchestratePath *OrchestratePath
 
+	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
+	// When non-nil, the default OrchestratePath's TaskDecomposer uses it
+	// before falling back to rule-based decomposition.
+	llmDecomposer LLMTaskDecomposer
+
 	// activeSessions tracks the running ProcessRequest per sessionID so
 	// HandleInterrupt can cancel them. Protected by mu.
 	mu             sync.Mutex
@@ -100,6 +105,17 @@ func WithCommandHandler(h *CommandHandler) OrchestratorOption {
 // path. v1.1.0+ orthogonal dispatch.
 func WithOrchestratePath(p *OrchestratePath) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.orchestratePath = p }
+}
+
+// WithLLMDecomposer wires an LLM-augmented task synthesizer into the
+// default OrchestratePath. When WithOrchestratePath is also used, that
+// path takes precedence and the LLM decomposer is ignored.
+//
+// D7-S5-A03: with this option wired, SynthesizeTaskGraph first asks the
+// LLM to produce a JSON task DAG; if the LLM call fails, returns no
+// JSON, or yields invalid task nodes, the rule-based fallback runs.
+func WithLLMDecomposer(d LLMTaskDecomposer) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.llmDecomposer = d }
 }
 
 // WithClassifier replaces the default RuleClassifier. The default is
@@ -159,7 +175,7 @@ func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...Orc
 		o.commandHandler = newDefaultCommandHandler(o.workModel, o.sink)
 	}
 	if o.orchestratePath == nil {
-		o.orchestratePath = newDefaultOrchestratePath(o.sink)
+		o.orchestratePath = newDefaultOrchestratePath(o.sink, o.llmDecomposer)
 	}
 	return o
 }

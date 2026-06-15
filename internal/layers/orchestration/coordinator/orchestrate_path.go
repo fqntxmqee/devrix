@@ -195,8 +195,11 @@ func emitError(ctx context.Context, sink EventPublisher, out chan<- *contracts.E
 // Artifacts (only Runners is initialized to an empty map if nil).
 // Production callers that need a real WorkerPool + WorkerRunner registry
 // should still wire explicitly via WithOrchestratePath.
-func newDefaultOrchestratePath(sink EventPublisher) *OrchestratePath {
+func newDefaultOrchestratePath(sink EventPublisher, llmDecomp LLMTaskDecomposer) *OrchestratePath {
 	decomp := NewTaskDecomposer()
+	if llmDecomp != nil {
+		decomp.SetLLMDecomposer(llmDecomp)
+	}
 	sched := wave.NewWaveScheduler(wave.SchedulerDeps{})
 	return NewOrchestratePath(decomp, sched, sink)
 }

@@ -73,12 +73,23 @@ func WireD7(
 		obsBridge = b
 	}
 	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
+
+	// DM-20260615-005 / D7-S5-A03: wire the LLM-augmented task
+	// synthesizer into the default OrchestratePath. Uses the same
+	// GatewayInvoker as the leader path; on parse/timeout failure the
+	// rule-based decomposeGoal fallback runs.
+	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+		LLM:         llmInvoker,
+		DefaultTier: llmStack.DefaultModel,
+	})
+
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
 		coordinator.WithSink(sink),
 		coordinator.WithObservability(obsBridge),
 		coordinator.WithWorkModel(wm),
+		coordinator.WithLLMDecomposer(llmDecomp),
 	)
 
 	entry := coordinator.NewEntry(orch)
