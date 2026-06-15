@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
 // outcome is the discrete outcome of a validation. It

@@ -3,7 +3,7 @@ package observability
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
 func BenchmarkCounterInc(b *testing.B) {

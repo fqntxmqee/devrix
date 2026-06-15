@@ -10,9 +10,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/settings"
-	"github.com/devrix/devrix/internal/layers/observability/telemetry"
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

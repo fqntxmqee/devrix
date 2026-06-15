@@ -1,0 +1,84 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-background-task-tools
+  demand_id: DM-20260611-009
+  title: "Background Task 工具 — task_stop / task_output"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-11"
+  updated_at: "2026-06-12"
+  source: clawcode-task-tool-comparison
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "BackgroundRegistry 扩展 Cancel/Output API + LLM 工具注册"
+    - id: D4
+      name: Multi-Agent
+      affected: true
+      reason: "Wave Worker 复用 Cancel 协议"
+
+  capabilities:
+    - id: BG-REGISTRY-CANCEL
+      name: BackgroundRegistry.RegisterWithCancel + Cancel(idempotent)
+    - id: BG-TASK-STOP-TOOL
+      name: LLM 工具 task_stop(task_id)
+    - id: BG-TASK-OUTPUT-TOOL
+      name: LLM 工具 task_output(task_id, block, timeout_ms)
+    - id: BG-LIST-API
+      name: BackgroundRegistry.List(sessionID) 供 task_list_background
+    - id: WAVE-WORKER-CANCEL-PROTOCOL
+      name: Wave Worker 共享 context.CancelFunc 注册表
+
+  t_points:
+    - D2-S9-A01-T16  # stop running task → cancelled (idempotent)
+    - D2-S9-A01-T17  # output block=false on running
+    - D2-S9-A01-T18  # output block=true waits complete (max 600s)
+    - D2-S9-A01-T19  # cancel suppresses completed notification (tombstone 协议)
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: internal/layers/contextengine/query/background.go
+    status: completed
+  - path: internal/layers/contextengine/background_task_tools.go
+    status: completed
+  - path: internal/layers/contextengine/background_task_tools_test.go
+    status: completed
+  - path: internal/layers/contextengine/query/background_cancel_test.go
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - "BackgroundRegistry RegisterWithCancel + Cancel + List + BackgroundWaiter"
+      - "task_stop / task_output / task_list_background LLM 工具"
+      - "RunBackground cancel tombstone 协议（不写 SessionQueue）"
+    status: implemented
+  v1.1:
+    features:
+      - "BackgroundRegistry 磁盘 persist（重启可列，不 resume）"
+      - "D6 BackgroundTaskProbe 注册"
+    status: future
+
+external_dependencies:
+  - component: "DM-012 QueryLoop RunBackground（已交付）"
+    status: available
+  - component: "DM-007 Wave Scheduler（planned）"
+    status: planned
+    note: "Worker 共享 context.CancelFunc 注册表"
+
+related_changes:
+  - devrix-wave-scheduler
+  - devrix-harness-unification

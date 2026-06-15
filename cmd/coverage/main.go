@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/devrix/devrix/internal/layers/observability/coverage"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 )
 
 func main() {

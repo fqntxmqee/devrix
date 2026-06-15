@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 const defaultLLMLogDir = "~/.devrix/logs/llm"

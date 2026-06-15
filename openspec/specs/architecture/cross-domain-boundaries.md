@@ -357,3 +357,4 @@
 | 1.1.0 | 2026-06-14 | v1.1 子 change 落地：§2.4.3 Breaker 事件命名 D6-A 决议固化；§2.4.4 D3→D5 metric；§2.3.2 D6 probe；§4 灰区第 5 项 |
 | 1.2.0 | 2026-06-14 | §3 D4 跨域边界（Hub-Spoke 全归 D7；D4 vs D7/D2/D1/D5）；灰区 Hub-Spoke 双头收敛表（DM-20260614-018） |
 | 1.3.0 | 2026-06-15 | 双边共识落盘：§2.1 D3 vs D2 DM-020 修订（D2→D3 禁止、ILLMGateway 消费方 D7）；§2.4 D3 vs D7 DM-020 修订（D7 直调 D3）；§3.6 Follower 对称性声明 + 影子编排风险交叉引用 |
+| 1.4.0 | 2026-06-15 | D5 SA Refine v1.0（DM-001 4+1 价值流 S21–S24）+ D6 SA Refine v1.0（DM-002 S11–S14；S4 Orchestration → S12 GuardRuntime）；现有 D5/D6 跨域边界（§2.2/§2.3）已在 D3 视角下覆盖，无需修改 |

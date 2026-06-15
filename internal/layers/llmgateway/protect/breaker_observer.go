@@ -3,7 +3,7 @@ package protect
 import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
 // BreakerStateMetricGauge records the current Breaker state per provider.

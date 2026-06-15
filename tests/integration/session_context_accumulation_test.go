@@ -21,7 +21,7 @@ import (
 	llmgw "github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/settings"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"

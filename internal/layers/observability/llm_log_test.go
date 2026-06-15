@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 func TestAppendLLMLogRaw_should_include_trace_id(t *testing.T) {

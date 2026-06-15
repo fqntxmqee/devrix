@@ -1,0 +1,65 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-d6-sa-refine
+  demand_id: DM-20260615-002
+  title: "D6 Evolution S/A 重切 — 消除占位 S + 解决 D7 命名冲突"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-15"
+  updated_at: "2026-06-15"
+  source: devrix-d3-sa-refine
+
+scope:
+  layers:
+    - id: D6
+      name: Evolution
+      affected: true
+      reason: "S 层重切：消除 PLANNED 占位 + 重命名 S4 Orchestration→GuardRuntime"
+
+  capabilities:
+    - id: D6-EVALUATE
+      name: S11 RunEvaluation — 评测执行
+    - id: D6-GUARD
+      name: S12 GuardRuntime — 运行时守护（原 S4 Orchestration）
+    - id: D6-VERSION
+      name: S13 TrackVersion — 版本追踪（PLANNED）
+    - id: D6-RELOAD
+      name: S14 ReloadConfig — 配置热更新（PLANNED）
+
+  t_points:
+    - D6-S11-A01-T01  # RunEvaluation: EvalRun 编排
+    - D6-S12-A01-T01  # GuardRuntime: ValidateDecision
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: acceptance-report.md
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - "D6 a-registry.md Canonical 重排（4 S 层）"
+      - "D6 t-registry.md 增 canonical_s 列 + Legacy 双轨"
+      - "S4 Orchestration → S12 GuardRuntime 消除 D7 命名冲突"
+      - "layering.md / code-layout.md / cross-domain-boundaries.md 同步"
+    status: planned
+  v2.0:
+    features:
+      - "evolution/orchestration/ → evolution/guard/"
+      - "evolution/eval/ → evolution/evaluate/"
+    status: future
+
+related_changes:
+  - devrix-d3-sa-refine
+  - devrix-d4-sa-refine
+  - devrix-d5-sa-refine

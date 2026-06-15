@@ -207,28 +207,52 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 
 ### D5 Observability Domain
 
+> **2026-06-15 SA Refine v1.0**: S 层从 9 技术模块重切为 4+1 价值流（DM-20260615-001）。Legacy S1–S9 冻结追溯。
+
+**Canonical（v3.0）：**
+
 | Module ID | Scenario | Responsibility | Status |
 |-----------|----------|----------------|--------|
-| D5-S1 | Tracer | 分布式追踪 | IMPLEMENTED |
-| D5-S2 | Metrics | 指标收集 | IMPLEMENTED |
-| D5-S3 | Logger | 日志记录 | IMPLEMENTED |
-| D5-S4 | Exporter | 数据导出 | IMPLEMENTED |
-| D5-S5 | Coverage | 操作覆盖率 | IMPLEMENTED |
-| D5-S6 | Telemetry | 遥测数据 | IMPLEMENTED |
-| D5-S7 | Settings | 配置管理 | IMPLEMENTED |
-| D5-S8 | Incident | 事件声明与处理 | IMPLEMENTED |
-| D5-S9 | Runtime | 运行时指标监控 | IMPLEMENTED |
+| D5-S21 | Instrument | 遥测生成：Span + Metric + Log + 属性构建 | IMPLEMENTED |
+| D5-S22 | Export | 遥测导出：OTLP / Prometheus / Console | IMPLEMENTED |
+| D5-S23 | Diagnose | 诊断辅助：Coverage + Incident + Health | IMPLEMENTED |
+| D5-S24 | Configure | 配置与运行时管理 | IMPLEMENTED |
+
+**Legacy（D5-S1–S9，冻结追溯）：**
+
+| Module ID | Scenario | Responsibility | Status | → Canonical |
+|-----------|----------|----------------|--------|-------------|
+| D5-S1 | Tracer | 分布式追踪 | LEGACY | → S21 |
+| D5-S2 | Metrics | 指标收集 | LEGACY | → S21 |
+| D5-S3 | Logger | 日志记录 | LEGACY | → S21 |
+| D5-S4 | Exporter | 数据导出 | LEGACY | → S22 |
+| D5-S5 | Coverage | 操作覆盖率 | LEGACY | → S23 |
+| D5-S6 | Telemetry | 遥测数据 | LEGACY | → S21 |
+| D5-S7 | Settings | 配置管理 | LEGACY | → S24 |
+| D5-S8 | Incident | 事件声明与处理 | LEGACY | → S23 |
+| D5-S9 | Runtime | 运行时指标监控 | LEGACY | → S24 |
 
 ### D6 Evolution Domain
 
+> **2026-06-15 SA Refine v1.0**: S 层重切为 4 价值流（DM-20260615-002）。S4 "Orchestration" → S12 GuardRuntime 消除 D7 命名冲突。Legacy S1–S4 冻结追溯。
+
+**Canonical（v3.0）：**
+
 | Module ID | Scenario | Responsibility | Status |
 |-----------|----------|----------------|--------|
-| D6-S1 | Version | 版本检测与记录 | PLANNED (v2.1.0) |
-| D6-S2 | Config | 配置热更新 | PLANNED (v2.2.0) |
-| D6-S3 | Eval | 评测引擎：EvalRun、Judge、探针、Delta、Tune、`devrix eval run` | IMPLEMENTED |
-| D6-S4 | Orchestration | 运行时决策校验：跨模型判官、干预、Observer | IMPLEMENTED |
+| D6-S11 | RunEvaluation | 评测执行：EvalRun、Judge、探针、Delta、Tune、Dataset | IMPLEMENTED |
+| D6-S12 | GuardRuntime | 运行时守护：Validator + Intervention + Observer | IMPLEMENTED |
+| D6-S13 | TrackVersion | 版本检测与报告 | PLANNED |
+| D6-S14 | ReloadConfig | 配置热更新 | PLANNED |
 
-Spec: `openspec/specs/d6-evolution/spec.md` (D6-S3)
+**Legacy（D6-S1–S4，冻结追溯）：**
+
+| Module ID | Scenario | Responsibility | Status | → Canonical |
+|-----------|----------|----------------|--------|-------------|
+| D6-S1 | Version | 版本检测与记录 | LEGACY（PLANNED） | → S13 |
+| D6-S2 | Config | 配置热更新 | LEGACY（PLANNED） | → S14 |
+| D6-S3 | Eval | 评测引擎 | LEGACY | → S11 |
+| D6-S4 | Orchestration | 运行时决策校验（**D7 命名冲突已消除**） | LEGACY | → S12 |
 
 ### D7 Orchestration Domain
 
@@ -466,20 +490,35 @@ layers/
 │   └── permission/                # D4-S3 ForkJoin (code in agent/ forkjoin.go)
 │
 ├── observability/                 # D5
-│   ├── tracer/                    # D5-S1
-│   ├── metrics/                   # D5-S2
-│   ├── logger/                    # D5-S3
-│   ├── exporter/                  # D5-S4
-│   ├── coverage/                  # D5-S5
-│   ├── telemetry/                 # D5-S6
-│   ├── settings/                  # D5-S7
-│   ├── incident/                  # D5-S8
-│   └── runtime/                   # D5-S9
+│   ├── observability.go           # Facade
+│   ├── instrument/                # D5-S21
+│   │   ├── tracer/
+│   │   ├── metrics/
+│   │   ├── logger/
+│   │   └── telemetry/
+│   ├── export/                    # D5-S22
+│   ├── diagnose/                  # D5-S23
+│   │   ├── coverage/
+│   │   └── incident/
+│   ├── configure/                 # D5-S24
+│   │   ├── settings/
+│   │   └── runtime/
+│   ├── tracer/bridge.go           # (deprecated → instrument/tracer)
+│   ├── metrics/bridge.go          # (deprecated → instrument/metrics)
+│   ├── logger/bridge.go           # (deprecated → instrument/logger)
+│   ├── telemetry/bridge.go        # (deprecated → instrument/telemetry)
+│   ├── exporter/bridge.go         # (deprecated → export)
+│   ├── coverage/bridge.go         # (deprecated → diagnose/coverage)
+│   ├── incident/bridge.go         # (deprecated → diagnose/incident)
+│   ├── settings/bridge.go         # (deprecated → configure/settings)
+│   └── runtime/bridge.go          # (deprecated → configure/runtime)
 │
 └── evolution/                     # D6
-    ├── eval/                      # D6-S3 Eval engine + probes
-    └── orchestration/             # D6-S4 Runtime judge / intervention
-    # PLANNED: version/ (D6-S1), config/ (D6-S2)
+    ├── evaluate/                  # D6-S11 RunEvaluation
+    ├── guard/                     # D6-S12 GuardRuntime
+    ├── eval/bridge.go             # (deprecated → evaluate)
+    └── orchestration/bridge.go    # (deprecated → guard)
+    # PLANNED: version/ (D6-S13), reload/ (D6-S14)
 ```
 
 ---
@@ -609,3 +648,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | **3.9.0** | **2026-06-15** | **D4 v2.0-d 物理路径迁移完成**（commit 3905c6a）：S11–S16 + Kernel 物理迁移（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；D7 Hub-Spoke bridge/dispatch/subquery 搬迁（`hubspoke/agent_bridge.go` `hubspoke/dispatch.go` `hubspoke/subquery_bridge.go`）；旧路径保留 re-export legacy.go；execute(9)+hubspoke(23) 测试新增；build/vet/test(71包) 全绿 |
 | **4.0.0** | **2026-06-15** | **D4 v2.0-e 最终**（commits e30fe72..ffd6c56）：5 个 re-export shim 删除 + delegate/ 死代码删除（720a4b1）；E-e3 预存集成测试错误修复（60939db）；observer 引用迁移至 `kernel.NoOpAgentObserver`；根 `contracts.go` + `shared/config/multiagent.go` re-export 保留；S7 归档至 `openspec/archive/2026-06-15-devrix-d4-sa-refine/` |
 | **4.1.0** | **2026-06-15** | **D7 Turn 编排上移 v1.0 Registry（DM-020）：** D2/D7 Turn 双轨声明；D2-S16 Legacy Freeze → D7-S2-A06 RunTurnLoop；LLM 调用权 D2→D7 产权转移；D2→D3 禁止；Follower 对称性（D2 Context / D4 Execution） |
+| **4.2.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；目录树更新；11 个 deprecated bridge.go |

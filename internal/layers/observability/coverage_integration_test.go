@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/observability/coverage"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 )
 
 func TestCoverageIntegration_染色是否工作(t *testing.T) {

@@ -42,7 +42,7 @@
 | DM-20260611-001 | D2 上下文引擎 Agentic Loop 深化 | devrix-agentic-loop | 2026-06-11 | — | **Superseded** → DM-012 + tech-debt |
 | DM-20260611-002 | 架构分层合规 — 消除反向依赖与契约错放 | devrix-layer-isolation | 2026-06-14 | — | ACCEPTED (v1.0; v1.1 跟进 `devrix-layer-isolation-v1.1`) |
 | DM-20260611-003 | 事件通道与背压机制 — Channel Drain/Compact/Reconnect | devrix-event-channel | 2026-06-14 | — | ACCEPTED |
-| DM-20260611-004 | Legacy Harness 退役 — QueryLoop 为唯一主路径 | devrix-harness-unification | 2026-06-11 | — | S4_Implemented (合并 `fix/remaining-critical`，待 S4-Gate + S5) |
+| DM-20260611-004 | Legacy Harness 退役 — QueryLoop 为唯一主路径 | devrix-harness-unification | 2026-06-15 | — | **S7_Archived**（v1.1 TD-QL-03 兜底接线 + PathRegressionProbe） |
 | DM-20260611-005 | 多 Agent 会话隔离 — Join 合并与 metadata 隔离 | devrix-multiagent-isolation | 2026-06-14 | — | ACCEPTED |
 | DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-11 | — | S5_Acceptance（单测 PASS，待真机） |
 | DM-20260611-007 | Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块 | devrix-wave-scheduler | 2026-06-14 | — | ACCEPTED (v1.0 lib; v1.2 bootstrap 接线见 active changes) |
@@ -67,7 +67,10 @@
 | **DM-20260614-018** | **D4 Multi-Agent S/A 重切 — 执行原语价值流化 + Hub-Spoke 归位 D7** | **devrix-d4-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry + v2.0-d 物理迁移 + v2.0-e cleanup; 8 commits; 71 包全绿)** |
 | **DM-20260614-019** | **D3 LLM Gateway v2.0 — 价值流物理路径迁移 + contracts.go 拆分** | **devrix-d3-sa-refine-v2.0** | **2026-06-14** | **—** | **ACCEPTED (v2.0; 7 路径迁移 + 8 bridge + build/test/vet 全绿)** |
 | **DM-20260614-020** | **D7 Turn 编排上移 — D7 直调 D3，D2 Thin 上下文面** | **devrix-d7-turn-orchestration** | **2026-06-15** | **—** | **ACCEPTED (v2.0 Structure; Phase D 6 slices; D7→D3 LLM 直达; TurnOrchestrator 状态机; D2→D3 import lint; 全量测试通过)** |
-| DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-11 | — | S2_Clarified |
+| DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-15 | — | ACCEPTED (Phase 3 Wave 对接完整) |
+| **DM-20260615-001** | **D5 Observability S/A 重切 — 技术模块→价值流化** | **devrix-d5-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；4+1 价值流 S21–S24)** |
+| **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
+| **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
 
 ## Archive Locations
 
@@ -134,6 +137,12 @@
 | **devrix-d3-sa-refine-v2.0** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/`** |
 | **devrix-d7-sa-refine** | **`openspec/archive/2026-06-14-devrix-d7-sa-refine/`** |
 | **devrix-d7-turn-orchestration** | **`openspec/archive/2026-06-15-devrix-d7-turn-orchestration/`** |
+| **devrix-harness-unification** | **`openspec/archive/2026-06-15-devrix-harness-unification/`** |
+| **devrix-harness-unification-v1.1** | **`openspec/archive/2026-06-15-devrix-harness-unification-v1.1/`** |
+| **devrix-d5-sa-refine** | **`openspec/archive/2026-06-15-devrix-d5-sa-refine/`** |
+| **devrix-d6-sa-refine** | **`openspec/archive/2026-06-15-devrix-d6-sa-refine/`** |
+| **devrix-background-task-tools** | **`openspec/archive/2026-06-15-devrix-background-task-tools/`** |
+| **devrix-d5-d6-sa-refine-v2.0** | **`openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -141,11 +150,8 @@
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
-| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S5_Accepted（v1.1 TD-QL-03 兜底接线完成，待 S6 归档） |
-| devrix-harness-unification-v1.1 | DM-20260612-013 | `openspec/changes/devrix-harness-unification-v1.1/` | S5_Accepted（TD-QL-03 兜底接线 + 3 测试 PASS） |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Pending（单测 PASS，待真机 E2E） |
 | devrix-im-card-ctx | DM-20260611-008 | `openspec/changes/devrix-im-card-ctx/` | S5 部分（T11–T13 真机/Jaeger 待做） |
-| devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S5_Accepted（Phase 1+2 完成；12 测试 PASS；Phase 3 Wave 对接待做） |
 | devrix-layer-isolation-v1.1 | DM-20260612-012 | `openspec/changes/devrix-layer-isolation-v1.1/` | v1.1 跟进（父需求已归档） |
 | devrix-unified-task-registry | DM-20260612-011 | `openspec/changes/devrix-unified-task-registry/` | S2 未开始 |
 | devrix-wave-worktree-isolation | DM-20260612-010 | `openspec/changes/devrix-wave-worktree-isolation/` | S2 未开始 |
@@ -153,6 +159,16 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-15 归档（S7 — D5/D6 SA Refine v2.0 物理路径迁移）**：
+
+- `devrix-d5-d6-sa-refine-v2.0` → `openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`（DM-20260615-003 ACCEPTED; v2.0 物理路径迁移; ~106 文件 git mv + ~133 import 更新; 3 包重命名（eval→evaluate, exporter→export, orchestration→guard）; 11 bridge.go; code-layout.md + layering.md 同步）
+
+**2026-06-15 归档（S7 — D5/D6 SA Refine v1.0 + background-task-tools）**：
+
+- `devrix-d5-sa-refine` → `openspec/archive/2026-06-15-devrix-d5-sa-refine/`（DM-20260615-001 ACCEPTED; v1.0 registry-only; D5 S 层 9→4+1 价值流 S21–S24; 41 T / 27 A / 14 P0; Legacy 双轨完整）
+- `devrix-d6-sa-refine` → `openspec/archive/2026-06-15-devrix-d6-sa-refine/`（DM-20260615-002 ACCEPTED; v1.0 registry-only; S4 Orchestration → S12 GuardRuntime; 24 T / 6 P0; Legacy 双轨完整）
+- `devrix-background-task-tools` → `openspec/archive/2026-06-15-devrix-background-task-tools/`（DM-20260611-009 ACCEPTED; Phase 1+2+3 完整; WorkerCancelRegistry 接口 + IsTerminal; 5 T IMPLEMENTED; 10 AC PASS）
 
 **2026-06-14 归档（S7 — D3 SA Refine v2.0）**：
 

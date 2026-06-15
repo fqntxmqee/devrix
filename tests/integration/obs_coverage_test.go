@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 )
 
 func TestCoverageReport_should_include_health_summary(t *testing.T) {

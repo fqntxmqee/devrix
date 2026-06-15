@@ -110,6 +110,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S9-A01-T17 | output block=false 返回 running 状态 + partial result | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T18 | output block=true 阻塞至 terminal 或 timeout（max 600s） | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` + `background_task_tools_test.go` | IMPLEMENTED | P0 |
 | D2-S9-A01-T19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` | IMPLEMENTED | P1 |
+| D2-S9-A01-T20 | IsTerminal 对 running/cancelled/completed/failed 正确报告（Phase 3 Wave WorkerCancelRegistry） | BGTask | `internal/layers/contextengine/nested/background_cancel_test.go` | IMPLEMENTED | P1 |
 
 ## D2-S10: QueryLoop Module
 

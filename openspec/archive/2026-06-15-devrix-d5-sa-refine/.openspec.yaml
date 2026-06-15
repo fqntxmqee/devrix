@@ -1,0 +1,66 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-d5-sa-refine
+  demand_id: DM-20260615-001
+  title: "D5 Observability S/A 重切 — 技术模块→价值流化"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-15"
+  updated_at: "2026-06-15"
+  source: devrix-d3-sa-refine
+
+scope:
+  layers:
+    - id: D5
+      name: Observability
+      affected: true
+      reason: "S 层从 9 技术模块重切为 4+1 价值流"
+
+  capabilities:
+    - id: D5-INSTRUMENT
+      name: S21 Instrument — 统一遥测生成入口
+    - id: D5-EXPORT
+      name: S22 Export — 遥测导出
+    - id: D5-DIAGNOSE
+      name: S23 Diagnose — 诊断辅助
+    - id: D5-CONFIGURE
+      name: S24 Configure — 配置与运行时管理
+
+  t_points:
+    - D5-S21-A01-T01  # Instrument: CreateSpan
+    - D5-S22-A01-T01  # Export: ExportSpans
+    - D5-S23-A01-T01  # Diagnose: RecordOperationHit
+    - D5-S24-A01-T01  # Configure: LoadObsConfig
+
+deliverables:
+  - path: proposal.md
+    status: completed
+  - path: demand.md
+    status: completed
+  - path: design.md
+    status: completed
+  - path: tasks.md
+    status: completed
+  - path: acceptance-report.md
+    status: completed
+
+version_scope:
+  v1.0:
+    features:
+      - "D5 a-registry.md Canonical 重排（4+1 S 层）"
+      - "D5 t-registry.md 增 canonical_s 列 + Legacy 双轨"
+      - "layering.md / code-layout.md / cross-domain-boundaries.md 同步"
+    status: planned
+  v2.0:
+    features:
+      - "物理路径 scenario-slug 迁移"
+      - "observability/instrument/ export/ diagnose/ configure/"
+    status: future
+
+related_changes:
+  - devrix-d3-sa-refine
+  - devrix-d4-sa-refine
+  - devrix-d6-sa-refine

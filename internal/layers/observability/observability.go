@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/devrix/devrix/internal/layers/observability/coverage"
-	"github.com/devrix/devrix/internal/layers/observability/exporter"
-	"github.com/devrix/devrix/internal/layers/observability/logger"
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
+	"github.com/devrix/devrix/internal/layers/observability/export"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/logger"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 // Observability is the main facade for the observability layer
@@ -48,7 +48,7 @@ func New(cfg *Config) (*Observability, error) {
 
 	// Initialize tracer
 	if cfg.IsTracingEnabled() {
-		spanExporter := exporter.NewTracingExporter(cfg.Tracing)
+		spanExporter := export.NewTracingExporter(cfg.Tracing)
 		obs.tracerProvider = tracer.NewTracerProvider(&cfg.Tracing, spanExporter)
 		obs.tracerInst = obs.tracerProvider.Tracer(cfg.Tracing.ServiceName)
 		obs.status.Tracer = "healthy"
@@ -117,11 +117,11 @@ func (o *Observability) Logger() *logger.StructuredLogger {
 }
 
 // MemoryExporter returns the span collector when exporter type is "memory".
-func (o *Observability) MemoryExporter() *exporter.MemoryExporter {
+func (o *Observability) MemoryExporter() *export.MemoryExporter {
 	if o.tracerProvider == nil {
 		return nil
 	}
-	me, ok := o.tracerProvider.Exporter().(*exporter.MemoryExporter)
+	me, ok := o.tracerProvider.Exporter().(*export.MemoryExporter)
 	if !ok {
 		return nil
 	}

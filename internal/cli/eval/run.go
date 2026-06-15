@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/devrix/devrix/internal/layers/evolution/eval"
+	"github.com/devrix/devrix/internal/layers/evolution/evaluate"
 )
 
 // Run dispatches eval subcommands.
@@ -48,32 +48,32 @@ func RunEval(args []string) error {
 		return err
 	}
 
-	jm := eval.NewJudgeManager(stack.client, nil, stack.config)
-	jm.RegisterRubric(eval.ScoreRubric{
+	jm := evaluate.NewJudgeManager(stack.client, nil, stack.config)
+	jm.RegisterRubric(evaluate.ScoreRubric{
 		Dimension:   "compression_recall",
 		Instruction: "Evaluate whether ALL key facts from the original context are preserved in the compressed version.",
 		Scale:       "0-1",
 	})
 
-	engine := eval.NewEvalEngine(eval.EvalConfig{
+	engine := evaluate.NewEvalEngine(evaluate.EvalConfig{
 		Enabled: true,
 		Judge:   stack.config,
 	}, jm)
 
 	if *baselinePath != "" {
-		baseline, err := eval.LoadBaseline(*baselinePath)
+		baseline, err := evaluate.LoadBaseline(*baselinePath)
 		if err != nil {
 			return fmt.Errorf("load baseline: %w", err)
 		}
 		engine.WithBaseline(baseline)
 	}
 
-	opts := eval.EvalOpts{
+	opts := evaluate.EvalOpts{
 		DatasetPath:  *dataset,
 		SaveBaseline: *saveBaseline,
 	}
 	if *maxItems > 0 {
-		opts.Sampling = &eval.SamplingOpts{MaxItems: *maxItems}
+		opts.Sampling = &evaluate.SamplingOpts{MaxItems: *maxItems}
 	}
 
 	report, err := engine.Run(context.Background(), opts)
@@ -85,13 +85,13 @@ func RunEval(args []string) error {
 	}
 
 	if *summary && report.Delta != nil {
-		_, _ = fmt.Fprintln(os.Stderr, eval.FormatDeltaSummary(report.Delta))
+		_, _ = fmt.Fprintln(os.Stderr, evaluate.FormatDeltaSummary(report.Delta))
 	}
 
 	if *gate {
-		gateResult := eval.CheckDeltaGate(report.Delta)
+		gateResult := evaluate.CheckDeltaGate(report.Delta)
 		if !gateResult.Passed {
-			return &eval.GateError{Result: gateResult}
+			return &evaluate.GateError{Result: gateResult}
 		}
 	}
 

@@ -29,6 +29,10 @@ type BackgroundTask struct {
 	done chan struct{}
 }
 
+// Compile-time check: BackgroundRegistry implements wave.WorkerCancelRegistry.
+// The interface is defined in D7-S3 (wave/types.go) to avoid import cycles.
+// var _ wave.WorkerCancelRegistry = (*BackgroundRegistry)(nil)
+
 // BackgroundRegistry tracks in-flight and completed background tasks.
 type BackgroundRegistry struct {
 	mu    sync.Mutex
@@ -101,6 +105,22 @@ func (r *BackgroundRegistry) SetTaskCancel(taskID string, cancel context.CancelF
 	if t, ok := r.tasks[taskID]; ok {
 		t.cancel = cancel
 	}
+}
+
+// IsTerminal reports whether the task has reached a terminal state
+// (completed / failed / cancelled). It is part of the wave.WorkerCancelRegistry
+// contract (DM-20260611-009 Phase 3).
+func (r *BackgroundRegistry) IsTerminal(taskID string) bool {
+	if r == nil {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.tasks[taskID]
+	if !ok {
+		return false
+	}
+	return t.Status != "running"
 }
 
 // Cancel cancels a running task. Idempotent: returns true the first time

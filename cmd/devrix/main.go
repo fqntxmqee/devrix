@@ -20,7 +20,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
 	"github.com/devrix/devrix/internal/layers/orchestration/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/evolution/orchestration"
+	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -304,12 +304,12 @@ func initOrchestration(
 		return
 	}
 
-	runtimeJudge := orchestration.NewRuntimeJudge(rawGateway, orchCfg)
-	executor := orchestration.NewInterventionExecutor(gw, milestoneSvc, agentFactory)
-	orchValidator := orchestration.NewRuntimeOrchestrationValidator(orchCfg, runtimeJudge, executor)
+	runtimeJudge := guard.NewRuntimeJudge(rawGateway, orchCfg)
+	executor := guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)
+	orchValidator := guard.NewRuntimeOrchestrationValidator(orchCfg, runtimeJudge, executor)
 	orchValidator.SetObservability(obs)
-	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) orchestration.AgentObserver {
-		return orchestration.NewOrchestrationObserver(orchValidator, ctx, session)
+	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) guard.AgentObserver {
+		return guard.NewOrchestrationObserver(orchValidator, ctx, session)
 	})
 	slog.Info("orchestration validator enabled",
 		"judge_provider", orchCfg.JudgeProvider,

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/coverage"
-	"github.com/devrix/devrix/internal/layers/observability/settings"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 )
 
 // Config represents the observability configuration

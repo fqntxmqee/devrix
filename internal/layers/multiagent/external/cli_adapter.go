@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 // CLIConfig holds configuration for a CLI agent tool.

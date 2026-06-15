@@ -3,21 +3,21 @@ package evalcli
 import (
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/evolution/eval"
+	"github.com/devrix/devrix/internal/layers/evolution/evaluate"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
 type judgeStack struct {
-	client eval.LLMClient
-	config eval.JudgeConfig
+	client evaluate.LLMClient
+	config evaluate.JudgeConfig
 }
 
 func buildJudgeStack(mockJudge bool, configPath, judgeModel string) (judgeStack, error) {
 	if mockJudge {
 		return judgeStack{
-			client: eval.NewStaticLLMClient(),
-			config: eval.JudgeConfig{Model: "mock", Temperature: 0},
+			client: evaluate.NewStaticLLMClient(),
+			config: evaluate.JudgeConfig{Model: "mock", Temperature: 0},
 		}, nil
 	}
 
@@ -42,8 +42,8 @@ func buildJudgeStack(mockJudge bool, configPath, judgeModel string) (judgeStack,
 	provider := llmCfg.DefaultProvider
 
 	return judgeStack{
-		client: eval.NewGatewayLLMClient(gw, model, provider),
-		config: eval.JudgeConfig{
+		client: evaluate.NewGatewayLLMClient(gw, model, provider),
+		config: evaluate.JudgeConfig{
 			Provider:    provider,
 			Model:       model,
 			Temperature: 0,

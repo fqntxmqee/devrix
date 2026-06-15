@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
-	"github.com/devrix/devrix/internal/layers/observability/settings"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 )
 
 // T: D5-S2-A01-T05

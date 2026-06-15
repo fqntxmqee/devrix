@@ -1,6 +1,6 @@
 package multiagent
 
-import "github.com/devrix/devrix/internal/layers/observability/coverage"
+import "github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 
 func init() {
 	coverage.RegisterProvider(spansProvider{})

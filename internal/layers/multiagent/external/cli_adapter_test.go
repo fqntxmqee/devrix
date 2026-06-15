@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 func TestCLIAgentTool_Execute_StreamJSON(t *testing.T) {

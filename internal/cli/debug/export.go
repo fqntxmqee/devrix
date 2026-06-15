@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/devrix/devrix/internal/layers/observability/incident"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/incident"
 )
 
 // RunExport executes `debug export` with the given args (after `debug export`).

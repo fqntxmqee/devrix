@@ -214,6 +214,43 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 - `hubspoke/doc.go` — 包文档
 - `delegatetools/` — 重构使用 Dispatcher.Dispatch()；WorkerRole 常量本地化
 
+### 4.6 D5 Observability
+
+> **2026-06-15 SA Refine v1.0**: 从 9 技术包重切为 4+1 价值流（DM-20260615-001）。v1.0 仅注册表，v2.0 物理迁移。
+
+| S ID | Scenario | scenario-slug | v2.0 目标 | 当前路径 | 状态 |
+|------|----------|---------------|----------|---------|------|
+| D5-S21 | Instrument | `instrument` | `observability/instrument/` | `instrument/tracer/` `instrument/metrics/` `instrument/logger/` `instrument/telemetry/` | v2.0 PHYSICAL |
+| D5-S22 | Export | `export` | `observability/export/` | `export/` | v2.0 PHYSICAL |
+| D5-S23 | Diagnose | `diagnose` | `observability/diagnose/` | `diagnose/coverage/` `diagnose/incident/` | v2.0 PHYSICAL |
+| D5-S24 | Configure | `configure` | `observability/configure/` | `configure/settings/` `configure/runtime/` | v2.0 PHYSICAL |
+| D5-S0 | Facade | — | `observability/` 根 | `observability.go` | v2.0 PHYSICAL |
+
+**关键 v2.0 迁移（DM-20260615-003，已完成）：**
+
+- `tracer/` + `metrics/` + `logger/` + `telemetry/` → `observability/instrument/`（包名不变）
+- `exporter/` → `observability/export/`（package export）
+- `coverage/` + `incident/` → `observability/diagnose/`（包名不变）
+- `settings/` + `runtime/` → `observability/configure/`（包名不变）
+- 旧路径保留 9 个 bridge.go（Deprecated，v2.1 移除）
+
+### 4.7 D6 Evolution
+
+> **2026-06-15 SA Refine v1.0**: S4 "Orchestration" → S12 GuardRuntime 消除 D7 命名冲突（DM-20260615-002）。v1.0 仅注册表，v2.0 物理迁移。
+
+| S ID | Scenario | scenario-slug | v2.0 目标 | 当前路径 | 状态 |
+|------|----------|---------------|----------|---------|------|
+| D6-S11 | RunEvaluation | `evaluate` | `evolution/evaluate/` | `evolution/evaluate/` | v2.0 PHYSICAL |
+| D6-S12 | GuardRuntime | `guard` | `evolution/guard/` | `evolution/guard/` | v2.0 PHYSICAL |
+| D6-S13 | TrackVersion | `version` | `evolution/version/` | `evolution/version/` | PLANNED |
+| D6-S14 | ReloadConfig | `reload` | `evolution/reload/` | `evolution/reload/` | PLANNED |
+
+**关键 v2.0 迁移（DM-20260615-003，已完成）：**
+
+- `evolution/orchestration/` → `evolution/guard/`（package guard）— 消除与 D7 的命名冲突
+- `evolution/eval/` → `evolution/evaluate/`（package evaluate）— slug 语义化
+- 旧路径保留 2 个 bridge.go（Deprecated，v2.1 移除）
+
 ---
 
 ## 5. 目标目录树（D1 终态示例）
@@ -288,3 +325,4 @@ internal/layers/communication/
 | **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；execute(9) + hubspoke(23) 测试新增；71 包全绿 |
 | **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿 |
 | **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator） |
+| **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除） |

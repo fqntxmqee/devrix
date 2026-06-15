@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/telemetry"
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 // T: D5-S4-A01-T03 (adapter → gateway trace inheritance)

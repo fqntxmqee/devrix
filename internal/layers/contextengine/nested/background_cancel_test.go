@@ -190,6 +190,42 @@ func TestBackgroundRegistry_Wait_timeout_returns_running(t *testing.T) {
 	}
 }
 
+// D2-S9-A01-T20: IsTerminal reports true for completed/cancelled/failed (Phase 3 Wave integration).
+func TestBackgroundRegistry_IsTerminal(t *testing.T) {
+	reg := nested.NewBackgroundRegistry()
+
+	// Unknown id
+	if reg.IsTerminal("nonexistent") {
+		t.Fatal("IsTerminal should return false for unknown id")
+	}
+
+	// Running
+	h, _ := reg.RegisterWithCancel("sess_t", "agent", "Test", "t1")
+	if reg.IsTerminal(h.ID) {
+		t.Fatal("IsTerminal should return false for running task")
+	}
+
+	// Cancelled
+	reg.Cancel(h.ID)
+	if !reg.IsTerminal(h.ID) {
+		t.Fatal("IsTerminal should return true after Cancel")
+	}
+
+	// Completed
+	h2, _ := reg.RegisterWithCancel("sess_t", "agent", "Test", "t2")
+	reg.Complete(h2.ID, "done", "", nil)
+	if !reg.IsTerminal(h2.ID) {
+		t.Fatal("IsTerminal should return true after Complete")
+	}
+
+	// Failed
+	h3, _ := reg.RegisterWithCancel("sess_t", "agent", "Test", "t3")
+	reg.Complete(h3.ID, "", "err", nil)
+	if !reg.IsTerminal(h3.ID) {
+		t.Fatal("IsTerminal should return true after Complete with error")
+	}
+}
+
 func TestBackgroundRegistry_List_returns_session_tasks(t *testing.T) {
 	reg := nested.NewBackgroundRegistry()
 	c1, _ := reg.RegisterWithCancel("sess_e", "explore", "Explore", "e1")

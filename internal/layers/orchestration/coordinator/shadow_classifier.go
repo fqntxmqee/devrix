@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
 // LLMIntentClassifier is the abstract LLM interface for intent classification.

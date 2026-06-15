@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/observability/telemetry"
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 // startHarnessSpan creates a child span for harness operations when observability is enabled.

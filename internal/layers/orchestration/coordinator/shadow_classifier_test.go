@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
-	"github.com/devrix/devrix/internal/layers/observability/settings"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 )
 
 // newShadowTestMeter returns a fresh MeterProvider-backed Meter.

@@ -1,0 +1,328 @@
+package evaluate
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestEvalEngine_Disabled(t *testing.T) {
+	config := EvalConfig{Enabled: false}
+	jm := NewJudgeManager(nil, nil, JudgeConfig{})
+	engine := NewEvalEngine(config, jm)
+
+	report, err := engine.Run(context.Background(), EvalOpts{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if report != nil {
+		t.Error("expected nil report when disabled")
+	}
+}
+
+func TestEvalEngine_EnabledButNoDataset(t *testing.T) {
+	config := EvalConfig{Enabled: true, Dataset: DatasetConfig{Path: "/nonexistent"}}
+	jm := NewJudgeManager(nil, nil, JudgeConfig{})
+	engine := NewEvalEngine(config, jm)
+
+	_, err := engine.Run(context.Background(), EvalOpts{})
+	if err == nil {
+		t.Fatal("expected error for nonexistent dataset")
+	}
+}
+
+func TestEvalEngine_FullFlow(t *testing.T) {
+	dir := t.TempDir()
+	datasetPath := filepath.Join(dir, "dataset.yaml")
+
+	// Create test dataset
+	datasetYAML := `
+id: test-v1
+version: v1
+created_at: 2026-06-10T00:00:00Z
+buckets:
+  - name: production
+    weight: 1.0
+items:
+  - id: t1
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    input:
+      original: "The user wants JWT auth with PostgreSQL."
+      compressed: "JWT auth with PostgreSQL."
+    expectation:
+      must_keep: ["JWT", "PostgreSQL"]
+  - id: t2
+    bucket: adversarial
+    domain: d2
+    dimension: compression_recall
+    input:
+      original: "Fact A, Fact B, Fact C."
+      compressed: "Fact A."
+    expectation:
+      must_keep: ["Fact A"]
+  - id: t3
+    bucket: edge
+    domain: d2
+    dimension: compression_recall
+    input:
+      original: "Some important detail X and Y."
+      compressed: "Nothing useful."
+    expectation:
+      must_keep: ["X", "Y"]
+`
+	if err := os.WriteFile(datasetPath, []byte(datasetYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fix time for deterministic testing
+	now = func() time.Time {
+		return time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	}
+	defer func() { now = timeNow }()
+
+	config := EvalConfig{
+		Enabled:  true,
+		Dataset:  DatasetConfig{Path: datasetPath},
+		Judge:    JudgeConfig{Model: "mock", Temperature: 0},
+		Sampling: SamplingConfig{Enabled: false},
+	}
+
+	client := &mockLLMClient{
+		response: "Reasoning: Facts preserved\nScore: 0.85\nConfidence: 0.8\n",
+		cost:     TokenCost{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+	}
+	jm := NewJudgeManager(client, nil, JudgeConfig{Model: "mock", Temperature: 0})
+	jm.RegisterRubric(ScoreRubric{Dimension: "compression_recall", Instruction: "test", Scale: "0-1"})
+
+	engine := NewEvalEngine(config, jm)
+
+	report, err := engine.Run(context.Background(), EvalOpts{DatasetPath: datasetPath})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if report == nil {
+		t.Fatal("report is nil")
+	}
+	if report.DatasetID != "test-v1" {
+		t.Errorf("DatasetID = %s, want test-v1", report.DatasetID)
+	}
+	if len(report.Scores) == 0 {
+		t.Fatal("Scores is empty")
+	}
+	if report.Dashboard.DimensionCount == 0 {
+		t.Error("DimensionCount is 0")
+	}
+	if report.Dashboard.ItemCount != 3 {
+		t.Errorf("ItemCount = %d, want 3", report.Dashboard.ItemCount)
+	}
+	if report.JudgeModel != "mock" {
+		t.Errorf("JudgeModel = %s, want mock", report.JudgeModel)
+	}
+}
+
+func TestEvalEngine_WithBaseline(t *testing.T) {
+	dir := t.TempDir()
+	datasetPath := filepath.Join(dir, "dataset.yaml")
+
+	datasetYAML := `
+id: test-v1
+version: v1
+created_at: 2026-06-10T00:00:00Z
+buckets:
+  - name: production
+    weight: 1.0
+items:
+  - id: t1
+    bucket: production
+    domain: d2
+    dimension: compression_recall
+    input: {}
+    expectation: {}
+`
+	if err := os.WriteFile(datasetPath, []byte(datasetYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	baseline := &EvalReport{
+		ID: "baseline",
+		Scores: []DomainScore{
+			{Domain: "d2", Dimension: "compression_recall", Score: 0.85, Confidence: 0.8},
+		},
+	}
+
+	config := EvalConfig{Enabled: true, Judge: JudgeConfig{Model: "mock", Temperature: 0}}
+	client := &mockLLMClient{
+		response: "Reasoning: OK\nScore: 0.85\nConfidence: 0.8\n",
+		cost:     TokenCost{TotalTokens: 15},
+	}
+	jm := NewJudgeManager(client, nil, JudgeConfig{Model: "mock", Temperature: 0})
+	jm.RegisterRubric(ScoreRubric{Dimension: "compression_recall", Instruction: "test", Scale: "0-1"})
+
+	engine := NewEvalEngine(config, jm)
+	engine.WithBaseline(baseline)
+
+	report, err := engine.Run(context.Background(), EvalOpts{DatasetPath: datasetPath})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if report.Delta == nil {
+		t.Fatal("Delta is nil")
+	}
+	if report.Delta.BaselineID != "baseline" {
+		t.Errorf("BaselineID = %s, want baseline", report.Delta.BaselineID)
+	}
+}
+
+func TestEvalEngine_EmptyDataset(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.yaml")
+
+	emptyYAML := `
+id: test-empty
+version: v1
+created_at: 2026-06-10T00:00:00Z
+buckets: []
+items: []
+`
+	if err := os.WriteFile(path, []byte(emptyYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config := EvalConfig{Enabled: true, Judge: JudgeConfig{Model: "mock"}}
+	jm := NewJudgeManager(nil, nil, JudgeConfig{})
+	engine := NewEvalEngine(config, jm)
+
+	_, err := engine.Run(context.Background(), EvalOpts{DatasetPath: path})
+	if err == nil || !strings.Contains(err.Error(), "at least one item") {
+		t.Errorf("expected 'at least one item' error, got %v", err)
+	}
+}
+
+func TestProbeRegistry(t *testing.T) {
+	for _, id := range []string{"compression_recall", "tool_accuracy", "provider_quality", "agent_forkjoin"} {
+		p := GetProbe(id)
+		if p == nil {
+			t.Fatalf("%s probe not registered", id)
+		}
+		if p.ID() != id {
+			t.Errorf("ID = %s, want %s", p.ID(), id)
+		}
+	}
+}
+
+func TestEvalEngine_TuneSuggestionsOnRegression(t *testing.T) {
+	baseline := &EvalReport{
+		ID: "baseline",
+		Scores: []DomainScore{
+			{Domain: "d2", Dimension: "compression_recall", Score: 0.95},
+		},
+	}
+	current := &EvalReport{
+		ID: "current",
+		Scores: []DomainScore{
+			{Domain: "d2", Dimension: "compression_recall", Score: 0.70},
+		},
+	}
+	delta := NewDeltaAnalyzer(baseline).Compare(current)
+	suggestions := NewTuneGenerator().Suggest(delta)
+	if len(suggestions) != 1 {
+		t.Fatalf("len(suggestions) = %d, want 1", len(suggestions))
+	}
+	if suggestions[0].Target != "context_engine.compression.budget" {
+		t.Errorf("Target = %q", suggestions[0].Target)
+	}
+}
+
+func TestEvalEngine_IntegrationWithRealDataset(t *testing.T) {
+	datasetPath := "../../../../openspec/eval-datasets/v1/dataset.yaml"
+	absPath, err := filepath.Abs(datasetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		t.Skip("dataset.yaml not found at", absPath)
+	}
+
+	ds, err := LoadDataset(absPath)
+	if err != nil {
+		t.Fatalf("LoadDataset() error = %v", err)
+	}
+	if len(ds.Items) != 19 {
+		t.Errorf("dataset items = %d, want 19", len(ds.Items))
+	}
+
+	now = func() time.Time {
+		return time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	}
+	defer func() { now = timeNow }()
+
+	config := EvalConfig{
+		Enabled: true,
+		Judge:   JudgeConfig{Model: "mock", Temperature: 0},
+	}
+	client := &mockLLMClient{
+		response: "Reasoning: Facts preserved\nScore: 0.85\nConfidence: 0.8\n",
+		cost:     TokenCost{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+	}
+	jm := NewJudgeManager(client, nil, JudgeConfig{Model: "mock", Temperature: 0})
+	jm.RegisterRubric(ScoreRubric{
+		Dimension:   "compression_recall",
+		Instruction: "Evaluate whether ALL key facts from the original context are preserved in the compressed version.",
+		Scale:       "0-1",
+	})
+
+	engine := NewEvalEngine(config, jm)
+
+	report, err := engine.Run(context.Background(), EvalOpts{DatasetPath: absPath})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if report == nil {
+		t.Fatal("report is nil")
+	}
+	if report.DatasetID != "compression-recall-v1" {
+		t.Errorf("DatasetID = %s, want compression-recall-v1", report.DatasetID)
+	}
+	if len(report.Scores) == 0 {
+		t.Fatal("Scores is empty — no probes matched items")
+	}
+	if report.Dashboard.ItemCount != 19 {
+		t.Errorf("ItemCount = %d, want 19", report.Dashboard.ItemCount)
+	}
+	if report.Dashboard.DimensionCount < 4 {
+		t.Errorf("DimensionCount = %d, want >= 4", report.Dashboard.DimensionCount)
+	}
+	if report.Dashboard.OverallScore <= 0 {
+		t.Errorf("OverallScore = %v, want > 0", report.Dashboard.OverallScore)
+	}
+	crScore := findDimensionScore(report.Scores, "compression_recall")
+	if crScore == nil {
+		t.Fatal("compression_recall score not found")
+	}
+	if len(crScore.JudgeLogs) != 10 {
+		t.Errorf("JudgeLogs = %d, want 10", len(crScore.JudgeLogs))
+	}
+	if report.Dashboard.JudgeCost.TotalTokens <= 0 {
+		t.Error("JudgeCost.TotalTokens should be > 0")
+	}
+	if crScore.Details == nil {
+		t.Fatal("Details is nil")
+	}
+	if _, ok := crScore.Details["must_keep_count"]; !ok {
+		t.Error("Details missing must_keep_count")
+	}
+}
+
+func findDimensionScore(scores []DomainScore, dimension string) *DomainScore {
+	for i := range scores {
+		if scores[i].Dimension == dimension {
+			return &scores[i]
+		}
+	}
+	return nil
+}

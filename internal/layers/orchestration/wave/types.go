@@ -169,6 +169,23 @@ type WorkerRunner interface {
 	Run(ctx context.Context, spec WorkerRunSpec) error
 }
 
+// WorkerCancelRegistry is the cancel contract between the Wave scheduler and
+// background-task registries. The primary implementation is
+// nested.BackgroundRegistry. The scheduler uses this interface to stop
+// running workers without importing contextengine directly.
+//
+// DM-20260611-009 Phase 3: defined so Wave (D7-S3) can reference the Cancel
+// protocol without a hard dependency on D2 nested package.
+type WorkerCancelRegistry interface {
+	// Cancel stops a running task. Returns true the first time the task
+	// transitions to "cancelled", false on subsequent calls or unknown id.
+	Cancel(taskID string) bool
+
+	// IsTerminal reports whether the task has reached a terminal state
+	// (completed / failed / cancelled).
+	IsTerminal(taskID string) bool
+}
+
 // WorkerRunSpec is the immutable input handed to a runner.
 type WorkerRunSpec struct {
 	SessionID    string

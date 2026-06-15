@@ -166,7 +166,20 @@ pending → running → { completed | failed | cancelled }
 | failed | 非 cancel 错误 |
 | cancelled | Leader/Wave/User 主动 cancel |
 
-### 6.2 Cancel 协议（依赖 DM-009）
+### 6.2 Cancel 协议（依赖 DM-20260611-009 Background Task Tools）
+
+**WorkerCancelRegistry 接口**（`wave/types.go`，DM-009 Phase 3 T8）：
+
+```go
+// WorkerCancelRegistry is the cancel contract between Wave and background-task
+// registries. Implemented by nested.BackgroundRegistry.
+type WorkerCancelRegistry interface {
+    Cancel(taskID string) bool
+    IsTerminal(taskID string) bool
+}
+```
+
+**Wave 调度器持有 handle 表实现单 Worker / 全量 cancel：**
 
 ```go
 type WorkerHandle struct {
@@ -181,6 +194,8 @@ func (s *WaveScheduler) CancelWorker(taskID string) error      // 单 Worker
 func (s *WaveScheduler) CancelAll(sessionID string) int        // session 结束 / /new
 func (s *WaveScheduler) CancelByConflictGroup(group string) int // ConflictGuard 升级
 ```
+
+`SubAgentRunner` 通过 `SubAgentDeps.Cancel`（`func(taskID string) bool`）桥接到 `BackgroundRegistry.Cancel`，后者实现 `WorkerCancelRegistry` 接口。`BackgroundRegistry.IsTerminal` 方法（DM-009 Phase 3 新增）供 runner 轮询任务终止状态。
 
 **实现要点：**
 

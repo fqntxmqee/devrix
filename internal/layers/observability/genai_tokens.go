@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
 var genAITokenCounters sync.Map // key: meterName|model|tokenType → metrics.Counter
