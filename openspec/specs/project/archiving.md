@@ -1,6 +1,6 @@
 # 归档规范
 
-**版本:** 1.0.0
+**版本:** 1.1.0
 **状态:** Active
 **所属阶段:** S6
 **前置阶段:** S5 验收通过、PR 已合并到 main
@@ -89,40 +89,90 @@ git add openspec/specs/d{N}-*/
 
 ## 3. 归档操作
 
-```bash
-# 1. 切换到 main 并拉取最新
-git checkout main
-git pull origin main
+**关键约束：** 归档变更也必须遵循 GitHub Flow，通过 `feat/<change-id>` 分支 + PR 合并到 master。**禁止**直接在 master 上提交归档，**禁止**将归档混入其他功能分支。
 
-# 2. 移动 change 到 archive
+### 3.0 分支策略（S6 专用）
+
+```
+场景 A: 独立归档分支（S6 在工作分支上触发）
+    从 master 切出 feat/archive-<change-id> → 归档操作 → push → PR → squash merge → 删除分支
+
+场景 B: S6 紧接 S4 实现（代码和归档在同一 change）
+    在已有 feat/<change-id> 分支上追加归档 commit → push → PR → squash merge → 删除分支
+```
+
+| 场景 | 分支名 | 说明 |
+|------|--------|------|
+| A | `feat/archive-<change-id>` | 仅做归档，不包含代码变更 |
+| B | `feat/<change-id>` | 代码实现和归档在同一分支，S6 在 PR 合并前追加 |
+
+### 3.1 执行步骤
+
+```bash
+# === 场景 A: 独立归档分支 ===
+
+# 1. 从 master 切出归档分支
+git checkout master
+git pull origin master
+git checkout -b feat/archive-<change-id>
+
+# === 场景 B: 在已有 feat/<change-id> 分支上追加 ===
+
+# 1. 切换到已有分支
+git checkout feat/<change-id>
+git pull origin feat/<change-id> 2>/dev/null || true
+
+# === 以下步骤两种场景通用 ===
+
+# 2. 确认前置条件
+# - PR 已合并到 master（场景 A）或即将通过当前 PR 合并（场景 B）
+# - acceptance-report.md 已创建且结论为 ACCEPTED
+# - .openspec.yaml status 已更新为 s7_archived
+
+# 3. 移动 change 到 archive
 ARCHIVE_DIR="openspec/archive/$(date +%Y-%m-%d)-<change-id>"
 mkdir -p "$ARCHIVE_DIR"
 cp -r openspec/changes/<change-id>/* "$ARCHIVE_DIR/"
 git add "$ARCHIVE_DIR"
 git rm -r openspec/changes/<change-id>/
 
-# 3. 更新索引
+# 4. 更新索引
 # 编辑 openspec/demand-archive-index.md，添加：
 # | <demand-id> | <change-id> | YYYY-MM-DD | PR #<number> |
 
 git add openspec/demand-archive-index.md
 
-# 4. 同步域架构文档（按 §2.4 评估）
-# 如果变更影响域架构，更新对应的 openspec/specs/d{N}-*/ 文件
-# - spec.md: 合并 Gherkin Scenario
-# - design.md: 更新领域模型/接口/流程图
-# - a-registry.md / f-registry.md / t-registry.md: 更新条目
+# 5. 同步域架构文档（按 §2.4 评估）
 git add openspec/specs/d{N}-*/ 2>/dev/null || true
 
-# 5. 提交归档
+# 6. 提交归档
 git commit -m "$(cat <<'EOF'
-archive: <change-id> 归档
+archive: <change-id> S6 归档
 
 归档至 openspec/archive/YYYY-MM-DD-<change-id>/
 PR: #<number>
 EOF
 )"
-git push
+git push -u origin HEAD
+
+# 7. 创建 PR 并合并
+gh pr create --title "archive: <change-id> S6 归档" \
+    --body "## Summary
+- 归档 change: <change-id>
+- Demand ID: <demand-id>
+- S5 验收: ACCEPTED
+- 代码 PR: #<number> (场景 A) / 当前 PR (场景 B)
+
+## 归档内容
+- acceptance-report.md
+- 域文档同步（如适用）
+- demand-archive-index.md 更新"
+
+# 8. 合并后删除分支
+git checkout master
+git pull origin master
+git branch -d feat/archive-<change-id>  # 场景 A
+git branch -d feat/<change-id>           # 场景 B
 ```
 
 ---
@@ -166,3 +216,27 @@ ls openspec/archive/YYYY-MM-DD-<change-id>/
 # 确认 git 状态干净
 git status
 ```
+
+---
+
+## 7. 分支清理
+
+S6 归档完成后，**必须**清理对应分支：
+
+| 步骤 | 命令 | 说明 |
+|------|------|------|
+| 确认已合并 | `git branch --merged origin/master \| grep <change-id>` | 分支必须在 master 中 |
+| 删除本地分支 | `git branch -d feat/<change-id>` | 场景 A/B 通用 |
+| 删除远程分支 | `git push origin --delete feat/<change-id>` | 如果 GitHub 未自动删除 |
+| 验证 | `git branch -a \| grep <change-id>` | 应无输出 |
+
+**禁止**保留已合并的 feature 分支，避免分支列表膨胀和职责混淆。
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-07 | 初始归档规范 |
+| 1.1.0 | 2026-06-16 | 新增 §3.0 分支策略（场景 A/B）+ §7 分支清理；禁止在 master 直推归档、禁止混入其他功能分支 |
