@@ -96,7 +96,7 @@ func (m *TaskManager) startSpan(operation string) (context.Context, tracer.Span)
 	if m.obsBridge == nil || !m.obsBridge.IsEnabled() {
 		return nil, nil
 	}
-	ctx, span := m.obsBridge.Tracer().Start(nil, operation)
+	ctx, span := m.obsBridge.Tracer().Start(context.Background(), operation)
 	return ctx, span
 }
 

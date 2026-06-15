@@ -23,8 +23,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|-----------|------|----------|-----------|--------|----------|
 | D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/flow/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/flow/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
@@ -59,7 +59,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |------|------|----------|-----------|--------|----------|
 | D7-S1-T01 | Task create 生成唯一 ID | D7-S1-A02-F01 | `workmodel/task_manager_test.go::TestTaskManager_Create` | IMPLEMENTED | P0 |
 | D7-S1-T02 | Task 依赖 blocked_by 正确 | D7-S1-A02-F03 | `workmodel/task_manager_test.go::TestTaskManager_Dependency` | IMPLEMENTED | P0 |
-| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `workmodel/disk_store_test.go::TestTaskManager_disk_persist_and_list_consistent` | IMPLEMENTED | P0 |
+| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `workmodel/disk_store_test.go::TestTaskManager_disk_persist_and_list_consistent`；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 |
 | D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `workmodel/task_manager_test.go::TestTaskManager_List` | IMPLEMENTED | P1 |
 | D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/flow/hub_test.go` | IMPLEMENTED | P1 |
 | D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | `coordinator/decomposer_test.go::TestTaskDecomposer_validateGraph` | IMPLEMENTED | P1 |
@@ -75,11 +75,11 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
 | D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `workmodel/plan_mode_test.go` 或 `task_manager_test` | IMPLEMENTED | P1 |
-| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `workmodel/plan_agent_whitelist_test.go`（10 ACs） | IMPLEMENTED | P0 |
+| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `workmodel/plan_agent_whitelist_test.go`（10 ACs）；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 |
 | D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
 | **D7-S5-T04** | **SynthesizeTaskGraph 产出有效 DAG** | **D7-S5-A02** | **`coordinator/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
 | **D7-S5-T05** | **SelectExecutor explore→D2 execute→D4** | **D7-S5-A03** | **`coordinator/executor_test.go::TestExecutorSelector_SelectExecutor`** | **IMPLEMENTED** | **P1** |
-| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `coordinator/{classifier,shadow_classifier,orchestrator}_test.go` | IMPLEMENTED | P0 |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `coordinator/{classifier,shadow_classifier,orchestrator}_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
 | D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `coordinator/shadow_classifier_test.go` | IMPLEMENTED | P0 |
 | D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | — | PLANNED (v1.2) | P0 |
 | D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
@@ -96,15 +96,15 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `coordinator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `coordinator/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `coordinator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T03 | OrchestratePath 按路由矩阵（非强制 Synthesize） | D7-S2-A01-F03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `coordinator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 |
 | D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
 | D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | — | PLANNED (v1.2) | P0 |
-| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `coordinator/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `coordinator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 |
 | **D7-S2-A04-T01** | **DispatchWorker D4 enabled with leader** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_enabled_withLeader`** | **IMPLEMENTED** | **P0** |
 | **D7-S2-A04-T02** | **DispatchWorker D4 disabled falls back to D2 SubQuery** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_disabled_fallsToD2`** | **IMPLEMENTED** | **P0** |
 | **D7-S2-A04-T03** | **DispatchWorker async mode** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_async`** | **IMPLEMENTED** | **P1** |
@@ -115,7 +115,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | 描述 | 归属 | Test 位置 | Status | Priority |
 |------|------|------|-----------|--------|----------|
-| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `internal/layers/communication/capture/d7_integration_test.go` | IMPLEMENTED | P0 |
+| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `tests/integration/d7/d7_entry_test.go`（WireD7 全栈）；`coordinator/entry_test.go` | IMPLEMENTED | P0 |
 | D7-D4-T01 | D2 loop 无 delegate hooks | D7-S2 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P1 |
 | D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/coordinator/entry_test.go` | IMPLEMENTED | P2 |
@@ -123,7 +123,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
 | D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/coordinator/d6_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `internal/layers/communication/capture/coordinator_matrix_test.go` | IMPLEMENTED | P0 |
+| D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `tests/integration/d7/d7_entry_test.go::TestIntegration_D7Entry_PlanModeStillUsesD7Path`；`coordinator_matrix_test.go` | IMPLEMENTED | P0 |
 | D7-THIN-T01 | loop.go 无编排字段 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 | D7-THIN-T02 | loop.go Run ≤200 行 | D2 瘦身 | — | PLANNED (R2 §4.3 决议 C — v1.0 不迁) | P0 |
 
