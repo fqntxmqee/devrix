@@ -6,18 +6,18 @@ import (
 
 // DSAFT: D3-S6-A01-T02 (FeatureFlagDefaults, v1.1 F9, D4-B 决议).
 // 8 combination unit test for the 3 v1.1 feature flags:
-//   - D3ResilienceEmitEnabled (F1+F2+F3)
-//   - D3SafetyLatencyEventEnabled (F8)
-//   - D3MetricEmitWarn (F9)
+//   - ResilienceEmitEnabled (F1+F2+F3)
+//   - SafetyLatencyEventEnabled (F8)
+//   - MetricEmitWarn (F9)
 //
 // Each combination must produce a distinct, well-formed struct, and the
 // default must match the D4-B 决议固化值 (resilience+latency ON, warn OFF).
 func TestLLMFeatureFlags_default_matches_D4B_resolution(t *testing.T) {
 	got := DefaultFeatureFlags()
 	want := LLMFeatureFlags{
-		D3ResilienceEmitEnabled:     true,
-		D3SafetyLatencyEventEnabled: true,
-		D3MetricEmitWarn:            false,
+		ResilienceEmitEnabled:     true,
+		SafetyLatencyEventEnabled: true,
+		MetricEmitWarn:            false,
 	}
 	if got != want {
 		t.Errorf("DefaultFeatureFlags = %+v, want %+v (D4-B 决议)", got, want)
@@ -56,9 +56,9 @@ func TestLLMFeatureFlags_eight_combinations(t *testing.T) {
 	seen := make(map[LLMFeatureFlags]bool, 8)
 	for _, s := range states {
 		f := LLMFeatureFlags{
-			D3ResilienceEmitEnabled:     s.r,
-			D3SafetyLatencyEventEnabled: s.s,
-			D3MetricEmitWarn:            s.w,
+			ResilienceEmitEnabled:     s.r,
+			SafetyLatencyEventEnabled: s.s,
+			MetricEmitWarn:            s.w,
 		}
 		if seen[f] {
 			t.Errorf("duplicate state for %+v — flags are not independent", f)

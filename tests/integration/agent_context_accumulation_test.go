@@ -24,7 +24,7 @@ import (
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// T: D2-S3-A01-T02, D4-S0-A01-T03
+// T: D2-S3-A01-T02, D4-S0-A01-T03 — shared engine context across D7 ingress turns.
 func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	commCfg := config.DefaultConfig()
@@ -58,18 +58,6 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		Config:       ctxCfg,
 	})
 
-	builder := &integrationEngineBuilder{
-		llm:      llmBridge,
-		tools:    &mockctx.ToolRunner{},
-		toolsReg: mustBuiltinRegistry(t),
-		ctxCfg:   ctxCfg,
-	}
-	factory := multiagentprovision.NewAgentFactoryWithBuilder(
-		multiagent.AgentDeps{Engine: engine},
-		builder,
-		config.DefaultMultiAgentConfig(),
-	)
-
 	dir := t.TempDir()
 	store, err := capture.NewFileSessionStore(dir)
 	if err != nil {
@@ -77,15 +65,21 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	}
 	permMgr := capture.NewPermissionManager(&commCfg.Permission)
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, commCfg)
+	testutil.WireGatewayOrchestration(gw, engine)
+
+	factory := multiagentprovision.NewAgentFactory(
+		multiagent.AgentDeps{Engine: engine},
+		config.DefaultMultiAgentConfig(),
+	)
 	gw.SetAgentFactory(factory)
 
-	session, err := gw.CreateSession("feishu_chat", "/tmp/work")
+	session, err := gw.CreateSession("feishu_chat", dir)
 	if err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
 	ctx := context.Background()
-	instructions := []string{"first via agent", "second via agent"}
+	instructions := []string{"first via d7", "second via d7"}
 	for i, inst := range instructions {
 		msg := &types.InboundMessage{
 			SessionID: session.SessionID,
@@ -96,6 +90,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		if err := gw.RouteInbound(ctx, msg); err != nil {
 			t.Fatalf("RouteInbound round %d: %v", i+1, err)
 		}
+		gw.WaitForProcesses()
 		expectedEvents := (i + 1) * 2
 		if !handler.WaitForMessages(expectedEvents, 10*time.Second) {
 			t.Fatalf("round %d: timeout, got %d events", i+1, handler.MessageCount())
@@ -123,6 +118,6 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		t.Fatalf("Get session: %v", err)
 	}
 	if len(updated.ContextSnapshot) == 0 {
-		t.Fatal("expected ContextSnapshot persisted on disk after agent route")
+		t.Fatal("expected ContextSnapshot persisted on disk after D7 ingress")
 	}
 }

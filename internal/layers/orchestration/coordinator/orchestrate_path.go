@@ -186,20 +186,32 @@ func emitError(ctx context.Context, sink EventPublisher, out chan<- *contracts.E
 }
 
 // newDefaultOrchestratePath builds an OrchestratePath bound to a fresh
-// TaskDecomposer and a fresh WaveScheduler. It is the v1.1.0+ default
-// for NewSessionOrchestrator when no WithOrchestratePath option is
-// supplied.
+// TaskDecomposer and a functional WaveScheduler. It is the v1.1.0+ default
+// for NewSessionOrchestrator when no WithOrchestratePath option is supplied.
 //
-// The default WaveScheduler is constructed with zero-value SchedulerDeps.
-// wave.NewWaveScheduler is nil-safe for Pool / Guard / Resolver /
-// Artifacts (only Runners is initialized to an empty map if nil).
-// Production callers that need a real WorkerPool + WorkerRunner registry
-// should still wire explicitly via WithOrchestratePath.
+// The default WaveScheduler has a real WorkerPool, ConflictGuard,
+// ArtifactStore, and ContextResolver — so the dispatch loop will not
+// deadlock or panic. Tasks that reach the dispatch phase will fail with
+// "no runner for kind X" errors (clean failure) because no WorkerRunners
+// are registered. Production callers that need real multi-agent execution
+// MUST wire a WaveScheduler with proper runners via WithOrchestratePath.
 func newDefaultOrchestratePath(sink EventPublisher, llmDecomp LLMTaskDecomposer) *OrchestratePath {
 	decomp := NewTaskDecomposer()
 	if llmDecomp != nil {
 		decomp.SetLLMDecomposer(llmDecomp)
 	}
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{})
+	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
+	guard := wave.NewConflictGuard()
+	artifacts := wave.NewArtifactStore()
+	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+		Artifacts:        artifacts,
+		BaseSystemPrompt: "",
+	})
+	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+		Pool:      pool,
+		Guard:     guard,
+		Resolver:  resolver,
+		Artifacts: artifacts,
+	})
 	return NewOrchestratePath(decomp, sched, sink)
 }

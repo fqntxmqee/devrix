@@ -130,7 +130,7 @@ func TestGateway_AgentFactoryWithD7_PrefersD7Path(t *testing.T) {
 	}
 }
 
-// T: D7-D1-T01 — missing orchestration entry fails fast.
+// T: D7-D1-T01 — missing orchestration entry fails fast (no agent-factory bypass).
 func TestGateway_MissingOrchestrationEntry(t *testing.T) {
 	gw := newTestGateway(t)
 
@@ -143,6 +143,30 @@ func TestGateway_MissingOrchestrationEntry(t *testing.T) {
 	}
 	if err := gw.RouteInbound(context.Background(), msg); err == nil {
 		t.Fatal("expected error when orchestration entry is nil")
+	}
+}
+
+// T: D7-D1-T03 — agent factory cannot bypass D7 when orchestration entry is absent.
+func TestGateway_AgentFactoryWithoutD7_Fails(t *testing.T) {
+	gw := newTestGateway(t)
+	factory := provision.NewAgentFactory(multiagent.AgentDeps{
+		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
+	}, config.DefaultMultiAgentConfig())
+	gw.SetAgentFactory(factory)
+
+	session, err := gw.CreateSession("cli", t.TempDir())
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+	msg := &types.InboundMessage{
+		SessionID: session.SessionID,
+		ChatID:    "chat-no-d7",
+		MessageID: "m1",
+		Content:   "hello",
+		UserID:    "user1",
+	}
+	if err := gw.RouteInbound(context.Background(), msg); err == nil {
+		t.Fatal("expected error when orchestration entry is nil even with agent factory")
 	}
 }
 

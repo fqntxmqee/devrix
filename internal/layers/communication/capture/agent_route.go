@@ -10,7 +10,8 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// SetAgentFactory enables Layer 4 agent routing for inbound messages.
+// SetAgentFactory enables session leader provisioning for D4 delegate/fork.
+// D1 ingress always routes through D7; the factory must not bypass orchestration entry.
 func (g *CommunicationGateway) SetAgentFactory(factory multiagent.IAgentFactory) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -52,51 +53,6 @@ func (g *CommunicationGateway) SessionAgent(sessionID string) multiagent.Agent {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.sessionAgents[sessionID]
-}
-
-func (g *CommunicationGateway) routeInboundViaAgent(
-	ctx context.Context,
-	msg *types.InboundMessage,
-	session *types.Session,
-	endSpan func(),
-) error {
-	if g.agentFactory == nil {
-		return fmt.Errorf("agent factory not configured")
-	}
-
-	ag, err := g.agentFactory.Create(ctx, multiagent.AgentConfig{
-		SessionID:    session.SessionID,
-		WorkDir:      session.WorkDir,
-		InitialInput: msg.Content,
-	}, session)
-	if err != nil {
-		return fmt.Errorf("agent create: %w", err)
-	}
-
-	g.RegisterSessionAgent(session.SessionID, ag)
-	g.attachSessionAgent(ctx, session, ag)
-
-	processCtx, cancel := context.WithCancel(ctx)
-	g.registerProcess(session.SessionID, cancel)
-	g.processes.Add(1)
-	go func() {
-		defer g.processes.Done()
-		defer endSpan()
-		defer cancel()
-		defer g.endInboundTurn(session.SessionID)
-		defer g.clearSessionAgent(session.SessionID)
-		if _, runErr := ag.Run(processCtx); runErr != nil {
-			g.handleEngineEvent(ctx, session, &EngineEvent{
-				Type:      "error",
-				Content:   runErr.Error(),
-				SessionID: session.SessionID,
-				Metadata:  map[string]string{"source": "agent_run"},
-			})
-		}
-		g.unregisterProcess(session.SessionID)
-		g.persistSessionAfterProcess(session)
-	}()
-	return nil
 }
 
 // ensureSessionLeaderAgent provisions a session leader for D4 delegate/fork without
@@ -146,12 +102,6 @@ func (g *CommunicationGateway) attachSessionAgent(
 	ag.SetEngineEventSink(func(ev *contracts.EngineEvent) {
 		g.handleEngineEvent(ctx, session, ev)
 	})
-}
-
-func (g *CommunicationGateway) clearSessionAgent(sessionID string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.sessionAgents, sessionID)
 }
 
 type gatewayAgentObserver struct {

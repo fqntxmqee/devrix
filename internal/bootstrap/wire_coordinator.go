@@ -15,12 +15,12 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// WireD7 initializes the D7 SessionOrchestrator and wires it into the capture.
+// InitOrchestration initializes the SessionOrchestrator and wires it into the capture.
 // D1 ingress requires a non-nil IOrchestrationEntry; returns error when d7.enabled=false.
 //
 // DM-020 (D7 Turn 编排上移): llmStack wires the D7→D3 LLMInvoker (A07).
-// The TurnOrchestrator (A06) is assembled in slice c with the D2 adapter.
-func WireD7(
+// The TurnOrchestrator (A06) is assembled in slice c with the context engine adapter.
+func InitOrchestration(
 	configFile string,
 	gw *capture.CommunicationGateway,
 	ctxEngine contracts.IEngine,
@@ -53,20 +53,20 @@ func WireD7(
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 
 	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
-	// This replaces the legacy d2Executor with D7's own turn loop that
-	// calls D3 directly for LLM and D2 via拆面 adapters for tools/persist.
-	d2a := newD2Adapter(gw, ctxEngine, llmStack.TokenCounter)
+	// This replaces the legacy executor with the orchestration turn loop that
+	// calls D3 directly for LLM and D2 via adapters for tools/persist.
+	ctxAdapter := newContextEngineAdapter(gw, ctxEngine, llmStack.TokenCounter)
 	llmInvoker := WireTurnInvoker(llmStack)
 	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
 		LLM:      llmInvoker,
-		Context:  d2a,
-		Tools:    d2a,
-		Persist:  d2a,
+		Context:  ctxAdapter,
+		Tools:    ctxAdapter,
+		Persist:  ctxAdapter,
 		MaxTurns: 8,
 	})
 	executor := newTurnOrchExecutor(turnOrch)
 
-	sink := newD1EventPublisher(gw)
+	sink := newGatewayEventPublisher(gw)
 
 	var obsBridge *observability.Bridge
 	if b, ok := obsBridgeArg.(*observability.Bridge); ok {
@@ -104,7 +104,7 @@ func WireD7(
 }
 
 // turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
-// DM-020 D-c: this replaces d2Executor as the D7 FastPath executor.
+// DM-020 D-c: this replaces the legacy executor as the FastPath executor.
 type turnOrchExecutor struct {
 	orch turn.TurnOrchestrator
 }
@@ -125,15 +125,15 @@ func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.Que
 	})
 }
 
-type d1EventPublisher struct {
+type gatewayEventPublisher struct {
 	gw *capture.CommunicationGateway
 }
 
-func newD1EventPublisher(gw *capture.CommunicationGateway) *d1EventPublisher {
-	return &d1EventPublisher{gw: gw}
+func newGatewayEventPublisher(gw *capture.CommunicationGateway) *gatewayEventPublisher {
+	return &gatewayEventPublisher{gw: gw}
 }
 
-func (p *d1EventPublisher) Publish(ctx context.Context, ev *contracts.EngineEvent) {
+func (p *gatewayEventPublisher) Publish(ctx context.Context, ev *contracts.EngineEvent) {
 	if p.gw == nil || ev == nil {
 		return
 	}

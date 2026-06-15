@@ -186,8 +186,8 @@ func main() {
 		)
 	}
 
-	if err := bootstrap.WireD7(configFile, gw, contextEngine, obsBridge, llmStack); err != nil {
-		slog.Error("failed to wire D7 orchestration", "error", err)
+	if err := bootstrap.InitOrchestration(configFile, gw, contextEngine, obsBridge, llmStack); err != nil {
+		slog.Error("failed to init orchestration", "error", err)
 		os.Exit(1)
 	}
 

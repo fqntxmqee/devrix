@@ -22,7 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
-// D7StackOptions configures WireD7 integration test wiring.
+// D7StackOptions configures InitOrchestration integration test wiring.
 type D7StackOptions struct {
 	LLMStub       *D7LLMStub
 	ExecutionFlow bool
@@ -48,7 +48,7 @@ type D7TestStack struct {
 	WorkDir   string
 }
 
-// NewD7TestStack wires bootstrap.WireD7 with mock LLM and context engine.
+// NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
 func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	t.Helper()
 
@@ -157,8 +157,8 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		}
 	}
 
-	if err := bootstrap.WireD7("", gw, engine, obsBridge, llmStack); err != nil {
-		t.Fatalf("WireD7: %v", err)
+	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmStack); err != nil {
+		t.Fatalf("InitOrchestration: %v", err)
 	}
 
 	if opt.OverrideOrchestratePath != nil {
