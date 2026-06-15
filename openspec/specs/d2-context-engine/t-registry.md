@@ -120,7 +120,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/usercontext/` | IMPLEMENTED | P0 |
 | D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/policy/permission/mode_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/contextengine/tasks/disk_store_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T39 | query_loop.enabled=false V4 回归 | QueryLoop | `tests/integration/query_loop_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/nested/subquery_test.go` | IMPLEMENTED | P1 |
 | D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/nested/fork_test.go` | IMPLEMENTED | P1 |

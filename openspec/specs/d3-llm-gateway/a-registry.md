@@ -53,7 +53,7 @@
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S1-A01** | **ResolveModelRoute** | A-BE | model_name (string) | (provider, resolved_model, error) | — | `internal/layers/llmgateway/gateway/router.go`（`Router.Resolve`） |
+| **D3-S1-A01** | **ResolveModelRoute** | A-BE | model_name (string) | (provider, resolved_model, error) | — | `internal/layers/llmgateway/route/router.go`（`Router.Resolve`） |
 
 **F 编排**（详见 `f-registry.md` §3.1）：
 
@@ -96,7 +96,7 @@ D3-S2-A01 StreamChatCompletion
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S3-A01** | **ShieldAndRetry** | A-BE | ctx, call, primary_model, fallback_model, retry_config | <-chan *AdapterChunk | circuit.{closed, open, half_open} | `internal/layers/llmgateway/breaker/circuit_breaker.go` + `internal/layers/llmgateway/retry/retry.go` |
+| **D3-S3-A01** | **ShieldAndRetry** | A-BE | ctx, call, primary_model, fallback_model, retry_config | <-chan *AdapterChunk | circuit.{closed, open, half_open} | `internal/layers/llmgateway/protect/circuit_breaker.go` + `internal/layers/llmgateway/protect/retry.go` |
 
 **F 编排**（详见 `f-registry.md` §3.3）：
 
@@ -163,7 +163,7 @@ D3-S5-A01 FilterAndMatchContent
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| **D3-S6-A01** | **LoadAndValidateLLMConfig** | A-BE | config_file | LLMGatewayConfig | — | `internal/layers/llmgateway/config/loader.go` + `internal/shared/config/llmgateway.go` |
+| **D3-S6-A01** | **LoadAndValidateLLMConfig** | A-BE | config_file | LLMGatewayConfig | — | `internal/layers/llmgateway/configure/loader.go` + `internal/layers/llmgateway/configure/shared_config.go` |
 
 **F 编排**（详见 `f-registry.md` §3.6）：
 
