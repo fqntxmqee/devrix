@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -83,10 +85,16 @@ func TestSessionOrchestrator_ProcessMessage_Skip(t *testing.T) {
 	}
 }
 
-// T: D7-S2-T01 — command-first path goes through D2.
+// T: D7-S2-T01 — command-first path goes through CommandHandler
+// (v1.1.0+ orthogonal dispatch), NOT through D2/FastPath. v1.0 routed
+// commands to D2 with a system-prompt hint; that v1.0 simplification
+// was removed (devrix-d7-orthogonal-intent-paths).
 func TestSessionOrchestrator_ProcessMessage_Command(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+	cli := workmodel.NewCLICommands(workmodel.NewTaskManager())
+	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
+	chHandler := NewCommandHandler(cli, plan, nil)
+	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithCommandHandler(chHandler))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
 		SessionID: "sess-1",
 		Message:   "/plan add auth",
@@ -94,13 +102,22 @@ func TestSessionOrchestrator_ProcessMessage_Command(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for range ch {
+	// v1.1.0+: channel must yield ≥1 text + complete event.
+	var sawText, sawComplete bool
+	for ev := range ch {
+		if ev.Type == "text" {
+			sawText = true
+		}
+		if ev.Type == "complete" {
+			sawComplete = true
+		}
 	}
-	if exec.calls != 1 {
-		t.Fatalf("command should call D2 exactly once, got %d", exec.calls)
+	if !sawText || !sawComplete {
+		t.Fatalf("command path must emit text+complete, got text=%v complete=%v", sawText, sawComplete)
 	}
-	if exec.executedMsgs[0] != "/plan add auth" {
-		t.Fatalf("command not forwarded, got %q", exec.executedMsgs[0])
+	// v1.1.0+: command path does NOT call D2 (zero LLM cost).
+	if exec.calls != 0 {
+		t.Fatalf("command path must not call D2, got %d calls", exec.calls)
 	}
 }
 
@@ -191,6 +208,31 @@ func (errD2) RunQueryLoop(_ context.Context, _ QueryRequest) (<-chan *contracts.
 	return nil, errors.New("simulated d2 error")
 }
 
+// fakeWaveScheduler is the minimal WaveSchedulerRunner for testing
+// OrchestratePath. It bypasses the real wave pool and returns a
+// caller-supplied artifact list (typically empty for anti-fabrication
+// tests).
+type fakeWaveScheduler struct {
+	mu        sync.Mutex
+	starts    int
+	waits     int
+	artifacts []wave.Artifact
+}
+
+func (f *fakeWaveScheduler) Start(_ context.Context, _ string, _ *wave.TaskGraph) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.starts++
+	return nil
+}
+
+func (f *fakeWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wave.Artifact, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.waits++
+	return f.artifacts, nil
+}
+
 // T: D7-S2-T04 — HandleInterrupt emits "stopped" event and runs cancelers
 // in the documented order (Wave → D4 → Process), per R2 命题 E 反驳.
 func TestInterruptHandler_Handle_SequenceAndEvent(t *testing.T) {
@@ -271,14 +313,22 @@ func TestInterruptHandler_Handle_Idempotent(t *testing.T) {
 // T: D7-S5-T06 — Command-first 路径在 ShadowClassifier 启用时不触发 LLM
 // classify。 ShadowClassifier 内部 tail-only 短路（rule != IntentOrchestrate
 // 直接返回，不启 goroutine），命令路径自然零 LLM 成本。
+//
+// v1.1.0+ (orthogonal dispatch): 命令路径走 CommandHandler，不调 D2。
+// 本测试断言：(1) D2 不被调用；(2) LLM 分类器不被触发（shadow 自然也不会）。
 func TestSessionOrchestrator_CommandFirst_ShadowNotCalled(t *testing.T) {
 	exec := &fakeD2{}
+	cli := workmodel.NewCLICommands(workmodel.NewTaskManager())
+	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
+	chHandler := NewCommandHandler(cli, plan, nil)
 	rule := NewRuleClassifier(DefaultConfig())
 	llm := &stubLLM{result: IntentClassification{Kind: IntentOrchestrate, Confidence: 80}}
 	mtr := newShadowTestMeter(t)
 	m := NewShadowMetrics(mtr)
 	shadow := NewShadowClassifier(rule, llm, m, 500)
-	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithShadowClassifier(shadow))
+	orch := NewSessionOrchestrator(DefaultConfig(), exec,
+		WithShadowClassifier(shadow),
+		WithCommandHandler(chHandler))
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
 		SessionID: "sess-cmd-shadow",
 		Message:   "/plan add auth",
@@ -293,11 +343,10 @@ func TestSessionOrchestrator_CommandFirst_ShadowNotCalled(t *testing.T) {
 	if calls := atomic.LoadInt32(&llm.calls); calls != 0 {
 		t.Fatalf("LLM called on command path: calls=%d (must be 0)", calls)
 	}
-	if exec.calls != 1 {
-		t.Fatalf("D2 must be called once for command path, got %d", exec.calls)
-	}
-	if exec.executedMsgs[0] != "/plan add auth" {
-		t.Fatalf("command not forwarded, got %q", exec.executedMsgs[0])
+	// v1.1.0+ (orthogonal dispatch): command path goes through
+	// CommandHandler, NOT D2. D2 is not called.
+	if exec.calls != 0 {
+		t.Fatalf("D2 must NOT be called for command path (v1.1+ orthogonal), got %d calls", exec.calls)
 	}
 }
 
@@ -344,11 +393,18 @@ func TestSessionOrchestrator_FastPath_NoWaveScheduled(t *testing.T) {
 // T: D7-S2-A01-T03 — 禁止在 Worker terminal FlowEvent 前伪造 Task 进度。
 // anti-fabrication commitment: D7 不允许在 Worker 发送 terminal FlowEvent 之前
 // 发送任何 synthetic Task progress 信号。
+//
+// v1.1.0+ (orthogonal dispatch): IntentOrchestrate routes through
+// OrchestratePath → SynthesizeTaskGraph → WaveScheduler. The
+// fakeWaveScheduler below emits a clean terminal-only event stream
+// (plan_formed, wave_started, text, complete) — no synthetic progress.
 func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(DefaultConfig(), exec)
+	decomp := NewTaskDecomposer()
+	sched := &fakeWaveScheduler{artifacts: nil}
+	op := NewOrchestratePath(decomp, sched, nil)
+	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithOrchestratePath(op))
 
-	// fakeD2 返回完整事件流（无 synthetic progress）
 	ch, err := orch.ProcessMessage(context.Background(), ProcessRequest{
 		SessionID: "sess-anti",
 		Message:   "do something complex",
@@ -359,7 +415,9 @@ func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 
 	var hasProgressBeforeComplete bool
 	var sawTerminal bool
+	var eventTypes []string
 	for ev := range ch {
+		eventTypes = append(eventTypes, ev.Type)
 		// terminal FlowEvent 类型: complete, stopped, error
 		if ev.Type == "complete" || ev.Type == "stopped" || ev.Type == "error" {
 			sawTerminal = true
@@ -373,6 +431,6 @@ func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 
 	// 验证：不应该在 terminal 之前看到任何 synthetic progress
 	if hasProgressBeforeComplete && !sawTerminal {
-		t.Fatalf("anti-fabrication violated: synthetic progress before terminal FlowEvent")
+		t.Fatalf("anti-fabrication violated: synthetic progress before terminal FlowEvent; events=%v", eventTypes)
 	}
 }

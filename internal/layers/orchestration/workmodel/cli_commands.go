@@ -83,7 +83,9 @@ func (c *CLICommands) Handle(cmd *Command, sessionID string) string {
 	}
 }
 
-func (c *CLICommands) help() string {
+// Help returns the /task help text. Exported so external callers (e.g.
+// coordinator.CommandHandler for /help) can dispatch without re-implementing.
+func (c *CLICommands) Help() string {
 	return `Task Commands:
   /task create <subject> [description]  - Create a new task
   /task list                          - List all tasks
@@ -102,6 +104,11 @@ Examples:
   /task plan "Add user authentication"
 `
 }
+
+// help is the unexported alias retained for backward compatibility with
+// internal callers that may have used it. v1.1.0+ external code should
+// use Help() instead.
+func (c *CLICommands) help() string { return c.Help() }
 
 func (c *CLICommands) create(sessionID string, args []string) string {
 	if len(args) < 1 {

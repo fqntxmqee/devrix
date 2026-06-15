@@ -1,0 +1,31 @@
+change_id: devrix-d7-orthogonal-intent-paths
+priority: P0
+demand_id: DM-20260615-004
+status: s3_design
+domains: [D7]
+dsaft_scenarios: [D7-S2, D7-S5]
+dsaft_activities:
+  - D7-S2-A01
+  - D7-S2-A02
+  - D7-S5-A02
+  - D7-S5-A04
+t_points:
+  - D7-S2-A01-T04
+  - D7-S2-A01-T05
+  - D7-S2-A01-T06
+  - D7-S5-A02-T01
+  - D7-S5-A02-T02
+  - D7-S5-A04-T01
+  - D7-S5-A04-T02
+version_scope:
+  v1.1: "D7 Intent 路径正交化（4 case = 4 真实执行链）"
+  v1.0: "v1.0 仍是 1 条 FastPath 占位链（历史追溯）"
+metrics_definitions:
+  - name: orchestration_intent_path_count
+    labels: [kind, path]
+    type: counter
+    description: "按 intent kind 与真实执行路径计数的请求总数"
+span_naming:
+  - D7-S2-ProcessMessage
+  - D7-S2-CommandHandler
+  - D7-S2-OrchestratePath

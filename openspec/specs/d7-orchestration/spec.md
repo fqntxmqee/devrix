@@ -3,7 +3,7 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 2.3.0
+**Version:** 2.5.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-15
 **Layering Spec:** `openspec/specs/architecture/layering.md`
@@ -20,7 +20,7 @@
 
 D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
 
-**现行实现路径（2026-06-15）：** v1.0 + v1.1 全部闭环（layer-delta Phase A–N）。Session Orchestrator（D7-S2 A01–A07, 含 Turn Leader A06/A07）+ ClassifyIntent/SynthesizeTaskGraph/SelectExecutor（D7-S5 A01–A03）+ WorkModel + PlanMode（D7-S1 + D7-S5 A04）位于 `internal/layers/orchestration/{coordinator,workmodel,turn,hubspoke}/`；Wave/Flow/IMSink（D7-S3/S4）位于 `internal/layers/orchestration/{wave,flow,workplan,imsink}/`。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（经 `d7_enabled` 路由开关，`bootstrap/wire_coordinator.go::WireD7` 完成所有 wiring）。
+**现行实现路径（2026-06-15）：** v1.0 + v1.1 全部闭环（layer-delta Phase A–N）+ v1.1.0 路径正交化（devrix-d7-orthogonal-intent-paths, DM-20260615-004）。Session Orchestrator（D7-S2 A01–A07, 含 Turn Leader A06/A07）+ ClassifyIntent/SynthesizeTaskGraph/SelectExecutor（D7-S5 A01–A03）+ WorkModel + PlanMode（D7-S1 + D7-S5 A04）位于 `internal/layers/orchestration/{coordinator,workmodel,turn,hubspoke}/`；Wave/Flow/IMSink（D7-S3/S4）位于 `internal/layers/orchestration/{wave,flow,workplan,imsink}/`。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（经 `d7_enabled` 路由开关，`bootstrap/wire_coordinator.go::WireD7` 完成所有 wiring）。**v1.1.0+ Intent 路径正交分发：** `coordinator.ProcessMessage` 的 4 个 IntentKind case 各自调用独立的执行链（`CommandHandler` / `FastPath` / `OrchestratePath`），不再有"4 case → 1 fastPath"占位实现。
 
 ### S 层博弈角色定义（切法 A — 按用户价值流）
 
@@ -106,9 +106,19 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 D1 Gateway.RouteInbound
     └── D7-S2 SessionOrchestrator.ProcessMessage    ← v1.0 主入口（wired by wire_coordinator.go::WireD7）
             ├── D7-S2-A02 ClassifyIntent (rule + LLM fallback)
+            ├── switch intent.Kind (v1.1.0+ orthogonal dispatch):
+            │     ├─ IntentSkip        → close channel
+            │     ├─ IntentCommand     → CommandHandler.Handle
+            │     │                       ├─ /plan → PlanCLICommands → PlanMode
+            │     │                       ├─ /task → CLICommands → TaskManager
+            │     │                       └─ /help, /stop → explicit handlers
+            │     ├─ IntentFast        → FastPath.Run → TurnOrchestrator → D3 (LLM) + D2 (tools/persist)
+            │     └─ IntentOrchestrate → OrchestratePath.Run
+            │                            ├─ TaskDecomposer.SynthesizeTaskGraph (D7-S5-A02)
+            │                            ├─ WaveScheduler.Start (D7-S3-A01)
+            │                            └─ WaveScheduler.WaitForCompletion (D7-S3)
             ├── D7-S2-A06 RunTurnLoop → D7-S2-A07 InvokeLLM → D3 (LLM Gateway)
             │                            → D2 (ContextPreparer / ToolRoundExecutor / SessionPersister)
-            ├── D7-S2-A01-F02 FastPath → D2.RunQueryLoop (legacy path)
             ├── D7-S2-A04 DispatchWorker → hubspoke.Dispatcher → D4 Worker / D2 SubQuery
             └── flow.GlobalHub.Publish    ← D7-S4 读模型入口
                     ├── workplan.Service.Apply
@@ -333,3 +343,4 @@ orchestration:
 | 2.2.0 | 2026-06-14 | Review R2：D7-D1 权力分配、HandleInterrupt 顺序、OQ 闭合 |
 | 2.3.0 | 2026-06-15 | **v1.0 + v1.1 闭环**：(1) S2 Turn Leader (DM-020) + Meta-Orchestrator 标注；(2) S1 State Authority 标注；(3) DSAFT 结构 + Scenarios 表 5/5 S 层 IMPLEMENTED；(4) Architecture 图更新至 D7-S2 主入口；(5) D7-S1 WorkModel Requirement 状态刷新（Partial → IMPLEMENTED）；(6) PLANNED Requirements 表全 ✅ |
 | **2.4.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：(1) `shared/contracts/llm_facade.go` 新增 `LLMCaller` + `Summarizer` 拆面契约；(2) `turn.QueryLLMCaller` + `turn.CompressionSummarizer` 实现并由 `bootstrap/context_engine.go` 单一注入点 wired 至 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`；(3) D2 production wiring 零 D3 import；(4) Cross-Domain Contracts 表新增两行 DM-020 拆面 IMPLEMENTED |
+| **2.5.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化**：(1) `coordinator.command_handler.go` 新增（IntentCommand 显式分发到 PlanCLI/CLICommands，零 LLM 成本）；(2) `coordinator.orchestrate_path.go` 新增（IntentOrchestrate 显式调 `TaskDecomposer.SynthesizeTaskGraph` + `WaveScheduler.Start` + `WaitForCompletion`）；(3) `coordinator.orchestrator.go::ProcessMessage` switch 4 case 改为 4 独立执行链，删除 v1.0 `handleCommand` / `orchestrate` 占位实现；(4) Architecture 图更新至 v1.1.0+ orthogonal 形态 |

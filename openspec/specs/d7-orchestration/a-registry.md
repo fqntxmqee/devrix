@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
+**Version:** 3.4.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -121,7 +121,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
-| D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
+| D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go`（v1.1.0+ 4 case = 4 独立执行链：`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip` 内联 close channel）|
 | D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 | D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | ✅ | `hubspoke/dispatch.go`（v1.0 路径：`bootstrap/delegate.go` 已 wired） |
@@ -191,3 +191,4 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | 3.1.0 | 2026-06-15 | Turn Leader A 增量：D7-S2-A06 RunTurnLoop + D7-S2-A07 InvokeLLM（DM-020 v1.0 Registry） |
 | 3.2.0 | 2026-06-15 | **v1.0 + v1.1 闭环对齐**：(1) D7-S1 写模型迁入 coordinator/workmodel.go + workmodel/，A01-A06 全 ✅；(2) D7-S2-A02/D7-S2-A04/D7-S2-A06/D7-S2-A07 wired 至 bootstrap；(3) D7-S4-A04/A05 wired 至 hubspoke；(4) D7-S5-A02/A03 规则+LLM 双路径实装。统计 19+16/19+16/0/0 |
 | **3.3.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：D7-S2-A07 InvokeLLM 兼作 D2 拆面出口（`turn.QueryLLMCaller` + `turn.CompressionSummarizer` 由同一 `llmgateway.IGateway` 驱动） |
+| **3.4.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化**：D7-S2-A01 ProcessMessage switch 4 case 改为 4 独立执行链（`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip`）；D7-S2-A01 标注补充 v1.1.0+ orthogonal 形态 |

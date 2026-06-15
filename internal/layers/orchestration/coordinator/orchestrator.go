@@ -15,8 +15,16 @@ import (
 // D1 RouteInbound (when d7_enabled=true) calls ProcessMessage. The
 // orchestrator:
 //  1. Classifies the intent (rule-only in v1.0).
-//  2. Routes to FastPath or OrchestratePath per the routing matrix.
+//  2. Routes to one of 4 real execution paths per the routing matrix:
+//     - IntentSkip        → close channel
+//     - IntentCommand     → CommandHandler (zero LLM, plan/task CLI)
+//     - IntentFast        → FastPath.Run (D2 single-turn LLM↔Tool loop)
+//     - IntentOrchestrate → OrchestratePath (SynthesizeTaskGraph → Wave)
 //  3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
+//
+// v1.1.0: each IntentKind has its own execution chain (orthogonal paths).
+// v1.0 had Command/Orchestrate collapsed to FastPath with system-prompt
+// hints; that v1.0 simplification is removed.
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
@@ -32,6 +40,10 @@ type SessionOrchestrator struct {
 	// shadowClassifier wraps classifier (when wired) with an async LLM
 	// shadow on the IntentOrchestrate tail. nil → behavior unchanged.
 	shadowClassifier *ShadowClassifier
+
+	// v1.1.0+ orthogonal paths
+	commandHandler  *CommandHandler
+	orchestratePath *OrchestratePath
 
 	// activeSessions tracks the running ProcessRequest per sessionID so
 	// HandleInterrupt can cancel them. Protected by mu.
@@ -78,6 +90,18 @@ func WithShadowClassifier(s *ShadowClassifier) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.shadowClassifier = s }
 }
 
+// WithCommandHandler wires the IntentCommand explicit-dispatch path.
+// v1.1.0+ orthogonal dispatch (devrix-d7-orthogonal-intent-paths).
+func WithCommandHandler(h *CommandHandler) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.commandHandler = h }
+}
+
+// WithOrchestratePath wires the IntentOrchestrate explicit-orchestration
+// path. v1.1.0+ orthogonal dispatch.
+func WithOrchestratePath(p *OrchestratePath) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.orchestratePath = p }
+}
+
 // WithClassifier replaces the default RuleClassifier. The default is
 // NewRuleClassifier(cfg) (rule-only). Tests use this to inject stubs;
 // v1.1+ may inject a LLM-first classifier that satisfies
@@ -95,6 +119,14 @@ func WithClassifier(c IntentClassifier) OrchestratorOption {
 // query-loop executor and options. The classifier defaults to
 // NewRuleClassifier(cfg) (rule-only) but can be replaced via
 // WithClassifier (tests, LLM-first v1.1+).
+//
+// v1.1.0+ orthogonal paths: if WithCommandHandler / WithOrchestratePath
+// are not provided, defaults are constructed (CommandHandler bound to
+// workmodel.GlobalTaskManager + a fresh PlanMode; OrchestratePath bound
+// to a fresh TaskDecomposer + fresh WaveScheduler). Tests that want
+// control over the wave scheduler or the plan mode should still wire
+// the options explicitly. Bootstrap does NOT need to wire these in
+// production — defaults are sufficient for d7_enabled=true.
 //
 // Options are applied in order. WithSink and WithValidator must be passed
 // before the orchestrator constructs the FastPath (i.e. via the returned
@@ -117,18 +149,33 @@ func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...Orc
 	}
 	// Build FastPath now that sink (if any) has been applied.
 	o.fastPath = NewFastPath(cfg, executor, o.sink)
+
+	// v1.1.0+ orthogonal paths: provide lazy defaults so callers (and
+	// tests) can rely on the 4-way switch without explicitly wiring
+	// the new options. Production code may still wire explicitly via
+	// WithCommandHandler / WithOrchestratePath to inject a real
+	// WaveScheduler or a custom PlanMode.
+	if o.commandHandler == nil {
+		o.commandHandler = newDefaultCommandHandler(o.workModel, o.sink)
+	}
+	if o.orchestratePath == nil {
+		o.orchestratePath = newDefaultOrchestratePath(o.sink)
+	}
 	return o
 }
 
 // ProcessMessage is the D1→D7 entry point.
 //
-// Routing:
-//   - skip        → return empty channel
-//   - command     → handleCommand (v1.0: passthrough to D2 with a
-//     system-prompt hint that this is a command)
-//   - fast        → FastPath.Run (D2.RunQueryLoop direct)
-//   - orchestrate → OrchestratePath (v1.0: route to PlanMode if active,
-//     else to a single-task D2 call; Wave is a v1.1+
+// Routing (v1.1.0+ orthogonal dispatch, see
+// devrix-d7-orthogonal-intent-paths):
+//   - skip        → return empty channel (inlined, no executor)
+//   - command     → CommandHandler.Handle (D7-internal CLI, zero LLM)
+//   - fast        → FastPath.Run (D2 single-turn LLM↔Tool loop)
+//   - orchestrate → OrchestratePath.Run (SynthesizeTaskGraph → Wave)
+//
+// Each IntentKind maps to an independent execution chain. v1.0 closure
+// had Command/Orchestrate collapsed to FastPath with system-prompt hints;
+// that v1.0 simplification is removed (see design.md §2.5).
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) (<-chan *contracts.EngineEvent, error) {
 	var (
 		intent IntentClassification
@@ -152,11 +199,17 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 		close(ch)
 		return ch, nil
 	case IntentCommand:
-		return o.handleCommand(ctx, req, intent)
+		if o.commandHandler == nil {
+			return nil, fmt.Errorf("orchestrator: IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
+		}
+		return o.commandHandler.Handle(ctx, req, intent)
 	case IntentFast:
 		return o.fastPath.Run(ctx, req, "")
 	case IntentOrchestrate:
-		return o.orchestrate(ctx, req, intent)
+		if o.orchestratePath == nil {
+			return nil, fmt.Errorf("orchestrator: IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)")
+		}
+		return o.orchestratePath.Run(ctx, req, intent)
 	default:
 		return nil, fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
 	}
@@ -220,21 +273,10 @@ func (o *SessionOrchestrator) callAdvisoryValidator(ctx context.Context, intent 
 	}
 }
 
-// handleCommand is the command-first path. v1.0 simply forwards to D2 with
-// a system prompt hint; the command semantics are handled by D2/CLI
-// downstream (e.g. /plan is a PlanMode trigger inside D2 currently, and
-// BackgroundTask is a D2 BackgroundRun).
-func (o *SessionOrchestrator) handleCommand(ctx context.Context, req ProcessRequest, intent IntentClassification) (<-chan *contracts.EngineEvent, error) {
-	return o.fastPath.Run(ctx, req, "[command:"+intent.Command+"]")
-}
-
-// orchestrate is the multi-step path. v1.0 supports a single D2 task; the
-// Wave/Plan integration is wired but Plan creation requires v1.1
-// SynthesizeTaskGraph. In v1.0 we route to FastPath with a system prompt
-// that asks the LLM to plan internally.
-func (o *SessionOrchestrator) orchestrate(ctx context.Context, req ProcessRequest, _ IntentClassification) (<-chan *contracts.EngineEvent, error) {
-	return o.fastPath.Run(ctx, req, "[orchestrate: please decompose and execute step by step]")
-}
+// handleCommand and orchestrate were removed in v1.1.0 (devrix-d7-orthogonal-intent-paths).
+// Their old behavior (FastPath.Run with a system-prompt hint) is replaced
+// by CommandHandler.Handle and OrchestratePath.Run respectively. The two
+// switch cases in ProcessMessage now call those independent paths directly.
 
 // ProcessMessageContract satisfies contracts.IOrchestrationEntry. It is the
 // D1 gateway-facing seam (string args instead of ProcessRequest).
@@ -276,6 +318,23 @@ func (e *Entry) Cancel(ctx context.Context, sessionID string) error {
 // handler (with Wave/D4 cancelers and sink).
 func (o *SessionOrchestrator) SetInterruptHandler(h *InterruptHandler) {
 	o.interruptHandler = h
+}
+
+// SetOrchestratePath replaces the OrchestratePath. v1.1.0+ orthogonal
+// dispatch: by default NewSessionOrchestrator installs a lazy
+// OrchestratePath bound to a zero-deps WaveScheduler (which is unsafe
+// for production). Production bootstrap and integration tests use this
+// setter to inject a fully-wired or fake scheduler.
+func (o *SessionOrchestrator) SetOrchestratePath(p *OrchestratePath) {
+	o.orchestratePath = p
+}
+
+// SetCommandHandler replaces the CommandHandler. Same rationale as
+// SetOrchestratePath — primarily a test seam so integration tests can
+// verify the orthogonal dispatch without depending on the lazy default
+// binding to workmodel.GlobalTaskManager.
+func (o *SessionOrchestrator) SetCommandHandler(h *CommandHandler) {
+	o.commandHandler = h
 }
 
 // registerInterrupt installs a cancel func keyed by sessionID. The same
