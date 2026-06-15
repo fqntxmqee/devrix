@@ -10,6 +10,14 @@ type spansProvider struct{}
 
 func (spansProvider) Spans() []coverage.OperationMeta {
 	return []coverage.OperationMeta{
+		// D7 Orchestration - Session / Turn (D7-S2)
+		{Name: "D7_S2_Orchestration_Session_Process", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_S2_Orchestration_Intent_Classify", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_S2_Orchestration_Turn_Run", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_S2_Orchestration_Turn_Iteration", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_S2_Orchestration_LLM_Invoke", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_S2_Orchestration_Orchestrate_Run", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+
 		// D7 Orchestration (D7-S3)
 		{Name: "D7_S3_Orchestration_Wave_Schedule", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "D7_S3_Orchestration_Wave_Task_Execute", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.1.0", Instrumented: true},

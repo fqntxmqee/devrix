@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -40,6 +43,18 @@ type OrchestratePath struct {
 	decomposer *TaskDecomposer
 	scheduler  WaveSchedulerRunner
 	sink       EventPublisher
+	obsBridge  *observability.Bridge
+}
+
+// SetObsBridge wires tracing for the orchestrate pipeline.
+func (op *OrchestratePath) SetObsBridge(bridge *observability.Bridge) {
+	if op == nil {
+		return
+	}
+	op.obsBridge = bridge
+	if ws, ok := op.scheduler.(*wave.WaveScheduler); ok {
+		ws.SetObsBridge(bridge)
+	}
 }
 
 // NewOrchestratePath builds the path. All args are required; nil →
@@ -76,6 +91,11 @@ func (op *OrchestratePath) Run(ctx context.Context, req ProcessRequest, _ Intent
 	out := make(chan *contracts.EngineEvent, 16)
 	go func() {
 		defer close(out)
+
+		ctx, orchSpan := startObsSpan(op.obsBridge, ctx, telemetry.OpD7_S2_Orchestration_Orchestrate_Run, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		)
+		defer endSpan(orchSpan)
 
 		// 1) SynthesizeTaskGraph (D7-S5-A02)
 		result, err := op.decomposer.SynthesizeTaskGraph(ctx, req.SessionID, req.Message)

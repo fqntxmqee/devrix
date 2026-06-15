@@ -330,9 +330,10 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	processCtx, cancel := context.WithCancel(ctx)
 	g.registerProcess(session.SessionID, cancel)
 
-	g.startDispatchRouteSpan(ctx, session.SessionID, "d7")
+	processCtx, endDispatch := g.startDispatchRouteSpan(processCtx, session.SessionID, "d7")
 	ch, err := g.orchestrationEntry.ProcessMessage(processCtx, session.SessionID, msg.Content)
 	if err != nil {
+		endDispatch()
 		cancel()
 		g.unregisterProcess(session.SessionID)
 		return fmt.Errorf("d7 entry ProcessMessage: %w", err)
@@ -342,6 +343,7 @@ func (g *CommunicationGateway) RouteInbound(ctx context.Context, msg *types.Inbo
 	g.processes.Add(1)
 	go func() {
 		defer g.processes.Done()
+		defer endDispatch()
 		defer endSpan()
 		defer cancel()
 		defer g.endInboundTurn(session.SessionID)

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -177,6 +179,9 @@ func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...Orc
 	if o.orchestratePath == nil {
 		o.orchestratePath = newDefaultOrchestratePath(o.sink, o.llmDecomposer)
 	}
+	if o.orchestratePath != nil {
+		o.orchestratePath.SetObsBridge(o.obsBridge)
+	}
 	return o
 }
 
@@ -193,42 +198,82 @@ func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...Orc
 // had Command/Orchestrate collapsed to FastPath with system-prompt hints;
 // that v1.0 simplification is removed (see design.md §2.5).
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) (<-chan *contracts.EngineEvent, error) {
+	ctx, sessionSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Session_Process, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(req.Message))},
+	)
+	// Keep sessionCtx for downstream routing. classifySpan mutates ctx; using
+	// that ctx after End() would attach Turn/Wave spans to the ended classify
+	// span instead of Session_Process (registry: Turn is sibling of Classify).
+	sessionCtx := ctx
+
+	classifySource := "rule"
+	_, classifySpan := o.startSpan(sessionCtx, telemetry.OpD7_S2_Orchestration_Intent_Classify, tracer.SpanKindInternal)
 	var (
 		intent IntentClassification
 		err    error
 	)
 	if o.shadowClassifier != nil {
+		classifySource = "shadow"
 		intent, err = o.shadowClassifier.Classify(ctx, req.Message)
 	} else {
 		intent, err = o.classifier.Classify(ctx, req.Message)
 	}
+	if classifySpan != nil {
+		classifySpan.SetAttributes(telemetry.SpanAttrs(telemetry.OpD7_S2_Orchestration_Intent_Classify,
+			intentClassifyAttrs(intent, classifySource)...)...)
+		if err != nil {
+			classifySpan.RecordError(err)
+			classifySpan.SetStatus(tracer.StatusCodeError, err.Error())
+		} else {
+			classifySpan.SetStatus(tracer.StatusCodeOk, "")
+		}
+		classifySpan.End()
+	}
 	if err != nil {
+		endSpanWithError(sessionSpan, err)
 		return nil, fmt.Errorf("orchestrator: classify: %w", err)
 	}
+	if sessionSpan != nil {
+		sessionSpan.SetAttributes(tracer.Attribute{Key: "orchestration.route", Value: routeLabel(intent)})
+	}
+
 	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but
 	// does not block the request — pass/fail is informational, timeout
 	// and panic are surfaced via the 4-counter + alert hook.
-	o.callAdvisoryValidator(ctx, intent, req.SessionID)
+	o.callAdvisoryValidator(sessionCtx, intent, req.SessionID)
+
+	var ch <-chan *contracts.EngineEvent
 	switch intent.Kind {
 	case IntentSkip:
-		ch := make(chan *contracts.EngineEvent)
-		close(ch)
-		return ch, nil
+		skipCh := make(chan *contracts.EngineEvent)
+		close(skipCh)
+		ch = skipCh
 	case IntentCommand:
 		if o.commandHandler == nil {
+			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: IntentCommand received but commandHandler is nil (bootstrap missing wiring)"))
 			return nil, fmt.Errorf("orchestrator: IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
 		}
-		return o.commandHandler.Handle(ctx, req, intent)
+		ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 	case IntentFast:
-		return o.fastPath.Run(ctx, req, "")
+		ch, err = o.fastPath.Run(sessionCtx, req, "")
 	case IntentOrchestrate:
 		if o.orchestratePath == nil {
+			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)"))
 			return nil, fmt.Errorf("orchestrator: IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)")
 		}
-		return o.orchestratePath.Run(ctx, req, intent)
+		ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
 	default:
-		return nil, fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
+		err = fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
 	}
+	if err != nil {
+		endSpanWithError(sessionSpan, err)
+		return nil, err
+	}
+	if sessionSpan != nil {
+		sessionSpan.SetStatus(tracer.StatusCodeOk, "")
+	}
+	return endSpanWhenChannelClosed(ch, sessionSpan), nil
 }
 
 // callAdvisoryValidator invokes the optional advisory validator, times

@@ -395,6 +395,55 @@ func TestCLIAgentTool_Execute_should_reuse_session_after_context_cancel(t *testi
 	}
 }
 
+// TestCLIAgentTool_Stop_kills_process_that_survives_stdin_close verifies the
+// OS-level SIGTERM/SIGKILL path in closeSession. The script below does not
+// exit when stdin is closed (it runs sleep+wait), so the graceful phase 1
+// (stdin close) is insufficient — phases 3-5 (SIGTERM → SIGKILL) must fire.
+// D7-S3-T11 (ORCH-S2-T21): CLI Worker cancel 进程终止.
+func TestCLIAgentTool_Stop_kills_process_that_survives_stdin_close(t *testing.T) {
+	script := `read line
+echo '{"type":"text","content":"ok"}'
+echo '{"type":"complete","content":""}'
+# Survive stdin close — background sleep keeps the process alive.
+sleep 60 &
+wait $!
+`
+	tool := NewCLIAgentTool(CLIConfig{
+		Name:    "stubborn-kill-test",
+		Command: "bash",
+		Args:    []string{"-c", script},
+		Timeout: 30 * time.Second,
+	})
+
+	ctx := context.Background()
+	ch, err := tool.Execute(ctx, "sess_stubborn", Request{Task: "test"})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	for evt := range ch {
+		if evt.Type == "complete" {
+			break
+		}
+	}
+
+	start := time.Now()
+	tool.Stop()
+	elapsed := time.Since(start)
+
+	// closeSession phases: stdin close (immediate) → 2s grace →
+	// SIGTERM → 3s grace → SIGKILL. Must finish well under 10s.
+	if elapsed > 10*time.Second {
+		t.Errorf("Stop took %v, expected < 10s (SIGTERM/SIGKILL path may not have fired)", elapsed)
+	}
+
+	tool.mu.RLock()
+	count := len(tool.sessions)
+	tool.mu.RUnlock()
+	if count != 0 {
+		t.Errorf("expected 0 sessions after Stop, got %d", count)
+	}
+}
+
 func TestCLIAgentTool_Execute_should_recreate_after_oneshot_exit(t *testing.T) {
 	// Simulates claude --print: subprocess exits after each complete event.
 	script := `read line; echo '{"type":"text","content":"turn"}'; echo '{"type":"complete","content":""}'`

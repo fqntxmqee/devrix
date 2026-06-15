@@ -65,6 +65,7 @@ type schedulerWaveState struct {
 	doneCh  chan struct{} // closed when all tasks reach terminal state
 	done    bool
 	cancels []context.CancelFunc // aggregated for CancelAll
+	scheduleSpan tracer.Span
 
 	// wakeup is closed when the wave should be torn down (cancel / done).
 	// The dispatch loop uses a separate trigger channel for slot-release
@@ -105,6 +106,13 @@ func NewWaveScheduler(deps SchedulerDeps) *WaveScheduler {
 		runners:   runners,
 		obsBridge: deps.Observability,
 		waves:     make(map[string]*schedulerWaveState),
+	}
+}
+
+// SetObsBridge wires the D5 observability bridge for wave spans.
+func (s *WaveScheduler) SetObsBridge(bridge *observability.Bridge) {
+	if s != nil {
+		s.obsBridge = bridge
 	}
 }
 
@@ -168,24 +176,20 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		}
 	}
 
-	_, span := s.startOrchSpan(ctx, telemetry.OpD7_S3_Orchestration_Wave_Schedule, tracer.SpanKindInternal,
+	waveCtx, scheduleSpan := s.startOrchSpan(ctx, telemetry.OpD7_S3_Orchestration_Wave_Schedule, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "wave.session_id", Value: sessionID},
 		tracer.Attribute{Key: "wave.task_count", Value: fmt.Sprintf("%d", len(graph.nodes))},
 	)
-	defer func() {
-		if span != nil {
-			span.End()
-		}
-	}()
 
 	s.mu.Lock()
 	existing, hasExisting := s.waves[sessionID]
 	state := &schedulerWaveState{
-		sessionID: sessionID,
-		graph:     graph,
-		handles:   make(map[string]*workerHandle),
-		doneCh:    make(chan struct{}),
-		wakeupCh:  make(chan struct{}, 64),
+		sessionID:    sessionID,
+		graph:        graph,
+		handles:      make(map[string]*workerHandle),
+		doneCh:       make(chan struct{}),
+		wakeupCh:     make(chan struct{}, 64),
+		scheduleSpan: scheduleSpan,
 	}
 	s.waves[sessionID] = state
 	s.mu.Unlock()
@@ -203,8 +207,8 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		})
 	}
 
-	// Spawn the dispatch loop.
-	go s.dispatchLoop(ctx, sessionID, state)
+	// Spawn the dispatch loop. waveCtx carries Wave_Schedule until markWaveDone.
+	go s.dispatchLoop(waveCtx, sessionID, state)
 	return nil
 }
 
@@ -304,9 +308,9 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	}
 
 	// Build a per-task context that the scheduler can cancel via CancelWorker.
-	// Detach from parentCtx: cancelling the parent should NOT kill in-flight
-	// workers (Plan Engine expects the wave to keep going on leader-ctx cancel).
-	taskCtx, cancel := context.WithCancel(context.Background())
+	// Detach cancellation from parentCtx but preserve trace context so
+	// Wave_Task_Execute stays under Wave_Schedule in Jaeger.
+	taskCtx, cancel := context.WithCancel(tracer.Detach(parentCtx))
 	state.graph.SetState(node.ID, StateRunning)
 	s.guard.Register(RunningTask{Node: node, SlotID: slotID})
 	s.incMetric("dispatch")
@@ -475,8 +479,13 @@ func (s *WaveScheduler) markWaveDone(state *schedulerWaveState) {
 		return
 	}
 	state.done = true
+	scheduleSpan := state.scheduleSpan
+	state.scheduleSpan = nil
 	close(state.doneCh)
 	state.mu.Unlock()
+	if scheduleSpan != nil {
+		scheduleSpan.End()
+	}
 }
 
 // CancelWorker cancels a single worker. Returns nil if the task was already

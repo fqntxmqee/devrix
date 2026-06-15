@@ -100,6 +100,14 @@ const (
 	OpD4_S4_Agent_Terminate = "D4_S4_Agent_Terminate"
 	OpD4_S4_Agent_State_Transition = "D4_S4_Agent_State_Transition"
 
+	// D7 Orchestration - Session / Turn (D7-S2)
+	OpD7_S2_Orchestration_Session_Process = "D7_S2_Orchestration_Session_Process"
+	OpD7_S2_Orchestration_Intent_Classify = "D7_S2_Orchestration_Intent_Classify"
+	OpD7_S2_Orchestration_Turn_Run        = "D7_S2_Orchestration_Turn_Run"
+	OpD7_S2_Orchestration_Turn_Iteration  = "D7_S2_Orchestration_Turn_Iteration"
+	OpD7_S2_Orchestration_LLM_Invoke      = "D7_S2_Orchestration_LLM_Invoke"
+	OpD7_S2_Orchestration_Orchestrate_Run = "D7_S2_Orchestration_Orchestrate_Run"
+
 	// D7 Orchestration (D7-S3)
 	OpD7_S3_Orchestration_Wave_Schedule = "D7_S3_Orchestration_Wave_Schedule"
 	OpD7_S3_Orchestration_Wave_Task_Execute = "D7_S3_Orchestration_Wave_Task_Execute"
@@ -165,7 +173,7 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerAgent, "agent_tool"
 
 	// D7 Orchestration
-	case strings.HasPrefix(operation, "D7_S3_Orchestration_"):
+	case strings.HasPrefix(operation, "D7_S2_Orchestration_"), strings.HasPrefix(operation, "D7_S3_Orchestration_"):
 		return LayerOrchestration, "orchestrator"
 	case strings.HasPrefix(operation, "D7_S1_Task_Manager_"):
 		return LayerOrchestration, "task_manager"

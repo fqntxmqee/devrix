@@ -11,11 +11,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
 )
 
-// ORCH-S2-T21 (stub): the runner bridge half is fully covered. The
-// process-kill half (OS-level SIGTERM on the actual cursor / claude-code
-// subprocess) is verified by cursor_adapter_test.go and cli_adapter_test.go
-// in the multiagent package. This test pins the contract that the
-// WorkerEvent channel sees a 'cancelled' event with the right content.
+// ORCH-S2-T21 (D7-S3-T11): the runner bridge half (cancelled event emission) is
+// covered here. The OS-level SIGTERM/SIGKILL path is verified by
+// TestCLIAgentTool_Stop_kills_process_that_survives_stdin_close in
+// multiagent/external/cli_adapter_test.go.
 func TestAgentToolRunner_L5_ORCH_21_CancelledEmitted(t *testing.T) {
 	fake := &fakeAgentTool{
 		events:           []external.Event{{Type: "thinking", Content: "start"}},

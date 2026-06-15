@@ -99,6 +99,14 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD4_S4_Agent_Terminate,
 		telemetry.OpD4_S4_Agent_State_Transition,
 
+		// D7 Orchestration - Session / Turn (D7-S2)
+		telemetry.OpD7_S2_Orchestration_Session_Process,
+		telemetry.OpD7_S2_Orchestration_Intent_Classify,
+		telemetry.OpD7_S2_Orchestration_Turn_Run,
+		telemetry.OpD7_S2_Orchestration_Turn_Iteration,
+		telemetry.OpD7_S2_Orchestration_LLM_Invoke,
+		telemetry.OpD7_S2_Orchestration_Orchestrate_Run,
+
 		// D7 Orchestration (D7-S3)
 		telemetry.OpD7_S3_Orchestration_Wave_Schedule,
 		telemetry.OpD7_S3_Orchestration_Wave_Task_Execute,
