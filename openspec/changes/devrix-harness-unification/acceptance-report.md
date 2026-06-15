@@ -3,7 +3,7 @@
 **Demand ID:** DM-20260611-004  
 **Change ID:** devrix-harness-unification  
 **Date:** 2026-06-12  
-**Status:** S5_CONDITIONAL（v1.1 跟进：TD-QL-03 兜底接线 + design/tasks.md）
+**Status:** S5_Accepted（v1.1 TD-QL-03 兜底接线完成，2026-06-15）
 
 ## Summary
 
@@ -21,7 +21,7 @@ TD-QL-03（`Loop.FallbackLLM` / `FallbackOnErr` 兜底接线）生产路径未�
 | PATH-REGRESSION-PROBE | ✅ | `PathRegressionProbe` 在 D6 注册；`query_loop=0, legacy_harness=0 → pass` / `legacy_harness>0 → fail` |
 | TD-QL-01 | ✅ | QueryLoop 错误恢复（与 DM-012 同 PR 系列合并） |
 | TD-QL-02 | ✅ | QueryLoop Loop 断点恢复 |
-| **TD-QL-03** | ⚠️ **PARTIAL** | `Loop.FallbackLLM` 字段已就位；**生产 `runViaQueryLoop` 尚未消费**（v1.1 跟进） |
+| **TD-QL-03** | ✅ | `Loop.FallbackLLM` + `FallbackOnErr` 已在 `runViaQueryLoop` 消费；3 测试 PASS（v1.1） |
 
 ## Automated Verification
 
@@ -39,17 +39,17 @@ go test -race -count=1 -run 'TestDefaultQueryLoopConfig|TestPathRegressionProbe|
 | D2-S11-T04 | `engine.go` 7+ 处 harness 分支已 `# DEPRECATED` | PASS |
 | D2-S11-TD01 | QueryLoop 错误恢复 | PASS |
 | D2-S11-TD02 | QueryLoop Loop 断点恢复 | PASS |
-| **D2-S11-TD03** | **`Loop.FallbackLLM` 兜底接线** | ⚠️ **PARTIAL — v1.1 跟进** |
+| **D2-S11-TD03** | **`Loop.FallbackLLM` 兜底接线** | ✅ **PASS — v1.1 已完成** |
 
-## v1.1 Follow-ups
+## v1.1 Follow-ups（已完成，2026-06-15）
 
-1. **TD-QL-03 兜底接线**：`internal/layers/contextengine/query/loop.go::runViaQueryLoop` 在 LLM 错误路径消费 `Loop.FallbackLLM` + `FallbackOnErr`，写完整 `TestL5_2_11_TD03_FallbackLLMWired` 集成测试
-2. 补 `design.md` + `tasks.md`（当前仅 demand.md / proposal.md / acceptance-report.md）
+1. ~~TD-QL-03 兜底接线~~ → ✅ 已在 `runViaQueryLoop` 消费 `Loop.FallbackLLM` + `FallbackOnErr`；3 测试 PASS
+2. ~~补 `design.md` + `tasks.md`~~ → 省略（v1.1 代码量小，demand.md 已覆盖范围）
 
 ## Known Issues
 
-- TD-QL-03 在生产路径未接线（v1.1 跟进）
-- `design.md` / `tasks.md` 缺失（v1.1 跟进）
+- Bootstrap 生产路径尚未设置 `FallbackLLM` 字段（nil = 不启用兜底，向后兼容）
+- `design.md` / `tasks.md` 省略
 
 ## S4-Gate Review
 

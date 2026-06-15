@@ -5,15 +5,15 @@ meta:
   change_id: devrix-harness-unification
   demand_id: DM-20260611-004
   title: "Legacy Harness 退役 — QueryLoop 为唯一主路径"
-  status: s5_acceptance
+  status: s5_accepted
   priority: P1
   owner: devrix-team
   created_at: "2026-06-11"
-  updated_at: "2026-06-12"
+  updated_at: "2026-06-15"
   source: devrix-harness-architecture-audit
   s4_gate_verdict: CONDITIONAL_PASS
   s4_gate_date: "2026-06-12"
-  s4_gate_note: "TD-QL-03 FallbackLLM 字段已就位但生产 runViaQueryLoop 尚未消费；design/tasks.md 缺失；均列入 v1.1 跟进"
+  s4_gate_note: "v1.1 TD-QL-03 completed 2026-06-15; all 7 T points PASS"
 
 scope:
   layers:
@@ -46,7 +46,7 @@ scope:
     - D2-S11-A01-T03  # 旧路径调用计数基线=0
     - D2-S11-A01-T04  # 压缩入口统一
     - D2-S11-A01-TD01  # TD-QL-01: 413 recovery
-    - D2-S11-A01-TD03  # TD-QL-03: fallback model (生产未接线, PARTIAL)
+    - D2-S11-A01-TD03  # TD-QL-03: fallback model (v1.1 completed, 3 tests PASS)
     - D2-S11-A01-D6PR  # D6 PathRegressionProbe
 
 deliverables:

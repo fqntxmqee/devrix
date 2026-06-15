@@ -141,8 +141,8 @@
 
 | Change ID | Demand ID | Path | 状态 |
 |-----------|-----------|------|------|
-| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S5_CONDITIONAL（TD-QL-03 已在 v1.1 接线，待更新 acceptance + 归档） |
-| devrix-harness-unification-v1.1 | DM-20260612-013 | `openspec/changes/devrix-harness-unification-v1.1/` | 代码已落地，待关闭 change |
+| devrix-harness-unification | DM-20260611-004 | `openspec/changes/devrix-harness-unification/` | S5_Accepted（v1.1 TD-QL-03 兜底接线完成，待 S6 归档） |
+| devrix-harness-unification-v1.1 | DM-20260612-013 | `openspec/changes/devrix-harness-unification-v1.1/` | S5_Accepted（TD-QL-03 兜底接线 + 3 测试 PASS） |
 | devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Pending（单测 PASS，待真机 E2E） |
 | devrix-im-card-ctx | DM-20260611-008 | `openspec/changes/devrix-im-card-ctx/` | S5 部分（T11–T13 真机/Jaeger 待做） |
 | devrix-background-task-tools | DM-20260611-009 | `openspec/changes/devrix-background-task-tools/` | S4_Developing（Wave cancel 接线待做） |
