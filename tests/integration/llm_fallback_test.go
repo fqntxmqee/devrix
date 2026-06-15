@@ -80,3 +80,5 @@ func (s integrationStubAdapter) Stream(ctx context.Context, req *llmgateway.Requ
 }
 
 func (s integrationStubAdapter) Provider() string { return s.provider }
+
+func (s integrationStubAdapter) Protocol() string { return adapter.ProtocolStub }

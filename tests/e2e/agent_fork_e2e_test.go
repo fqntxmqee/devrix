@@ -24,7 +24,7 @@ func TestE2E_AgentForkParallelJoin(t *testing.T) {
 	}, config.DefaultMultiAgentConfig())
 
 	session := types.NewSession("sess_e2e_fork", "cli", t.TempDir())
-	parent, err := provision.Create(context.Background(), multiagent.AgentConfig{
+	parent, err := factory.Create(context.Background(), multiagent.AgentConfig{
 		SessionID:   session.SessionID,
 		WorkDir:     session.WorkDir,
 		MaxChildren: 2,

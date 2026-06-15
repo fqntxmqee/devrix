@@ -22,6 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -348,14 +349,14 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 		t.Logf("  %s: %d", name, count)
 	}
 
-	if spanByName["context.process"] < 3 {
-		t.Errorf("expected >= 3 context.process spans, got %d", spanByName["context.process"])
+	if spanByName[telemetry.OpD2_S2_Context_Process] < 3 {
+		t.Errorf("expected >= 3 %s spans, got %d", telemetry.OpD2_S2_Context_Process, spanByName[telemetry.OpD2_S2_Context_Process])
 	}
-	if spanByName["context.snapshot.load"] < 3 {
-		t.Errorf("expected >= 3 context.snapshot.load spans, got %d", spanByName["context.snapshot.load"])
+	if spanByName[telemetry.OpD2_S2_Context_Snapshot_Load] < 3 {
+		t.Errorf("expected >= 3 %s spans, got %d", telemetry.OpD2_S2_Context_Snapshot_Load, spanByName[telemetry.OpD2_S2_Context_Snapshot_Load])
 	}
-	if spanByName["llm.stream"] < 3 {
-		t.Errorf("expected >= 3 llm.stream spans, got %d", spanByName["llm.stream"])
+	if spanByName[telemetry.OpD3_S3_LLM_Stream] < 3 {
+		t.Errorf("expected >= 3 %s spans, got %d", telemetry.OpD3_S3_LLM_Stream, spanByName[telemetry.OpD3_S3_LLM_Stream])
 	}
 	t.Logf("  ✓ All required spans present across 3 rounds")
 

@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
@@ -70,21 +69,21 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 	}
 
 	for _, name := range []string{
-		telemetry.OpContextHarnessBootstrapRun,
-		telemetry.OpContextSystemPromptBuild,
+		telemetry.OpD2_S5_Context_Harness_Bootstrap_Run,
+		telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build,
 	} {
 		if counts[name] == 0 {
 			t.Errorf("missing span %q", name)
 		}
 	}
-	if counts[telemetry.OpContextHarnessBootstrapStage] == 0 {
+	if counts[telemetry.OpD2_S5_Context_Harness_Bootstrap_Stage] == 0 {
 		t.Fatal("expected bootstrap stage spans")
 	}
 
 	var runSpanID tracer.SpanID
 	var runFound bool
 	for _, s := range spans {
-		if s.Name() == telemetry.OpContextHarnessBootstrapRun {
+		if s.Name() == telemetry.OpD2_S5_Context_Harness_Bootstrap_Run {
 			runSpanID = s.SpanContext().SpanID
 			runFound = true
 		}
@@ -95,7 +94,7 @@ func TestIntegration_HarnessObs_enabled_span_tree(t *testing.T) {
 
 	stageParents := 0
 	for _, s := range spans {
-		if s.Name() != telemetry.OpContextHarnessBootstrapStage {
+		if s.Name() != telemetry.OpD2_S5_Context_Harness_Bootstrap_Stage {
 			continue
 		}
 		parent := s.Parent()
@@ -134,7 +133,12 @@ func TestIntegration_HarnessObs_disabled_no_harness_spans(t *testing.T) {
 
 	for _, s := range obs.MemoryExporter().Spans() {
 		name := s.Name()
-		if strings.HasPrefix(name, "context.harness.") || name == telemetry.OpContextSystemPromptBuild {
+		switch name {
+		case telemetry.OpD2_S5_Context_Harness_Bootstrap_Run,
+			telemetry.OpD2_S5_Context_Harness_Bootstrap_Stage,
+			telemetry.OpD2_S5_Context_Harness_ToolPool,
+			telemetry.OpD2_S5_Context_Harness_Preflight,
+			telemetry.OpD2_S5_Context_Harness_Route:
 			t.Fatalf("unexpected harness span when disabled: %s", name)
 		}
 	}
@@ -163,8 +167,8 @@ func TestIntegration_HarnessObs_coverage_hits_harness_operations(t *testing.T) {
 
 	report := obs.CoverageReport(true)
 	for _, op := range []string{
-		telemetry.OpContextHarnessBootstrapRun,
-		telemetry.OpContextSystemPromptBuild,
+		telemetry.OpD2_S5_Context_Harness_Bootstrap_Run,
+		telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build,
 	} {
 		if report.Hits[op] == 0 {
 			t.Errorf("expected coverage hit for %q, hits: %+v", op, report.Hits)

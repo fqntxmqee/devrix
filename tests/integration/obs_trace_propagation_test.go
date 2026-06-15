@@ -22,18 +22,18 @@ func TestAdapterToGateway_should_share_trace_id(t *testing.T) {
 	tr := obs.Tracer()
 	ctx := context.Background()
 
-	ctx, adapterSpan := tr.Start(ctx, telemetry.OpAdapterMessageReceive,
+	ctx, adapterSpan := tr.Start(ctx, telemetry.OpD1_S17_Adapter_Message_Receive,
 		tracer.WithSpanKind(tracer.SpanKindServer),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpAdapterMessageReceive,
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S17_Adapter_Message_Receive,
 			tracer.Attribute{Key: "adapter", Value: "feishu"},
 		)...),
 	)
 	parentTrace := adapterSpan.SpanContext().TraceID
 	adapterSpan.End()
 
-	ctx, gatewaySpan := tr.Start(ctx, telemetry.OpGatewayMessageReceive,
+	ctx, gatewaySpan := tr.Start(ctx, telemetry.OpD1_S13_Capture_Message_Receive,
 		tracer.WithSpanKind(tracer.SpanKindServer),
-		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpGatewayMessageReceive)...),
+		tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Message_Receive)...),
 	)
 	childTrace := gatewaySpan.SpanContext().TraceID
 	gatewaySpan.End()

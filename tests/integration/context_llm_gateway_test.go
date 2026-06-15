@@ -32,13 +32,16 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 	}
 }
 
-// T: D2-S0-A01-T02
-func TestIntegration_WireContextLLMFallsBackToMock(t *testing.T) {
+// T: D3-X-A02-T01 — nil obs bridge must fail fast (v1.1 BREAKING).
+func TestIntegration_WireContextLLM_obs_nil_returns_ErrObservabilityRequired(t *testing.T) {
 	stack, err := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil)
-	if err != nil {
+	if err == nil {
+		t.Fatal("expected error when obs bridge is nil")
+	}
+	if !llmbridge.IsObservabilityRequiredError(err) {
 		t.Fatalf("WireContextLLM: %v", err)
 	}
-	if stack.Gateway == nil {
-		t.Fatal("expected gateway")
+	if stack.Gateway != nil {
+		t.Fatal("expected nil gateway on error")
 	}
 }

@@ -79,8 +79,8 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 	for range ch {
 	}
 
-	if !strings.Contains(llm.lastSystemPrompt, "## 项目记忆（LongTerm）") {
-		t.Fatalf("expected longterm appendix in system prompt, got: %q", llm.lastSystemPrompt)
+	if !strings.Contains(llm.lastSystemPrompt, "<memory_context>") {
+		t.Fatalf("expected memory_context block in system prompt, got: %q", llm.lastSystemPrompt)
 	}
 	if !strings.Contains(llm.lastSystemPrompt, "[architecture]") {
 		t.Fatalf("expected recalled topic in system prompt, got: %q", llm.lastSystemPrompt)

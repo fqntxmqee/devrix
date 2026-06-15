@@ -18,7 +18,7 @@ func TestCoverageReport_should_include_health_summary(t *testing.T) {
 	}
 
 	tr := obs.Tracer()
-	_, span := tr.Start(context.Background(), telemetry.OpContextProcess)
+	_, span := tr.Start(context.Background(), telemetry.OpD2_S2_Context_Process)
 	span.End()
 
 	health := obs.HealthCheck()
@@ -40,7 +40,7 @@ func TestCoverageReport_should_list_zero_hit_operations(t *testing.T) {
 	}
 
 	tr := obs.Tracer()
-	_, span := tr.Start(context.Background(), telemetry.OpGatewayMessageReceive)
+	_, span := tr.Start(context.Background(), telemetry.OpD2_S2_Context_Process)
 	span.End()
 
 	report := obs.CoverageReport(false)

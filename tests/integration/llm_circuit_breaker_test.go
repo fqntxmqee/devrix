@@ -25,7 +25,7 @@ func TestIntegration_LLMCircuitBreaker_state_transitions(t *testing.T) {
 		OpenDuration:     10 * time.Millisecond,
 		Scope:            "provider",
 	}
-	cb := breaker.New(cfg).WithClock(clock)
+	cb := protect.New(cfg).WithClock(clock)
 	const provider = "deepseek"
 
 	// Closed: success path
