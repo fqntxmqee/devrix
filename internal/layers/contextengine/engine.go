@@ -212,6 +212,12 @@ func (e *ContextEngine) Shutdown(timeout time.Duration) error {
 	return e.asyncCompact.Shutdown(timeout)
 }
 
+// ToolRunner exposes the engine's IToolRunner for D7 TurnOrchestrator adapters (DM-020 D-c).
+func (e *ContextEngine) ToolRunner() IToolRunner { return e.tools }
+
+// PermissionGate exposes the engine's IPermissionGate for D7 TurnOrchestrator adapters (DM-020 D-c).
+func (e *ContextEngine) PermissionGate() contracts.IPermissionGate { return e.permission }
+
 // Process implements contracts.IEngine.
 func (e *ContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
 	ch := make(chan *contracts.EngineEvent, 32)

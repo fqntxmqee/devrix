@@ -2,10 +2,9 @@
 
 **Change ID:** devrix-d7-turn-orchestration  
 **Demand ID:** DM-20260614-020  
-**Status:** S5_Accepted（v1.0 Registry）  
-**Phases:** v1.0 Registry（A–C ✅）→ v2.0 Structure（D）
+**Status:** S5_Accepted（v2.0 Structure 完成）
 
-> v1.0 **零 Go 变更**。
+> v1.0 Registry + v2.0 Structure 全部完成。
 
 ---
 
@@ -57,14 +56,14 @@
 
 ## Phase D — v2.0 Structure（slice a–f）
 
-| Slice | Task | T |
-|-------|------|---|
-| D-a | `orchestration/turn/` 骨架 | — |
-| D-b | bootstrap WireContextLLM → D7 | A07 |
-| D-c | FastPath → TurnOrchestrator | A06 P0 |
-| D-d | D2 移除 ILLMGateway | THIN-T01 |
-| D-e | Autocompact D7→D3 | S15-T10 |
-| D-f | Legacy adapter + 全量 T 绿 | P0 19+ |
+| Slice | Task | T | 状态 |
+|-------|------|---|------|
+| D-a | `orchestration/turn/` 骨架 | — | ✅ |
+| D-b | bootstrap WireContextLLM → D7 | A07 | ✅ |
+| D-c | FastPath → TurnOrchestrator | A06 P0 | ✅ |
+| D-d | D2 移除 ILLMGateway + import lint | THIN-T01 | ✅ |
+| D-e | Autocompact D7→D3 | S15-T10 | ✅ |
+| D-f | Legacy adapter + 全量 T 绿 | P0 19+ | ✅ |
 
 ---
 
@@ -87,3 +86,4 @@ A → B (v1.0 Registry) → C (验收)
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 0.1 | 2026-06-14 | 初稿 |
+| 0.2 | 2026-06-15 | Phase D (a–f) 全部完成 |

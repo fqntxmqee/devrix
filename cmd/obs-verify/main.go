@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/bootstrap"
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
@@ -53,7 +54,7 @@ func main() {
 
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
 	gw.SetObservability(obs)
-	if err := bootstrap.WireD7("", gw, engine, obsBridge); err != nil {
+	if err := bootstrap.WireD7("", gw, engine, obsBridge, llmbridge.ContextLLMStack{}); err != nil {
 		log.Fatal(err)
 	}
 

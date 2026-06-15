@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
+	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -16,11 +18,15 @@ import (
 
 // WireD7 initializes the D7 SessionOrchestrator and wires it into the capture.
 // D1 ingress requires a non-nil IOrchestrationEntry; returns error when d7.enabled=false.
+//
+// DM-020 (D7 Turn 编排上移): llmStack wires the D7→D3 LLMInvoker (A07).
+// The TurnOrchestrator (A06) is assembled in slice c with the D2 adapter.
 func WireD7(
 	configFile string,
 	gw *capture.CommunicationGateway,
 	ctxEngine contracts.IEngine,
 	obsBridgeArg interface{},
+	llmStack llmbridge.ContextLLMStack,
 ) error {
 	coordCfg := config.DefaultCoordinatorConfig()
 	if configFile != "" {
@@ -47,7 +53,20 @@ func WireD7(
 	}
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 
-	d2Executor := newD2Executor(gw, ctxEngine)
+	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
+	// This replaces the legacy d2Executor with D7's own turn loop that
+	// calls D3 directly for LLM and D2 via拆面 adapters for tools/persist.
+	d2a := newD2Adapter(gw, ctxEngine, llmStack.TokenCounter)
+	llmInvoker := WireTurnInvoker(llmStack)
+	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
+		LLM:      llmInvoker,
+		Context:  d2a,
+		Tools:    d2a,
+		Persist:  d2a,
+		MaxTurns: 8,
+	})
+	executor := newTurnOrchExecutor(turnOrch)
+
 	sink := newD1EventPublisher(gw)
 
 	var obsBridge *observability.Bridge
@@ -57,7 +76,7 @@ func WireD7(
 	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
-		d2Executor,
+		executor,
 		coordinator.WithSink(sink),
 		coordinator.WithObservability(obsBridge),
 		coordinator.WithWorkModel(wm),
@@ -70,10 +89,12 @@ func WireD7(
 	}
 
 	slog.Info("d7: SessionOrchestrator wired to gateway, D1→D7.ProcessMessage path active")
+	slog.Info("d7: TurnOrchestrator wired (D7-S2-A06+A07)", "max_turns", 8)
 	return nil
 }
 
 // d2Executor adapts D2 ContextEngine to the D7 QueryLoopExecutor interface.
+// DEPRECATED: v2.0-c replaces with turnOrchExecutor.
 type d2Executor struct {
 	gw     *capture.CommunicationGateway
 	engine contracts.IEngine
@@ -105,6 +126,28 @@ func (e *d2Executor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequ
 	}
 
 	return e.engine.Process(ctx, session, message), nil
+}
+
+// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
+// DM-020 D-c: this replaces d2Executor as the D7 FastPath executor.
+type turnOrchExecutor struct {
+	orch turn.TurnOrchestrator
+}
+
+func newTurnOrchExecutor(orch turn.TurnOrchestrator) *turnOrchExecutor {
+	return &turnOrchExecutor{orch: orch}
+}
+
+func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
+	if len(req.Messages) == 0 {
+		return nil, fmt.Errorf("turn executor: at least one message required")
+	}
+	return e.orch.RunTurn(ctx, turn.TurnRequest{
+		SessionID:   req.SessionID,
+		UserMessage: req.Messages[0],
+		MaxTurns:    req.MaxTurns,
+		Scope:       turn.TurnScopeMain,
+	})
 }
 
 type d1EventPublisher struct {
