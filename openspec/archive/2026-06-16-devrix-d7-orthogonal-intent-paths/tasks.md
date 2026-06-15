@@ -28,9 +28,9 @@
 | Task | Owner | 估算 | 状态 | 文件 |
 |------|-------|------|------|------|
 | T3.1 | docs | 0.1d | ✅ | `openspec/changes/devrix-d7-orthogonal-intent-paths/specs/d7-orchestration/spec.md` (Gherkin Scenarios) |
-| T3.2 | docs | 0.1d | pending | `openspec/specs/d7-orchestration/spec.md` (D7-S2-A01 状态 + Revision History) |
-| T3.3 | docs | 0.1d | pending | `openspec/specs/d7-orchestration/a-registry.md` (D7-S2-A01 标注) |
-| T3.4 | docs | 0.1d | pending | `openspec/specs/d7-orchestration/t-registry.md` (新增 3 P0 T) |
+| T3.2 | docs | 0.1d | ✅ | `openspec/specs/d7-orchestration/spec.md` (D7-S2-A01 状态 + Revision History → v3.0.0) |
+| T3.3 | docs | 0.1d | ✅ | `openspec/specs/d7-orchestration/a-registry.md` (D7-S2-A01 标注 → v3.4.0) |
+| T3.4 | docs | 0.1d | ✅ | `openspec/specs/d7-orchestration/t-registry.md` (新增 6 P0 T → v2.5.0, 最终 v3.0.0) |
 
 ## Phase 4: 验证门禁
 
