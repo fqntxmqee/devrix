@@ -3,7 +3,7 @@
 **Domain:** D5 Observability
 **Version:** 2.0.0
 **Status:** Active (2026-06-14)
-**Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+**Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
 > D5 是可观测性元域。本文件为全局 Span/Operation 注册表的权威索引，汇总所有 57 个已注册 Operation 及其按域/组件的分布。
 
@@ -120,5 +120,5 @@ Span 属性通过 `telemetry.SpanAttrs()` 自动注入 `devrix.layer` 和 `devri
 ## 关联文档
 
 - 全局 Spans 索引：`openspec/spans-registry.md`
-- Operation 常量定义：`internal/layers/observability/telemetry/names.go`
-- Coverage Registry：`internal/layers/observability/coverage/registry.go`
+- Operation 常量定义：`internal/layers/observability/instrument/telemetry/names.go`
+- Coverage Registry：`internal/layers/observability/diagnose/coverage/registry.go`

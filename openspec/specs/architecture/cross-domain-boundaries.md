@@ -104,7 +104,7 @@
 
 | 锚点 | 路径 | D3 责任 | D5 责任 |
 |------|------|---------|--------|
-| `internal/layers/observability/coverage/registry.go` | D5 暴露 `Meter()` / `Tracer()` API | D3 调用 D5 API emit span / metric | D5 提供 OTel SDK 包装 |
+| `internal/layers/observability/diagnose/coverage/registry.go` | D5 暴露 `Meter()` / `Tracer()` API | D3 调用 D5 API emit span / metric | D5 提供 OTel SDK 包装 |
 
 #### 2.2.2 SoT 划分
 

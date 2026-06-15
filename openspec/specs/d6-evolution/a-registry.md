@@ -21,11 +21,11 @@ D6 演化域 A 层活动注册表（Canonical v3.0）。S 层重切为 4 价值�
 
 | A ID | Name | Type | Input | Output | State Change | Code Location | Legacy |
 |------|------|------|-------|--------|--------------|---------------|--------|
-| D6-S11-A01 | RunEval | A-BE | dataset, probes | eval_report | eval.{started,completed} | `evolution/eval/engine.go` | S3-A01 |
-| D6-S11-A02 | JudgeResult | A-BE | eval_item, rubric | judge_score | -- | `evolution/eval/judge.go` | S3-A02 |
-| D6-S11-A03 | CompareDelta | A-BE | current_report, baseline | eval_delta | -- | `evolution/eval/delta.go` | S3-A03 |
-| D6-S11-A04 | GenerateTune | A-BE | eval_delta | tune_suggestions | -- | `evolution/eval/tune.go` | S3-A04 |
-| D6-S11-A05 | ManageDataset | A-BE | path, items | dataset, baseline | -- | `evolution/eval/dataset.go` | S3-A05 |
+| D6-S11-A01 | RunEval | A-BE | dataset, probes | eval_report | eval.{started,completed} | `evolution/evaluate/engine.go` | S3-A01 |
+| D6-S11-A02 | JudgeResult | A-BE | eval_item, rubric | judge_score | -- | `evolution/evaluate/judge.go` | S3-A02 |
+| D6-S11-A03 | CompareDelta | A-BE | current_report, baseline | eval_delta | -- | `evolution/evaluate/delta.go` | S3-A03 |
+| D6-S11-A04 | GenerateTune | A-BE | eval_delta | tune_suggestions | -- | `evolution/evaluate/tune.go` | S3-A04 |
+| D6-S11-A05 | ManageDataset | A-BE | path, items | dataset, baseline | -- | `evolution/evaluate/dataset.go` | S3-A05 |
 
 ## D6-S12: GuardRuntime（运行时守护）
 
@@ -33,9 +33,9 @@ D6 演化域 A 层活动注册表（Canonical v3.0）。S 层重切为 4 价值�
 
 | A ID | Name | Type | Input | Output | State Change | Code Location | Legacy |
 |------|------|------|-------|--------|--------------|---------------|--------|
-| D6-S12-A01 | ValidateDecision | A-BE | decision_record, session | validation_result | validation.{passed,failed} | `evolution/orchestration/validator.go` | S4-A01 |
-| D6-S12-A02 | ExecuteIntervention | A-BE | intervention, session | -- | agent.{terminated,rerouted}, task.{failed,completed} | `evolution/orchestration/intervention.go` | S4-A02 |
-| D6-S12-A03 | ObserveAgent | A-BE | agent_event | decision_record | validation_triggered | `evolution/orchestration/observer.go` | S4-A03 |
+| D6-S12-A01 | ValidateDecision | A-BE | decision_record, session | validation_result | validation.{passed,failed} | `evolution/guard/validator.go` | S4-A01 |
+| D6-S12-A02 | ExecuteIntervention | A-BE | intervention, session | -- | agent.{terminated,rerouted}, task.{failed,completed} | `evolution/guard/intervention.go` | S4-A02 |
+| D6-S12-A03 | ObserveAgent | A-BE | agent_event | decision_record | validation_triggered | `evolution/guard/observer.go` | S4-A03 |
 
 ## D6-S13: TrackVersion（版本追踪 — PLANNED）
 

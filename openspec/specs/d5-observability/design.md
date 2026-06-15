@@ -7,8 +7,8 @@
 **Status:** Active
 **Last Updated:** 2026-06-14
 **架构入口:** `openspec/specs/d5-observability/spec.md`
-**Operation 常量:** `internal/layers/observability/telemetry/names.go`
-**Registry SoT:** `internal/layers/observability/coverage/registry.go`
+**Operation 常量:** `internal/layers/observability/instrument/telemetry/names.go`
+**Registry SoT:** `internal/layers/observability/diagnose/coverage/registry.go`
 
 > **注意:** `context.pev.*` 与 `pev_engine` 组件已退役（2026-06-13）。生产路径以 `context.process` + `query.loop.*` + `llm.stream` 为主；`context.harness.*` 仅在 `harness.enabled=true` 时触发。
 

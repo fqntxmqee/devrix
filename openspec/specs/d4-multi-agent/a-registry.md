@@ -90,7 +90,7 @@
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| D4-S8-A01 | RecordForkPolicyMetrics | A-BE | policy_label | — | counter.inc | `observability/metrics.go` (IncForkSessionView / SetObservabilitySink) |
+| D4-S8-A01 | RecordForkPolicyMetrics | A-BE | policy_label | — | counter.inc | `observability/instrument/metrics/` (IncForkSessionView / SetObservabilitySink) |
 
 ## D4-S9: SessionView
 

@@ -4,7 +4,7 @@
 **Version:** 3.0.0
 **Status:** Active (2026-06-14)
 **Change:** DM-20260614-006 — 切法 A; DM-20260614-007 — D7-only ingress
-**Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+**Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
 ---
 

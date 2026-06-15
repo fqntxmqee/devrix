@@ -95,8 +95,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
-| D4-S8-A01-F01 | IncForkSessionView | F-BE | policy_label | — | S8-F01 | `observability/metrics.go` (IncForkSessionView) |
-| D4-S8-A01-F02 | SetObservabilitySink | F-BE | sink | — | S8-F02 | `observability/metrics.go` (SetObservabilitySink) |
+| D4-S8-A01-F01 | IncForkSessionView | F-BE | policy_label | — | S8-F01 | `observability/instrument/metrics/` (IncForkSessionView) |
+| D4-S8-A01-F02 | SetObservabilitySink | F-BE | sink | — | S8-F02 | `observability/instrument/metrics/` (SetObservabilitySink) |
 
 ---
 
@@ -193,8 +193,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 
 | F ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| D4-S8-A01-F01 | IncForkSessionView | F-BE | policy_label | — | `observability/metrics.go` (IncForkSessionView) |
-| D4-S8-A01-F02 | SetObservabilitySink | F-BE | sink | — | `observability/metrics.go` (SetObservabilitySink) |
+| D4-S8-A01-F01 | IncForkSessionView | F-BE | policy_label | — | `observability/instrument/metrics/` (IncForkSessionView) |
+| D4-S8-A01-F02 | SetObservabilitySink | F-BE | sink | — | `observability/instrument/metrics/` (SetObservabilitySink) |
 
 ## D4-S9-A01 ManageSessionView
 

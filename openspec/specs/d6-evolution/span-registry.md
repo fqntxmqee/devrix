@@ -3,7 +3,7 @@
 **Domain:** D6 Evolution
 **Version:** 2.1.0
 **Status:** Active (2026-06-14)
-**Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+**Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
 ---
 

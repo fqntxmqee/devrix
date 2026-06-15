@@ -4,7 +4,7 @@
 **Version:** 3.1.0
 **Status:** Active (2026-06-14)
 **Change:** devrix-d3-sa-refine（R1+R2+R3 决议）+ devrix-d3-sa-refine-v1.1（D1-A / D5-A / D6-A 决议；运行时 span 名保持不变 — R1 Q3 + playbook 原则 3）
-**Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+**Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
 ---
 

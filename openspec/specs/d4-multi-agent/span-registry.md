@@ -5,7 +5,7 @@
 **Status:** Active (2026-06-14)
 **Change ID:** devrix-d4-sa-refine
 **Demand ID:** DM-20260614-018
-**Canonical Source:** `internal/layers/observability/telemetry/names.go` · `internal/layers/observability/coverage/registry.go`
+**Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
 ---
 
@@ -62,7 +62,7 @@ agent.run
 | 资产 | v1.0 现状 | v1.1 目标 | 说明 |
 |------|-----------|-----------|------|
 | `agent.*` operations | D4 emit | **D5 SoT** | D4 仅保留 `SetObservabilitySink` hook |
-| `agent.*` metrics | D4 `observability/metrics.go` | **D5 span-registry** | 含 `agent.fork.created_total` 等 8 项 |
+| `agent.*` metrics | D4 `observability/instrument/metrics/` | **D5 span-registry** | 含 `agent.fork.created_total` 等 8 项 |
 | Hub-Spoke Flow span | D4 `delegate/bridge` + D2 `flow_report` | **D7 `orchestration.flow.*`** | v2.0 代码迁 D7 `hubspoke/` |
 | D4-S8-A01 | RecordForkPolicyMetrics | **Deprecated → D5** | Phase D1 执行 |
 

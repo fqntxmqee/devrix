@@ -136,7 +136,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S11-A01-T04 | 压缩入口统一：QueryLoop 走 messages-only 七步管道 | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
 | D2-S11-A01-TD01 | TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 | HarnessUnification | `internal/layers/contextengine/query/loop_recovery_test.go` | IMPLEMENTED | P1 |
 | D2-S11-A01-TD03 | TD-QL-03: overload/5xx → 切换 fallback model (生产未接线) | HarnessUnification | `internal/layers/contextengine/query/loop_fallback_test.go` | PARTIAL | P1 |
-| D2-S11-A01-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 | HarnessUnification | `internal/layers/evolution/eval/path_regression_probe_test.go` | IMPLEMENTED | P0 |
+| D2-S11-A01-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 | HarnessUnification | `internal/layers/evolution/evaluate/path_regression_probe_test.go` | IMPLEMENTED | P0 |
 
 ## D2-S12: Worktree Module
 

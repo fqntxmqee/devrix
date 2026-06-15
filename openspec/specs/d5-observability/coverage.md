@@ -2,8 +2,8 @@
 
 实时跟踪运行时 Span 调用，识别从未被触发过的 Operation（潜在死代码或未启用功能）。
 
-**Registry SoT:** `internal/layers/observability/coverage/registry.go`（当前 **56** 条 Operation）
-**常量 SoT:** `internal/layers/observability/telemetry/names.go`
+**Registry SoT:** `internal/layers/observability/diagnose/coverage/registry.go`（当前 **56** 条 Operation）
+**常量 SoT:** `internal/layers/observability/instrument/telemetry/names.go`
 
 > **2026-06-13 变更:** `context.pev.*` 族已移除；新增 `query.loop.*`、`tool.execute.*`、`task.*`、`orchestration.*`。
 
@@ -62,7 +62,7 @@ Tracer.Start(operation)
 2. 在 `coverage/registry.go` `AllOperations()` 添加 `OperationMeta`
 3. 在 `coverage/registry_test.go` expected 列表追加
 4. 在业务代码 `tracer.Start(ctx, telemetry.OpXxx, ...)` 创建 span
-5. 运行 `go test ./internal/layers/observability/coverage/...`
+5. 运行 `go test ./internal/layers/observability/diagnose/coverage/...`
 
 ```go
 {Name: "context.my_operation", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true}
