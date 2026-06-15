@@ -161,6 +161,9 @@ func (a *Impl) finishResult(result *multiagent.AgentResult) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.state == multiagent.AgentStateTerminated {
+		// Agent already terminated (e.g. PermissionGate timeout). Ensure the
+		// done channel is closed so Wait() does not block indefinitely.
+		a.doneOnce.Do(func() { close(a.done) })
 		return
 	}
 	a.result = result
