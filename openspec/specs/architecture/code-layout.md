@@ -25,13 +25,13 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 ## 2. 命名规则
 
-| 层级 | 路径段 | 规则 | 示例 |
-|------|--------|------|------|
-| L1 领域 | `{domain-slug}/` | 全小写复合词，无下划线；与 `layering.md` D 表一致 | `communication`, `contextengine`, `orchestration` |
-| L2 场景 | `{scenario-slug}/` | **Go 合法目录名**（同 §2.2）；在本文 §4 登记，**禁止自造** | `capture`, `thinking`, `taskprogress` |
-| L3 活动 | `{activity-slug}/` | **可选**；仅当单 S 下 A 组 >1 且需物理隔离时使用；同样遵守 Go 目录名规则 | `dispatch`, `encode/feishu` |
-| 域内核 | `kernel/` | 非 S 的共享模型（Card、Session 值对象等） | `communication/kernel/` |
-| 跨域契约 | — | `internal/shared/contracts/` | 禁止域内 duplicated 契约 |
+| 层级    | 路径段                | 规则                                            | 示例                                                |
+| ----- | ------------------ | --------------------------------------------- | ------------------------------------------------- |
+| L1 领域 | `{domain-slug}/`   | 全小写复合词，无下划线；与 `layering.md` D 表一致             | `communication`, `contextengine`, `orchestration` |
+| L2 场景 | `{scenario-slug}/` | **Go 合法目录名**（同 §2.2）；在本文 §4 登记，**禁止自造**       | `capture`, `thinking`, `taskprogress`             |
+| L3 活动 | `{activity-slug}/` | **可选**；仅当单 S 下 A 组 >1 且需物理隔离时使用；同样遵守 Go 目录名规则 | `dispatch`, `encode/feishu`                       |
+| 域内核   | `kernel/`          | 非 S 的共享模型（Card、Session 值对象等）                  | `communication/kernel/`                           |
+| 跨域契约  | —                  | `internal/shared/contracts/`                  | 禁止域内 duplicated 契约                                |
 
 **禁止作为 L2 场景目录名：**
 
@@ -47,9 +47,9 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 ```text
 1. 是否跨域共享契约/类型？
    YES → internal/shared/{contracts,types,config}/
-2. 属于哪个 L1 领域 D？
+2. 属于哪个领域 D？
    → internal/layers/{domain-slug}/
-3. 属于哪个 L2 场景 S？（查 §4 注册表）
+3. 属于哪个场景 S？（查 §4 注册表）
    → …/{scenario-slug}/
 4. 是否域内核（无 S 归属）？
    → …/kernel/
@@ -66,42 +66,43 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 ### 4.1 D1 Communication（canonical S13–S18）
 
-| S ID | Scenario | scenario-slug | 目标路径 | 职责摘要 |
-|------|----------|---------------|----------|----------|
-| D1-S13 | CaptureUserIntent | `capture` | `communication/capture/` | 入站、Persist、Dispatch、Permission、Command |
-| D1-S14 | PresentThinking | `thinking` | `communication/thinking/` | Thinking 信号映射与 emit |
-| D1-S15 | PresentTaskProgress | `taskprogress` | `communication/taskprogress/` | Task/Tool/Worker/Milestone **展示** |
-| D1-S16 | DeliverConclusion | `conclusion` | `communication/conclusion/` | Conclusion 流式/终态/摘要 |
-| D1-S17 | ConnectChannel | `channel` | `communication/channel/` | IM 适配、连接、实例、限流、Encode |
-| D1-S18 | GuaranteeDelivery | `delivery` | `communication/delivery/` | EventBus、Critical、Drain |
-| — | Domain Kernel | `kernel` | `communication/kernel/` | Card、平台无关消息模型 |
+| S ID   | Scenario            | scenario-slug  | 目标路径                          | 职责摘要                                   |
+| ------ | ------------------- | -------------- | ----------------------------- | -------------------------------------- |
+| D1-S13 | CaptureUserIntent   | `capture`      | `communication/capture/`      | 入站、Persist、Dispatch、Permission、Command |
+| D1-S14 | PresentThinking     | `thinking`     | `communication/thinking/`     | Thinking 信号映射与 emit                    |
+| D1-S15 | PresentTaskProgress | `taskprogress` | `communication/taskprogress/` | Task/Tool/Worker/Milestone **展示**      |
+| D1-S16 | DeliverConclusion   | `conclusion`   | `communication/conclusion/`   | Conclusion 流式/终态/摘要                    |
+| D1-S17 | ConnectChannel      | `channel`      | `communication/channel/`      | IM 适配、连接、实例、限流、Encode                  |
+| D1-S18 | GuaranteeDelivery   | `delivery`     | `communication/delivery/`     | EventBus、Critical、Drain                |
+| —      | Domain Kernel       | `kernel`       | `communication/kernel/`       | Card、平台无关消息模型                          |
 
 **横切（暂存，随迁移收敛）：**
 
-| 组件 | 当前路径 | 收敛目标 |
-|------|----------|----------|
-| Turn tracker / 信号锚点 | `communication/capture/signal/` | ✅ 已收敛 |
-| 契约映射 | `shared/contracts/im_outbound_signal.go` | 保持 shared |
+| 组件                  | 当前路径                                     | 收敛目标      |
+| ------------------- | ---------------------------------------- | --------- |
+| Turn tracker / 信号锚点 | `communication/capture/signal/`          | ✅ 已收敛     |
+| 契约映射                | `shared/contracts/im_outbound_signal.go` | 保持 shared |
 
 ### 4.2 D7 Orchestration
 
 > D7 待迁移目录须遵守 §2.2（无下划线）。DSAFT 场景名与 slug 映射示例：`Wave Scheduler` → `wavescheduler/`。
 
-| S ID | Scenario | scenario-slug | 目标路径 | 当前路径（迁移中） |
-|------|----------|---------------|----------|-------------------|
-| D7-S1 | Work Model | `workmodel` | `orchestration/workmodel/` | ✅ DM-012 |
-| D7-S2 | Session Orchestrator | `sessionorchestrator` | `orchestration/sessionorchestrator/` | `orchestration/coordinator/` |
-| D7-S3 | Wave Scheduler | `wavescheduler` | `orchestration/wavescheduler/` | `orchestration/wave/` |
-| D7-S4 | Execution Flow | `executionflow` | `orchestration/executionflow/` | `flow/`, `workplan/`, `imsink/` |
-| D7-S5 | Decision & Planning | `decisionplanning` | `orchestration/decisionplanning/` | `coordinator/classifier*` |
-| — | Worker tool policy F | `toolpolicy` | `orchestration/toolpolicy/` | ✅ DM-015 |
-| — | Delegate routing F | `delegatetools` | `orchestration/delegatetools/` | ✅ DM-011 |
-| — | Session command queue F | `sessionqueue` | `orchestration/sessionqueue/` | ✅ DM-013 |
-| — | Milestone DAG | `milestone` | `orchestration/milestone/` | ✅ 已迁入 |
-| **D7-S2-A06** | **RunTurnLoop** | `turn` | `orchestration/turn/orchestrator.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
-| **D7-S2-A07** | **InvokeLLM** | `turn` | `orchestration/turn/llm.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
+| S ID          | Scenario                | scenario-slug         | 目标路径                                 | 当前路径（迁移中）                          |
+| ------------- | ----------------------- | --------------------- | ------------------------------------ | ---------------------------------- |
+| D7-S1         | Work Model              | `workmodel`           | `orchestration/workmodel/`           | ✅ DM-012                           |
+| D7-S2         | Session Orchestrator    | `sessionorchestrator` | `orchestration/sessionorchestrator/` | `orchestration/coordinator/`       |
+| D7-S3         | Wave Scheduler          | `wavescheduler`       | `orchestration/wavescheduler/`       | `orchestration/wave/`              |
+| D7-S4         | Execution Flow          | `executionflow`       | `orchestration/executionflow/`       | `flow/`, `workplan/`, `imsink/`    |
+| D7-S5         | Decision & Planning     | `decisionplanning`    | `orchestration/decisionplanning/`    | `coordinator/classifier*`          |
+| —             | Worker tool policy F    | `toolpolicy`          | `orchestration/toolpolicy/`          | ✅ DM-015                           |
+| —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
+| —             | Session command queue F | `sessionqueue`        | `orchestration/sessionqueue/`        | ✅ DM-013                           |
+| —             | Milestone DAG           | `milestone`           | `orchestration/milestone/`           | ✅ 已迁入                              |
+| **D7-S2-A06** | **RunTurnLoop**         | `turn`                | `orchestration/turn/orchestrator.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
+| **D7-S2-A07** | **InvokeLLM**           | `turn`                | `orchestration/turn/llm.go`          | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
 
 > **DM-020 bootstrap 注释（v1.0 Registry / v2.0-b 实施）：** `bootstrap/main.go` 目标接线：
+> 
 > ```text
 > WireContextLLM(obs) → TurnOrchestrator deps  # 迁出 context_engine，D7 持有 ILLMGateway
 > WireContextEngine() → ContextPreparer only   # 无 LLM 字段
@@ -112,26 +113,26 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 > **Canonical S15–S20**（DM-20260614-009）。Legacy module 路径仍有效；v2.0 按 scenario-slug 收敛。
 
-| S ID | Scenario | scenario-slug | 当前路径 | v2.0 目标 |
-|------|----------|---------------|----------|-----------|
-| D2-S15 | PrepareExecutionContext | `prepare` | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014 |
-| D2-S16 | RunQueryLoop | `query` | `contextengine/query/` | 保持（loop 瘦身） |
-| D2-S17 | PersistSessionState | `persist` | `persist/snapshot/`, `persist/transcript/` | ✅ DM-014 |
-| D2-S18 | EnforceExecutionPolicy | `policy` | `policy/permission/`, `policy/toolrunner/` | ✅ DM-014 |
-| D2-S19 | NestedExecution | `nested` | `nested/subquery.go`, `nested/background.go`, `nested/fork.go` | ✅ DM-014 |
-| D2-S20 | LegacyHarnessFallback | `legacyharness` | `harness/` | 保持或 `legacy/` |
-| **D2-S16** | **RunQueryLoop（Legacy Freeze）** | **`query`** | **`contextengine/query/`** | **Legacy freeze（DM-020）；Turn 主循环迁 D7-S2-A06** |
+| S ID       | Scenario                        | scenario-slug   | 当前路径                                                                               | v2.0 目标                                       |
+| ---------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
+| D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014                                      |
+| D2-S16     | RunQueryLoop                    | `query`         | `contextengine/query/`                                                             | 保持（loop 瘦身）                                   |
+| D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/`                                         | ✅ DM-014                                      |
+| D2-S18     | EnforceExecutionPolicy          | `policy`        | `policy/permission/`, `policy/toolrunner/`                                         | ✅ DM-014                                      |
+| D2-S19     | NestedExecution                 | `nested`        | `nested/subquery.go`, `nested/background.go`, `nested/fork.go`                     | ✅ DM-014                                      |
+| D2-S20     | LegacyHarnessFallback           | `legacyharness` | `harness/`                                                                         | 保持或 `legacy/`                                 |
+| **D2-S16** | **RunQueryLoop（Legacy Freeze）** | **`query`**     | **`contextengine/query/`**                                                         | **Legacy freeze（DM-020）；Turn 主循环迁 D7-S2-A06** |
 
 > **DM-020 bootstrap 注释（v1.0 Registry）：** `WireContextLLM` 当前在 `internal/bootstrap/` 为 D2 接线 ILLMGateway。v2.0-b 迁移后，D7 持有 ILLMGateway（`WireContextLLM → TurnOrchestrator deps`），D2 仅保留 ContextPreparer（`WireContextEngine → ContextPreparer only，无 LLM 字段`）。
 
 **Legacy module 路径（冻结追溯）：**
 
-| Legacy S | scenario-slug | 路径 |
-|----------|---------------|------|
-| D2-S2 | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` | ✅ DM-014 |
-| D2-S3 | `memory` | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/` | ✅ DM-014 |
-| D2-S11 | `queue` | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4) | ✅ DM-013 |
-| D2-S12 | `worktree` | `contextengine/worktree/` |
+| Legacy S | scenario-slug | 路径                                                                      |
+| -------- | ------------- | ----------------------------------------------------------------------- |
+| D2-S2    | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` |
+| D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/`           |
+| D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4)      |
+| D2-S12   | `worktree`    | `contextengine/worktree/`                                               |
 
 ### 4.4 D3 LLM Gateway（canonical S1–S6 / 5+1 价值流）
 
@@ -141,16 +142,16 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 > **v2.0** 物理路径按 scenario-slug 迁移（DM-20260614-019 / devrix-d3-sa-refine-v2.0 **ACCEPTED** commit d222328）。
 > 详见 `openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/acceptance-report.md`。
 
-| S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
-|------|----------|----------------------|--------------|-----------|------|
-| D3-S1 | RouteModel | `route` | `gateway/router.go` (路由解析部分) | `llmgateway/route/` | ✅ 完成 |
-| D3-S2 | StreamChat | `stream` | `adapter/` (全部) + `gateway/gateway.go` Stream 主实现 | `llmgateway/stream/`（含 `stream/adapter/` 子目录） | ✅ 完成 |
-| D3-S3 | ProtectCall | `protect` | `breaker/` + `retry/` + `gateway/breaker_observer.go` | `llmgateway/protect/`（两机制独立 .go） | ✅ 完成 |
-| D3-S4 | BudgetTokens | `budget` | `token/` | `llmgateway/budget/` | ✅ 完成 |
-| D3-S5 | GuardContent | `guard` | `safety/` | `llmgateway/guard/` | ✅ 完成 |
-| D3-S6 | ConfigureGateway | `configure` | `config/` + `shared/config/llmgateway.go` | `llmgateway/configure/`（合并 shared） | ✅ 完成 |
-| — | Domain Kernel | (根 `contracts.go` 拆分后 < 200 行) | `llmgateway/contracts.go` | `llmgateway/contracts.go` (145 行) | ✅ AC-09 达成 |
-| D3-X | CROSS 跨域锚点 | (Bridge 不变) | `internal/bridges/llm/` | `internal/bridges/llm/` | ✅ 不动 |
+| S ID  | Scenario         | scenario-slug (v2.0)           | v1.0 当前路径                                             | v2.0 目标                                       | 状态         |
+| ----- | ---------------- | ------------------------------ | ----------------------------------------------------- | --------------------------------------------- | ---------- |
+| D3-S1 | RouteModel       | `route`                        | `gateway/router.go` (路由解析部分)                          | `llmgateway/route/`                           | ✅ 完成       |
+| D3-S2 | StreamChat       | `stream`                       | `adapter/` (全部) + `gateway/gateway.go` Stream 主实现     | `llmgateway/stream/`（含 `stream/adapter/` 子目录） | ✅ 完成       |
+| D3-S3 | ProtectCall      | `protect`                      | `breaker/` + `retry/` + `gateway/breaker_observer.go` | `llmgateway/protect/`（两机制独立 .go）              | ✅ 完成       |
+| D3-S4 | BudgetTokens     | `budget`                       | `token/`                                              | `llmgateway/budget/`                          | ✅ 完成       |
+| D3-S5 | GuardContent     | `guard`                        | `safety/`                                             | `llmgateway/guard/`                           | ✅ 完成       |
+| D3-S6 | ConfigureGateway | `configure`                    | `config/` + `shared/config/llmgateway.go`             | `llmgateway/configure/`（合并 shared）            | ✅ 完成       |
+| —     | Domain Kernel    | (根 `contracts.go` 拆分后 < 200 行) | `llmgateway/contracts.go`                             | `llmgateway/contracts.go` (145 行)             | ✅ AC-09 达成 |
+| D3-X  | CROSS 跨域锚点       | (Bridge 不变)                    | `internal/bridges/llm/`                               | `internal/bridges/llm/`                       | ✅ 不动       |
 
 **Scenario-slug 命名依据**（与 code-layout §2 规则一致）：
 
@@ -177,36 +178,37 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 **跨域漂移（v2.0 迁出 D2）：**
 
-| 组件 | 当前路径 | 目标 | 状态 |
-|------|----------|------|------|
-| ~~delegate_tools~~ | ~~`contextengine/delegate_tools.go`~~ | `orchestration/delegatetools/` | ✅ DM-011 |
-| TaskManager | ~~`contextengine/tasks/`~~ | `orchestration/workmodel/` (D7-S1) | ✅ DM-012 |
-| queue delegate-progress | ~~`contextengine/queue/`~~ | D7-S4 `sessionqueue/` | ✅ DM-013 |
+| 组件                      | 当前路径                                  | 目标                                 | 状态       |
+| ----------------------- | ------------------------------------- | ---------------------------------- | -------- |
+| ~~delegate_tools~~      | ~~`contextengine/delegate_tools.go`~~ | `orchestration/delegatetools/`     | ✅ DM-011 |
+| TaskManager             | ~~`contextengine/tasks/`~~            | `orchestration/workmodel/` (D7-S1) | ✅ DM-012 |
+| queue delegate-progress | ~~`contextengine/queue/`~~            | D7-S4 `sessionqueue/`              | ✅ DM-013 |
 
 ### 4.5 D4 Multi-Agent（canonical S11–S16 / 5+1 价值流）
 
 > **Canonical S11–S16**（DM-20260614-018 / devrix-d4-sa-refine）。v2.0-d 物理迁移完成；v2.0-e re-export shim 已删除（`factory/` `agent/` `sessionview/` `observer/` `tool/`）；Hub-Spoke 编排代码 v2.0 迁 D7 `hubspoke/`。
 
-| S ID | Scenario | scenario-slug (v2.0) | v1.0 当前路径 | v2.0 目标 | 状态 |
-|------|----------|----------------------|--------------|-----------|------|
-| D4-S11 | ProvisionAgent | `provision` | `factory/` + `collaboration/` + `builtin/` | `multiagent/provision/` | ✅ v2.0-d |
-| D4-S12 | RunAgentLoop | `run` | `agent/`（lifecycle, state, perm_gate） | `multiagent/run/` | ✅ v2.0-d |
-| D4-S13 | IsolateAndMerge | `isolate` | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` + `multiagent/run/` | ✅ v2.0-d |
-| D4-S14 | ExecuteWorker | `execute` | `delegate/service.go` | `multiagent/execute/` | ✅ v2.0-d |
-| D4-S15 | InvokeExternalAgent | `external` | `tool/` | `multiagent/external/` | ✅ v2.0-d |
-| D4-S16 | ConfigureAgents | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` | ✅ v2.0-d |
-| — | Domain Kernel | `kernel` | `contracts.go` + `observer/` | `multiagent/kernel/` | ✅ v2.0-d |
+| S ID   | Scenario            | scenario-slug (v2.0) | v1.0 当前路径                                                 | v2.0 目标                                   | 状态       |
+| ------ | ------------------- | -------------------- | --------------------------------------------------------- | ----------------------------------------- | -------- |
+| D4-S11 | ProvisionAgent      | `provision`          | `factory/` + `collaboration/` + `builtin/`                | `multiagent/provision/`                   | ✅ v2.0-d |
+| D4-S12 | RunAgentLoop        | `run`                | `agent/`（lifecycle, state, perm_gate）                     | `multiagent/run/`                         | ✅ v2.0-d |
+| D4-S13 | IsolateAndMerge     | `isolate`            | `agent/forkjoin.go` + `sessionview/` + `worker_engine.go` | `multiagent/isolate/` + `multiagent/run/` | ✅ v2.0-d |
+| D4-S14 | ExecuteWorker       | `execute`            | `delegate/service.go`                                     | `multiagent/execute/`                     | ✅ v2.0-d |
+| D4-S15 | InvokeExternalAgent | `external`           | `tool/`                                                   | `multiagent/external/`                    | ✅ v2.0-d |
+| D4-S16 | ConfigureAgents     | `configure`          | `shared/config/multiagent.go`                             | `multiagent/configure/`                   | ✅ v2.0-d |
+| —      | Domain Kernel       | `kernel`             | `contracts.go` + `observer/`                              | `multiagent/kernel/`                      | ✅ v2.0-d |
 
 **Hub-Spoke 迁 D7（v2.0-b/c，非 D4 目录）：**
 
-| 组件 | v1.0 路径 | v2.0 目标 | 状态 |
-|------|----------|-----------|------|
-| Agent FlowBridge | `multiagent/delegate/bridge.go` | `orchestration/hubspoke/agent_bridge.go` | ✅ v2.0-d |
-| Dispatch / fallback | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go` | ✅ v2.0-d |
-| SubQuery Flow | `contextengine/nested/flow_report.go` | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-d |
-| Dispatcher bootstrap | `bootstrap/delegate.go` | `bootstrap/delegate.go`（重构） | ✅ v2.0-d |
+| 组件                   | v1.0 路径                                | v2.0 目标                                     | 状态       |
+| -------------------- | -------------------------------------- | ------------------------------------------- | -------- |
+| Agent FlowBridge     | `multiagent/delegate/bridge.go`        | `orchestration/hubspoke/agent_bridge.go`    | ✅ v2.0-d |
+| Dispatch / fallback  | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go`        | ✅ v2.0-d |
+| SubQuery Flow        | `contextengine/nested/flow_report.go`  | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-d |
+| Dispatcher bootstrap | `bootstrap/delegate.go`                | `bootstrap/delegate.go`（重构）                 | ✅ v2.0-d |
 
 **v2.0-b 里程碑：**
+
 - `execute/worker.go` — WorkerExecutor 实现（D4-S14 执行面）
 - `execute/contracts.go` — WorkerExecutor 接口 + WorkerRunSpec
 - `hubspoke/agent_bridge.go` — Agent FlowBridge（从 D4 迁入）
@@ -218,13 +220,13 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 > **2026-06-15 SA Refine v1.0**: 从 9 技术包重切为 4+1 价值流（DM-20260615-001）。v1.0 仅注册表，v2.0 物理迁移。
 
-| S ID | Scenario | scenario-slug | v2.0 目标 | 当前路径 | 状态 |
-|------|----------|---------------|----------|---------|------|
-| D5-S21 | Instrument | `instrument` | `observability/instrument/` | `instrument/tracer/` `instrument/metrics/` `instrument/logger/` `instrument/telemetry/` | v2.0 PHYSICAL |
-| D5-S22 | Export | `export` | `observability/export/` | `export/` | v2.0 PHYSICAL |
-| D5-S23 | Diagnose | `diagnose` | `observability/diagnose/` | `diagnose/coverage/` `diagnose/incident/` | v2.0 PHYSICAL |
-| D5-S24 | Configure | `configure` | `observability/configure/` | `configure/settings/` `configure/runtime/` | v2.0 PHYSICAL |
-| D5-S0 | Facade | — | `observability/` 根 | `observability.go` | v2.0 PHYSICAL |
+| S ID   | Scenario   | scenario-slug | v2.0 目标                     | 当前路径                                                                                    | 状态            |
+| ------ | ---------- | ------------- | --------------------------- | --------------------------------------------------------------------------------------- | ------------- |
+| D5-S21 | Instrument | `instrument`  | `observability/instrument/` | `instrument/tracer/` `instrument/metrics/` `instrument/logger/` `instrument/telemetry/` | v2.0 PHYSICAL |
+| D5-S22 | Export     | `export`      | `observability/export/`     | `export/`                                                                               | v2.0 PHYSICAL |
+| D5-S23 | Diagnose   | `diagnose`    | `observability/diagnose/`   | `diagnose/coverage/` `diagnose/incident/`                                               | v2.0 PHYSICAL |
+| D5-S24 | Configure  | `configure`   | `observability/configure/`  | `configure/settings/` `configure/runtime/`                                              | v2.0 PHYSICAL |
+| D5-S0  | Facade     | —             | `observability/` 根          | `observability.go`                                                                      | v2.0 PHYSICAL |
 
 **关键 v2.0 迁移（DM-20260615-003，已完成）：**
 
@@ -238,12 +240,12 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 > **2026-06-15 SA Refine v1.0**: S4 "Orchestration" → S12 GuardRuntime 消除 D7 命名冲突（DM-20260615-002）。v1.0 仅注册表，v2.0 物理迁移。
 
-| S ID | Scenario | scenario-slug | v2.0 目标 | 当前路径 | 状态 |
-|------|----------|---------------|----------|---------|------|
-| D6-S11 | RunEvaluation | `evaluate` | `evolution/evaluate/` | `evolution/evaluate/` | v2.0 PHYSICAL |
-| D6-S12 | GuardRuntime | `guard` | `evolution/guard/` | `evolution/guard/` | v2.0 PHYSICAL |
-| D6-S13 | TrackVersion | `version` | `evolution/version/` | `evolution/version/` | PLANNED |
-| D6-S14 | ReloadConfig | `reload` | `evolution/reload/` | `evolution/reload/` | PLANNED |
+| S ID   | Scenario      | scenario-slug | v2.0 目标               | 当前路径                  | 状态            |
+| ------ | ------------- | ------------- | --------------------- | --------------------- | ------------- |
+| D6-S11 | RunEvaluation | `evaluate`    | `evolution/evaluate/` | `evolution/evaluate/` | v2.0 PHYSICAL |
+| D6-S12 | GuardRuntime  | `guard`       | `evolution/guard/`    | `evolution/guard/`    | v2.0 PHYSICAL |
+| D6-S13 | TrackVersion  | `version`     | `evolution/version/`  | `evolution/version/`  | PLANNED       |
+| D6-S14 | ReloadConfig  | `reload`      | `evolution/reload/`   | `evolution/reload/`   | PLANNED       |
 
 **关键 v2.0 迁移（DM-20260615-003，已完成）：**
 
@@ -281,15 +283,15 @@ internal/layers/communication/
 
 ## 6. 当前 → 目标迁移（D1）
 
-| 当前路径 | 目标 scenario-slug | 迁移状态 | 关联 Change |
-|----------|-------------------|----------|-------------|
-| `gateway/` | `capture/` + 部分 `conclusion/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `present/` | `thinking/` `taskprogress/` `conclusion/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `signal/` | `capture/signal/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `adapters/` … `renderers/` | `channel/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `eventbus/` | `delivery/eventbus/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `core/` | `kernel/` | ✅ IMPLEMENTED | DM-20260614-006 |
-| `communication/milestone/` | — | ✅ 已迁至 `orchestration/milestone/` | DM-20260614-006 |
+| 当前路径                       | 目标 scenario-slug                          | 迁移状态                             | 关联 Change       |
+| -------------------------- | ----------------------------------------- | -------------------------------- | --------------- |
+| `gateway/`                 | `capture/` + 部分 `conclusion/`             | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `present/`                 | `thinking/` `taskprogress/` `conclusion/` | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `signal/`                  | `capture/signal/`                         | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `adapters/` … `renderers/` | `channel/`                                | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `eventbus/`                | `delivery/eventbus/`                      | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `core/`                    | `kernel/`                                 | ✅ IMPLEMENTED                    | DM-20260614-006 |
+| `communication/milestone/` | —                                         | ✅ 已迁至 `orchestration/milestone/` | DM-20260614-006 |
 
 **迁移原则：**
 
@@ -302,12 +304,12 @@ internal/layers/communication/
 
 ## 7. 与 OpenSpec 的对应
 
-| 代码 | 规格 |
-|------|------|
-| `internal/layers/{domain}/` | `openspec/specs/{domain}-*/spec.md` |
-| scenario-slug | `layering.md` S 表 + 域 `a-registry.md` / `f-registry.md` |
-| `*_test.go` 内 `// T:` | `openspec/specs/{domain}/t-registry.md` |
-| span 名 | `{domain}/span-registry.md` |
+| 代码                          | 规格                                                      |
+| --------------------------- | ------------------------------------------------------- |
+| `internal/layers/{domain}/` | `openspec/specs/{domain}-*/spec.md`                     |
+| scenario-slug               | `layering.md` S 表 + 域 `a-registry.md` / `f-registry.md` |
+| `*_test.go` 内 `// T:`       | `openspec/specs/{domain}/t-registry.md`                 |
+| span 名                      | `{domain}/span-registry.md`                             |
 
 验收/归档时 **代码路径与 spec 必须同步更新**（见 `specs/05-delivery-process.md` §6.3、§8.2）。
 
@@ -315,14 +317,14 @@ internal/layers/communication/
 
 ## 8. 变更记录
 
-| 版本 | 日期 | 说明 |
-|------|------|------|
-| 1.0.0 | 2026-06-14 | 初版：D1/D7 scenario-slug 注册表 + D1 迁移矩阵 |
-| 1.1.0 | 2026-06-14 | D1 物理路径迁移完成（capture/channel/delivery/kernel） |
-| 1.3.0 | 2026-06-14 | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011) |
-| 1.4.0 | 2026-06-14 | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位 |
-| **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成 |
+| 版本        | 日期             | 说明                                                                                                                                                                                                                                                                                                                                |
+| --------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0     | 2026-06-14     | 初版：D1/D7 scenario-slug 注册表 + D1 迁移矩阵                                                                                                                                                                                                                                                                                              |
+| 1.1.0     | 2026-06-14     | D1 物理路径迁移完成（capture/channel/delivery/kernel）                                                                                                                                                                                                                                                                                      |
+| 1.3.0     | 2026-06-14     | D2 S15–S20 Canonical；delegate_tools → delegatetools (DM-011)                                                                                                                                                                                                                                                                      |
+| 1.4.0     | 2026-06-14     | **D3 S1–S6 Canonical**（DM-20260614-016 / devrix-d3-sa-refine）：5+1 价值流 scenario-slug 注册表（`route` `stream` `protect` `budget` `guard` `configure`）；v1.0 物理路径保留 + v2.0 迁移目标映射；D3-X 跨域锚点声明 `internal/bridges/llm/`；contracts.go 拆分粒度占位                                                                                                |
+| **1.5.0** | **2026-06-14** | **D3 S1–S6 v2.0 物理迁移状态**（DM-20260614-019 / devrix-d3-sa-refine-v2.0 ACCEPTED commit d222328）：6 个 slug 全部 ✅ 完成（含 `stream/adapter/` 子目录 + `configure/` 跨包合并 shared/config）；D3-X 跨域锚点 ✅ 不动；contracts.go 145 行 AC-09 达成                                                                                                               |
 | **1.6.0** | **2026-06-15** | **D4 S11–S16 + Kernel v2.0-d 物理迁移状态**（DM-20260614-018 / devrix-d4-sa-refine commit 3905c6a）：6 个 slug + kernel 全部 ✅ v2.0-d（`provision/` `run/` `isolate/` `execute/` `external/` `configure/` `kernel/`）；Hub-Spoke v2.0-d（agent_bridge/dispatch/subquery_bridge → `orchestration/hubspoke/`）；execute(9) + hubspoke(23) 测试新增；71 包全绿 |
-| **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿 |
-| **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator） |
-| **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除） |
+| **1.7.0** | **2026-06-15** | **D4 v2.0-e re-export 清理**（commit e30fe72）：5 个 re-export shim 删除（`factory/legacy.go` `agent/legacy.go` `sessionview/legacy.go` `observer/noop.go` `tool/legacy.go`）；observer 引用迁移至 kernel；71 包全绿                                                                                                                                  |
+| **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator）                                                                                                                                                                                                         |
+| **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除）                                                 |
