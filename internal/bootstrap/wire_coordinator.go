@@ -13,7 +13,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // WireD7 initializes the D7 SessionOrchestrator and wires it into the capture.
@@ -91,41 +90,6 @@ func WireD7(
 	slog.Info("d7: SessionOrchestrator wired to gateway, D1→D7.ProcessMessage path active")
 	slog.Info("d7: TurnOrchestrator wired (D7-S2-A06+A07)", "max_turns", 8)
 	return nil
-}
-
-// d2Executor adapts D2 ContextEngine to the D7 QueryLoopExecutor interface.
-// DEPRECATED: v2.0-c replaces with turnOrchExecutor.
-type d2Executor struct {
-	gw     *capture.CommunicationGateway
-	engine contracts.IEngine
-}
-
-func newD2Executor(gw *capture.CommunicationGateway, engine contracts.IEngine) *d2Executor {
-	return &d2Executor{gw: gw, engine: engine}
-}
-
-func (e *d2Executor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
-	if e.engine == nil {
-		return nil, fmt.Errorf("d7 executor: context engine is nil")
-	}
-	if e.gw == nil {
-		return nil, fmt.Errorf("d7 executor: gateway is nil")
-	}
-
-	session, err := e.gw.GetSession(req.SessionID)
-	if err != nil {
-		session = types.NewSession(req.SessionID, "d7", "")
-	}
-
-	var message string
-	if len(req.Messages) > 0 {
-		message = req.Messages[0].Content
-	}
-	if req.SystemPrompt != "" {
-		message = req.SystemPrompt + "\n" + message
-	}
-
-	return e.engine.Process(ctx, session, message), nil
 }
 
 // turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
