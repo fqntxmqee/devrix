@@ -66,6 +66,15 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 		Messages: []types.Message{req.Message},
 		Tools:    toolSchemas,
 	}
+	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+		if sc, ok := ce.SessionContext(req.SessionID); ok && sc != nil {
+			result.Model = sc.Model
+			result.MaxContextTokens = sc.TokenBudget.MaxContextTokens
+		}
+	}
+	if session != nil && session.Model != "" {
+		result.Model = session.Model
+	}
 
 	// D-e: check token budget and generate CompressHint if needed.
 	if a.counter != nil && len(result.Messages) > 0 {

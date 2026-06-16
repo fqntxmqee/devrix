@@ -93,6 +93,10 @@ func doneChunk() llmgateway.Chunk {
 	return llmgateway.Chunk{Done: true, Usage: llmgateway.TokenUsage{PromptTokens: 10, CompletionTokens: 5}}
 }
 
+func usageDoneChunk(prompt, completion int) llmgateway.Chunk {
+	return llmgateway.Chunk{Done: true, Usage: llmgateway.TokenUsage{PromptTokens: prompt, CompletionTokens: completion}}
+}
+
 func collectEvents(ch <-chan *contracts.EngineEvent) []*contracts.EngineEvent {
 	var evs []*contracts.EngineEvent
 	for e := range ch {
@@ -166,6 +170,51 @@ func TestOrchestrator_RunTurn_SingleTurn_NoTools(t *testing.T) {
 	}
 	if p.TurnCount != 1 {
 		t.Errorf("persist TurnCount = %d, want 1", p.TurnCount)
+	}
+}
+
+func TestOrchestrator_RunTurn_CompleteCarriesUsageMetadata(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("hello"), usageDoneChunk(12800, 5),
+	}}
+	ctxPrep := &stubContext{prepared: PreparedContext{
+		Model:            "MiniMax-M2.5",
+		MaxContextTokens: 128000,
+	}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: &stubTools{}, Persist: &stubPersist{}, MaxTurns: 4,
+		DefaultModel: "fallback-model", MaxContextTokens: 64000,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-meta",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+			break
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if complete.Metadata["usage"] != "12805" {
+		t.Fatalf("usage metadata = %q, want 12805", complete.Metadata["usage"])
+	}
+	if complete.Metadata["model"] != "MiniMax-M2.5" {
+		t.Fatalf("model metadata = %q, want MiniMax-M2.5", complete.Metadata["model"])
+	}
+	if complete.Metadata["duration"] == "" {
+		t.Fatal("expected duration metadata")
+	}
+	if complete.Metadata["ctx_pct"] == "" {
+		t.Fatal("expected ctx_pct metadata")
 	}
 }
 

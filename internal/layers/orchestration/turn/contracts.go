@@ -36,10 +36,12 @@ type CompressHint struct {
 // PreparedContext is the output of D2-S15 PrepareExecutionContext, ready for
 // LLM consumption.
 type PreparedContext struct {
-	SystemPrompt string
-	Messages     []types.Message
-	Tools        []ToolSchema
-	CompressHint *CompressHint
+	SystemPrompt     string
+	Messages         []types.Message
+	Tools            []ToolSchema
+	CompressHint     *CompressHint
+	Model            string
+	MaxContextTokens int
 }
 
 // ToolRoundRequest is the input to D2-S18 ExecuteToolRound.
