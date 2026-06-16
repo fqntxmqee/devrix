@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-loop-first-routing`
 **Demand ID:** `DM-20260616-002`
-**Status:** Draft
+**Status:** Archived (S7)
 **Created:** 2026-06-16
 
 ---

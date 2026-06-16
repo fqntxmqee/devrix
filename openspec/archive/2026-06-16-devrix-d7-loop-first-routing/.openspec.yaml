@@ -1,0 +1,16 @@
+change_id: devrix-d7-loop-first-routing
+demand_id: DM-20260616-002
+title: D7 Loop-First Routing
+status: s7_archived
+created: 2026-06-16
+archived: 2026-06-16
+domain: orchestration
+domains: [D7]
+dsaft_scenarios: [D7-S2]
+t_points:
+  - D7-S2-L5-01
+  - D7-S2-L5-02
+  - D7-S2-L5-03
+  - D7-S2-L5-04
+  - D7-S2-L5-05
+  - D7-S2-L5-06
