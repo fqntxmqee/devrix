@@ -42,12 +42,18 @@ func InitOrchestration(
 	}
 
 	slog.Info("d7: initializing SessionOrchestrator",
+		"routing_mode", coordCfg.RoutingMode,
 		"fast_path_threshold", coordCfg.FastPathThreshold,
 		"command_first", coordCfg.CommandFirst,
 	)
 
+	routingMode := coordinator.RoutingModeLoopFirst
+	if coordCfg.RoutingMode == "rule_orchestrate" {
+		routingMode = coordinator.RoutingModeRuleOrchestrate
+	}
 	coordinatorFileCfg := coordinator.FileConfig{
 		Enabled:           boolPtr(coordCfg.Enabled),
+		RoutingMode:       strPtr(string(routingMode)),
 		FastPathThreshold: intPtr(coordCfg.FastPathThreshold),
 		CommandFirst:      boolPtr(coordCfg.CommandFirst),
 	}
@@ -63,15 +69,7 @@ func InitOrchestration(
 	// calls D3 directly for LLM and D2 via adapters for tools/persist.
 	ctxAdapter := newContextEngineAdapter(gw, ctxEngine, llmStack.TokenCounter)
 	llmInvoker := WireTurnInvoker(llmStack)
-	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
-		LLM:       llmInvoker,
-		Context:   ctxAdapter,
-		Tools:     ctxAdapter,
-		Persist:   ctxAdapter,
-		MaxTurns:  8,
-		ObsBridge: obsBridge,
-	})
-	executor := newTurnOrchExecutor(turnOrch)
+	loopFirst := coordinatorCfg.IsLoopFirst()
 
 	sink := newGatewayEventPublisher(gw)
 
@@ -95,10 +93,6 @@ func InitOrchestration(
 		return out
 	})
 
-	// DM-20260615-005 / D7-S5-A03: wire the LLM-augmented task
-	// synthesizer into the default OrchestratePath. Uses the same
-	// GatewayInvoker as the leader path; on parse/timeout failure the
-	// rule-based decomposeGoal fallback runs.
 	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
 		LLM:         llmInvoker,
 		DefaultTier: llmStack.DefaultModel,
@@ -111,6 +105,24 @@ func InitOrchestration(
 		ObsBridge:  obsBridge,
 	})
 
+	planMode := workmodel.NewPlanMode(newPlanLLMCompleter(llmInvoker, llmStack.DefaultModel), obsBridge)
+	toolExec := coordinator.NewTurnToolExecutor(ctxAdapter, orchPath, planMode, loopFirst)
+	if obsBridge != nil {
+		toolExec.SetTurnToolMetrics(coordinator.NewTurnToolMetrics(obsBridge.Meter()))
+	}
+
+	ctxPrep := &coordinator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
+
+	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
+		LLM:       llmInvoker,
+		Context:   ctxPrep,
+		Tools:     toolExec,
+		Persist:   ctxAdapter,
+		MaxTurns:  8,
+		ObsBridge: obsBridge,
+	})
+	executor := newTurnOrchExecutor(turnOrch)
+
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
@@ -118,6 +130,7 @@ func InitOrchestration(
 		coordinator.WithObservability(obsBridge),
 		coordinator.WithWorkModel(wm),
 		coordinator.WithOrchestratePath(orchPath),
+		coordinator.WithTurnToolExecutor(toolExec),
 	)
 
 	entry := coordinator.NewEntry(orch)
@@ -146,10 +159,11 @@ func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.Que
 		return nil, fmt.Errorf("turn executor: at least one message required")
 	}
 	return e.orch.RunTurn(ctx, turn.TurnRequest{
-		SessionID:   req.SessionID,
-		UserMessage: req.Messages[0],
-		MaxTurns:    req.MaxTurns,
-		Scope:       turn.TurnScopeMain,
+		SessionID:    req.SessionID,
+		UserMessage:  req.Messages[0],
+		SystemPrompt: req.SystemPrompt,
+		MaxTurns:     req.MaxTurns,
+		Scope:        turn.TurnScopeMain,
 	})
 }
 
@@ -174,6 +188,10 @@ func boolPtr(b bool) *bool {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func strPtr(s string) *string {
+	return &s
 }
 
 // mapBackgroundStatus converts a BackgroundRegistry status string to a

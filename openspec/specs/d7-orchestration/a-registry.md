@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.5.0
+**Version:** 3.6.0
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -72,7 +72,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | A ID | Name | Type | Input | Output | State Change | Status | Code Location |
 |------|------|------|-------|--------|--------------|--------|---------------|
-| D7-S2-A01 | ProcessMessage | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go` |
+| D7-S2-A01 | ProcessMessage | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go`（**loop_first** default: Skip/Command/Turn；**rule_orchestrate**: 4 独立链 CommandHandler/FastPath/OrchestratePath）|
 | D7-S2-A02 | EvaluateIntent | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 
@@ -141,7 +141,7 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
-| D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go`（v1.1.0+ 4 case = 4 独立执行链：`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip` 内联 close channel）|
+| D7-S2-A01 | ProcessMessage | D7-S2-A01-LEGACY | A-BE | message, session | events stream | session.orchestrating | ✅ | `orchestration/coordinator/orchestrator.go`（loop_first: Turn default；rule_orchestrate: 4 case 正交链）|
 | D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/coordinator/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/coordinator/interrupt.go` |
 | D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | ✅ | `hubspoke/dispatch.go`（v1.0 路径：`bootstrap/delegate.go` 已 wired） |

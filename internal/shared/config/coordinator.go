@@ -16,6 +16,7 @@ package config
 // remains for backward compatibility with existing config files.
 type CoordinatorConfig struct {
 	Enabled                     bool     `yaml:"enabled"`
+	RoutingMode                 string   `yaml:"routing_mode"`
 	FastPathThreshold           int      `yaml:"fast_path_threshold"`
 	CommandFirst                bool     `yaml:"command_first"`
 	LLMFallback                 bool     `yaml:"llm_fallback"`
@@ -28,6 +29,7 @@ type CoordinatorConfig struct {
 func DefaultCoordinatorConfig() CoordinatorConfig {
 	return CoordinatorConfig{
 		Enabled:                     true,
+		RoutingMode:                 "loop_first",
 		FastPathThreshold:           90,
 		CommandFirst:                true,
 		LLMFallback:                 false,
@@ -46,6 +48,9 @@ func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
 	}
 	if file.Enabled != nil {
 		cfg.Enabled = *file.Enabled
+	}
+	if file.RoutingMode != nil && *file.RoutingMode != "" {
+		cfg.RoutingMode = *file.RoutingMode
 	}
 	if file.FastPathThreshold != nil {
 		cfg.FastPathThreshold = *file.FastPathThreshold

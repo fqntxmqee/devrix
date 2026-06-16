@@ -100,8 +100,21 @@ func (g *CommunicationGateway) attachSessionAgent(
 		}
 	}
 	ag.SetEngineEventSink(func(ev *contracts.EngineEvent) {
+		if g.hasActiveProcess(session.SessionID) {
+			return
+		}
 		g.handleEngineEvent(ctx, session, ev)
 	})
+}
+
+func (g *CommunicationGateway) hasActiveProcess(sessionID string) bool {
+	if g == nil {
+		return false
+	}
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	_, ok := g.activeProcesses[sessionID]
+	return ok
 }
 
 type gatewayAgentObserver struct {

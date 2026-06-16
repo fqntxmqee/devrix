@@ -57,9 +57,9 @@ func NewRuleClassifier(cfg *Config) *RuleClassifier {
 			regexp.MustCompile(`^`+regexp.QuoteMeta(c)+`(?:\s|$)`))
 	}
 	rc.fastPatterns = []fastRule{
-		{regexp.MustCompile(`^(hi|hello|hey|你好|嗨)\b`), "greeting"},
-		{regexp.MustCompile(`^(thanks|thank you|thx|谢谢)\b`), "thanks"},
-		{regexp.MustCompile(`^(bye|goodbye|再见)\b`), "goodbye"},
+		{regexp.MustCompile(`^(hi|hello|hey|你好|嗨)(?:$|[\s,.!?])`), "greeting"},
+		{regexp.MustCompile(`^(thanks|thank you|thx|谢谢)(?:$|[\s,.!?])`), "thanks"},
+		{regexp.MustCompile(`^(bye|goodbye|再见)(?:$|[\s,.!?])`), "goodbye"},
 		{regexp.MustCompile(`^/help\b`), "help command"},
 		{regexp.MustCompile(`^/(status|version|ping)\b`), "status command"},
 	}
@@ -108,6 +108,15 @@ func (c *RuleClassifier) Classify(_ context.Context, message string) (IntentClas
 			}, nil
 		}
 	}
+	// Loop-first: all non-command messages enter the Turn loop; complexity
+	// is decided inside the loop via tool calls (Clawcode-aligned harness).
+	if c.cfg != nil && c.cfg.IsLoopFirst() {
+		return IntentClassification{
+			Kind:       IntentFast,
+			Confidence: 100,
+			Reason:     "loop_first_default",
+		}, nil
+	}
 	// Short single-token messages default to FastPath with lower confidence
 	// so they still go through the engine but get classified as fast.
 	if len(trimmed) <= 32 && !strings.ContainsAny(trimmed, "\n;") {
@@ -121,5 +130,40 @@ func (c *RuleClassifier) Classify(_ context.Context, message string) (IntentClas
 		Kind:       IntentOrchestrate,
 		Confidence: 60,
 		Reason:     "no fast pattern matched",
+	}, nil
+}
+
+// ClassifyLegacyTail applies rule_orchestrate tail logic (skip loop_first default).
+// Used by ShadowClassifier to decide loop_first shadow samples without affecting routing.
+func (c *RuleClassifier) ClassifyLegacyTail(_ context.Context, message string) (IntentClassification, error) {
+	if c.emptyPattern.MatchString(message) {
+		return IntentClassification{Kind: IntentSkip, Confidence: 100, Reason: "empty message"}, nil
+	}
+	trimmed := strings.TrimSpace(message)
+	if c.cfg != nil && c.cfg.CommandFirst {
+		for _, re := range c.commandRegexes {
+			if re.MatchString(trimmed) {
+				cmd := trimmed
+				if idx := strings.IndexAny(trimmed, " \t\n"); idx >= 0 {
+					cmd = trimmed[:idx]
+				}
+				return IntentClassification{
+					Kind: IntentCommand, Confidence: 100, Reason: "command whitelist match", Command: cmd,
+				}, nil
+			}
+		}
+	}
+	for _, r := range c.fastPatterns {
+		if r.pattern.MatchString(trimmed) {
+			return IntentClassification{Kind: IntentFast, Confidence: 95, Reason: r.reason}, nil
+		}
+	}
+	if len(trimmed) <= 32 && !strings.ContainsAny(trimmed, "\n;") {
+		return IntentClassification{
+			Kind: IntentFast, Confidence: 70, Reason: "short single-line message",
+		}, nil
+	}
+	return IntentClassification{
+		Kind: IntentOrchestrate, Confidence: 60, Reason: "no fast pattern matched",
 	}, nil
 }

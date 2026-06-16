@@ -8,7 +8,7 @@ import (
 )
 
 func TestLLMFallbackClassifier_Classify(t *testing.T) {
-	rule := NewRuleClassifier(DefaultConfig())
+	rule := NewRuleClassifier(RuleOrchestrateConfig())
 
 	tests := []struct {
 		name           string
@@ -115,7 +115,7 @@ func (m *mockLLMClassifier) ClassifyIntent(ctx context.Context, message string) 
 }
 
 func TestLLMFallbackClassifier_Timeout(t *testing.T) {
-	rule := NewRuleClassifier(DefaultConfig())
+	rule := NewRuleClassifier(RuleOrchestrateConfig())
 
 	slowLLM := &slowLLMClassifier{delay: 100 * time.Millisecond}
 	classifier := NewLLMFallbackClassifier(rule, slowLLM, 70)

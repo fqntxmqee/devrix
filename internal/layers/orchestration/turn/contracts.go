@@ -19,10 +19,11 @@ const (
 
 // TurnRequest is the input to RunTurn.
 type TurnRequest struct {
-	SessionID   string
-	UserMessage types.Message
-	MaxTurns    int
-	Scope       TurnScope
+	SessionID    string
+	UserMessage  types.Message
+	SystemPrompt string
+	MaxTurns     int
+	Scope        TurnScope
 }
 
 // CompressHint signals that D2 detected a token budget overrun and D7 should

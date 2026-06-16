@@ -66,6 +66,7 @@ func TestIntegration_D7WaveScheduler_RealDispatch(t *testing.T) {
 	})
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(
 			coordinator.NewTaskDecomposer(),
@@ -123,6 +124,7 @@ func TestIntegration_D7WaveScheduler_EmptyGraph(t *testing.T) {
 	})
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(
 			coordinator.NewTaskDecomposer(),
@@ -175,6 +177,7 @@ func TestIntegration_D7WaveScheduler_ConflictGuard(t *testing.T) {
 	})
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(
 			coordinator.NewTaskDecomposer(),

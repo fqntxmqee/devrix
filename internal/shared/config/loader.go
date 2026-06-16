@@ -114,6 +114,7 @@ type OrchestrationFileConfig struct {
 // config files; v1.1 may rename it to `coordinator`.
 type CoordinatorFileConfig struct {
 	Enabled                     *bool    `yaml:"enabled"`
+	RoutingMode                 *string  `yaml:"routing_mode"`
 	FastPathThreshold           *int     `yaml:"fast_path_threshold"`
 	CommandFirst                *bool    `yaml:"command_first"`
 	LLMFallback                 *bool    `yaml:"llm_fallback"`
