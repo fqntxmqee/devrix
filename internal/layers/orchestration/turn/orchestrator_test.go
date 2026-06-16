@@ -124,6 +124,54 @@ func hasType(evs []*contracts.EngineEvent, typ string) bool {
 
 // --- tests ---
 
+// D7-S2-A06-T01b: LLM request must contain exactly one copy of the current user turn.
+func TestOrchestrator_RunTurn_SingleUserMessageInLLMRequest(t *testing.T) {
+	var captured LLMInvokeRequest
+	llm := &stubLLM{fn: func(_ context.Context, req LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		captured = req
+		ch := make(chan llmgateway.Chunk, 1)
+		ch <- textChunk("ok")
+		close(ch)
+		return ch, nil
+	}}
+	history := []types.Message{
+		{Role: types.MessageRoleUser, Content: "上一轮", SessionID: "sess-dup"},
+		{Role: types.MessageRoleAssistant, Content: "回答", SessionID: "sess-dup"},
+	}
+	ctxPrep := &stubContext{prepared: PreparedContext{Messages: history}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: &stubTools{}, Persist: &stubPersist{}, MaxTurns: 1,
+	})
+
+	current := types.Message{
+		Role:      types.MessageRoleUser,
+		Content:   "d5和d6重构需求应该交付了，请结合代码判断一下",
+		SessionID: "sess-dup",
+	}
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-dup",
+		UserMessage: current,
+		MaxTurns:    1,
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	_ = collectEvents(ch)
+
+	userCount := 0
+	for _, m := range captured.Messages {
+		if m.Role == types.MessageRoleUser && m.Content == current.Content {
+			userCount++
+		}
+	}
+	if userCount != 1 {
+		t.Fatalf("expected 1 current user message in LLM request, got %d: %+v", userCount, captured.Messages)
+	}
+	if len(captured.Messages) != len(history)+1 {
+		t.Fatalf("expected %d messages (history + current), got %d: %+v", len(history)+1, len(captured.Messages), captured.Messages)
+	}
+}
+
 // D7-S2-A06-T01: Basic turn — PREPARE → LLM(text) → PERSIST → complete
 func TestOrchestrator_RunTurn_SingleTurn_NoTools(t *testing.T) {
 	llm := &stubLLM{chunks: []llmgateway.Chunk{

@@ -63,11 +63,11 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 	}
 
 	result := turn.PreparedContext{
-		Messages: []types.Message{req.Message},
-		Tools:    toolSchemas,
+		Tools: toolSchemas,
 	}
-	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
-		if sc, ok := ce.SessionContext(req.SessionID); ok && sc != nil {
+	if prov, ok := a.engine.(sessionContextProvider); ok {
+		if sc, ok := prov.SessionContext(req.SessionID); ok && sc != nil {
+			result.Messages = copySessionMessages(sc.Messages)
 			result.Model = sc.Model
 			result.MaxContextTokens = sc.TokenBudget.MaxContextTokens
 		}
@@ -76,18 +76,39 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 		result.Model = session.Model
 	}
 
-	// D-e: check token budget and generate CompressHint if needed.
-	if a.counter != nil && len(result.Messages) > 0 {
-		tokens := a.counter.CountMessages(result.Messages)
-		if tokens > compressThreshold {
-			result.CompressHint = &turn.CompressHint{
-				MessagesToSummarize: result.Messages,
-				TargetTokenBudget:   compressThreshold / 2,
+	// D-e: check token budget and generate CompressHint when exceeded.
+	// Count history + current turn; TurnOrchestrator appends req.Message separately.
+	if a.counter != nil {
+		toCount := append([]types.Message(nil), result.Messages...)
+		if req.Message.Content != "" || req.Message.Role != "" {
+			toCount = append(toCount, req.Message)
+		}
+		if len(toCount) > 0 {
+			tokens := a.counter.CountMessages(toCount)
+			if tokens > compressThreshold {
+				result.CompressHint = &turn.CompressHint{
+					MessagesToSummarize: result.Messages,
+					TargetTokenBudget:   compressThreshold / 2,
+				}
 			}
 		}
 	}
 
 	return result, nil
+}
+
+// sessionContextProvider is implemented by *contextengine.ContextEngine.
+type sessionContextProvider interface {
+	SessionContext(sessionID string) (*types.SessionContext, bool)
+}
+
+func copySessionMessages(msgs []types.Message) []types.Message {
+	if len(msgs) == 0 {
+		return nil
+	}
+	out := make([]types.Message, len(msgs))
+	copy(out, msgs)
+	return out
 }
 
 func parseToolParams(raw string) map[string]any {
