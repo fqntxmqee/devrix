@@ -173,3 +173,49 @@ func TestPlanAgent_MinimalWhitelist_StillValid(t *testing.T) {
 		}
 	}
 }
+
+// T: D7-S5-A02-F01-T01 — whitelist tool passes validation.
+func TestPlanAgent_ValidateToolCall_Allowed(t *testing.T) {
+	a := &PlanAgent{}
+	for _, tool := range PlanAgentReadOnlyTools {
+		if err := a.ValidateToolCall(tool); err != nil {
+			t.Fatalf("ValidateToolCall(%q) = %v, want nil (whitelist tool)", tool, err)
+		}
+	}
+}
+
+// T: D7-S5-A02-F01-T02 — forbidden tool is rejected.
+func TestPlanAgent_ValidateToolCall_Forbidden(t *testing.T) {
+	a := &PlanAgent{}
+	for _, tool := range PlanAgentForbiddenTools {
+		err := a.ValidateToolCall(tool)
+		if err == nil {
+			t.Fatalf("ValidateToolCall(%q) = nil, want error (forbidden tool)", tool)
+		}
+		if !strings.Contains(err.Error(), "forbidden") {
+			t.Fatalf("ValidateToolCall(%q) error = %q, want 'forbidden' in message", tool, err.Error())
+		}
+	}
+}
+
+// T: D7-S5-A02-F01-T03 — unknown tool is rejected.
+func TestPlanAgent_ValidateToolCall_Unknown(t *testing.T) {
+	a := &PlanAgent{}
+	for _, name := range []string{"unknown_tool", "Write", "READ"} {
+		err := a.ValidateToolCall(name)
+		if err == nil {
+			t.Fatalf("ValidateToolCall(%q) = nil, want error (unknown tool)", name)
+		}
+	}
+}
+
+// T: D7-S5-A02-F01-T04 — nil receiver passes through safely.
+func TestPlanAgent_ValidateToolCall_NilReceiver(t *testing.T) {
+	var a *PlanAgent
+	if err := a.ValidateToolCall("write"); err != nil {
+		t.Fatalf("nil receiver ValidateToolCall = %v, want nil (passthrough)", err)
+	}
+	if err := a.ValidateToolCall("bash"); err != nil {
+		t.Fatalf("nil receiver ValidateToolCall(bash) = %v, want nil (passthrough)", err)
+	}
+}

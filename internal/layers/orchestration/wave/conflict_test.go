@@ -87,3 +87,58 @@ func TestConflictGuard_GlobMatching(t *testing.T) {
 		t.Fatal("expected **/*.go to match")
 	}
 }
+
+// T: D7-S3-A01-F03-T01 — AllowAndRegister succeeds and registers.
+func TestConflictGuard_AllowAndRegister_NoConflict(t *testing.T) {
+	g := NewConflictGuard()
+	node := TaskNode{ID: "a", WorkerType: WorkerSubAgent, ConflictGroup: "db"}
+
+	if !g.AllowAndRegister(node, "s1", nil) {
+		t.Fatal("expected AllowAndRegister to succeed with empty guard")
+	}
+	if len(g.Running()) != 1 {
+		t.Fatalf("expected 1 running task after registration, got %d", len(g.Running()))
+	}
+}
+
+// T: D7-S3-A01-F03-T02 — AllowAndRegister blocks on conflict group.
+func TestConflictGuard_AllowAndRegister_ConflictGroup(t *testing.T) {
+	g := NewConflictGuard()
+	a := TaskNode{ID: "a", WorkerType: WorkerSubAgent, ConflictGroup: "db"}
+	b := TaskNode{ID: "b", WorkerType: WorkerSubAgent, ConflictGroup: "db"}
+
+	g.Register(RunningTask{Node: a, SlotID: "s1"})
+	if g.AllowAndRegister(b, "s2", nil) {
+		t.Fatal("expected AllowAndRegister to block on same conflict group")
+	}
+	if len(g.Running()) != 1 {
+		t.Fatalf("expected 1 running task (b not registered), got %d", len(g.Running()))
+	}
+}
+
+// T: D7-S3-A01-F03-T03 — AllowAndRegister allows different groups.
+func TestConflictGuard_AllowAndRegister_DifferentGroup(t *testing.T) {
+	g := NewConflictGuard()
+	a := TaskNode{ID: "a", WorkerType: WorkerSubAgent, ConflictGroup: "db"}
+	b := TaskNode{ID: "b", WorkerType: WorkerSubAgent, ConflictGroup: "fs"}
+
+	g.Register(RunningTask{Node: a, SlotID: "s1"})
+	if !g.AllowAndRegister(b, "s2", nil) {
+		t.Fatal("expected AllowAndRegister to allow different conflict group")
+	}
+	if len(g.Running()) != 2 {
+		t.Fatalf("expected 2 running tasks, got %d", len(g.Running()))
+	}
+}
+
+// T: D7-S3-A01-F03-T04 — AllowAndRegister blocks on file scope intersection.
+func TestConflictGuard_AllowAndRegister_FileScope(t *testing.T) {
+	g := NewConflictGuard()
+	a := TaskNode{ID: "a", WorkerType: WorkerSubAgent, FileScope: []string{"src/auth/**"}}
+	b := TaskNode{ID: "b", WorkerType: WorkerSubAgent, FileScope: []string{"src/auth/login.go"}}
+
+	g.Register(RunningTask{Node: a, SlotID: "s1"})
+	if g.AllowAndRegister(b, "s2", nil) {
+		t.Fatal("expected AllowAndRegister to block on file scope intersection")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
@@ -24,7 +25,10 @@ import (
 
 // D7StackOptions configures InitOrchestration integration test wiring.
 type D7StackOptions struct {
-	LLMStub       *D7LLMStub
+	// LLMStub is the IAdapter used for D3 calls. When nil, defaults to
+	// &D7LLMStub{Response: "D7 integration OK"}. Tests can inject
+	// *D7LLMStub, *SequenceLLMStub, or any custom llmgateway.IAdapter.
+	LLMStub       llmgateway.IAdapter
 	ExecutionFlow bool
 	Delegate      bool
 	MultiAgent    bool
@@ -44,7 +48,7 @@ type D7TestStack struct {
 	Gateway   *capture.CommunicationGateway
 	Handler   *MockEventHandler
 	Engine    *contextengine.ContextEngine
-	LLMStub   *D7LLMStub
+	LLMStub   llmgateway.IAdapter
 	WorkDir   string
 }
 

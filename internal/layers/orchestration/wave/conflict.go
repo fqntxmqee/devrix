@@ -68,6 +68,31 @@ func (g *ConflictGuard) Register(t RunningTask) {
 	g.running[t.SlotID] = t
 }
 
+// AllowAndRegister atomically checks the candidate against running tasks
+// and, if allowed, registers it. Returns true when the task was registered.
+// This eliminates the TOCTOU window between separate Allow+Register calls.
+func (g *ConflictGuard) AllowAndRegister(candidate TaskNode, slotID SlotID, running []RunningTask) bool {
+	if g == nil {
+		return true
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	effective := make([]RunningTask, 0, len(g.running)+len(running))
+	for _, r := range g.running {
+		effective = append(effective, r)
+	}
+	effective = append(effective, running...)
+
+	for _, r := range effective {
+		if conflictBetween(candidate, r.Node) {
+			return false
+		}
+	}
+	g.running[slotID] = RunningTask{Node: candidate, SlotID: slotID}
+	return true
+}
+
 // Unregister removes a running task by slot id (idempotent).
 func (g *ConflictGuard) Unregister(slotID SlotID) {
 	if g == nil {

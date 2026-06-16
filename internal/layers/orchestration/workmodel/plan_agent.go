@@ -58,6 +58,12 @@ func (a *PlanAgent) AllowedTools() []string {
 	return PlanAgentReadOnlyTools
 }
 
+// HasLLM reports whether the PlanAgent has a usable LLM backend.
+// nil-receiver safe.
+func (a *PlanAgent) HasLLM() bool {
+	return a != nil && a.llm != nil
+}
+
 // IsReadOnlyTool reports whether the named tool is in the read-only
 // whitelist. nil-receiver safe: returns false instead of panicking.
 func (a *PlanAgent) IsReadOnlyTool(name string) bool {
@@ -70,6 +76,25 @@ func (a *PlanAgent) IsReadOnlyTool(name string) bool {
 		}
 	}
 	return false
+}
+
+// ValidateToolCall checks whether the named tool is allowed in PlanAgent's
+// read-only sandbox. It returns an error describing the violation if the
+// tool is forbidden or not in the whitelist. nil-receiver safe: returns nil
+// (passthrough — no sandbox without a PlanAgent).
+func (a *PlanAgent) ValidateToolCall(name string) error {
+	if a == nil {
+		return nil
+	}
+	if a.IsReadOnlyTool(name) {
+		return nil
+	}
+	for _, fb := range PlanAgentForbiddenTools {
+		if fb == name {
+			return fmt.Errorf("plan mode: tool %q is forbidden (write/execute not allowed in read-only sandbox)", name)
+		}
+	}
+	return fmt.Errorf("plan mode: tool %q is not in the read-only whitelist", name)
 }
 
 // LLMCompleter interface for LLM calls.

@@ -50,3 +50,55 @@ func (s *D7LLMStub) Stream(ctx context.Context, req *llmgateway.Request) (<-chan
 func (s *D7LLMStub) Provider() string { return "deepseek" }
 
 func (s *D7LLMStub) Protocol() string { return adapter.ProtocolStub }
+
+// SequenceLLMStub is an IAdapter that returns different Responses for each
+// Stream call. Each element of Responses is a sequence of chunks emitted
+// for one invocation (call 1 → Responses[0], call 2 → Responses[1], etc.).
+// If more calls are made than configured Responses, it reuses the last entry.
+type SequenceLLMStub struct {
+	Responses [][]llmgateway.Chunk
+	CallCount atomic.Int64
+}
+
+func (s *SequenceLLMStub) Stream(ctx context.Context, req *llmgateway.Request) (<-chan *llmgateway.AdapterChunk, error) {
+	idx := int(s.CallCount.Add(1)) - 1
+	chunks := s.pickResponses(idx)
+
+	ch := make(chan *llmgateway.AdapterChunk, len(chunks)+1)
+	for _, c := range chunks {
+		ch <- &llmgateway.AdapterChunk{Parsed: &llmgateway.Chunk{
+			Content:   c.Content,
+			Thinking:  c.Thinking,
+			ToolCalls: c.ToolCalls,
+			Done:      c.Done,
+			Usage:     c.Usage,
+		}}
+		if c.Done {
+			close(ch)
+			return ch, nil
+		}
+	}
+	// If no Done chunk in the sequence, append one
+	ch <- &llmgateway.AdapterChunk{
+		Parsed: &llmgateway.Chunk{
+			Done:  true,
+			Usage: llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		},
+	}
+	close(ch)
+	return ch, nil
+}
+
+func (s *SequenceLLMStub) pickResponses(idx int) []llmgateway.Chunk {
+	if len(s.Responses) == 0 {
+		return []llmgateway.Chunk{{Content: "D7 integration OK"}}
+	}
+	if idx < len(s.Responses) {
+		return s.Responses[idx]
+	}
+	return s.Responses[len(s.Responses)-1]
+}
+
+func (s *SequenceLLMStub) Provider() string { return "deepseek" }
+
+func (s *SequenceLLMStub) Protocol() string { return adapter.ProtocolStub }

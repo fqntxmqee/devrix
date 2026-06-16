@@ -118,7 +118,6 @@ type CoordinatorFileConfig struct {
 	CommandFirst                *bool    `yaml:"command_first"`
 	LLMFallback                 *bool    `yaml:"llm_fallback"`
 	AdvisoryValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
-	PlanModeApproveGate         *bool    `yaml:"plan_mode_approve_gate"`
 	CommandWhitelist            []string `yaml:"command_whitelist"`
 }
 

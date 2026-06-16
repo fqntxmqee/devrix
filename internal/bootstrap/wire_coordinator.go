@@ -44,14 +44,12 @@ func InitOrchestration(
 	slog.Info("d7: initializing SessionOrchestrator",
 		"fast_path_threshold", coordCfg.FastPathThreshold,
 		"command_first", coordCfg.CommandFirst,
-		"plan_mode_approve_gate", coordCfg.PlanModeApproveGate,
 	)
 
 	coordinatorFileCfg := coordinator.FileConfig{
-		Enabled:             boolPtr(coordCfg.Enabled),
-		FastPathThreshold:   intPtr(coordCfg.FastPathThreshold),
-		CommandFirst:        boolPtr(coordCfg.CommandFirst),
-		PlanModeApproveGate: boolPtr(coordCfg.PlanModeApproveGate),
+		Enabled:           boolPtr(coordCfg.Enabled),
+		FastPathThreshold: intPtr(coordCfg.FastPathThreshold),
+		CommandFirst:      boolPtr(coordCfg.CommandFirst),
 	}
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 

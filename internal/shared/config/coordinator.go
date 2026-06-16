@@ -20,7 +20,6 @@ type CoordinatorConfig struct {
 	CommandFirst                bool     `yaml:"command_first"`
 	LLMFallback                 bool     `yaml:"llm_fallback"`
 	AdvisoryValidationTimeoutMs int      `yaml:"d6_validation_timeout_ms"`
-	PlanModeApproveGate         bool     `yaml:"plan_mode_approve_gate"`
 	CommandWhitelist            []string `yaml:"command_whitelist"`
 }
 
@@ -33,7 +32,6 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 		CommandFirst:                true,
 		LLMFallback:                 false,
 		AdvisoryValidationTimeoutMs: 50,
-		PlanModeApproveGate:         true,
 		CommandWhitelist: []string{
 			"/plan", "/stop", "/task", "/help",
 		},
@@ -60,9 +58,6 @@ func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
 	}
 	if file.AdvisoryValidationTimeoutMs != nil {
 		cfg.AdvisoryValidationTimeoutMs = *file.AdvisoryValidationTimeoutMs
-	}
-	if file.PlanModeApproveGate != nil {
-		cfg.PlanModeApproveGate = *file.PlanModeApproveGate
 	}
 	if len(file.CommandWhitelist) > 0 {
 		cfg.CommandWhitelist = file.CommandWhitelist
