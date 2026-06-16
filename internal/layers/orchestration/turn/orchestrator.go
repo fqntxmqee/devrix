@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -16,23 +17,27 @@ import (
 
 // OrchestratorDeps holds the dependencies for the TurnOrchestrator.
 type OrchestratorDeps struct {
-	LLM       LLMInvoker
-	Context   ContextPreparer
-	Tools     ToolRoundExecutor
-	Persist   SessionPersister
-	MaxTurns  int
-	ObsBridge *observability.Bridge
+	LLM              LLMInvoker
+	Context          ContextPreparer
+	Tools            ToolRoundExecutor
+	Persist          SessionPersister
+	MaxTurns         int
+	DefaultModel     string
+	MaxContextTokens int
+	ObsBridge        *observability.Bridge
 }
 
 // DefaultOrchestrator implements TurnOrchestrator with the canonical
 // prepare→llm→tools→persist state machine (design.md §3).
 type DefaultOrchestrator struct {
-	llm       LLMInvoker
-	context   ContextPreparer
-	tools     ToolRoundExecutor
-	persist   SessionPersister
-	maxTurns  int
-	obsBridge *observability.Bridge
+	llm              LLMInvoker
+	context          ContextPreparer
+	tools            ToolRoundExecutor
+	persist          SessionPersister
+	maxTurns         int
+	defaultModel     string
+	maxContextTokens int
+	obsBridge        *observability.Bridge
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -41,12 +46,14 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		deps.MaxTurns = 8
 	}
 	return &DefaultOrchestrator{
-		llm:       deps.LLM,
-		context:   deps.Context,
-		tools:     deps.Tools,
-		persist:   deps.Persist,
-		maxTurns:  deps.MaxTurns,
-		obsBridge: deps.ObsBridge,
+		llm:              deps.LLM,
+		context:          deps.Context,
+		tools:            deps.Tools,
+		persist:          deps.Persist,
+		maxTurns:         deps.MaxTurns,
+		defaultModel:     deps.DefaultModel,
+		maxContextTokens: deps.MaxContextTokens,
+		obsBridge:        deps.ObsBridge,
 	}
 }
 
@@ -82,6 +89,7 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 // runLoop is the internal state machine: PREPARE → LLM ↔ TOOL_ROUND → PERSIST.
 // Cross-domain calls: D7→D2 (prepare/tools/persist), D7→D3 (LLM invoke).
 func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) {
+	start := time.Now()
 	// Step 1: PREPARE — D7 calls D2 for context assembly
 	ctx, prepSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
@@ -120,7 +128,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	messages = append(messages, req.UserMessage)
 
 	tools := prepared.Tools
+	model := prepared.Model
+	maxContextTokens := prepared.MaxContextTokens
 	var totalUsage llmgateway.TokenUsage
+	var lastPromptTokens int
 	var finalText string
 
 	// Step 2+3: LLM↔Tool loop
@@ -182,6 +193,9 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			if chunk.Done {
 				totalUsage.PromptTokens += chunk.Usage.PromptTokens
 				totalUsage.CompletionTokens += chunk.Usage.CompletionTokens
+				if chunk.Usage.PromptTokens > 0 {
+					lastPromptTokens = chunk.Usage.PromptTokens
+				}
 			}
 		}
 		endSpan(llmSpan)
@@ -204,10 +218,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			})
 			endSpan(persistSpan)
 			endSpan(turnSpan)
-			out <- &contracts.EngineEvent{
-				Type:      "complete",
-				SessionID: req.SessionID,
-			}
+			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens)
 			return
 		}
 
@@ -293,10 +304,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		FinalText:  finalText,
 	})
 	endSpan(persistSpan)
-	out <- &contracts.EngineEvent{
-		Type:      "complete",
-		SessionID: req.SessionID,
-	}
+	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens)
 }
 
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string) {
@@ -304,6 +312,38 @@ func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessi
 		Type:      "error",
 		Content:   content,
 		SessionID: sessionID,
+	}
+}
+
+func (o *DefaultOrchestrator) emitComplete(
+	out chan<- *contracts.EngineEvent,
+	sessionID string,
+	start time.Time,
+	usage llmgateway.TokenUsage,
+	lastPromptTokens int,
+	model string,
+	maxContextTokens int,
+) {
+	if model == "" {
+		model = o.defaultModel
+	}
+	if maxContextTokens <= 0 {
+		maxContextTokens = o.maxContextTokens
+	}
+	meta := map[string]string{
+		"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+		"usage":    fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens),
+	}
+	if model != "" {
+		meta["model"] = model
+	}
+	if pct := contracts.ComputeCtxPct(lastPromptTokens, maxContextTokens); pct > 0 {
+		meta["ctx_pct"] = fmt.Sprintf("%d", pct)
+	}
+	out <- &contracts.EngineEvent{
+		Type:      "complete",
+		SessionID: sessionID,
+		Metadata:  meta,
 	}
 }
 

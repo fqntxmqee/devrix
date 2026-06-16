@@ -59,6 +59,13 @@ func InitOrchestration(
 	}
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 
+	maxContextTokens := config.DefaultContextEngineConfig().MaxContextTokens
+	if configFile != "" {
+		if fileCfg, err := config.LoadConfigFile(configFile); err == nil && fileCfg.ContextEngine.MaxContextTokens > 0 {
+			maxContextTokens = fileCfg.ContextEngine.MaxContextTokens
+		}
+	}
+
 	var obsBridge *observability.Bridge
 	if b, ok := obsBridgeArg.(*observability.Bridge); ok {
 		obsBridge = b
@@ -114,12 +121,14 @@ func InitOrchestration(
 	ctxPrep := &coordinator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
 
 	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
-		LLM:       llmInvoker,
-		Context:   ctxPrep,
-		Tools:     toolExec,
-		Persist:   ctxAdapter,
-		MaxTurns:  8,
-		ObsBridge: obsBridge,
+		LLM:              llmInvoker,
+		Context:          ctxPrep,
+		Tools:            toolExec,
+		Persist:          ctxAdapter,
+		MaxTurns:         8,
+		DefaultModel:     llmStack.DefaultModel,
+		MaxContextTokens: maxContextTokens,
+		ObsBridge:        obsBridge,
 	})
 	executor := newTurnOrchExecutor(turnOrch)
 
