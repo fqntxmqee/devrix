@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/fallback"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
@@ -47,11 +46,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		asyncCompact = compression.NewAsyncAutocompacter(summarizer)
 	}
 	toolsReg := deps.ToolsReg
-	harnessBoot := fallback.NewBootstrap(fallback.BootstrapDeps{
-		Config:    cfg.Harness,
-		ToolsReg:  toolRegistryAdapter{reg: toolsReg},
-		ObsBridge: deps.ObsBridge,
-	})
 	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
 
 	loop := &query.Loop{
@@ -106,11 +100,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		tools:        deps.Tools,
 		toolsReg:     toolsReg,
 		permission:   deps.Permission,
-		harnessBoot:  harnessBoot,
 		assembler:    prompt.NewSystemPromptAssembler(cfg.Workspace),
-		preflight:    fallback.NewPreflightEvaluator(cfg.Preflight, fallback.NewToolPoolFilter(cfg.Harness.ToolPool)),
-		router:       fallback.NewPromptRouter(cfg.Harness.Routing),
-		transcript:   fallback.NewTranscriptManager(cfg.Harness.Transcript),
 		mainTranscript: mainTranscript,
 		attachReg:      attachments.NewRegistry(cfg.Attachments),
 		sessionQueue:   deps.SessionCommandQueue,

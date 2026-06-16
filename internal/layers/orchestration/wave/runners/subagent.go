@@ -37,7 +37,7 @@ type SubAgentDeps struct {
 }
 
 // SubAgentParams is what SubAgentRunner needs to start a SubQuery. It mirrors
-// nested.SubQueryParams but is local to avoid an import cycle.
+// enforce.SubQueryParams but is local to avoid an import cycle.
 type SubAgentParams struct {
 	SessionID string
 	AgentID   string

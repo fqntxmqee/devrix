@@ -79,35 +79,6 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	}
 }
 
-// D2-S11-A01-T02 副: 显式 query_loop.enabled=false → 路径计数走 legacy。
-func TestContextEngine_QueryLoopDisabled_LegacyIncrement(t *testing.T) {
-	runtime.Reset()
-
-	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.Enabled = false
-	cfg.Harness.Enabled = true
-
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{Output: "tool out"},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
-	})
-
-	session := types.NewSession("sess_legacy_2_9_02", "cli", t.TempDir())
-	ch := engine.Process(context.Background(), session, "ping")
-	for ev := range ch {
-		_ = ev
-	}
-
-	snap := runtime.Snapshot()
-	if snap.LegacyHarness < 1 {
-		t.Errorf("legacy_harness = %d, want >= 1 (explicit query_loop.enabled=false must take the legacy path)", snap.LegacyHarness)
-	}
-}
-
 // itoa is a tiny no-allocation integer formatter used to label sessions
 // in the 100-iteration baseline test. Avoids pulling in fmt just for one
 // call site.

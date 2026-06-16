@@ -3,9 +3,9 @@
 **Domain ID:** D2
 **Slug:** `contextengine`
 **Type:** Core Domain
-**Status:** Active — Canonical S15–S20 (v1.0 registry, DM-20260614-009)
-**Version:** 6.1.0
-**Last Updated:** 2026-06-15
+**Status:** Active — Canonical S15–S18 (v2.0 final, S19 dismantled, S20 removed)
+**Version:** 7.0.0
+**Last Updated:** 2026-06-16
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
@@ -23,8 +23,8 @@
 | LLM↔Tool 多轮（Legacy 冻结 → D7-S2-A06） | ~~D2-S16 RunQueryLoop~~ |
 | Tool 权限/沙箱先于执行 | D2-S18 EnforceExecutionPolicy |
 | Turn 后状态 durable + deferred complete | D2-S17 PersistSessionState |
-| 嵌套 SubQuery/Background 有边界 | D2-S19 NestedExecution |
-| Legacy Harness 仅显式配置 | D2-S20 LegacyHarnessFallback |
+| 嵌套 SubQuery/Background 有边界 | ~~D2-S19 NestedExecution~~ → S15+S18 拆分 |
+| ~~Legacy Harness 仅显式配置~~ | D2-S20 LegacyHarnessFallback（**REMOVED v6.5.0**） |
 
 ---
 
@@ -51,8 +51,8 @@
 | D2-S16 | RunQueryLoop | LLM↔Tool 执行原语（Thin Loop） | **LEGACY FREEZE（DM-020）** |
 | D2-S17 | PersistSessionState | Snapshot, transcript, commit window | REGISTRY |
 | D2-S18 | EnforceExecutionPolicy | Permission, sandbox, tool surface | **REGISTRY（自 S16 拆出 tool 面，DM-020）** |
-| D2-S19 | NestedExecution | SubQuery, background, fork, sidechain | REGISTRY |
-| D2-S20 | LegacyHarnessFallback | `query_loop.enabled=false` 路径 | REGISTRY |
+| D2-S19 | NestedExecution | ~~SubQuery, background, fork, sidechain~~ → S15+S18 拆分 | **DISMANTLED（v6.4.0）** |
+| D2-S20 | LegacyHarnessFallback | ~~`query_loop.enabled=false` 路径~~ | **REMOVED（v6.5.0）**: harness 完全移除 |
 
 ### Legacy Module Index（冻结追溯）— D2-S1–S14
 
@@ -66,7 +66,7 @@
 | D2-S6 | Snapshot | Legacy | → S17 |
 | D2-S7 | Prompt | Legacy | → S15 |
 | D2-S8 | Sandbox | Legacy | → S18 |
-| D2-S9 | Harness | Legacy | → S20 |
+| D2-S9 | Harness | Legacy | → **REMOVED** |
 | D2-S10 | QueryLoop | Legacy | → S16, S18, S19 |
 | D2-S11 | Queue | Legacy | → **D7-S4** |
 | D2-S12 | Worktree | Legacy | → S18 |
@@ -74,6 +74,23 @@
 | D2-S14 | Mock | Legacy | 测试辅助 |
 
 > **Change:** `openspec/archive/2026-06-14-devrix-d2-sa-refine/` (DM-20260614-009)
+
+### 物理路径映射表（Canonical S → 代码目录）
+
+| Canonical S | Scenario | 物理路径 |
+|-------------|----------|---------|
+| D2-S15 | PrepareExecutionContext | `prepare/` (memory/, compression/, prompt/, conversation/fork.go+fork_worker.go, attachments/, usercontext/) |
+| D2-S16 | RunQueryLoop | `query/` (loop.go) + `engine.go` (facade) |
+| D2-S17 | PersistSessionState | `persist/` (snapshot/, transcript/) + `engine_persist.go` |
+| D2-S18 | EnforceExecutionPolicy | `enforce/` (permission/, toolrunner/, registry/, tool_filter.go, agent_role_filter.go, background.go, subquery.go, background_task_tools.go, queryloop_tools.go) |
+| D2-S19 | ~~NestedExecution~~ → S15+S18 | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` |
+| D2-S20 | ~~LegacyHarnessFallback~~ | **REMOVED（v6.5.0）**: `fallback/` 目录已删除，所有 harness 相关代码已清理 |
+
+> **v2.0 重命名记录：**
+> - `policy/` → `enforce/`（2026-06-16，对齐 D1 capture/channel/delivery 模式）
+> - `harness/` → `fallback/`（2026-06-16，语义化 LEGACY 标记）
+> - `attachments/` → `prepare/attachments/`（2026-06-16）
+> - `usercontext/` → `prepare/usercontext/`（2026-06-16）
 
 ---
 
@@ -110,7 +127,7 @@ D1 → D7.ProcessMessage → D7.RunTurnLoop（D7-S2-A06）
 |---------|--------------|
 | FastPath | S15→S16→S17 |
 | Wave Worker (D2) | S16 + S18 per worker |
-| SubQuery / Background | S19 |
+| SubQuery / Background | S15（fork）+ S18（subquery/background） |
 | PlanMode（决策在 D7-S5） | S18 机制执行 |
 
 ### 注入点（D7 → D2，非 D2 编排）
@@ -147,21 +164,24 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 
 ---
 
-## 实现状态（2026-06-15）
+## 实现状态（2026-06-16, v7.0.0）
 
 | 项 | 状态 |
 |----|------|
 | QueryLoop 主路径 | ✅ IMPLEMENTED |
 | Per-turn compression | ✅ IMPLEMENTED |
 | Deferred complete | ✅ IMPLEMENTED |
-| D2 Thin（query 无 orchestration/multiagent） | ✅ IMPLEMENTED | `d2_thin_test.go` |
-| D7 ingress（capture 无 contextengine） | ✅ IMPLEMENTED | `d7_boundary_test.go` |
-| tasks/ 归 D7 | ✅ 已迁入 `orchestration/workmodel/`（DM-20260614-009 v1.1 closure） |
-| ~~delegate_tools 移除~~ | ✅ `orchestration/delegatetools/` (DM-011) |
-| scenario 物理路径 S15/S17/S18 | ⬜ v2.0 |
-| **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ✅ v1.0 Registry（DM-020, commit 41aec47） |
-| **D2→D3 import lint（CI 硬阻断）** | ✅ v2.0-d（DM-020, `lint/layer::TestD2_D3Ban` 4 whitelist = 4 fallback 路径） |
-| **S18 ExecuteToolRound 拆面** | ✅ v2.0-d（DM-020, D7 → `ContextPreparer` / `ToolRoundExecutor` / `SessionPersister`） |
+| D2 Thin（query 无 orchestration/multiagent） | ✅ IMPLEMENTED |
+| D7 ingress（capture 无 contextengine） | ✅ IMPLEMENTED |
+| tasks/ 归 D7 | ✅ 已迁入 `orchestration/workmodel/` |
+| scenario 物理路径 S15/S17/S18 | ✅ IMPLEMENTED |
+| **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ✅ v1.0 Registry（DM-020） |
+| **D2→D3 import lint（CI 硬阻断）** | ✅ v2.0-d（DM-020） |
+| **S18 ExecuteToolRound 拆面** | ✅ v2.0-d（DM-020） |
+| **S20 LegacyHarnessFallback 移除** | ✅ 所有 harness 代码、类型、测试已删除 |
+| **S19 NestedExecution 拆解** | ✅ fork→prepare/conversation/, subquery+background→enforce/ |
+| **v2.0 根目录瘦身** | ✅ 11 生产文件（~1000行），engine.go 212行 Facade |
+| **工具注册迁入 enforce/** | ✅ `background_task_tools.go` + `queryloop_tools.go` → `enforce/` |
 
 ---
 
@@ -170,6 +190,11 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | Version | Date | Changes |
 |---------|------|---------|
 | 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
+| 7.0.0 | 2026-06-16 | **v2.0 终态**: (1) `background_task_tools.go` + `queryloop_tools.go` → `enforce/`; (2) 根目录合并 `tool_register.go`→`tool_context.go`; (3) `spans.go` 清理 harness span 死引用; (4) 根目录 11 生产文件 `engine.go` 212行 Facade |
+| 6.5.1 | 2026-06-16 | **根目录瘦身**: `process_overlay.go` → `prepare/conversation/fork_worker.go`; 删除死代码 `tool_messages.go`; `tool_context.go` 移除 `parseToolInput`/`toolInputString` 包装函数 |
+| 6.5.0 | 2026-06-16 | **S20 移除**: `fallback/` 目录删除，`engine_harness.go` + `harness_adapter.go` 删除，`engine.go` 去 harness 分支，`assembler.go` 清理 harness 字段，`types/harness.go` 删除，`SessionContext.Harness`/`.Transcript` + `Session.HarnessInitialized` 移除 |
+| 6.4.0 | 2026-06-16 | **S19 拆解（DISMANTLED）**: fork.go → `prepare/conversation/`（S15），subquery.go + background.go → `enforce/`（S18），所有外部 import `nested.` → `enforce.`，`nested/` 目录删除 |
+| 6.3.0 | 2026-06-16 | **v2.0 物理重构同步**：(1) 新增物理路径映射表；(2) 实现状态 `scenario 物理路径 S15/S17/S18` ⬜ v2.0 → ✅ IMPLEMENTED；(3) 记录 `policy/`→`enforce/`、`harness/`→`fallback/`、`attachments/`→`prepare/`、`usercontext/`→`prepare/` 重命名 |
 | 6.2.0 | 2026-06-15 | **D7 Real-Closure Spec Sync (D2 侧)**：(1) 实现状态表 `tasks/ 归 D7` ⬜ v2.0 → ✅ 已迁入 `orchestration/workmodel/`（DM-20260614-009 v1.1 closure，commit 41aec47 后）；(2) Out of Scope 表 `Task 写模型 / PlanMode` 备注从 `代码暂在 tasks/` 改为 `✅ 已迁入 orchestration/workmodel/` |
 
 ---

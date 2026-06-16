@@ -7,7 +7,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
@@ -87,7 +87,7 @@ func contextEngineFrom(engine contracts.IEngine) *contextengine.ContextEngine {
 }
 
 func buildSubAgentDeps(ce *contextengine.ContextEngine, gw *capture.CommunicationGateway) runners.SubAgentDeps {
-	reg := nested.GlobalBackgroundRegistry
+	reg := enforce.GlobalBackgroundRegistry
 	return runners.SubAgentDeps{
 		Start: func(ctx context.Context, params runners.SubAgentParams) (string, error) {
 			parentSC, err := resolveParentSessionContext(ce, gw, params.SessionID)
@@ -106,7 +106,7 @@ func buildSubAgentDeps(ce *contextengine.ContextEngine, gw *capture.Communicatio
 			if maxTurns <= 0 {
 				maxTurns = 30
 			}
-			return nested.RunBackground(ctx, nested.LoopDeps{Loop: ce.QueryLoop()}, nested.SubQueryParams{
+			return enforce.RunBackground(ctx, enforce.LoopDeps{Loop: ce.QueryLoop()}, enforce.SubQueryParams{
 				ParentSC:       parentSC,
 				AgentID:        params.AgentID,
 				AgentName:      params.AgentName,

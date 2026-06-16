@@ -53,9 +53,6 @@ type Session struct {
 	// for COW semantics (DM-20260611-005).
 	Metadata map[string]any
 
-	// Harness bootstrap completed for this session (V5).
-	HarnessInitialized bool
-
 	// 并发保护
 	mu sync.RWMutex
 }

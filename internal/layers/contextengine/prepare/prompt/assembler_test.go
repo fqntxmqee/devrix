@@ -13,7 +13,6 @@ import (
 func TestSystemPromptAssembler_should_omit_agents_when_prepend_mode(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, _ := assembler.Build(SystemPromptBuildInput{
-		HarnessEnabled:       true,
 		AgentsRaw:            "Project agents content",
 		OmitAgentsFromSystem: true,
 	})
@@ -23,25 +22,14 @@ func TestSystemPromptAssembler_should_omit_agents_when_prepend_mode(t *testing.T
 }
 
 // T: D2-S9-A02-T10
-func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.T) {
+func TestSystemPromptAssembler_should_build_xml_blocks(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, report := assembler.Build(SystemPromptBuildInput{
-		HarnessEnabled: true,
-		AgentsRaw:      "Project agents content",
+		AgentsRaw: "Project agents content",
 		MemoryEntries: []memory.MemoryEntry{
 			{Topic: "architecture", Content: "use DDD"},
 		},
-		Bootstrap: &types.BootstrapReport{
-			Trusted:      true,
-			ToolCount:    5,
-			VisibleTools: 3,
-			VisibleToolList: []types.VisibleTool{
-				{Name: "bash"}, {Name: "read_file"}, {Name: "write_file"},
-			},
-			StagesApplied: []types.BootstrapStage{types.BootstrapStageToolPool},
-		},
-		Workspace: &types.WorkspaceContext{WorkDir: "/tmp/proj", GoFileCount: 10},
-		Session:   types.NewSession("sess_1", "cli", "/tmp/proj"),
+		Session: types.NewSession("sess_1", "cli", "/tmp/proj"),
 		Runtime: ProcessRuntimeContext{
 			SessionID: "sess_1",
 			RequestID: "req_1",
@@ -65,8 +53,7 @@ func TestSystemPromptAssembler_should_build_xml_when_harness_enabled(t *testing.
 func TestSystemPromptAssembler_should_produce_stable_template_hash(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	in := SystemPromptBuildInput{
-		HarnessEnabled: true,
-		AgentsRaw:      "# Agents\n",
+		AgentsRaw: "# Agents\n",
 	}
 	_, r1 := assembler.Build(in)
 	_, r2 := assembler.Build(in)
@@ -130,10 +117,9 @@ func TestSystemPromptAssembler_should_disable_boundary_when_config_off(t *testin
 	}
 }
 
-func TestSystemPromptAssembler_should_use_core_when_harness_disabled(t *testing.T) {
+func TestSystemPromptAssembler_should_use_core_template(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, report := assembler.Build(SystemPromptBuildInput{
-		HarnessEnabled:       false,
 		AgentsRaw:            "Project agents content",
 		OmitAgentsFromSystem: true,
 		MemoryEntries: []memory.MemoryEntry{
@@ -159,7 +145,6 @@ func TestSystemPromptAssembler_should_use_core_when_harness_disabled(t *testing.
 func TestSystemPromptAssembler_should_embed_agents_when_system_mode(t *testing.T) {
 	assembler := NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
 	prompt, _ := assembler.Build(SystemPromptBuildInput{
-		HarnessEnabled:       false,
 		AgentsRaw:            "Project agents content",
 		OmitAgentsFromSystem: false,
 	})

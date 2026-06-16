@@ -3,9 +3,10 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 3.0.0
+**Version:** 3.2.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-16
+**Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -48,7 +49,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 
 ## Review R1 澄清摘要（2026-06-14）
 
-完整条文见 `d7-domain.md` §Requirements Clarifications 与 `demand.md`。
+完整条文见 `d7-requirements-clarifications.md` §Requirements Clarifications 与 `demand.md`。
 
 | 主题 | 决议 |
 |------|------|
@@ -319,6 +320,15 @@ orchestration:
 
 ---
 
+## Guides（互补，非登记 SoT）
+
+- **领域 SoT**: `d7-domain.md` — North Star、Out of Scope、文档索引
+- **终态架构**: `terminal-state-guide.md` — IntentKind 四链、跨域时序、路由矩阵
+- **可观测性**: `observability-guide.md` — Span↔T、Trace 树、FastPath SLA、P0 Runbook
+- **澄清归档**: `d7-requirements-clarifications.md` — Review R1/R2 完整条文
+
+---
+
 ## Cross-Domain Contracts
 
 | 契约 | 方向 | 接口 | 状态 |
@@ -348,4 +358,6 @@ orchestration:
 | **2.7.0** | **2026-06-15** | **D7 Real-Closure Spec Sync**：(1) 实现状态表 4 cell 更新（D7-S1 WorkModel、D7-S5 PlanMode、D7-S2-A06 RunTurnLoop、D7-S2-A07 InvokeLLM 全部 IMPLEMENTED）；(2) 域边界移除 "Task 写模型（暂在 D2）"；(3) D2 Loop 最终状态 sync（loop.go ≤200 行，LoopHooks 已删除）|
 | **2.9.0** | **2026-06-15** | **D2 Loop 瘦身闭环**：(1) `query/loop.go` 239 行→170 行（符合 ≤200 行目标）；(2) `LoopHooks` 结构体删除，4 个编排字段迁出（`PlanMode`/`TaskManager`/`Orchestration`/`Hub`）；(3) D7-D4-T01 / D7-THIN-T01/T02 T 点闭环 |
 | **2.10.0** | **2026-06-15** | **D7-S5 LLM Decomposer 闭环**：(1) `coordinator/llm_decomposer.go` 新增（LLM 增强任务合成，JSON DAG → wave.TaskNode）；(2) `coordinator/llm_decomposer_test.go` 7 T sub-cases（happy/bad JSON/enum coercion/unknown deps/extractJSON/nil LLM/routing）；(3) `WithLLMDecomposer` option wired into SessionOrchestrator |
-| **3.0.0** | **2026-06-16** | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 Task 状态机守卫（`IsLegalTransition` 24 transition + 4 journey）；(2) D7-S5-A01-T01 置信度阈值验证 + `FastPathThreshold` gating；(3) D7-S2-A06-T01..T04 Turn Leader 全部 IMPLEMENTED（含 SubQuery nested turn）；(4) D7-S2-A07-T01/T02 LLM Invoker breaker/timeout 测试（`llm_test.go` 9 tests）；(5) t-registry 3.0.0：66/66 IMPLEMENTED，0 PLANNED |
+| **3.0.0** | **2026-06-16** | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 Task 状态机守卫；(2) D7-S5-A01-T01 置信度阈值；(3) D7-S2-A06/A07 Turn Leader；(4) t-registry 66/66 IMPLEMENTED |
+| **3.1.0** | **2026-06-16** | 薄 `d7-domain.md` + `terminal-state-guide.md`；澄清迁至 `d7-requirements-clarifications.md`；域边界 LLM 产权修正 |
+| **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |

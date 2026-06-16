@@ -88,31 +88,6 @@ func TestQueryLoop_CompressFn_UsesMessagesOnlyPipeline(t *testing.T) {
 	}
 }
 
-// D2-S11-A01-T04 副: harness 路径（query_loop.enabled=false）下，
-// engine 入口压缩带 system prompt，但**不**走 QueryLoop 路径。
-// 验证：基线 legacy_harness 计数 = 1。
-func TestContextEngine_LegacyHarness_HarnessCompressionBranch(t *testing.T) {
-	runtime.Reset()
-	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.Enabled = false
-	cfg.Harness.Enabled = true
-
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{Output: "tool"},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
-	})
-
-	session := types.NewSession("sess_l5_2_9_04_legacy", "cli", t.TempDir())
-	ch := engine.Process(context.Background(), session, "ping")
-	for ev := range ch {
-		_ = ev
-	}
-}
-
 // sessionIDFor 给 3-iteration 测试生成唯一的 session id，避免共享
 // SessionContext 在 race detector 下被并发改写。
 func sessionIDFor(i int) string {

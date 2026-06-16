@@ -6,6 +6,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
@@ -41,13 +42,13 @@ func NewContextEngine(
 		slog.Error("create builtin tool registry", "error", err)
 		toolReg = contextengine.NewToolRegistry()
 	}
-	if err := contextengine.RegisterQueryLoopTools(toolReg, ctxCfg); err != nil {
+	if err := enforce.RegisterQueryLoopTools(toolReg, ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
 	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, workmodel.GlobalTaskManager); err != nil {
 		slog.Error("register task tools", "error", err)
 	}
-	if err := contextengine.RegisterBackgroundTaskTools(toolReg); err != nil {
+	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
 	}
 

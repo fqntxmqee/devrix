@@ -21,15 +21,7 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D2_S2_Context_Tools_Register", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "D2_S2_Context_Memory_Snapshot_Save", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
-		// D2 Context Engine - Harness (D2-S5)
-		{Name: "D2_S5_Context_Harness_Bootstrap_Run", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-		{Name: "D2_S5_Context_Harness_Bootstrap_Stage", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-		{Name: "D2_S5_Context_Harness_Preflight", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-		{Name: "D2_S5_Context_Harness_Route", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-		{Name: "D2_S5_Context_Harness_ToolPool", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-		{Name: "D2_S5_Context_Harness_SystemPrompt_Build", Layer: "context", Component: "harness", SinceVersion: "5.0.0", Instrumented: true},
-
-		// D2 Context Engine - QueryLoop (D2-S10)
+		// D2 Context Engine - QueryLoop (D2-S16)
 		{Name: "D2_S10_Query_Loop_Run", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "D2_S10_Query_Loop_Turn", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "D2_S10_Query_Loop_LLM_Call", Layer: "context", Component: "query_loop", SinceVersion: "2.1.0", Instrumented: true},

@@ -81,14 +81,6 @@ func ToolSessionIDFromContext(ctx context.Context) string {
 	return toolrunner.ToolSessionIDFromContext(ctx)
 }
 
-func parseToolInput(input string) map[string]string {
-	return toolrunner.ParseToolInput(input)
-}
-
-func toolInputString(input string, keys ...string) string {
-	return toolrunner.ToolInputString(input, keys...)
-}
-
 func ToolContext(ctx context.Context, sc *types.SessionContext) context.Context {
 	return ToolContextWithGate(ctx, sc, nil)
 }
@@ -107,6 +99,16 @@ func ToolContextWithGate(ctx context.Context, sc *types.SessionContext, gate con
 		}
 	}
 	return ctx
+}
+
+// RegisterBackgroundTaskTools registers task_stop / task_output as LLM tools.
+func RegisterBackgroundTaskTools(reg *ToolRegistry) error {
+	return enforce.RegisterBackgroundTaskTools(reg)
+}
+
+// RegisterQueryLoopTools registers plan-mode tools when QueryLoop is enabled.
+func RegisterQueryLoopTools(reg *ToolRegistry, cfg *ContextEngineConfig) error {
+	return enforce.RegisterQueryLoopTools(reg, cfg)
 }
 
 // withToolStreamEmitter bridges ToolStreamEmitter events to EngineEvent emit.

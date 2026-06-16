@@ -371,7 +371,7 @@
 | D3 spec | `openspec/specs/d3-llm-gateway/spec.md` | D3 域内 SoT（含 5+1 S） |
 | D3 design | `openspec/specs/d3-llm-gateway/design.md` | D3 编排时序与跨域 emit |
 | D3 span-registry | `openspec/specs/d3-llm-gateway/span-registry.md` | 跨 D5 span / metric 名 SoT |
-| D7 编排 spec | `openspec/specs/d7-orchestration/d7-domain.md` | EngineEvent 类型 SoT |
+| D7 编排 spec | `openspec/specs/d7-orchestration/d7-domain.md` | 领域 SoT；时序见 `terminal-state-guide.md`；Runbook 见 `observability-guide.md` |
 | D5 可观测性 spec | `openspec/specs/d5-observability/` | OTel / Prometheus 配置 |
 | D6 演化 spec | `openspec/specs/d6-evolution/spec.md` | probe 列表与告警阈值 |
 | D2 上下文引擎 spec | `openspec/specs/d2-context-engine/d2-domain.md` | PermissionMode SoT |

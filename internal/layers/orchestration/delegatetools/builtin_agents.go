@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -18,17 +18,17 @@ const (
 )
 
 // RunExplore runs a read-only exploration sub-query via D2 nested execution.
-func RunExplore(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
+func RunExplore(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentExplore, agent.ExplorePrompt, prompt, tools, maxTurns, true)
 }
 
 // RunPlan runs a read-only planning sub-query via D2 nested execution.
-func RunPlan(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
+func RunPlan(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentPlan, agent.PlanPrompt, prompt, tools, maxTurns, true)
 }
 
 // RunImplement runs a read-write implementation sub-query via D2 nested execution.
-func RunImplement(ctx context.Context, deps nested.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*nested.SubQueryResult, error) {
+func RunImplement(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", AgentImplement)
 	}
@@ -36,7 +36,7 @@ func RunImplement(ctx context.Context, deps nested.LoopDeps, parent *types.Sessi
 		maxTurns = 50
 	}
 	agentID := fmt.Sprintf("%s_%s", AgentImplement, uuid.New().String()[:8])
-	return nested.Run(ctx, deps, nested.SubQueryParams{
+	return enforce.Run(ctx, deps, enforce.SubQueryParams{
 		ParentSC:       parent,
 		AgentID:        agentID,
 		AgentName:      AgentImplement,
@@ -53,13 +53,13 @@ func RunImplement(ctx context.Context, deps nested.LoopDeps, parent *types.Sessi
 
 func runBuiltin(
 	ctx context.Context,
-	deps nested.LoopDeps,
+	deps enforce.LoopDeps,
 	parent *types.SessionContext,
 	name, systemPrompt, prompt string,
 	tools []query.ToolSchema,
 	maxTurns int,
 	readOnly bool,
-) (*nested.SubQueryResult, error) {
+) (*enforce.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", name)
 	}
@@ -67,7 +67,7 @@ func runBuiltin(
 		maxTurns = 50
 	}
 	agentID := fmt.Sprintf("%s_%s", name, uuid.New().String()[:8])
-	return nested.Run(ctx, deps, nested.SubQueryParams{
+	return enforce.Run(ctx, deps, enforce.SubQueryParams{
 		ParentSC:       parent,
 		AgentID:        agentID,
 		AgentName:      name,

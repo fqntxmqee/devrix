@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -13,7 +13,7 @@ import (
 // SubQueryRunner runs D2 SubQuery when D4 delegate is unavailable.
 // Implements hubspoke.SubQueryRunner.
 type SubQueryRunner struct {
-	LoopDeps nested.LoopDeps
+	LoopDeps enforce.LoopDeps
 }
 
 // RunSubQuery implements hubspoke.SubQueryRunner.
@@ -34,7 +34,7 @@ func (f *SubQueryRunner) RunSubQuery(
 		maxTurns = 50
 	}
 	var (
-		res *nested.SubQueryResult
+		res *enforce.SubQueryResult
 		err error
 	)
 	switch WorkerRole(role) {
@@ -45,7 +45,7 @@ func (f *SubQueryRunner) RunSubQuery(
 	case WorkerRoleImplement:
 		res, err = RunImplement(ctx, deps, parent, directive, nil, maxTurns)
 	default:
-		res, err = nested.Run(ctx, deps, nested.SubQueryParams{
+		res, err = enforce.Run(ctx, deps, enforce.SubQueryParams{
 			ParentSC:       parent,
 			AgentID:        fmt.Sprintf("implement_%s", taskID),
 			AgentName:      "implement",
@@ -78,6 +78,6 @@ func systemPromptForRole(role string) string {
 }
 
 // BuildSubQueryRunner creates a hubspoke.SubQueryRunner from QueryLoop deps.
-func BuildSubQueryRunner(deps nested.LoopDeps) hubspoke.SubQueryRunner {
+func BuildSubQueryRunner(deps enforce.LoopDeps) hubspoke.SubQueryRunner {
 	return &SubQueryRunner{LoopDeps: deps}
 }

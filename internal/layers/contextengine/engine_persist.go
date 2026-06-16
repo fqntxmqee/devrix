@@ -29,7 +29,6 @@ func (e *ContextEngine) finalizeTurn(
 	working *memory.WorkingMemory,
 	message string,
 	workerLocal bool,
-	harnessEnabled bool,
 	transcriptFrom int,
 	pendingComplete *contracts.EngineEvent,
 	ch chan<- *contracts.EngineEvent,
@@ -92,10 +91,7 @@ func (e *ContextEngine) finalizeTurn(
 		if assistantSummary == "" {
 			assistantSummary = lastAssistantContent(sc.Messages)
 		}
-		if harnessEnabled && !workerLocal {
-			e.transcript.AppendTurn(sc, message, assistantSummary)
-		}
-		storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Longterm_Store, tracer.SpanKindInternal)
+	storeCtx, storeSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Longterm_Store, tracer.SpanKindInternal)
 		storeErr := e.memory.AutoStoreLongTerm(storeCtx, sc, message, assistantSummary)
 		if storeSpan != nil {
 			if storeErr != nil {

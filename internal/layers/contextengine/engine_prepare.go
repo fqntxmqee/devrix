@@ -94,15 +94,11 @@ func (e *ContextEngine) prepareMessages(
 	ctx context.Context,
 	sc *types.SessionContext,
 	sessionID string,
-	harnessEnabled bool,
 	workerLocal bool,
 	emit func(*contracts.EngineEvent),
 ) ([]types.Message, bool) {
 	msgs := conversation.RepairToolMessageChain(conversation.MessagesAfterCompactBoundary(sc.Messages))
 	compSystemPrompt := sc.SystemPrompt
-	if harnessEnabled && !workerLocal {
-		compSystemPrompt = ""
-	}
 	skipEntryCompress := e.cfg.QueryLoop.Enabled && e.cfg.QueryLoop.CompressPerTurn
 	if !skipEntryCompress && e.shouldCompress(msgs, sc.TokenBudget) {
 		compCtx, compSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Run, tracer.SpanKindInternal,
@@ -135,9 +131,7 @@ func (e *ContextEngine) prepareMessages(
 			e.compressionRatio.Observe(report.Ratio())
 		}
 		e.observer.EmitContextCompressed(report)
-		if !harnessEnabled {
-			e.memory.SetCompressedView(sc, compressed)
-		}
+		e.memory.SetCompressedView(sc, compressed)
 		emit(infoEvent(sessionID, fmt.Sprintf("上下文已压缩 (%d→%d tokens)", report.OriginalTokens, report.CompressedTokens)))
 		msgs = stripSystemMessage(compressed)
 	}

@@ -21,3 +21,12 @@ type NoOpObserver = kernel.NoOpObserver
 
 // TokenUsage reports token consumption for observability helpers.
 type TokenUsage = kernel.TokenUsage
+
+// IEngine is the cross-layer context processing contract.
+type IEngine = kernel.IEngine
+
+// EngineEvent is emitted by the context engine during Process.
+type EngineEvent = kernel.EngineEvent
+
+// ContextEngineConfig is the D2 domain configuration root.
+type ContextEngineConfig = kernel.ContextEngineConfig

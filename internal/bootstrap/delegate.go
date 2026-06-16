@@ -5,7 +5,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
@@ -39,7 +39,7 @@ func WireDelegate(
 	}
 	var subQuery hubspoke.SubQueryRunner
 	if engine != nil && ctxCfg.QueryLoop.Enabled {
-		subQuery = delegatetools.BuildSubQueryRunner(nested.LoopDeps{
+		subQuery = delegatetools.BuildSubQueryRunner(enforce.LoopDeps{
 			Loop: engine.QueryLoop(),
 		})
 	}
