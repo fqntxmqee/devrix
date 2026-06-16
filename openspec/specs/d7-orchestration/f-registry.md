@@ -6,6 +6,7 @@
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
+**Domain SoT:** `d7-domain.md`
 
 ---
 

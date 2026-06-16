@@ -1,9 +1,12 @@
 # D7 Orchestration Span 注册表
 
 **Domain:** D7 Orchestration
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Status:** Active (2026-06-16)
+**Domain SoT:** `d7-domain.md`
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
+
+> **Trace 树 / Span↔T / P0 Runbook：** 见 `observability-guide.md` §1–§7（本文仅登记 operation 名，不展开流程）。
 
 ---
 
@@ -87,3 +90,4 @@ D1_S13_Capture_Message_Receive
 - D5 全局 Trace Tree：`openspec/specs/d5-observability/span-registry.md`
 - D2 Context Engine：`openspec/specs/d2-context-engine/span-registry.md`
 - 全局 Spans 索引：`openspec/spans-registry.md`
+- **Span↔T / Runbook：** `observability-guide.md`

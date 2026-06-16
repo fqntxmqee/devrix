@@ -7,7 +7,7 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
@@ -78,11 +78,11 @@ func InitOrchestration(
 	sink := newGatewayEventPublisher(gw)
 
 	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
-	if nested.GlobalBackgroundRegistry == nil {
-		nested.SetGlobalBackgroundRegistry()
+	if enforce.GlobalBackgroundRegistry == nil {
+		enforce.SetGlobalBackgroundRegistry()
 	}
 	wm.SetBackgroundProvider(func(sessionID string) []coordinator.BackgroundLite {
-		tasks := nested.GlobalBackgroundRegistry.List(sessionID)
+		tasks := enforce.GlobalBackgroundRegistry.List(sessionID)
 		if len(tasks) == 0 {
 			return nil
 		}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -104,13 +103,6 @@ func TestMapProcessError_WrappedSentinelError(t *testing.T) {
 	}
 }
 
-func TestToolDescsToVisibleTools_Nil(t *testing.T) {
-	tools := toolDescsToVisibleTools(nil)
-	if len(tools) != 0 {
-		t.Errorf("expected empty slice for nil input, got %d", len(tools))
-	}
-}
-
 func TestFilterToolsByPermissionMode_NonPlanMode(t *testing.T) {
 	tools := []ToolSchema{{Name: "bash"}, {Name: "read"}}
 	got := enforce.FilterToolsByPermissionMode(types.PermissionDefault, tools, "")
@@ -131,20 +123,6 @@ func TestFilterToolsByPermissionMode_PlanMode(t *testing.T) {
 	}
 }
 
-func TestToolDescsToSchemas_Nil(t *testing.T) {
-	got := toolDescsToSchemas(nil)
-	if len(got) != 0 {
-		t.Errorf("expected empty slice for nil input, got %d", len(got))
-	}
-}
-
-func TestVisibleToolsToSchemas_Nil(t *testing.T) {
-	got := visibleToolsToSchemas(nil)
-	if len(got) != 0 {
-		t.Errorf("expected empty slice for nil state, got %d", len(got))
-	}
-}
-
 func TestInfoEvent(t *testing.T) {
 	ev := infoEvent("sid", "content")
 	if ev.Type != "info" {
@@ -156,13 +134,6 @@ func TestInfoEvent(t *testing.T) {
 	if ev.SessionID != "sid" {
 		t.Errorf("sessionID = %s, want sid", ev.SessionID)
 	}
-}
-
-func TestConfigureLLMLogging(t *testing.T) {
-	ConfigureLLMLogging(observability.LLMLogSettings{
-		LogContent: true,
-		LogDir:     "/tmp/logs",
-	})
 }
 
 func TestLastAssistantContent(t *testing.T) {
@@ -190,10 +161,6 @@ func TestLastAssistantContent(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCurrentLLMLogSettings(t *testing.T) {
-	_ = currentLLMLogSettings()
 }
 
 func TestNoOpObserver(t *testing.T) {

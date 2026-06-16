@@ -4,13 +4,17 @@
 **Version:** 3.0.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
+**Complements:** `terminal-state-guide.md` · `observability-guide.md`
 
 ---
 
 ## Overview
 
 D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档统一映射为 D7-S*-T* 编号。遗留 ORCH ID 保留在「Legacy ID」列以便追溯。
+
+> **按 S 分组摘要 / P0 Runbook / Trace 树：** 见 `observability-guide.md` §5–§7（本文保留全表登记）。
 
 **状态：** IMPLEMENTED · PARTIAL · PLANNED
 

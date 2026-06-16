@@ -87,8 +87,6 @@ type SessionContext struct {
 	SystemPrompt   string
 	LastRequestID  string
 	UpdatedAt      time.Time
-	Harness        *HarnessSessionState
-	Transcript     *TranscriptStore
 	// QueryLoop / permission state (Claude Code aligned).
 	PermissionMode PermissionMode
 	PrePlanMode    PermissionMode

@@ -25,10 +25,10 @@ func TestD2Thin_QueryPackage_NoOrchestrationOrMultiAgent(t *testing.T) {
 	assertNoForbiddenImports(t, filepath.Join(repoRootFromTest(t), "internal", "layers", "contextengine", "query"))
 }
 
-// TestD2Thin_NestedPackage_NoOrchestrationOrMultiAgent verifies D2-S19 nested
-// execution stays free of D7/D4 orchestration imports.
-func TestD2Thin_NestedPackage_NoOrchestrationOrMultiAgent(t *testing.T) {
-	assertNoForbiddenImports(t, filepath.Join(repoRootFromTest(t), "internal", "layers", "contextengine", "nested"))
+// TestD2Thin_EnforcePackage_NoOrchestrationOrMultiAgent verifies D2-S18 enforce
+// execution (subquery + background) stays free of D7/D4 orchestration imports.
+func TestD2Thin_EnforcePackage_NoOrchestrationOrMultiAgent(t *testing.T) {
+	assertNoForbiddenImports(t, filepath.Join(repoRootFromTest(t), "internal", "layers", "contextengine", "enforce"))
 }
 
 // TestD2Thin_ContextEngine_NoOrchestrationOrMultiAgent verifies D2 root packages

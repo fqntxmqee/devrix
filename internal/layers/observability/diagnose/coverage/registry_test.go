@@ -58,15 +58,7 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S2_Context_Tools_Register,
 		telemetry.OpD2_S2_Context_Memory_Snapshot_Save,
 
-		// D2 Context Engine - Harness (D2-S5)
-		telemetry.OpD2_S5_Context_Harness_Bootstrap_Run,
-		telemetry.OpD2_S5_Context_Harness_Bootstrap_Stage,
-		telemetry.OpD2_S5_Context_Harness_ToolPool,
-		telemetry.OpD2_S5_Context_Harness_Preflight,
-		telemetry.OpD2_S5_Context_Harness_Route,
-		telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build,
-
-		// D2 Context Engine - QueryLoop (D2-S10)
+		// D2 Context Engine - QueryLoop (D2-S16)
 		telemetry.OpD2_S10_Query_Loop_Run,
 		telemetry.OpD2_S10_Query_Loop_Turn,
 		telemetry.OpD2_S10_Query_Loop_LLM_Call,

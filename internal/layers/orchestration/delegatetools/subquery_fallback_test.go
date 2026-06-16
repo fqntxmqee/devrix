@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -34,7 +34,7 @@ func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T
 		LLM:        &query.SequentialLLM{Responses: []query.LLMScript{{Content: "fallback summary"}}},
 		Permission: query.AllowPermission{},
 	}
-	adapter := &SubQueryRunner{LoopDeps: nested.LoopDeps{Loop: loop}}
+	adapter := &SubQueryRunner{LoopDeps: enforce.LoopDeps{Loop: loop}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}
 
 	_, err := adapter.RunSubQuery(context.Background(), parent, "explore", "scan repo", "task_fb", 0)

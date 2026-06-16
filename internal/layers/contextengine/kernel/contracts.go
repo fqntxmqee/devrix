@@ -4,8 +4,12 @@ package kernel
 
 import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
+	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// --- Observer types ---
 
 // AutocompactMeta describes autocompact observability metadata.
 type AutocompactMeta = compression.AutocompactMeta
@@ -41,3 +45,20 @@ type TokenUsage struct {
 	CacheReadTokens  int
 	ReasoningTokens  int
 }
+
+// --- Cross-layer contracts (aliased from shared/) ---
+
+// IEngine is the cross-layer context processing contract (L1 ↔ L2 ↔ L4).
+//
+// DSAFT: D2-S1-A01-F01
+type IEngine = contracts.IEngine
+
+// EngineEvent is emitted by the context engine during Process.
+//
+// DSAFT: D2-S1-A01-F02
+type EngineEvent = contracts.EngineEvent
+
+// ContextEngineConfig is the D2 domain configuration root.
+//
+// DSAFT: D2-S1-A01 (Config)
+type ContextEngineConfig = config.ContextEngineConfig

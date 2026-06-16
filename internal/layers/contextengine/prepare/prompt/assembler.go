@@ -30,30 +30,25 @@ type ProcessRuntimeContext struct {
 
 // SystemPromptBuildInput holds inputs for system prompt assembly.
 type SystemPromptBuildInput struct {
-	WorkDir        string
-	Session        *types.Session
-	Runtime        ProcessRuntimeContext
-	AgentsRaw      string
-	MemoryEntries  []memory.MemoryEntry
-	Bootstrap      *types.BootstrapReport
-	Workspace      *types.WorkspaceContext
-	Routing              *types.RoutingHint
-	Preflight            *types.PreflightResult
-	HarnessEnabled       bool
+	WorkDir              string
+	Session              *types.Session
+	Runtime              ProcessRuntimeContext
+	AgentsRaw            string
+	MemoryEntries        []memory.MemoryEntry
 	OmitAgentsFromSystem bool
 	RecallMaxTokens      int
 }
 
 // SystemPromptBuildReport describes assembly observability metadata.
 type SystemPromptBuildReport struct {
-	TotalTokens     int
-	LayerTokens     [4]int
-	MemoryTruncated bool
-	BlocksIncluded  []string
-	TemplateHash        string
-	AgentsMDHash        string
-	SectionCount        int
-	HasDynamicBoundary  bool
+	TotalTokens        int
+	LayerTokens        [4]int
+	MemoryTruncated    bool
+	BlocksIncluded     []string
+	TemplateHash       string
+	AgentsMDHash       string
+	SectionCount       int
+	HasDynamicBoundary bool
 	DynamicSectionNames []string
 }
 
@@ -70,7 +65,7 @@ type SystemPromptAssembler struct {
 func NewSystemPromptAssembler(cfg config.WorkspacePromptConfig) *SystemPromptAssembler {
 	core := defaultCoreTemplate
 	guidance := defaultGuidanceTemplate
-	
+
 	// Create prompt loader for section-based prompts
 	var loader *Loader
 	if cfg.PromptConfig != nil && cfg.PromptConfig.UseSections {
@@ -110,7 +105,7 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	layer3 := ""
 	if layer3HasContent(blocks) {
 		loaded := buildLoadedContext(blocks)
-		layer3Header := "## Workspace Files (Injected)\nThe following <loaded_context> was loaded from workspace and harness runtime.\n\n"
+		layer3Header := "## Workspace Files (Injected)\nThe following <loaded_context> was loaded from workspace.\n\n"
 		layer3 = layer3Header + loaded
 		report.LayerTokens[3] = estimateTokens(layer3)
 	}
@@ -315,32 +310,12 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 	memoryRaw, truncated := memory.FormatMemoryContext(in.MemoryEntries, memoryBudget)
 	report.MemoryTruncated = truncated
 
-	harnessInit := ""
-	workspaceSnap := ""
-	routing := ""
-	preflight := ""
-	if in.HarnessEnabled {
-		if in.Bootstrap != nil {
-			harnessInit = formatHarnessInit(*in.Bootstrap)
-		}
-		if in.Workspace != nil {
-			workspaceSnap = formatWorkspaceSnapshot(*in.Workspace)
-		}
-		routing = formatRoutingHints(in.Routing)
-		preflight = formatPreflightWarnings(in.Preflight)
-	}
-
-	fixedTokens := estimateTokens(harnessInit) + estimateTokens(workspaceSnap) +
-		estimateTokens(routing) + estimateTokens(preflight)
-	agentsBudget := budget - fixedTokens
-	if agentsBudget < 0 {
-		agentsBudget = 0
-	}
+	agentsBudget := budget
 	agentsRaw := truncateToTokenBudget(strings.TrimSpace(in.AgentsRaw), agentsBudget)
 	if in.OmitAgentsFromSystem {
 		agentsRaw = ""
 	}
-	budget -= fixedTokens + estimateTokens(agentsRaw)
+	budget -= estimateTokens(agentsRaw)
 	if budget < 0 {
 		budget = 0
 	}
@@ -351,18 +326,6 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 	}
 	if memoryRaw != "" {
 		blocks["memory_context"] = memoryRaw
-	}
-	if harnessInit != "" {
-		blocks["harness_init"] = harnessInit
-	}
-	if workspaceSnap != "" {
-		blocks["workspace_snapshot"] = workspaceSnap
-	}
-	if routing != "" {
-		blocks["routing_hints"] = routing
-	}
-	if preflight != "" {
-		blocks["preflight_warnings"] = preflight
 	}
 
 	for tag := range blocks {
@@ -382,20 +345,13 @@ func layer3HasContent(blocks map[string]string) bool {
 
 func buildLoadedContext(blocks map[string]string) string {
 	order := []string{
-		"agents_context", "memory_context", "harness_init",
-		"workspace_snapshot", "routing_hints", "preflight_warnings",
+		"agents_context", "memory_context",
 	}
 	var b strings.Builder
 	b.WriteString("<loaded_context>\n")
 	for _, tag := range order {
 		content, ok := blocks[tag]
 		if !ok {
-			continue
-		}
-		if tag == "routing_hints" && strings.TrimSpace(content) == "" {
-			continue
-		}
-		if tag == "preflight_warnings" && strings.TrimSpace(content) == "" {
 			continue
 		}
 		b.WriteString(buildXMLContext(tag, content))
@@ -409,62 +365,6 @@ func buildXMLContext(tag, content string) string {
 		return fmt.Sprintf("<%s></%s>\n", tag, tag)
 	}
 	return fmt.Sprintf("<%s>\n%s\n</%s>\n", tag, strings.TrimSpace(content), tag)
-}
-
-func formatHarnessInit(report types.BootstrapReport) string {
-	toolNames := make([]string, 0, len(report.VisibleToolList))
-	for _, t := range report.VisibleToolList {
-		toolNames = append(toolNames, t.Name)
-	}
-	stages := make([]string, 0, len(report.StagesApplied))
-	for _, s := range report.StagesApplied {
-		stages = append(stages, string(s))
-	}
-	return fmt.Sprintf(`Trusted: %t
-Visible tools: %s (filtered from %d)
-Deferred init: plugin=%t skill=%t mcp=%t hooks=%t
-Bootstrap stages: %s`,
-		report.Trusted,
-		strings.Join(toolNames, ", "),
-		report.ToolCount,
-		report.DeferredInit.PluginInit,
-		report.DeferredInit.SkillInit,
-		report.DeferredInit.MCPPrefetch,
-		report.DeferredInit.SessionHooks,
-		strings.Join(stages, ", "),
-	)
-}
-
-func formatWorkspaceSnapshot(ws types.WorkspaceContext) string {
-	return fmt.Sprintf(`WorkDir: %s
-AGENTS.md present: %t
-Go source files: %d
-Go test files: %d
-Scanned at: %s`,
-		ws.WorkDir, ws.AgentsMDPresent, ws.GoFileCount, ws.TestFileCount, ws.ScannedAt.Format(time.RFC3339))
-}
-
-func formatRoutingHints(hint *types.RoutingHint) string {
-	if hint == nil || len(hint.Tools) == 0 {
-		return ""
-	}
-	return fmt.Sprintf(`<routing_hints advisory="true">
-Matched tools: %s
-Note: These hints are advisory only; you may still choose other tools.
-</routing_hints>`, strings.Join(hint.Tools, ", "))
-}
-
-func formatPreflightWarnings(result *types.PreflightResult) string {
-	if result == nil || len(result.Warnings) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	for _, w := range result.Warnings {
-		b.WriteString("- ")
-		b.WriteString(w)
-		b.WriteString("\n")
-	}
-	return b.String()
 }
 
 func estimateTokens(s string) int {

@@ -9,7 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
-	"github.com/devrix/devrix/internal/layers/contextengine/fallback"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
@@ -20,8 +20,6 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
-
-
 
 // SessionContext returns the cached session context for a session ID (test helper).
 func (e *ContextEngine) SessionContext(sessionID string) (*types.SessionContext, bool) {
@@ -73,7 +71,6 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	e.initMetrics()
 
-	// Create "context_engine.process" span as child of gateway span.
 	ctx, processSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session.id", Value: session.SessionID},
 		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(message))},
@@ -82,28 +79,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		defer processSpan.End()
 	}
 
-	// #deprecated: legacy fallback, will be removed in v2.0 (DM-20260611-004).
-	// QueryLoop (`cfg.QueryLoop.Enabled`) is now the sole primary LLM↔Tool
-	// path. The `harnessEnabled && !workerLocal` branches below are kept as
-	// legacy fallback only when `query_loop.enabled: false` is explicitly set.
-	harnessEnabled := e.cfg.Harness.Enabled
-
-	// Record the resolved path before any LLM call. The D6
-	// PathRegressionProbe uses these counters to assert that the legacy
-	// harness path never fires in production (query_loop.enabled=true is
-	// the default after DM-20260611-004).
-	if e.cfg.QueryLoop.Enabled {
-		obsruntime.Record(obsruntime.PathQueryLoop)
-	} else {
-		obsruntime.Record(obsruntime.PathLegacyHarness)
-	}
+	obsruntime.Record(obsruntime.PathQueryLoop)
 	agentsRaw := e.prompt.Load(session.WorkDir)
-	// System prompt load observability (agents file for prepend / optional Layer 3).
 	{
 		_, spSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_SystemPrompt_Load, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "agents_raw.length", Value: fmt.Sprintf("%d", len(agentsRaw))},
 			tracer.Attribute{Key: "system_prompt.sources_count", Value: fmt.Sprintf("%d", len(e.cfg.SystemPrompt.Sources))},
-			tracer.Attribute{Key: "fallback.enabled", Value: fmt.Sprintf("%t", harnessEnabled)},
 		)
 		if spSpan != nil {
 			spSpan.End()
@@ -116,29 +97,22 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 	workerLocal := false
 	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
-		sc = forkWorkerSessionContext(sc, ov)
+		sc = conversation.ForkWorkerSessionContext(sc, ov)
 		workerLocal = true
 	}
 	permission.InitSessionPermission(sc, e.cfg.Permission)
 	if sc.Model == "" && e.defaultModel != "" {
 		sc.Model = e.defaultModel
 	}
-	// Resolve ModelTier to a concrete model name if a tier resolver is available.
 	if sc.ModelTier != "" && e.tierResolver != nil {
 		if resolved, err := e.tierResolver.ResolveTier(sc.ModelTier); err == nil && resolved != "" {
 			sc.Model = resolved
 		}
 	}
-	// If no model set yet, try resolving the default tier.
 	if sc.Model == "" && e.tierResolver != nil && e.defaultModel != "" {
 		if resolved, err := e.tierResolver.ResolveTier(e.defaultModel); err == nil && resolved != "" {
 			sc.Model = resolved
 		}
-	}
-
-	// #deprecated: legacy fallback (see harnessEnabled declaration above)
-	if err := e.bootstrapHarness(ctx, session, sc, emit); err != nil {
-		return
 	}
 
 	memoryEntries, ok := e.recallLongTermMemory(ctx, session.SessionID, message, workerLocal, processSpan, emit)
@@ -152,26 +126,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 	transcriptFrom := len(sc.Messages)
 
-	msgs, ok := e.prepareMessages(ctx, sc, session.SessionID, harnessEnabled, workerLocal, emit)
+	msgs, ok := e.prepareMessages(ctx, sc, session.SessionID, workerLocal, emit)
 	if !ok {
 		return
 	}
 
-	var routingHint *types.RoutingHint
-	var preflightResult *types.PreflightResult
-	visibleTools := fallback.VisibleToolsFromState(sc.Harness)
-	hResp := e.runHarnessPreflight(ctx, sc, agentsRaw, memoryEntries, message, visibleTools, workerLocal)
-	visibleTools = hResp.visibleTools
-	routingHint = hResp.routingHint
-	preflightResult = hResp.preflightResult
-
 	if !workerLocal {
-		var bootstrapReport *types.BootstrapReport
-		var workspace *types.WorkspaceContext
-		if sc.Harness != nil {
-			bootstrapReport = &sc.Harness.Report
-			workspace = &sc.Harness.Report.Workspace
-		}
 		omitAgents := e.cfg.UserContext.Mode == "prepend"
 		buildInput := prompt.SystemPromptBuildInput{
 			WorkDir: session.WorkDir,
@@ -183,11 +143,6 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 			},
 			AgentsRaw:            agentsRaw,
 			MemoryEntries:        memoryEntries,
-			Bootstrap:            bootstrapReport,
-			Workspace:            workspace,
-			Routing:              routingHint,
-			Preflight:            preflightResult,
-			HarnessEnabled:       harnessEnabled,
 			OmitAgentsFromSystem: omitAgents,
 			RecallMaxTokens:      e.cfg.LongTerm.RecallMaxTokens,
 		}
@@ -215,21 +170,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	e.memory.SetCompressedView(sc, view)
 
 	working := memory.NewWorkingMemory()
-	// Defer the "complete" event until AFTER snapshot persist + sc.Messages
-	// writes finish below. The QueryLoop path historically emits
-	// complete inline (before AppendMessage at L522 and PersistSnapshot at
-	// L555), which races with downstream readers (gateway persist,
-	// integration tests reading sc.Messages once the handler counts
-	// "complete"). Intercept it here, replay after the writes are durable.
 	var pendingComplete *contracts.EngineEvent
 	messages := sc.CompressedView
 	if len(messages) > 0 && messages[0].Role == types.MessageRoleSystem {
 		messages = messages[1:]
 	}
 
-	// DM-020 D2 thin closure: per-turn attachment injection and Hub-Spoke
-	// drain now run in D2 Prepare (engine.runProcess), not inside query.Loop.
-	// The loop body is a pure LLM↔Tool execution primitive.
 	if e.attachReg != nil && !workerLocal {
 		payloads := e.attachReg.Collect(ctx, sc, messages, 0)
 		messages = append(messages, attachments.Render(payloads)...)
@@ -240,13 +186,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		messages = append(messages, contracts.RenderQueueNotifications(sc.SessionID, drained)...)
 	}
 
-	toolSchemas := fallback.VisibleToolsFromState(sc.Harness)
-	var tools []ToolSchema
-	if len(toolSchemas) > 0 && sc.Harness != nil {
-		tools = visibleToolsToSchemas(sc.Harness)
-	} else {
-		tools, _ = e.toolsReg.ListTools(ctx, sc.WorkDir)
-	}
+	tools, _ := e.toolsReg.ListTools(ctx, sc.WorkDir)
 	tools = enforce.FilterToolsByPermissionMode(sc.PermissionMode, tools, sc.PlanFilePath)
 	if e.agentRoleToolFilter != nil {
 		tools = e.agentRoleToolFilter.Filter(sc, tools)
@@ -268,5 +208,5 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		emit(ev)
 	})
 
-	e.finalizeTurn(ctx, session, sc, res, runErr, working, message, workerLocal, harnessEnabled, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
+	e.finalizeTurn(ctx, session, sc, res, runErr, working, message, workerLocal, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
 }

@@ -267,7 +267,7 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 | D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 进度广播 | DESIGN | ORCH-S1/S2 升格 |
 | D7-S5 | Decision & Planning | 意图分类（规则+LLM）、任务拆解、执行器选择 | DESIGN | 新增 |
 
-Spec: `openspec/specs/d7-orchestration/d7-domain.md` (D7)
+Spec: `openspec/specs/d7-orchestration/d7-domain.md` · Guides: `terminal-state-guide.md` · `observability-guide.md` (D7)
 
 > **迁移说明（ORCH → D7）**: ORCH-S3 → D7-S3, ORCH-S1/S2 → D7-S4。迁移期间 `internal/layers/orchestration/` 保留作为 re-export 桥接包，D7 稳定后移除。
 

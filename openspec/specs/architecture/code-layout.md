@@ -2,7 +2,7 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.11.0
+**Version:** 1.11.1
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 
@@ -118,9 +118,9 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014                                      |
 | D2-S16     | RunQueryLoop                    | `query`         | `contextengine/query/`                                                             | 保持（loop 瘦身）                                   |
 | D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/`                                         | ✅ DM-014                                      |
-| D2-S18     | EnforceExecutionPolicy          | `policy`        | `policy/permission/`, `policy/toolrunner/`                                         | ✅ DM-014                                      |
-| D2-S19     | NestedExecution                 | `nested`        | `nested/subquery.go`, `nested/background.go`, `nested/fork.go`                     | ✅ DM-014                                      |
-| D2-S20     | LegacyHarnessFallback           | `legacyharness` | `harness/`                                                                         | 保持或 `legacy/`                                 |
+| D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/queryloop_tools.go` | ✅ DM-014                                      |
+| D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ DM-014                                      |
+| D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ DM-014                                      |
 | **D2-S16** | **RunQueryLoop（Legacy Freeze）** | **`query`**     | **`contextengine/query/`**                                                         | **Legacy freeze（DM-020）；Turn 主循环迁 D7-S2-A06** |
 
 > **DM-020 bootstrap 注释（v1.0 Registry）：** `WireContextLLM` 当前在 `internal/bootstrap/` 为 D2 接线 ILLMGateway。v2.0-b 迁移后，D7 持有 ILLMGateway（`WireContextLLM → TurnOrchestrator deps`），D2 仅保留 ContextPreparer（`WireContextEngine → ContextPreparer only，无 LLM 字段`）。
@@ -204,7 +204,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | -------------------- | -------------------------------------- | ------------------------------------------- | -------- |
 | Agent FlowBridge     | `multiagent/delegate/bridge.go`        | `orchestration/hubspoke/agent_bridge.go`    | ✅ v2.0-d |
 | Dispatch / fallback  | `multiagent/delegate/service.go`（编排部分） | `orchestration/hubspoke/dispatch.go`        | ✅ v2.0-d |
-| SubQuery Flow        | `contextengine/nested/flow_report.go`  | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-d |
+| SubQuery Flow        | `contextengine/enforce/flow_report_test.go`  | `orchestration/hubspoke/subquery_bridge.go` | ✅ v2.0-d |
 | Dispatcher bootstrap | `bootstrap/delegate.go`                | `bootstrap/delegate.go`（重构）                 | ✅ v2.0-d |
 
 **v2.0-b 里程碑：**

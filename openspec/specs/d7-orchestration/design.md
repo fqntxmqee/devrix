@@ -19,8 +19,12 @@
 
 | 文档 | 用途 |
 |------|------|
+| `d7-domain.md` | **领域 SoT**（North Star、Out of Scope、文档索引） |
 | `spec.md` | DSAFT 规范 SoT（Scenarios、Requirements） |
-| `d7-domain.md` | D7 v1.0 完整需求规格（含 PLANNED 项） |
+| `terminal-state-guide.md` | **终态流程指南**（IntentKind 四链、A→F 编排树、跨域时序） |
+| `observability-guide.md` | **可观测性指南**（Span↔T、Trace 树、P0 Runbook） |
+| `dsaft-architecture.md` | Stub（DSAFT 五层计数） |
+| `d7-requirements-clarifications.md` | Review R1/R2 完整澄清（归档） |
 | 本文档 | 六段式可读架构设计（评审 / onboarding） |
 | `layer-delta.md` | 层能力 Delta（现行 vs 目标） |
 | `task-planning-design.md` | PlanMode / PlanAgent 专项设计 |

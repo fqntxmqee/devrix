@@ -3,7 +3,6 @@ package contextengine
 import (
 	"sync"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/fallback"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -51,11 +50,7 @@ type ContextEngine struct {
 	compObserver ICompressionObserver
 	obsBridge    *observability.Bridge
 	asyncCompact *compression.AsyncAutocompacter
-	harnessBoot  *fallback.Bootstrap
 	assembler    *prompt.SystemPromptAssembler
-	preflight    *fallback.PreflightEvaluator
-	router       *fallback.PromptRouter
-	transcript   *fallback.TranscriptManager
 	mainTranscript *transcript.MainThreadStore
 	attachReg      *attachments.Registry
 	sessionQueue   contracts.SessionCommandQueue

@@ -160,7 +160,7 @@ PlanMode MUST support `/plan` workflow with read-only PlanAgent exploration.
 
 D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 
-**Review R1 补充：** OrchestratePath v1.0 不依赖 SynthesizeTaskGraph；并行 execute 委托 S3 Wave。见 `d7-domain.md` Routing Matrix。
+**Review R1 补充：** OrchestratePath v1.0 不依赖 SynthesizeTaskGraph；并行 execute 委托 S3 Wave。见 `d7-requirements-clarifications.md` Routing Matrix。
 
 #### Scenario: Entry point migration
 
@@ -177,7 +177,7 @@ D1 `RouteInbound` MUST call `D7.ProcessMessage` instead of `D2.Process`.
 
 Four-combination regression (`d7_enabled` × `plan.enabled`) MUST pass before defaulting `d7_enabled=true`.
 
-See `d7-domain.md` §Migration Coexistence Contract. T: D7-MIG-T01.
+See `d7-requirements-clarifications.md` §Migration Coexistence Contract. T: D7-MIG-T01.
 
 ---
 
@@ -247,3 +247,21 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 2.5.0 | 2026-06-14 | v1.1 全部完成：DiskStore 持久化、SelectExecutor、LLM fallback、LLM-based 拆解 |
 | 2.6.0 | 2026-06-15 | DM-020 Turn Leader wired + Hub-Spoke SoT + D2 Thin 进行中 |
 | 3.0.0 | 2026-06-16 | **v1.2 + v2.0-b/c/f 全部闭环**：(1) Task 写模型已迁入 `workmodel/`，D2 托管标注清除；(2) S 层表补 D7-S1 State Authority；(3) D7-S2 Turn Leader 角色补登；(4) Task Model Trinity PARTIAL→DONE；(5) D2 Thin 标注 170 行最终态；(6) Phase N 闭环 |
+
+---
+
+## Docs Sync（2026-06-16）
+
+领域规格同步（`openspec/specs/d7-orchestration/`，无代码变更）：
+
+| 新增/更新 | 文件 | 说明 |
+|----------|------|------|
+| REWRITE | `d7-domain.md` v1.0.0 | 薄领域 SoT（对齐 D1 `*-domain.md` 模式） |
+| ADDED | `terminal-state-guide.md` | IntentKind 四链、A→F 编排树、跨域时序 |
+| RENAMED | `d7-requirements-clarifications.md` | 原厚 `d7-domain.md`（Review R1/R2 + 历史 Gherkin） |
+| UPDATED | `spec.md` v3.1.0 | Domain SoT 指针；域边界 LLM 产权修正 |
+| UPDATED | `a-registry.md` v3.5.0 | Canonical 段补登 S1；24 A 统计 |
+| UPDATED | `design.md` / `t-registry.md` / `d3-boundary.md` | 文档索引交叉引用 |
+| UPDATED | `dsaft-architecture.md` | 收敛为 Stub v2.0.0 |
+| ADDED | `observability-guide.md` | Span↔T、Trace 树、Hub Flow、P0 Runbook |
+| UPDATED | `span-registry.md` | Guides 指针 |

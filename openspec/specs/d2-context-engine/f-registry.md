@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d2-context-engine/a-registry.md`
@@ -67,8 +67,8 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 | F ID | Name | Input | Output | Code Location |
 |------|------|-------|--------|---------------|
-| D2-S2-A02-F01 | ExecuteTools | []ToolCall | []ToolResult | `engine.go` |
-| D2-S2-A02-F02 | PersistToolHistory | tool_calls | sc.Messages | `engine.go` |
+| D2-S2-A02-F01 | ExecuteTools | []ToolCall | []ToolResult | `enforce/toolrunner/tool_runner.go` |
+| D2-S2-A02-F02 | PersistToolHistory | tool_calls | sc.Messages | `engine_persist.go` |
 
 ### D2-S2-A03 StreamResponse
 
@@ -91,8 +91,8 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 | F ID | Name | Input | Output | Code Location |
 |------|------|-------|--------|---------------|
-| D2-S3-A02-F01 | FilterByPermissionMode | tools, mode | visible | `permission_tools.go` |
-| D2-S3-A02-F02 | FilterByAgentRole | tools, role | visible | `agent_role_filter.go` |
+| D2-S3-A02-F01 | FilterByPermissionMode | tools, mode | visible | `enforce/tool_filter.go` |
+| D2-S3-A02-F02 | FilterByAgentRole | tools, role | visible | `enforce/agent_role_filter.go` |
 
 ### D2-S3-A03 SandboxExecution
 
@@ -136,41 +136,43 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 | F ID | Name | Input | Output | Code Location |
 |------|------|-------|--------|---------------|
-| D2-S4-A04-F01 | CommitActiveWindow | session, budget | active | `engine.go` |
+| D2-S4-A04-F01 | CommitActiveWindow | session, budget | active | `engine_persist.go` |
 | D2-S4-A04-F02 | TrimMessages | session, max | trimmed | `prepare/memory/manager.go` |
 
 ---
 
-## D2-S5 NestedExecution
+## D2-S5 ~~NestedExecution~~ → S1+S2 拆解（DISMANTLED v3.1.0）
 
-### D2-S5-A01 SpawnSubquery
+> **2026-06-16**: S19 拆解。fork 归 S1 PrepareContext，subquery+background 归 S2 ExecuteQuery。
 
-| F ID | Name | Input | Output | Code Location |
-|------|------|-------|--------|---------------|
-| D2-S5-A01-F01 | RunSubQuery | spec | result | `nested/subquery.go` |
+### ~~D2-S5-A01 SpawnSubquery~~ → S2 ExecuteQuery
 
-### D2-S5-A02 RunBackgroundTask
+| F ID | Name | 原 Code Location | 新 Code Location |
+|------|------|-----------------|-----------------|
+| D2-S5-A01-F01 | RunSubQuery | `nested/subquery.go` | `enforce/subquery.go` |
 
-| F ID | Name | Input | Output | Code Location |
-|------|------|-------|--------|---------------|
-| D2-S5-A02-F01 | RegisterTask | session_id, agent_id | task_id | `nested/background.go` |
-| D2-S5-A02-F02 | WaitForTask | task_id, timeout | state | `nested/background.go` |
-| D2-S5-A02-F03 | CancelTask | task_id | — | `nested/background.go` |
+### ~~D2-S5-A02 RunBackgroundTask~~ → S2 ExecuteQuery
+
+| F ID | Name | 原 Code Location | 新 Code Location |
+|------|------|-----------------|-----------------|
+| D2-S5-A02-F01 | RegisterTask | `nested/background.go` | `enforce/background.go` |
+| D2-S5-A02-F02 | WaitForTask | `nested/background.go` | `enforce/background.go` |
+| D2-S5-A02-F03 | CancelTask | `nested/background.go` | `enforce/background.go` |
 
 ---
 
 ## Legacy F（冻结，保留追溯）
 
-> 以下 F 点映射到 D2-S9 Harness（#deprecated）。
+> 以下 F 点映射到 D2-S9 Harness（**REMOVED v6.5.0**）。
 
-| F ID | Name | Code Location |
-|------|------|---------------|
-| D2-S9-A01-F01 | ScanWorkspace | `harness/workspace.go` |
-| D2-S9-A01-F02 | RoutePrompt | `harness/router.go` |
-| D2-S9-A02-F01 | EvaluatePreflight | `harness/preflight.go` |
-| D2-S9-A02-F02 | FilterVisibleTools | `harness/preflight.go` |
-| D2-S9-A03-F01 | FilterByMode | `harness/toolpool.go` |
-| D2-S9-A03-F02 | FilterByConfig | `harness/toolpool.go` |
+| F ID | Name | Code Location | Status |
+|------|------|---------------|--------|
+| D2-S9-A01-F01 | ScanWorkspace | ~~`fallback/workspace.go`~~ | **REMOVED** |
+| D2-S9-A01-F02 | RoutePrompt | ~~`fallback/router.go`~~ | **REMOVED** |
+| D2-S9-A02-F01 | EvaluatePreflight | ~~`fallback/preflight.go`~~ | **REMOVED** |
+| D2-S9-A02-F02 | FilterVisibleTools | ~~`fallback/preflight.go`~~ | **REMOVED** |
+| D2-S9-A03-F01 | FilterByMode | ~~`fallback/toolpool.go`~~ | **REMOVED** |
+| D2-S9-A03-F02 | FilterByConfig | ~~`fallback/toolpool.go`~~ | **REMOVED** |
 | D2-S1-A01-F03 | RunPEVCycle | RETIRED |
 | D2-S1-A02-F01 | VerifyCommands | RETIRED |
 | D2-S1-A03-F01–F03 | Plan/Milestone | RETIRED |
@@ -185,5 +187,5 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 | S2 ExecuteQuery | 7 |
 | S3 EnforcePolicy | 8 |
 | S4 PersistState | 7 |
-| S5 NestedExecution | 4 |
-| **Total** | **38** |
+| S5 NestedExecution | 4 | **DISMANTLED** |
+| **Total** | **38** | |
