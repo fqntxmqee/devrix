@@ -106,6 +106,23 @@ git add openspec/specs/d{N}-*/
 | A | `feat/archive-<change-id>` | 仅做归档，不包含代码变更 |
 | B | `feat/<change-id>` | 代码实现和归档在同一分支，S6 在 PR 合并前追加 |
 
+### 3.0.1 预检（强制）
+
+**提交归档 commit 前必须运行验证脚本：**
+
+```bash
+# 场景 A（独立归档分支，已验证 changes/ 目录）
+./scripts/verify-archive.sh --changes <change-id>
+
+# 场景 B（在 feature 分支追加，change 仍在 changes/ 目录）
+./scripts/verify-archive.sh --changes <change-id>
+
+# 补充归档后（change 已移入 archive/）
+./scripts/verify-archive.sh <change-id>
+```
+
+脚本对应 §2.1–§2.4 检查清单，退出码 0 = 全部通过。**✗ 项必须先修复再提交。**
+
 ### 3.1 执行步骤
 
 ```bash
