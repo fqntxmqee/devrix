@@ -19,6 +19,10 @@ const (
 // ExecutorSelector implements D7-S5-A03 SelectExecutor.
 // It routes TaskNodes to either D2 (PlanAgent) or D4 (multi-agent workers)
 // based on task type and worker configuration.
+//
+// Deprecated: WaveScheduler dispatches directly through the WorkerRunner
+// interface; ExecutorSelector is not used in the current dispatch path.
+// Code and tests are kept for future reference.
 type ExecutorSelector struct{}
 
 // NewExecutorSelector creates a new ExecutorSelector.

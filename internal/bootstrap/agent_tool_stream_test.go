@@ -11,7 +11,10 @@ import (
 
 func TestAgentToolPlugin_Execute_should_emit_stream_events(t *testing.T) {
 	script := `echo '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"plan step"},{"type":"text","text":"hello"}]}}'
-echo '{"type":"result","subtype":"success","result":"hello"}'`
+echo '{"type":"result","subtype":"success","result":"hello"}'
+# Drain stdin to keep the pipe open until the adapter finishes writing;
+# without this, bash exits immediately and the adapter hits broken pipe.
+cat > /dev/null`
 
 	agt := external.NewCLIAgentTool(external.CLIConfig{
 		Name:        "claude-mock",

@@ -72,6 +72,7 @@
 | **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
 | **DM-20260615-004** | **D7 Intent 路径正交化 — 4 IntentKind = 4 独立执行链** | **devrix-d7-orthogonal-intent-paths** | **2026-06-16** | **[#35](https://github.com/fqntxmqee/devrix/pull/35)** | **ACCEPTED (7 T PASS; PR #35 merged `6086259`)** |
+| **DM-20260616-001** | **D7 不确定性处理能力缺口修复 — 5 个关键缺口闭环** | **devrix-d7-uncertainty-gaps** | **2026-06-16** | **—** | **ACCEPTED (6 AC PASS; 13 packages + 25 integration tests -race 全绿)** |
 
 ## Archive Locations
 
@@ -145,6 +146,7 @@
 | **devrix-background-task-tools** | **`openspec/archive/2026-06-15-devrix-background-task-tools/`** |
 | **devrix-d5-d6-sa-refine-v2.0** | **`openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`** |
 | **devrix-d7-orthogonal-intent-paths** | **`openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`** |
+| **devrix-d7-uncertainty-gaps** | **`openspec/archive/2026-06-16-devrix-d7-uncertainty-gaps/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -161,6 +163,10 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-16 归档（S7 — D7 不确定性处理能力缺口修复）**：
+
+- `devrix-d7-uncertainty-gaps` → `openspec/archive/2026-06-16-devrix-d7-uncertainty-gaps/`（DM-20260616-001 ACCEPTED; 5 个关键缺口闭环: PlanAgent 运行时门控 + PlanModeApproveGate 移除 + ConflictGuard 原子化 + OrchestratePath sink 推送 + PlanMode nil LLM 防御; 6 AC PASS; 13 packages + 25 integration tests -race 全绿）
 
 **2026-06-16 归档（S7 — D7 Intent 路径正交化）**：
 

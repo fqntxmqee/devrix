@@ -211,10 +211,12 @@ func workerEventToEngine(sessionID, taskID string, ev wave.WorkerEvent) *contrac
 	}
 }
 
-// emit writes an event to the caller channel, respecting ctx cancellation.
-// Events are not duplicated to sink — D1 gateway consumes the returned channel.
+// emit writes an event to the caller channel and pushes to the EventPublisher
+// sink for IM/WebSocket notifications. Both paths respect ctx cancellation.
 func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, ev *contracts.EngineEvent) {
-	_ = sink
+	if sink != nil {
+		sink.Publish(ctx, ev)
+	}
 	select {
 	case out <- ev:
 	case <-ctx.Done():

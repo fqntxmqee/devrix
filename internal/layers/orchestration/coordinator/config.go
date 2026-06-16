@@ -11,15 +11,12 @@ package coordinator
 //     and bypass the LLM (v1.0 default true).
 //   - LLMFallback:       v1.0 always false (LLM fallback deferred to v1.1).
 //   - AdvisoryValidationTimeoutMs: advisory D6 validation budget. Timeout → pass.
-//   - PlanModeApproveGate: when true, Wave triggers require an explicit
-//     Plan approve (per R2 OQ-1 resolution A).
 type Config struct {
 	Enabled                     bool
 	FastPathThreshold           int
 	CommandFirst                bool
 	LLMFallback                 bool
 	AdvisoryValidationTimeoutMs int
-	PlanModeApproveGate         bool
 	CommandWhitelist            []string
 	// ShadowLLMClassify enables the async LLM classify shadow on the
 	// IntentOrchestrate tail (R2 §5 命题 C). Default false; enable per
@@ -39,7 +36,6 @@ func DefaultConfig() *Config {
 		CommandFirst:                true,
 		LLMFallback:                 false,
 		AdvisoryValidationTimeoutMs: 50,
-		PlanModeApproveGate:         true,
 		CommandWhitelist: []string{
 			"/plan", "/stop", "/task", "/help",
 		},
@@ -56,7 +52,6 @@ type FileConfig struct {
 	CommandFirst                *bool    `yaml:"command_first"`
 	LLMFallback                 *bool    `yaml:"llm_fallback"`
 	AdvisoryValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
-	PlanModeApproveGate         *bool    `yaml:"plan_mode_approve_gate"`
 	CommandWhitelist            []string `yaml:"command_whitelist"`
 	ShadowLLMClassify           *bool    `yaml:"shadow_llm_classify"`
 	ShadowLLMTimeoutMs          *int     `yaml:"shadow_llm_timeout_ms"`
@@ -82,9 +77,6 @@ func BuildConfig(file *FileConfig) *Config {
 	}
 	if file.AdvisoryValidationTimeoutMs != nil {
 		cfg.AdvisoryValidationTimeoutMs = *file.AdvisoryValidationTimeoutMs
-	}
-	if file.PlanModeApproveGate != nil {
-		cfg.PlanModeApproveGate = *file.PlanModeApproveGate
 	}
 	if len(file.CommandWhitelist) > 0 {
 		cfg.CommandWhitelist = file.CommandWhitelist

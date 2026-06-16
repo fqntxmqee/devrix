@@ -65,7 +65,7 @@ func (p *PlanMode) Enter(ctx context.Context, sessionID, userGoal string) error 
 		tracer.Attribute{Key: "plan_mode.state", Value: string(PlanModeActive)},
 	)
 
-	if p.planAgent == nil {
+	if p.planAgent == nil || !p.planAgent.HasLLM() {
 		if span != nil {
 			span.End()
 		}

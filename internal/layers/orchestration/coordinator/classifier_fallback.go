@@ -8,6 +8,9 @@ import (
 // LLMFallbackClassifier wraps a rule-based IntentClassifier and falls back
 // to an LLM classifier when confidence is below the threshold.
 //
+// Deprecated: LLM fallback classification is deferred to v1.1 (LLMFallback
+// config defaults to false, no production call site creates this classifier).
+// Code and tests are kept for future reference.
 // v1.0 behavior (ShadowClassifier): LLM is shadow-only, rule result always returned.
 // v1.1 behavior (this classifier): LLM is called when confidence < minConfidence,
 // and its result is returned if it has higher confidence than the rule.
