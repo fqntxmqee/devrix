@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/golang/snappy"
@@ -138,7 +139,7 @@ func (s *Store) ReadBackup(sessionID string) ([]byte, error) {
 }
 
 func (s *Store) backupPath(sessionID string) (string, error) {
-	dir := expandPath(s.cfg.BackupDir)
+	dir := textutil.ExpandPath(s.cfg.BackupDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create backup dir: %w", err)
 	}
@@ -194,12 +195,4 @@ func snapshotToBudget(s types.TokenBudgetSnapshot) types.TokenBudget {
 		ToolResultBudget:  s.ToolResultBudget,
 		CompressionTarget: s.CompressionTarget,
 	}
-}
-
-func expandPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
-		home, _ := os.UserHomeDir()
-		path = filepath.Join(home, path[1:])
-	}
-	return os.ExpandEnv(path)
 }
