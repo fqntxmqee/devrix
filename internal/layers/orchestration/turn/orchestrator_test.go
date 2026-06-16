@@ -49,11 +49,13 @@ func (s *stubContext) Prepare(_ context.Context, _ PrepareRequest) (PreparedCont
 }
 
 type stubTools struct {
-	results []ToolResult
-	err     error
+	results   []ToolResult
+	err       error
+	lastCalls []llmgateway.ToolCall
 }
 
-func (s *stubTools) ExecuteRound(_ context.Context, _ ToolRoundRequest) (ToolRoundResult, error) {
+func (s *stubTools) ExecuteRound(_ context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
+	s.lastCalls = append([]llmgateway.ToolCall(nil), req.ToolCalls...)
 	if s.err != nil {
 		return ToolRoundResult{}, s.err
 	}
@@ -225,6 +227,60 @@ func TestOrchestrator_RunTurn_MultiTurn_ToolLoop(t *testing.T) {
 	}
 	if !hasType(evs, "complete") {
 		t.Error("expected complete event")
+	}
+}
+
+// Streaming SSE sends the full merged tool-call snapshot on every delta frame.
+func TestDedupeToolCalls_should_collapse_by_id(t *testing.T) {
+	calls := []llmgateway.ToolCall{
+		{ID: "call_1", Name: "grep"},
+		{ID: "call_1", Name: "grep"},
+		{ID: "call_2", Name: "read"},
+	}
+	got := dedupeToolCalls(calls)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+}
+
+func TestOrchestrator_RunTurn_DedupesStreamingToolCalls(t *testing.T) {
+	callCount := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := callCount.Add(1)
+		if n == 1 {
+			ch := make(chan llmgateway.Chunk, 4)
+			ch <- llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{{ID: "call_1", Name: "grep", Input: `{"q":"todo"}`}}}
+			ch <- llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{{ID: "call_1", Name: "grep", Input: `{"q":"todo"}`}}}
+			ch <- llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{{ID: "call_1", Name: "grep", Input: `{"q":"todo"}`}}, Done: true}
+			close(ch)
+			return ch, nil
+		}
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- textChunk("done")
+		ch <- doneChunk()
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "call_1", Output: "ok"}}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: &stubPersist{}, MaxTurns: 4,
+	})
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-dedup",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "list todos"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	collectEvents(ch)
+
+	if len(tools.lastCalls) != 1 {
+		t.Fatalf("ExecuteRound tool call count = %d, want 1", len(tools.lastCalls))
+	}
+	if callCount.Load() != 2 {
+		t.Fatalf("LLM rounds = %d, want 2", callCount.Load())
 	}
 }
 

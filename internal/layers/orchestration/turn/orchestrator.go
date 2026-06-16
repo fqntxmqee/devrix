@@ -154,7 +154,9 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			return
 		}
 
-		// Process stream chunks
+		// Process stream chunks. SSE accumulator emits the full merged tool-call
+		// snapshot on every delta frame — replace, do not append (MiniMax rejects
+		// duplicate tool_call ids in the follow-up request).
 		var contentBuf strings.Builder
 		var toolCalls []llmgateway.ToolCall
 
@@ -175,7 +177,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				}
 			}
 			if len(chunk.ToolCalls) > 0 {
-				toolCalls = append(toolCalls, chunk.ToolCalls...)
+				toolCalls = chunk.ToolCalls
 			}
 			if chunk.Done {
 				totalUsage.PromptTokens += chunk.Usage.PromptTokens
@@ -185,6 +187,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		endSpan(llmSpan)
 
 		finalText = contentBuf.String()
+		toolCalls = dedupeToolCalls(toolCalls)
 
 		// No tool calls → final response
 		if len(toolCalls) == 0 {
@@ -439,4 +442,25 @@ func mergeSystemPrompt(prepared, extra string) string {
 	default:
 		return prepared + "\n" + extra
 	}
+}
+
+func dedupeToolCalls(calls []llmgateway.ToolCall) []llmgateway.ToolCall {
+	if len(calls) <= 1 {
+		return calls
+	}
+	seen := make(map[string]struct{}, len(calls))
+	out := make([]llmgateway.ToolCall, 0, len(calls))
+	for i, c := range calls {
+		id := strings.TrimSpace(c.ID)
+		if id == "" {
+			id = fmt.Sprintf("call_%d", i)
+			c.ID = id
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, c)
+	}
+	return out
 }
