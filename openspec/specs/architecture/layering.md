@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.5.0
-**Last Updated:** 2026-06-15
+**Version:** 4.6.0
+**Last Updated:** 2026-06-16
 
 ---
 
@@ -43,9 +43,10 @@
 
 ### D1 Communication Domain
 
+> **Domain SoT：** `openspec/specs/d1-communication/d1-domain.md`  
 > **SoT（v3.4+）：** 价值流 Scenario 以 **D1-S13–S18** 为准（切法 A，DM-20260614-006）。  
 > **v2.0（v3.5+）：** 代码包按价值流对齐；Legacy D1-S1–S12 索引已退役，见下方 Package Map。  
-> 详见 `openspec/changes/devrix-d1-sa-refine/design.md` §2.2。
+> **流程 / 可观测性指南：** `terminal-state-guide.md` · `observability-guide.md`（互补登记表，不重复 A/F/T 全表）。
 
 #### Canonical — 价值流（D1-S13–S18）
 
@@ -655,3 +656,4 @@ T 层测试点标准编号格式: `D{X}-S{X}-A{XX}-T{NN}`（DSAFT 标准）
 | **4.3.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：D2 拆面契约上提至 `internal/shared/contracts/llm_facade.go`（`LLMCaller` + `Summarizer` 接口 + 辅助类型）；D7 `turn.QueryLLMCaller` / `turn.CompressionSummarizer` 实现并由 `bootstrap/context_engine.go` 单一注入点注入 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`；D2 production wiring 零 D3 import；D2 `query/adapters.go` `NewLLMCaller(llmgateway.ILLMGateway)` 与 `compression/llm_summarizer.go` 标 Deprecated fallback（保留供内部测试用 mockctx.LLMGateway）；D7 turn/ 新增 9 个单元测试；build/vet/test -short 全工程绿；`lint/layer::TestD2_D3Ban` 通过（4 个白名单 = 4 个实际 fallback 路径） |
 | **4.4.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化（v1.1.0 闭合）**：(1) `coordinator.command_handler.go` 新增 — IntentCommand 显式分发到 `PlanCLICommands` / `CLICommands`（零 LLM 成本）；(2) `coordinator.orchestrate_path.go` 新增 — IntentOrchestrate 显式调 `TaskDecomposer.SynthesizeTaskGraph` + `WaveScheduler.Start` + `WaitForCompletion`；(3) `coordinator.orchestrator.go::ProcessMessage` switch 4 case 改为 4 独立执行链（`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip` 内联），删除 v1.0 `handleCommand` / `orchestrate` 占位实现（system_prompt 字符串前缀让 LLM 自解释）；(4) D7 v1.0 "1 fastPath 占位 3 hint 前缀"临时妥协彻底关闭；(5) 9 个 P0 单测覆盖 3 新路径（3 + 5 + 1）；(6) `internal/layers/orchestration/workmodel/cli_commands.go` 导出 `Help()`（被 `CommandHandler.dispatch` 用于 `/help`）；(7) `NewSessionOrchestrator` 增加 lazy default（CommandHandler → `workmodel.GlobalTaskManager` + 新 PlanMode；OrchestratePath → 新 `TaskDecomposer` + 新 `WaveScheduler`），bootstrap 不必显式 wire 仍可启动；(8) build/vet/test -race 全工程绿，`TestD2_D3Ban` 不回归 |
 | **4.5.0** | **2026-06-15** | **DM-20260615-004 跨文档同步**：`d2-context-engine/d2-domain.md` 状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面，commit 41aec47 + `TestD2_D3Ban` 4 whitelist）；D7 目录树新增 `coordinator/command_handler.go` 与 `coordinator/orchestrate_path.go` 两文件（PR #35 引入但目录树尚未登记） |
+| **4.6.0** | **2026-06-16** | **D1 领域文档同步**：新增 `d1-domain.md`（North Star + Out of Scope + 文档索引）；新增互补指南 `terminal-state-guide.md`（终态流程/时序）与 `observability-guide.md`（Span↔T/必达 Runbook）；D1 § 增加 Domain SoT 与 Guides 交叉引用 |

@@ -4,6 +4,7 @@
 **Version:** 3.0.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
 **Change:** DM-20260614-006 — 切法 A 双轨
 
 ---
@@ -12,7 +13,7 @@
 
 - **Canonical SoT：** 价值流 `D1-S13–S18`（见 `layering.md` v3.4+）
 - **Legacy T ID：** 44 条 IMPLEMENTED 测试注释 **v1.0 不改**；本表 **Canonical** 列指向终态 S/A/F
-- **新增 T：** 11 条 PLANNED canonical T（v1.1 实现并标注 `@L5` / `// T:`）
+- **按 S 分组摘要 / P0 Runbook / 必达演练：** 见 `observability-guide.md` §4–§6（本文保留全表登记）
 
 ---
 

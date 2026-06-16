@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/policy/permission"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

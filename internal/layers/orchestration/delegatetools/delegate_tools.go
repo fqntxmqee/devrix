@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"

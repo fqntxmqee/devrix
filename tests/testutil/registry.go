@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 )
 
 // MustBuiltinRegistry fails the test when the built-in registry cannot be constructed.

@@ -3,7 +3,7 @@ package toolpolicy_test
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/shared/types"
 )

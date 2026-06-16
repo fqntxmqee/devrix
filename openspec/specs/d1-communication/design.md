@@ -6,7 +6,7 @@
 > **版本：** 2.0.0
 > **状态：** Active — 主路径 CommunicationGateway；新引入 BackpressureEventBus（DM-20260611-003）
 > **DSAFT 域归属：** D1 Communication Domain（Core）
-> **关联 OpenSpec：** 规格 SoT：`openspec/specs/d1-communication/spec.md` · Delta：`layer-delta.md` · A/F/T 注册表：`a-registry.md` / `f-registry.md` / `t-registry.md`
+> **关联 OpenSpec：** 领域 SoT：`openspec/specs/d1-communication/d1-domain.md` · 验收：`spec.md` · Delta：`layer-delta.md` · A/F/T：`a-registry.md` / `f-registry.md` / `t-registry.md`
 
 ---
 
@@ -15,12 +15,15 @@
 | 文档 | 用途 |
 |------|------|
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
+| `openspec/specs/d1-communication/d1-domain.md` | **领域 SoT**（North Star、Out of Scope、文档索引） |
 | `openspec/specs/d1-communication/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
+| `openspec/specs/d1-communication/terminal-state-guide.md` | **终态流程指南**（跨域时序、A→F 编排树、IntentKind；不重复登记表） |
+| `openspec/specs/d1-communication/observability-guide.md` | **可观测性指南**（Span↔T、Trace 树、必达 Runbook；不重复 span/t 全表） |
 | `openspec/specs/d1-communication/layer-delta.md` | 层能力 Delta SoT（V1 → V2 演进记录） |
-| `openspec/specs/d1-communication/a-registry.md` | A 层活动注册表（21 Activities） |
-| `openspec/specs/d1-communication/f-registry.md` | F 层功能点注册表（43 Function Points） |
-| `openspec/specs/d1-communication/t-registry.md` | T 层测试点注册表（44 / 44 IMPLEMENTED） |
-| `openspec/specs/d1-communication/span-registry.md` | Span 注册表（15 ops，gateway + adapter） |
+| `openspec/specs/d1-communication/a-registry.md` | A 层活动注册表（Canonical 16 + Legacy） |
+| `openspec/specs/d1-communication/f-registry.md` | F 层功能点注册表（Canonical 18 + Legacy） |
+| `openspec/specs/d1-communication/t-registry.md` | T 层测试点注册表（56 / 56 IMPLEMENTED） |
+| `openspec/specs/d1-communication/span-registry.md` | Span 注册表（Canonical + Legacy ops） |
 | `openspec/specs/architecture/layering.md` | Devrix 分层架构与 D/S/A/F/T 编号规则 |
 
 ---
@@ -36,19 +39,19 @@
 
 | 概念 | 定义 | D1 对应 |
 |------|------|---------|
-| **Separating Equilibrium**（分离均衡） | 不同类型的发送者选择不同信号，使接收者能推断类型 | D1-S2/D7-S5 ClassifyIntent 按规则分类 |
-| **Costly Signal**（成本信号） | 信号发送者承担真实成本，不可伪造 | D1-S13 `thinking` / `task_work_proof` |
-| **Commitment Device**（承诺机制） | 发送者通过信号约束自身未来行为 | D1-S14 `complete` / D1-S16 `error` |
-| **Screening Mechanism**（筛选机制） | 接收者设计契约让发送者自我选择 | D1-S12 Permission YOLO 模式 |
+| **Separating Equilibrium**（分离均衡） | 不同类型的发送者选择不同信号，使接收者能推断类型 | **D7-S5** ClassifyIntent（D1 仅 Dispatch） |
+| **Costly Signal**（成本信号） | 信号发送者承担真实成本，不可伪造 | **D1-S14** Thinking · **D1-S16** Conclusion |
+| **Commitment Device**（承诺机制） | 发送者通过信号约束自身未来行为 | **D1-S18** Critical 必达 · **D1-S16** complete/error |
+| **Screening Mechanism**（筛选机制） | 接收者设计契约让发送者自我选择 | **D1-S13-A04** Permission YOLO |
 
 #### 信号分类与博弈角色
 
 | 信号类型 | D1 S 层 | 博弈含义 | 可验证性 |
 |---------|---------|---------|---------|
-| **Critical 必达信号** | D1-S9 | Commitment Device：必须送达，不可丢失 | ✅ 独立通道保证 |
-| **Thinking 信号** | D1-S13 | Costly Signal：LLM 推理过程，用户可感知成本 | ✅ 有代价 |
-| **Task 进度信号** | D1-S14 | Separating Equilibrium：任务完成状态可验证 | ✅ 原子性 |
-| **Conclusion 信号** | D1-S15 | Costly Signal：最终结论，用户决策依据 | ✅ 不可伪造 |
+| **Critical 必达信号** | **D1-S18** GuaranteeDelivery | Commitment Device：必须送达，不可丢失 | ✅ PublishCritical |
+| **Thinking 信号** | **D1-S14** PresentThinking | Costly Signal：LLM 推理过程，用户可感知成本 | ✅ 有代价 |
+| **Task 进度信号** | **D1-S15** PresentTaskProgress | Commitment Device：任务进度可验证 | ✅ work_proof span |
+| **Conclusion 信号** | **D1-S16** DeliverConclusion | Costly Signal：最终结论，用户决策依据 | ✅ 不可伪造 |
 
 #### 博弈约束
 
@@ -77,7 +80,7 @@
 | **消息端到端延迟**（入站 → 首 `thinking`） | P99 < 800ms | Gateway span `comm.gateway.route` |
 | **CardKit 流式节流** | 默认 ≥ 80ms / chunk（可配） | `streamThrottle.MinInterval` |
 | **背压 Drain 收敛** | 低水位阈值 `LowWatermark` 内 P99 < 1s | EventBus DrainReport.Duration |
-| **Critical 事件送达** | 100%（永不丢、必经独立通道） | 测试 D1-S9-A01-T02 |
+| **Critical 事件送达** | 100%（永不丢、必经独立通道） | 测试 **D1-S18-A01-F02-T01** |
 | **单实例会话容量** | ≥ 1000 Session / 进程 | 与 `session.max_sessions=1000` 对齐 |
 | **权限响应超时** | 默认 60s，可配 | PermissionConfig.DefaultTimeout |
 | **飞书重连退避上限** | ≤ 60s 指数退避 | ConnectionManager.RestoreConnection |
@@ -87,13 +90,13 @@
 
 | 类型 | 约束 | 设计响应 |
 |------|------|----------|
-| **架构** | D1 不得反向依赖 D2 之外的领域逻辑 | 仅通过 `contracts.IEngine` 调用 D2 |
+| **架构** | D1 ingress 后路由 **D7**；禁止直连 D2（DM-007） | `IOrchestrationEntry.ProcessMessage` |
 | **架构** | D1 Adapter 仅通过 `GatewayAPI` 暴露反向调用 | 见 `gateway/api.go: GatewayAPI` |
 | **可观测** | 必须接入 D5 `observability.Bridge`（D1 旧 metrics 包已弃用） | `internal/layers/communication/metrics/` 标注 DEPRECATED |
 | **存储** | V2 默认文件存储（`FileSessionStore`），原子写 | 见 §4 领域模型 |
 | **跨域** | Worker 卡片数据来自 D7 `wave.WorkerEvent` | 见 §5 核心链路 |
 | **配置** | `devrix.yaml` → `connection.*` / `rate_limit.*` / `feishu.*` | 通过 `config.CommunicationConfig` 注入 |
-| **测试** | T 层 44 个测试点全部 IMPLEMENTED | `openspec/specs/d1-communication/t-registry.md` |
+| **测试** | T 层 56 个测试点全部 IMPLEMENTED（26 P0） | `t-registry.md` · Runbook 见 `observability-guide.md` |
 
 ---
 
@@ -117,8 +120,8 @@
 | 接口 | `I` 前缀 + 能力描述 | `IInstanceRegistry` / `IMilestoneService` |
 | 适配器 | `<Platform>Adapter` | `FeishuAdapter` / `DingTalkAdapter` / `CLIAdapter` |
 | 渲染器 | `<Format>Renderer` | `CLIRenderer` / `DingTalkCardRenderer` |
-| Activity 编号 | `D1-S{N}-A{NN}` | `D1-S1-A02 RouteMessage` |
-| Function 编号 | `D1-S{N}-A{NN}-F{NN}` | `D1-S2-A03-F01 EmitWorkerEvent` |
+| Activity 编号 | `D1-S{N}-A{NN}` | `D1-S13-A03 DispatchToAgent`（Canonical 示例） |
+| Function 编号 | `D1-S{N}-A{NN}-F{NN}` | `D1-S15-A02-F02 encodeFeishuWorkerCard` |
 
 ### 2.3 代码风格
 
@@ -129,7 +132,10 @@
 
 ## ③ 业务流程
 
-### 3.1 核心用例：用户通过飞书发起 Agent 任务
+> **Canonical 主路径（DM-007+）：** D1-S13 → D7 `ProcessMessage` → EngineEvent → D1-S14/15/16 → D1-S18。详见 `terminal-state-guide.md` §4–§8。  
+> 下列 §3.1 为 **Legacy v1.0 Agent 旁路** 用例图，保留供追溯。
+
+### 3.1 核心用例：用户通过飞书发起 Agent 任务（Legacy）
 
 ```
 ┌────┐  ┌─────────────┐  ┌──────────┐  ┌────────┐  ┌────────────┐  ┌────────┐  ┌──────────┐
@@ -281,7 +287,9 @@ type CardElement interface{ cardElement() }
 
 ## ⑤ 核心链路图
 
-### 5.1 端到端路径（IM → Engine → IM）
+> **Legacy v1.0 链路。** Canonical 见 `terminal-state-guide.md` §4（D7 `ProcessMessage` 入口）。
+
+### 5.1 端到端路径（IM → Engine → IM）（Legacy）
 
 ```
 User
@@ -476,13 +484,13 @@ YOLO 规则（DM-20260607-001）：
 
 | 注册表 | 路径 | 条目数 |
 |--------|------|--------|
-| A 层活动 | `openspec/specs/d1-communication/a-registry.md` | 21 Activities（12 Scenarios） |
-| F 层功能点 | `openspec/specs/d1-communication/f-registry.md` | 43 F Points |
-| T 层测试点 | `openspec/specs/d1-communication/t-registry.md` | 44 / 44 IMPLEMENTED |
+| A 层活动 | `a-registry.md` | 16 Canonical + Legacy 追溯 |
+| F 层功能点 | `f-registry.md` | 18 Canonical + Legacy 追溯 |
+| T 层测试点 | `t-registry.md` | 56 / 56 IMPLEMENTED |
 
-关键 Bridge 功能点：
-- `D1-S5-A01-F06 AdaptToPlanner`：Milestone → Planner 接口（`bridges/milestone/wire.go`）
-- `D1-S1-A03-F03 AdaptToPermissionGate`：Permission → IPG（`gateway/permission_adapter.go`）
+关键 Bridge 功能点（Legacy 追溯）：
+- `D1-S15-A01-F03` emitMilestoneCardProgress → D7 milestone（`orchestration/milestone/`）
+- `D1-S13-A04` ResolvePermissionGate → IPG（`capture/permission.go`）
 
 ---
 
@@ -490,7 +498,11 @@ YOLO 规则（DM-20260607-001）：
 
 | 文档 | 关系 |
 |------|------|
-| `openspec/specs/d2-context-engine/design.md` | D2 QueryLoop 引擎设计（D1 调用方） |
+| `d1-domain.md` | 领域 SoT |
+| `terminal-state-guide.md` | Canonical 主路径与时序 |
+| `observability-guide.md` | Span↔T、必达 Runbook |
+| `dsaft-architecture.md` | Stub（计数表）；明细已迁移 |
+| `openspec/specs/d2-context-engine/design.md` | D2 引擎设计（D7 调度，D1 不直连） |
 | `openspec/specs/d3-llm-gateway/design.md` | D3 LLM 网关设计（D1 不直接依赖） |
 | `openspec/specs/d4-multi-agent/design.md` | D4 MultiAgent 设计（D1 通过 AgentFactory 协作） |
 | `openspec/specs/d5-observability/spec.md` | D5 Observability 桥接规范（D1 强制接入） |

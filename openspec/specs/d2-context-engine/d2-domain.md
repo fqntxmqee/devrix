@@ -182,5 +182,6 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 | `design.md` | 六段式架构设计 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
 | `d7-boundary.md` | **D2↔D7 跨域 SoT** |
+| `../d1-communication/d1-domain.md` | D1 入口与展示域 SoT |
 | `layer-delta.md` | Delta SoT |
 | `docs/methodology/dsaft-refactoring-playbook.md` | 重构方法论 |

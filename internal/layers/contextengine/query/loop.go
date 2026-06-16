@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
-	"github.com/devrix/devrix/internal/layers/contextengine/usercontext"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"

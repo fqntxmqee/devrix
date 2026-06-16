@@ -3,7 +3,7 @@ package contextengine_test
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 )
 
 func mustBuiltinRegistry(t *testing.T) *registry.BuiltinRegistry {

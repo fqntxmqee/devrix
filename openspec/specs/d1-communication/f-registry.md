@@ -6,12 +6,15 @@
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d1-communication/a-registry.md`
+**Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
 
 ---
 
 ## Overview
 
 D1 通信域 F 层功能点注册表。**Canonical SoT：S13–S18 下 F**（见 §Canonical）。Legacy F 表保留于 §Legacy。
+
+> **A→F 编排树**（可读结构图）见 `terminal-state-guide.md` §3；本文保留 F 点字段与代码路径登记。
 
 ---
 

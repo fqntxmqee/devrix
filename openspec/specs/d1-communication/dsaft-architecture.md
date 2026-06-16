@@ -1,73 +1,40 @@
-# D1 Communication Domain - DSAFT Architecture Analysis
+# D1 Communication — DSAFT 层计数（Stub）
 
 **Capability:** d1-communication
-**Domain:** D1
-**DSAFT Type:** Core Domain
-**Version:** 1.0.0
-**Status:** Active
-**Last Updated:** 2026-06-15
-**Parent:** spec.md, a-registry.md, f-registry.md
+**Status:** Deprecated — 内容已迁移
+**Version:** 2.0.0
+**Last Updated:** 2026-06-16
+**Superseded By:** `d1-domain.md` · `terminal-state-guide.md` · `observability-guide.md`
 
 ---
 
-## Overview
+> **本文件仅为历史入口保留。** 领域边界、跨域流程、IntentKind 时序、Span Runbook 请读下方迁移表，勿在本文件追加内容。
 
-D1 Communication Domain handles IM platform integration, message presentation, and delivery guarantee. As the entry layer of Devrix, all user interactions flow through this domain.
+## 迁移去向
 
-## DSAFT Five-Layer Definition
+| 原内容 | 现 SoT |
+|--------|--------|
+| North Star / Out of Scope / 6S 承诺 | `d1-domain.md` |
+| S/A 明细、代码路径 | `a-registry.md` |
+| A→F 编排树、主路径、时序图 | `terminal-state-guide.md` |
+| Span↔T、必达演练、P0 Runbook | `observability-guide.md` |
+| Gherkin 验收 | `spec.md` |
+| EventBus / CardKit 实现细节 | `design.md` |
 
-| Layer | Definition | D1 Mapping |
-|-------|-----------|------------|
-| **D** | Business capability boundary | D1 Communication Domain |
-| **S** | Business value flow | S13-S18 (6 scenarios) |
-| **A** | Business actions | 16 Canonical Activities |
-| **F** | Function points | 18 Canonical Functions |
-| **T** | Test contracts | 56 test points |
+## DSAFT 五层计数（Canonical）
 
-## S Layer: Value Flow
+| Layer | D1 Mapping |
+|-------|------------|
+| **D** | D1 Communication |
+| **S** | S13–S18（6） |
+| **A** | 16 |
+| **F** | 18 |
+| **T** | 56（26 P0） |
 
-| S ID | Scenario | User Goal | Status |
-|------|----------|-----------|--------|
-| S13 | CaptureUserIntent | Command parsing, permission | IMPLEMENTED |
-| S14 | PresentThinking | Real-time thinking output | IMPLEMENTED |
-| S15 | PresentTaskProgress | Task/tool/Worker progress | IMPLEMENTED |
-| S16 | DeliverConclusion | Final conclusion | IMPLEMENTED |
-| S17 | ConnectChannel | Multi-IM platform | IMPLEMENTED |
-| S18 | GuaranteeDelivery | Guaranteed delivery | IMPLEMENTED |
-
-## A Layer: Activities
-
-| A ID | Name | S归属 | Kind |
-|------|------|-------|------|
-| D1-S13-A01 | AcceptInboundMessage | S13 | USER |
-| D1-S13-A02 | PersistUserTurn | S13 | SYSTEM |
-| D1-S13-A03 | DispatchToAgent | S13 | USER |
-| D1-S13-A04 | ResolvePermissionGate | S13 | USER |
-| D1-S13-A05 | ParseCommand | S13 | USER |
-| D1-S14-A01 | EmitThinkingDelta | S14 | SYSTEM |
-| D1-S15-A01 | EmitToolProgress | S15 | SYSTEM |
-| D1-S15-A02 | EmitWorkerProgress | S15 | SYSTEM |
-| D1-S16-A01 | EmitSummaryChunk | S16 | SYSTEM |
-| D1-S16-A02 | FinalizeReply | S16 | SYSTEM |
-| D1-S17-A01 | ParseFeishuInbound | S17 | USER |
-| D1-S17-A02 | ParseDingTalkInbound | S17 | USER |
-| D1-S17-A03 | ParseCLIInbound | S17 | USER |
-| D1-S17-A04 | ManageConnection | S17 | INTERNAL |
-| D1-S17-A05 | RegisterInstance | S17 | INTERNAL |
-| D1-S17-A06 | CheckRateLimit | S17 | INTERNAL |
-| D1-S18-A01 | DeliverOutboundSignal | S18 | SYSTEM |
-
-## Cross-Domain Relationships
-
-| Direction | Domain | Interface |
-|-----------|--------|-----------|
-| D1 -> D2 | Context Engine | IEngine.Process |
-| D1 -> D4 | MultiAgent | IAgentFactory |
-| D1 -> D7 | Orchestration | IOrchestrationEntry.ProcessMessage |
-| D1 <-> D5 | Observability | Observability, Bridge |
-
-## Revision History
+## 修订记录
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-15 | Initial DSAFT architecture analysis |
+| 1.1.0 | 2026-06-16 | 跨域表同步 DM-007 |
+| **2.0.0** | **2026-06-16** | **收敛为 Stub**；明细迁至 `d1-domain.md` + Guides |

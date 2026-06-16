@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.0.0
+**Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d2-context-engine/a-registry.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
@@ -12,157 +12,178 @@
 
 ## Overview
 
-D2 F 层注册表。**Canonical SoT：** 随 D2-S15–S20 A 层（DM-20260614-009）。Legacy F 见各 Legacy S 节。
-
-### Canonical F 摘要
-
-| Canonical S | 关键 F | Legacy 来源 |
-|-------------|--------|-------------|
-| S15 | RunPipeline, RepairChain, BuildPrompt, CountTokens | S2/S7/S13/S4 |
-| S16 | LoopRun, ExecuteToolBatch, StreamEmit | S10 core |
-| S17 | Serialize, AppendTranscript, CommitWindow | S6/S3 |
-| S18 | SandboxExec, PlanWriteGate, ToolPoolFilter | S8/S5/S9 |
-| S19 | SubQueryRun, ForkBuild, SidechainAppend | S10 nested |
-| S20 | BootstrapStages, PreflightScore | S9 |
+D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 ---
 
-## D2-S1 (RETIRED): PEV
+## D2-S1 PrepareContext
 
-> **2026-06-13**：PEV 功能点已移除。QueryLoop 见 D2-S10。
+### D2-S1-A01 LoadSession
 
-| F ID | Name | Status | Successor |
-|------|------|--------|-----------|
-| D2-S1-A01-F03 | RunPEVCycle | RETIRED | D2-S10 QueryLoop |
-| D2-S1-A02-F01 | VerifyCommands | RETIRED | — |
-| D2-S1-A03-F01–F03 | Plan/Milestone | RETIRED | — |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S1-A01-F01 | LoadOrInit | session_id, model | *SessionContext | `prepare/memory/manager.go` |
+| D2-S1-A01-F02 | AppendMessages | session, messages | — | `prepare/memory/manager.go` |
 
-## D2-S2-A01 CompressContext
+### D2-S1-A02 RecallMemory
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S2-A01-F01 | RunPipeline | F-BE | messages, budget | compressed, report | `compression/pipeline.go` |
-| D2-S2-A01-F02 | AutoCompact | F-BE | messages, llm | compacted | `compression/autocompact.go` |
-| D2-S2-A01-F03 | AsyncCompact | F-BE | messages, llm | placeholder + async | `compression/async_compact.go` |
-| D2-S2-A01-F04 | TruncateFallback | F-BE | messages, max_tokens | truncated | `compression/pipeline.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S1-A02-F01 | RecallLongTerm | session_id, query | []MemoryEntry | `prepare/memory/longterm.go` |
+| D2-S1-A02-F02 | FormatMemoryContext | entries, max_tokens | string | `prepare/memory/longterm_format.go` |
 
-## D2-S3-A01 ManageMemory
+### D2-S1-A03 CompressContext
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S3-A01-F01 | LoadOrInit | F-BE | session_id | *SessionContext | `memory/manager.go` |
-| D2-S3-A01-F02 | AppendMessages | F-BE | session, messages | — | `memory/manager.go` |
-| D2-S3-A01-F03 | RecallLongTerm | F-BE | session_id | []Memory | `memory/longterm.go` |
-| D2-S3-A01-F04 | CommitActiveWindow | F-BE | session, budget | active_messages | `engine.go` (`commitActiveWindow`) |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S1-A03-F01 | RunPipeline | messages, budget | compressed, report | `prepare/compression/pipeline.go` |
+| D2-S1-A03-F02 | RepairToolChain | messages | valid_messages | `prepare/conversation/repair.go` |
+| D2-S1-A03-F03 | AutoCompact | messages, llm | compacted | `prepare/compression/autocompact.go` |
+| D2-S1-A03-F04 | AsyncCompact | messages, llm | placeholder+async | `prepare/compression/async_compact.go` |
+| D2-S1-A03-F05 | MessagesAfterCompactBoundary | messages | tail_messages | `prepare/conversation/boundary.go` |
 
-## D2-S4-A01 CountTokens
+### D2-S1-A04 AssemblePrompt
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S4-A01-F01 | CountText | F-BE | text | int | `contracts/tokencounter.go` |
-| D2-S4-A01-F02 | CountMessages | F-BE | []Message | int | `contracts/tokencounter.go` |
-| D2-S4-A01-F03 | CountWithSystemPrompt | F-BE | prompt, messages | int | `contracts/tokencounter.go` |
-| D2-S4-A01-F04 | TruncateToTokens | F-BE | text, max_tokens | string | `contracts/tokencounter.go` |
-| D2-S4-A01-F05 | EncodingForModel | F-BE | model | encoding_name | `contracts/tokencounter.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S1-A04-F01 | BuildSystemPrompt | build_input | prompt, report | `prepare/prompt/assembler.go` |
+| D2-S1-A04-F02 | LoadPromptSections | workdir | sections | `prepare/prompt/loader.go` |
+| D2-S1-A04-F03 | CountTokens | text | int | `token/counter.go` |
 
-## D2-S5-A01 RegisterOperation
+---
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S5-A01-F01 | RegisterTool | F-BE | tool_spec | — | `registry/builtin.go` |
-| D2-S5-A01-F02 | ListTools | F-BE | — | []ToolSpec | `registry/builtin.go` |
+## D2-S2 ExecuteQuery
 
-## D2-S6-A01 SnapshotContext
+### D2-S2-A01 RunLoop
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S6-A01-F01 | Serialize | F-BE | SessionContext | bytes | `snapshot/store.go` |
-| D2-S6-A01-F02 | Deserialize | F-BE | bytes | SessionContext | `snapshot/store.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S2-A01-F01 | RunLoop | ctx, session, params | *Result | `query/loop.go` |
+| D2-S2-A01-F02 | CallLLM | request | <-chan LLMChunk | `query/loop.go` |
+| D2-S2-A01-F03 | RecoverFrom413 | oversized | retry_msgs | `query/recovery.go` |
+| D2-S2-A01-F04 | FallbackOnOverload | error | fallback_llm | `query/recovery.go` |
 
-## D2-S6-A02 PersistMainTranscript
+### D2-S2-A02 ExecuteToolRound
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S6-A02-F01 | AppendBatch | F-BE | session_id, messages | — | `transcript/main_thread.go` |
-| D2-S6-A02-F02 | Load | F-BE | session_id | []Message | `transcript/main_thread.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S2-A02-F01 | ExecuteTools | []ToolCall | []ToolResult | `engine.go` |
+| D2-S2-A02-F02 | PersistToolHistory | tool_calls | sc.Messages | `engine.go` |
 
-## D2-S7-A01 LoadPromptSections
+### D2-S2-A03 StreamResponse
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S7-A01-F01 | LoadAsSections | F-BE | workdir | []string | `prompt/loader.go` |
-| D2-S7-A01-F02 | LoadWithDynamic | F-BE | workdir | sections + boundary | `prompt/loader.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S2-A03-F01 | StreamEmit | text_chunk | EngineEvent | `query/loop.go` |
 
-## D2-S7-A02 AssembleSystemPrompt
+---
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S7-A02-F01 | Build | F-BE | SystemPromptBuildInput | prompt, report | `prompt/assembler.go` |
-| D2-S7-A02-F02 | BuildLegacy | F-BE | agents_raw, memory | prompt | `prompt/assembler.go` |
+## D2-S3 EnforcePolicy
 
-## D2-S8-A01 IsolateTool
+### D2-S3-A01 CheckPermission
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S8-A01-F01 | SandboxBash | F-BE | command, workdir | result | `toolrunner/sandbox.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S3-A01-F01 | CheckPermission | tool_call, mode | allow/deny | `enforce/permission/mode.go` |
+| D2-S3-A01-F02 | PlanModeWriteGate | path, plan_file | allowed | `enforce/permission/mode.go` |
 
-## D2-S9-A01 BootstrapSession
+### D2-S3-A02 FilterTools
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S9-A01-F01 | ScanWorkspace | F-BE | workdir | *WorkspaceContext | `harness/workspace.go` |
-| D2-S9-A01-F02 | RoutePrompt | F-BE | user_message, tools | routing_hints | `harness/router.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S3-A02-F01 | FilterByPermissionMode | tools, mode | visible | `permission_tools.go` |
+| D2-S3-A02-F02 | FilterByAgentRole | tools, role | visible | `agent_role_filter.go` |
 
-## D2-S9-A02 EvaluatePreflight
+### D2-S3-A03 SandboxExecution
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S9-A02-F01 | Evaluate | F-BE | ctx, messages, budget | *PreflightResult | `harness/preflight.go` |
-| D2-S9-A02-F02 | FilterVisibleTools | F-BE | message, tools | filtered_tools | `harness/preflight.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S3-A03-F01 | SandboxBash | command, workdir | result | `enforce/toolrunner/sandbox.go` |
 
-## D2-S9-A03 FilterToolPool
+### D2-S3-A04 RegisterTools
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S9-A03-F01 | FilterByMode | F-BE | all_tools, mode | visible_tools | `harness/toolpool.go` |
-| D2-S9-A03-F02 | FilterByConfig | F-BE | tools, deny_list | filtered_tools | `harness/toolpool.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S3-A04-F01 | RegisterTool | tool_spec | — | `enforce/toolrunner/tool_runner.go` |
+| D2-S3-A04-F02 | ListTools | — | []ToolSchema | `enforce/toolrunner/tool_runner.go` |
+| D2-S3-A04-F03 | RegisterBuiltinTools | config | registry | `registry/builtin.go` |
 
-## D2-S10-A01 RunQueryLoop
+---
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S10-A01-F01 | RunLoop | F-BE | ctx, session, params | *Result | `query/loop.go` |
-| D2-S10-A01-F02 | CallLLM | F-BE | request | <-chan LLMChunk | `query/loop.go` |
-| D2-S10-A01-F03 | ExecuteTools | F-BE | []ToolCall | []ToolResult | `query/streaming_executor.go` |
-| D2-S10-A01-F04 | RecoverFrom413 | F-BE | oversized request | retry messages | `query/recovery.go` |
-| D2-S10-A01-F05 | FallbackOnOverload | F-BE | primary error | fallback LLM | `query/recovery.go` |
+## D2-S4 PersistState
 
-## D2-S10-A03 ExecuteBackgroundTask
+### D2-S4-A01 SaveSnapshot
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S10-A03-F01 | RegisterTask | F-BE | session_id, agent_id | task_id | `nested/background.go` |
-| D2-S10-A03-F02 | WaitForTask | F-BE | task_id, timeout | terminal_state | `nested/background.go` |
-| D2-S10-A03-F03 | CancelTask | F-BE | task_id | — | `nested/background.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S4-A01-F01 | Serialize | SessionContext | bytes | `persist/snapshot/store.go` |
+| D2-S4-A01-F02 | Deserialize | bytes | SessionContext | `persist/snapshot/store.go` |
 
-## D2-S13-A01 RepairToolChain
+### D2-S4-A02 WriteTranscript
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S13-A01-F01 | RepairToolMessageChain | F-BE | messages | valid_messages | `conversation/repair.go` |
-| D2-S13-A01-F02 | FilterIncompleteToolCalls | F-BE | messages | trimmed | `conversation/filter.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S4-A02-F01 | AppendMainTranscript | session_id, msgs | — | `persist/transcript/main_thread.go` |
+| D2-S4-A02-F02 | AppendSidechain | session_id, msgs | — | `persist/transcript/sidechain.go` |
 
-## D2-S13-A02 ManageCompactBoundary
+### D2-S4-A03 StoreLongTerm
 
-| F ID | Name | Type | Input | Output | Code Location |
-|------|------|------|-------|--------|---------------|
-| D2-S13-A02-F01 | MessagesAfterCompactBoundary | F-BE | messages | tail_messages | `conversation/boundary.go` |
-| D2-S13-A02-F02 | NewCompactBoundaryMessage | F-BE | trigger, count | system_marker | `conversation/boundary.go` |
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S4-A03-F01 | AutoStore | session, query, summary | — | `prepare/memory/longterm.go` |
+
+### D2-S4-A04 CommitWindow
+
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S4-A04-F01 | CommitActiveWindow | session, budget | active | `engine.go` |
+| D2-S4-A04-F02 | TrimMessages | session, max | trimmed | `prepare/memory/manager.go` |
+
+---
+
+## D2-S5 NestedExecution
+
+### D2-S5-A01 SpawnSubquery
+
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S5-A01-F01 | RunSubQuery | spec | result | `nested/subquery.go` |
+
+### D2-S5-A02 RunBackgroundTask
+
+| F ID | Name | Input | Output | Code Location |
+|------|------|-------|--------|---------------|
+| D2-S5-A02-F01 | RegisterTask | session_id, agent_id | task_id | `nested/background.go` |
+| D2-S5-A02-F02 | WaitForTask | task_id, timeout | state | `nested/background.go` |
+| D2-S5-A02-F03 | CancelTask | task_id | — | `nested/background.go` |
+
+---
+
+## Legacy F（冻结，保留追溯）
+
+> 以下 F 点映射到 D2-S9 Harness（#deprecated）。
+
+| F ID | Name | Code Location |
+|------|------|---------------|
+| D2-S9-A01-F01 | ScanWorkspace | `harness/workspace.go` |
+| D2-S9-A01-F02 | RoutePrompt | `harness/router.go` |
+| D2-S9-A02-F01 | EvaluatePreflight | `harness/preflight.go` |
+| D2-S9-A02-F02 | FilterVisibleTools | `harness/preflight.go` |
+| D2-S9-A03-F01 | FilterByMode | `harness/toolpool.go` |
+| D2-S9-A03-F02 | FilterByConfig | `harness/toolpool.go` |
+| D2-S1-A01-F03 | RunPEVCycle | RETIRED |
+| D2-S1-A02-F01 | VerifyCommands | RETIRED |
+| D2-S1-A03-F01–F03 | Plan/Milestone | RETIRED |
 
 ---
 
 ## Statistics
 
-| Activities with F | Total F Points |
-|-------------------|----------------|
-| 18 | 38 |
+| Canonical S | F Points |
+|-------------|----------|
+| S1 PrepareContext | 12 |
+| S2 ExecuteQuery | 7 |
+| S3 EnforcePolicy | 8 |
+| S4 PersistState | 7 |
+| S5 NestedExecution | 4 |
+| **Total** | **38** |

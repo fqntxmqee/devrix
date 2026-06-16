@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/attachments"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/shared/config"
