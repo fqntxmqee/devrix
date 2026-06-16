@@ -39,6 +39,7 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 | S4 实现 | `coding.md` + `testing.md` | go vet + test-unit |
 | **S4-Gate** | **`review-code.md`** | 代码审查通过 |
 | S5 验收 | `testing.md` | P0 T 层 100% + 覆盖率 ≥ 80% |
+| **S6 交付** | **`git-workflow.md`** | PR 合入 master（CI + Auto-merge） |
 | S6 归档 | `archiving.md` | 归档检查清单 |
 
 所有子规范路径：`openspec/specs/project/<规范名>`
@@ -49,6 +50,6 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 - **配置**: `devrix.yaml`（默认）→ `config.yaml`（本地覆盖）→ 环境变量 → CLI flags
 - **不可变性**: 值对象不可变（`With*` 返回新副本）；实体通过 method 加锁变更状态。详见 `openspec/specs/project/coding.md` §9
 - **文件规模**: 函数 < 50 行，文件 < 800 行
-- **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge
+- **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge + auto-merge；**流程 SoT：`openspec/specs/project/git-workflow.md`**
 - **T 层测试点**: 编号 `D{X}-S{X}-A{XX}-T{XX}`（DSAFT 标准），索引 `openspec/t-registry.md`，各域 `openspec/specs/d{N}-*/t-registry.md`
 - **Change 目录**: `openspec/changes/<change-id>/`，归档到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`

@@ -8,6 +8,7 @@
 - 遵循 OpenSpec S1–S7 交付管线；新功能需有 `openspec/changes/{slug}/demand.md`
 - 使用 DSAFT 六域架构；生产路径为 QueryLoop（`harness.enabled: false` 默认）
 - Commit 使用 Conventional Commits；单 PR 变更控制在 400 行以内
+- **Git / PR / CI / Auto-merge**：`openspec/specs/project/git-workflow.md`（push、开 PR、盯 CI、合入前必读）
 - Java 17+ / Spring Boot 3.x；TypeScript strict，禁止 `any`
 
 ## 编码原则
