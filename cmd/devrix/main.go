@@ -186,7 +186,7 @@ func main() {
 		)
 	}
 
-	if err := bootstrap.InitOrchestration(configFile, gw, contextEngine, obsBridge, llmStack); err != nil {
+	if err := bootstrap.InitOrchestration(configFile, gw, contextEngine, obsBridge, llmStack, agentToolReg); err != nil {
 		slog.Error("failed to init orchestration", "error", err)
 		os.Exit(1)
 	}

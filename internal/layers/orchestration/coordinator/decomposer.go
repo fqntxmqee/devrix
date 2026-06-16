@@ -137,7 +137,7 @@ func (d *TaskDecomposer) decomposeGoal(goal string) []string {
 }
 
 // buildNodes creates TaskNode list from sub-goals.
-// v1.1 assigns WorkerCursor to all tasks with ContextFresh policy.
+// v1.1 assigns WorkerSubAgent (SubQuery) so the default wired scheduler can execute.
 func (d *TaskDecomposer) buildNodes(sessionID string, subGoals []string) []wave.TaskNode {
 	nodes := make([]wave.TaskNode, 0, len(subGoals))
 
@@ -148,7 +148,7 @@ func (d *TaskDecomposer) buildNodes(sessionID string, subGoals []string) []wave.
 			ID:            nodeID,
 			Title:         truncateTitle(sg),
 			Directive:     sg,
-			WorkerType:    wave.WorkerCursor,
+			WorkerType:    wave.WorkerSubAgent,
 			ContextPolicy: wave.ContextFresh,
 			Metadata: map[string]any{
 				"session_id": sessionID,

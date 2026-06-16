@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,9 @@ type ContextResolverIface interface {
 	Resolve(n TaskNode) (ResolvedContext, error)
 }
 
+// WorkerEventHandler receives streaming worker events for IM / observability.
+type WorkerEventHandler func(sessionID, taskID string, ev WorkerEvent)
+
 // WaveScheduler is the DAG-driven, 5-slot worker pool. It does NOT make LLM
 // scheduling decisions: it reads ready nodes from the in-memory TaskGraph,
 // acquires slots from WorkerPool, checks ConflictGuard, and dispatches
@@ -44,6 +48,7 @@ type WaveScheduler struct {
 	artifacts *ArtifactStore
 	runners   map[WorkerType]WorkerRunner
 	obsBridge *observability.Bridge
+	onWorkerEvent WorkerEventHandler
 
 	// Per-wave runtime state. A wave is uniquely identified by sessionID —
 	// v1.0 supports one active wave per session.
@@ -113,6 +118,13 @@ func NewWaveScheduler(deps SchedulerDeps) *WaveScheduler {
 func (s *WaveScheduler) SetObsBridge(bridge *observability.Bridge) {
 	if s != nil {
 		s.obsBridge = bridge
+	}
+}
+
+// SetWorkerEventHandler forwards worker streaming events to OrchestratePath / IM.
+func (s *WaveScheduler) SetWorkerEventHandler(h WorkerEventHandler) {
+	if s != nil {
+		s.onWorkerEvent = h
 	}
 }
 
@@ -275,17 +287,16 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string, state *schedulerWaveState, node TaskNode, slotID SlotID) {
 	runner, ok := s.runners[node.WorkerType]
 	if !ok {
-		// No runner — fail immediately and release slot.
-		s.pool.Release(slotID)
-		state.graph.SetState(node.ID, StateFailed)
-		s.incMetric("failed")
-		s.finalizeTask(sessionID, state, node.ID, Artifact{
-			TaskID:    node.ID,
-			SessionID: sessionID,
-			Error:     fmt.Sprintf("no runner for kind %q", node.WorkerType),
-			ExitCode:  -1,
-			StartedAt: time.Now(),
-			EndedAt:   time.Now(),
+		// No runner — fail immediately, persist artifact, release slot.
+		now := time.Now()
+		s.completeTask(sessionID, state, node.ID, slotID, Artifact{
+			TaskID:     node.ID,
+			SessionID:  sessionID,
+			WorkerType: node.WorkerType,
+			Error:      fmt.Sprintf("no runner for kind %q", node.WorkerType),
+			ExitCode:   -1,
+			StartedAt:  now,
+			EndedAt:    now,
 		})
 		return
 	}
@@ -293,16 +304,15 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	// Resolve context.
 	resolved, err := s.resolver.Resolve(node)
 	if err != nil {
-		s.pool.Release(slotID)
-		state.graph.SetState(node.ID, StateFailed)
-		s.incMetric("failed")
-		s.finalizeTask(sessionID, state, node.ID, Artifact{
-			TaskID:    node.ID,
-			SessionID: sessionID,
-			Error:     err.Error(),
-			ExitCode:  -1,
-			StartedAt: time.Now(),
-			EndedAt:   time.Now(),
+		now := time.Now()
+		s.completeTask(sessionID, state, node.ID, slotID, Artifact{
+			TaskID:     node.ID,
+			SessionID:  sessionID,
+			WorkerType: node.WorkerType,
+			Error:      err.Error(),
+			ExitCode:   -1,
+			StartedAt:  now,
+			EndedAt:    now,
 		})
 		return
 	}
@@ -328,6 +338,8 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	state.cancels = append(state.cancels, cancel)
 	state.mu.Unlock()
 
+	var outputMu sync.Mutex
+	outputParts := make([]string, 0, 4)
 	spec := WorkerRunSpec{
 		SessionID: sessionID,
 		TaskID:    node.ID,
@@ -337,13 +349,24 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 		ModelTier: node.ModelTier,
 		Context:   resolved,
 		Emit: func(ev WorkerEvent) {
-			// Hook for IM card renderer (ORCH-S2-T14).
+			if s.onWorkerEvent != nil {
+				s.onWorkerEvent(sessionID, node.ID, ev)
+			}
 			slog.Debug("wave: worker event",
 				"session", sessionID,
 				"task", node.ID,
 				"type", ev.Type,
 				"content.len", len(ev.Content),
 			)
+			if ev.Content == "" {
+				return
+			}
+			switch ev.Type {
+			case "text", "complete", "tool_use":
+				outputMu.Lock()
+				outputParts = append(outputParts, ev.Content)
+				outputMu.Unlock()
+			}
 		},
 	}
 
@@ -388,14 +411,17 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			bgID = handle.bgID
 		}
 		_ = bgID
-		// Determine artifact summary from spec — in production, runner emits
-		// a "complete" event with content that we capture. v1.0 keeps it simple:
-		// we record the worker's directive as the summary placeholder.
+		summary := spec.Directive
+		outputMu.Lock()
+		if len(outputParts) > 0 {
+			summary = strings.Join(outputParts, "\n")
+		}
+		outputMu.Unlock()
 		art := Artifact{
 			TaskID:     node.ID,
 			SessionID:  sessionID,
 			WorkerType: node.WorkerType,
-			Summary:    spec.Directive,
+			Summary:    summary,
 			ExitCode:   exitCode,
 			Error:      errMsg,
 			StartedAt:  handle.startedAt,

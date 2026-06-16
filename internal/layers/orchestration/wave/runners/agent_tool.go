@@ -13,7 +13,12 @@ import (
 // AgentToolDeps wires AgentToolRunner.
 type AgentToolDeps struct {
 	// Registry maps worker kind → underlying AgentTool (cursor / claude-code).
-	Registry *external.Registry
+	Registry AgentToolLookup
+}
+
+// AgentToolLookup resolves agent tools by registry name.
+type AgentToolLookup interface {
+	Get(name string) (external.AgentTool, error)
 }
 
 // AgentToolRunner implements wave.WorkerRunner for CLI Agent Tools (cursor /
@@ -45,7 +50,7 @@ func (r *AgentToolRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) erro
 	if r.deps.Registry == nil {
 		return fmt.Errorf("agent_tool runner: registry is nil")
 	}
-	agt, err := r.deps.Registry.Get(string(r.kind))
+	agt, err := r.deps.Registry.Get(RegistryToolName(r.kind))
 	if err != nil {
 		return fmt.Errorf("agent_tool runner: %w", err)
 	}

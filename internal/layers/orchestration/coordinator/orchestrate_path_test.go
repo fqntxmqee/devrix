@@ -30,8 +30,8 @@ func TestOrchestratePath_Run_PipelineSequence(t *testing.T) {
 	for ev := range ch {
 		types = append(types, ev.Type)
 	}
-	// Required sequence: plan_formed, wave_started, text, complete.
-	want := []string{"plan_formed", "wave_started", "text", "complete"}
+	// Empty artifacts → error (no worker output), not a misleading text reply.
+	want := []string{"plan_formed", "wave_started", "error"}
 	if !sequenceContains(types, want) {
 		t.Fatalf("event sequence %v must contain %v in order", types, want)
 	}
@@ -113,11 +113,8 @@ func TestOrchestratePath_SummarizeArtifacts(t *testing.T) {
 		},
 	}
 	got := summarizeArtifacts(artifacts)
-	if !strings.Contains(got, "t1") {
-		t.Fatalf("summary should mention task id, got %q", got)
-	}
-	if !strings.Contains(got, "fixed auth bug") {
-		t.Fatalf("summary should include description, got %q", got)
+	if got != "fixed auth bug" {
+		t.Fatalf("summary should be task output, got %q", got)
 	}
 }
 

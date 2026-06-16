@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -117,6 +116,14 @@ func (op *OrchestratePath) Run(ctx context.Context, req ProcessRequest, _ Intent
 		// 2) Build TaskGraph (D7-S3)
 		graph := buildTaskGraph(result.Nodes)
 
+		if ws, ok := op.scheduler.(*wave.WaveScheduler); ok {
+			ws.SetWorkerEventHandler(func(sessionID, taskID string, ev wave.WorkerEvent) {
+				if engineEv := workerEventToEngine(sessionID, taskID, ev); engineEv != nil {
+					emit(ctx, op.sink, out, engineEv)
+				}
+			})
+		}
+
 		// 3) WaveScheduler.Start
 		if err := op.scheduler.Start(ctx, req.SessionID, graph); err != nil {
 			emitError(ctx, op.sink, out, req.SessionID, "wave_start", err)
@@ -136,6 +143,11 @@ func (op *OrchestratePath) Run(ctx context.Context, req ProcessRequest, _ Intent
 		}
 
 		// 5) Summarize artifacts and emit terminal events
+		if len(artifacts) == 0 {
+			emitError(ctx, op.sink, out, req.SessionID, "wave_complete",
+				fmt.Errorf("wave finished with no task output (check worker runners)"))
+			return
+		}
 		summary := summarizeArtifacts(artifacts)
 		emit(ctx, op.sink, out, &contracts.EngineEvent{
 			Type:      "text",
@@ -159,35 +171,50 @@ func buildTaskGraph(nodes []wave.TaskNode) *wave.TaskGraph {
 	return wave.NewTaskGraph(nodes)
 }
 
-// summarizeArtifacts produces a short text summary of wave artifacts,
-// suitable for emitting as a single text EngineEvent.
+// summarizeArtifacts produces user-facing text from wave artifacts for IM reply.
 func summarizeArtifacts(artifacts []wave.Artifact) string {
 	if len(artifacts) == 0 {
 		return "(no artifacts)"
 	}
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Wave complete: %d task(s)\n", len(artifacts)))
-	for i, a := range artifacts {
-		// truncate summary to 120 chars
-		s := a.Summary
-		if len(s) > 120 {
-			s = s[:117] + "..."
+	parts := make([]string, 0, len(artifacts))
+	for _, a := range artifacts {
+		if a.Error != "" {
+			parts = append(parts, fmt.Sprintf("[%s] failed: %s", a.TaskID, a.Error))
+			continue
 		}
-		fmt.Fprintf(&sb, "- [%s] %s (exit=%d, %s)\n",
-			a.TaskID, s, a.ExitCode, a.EndedAt.Sub(a.StartedAt).Round(time.Millisecond))
-		_ = i
+		content := strings.TrimSpace(a.Summary)
+		if content == "" {
+			continue
+		}
+		parts = append(parts, content)
 	}
-	return sb.String()
+	if len(parts) == 0 {
+		return fmt.Sprintf("Wave complete: %d task(s) finished with no text output", len(artifacts))
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return strings.Join(parts, "\n\n---\n\n")
 }
 
-// emit publishes an event to the sink (if any) and writes it to the
-// channel, respecting ctx cancellation. Channel send is best-effort:
-// on cancellation the goroutine returns and the channel will be closed
-// by the deferred close above.
-func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, ev *contracts.EngineEvent) {
-	if sink != nil {
-		sink.Publish(ctx, ev)
+func workerEventToEngine(sessionID, taskID string, ev wave.WorkerEvent) *contracts.EngineEvent {
+	switch ev.Type {
+	case "thinking", "text", "tool_use", "error":
+		return &contracts.EngineEvent{
+			Type:      ev.Type,
+			Content:   ev.Content,
+			SessionID: sessionID,
+			Metadata:  map[string]string{"wave_task_id": taskID},
+		}
+	default:
+		return nil
 	}
+}
+
+// emit writes an event to the caller channel, respecting ctx cancellation.
+// Events are not duplicated to sink — D1 gateway consumes the returned channel.
+func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, ev *contracts.EngineEvent) {
+	_ = sink
 	select {
 	case out <- ev:
 	case <-ctx.Done():
