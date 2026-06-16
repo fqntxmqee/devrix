@@ -40,7 +40,7 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 | **S4-Gate** | **`review-code.md`** | 代码审查通过 |
 | S5 验收 | `testing.md` | P0 T 层 100% + 覆盖率 ≥ 80% |
 | **S6 交付** | **`git-workflow.md`** | PR 合入 master（CI + Auto-merge） |
-| S6 归档 | `archiving.md` | 归档检查清单 |
+| S6 归档 | `archiving.md` + `scripts/verify-archive.sh` | `verify-archive.sh` 全部通过 |
 
 所有子规范路径：`openspec/specs/project/<规范名>`
 

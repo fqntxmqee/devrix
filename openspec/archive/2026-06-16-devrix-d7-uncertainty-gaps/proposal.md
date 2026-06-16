@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d7-uncertainty-gaps
 **Demand ID:** DM-20260616-001
-**阶段:** S2 Proposal
+**阶段:** S6 Archived
 **版本:** v1.0
 
 ---
