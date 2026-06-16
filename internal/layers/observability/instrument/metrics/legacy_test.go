@@ -1,5 +1,7 @@
 package metrics
 
+import "testing"
+
 // Covers: D5-S24-A02-T04 — d2_query_loop_legacy_invocations_total
 // is registered in the observability registry and exposed on
 // /metrics scraping.
