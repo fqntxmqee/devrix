@@ -1,7 +1,7 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.3.0
+**Version:** 2.4.0
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
@@ -15,7 +15,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | Canonical T ID | Legacy T ID | Canonical S | 描述 | Status |
 |----------------|-------------|-------------|------|--------|
 | D2-S15-A01-T01 | D2-S3-A01-T01 | S15 | 新会话历史正确追加 | IMPLEMENTED |
-| D2-S15-A02-T01 | D2-S13-A01-T01 | S15 | RepairToolChain 修复 orphan | PLANNED |
+| D2-S15-A02-T01 | D2-S13-A01-T01 | S15 | RepairToolChain 修复 orphan | IMPLEMENTED | `prepare/conversation/repair_test.go` |
 | D2-S15-A03-T01 | D2-S2-A01-T01 | S15 | 超阈值触发压缩 | IMPLEMENTED |
 | D2-S16-A01-T01 | D2-S10-A01-T34 | S16 | Multi-turn tool loop | IMPLEMENTED |
 | D2-S16-A01-T02 | D2-CTX-T01 | S16 | Process cancel 无 panic | IMPLEMENTED |
@@ -117,7 +117,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
 | D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | QueryLoop | `internal/layers/contextengine/query/loop_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/prepare/usercontext/provider_test.go` | PLANNED | P0 |
+| D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/prepare/usercontext/provider_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/enforce/permission/mode_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
@@ -191,4 +191,4 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 60 | 58 | 1 | 18 |
+| 60 | 59 | 1 | 18 |
