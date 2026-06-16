@@ -2,18 +2,24 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.4.0
-**Last Updated:** 2026-06-15
+**Version:** 3.5.0
+**Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `d7-domain.md`
 
 ---
 
 ## Overview
 
-D7 编排域 A 层活动注册表。代码分布：
-- `internal/layers/orchestration/coordinator/`（D7-S2 Session Orchestrator + D7-S5 Intent/Decision）— D7 包命名为 `coordinator`
-- `internal/layers/orchestration/wave|flow|workplan|imsink/`（D7-S3 Wave Scheduler + D7-S4 Execution Flow）— 下层原语
-- `internal/layers/contextengine/tasks/`（D7-S1 部分 + D7-S5 PlanMode）— 写模型与 PlanMode 仍托管于 D2（v1.1 迁入 coordinator）
+D7 编排域 A 层活动注册表。
+
+> **终态流程 / IntentKind 四链：** 见 `terminal-state-guide.md` §3–§7；**Span↔T Runbook：** 见 `observability-guide.md`。
+
+代码分布：
+
+- `internal/layers/orchestration/coordinator/`（D7-S2 + D7-S5）
+- `internal/layers/orchestration/wave|flow|workplan|imsink/`（D7-S3 + D7-S4）
+- `internal/layers/orchestration/workmodel/`（D7-S1，v1.1 迁入）
 
 **状态图例：** ✅ IMPLEMENTED · 🔶 PARTIAL · ⬜ PLANNED
 
@@ -112,7 +118,21 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 ## Canonical S 层定义（切法 A — 按用户价值流）
 
-> 以下为 `devrix-d7-sa-refine` v1.0 Canonical 定义。按用户价值流划分 S 层，Legacy 双轨可追溯。
+> 以下为 `devrix-d7-sa-refine` v1.0 Canonical 定义。流程见 `terminal-state-guide.md`。
+
+### D7-S1: Work Model ✅ Canonical
+
+> North Star: Task/Plan **事实与状态机**单一权威
+> 博弈角色: **State Authority**
+
+| A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
+|------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| D7-S1-A01 | CreateWorkPlan | D7-S1-A01-LEGACY | A-BE | session_id, goal, context | Plan | work_plan.created | ✅ | `coordinator/workmodel.go` + `workmodel/plan_mode.go` |
+| D7-S1-A02 | ManageTask | D7-S1-A02-LEGACY | A-BE | task_id, action | task_state | task.* | ✅ | `workmodel/task_manager.go` + `task_store.go` |
+| D7-S1-A03 | QueryWorkPlan | D7-S1-A03-LEGACY | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/flow/hub.go` Snapshot |
+| D7-S1-A04 | EnterPlanMode | — | A-BE | session_id, goal | plan_state | plan.entered | ✅ | `workmodel/plan_mode.go` |
+| D7-S1-A05 | ApprovePlan | — | A-BE | session_id | []Task | plan.approved | ✅ | `workmodel/plan_mode.go` |
+| D7-S1-A06 | ExecutePlanAgent | D7-S5-A04-LEGACY | A-BE | goal, context | PlanResult | plan.generated | ✅ | `workmodel/plan_agent.go` |
 
 ### D7-S2: 会话编排入口 + Turn Leader ✅ Canonical
 
@@ -174,7 +194,8 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| 5 (Legacy) + 4 (Canonical) | 19 (Legacy) + 16 (Canonical) | 19 + 16 | 0 | 0 |
+| 5 Canonical (S1–S5) | 24 | 24 | 0 | 0 |
+| + Legacy 追溯段 | +19 | — | — | — |
 
 > **v1.0 + v1.1 closure (2026-06-15):** All S-layer activities are now IMPLEMENTED. v2.0-c/f slices (A06/A07 T 层) are still PLANNED at the T level (no test fixtures in `turn/orchestrator_test.go`); the A 层 activities themselves are wired and active in `bootstrap/wire_coordinator.go`.
 
@@ -191,4 +212,4 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | 3.1.0 | 2026-06-15 | Turn Leader A 增量：D7-S2-A06 RunTurnLoop + D7-S2-A07 InvokeLLM（DM-020 v1.0 Registry） |
 | 3.2.0 | 2026-06-15 | **v1.0 + v1.1 闭环对齐**：(1) D7-S1 写模型迁入 coordinator/workmodel.go + workmodel/，A01-A06 全 ✅；(2) D7-S2-A02/D7-S2-A04/D7-S2-A06/D7-S2-A07 wired 至 bootstrap；(3) D7-S4-A04/A05 wired 至 hubspoke；(4) D7-S5-A02/A03 规则+LLM 双路径实装。统计 19+16/19+16/0/0 |
 | **3.3.0** | **2026-06-15** | **DM-020 D2→D3 拆面闭合**：D7-S2-A07 InvokeLLM 兼作 D2 拆面出口（`turn.QueryLLMCaller` + `turn.CompressionSummarizer` 由同一 `llmgateway.IGateway` 驱动） |
-| **3.4.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化**：D7-S2-A01 ProcessMessage switch 4 case 改为 4 独立执行链（`CommandHandler` / `FastPath` / `OrchestratePath` + `IntentSkip`）；D7-S2-A01 标注补充 v1.1.0+ orthogonal 形态 |
+| **3.5.0** | **2026-06-16** | Canonical 段补登 S1（A01–A06）；24 A 统计；Guides 指针 |
