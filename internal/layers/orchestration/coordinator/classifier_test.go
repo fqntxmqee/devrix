@@ -81,9 +81,9 @@ func TestRuleClassifier_Classify_FastPath(t *testing.T) {
 	}
 }
 
-// T: D7-S5-T03 (negative) — complex message falls through to orchestrate.
+// T: D7-S5-T03 (negative) — complex message falls through to orchestrate (legacy mode).
 func TestRuleClassifier_Classify_Orchestrate(t *testing.T) {
-	c := NewRuleClassifier(DefaultConfig())
+	c := NewRuleClassifier(RuleOrchestrateConfig())
 	got, err := c.Classify(context.Background(),
 		"investigate the auth module latency and propose a refactor plan with milestones")
 	if err != nil {
@@ -94,9 +94,9 @@ func TestRuleClassifier_Classify_Orchestrate(t *testing.T) {
 	}
 }
 
-// T: D7-S5-T03 — short single-token messages default to fast with 70 confidence.
+// T: D7-S5-T03 — short single-token messages default to fast with 70 confidence (legacy).
 func TestRuleClassifier_Classify_ShortDefaultsFast(t *testing.T) {
-	c := NewRuleClassifier(DefaultConfig())
+	c := NewRuleClassifier(RuleOrchestrateConfig())
 	got, err := c.Classify(context.Background(), "what time is it")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -130,7 +130,7 @@ func TestRuleClassifier_Classify_CommandFirst_Disabled(t *testing.T) {
 // guarantees screening repeatability (determinism).
 
 func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
-	c := NewRuleClassifier(DefaultConfig())
+	c := NewRuleClassifier(RuleOrchestrateConfig())
 	tests := []struct {
 		name       string
 		input      string
@@ -147,8 +147,8 @@ func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
 		// /status is NOT in the command whitelist, matches fast pattern
 		{"fast /status", "/status", IntentFast, 95},
 		{"fast greeting en", "hello", IntentFast, 95},
-		// 中文不匹配 \b，回退到 short single-line → confidence=70
-		{"fast greeting zh", "你好", IntentFast, 70},
+		// CJK greeting uses punctuation/end anchor instead of \b.
+		{"fast greeting zh", "你好", IntentFast, 95},
 		{"fast thanks", "thanks!", IntentFast, 95},
 		{"fast goodbye", "bye", IntentFast, 95},
 		{"fast short default", "what time is it", IntentFast, 70},
@@ -168,6 +168,25 @@ func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
 				t.Errorf("confidence = %d, want %d", got.Confidence, tt.wantConf)
 			}
 		})
+	}
+}
+
+// T: D7-S2-L5-01 — loop_first routes non-command messages to Turn with confidence 100.
+func TestRuleClassifier_Classify_LoopFirstDefault(t *testing.T) {
+	c := NewRuleClassifier(DefaultConfig())
+	got, err := c.Classify(context.Background(),
+		"investigate the auth module latency and propose a refactor plan with milestones")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Kind != IntentFast {
+		t.Fatalf("want IntentFast, got %q (reason=%s)", got.Kind, got.Reason)
+	}
+	if got.Confidence != 100 {
+		t.Fatalf("want 100 confidence, got %d", got.Confidence)
+	}
+	if got.Reason != "loop_first_default" {
+		t.Fatalf("want loop_first_default reason, got %q", got.Reason)
 	}
 }
 
@@ -191,7 +210,7 @@ func TestRuleClassifier_ConfidenceDeterminism(t *testing.T) {
 }
 
 func TestRuleClassifier_ConfidenceRange(t *testing.T) {
-	c := NewRuleClassifier(DefaultConfig())
+	c := NewRuleClassifier(RuleOrchestrateConfig())
 	// All possible classification paths must produce confidence in [0, 100].
 	inputs := []string{
 		"",               // skip

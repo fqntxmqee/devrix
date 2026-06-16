@@ -143,7 +143,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		)
 		chunkCh, err := o.llm.InvokeStream(turnCtx, LLMInvokeRequest{
 			SessionID:    req.SessionID,
-			SystemPrompt: prepared.SystemPrompt,
+			SystemPrompt: mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt),
 			Messages:     messages,
 			Tools:        tools,
 		})
@@ -224,7 +224,16 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			tracer.Attribute{Key: "tool.count", Value: fmt.Sprintf("%d", len(toolCalls))},
 			tracer.Attribute{Key: "context.caller", Value: "d7"},
 		)
-		toolResult, err := o.tools.ExecuteRound(turnCtx, ToolRoundRequest{
+		toolCtx := WithToolEventStream(turnCtx, func(ev *contracts.EngineEvent) {
+			if ev == nil {
+				return
+			}
+			select {
+			case out <- ev:
+			case <-turnCtx.Done():
+			}
+		})
+		toolResult, err := o.tools.ExecuteRound(toolCtx, ToolRoundRequest{
 			SessionID: req.SessionID,
 			ToolCalls: toolCalls,
 		})
@@ -416,5 +425,18 @@ func buildToolResultMsg(sessionID string, r ToolResult) types.Message {
 		Role:      types.MessageRoleTool,
 		Content:   content,
 		Metadata:  map[string]string{"tool_call_id": r.ToolCallID},
+	}
+}
+
+func mergeSystemPrompt(prepared, extra string) string {
+	prepared = strings.TrimSpace(prepared)
+	extra = strings.TrimSpace(extra)
+	switch {
+	case prepared == "":
+		return extra
+	case extra == "":
+		return prepared
+	default:
+		return prepared + "\n" + extra
 	}
 }

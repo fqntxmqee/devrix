@@ -168,8 +168,8 @@ func (f *fakeSink) Publish(_ context.Context, ev *contracts.EngineEvent) {
 	f.events = append(f.events, ev)
 }
 
-// T: D7-S2-T01 — FastPath mirrors events to the D1 sink if configured.
-func TestSessionOrchestrator_FastPath_SinkMirror(t *testing.T) {
+// T: D7-S2-T01 — FastPath does not mirror events to sink (D1 consumes channel only).
+func TestSessionOrchestrator_FastPath_NoSinkMirrorOnStream(t *testing.T) {
 	exec := &fakeD2{}
 	sink := &fakeSink{}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec, WithSink(sink))
@@ -182,10 +182,9 @@ func TestSessionOrchestrator_FastPath_SinkMirror(t *testing.T) {
 	}
 	for range ch {
 	}
-	// Give the mirror goroutine a moment to flush.
 	time.Sleep(5 * time.Millisecond)
-	if len(sink.events) == 0 {
-		t.Fatalf("sink received no events")
+	if len(sink.events) != 0 {
+		t.Fatalf("sink should not receive stream events, got %d", len(sink.events))
 	}
 }
 
@@ -441,6 +440,7 @@ func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 
 func TestSessionOrchestrator_FastPathConfidenceBelowThreshold(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.RoutingMode = RoutingModeRuleOrchestrate
 	cfg.FastPathThreshold = 80 // short message default is 70
 
 	decomp := NewTaskDecomposer()

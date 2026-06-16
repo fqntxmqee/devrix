@@ -5,14 +5,16 @@ package coordinator
 // v1.0 fields:
 //   - Enabled:           feature flag (orchestration.d7_enabled). When false,
 //     D1 routes directly to D2.Process (legacy).
+//   - RoutingMode:       loop_first (default) or rule_orchestrate (legacy ingress).
 //   - FastPathThreshold: minimum ClassifyIntent confidence for the FastPath.
-//     Below this, the message is routed to OrchestratePath.
+//     Below this, the message is routed to OrchestratePath (rule_orchestrate only).
 //   - CommandFirst:      if true, recognized commands short-circuit Classify
 //     and bypass the LLM (v1.0 default true).
 //   - LLMFallback:       v1.0 always false (LLM fallback deferred to v1.1).
 //   - AdvisoryValidationTimeoutMs: advisory D6 validation budget. Timeout → pass.
 type Config struct {
 	Enabled                     bool
+	RoutingMode                 RoutingMode
 	FastPathThreshold           int
 	CommandFirst                bool
 	LLMFallback                 bool
@@ -32,6 +34,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Enabled:                     false,
+		RoutingMode:                 RoutingModeLoopFirst,
 		FastPathThreshold:           90,
 		CommandFirst:                true,
 		LLMFallback:                 false,
@@ -44,10 +47,18 @@ func DefaultConfig() *Config {
 	}
 }
 
+// RuleOrchestrateConfig returns defaults with legacy ingress routing (DM-20260615-004).
+func RuleOrchestrateConfig() *Config {
+	cfg := DefaultConfig()
+	cfg.RoutingMode = RoutingModeRuleOrchestrate
+	return cfg
+}
+
 // FileConfig is the YAML deserialization target. BuildConfig merges file
 // overrides on top of DefaultConfig (per coding.md §4.2).
 type FileConfig struct {
 	Enabled                     *bool    `yaml:"enabled"`
+	RoutingMode                 *string  `yaml:"routing_mode"`
 	FastPathThreshold           *int     `yaml:"fast_path_threshold"`
 	CommandFirst                *bool    `yaml:"command_first"`
 	LLMFallback                 *bool    `yaml:"llm_fallback"`
@@ -65,6 +76,9 @@ func BuildConfig(file *FileConfig) *Config {
 	}
 	if file.Enabled != nil {
 		cfg.Enabled = *file.Enabled
+	}
+	if file.RoutingMode != nil {
+		cfg.RoutingMode = normalizeRoutingMode(RoutingMode(*file.RoutingMode))
 	}
 	if file.FastPathThreshold != nil {
 		cfg.FastPathThreshold = *file.FastPathThreshold

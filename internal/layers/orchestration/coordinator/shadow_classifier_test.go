@@ -76,8 +76,11 @@ func TestShadowClassifier_NilLLM_NoOp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Classify err: %v", err)
 	}
-	if result.Kind != IntentOrchestrate {
-		t.Fatalf("expected IntentOrchestrate, got %v", result.Kind)
+	if result.Kind != IntentFast {
+		t.Fatalf("expected IntentFast (loop_first routing), got %v", result.Kind)
+	}
+	if result.Reason != "loop_first_default" {
+		t.Fatalf("expected loop_first_default, got %q", result.Reason)
 	}
 }
 
@@ -148,8 +151,11 @@ func TestShadowClassifier_TailOnly_AsyncOnOrchestrate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Classify err: %v", err)
 	}
-	if result.Kind != IntentOrchestrate {
-		t.Fatalf("expected IntentOrchestrate, got %v", result.Kind)
+	if result.Kind != IntentFast {
+		t.Fatalf("expected IntentFast (loop_first routing), got %v", result.Kind)
+	}
+	if result.Reason != "loop_first_default" {
+		t.Fatalf("expected loop_first_default, got %q", result.Reason)
 	}
 	// Wait for async LLM call AND metric update.
 	if !waitForCalls(llm, 1, 200*time.Millisecond) {
@@ -216,7 +222,7 @@ func TestShadowClassifier_LLMTimeout_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Classify err (should be silent on shadow error): %v", err)
 	}
-	if result.Kind != IntentOrchestrate {
+	if result.Kind != IntentFast {
 		t.Fatalf("rule result mutated: %v", result.Kind)
 	}
 	if !waitForCalls(llm, 1, 300*time.Millisecond) {

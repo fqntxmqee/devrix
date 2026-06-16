@@ -2,6 +2,8 @@ package testutil
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
@@ -39,6 +41,9 @@ type D7StackOptions struct {
 	// backed by a fake scheduler (see D7Stack.OrchestratePath entry in
 	// tests/integration/d7/d7_orthogonal_dispatch_test.go).
 	OverrideOrchestratePath *coordinator.OrchestratePath
+
+	// RoutingMode sets coordinator.routing_mode (default loop_first).
+	RoutingMode string
 }
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
@@ -161,7 +166,17 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		}
 	}
 
-	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmStack, nil); err != nil {
+	configFile := ""
+	if opt.RoutingMode != "" {
+		cfgPath := filepath.Join(workDir, "d7-test-config.yaml")
+		yaml := "d7:\n  enabled: true\n  routing_mode: " + opt.RoutingMode + "\n"
+		if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
+			t.Fatalf("write test config: %v", err)
+		}
+		configFile = cfgPath
+	}
+
+	if err := bootstrap.InitOrchestration(configFile, gw, engine, obsBridge, llmStack, nil); err != nil {
 		t.Fatalf("InitOrchestration: %v", err)
 	}
 

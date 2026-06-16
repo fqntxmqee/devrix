@@ -9,6 +9,7 @@ func TestRouteLabel_should_map_intent_kinds(t *testing.T) {
 		want   string
 	}{
 		{IntentClassification{Kind: IntentFast}, "fast"},
+		{IntentClassification{Kind: IntentFast, Reason: "loop_first_default"}, "turn"},
 		{IntentClassification{Kind: IntentCommand, Command: "/plan"}, "command"},
 		{IntentClassification{Kind: IntentOrchestrate}, "orchestrate"},
 		{IntentClassification{Kind: IntentSkip}, "skip"},

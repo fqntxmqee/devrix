@@ -199,7 +199,7 @@ func summarizeArtifacts(artifacts []wave.Artifact) string {
 
 func workerEventToEngine(sessionID, taskID string, ev wave.WorkerEvent) *contracts.EngineEvent {
 	switch ev.Type {
-	case "thinking", "text", "tool_use", "error":
+	case "thinking", "tool_use", "error":
 		return &contracts.EngineEvent{
 			Type:      ev.Type,
 			Content:   ev.Content,
@@ -211,12 +211,10 @@ func workerEventToEngine(sessionID, taskID string, ev wave.WorkerEvent) *contrac
 	}
 }
 
-// emit writes an event to the caller channel and pushes to the EventPublisher
-// sink for IM/WebSocket notifications. Both paths respect ctx cancellation.
+// emit writes an event to the caller channel, respecting ctx cancellation.
+// Events are not duplicated to sink — D1 gateway consumes the returned channel.
 func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, ev *contracts.EngineEvent) {
-	if sink != nil {
-		sink.Publish(ctx, ev)
-	}
+	_ = sink
 	select {
 	case out <- ev:
 	case <-ctx.Done():

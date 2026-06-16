@@ -46,6 +46,7 @@ type SessionOrchestrator struct {
 	// v1.1.0+ orthogonal paths
 	commandHandler  *CommandHandler
 	orchestratePath *OrchestratePath
+	turnToolExec    *TurnToolExecutor
 
 	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
 	// When non-nil, the default OrchestratePath's TaskDecomposer uses it
@@ -107,6 +108,12 @@ func WithCommandHandler(h *CommandHandler) OrchestratorOption {
 // path. v1.1.0+ orthogonal dispatch.
 func WithOrchestratePath(p *OrchestratePath) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.orchestratePath = p }
+}
+
+// WithTurnToolExecutor wires the loop-first turn tool executor for
+// delegate_wave / enter_plan_mode. SetOrchestratePath updates its path.
+func WithTurnToolExecutor(e *TurnToolExecutor) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.turnToolExec = e }
 }
 
 // WithLLMDecomposer wires an LLM-augmented task synthesizer into the
@@ -243,8 +250,8 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 	// and panic are surfaced via the 4-counter + alert hook.
 	o.callAdvisoryValidator(sessionCtx, intent, req.SessionID)
 
-	// D7-S5-A01-T01: FastPath confidence threshold gating.
-	if intent.Kind == IntentFast && intent.Confidence < o.cfg.FastPathThreshold {
+	// D7-S5-A01-T01: FastPath confidence threshold gating (rule_orchestrate only).
+	if !o.cfg.IsLoopFirst() && intent.Kind == IntentFast && intent.Confidence < o.cfg.FastPathThreshold {
 		intent = IntentClassification{
 			Kind:       IntentOrchestrate,
 			Confidence: intent.Confidence,
@@ -266,7 +273,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 		}
 		ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 	case IntentFast:
-		ch, err = o.fastPath.Run(sessionCtx, req, "")
+		ch, err = o.fastPath.Run(sessionCtx, req, turnSystemPrompt(o.cfg, ""))
 	case IntentOrchestrate:
 		if o.orchestratePath == nil {
 			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)"))
@@ -398,6 +405,9 @@ func (o *SessionOrchestrator) SetInterruptHandler(h *InterruptHandler) {
 // setter to inject a fully-wired or fake scheduler.
 func (o *SessionOrchestrator) SetOrchestratePath(p *OrchestratePath) {
 	o.orchestratePath = p
+	if o.turnToolExec != nil {
+		o.turnToolExec.Orchestrate = p
+	}
 }
 
 // SetCommandHandler replaces the CommandHandler. Same rationale as

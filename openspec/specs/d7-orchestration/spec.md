@@ -475,12 +475,24 @@ context_engine:
 # D7 v1.0 规划配置（未实现）
 orchestration:
   d7_enabled: true              # false 时 WireD7 失败，进程不启动（DM-007）
+  routing_mode: loop_first      # loop_first (default) | rule_orchestrate (legacy ingress)
   fast_path:
     confidence_threshold: 0.9
   plan:
     max_tasks_per_plan: 20
     max_depth: 5
 ```
+
+### Loop-First Routing (DM-20260616-002)
+
+When `coordinator.routing_mode` is `loop_first` (default):
+
+- Ingress: Skip | Command | Turn — no ingress-level `OrchestratePath`
+- Wave/Plan: tool-gated inside Turn via `delegate_wave` / `enter_plan_mode`
+- ShadowClassifier: continues tail-only observation on legacy orchestrate tail without changing routing
+- Metrics: `orchestration.tool.delegate_wave`, route span label `turn` for loop_first messages
+
+When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preserved (FastPathThreshold downgrade).
 
 ---
 
@@ -524,5 +536,6 @@ orchestration:
 | **2.10.0** | **2026-06-15** | **D7-S5 LLM Decomposer 闭环**：(1) `coordinator/llm_decomposer.go` 新增（LLM 增强任务合成，JSON DAG → wave.TaskNode）；(2) `coordinator/llm_decomposer_test.go` 7 T sub-cases（happy/bad JSON/enum coercion/unknown deps/extractJSON/nil LLM/routing）；(3) `WithLLMDecomposer` option wired into SessionOrchestrator |
 | **3.0.0** | **2026-06-16** | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 Task 状态机守卫；(2) D7-S5-A01-T01 置信度阈值；(3) D7-S2-A06/A07 Turn Leader；(4) t-registry 66/66 IMPLEMENTED |
 | **3.1.0** | **2026-06-16** | 薄 `d7-domain.md` + `terminal-state-guide.md`；澄清迁至 `d7-requirements-clarifications.md`；域边界 LLM 产权修正 |
+| **3.4.0** | **2026-06-16** | **devrix-d7-loop-first-routing (DM-20260616-002)**：(1) `routing_mode=loop_first` 默认 ingress → Turn；(2) `delegate_wave` / `enter_plan_mode` tool 门控 Wave/Plan；(3) EngineEvent 单投递路径；(4) `rule_orchestrate` 回滚；(5) L5-01..06 登记 |
 | **3.3.0** | **2026-06-16** | **devrix-d7-uncertainty-gaps (DM-20260616-001) 归档**：(1) PlanAgent 运行时门控 Gherkin scenarios（4 T 点）；(2) PlanMode LLM 守卫（2 T 点）；(3) ConflictGuard 原子 Allow+Register（4 T 点）；(4) OrchestratePath FlowEvent sink 恢复（2 T 点）；(5) PlanModeApproveGate 死配置移除（2 T 点）；(6) 死代码 Deprecated 标记（2 T 点） |
 | **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |

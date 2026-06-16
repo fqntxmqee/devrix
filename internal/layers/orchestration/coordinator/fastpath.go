@@ -32,8 +32,8 @@ func NewFastPath(cfg *Config, executor QueryLoopExecutor, sink EventPublisher) *
 }
 
 // Run executes the fast path: build a minimal QueryRequest, invoke D2, and
-// return the streaming channel. The EventPublisher, if present, receives a
-// mirrored copy of every event.
+// return the streaming channel. Events are not mirrored to sink — D1 gateway
+// consumes the returned channel as the sole delivery path for this turn.
 //
 // Run does NOT call ClassifyIntent — the orchestrator does that. The
 // orchestrator decides whether FastPath is appropriate; FastPath executes
@@ -52,24 +52,5 @@ func (fp *FastPath) Run(ctx context.Context, req ProcessRequest, systemPrompt st
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: FastPath.RunQueryLoop: %w", err)
 	}
-	if fp.sink == nil {
-		return out, nil
-	}
-	// Mirror through the sink (best-effort, non-blocking). Per the D7-D1
-	// contract, the sink Publish must be safe to call from a goroutine.
-	mirrored := make(chan *contracts.EngineEvent, 32)
-	go func() {
-		defer close(mirrored)
-		for ev := range out {
-			if ev != nil {
-				fp.sink.Publish(ctx, ev)
-			}
-			select {
-			case mirrored <- ev:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return mirrored, nil
+	return out, nil
 }

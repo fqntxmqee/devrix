@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -141,7 +141,18 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S2-A03-F06-T02** | — | **ExecutorSelector Deprecated marker** | **D7-S2-A03-F06** | **`coordinator/executor.go`** | **IMPLEMENTED** | **P1** |
 | **D7-S2-A06-IT01** | — | **Multi-turn tool conversation (2 LLM rounds)** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MultiTurnToolConversation`** | **IMPLEMENTED** | **P0** |
 | **D7-S2-A06-IT02** | — | **MaxTurns cap enforcement** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MaxTurnsCap`** | **IMPLEMENTED** | **P1** |
-| **D7-S2-A06-IT03** | — | **Context cancellation** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_ContextCancellation`** | **IMPLEMENTED** | **P1** |
+| **D7-S2-A06-IT03** | — | **StopProcess during slow Turn** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_ContextCancellation`** | **IMPLEMENTED** | **P1** |
+
+### Loop-First Routing L5 (DM-20260616-002)
+
+| L5 ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
+|-------|------|----------|-----------|--------|----------|
+| **D7-S2-L5-01** | 问候语 Turn 不触发 Wave（无 plan_formed/wave_started） | D7-S2-A01 | `tests/integration/d7/d7_loop_first_test.go::TestIntegration_D7LoopFirst_GreetingNoWave`；`coordinator/classifier_test.go::TestRuleClassifier_Classify_LoopFirstDefault` | IMPLEMENTED | P0 |
+| **D7-S2-L5-02** | delegate_wave tool 门控 OrchestratePath | D7-S2-F02 | `coordinator/turn_tools_test.go`；`tests/integration/d7/d7_loop_first_test.go::TestIntegration_D7LoopFirst_DelegateWaveTool` | IMPLEMENTED | P0 |
+| **D7-S2-L5-03** | Slash 命令零 LLM | D7-S2-A01 | `tests/integration/d7/d7_orthogonal_dispatch_test.go::TestIntegration_D7ProcessMessage_CommandBypassesLLM` | IMPLEMENTED | P0 |
+| **D7-S2-L5-04** | EngineEvent 单投递（无 sink mirror） | D7-S2-F03 | `coordinator/orchestrator_test.go`；`capture/agent_route.go` | IMPLEMENTED | P0 |
+| **D7-S2-L5-05** | enter_plan_mode tool | D7-S2-F02 | `coordinator/turn_tools_test.go` | IMPLEMENTED | P1 |
+| **D7-S2-L5-06** | rule_orchestrate 回滚（threshold 降级） | D7-S2-F01 | `coordinator/routing_test.go`；`coordinator/orchestrator_test.go` | IMPLEMENTED | P1 |
 
 ---
 

@@ -96,6 +96,7 @@ func TestIntegration_D7LLMDecomposer_EndToEnd(t *testing.T) {
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
 	})
@@ -171,6 +172,7 @@ func TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON(t *testing.T) {
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
 	})
@@ -220,6 +222,7 @@ func TestIntegration_D7LLMDecomposer_EmptyTaskList(t *testing.T) {
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
 	})
@@ -276,6 +279,7 @@ Here is my plan:
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
+		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
 	})

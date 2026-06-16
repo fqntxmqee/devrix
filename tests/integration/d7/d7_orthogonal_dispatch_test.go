@@ -101,17 +101,11 @@ func TestIntegration_D7ProcessMessage_FastPathUsesLLM(t *testing.T) {
 	}
 }
 
-// T: D7-S2-A01-T06 (Orchestrate path)
+// T: D7-S2-A01-T06 (Orchestrate path — legacy rule_orchestrate ingress)
 //
-// A long complex message (no fast pattern match, > 32 chars) routes to
-// IntentOrchestrate → OrchestratePath.Run. The path must dispatch to
-// the WaveScheduler (here a fake that records the call) and emit the
-// plan_formed + wave_started + text + complete sequence.
-//
-// Note: the lazy default OrchestratePath uses a zero-deps WaveScheduler
-// that panics on Start (dispatchLoop dereferences nil guard/pool). The
-// test injects a custom OrchestratePath via D7StackOptions.OverrideOrchestratePath
-// — the production bootstrap should follow the same pattern.
+// Under routing_mode=rule_orchestrate, a long complex message routes to
+// IntentOrchestrate → OrchestratePath.Run at ingress. loop_first mode uses
+// delegate_wave tool instead (see d7_loop_first_test.go).
 func TestIntegration_D7ProcessMessage_OrchestratePathDispatchesToScheduler(t *testing.T) {
 	stub := &testutil.D7LLMStub{Response: "should-not-be-called"}
 	fake := &fakeWaveScheduler{
@@ -124,10 +118,11 @@ func TestIntegration_D7ProcessMessage_OrchestratePathDispatchesToScheduler(t *te
 	}
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		LLMStub: stub,
+		RoutingMode: "rule_orchestrate",
 		OverrideOrchestratePath: coordinator.NewOrchestratePath(
 			coordinator.NewTaskDecomposer(),
 			fake,
-			nil, // sink — OrchestratePath.Run emits to out channel only
+			nil,
 		),
 	})
 

@@ -123,8 +123,18 @@ func (s *ShadowClassifier) Classify(ctx context.Context, message string) (Intent
 	if err != nil {
 		return result, err
 	}
-	// Tail-only: only run shadow when rule fell through to orchestrate.
-	if result.Kind != IntentOrchestrate {
+	shadowBaseline := result
+	if result.Reason == "loop_first_default" {
+		if rc, ok := s.rule.(*RuleClassifier); ok {
+			legacy, legErr := rc.ClassifyLegacyTail(ctx, message)
+			if legErr != nil || legacy.Kind != IntentOrchestrate {
+				return result, nil
+			}
+			shadowBaseline = legacy
+		} else {
+			return result, nil
+		}
+	} else if result.Kind != IntentOrchestrate {
 		return result, nil
 	}
 	if s.llm == nil {
@@ -135,7 +145,7 @@ func (s *ShadowClassifier) Classify(ctx context.Context, message string) (Intent
 	}
 	// Fire-and-forget. Detach from parent ctx so request cancellation
 	// does not abort the shadow (R2 §5 命题 C: shadow 仅作 v1.1 准备).
-	go s.shadowAsync(context.WithoutCancel(ctx), message, result)
+	go s.shadowAsync(context.WithoutCancel(ctx), message, shadowBaseline)
 	return result, nil
 }
 

@@ -43,6 +43,9 @@ func (o *SessionOrchestrator) startSpan(
 }
 
 func routeLabel(intent IntentClassification) string {
+	if intent.Reason == "loop_first_default" {
+		return "turn"
+	}
 	switch intent.Kind {
 	case IntentCommand:
 		return "command"

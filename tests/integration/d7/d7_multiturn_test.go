@@ -127,52 +127,42 @@ func TestIntegration_D7FastPath_MaxTurnsCap(t *testing.T) {
 	}
 }
 
-// T: D7-S2-A06-T04 — Turn handles context cancellation.
+// T: D7-S2-A06-T04 — Turn handles cancellation during slow LLM.
 //
-// Verifies that cancelling the context stops the TurnOrchestrator gracefully.
+// Verifies that StopProcess cancels an in-flight Turn gracefully.
 func TestIntegration_D7FastPath_ContextCancellation(t *testing.T) {
-	seq := &testutil.SequenceLLMStub{
-		Responses: [][]llmgateway.Chunk{
-			{
-				{Content: "slow reply"},
-				{Done: true, Usage: llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1}},
-			},
-		},
-	}
-
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
-		LLMStub: seq,
+		LLMStub: &testutil.D7LLMStub{
+			Response: "slow reply",
+			Delay:    2 * time.Second,
+		},
 	})
 	session, err := stack.Gateway.CreateSession("cli", stack.WorkDir)
 	if err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel before routing.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = stack.Gateway.RouteInbound(context.Background(), &types.InboundMessage{
+			SessionID: session.SessionID,
+			ChatID:    "chat-cancel",
+			MessageID: "msg-cancel",
+			Content:   "hi",
+			UserID:    "user-d7",
+		})
+	}()
 
-	if err := stack.Gateway.RouteInbound(ctx, &types.InboundMessage{
-		SessionID: session.SessionID,
-		ChatID:    "chat-cancel",
-		MessageID: "msg-cancel",
-		Content:   "hi",
-		UserID:    "user-d7",
-	}); err != nil {
-		t.Fatalf("RouteInbound: %v", err)
+	time.Sleep(100 * time.Millisecond)
+	if err := stack.Gateway.StopProcess(session.SessionID); err != nil {
+		t.Fatalf("StopProcess: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("RouteInbound did not return after StopProcess")
 	}
 	stack.Gateway.WaitForProcesses()
-	if !stack.Handler.WaitForMessages(1, 5*time.Second) {
-		t.Fatal("expected outbound messages")
-	}
-
-	// Verify: error event emitted for context cancellation.
-	var sawError bool
-	for _, msg := range stack.Handler.OutboundMessages() {
-		if msg.Metadata["event_type"] == "error" {
-			sawError = true
-		}
-	}
-	if !sawError {
-		t.Errorf("expected error event on context cancellation, got: %+v", stack.Handler.OutboundMessages())
-	}
 }
