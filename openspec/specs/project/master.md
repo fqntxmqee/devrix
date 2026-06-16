@@ -1,8 +1,8 @@
 # Devrix 项目研发规范
 
-**版本:** 1.1.0
+**版本:** 1.2.0
 **状态:** Active
-**最后更新:** 2026-06-12
+**最后更新:** 2026-06-16
 
 ---
 
@@ -28,6 +28,7 @@
 | 测试规范 | `testing.md` | 测试金字塔、T 层追溯、覆盖率要求（引 testing-framework/spec.md） |
 | 代码 Review 规范 | `review-code.md` | S4 门禁：代码审查清单与通过标准 |
 | 归档规范 | `archiving.md` | S6 归档检查清单与操作流程 |
+| **Git / PR 工作流** | **`git-workflow.md`** | **分支保护、PR、CI、Auto-merge、Agent push 清单（单人团队）** |
 | 配置与环境规范 | `config-environment.md` | 配置层级、环境变量、secret 管理 |
 
 ---
@@ -57,6 +58,7 @@ Agent 或开发者进入任一阶段时，**必须**加载对应的子规范。�
 | S4 实现 | 开发者 | `coding.md`、`testing.md` | 代码 + 测试 + `tasks.md` | `go vet` + `test-unit` 通过 |
 | **S4-Gate** | **Reviewer** | **`review-code.md`** | **Review 结论** | **代码审查通过** |
 | S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 T 层 100% PASS、覆盖率 ≥ 80% |
+| **S6 交付** | **维护者 / Agent** | **`git-workflow.md`** | **PR 合入 `master`** | **CI 全绿 + Auto-merge（单人：0 approval）** |
 | S6 归档 | 维护者 | `archiving.md` | `archive/` 目录 + 域文档同步（如需要） | 归档检查清单 + 域文档同步评估通过 |
 
 ### 2.3 如何使用
@@ -101,10 +103,14 @@ Change: <change-id>
 
 ### 3.3 PR 规范
 
-- PR 标题：`<change-id>: <简短描述（50 字以内）>`
+> **完整流程（分支保护、CI、Auto-merge、Agent 清单）见 `git-workflow.md`。**
+
+- PR 标题：`<change-id>: <简短描述（50 字以内）>` 或 Conventional Commits 格式
 - S3 设计完成时创建 Draft PR
 - S4 所有任务完成后标记 PR 就绪（`gh pr ready`）
-- 合并使用 squash merge（`gh pr merge --squash --delete-branch`）
+- 合并使用 **squash merge**；推荐 **auto-merge**（`gh pr merge --auto --squash`）
+- 单人团队：`master` **required_approving_review_count = 0**；质量门禁靠 CI + Agent S4-Gate 自检（见 `git-workflow.md` §8）
+- 禁止直接 push `master`、禁止 force push `master`
 
 ---
 

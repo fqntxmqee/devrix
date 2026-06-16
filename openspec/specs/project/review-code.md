@@ -117,3 +117,17 @@ Review 完成时确认：
 - [ ] P0 T 层测试通过
 - [ ] CI 全绿
 - [ ] Review 结论明确（Approved / Changes Requested）
+
+---
+
+## 7. 单人团队模式（Solo Maintainer）
+
+> 仓库无第二 Reviewer 时，GitHub 不允许作者 approve 自己的 PR。门禁配置见 **`git-workflow.md`**（`required_approving_review_count: 0`）。
+
+**S4-Gate 不跳过**，签收方式改为：
+
+1. **Agent 或作者** 按 §2 全表自检，结果写入 PR 描述的「S4-Gate 自检」章节
+2. **CI** 三项 required checks 全绿（`git-workflow.md` §4）
+3. **Auto-merge** 开启后由 GitHub 自动 squash 合入
+
+禁止：因无 Reviewer 而直接 push `master` 或绕过 CI。
