@@ -15,6 +15,8 @@
 
 上下文引擎负责会话级消息历史、Token 预算、七步压缩与 **QueryLoop** 多轮工具执行，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
 
+> **⚠️ LEGACY 标记（2026-06-17，DM-20260617-001）**：D2-S10 QueryLoop 主循环（`internal/layers/contextengine/query/loop.go::Loop.Run`）在 `loopFirst=false` 路径下被标 Deprecated。**canonical 主路径是 D7-S2-A06 RunTurnLoop**（`internal/layers/orchestration/turn/orchestrator.go`），`loopFirst=true` 是默认。Loop.Run 函数体逻辑保留（紧急回滚兜底），仅顶部加 metric 递增 + 一次性 slog.Warn。本 spec 章节（D2-S10）所有 Requirement 与 Scenario **保留** 用于回滚兼容，新能力**不得**依赖本路径。详见 `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC) 与 `openspec/changes/devrix-queryloop-legacy-decommission/`。
+
 > **V7（2026-06-13，DM-20260611-004）**：`query_loop.enabled` 默认 `true`；Harness Bootstrap 降为 legacy fallback（仅 `query_loop.enabled=false` 时）。PEV（D2-S1）已退役。主路径为 QueryLoop（D2-S10）+ per-turn `commitActiveWindow` 压缩 + `conversation.RepairToolMessageChain`。
 
 V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。

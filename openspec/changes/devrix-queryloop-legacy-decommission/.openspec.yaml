@@ -1,0 +1,31 @@
+change_id: devrix-queryloop-legacy-decommission
+priority: P0
+demand_id: DM-20260617-001
+status: s2_design
+domains: [D2, D5, D7]
+dsaft_scenarios:
+  # D7 Orchestration（主路径）
+  - D7-S2-RunTurnLoop       # loopFirst=true 主路径（已是默认）
+  - D7-S2-InvokeLLM        # D7 → D3 直调（已有）
+  # D2 Context Engine（legacy 路径）
+  - D2-S10-QueryLoop       # LEGACY 路径，Z0 标 Deprecated
+  # D5 Observability（metric 出口）
+  - D5-S24-Configure       # legacy metric 注册
+dsaft_activities:
+  - D7-S2-A06-RunTurnLoop          # 主路径护栏测试（T09/T10）
+  - D7-S2-A07-InvokeLLM            # D7→D3 直调验证
+  - D2-S10-A01-RunLoop             # LEGACY 标 Deprecated + slog.Warn
+  - D5-S24-A03-EmitLegacyMetric    # 新 metric 注册
+t_points: []
+version_scope:
+  v1.0: D2 QueryLoop 标 Deprecated + legacy metric + 主路径测试护栏（不删除任何代码）
+  v1.1: Z1 演进：legacy 调用降至 <1/day 后，Loop.Run 改为 thin wrapper
+  v2.0: Z2 演进：legacy 调用 = 0 后，删除 D2.QueryLoop + 拆面 adapter + 配置项
+metrics_definitions:
+  - name: d2_query_loop_legacy_invocations_total
+    type: counter
+    labels: []
+    description: D2.QueryLoop.Run 被调用的累计次数（仅 loopFirst=false 路径下递增）
+    added_in: v1.0
+span_naming: []
+tech_debt_ref: openspec/tech-debt/queryloop-location.md

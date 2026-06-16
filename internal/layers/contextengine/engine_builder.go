@@ -13,6 +13,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -62,6 +64,10 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		StreamingTools:    cfg.QueryLoop.StreamingTools,
 		Observability:     deps.ObsBridge,
 	}
+	// DM-20260617-001: wire the legacy-path counter so any
+	// loopFirst=false invocation bumps
+	// d2_query_loop_legacy_invocations_total.
+	loop.LegacyCounter = resolveLegacyQueryLoopCounter(deps.ObsBridge)
 	if cfg.QueryLoop.CompressPerTurn {
 		loop.CompressFactory = compression.NewQueryLoopCompressFactory(
 			cfg.QueryLoop.CompressPerTurn,
@@ -110,4 +116,43 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		queryCaller: queryCaller,
 		summarizer:  summarizer,
 	}
+}
+
+// resolveLegacyQueryLoopCounter returns the
+// d2_query_loop_legacy_invocations_total counter for the QueryLoop
+// to bump on every Run() invocation. Returns nil if observability is
+// not wired (test contexts, dev mode with bridge disabled) so the
+// counter becomes a soft dependency rather than a hard boot
+// requirement.
+//
+// The counter is registered with its canonical name in the
+// observability registry directly (not via the meter's auto-prefix
+// machinery) so the name on /metrics scraping is exactly
+// `d2_query_loop_legacy_invocations_total` with no meter prefix.
+// See openspec/specs/d7-orchestration/spec.md "D2 QueryLoop Legacy
+// Path Decommission" and the t-registry entry D5-S24-A02-T04.
+//
+// DM-20260617-001.
+func resolveLegacyQueryLoopCounter(bridge *observability.Bridge) metrics.Counter {
+	if bridge == nil {
+		return nil
+	}
+	meter := bridge.Meter()
+	if meter == nil {
+		return nil
+	}
+	registry := meter.Registry()
+	if registry == nil {
+		return nil
+	}
+	const name = "d2_query_loop_legacy_invocations_total"
+	// Register directly into the underlying registry so the metric
+	// name is exactly `d2_query_loop_legacy_invocations_total` (no
+	// `devrix_` prefix from the meter's fullMetricName helper).
+	if existing, ok := registry.GetCounter(name, nil); ok && existing != nil {
+		return existing
+	}
+	c := metrics.NewCounter(name, nil)
+	_ = registry.RegisterCounter(name, nil, c)
+	return c
 }
