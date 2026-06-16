@@ -199,14 +199,18 @@ D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包�
 
 ---
 
-## 相关文档
+## 规格文档索引
 
 | 文档 | 用途 |
 |------|------|
 | `spec.md` | Gherkin 验收规格 |
+| `terminal-state-guide.md` | D7 拆面时序、S15–S18 A 树、硬约束 |
+| `observability-guide.md` | Span↔T、DM-020 Trace 树、P0 Runbook |
 | `design.md` | 六段式架构设计 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 注册表 |
+| `span-registry.md` | Span operation 登记 SoT |
 | `d7-boundary.md` | **D2↔D7 跨域 SoT** |
+| `dsaft-architecture.md` | Stub — DSAFT 五层计数 |
 | `../d1-communication/d1-domain.md` | D1 入口与展示域 SoT |
 | `layer-delta.md` | Delta SoT |
 | `docs/methodology/dsaft-refactoring-playbook.md` | 重构方法论 |

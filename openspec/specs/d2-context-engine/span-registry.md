@@ -1,9 +1,10 @@
 # D2 Context Engine Span 注册表
 
 **Domain:** D2 Context Engine
-**Version:** 2.1.0
-**Status:** Active (2026-06-14) — Canonical S mapping (DM-20260614-009/010)
+**Version:** 2.2.0
+**Status:** Active (2026-06-16) — Canonical S15–S18 mapping
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
+**Complements:** `observability-guide.md`（Trace 树 + P0 Runbook）
 
 ---
 
@@ -23,7 +24,9 @@
 | `context.tools.register` | INTERNAL | context_engine | S18 | 2.0.0 |
 | `context.memory.snapshot.save` | INTERNAL | context_engine | S17 | 2.0.0 |
 
-### Harness Bootstrap（5 ops）
+### Harness Bootstrap（5 ops）— **REMOVED（D2-S20 v6.5.0）**
+
+> 生产路径不应出现下列 span。追溯登记保留；DM-020 主路径见 `observability-guide.md` §2.1。
 
 | Operation | Kind | Component | Since | Key Attributes |
 |-----------|------|-----------|-------|----------------|
@@ -109,5 +112,6 @@ context.process
 
 ## 关联文档
 
+- `observability-guide.md` — Trace 树 + P0 Runbook
 - D5 全局 Trace Tree：`openspec/specs/d5-observability/span-registry.md`
 - 全局 Spans 索引：`openspec/spans-registry.md`
