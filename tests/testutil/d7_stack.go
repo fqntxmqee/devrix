@@ -157,7 +157,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		}
 	}
 
-	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmStack); err != nil {
+	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmStack, nil); err != nil {
 		t.Fatalf("InitOrchestration: %v", err)
 	}
 

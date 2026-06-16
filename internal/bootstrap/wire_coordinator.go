@@ -8,6 +8,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine/nested"
+	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
@@ -27,6 +28,7 @@ func InitOrchestration(
 	ctxEngine contracts.IEngine,
 	obsBridgeArg interface{},
 	llmStack llmbridge.ContextLLMStack,
+	agentToolReg *external.Registry,
 ) error {
 	coordCfg := config.DefaultCoordinatorConfig()
 	if configFile != "" {
@@ -104,13 +106,20 @@ func InitOrchestration(
 		DefaultTier: llmStack.DefaultModel,
 	})
 
+	orchPath := BuildOrchestratePath(sink, llmDecomp, WaveSchedulerDeps{
+		GW:         gw,
+		Engine:     ctxEngine,
+		AgentTools: agentToolReg,
+		ObsBridge:  obsBridge,
+	})
+
 	orch := coordinator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
 		coordinator.WithSink(sink),
 		coordinator.WithObservability(obsBridge),
 		coordinator.WithWorkModel(wm),
-		coordinator.WithLLMDecomposer(llmDecomp),
+		coordinator.WithOrchestratePath(orchPath),
 	)
 
 	entry := coordinator.NewEntry(orch)
