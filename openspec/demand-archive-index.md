@@ -73,6 +73,7 @@
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
 | **DM-20260615-004** | **D7 Intent 路径正交化 — 4 IntentKind = 4 独立执行链** | **devrix-d7-orthogonal-intent-paths** | **2026-06-16** | **[#35](https://github.com/fqntxmqee/devrix/pull/35)** | **ACCEPTED (7 T PASS; PR #35 merged `6086259`)** |
 | **DM-20260616-001** | **D7 不确定性处理能力缺口修复 — 5 个关键缺口闭环** | **devrix-d7-uncertainty-gaps** | **2026-06-16** | **—** | **ACCEPTED (6 AC PASS; 13 packages + 25 integration tests -race 全绿)** |
+| **DM-20260616-002** | **D7 Loop-First 路由 — Clawcode 对齐 ingress + tool 门控 Wave** | **devrix-d7-loop-first-routing** | **2026-06-16** | **[#46](https://github.com/fqntxmqee/devrix/pull/46)** | **ACCEPTED (L5-01..06 PASS; unit + D7 integration -race 全绿)** |
 
 ## Archive Locations
 
@@ -147,6 +148,7 @@
 | **devrix-d5-d6-sa-refine-v2.0** | **`openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`** |
 | **devrix-d7-orthogonal-intent-paths** | **`openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`** |
 | **devrix-d7-uncertainty-gaps** | **`openspec/archive/2026-06-16-devrix-d7-uncertainty-gaps/`** |
+| **devrix-d7-loop-first-routing** | **`openspec/archive/2026-06-16-devrix-d7-loop-first-routing/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -163,6 +165,10 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-16 归档（S7 — D7 Loop-First 路由）**：
+
+- `devrix-d7-loop-first-routing` → `openspec/archive/2026-06-16-devrix-d7-loop-first-routing/`（DM-20260616-002 ACCEPTED; loop_first 默认 ingress → Turn; delegate_wave/enter_plan_mode tool 门控 Wave/Plan; EngineEvent 单投递; L5-01..06 PASS; PR #46 merged `866506f`）
 
 **2026-06-16 归档（S7 — D7 不确定性处理能力缺口修复）**：
 
