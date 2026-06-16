@@ -3,12 +3,13 @@ package contextengine
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Tool types and registry constructors re-exported from toolrunner (D2-S5).
+// Tool types and registry constructors re-exported from toolrunner (D2-S3).
 type (
 	ToolSchema    = toolrunner.ToolSchema
 	ToolCall      = toolrunner.ToolCall
@@ -18,6 +19,9 @@ type (
 	PluginRunner  = toolrunner.PluginRunner
 	ToolRegistry  = toolrunner.ToolRegistry
 	ToolLimiter   = toolrunner.ToolLimiter
+
+	// AgentRoleToolFilter 从 enforce 包 re-export。
+	AgentRoleToolFilter = enforce.AgentRoleToolFilter
 )
 
 var (

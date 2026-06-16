@@ -103,8 +103,8 @@ func DefaultCatalog() []Contract {
 		{Name: "IPermissionGate", Owner: "shared/contracts", Source: "permission.go"},
 		{Name: "ILLMGateway", Owner: "llmgateway", Source: "contracts.go"},
 		{Name: "ITierResolver", Owner: "llmgateway", Source: "contracts.go"},
-		{Name: "IToolRunner", Owner: "contextengine/policy/toolrunner", Source: "contracts.go"},
-		{Name: "IToolRegistry", Owner: "contextengine/policy/toolrunner", Source: "contracts.go"},
+		{Name: "IToolRunner", Owner: "contextengine/enforce/toolrunner", Source: "contracts.go"},
+		{Name: "IToolRegistry", Owner: "contextengine/enforce/toolrunner", Source: "contracts.go"},
 	}
 }
 

@@ -273,3 +273,21 @@ Added: CardkitClient for streaming, WorkerCardRenderer for orchestration, struct
 ## REMOVED
 
 (None — deprecated metrics package retained for reference, not removed)
+
+---
+
+## Docs Sync（2026-06-16）
+
+领域规格同步（`openspec/specs/d1-communication/`，无代码变更）：
+
+| 新增/更新 | 文件 | 说明 |
+|----------|------|------|
+| ADDED | `d1-domain.md` | 领域 SoT（对齐 D2/D4 `*-domain.md` 模式） |
+| ADDED | `terminal-state-guide.md` | 终态流程、IntentKind 时序、A→F 编排树 |
+| ADDED | `observability-guide.md` | Span↔T、Trace 树、EventBus 必达 Runbook |
+| UPDATED | `layering.md` v4.6.0、`code-layout.md` v1.11.0、`cross-domain-boundaries.md` v1.6.0 | 架构层交叉引用 |
+| UPDATED | `a/f/t/span-registry.md`、`spec.md` | Domain SoT 与 Guides 指针 |
+| UPDATED | `dsaft-architecture.md` | 收敛为 Stub v2.0.0，明细迁至 d1-domain + Guides |
+| UPDATED | `design.md` | Canonical S 编号修正（§① 博弈表、§1.3 约束、附录 A） |
+| UPDATED | `spec.md` v4.1.1 | §博弈论表与 design.md 对齐 |
+| UPDATED | `observability-guide.md` | Runbook Compact/Reconnect 引用 Canonical F + Legacy T 注记 |

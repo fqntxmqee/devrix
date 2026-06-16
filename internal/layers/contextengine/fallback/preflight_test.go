@@ -1,0 +1,47 @@
+package fallback_test
+
+import (
+	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/fallback"
+	"github.com/devrix/devrix/internal/shared/config"
+)
+
+// T: D2-S9-A01-T09
+func TestPreflightEvaluator_should_warn_on_empty_message(t *testing.T) {
+	eval := fallback.NewPreflightEvaluator(config.PreflightConfig{
+		Enabled:     true,
+		Mode:        config.PreflightModeWarnOnly,
+		TokenBudget: 8000,
+		WarnRatio:   0.85,
+	}, fallback.NewToolPoolFilter(config.DefaultHarnessConfig().ToolPool))
+	result := eval.Evaluate(nil, "   ", nil, "context")
+	if result.Scores.Completeness != 0 {
+		t.Fatalf("completeness: got %d want 0", result.Scores.Completeness)
+	}
+	if len(result.Warnings) == 0 {
+		t.Fatal("expected warnings")
+	}
+}
+
+// T: D2-S9-A01-T09
+func TestPreflightEvaluator_should_filter_irrelevant_tools(t *testing.T) {
+	eval := fallback.NewPreflightEvaluator(config.PreflightConfig{
+		Enabled: true,
+		ToolFilter: config.PreflightToolFilterConfig{
+			Enabled: true,
+			Mode:    config.PreflightToolFilterAutoRepair,
+		},
+	}, fallback.NewToolPoolFilter(config.DefaultHarnessConfig().ToolPool))
+	tools := []fallback.ToolDesc{
+		{Name: "bash", Description: "shell"},
+		{Name: "read_file", Description: "read files"},
+		{Name: "write_file", Description: "write files"},
+		{Name: "call_cursor", Description: "cursor agent"},
+	}
+	filtered, decision := eval.FilterVisibleTools("run ls in terminal", tools)
+	if len(filtered) == 0 {
+		t.Fatal("expected kept tools")
+	}
+	_ = decision
+}

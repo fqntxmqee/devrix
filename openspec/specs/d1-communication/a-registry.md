@@ -5,6 +5,7 @@
 **Version:** 3.0.0
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
 
 ---
 
@@ -12,6 +13,8 @@
 
 D1 通信域 A 层活动注册表。**Canonical SoT：D1-S13–S18**（DM-20260614-006）。  
 Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力只登记 canonical A。
+
+> **流程与时序**（A→F 编排树、IntentKind、跨域契约）见 `terminal-state-guide.md`；本文不重复流程描述。
 
 ---
 

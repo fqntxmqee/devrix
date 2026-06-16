@@ -79,7 +79,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/policy/toolrunner/sandbox_test.go` | IMPLEMENTED |
+| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/enforce/toolrunner/sandbox_test.go` | IMPLEMENTED |
 | D2-S8-A01-T02 | Shell injection attack prevention | Sandbox | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 
 ## D2-S9: Harness Module
@@ -119,7 +119,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | QueryLoop | `internal/layers/contextengine/query/loop_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/usercontext/` | IMPLEMENTED | P0 |
 | D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/policy/permission/mode_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/enforce/permission/mode_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T39 | query_loop.enabled=false V4 回归 | QueryLoop | `tests/integration/query_loop_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/nested/subquery_test.go` | IMPLEMENTED | P1 |

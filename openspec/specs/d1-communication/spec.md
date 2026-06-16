@@ -2,8 +2,9 @@
 
 **Capability:** communication
 **Status:** Active
-**Version:** 4.0.0
-**Last Updated:** 2026-06-14
+**Version:** 4.1.1
+**Last Updated:** 2026-06-16
+**Domain SoT:** `d1-domain.md`
 
 ---
 
@@ -22,10 +23,10 @@
 
 | 概念 | 定义 | D1 对应 |
 |------|------|---------|
-| **Separating Equilibrium** | 不同类型发送者选择不同信号，使接收者能推断类型 | D1-S13 ClassifyIntent |
-| **Costly Signal** | 信号发送者承担真实成本，不可伪造 | D1-S14 Thinking、D1-S16 Conclusion |
-| **Commitment Device** | 发送者通过信号约束自身未来行为 | D1-S15 Task Progress、D1-S16 Error |
-| **Screening Mechanism** | 接收者设计契约让发送者自我选择 | D1-S12 Permission YOLO |
+| **Separating Equilibrium** | 不同类型发送者选择不同信号，使接收者能推断类型 | **D7-S5** ClassifyIntent（D1 仅 Dispatch） |
+| **Costly Signal** | 信号发送者承担真实成本，不可伪造 | **D1-S14** Thinking · **D1-S16** Conclusion |
+| **Commitment Device** | 发送者通过信号约束自身未来行为 | **D1-S18** Critical 必达 · **D1-S16** complete/error |
+| **Screening Mechanism** | 接收者设计契约让发送者自我选择 | **D1-S13-A04** Permission YOLO |
 
 **禁止约束：** 禁止伪造进度信号（anti-fabrication commitment device）。
 
@@ -165,5 +166,11 @@ User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context E
 
 - **A 层**: `a-registry.md` — Canonical 16 + Legacy 21 Activities
 - **F 层**: `f-registry.md` — Canonical 18 + Legacy 43 Function Points
-- **T 层**: `t-registry.md` — 56 Test Points (44 IMPLEMENTED Legacy + 12 PLANNED Canonical)
+- **T 层**: `t-registry.md` — 56 Test Points（全 IMPLEMENTED）
 - **Span**: `span-registry.md` — d1.signal.* / capture / critical
+
+## Guides（互补，非登记 SoT）
+
+- **领域 SoT**: `d1-domain.md` — North Star、Out of Scope、文档索引
+- **终态架构**: `terminal-state-guide.md` — 跨域流程、A→F 编排树、IntentKind 时序、信号映射
+- **可观测性**: `observability-guide.md` — Span↔T 绑定、Trace 树、EventBus 必达、验收 Runbook

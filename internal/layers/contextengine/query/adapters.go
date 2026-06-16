@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/policy/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"

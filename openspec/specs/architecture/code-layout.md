@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.10.0
-**Last Updated:** 2026-06-15
+**Version:** 1.11.0
+**Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -297,7 +297,7 @@ internal/layers/communication/
 
 1. **新代码** 必须写入 §4 登记的 **目标 scenario-slug**；禁止在新 `gateway/` 下追加 F。
 2. **旧路径** 允许 `re-export` / type alias 一个发布周期，PR 标注 `BREAKING` 与迁移表。
-3. 每个迁移 PR 更新：`code-layout.md` 迁移状态、`layering.md` Package Map、`d1-communication/spec.md`。
+3. 每个迁移 PR 更新：`code-layout.md` 迁移状态、`layering.md` Package Map、`d1-communication/d1-domain.md` + `spec.md`。
 4. 单 PR 仅迁 **一个 scenario-slug**（或一组强耦合 F），并跑关联 L5/T。
 
 ---
@@ -306,8 +306,9 @@ internal/layers/communication/
 
 | 代码                          | 规格                                                      |
 | --------------------------- | ------------------------------------------------------- |
-| `internal/layers/{domain}/` | `openspec/specs/{domain}-*/spec.md`                     |
+| `internal/layers/{domain}/` | `openspec/specs/{domain}-*/{domain}-domain.md`（领域 SoT）+ `spec.md`（Gherkin） |
 | scenario-slug               | `layering.md` S 表 + 域 `a-registry.md` / `f-registry.md` |
+| 流程 / 时序 / Runbook（D1）      | `d1-communication/terminal-state-guide.md` · `observability-guide.md` |
 | `*_test.go` 内 `// T:`       | `openspec/specs/{domain}/t-registry.md`                 |
 | span 名                      | `{domain}/span-registry.md`                             |
 
@@ -329,3 +330,4 @@ internal/layers/communication/
 | **1.8.0** | **2026-06-15** | **DM-020 v1.0 Registry：** D7-S2-A06/A07 turn/ 目录登记；D2-S16 Legacy Freeze；bootstrap 接线注释（WireContextLLM → TurnOrchestrator）                                                                                                                                                                                                         |
 | **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除）                                                 |
 | **1.10.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化文档同步**：layering.md v4.4.0 D7 目录树新增 `coordinator/command_handler.go`（IntentCommand 零 LLM 分发）+ `coordinator/orchestrate_path.go`（IntentOrchestrate 显式调 SynthesizeTaskGraph + WaveScheduler）；两文件位于 `internal/layers/orchestration/coordinator/` 包内，PR #35 引入；§3 目录决策树 §6 D1 终态示例同步不需更新（D7 目录树属于 layering.md 职责） |
+| **1.11.0** | **2026-06-16** | **D1 领域文档同步**：§7 OpenSpec 对应表增加 `d1-domain.md` 领域 SoT 与 `terminal-state-guide` / `observability-guide` 指南路径 |

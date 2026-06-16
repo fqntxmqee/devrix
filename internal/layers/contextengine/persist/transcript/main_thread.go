@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -19,7 +20,7 @@ type MainThreadStore struct {
 
 // NewMainThreadStore creates a store under baseDir (e.g. ~/.devrix/sessions).
 func NewMainThreadStore(baseDir string) (*MainThreadStore, error) {
-	dir := expandPath(baseDir)
+	dir := textutil.ExpandPath(baseDir)
 	if dir == "" {
 		return nil, fmt.Errorf("main transcript base dir is required")
 	}

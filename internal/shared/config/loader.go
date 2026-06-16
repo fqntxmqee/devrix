@@ -3,9 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
+
+	"github.com/devrix/devrix/internal/shared/textutil"
 
 	"github.com/devrix/devrix/internal/shared/types"
 	"gopkg.in/yaml.v3"
@@ -393,7 +393,7 @@ func FindConfigFile() string {
 
 	// Search standard locations
 	for _, loc := range locations {
-		path := expandPath(loc)
+		path := textutil.ExpandPath(loc)
 		if _, err := os.Stat(path); err == nil {
 			return path
 		}
@@ -402,13 +402,6 @@ func FindConfigFile() string {
 	return ""
 }
 
-func expandPath(path string) string {
-	if strings.HasPrefix(path, "~") {
-		home, _ := os.UserHomeDir()
-		path = filepath.Join(home, path[1:])
-	}
-	return os.ExpandEnv(path)
-}
 
 func buildCommunicationConfig(fileCfg *ConfigFile) *CommunicationConfig {
 	cfg := DefaultConfig()

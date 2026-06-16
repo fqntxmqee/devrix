@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -36,13 +35,14 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		i := i
 		g.Go(func() error {
-			sc := &types.SessionContext{
-				SessionID: fmt.Sprintf("mem-%d", i),
-				WorkDir:   t.TempDir(),
-				Model:     "test",
+			session := types.NewSession(fmt.Sprintf("mem-%d", i), "cli", t.TempDir())
+			ch := engine.Process(context.Background(), session, "hello")
+			for ev := range ch {
+				if ev.Type == "error" {
+					return fmt.Errorf("engine error: %s", ev.Content)
+				}
 			}
-			_, err := engine.Run(context.Background(), sc, nil, "hello", func(*capture.EngineEvent) {})
-			return err
+			return nil
 		})
 	}
 	if err := g.Wait(); err != nil {

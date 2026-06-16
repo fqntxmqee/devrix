@@ -72,7 +72,7 @@
 | **复用** | 不复建 Observer 体系 | 适配器桥接到 `contextengine.IObserver` |
 | **版本** | V1 不实现 Supervisor-Worker、Peer-Review | 明确 FeatureNotImplemented |
 | **测试** | 遵守测试框架规约 | {T}-AGENT-* 测试点 + `tests/` 分层 |
-| **安全** | Agent 沙箱不可逃逸 | 工具执行复用 `contextengine/policy/toolrunner` 沙箱 |
+| **安全** | Agent 沙箱不可逃逸 | 工具执行复用 `contextengine/enforce/toolrunner` 沙箱 |
 
 ---
 

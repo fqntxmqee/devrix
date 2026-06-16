@@ -2,8 +2,8 @@
 
 **Capability:** architecture-cross-domain
 **Status:** Active
-**Version:** 1.5.0
-**Last Updated:** 2026-06-15
+**Version:** 1.6.0
+**Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d3-sa-refine（DM-20260614-016 / R2 命题 E 决议落地）+ devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6-A 决议固化 Breaker 事件命名 + §2.4.4 新增 D3→D5 metric 命名边界）+ DM-20260615-004 D7 Intent 路径正交化（§2.4.4 D7 ↔ D1/D2/D4 跨域锚点登记）
 
@@ -250,11 +250,13 @@
 
 ### 2.5 D3 vs D1 (Communication)
 
+> D1 作为入口与展示域的完整 North Star 与 Out of Scope 见 `openspec/specs/d1-communication/d1-domain.md`。
+
 | 概念 | D3 SoT | D1 SoT | 备注 |
 |------|--------|--------|------|
 | LLM 调用结果展示 | D3 返回 `Chunk` / `Result` | **D1**（`D1-S16 DeliverConclusion` 渲染） | D1 SoT |
 | Stream chunk → IM 渲染 | D3 透传原始 chunk | **D1** 适配（`D1-S17 ConnectChannel` 编码） | D1 SoT |
-| User intent 解析 | D3 不参与 | **D1**（`D1-S13 CaptureUserIntent`） | D1 SoT |
+| User intent 解析 | D3 不参与 | **D7**（`D7-S5 ClassifyIntent`）；D1 仅 **Dispatch** | DM-007 修订 |
 
 > **无跨域锚点**：D3 与 D1 间的传输是 D1 inbound → D7 orchestrator → D2 QueryLoop → D3 LLM Gateway，无直接契约。D1 不直接调用 D3。
 
@@ -373,6 +375,7 @@
 | D5 可观测性 spec | `openspec/specs/d5-observability/` | OTel / Prometheus 配置 |
 | D6 演化 spec | `openspec/specs/d6-evolution/spec.md` | probe 列表与告警阈值 |
 | D2 上下文引擎 spec | `openspec/specs/d2-context-engine/d2-domain.md` | PermissionMode SoT |
+| D1 通信 spec | `openspec/specs/d1-communication/d1-domain.md` | EngineEvent 展示、ingress D7-only SoT |
 | D4 多智能体 spec | `openspec/specs/d4-multi-agent/d4-domain.md` | D4 Follower SoT |
 | D4↔D7 边界 | `openspec/specs/d4-multi-agent/d7-boundary.md` | Hub-Spoke 全归 D7 |
 
@@ -388,3 +391,4 @@
 | 1.3.0 | 2026-06-15 | 双边共识落盘：§2.1 D3 vs D2 DM-020 修订（D2→D3 禁止、ILLMGateway 消费方 D7）；§2.4 D3 vs D7 DM-020 修订（D7 直调 D3）；§3.6 Follower 对称性声明 + 影子编排风险交叉引用 |
 | 1.4.0 | 2026-06-15 | D5 SA Refine v1.0（DM-001 4+1 价值流 S21–S24）+ D6 SA Refine v1.0（DM-002 S11–S14；S4 Orchestration → S12 GuardRuntime）；现有 D5/D6 跨域边界（§2.2/§2.3）已在 D3 视角下覆盖，无需修改 |
 | 1.5.0 | 2026-06-15 | DM-20260615-004 D7 Intent 路径正交化跨域登记：§2.4.4 新增 4 IntentKind × 跨域 SoT 表（D3 调用 / D2 参与 / D4 参与 + v1.0 → v1.1.0 关键变化 + 禁止退化）；§4 灰区新增第 6 项（D7 + D2 + D4 涉及）；意图分类合约化，禁止重启 v1.0 占位 + hint 实现 |
+| 1.6.0 | 2026-06-16 | §5 关联文档新增 `d1-communication/d1-domain.md`（D1 Trusted Intermediary、ingress D7-only） |

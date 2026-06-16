@@ -1,8 +1,9 @@
 # D1 Communication Span 注册表
 
 **Domain:** D1 Communication
-**Version:** 3.0.0
-**Status:** Active (2026-06-14)
+**Version:** 3.1.0
+**Status:** Active (2026-06-16)
+**Domain SoT:** `d1-domain.md`
 **Change:** DM-20260614-006 — 切法 A; DM-20260614-007 — D7-only ingress
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
@@ -66,5 +67,7 @@
 
 ## 关联文档
 
+- **Trace 树 / 必达演练 / Runbook**：`observability-guide.md`（本文仅登记 operation 名，不展开流程）
+- **主路径时序**：`terminal-state-guide.md` §8
 - D5 全局 Trace Tree：`openspec/specs/d5-observability/span-registry.md`
 - 全局 Spans 索引：`openspec/spans-registry.md`

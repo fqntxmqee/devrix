@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -19,7 +20,7 @@ type SidechainStore struct {
 
 // NewSidechainStore creates a store under baseDir (e.g. ~/.devrix/sessions).
 func NewSidechainStore(baseDir string) (*SidechainStore, error) {
-	dir := expandPath(baseDir)
+	dir := textutil.ExpandPath(baseDir)
 	if dir == "" {
 		return nil, fmt.Errorf("sidechain base dir is required")
 	}
@@ -86,12 +87,4 @@ func (s *SidechainStore) Load(sessionID, agentID string) ([]types.Message, error
 		out = append(out, msg)
 	}
 	return out, scanner.Err()
-}
-
-func expandPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
-		home, _ := os.UserHomeDir()
-		path = filepath.Join(home, path[1:])
-	}
-	return os.ExpandEnv(path)
 }

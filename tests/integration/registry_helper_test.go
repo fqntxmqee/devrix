@@ -5,7 +5,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/registry"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 )
 
 // mustBuiltinRegistry is a small wrapper that fails the test if the
