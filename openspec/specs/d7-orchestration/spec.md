@@ -3,7 +3,7 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-16
 **Domain SoT:** `d7-domain.md`
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes)
 
 ---
 
@@ -291,6 +291,170 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 
 ---
 
+### Requirement: PlanAgent Read-Only Sandbox (devrix-d7-uncertainty-gaps)
+
+`PlanAgent` MUST enforce tool call whitelist at runtime, not only via prompt. `ValidateToolCall()` checks against the read-only whitelist and forbidden list, failing closed on unknown tools.
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/workmodel/plan_agent.go`
+**T:** D7-S5-A02-F01-T01 … D7-S5-A02-F01-T04
+
+#### Scenario: Allowed tool passes validation
+
+- GIVEN a PlanAgent with the default read-only whitelist
+- WHEN `ValidateToolCall` is called with `"read"`
+- THEN no error is returned
+
+#### Scenario: Forbidden tool is rejected
+
+- GIVEN a PlanAgent with the default read-only whitelist
+- WHEN `ValidateToolCall` is called with `"write"`
+- THEN an error is returned containing `"forbidden in plan mode"`
+
+#### Scenario: Unknown tool is rejected
+
+- GIVEN a PlanAgent with the default read-only whitelist
+- WHEN `ValidateToolCall` is called with `"unknown_tool"`
+- THEN an error is returned containing `"not in the plan mode read-only whitelist"`
+
+#### Scenario: Nil PlanAgent passes through
+
+- GIVEN a nil PlanAgent
+- WHEN `ValidateToolCall` is called with `"write"`
+- THEN no error is returned (passthrough: no sandbox without PlanAgent)
+
+---
+
+### Requirement: PlanMode LLM Guard (devrix-d7-uncertainty-gaps)
+
+`PlanMode.Enter()` MUST validate LLM availability via `HasLLM()` before entering active state, returning `ErrLLMNotConfigured` immediately instead of failing later during execution.
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/workmodel/plan_mode.go`
+**T:** D7-S5-A02-F02-T01 … D7-S5-A02-F02-T02
+
+#### Scenario: Enter with nil LLM returns error
+
+- GIVEN a PlanMode created with nil LLM
+- WHEN `Enter` is called
+- THEN `ErrLLMNotConfigured` is returned
+- AND the PlanMode state remains Inactive
+
+#### Scenario: Enter with valid LLM succeeds
+
+- GIVEN a PlanMode created with a valid LLMCompleter
+- WHEN `Enter` is called
+- THEN no error is returned
+- AND the PlanMode state is Active
+
+---
+
+### Requirement: ConflictGuard Atomic Allow+Register (devrix-d7-uncertainty-gaps)
+
+`ConflictGuard.AllowAndRegister()` MUST atomically check conflict and register a task, eliminating the TOCTOU window between `Allow()` and `Register()`. Returns `true` if registered, `false` if conflict prevents registration.
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/wave/conflict.go`
+**T:** D7-S3-A01-F03-T01 … D7-S3-A01-F03-T04
+
+#### Scenario: AllowAndRegister succeeds when no conflict
+
+- GIVEN an empty ConflictGuard
+- WHEN `AllowAndRegister` is called with a TaskNode in group `"A"`
+- THEN the call returns true
+- AND the task is registered in the guard
+
+#### Scenario: AllowAndRegister blocks on conflict group
+
+- GIVEN a ConflictGuard with a running task in group `"A"`
+- WHEN `AllowAndRegister` is called with another TaskNode in group `"A"`
+- THEN the call returns false
+- AND the second task is NOT registered
+
+#### Scenario: AllowAndRegister allows different groups
+
+- GIVEN a ConflictGuard with a running task in group `"A"`
+- WHEN `AllowAndRegister` is called with a TaskNode in group `"B"`
+- THEN the call returns true
+- AND both tasks are registered
+
+#### Scenario: AllowAndRegister blocks on file scope intersection
+
+- GIVEN a ConflictGuard with a running write task scoped to `"src/auth/**"`
+- WHEN `AllowAndRegister` is called with a write TaskNode scoped to `"src/auth/login.go"`
+- THEN the call returns false
+
+---
+
+### Requirement: OrchestratePath FlowEvent Sink (devrix-d7-uncertainty-gaps)
+
+`emit()` MUST push FlowEvent to the EventPublisher sink for IM/WebSocket notifications, while also writing to the caller channel. Both paths respect context cancellation; nil sink is gracefully tolerated.
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/coordinator/orchestrate_path.go`
+**T:** D7-S3-A01-F04-T01 … D7-S3-A01-F04-T02
+
+#### Scenario: emit pushes to sink when available
+
+- GIVEN an OrchestratePath with a non-nil EventPublisher sink
+- AND a WorkerEvent with Type `"text"` and Content `"task_1 done"`
+- WHEN `emit` is called
+- THEN `sink.Publish` is called with the corresponding EngineEvent
+- AND the event is also written to the out channel
+
+#### Scenario: emit tolerates nil sink
+
+- GIVEN an OrchestratePath with a nil EventPublisher sink
+- WHEN `emit` is called
+- THEN no panic occurs
+- AND the event is written to the out channel
+
+---
+
+### Requirement: Dead Code Markers (devrix-d7-uncertainty-gaps)
+
+`LLMFallbackClassifier` and `ExecutorSelector` MUST carry `Deprecated:` comments documenting they are deferred to v1.1, so future readers understand they are intentionally dead code rather than bugs.
+
+**Priority:** P1
+**Package:** `internal/layers/orchestration/coordinator/classifier_fallback.go`, `internal/layers/orchestration/coordinator/executor.go`
+**T:** D7-S2-A03-F06-T01 … D7-S2-A03-F06-T02
+
+#### Scenario: LLMFallbackClassifier has Deprecated marker
+
+- GIVEN the `classifier_fallback.go` file
+- THEN the file contains a `Deprecated:` comment
+- AND the existing tests still pass
+
+#### Scenario: ExecutorSelector has Deprecated marker
+
+- GIVEN the `executor.go` file
+- THEN the file contains a `Deprecated:` comment
+- AND the existing tests still pass
+
+---
+
+## REMOVED Requirements
+
+### Requirement: PlanModeApproveGate Config (devrix-d7-uncertainty-gaps)
+
+The `PlanModeApproveGate` config field has been removed across all config layers — Approve/Reject is driven by explicit CLI commands, not an extra config switch.
+
+**Priority:** P0
+**Packages:** `internal/layers/orchestration/coordinator/config.go`, `internal/shared/config/coordinator.go`, `internal/shared/config/loader.go`, `internal/bootstrap/wire_coordinator.go`
+**T:** D7-S5-A02-F05-T01 … D7-S5-A02-F05-T02
+
+#### Scenario: Config struct no longer contains the field
+
+- GIVEN the Config struct definition
+- THEN `PlanModeApproveGate` field does not exist
+
+#### Scenario: Default config compiles without it
+
+- GIVEN the `DefaultConfig` function
+- THEN no reference to `PlanModeApproveGate` exists
+
+---
+
 ## Configuration
 
 ```yaml
@@ -360,4 +524,5 @@ orchestration:
 | **2.10.0** | **2026-06-15** | **D7-S5 LLM Decomposer 闭环**：(1) `coordinator/llm_decomposer.go` 新增（LLM 增强任务合成，JSON DAG → wave.TaskNode）；(2) `coordinator/llm_decomposer_test.go` 7 T sub-cases（happy/bad JSON/enum coercion/unknown deps/extractJSON/nil LLM/routing）；(3) `WithLLMDecomposer` option wired into SessionOrchestrator |
 | **3.0.0** | **2026-06-16** | **v1.2 + v2.0-b/c/f 全部闭环**：(1) D7-S1-T08 Task 状态机守卫；(2) D7-S5-A01-T01 置信度阈值；(3) D7-S2-A06/A07 Turn Leader；(4) t-registry 66/66 IMPLEMENTED |
 | **3.1.0** | **2026-06-16** | 薄 `d7-domain.md` + `terminal-state-guide.md`；澄清迁至 `d7-requirements-clarifications.md`；域边界 LLM 产权修正 |
+| **3.3.0** | **2026-06-16** | **devrix-d7-uncertainty-gaps (DM-20260616-001) 归档**：(1) PlanAgent 运行时门控 Gherkin scenarios（4 T 点）；(2) PlanMode LLM 守卫（2 T 点）；(3) ConflictGuard 原子 Allow+Register（4 T 点）；(4) OrchestratePath FlowEvent sink 恢复（2 T 点）；(5) PlanModeApproveGate 死配置移除（2 T 点）；(6) 死代码 Deprecated 标记（2 T 点） |
 | **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |

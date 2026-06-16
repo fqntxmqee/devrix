@@ -1,0 +1,49 @@
+change_id: devrix-d7-uncertainty-gaps
+priority: P0
+demand_id: DM-20260616-001
+status: s7_archived
+domains: [D7]
+dsaft_scenarios: [D7-S2, D7-S3, D7-S5]
+dsaft_activities:
+  - D7-S2-A03
+  - D7-S3-A01
+  - D7-S5-A02
+t_points:
+  # PlanAgent tool validation
+  - D7-S5-A02-F01-T01
+  - D7-S5-A02-F01-T02
+  - D7-S5-A02-F01-T03
+  - D7-S5-A02-F01-T04
+  # PlanMode LLM guard
+  - D7-S5-A02-F02-T01
+  - D7-S5-A02-F02-T02
+  # ConflictGuard TOCTOU
+  - D7-S3-A01-F03-T01
+  - D7-S3-A01-F03-T02
+  - D7-S3-A01-F03-T03
+  - D7-S3-A01-F03-T04
+  # OrchestratePath sink
+  - D7-S3-A01-F04-T01
+  - D7-S3-A01-F04-T02
+  # PlanModeApproveGate removal
+  - D7-S5-A02-F05-T01
+  - D7-S5-A02-F05-T02
+  # Dead code markers
+  - D7-S2-A03-F06-T01
+  - D7-S2-A03-F06-T02
+  # Integration tests
+  - D7-S2-A06-IT01
+  - D7-S2-A06-IT02
+  - D7-S2-A06-IT03
+  - D7-S3-A01-IT01
+  - D7-S3-A01-IT02
+  - D7-S3-A01-IT03
+  - D7-S5-A02-IT01
+  - D7-S5-A02-IT02
+  - D7-S5-A02-IT03
+  - D7-S5-A02-IT04
+version_scope:
+  v1.1: "D7 不确定性能力缺口修复：PlanAgent 运行时门控、ConflictGuard TOCTOU 原子化、OrchestratePath sink 恢复、PlanMode LLM 守卫、PlanModeApproveGate 死配置清理"
+span_naming:
+  - D7-S3-AllowAndRegister
+  - D7-S5-ValidateToolCall
