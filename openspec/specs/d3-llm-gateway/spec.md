@@ -7,7 +7,8 @@
 **DSAFT Type:** 公共域 (Common Domain)
 **Version:** 3.2.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-15
+**Last Updated:** 2026-06-16
+**Domain SoT:** `d3-domain.md` · **Guides:** `terminal-state-guide.md` · `observability-guide.md`
 
 ---
 

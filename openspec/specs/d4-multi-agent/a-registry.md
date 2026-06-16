@@ -2,10 +2,14 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.1.0
+**Last Updated:** 2026-06-16
 **Change ID:** devrix-d4-sa-refine
 **Parent:** `openspec/specs/architecture/layering.md`
+**Domain SoT:** `d4-domain.md`
+
+> **终态流程 / D7 派发：** 见 `terminal-state-guide.md`  
+> **Span↔T Runbook：** 见 `observability-guide.md`
 
 ---
 

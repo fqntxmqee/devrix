@@ -75,6 +75,7 @@ agent.run
 
 ## 关联文档
 
+- `observability-guide.md` — Worker Trace 树 + P0 Runbook
 - D5 全局 Trace Tree：`openspec/specs/d5-observability/span-registry.md`
 - 全局 Spans 索引：`openspec/spans-registry.md`
 - D4↔D7 边界：`openspec/specs/d4-multi-agent/d7-boundary.md`

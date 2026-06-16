@@ -101,6 +101,22 @@
 
 ---
 
+## 规格文档索引
+
+| 文档 | 用途 |
+|------|------|
+| `spec.md` | Gherkin 验收规格 |
+| `terminal-state-guide.md` | D7 派发时序、S11–S16 A 树、硬约束 |
+| `observability-guide.md` | Span↔T、Worker Trace 树、P0 Runbook |
+| `design.md` | 六段式详细设计 |
+| `dsaft-architecture.md` | Stub — DSAFT 五层计数 |
+| `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 登记 SoT |
+| `span-registry.md` | Span operation 登记 SoT |
+| `d7-boundary.md` | **D4↔D7 跨域 SoT** |
+| `layer-delta.md` | V1→V2 演进 Delta |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |

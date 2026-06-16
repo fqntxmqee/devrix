@@ -14,6 +14,9 @@
 | 文档 | 用途 |
 |------|------|
 | 本文档 | 按六段式框架展开的**可读架构设计**（评审 / onboarding） |
+| `openspec/specs/d2-context-engine/d2-domain.md` | 领域 SoT（S15–S18） |
+| `openspec/specs/d2-context-engine/terminal-state-guide.md` | D7 拆面时序 |
+| `openspec/specs/d2-context-engine/observability-guide.md` | Span↔T、P0 Runbook |
 | `openspec/specs/d2-context-engine/spec.md` | 验收规格（Gherkin Scenario → T 层，canonical） |
 | `openspec/specs/d2-context-engine/layer-delta.md` | 层能力 Delta SoT |
 | `openspec/specs/d2-context-engine/prompt-system-design.md` | 提示词系统专项设计 |

@@ -6,7 +6,8 @@
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d3-sa-refine（R1+Q1-Q7 决议 + R2 命题 A/OQ-4 决议 + R3 命题 A~D 自裁决）
-**Companion Docs:** `f-registry.md` · `t-registry.md` · `span-registry.md` · `spec.md` · `design.md`
+**Domain SoT:** `d3-domain.md`
+**Companion Docs:** `terminal-state-guide.md` · `observability-guide.md` · `f-registry.md` · `t-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---
 
