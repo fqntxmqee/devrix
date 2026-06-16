@@ -218,6 +218,39 @@ func TestOrchestrator_RunTurn_CompleteCarriesUsageMetadata(t *testing.T) {
 	}
 }
 
+func TestOrchestrator_RunTurn_UsageOnNonDoneChunk(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("hello"),
+		{Usage: llmgateway.TokenUsage{PromptTokens: 120, CompletionTokens: 30}},
+		{Done: true},
+	}}
+	ctxPrep := &stubContext{prepared: PreparedContext{Model: "MiniMax-M2.5"}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: &stubTools{}, Persist: &stubPersist{}, MaxTurns: 4,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-usage",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if complete.Metadata["usage"] != "150" {
+		t.Fatalf("usage metadata = %q, want 150", complete.Metadata["usage"])
+	}
+}
+
 // D7-S2-A06-T03: Multi-turn tool_use — LLM returns tool_calls → tool round → LLM(text)
 func TestOrchestrator_RunTurn_MultiTurn_ToolLoop(t *testing.T) {
 	callCount := atomic.Int64{}

@@ -170,6 +170,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// duplicate tool_call ids in the follow-up request).
 		var contentBuf strings.Builder
 		var toolCalls []llmgateway.ToolCall
+		var iterUsage llmgateway.TokenUsage
 
 		for chunk := range chunkCh {
 			if chunk.Thinking != "" {
@@ -190,13 +191,17 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			if len(chunk.ToolCalls) > 0 {
 				toolCalls = chunk.ToolCalls
 			}
-			if chunk.Done {
-				totalUsage.PromptTokens += chunk.Usage.PromptTokens
-				totalUsage.CompletionTokens += chunk.Usage.CompletionTokens
-				if chunk.Usage.PromptTokens > 0 {
-					lastPromptTokens = chunk.Usage.PromptTokens
-				}
+			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+				iterUsage = chunk.Usage
+			} else if chunk.Usage.TotalTokens > 0 && iterUsage.PromptTokens == 0 && iterUsage.CompletionTokens == 0 {
+				iterUsage = chunk.Usage
 			}
+		}
+		totalUsage.PromptTokens += iterUsage.PromptTokens
+		totalUsage.CompletionTokens += iterUsage.CompletionTokens
+		totalUsage.TotalTokens += iterUsage.TotalTokens
+		if iterUsage.PromptTokens > 0 {
+			lastPromptTokens = iterUsage.PromptTokens
 		}
 		endSpan(llmSpan)
 
@@ -332,7 +337,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	}
 	meta := map[string]string{
 		"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),
-		"usage":    fmt.Sprintf("%d", usage.PromptTokens+usage.CompletionTokens),
+		"usage":    fmt.Sprintf("%d", usageTokenTotal(usage)),
 	}
 	if model != "" {
 		meta["model"] = model
@@ -491,6 +496,13 @@ func mergeSystemPrompt(prepared, extra string) string {
 	default:
 		return prepared + "\n" + extra
 	}
+}
+
+func usageTokenTotal(u llmgateway.TokenUsage) int {
+	if u.PromptTokens > 0 || u.CompletionTokens > 0 {
+		return u.PromptTokens + u.CompletionTokens
+	}
+	return u.TotalTokens
 }
 
 func toolNameForCallID(calls []llmgateway.ToolCall, id string) string {
