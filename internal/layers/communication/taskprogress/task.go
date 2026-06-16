@@ -15,10 +15,14 @@ func EmitToolCall(session *types.Session, event *contracts.EngineEvent, sig cont
 	if toolName == "" && event.Metadata != nil {
 		toolName = event.Metadata["tool_name"]
 	}
+	input := kernel.MetaField(event.Metadata, "input")
+	if input == "" {
+		input = event.ToolInput
+	}
 	meta := kernel.EnrichMetadata(map[string]string{
 		"event_type": "tool_call",
 		"tool_name":  toolName,
-		"input":      kernel.MetaField(event.Metadata, "input"),
+		"input":      input,
 	}, kernel.SigOrEmpty(hasSig, sig))
 	emit.OnMessage(&types.OutboundMessage{
 		MessageID:  kernel.NewMessageID(),

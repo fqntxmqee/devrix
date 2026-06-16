@@ -218,6 +218,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				ToolName:  tc.Name,
 				ToolInput: tc.Input,
 				SessionID: req.SessionID,
+				Metadata: map[string]string{
+					"tool_name": tc.Name,
+					"input":     tc.Input,
+				},
 			}
 		}
 
@@ -254,10 +258,15 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			if r.Error != "" {
 				content = r.Error
 			}
+			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
 			out <- &contracts.EngineEvent{
 				Type:      "tool_result",
+				ToolName:  toolName,
 				Content:   content,
 				SessionID: req.SessionID,
+				Metadata: map[string]string{
+					"tool_name": toolName,
+				},
 			}
 		}
 
@@ -442,6 +451,16 @@ func mergeSystemPrompt(prepared, extra string) string {
 	default:
 		return prepared + "\n" + extra
 	}
+}
+
+func toolNameForCallID(calls []llmgateway.ToolCall, id string) string {
+	id = strings.TrimSpace(id)
+	for _, tc := range calls {
+		if strings.TrimSpace(tc.ID) == id {
+			return tc.Name
+		}
+	}
+	return ""
 }
 
 func dedupeToolCalls(calls []llmgateway.ToolCall) []llmgateway.ToolCall {
