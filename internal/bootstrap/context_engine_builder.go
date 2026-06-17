@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -111,6 +112,11 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 				slog.Info("agent tool registered", "tool", plugin.Name())
 			}
 		}
+	}
+
+	// G1 LSP tool (default disabled; 启用需 lsp.enabled=true + servers 配置)
+	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
+		slog.Error("register lsp tool", "error", err)
 	}
 
 	tools := contextengine.NewLimitedToolRunner(

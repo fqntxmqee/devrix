@@ -120,6 +120,13 @@
 | D4-S0-A01-T02 | Fork 消息隔离并发安全 | `internal/layers/multiagent/run/agent_test.go` | IMPLEMENTED | P0 |
 | D4-S0-A01-T03 | Gateway → ResolvePermission 集成全流程 | `tests/integration/agent_integration_test.go` | IMPLEMENTED | P0 |
 | D4-S0-A01-T04 | E2E Fork 端到端 | `tests/e2e/agent_fork_e2e_test.go` | IMPLEMENTED | P0 |
+| D4-FF-T01 | FreeFork 批量 fork 全部成功 | `internal/layers/multiagent/provision/freefork/forker_test.go` | IMPLEMENTED | P0 |
+| D4-FF-T02 | FreeFork 工厂失败 → 已启动子 agent Terminate + worktree Exit | `internal/layers/multiagent/provision/freefork/forker_test.go` | IMPLEMENTED | P0 |
+| D4-FF-T03 | FreeFork prompt → AgentConfig.InitialInput | `internal/layers/multiagent/provision/freefork/forker_test.go` | IMPLEMENTED | P1 |
+| D4-NT-T01 | TaskManager 终态 publish CompletionEvent | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P0 |
+| D4-NT-T02 | Bus.Drain 一次性读出全部未消费 event | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P0 |
+| D4-NT-T03 | Bus channel 满 → 降级 pending list | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P1 |
+| D4-NT-T04 | FormatReminder 渲染 `<task_notifications>` 块 | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P0 |
 
 ---
 

@@ -19,15 +19,15 @@
 
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
-| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 56 | 56 | 0 | 26 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 59 | 58 | 0 | 27 |
-| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 26 | 25 | 1 | 11 |
-| D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 38 | 38 | 0 | 19 |
-| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 38 | 35 | 3 | 11 |
-| D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 21 | 19 | 2 | 5 |
+| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 60 | 60 | 0 | 27 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 68 | 68 | 0 | 30 |
+| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 29 | 28 | 1 | 13 |
+| D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 46 | 46 | 0 | 23 |
+| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 47 | 44 | 3 | 17 |
+| D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 7 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 46 | 39 | 5 | 26 |
 
-**总计**: 284 · IMPLEMENTED 270 · PLANNED 11 · PARTIAL 2 · P0 125
+**总计**: 320 · IMPLEMENTED 307 · PLANNED 11 · PARTIAL 2 · P0 143
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 

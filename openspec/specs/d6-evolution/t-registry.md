@@ -39,6 +39,9 @@
 | T ID | 描述 | canonical_s | Priority | Test 位置 | Status | Legacy T ID |
 |------|------|-------------|----------|-----------|--------|-------------|
 | D6-S11-A02-T02 | LLM-as-Judge 校准与分歧（Cohen's kappa） | S11 | P0 | `internal/layers/evolution/evaluate/judge_test.go` | IMPLEMENTED | D6-S3-A02-T02 |
+| D6-S11-A02-T03 | Verifier 全部 plan item 通过 | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
+| D6-S11-A02-T04 | Verifier 缺失 evidence → unverified | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
+| D6-S11-A02-T05 | Verifier `_test.go` 缺 `func TestXxx(` → fail | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
 
 ### D6-S11-A04: GenerateTune
 
