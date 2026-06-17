@@ -153,17 +153,15 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// 注入点接入, 避免 prompt 包 import orchestration/workmodel/notify.
 	wireTaskNotifDrainer()
 
-	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 tracker.GlobalTracker 注入。
-	// 同一 buildWithGate 中创建 tracker 实例 + SetGlobalTracker + 启动 tick goroutine。
+	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 surface 注入。
+	// 同一 buildWithGate 中创建 tracker 实例 + 启动 tick goroutine。tracker 实例
+	// 通过 BuildSurfaces(SurfaceBuildOpts.Tracker) 显式传给 surface.TrackerSurface,
+	// 不再走 tracker.SetGlobalTracker + toolrunner.RegisterTrackerTool 旧路径。
 	// W13 (AC14): tracker cap / tick interval 走 DiagnosticsConfig.
 	// S4-Gate H-1 fix: 用 builder 持有的 ctx 控制 tick goroutine 生命周期, 避免多次 build 泄漏.
 	diagCfg := b.ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
-	tracker.SetGlobalTracker(diagTracker)
 	startTrackerTick(b.ctx, diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
-	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
-		slog.Error("register query_diagnostics tool", "error", err)
-	}
 
 	// DM-20260617-002 W11 (AC9): transcript Writer 全局注入, 让 gateway.ExpireSession
 	// 调 transcript.Append 写 session_close event. dir 优先取 DiagnosticsConfig.TranscriptDir,

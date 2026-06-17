@@ -112,12 +112,12 @@ func NewContextEngine(
 
 	diagCfg := ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
-	tracker.SetGlobalTracker(diagTracker)
+	// W11 phase 2: query_diagnostics is exposed via surface.TrackerSurface
+	// (built in BuildSurfaces below). The legacy toolrunner.RegisterTrackerTool
+	// + tracker.SetGlobalTracker path is removed; the surface holds the
+	// tracker instance explicitly so production code no longer relies on the
+	// process-wide singleton.
 	startTrackerTick(context.Background(), diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
-
-	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
-		slog.Error("register query_diagnostics tool", "error", err)
-	}
 
 	tdir := diagCfg.TranscriptDir
 	if tdir == "" {

@@ -9,14 +9,12 @@ package bootstrap
 // respond with "unknown tool" even though the per-agent builder path
 // (buildWithGate) had registered them.
 //
-// Architecture: the main engine's diagnostic surface is split between
-//   - NewContextEngine:  registers free_fork / query_diagnostics /
-//                        verify_plan_execution / lsp / todo_write
-//   - WireDelegate:      registers delegate_* (after NewContextEngine,
-//                        so it sees a populated engine)
-//
-// This test wires the same calls main.go does (NewContextEngine + WireDelegate)
-// and asserts the leader LLM sees the full tool surface.
+// Architecture (W11 phase 2a): the main engine's diagnostic surface lives on
+// the engine's surface list, NOT on the legacy toolRunner registry. Wires
+// (NewContextEngine + WireDelegate) populate Surfaces, and the test
+// enumerates via ce.Surfaces() (TOOL-SURFACE-1 SoT). The legacy registry
+// still backs the BuiltinSurface so builtins (read_file, glob, grep, bash,
+// edit_file) show up via the BuiltinSurface.Tools enumeration.
 
 import (
 	"context"
@@ -29,6 +27,18 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
+
+// collectToolNames flattens the engine's surface list into a name set.
+func collectToolNames(t *testing.T, ce *contextengine.ContextEngine) map[string]bool {
+	t.Helper()
+	got := map[string]bool{}
+	for _, s := range ce.Surfaces() {
+		for _, sp := range s.Tools(context.Background(), "", "") {
+			got[sp.Name] = true
+		}
+	}
+	return got
+}
 
 func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 	obsBridge := observability.NewBridge(observability.NewNoOp())
@@ -46,15 +56,10 @@ func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 	// WireDelegate owns delegate_* registration on the main engine.
 	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry())
 
-	schemas, err := ce.ToolRegistry().ListTools(context.Background(), "")
-	if err != nil {
-		t.Fatalf("ListTools: %v", err)
-	}
-	got := make(map[string]bool, len(schemas))
-	names := make([]string, 0, len(schemas))
-	for _, s := range schemas {
-		got[s.Name] = true
-		names = append(names, s.Name)
+	got := collectToolNames(t, ce)
+	names := make([]string, 0, len(got))
+	for n := range got {
+		names = append(names, n)
 	}
 	sort.Strings(names)
 
@@ -94,22 +99,10 @@ func TestSelectContextEngine_ForwardsMultiAgentConfig(t *testing.T) {
 	}
 	// Mirror main.go:WireDelegate.
 	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry())
-	schemas, err := ce.ToolRegistry().ListTools(context.Background(), "")
-	if err != nil {
-		t.Fatalf("ListTools: %v", err)
-	}
+	got := collectToolNames(t, ce)
 	for _, want := range []string{"free_fork", "query_diagnostics", "delegate_explore"} {
-		found := false
-		for _, s := range schemas {
-			if s.Name == want {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !got[want] {
 			t.Errorf("SelectContextEngine → main engine missing %q", want)
 		}
 	}
 }
-
-

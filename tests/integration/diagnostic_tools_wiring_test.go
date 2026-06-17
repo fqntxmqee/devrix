@@ -30,12 +30,13 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/shared/types"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // TestIntegration_A1_DoctorCLI — A1 闭环: /doctor 输出 7 项 check。
@@ -145,7 +146,7 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 		t.Fatalf("RegisterFreeForkTool: %v", err)
 	}
 	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name: "free_fork",
+		Name:  "free_fork",
 		Input: `{"parent_session":"sess-int","requests":[{"name":"r1","prompt":"p1","worktree":true}]}`,
 	})
 	if res.Error != "" {
@@ -160,6 +161,10 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 }
 
 // TestIntegration_G6_QueryDiagnosticsTool — G6 闭环: tick → query。
+//
+// W11 phase 2a: query_diagnostics 的实现已从 toolrunner.trackerRunner +
+// tracker.SetGlobalTracker 迁移到 surface.TrackerSurface。integration test
+// 现在直接构造 surface 走 Execute 路径, 不再依赖任何 process-wide global。
 func TestIntegration_G6_QueryDiagnosticsTool(t *testing.T) {
 	tr := tracker.New(0)
 	tr.SetLinter(".go", func(_ context.Context, _ string) ([]tracker.Diagnostic, error) {
@@ -172,18 +177,12 @@ func TestIntegration_G6_QueryDiagnosticsTool(t *testing.T) {
 	if added != 1 {
 		t.Fatalf("tick added=%d, want 1", added)
 	}
-	prevT := tracker.GlobalTracker()
-	tracker.SetGlobalTracker(tr)
-	t.Cleanup(func() { tracker.SetGlobalTracker(prevT) })
 
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterTrackerTool(reg); err != nil {
-		t.Fatalf("RegisterTrackerTool: %v", err)
+	s := surface.NewTrackerSurface(tr)
+	res, err := s.Execute(context.Background(), "query_diagnostics", `{}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name:  "query_diagnostics",
-		Input: `{}`,
-	})
 	if res.Error != "" {
 		t.Fatalf("query_diagnostics error: %s", res.Error)
 	}
@@ -308,9 +307,9 @@ func (f *fakeFactory) ReleaseSession(_ string) {}
 
 type fakeAgent struct{ id string }
 
-func (a *fakeAgent) ID() string                       { return a.id }
-func (a *fakeAgent) State() multiagent.AgentState     { return multiagent.AgentStateRunning }
-func (a *fakeAgent) Config() multiagent.AgentConfig   { return multiagent.AgentConfig{} }
+func (a *fakeAgent) ID() string                     { return a.id }
+func (a *fakeAgent) State() multiagent.AgentState   { return multiagent.AgentStateRunning }
+func (a *fakeAgent) Config() multiagent.AgentConfig { return multiagent.AgentConfig{} }
 func (a *fakeAgent) Run(_ context.Context) (*multiagent.AgentResult, error) {
 	return &multiagent.AgentResult{ExitCode: 0}, nil
 }
@@ -322,7 +321,7 @@ func (a *fakeAgent) Terminate(_ context.Context) error                { return n
 func (a *fakeAgent) Wait(_ context.Context) (*multiagent.AgentResult, error) {
 	return &multiagent.AgentResult{ExitCode: 0}, nil
 }
-func (a *fakeAgent) ResolvePermission(string, bool)              {}
-func (a *fakeAgent) GetMessages() []types.Message                { return nil }
-func (a *fakeAgent) SetAgentObserver(multiagent.AgentObserver)   {}
+func (a *fakeAgent) ResolvePermission(string, bool)                  {}
+func (a *fakeAgent) GetMessages() []types.Message                    { return nil }
+func (a *fakeAgent) SetAgentObserver(multiagent.AgentObserver)       {}
 func (a *fakeAgent) SetEngineEventSink(func(*contracts.EngineEvent)) {}
