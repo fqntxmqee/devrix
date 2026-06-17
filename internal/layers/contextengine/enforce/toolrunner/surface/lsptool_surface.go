@@ -51,7 +51,8 @@ func (s *LSPToolSurface) InterruptBehavior(name string) contracts.InterruptMode 
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. Default Allow.
+// CheckPermission implements contracts.ToolSurface. LSP is a pure
+// read-only code-intelligence tool — always Allow.
 func (s *LSPToolSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }

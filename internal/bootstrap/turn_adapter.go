@@ -219,6 +219,18 @@ func parseToolParams(raw string) map[string]any {
 // for the gate call (the gate is a shared, sequential resource). The
 // results slice is pre-allocated and indexed so the order of
 // req.ToolCalls is preserved in the output.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002 devrix-surface-permission-extension):
+// ExecuteRound runs a 2-phase dispatch:
+//
+//	Phase 1: for each tool call, consult surface.CheckPermission. If
+//	  the surface returns Deny or Ask, the result is set immediately
+//	  (PermissionDeniedError / PermissionAskRequiredError) and the
+//	  tool is NOT executed. Ask delegates to IPermissionGate.CheckPermission
+//	  for the final policy decision (plan-mode OpenWorld denial goes
+//	  through this path).
+//	Phase 2: parallel / sequential dispatch of the remaining
+//	  Allow tools, identical to DM-001 F06.
 func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
 	if a.tools == nil && len(a.surfaces) == 0 {
 		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
@@ -236,8 +248,19 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 	concSafe := a.concurrencyMap()
 	results := make([]turn.ToolResult, len(req.ToolCalls))
 
+	// Phase 1: CheckPermission pre-dispatch (DM-002 F07).
+	for i, tc := range req.ToolCalls {
+		if r, denied := a.checkPermission(toolCtx, req.SessionID, tc); denied {
+			results[i] = r
+		}
+	}
+
+	// Phase 2: execute the surviving calls in parallel / sequential.
 	var parallelIdx []int
 	for i, tc := range req.ToolCalls {
+		if results[i].Error != "" {
+			continue // already denied in Phase 1
+		}
 		if concSafe[tc.Name] {
 			parallelIdx = append(parallelIdx, i)
 			continue
@@ -258,6 +281,75 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 	}
 
 	return turn.ToolRoundResult{Results: results}, nil
+}
+
+// checkPermission runs surface.CheckPermission → IPermissionGate.CheckPermission
+// and returns the appropriate ToolResult + denied=true when the tool
+// should NOT be executed. Returns (_, false) when the call should
+// proceed to Phase 2.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) (turn.ToolResult, bool) {
+	surf, ok := a.findSurface(tc.Name)
+	if !ok {
+		return turn.ToolResult{}, false
+	}
+	spec, _ := a.findSpec(toolCtx, tc.Name)
+	var specVal contracts.ToolSpec
+	if spec != nil {
+		specVal = *spec
+	}
+	decision := surf.CheckPermission(toolCtx, specVal, json.RawMessage(tc.Input))
+	if decision == contracts.DecisionAllow {
+		return turn.ToolResult{}, false
+	}
+	if decision == contracts.DecisionAsk && a.perm != nil {
+		decision = a.perm.CheckPermission(toolCtx, specVal)
+	}
+	if decision == contracts.DecisionAllow {
+		return turn.ToolResult{}, false
+	}
+	reason := ""
+	switch decision {
+	case contracts.DecisionDeny:
+		reason = "policy denied"
+	case contracts.DecisionAsk:
+		reason = "ask required"
+	}
+	if decision == contracts.DecisionDeny {
+		return turn.ToolResult{
+			ToolCallID: tc.ID,
+			Error: (&contracts.PermissionDeniedError{
+				Spec:   specVal,
+				Input:  json.RawMessage(tc.Input),
+				Reason: reason,
+			}).Error(),
+		}, true
+	}
+	return turn.ToolResult{
+		ToolCallID: tc.ID,
+		Error: (&contracts.PermissionAskRequiredError{
+			Spec:   specVal,
+			Input:  json.RawMessage(tc.Input),
+			Reason: reason,
+		}).Error(),
+	}, true
+}
+
+// findSpec looks up the ToolSpec for a tool name across all surfaces.
+// Returns (nil, false) when no surface claims the tool.
+func (a *contextEngineAdapter) findSpec(ctx context.Context, name string) (*contracts.ToolSpec, bool) {
+	for _, s := range a.surfaces {
+		if s == nil {
+			continue
+		}
+		for _, sp := range s.Tools(ctx, "", "") {
+			if sp.Name == name {
+				return &sp, true
+			}
+		}
+	}
+	return nil, false
 }
 
 // executeOne runs the full gate → surface → fallback chain for a single

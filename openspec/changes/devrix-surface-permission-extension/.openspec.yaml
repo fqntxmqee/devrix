@@ -1,0 +1,120 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-surface-permission-extension
+  demand_id: DM-20260618-002
+  title: "Per-tool CheckPermission hook + IPermissionGate.ToolPolicy"
+  status: s1_proposed
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-18"
+  updated_at: "2026-06-18"
+  source: clawcode-tool-design-comparison-2026-06-17
+  parent_changes:
+    - devrix-tool-surface-contract (DM-20260617-007, S7_archived)
+    - devrix-tool-surface-phase2-full (DM-20260617-008, S7_archived)
+    - devrix-tool-spec-enrichment (DM-20260618-001, S4_Ready)
+  depends_on:
+    - devrix-tool-spec-enrichment  # ToolSpec 4 bool 字段是本 change 前置
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "Surface 集成 permission 检查；turn_adapter 在 dispatch 前调 CheckPermission"
+    - id: D7
+      name: Orchestration
+      affected: true
+      reason: "IPermissionGate 扩展 consume ToolSpec.OpenWorld/Destructive"
+    - id: tool-surface
+      name: Tool Surface Contract
+      affected: true
+      reason: "横切契约域 TOOL-SURFACE-1 加 CheckPermission hook"
+    - id: bash
+      name: Bash Tool AST
+      affected: true
+      reason: "BashSurface 内置 AST 解析器，policy 可拒危险 cmd"
+
+  capabilities:
+    - id: TOOL-SURFACE-1-A01
+      name: ToolSurfaceContract
+      reason: "+1 method CheckPermission（接口加方法；本 change 是 A change 第二个）"
+    - id: PERMISSION-GATE-1
+      name: PermissionGate
+      reason: "IPermissionGate 加 CheckPermission(ctx, spec) Decision 方法"
+    - id: BASH-AST-1
+      name: BashASTPolicy
+      reason: "BashSurface 内嵌 AST 解析，支持 deny-list (rm -rf /) 等"
+
+  t_points:
+    # 新增 P0 T 点
+    - TOOL-SURFACE-1-T26       # ToolSurface.CheckPermission hook 默认 Allow
+    - TOOL-SURFACE-1-T27       # BashSurface 内置 AST 拒危险 cmd
+    - TOOL-SURFACE-1-T28       # IPermissionGate.CheckPermission consume ToolSpec orthogonal flags
+    - TOOL-SURFACE-1-T29       # turn_adapter dispatch 前 CheckPermission 调用
+    - PERMISSION-GATE-1-T01    # Permission policy 决策 path 单元测试
+    - PERMISSION-GATE-1-T02    # Plan mode 自动 deny OpenWorld tools
+    # 既有 15 个 P0 T 点（沿用：本 change + DM-001 合并后必须保持 PASS）
+    - TOOL-SURFACE-1-T01
+    - TOOL-SURFACE-1-T02
+    - TOOL-SURFACE-1-T03
+    - TOOL-SURFACE-1-T04
+    - TOOL-SURFACE-1-T05
+    - TOOL-SURFACE-1-T06
+    - TOOL-SURFACE-1-T07
+    - TOOL-SURFACE-1-T08
+    - TOOL-SURFACE-1-T09
+    - TOOL-SURFACE-1-T10
+    - TOOL-SURFACE-1-T11
+    - TOOL-SURFACE-1-T22
+    - TOOL-SURFACE-1-T23
+    - TOOL-SURFACE-1-T24
+    - TOOL-SURFACE-1-T25
+
+version_scope:
+  v1.0:
+    features:
+      - "ToolSurface interface + 1 method CheckPermission(ctx, spec, input) Decision"
+      - "Decision enum: Allow / Deny / Ask 三态（与 clawcode 一致）"
+      - "BashSurface 内置 AST 解析器（基于 mvdan/sh 或自实现 tree-sitter bash）"
+      - "IPermissionGate.CheckPermission(ctx, spec) Decision 扩展"
+      - "Plan mode 自动 deny OpenWorld=true 的 tool（per-risk 收紧）"
+      - "turn_adapter ExecuteRound 在 dispatch 前调 CheckPermission"
+      - "7 surface 默认实现 CheckPermission=Allow（向后兼容 DM-001）"
+    status: planned
+  v1.1:
+    features:
+      - "Per-tool 自定义 permission policy DSL（YAML/JSON 配置）"
+      - "Policy 决策 audit log（追责：哪个 tool 被谁拒绝/批准）"
+    status: future
+
+metrics_definitions:
+  - name: tool_check_permission_default_allow_coverage
+    description: 7 surface 全部实现 CheckPermission 默认 Allow
+    target: 100
+    baseline: 0
+  - name: bash_ast_dangerous_cmd_deny_rate
+    description: BashSurface 内置 AST 拒危险 cmd 的命中率（基于已知 deny-list）
+    target: 100
+    baseline: 0
+  - name: plan_mode_open_world_deny_pct
+    description: Plan mode 拒绝 OpenWorld=true tool 的比例
+    target: 100
+    baseline: 0
+  - name: permission_check_overhead_ms
+    description: 单 tool CheckPermission 调用 overhead (p99)
+    target: < 5ms
+    baseline: 0  # 当前 IPermissionGate.Request 每次 ~20ms（同步 RPC）
+
+span_naming:
+  - TOOL-SURFACE-1-A01: tool.surface.contract.v3
+  - PERMISSION-GATE-1: perm.gate.tool_policy
+
+capability_aliases:
+  ToolSurface: TOOL-SURFACE-1-A01-ToolSurfaceContract
+  ToolSpec: TOOL-SURFACE-1-A01-ToolSpec
+  CheckPermission: TOOL-SURFACE-1-A01-CheckPermission
+  IPermissionGate: PERMISSION-GATE-1-IPermissionGate
+  BashASTPolicy: BASH-AST-1-BashASTPolicy

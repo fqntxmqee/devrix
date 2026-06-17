@@ -27,14 +27,26 @@ import (
 // The surface is constructed from an existing *toolrunner.ToolRegistry so
 // the existing test suite for builtin tools (sandbox, edit, glob, grep) does
 // not need to be rewritten.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002): bashAST is the optional
+// BashASTPolicy used by CheckPermission. A nil policy means bash
+// CheckPermission returns Allow (no AST enforcement) — this is the
+// graceful-degradation path for unit tests that don't wire the policy.
 type BuiltinSurface struct {
-	reg *toolrunner.ToolRegistry
+	reg     *toolrunner.ToolRegistry
+	bashAST *BashASTPolicy
 }
 
 // NewBuiltinSurface constructs a surface backed by a tool registry. If reg
 // is nil, the surface is empty (no tools) but still safe to call.
 func NewBuiltinSurface(reg *toolrunner.ToolRegistry) *BuiltinSurface {
 	return &BuiltinSurface{reg: reg}
+}
+
+// NewBuiltinSurfaceWithBashAST wires the AST policy (DM-20260618-002).
+// Pass nil to keep CheckPermission in graceful-degradation mode.
+func NewBuiltinSurfaceWithBashAST(reg *toolrunner.ToolRegistry, bashAST *BashASTPolicy) *BuiltinSurface {
+	return &BuiltinSurface{reg: reg, bashAST: bashAST}
 }
 
 // Name implements contracts.ToolSurface.
@@ -74,13 +86,6 @@ func (s *BuiltinSurface) InterruptBehavior(name string) contracts.InterruptMode 
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. The default is
-// Allow; surfaces can override to install per-tool policies. BashASTPolicy
-// (DM-20260618-002) is wired in via NewBuiltinSurfaceWithBashAST.
-func (s *BuiltinSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
-	return contracts.DecisionAllow
-}
-
 // RiskLevel implements contracts.ToolSurface.
 func (s *BuiltinSurface) RiskLevel(name string) types.RiskLevel {
 	if s.reg == nil {
@@ -109,4 +114,27 @@ func (s *BuiltinSurface) Execute(ctx context.Context, name, input, workDir strin
 		return &contracts.ToolResult{Error: "builtin: nil result"}, nil
 	}
 	return &contracts.ToolResult{Output: res.Output, Error: res.Error}, nil
+}
+
+// CheckPermission implements contracts.ToolSurface.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002): bash gets AST-level
+// policy; every other builtin tool (read/write/edit/grep/glob) is
+// Allow. A nil bashAST short-circuits to Allow (graceful degradation
+// for unit tests that don't wire the policy).
+func (s *BuiltinSurface) CheckPermission(_ context.Context, spec contracts.ToolSpec, input json.RawMessage) contracts.Decision {
+	if spec.Name != "bash" {
+		return contracts.DecisionAllow
+	}
+	if s.bashAST == nil {
+		return contracts.DecisionAllow
+	}
+	var in struct {
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal(input, &in); err != nil {
+		return contracts.DecisionAsk
+	}
+	decision, _ := s.bashAST.Check(in.Command)
+	return decision
 }

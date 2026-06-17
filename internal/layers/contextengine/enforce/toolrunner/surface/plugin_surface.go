@@ -83,8 +83,11 @@ func (s *PluginSurface) InterruptBehavior(name string) contracts.InterruptMode {
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. Default Allow.
-func (s *PluginSurface) CheckPermission(ctx context.Context, spec contracts.ToolSpec, input json.RawMessage) contracts.Decision {
+// CheckPermission implements contracts.ToolSurface. The default for
+// plugin-backed tools (delegate_*, task_*) is Allow; per-runner
+// overrides can be added by extending PluginRunner with a CheckPermission
+// hook (P2 follow-up — see DM-002 §3.3).
+func (s *PluginSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }
 

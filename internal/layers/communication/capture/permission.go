@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -145,6 +146,34 @@ func (p *PermissionManager) IsYOLOMode() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.userCfg != nil && p.userCfg.YOLO.Enabled
+}
+
+// CheckPermission implements contracts.IPermissionGate. Maps the
+// spec's RiskLevel onto a 3-state Decision:
+//
+//	LOW      → Allow
+//	MEDIUM   → Ask  (user must explicitly approve in v1)
+//	HIGH     → Ask
+//	CRITICAL → Deny (block by default; can be loosened with explicit
+//	          user policy in v2 DSL)
+//
+// The conservative Ask/Deny for non-LOW risk keeps YOLO mode from
+// silently auto-approving sensitive operations. This is intentionally
+// a separate code path from the turn-level Request (which YOLO
+// honors); per-tool CheckPermission is the strict 3-state gate that
+// turn_adapter consults BEFORE surface.Execute runs.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (p *PermissionManager) CheckPermission(_ context.Context, spec contracts.ToolSpec) contracts.Decision {
+	switch spec.Risk {
+	case types.RiskLevelLow:
+		return contracts.DecisionAllow
+	case types.RiskLevelMedium, types.RiskLevelHigh:
+		return contracts.DecisionAsk
+	case types.RiskLevelCritical:
+		return contracts.DecisionDeny
+	}
+	return contracts.DecisionAsk
 }
 
 // AutoApproveFiles reports whether YOLO allows workspace file writes without plan-mode restrictions.

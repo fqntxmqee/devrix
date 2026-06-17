@@ -14,13 +14,25 @@ import (
 // FreeForkerFunc (NOT the package-level globalFreeForker), so the
 // dependency is visible in the constructor. This is the replacement for
 // toolrunner.globalFreeForker / SetFreeForker.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002): permGate is the
+// IPermissionGate used by CheckPermission. A nil gate is the
+// conservative default (Ask).
 type FreeForkSurface struct {
-	forker toolrunner.FreeForkerFunc
+	forker   toolrunner.FreeForkerFunc
+	permGate contracts.IPermissionGate
 }
 
 // NewFreeForkSurface wires a forker into the surface.
 func NewFreeForkSurface(f toolrunner.FreeForkerFunc) *FreeForkSurface {
 	return &FreeForkSurface{forker: f}
+}
+
+// NewFreeForkSurfaceWithGate wires both the forker and the permission
+// gate. Use this in production (DM-002 requires a gate); the
+// 1-arg constructor is the legacy compat path for unit tests.
+func NewFreeForkSurfaceWithGate(f toolrunner.FreeForkerFunc, gate contracts.IPermissionGate) *FreeForkSurface {
+	return &FreeForkSurface{forker: f, permGate: gate}
 }
 
 // Name implements contracts.ToolSurface.
@@ -48,9 +60,19 @@ func (s *FreeForkSurface) InterruptBehavior(name string) contracts.InterruptMode
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. Default Allow.
-func (s *FreeForkSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
-	return contracts.DecisionAllow
+// CheckPermission implements contracts.ToolSurface. free_fork spawns
+// up to 5 child agents — a multi-agent blast radius — so the
+// permission decision is delegated to the global IPermissionGate
+// (which knows about plan_mode, YOLO, and per-user policy). A nil
+// gate returns Ask (conservative default — the LLM should not be
+// able to spawn child agents in unattended mode).
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (s *FreeForkSurface) CheckPermission(ctx context.Context, spec contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	if s.permGate == nil {
+		return contracts.DecisionAsk
+	}
+	return s.permGate.CheckPermission(ctx, spec)
 }
 
 // RiskLevel implements contracts.ToolSurface.
