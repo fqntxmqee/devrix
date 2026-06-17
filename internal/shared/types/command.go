@@ -12,6 +12,7 @@ const (
 	CommandTask    CommandType = "task"
 	CommandPlan    CommandType = "plan"
 	CommandVerify  CommandType = "verify"
+	CommandDoctor  CommandType = "doctor"
 	CommandUnknown CommandType = "unknown"
 )
 
@@ -62,6 +63,8 @@ func ParseCommand(input string, prefix string) *Command {
 		cmdType = CommandPlan
 	case strings.EqualFold(parts[0], "verify"):
 		cmdType = CommandVerify
+	case strings.EqualFold(parts[0], "doctor"):
+		cmdType = CommandDoctor
 	default:
 		cmdType = CommandUnknown
 	}

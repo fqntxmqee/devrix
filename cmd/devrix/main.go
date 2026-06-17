@@ -12,6 +12,7 @@ import (
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
+	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/channel/connection"
@@ -56,6 +57,15 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "eval" {
 		if err := evalcli.Run(os.Args[2:]); err != nil {
 			slog.Error("eval command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-002 W9 (AC1): /doctor 自检 CLI 子命令, 不需要 LLM / obs 栈。
+	if len(os.Args) >= 2 && os.Args[1] == "doctor" {
+		if err := doctorcli.Run(os.Args[2:]); err != nil {
+			slog.Error("doctor command failed", "error", err)
 			os.Exit(1)
 		}
 		return
