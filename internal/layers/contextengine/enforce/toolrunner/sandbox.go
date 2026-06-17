@@ -15,6 +15,14 @@ type CommandPolicy struct {
 	Allowlist    []string
 	DenyPatterns []*regexp.Regexp
 	WorkDirLock  bool
+	// ASTAnalyzer 可选：G2 Bash AST 二次审计，在 regex 之前生效。
+	// nil 时跳过 AST 检查（生产环境可通过 WireASTAnalyzer 注入）。
+	ASTAnalyzer ASTAnalyzer
+}
+
+// ASTAnalyzer 由 sandboxast.Analyzer 实现的接口，便于 sandbox.go 不直接依赖 sandboxast。
+type ASTAnalyzer interface {
+	Analyze(cmd string) (allow bool, reason string)
 }
 
 var defaultAllowlist = []string{
@@ -81,6 +89,13 @@ func compileDenyPatterns(patterns []string) []*regexp.Regexp {
 func (p *CommandPolicy) Validate(command string) error {
 	if p == nil || !p.Enabled {
 		return nil
+	}
+
+	// G2 AST 前置：先经 mvdan.cc/sh 解析
+	if p.ASTAnalyzer != nil {
+		if allow, reason := p.ASTAnalyzer.Analyze(command); !allow {
+			return fmt.Errorf("sandbox: ast block: %s. %s", reason, sandboxPolicyHint)
+		}
 	}
 
 	cmdName := extractCommandName(command)
