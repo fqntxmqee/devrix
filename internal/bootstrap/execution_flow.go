@@ -22,29 +22,35 @@ func WireExecutionFlow(
 	ctxCfg *config.ContextEngineConfig,
 	gw *capture.CommunicationGateway,
 	obsBridge *observability.Bridge,
-) contracts.ExecutionFlowHub {
+	tm *workmodel.TaskManager,
+) (contracts.ExecutionFlowHub, *sessionqueue.SessionQueue) {
 	if ctxCfg == nil {
-		return contracts.NoOpExecutionFlowHub{}
+		return contracts.NoOpExecutionFlowHub{}, nil
 	}
 	cfg := config.NormalizeExecutionFlowConfig(ctxCfg.ExecutionFlow)
 	if !cfg.Enabled {
-		return contracts.NoOpExecutionFlowHub{}
+		return contracts.NoOpExecutionFlowHub{}, nil
 	}
 	var im flow.IMSink
 	if cfg.IMProgress && gw != nil {
 		im = imsink.NewGatewaySink(gatewayEngineSink{gw: gw})
 	}
+	q := sessionqueue.NewSessionQueue()
+	tasks := tm
+	if tasks == nil {
+		tasks = workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
+	}
 	hub := flow.NewHub(flow.HubDeps{
 		Config: cfg,
-		Queue:  sessionqueue.NewSessionQueue(),
-		Tasks:  workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge),
+		Queue:  q,
+		Tasks:  tasks,
 		IM:     im,
 	})
 	slog.Info("execution flow hub enabled",
 		"link_tasks", cfg.LinkTasks,
 		"im_progress", cfg.IMProgress,
 	)
-	return hub
+	return hub, q
 }
 
 type gatewayEngineSink struct {

@@ -21,8 +21,10 @@ import (
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // D7StackOptions configures InitOrchestration integration test wiring.
@@ -54,8 +56,10 @@ type D7TestStack struct {
 	Handler     *MockEventHandler
 	Engine      *contextengine.ContextEngine
 	LLMStub     llmgateway.IAdapter
-	WorkDir     string
-	TaskManager *workmodel.TaskManager
+	WorkDir       string
+	TaskManager   *workmodel.TaskManager
+	FlowHub       contracts.ExecutionFlowHub
+	SessionQueue  *sessionqueue.SessionQueue
 }
 
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
@@ -157,15 +161,16 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		gw.SetAgentFactory(factory)
 	}
 
-	if opt.ExecutionFlow {
-		bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
+	var flowHub contracts.ExecutionFlowHub
+	var sessionQ *sessionqueue.SessionQueue
+	if opt.ExecutionFlow || opt.Delegate {
+		flowHub, sessionQ = bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	}
 	if opt.Delegate {
 		maCfg := config.DefaultMultiAgentConfig()
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
-			hub := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, hub, tm)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, flowHub, tm)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}
@@ -194,13 +199,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	return &D7TestStack{
-		Obs:        obs,
-		ObsBridge:  obsBridge,
-		Gateway:    gw,
-		Handler:    handler,
-		Engine:     engine,
-		LLMStub:    stub,
-		WorkDir:    workDir,
-		TaskManager: tm,
+		Obs:          obs,
+		ObsBridge:    obsBridge,
+		Gateway:      gw,
+		Handler:      handler,
+		Engine:       engine,
+		LLMStub:      stub,
+		WorkDir:      workDir,
+		TaskManager:  tm,
+		FlowHub:      flowHub,
+		SessionQueue: sessionQ,
 	}
 }

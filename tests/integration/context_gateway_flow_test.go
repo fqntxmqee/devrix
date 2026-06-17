@@ -37,7 +37,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 		Config:     ctxCfg,
 	})
 
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg, nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 
 	session, err := gw.CreateSession("cli", "/tmp")
@@ -85,7 +85,7 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 		Config: ctxCfg,
 	})
 
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg, nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 	session, _ := gw.CreateSession("cli", "/tmp")
 

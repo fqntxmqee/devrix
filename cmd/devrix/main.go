@@ -274,7 +274,7 @@ func main() {
 
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 
-	hub := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
+	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
 		// DM-20260617-008 W4: shared TaskManager (see tm construction above).
 		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry(), hub, tm)

@@ -25,7 +25,7 @@ func TestGateway_should_track_active_sessions_via_session_bridge(t *testing.T) {
 		t.Fatalf("observability: %v", err)
 	}
 
-	gw := capture.NewCommunicationGateway(store, nil, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, nil, nil, config.DefaultConfig(), nil)
 	gw.SetObservability(obs)
 
 	session, err := gw.CreateSession("feishu_chat", "/tmp")

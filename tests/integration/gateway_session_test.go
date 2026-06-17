@@ -29,6 +29,7 @@ func TestIntegration_CLIToGatewayToSession(t *testing.T) {
 		eventHandler,
 		nil,
 		cfg,
+		nil,
 	)
 
 	session, err := gw.CreateSession("cli", "/tmp")
@@ -85,7 +86,7 @@ func TestIntegration_SessionExpiration(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Session.IdleTimeout = 2 * time.Second
 
-	gw := capture.NewCommunicationGateway(store, nil, nil, cfg)
+	gw := capture.NewCommunicationGateway(store, nil, nil, cfg, nil)
 	testutil.WireGatewayOrchestration(gw, resumeEngine{})
 
 	session, err := gw.CreateSession("cli", "/tmp")

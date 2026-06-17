@@ -33,6 +33,12 @@ func InitOrchestration(
 	coordCfg := config.DefaultCoordinatorConfig()
 	tasksCfg := config.DefaultTasksConfig()
 	if configFile != "" {
+		if fileCfg, err := config.LoadConfigFile(configFile); err == nil {
+			coordCfg = config.BuildCoordinatorConfig(&fileCfg.Coordinator)
+			if fileCfg.ContextEngine.Tasks.Mode != "" || fileCfg.ContextEngine.Tasks.StoreDir != "" {
+				tasksCfg = fileCfg.ContextEngine.Tasks
+			}
+		}
 		if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
 			tasksCfg = ctxFileCfg.Tasks
 		}

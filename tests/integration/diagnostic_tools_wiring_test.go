@@ -197,9 +197,6 @@ func TestIntegration_A3_TranscriptOnSessionClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
-	prevW := transcript.GlobalWriter()
-	transcript.SetGlobalWriter(tw)
-	t.Cleanup(func() { transcript.SetGlobalWriter(prevW) })
 
 	store, err := capture.NewFileSessionStore(filepath.Join(tmp, "sessions"))
 	if err != nil {
@@ -209,7 +206,7 @@ func TestIntegration_A3_TranscriptOnSessionClose(t *testing.T) {
 	if err := store.Create(sess); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, tw)
 	if err := gw.ExpireSession("sess-int-3"); err != nil {
 		t.Fatalf("ExpireSession: %v", err)
 	}
