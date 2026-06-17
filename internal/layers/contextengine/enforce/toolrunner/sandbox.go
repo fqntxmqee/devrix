@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 const sandboxPolicyHint = "This is a sandbox policy (not permission/YOLO); use relative paths under WorkDir or read_file/glob/list_dir for files."
@@ -94,7 +96,12 @@ func (p *CommandPolicy) Validate(command string) error {
 	// G2 AST 前置：先经 mvdan.cc/sh 解析
 	if p.ASTAnalyzer != nil {
 		if allow, reason := p.ASTAnalyzer.Analyze(command); !allow {
-			return fmt.Errorf("sandbox: ast block: %s. %s", reason, sandboxPolicyHint)
+			// DM-20260617-002 W2 (AC8): 截短错误栈到 5 帧，
+			// 让 sandbox 拒绝错误进入 IM 通知时噪声可控。
+			return sharederrors.WithShortStack(
+				fmt.Errorf("sandbox: ast block: %s. %s", reason, sandboxPolicyHint),
+				5,
+			)
 		}
 	}
 
@@ -107,7 +114,11 @@ func (p *CommandPolicy) Validate(command string) error {
 	scrubbed := scrubBenignDevNullRedirects(command)
 	for _, pattern := range p.DenyPatterns {
 		if pattern.MatchString(scrubbed) {
-			return fmt.Errorf("sandbox: dangerous command pattern detected: %s. %s", pattern.String(), sandboxPolicyHint)
+			// DM-20260617-002 W2 (AC8): 同上，dangerous pattern 错误也加短栈。
+			return sharederrors.WithShortStack(
+				fmt.Errorf("sandbox: dangerous command pattern detected: %s. %s", pattern.String(), sandboxPolicyHint),
+				5,
+			)
 		}
 	}
 
