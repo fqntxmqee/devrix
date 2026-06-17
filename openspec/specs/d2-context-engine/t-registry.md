@@ -44,6 +44,8 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S3-A01-T04 | LongTerm Store 持久化写入 | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
 | D2-S3-A01-T05 | L3 长期记忆返回 NotImplemented | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
 | D2-S3-A01-T06 | 快照使用 snappy 压缩体积显著缩减 | Memory | `internal/layers/contextengine/persist/snapshot/store_test.go` | IMPLEMENTED |
+| **D2-S3-A02-T01** | **ContextEngine.AppendAndTrimMessages 写入 D2 内存并按 budget 裁剪（DM-20260617-003 D7 turn bridge）** | **Memory** | **`internal/layers/contextengine/engine_persist_bridge_test.go::Test{AppendAndTrimMessages_EmptyMessages,FreshSession,ExistingSession,TrimTriggered,RaceSafety}`** | **IMPLEMENTED** | **P0** |
+| **D2-S3-A02-T02** | **AppendAndTrimMessages lazy-init 不存在的 sid** | **Memory** | **`internal/layers/contextengine/engine_persist_bridge_test.go::TestAppendAndTrimMessages_FreshSession`** | **IMPLEMENTED** | **P0** |
 
 ## D2-S2: Compression Module
 
@@ -202,4 +204,4 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 60 | 59 | 1 | 18 |
+| 62 | 62 | 0 | 20 |

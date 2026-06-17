@@ -6,6 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
@@ -62,7 +63,7 @@ func WireDelegate(
 		Leader:     gatewayLeaderResolver{gw: gw},
 	})
 
-	if reg, ok := toolReg.(*contextengine.ToolRegistry); ok {
+	if reg, ok := toolReg.(*toolrunner.ToolRegistry); ok {
 		if err := delegatetools.RegisterTools(reg, maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)
 		}

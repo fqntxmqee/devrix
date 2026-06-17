@@ -35,6 +35,39 @@ func (e *ContextEngine) ExportSessionSnapshot(sessionID string) ([]byte, error) 
 	return e.memory.PersistSnapshot(sc)
 }
 
+// AppendAndTrimMessages writes a batch of messages into the session context's
+// Messages and then trims to the configured token budget. Used by D7 turn
+// orchestrator's SessionPersister.PersistTurn to commit a turn's transcript
+// back into D2 memory so the next Prepare call can read it back.
+//
+// DM-20260617-003 (devrix-d7-turn-history-persist): bridges D7 turn bridge to
+// D2 Memory. Lazily initializes the session if it does not yet exist (D7 path
+// first-write scenario).
+func (e *ContextEngine) AppendAndTrimMessages(sessionID string, msgs []types.Message) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	sc, ok := e.memory.Get(sessionID)
+	if !ok || sc == nil {
+		stub := &types.Session{SessionID: sessionID}
+		var initOK bool
+		sc, initOK = e.loadOrInitSession(context.Background(), stub, noopEmit)
+		if !initOK || sc == nil {
+			return fmt.Errorf("append+trim: cannot init session %s", sessionID)
+		}
+	}
+	for i := range msgs {
+		e.memory.AppendFullMessage(sc, msgs[i])
+	}
+	e.memory.TrimMessages(sc)
+	return nil
+}
+
+// noopEmit is used by AppendAndTrimMessages when calling loadOrInitSession
+// (which may invoke emit on snapshot corruption). We discard events silently
+// because the D7 turn persist path does not own the engine event channel.
+func noopEmit(*contracts.EngineEvent) {}
+
 // Shutdown waits for background autocompact work to finish.
 func (e *ContextEngine) Shutdown(timeout time.Duration) error {
 	if e.asyncCompact == nil {
