@@ -1,7 +1,7 @@
 change_id: devrix-diagnostic-tools-wiring
 priority: P0
 demand_id: DM-20260617-002
-status: s2_design
+status: s7_archived
 domains: [D1, D2, D3, D4, D5, D6, tool-security]
 dsaft_scenarios:
   - D1-S2               # A3 Transcript 持久化场景

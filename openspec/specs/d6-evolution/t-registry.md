@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec Reference:** `openspec/specs/d6-evolution/spec.md`
-**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Verifier
+**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Verifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — G4 verify_plan_execution LLM tool
 
 ---
 

@@ -5,7 +5,7 @@
 **Version:** 3.1.1
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier
+**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring
 **Companion Docs:** `a-registry.md` · `f-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---

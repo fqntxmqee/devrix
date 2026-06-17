@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-diagnostic-tools-wiring
 **Demand ID:** DM-20260617-002
-**Status:** S2_Design
+**Status:** S7_Archived (PR #60 merged 2026-06-17)
 **关联 upstream:** DM-20260616-003 (devrix-diagnostic-tools-parity, ACCEPTED 2026-06-17)
 
 ---
