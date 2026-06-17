@@ -162,7 +162,7 @@ func NewContextEngine(
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).
 		Surfaces: surfaces,
 		Filters:  nil,

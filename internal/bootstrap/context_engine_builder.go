@@ -213,7 +213,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		Surfaces:            surfaces,
 		Filters:             DefaultFilters(),
 	})
