@@ -5,6 +5,7 @@
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
+**Change:** devrix-diagnostic-tools-parity (DM-20260616-003) — LSP Tool + Bash AST + Window Analyzer
 
 ---
 

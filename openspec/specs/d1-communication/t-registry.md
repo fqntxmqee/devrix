@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19
 
 ---
 

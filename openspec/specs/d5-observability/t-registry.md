@@ -4,7 +4,7 @@
 **Version:** 3.0.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）
+**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Tracker + Doctor + Debug Filter + Fault Inject
 
 ---
 

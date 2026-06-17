@@ -3,7 +3,7 @@
 **Status:** Active
 **Version:** 3.0.0
 **Last Updated:** 2026-06-14
-**Change ID:** devrix-d4-sa-refine
+**Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
