@@ -160,7 +160,8 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		maCfg := config.DefaultMultiAgentConfig()
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg)
+			hub := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, hub)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}

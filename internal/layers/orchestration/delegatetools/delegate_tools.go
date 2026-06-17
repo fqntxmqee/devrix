@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -156,7 +155,7 @@ func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*toolr
 	if sc == nil {
 		return &toolrunner.ToolResult{Error: "delegate_status: session context unavailable"}, nil
 	}
-	snap := flow.GlobalHub.Snapshot(sc.SessionID)
+	snap := globalDeps.Dispatcher.Hub().Snapshot(sc.SessionID)
 	data, err := json.Marshal(snap)
 	if err != nil {
 		return &toolrunner.ToolResult{Error: err.Error()}, nil

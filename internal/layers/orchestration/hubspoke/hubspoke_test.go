@@ -244,7 +244,7 @@ func TestNewDispatcher(t *testing.T) {
 		config.DelegateConfig{Enabled: true},
 		nil, // executor
 		nil, // subQuery
-		nil, // hub → defaults to flow.GlobalHub
+		nil, // hub → defaults to NoOp (flow.GlobalHub removed DM-20260617-008 W2)
 		nil, // leaderRes
 	)
 	if d == nil {

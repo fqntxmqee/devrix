@@ -13,15 +13,22 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// WireExecutionFlow configures the global ExecutionFlowHub (Hub-Spoke v2).
-func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *capture.CommunicationGateway, obsBridge *observability.Bridge) {
+// WireExecutionFlow constructs the ExecutionFlowHub and returns it.
+//
+// DM-20260617-008 W2: returns the hub to the caller instead of writing it
+// to flow.GlobalHub (the process-wide global has been removed). Callers
+// pass the hub to downstream wiring (e.g. WireDelegate).
+func WireExecutionFlow(
+	ctxCfg *config.ContextEngineConfig,
+	gw *capture.CommunicationGateway,
+	obsBridge *observability.Bridge,
+) contracts.ExecutionFlowHub {
 	if ctxCfg == nil {
-		return
+		return contracts.NoOpExecutionFlowHub{}
 	}
 	cfg := config.NormalizeExecutionFlowConfig(ctxCfg.ExecutionFlow)
 	if !cfg.Enabled {
-		flow.SetGlobalHub(nil)
-		return
+		return contracts.NoOpExecutionFlowHub{}
 	}
 	var im flow.IMSink
 	if cfg.IMProgress && gw != nil {
@@ -29,15 +36,15 @@ func WireExecutionFlow(ctxCfg *config.ContextEngineConfig, gw *capture.Communica
 	}
 	hub := flow.NewHub(flow.HubDeps{
 		Config: cfg,
-		Queue:  sessionqueue.GlobalSessionQueue,
-		Tasks:  workmodel.GlobalTaskManager,
+		Queue:  sessionqueue.NewSessionQueue(),
+		Tasks:  workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge),
 		IM:     im,
 	})
-	flow.SetGlobalHub(hub)
 	slog.Info("execution flow hub enabled",
 		"link_tasks", cfg.LinkTasks,
 		"im_progress", cfg.IMProgress,
 	)
+	return hub
 }
 
 type gatewayEngineSink struct {
