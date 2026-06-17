@@ -69,6 +69,7 @@
 | **DM-20260614-020** | **D7 Turn 编排上移 — D7 直调 D3，D2 Thin 上下文面** | **devrix-d7-turn-orchestration** | **2026-06-15** | **—** | **ACCEPTED (v2.0 Structure; Phase D 6 slices; D7→D3 LLM 直达; TurnOrchestrator 状态机; D2→D3 import lint; 全量测试通过)** |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-15 | — | ACCEPTED (Phase 3 Wave 对接完整) |
 | **DM-20260617-001** | **D2 QueryLoop 退役标记 — 3 信号 deprecation 契约（metric + warn + spec）** | **devrix-queryloop-legacy-decommission** | **2026-06-17** | **[#54](https://github.com/fqntxmqee/devrix/pull/54)** | **ACCEPTED (Z0: 不删代码；Z1/Z2 由 metric 阈值触发)** |
+| **DM-20260617-002** | **诊断工具 wiring 闭环 — 13 项能力 E2E 可达 (G1-G6+A1-A7)** | **devrix-diagnostic-tools-wiring** | **2026-06-17** | **[#60](https://github.com/fqntxmqee/devrix/pull/60)** | **ACCEPTED (W1-W14 + H-1/H-2/H-3 fix; 60+ 单测 + 9 集成测试全绿; 可触达 1/13→13/13)** |
 | **DM-20260615-001** | **D5 Observability S/A 重切 — 技术模块→价值流化** | **devrix-d5-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；4+1 价值流 S21–S24)** |
 | **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |

@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
-**Change:** devrix-diagnostic-tools-parity (DM-20260616-003) — LSP Tool + Bash AST + Window Analyzer
+**Change:** devrix-diagnostic-tools-parity (DM-20260616-003) — LSP Tool + Bash AST + Window Analyzer / devrix-diagnostic-tools-wiring (DM-20260617-002) — D2 Thin DI + G1/G2 wiring + /context analyze CLI
 
 ---
 
