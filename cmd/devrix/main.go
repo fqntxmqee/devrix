@@ -12,6 +12,8 @@ import (
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
+	contextanalyze "github.com/devrix/devrix/internal/cli/context_analyze"
+	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/channel/connection"
@@ -33,9 +35,17 @@ import (
 )
 
 func main() {
+	// DM-20260617-002 W5 (AC12): 在最早时机解析 --debug flag 并安装 filter，
+	// 这样后续所有 slog 调用都受 categories 白名单过滤。
+	debugCategories := bootstrap.ParseDebugFlag(os.Args[1:])
+
 	// Go 1.26: replace default slog handler before any log call to avoid
 	// circular log→slog→log deadlock in the runtime default handler.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	if len(debugCategories) > 0 {
+		bootstrap.InstallDebugFilter(debugCategories)
+	}
 
 	if len(os.Args) >= 2 && os.Args[1] == "debug" {
 		if err := clidebug.Run(os.Args[2:]); err != nil {
@@ -48,6 +58,24 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "eval" {
 		if err := evalcli.Run(os.Args[2:]); err != nil {
 			slog.Error("eval command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-002 W9 (AC1): /doctor 自检 CLI 子命令, 不需要 LLM / obs 栈。
+	if len(os.Args) >= 2 && os.Args[1] == "doctor" {
+		if err := doctorcli.Run(os.Args[2:]); err != nil {
+			slog.Error("doctor command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-002 W10 (AC2): /context analyze CLI 子命令, 不需要 LLM / obs 栈。
+	if len(os.Args) >= 2 && (os.Args[1] == "context-analyze" || os.Args[1] == "context_analyze") {
+		if err := contextanalyze.Run(os.Args[2:]); err != nil {
+			slog.Error("context-analyze command failed", "error", err)
 			os.Exit(1)
 		}
 		return
@@ -170,13 +198,19 @@ func main() {
 		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
 	}
 
+	// DM-20260617-002 S4-Gate H-1 fix: ctx 提前到 engine builder 之前, 让
+	// startTrackerTick 等后台 goroutine 能在 shutdown 时干净退出 (cancel 传播)。
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg)
 	gw.SetObservability(obs)
 
 	var agentFactory multiagent.IAgentFactory
 	if multiAgentCfg.Enabled {
 		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
-			WithMultiAgentConfig(multiAgentCfg)
+			WithMultiAgentConfig(multiAgentCfg).
+			WithContext(ctx)
 		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
@@ -197,9 +231,6 @@ func main() {
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
 		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry())
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 

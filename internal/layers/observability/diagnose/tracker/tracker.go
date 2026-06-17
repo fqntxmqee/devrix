@@ -46,6 +46,10 @@ type Diagnostic struct {
 // LinterFunc 对单个文件运行 linter 并返回 diagnostic 列表。
 type LinterFunc func(ctx context.Context, file string) ([]Diagnostic, error)
 
+// RecentBufferSize — 累积最近 N 个 diagnostic 用于 query_diagnostics LLM tool。
+// D5-S23-A02 (W8) 引入, 与 DefaultCapacity 独立。
+const RecentBufferSize = 256
+
 // Tracker 维护"编辑前 → 编辑后"linter 状态对比。
 type Tracker struct {
 	mu      sync.Mutex
@@ -58,6 +62,14 @@ type Tracker struct {
 
 	// 缺省 linter（无匹配时使用）
 	defaultLinter LinterFunc
+
+	// W8: 周期 tick 要扫描的文件集合。
+	watchedMu sync.Mutex
+	watched   map[string]struct{}
+
+	// W8: 累积最近 N 个 diagnostic (按时间序,FIFO 截断)。
+	recentMu sync.Mutex
+	recent   []Diagnostic
 }
 
 // New 构造 tracker，cap 传 0 用 DefaultCapacity。
@@ -70,6 +82,8 @@ func New(cap int) *Tracker {
 		lru:     list.New(),
 		by:      make(map[string]*list.Element),
 		linters: make(map[string]LinterFunc),
+		watched: make(map[string]struct{}),
+		recent:  make([]Diagnostic, 0, RecentBufferSize),
 	}
 	// 内置默认 linter
 	t.linters[".go"] = goVetLinter
@@ -128,6 +142,100 @@ func (t *Tracker) Diff(ctx context.Context, file string) ([]Diagnostic, error) {
 		}
 	}
 	return added, nil
+}
+
+// === W8 (D5-S23-A02) watched set + tick + recent 累积 ===
+
+// WatchFile 把文件加入 tick 周期扫描集合。重复加入是 no-op。
+func (t *Tracker) WatchFile(file string) {
+	if file == "" {
+		return
+	}
+	t.watchedMu.Lock()
+	defer t.watchedMu.Unlock()
+	if t.watched == nil {
+		t.watched = make(map[string]struct{})
+	}
+	t.watched[file] = struct{}{}
+}
+
+// UnwatchFile 从 tick 集合中移除文件。
+func (t *Tracker) UnwatchFile(file string) {
+	t.watchedMu.Lock()
+	defer t.watchedMu.Unlock()
+	delete(t.watched, file)
+}
+
+// WatchedFiles 快照当前 tick 集合（线程安全）。
+func (t *Tracker) WatchedFiles() []string {
+	t.watchedMu.Lock()
+	defer t.watchedMu.Unlock()
+	out := make([]string, 0, len(t.watched))
+	for f := range t.watched {
+		out = append(out, f)
+	}
+	return out
+}
+
+// TickOnce 对 watched 集合中每个文件调 Diff,把新增 diagnostic 累积到 recent ring buffer。
+// 返回本次 tick 累积的 diagnostic 数量。
+func (t *Tracker) TickOnce(ctx context.Context) int {
+	files := t.WatchedFiles()
+	if len(files) == 0 {
+		return 0
+	}
+	added := 0
+	for _, f := range files {
+		diags, err := t.Diff(ctx, f)
+		if err != nil || len(diags) == 0 {
+			continue
+		}
+		t.appendRecent(diags)
+		added += len(diags)
+	}
+	return added
+}
+
+// Recent 返回最近累积的 diagnostic 副本（按追加顺序,最多 RecentBufferSize 条）。
+func (t *Tracker) Recent() []Diagnostic {
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	out := make([]Diagnostic, len(t.recent))
+	copy(out, t.recent)
+	return out
+}
+
+// RecentCount 返回当前 recent buffer 中的 diagnostic 数量。
+func (t *Tracker) RecentCount() int {
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	return len(t.recent)
+}
+
+// ClearRecent 清空 recent buffer。
+func (t *Tracker) ClearRecent() {
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	t.recent = t.recent[:0]
+}
+
+// RecordDiags 把外部 diagnostic（如 snapshot baseline 注入）追加到 recent。
+// 供 bootstrap 阶段在文件编辑前先 RecordDiags 作为 "已存在" 集合的对比基线外提示。
+func (t *Tracker) RecordDiags(diags []Diagnostic) {
+	if len(diags) == 0 {
+		return
+	}
+	t.appendRecent(diags)
+}
+
+func (t *Tracker) appendRecent(diags []Diagnostic) {
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	t.recent = append(t.recent, diags...)
+	if len(t.recent) > RecentBufferSize {
+		// FIFO 截断:丢弃最老的。
+		t.recent = t.recent[len(t.recent)-RecentBufferSize:]
+	}
 }
 
 // Flush 清空所有快照（重启 / 新会话）。
