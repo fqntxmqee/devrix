@@ -7,7 +7,13 @@
 
 ---
 
-## W1 — 共享错误栈截断（A7）
+> **能力别名前缀 (Capability Aliases)**
+>
+> 本 change 遵循 DSAFT 域-场景-活动-功能-任务五层命名作为权威 ID。G1-G6 / A1-A7 是 S2 阶段为方便对照 `docs/reference/clawcode-diagnostic-tools-analysis.md` 而保留的需求侧别名前缀。W{N} 任务行项沿用 capability-DSAFT Activity 双标（`DSAFT Activity (alias Gx/Ax)`）。
+
+---
+
+## W1 — D2-S6-A02 共享错误栈截断 (alias A7)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -15,7 +21,7 @@
 | W1.2 | 过滤 runtime/testing/reflect 噪声 | `internal/shared/errors/shortstack.go` | done |
 | W1.3 | 单元测试（深度 ≥ 3、并发安全、nil-safe） | `internal/shared/errors/shortstack_test.go` | done |
 
-## W2 — LLM 错误分类（A6）
+## W2 — D3-S3-A02 LLM 错误分类 (alias A6)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -25,7 +31,7 @@
 | W2.4 | 20+ 内置 regex 规则（rate_limit / quota / auth / network / stream_error 等） | `internal/layers/llmgateway/protect/errorclass/classifier.go` | done |
 | W2.5 | 单元测试（每个 Class 至少一个 case） | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | done |
 
-## W3 — LSP 代码智能工具（G1）
+## W3 — D2-S4-A01 LSP 代码智能工具 (alias G1)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -40,7 +46,7 @@
 | W3.9 | `RegisterLSPTool` bootstrap 入口（默认 disabled） | `internal/layers/contextengine/enforce/toolrunner/lsp_register.go` | done |
 | W3.10 | 接入 `context_engine_builder.go` 工具注册流程 | `internal/bootstrap/context_engine_builder.go` | done |
 
-## W4 — Bash AST 安全分析器（G2）
+## W4 — TOOL-SEC-2-A02 Bash AST 安全分析器 (alias G2)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -53,7 +59,7 @@
 | W4.7 | `CommandPolicy.ASTAnalyzer` 字段 + `Validate()` 前置调用 | `internal/layers/contextengine/enforce/toolrunner/sandbox.go` | done |
 | W4.8 | 单元测试(heredoc_injection / zsh_attack / command_subst / process_subst / dangerous_redirect / eval_call / nested_escape / compound) | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | done |
 
-## W5 — 后台任务完成通知总线（G3）
+## W5 — D4-S12-A03 后台任务完成通知总线 (alias G3)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -64,7 +70,7 @@
 | W5.5 | `TaskManager.UpdateStatus` 进入终态时 `go publishCompletion` 钩子 | `internal/layers/orchestration/workmodel/task_manager.go` | done |
 | W5.6 | 单元测试(Publish/Drain/Subscribe/channel 满溢出/session 隔离/concurrent) | `internal/layers/orchestration/workmodel/notify/bus_test.go` | done |
 
-## W6 — 实现后自动验证（G4）
+## W6 — D6-S11-A02 实现后自动验证 (alias G4)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -74,17 +80,17 @@
 | W6.4 | `FormatJSON` 报告序列化 | `internal/layers/evolution/verify/plan.go` | done |
 | W6.5 | 单元测试(行解析 / 缺文件 / 测试函数缺失 / ctx 取消) | `internal/layers/evolution/verify/plan_test.go` | done |
 
-## W7 — 自由分叉子代理（G5）
+## W7 — D4-S11-A02 + D4-S13-A02 自由分叉子代理 (alias G5)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
 | W7.1 | `ForkRequest` / `Handle` / `Forker` interface | `internal/layers/multiagent/provision/freefork/forker.go` | done |
-| W7.2 | `DefaultForker.Fork`:批量 + 并行 + worktree 隔离 | `internal/layers/multiagent/provision/freefork/forker.go` | done |
+| W7.2 | `DefaultForker.Fork`:批量 + 并行 + worktree 隔离 (D4-S13-A02) | `internal/layers/multiagent/provision/freefork/forker.go` | done |
 | W7.3 | 失败回滚(已启动子 agent Terminate + worktree Exit) | `internal/layers/multiagent/provision/freefork/forker.go` | done |
 | W7.4 | `slugify` 规整 Name → worktree slug | `internal/layers/multiagent/provision/freefork/forker.go` | done |
 | W7.5 | 单元测试(批量 / 失败回滚 / prompt 传递 / slug) | `internal/layers/multiagent/provision/freefork/forker_test.go` | done |
 
-## W8 — /doctor 自检命令（A1）
+## W8 — D5-S23-A03 /doctor 自检命令 (alias A1)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -93,7 +99,7 @@
 | W8.3 | `FormatJSON` / `FormatTable` / `Summary` 渲染 | `internal/layers/observability/diagnose/doctor/doctor.go` | done |
 | W8.4 | 单元测试(7 项 check / 状态聚合 / JSON 序列化) | `internal/layers/observability/diagnose/doctor/doctor_test.go` | done |
 
-## W9 — Debug 日志分类过滤（A2）
+## W9 — D5-S24-A02 Debug 日志分类过滤 (alias A2)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -101,7 +107,7 @@
 | W9.2 | `WithPassthroughNonDebug` 切换非 debug 级别放行(默认 true) | `internal/layers/observability/instrument/logger/debugfilter/filter.go` | done |
 | W9.3 | 单元测试(categories 过滤 / 非 debug 放行 / 未知 Component 拦截 / nil-safe) | `internal/layers/observability/instrument/logger/debugfilter/filter_test.go` | done |
 
-## W10 — 会话转录持久化（A3）
+## W10 — D1-S2-A02 会话转录持久化 (alias A3)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -113,7 +119,7 @@
 | W10.6 | `GlobalWriter` 进程级单例 + `Append` 快捷方法 | `internal/layers/communication/capture/transcript/wire.go` | done |
 | W10.7 | 单元测试(追加 / 读回 / 并发 / 路径遍历) | `internal/layers/communication/capture/transcript/writer_test.go` | done |
 
-## W11 — 故障注入（A4）
+## W11 — D5-S23-A04 故障注入 (alias A4)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -124,7 +130,7 @@
 | W11.5 | 生产 no-op stub(`!testbuild` tag) | `internal/layers/observability/diagnose/faultinject/injector_prod.go` | done |
 | W11.6 | 单元测试(env 解析 / once / reset / AddRule / latency / nil-safe) | `internal/layers/observability/diagnose/faultinject/injector_test.go` | done |
 
-## W12 — 上下文窗口分析（A5）
+## W12 — D2-S6-A03 上下文窗口分析 (alias A5)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -134,7 +140,7 @@
 | W12.4 | `FormatTable` ASCII 进度条 | `internal/layers/contextengine/token/windowanalyzer/analyzer.go` | done |
 | W12.5 | 单元测试(各 category 计数 / role 路由 / thinking/reminder 标记) | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | done |
 
-## W13 — 诊断跟踪器（G6,前序已实现）
+## W13 — D5-S23-A02 诊断跟踪器 (alias G6,前序已实现)
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
@@ -147,13 +153,13 @@
 
 | ID | 任务 | File | Status |
 |----|------|------|--------|
-| W14.1 | 在 `d1/spec.md` 加 transcript Gherkin scenario | `openspec/specs/d1-communication/spec.md` | pending |
-| W14.2 | 在 `d2/spec.md` 加 LSP / windowanalyzer scenarios | `openspec/specs/d2-context-engine/spec.md` | pending |
-| W14.3 | 在 `d3/spec.md` 加 ErrorClassifier scenarios | `openspec/specs/d3-llm-gateway/spec.md` | pending |
-| W14.4 | 在 `d4/spec.md` 加 Free Fork / Task Notify scenarios | `openspec/specs/d4-multi-agent/spec.md` | pending |
-| W14.5 | 在 `d5/spec.md` 加 Diagnostic Tracker / doctor / debugfilter / fault inject scenarios | `openspec/specs/d5-observability/spec.md` | pending |
-| W14.6 | 在 `d6/spec.md` 加 Verifier scenarios | `openspec/specs/d6-evolution/spec.md` | pending |
-| W14.7 | 在 `tool-security/spec.md` 加 Bash AST scenarios | `openspec/specs/tool-security/spec.md` | pending |
+| W14.1 | 在 `d1/spec.md` 加 transcript (D1-S2-A02) Gherkin scenario | `openspec/specs/d1-communication/spec.md` | pending |
+| W14.2 | 在 `d2/spec.md` 加 LSP (D2-S4-A01) / windowanalyzer (D2-S6-A03) scenarios | `openspec/specs/d2-context-engine/spec.md` | pending |
+| W14.3 | 在 `d3/spec.md` 加 ErrorClassifier (D3-S3-A02) scenarios | `openspec/specs/d3-llm-gateway/spec.md` | pending |
+| W14.4 | 在 `d4/spec.md` 加 Free Fork (D4-S11-A02) / Task Notify (D4-S12-A03) scenarios | `openspec/specs/d4-multi-agent/spec.md` | pending |
+| W14.5 | 在 `d5/spec.md` 加 Diagnostic Tracker (D5-S23-A02) / doctor (D5-S23-A03) / debugfilter (D5-S24-A02) / fault inject (D5-S23-A04) scenarios | `openspec/specs/d5-observability/spec.md` | pending |
+| W14.6 | 在 `d6/spec.md` 加 Verifier (D6-S11-A02) scenarios | `openspec/specs/d6-evolution/spec.md` | pending |
+| W14.7 | 在 `tool-security/spec.md` 加 Bash AST (TOOL-SEC-2-A02) scenarios | `openspec/specs/tool-security/spec.md` | pending |
 | W14.8 | 更新 7 个域的 t-registry.md | `openspec/specs/d{1..6}-*/t-registry.md` + `openspec/specs/tool-security/t-registry.md` | pending |
 
 ## W15 — Documentation
@@ -163,37 +169,38 @@
 | W15.1 | 写 `tasks.md`(本文件) | `openspec/changes/devrix-diagnostic-tools-parity/tasks.md` | done |
 | W15.2 | 写 `acceptance-report.md`(S5) | `openspec/changes/devrix-diagnostic-tools-parity/acceptance-report.md` | pending |
 | W15.3 | 归档 change directory(S6) | `openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/` | pending |
+| W15.4 | docs 重构 — 以 DSAFT Activity 为权威 ID,G1-G6 / A1-A7 降级为 alias | 本 archive 目录 6 个 .md | done (PR #TBD) |
 
 ---
 
 ## File Manifest
 
 ### New files
-- `internal/shared/errors/shortstack.go` + test
-- `internal/layers/llmgateway/protect/errorclass/classifier.go` + test
-- `internal/layers/observability/diagnose/tracker/tracker.go` + test
-- `internal/shared/lsp/types.go` + test
-- `internal/shared/lsp/manager.go` + test
-- `internal/layers/contextengine/enforce/toolrunner/lsp_tool.go` + test
-- `internal/layers/contextengine/enforce/toolrunner/lsp_register.go`
-- `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer.go` + test
-- `internal/layers/contextengine/enforce/toolrunner/sandboxast/policy_adapter.go`
-- `internal/layers/orchestration/workmodel/notify/bus.go` + test
-- `internal/layers/orchestration/workmodel/notify/wire.go`
-- `internal/layers/evolution/verify/plan.go` + test
-- `internal/layers/multiagent/provision/freefork/forker.go` + test
-- `internal/layers/observability/diagnose/doctor/doctor.go` + test
-- `internal/layers/observability/instrument/logger/debugfilter/filter.go` + test
-- `internal/layers/communication/capture/transcript/writer.go` + test
-- `internal/layers/communication/capture/transcript/wire.go`
-- `internal/layers/observability/diagnose/faultinject/injector.go` (testbuild)
-- `internal/layers/observability/diagnose/faultinject/injector_prod.go` (!testbuild)
-- `internal/layers/observability/diagnose/faultinject/injector_test.go` (testbuild)
-- `internal/layers/observability/diagnose/faultinject/sleep.go` (testbuild)
-- `internal/layers/contextengine/token/windowanalyzer/analyzer.go` + test
+- `internal/shared/errors/shortstack.go` + test — D2-S6-A02 (alias A7)
+- `internal/layers/llmgateway/protect/errorclass/classifier.go` + test — D3-S3-A02 (alias A6)
+- `internal/layers/observability/diagnose/tracker/tracker.go` + test — D5-S23-A02 (alias G6)
+- `internal/shared/lsp/types.go` + test — D2-S4-A01 (alias G1)
+- `internal/shared/lsp/manager.go` + test — D2-S4-A01 (alias G1)
+- `internal/layers/contextengine/enforce/toolrunner/lsp_tool.go` + test — D2-S4-A01 (alias G1)
+- `internal/layers/contextengine/enforce/toolrunner/lsp_register.go` — D2-S4-A01 (alias G1)
+- `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer.go` + test — TOOL-SEC-2-A02 (alias G2)
+- `internal/layers/contextengine/enforce/toolrunner/sandboxast/policy_adapter.go` — TOOL-SEC-2-A02 (alias G2)
+- `internal/layers/orchestration/workmodel/notify/bus.go` + test — D4-S12-A03 (alias G3)
+- `internal/layers/orchestration/workmodel/notify/wire.go` — D4-S12-A03 (alias G3)
+- `internal/layers/evolution/verify/plan.go` + test — D6-S11-A02 (alias G4)
+- `internal/layers/multiagent/provision/freefork/forker.go` + test — D4-S11-A02 + D4-S13-A02 (alias G5)
+- `internal/layers/observability/diagnose/doctor/doctor.go` + test — D5-S23-A03 (alias A1)
+- `internal/layers/observability/instrument/logger/debugfilter/filter.go` + test — D5-S24-A02 (alias A2)
+- `internal/layers/communication/capture/transcript/writer.go` + test — D1-S2-A02 (alias A3)
+- `internal/layers/communication/capture/transcript/wire.go` — D1-S2-A02 (alias A3)
+- `internal/layers/observability/diagnose/faultinject/injector.go` (testbuild) — D5-S23-A04 (alias A4)
+- `internal/layers/observability/diagnose/faultinject/injector_prod.go` (!testbuild) — D5-S23-A04 (alias A4)
+- `internal/layers/observability/diagnose/faultinject/injector_test.go` (testbuild) — D5-S23-A04 (alias A4)
+- `internal/layers/observability/diagnose/faultinject/sleep.go` (testbuild) — D5-S23-A04 (alias A4)
+- `internal/layers/contextengine/token/windowanalyzer/analyzer.go` + test — D2-S6-A03 (alias A5)
 
 ### Modified files
-- `internal/layers/contextengine/enforce/toolrunner/sandbox.go` — `ASTAnalyzer` 字段 + `Validate()` 前置调用
-- `internal/layers/orchestration/workmodel/task_manager.go` — `UpdateStatus` 进入终态时 publish notify event
-- `internal/bootstrap/context_engine_builder.go` — `toolrunner.RegisterLSPTool` 接入
+- `internal/layers/contextengine/enforce/toolrunner/sandbox.go` — TOOL-SEC-2-A02 `ASTAnalyzer` 字段 + `Validate()` 前置调用
+- `internal/layers/orchestration/workmodel/task_manager.go` — D4-S12-A03 `UpdateStatus` 进入终态时 publish notify event
+- `internal/bootstrap/context_engine_builder.go` — D2-S4-A01 `RegisterLSPTool` 接入
 - `go.mod` — 添加 `mvdan.cc/sh/v3` 依赖

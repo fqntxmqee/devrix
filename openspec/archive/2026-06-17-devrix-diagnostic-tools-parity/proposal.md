@@ -8,9 +8,32 @@
 
 ---
 
+> **能力别名前缀 (Capability Aliases)**
+>
+> 本 change 遵循 DSAFT 域-场景-活动-功能-任务五层命名作为权威 ID（详见 `openspec/specs/project/master.md` §1.2 + `docs/methodology/dsaft-methodology.md`）。G1-G6 / A1-A7 是 S2 阶段为方便对照 `docs/reference/clawcode-diagnostic-tools-analysis.md` 而保留的需求侧别名前缀。两者一一映射如下（按 DSAFT Activity 升序）：
+>
+> | DSAFT Activity | Alias | 域 | 能力 |
+> |----------------|-------|----|------|
+> | D1-S2-A02-PersistTranscript | A3 | D1 | 会话转录持久化 |
+> | D2-S4-A01-ToolRegister | G1 | D2 | LSP 代码智能工具 |
+> | D2-S6-A02-TruncateError | A7 | D2 | 共享错误栈截断 |
+> | D2-S6-A03-AnalyzeWindow | A5 | D2 | 上下文窗口分析 |
+> | D3-S3-A02-ErrorMapping | A6 | D3 | LLM 错误分类 |
+> | D4-S11-A02-ForkAgent | G5 | D4 | 自由分叉子代理 |
+> | D4-S12-A03-NotifyChild | G3 | D4 | 后台任务完成通知 |
+> | D4-S13-A02-IsolateWorktree | G5 | D4 | (G5 worktree 隔离子能力) |
+> | D5-S23-A02-TrackDiagnostics | G6 | D5 | 诊断跟踪器 |
+> | D5-S23-A03-RunDoctor | A1 | D5 | /doctor 自检命令 |
+> | D5-S23-A04-FaultInject | A4 | D5 | 故障注入 |
+> | D5-S24-A02-ConfigureDebugFilter | A2 | D5 | Debug 日志分类过滤 |
+> | D6-S11-A02-VerifyPlanExec | G4 | D6 | 实现后自动验证 |
+> | TOOL-SEC-2-A02-ShellASTPolicy | G2 | tool-security | Bash AST 安全分析器 |
+
+---
+
 ## 1. Background
 
-devrix 当前诊断工具能力与 clawcode (Claude Code v2.1.88) 存在 **6 项核心能力差距**（G1-G6）和 **7 项附加诊断特性缺口**（A1-A7）。最大差距为 LSP Tool（完全缺失）与文件诊断追踪（完全缺失）。详细背景见 `demand.md` §1，分析依据见 `docs/reference/clawcode-diagnostic-tools-analysis.md`。
+devrix 当前诊断工具能力与 clawcode (Claude Code v2.1.88) 存在 **6 项核心能力差距**（G1-G6 别名 → D2-S4/D4-S11/D4-S12/D4-S13/D5-S23/D6-S11/D2-S6 + TOOL-SEC 场景）和 **7 项附加诊断特性缺口**（A1-A7 别名 → D5-S23/D5-S24/D1-S2/D2-S6 + D3-S3）。最大差距为 LSP 代码智能工具（D2-S4-A01，完全缺失）与文件诊断追踪（D5-S23-A02，完全缺失）。详细背景见 `demand.md` §1，分析依据见 `docs/reference/clawcode-diagnostic-tools-analysis.md`。
 
 参考 devrix 历史分批模式（`devrix-observability-enhancement` → `-p1` → `-p2`），本提案采用 **umbrella + sub-change** 模式：v1.0（当前 change）产出统一规范需求，v1.1/v1.2/v1.3 三个 sub-change 分别承接 P0/P1/P2 实现。
 
@@ -18,13 +41,13 @@ devrix 当前诊断工具能力与 clawcode (Claude Code v2.1.88) 存在 **6 项
 
 | # | 问题 | 触发频次 | 用户痛感 |
 |---|------|---------|---------|
-| P1 | LLM 排错只能靠 grep + 记忆，无 IDE 级代码理解（G1） | 高频 | 改函数不知谁依赖、不知完整调用栈 |
-| P2 | 编辑文件不知是否引入新错（G6） | 高频 | 改完等 CI/build 反馈，循环时间长 |
-| P3 | 复杂 bash 命令沙箱误杀或漏判（G2） | 中频 | heredoc/zsh 攻击面覆盖不全 |
-| P4 | S4-Gate 靠人工 Review（G4） | 每次合并 | reviewer 负担重 |
-| P5 | 后台任务无完成通知（G3） | 中频 | 模型轮询浪费 token |
-| P6 | Fork 子代理受 DAG 限制（G5） | 低频 | 探索性排查需要自由分叉 |
-| P7 | 无 `/doctor`、无 debug 过滤、无上下文窗口可视化（A1/A2/A5） | 低频 | 故障定位效率低 |
+| P1 | LLM 排错只能靠 grep + 记忆，无 IDE 级代码理解（D2-S4-A01, alias G1） | 高频 | 改函数不知谁依赖、不知完整调用栈 |
+| P2 | 编辑文件不知是否引入新错（D5-S23-A02, alias G6） | 高频 | 改完等 CI/build 反馈，循环时间长 |
+| P3 | 复杂 bash 命令沙箱误杀或漏判（TOOL-SEC-2-A02, alias G2） | 中频 | heredoc/zsh 攻击面覆盖不全 |
+| P4 | S4-Gate 靠人工 Review（D6-S11-A02, alias G4） | 每次合并 | reviewer 负担重 |
+| P5 | 后台任务无完成通知（D4-S12-A03, alias G3） | 中频 | 模型轮询浪费 token |
+| P6 | Fork 子代理受 DAG 限制（D4-S11-A02, alias G5） | 低频 | 探索性排查需要自由分叉 |
+| P7 | 无 `/doctor`、无 debug 过滤、无上下文窗口可视化（D5-S23-A03 / D5-S24-A02 / D2-S6-A03, alias A1/A2/A5） | 低频 | 故障定位效率低 |
 
 ## 3. Proposed Solution
 
@@ -35,9 +58,9 @@ devrix 当前诊断工具能力与 clawcode (Claude Code v2.1.88) 存在 **6 项
 ```
 v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
    │
-   ├─ v1.1 sub-change-A (P0, G1+G6+A6+A7)
-   ├─ v1.2 sub-change-B (P1, G2+G4)
-   └─ v1.3 sub-change-C (P2, G3+G5+A1+A2+A3+A4+A5)
+   ├─ v1.1 sub-change-A (P0, D2-S4-A01 + D5-S23-A02 + D3-S3-A02 + D2-S6-A02, alias G1+G6+A6+A7)
+   ├─ v1.2 sub-change-B (P1, TOOL-SEC-2-A02 + D6-S11-A02, alias G2+G4)
+   └─ v1.3 sub-change-C (P2, D4-S12-A03 + D4-S11-A02 + D5-S23-A03 + D5-S24-A02 + D1-S2-A02 + D5-S23-A04 + D2-S6-A03, alias G3+G5+A1+A2+A3+A4+A5)
 ```
 
 > **关于 D2 QueryLoop 位置：** 用户指出 D2 QueryLoop 位置错位（DM-020 半重构遗留）。
@@ -48,25 +71,25 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 
 ### 3.2 域归属映射
 
-| 差距/特性 | 主域 | 横切域 | 备注 |
-|----------|------|--------|------|
-| G1 LSP Tool | D2 Context Engine | tool-security | 复用 ToolPool 注册 |
-| G2 Bash AST | tool-security | D5 observability | 错误分类 A6 关联 |
-| G3 后台任务通知 | D4 Multi-Agent | D1 Communication | 跨任务类型统一 |
-| G4 实现后验证 | D6 Evolution | D5 observability | 复用 D6 Eval 框架 |
-| G5 自由分叉 | D4 Multi-Agent | — | worktree 隔离默认 |
-| G6 文件诊断追踪 | D5 Observability | D2 Context Engine | 埋点在 edit_file/write_file |
-| A1 `/doctor` | D5 Observability | D1 Communication | JSON 报告 |
-| A2 debug 过滤 | D5 Observability | — | tracer/logger 子句 |
-| A3 会话转录 | D1 Communication | — | JSONL + --continue |
-| A4 故障注入 | D5 Observability | D6 Evolution | 测试 harness |
-| A5 上下文窗口 | D2 Context Engine | — | 按类别 token 分解 |
-| A6 错误分类 | D3 LLM Gateway | tool-security | 20+ sentinel error |
-| A7 堆栈截断 | tool-security | — | shared/errors helper |
+| DSAFT Activity | Alias | 主域 | 横切域 | 备注 |
+|----------------|-------|------|--------|------|
+| D2-S4-A01-ToolRegister | G1 | D2 Context Engine | tool-security | 复用 ToolPool 注册 |
+| TOOL-SEC-2-A02-ShellASTPolicy | G2 | tool-security | D5 observability | 错误分类 D3-S3-A02 关联 |
+| D4-S12-A03-NotifyChild | G3 | D4 Multi-Agent | D1 Communication | 跨任务类型统一 |
+| D6-S11-A02-VerifyPlanExec | G4 | D6 Evolution | D5 observability | 复用 D6 Eval 框架 |
+| D4-S11-A02-ForkAgent + D4-S13-A02-IsolateWorktree | G5 | D4 Multi-Agent | — | worktree 隔离默认 |
+| D5-S23-A02-TrackDiagnostics | G6 | D5 Observability | D2 Context Engine | 埋点在 edit_file/write_file |
+| D5-S23-A03-RunDoctor | A1 | D5 Observability | D1 Communication | JSON 报告 |
+| D5-S24-A02-ConfigureDebugFilter | A2 | D5 Observability | — | tracer/logger 子句 |
+| D1-S2-A02-PersistTranscript | A3 | D1 Communication | — | JSONL + --continue |
+| D5-S23-A04-FaultInject | A4 | D5 Observability | D6 Evolution | 测试 harness |
+| D2-S6-A03-AnalyzeWindow | A5 | D2 Context Engine | — | 按类别 token 分解 |
+| D3-S3-A02-ErrorMapping | A6 | D3 LLM Gateway | tool-security | 20+ sentinel error |
+| D2-S6-A02-TruncateError | A7 | tool-security | — | shared/errors helper |
 
 ### 3.3 v1.1 sub-change-A 范围草案（P0）
 
-**主题:** LSP Tool (3 ops) + 文件诊断追踪 + 错误分类接入 + 堆栈截断
+**主题:** LSP 代码智能工具 (D2-S4-A01) + 文件诊断追踪 (D5-S23-A02) + 错误分类接入 (D3-S3-A02) + 堆栈截断 (D2-S6-A02)
 
 - `internal/layers/contextengine/tool/lsp/` — gopls/tsserver adapter (P0 ops: goToDefinition / findReferences / incomingCalls)
 - `internal/layers/observability/diagnose/tracker/` — 500 文件 LRU + edit_file/write_file 埋点
@@ -85,7 +108,7 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 
 ### 3.4 v1.2 sub-change-B 范围草案（P1）
 
-**主题:** Bash AST 安全 + 实现后自动验证
+**主题:** Bash AST 安全 (TOOL-SEC-2-A02) + 实现后自动验证 (D6-S11-A02)
 
 - tool-security 引入 `mvdan.cc/sh` AST 解析
 - heredoc 内容单独审计
@@ -95,7 +118,7 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 
 ### 3.5 v1.3 sub-change-C 范围草案（P2）
 
-**主题:** 后台任务通知 + 自由分叉 + 7 项附加诊断特性
+**主题:** 后台任务通知 (D4-S12-A03) + 自由分叉 (D4-S11-A02 + D4-S13-A02) + 7 项附加诊断特性
 
 - D4 fork/freefork：脱离 DAG 即兴分叉 + worktree 隔离 + SendMessage channel
 - D4 RunAgentLoop：后台任务完成事件推送
@@ -133,9 +156,9 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 
 | Sub-change | DM ID | 分支 | 优先级 |
 |------------|-------|------|--------|
-| v1.1 sub-A (LSP Tool + File Tracker + Errors + Stack) | DM-20260617-NN1 | `feat/devrix-diagnostic-tools-A` | P0 |
-| v1.2 sub-B (Bash AST + Verify Gate) | DM-20260617-NN2 | `feat/devrix-diagnostic-tools-B` | P1 |
-| v1.3 sub-C (Notifications + Freefork + 7 add-ons) | DM-20260617-NN3 | `feat/devrix-diagnostic-tools-C` | P2 |
+| v1.1 sub-A (D2-S4-A01 + D5-S23-A02 + D3-S3-A02 + D2-S6-A02, alias G1+G6+A6+A7) | DM-20260617-NN1 | `feat/devrix-diagnostic-tools-A` | P0 |
+| v1.2 sub-B (TOOL-SEC-2-A02 + D6-S11-A02, alias G2+G4) | DM-20260617-NN2 | `feat/devrix-diagnostic-tools-B` | P1 |
+| v1.3 sub-C (D4-S12-A03 + D4-S11-A02 + 7 add-ons, alias G3+G5+A1+A2+A3+A4+A5) | DM-20260617-NN3 | `feat/devrix-diagnostic-tools-C` | P2 |
 
 > **D2 QueryLoop 债务** 已独立为 `devrix-queryloop-legacy-decommission` (DM-20260617-NN0)，见 `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC)。本 change 不混合处理。
 
@@ -151,7 +174,7 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 | LSP server 进程数失控 | OOM | 单 workspace ≤4 server + LRU 淘汰 |
 | 文件诊断 linter 阻塞编辑 | 延迟 5s→60s | 异步化 OnEditComplete，编辑主路径不阻塞 |
 | Tree-sitter 引入 CGO 依赖 | 二进制 +200KB | v1.2 评估 `mvdan.cc/sh` 纯 Go 实现优先 |
-| 自由分叉破坏 DAG 隔离保证 | session 串扰 | freefork 子代理默认 worktree 隔离 |
+| 自由分叉破坏 DAG 隔离保证 | session 串扰 | freefork 子代理默认 worktree 隔离 (D4-S13-A02) |
 | 跨域 import 爆炸 | 依赖环 | layering gate + `internal/shared/` 横切接口 |
 
 ## 7. Out of Scope
@@ -172,10 +195,10 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 |------|------|------|
 | A. 单 change 涵盖全部 13 项 | 统一提案；一次 PR | 巨型 PR 难 review；混合 P0/P1/P2 优先级；blast radius 大 |
 | B. **Umbrella v1.0 + 3 个 sub-change**（推荐） | 与 observability-enhancement 历史模式一致；P0 优先交付；sub-change 各自独立 review | 需要手动维护跨 sub-change 依赖关系 |
-| C. 13 个 sub-change（每项一个） | 粒度最细 | 管理开销大；G1+G6 强耦合应合并 |
+| C. 13 个 sub-change（每项一个） | 粒度最细 | 管理开销大；D2-S4-A01 + D5-S23-A02 强耦合应合并 |
 
 **选择:** B
-**理由:** G1/G6 强耦合（均涉及 D2 ToolPool + QueryLoop）、G2/G4 强耦合（均涉及安全/验证）、G3/G5 强耦合（均涉及 D4 异步）；3 个 sub-change 平衡粒度与耦合。模式与 DM-20260610-001..003 一致。
+**理由:** D2-S4-A01 (LSP) / D5-S23-A02 (Tracker) 强耦合（均涉及 D2 ToolPool + QueryLoop）、TOOL-SEC-2-A02 (Bash AST) / D6-S11-A02 (Verifier) 强耦合（均涉及安全/验证）、D4-S12-A03 (Notify) / D4-S11-A02 (FreeFork) 强耦合（均涉及 D4 异步）；3 个 sub-change 平衡粒度与耦合。模式与 DM-20260610-001..003 一致。
 
 ### Decision: LSP server 进程管理复用 D1 sandbox
 
@@ -202,8 +225,9 @@ v1.0 (本 change)  →  规范需求 (S1+S2) + Gherkin 草案
 ## 附录 A: Gherkin 需求草案
 
 > 本附录为 S3 阶段 `specs/<module>/spec.md` 的种子。sub-change 在 S3 阶段将其转为正式 ADDED Requirements。
+> 各 Scenario 标题前的 `DSAFT Activity (alias)` 标识权威 ID；alias 保留方便对照 clawcode 分析文档。
 
-### A.1 LSP Tool（草案 → v1.1 sub-A spec）
+### A.1 D2-S4-A01 LSP Tool（草案 → v1.1 sub-A spec, alias G1）
 
 ```gherkin
 Feature: LSP Code Intelligence Tool
@@ -232,7 +256,7 @@ Feature: LSP Code Intelligence Tool
     And a new server starts for the 5th file type
 ```
 
-### A.2 文件诊断追踪（草案 → v1.1 sub-A spec）
+### A.2 D5-S23-A02 文件诊断追踪（草案 → v1.1 sub-A spec, alias G6）
 
 ```gherkin
 Feature: File Diagnostic Tracking
@@ -254,7 +278,7 @@ Feature: File Diagnostic Tracking
     Then at most 500 files are tracked (LRU eviction)
 ```
 
-### A.3 Bash AST 安全（草案 → v1.2 sub-B spec）
+### A.3 TOOL-SEC-2-A02 Bash AST 安全（草案 → v1.2 sub-B spec, alias G2）
 
 ```gherkin
 Feature: Shell AST Security Analysis
@@ -276,7 +300,7 @@ Feature: Shell AST Security Analysis
     And the command is rejected if either layer flags it
 ```
 
-### A.4 实现后验证（草案 → v1.2 sub-B spec）
+### A.4 D6-S11-A02 实现后验证（草案 → v1.2 sub-B spec, alias G4）
 
 ```gherkin
 Feature: Post-Implementation Plan Verification
@@ -293,7 +317,7 @@ Feature: Post-Implementation Plan Verification
     And S4-Gate blocks merge
 ```
 
-### A.5 自由分叉 + 后台任务通知（草案 → v1.3 sub-C spec）
+### A.5 D4-S11-A02 + D4-S12-A03 自由分叉 + 后台任务通知（草案 → v1.3 sub-C spec, alias G5+G3）
 
 ```gherkin
 Feature: Free-Fork Subagent Mode
@@ -302,7 +326,7 @@ Feature: Free-Fork Subagent Mode
     Given DAG topology defines 2 parallel children
     When freefork mode is enabled with N=5
     Then 5 subagents spawn concurrently
-    And each runs in its own worktree
+    And each runs in its own worktree (D4-S13-A02)
 
   Scenario: Subagents communicate via SendMessage
     Given 3 freefork children are running
@@ -319,10 +343,10 @@ Feature: Background Task Completion Notification
     And the event includes exit_code, duration, and tail output
 ```
 
-### A.6 附加诊断特性（草案 → v1.3 sub-C spec）
+### A.6 附加诊断特性（草案 → v1.3 sub-C spec, alias A1+A2+A5）
 
 ```gherkin
-Feature: /doctor Self-Diagnostic Command
+Feature: /doctor Self-Diagnostic Command (D5-S23-A03, alias A1)
 
   Scenario: /doctor reports healthy state
     Given install/version/config/context all green
@@ -334,7 +358,7 @@ Feature: /doctor Self-Diagnostic Command
     When user runs /doctor
     Then JSON report shows "lsp_server_path": "missing"
 
-Feature: Debug Log Category Filter
+Feature: Debug Log Category Filter (D5-S24-A02, alias A2)
 
   Scenario: --debug=api enables only api logs
     Given the user passes --debug=api
@@ -342,7 +366,7 @@ Feature: Debug Log Category Filter
     Then only api.* category logs are emitted
     And hooks/telemetry logs are suppressed
 
-Feature: Context Window Analyzer
+Feature: Context Window Analyzer (D2-S6-A03, alias A5)
 
   Scenario: Token breakdown by category
     Given a session with 5 system + 20 user + 15 assistant messages
@@ -361,3 +385,4 @@ Feature: Context Window Analyzer
 - [x] Out of Scope 已明确声明（§7）
 - [x] Gherkin 草案附录（§A）覆盖 13 项能力
 - [x] D2 QueryLoop 债务独立为 `devrix-queryloop-legacy-decommission`（DM-20260617-001），不混入本 change
+- [x] 能力别名表（文档抬头）已建立，G1-G6 / A1-A7 与 DSAFT Activity 一一映射（docs 重构时引入）
