@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap"
 	contextanalyze "github.com/devrix/devrix/internal/cli/context_analyze"
 	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
+	toolcli "github.com/devrix/devrix/internal/cli/tool"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/channel/connection"
@@ -76,6 +77,16 @@ func main() {
 	if len(os.Args) >= 2 && (os.Args[1] == "context-analyze" || os.Args[1] == "context_analyze") {
 		if err := contextanalyze.Run(os.Args[2:]); err != nil {
 			slog.Error("context-analyze command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-007 W12 (AC12, AC13): /tool list 子命令, dump 当前
+	// BuildSurfaces 输出的 tool schema 列表, 不需要 LLM stack / multi-agent。
+	if len(os.Args) >= 2 && os.Args[1] == "tool" && len(os.Args) >= 3 && os.Args[2] == "list" {
+		if err := toolcli.Run(os.Args[3:]); err != nil {
+			slog.Error("tool list command failed", "error", err)
 			os.Exit(1)
 		}
 		return
