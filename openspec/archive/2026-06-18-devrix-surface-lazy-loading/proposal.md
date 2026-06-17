@@ -2,9 +2,10 @@
 
 **Change ID:** devrix-surface-lazy-loading
 **Demand ID:** DM-20260618-003
-**Status:** S2_Clarified
+**Status:** S7_Archived
 **Priority:** P0
 **Date:** 2026-06-18
+**Merged PR:** [#70](https://github.com/fqntxmqee/devrix/pull/70)
 
 ---
 
