@@ -1,0 +1,54 @@
+change_id: devrix-surface-lazy-loading
+priority: P0
+demand_id: DM-20260618-003
+parent_demand: DM-20260618-001, DM-20260618-002
+parent_change: devrix-tool-spec-enrichment (PR #67 merged 2026-06-18, S7_archived); devrix-surface-permission-extension (PR #68 in-flight)
+status: s3_designed
+title: "ToolSpec DeferLoading + ToolFilter ShouldDefer + ToolSearchSurface + zodgen"
+domains: [D2, D7, tool-surface]
+created_at: "2026-06-18"
+updated_at: "2026-06-18"
+source: anthropic-tool-search-tool-2026 + claude-code-defer-loading
+
+t_points:
+  # 新增 P0 T 点
+  - TOOL-SURFACE-1-T26       # ToolSpec.DeferLoading + ShouldDeferByDefault (6 candidates)
+  - TOOL-SURFACE-1-T27       # PlanModeOpenWorldPolicy.ShouldDefer runtime defer
+  - TOOL-SURFACE-1-T28       # ToolSearchSurface (新 surface 类型) tool_search tool
+  - TOOL-SURFACE-1-T29       # turn_adapter.Prepare 过滤 DeferLoading=true 的 tools
+  - TOOL-SURFACE-1-T30       # zodgen Go struct → JSON Schema subset
+
+version_scope:
+  v1.0:
+    features:
+      - "ToolSpec.DeferLoading bool 字段 (静态标记)"
+      - "ToolFilter.ShouldDefer(ctx, spec) bool 钩子 (runtime 标记)"
+      - "orthogonal_flags.ShouldDeferByDefault (delegate_*, *_background)"
+      - "ToolSearchSurface (新 surface 类型) 提供 tool_search tool"
+      - "turn_adapter.Prepare 过滤 DeferLoading=true (除 tool_search)"
+      - "zodgen (Go struct → JSON Schema subset)"
+    status: planned
+  v1.1:
+    features:
+      - "anthropic package (real API client, v1.1 留 stub in v1.0)"
+      - "zodgen 完整 schema 转换 ($ref / oneOf / anyOf)"
+      - "ToolSearch embedding 检索"
+    status: future
+
+metrics_definitions:
+  - name: avg_tools_per_turn
+    description: turn_adapter.Prepare 下发到 LLM 的 tool schema 平均数
+    target: <10
+    baseline: ~80
+  - name: prompt_cache_hit_rate
+    description: Anthropic prompt cache 命中率
+    target: >85
+    baseline: <60
+  - name: tool_search_coverage
+    description: LLM 通过 tool_search 找到正确工具的成功率
+    target: >90
+    baseline: 0  # 当前没有 tool_search
+
+span_naming:
+  - TOOL-SURFACE-1-A01-F08: tool.spec.defer_loading
+  - TOOL-SURFACE-1-A02: tool.search.surface
