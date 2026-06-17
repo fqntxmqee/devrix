@@ -5,7 +5,7 @@
 **Version:** 3.1.1
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）
+**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring
 **Companion Docs:** `a-registry.md` · `f-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---
@@ -185,6 +185,9 @@ D3-S3-A01 ShieldAndRetry
 |-------|------|--------|--------|-----------|--------|
 | D3-X-A01-T01 | Bridge 适配 Gateway → ILLMGateway | P1 | D3-X-A01 AdaptToContextEngine | `internal/bridges/llm/bridge_test.go` | IMPLEMENTED |
 | **D3-X-A02-T01** | **`WireContextLLM` obs nil fail-fast** `<!-- v1.1 F4 -->` | **P0** | D3-X-A02 WireLLMStack F02 FailFastOnObsNil | `internal/bridges/llm/wire_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 签名 `WireContextLLM(...) (ContextLLMStack, error)`，ErrObservabilityRequired sentinel） |
+| D3-EC-T01 | ErrorClassifier LlmError.Code 优先匹配 | P0 | S4 ProtectCall 21 类错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
+| D3-EC-T02 | ErrorClassifier HTTP status fallback (401→Auth, 429→RateLimit, 5xx→Upstream) | P0 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
+| D3-EC-T03 | ErrorClassifier ctx propagation (`InjectClassification` / `FromContext`) | P1 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
 
 ---
 

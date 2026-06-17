@@ -1,0 +1,79 @@
+change_id: devrix-diagnostic-tools-wiring
+priority: P0
+demand_id: DM-20260617-002
+status: s7_archived
+domains: [D1, D2, D3, D4, D5, D6, tool-security]
+dsaft_scenarios:
+  - D1-S2               # A3 Transcript 持久化场景
+  - D2-S4               # G1 LSP Tool 场景
+  - D2-S6               # A5 WindowAnalyzer + A7 ShortStack 场景
+  - D3-S3               # A6 ErrorClassifier 场景
+  - D4-S11              # G5 FreeFork 场景
+  - D4-S12              # G3 Notify 场景
+  - D4-S13              # G5 worktree 隔离场景
+  - D5-S23              # A1 Doctor + G6 Tracker + A4 FaultInject 场景
+  - D5-S24              # A2 DebugFilter 场景
+  - D6-S11              # G4 Verifier 场景
+  - TOOL-SEC-2          # G2 Bash AST 场景（横切）
+dsaft_activities:
+  - D1-S2-A02-PersistTranscript           # A3
+  - D2-S4-A01-ToolRegister               # G1
+  - D2-S6-A02-TruncateError              # A7
+  - D2-S6-A03-AnalyzeWindow              # A5
+  - D3-S3-A02-ErrorMapping               # A6
+  - D4-S11-A02-ForkAgent                 # G5 (主)
+  - D4-S12-A03-NotifyChild               # G3
+  - D4-S13-A02-IsolateWorktree           # G5 (worktree 隔离子能力)
+  - D5-S23-A02-TrackDiagnostics          # G6
+  - D5-S23-A03-RunDoctor                 # A1
+  - D5-S23-A04-FaultInject               # A4 (本期 P2, 仅需求锁定)
+  - D5-S24-A02-ConfigureDebugFilter      # A2
+  - D6-S11-A02-VerifyPlanExec            # G4
+  - TOOL-SEC-2-A02-ShellASTPolicy        # G2
+t_points:
+  # 沿用 DM-016 已登记 T 编号；本 change 不新增 T 节点
+  - D1-S2-A02-T01     # transcript writer happy path
+  - D2-S4-A01-T01     # LSP tool disabled default
+  - D2-S4-A01-T02     # LSP definition 成功
+  - D2-S4-A01-T03     # LSP manager LRU
+  - D2-S6-A02-T01     # ShortStack filter
+  - D2-S6-A03-T01     # WindowAnalyzer 分类
+  - D3-S3-A02-T01     # ErrorClassify 401
+  - D3-S3-A02-T02     # ErrorClassify ctx roundtrip
+  - D4-S11-A02-T01    # FreeFork batch
+  - D4-S11-A02-T02    # FreeFork rollback
+  - D4-S12-A03-T01    # Notify publish
+  - D4-S12-A03-T02    # Notify drain
+  - D5-S23-A02-T01    # Tracker diff new error
+  - D5-S23-A02-T02    # Tracker diff unrelated
+  - D5-S23-A03-T01    # Doctor healthy
+  - D5-S23-A03-T02    # Doctor lsp-fake fail
+  - D5-S24-A02-T01    # DebugFilter whitelist
+  - D5-S24-A02-T02    # DebugFilter non-debug passthrough
+  - D6-S11-A02-T01    # Verifier done items
+  - D6-S11-A02-T02    # Verifier missing file
+  - TOOL-SEC-2-A02-T01  # Bash AST heredoc
+  - TOOL-SEC-2-A02-T02  # Bash AST eval
+version_scope:
+  v1.0: |
+    把 DM-20260616-003 已交付的 13 项 library 能力接入到运行期可达路径，
+    包括 LLM tool 注册 (5 项) + CLI slash command (2 项) + 错误路径接入 (3 项)
+    + AST 注入 + DebugFilter + Transcript + Notify consume (4 项)。
+    共 14 项 wiring；AC 12/13 IM 可达（A4 FaultInject 仍仅 testbuild）。
+metrics_definitions: []
+span_naming:
+  - OpWiring_<Activity>: e.g. OpWiring_D2_S4_A01_LSPTool_Register
+capability_aliases:
+  G1: D2-S4-A01-ToolRegister
+  G2: TOOL-SEC-2-A02-ShellASTPolicy
+  G3: D4-S12-A03-NotifyChild
+  G4: D6-S11-A02-VerifyPlanExec
+  G5: D4-S11-A02-ForkAgent + D4-S13-A02-IsolateWorktree
+  G6: D5-S23-A02-TrackDiagnostics
+  A1: D5-S23-A03-RunDoctor
+  A2: D5-S24-A02-ConfigureDebugFilter
+  A3: D1-S2-A02-PersistTranscript
+  A4: D5-S23-A04-FaultInject
+  A5: D2-S6-A03-AnalyzeWindow
+  A6: D3-S3-A02-ErrorMapping
+  A7: D2-S6-A02-TruncateError

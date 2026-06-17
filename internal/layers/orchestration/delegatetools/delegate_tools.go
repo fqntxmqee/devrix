@@ -10,9 +10,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
-	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -156,7 +154,7 @@ func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*toolr
 	if sc == nil {
 		return &toolrunner.ToolResult{Error: "delegate_status: session context unavailable"}, nil
 	}
-	snap := flow.GlobalHub.Snapshot(sc.SessionID)
+	snap := globalDeps.Dispatcher.Hub().Snapshot(sc.SessionID)
 	data, err := json.Marshal(snap)
 	if err != nil {
 		return &toolrunner.ToolResult{Error: err.Error()}, nil
@@ -168,7 +166,8 @@ func resolveDelegateTaskID(sessionID, taskID, directive string) string {
 	if id := strings.TrimSpace(taskID); id != "" {
 		return id
 	}
-	if workmodel.GlobalTaskManager == nil || sessionID == "" {
+	tm := globalDeps.Tasks
+	if tm == nil || sessionID == "" {
 		return ""
 	}
 	subject := strings.TrimSpace(directive)
@@ -178,5 +177,5 @@ func resolveDelegateTaskID(sessionID, taskID, directive string) string {
 	if len(subject) > 120 {
 		subject = subject[:117] + "..."
 	}
-	return workmodel.GlobalTaskManager.Create(sessionID, subject, directive).ID
+	return tm.Create(sessionID, subject, directive).ID
 }

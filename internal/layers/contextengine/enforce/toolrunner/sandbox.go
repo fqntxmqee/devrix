@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 const sandboxPolicyHint = "This is a sandbox policy (not permission/YOLO); use relative paths under WorkDir or read_file/glob/list_dir for files."
@@ -15,6 +17,14 @@ type CommandPolicy struct {
 	Allowlist    []string
 	DenyPatterns []*regexp.Regexp
 	WorkDirLock  bool
+	// ASTAnalyzer 可选：G2 Bash AST 二次审计，在 regex 之前生效。
+	// nil 时跳过 AST 检查（生产环境可通过 WireASTAnalyzer 注入）。
+	ASTAnalyzer ASTAnalyzer
+}
+
+// ASTAnalyzer 由 sandboxast.Analyzer 实现的接口，便于 sandbox.go 不直接依赖 sandboxast。
+type ASTAnalyzer interface {
+	Analyze(cmd string) (allow bool, reason string)
 }
 
 var defaultAllowlist = []string{
@@ -83,6 +93,18 @@ func (p *CommandPolicy) Validate(command string) error {
 		return nil
 	}
 
+	// G2 AST 前置：先经 mvdan.cc/sh 解析
+	if p.ASTAnalyzer != nil {
+		if allow, reason := p.ASTAnalyzer.Analyze(command); !allow {
+			// DM-20260617-002 W2 (AC8): 截短错误栈到 5 帧，
+			// 让 sandbox 拒绝错误进入 IM 通知时噪声可控。
+			return sharederrors.WithShortStack(
+				fmt.Errorf("sandbox: ast block: %s. %s", reason, sandboxPolicyHint),
+				5,
+			)
+		}
+	}
+
 	cmdName := extractCommandName(command)
 	if cmdName == "" {
 		return fmt.Errorf("empty command")
@@ -92,7 +114,11 @@ func (p *CommandPolicy) Validate(command string) error {
 	scrubbed := scrubBenignDevNullRedirects(command)
 	for _, pattern := range p.DenyPatterns {
 		if pattern.MatchString(scrubbed) {
-			return fmt.Errorf("sandbox: dangerous command pattern detected: %s. %s", pattern.String(), sandboxPolicyHint)
+			// DM-20260617-002 W2 (AC8): 同上，dangerous pattern 错误也加短栈。
+			return sharederrors.WithShortStack(
+				fmt.Errorf("sandbox: dangerous command pattern detected: %s. %s", pattern.String(), sandboxPolicyHint),
+				5,
+			)
 		}
 	}
 

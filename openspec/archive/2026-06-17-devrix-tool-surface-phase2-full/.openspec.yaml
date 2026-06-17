@@ -1,0 +1,84 @@
+change_id: devrix-tool-surface-phase2-full
+priority: P0
+demand_id: DM-20260617-008
+parent_demand: DM-20260617-007
+parent_change: devrix-tool-surface-contract (PR #63 merged 2026-06-17, S7_archived)
+status: s7_archived
+domains: [D1, D2, D4, D7, tool-surface]
+dsaft_scenarios:
+  - D1-S2                       # Transcript 写入场景（gateway.ExpireSession 改 Gateway.Writer 注入）
+  - D2-S6                       # Context Engine 内部编排（SessionCommandQueue 字段化）
+  - D4-S11                      # Multi-agent 内部编排（TaskManager 注入）
+  - D7-S5                       # Per-agent orchestration（Hub 注入 + freefork Forker 注入）
+  - TOOL-SURFACE-1              # 沿用父 change 的横切契约域（不变）
+dsaft_activities:
+  - D1-S2-A02-PersistTranscript         # transcript.Writer 显式构造期注入
+  - D2-S6-A03-AnalyzeWindow             # sessionqueue 构造期注入
+  - D4-S11-A02-ForkAgent                # TaskManager + freefork.Forker 显式构造期注入
+  - D7-S5-A01-ExecuteRound              # flow.Hub 显式构造期注入
+  - TOOL-SURFACE-1-A01-ToolSurfaceContract   # 沿用父 change 契约（不变）
+t_points:
+  # === P0 测试点（本期必须达成） ===
+  - TOOL-SURFACE-1-T15      # transcript.GlobalWriter 零引用 + Gateway.Writer 注入 (Sub-commit 1)
+  - TOOL-SURFACE-1-T16      # flow.GlobalHub 零引用 + flow.NewHub(SessionCommandQueue) (Sub-commit 2)
+  - TOOL-SURFACE-1-T17      # sessionqueue.GlobalSessionQueue 零引用 + 5 caller 注入 (Sub-commit 3)
+  - TOOL-SURFACE-1-T18      # workmodel.GlobalTaskManager 零引用 + 6+ caller 注入 (Sub-commit 4)
+  - TOOL-SURFACE-1-T19      # freefork.SetGlobalForker 零引用 + Forker 参数化 (Sub-commit 5)
+  - TOOL-SURFACE-1-T20      # git grep 验证 5 global + 5 setter 全删 (W11.6)
+  - TOOL-SURFACE-1-T21      # go test -race ./... 100% 绿 (S5)
+  # === 既有 P0 T 点（沿用，本 change 不修改期望值） ===
+  - D2-S4-A01-T01           # LSP tool (DM-002 baseline)
+  - D4-S11-A02-T01          # FreeFork batch
+  - D4-S11-A02-T02          # FreeFork rollback
+  - D5-S23-A02-T01          # Tracker diff new error
+  - D5-S23-A02-T02          # Tracker diff unrelated
+  - D6-S11-A02-T01          # Verifier done items
+  - D6-S11-A02-T02          # Verifier missing file
+version_scope:
+  v1.0: |
+    工具装配整体收编为 shared/contracts 拆面契约层（父 change v1.0 范围）。
+    本 change (v1.1 阶段 2 完整)：
+    - 删除 5 个剩余 global singleton（transcript / flow / workmodel / sessionqueue / freefork-in-pkg）
+    - 全部 caller 改构造期显式 dep 注入（不引入 DI 框架）
+    - 所有 SetGlobal*/Get* 全局访问归零
+    - 不新增 surface / filter / ToolSpec 字段
+    - 不修改父 change 的 22 AC 期望值
+metrics_definitions:
+  - name: tool_surface_global_var_count
+    description: 工具相关 package-level global var 数量
+    target: 0
+    baseline: 5  # PR #63 后剩余 5（transcript/flow/workmodel/sessionqueue/freefork-in-pkg）
+  - name: tool_bootstrap_entry_count
+    description: bootstrap 入口数（tool 注册相关，沿用父 change 数据）
+    target: 1
+    baseline: 1  # BuildSurfaces 单入口（PR #63 已完成）
+  - name: set_global_call_site_count
+    description: SetGlobal*/Global* 引用数（除注释）
+    target: 0
+    baseline: 17  # 12 caller × 1-3 处 (跨 5 global 累加)
+  - name: tool_p0_test_pass_rate_pct
+    description: 工具相关 P0 T 测试点通过率
+    target: 100
+    baseline: 100  # PR #63 已固化
+span_naming:
+  - TOOL-SURFACE-1-A01: tool.surface.contract          # 沿用父 change
+  - D1-S2-A02: communication.transcript.write         # 本 change 新增 (Sub-commit 1)
+  - D2-S6-A03: contextengine.sessionqueue.dispatch    # 本 change 新增 (Sub-commit 3)
+  - D4-S11-A02: multiagent.task_manager.dispatch      # 本 change 新增 (Sub-commit 4)
+  - D4-S11-A02: multiagent.forker.inject              # 本 change 新增 (Sub-commit 5)
+  - D7-S5-A01: orchestration.hub.dispatch             # 本 change 新增 (Sub-commit 2)
+capability_aliases:
+  # 沿用父 change
+  ToolSurface: TOOL-SURFACE-1-A01-ToolSurfaceContract
+  ToolFilter: TOOL-SURFACE-1-A02-ToolFilterContract
+  # 本 change 新增 5 个 alias
+  TranscriptWriter: D1-S2-A02-PersistTranscript
+  SessionQueue: D2-S6-A03-AnalyzeWindow
+  TaskManager: D4-S11-A02-ForkAgent
+  FreeForker: D4-S11-A02-ForkAgent
+  FlowHub: D7-S5-A01-ExecuteRound
+parent_change_link: openspec/archive/2026-06-17-devrix-tool-surface-contract/
+inheritance_notes: |
+  本 change 严格限定在父 change design.md §2.8 "阶段 2 (PR #64)" 描述的工作。
+  父 change 的 22 AC 期望值不变；本 change 完成 5 sub-commit 后
+  父 AC4 (6+ global 全删) + AC14 (SetGlobalXxx API 全删) 由 PARTIAL 转 PASS。

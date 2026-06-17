@@ -12,6 +12,9 @@ import (
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
+	contextanalyze "github.com/devrix/devrix/internal/cli/context_analyze"
+	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
+	toolcli "github.com/devrix/devrix/internal/cli/tool"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/channel/adapters"
 	"github.com/devrix/devrix/internal/layers/communication/channel/connection"
@@ -23,7 +26,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 
 	// Spans self-registration (trigger init() to register domain spans)
 	_ "github.com/devrix/devrix/internal/layers/communication"
@@ -33,9 +39,17 @@ import (
 )
 
 func main() {
+	// DM-20260617-002 W5 (AC12): 在最早时机解析 --debug flag 并安装 filter，
+	// 这样后续所有 slog 调用都受 categories 白名单过滤。
+	debugCategories := bootstrap.ParseDebugFlag(os.Args[1:])
+
 	// Go 1.26: replace default slog handler before any log call to avoid
 	// circular log→slog→log deadlock in the runtime default handler.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	if len(debugCategories) > 0 {
+		bootstrap.InstallDebugFilter(debugCategories)
+	}
 
 	if len(os.Args) >= 2 && os.Args[1] == "debug" {
 		if err := clidebug.Run(os.Args[2:]); err != nil {
@@ -48,6 +62,34 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "eval" {
 		if err := evalcli.Run(os.Args[2:]); err != nil {
 			slog.Error("eval command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-002 W9 (AC1): /doctor 自检 CLI 子命令, 不需要 LLM / obs 栈。
+	if len(os.Args) >= 2 && os.Args[1] == "doctor" {
+		if err := doctorcli.Run(os.Args[2:]); err != nil {
+			slog.Error("doctor command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-002 W10 (AC2): /context analyze CLI 子命令, 不需要 LLM / obs 栈。
+	if len(os.Args) >= 2 && (os.Args[1] == "context-analyze" || os.Args[1] == "context_analyze") {
+		if err := contextanalyze.Run(os.Args[2:]); err != nil {
+			slog.Error("context-analyze command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// DM-20260617-007 W12 (AC12, AC13): /tool list 子命令, dump 当前
+	// BuildSurfaces 输出的 tool schema 列表, 不需要 LLM stack / multi-agent。
+	if len(os.Args) >= 2 && os.Args[1] == "tool" && len(os.Args) >= 3 && os.Args[2] == "list" {
+		if err := toolcli.Run(os.Args[3:]); err != nil {
+			slog.Error("tool list command failed", "error", err)
 			os.Exit(1)
 		}
 		return
@@ -147,14 +189,37 @@ func main() {
 	if userCfg.IM.Enabled {
 		engineMode = config.ResolveContextEngine(userCfg.IM)
 	}
+
+	// DM-20260617-008 W5: build factory + forker BEFORE the main engine so
+	// the main engine's free_fork surface can be wired with the explicit
+	// forker (replaces the legacy freefork.SetGlobalForker write inside
+	// WireMultiAgent). The factory's shared engine is wired later via
+	// factoryImpl.SetSharedEngine(contextEngine) once the main engine is
+	// built.
+	var (
+		engineBuilder *bootstrap.ContextEngineBuilder
+		agentFactory  multiagent.IAgentFactory
+		forker        freefork.Forker
+	)
+	if multiAgentCfg.Enabled {
+		engineBuilder = bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
+			WithMultiAgentConfig(multiAgentCfg)
+		bootstrapFactory := bootstrap.WireAgentFactory(engineBuilder, multiAgentCfg, obsBridge, nil)
+		forker = bootstrap.WireDefaultForker(bootstrapFactory)
+		engineBuilder.WithForker(forker)
+		agentFactory = bootstrapFactory
+	}
+
 	contextEngine := bootstrap.SelectContextEngine(
 		engineMode,
 		permissionMgr,
 		ctxCfg,
 		toolCfg,
+		multiAgentCfg,
 		obsBridge,
 		llmStack,
 		agentToolReg,
+		forker,
 	)
 
 	defaultEventHandler := &DefaultEventHandler{
@@ -170,14 +235,30 @@ func main() {
 		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
 	}
 
-	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg)
+	// DM-20260617-002 S4-Gate H-1 fix: ctx 提前到 engine builder 之前, 让
+	// startTrackerTick 等后台 goroutine 能在 shutdown 时干净退出 (cancel 传播)。
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// DM-20260617-008 W1: transcript writer injected via ctor (no process-wide global).
+	transcriptWriter := bootstrap.NewTranscriptWriter(ctxCfg)
+	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg, transcriptWriter)
 	gw.SetObservability(obs)
 
-	var agentFactory multiagent.IAgentFactory
-	if multiAgentCfg.Enabled {
-		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
-			WithMultiAgentConfig(multiAgentCfg)
-		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
+	// DM-20260617-008 W4: TaskManager constructed once at startup and
+	// shared with InitOrchestration (NewLocalWorkModel + WithTaskManager),
+	// WireDelegate (delegatetools.SetDeps.Tasks), and NewCLIAdapter.
+	// Replaces workmodel.GlobalTaskManager process-wide singleton.
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
+
+	if multiAgentCfg.Enabled && agentFactory != nil {
+		// DM-20260617-008 W5: now that the main engine exists, wire it into
+		// the factory's deps.Engine so root session agents share the
+		// gateway context engine and accumulate history.
+		if factoryImpl, ok := agentFactory.(*multiagentprovision.AgentFactory); ok {
+			factoryImpl.SetSharedEngine(contextEngine)
+		}
+		engineBuilder.WithContext(ctx)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
 			"max_children", multiAgentCfg.MaxChildren,
@@ -193,13 +274,11 @@ func main() {
 
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 
-	bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
+	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
-		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry())
+		// DM-20260617-008 W4: shared TaskManager (see tm construction above).
+		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry(), hub, tm)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 
@@ -257,7 +336,8 @@ func main() {
 	)
 
 	if runCLI {
-		cli := adapters.NewCLIAdapter(gw, commCfg)
+		// DM-20260617-008 W4: shared TaskManager (constructed above).
+		cli := adapters.NewCLIAdapter(gw, commCfg, tm)
 		if err := cli.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("cli exited with error", "error", err)
 			os.Exit(1)

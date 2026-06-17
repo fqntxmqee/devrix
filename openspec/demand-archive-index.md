@@ -68,12 +68,18 @@
 | **DM-20260614-019** | **D3 LLM Gateway v2.0 — 价值流物理路径迁移 + contracts.go 拆分** | **devrix-d3-sa-refine-v2.0** | **2026-06-14** | **—** | **ACCEPTED (v2.0; 7 路径迁移 + 8 bridge + build/test/vet 全绿)** |
 | **DM-20260614-020** | **D7 Turn 编排上移 — D7 直调 D3，D2 Thin 上下文面** | **devrix-d7-turn-orchestration** | **2026-06-15** | **—** | **ACCEPTED (v2.0 Structure; Phase D 6 slices; D7→D3 LLM 直达; TurnOrchestrator 状态机; D2→D3 import lint; 全量测试通过)** |
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-15 | — | ACCEPTED (Phase 3 Wave 对接完整) |
+| **DM-20260617-001** | **D2 QueryLoop 退役标记 — 3 信号 deprecation 契约（metric + warn + spec）** | **devrix-queryloop-legacy-decommission** | **2026-06-17** | **[#54](https://github.com/fqntxmqee/devrix/pull/54)** | **ACCEPTED (Z0: 不删代码；Z1/Z2 由 metric 阈值触发)** |
+| **DM-20260617-002** | **诊断工具 wiring 闭环 — 13 项能力 E2E 可达 (G1-G6+A1-A7)** | **devrix-diagnostic-tools-wiring** | **2026-06-17** | **[#60](https://github.com/fqntxmqee/devrix/pull/60)** | **ACCEPTED (W1-W14 + H-1/H-2/H-3 fix; 60+ 单测 + 9 集成测试全绿; 可触达 1/13→13/13)** |
+| **DM-20260617-003** | **D7 turn history persist 修复 — loop_first 路由下多轮上下文丢失 (P0 bug)** | **devrix-d7-turn-history-persist** | **2026-06-17** | **—** | **S3_DESIGN (turn_adapter.PersistTurn stub → AppendAndTrimMessages 桥接 D2 Memory; 4 P0 T; ~30 行修复 + ~310 行测试)** |
 | **DM-20260615-001** | **D5 Observability S/A 重切 — 技术模块→价值流化** | **devrix-d5-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；4+1 价值流 S21–S24)** |
 | **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
 | **DM-20260615-004** | **D7 Intent 路径正交化 — 4 IntentKind = 4 独立执行链** | **devrix-d7-orthogonal-intent-paths** | **2026-06-16** | **[#35](https://github.com/fqntxmqee/devrix/pull/35)** | **ACCEPTED (7 T PASS; PR #35 merged `6086259`)** |
 | **DM-20260616-001** | **D7 不确定性处理能力缺口修复 — 5 个关键缺口闭环** | **devrix-d7-uncertainty-gaps** | **2026-06-16** | **—** | **ACCEPTED (6 AC PASS; 13 packages + 25 integration tests -race 全绿)** |
 | **DM-20260616-002** | **D7 Loop-First 路由 — Clawcode 对齐 ingress + tool 门控 Wave** | **devrix-d7-loop-first-routing** | **2026-06-16** | **[#46](https://github.com/fqntxmqee/devrix/pull/46)** | **ACCEPTED (L5-01..06 PASS; unit + D7 integration -race 全绿)** |
+| **DM-20260616-003** | **诊断工具能力差距闭环 — 对齐 clawcode (Claude Code v2.1.88)** | **devrix-diagnostic-tools-parity** | **2026-06-17** | **—** | **ACCEPTED (13 能力一次性交付: G1-G6 核心差距 + A1-A7 附加; 21 新文件 + 4 wiring; 7 域 t-registry +36; go build/vet/test -race 全绿; testbuild tag 全绿)** |
+| **DM-20260617-007** | **工具面契约化 — ToolSurface + ToolFilter 拆面 + 6+ global 两阶段删除** | **devrix-tool-surface-contract** | **2026-06-17** | **—** | **ACCEPTED (PR #63 done: W1-W12, 7 surface + 3 filter + 1 dispatch, 12 global → 3, 3 入口 → 1; PR #64 done: 5 sub-commit W1-W5 删除 transcript/flow/sessionqueue/workmodel/freefork 5 global, 12 → 0; AC4 + AC14 PARTIAL → PASS; 22/22 AC PASS)** |
+| **DM-20260617-008** | **工具面 phase-2 完整 — 5 剩余 global singleton 全删 (transcript/flow/sessionqueue/workmodel/freefork)** | **devrix-tool-surface-phase2-full** | **2026-06-17** | **[#TBD](https://github.com/fqntxmqee/devrix/pull/TBD)** | **ACCEPTED (5 sub-commit 全部 PASS: W1 transcript / W2 flow / W3 sessionqueue / W4 workmodel / W5 freefork; 7 P0 T 点 T15-T21 全部 IMPLEMENTED; 89 packages go test -race 100% 绿; 12 global 全删闭环; 父 AC4 + AC14 PARTIAL → PASS)** |
 
 ## Archive Locations
 
@@ -149,6 +155,8 @@
 | **devrix-d7-orthogonal-intent-paths** | **`openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`** |
 | **devrix-d7-uncertainty-gaps** | **`openspec/archive/2026-06-16-devrix-d7-uncertainty-gaps/`** |
 | **devrix-d7-loop-first-routing** | **`openspec/archive/2026-06-16-devrix-d7-loop-first-routing/`** |
+| **devrix-diagnostic-tools-parity** | **`openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`** |
+| **devrix-tool-surface-phase2-full** | **`openspec/archive/2026-06-17-devrix-tool-surface-phase2-full/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -165,6 +173,10 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-17 归档（S7 — 诊断工具能力差距闭环）**：
+
+- `devrix-diagnostic-tools-parity` → `openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`（DM-20260616-003 ACCEPTED; 13 能力一次性交付: G1 LSP Tool + G2 Bash AST + G3 Task Notify + G4 Verifier + G5 Free Fork + G6 Diagnostic Tracker + A1 /doctor + A2 Debug Filter + A3 Transcript + A4 Fault Inject + A5 Window Analyzer + A6 Error Classifier + A7 Short Stack; 21 新文件 + 4 wiring (bootstrap, task_manager, lsp_register, shortstack_test); 7 域 t-registry 累计 +36 (284→320 IMPLEMENTED); go build/vet/test -race + testbuild tag 全绿）
 
 **2026-06-16 归档（S7 — D7 Loop-First 路由）**：
 

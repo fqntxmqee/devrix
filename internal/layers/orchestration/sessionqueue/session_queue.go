@@ -10,14 +10,13 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// SessionQueue holds per-session command queues (process-global singleton pattern).
+// SessionQueue holds per-session command queues (was process-global singleton
+// pattern; DM-20260617-008 W3 removes the global var — callers now create
+// a local instance via NewSessionQueue).
 type SessionQueue struct {
 	mu   sync.Mutex
 	cmds map[string][]contracts.QueuedCommand
 }
-
-// GlobalSessionQueue is the default queue instance.
-var GlobalSessionQueue = NewSessionQueue()
 
 // NewSessionQueue creates an empty session queue.
 func NewSessionQueue() *SessionQueue {

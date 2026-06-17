@@ -1,0 +1,61 @@
+change_id: devrix-diagnostic-tools-parity
+priority: P0
+demand_id: DM-20260616-003
+status: s7_archived
+domains: [D1, D2, D3, D4, D5, D6, tool-security]
+dsaft_scenarios:
+  # D2 Context Engine
+  - D2-S4-ToolIntegrate    # ToolPool 插件化注册 (LSP Tool 入口)
+  - D2-S6-Compact          # 错误截断 / 上下文窗口分析
+  # D3 LLM Gateway
+  - D3-S3-Dispatch         # API 错误分类引擎
+  # D4 Multi-Agent
+  - D4-S11-ProvisionAgent  # 自由分叉模式
+  - D4-S12-RunAgentLoop    # 后台任务通知 channel
+  - D4-S13-IsolateAndMerge # Fork 隔离 + worktree
+  # D5 Observability
+  - D5-S23-Diagnose        # /doctor + 文件诊断追踪 + 故障注入
+  - D5-S24-Configure       # debug 日志分类过滤
+  # D6 Evolution
+  - D6-S11-RunEvaluation   # 实现后自动验证
+  # tool-security (横切)
+  - TOOL-SEC-2-Bash        # Bash AST 级别安全分析
+  # D1 Communication
+  - D1-S2-SessionRecord    # 会话转录持久化
+dsaft_activities:
+  - D1-S2-A02-PersistTranscript
+  - D2-S4-A01-ToolRegister
+  - D2-S6-A02-TruncateError
+  - D2-S6-A03-AnalyzeWindow     # A5 上下文窗口分析
+  - D3-S3-A02-ErrorMapping
+  - D4-S11-A02-ForkAgent
+  - D4-S12-A03-NotifyChild
+  - D4-S13-A02-IsolateWorktree  # G5 worktree 隔离
+  - D5-S23-A02-TrackDiagnostics
+  - D5-S23-A03-RunDoctor
+  - D5-S23-A04-FaultInject      # A4 故障注入
+  - D5-S24-A02-ConfigureDebugFilter
+  - D6-S11-A02-VerifyPlanExec
+  - TOOL-SEC-2-A02-ShellASTPolicy
+t_points: []            # S7 归档阶段已合并到 openspec/t-registry.md
+version_scope:
+  v1.0: 13 能力一次性交付（DSAFT 权威 ID：13 个 Activity 节点；G1-G6 核心差距 + A1-A7 附加为需求侧 alias）+ 全量单元测试 + 7 域 t-registry 更新 + S5 验收
+metrics_definitions: []
+span_naming: []
+# Capability aliases: G1-G6 / A1-A7 是 S2 阶段为对照
+# docs/reference/clawcode-diagnostic-tools-analysis.md 而保留的需求侧别名。
+# 权威命名遵循 DSAFT（见 dsaft_scenarios / dsaft_activities）。
+# 别名 → Activity 映射：
+#   G1 → D2-S4-A01-ToolRegister        (LSP 代码智能工具)
+#   G2 → TOOL-SEC-2-A02-ShellASTPolicy (Bash AST 安全分析器)
+#   G3 → D4-S12-A03-NotifyChild        (后台任务完成通知)
+#   G4 → D6-S11-A02-VerifyPlanExec     (实现后自动验证)
+#   G5 → D4-S11-A02-ForkAgent + D4-S13-A02-IsolateWorktree (自由分叉子代理)
+#   G6 → D5-S23-A02-TrackDiagnostics   (诊断跟踪器)
+#   A1 → D5-S23-A03-RunDoctor          (/doctor 自检命令)
+#   A2 → D5-S24-A02-ConfigureDebugFilter (Debug 日志分类过滤)
+#   A3 → D1-S2-A02-PersistTranscript   (会话转录持久化)
+#   A4 → D5-S23-A04-FaultInject        (故障注入)
+#   A5 → D2-S6-A03-AnalyzeWindow       (上下文窗口分析)
+#   A6 → D3-S3-A02-ErrorMapping        (LLM 错误分类)
+#   A7 → D2-S6-A02-TruncateError       (共享错误栈截断)

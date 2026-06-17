@@ -11,6 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
+	"github.com/devrix/devrix/internal/layers/llmgateway/protect/errorclass"
 	"github.com/devrix/devrix/internal/layers/llmgateway/route"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -37,13 +38,30 @@ type Deps struct {
 
 // Gateway orchestrates routing, breaker, retry, and adapters.
 type Gateway struct {
-	cfg     *configure.LLMGatewayConfig
-	router  *route.Router
-	breaker llmgateway.ICircuitBreaker
-	retry   *protect.Executor
-	reg     *adapter.Registry
-	counter *budget.Counter
-	obs     *observability.Bridge
+	cfg        *configure.LLMGatewayConfig
+	router     *route.Router
+	breaker    llmgateway.ICircuitBreaker
+	retry      *protect.Executor
+	reg        *adapter.Registry
+	counter    *budget.Counter
+	obs        *observability.Bridge
+	classifier errorclass.Classifier // optional, DM-20260617-002 W1
+}
+
+// WithClassifier 注入错误分类器。nil 时降级为仅做短栈包装。
+func (g *Gateway) WithClassifier(c errorclass.Classifier) *Gateway {
+	g.classifier = c
+	return g
+}
+
+// classify 是 classifyAndWrap 在 Gateway 上的便捷方法。
+func (g *Gateway) classify(err error) error {
+	return classifyAndWrap(g.classifier, err, 0, "")
+}
+
+// classifyWithStatus 带 HTTP status 的错误分类（adapter 层有非零 status 时用）。
+func (g *Gateway) classifyWithStatus(err error, status int, raw string) error {
+	return classifyAndWrap(g.classifier, err, status, raw)
 }
 
 // New creates a gateway from dependencies.
@@ -146,7 +164,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		if err != nil {
 			finishStream(err, llmgateway.TokenUsage{}, false, "", "")
-			return nil, err
+			return nil, g.classify(err)
 		}
 		provider, model = p, m
 	}
@@ -155,13 +173,13 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	if !ok {
 		err := fmt.Errorf("provider config missing: %s", provider)
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, err
+		return nil, g.classify(err)
 	}
 
 	count := g.counter.CountWithSystemPrompt(req.SystemPrompt, req.Messages)
 	if err := g.counter.CheckBudget(count, defaultPromptTokenBudget); err != nil {
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, err
+		return nil, g.classify(err)
 	}
 
 	// llm.circuit_breaker child span
@@ -176,18 +194,18 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		if err != nil {
 			finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-			return nil, err
+			return nil, g.classify(err)
 		}
 		if !allowed {
 			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, false, provider, model)
-			return nil, fmt.Errorf("circuit breaker rejected: %s", provider)
+			return nil, g.classify(fmt.Errorf("circuit breaker rejected: %s", provider))
 		}
 	}
 
 	ad, err := g.reg.Get(provider)
 	if err != nil {
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, err
+		return nil, g.classify(err)
 	}
 
 	// Timeout setup
@@ -255,7 +273,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			retrySpan.End()
 		}
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, err
+		return nil, g.classify(err)
 	}
 
 	out := make(chan llmgateway.Chunk, 32)
@@ -306,7 +324,11 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				g.breaker.RecordFailure(provider)
 			}
 			g.recordError(provider, primaryModel)
-			finishStream(streamErr, usage, usageReceived, provider, model)
+			// DM-20260617-002 W1: classify + shortstack wrapper on stream errors.
+			// 流错误通过 finishStream(span RecordError + RecordLLMSpanPayload) 落库，
+			// out channel 正常关闭让 consumer 拿到 io.EOF 风格的语义。
+			classified := g.classify(streamErr)
+			finishStream(classified, usage, usageReceived, provider, model)
 			return
 		}
 		g.breaker.RecordSuccess(provider)

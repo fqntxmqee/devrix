@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring
 
 ---
 
@@ -33,6 +33,10 @@
 | D1-S17-A01-T01 | 飞书入站 Parse 与 canonical 信号链兼容 | S17-A01 ParseFeishuInbound | `channel/adapters/feishu_test.go` | IMPLEMENTED | P1 |
 | D1-S18-A01-F02-T01 | PublishCritical complete/error 不被 Drain | S18-A01-F02 PublishCritical | `internal/layers/communication/delivery/eventbus/bus_test.go` | IMPLEMENTED | P0 |
 | D1-S18-A01-F03-T01 | Drain 排空非 Critical 且不丢 Critical | S18-A01-F03 Drain | `internal/layers/communication/delivery/eventbus/drain_test.go` | IMPLEMENTED | P0 |
+| D1-S19-A01-T01 | Transcript Writer 追加 + 读回 (NDJSON) | S19-A01 PersistTranscript | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P0 |
+| D1-S19-A01-T02 | Transcript ListSessions 按 mtime 倒序 | S19-A01 ListSessions | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P0 |
+| D1-S19-A01-T03 | Transcript path traversal 防御 | S19-A01 SanitizeFilename | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P0 |
+| D1-S19-A01-T04 | Transcript 并发 100 goroutine 追加无丢行 | S19-A01 ConcurrentAppend | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P1 |
 
 ---
 

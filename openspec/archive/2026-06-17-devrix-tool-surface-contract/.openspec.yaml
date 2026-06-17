@@ -1,0 +1,124 @@
+change_id: devrix-tool-surface-contract
+priority: P0
+demand_id: DM-20260617-007
+status: s7_archived
+archived: 2026-06-17
+phase_2_split:
+  pr_63: feat/devrix-tool-surface-contract (W11 phase 2c + W12 + 阶段 1 全量)
+  pr_64_followup: devrix-tool-surface-phase2-full (W11 阶段 2 完整, 剩余 5 global)
+domains: [D2, D7, tool-surface]
+dsaft_scenarios:
+  - D2-S4               # Tool Registration 场景（主入口收编）
+  - D7-S5               # Per-agent Tool Visibility 场景（filter 链）
+  - D7-S5-A01           # D7 Turn Adapter 场景（ExecuteRound 走 surface）
+  - TOOL-SURFACE-1      # 新增横切契约域（拆面契约层）
+dsaft_activities:
+  - D2-S4-A01-ToolRegister              # 既有 G1 LSP 走 surface 化
+  - D4-S11-A02-ForkAgent                # G5 FreeFork surface 化
+  - D4-S13-A02-IsolateWorktree          # G5 worktree 隔离子能力
+  - D5-S23-A02-TrackDiagnostics         # G6 Tracker surface 化
+  - D6-S11-A02-VerifyPlanExec           # G4 Verify surface 化
+  - D4-S12-A03-NotifyChild              # G3 Notify 消费路径（per-agent）
+  - TOOL-SURFACE-1-A01-ToolSurfaceContract      # 新增
+  - TOOL-SURFACE-1-A02-ToolFilterContract       # 新增
+  - TOOL-SURFACE-1-A03-SurfaceImplementations  # 新增（7 surface）
+  - TOOL-SURFACE-1-A04-FilterImplementations    # 新增（3+ filter）
+  - TOOL-SURFACE-1-A05-BootstrapConsolidation   # 新增（3 入口收编）
+t_points:
+  # === P0 测试点（本期必须达成） ===
+  - TOOL-SURFACE-1-T01        # ToolSurface 4 方法 interface compliance (W1)
+  - TOOL-SURFACE-1-T02        # ToolFilter + Composite + Allow + Deny (W2)
+  - TOOL-SURFACE-1-T03        # 7 surface.Tools() + RiskLevel 查询 (W3-W5)
+  - TOOL-SURFACE-1-T04        # 7 surface.Execute 行为 (W3-W5)
+  - TOOL-SURFACE-1-T05        # PerAgentFilter + PerRiskFilter (W6)
+  - TOOL-SURFACE-1-T06        # toolpolicy.AsToolFilter 行为等价 (W7)
+  - TOOL-SURFACE-1-T07        # NewContextEngine 接受 surface 列表 (W8)
+  - TOOL-SURFACE-1-T08        # buildWithGate ⊇ main (AC7) (W8)
+  - TOOL-SURFACE-1-T09        # turn_adapter.ExecuteRound 走 surface.Execute (W9)
+  # 既有 P0 T 点（沿用，本 change 不修改期望值）
+  - D2-S4-A01-T01             # LSP tool (DM-20260616-003 baseline)
+  - D4-S11-A02-T01            # FreeFork batch
+  - D4-S11-A02-T02            # FreeFork rollback
+  - D5-S23-A02-T01            # Tracker diff new error
+  - D5-S23-A02-T02            # Tracker diff unrelated
+  - D6-S11-A02-T01            # Verifier done items
+  - D6-S11-A02-T02            # Verifier missing file
+  # === P1 测试点（本期交付） ===
+  - TOOL-SURFACE-1-T10        # 6+ global 零引用 (W11)
+  - TOOL-SURFACE-1-T11        # devrix tool list CLI 输出 (W12)
+  # === P2 测试点（本期不交付，需求锁定） ===
+  - TOOL-SURFACE-1-T12        # PerSessionFilter (P1, S6 backlog)
+  - TOOL-SURFACE-1-T13        # Surface 动态 plugin loader (P2, S6 backlog)
+  - TOOL-SURFACE-1-T14        # ToolFilter + IPermissionGate 合并 (P2, S6 backlog)
+version_scope:
+  v1.0: |
+    工具装配整体收编为 shared/contracts 拆面契约层。
+    - internal/shared/contracts.ToolSurface 4 方法 interface
+    - internal/shared/contracts.ToolFilter 1 方法 interface
+    - 7 个 surface 实现就位（Builtin / LSPTool / FreeFork / Tracker / Verify / Delegate / BackgroundTask）
+    - 3+ 个 filter 实现就位（PerAgent / PerRisk / Composite + toolpolicy 适配）
+    - 3 入口收编为 1 入口（NewContextEngine 接受 []ToolSurface）
+    - 6+ global singleton 全删（两阶段：先收敛后删除）
+    - turn_adapter.ExecuteRound 走 surface.Execute（与 D2 legacy query/executor 同链路）
+    - per-agent ⊇ main 等价性回归测试守护
+  v1.1: |
+    阶段 2 增强（本期不交付）：
+    - PerSessionFilter（per-session allow/deny 单点 tool）
+    - devrix tool list 增强（--risk / --mode flag）
+metrics_definitions:
+  - name: tool_surface_global_var_count
+    description: 工具相关 package-level global var 数量
+    target: 0
+    baseline: 6+
+  - name: tool_bootstrap_entry_count
+    description: bootstrap 入口数（tool 注册相关）
+    target: 1
+    baseline: 3
+  - name: per_agent_tool_coverage_pct
+    description: per-agent 模式可见 tool 集合 / main 模式可见 tool 集合
+    target: 100
+    baseline: ~50  # 实际当前已全部注册，但无回归测试守护
+  - name: turn_adapter_surface_path_pct
+    description: turn_adapter.ExecuteRound 走 ToolSurface.Execute 的比例
+    target: 100
+    baseline: 0    # 当前走 a.tools.Execute 旁路
+  - name: tool_p0_test_pass_rate_pct
+    description: 工具相关 P0 T 测试点通过率
+    target: 100
+    baseline: 100  # 既有 13 个 P0 T 点（DM-002 wiring）全绿
+span_naming:
+  - TOOL-SURFACE-1-A01: tool.surface.contract
+  - TOOL-SURFACE-1-A02: tool.filter.contract
+  - TOOL-SURFACE-1-A03: tool.surface.<name>.execute
+  - TOOL-SURFACE-1-A04: tool.filter.<name>.apply
+  - TOOL-SURFACE-1-A05: tool.bootstrap.surface_assembly
+capability_aliases:
+  # 拆面契约别名
+  ToolSurface: TOOL-SURFACE-1-A01-ToolSurfaceContract
+  ToolFilter: TOOL-SURFACE-1-A02-ToolFilterContract
+  # Surface 别名
+  Builtin: TOOL-SURFACE-1-A03-BuiltinSurface
+  LSPTool: TOOL-SURFACE-1-A03-LSPToolSurface
+  FreeFork: TOOL-SURFACE-1-A03-FreeForkSurface
+  Tracker: TOOL-SURFACE-1-A03-TrackerSurface
+  Verify: TOOL-SURFACE-1-A03-VerifySurface
+  Delegate: TOOL-SURFACE-1-A03-DelegateSurface
+  BackgroundTask: TOOL-SURFACE-1-A03-BackgroundTaskSurface
+  # Filter 别名
+  PerAgent: TOOL-SURFACE-1-A04-PerAgentFilter
+  PerRisk: TOOL-SURFACE-1-A04-PerRiskFilter
+  PerSession: TOOL-SURFACE-1-A04-PerSessionFilter
+  # 既有 13 项 wiring alias（沿用 DM-002）
+  G1: D2-S4-A01-ToolRegister
+  G2: TOOL-SEC-2-A02-ShellASTPolicy
+  G3: D4-S12-A03-NotifyChild
+  G4: D6-S11-A02-VerifyPlanExec
+  G5: D4-S11-A02-ForkAgent + D4-S13-A02-IsolateWorktree
+  G6: D5-S23-A02-TrackDiagnostics
+  A1: D5-S23-A03-RunDoctor
+  A2: D5-S24-A02-ConfigureDebugFilter
+  A3: D1-S2-A02-PersistTranscript
+  A4: D5-S23-A04-FaultInject
+  A5: D2-S6-A03-AnalyzeWindow
+  A6: D3-S3-A02-ErrorMapping
+  A7: D2-S6-A02-TruncateError

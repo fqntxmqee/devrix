@@ -199,6 +199,36 @@ func orchestrationToolSchemas() []turn.ToolSchema {
 				"required": []any{"goal"},
 			},
 		},
+		// DM-20260617-004 (devrix-d7-tool-ctx-inject): expose free_fork to LLM
+		// under loop_first so users saying "用 free_fork 启 N 个 worker" reach a
+		// real registered tool. Execution is delegated to the base adapter's
+		// ExecuteRound fallback path (freeforkRunner in D2 ToolRegistry).
+		{
+			Name:        "free_fork",
+			Description: "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id and runs in an isolated worktree. Returns {spawned_count, agent_ids:[...]}.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"parent_session": map[string]any{"type": "string", "description": "Parent session id (caller's session)."},
+					"requests": map[string]any{
+						"type": "array",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"name":     map[string]any{"type": "string", "description": "Short name for the worker (used in logs)."},
+								"prompt":   map[string]any{"type": "string", "description": "Self-contained instruction for the worker."},
+								"worktree": map[string]any{"type": "boolean", "description": "Run in isolated worktree (default true)."},
+								"mode":     map[string]any{"type": "string", "description": "Collaboration mode (default: 'default')."},
+							},
+							"required": []any{"name", "prompt"},
+						},
+						"minItems": 1,
+						"maxItems": 5,
+					},
+				},
+				"required": []any{"parent_session", "requests"},
+			},
+		},
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -47,6 +48,10 @@ type SessionOrchestrator struct {
 	commandHandler  *CommandHandler
 	orchestratePath *OrchestratePath
 	turnToolExec    *TurnToolExecutor
+
+	// taskManager is the D7 task store injected at construction (DM-20260617-008 W4).
+	// nil → a fresh in-memory taskmanager is created in NewSessionOrchestrator.
+	taskManager *workmodel.TaskManager
 
 	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
 	// When non-nil, the default OrchestratePath's TaskDecomposer uses it
@@ -127,6 +132,16 @@ func WithLLMDecomposer(d LLMTaskDecomposer) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.llmDecomposer = d }
 }
 
+// WithTaskManager wires the *workmodel.TaskManager that backs /task CLI
+// commands and the default CommandHandler.
+//
+// DM-20260617-008 W4: replaces the previous process-wide
+// workmodel.GlobalTaskManager singleton. When this option is omitted,
+// NewSessionOrchestrator creates a fresh in-memory TaskManager.
+func WithTaskManager(tm *workmodel.TaskManager) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.taskManager = tm }
+}
+
 // WithClassifier replaces the default RuleClassifier. The default is
 // NewRuleClassifier(cfg) (rule-only). Tests use this to inject stubs;
 // v1.1+ may inject a LLM-first classifier that satisfies
@@ -180,8 +195,11 @@ func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...Orc
 	// the new options. Production code may still wire explicitly via
 	// WithCommandHandler / WithOrchestratePath to inject a real
 	// WaveScheduler or a custom PlanMode.
+	if o.taskManager == nil {
+		o.taskManager = workmodel.NewTaskManager()
+	}
 	if o.commandHandler == nil {
-		o.commandHandler = newDefaultCommandHandler(o.workModel, o.sink)
+		o.commandHandler = newDefaultCommandHandler(o.workModel, o.sink, o.taskManager)
 	}
 	if o.orchestratePath == nil {
 		o.orchestratePath = newDefaultOrchestratePath(o.sink, o.llmDecomposer)

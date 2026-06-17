@@ -1,7 +1,7 @@
 change_id: devrix-queryloop-legacy-decommission
 priority: P0
 demand_id: DM-20260617-001
-status: s2_design
+status: s7_archived
 domains: [D2, D5, D7]
 dsaft_scenarios:
   # D7 Orchestration（主路径）

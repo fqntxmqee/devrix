@@ -33,7 +33,7 @@ func TestContextEngineAdapter_Prepare_excludes_current_user_message(t *testing.T
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 	sess := types.NewSession("sess-turn", "test", "/tmp")
 	if err := store.Create(sess); err != nil {
 		t.Fatalf("create session: %v", err)

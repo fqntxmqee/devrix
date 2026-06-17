@@ -6,13 +6,15 @@ import "strings"
 type CommandType string
 
 const (
-	CommandNew     CommandType = "new"
-	CommandStop    CommandType = "stop"
-	CommandHelp    CommandType = "help"
-	CommandTask    CommandType = "task"
-	CommandPlan    CommandType = "plan"
-	CommandVerify  CommandType = "verify"
-	CommandUnknown CommandType = "unknown"
+	CommandNew            CommandType = "new"
+	CommandStop           CommandType = "stop"
+	CommandHelp           CommandType = "help"
+	CommandTask           CommandType = "task"
+	CommandPlan           CommandType = "plan"
+	CommandVerify         CommandType = "verify"
+	CommandDoctor         CommandType = "doctor"
+	CommandContextAnalyze CommandType = "context_analyze"
+	CommandUnknown        CommandType = "unknown"
 )
 
 // Command represents a parsed command from user input
@@ -62,6 +64,10 @@ func ParseCommand(input string, prefix string) *Command {
 		cmdType = CommandPlan
 	case strings.EqualFold(parts[0], "verify"):
 		cmdType = CommandVerify
+	case strings.EqualFold(parts[0], "doctor"):
+		cmdType = CommandDoctor
+	case strings.EqualFold(parts[0], "context-analyze"), strings.EqualFold(parts[0], "context_analyze"):
+		cmdType = CommandContextAnalyze
 	default:
 		cmdType = CommandUnknown
 	}

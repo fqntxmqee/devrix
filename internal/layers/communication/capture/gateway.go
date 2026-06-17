@@ -10,6 +10,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/delivery/eventbus"
 	"github.com/devrix/devrix/internal/layers/communication/capture/signal"
+	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -71,14 +72,23 @@ type CommunicationGateway struct {
 	turnTracker *signal.TurnTracker
 	clock       clock
 	presenter   SignalRouter
+
+	// DM-20260617-008 W1: transcript writer injected at construction
+	// (replaces transcript.GlobalWriter process-wide singleton).
+	writer *transcript.Writer
 }
 
-// NewCommunicationGateway creates a new CommunicationGateway
+// NewCommunicationGateway creates a new CommunicationGateway.
+//
+// The `writer` parameter is the transcript writer used by ExpireSession to
+// record session_close events. Pass nil to disable transcript logging
+// (best-effort: ExpireSession will succeed even when writer is nil).
 func NewCommunicationGateway(
 	sessionStore SessionStore,
 	eventHandler EventHandler,
 	permissionMgr *PermissionManager,
 	cfg *config.CommunicationConfig,
+	writer *transcript.Writer,
 ) *CommunicationGateway {
 	gw := &CommunicationGateway{
 		sessionStore:    sessionStore,
@@ -89,6 +99,7 @@ func NewCommunicationGateway(
 		activeProcesses: make(map[string]context.CancelFunc),
 		turnTracker:     signal.NewTurnTracker(),
 		clock:           realClock{},
+		writer:          writer,
 	}
 	return gw
 }
@@ -804,6 +815,15 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 	g.mu.Lock()
 	delete(g.sessions, sessionID)
 	g.mu.Unlock()
+
+	// DM-20260617-002 W11 (AC9): session close 钩子写 transcript.
+	// DM-20260617-008 W1: writer injected via ctor (no process-wide global).
+	if w := g.writer; w != nil {
+		_ = w.Append(sessionID, transcript.Event{
+			Kind: "session_close",
+			Body: "expired",
+		})
+	}
 
 	// Also delete from persistent store to prevent storage leak
 	if err := g.sessionStore.Delete(sessionID); err != nil {

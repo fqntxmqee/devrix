@@ -10,6 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/google/uuid"
 )
@@ -50,19 +51,11 @@ type TaskManager struct {
 	obsBridge *observability.Bridge
 }
 
-// GlobalTaskManager is the process-wide task manager singleton.
-var GlobalTaskManager *TaskManager
-
-func init() {
-	GlobalTaskManager = NewTaskManager()
-}
-
-// InitGlobalTaskManager reconfigures the singleton from config (disk when mode=v2).
-func InitGlobalTaskManager(cfg config.TasksConfig, obsBridge *observability.Bridge) {
-	GlobalTaskManager = NewTaskManagerFromConfig(cfg, obsBridge)
-}
-
 // NewTaskManager creates a new in-memory task manager.
+//
+// DM-20260617-008 W4: callers should construct their own *TaskManager and
+// inject it where needed. The previous GlobalTaskManager package-level
+// singleton has been removed.
 func NewTaskManager() *TaskManager {
 	return &TaskManager{
 		tasks: make(map[string]map[string]*Task),
@@ -201,10 +194,38 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 	if !IsLegalTransition(task.Status, status) {
 		return fmt.Errorf("%w: from %s to %s", ErrIllegalTransition, task.Status, status)
 	}
+	prev := task.Status
 	task.Status = status
 	task.UpdatedAt = time.Now()
 	m.persistLocked(sessionID)
+
+	// G3 notify: 任务进入终态时,publish CompletionEvent。
+	if status == TaskStatusCompleted || status == TaskStatusFailed {
+		go m.publishCompletion(sessionID, taskID, task.Subject, status)
+	}
+	_ = prev
 	return nil
+}
+
+// publishCompletion 异步投递 CompletionEvent 到 notify.GlobalBus。
+func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, status TaskStatus) {
+	defer func() { _ = recover() }()
+	bus := notify.GlobalBus()
+	if bus == nil {
+		return
+	}
+	kind := "workmodel"
+	errStr := ""
+	if status == TaskStatusFailed {
+		errStr = "task failed"
+	}
+	bus.Publish(sessionID, notify.CompletionEvent{
+		TaskID:  taskID,
+		Kind:    kind,
+		Summary: fmt.Sprintf("%s → %s", subject, status),
+		Error:   errStr,
+		Time:    time.Now(),
+	})
 }
 
 // SetOwner assigns owner to task.

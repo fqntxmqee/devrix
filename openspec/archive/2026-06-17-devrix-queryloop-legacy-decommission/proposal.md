@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-queryloop-legacy-decommission
 **Demand ID:** DM-20260617-001
-**Status:** S2_Design
+**Status:** S7_Archived (PR #54 merged 2026-06-17)
 **Version:** v1.0
 **域:** D2 / D5 / D7
 **架构债:** `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC)

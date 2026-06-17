@@ -1,10 +1,12 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.4.0
-**Last Updated:** 2026-06-16
+**Version:** 2.6.0
+**Last Updated:** 2026-06-17
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
+**Change:** devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地：7 surface + 3 filter + turn_adapter dispatch 路径
+**Change:** devrix-tool-surface-phase2-full (DM-20260617-008) — W1-W5 阶段 2 落地：5 剩余 global singleton 全删
 
 ---
 
@@ -43,6 +45,8 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S3-A01-T04 | LongTerm Store 持久化写入 | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
 | D2-S3-A01-T05 | L3 长期记忆返回 NotImplemented | Memory | `internal/layers/contextengine/prepare/memory/longterm_test.go` | IMPLEMENTED |
 | D2-S3-A01-T06 | 快照使用 snappy 压缩体积显著缩减 | Memory | `internal/layers/contextengine/persist/snapshot/store_test.go` | IMPLEMENTED |
+| **D2-S3-A02-T01** | **ContextEngine.AppendAndTrimMessages 写入 D2 内存并按 budget 裁剪（DM-20260617-003 D7 turn bridge）** | **Memory** | **`internal/layers/contextengine/engine_persist_bridge_test.go::Test{AppendAndTrimMessages_EmptyMessages,FreshSession,ExistingSession,TrimTriggered,RaceSafety}`** | **IMPLEMENTED** | **P0** |
+| **D2-S3-A02-T02** | **AppendAndTrimMessages lazy-init 不存在的 sid** | **Memory** | **`internal/layers/contextengine/engine_persist_bridge_test.go::TestAppendAndTrimMessages_FreshSession`** | **IMPLEMENTED** | **P0** |
 
 ## D2-S2: Compression Module
 
@@ -157,6 +161,45 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S13-A01-T01 | RepairToolMessageChain 剔除 orphan tool results | Conversation | `internal/layers/contextengine/prepare/conversation/repair_test.go` | IMPLEMENTED | P0 |
 | D2-S13-A02-T01 | MessagesAfterCompactBoundary 仅保留尾部 | Conversation | `internal/layers/contextengine/prepare/conversation/boundary_test.go` | IMPLEMENTED | P1 |
 
+## TOOL-SURFACE-1: Tool Surface Contract (DM-20260617-007)
+
+> **devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地。**
+> 7 个 surface (Builtin / LSP / FreeFork / Tracker / Verify / Delegate /
+> BackgroundTask) + 3 个 filter (PerAgent / PerRisk / toolpolicy
+> adapter) + 1 个 dispatch path (turn_adapter.findSurface).
+> 完整列表见 `openspec/changes/devrix-tool-surface-contract/design.md` §2.5-§2.6。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| TOOL-SURFACE-1-T01 | ToolSurface 4 方法契约 (Name/Tools/RiskLevel/Execute) 编译期断言 | Surface Contract | `internal/shared/contracts/tool_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T02 | ToolFilter 1 方法契约 (Apply) + Composite/Allow/Deny/ApplyFilters | Filter Contract | `internal/shared/contracts/tool_filter_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T03 | BuiltinSurface + LSPToolSurface 可见性 (cfg nil / 无 server / 有 server) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{builtin,lsptool}_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T04 | FreeForkSurface + TrackerSurface + VerifySurface 行为 + 接口合规 | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w4_surfaces,w4_surfaces}_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T05 | PluginSurface dispatch (delegate + background 共享) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w5_surfaces,plugin}_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T01 | PerAgentFilter 5 agent + WithAllowlist + 不可变 + 未知 agent | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T02 | PerRiskFilter 4 阈值 + 空阈值 pass-through | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T03 | Composite FIFO 顺序 + 顺序敏感性 | Filter Composition | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P1 |
+| TOOL-FILTER-1-T04 | toolpolicy.AsToolFilter 5 agent 适配 | Adapter | `internal/layers/orchestration/toolpolicy/filter_adapter_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T08 | NewContextEngine 收编 surface 列表 (BuildSurfaces + DefaultFilters) | Engine Wiring | `internal/bootstrap/surfaces_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T09 | turn_adapter.ExecuteRound 走 surface.Execute (findSurface 线性扫) | Dispatch Path | `internal/bootstrap/turn_adapter_surface_test.go` | IMPLEMENTED | P0 |
+
+## TOOL-SURFACE-1: Phase 2 Full — Global Singleton Cleanup (DM-20260617-008)
+
+> **devrix-tool-surface-phase2-full (DM-20260617-008) — W1-W5 阶段 2 落地。**
+> 删除 5 个剩余 global singleton (transcript / flow / sessionqueue /
+> workmodel / freefork-in-pkg), 全部 caller 改构造期显式 dep 注入。
+> 父 change AC4 (6+ global 全删) + AC14 (SetGlobalXxx API 全删) 由 PARTIAL 转 PASS。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| TOOL-SURFACE-1-T15 | transcript.GlobalWriter 零引用 + Gateway.Writer 字段注入 | Global Cleanup | git grep + `internal/layers/communication/capture/gateway.go` (Writer field) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T16 | flow.GlobalHub 零引用 + delegatetools.Deps.Hub 字段注入 | Global Cleanup | git grep + `internal/layers/orchestration/delegatetools/deps.go` (Hub field) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T17 | sessionqueue.GlobalSessionQueue 零引用 + 5 caller 局部 NewSessionQueue() | Global Cleanup | git grep + `internal/layers/orchestration/sessionqueue/session_queue.go` (no Global var) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T18 | workmodel.GlobalTaskManager 零引用 + 6+ caller ctor 注入 (Orchestrator.tasks / CommandHandler.tasks / delegatetools.Deps.Tasks / cli.NewCLIAdapter) | Global Cleanup | git grep + `internal/layers/orchestration/workmodel/task_manager.go` (no Global var) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T19 | freefork.SetGlobalForker 零引用 + freeforkGlobalFunc 参数化 Forker | Global Cleanup | git grep + `internal/layers/multiagent/provision/freefork/freefork_injection.go` (factory pattern) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T20 | git grep 验证 5 global + 5 setter 全删 (production-code 0 命中) | Static Verify | `git grep -nE "SetGlobal\|GlobalSessionQueue\|GlobalTaskManager\|GlobalHub\|GlobalWriter\|GlobalForker" internal/` (only comment matches) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T21 | go test -race -count=1 ./... 100% 绿 (89 packages) | Dynamic Verify | `go test -race -timeout 180s -count=1 ./...` (all OK) | IMPLEMENTED | P0 |
+
 ## D2: Cross-Scenario Tests
 
 | T ID | 描述 | Test 位置 | Status |
@@ -184,6 +227,16 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T41 | D2-S15-A04-T* | S15 Prepare | D2 | Fork subagent placeholder |
 | D2-S10-A01-T42 | D2-S18-A02-T* | S18 Enforce | D2 | Sidechain transcript resume |
 | （新增） | D2-S15-A01-T10 | S15 Prepare | D2 | CompressHint no LLM（D2 不调 D3 摘要） |
+| D2-DIAG-T01 | D2-S23-A01-T01 | S23 LSP Tool | D2 | LSP `definition` operation 返回 location | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T02 | D2-S23-A01-T02 | S23 LSP Tool | D2 | LSP `references` operation 返回引用列表 | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T03 | D2-S23-A01-T03 | S23 LSP Tool | D2 | LSP `incoming_calls` 返回 call hierarchy | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P1 |
+| D2-DIAG-T04 | D2-S23-A02-T01 | S23 WindowAnalyzer | D2 | WindowAnalyzer 按 5 类拆分 token | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T05 | D2-S23-A02-T02 | S23 WindowAnalyzer | D2 | WindowAnalyzer role 路由（system/tool/thinking/reminder） | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T01 | TS-AST-T01 | tool-security AST | shared | Bash AST 阻止 heredoc 注入 | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T02 | TS-AST-T02 | tool-security AST | shared | Bash AST 阻止 zsh attack surface | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T03 | TS-AST-T03 | tool-security AST | shared | Bash AST 阻止 process/command substitution | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T04 | TS-AST-T04 | tool-security AST | shared | Bash AST 阻止 dangerous redirect (`>/dev/sda`) | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T05 | TS-AST-T05 | tool-security AST | shared | Bash AST 阻止 eval/source/exec/`.` | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -191,4 +244,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 60 | 59 | 1 | 18 |
+| 80 | 80 | 0 | 37 |
+
+> TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
+> TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。

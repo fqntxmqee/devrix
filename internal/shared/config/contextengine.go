@@ -27,6 +27,11 @@ type ContextEngineConfig struct {
 	Worktree           WorktreeConfig     `yaml:"worktree"`
 	TodoWrite          TodoWriteConfig    `yaml:"todo_write"`
 	MainTranscript     MainTranscriptConfig `yaml:"main_transcript"`
+	// Diagnostics DM-20260617-002 W13 (AC14) — 诊断 / 通知 / LSP / transcript 集中配置。
+	Diagnostics        DiagnosticsConfig  `yaml:"diagnostics"`
+	// Tools DM-20260617-007 W12 (AC12) — tool surface 可见性 / 风险阈值配置。
+	// 空 map / 未配置 = 所有 surface 全开, 风险阈值由每个 tool 自己声明。
+	Tools              ToolsConfig        `yaml:"tools"`
 }
 
 // MainTranscriptConfig controls append-only JSONL persistence for main sessions.
@@ -152,6 +157,8 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		Worktree:      DefaultWorktreeConfig(),
 		TodoWrite:      DefaultTodoWriteConfig(),
 		MainTranscript: DefaultMainTranscriptConfig(),
+		Diagnostics:    DefaultDiagnosticsConfig(),
+		Tools:          DefaultToolsConfig(),
 	}
 }
 
@@ -191,4 +198,100 @@ type TodoWriteConfig struct {
 // DefaultTodoWriteConfig returns default todo_write settings.
 func DefaultTodoWriteConfig() TodoWriteConfig {
 	return TodoWriteConfig{Enabled: true}
+}
+
+// DiagnosticsConfig DM-20260617-002 W13 (AC14) — 集中配置所有诊断 / 通知 /
+// LSP / transcript 子系统参数; 各 bootstrap / CLI / tool 入口从这里读取。
+type DiagnosticsConfig struct {
+	// TrackerLRUCapacity 文件诊断追踪器 LRU 上限。0 走 default (500)。
+	TrackerLRUCapacity int `yaml:"tracker_lru_capacity"`
+	// TrackerTickIntervalMs 周期 tick 间隔 (毫秒)。<=0 走 default (1000ms = 1s)。
+	TrackerTickIntervalMs int `yaml:"tracker_tick_interval_ms"`
+	// LSPEnabled 是否启用 LSP tool。默认 false,需配置 servers 才生效。
+	LSPEnabled bool `yaml:"lsp_enabled"`
+	// LSPServers 启用的 LSP server 列表。
+	LSPServers []LSPServerConfig `yaml:"lsp_servers"`
+	// DebugCategories 默认注入到 DebugFilter 的 category 列表 (与 --debug 等价)。
+	DebugCategories []string `yaml:"debug_categories"`
+	// TranscriptDir transcript .jsonl 落盘目录。空则按 $DEVRIX_TRANSCRIPT_DIR
+	// → ~/.devrix/transcripts fallback。
+	TranscriptDir string `yaml:"transcript_dir"`
+}
+
+// LSPServerConfig 描述一个 LSP server 启动命令 (D2-S7-A02 / G1)。
+type LSPServerConfig struct {
+	Name    string   `yaml:"name"`
+	Command string   `yaml:"command"`
+	Args    []string `yaml:"args"`
+}
+
+// DefaultDiagnosticsConfig returns sensible defaults; 0 值字段走 internal default。
+func DefaultDiagnosticsConfig() DiagnosticsConfig {
+	return DiagnosticsConfig{
+		TrackerLRUCapacity:   500,
+		TrackerTickIntervalMs: 1000,
+		LSPEnabled:           false,
+	}
+}
+
+// Normalized 填充 0 值字段为 default; 保留显式设置。
+func (c DiagnosticsConfig) Normalized() DiagnosticsConfig {
+	def := DefaultDiagnosticsConfig()
+	out := c
+	if out.TrackerLRUCapacity <= 0 {
+		out.TrackerLRUCapacity = def.TrackerLRUCapacity
+	}
+	if out.TrackerTickIntervalMs <= 0 {
+		out.TrackerTickIntervalMs = def.TrackerTickIntervalMs
+	}
+	return out
+}
+
+// ToolsConfig DM-20260617-007 W12 (AC12) — tool surface 可见性 / 风险阈值配置。
+// 按 surface name 索引, key 与 surface.Name() 一致 ("builtin" / "lsp" /
+// "free_fork" / "tracker" / "verify" / "delegate_*" / "background_task" / ...)。
+type ToolsConfig struct {
+	// Surfaces 显式 surface 级覆盖; 空 = 全开 (各 surface 暴露所有 tool)。
+	Surfaces map[string]SurfaceConfig `yaml:"surfaces"`
+	// RiskThreshold 全局风险阈值; tool.Risk 超过此值时被 per-risk filter 隐藏。
+	// 留空 "" = 不过滤, 暴露所有 risk 等级。
+	RiskThreshold string `yaml:"risk_threshold"`
+}
+
+// SurfaceConfig 单个 surface 的可见性 / 风险阈值覆盖。
+type SurfaceConfig struct {
+	// Enabled false = 整 surface 隐藏 (Tools() 返回空); 缺省 / nil = true。
+	Enabled *bool `yaml:"enabled"`
+	// RiskThreshold 覆盖全局阈值, 仅作用于本 surface。
+	RiskThreshold string `yaml:"risk_threshold"`
+}
+
+// DefaultToolsConfig returns sane defaults (all surfaces enabled, no threshold).
+func DefaultToolsConfig() ToolsConfig {
+	return ToolsConfig{
+		Surfaces: map[string]SurfaceConfig{},
+	}
+}
+
+// Normalized fills in nil Enabled pointers to point at true (no behavior change
+// for explicit false; the default action is "enabled unless explicitly disabled").
+func (c ToolsConfig) Normalized() ToolsConfig {
+	out := c
+	if out.Surfaces == nil {
+		out.Surfaces = map[string]SurfaceConfig{}
+	}
+	return out
+}
+
+// IsEnabled returns true if the surface is not explicitly disabled in config.
+// Returns true when the surface has no entry in the Surfaces map (default-on).
+func (c ToolsConfig) IsEnabled(surfaceName string) bool {
+	if c.Surfaces == nil {
+		return true
+	}
+	sc, ok := c.Surfaces[surfaceName]
+	if !ok || sc.Enabled == nil {
+		return true
+	}
+	return *sc.Enabled
 }

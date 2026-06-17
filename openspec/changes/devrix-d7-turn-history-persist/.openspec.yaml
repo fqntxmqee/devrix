@@ -1,0 +1,20 @@
+change_id: devrix-d7-turn-history-persist
+priority: P0
+demand_id: DM-20260617-003
+status: s3_design
+domains: [D7, D2]
+dsaft_scenarios: [D7-S5, D2-S3]
+dsaft_activities:
+  - D7-S5-A04        # D7 turn history persist bridge
+  - D2-S3-A02        # D2 memory append+trim bridge
+t_points:
+  - D7-S5-A04-T01
+  - D7-S5-A04-T02
+  - D2-S3-A02-T01
+  - D2-S3-A02-T02
+version_scope:
+  v1.0: D7 turn history persist bridge (P0 bug fix)
+metrics_definitions: []
+span_naming:
+  - D7-S5-A04: d7.turn.persist
+  - D2-S3-A02: d2.memory.append_and_trim

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -32,10 +33,15 @@ func newToolExecConfig(toolCfg *config.ToolConfig) *toolExecConfig {
 		toolCfg = config.DefaultToolConfig()
 	}
 	enabled := toolCfg.SandboxEnabled()
+	policy := NewCommandPolicy(enabled, toolCfg.Sandbox.AllowlistExtra, toolCfg.Sandbox.DenyPatternsExtra)
+	// DM-20260617-002 W4 (AC10): 注入 G2 Bash AST analyzer，仅当 ASTEnabled=true。
+	if enabled && toolCfg.ASTEnabled() {
+		policy.ASTAnalyzer = sandboxast.NewPolicyAnalyzer()
+	}
 	return &toolExecConfig{
 		timeout:        defaultToolTimeout,
 		maxOutputBytes: defaultMaxToolOutput,
-		policy:         NewCommandPolicy(enabled, toolCfg.Sandbox.AllowlistExtra, toolCfg.Sandbox.DenyPatternsExtra),
+		policy:         policy,
 		auditEnabled:   enabled,
 	}
 }

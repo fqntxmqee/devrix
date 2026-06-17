@@ -29,7 +29,7 @@ func TestIntegration_D7Entry_MissingOrchestrationEntryFailsFast(t *testing.T) {
 		t.Fatalf("store: %v", err)
 	}
 	handler := testutil.NewMockEventHandler()
-	gw := capture.NewCommunicationGateway(store, handler, capture.NewPermissionManager(&config.DefaultConfig().Permission), config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, capture.NewPermissionManager(&config.DefaultConfig().Permission), config.DefaultConfig(), nil)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {

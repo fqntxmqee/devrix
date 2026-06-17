@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/devrix/devrix/internal/cli/doctor"
+	"github.com/devrix/devrix/internal/cli/context_analyze"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/renderers"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -39,18 +42,27 @@ type CLIAdapter struct {
 	permissionHandler func(*types.PermissionRequest) bool
 }
 
-// NewCLIAdapter creates a new CLIAdapter
+// NewCLIAdapter creates a new CLIAdapter.
+//
+// DM-20260617-008 W4: tm is the workmodel.TaskManager used for /task CLI
+// commands. Pass nil to disable task commands (was: read from
+// workmodel.GlobalTaskManager process-wide singleton).
 func NewCLIAdapter(
 	gw *capture.CommunicationGateway,
 	cfg *config.CommunicationConfig,
+	tm *workmodel.TaskManager,
 ) *CLIAdapter {
+	var taskCmds *workmodel.CLICommands
+	if tm != nil {
+		taskCmds = workmodel.NewCLICommands(tm)
+	}
 	return &CLIAdapter{
 		gateway:      gw,
 		renderer:     renderers.NewCLIRenderer(cfg.CLI.ANSI),
 		cfg:          cfg,
 		reader:       bufio.NewReader(os.Stdin),
 		writer:       os.Stdout,
-		taskCommands: workmodel.NewCLICommands(workmodel.GlobalTaskManager),
+		taskCommands: taskCmds,
 		planMode:     workmodel.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
 	}
 }
@@ -191,6 +203,12 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 	case types.CommandPlan:
 		a.handlePlanCommand(cmd.Args)
 
+	case types.CommandDoctor:
+		a.handleDoctorCommand(ctx, cmd.Args)
+
+	case types.CommandContextAnalyze:
+		a.handleContextAnalyzeCommand(ctx, cmd.Args)
+
 	default:
 		a.writer.Write([]byte(fmt.Sprintf("%sUnknown command: %s%s\n", a.cfg.CLI.ANSI.Warning, input, a.cfg.CLI.ANSI.Reset)))
 		a.showHelp()
@@ -240,6 +258,10 @@ func (a *CLIAdapter) handleTaskCommand(args []string) {
 		return
 	}
 
+	if a.taskCommands == nil {
+		a.writer.Write([]byte("task commands disabled (no TaskManager wired)\n"))
+		return
+	}
 	output := a.taskCommands.Handle(cmd, sessionID)
 	a.writer.Write([]byte(output + "\n"))
 }
@@ -258,6 +280,60 @@ func (a *CLIAdapter) handlePlanCommand(args []string) {
 	planCommands := workmodel.NewPlanCLICommands(a.planMode)
 	output := planCommands.Handle(args, sessionID, workDir, nil)
 	a.writer.Write([]byte(output + "\n"))
+}
+
+// handleDoctorCommand 触发 /doctor 自检(把当前 session 的 workdir + transcript dir
+// 传给 cli/doctor 包), DM-20260617-002 W9 (AC1)。
+func (a *CLIAdapter) handleDoctorCommand(_ context.Context, args []string) {
+	// 把 workdir 注入到 args
+	extra := []string{}
+	a.mu.RLock()
+	if a.currentSession != nil && a.currentSession.WorkDir != "" {
+		extra = append(extra, "--workdir="+a.currentSession.WorkDir)
+	}
+	a.mu.RUnlock()
+	merged := append(extra, args...)
+	// 重新绑定 writer 防止 doctorcli 写到 caller 的 stdout, 这里用 cli adapter writer
+	old := os.Stdout
+	pr, pw, _ := os.Pipe()
+	os.Stdout = pw
+	done := make(chan struct{})
+	var buf bytes.Buffer
+	go func() {
+		_, _ = io.Copy(&buf, pr)
+		close(done)
+	}()
+	_ = doctorcli.Run(merged)
+	_ = pw.Close()
+	os.Stdout = old
+	<-done
+	a.writer.Write(buf.Bytes())
+}
+
+// handleContextAnalyzeCommand 触发 /context analyze, DM-20260617-002 W10 (AC2)。
+// 当前 session 有 chat_id/session id 时自动注入 --session 参数。
+func (a *CLIAdapter) handleContextAnalyzeCommand(_ context.Context, args []string) {
+	extra := []string{}
+	a.mu.RLock()
+	if a.currentSession != nil && a.currentSession.SessionID != "" {
+		extra = append(extra, "--session="+a.currentSession.SessionID)
+	}
+	a.mu.RUnlock()
+	merged := append(extra, args...)
+	old := os.Stdout
+	pr, pw, _ := os.Pipe()
+	os.Stdout = pw
+	done := make(chan struct{})
+	var buf bytes.Buffer
+	go func() {
+		_, _ = io.Copy(&buf, pr)
+		close(done)
+	}()
+	_ = contextanalyze.Run(merged)
+	_ = pw.Close()
+	os.Stdout = old
+	<-done
+	a.writer.Write(buf.Bytes())
 }
 
 // sendMessage sends a message to the gateway

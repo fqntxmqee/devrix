@@ -53,7 +53,7 @@ func NewHub(deps HubDeps) *Hub {
 	}
 	q := deps.Queue
 	if q == nil {
-		q = sessionqueue.GlobalSessionQueue
+		q = sessionqueue.NewSessionQueue()
 	}
 	return &Hub{
 		cfg:          cfg,
@@ -64,18 +64,6 @@ func NewHub(deps HubDeps) *Hub {
 		obsBridge:    deps.ObsBridge,
 		lastToolEmit: make(map[string]time.Time),
 	}
-}
-
-// GlobalHub is the process-wide execution flow hub (NoOp until wired).
-var GlobalHub contracts.ExecutionFlowHub = contracts.NoOpExecutionFlowHub{}
-
-// SetGlobalHub replaces GlobalHub (bootstrap).
-func SetGlobalHub(h contracts.ExecutionFlowHub) {
-	if h == nil {
-		GlobalHub = contracts.NoOpExecutionFlowHub{}
-		return
-	}
-	GlobalHub = h
 }
 
 // Publish records a flow event and fans out to Leader queue and IM.

@@ -53,7 +53,7 @@ func main() {
 		ObsBridge:  obsBridge,
 	})
 
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg, nil)
 	gw.SetObservability(obs)
 	if err := bootstrap.InitOrchestration("", gw, engine, obsBridge, llmbridge.ContextLLMStack{}, nil); err != nil {
 		log.Fatal(err)

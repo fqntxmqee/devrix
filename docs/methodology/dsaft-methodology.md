@@ -296,4 +296,87 @@ D2（用户领域 / 公共域）
 
 ---
 
+## 十二、Facet Decomposition 案例：ToolSurface + ToolFilter
+
+DSAFT 不只描述"按 D 切领域"，也指导"按 Facet（面）切关注点"。
+当一个领域有 N 个正交关注点（可见性 / 风险 / 调度 / 可观测性...）
+同时被 N 个独立模块消费，**拆面**比**拆域**更适合。
+
+### 12.1 反例：3 入口重复装配 + 6+ global singleton
+
+```
+NewContextEngine     → 注册 7 tool, 5 global var
+buildWithGate        → 注册 7 tool, 5 global var (重复)
+WireDelegate         → 注册 4 tool, 2 global var
+```
+
+- 每次"加 tool" → 改 3 处 + 1 global + 1 allowlist
+- 每次"新 agent 模式" → 改 3 处 + 1 filter
+- 6+ global singleton 让"谁注册了谁没注册"无法静态分析
+- 任意一个 engine 漏注册一个 tool → LLM 收到 "unknown tool"
+
+### 12.2 拆面契约定型（正交关注点）
+
+```go
+// shared/contracts/tool_surface.go
+type ToolSurface interface {
+    Name() string
+    Tools(ctx, workDir, sessionID) []ToolSpec
+    RiskLevel(name) RiskLevel
+    Execute(ctx, name, input, workDir) (*ToolResult, error)
+}
+
+// shared/contracts/tool_filter.go
+type ToolFilter interface {
+    Apply(specs []ToolSpec, ctx FilterCtx) []ToolSpec
+}
+```
+
+| 关注点 | 拆面契约 | 实现位置 |
+|--------|----------|----------|
+| "有什么 tool" | `ToolSurface.Tools()` | 每个 surface 一个文件 |
+| "这个 tool 风险多大" | `ToolSurface.RiskLevel()` | 同上 |
+| "执行 tool" | `ToolSurface.Execute()` | 同上 |
+| "这个 agent 能看什么" | `ToolFilter.Apply()` | toolpolicy / per-risk / per-session |
+| "执行链路" | `findSurface(name) → surf.Execute()` | turn_adapter |
+
+### 12.3 拆面 vs 拆域
+
+| 维度 | 拆域 (D-S-A) | 拆面 (Facet) |
+|------|--------------|--------------|
+| 切分依据 | 业务边界 (Bounded Context) | 关注点 (Concern) |
+| 适用场景 | 多业务实体共变 | 同实体多关注点交织 |
+| 复用方式 | 域内组合 | 跨域叠加 |
+| 演化单元 | 整个域的 spec / design / impl | 单个面契约 + 一组实现 |
+| 代价 | 跨域调用需 IPC / RPC | 跨面仅是 interface 组合 |
+
+**判定**：当 ≥3 个模块**同时**需要"工具可见性 / 风险 / 调度"这三个关注点的
+不同子集时，拆面比拆域收益高。
+
+### 12.4 devrix 实战（DM-20260617-007）
+
+| 指标 | 拆面前 | 拆面后 |
+|------|--------|--------|
+| 入口数 | 3 (NewContextEngine / buildWithGate / WireDelegate) | 1 (BuildSurfaces) |
+| Global singleton | 12 个 | 3 (PR #63) → 0 (PR #64 目标) |
+| "加 tool" 改动点 | 3 文件 + 1 global + 1 allowlist | 1 个 surface 文件 + 注册到 BuildSurfaces |
+| 等价性测试 | 无 | `TestBuildWithGate_SupersetOfMainEngineTools` |
+| 可发现性 | 注册 side effect | `devrix tool list` 直接 dump |
+
+参考 OpenSpec change: `openspec/changes/devrix-tool-surface-contract/` (DM-20260617-007).
+
+### 12.5 拆面 checklist
+
+判断何时需要拆面：
+
+- [ ] ≥3 个模块同时关心同一资源的多个正交维度
+- [ ] 任意 1 个模块的变更会强制另外 N-1 个模块也改动
+- [ ] "加一条规则" / "加一个 provider" 需要碰 ≥3 处
+- [ ] process-wide global singleton ≥3 个
+- [ ] 跨模块测试 setup 出现 `defer reset(global)` 反模式
+
+满足 ≥3 条 → 启动 Facet Decomposition 拆面契约定型。
+
+---
+
 *DSAFT 架构方法论 v4.0.0 — D 领域 / S 场景 / A 活动 / F 功能点 / T 测试点*
