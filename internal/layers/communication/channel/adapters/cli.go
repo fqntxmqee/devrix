@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/devrix/devrix/internal/cli/doctor"
+	"github.com/devrix/devrix/internal/cli/context_analyze"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/renderers"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -196,6 +197,9 @@ func (a *CLIAdapter) handleCommand(ctx context.Context, input string) error {
 	case types.CommandDoctor:
 		a.handleDoctorCommand(ctx, cmd.Args)
 
+	case types.CommandContextAnalyze:
+		a.handleContextAnalyzeCommand(ctx, cmd.Args)
+
 	default:
 		a.writer.Write([]byte(fmt.Sprintf("%sUnknown command: %s%s\n", a.cfg.CLI.ANSI.Warning, input, a.cfg.CLI.ANSI.Reset)))
 		a.showHelp()
@@ -287,6 +291,32 @@ func (a *CLIAdapter) handleDoctorCommand(_ context.Context, args []string) {
 		close(done)
 	}()
 	_ = doctorcli.Run(merged)
+	_ = pw.Close()
+	os.Stdout = old
+	<-done
+	a.writer.Write(buf.Bytes())
+}
+
+// handleContextAnalyzeCommand 触发 /context analyze, DM-20260617-002 W10 (AC2)。
+// 当前 session 有 chat_id/session id 时自动注入 --session 参数。
+func (a *CLIAdapter) handleContextAnalyzeCommand(_ context.Context, args []string) {
+	extra := []string{}
+	a.mu.RLock()
+	if a.currentSession != nil && a.currentSession.SessionID != "" {
+		extra = append(extra, "--session="+a.currentSession.SessionID)
+	}
+	a.mu.RUnlock()
+	merged := append(extra, args...)
+	old := os.Stdout
+	pr, pw, _ := os.Pipe()
+	os.Stdout = pw
+	done := make(chan struct{})
+	var buf bytes.Buffer
+	go func() {
+		_, _ = io.Copy(&buf, pr)
+		close(done)
+	}()
+	_ = contextanalyze.Run(merged)
 	_ = pw.Close()
 	os.Stdout = old
 	<-done
