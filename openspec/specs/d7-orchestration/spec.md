@@ -579,6 +579,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | D1 entry | D1 → D7 | `ProcessMessage` | IMPLEMENTED |
 | **DM-020 LLMCaller 拆面** | **D7 → D2** | `contracts.LLMCaller` ← `turn.QueryLLMCaller` | **IMPLEMENTED** |
 | **DM-020 Summarizer 拆面** | **D7 → D2** | `contracts.Summarizer` ← `turn.CompressionSummarizer` | **IMPLEMENTED** |
+| **DM-20260617-008 Tool 端到端链路** | **D7 → D2** | `turn_adapter.ExecuteRound` (派发闸口) | **IMPLEMENTED** — 完整链路 SoT 在 `openspec/specs/d2-context-engine/spec.md` §"Tool Call End-to-End Flow" (Chain A/B/C + 5 surface 派发表 + 跨域拓扑) |
 
 ---
 
@@ -603,3 +604,4 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.3.0** | **2026-06-16** | **devrix-d7-uncertainty-gaps (DM-20260616-001) 归档**：(1) PlanAgent 运行时门控 Gherkin scenarios（4 T 点）；(2) PlanMode LLM 守卫（2 T 点）；(3) ConflictGuard 原子 Allow+Register（4 T 点）；(4) OrchestratePath FlowEvent sink 恢复（2 T 点）；(5) PlanModeApproveGate 死配置移除（2 T 点）；(6) 死代码 Deprecated 标记（2 T 点） |
 | **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |
 | **3.5.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) ADDED Requirements：D2 QueryLoop Legacy Path Decommission（loopFirst=true 主路径护栏 + 拆面 adapter 零调用 + legacy metric 暴露 + CLI 警告 + D2-S10 spec.md LEGACY 标记）；(2) 6 个 Gherkin Scenario 覆盖 AC1-AC7；(3) T09/T10 + T04/T05 注册 |
+| **3.6.0** | **2026-06-17** | **devrix-tool-surface-phase2-full (DM-20260617-008) 工具调用链路登记**：(1) Cross-Domain Contracts 表新增 DM-20260617-008 行（指 D2 spec §"Tool Call End-to-End Flow" 为完整链路 SoT）；(2) 端到端 Chain A/B/C 视图（3 链 7 surface 5 domain 拓扑）由 D2 spec 持有, D7 通过本表反查 |
