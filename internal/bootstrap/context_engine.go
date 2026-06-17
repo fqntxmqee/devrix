@@ -100,6 +100,13 @@ func NewContextEngine(
 	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
 		slog.Error("register free_fork tool", "error", err)
 	}
+	// TOOL-SURFACE-1 (W11): build the forker closure once and pass it
+	// to both the legacy wireFreeForkerInjection (which injects via
+	// the global setter) and BuildSurfaces (which passes it explicitly
+	// to the FreeForkSurface). The two paths share the same closure;
+	// the surface path is the primary one. The global is kept in
+	// phase 1 for legacy compatibility and will be removed in W11
+	// phase 2.
 	wireFreeForkerInjection()
 	wireTaskNotifDrainer()
 
@@ -153,11 +160,17 @@ func NewContextEngine(
 	// on the engine for the W9 turn_adapter surface dispatch path.
 	// For now, the legacy Tools/ToolsReg path is still in use and
 	// produces the same tool set the leader LLM sees.
+	//
+	// TOOL-SURFACE-1 (W11 partial): pass the same forker closure the
+	// legacy wireFreeForkerInjection installs. The surface path is
+	// primary; the global injection is the legacy back-compat. When
+	// the surface set covers all callers, the global injection can
+	// be removed.
 	surfaces := BuildSurfaces(SurfaceBuildOpts{
 		ToolReg:   toolReg,
 		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
 		Tracker:   diagTracker,
-		Forker:    nil, // FreeFork wired via legacy RegisterFreeForkTool above
+		Forker:    freeforkGlobalFunc,
 	})
 
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
