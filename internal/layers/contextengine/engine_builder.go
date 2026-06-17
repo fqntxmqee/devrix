@@ -4,14 +4,14 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/usercontext"
-	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
-	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
+	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/contextengine/token"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
@@ -51,18 +51,18 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	ucProvider := usercontext.NewProvider(prompt.NewLoader(&cfg.SystemPrompt), cfg.UserContext)
 
 	loop := &query.Loop{
-		LLM:             queryCaller,
-		Tools:           query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
-		Permission:      query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
-		UserContext:     ucProvider,
+		LLM:         queryCaller,
+		Tools:       query.NewToolExecutor(deps.Tools, toolsReg, deps.ObsBridge),
+		Permission:  query.NewPermChecker(deps.Permission, toolsReg, deps.ObsBridge),
+		UserContext: ucProvider,
 		WrapToolContext: func(ctx context.Context, sc *types.SessionContext) context.Context {
 			return ToolContextWithGate(ctx, sc, deps.Permission)
 		},
 		WrapToolStreamContext: func(ctx context.Context, emit query.EmitFunc, sessionID, toolName string) context.Context {
 			return withToolStreamEmitter(ctx, emit, sessionID, toolName)
 		},
-		StreamingTools:    cfg.QueryLoop.StreamingTools,
-		Observability:     deps.ObsBridge,
+		StreamingTools: cfg.QueryLoop.StreamingTools,
+		Observability:  deps.ObsBridge,
 	}
 	// DM-20260617-001: wire the legacy-path counter so any
 	// loopFirst=false invocation bumps
@@ -94,27 +94,32 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 
 	return &ContextEngine{
-		memory:       memory.NewManager(cfg, store, deps.LongTerm),
-		counter:      counter,
-		queryLoop:    loop,
-		prompt:       prompt.NewLoader(&cfg.SystemPrompt),
-		cfg:          cfg,
-		observer:     observer,
-		compObserver: compObserver,
-		obsBridge:    deps.ObsBridge,
-		asyncCompact: asyncCompact,
-		tools:        deps.Tools,
-		toolsReg:     toolsReg,
-		permission:   deps.Permission,
-		assembler:    prompt.NewSystemPromptAssembler(cfg.Workspace),
-		mainTranscript: mainTranscript,
-		attachReg:      attachments.NewRegistry(cfg.Attachments),
-		sessionQueue:   deps.SessionCommandQueue,
-		defaultModel: deps.DefaultModel,
-		tierResolver: deps.TierResolver,
+		memory:              memory.NewManager(cfg, store, deps.LongTerm),
+		counter:             counter,
+		queryLoop:           loop,
+		prompt:              prompt.NewLoader(&cfg.SystemPrompt),
+		cfg:                 cfg,
+		observer:            observer,
+		compObserver:        compObserver,
+		obsBridge:           deps.ObsBridge,
+		asyncCompact:        asyncCompact,
+		tools:               deps.Tools,
+		toolsReg:            toolsReg,
+		permission:          deps.Permission,
+		assembler:           prompt.NewSystemPromptAssembler(cfg.Workspace),
+		mainTranscript:      mainTranscript,
+		attachReg:           attachments.NewRegistry(cfg.Attachments),
+		sessionQueue:        deps.SessionCommandQueue,
+		defaultModel:        deps.DefaultModel,
+		tierResolver:        deps.TierResolver,
 		agentRoleToolFilter: deps.AgentRoleToolFilter,
-		queryCaller: queryCaller,
-		summarizer:  summarizer,
+		queryCaller:         queryCaller,
+		summarizer:          summarizer,
+		// TOOL-SURFACE-1 (W8): surface list + filter chain from deps.
+		// nil in phase 1 means legacy path; non-nil in phase 2 enables
+		// the W9 turn_adapter surface dispatch.
+		surfaces: deps.Surfaces,
+		filters:  deps.Filters,
 	}
 }
 

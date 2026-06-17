@@ -148,6 +148,18 @@ func NewContextEngine(
 		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
 	})
 
+	// TOOL-SURFACE-1 (W8): assemble the surface list from the same
+	// dependencies the legacy registry uses. The surfaces are stored
+	// on the engine for the W9 turn_adapter surface dispatch path.
+	// For now, the legacy Tools/ToolsReg path is still in use and
+	// produces the same tool set the leader LLM sees.
+	surfaces := BuildSurfaces(SurfaceBuildOpts{
+		ToolReg:   toolReg,
+		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:   diagTracker,
+		Forker:    nil, // FreeFork wired via legacy RegisterFreeForkTool above
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		// LLM deliberately omitted — production must go through DM-020 拆面.
 		TokenCounter:        stack.TokenCounter,
@@ -164,13 +176,16 @@ func NewContextEngine(
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).
+		Surfaces: surfaces,
+		Filters:  nil,
 	})
 }
 
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
-	_ contracts.LLMCaller     = (*turn.QueryLLMCaller)(nil)
-	_ contracts.Summarizer    = (*turn.CompressionSummarizer)(nil)
-	_ contracts.IEngine       = (*contextengine.ContextEngine)(nil)
+	_ contracts.LLMCaller       = (*turn.QueryLLMCaller)(nil)
+	_ contracts.Summarizer      = (*turn.CompressionSummarizer)(nil)
+	_ contracts.IEngine         = (*contextengine.ContextEngine)(nil)
 	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)
 )
