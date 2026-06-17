@@ -33,9 +33,17 @@ import (
 )
 
 func main() {
+	// DM-20260617-002 W5 (AC12): 在最早时机解析 --debug flag 并安装 filter，
+	// 这样后续所有 slog 调用都受 categories 白名单过滤。
+	debugCategories := bootstrap.ParseDebugFlag(os.Args[1:])
+
 	// Go 1.26: replace default slog handler before any log call to avoid
 	// circular log→slog→log deadlock in the runtime default handler.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	if len(debugCategories) > 0 {
+		bootstrap.InstallDebugFilter(debugCategories)
+	}
 
 	if len(os.Args) >= 2 && os.Args[1] == "debug" {
 		if err := clidebug.Run(os.Args[2:]); err != nil {
