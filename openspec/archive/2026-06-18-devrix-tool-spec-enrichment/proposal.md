@@ -1,10 +1,11 @@
 # S2 提案：ToolSpec orthogonal flags + InterruptBehavior + BuildSurfaces sort
 
 **Change ID:** devrix-tool-spec-enrichment
-**DM ID:** DM-20260618-001
-**状态:** S2_Clarified
-**提案人:** AI Assistant
-**日期:** 2026-06-18
+**Demand ID:** DM-20260618-001
+**Status:** S7_Archived
+**Priority:** P0
+**Date:** 2026-06-18
+**Merged PR:** [#67](https://github.com/fqntxmqee/devrix/pull/67)
 
 ---
 
