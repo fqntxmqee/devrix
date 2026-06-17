@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-tool-surface-contract
 **Demand ID:** DM-20260617-007
-**Status:** S2_Design
+**Status:** S7_Archived (PR #63 merged 2026-06-17; PR #64 followup W11 phase 2 full split)
 **Priority:** P0
 **DSAFT:** D2-S4 (Tool Registration 场景) + D7-S5 (Per-agent Tool Visibility 场景) + 新增横切契约域 TOOL-SURFACE
 

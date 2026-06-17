@@ -1,7 +1,11 @@
 change_id: devrix-tool-surface-contract
 priority: P0
 demand_id: DM-20260617-007
-status: s1_proposal
+status: s7_archived
+archived: 2026-06-17
+phase_2_split:
+  pr_63: feat/devrix-tool-surface-contract (W11 phase 2c + W12 + 阶段 1 全量)
+  pr_64_followup: devrix-tool-surface-phase2-full (W11 阶段 2 完整, 剩余 5 global)
 domains: [D2, D7, tool-surface]
 dsaft_scenarios:
   - D2-S4               # Tool Registration 场景（主入口收编）

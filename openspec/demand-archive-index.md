@@ -78,6 +78,7 @@
 | **DM-20260616-001** | **D7 不确定性处理能力缺口修复 — 5 个关键缺口闭环** | **devrix-d7-uncertainty-gaps** | **2026-06-16** | **—** | **ACCEPTED (6 AC PASS; 13 packages + 25 integration tests -race 全绿)** |
 | **DM-20260616-002** | **D7 Loop-First 路由 — Clawcode 对齐 ingress + tool 门控 Wave** | **devrix-d7-loop-first-routing** | **2026-06-16** | **[#46](https://github.com/fqntxmqee/devrix/pull/46)** | **ACCEPTED (L5-01..06 PASS; unit + D7 integration -race 全绿)** |
 | **DM-20260616-003** | **诊断工具能力差距闭环 — 对齐 clawcode (Claude Code v2.1.88)** | **devrix-diagnostic-tools-parity** | **2026-06-17** | **—** | **ACCEPTED (13 能力一次性交付: G1-G6 核心差距 + A1-A7 附加; 21 新文件 + 4 wiring; 7 域 t-registry +36; go build/vet/test -race 全绿; testbuild tag 全绿)** |
+| **DM-20260617-007** | **工具面契约化 — ToolSurface + ToolFilter 拆面 + 6+ global 两阶段删除** | **devrix-tool-surface-contract** | **2026-06-17** | **—** | **PARTIAL (PR #63 done: W1-W12, 7 surface + 3 filter + 1 dispatch, 12 global → 3, 3 入口 → 1; PR #64 收尾剩 5 global; 17/22 AC PASS, 4 PARTIAL, 1 PENDING W14 归档脚本)** |
 
 ## Archive Locations
 
