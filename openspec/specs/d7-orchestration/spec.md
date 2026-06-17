@@ -431,6 +431,69 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 - THEN the file contains a `Deprecated:` comment
 - AND the existing tests still pass
 
+### Requirement: D2 QueryLoop Legacy Path Decommission (devrix-queryloop-legacy-decommission)
+
+The D7 RunTurnLoop canonical path MUST remain the default (loopFirst=true) and is unaffected by this change. The LEGACY D2.QueryLoop.Run path (loopFirst=false) MUST emit a deprecation warning and increment a metric counter, but MUST continue to function for emergency rollback.
+
+See `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC) for full context.
+
+**Priority**: P0
+**T mapping**: D7-S2-A06-T09, D7-S2-A06-T10, D5-S24-A02-T04, D5-S24-A02-T05
+
+#### Scenario: LoopFirst=true — D2 QueryLoop never invoked
+
+- GIVEN devrix.yaml has loopFirst=true (default)
+- WHEN 100 independent sessions complete a full turn
+- THEN `d2_query_loop_legacy_invocations_total` counter == 0
+- AND the D2→D3 facade adapter (`internal/shared/contracts/llm_facade.go`) is loaded but never invoked
+- AND `internal/layers/orchestration/turn/query_llm_caller.go` is loaded but never invoked
+
+<!-- T: D7-S2-A06-T09, D7-S2-A06-T10 -->
+
+#### Scenario: LoopFirst=false — deprecation warning emitted once per process
+
+- GIVEN devrix.yaml explicitly sets loopFirst=false
+- WHEN `D2.QueryLoop.Run()` is invoked multiple times in the same process
+- THEN slog.Warn is emitted exactly once with message "D2.QueryLoop.Run is deprecated; use D7 RunTurnLoop (loopFirst=true)"
+- AND `d2_query_loop_legacy_invocations_total` increments on every invocation
+
+<!-- T: D5-S24-A02-T05 -->
+
+#### Scenario: Legacy metric exposed on /metrics endpoint
+
+- GIVEN devrix is running with observability enabled
+- WHEN the `/metrics` endpoint is scraped
+- THEN `d2_query_loop_legacy_invocations_total` appears in the response
+- AND the metric type is `counter`
+- AND the metric has no labels
+
+<!-- T: D5-S24-A02-T04 -->
+
+#### Scenario: LoopFirst=false CLI flag warning visible
+
+- GIVEN the user runs `devrix --help`
+- WHEN the help text for `--loop-first` is displayed
+- THEN the text contains "WARNING", "LEGACY", and "ONLY for temporary rollback"
+- AND it references `openspec/tech-debt/queryloop-location.md`
+
+#### Scenario: Main path code unchanged
+
+- GIVEN the diff between this change and the previous release tag
+- WHEN files in the main path are inspected
+- THEN `internal/layers/orchestration/turn/orchestrator.go` has 0 line changes
+- AND `internal/layers/orchestration/turn/llm.go` has 0 line changes
+- AND `internal/bootstrap/wire_coordinator.go` has 0 line changes
+- AND `internal/shared/contracts/llm_facade.go` has 0 line changes
+- AND `internal/layers/orchestration/turn/query_llm_caller.go` has 0 line changes
+
+#### Scenario: D2-S10 spec.md marked LEGACY
+
+- GIVEN `openspec/specs/d2-context-engine/spec.md`
+- WHEN the D2-S10 Requirement section is read
+- THEN it begins with "⚠️ LEGACY PATH" marker
+- AND the marker links to `openspec/tech-debt/queryloop-location.md`
+- AND existing Scenarios are preserved (no deletions)
+
 ---
 
 ## REMOVED Requirements
@@ -539,3 +602,4 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.4.0** | **2026-06-16** | **devrix-d7-loop-first-routing (DM-20260616-002)**：(1) `routing_mode=loop_first` 默认 ingress → Turn；(2) `delegate_wave` / `enter_plan_mode` tool 门控 Wave/Plan；(3) EngineEvent 单投递路径；(4) `rule_orchestrate` 回滚；(5) L5-01..06 登记 |
 | **3.3.0** | **2026-06-16** | **devrix-d7-uncertainty-gaps (DM-20260616-001) 归档**：(1) PlanAgent 运行时门控 Gherkin scenarios（4 T 点）；(2) PlanMode LLM 守卫（2 T 点）；(3) ConflictGuard 原子 Allow+Register（4 T 点）；(4) OrchestratePath FlowEvent sink 恢复（2 T 点）；(5) PlanModeApproveGate 死配置移除（2 T 点）；(6) 死代码 Deprecated 标记（2 T 点） |
 | **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |
+| **3.5.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) ADDED Requirements：D2 QueryLoop Legacy Path Decommission（loopFirst=true 主路径护栏 + 拆面 adapter 零调用 + legacy metric 暴露 + CLI 警告 + D2-S10 spec.md LEGACY 标记）；(2) 6 个 Gherkin Scenario 覆盖 AC1-AC7；(3) T09/T10 + T04/T05 注册 |

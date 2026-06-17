@@ -51,6 +51,18 @@ func InitOrchestration(
 	if coordCfg.RoutingMode == "rule_orchestrate" {
 		routingMode = coordinator.RoutingModeRuleOrchestrate
 	}
+	// DM-20260617-001: when the operator opts into rule_orchestrate
+	// (legacy routing) the boot log carries a deprecation warning so
+	// the choice is visible without scraping metrics. The corresponding
+	// per-Run() warning lives in `query.Loop.Run` and is gated by
+	// sync.Once.
+	if routingMode == coordinator.RoutingModeRuleOrchestrate {
+		slog.Warn("d7: routing_mode=rule_orchestrate is DEPRECATED; ingress will reach D2.QueryLoop.Run and bump d2_query_loop_legacy_invocations_total. Set routing_mode=loop_first (default) to silence this warning.",
+			"change", "devrix-queryloop-legacy-decommission",
+			"dm", "DM-20260617-001",
+			"canonical_path", "D7-S2-A06 RunTurnLoop",
+		)
+	}
 	coordinatorFileCfg := coordinator.FileConfig{
 		Enabled:           boolPtr(coordCfg.Enabled),
 		RoutingMode:       strPtr(string(routingMode)),

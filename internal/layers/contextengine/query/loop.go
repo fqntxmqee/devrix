@@ -3,12 +3,15 @@ package query
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/usercontext"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -48,15 +51,59 @@ type Loop struct {
 	// FallbackLLM. nil means "never fallback" (the safer default).
 	// Production code wires `query.IsOverloadOr5xx` (see recovery.go).
 	FallbackOnErr func(err error) bool
+
+	// LegacyCounter (DM-20260617-001) increments the
+	// `d2_query_loop_legacy_invocations_total` counter on every Run().
+	// nil disables the metric (e.g. for unit tests that do not need
+	// to spin up the observability registry).
+	LegacyCounter metrics.Counter
+	// warnLegacyOnce ensures the deprecation log line is emitted at
+	// most once per Loop instance, even when Run() is invoked
+	// thousands of times under load. Production wiring creates a
+	// single Loop at boot, so this is effectively per-process; tests
+	// that allocate multiple Loops must reset their own expectation.
+	warnLegacyOnce sync.Once
 }
 
 // Run executes the loop until no tool calls, max turns, cancel, or hook stop.
+//
+// # DEPRECATED (DM-20260617-001)
+//
+// Loop.Run is the D2-S10 main loop reached only when
+// `loopFirst=false` (legacy routing). The canonical orchestration
+// path is D7-S2-A06 RunTurnLoop, which is the default when
+// loopFirst=true. New code must NOT call this method directly;
+// production wiring should disable the legacy path entirely
+// (see `internal/layers/orchestration/coordinator.IsLoopFirst`).
+//
+// The deprecation contract is enforced through three signals:
+//  1. A run-level bump of `d2_query_loop_legacy_invocations_total`
+//     (D5-S24-A02) so SRE can alert on any drift above zero.
+//  2. A one-shot `slog.Warn` per Loop instance so operators see
+//     the message in startup logs but do not get spammed at runtime.
+//  3. This docstring is mirrored in
+//     `openspec/specs/d2-context-engine/spec.md` D2-S10.
 func (l *Loop) Run(
 	ctx context.Context,
 	sc *types.SessionContext,
 	params Params,
 	emit EmitFunc,
 ) (*Result, error) {
+	if l.LegacyCounter != nil {
+		l.LegacyCounter.Inc()
+	}
+	l.warnLegacyOnce.Do(func() {
+		sessionID := ""
+		if sc != nil {
+			sessionID = sc.SessionID
+		}
+		slog.Warn("D2.QueryLoop.Run is DEPRECATED; use D7 RunTurnLoop (loopFirst=true).",
+			"change", "devrix-queryloop-legacy-decommission",
+			"dm", "DM-20260617-001",
+			"session_id", sessionID,
+			"canonical_path", "D7-S2-A06 RunTurnLoop",
+		)
+	})
 	if l.LLM == nil {
 		return nil, fmt.Errorf("query loop: LLM is nil")
 	}
