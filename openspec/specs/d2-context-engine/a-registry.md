@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.0.0
-**Last Updated:** 2026-06-16
+**Version:** 4.1.0
+**Last Updated:** 2026-06-18
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d2-domain.md`
 
@@ -56,14 +56,25 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 ### D2-S18: EnforceExecutionPolicy ✅
 
 > North Star: 权限 / 沙箱 / 工具面先于执行；SubQuery/Background 执行体
+>
+> **v3 增量 (DM-20260618-001/002/003):**
+> - D2-S18-A01 拆分为 **Surface.CheckPermission** (per-tool hook, surface 内置) +
+>   **IPermissionGate.CheckPermission** (D7 orchestration 提供, plan_mode 自动 deny) +
+>   **PlanModeOpenWorldPolicy.ShouldDefer** (runtime 懒加载过滤)
+> - D2-S18-A02 拆分为 **PerAgentFilter.Apply** + **PerRiskFilter.Apply** +
+>   **ToolFilter.ShouldDefer** (DM-20260618-003 新增)
+> - D2-S18-A04 扩展为 **BuildSurfaces(SurfaceBuildOpts) → []ToolSurface**（8 surface
+>   含 ToolSearchSurface）+ 排序稳定 + 4 bool 字段填充
+> - D2-S18-A05 升级为 2-phase dispatch (Phase 1 CheckPermission sequential,
+>   Phase 2 parallel via ConcurrencySafe)
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| D2-S18-A01 | CheckPermission | A-BE | tool_call | allow/deny | `enforce/permission/mode.go` |
-| D2-S18-A02 | FilterTools | A-BE | all_tools, mode | visible | `enforce/tool_filter.go` |
+| D2-S18-A01 | CheckPermission (3-tier) | A-BE | tool_call, ctx | Decision (allow/deny/ask) | `contracts/permission.go` + `surface/{bash_ast,permission}.go` + `orchestration/toolpolicy/plan_mode.go` |
+| D2-S18-A02 | FilterTools + ShouldDefer | A-BE | all_tools, mode, ctx | visible (defer-aware) | `enforce/toolrunner/filter/{per_agent,per_risk}.go` + `toolpolicy/filter_adapter.go` |
 | D2-S18-A03 | SandboxExecution | A-BE | tool_call, workdir | sandboxed | `enforce/toolrunner/sandbox.go` |
-| D2-S18-A04 | RegisterTools | A-BE | config | tool_registry | `enforce/toolrunner/tool_runner.go` |
-| D2-S18-A05 | ExecuteToolRound | A-BE | tool_calls | tool_results | `enforce/toolrunner/tool_runner.go` |
+| D2-S18-A04 | BuildSurfaces (8 surface) | A-BE | config, opts | sorted []ToolSurface | `bootstrap/surfaces.go` + `surface/{builtin,lsptool,freefork,tracker,verify,delegate,background_task,tool_search}_surface.go` |
+| D2-S18-A05 | ExecuteToolRound (2-phase) | A-BE | tool_calls, ctx | tool_results (indexed) | `bootstrap/turn_adapter.go` |
 | D2-S18-A06 | SpawnSubquery | A-BE | spec | task_id | `enforce/subquery.go` |
 | D2-S18-A07 | RunBackgroundTask | A-BE | spec | bg_id | `enforce/background.go` |
 | D2-S18-A08 | MergeSubResult | A-BE | sub_result | messages | `enforce/subquery.go` |
@@ -124,4 +135,5 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 | Version | Date | Changes |
 |---------|------|---------|
 | 3.1.0 | 2026-06-16 | S19 拆解、S20 移除 |
-| **4.0.0** | **2026-06-16** | **Canonical 全局编号 S15–S18**；ExecuteToolRound 归 S18；S19 活动并入 S18；Guides 指针 |
+| 4.0.0 | 2026-06-16 | Canonical 全局编号 S15–S18；ExecuteToolRound 归 S18；S19 活动并入 S18；Guides 指针 |
+| **4.1.0** | **2026-06-18** | **S18 v3 — 3-tier CheckPermission (Surface + IPermissionGate + PlanMode); 8 surface (含 ToolSearchSurface); 2-phase ExecuteToolRound; ToolSpec 4 bool + DeferLoading 字段；ToolFilter.ShouldDefer runtime hook；A01/A02/A04/A05 拆解细化** (DM-20260618-001/002/003) |
