@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -286,7 +287,22 @@ Workspace directory: %s
 Session ID: %s
 Request ID: %s
 Model: %s
-`, agentName, time.Now().Format("Monday Jan 2, 2006"), runtime.GOOS, workDir, sessionID, requestID, model)
+`, agentName, time.Now().Format("Monday Jan 2, 2006"), runtime.GOOS, workDir, sessionID, requestID, model) + drainTaskNotifications(sessionID)
+}
+
+// drainTaskNotifications (D4-S12-A03 / G3) 在 prepare 阶段把 session 累积的
+// 后台任务完成事件 drain 出来, 附加到 system reminder 段。bus 为 nil / 无事件时
+// 返回空字符串。bus.Drain 一次性消费 + 清空 pending, 不会重复注入。
+func drainTaskNotifications(sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+	bus := notify.GlobalBus()
+	if bus == nil {
+		return ""
+	}
+	events := bus.Drain(sessionID)
+	return notify.FormatReminder(events)
 }
 
 type layer3BlockReport struct {
