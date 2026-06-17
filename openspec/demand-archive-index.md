@@ -70,7 +70,7 @@
 | DM-20260611-009 | Background Task 工具 — task_stop / task_output | devrix-background-task-tools | 2026-06-15 | — | ACCEPTED (Phase 3 Wave 对接完整) |
 | **DM-20260617-001** | **D2 QueryLoop 退役标记 — 3 信号 deprecation 契约（metric + warn + spec）** | **devrix-queryloop-legacy-decommission** | **2026-06-17** | **[#54](https://github.com/fqntxmqee/devrix/pull/54)** | **ACCEPTED (Z0: 不删代码；Z1/Z2 由 metric 阈值触发)** |
 | **DM-20260617-002** | **诊断工具 wiring 闭环 — 13 项能力 E2E 可达 (G1-G6+A1-A7)** | **devrix-diagnostic-tools-wiring** | **2026-06-17** | **[#60](https://github.com/fqntxmqee/devrix/pull/60)** | **ACCEPTED (W1-W14 + H-1/H-2/H-3 fix; 60+ 单测 + 9 集成测试全绿; 可触达 1/13→13/13)** |
-| **DM-20260617-003** | **D7 turn history persist 修复 — loop_first 路由下多轮上下文丢失 (P0 bug)** | **devrix-d7-turn-history-persist** | **2026-06-17** | **—** | **S3_DESIGN (turn_adapter.PersistTurn stub → AppendAndTrimMessages 桥接 D2 Memory; 4 P0 T; ~30 行修复 + ~310 行测试)** |
+| **DM-20260617-003** | **D7 turn history persist 修复 — loop_first 路由下多轮上下文丢失 (P0 bug)** | **devrix-d7-turn-history-persist** | **2026-06-17** | **[#62](https://github.com/fqntxmqee/devrix/pull/62)** | **ACCEPTED (hotfix 路径 — S1-S3 ceremony 跳过; PR #62 + #64 合并: turn_adapter.PersistTurn stub → AppendAndTrimMessages 桥接 D2 Memory; 4 P0 T (D2-S3-A02-T01/T02 + D7-S5-A04-T01/T02) 全部 IMPLEMENTED; 飞书 IM 3-轮 E2E 历史引用通过; ~30 行修复 + ~310 行测试)** |
 | **DM-20260615-001** | **D5 Observability S/A 重切 — 技术模块→价值流化** | **devrix-d5-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；4+1 价值流 S21–S24)** |
 | **DM-20260615-002** | **D6 Evolution S/A 重切 — 消除占位 S + D7 命名冲突** | **devrix-d6-sa-refine** | **2026-06-15** | **—** | **ACCEPTED (v1.0 registry；S4→S12 GuardRuntime)** |
 | **DM-20260615-003** | **D5+D6 SA Refine v2.0 — 物理路径迁移** | **devrix-d5-d6-sa-refine-v2.0** | **2026-06-15** | **—** | **ACCEPTED (v2.0; ~106 文件 + ~133 import; 11 bridge)** |
@@ -160,6 +160,7 @@
 | **devrix-d7-loop-first-routing** | **`openspec/archive/2026-06-16-devrix-d7-loop-first-routing/`** |
 | **devrix-diagnostic-tools-parity** | **`openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`** |
 | **devrix-tool-surface-phase2-full** | **`openspec/archive/2026-06-17-devrix-tool-surface-phase2-full/`** |
+| **devrix-d7-turn-history-persist** | **`openspec/archive/2026-06-17-devrix-d7-turn-history-persist/`** |
 | **devrix-tool-spec-enrichment** | **`openspec/archive/2026-06-18-devrix-tool-spec-enrichment/`** |
 | **devrix-surface-permission-extension** | **`openspec/archive/2026-06-18-devrix-surface-permission-extension/`** |
 | **devrix-surface-lazy-loading** | **`openspec/archive/2026-06-18-devrix-surface-lazy-loading/`** |
