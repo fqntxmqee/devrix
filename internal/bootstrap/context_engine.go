@@ -3,13 +3,10 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -109,23 +106,10 @@ func NewContextEngine(
 	// process-wide singleton.
 	startTrackerTick(context.Background(), diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
 
-	tdir := diagCfg.TranscriptDir
-	if tdir == "" {
-		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
-	}
-	if tdir == "" {
-		if home, herr := os.UserHomeDir(); herr == nil {
-			tdir = filepath.Join(home, ".devrix", "transcripts")
-		}
-	}
-	if tdir != "" {
-		if tw, err := transcript.NewWriter(tdir); err == nil {
-			transcript.SetGlobalWriter(tw)
-			slog.Info("transcript writer initialized", "dir", tdir)
-		} else {
-			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
-		}
-	}
+	// DM-20260617-008 W1: transcript writer creation moved to bootstrap.NewTranscriptWriter.
+	// Caller (cmd/devrix/main.go) invokes NewTranscriptWriter and passes the result to
+	// capture.NewCommunicationGateway as the `writer` arg; this function no longer
+	// touches the process-wide singleton.
 
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,

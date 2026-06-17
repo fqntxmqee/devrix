@@ -62,7 +62,7 @@ func newTestGatewayInDir(t *testing.T, dir string) *capture.CommunicationGateway
 			{Type: "complete", Content: ""},
 		},
 	}
-	gw := capture.NewCommunicationGateway(store, cliMockEventHandler{}, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, cliMockEventHandler{}, nil, config.DefaultConfig(), nil)
 	gw.SetOrchestrationEntry(&cliOrchestrationEntry{engine: engine})
 	return gw
 }

@@ -200,7 +200,7 @@ func newTestGateway(t *testing.T) *CommunicationGateway {
 	store := &fakeSessionStore{}
 	handler := &fakeEventHandler{}
 	cfg := &config.CommunicationConfig{}
-	gw := NewCommunicationGateway(store, handler, nil, cfg)
+	gw := NewCommunicationGateway(store, handler, nil, cfg, nil)
 	return gw
 }
 

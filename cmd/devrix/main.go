@@ -215,7 +215,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg)
+	// DM-20260617-008 W1: transcript writer injected via ctor (no process-wide global).
+	transcriptWriter := bootstrap.NewTranscriptWriter(ctxCfg)
+	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg, transcriptWriter)
 	gw.SetObservability(obs)
 
 	var agentFactory multiagent.IAgentFactory

@@ -105,7 +105,7 @@ func TestExecuteRound_PermissionDenied_ToolNotCalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	perm := &recordingPermission{decision: false}
 	tools := &recordingToolRunner{}
@@ -168,7 +168,7 @@ func TestExecuteRound_PermissionAllowed_PropagatesRisk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	perm := &recordingPermission{decision: true}
 	tools := &recordingToolRunner{out: "ran"}
@@ -224,7 +224,7 @@ func TestExecuteRound_NilPermission_StillExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	tools := &recordingToolRunner{out: "ok"}
 	reg := &riskFixedRegistry{risk: types.RiskLevelLow}
@@ -266,7 +266,7 @@ func TestExecuteRound_PermissionMixed_OnlyAllowedRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	perm := &togglingPermission{
 		deny: map[string]bool{"bash": true}, // deny bash, allow write_file
@@ -329,7 +329,7 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false

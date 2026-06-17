@@ -141,7 +141,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 	handler := NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig(), nil)
 	gw.SetObservability(obs)
 
 	if opt.MultiAgent {
