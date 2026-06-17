@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
-	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -116,10 +115,16 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 		sessionID = in.Session.SessionID
 	}
 
+	// S4-Gate H-2 fix: drainTaskNotifications 必须每次 Build 都调, 因为它是消费性
+	// 语义 (bus.Drain 一次性清空 pending). 如果放进 buildSessionContext, 而
+	// buildSessionContext 会被 dynamic_sections 的 cache 命中, 第二次 build
+	// 就拿不到新 event 了. 这里作为 top-level "live" section 拼接, 不进 cache.
+	taskNotif := drainTaskNotifications(sessionID)
+
 	if a.enableDynamicBoundary() {
 		report.HasDynamicBoundary = true
 		staticParts := joinNonEmptyParts(layer0, layer2)
-		dynamicParts, dynNames := a.buildDynamicSections(sessionID, in, layer3)
+		dynamicParts, dynNames := a.buildDynamicSections(sessionID, in, layer3, taskNotif)
 		report.DynamicSectionNames = dynNames
 		report.LayerTokens[1] = estimateTokens(strings.Join(dynamicParts, "\n\n"))
 
@@ -128,7 +133,7 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 		return out, report
 	}
 
-	layer1 := a.buildSessionContext(in)
+	layer1 := a.buildSessionContext(in) + taskNotif
 	report.LayerTokens[1] = estimateTokens(layer1)
 
 	out := joinNonEmptyParts(layer0, layer1, layer2, layer3)
@@ -152,7 +157,7 @@ func (a *SystemPromptAssembler) wantsDynamicSection(name string) bool {
 	return false
 }
 
-func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in SystemPromptBuildInput, layer3 string) ([]string, []string) {
+func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in SystemPromptBuildInput, layer3, taskNotif string) ([]string, []string) {
 	var parts []string
 	var names []string
 
@@ -162,6 +167,14 @@ func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in System
 	if strings.TrimSpace(sessionCtx) != "" {
 		parts = append(parts, sessionCtx)
 		names = append(names, "session_context")
+	}
+
+	// S4-Gate H-2 fix: task_notifications 是 live section, 不进 cache,
+	// 每次 Build 都会拿到 bus 里的最新完成事件. taskNotif 由 Build 顶层
+	// drain 后传入, 这里只负责拼接 / 跳过空段.
+	if strings.TrimSpace(taskNotif) != "" {
+		parts = append(parts, taskNotif)
+		names = append(names, "task_notifications")
 	}
 
 	if a.wantsDynamicSection("git_status") {
@@ -279,6 +292,8 @@ func (a *SystemPromptAssembler) buildSessionContext(in SystemPromptBuildInput) s
 		}
 		model = in.Session.Model
 	}
+	// S4-Gate H-2 fix: 不在这里 drain — 移到 Build 顶层, 避免被 dynamic_sections
+	// cache 命中导致第二次 build 拿不到新 event.
 	return fmt.Sprintf(`## Session Context
 Agent: %s
 Today's date: %s
@@ -287,22 +302,51 @@ Workspace directory: %s
 Session ID: %s
 Request ID: %s
 Model: %s
-`, agentName, time.Now().Format("Monday Jan 2, 2006"), runtime.GOOS, workDir, sessionID, requestID, model) + drainTaskNotifications(sessionID)
+`, agentName, time.Now().Format("Monday Jan 2, 2006"), runtime.GOOS, workDir, sessionID, requestID, model)
 }
 
 // drainTaskNotifications (D4-S12-A03 / G3) 在 prepare 阶段把 session 累积的
 // 后台任务完成事件 drain 出来, 附加到 system reminder 段。bus 为 nil / 无事件时
 // 返回空字符串。bus.Drain 一次性消费 + 清空 pending, 不会重复注入。
+//
+// S4-Gate H-3 fix: D2 Thin — prompt 包不 import orchestration/workmodel/notify,
+// 用 function-based DI: 注入点 SetTaskNotifDrainer, 真实实现 (调用 notify.GlobalBus()
+// + FormatReminder) 放在 bootstrap 层. 默认实现返回空字符串, 单元测试不依赖 D7.
 func drainTaskNotifications(sessionID string) string {
 	if sessionID == "" {
 		return ""
 	}
-	bus := notify.GlobalBus()
-	if bus == nil {
+	fn := getTaskNotifDrainer()
+	if fn == nil {
 		return ""
 	}
-	events := bus.Drain(sessionID)
-	return notify.FormatReminder(events)
+	return fn(sessionID)
+}
+
+// TaskNotifDrainerFunc drain 出 session 累积的 task notification 文本.
+// 返回 "" 表示无 event 可注入. 导出供 bootstrap / 测试注入.
+type TaskNotifDrainerFunc func(sessionID string) string
+
+var globalTaskNotifDrainer TaskNotifDrainerFunc
+
+func getTaskNotifDrainer() TaskNotifDrainerFunc { return globalTaskNotifDrainer }
+
+// SetTaskNotifDrainer 注入真实的 task notification drainer (通常在 bootstrap
+// 阶段调用). nil 参数会保留原值, 避免误清空.
+func SetTaskNotifDrainer(f TaskNotifDrainerFunc) {
+	if f != nil {
+		globalTaskNotifDrainer = f
+	}
+}
+
+// SetTaskNotifDrainerForTest 同 SetTaskNotifDrainer, 但返回之前的函数, 便于
+// t.Cleanup 恢复. nil 参数保留原值, 同 SetTaskNotifDrainer 语义.
+func SetTaskNotifDrainerForTest(f TaskNotifDrainerFunc) TaskNotifDrainerFunc {
+	prev := globalTaskNotifDrainer
+	if f != nil {
+		globalTaskNotifDrainer = f
+	}
+	return prev
 }
 
 type layer3BlockReport struct {
