@@ -8,10 +8,33 @@
 
 ---
 
+> **能力别名前缀 (Capability Aliases)**
+>
+> 本 change 遵循 DSAFT 域-场景-活动-功能-任务五层命名作为权威 ID。G1-G6 / A1-A7 是 S2 阶段为方便对照 `docs/reference/clawcode-diagnostic-tools-analysis.md` 而保留的需求侧别名前缀。一一映射：
+>
+> | DSAFT Activity | Alias | 域 | 能力 |
+> |----------------|-------|----|------|
+> | D1-S2-A02-PersistTranscript | A3 | D1 | 会话转录持久化 |
+> | D2-S4-A01-ToolRegister | G1 | D2 | LSP 代码智能工具 |
+> | D2-S6-A02-TruncateError | A7 | D2 | 共享错误栈截断 |
+> | D2-S6-A03-AnalyzeWindow | A5 | D2 | 上下文窗口分析 |
+> | D3-S3-A02-ErrorMapping | A6 | D3 | LLM 错误分类 |
+> | D4-S11-A02-ForkAgent | G5 | D4 | 自由分叉子代理 |
+> | D4-S12-A03-NotifyChild | G3 | D4 | 后台任务完成通知 |
+> | D4-S13-A02-IsolateWorktree | G5 | D4 | (G5 worktree 隔离子能力) |
+> | D5-S23-A02-TrackDiagnostics | G6 | D5 | 诊断跟踪器 |
+> | D5-S23-A03-RunDoctor | A1 | D5 | /doctor 自检命令 |
+> | D5-S23-A04-FaultInject | A4 | D5 | 故障注入 |
+> | D5-S24-A02-ConfigureDebugFilter | A2 | D5 | Debug 日志分类过滤 |
+> | D6-S11-A02-VerifyPlanExec | G4 | D6 | 实现后自动验证 |
+> | TOOL-SEC-2-A02-ShellASTPolicy | G2 | tool-security | Bash AST 安全分析器 |
+
+---
+
 ## 0. 范围调整说明
 
 原 proposal §3.1 计划 "umbrella + 3 sub-change" 拆分。**本次按用户指令调整为单 change 一次性闭环**：
-全部 13 项能力（G1–G6 + A1–A7）在本 change 内完成 S3→S6，**实现能力对标 clawcode**，
+全部 13 项能力（6 项核心差距 + 7 项附加诊断特性，见 alias 表）在本 change 内完成 S3→S6，**实现能力对标 clawcode**，
 不输出 sub-change DM ID。
 
 `.openspec.yaml` 中的 `version_scope` 字段保留作为历史决策痕迹，但不再生成 v1.1/v1.2/v1.3 子目录。
@@ -22,21 +45,21 @@
 
 ### 1.1 域归属（与 proposal §3.2 一致）
 
-| 能力 | 主域 | 实现包 |
-|------|------|--------|
-| G1 LSP Tool | D2 Context Engine | `internal/layers/contextengine/enforce/toolrunner/lsp/` + `internal/shared/lsp/` |
-| G2 Bash AST 安全 | tool-security | `internal/layers/contextengine/enforce/toolrunner/sandboxast/` |
-| G3 后台任务通知 | D4 Multi-Agent | `internal/layers/orchestration/workmodel/notify/` |
-| G4 实现后验证 | D6 Evolution | `internal/layers/evolution/verify/` |
-| G5 自由分叉子代理 | D4 Multi-Agent | `internal/layers/multiagent/provision/freefork/` |
-| G6 文件诊断追踪 | D5 Observability | `internal/layers/observability/diagnose/tracker/` |
-| A1 /doctor | D5 Observability | `internal/layers/observability/diagnose/doctor/` |
-| A2 debug 过滤 | D5 Observability | `internal/layers/observability/instrument/logger/debugfilter/` |
-| A3 会话转录 | D1 Communication | `internal/layers/communication/capture/transcript/` |
-| A4 故障注入 | D5 Observability | `internal/layers/observability/diagnose/faultinject/` |
-| A5 上下文窗口分析 | D2 Context Engine | `internal/layers/contextengine/token/windowanalyzer/` |
-| A6 错误分类引擎 | D3 LLM Gateway | `internal/layers/llmgateway/protect/errorclass/` |
-| A7 堆栈截断 | shared (横切) | `internal/shared/errors/shortstack.go` |
+| DSAFT Activity | Alias | 主域 | 实现包 |
+|----------------|-------|------|--------|
+| D2-S4-A01-ToolRegister | G1 | D2 Context Engine | `internal/layers/contextengine/enforce/toolrunner/lsp/` + `internal/shared/lsp/` |
+| TOOL-SEC-2-A02-ShellASTPolicy | G2 | tool-security | `internal/layers/contextengine/enforce/toolrunner/sandboxast/` |
+| D4-S12-A03-NotifyChild | G3 | D4 Multi-Agent | `internal/layers/orchestration/workmodel/notify/` |
+| D6-S11-A02-VerifyPlanExec | G4 | D6 Evolution | `internal/layers/evolution/verify/` |
+| D4-S11-A02-ForkAgent + D4-S13-A02-IsolateWorktree | G5 | D4 Multi-Agent | `internal/layers/multiagent/provision/freefork/` |
+| D5-S23-A02-TrackDiagnostics | G6 | D5 Observability | `internal/layers/observability/diagnose/tracker/` |
+| D5-S23-A03-RunDoctor | A1 | D5 Observability | `internal/layers/observability/diagnose/doctor/` |
+| D5-S24-A02-ConfigureDebugFilter | A2 | D5 Observability | `internal/layers/observability/instrument/logger/debugfilter/` |
+| D1-S2-A02-PersistTranscript | A3 | D1 Communication | `internal/layers/communication/capture/transcript/` |
+| D5-S23-A04-FaultInject | A4 | D5 Observability | `internal/layers/observability/diagnose/faultinject/` |
+| D2-S6-A03-AnalyzeWindow | A5 | D2 Context Engine | `internal/layers/contextengine/token/windowanalyzer/` |
+| D3-S3-A02-ErrorMapping | A6 | D3 LLM Gateway | `internal/layers/llmgateway/protect/errorclass/` |
+| D2-S6-A02-TruncateError | A7 | shared (横切) | `internal/shared/errors/shortstack.go` |
 
 > **遵循约束**：所有跨域调用经 `internal/shared/`；新增 package 不引入新的依赖环。
 
@@ -50,46 +73,49 @@
 | D4 | 文件诊断同步/异步 | (a) 异步 OnEditComplete；(b) 同步 block | **(a)** | proposal §8 Decision 已选 |
 | D5 | Bash AST 解析器 | (a) `mvdan.cc/sh/v3/syntax` 纯 Go；(b) Tree-sitter CGO | **(a)** | proposal §6 风险表已选纯 Go |
 | D6 | 错误分类匹配方式 | (a) 字符串前缀；(b) 正则 + HTTP 码组合 | **(b)** | 覆盖 anthropic/openai 多种格式 |
-| D7 | Free-fork 隔离 | (a) worktree 默认开；(b) 进程级隔离 | **(a)** | demand §6 已要求 worktree 默认 |
+| D7 | Free-fork 隔离 | (a) worktree 默认开（D4-S13-A02）；(b) 进程级隔离 | **(a)** | demand §6 已要求 worktree 默认 |
 | D8 | /doctor 输出格式 | (a) 仅 JSON；(b) JSON + table | **(b)** | CLI 友好 + CI 友好 |
-| D9 | A2 debug 过滤实现 | (a) slog handler 包装；(b) 全局开关 | **(a)** | slog 原生 Attr 路由，零侵入 |
+| D9 | D5-S24-A02 debug 过滤实现 | (a) slog handler 包装；(b) 全局开关 | **(a)** | slog 原生 Attr 路由，零侵入 |
 | D10 | 转录格式 | (a) JSONL；(b) SQLite | **(a)** | clawcode 一致；`--continue` 易实现 |
 
 ### 1.3 注册路径汇总
 
-新增 tool / 钩子的注册点：
+新增 tool / 钩子的注册点（按 DSAFT 活动 ID 标注）：
 
 ```
 internal/bootstrap/context_engine_builder.go
   └─ buildWithGate(): toolReg.Register(...)
-       新增: registerLSPTool(...)            # G1
-       新增: registerDiagnosticTrackerHook() # G6 在 edit/write 后调用
+       新增: registerLSPTool(...)             # D2-S4-A01
+       新增: registerDiagnosticTrackerHook()  # D5-S23-A02 在 edit/write 后调用
 
 internal/bootstrap/wire_observability.go
-  └─ 新增: WireDoctorCommand()               # A1
-  └─ 新增: WireDebugFilter()                 # A2
-  └─ 新增: WireFaultInject()                 # A4
+  └─ 新增: WireDoctorCommand()                # D5-S23-A03
+  └─ 新增: WireDebugFilter()                  # D5-S24-A02
+  └─ 新增: WireFaultInject()                  # D5-S23-A04
 
 internal/bootstrap/wire_d1.go / capture.go
-  └─ 新增: WireTranscript()                  # A3
+  └─ 新增: WireTranscript()                   # D1-S2-A02
 
 internal/bootstrap/wire_llm.go
-  └─ 新增: WireErrorClassifier()             # A6
+  └─ 新增: WireErrorClassifier()              # D3-S3-A02
 
 internal/bootstrap/wire_multiagent.go
-  └─ 新增: WireFreeFork()                    # G5
+  └─ 新增: WireFreeFork()                     # D4-S11-A02 + D4-S13-A02
+
+internal/bootstrap/wire_orchestration.go
+  └─ 新增: WireTaskNotify()                   # D4-S12-A03
 
 internal/bootstrap/cli.go
-  └─ 新增: /doctor 命令路由                  # A1
-  └─ 新增: --debug=cat1,cat2 flag            # A2
-  └─ 新增: --continue flag                   # A3
+  └─ 新增: /doctor 命令路由                   # D5-S23-A03
+  └─ 新增: --debug=cat1,cat2 flag             # D5-S24-A02
+  └─ 新增: --continue flag                    # D1-S2-A02
 ```
 
 ---
 
 ## 2. 各能力详细设计
 
-### 2.1 G1 — LSP Tool
+### 2.1 D2-S4-A01 — LSP 代码智能工具 (alias G1)
 
 **对标**: `clawcode/src/tools/LSPTool/` + `clawcode/src/services/lsp/`
 
@@ -241,7 +267,7 @@ type LSPServer struct {
 }
 ```
 
-### 2.2 G6 — 文件诊断追踪
+### 2.2 D5-S23-A02 — 文件诊断追踪 (alias G6)
 
 **对标**: `clawcode/src/services/diagnosticTracking.ts` + `LSPDiagnosticRegistry.ts`
 
@@ -304,7 +330,7 @@ LinterFunc 注册表按文件扩展名路由；无匹配 linter 时 `Diff` 返�
 
 500 文件容量，超出时淘汰最久未访问的快照；同 file 多次 SnapshotBefore 替换旧值。
 
-### 2.3 A6 — 错误分类引擎
+### 2.3 D3-S3-A02 — 错误分类引擎 (alias A6)
 
 **对标**: clawcode 错误分类（散落于 `utils/errors`）+ devrix 现有 sentinel。
 
@@ -357,7 +383,7 @@ type Classifier interface {
 
 `internal/layers/llmgateway/protect/` 现有重试/熔断逻辑在产生 error 时调用 `Classifier.Classify(...)`，将结果存入 ctx (`errorclass.WithClassification(ctx, c)`)。Span attribute 附加 `error.class`。
 
-### 2.4 A7 — 堆栈截断
+### 2.4 D2-S6-A02 — 堆栈截断 (alias A7)
 
 `internal/shared/errors/shortstack.go`：
 
@@ -371,7 +397,7 @@ func WithShortStack(err error, maxFrames int) error
 
 策略：`runtime.Callers` + 过滤 `runtime.`/`testing.`/`reflect.` 前缀帧；输出 `file:line func()` 一行一帧。
 
-### 2.5 G2 — Bash AST 安全分析
+### 2.5 TOOL-SEC-2-A02 — Bash AST 安全分析 (alias G2)
 
 **对标**: `clawcode/src/tools/BashTool/bashSecurity.ts`（2592 行）。
 
@@ -436,7 +462,7 @@ func (p *CommandPolicy) Check(cmd string) error {
 }
 ```
 
-### 2.6 G4 — 实现后自动验证
+### 2.6 D6-S11-A02 — 实现后自动验证 (alias G4)
 
 **对标**: `clawcode/src/tools/VerifyPlanExecutionTool/`。
 
@@ -484,7 +510,7 @@ type UnverifiedItem struct {
 3. 输出 JSON 报告 `verification_report.json`
 4. CLI：`devrix verify-plan <change-id>` 返回 exit 0/1
 
-### 2.7 G3 — 后台任务完成通知
+### 2.7 D4-S12-A03 — 后台任务完成通知 (alias G3)
 
 **对标**: `clawcode/src/tools/TaskOutputTool/TaskOutputTool.tsx`。
 
@@ -514,7 +540,7 @@ type Bus interface {
 
 下一回合 prepareTurn 阶段，附加未消费的 completion event 到 system reminder。
 
-### 2.8 G5 — 自由分叉子代理
+### 2.8 D4-S11-A02 + D4-S13-A02 — 自由分叉子代理 (alias G5)
 
 **对标**: `clawcode/src/tools/AgentTool/ForkSubagent`。
 
@@ -526,7 +552,7 @@ type Bus interface {
 type ForkRequest struct {
     Name     string
     Prompt   string
-    Worktree bool // 默认 true
+    Worktree bool // 默认 true (D4-S13-A02)
 }
 
 type Forker interface {
@@ -540,11 +566,11 @@ type Handle struct {
 }
 ```
 
-每个 Fork child 在独立 worktree 启动；通过 `multiagent/external` Registry 注册 child agent；child→child SendMessage 经 `Inbox` 直接路由（绕过 DAG）。
+每个 Fork child 在独立 worktree 启动（D4-S13-A02 默认开启）；通过 `multiagent/external` Registry 注册 child agent；child→child SendMessage 经 `Inbox` 直接路由（绕过 DAG）。
 
 新增 tool `fork_subagent`（PluginRunner）参数：`children: [{name, prompt}], worktree: bool, n: int`。
 
-### 2.9 A1 — /doctor
+### 2.9 D5-S23-A03 — /doctor (alias A1)
 
 **对标**: clawcode `/doctor` slash command。
 
@@ -571,11 +597,11 @@ type Doctor interface {
 - `workdir_writable` — 当前 workdir 可写
 - `observability_ready` — slog / tracer initialized
 - `tool_count` — 注册工具数 > 0
-- `transcript_dir_ok` — 转录目录可写（A3）
+- `transcript_dir_ok` — 转录目录可写（D1-S2-A02）
 
 CLI：`devrix doctor [--json|--table]` 输出。
 
-### 2.10 A2 — Debug 日志分类过滤
+### 2.10 D5-S24-A02 — Debug 日志分类过滤 (alias A2)
 
 `internal/layers/observability/instrument/logger/debugfilter/`：
 
@@ -591,7 +617,7 @@ func New(inner slog.Handler, categories []string) *Filter
 
 启用方式：CLI `--debug=api,hooks,telemetry`；handler 在 `Enabled()` 检查 record attrs 或 logger group。
 
-### 2.11 A3 — 会话转录持久化
+### 2.11 D1-S2-A02 — 会话转录持久化 (alias A3)
 
 `internal/layers/communication/capture/transcript/`：
 
@@ -614,7 +640,7 @@ type Event struct {
 
 `--continue` CLI flag：读取最近 session 文件 → 重建 D2 context window → 进入新回合。
 
-### 2.12 A4 — 故障注入
+### 2.12 D5-S23-A04 — 故障注入 (alias A4)
 
 `internal/layers/observability/diagnose/faultinject/`：
 
@@ -636,7 +662,7 @@ func (i *Injector) Hook(target string) error // 返回注入错误或 nil
 
 由环境变量 `DEVRIX_FAULT_INJECT=target=mode:param[,target=...]` 启用，仅在 `tests/` build tag 下生效；生产 binary `nil` 实现。
 
-### 2.13 A5 — 上下文窗口分析
+### 2.13 D2-S6-A03 — 上下文窗口分析 (alias A5)
 
 `internal/layers/contextengine/token/windowanalyzer/`：
 
@@ -677,34 +703,34 @@ type Analyzer interface {
 
 ## 4. 测试矩阵
 
-| ID | 描述 | 实现 | 测试位置 |
-|----|------|------|----------|
-| D2-S4-A01-T01 | LSP ToolPool 注册 | G1 | `enforce/toolrunner/lsp_tool_test.go` |
-| D2-S4-A01-T02 | LSP definition 返回 location + context | G1 | `shared/lsp/manager_test.go` |
-| D2-S4-A01-T03 | LSP references 跨文件 | G1 | `shared/lsp/manager_test.go` |
-| D2-S4-A01-T04 | LSP incomingCalls 列出调用方 | G1 | `shared/lsp/manager_test.go` |
-| D2-S4-A01-T05 | LSP LRU 淘汰 (cap=2 → 3rd 触发 evict) | G1 | `shared/lsp/manager_test.go` |
-| D5-S23-A02-T01 | Tracker SnapshotBefore + Diff 报新错 | G6 | `diagnose/tracker/tracker_test.go` |
-| D5-S23-A02-T02 | Tracker 无关编辑 → Diff 为空 | G6 | `diagnose/tracker/tracker_test.go` |
-| D5-S23-A02-T03 | Tracker 500 LRU 去重 | G6 | `diagnose/tracker/tracker_test.go` |
-| TOOL-SEC-2-A02-T01 | Bash AST 检出 heredoc 注入 | G2 | `sandboxast/analyzer_test.go` |
-| TOOL-SEC-2-A02-T02 | Bash AST 检出 zsh sysopen | G2 | `sandboxast/analyzer_test.go` |
-| TOOL-SEC-2-A02-T03 | AST 解析失败 → regex fallback | G2 | `sandboxast/analyzer_test.go` |
-| D6-S11-A02-T01 | Verifier 全部 plan item 通过 | G4 | `evolution/verify/plan_test.go` |
-| D6-S11-A02-T02 | Verifier 缺失 evidence → unverified | G4 | `evolution/verify/plan_test.go` |
-| D4-S12-A03-T01 | TaskNotify Bus 推送 completion event | G3 | `notify/bus_test.go` |
-| D4-S11-A02-T01 | FreeFork 启动 N 子代理 worktree 隔离 | G5 | `provision/freefork/forker_test.go` |
-| D4-S11-A02-T02 | FreeFork SendMessage 路由 | G5 | `provision/freefork/forker_test.go` |
-| D5-S23-A03-T01 | Doctor 报告 healthy | A1 | `doctor/doctor_test.go` |
-| D5-S23-A03-T02 | Doctor 检出 missing lsp server | A1 | `doctor/doctor_test.go` |
-| D5-S24-A02-T01 | DebugFilter `api` 类启用 | A2 | `debugfilter/filter_test.go` |
-| D1-S2-A02-T01 | Transcript writer append JSONL | A3 | `transcript/writer_test.go` |
-| D1-S2-A02-T02 | Transcript --continue 恢复 session | A3 | `transcript/replay_test.go` |
-| D5-S23-A04-T01 | FaultInject 触发 error 一次 | A4 | `faultinject/injector_test.go` |
-| D2-S6-A03-T01 | WindowAnalyzer 分解 token 类别 | A5 | `windowanalyzer/analyzer_test.go` |
-| D3-S3-A02-T01 | ErrorClass map rate_limit 429 | A6 | `errorclass/classifier_test.go` |
-| D3-S3-A02-T02 | ErrorClass ≥20 类映射 | A6 | `errorclass/classifier_test.go` |
-| TOOL-SEC-2-A03-T01 | ShortStack 截取 N 帧 | A7 | `shared/errors/shortstack_test.go` |
+| ID | 描述 | 实现 (DSAFT Activity, alias) | 测试位置 |
+|----|------|------------------------------|----------|
+| D2-S4-A01-T01 | LSP ToolPool 注册 | D2-S4-A01 (G1) | `enforce/toolrunner/lsp_tool_test.go` |
+| D2-S4-A01-T02 | LSP definition 返回 location + context | D2-S4-A01 (G1) | `shared/lsp/manager_test.go` |
+| D2-S4-A01-T03 | LSP references 跨文件 | D2-S4-A01 (G1) | `shared/lsp/manager_test.go` |
+| D2-S4-A01-T04 | LSP incomingCalls 列出调用方 | D2-S4-A01 (G1) | `shared/lsp/manager_test.go` |
+| D2-S4-A01-T05 | LSP LRU 淘汰 (cap=2 → 3rd 触发 evict) | D2-S4-A01 (G1) | `shared/lsp/manager_test.go` |
+| D5-S23-A02-T01 | Tracker SnapshotBefore + Diff 报新错 | D5-S23-A02 (G6) | `diagnose/tracker/tracker_test.go` |
+| D5-S23-A02-T02 | Tracker 无关编辑 → Diff 为空 | D5-S23-A02 (G6) | `diagnose/tracker/tracker_test.go` |
+| D5-S23-A02-T03 | Tracker 500 LRU 去重 | D5-S23-A02 (G6) | `diagnose/tracker/tracker_test.go` |
+| TOOL-SEC-2-A02-T01 | Bash AST 检出 heredoc 注入 | TOOL-SEC-2-A02 (G2) | `sandboxast/analyzer_test.go` |
+| TOOL-SEC-2-A02-T02 | Bash AST 检出 zsh sysopen | TOOL-SEC-2-A02 (G2) | `sandboxast/analyzer_test.go` |
+| TOOL-SEC-2-A02-T03 | AST 解析失败 → regex fallback | TOOL-SEC-2-A02 (G2) | `sandboxast/analyzer_test.go` |
+| D6-S11-A02-T01 | Verifier 全部 plan item 通过 | D6-S11-A02 (G4) | `evolution/verify/plan_test.go` |
+| D6-S11-A02-T02 | Verifier 缺失 evidence → unverified | D6-S11-A02 (G4) | `evolution/verify/plan_test.go` |
+| D4-S12-A03-T01 | TaskNotify Bus 推送 completion event | D4-S12-A03 (G3) | `notify/bus_test.go` |
+| D4-S11-A02-T01 | FreeFork 启动 N 子代理 worktree 隔离 (D4-S13-A02) | D4-S11-A02 + D4-S13-A02 (G5) | `provision/freefork/forker_test.go` |
+| D4-S11-A02-T02 | FreeFork SendMessage 路由 | D4-S11-A02 (G5) | `provision/freefork/forker_test.go` |
+| D5-S23-A03-T01 | Doctor 报告 healthy | D5-S23-A03 (A1) | `doctor/doctor_test.go` |
+| D5-S23-A03-T02 | Doctor 检出 missing lsp server | D5-S23-A03 (A1) | `doctor/doctor_test.go` |
+| D5-S24-A02-T01 | DebugFilter `api` 类启用 | D5-S24-A02 (A2) | `debugfilter/filter_test.go` |
+| D1-S2-A02-T01 | Transcript writer append JSONL | D1-S2-A02 (A3) | `transcript/writer_test.go` |
+| D1-S2-A02-T02 | Transcript --continue 恢复 session | D1-S2-A02 (A3) | `transcript/replay_test.go` |
+| D5-S23-A04-T01 | FaultInject 触发 error 一次 | D5-S23-A04 (A4) | `faultinject/injector_test.go` |
+| D2-S6-A03-T01 | WindowAnalyzer 分解 token 类别 | D2-S6-A03 (A5) | `windowanalyzer/analyzer_test.go` |
+| D3-S3-A02-T01 | ErrorClass map rate_limit 429 | D3-S3-A02 (A6) | `errorclass/classifier_test.go` |
+| D3-S3-A02-T02 | ErrorClass ≥20 类映射 | D3-S3-A02 (A6) | `errorclass/classifier_test.go` |
+| TOOL-SEC-2-A03-T01 | ShortStack 截取 N 帧 | D2-S6-A02 (A7) | `shared/errors/shortstack_test.go` |
 
 **P0 测试点**: D2-S4-A01-T01..T05、D5-S23-A02-T01..T03、D3-S3-A02-T01..T02、TOOL-SEC-2-A03-T01 共 **11 项**。
 
@@ -717,30 +743,30 @@ type Analyzer interface {
 | R1 | gopls/tsserver 未安装导致 LSP tool 调用失败 | `LSPConfig.Enabled` 默认 `false`；Manager 在 Acquire 时返回明确错误（`lsp: server "gopls" not found in PATH`）；Doctor check 提前告警 |
 | R2 | `go vet` 在不完整 package 上失败导致 tracker 误报 | tracker 仅 diff 新增 diagnostic（旧+新 → 新 -= 旧），不报告"消失"；vet exit≠0 时记录但不暴露给模型 |
 | R3 | mvdan.cc/sh AST 解析 panic | Analyzer 内 `defer recover` → 返回 `Verdict.Allow=true`（fallback 到 regex） |
-| R4 | FreeFork worktree 数量爆炸 | `MaxConcurrentFork=8`（config）；超出 → 拒绝并 hint |
-| R5 | A3 转录目录 disk full | Writer 在 ENOSPC 时降级为 in-memory ring buffer，记录 metric |
-| R6 | A4 Injector 误触发到生产 | 仅在 `testbuild` build tag + `DEVRIX_FAULT_INJECT` env 同时存在时启用 |
-| R7 | ErrorClass 漏分类导致 metric 噪声 | 未匹配返回 `ClassUnknown`，配 metric `llm_error_unclassified_total`，阈值告警 |
+| R4 | FreeFork worktree 数量爆炸 | `MaxConcurrentFork=8`（config）；超出 → 拒绝并 hint（D4-S13-A02 隔离计数） |
+| R5 | D1-S2-A02 转录目录 disk full | Writer 在 ENOSPC 时降级为 in-memory ring buffer，记录 metric |
+| R6 | D5-S23-A04 Injector 误触发到生产 | 仅在 `testbuild` build tag + `DEVRIX_FAULT_INJECT` env 同时存在时启用 |
+| R7 | D3-S3-A02 漏分类导致 metric 噪声 | 未匹配返回 `ClassUnknown`，配 metric `llm_error_unclassified_total`，阈值告警 |
 
 ---
 
 ## 6. 实施顺序
 
-按依赖关系排序，每项独立可 merge：
+按依赖关系排序，每项独立可 merge（以 DSAFT Activity 标识）：
 
-1. A7 ShortStack（shared 横切，零依赖）
-2. A6 ErrorClassifier（依赖 shared/errors）
-3. G6 Tracker（独立）
-4. G1 LSP (shared/lsp → toolrunner/lsp_tool)
-5. G2 Bash AST (go get + analyzer)
-6. G4 Verifier
-7. G3 TaskNotify
-8. G5 FreeFork（依赖 multiagent/external）
-9. A1 Doctor
-10. A2 DebugFilter
-11. A3 Transcript
-12. A4 FaultInject
-13. A5 WindowAnalyzer
+1. D2-S6-A02 (alias A7) ShortStack（shared 横切，零依赖）
+2. D3-S3-A02 (alias A6) ErrorClassifier（依赖 shared/errors）
+3. D5-S23-A02 (alias G6) Tracker（独立）
+4. D2-S4-A01 (alias G1) LSP (shared/lsp → toolrunner/lsp_tool)
+5. TOOL-SEC-2-A02 (alias G2) Bash AST (go get + analyzer)
+6. D6-S11-A02 (alias G4) Verifier
+7. D4-S12-A03 (alias G3) TaskNotify
+8. D4-S11-A02 + D4-S13-A02 (alias G5) FreeFork（依赖 multiagent/external）
+9. D5-S23-A03 (alias A1) Doctor
+10. D5-S24-A02 (alias A2) DebugFilter
+11. D1-S2-A02 (alias A3) Transcript
+12. D5-S23-A04 (alias A4) FaultInject
+13. D2-S6-A03 (alias A5) WindowAnalyzer
 
 完成后 `bootstrap` 串联 + 集成测试。
 
