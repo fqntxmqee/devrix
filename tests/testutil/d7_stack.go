@@ -48,13 +48,14 @@ type D7StackOptions struct {
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
 type D7TestStack struct {
-	Obs       *observability.Observability
-	ObsBridge *observability.Bridge
-	Gateway   *capture.CommunicationGateway
-	Handler   *MockEventHandler
-	Engine    *contextengine.ContextEngine
-	LLMStub   llmgateway.IAdapter
-	WorkDir   string
+	Obs         *observability.Observability
+	ObsBridge   *observability.Bridge
+	Gateway     *capture.CommunicationGateway
+	Handler     *MockEventHandler
+	Engine      *contextengine.ContextEngine
+	LLMStub     llmgateway.IAdapter
+	WorkDir     string
+	TaskManager *workmodel.TaskManager
 }
 
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
@@ -112,7 +113,10 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 	ctxCfg.Tasks.Mode = "v2"
 	ctxCfg.Tasks.StoreDir = workDir
-	workmodel.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and shared with
+	// InitOrchestration + WireDelegate + tests (was: workmodel.GlobalTaskManager
+	// process-wide singleton).
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 
 	var toolsReg contextengine.IToolRegistry
 	if opt.Delegate {
@@ -161,7 +165,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
 			hub := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, hub)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, hub, tm)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}
@@ -190,12 +194,13 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	return &D7TestStack{
-		Obs:       obs,
-		ObsBridge: obsBridge,
-		Gateway:   gw,
-		Handler:   handler,
-		Engine:    engine,
-		LLMStub:   stub,
-		WorkDir:   workDir,
+		Obs:        obs,
+		ObsBridge:  obsBridge,
+		Gateway:    gw,
+		Handler:    handler,
+		Engine:     engine,
+		LLMStub:    stub,
+		WorkDir:    workDir,
+		TaskManager: tm,
 	}
 }

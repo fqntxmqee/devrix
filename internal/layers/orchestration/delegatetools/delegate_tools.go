@@ -11,7 +11,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
-	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -167,7 +166,8 @@ func resolveDelegateTaskID(sessionID, taskID, directive string) string {
 	if id := strings.TrimSpace(taskID); id != "" {
 		return id
 	}
-	if workmodel.GlobalTaskManager == nil || sessionID == "" {
+	tm := globalDeps.Tasks
+	if tm == nil || sessionID == "" {
 		return ""
 	}
 	subject := strings.TrimSpace(directive)
@@ -177,5 +177,5 @@ func resolveDelegateTaskID(sessionID, taskID, directive string) string {
 	if len(subject) > 120 {
 		subject = subject[:117] + "..."
 	}
-	return workmodel.GlobalTaskManager.Create(sessionID, subject, directive).ID
+	return tm.Create(sessionID, subject, directive).ID
 }

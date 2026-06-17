@@ -92,7 +92,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		return nil
 	}
 	longTerm := WireContextV3(b.ctxCfg)
-	workmodel.InitGlobalTaskManager(b.ctxCfg.Tasks, b.obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and passed to
+	// RegisterTaskTools. Replaces workmodel.GlobalTaskManager singleton.
+	tm := workmodel.NewTaskManagerFromConfig(b.ctxCfg.Tasks, b.obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -101,7 +103,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if err := enforce.RegisterQueryLoopTools(toolReg, b.ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
-	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, workmodel.GlobalTaskManager); err != nil {
+	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, tm); err != nil {
 		slog.Error("register task tools", "error", err)
 	}
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {

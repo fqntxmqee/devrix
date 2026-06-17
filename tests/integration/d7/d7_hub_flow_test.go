@@ -16,9 +16,9 @@ import (
 
 // T: D7-S4-T02, D7-S4-T03, D7-S1-T05
 func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
-	_ = testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
+	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
 
-	task := workmodel.GlobalTaskManager.Create("sess_hub", "explore module", "")
+	task := stack.TaskManager.Create("sess_hub", "explore module", "")
 	if task == nil {
 		t.Fatal("expected task")
 	}
@@ -40,7 +40,7 @@ func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 		Summary:   "started explore worker",
 	})
 
-	got, ok := workmodel.GlobalTaskManager.Get("sess_hub", task.ID)
+	got, ok := stack.TaskManager.Get("sess_hub", task.ID)
 	if !ok {
 		t.Fatal("task not found after FlowStarted")
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 
 	// Spans self-registration (trigger init() to register domain spans)
 	_ "github.com/devrix/devrix/internal/layers/communication"
@@ -220,6 +221,12 @@ func main() {
 	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg, transcriptWriter)
 	gw.SetObservability(obs)
 
+	// DM-20260617-008 W4: TaskManager constructed once at startup and
+	// shared with InitOrchestration (NewLocalWorkModel + WithTaskManager),
+	// WireDelegate (delegatetools.SetDeps.Tasks), and NewCLIAdapter.
+	// Replaces workmodel.GlobalTaskManager process-wide singleton.
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
+
 	var agentFactory multiagent.IAgentFactory
 	if multiAgentCfg.Enabled {
 		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
@@ -243,7 +250,8 @@ func main() {
 
 	hub := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
-		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry(), hub)
+		// DM-20260617-008 W4: shared TaskManager (see tm construction above).
+		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry(), hub, tm)
 	}
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
@@ -302,7 +310,8 @@ func main() {
 	)
 
 	if runCLI {
-		cli := adapters.NewCLIAdapter(gw, commCfg)
+		// DM-20260617-008 W4: shared TaskManager (constructed above).
+		cli := adapters.NewCLIAdapter(gw, commCfg, tm)
 		if err := cli.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("cli exited with error", "error", err)
 			os.Exit(1)

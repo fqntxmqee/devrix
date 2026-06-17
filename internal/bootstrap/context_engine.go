@@ -47,7 +47,10 @@ func NewContextEngine(
 	agentToolReg *external.Registry,
 ) *contextengine.ContextEngine {
 	longTerm := WireContextV3(ctxCfg)
-	workmodel.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and passed to
+	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
+	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -56,7 +59,7 @@ func NewContextEngine(
 	if err := enforce.RegisterQueryLoopTools(toolReg, ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
-	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, workmodel.GlobalTaskManager); err != nil {
+	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, tm); err != nil {
 		slog.Error("register task tools", "error", err)
 	}
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {

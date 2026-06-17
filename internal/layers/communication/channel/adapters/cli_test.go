@@ -77,7 +77,7 @@ func newTestCLIAdapter(t *testing.T, gw *capture.CommunicationGateway, stdin str
 	t.Helper()
 
 	out := &bytes.Buffer{}
-	a := NewCLIAdapter(gw, config.DefaultConfig())
+	a := NewCLIAdapter(gw, config.DefaultConfig(), nil)
 	a.reader = bufio.NewReader(strings.NewReader(stdin))
 	a.writer = out
 	return a, out

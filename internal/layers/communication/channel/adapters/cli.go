@@ -42,18 +42,27 @@ type CLIAdapter struct {
 	permissionHandler func(*types.PermissionRequest) bool
 }
 
-// NewCLIAdapter creates a new CLIAdapter
+// NewCLIAdapter creates a new CLIAdapter.
+//
+// DM-20260617-008 W4: tm is the workmodel.TaskManager used for /task CLI
+// commands. Pass nil to disable task commands (was: read from
+// workmodel.GlobalTaskManager process-wide singleton).
 func NewCLIAdapter(
 	gw *capture.CommunicationGateway,
 	cfg *config.CommunicationConfig,
+	tm *workmodel.TaskManager,
 ) *CLIAdapter {
+	var taskCmds *workmodel.CLICommands
+	if tm != nil {
+		taskCmds = workmodel.NewCLICommands(tm)
+	}
 	return &CLIAdapter{
 		gateway:      gw,
 		renderer:     renderers.NewCLIRenderer(cfg.CLI.ANSI),
 		cfg:          cfg,
 		reader:       bufio.NewReader(os.Stdin),
 		writer:       os.Stdout,
-		taskCommands: workmodel.NewCLICommands(workmodel.GlobalTaskManager),
+		taskCommands: taskCmds,
 		planMode:     workmodel.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
 	}
 }
@@ -249,6 +258,10 @@ func (a *CLIAdapter) handleTaskCommand(args []string) {
 		return
 	}
 
+	if a.taskCommands == nil {
+		a.writer.Write([]byte("task commands disabled (no TaskManager wired)\n"))
+		return
+	}
 	output := a.taskCommands.Handle(cmd, sessionID)
 	a.writer.Write([]byte(output + "\n"))
 }

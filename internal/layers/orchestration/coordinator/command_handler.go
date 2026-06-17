@@ -152,19 +152,21 @@ func splitCommand(raw string) (string, []string) {
 	return cmd, strings.Fields(rest)
 }
 
-// newDefaultCommandHandler builds a CommandHandler bound to the global
-// TaskManager (workmodel.GlobalTaskManager) and a fresh PlanMode. It is
-// the v1.1.0+ default for NewSessionOrchestrator when no
-// WithCommandHandler option is supplied.
+// newDefaultCommandHandler builds a CommandHandler bound to the supplied
+// TaskManager and a fresh PlanMode. It is the v1.1.0+ default for
+// NewSessionOrchestrator when no WithCommandHandler option is supplied.
+//
+// DM-20260617-008 W4: TaskManager is injected explicitly (was: read from
+// the workmodel.GlobalTaskManager process-wide singleton).
 //
 // The default is intentionally minimal — production callers that need a
 // shared PlanMode state across sessions should still wire explicitly.
-func newDefaultCommandHandler(_ WorkModel, sink EventPublisher) *CommandHandler {
-	// Use the global task manager singleton for /task commands. For /plan,
-	// each default-constructed PlanMode maintains its own state, which is
-	// correct for v1.1.0 (PlanMode is per-session; the singleton TaskManager
-	// is process-wide and stores the underlying tasks).
-	cli := workmodel.NewCLICommands(workmodel.GlobalTaskManager)
+func newDefaultCommandHandler(_ WorkModel, sink EventPublisher, tm *workmodel.TaskManager) *CommandHandler {
+	// Use the injected TaskManager for /task commands. For /plan, each
+	// default-constructed PlanMode maintains its own state, which is
+	// correct for v1.1.0 (PlanMode is per-session; the injected
+	// TaskManager stores the underlying tasks).
+	cli := workmodel.NewCLICommands(tm)
 	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
 	return NewCommandHandler(cli, plan, sink)
 }
