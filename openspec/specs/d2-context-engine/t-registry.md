@@ -1,11 +1,11 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.4.0
-**Last Updated:** 2026-06-16
+**Version:** 2.5.0
+**Last Updated:** 2026-06-17
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
-**Change:** devrix-diagnostic-tools-parity (DM-20260616-003) — LSP Tool + Bash AST + Window Analyzer / devrix-diagnostic-tools-wiring (DM-20260617-002) — D2 Thin DI + G1/G2 wiring + /context analyze CLI
+**Change:** devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地：7 surface + 3 filter + turn_adapter dispatch 路径
 
 ---
 
@@ -160,6 +160,28 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S13-A01-T01 | RepairToolMessageChain 剔除 orphan tool results | Conversation | `internal/layers/contextengine/prepare/conversation/repair_test.go` | IMPLEMENTED | P0 |
 | D2-S13-A02-T01 | MessagesAfterCompactBoundary 仅保留尾部 | Conversation | `internal/layers/contextengine/prepare/conversation/boundary_test.go` | IMPLEMENTED | P1 |
 
+## TOOL-SURFACE-1: Tool Surface Contract (DM-20260617-007)
+
+> **devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地。**
+> 7 个 surface (Builtin / LSP / FreeFork / Tracker / Verify / Delegate /
+> BackgroundTask) + 3 个 filter (PerAgent / PerRisk / toolpolicy
+> adapter) + 1 个 dispatch path (turn_adapter.findSurface).
+> 完整列表见 `openspec/changes/devrix-tool-surface-contract/design.md` §2.5-§2.6。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| TOOL-SURFACE-1-T01 | ToolSurface 4 方法契约 (Name/Tools/RiskLevel/Execute) 编译期断言 | Surface Contract | `internal/shared/contracts/tool_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T02 | ToolFilter 1 方法契约 (Apply) + Composite/Allow/Deny/ApplyFilters | Filter Contract | `internal/shared/contracts/tool_filter_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T03 | BuiltinSurface + LSPToolSurface 可见性 (cfg nil / 无 server / 有 server) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{builtin,lsptool}_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T04 | FreeForkSurface + TrackerSurface + VerifySurface 行为 + 接口合规 | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w4_surfaces,w4_surfaces}_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T05 | PluginSurface dispatch (delegate + background 共享) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w5_surfaces,plugin}_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T01 | PerAgentFilter 5 agent + WithAllowlist + 不可变 + 未知 agent | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T02 | PerRiskFilter 4 阈值 + 空阈值 pass-through | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T03 | Composite FIFO 顺序 + 顺序敏感性 | Filter Composition | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P1 |
+| TOOL-FILTER-1-T04 | toolpolicy.AsToolFilter 5 agent 适配 | Adapter | `internal/layers/orchestration/toolpolicy/filter_adapter_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T08 | NewContextEngine 收编 surface 列表 (BuildSurfaces + DefaultFilters) | Engine Wiring | `internal/bootstrap/surfaces_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T09 | turn_adapter.ExecuteRound 走 surface.Execute (findSurface 线性扫) | Dispatch Path | `internal/bootstrap/turn_adapter_surface_test.go` | IMPLEMENTED | P0 |
+
 ## D2: Cross-Scenario Tests
 
 | T ID | 描述 | Test 位置 | Status |
@@ -204,4 +226,6 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 62 | 62 | 0 | 20 |
+| 73 | 73 | 0 | 30 |
+
+> TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。

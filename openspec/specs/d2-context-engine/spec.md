@@ -1013,6 +1013,135 @@ Process MUST emit `complete` only after `sc.Messages` and `session.ContextSnapsh
 
 ---
 
+## ADDED Requirements (TOOL-SURFACE-1 — Tool Surface Contract)
+
+> **devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地。**
+> 把 3 个工具入口 (NewContextEngine / buildWithGate / WireDelegate) + 6+
+> package-level globals 收编为 1 个 `[]contracts.ToolSurface` 列表 + `[]contracts.ToolFilter`
+> 链 + 1 个 turn_adapter dispatch 路径。详细设计见
+> `openspec/changes/devrix-tool-surface-contract/{demand,design}.md`。
+
+### Requirement: ToolSurface Contract
+
+The system MUST expose every LLM-callable tool behind a single
+`contracts.ToolSurface` interface (Name / Tools / RiskLevel / Execute) and
+MUST NOT require callers to read package-level globals to discover or
+execute tools.
+
+#### Scenario: Every surface implements the 4-method contract
+
+- **WHEN** any surface is constructed (Builtin, LSP, FreeFork, Tracker,
+  Verify, Delegate, BackgroundTask)
+- **THEN** it satisfies `var _ contracts.ToolSurface = ...` at compile time
+- **AND** all 4 methods are non-nil and safe to call with empty input
+
+#### Scenario: Surfaces with nil dependencies are still safe
+
+- **WHEN** a surface is constructed with a nil dependency (nil tracker,
+  nil forker, nil cfg)
+- **THEN** `Tools()` returns the spec when known OR an empty list
+- **AND** `Execute()` returns a `ToolResult{Error: ...}` envelope
+  (not a Go error) for missing prerequisites
+
+### Requirement: ToolFilter Contract
+
+The system MUST allow per-context tool visibility through a
+`contracts.ToolFilter` chain (1-method `Apply` + Composite/Allow/Deny
+helpers) and MUST compose filters in FIFO order.
+
+#### Scenario: Filter chain applied in order
+
+- **WHEN** `ApplyFilters(surfaces, filters, FilterCtx)` is called with
+  multiple filters
+- **THEN** the result is the input run through each filter left-to-right
+- **AND** no filter mutates its input slice
+
+#### Scenario: ApplyFilters wraps each surface in a filteredSurface
+
+- **WHEN** the filter chain produces an empty spec set for a surface
+- **THEN** that surface's `Execute()` returns "tool not visible in
+  current context" without dispatching to the underlying runner
+
+### Requirement: 7 Surface Implementations
+
+The system MUST provide exactly 7 surface implementations matching
+the per-domain ownership from design.md §2.5:
+
+| Surface | File | Wraps |
+|---------|------|-------|
+| BuiltinSurface | `surface/builtin_surface.go` | `*toolrunner.ToolRegistry` |
+| LSPToolSurface | `surface/lsptool_surface.go` | `*toolrunner.LSPConfig` |
+| FreeForkSurface | `surface/freefork_surface.go` | `toolrunner.FreeForkerFunc` |
+| TrackerSurface | `surface/tracker_surface.go` | `*tracker.Tracker` |
+| VerifySurface | `surface/verify_surface.go` | (stateless) |
+| DelegateSurface | `surface/delegate_surface.go` | `[]toolrunner.PluginRunner` |
+| BackgroundTaskSurface | `surface/background_task_surface.go` | `[]toolrunner.PluginRunner` |
+
+DelegateSurface and BackgroundTaskSurface share a `PluginSurface`
+implementation that wraps `[]toolrunner.PluginRunner` and dispatches
+by name (O(1) lookup).
+
+### Requirement: 3 Filter Implementations
+
+The system MUST provide per-agent, per-risk, and toolpolicy-adapted
+filter implementations:
+
+| Filter | File | FilterCtx field |
+|--------|------|-----------------|
+| PerAgentFilter | `filter/per_agent.go` | `AgentType` |
+| PerRiskFilter | `filter/per_risk.go` | `RiskThreshold` |
+| toolpolicy.AsToolFilter | `toolpolicy/filter_adapter.go` | `AgentType` |
+
+`Composite(perAgent, perRisk)` is the canonical per-mode chain. Filter
+order is significant: per-agent first (drops dangerous tools), per-risk
+second (caps remaining tools at the threshold).
+
+### Requirement: EngineDeps Carries Surface List
+
+The system MUST add `Surfaces []contracts.ToolSurface` and
+`Filters []contracts.ToolFilter` to `contextengine.EngineDeps`. Both
+fields are optional — nil means the legacy IToolRunner path is still
+in use (phase-1 back-compat). Bootstrap MUST populate both via
+`bootstrap.BuildSurfaces(SurfaceBuildOpts{...})`.
+
+#### Scenario: NewContextEngine stores surfaces and filters
+
+- **WHEN** `NewContextEngine` is called with non-nil Surfaces
+- **THEN** `engine.Surfaces()` returns the same list
+- **AND** `engine.HasSurfaces()` returns true
+- **AND** `engine.Filters()` returns the filters slice
+
+### Requirement: turn_adapter Surface Dispatch
+
+The `contextEngineAdapter.ExecuteRound` MUST route tool calls through
+`findSurface` → `surface.Execute` when the engine has surfaces. The
+legacy `IToolRunner.Execute` path is the fallback for tool names no
+surface claims (removed in phase 2 / W11).
+
+#### Scenario: Surface dispatch path is primary
+
+- **WHEN** a tool call lands in ExecuteRound and a surface claims the name
+- **THEN** the surface's `Execute(ctx, name, input, workDir)` is called
+- **AND** the legacy `a.tools.Execute` is NOT called for that tool
+- **AND** Go errors from the surface propagate as `ToolResult.Error`
+  (NOT as the round-level error)
+
+#### Scenario: Linear scan finds first matching surface
+
+- **WHEN** multiple surfaces are present and the tool name is in only
+  one surface's spec set
+- **THEN** `findSurface(name)` returns the first surface whose
+  `RiskLevel(name)` returns a non-empty value
+- **AND** subsequent surfaces are not consulted
+
+### Requirement: Risk Propagation From Surfaces
+
+`ExecuteRound` MUST use the surface-reported risk for permission
+gating, falling back to `toolsReg.RiskLevel(name)` when the tool is
+not in any surface, and finally to `RiskLevelLow` as the safe default.
+
+---
+
 ## REMOVED Requirements
 
 (None)
