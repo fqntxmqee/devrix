@@ -5,6 +5,7 @@
 **Last Updated:** 2026-06-16
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
+**Change:** devrix-diagnostic-tools-parity (DM-20260616-003) — LSP Tool + Bash AST + Window Analyzer
 
 ---
 
@@ -184,6 +185,16 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T41 | D2-S15-A04-T* | S15 Prepare | D2 | Fork subagent placeholder |
 | D2-S10-A01-T42 | D2-S18-A02-T* | S18 Enforce | D2 | Sidechain transcript resume |
 | （新增） | D2-S15-A01-T10 | S15 Prepare | D2 | CompressHint no LLM（D2 不调 D3 摘要） |
+| D2-DIAG-T01 | D2-S23-A01-T01 | S23 LSP Tool | D2 | LSP `definition` operation 返回 location | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T02 | D2-S23-A01-T02 | S23 LSP Tool | D2 | LSP `references` operation 返回引用列表 | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T03 | D2-S23-A01-T03 | S23 LSP Tool | D2 | LSP `incoming_calls` 返回 call hierarchy | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P1 |
+| D2-DIAG-T04 | D2-S23-A02-T01 | S23 WindowAnalyzer | D2 | WindowAnalyzer 按 5 类拆分 token | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T05 | D2-S23-A02-T02 | S23 WindowAnalyzer | D2 | WindowAnalyzer role 路由（system/tool/thinking/reminder） | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T01 | TS-AST-T01 | tool-security AST | shared | Bash AST 阻止 heredoc 注入 | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T02 | TS-AST-T02 | tool-security AST | shared | Bash AST 阻止 zsh attack surface | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T03 | TS-AST-T03 | tool-security AST | shared | Bash AST 阻止 process/command substitution | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T04 | TS-AST-T04 | tool-security AST | shared | Bash AST 阻止 dangerous redirect (`>/dev/sda`) | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T05 | TS-AST-T05 | tool-security AST | shared | Bash AST 阻止 eval/source/exec/`.` | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
 
 ---
 

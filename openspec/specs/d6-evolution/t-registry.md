@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec Reference:** `openspec/specs/d6-evolution/spec.md`
-**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）
+**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Verifier
 
 ---
 
@@ -39,6 +39,9 @@
 | T ID | 描述 | canonical_s | Priority | Test 位置 | Status | Legacy T ID |
 |------|------|-------------|----------|-----------|--------|-------------|
 | D6-S11-A02-T02 | LLM-as-Judge 校准与分歧（Cohen's kappa） | S11 | P0 | `internal/layers/evolution/evaluate/judge_test.go` | IMPLEMENTED | D6-S3-A02-T02 |
+| D6-S11-A02-T03 | Verifier 全部 plan item 通过 | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
+| D6-S11-A02-T04 | Verifier 缺失 evidence → unverified | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
+| D6-S11-A02-T05 | Verifier `_test.go` 缺 `func TestXxx(` → fail | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
 
 ### D6-S11-A04: GenerateTune
 

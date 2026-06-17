@@ -4,7 +4,7 @@
 **Version:** 3.0.0
 **Last Updated:** 2026-06-15
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）
+**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Tracker + Doctor + Debug Filter + Fault Inject
 
 ---
 
@@ -54,10 +54,18 @@
 | D5-S23-A01-T04 | 采样关闭仍 RecordHit | S23 | P0 | `internal/layers/observability/diagnose/coverage/coverage_test.go` | IMPLEMENTED | D5-S5-A01-T04 |
 | D5-S23-A01-T05 | Harness enabled 产生 harness span 树 | S23 | P1 | `tests/integration/context_harness_obs_test.go` | IMPLEMENTED | D5-S5-A01-T05 |
 | D5-S23-A02-T01 | 端到端染色集成 | S23 | P1 | `internal/layers/observability/coverage_integration_test.go` | IMPLEMENTED | D5-S5-A02-T01 |
+| D5-S23-A03-T01 | Doctor 报告 healthy（7 项全 pass） | S23 | P0 | `internal/layers/observability/diagnose/doctor/doctor_test.go` | IMPLEMENTED | — |
+| D5-S23-A03-T02 | Doctor 检出 missing lsp server → StatusFail | S23 | P0 | `internal/layers/observability/diagnose/doctor/doctor_test.go` | IMPLEMENTED | — |
 | D5-S23-A04-T01 | Export bundle schema v1 有效 JSON | S23 | P1 | `internal/layers/observability/diagnose/incident/export_test.go` | IMPLEMENTED | D5-S8-A01-T01 |
 | D5-S23-A04-T02 | CLI `devrix debug export` 行为一致 | S23 | P2 | `internal/cli/debug/export_test.go` | IMPLEMENTED | D5-S8-A01-T02 |
 | D5-S23-A06-T01 | SessionBridge ActiveSessions gauge 增减 | S23 | P1 | `tests/integration/obs_session_bridge_test.go` | IMPLEMENTED | D5-S0-A02-T01 |
 | D5-S23-A06-T02 | HealthCheck 含 coverage 摘要 | S23 | P1 | — | PLANNED | D5-S0-A02-T02 |
+| D5-S23-A07-T01 | Diagnostic Tracker 500-file LRU + Diff | S23 | P0 | `internal/layers/observability/diagnose/tracker/tracker_test.go` | IMPLEMENTED | — |
+| D5-S23-A07-T02 | Tracker 内置 linter (go/tsc/shellcheck) 报告 | S23 | P0 | `internal/layers/observability/diagnose/tracker/tracker_test.go` | IMPLEMENTED | — |
+| D5-S23-A08-T01 | DebugFilter 按 categories 过滤 debug 级别 | S23 | P0 | `internal/layers/observability/instrument/logger/debugfilter/filter_test.go` | IMPLEMENTED | — |
+| D5-S23-A08-T02 | DebugFilter 非 debug 级别 passthrough | S23 | P0 | `internal/layers/observability/instrument/logger/debugfilter/filter_test.go` | IMPLEMENTED | — |
+| D5-S23-A09-T01 | FaultInject (testbuild) env 解析 + Hook | S23 | P0 | `internal/layers/observability/diagnose/faultinject/injector_test.go` | IMPLEMENTED | — |
+| D5-S23-A09-T02 | FaultInject 生产 no-op stub (无 testbuild) | S23 | P0 | `internal/layers/observability/diagnose/faultinject/injector_prod.go` | IMPLEMENTED | — |
 
 ## D5-S24: Configure（配置与运行时管理）
 
