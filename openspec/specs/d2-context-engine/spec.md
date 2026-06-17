@@ -1431,6 +1431,177 @@ surface claims (removed in phase 2 / W11).
 gating, falling back to `toolsReg.RiskLevel(name)` when the tool is
 not in any surface, and finally to `RiskLevelLow` as the safe default.
 
+### Requirement: Tool Call End-to-End Flow (SoT)
+
+> **Source-of-truth for "how a tool call travels from user input to
+> executed runner".** This is the canonical chain; D7 owns the
+> orchestration layer (SessionOrchestrator / turn.Orchestrator) and
+> references back here for dispatch details. Updated 2026-06-17 after
+> `devrix-tool-surface-phase2-full` (DM-20260617-008) — all 5
+> remaining global singletons (transcript / flow / workmodel /
+> sessionqueue / freefork) deleted; ToolSurface is the single dispatch
+> path. See D7 spec §"DSAFT 结构" for the orchestration-side view.
+
+The system MUST route tool calls through exactly **three logical chain
+classes**, each ending at a runner that produces a `ToolResult` returned
+to the LLM for the next turn:
+
+#### Chain A — LLM 决策型 (主链)
+
+```
+用户消息 (D1 ingress)
+  ↓ CommunicationGateway.ProcessMessage
+  ↓ capture.NewCommunicationGateway(..., writer=tw)  [cmd/devrix/main.go:245]
+SessionOrchestrator (D7)                             [bootstrap/wire_coordinator.go:153]
+  ↓ gw.SetOrchestrationEntry(entry)                 [wire_coordinator.go:165]
+turn.Orchestrator (D7)                              [wire_coordinator.go:141]
+  ↓ for each turn:
+      ├─ Prepare   → contextEngineAdapter.Prepare   [turn_adapter.go:64]
+      │              └─ 聚合 surface.Tools() + toolReg.ListTools() 去重
+      ├─ Invoke    → turn.Orchestrator 调 D3 LLM    [context_engine.go:125]
+      │              (QueryLLMCaller, 不经过 turn_adapter)
+      └─ ExecuteRound → contextEngineAdapter.ExecuteRound  [turn_adapter.go:186]
+                        │
+                        ├─ 1) IPermissionGate.Request(risk)        [turn_adapter.go:207]
+                        │     (失败 → ToolResult{Error:"permission denied"})
+                        ├─ 2) findSurface(name) → surface.Execute    [turn_adapter.go:215-223]
+                        │     (5 surface: Builtin / LSP / Tracker / FreeFork / Verify)
+                        └─ 3) fallback: a.tools.Execute(tc)          [turn_adapter.go:233-249]
+                              (legacy 兜底: delegate_* + background_task_* 注册在 toolReg)
+                        ↓
+                ToolResult{Output, Error} → 流回 D7 → D3 重新调 LLM → 循环
+```
+
+`findSurface` 是线性扫 surface 列表 (O(N≤5)), 第一个 `RiskLevel(name)
+!= ""` 胜出, 后续 surface 不再询问 (W9: 短路求值)。
+`a.tools.Execute` 兜底是 W11 计划收敛的 tech-debt, 收编完成后唯一派发
+闸口将只剩 `findSurface` 路径。
+
+#### Chain B — LLM×N 委派型 (跨域触发 LLM)
+
+只有 2 个 tool 内部会自己再调 LLM, 是 D2→D4 的桥:
+
+| Tool | surface.Execute 行为 | 内部新开 | 同步? | 风险 |
+|---|---|---|---|---|
+| `free_fork` | `s.forker(ctx, parentSession, []ForkRequest)` → `freefork.Forker.Fork` | 子 agent (默认 worktree 隔离) | **异步** (返回 handle) | **HIGH** |
+| `delegate_explore/plan/implement` | `hubspoke.Dispatcher.Dispatch` → `execute.Executor` | worker agent (per-agent engine) | 同步 (ack-level) | Y |
+| `delegate_status` | 只查 status, 不开 agent | — | 同步 | LOW |
+
+**关键拓扑**:
+```
+D2 (主引擎 LLM 决策)
+  ├─ free_fork surface
+  │   └─→ D4 multiagent.AgentFactory.Create  [provision/factory.go:78]
+  │        └─→ run.New (新 session, 独立 worktree, 独立 engine)
+  │             └─→ 子 agent 内部完整重走 Chain A (递归)
+  └─ delegate_explore surface (主引擎走 toolReg 旧路径, per-agent 走 surface)
+      └─→ hubspoke.Dispatcher  [delegate.go:71]
+           └─→ execute.Executor  → 创建子 agent, 等 ack
+```
+
+#### Chain C — CLI/IM 命令型 (不经 LLM)
+
+```
+CLI 模式 (DEVRIX_CLI=1):
+  adapters.NewCLIAdapter(gw, commCfg, tm).Start(ctx)   [cmd/devrix/main.go:340]
+    ↓ 命令分发
+  → CommunicationGateway.ProcessMessage  (命令当 inbound 消息)
+  → 上面 Chain A (从 SessionOrchestrator 开始)
+  → 某些命令 (如 /tool list) 走 toolcli.Run, 完全绕开 LLM
+
+IM 模式 (飞书/钉钉/企微):
+  StartIM(ctx, gw, imHosts)                            [cmd/devrix/main.go:285]
+    ↓ IM adapter 转发 inbound message
+  → 上面 Chain A
+```
+
+#### Surface → Runner → 域 完整对照
+
+| Surface | 调用的下游 | 文件:行 | 同步? | 跨域? |
+|---|---|---|---|---|
+| **BuiltinSurface** | `ToolRegistry.Execute` → 6 builtin (bash/read/write/glob/grep/edit) | `surface/builtin_surface.go:79` | ✅ | D2 内 |
+| **LSPToolSurface** | `*lspRunner` → 外部 LSP server (gopls/jdtls/pyright) | `surface/lsptool_surface.go:61` | ✅ | D2 + 外部 |
+| **FreeForkSurface** | `freefork.Forker.Fork` → D4 AgentFactory | `surface/freefork_surface.go:95` | ❌ 异步 | **D2→D4** |
+| **TrackerSurface** | `tracker.Tracker.Recent()` 读 D5 LRU | `surface/tracker_surface.go:90` | ✅ | D2→D5 |
+| **VerifySurface** | `verify.FileVerifier.Verify` 读盘+静态分析 | `surface/verify_surface.go:66` | ✅ | D2→D6 |
+
+兜底 (`a.tools.Execute`):
+
+| ToolReg runner | 调用的下游 | 文件 | 跨域? |
+|---|---|---|---|
+| `delegate_explore/plan/implement/status` | `hubspoke.Dispatcher` → `execute.Executor` → D4 worker | `delegate_tools.go:28-44` | **D2→D4** |
+| `task_stop / task_output / task_list_background` | `enforce.BackgroundRegistry` 内存 | `background_task_tools.go` | D2 内 |
+
+#### 跨域调用拓扑
+
+```
+                ┌─────────────────────────────────────┐
+                │   D1 CommunicationGateway           │  (用户消息入口)
+                └────────────────┬────────────────────┘
+                                 ↓
+                ┌─────────────────────────────────────┐
+                │   D7 Orchestration                  │  (turn.Orchestrator 决策循环)
+                └────────────────┬────────────────────┘
+                                 ↓ 调 LLM
+                ┌─────────────────────────────────────┐
+                │   D3 LLM Gateway                    │  (QueryLLMCaller)
+                └────────────────┬────────────────────┘
+                                 ↓ LLM 输出 tool_use
+                ┌─────────────────────────────────────┐
+                │   D7→D2 turn_adapter.ExecuteRound   │  (派发核心)
+                │   1. perm.Request                   │
+                │   2. findSurface                    │
+                │   3. fallback toolReg.Execute       │
+                └─┬───────┬────────┬──────┬───────┬───┘
+                  ↓       ↓        ↓      ↓       ↓
+              D2 内部   D2+LSP   D2→D5  D2→D6  D2→D4
+              builtin   (外部)  tracker verify  free_fork /
+              (6 个)             (LRU)  (读盘)  delegate_*
+                                           (委派子 agent,
+                                            重走 Chain A)
+```
+
+#### Scenario: 派发闸口唯一性
+
+- **WHEN** a tool call lands in `contextEngineAdapter.ExecuteRound`
+- **THEN** `IPermissionGate.Request` is invoked exactly once per call
+  before any execution
+- **AND** `findSurface` is consulted; on hit, `surface.Execute` is
+  called and the fallback `a.tools.Execute` is NOT called for that
+  tool
+- **AND** permission denial produces `ToolResult{Error:"permission
+  denied"}` (NOT a round-level error)
+
+#### Scenario: free_fork fire-and-forget 语义
+
+- **WHEN** `free_fork` surface.Execute returns
+- **THEN** the returned `ToolResult.Output` contains the
+  `FreeForkHandleDTO` (agent IDs) only
+- **AND** the child agent continues execution asynchronously
+  (Chain A 递归) — the main turn loop does NOT wait for child
+  completion
+- **AND** `free_fork` is the only surface with this async contract;
+  all other surfaces MUST complete before `ExecuteRound` returns
+
+#### Scenario: per-agent engine tool 集合 ⊇ main engine
+
+- **WHEN** `buildWithGate` (per-agent path) is called
+- **THEN** the assembled surface list is a strict superset of the
+  main engine's surface list (modulo `defaultMode` filter drops)
+- **AND** `TestBuildWithGate_SupersetOfMainEngineTools` enforces this
+  invariant at test time
+- **AND** the filter chain (`DefaultFilters()`) is applied to per-agent
+  surfaces only, never to the main engine
+
+#### Scenario: 唯一无跨域 surface
+
+- **WHEN** a tool call hits `BuiltinSurface`
+- **THEN** execution stays within D2 (sandbox + filesystem)
+- **AND** no inter-domain call occurs (D3 / D4 / D5 / D6 not
+  involved)
+- **AND** `BuiltinSurface` is the only surface with this closed-loop
+  property; all others cross at least one domain boundary
+
 ---
 
 ## REMOVED Requirements
