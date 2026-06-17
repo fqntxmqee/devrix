@@ -81,6 +81,8 @@
 | **DM-20260617-007** | **工具面契约化 — ToolSurface + ToolFilter 拆面 + 6+ global 两阶段删除** | **devrix-tool-surface-contract** | **2026-06-17** | **—** | **ACCEPTED (PR #63 done: W1-W12, 7 surface + 3 filter + 1 dispatch, 12 global → 3, 3 入口 → 1; PR #64 done: 5 sub-commit W1-W5 删除 transcript/flow/sessionqueue/workmodel/freefork 5 global, 12 → 0; AC4 + AC14 PARTIAL → PASS; 22/22 AC PASS)** |
 | **DM-20260617-008** | **工具面 phase-2 完整 — 5 剩余 global singleton 全删 (transcript/flow/sessionqueue/workmodel/freefork)** | **devrix-tool-surface-phase2-full** | **2026-06-17** | **[#64](https://github.com/fqntxmqee/devrix/pull/64)** | **ACCEPTED (5 sub-commit 全部 PASS: W1 transcript / W2 flow / W3 sessionqueue / W4 workmodel / W5 freefork; 7 P0 T 点 T15-T21 全部 IMPLEMENTED; 89 packages go test -race 100% 绿; 12 global 全删闭环; 父 AC4 + AC14 PARTIAL → PASS)** |
 | **DM-20260618-001** | **ToolSpec 正交 4 bool + InterruptBehavior + BuildSurfaces sort.Slice + turn_adapter 并行 dispatch** | **devrix-tool-spec-enrichment** | **2026-06-18** | **[#67](https://github.com/fqntxmqee/devrix/pull/67)** | **ACCEPTED (4 P0 T 点 T22-T25 全部 IMPLEMENTED; 既有 T01-T11 保持 PASS; 7 surface 100% 填充 4 bool; BuildSurfaces 排序稳定; turn_adapter errgroup + indexed write-back; CI unit/integration/layer-lint 全 SUCCESS)** |
+| **DM-20260618-002** | **Per-tool CheckPermission 钩子 + IPermissionGate.ToolPolicy + BashAST + PlanMode** | **devrix-surface-permission-extension** | **2026-06-18** | **[#68](https://github.com/fqntxmqee/devrix/pull/68)** | **ACCEPTED (6 新 P0 T 点 T26-T29 + PERMISSION-GATE-1-T01/T02 全部 IMPLEMENTED; 既有 15 P0 T 点保持 PASS; 7 surface 实现 CheckPermission=Allow; BashASTPolicy 5 deny rules 拒危险 cmd; PlanModeOpenWorldPolicy 在 plan_mode+OpenWorld+not-allowlist 时 deny; turn_adapter 2-phase dispatch + indexed write-back; capture.PermissionManager.CheckPermission 补齐 Risk→Decision 映射; rebase onto #70 (DM-20260618-003) 合并后冲突全部解决; CI unit/integration/layer-lint/coverage 全 SUCCESS)** |
+| **DM-20260618-003** | **ToolSpec.DeferLoading + ToolFilter.ShouldDefer + ToolSearchSurface + zodgen (LLM prompt 懒加载)** | **devrix-surface-lazy-loading** | **2026-06-18** | **[#70](https://github.com/fqntxmqee/devrix/pull/70)** | **ACCEPTED (5 新 P0 T 点 T26-T30 全部 IMPLEMENTED; 静态 DeferLoading 标记 + runtime DeferDecision 链 + ToolSearchSurface (top-5) + turn_adapter.Prepare 过滤 + PlanModeOpenWorldPolicy.ShouldDefer + zodgen Go struct → JSON Schema; anthropic stub v1.1 占位; 6 hardcoded defer-by-default (delegate_*, task_output_background); 7 surface + 3 filter wiring; CI unit/integration/layer-lint/coverage 全 SUCCESS)** |
 
 ## Archive Locations
 
@@ -159,6 +161,8 @@
 | **devrix-diagnostic-tools-parity** | **`openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`** |
 | **devrix-tool-surface-phase2-full** | **`openspec/archive/2026-06-17-devrix-tool-surface-phase2-full/`** |
 | **devrix-tool-spec-enrichment** | **`openspec/archive/2026-06-18-devrix-tool-spec-enrichment/`** |
+| **devrix-surface-permission-extension** | **`openspec/archive/2026-06-18-devrix-surface-permission-extension/`** |
+| **devrix-surface-lazy-loading** | **`openspec/archive/2026-06-18-devrix-surface-lazy-loading/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
