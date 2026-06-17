@@ -124,6 +124,11 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		slog.Error("register verify_plan_execution tool", "error", err)
 	}
 
+	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 freefork.GlobalForker 注入。
+	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
+		slog.Error("register free_fork tool", "error", err)
+	}
+
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
 		contextengine.NewToolLimiter(b.toolCfg.ConcurrentMax),
