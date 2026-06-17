@@ -6,7 +6,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -58,6 +57,10 @@ type Dispatcher struct {
 }
 
 // NewDispatcher creates a SpokeDispatcher.
+//
+// hub: the ExecutionFlowHub used for publishing flow events. When nil, a
+// NoOpExecutionFlowHub is used (was: flow.GlobalHub default in PR #63;
+// DM-20260617-008 W2 removes the process-wide global).
 func NewDispatcher(
 	cfg config.DelegateConfig,
 	exec execute.WorkerExecutor,
@@ -66,7 +69,7 @@ func NewDispatcher(
 	leaderRes LeaderResolver,
 ) *Dispatcher {
 	if hub == nil {
-		hub = flow.GlobalHub
+		hub = contracts.NoOpExecutionFlowHub{}
 	}
 	return &Dispatcher{
 		cfg:       cfg,

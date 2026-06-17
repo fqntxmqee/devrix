@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -17,6 +16,9 @@ type SubQueryRunner struct {
 }
 
 // RunSubQuery implements hubspoke.SubQueryRunner.
+//
+// DM-20260617-008 W2: caller is responsible for setting LoopDeps.FlowReporter
+// (was previously auto-derived from flow.GlobalHub when nil).
 func (f *SubQueryRunner) RunSubQuery(
 	ctx context.Context,
 	parent *types.SessionContext,
@@ -27,9 +29,6 @@ func (f *SubQueryRunner) RunSubQuery(
 		return "", fmt.Errorf("subquery fallback: parent context is nil")
 	}
 	deps := f.LoopDeps
-	if deps.FlowReporter == nil && flow.GlobalHub != nil {
-		deps.FlowReporter = hubspoke.NewFlowReporter(flow.GlobalHub)
-	}
 	if maxTurns <= 0 {
 		maxTurns = 50
 	}

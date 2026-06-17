@@ -115,7 +115,7 @@ func buildSubAgentDeps(ce *contextengine.ContextEngine, gw *capture.Communicatio
 				MaxTurns:       maxTurns,
 				ModelTier:      params.ModelTier,
 				ReadOnlyTools:  params.ReadOnlyTools,
-			}, reg, sessionqueue.GlobalSessionQueue)
+			}, reg, sessionqueue.NewSessionQueue())
 		},
 		Cancel: func(taskID string) bool {
 			if reg == nil {

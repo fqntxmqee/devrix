@@ -74,7 +74,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		t.Fatalf("store: %v", err)
 	}
 	permMgr := capture.NewPermissionManager(&commCfg.Permission)
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, commCfg)
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, commCfg, nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 
 	factory := multiagentprovision.NewAgentFactory(

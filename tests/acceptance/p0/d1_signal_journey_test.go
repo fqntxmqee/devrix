@@ -32,7 +32,7 @@ func TestL5_D1_SignalJourney_CaptureToConclusion(t *testing.T) {
 		},
 	}
 
-	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig(), nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 	session, err := gw.CreateSession("cli", dir)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestL5_D1_SignalJourney_ErrorConclusion(t *testing.T) {
 		},
 	}
 
-	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig(), nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 	session, err := gw.CreateSession("cli", dir)
 	if err != nil {
@@ -142,7 +142,7 @@ func TestL5_D1_ConclusionFeedbackCapture(t *testing.T) {
 	engine := &testutil.MockContextEngine{
 		Events: []*capture.EngineEvent{{Type: "complete"}},
 	}
-	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig(), nil)
 	testutil.WireGatewayOrchestration(gw, engine)
 	session, err := gw.CreateSession("cli", dir)
 	if err != nil {

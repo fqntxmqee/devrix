@@ -21,8 +21,10 @@ import (
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // D7StackOptions configures InitOrchestration integration test wiring.
@@ -48,13 +50,16 @@ type D7StackOptions struct {
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
 type D7TestStack struct {
-	Obs       *observability.Observability
-	ObsBridge *observability.Bridge
-	Gateway   *capture.CommunicationGateway
-	Handler   *MockEventHandler
-	Engine    *contextengine.ContextEngine
-	LLMStub   llmgateway.IAdapter
-	WorkDir   string
+	Obs         *observability.Observability
+	ObsBridge   *observability.Bridge
+	Gateway     *capture.CommunicationGateway
+	Handler     *MockEventHandler
+	Engine      *contextengine.ContextEngine
+	LLMStub     llmgateway.IAdapter
+	WorkDir       string
+	TaskManager   *workmodel.TaskManager
+	FlowHub       contracts.ExecutionFlowHub
+	SessionQueue  *sessionqueue.SessionQueue
 }
 
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
@@ -112,7 +117,10 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 	ctxCfg.Tasks.Mode = "v2"
 	ctxCfg.Tasks.StoreDir = workDir
-	workmodel.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and shared with
+	// InitOrchestration + WireDelegate + tests (was: workmodel.GlobalTaskManager
+	// process-wide singleton).
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 
 	var toolsReg contextengine.IToolRegistry
 	if opt.Delegate {
@@ -141,7 +149,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 	handler := NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig(), nil)
 	gw.SetObservability(obs)
 
 	if opt.MultiAgent {
@@ -153,14 +161,16 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		gw.SetAgentFactory(factory)
 	}
 
-	if opt.ExecutionFlow {
-		bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge)
+	var flowHub contracts.ExecutionFlowHub
+	var sessionQ *sessionqueue.SessionQueue
+	if opt.ExecutionFlow || opt.Delegate {
+		flowHub, sessionQ = bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	}
 	if opt.Delegate {
 		maCfg := config.DefaultMultiAgentConfig()
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, flowHub, tm)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}
@@ -189,12 +199,15 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	return &D7TestStack{
-		Obs:       obs,
-		ObsBridge: obsBridge,
-		Gateway:   gw,
-		Handler:   handler,
-		Engine:    engine,
-		LLMStub:   stub,
-		WorkDir:   workDir,
+		Obs:          obs,
+		ObsBridge:    obsBridge,
+		Gateway:      gw,
+		Handler:      handler,
+		Engine:       engine,
+		LLMStub:      stub,
+		WorkDir:      workDir,
+		TaskManager:  tm,
+		FlowHub:      flowHub,
+		SessionQueue: sessionQ,
 	}
 }

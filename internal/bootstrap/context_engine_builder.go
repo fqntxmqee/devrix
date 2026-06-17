@@ -3,18 +3,15 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
@@ -41,6 +38,12 @@ type ContextEngineBuilder struct {
 	maCfg        *config.MultiAgentConfig
 	obsBridge    *observability.Bridge
 	agentToolReg *external.Registry
+	// forker is the free_fork tool injection. nil → free_fork tool returns
+	// "forker not initialized" error (legacy behaviour). DM-20260617-008 W5
+	// replaces the previous freefork.GlobalForker() lookup with this explicit
+	// field; callers (main.go) construct the forker via WireDefaultForker
+	// before calling NewContextEngineBuilder.
+	forker freefork.Forker
 	// ctx 用于 startTrackerTick 等后台 goroutine 的生命周期管理;
 	// nil 时回退到 context.Background (不会主动退出, 适用于单例启动场景).
 	ctx context.Context
@@ -82,6 +85,15 @@ func (b *ContextEngineBuilder) WithContext(ctx context.Context) *ContextEngineBu
 	return b
 }
 
+// WithForker wires the free_fork tool injection. Replaces the legacy
+// freefork.SetGlobalForker process-wide write (DM-20260617-008 W5).
+func (b *ContextEngineBuilder) WithForker(f freefork.Forker) *ContextEngineBuilder {
+	if b != nil {
+		b.forker = f
+	}
+	return b
+}
+
 // Build returns a context engine using the agent permission gate.
 func (b *ContextEngineBuilder) Build(perm multiagent.PermissionGate) contracts.IEngine {
 	var gate contracts.IPermissionGate
@@ -96,7 +108,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		return nil
 	}
 	longTerm := WireContextV3(b.ctxCfg)
-	workmodel.InitGlobalTaskManager(b.ctxCfg.Tasks, b.obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and passed to
+	// RegisterTaskTools. Replaces workmodel.GlobalTaskManager singleton.
+	tm := workmodel.NewTaskManagerFromConfig(b.ctxCfg.Tasks, b.obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -105,7 +119,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if err := enforce.RegisterQueryLoopTools(toolReg, b.ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
-	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, workmodel.GlobalTaskManager); err != nil {
+	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, tm); err != nil {
 		slog.Error("register task tools", "error", err)
 	}
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
@@ -134,57 +148,41 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	}
 
 	// G1 LSP tool (default disabled; 启用需 lsp.enabled=true + servers 配置)
-	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
-		slog.Error("register lsp tool", "error", err)
-	}
+	// W11 phase 2c: legacy RegisterLSPTool is removed; the lsp tool is now
+	// exposed via surface.LSPToolSurface (built in BuildSurfaces below).
+	// The lspRunner itself is kept in toolrunner (LSPToolSurface wraps it
+	// via NewLSPRunnerForSurface) but the Register*Tool registration helper
+	// is gone. turn_adapter.Prepare now reads the schema from the surface
+	// list, not from toolReg.
 
 	// DM-20260617-002 W6 (AC4): G4 verify_plan_execution tool — 暴露给 LLM。
-	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
-		slog.Error("register verify_plan_execution tool", "error", err)
-	}
+	// W11 phase 2c: now exposed exclusively via surface.VerifySurface below.
+	// The legacy verifyRunner is removed.
 
 	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 toolrunner.SetFreeForker 注入。
 	// S4-Gate H-3 fix: function-based DI, toolrunner 不直接 import freefork.
-	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
-		slog.Error("register free_fork tool", "error", err)
-	}
-	wireFreeForkerInjection()
+	// W11 phase 2c: now exposed exclusively via surface.FreeForkSurface below.
+	// The legacy freeforkRunner is removed; the toolrunner.globalFreeForker
+	// package-level singleton is gone (the FreeForkerFunc is held in the
+	// surface, not in a global var).
 	// DM-20260617-002 W12 (AC11) + S4-Gate H-3: G3 notify drainer 通过 prompt
 	// 注入点接入, 避免 prompt 包 import orchestration/workmodel/notify.
 	wireTaskNotifDrainer()
 
-	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 tracker.GlobalTracker 注入。
-	// 同一 buildWithGate 中创建 tracker 实例 + SetGlobalTracker + 启动 tick goroutine。
+	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 surface 注入。
+	// 同一 buildWithGate 中创建 tracker 实例 + 启动 tick goroutine。tracker 实例
+	// 通过 BuildSurfaces(SurfaceBuildOpts.Tracker) 显式传给 surface.TrackerSurface,
+	// 不再走 tracker.SetGlobalTracker + toolrunner.RegisterTrackerTool 旧路径。
 	// W13 (AC14): tracker cap / tick interval 走 DiagnosticsConfig.
 	// S4-Gate H-1 fix: 用 builder 持有的 ctx 控制 tick goroutine 生命周期, 避免多次 build 泄漏.
 	diagCfg := b.ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
-	tracker.SetGlobalTracker(diagTracker)
 	startTrackerTick(b.ctx, diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
-	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
-		slog.Error("register query_diagnostics tool", "error", err)
-	}
 
-	// DM-20260617-002 W11 (AC9): transcript Writer 全局注入, 让 gateway.ExpireSession
-	// 调 transcript.Append 写 session_close event. dir 优先取 DiagnosticsConfig.TranscriptDir,
-	// 然后 $DEVRIX_TRANSCRIPT_DIR, 最后 ~/.devrix/transcripts.
-	tdir := diagCfg.TranscriptDir
-	if tdir == "" {
-		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
-	}
-	if tdir == "" {
-		if home, herr := os.UserHomeDir(); herr == nil {
-			tdir = filepath.Join(home, ".devrix", "transcripts")
-		}
-	}
-	if tdir != "" {
-		if tw, err := transcript.NewWriter(tdir); err == nil {
-			transcript.SetGlobalWriter(tw)
-			slog.Info("transcript writer initialized", "dir", tdir)
-		} else {
-			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
-		}
-	}
+	// DM-20260617-008 W1: transcript writer creation moved to bootstrap.NewTranscriptWriter.
+	// Caller (cmd/devrix/main.go) invokes NewTranscriptWriter and passes the result to
+	// capture.NewCommunicationGateway as the `writer` arg; this function no longer
+	// touches the process-wide singleton.
 
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
@@ -205,6 +203,19 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		Timeout:      b.ctxCfg.Compression.Autocompact.Timeout,
 	})
 
+	// TOOL-SURFACE-1 (W11 phase 2b): assemble the surface list for the
+	// per-agent engine so turn_adapter.findSurface dispatches through the
+	// surface path (the same as the main engine). The diagTracker created
+	// above is the canonical instance; b.forker is the explicit free_fork
+	// dependency (DM-20260617-008 W5). When the surface set covers all
+	// callers, the global injection can be removed.
+	surfaces := BuildSurfaces(SurfaceBuildOpts{
+		ToolReg:   toolReg,
+		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:   diagTracker,
+		Forker:    freeforkGlobalFunc(b.forker),
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		TokenCounter:        b.stack.TokenCounter,
 		Tools:               tools,
@@ -219,7 +230,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		SessionCommandQueue: sessionqueue.NewSessionQueue(),
+		Surfaces:            surfaces,
+		Filters:             DefaultFilters(),
 	})
 }
 

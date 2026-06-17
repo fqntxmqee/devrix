@@ -6,7 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/query"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
+	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -24,17 +24,19 @@ func (h *captureFlowHub) Snapshot(string) contracts.WorkPlanSnapshot {
 }
 
 // T: D4-S10-A01-T08 (legacy; canonical → D7-S4)
+//
+// DM-20260617-008 W2: caller injects FlowReporter via LoopDeps (no global).
 func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T) {
 	hub := &captureFlowHub{}
-	prev := flow.GlobalHub
-	flow.SetGlobalHub(hub)
-	defer flow.SetGlobalHub(prev)
 
 	loop := &query.Loop{
 		LLM:        &query.SequentialLLM{Responses: []query.LLMScript{{Content: "fallback summary"}}},
 		Permission: query.AllowPermission{},
 	}
-	adapter := &SubQueryRunner{LoopDeps: enforce.LoopDeps{Loop: loop}}
+	adapter := &SubQueryRunner{LoopDeps: enforce.LoopDeps{
+		Loop:         loop,
+		FlowReporter: hubspoke.NewFlowReporter(hub),
+	}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}
 
 	_, err := adapter.RunSubQuery(context.Background(), parent, "explore", "scan repo", "task_fb", 0)

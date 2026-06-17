@@ -3,16 +3,12 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
@@ -25,6 +21,7 @@ import (
 	// tool package is imported via the agentToolReg parameter; the bridge plugin
 	// is created here at the composition root.
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 )
 
 // NewContextEngine wires Layer 2 to a pre-built LLM stack (L3 bridge).
@@ -49,9 +46,13 @@ func NewContextEngine(
 	maCfg *config.MultiAgentConfig,
 	obsBridge *observability.Bridge,
 	agentToolReg *external.Registry,
+	forker freefork.Forker,
 ) *contextengine.ContextEngine {
 	longTerm := WireContextV3(ctxCfg)
-	workmodel.InitGlobalTaskManager(ctxCfg.Tasks, obsBridge)
+	// DM-20260617-008 W4: TaskManager constructed locally and passed to
+	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
+	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
+	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -60,7 +61,7 @@ func NewContextEngine(
 	if err := enforce.RegisterQueryLoopTools(toolReg, ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
-	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, workmodel.GlobalTaskManager); err != nil {
+	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, tm); err != nil {
 		slog.Error("register task tools", "error", err)
 	}
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
@@ -91,44 +92,29 @@ func NewContextEngine(
 
 	// Diagnostic tool surface (kept in sync with ContextEngineBuilder.buildWithGate
 	// so the leader LLM sees the same tool list as per-agent engines).
-	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
-		slog.Error("register lsp tool", "error", err)
-	}
-	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
-		slog.Error("register verify_plan_execution tool", "error", err)
-	}
-	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
-		slog.Error("register free_fork tool", "error", err)
-	}
-	wireFreeForkerInjection()
+	//
+	// W11 phase 2c: lsp / verify_plan_execution / free_fork are now exposed
+	// exclusively via the surface list built in BuildSurfaces below. The
+	// legacy toolrunner.RegisterLSPTool / RegisterVerifyTool / RegisterFreeForkTool
+	// helpers are removed; turn_adapter.Prepare aggregates tool specs from
+	// the engine's surface list (TOOL-SURFACE-1 SoT) and the per-tool
+	// dispatch goes through surface.Execute (W9). The schema + execution
+	// surface is no longer dependent on a package-level global singleton.
 	wireTaskNotifDrainer()
 
 	diagCfg := ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
-	tracker.SetGlobalTracker(diagTracker)
+	// W11 phase 2: query_diagnostics is exposed via surface.TrackerSurface
+	// (built in BuildSurfaces below). The legacy toolrunner.RegisterTrackerTool
+	// + tracker.SetGlobalTracker path is removed; the surface holds the
+	// tracker instance explicitly so production code no longer relies on the
+	// process-wide singleton.
 	startTrackerTick(context.Background(), diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
 
-	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
-		slog.Error("register query_diagnostics tool", "error", err)
-	}
-
-	tdir := diagCfg.TranscriptDir
-	if tdir == "" {
-		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
-	}
-	if tdir == "" {
-		if home, herr := os.UserHomeDir(); herr == nil {
-			tdir = filepath.Join(home, ".devrix", "transcripts")
-		}
-	}
-	if tdir != "" {
-		if tw, err := transcript.NewWriter(tdir); err == nil {
-			transcript.SetGlobalWriter(tw)
-			slog.Info("transcript writer initialized", "dir", tdir)
-		} else {
-			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
-		}
-	}
+	// DM-20260617-008 W1: transcript writer creation moved to bootstrap.NewTranscriptWriter.
+	// Caller (cmd/devrix/main.go) invokes NewTranscriptWriter and passes the result to
+	// capture.NewCommunicationGateway as the `writer` arg; this function no longer
+	// touches the process-wide singleton.
 
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
@@ -148,6 +134,28 @@ func NewContextEngine(
 		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
 	})
 
+	// TOOL-SURFACE-1 (W8): assemble the surface list from the same
+	// dependencies the legacy registry uses. The surfaces are stored
+	// on the engine for the W9 turn_adapter surface dispatch path.
+	// For now, the legacy Tools/ToolsReg path is still in use and
+	// produces the same tool set the leader LLM sees.
+	//
+	// TOOL-SURFACE-1 (W11 partial): pass the same forker closure the
+	// legacy wireFreeForkerInjection installs. The surface path is
+	// primary; the global injection is the legacy back-compat. When
+	// the surface set covers all callers, the global injection can
+	// be removed.
+	//
+	// DM-20260617-008 W5: freeforkGlobalFunc takes the Forker directly
+	// (replaces freefork.GlobalForker() / SetGlobalForker process-wide
+	// singleton). Caller passes nil when multi-agent free_fork is disabled.
+	surfaces := BuildSurfaces(SurfaceBuildOpts{
+		ToolReg:   toolReg,
+		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:   diagTracker,
+		Forker:    freeforkGlobalFunc(forker),
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		// LLM deliberately omitted — production must go through DM-020 拆面.
 		TokenCounter:        stack.TokenCounter,
@@ -163,14 +171,17 @@ func NewContextEngine(
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
-		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		SessionCommandQueue: sessionqueue.NewSessionQueue(),
+		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).
+		Surfaces: surfaces,
+		Filters:  nil,
 	})
 }
 
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
-	_ contracts.LLMCaller     = (*turn.QueryLLMCaller)(nil)
-	_ contracts.Summarizer    = (*turn.CompressionSummarizer)(nil)
-	_ contracts.IEngine       = (*contextengine.ContextEngine)(nil)
+	_ contracts.LLMCaller       = (*turn.QueryLLMCaller)(nil)
+	_ contracts.Summarizer      = (*turn.CompressionSummarizer)(nil)
+	_ contracts.IEngine         = (*contextengine.ContextEngine)(nil)
 	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)
 )

@@ -29,6 +29,9 @@ type ContextEngineConfig struct {
 	MainTranscript     MainTranscriptConfig `yaml:"main_transcript"`
 	// Diagnostics DM-20260617-002 W13 (AC14) — 诊断 / 通知 / LSP / transcript 集中配置。
 	Diagnostics        DiagnosticsConfig  `yaml:"diagnostics"`
+	// Tools DM-20260617-007 W12 (AC12) — tool surface 可见性 / 风险阈值配置。
+	// 空 map / 未配置 = 所有 surface 全开, 风险阈值由每个 tool 自己声明。
+	Tools              ToolsConfig        `yaml:"tools"`
 }
 
 // MainTranscriptConfig controls append-only JSONL persistence for main sessions.
@@ -155,6 +158,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		TodoWrite:      DefaultTodoWriteConfig(),
 		MainTranscript: DefaultMainTranscriptConfig(),
 		Diagnostics:    DefaultDiagnosticsConfig(),
+		Tools:          DefaultToolsConfig(),
 	}
 }
 
@@ -241,4 +245,53 @@ func (c DiagnosticsConfig) Normalized() DiagnosticsConfig {
 		out.TrackerTickIntervalMs = def.TrackerTickIntervalMs
 	}
 	return out
+}
+
+// ToolsConfig DM-20260617-007 W12 (AC12) — tool surface 可见性 / 风险阈值配置。
+// 按 surface name 索引, key 与 surface.Name() 一致 ("builtin" / "lsp" /
+// "free_fork" / "tracker" / "verify" / "delegate_*" / "background_task" / ...)。
+type ToolsConfig struct {
+	// Surfaces 显式 surface 级覆盖; 空 = 全开 (各 surface 暴露所有 tool)。
+	Surfaces map[string]SurfaceConfig `yaml:"surfaces"`
+	// RiskThreshold 全局风险阈值; tool.Risk 超过此值时被 per-risk filter 隐藏。
+	// 留空 "" = 不过滤, 暴露所有 risk 等级。
+	RiskThreshold string `yaml:"risk_threshold"`
+}
+
+// SurfaceConfig 单个 surface 的可见性 / 风险阈值覆盖。
+type SurfaceConfig struct {
+	// Enabled false = 整 surface 隐藏 (Tools() 返回空); 缺省 / nil = true。
+	Enabled *bool `yaml:"enabled"`
+	// RiskThreshold 覆盖全局阈值, 仅作用于本 surface。
+	RiskThreshold string `yaml:"risk_threshold"`
+}
+
+// DefaultToolsConfig returns sane defaults (all surfaces enabled, no threshold).
+func DefaultToolsConfig() ToolsConfig {
+	return ToolsConfig{
+		Surfaces: map[string]SurfaceConfig{},
+	}
+}
+
+// Normalized fills in nil Enabled pointers to point at true (no behavior change
+// for explicit false; the default action is "enabled unless explicitly disabled").
+func (c ToolsConfig) Normalized() ToolsConfig {
+	out := c
+	if out.Surfaces == nil {
+		out.Surfaces = map[string]SurfaceConfig{}
+	}
+	return out
+}
+
+// IsEnabled returns true if the surface is not explicitly disabled in config.
+// Returns true when the surface has no entry in the Surfaces map (default-on).
+func (c ToolsConfig) IsEnabled(surfaceName string) bool {
+	if c.Surfaces == nil {
+		return true
+	}
+	sc, ok := c.Surfaces[surfaceName]
+	if !ok || sc.Enabled == nil {
+		return true
+	}
+	return *sc.Enabled
 }

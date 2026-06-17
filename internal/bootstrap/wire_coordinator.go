@@ -31,9 +31,16 @@ func InitOrchestration(
 	agentToolReg *external.Registry,
 ) error {
 	coordCfg := config.DefaultCoordinatorConfig()
+	tasksCfg := config.DefaultTasksConfig()
 	if configFile != "" {
 		if fileCfg, err := config.LoadConfigFile(configFile); err == nil {
 			coordCfg = config.BuildCoordinatorConfig(&fileCfg.Coordinator)
+			if fileCfg.ContextEngine.Tasks.Mode != "" || fileCfg.ContextEngine.Tasks.StoreDir != "" {
+				tasksCfg = fileCfg.ContextEngine.Tasks
+			}
+		}
+		if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
+			tasksCfg = ctxFileCfg.Tasks
 		}
 	}
 
@@ -83,6 +90,11 @@ func InitOrchestration(
 		obsBridge = b
 	}
 
+	// DM-20260617-008 W4: TaskManager constructed locally and shared with
+	// NewLocalWorkModel + NewSessionOrchestrator (via WithTaskManager).
+	// Replaces workmodel.GlobalTaskManager process-wide singleton.
+	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
+
 	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
 	// This replaces the legacy executor with the orchestration turn loop that
 	// calls D3 directly for LLM and D2 via adapters for tools/persist.
@@ -92,7 +104,7 @@ func InitOrchestration(
 
 	sink := newGatewayEventPublisher(gw)
 
-	wm := coordinator.NewLocalWorkModel(workmodel.GlobalTaskManager)
+	wm := coordinator.NewLocalWorkModel(tm)
 	if enforce.GlobalBackgroundRegistry == nil {
 		enforce.SetGlobalBackgroundRegistry()
 	}
@@ -152,6 +164,7 @@ func InitOrchestration(
 		coordinator.WithWorkModel(wm),
 		coordinator.WithOrchestratePath(orchPath),
 		coordinator.WithTurnToolExecutor(toolExec),
+		coordinator.WithTaskManager(tm),
 	)
 
 	entry := coordinator.NewEntry(orch)

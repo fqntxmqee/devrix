@@ -36,7 +36,7 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
@@ -89,7 +89,7 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
@@ -143,7 +143,7 @@ func TestPersistTurn_NilEngine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	// pass a stub that is NOT *contextengine.ContextEngine — adapter must no-op.
 	adapter := newContextEngineAdapter(gw, &stubSessionEngine{}, nil)
@@ -163,7 +163,7 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
@@ -207,7 +207,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
@@ -276,7 +276,7 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session store: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false

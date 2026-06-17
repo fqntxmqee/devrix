@@ -62,7 +62,7 @@ func newTestGatewayInDir(t *testing.T, dir string) *capture.CommunicationGateway
 			{Type: "complete", Content: ""},
 		},
 	}
-	gw := capture.NewCommunicationGateway(store, cliMockEventHandler{}, nil, config.DefaultConfig())
+	gw := capture.NewCommunicationGateway(store, cliMockEventHandler{}, nil, config.DefaultConfig(), nil)
 	gw.SetOrchestrationEntry(&cliOrchestrationEntry{engine: engine})
 	return gw
 }
@@ -77,7 +77,7 @@ func newTestCLIAdapter(t *testing.T, gw *capture.CommunicationGateway, stdin str
 	t.Helper()
 
 	out := &bytes.Buffer{}
-	a := NewCLIAdapter(gw, config.DefaultConfig())
+	a := NewCLIAdapter(gw, config.DefaultConfig(), nil)
 	a.reader = bufio.NewReader(strings.NewReader(stdin))
 	a.writer = out
 	return a, out

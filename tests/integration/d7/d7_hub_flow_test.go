@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/flow"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/tests/testutil"
@@ -16,20 +15,20 @@ import (
 
 // T: D7-S4-T02, D7-S4-T03, D7-S1-T05
 func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
-	_ = testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
+	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
 
-	task := workmodel.GlobalTaskManager.Create("sess_hub", "explore module", "")
+	task := stack.TaskManager.Create("sess_hub", "explore module", "")
 	if task == nil {
 		t.Fatal("expected task")
 	}
 
-	hub, ok := flow.GlobalHub.(*flow.Hub)
+	hub, ok := stack.FlowHub.(*flow.Hub)
 	if !ok {
-		t.Fatalf("expected wired flow.Hub, got %T", flow.GlobalHub)
+		t.Fatalf("expected wired flow.Hub, got %T", stack.FlowHub)
 	}
 	_ = hub
 
-	flow.GlobalHub.Publish(context.Background(), contracts.FlowEvent{
+	stack.FlowHub.Publish(context.Background(), contracts.FlowEvent{
 		SessionID: "sess_hub",
 		FlowID:    "flow-1",
 		WorkerID:  "worker-1",
@@ -40,7 +39,7 @@ func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 		Summary:   "started explore worker",
 	})
 
-	got, ok := workmodel.GlobalTaskManager.Get("sess_hub", task.ID)
+	got, ok := stack.TaskManager.Get("sess_hub", task.ID)
 	if !ok {
 		t.Fatal("task not found after FlowStarted")
 	}
@@ -51,7 +50,10 @@ func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 		t.Fatalf("status = %q, want in_progress", got.Status)
 	}
 
-	drained := sessionqueue.GlobalSessionQueue.Drain("sess_hub", "", true)
+	if stack.SessionQueue == nil {
+		t.Fatal("expected session queue wired with execution flow hub")
+	}
+	drained := stack.SessionQueue.Drain("sess_hub", "", true)
 	if len(drained) != 1 || drained[0].Mode != contracts.ModeDelegateProgress {
 		t.Fatalf("delegate-progress queue = %+v", drained)
 	}

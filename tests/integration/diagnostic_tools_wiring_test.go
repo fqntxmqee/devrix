@@ -30,12 +30,13 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/shared/types"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // TestIntegration_A1_DoctorCLI — A1 闭环: /doctor 输出 7 项 check。
@@ -102,14 +103,14 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 		_ = os.Remove("/tmp/test_evidence_int.go")
 	})
 
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterVerifyTool(reg); err != nil {
-		t.Fatalf("RegisterVerifyTool: %v", err)
+	// W11 phase 2c: verify_plan_execution is now exposed via surface.VerifySurface
+	// (TOOL-SURFACE-1 SoT). The integration test goes through the surface
+	// Execute path instead of toolrunner.RegisterVerifyTool + reg.Execute.
+	s := surface.NewVerifySurface()
+	res, err := s.Execute(context.Background(), "verify_plan_execution", `{"change_id":"demo-change","repo_root":"`+tmp+`"}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name:  "verify_plan_execution",
-		Input: `{"change_id":"demo-change","repo_root":"` + tmp + `"}`,
-	})
 	if res.Error != "" {
 		t.Fatalf("verify error: %s", res.Error)
 	}
@@ -118,11 +119,14 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 	}
 }
 
-// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 调 SetFreeForker 注入的函数。
+// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 通过 surface 注入函数。
+//
+// W11 phase 2c: free_fork 的实现已从 toolrunner.freeforkRunner +
+// toolrunner.SetFreeForker(global) 迁移到 surface.FreeForkSurface。FreeForkerFunc
+// 现在显式传给 surface 构造函数, integration test 直接构造 surface 走 Execute 路径。
 func TestIntegration_G5_FreeForkTool(t *testing.T) {
 	factory := &fakeFactory{}
-	// 通过 toolrunner.SetFreeForker 注入, 模拟 bootstrap 的真实链路.
-	prevFn := toolrunner.SetFreeForkerForTest(func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	forker := func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
 		_ = parentSession
 		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
@@ -137,17 +141,13 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 			})
 		}
 		return handles, nil
-	})
-	t.Cleanup(func() { toolrunner.SetFreeForker(prevFn) })
-
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterFreeForkTool(reg); err != nil {
-		t.Fatalf("RegisterFreeForkTool: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name: "free_fork",
-		Input: `{"parent_session":"sess-int","requests":[{"name":"r1","prompt":"p1","worktree":true}]}`,
-	})
+
+	s := surface.NewFreeForkSurface(forker)
+	res, err := s.Execute(context.Background(), "free_fork", `{"parent_session":"sess-int","requests":[{"name":"r1","prompt":"p1","worktree":true}]}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
+	}
 	if res.Error != "" {
 		t.Fatalf("free_fork error: %s", res.Error)
 	}
@@ -160,6 +160,10 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 }
 
 // TestIntegration_G6_QueryDiagnosticsTool — G6 闭环: tick → query。
+//
+// W11 phase 2a: query_diagnostics 的实现已从 toolrunner.trackerRunner +
+// tracker.SetGlobalTracker 迁移到 surface.TrackerSurface。integration test
+// 现在直接构造 surface 走 Execute 路径, 不再依赖任何 process-wide global。
 func TestIntegration_G6_QueryDiagnosticsTool(t *testing.T) {
 	tr := tracker.New(0)
 	tr.SetLinter(".go", func(_ context.Context, _ string) ([]tracker.Diagnostic, error) {
@@ -172,18 +176,12 @@ func TestIntegration_G6_QueryDiagnosticsTool(t *testing.T) {
 	if added != 1 {
 		t.Fatalf("tick added=%d, want 1", added)
 	}
-	prevT := tracker.GlobalTracker()
-	tracker.SetGlobalTracker(tr)
-	t.Cleanup(func() { tracker.SetGlobalTracker(prevT) })
 
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterTrackerTool(reg); err != nil {
-		t.Fatalf("RegisterTrackerTool: %v", err)
+	s := surface.NewTrackerSurface(tr)
+	res, err := s.Execute(context.Background(), "query_diagnostics", `{}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name:  "query_diagnostics",
-		Input: `{}`,
-	})
 	if res.Error != "" {
 		t.Fatalf("query_diagnostics error: %s", res.Error)
 	}
@@ -199,9 +197,6 @@ func TestIntegration_A3_TranscriptOnSessionClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
-	prevW := transcript.GlobalWriter()
-	transcript.SetGlobalWriter(tw)
-	t.Cleanup(func() { transcript.SetGlobalWriter(prevW) })
 
 	store, err := capture.NewFileSessionStore(filepath.Join(tmp, "sessions"))
 	if err != nil {
@@ -211,7 +206,7 @@ func TestIntegration_A3_TranscriptOnSessionClose(t *testing.T) {
 	if err := store.Create(sess); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, tw)
 	if err := gw.ExpireSession("sess-int-3"); err != nil {
 		t.Fatalf("ExpireSession: %v", err)
 	}
@@ -308,9 +303,9 @@ func (f *fakeFactory) ReleaseSession(_ string) {}
 
 type fakeAgent struct{ id string }
 
-func (a *fakeAgent) ID() string                       { return a.id }
-func (a *fakeAgent) State() multiagent.AgentState     { return multiagent.AgentStateRunning }
-func (a *fakeAgent) Config() multiagent.AgentConfig   { return multiagent.AgentConfig{} }
+func (a *fakeAgent) ID() string                     { return a.id }
+func (a *fakeAgent) State() multiagent.AgentState   { return multiagent.AgentStateRunning }
+func (a *fakeAgent) Config() multiagent.AgentConfig { return multiagent.AgentConfig{} }
 func (a *fakeAgent) Run(_ context.Context) (*multiagent.AgentResult, error) {
 	return &multiagent.AgentResult{ExitCode: 0}, nil
 }
@@ -322,7 +317,7 @@ func (a *fakeAgent) Terminate(_ context.Context) error                { return n
 func (a *fakeAgent) Wait(_ context.Context) (*multiagent.AgentResult, error) {
 	return &multiagent.AgentResult{ExitCode: 0}, nil
 }
-func (a *fakeAgent) ResolvePermission(string, bool)              {}
-func (a *fakeAgent) GetMessages() []types.Message                { return nil }
-func (a *fakeAgent) SetAgentObserver(multiagent.AgentObserver)   {}
+func (a *fakeAgent) ResolvePermission(string, bool)                  {}
+func (a *fakeAgent) GetMessages() []types.Message                    { return nil }
+func (a *fakeAgent) SetAgentObserver(multiagent.AgentObserver)       {}
 func (a *fakeAgent) SetEngineEventSink(func(*contracts.EngineEvent)) {}

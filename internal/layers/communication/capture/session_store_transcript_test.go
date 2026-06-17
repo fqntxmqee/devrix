@@ -26,9 +26,6 @@ func TestExpireSession_WritesTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
-	prevW := transcript.GlobalWriter()
-	transcript.SetGlobalWriter(tw)
-	t.Cleanup(func() { transcript.SetGlobalWriter(prevW) })
 
 	store, err := capture.NewFileSessionStore(filepath.Join(tmp, "sessions"))
 	if err != nil {
@@ -39,7 +36,7 @@ func TestExpireSession_WritesTranscript(t *testing.T) {
 		t.Fatalf("store.Create: %v", err)
 	}
 
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, tw)
 	if err := gw.ExpireSession("sess_close_1"); err != nil {
 		t.Fatalf("ExpireSession: %v", err)
 	}
@@ -73,7 +70,7 @@ func TestExpireSession_RemovesFromStore(t *testing.T) {
 		t.Fatalf("store.Create: %v", err)
 	}
 
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 	if err := gw.ExpireSession("sess_close_2"); err != nil {
 		t.Fatalf("ExpireSession: %v", err)
 	}
@@ -117,12 +114,9 @@ func TestListSessions_OrderedByMTime(t *testing.T) {
 	}
 }
 
-// T: 无 GlobalWriter 时 ExpireSession 不报错（transcript 是 best-effort）.
-func TestExpireSession_NoGlobalWriterNoError(t *testing.T) {
-	prevW := transcript.GlobalWriter()
-	transcript.SetGlobalWriter(nil)
-	t.Cleanup(func() { transcript.SetGlobalWriter(prevW) })
-
+// T: writer=nil 时 ExpireSession 不报错 (best-effort, no-op).
+// DM-20260617-008 W1: writer is injected via ctor (was process-wide global).
+func TestExpireSession_NoWriterNoError(t *testing.T) {
 	tmp := t.TempDir()
 	store, err := capture.NewFileSessionStore(filepath.Join(tmp, "sessions"))
 	if err != nil {
@@ -132,7 +126,7 @@ func TestExpireSession_NoGlobalWriterNoError(t *testing.T) {
 	if err := store.Create(sess); err != nil {
 		t.Fatalf("store.Create: %v", err)
 	}
-	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 	if err := gw.ExpireSession("sess_no_tw"); err != nil {
 		t.Errorf("ExpireSession should not error when transcript is nil, got: %v", err)
 	}

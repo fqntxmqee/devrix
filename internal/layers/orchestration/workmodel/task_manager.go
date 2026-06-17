@@ -51,19 +51,11 @@ type TaskManager struct {
 	obsBridge *observability.Bridge
 }
 
-// GlobalTaskManager is the process-wide task manager singleton.
-var GlobalTaskManager *TaskManager
-
-func init() {
-	GlobalTaskManager = NewTaskManager()
-}
-
-// InitGlobalTaskManager reconfigures the singleton from config (disk when mode=v2).
-func InitGlobalTaskManager(cfg config.TasksConfig, obsBridge *observability.Bridge) {
-	GlobalTaskManager = NewTaskManagerFromConfig(cfg, obsBridge)
-}
-
 // NewTaskManager creates a new in-memory task manager.
+//
+// DM-20260617-008 W4: callers should construct their own *TaskManager and
+// inject it where needed. The previous GlobalTaskManager package-level
+// singleton has been removed.
 func NewTaskManager() *TaskManager {
 	return &TaskManager{
 		tasks: make(map[string]map[string]*Task),
