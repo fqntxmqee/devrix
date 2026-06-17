@@ -1,0 +1,73 @@
+change_id: devrix-tool-spec-enrichment
+priority: P0
+demand_id: DM-20260618-001
+parent_demand: DM-20260617-007, DM-20260617-008
+parent_change: devrix-tool-surface-contract (PR #63 + #64 merged 2026-06-17, S7_archived)
+status: s7_archived
+title: "ToolSpec orthogonal flags + InterruptBehavior + BuildSurfaces sort"
+domains: [D2, D7, tool-surface]
+created_at: "2026-06-18"
+updated_at: "2026-06-18"
+source: clawcode-tool-design-comparison-2026-06-17
+
+# TOOL-SURFACE-1 P0 T 点
+t_points:
+  # 新增 P0 T 点
+  - TOOL-SURFACE-1-T22       # ToolSpec 4 bool 字段定义与填充
+  - TOOL-SURFACE-1-T23       # ToolSurface InterruptBehavior 方法 + 默认 block
+  - TOOL-SURFACE-1-T24       # BuildSurfaces sort.Slice by name 稳定性
+  - TOOL-SURFACE-1-T25       # turn_adapter 按 ConcurrencySafe 并行 dispatch
+  # 既有 11 个 P0 T 点（沿用，本 change 必须保持 PASS）
+  - TOOL-SURFACE-1-T01
+  - TOOL-SURFACE-1-T02
+  - TOOL-SURFACE-1-T03
+  - TOOL-SURFACE-1-T04
+  - TOOL-SURFACE-1-T05
+  - TOOL-SURFACE-1-T06
+  - TOOL-SURFACE-1-T07
+  - TOOL-SURFACE-1-T08
+  - TOOL-SURFACE-1-T09
+  - TOOL-SURFACE-1-T10
+  - TOOL-SURFACE-1-T11
+
+version_scope:
+  v1.0:
+    features:
+      - "ToolSpec 加 4 bool: ReadOnly / Destructive / OpenWorld / ConcurrencySafe"
+      - "ToolSurface 加 InterruptBehavior(name) InterruptMode 方法"
+      - "BuildSurfaces sort.Slice by name 提升 prompt cache 稳定性"
+      - "turn_adapter 按 ConcurrencySafe 决定并行 dispatch"
+      - "7 surface 全部改 Risk 查询 → ToolSpec 填充（含 4 bool）"
+    status: planned
+  v1.1:
+    features:
+      - "Per-tool CheckPermission 钩子（devrix-surface-permission-extension followup, DM-20260618-002）"
+      - "Per-tool 自定义 permission policy（如 BashTool AST 验证）"
+    status: future
+
+metrics_definitions:
+  - name: tool_spec_orthogonal_flag_coverage
+    description: 7 surface 全部 ToolSpec 填充 4 bool 字段的覆盖率
+    target: 100
+    baseline: 0
+  - name: build_surfaces_sort_stability
+    description: BuildSurfaces 输出顺序在不同 env 下保持稳定 (prompt cache hit)
+    target: 100
+    baseline: 0
+  - name: turn_adapter_parallel_dispatch_pct
+    description: turn_adapter.ExecuteRound 对 ConcurrencySafe=true 的 tool 走并行 dispatch 的比例
+    target: 100
+    baseline: 0
+  - name: tool_interrupt_cancel_response_ms
+    description: 收到用户取消信号后 LongRun surface (FreeFork/TaskOutput) cancel 响应时间
+    target: < 200ms
+    baseline: 60s
+
+span_naming:
+  - TOOL-SURFACE-1-A01: tool.surface.contract.v2
+  - TOOL-SURFACE-1-A01-F02: tool.spec.orthogonal_flags
+
+capability_aliases:
+  ToolSurface: TOOL-SURFACE-1-A01-ToolSurfaceContract
+  ToolSpec: TOOL-SURFACE-1-A01-ToolSpec
+  InterruptBehavior: TOOL-SURFACE-1-A01-F05-InterruptBehavior
