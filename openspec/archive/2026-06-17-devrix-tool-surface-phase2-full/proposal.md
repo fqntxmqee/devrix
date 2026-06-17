@@ -2,8 +2,8 @@
 
 **Change ID:** devrix-tool-surface-phase2-full
 **Demand ID:** DM-20260617-008
-**Parent Demand:** DM-20260617-007 (devrix-tool-surface-contract, S6_archived 2026-06-17)
-**Status:** S2_Proposal
+**Parent Demand:** DM-20260617-007 (devrix-tool-surface-contract, S7_archived 2026-06-17)
+**Status:** S7_Archived
 **Priority:** P0
 
 ---
