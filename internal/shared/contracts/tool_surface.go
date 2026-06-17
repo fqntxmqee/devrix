@@ -145,13 +145,14 @@ func (e *PermissionAskRequiredError) Error() string {
 //
 // Design principles:
 //   - Accept interfaces, return structs (ToolSpec / ToolResult are structs)
-//   - 5 methods, each 1-3 lines in typical implementations
+//   - 6 methods, each 1-3 lines in typical implementations
 //   - Does not hold ctx; Execute / Tools accept ctx
 //   - Does NOT make permission decisions (IPermissionGate runs in
 //     turn_adapter.ExecuteRound, BEFORE surf.Execute)
 //
 // DSAFT: TOOL-SURFACE-1-A01 (DM-20260617-007) + TOOL-SURFACE-1-A01-F05
-// (DM-20260618-001 — InterruptBehavior addition).
+// (DM-20260618-001 — InterruptBehavior addition) +
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002 — CheckPermission addition).
 type ToolSurface interface {
 	// Name returns the surface identifier (used in devrix.yaml config,
 	// log tags, and `devrix tool list` output).
@@ -189,18 +190,19 @@ type ToolSurface interface {
 	// that genuinely run >5s in normal use override this.
 	InterruptBehavior(name string) InterruptMode
 
-	// CheckPermission returns the per-tool permission verdict for the
-	// given spec + input. Surfaces should answer Allow when the tool is
-	// safe to execute unconditionally, Deny when it can never run in
-	// this context (the caller will NOT invoke Execute), and Ask when
-	// the policy is uncertain (the caller will consult IPermissionGate
-	// for the final decision).
+	// CheckPermission is the per-tool pre-dispatch hook. turn_adapter
+	// calls it BEFORE Execute; a non-Allow decision skips Execute and
+	// the LLM gets a PermissionDeniedError / PermissionAskRequiredError
+	// envelope in result.Results[i].Error.
 	//
-	// The default implementation (returned by stubSurface in tests)
-	// returns Allow unconditionally; surfaces with explicit policies
-	// (BashASTPolicy on bash, PlanModeOpenWorldPolicy on open-world
-	// tools) override this.
+	// 5 surfaces return Allow unconditionally (read-only / stateless
+	// tools). 2 surfaces override:
+	//   - BuiltinSurface  → BashASTPolicy parses the command and
+	//     denies rm -rf /, dd, mkfs, sudo, chmod 777 /.
+	//   - FreeForkSurface → delegates to IPermissionGate.CheckPermission
+	//     (multi-agent spawns need the global policy).
 	//
+	// Performance budget: < 5ms p99 (BashASTPolicy is the hot path).
 	// DSAFT: TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
 	CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision
 }

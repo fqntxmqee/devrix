@@ -220,8 +220,9 @@ func (f *filteredSurface) InterruptBehavior(name string) InterruptMode {
 }
 
 // CheckPermission delegates to the parent surface. Visibility filtering
-// happens separately in Apply (the filter removes specs entirely); this
-// method only reports what the parent would have decided.
+// is a different concern from permission: a hidden tool never reaches
+// CheckPermission (turn_adapter filters on Tools() first), so the
+// permission check is identical to the parent's.
 func (f *filteredSurface) CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision {
 	return f.parent.CheckPermission(ctx, spec, input)
 }

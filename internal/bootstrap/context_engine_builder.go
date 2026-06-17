@@ -30,6 +30,20 @@ func (f permissionGateFunc) Request(ctx context.Context, sessionID, toolName, in
 	return f(ctx, sessionID, toolName, input, risk)
 }
 
+// CheckPermission is a Risk-only fallback for the legacy
+// permissionGateFunc adapter. Plan-mode OpenWorld denial is composed
+// at the turn_adapter layer (DM-20260618-002), not here.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (f permissionGateFunc) CheckPermission(_ context.Context, spec contracts.ToolSpec) contracts.Decision {
+	switch spec.Risk {
+	case types.RiskLevelLow:
+		return contracts.DecisionAllow
+	default:
+		return contracts.DecisionAsk
+	}
+}
+
 // ContextEngineBuilder builds Layer 2 engines with a custom permission gate (per Agent).
 type ContextEngineBuilder struct {
 	stack        llmbridge.ContextLLMStack

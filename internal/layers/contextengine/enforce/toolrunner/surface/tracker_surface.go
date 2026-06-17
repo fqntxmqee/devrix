@@ -56,7 +56,8 @@ func (s *TrackerSurface) InterruptBehavior(name string) contracts.InterruptMode 
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. Default Allow.
+// CheckPermission implements contracts.ToolSurface. query_diagnostics is
+// a read-only diagnostic query — always Allow.
 func (s *TrackerSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }

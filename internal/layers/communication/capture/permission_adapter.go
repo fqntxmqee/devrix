@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -22,6 +23,18 @@ func (a *PermissionGateAdapter) Request(ctx context.Context, sessionID, toolName
 		return false
 	}
 	return a.mgr.Request(ctx, sessionID, toolName, input, risk)
+}
+
+// CheckPermission implements contracts.IPermissionGate (DM-20260618-002).
+// Default Risk → Decision mapping; plan-mode OpenWorld denial is
+// composed by the bootstrap (PlanModeOpenWorldPolicy), not here.
+func (a *PermissionGateAdapter) CheckPermission(_ context.Context, spec contracts.ToolSpec) contracts.Decision {
+	switch spec.Risk {
+	case types.RiskLevelLow:
+		return contracts.DecisionAllow
+	default:
+		return contracts.DecisionAsk
+	}
 }
 
 // IsYOLOMode delegates to PermissionManager.

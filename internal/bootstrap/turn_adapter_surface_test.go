@@ -3,11 +3,13 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -30,6 +32,7 @@ type stubSurface struct {
 	mu           *sync.Mutex
 	DeferLoading bool
 	OpenWorld    bool
+	permReturn   contracts.Decision // empty = DecisionAllow
 }
 
 func (s *stubSurface) Name() string { return s.name }
@@ -55,6 +58,9 @@ func (s *stubSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 }
 
 func (s *stubSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	if s.permReturn != "" {
+		return s.permReturn
+	}
 	return contracts.DecisionAllow
 }
 
@@ -378,5 +384,119 @@ func TestPrepare_FilterDeferDecider(t *testing.T) {
 		if ts.Name == "openworld" {
 			t.Error("openworld should be deferred by AlwaysDefer decider")
 		}
+	}
+}
+
+// T: TOOL-SURFACE-1-A01-T26 — Surface returns Deny → ExecuteRound writes
+// PermissionDeniedError to result.Results[i].Error, Execute is never
+// called, and the result slot is NOT overwritten in Phase 2.
+func TestExecuteRound_CheckPermission_DenyBlocksExecute(t *testing.T) {
+	hits := new(int32)
+	adapter := &contextEngineAdapter{
+		surfaces: []contracts.ToolSurface{
+			&stubSurface{
+				name: "danger", risk: types.RiskLevelHigh,
+				permReturn: contracts.DecisionDeny, hits: hits,
+			},
+		},
+	}
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "danger", Input: `{}`}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if got := atomic.LoadInt32(hits); got != 0 {
+		t.Errorf("surface Execute hits = %d, want 0 (denied before execute)", got)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("len = %d, want 1", len(res.Results))
+	}
+	if res.Results[0].Error == "" {
+		t.Fatal("Result.Error empty, want PermissionDeniedError envelope")
+	}
+	if !strings.Contains(res.Results[0].Error, "permission denied") {
+		t.Errorf("Error = %q, want 'permission denied' substring", res.Results[0].Error)
+	}
+}
+
+// T: TOOL-SURFACE-1-A01-T26 — Surface returns Ask → IPermissionGate is
+// consulted; if it returns Allow, Execute is called normally.
+func TestExecuteRound_CheckPermission_AskDelegatesToGate_Allows(t *testing.T) {
+	hits := new(int32)
+	adapter := &contextEngineAdapter{
+		surfaces: []contracts.ToolSurface{
+			&stubSurface{
+				name: "maybe", risk: types.RiskLevelMedium,
+				permReturn: contracts.DecisionAsk, hits: hits,
+			},
+		},
+		perm: mockctx.AllowAllPermission{},
+	}
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if got := atomic.LoadInt32(hits); got != 1 {
+		t.Errorf("Execute hits = %d, want 1 (gate allowed)", got)
+	}
+	if res.Results[0].Error != "" {
+		t.Errorf("Result.Error = %q, want empty", res.Results[0].Error)
+	}
+}
+
+// T: TOOL-SURFACE-1-A01-T26 — Surface returns Ask → gate returns Deny
+// → result has PermissionDeniedError envelope, Execute NOT called.
+func TestExecuteRound_CheckPermission_AskDelegatesToGate_Denies(t *testing.T) {
+	hits := new(int32)
+	adapter := &contextEngineAdapter{
+		surfaces: []contracts.ToolSurface{
+			&stubSurface{
+				name: "maybe", risk: types.RiskLevelMedium,
+				permReturn: contracts.DecisionAsk, hits: hits,
+			},
+		},
+		perm: mockctx.DenyAllPermission{},
+	}
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if got := atomic.LoadInt32(hits); got != 0 {
+		t.Errorf("Execute hits = %d, want 0 (gate denied)", got)
+	}
+	if !strings.Contains(res.Results[0].Error, "permission denied") {
+		t.Errorf("Error = %q, want 'permission denied' substring", res.Results[0].Error)
+	}
+}
+
+// T: TOOL-SURFACE-1-A01-T26 — Surface returns Ask → no gate wired →
+// conservative default: Ask stays as PermissionAskRequiredError.
+func TestExecuteRound_CheckPermission_AskWithNoGate(t *testing.T) {
+	hits := new(int32)
+	adapter := &contextEngineAdapter{
+		surfaces: []contracts.ToolSurface{
+			&stubSurface{
+				name: "maybe", risk: types.RiskLevelMedium,
+				permReturn: contracts.DecisionAsk, hits: hits,
+			},
+		},
+		// perm is nil
+	}
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if got := atomic.LoadInt32(hits); got != 0 {
+		t.Errorf("Execute hits = %d, want 0 (no gate → conservative Ask)", got)
+	}
+	if !strings.Contains(res.Results[0].Error, "permission ask required") {
+		t.Errorf("Error = %q, want 'permission ask required' substring", res.Results[0].Error)
 	}
 }

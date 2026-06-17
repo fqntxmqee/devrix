@@ -20,6 +20,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -56,6 +57,14 @@ func (p *recordingPermission) Calls() []permCall {
 	out := make([]permCall, len(p.calls))
 	copy(out, p.calls)
 	return out
+}
+
+// CheckPermission implements contracts.IPermissionGate. Returns Allow
+// by default; tests can override via the permDecision field.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (p *recordingPermission) CheckPermission(_ context.Context, _ contracts.ToolSpec) contracts.Decision {
+	return contracts.DecisionAllow
 }
 
 // recordingToolRunner captures every Execute call so the test can assert on
@@ -318,6 +327,17 @@ type togglingPermission struct {
 
 func (p *togglingPermission) Request(_ context.Context, _, toolName, _ string, _ types.RiskLevel) bool {
 	return !p.deny[toolName]
+}
+
+// CheckPermission mirrors Request: denied tools → Deny; everything
+// else → Allow.
+//
+// TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+func (p *togglingPermission) CheckPermission(_ context.Context, spec contracts.ToolSpec) contracts.Decision {
+	if p.deny[spec.Name] {
+		return contracts.DecisionDeny
+	}
+	return contracts.DecisionAllow
 }
 
 // T: D7-S2-A06-T03 — integration: wire the adapter through the real
