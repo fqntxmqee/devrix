@@ -143,6 +143,9 @@ func (s *staticSurface) RiskLevel(name string) types.RiskLevel {
 func (s *staticSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	return &contracts.ToolResult{Error: "static test surface"}, nil
 }
+func (s *staticSurface) InterruptBehavior(_ string) contracts.InterruptMode {
+	return contracts.InterruptBlock
+}
 
 // buildTestSurfaces constructs a small canonical list for testing. Mirrors
 // the production BuildSurfaces output (BuiltinSurface + LSPToolSurface +

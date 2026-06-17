@@ -144,6 +144,9 @@ func (s *markerSurface) RiskLevel(n string) types.RiskLevel {
 func (s *markerSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	return &contracts.ToolResult{Output: s.output}, nil
 }
+func (s *markerSurface) InterruptBehavior(_ string) contracts.InterruptMode {
+	return contracts.InterruptBlock
+}
 
 type stubIntegratedSurface struct {
 	name     string
@@ -162,6 +165,9 @@ func (s *stubIntegratedSurface) RiskLevel(n string) types.RiskLevel {
 }
 func (s *stubIntegratedSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	return &contracts.ToolResult{Output: "stub"}, nil
+}
+func (s *stubIntegratedSurface) InterruptBehavior(_ string) contracts.InterruptMode {
+	return contracts.InterruptBlock
 }
 
 // Importing the alias as toolpolicyfilter so the `toolpolicy` import below

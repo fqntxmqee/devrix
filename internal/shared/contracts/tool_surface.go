@@ -10,11 +10,35 @@ import (
 // and D2 toolrunner.ToolSchema). All cross-layer tool exchanges use ToolSpec.
 //
 // DSAFT: TOOL-SURFACE-1-A01 (DM-20260617-007 devrix-tool-surface-contract)
+// TOOL-SURFACE-1-A01-F02 (DM-20260618-001 devrix-tool-spec-enrichment):
+//
+//	4 orthogonal bool flags supplement the legacy Risk enum so that
+//	PerAgentFilter / PerRiskFilter / turn_adapter can make fine-grained
+//	decisions without parsing Risk strings.
 type ToolSpec struct {
 	Name        string
 	Description string
 	Parameters  string // JSON Schema
 	Risk        types.RiskLevel
+
+	// ReadOnly: tool does not modify the filesystem (read_file / glob / grep / lsp / verify).
+	// PerAgentFilter consumes this to auto-extend the explore agent's visible set.
+	ReadOnly bool
+
+	// Destructive: tool performs irreversible operations (rm / force_push / delete_branch).
+	// PerRiskFilter in plan_mode MAY consult this together with OpenWorld to decide
+	// whether the LLM can call the tool without human confirmation.
+	Destructive bool
+
+	// OpenWorld: tool's side effects extend beyond the local machine
+	// (web_fetch / send_im_message / free_fork spawning child agents).
+	// PerRiskFilter uses this in plan_mode to drop the tool from the visible set.
+	OpenWorld bool
+
+	// ConcurrencySafe: multiple invocations of the same tool may run in parallel
+	// without mutual interference (e.g. read_file on different paths).
+	// turn_adapter.ExecuteRound uses this to decide parallel vs sequential dispatch.
+	ConcurrencySafe bool
 }
 
 // ToolResult is the return type of ToolSurface.Execute.
@@ -24,6 +48,24 @@ type ToolResult struct {
 	Output string
 	Error  string
 }
+
+// InterruptMode describes how a tool responds to a context cancellation signal.
+//
+// DSAFT: TOOL-SURFACE-1-A01-F05 (DM-20260618-001 devrix-tool-spec-enrichment).
+// The 1:1 mapping with clawcode Tool.interruptBehavior (Tool.ts:410-416)
+// lets long-run tools opt out of waiting for natural completion when the
+// user issues a new message mid-turn.
+type InterruptMode string
+
+const (
+	// InterruptCancel: the surface MUST select on ctx.Done() and return
+	// ctx.Err() within 200ms of cancellation.
+	InterruptCancel InterruptMode = "cancel"
+
+	// InterruptBlock: the surface ignores ctx cancellation and runs to
+	// natural completion. The default for short-run tools.
+	InterruptBlock InterruptMode = "block"
+)
 
 // ToolSurface is a discoverable entry point for a group of related tools.
 //
@@ -36,12 +78,13 @@ type ToolResult struct {
 //
 // Design principles:
 //   - Accept interfaces, return structs (ToolSpec / ToolResult are structs)
-//   - 4 methods, each 1-3 lines in typical implementations
+//   - 5 methods, each 1-3 lines in typical implementations
 //   - Does not hold ctx; Execute / Tools accept ctx
 //   - Does NOT make permission decisions (IPermissionGate runs in
 //     turn_adapter.ExecuteRound, BEFORE surf.Execute)
 //
-// DSAFT: TOOL-SURFACE-1-A01 (DM-20260617-007 devrix-tool-surface-contract)
+// DSAFT: TOOL-SURFACE-1-A01 (DM-20260617-007) + TOOL-SURFACE-1-A01-F05
+// (DM-20260618-001 — InterruptBehavior addition).
 type ToolSurface interface {
 	// Name returns the surface identifier (used in devrix.yaml config,
 	// log tags, and `devrix tool list` output).
@@ -69,4 +112,13 @@ type ToolSurface interface {
 	// workDir and sessionID are passed explicitly (not via ctx value) so
 	// surfaces do not need to know about D1/D2 ctx conventions.
 	Execute(ctx context.Context, name, input, workDir string) (*ToolResult, error)
+
+	// InterruptBehavior returns the interrupt mode for the named tool.
+	// Long-run tools (FreeForkSurface.free_fork) MUST return InterruptCancel
+	// and select on ctx.Done() inside Execute; everything else returns
+	// InterruptBlock by convention.
+	//
+	// The default is InterruptBlock (existing 7 surfaces); only surfaces
+	// that genuinely run >5s in normal use override this.
+	InterruptBehavior(name string) InterruptMode
 }

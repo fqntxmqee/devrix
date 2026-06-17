@@ -154,6 +154,12 @@ func (f *filteredSurface) Execute(ctx context.Context, name, input, workDir stri
 	}, nil
 }
 
+// InterruptBehavior delegates to the parent surface. The filter doesn't
+// change the interrupt mode — only the visible set of tools.
+func (f *filteredSurface) InterruptBehavior(name string) InterruptMode {
+	return f.parent.InterruptBehavior(name)
+}
+
 // ctxForLog extracts a session/agent hint from ctx for error messages.
 // Returns "" if no usable value is found; this is intentionally cheap
 // and best-effort.

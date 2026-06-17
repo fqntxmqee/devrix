@@ -28,12 +28,24 @@ func (s *FreeForkSurface) Name() string { return "free_fork" }
 
 // Tools implements contracts.ToolSurface.
 func (s *FreeForkSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
+	rOnly, dest, openW, concSafe := OrthogonalFlagFor("free_fork")
 	return []contracts.ToolSpec{{
-		Name:        "free_fork",
-		Description: "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id but runs in an isolated worktree (default). Returns agent_ids list.",
-		Parameters:  `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "worktree": true, "mode": "default"}]}`,
-		Risk:        types.RiskLevelHigh,
+		Name:            "free_fork",
+		Description:     "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id but runs in an isolated worktree (default). Returns agent_ids list.",
+		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "worktree": true, "mode": "default"}]}`,
+		Risk:            types.RiskLevelHigh,
+		ReadOnly:        rOnly,
+		Destructive:     dest,
+		OpenWorld:       openW,
+		ConcurrencySafe: concSafe,
 	}}
+}
+
+// InterruptBehavior implements contracts.ToolSurface. free_fork is the only
+// long-run tool in devrix and MUST return InterruptCancel so the surface
+// selects on ctx.Done() inside Execute when the user issues a new message.
+func (s *FreeForkSurface) InterruptBehavior(name string) contracts.InterruptMode {
+	return InterruptBehaviorFor(name)
 }
 
 // RiskLevel implements contracts.ToolSurface.

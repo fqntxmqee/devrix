@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"sort"
+
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
@@ -29,6 +31,11 @@ type SurfaceBuildOpts struct {
 // Surfaces that are unconfigured (nil deps) are silently dropped from
 // the list — callers should check the length if they need to assert
 // "all 7 surfaces present".
+//
+// TOOL-SURFACE-1-A01-F03 (DM-20260618-001 devrix-tool-spec-enrichment):
+// the returned slice is sorted by Name() so the dispatch order is
+// stable across processes (required for the LLM prompt cache —
+// reordering surfaces changes the tool list hash).
 func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	var out []contracts.ToolSurface
 	if opts.ToolReg != nil {
@@ -46,6 +53,7 @@ func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	}
 	// VerifySurface is stateless — always safe to add.
 	out = append(out, surface.NewVerifySurface())
+	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
 	return out
 }
 
