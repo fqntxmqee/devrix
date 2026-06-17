@@ -25,12 +25,13 @@ func NewLSPToolSurface(cfg *toolrunner.LSPConfig) *LSPToolSurface {
 // Name implements contracts.ToolSurface.
 func (s *LSPToolSurface) Name() string { return "lsp" }
 
-// Tools implements contracts.ToolSurface. Returns nil when the surface is
-// disabled (per devrix.yaml lsp.enabled + lsp.servers).
+// Tools implements contracts.ToolSurface.
+//
+// W11 phase 2c: schema is always returned so the LLM can see the tool in
+// its tool list (TOOL-SURFACE-1 SoT), matching the legacy RegisterLSPTool
+// behavior of exposing the schema even when LSP is disabled. Execute is
+// what actually reports "lsp not enabled" at call time.
 func (s *LSPToolSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
-	if s.cfg == nil || !s.cfg.Enabled || len(s.cfg.Servers) == 0 {
-		return nil
-	}
 	return []contracts.ToolSpec{{
 		Name:        "lsp",
 		Description: "LSP code intelligence. operations: definition | references | incoming_calls",

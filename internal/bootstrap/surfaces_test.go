@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -39,14 +40,18 @@ func TestBuildSurfaces_AllConfigured(t *testing.T) {
 	}
 }
 
-// T: TOOL-SURFACE-1-T08 — BuildSurfaces with no opts: only Verify (stateless).
+// T: TOOL-SURFACE-1-T08 — BuildSurfaces with no opts: LSP + Verify
+// (both always-on, regardless of ToolReg/Tracker/Forker). LSP is added
+// unconditionally so the LLM tool list is stable; Verify is stateless.
 func TestBuildSurfaces_OnlyStateless(t *testing.T) {
 	surfaces := BuildSurfaces(SurfaceBuildOpts{})
-	if len(surfaces) != 1 {
-		t.Fatalf("len = %d, want 1 (verify only)", len(surfaces))
+	if len(surfaces) != 2 {
+		t.Fatalf("len = %d, want 2 (lsp + verify)", len(surfaces))
 	}
-	if surfaces[0].Name() != "verify" {
-		t.Errorf("Name = %q, want verify", surfaces[0].Name())
+	names := surfaceNames(surfaces)
+	want := []string{"lsp", "verify"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("names = %v, want %v", names, want)
 	}
 }
 

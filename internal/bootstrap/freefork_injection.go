@@ -10,19 +10,26 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 )
 
-// freeforkInjectionOnce 确保 wireFreeForkerInjection 只注入一次 (测试可重入)。
+// freeforkInjectionOnce is retained as a sentinel for tests that want to
+// assert "the freefork DI closure has been initialised" without actually
+// touching a global. The wireFreeForkerInjection hook is now a no-op kept
+// only for source-level compatibility with previous W11 callers; the real
+// forker is held by surface.FreeForkSurface (TOOL-SURFACE-1 SoT).
 var freeforkInjectionOnce sync.Once
 
-// wireFreeForkerInjection 把 freefork.GlobalForker().Fork 包成 toolrunner.FreeForkerFunc
-// 注入到 toolrunner global. bootstrap 阶段调用, 之后 LLM 调 free_fork 时
-// toolrunner 不需要 import freefork / multiagent 任何包.
+// wireFreeForkerInjection is preserved as a no-op for back-compat with
+// earlier OpenSpec W11 callers. W11 phase 2c removes the package-level
+// toolrunner.globalFreeForker; the FreeForkerFunc is now plumbed via
+// BuildSurfaces(SurfaceBuildOpts.Forker) instead.
 func wireFreeForkerInjection() {
-	freeforkInjectionOnce.Do(func() {
-		toolrunner.SetFreeForker(freeforkGlobalFunc)
-	})
+	freeforkInjectionOnce.Do(func() {})
 }
 
-// freeforkGlobalFunc 是注入到 toolrunner 的真实实现.
+// freeforkGlobalFunc 是 BuildSurfaces 阶段注入到 surface.FreeForkSurface 的真实实现.
+//
+// W11 phase 2c: this is no longer a global — it's a regular package function
+// called by context_engine.go / context_engine_builder.go at engine build
+// time. The closure is held in the surface for the lifetime of the engine.
 func freeforkGlobalFunc(ctx context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
 	f := freefork.GlobalForker()
 	if f == nil {

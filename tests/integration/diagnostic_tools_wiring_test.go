@@ -103,14 +103,14 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 		_ = os.Remove("/tmp/test_evidence_int.go")
 	})
 
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterVerifyTool(reg); err != nil {
-		t.Fatalf("RegisterVerifyTool: %v", err)
+	// W11 phase 2c: verify_plan_execution is now exposed via surface.VerifySurface
+	// (TOOL-SURFACE-1 SoT). The integration test goes through the surface
+	// Execute path instead of toolrunner.RegisterVerifyTool + reg.Execute.
+	s := surface.NewVerifySurface()
+	res, err := s.Execute(context.Background(), "verify_plan_execution", `{"change_id":"demo-change","repo_root":"`+tmp+`"}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name:  "verify_plan_execution",
-		Input: `{"change_id":"demo-change","repo_root":"` + tmp + `"}`,
-	})
 	if res.Error != "" {
 		t.Fatalf("verify error: %s", res.Error)
 	}
@@ -119,11 +119,14 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 	}
 }
 
-// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 调 SetFreeForker 注入的函数。
+// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 通过 surface 注入函数。
+//
+// W11 phase 2c: free_fork 的实现已从 toolrunner.freeforkRunner +
+// toolrunner.SetFreeForker(global) 迁移到 surface.FreeForkSurface。FreeForkerFunc
+// 现在显式传给 surface 构造函数, integration test 直接构造 surface 走 Execute 路径。
 func TestIntegration_G5_FreeForkTool(t *testing.T) {
 	factory := &fakeFactory{}
-	// 通过 toolrunner.SetFreeForker 注入, 模拟 bootstrap 的真实链路.
-	prevFn := toolrunner.SetFreeForkerForTest(func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	forker := func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
 		_ = parentSession
 		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
@@ -138,17 +141,13 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 			})
 		}
 		return handles, nil
-	})
-	t.Cleanup(func() { toolrunner.SetFreeForker(prevFn) })
-
-	reg := toolrunner.NewToolRegistry()
-	if err := toolrunner.RegisterFreeForkTool(reg); err != nil {
-		t.Fatalf("RegisterFreeForkTool: %v", err)
 	}
-	res, _ := reg.Execute(context.Background(), toolrunner.ToolCall{
-		Name:  "free_fork",
-		Input: `{"parent_session":"sess-int","requests":[{"name":"r1","prompt":"p1","worktree":true}]}`,
-	})
+
+	s := surface.NewFreeForkSurface(forker)
+	res, err := s.Execute(context.Background(), "free_fork", `{"parent_session":"sess-int","requests":[{"name":"r1","prompt":"p1","worktree":true}]}`, "")
+	if err != nil {
+		t.Fatalf("surface.Execute: %v", err)
+	}
 	if res.Error != "" {
 		t.Fatalf("free_fork error: %s", res.Error)
 	}

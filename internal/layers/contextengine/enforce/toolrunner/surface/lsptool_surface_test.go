@@ -10,22 +10,27 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// T: TOOL-SURFACE-1-T03 — LSPToolSurface.Tools returns nil when disabled
-// (cfg == nil → defaults to Enabled=false).
+// T: TOOL-SURFACE-1-T03 — LSPToolSurface.Tools always returns the lsp schema
+// (W11 phase 2c). Mirrors the legacy RegisterLSPTool behavior: the LLM
+// must see the tool in its tool list so it can be invoked; Execute is
+// what reports "lsp not enabled" at call time.
 func TestLSPToolSurface_Disabled(t *testing.T) {
 	s := surface.NewLSPToolSurface(nil)
-	if got := s.Tools(context.Background(), "", ""); got != nil {
-		t.Errorf("disabled LSP Tools = %v, want nil", got)
+	specs := s.Tools(context.Background(), "", "")
+	if len(specs) != 1 || specs[0].Name != "lsp" {
+		t.Errorf("disabled LSP Tools = %v, want 1 spec named lsp", specs)
 	}
 }
 
-// T: TOOL-SURFACE-1-T03 — LSPToolSurface.Tools returns nil when Enabled
-// but no servers configured.
+// T: TOOL-SURFACE-1-T03 — LSPToolSurface.Tools returns 1 spec when Enabled
+// but no servers configured (schema is always exposed; "no servers" is
+// reported at Execute time, not at schema time).
 func TestLSPToolSurface_EnabledNoServers(t *testing.T) {
 	cfg := &toolrunner.LSPConfig{Enabled: true}
 	s := surface.NewLSPToolSurface(cfg)
-	if got := s.Tools(context.Background(), "", ""); got != nil {
-		t.Errorf("enabled-no-servers Tools = %v, want nil", got)
+	specs := s.Tools(context.Background(), "", "")
+	if len(specs) != 1 || specs[0].Name != "lsp" {
+		t.Errorf("enabled-no-servers Tools = %v, want 1 spec named lsp", specs)
 	}
 }
 

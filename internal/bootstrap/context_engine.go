@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
@@ -91,23 +90,14 @@ func NewContextEngine(
 
 	// Diagnostic tool surface (kept in sync with ContextEngineBuilder.buildWithGate
 	// so the leader LLM sees the same tool list as per-agent engines).
-	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
-		slog.Error("register lsp tool", "error", err)
-	}
-	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
-		slog.Error("register verify_plan_execution tool", "error", err)
-	}
-	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
-		slog.Error("register free_fork tool", "error", err)
-	}
-	// TOOL-SURFACE-1 (W11): build the forker closure once and pass it
-	// to both the legacy wireFreeForkerInjection (which injects via
-	// the global setter) and BuildSurfaces (which passes it explicitly
-	// to the FreeForkSurface). The two paths share the same closure;
-	// the surface path is the primary one. The global is kept in
-	// phase 1 for legacy compatibility and will be removed in W11
-	// phase 2.
-	wireFreeForkerInjection()
+	//
+	// W11 phase 2c: lsp / verify_plan_execution / free_fork are now exposed
+	// exclusively via the surface list built in BuildSurfaces below. The
+	// legacy toolrunner.RegisterLSPTool / RegisterVerifyTool / RegisterFreeForkTool
+	// helpers are removed; turn_adapter.Prepare aggregates tool specs from
+	// the engine's surface list (TOOL-SURFACE-1 SoT) and the per-tool
+	// dispatch goes through surface.Execute (W9). The schema + execution
+	// surface is no longer dependent on a package-level global singleton.
 	wireTaskNotifDrainer()
 
 	diagCfg := ctxCfg.Diagnostics.Normalized()

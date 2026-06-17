@@ -34,9 +34,10 @@ func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	if opts.ToolReg != nil {
 		out = append(out, surface.NewBuiltinSurface(opts.ToolReg))
 	}
-	if opts.LSPConfig != nil {
-		out = append(out, surface.NewLSPToolSurface(opts.LSPConfig))
-	}
+	// W11 phase 2c: LSP surface is added unconditionally so the lsp tool
+	// schema is in the LLM tool list even when LSP is disabled. The
+	// surface itself reports the disabled state at Execute time.
+	out = append(out, surface.NewLSPToolSurface(opts.LSPConfig))
 	if opts.Tracker != nil {
 		out = append(out, surface.NewTrackerSurface(opts.Tracker))
 	}

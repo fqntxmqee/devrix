@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -134,31 +133,23 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	}
 
 	// G1 LSP tool (default disabled; 启用需 lsp.enabled=true + servers 配置)
-	// W11 phase 2b: legacy RegisterLSPTool is no longer the dispatch path
-	// once the engine has a surface list; the surface is built in BuildSurfaces
-	// below using the same LSPConfig (or nil = disabled). The legacy
-	// registration is kept here ONLY so the per-agent engine's toolReg still
-	// has the schema available for the LLM tool list when the engine has no
-	// surfaces. Once the legacy globals are removed (W11 phase 2c), this
-	// registration is dropped together with the runner.
-	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
-		slog.Error("register lsp tool", "error", err)
-	}
+	// W11 phase 2c: legacy RegisterLSPTool is removed; the lsp tool is now
+	// exposed via surface.LSPToolSurface (built in BuildSurfaces below).
+	// The lspRunner itself is kept in toolrunner (LSPToolSurface wraps it
+	// via NewLSPRunnerForSurface) but the Register*Tool registration helper
+	// is gone. turn_adapter.Prepare now reads the schema from the surface
+	// list, not from toolReg.
 
 	// DM-20260617-002 W6 (AC4): G4 verify_plan_execution tool — 暴露给 LLM。
-	// W11 phase 2b: also exposed via surface.VerifySurface (stateless) below.
-	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
-		slog.Error("register verify_plan_execution tool", "error", err)
-	}
+	// W11 phase 2c: now exposed exclusively via surface.VerifySurface below.
+	// The legacy verifyRunner is removed.
 
 	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 toolrunner.SetFreeForker 注入。
 	// S4-Gate H-3 fix: function-based DI, toolrunner 不直接 import freefork.
-	// W11 phase 2b: also exposed via surface.FreeForkSurface below; legacy
-	// RegisterFreeForkTool kept for per-agent engine schema compat.
-	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
-		slog.Error("register free_fork tool", "error", err)
-	}
-	wireFreeForkerInjection()
+	// W11 phase 2c: now exposed exclusively via surface.FreeForkSurface below.
+	// The legacy freeforkRunner is removed; the toolrunner.globalFreeForker
+	// package-level singleton is gone (the FreeForkerFunc is held in the
+	// surface, not in a global var).
 	// DM-20260617-002 W12 (AC11) + S4-Gate H-3: G3 notify drainer 通过 prompt
 	// 注入点接入, 避免 prompt 包 import orchestration/workmodel/notify.
 	wireTaskNotifDrainer()
