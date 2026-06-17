@@ -180,6 +180,7 @@ func main() {
 		permissionMgr,
 		ctxCfg,
 		toolCfg,
+		multiAgentCfg,
 		obsBridge,
 		llmStack,
 		agentToolReg,

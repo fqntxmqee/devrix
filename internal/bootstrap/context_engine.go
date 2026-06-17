@@ -1,13 +1,20 @@
 package bootstrap
 
 import (
+	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
@@ -27,11 +34,19 @@ import (
 // and injecting them via EngineDeps.QueryLLMCaller / EngineDeps.Summarizer.
 // EngineDeps.LLM is left nil so production wiring cannot fall through to the
 // deprecated D2→D3 direct path.
+//
+// DM-20260617-005: register the same diagnostic tool surface that
+// buildWithGate exposes to per-agent engines. The main engine used by
+// devrix binary goes through SelectContextEngine → NewContextEngine;
+// without these registrations the leader LLM cannot see free_fork,
+// query_diagnostics, verify_plan_execution, lsp, or delegate_*, so it
+// responds with "unknown tool" when the user asks for them.
 func NewContextEngine(
 	stack llmbridge.ContextLLMStack,
 	permMgr *capture.PermissionManager,
 	ctxCfg *config.ContextEngineConfig,
 	toolCfg *config.ToolConfig,
+	maCfg *config.MultiAgentConfig,
 	obsBridge *observability.Bridge,
 	agentToolReg *external.Registry,
 ) *contextengine.ContextEngine {
@@ -51,6 +66,16 @@ func NewContextEngine(
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
 	}
+	if ctxCfg.TodoWrite.Enabled {
+		if err := toolReg.Register(contextengine.NewTodoWriteRunner()); err != nil {
+			slog.Error("register todo_write", "error", err)
+		}
+	}
+	// delegate_* tools are NOT registered here on the main engine —
+	// WireDelegate owns that registration (see internal/bootstrap/delegate.go)
+	// so the leader LLM sees the same set the leader is allowed to dispatch.
+	// Per-agent engines (ContextEngineBuilder.buildWithGate) register them
+	// directly because they don't go through WireDelegate.
 
 	// Register per-agent call_<name> plugins if agent tools are enabled.
 	if agentToolReg != nil {
@@ -61,6 +86,47 @@ func NewContextEngine(
 			} else {
 				slog.Info("agent tool registered", "tool", plugin.Name())
 			}
+		}
+	}
+
+	// Diagnostic tool surface (kept in sync with ContextEngineBuilder.buildWithGate
+	// so the leader LLM sees the same tool list as per-agent engines).
+	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
+		slog.Error("register lsp tool", "error", err)
+	}
+	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
+		slog.Error("register verify_plan_execution tool", "error", err)
+	}
+	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
+		slog.Error("register free_fork tool", "error", err)
+	}
+	wireFreeForkerInjection()
+	wireTaskNotifDrainer()
+
+	diagCfg := ctxCfg.Diagnostics.Normalized()
+	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
+	tracker.SetGlobalTracker(diagTracker)
+	startTrackerTick(context.Background(), diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
+
+	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
+		slog.Error("register query_diagnostics tool", "error", err)
+	}
+
+	tdir := diagCfg.TranscriptDir
+	if tdir == "" {
+		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
+	}
+	if tdir == "" {
+		if home, herr := os.UserHomeDir(); herr == nil {
+			tdir = filepath.Join(home, ".devrix", "transcripts")
+		}
+	}
+	if tdir != "" {
+		if tw, err := transcript.NewWriter(tdir); err == nil {
+			transcript.SetGlobalWriter(tw)
+			slog.Info("transcript writer initialized", "dir", tdir)
+		} else {
+			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
 		}
 	}
 
@@ -103,6 +169,8 @@ func NewContextEngine(
 
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
-	_ contracts.LLMCaller = (*turn.QueryLLMCaller)(nil)
-	_ contracts.Summarizer = (*turn.CompressionSummarizer)(nil)
+	_ contracts.LLMCaller     = (*turn.QueryLLMCaller)(nil)
+	_ contracts.Summarizer    = (*turn.CompressionSummarizer)(nil)
+	_ contracts.IEngine       = (*contextengine.ContextEngine)(nil)
+	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)
 )
