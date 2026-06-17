@@ -31,7 +31,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -119,15 +118,27 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 	}
 }
 
-// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 调 GlobalForker。
+// TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 调 SetFreeForker 注入的函数。
 func TestIntegration_G5_FreeForkTool(t *testing.T) {
 	factory := &fakeFactory{}
-	prevF := freefork.GlobalForker()
-	freefork.SetGlobalForker(freefork.NewDefaultForker(freefork.ForkerDeps{
-		Factory:       factory,
-		DefaultConfig: multiagent.AgentConfig{Mode: multiagent.ModeDefault},
-	}))
-	t.Cleanup(func() { freefork.SetGlobalForker(prevF) })
+	// 通过 toolrunner.SetFreeForker 注入, 模拟 bootstrap 的真实链路.
+	prevFn := toolrunner.SetFreeForkerForTest(func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+		_ = parentSession
+		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
+		for _, r := range reqs {
+			_ = r
+			// 走 factory: 复用 fakeFactory 的 Create 计数
+			if _, err := factory.Create(context.Background(), multiagent.AgentConfig{}, nil); err != nil {
+				return nil, err
+			}
+			handles = append(handles, toolrunner.FreeForkHandleDTO{
+				AgentID: "agent-x",
+				Name:    "stub",
+			})
+		}
+		return handles, nil
+	})
+	t.Cleanup(func() { toolrunner.SetFreeForker(prevFn) })
 
 	reg := toolrunner.NewToolRegistry()
 	if err := toolrunner.RegisterFreeForkTool(reg); err != nil {
