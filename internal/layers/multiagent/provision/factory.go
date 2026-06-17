@@ -56,6 +56,24 @@ func NewAgentFactoryWithBuilder(
 	return f
 }
 
+// SetSharedEngine replaces the factory's root-session shared engine. The
+// factory's deps.Engine is used for non-forked agents (ParentID == "") so they
+// share the gateway context engine and accumulate history. Callers that build
+// the factory before the main engine (e.g. main.go orchestrates factory + forker
+// before SelectContextEngine) use this setter to inject the engine after
+// construction.
+//
+// DM-20260617-008 W5: replaces the previous in-place mutation that WireMultiAgent
+// performed while constructing the factory. The factory's deps.Engine is now
+// set in two phases (nil at construction, set via this method after the main
+// engine is built).
+func (f *AgentFactory) SetSharedEngine(engine contracts.IEngine) {
+	if f == nil {
+		return
+	}
+	f.deps.Engine = engine
+}
+
 // Create implements multiagent.IAgentFactory.
 func (f *AgentFactory) Create(
 	ctx context.Context,

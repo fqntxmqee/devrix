@@ -26,6 +26,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 
@@ -187,6 +189,27 @@ func main() {
 	if userCfg.IM.Enabled {
 		engineMode = config.ResolveContextEngine(userCfg.IM)
 	}
+
+	// DM-20260617-008 W5: build factory + forker BEFORE the main engine so
+	// the main engine's free_fork surface can be wired with the explicit
+	// forker (replaces the legacy freefork.SetGlobalForker write inside
+	// WireMultiAgent). The factory's shared engine is wired later via
+	// factoryImpl.SetSharedEngine(contextEngine) once the main engine is
+	// built.
+	var (
+		engineBuilder *bootstrap.ContextEngineBuilder
+		agentFactory  multiagent.IAgentFactory
+		forker        freefork.Forker
+	)
+	if multiAgentCfg.Enabled {
+		engineBuilder = bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
+			WithMultiAgentConfig(multiAgentCfg)
+		bootstrapFactory := bootstrap.WireAgentFactory(engineBuilder, multiAgentCfg, obsBridge, nil)
+		forker = bootstrap.WireDefaultForker(bootstrapFactory)
+		engineBuilder.WithForker(forker)
+		agentFactory = bootstrapFactory
+	}
+
 	contextEngine := bootstrap.SelectContextEngine(
 		engineMode,
 		permissionMgr,
@@ -196,6 +219,7 @@ func main() {
 		obsBridge,
 		llmStack,
 		agentToolReg,
+		forker,
 	)
 
 	defaultEventHandler := &DefaultEventHandler{
@@ -227,12 +251,14 @@ func main() {
 	// Replaces workmodel.GlobalTaskManager process-wide singleton.
 	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 
-	var agentFactory multiagent.IAgentFactory
-	if multiAgentCfg.Enabled {
-		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
-			WithMultiAgentConfig(multiAgentCfg).
-			WithContext(ctx)
-		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
+	if multiAgentCfg.Enabled && agentFactory != nil {
+		// DM-20260617-008 W5: now that the main engine exists, wire it into
+		// the factory's deps.Engine so root session agents share the
+		// gateway context engine and accumulate history.
+		if factoryImpl, ok := agentFactory.(*multiagentprovision.AgentFactory); ok {
+			factoryImpl.SetSharedEngine(contextEngine)
+		}
+		engineBuilder.WithContext(ctx)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
 			"max_children", multiAgentCfg.MaxChildren,

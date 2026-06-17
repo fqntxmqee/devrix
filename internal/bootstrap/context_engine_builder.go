@@ -11,6 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
@@ -37,6 +38,12 @@ type ContextEngineBuilder struct {
 	maCfg        *config.MultiAgentConfig
 	obsBridge    *observability.Bridge
 	agentToolReg *external.Registry
+	// forker is the free_fork tool injection. nil → free_fork tool returns
+	// "forker not initialized" error (legacy behaviour). DM-20260617-008 W5
+	// replaces the previous freefork.GlobalForker() lookup with this explicit
+	// field; callers (main.go) construct the forker via WireDefaultForker
+	// before calling NewContextEngineBuilder.
+	forker freefork.Forker
 	// ctx 用于 startTrackerTick 等后台 goroutine 的生命周期管理;
 	// nil 时回退到 context.Background (不会主动退出, 适用于单例启动场景).
 	ctx context.Context
@@ -74,6 +81,15 @@ func (b *ContextEngineBuilder) WithMultiAgentConfig(maCfg *config.MultiAgentConf
 func (b *ContextEngineBuilder) WithContext(ctx context.Context) *ContextEngineBuilder {
 	if b != nil && ctx != nil {
 		b.ctx = ctx
+	}
+	return b
+}
+
+// WithForker wires the free_fork tool injection. Replaces the legacy
+// freefork.SetGlobalForker process-wide write (DM-20260617-008 W5).
+func (b *ContextEngineBuilder) WithForker(f freefork.Forker) *ContextEngineBuilder {
+	if b != nil {
+		b.forker = f
 	}
 	return b
 }
@@ -190,15 +206,14 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// TOOL-SURFACE-1 (W11 phase 2b): assemble the surface list for the
 	// per-agent engine so turn_adapter.findSurface dispatches through the
 	// surface path (the same as the main engine). The diagTracker created
-	// above is the canonical instance; freeforkGlobalFunc is the
-	// process-wide closure that wraps freefork.GlobalForker().Fork. Until
-	// W11 phase 2c deletes the legacy globals, both paths still produce
-	// the same tool set.
+	// above is the canonical instance; b.forker is the explicit free_fork
+	// dependency (DM-20260617-008 W5). When the surface set covers all
+	// callers, the global injection can be removed.
 	surfaces := BuildSurfaces(SurfaceBuildOpts{
 		ToolReg:   toolReg,
 		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
 		Tracker:   diagTracker,
-		Forker:    freeforkGlobalFunc,
+		Forker:    freeforkGlobalFunc(b.forker),
 	})
 
 	return contextengine.NewContextEngine(contextengine.EngineDeps{

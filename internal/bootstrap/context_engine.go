@@ -21,6 +21,7 @@ import (
 	// tool package is imported via the agentToolReg parameter; the bridge plugin
 	// is created here at the composition root.
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
+	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 )
 
 // NewContextEngine wires Layer 2 to a pre-built LLM stack (L3 bridge).
@@ -45,6 +46,7 @@ func NewContextEngine(
 	maCfg *config.MultiAgentConfig,
 	obsBridge *observability.Bridge,
 	agentToolReg *external.Registry,
+	forker freefork.Forker,
 ) *contextengine.ContextEngine {
 	longTerm := WireContextV3(ctxCfg)
 	// DM-20260617-008 W4: TaskManager constructed locally and passed to
@@ -143,11 +145,15 @@ func NewContextEngine(
 	// primary; the global injection is the legacy back-compat. When
 	// the surface set covers all callers, the global injection can
 	// be removed.
+	//
+	// DM-20260617-008 W5: freeforkGlobalFunc takes the Forker directly
+	// (replaces freefork.GlobalForker() / SetGlobalForker process-wide
+	// singleton). Caller passes nil when multi-agent free_fork is disabled.
 	surfaces := BuildSurfaces(SurfaceBuildOpts{
 		ToolReg:   toolReg,
 		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
 		Tracker:   diagTracker,
-		Forker:    freeforkGlobalFunc,
+		Forker:    freeforkGlobalFunc(forker),
 	})
 
 	return contextengine.NewContextEngine(contextengine.EngineDeps{

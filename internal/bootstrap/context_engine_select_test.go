@@ -49,7 +49,7 @@ func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 	permMgr := capture.NewPermissionManager(&config.PermissionConfig{})
 	stack := llmbridge.ContextLLMStack{}
 
-	ce := NewContextEngine(stack, permMgr, ctxCfg, toolCfg, maCfg, obsBridge, nil)
+	ce := NewContextEngine(stack, permMgr, ctxCfg, toolCfg, maCfg, obsBridge, nil, nil)
 	if ce == nil {
 		t.Fatal("NewContextEngine returned nil")
 	}
@@ -89,7 +89,7 @@ func TestSelectContextEngine_ForwardsMultiAgentConfig(t *testing.T) {
 	permMgr := capture.NewPermissionManager(&config.PermissionConfig{})
 	stack := llmbridge.ContextLLMStack{}
 
-	eng := SelectContextEngine("context", permMgr, ctxCfg, toolCfg, maCfg, obsBridge, stack, nil)
+	eng := SelectContextEngine("context", permMgr, ctxCfg, toolCfg, maCfg, obsBridge, stack, nil, nil)
 	if eng == nil {
 		t.Fatal("SelectContextEngine returned nil")
 	}
