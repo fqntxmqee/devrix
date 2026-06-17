@@ -38,12 +38,22 @@ func (s *TrackerSurface) Name() string { return "tracker" }
 // nil-tracker case is reported at Execute time so the tool is still
 // discoverable (otherwise the LLM would silently lose the schema).
 func (s *TrackerSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
+	rOnly, dest, openW, concSafe := OrthogonalFlagFor("query_diagnostics")
 	return []contracts.ToolSpec{{
-		Name:        "query_diagnostics",
-		Description: "Query the recent file-diagnostic buffer maintained by the periodic linter tick. Returns up to `limit` (default 50) diagnostics with file/line/severity/source/message. Optional `file` and `severity` filters narrow the result.",
-		Parameters:  `{"limit": 50, "file": "<optional>", "severity": "<error|warning|info>"}`,
-		Risk:        types.RiskLevelLow,
+		Name:            "query_diagnostics",
+		Description:     "Query the recent file-diagnostic buffer maintained by the periodic linter tick. Returns up to `limit` (default 50) diagnostics with file/line/severity/source/message. Optional `file` and `severity` filters narrow the result.",
+		Parameters:      `{"limit": 50, "file": "<optional>", "severity": "<error|warning|info>"}`,
+		Risk:            types.RiskLevelLow,
+		ReadOnly:        rOnly,
+		Destructive:     dest,
+		OpenWorld:       openW,
+		ConcurrencySafe: concSafe,
 	}}
+}
+
+// InterruptBehavior implements contracts.ToolSurface.
+func (s *TrackerSurface) InterruptBehavior(name string) contracts.InterruptMode {
+	return InterruptBehaviorFor(name)
 }
 
 // RiskLevel implements contracts.ToolSurface.

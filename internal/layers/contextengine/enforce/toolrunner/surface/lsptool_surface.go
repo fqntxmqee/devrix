@@ -32,12 +32,22 @@ func (s *LSPToolSurface) Name() string { return "lsp" }
 // behavior of exposing the schema even when LSP is disabled. Execute is
 // what actually reports "lsp not enabled" at call time.
 func (s *LSPToolSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
+	rOnly, dest, openW, concSafe := OrthogonalFlagFor("lsp")
 	return []contracts.ToolSpec{{
-		Name:        "lsp",
-		Description: "LSP code intelligence. operations: definition | references | incoming_calls",
-		Parameters:  toolrunner.LSPToolJSONSchema,
-		Risk:        types.RiskLevelLow,
+		Name:            "lsp",
+		Description:     "LSP code intelligence. operations: definition | references | incoming_calls",
+		Parameters:      toolrunner.LSPToolJSONSchema,
+		Risk:            types.RiskLevelLow,
+		ReadOnly:        rOnly,
+		Destructive:     dest,
+		OpenWorld:       openW,
+		ConcurrencySafe: concSafe,
 	}}
+}
+
+// InterruptBehavior implements contracts.ToolSurface.
+func (s *LSPToolSurface) InterruptBehavior(name string) contracts.InterruptMode {
+	return InterruptBehaviorFor(name)
 }
 
 // RiskLevel implements contracts.ToolSurface.

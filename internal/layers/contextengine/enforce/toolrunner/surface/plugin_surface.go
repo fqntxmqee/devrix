@@ -60,14 +60,26 @@ func (s *PluginSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 	for _, n := range s.order {
 		r := s.runners[n]
 		sc := r.Schema()
+		rOnly, dest, openW, concSafe := OrthogonalFlagFor(sc.Name)
 		out = append(out, contracts.ToolSpec{
-			Name:        sc.Name,
-			Description: sc.Description,
-			Parameters:  sc.Parameters,
-			Risk:        r.RiskLevel(),
+			Name:            sc.Name,
+			Description:     sc.Description,
+			Parameters:      sc.Parameters,
+			Risk:            r.RiskLevel(),
+			ReadOnly:        rOnly,
+			Destructive:     dest,
+			OpenWorld:       openW,
+			ConcurrencySafe: concSafe,
 		})
 	}
 	return out
+}
+
+// InterruptBehavior implements contracts.ToolSurface. delegate_* tools are
+// long-run (they spawn hubspoke child agents), so they opt into
+// InterruptCancel; everything else blocks.
+func (s *PluginSurface) InterruptBehavior(name string) contracts.InterruptMode {
+	return InterruptBehaviorFor(name)
 }
 
 // RiskLevel implements contracts.ToolSurface. For known names, returns the

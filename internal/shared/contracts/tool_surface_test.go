@@ -14,11 +14,12 @@ import (
 var _ contracts.ToolSurface = (*stubSurface)(nil)
 
 type stubSurface struct {
-	name    string
-	tools   []contracts.ToolSpec
-	risk    types.RiskLevel
-	output  string
-	execErr error
+	name      string
+	tools     []contracts.ToolSpec
+	risk      types.RiskLevel
+	interrupt contracts.InterruptMode
+	output    string
+	execErr   error
 }
 
 func (s *stubSurface) Name() string { return s.name }
@@ -26,6 +27,12 @@ func (s *stubSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec
 	return s.tools
 }
 func (s *stubSurface) RiskLevel(_ string) types.RiskLevel { return s.risk }
+func (s *stubSurface) InterruptBehavior(_ string) contracts.InterruptMode {
+	if s.interrupt != "" {
+		return s.interrupt
+	}
+	return contracts.InterruptBlock
+}
 func (s *stubSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	if s.execErr != nil {
 		return nil, s.execErr

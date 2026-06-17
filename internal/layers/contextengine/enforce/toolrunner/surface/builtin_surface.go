@@ -51,14 +51,25 @@ func (s *BuiltinSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 	}
 	out := make([]contracts.ToolSpec, 0, len(schemas))
 	for _, sc := range schemas {
+		rOnly, dest, openW, concSafe := OrthogonalFlagFor(sc.Name)
 		out = append(out, contracts.ToolSpec{
-			Name:        sc.Name,
-			Description: sc.Description,
-			Parameters:  sc.Parameters,
-			Risk:        s.reg.RiskLevel(sc.Name),
+			Name:            sc.Name,
+			Description:     sc.Description,
+			Parameters:      sc.Parameters,
+			Risk:            s.reg.RiskLevel(sc.Name),
+			ReadOnly:        rOnly,
+			Destructive:     dest,
+			OpenWorld:       openW,
+			ConcurrencySafe: concSafe,
 		})
 	}
 	return out
+}
+
+// InterruptBehavior implements contracts.ToolSurface. All builtin tools are
+// short-run, so they all block on ctx cancellation.
+func (s *BuiltinSurface) InterruptBehavior(name string) contracts.InterruptMode {
+	return InterruptBehaviorFor(name)
 }
 
 // RiskLevel implements contracts.ToolSurface.

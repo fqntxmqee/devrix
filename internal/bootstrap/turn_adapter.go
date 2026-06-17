@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -183,6 +186,14 @@ func parseToolParams(raw string) map[string]any {
 // dispatches each tool call to the matching surface.Execute. The legacy
 // IToolRunner path is still used when surfaces are absent (phase-1
 // back-compat) or for a tool name that no surface claims.
+//
+// TOOL-SURFACE-1-A01-F06 (DM-20260618-001 devrix-tool-spec-enrichment):
+// tool calls marked ConcurrencySafe=true on their ToolSpec run in
+// parallel via errgroup; the rest run sequentially. The permission
+// gate is consulted INSIDE executeOne so the gate mutex is held only
+// for the gate call (the gate is a shared, sequential resource). The
+// results slice is pre-allocated and indexed so the order of
+// req.ToolCalls is preserved in the output.
 func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
 	if a.tools == nil && len(a.surfaces) == 0 {
 		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
@@ -197,59 +208,88 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 		}
 	}
 
+	concSafe := a.concurrencyMap()
 	results := make([]turn.ToolResult, len(req.ToolCalls))
+
+	var parallelIdx []int
 	for i, tc := range req.ToolCalls {
-		// DM-20260617-006: gate via IPermissionGate (suggestion 3) and
-		// propagate risk into the D2 ToolCall (suggestion 4 partial). When
-		// a.perm is nil we leave the gate open — adapter is shared with
-		// tests/mocks that don't wire permission state.
-		risk := a.riskForTool(tc.Name)
-		if a.perm != nil && !a.perm.Request(toolCtx, req.SessionID, tc.Name, tc.Input, risk) {
-			results[i] = turn.ToolResult{
-				ToolCallID: tc.ID,
-				Error:      "permission denied",
-			}
+		if concSafe[tc.Name] {
+			parallelIdx = append(parallelIdx, i)
 			continue
 		}
-		// TOOL-SURFACE-1 (W9): prefer surface dispatch when available.
-		surf, ok := a.findSurface(tc.Name)
-		if ok {
-			res, err := surf.Execute(toolCtx, tc.Name, tc.Input, "")
-			if err != nil {
-				results[i] = turn.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
-			} else {
-				results[i] = turn.ToolResult{ToolCallID: tc.ID, Output: res.Output, Error: res.Error}
-			}
-			continue
+		results[i] = a.executeOne(toolCtx, req.SessionID, tc)
+	}
+
+	if len(parallelIdx) > 0 {
+		var g errgroup.Group
+		for _, idx := range parallelIdx {
+			idx, tc := idx, req.ToolCalls[idx]
+			g.Go(func() error {
+				results[idx] = a.executeOne(toolCtx, req.SessionID, tc)
+				return nil
+			})
 		}
-		// Fall back to the legacy IToolRunner path (W11 removes this).
-		if a.tools == nil {
-			results[i] = turn.ToolResult{
-				ToolCallID: tc.ID,
-				Error:      fmt.Sprintf("turn adapter: no surface or runner for tool %q", tc.Name),
-			}
-			continue
-		}
-		result, err := a.tools.Execute(toolCtx, contextengine.ToolCall{
-			ID:        tc.ID,
-			Name:      tc.Name,
-			Input:     tc.Input,
-			RiskLevel: risk,
-		})
+		_ = g.Wait()
+	}
+
+	return turn.ToolRoundResult{Results: results}, nil
+}
+
+// executeOne runs the full gate → surface → fallback chain for a single
+// tool call. Shared by both the sequential and parallel dispatch paths.
+func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) turn.ToolResult {
+	// DM-20260617-006: gate via IPermissionGate (suggestion 3) and
+	// propagate risk into the D2 ToolCall (suggestion 4 partial). When
+	// a.perm is nil we leave the gate open — adapter is shared with
+	// tests/mocks that don't wire permission state.
+	risk := a.riskForTool(tc.Name)
+	if a.perm != nil && !a.perm.Request(toolCtx, sessionID, tc.Name, tc.Input, risk) {
+		return turn.ToolResult{ToolCallID: tc.ID, Error: "permission denied"}
+	}
+	// TOOL-SURFACE-1 (W9): prefer surface dispatch when available.
+	if surf, ok := a.findSurface(tc.Name); ok {
+		res, err := surf.Execute(toolCtx, tc.Name, tc.Input, "")
 		if err != nil {
-			results[i] = turn.ToolResult{
-				ToolCallID: tc.ID,
-				Error:      err.Error(),
-			}
-		} else {
-			results[i] = turn.ToolResult{
-				ToolCallID: tc.ID,
-				Output:     result.Output,
-				Error:      result.Error,
-			}
+			return turn.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
+		}
+		return turn.ToolResult{ToolCallID: tc.ID, Output: res.Output, Error: res.Error}
+	}
+	// Fall back to the legacy IToolRunner path (W11 removes this).
+	if a.tools == nil {
+		return turn.ToolResult{
+			ToolCallID: tc.ID,
+			Error:      fmt.Sprintf("turn adapter: no surface or runner for tool %q", tc.Name),
 		}
 	}
-	return turn.ToolRoundResult{Results: results}, nil
+	result, err := a.tools.Execute(toolCtx, contextengine.ToolCall{
+		ID:        tc.ID,
+		Name:      tc.Name,
+		Input:     tc.Input,
+		RiskLevel: risk,
+	})
+	if err != nil {
+		return turn.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
+	}
+	return turn.ToolResult{ToolCallID: tc.ID, Output: result.Output, Error: result.Error}
+}
+
+// concurrencyMap builds a toolName → ConcurrencySafe lookup from the
+// surface list. Tools not declared by any surface default to false
+// (sequential). Used by ExecuteRound to decide parallel vs sequential
+// dispatch.
+//
+// TOOL-SURFACE-1-A01-F06 (DM-20260618-001 devrix-tool-spec-enrichment).
+func (a *contextEngineAdapter) concurrencyMap() map[string]bool {
+	m := make(map[string]bool, 32)
+	for _, s := range a.surfaces {
+		if s == nil {
+			continue
+		}
+		for _, sp := range s.Tools(context.Background(), "", "") {
+			m[sp.Name] = sp.ConcurrencySafe
+		}
+	}
+	return m
 }
 
 // riskForTool returns the risk classification for toolName. Surfaces are
