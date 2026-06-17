@@ -2,13 +2,17 @@ package bootstrap
 
 import (
 	"context"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -190,4 +194,124 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// T: D7-S2-A06-T02 (DM-20260617-004 devrix-d7-tool-ctx-inject)
+// ExecuteRound must inject the live SessionContext (WorkDir + SessionID) into
+// the per-tool ctx, mirroring D2 queryloop's WrapToolContext. Without this,
+// permission-aware tools (delegate_status, task_output, task_list_background)
+// report "session context unavailable" / "session_id unavailable" under the
+// LoopFirst routing path.
+func TestExecuteRound_AttachesSessionContext(t *testing.T) {
+	store, err := capture.NewFileSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("session store: %v", err)
+	}
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+
+	cfg := config.DefaultContextEngineConfig()
+	cfg.Compression.Autocompact.Enabled = false
+	cfg.Snapshot.Enabled = false
+	realReg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("real reg: %v", err)
+	}
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
+		Tools:          realReg,
+		ToolsReg:       mustBuiltinRegistryForAdapter(t),
+		Permission:     mockctx.AllowAllPermission{},
+		Config:         cfg,
+	})
+	adapter := newContextEngineAdapter(gw, engine, nil)
+	sid := "sess-ctx-inject"
+
+	// Seed sc with a real workdir so bash `pwd` returns it.
+	workDir := t.TempDir()
+	session := types.NewSession(sid, "cli", workDir)
+	ch := engine.Process(context.Background(), session, "warmup")
+	for range ch {
+	}
+	sc, ok := engine.SessionContext(sid)
+	if !ok {
+		t.Fatalf("precondition: sc not created for %s", sid)
+	}
+	// sc.WorkDir is what bash will chdir into.
+	wantWorkDir := sc.WorkDir
+	if _, err := os.Stat(wantWorkDir); err != nil {
+		t.Fatalf("sc.WorkDir does not exist: %v", err)
+	}
+
+	// Call bash via ExecuteRound; bash reads workdir from ctx. If sc is not
+	// injected, bash falls back to os.Getwd() (the test process cwd) and the
+	// output will NOT contain workDir.
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		SessionID: sid,
+		ToolCalls: []llmgateway.ToolCall{{
+			ID:    "call-bash-1",
+			Name:  "bash",
+			Input: `{"command":"pwd"}`,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("ExecuteRound results len = %d, want 1", len(res.Results))
+	}
+	if res.Results[0].Error != "" {
+		t.Fatalf("bash error: %s", res.Results[0].Error)
+	}
+	if !strings.Contains(res.Results[0].Output, wantWorkDir) {
+		t.Errorf("bash output %q does not contain workDir %q — sc not injected into ctx",
+			res.Results[0].Output, wantWorkDir)
+	}
+}
+
+// T: D7-S2-A06-T02 — ExecuteRound with no matching sc must not panic and
+// must still execute the tool (falling back to os.Getwd()).
+func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
+	store, err := capture.NewFileSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("session store: %v", err)
+	}
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil)
+
+	cfg := config.DefaultContextEngineConfig()
+	cfg.Compression.Autocompact.Enabled = false
+	cfg.Snapshot.Enabled = false
+	realReg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("real reg: %v", err)
+	}
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		Summarizer:     &mockctx.StaticSummarizer{},
+		Tools:          realReg,
+		ToolsReg:       mustBuiltinRegistryForAdapter(t),
+		Permission:     mockctx.AllowAllPermission{},
+		Config:         cfg,
+	})
+	adapter := newContextEngineAdapter(gw, engine, nil)
+
+	// No Process() call → no sc in memory.
+	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+		SessionID: "sess-no-sc",
+		ToolCalls: []llmgateway.ToolCall{{
+			ID:    "call-bash-noop",
+			Name:  "bash",
+			Input: `{"command":"echo hi"}`,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteRound: %v", err)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("ExecuteRound results len = %d, want 1", len(res.Results))
+	}
+	// bash should still run (falls back to os.Getwd) — output contains "hi".
+	if !strings.Contains(res.Results[0].Output, "hi") {
+		t.Errorf("bash output without sc: %q (expected to contain 'hi')", res.Results[0].Output)
+	}
 }

@@ -123,14 +123,31 @@ func parseToolParams(raw string) map[string]any {
 }
 
 // ExecuteRound implements turn.ToolRoundExecutor.
+//
+// DM-20260617-004 (devrix-d7-tool-ctx-inject): D7 path doesn't go through
+// D2 queryloop's WrapToolContext hook, so the live SessionContext (and its
+// SessionID/WorkDir) never reaches permission-aware tool runners
+// (delegate_status, task_output, task_list_background). Without it, those
+// tools return "session context unavailable" / "session_id unavailable".
+// Mirror D2's ToolContextWithGate here so D7→D2 tool dispatch behaves the
+// same as the legacy D2 path.
 func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
 	if a.tools == nil {
 		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
 	}
 
+	toolCtx := ctx
+	if req.SessionID != "" {
+		if prov, ok := a.engine.(sessionContextProvider); ok {
+			if sc, ok := prov.SessionContext(req.SessionID); ok && sc != nil {
+				toolCtx = contextengine.ToolContextWithGate(toolCtx, sc, a.perm)
+			}
+		}
+	}
+
 	results := make([]turn.ToolResult, len(req.ToolCalls))
 	for i, tc := range req.ToolCalls {
-		result, err := a.tools.Execute(ctx, contextengine.ToolCall{
+		result, err := a.tools.Execute(toolCtx, contextengine.ToolCall{
 			ID:    tc.ID,
 			Name:  tc.Name,
 			Input: tc.Input,
