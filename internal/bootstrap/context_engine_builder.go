@@ -3,10 +3,13 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
@@ -138,6 +141,24 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	startTrackerTick(diagTracker, 1*time.Second)
 	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
 		slog.Error("register query_diagnostics tool", "error", err)
+	}
+
+	// DM-20260617-002 W11 (AC9): transcript Writer 全局注入, 让 gateway.ExpireSession
+	// 调 transcript.Append 写 session_close event. dir 优先取 DEVRIX_TRANSCRIPT_DIR,
+	// 否则 ~/.devrix/transcripts.
+	if tdir := os.Getenv("DEVRIX_TRANSCRIPT_DIR"); tdir != "" {
+		if tw, err := transcript.NewWriter(tdir); err == nil {
+			transcript.SetGlobalWriter(tw)
+			slog.Info("transcript writer initialized", "dir", tdir)
+		} else {
+			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
+		}
+	} else if home, herr := os.UserHomeDir(); herr == nil {
+		tdir := filepath.Join(home, ".devrix", "transcripts")
+		if tw, err := transcript.NewWriter(tdir); err == nil {
+			transcript.SetGlobalWriter(tw)
+			slog.Info("transcript writer initialized", "dir", tdir)
+		}
 	}
 
 	tools := contextengine.NewLimitedToolRunner(

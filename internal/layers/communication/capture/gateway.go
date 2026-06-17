@@ -10,6 +10,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/delivery/eventbus"
 	"github.com/devrix/devrix/internal/layers/communication/capture/signal"
+	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -804,6 +805,15 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 	g.mu.Lock()
 	delete(g.sessions, sessionID)
 	g.mu.Unlock()
+
+	// DM-20260617-002 W11 (AC9): session close 钩子写 transcript.
+	// 在 store.Delete 之前调 transcript.Append, 落盘一条 session_close event.
+	if w := transcript.GlobalWriter(); w != nil {
+		_ = w.Append(sessionID, transcript.Event{
+			Kind: "session_close",
+			Body: "expired",
+		})
+	}
 
 	// Also delete from persistent store to prevent storage leak
 	if err := g.sessionStore.Delete(sessionID); err != nil {
