@@ -198,13 +198,19 @@ func main() {
 		eventHandler = bootstrap.NewCLIProgressHandler(defaultEventHandler, commCfg.CLI.ANSI)
 	}
 
+	// DM-20260617-002 S4-Gate H-1 fix: ctx 提前到 engine builder 之前, 让
+	// startTrackerTick 等后台 goroutine 能在 shutdown 时干净退出 (cancel 传播)。
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg)
 	gw.SetObservability(obs)
 
 	var agentFactory multiagent.IAgentFactory
 	if multiAgentCfg.Enabled {
 		engineBuilder := bootstrap.NewContextEngineBuilder(llmStack, ctxCfg, toolCfg, obsBridge, agentToolReg).
-			WithMultiAgentConfig(multiAgentCfg)
+			WithMultiAgentConfig(multiAgentCfg).
+			WithContext(ctx)
 		agentFactory = bootstrap.WireMultiAgent(engineBuilder, multiAgentCfg, obsBridge, contextEngine)
 		gw.SetAgentFactory(agentFactory)
 		slog.Info("multi-agent layer enabled",
@@ -225,9 +231,6 @@ func main() {
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
 		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry())
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
 
