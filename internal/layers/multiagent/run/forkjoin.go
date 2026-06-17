@@ -54,7 +54,8 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 		if forkSpan != nil {
 			forkSpan.End()
 		}
-		return nil, err
+		// DM-20260617-002 W3 (AC8 后半): agent spawn 失败错误加短栈，便于 IM 渲染。
+		return nil, sharederrors.WithShortStack(err, 5)
 	}
 	if impl, ok := child.(*Impl); ok {
 		impl.AttachSessionView(childView)
