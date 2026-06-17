@@ -2,8 +2,8 @@
 
 **Change ID:** devrix-diagnostic-tools-parity
 **Demand ID:** DM-20260616-003
-**Status:** S2_Design
-**Version:** v1.0 (本 change 仅产出规范需求，不实现)
+**Status:** S7_Archived
+**Version:** v1.0 (13 能力 + 7 域 t-registry + S5 验收 + 全量单测全绿)
 **域:** D1 / D2 / D3 / D4 / D5 / D6 + tool-security 横切
 
 ---

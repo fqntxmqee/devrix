@@ -1,7 +1,7 @@
 change_id: devrix-diagnostic-tools-parity
 priority: P0
 demand_id: DM-20260616-003
-status: s2_design
+status: s7_archived
 domains: [D1, D2, D3, D4, D5, D6, tool-security]
 dsaft_scenarios:
   # D2 Context Engine
@@ -34,11 +34,8 @@ dsaft_activities:
   - D6-S11-A02-VerifyPlanExec
   - TOOL-SEC-2-A02-ShellASTPolicy
   - D1-S2-A02-PersistTranscript
-t_points: []            # S2 阶段登记为 PLANNED，由各 sub-change 在 S3 阶段补全
+t_points: []            # S7 归档阶段已合并到 openspec/t-registry.md
 version_scope:
-  v1.0: 6 大核心差距 + 7 项附加特性的需求规格与提案；不实现
-  v1.1: sub-change-A (P0): LSP Tool (3 ops) + 文件诊断追踪 + 错误分类 + 堆栈截断
-  v1.2: sub-change-B (P1): Bash AST 安全 + 实现后自动验证
-  v1.3: sub-change-C (P2): 后台任务通知 + 自由分叉 + 附加特性 7 选 N
+  v1.0: 13 能力一次性交付（G1-G6 核心差距 + A1-A7 附加）+ 全量单元测试 + 7 域 t-registry 更新 + S5 验收
 metrics_definitions: []
 span_naming: []

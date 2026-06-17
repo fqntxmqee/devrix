@@ -75,6 +75,7 @@
 | **DM-20260615-004** | **D7 Intent 路径正交化 — 4 IntentKind = 4 独立执行链** | **devrix-d7-orthogonal-intent-paths** | **2026-06-16** | **[#35](https://github.com/fqntxmqee/devrix/pull/35)** | **ACCEPTED (7 T PASS; PR #35 merged `6086259`)** |
 | **DM-20260616-001** | **D7 不确定性处理能力缺口修复 — 5 个关键缺口闭环** | **devrix-d7-uncertainty-gaps** | **2026-06-16** | **—** | **ACCEPTED (6 AC PASS; 13 packages + 25 integration tests -race 全绿)** |
 | **DM-20260616-002** | **D7 Loop-First 路由 — Clawcode 对齐 ingress + tool 门控 Wave** | **devrix-d7-loop-first-routing** | **2026-06-16** | **[#46](https://github.com/fqntxmqee/devrix/pull/46)** | **ACCEPTED (L5-01..06 PASS; unit + D7 integration -race 全绿)** |
+| **DM-20260616-003** | **诊断工具能力差距闭环 — 对齐 clawcode (Claude Code v2.1.88)** | **devrix-diagnostic-tools-parity** | **2026-06-17** | **—** | **ACCEPTED (13 能力一次性交付: G1-G6 核心差距 + A1-A7 附加; 21 新文件 + 4 wiring; 7 域 t-registry +36; go build/vet/test -race 全绿; testbuild tag 全绿)** |
 
 ## Archive Locations
 
@@ -150,6 +151,7 @@
 | **devrix-d7-orthogonal-intent-paths** | **`openspec/archive/2026-06-16-devrix-d7-orthogonal-intent-paths/`** |
 | **devrix-d7-uncertainty-gaps** | **`openspec/archive/2026-06-16-devrix-d7-uncertainty-gaps/`** |
 | **devrix-d7-loop-first-routing** | **`openspec/archive/2026-06-16-devrix-d7-loop-first-routing/`** |
+| **devrix-diagnostic-tools-parity** | **`openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
@@ -166,6 +168,10 @@
 | devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
 | feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
 | devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+
+**2026-06-17 归档（S7 — 诊断工具能力差距闭环）**：
+
+- `devrix-diagnostic-tools-parity` → `openspec/archive/2026-06-17-devrix-diagnostic-tools-parity/`（DM-20260616-003 ACCEPTED; 13 能力一次性交付: G1 LSP Tool + G2 Bash AST + G3 Task Notify + G4 Verifier + G5 Free Fork + G6 Diagnostic Tracker + A1 /doctor + A2 Debug Filter + A3 Transcript + A4 Fault Inject + A5 Window Analyzer + A6 Error Classifier + A7 Short Stack; 21 新文件 + 4 wiring (bootstrap, task_manager, lsp_register, shortstack_test); 7 域 t-registry 累计 +36 (284→320 IMPLEMENTED); go build/vet/test -race + testbuild tag 全绿）
 
 **2026-06-16 归档（S7 — D7 Loop-First 路由）**：
 
