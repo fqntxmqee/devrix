@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.3.0
-**Last Updated:** 2026-06-14
+**Version:** 4.4.0
+**Last Updated:** 2026-06-18
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -12,6 +12,8 @@
 本文档为 Devrix T 层注册表的**索引入口**。各域的 T 层测试点已拆分为独立文件。
 
 > **编号格式**: `D{X}-S{X}-A{XX}-T{XX}`（T 归属 A）或 `D{X}-S{X}-A{XX}-F{XX}-T{XX}`（T 归属 F）
+>
+> **横切契约域** (TOOL-SURFACE-1 / PERMISSION-GATE-1) T 点用 `TOOL-SURFACE-1-T{nn}` / `PERMISSION-GATE-1-T{nn}` 平铺编号，归属 D2 (Context Engine) + D7 (Orchestration) 共同 consumption。
 
 ---
 
@@ -20,14 +22,17 @@
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 60 | 60 | 0 | 27 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 68 | 68 | 0 | 30 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 83 | 83 | 0 | 40 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 29 | 28 | 1 | 13 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 46 | 46 | 0 | 23 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 47 | 44 | 3 | 17 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 7 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 46 | 39 | 5 | 26 |
 
-**总计**: 320 · IMPLEMENTED 307 · PLANNED 11 · PARTIAL 2 · P0 143
+**总计**: 335 · IMPLEMENTED 322 · PLANNED 11 · PARTIAL 2 · P0 153
+
+> 2026-06-18 增量：DM-20260618-001/002/003 三个 change 共加 15 个 P0 T 点（T22-T34 + PERMISSION-GATE-1-T01/T02）— 全 IMPLEMENTED。
+> 详见 `openspec/specs/d2-context-engine/t-registry.md` §"TOOL-SURFACE-1: v2 / v3 / Lazy Loading"。
 
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 

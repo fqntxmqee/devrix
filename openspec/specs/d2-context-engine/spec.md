@@ -1019,21 +1019,21 @@ Process MUST emit `complete` only after `sc.Messages` and `session.ContextSnapsh
 > 把 3 个工具入口 (NewContextEngine / buildWithGate / WireDelegate) + 6+
 > package-level globals 收编为 1 个 `[]contracts.ToolSurface` 列表 + `[]contracts.ToolFilter`
 > 链 + 1 个 turn_adapter dispatch 路径。详细设计见
-> `openspec/changes/devrix-tool-surface-contract/{demand,design}.md`。
+> `openspec/archive/2026-06-17-devrix-tool-surface-contract/{demand,design}.md`。
 
 ### Requirement: ToolSurface Contract
 
 The system MUST expose every LLM-callable tool behind a single
-`contracts.ToolSurface` interface (Name / Tools / RiskLevel / Execute) and
-MUST NOT require callers to read package-level globals to discover or
-execute tools.
+`contracts.ToolSurface` interface (v3: 6 methods — Name / Tools / RiskLevel /
+InterruptBehavior / CheckPermission / Execute) and MUST NOT require
+callers to read package-level globals to discover or execute tools.
 
-#### Scenario: Every surface implements the 4-method contract
+#### Scenario: Every surface implements the 6-method contract
 
 - **WHEN** any surface is constructed (Builtin, LSP, FreeFork, Tracker,
-  Verify, Delegate, BackgroundTask)
+  Verify, Delegate, BackgroundTask, ToolSearch)
 - **THEN** it satisfies `var _ contracts.ToolSurface = ...` at compile time
-- **AND** all 4 methods are non-nil and safe to call with empty input
+- **AND** all 6 methods are non-nil and safe to call with empty input
 
 #### Scenario: Surfaces with nil dependencies are still safe
 
@@ -1042,6 +1042,297 @@ execute tools.
 - **THEN** `Tools()` returns the spec when known OR an empty list
 - **AND** `Execute()` returns a `ToolResult{Error: ...}` envelope
   (not a Go error) for missing prerequisites
+
+### Requirement: ToolSpec Orthogonal Flags (4 bool)
+
+> **devrix-tool-spec-enrichment (DM-20260618-001).**
+
+The `contracts.ToolSpec` struct (defined in
+`internal/shared/contracts/tool_surface.go`) MUST add four orthogonal
+boolean fields: `ReadOnly`, `Destructive`, `OpenWorld`, `ConcurrencySafe`.
+
+Each field MUST default to `false` (zero value). Every ToolSurface
+implementation MUST explicitly set these fields for every tool in its
+`Tools(ctx, workDir, sessionID)` return value. Implementations MUST NOT
+rely on default-zero behavior.
+
+Field semantics:
+- `ReadOnly`: tool does not modify the filesystem (read_file, glob, grep, lsp, verify)
+- `Destructive`: tool performs irreversible operations (write_file, edit_file, bash)
+- `OpenWorld`: tool's side effects extend beyond the local machine
+  (free_fork spawning agents, web_fetch)
+- `ConcurrencySafe`: multiple invocations of the same tool may run in
+  parallel without mutual interference (read_file on different paths)
+
+The `Risk` field MUST remain unchanged for backward compatibility. The
+4 bool fields MUST be consumed by:
+- `PerAgentFilter` (auto-extend explore agent's visible set via `ReadOnly`)
+- `PerRiskFilter` (tighten plan_mode via `OpenWorld`)
+- `turn_adapter.ExecuteRound` (parallel dispatch via `ConcurrencySafe`)
+
+#### Scenario: bash tool is Destructive but ConcurrencySafe
+
+- **GIVEN** BuiltinSurface.Tools(ctx, "", "")
+- **WHEN** the returned ToolSpec with Name="bash" is inspected
+- **THEN** `Destructive` MUST be `true`
+- **AND** `ConcurrencySafe` MUST be `true`
+- **AND** `ReadOnly` MUST be `false`
+- **AND** `OpenWorld` MUST be `false`
+
+#### Scenario: free_fork tool is OpenWorld and not ConcurrencySafe
+
+- **GIVEN** FreeForkSurface.Tools(ctx, "", "")
+- **WHEN** the returned ToolSpec with Name="free_fork" is inspected
+- **THEN** `OpenWorld` MUST be `true`
+- **AND** `ConcurrencySafe` MUST be `false`
+- **AND** `Destructive` MUST be `false`
+
+### Requirement: InterruptBehavior Method
+
+> **devrix-tool-spec-enrichment (DM-20260618-001).**
+
+The `contracts.ToolSurface` interface MUST add a fifth method
+`InterruptBehavior(name string) InterruptMode`.
+
+`InterruptMode` MUST be a string enum with two values:
+- `InterruptCancel` ("cancel"): surface MUST immediately stop execution
+  and return `ctx.Err()` when the context is cancelled
+- `InterruptBlock` ("block"): surface MUST ignore context cancellation
+  and complete naturally
+
+The default behavior for all surfaces MUST be `InterruptBlock`
+(backward compatible with the 7 surfaces from DM-007). ONLY
+`FreeForkSurface` MUST explicitly return `InterruptCancel` for `free_fork`.
+
+#### Scenario: FreeForkSurface cancel responds within 200ms
+
+- **GIVEN** a FreeForkSurface configured with a forker that takes 5s to complete
+- **WHEN** `Execute(ctx, "free_fork", ...)` is invoked
+- **AND** `cancel()` is called 50ms after Execute starts
+- **THEN** Execute MUST return within 200ms of the cancel call
+- **AND** the returned error MUST wrap `context.Canceled`
+
+### Requirement: BuildSurfaces Deterministic Ordering
+
+> **devrix-tool-spec-enrichment (DM-20260618-001).**
+
+The `bootstrap.BuildSurfaces(SurfaceBuildOpts) []contracts.ToolSurface`
+function MUST return surfaces sorted by `Name()` in lexicographic
+ascending order. The sort MUST be applied after all conditional appends
+and the output order MUST be stable across different `SurfaceBuildOpts`
+values where the same set of surfaces is included.
+
+#### Scenario: sort order is lexicographic by surface name
+
+- **GIVEN** a SurfaceBuildOpts that produces surfaces named: lsp, freefork, tracker, builtin, verify
+- **WHEN** `BuildSurfaces(opts)` is called
+- **THEN** the returned surface order MUST be: builtin, freefork, lsp, tracker, verify
+
+### Requirement: Per-tool CheckPermission Hook
+
+> **devrix-surface-permission-extension (DM-20260618-002).**
+
+The `contracts.ToolSurface` interface MUST add a sixth method
+`CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision`.
+
+`Decision` MUST be a string enum with three values defined in
+`internal/shared/contracts/permission.go`:
+- `DecisionAllow` ("allow"): the tool may proceed to Execute
+- `DecisionDeny` ("deny"): the tool is rejected; Execute MUST NOT be called
+- `DecisionAsk` ("ask"): the tool requires user confirmation; turn_adapter
+  MUST consult `IPermissionGate.CheckPermission`
+
+#### Default implementations
+
+- `BuiltinSurface.CheckPermission` MUST return `DecisionAllow` for
+  non-bash tools. For `bash`, it MUST delegate to an injected
+  `BashASTPolicy` which uses `mvdan.cc/sh/v3/syntax` to parse the
+  command and apply deny-list rules.
+- `LSPToolSurface`, `TrackerSurface`, `VerifySurface`, `DelegateSurface`,
+  `BackgroundTaskSurface` MUST all return `DecisionAllow`.
+- `FreeForkSurface.CheckPermission` MUST delegate to
+  `IPermissionGate.CheckPermission(ctx, spec)`.
+
+#### Calling sequence
+
+`turn_adapter.ExecuteRound` MUST, for each ToolCall, invoke
+`surface.CheckPermission` first. If the result is `DecisionAsk`, it MUST
+then invoke `permGate.CheckPermission(ctx, spec)`. If the final decision
+is `Deny` or `Ask`, `surface.Execute` MUST NOT be called and the
+corresponding `ToolResult.Error` MUST be set to a `PermissionDeniedError`
+or `PermissionAskRequiredError` respectively.
+
+#### Scenario: 5 short-run surfaces default to Allow
+
+- **GIVEN** any of LSPToolSurface, TrackerSurface, VerifySurface, DelegateSurface, BackgroundTaskSurface
+- **WHEN** `CheckPermission(ctx, spec, input)` is called for any tool name
+- **THEN** the result MUST be `DecisionAllow`
+
+### Requirement: BashASTPolicy Deny-list
+
+> **devrix-surface-permission-extension (DM-20260618-002).**
+
+The `BashASTPolicy` type (defined in
+`internal/layers/contextengine/enforce/toolrunner/surface/bash_ast.go`)
+MUST use `mvdan.cc/sh/v3/syntax` to parse bash commands and apply a
+default deny-list with at minimum these rules:
+
+| Rule name | Pattern | Reason |
+|-----------|---------|--------|
+| `rm-rf-root` | `rm -rf /` or `rm -rf /*` | filesystem destruction |
+| `dd-overwrite` | `dd ...` | disk block overwrite |
+| `mkfs-format` | `mkfs` or `mkfs.*` | filesystem format |
+| `sudo-elevate` | `sudo ...` | privilege escalation |
+| `chmod-777-root` | `chmod 777 /` | permission opening |
+
+Commands that fail to parse MUST result in `DecisionAsk` (conservative).
+
+#### Scenario: rm -rf / is denied
+
+- **GIVEN** a BashASTPolicy with the default deny-list
+- **WHEN** `Check("rm -rf /")` is called
+- **THEN** the result MUST be `DecisionDeny`
+- **AND** the reason MUST contain "rm -rf /"
+
+#### Scenario: parse error returns Ask
+
+- **GIVEN** a BashASTPolicy with the default deny-list
+- **WHEN** `Check("if then else end")` (incomplete bash) is called
+- **THEN** the result MUST be `DecisionAsk`
+
+### Requirement: PlanMode OpenWorld Auto-Deny
+
+> **devrix-surface-permission-extension (DM-20260618-002).**
+
+The `IPermissionGate.CheckPermission(ctx, spec)` method (defined in
+`internal/layers/orchestration/toolpolicy/plan_mode.go`) MUST apply the
+`PlanModeOpenWorldPolicy`: when `ctx.Value(ModeKey) == "plan_mode"` AND
+`spec.OpenWorld == true`, return `DecisionDeny` UNLESS `spec.Name` is
+in `cfg.PlanMode.OpenWorldAllowList`. The allowlist MUST support
+wildcard patterns (e.g. `"git_*"` matches `"git_fetch"`, `"git_log"`).
+
+#### Scenario: plan mode denies free_fork
+
+- **GIVEN** a context with `ModeKey = "plan_mode"`
+- **AND** a ToolSpec with `Name="free_fork"`, `OpenWorld=true`, `Risk=RiskHigh`
+- **AND** a PlanModeOpenWorldPolicy with empty AllowList
+- **WHEN** `CheckPermission(ctx, spec)` is called
+- **THEN** the result MUST be `DecisionDeny`
+
+### Requirement: turn_adapter Two-Phase Dispatch
+
+> **devrix-surface-permission-extension (DM-20260618-002) +
+> devrix-tool-spec-enrichment (DM-20260618-001).**
+
+`bootstrap.contextEngineAdapter.ExecuteRound(ctx, req)` MUST execute
+in two phases:
+
+**Phase 1 (sequential, decision-only)**: for each ToolCall, call
+`surface.CheckPermission(ctx, spec, input)`. If the result is
+`DecisionAsk`, call `permGate.CheckPermission(ctx, spec)`. If the final
+decision is `Deny` or `Ask`, populate `results[i].Error` with the
+appropriate error type and skip Phase 2 for this index.
+
+**Phase 2 (parallel dispatch, DM-001 T25)**: for ToolCalls that
+survived Phase 1, group by `spec.ConcurrencySafe` and dispatch as
+described in the parallel dispatch requirement.
+
+The order of `result.Results` MUST match `req.ToolCalls` (preserved by
+indexed slice write-back).
+
+#### Scenario: Deny skips Execute
+
+- **GIVEN** a turn_adapter with a mock BashSurface whose `CheckPermission` returns `DecisionDeny`
+- **WHEN** `ExecuteRound(ctx, req)` is called with name="bash", input=`{"command":"rm -rf /"}`
+- **THEN** `result.Results[0].Error` MUST contain "permission denied"
+- **AND** `mockSurface.executeCount` MUST be `0`
+
+### Requirement: ToolSpec.DeferLoading
+
+> **devrix-surface-lazy-loading (DM-20260618-003).**
+
+The `contracts.ToolSpec` struct MUST add a `DeferLoading bool` field
+(default `false`). When `true`, `turn_adapter.Prepare` MUST exclude
+the tool from the LLM-visible tool list UNLESS the tool name is
+`"tool_search"` (the lazy-load escape hatch).
+
+The static default-defer set MUST be:
+- builtin tools with name prefix `delegate_` (delegate_explore,
+  delegate_status, delegate_status_all, delegate_plan, delegate_research)
+- builtin tool with name suffix `_background` (task_output_background)
+
+#### Scenario: 6 hardcoded candidates defer by default
+
+- **GIVEN** `ShouldDeferByDefault("delegate_explore")` etc.
+- **WHEN** called for any of: `delegate_explore`, `delegate_status`,
+  `delegate_status_all`, `delegate_plan`, `delegate_research`,
+  `task_output_background`
+- **THEN** the result MUST be `true`
+
+### Requirement: ToolFilter.ShouldDefer
+
+> **devrix-surface-lazy-loading (DM-20260618-003).**
+
+The `contracts.ToolFilter` interface MUST add a runtime hook
+`ShouldDefer(ctx context.Context, spec ToolSpec) bool`. When `true`,
+the tool MUST be excluded from the LLM-visible tool list during
+`turn_adapter.Prepare`. Both static (`DeferLoading`) and runtime
+(`ShouldDefer`) defer signals MUST be OR'd — either being true
+deferred the tool.
+
+`PlanModeOpenWorldPolicy.ShouldDefer` MUST return `true` when
+`mode == plan_mode && spec.OpenWorld && !in_allowlist` (same logic as
+CheckPermission Decision, applied at filter layer for Prepare-time
+filtering).
+
+#### Scenario: Prepare filters out deferred tools
+
+- **GIVEN** a turn_adapter with surfaces including a deferred `delegate_research`
+- **AND** the standard `tool_search` surface
+- **WHEN** `Prepare(ctx, req)` is called
+- **THEN** the prepared tool list MUST contain `tool_search` and core
+  builtin tools (bash / read / write / edit / glob / grep)
+- **AND** the prepared tool list MUST NOT contain `delegate_research` or
+  any other `DeferLoading=true` tool
+
+### Requirement: ToolSearchSurface
+
+> **devrix-surface-lazy-loading (DM-20260618-003).**
+
+The system MUST add a new `ToolSearchSurface` (8th surface) that
+exposes a single tool `tool_search`. The tool's `Execute(query, category)`
+MUST return up to 5 matching `ToolSpec` entries from the deferred tool
+registry. Search ranking MUST be: exact name match > glob match >
+substring match > empty.
+
+`ToolSearchSurface.Tools()` MUST return exactly one spec with
+`DeferLoading: false` (forced; this is the only way LLM can discover
+deferred tools).
+
+#### Scenario: ToolSearchSurface.search returns top-5
+
+- **GIVEN** a ToolSearchSurface constructed with 10 deferred tool specs
+- **WHEN** `Execute("delegate_research", "")` is called
+- **THEN** the result MUST contain the `delegate_research` spec
+- **AND** the result MUST contain at most 5 specs
+
+### Requirement: zodgen Schema Generator
+
+> **devrix-surface-lazy-loading (DM-20260618-003).**
+
+The `internal/layers/contextengine/enforce/toolrunner/zodgen` package
+MUST provide a `Schema(reflect.Type) map[string]any` function that
+converts a Go struct (with `json` + `jsonschema` tags) into a JSON
+Schema subset (type / properties / required / enum / description).
+Full `$ref` / `oneOf` / `anyOf` / `allOf` support is **v1.1** (out of
+scope for DM-003).
+
+#### Scenario: nested struct is recursed
+
+- **GIVEN** a Go struct with a nested struct field
+- **WHEN** `Schema(t)` is called
+- **THEN** the nested struct MUST be recursed into a JSON Schema
+  `properties` entry
 
 ### Requirement: ToolFilter Contract
 
