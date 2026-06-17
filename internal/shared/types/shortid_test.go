@@ -32,7 +32,10 @@ func TestGenerateShortId(t *testing.T) {
 
 // T: D1-S8-A01-T01
 func TestGenerateShortId_Uniqueness(t *testing.T) {
-	const iterations = 1000
+	// Birthday paradox: requiring zero collisions in k random draws from space N is
+	// probabilistic, not deterministic. |charset|^ShortIdLength ≈ 34^5 ≈ 45M.
+	// k=1000 ⇒ P(collision) ≈ 2% (flaky in CI); k=100 ⇒ P(collision) < 0.03%.
+	const iterations = 100
 	generated := make(map[string]bool, iterations)
 	for i := 0; i < iterations; i++ {
 		shortId, err := GenerateShortId()
