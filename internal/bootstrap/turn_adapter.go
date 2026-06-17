@@ -152,10 +152,17 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 }
 
 // PersistTurn implements turn.SessionPersister.
+//
+// DM-20260617-003 (devrix-d7-turn-history-persist): commit this turn's
+// transcript (user + assistant + tool_calls + tool_results) into D2 memory
+// so the next Prepare call can read it back. Previous implementation was a
+// stub that discarded req.Messages, causing multi-turn conversation context
+// loss under the loop_first routing mode.
 func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req turn.PersistRequest) error {
 	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
-		_, err := ce.ExportSessionSnapshot(req.SessionID)
-		return err
+		if err := ce.AppendAndTrimMessages(req.SessionID, req.Messages); err != nil {
+			return fmt.Errorf("turn adapter: persist: %w", err)
+		}
 	}
 	return nil
 }
