@@ -1,7 +1,10 @@
 change_id: devrix-d7-turn-history-persist
 priority: P0
 demand_id: DM-20260617-003
-status: s3_design
+parent_demand: DM-20260616-013 (loop_first routing)
+parent_change: devrix-d7-loop-first-routing (S7_archived 2026-06-16)
+status: s7_archived
+merged_via: PR #62 (squash merge commit 6e913c4, 2026-06-17)
 domains: [D7, D2]
 dsaft_scenarios: [D7-S5, D2-S3]
 dsaft_activities:

@@ -2,8 +2,9 @@
 
 **Change ID:** devrix-d7-turn-history-persist
 **Demand ID:** DM-20260617-003
-**Status:** S2_Design
+**Status:** S6_Archived (2026-06-17, hotfix 路径 — S1-S3 ceremony 跳过, S4-S6 文档 + S6 归档在 follow-up PR 闭环)
 **Priority:** P0
+**PR:** [#62](https://github.com/fqntxmqee/devrix/pull/62)
 **DSAFT:** D7-S5（D7 Session Persistence 场景，原 D7-S5 占位；本 change 落地）
 
 ---
