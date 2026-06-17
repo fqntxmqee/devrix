@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
@@ -12,6 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
@@ -129,6 +131,15 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		slog.Error("register free_fork tool", "error", err)
 	}
 
+	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 tracker.GlobalTracker 注入。
+	// 同一 buildWithGate 中创建 tracker 实例 + SetGlobalTracker + 启动 1s 间隔 tick goroutine。
+	diagTracker := tracker.New(0)
+	tracker.SetGlobalTracker(diagTracker)
+	startTrackerTick(diagTracker, 1*time.Second)
+	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
+		slog.Error("register query_diagnostics tool", "error", err)
+	}
+
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
 		contextengine.NewToolLimiter(b.toolCfg.ConcurrentMax),
@@ -164,4 +175,20 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
 	})
+}
+
+// startTrackerTick 在后台 goroutine 中按 interval 调 TickOnce,跟进程同生命周期。
+// DM-20260617-002 W8: query_diagnostics tool 的"异步 tick"实现。linter 不可用时
+// TickOnce 内部静默返回 0,不输出日志（避免噪音）。
+func startTrackerTick(tr *tracker.Tracker, interval time.Duration) {
+	if tr == nil || interval <= 0 {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			tr.TickOnce(context.Background())
+		}
+	}()
 }
