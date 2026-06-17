@@ -119,6 +119,11 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		slog.Error("register lsp tool", "error", err)
 	}
 
+	// DM-20260617-002 W6 (AC4): G4 verify_plan_execution tool — 暴露给 LLM。
+	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
+		slog.Error("register verify_plan_execution tool", "error", err)
+	}
+
 	tools := contextengine.NewLimitedToolRunner(
 		toolReg,
 		contextengine.NewToolLimiter(b.toolCfg.ConcurrentMax),
