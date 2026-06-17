@@ -55,17 +55,42 @@ const compressThreshold = 4000
 
 // Prepare implements turn.ContextPreparer.
 // D-e: checks token budget and returns CompressHint when exceeded.
+//
+// TOOL-SURFACE-1 (W11 phase 2b): tool schema aggregation prefers the
+// engine's surface list (the new SoT) and falls back to the legacy
+// toolReg only for tools that no surface claims. This lets the LLM
+// see free_fork / query_diagnostics / verify_plan_execution / lsp
+// without those tools being registered in toolReg.
 func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
 	session, err := a.gw.GetSession(req.SessionID)
 	if err != nil {
 		session = types.NewSession(req.SessionID, "d7", "")
 	}
 
+	seen := map[string]bool{}
 	var toolSchemas []turn.ToolSchema
+	for _, s := range a.surfaces {
+		for _, sp := range s.Tools(ctx, session.WorkDir, "") {
+			if seen[sp.Name] {
+				continue
+			}
+			seen[sp.Name] = true
+			params := parseToolParams(sp.Parameters)
+			toolSchemas = append(toolSchemas, turn.ToolSchema{
+				Name:        sp.Name,
+				Description: sp.Description,
+				Parameters:  params,
+			})
+		}
+	}
 	if a.toolsReg != nil {
 		schemas, err := a.toolsReg.ListTools(ctx, session.WorkDir)
 		if err == nil {
 			for _, s := range schemas {
+				if seen[s.Name] {
+					continue
+				}
+				seen[s.Name] = true
 				params := parseToolParams(s.Parameters)
 				toolSchemas = append(toolSchemas, turn.ToolSchema{
 					Name:        s.Name,

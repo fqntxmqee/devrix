@@ -134,17 +134,27 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	}
 
 	// G1 LSP tool (default disabled; 启用需 lsp.enabled=true + servers 配置)
+	// W11 phase 2b: legacy RegisterLSPTool is no longer the dispatch path
+	// once the engine has a surface list; the surface is built in BuildSurfaces
+	// below using the same LSPConfig (or nil = disabled). The legacy
+	// registration is kept here ONLY so the per-agent engine's toolReg still
+	// has the schema available for the LLM tool list when the engine has no
+	// surfaces. Once the legacy globals are removed (W11 phase 2c), this
+	// registration is dropped together with the runner.
 	if err := toolrunner.RegisterLSPTool(toolReg, nil); err != nil {
 		slog.Error("register lsp tool", "error", err)
 	}
 
 	// DM-20260617-002 W6 (AC4): G4 verify_plan_execution tool — 暴露给 LLM。
+	// W11 phase 2b: also exposed via surface.VerifySurface (stateless) below.
 	if err := toolrunner.RegisterVerifyTool(toolReg); err != nil {
 		slog.Error("register verify_plan_execution tool", "error", err)
 	}
 
 	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 toolrunner.SetFreeForker 注入。
 	// S4-Gate H-3 fix: function-based DI, toolrunner 不直接 import freefork.
+	// W11 phase 2b: also exposed via surface.FreeForkSurface below; legacy
+	// RegisterFreeForkTool kept for per-agent engine schema compat.
 	if err := toolrunner.RegisterFreeForkTool(toolReg); err != nil {
 		slog.Error("register free_fork tool", "error", err)
 	}
@@ -203,6 +213,20 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		Timeout:      b.ctxCfg.Compression.Autocompact.Timeout,
 	})
 
+	// TOOL-SURFACE-1 (W11 phase 2b): assemble the surface list for the
+	// per-agent engine so turn_adapter.findSurface dispatches through the
+	// surface path (the same as the main engine). The diagTracker created
+	// above is the canonical instance; freeforkGlobalFunc is the
+	// process-wide closure that wraps freefork.GlobalForker().Fork. Until
+	// W11 phase 2c deletes the legacy globals, both paths still produce
+	// the same tool set.
+	surfaces := BuildSurfaces(SurfaceBuildOpts{
+		ToolReg:   toolReg,
+		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:   diagTracker,
+		Forker:    freeforkGlobalFunc,
+	})
+
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		TokenCounter:        b.stack.TokenCounter,
 		Tools:               tools,
@@ -218,6 +242,8 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.GlobalSessionQueue,
+		Surfaces:            surfaces,
+		Filters:             DefaultFilters(),
 	})
 }
 
