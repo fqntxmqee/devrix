@@ -131,6 +131,14 @@ func parseToolParams(raw string) map[string]any {
 // tools return "session context unavailable" / "session_id unavailable".
 // Mirror D2's ToolContextWithGate here so D7→D2 tool dispatch behaves the
 // same as the legacy D2 path.
+//
+// DM-20260617-006 (devrix-tool-pipeline-permission): close the D2→D7 拆面
+// gap on tool permission. D2 legacy path (query/executor.go:50) already
+// gates via permChecker.Request; the D7 turn adapter used to skip this
+// check, leaving all tools auto-approved in plan_mode and outside YOLO.
+// Now call IPermissionGate.Request with the looked-up risk before
+// a.tools.Execute, and propagate the risk into contextengine.ToolCall so
+// downstream runners can read the policy classification.
 func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
 	if a.tools == nil {
 		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
@@ -147,10 +155,26 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 
 	results := make([]turn.ToolResult, len(req.ToolCalls))
 	for i, tc := range req.ToolCalls {
+		// DM-20260617-006: gate via IPermissionGate (suggestion 3) and
+		// propagate risk into the D2 ToolCall (suggestion 4 partial). When
+		// a.perm is nil we leave the gate open — adapter is shared with
+		// tests/mocks that don't wire permission state.
+		risk := types.RiskLevelLow
+		if a.toolsReg != nil {
+			risk = a.toolsReg.RiskLevel(tc.Name)
+		}
+		if a.perm != nil && !a.perm.Request(toolCtx, req.SessionID, tc.Name, tc.Input, risk) {
+			results[i] = turn.ToolResult{
+				ToolCallID: tc.ID,
+				Error:      "permission denied",
+			}
+			continue
+		}
 		result, err := a.tools.Execute(toolCtx, contextengine.ToolCall{
-			ID:    tc.ID,
-			Name:  tc.Name,
-			Input: tc.Input,
+			ID:        tc.ID,
+			Name:      tc.Name,
+			Input:     tc.Input,
+			RiskLevel: risk,
 		})
 		if err != nil {
 			results[i] = turn.ToolResult{
