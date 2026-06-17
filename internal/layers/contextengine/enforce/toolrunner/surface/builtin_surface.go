@@ -86,13 +86,6 @@ func (s *BuiltinSurface) InterruptBehavior(name string) contracts.InterruptMode 
 	return InterruptBehaviorFor(name)
 }
 
-// CheckPermission implements contracts.ToolSurface. The default is
-// Allow; surfaces can override to install per-tool policies. BashASTPolicy
-// (DM-20260618-002) is wired in via NewBuiltinSurfaceWithBashAST.
-func (s *BuiltinSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
-	return contracts.DecisionAllow
-}
-
 // RiskLevel implements contracts.ToolSurface.
 func (s *BuiltinSurface) RiskLevel(name string) types.RiskLevel {
 	if s.reg == nil {

@@ -78,62 +78,6 @@ const (
 	InterruptBlock InterruptMode = "block"
 )
 
-// Decision is the per-tool permission verdict returned by
-// ToolSurface.CheckPermission (DM-20260618-002 devrix-surface-permission-extension).
-//
-// DSAFT: TOOL-SURFACE-1-A01-F07.
-type Decision string
-
-const (
-	// DecisionAllow: the tool may execute without further checks.
-	DecisionAllow Decision = "allow"
-
-	// DecisionDeny: the tool must not execute; the result slot receives
-	// a PermissionDeniedError envelope.
-	DecisionDeny Decision = "deny"
-
-	// DecisionAsk: the policy is uncertain; defer to IPermissionGate
-	// (or, if no gate is wired, treat as conservative Ask).
-	DecisionAsk Decision = "ask"
-)
-
-// PermissionDeniedError is written to Result.Error when a tool is denied.
-// Implements error so callers can errors.As it back to the original
-// envelope if they need structured access (Reason / Spec / Input).
-//
-// DSAFT: TOOL-SURFACE-1-A01-F07.
-type PermissionDeniedError struct {
-	Spec   ToolSpec
-	Input  json.RawMessage
-	Reason string
-}
-
-func (e *PermissionDeniedError) Error() string {
-	reason := e.Reason
-	if reason == "" {
-		reason = "policy denied"
-	}
-	return "permission denied: " + reason + " (tool=" + e.Spec.Name + ")"
-}
-
-// PermissionAskRequiredError is the Ask variant. ExecuteRound writes this
-// when the surface returned Ask and no gate is wired to resolve it.
-//
-// DSAFT: TOOL-SURFACE-1-A01-F07.
-type PermissionAskRequiredError struct {
-	Spec   ToolSpec
-	Input  json.RawMessage
-	Reason string
-}
-
-func (e *PermissionAskRequiredError) Error() string {
-	reason := e.Reason
-	if reason == "" {
-		reason = "ask required"
-	}
-	return "permission ask required: " + reason + " (tool=" + e.Spec.Name + ")"
-}
-
 // ToolSurface is a discoverable entry point for a group of related tools.
 //
 // Per devrix Facet Decomposition (DM-020 D-c + architecture-design.md §1.1),

@@ -151,10 +151,6 @@ func (s *markerSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec,
 	return contracts.DecisionAllow
 }
 
-func (s *markerSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
-	return contracts.DecisionAllow
-}
-
 type stubIntegratedSurface struct {
 	name     string
 	toolName string
@@ -176,10 +172,6 @@ func (s *stubIntegratedSurface) Execute(_ context.Context, _, _, _ string) (*con
 func (s *stubIntegratedSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 	return contracts.InterruptBlock
 }
-func (s *stubIntegratedSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
-	return contracts.DecisionAllow
-}
-
 func (s *stubIntegratedSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }
