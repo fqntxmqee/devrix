@@ -28,6 +28,20 @@ type lspRunner struct {
 	mgr *lsp.Manager
 }
 
+// LSPRunnerAlias is an exported wrapper used by the surface package.
+// It is a type alias so callers outside toolrunner can hold a stable
+// reference to an LSP runner without importing the package-private
+// lspRunner type. (DM-20260617-007 devrix-tool-surface-contract)
+type LSPRunnerAlias = lspRunner
+
+// NewLSPRunnerForSurface returns an LSP runner suitable for embedding in
+// surface.LSPToolSurface. It mirrors newLSPRunner but is exported.
+func NewLSPRunnerForSurface(cfg *LSPConfig) *lspRunner { return newLSPRunner(cfg) }
+
+// LSPToolJSONSchema is the exported JSON schema for the lsp tool. Mirrors
+// lspToolJSONSchema but is exported for use by surface.LSPToolSurface.Tools().
+const LSPToolJSONSchema = lspToolJSONSchema
+
 func newLSPRunner(cfg *LSPConfig) *lspRunner {
 	if cfg == nil {
 		cfg = &LSPConfig{Enabled: false}
