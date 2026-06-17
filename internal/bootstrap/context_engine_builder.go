@@ -135,29 +135,34 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	}
 
 	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 tracker.GlobalTracker 注入。
-	// 同一 buildWithGate 中创建 tracker 实例 + SetGlobalTracker + 启动 1s 间隔 tick goroutine。
-	diagTracker := tracker.New(0)
+	// 同一 buildWithGate 中创建 tracker 实例 + SetGlobalTracker + 启动 tick goroutine。
+	// W13 (AC14): tracker cap / tick interval 走 DiagnosticsConfig.
+	diagCfg := b.ctxCfg.Diagnostics.Normalized()
+	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
 	tracker.SetGlobalTracker(diagTracker)
-	startTrackerTick(diagTracker, 1*time.Second)
+	startTrackerTick(diagTracker, time.Duration(diagCfg.TrackerTickIntervalMs)*time.Millisecond)
 	if err := toolrunner.RegisterTrackerTool(toolReg); err != nil {
 		slog.Error("register query_diagnostics tool", "error", err)
 	}
 
 	// DM-20260617-002 W11 (AC9): transcript Writer 全局注入, 让 gateway.ExpireSession
-	// 调 transcript.Append 写 session_close event. dir 优先取 DEVRIX_TRANSCRIPT_DIR,
-	// 否则 ~/.devrix/transcripts.
-	if tdir := os.Getenv("DEVRIX_TRANSCRIPT_DIR"); tdir != "" {
+	// 调 transcript.Append 写 session_close event. dir 优先取 DiagnosticsConfig.TranscriptDir,
+	// 然后 $DEVRIX_TRANSCRIPT_DIR, 最后 ~/.devrix/transcripts.
+	tdir := diagCfg.TranscriptDir
+	if tdir == "" {
+		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
+	}
+	if tdir == "" {
+		if home, herr := os.UserHomeDir(); herr == nil {
+			tdir = filepath.Join(home, ".devrix", "transcripts")
+		}
+	}
+	if tdir != "" {
 		if tw, err := transcript.NewWriter(tdir); err == nil {
 			transcript.SetGlobalWriter(tw)
 			slog.Info("transcript writer initialized", "dir", tdir)
 		} else {
 			slog.Warn("transcript writer init failed", "dir", tdir, "error", err)
-		}
-	} else if home, herr := os.UserHomeDir(); herr == nil {
-		tdir := filepath.Join(home, ".devrix", "transcripts")
-		if tw, err := transcript.NewWriter(tdir); err == nil {
-			transcript.SetGlobalWriter(tw)
-			slog.Info("transcript writer initialized", "dir", tdir)
 		}
 	}
 

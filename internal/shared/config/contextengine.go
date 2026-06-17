@@ -27,6 +27,8 @@ type ContextEngineConfig struct {
 	Worktree           WorktreeConfig     `yaml:"worktree"`
 	TodoWrite          TodoWriteConfig    `yaml:"todo_write"`
 	MainTranscript     MainTranscriptConfig `yaml:"main_transcript"`
+	// Diagnostics DM-20260617-002 W13 (AC14) — 诊断 / 通知 / LSP / transcript 集中配置。
+	Diagnostics        DiagnosticsConfig  `yaml:"diagnostics"`
 }
 
 // MainTranscriptConfig controls append-only JSONL persistence for main sessions.
@@ -152,6 +154,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		Worktree:      DefaultWorktreeConfig(),
 		TodoWrite:      DefaultTodoWriteConfig(),
 		MainTranscript: DefaultMainTranscriptConfig(),
+		Diagnostics:    DefaultDiagnosticsConfig(),
 	}
 }
 
@@ -191,4 +194,51 @@ type TodoWriteConfig struct {
 // DefaultTodoWriteConfig returns default todo_write settings.
 func DefaultTodoWriteConfig() TodoWriteConfig {
 	return TodoWriteConfig{Enabled: true}
+}
+
+// DiagnosticsConfig DM-20260617-002 W13 (AC14) — 集中配置所有诊断 / 通知 /
+// LSP / transcript 子系统参数; 各 bootstrap / CLI / tool 入口从这里读取。
+type DiagnosticsConfig struct {
+	// TrackerLRUCapacity 文件诊断追踪器 LRU 上限。0 走 default (500)。
+	TrackerLRUCapacity int `yaml:"tracker_lru_capacity"`
+	// TrackerTickIntervalMs 周期 tick 间隔 (毫秒)。<=0 走 default (1000ms = 1s)。
+	TrackerTickIntervalMs int `yaml:"tracker_tick_interval_ms"`
+	// LSPEnabled 是否启用 LSP tool。默认 false,需配置 servers 才生效。
+	LSPEnabled bool `yaml:"lsp_enabled"`
+	// LSPServers 启用的 LSP server 列表。
+	LSPServers []LSPServerConfig `yaml:"lsp_servers"`
+	// DebugCategories 默认注入到 DebugFilter 的 category 列表 (与 --debug 等价)。
+	DebugCategories []string `yaml:"debug_categories"`
+	// TranscriptDir transcript .jsonl 落盘目录。空则按 $DEVRIX_TRANSCRIPT_DIR
+	// → ~/.devrix/transcripts fallback。
+	TranscriptDir string `yaml:"transcript_dir"`
+}
+
+// LSPServerConfig 描述一个 LSP server 启动命令 (D2-S7-A02 / G1)。
+type LSPServerConfig struct {
+	Name    string   `yaml:"name"`
+	Command string   `yaml:"command"`
+	Args    []string `yaml:"args"`
+}
+
+// DefaultDiagnosticsConfig returns sensible defaults; 0 值字段走 internal default。
+func DefaultDiagnosticsConfig() DiagnosticsConfig {
+	return DiagnosticsConfig{
+		TrackerLRUCapacity:   500,
+		TrackerTickIntervalMs: 1000,
+		LSPEnabled:           false,
+	}
+}
+
+// Normalized 填充 0 值字段为 default; 保留显式设置。
+func (c DiagnosticsConfig) Normalized() DiagnosticsConfig {
+	def := DefaultDiagnosticsConfig()
+	out := c
+	if out.TrackerLRUCapacity <= 0 {
+		out.TrackerLRUCapacity = def.TrackerLRUCapacity
+	}
+	if out.TrackerTickIntervalMs <= 0 {
+		out.TrackerTickIntervalMs = def.TrackerTickIntervalMs
+	}
+	return out
 }
