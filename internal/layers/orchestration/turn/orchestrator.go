@@ -99,6 +99,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	prepared, err := o.context.Prepare(ctx, PrepareRequest{
 		SessionID: req.SessionID,
 		Message:   req.UserMessage,
+		Mode:      req.Mode,
 	})
 	endSpan(prepSpan)
 	if err != nil {
@@ -215,11 +216,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				tracer.Attribute{Key: "context.caller", Value: "d7"},
 			)
 			_ = o.persist.PersistTurn(turnCtx, PersistRequest{
-				SessionID:  req.SessionID,
-				Messages:   messages,
-				TurnCount:  turn + 1,
-				Usage:      totalUsage,
-				FinalText:  finalText,
+				SessionID: req.SessionID,
+				Messages:  messages,
+				TurnCount: turn + 1,
+				Usage:     totalUsage,
+				FinalText: finalText,
 			})
 			endSpan(persistSpan)
 			endSpan(turnSpan)
@@ -302,11 +303,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 	_ = o.persist.PersistTurn(ctx, PersistRequest{
-		SessionID:  req.SessionID,
-		Messages:   messages,
-		TurnCount:  req.MaxTurns,
-		Usage:      totalUsage,
-		FinalText:  finalText,
+		SessionID: req.SessionID,
+		Messages:  messages,
+		TurnCount: req.MaxTurns,
+		Usage:     totalUsage,
+		FinalText: finalText,
 	})
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens)
@@ -363,9 +364,9 @@ const (
 
 // compressResult wraps the summary with metadata about which strategy was used.
 type compressResult struct {
-	Summary      string
-	Degradation  CompressDegradation
-	TruncatedTo  int // number of messages kept (only for Truncation)
+	Summary     string
+	Degradation CompressDegradation
+	TruncatedTo int // number of messages kept (only for Truncation)
 }
 
 const maxTruncatedMessages = 20

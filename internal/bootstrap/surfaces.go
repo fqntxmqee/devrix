@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"sort"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
@@ -36,6 +37,11 @@ type SurfaceBuildOpts struct {
 // the returned slice is sorted by Name() so the dispatch order is
 // stable across processes (required for the LLM prompt cache —
 // reordering surfaces changes the tool list hash).
+//
+// TOOL-SURFACE-1-A02 (DM-20260618-003 devrix-surface-lazy-loading):
+// ToolSearchSurface is appended LAST after the catalog of all
+// non-tool_search specs has been collected. The catalog is computed by
+// calling each surface's Tools(); tool_search itself is excluded.
 func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	var out []contracts.ToolSurface
 	if opts.ToolReg != nil {
@@ -54,6 +60,31 @@ func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	// VerifySurface is stateless — always safe to add.
 	out = append(out, surface.NewVerifySurface())
 	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
+
+	// TOOL-SURFACE-1-A02: build the deferred-tool catalog for
+	// tool_search. Catalog is the union of every non-tool_search spec
+	// emitted by every surface. ToolSearchSurface is appended LAST so
+	// findSurface() short-circuits on it ONLY when the caller explicitly
+	// asks for "tool_search" (it returns "" for every other name).
+	allSpecs := collectAllSpecs(out)
+	out = append(out, surface.NewToolSearchSurface(allSpecs))
+	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
+	return out
+}
+
+// collectAllSpecs returns the union of Tools() across every surface.
+// ToolSearchSurface specs are excluded (it would otherwise recurse).
+func collectAllSpecs(surfaces []contracts.ToolSurface) []contracts.ToolSpec {
+	var out []contracts.ToolSpec
+	for _, s := range surfaces {
+		if s == nil {
+			continue
+		}
+		if s.Name() == surface.ToolSearchSurfaceName {
+			continue
+		}
+		out = append(out, s.Tools(context.Background(), "", "")...)
+	}
 	return out
 }
 

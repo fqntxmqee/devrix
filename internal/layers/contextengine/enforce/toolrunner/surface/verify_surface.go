@@ -42,6 +42,11 @@ func (s *VerifySurface) InterruptBehavior(name string) contracts.InterruptMode {
 	return InterruptBehaviorFor(name)
 }
 
+// CheckPermission implements contracts.ToolSurface. Default Allow.
+func (s *VerifySurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *VerifySurface) RiskLevel(name string) types.RiskLevel {
 	if name == "verify_plan_execution" {

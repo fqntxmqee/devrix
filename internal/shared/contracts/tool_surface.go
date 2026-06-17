@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -39,6 +40,16 @@ type ToolSpec struct {
 	// without mutual interference (e.g. read_file on different paths).
 	// turn_adapter.ExecuteRound uses this to decide parallel vs sequential dispatch.
 	ConcurrencySafe bool
+
+	// DeferLoading marks tools whose full schema is not sent to the LLM on
+	// every turn. turn_adapter.Prepare filters these out of the system
+	// prompt; the LLM must call tool_search to retrieve the schema on
+	// demand. Empty / unused tools (delegate_*, *_background) get this
+	// flag at BuildSurfaces time. Runtime ToolFilter.ShouldDefer can also
+	// add it (e.g. plan_mode → defer all open-world tools).
+	//
+	// DSAFT: TOOL-SURFACE-1-A01-F08 (DM-20260618-003 devrix-surface-lazy-loading).
+	DeferLoading bool
 }
 
 // ToolResult is the return type of ToolSurface.Execute.
@@ -66,6 +77,62 @@ const (
 	// natural completion. The default for short-run tools.
 	InterruptBlock InterruptMode = "block"
 )
+
+// Decision is the per-tool permission verdict returned by
+// ToolSurface.CheckPermission (DM-20260618-002 devrix-surface-permission-extension).
+//
+// DSAFT: TOOL-SURFACE-1-A01-F07.
+type Decision string
+
+const (
+	// DecisionAllow: the tool may execute without further checks.
+	DecisionAllow Decision = "allow"
+
+	// DecisionDeny: the tool must not execute; the result slot receives
+	// a PermissionDeniedError envelope.
+	DecisionDeny Decision = "deny"
+
+	// DecisionAsk: the policy is uncertain; defer to IPermissionGate
+	// (or, if no gate is wired, treat as conservative Ask).
+	DecisionAsk Decision = "ask"
+)
+
+// PermissionDeniedError is written to Result.Error when a tool is denied.
+// Implements error so callers can errors.As it back to the original
+// envelope if they need structured access (Reason / Spec / Input).
+//
+// DSAFT: TOOL-SURFACE-1-A01-F07.
+type PermissionDeniedError struct {
+	Spec   ToolSpec
+	Input  json.RawMessage
+	Reason string
+}
+
+func (e *PermissionDeniedError) Error() string {
+	reason := e.Reason
+	if reason == "" {
+		reason = "policy denied"
+	}
+	return "permission denied: " + reason + " (tool=" + e.Spec.Name + ")"
+}
+
+// PermissionAskRequiredError is the Ask variant. ExecuteRound writes this
+// when the surface returned Ask and no gate is wired to resolve it.
+//
+// DSAFT: TOOL-SURFACE-1-A01-F07.
+type PermissionAskRequiredError struct {
+	Spec   ToolSpec
+	Input  json.RawMessage
+	Reason string
+}
+
+func (e *PermissionAskRequiredError) Error() string {
+	reason := e.Reason
+	if reason == "" {
+		reason = "ask required"
+	}
+	return "permission ask required: " + reason + " (tool=" + e.Spec.Name + ")"
+}
 
 // ToolSurface is a discoverable entry point for a group of related tools.
 //
@@ -121,4 +188,19 @@ type ToolSurface interface {
 	// The default is InterruptBlock (existing 7 surfaces); only surfaces
 	// that genuinely run >5s in normal use override this.
 	InterruptBehavior(name string) InterruptMode
+
+	// CheckPermission returns the per-tool permission verdict for the
+	// given spec + input. Surfaces should answer Allow when the tool is
+	// safe to execute unconditionally, Deny when it can never run in
+	// this context (the caller will NOT invoke Execute), and Ask when
+	// the policy is uncertain (the caller will consult IPermissionGate
+	// for the final decision).
+	//
+	// The default implementation (returned by stubSurface in tests)
+	// returns Allow unconditionally; surfaces with explicit policies
+	// (BashASTPolicy on bash, PlanModeOpenWorldPolicy on open-world
+	// tools) override this.
+	//
+	// DSAFT: TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
+	CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision
 }

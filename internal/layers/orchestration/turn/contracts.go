@@ -24,6 +24,9 @@ type TurnRequest struct {
 	SystemPrompt string
 	MaxTurns     int
 	Scope        TurnScope
+	// Mode is the agent mode for this turn ("plan_mode" | "build_mode" | ...).
+	// Empty means no mode-specific constraint.
+	Mode string
 }
 
 // CompressHint signals that D2 detected a token budget overrun and D7 should
@@ -64,11 +67,11 @@ type ToolResult struct {
 
 // PersistRequest is the input to D2-S17 PersistSessionState.
 type PersistRequest struct {
-	SessionID  string
-	Messages   []types.Message
-	TurnCount  int
-	Usage      llmgateway.TokenUsage
-	FinalText  string
+	SessionID string
+	Messages  []types.Message
+	TurnCount int
+	Usage     llmgateway.TokenUsage
+	FinalText string
 }
 
 // ToolSchema mirrors query.ToolSchema for the D7→D2 contract boundary.
@@ -106,6 +109,10 @@ type ContextPreparer interface {
 type PrepareRequest struct {
 	SessionID string
 	Message   types.Message
+	// Mode is the agent mode for the upcoming turn ("plan_mode" | "build_mode" | ...).
+	// ToolFilters that key off the mode (e.g. PlanModeOpenWorldPolicy.ShouldDefer)
+	// consult this field. Empty means "no mode constraint".
+	Mode string
 }
 
 // ToolRoundExecutor runs policy-gated tool batch (D2-S18).

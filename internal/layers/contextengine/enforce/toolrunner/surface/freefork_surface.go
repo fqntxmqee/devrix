@@ -48,6 +48,11 @@ func (s *FreeForkSurface) InterruptBehavior(name string) contracts.InterruptMode
 	return InterruptBehaviorFor(name)
 }
 
+// CheckPermission implements contracts.ToolSurface. Default Allow.
+func (s *FreeForkSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *FreeForkSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "free_fork" {
