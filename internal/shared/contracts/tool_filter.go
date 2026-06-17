@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/devrix/devrix/internal/shared/types"
@@ -48,6 +49,64 @@ func (c *compositeFilter) Apply(specs []ToolSpec, ctx FilterCtx) []ToolSpec {
 	}
 	return specs
 }
+
+// DeferDecision is the optional hook a filter can register to mark tools
+// for defer-loading (NOT removal — DeferLoading=true keeps the tool
+// discoverable via tool_search but omits the schema from the default
+// system prompt).
+//
+// DSAFT: TOOL-SURFACE-1-A01-F08 (DM-20260618-003).
+type DeferDecision interface {
+	// ShouldDefer returns true when the spec's schema should be omitted
+	// from the default system prompt. Runtime filters use this to defer
+	// tools conditionally (e.g. plan_mode → defer all open-world tools).
+	// tool_search itself MUST always return false.
+	ShouldDefer(ctx context.Context, spec ToolSpec) bool
+}
+
+// DeferChain composes multiple DeferDecision hooks in FIFO order.
+// Returns true if ANY hook returns true (logical OR).
+//
+// DSAFT: TOOL-SURFACE-1-A01-F08.
+func DeferChain(decisions ...DeferDecision) DeferDecision {
+	return &deferChain{decisions: decisions}
+}
+
+type deferChain struct{ decisions []DeferDecision }
+
+func (d *deferChain) ShouldDefer(ctx context.Context, spec ToolSpec) bool {
+	for _, dec := range d.decisions {
+		if dec == nil {
+			continue
+		}
+		if dec.ShouldDefer(ctx, spec) {
+			return true
+		}
+	}
+	return false
+}
+
+// AlwaysDefer returns a DeferDecision that defers tools matching the
+// names list (exact match).
+func AlwaysDefer(names ...string) DeferDecision {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[n] = true
+	}
+	return &alwaysDefer{set: set}
+}
+
+type alwaysDefer struct{ set map[string]bool }
+
+func (a *alwaysDefer) ShouldDefer(_ context.Context, spec ToolSpec) bool {
+	return a.set[spec.Name]
+}
+
+// NeverDefer is a no-op DeferDecision (always false). Useful as a
+// placeholder and in tests.
+type NeverDefer struct{}
+
+func (NeverDefer) ShouldDefer(_ context.Context, _ ToolSpec) bool { return false }
 
 // Allow returns a filter that keeps only tools whose Name is in the
 // allowlist. An empty allowlist keeps nothing.
@@ -158,6 +217,13 @@ func (f *filteredSurface) Execute(ctx context.Context, name, input, workDir stri
 // change the interrupt mode — only the visible set of tools.
 func (f *filteredSurface) InterruptBehavior(name string) InterruptMode {
 	return f.parent.InterruptBehavior(name)
+}
+
+// CheckPermission delegates to the parent surface. Visibility filtering
+// happens separately in Apply (the filter removes specs entirely); this
+// method only reports what the parent would have decided.
+func (f *filteredSurface) CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision {
+	return f.parent.CheckPermission(ctx, spec, input)
 }
 
 // ctxForLog extracts a session/agent hint from ctx for error messages.

@@ -2,6 +2,7 @@ package contracts_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -32,6 +33,10 @@ func (s *stubSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 		return s.interrupt
 	}
 	return contracts.InterruptBlock
+}
+
+func (s *stubSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
 }
 func (s *stubSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	if s.execErr != nil {

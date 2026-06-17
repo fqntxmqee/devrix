@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -27,11 +28,20 @@ type stubSurface struct {
 	startTimes   *[]time.Time
 	endTimes     *[]time.Time
 	mu           *sync.Mutex
+	DeferLoading bool
+	OpenWorld    bool
 }
 
 func (s *stubSurface) Name() string { return s.name }
 func (s *stubSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
-	return []contracts.ToolSpec{{Name: s.name, Risk: s.risk, ConcurrencySafe: s.concSafe}}
+	return []contracts.ToolSpec{
+		{
+			Name: s.name, Risk: s.risk,
+			ConcurrencySafe: s.concSafe,
+			DeferLoading:    s.DeferLoading,
+			OpenWorld:       s.OpenWorld,
+		},
+	}
 }
 func (s *stubSurface) RiskLevel(name string) types.RiskLevel {
 	if name == s.name {
@@ -42,6 +52,10 @@ func (s *stubSurface) RiskLevel(name string) types.RiskLevel {
 
 func (s *stubSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 	return contracts.InterruptBlock
+}
+
+func (s *stubSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
 }
 
 func (s *stubSurface) Execute(_ context.Context, name, input, _ string) (*contracts.ToolResult, error) {
@@ -307,5 +321,62 @@ func TestExecuteRound_ConcurrencyMap_ReflectsSurfaceSpec(t *testing.T) {
 	}
 	if _, ok := m["unknown"]; ok {
 		t.Errorf("concurrencyMap[unknown] = present, want absent")
+	}
+}
+
+// T: TOOL-SURFACE-1-T29 — Prepare filters out DeferLoading=true specs
+// (except tool_search itself) and respects the deferDecider chain.
+func TestPrepare_FilterDeferLoading(t *testing.T) {
+	surfaces := []contracts.ToolSurface{
+		&stubSurface{name: "alpha", risk: types.RiskLevelLow},
+		&stubSurface{name: "delegate_research", risk: types.RiskLevelHigh, DeferLoading: true},
+		&stubSurface{name: "tool_search", risk: types.RiskLevelLow, DeferLoading: false},
+	}
+	a := &contextEngineAdapter{
+		gw:           nil,
+		surfaces:     surfaces,
+		deferDecider: contracts.NeverDefer{},
+	}
+	// Prepare needs session lookup to succeed — use a fake via gw nil path
+	// (which falls back to types.NewSession(req.SessionID, ...)).
+	res, err := a.Prepare(context.Background(), turn.PrepareRequest{SessionID: "sess-x"})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	names := map[string]bool{}
+	for _, ts := range res.Tools {
+		names[ts.Name] = true
+	}
+	if !names["alpha"] {
+		t.Error("alpha (non-defer) should be in prompt")
+	}
+	if !names["tool_search"] {
+		t.Error("tool_search (forced non-defer) should be in prompt")
+	}
+	if names["delegate_research"] {
+		t.Error("delegate_research (DeferLoading=true) leaked to LLM prompt")
+	}
+}
+
+// T: TOOL-SURFACE-1-T29 — deferDecider chain adds runtime defer (e.g. plan_mode
+// → defer all open-world tools).
+func TestPrepare_FilterDeferDecider(t *testing.T) {
+	surfaces := []contracts.ToolSurface{
+		&stubSurface{name: "alpha", risk: types.RiskLevelLow},
+		&stubSurface{name: "openworld", risk: types.RiskLevelHigh, OpenWorld: true},
+	}
+	a := &contextEngineAdapter{
+		gw:           nil,
+		surfaces:     surfaces,
+		deferDecider: contracts.AlwaysDefer("openworld"),
+	}
+	res, err := a.Prepare(context.Background(), turn.PrepareRequest{SessionID: "sess-y"})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	for _, ts := range res.Tools {
+		if ts.Name == "openworld" {
+			t.Error("openworld should be deferred by AlwaysDefer decider")
+		}
 	}
 }

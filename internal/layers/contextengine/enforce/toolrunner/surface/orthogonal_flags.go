@@ -1,6 +1,11 @@
 package surface
 
-import "github.com/devrix/devrix/internal/shared/contracts"
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/devrix/devrix/internal/shared/contracts"
+)
 
 // OrthogonalFlags is the 4-bool truth table for each tool name in devrix
 // (TOOL-SURFACE-1-A01-F02 — DM-20260618-001 devrix-tool-spec-enrichment).
@@ -92,4 +97,47 @@ func hasPrefix(s, prefix string) bool {
 		return false
 	}
 	return s[:len(prefix)] == prefix
+}
+
+// ShouldDeferByDefault returns true for tools whose full schema is omitted
+// from the default system prompt and must be retrieved on demand via
+// tool_search. The 6 hardcoded candidates are:
+//   - delegate_* (5: delegate_explore / delegate_status / delegate_status_all
+//     / delegate_plan / delegate_research) — spawns child agent, rarely
+//     invoked outside plan-mode finalization.
+//   - task_output_background (1: suffix match) — polling helper, low value.
+//
+// tool_search itself MUST always return false (otherwise deadlock).
+//
+// DSAFT: TOOL-SURFACE-1-A01-F08 (DM-20260618-003 devrix-surface-lazy-loading).
+func ShouldDeferByDefault(toolName string) bool {
+	if toolName == "tool_search" {
+		return false
+	}
+	if hasPrefix(toolName, "delegate_") {
+		return true
+	}
+	if hasPrefix(toolName, "task_") && toolName == "task_output_background" {
+		return true
+	}
+	// Also catch `*_background` suffix generally (defensive for future tools).
+	if len(toolName) > len("_background") &&
+		toolName[len(toolName)-len("_background"):] == "_background" {
+		return true
+	}
+	return false
+}
+
+// AllowAllCheckPermission is the default CheckPermission implementation
+// for surfaces without per-tool policy. It returns DecisionAllow
+// unconditionally. ToolSurface implementations can embed
+// allowAllChecker to satisfy the interface with one line.
+//
+// DSAFT: TOOL-SURFACE-1-A01-F07 (DM-20260618-002 — see PR #68 for full
+// integration; here we provide the helper so every surface compiles
+// under the ToolSurface v2 contract).
+type allowAllChecker struct{}
+
+func (allowAllChecker) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
 }

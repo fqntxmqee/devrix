@@ -25,18 +25,27 @@ import (
 // surface list when available (TOOL-SURFACE-1-A03 dispatch path) and
 // falls back to the legacy IToolRunner when the engine was built without
 // surfaces (phase-1 back-compat).
+//
+// TOOL-SURFACE-1-A02 (DM-20260618-003 devrix-surface-lazy-loading):
+// the adapter filters out DeferLoading=true specs from the LLM prompt
+// (tool_search is exempt) and consults an optional DeferDecision chain
+// (e.g. PlanModeOpenWorldPolicy) for runtime defer signals.
 type contextEngineAdapter struct {
-	gw       *capture.CommunicationGateway
-	engine   contracts.IEngine
-	tools    contextengine.IToolRunner
-	toolsReg contextengine.IToolRegistry
-	perm     contracts.IPermissionGate
-	counter  contracts.ITokenCounter
-	surfaces []contracts.ToolSurface
+	gw           *capture.CommunicationGateway
+	engine       contracts.IEngine
+	tools        contextengine.IToolRunner
+	toolsReg     contextengine.IToolRegistry
+	perm         contracts.IPermissionGate
+	counter      contracts.ITokenCounter
+	surfaces     []contracts.ToolSurface
+	deferDecider contracts.DeferDecision
 }
 
 func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.IEngine, counter contracts.ITokenCounter) *contextEngineAdapter {
-	a := &contextEngineAdapter{gw: gw, engine: engine, counter: counter}
+	a := &contextEngineAdapter{
+		gw: gw, engine: engine, counter: counter,
+		deferDecider: contracts.NeverDefer{},
+	}
 	if ce, ok := engine.(*contextengine.ContextEngine); ok {
 		a.tools = ce.ToolRunner()
 		a.toolsReg = ce.ToolRegistry()
@@ -65,8 +74,14 @@ const compressThreshold = 4000
 // see free_fork / query_diagnostics / verify_plan_execution / lsp
 // without those tools being registered in toolReg.
 func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
-	session, err := a.gw.GetSession(req.SessionID)
-	if err != nil {
+	var session *types.Session
+	if a.gw != nil {
+		s, err := a.gw.GetSession(req.SessionID)
+		if err == nil {
+			session = s
+		}
+	}
+	if session == nil {
 		session = types.NewSession(req.SessionID, "d7", "")
 	}
 
@@ -78,6 +93,16 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 				continue
 			}
 			seen[sp.Name] = true
+			// TOOL-SURFACE-1-A02 (DM-20260618-003): defer-load filter.
+			// Static DeferLoading=true specs and runtime defer decisions
+			// (e.g. PlanModeOpenWorldPolicy) are dropped from the LLM
+			// prompt. tool_search itself MUST stay in-pack.
+			if sp.DeferLoading && sp.Name != "tool_search" {
+				continue
+			}
+			if a.deferDecider != nil && a.deferDecider.ShouldDefer(ctx, sp) {
+				continue
+			}
 			params := parseToolParams(sp.Parameters)
 			toolSchemas = append(toolSchemas, turn.ToolSchema{
 				Name:        sp.Name,

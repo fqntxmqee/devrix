@@ -2,6 +2,7 @@ package surface
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
@@ -80,6 +81,11 @@ func (s *PluginSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 // InterruptCancel; everything else blocks.
 func (s *PluginSurface) InterruptBehavior(name string) contracts.InterruptMode {
 	return InterruptBehaviorFor(name)
+}
+
+// CheckPermission implements contracts.ToolSurface. Default Allow.
+func (s *PluginSurface) CheckPermission(ctx context.Context, spec contracts.ToolSpec, input json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
 }
 
 // RiskLevel implements contracts.ToolSurface. For known names, returns the

@@ -146,6 +146,9 @@ func (s *staticSurface) Execute(_ context.Context, _, _, _ string) (*contracts.T
 func (s *staticSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 	return contracts.InterruptBlock
 }
+func (s *staticSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
+	return contracts.DecisionAllow
+}
 
 // buildTestSurfaces constructs a small canonical list for testing. Mirrors
 // the production BuildSurfaces output (BuiltinSurface + LSPToolSurface +
