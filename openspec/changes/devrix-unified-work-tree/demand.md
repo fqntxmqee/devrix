@@ -198,6 +198,99 @@ WorkItem {
 | AC18 | Uncertainty > threshold 时自动 decompose 子 WorkItem |
 | AC19 | legacy `task_create`/`todo_write`/`delegate_*` alias 至少保留 1 版本 |
 
+### 扩展验收标准（博弈论分析后新增，AC20–AC36）
+
+> 完整定义见 `tasks.md` §验收标准汇总。此处仅登记 ID，保持 demand.md 为 AC 索引 SoT。
+
+| ID | 标准 | Phase | 优先级 |
+|----|------|-------|--------|
+| AC20 | 单 WorkItem 递归 decompose 深度 ≤ 3（可配置 `work_tree.max_decompose_depth`） | Phase 5 | P2 |
+| AC21 | 深度超限 fallback inline execute（保留 LLM 对 leaf task 的直接责任） | Phase 5 | P2 |
+| AC22 | 同 Session 24h 内同 Kind decompose > 5 → 触发 `task_await` 人工 review | Phase 5 | P2 |
+| AC23 | CI static analysis 检测 D2 直写 `sc.Todos` + 新增 `*Registry/*Manager` 类 | Phase 0 | P0 |
+| AC24 | Code Owner Bot 就绪，新增 task 实体时自动 @ D7 架构师 | Phase 6 | P1 |
+| AC25 | 季度 Property Rights Audit 脚本可运行，首次运行输出基准报告 | Phase 6 | P1 |
+| AC27 | Uncertainty Anchor 集成测试——LLM 空 evidence 时 uncertainty 回退到 historical+structural | Phase 5 | P0 |
+| AC28 | RunTurn 单层递归——LLM decompose 创建子项 → spawn → await → parent 在 children terminal 后继续 | Phase 1.5 | P1 |
+| AC29 | 子任务 terminal 后 parent WorkItem uncertainty 自动重评估 | Phase 1.5 | P1 |
+| AC30 | 用户在新 Session 问"昨天那个 task 完成了吗"→ 返回历史 WorkItem 状态 | Phase 7 | P2 |
+| AC31 | 历史 Session WorkItem 默认不可修改（lock 协议生效） | Phase 7 | P2 |
+| AC32 | "继续昨天的第三个任务"→ 创建新 Session，继承 WorkItem 上下文 | Phase 7 | P2 |
+| AC33 | 同场景 10 Session 后 auto-decompose 的子任务 terminal 率 ≥ 手动 decompose | Phase 8 | P3 |
+| AC34 | LLM 提议新 Kind 时附带 evidence + historical precedent | Phase 8 | P3 |
+| AC35 | 新项目启动时系统建议任务模板（基于相似项目） | Phase 8 | P3 |
+| AC36 | Uncertainty 阈值在 10 Session 后收敛到用户最优值（不再需要手动调整） | Phase 8 | P3 |
+
+> **AC26** 为 Codex 提议（v1.1 empty RunRef → block spawn），Claude 保留异议——替代方案 rate-limited warn + dashboard 计数器，v1.2 hard dependency。不在当前 AC 列表中。
+
+### 补充验收标准（S3 覆盖审计新增，AC37–AC51）
+
+> 2026-06-18 S3 阶段 DSAFT 覆盖审计发现 5 Critical + 9 High 缺口。以下 AC 按优先级门控：Critical 必须在 Phase 对应版本实现，High 建议在对应版本实现，标注为"应实现"。
+
+#### 状态机与数据完整性（Phase 0，v1.0）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC37** | **P0** | WorkItem 状态机强制合法转换：`pending→in_progress→completed/failed/cancelled` 为唯一路径；terminal→back to in_progress 必须拒绝并返回 `ErrInvalidTransition` |
+| **AC38** | **P1** | v1→v2 迁移边界：(a) 损坏 v1 JSON → 返回 `ErrMigrationFailed` 并保留原文件；(b) 空 v1 文件 → 创建空 v2 WorkTree；(c) v1 和 v2 文件同时存在 → 优先读 v2，warn v1 将被忽略 |
+| **AC39** | **P1** | `WorkTree.Remove(itemID)` 级联删除所有子孙节点（硬删除，不软删除）；删除 goal 节点等价于清空整个 session WorkTree |
+
+#### 并发与容错（Phase 0/3）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC40** | **P0** | 循环依赖检测：`WorkTree.AddDependency(A, B)` 若 B 的传递依赖中包含 A → 返回 `ErrCircularDependency`；`GetReadyItems` 启动时全量检测并 log 所有成环项 |
+| **AC41** | **P1** | RunRegistry terminal callback 失败重试：更新 WorkItem.Status 失败时指数退避重试（100ms→200ms→400ms，最多 3 次）；3 次均失败 → 写 error log + 标记 RunRegistry 条目 `notified=failed` |
+| **AC42** | **P1** | 并发 terminal 通知幂等：多个子任务同一时刻 terminal → parent 只 re-resolve 一次（`sync.Once` 或等效 CAS）；后续 terminal 事件检测到 parent 已在 resolving 状态时跳过 |
+
+#### 递归求解正确性（Phase 1.5/5，v1.5–v2.0）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC43** | **P0** | 子任务部分失败处理：父 WorkItem 的子节点 terminal 后状态混合（部分 completed + 部分 failed）→ 父节点标记 `failed`，`Directive` 追加子任务失败摘要；用户可通过 `task_spawn` 手动重试失败子项 |
+| **AC44** | **P1** | GetFocus 确定性 tiebreak：同 kind + 同 uncertainty → 按 `CreatedAt` 升序（FIFO）；同 kind + 同 uncertainty + 同 CreatedAt → 按 ID 字典序。确保同一状态下 LLM 每次看到相同 focus |
+| **AC45** | **P1** | ResolveFocus dispatch 路由：goal→仅 decompose；explore/plan/verify→spawn(readonly)；implement→spawn(write)；checklist→inline 当前 turn；shell/agent→spawn(async)。路由错误（如 goal spawn）→ 返回 `ErrInvalidDispatch` |
+
+#### Wave 迁移（Phase 2，v1.1）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC46** | **P1** | WaveScheduler 读 WorkTree 正确性：(a) `GetReadyItems(session)` 返回 deps satisfied 的项；(b) `filtered by subtree(batchRootID)` 排除非本 batch 项；(c) TaskNode 投影 adapter 往返一致（WorkItem→TaskNode→WorkItem 关键字段不丢） |
+
+#### Checklist Promote（Phase 2，v1.1）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC47** | **P1** | PlanMode approve checklist promote：ephemeral checklist 子项 → `kind=implement, ephemeral=false` 持久子项；(a) 原 checklist 项标记 `completed`；(b) 新 implement 项保留原 Title+Directive；(c) 新项 BlockedBy 继承 checklist 项的依赖关系 |
+
+#### Tool 面（Phase 4，v2.0）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC48** | **P1** | Alias 行为等价性：`task_write(mode=checklist, items=[...])` 输出（WorkItem 树状态 + sc.Todos 投影）与旧 `todo_write(todos=[...])` 完全一致；`task_spawn(kind=explore, ...)` 与旧 `delegate_explore` 行为等价 |
+
+#### 跨会话（Phase 7，v2.1）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC49** | **P0** | Lock 运行时 enforcement：对 `LockHistorical()` 标记的 WorkItem 调用 `UpdateStatus/Remove/UpsertChecklist` → 返回 `ErrWorkItemLocked`；只读操作（Get/List/ListChildren）不受 lock 影响 |
+| **AC50** | **P1** | 链式继承追溯：Session A→B 继承（B.InheritContext(A, item)）→ Session B→C 继承（C.InheritContext(B, item')）→ C 中 WorkItem.SourceSession = A（追溯链不中断） |
+
+#### 自演化（Phase 8，v3.0）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC51** | **P1** | 冷启动降级：(a) < 3 Session 历史数据时 `AdaptThreshold` 返回全局默认值（0.3/0.7）；(b) < 5 Session 时 `ExtractTemplate` 返回 nil（不建议模板）；(c) 降级行为对用户透明，不报错 |
+| **AC52** | **P1** | 阈值振荡防止：`AdaptThreshold` 使用 hysteresis——只有当新阈值与当前值差异 > 0.1 且连续 3 个 Session 同方向时才更新；防止 terminal 率正常波动导致阈值频繁跳变 |
+
+#### 系统韧性（Phase 0，v1.0）
+
+| ID | 优先级 | 标准 |
+|----|--------|------|
+| **AC53** | **P1** | 磁盘写入原子性：`DiskWorkItemStore.Save` 先写临时文件（`*.tmp`），写入完成后 `os.Rename` 原子替换；写入中断时原文件保持完整（不产生半写损坏文件） |
+
+> **统计：** 补充 AC37–AC53（17 条）：P0 4 条（AC37/AC40/AC43/AC49），P1 13 条。全量 AC 从 36 条扩展到 **52 条**（AC26 除外）。
+
 ### T 层测试点（草案，S3 登记 t-registry）
 
 | T ID | Given-When-Then | 优先级 |

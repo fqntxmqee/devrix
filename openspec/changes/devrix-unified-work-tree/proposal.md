@@ -3,7 +3,7 @@
 **Change ID:** `devrix-unified-work-tree`  
 **Demand ID:** DM-20260617-009  
 **Created:** 2026-06-17  
-**Status:** Draft
+**Status:** S3_Gate_Passed
 
 ---
 
@@ -73,11 +73,14 @@ Devrix 编排域把 **工作单元 (What)**、**执行句柄 (How)**、**编排�
 
 ## Success Criteria
 
-- [ ] AC1–AC5：WorkItem 基础模型 + legacy 兼容（P0）
-- [ ] AC6–AC10：各写入路径挂树（P1）
-- [ ] AC11–AC13：RunRegistry 挂接（P2，依赖 DM-011）
-- [ ] AC14–AC19：tool 简化 + 递归求解（P3）
-- [ ] 全量 `go test ./internal/layers/orchestration/...` 绿
+| Milestone | AC 范围 | 核心交付 |
+|-----------|---------|---------|
+| A (v1.0–v1.2) 产权集中 | AC1–AC13, AC23–AC25 | 6→1 模型统一，WorkTree 为唯一真相源 |
+| B (v1.5–v2.0) 递归求解 | AC14–AC22, AC27–AC29 | 最小递归 → 完整递归 + tool 统一 |
+| C (v2.1–v3.0) 自演化 | AC30–AC36 | 跨会话 + 自适应学习 |
+
+- [ ] 全量 `go test ./internal/layers/orchestration/...` 每版绿
+- [ ] 详见 `version-roadmap.md` 完整演进路线
 
 ## Risks & Mitigations
 
@@ -88,8 +91,46 @@ Devrix 编排域把 **工作单元 (What)**、**执行句柄 (How)**、**编排�
 | todo_write 回归 | Med | High | sc.Todos 投影 + 集成测试 |
 | ID 前缀变更 | Low | Med | 文档 + alias |
 
+## Game Theory Analysis
+
+### 分析文件
+
+| 文件 | 作者 | 角色 |
+|------|------|------|
+| `gaming-analysis.md` | Claude | 初始博弈论分析 — 产权理论、What/How 分离、递归求解、Tool 面简化 |
+| `review-gametheory-worktree.md` | Codex (MiniMax-M3) | 独立审查 — 发现 3 处概念错位、5 个结构性盲点 |
+| `gaming-analysis-response.md` | Claude | 对 Codex 审查的观点 — 接受 6/7 修正，保留 1 项异议 |
+
+### 关键修正（Claude 接受）
+
+1. **§4.2 Spence Costly Signal → Cheap Talk** — LLM 设 uncertainty 对 LLM 无成本，separating equilibrium 论证需重建，引入 Uncertainty Anchor 机制（AC27）
+2. **§2 Coase → Demsetz/Williamson** — 术语精度修正，论证结构不变
+3. **产权过渡期博弈缺失** — 需新增 T0→T1→T2 两阶段博弈分析
+4. **递归深度硬上限缺失** — AC20-22
+5. **§7.2 防御从 CR 升级到 CI 自动化** — AC23-25
+
+### 保留异议
+
+- **AC26 (empty RunRef → block spawn)**: 不同意 v1.1 block，改为 rate-limited warn + v1.2 hard dependency
+
+## Version Roadmap
+
+详见 `version-roadmap.md` — 完整演进路线 v1.0 → v3.0：
+
+```
+v1.0 ─→ v1.1 ─→ v1.2 ─→ v1.5 ⭐ ─→ v2.0 ─→ v2.1 ─→ v3.0
+产权      写入      执行      最小       完整       跨会话     自演化
+集中      统一      观测      递归       递归                 任务系统
+```
+
+三个里程碑，每个独立交付价值：
+- **A (v1.0–v1.2):** 产权集中，6→1 模型，WorkTree 唯一真相源
+- **B (v1.5–v2.0):** 递归求解，最小递归 MVP → 完整递归引擎
+- **C (v2.1–v3.0):** 自演化，跨会话记忆 → 任务模板学习
+
 ## Next Steps
 
-1. Review `demand.md` + `design.md`
-2. `/openspec-apply devrix-unified-work-tree` 从 Phase 0（v1.0 模型）开始
-3. 并行推进 DM-011 RunRegistry Phase 1
+1. S3-Gate Review：`gaming-analysis.md` v2 + `version-roadmap.md` + 双边共识
+2. 通过后 → `/openspec-apply devrix-unified-work-tree` 从 Phase 0 开始
+3. 并行推进 DM-011 RunRegistry Phase 1（解锁 v1.2）
+4. v1.5 最小递归作为独立里程碑验证核心循环
