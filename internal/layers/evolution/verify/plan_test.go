@@ -201,3 +201,44 @@ func mustWrite(t *testing.T, p, content string) {
 		t.Fatal(err)
 	}
 }
+
+// === DM-20260618-007 W11-W12 cross-reference (T 点映射) ===
+
+// T: verify-plan-execution T01 (parser) — TestLoadPlan_ParsesRows 覆盖。
+// T: verify-plan-execution T02 (executor) — TestVerify_AllPass + TestVerify_MissingFile 覆盖。
+// T: verify-plan-execution T03 (aggregator) — TestFormatJSON 覆盖。
+// 整合 spec 映射: 3 F (parser + executor + aggregator) 由 FileVerifier 单一类型实现。
+func TestW11_12_VerifyStack_T_CrossRef(t *testing.T) {
+	repo := t.TempDir()
+	mustWrite(t, filepath.Join(repo, "internal/foo/a.go"), "package foo")
+	mustWrite(t, filepath.Join(repo, "internal/foo/a_test.go"), "package foo\nfunc TestA(t *testing.T) {}\n")
+	p := writeTasksFile(t, sampleTasks)
+	fv := NewFileVerifier()
+
+	// W11: parser
+	items, err := fv.LoadPlan(p)
+	if err != nil {
+		t.Fatalf("W11 parser LoadPlan: %v", err)
+	}
+	if len(items) == 0 {
+		t.Error("W11: parser returned 0 items")
+	}
+
+	// W12: executor
+	report, err := fv.Verify(context.Background(), items, repo)
+	if err != nil {
+		t.Fatalf("W12 Verify: %v", err)
+	}
+	if report.Verified+report.Skipped+len(report.Unverified) == 0 {
+		t.Error("W12: executor reported 0 items")
+	}
+
+	// W12: aggregator
+	bz, err := FormatJSON(report)
+	if err != nil {
+		t.Fatalf("FormatJSON: %v", err)
+	}
+	if !strings.Contains(string(bz), `"verified"`) {
+		t.Errorf("W12: JSON missing verified field, got: %s", bz)
+	}
+}
