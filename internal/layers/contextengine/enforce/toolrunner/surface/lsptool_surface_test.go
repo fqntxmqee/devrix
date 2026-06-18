@@ -106,7 +106,7 @@ func TestLSPToolSurface_RiskLevel(t *testing.T) {
 			t.Errorf("%s risk = %q, want LOW", name, s.RiskLevel(name))
 		}
 	}
-	if s.RiskLevel("other") != types.RiskLevelLow {
-		t.Errorf("other risk = %q, want LOW (default)", s.RiskLevel("other"))
+	if s.RiskLevel("other") != "" {
+		t.Errorf("other risk = %q, want empty (surface does not claim)", s.RiskLevel("other"))
 	}
 }

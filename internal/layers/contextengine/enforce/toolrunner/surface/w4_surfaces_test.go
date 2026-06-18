@@ -91,8 +91,8 @@ func TestFreeForkSurface_RiskLevel(t *testing.T) {
 	if s.RiskLevel("free_fork") != types.RiskLevelHigh {
 		t.Errorf("risk = %q, want HIGH", s.RiskLevel("free_fork"))
 	}
-	if s.RiskLevel("other") != types.RiskLevelLow {
-		t.Errorf("other = %q, want LOW default", s.RiskLevel("other"))
+	if s.RiskLevel("other") != "" {
+		t.Errorf("other = %q, want empty (surface does not claim)", s.RiskLevel("other"))
 	}
 }
 

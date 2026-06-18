@@ -67,7 +67,7 @@ func (s *TrackerSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "query_diagnostics" {
 		return types.RiskLevelLow
 	}
-	return types.RiskLevelLow
+	return ""
 }
 
 // queryDiagInput mirrors toolrunner.queryDiagInput.

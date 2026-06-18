@@ -80,7 +80,7 @@ func (s *FreeForkSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "free_fork" {
 		return types.RiskLevelHigh
 	}
-	return types.RiskLevelLow
+	return ""
 }
 
 // freeforkInput / Request / Output / Handle mirror the toolrunner types.

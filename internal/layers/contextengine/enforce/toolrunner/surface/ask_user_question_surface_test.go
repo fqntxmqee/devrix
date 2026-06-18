@@ -51,6 +51,19 @@ func TestAskUserQuestionSurface_Tools(t *testing.T) {
 	}
 }
 
+// T: ASK-Q-T01b — RiskLevel must not claim tools owned by other surfaces.
+func TestAskUserQuestionSurface_RiskLevel_OnlyOwnTool(t *testing.T) {
+	s := surface.NewAskUserQuestionSurface()
+	if r := s.RiskLevel("ask_user_question"); r != types.RiskLevelLow {
+		t.Errorf("RiskLevel(ask_user_question) = %q, want low", r)
+	}
+	for _, name := range []string{"bash", "read_file", "delegate_explore", "tool_search"} {
+		if r := s.RiskLevel(name); r != "" {
+			t.Errorf("RiskLevel(%q) = %q, want empty (must not hijack dispatch)", name, r)
+		}
+	}
+}
+
 // T: ASK-Q-T02 — validation: empty questions array.
 func TestAskUserQuestionSurface_Execute_EmptyQuestions(t *testing.T) {
 	s := surface.NewAskUserQuestionSurface()

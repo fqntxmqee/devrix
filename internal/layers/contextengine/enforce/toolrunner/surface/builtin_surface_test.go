@@ -49,8 +49,8 @@ func TestBuiltinSurface_RiskLevel(t *testing.T) {
 	if s.RiskLevel("read_file") != types.RiskLevelLow {
 		t.Errorf("read_file risk = %q, want LOW", s.RiskLevel("read_file"))
 	}
-	if s.RiskLevel("nonexistent") != types.RiskLevelLow {
-		t.Errorf("unknown tool risk = %q, want LOW (default)", s.RiskLevel("nonexistent"))
+	if s.RiskLevel("nonexistent") != "" {
+		t.Errorf("unknown tool risk = %q, want empty (surface does not claim)", s.RiskLevel("nonexistent"))
 	}
 }
 
