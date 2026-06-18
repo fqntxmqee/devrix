@@ -4,8 +4,8 @@
 **Slug:** `orchestration`
 **Type:** Core Domain
 **Status:** Active — Canonical S1–S5（v1.0+ value-stream，无需像 D1 重编号）
-**Version:** 1.0.0
-**Last Updated:** 2026-06-16
+**Version:** 1.1.0
+**Last Updated:** 2026-06-18
 **Depends On:** D1（ingress `ProcessMessage`）、D2（Follower 拆面）、D3（`IGateway`，D7 直调）、D4（Delegate Follower）
 **Depended By:** D1（EngineEvent / Flow 展示）、D6（`ValidateOrchestration` advisory）
 **Hard Ban:** D1→D2 直连 `IEngine.Process`（DM-007）；D2→D3 import（DM-020）；D4 直 Publish FlowEvent（DM-018）
@@ -19,8 +19,8 @@
 
 | 可验证承诺 | Canonical S |
 |-----------|-------------|
-| Task/Plan 事实与状态机单一权威 | D7-S1 Work Model |
-| 用户消息统一入口 + Turn 主循环 + LLM 调用权 | D7-S2 Session Orchestrator |
+| Task/Plan 事实与状态机单一权威 | D7-S1 Work Model（**WorkItem + WorkTree**，`run_ref` → RunRegistry） |
+| 用户消息统一入口 + Turn 主循环 + LLM 调用权 + **RunTurn resolve/decompose/await** | D7-S2 Session Orchestrator |
 | 多 Worker 并行 DAG，冲突与上下文隔离 | D7-S3 Wave Scheduler |
 | FlowEvent / WorkPlan 聚合，进度广播 | D7-S4 Execution Flow |
 | 意图分类、任务拆解、执行器选择 | D7-S5 Decision & Planning |
@@ -58,7 +58,7 @@
 |----|------|----------|
 | A | 24（S1:6 · S2:6 · S3:3 · S4:5 · S5:4） | `a-registry.md` |
 | F | 51（Legacy 44 + Canonical 7） | `f-registry.md` |
-| T | 66（44 P0） | `t-registry.md` |
+| T | 69（47 P0） | `t-registry.md` |
 | Span | 9 ops | `span-registry.md` |
 
 ---
@@ -76,6 +76,7 @@
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 登记 SoT |
 | `span-registry.md` | Span operation 登记 SoT |
 | `layer-delta.md` | V1→V2 演进 Delta |
+| `../../tech-debt/worktree-v2-deferred.md` | WorkTree v2.1+ 技术债务（TD-WT-01..06） |
 | `../architecture/code-layout.md` §4.2 | scenario-slug 物理路径 |
 
 ---
@@ -84,4 +85,5 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-06-18 | DM-20260617-009 闭环：WorkItem/WorkTree 写入 North Star；RunTurn resolve/decompose/await；tech-debt 索引 |
 | 1.0.0 | 2026-06-16 | 初版：薄领域 SoT；厚版迁至 `d7-requirements-clarifications.md`；对齐 D1 `*-domain.md` 模式 |

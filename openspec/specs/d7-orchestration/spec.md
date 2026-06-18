@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 3.3.0
+**Version:** 3.8.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-16
+**Last Updated:** 2026-06-18
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -606,6 +606,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.5.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) ADDED Requirements：D2 QueryLoop Legacy Path Decommission（loopFirst=true 主路径护栏 + 拆面 adapter 零调用 + legacy metric 暴露 + CLI 警告 + D2-S10 spec.md LEGACY 标记）；(2) 6 个 Gherkin Scenario 覆盖 AC1-AC7；(3) T09/T10 + T04/T05 注册 |
 | **3.6.0** | **2026-06-17** | **devrix-tool-surface-phase2-full (DM-20260617-008) 工具调用链路登记**：(1) Cross-Domain Contracts 表新增 DM-20260617-008 行（指 D2 spec §"Tool Call End-to-End Flow" 为完整链路 SoT）；(2) 端到端 Chain A/B/C 视图（3 链 7 surface 5 domain 拓扑）由 D2 spec 持有, D7 通过本表反查 |
 | **3.7.0** | **2026-06-17** | **devrix-unified-work-tree (DM-20260617-009)**：(1) ADDED WorkItem + WorkTree 统一工作语义；(2) WorkTree ⊥ RunRegistry 分离（`run_ref` 外键）；(3) todo_write→checklist ephemeral 子节点 + sc.Todos 投影；(4) Wave OrchestratePath SyncWaveNodes；(5) legacy TaskManager 适配器；(6) 跨 session 只读查询 baseline |
+| **3.8.0** | **2026-06-18** | **devrix-unified-work-tree v1.5–v2.0 闭环 (PR #85–#87)**：(1) 统一工具 alias task_write/spawn/await；(2) RunTurn decompose + ResolveHint + depth/daily limits；(3) RunTurn blocking await (`ResolveAwaiter`)；(4) v2.1+ defer → `openspec/tech-debt/worktree-v2-deferred.md` |
 
 ---
 
@@ -641,7 +642,25 @@ Work semantics (What) and execution handles (How) MUST remain separate stores. `
 
 `OrchestratePath` SHALL call `TaskManager.SyncWaveNodes` after `SynthesizeTaskGraph`, writing implement subtrees before Wave dispatch.
 
-### Deprecated (v2.0 target)
+### Deprecated (v2.0 target → v2.1 tech-debt)
+
+> 详见 `openspec/tech-debt/worktree-v2-deferred.md` (TD-WT-02, TD-WT-03)
 
 - Session-scratch `sc.Todos` as authoritative checklist (demoted to read projection via WorkTree)
 - Independent persistent wave task graph as work semantics SoT
+
+### Requirement: RunTurn Resolve and Decompose (v1.5–v2.0)
+
+`DefaultOrchestrator.RunTurn` SHALL inject focus context via `FocusHintProvider`, MAY block-await running focus children via `ResolveAwaiter`, and SHALL guide decompose via `ResolveHint` when uncertainty exceeds threshold.
+
+#### Scenario: Blocking await before LLM loop
+- GIVEN a focus WorkItem with in-progress children that have `run_ref`
+- WHEN RunTurn starts
+- THEN `ResolveAwaiter` blocks until children reach terminal or timeout
+- AND a `resolve` engine event is emitted with await summary
+
+#### Scenario: High uncertainty decompose guidance
+- GIVEN a focus WorkItem with uncertainty ≥ threshold and decomposable kind
+- WHEN RunTurn injects focus hint
+- THEN ResolveHint advises `task_write mode=decompose`
+- AND `DecomposeChildren` enforces max depth, max children, and daily limit

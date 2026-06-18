@@ -132,5 +132,15 @@ v1.0 ─→ v1.1 ─→ v1.2 ─→ v1.5 ⭐ ─→ v2.0 ─→ v2.1 ─→ v3.0
 
 1. S3-Gate Review：`gaming-analysis.md` v2 + `version-roadmap.md` + 双边共识
 2. 通过后 → `/openspec-apply devrix-unified-work-tree` 从 Phase 0 开始
-3. 并行推进 DM-011 RunRegistry Phase 1（解锁 v1.2）
-4. v1.5 最小递归作为独立里程碑验证核心循环
+3. 并行推进 DM-011 RunRegistry Phase 1（解锁 v1.2）— ✅ 内联实现完成
+4. v1.5 最小递归作为独立里程碑验证核心循环 — ✅ PR #85–#87
+5. v2.1+ 演进项登记 tech-debt — ✅ `openspec/tech-debt/worktree-v2-deferred.md`
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-18  
+**Outcome:** Successfully implemented (v1.0–v2.0); v2.1+ deferred to tech-debt  
+**PRs:** #83, #84, #85, #86, #87  
+**Specs Updated:** `specs/d7-orchestration/spec.md` v3.8.0, `d7-domain.md` v1.1.0, `t-registry.md`
