@@ -121,7 +121,7 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		Async:        fields["async"] == "true",
 	}
 
-	runID, _ := runregistry.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
+	runID, _ := workmodel.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
 
 	res, err := disp.Dispatch(ctx, req)
 	if err != nil {

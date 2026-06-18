@@ -52,8 +52,8 @@
 
 ## 已知限制 / Follow-up
 
-1. **task_write / task_spawn / task_await** 统一 alias — v2.0 独立 PR
-2. **RunTurn 自动 decompose 循环** — hook 接口 `ResolveFocus` 已就绪，Turn 集成留 v2.0
+1. ~~**task_write / task_spawn / task_await** 统一 alias~~ → 见 PR #85 (v2.0 tools)
+2. **RunTurn 自动 decompose 循环** — FocusHint hook 已交付；LLM 驱动 decompose 留 v2.0+
 3. **Phase 8 自演化** — 需 10+ Session 数据积累后激活 optimizer
 
 ## Decision

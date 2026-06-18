@@ -86,6 +86,12 @@ func WireDelegate(
 		if err := delegatetools.RegisterTools(reg, maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)
 		}
+		if ctxCfg != nil {
+			if err := workmodel.RegisterUnifiedTaskTools(reg, ctxCfg, tm); err != nil {
+				slog.Error("register unified task tools", "error", err)
+			}
+			workmodel.SetUnifiedToolRegistry(reg)
+		}
 	}
 	slog.Info("d4 delegate enabled (hubspoke)",
 		"allow_async", maCfg.Delegate.AllowAsync,
