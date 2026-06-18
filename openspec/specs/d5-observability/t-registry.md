@@ -1,10 +1,10 @@
 # D5 Observability Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-15
+**Version:** 3.1.0
+**Last Updated:** 2026-06-18
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Tracker + Doctor + Debug Filter + Fault Inject / devrix-diagnostic-tools-wiring (DM-20260617-002) — Tracker async tick + /doctor CLI + A2 DebugFilter
+**Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Tracker + Doctor + Debug Filter + Fault Inject / devrix-diagnostic-tools-wiring (DM-20260617-002) — Tracker async tick + /doctor CLI + A2 DebugFilter / devrix-tools-terminal-architecture (DM-20260618-007) — Tracker W6-W7 (D5-S23-A02-F01-T01 + F02-T01 + F03-T01/T02)
 
 ---
 
@@ -59,6 +59,10 @@
 | D5-S23-A04-T01 | Export bundle schema v1 有效 JSON | S23 | P1 | `internal/layers/observability/diagnose/incident/export_test.go` | IMPLEMENTED | D5-S8-A01-T01 |
 | D5-S23-A04-T02 | CLI `devrix debug export` 行为一致 | S23 | P2 | `internal/cli/debug/export_test.go` | IMPLEMENTED | D5-S8-A01-T02 |
 | D5-S23-A06-T01 | SessionBridge ActiveSessions gauge 增减 | S23 | P1 | `tests/integration/obs_session_bridge_test.go` | IMPLEMENTED | D5-S0-A02-T01 |
+| **D5-S23-A02-F01-T01** | **Tracker diff 收集 (W6)** | **S23** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW6_DiffCollection_T01_CrossRef)** | **IMPLEMENTED** | **—** |
+| **D5-S23-A02-F02-T01** | **Tracker LRU dedup 跨文件 (W6)** | **S23** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW6_LRUDedup_T02_CrossRef)** | **IMPLEMENTED** | **—** |
+| **D5-S23-A02-F03-T01** | **Tracker 异步 Linter 集成 (.go → go vet) + WatchFile (W7)** | **S23** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW7_LinterIntegration_T03_CrossRef) + tests/integration/tools_terminal_test.go (TestTracker_NonBlocking)** | **IMPLEMENTED** | **—** |
+| **D5-S23-A02-F03-T02** | **Tracker 高频 tick 非阻塞 (W7)** | **S23** | **P0** | **`tests/integration/tools_terminal_test.go` (TestTracker_NonBlocking)** | **IMPLEMENTED** | **—** |
 | D5-S23-A06-T02 | HealthCheck 含 coverage 摘要 | S23 | P1 | — | PLANNED | D5-S0-A02-T02 |
 | D5-S23-A07-T01 | Diagnostic Tracker 500-file LRU + Diff | S23 | P0 | `internal/layers/observability/diagnose/tracker/tracker_test.go` | IMPLEMENTED | — |
 | D5-S23-A07-T02 | Tracker 内置 linter (go/tsc/shellcheck) 报告 | S23 | P0 | `internal/layers/observability/diagnose/tracker/tracker_test.go` | IMPLEMENTED | — |
