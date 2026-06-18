@@ -224,7 +224,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			})
 			endSpan(persistSpan)
 			endSpan(turnSpan)
-			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens)
+			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens, finalText)
 			return
 		}
 
@@ -293,7 +293,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			messages = append(messages, buildToolResultMsg(req.SessionID, r))
 		}
 
-		finalText = ""
+		// NOTE: finalText is intentionally NOT cleared here — it must survive to the
+		// emitComplete call after the for-loop exits, so MaxTurns-exceeded emits
+		// the last iteration's LLM text (otherwise the IM adapter sees an empty
+		// complete event and the user gets no conclusion card).
 		endSpan(turnSpan)
 	}
 
@@ -310,7 +313,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		FinalText: finalText,
 	})
 	endSpan(persistSpan)
-	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens)
+	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens, finalText)
 }
 
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string) {
@@ -329,6 +332,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	lastPromptTokens int,
 	model string,
 	maxContextTokens int,
+	finalText string,
 ) {
 	if model == "" {
 		model = o.defaultModel
@@ -346,8 +350,13 @@ func (o *DefaultOrchestrator) emitComplete(
 	if pct := contracts.ComputeCtxPct(lastPromptTokens, maxContextTokens); pct > 0 {
 		meta["ctx_pct"] = fmt.Sprintf("%d", pct)
 	}
+	// Surface the last LLM-generated text on the complete event so IM adapters
+	// (Feishu cardkit streaming finalize, CLI plain stdout) can render the
+	// conclusion even when no interleaved text chunks were emitted (e.g. LLM
+	// called tools, got result, ended the turn without an explicit summary).
 	out <- &contracts.EngineEvent{
 		Type:      "complete",
+		Content:   finalText,
 		SessionID: sessionID,
 		Metadata:  meta,
 	}
