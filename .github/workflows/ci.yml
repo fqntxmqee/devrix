@@ -36,10 +36,13 @@ jobs:
       - name: Verify dependency versions (DM-20260618-007 W0)
         run: |
           # Lock mvdan.cc/sh/v3 to v3.x to avoid silent v4 major-version upgrades.
-          actual="$(go list -m mvdan.cc/sh/v3 2>/dev/null || echo MISSING)"
+          # `go list -m` outputs "<module> <version>" (e.g. "mvdan.cc/sh/v3 v3.13.1").
+          # Extract the version column (last whitespace-separated token).
+          mod_out="$(go list -m mvdan.cc/sh/v3 2>/dev/null || echo MISSING)"
+          actual="${mod_out##* }"
           case "$actual" in
             v3.*) echo "mvdan.cc/sh/v3 locked at $actual (OK)" ;;
-            *) echo "::error::mvdan.cc/sh/v3 must be locked to v3.x (got: $actual)"; exit 1 ;;
+            *) echo "::error::mvdan.cc/sh/v3 must be locked to v3.x (got: $actual; full: $mod_out)"; exit 1 ;;
           esac
 
       - name: Unit tests
