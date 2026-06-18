@@ -78,6 +78,20 @@ type CallHierarchyItem struct {
 	Selection Range     `json:"selectionRange"`
 }
 
+// HoverInfo LSP hover result (DM-20260618-007 D2-S4-A01-F04).
+type HoverInfo struct {
+	Contents string `json:"contents"`
+	Range    *Range `json:"range,omitempty"`
+}
+
+// SymbolInformation LSP workspace/symbol result (DM-20260618-007 D2-S4-A01-F05).
+type SymbolInformation struct {
+	Name     string     `json:"name"`
+	Kind     SymbolKind `json:"kind"`
+	Location Location   `json:"location"`
+	ContainerName string `json:"containerName,omitempty"`
+}
+
 // CallHierarchyIncomingCall LSP 调用方信息。
 type CallHierarchyIncomingCall struct {
 	From       CallHierarchyItem `json:"from"`
@@ -92,6 +106,10 @@ type Client interface {
 	References(ctx context.Context, uri string, p Position, includeDecl bool) ([]Location, error)
 	PrepareCallHierarchy(ctx context.Context, uri string, p Position) ([]CallHierarchyItem, error)
 	IncomingCalls(ctx context.Context, item CallHierarchyItem) ([]CallHierarchyIncomingCall, error)
+	// DM-20260618-007 D2-S4-A01-F04 — hover.
+	Hover(ctx context.Context, uri string, p Position) (*HoverInfo, error)
+	// DM-20260618-007 D2-S4-A01-F05 — workspace symbol search.
+	WorkspaceSymbol(ctx context.Context, query string) ([]SymbolInformation, error)
 	Close() error
 }
 
@@ -500,6 +518,47 @@ func (c *lspClient) IncomingCalls(ctx context.Context, item CallHierarchyItem) (
 	var out []CallHierarchyIncomingCall
 	if err := json.Unmarshal(*resp, &out); err != nil {
 		return nil, fmt.Errorf("lsp: decode incoming calls: %w", err)
+	}
+	return out, nil
+}
+
+// Hover DM-20260618-007 D2-S4-A01-F04 — textDocument/hover.
+func (c *lspClient) Hover(ctx context.Context, uri string, p Position) (*HoverInfo, error) {
+	resp, err := c.rpc.request("textDocument/hover", map[string]any{
+		"textDocument": map[string]any{"uri": uri},
+		"position":     p,
+	}, c.timeout)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || string(*resp) == "null" {
+		return nil, nil
+	}
+	var out HoverInfo
+	if err := json.Unmarshal(*resp, &out); err != nil {
+		return nil, fmt.Errorf("lsp: decode hover: %w", err)
+	}
+	return &out, nil
+}
+
+// WorkspaceSymbol DM-20260618-007 D2-S4-A01-F05 — workspace/symbol.
+// Returns nil (no error) if server responds with null (no matches).
+func (c *lspClient) WorkspaceSymbol(ctx context.Context, query string) ([]SymbolInformation, error) {
+	if query == "" {
+		return nil, fmt.Errorf("lsp: workspaceSymbol: query is empty")
+	}
+	resp, err := c.rpc.request("workspace/symbol", map[string]any{
+		"query": query,
+	}, c.timeout)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || string(*resp) == "null" {
+		return nil, nil
+	}
+	var out []SymbolInformation
+	if err := json.Unmarshal(*resp, &out); err != nil {
+		return nil, fmt.Errorf("lsp: decode workspace symbol: %w", err)
 	}
 	return out, nil
 }

@@ -72,7 +72,8 @@ func TestLSP_FileNotFound(t *testing.T) {
 	}
 }
 
-// TestLSP_SchemaExposesOperations — Schema 含 3 个合法 operation。
+// TestLSP_SchemaExposesOperations — Schema 含 5 个合法 operation
+// (DM-20260618-007 D2-S4-A01 扩展: + hover, + workspace_symbol).
 func TestLSP_SchemaExposesOperations(t *testing.T) {
 	r := newLSPRunner(&LSPConfig{Enabled: true})
 	schema := r.Schema()
@@ -89,7 +90,13 @@ func TestLSP_SchemaExposesOperations(t *testing.T) {
 	if err := json.Unmarshal([]byte(schema.Parameters), &params); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"definition": true, "references": true, "incoming_calls": true}
+	want := map[string]bool{
+		"definition":       true,
+		"references":       true,
+		"incoming_calls":   true,
+		"hover":            true, // D2-S4-A01-F04
+		"workspace_symbol": true, // D2-S4-A01-F05
+	}
 	for _, op := range params.Properties.Operation.Enum {
 		if !want[op] {
 			t.Errorf("unexpected op: %s", op)
