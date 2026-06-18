@@ -34,6 +34,9 @@
 > 2026-06-18 增量：DM-20260618-001/002/003 三个 change 共加 15 个 P0 T 点（T22-T34 + PERMISSION-GATE-1-T01/T02）— 全 IMPLEMENTED。
 > 详见 `openspec/specs/d2-context-engine/t-registry.md` §"TOOL-SURFACE-1: v2 / v3 / Lazy Loading"。
 
+> 2026-06-18 增量：DM-20260618-007 (devrix-tools-terminal-architecture) 5 Surface × 跨切面 LTL-Lite — 加 25 个 T 点 (D2-S4-A01-T01~T06 + TOOL-SEC-2-A02-T01~T03 + D5-S23-A02-T01~T04 + D4-S11-A02-T01~T04 + D4-S13-A02-T01 + D6-S11-A02-T01~T03 + D4-S12-A03-T01 + PERMISSION-GATE-1-T01/T02/T03) — 全 IMPLEMENTED。
+> 详见 `openspec/changes/devrix-tools-terminal-architecture/acceptance-report.md` §2 T 层验证。
+
 > D2 含 1 条 PARTIAL（`D2-S11-A01-TD03`），计入 Total，不计入 IMPLEMENTED。
 
 ---

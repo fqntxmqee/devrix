@@ -211,6 +211,16 @@ type DiagnosticsConfig struct {
 	LSPEnabled bool `yaml:"lsp_enabled"`
 	// LSPServers 启用的 LSP server 列表。
 	LSPServers []LSPServerConfig `yaml:"lsp_servers"`
+	// LSPMaxServers DM-20260618-007 W0 (D2-S4-A01) — LSP server 进程池上限。
+	// 默认 4; invariant `lsp_servers <= 4` 在 runtime check 中强约束 (LTL-Lite)。
+	// 0 走 default。
+	LSPMaxServers int `yaml:"lsp_max_servers"`
+	// LSPMethodTimeoutMs DM-20260618-007 W0 (SUG-2) — 单个 LSP method 调用超时 (ms)。
+	// 默认 2000ms; p99 告警阈值 lsp.latency_alert_ms (默认 1500ms)。
+	LSPMethodTimeoutMs int `yaml:"lsp_method_timeout_ms"`
+	// LSPLatencyAlertMs DM-20260618-007 W0 (SUG-2) — D5 metrics p99 告警阈值 (ms)。
+	// 0 走 default (1500ms)。
+	LSPLatencyAlertMs int `yaml:"lsp_latency_alert_ms"`
 	// DebugCategories 默认注入到 DebugFilter 的 category 列表 (与 --debug 等价)。
 	DebugCategories []string `yaml:"debug_categories"`
 	// TranscriptDir transcript .jsonl 落盘目录。空则按 $DEVRIX_TRANSCRIPT_DIR
@@ -231,6 +241,9 @@ func DefaultDiagnosticsConfig() DiagnosticsConfig {
 		TrackerLRUCapacity:   500,
 		TrackerTickIntervalMs: 1000,
 		LSPEnabled:           false,
+		LSPMaxServers:        4,
+		LSPMethodTimeoutMs:   2000,
+		LSPLatencyAlertMs:    1500,
 	}
 }
 
@@ -244,6 +257,15 @@ func (c DiagnosticsConfig) Normalized() DiagnosticsConfig {
 	if out.TrackerTickIntervalMs <= 0 {
 		out.TrackerTickIntervalMs = def.TrackerTickIntervalMs
 	}
+	if out.LSPMaxServers <= 0 {
+		out.LSPMaxServers = def.LSPMaxServers
+	}
+	if out.LSPMethodTimeoutMs <= 0 {
+		out.LSPMethodTimeoutMs = def.LSPMethodTimeoutMs
+	}
+	if out.LSPLatencyAlertMs <= 0 {
+		out.LSPLatencyAlertMs = def.LSPLatencyAlertMs
+	}
 	return out
 }
 
@@ -256,6 +278,15 @@ type ToolsConfig struct {
 	// RiskThreshold 全局风险阈值; tool.Risk 超过此值时被 per-risk filter 隐藏。
 	// 留空 "" = 不过滤, 暴露所有 risk 等级。
 	RiskThreshold string `yaml:"risk_threshold"`
+	// FreeForkMaxConcurrent DM-20260618-007 W0 (D4-S11-A02) — free_fork 最大并发子代理数。
+	// 默认 8 (硬约束 by invariant `concurrent_forks <= 8`)。0 走 default。
+	FreeForkMaxConcurrent int `yaml:"free_fork_max_concurrent"`
+	// VerifyTimeoutSec DM-20260618-007 W0 (D6-S11-A02) — verify 单项超时 (秒)。
+	// 默认 300s (5 分钟); per-verify-type 可覆盖。
+	VerifyTimeoutSec int `yaml:"verify_timeout_sec"`
+	// TrackerSamplingThresholdHz DM-20260618-007 W0 (D5-S23-A02) — 编辑频率
+	// 高于此值时降级为采样追踪 (fire-and-forget 丢失误接受)。默认 10/s。
+	TrackerSamplingThresholdHz int `yaml:"tracker_sampling_threshold_hz"`
 }
 
 // SurfaceConfig 单个 surface 的可见性 / 风险阈值覆盖。
@@ -269,7 +300,10 @@ type SurfaceConfig struct {
 // DefaultToolsConfig returns sane defaults (all surfaces enabled, no threshold).
 func DefaultToolsConfig() ToolsConfig {
 	return ToolsConfig{
-		Surfaces: map[string]SurfaceConfig{},
+		Surfaces:                  map[string]SurfaceConfig{},
+		FreeForkMaxConcurrent:     8,
+		VerifyTimeoutSec:          300,
+		TrackerSamplingThresholdHz: 10,
 	}
 }
 
@@ -279,6 +313,15 @@ func (c ToolsConfig) Normalized() ToolsConfig {
 	out := c
 	if out.Surfaces == nil {
 		out.Surfaces = map[string]SurfaceConfig{}
+	}
+	if out.FreeForkMaxConcurrent <= 0 {
+		out.FreeForkMaxConcurrent = 8
+	}
+	if out.VerifyTimeoutSec <= 0 {
+		out.VerifyTimeoutSec = 300
+	}
+	if out.TrackerSamplingThresholdHz <= 0 {
+		out.TrackerSamplingThresholdHz = 10
 	}
 	return out
 }

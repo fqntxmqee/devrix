@@ -11,6 +11,7 @@
 **Change:** devrix-surface-permission-extension (DM-20260618-002) — v3: CheckPermission (6th method) + Decision enum + BashAST + IPermissionGate + turn_adapter 2-phase (T26-T29, PERMISSION-GATE-1-T01/T02)
 **Change:** devrix-surface-lazy-loading (DM-20260618-003) — DeferLoading + ShouldDefer + ToolSearchSurface + zodgen (T30-T34)
 **Change:** devrix-ask-user-question (DM-20260618-006) — AskUserQuestionSurface (9th) + IM 推送 sender 桥接 (T35-T38)
+**Change:** devrix-tools-terminal-architecture (DM-20260618-007) — LSP 5 typed method spec (T02-T04) + BashAST fail-closed + zsh 22+ rules (T05-T06) + cross-cutting LTL-Lite framework
 
 ---
 
@@ -82,6 +83,11 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
 | D2-S4-A01-T01 | Token 计数共享约定与 Gateway 对齐 | Token | `tests/acceptance/p0/ctx_plan_longterm_test.go` | IMPLEMENTED |
+| D2-S4-A01-T02 | lsp_go_to_definition spec + Execute 路径 | LSP | `tests/integration/tools_terminal_test.go` (TestLSP_End2End) | IMPLEMENTED | P0 |
+| D2-S4-A01-T03 | lsp_find_references spec + Execute 路径 | LSP | `tests/integration/tools_terminal_test.go` (TestLSP_End2End) | IMPLEMENTED | P0 |
+| D2-S4-A01-T04 | lsp_incoming_calls / hover / workspace_symbol spec 暴露 | LSP | `tests/integration/tools_terminal_test.go` (TestLSP_End2End) | IMPLEMENTED | P0 |
+| D2-S4-A01-T05 | bash audit + policy decision (fail-closed) | Bash | `tests/integration/tools_terminal_test.go` (TestBashAST_DenyAttack) | IMPLEMENTED | P0 |
+| D2-S4-A01-T06 | zsh attack pattern deny (22+ rules) | Bash | `internal/layers/contextengine/enforce/toolrunner/bash/` | IMPLEMENTED | P0 |
 
 ## D2-S8: Sandbox Module
 

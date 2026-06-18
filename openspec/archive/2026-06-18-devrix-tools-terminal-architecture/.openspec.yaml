@@ -1,0 +1,100 @@
+change_id: devrix-tools-terminal-architecture
+priority: P0
+demand_id: DM-20260618-007
+status: s7_archived
+domains: [D2, D3, D4, D5, D6, D7]
+dsaft_scenarios:
+  - D2-S16  # RunQueryLoop → StreamingToolExecutor 混合批次
+  - D2-S18  # EnforceExecutionPolicy → BashAST 升级 + 文件诊断追踪
+  - D2-S4   # LSP Tool Surface
+  - D3-S5   # GuardContent — D3 对工具系统的独立制衡
+  - D4-S11  # ForkAgent — 自由分叉探索
+  - D4-S13  # IsolateWorktree — worktree 隔离
+  - D5-S23  # Diagnose — 文件诊断追踪 / doctor / 故障注入
+  - D6-S11  # Verify — 实现后自动验证
+  - D7-S5   # ClassifyIntent — D7 持有 LLM 调用权的产权配置
+dsaft_activities:
+  - D2-S4-A01       # LSP Tool 注册与调度
+  - TOOL-SEC-2-A02  # Bash AST 安全引擎
+  - D2-S18-A01      # CheckPermission 三态门控
+  - D2-S18-A05      # BuildSurfaces 单入口
+  - D2-S18-A06      # ExecuteToolRound 两阶段分派（混合批次）
+  - D5-S23-A02      # 文件诊断追踪
+  - D4-S11-A02      # 自由分叉探索
+  - D4-S13-A02      # Worktree 隔离
+  - D6-S11-A02      # 实现后自动验证
+  - D4-S12-A03      # 后台任务事件推送通知
+dsaft_functions:
+  # Phase 1: LSP Tool Surface
+  - D2-S4-A01-F01   # goToDefinition
+  - D2-S4-A01-F02   # findReferences
+  - D2-S4-A01-F03   # incomingCalls
+  - D2-S4-A01-F04   # hover
+  - D2-S4-A01-F05   # workspaceSymbol
+  - D2-S4-A01-F06   # LSP server 进程池（LRU 淘汰）
+  # Phase 1: Bash AST 安全引擎
+  - TOOL-SEC-2-A02-F01  # AST 解析（mvdan.cc/sh）
+  - TOOL-SEC-2-A02-F02  # heredoc 审计
+  - TOOL-SEC-2-A02-F03  # zsh 攻击面规则集
+  # Phase 1: 文件诊断追踪
+  - D5-S23-A02-F01  # 编辑前后 diff 收集
+  - D5-S23-A02-F02  # LRU 去重
+  - D5-S23-A02-F03  # 异步触发器（不阻塞编辑）
+  # Phase 1: 自由分叉探索
+  - D4-S11-A02-F01  # ForkAgent 创建
+  - D4-S11-A02-F02  # SendMessage 通道
+  - D4-S11-A02-F03  # fork 资源争抢仲裁
+  - D4-S13-A02-F01  # worktree 隔离
+  # Phase 1: 实现后自动验证
+  - D6-S11-A02-F01  # tasks.md 解析
+  - D6-S11-A02-F02  # 验证项执行编排
+  - D6-S11-A02-F03  # 结果聚合 + pass/fail 报告
+  # Phase 1: 后台任务事件推送
+  - D4-S12-A03-F01  # 事件流推送
+  # Phase 2: StreamingToolExecutor 混合批次
+  - D2-S18-A06-F01  # 混合批次调度
+  - D2-S18-A06-F02  # sibling abort
+  - D2-S18-A06-F03  # fallback discard
+  # Phase 1.5: LTL-Lite 框架
+  - PERMISSION-GATE-1-T01  # 跨切面：LTL-Lite runtime check
+  - PERMISSION-GATE-1-T02  # 跨切面：CI lint invariant existence
+t_points:
+  # Phase 1 P0 T 点（新增）
+  - D2-S4-A01-T01
+  - D2-S4-A01-T02
+  - D2-S4-A01-T03
+  - D2-S4-A01-T04
+  - D2-S4-A01-T05
+  - D2-S4-A01-T06
+  - TOOL-SEC-2-A02-T01
+  - TOOL-SEC-2-A02-T02
+  - TOOL-SEC-2-A02-T03
+  - TOOL-SEC-2-A02-T04
+  - TOOL-SEC-2-A02-T05
+  - TOOL-SEC-2-A02-T06
+  - D5-S23-A02-T01
+  - D5-S23-A02-T02
+  - D5-S23-A02-T03
+  - D5-S23-A02-T04
+  - D5-S23-A02-T05
+  - D4-S11-A02-T01
+  - D4-S11-A02-T02
+  - D4-S11-A02-T03
+  - D4-S11-A02-T04
+  - D4-S13-A02-T01
+  - D6-S11-A02-T01
+  - D6-S11-A02-T02
+  - D6-S11-A02-T03
+version_scope:
+  v1.0: "Phase 1 (P0): LSP Tool + BashAST + 文件诊断追踪 + 自由分叉 + 自动验证"
+  v1.1: "Phase 1.5 (P0): MCP 机制设计预研 + LTL-Lite 不变式规约框架 (R1/R2 博弈论 Review 新增)"
+  v1.2: "Phase 2 (P1): StreamingToolExecutor 混合批次 + PerSessionFilter + MCP 接入 + Capability Attestation + Costly Sandboxing + Cross-Validation + Causal Audit Trail"
+  v2.0: "Phase 3 (P2): Web 工具 + 上下文分析 + /doctor + 会话转录 + 故障注入 + 错误分类引擎 + 工具注意力热力图"
+metrics_definitions:
+  - d7.flow.chain_consistency    # FlowEvent vs D1 Task 交叉验证
+  - d7.classify.threshold_breach_rate  # FastPath 阈值超限告警
+  - d7.route.conservative        # D6 信誉惩罚导致的保守路由标记
+span_naming:
+  - d7.route.decision            # 路由决策记录
+  - d7.route.conservative        # L3 保守路由标记
+  - d2.tool.diagnostic.diff      # 文件诊断追踪 diff 输出

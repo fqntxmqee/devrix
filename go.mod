@@ -12,6 +12,9 @@ require (
 	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.37.0
+	// mvdan.cc/sh/v3 locked to v3.x for Bash AST parsing (DM-20260618-007 W0).
+	// Phase 1.5 may upgrade to v4 if API stabilizes.
+	mvdan.cc/sh/v3 v3.13.1
 )
 
 require (
@@ -29,5 +32,4 @@ require (
 	modernc.org/libc v1.62.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.9.1 // indirect
-	mvdan.cc/sh/v3 v3.13.1 // indirect
 )

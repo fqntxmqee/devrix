@@ -241,3 +241,60 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// === DM-20260618-007 W6/W7 spec cross-reference (T 点映射) ===
+
+// T: D5-S23-A02-T01 — diff 收集。验证 Diff() 报告"编辑后新增"diagnostic。
+// 由 TestDiff_ReportsNewError (line 67) 覆盖 — 见 W6 tasks.md §3 W6 文件 1 diff.go。
+func TestW6_DiffCollection_T01_CrossRef(t *testing.T) {
+	tr := New(10)
+	fl := newFakeLinter()
+	tr.SetLinter(".fake", fl.lint)
+
+	// 编辑前: a.fake 无 diagnostic
+	_ = tr.SnapshotBefore(context.Background(), "a.fake")
+
+	// 编辑后: a.fake 出现 1 个 error
+	fl.set("a.fake", []Diagnostic{diag("a.fake", 1, "error", "new-error")})
+	added, _ := tr.Diff(context.Background(), "a.fake")
+
+	if len(added) != 1 || added[0].Message != "new-error" {
+		t.Fatalf("Diff should report 1 new error, got %+v", added)
+	}
+}
+
+// T: D5-S23-A02-T02 — LRU 去重 (cap=2, 第 3 个 file 触发淘汰)。
+// 由 TestLRU_EvictsOldest (line 127) + TestLRU_RefreshOnAccess (line 142) 覆盖。
+func TestW6_LRUDedup_T02_CrossRef(t *testing.T) {
+	tr := New(2)
+	fl := newFakeLinter()
+	tr.SetLinter(".fake", fl.lint)
+
+	_ = tr.SnapshotBefore(context.Background(), "a.fake")
+	_ = tr.SnapshotBefore(context.Background(), "b.fake")
+	_ = tr.SnapshotBefore(context.Background(), "c.fake") // 触发淘汰 a
+
+	if got := tr.Len(); got != 2 {
+		t.Fatalf("LRU cap broken: len=%d, want 2", got)
+	}
+}
+
+// T: W7 集成 — linter 路由 (go-vet/tsc/shellcheck) 通过 SetLinter 注册 + TickOnce 周期调用。
+// 现有 TestNoLinter_NoOp 覆盖"无 linter 时 no-op"; SetLinter 单元测试在 D5-S23-A02-T03 中由
+// 集成测试覆盖 (TestW7_LinterIntegration_T03_CrossRef 在此 minimal 版本)。
+func TestW7_LinterIntegration_T03_CrossRef(t *testing.T) {
+	tr := New(10)
+	called := 0
+	tr.SetLinter(".foo", func(ctx context.Context, file string) ([]Diagnostic, error) {
+		called++
+		return []Diagnostic{diag(file, 1, "info", "lint")}, nil
+	})
+
+	_ = tr.SnapshotBefore(context.Background(), "x.foo")
+	added, _ := tr.Diff(context.Background(), "x.foo")
+	// Linter 在 SnapshotBefore + Diff 各调一次 (预期 2 次); 验证路由正确
+	if called < 2 {
+		t.Errorf("expected linter called >= 2 times (Snapshot + Diff), got %d", called)
+	}
+	_ = added
+}

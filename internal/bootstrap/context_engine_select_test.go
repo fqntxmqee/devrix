@@ -67,7 +67,12 @@ func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 		"free_fork",
 		"query_diagnostics",
 		"verify_plan_execution",
-		"lsp",
+		// DM-20260618-007 W3 — LSP 拆 5 个 typed spec 替代单 "lsp" spec。
+		"lsp_go_to_definition",
+		"lsp_find_references",
+		"lsp_incoming_calls",
+		"lsp_hover",
+		"lsp_workspace_symbol",
 		"delegate_explore",
 		"delegate_plan",
 		"delegate_implement",
