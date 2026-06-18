@@ -13,14 +13,14 @@
 | AC6–AC8 | 写入路径挂树 (EnsureGoal, delegate, plan, task_list tree) | ✅ PASS | `orchestrator.go`, `delegate_tools.go`, `cli_commands.go`, `tool_suite.go` |
 | AC9–AC10 | todo_write checklist + Wave 吸收 | ✅ PASS | `todo_tool.go`, `todo_sync.go`, `worktree_wave.go`, `orchestrate_path.go` |
 | AC11–AC13 | RunRegistry 挂接 RunRef | ✅ PASS | `runregistry/`, `spawn.go`, `delegate_tools.go`, `agent_bridge.go` |
-| AC14–AC16 | Tool 面简化 (task_write/spawn/await) | ⚠️ PARTIAL | `task_list format=tree` 已交付；统一 alias 工具留 v2.0 follow-up |
-| AC17–AC19 | 递归求解引擎 | ⚠️ PARTIAL | `GetFocus`, `ResolveFocus`, `uncertainty.go` 基础已交付 |
-| AC20–AC22 | 深度/宽度/24h 约束 | ⚠️ PARTIAL | `DefaultMaxDecomposeDepth=3` 常量；RunTurn 自动 decompose 留 v2.0 |
+| AC14–AC16 | Tool 面简化 (task_write/spawn/await) | ✅ PASS | PR #85: `unified_tools.go` task_write/spawn/await alias |
+| AC17–AC19 | 递归求解引擎 | ✅ PASS | PR #86: `decompose.go`, `resolve_hint.go`, `ResolveHint` in FocusHint |
+| AC20–AC22 | 深度/宽度/24h 约束 | ✅ PASS | PR #86: `MaxDecomposeDepth`, `DefaultMaxChildren=7`, daily limit 5/24h |
 | AC23 | CI static analysis | ✅ PASS | `scripts/audit-property-rights.sh` + CI step |
 | AC24 | Code Owner Bot | ✅ PASS | `.github/CODEOWNERS` |
 | AC25 | Property Rights Audit | ✅ PASS | `scripts/audit-property-rights.sh` baseline report |
 | AC27 | Uncertainty Anchor | ✅ PASS | `uncertainty.go`, `uncertainty_test.go` |
-| AC28–AC29 | RunTurn 单层递归 MVP | ⚠️ PARTIAL | `resolve.go` parent re-eval + RunRef terminal callback |
+| AC28–AC29 | RunTurn 单层递归 MVP | ✅ PASS | PR #86: `ResolveHint` + `task_write mode=decompose`; `resolve.go` parent re-eval |
 | AC30–AC32 | 跨 Session | ✅ PASS (baseline) | `cross_session.go`, `cross_session_test.go` |
 | AC33–AC36 | 自演化 | ⚠️ BASELINE | `AdaptiveThreshold` 冷启动 + hysteresis API |
 | AC37–AC40 | 状态机/迁移/级联/环检测 | ✅ PASS | `work_tree.go`, `work_tree_test.go` |
@@ -28,7 +28,7 @@
 | AC43–AC44 | 部分失败/GetFocus tiebreak | ✅ PASS | `resolve.go`, `uncertainty_test.go`, `work_tree_test.go` |
 | AC45 | ResolveFocus dispatch | ✅ PASS | `worktree_wave.go::ResolveFocusKind`, `CanSpawn` |
 | AC46–AC47 | Wave WorkTree + checklist promote | ✅ PASS | `SyncWaveNodes`, `PromoteChecklist` in plan approve |
-| AC48 | Alias 等价性 | ⏳ DEFERRED | v2.0 alias 注册 follow-up |
+| AC48 | Alias 等价性 | ✅ PASS | PR #85: task_write/spawn/await alias + PR #86 decompose mode |
 | AC49–AC50 | Lock enforcement + 链式继承 | ✅ PASS | `ErrWorkItemLocked`, `SourceSession` field |
 | AC51–AC52 | 冷启动/hysteresis | ✅ PASS | `uncertainty.go::AdaptiveThreshold` |
 | AC53 | 磁盘原子写入 | ✅ PASS | `workitem_store.go` tmp+rename |
@@ -42,6 +42,9 @@
 | D7-S1-T11 | GetFocus tiebreak | IMPLEMENTED | `work_tree_test.go::TestWorkTree_GetFocusTiebreak` |
 | D7-S1-T12 | RunRef terminal → WorkItem status | IMPLEMENTED | `runregistry/spawn_test.go` |
 | D7-S1-T13 | Cross-session FindByItemID | IMPLEMENTED | `cross_session_test.go` |
+| D7-S1-T14 | DecomposeChildren depth limit | IMPLEMENTED | `decompose_test.go::TestDecomposeChildren_DepthLimit` |
+| D7-S1-T15 | Decompose daily limit 5/24h | IMPLEMENTED | `decompose_test.go::TestDecomposeChildren_DailyLimit` |
+| D7-S1-T16 | ResolveHint high uncertainty | IMPLEMENTED | `decompose_test.go::TestResolveHint_HighUncertainty` |
 | D7-S3-T12 | OrchestratePath SyncWaveNodes | IMPLEMENTED | `orchestrate_path.go` wiring |
 
 ## Quality Gate
@@ -52,9 +55,10 @@
 
 ## 已知限制 / Follow-up
 
-1. ~~**task_write / task_spawn / task_await** 统一 alias~~ → 见 PR #85 (v2.0 tools)
-2. **RunTurn 自动 decompose 循环** — FocusHint hook 已交付；LLM 驱动 decompose 留 v2.0+
-3. **Phase 8 自演化** — 需 10+ Session 数据积累后激活 optimizer
+1. ~~**task_write / task_spawn / task_await** 统一 alias~~ → PR #85
+2. ~~**RunTurn decompose 循环**~~ → PR #86: `ResolveHint` + `task_write mode=decompose` + depth/daily limits
+3. **RunTurn blocking await** — hint-only; full blocking await for running children deferred
+4. **Phase 8 自演化** — 需 10+ Session 数据积累后激活 optimizer
 
 ## Decision
 

@@ -74,19 +74,22 @@ func (r *taskWriteRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLo
 func (r *taskWriteRunner) Schema() toolrunner.ToolSchema {
 	return toolrunner.ToolSchema{
 		Name: ToolNameTaskWrite,
-		Description: "Unified task write: mode=checklist (replaces todo_write), mode=create, mode=update. " +
+		Description: "Unified task write: mode=checklist (replaces todo_write), mode=create, mode=update, mode=decompose. " +
 			"Prefer this over legacy todo_write / task_create / task_update.",
-		Parameters: `{"type":"object","required":["mode"],"properties":{"mode":{"type":"string","enum":["checklist","create","update"]},"todos":{"type":"array"},"subject":{"type":"string"},"description":{"type":"string"},"task_id":{"type":"string"},"status":{"type":"string"},"owner":{"type":"string"},"blocked_by":{"type":"string"}}}`,
+		Parameters: `{"type":"object","required":["mode"],"properties":{"mode":{"type":"string","enum":["checklist","create","update","decompose"]},"todos":{"type":"array"},"children":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"directive":{"type":"string"},"kind":{"type":"string"}}}},"parent_id":{"type":"string"},"subject":{"type":"string"},"description":{"type":"string"},"task_id":{"type":"string"},"status":{"type":"string"},"owner":{"type":"string"},"blocked_by":{"type":"string"}}}`,
 	}
 }
 
 func (r *taskWriteRunner) Execute(ctx context.Context, _, input string) (*toolrunner.ToolResult, error) {
+	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
 	fields := parseUnifiedInput(input)
 	mode := strings.ToLower(strings.TrimSpace(fields["mode"]))
 	if mode == "" {
 		mode = "checklist"
 	}
 	switch mode {
+	case "decompose":
+		return r.executeDecompose(ctx, sessionID, input)
 	case "checklist":
 		payload, err := json.Marshal(map[string]any{"todos": fieldsRawTodos(input)})
 		if err != nil {
@@ -110,8 +113,57 @@ func (r *taskWriteRunner) Execute(ctx context.Context, _, input string) (*toolru
 		}
 		return withDeprecationNotice(res, "[task_write] update mode forwards to task_update."), nil
 	default:
-		return &toolrunner.ToolResult{Error: "task_write: mode must be checklist, create, or update"}, nil
+		return &toolrunner.ToolResult{Error: "task_write: mode must be checklist, create, update, or decompose"}, nil
 	}
+}
+
+func (r *taskWriteRunner) executeDecompose(ctx context.Context, sessionID, input string) (*toolrunner.ToolResult, error) {
+	if sessionID == "" {
+		return &toolrunner.ToolResult{Error: "task_write: session_id unavailable"}, nil
+	}
+	specs, parentID, err := parseDecomposeInput(input)
+	if err != nil {
+		return &toolrunner.ToolResult{Error: err.Error()}, nil
+	}
+	if parentID == "" {
+		focus, err := ResolveFocus(sessionID, r.manager)
+		if err != nil || focus == nil {
+			return &toolrunner.ToolResult{Error: "task_write: parent_id required when no focus"}, nil
+		}
+		parentID = focus.ID
+	}
+	items, err := r.manager.DecomposeChildren(sessionID, parentID, specs)
+	if err != nil {
+		return &toolrunner.ToolResult{Error: err.Error()}, nil
+	}
+	data, _ := json.Marshal(map[string]any{"parent_id": parentID, "children": items})
+	return &toolrunner.ToolResult{Output: string(data)}, nil
+}
+
+func parseDecomposeInput(input string) ([]ChildSpec, string, error) {
+	var raw struct {
+		ParentID string `json:"parent_id"`
+		Children []struct {
+			Title     string `json:"title"`
+			Directive string `json:"directive"`
+			Kind      string `json:"kind"`
+		} `json:"children"`
+	}
+	if err := json.Unmarshal([]byte(input), &raw); err != nil {
+		return nil, "", fmt.Errorf("task_write decompose: invalid json")
+	}
+	if len(raw.Children) == 0 {
+		return nil, "", fmt.Errorf("task_write decompose: children required")
+	}
+	specs := make([]ChildSpec, 0, len(raw.Children))
+	for _, c := range raw.Children {
+		specs = append(specs, ChildSpec{
+			Kind:      ResolveFocusKind(c.Kind),
+			Title:     c.Title,
+			Directive: c.Directive,
+		})
+	}
+	return specs, raw.ParentID, nil
 }
 
 type taskSpawnRunner struct {

@@ -109,6 +109,14 @@ func (t *WorkTree) EnsureSession(sessionID string) {
 	t.ensureSessionLocked(sessionID)
 }
 
+// MaxDecomposeDepth returns configured max tree depth for decomposition.
+func (t *WorkTree) MaxDecomposeDepth() int {
+	if t == nil || t.maxDecomposeDepth <= 0 {
+		return DefaultMaxDecomposeDepth
+	}
+	return t.maxDecomposeDepth
+}
+
 // EnsureGoal returns the session root goal, creating one if absent.
 func (t *WorkTree) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
 	t.mu.Lock()
@@ -144,6 +152,9 @@ func (t *WorkTree) Create(sessionID string, in CreateWorkItemInput) (*WorkItem, 
 		}
 		if err := t.checkMutable(parent); err != nil {
 			return nil, err
+		}
+		if t.depthLocked(sessionID, in.ParentID)+1 > t.MaxDecomposeDepth() {
+			return nil, ErrDecomposeDepthExceeded
 		}
 	}
 
@@ -252,7 +263,10 @@ func (t *WorkTree) Ancestors(sessionID, itemID string) []*WorkItem {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.ensureSessionLocked(sessionID)
+	return t.ancestorsLocked(sessionID, itemID)
+}
 
+func (t *WorkTree) ancestorsLocked(sessionID, itemID string) []*WorkItem {
 	item, ok := t.items[sessionID][itemID]
 	if !ok {
 		return nil
@@ -273,7 +287,14 @@ func (t *WorkTree) Ancestors(sessionID, itemID string) []*WorkItem {
 
 // Depth returns the depth of item in the tree (root=0).
 func (t *WorkTree) Depth(sessionID, itemID string) int {
-	ancestors := t.Ancestors(sessionID, itemID)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	return t.depthLocked(sessionID, itemID)
+}
+
+func (t *WorkTree) depthLocked(sessionID, itemID string) int {
+	ancestors := t.ancestorsLocked(sessionID, itemID)
 	if len(ancestors) == 0 {
 		return 0
 	}
