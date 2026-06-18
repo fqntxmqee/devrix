@@ -1,0 +1,85 @@
+version: "1.0"
+kind: change
+
+meta:
+  change_id: devrix-unified-work-tree
+  demand_id: DM-20260617-009
+  title: "Unified Work Tree — 工作单元树 + 递归求解终态"
+  status: s2_clarified
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-17"
+  updated_at: "2026-06-17"
+  source: orchestration-task-system-design-discussion
+
+scope:
+  layers:
+    - id: D7
+      name: Orchestration
+      affected: true
+      reason: "WorkTree 归属 D7-S1；RunTurn 递归引擎；Wave/delegate 写子项"
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "todo_write 底层改 WorkTree；task_* tool surface 简化"
+    - id: D4
+      name: Multi-Agent
+      affected: true
+      reason: "delegate_*/agent_tools 作为 spawn 策略，非独立任务系统"
+
+  capabilities:
+    - id: D7-WORK-TREE
+      name: WorkItem + WorkTree 统一工作语义（What）
+    - id: D7-RUN-REGISTRY
+      name: RunRegistry 统一执行观测（How，见 DM-011）
+    - id: D7-RUN-TURN-RESOLVE
+      name: RunTurn 递归 focus + uncertainty decompose
+    - id: D7-TOOL-TASK-WRITE
+      name: task_write / task_spawn / task_await / task_list 极简 tool 面
+
+  t_points:
+    - D7-S1-A01-T01
+    - D7-S1-A01-T02
+    - D7-S1-A01-T03
+    - D7-S1-A02-T01
+    - D7-S1-A02-T02
+    - D7-S2-A06-T11
+
+version_scope:
+  v1.0:
+    features:
+      - "WorkItem + WorkTree 核心模型与 DiskWorkItemStore v2"
+      - "TaskManager 委托 WorkTree（legacy Task 兼容）"
+      - "v1 Task JSON 自动迁移"
+    status: planned
+  v1.1:
+    features:
+      - "Session goal + delegate/plan 写 parent_id"
+      - "todo_write → checklist 子节点"
+      - "Wave TaskNode → WorkItem 视图"
+    status: planned
+  v1.2:
+    features:
+      - "RunRegistry 挂接 WorkItem.RunRef（依赖 DM-011）"
+      - "QueryWorkPlan 树形读模型"
+    status: planned
+  v2.0:
+    features:
+      - "task_write/spawn/await/list tool rename（alias 期）"
+      - "Uncertainty 驱动 decompose + focus resolver"
+      - "删 legacy flat Task / TaskNode / sc.Todos"
+    status: planned
+
+external_dependencies:
+  - component: "DM-011 devrix-unified-task-registry（RunRegistry How 层）"
+    status: s2_clarified
+  - component: "DM-20260617-001 loop_first RunTurn canonical path"
+    status: available
+  - component: "DM-20260617-008 workmodel 显式注入（无 GlobalTaskManager）"
+    status: available
+
+related_changes:
+  - devrix-unified-task-registry
+  - devrix-wave-scheduler
+  - devrix-task-planning
+  - devrix-queryloop-legacy-decommission
