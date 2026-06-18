@@ -107,7 +107,7 @@ func (r *ToolRegistry) RiskLevel(toolName string) types.RiskLevel {
 	runner, ok := r.runners[toolName]
 	r.mu.RUnlock()
 	if !ok {
-		return types.RiskLevelLow
+		return ""
 	}
 	return runner.RiskLevel()
 }

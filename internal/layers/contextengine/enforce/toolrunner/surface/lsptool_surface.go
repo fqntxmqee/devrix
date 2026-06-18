@@ -134,7 +134,10 @@ func (s *LSPToolSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec
 
 // RiskLevel implements contracts.ToolSurface.
 func (s *LSPToolSurface) RiskLevel(name string) types.RiskLevel {
-	return types.RiskLevelLow
+	if _, ok := lspMethodOpMap[name]; ok {
+		return types.RiskLevelLow
+	}
+	return ""
 }
 
 // Execute implements contracts.ToolSurface. 路由 5 个 typed method 到

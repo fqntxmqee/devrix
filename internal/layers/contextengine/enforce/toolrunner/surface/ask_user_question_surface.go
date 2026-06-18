@@ -124,7 +124,7 @@ func (s *AskUserQuestionSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "ask_user_question" {
 		return types.RiskLevelLow
 	}
-	return types.RiskLevelLow
+	return ""
 }
 
 // CheckPermission implements contracts.ToolSurface. Pure interactive

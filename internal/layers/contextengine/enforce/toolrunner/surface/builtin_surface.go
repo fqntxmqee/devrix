@@ -89,7 +89,7 @@ func (s *BuiltinSurface) InterruptBehavior(name string) contracts.InterruptMode 
 // RiskLevel implements contracts.ToolSurface.
 func (s *BuiltinSurface) RiskLevel(name string) types.RiskLevel {
 	if s.reg == nil {
-		return types.RiskLevelLow
+		return ""
 	}
 	return s.reg.RiskLevel(name)
 }

@@ -53,7 +53,7 @@ func (s *VerifySurface) RiskLevel(name string) types.RiskLevel {
 	if name == "verify_plan_execution" {
 		return types.RiskLevelLow
 	}
-	return types.RiskLevelLow
+	return ""
 }
 
 // verifyInput mirrors toolrunner.verifyInput.
