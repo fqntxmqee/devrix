@@ -1,0 +1,56 @@
+change_id: devrix-ask-user-question
+priority: P1
+demand_id: DM-20260618-006
+parent_demand: DM-20260617-007
+parent_change: devrix-tool-surface-contract (PR #63 + #64, S7_archived 2026-06-17)
+status: s7_archived
+archived: 2026-06-18
+title: "ask_user_question ToolSurface — interactive LLM Q&A via IM"
+domains: [D2, tool-surface]
+dsaft_scenarios:
+  - D2-S4               # Tool Registration 场景（9th surface 挂入 BuildSurfaces）
+  - TOOL-SURFACE-1      # 横切契约域
+dsaft_activities:
+  - TOOL-SURFACE-1-A04-AskUserQuestionSurface   # 新增（9th surface, stateless）
+  - TOOL-SURFACE-1-A04-AskUserQuestionSender    # 新增（process-global hook 桥接 IM gateway）
+  - D2-S4-A01-ToolRegister                       # BuildSurfaces 装配新 surface
+created_at: "2026-06-18"
+updated_at: "2026-06-18"
+source: clawcode-tool-design-comparison-2026-06-17
+
+# TOOL-SURFACE-1 P1 T 点（详见 openspec/specs/d2-context-engine/t-registry.md）
+t_points:
+  - TOOL-SURFACE-1-T35  # AskUserQuestionSurface.Tools() spec + orthogonal flags + interrupt
+  - TOOL-SURFACE-1-T36  # 5 项 validation 规则
+  - TOOL-SURFACE-1-T37  # sender 桥接（无 sender / 错 / happy / multi-question）
+  - TOOL-SURFACE-1-T38  # BuildSurfaces 装配 + main.go 装配 + 启动 0 错误
+
+version_scope:
+  v1.0:
+    features:
+      - "ask_user_question ToolSurface 新增（stateless, 1-4 questions, 2-4 options）"
+      - "main.go 装配 sender 桥接到 gw.RouteOutbound（IM 推送）"
+      - "OrthogonalFlagFor + InterruptBehaviorFor 登记（OpenWorld, ReadOnly, InterruptCancel）"
+      - "BuildSurfaces 装配（按 name 字典序排序稳定）"
+    status: planned
+  v1.1:
+    features:
+      - "事件总线 rendezvous 实现的同步阻塞式 ask_user_question（CLI/REPL 场景）"
+    status: future
+
+metrics_definitions:
+  - name: ask_user_question_delivery_rate
+    description: ask_user_question 工具 IM 推送成功率（sender 存在时 Delivered=true 占比）
+    target: 100
+    baseline: 0
+  - name: ask_user_question_interrupt_response_ms
+    description: 收到用户新消息时中断长 run ask_user_question 调用的响应时间
+    target: < 200ms
+    baseline: 60s
+
+span_naming:
+  - TOOL-SURFACE-1-A04: tool.surface.ask_user_question
+
+capability_aliases:
+  AskUserQuestionSurface: TOOL-SURFACE-1-A04-AskUserQuestionSurface
+  AskUserQuestionSender: TOOL-SURFACE-1-A04-AskUserQuestionSender

@@ -10,6 +10,7 @@
 **Change:** devrix-tool-spec-enrichment (DM-20260618-001) — v2: ToolSpec 4 bool + InterruptBehavior (5th method) + BuildSurfaces sort + parallel dispatch (T22-T25)
 **Change:** devrix-surface-permission-extension (DM-20260618-002) — v3: CheckPermission (6th method) + Decision enum + BashAST + IPermissionGate + turn_adapter 2-phase (T26-T29, PERMISSION-GATE-1-T01/T02)
 **Change:** devrix-surface-lazy-loading (DM-20260618-003) — DeferLoading + ShouldDefer + ToolSearchSurface + zodgen (T30-T34)
+**Change:** devrix-ask-user-question (DM-20260618-006) — AskUserQuestionSurface (9th) + IM 推送 sender 桥接 (T35-T38)
 
 ---
 
@@ -256,6 +257,23 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | TOOL-SURFACE-1-T32 | ToolSearchSurface.Tools() 返回 1 个 spec (DeferLoading=false 强制)；search() 匹配 exact > glob > substring，top-5 cap | ToolSearchSurface | `internal/layers/contextengine/enforce/toolrunner/surface/tool_search_surface_test.go` (6 cases) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T33 | turn_adapter.Prepare 过滤 DeferLoading=true 的 tools (tool_search 必须保留)；deferDecider chain 加 runtime defer | Prepare Filter | `internal/bootstrap/turn_adapter_surface_test.go::TestPrepare_FiltersDeferred` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T34 | PlanModeOpenWorldPolicy.ShouldDefer runtime defer (mode=plan_mode + OpenWorld + !allowlist → defer) | ShouldDefer Runtime | `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanModeOpenWorldPolicy_ShouldDefer` | IMPLEMENTED | P0 |
+
+## TOOL-SURFACE-1: ask_user_question (DM-20260618-006)
+
+> **devrix-ask-user-question (DM-20260618-006) — 4 个 P1 T 点。**
+> 新增 AskUserQuestionSurface（9th surface，stateless），让 LLM
+> 通过 IM 通道向用户主动提 1-4 个多选问题。Sender 桥接到
+> CommunicationGateway.RouteOutbound；OrthogonalFlagFor +
+> InterruptBehaviorFor 登记。BuildSurfaces 装配并保持字典序稳定。
+> **范围外**：task_* 任务管理工具（v2 workmodel 既有覆盖，
+> 本次 hotfix 发现 → 0 新增代码达成 B 部分需求）。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|--------|-----------|--------|----------|
+| TOOL-SURFACE-1-T35 | AskUserQuestionSurface.Tools() 1 spec + OrthogonalFlagFor 返回 (ReadOnly=T, OpenWorld=T, ConcurrencySafe=F) + InterruptBehavior=InterruptCancel | ask_user_question Spec | `internal/layers/contextengine/enforce/toolrunner/surface/ask_user_question_surface_test.go::TestAskUserQuestionSurface_Tools` | IMPLEMENTED | P1 |
+| TOOL-SURFACE-1-T36 | 5 项 validation: 1-4 questions / 2-4 options / header ≤ 12 / unique label / non-empty label-question | ask_user_question Validation | `ask_user_question_surface_test.go::TestAskUserQuestionSurface_Execute_{EmptyQuestions,TooManyQuestions,OptionLabelRequired,DuplicateLabels,HeaderCap}` | IMPLEMENTED | P1 |
+| TOOL-SURFACE-1-T37 | sender 桥接: 装配 → gw.RouteOutbound；无 sender → Delivered=false graceful；sender 错 → ToolResult.Error | ask_user_question Sender | `ask_user_question_surface_test.go::TestAskUserQuestionSurface_Execute_{HappyPath,NoSender,SenderError,RenderMultiple}` | IMPLEMENTED | P1 |
+| TOOL-SURFACE-1-T38 | BuildSurfaces 装配 ask_user_question surface + 排序稳定 (3 套 opts 一致)；main.go 装配 sender；启动 0 错误 | ask_user_question Wiring | `internal/bootstrap/surfaces_test.go::TestBuildSurfaces_OnlyStateless` + `cmd/devrix/main.go` startup log | IMPLEMENTED | P1 |
 
 ## D2: Cross-Scenario Tests
 
