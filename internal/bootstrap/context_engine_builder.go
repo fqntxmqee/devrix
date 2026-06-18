@@ -152,6 +152,10 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 			slog.Error("register delegate tools", "error", err)
 		}
 	}
+	if err := workmodel.RegisterUnifiedTaskTools(toolReg, b.ctxCfg, tm); err != nil {
+		slog.Error("register unified task tools", "error", err)
+	}
+	workmodel.SetUnifiedToolRegistry(toolReg)
 
 	if b.agentToolReg != nil {
 		plugins := newAgentToolPlugins(b.agentToolReg, b.obsBridge)

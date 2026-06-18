@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -58,7 +58,7 @@ func (b *AgentBridge) OnWorkerCompleted(workerID, sessionID string, summary stri
 	if b == nil || b.hub == nil {
 		return
 	}
-	runregistry.CompleteByWorkItem(sessionID, b.taskID, summary, runErr)
+	workmodel.CompleteByWorkItem(sessionID, b.taskID, summary, runErr)
 	kind := contracts.FlowCompleted
 	if runErr != nil {
 		kind = contracts.FlowFailed

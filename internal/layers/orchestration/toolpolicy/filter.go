@@ -15,6 +15,7 @@ var delegateToolNames = map[string]bool{
 	"delegate_plan":      true,
 	"delegate_implement": true,
 	"delegate_status":    true,
+	"task_spawn":         true,
 }
 
 // Filter implements contextengine.AgentRoleToolFilter.
@@ -63,8 +64,11 @@ func filterReadOnlyWorkerTools(tools []toolrunner.ToolSchema) []toolrunner.ToolS
 		"read_file": true, "glob": true, "grep": true, "list_dir": true, "bash": true,
 		"enter_plan_mode": true, "exit_plan_mode": true,
 		"todo_write":      true,
+		"task_write":      true,
+		"task_list":       true,
+		"task_await":      true,
 		"edit_file":       true,
-		"task_create":     true, "task_get": true, "task_list": true, "task_update": true,
+		"task_create":     true, "task_get": true, "task_update": true,
 	}
 	out := make([]toolrunner.ToolSchema, 0, len(tools))
 	for _, t := range tools {

@@ -159,6 +159,7 @@ func InitOrchestration(
 		DefaultModel:     llmStack.DefaultModel,
 		MaxContextTokens: maxContextTokens,
 		ObsBridge:        obsBridge,
+		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 	})
 	executor := newTurnOrchExecutor(turnOrch)
 

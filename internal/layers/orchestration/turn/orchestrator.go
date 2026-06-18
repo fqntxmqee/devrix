@@ -25,6 +25,7 @@ type OrchestratorDeps struct {
 	DefaultModel     string
 	MaxContextTokens int
 	ObsBridge        *observability.Bridge
+	FocusHint        FocusHintProvider
 }
 
 // DefaultOrchestrator implements TurnOrchestrator with the canonical
@@ -38,6 +39,7 @@ type DefaultOrchestrator struct {
 	defaultModel     string
 	maxContextTokens int
 	obsBridge        *observability.Bridge
+	focusHint        FocusHintProvider
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -54,6 +56,7 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		defaultModel:     deps.DefaultModel,
 		maxContextTokens: deps.MaxContextTokens,
 		obsBridge:        deps.ObsBridge,
+		focusHint:        deps.FocusHint,
 	}
 }
 
@@ -107,6 +110,13 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		return
 	}
 
+	systemPrompt := mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt)
+	if o.focusHint != nil {
+		if hint := strings.TrimSpace(o.focusHint.FocusHint(ctx, req.SessionID)); hint != "" {
+			systemPrompt = mergeSystemPrompt(systemPrompt, hint)
+		}
+	}
+
 	// D-e: handle CompressHint — D7 calls D3 for summarization.
 	if prepared.CompressHint != nil {
 		compressCtx, compressSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
@@ -155,7 +165,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		)
 		chunkCh, err := o.llm.InvokeStream(turnCtx, LLMInvokeRequest{
 			SessionID:    req.SessionID,
-			SystemPrompt: mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt),
+			SystemPrompt: systemPrompt,
 			Messages:     messages,
 			Tools:        tools,
 		})

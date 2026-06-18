@@ -40,6 +40,7 @@ var adapterDelegateToolNames = map[string]bool{
 	"delegate_plan":      true,
 	"delegate_implement": true,
 	"delegate_status":    true,
+	"task_spawn":         true,
 }
 
 var adapterReadOnlyWorkerTools = map[string]bool{
@@ -51,10 +52,12 @@ var adapterReadOnlyWorkerTools = map[string]bool{
 	"enter_plan_mode": true,
 	"exit_plan_mode":  true,
 	"todo_write":      true,
+	"task_write":      true,
+	"task_list":       true,
+	"task_await":      true,
 	"edit_file":       true,
 	"task_create":     true,
 	"task_get":        true,
-	"task_list":       true,
 	"task_update":     true,
 }
 
