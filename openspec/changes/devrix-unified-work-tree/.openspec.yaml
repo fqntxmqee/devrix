@@ -5,45 +5,115 @@ meta:
   change_id: devrix-unified-work-tree
   demand_id: DM-20260617-009
   title: "Unified Work Tree — 工作单元树 + 递归求解终态"
-  status: s2_clarified
+  status: s3_gate_passed
   priority: P1
   owner: devrix-team
   created_at: "2026-06-17"
-  updated_at: "2026-06-17"
+  updated_at: "2026-06-18"
   source: orchestration-task-system-design-discussion
 
+analysis_status:
+  gaming_v2: corrected      # §2/§4.2/§6 修正完成，§2.5/§4.4 新增
+  codex_review: completed   # MiniMax-M3 review-gametheory-worktree.md
+  claude_response: completed  # gaming-analysis-response.md
+  consensus: completed      # gaming-analysis-bilateral-consensus.md
+  dsaft_coverage_audit: completed  # 2026-06-18 S3 覆盖审计，AC37-AC53 新增 17 条
+  s3_gate_review: passed           # 2026-06-18 Grill Review, 0 blockers, 4 suggestions
+  ready_for_s4: true
+
 scope:
-  layers:
-    - id: D7
-      name: Orchestration
-      affected: true
-      reason: "WorkTree 归属 D7-S1；RunTurn 递归引擎；Wave/delegate 写子项"
-    - id: D2
-      name: Context Engine
-      affected: true
-      reason: "todo_write 底层改 WorkTree；task_* tool surface 简化"
-    - id: D4
-      name: Multi-Agent
-      affected: true
-      reason: "delegate_*/agent_tools 作为 spawn 策略，非独立任务系统"
+  domains: [D7, D2, D4]
+  dsaft_scenarios:
+    - D7-S1   # Work Model — WorkItem 树、持久化、Uncertainty Anchor
+    - D7-S2   # Session Orchestrator — RunTurn resolve hook、GetFocus
+    - D7-S3   # Wave Scheduler — 读 WorkTree 替代独立 TaskGraph
+    - D7-S5   # Decision & Planning — SynthesizeTaskGraph 写 WorkTree 子树
+    - D7-S6   # Self-Evolution (v3.0 新增) — 自适应阈值、模板提取、结构优化
+  dsaft_activities:
+    # 修改的 A
+    modified:
+      - D7-S1-A02   # ManageTask → 委托 WorkTree
+      - D7-S1-A03   # QueryWorkPlan → 树形输出
+      - D7-S3-A01   # ScheduleWave → 读 WorkTree
+      - D7-S5-A02   # SynthesizeTaskGraph → 写 WorkTree 子树
+      - D7-S2-A06   # RunTurnLoop → resolve hook
+    # 新增的 A
+    added:
+      - D7-S1-A07   # EnsureGoal (v1.1)
+      - D7-S1-A08   # UpsertChecklist (v1.1)
+      - D7-S2-A08   # GetFocus (v1.5)
+      - D7-S2-A09   # ResolveFocus (v1.5)
+      - D7-S1-A09   # ComputeUncertainty (v2.0)
+      - D7-S1-A10   # QueryHistoricalWorkPlan (v2.1)
+      - D7-S1-A11   # InheritWorkContext (v2.1)
+      - D7-S6-A01   # AdaptThreshold (v3.0)
+      - D7-S6-A02   # ExtractTemplate (v3.0)
+      - D7-S6-A03   # OptimizeStructure (v3.0)
 
   capabilities:
     - id: D7-WORK-TREE
       name: WorkItem + WorkTree 统一工作语义（What）
+      dsaft: [D7-S1-A02, D7-S1-A07, D7-S1-A08]
     - id: D7-RUN-REGISTRY
       name: RunRegistry 统一执行观测（How，见 DM-011）
+      dsaft: [D7-S1-A02]  # RunRef 关联
     - id: D7-RUN-TURN-RESOLVE
       name: RunTurn 递归 focus + uncertainty decompose
+      dsaft: [D7-S2-A06, D7-S2-A08, D7-S2-A09]
     - id: D7-TOOL-TASK-WRITE
       name: task_write / task_spawn / task_await / task_list 极简 tool 面
+      dsaft: [D7-S5-A02]
+    - id: D7-UNCERTAINTY-ANCHOR
+      name: Uncertainty Anchor 机制（v2.0）
+      dsaft: [D7-S1-A09]
+    - id: D7-CROSS-SESSION
+      name: 跨会话 WorkItem 访问（v2.1）
+      dsaft: [D7-S1-A10, D7-S1-A11]
+    - id: D7-SELF-EVOLUTION
+      name: 任务系统自演化（v3.0）
+      dsaft: [D7-S6-A01, D7-S6-A02, D7-S6-A03]
 
   t_points:
+    # Phase 0: v1.0 基础模型 (AC1-5, AC23, AC37-40, AC53)
     - D7-S1-A01-T01
     - D7-S1-A01-T02
     - D7-S1-A01-T03
+    - D7-S1-A01-T04    # v1→v2 迁移边界 (AC38)
+    - D7-S1-A01-T05    # 循环依赖检测 (AC40)
     - D7-S1-A02-T01
     - D7-S1-A02-T02
+    - D7-S1-A02-T03    # WorkItem 状态机转换 (AC37)
+    - D7-S1-A02-T04    # WorkTree.Remove 级联 (AC39)
+    - D7-S1-A02-T05    # 磁盘写入原子性 (AC53)
     - D7-S2-A06-T11
+    # Phase 1.5-2.0: 递归求解 (AC20-22, AC27-29, AC43-45)
+    - D7-S2-A08-T01    # GetFocus 优先级排序
+    - D7-S2-A08-T02    # GetFocus 确定性 tiebreak (AC44)
+    - D7-S2-A09-T01    # ResolveFocus 单层递归
+    - D7-S2-A09-T02    # ResolveFocus 多层递归
+    - D7-S2-A09-T03    # 子任务部分失败处理 (AC43)
+    - D7-S2-A09-T04    # ResolveFocus dispatch 路由 (AC45)
+    - D7-S1-A09-T01    # ComputeUncertainty anchor
+    - D7-S1-A09-T02    # ComputeUncertainty 空 evidence 回退
+    # Phase 2: todo_write + Wave (AC46-47)
+    - D7-S3-A01-T01    # WaveScheduler 读 WorkTree 正确性 (AC46)
+    - D7-S1-A08-T01    # Checklist promote ephemeral→persistent (AC47)
+    # Phase 3: RunRegistry (AC41-42)
+    - D7-S2-A06-T12    # Terminal callback 失败重试 (AC41)
+    - D7-S2-A06-T13    # 并发 terminal 通知幂等 (AC42)
+    # Phase 4: Tool 面 (AC48)
+    - D7-S5-A02-T02    # Alias 行为等价性 (AC48)
+    # Phase 7: v2.1 跨会话 (AC30-32, AC49-50)
+    - D7-S1-A10-T01    # QueryHistoricalWorkPlan
+    - D7-S1-A10-T02    # Lock 运行时 enforcement (AC49)
+    - D7-S1-A11-T01    # InheritWorkContext
+    - D7-S1-A11-T02    # 链式继承追溯 (AC50)
+    # Phase 8: v3.0 自演化 (AC33-36, AC51-52)
+    - D7-S6-A01-T01    # AdaptThreshold 收敛
+    - D7-S6-A01-T02    # 冷启动降级 (AC51)
+    - D7-S6-A01-T03    # 阈值振荡防止 (AC52)
+    - D7-S6-A02-T01    # ExtractTemplate
+    - D7-S6-A03-T01    # OptimizeStructure
 
 version_scope:
   v1.0:
@@ -51,23 +121,52 @@ version_scope:
       - "WorkItem + WorkTree 核心模型与 DiskWorkItemStore v2"
       - "TaskManager 委托 WorkTree（legacy Task 兼容）"
       - "v1 Task JSON 自动迁移"
+      - "CI static analysis 防产权侵蚀（AC23）"
     status: planned
   v1.1:
     features:
       - "Session goal + delegate/plan 写 parent_id"
       - "todo_write → checklist 子节点"
       - "Wave TaskNode → WorkItem 视图"
+      - "Code Owner Bot（AC24）"
     status: planned
   v1.2:
     features:
-      - "RunRegistry 挂接 WorkItem.RunRef（依赖 DM-011）"
+      - "RunRegistry 挂接 WorkItem.RunRef（依赖 DM-011 Phase 1）"
       - "QueryWorkPlan 树形读模型"
+      - "季度 Property Rights Audit（AC25）"
+    status: planned
+  v1.5:
+    features:
+      - "最小递归引擎 — RunTurn 单层 focus→decompose→spawn→await→continue"
+      - "基础 uncertainty（LLM claim only）"
+      - "task_await 基础实现"
+      - "depth=1 硬编码（单层递归）"
+    note: "⭐ 新增里程碑：让 WorkTree 从静态树变成活的任务循环"
     status: planned
   v2.0:
     features:
       - "task_write/spawn/await/list tool rename（alias 期）"
-      - "Uncertainty 驱动 decompose + focus resolver"
+      - "多层递归 decompose（depth ≤ 3）"
+      - "Uncertainty Anchor 机制（AC27）"
+      - "递归深度/宽度约束（AC20-22）"
       - "删 legacy flat Task / TaskNode / sc.Todos"
+    status: planned
+  v2.1:
+    features:
+      - "跨 Session WorkItem 只读查询"
+      - "历史 WorkItem lock 协议"
+      - "跨 Session mutable 引用 + arbitration"
+      - "飞书卡片历史任务摘要"
+    note: "任务生命周期超越单 Session"
+    status: planned
+  v3.0:
+    features:
+      - "自适应 Uncertainty 阈值（基于用户/项目历史学习）"
+      - "WorkItem Kind 自动检测 + 提议协议"
+      - "跨项目任务模板提取与复用"
+      - "WorkTree 结构自优化（terminal 率反馈）"
+    note: "任务系统从静态机制设计进化为学习的机制设计"
     status: planned
 
 external_dependencies:
@@ -77,6 +176,12 @@ external_dependencies:
     status: available
   - component: "DM-20260617-008 workmodel 显式注入（无 GlobalTaskManager）"
     status: available
+
+analysis:
+  gaming: gaming-analysis.md              # 终态任务架构博弈论分析 (2026-06-18, Claude)
+  review: review-gametheory-worktree.md   # Codex (MiniMax-M3) 审查 (2026-06-18)
+  response: gaming-analysis-response.md   # Claude 对 Codex 审查的观点 (2026-06-18)
+  consensus: gaming-analysis-bilateral-consensus.md  # 双边共识 (2026-06-18)
 
 related_changes:
   - devrix-unified-task-registry
