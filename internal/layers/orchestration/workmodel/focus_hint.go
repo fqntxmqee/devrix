@@ -47,5 +47,9 @@ func (p *FocusHintProvider) FocusHint(_ context.Context, sessionID string) strin
 	if running > 0 {
 		b.WriteString(" Consider task_await for in-progress children before spawning duplicates.")
 	}
+	if hint := ResolveHint(sessionID, p.Manager, focus); hint != "" {
+		b.WriteString(" ")
+		b.WriteString(hint)
+	}
 	return b.String()
 }
