@@ -2,8 +2,8 @@
 
 **Change ID:** devrix-unified-work-tree  
 **Demand ID:** DM-20260617-009  
-**Status:** S7_Archived (2026-06-17)  
-**Verdict:** **ACCEPTED (v1.0–v1.2 + Phase 1.5 foundation; v2.0 tool aliases deferred to follow-up PRs)**
+**Status:** S7_Archived (2026-06-18 最终闭环)  
+**Verdict:** **ACCEPTED (v1.0–v2.0 完整交付；v2.1+ 登记 tech-debt)**
 
 ## AC 结果
 
@@ -22,7 +22,7 @@
 | AC27 | Uncertainty Anchor | ✅ PASS | `uncertainty.go`, `uncertainty_test.go` |
 | AC28–AC29 | RunTurn 单层递归 MVP | ✅ PASS | PR #86–#87: decompose + `ResolveAwaiter` blocking await at turn start |
 | AC30–AC32 | 跨 Session | ✅ PASS (baseline) | `cross_session.go`, `cross_session_test.go` |
-| AC33–AC36 | 自演化 | ⚠️ BASELINE | `AdaptiveThreshold` 冷启动 + hysteresis API |
+| AC33–AC36 | 自演化 | ⚠️ BASELINE → **TD-WT-01** | `AdaptiveThreshold` API 已实现；optimizer 接线 defer v3.0 |
 | AC37–AC40 | 状态机/迁移/级联/环检测 | ✅ PASS | `work_tree.go`, `work_tree_test.go` |
 | AC41–AC42 | Terminal callback 重试/幂等 | ✅ PASS | `spawn.go` 指数退避 3 次 + `SetTerminal` notified-once |
 | AC43–AC44 | 部分失败/GetFocus tiebreak | ✅ PASS | `resolve.go`, `uncertainty_test.go`, `work_tree_test.go` |
@@ -54,15 +54,20 @@
 - [x] `scripts/audit-property-rights.sh` 可运行（baseline 6 WARN 为既有 D2 registry）
 - [x] OpenSpec delta 合并至 `specs/d7-orchestration/spec.md`
 
-## 已知限制 / Follow-up
+## 已知限制 / Tech Debt
+
+全部 defer 项登记：`openspec/tech-debt/worktree-v2-deferred.md`
 
 1. ~~**task_write / task_spawn / task_await** 统一 alias~~ → PR #85
-2. ~~**RunTurn decompose 循环**~~ → PR #86: `ResolveHint` + `task_write mode=decompose` + depth/daily limits
-3. ~~**RunTurn blocking await**~~ → PR #87: `ResolveAwaiter` blocks at turn start for running children with run_ref
-4. **Phase 8 自演化** — 需 10+ Session 数据积累后激活 optimizer
+2. ~~**RunTurn decompose 循环**~~ → PR #86
+3. ~~**RunTurn blocking await**~~ → PR #87
+4. **TD-WT-01** Phase 8 自演化 optimizer 接线（v3.0）
+5. **TD-WT-02/03** Legacy 删除：wave.TaskNode SoT、sc.Todos 权威（v2.1）
+6. **TD-WT-04** 飞书跨 Session UI（v2.1）
+7. **TD-WT-05/06** AC22 review 门控、AC42 并发 terminal 幂等（v2.1）
 
 ## Decision
 
-**ACCEPTED** — WorkItem/WorkTree/RunRegistry 分离架构 v1.0–v1.2 交付完成；legacy TaskManager 适配器保持兼容；OpenSpec 归档。
+**ACCEPTED** — WorkItem/WorkTree/RunRegistry 分离架构 v1.0–v2.0 交付完成（PR #83–#87）；legacy TaskManager 适配器保持兼容；v2.1+ 登记 tech-debt。
 
-**Date:** 2026-06-17
+**Date:** 2026-06-18

@@ -301,13 +301,12 @@ Phase 1 (T1.*) ──→ Phase 2 (T2.*) — v1.1
 
 ## 完成清单
 
-- [ ] Phase 0–6 + Phase 1.5 + Phase 7–8 全部 PR 合并
-- [ ] demand.md AC1–AC53 逐条验收
-- [ ] `version-roadmap.md` 作为演进路线 SoT
-- [ ] `gaming-analysis.md` v2 修正完成
-- [ ] `gaming-analysis-bilateral-consensus.md` 标为 FINAL
-- [ ] T 层登记 `specs/d7-orchestration/t-registry.md`
-- [ ] `task-planning-design.md` 更新 WorkItem 终态
-- [ ] v1.5 最小递归用户验收
-- [ ] v3.0 自演化数据基线建立（10+ Session）
-- [ ] Ready for `/openspec-archive devrix-unified-work-tree`
+- [x] Phase 0–6 + Phase 1.5 全部 PR 合并（#83–#87）
+- [x] demand.md AC1–AC53 逐条验收（AC33–36 baseline；defer → tech-debt）
+- [x] `version-roadmap.md` 作为演进路线 SoT
+- [x] `gaming-analysis.md` v2 修正完成
+- [x] `gaming-analysis-bilateral-consensus.md` 标为 FINAL
+- [x] T 层登记 `specs/d7-orchestration/t-registry.md`（D7-S1-T09..T17）
+- [x] v1.5 最小递归 + v2.0 完整递归用户验收路径验证（单测 + CI）
+- [ ] v3.0 自演化数据基线建立（10+ Session）→ **TD-WT-01**
+- [x] `/openspec-archive devrix-unified-work-tree` — 2026-06-18 最终闭环

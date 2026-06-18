@@ -5,7 +5,7 @@ meta:
   change_id: devrix-unified-work-tree
   demand_id: DM-20260617-009
   title: "Unified Work Tree — 工作单元树 + 递归求解终态"
-  status: s3_gate_passed
+  status: s7_archived
   priority: P1
   owner: devrix-team
   created_at: "2026-06-17"
@@ -20,6 +20,9 @@ analysis_status:
   dsaft_coverage_audit: completed  # 2026-06-18 S3 覆盖审计，AC37-AC53 新增 17 条
   s3_gate_review: passed           # 2026-06-18 Grill Review, 0 blockers, 4 suggestions
   ready_for_s4: true
+  s7_archived: "2026-06-18"
+  prs: [#83, #84, #85, #86, #87]
+  tech_debt: openspec/tech-debt/worktree-v2-deferred.md
 
 scope:
   domains: [D7, D2, D4]
