@@ -59,6 +59,11 @@ func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	}
 	// VerifySurface is stateless — always safe to add.
 	out = append(out, surface.NewVerifySurface())
+	// AskUserQuestionSurface (DM-20260618-006 devrix-ask-user-question) is
+	// stateless — always safe to add. Sender is wired separately by
+	// bootstrap via SetAskUserQuestionSender so the surface can run
+	// without a gateway (e.g. in unit tests).
+	out = append(out, surface.NewAskUserQuestionSurface())
 	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
 
 	// TOOL-SURFACE-1-A02: build the deferred-tool catalog for

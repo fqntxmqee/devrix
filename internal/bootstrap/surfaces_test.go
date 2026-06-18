@@ -104,22 +104,23 @@ func TestBuildSurfaces_FullDeps_AlphabeticalOrder(t *testing.T) {
 	for i, s := range surfaces {
 		got[i] = s.Name()
 	}
-	want := []string{"free_fork", "lsp", "tool_search", "tracker", "verify"}
+	want := []string{"ask_user_question", "free_fork", "lsp", "tool_search", "tracker", "verify"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("BuildSurfaces order = %v, want %v", got, want)
 	}
 }
 
 // T: TOOL-SURFACE-1-T08 — BuildSurfaces with no opts: LSP + Verify +
-// ToolSearchSurface (the deferred-tool catalog). LSP is added
-// unconditionally so the LLM tool list is stable; Verify is stateless.
+// AskUserQuestion + ToolSearchSurface (the deferred-tool catalog). LSP
+// is added unconditionally so the LLM tool list is stable; Verify and
+// AskUserQuestion are stateless.
 func TestBuildSurfaces_OnlyStateless(t *testing.T) {
 	surfaces := BuildSurfaces(SurfaceBuildOpts{})
-	if len(surfaces) != 3 {
-		t.Fatalf("len = %d, want 3 (lsp + verify + tool_search)", len(surfaces))
+	if len(surfaces) != 4 {
+		t.Fatalf("len = %d, want 4 (lsp + ask_user_question + verify + tool_search)", len(surfaces))
 	}
 	names := surfaceNames(surfaces)
-	want := []string{"lsp", "tool_search", "verify"}
+	want := []string{"ask_user_question", "lsp", "tool_search", "verify"}
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("names = %v, want %v", names, want)
 	}

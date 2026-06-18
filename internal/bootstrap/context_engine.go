@@ -67,6 +67,10 @@ func NewContextEngine(
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
 	}
+	// task_create/get/list/update/delete are provided by workmodel.RegisterTaskTools
+	// when ctxCfg.Tasks.Mode == "v2" (see devrix.yaml). The v2 path is the
+	// production task lifecycle surface and already supports owner /
+	// blocked_by / dependencies. No additional registration is needed here.
 	if ctxCfg.TodoWrite.Enabled {
 		if err := toolReg.Register(contextengine.NewTodoWriteRunner()); err != nil {
 			slog.Error("register todo_write", "error", err)
