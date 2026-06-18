@@ -139,6 +139,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if err := enforce.RegisterBackgroundTaskTools(toolReg); err != nil {
 		slog.Error("register background task tools", "error", err)
 	}
+	// task_create/get/list/update/delete are provided by workmodel.RegisterTaskTools
+	// when ctxCfg.Tasks.Mode == "v2" (see devrix.yaml). No additional
+	// registration is needed here — see context_engine.go for the full note.
 	if b.ctxCfg.TodoWrite.Enabled {
 		if err := toolReg.Register(contextengine.NewTodoWriteRunner()); err != nil {
 			slog.Error("register todo_write", "error", err)

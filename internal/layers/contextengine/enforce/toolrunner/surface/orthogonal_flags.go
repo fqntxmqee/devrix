@@ -31,6 +31,7 @@ import (
 //	verify_plan_execution | Y |    N      |     N     |       N
 //	delegate_*   |    N     |      N      |     Y     |       N
 //	task_output  |    Y     |      N      |     N     |       Y
+//	ask_user_question | Y  |      N      |     Y     |       N
 //
 // Tools not in the table get all-false (the conservative default; the
 // surface MUST still emit a non-zero bool combination, so callers SHOULD
@@ -60,6 +61,8 @@ func OrthogonalFlagFor(toolName string) (readOnly, destructive, openWorld, concu
 		return false, false, true, false
 	case "query_diagnostics":
 		return true, false, false, true
+	case "ask_user_question":
+		return true, false, true, false
 	case "verify_plan_execution":
 		return true, false, false, false
 	}
@@ -75,15 +78,20 @@ func OrthogonalFlagFor(toolName string) (readOnly, destructive, openWorld, concu
 }
 
 // InterruptBehaviorFor returns the InterruptMode for a given tool name.
-// Only long-run tools (free_fork, delegate_*) opt into InterruptCancel.
-// Everything else (and unknown names) is InterruptBlock.
+// Only long-run tools (free_fork, delegate_*, ask_user_question) opt
+// into InterruptCancel. Everything else (and unknown names) is
+// InterruptBlock.
 //
 // TOOL-SURFACE-1-A01-F05 (DM-20260618-001): the surface MUST return this
 // from InterruptBehavior and (for InterruptCancel) select on ctx.Done()
 // inside Execute.
+//
+// ask_user_question (DM-20260618-006) opts into InterruptCancel so the
+// D7 runLoop can abort a pending question when the user issues a new
+// message mid-turn.
 func InterruptBehaviorFor(toolName string) contracts.InterruptMode {
 	switch toolName {
-	case "free_fork":
+	case "free_fork", "ask_user_question":
 		return contracts.InterruptCancel
 	}
 	if hasPrefix(toolName, "delegate_") {

@@ -23,6 +23,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
 	"github.com/devrix/devrix/internal/layers/orchestration/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -244,6 +245,25 @@ func main() {
 	transcriptWriter := bootstrap.NewTranscriptWriter(ctxCfg)
 	gw := capture.NewCommunicationGateway(sessionStore, eventHandler, permissionMgr, commCfg, transcriptWriter)
 	gw.SetObservability(obs)
+
+	// DM-20260618-006 (devrix-ask-user-question): wire the
+	// ask_user_question surface's sender to the gateway's outbound path.
+	// The surface itself is mounted by bootstrap.BuildSurfaces (see
+	// internal/bootstrap/surfaces.go); this is the bridge that lets the
+	// tool push a formatted question to the user's IM chat.
+	asksurface.SetAskUserQuestionSender(func(ctx context.Context, sessionID, text string) error {
+		return gw.RouteOutbound(&types.OutboundMessage{
+			MessageID: "ask_" + sessionID + "_" + time.Now().UTC().Format("20060102T150405.000"),
+			SessionID: sessionID,
+			Content:   text,
+			Role:      types.MessageRoleAssistant,
+			Metadata: map[string]string{
+				"source":   "ask_user_question",
+				"blocking": "false",
+			},
+			SentAt: time.Now().UTC(),
+		})
+	})
 
 	// DM-20260617-008 W4: TaskManager constructed once at startup and
 	// shared with InitOrchestration (NewLocalWorkModel + WithTaskManager),
