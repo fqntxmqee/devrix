@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-tools-terminal-architecture
 **Demand ID:** DM-20260618-007
-**Status:** S2_Resolved（R2 博弈论 Review 100% 共识达成，2026-06-18）
+**Status:** S7_Archived（W17 验收通过，2026-06-18）
 
 ---
 

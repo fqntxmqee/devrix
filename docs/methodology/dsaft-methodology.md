@@ -377,6 +377,80 @@ type ToolFilter interface {
 
 满足 ≥3 条 → 启动 Facet Decomposition 拆面契约定型。
 
+### 12.6 LTL-Lite 不变式规约（Cross-Cutting Constraint DSL）
+
+**背景**：拆面后 5+ ToolSurface 各自有 invariant，但跨 surface 的"前置条件满足 → 后置条件成立"约束散落在代码各处，缺乏统一表达 + 静态校验 + 运行时强制。
+
+**LTL-Lite** = 简化版线性时序逻辑，仅保留"pre → post"条件约束（无 G/F/U 操作符），覆盖 devrix 90% 跨切面场景。
+
+**实现**（DM-20260618-007 W14-W15）：
+
+```go
+// 1. 编译期 DSL: Go struct tag
+type lspSurfaceInvariants struct {
+    TypedMethod       string `invariant:"is_typed_method => typed_only"`
+    ReadOnlyFlag      string `invariant:"read_only => no_destructive"`
+    ConcurrencySafety string `invariant:"is_concurrent_safe => single_call_idempotent"`
+    LowRisk           string `invariant:"low_risk => no_destructive"`
+}
+
+// 2. 编译期 parse: reflect 抽 tag,生成 InvariantSet
+set, _ := ltllite.ParseStruct(lspSurfaceInvariants{})
+
+// 3. 运行时 check: state 评估
+state := ltllite.MapState{"is_typed_method": true, "typed_only": true}
+violations := ltllite.Check(set, state)
+if len(violations) > 0 {
+    return fmt.Errorf("LTL violation: %v", violations)
+}
+
+// 4. CI lint: 跨 _invariant.go 冲突检测 + 缺文件 warning
+// go run ./tools/ci-lint-invariant -roots ./internal/layers/...
+```
+
+**5 surface _invariant.go**（每个 surface 一份）：
+
+| Surface | 文件 | Invariant 主题 |
+|---------|------|---------------|
+| LSP | `surface/lsp_surface_invariant.go` | typed_method/read_only/concurrency_safe/low_risk |
+| Bash | `surface/bash_surface_invariant.go` | deny_rules/policy_integrated/permission_hook/risk_not_low |
+| Tracker | `observability/diagnose/tracker/_invariant.go` | lru_cap/linter_routed/watch_consistent/recent_bounded |
+| FreeFork | `multiagent/provision/freefork/_invariant.go` | concurrency/worktree_isolated/rollback_on_failure/handle_terminates |
+| Verify | `evolution/verify/_invariant.go` | read_only/evidence_routed/skipped_separated/report_schema |
+
+**turn_adapter HookRegistry**（W15 续 跨切面执行点）：
+
+```go
+type HookRegistry struct { ... }
+func (r *HookRegistry) Register(h SurfaceHook)
+func (r *HookRegistry) Prepare() error              // 全量 invariant check
+func (r *HookRegistry) BeforeExecute(surfaceName) error  // 单 surface 定向重检
+func (r *HookRegistry) PrepareTimed() (time.Duration, error)  // 含 latency 监控
+```
+
+调用时机：
+
+- **Prepare** — turn 开始前，violation → wrapped `ErrInvariantViolation` 立即中止
+- **BeforeExecute** — 每个 surface.Execute 前重检，节省时间（不跑全量）
+- **性能 bound** — ≤5ms/1000 invariants (spec §LTL-Lite Self-Invariants)
+
+**ci-lint-invariant**（CI 静态校验）：
+
+```bash
+go run ./tools/ci-lint-invariant \
+    -roots ./internal/layers/contextengine/enforce/toolrunner/surface,./internal/layers/multiagent/provision/freefork,./internal/layers/observability/diagnose/tracker,./internal/layers/evolution/verify \
+    -fail-on-warn
+```
+
+检测项：
+- 每个 `_invariant.go` 文件存在（缺文件 → warning）
+- 每个 invariant tag 格式合法（含 `=>`）
+- 跨 surface 同名 invariant 不同 post → conflict warning
+- 退出码：0 全过 / 1 error / 2 warn (with -fail-on-warn)
+
+参考 OpenSpec change: `openspec/changes/devrix-tools-terminal-architecture/` (DM-20260618-007).
+参考实现: `internal/shared/ltllite/`, `internal/layers/orchestration/turn_adapter/ltl_hook.go`.
+
 ---
 
 *DSAFT 架构方法论 v4.0.0 — D 领域 / S 场景 / A 活动 / F 功能点 / T 测试点*

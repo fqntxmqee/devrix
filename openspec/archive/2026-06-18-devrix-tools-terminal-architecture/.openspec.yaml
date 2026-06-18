@@ -1,7 +1,7 @@
 change_id: devrix-tools-terminal-architecture
 priority: P0
 demand_id: DM-20260618-007
-status: s4_implementation
+status: s7_archived
 domains: [D2, D3, D4, D5, D6, D7]
 dsaft_scenarios:
   - D2-S16  # RunQueryLoop → StreamingToolExecutor 混合批次

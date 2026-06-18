@@ -84,6 +84,7 @@
 | **DM-20260618-002** | **Per-tool CheckPermission 钩子 + IPermissionGate.ToolPolicy + BashAST + PlanMode** | **devrix-surface-permission-extension** | **2026-06-18** | **[#68](https://github.com/fqntxmqee/devrix/pull/68)** | **ACCEPTED (6 新 P0 T 点 T26-T29 + PERMISSION-GATE-1-T01/T02 全部 IMPLEMENTED; 既有 15 P0 T 点保持 PASS; 7 surface 实现 CheckPermission=Allow; BashASTPolicy 5 deny rules 拒危险 cmd; PlanModeOpenWorldPolicy 在 plan_mode+OpenWorld+not-allowlist 时 deny; turn_adapter 2-phase dispatch + indexed write-back; capture.PermissionManager.CheckPermission 补齐 Risk→Decision 映射; rebase onto #70 (DM-20260618-003) 合并后冲突全部解决; CI unit/integration/layer-lint/coverage 全 SUCCESS)** |
 | **DM-20260618-003** | **ToolSpec.DeferLoading + ToolFilter.ShouldDefer + ToolSearchSurface + zodgen (LLM prompt 懒加载)** | **devrix-surface-lazy-loading** | **2026-06-18** | **[#70](https://github.com/fqntxmqee/devrix/pull/70)** | **ACCEPTED (5 新 P0 T 点 T26-T30 全部 IMPLEMENTED; 静态 DeferLoading 标记 + runtime DeferDecision 链 + ToolSearchSurface (top-5) + turn_adapter.Prepare 过滤 + PlanModeOpenWorldPolicy.ShouldDefer + zodgen Go struct → JSON Schema; anthropic stub v1.1 占位; 6 hardcoded defer-by-default (delegate_*, task_output_background); 7 surface + 3 filter wiring; CI unit/integration/layer-lint/coverage 全 SUCCESS)** |
 | **DM-20260618-006** | **ask_user_question ToolSurface — LLM 主动 IM 多选提问 (非阻塞)** | **devrix-ask-user-question** | **2026-06-18** | **[#75](https://github.com/fqntxmqee/devrix/pull/75)** | **ACCEPTED (12 单测 T01-T12 全 PASS; ask_user_question 沿用 TOOL-SURFACE-1 4 方法 interface + InterruptCancel; sender 桥接到 gw.RouteOutbound; BuildSurfaces 排序稳定; 9 AC PASS; hotfix 发现 v2 workmodel task_* 工具已覆盖用户 B 需求,回滚冗余 task_lifecycle 代码,0 新增达成)** |
+| **DM-20260618-007** | **终端侧工具链架构 — 5 Surface × 跨切面 LTL-Lite 不变式规约** | **devrix-tools-terminal-architecture** | **2026-06-18** | **[#76](https://github.com/fqntxmqee/devrix/pull/76)** | **ACCEPTED (17 W 全部推送: W0 infra / W1-3 LSP 5 typed spec / W4-5 BashAST fail-closed + 22+ zsh rules / W6-7 tracker LRU + linter / W8-10 freefork 3-way + worktree / W11-12 verify parser + executor + aggregator / W13 tool_stream / W14-15 ltllite 框架 + 5 surface _invariant.go + ci-lint-invariant + turn_adapter HookRegistry / W16 全量回归 99 packages + integration/smoke tagged 100 packages / W17 验收 + 归档; 27 AC 全 PASS (7 P0 + 20 P1); 25 个 T 点全 IMPLEMENTED 平均覆盖率 ≥ 85%; 99 packages go test -race 全绿; 5 _invariant.go / 20 invariants / 0 conflict; 5-step IM E2E 全过)** |
 
 ## Archive Locations
 
@@ -165,6 +166,7 @@
 | **devrix-tool-spec-enrichment** | **`openspec/archive/2026-06-18-devrix-tool-spec-enrichment/`** |
 | **devrix-surface-permission-extension** | **`openspec/archive/2026-06-18-devrix-surface-permission-extension/`** |
 | **devrix-surface-lazy-loading** | **`openspec/archive/2026-06-18-devrix-surface-lazy-loading/`** |
+| **devrix-tools-terminal-architecture** | **`openspec/archive/2026-06-18-devrix-tools-terminal-architecture/`** |
 | devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
