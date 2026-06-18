@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -992,6 +993,122 @@ func TestOrchestrator_RunTurn_SameOrchestratorForMainAndSubQuery(t *testing.T) {
 
 	if callCount.Load() != 2 {
 		t.Errorf("expected 2 total LLM calls, got %d", callCount.Load())
+	}
+}
+
+// Regression: complete event must surface the final LLM-generated text on its
+// Content field so IM adapters (Feishu cardkit streaming finalize, CLI plain
+// stdout) can render the conclusion even when LLM produced no interleaved text
+// chunks (e.g. thinking model that only emits a Done marker). See feishu.go
+// OnMessage case "complete" → finalizeStructuredSession.
+func TestOrchestrator_RunTurn_CompleteCarriesFinalText_NoTools(t *testing.T) {
+	const wantText = "make lint 通过，无违规"
+
+	// Simulate thinking model: only Done chunk, no Content chunks.
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		thinkingChunk("analyzing lint output..."),
+		doneChunk(),
+	}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: &stubTools{}, Persist: &stubPersist{}, MaxTurns: 4,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-no-text",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "run lint"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+			break
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	// Boundary: even when LLM emits no Content chunks, the empty finalText is
+	// forwarded on the event (semantic: "no summary text"). Adapter side then
+	// falls back to thinking buffer / last tool_result.
+	if complete.Content != "" {
+		t.Errorf("complete.Content = %q, want empty (no text chunks in this scenario)", complete.Content)
+	}
+	if complete.SessionID != "sess-no-text" {
+		t.Errorf("complete.SessionID = %q, want sess-no-text", complete.SessionID)
+	}
+}
+
+// Regression: MaxTurns-exceeded path must emit a complete event whose Content
+// carries the LAST iteration's accumulated LLM text. Previously the finalText
+// was reset to "" at the end of each iteration, so MaxTurns emits were empty
+// and IM adapters showed no conclusion card.
+func TestOrchestrator_RunTurn_CompleteCarriesLastIterationText_MaxTurns(t *testing.T) {
+	const lastIterText = "third attempt summary"
+
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 4)
+		switch n {
+		case 1:
+			ch <- textChunk("first iter ")
+		case 2:
+			ch <- textChunk("second iter ")
+		case 3:
+			ch <- textChunk(lastIterText)
+		}
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: "{}"}},
+			Done:      true,
+			Usage:     llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "tx", Output: "ok"}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: persist, MaxTurns: 3,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-maxtext",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "loop"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	if turnIdx.Load() != 3 {
+		t.Fatalf("expected 3 LLM calls (MaxTurns), got %d", turnIdx.Load())
+	}
+
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+			break
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event after MaxTurns")
+	}
+	if !strings.Contains(complete.Content, lastIterText) {
+		t.Errorf("complete.Content = %q, want substring %q (last iteration's text)", complete.Content, lastIterText)
+	}
+	// Verify previous iteration's text is NOT present (finalText must be the
+	// last iteration's value, not an accumulator).
+	if strings.Contains(complete.Content, "first iter") {
+		t.Errorf("complete.Content should not contain earlier iteration's text, got %q", complete.Content)
 	}
 }
 
