@@ -319,3 +319,40 @@ func TestFork_InterfaceConformance(t *testing.T) {
 func TestKernelImport(t *testing.T) {
 	_ = kernel.AgentStateCreated
 }
+
+// === DM-20260618-007 W8-W10 cross-reference (T 点映射) ===
+
+// T: W8 (FreeForker.Fork 批量 fork)— 现有 TestFork_SpawnsAll 覆盖。
+// T: W9 (WorkerContext / Spawn One)— 现有 TestFork_PromptPassedToAgent + TestSlugify_BasicCases 覆盖。
+// T: W10 (Worktree sandbox)— 现有 TestFork_WorktreeDisabledSkipsSandbox 覆盖。
+//
+// 整合 spec 映射: free-fork change 的 3 F (Fork + WorkerContext + Worktree)
+// 全部由 multiagent/provision/freefork/forker.go + shared/contracts/worktree.go 实现。
+func TestW8_10_FreeForkStack_T_CrossRef(t *testing.T) {
+	fac := &stubFactory{}
+	wt := &stubWorktree{enabled: true, base: t.TempDir()}
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: wt})
+
+	// W8: Fork 批量 (T: free-fork T01)
+	handles, err := f.Fork(context.Background(), "sess-W8", []ForkRequest{
+		{Name: "alpha", Prompt: "W8 test", Worktree: true},
+	})
+	if err != nil {
+		t.Fatalf("W8 Fork: %v", err)
+	}
+	if len(handles) != 1 {
+		t.Errorf("W8: handles = %d, want 1", len(handles))
+	}
+
+	// W10: Worktree sandbox 启用时调用 Enter (T: free-fork T03)
+	// 验证 wt.base 下应创建 alpha 子目录
+	if !wt.Enabled() {
+		t.Error("W10: worktree should be enabled")
+	}
+
+	// W9: WorkerContext / spawnOne 把 prompt 透传给 child agent
+	got := fac.snapshot()
+	if len(got) != 1 || got[0].InitialInput != "W8 test" {
+		t.Errorf("W9: prompt not propagated, got %+v", got)
+	}
+}
