@@ -3,11 +3,7 @@
 **Change ID:** `devrix-unified-work-tree`  
 **Demand ID:** DM-20260617-009  
 **Created:** 2026-06-17  
-<<<<<<< HEAD:openspec/archive/2026-06-17-devrix-unified-work-tree/proposal.md
 **Status:** S7_Archived (2026-06-17)
-=======
-**Status:** S3_Gate_Passed
->>>>>>> origin/master:openspec/changes/devrix-unified-work-tree/proposal.md
 
 ---
 
