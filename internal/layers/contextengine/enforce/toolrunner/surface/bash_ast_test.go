@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/bash"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
 )
 
@@ -71,5 +72,79 @@ func TestBashASTPolicy_MultiStatement_DenyStillApplies(t *testing.T) {
 	decision, reason := p.Check("ls -la; rm -rf /")
 	if string(decision) != "deny" {
 		t.Errorf("multi-statement deny: decision = %q, want deny (reason=%q)", decision, reason)
+	}
+}
+
+// T: W5-TOOL-SEC-2-A02-T06 — BashASTPolicy v2 (with bash.Policy) 拒绝 zsh 攻击面。
+// 验证集成 sandboxast 后能拦 zmodload / preexec / autoload 等。
+func TestBashASTPolicy_V2_DenyZshAttack(t *testing.T) {
+	bp := bash.NewPolicy()
+	p := surface.NewBashASTPolicyWithBashPolicy(bp)
+	for _, cmd := range []string{
+		"zmodload zsh/sys",
+		"preexec() { echo running }",
+		"autoload -U compinit",
+		"echo *(.)",
+	} {
+		decision, reason := p.Check(cmd)
+		if string(decision) != "deny" {
+			t.Errorf("zsh attack not denied: %q; decision=%q reason=%q", cmd, decision, reason)
+		}
+	}
+}
+
+// T: W5 — BashASTPolicy v2 拒绝危险词 (eval / exec / sudo / chmod / xargs)。
+func TestBashASTPolicy_V2_DenyDangerousWords(t *testing.T) {
+	bp := bash.NewPolicy()
+	p := surface.NewBashASTPolicyWithBashPolicy(bp)
+	for _, cmd := range []string{
+		"eval $user_input",
+		"exec /bin/sh",
+		"sudo cat /etc/shadow",
+		"chmod 777 /",
+		"xargs rm -rf",
+	} {
+		decision, _ := p.Check(cmd)
+		if string(decision) != "deny" {
+			t.Errorf("dangerous word not denied: %q; decision=%q", cmd, decision)
+		}
+	}
+}
+
+// T: W5 — BashASTPolicy v2 fail-closed (parse error → Deny, 非 Ask)。
+func TestBashASTPolicy_V2_FailClosedOnParseError(t *testing.T) {
+	bp := bash.NewPolicy()
+	p := surface.NewBashASTPolicyWithBashPolicy(bp)
+	decision, reason := p.Check("echo 'unterminated")
+	if string(decision) != "deny" {
+		t.Errorf("v2 fail-closed: decision = %q, want deny (reason=%q)", decision, reason)
+	}
+	if !strings.Contains(reason, "parse") {
+		t.Errorf("reason should mention parse, got %q", reason)
+	}
+}
+
+// T: W5 — BashASTPolicy v2 良性命令仍 Allow (向后兼容 v1)。
+func TestBashASTPolicy_V2_AllowsBenign(t *testing.T) {
+	bp := bash.NewPolicy()
+	p := surface.NewBashASTPolicyWithBashPolicy(bp)
+	for _, cmd := range []string{
+		"ls -la /tmp",
+		"cat README.md | head -20",
+		"go test ./...",
+	} {
+		decision, _ := p.Check(cmd)
+		if string(decision) != "allow" {
+			t.Errorf("benign cmd denied: %q; decision=%q", cmd, decision)
+		}
+	}
+}
+
+// T: W5 — BashASTPolicy v2 包含 5 deny rules (v1 + v2 行为都生效)。
+func TestBashASTPolicy_V2_HasBothRuleSets(t *testing.T) {
+	bp := bash.NewPolicy()
+	p := surface.NewBashASTPolicyWithBashPolicy(bp)
+	if len(p.DenyList) != 5 {
+		t.Errorf("DenyList = %d, want 5 (v1 + v2 backward compat)", len(p.DenyList))
 	}
 }
