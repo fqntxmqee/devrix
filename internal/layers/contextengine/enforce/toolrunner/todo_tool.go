@@ -25,6 +25,16 @@ type todoWriteOutput struct {
 
 type todoWriteRunner struct{}
 
+// TodoSyncFunc syncs todos to WorkTree; returns projected todos for session context.
+type TodoSyncFunc func(sessionID string, todos []types.TodoItem) []types.TodoItem
+
+var globalTodoSync TodoSyncFunc
+
+// SetTodoSync wires D7 WorkTree sync from bootstrap.
+func SetTodoSync(fn TodoSyncFunc) {
+	globalTodoSync = fn
+}
+
 func NewTodoWriteRunner() *todoWriteRunner {
 	return &todoWriteRunner{}
 }
@@ -63,11 +73,14 @@ func (r *todoWriteRunner) Execute(ctx context.Context, workDir, input string) (*
 		}
 	}
 
-	// Full-snapshot replacement
+	// Full-snapshot replacement (+ optional WorkTree sync)
 	if len(req.Todos) == 0 {
 		sc.Todos = nil
 	} else {
 		sc.Todos = req.Todos
+	}
+	if globalTodoSync != nil && sc.SessionID != "" {
+		sc.Todos = globalTodoSync(sc.SessionID, sc.Todos)
 	}
 
 	// Update verification state

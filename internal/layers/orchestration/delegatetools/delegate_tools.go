@@ -11,6 +11,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
+	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -114,14 +116,28 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		ParentSC:     sc,
 		Role:         string(r.role),
 		Directive:    directive,
-		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive),
+		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role))),
 		WorktreeSlug: fields["worktree_slug"],
 		Async:        fields["async"] == "true",
 	}
 
+	runID, _ := runregistry.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
+
 	res, err := disp.Dispatch(ctx, req)
 	if err != nil {
+		if runID != "" && runregistry.Global != nil {
+			runregistry.Global.SetTerminal(runID, runregistry.StatusFailed, "", err.Error())
+		}
 		return &toolrunner.ToolResult{Error: err.Error()}, nil
+	}
+	if runID != "" && runregistry.Global != nil && !req.Async {
+		st := runregistry.StatusCompleted
+		errStr := ""
+		if res.Error != nil {
+			st = runregistry.StatusFailed
+			errStr = res.Error.Error()
+		}
+		runregistry.Global.SetTerminal(runID, st, res.Summary, errStr)
 	}
 
 	out := strings.TrimSpace(res.Summary)
@@ -162,7 +178,7 @@ func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*toolr
 	return &toolrunner.ToolResult{Output: string(data)}, nil
 }
 
-func resolveDelegateTaskID(sessionID, taskID, directive string) string {
+func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.WorkKind) string {
 	if id := strings.TrimSpace(taskID); id != "" {
 		return id
 	}
@@ -177,5 +193,19 @@ func resolveDelegateTaskID(sessionID, taskID, directive string) string {
 	if len(subject) > 120 {
 		subject = subject[:117] + "..."
 	}
-	return tm.Create(sessionID, subject, directive).ID
+	goal, _ := tm.EnsureGoal(sessionID, subject)
+	parentID := ""
+	if goal != nil {
+		parentID = goal.ID
+	}
+	item, err := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{
+		ParentID:  parentID,
+		Kind:      kind,
+		Title:     subject,
+		Directive: directive,
+	})
+	if err != nil || item == nil {
+		return tm.Create(sessionID, subject, directive).ID
+	}
+	return item.ID
 }

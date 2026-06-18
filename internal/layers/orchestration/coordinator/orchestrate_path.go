@@ -25,6 +25,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -39,10 +40,18 @@ type WaveSchedulerRunner interface {
 // OrchestratePath runs the D7-S5-A02 + D7-S3-A01 pipeline for
 // IntentOrchestrate messages.
 type OrchestratePath struct {
-	decomposer *TaskDecomposer
-	scheduler  WaveSchedulerRunner
-	sink       EventPublisher
-	obsBridge  *observability.Bridge
+	decomposer  *TaskDecomposer
+	scheduler   WaveSchedulerRunner
+	sink        EventPublisher
+	obsBridge   *observability.Bridge
+	taskManager *workmodel.TaskManager
+}
+
+// SetTaskManager wires WorkTree sync for wave nodes.
+func (op *OrchestratePath) SetTaskManager(tm *workmodel.TaskManager) {
+	if op != nil {
+		op.taskManager = tm
+	}
 }
 
 // SetObsBridge wires tracing for the orchestrate pipeline.
@@ -106,6 +115,12 @@ func (op *OrchestratePath) Run(ctx context.Context, req ProcessRequest, _ Intent
 			emitError(ctx, op.sink, out, req.SessionID, "validate_task_graph",
 				fmt.Errorf("graph invalid: %v", result.Validation.Errors))
 			return
+		}
+		if op.taskManager != nil {
+			if _, err := op.taskManager.SyncWaveNodes(req.SessionID, result.Nodes); err != nil {
+				emitError(ctx, op.sink, out, req.SessionID, "worktree_sync", err)
+				return
+			}
 		}
 		emit(ctx, op.sink, out, &contracts.EngineEvent{
 			Type:      "plan_formed",

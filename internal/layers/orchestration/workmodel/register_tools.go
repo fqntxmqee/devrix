@@ -67,7 +67,7 @@ func (r *taskToolRunner) Schema() toolrunner.ToolSchema {
 			Parameters: `{"type":"object","required":["task_id"],"properties":{"task_id":{"type":"string"}}}`,
 		}
 	case taskActionList:
-		return toolrunner.ToolSchema{Name: r.name, Description: "List all tasks for the session", Parameters: `{"type":"object","properties":{}}`}
+		return toolrunner.ToolSchema{Name: r.name, Description: "List all tasks for the session", Parameters: `{"type":"object","properties":{"format":{"type":"string","enum":["flat","tree"]}}}`}
 	default:
 		return toolrunner.ToolSchema{
 			Name: r.name, Description: "Update a task",
@@ -92,6 +92,7 @@ func (r *taskToolRunner) Execute(ctx context.Context, _, input string) (*toolrun
 		Status:      fields["status"],
 		Owner:       fields["owner"],
 		BlockedBy:   fields["blocked_by"],
+		Format:      fields["format"],
 	})
 	if err != nil {
 		return &toolrunner.ToolResult{Error: err.Error()}, nil

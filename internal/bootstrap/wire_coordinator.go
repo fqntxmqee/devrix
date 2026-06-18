@@ -12,6 +12,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -94,6 +96,9 @@ func InitOrchestration(
 	// NewLocalWorkModel + NewSessionOrchestrator (via WithTaskManager).
 	// Replaces workmodel.GlobalTaskManager process-wide singleton.
 	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
+	runregistry.SetGlobal(runregistry.NewRegistry("~/.devrix/runs"))
+	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
+	toolrunner.SetTodoSync(todoBackend.Sync)
 
 	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
 	// This replaces the legacy executor with the orchestration turn loop that
@@ -135,6 +140,7 @@ func InitOrchestration(
 		AgentTools: agentToolReg,
 		ObsBridge:  obsBridge,
 	})
+	orchPath.SetTaskManager(tm)
 
 	planMode := workmodel.NewPlanMode(newPlanLLMCompleter(llmInvoker, llmStack.DefaultModel), obsBridge)
 	toolExec := coordinator.NewTurnToolExecutor(ctxAdapter, orchPath, planMode, loopFirst)

@@ -18,14 +18,15 @@ func NewToolSuite(manager *TaskManager) *ToolSuite {
 
 // TaskToolInput is the input for task operations.
 type TaskToolInput struct {
-	SessionID string `json:"session_id"`
-	ToolName  string `json:"tool_name"`
-	TaskID    string `json:"task_id,omitempty"`
-	Subject   string `json:"subject,omitempty"`
+	SessionID   string `json:"session_id"`
+	ToolName    string `json:"tool_name"`
+	TaskID      string `json:"task_id,omitempty"`
+	Subject     string `json:"subject,omitempty"`
 	Description string `json:"description,omitempty"`
-	Status   string `json:"status,omitempty"`
-	Owner    string `json:"owner,omitempty"`
-	BlockedBy string `json:"blocked_by,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Owner       string `json:"owner,omitempty"`
+	BlockedBy   string `json:"blocked_by,omitempty"`
+	Format      string `json:"format,omitempty"`
 }
 
 // TaskToolOutput is the output from task operations.
@@ -104,8 +105,16 @@ func (t *ToolSuite) Get(_ context.Context, input TaskToolInput) (*TaskToolOutput
 	}, nil
 }
 
-// List returns all tasks for session.
+// List returns all tasks for session (optional format=tree).
 func (t *ToolSuite) List(_ context.Context, input TaskToolInput) (*TaskToolOutput, error) {
+	if input.Format == "tree" {
+		tree := t.manager.Tree().BuildTree(input.SessionID, "")
+		return &TaskToolOutput{
+			Success: true,
+			Message: fmt.Sprintf("Found %d root nodes", len(tree)),
+			Data:    tree,
+		}, nil
+	}
 	tasks := t.manager.List(input.SessionID)
 
 	return &TaskToolOutput{

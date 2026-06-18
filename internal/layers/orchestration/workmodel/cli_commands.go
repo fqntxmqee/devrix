@@ -306,11 +306,17 @@ Note: VerificationAgent integration with LLM is pending.
 // PlanCLICommands handles /plan commands.
 type PlanCLICommands struct {
 	planMode *PlanMode
+	manager  *TaskManager
 }
 
 // NewPlanCLICommands creates plan CLI commands.
 func NewPlanCLICommands(pm *PlanMode) *PlanCLICommands {
 	return &PlanCLICommands{planMode: pm}
+}
+
+// SetTaskManager wires task creation on plan approve.
+func (c *PlanCLICommands) SetTaskManager(m *TaskManager) {
+	c.manager = m
 }
 
 // Handle processes a /plan command.
@@ -386,6 +392,26 @@ func (c *PlanCLICommands) approve(sessionID string) string {
 	tasks := c.planMode.Approve()
 	if len(tasks) == 0 {
 		return "No tasks in the plan"
+	}
+
+	if c.manager != nil {
+		goal, _ := c.manager.EnsureGoal(sessionID, c.planMode.userGoal)
+		parentID := ""
+		if goal != nil {
+			parentID = goal.ID
+		}
+		_, _ = c.manager.Tree().PromoteChecklist(sessionID, parentID)
+		for _, task := range tasks {
+			if task == nil {
+				continue
+			}
+			_, _ = c.manager.CreateWorkItem(sessionID, CreateWorkItemInput{
+				ParentID:  parentID,
+				Kind:      WorkKindImplement,
+				Title:     task.Subject,
+				Directive: task.Description,
+			})
+		}
 	}
 
 	c.planMode.Exit()
