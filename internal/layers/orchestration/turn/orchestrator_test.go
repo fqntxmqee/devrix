@@ -1112,3 +1112,42 @@ func TestOrchestrator_RunTurn_CompleteCarriesLastIterationText_MaxTurns(t *testi
 	}
 }
 
+type stubResolveAwait struct {
+	summary string
+}
+
+func (s *stubResolveAwait) AwaitRunningChildren(_ context.Context, _ string) string {
+	return s.summary
+}
+
+func TestOrchestrator_RunTurn_EmitsResolveAwaitSummary(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{textChunk("done")}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:          llm,
+		Context:      &stubContext{},
+		Tools:        &stubTools{},
+		Persist:      &stubPersist{},
+		ResolveAwait: &stubResolveAwait{summary: "Resolve await: child: completed: ok."},
+	})
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-resolve",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	var resolveEv *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "resolve" {
+			resolveEv = ev
+		}
+	}
+	if resolveEv == nil {
+		t.Fatal("expected resolve event")
+	}
+	if !strings.Contains(resolveEv.Content, "Resolve await") {
+		t.Fatalf("resolve content = %q", resolveEv.Content)
+	}
+}
+

@@ -20,7 +20,7 @@
 | AC24 | Code Owner Bot | ✅ PASS | `.github/CODEOWNERS` |
 | AC25 | Property Rights Audit | ✅ PASS | `scripts/audit-property-rights.sh` baseline report |
 | AC27 | Uncertainty Anchor | ✅ PASS | `uncertainty.go`, `uncertainty_test.go` |
-| AC28–AC29 | RunTurn 单层递归 MVP | ✅ PASS | PR #86: `ResolveHint` + `task_write mode=decompose`; `resolve.go` parent re-eval |
+| AC28–AC29 | RunTurn 单层递归 MVP | ✅ PASS | PR #86–#87: decompose + `ResolveAwaiter` blocking await at turn start |
 | AC30–AC32 | 跨 Session | ✅ PASS (baseline) | `cross_session.go`, `cross_session_test.go` |
 | AC33–AC36 | 自演化 | ⚠️ BASELINE | `AdaptiveThreshold` 冷启动 + hysteresis API |
 | AC37–AC40 | 状态机/迁移/级联/环检测 | ✅ PASS | `work_tree.go`, `work_tree_test.go` |
@@ -45,6 +45,7 @@
 | D7-S1-T14 | DecomposeChildren depth limit | IMPLEMENTED | `decompose_test.go::TestDecomposeChildren_DepthLimit` |
 | D7-S1-T15 | Decompose daily limit 5/24h | IMPLEMENTED | `decompose_test.go::TestDecomposeChildren_DailyLimit` |
 | D7-S1-T16 | ResolveHint high uncertainty | IMPLEMENTED | `decompose_test.go::TestResolveHint_HighUncertainty` |
+| D7-S1-T17 | RunTurn blocking await running children | IMPLEMENTED | `resolve_await_test.go::TestAwaitRunningChildren_BlocksUntilTerminal` |
 | D7-S3-T12 | OrchestratePath SyncWaveNodes | IMPLEMENTED | `orchestrate_path.go` wiring |
 
 ## Quality Gate
@@ -57,7 +58,7 @@
 
 1. ~~**task_write / task_spawn / task_await** 统一 alias~~ → PR #85
 2. ~~**RunTurn decompose 循环**~~ → PR #86: `ResolveHint` + `task_write mode=decompose` + depth/daily limits
-3. **RunTurn blocking await** — hint-only; full blocking await for running children deferred
+3. ~~**RunTurn blocking await**~~ → PR #87: `ResolveAwaiter` blocks at turn start for running children with run_ref
 4. **Phase 8 自演化** — 需 10+ Session 数据积累后激活 optimizer
 
 ## Decision

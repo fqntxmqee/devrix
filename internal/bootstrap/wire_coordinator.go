@@ -160,6 +160,7 @@ func InitOrchestration(
 		MaxContextTokens: maxContextTokens,
 		ObsBridge:        obsBridge,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
+		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
 	})
 	executor := newTurnOrchExecutor(turnOrch)
 
