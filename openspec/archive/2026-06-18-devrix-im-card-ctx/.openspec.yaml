@@ -1,0 +1,46 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-im-card-ctx
+  demand_id: DM-20260611-008
+  title: "飞书 IM 完成卡 — 追加 ctx 比例 + token 链路全埋点"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-11"
+  updated_at: "2026-06-18"
+  archived_at: "2026-06-18"
+  source: 用户反馈（IM 卡片 "消耗: 0 tokens" 排查）
+  verdict: "ACCEPTED (P1); PR #27+#28 + #79 合并; ctx% + token 链路全部上线"
+
+scope:
+  layers:
+    - id: D1
+      name: Communication
+      affected: true
+      reason: "Feishu 完成卡摘要 + ctx% 显示"
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "PEV 链路 span token 完整埋点 + emit complete 带 ctx_pct"
+    - id: D5
+      name: Observability
+      affected: true
+      reason: "Jaeger 可观测 token 链路"
+  capabilities:
+    - id: IM-COMPLETE-CARD-CTX
+      name: 飞书完成卡 ctx% + token 链路完整
+  t_points:
+    - D1-S2-A02-T09
+    - D1-S2-A02-T10
+    - D1-S2-A02-T11
+
+version_scope:
+  v1.0:
+    features:
+      - "D1 summary.go 计算并输出 ctx% + tokens"
+      - "D2 PEV 链路 span 补齐 token 关键属性"
+      - "PR #79 修复 finalText 透传(emitComplete 携带 lastPromptTokens)"
+    status: implemented

@@ -1,0 +1,16 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-layer-isolation-v1.1
+  demand_id: DM-20260612-012
+  title: "架构分层 v1.1 — 4 接口契约物理迁移"
+  status: s7_archived
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-12"
+  updated_at: "2026-06-18"
+  archived_at: "2026-06-18"
+  parent_change: devrix-layer-isolation
+  verdict: "S7_Archived; v1.1 follow-up; 4 接口物理迁移已完成; design.md / tasks.md 未补全作为 v1.0 文档债务保留"

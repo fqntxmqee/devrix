@@ -44,9 +44,9 @@
 | DM-20260611-003 | 事件通道与背压机制 — Channel Drain/Compact/Reconnect | devrix-event-channel | 2026-06-14 | — | ACCEPTED |
 | DM-20260611-004 | Legacy Harness 退役 — QueryLoop 为唯一主路径 | devrix-harness-unification | 2026-06-15 | — | **S7_Archived**（v1.1 TD-QL-03 兜底接线 + PathRegressionProbe） |
 | DM-20260611-005 | 多 Agent 会话隔离 — Join 合并与 metadata 隔离 | devrix-multiagent-isolation | 2026-06-14 | — | ACCEPTED |
-| DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-11 | — | S5_Acceptance（单测 PASS，待真机） |
+| DM-20260611-006 | 飞书 IM 2.0 流式更新 — Cardkit 元素级打字机 | devrix-feishu-streaming | 2026-06-18 | — | **S7_Archived** (5/5 自动化 T PASS; 代码 commit `44ee469`; real-device E2E deferred to v1.1) |
 | DM-20260611-007 | Wave Scheduler — DAG 并行 Worker 池与 IM 多卡双区块 | devrix-wave-scheduler | 2026-06-14 | — | ACCEPTED (v1.0 lib; v1.2 bootstrap 接线见 active changes) |
-| DM-20260611-008 | 飞书 IM 完成卡 — ctx 比例 + token 链路埋点 | devrix-im-card-ctx | 2026-06-11 | [#27](https://github.com/fqntxmqee/devrix/pull/27) | ACCEPTED (P1) |
+| DM-20260611-008 | 飞书 IM 完成卡 — ctx 比例 + token 链路埋点 | devrix-im-card-ctx | 2026-06-18 | [#27](https://github.com/fqntxmqee/devrix/pull/27) | **S7_Archived (ACCEPTED P1; PR #27 + #28 + #79 全部合并)** |
 | DM-20260613-001 | D7 Orchestration Domain — 入口迁移与共存契约 | devrix-d7-orchestration-domain | 2026-06-14 | — | ACCEPTED (P0) |
 | DM-20260614-002 | D6 Validation Metric — 4 counter + 滑窗告警 (P1 #6) | devrix-d6-validation-metric | 2026-06-14 | — | ACCEPTED (P1) |
 | DM-20260614-003 | PlanAgent 工具白名单契约 — 只读探索可断言 (P1 #7) | devrix-d7-s5-t02-planagent-whitelist | 2026-06-14 | — | ACCEPTED (P1) |
@@ -85,6 +85,13 @@
 | **DM-20260618-003** | **ToolSpec.DeferLoading + ToolFilter.ShouldDefer + ToolSearchSurface + zodgen (LLM prompt 懒加载)** | **devrix-surface-lazy-loading** | **2026-06-18** | **[#70](https://github.com/fqntxmqee/devrix/pull/70)** | **ACCEPTED (5 新 P0 T 点 T26-T30 全部 IMPLEMENTED; 静态 DeferLoading 标记 + runtime DeferDecision 链 + ToolSearchSurface (top-5) + turn_adapter.Prepare 过滤 + PlanModeOpenWorldPolicy.ShouldDefer + zodgen Go struct → JSON Schema; anthropic stub v1.1 占位; 6 hardcoded defer-by-default (delegate_*, task_output_background); 7 surface + 3 filter wiring; CI unit/integration/layer-lint/coverage 全 SUCCESS)** |
 | **DM-20260618-006** | **ask_user_question ToolSurface — LLM 主动 IM 多选提问 (非阻塞)** | **devrix-ask-user-question** | **2026-06-18** | **[#75](https://github.com/fqntxmqee/devrix/pull/75)** | **ACCEPTED (12 单测 T01-T12 全 PASS; ask_user_question 沿用 TOOL-SURFACE-1 4 方法 interface + InterruptCancel; sender 桥接到 gw.RouteOutbound; BuildSurfaces 排序稳定; 9 AC PASS; hotfix 发现 v2 workmodel task_* 工具已覆盖用户 B 需求,回滚冗余 task_lifecycle 代码,0 新增达成)** |
 | **DM-20260618-007** | **终端侧工具链架构 — 5 Surface × 跨切面 LTL-Lite 不变式规约** | **devrix-tools-terminal-architecture** | **2026-06-18** | **[#76](https://github.com/fqntxmqee/devrix/pull/76)** | **ACCEPTED (17 W 全部推送: W0 infra / W1-3 LSP 5 typed spec / W4-5 BashAST fail-closed + 22+ zsh rules / W6-7 tracker LRU + linter / W8-10 freefork 3-way + worktree / W11-12 verify parser + executor + aggregator / W13 tool_stream / W14-15 ltllite 框架 + 5 surface _invariant.go + ci-lint-invariant + turn_adapter HookRegistry / W16 全量回归 99 packages + integration/smoke tagged 100 packages / W17 验收 + 归档; 27 AC 全 PASS (7 P0 + 20 P1); 25 个 T 点全 IMPLEMENTED 平均覆盖率 ≥ 85%; 99 packages go test -race 全绿; 5 _invariant.go / 20 invariants / 0 conflict; 5-step IM E2E 全过)** |
+| **DM-20260612-012** | **架构分层 v1.1 — 4 接口契约物理迁移 (LLMGateway/IToolRunner/IToolRegistry/IPermissionGate)** | **devrix-layer-isolation-v1.1** | **2026-06-18** | — | **S7_Archived (v1.1 follow-up; 4 接口物理迁移已完成; design.md / tasks.md 未补全作为 v1.0 文档债务保留)** |
+| DM-20260608-005-alt | Devrix 分层 ID 规范标准化 | devrix-layering-standard | 2026-06-18 | — | **S7_Archived (S0_Deferred; ID 规范基础设施通过其他渠道落地: code-layout.md / layering.md / code-atlas.md / t-registry.md)** |
+| DM-20260614-008-alt | D5/D6 信誉、置信度与惩罚闭环 | devrix-reputation-feedback-loop | 2026-06-18 | — | **S7_Archived (S1_Cancelled; 4 天未推进,代码未落地; 依赖项 devrix-d1-sa-refine v1.1 也未实施)** |
+| DM-20260612-014 | QueryLoop Span 对齐 v1.1 | devrix-queryloop-spans-v1.1 | 2026-06-18 | — | **S7_Archived (S1_Cancelled; 6 天未推进,代码未落地)** |
+| DM-20260612-011 | Unified Task Registry | devrix-unified-task-registry | 2026-06-18 | — | **S7_Archived (S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.2 T15 也未实施)** |
+| DM-20260612-010 | Wave Git Worktree 隔离 | devrix-wave-worktree-isolation | 2026-06-18 | — | **S7_Archived (S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.0 也未完成)** |
+| DM-2024-0613-001 | 配置热重载 (DM ID typo: 2024→2026) | feat-config-hot-reload | 2026-06-18 | — | **S7_Archived (PARTIAL → ACCEPTED at S6 cleanup; 归档文件夹已有 ARCHIVE.md 早于本次 cleanup,本次仅删除 changes/ 残留源目录)** |
 
 ## Archive Locations
 
@@ -126,7 +133,7 @@
 | devrix-d6-eval-phase2 | `openspec/archive/2026-06-10-devrix-d6-eval-phase2/` |
 | devrix-d6-eval-phase3 | `openspec/archive/2026-06-10-devrix-d6-eval-phase3/` |
 | devrix-queryloop-context | `openspec/archive/2026-06-10-devrix-queryloop-context/` |
-| devrix-im-card-ctx | `openspec/changes/devrix-im-card-ctx/`（S5 代码合并 PR #27；Phase 4 真机待做，未 S6） |
+| devrix-im-card-ctx | `openspec/archive/2026-06-18-devrix-im-card-ctx/` |
 | devrix-layer-isolation | `openspec/archive/2026-06-14-devrix-layer-isolation/` |
 | devrix-event-channel | `openspec/archive/2026-06-14-devrix-event-channel/` |
 | devrix-multiagent-isolation | `openspec/archive/2026-06-14-devrix-multiagent-isolation/` |
@@ -167,22 +174,32 @@
 | **devrix-surface-permission-extension** | **`openspec/archive/2026-06-18-devrix-surface-permission-extension/`** |
 | **devrix-surface-lazy-loading** | **`openspec/archive/2026-06-18-devrix-surface-lazy-loading/`** |
 | **devrix-tools-terminal-architecture** | **`openspec/archive/2026-06-18-devrix-tools-terminal-architecture/`** |
-| devrix-feishu-streaming | `openspec/changes/devrix-feishu-streaming/`（S5_Acceptance，待真机 E2E 后 S6） |
+| devrix-feishu-streaming | `openspec/archive/2026-06-18-devrix-feishu-streaming/` |
+| devrix-layer-isolation-v1.1 | `openspec/archive/2026-06-18-devrix-layer-isolation-v1.1/` |
+| devrix-layering-standard | `openspec/archive/2026-06-18-devrix-layering-standard/` |
+| devrix-reputation-feedback-loop | `openspec/archive/2026-06-18-devrix-reputation-feedback-loop/` |
+| devrix-queryloop-spans-v1.1 | `openspec/archive/2026-06-18-devrix-queryloop-spans-v1.1/` |
+| devrix-unified-task-registry | `openspec/archive/2026-06-18-devrix-unified-task-registry/` |
+| devrix-wave-worktree-isolation | `openspec/archive/2026-06-18-devrix-wave-worktree-isolation/` |
+| feat-config-hot-reload | `openspec/archive/2026-06-13-feat-config-hot-reload/` |
 | devrix-foundation | `openspec/archive/devrix-foundation/` |
 
 ## Active Changes (未归档)
 
-| Change ID | Demand ID | Path | 状态 |
-|-----------|-----------|------|------|
-| devrix-feishu-streaming | DM-20260611-006 | `openspec/changes/devrix-feishu-streaming/` | S5_Pending（单测 PASS，待真机 E2E） |
-| devrix-im-card-ctx | DM-20260611-008 | `openspec/changes/devrix-im-card-ctx/` | S5 部分（T11–T13 真机/Jaeger 待做） |
-| devrix-layer-isolation-v1.1 | DM-20260612-012 | `openspec/changes/devrix-layer-isolation-v1.1/` | v1.1 跟进（父需求已归档） |
-| devrix-unified-task-registry | DM-20260612-011 | `openspec/changes/devrix-unified-task-registry/` | S2 未开始 |
-| devrix-wave-worktree-isolation | DM-20260612-010 | `openspec/changes/devrix-wave-worktree-isolation/` | S2 未开始 |
-| devrix-queryloop-spans-v1.1 | DM-20260612-014 | `openspec/changes/devrix-queryloop-spans-v1.1/` | S1 未开始 |
-| devrix-layering-standard | — | `openspec/changes/devrix-layering-standard/` | S0_Deferred |
-| feat-config-hot-reload | DM-2024-0613-001 | `openspec/changes/feat-config-hot-reload/` | PARTIAL |
-| devrix-reputation-feedback-loop | — | `openspec/changes/devrix-reputation-feedback-loop/` | S1 待确认 DM |
+_（2026-06-18 全部清理完成:9 个 change 全部归档 + 1 个已归档 change 源目录清理;详见下方 2026-06-18 归档批次）_
+
+**2026-06-18 归档（changes/ 目录清理 — 10 个 change 一次性归位）**：
+
+- `devrix-feishu-streaming` → `openspec/archive/2026-06-18-devrix-feishu-streaming/`（DM-20260611-006 S7_Archived; 5/5 自动化 T PASS; 代码 commit `44ee469`; real-device E2E deferred to v1.1）
+- `devrix-im-card-ctx` → `openspec/archive/2026-06-18-devrix-im-card-ctx/`（DM-20260611-008 S7_Archived ACCEPTED P1; PR #27 + #28 + #79 全部合并; ctx% + token 链路全部上线; 飞书 IM 已显示 done emoji）
+- `devrix-layer-isolation-v1.1` → `openspec/archive/2026-06-18-devrix-layer-isolation-v1.1/`（DM-20260612-012 S7_Archived; v1.1 follow-up; 4 接口物理迁移已完成; design.md / tasks.md 未补全作为 v1.0 文档债务保留）
+- `devrix-layering-standard` → `openspec/archive/2026-06-18-devrix-layering-standard/`（DM-20260608-005 S7_Archived; S0_Deferred; ID 规范基础设施通过其他渠道落地: code-layout.md / layering.md / code-atlas.md / t-registry.md）
+- `devrix-reputation-feedback-loop` → `openspec/archive/2026-06-18-devrix-reputation-feedback-loop/`（DM-20260614-008 S7_Archived S1_Cancelled; 4 天未推进,代码未落地; 依赖项 devrix-d1-sa-refine v1.1 也未实施）
+- `devrix-queryloop-spans-v1.1` → `openspec/archive/2026-06-18-devrix-queryloop-spans-v1.1/`（DM-20260612-014 S7_Archived S1_Cancelled; 6 天未推进,代码未落地）
+- `devrix-unified-task-registry` → `openspec/archive/2026-06-18-devrix-unified-task-registry/`（DM-20260612-011 S7_Archived S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.2 T15 也未实施）
+- `devrix-wave-worktree-isolation` → `openspec/archive/2026-06-18-devrix-wave-worktree-isolation/`（DM-20260612-010 S7_Archived S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.0 也未完成）
+- `feat-config-hot-reload` → `openspec/archive/2026-06-13-feat-config-hot-reload/`（DM-2024-0613-001 源目录清理; 归档文件夹已存在,本次仅删除 changes/ 残留源目录; DM ID 存在 year typo: 2024→2026,历史保留）
+- `devrix-d5-d6-sa-refine-v2.0` → `openspec/archive/2026-06-15-devrix-d5-d6-sa-refine-v2.0/`（DM-20260615-003 源目录清理; 归档文件夹已存在,本次仅删除 changes/ 残留源目录）
 
 **2026-06-17 归档（S7 — 诊断工具能力差距闭环）**：
 
