@@ -168,5 +168,6 @@ func newDefaultCommandHandler(_ WorkModel, sink EventPublisher, tm *workmodel.Ta
 	// TaskManager stores the underlying tasks).
 	cli := workmodel.NewCLICommands(tm)
 	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
+	plan.SetTaskManager(tm)
 	return NewCommandHandler(cli, plan, sink)
 }

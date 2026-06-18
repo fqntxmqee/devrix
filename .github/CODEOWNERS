@@ -1,0 +1,6 @@
+# D7 orchestration — WorkTree / RunRegistry / task tools
+/internal/layers/orchestration/workmodel/ @devrix/d7-architects
+/internal/layers/orchestration/runregistry/ @devrix/d7-architects
+/internal/layers/orchestration/coordinator/orchestrate_path.go @devrix/d7-architects
+/internal/layers/orchestration/delegatetools/ @devrix/d7-architects
+/openspec/specs/d7-orchestration/ @devrix/d7-architects

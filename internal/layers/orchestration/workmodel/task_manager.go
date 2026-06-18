@@ -3,8 +3,6 @@ package workmodel
 import (
 	"context"
 	"fmt"
-	"os"
-	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -16,6 +14,7 @@ import (
 )
 
 // Task represents a single task item in the D7 work model.
+// Legacy flat view; new code should use WorkItem via TaskManager.Tree().
 type Task struct {
 	ID          string     `json:"id"`
 	Subject     string     `json:"subject"`
@@ -44,22 +43,15 @@ func NewTask(subject, description string) *Task {
 }
 
 // TaskManager manages task lists for sessions in D7-S1.
+// Internally delegates to WorkTree; Task methods remain for backward compatibility.
 type TaskManager struct {
-	mu        sync.RWMutex
-	tasks     map[string]map[string]*Task // sessionID -> taskID -> Task
-	store     TaskStore
+	tree      *WorkTree
 	obsBridge *observability.Bridge
 }
 
 // NewTaskManager creates a new in-memory task manager.
-//
-// DM-20260617-008 W4: callers should construct their own *TaskManager and
-// inject it where needed. The previous GlobalTaskManager package-level
-// singleton has been removed.
 func NewTaskManager() *TaskManager {
-	return &TaskManager{
-		tasks: make(map[string]map[string]*Task),
-	}
+	return &TaskManager{tree: NewWorkTree()}
 }
 
 // NewTaskManagerFromConfig creates a task manager with optional disk persistence.
@@ -67,12 +59,17 @@ func NewTaskManagerFromConfig(cfg config.TasksConfig, obsBridge *observability.B
 	m := NewTaskManager()
 	m.obsBridge = obsBridge
 	if cfg.Mode == "v2" && cfg.StoreDir != "" {
-		store, err := NewDiskTaskStore(cfg.StoreDir)
+		store, err := NewDiskWorkItemStore(cfg.StoreDir)
 		if err == nil {
-			m.store = store
+			m.tree.SetStore(store)
 		}
 	}
 	return m
+}
+
+// Tree returns the underlying work tree.
+func (m *TaskManager) Tree() *WorkTree {
+	return m.tree
 }
 
 // SetObservability wires the observability bridge.
@@ -80,9 +77,13 @@ func (m *TaskManager) SetObservability(obs *observability.Bridge) {
 	m.obsBridge = obs
 }
 
-// SetStore wires optional disk persistence.
+// SetStore wires optional disk persistence (legacy TaskStore adapter).
 func (m *TaskManager) SetStore(store TaskStore) {
-	m.store = store
+	if store == nil {
+		m.tree.SetStore(nil)
+		return
+	}
+	m.tree.SetStore(&taskStoreAdapter{store: store})
 }
 
 func (m *TaskManager) startSpan(operation string) (context.Context, tracer.Span) {
@@ -93,87 +94,81 @@ func (m *TaskManager) startSpan(operation string) (context.Context, tracer.Span)
 	return ctx, span
 }
 
-// EnsureSession creates task map for session if not exists.
+// EnsureSession creates item map for session if not exists.
 func (m *TaskManager) EnsureSession(sessionID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
+	m.tree.EnsureSession(sessionID)
 }
 
-func (m *TaskManager) ensureSessionLocked(sessionID string) {
-	if m.tasks[sessionID] != nil {
-		return
-	}
-	m.tasks[sessionID] = make(map[string]*Task)
-	if m.store == nil {
-		return
-	}
-	loaded, err := m.store.Load(sessionID)
-	if err != nil || len(loaded) == 0 {
-		return
-	}
-	for _, t := range loaded {
-		if t != nil {
-			m.tasks[sessionID][t.ID] = t
-		}
-	}
+// EnsureGoal ensures session root goal exists.
+func (m *TaskManager) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
+	return m.tree.EnsureGoal(sessionID, directive)
 }
 
-func (m *TaskManager) persistLocked(sessionID string) {
-	if m.store == nil {
-		return
-	}
-	tasks := make([]*Task, 0, len(m.tasks[sessionID]))
-	for _, t := range m.tasks[sessionID] {
-		tasks = append(tasks, t)
-	}
-	_ = m.store.Save(sessionID, tasks)
-}
-
-// Create creates a new task in session.
+// Create creates a new implement work item under session goal.
 func (m *TaskManager) Create(sessionID, subject, description string) *Task {
 	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
 	if span != nil {
 		defer span.End()
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
+	goal, _ := m.tree.EnsureGoal(sessionID, subject)
+	parentID := ""
+	if goal != nil {
+		parentID = goal.ID
+	}
 
-	task := NewTask(subject, description)
-	m.tasks[sessionID][task.ID] = task
-	m.persistLocked(sessionID)
+	item, err := m.tree.Create(sessionID, CreateWorkItemInput{
+		ParentID:  parentID,
+		Kind:      WorkKindImplement,
+		Title:     subject,
+		Directive: description,
+	})
+	if err != nil {
+		return nil
+	}
 
 	if span != nil {
 		span.SetAttributes(
-			tracer.Attribute{Key: "task.id", Value: task.ID},
+			tracer.Attribute{Key: "task.id", Value: item.ID},
 			tracer.Attribute{Key: "task.subject", Value: truncateSubject(subject, 200)},
 		)
 	}
-	return task
+	return item.ToTask()
+}
+
+// CreateWorkItem creates a work item with full control.
+func (m *TaskManager) CreateWorkItem(sessionID string, in CreateWorkItemInput) (*WorkItem, error) {
+	return m.tree.Create(sessionID, in)
 }
 
 // Get retrieves a task by ID.
 func (m *TaskManager) Get(sessionID, taskID string) (*Task, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-	task, ok := m.tasks[sessionID][taskID]
-	return task, ok
+	item, ok := m.tree.Get(sessionID, taskID)
+	if !ok {
+		return nil, false
+	}
+	return item.ToTask(), true
 }
 
-// List returns all tasks for session.
-func (m *TaskManager) List(sessionID string) []*Task {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
+// GetWorkItem retrieves a work item by ID.
+func (m *TaskManager) GetWorkItem(sessionID, itemID string) (*WorkItem, bool) {
+	return m.tree.Get(sessionID, itemID)
+}
 
-	tasks := make([]*Task, 0, len(m.tasks[sessionID]))
-	for _, t := range m.tasks[sessionID] {
-		tasks = append(tasks, t)
+// List returns legacy task view items (excludes session goal and ephemeral checklist).
+func (m *TaskManager) List(sessionID string) []*Task {
+	items := m.tree.List(sessionID)
+	out := make([]*Task, 0, len(items))
+	for _, item := range items {
+		if item == nil || item.Kind == WorkKindGoal {
+			continue
+		}
+		if item.Kind == WorkKindChecklist && item.Ephemeral {
+			continue
+		}
+		out = append(out, item.ToTask())
 	}
-	return tasks
+	return out
 }
 
 // UpdateStatus updates task status.
@@ -183,45 +178,35 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 		defer span.End()
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-
-	task, ok := m.tasks[sessionID][taskID]
+	item, ok := m.tree.Get(sessionID, taskID)
 	if !ok {
 		return fmt.Errorf("task not found: %s", taskID)
 	}
-	if !IsLegalTransition(task.Status, status) {
-		return fmt.Errorf("%w: from %s to %s", ErrIllegalTransition, task.Status, status)
-	}
-	prev := task.Status
-	task.Status = status
-	task.UpdatedAt = time.Now()
-	m.persistLocked(sessionID)
 
-	// G3 notify: 任务进入终态时,publish CompletionEvent。
+	if err := m.tree.UpdateStatus(sessionID, taskID, status); err != nil {
+		return err
+	}
+
 	if status == TaskStatusCompleted || status == TaskStatusFailed {
+		task := item.ToTask()
 		go m.publishCompletion(sessionID, taskID, task.Subject, status)
 	}
-	_ = prev
 	return nil
 }
 
-// publishCompletion 异步投递 CompletionEvent 到 notify.GlobalBus。
 func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, status TaskStatus) {
 	defer func() { _ = recover() }()
 	bus := notify.GlobalBus()
 	if bus == nil {
 		return
 	}
-	kind := "workmodel"
 	errStr := ""
 	if status == TaskStatusFailed {
 		errStr = "task failed"
 	}
 	bus.Publish(sessionID, notify.CompletionEvent{
 		TaskID:  taskID,
-		Kind:    kind,
+		Kind:    "workmodel",
 		Summary: fmt.Sprintf("%s → %s", subject, status),
 		Error:   errStr,
 		Time:    time.Now(),
@@ -230,100 +215,27 @@ func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, statu
 
 // SetOwner assigns owner to task.
 func (m *TaskManager) SetOwner(sessionID, taskID, owner string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-
-	task, ok := m.tasks[sessionID][taskID]
-	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-	task.Owner = owner
-	task.UpdatedAt = time.Now()
-	m.persistLocked(sessionID)
-	return nil
+	return m.tree.SetOwner(sessionID, taskID, owner)
 }
 
 // AddDependency adds a blocked-by dependency.
 func (m *TaskManager) AddDependency(sessionID, taskID, blockedByID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-
-	task, ok := m.tasks[sessionID][taskID]
-	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-
-	task.BlockedBy = append(task.BlockedBy, blockedByID)
-
-	if blocker, ok := m.tasks[sessionID][blockedByID]; ok {
-		blocker.Blocks = append(blocker.Blocks, taskID)
-	}
-
-	task.UpdatedAt = time.Now()
-	m.persistLocked(sessionID)
-	return nil
+	return m.tree.AddDependency(sessionID, taskID, blockedByID)
 }
 
 // RemoveTask removes a task.
 func (m *TaskManager) RemoveTask(sessionID, taskID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-
-	_, ok := m.tasks[sessionID][taskID]
-	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-
-	for _, t := range m.tasks[sessionID] {
-		for i, blocked := range t.BlockedBy {
-			if blocked == taskID {
-				t.BlockedBy = append(t.BlockedBy[:i], t.BlockedBy[i+1:]...)
-				break
-			}
-		}
-	}
-
-	delete(m.tasks[sessionID], taskID)
-	m.persistLocked(sessionID)
-	return nil
+	return m.tree.Remove(sessionID, taskID)
 }
 
 // GetReadyTasks returns tasks that are not blocked.
 func (m *TaskManager) GetReadyTasks(sessionID string) []*Task {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureSessionLocked(sessionID)
-
-	var ready []*Task
-	for _, t := range m.tasks[sessionID] {
-		if t.Status != TaskStatusPending {
-			continue
-		}
-		allBlocked := true
-		for _, blockerID := range t.BlockedBy {
-			if blocker, ok := m.tasks[sessionID][blockerID]; !ok || blocker.Status != TaskStatusCompleted {
-				allBlocked = false
-				break
-			}
-		}
-		if allBlocked || len(t.BlockedBy) == 0 {
-			ready = append(ready, t)
-		}
-	}
-	return ready
+	return TasksFromWorkItems(m.tree.GetReadyItems(sessionID))
 }
 
 // ClearSession removes all tasks for session.
 func (m *TaskManager) ClearSession(sessionID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.tasks, sessionID)
-	if store, ok := m.store.(*DiskTaskStore); ok && store != nil {
-		_ = os.Remove(store.path(sessionID))
-	}
+	m.tree.ClearSession(sessionID)
 }
 
 // FormatTaskSummary returns a formatted summary string.

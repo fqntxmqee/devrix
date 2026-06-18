@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -261,6 +262,10 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req ProcessReq
 	}
 	if sessionSpan != nil {
 		sessionSpan.SetAttributes(tracer.Attribute{Key: "orchestration.route", Value: routeLabel(intent)})
+	}
+
+	if o.taskManager != nil && req.SessionID != "" && strings.TrimSpace(req.Message) != "" && intent.Kind != IntentSkip {
+		_, _ = o.taskManager.EnsureGoal(req.SessionID, req.Message)
 	}
 
 	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but

@@ -605,3 +605,43 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.2.0** | **2026-06-16** | `observability-guide.md`；`dsaft-architecture.md` Stub；Guides 索引 |
 | **3.5.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) ADDED Requirements：D2 QueryLoop Legacy Path Decommission（loopFirst=true 主路径护栏 + 拆面 adapter 零调用 + legacy metric 暴露 + CLI 警告 + D2-S10 spec.md LEGACY 标记）；(2) 6 个 Gherkin Scenario 覆盖 AC1-AC7；(3) T09/T10 + T04/T05 注册 |
 | **3.6.0** | **2026-06-17** | **devrix-tool-surface-phase2-full (DM-20260617-008) 工具调用链路登记**：(1) Cross-Domain Contracts 表新增 DM-20260617-008 行（指 D2 spec §"Tool Call End-to-End Flow" 为完整链路 SoT）；(2) 端到端 Chain A/B/C 视图（3 链 7 surface 5 domain 拓扑）由 D2 spec 持有, D7 通过本表反查 |
+| **3.7.0** | **2026-06-17** | **devrix-unified-work-tree (DM-20260617-009)**：(1) ADDED WorkItem + WorkTree 统一工作语义；(2) WorkTree ⊥ RunRegistry 分离（`run_ref` 外键）；(3) todo_write→checklist ephemeral 子节点 + sc.Todos 投影；(4) Wave OrchestratePath SyncWaveNodes；(5) legacy TaskManager 适配器；(6) 跨 session 只读查询 baseline |
+
+---
+
+## Unified Work Tree (DM-20260617-009)
+
+> **Archived:** `openspec/archive/2026-06-17-devrix-unified-work-tree/`
+
+### Requirement: WorkItem Unified Work Unit Model
+
+The orchestration layer SHALL represent all work semantics as `WorkItem` nodes in a per-session tree owned by D7 `WorkTree`.
+
+Each WorkItem MUST have: `id`, optional `parent_id`, `kind`, `status`, `title`, `directive`, optional `uncertainty`, `policy`, dependency edges, optional `run_ref`, and `ephemeral` flag.
+
+#### Scenario: Session root goal creation
+- GIVEN a new session with no work items
+- WHEN the first user message is processed
+- THEN exactly one `kind=goal` root WorkItem exists with the user directive as `directive`
+
+#### Scenario: Child work item under goal
+- GIVEN an existing session goal WorkItem
+- WHEN `delegate_implement` is invoked without an explicit work item id
+- THEN a new `kind=implement` WorkItem is created with `parent_id` set to the goal id
+
+### Requirement: WorkTree and RunRegistry Separation
+
+Work semantics (What) and execution handles (How) MUST remain separate stores. `WorkItem.run_ref` links to RunRegistry entries; terminal callbacks update WorkItem status and bubble parent re-evaluation.
+
+### Requirement: Legacy TaskManager Compatibility Adapter
+
+`TaskManager` delegates to `WorkTree` internally while preserving flat `Task` API for `task_create`, `task_get`, `task_list`, and `/task` CLI commands.
+
+### Requirement: Wave Scheduler Reads WorkTree (v1.1)
+
+`OrchestratePath` SHALL call `TaskManager.SyncWaveNodes` after `SynthesizeTaskGraph`, writing implement subtrees before Wave dispatch.
+
+### Deprecated (v2.0 target)
+
+- Session-scratch `sc.Todos` as authoritative checklist (demoted to read projection via WorkTree)
+- Independent persistent wave task graph as work semantics SoT
