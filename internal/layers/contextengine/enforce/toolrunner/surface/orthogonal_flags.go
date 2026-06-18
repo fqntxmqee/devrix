@@ -55,7 +55,12 @@ func OrthogonalFlagFor(toolName string) (readOnly, destructive, openWorld, concu
 		return true, false, false, true
 	case "glob":
 		return true, false, false, true
-	case "lsp":
+	case "lsp",
+		"lsp_go_to_definition",
+		"lsp_find_references",
+		"lsp_incoming_calls",
+		"lsp_hover",
+		"lsp_workspace_symbol":
 		return true, false, false, false
 	case "free_fork":
 		return false, false, true, false
