@@ -1,0 +1,22 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-layering-standard
+  demand_id: DM-20260608-005
+  title: "Devrix 分层 ID 规范标准化"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-08"
+  updated_at: "2026-06-18"
+  archived_at: "2026-06-18"
+  verdict: "S0_Deferred at demand creation; ID 规范基础设施通过其他渠道落地 (code-layout.md / layering.md / code-atlas.md 已在 openspec/specs/architecture/)"
+
+scope:
+  layers:
+    - id: ARCH
+      name: Architecture
+      affected: true
+      reason: "分层 ID 规范 (D{X}-S{X}-A{XX}-T{XX})"

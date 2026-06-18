@@ -1,0 +1,24 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-unified-task-registry
+  demand_id: DM-20260612-011
+  title: "Unified Task Registry — 后台任务统一注册与 output delta"
+  status: s7_archived
+  priority: P1
+  owner: devrix-team
+  created_at: "2026-06-12"
+  updated_at: "2026-06-18"
+  archived_at: "2026-06-18"
+  verdict: "S2_Cancelled (6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.2 T15 也未实施)"
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+    - id: D1
+      name: Orchestration
+      affected: true
