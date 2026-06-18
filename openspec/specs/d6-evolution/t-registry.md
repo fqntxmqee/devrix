@@ -1,11 +1,11 @@
 # D6 Evolution Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-15
+**Version:** 3.1.0
+**Last Updated:** 2026-06-18
 **Parent:** `openspec/specs/architecture/layering.md`
 **Spec Reference:** `openspec/specs/d6-evolution/spec.md`
-**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Verifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — G4 verify_plan_execution LLM tool
+**Change:** devrix-d6-sa-refine（DM-20260615-002 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨；S4 Orchestration → S12 GuardRuntime）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Verifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — G4 verify_plan_execution LLM tool / devrix-tools-terminal-architecture (DM-20260618-007) — Verify W11-W12 (D6-S11-A02-T06/T07/T08)
 
 ---
 
@@ -42,6 +42,9 @@
 | D6-S11-A02-T03 | Verifier 全部 plan item 通过 | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
 | D6-S11-A02-T04 | Verifier 缺失 evidence → unverified | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
 | D6-S11-A02-T05 | Verifier `_test.go` 缺 `func TestXxx(` → fail | S11 | P0 | `internal/layers/evolution/verify/plan_test.go` | IMPLEMENTED | — |
+| **D6-S11-A02-T06** | **tasks.md parser 兼容 \| W{N}.{M} \| 表格 + done/pending (Verify W11)** | **S11** | **P0** | **`internal/layers/evolution/verify/plan_test.go` (TestW11_12_VerifyStack_T_CrossRef) + tests/integration/tools_terminal_test.go (TestVerify_AllPass)** | **IMPLEMENTED** | **—** |
+| **D6-S11-A02-T07** | **evidence kind → checker 路由 5 kind (file/test/cmd/api/...) (Verify W11)** | **S11** | **P0** | **`internal/layers/evolution/verify/plan_test.go` + `surface/verify_surface.go`** | **IMPLEMENTED** | **—** |
+| **D6-S11-A02-T08** | **aggregator (verified/unverified/skipped/summary) + report JSON (Verify W12)** | **S11** | **P0** | **`internal/layers/evolution/verify/plan_test.go` (TestW11_12_VerifyStack_T_CrossRef)** | **IMPLEMENTED** | **—** |
 
 ### D6-S11-A04: GenerateTune
 

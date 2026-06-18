@@ -1,9 +1,9 @@
 # D4 Multi-Agent Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-14
-**Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify / devrix-diagnostic-tools-wiring (DM-20260617-002) — Free Fork DI + Notify consume
+**Version:** 3.1.0
+**Last Updated:** 2026-06-18
+**Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify / devrix-diagnostic-tools-wiring (DM-20260617-002) — Free Fork DI + Notify consume / devrix-tools-terminal-architecture (DM-20260618-007) — FreeFork W8-W10 + BackgroundTaskSurface W13 (D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01)
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -127,6 +127,12 @@
 | D4-NT-T02 | Bus.Drain 一次性读出全部未消费 event | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P0 |
 | D4-NT-T03 | Bus channel 满 → 降级 pending list | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P1 |
 | D4-NT-T04 | FormatReminder 渲染 `<task_notifications>` 块 | `internal/layers/orchestration/workmodel/notify/bus_test.go` | IMPLEMENTED | P0 |
+| **D4-S11-A02-T01** | **ForkAgent + SendMessage + WorkerContext budget (FreeFork W8)** | **`internal/layers/multiagent/provision/freefork/forker_test.go` (TestW8_10_FreeForkStack_T_CrossRef)** | **IMPLEMENTED** | **P0** |
+| **D4-S11-A02-T02** | **资源争抢仲裁 (FreeFork W9)** | **`internal/layers/multiagent/provision/freefork/forker_test.go`** | **IMPLEMENTED** | **P0** |
+| **D4-S11-A02-T03** | **FreeForkSurface 集成 3 分叉 (FreeFork W9)** | **`tests/integration/tools_terminal_test.go` (TestFreeFork_3Directions)** | **IMPLEMENTED** | **P0** |
+| **D4-S11-A02-T04** | **maxChildren 并发 budget enforcement (FreeFork W8)** | **`internal/layers/multiagent/provision/freefork/forker_test.go`** | **IMPLEMENTED** | **P0** |
+| **D4-S13-A02-T01** | **Worktree 隔离 per-handle (FreeFork W10)** | **`internal/layers/multiagent/provision/freefork/forker_test.go`** | **IMPLEMENTED** | **P0** |
+| **D4-S12-A03-T01** | **BackgroundTaskSurface ToolEventStream context 推送 (D4-S12 W13)** | **`internal/layers/orchestration/turn/tool_stream_test.go`** | **IMPLEMENTED** | **P0** |
 
 ---
 
