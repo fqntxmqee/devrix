@@ -26,6 +26,7 @@ type OrchestratorDeps struct {
 	MaxContextTokens int
 	ObsBridge        *observability.Bridge
 	FocusHint        FocusHintProvider
+	ResolveAwait     ResolveAwaiter
 }
 
 // DefaultOrchestrator implements TurnOrchestrator with the canonical
@@ -40,6 +41,7 @@ type DefaultOrchestrator struct {
 	maxContextTokens int
 	obsBridge        *observability.Bridge
 	focusHint        FocusHintProvider
+	resolveAwait     ResolveAwaiter
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -57,6 +59,7 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		maxContextTokens: deps.MaxContextTokens,
 		obsBridge:        deps.ObsBridge,
 		focusHint:        deps.FocusHint,
+		resolveAwait:     deps.ResolveAwait,
 	}
 }
 
@@ -114,6 +117,16 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	if o.focusHint != nil {
 		if hint := strings.TrimSpace(o.focusHint.FocusHint(ctx, req.SessionID)); hint != "" {
 			systemPrompt = mergeSystemPrompt(systemPrompt, hint)
+		}
+	}
+	if o.resolveAwait != nil {
+		if summary := strings.TrimSpace(o.resolveAwait.AwaitRunningChildren(ctx, req.SessionID)); summary != "" {
+			systemPrompt = mergeSystemPrompt(systemPrompt, summary)
+			out <- &contracts.EngineEvent{
+				Type:      "resolve",
+				Content:   summary,
+				SessionID: req.SessionID,
+			}
 		}
 	}
 
