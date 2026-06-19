@@ -57,3 +57,33 @@ jobs:
 
       - name: Unit tests
         run: ./scripts/test-unit.sh
+
+      # AC-B3: bridge 防回归（devrix-d5-v2-terminal DM-20260619-006）
+      # 9 个 v2.0 bridge 包已删除，import 必须直接走 canonical `instrument/*`、`export/*`、`diagnose/*`、`configure/*` 路径。
+      # 任何命中即视为回归，CI 阻断。
+      - name: Bridge regression guard
+        run: |
+          set -e
+          matches=$(grep -rn \
+            -e "internal/layers/observability/tracer" \
+            -e "internal/layers/observability/metrics" \
+            -e "internal/layers/observability/logger" \
+            -e "internal/layers/observability/telemetry" \
+            -e "internal/layers/observability/exporter" \
+            -e "internal/layers/observability/coverage" \
+            -e "internal/layers/observability/incident" \
+            -e "internal/layers/observability/settings" \
+            -e "internal/layers/observability/runtime" \
+            --include="*.go" \
+            --exclude-dir=archive \
+            --exclude-dir=vendor \
+            --exclude-dir=openspec \
+            . || true)
+          # 允许 canonical `configure/{settings,runtime}` 命中（删除后已重命名）
+          bad=$(echo "$matches" | grep -v "internal/layers/observability/configure/" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::D5 v2.1 bridge import regression detected:"
+            echo "$bad"
+            echo "Use canonical paths: instrument/*, export/*, diagnose/*, configure/*"
+            exit 1
+          fi
