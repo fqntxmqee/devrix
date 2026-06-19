@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -431,7 +431,7 @@ func TestExecuteRound_CheckPermission_AskDelegatesToGate_Allows(t *testing.T) {
 				permReturn: contracts.DecisionAsk, hits: hits,
 			},
 		},
-		perm: mockctx.AllowAllPermission{},
+		perm: enforce.AllowAllPermission{},
 	}
 	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
@@ -458,7 +458,7 @@ func TestExecuteRound_CheckPermission_AskDelegatesToGate_Denies(t *testing.T) {
 				permReturn: contracts.DecisionAsk, hits: hits,
 			},
 		},
-		perm: mockctx.DenyAllPermission{},
+		perm: enforce.DenyAllPermission{},
 	}
 	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},

@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/bootstrap"
+	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
@@ -50,16 +50,16 @@ type D7StackOptions struct {
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
 type D7TestStack struct {
-	Obs         *observability.Observability
-	ObsBridge   *observability.Bridge
-	Gateway     *capture.CommunicationGateway
-	Handler     *MockEventHandler
-	Engine      *contextengine.ContextEngine
-	LLMStub     llmgateway.IAdapter
-	WorkDir       string
-	TaskManager   *workmodel.TaskManager
-	FlowHub       contracts.ExecutionFlowHub
-	SessionQueue  *sessionqueue.SessionQueue
+	Obs          *observability.Observability
+	ObsBridge    *observability.Bridge
+	Gateway      *capture.CommunicationGateway
+	Handler      *MockEventHandler
+	Engine       *contextengine.ContextEngine
+	LLMStub      llmgateway.IAdapter
+	WorkDir      string
+	TaskManager  *workmodel.TaskManager
+	FlowHub      contracts.ExecutionFlowHub
+	SessionQueue *sessionqueue.SessionQueue
 }
 
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
@@ -136,9 +136,9 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	engine := contextengine.NewContextEngine(MergeEngineDeps(
 		ContextEngineDepsFromStack(llmStack, ctxCfg),
 		contextengine.EngineDeps{
-			Tools:      &mockctx.ToolRunner{},
+			Tools:      &enforce.ToolRunner{},
 			ToolsReg:   toolsReg,
-			Permission: mockctx.AllowAllPermission{},
+			Permission: enforce.AllowAllPermission{},
 			ObsBridge:  obsBridge,
 		},
 	))

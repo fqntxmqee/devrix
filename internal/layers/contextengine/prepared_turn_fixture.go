@@ -1,4 +1,4 @@
-package mockctx
+package contextengine
 
 import (
 	"context"
@@ -11,11 +11,12 @@ import (
 //
 // Cross-domain fixture: D7-S2-A06 RunTurn is the production implementation;
 // D2 (legacy/ + prepare.Orchestrator) consumes via EngineDeps.PreparedTurnRunner.
-// Lives in D2/mock/ because D2 tests need a fake and D2 cannot import D7.
+// Lives at D2 root because D2 cannot import D7 — see summarizer_fixture.go for
+// the rationale comment that applies to both fixtures in this package.
 type StaticPreparedTurnRunner struct {
-	Response string
-	Err      error
-	ToolName string
+	Response  string
+	Err       error
+	ToolName  string
 	ToolInput string
 }
 

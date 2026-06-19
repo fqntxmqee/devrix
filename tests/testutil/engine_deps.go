@@ -3,7 +3,6 @@ package testutil
 import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -82,7 +81,7 @@ func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
 		panic("test EngineDeps missing Summarizer")
 	}
 	if deps.PreparedTurnRunner == nil {
-		deps.PreparedTurnRunner = &mockctx.StaticPreparedTurnRunner{}
+		deps.PreparedTurnRunner = &contextengine.StaticPreparedTurnRunner{}
 	}
 	return deps
 }
@@ -90,16 +89,16 @@ func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
 // EngineDepsWithPreparedTurn returns minimal EngineDeps with a static prepared-turn runner.
 func EngineDepsWithPreparedTurn(runner contracts.PreparedTurnRunner) contextengine.EngineDeps {
 	if runner == nil {
-		runner = &mockctx.StaticPreparedTurnRunner{}
+		runner = &contextengine.StaticPreparedTurnRunner{}
 	}
 	return contextengine.EngineDeps{
 		PreparedTurnRunner: runner,
-		Summarizer:         &mockctx.StaticSummarizer{},
+		Summarizer:         &contextengine.StaticSummarizer{},
 	}
 }
 
 // StaticLLMDeps is intentionally removed (2026-06-19 v2.2 closure + dead-code cleanup).
 // The pre-QueryLoop-dismantle path converted a contracts.LLMCaller into a
-// StaticPreparedTurnRunner; both the contracts.LLMCaller interface and
-// mockctx.StaticLLMCaller were removed in DM-20260618-010 → DM-20260619-007.
-// Callers should use EngineDepsWithPreparedTurn directly.
+// StaticPreparedTurnRunner; both the contracts.LLMCaller interface and the
+// legacy static-llm-caller helper were removed in DM-20260618-010 →
+// DM-20260619-007. Callers should use EngineDepsWithPreparedTurn directly.

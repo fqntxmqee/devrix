@@ -1,19 +1,4 @@
-// Package mockctx provides test doubles for D2 ContextEngine ports.
-//
-// mock/ structure (2026-06-19 v2.2 closure + dead-code cleanup):
-//
-//   tool_runner.go    — S18 ports D2 owns: IToolRunner, IPermissionGate test doubles
-//   summarizer.go     — Cross-domain fixture: contracts.Summarizer (D7-S2-A07 owner; D2 consumer)
-//   prepared_turn.go  — Cross-domain fixture: contracts.PreparedTurnRunner (D7-S2-A06 owner; D2 consumer)
-//
-// D2 cannot import D7 (D2 is Follower; D7 is Leader), so cross-domain fixtures
-// must live in D2/mock/ for D2 tests to use them.
-//
-// Stay-in-domain rationale: cmd/obs-verify/main.go imports mockctx as a
-// non-test smoke-test fixture. Moving to tests/testutil/ would force cmd/
-// to import tests/, which violates Go's test-only-imports convention.
-// See devrix-d2-structure-closure (DM-20260619-007) P2-T3 decision.
-package mockctx
+package enforce
 
 import (
 	"context"
@@ -22,6 +7,19 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// Test doubles for S18 ports owned by D2 (enforce/).
+//
+// These live in the enforce/ package alongside the interfaces they implement
+// (IToolRunner in enforce/tools, IPermissionGate in shared/contracts). They
+// are not production code — they are zero-config fakes for tests and the
+// cmd/obs-verify smoke binary. Production callers must use the real
+// ToolRegistry / PermissionGate implementations.
+//
+// Migrated from internal/layers/contextengine/mock/tool_runner.go during
+// the 2026-06-19 D2 mock/ cleanup. The mock/ package was semantically
+// misleading — it bundled D2-owned doubles with cross-domain fixtures; this
+// split puts each in its semantic home.
 
 // ToolRunner is a no-op IToolRunner test double for S18.
 type ToolRunner struct {

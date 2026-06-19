@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -32,12 +32,12 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	cfg.TurnRuntime.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{Output: "tool out"},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "tool out"},
+		ToolsReg:           mustBuiltinRegistry(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 
 	session := types.NewSession("sess_l5_2_9_02", "cli", t.TempDir())
@@ -63,12 +63,12 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	cfg.TurnRuntime.MaxTurns = 2
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{Output: "tool out"},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "tool out"},
+		ToolsReg:           mustBuiltinRegistry(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 
 	const iterations = 100

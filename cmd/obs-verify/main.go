@@ -11,7 +11,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -44,10 +44,10 @@ func main() {
 		log.Fatal(err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		Summarizer: &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{},
+		Summarizer: &contextengine.StaticSummarizer{},
+		Tools:      &enforce.ToolRunner{},
 		ToolsReg:   toolsReg,
-		Permission: mockctx.AllowAllPermission{},
+		Permission: enforce.AllowAllPermission{},
 		Config:     ctxCfg,
 		ObsBridge:  obsBridge,
 	})

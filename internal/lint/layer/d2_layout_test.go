@@ -25,11 +25,19 @@ import (
 
 // allowedRootProductionFiles are the only files permitted at D2 root after v2.2 closure.
 // `tool_context.go` is allowed as a transitional type alias only after P2 migration.
+// `summarizer_fixture.go` and `prepared_turn_fixture.go` are cross-domain D7-contract
+// fixtures (DM-20260619-008 devrix-d2-mock-semantic-split): D2 cannot import D7
+// (Follower→Leader ban), so static fakes for D7-owned contracts (Summarizer,
+// PreparedTurnRunner) live at D2 root as production-buildable helpers consumed by
+// D2 tests, the cmd/obs-verify smoke binary, and integration tests across the repo.
+// They cannot live in *_test.go because cmd/obs-verify imports them from main.
 var allowedRootProductionFiles = map[string]bool{
-	"contracts.go":       true,
-	"aliases.go":         true,
-	"tool_context.go":    true, // P2 transitional: re-exports types after enforce/tools/context.go extraction
-	"doc.go":             true, // package doc
+	"contracts.go":              true,
+	"aliases.go":                true,
+	"tool_context.go":           true, // P2 transitional: re-exports types after enforce/tools/context.go extraction
+	"doc.go":                    true, // package doc
+	"summarizer_fixture.go":     true, // D7 contracts.Summarizer cross-domain fixture
+	"prepared_turn_fixture.go":  true, // D7 contracts.PreparedTurnRunner cross-domain fixture
 }
 
 // forbiddenRootBasenames are filenames that signal Pre-v2.2 drift at D2 root.

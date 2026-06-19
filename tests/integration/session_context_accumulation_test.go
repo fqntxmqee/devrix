@@ -13,7 +13,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
@@ -141,12 +141,12 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
 		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
 		contextengine.EngineDeps{
-			PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{
+			PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{
 				Response: "Echo: round response",
 			},
-			Tools:      &mockctx.ToolRunner{},
+			Tools:      &enforce.ToolRunner{},
 			ToolsReg:   mustBuiltinRegistry(t),
-			Permission: mockctx.AllowAllPermission{},
+			Permission: enforce.AllowAllPermission{},
 			ObsBridge:  obsBridge,
 		},
 	))

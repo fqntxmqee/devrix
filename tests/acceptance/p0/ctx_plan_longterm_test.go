@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -60,12 +60,12 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: turn,
-		Summarizer:         &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   toolsReg,
-		Permission: mockctx.AllowAllPermission{},
-		LongTerm:   lt,
-		Config:     ctxCfg,
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{},
+		ToolsReg:           toolsReg,
+		Permission:         enforce.AllowAllPermission{},
+		LongTerm:           lt,
+		Config:             ctxCfg,
 	})
 
 	session := &types.Session{
