@@ -77,6 +77,15 @@ func (r *bashRunner) Schema() ToolSchema {
 	return ToolSchema{
 		Name:        "bash",
 		Description: "Execute a shell command in the session WorkDir (sandboxed). Use relative paths; prefer read_file/glob/list_dir for file reads.",
+		// Tool-arg schema for Bash (2026-06-20): the previous implementation
+		// omitted Parameters, which made the LLM emit `arguments: "{}"` for
+		// every bash call. The tool then rejected with "invalid command —
+		// pass a shell command string" and the LLM re-issued the same empty
+		// call, producing the 4-call loop visible in
+		// sess_1781908264924_6000.json. With Parameters declared, the model
+		// knows to send {"command": "..."} and bashWrongToolHint stops
+		// firing on the first turn.
+		Parameters: `{"type":"object","required":["command"],"properties":{"command":{"type":"string","description":"Shell command to execute. Prefer relative paths; use read_file/glob/grep for file reads."}}}`,
 	}
 }
 
