@@ -109,6 +109,72 @@ func TestAppendAndTrimMessages_noBootstrapMissingSession(t *testing.T) {
 	}
 }
 
+// TestAppendAndTrimMessages_DedupByID reproduces the context-bleed pattern
+// observed 2026-06-20: the D7 turn orchestrator passes the full history
+// slice [prepared.Messages + req.UserMessage] to PersistTurn, where
+// prepared.Messages is sourced from sc.Messages. Without ID-based dedup,
+// every prior message would be appended a second time each turn (2^N
+// growth). After the fix, the existing IDs are detected and skipped; only
+// genuinely-new messages land in sc.Messages.
+func TestAppendAndTrimMessages_DedupByID(t *testing.T) {
+	store := &stubStore{sessions: map[string]*types.SessionContext{
+		"s1": {
+			SessionID: "s1",
+			Messages: []types.Message{
+				{ID: "m1", Role: types.MessageRoleUser, Content: "你好"},
+				{ID: "m2", Role: types.MessageRoleAssistant, Content: "hi"},
+				{ID: "m3", Role: types.MessageRoleUser, Content: "请尝试多轮"},
+				{ID: "m4", Role: types.MessageRoleAssistant, Content: "ok"},
+			},
+		},
+	}}
+	// D7 caller mistakenly re-passes the whole history plus the new turn.
+	msgs := []types.Message{
+		{ID: "m1", Role: types.MessageRoleUser, Content: "你好"},
+		{ID: "m2", Role: types.MessageRoleAssistant, Content: "hi"},
+		{ID: "m3", Role: types.MessageRoleUser, Content: "请尝试多轮"},
+		{ID: "m4", Role: types.MessageRoleAssistant, Content: "ok"},
+		{ID: "m5", Role: types.MessageRoleUser, Content: "跑一个复杂指令"},
+	}
+	if err := persist.AppendAndTrimMessages(persist.CommitDeps{Store: store}, "s1", msgs); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	// After TrimMessages (stub keeps last 2), exactly the last two distinct
+	// IDs should remain: m4 + m5.
+	got := store.sessions["s1"].Messages
+	if len(got) != 2 {
+		t.Fatalf("after dedup+trim: got %d messages, want 2: %#v", len(got), got)
+	}
+	if got[0].ID != "m4" || got[1].ID != "m5" {
+		t.Fatalf("expected [m4, m5], got [%s, %s]", got[0].ID, got[1].ID)
+	}
+}
+
+// TestAppendAndTrimMessages_NoDedupWhenIDsAbsent ensures the dedup path is
+// non-destructive for messages without IDs (legacy callers / bootstrap
+// paths). Such messages must still be appended, with the Store assigning IDs.
+func TestAppendAndTrimMessages_NoDedupWhenIDsAbsent(t *testing.T) {
+	store := &stubStore{sessions: map[string]*types.SessionContext{
+		"s1": {SessionID: "s1", Messages: []types.Message{{Role: types.MessageRoleUser, Content: "old"}}},
+	}}
+	msgs := []types.Message{
+		{Role: types.MessageRoleUser, Content: "new1"},
+		{Role: types.MessageRoleAssistant, Content: "new2"},
+	}
+	if err := persist.AppendAndTrimMessages(persist.CommitDeps{Store: store}, "s1", msgs); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	// Stub TrimMessages keeps only the last 2 entries. What matters here is
+	// that both new messages landed (no ID-based drop of empty-ID msgs).
+	got := store.sessions["s1"].Messages
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages after trim, got %d: %#v", len(got), got)
+	}
+	if got[0].Content != "new1" || got[1].Content != "new2" {
+		t.Fatalf("unexpected contents after dedup-bypass: [%q, %q]", got[0].Content, got[1].Content)
+	}
+}
+
 // T: D2-S17-A02-T01 (race-safety: per-session turn-serial pattern)
 // In production, AppendAndTrimMessages is called per-session from D7 turn
 // orchestrator (one turn at a time per session). This test validates that
