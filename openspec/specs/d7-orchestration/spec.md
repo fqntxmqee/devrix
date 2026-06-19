@@ -282,7 +282,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 | D7-S5-P2 ClassifyIntent | 规则 + command-first + LLM fallback | ✅ IMPLEMENTED |
 | D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG（规则 + LLM） | ✅ IMPLEMENTED |
 | D7-S5 SelectExecutor | D2/D4 执行器选择 | ✅ IMPLEMENTED |
-| D2 Thin QueryLoop | loop.go ≤200 行、无 D4 import | ✅ IMPLEMENTED |
+| D2 Thin / QueryLoop removed | loop 已删；D2 无 D4 import | ✅ DM-20260618-010 |
 | D7 package identity | `internal/layers/orchestration/coordinator/` (package `coordinator`) | ✅ IMPLEMENTED |
 | D7 Migration Coexistence | 4 组合回归 | ✅ IMPLEMENTED |
 | D7-S2 Turn Leader (DM-020) | A06 RunTurnLoop + A07 InvokeLLM | ✅ IMPLEMENTED（wired by `wire_coordinator.go`） |
