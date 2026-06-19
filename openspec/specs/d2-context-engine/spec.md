@@ -783,25 +783,7 @@ Transcript 分离 MUST 支持 compact view 与 append-only full log 双轨（对
 
 ### Requirement: QueryLoop Runtime
 
-When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool rounds to `query.Loop` instead of the legacy fixed-iteration execute loop. When `enabled=false`, behavior MUST remain bit-identical to V5.
-
-**Priority:** P0  
-**L3:** L3-BE-CTX-QueryLoop  
-**L4:** query_loop  
-**T:** D2-CTX-T34, D2-CTX-T39
-
-#### Scenario: Multi-turn tool loop
-
-- GIVEN `query_loop.enabled=true` and LLM returns tool_use until final text
-- WHEN Process runs
-- THEN Loop continues until no pending tool calls or `max_turns` reached
-- AND `TurnCount` reflects tool rounds executed
-
-#### Scenario: V5 regression with query loop disabled
-
-- GIVEN `query_loop.enabled=false`
-- WHEN any V5 T 层 scenario runs
-- THEN behavior is unchanged from V5
+**Status:** REMOVED (DM-20260618-010). See archive `openspec/archive/2026-06-18-devrix-d2-queryloop-dismantle/`.
 
 ---
 
@@ -969,14 +951,14 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 
 ## ADDED Requirements (V7 Harness Unification)
 
-> **修订 (DM-20260618-010)**：`query_loop.enabled` 已删除。`PathQueryLoop` runtime 标签仍用于 `engine.Process()` 路径计数（语义上为 D7 PreparedTurnRunner）。
+> **修订 (DM-20260618-010)**：`query_loop.enabled` 已删除。Production Process 记录 `obsruntime.PathD7Turn`。
 
-### Requirement: QueryLoop Default Primary Path
+### Requirement: D7 Turn Primary Path
 
-`context_engine.query_loop.enabled` MUST default to `true`. Production Process MUST record `obsruntime.PathQueryLoop` unless operator explicitly sets `query_loop.enabled=false`.
+Production Process MUST delegate LLM↔Tool rounds to D7 via `PreparedTurnRunner` and MUST record `obsruntime.PathD7Turn`. Legacy harness bootstrap MUST NOT run.
 
 **Priority:** P0  
-**L4:** query_loop  
+**L4:** d7_turn  
 **T:** D2-S11-A01-T01, D2-S11-A01-T02, D2-S11-A01-D6PR
 
 #### Scenario: Legacy harness path not taken by default
@@ -985,6 +967,7 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 - WHEN Process runs
 - THEN legacy harness bootstrap branch is not executed
 - AND PathRegressionProbe legacy_harness counter remains 0
+- AND `obsruntime.PathD7Turn` is incremented
 
 ### Requirement: Per-Turn Active Window Compression
 
@@ -1464,8 +1447,7 @@ turn.Orchestrator (D7)                              [wire_coordinator.go:141]
   ↓ for each turn:
       ├─ Prepare   → contextEngineAdapter.Prepare   [turn_adapter.go:64]
       │              └─ 聚合 surface.Tools() + toolReg.ListTools() 去重
-      ├─ Invoke    → turn.Orchestrator 调 D3 LLM    [context_engine.go:125]
-      │              (QueryLLMCaller, 不经过 turn_adapter)
+      ├─ Invoke    → turn.GatewayInvoker → D3 LLM       [turn/llm.go]
       └─ ExecuteRound → contextEngineAdapter.ExecuteRound  [turn_adapter.go:186]
                         │
                         ├─ 1) IPermissionGate.Request(risk)        [turn_adapter.go:207]
@@ -1612,4 +1594,8 @@ IM 模式 (飞书/钉钉/企微):
 
 ## REMOVED Requirements
 
-(None)
+### Requirement: D2-S10/S16 QueryLoop Module (DM-20260618-010)
+
+Physical module `contextengine/query/loop.go`, `QueryLLMCaller`, and `query_loop.enabled` config removed. Capabilities: D7 `RunTurn`/`SubTurn`, D2-S18 tool rounds.
+
+---

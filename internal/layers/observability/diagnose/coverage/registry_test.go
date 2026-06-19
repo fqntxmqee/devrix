@@ -58,11 +58,6 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S2_Context_Tools_Register,
 		telemetry.OpD2_S2_Context_Memory_Snapshot_Save,
 
-		// D2 Context Engine - QueryLoop (D2-S16)
-		telemetry.OpD2_S10_Query_Loop_Run,
-		telemetry.OpD2_S10_Query_Loop_Turn,
-		telemetry.OpD2_S10_Query_Loop_LLM_Call,
-
 		// D2 Context Engine - Tool Execution (D2-S5)
 		telemetry.OpD2_S5_Tool_Execute_Single,
 		telemetry.OpD2_S5_Tool_Execute_Permission,

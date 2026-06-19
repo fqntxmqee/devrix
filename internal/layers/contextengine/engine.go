@@ -111,7 +111,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		defer processSpan.End()
 	}
 
-	obsruntime.Record(obsruntime.PathQueryLoop)
+	obsruntime.Record(obsruntime.PathD7Turn)
 	agentsRaw := e.prompt.Load(session.WorkDir)
 	{
 		_, spSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_SystemPrompt_Load, tracer.SpanKindInternal,

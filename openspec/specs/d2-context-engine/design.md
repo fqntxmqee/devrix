@@ -617,8 +617,8 @@ go test -tags='acceptance && p0 && d2' ./tests/acceptance/p0/ -run Harness -coun
 
 | 能力 | 说明 |
 |------|------|
-| 主路径 | `query_loop.enabled=true`（默认）；`obsruntime.PathQueryLoop` 计数 |
-| Legacy fallback | 仅当 `query_loop.enabled=false` 时走 Harness Bootstrap + 入口压缩旧路径 |
+| 主路径 | D7 RunTurn；`obsruntime.PathD7Turn` 计数 |
+| Legacy fallback | **REMOVED**（harness + QueryLoop 均已删除） |
 | Per-turn 压缩 | `compress_per_turn=true`（默认）跳过 Process 入口压缩；`commitActiveWindow` 在回合结束后压缩 active window |
 | Conversation | `RepairToolMessageChain` + `MessagesAfterCompactBoundary` 保证 API 消息合法 |
 | Main transcript | `main_transcript.enabled` → `{base_dir}/{sessionId}/transcript.jsonl` append-only |

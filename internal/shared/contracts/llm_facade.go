@@ -6,10 +6,9 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// LLMCaller performs one streaming LLM call with optional user context prepend.
+// LLMCaller is a mock/test-only streaming LLM facade.
 //
-// DSAFT: D7-S2-A07 (InvokeLLM) → D2 query loop 拆面出口
-// Implemented by D7 turn.CompressionSummarizer; consumed by D2 compression pipeline.
+// Deprecated: production LLM calls use D7 GatewayInvoker. Retained for mockctx.StaticLLMCaller.
 type LLMCaller interface {
 	Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, error)
 }

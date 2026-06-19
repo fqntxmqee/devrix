@@ -9,16 +9,16 @@ import (
 // 且不变量：Snapshot 内部一致性。
 func TestPathResolver_Record_AndSnapshot(t *testing.T) {
 	Reset()
-	if s := Snapshot(); s.QueryLoop != 0 || s.LegacyHarness != 0 {
+	if s := Snapshot(); s.D7Turn != 0 || s.LegacyHarness != 0 {
 		t.Fatalf("after Reset, want zeros, got %+v", s)
 	}
-	Record(PathQueryLoop)
-	Record(PathQueryLoop)
+	Record(PathD7Turn)
+	Record(PathD7Turn)
 	Record(PathLegacyHarness)
 
 	s := Snapshot()
-	if s.QueryLoop != 2 {
-		t.Errorf("QueryLoop = %d, want 2", s.QueryLoop)
+	if s.D7Turn != 2 {
+		t.Errorf("D7Turn = %d, want 2", s.D7Turn)
 	}
 	if s.LegacyHarness != 1 {
 		t.Errorf("LegacyHarness = %d, want 1", s.LegacyHarness)
@@ -36,13 +36,13 @@ func TestPathResolver_ConcurrentRecord(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < perGoroutine; j++ {
-				Record(PathQueryLoop)
+				Record(PathD7Turn)
 			}
 		}()
 	}
 	wg.Wait()
-	if got := Snapshot().QueryLoop; got != int64(goroutines*perGoroutine) {
-		t.Errorf("QueryLoop = %d, want %d", got, goroutines*perGoroutine)
+	if got := Snapshot().D7Turn; got != int64(goroutines*perGoroutine) {
+		t.Errorf("D7Turn = %d, want %d", got, goroutines*perGoroutine)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestPathResolver_ConcurrentRecord(t *testing.T) {
 func TestPathResolver_UnknownKind_Noop(t *testing.T) {
 	Reset()
 	Record(PathKind("totally_unknown_path"))
-	if s := Snapshot(); s.QueryLoop != 0 || s.LegacyHarness != 0 {
+	if s := Snapshot(); s.D7Turn != 0 || s.LegacyHarness != 0 {
 		t.Errorf("unknown path leaked into counters: %+v", s)
 	}
 }
@@ -58,10 +58,10 @@ func TestPathResolver_UnknownKind_Noop(t *testing.T) {
 // Reset() 行为。
 func TestPathResolver_Reset(t *testing.T) {
 	Reset()
-	Record(PathQueryLoop)
+	Record(PathD7Turn)
 	Record(PathLegacyHarness)
 	Reset()
-	if s := Snapshot(); s.QueryLoop != 0 || s.LegacyHarness != 0 {
+	if s := Snapshot(); s.D7Turn != 0 || s.LegacyHarness != 0 {
 		t.Errorf("after Reset, want zeros, got %+v", s)
 	}
 }

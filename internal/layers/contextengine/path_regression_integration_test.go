@@ -38,8 +38,8 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	if snap.LegacyHarness != 0 {
 		t.Errorf("legacy_harness = %d, want 0 (QueryLoop must not touch legacy path)", snap.LegacyHarness)
 	}
-	if snap.QueryLoop < 1 {
-		t.Errorf("query_loop = %d, want >= 1 (Process() must record the path it took)", snap.QueryLoop)
+	if snap.D7Turn < 1 {
+		t.Errorf("d7_turn = %d, want >= 1 (Process() must record the path it took)", snap.D7Turn)
 	}
 }
 
@@ -72,8 +72,8 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	if snap.LegacyHarness != 0 {
 		t.Errorf("legacy_harness = %d, want 0 after %d iterations", snap.LegacyHarness, iterations)
 	}
-	if snap.QueryLoop != int64(iterations) {
-		t.Errorf("query_loop = %d, want %d (every Process() should record 1)", snap.QueryLoop, iterations)
+	if snap.D7Turn != int64(iterations) {
+		t.Errorf("d7_turn = %d, want %d (every Process() should record 1)", snap.D7Turn, iterations)
 	}
 }
 
