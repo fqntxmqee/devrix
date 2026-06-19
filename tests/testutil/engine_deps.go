@@ -98,11 +98,8 @@ func EngineDepsWithPreparedTurn(runner contracts.PreparedTurnRunner) contextengi
 	}
 }
 
-// StaticLLMDeps returns deps with a static prepared-turn runner (legacy name kept for tests).
-func StaticLLMDeps(caller contracts.LLMCaller) contextengine.EngineDeps {
-	runner := &mockctx.StaticPreparedTurnRunner{}
-	if c, ok := caller.(*mockctx.StaticLLMCaller); ok {
-		runner = mockctx.PreparedTurnRunnerFromCaller(c).(*mockctx.StaticPreparedTurnRunner)
-	}
-	return EngineDepsWithPreparedTurn(runner)
-}
+// StaticLLMDeps is intentionally removed (2026-06-19 v2.2 closure + dead-code cleanup).
+// The pre-QueryLoop-dismantle path converted a contracts.LLMCaller into a
+// StaticPreparedTurnRunner; both the contracts.LLMCaller interface and
+// mockctx.StaticLLMCaller were removed in DM-20260618-010 → DM-20260619-007.
+// Callers should use EngineDepsWithPreparedTurn directly.

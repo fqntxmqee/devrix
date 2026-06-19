@@ -8,13 +8,22 @@ import (
 )
 
 // StaticPreparedTurnRunner is a test double for contracts.PreparedTurnRunner.
+//
+// Cross-domain fixture: D7-S2-A06 RunTurn is the production implementation;
+// D2 (legacy/ + prepare.Orchestrator) consumes via EngineDeps.PreparedTurnRunner.
+// Lives in D2/mock/ because D2 tests need a fake and D2 cannot import D7.
 type StaticPreparedTurnRunner struct {
 	Response string
 	Err      error
-	ToolCall *contracts.ToolCall
+	ToolName string
+	ToolInput string
 }
 
 // RunPreparedTurn implements contracts.PreparedTurnRunner.
+//
+// Emits a complete EngineEvent stream (text/tool_call → complete) when req.Emit
+// is non-nil. The streaming text chunks carry is_complete="false" so the
+// engine's working-memory aggregator flushes them into sc.Messages on persist.
 func (m *StaticPreparedTurnRunner) RunPreparedTurn(ctx context.Context, req contracts.PreparedTurnRequest) (*contracts.PreparedTurnResult, error) {
 	if m.Err != nil {
 		return nil, m.Err
@@ -23,18 +32,16 @@ func (m *StaticPreparedTurnRunner) RunPreparedTurn(ctx context.Context, req cont
 	if text == "" {
 		text = "I can help you with that."
 	}
+	emitTool := m.ToolName != ""
 	if req.Emit != nil {
-		if m.ToolCall != nil {
+		if emitTool {
 			req.Emit(&contracts.EngineEvent{
 				Type:      "tool_call",
 				SessionID: req.SessionID,
-				ToolName:  m.ToolCall.Name,
-				ToolInput: m.ToolCall.Input,
+				ToolName:  m.ToolName,
+				ToolInput: m.ToolInput,
 			})
 		} else {
-			// Streaming text chunks must carry is_complete="false" so the
-			// engine's working-memory aggregator (engine.go:236) flushes
-			// them into sc.Messages on persist. See D2 spec §event types.
 			req.Emit(&contracts.EngineEvent{
 				Type:      "text",
 				Content:   text,
@@ -50,11 +57,10 @@ func (m *StaticPreparedTurnRunner) RunPreparedTurn(ctx context.Context, req cont
 		})
 	}
 	var history []types.ToolCallRecord
-	if m.ToolCall != nil {
+	if emitTool {
 		history = []types.ToolCallRecord{{
-			CallID:   m.ToolCall.ID,
-			ToolName: m.ToolCall.Name,
-			Input:    m.ToolCall.Input,
+			ToolName: m.ToolName,
+			Input:    m.ToolInput,
 		}}
 	}
 	return &contracts.PreparedTurnResult{
@@ -65,20 +71,11 @@ func (m *StaticPreparedTurnRunner) RunPreparedTurn(ctx context.Context, req cont
 }
 
 // PreparedTurnRunnerWithTools returns a runner that emits a bash tool call.
+//
+// Convenience constructor for tests that want to exercise the tool_call path.
 func PreparedTurnRunnerWithTools() contracts.PreparedTurnRunner {
 	return &StaticPreparedTurnRunner{
-		ToolCall: &contracts.ToolCall{ID: "tc1", Name: "bash", Input: "ls"},
-	}
-}
-
-// PreparedTurnRunnerFromCaller adapts a legacy StaticLLMCaller-style response.
-func PreparedTurnRunnerFromCaller(caller *StaticLLMCaller) contracts.PreparedTurnRunner {
-	if caller == nil {
-		return &StaticPreparedTurnRunner{}
-	}
-	return &StaticPreparedTurnRunner{
-		Response: caller.Response,
-		Err:      caller.Err,
-		ToolCall: caller.ToolCall,
+		ToolName:  "bash",
+		ToolInput: "ls",
 	}
 }
