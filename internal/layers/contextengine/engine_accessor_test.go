@@ -15,6 +15,11 @@ func newTestEngine(t *testing.T) *contextengine.ContextEngine {
 	t.Helper()
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
+	// Disable on-disk snapshots in tests to prevent cross-test pollution via
+	// the shared ~/.devrix/context backup dir. Manager.LoadOrInit falls back
+	// to ReadBackup when session.ContextSnapshot is empty, which previously
+	// caused tests to load stale state from previous runs.
+	cfg.Snapshot.Enabled = false
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:           &mockctx.StaticSummarizer{},

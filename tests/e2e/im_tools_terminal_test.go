@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/bash"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/bash"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 )
 
@@ -36,7 +36,7 @@ func TestE2E_IMToolsTerminal_5Steps(t *testing.T) {
 	ctx := context.Background()
 
 	// ---- Step 1: LSP ----
-	cfg := &toolrunner.LSPConfig{Enabled: false}
+	cfg := &tools.LSPConfig{Enabled: false}
 	lsp := surface.NewLSPToolSurface(cfg)
 	lspRes, _ := lsp.Execute(ctx, surface.LSPGoToDefinition,
 		`{"file_path":"/tmp/x.go","line":1,"character":1}`, "")
@@ -54,14 +54,14 @@ func TestE2E_IMToolsTerminal_5Steps(t *testing.T) {
 	}
 
 	// ---- Step 3: FreeFork ----
-	forker := func(_ context.Context, _ string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
-		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
+	forker := func(_ context.Context, _ string, reqs []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
+		handles := make([]tools.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
 			wt := ""
 			if r.WantsSandbox() {
 				wt = r.Name + ".wt"
 			}
-			handles = append(handles, toolrunner.FreeForkHandleDTO{AgentID: r.Name, Name: r.Name, SandboxPath: wt})
+			handles = append(handles, tools.FreeForkHandleDTO{AgentID: r.Name, Name: r.Name, SandboxPath: wt})
 		}
 		return handles, nil
 	}

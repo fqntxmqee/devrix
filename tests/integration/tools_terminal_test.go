@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/sandboxast"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/shared/ltllite"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn_adapter"
@@ -33,7 +33,7 @@ import (
 
 // TestLSP_End2End — G1: lsp_go_to_definition spec 暴露 + Execute 入口可达。
 func TestLSP_End2End(t *testing.T) {
-	cfg := &toolrunner.LSPConfig{Enabled: false}
+	cfg := &tools.LSPConfig{Enabled: false}
 	s := surface.NewLSPToolSurface(cfg)
 	specs := s.Tools(context.Background(), "", "")
 	if len(specs) != 5 {
@@ -102,15 +102,15 @@ func TestBashAST_DenyAttack(t *testing.T) {
 
 // TestFreeFork_3Directions — G4: free_fork surface n=3 → 3 handle。
 func TestFreeFork_3Directions(t *testing.T) {
-	forker := func(_ context.Context, parent string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	forker := func(_ context.Context, parent string, reqs []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 		_ = parent
-		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
+		handles := make([]tools.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
 			wt := ""
 			if r.WantsSandbox() {
 				wt = r.Name + ".wt"
 			}
-			handles = append(handles, toolrunner.FreeForkHandleDTO{
+			handles = append(handles, tools.FreeForkHandleDTO{
 				AgentID:  "agent-" + r.Name,
 				Name:     r.Name,
 				SandboxPath: wt,

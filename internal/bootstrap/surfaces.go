@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -17,10 +17,10 @@ import (
 //
 // DSAFT: TOOL-SURFACE-1-A03-F04 (DM-20260617-007 devrix-tool-surface-contract)
 type SurfaceBuildOpts struct {
-	ToolReg   *toolrunner.ToolRegistry  // BuiltinSurface input
-	LSPConfig *toolrunner.LSPConfig     // LSPToolSurface input (nil → omit)
+	ToolReg   *tools.ToolRegistry  // BuiltinSurface input
+	LSPConfig *tools.LSPConfig     // LSPToolSurface input (nil → omit)
 	Tracker   *tracker.Tracker          // TrackerSurface input (nil → omit)
-	Forker    toolrunner.FreeForkerFunc // FreeForkSurface input (nil → omit)
+	Forker    tools.FreeForkerFunc // FreeForkSurface input (nil → omit)
 	WorkDir   string                    // for VerifySurface fallback (optional)
 }
 

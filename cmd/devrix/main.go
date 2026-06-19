@@ -23,7 +23,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
 	"github.com/devrix/devrix/internal/layers/orchestration/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/multiagent"

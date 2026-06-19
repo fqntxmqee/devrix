@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -38,11 +38,11 @@ func SetBackgroundTaskToolsDeps(deps BackgroundTaskToolsDeps) {
 
 // RegisterBackgroundTaskTools registers task_stop / task_output as LLM tools.
 // Safe to call when turn runtime is active. No-op if registry is nil.
-func RegisterBackgroundTaskTools(reg *toolrunner.ToolRegistry) error {
+func RegisterBackgroundTaskTools(reg *tools.ToolRegistry) error {
 	if reg == nil {
 		return nil
 	}
-	for _, runner := range []toolrunner.PluginRunner{
+	for _, runner := range []tools.PluginRunner{
 		newTaskStopRunner(),
 		newTaskOutputRunner(),
 		newTaskListBackgroundRunner(),
@@ -64,34 +64,34 @@ func (r *taskStopRunner) Name() string { return "task_stop" }
 
 func (r *taskStopRunner) RiskLevel() types.RiskLevel { return types.RiskLevelMedium }
 
-func (r *taskStopRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (r *taskStopRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name:        "task_stop",
 		Description: "Cancel a running background SubQuery by task_id (idempotent; returns the previous status).",
 		Parameters:  `{"type":"object","required":["task_id"],"properties":{"task_id":{"type":"string","description":"Background task id returned by delegate_explore/plan/implement with async=true or by RunBackground."}}}`,
 	}
 }
 
-func (r *taskStopRunner) Execute(ctx context.Context, _, input string) (*toolrunner.ToolResult, error) {
-	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
+func (r *taskStopRunner) Execute(ctx context.Context, _, input string) (*tools.ToolResult, error) {
+	sessionID := tools.ToolSessionIDFromContext(ctx)
 	if sessionID == "" {
-		return &toolrunner.ToolResult{Error: "task_stop: session_id unavailable"}, nil
+		return &tools.ToolResult{Error: "task_stop: session_id unavailable"}, nil
 	}
-	fields := toolrunner.ParseToolInput(input)
+	fields := tools.ParseToolInput(input)
 	taskID := strings.TrimSpace(fields["task_id"])
 	if taskID == "" {
-		return &toolrunner.ToolResult{Error: "task_stop: task_id is required"}, nil
+		return &tools.ToolResult{Error: "task_stop: task_id is required"}, nil
 	}
 	reg := backgroundRegistry()
 	if reg == nil {
-		return &toolrunner.ToolResult{Error: "task_stop: background registry not initialized"}, nil
+		return &tools.ToolResult{Error: "task_stop: background registry not initialized"}, nil
 	}
 	task, ok := reg.Get(taskID)
 	if !ok {
-		return &toolrunner.ToolResult{Error: fmt.Sprintf("task_stop: unknown task_id %s", taskID)}, nil
+		return &tools.ToolResult{Error: fmt.Sprintf("task_stop: unknown task_id %s", taskID)}, nil
 	}
 	if task.SessionID != sessionID {
-		return &toolrunner.ToolResult{Error: "task_stop: task belongs to a different session"}, nil
+		return &tools.ToolResult{Error: "task_stop: task belongs to a different session"}, nil
 	}
 	prev := task.Status
 	cancelled := reg.Cancel(taskID)
@@ -105,7 +105,7 @@ func (r *taskStopRunner) Execute(ctx context.Context, _, input string) (*toolrun
 		out["new_status"] = prev
 	}
 	data, _ := json.Marshal(out)
-	return &toolrunner.ToolResult{Output: string(data)}, nil
+	return &tools.ToolResult{Output: string(data)}, nil
 }
 
 // --- task_output --------------------------------------------------------------
@@ -118,8 +118,8 @@ func (r *taskOutputRunner) Name() string { return "task_output" }
 
 func (r *taskOutputRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
-func (r *taskOutputRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (r *taskOutputRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name:        "task_output",
 		Description: "Read the status/output of a background SubQuery. block=true waits until the task reaches a terminal state (max 600s).",
 		Parameters: `{"type":"object","required":["task_id"],"properties":{
@@ -130,22 +130,22 @@ func (r *taskOutputRunner) Schema() toolrunner.ToolSchema {
 	}
 }
 
-func (r *taskOutputRunner) Execute(ctx context.Context, _, input string) (*toolrunner.ToolResult, error) {
-	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
+func (r *taskOutputRunner) Execute(ctx context.Context, _, input string) (*tools.ToolResult, error) {
+	sessionID := tools.ToolSessionIDFromContext(ctx)
 	if sessionID == "" {
-		return &toolrunner.ToolResult{Error: "task_output: session_id unavailable"}, nil
+		return &tools.ToolResult{Error: "task_output: session_id unavailable"}, nil
 	}
-	fields := toolrunner.ParseToolInput(input)
+	fields := tools.ParseToolInput(input)
 	taskID := strings.TrimSpace(fields["task_id"])
 	if taskID == "" {
-		return &toolrunner.ToolResult{Error: "task_output: task_id is required"}, nil
+		return &tools.ToolResult{Error: "task_output: task_id is required"}, nil
 	}
 	block := parseBoolField(fields["block"])
 	timeout := parseTimeoutMs(fields["timeout_ms"], 30*time.Second)
 
 	reg := backgroundRegistry()
 	if reg == nil {
-		return &toolrunner.ToolResult{Error: "task_output: background registry not initialized"}, nil
+		return &tools.ToolResult{Error: "task_output: background registry not initialized"}, nil
 	}
 	waiter := backgroundWaiter()
 	if waiter == nil {
@@ -154,10 +154,10 @@ func (r *taskOutputRunner) Execute(ctx context.Context, _, input string) (*toolr
 
 	task, ok := reg.Get(taskID)
 	if !ok {
-		return &toolrunner.ToolResult{Error: fmt.Sprintf("task_output: unknown task_id %s", taskID)}, nil
+		return &tools.ToolResult{Error: fmt.Sprintf("task_output: unknown task_id %s", taskID)}, nil
 	}
 	if task.SessionID != sessionID {
-		return &toolrunner.ToolResult{Error: "task_output: task belongs to a different session"}, nil
+		return &tools.ToolResult{Error: "task_output: task belongs to a different session"}, nil
 	}
 
 	if block && task.Status == "running" {
@@ -177,7 +177,7 @@ func (r *taskOutputRunner) Execute(ctx context.Context, _, input string) (*toolr
 		"ended_at":   task.EndedAt,
 	}
 	data, _ := json.Marshal(out)
-	return &toolrunner.ToolResult{Output: string(data)}, nil
+	return &tools.ToolResult{Output: string(data)}, nil
 }
 
 // --- task_list_background (P1) ----------------------------------------------
@@ -190,22 +190,22 @@ func (r *taskListBackgroundRunner) Name() string { return "task_list_background"
 
 func (r *taskListBackgroundRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
-func (r *taskListBackgroundRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (r *taskListBackgroundRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name:        "task_list_background",
 		Description: "List all background SubQuery tasks for the current session (running + terminal). task_id prefix 'bg_' identifies background SubQuery; 'task_' prefix is for Plan tasks.",
 		Parameters:  `{"type":"object","properties":{}}`,
 	}
 }
 
-func (r *taskListBackgroundRunner) Execute(ctx context.Context, _, _ string) (*toolrunner.ToolResult, error) {
-	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
+func (r *taskListBackgroundRunner) Execute(ctx context.Context, _, _ string) (*tools.ToolResult, error) {
+	sessionID := tools.ToolSessionIDFromContext(ctx)
 	if sessionID == "" {
-		return &toolrunner.ToolResult{Error: "task_list_background: session_id unavailable"}, nil
+		return &tools.ToolResult{Error: "task_list_background: session_id unavailable"}, nil
 	}
 	reg := backgroundRegistry()
 	if reg == nil {
-		return &toolrunner.ToolResult{Error: "task_list_background: background registry not initialized"}, nil
+		return &tools.ToolResult{Error: "task_list_background: background registry not initialized"}, nil
 	}
 	tasks := reg.List(sessionID)
 	out := make([]map[string]any, 0, len(tasks))
@@ -220,7 +220,7 @@ func (r *taskListBackgroundRunner) Execute(ctx context.Context, _, _ string) (*t
 		})
 	}
 	data, _ := json.Marshal(map[string]any{"tasks": out, "count": len(out)})
-	return &toolrunner.ToolResult{Output: string(data)}, nil
+	return &tools.ToolResult{Output: string(data)}, nil
 }
 
 // --- helpers ------------------------------------------------------------------

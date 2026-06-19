@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -48,7 +48,7 @@ func TestBuildSurfaces_AllConfigured(t *testing.T) {
 // sort, even though the per-opts surface count differs.
 func TestBuildSurfaces_SortByName_Stable(t *testing.T) {
 	tr := tracker.New(8)
-	okFork := func(_ context.Context, _ string, _ []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	okFork := func(_ context.Context, _ string, _ []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 		return nil, nil
 	}
 	optsList := []SurfaceBuildOpts{
@@ -92,7 +92,7 @@ func TestBuildSurfaces_SortByName_Stable(t *testing.T) {
 // tracker < verify (T3.3).
 func TestBuildSurfaces_FullDeps_AlphabeticalOrder(t *testing.T) {
 	tr := tracker.New(8)
-	okFork := func(_ context.Context, _ string, _ []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	okFork := func(_ context.Context, _ string, _ []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 		return nil, nil
 	}
 	surfaces := BuildSurfaces(SurfaceBuildOpts{

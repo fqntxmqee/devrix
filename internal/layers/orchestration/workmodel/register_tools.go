@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // RegisterTaskTools registers task_* tools when Tasks.Mode is v2.
-func RegisterTaskTools(reg *toolrunner.ToolRegistry, cfg *config.ContextEngineConfig, manager *TaskManager) error {
+func RegisterTaskTools(reg *tools.ToolRegistry, cfg *config.ContextEngineConfig, manager *TaskManager) error {
 	if reg == nil || cfg == nil || manager == nil {
 		return nil
 	}
@@ -41,8 +41,8 @@ type taskToolRunner struct {
 	action  taskAction
 }
 
-func newTaskToolRunners(manager *TaskManager) []toolrunner.PluginRunner {
-	return []toolrunner.PluginRunner{
+func newTaskToolRunners(manager *TaskManager) []tools.PluginRunner {
+	return []tools.PluginRunner{
 		&taskToolRunner{name: ToolNameTaskCreate, manager: manager, action: taskActionCreate},
 		&taskToolRunner{name: ToolNameTaskGet, manager: manager, action: taskActionGet},
 		&taskToolRunner{name: ToolNameTaskList, manager: manager, action: taskActionList},
@@ -54,32 +54,32 @@ func (r *taskToolRunner) Name() string { return r.name }
 
 func (r *taskToolRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
-func (r *taskToolRunner) Schema() toolrunner.ToolSchema {
+func (r *taskToolRunner) Schema() tools.ToolSchema {
 	switch r.action {
 	case taskActionCreate:
-		return toolrunner.ToolSchema{
+		return tools.ToolSchema{
 			Name: r.name, Description: "Create a persisted task",
 			Parameters: `{"type":"object","required":["subject"],"properties":{"subject":{"type":"string"},"description":{"type":"string"}}}`,
 		}
 	case taskActionGet:
-		return toolrunner.ToolSchema{
+		return tools.ToolSchema{
 			Name: r.name, Description: "Get a task by id",
 			Parameters: `{"type":"object","required":["task_id"],"properties":{"task_id":{"type":"string"}}}`,
 		}
 	case taskActionList:
-		return toolrunner.ToolSchema{Name: r.name, Description: "List all tasks for the session", Parameters: `{"type":"object","properties":{"format":{"type":"string","enum":["flat","tree"]}}}`}
+		return tools.ToolSchema{Name: r.name, Description: "List all tasks for the session", Parameters: `{"type":"object","properties":{"format":{"type":"string","enum":["flat","tree"]}}}`}
 	default:
-		return toolrunner.ToolSchema{
+		return tools.ToolSchema{
 			Name: r.name, Description: "Update a task",
 			Parameters: `{"type":"object","required":["task_id"],"properties":{"task_id":{"type":"string"},"status":{"type":"string"},"owner":{"type":"string"},"blocked_by":{"type":"string"}}}`,
 		}
 	}
 }
 
-func (r *taskToolRunner) Execute(ctx context.Context, _, input string) (*toolrunner.ToolResult, error) {
-	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
+func (r *taskToolRunner) Execute(ctx context.Context, _, input string) (*tools.ToolResult, error) {
+	sessionID := tools.ToolSessionIDFromContext(ctx)
 	if sessionID == "" {
-		return &toolrunner.ToolResult{Error: r.name + ": session_id unavailable"}, nil
+		return &tools.ToolResult{Error: r.name + ": session_id unavailable"}, nil
 	}
 	fields := parseToolInput(input)
 	suite := NewToolSuite(r.manager)
@@ -95,17 +95,17 @@ func (r *taskToolRunner) Execute(ctx context.Context, _, input string) (*toolrun
 		Format:      fields["format"],
 	})
 	if err != nil {
-		return &toolrunner.ToolResult{Error: err.Error()}, nil
+		return &tools.ToolResult{Error: err.Error()}, nil
 	}
 	if out == nil || !out.Success {
 		msg := "task operation failed"
 		if out != nil && out.Message != "" {
 			msg = out.Message
 		}
-		return &toolrunner.ToolResult{Error: msg}, nil
+		return &tools.ToolResult{Error: msg}, nil
 	}
 	data, _ := json.Marshal(out)
-	return &toolrunner.ToolResult{Output: string(data)}, nil
+	return &tools.ToolResult{Output: string(data)}, nil
 }
 
 func parseToolInput(input string) map[string]string {

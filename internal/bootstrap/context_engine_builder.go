@@ -121,7 +121,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if b == nil {
 		return nil
 	}
-	longTerm := WireContextV3(b.ctxCfg)
+	longTermRecaller, longTermStore := WireContextV3(b.ctxCfg)
 	// DM-20260617-008 W4: TaskManager constructed locally and passed to
 	// RegisterTaskTools. Replaces workmodel.GlobalTaskManager singleton.
 	tm := workmodel.NewTaskManagerFromConfig(b.ctxCfg.Tasks, b.obsBridge)
@@ -171,7 +171,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// G1 LSP tool (default disabled; 启用需 lsp.enabled=true + servers 配置)
 	// W11 phase 2c: legacy RegisterLSPTool is removed; the lsp tool is now
 	// exposed via surface.LSPToolSurface (built in BuildSurfaces below).
-	// The lspRunner itself is kept in toolrunner (LSPToolSurface wraps it
+	// The lspRunner itself is kept in tools (LSPToolSurface wraps it
 	// via NewLSPRunnerForSurface) but the Register*Tool registration helper
 	// is gone. turn_adapter.Prepare now reads the schema from the surface
 	// list, not from toolReg.
@@ -180,10 +180,10 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// W11 phase 2c: now exposed exclusively via surface.VerifySurface below.
 	// The legacy verifyRunner is removed.
 
-	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 toolrunner.SetFreeForker 注入。
-	// S4-Gate H-3 fix: function-based DI, toolrunner 不直接 import freefork.
+	// DM-20260617-002 W7 (AC5): G5 free_fork tool — 通过 tools.SetFreeForker 注入。
+	// S4-Gate H-3 fix: function-based DI, tools 不直接 import freefork.
 	// W11 phase 2c: now exposed exclusively via surface.FreeForkSurface below.
-	// The legacy freeforkRunner is removed; the toolrunner.globalFreeForker
+	// The legacy freeforkRunner is removed; the tools.globalFreeForker
 	// package-level singleton is gone (the FreeForkerFunc is held in the
 	// surface, not in a global var).
 	// DM-20260617-002 W12 (AC11) + S4-Gate H-3: G3 notify drainer 通过 prompt
@@ -193,7 +193,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 surface 注入。
 	// 同一 buildWithGate 中创建 tracker 实例 + 启动 tick goroutine。tracker 实例
 	// 通过 BuildSurfaces(SurfaceBuildOpts.Tracker) 显式传给 surface.TrackerSurface,
-	// 不再走 tracker.SetGlobalTracker + toolrunner.RegisterTrackerTool 旧路径。
+	// 不再走 tracker.SetGlobalTracker + tools.RegisterTrackerTool 旧路径。
 	// W13 (AC14): tracker cap / tick interval 走 DiagnosticsConfig.
 	// S4-Gate H-1 fix: 用 builder 持有的 ctx 控制 tick goroutine 生命周期, 避免多次 build 泄漏.
 	diagCfg := b.ctxCfg.Diagnostics.Normalized()
@@ -238,7 +238,8 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		ToolsReg:            toolReg,
 		Permission:          perm,
 		Observer:            contextengine.NoOpObserver{},
-		LongTerm:            longTerm,
+		LongTermRecaller:    longTermRecaller,
+		LongTermStore:       longTermStore,
 		Config:              b.ctxCfg,
 		ObsBridge:           b.obsBridge,
 		DefaultModel:        b.stack.DefaultModel,

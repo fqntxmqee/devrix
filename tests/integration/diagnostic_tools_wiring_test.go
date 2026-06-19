@@ -29,8 +29,8 @@ import (
 	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
@@ -105,7 +105,7 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 
 	// W11 phase 2c: verify_plan_execution is now exposed via surface.VerifySurface
 	// (TOOL-SURFACE-1 SoT). The integration test goes through the surface
-	// Execute path instead of toolrunner.RegisterVerifyTool + reg.Execute.
+	// Execute path instead of tools.RegisterVerifyTool + reg.Execute.
 	s := surface.NewVerifySurface()
 	res, err := s.Execute(context.Background(), "verify_plan_execution", `{"change_id":"demo-change","repo_root":"`+tmp+`"}`, "")
 	if err != nil {
@@ -121,21 +121,21 @@ func TestIntegration_G4_VerifyTool(t *testing.T) {
 
 // TestIntegration_G5_FreeForkTool — G5 闭环: free_fork tool 通过 surface 注入函数。
 //
-// W11 phase 2c: free_fork 的实现已从 toolrunner.freeforkRunner +
-// toolrunner.SetFreeForker(global) 迁移到 surface.FreeForkSurface。FreeForkerFunc
+// W11 phase 2c: free_fork 的实现已从 tools.freeforkRunner +
+// tools.SetFreeForker(global) 迁移到 surface.FreeForkSurface。FreeForkerFunc
 // 现在显式传给 surface 构造函数, integration test 直接构造 surface 走 Execute 路径。
 func TestIntegration_G5_FreeForkTool(t *testing.T) {
 	factory := &fakeFactory{}
-	forker := func(_ context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+	forker := func(_ context.Context, parentSession string, reqs []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 		_ = parentSession
-		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
+		handles := make([]tools.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
 			_ = r
 			// 走 factory: 复用 fakeFactory 的 Create 计数
 			if _, err := factory.Create(context.Background(), multiagent.AgentConfig{}, nil); err != nil {
 				return nil, err
 			}
-			handles = append(handles, toolrunner.FreeForkHandleDTO{
+			handles = append(handles, tools.FreeForkHandleDTO{
 				AgentID: "agent-x",
 				Name:    "stub",
 			})
@@ -161,7 +161,7 @@ func TestIntegration_G5_FreeForkTool(t *testing.T) {
 
 // TestIntegration_G6_QueryDiagnosticsTool — G6 闭环: tick → query。
 //
-// W11 phase 2a: query_diagnostics 的实现已从 toolrunner.trackerRunner +
+// W11 phase 2a: query_diagnostics 的实现已从 tools.trackerRunner +
 // tracker.SetGlobalTracker 迁移到 surface.TrackerSurface。integration test
 // 现在直接构造 surface 走 Execute 路径, 不再依赖任何 process-wide global。
 func TestIntegration_G6_QueryDiagnosticsTool(t *testing.T) {

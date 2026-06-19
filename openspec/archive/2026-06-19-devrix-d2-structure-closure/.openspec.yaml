@@ -1,0 +1,56 @@
+change_id: devrix-d2-structure-closure
+priority: P0
+demand_id: DM-20260619-007
+status: s7_archived
+archived_at: "2026-06-19"
+domains: [D2]
+dsaft_scenarios: [D2-S15, D2-S17, D2-S18]
+dsaft_activities:
+  - D2-S15-A01
+  - D2-S15-A02
+  - D2-S15-A03
+  - D2-S15-A04
+  - D2-S17-A01
+  - D2-S17-A02
+  - D2-S17-A03
+  - D2-S17-A04
+  - D2-S18-A01
+  - D2-S18-A02
+  - D2-S18-A03
+  - D2-S18-A04
+  - D2-S18-A05
+  - D2-S18-A06
+  - D2-S18-A07
+  - D2-S18-A08
+version_scope:
+  v2.2-structure: "Scenario orchestrator 生产 wired + 根目录清零 + enforce/tools 归位 + memory 读写分离 + legacy Process 退役"
+parent_changes:
+  - devrix-d2-sa-refine          # DM-20260614-009 v1.0 Registry + Thin
+  - devrix-d2-queryloop-dismantle # DM-20260618-010 S16 REMOVED
+  # partial: PR #104 facade/token/kernel（无独立 demand，本 change 闭合终态）
+t_points:
+  policy: "T ID 不变；测试随物理路径迁移；新增 7 项布局守卫 T"
+  layout_guards:
+    - D2-STRUCT-T01
+    - D2-STRUCT-T02
+    - D2-STRUCT-T03
+    - D2-STRUCT-T04
+    - D2-STRUCT-T05
+    - D2-STRUCT-T06
+    - D2-STRUCT-T07
+s3_gate:
+  approved_at: "2026-06-19"
+  approved_scope: "P1-a"
+  blocked_until: cleared
+s5_gate:
+  result: ACCEPTED
+  ac_total: 19
+  ac_passed: 19
+  ac_failed: 0
+  ac_partial: 0
+  review_date: "2026-06-19"
+  reviewer: devrix-team
+  report: acceptance-report.md
+s7_gate:
+  archived_at: "2026-06-19"
+  archive_path: openspec/archive/2026-06-19-devrix-d2-structure-closure/

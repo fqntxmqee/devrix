@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 func TestTaskWrite_ChecklistForwardsToTodoWrite(t *testing.T) {
-	reg := toolrunner.NewToolRegistry()
-	_ = reg.Register(toolrunner.NewTodoWriteRunner())
+	reg := tools.NewToolRegistry()
+	_ = reg.Register(tools.NewTodoWriteRunner())
 	SetUnifiedToolRegistry(reg)
 	tm := NewTaskManager()
 	_ = RegisterUnifiedTaskTools(reg, &config.ContextEngineConfig{Tasks: config.TasksConfig{Mode: "v2"}}, tm)
 
-	ctx := toolrunner.WithToolSessionContext(context.Background(), &types.SessionContext{SessionID: "s1"})
+	ctx := tools.WithToolSessionContext(context.Background(), &types.SessionContext{SessionID: "s1"})
 	runner := &taskWriteRunner{manager: tm}
 	res, err := runner.Execute(ctx, "", `{"mode":"checklist","todos":[{"content":"a","status":"pending","activeForm":"a"}]}`)
 	if err != nil {
@@ -30,7 +30,7 @@ func TestTaskWrite_ChecklistForwardsToTodoWrite(t *testing.T) {
 }
 
 func TestTaskSpawn_ForwardsDelegateExplore(t *testing.T) {
-	reg := toolrunner.NewToolRegistry()
+	reg := tools.NewToolRegistry()
 	reg.Register(&stubForwardRunner{name: "delegate_explore", out: "ok"})
 	SetUnifiedToolRegistry(reg)
 	tm := NewTaskManager()
@@ -54,7 +54,7 @@ func TestTaskAwait_RunRefTerminal(t *testing.T) {
 	reg.SetTerminal(runID, runregistry.StatusCompleted, "done", "")
 
 	runner := &taskAwaitRunner{manager: tm}
-	ctx := toolrunner.WithToolSessionID(context.Background(), "s1")
+	ctx := tools.WithToolSessionID(context.Background(), "s1")
 	res, err := runner.Execute(ctx, "", `{"task_id":"`+item.ID+`","block":false}`)
 	if err != nil {
 		t.Fatal(err)
@@ -75,9 +75,9 @@ type stubForwardRunner struct {
 
 func (s *stubForwardRunner) Name() string { return s.name }
 func (s *stubForwardRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
-func (s *stubForwardRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{Name: s.name}
+func (s *stubForwardRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{Name: s.name}
 }
-func (s *stubForwardRunner) Execute(_ context.Context, _, _ string) (*toolrunner.ToolResult, error) {
-	return &toolrunner.ToolResult{Output: s.out}, nil
+func (s *stubForwardRunner) Execute(_ context.Context, _, _ string) (*tools.ToolResult, error) {
+	return &tools.ToolResult{Output: s.out}, nil
 }

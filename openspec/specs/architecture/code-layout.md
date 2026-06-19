@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.11.1
-**Last Updated:** 2026-06-16
+**Version:** 1.12.0
+**Last Updated:** 2026-06-19
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -115,19 +115,34 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 ### 4.3 D2 Context Engine
 
-> **Canonical S15–S20**（DM-20260614-009）。Legacy module 路径仍有效；v2.0 按 scenario-slug 收敛。
+> **Canonical S15–S20**（DM-20260614-009 + DM-20260619-007 v2.2 closure）。v2.2 终态路径已锁定。
 
-| S ID       | Scenario                        | scenario-slug   | 当前路径                                                                               | v2.0 目标                                       |
-| ---------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
-| D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` `prepare/token/` | ✅ DM-014                                      |
-| D2-S16     | ~~RunQueryLoop~~                | —               | **REMOVED**（DM-20260618-010）；`contextengine/query/` 已删除 → D7 `orchestration/turn/` | ✅ D7-S2-A06                                   |
-| D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/` + `facade/engine_persist.go`          | ✅ DM-014                                      |
-| D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/planmode_tools.go` | ✅ DM-014                                      |
-| —          | Process facade (S15→D7→S17)     | `facade`        | `facade/engine.go`, `facade/engine_prepare.go`, `facade/engine_persist.go`, …      | ✅ DSAFT v2.0                                  |
-| —          | Domain kernel                   | `kernel`        | `kernel/contracts.go`, `kernel/spans.go`                                           | ✅ DSAFT v2.0                                  |
-| D2 root    | Public API re-exports           | —               | `contracts.go`, `aliases.go`, `tool_context.go`（3 生产文件）                         | ✅ DSAFT v2.0                                  |
-| D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ DM-014                                      |
-| D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ DM-014                                      |
+| S ID       | Scenario                        | scenario-slug   | 终态路径（v2.2, DM-20260619-007）                                                    | Status |
+| ---------- | ------------------------------- | --------------- | --------------------------------------------------------------------------------- | ------ |
+| D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/{memory,compression,prompt,conversation,token,attachments,usercontext}/` + `prepare/adapters/` + `prepare/orchestrator.go` | ✅ |
+| D2-S16     | ~~RunQueryLoop~~                | —               | **REMOVED**（DM-20260618-010）；`contextengine/query/` 已删除 → D7 `orchestration/turn/` | ✅ |
+| D2-S17     | PersistSessionState             | `persist`       | `persist/{snapshot,transcript}/` + `persist/{commit,commit_window,orchestrator}.go` + `persist/memory/store.go` (P4 split) | ✅ |
+| D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/{permission,tools,registry,sandbox}/` + `enforce/{tool_filter,agent_role_filter,background_task_tools,planmode_tools}.go` | ✅ |
+| —          | Process legacy (P5 retired)     | `legacy`        | `legacy/{engine,engine_builder,engine_persist_v2,engine_*,prepared_turn_*}.go` — **Deprecated**，slog.Warn + D2-STRUCT-T07 guard | ✅ |
+| —          | Domain kernel                   | `kernel`        | `kernel/{contracts,spans}.go`                                                       | ✅ |
+| —          | Public API re-exports           | —               | `contracts.go`, `aliases.go` (type aliases → legacy), `tool_context.go` (type alias → `enforce/tools/context.go`) | ✅ |
+| D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ |
+| D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ |
+
+> **v2.2 深度规则（DM-20260619-007 P3-T5）：**
+> - `enforce/tools/surface/` 是允许的 2 层嵌套（scenario → scenario 内部 sub-scenario）。其他 scenario 子目录深度 ≤ 1。
+> - `enforce/` 与 `prepare/` 与 `persist/` 是 peer；不存在互相 import。
+> - `prepare/memory/` 与 `persist/memory/` 必须保持解耦：Recall (S15) 在前者，Store (S17) 在后者；端口接口在 `internal/shared/contracts/memory.go`（D2-STRUCT-T04）。
+> - `legacy/` 仅由 `contextengine/aliases.go` 反向引用；其他生产代码必须经 D7 SessionOrchestrator 或 turn_adapter 走 D2 路径。
+>
+> **D2-STRUCT Layout Guards（`internal/lint/layer/d2_layout_test.go`）：**
+> - **D2-STRUCT-T01** 根目录生产文件白名单（`contracts.go` + `aliases.go` + `tool_context.go` + `doc.go`）
+> - **D2-STRUCT-T02** 无 `engine_persist.go` 在根或 `facade/` 外（`facade/` 已不存在，等价于全工程除 `legacy/` 外禁用）
+> - **D2-STRUCT-T03** `enforce/tools/` 包名 = `package tools`，禁止 `package toolrunner` 残留
+> - **D2-STRUCT-T04** `prepare/memory/` ↔ `persist/memory/` 无循环导入
+> - **D2-STRUCT-T05** `enforce/orchestrator.go` 已删除（stub 移除，dispatch 由 `turn_adapter` 接管）
+> - **D2-STRUCT-T06** scenario 下目录深度 ≤ 2 层
+> - **D2-STRUCT-T07** P5 退役：禁止新增 `legacy.ContextEngine.Process()` 生产引用（CI 硬阻断）
 
 > **DM-020 bootstrap 注释（v1.0 Registry）：** `WireContextLLM` 当前在 `internal/bootstrap/` 为 D2 接线 ILLMGateway。v2.0-b 迁移后，D7 持有 ILLMGateway（`WireContextLLM → TurnOrchestrator deps`），D2 仅保留 ContextPreparer（`WireContextEngine → ContextPreparer only，无 LLM 字段`）。
 
@@ -136,10 +151,12 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | Legacy S | scenario-slug | 路径                                                                      |
 | -------- | ------------- | ----------------------------------------------------------------------- |
 | D2-S2    | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` |
-| D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/`           |
+| D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/` (read) + `contextengine/persist/memory/` (write, v2.2) |
 | D2-S4    | `token`       | ~~`contextengine/token/`~~ → `contextengine/prepare/token/`              |
 | D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4)      |
-| D2-S12   | `sandbox`    | `contextengine/sandbox/`                                               |
+| D2-S12   | `sandbox`    | `contextengine/sandbox/` → `contextengine/enforce/sandbox/` (v2.2, P3-T1) |
+| D2-S5/S8 | `toolrunner`  | `contextengine/enforce/toolrunner/` → `contextengine/enforce/tools/` (v2.2, P3-T2, package renamed) |
+| —        | `facade`      | `contextengine/facade/` → `contextengine/legacy/` (v2.2, P5 retired) |
 
 ### 4.4 D3 LLM Gateway（canonical S1–S6 / 5+1 价值流）
 

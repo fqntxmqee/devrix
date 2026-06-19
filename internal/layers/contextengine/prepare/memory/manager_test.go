@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -14,7 +14,7 @@ import (
 // T: D2-S3-A01-T01, D2-S3-A01-T01
 func TestManager_should_initialize_new_session_context(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_1", "cli", "/tmp")
 
 	sc, err := mgr.LoadOrInit(session, "system prompt")
@@ -32,7 +32,7 @@ func TestManager_should_initialize_new_session_context(t *testing.T) {
 // T: D2-S3-A01-T01
 func TestManager_should_append_user_message_and_dedupe_request_id(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_2", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -53,7 +53,7 @@ func TestManager_should_restore_from_backup_when_session_snapshot_empty(t *testi
 	cfg.Snapshot.Enabled = true
 	cfg.Snapshot.BackupDir = t.TempDir()
 	store := snapshot.NewStore(&cfg.Snapshot)
-	mgr := memory.NewManager(cfg, store, nil)
+	mgr := memory.NewManager(cfg, store, nil, nil)
 
 	orig := &types.SessionContext{
 		SessionID:    "sess_backup",
@@ -85,7 +85,7 @@ func TestManager_should_restore_from_backup_when_session_snapshot_empty(t *testi
 
 func TestManager_RemoveLastUserMessage(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_rm", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -104,7 +104,7 @@ func TestManager_RemoveLastUserMessage(t *testing.T) {
 
 func TestManager_RemoveLastUserMessage_noop_when_no_user_message(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_rm2", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -118,7 +118,7 @@ func TestManager_RemoveLastUserMessage_noop_when_no_user_message(t *testing.T) {
 
 func TestManager_RemoveLastUserMessage_only_removes_last_user(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_rm3", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -140,7 +140,7 @@ func TestManager_TrimMessages(t *testing.T) {
 	cfg.Compression.MaxMessages = 8
 	cfg.Compression.KeepTailMessages = 4
 	cfg.Compression.Autocompact.PreserveHeadTurns = 1
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_trim", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -164,7 +164,7 @@ func TestManager_TrimMessages(t *testing.T) {
 
 func TestManager_TrimMessages_noop_when_within_limit(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_trim2", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -179,7 +179,7 @@ func TestManager_TrimMessages_noop_when_within_limit(t *testing.T) {
 
 func TestManager_TrimMessages_should_repair_incomplete_chain_when_within_limit(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_trim4", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -202,7 +202,7 @@ func TestManager_TrimMessages_should_repair_incomplete_chain_when_within_limit(t
 
 func TestManager_StopCleanup_should_repair_incomplete_tool_round(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_stop_cleanup", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -230,7 +230,7 @@ func TestManager_TrimMessages_repairs_chain_after_trim(t *testing.T) {
 	cfg.Compression.MaxMessages = 2
 	cfg.Compression.KeepTailMessages = 1
 	cfg.Compression.Autocompact.PreserveHeadTurns = 1
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_trim3", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -257,7 +257,7 @@ func TestManager_TrimMessages_repairs_chain_after_trim(t *testing.T) {
 func TestManager_LoadOrInit_cache_hit_repairs_messages(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	store := snapshot.NewStore(&cfg.Snapshot)
-	mgr := memory.NewManager(cfg, store, nil)
+	mgr := memory.NewManager(cfg, store, nil, nil)
 	session := types.NewSession("sess_cache", "cli", "/tmp")
 
 	// Load fresh
@@ -280,7 +280,7 @@ func TestManager_LoadOrInit_cache_hit_repairs_messages(t *testing.T) {
 func TestManager_LoadOrInit_cache_hit_drops_orphan_tool_results(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	store := snapshot.NewStore(&cfg.Snapshot)
-	mgr := memory.NewManager(cfg, store, nil)
+	mgr := memory.NewManager(cfg, store, nil, nil)
 	session := types.NewSession("sess_cache2", "cli", "/tmp")
 
 	// Load fresh, inject corrupted state (tool result without preceding assistant)
@@ -302,7 +302,7 @@ func TestManager_LoadOrInit_cache_hit_drops_orphan_tool_results(t *testing.T) {
 
 func TestManager_AppendFullMessage(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	session := types.NewSession("sess_full", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -333,7 +333,7 @@ func TestManager_PersistSnapshot(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Snapshot.BackupDir = t.TempDir()
 	store := snapshot.NewStore(&cfg.Snapshot)
-	mgr := memory.NewManager(cfg, store, nil)
+	mgr := memory.NewManager(cfg, store, nil, nil)
 	session := types.NewSession("sess_persist", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -358,7 +358,7 @@ func TestManager_PersistSnapshot(t *testing.T) {
 
 func TestManager_Get_returns_nil_for_missing(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 
 	sc, ok := mgr.Get("nonexistent")
 	if ok {

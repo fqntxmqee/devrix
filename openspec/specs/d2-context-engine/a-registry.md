@@ -27,7 +27,7 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
 | D2-S15-A01 | LoadSession | A-BE | session, model | SessionContext | `prepare/memory/manager.go` |
-| D2-S15-A02 | RecallMemory | A-BE | query | memory_entries | `prepare/memory/longterm.go` |
+| D2-S15-A02 | RecallMemory | A-BE | query | memory_entries | `prepare/memory/recall.go` (port) + `persist/memory/store.go` (impl) |
 | D2-S15-A03 | CompressContext | A-BE | messages, budget | compressed, report | `prepare/compression/pipeline.go` |
 | D2-S15-A04 | AssemblePrompt | A-BE | build_input | system_prompt | `prepare/prompt/assembler.go` |
 
@@ -50,7 +50,7 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 |------|------|------|-------|--------|---------------|
 | D2-S17-A01 | SaveSnapshot | A-BE | session | snapshot_bytes | `persist/snapshot/store.go` |
 | D2-S17-A02 | WriteTranscript | A-BE | session_id, delta | jsonl | `persist/transcript/main_thread.go` |
-| D2-S17-A03 | StoreLongTerm | A-BE | session, query, summary | — | `prepare/memory/longterm.go` |
+| D2-S17-A03 | StoreLongTerm | A-BE | session, query, summary | — | `persist/memory/store.go` (impl) |
 | D2-S17-A04 | CommitWindow | A-BE | session, budget | trimmed | `persist/commit.go` |
 
 ### D2-S18: EnforceExecutionPolicy ✅

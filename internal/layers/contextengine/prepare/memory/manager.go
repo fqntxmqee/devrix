@@ -6,29 +6,48 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // Manager manages in-memory session contexts and persistence.
+//
+// P4 split (AC-P4-3): long-term memory is now injected as two
+// independent ports — a LongTermRecaller (S15-A02, read-side) and a
+// LongTermStore (S17-A03, write-side). Both typically resolve to the
+// same *SQLiteLongTerm value, but the consumer code only sees the
+// narrow role it needs. Port interfaces live in shared/contracts so
+// this package and persist/memory can share them without an import
+// cycle (D2-STRUCT-T04).
 type Manager struct {
-	mu          sync.RWMutex
-	messagesMu  sync.RWMutex // protects sc.Messages concurrent reads/writes
-	contexts    map[string]*types.SessionContext
-	store       *snapshot.Store
-	cfg         *config.ContextEngineConfig
-	longTerm    ILongTermMemory
+	mu         sync.RWMutex
+	messagesMu sync.RWMutex // protects sc.Messages concurrent reads/writes
+	contexts   map[string]*types.SessionContext
+	store      *snapshot.Store
+	cfg        *config.ContextEngineConfig
+	recaller   contracts.LongTermRecaller
+	writer     contracts.LongTermStore
 }
 
 // NewManager creates a memory manager.
-func NewManager(cfg *config.ContextEngineConfig, store *snapshot.Store, longTerm ILongTermMemory) *Manager {
+//
+// recaller / writer may be nil; in that case the corresponding
+// read/write calls become no-ops (EnrichWithLongTermRecall, AutoStoreLongTerm).
+func NewManager(
+	cfg *config.ContextEngineConfig,
+	store *snapshot.Store,
+	recaller contracts.LongTermRecaller,
+	writer contracts.LongTermStore,
+) *Manager {
 	return &Manager{
 		contexts: make(map[string]*types.SessionContext),
 		store:    store,
 		cfg:      cfg,
-		longTerm: longTerm,
+		recaller: recaller,
+		writer:   writer,
 	}
 }
 
@@ -47,19 +66,19 @@ func (m *Manager) EnrichWithLongTermRecall(ctx context.Context, sc *types.Sessio
 
 // RecallLongTermEntries returns recalled memory entries without mutating session context.
 func (m *Manager) RecallLongTermEntries(ctx context.Context, query string) ([]MemoryEntry, error) {
-	if m.longTerm == nil || !m.cfg.LongTerm.Enabled {
+	if m.recaller == nil || !m.cfg.LongTerm.Enabled {
 		return nil, nil
 	}
 	limit := m.cfg.LongTerm.RecallMaxEntries
 	if limit <= 0 {
 		limit = 5
 	}
-	return m.longTerm.Recall(ctx, query, limit)
+	return m.recaller.Recall(ctx, query, limit)
 }
 
 // AutoStoreLongTerm persists a summary when auto_store is enabled.
 func (m *Manager) AutoStoreLongTerm(ctx context.Context, sc *types.SessionContext, userMessage, summary string) error {
-	if m.longTerm == nil || !m.cfg.LongTerm.Enabled || !m.cfg.LongTerm.AutoStore {
+	if m.writer == nil || !m.cfg.LongTerm.Enabled || !m.cfg.LongTerm.AutoStore {
 		return nil
 	}
 	topic := ResolveStoreTopic(userMessage, m.cfg.LongTerm.Topics)
@@ -73,7 +92,7 @@ func (m *Manager) AutoStoreLongTerm(ctx context.Context, sc *types.SessionContex
 	if content == "" {
 		return nil
 	}
-	return m.longTerm.Store(ctx, MemoryEntry{
+	return m.writer.Store(ctx, MemoryEntry{
 		SessionID: sc.SessionID,
 		Topic:     topic,
 		Content:   content,
@@ -109,10 +128,10 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 	} else {
 		max, reserved, toolResult, target, snipTarget := m.cfg.ToTokenBudget()
 		sc = &types.SessionContext{
-			SessionID:    session.SessionID,
-			WorkDir:      session.WorkDir,
-			Model:        session.Model,
-			Messages:     []types.Message{},
+			SessionID: session.SessionID,
+			WorkDir:   session.WorkDir,
+			Model:     session.Model,
+			Messages:  []types.Message{},
 			TokenBudget: types.TokenBudget{
 				MaxContextTokens:  max,
 				ReservedOutput:    reserved,
@@ -231,6 +250,13 @@ func (m *Manager) PersistSnapshot(sc *types.SessionContext) ([]byte, error) {
 		return data, nil
 	}
 	return data, nil
+}
+
+// WriteSnapshotBytes writes already-serialized snapshot bytes to disk.
+// Used by persist.Orchestrator when the snapshot was serialized upstream
+// (e.g. by facade memory.PersistSnapshot).
+func (m *Manager) WriteSnapshotBytes(sessionID string, data []byte) error {
+	return m.store.WriteBackup(sessionID, data)
 }
 
 // Get returns cached context.

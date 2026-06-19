@@ -1,8 +1,8 @@
 # D2 Context Engine Span 注册表
 
 **Domain:** D2 Context Engine
-**Version:** 2.2.0
-**Status:** Active (2026-06-16) — Canonical S15–S18 mapping
+**Version:** 2.3.0
+**Status:** Active (2026-06-19) — v2.2 structure closure paths synced (P3-T2, P4, P5)
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 **Complements:** `observability-guide.md`（Trace 树 + P0 Runbook）
 

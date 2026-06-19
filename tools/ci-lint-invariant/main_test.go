@@ -10,7 +10,7 @@ import (
 // T: W15 — ci-lint-invariant 找到所有 5 个 _invariant.go 文件。
 func TestScan_FindsAllInvariantFiles(t *testing.T) {
 	roots := []string{
-		"./internal/layers/contextengine/enforce/toolrunner/surface",
+		"./internal/layers/contextengine/enforce/tools/surface",
 		"./internal/layers/multiagent/provision/freefork",
 		"./internal/layers/observability/diagnose/tracker",
 		"./internal/layers/evolution/verify",

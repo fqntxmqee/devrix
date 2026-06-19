@@ -6,7 +6,7 @@ package toolpolicy
 import (
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -27,16 +27,16 @@ func NewFilter() *Filter {
 }
 
 // FilterToolsForAgentRole hides delegate tools from workers and sub-agents.
-func FilterToolsForAgentRole(sc *types.SessionContext, tools []toolrunner.ToolSchema) []toolrunner.ToolSchema {
-	if sc == nil || len(tools) == 0 {
-		return tools
+func FilterToolsForAgentRole(sc *types.SessionContext, ts []tools.ToolSchema) []tools.ToolSchema {
+	if sc == nil || len(ts) == 0 {
+		return ts
 	}
 	isLeaderMain := sc.AgentID == "" && !sc.IsWorker
 	if isLeaderMain {
-		return tools
+		return ts
 	}
-	out := make([]toolrunner.ToolSchema, 0, len(tools))
-	for _, t := range tools {
+	out := make([]tools.ToolSchema, 0, len(ts))
+	for _, t := range ts {
 		if delegateToolNames[t.Name] {
 			continue
 		}
@@ -52,14 +52,14 @@ func FilterToolsForAgentRole(sc *types.SessionContext, tools []toolrunner.ToolSc
 }
 
 // Filter satisfies contextengine.AgentRoleToolFilter using D2 ToolSchema aliases.
-func (f *Filter) Filter(sc *types.SessionContext, tools []toolrunner.ToolSchema) []toolrunner.ToolSchema {
+func (f *Filter) Filter(sc *types.SessionContext, ts []tools.ToolSchema) []tools.ToolSchema {
 	if f == nil {
-		return tools
+		return ts
 	}
-	return FilterToolsForAgentRole(sc, tools)
+	return FilterToolsForAgentRole(sc, ts)
 }
 
-func filterReadOnlyWorkerTools(tools []toolrunner.ToolSchema) []toolrunner.ToolSchema {
+func filterReadOnlyWorkerTools(ts []tools.ToolSchema) []tools.ToolSchema {
 	allowed := map[string]bool{
 		"read_file": true, "glob": true, "grep": true, "list_dir": true, "bash": true,
 		"enter_plan_mode": true, "exit_plan_mode": true,
@@ -70,8 +70,8 @@ func filterReadOnlyWorkerTools(tools []toolrunner.ToolSchema) []toolrunner.ToolS
 		"edit_file":       true,
 		"task_create":     true, "task_get": true, "task_update": true,
 	}
-	out := make([]toolrunner.ToolSchema, 0, len(tools))
-	for _, t := range tools {
+	out := make([]tools.ToolSchema, 0, len(ts))
+	for _, t := range ts {
 		name := strings.ToLower(t.Name)
 		if allowed[name] {
 			out = append(out, t)

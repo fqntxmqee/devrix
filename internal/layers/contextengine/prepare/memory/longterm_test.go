@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	persistmemory "github.com/devrix/devrix/internal/layers/contextengine/persist/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	prepareref "github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -22,7 +23,7 @@ func tempSQLiteDB(t *testing.T) string {
 
 // T: D2-S3-A01-T05
 func TestLongTermMemory_should_return_not_implemented_when_disabled(t *testing.T) {
-	lt := memory.NewDisabledLongTermMemory()
+	lt := persistmemory.NewDisabledLongTerm()
 	_, err := lt.Recall(context.Background(), "query", 5)
 	if err == nil {
 		t.Fatal("expected error")
@@ -35,14 +36,14 @@ func TestLongTermMemory_should_return_not_implemented_when_disabled(t *testing.T
 // T: D2-S3-A01-T04
 func TestSQLiteLongTermMemory_should_store_and_recall_entries(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
-	lt, err := memory.OpenSQLiteLongTerm(dbPath)
+	lt, err := persistmemory.OpenSQLiteLongTerm(dbPath)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	defer lt.Close()
 
 	ctx := context.Background()
-	if err := lt.Store(ctx, memory.MemoryEntry{
+	if err := lt.Store(ctx, persistmemory.MemoryEntry{
 		ID:        "mem-1",
 		SessionID: "sess-1",
 		Topic:     "architecture",
@@ -66,14 +67,14 @@ func TestSQLiteLongTermMemory_should_store_and_recall_entries(t *testing.T) {
 // T: D2-S3-A01-T03
 func TestManager_should_inject_longterm_recall_into_system_prompt(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
-	lt, err := memory.OpenSQLiteLongTerm(dbPath)
+	lt, err := persistmemory.OpenSQLiteLongTerm(dbPath)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	defer lt.Close()
 
 	ctx := context.Background()
-	if err := lt.Store(ctx, memory.MemoryEntry{
+	if err := lt.Store(ctx, persistmemory.MemoryEntry{
 		SessionID: "sess-2",
 		Topic:     "bugs",
 		Content:   "fixed gauge precision issue",
@@ -86,7 +87,7 @@ func TestManager_should_inject_longterm_recall_into_system_prompt(t *testing.T) 
 	cfg.LongTerm.RecallMaxEntries = 5
 	cfg.LongTerm.RecallMaxTokens = 500
 
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), lt)
+	mgr := prepareref.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), lt, lt)
 	session := types.NewSession("sess-2", "cli", "/tmp")
 	sc, err := mgr.LoadOrInit(session, "base prompt")
 	if err != nil {
@@ -106,7 +107,7 @@ func TestManager_should_inject_longterm_recall_into_system_prompt(t *testing.T) 
 // T: D2-S3-A01-T04
 func TestManager_should_auto_store_when_enabled(t *testing.T) {
 	dbPath := tempSQLiteDB(t)
-	lt, err := memory.OpenSQLiteLongTerm(dbPath)
+	lt, err := persistmemory.OpenSQLiteLongTerm(dbPath)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -117,7 +118,7 @@ func TestManager_should_auto_store_when_enabled(t *testing.T) {
 	cfg.LongTerm.AutoStore = true
 	cfg.LongTerm.Topics = []string{"architecture", "decisions"}
 
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), lt)
+	mgr := prepareref.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), lt, lt)
 	session := types.NewSession("sess-3", "cli", "/tmp")
 	sc, _ := mgr.LoadOrInit(session, "prompt")
 
@@ -139,11 +140,11 @@ func TestManager_should_auto_store_when_enabled(t *testing.T) {
 }
 
 func TestFormatLongTermAppendix_should_respect_token_budget(t *testing.T) {
-	entries := []memory.MemoryEntry{
+	entries := []prepareref.MemoryEntry{
 		{Topic: "a", Content: strings.Repeat("x", 500)},
 		{Topic: "b", Content: strings.Repeat("y", 500)},
 	}
-	appendix := memory.FormatLongTermAppendix(entries, 50)
+	appendix := prepareref.FormatLongTermAppendix(entries, 50)
 	if len(appendix) > 50*4+100 {
 		t.Fatalf("appendix too long: %d chars", len(appendix))
 	}
@@ -156,11 +157,12 @@ func TestNewLongTermFromConfig_should_use_temp_db_when_enabled(t *testing.T) {
 		Enabled: true,
 		DBPath:  path,
 	}
-	lt, err := memory.NewLongTermFromConfig(cfg)
+	recaller, store, err := persistmemory.NewLongTermFromConfig(cfg)
 	if err != nil {
 		t.Fatalf("NewLongTermFromConfig: %v", err)
 	}
-	defer lt.Close()
+	defer recaller.Close()
+	defer store.Close()
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected db file created: %v", err)
 	}

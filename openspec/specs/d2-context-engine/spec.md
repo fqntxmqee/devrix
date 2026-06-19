@@ -1162,7 +1162,7 @@ or `PermissionAskRequiredError` respectively.
 > **devrix-surface-permission-extension (DM-20260618-002).**
 
 The `BashASTPolicy` type (defined in
-`internal/layers/contextengine/enforce/toolrunner/surface/bash_ast.go`)
+`internal/layers/contextengine/enforce/tools/surface/bash_ast.go`)
 MUST use `mvdan.cc/sh/v3/syntax` to parse bash commands and apply a
 default deny-list with at minimum these rules:
 
@@ -1309,7 +1309,7 @@ deferred tools).
 
 > **devrix-surface-lazy-loading (DM-20260618-003).**
 
-The `internal/layers/contextengine/enforce/toolrunner/zodgen` package
+The `internal/layers/contextengine/enforce/tools/zodgen` package
 MUST provide a `Schema(reflect.Type) map[string]any` function that
 converts a Go struct (with `json` + `jsonschema` tags) into a JSON
 Schema subset (type / properties / required / enum / description).

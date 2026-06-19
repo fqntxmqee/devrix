@@ -92,6 +92,7 @@
 | **DM-20260619-004** | **D2 spec 退役标记完整性 — layer-delta.md 措辞软化 + d7-boundary.md Loop.Run Deprecated** | **devrix-spec-sync-d2-layer-delta-soften** | **2026-06-19** | **[#94](https://github.com/fqntxmqee/devrix/pull/94)** | **S7_Archived (docs-only; 9/9 AC PASS; layer-delta.md QueryLoop Primary Runtime → QueryLoop Default Runtime ⚠️ DEPRECATED (DM-20260617-001 引用 + canonical=D7-S2-A06 RunTurnLoop); MUST route all → routes ... AND canonical 主路径; d7-boundary.md §4 加 5 列状态 Loop.Run + LoopHooks 标 DEPRECATED, §79 加 DEPRECATED 注释; D2-S10 Scenario 全保留 (per spec.md §18 回滚兼容); `MUST route all` grep 0 命中; go vet 0 错; layer-lint strict/warn + unit/integration/e2e/acceptance/coverage 全 SUCCESS)** |
 | **DM-20260619-005** | **D7 v2.0 结构重构 — 物理路径对齐 S 层 + WorkTree Legacy 清债** | **devrix-d7-v2-structure** | **2026-06-19** | **[#101](https://github.com/fqntxmqee/devrix/pull/101)** | **ACCEPTED (S2→sessionorchestrator, S3→wavescheduler, S4→executionflow, S5→decisionplanning; coordinator/hubspoke shim; TD-WT-02/03 PARTIAL; 66/66 T PASS; go test + race + layer-lint strict + d7 integration 全绿)** |
 | **DM-20260619-006** | **D5 v2.1 终态重构 — 规格对齐 + S23 语义闭合 + Bridge 清债（S3 设计稿）** | **devrix-d5-v2-terminal** | **—** | **[#106](https://github.com/fqntxmqee/devrix/pull/106)** | **S3_Design merged to master (docs-only 21 files; `openspec/changes/devrix-d5-v2-terminal/`; gaming-analysis 待 Claude 对焦; S4 未启动)** |
+| **DM-20260619-007** | **D2 v2.2 Structure 终态 — Scenario 编排收敛 + 物理路径双锚点闭合** | **devrix-d2-structure-closure** | **2026-06-19** | **— (TBD; 待 PR 创建)** | **S7_Archived (19/19 AC 全 PASS = 6 P0 + 13 P1; 9 commit 合入 feat/d2-structure-p1e-persist-orchestrator; 70+ 文件 toolrunner→tools 重命名 + 13 文件 facade→legacy 迁移 + 1 新建 enforce/orchestrator.go stub 删除 + 2 新建 shared/types+contracts + 1 新建 persist/memory/store.go; 7 layout guards D2-STRUCT-T01..T07 全 IMPLEMENTED; 6 文档同步 d2-domain v8.2.0 + code-layout v1.12.0 + layering v4.7.0 + layer-delta + span-registry v2.3.0 + code-atlas; go vet 0 错 + go test -race 全绿 + layer-lint strict + d2 integration 全绿; 终态 D2 域目录与 d2-domain.md 物理路径映射表 100% 一致)** |
 | **DM-20260612-012** | **架构分层 v1.1 — 4 接口契约物理迁移 (LLMGateway/IToolRunner/IToolRegistry/IPermissionGate)** | **devrix-layer-isolation-v1.1** | **2026-06-18** | — | **S7_Archived (v1.1 follow-up; 4 接口物理迁移已完成; design.md / tasks.md 未补全作为 v1.0 文档债务保留)** |
 | DM-20260608-005-alt | Devrix 分层 ID 规范标准化 | devrix-layering-standard | 2026-06-18 | — | **S7_Archived (S0_Deferred; ID 规范基础设施通过其他渠道落地: code-layout.md / layering.md / code-atlas.md / t-registry.md)** |
 | DM-20260614-008-alt | D5/D6 信誉、置信度与惩罚闭环 | devrix-reputation-feedback-loop | 2026-06-18 | — | **S7_Archived (S1_Cancelled; 4 天未推进,代码未落地; 依赖项 devrix-d1-sa-refine v1.1 也未实施)** |
@@ -160,6 +161,7 @@
 | devrix-d2-sa-refine-v2.0-sessionqueue | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-sessionqueue/` |
 | devrix-d2-sa-refine-v2.0-physical-dirs | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-physical-dirs/` |
 | devrix-d2-sa-refine-v2.0-toolpolicy | `openspec/archive/2026-06-14-devrix-d2-sa-refine-v2.0-toolpolicy/` |
+| **devrix-d2-structure-closure** | **`openspec/archive/2026-06-19-devrix-d2-structure-closure/`** |
 | **devrix-d3-sa-refine** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine/`** |
 | **devrix-d3-sa-refine-v1.1** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v1.1/`** |
 | **devrix-d3-sa-refine-v2.0** | **`openspec/archive/2026-06-14-devrix-d3-sa-refine-v2.0/`** |
@@ -198,9 +200,7 @@
 
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
-| `devrix-d2-structure-closure` | DM-20260619-007 | **S2_Clarified**（待 S3-Gate） | `openspec/changes/devrix-d2-structure-closure/` |
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
-| `chore/d2-sandbox-rename` | — | PR [#103](https://github.com/fqntxmqee/devrix/pull/103) CLOSED | 并入 DM-20260619-007 P3 |
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 

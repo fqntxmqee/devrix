@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // T: TOOL-SURFACE-1-T11 — text output contains every surface name and tool name.
 func TestListCmd_TextOutput(t *testing.T) {
-	reg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	reg, err := tools.NewBuiltinToolRegistry(nil)
 	if err != nil {
 		t.Fatalf("NewBuiltinToolRegistry: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestListCmd_TextOutput(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T11 — JSON output is well-formed and contains expected fields.
 func TestListCmd_JSONOutput(t *testing.T) {
-	reg, _ := toolrunner.NewBuiltinToolRegistry(nil)
+	reg, _ := tools.NewBuiltinToolRegistry(nil)
 	surfaces := buildTestSurfaces(reg)
 	cmd := &ListCmd{
 		Surfaces:  surfaces,
@@ -153,7 +153,7 @@ func (s *staticSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec,
 // buildTestSurfaces constructs a small canonical list for testing. Mirrors
 // the production BuildSurfaces output (BuiltinSurface + LSPToolSurface +
 // VerifySurface) using staticSurface wrappers.
-func buildTestSurfaces(reg *toolrunner.ToolRegistry) []contracts.ToolSurface {
+func buildTestSurfaces(reg *tools.ToolRegistry) []contracts.ToolSurface {
 	tools, _ := reg.ListTools(context.Background(), "")
 	specs := make([]contracts.ToolSpec, 0, len(tools))
 	for _, t := range tools {

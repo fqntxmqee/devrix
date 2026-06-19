@@ -87,13 +87,13 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S4-A01-T03 | lsp_find_references spec + Execute 路径 | LSP | `tests/integration/tools_terminal_test.go` (TestLSP_End2End) | IMPLEMENTED | P0 |
 | D2-S4-A01-T04 | lsp_incoming_calls / hover / workspace_symbol spec 暴露 | LSP | `tests/integration/tools_terminal_test.go` (TestLSP_End2End) | IMPLEMENTED | P0 |
 | D2-S4-A01-T05 | bash audit + policy decision (fail-closed) | Bash | `tests/integration/tools_terminal_test.go` (TestBashAST_DenyAttack) | IMPLEMENTED | P0 |
-| D2-S4-A01-T06 | zsh attack pattern deny (22+ rules) | Bash | `internal/layers/contextengine/enforce/toolrunner/bash/` | IMPLEMENTED | P0 |
+| D2-S4-A01-T06 | zsh attack pattern deny (22+ rules) | Bash | `internal/layers/contextengine/enforce/tools/bash/` | IMPLEMENTED | P0 |
 
 ## D2-S8: Sandbox Module
 
 | T ID | 描述 | S 映射 | Test 位置 | Status |
 |-------|------|---------|-----------|--------|
-| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/enforce/toolrunner/sandbox_test.go` | IMPLEMENTED |
+| D2-S8-A01-T01 | bash 困居工作目录 + 命令白名单 | Sandbox | `internal/layers/contextengine/enforce/tools/sandbox_test.go` | IMPLEMENTED |
 | D2-S8-A01-T02 | Shell injection attack prevention | Sandbox | `tests/security/shell_injection_test.go` | IMPLEMENTED |
 
 ## D2-S9: Harness Module
@@ -185,12 +185,12 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 |-------|------|---------|-----------|--------|----------|
 | TOOL-SURFACE-1-T01 | ToolSurface 4 方法契约 (Name/Tools/RiskLevel/Execute) 编译期断言 | Surface Contract | `internal/shared/contracts/tool_surface_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T02 | ToolFilter 1 方法契约 (Apply) + Composite/Allow/Deny/ApplyFilters | Filter Contract | `internal/shared/contracts/tool_filter_test.go` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T03 | BuiltinSurface + LSPToolSurface 可见性 (cfg nil / 无 server / 有 server) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{builtin,lsptool}_surface_test.go` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T04 | FreeForkSurface + TrackerSurface + VerifySurface 行为 + 接口合规 | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w4_surfaces,w4_surfaces}_test.go` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T05 | PluginSurface dispatch (delegate + background 共享) | Surface Wiring | `internal/layers/contextengine/enforce/toolrunner/surface/{w5_surfaces,plugin}_test.go` | IMPLEMENTED | P0 |
-| TOOL-FILTER-1-T01 | PerAgentFilter 5 agent + WithAllowlist + 不可变 + 未知 agent | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
-| TOOL-FILTER-1-T02 | PerRiskFilter 4 阈值 + 空阈值 pass-through | Filter Impl | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
-| TOOL-FILTER-1-T03 | Composite FIFO 顺序 + 顺序敏感性 | Filter Composition | `internal/layers/contextengine/enforce/toolrunner/filter/w6_filters_test.go` | IMPLEMENTED | P1 |
+| TOOL-SURFACE-1-T03 | BuiltinSurface + LSPToolSurface 可见性 (cfg nil / 无 server / 有 server) | Surface Wiring | `internal/layers/contextengine/enforce/tools/surface/{builtin,lsptool}_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T04 | FreeForkSurface + TrackerSurface + VerifySurface 行为 + 接口合规 | Surface Wiring | `internal/layers/contextengine/enforce/tools/surface/{w4_surfaces,w4_surfaces}_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T05 | PluginSurface dispatch (delegate + background 共享) | Surface Wiring | `internal/layers/contextengine/enforce/tools/surface/{w5_surfaces,plugin}_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T01 | PerAgentFilter 5 agent + WithAllowlist + 不可变 + 未知 agent | Filter Impl | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T02 | PerRiskFilter 4 阈值 + 空阈值 pass-through | Filter Impl | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T03 | Composite FIFO 顺序 + 顺序敏感性 | Filter Composition | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P1 |
 | TOOL-FILTER-1-T04 | toolpolicy.AsToolFilter 5 agent 适配 | Adapter | `internal/layers/orchestration/toolpolicy/filter_adapter_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T08 | NewContextEngine 收编 surface 列表 (BuildSurfaces + DefaultFilters) | Engine Wiring | `internal/bootstrap/surfaces_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T09 | turn_adapter.ExecuteRound 走 surface.Execute (findSurface 线性扫) | Dispatch Path | `internal/bootstrap/turn_adapter_surface_test.go` | IMPLEMENTED | P0 |
@@ -222,7 +222,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|--------|-----------|--------|----------|
 | TOOL-SURFACE-1-T22 | 7 surface Tools() 100% 填充 4 bool 字段（每 spec 至少 1 个 true） | ToolSpec v2 | `tests/integration/tool_surface_test.go::TestIntegration_AllSurfaces_HaveCompleteOrthogonalFlags` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T23 | FreeForkSurface.InterruptBehavior=InterruptCancel，6 short-run surface=InterruptBlock；free_fork cancel 200ms 内返回 | InterruptBehavior | `internal/layers/contextengine/enforce/toolrunner/surface/{freefork,builtin,lsptool,tracker,verify,delegate,background_task}_surface_test.go` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T23 | FreeForkSurface.InterruptBehavior=InterruptCancel，6 short-run surface=InterruptBlock；free_fork cancel 200ms 内返回 | InterruptBehavior | `internal/layers/contextengine/enforce/tools/surface/{freefork,builtin,lsptool,tracker,verify,delegate,background_task}_surface_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T24 | BuildSurfaces 排序稳定 (lexicographic by Name)，3 套 opts 顺序一致 | BuildSurfaces | `internal/bootstrap/surfaces_test.go::TestBuildSurfaces_StableOrder` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T25 | turn_adapter 并行 dispatch (ConcurrencySafe=true → errgroup；=false → 顺序)；indexed write-back 保序；race 无报警 | Parallel Dispatch | `tests/integration/turn_adapter_test.go::TestTurnAdapter_ParallelDispatch` | IMPLEMENTED | P0 |
 
@@ -237,7 +237,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|--------|-----------|--------|----------|
 | TOOL-SURFACE-1-T26 | Surface.CheckPermission 5 short-run surface=DecisionAllow；Surface 返回 Ask 时 turn_adapter 调 IPermissionGate 进一步决策 | Surface Permission | `internal/bootstrap/turn_adapter_surface_test.go::TestCheckPermission_Ask_EscalatesToIPermissionGate` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T27 | BashASTPolicy 默认 deny-list (rm -rf /, dd, mkfs, sudo, chmod 777 /) → DecisionDeny；parse 错误 → Ask | BashAST | `internal/layers/contextengine/enforce/toolrunner/surface/bash_ast_test.go` (7 cases) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T27 | BashASTPolicy 默认 deny-list (rm -rf /, dd, mkfs, sudo, chmod 777 /) → DecisionDeny；parse 错误 → Ask | BashAST | `internal/layers/contextengine/enforce/tools/surface/bash_ast_test.go` (7 cases) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T28 | IPermissionGate.CheckPermission 消费 ToolSpec.OpenWorld 字段 (4 bool orthogonal flags) | Permission Gate | `internal/layers/orchestration/toolpolicy/plan_mode_test.go` (consume spec flags) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T29 | turn_adapter.ExecuteRound dispatch 前 CheckPermission；PlanModeOpenWorldPolicy 在 plan_mode + OpenWorld + not-allowlist 时 Deny | Two-phase Dispatch | `internal/bootstrap/turn_adapter_surface_test.go` + `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanModeOpenWorldPolicy` | IMPLEMENTED | P0 |
 
@@ -260,9 +260,9 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|--------|-----------|--------|----------|
-| TOOL-SURFACE-1-T30 | zodgen.Schema() Go struct → JSON Schema subset (type/properties/required/enum/description) | zodgen | `internal/layers/contextengine/enforce/toolrunner/zodgen/zodgen_test.go` (10 cases) | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T31 | ShouldDeferByDefault 返回 true for 6 hardcoded candidates (delegate_*, task_output_background) | DeferLoading Static | `internal/layers/contextengine/enforce/toolrunner/surface/tool_search_surface_test.go::TestShouldDeferByDefault` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T32 | ToolSearchSurface.Tools() 返回 1 个 spec (DeferLoading=false 强制)；search() 匹配 exact > glob > substring，top-5 cap | ToolSearchSurface | `internal/layers/contextengine/enforce/toolrunner/surface/tool_search_surface_test.go` (6 cases) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T30 | zodgen.Schema() Go struct → JSON Schema subset (type/properties/required/enum/description) | zodgen | `internal/layers/contextengine/enforce/tools/zodgen/zodgen_test.go` (10 cases) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T31 | ShouldDeferByDefault 返回 true for 6 hardcoded candidates (delegate_*, task_output_background) | DeferLoading Static | `internal/layers/contextengine/enforce/tools/surface/tool_search_surface_test.go::TestShouldDeferByDefault` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T32 | ToolSearchSurface.Tools() 返回 1 个 spec (DeferLoading=false 强制)；search() 匹配 exact > glob > substring，top-5 cap | ToolSearchSurface | `internal/layers/contextengine/enforce/tools/surface/tool_search_surface_test.go` (6 cases) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T33 | turn_adapter.Prepare 过滤 DeferLoading=true 的 tools (tool_search 必须保留)；deferDecider chain 加 runtime defer | Prepare Filter | `internal/bootstrap/turn_adapter_surface_test.go::TestPrepare_FiltersDeferred` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T34 | PlanModeOpenWorldPolicy.ShouldDefer runtime defer (mode=plan_mode + OpenWorld + !allowlist → defer) | ShouldDefer Runtime | `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanModeOpenWorldPolicy_ShouldDefer` | IMPLEMENTED | P0 |
 
@@ -278,7 +278,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|--------|-----------|--------|----------|
-| TOOL-SURFACE-1-T35 | AskUserQuestionSurface.Tools() 1 spec + OrthogonalFlagFor 返回 (ReadOnly=T, OpenWorld=T, ConcurrencySafe=F) + InterruptBehavior=InterruptCancel | ask_user_question Spec | `internal/layers/contextengine/enforce/toolrunner/surface/ask_user_question_surface_test.go::TestAskUserQuestionSurface_Tools` | IMPLEMENTED | P1 |
+| TOOL-SURFACE-1-T35 | AskUserQuestionSurface.Tools() 1 spec + OrthogonalFlagFor 返回 (ReadOnly=T, OpenWorld=T, ConcurrencySafe=F) + InterruptBehavior=InterruptCancel | ask_user_question Spec | `internal/layers/contextengine/enforce/tools/surface/ask_user_question_surface_test.go::TestAskUserQuestionSurface_Tools` | IMPLEMENTED | P1 |
 | TOOL-SURFACE-1-T36 | 5 项 validation: 1-4 questions / 2-4 options / header ≤ 12 / unique label / non-empty label-question | ask_user_question Validation | `ask_user_question_surface_test.go::TestAskUserQuestionSurface_Execute_{EmptyQuestions,TooManyQuestions,OptionLabelRequired,DuplicateLabels,HeaderCap}` | IMPLEMENTED | P1 |
 | TOOL-SURFACE-1-T37 | sender 桥接: 装配 → gw.RouteOutbound；无 sender → Delivered=false graceful；sender 错 → ToolResult.Error | ask_user_question Sender | `ask_user_question_surface_test.go::TestAskUserQuestionSurface_Execute_{HappyPath,NoSender,SenderError,RenderMultiple}` | IMPLEMENTED | P1 |
 | TOOL-SURFACE-1-T38 | BuildSurfaces 装配 ask_user_question surface + 排序稳定 (3 套 opts 一致)；main.go 装配 sender；启动 0 错误 | ask_user_question Wiring | `internal/bootstrap/surfaces_test.go::TestBuildSurfaces_OnlyStateless` + `cmd/devrix/main.go` startup log | IMPLEMENTED | P1 |
@@ -310,16 +310,16 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T41 | D2-S15-A04-T* | S15 Prepare | D2 | Fork subagent placeholder |
 | D2-S10-A01-T42 | D2-S18-A02-T* | S18 Enforce | D2 | Sidechain transcript resume |
 | （新增） | D2-S15-A01-T10 | S15 Prepare | D2 | CompressHint no LLM（D2 不调 D3 摘要） |
-| D2-DIAG-T01 | D2-S23-A01-T01 | S23 LSP Tool | D2 | LSP `definition` operation 返回 location | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
-| D2-DIAG-T02 | D2-S23-A01-T02 | S23 LSP Tool | D2 | LSP `references` operation 返回引用列表 | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
-| D2-DIAG-T03 | D2-S23-A01-T03 | S23 LSP Tool | D2 | LSP `incoming_calls` 返回 call hierarchy | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P1 |
+| D2-DIAG-T01 | D2-S23-A01-T01 | S23 LSP Tool | D2 | LSP `definition` operation 返回 location | `internal/layers/contextengine/enforce/tools/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T02 | D2-S23-A01-T02 | S23 LSP Tool | D2 | LSP `references` operation 返回引用列表 | `internal/layers/contextengine/enforce/tools/lsp_tool_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T03 | D2-S23-A01-T03 | S23 LSP Tool | D2 | LSP `incoming_calls` 返回 call hierarchy | `internal/layers/contextengine/enforce/tools/lsp_tool_test.go` | IMPLEMENTED | P1 |
 | D2-DIAG-T04 | D2-S23-A02-T01 | S23 WindowAnalyzer | D2 | WindowAnalyzer 按 5 类拆分 token | `internal/layers/contextengine/prepare/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
 | D2-DIAG-T05 | D2-S23-A02-T02 | S23 WindowAnalyzer | D2 | WindowAnalyzer role 路由（system/tool/thinking/reminder） | `internal/layers/contextengine/prepare/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-SEC-T01 | TS-AST-T01 | tool-security AST | shared | Bash AST 阻止 heredoc 注入 | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-SEC-T02 | TS-AST-T02 | tool-security AST | shared | Bash AST 阻止 zsh attack surface | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-SEC-T03 | TS-AST-T03 | tool-security AST | shared | Bash AST 阻止 process/command substitution | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-SEC-T04 | TS-AST-T04 | tool-security AST | shared | Bash AST 阻止 dangerous redirect (`>/dev/sda`) | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-SEC-T05 | TS-AST-T05 | tool-security AST | shared | Bash AST 阻止 eval/source/exec/`.` | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T01 | TS-AST-T01 | tool-security AST | shared | Bash AST 阻止 heredoc 注入 | `internal/layers/contextengine/enforce/tools/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T02 | TS-AST-T02 | tool-security AST | shared | Bash AST 阻止 zsh attack surface | `internal/layers/contextengine/enforce/tools/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T03 | TS-AST-T03 | tool-security AST | shared | Bash AST 阻止 process/command substitution | `internal/layers/contextengine/enforce/tools/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T04 | TS-AST-T04 | tool-security AST | shared | Bash AST 阻止 dangerous redirect (`>/dev/sda`) | `internal/layers/contextengine/enforce/tools/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-SEC-T05 | TS-AST-T05 | tool-security AST | shared | Bash AST 阻止 eval/source/exec/`.` | `internal/layers/contextengine/enforce/tools/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
 
 ---
 
@@ -352,5 +352,6 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-STRUCT-T04** | `prepare/memory/` 与 `persist/memory/` 无循环依赖（Recall 与 Store 接口解耦） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
 | **D2-STRUCT-T05** | `enforce/orchestrator.go` 已删除（stub 移除，dispatch 由 `turn_adapter` 接管） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
 | **D2-STRUCT-T06** | scenario 下目录深度 ≤2 层（`enforce/tools/surface/` ✅；更深需 F-registry 登记） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T07** | P5 legacy 退役：禁止新增 `legacy.ContextEngine.Process()` 生产引用（CI 硬阻断）；现有 8 个 caller 在 allowlist（cmd/llm-smoke + multiagent/run + tests/* + communication mocks） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P1 |
 
 > 全部由 `internal/lint/layer/d2_layout_test.go` 单一守卫测试驱动。

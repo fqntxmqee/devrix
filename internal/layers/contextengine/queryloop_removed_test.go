@@ -1,3 +1,10 @@
+// Package contextengine — queryloop decommission guard tests.
+//
+// P2-T5 status: TestD2_RootProductionFiles_ThinFacade and TestD2_NoQueryLoopProductionReferences
+// consolidated into internal/lint/layer/d2_layout_test.go (D2-STRUCT-T01/T02/T04/T05/T06).
+// Remaining: TestD2_QueryLoopRemoved (query/ dir absence) and
+// TestD2_EngineUsesPreparedTurnRunner (engine smoke) are kept here as
+// domain-level smoke checks.
 package contextengine
 
 import (
@@ -5,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -24,34 +30,6 @@ func TestD2_QueryLoopRemoved(t *testing.T) {
 	}
 }
 
-func TestD2_RootProductionFiles_ThinFacade(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Dir(file)
-	allowed := map[string]bool{
-		"aliases.go":      true,
-		"contracts.go":    true,
-		"tool_context.go": true,
-	}
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		t.Fatalf("ReadDir: %v", err)
-	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
-			continue
-		}
-		if !allowed[e.Name()] {
-			t.Errorf("unexpected production file at D2 root: %s (engine logic belongs in facade/ or scenario dirs)", e.Name())
-		}
-	}
-	if _, err := os.Stat(filepath.Join(root, "facade", "engine.go")); err != nil {
-		t.Fatalf("facade/engine.go missing: %v", err)
-	}
-}
-
 func TestD2_EngineUsesPreparedTurnRunner(t *testing.T) {
 	e := NewContextEngine(EngineDeps{
 		Summarizer: &staticSummarizer{},
@@ -61,43 +39,6 @@ func TestD2_EngineUsesPreparedTurnRunner(t *testing.T) {
 	}
 	var _ contracts.PreparedTurnRunner
 	_ = e.SetPreparedTurnRunner
-}
-
-func TestD2_NoQueryLoopProductionReferences(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Join(filepath.Dir(file), "..")
-	var offenders []string
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			if d != nil && d.IsDir() {
-				switch d.Name() {
-				case "vendor", ".git":
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		content := string(data)
-		for _, needle := range []string{"QueryLLMCaller", "query.Loop.Run", "Loop.Run("} {
-			if strings.Contains(content, needle) {
-				offenders = append(offenders, path+": contains "+needle)
-			}
-		}
-		return nil
-	})
-	if len(offenders) > 0 {
-		t.Fatalf("production references to removed QueryLoop API:\n%s", strings.Join(offenders, "\n"))
-	}
 }
 
 type staticSummarizer struct{}

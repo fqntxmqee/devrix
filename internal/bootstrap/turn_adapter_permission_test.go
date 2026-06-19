@@ -15,7 +15,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
@@ -71,11 +71,11 @@ func (p *recordingPermission) CheckPermission(_ context.Context, _ contracts.Too
 // the RiskLevel that the adapter passed through.
 type recordingToolRunner struct {
 	mu    sync.Mutex
-	calls []toolrunner.ToolCall
+	calls []tools.ToolCall
 	out   string
 }
 
-func (r *recordingToolRunner) Execute(_ context.Context, call toolrunner.ToolCall) (*toolrunner.ToolResult, error) {
+func (r *recordingToolRunner) Execute(_ context.Context, call tools.ToolCall) (*tools.ToolResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, call)
@@ -83,13 +83,13 @@ func (r *recordingToolRunner) Execute(_ context.Context, call toolrunner.ToolCal
 	if out == "" {
 		out = "ok"
 	}
-	return &toolrunner.ToolResult{Output: out}, nil
+	return &tools.ToolResult{Output: out}, nil
 }
 
-func (r *recordingToolRunner) Calls() []toolrunner.ToolCall {
+func (r *recordingToolRunner) Calls() []tools.ToolCall {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]toolrunner.ToolCall, len(r.calls))
+	out := make([]tools.ToolCall, len(r.calls))
 	copy(out, r.calls)
 	return out
 }
@@ -100,7 +100,7 @@ type riskFixedRegistry struct {
 	risk types.RiskLevel
 }
 
-func (r *riskFixedRegistry) ListTools(context.Context, string) ([]toolrunner.ToolSchema, error) {
+func (r *riskFixedRegistry) ListTools(context.Context, string) ([]tools.ToolSchema, error) {
 	return nil, nil
 }
 func (r *riskFixedRegistry) RiskLevel(string) types.RiskLevel { return r.risk }
@@ -354,7 +354,7 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	cfg.Snapshot.Enabled = false
-	realReg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	realReg, err := tools.NewBuiltinToolRegistry(nil)
 	if err != nil {
 		t.Fatalf("real reg: %v", err)
 	}

@@ -49,8 +49,11 @@ func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDe
 	if patch.Permission != nil {
 		base.Permission = patch.Permission
 	}
-	if patch.LongTerm != nil {
-		base.LongTerm = patch.LongTerm
+	if patch.LongTermRecaller != nil {
+		base.LongTermRecaller = patch.LongTermRecaller
+	}
+	if patch.LongTermStore != nil {
+		base.LongTermStore = patch.LongTermStore
 	}
 	if patch.Config != nil {
 		base.Config = patch.Config
