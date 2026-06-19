@@ -186,7 +186,7 @@ func InitOrchestration(
 	}
 
 	slog.Info("d7: SessionOrchestrator wired to gateway, D1→D7.ProcessMessage path active")
-	slog.Info("d7: TurnOrchestrator wired (D7-S2-A06+A07)", "max_turns", 8)
+	slog.Info("d7: TurnOrchestrator wired (D7-S2-A06+A07)", "max_turns", turnOrch.MaxTurns())
 	return nil
 }
 

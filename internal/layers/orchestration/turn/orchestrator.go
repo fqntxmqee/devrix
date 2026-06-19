@@ -131,6 +131,14 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 	}
 }
 
+// MaxTurns returns the orchestrator-level MaxTurns bound (0 = unbounded).
+// Surfaced for diagnostics in the D7 bootstrap wiring log so the actual
+// bound is observable in startup logs (the previous hardcoded 8 was
+// misleading once the main conversation switched to unbounded).
+func (o *DefaultOrchestrator) MaxTurns() int {
+	return o.maxTurns
+}
+
 // RunTurn executes the full prepare→llm→tools→persist loop (D7-S2-A06).
 //
 // State machine (design.md §3):
