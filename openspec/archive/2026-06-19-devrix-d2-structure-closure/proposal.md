@@ -2,8 +2,11 @@
 
 **Change ID:** devrix-d2-structure-closure  
 **Demand ID:** DM-20260619-007  
-**Status:** S3_Approved  
-**S3-Gate:** P1-a Approved 2026-06-19（owner 确认；P1-b/c 推进中）  
+**Status:** S7_Archived  
+**Created:** 2026-06-19  
+**S3-Gate:** P1-a Approved 2026-06-19（owner 确认）  
+**S5-Gate:** ACCEPTED 2026-06-19（19/19 AC PASS）  
+**S7-Gate:** Archived 2026-06-19（`openspec/archive/2026-06-19-devrix-d2-structure-closure/`）  
 **Methodology:** `docs/methodology/dsaft-refactoring-playbook.md` §3–§6
 
 ---
