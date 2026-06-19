@@ -6,9 +6,9 @@
 
 **Domain:** D3 - LLM Gateway
 **DSAFT Type:** 公共域 (Common Domain)
-**Version:** 3.2.0
-**Status:** Active (2026-06-14)
-**Last Updated:** 2026-06-14
+**Version:** 3.3.0
+**Status:** Active (2026-06-19)
+**Last Updated:** 2026-06-19
 
 ---
 
@@ -572,7 +572,9 @@ type ISafetyFilter interface {
 }
 ```
 
-### 5.2 配置类型（shared/config/llmgateway.go）
+### 5.2 配置类型（`configure/shared_config.go` · v2.0 物理路径）
+
+> **v2.0 路径迁移**（DM-20260614-019, 2026-06-14 落地）：原 `internal/shared/config/llmgateway.go` 已合并到 `internal/layers/llmgateway/configure/shared_config.go`，与 `configure/loader.go` 同包。旧路径保留 1 发布周期 re-export 桥接。
 
 ```go
 type LLMGatewayConfig struct {
@@ -773,9 +775,9 @@ internal/bridges/llm/
 └── readiness.go                # Readiness probe
 ```
 
-### 10.2 v2.0 物理路径（Phase F 实施中）
+### 10.2 v2.0 物理路径（✅ 已完成，DM-20260614-019, 2026-06-14）
 
-> **v1.0 不动**；v2.0 物理路径 1:1 对齐 5+1 S：
+> **v2.0 状态**：v2.0 物理路径迁移已 2026-06-14 落地（DM-20260614-019 `devrix-d3-sa-refine-v2.0`）。11 P0 T + 26 T 回归 100% 绿；re-export 桥接保留 1 发布周期（计划 v2.1 物理清理）。当前实际代码已全部位于 v2.0 物理路径，本节为权威目录树。
 
 ```
 internal/layers/llmgateway/
@@ -1037,3 +1039,4 @@ F11 layering.md + code-layout.md 同步
 | 3.0.0 | 2026-06-14 | 5+1 S 价值流化；A + F 编排时序图（§3）；R2 §4.3 contracts.go 拆分粒度占位（§2.1）；R3 P0 #8 fail-fast（§2.2 + §10.1）；R3 P1 #11 Breaker scope 扩展（§6）；R3 P1 #15 IAdapter.Protocol()（§5.1）；R3 P1 #16 Safety 时延（§8.2）；v2.0 物理路径计划（§10.2） |
 | 3.1.0 | 2026-06-14 | v1.1 子 change 落地：§3.5 新增 F1-F9 时序图；§9 Feature flag 表更新为 D4-B 决议；§8.4 Safety F04 实施细节；R3 P0 #8 fail-fast 占位 → 实施；R3 P1 #15/#16 占位 → 实施 |
 | **3.2.0** | **2026-06-14** | **v2.0 子 change 落地**：§0 V3.1.0→V3.2.0 变更摘要 + 不变性承诺表；§10.2 物理路径 1:1 对齐 5+1 S 详细目录树 + 7 桥接目录 + 根 contracts.go re-export 模板；§13 v2.0 实施步骤（F2-F8 + F9 + F11 详细步骤表）；§14 Phase G 13 项验收 |
+| **3.3.0** | **2026-06-19** | **v2.0 状态刷新**（DM-20260619-002）：§5.2 路径 `shared/config/llmgateway.go` → `configure/shared_config.go`（v2.0 已落地）；§10.2 状态从"Phase F 实施中"改为"已完成（DM-20260614-019, 2026-06-14）"；Last Updated 同步至 2026-06-19 |
