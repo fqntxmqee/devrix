@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/devrix/devrix/internal/layers/observability/logger"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/logger"
 )
 
 // InstallSlogBridge wraps the default slog handler to inject traceId/spanId from context.

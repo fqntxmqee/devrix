@@ -1,9 +1,9 @@
 package observability
 
 import (
-	"github.com/devrix/devrix/internal/layers/observability/logger"
-	"github.com/devrix/devrix/internal/layers/observability/metrics"
-	"github.com/devrix/devrix/internal/layers/observability/tracer"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/logger"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 // Bridge provides convenience methods for integrating observability into other layers

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/observability/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 )
 
 func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
