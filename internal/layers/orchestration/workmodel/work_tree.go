@@ -118,6 +118,20 @@ func (t *WorkTree) MaxDecomposeDepth() int {
 }
 
 // EnsureGoal returns the session root goal, creating one if absent.
+//
+// When an existing goal is found and is not locked, its Title and
+// Directive are refreshed to reflect the latest user directive (so the
+// focus hint and downstream prompts track the current intent instead of
+// the very first message). Locked goals (terminal status set by
+// UpdateStatus) are preserved as-is and a fresh root goal is created
+// above the historical work — the original goal's children stay attached
+// to the original parent.
+//
+// Context-bleed fix (2026-06-20): the previous implementation always
+// returned the first goal regardless of new directives, so "Work focus:
+// [goal] 你好" stayed stuck across turns even when the user pivoted to a
+// different intent, and the LLM treated later instructions as
+// continuations of the first message.
 func (t *WorkTree) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -125,6 +139,20 @@ func (t *WorkTree) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
 
 	for _, item := range t.items[sessionID] {
 		if item.Kind == WorkKindGoal && item.ParentID == "" {
+			if item.Locked {
+				continue
+			}
+			if item.Directive == directive {
+				return item, nil
+			}
+			title := directive
+			if len(title) > 80 {
+				title = title[:80] + "..."
+			}
+			item.Title = title
+			item.Directive = directive
+			t.touch(item)
+			t.persistLocked(sessionID)
 			return item, nil
 		}
 	}
