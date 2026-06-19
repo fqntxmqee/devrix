@@ -156,3 +156,147 @@ func TestStreamOpenAISSE_should_parse_reasoning_content(t *testing.T) {
 		t.Errorf("thinking: %q", thinking)
 	}
 }
+
+// TestStreamOpenAISSE_should_split_inline_think_tags covers the minimax M2.7
+// case: the LLM emits <think>...</think> inside delta.Content (no provider-native
+// reasoning field). The splitter must route the inner text to chunk.Thinking
+// and the trailing text to chunk.Content.
+func TestStreamOpenAISSE_should_split_inline_think_tags(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"<think>用户想让我统计"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":"...让我列出来</think>"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":"\n\n让我统计一下："}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":"\n1. bash"},"finish_reason":"stop"}]}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var thinking, content strings.Builder
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		thinking.WriteString(chunk.Thinking)
+		content.WriteString(chunk.Content)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	wantThinking := "用户想让我统计...让我列出来"
+	if thinking.String() != wantThinking {
+		t.Errorf("thinking = %q, want %q", thinking.String(), wantThinking)
+	}
+	wantContent := "\n\n让我统计一下：\n1. bash"
+	if content.String() != wantContent {
+		t.Errorf("content = %q, want %q", content.String(), wantContent)
+	}
+}
+
+// TestStreamOpenAISSE_should_split_think_tag_straddling_chunks covers a
+// pathological split: <think> in chunk N, the entire body in chunk N+1, and
+// </think> in chunk N+2. The splitter is stateful and must hold the body
+// until it sees the closing tag.
+func TestStreamOpenAISSE_should_split_think_tag_straddling_chunks(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"<think>"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":"deep thought across"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":" multiple chunks"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":"</think>answer"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":" tail"},"finish_reason":"stop"}]}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var thinking, content strings.Builder
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		thinking.WriteString(chunk.Thinking)
+		content.WriteString(chunk.Content)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	wantThinking := "deep thought across multiple chunks"
+	if thinking.String() != wantThinking {
+		t.Errorf("thinking = %q, want %q", thinking.String(), wantThinking)
+	}
+	wantContent := "answer tail"
+	if content.String() != wantContent {
+		t.Errorf("content = %q, want %q", content.String(), wantContent)
+	}
+}
+
+// TestStreamOpenAISSE_should_flush_unclosed_think_at_stream_end covers a
+// pathological case: the LLM emits <think> but never closes it (truncation
+// or model laziness). The splitter buffers the body and Flush() must
+// release it on [DONE] so the thinking isn't silently dropped.
+func TestStreamOpenAISSE_should_flush_unclosed_think_at_stream_end(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"<think>unfinished thought"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":" still going"}}],"finish_reason":"length"}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var thinking, content strings.Builder
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		thinking.WriteString(chunk.Thinking)
+		content.WriteString(chunk.Content)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// Unclosed <think> → all body is thinking, no content.
+	if thinking.String() != "unfinished thought still going" {
+		t.Errorf("thinking = %q", thinking.String())
+	}
+	if content.Len() != 0 {
+		t.Errorf("content = %q, want empty", content.String())
+	}
+}
+
+// TestStreamOpenAISSE_should_not_split_when_native_reasoning_present covers
+// the DeepSeek-R1 / Anthropic path: when the provider already populates
+// delta.ReasoningContent, the splitter MUST NOT touch delta.Content (which
+// is already clean). Splitting clean content would still be a no-op for
+// well-behaved content, but a regression in the splitter could re-tag
+// clean content as thinking. This test pins the precedence.
+func TestStreamOpenAISSE_should_not_split_when_native_reasoning_present(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"reasoning_content":"native","content":"<think>should"}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"content":" not split</think>clean"}}],"finish_reason":"stop"}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var thinking, content strings.Builder
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		thinking.WriteString(chunk.Thinking)
+		content.WriteString(chunk.Content)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// Native reasoning wins; subsequent <think> tags in delta.Content are
+	// passed through verbatim (the splitter was never engaged).
+	if thinking.String() != "native" {
+		t.Errorf("thinking = %q, want %q", thinking.String(), "native")
+	}
+	wantContent := "<think>should not split</think>clean"
+	if content.String() != wantContent {
+		t.Errorf("content = %q, want %q", content.String(), wantContent)
+	}
+}

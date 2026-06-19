@@ -755,6 +755,93 @@ func TestOrchestrator_RunTurn_CompressHint_LLM(t *testing.T) {
 	}
 }
 
+// --- CompressHint strips <think> from LLM-generated summary ---
+//
+// Regression: a previous build stored the LLM's compression summary verbatim
+// into the next-turn system message. When the LLM emitted its working notes
+// inside <think>...</think> (minimax M2.7, DeepSeek-R1 w/ chat template),
+// the system message was polluted with thinking content, which the LLM
+// then mirrored in subsequent turns ("<think>用户想...</think>" wrapping
+// every answer). Fix: runCompress must call textutil.StripThinkingTags on
+// the LLM summary before returning it.
+
+func TestOrchestrator_RunTurn_CompressHint_StripsThinkTags(t *testing.T) {
+	callCount := atomic.Int64{}
+	var secondCallMessages []types.Message
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, req LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := callCount.Add(1)
+		if n == 1 {
+			// Compression call: LLM emits thinking + actual summary
+			ch := make(chan llmgateway.Chunk, 4)
+			ch <- llmgateway.Chunk{Content: "<think>"}
+			ch <- llmgateway.Chunk{Content: "user asked me to summarize, let me think..."}
+			ch <- llmgateway.Chunk{Content: "</think>\n\nThe user is debugging devrix."}
+			ch <- llmgateway.Chunk{Done: true}
+			close(ch)
+			return ch, nil
+		}
+		// Main turn call: capture what the orchestrator actually sent us
+		secondCallMessages = append([]types.Message(nil), req.Messages...)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- textChunk("got it")
+		ch <- doneChunk()
+		close(ch)
+		return ch, nil
+	}
+
+	ctxPrep := &stubContext{prepared: PreparedContext{
+		CompressHint: &CompressHint{
+			MessagesToSummarize: []types.Message{
+				{Role: types.MessageRoleUser, Content: "long history"},
+			},
+			TargetTokenBudget: 2000,
+		},
+	}}
+	persist := &stubPersist{}
+	tools := &stubTools{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: tools, Persist: persist, MaxTurns: 4,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-strip-think",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "continue"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	if callCount.Load() != 2 {
+		t.Fatalf("expected 2 LLM calls, got %d", callCount.Load())
+	}
+	if !hasType(evs, "complete") {
+		t.Error("expected complete event after compress")
+	}
+
+	// Find the system message injected from the compression summary.
+	var systemContent string
+	for _, m := range secondCallMessages {
+		if m.Role == types.MessageRoleSystem {
+			systemContent = m.Content
+			break
+		}
+	}
+	if systemContent == "" {
+		t.Fatal("no system message found in second LLM call")
+	}
+	if strings.Contains(systemContent, "<think>") {
+		t.Errorf("system message still contains <think>: %q", systemContent)
+	}
+	if strings.Contains(systemContent, "</think>") {
+		t.Errorf("system message still contains </think>: %q", systemContent)
+	}
+	if !strings.Contains(systemContent, "The user is debugging devrix.") {
+		t.Errorf("system message lost the actual summary: %q", systemContent)
+	}
+}
+
 // --- CompressHint empty summary falls through to truncation ---
 
 func TestOrchestrator_RunTurn_CompressHint_TruncationFallback(t *testing.T) {
@@ -1004,9 +1091,9 @@ func TestOrchestrator_RunTurn_SameOrchestratorForMainAndSubQuery(t *testing.T) {
 func TestOrchestrator_RunTurn_CompleteCarriesFinalText_NoTools(t *testing.T) {
 	const wantText = "make lint 通过，无违规"
 
-	// Simulate thinking model: only Done chunk, no Content chunks.
+	// Simulate a clean LLM: emits a final-text chunk then Done.
 	llm := &stubLLM{chunks: []llmgateway.Chunk{
-		thinkingChunk("analyzing lint output..."),
+		textChunk(wantText),
 		doneChunk(),
 	}}
 	orch := NewOrchestrator(OrchestratorDeps{
@@ -1032,11 +1119,11 @@ func TestOrchestrator_RunTurn_CompleteCarriesFinalText_NoTools(t *testing.T) {
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	// Boundary: even when LLM emits no Content chunks, the empty finalText is
-	// forwarded on the event (semantic: "no summary text"). Adapter side then
-	// falls back to thinking buffer / last tool_result.
-	if complete.Content != "" {
-		t.Errorf("complete.Content = %q, want empty (no text chunks in this scenario)", complete.Content)
+	// When the LLM emits a final-text chunk, the orchestrator forwards it
+	// verbatim on complete.Content. The D1 IM adapter renders it as the
+	// conclusion card text.
+	if complete.Content != wantText {
+		t.Errorf("complete.Content = %q, want %q", complete.Content, wantText)
 	}
 	if complete.SessionID != "sess-no-text" {
 		t.Errorf("complete.SessionID = %q, want sess-no-text", complete.SessionID)
@@ -1148,6 +1235,172 @@ func TestOrchestrator_RunTurn_EmitsResolveAwaitSummary(t *testing.T) {
 	}
 	if !strings.Contains(resolveEv.Content, "Resolve await") {
 		t.Fatalf("resolve content = %q", resolveEv.Content)
+	}
+}
+
+// TestResolveFinalText covers the thinking→finalText fallback helper. The
+// bug it pins: when the LLM emits only thinking and no clean content
+// (typical for providers without a native reasoning field when the
+// model is in a tool-call-only final state), the IM adapter receives an
+// empty finalText and renders a blank conclusion card. The helper must
+// promote the most recent non-empty thinking into finalText and strip
+// <think> defensively in case the splitter ever leaks a tag boundary.
+func TestResolveFinalText(t *testing.T) {
+	cases := []struct {
+		name      string
+		finalText string
+		thinking  string
+		want      string
+	}{
+		{
+			name:      "non_empty_finalText_wins",
+			finalText: "the answer is 42",
+			thinking:  "i should think about this",
+			want:      "the answer is 42",
+		},
+		{
+			name:      "whitespace_finalText_falls_back_to_thinking",
+			finalText: "\n\n\n",
+			thinking:  "let me think: 6*7=42",
+			want:      "let me think: 6*7=42",
+		},
+		{
+			name:      "empty_thinking_keeps_blank",
+			finalText: "",
+			thinking:  "",
+			want:      "",
+		},
+		{
+			name:      "think_tags_in_thinking_are_stripped",
+			finalText: "",
+			thinking:  "<think>working notes</think>the final answer",
+			want:      "the final answer",
+		},
+		{
+			name:      "unclosed_think_tag_is_dropped_safely",
+			finalText: "",
+			thinking:  "<think>incomplete working notes",
+			// StripThinkingTags drops unclosed <think> blocks entirely
+			// (no matching closing tag → no safe partial). The helper
+			// returns blank in that case, which the IM adapter then
+			// handles via the empty-summary footer (D1 fallback).
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveFinalText(tc.finalText, tc.thinking)
+			if got != tc.want {
+				t.Errorf("resolveFinalText(%q, %q) = %q, want %q",
+					tc.finalText, tc.thinking, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank covers the
+// max-turns + no-clean-text scenario reported by the user
+// ("请尝试多轮工具调用…"). The LLM streams thinking-only chunks on the
+// final iteration, hits MaxTurns, and the orchestrator must promote the
+// last thinking into complete.Content so the IM adapter does not render
+// an empty conclusion card.
+func TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank_MaxTurns(t *testing.T) {
+	const tailThinking = "已多次调用工具触达 max-turns 兜底"
+
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 4)
+		if n == 1 {
+			ch <- thinkingChunk("first iteration: planning")
+		} else {
+			ch <- thinkingChunk(tailThinking)
+		}
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: "{}"}},
+			Done:      true,
+			Usage:     llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "tx", Output: "ok"}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: persist, MaxTurns: 3,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-think-only",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "loop with thinking only"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	if turnIdx.Load() != 3 {
+		t.Fatalf("expected 3 LLM calls (MaxTurns), got %d", turnIdx.Load())
+	}
+
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+			break
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if !strings.Contains(complete.Content, tailThinking) {
+		t.Errorf("complete.Content = %q, want substring %q (promoted from thinking)", complete.Content, tailThinking)
+	}
+	// Earlier iteration's planning must NOT leak into the conclusion.
+	if strings.Contains(complete.Content, "first iteration") {
+		t.Errorf("complete.Content should not contain earlier iteration's thinking, got %q", complete.Content)
+	}
+}
+
+// TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank_NoToolCalls
+// covers the no-tool-call + thinking-only scenario: the LLM produces
+// thinking but no clean text, ends the turn with finish_reason=stop,
+// and the orchestrator must still promote the thinking into finalText.
+func TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank_NoToolCalls(t *testing.T) {
+	const tailThinking = "reflection without final answer"
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		thinkingChunk("analyzing the request"),
+		thinkingChunk(tailThinking),
+		doneChunk(),
+	}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: &stubTools{}, Persist: &stubPersist{},
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-thinkonly-notool",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	var complete *contracts.EngineEvent
+	for _, ev := range evs {
+		if ev.Type == "complete" {
+			complete = ev
+			break
+		}
+	}
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if !strings.Contains(complete.Content, tailThinking) {
+		t.Errorf("complete.Content = %q, want substring %q", complete.Content, tailThinking)
 	}
 }
 

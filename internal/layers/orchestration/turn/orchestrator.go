@@ -12,6 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -205,6 +206,13 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	var totalUsage llmgateway.TokenUsage
 	var lastPromptTokens int
 	var finalText string
+	// lastThinkingTail retains the most recent LLM thinking content, post-strip.
+	// Used as a finalText fallback at emitComplete time when the LLM never
+	// emitted a clean summary (e.g. a provider without native reasoning emits
+	// its working notes inside <think> tags and the splitter routed them to
+	// thinking, leaving content empty — the user would otherwise see a blank
+	// conclusion card).
+	var lastThinkingTail strings.Builder
 
 	// Step 2+3: LLM↔Tool loop
 	for turn := 0; turn < req.MaxTurns; turn++ {
@@ -228,9 +236,14 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		var toolCalls []llmgateway.ToolCall
 		var iterUsage llmgateway.TokenUsage
 		var finishReason string
+		// turnThinking accumulates all thinking chunks emitted in this turn.
+		// After the inner stream loop, the most recent non-empty turn's
+		// turnThinking.String() is preserved as lastThinkingTail for the
+		// finalText fallback below (see emitComplete call sites).
+		var turnThinking strings.Builder
 
 		streamRecoveryAttempts := 0
-		streamRecoveryLoop:
+	streamRecoveryLoop:
 		for {
 			chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
 				SessionID:    req.SessionID,
@@ -249,6 +262,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			toolCalls = nil
 			finishReason = ""
 			iterUsage = llmgateway.TokenUsage{}
+			turnThinking.Reset()
 			var partial partialStreamEmit
 
 			for chunk := range chunkCh {
@@ -257,6 +271,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				}
 				if chunk.Thinking != "" {
 					partial.hadThinking = true
+					turnThinking.WriteString(chunk.Thinking)
 					out <- &contracts.EngineEvent{
 						Type:      "thinking",
 						Content:   chunk.Thinking,
@@ -306,6 +321,13 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		endSpan(llmSpan)
 
 		finalText = contentBuf.String()
+		// Preserve this turn's accumulated thinking for the emitComplete
+		// fallback below. Stash as lastThinkingTail AFTER finalText is set so
+		// the most recent non-empty thinking is always the fallback source.
+		if t := strings.TrimSpace(turnThinking.String()); t != "" {
+			lastThinkingTail.Reset()
+			lastThinkingTail.WriteString(t)
+		}
 		toolCalls = dedupeToolCalls(toolCalls)
 
 		// No tool calls → final response
@@ -323,7 +345,8 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			})
 			endSpan(persistSpan)
 			endSpan(turnSpan)
-			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens, finalText)
+			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
+				resolveFinalText(finalText, lastThinkingTail.String()))
 			return
 		}
 
@@ -412,7 +435,20 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		FinalText: finalText,
 	})
 	endSpan(persistSpan)
-	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens, finalText)
+	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
+		resolveFinalText(finalText, lastThinkingTail.String()))
+}
+
+// resolveFinalText promotes the most recent accumulated thinking into
+// finalText when finalText is blank, so the IM adapter's conclusion card
+// is never empty. The thinking content is <think>-stripped defensively
+// in case the gateway splitter ever leaks a tag boundary.
+func resolveFinalText(finalText, thinkingTail string) string {
+	if strings.TrimSpace(finalText) != "" {
+		return finalText
+	}
+	stripped := textutil.StripThinkingTags(thinkingTail)
+	return strings.TrimSpace(stripped)
 }
 
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string) {
@@ -514,7 +550,12 @@ func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, 
 				summaryBuilder.WriteString(chunk.Content)
 			}
 		}
-		if summary := summaryBuilder.String(); summary != "" {
+		// Strip <think>...</think> blocks before storing. The LLM may emit
+		// its working notes inside XML tags (minimax / DeepSeek-R1 w/o
+		// native reasoning field) and those would otherwise be re-injected
+		// into the next turn as a system message, polluting context and
+		// teaching the LLM to wrap subsequent answers in <think> too.
+		if summary := textutil.StripThinkingTags(summaryBuilder.String()); summary != "" {
 			return compressResult{Summary: summary, Degradation: CompressLLM}
 		}
 	}

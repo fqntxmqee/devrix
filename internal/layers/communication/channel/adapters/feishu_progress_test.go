@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
+
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
-
-	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
 
 func TestStripOuterCodeFence(t *testing.T) {
@@ -302,6 +302,71 @@ func TestFeishuAdapter_StructuredProgress_SimpleReplyNoEmptyTaskCard(t *testing.
 		t.Fatalf("patchCount = %d, want 1 (complete footer on response)", patchCount)
 	}
 }
+
+// TestFeishuAdapter_FinalizeStructuredSession_EmptySummaryPatchesFooter
+// pins the fix for the user-reported bug
+// ("devrix 好像理解我的意思，但最后没有总结信息发送给我"):
+// when the D7 orchestrator emits a complete event with an empty
+// summary (e.g. max-turns reached mid-tool-call while the LLM was still
+// looping), the IM adapter MUST still patch the reply card with a
+// minimal completion footer so the user sees "✅ 任务已完成" rather
+// than a dangling partial card with no closure. Without the fix, the
+// session silently returned from finalizeStructuredSession and the
+// user received no signal that the task had finished.
+func TestFeishuAdapter_FinalizeStructuredSession_EmptySummaryPatchesFooter(t *testing.T) {
+	var replyCount int
+	var patchCount int
+
+	msgID := "om_response"
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			replyCount++
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+			patchCount++
+			return &larkim.PatchMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:         "test_app",
+		AppSecret:     "test_secret",
+		ProgressStyle: progressStyleStructured,
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_empty_summary", feishuReplyContext{userMessageID: "om_root"})
+
+	// First emit a text event so responseMsgID is populated.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_empty_summary", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "好的，让我继续增加上下文", Metadata: map[string]string{"event_type": "text"},
+	})
+	// Then emit a complete event with EMPTY content (the failure mode).
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_empty_summary", ChatID: "feishu_oc_123456_ou_654321",
+		Content: "", Metadata: map[string]string{"event_type": "complete"},
+	})
+
+	if replyCount != 1 {
+		t.Fatalf("replyCount = %d, want 1 (response card created)", replyCount)
+	}
+	// The fix: a patch MUST be issued even with empty summary.
+	// Without the fix, finalizeStructuredSession returned nil silently
+	// (because strings.TrimSpace("") is "" and the responseMsgID != ""
+	// check at the bottom short-circuited without ever patching) and
+	// the user received no "任务完成" signal at all.
+	if patchCount < 1 {
+		t.Fatalf("patchCount = %d, want >=1 (empty-summary fallback must still patch the reply card)", patchCount)
+	}
+}
+
+// extractPatchedCardJSON was removed; see the simpler
+// TestFeishuAdapter_FinalizeStructuredSession_EmptySummaryPatchesFooter
+// which validates behavior via the patch call count + stream state.
 
 func cardBodyMarkdown(card *kernel.Card) string {
 	var parts []string
