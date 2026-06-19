@@ -1,43 +1,11 @@
 package contracts
 
-import (
-	"context"
-
-	"github.com/devrix/devrix/internal/shared/types"
-)
-
-// LLMCaller is a mock/test-only streaming LLM facade.
-//
-// Deprecated: production LLM calls use D7 GatewayInvoker. Retained for mockctx.StaticLLMCaller.
-type LLMCaller interface {
-	Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, error)
-}
-
-// LLMRequest is the per-iteration LLM input.
-type LLMRequest struct {
-	Model        string
-	SystemPrompt string
-	Messages     []types.Message
-	Tools        []ToolSchema
-}
-
-// LLMChunk is a streaming LLM response fragment.
-type LLMChunk struct {
-	Content   string
-	Thinking  string
-	ToolCalls []ToolCall
-	Done      bool
-	Usage     TokenUsage
-}
-
-// ToolCall is an LLM-requested tool invocation.
-type ToolCall struct {
-	ID    string
-	Name  string
-	Input string
-}
+import "context"
 
 // ToolSchema describes a tool for the LLM facade contract.
+//
+// DSAFT: D2-S18-A03 ToolRegistry (D2 owner) + D7 delegation surface (D7 consumer).
+// Used by D2 subquery (enforce/subquery.go) and D7 delegatetools/builtin_agents.go.
 type ToolSchema struct {
 	Name        string
 	Description string
@@ -45,6 +13,8 @@ type ToolSchema struct {
 }
 
 // TokenUsage reports per-call token consumption.
+//
+// DSAFT: cross-domain type. D2 prepared_turn_result.go + D7 turn/subturn.go consume.
 type TokenUsage struct {
 	PromptTokens     int
 	CompletionTokens int
