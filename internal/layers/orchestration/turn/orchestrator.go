@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,6 +23,12 @@ type OrchestratorDeps struct {
 	Context          ContextPreparer
 	Tools            ToolRoundExecutor
 	Persist          SessionPersister
+	// MaxTurns is an *optional safety net*, not the expected loop bound.
+	// 0 / negative → unbounded: the loop only terminates on LLM natural
+	// finish or one of the deterministic exit reasons below. The agent
+	// matches claude-code semantics: the main conversation has no hard
+	// turn limit; child agents (compact, extract-memories, etc.) set
+	// their own MaxTurns based on expected workload.
 	MaxTurns         int
 	DefaultModel     string
 	MaxContextTokens int
@@ -29,6 +36,60 @@ type OrchestratorDeps struct {
 	FocusHint        FocusHintProvider
 	ResolveAwait     ResolveAwaiter
 }
+
+// ExitReason captures *why* the turn loop stopped. Surfaced on the final
+// `complete` EngineEvent's Metadata["exit_reason"] and on the persisted
+// turn record so SDK consumers, dashboards, and tests can distinguish a
+// healthy LLM finish from a forced exit.
+//
+// The taxonomy mirrors claude-code's query-loop terminal reasons
+// (clawcode/src/query.ts + 16-reason catalogue in
+// docs/agent/clawcode/01-tools-queryloop §4). Only the subset relevant
+// to devrix's D7 orchestrator is enumerated; missing reasons (e.g.
+// prompt_too_long, image_error) are still surfaced via D2 enforce
+// before reaching D7, so D7 does not need its own enum values for them.
+type ExitReason string
+
+const (
+	// ExitReasonNatural: LLM emitted no tool calls (end_turn / stop).
+	ExitReasonNatural ExitReason = "natural"
+	// ExitReasonMaxTurns: MaxTurns safety net triggered. Only set when
+	// MaxTurns > 0; an unbounded turn (MaxTurns ≤ 0) cannot hit this.
+	ExitReasonMaxTurns ExitReason = "max_turns"
+	// ExitReasonAbortedUser: ctx cancelled (user interrupt / deadline).
+	ExitReasonAbortedUser ExitReason = "aborted_user"
+	// ExitReasonAbortedLLM: invokeStream returned a fatal error.
+	ExitReasonAbortedLLM ExitReason = "aborted_llm"
+	// ExitReasonAbortedTool: ExecuteRound returned a fatal error.
+	ExitReasonAbortedTool ExitReason = "aborted_tool"
+	// ExitReasonRepeatedTool: same (tool_name|input) signature appeared
+	// ≥ repeatedToolThreshold times in the last repeatedToolLookback
+	// turns. Indicates the LLM is stuck retrying the same action.
+	ExitReasonRepeatedTool ExitReason = "repeated_tool"
+	// ExitReasonToolFailure: ≥ consecutiveToolErrorThreshold consecutive
+	// tool errors with the same error fingerprint. Indicates the LLM
+	// cannot recover from a tool failure pattern.
+	ExitReasonToolFailure ExitReason = "tool_failure"
+	// ExitReasonTokenDiminishing: cumulative token usage crossed the
+	// 90% budget threshold AND the last two per-turn deltas were both
+	// below the diminishing delta floor. Mirrors clawcode's
+	// checkTokenBudget "marginal utility" stop condition.
+	ExitReasonTokenDiminishing ExitReason = "token_diminishing"
+)
+
+// Deterministic-exit thresholds. Aligned with clawcode's hard-coded
+// constants in src/query/tokenBudget.ts and src/query.ts.
+const (
+	repeatedToolLookback             = 5
+	repeatedToolThreshold            = 3
+	consecutiveToolErrorThreshold    = 3
+	tokenBudgetCompletionThreshold   = 0.9
+	tokenBudgetDiminishingDelta      = 500
+	tokenBudgetDiminishingChecks     = 2
+)
+
+// Metadata key on the final complete event carrying the exit reason.
+const metadataKeyExitReason = "exit_reason"
 
 // DefaultOrchestrator implements TurnOrchestrator with the canonical
 // prepare→llm→tools→persist state machine (design.md §3).
@@ -46,10 +107,16 @@ type DefaultOrchestrator struct {
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
+//
+// MaxTurns ≤ 0 means *unbounded* — the loop runs until the LLM naturally
+// finishes or one of the deterministic exit reasons fires. Match
+// clawcode semantics where the main conversation has no hard turn
+// ceiling; child agents that need a bound set it explicitly (see
+// internal/layers/orchestration/delegatetools/builtin_agents.go).
 func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
-	if deps.MaxTurns <= 0 {
-		deps.MaxTurns = 8
-	}
+	// Leave deps.MaxTurns at 0 / negative — the orchestrator treats those
+	// as "no safety net" rather than substituting a magic default. See
+	// OrchestratorDeps.MaxTurns doc for the rationale.
 	return &DefaultOrchestrator{
 		llm:              deps.LLM,
 		context:          deps.Context,
@@ -68,14 +135,23 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 //
 // State machine (design.md §3):
 //
-//	START → PREPARE → ROUTE+LLM → [TOOL_ROUND] → PERSIST → COMPLETE
-//	                      ↑           │
-//	                      └─ turns<max ┘
+//	START → PREPARE → LLM ↔ TOOL_ROUND → [exit-reason check] → PERSIST → COMPLETE
+//	                    ↑                       │
+//	                    └───────────────────────┘
+//
+// The loop runs until one of the ExitReason conditions fires:
+//   - natural (LLM end_turn, no tool calls)
+//   - max_turns (only when req.MaxTurns > 0 AND exceeded)
+//   - aborted_user / aborted_llm / aborted_tool (fatal errors)
+//   - repeated_tool / tool_failure / token_diminishing (deterministic safety)
+//
+// req.MaxTurns falls back to o.maxTurns only when o.maxTurns > 0; an
+// orchestrator constructed with no MaxTurns runs unbounded.
 func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-chan *contracts.EngineEvent, error) {
 	if req.SessionID == "" {
 		return nil, fmt.Errorf("turn: SessionID is required")
 	}
-	if req.MaxTurns <= 0 {
+	if req.MaxTurns <= 0 && o.maxTurns > 0 {
 		req.MaxTurns = o.maxTurns
 	}
 
@@ -95,6 +171,12 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 
 // runLoop is the internal state machine: PREPARE → LLM ↔ TOOL_ROUND → PERSIST.
 // Cross-domain calls: D7→D2 (prepare/tools/persist), D7→D3 (LLM invoke).
+//
+// The main loop is `for { ... }` with no implicit turn bound (matching
+// clawcode/src/query.ts:307 `while (true)`); the only hard cap is the
+// optional MaxTurns safety net. Termination reasons are captured in the
+// exitReason variable and surfaced on the final `complete` event's
+// Metadata["exit_reason"] (see ExitReason constants).
 func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) {
 	start := time.Now()
 	nested := isNestedScope(req.Scope) || len(req.PreloadedMessages) > 0
@@ -214,22 +296,45 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	// conclusion card).
 	var lastThinkingTail strings.Builder
 
-	// Step 2+3: LLM↔Tool loop
-	for turn := 0; turn < req.MaxTurns; turn++ {
+	// Step 2+3: LLM↔Tool loop. Termination is driven by the exitReason
+	// local below; the loop body uses `break` (or `return` for fatal
+	// aborts that already emit an error event) to land in the unified
+	// finalize block at the bottom.
+	exitReason := ExitReasonNatural
+	turnCount := 0
+	recentToolSignatures := make([]string, 0, repeatedToolLookback)
+	var consecutiveErrorFP string
+	consecutiveErrorCount := 0
+	budgetTracker := newBudgetTracker(maxContextTokens)
+
+	for {
+		turnCount++
+
+		// ctx cancellation / deadline — aborts with an explicit error
+		// event so the IM adapter renders the cancellation rather than
+		// waiting for an unobservable stream close.
 		if err := ctx.Err(); err != nil {
 			o.emitError(out, req.SessionID, fmt.Sprintf("turn cancelled: %v", err))
 			return
 		}
 
+		// Safety net: only fires when the caller explicitly set a positive
+		// MaxTurns. An unbounded turn (MaxTurns ≤ 0) is governed solely by
+		// the natural-finish + deterministic-exit reasons below.
+		if req.MaxTurns > 0 && turnCount > req.MaxTurns {
+			exitReason = ExitReasonMaxTurns
+			break
+		}
+
 		turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
+			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
 		)
 
 		// D7→D3 LLM invoke (D7-S2-A07)
 		turnCtx, llmSpan := o.startSpan(turnCtx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
+			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
 			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
 		)
 		var contentBuf strings.Builder
@@ -330,24 +435,26 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		}
 		toolCalls = dedupeToolCalls(toolCalls)
 
-		// No tool calls → final response
+		// No tool calls → natural LLM finish. The terminal `complete`
+		// event below carries exit_reason=natural.
 		if len(toolCalls) == 0 {
-			_, persistSpan := o.startSpan(turnCtx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
-				tracer.Attribute{Key: "session_id", Value: req.SessionID},
-				tracer.Attribute{Key: "context.caller", Value: "d7"},
-			)
-			_ = persister.PersistTurn(turnCtx, PersistRequest{
-				SessionID: req.SessionID,
-				Messages:  messages,
-				TurnCount: turn + 1,
-				Usage:     totalUsage,
-				FinalText: finalText,
-			})
-			endSpan(persistSpan)
-			endSpan(turnSpan)
-			o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
-				resolveFinalText(finalText, lastThinkingTail.String()))
-			return
+			exitReason = ExitReasonNatural
+			break
+		}
+
+		// Repeated-tool detector: same (tool_name|input) signature
+		// appears ≥ repeatedToolThreshold times in the last
+		// repeatedToolLookback turns. The LLM is stuck retrying the
+		// same action; continuing would burn tokens without progress.
+		sig := toolCallsSignature(toolCalls)
+		if isRepeatedToolSignature(sig, recentToolSignatures) {
+			exitReason = ExitReasonRepeatedTool
+			break
+		}
+		recentToolSignatures = append(recentToolSignatures, sig)
+		if len(recentToolSignatures) > repeatedToolLookback {
+			// Keep the most recent N signatures (drop the oldest).
+			recentToolSignatures = recentToolSignatures[len(recentToolSignatures)-repeatedToolLookback:]
 		}
 
 		// Emit tool call events
@@ -409,46 +516,100 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			}
 		}
 
+		// Consecutive-tool-error detector: ≥ consecutiveToolErrorThreshold
+		// consecutive turns produced at least one tool result with the
+		// same non-empty error fingerprint. The LLM cannot recover from
+		// this error pattern; further turns just repeat the same
+		// rejection.
+		if fp := toolResultErrorFingerprint(toolResult.Results); fp != "" {
+			if fp == consecutiveErrorFP {
+				consecutiveErrorCount++
+			} else {
+				consecutiveErrorFP = fp
+				consecutiveErrorCount = 1
+			}
+			if consecutiveErrorCount >= consecutiveToolErrorThreshold {
+				exitReason = ExitReasonToolFailure
+				break
+			}
+		} else {
+			consecutiveErrorFP = ""
+			consecutiveErrorCount = 0
+		}
+
+		// Token-budget diminishing-returns detector. Mirrors
+		// clawcode/src/query/tokenBudget.ts checkTokenBudget:
+		// once cumulative usage crosses 90% of the context budget AND
+		// the last two per-turn deltas are both below the floor,
+		// continuing yields marginal value → stop. Disabled when
+		// maxContextTokens is 0 / unset (the orchestrator has no
+		// budget signal in that case).
+		budgetTracker.observe(totalUsage)
+		if budgetTracker.shouldStopDiminishing(maxContextTokens) {
+			exitReason = ExitReasonTokenDiminishing
+			break
+		}
+
 		// Build assistant tool-call message and tool result messages for the next turn.
 		messages = append(messages, buildAssistantToolCallMsg(req.SessionID, toolCalls, finalText))
 		for _, r := range toolResult.Results {
 			messages = append(messages, buildToolResultMsg(req.SessionID, r))
 		}
 
-		// NOTE: finalText is intentionally NOT cleared here — it must survive to the
-		// emitComplete call after the for-loop exits, so MaxTurns-exceeded emits
-		// the last iteration's LLM text (otherwise the IM adapter sees an empty
-		// complete event and the user gets no conclusion card).
+		// NOTE: finalText is intentionally NOT cleared here — it must
+		// survive to the emitComplete call below, so MaxTurns-exceeded
+		// (or any other non-natural exit after a tool round) emits the
+		// last iteration's LLM text instead of an empty conclusion.
 		endSpan(turnSpan)
 	}
 
-	// Max turns reached
+	// Finalize: persist + emit complete with the resolved exit reason.
+	// The aborted_* paths already returned above with their own error
+	// event; everything else (natural / max_turns / repeated_tool /
+	// tool_failure / token_diminishing) reaches here and emits a
+	// single terminal `complete` whose Metadata carries exit_reason.
 	_, persistSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
+		tracer.Attribute{Key: string(metadataKeyExitReason), Value: string(exitReason)},
 	)
+	resolvedFinal := resolveFinalText(finalText, lastThinkingTail.String(), exitReason, req.MaxTurns)
 	_ = persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  messages,
-		TurnCount: req.MaxTurns,
+		TurnCount: turnCount,
 		Usage:     totalUsage,
-		FinalText: finalText,
+		FinalText: resolvedFinal,
 	})
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
-		resolveFinalText(finalText, lastThinkingTail.String()))
+		resolvedFinal, exitReason)
 }
 
 // resolveFinalText promotes the most recent accumulated thinking into
 // finalText when finalText is blank, so the IM adapter's conclusion card
 // is never empty. The thinking content is <think>-stripped defensively
 // in case the gateway splitter ever leaks a tag boundary.
-func resolveFinalText(finalText, thinkingTail string) string {
-	if strings.TrimSpace(finalText) != "" {
-		return finalText
+//
+// When the loop terminated on the MaxTurns safety net (exitReason ==
+// ExitReasonMaxTurns), a truncation notice is prepended so the user can
+// see the loop hit its bound rather than mistaking a quiet final-text
+// for a normal end. Unbounded turns (maxTurns ≤ 0) never carry this
+// notice regardless of how they exited.
+func resolveFinalText(finalText, thinkingTail string, exitReason ExitReason, maxTurns int) string {
+	promoted := finalText
+	if strings.TrimSpace(promoted) == "" {
+		promoted = textutil.StripThinkingTags(thinkingTail)
 	}
-	stripped := textutil.StripThinkingTags(thinkingTail)
-	return strings.TrimSpace(stripped)
+	promoted = strings.TrimSpace(promoted)
+	if exitReason == ExitReasonMaxTurns && maxTurns > 0 {
+		notice := fmt.Sprintf("[max-turns reached after %d iterations; turn truncated]", maxTurns)
+		if promoted == "" {
+			return notice
+		}
+		return notice + "\n" + promoted
+	}
+	return promoted
 }
 
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string) {
@@ -468,6 +629,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	model string,
 	maxContextTokens int,
 	finalText string,
+	exitReason ExitReason,
 ) {
 	if model == "" {
 		model = o.defaultModel
@@ -478,6 +640,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	meta := map[string]string{
 		"duration": fmt.Sprintf("%d", time.Since(start).Milliseconds()),
 		"usage":    fmt.Sprintf("%d", usageTokenTotal(usage)),
+		metadataKeyExitReason: string(exitReason),
 	}
 	if model != "" {
 		meta["model"] = model
@@ -684,4 +847,124 @@ func dedupeToolCalls(calls []llmgateway.ToolCall) []llmgateway.ToolCall {
 		out = append(out, c)
 	}
 	return out
+}
+
+// toolCallsSignature produces a stable "name|input" signature for a batch
+// of tool calls. Parallel tool calls are sorted by name+input so two
+// semantically equivalent batches always hash to the same signature.
+// The signature is what the repeated-tool detector compares turn-over-turn.
+func toolCallsSignature(calls []llmgateway.ToolCall) string {
+	if len(calls) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(calls))
+	for _, c := range calls {
+		parts = append(parts, c.Name+"|"+c.Input)
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ";")
+}
+
+// isRepeatedToolSignature returns true when the given signature has
+// already appeared ≥ repeatedToolThreshold times in the lookback window.
+// The LLM is considered stuck when it keeps retrying the same action
+// regardless of intervening context — the orchestrator breaks the loop
+// and surfaces ExitReasonRepeatedTool on the final complete event.
+func isRepeatedToolSignature(sig string, history []string) bool {
+	if sig == "" {
+		return false
+	}
+	count := 0
+	for _, prev := range history {
+		if prev == sig {
+			count++
+		}
+	}
+	return count >= repeatedToolThreshold
+}
+
+// toolResultErrorFingerprint builds a stable fingerprint over the error
+// text of a tool round. Returns "" when the round had no errors (a
+// clean round resets the consecutive-error counter). Different error
+// strings produce different fingerprints so the counter only fires on
+// the *same* error pattern repeating.
+func toolResultErrorFingerprint(results []ToolResult) string {
+	var firstErr string
+	var count int
+	for _, r := range results {
+		if strings.TrimSpace(r.Error) == "" {
+			continue
+		}
+		if firstErr == "" {
+			firstErr = r.Error
+		}
+		count++
+	}
+	if count == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s|count=%d", firstErr, count)
+}
+
+// budgetTracker observes per-turn token usage deltas and decides when
+// the cumulative spend has crossed the context budget *and* the last
+// two increments were both small enough that further turns add
+// marginal value at best. Mirrors clawcode/src/query/tokenBudget.ts
+// checkTokenBudget (90% threshold + 500-token floor + 2 consecutive
+// small-delta observations).
+type budgetTracker struct {
+	lastTotal    int
+	recentDeltas [tokenBudgetDiminishingChecks]int
+	deltasFilled int
+}
+
+func newBudgetTracker(_ int) *budgetTracker {
+	return &budgetTracker{}
+}
+
+// observe records a cumulative usage snapshot. The delta between the
+// previous and current total tokens is stored in the rolling window.
+func (b *budgetTracker) observe(usage llmgateway.TokenUsage) {
+	total := usageTokenTotal(usage)
+	delta := total - b.lastTotal
+	if delta < 0 {
+		// Provider reset / first observation; treat the new total as
+		// a fresh baseline rather than a negative delta.
+		delta = total
+	}
+	b.lastTotal = total
+	if b.deltasFilled < tokenBudgetDiminishingChecks {
+		b.recentDeltas[b.deltasFilled] = delta
+		b.deltasFilled++
+		return
+	}
+	// Shift left, append at the end. Keeps the most recent N deltas.
+	for i := 0; i < tokenBudgetDiminishingChecks-1; i++ {
+		b.recentDeltas[i] = b.recentDeltas[i+1]
+	}
+	b.recentDeltas[tokenBudgetDiminishingChecks-1] = delta
+}
+
+// shouldStopDiminishing returns true when both conditions hold:
+//   - cumulative usage has crossed tokenBudgetCompletionThreshold of
+//     maxContextTokens (i.e. ≥ 90% of the context window is consumed);
+//   - the most recent tokenBudgetDiminishingChecks per-turn deltas are
+//     all below tokenBudgetDiminishingDelta (each turn is adding < 500
+//     tokens of useful work).
+//
+// When maxContextTokens is 0 / unset the orchestrator has no budget
+// signal and the detector stays disabled.
+func (b *budgetTracker) shouldStopDiminishing(maxContextTokens int) bool {
+	if maxContextTokens <= 0 || b.deltasFilled < tokenBudgetDiminishingChecks {
+		return false
+	}
+	if b.lastTotal < int(float64(maxContextTokens)*tokenBudgetCompletionThreshold) {
+		return false
+	}
+	for _, d := range b.recentDeltas[:tokenBudgetDiminishingChecks] {
+		if d >= tokenBudgetDiminishingDelta {
+			return false
+		}
+	}
+	return true
 }
