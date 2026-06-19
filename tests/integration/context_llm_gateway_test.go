@@ -7,7 +7,6 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	llmtoken "github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -23,8 +22,8 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 	}
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{},
-		Summarizer:     &mockctx.StaticSummarizer{},
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{},
+		Summarizer:     &contextengine.StaticSummarizer{},
 		TokenCounter: counter,
 		Config:       cfg,
 	})

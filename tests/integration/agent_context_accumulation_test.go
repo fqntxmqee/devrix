@@ -11,7 +11,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	"github.com/devrix/devrix/internal/layers/llmgateway/protect"
@@ -62,10 +62,10 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
 		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
 		contextengine.EngineDeps{
-			PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "Echo: agent route"},
-			Tools:      &mockctx.ToolRunner{},
-			ToolsReg:   mustBuiltinRegistry(t),
-			Permission: mockctx.AllowAllPermission{},
+			PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "Echo: agent route"},
+			Tools:              &enforce.ToolRunner{},
+			ToolsReg:           mustBuiltinRegistry(t),
+			Permission:         enforce.AllowAllPermission{},
 		},
 	))
 

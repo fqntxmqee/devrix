@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"golang.org/x/sync/errgroup"
@@ -23,12 +23,12 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{Output: "ok"},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "ok"},
+		ToolsReg:           mustBuiltinRegistry(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 
 	var g errgroup.Group

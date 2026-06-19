@@ -10,11 +10,11 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
+	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -74,11 +74,11 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &bashOncePreparedTurn{},
-		Summarizer:         &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   reg,
-		Permission: permMgr,
-		Config:     ctxCfg,
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{},
+		ToolsReg:           reg,
+		Permission:         permMgr,
+		Config:             ctxCfg,
 	})
 	testutil.WireGatewayOrchestration(gw, engine)
 

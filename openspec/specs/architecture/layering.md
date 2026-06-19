@@ -442,7 +442,9 @@ layers/
 │   ├── kernel/                    # D2 contracts + span registry
 │   ├── legacy/                    # P5 deprecated Process() entry (D2-STRUCT-T07)
 │   │   └── engine.go              # Process() with slog.Warn
-│   ├── mock/                      # D2 mockctx (test-only ports, kept in domain for cmd/obs-verify)
+│   ├── enforce/doubles.go         # D2-owned test doubles (ToolRunner, AllowAllPermission, DenyAllPermission)
+│   ├── summarizer_fixture.go      # Cross-domain D7 fixture (StaticSummarizer)
+│   ├── prepared_turn_fixture.go   # Cross-domain D7 fixture (StaticPreparedTurnRunner)
 │   ├── contracts.go               # D2 root public API
 │   ├── aliases.go                 # ContextEngine/EngineDeps deprecated aliases → legacy/
 │   └── tool_context.go            # type alias → enforce/tools/context.go

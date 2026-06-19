@@ -10,7 +10,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/devrix/devrix/tests/testutil"
@@ -29,12 +29,12 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "Hello from context engine"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:      &mockctx.ToolRunner{},
-		ToolsReg:   mustBuiltinRegistry(t),
-		Permission: mockctx.AllowAllPermission{},
-		Config:     ctxCfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "Hello from context engine"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{},
+		ToolsReg:           mustBuiltinRegistry(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             ctxCfg,
 	})
 
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg, nil)
@@ -77,12 +77,12 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: mockctx.PreparedTurnRunnerWithTools(),
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools: &mockctx.ToolRunner{},
-		ToolsReg: mustBuiltinRegistry(t),
-		Permission: mockctx.DenyAllPermission{},
-		Config: ctxCfg,
+		PreparedTurnRunner: contextengine.PreparedTurnRunnerWithTools(),
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{},
+		ToolsReg:           mustBuiltinRegistry(t),
+		Permission:         enforce.DenyAllPermission{},
+		Config:             ctxCfg,
 	})
 
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, cfg, nil)

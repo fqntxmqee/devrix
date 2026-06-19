@@ -9,9 +9,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -41,12 +41,12 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          &mockctx.ToolRunner{Output: "ok"},
-		ToolsReg:       mustBuiltinRegistryForAdapter(t),
-		Permission:     mockctx.AllowAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "ok"},
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 
 	adapter := newContextEngineAdapter(gw, engine, nil)
@@ -94,12 +94,12 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          &mockctx.ToolRunner{Output: "ok"},
-		ToolsReg:       mustBuiltinRegistryForAdapter(t),
-		Permission:     mockctx.AllowAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "ok"},
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 	sid := "sess-3turns"
@@ -168,12 +168,12 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          &mockctx.ToolRunner{Output: "ok"},
-		ToolsReg:       mustBuiltinRegistryForAdapter(t),
-		Permission:     mockctx.AllowAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "ok"},
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 
@@ -217,12 +217,12 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 		t.Fatalf("real reg: %v", err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          realReg,
-		ToolsReg:       mustBuiltinRegistryForAdapter(t),
-		Permission:     mockctx.AllowAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              realReg,
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 	sid := "sess-ctx-inject"
@@ -286,12 +286,12 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 		t.Fatalf("real reg: %v", err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          realReg,
-		ToolsReg:       mustBuiltinRegistryForAdapter(t),
-		Permission:     mockctx.AllowAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              realReg,
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 

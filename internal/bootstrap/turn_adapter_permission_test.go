@@ -15,8 +15,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -360,12 +360,12 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 	}
 	registryBuiltin := mustBuiltinRegistryForAdapter(t)
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
-		Tools:          realReg,
-		ToolsReg:       registryBuiltin,
-		Permission:     mockctx.DenyAllPermission{},
-		Config:         cfg,
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              realReg,
+		ToolsReg:           registryBuiltin,
+		Permission:         enforce.DenyAllPermission{},
+		Config:             cfg,
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 
