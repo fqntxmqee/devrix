@@ -225,11 +225,12 @@ sequenceDiagram
 
 | scenario-slug | Canonical S | 当前路径 |
 |---------------|-------------|----------|
-| `workmodel` | S1 | `orchestration/workmodel/` + `coordinator/workmodel.go` |
-| `sessionorchestrator` | S2 | `orchestration/coordinator/` + `turn/` + `hubspoke/` |
-| `wavescheduler` | S3 | `orchestration/wave/` |
-| `executionflow` | S4 | `flow/` · `workplan/` · `imsink/` · `hubspoke/` |
-| `decisionplanning` | S5 | `coordinator/classifier*` · `decomposer.go` · `executor.go` |
+| `workmodel` | S1 | `orchestration/workmodel/` + `sessionorchestrator/workmodel.go` |
+| `sessionorchestrator` | S2 | `orchestration/sessionorchestrator/` + `turn/` |
+| `wavescheduler` | S3 | `orchestration/wavescheduler/` |
+| `executionflow` | S4 | `executionflow/{hub,workplan,imsink,bridge}/` |
+| `decisionplanning` | S5 | `orchestration/decisionplanning/` |
+| `coordinator` / `hubspoke` | shim | 1-release type aliases |
 
 **Bootstrap：** `internal/bootstrap/wire_coordinator.go::WireD7`
 

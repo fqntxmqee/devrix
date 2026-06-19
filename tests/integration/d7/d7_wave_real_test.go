@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// stubWorkerRunner is a minimal wave.WorkerRunner that simulates a short
+// stubWorkerRunner is a minimal wavescheduler.WorkerRunner that simulates a short
 // task with a configurable delay. It emits a text WorkerEvent and records
 // its run count for test assertions.
 type stubWorkerRunner struct {
@@ -22,16 +22,16 @@ type stubWorkerRunner struct {
 	runCount atomic.Int64
 }
 
-func (r *stubWorkerRunner) Kind() wave.WorkerType { return wave.WorkerSubAgent }
+func (r *stubWorkerRunner) Kind() wavescheduler.WorkerType { return wavescheduler.WorkerSubAgent }
 
-func (r *stubWorkerRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) error {
+func (r *stubWorkerRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSpec) error {
 	r.runCount.Add(1)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(r.delay):
 	}
-	spec.Emit(wave.WorkerEvent{Type: "text", Content: spec.Directive + " done"})
+	spec.Emit(wavescheduler.WorkerEvent{Type: "text", Content: spec.Directive + " done"})
 	return nil
 }
 
@@ -48,20 +48,20 @@ func (r *stubWorkerRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) err
 func TestIntegration_D7WaveScheduler_RealDispatch(t *testing.T) {
 	runner := &stubWorkerRunner{delay: 20 * time.Millisecond}
 
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -113,13 +113,13 @@ func TestIntegration_D7WaveScheduler_RealDispatch(t *testing.T) {
 // T: D7-S3-A01-T02 — WaveScheduler handles empty graph gracefully.
 func TestIntegration_D7WaveScheduler_EmptyGraph(t *testing.T) {
 	runner := &stubWorkerRunner{delay: 10 * time.Millisecond}
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
-		Pool:      wave.NewWorkerPool(wave.DefaultPoolCapacity),
-		Guard:     wave.NewConflictGuard(),
-		Resolver:  wave.NewContextResolver(wave.ContextResolverDeps{}),
-		Artifacts: wave.NewArtifactStore(),
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
+		Pool:      wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity),
+		Guard:     wavescheduler.NewConflictGuard(),
+		Resolver:  wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{}),
+		Artifacts: wavescheduler.NewArtifactStore(),
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -159,20 +159,20 @@ func TestIntegration_D7WaveScheduler_ConflictGuard(t *testing.T) {
 		delay:         30 * time.Millisecond,
 	}
 
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -206,9 +206,9 @@ type conflictDetectRunner struct {
 	delay         time.Duration
 }
 
-func (r *conflictDetectRunner) Kind() wave.WorkerType { return wave.WorkerSubAgent }
+func (r *conflictDetectRunner) Kind() wavescheduler.WorkerType { return wavescheduler.WorkerSubAgent }
 
-func (r *conflictDetectRunner) Run(ctx context.Context, spec wave.WorkerRunSpec) error {
+func (r *conflictDetectRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSpec) error {
 	cur := r.concurrent.Add(1)
 	// Track peak.
 	for {
@@ -224,6 +224,6 @@ func (r *conflictDetectRunner) Run(ctx context.Context, spec wave.WorkerRunSpec)
 		return ctx.Err()
 	case <-time.After(r.delay):
 	}
-	spec.Emit(wave.WorkerEvent{Type: "text", Content: spec.Directive + " done"})
+	spec.Emit(wavescheduler.WorkerEvent{Type: "text", Content: spec.Directive + " done"})
 	return nil
 }

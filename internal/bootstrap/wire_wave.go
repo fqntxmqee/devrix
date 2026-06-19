@@ -12,8 +12,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave/runners"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler/runners"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -27,20 +27,20 @@ type WaveSchedulerDeps struct {
 }
 
 // WireWaveScheduler builds a WaveScheduler with SubAgent and optional AgentTool runners.
-func WireWaveScheduler(deps WaveSchedulerDeps) *wave.WaveScheduler {
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	artifacts := wave.NewArtifactStore()
-	runnerMap := make(map[wave.WorkerType]wave.WorkerRunner)
+func WireWaveScheduler(deps WaveSchedulerDeps) *wavescheduler.WaveScheduler {
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	artifacts := wavescheduler.NewArtifactStore()
+	runnerMap := make(map[wavescheduler.WorkerType]wavescheduler.WorkerRunner)
 
 	if WiredSubTurn() != nil || contextEngineFrom(deps.Engine) != nil {
-		runnerMap[wave.WorkerSubAgent] = runners.NewSubAgentRunner(buildSubAgentDeps(deps.GW, deps.Engine))
+		runnerMap[wavescheduler.WorkerSubAgent] = runners.NewSubAgentRunner(buildSubAgentDeps(deps.GW, deps.Engine))
 		slog.Info("d7: wave subagent runner wired")
 	} else {
 		slog.Warn("d7: wave subagent runner skipped (SubTurn executor unavailable)")
 	}
 
 	if deps.AgentTools != nil {
-		for _, kind := range []wave.WorkerType{wave.WorkerCursor, wave.WorkerClaudeCode} {
+		for _, kind := range []wavescheduler.WorkerType{wavescheduler.WorkerCursor, wavescheduler.WorkerClaudeCode} {
 			name := runners.RegistryToolName(kind)
 			if _, err := deps.AgentTools.Get(name); err == nil {
 				runnerMap[kind] = runners.NewAgentToolRunner(kind, runners.AgentToolDeps{
@@ -51,10 +51,10 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wave.WaveScheduler {
 		}
 	}
 
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:          pool,
-		Guard:         wave.NewConflictGuard(),
-		Resolver:      wave.NewContextResolver(wave.ContextResolverDeps{Artifacts: artifacts}),
+		Guard:         wavescheduler.NewConflictGuard(),
+		Resolver:      wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{Artifacts: artifacts}),
 		Artifacts:     artifacts,
 		Runners:       runnerMap,
 		Observability: deps.ObsBridge,

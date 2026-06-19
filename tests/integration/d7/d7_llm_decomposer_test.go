@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -75,20 +75,20 @@ func TestIntegration_D7LLMDecomposer_EndToEnd(t *testing.T) {
 	})
 
 	runner := &stubWorkerRunner{delay: 10 * time.Millisecond}
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -151,20 +151,20 @@ func TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON(t *testing.T) {
 	})
 
 	runner := &stubWorkerRunner{delay: 10 * time.Millisecond}
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -201,20 +201,20 @@ func TestIntegration_D7LLMDecomposer_EmptyTaskList(t *testing.T) {
 	})
 
 	runner := &stubWorkerRunner{delay: 10 * time.Millisecond}
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 
@@ -258,20 +258,20 @@ Here is my plan:
 	})
 
 	runner := &stubWorkerRunner{delay: 10 * time.Millisecond}
-	pool := wave.NewWorkerPool(wave.DefaultPoolCapacity)
-	guard := wave.NewConflictGuard()
-	artifacts := wave.NewArtifactStore()
-	resolver := wave.NewContextResolver(wave.ContextResolverDeps{
+	pool := wavescheduler.NewWorkerPool(wavescheduler.DefaultPoolCapacity)
+	guard := wavescheduler.NewConflictGuard()
+	artifacts := wavescheduler.NewArtifactStore()
+	resolver := wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{
 		Artifacts:        artifacts,
 		BaseSystemPrompt: "",
 	})
-	sched := wave.NewWaveScheduler(wave.SchedulerDeps{
+	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:      pool,
 		Guard:     guard,
 		Resolver:  resolver,
 		Artifacts: artifacts,
-		Runners: map[wave.WorkerType]wave.WorkerRunner{
-			wave.WorkerSubAgent: runner,
+		Runners: map[wavescheduler.WorkerType]wavescheduler.WorkerRunner{
+			wavescheduler.WorkerSubAgent: runner,
 		},
 	})
 

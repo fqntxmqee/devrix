@@ -56,8 +56,8 @@ D1.Gateway.RouteInbound
 | ClassifyIntent / Command-first | ✅ S5 | ❌ | — | — | — |
 | Wave / DAG 调度 | ✅ S3 | ❌ | — | — | — |
 | FlowEvent / WorkPlan | ✅ S4 | ❌ | 展示 | 产出事件 | — |
-| Task 写模型 | ✅ S1（目标） | 🔶 暂托管 | — | — | — |
-| PlanMode / PlanAgent | ✅ S5（目标） | 🔶 暂托管 | — | — | — |
+| Task 写模型 | ✅ S1 `workmodel/` | — | — | — | — |
+| PlanMode / PlanAgent | ✅ S1 `workmodel/plan_*.go` | — | — | — | — |
 | delegate_* 路由 | ✅ F（目标） | 🔶 暂存 | — | ✅ 执行 | — |
 | Session 上下文 / 压缩 | ❌ | ✅ S15/S17 | — | — | — |
 | Turn 主循环 LLM↔Tool | ✅ S2-A06 RunTurn | ❌（**REMOVED S16**） | — | — | — |
@@ -75,13 +75,13 @@ D1.Gateway.RouteInbound
 
 | 接口 | 定义位置 | 实现 | 消费 | 状态 |
 |------|----------|------|------|------|
-| `IOrchestrationEntry` | `shared/contracts` | D7 `coordinator.Entry` | D1 Gateway | ACTIVE |
-| `TurnExecutor` | `coordinator` | `bootstrap.turnOrchExecutor` → `turn.TurnOrchestrator` | D7 FastPath | ACTIVE |
+| `IOrchestrationEntry` | `shared/contracts` | D7 `sessionorchestrator.Entry`（`coordinator.Entry` shim） | D1 Gateway | ACTIVE |
+| `TurnExecutor` | `sessionorchestrator` | `bootstrap.turnOrchExecutor` → `turn.TurnOrchestrator` | D7 FastPath | ACTIVE |
 | `PreparedTurnRunner` | `shared/contracts` | `turn.PreparedTurnAdapter` | D2 `engine.Process` | ACTIVE |
 | `IEngine` | `shared/contracts` | `contextengine.Engine` | D7 via adapter | ACTIVE |
 | `Loop.Run` | ~~`query/loop.go`~~ | — | — | **REMOVED** (DM-20260618-010) |
 | `QueryLoopExecutor` | ~~`coordinator`~~ | — | — | **REMOVED** → `TurnExecutor` |
-| `ExecutionFlowHub` | `shared/contracts` | D7 flow | D2/D4 发布 | ACTIVE |
+| `ExecutionFlowHub` | `shared/contracts` | D7 `executionflow/hub` | D2/D4 发布 | ACTIVE |
 
 ### 4.1 依赖规则（DM-020 + DM-20260618-010）
 
@@ -126,7 +126,7 @@ D1.Gateway.RouteInbound
 | 3 | ~~`contextengine/delegate_tools.go`~~ | D4 路由 | `orchestration/delegatetools/` | ✅ DM-011 |
 | 4 | ~~`contextengine/queue/`~~ delegate-progress | Flow drain | D7-S4 `sessionqueue/` | ✅ DM-013 |
 | 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `toolpolicy/` | ✅ DM-015 |
-| 6 | `contextengine/nested/flow_report.go` | SubQuery FlowEvent 发布 | D7-S4 `hubspoke/subquery_bridge.go` | ⬜ DM-018 slice-c |
+| 6 | `contextengine/nested/flow_report.go` | SubQuery FlowEvent 发布 | D7-S4 `executionflow/bridge/subquery_bridge.go` | ⬜ DM-018 slice-c |
 | 7 | ~~`contextengine/query/loop.go`~~ | LLM↔Tool loop | D7 `turn/orchestrator.go` | ✅ DM-20260618-010 |
 
 ---

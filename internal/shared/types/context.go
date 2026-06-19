@@ -96,7 +96,8 @@ type SessionContext struct {
 	QueryDepth     int
 	IsWorker       bool
 	WorkerRole     string
-	// TodoWrite tracking.
+	// TodoWrite tracking. Deprecated: read projection from D7 WorkTree checklist (TD-WT-03).
+	// Authoritative writes go through workmodel.TodoWriteBackend → WorkTree.
 	Todos      []TodoItem `json:"todos,omitempty"`
 	VerifState VerifState `json:"verifState,omitempty"`
 }

@@ -264,7 +264,7 @@ sequenceDiagram
     Note over GW,S16: 无 thinking/tool 信号
 ```
 
-命令白名单：`/plan` `/task` `/help` `/stop` — 见 `orchestration/coordinator/command_handler.go`。
+命令白名单：`/plan` `/task` `/help` `/stop` — 见 `orchestration/sessionorchestrator/command_handler.go`。
 
 ### 8.3 IntentOrchestrate（多任务）
 

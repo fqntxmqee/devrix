@@ -100,7 +100,7 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 | D2 Context Engine | `observability.Bridge` tracer/meter/logger | `engine.go`, `query/loop.go`, `harness/` |
 | D3 LLM Gateway | `llm.stream` span、`RecordGenAITokenUsage` | `gateway/gateway.go`, `adapter/` |
 | D4 Multi-Agent | `agent.*` spans、Fork policy metrics sink | `multiagent/observability/` |
-| D7 Orchestration | `orchestration.*` spans | `orchestration/flow/`, `wave/` |
+| D7 Orchestration | `orchestration.*` spans | `orchestration/wavescheduler/`, `executionflow/` |
 | Shared | `config`, `types` | 全子包 |
 
 ## Package Map

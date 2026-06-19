@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 3.8.0
+**Version:** 3.9.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-18
+**Last Updated:** 2026-06-19
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -21,7 +21,7 @@
 
 D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
 
-**现行实现路径（2026-06-15）：** v1.0 + v1.1 全部闭环（layer-delta Phase A–N）+ v1.1.0 路径正交化（devrix-d7-orthogonal-intent-paths, DM-20260615-004）。Session Orchestrator（D7-S2 A01–A07, 含 Turn Leader A06/A07）+ ClassifyIntent/SynthesizeTaskGraph/SelectExecutor（D7-S5 A01–A03）+ WorkModel + PlanMode（D7-S1 + D7-S5 A04）位于 `internal/layers/orchestration/{coordinator,workmodel,turn,hubspoke}/`；Wave/Flow/IMSink（D7-S3/S4）位于 `internal/layers/orchestration/{wave,flow,workplan,imsink}/`。D1 主入口已切换至 `coordinator.Entry.ProcessMessage`（经 `d7_enabled` 路由开关，`bootstrap/wire_coordinator.go::WireD7` 完成所有 wiring）。**v1.1.0+ Intent 路径正交分发：** `coordinator.ProcessMessage` 的 4 个 IntentKind case 各自调用独立的执行链（`CommandHandler` / `FastPath` / `OrchestratePath`），不再有"4 case → 1 fastPath"占位实现。
+**现行实现路径（2026-06-19）：** v2.0 Structure（DM-20260619-005）物理路径与 S 层 1:1 对齐：S2 `sessionorchestrator/`、S3 `wavescheduler/`、S4 `executionflow/{hub,workplan,imsink,bridge}/`、S5 `decisionplanning/`；`coordinator/` 与 `hubspoke/` 保留 type-alias shim。D1 主入口 `sessionorchestrator.Entry.ProcessMessage`（`coordinator.Entry` shim，`bootstrap/wire_coordinator.go::WireD7`）。Intent 四链正交分发不变（CommandHandler / FastPath / OrchestratePath / Skip）。
 
 ### S 层博弈角色定义（切法 A — 按用户价值流）
 
@@ -81,11 +81,11 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | 层级 | ID | 名称 | 说明 | 实现状态 |
 |------|-----|------|------|----------|
 | D | D7 | Orchestration | 跨域编排协调层 | **IMPLEMENTED**（v1.0 + v1.1 闭环） |
-| S | D7-S1 | Work Model | Task/Plan 数据模型与生命周期 | **IMPLEMENTED** → `coordinator/workmodel.go` + `orchestration/workmodel/` |
-| S | D7-S2 | Session Orchestrator | 用户消息主入口、Turn 主循环、Dispatch | **IMPLEMENTED** → `coordinator/` + `turn/` + `hubspoke/` |
-| S | D7-S3 | Wave Scheduler | DAG 调度、WorkerPool、ConflictGuard | IMPLEMENTED → `orchestration/wave/` |
-| S | D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 广播 | IMPLEMENTED → `orchestration/flow/` + `hubspoke/` |
-| S | D7-S5 | Decision & Planning | 意图分类、任务拆解、执行器选择 | **IMPLEMENTED** → `coordinator/{classifier,classifier_fallback,decomposer,executor}.go` |
+| S | D7-S1 | Work Model | Task/Plan 数据模型与生命周期 | **IMPLEMENTED** → `workmodel/` + `sessionorchestrator/workmodel.go` |
+| S | D7-S2 | Session Orchestrator | 用户消息主入口、Turn 主循环、Dispatch | **IMPLEMENTED** → `sessionorchestrator/` + `turn/` |
+| S | D7-S3 | Wave Scheduler | DAG 调度、WorkerPool、ConflictGuard | IMPLEMENTED → `wavescheduler/` |
+| S | D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 广播 | IMPLEMENTED → `executionflow/` |
+| S | D7-S5 | Decision & Planning | 意图分类、任务拆解、执行器选择 | **IMPLEMENTED** → `decisionplanning/` |
 
 ---
 
@@ -93,11 +93,11 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 
 | ID | Scenario | Responsibility | Status | 代码位置 |
 |----|----------|----------------|--------|----------|
-| D7-S1 | Work Model | Task CRUD、依赖 DAG、磁盘持久化、PlanMode 状态机 | **IMPLEMENTED** | `orchestration/workmodel/` + `coordinator/workmodel.go` |
-| D7-S2 | Session Orchestrator | ProcessMessage、FastPath、HandleInterrupt、TurnLoop、InvokeLLM、Dispatch | **IMPLEMENTED** | `orchestration/coordinator/` + `turn/` + `hubspoke/` |
-| D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard | IMPLEMENTED | `orchestration/wave/` |
-| D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | IMPLEMENTED | `orchestration/flow/`, `workplan/`, `imsink/`, `hubspoke/` |
-| D7-S5 | Decision & Planning | PlanAgent 只读探索、规则+LLM 分类、SynthesizeTaskGraph、SelectExecutor | **IMPLEMENTED** | `coordinator/{classifier,classifier_fallback,decomposer,executor,shadow_classifier}.go` + `workmodel/plan_*.go` |
+| D7-S1 | Work Model | Task CRUD、依赖 DAG、磁盘持久化、PlanMode 状态机 | **IMPLEMENTED** | `workmodel/` + `sessionorchestrator/workmodel.go` |
+| D7-S2 | Session Orchestrator | ProcessMessage、FastPath、HandleInterrupt、TurnLoop、InvokeLLM、Dispatch | **IMPLEMENTED** | `sessionorchestrator/` + `turn/` |
+| D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard | IMPLEMENTED | `wavescheduler/` |
+| D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | IMPLEMENTED | `executionflow/{hub,workplan,imsink,bridge}/` |
+| D7-S5 | Decision & Planning | PlanAgent 只读探索、规则+LLM 分类、SynthesizeTaskGraph、SelectExecutor | **IMPLEMENTED** | `decisionplanning/` + `workmodel/plan_*.go` |
 
 ---
 
@@ -155,7 +155,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `WaveScheduler` MUST provide DAG-based multi-agent scheduling with fixed WorkerPool capacity, ConflictGuard, and ContextPolicy resolution.
 
 **Priority:** P0  
-**Package:** `internal/layers/orchestration/wave/`  
+**Package:** `internal/layers/orchestration/wavescheduler/`  
 **T:** D7-S3-T01 … D7-S3-T10
 
 #### Scenario: DAG ready-node dispatch
@@ -195,7 +195,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `ExecutionFlowHub` MUST aggregate `FlowEvent` from D2 SubQuery and D4 Delegate into WorkPlan snapshots, enqueue Leader delegate-progress, and optionally emit IM worker_progress.
 
 **Priority:** P0  
-**Package:** `internal/layers/orchestration/flow/hub.go`  
+**Package:** `internal/layers/orchestration/executionflow/hub/hub.go`  
 **Contract:** `internal/shared/contracts/execution_flow.go`  
 **T:** D7-S4-T01 … D7-S4-T04
 
@@ -234,7 +234,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `TaskManager` MUST provide session-scoped Task CRUD with optional disk persistence and dependency tracking. PlanMode MUST support inactive → active → pending_approval lifecycle.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/workmodel/` + `coordinator/workmodel.go`（v1.1 闭环，layer-delta Phase I/J）
+**Package:** `internal/layers/orchestration/workmodel/` + `sessionorchestrator/workmodel.go`（v1.1 闭环，layer-delta Phase I/J）
 **T:** D7-S1-T01 … D7-S1-T08（其中 T06 升 IMPLEMENTED via decomposer_test.go::validateGraph）
 
 #### Scenario: Task create and persist
@@ -283,7 +283,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 | D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG（规则 + LLM） | ✅ IMPLEMENTED |
 | D7-S5 SelectExecutor | D2/D4 执行器选择 | ✅ IMPLEMENTED |
 | D2 Thin / QueryLoop removed | loop 已删；D2 无 D4 import | ✅ DM-20260618-010 |
-| D7 package identity | `internal/layers/orchestration/coordinator/` (package `coordinator`) | ✅ IMPLEMENTED |
+| D7 package identity | `sessionorchestrator/` + `decisionplanning/` + `orchtypes/`；`coordinator/` shim（DM-20260619-005） | ✅ IMPLEMENTED |
 | D7 Migration Coexistence | 4 组合回归 | ✅ IMPLEMENTED |
 | D7-S2 Turn Leader (DM-020) | A06 RunTurnLoop + A07 InvokeLLM | ✅ IMPLEMENTED（wired by `wire_coordinator.go`） |
 | D7-S2 Hub-Spoke (DM-018) | A04 DispatchWorker + A04/A05 SpokeBridge | ✅ IMPLEMENTED（wired by `delegate.go`） |
@@ -354,7 +354,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `ConflictGuard.AllowAndRegister()` MUST atomically check conflict and register a task, eliminating the TOCTOU window between `Allow()` and `Register()`. Returns `true` if registered, `false` if conflict prevents registration.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/wave/conflict.go`
+**Package:** `internal/layers/orchestration/wavescheduler/conflict.go`
 **T:** D7-S3-A01-F03-T01 … D7-S3-A01-F03-T04
 
 #### Scenario: AllowAndRegister succeeds when no conflict
@@ -391,7 +391,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `emit()` MUST push FlowEvent to the EventPublisher sink for IM/WebSocket notifications, while also writing to the caller channel. Both paths respect context cancellation; nil sink is gracefully tolerated.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/coordinator/orchestrate_path.go`
+**Package:** `internal/layers/orchestration/sessionorchestrator/orchestrate_path.go`
 **T:** D7-S3-A01-F04-T01 … D7-S3-A01-F04-T02
 
 #### Scenario: emit pushes to sink when available
@@ -416,7 +416,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `LLMFallbackClassifier` and `ExecutorSelector` MUST carry `Deprecated:` comments documenting they are deferred to v1.1, so future readers understand they are intentionally dead code rather than bugs.
 
 **Priority:** P1
-**Package:** `internal/layers/orchestration/coordinator/classifier_fallback.go`, `internal/layers/orchestration/coordinator/executor.go`
+**Package:** `internal/layers/orchestration/decisionplanning/classifier_fallback.go`, `internal/layers/orchestration/decisionplanning/executor.go`
 **T:** D7-S2-A03-F06-T01 … D7-S2-A03-F06-T02
 
 #### Scenario: LLMFallbackClassifier has Deprecated marker
@@ -456,7 +456,7 @@ D2 `query.Loop`, `QueryLLMCaller`, and `d2_query_loop_legacy_invocations_total` 
 The `PlanModeApproveGate` config field has been removed across all config layers — Approve/Reject is driven by explicit CLI commands, not an extra config switch.
 
 **Priority:** P0
-**Packages:** `internal/layers/orchestration/coordinator/config.go`, `internal/shared/config/coordinator.go`, `internal/shared/config/loader.go`, `internal/bootstrap/wire_coordinator.go`
+**Packages:** `internal/layers/orchestration/orchtypes/config.go`, `internal/shared/config/coordinator.go`, `internal/shared/config/loader.go`, `internal/bootstrap/wire_coordinator.go`
 **T:** D7-S5-A02-F05-T01 … D7-S5-A02-F05-T02
 
 #### Scenario: Config struct no longer contains the field
@@ -560,6 +560,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.6.0** | **2026-06-17** | **devrix-tool-surface-phase2-full (DM-20260617-008) 工具调用链路登记**：(1) Cross-Domain Contracts 表新增 DM-20260617-008 行（指 D2 spec §"Tool Call End-to-End Flow" 为完整链路 SoT）；(2) 端到端 Chain A/B/C 视图（3 链 7 surface 5 domain 拓扑）由 D2 spec 持有, D7 通过本表反查 |
 | **3.7.0** | **2026-06-17** | **devrix-unified-work-tree (DM-20260617-009)**：(1) ADDED WorkItem + WorkTree 统一工作语义；(2) WorkTree ⊥ RunRegistry 分离（`run_ref` 外键）；(3) todo_write→checklist ephemeral 子节点 + sc.Todos 投影；(4) Wave OrchestratePath SyncWaveNodes；(5) legacy TaskManager 适配器；(6) 跨 session 只读查询 baseline |
 | **3.8.0** | **2026-06-18** | **devrix-unified-work-tree v1.5–v2.0 闭环 (PR #85–#87)**：(1) 统一工具 alias task_write/spawn/await；(2) RunTurn decompose + ResolveHint + depth/daily limits；(3) RunTurn blocking await (`ResolveAwaiter`)；(4) v2.1+ defer → `openspec/tech-debt/worktree-v2-deferred.md` |
+| **3.9.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：(1) S 层物理路径对齐 `code-layout.md` §4.2；(2) coordinator→sessionorchestrator+decisionplanning+orchtypes；(3) wave→wavescheduler、S4→executionflow；(4) hubspoke dispatch/bridge 拆分；(5) WorkTree TD-WT-02/03 部分闭合 |
 
 ---
 

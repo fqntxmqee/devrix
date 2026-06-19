@@ -131,12 +131,12 @@ D4 Agent / D2 SubQuery / D7 Wave
 
 | 场景 | 测试文件 | T ID |
 |------|----------|------|
-| Hub 双通道 WorkPlan + Queue + IM | `flow/hub_test.go` | **D7-S4-T02** |
-| FlowStarted → delegate-progress | `flow/hub_test.go` | **D7-S4-T03** |
+| Hub 双通道 WorkPlan + Queue + IM | `executionflow/hub/hub_test.go` | **D7-S4-T02** |
+| FlowStarted → delegate-progress | `executionflow/hub/hub_test.go` | **D7-S4-T03** |
 | AgentBridge success/error | `hubspoke/hubspoke_test.go` | **D7-S4-T08** |
 | SubQueryBridge 三态 | `hubspoke/hubspoke_test.go` | **D7-S4-T09** |
-| IMSink worker_progress | `imsink/gateway_test.go` | **D7-S4-T05** |
-| 禁止伪造 Task 进度 | `coordinator/orchestrator_test.go` | **D7-S2-A01-T03** |
+| IMSink worker_progress | `executionflow/imsink/gateway_test.go` | **D7-S4-T05** |
+| 禁止伪造 Task 进度 | `sessionorchestrator/orchestrator_test.go` | **D7-S2-A01-T03** |
 
 ---
 
@@ -160,16 +160,19 @@ D4 Agent / D2 SubQuery / D7 Wave
 go test ./tests/integration/d7/ -run 'D7Entry|FastPath' -v
 
 # Session Orchestrator 核心
-go test ./internal/layers/orchestration/coordinator/ -v
+go test ./internal/layers/orchestration/sessionorchestrator/ -v
+
+# Decision planning (Classify / Decompose)
+go test ./internal/layers/orchestration/decisionplanning/ -v
 
 # Turn Leader + LLM Invoker（DM-020）
 go test ./internal/layers/orchestration/turn/ -v
 
 # Wave DAG 调度
-go test ./internal/layers/orchestration/wave/ -v
+go test ./internal/layers/orchestration/wavescheduler/ -v
 
-# Hub-Spoke + Flow
-go test ./internal/layers/orchestration/flow/ ./internal/layers/orchestration/hubspoke/ -v
+# Execution flow + Hub-Spoke tests
+go test ./internal/layers/orchestration/executionflow/... ./internal/layers/orchestration/hubspoke/ -v
 
 # WorkModel + PlanMode
 go test ./internal/layers/orchestration/workmodel/ -v
@@ -191,7 +194,7 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | `orchestration.d6.validation.timeout` | 50ms 超时视为 pass | D7-D6-T02 |
 | `orchestration.d6.validation.error` | panic-recovered | D7-D6-T05 |
 
-测试：`coordinator/d6_metrics_test.go`。timeout_rate > 5% 触发 AlertHook（D7-D6-T04）。
+测试：`sessionorchestrator/validation_metrics_test.go`。timeout_rate > 5% 触发 AlertHook（D7-D6-T04）。
 
 ---
 

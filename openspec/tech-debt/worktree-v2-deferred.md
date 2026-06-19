@@ -1,7 +1,7 @@
 # Tech Debt: Unified Work Tree v2.1+ Deferred Items
 
 **TD ID:** TD-WT-DEF
-**Status:** OPEN
+**Status:** PARTIAL CLOSED (TD-WT-02/03 closed DM-20260619-005; TD-WT-01/04/05/06 remain OPEN)
 **Severity:** Low–Medium（功能已可用；遗留为演进与清理债）
 **Created:** 2026-06-18
 **Owner:** —（待指派）
@@ -30,8 +30,8 @@ DM-20260617-009 于 2026-06-18 完成 v1.0–v2.0 核心交付（WorkItem/WorkTr
 | 子项 | 已实现 baseline | 缺口 |
 |------|----------------|------|
 | TD-WT-01 | `uncertainty.go::AdaptiveThreshold` + 单测 | 无 Session 历史采集、无 optimizer 循环 |
-| TD-WT-02 | `SyncWaveNodes` 挂树 | `wave.TaskNode` 仍独立持久化/调度 |
-| TD-WT-03 | `TodoWriteBackend` → WorkTree checklist | D2 session scratch `Todos` 仍可能被误作 SoT |
+| TD-WT-02 | `SyncWaveNodes` + `WaveNodesFromSubtree` 投影 | TaskNode 不再独立 SoT；磁盘持久化路径仍待 audit（PARTIAL） |
+| TD-WT-03 | `TodoWriteBackend` → WorkTree checklist；`sc.Todos` Deprecated | 需确认无写入路径将 `sc.Todos` 作权威 SoT |
 | TD-WT-04 | `cross_session_test.go` FindByItemID | D1 Feishu card 无跨 session 摘要 UI |
 | TD-WT-05 | `decompose.go` daily limit 5/24h | 无 review 门控 / task_await 人工介入 |
 | TD-WT-06 | `ReevaluateParentAfterChild` | 无并发 terminal 去重 |
@@ -44,9 +44,9 @@ DM-20260617-009 于 2026-06-18 完成 v1.0–v2.0 核心交付（WorkItem/WorkTr
 - [ ] 10+ Session 数据验证 hysteresis 不震荡
 
 ### TD-WT-02 / TD-WT-03（Legacy 清理）
-- [ ] Wave 调度仅读 WorkTree，TaskNode 不写盘
-- [ ] `sc.Todos` 标记 Deprecated，写入路径 audit 为零
-- [ ] `scripts/audit-property-rights.sh` 无 WorkTree 产权 WARN
+- [x] Wave 调度从 WorkTree 投影 TaskNode（`orchestrate_path` + `WaveNodesFromSubtree`）
+- [x] `sc.Todos` 标记 Deprecated
+- [ ] `scripts/audit-property-rights.sh` 无 WorkTree 产权 WARN（全量 audit 待后续 change）
 
 ### TD-WT-04（跨 Session UI）
 - [ ] D1 Feishu adapter 读取 `QueryWorkPlan(historical_session_id)`

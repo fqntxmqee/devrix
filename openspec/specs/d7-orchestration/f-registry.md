@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-15
+**Version:** 3.1.0
+**Last Updated:** 2026-06-19
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 **Domain SoT:** `d7-domain.md`
@@ -31,21 +31,21 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ## D7-S1-A01 CreateWorkPlan ✅
 
-> **v1.1 closure:** 写模型已迁入 `coordinator/workmodel.go` + `workmodel/plan_mode.go`。
+> **v1.1 closure:** 写模型已迁入 `sessionorchestrator/workmodel.go` + `workmodel/plan_mode.go`。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S1-A01-F01 | SynthesizePlan | F-BE | goal, context | []TaskNode | ✅ | `coordinator/workmodel.go` SynthesizePlan |
-| D7-S1-A01-F02 | ValidatePlanDAG | F-BE | []TaskNode | valid/invalid | ✅ | `coordinator/workmodel.go` validateDAG + `decomposer.go` validateGraph |
-| D7-S1-A01-F03 | EstimateTaskScope | F-BE | goal, context | complexity_score | ✅ | `coordinator/decomposer.go` decomposeGoal |
+| D7-S1-A01-F01 | SynthesizePlan | F-BE | goal, context | []TaskNode | ✅ | `sessionorchestrator/workmodel.go` SynthesizePlan |
+| D7-S1-A01-F02 | ValidatePlanDAG | F-BE | []TaskNode | valid/invalid | ✅ | `sessionorchestrator/workmodel.go` validateDAG + `decisionplanning/decomposer.go` validateGraph |
+| D7-S1-A01-F03 | EstimateTaskScope | F-BE | goal, context | complexity_score | ✅ | `decisionplanning/decomposer.go` decomposeGoal |
 
 ## D7-S1-A03 QueryWorkPlan ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S1-A03-F01 | BuildSessionSnapshot | F-BE | session_id | WorkPlanSnapshot | ✅ | `orchestration/flow/hub.go` |
-| D7-S1-A03-F02 | BuildTaskSnapshots | F-BE | session_id | []TaskSnapshot | ✅ | `orchestration/flow/hub.go` taskSnapshots |
-| D7-S1-A03-F03 | ApplyFlowEvent | F-BE | FlowEvent | — | ✅ | `orchestration/workplan/service.go` Apply |
+| D7-S1-A03-F01 | BuildSessionSnapshot | F-BE | session_id | WorkPlanSnapshot | ✅ | `orchestration/executionflow/hub/hub.go` |
+| D7-S1-A03-F02 | BuildTaskSnapshots | F-BE | session_id | []TaskSnapshot | ✅ | `orchestration/executionflow/hub/hub.go` taskSnapshots |
+| D7-S1-A03-F03 | ApplyFlowEvent | F-BE | FlowEvent | — | ✅ | `orchestration/executionflow/workplan/service.go` Apply |
 
 ## D7-S1-A04/A05 PlanMode ✅
 
@@ -62,87 +62,87 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `coordinator/orchestrator.go` ProcessMessage switch |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `coordinator/fastpath.go` Run |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `coordinator/orchestrator.go` orchestrate (delegates to D2/turn) |
-| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `coordinator/orchestrator.go` + `EventPublisher` |
-| D7-S2-A01-F05 | HandleInterrupt | F-BE | session_id, reason | — | ✅ | `coordinator/interrupt.go` |
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/orchestrator.go` ProcessMessage switch |
+| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `sessionorchestrator/fastpath.go` Run |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/orchestrator.go` orchestrate (delegates to D2/turn) |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/orchestrator.go` + `EventPublisher` |
+| D7-S2-A01-F05 | HandleInterrupt | F-BE | session_id, reason | — | ✅ | `sessionorchestrator/interrupt.go` |
 
 ## D7-S2-A02 EvaluateIntent ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A02-F01 | ClassifyByRules | F-BE | message | rules_hint + confidence | ✅ | `coordinator/classifier.go` RuleClassifier.Classify |
-| D7-S2-A02-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `coordinator/classifier_fallback.go`（合并 LLM-first 路径） |
+| D7-S2-A02-F01 | ClassifyByRules | F-BE | message | rules_hint + confidence | ✅ | `decisionplanning/classifier.go` RuleClassifier.Classify |
+| D7-S2-A02-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `decisionplanning/classifier_fallback.go`（合并 LLM-first 路径） |
 
 ## D7-S2-A03 HandleInterrupt 🔶
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S2-A03-F01 | CancelActiveProcess | F-BE | session_id | — | 🔶 | `communication/gateway/gateway.go` StopProcess |
-| D7-S2-A03-F02 | CancelWaveWorkers | F-BE | session_id | — | ✅ | `orchestration/wave/scheduler.go` CancelAll |
+| D7-S2-A03-F02 | CancelWaveWorkers | F-BE | session_id | — | ✅ | `orchestration/wavescheduler/scheduler.go` CancelAll |
 
 ## D7-S3-A01 ScheduleWave ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S3-A01-F01 | StartWave | F-BE | session_id, task_graph | — | ✅ | `orchestration/wave/scheduler.go` Start |
-| D7-S3-A01-F02 | DispatchWorker | F-BE | task_node, slot | — | ✅ | `orchestration/wave/scheduler.go` dispatchOne |
-| D7-S3-A01-F03 | WaitForCompletion | F-BE | session_id | []Artifact | ✅ | `orchestration/wave/scheduler.go` WaitForCompletion |
-| D7-S3-A01-F04 | ContinuousRedispatch | F-BE | slot_release | — | ✅ | `orchestration/wave/scheduler.go` dispatchLoop |
-| D7-S3-A01-F05 | CancelWorker | F-BE | task_id | — | ✅ | `orchestration/wave/scheduler.go` CancelWorker |
+| D7-S3-A01-F01 | StartWave | F-BE | session_id, task_graph | — | ✅ | `orchestration/wavescheduler/scheduler.go` Start |
+| D7-S3-A01-F02 | DispatchWorker | F-BE | task_node, slot | — | ✅ | `orchestration/wavescheduler/scheduler.go` dispatchOne |
+| D7-S3-A01-F03 | WaitForCompletion | F-BE | session_id | []Artifact | ✅ | `orchestration/wavescheduler/scheduler.go` WaitForCompletion |
+| D7-S3-A01-F04 | ContinuousRedispatch | F-BE | slot_release | — | ✅ | `orchestration/wavescheduler/scheduler.go` dispatchLoop |
+| D7-S3-A01-F05 | CancelWorker | F-BE | task_id | — | ✅ | `orchestration/wavescheduler/scheduler.go` CancelWorker |
 
 ## D7-S3-A02 ResolveWorkerContext ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S3-A02-F01 | ResolveFreshContext | F-BE | task_node | ResolvedContext | ✅ | `orchestration/wave/context.go` resolveFresh |
-| D7-S3-A02-F02 | ResolveUpstreamContext | F-BE | task_node, artifacts | ResolvedContext | ✅ | `orchestration/wave/context.go` resolveUpstream |
-| D7-S3-A02-F03 | ResolveResumeContext | F-BE | task_node, sidechain | ResolvedContext | ✅ | `orchestration/wave/context.go` resolveResume |
+| D7-S3-A02-F01 | ResolveFreshContext | F-BE | task_node | ResolvedContext | ✅ | `orchestration/wavescheduler/context.go` resolveFresh |
+| D7-S3-A02-F02 | ResolveUpstreamContext | F-BE | task_node, artifacts | ResolvedContext | ✅ | `orchestration/wavescheduler/context.go` resolveUpstream |
+| D7-S3-A02-F03 | ResolveResumeContext | F-BE | task_node, sidechain | ResolvedContext | ✅ | `orchestration/wavescheduler/context.go` resolveResume |
 
 ## D7-S3-A03 GuardConflict ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S3-A03-F01 | CheckConflict | F-BE | candidate, running | allowed/blocked | ✅ | `orchestration/wave/conflict.go` Allow |
-| D7-S3-A03-F02 | RegisterTaskGuard | F-BE | task_node, slot | — | ✅ | `orchestration/wave/conflict.go` Register |
-| D7-S3-A03-F03 | CheckFileScopeOverlap | F-BE | file_scope[] | bool | ✅ | `orchestration/wave/conflict.go` pathsOverlap |
+| D7-S3-A03-F01 | CheckConflict | F-BE | candidate, running | allowed/blocked | ✅ | `orchestration/wavescheduler/conflict.go` Allow |
+| D7-S3-A03-F02 | RegisterTaskGuard | F-BE | task_node, slot | — | ✅ | `orchestration/wavescheduler/conflict.go` Register |
+| D7-S3-A03-F03 | CheckFileScopeOverlap | F-BE | file_scope[] | bool | ✅ | `orchestration/wavescheduler/conflict.go` pathsOverlap |
 
 ## D7-S3 基础设施 ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S3-F01 | AcquireSlot | F-BE | worker_type | SlotID | ✅ | `orchestration/wave/pool.go` Acquire |
-| D7-S3-F02 | ReleaseSlot | F-BE | slot_id | — | ✅ | `orchestration/wave/pool.go` Release |
-| D7-S3-F03 | ReadyNodes | F-BE | — | []TaskNode | ✅ | `orchestration/wave/taskgraph.go` ReadyNodes |
-| D7-S3-F04 | StoreArtifact | F-BE | artifact | — | ✅ | `orchestration/wave/artifact.go` Put |
-| D7-S3-F05 | RunSubAgent | F-BE | WorkerRunSpec | error | ✅ | `orchestration/wave/runners/subagent.go` |
-| D7-S3-F06 | RunAgentTool | F-BE | WorkerRunSpec | error | ✅ | `orchestration/wave/runners/agent_tool.go` |
+| D7-S3-F01 | AcquireSlot | F-BE | worker_type | SlotID | ✅ | `orchestration/wavescheduler/pool.go` Acquire |
+| D7-S3-F02 | ReleaseSlot | F-BE | slot_id | — | ✅ | `orchestration/wavescheduler/pool.go` Release |
+| D7-S3-F03 | ReadyNodes | F-BE | — | []TaskNode | ✅ | `orchestration/wavescheduler/taskgraph.go` ReadyNodes |
+| D7-S3-F04 | StoreArtifact | F-BE | artifact | — | ✅ | `orchestration/wavescheduler/artifact.go` Put |
+| D7-S3-F05 | RunSubAgent | F-BE | WorkerRunSpec | error | ✅ | `orchestration/wavescheduler/runners/subagent.go` |
+| D7-S3-F06 | RunAgentTool | F-BE | WorkerRunSpec | error | ✅ | `orchestration/wavescheduler/runners/agent_tool.go` |
 
 ## D7-S4-A01 PublishFlowEvent ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S4-A01-F01 | PublishEvent | F-BE | FlowEvent | — | ✅ | `orchestration/flow/hub.go` Publish |
-| D7-S4-A01-F02 | EnqueueLeaderNotification | F-BE | session_id, event | — | ✅ | `orchestration/flow/hub.go` queue.Enqueue |
-| D7-S4-A01-F03 | LinkTaskStatus | F-BE | FlowEvent | — | ✅ | `orchestration/flow/hub.go` linkTask |
-| D7-S4-A01-F04 | ThrottleToolEmit | F-BE | FlowToolCall | bool | ✅ | `orchestration/flow/hub.go` allowToolEmit |
+| D7-S4-A01-F01 | PublishEvent | F-BE | FlowEvent | — | ✅ | `orchestration/executionflow/hub/hub.go` Publish |
+| D7-S4-A01-F02 | EnqueueLeaderNotification | F-BE | session_id, event | — | ✅ | `orchestration/executionflow/hub/hub.go` queue.Enqueue |
+| D7-S4-A01-F03 | LinkTaskStatus | F-BE | FlowEvent | — | ✅ | `orchestration/executionflow/hub/hub.go` linkTask |
+| D7-S4-A01-F04 | ThrottleToolEmit | F-BE | FlowToolCall | bool | ✅ | `orchestration/executionflow/hub/hub.go` allowToolEmit |
 
 ## D7-S4-A03 NotifyGateway ✅
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S4-A03-F01 | EmitWorkerProgress | F-BE | FlowEvent | EngineEvent | ✅ | `orchestration/imsink/gateway.go` |
+| D7-S4-A03-F01 | EmitWorkerProgress | F-BE | FlowEvent | EngineEvent | ✅ | `orchestration/executionflow/imsink/gateway.go` |
 
 ## D7-S5-A01 ClassifyIntent ✅
 
-> **v1.1 closure:** LLM-first 路径通过 `coordinator/classifier_fallback.go` 实现；rule+LLM merge 在 `Classify` 调用链中。
+> **v1.1 closure:** LLM-first 路径通过 `decisionplanning/classifier_fallback.go` 实现；rule+LLM merge 在 `Classify` 调用链中。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `coordinator/classifier.go` RuleClassifier.Classify |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `coordinator/classifier_fallback.go` LLMClassifier.Classify |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `coordinator/classifier.go` + `classifier_fallback.go` Merge |
+| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `decisionplanning/classifier.go` RuleClassifier.Classify |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `decisionplanning/classifier_fallback.go` LLMClassifier.Classify |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `decisionplanning/classifier.go` + `classifier_fallback.go` Merge |
 
 ## D7-S5-A02 SynthesizeTaskGraph ✅
 
@@ -150,9 +150,9 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A02-F01 | DecomposeGoal | F-BE | goal | []sub_goal | ✅ | `coordinator/decomposer.go` decomposeGoal |
-| D7-S5-A02-F02 | BuildDependencyGraph | F-BE | []sub_goal | []TaskNode | ✅ | `coordinator/decomposer.go` SynthesizeTaskGraph |
-| D7-S5-A02-F03 | ValidateTaskGraph | F-BE | []TaskNode | validation_report | ✅ | `coordinator/decomposer.go` validateGraph |
+| D7-S5-A02-F01 | DecomposeGoal | F-BE | goal | []sub_goal | ✅ | `decisionplanning/decomposer.go` decomposeGoal |
+| D7-S5-A02-F02 | BuildDependencyGraph | F-BE | []sub_goal | []TaskNode | ✅ | `decisionplanning/decomposer.go` SynthesizeTaskGraph |
+| D7-S5-A02-F03 | ValidateTaskGraph | F-BE | []TaskNode | validation_report | ✅ | `decisionplanning/decomposer.go` validateGraph |
 
 ## D7-S5-A03 SelectExecutor ✅
 
@@ -160,8 +160,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | ✅ | `coordinator/executor.go` SelectExecutor |
-| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | ✅ | `coordinator/executor.go` CheckAvailability |
+| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | ✅ | `decisionplanning/executor.go` SelectExecutor |
+| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | ✅ | `decisionplanning/executor.go` CheckAvailability |
 
 ---
 
@@ -173,18 +173,18 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `coordinator/orchestrator.go` ProcessMessage switch |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `coordinator/fastpath.go` Run |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `coordinator/orchestrator.go` orchestrate |
-| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `coordinator/orchestrator.go` + `EventPublisher` |
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/orchestrator.go` ProcessMessage switch |
+| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `sessionorchestrator/fastpath.go` Run |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/orchestrator.go` orchestrate |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/orchestrator.go` + `EventPublisher` |
 
 ### D7-S5 Canonical F 层
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/coordinator/classifier.go` RuleClassifier.Classify |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/coordinator/classifier_fallback.go` LLMClassifier.Classify |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/coordinator/classifier_fallback.go` Merge |
+| D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/decisionplanning/classifier.go` RuleClassifier.Classify |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/decisionplanning/classifier_fallback.go` LLMClassifier.Classify |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/decisionplanning/classifier_fallback.go` Merge |
 
 ---
 

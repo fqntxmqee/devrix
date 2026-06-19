@@ -1,30 +1,30 @@
 # 任务规划系统设计
 
 **文档类型:** 详细架构设计
-**Domain:** D7-S1 / D7-S5（现行托管 D2 `contextengine/tasks/`）
+**Domain:** D7-S1（`workmodel/`）；PlanAgent 编排面 D7-S5（`decisionplanning/` 消费）
 **Change ID:** devrix-task-planning
-**版本:** 2.1.0
-**状态:** Active — IMPLEMENTED (PlanMode + TaskManager)
-**Last Updated:** 2026-06-14
+**版本:** 2.2.0
+**状态:** Active — IMPLEMENTED (PlanMode + TaskManager in D7 workmodel)
+**Last Updated:** 2026-06-19
 **对标:** Claude Code Plan Mode
 **关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`, `demand.md` (DM-20260613-001)
 
 ---
 
-## 实现状态（2026-06-14）
+## 实现状态（2026-06-19）
 
 | 组件 | 状态 | 代码位置 |
 |------|------|----------|
-| TaskManager | ✅ | `contextengine/tasks/task_manager.go` |
-| DiskStore (v2) | ✅ | `contextengine/tasks/disk_store.go` |
-| PlanMode 状态机 | ✅ | `contextengine/tasks/plan_mode.go` |
-| PlanAgent 只读探索 | ✅ | `contextengine/tasks/plan_agent.go` |
-| VerificationAgent | 🔶 设计完成 | `contextengine/tasks/verification_agent.go`（若存在） |
-| CLI `/task` `/plan` | ✅ | `contextengine/tasks/cli_commands.go` |
-| D7-S5 ClassifyIntent | ✅ | `orchestration/coordinator/classifier.go` |
-| D7-S1 CreateWorkPlan | ⬜ | v1.1 计划（v1.0 仍由 `contextengine/tasks/` 托管） |
+| TaskManager | ✅ | `orchestration/workmodel/task_manager.go` |
+| DiskStore (v2) | ✅ | `orchestration/workmodel/task_store.go` |
+| PlanMode 状态机 | ✅ | `orchestration/workmodel/plan_mode.go` |
+| PlanAgent 只读探索 | ✅ | `orchestration/workmodel/plan_agent.go` |
+| VerificationAgent | 🔶 设计完成 | 待独立 change |
+| CLI `/task` `/plan` | ✅ | `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` |
+| D7-S5 ClassifyIntent | ✅ | `orchestration/decisionplanning/classifier.go` |
+| D7-S1 CreateWorkPlan | ✅ | `sessionorchestrator/workmodel.go` + `workmodel/plan_mode.go` |
 
-> **迁移说明：** 本模块目标迁入 `internal/layers/orchestration/coordinator/`（D7-S1 Work Model + D7-S5 PlanMode），迁移期间保持 D2 包路径。
+> **迁移说明：** Task/Plan 写模型已完全迁入 `internal/layers/orchestration/workmodel/`（DM-012 + DM-20260619-005）。`contextengine/tasks/` 仅为历史 shim。
 
 ---
 
@@ -111,7 +111,7 @@ FlowCompleted       → TaskManager.status=completed
 FlowFailed          → TaskManager.status=failed
 ```
 
-实现：`orchestration/flow/hub.go` linkTask()
+实现：`orchestration/executionflow/hub/hub.go` linkTask()
 
 ---
 
@@ -129,7 +129,7 @@ FlowFailed          → TaskManager.status=failed
 /task dep <task_id> <blocked_by>   # 添加依赖
 ```
 
-**实现：** `contextengine/tasks/cli_commands.go`
+**实现：** `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go`
 
 ### 规划命令 (`/plan`)
 
@@ -142,7 +142,7 @@ FlowFailed          → TaskManager.status=failed
 /plan show     # 显示当前计划
 ```
 
-**实现：** `contextengine/tasks/cli_commands.go` + `plan_mode.go`
+**实现：** `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` + `plan_mode.go`
 
 ---
 
@@ -242,23 +242,30 @@ internal/layers/contextengine/tasks/
 ├── tool_suite.go            # Task/Plan 工具注册
 └── cli_commands.go          # /task /plan CLI
 
-internal/layers/orchestration/flow/
+internal/layers/orchestration/executionflow/hub/
 └── hub.go                   # linkTask → TaskManager 联动
+
+internal/layers/orchestration/sessionorchestrator/
+└── command_handler.go       # /task /plan CLI dispatch
 
 internal/shared/config/
 ├── queryloop.go             # TasksConfig
 └── execution_flow.go        # ExecutionFlowConfig
 ```
 
-### 目标迁移（D7 v1.1）
+### v2.0 结构（DM-20260619-005，已落地）
 
 ```
-internal/layers/orchestration/coordinator/
-├── workmodel.go             # ← task_manager.go
-├── plan_mode.go             # ← plan_mode.go
-├── plan_agent.go            # ← plan_agent.go
-└── workmodel_store.go       # ← disk_store.go
+internal/layers/orchestration/sessionorchestrator/
+└── workmodel.go             # CreateWorkPlan facade
+
+internal/layers/orchestration/workmodel/
+├── task_manager.go          # Task CRUD + DAG
+├── plan_mode.go             # PlanMode 状态机
+└── plan_agent.go            # PlanAgent 只读探索
 ```
+
+### 目标迁移（D7 v1.1，历史）
 
 ---
 
@@ -280,7 +287,9 @@ internal/layers/orchestration/coordinator/
 ```bash
 # 单元测试
 go test ./internal/layers/contextengine/tasks/...
-go test ./internal/layers/orchestration/flow/...
+go test ./internal/layers/orchestration/workmodel/...
+go test ./internal/layers/orchestration/sessionorchestrator/...
+go test ./internal/layers/orchestration/executionflow/...
 
 # CLI 手动验收
 # 启动 devrix 后：

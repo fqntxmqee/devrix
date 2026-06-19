@@ -8,7 +8,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -37,7 +37,7 @@ func TestIntegration_D7LoopFirst_GreetingNoWave(t *testing.T) {
 // T: D7-S2-L5-02 — delegate_wave tool gates OrchestratePath under loop_first.
 func TestIntegration_D7LoopFirst_DelegateWaveTool(t *testing.T) {
 	fake := &fakeWaveScheduler{
-		artifacts: []wave.Artifact{{
+		artifacts: []wavescheduler.Artifact{{
 			TaskID:  "task_1",
 			Summary: "loop-first wave summary",
 			ExitCode: 0,

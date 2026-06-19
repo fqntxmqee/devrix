@@ -75,10 +75,10 @@ Devrix 使用 **DSAFT** 五层编号描述业务架构，从稳定到易变：
 | S 层 | 博弈角色 | North Star | 实现状态 | 关键包 |
 |------|---------|------------|----------|--------|
 | **D7-S1** | **State Authority**（非博弈）| Task/Plan 持久化与状态机；产"事实"而非"决策" | ✅ IMPLEMENTED (v1.1 closure, DM-20260614-009) | `orchestration/workmodel/` |
-| **D7-S2** | **Screening Mechanism** + **Turn Leader (Stackelberg)** | 用户消息统一入口 + Turn 主循环；元层 | ✅ IMPLEMENTED (v1.0 closure, DM-020) | `orchestration/coordinator/` + `turn/` + `hubspoke/` |
-| **D7-S3** | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 | ✅ IMPLEMENTED (5-slot WorkerPool + ConflictGuard) | `orchestration/wave/` |
-| **D7-S4** | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 | ✅ IMPLEMENTED (Flow Hub + WorkPlan + IM Sink) | `orchestration/flow/` + `workplan/` + `imsink/` |
-| **D7-S5** | **Information Producer** | 把用户 goal 转化为可执行的任务结构 | ✅ IMPLEMENTED (ClassifyIntent + LLMDecomposer + PlanMode) | `orchestration/coordinator/{classifier,decomposer}.go` + `workmodel/plan_*.go` |
+| **D7-S2** | **Screening Mechanism** + **Turn Leader (Stackelberg)** | 用户消息统一入口 + Turn 主循环；元层 | ✅ IMPLEMENTED (v2.0 Structure, DM-20260619-005) | `orchestration/sessionorchestrator/` + `turn/` |
+| **D7-S3** | **Mechanism Designer** | 多任务并行执行，冲突避免，上下文隔离 | ✅ IMPLEMENTED (5-slot WorkerPool + ConflictGuard) | `orchestration/wavescheduler/` |
+| **D7-S4** | **Costly Signaler** | 执行进度透明，WorkPlan 可追溯 | ✅ IMPLEMENTED (Flow Hub + WorkPlan + IM Sink) | `orchestration/executionflow/{hub,workplan,imsink,bridge}/` |
+| **D7-S5** | **Information Producer** | 把用户 goal 转化为可执行的任务结构 | ✅ IMPLEMENTED (ClassifyIntent + LLMDecomposer + PlanMode) | `orchestration/decisionplanning/` + `workmodel/plan_*.go` |
 
 ### 3.2 D2 Follower 契约（DM-020）
 

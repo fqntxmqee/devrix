@@ -5,8 +5,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
-	"github.com/devrix/devrix/internal/layers/orchestration/imsink"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/hub"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/imsink"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -16,7 +16,7 @@ import (
 // WireExecutionFlow constructs the ExecutionFlowHub and returns it.
 //
 // DM-20260617-008 W2: returns the hub to the caller instead of writing it
-// to flow.GlobalHub (the process-wide global has been removed). Callers
+// to hub.GlobalHub (the process-wide global has been removed). Callers
 // pass the hub to downstream wiring (e.g. WireDelegate).
 func WireExecutionFlow(
 	ctxCfg *config.ContextEngineConfig,
@@ -31,7 +31,7 @@ func WireExecutionFlow(
 	if !cfg.Enabled {
 		return contracts.NoOpExecutionFlowHub{}, nil
 	}
-	var im flow.IMSink
+	var im hub.IMSink
 	if cfg.IMProgress && gw != nil {
 		im = imsink.NewGatewaySink(gatewayEngineSink{gw: gw})
 	}
@@ -40,7 +40,7 @@ func WireExecutionFlow(
 	if tasks == nil {
 		tasks = workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 	}
-	hub := flow.NewHub(flow.HubDeps{
+	hub := hub.NewHub(hub.HubDeps{
 		Config: cfg,
 		Queue:  q,
 		Tasks:  tasks,

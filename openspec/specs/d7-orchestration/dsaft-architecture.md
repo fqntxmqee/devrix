@@ -1,9 +1,9 @@
 # D7 Orchestration — DSAFT 层计数（Stub）
 
 **Capability:** d7-orchestration
-**Status:** Deprecated — 内容已迁移
-**Version:** 2.0.0
-**Last Updated:** 2026-06-16
+**Status:** Active — pointer stub (counts verified 2026-06-19, DM-20260619-005)
+**Version:** 2.1.0
+**Last Updated:** 2026-06-19
 **Superseded By:** `d7-domain.md` · `terminal-state-guide.md` · `observability-guide.md`
 
 ---
@@ -37,4 +37,4 @@
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-15 | Initial DSAFT architecture analysis |
-| **2.0.0** | **2026-06-16** | **收敛为 Stub**；明细迁至 `d7-domain.md` + Guides |
+| **2.1.0** | **2026-06-19** | **v2.0 Structure 路径对齐后计数复核**（S1–S5 物理路径见 `code-layout.md` §4.2） |

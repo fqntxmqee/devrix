@@ -1,7 +1,7 @@
 # 端到端请求流（D7 编排层 v2.0 时代）
 
 **Last Updated:** 2026-06-19
-**代码锚点：** `gateway.go` → `coordinator/orchestrator.go:ProcessMessage` → `turn/orchestrator.go:RunTurn` → `bridges/llm` + `wave/scheduler.go`
+**代码锚点：** `gateway.go` → `sessionorchestrator/orchestrator.go:ProcessMessage` → `turn/orchestrator.go:RunTurn` → `bridges/llm` + `wavescheduler/scheduler.go`
 **SoT：** `openspec/specs/d7-orchestration/spec.md` v3.8.0
 
 > **主入口已迁移 D7（v1.0 closure 2026-06-15, PR #36）。** D1 ingress → D7-S2 SessionOrchestrator → 4 IntentKind → 4 真实执行链。D2 QueryLoop legacy 路径**仅作 fallback**，D2→D3 import ban 已被 CI 硬阻断（D7 拥有 LLM 调用权，DM-020）。
@@ -87,7 +87,7 @@ sequenceDiagram
 
 ## 3. D7-S2 ProcessMessage 管线
 
-**入口：** `internal/layers/orchestration/coordinator/orchestrator.go:ProcessMessage`
+**入口：** `internal/layers/orchestration/sessionorchestrator/orchestrator.go:ProcessMessage`
 
 | 步骤 | D-S | Activity | 说明 |
 |------|-----|----------|------|
@@ -99,8 +99,8 @@ sequenceDiagram
 | 3c | D7-S2-A03 | IntentFast | `FastPath.Run` → `turn.RunTurn` resolve/decompose 循环 |
 | 3d | D7-S2-A03 | IntentOrchestrate | `OrchestratePath.Run` → `LLMDecomposer` + `WaveScheduler` |
 | 4 | D7-S2-A06 | RunTurnLoop | 仅 IntentFast 路径；调 `D3`（D7 直调）+ 调 D2 Follower |
-| 5 | D7-S2-A04 | DispatchWorker | IntentOrchestrate / DecomposeHint 触发时 → `hubspoke.Dispatcher` → D4 Worker |
-| 6 | D7-S4 | Publish | `flow.GlobalHub.Publish(FlowEvent)` → WorkPlan 读模型 + IM sink |
+| 5 | D7-S2-A04 | DispatchWorker | IntentOrchestrate / DecomposeHint 触发时 → `sessionorchestrator.Dispatcher`（`hubspoke` shim）→ D4 Worker |
+| 6 | D7-S4 | Publish | `executionflow/hub.GlobalHub.Publish(FlowEvent)` → WorkPlan 读模型 + IM sink |
 
 **关键设计（DM-020 产权声明）：**
 - D7 是**唯一有权决定何时调用 D3** 的域

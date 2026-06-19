@@ -193,7 +193,7 @@
 | 锚点 | 路径 | D3 责任 | D7 责任 |
 |------|------|---------|--------|
 | `internal/bridges/llm/bridge.go` | D3↔D7 契约实现 | D3 暴露 `IGateway` / `Request` / `Chunk` 类型 | D7-S2-A07 InvokeLLM 消费；D7-S2-A06 RunTurnLoop 编排 |
-| D7 EngineEvent 复用 | `internal/layers/orchestration/coordinator/contracts.go` | D3 复用 `FlowStarted` / `FlowFailed` | D7 维护 EngineEvent 类型 |
+| D7 EngineEvent 复用 | `internal/layers/orchestration/sessionorchestrator/contracts.go` | D3 复用 `FlowStarted` / `FlowFailed` | D7 维护 EngineEvent 类型 |
 
 #### 2.4.2 SoT 划分
 
@@ -242,7 +242,7 @@
 **跨域契约影响（v1.1.0+）：**
 
 - **D3 LLM 调用次数 metric**：`intent_kind` 标签必须分别采集 4 IntentKind；v1.0 混在 `intent_kind=fast` 单一桶的 metric 已废弃
-- **D5 metric**：`intent_dispatch_total{kind=skip|command|fast|orchestrate}` 新增（`coordinator/orchestrator.go` 内 emit）
+- **D5 metric**：`intent_dispatch_total{kind=skip|command|fast|orchestrate}` 新增（`sessionorchestrator/orchestrator.go` 内 emit）
 - **D2 拆面契约**：仅 `IntentFast` 与 `IntentOrchestrate` 触发 `QueryLLMCaller` / `CompressionSummarizer` 调用；`IntentCommand` 与 `IntentSkip` 路径不经过 D2
 - **D4 拆面契约**：仅 `IntentOrchestrate` 触发 D4 worker dispatch；`IntentFast` 路径不直接 dispatch worker
 

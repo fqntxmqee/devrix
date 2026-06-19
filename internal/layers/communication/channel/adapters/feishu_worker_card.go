@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
 // ErrWorkerCardClosed indicates the renderer has been closed and no further
@@ -48,7 +48,7 @@ type WorkerCardSession struct {
 	SessionID   string
 	TaskID      string
 	WorkerID    string
-	WorkerType  wave.WorkerType
+	WorkerType  wavescheduler.WorkerType
 	CardID      string
 	Title       string
 	thinkingSeq int
@@ -66,7 +66,7 @@ type WorkerCardOptions struct {
 	SessionID  string
 	TaskID     string
 	WorkerID   string
-	WorkerType wave.WorkerType
+	WorkerType wavescheduler.WorkerType
 	Title      string
 }
 
@@ -119,9 +119,9 @@ func (r *WorkerCardRenderer) GetSession(opts WorkerCardOptions) *WorkerCardSessi
 	return s
 }
 
-// EmitWorkerEvent drives the card from a wave.WorkerEvent. It is idempotent
+// EmitWorkerEvent drives the card from a wavescheduler.WorkerEvent. It is idempotent
 // for the same event and safe to call concurrently.
-func (r *WorkerCardRenderer) EmitWorkerEvent(ctx context.Context, opts WorkerCardOptions, ev wave.WorkerEvent) error {
+func (r *WorkerCardRenderer) EmitWorkerEvent(ctx context.Context, opts WorkerCardOptions, ev wavescheduler.WorkerEvent) error {
 	if r == nil {
 		return errWaveNil
 	}
@@ -290,13 +290,13 @@ func buildWorkerCardJSON(sess *WorkerCardSession) string {
 	return string(b)
 }
 
-func workerEmoji(wt wave.WorkerType) string {
+func workerEmoji(wt wavescheduler.WorkerType) string {
 	switch wt {
-	case wave.WorkerCursor:
+	case wavescheduler.WorkerCursor:
 		return "🖱️"
-	case wave.WorkerClaudeCode:
+	case wavescheduler.WorkerClaudeCode:
 		return "🛠️"
-	case wave.WorkerSubAgent:
+	case wavescheduler.WorkerSubAgent:
 		return "🤖"
 	default:
 		return "⚙️"

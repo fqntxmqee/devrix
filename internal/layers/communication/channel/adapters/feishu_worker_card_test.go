@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
 // fakeCardkitClient is a stand-in for the real CardkitClient that records
@@ -78,15 +78,15 @@ func TestWorkerCardRenderer_StreamsTwoBlocksPerTask(t *testing.T) {
 		SessionID:  "sess-A",
 		TaskID:     "task-1",
 		WorkerID:   "w1",
-		WorkerType: wave.WorkerSubAgent,
+		WorkerType: wavescheduler.WorkerSubAgent,
 		Title:      "build api",
 	}
 
 	// Emit thinking + text.
-	if err := r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "thinking", Content: "hello "}); err != nil {
+	if err := r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "thinking", Content: "hello "}); err != nil {
 		t.Fatalf("emit thinking: %v", err)
 	}
-	if err := r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "text", Content: "world "}); err != nil {
+	if err := r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "text", Content: "world "}); err != nil {
 		t.Fatalf("emit text: %v", err)
 	}
 
@@ -120,10 +120,10 @@ func TestWorkerCardRenderer_TerminalUpdate(t *testing.T) {
 	opts := WorkerCardOptions{
 		SessionID:  "sess-A",
 		TaskID:     "task-1",
-		WorkerType: wave.WorkerCursor,
+		WorkerType: wavescheduler.WorkerCursor,
 	}
-	_ = r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "thinking", Content: "x"})
-	_ = r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "complete", Content: "done"})
+	_ = r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "thinking", Content: "x"})
+	_ = r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "complete", Content: "done"})
 
 	_, _, updated := fake.Stats()
 	if updated != 1 {
@@ -145,9 +145,9 @@ func TestWorkerCardRenderer_IndependentCardsPerTask(t *testing.T) {
 		opts := WorkerCardOptions{
 			SessionID:  "sess-A",
 			TaskID:     tID,
-			WorkerType: wave.WorkerSubAgent,
+			WorkerType: wavescheduler.WorkerSubAgent,
 		}
-		if err := r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "thinking", Content: tID}); err != nil {
+		if err := r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "thinking", Content: tID}); err != nil {
 			t.Fatalf("emit %s: %v", tID, err)
 		}
 	}
@@ -168,8 +168,8 @@ func TestWorkerCardRenderer_NoCardOnTerminalOnly(t *testing.T) {
 	r := NewWorkerCardRenderer(nil)
 	r.cardkit = fake
 
-	opts := WorkerCardOptions{SessionID: "sess-X", TaskID: "task-3", WorkerType: wave.WorkerSubAgent}
-	if err := r.EmitWorkerEvent(context.Background(), opts, wave.WorkerEvent{Type: "cancelled"}); err != nil {
+	opts := WorkerCardOptions{SessionID: "sess-X", TaskID: "task-3", WorkerType: wavescheduler.WorkerSubAgent}
+	if err := r.EmitWorkerEvent(context.Background(), opts, wavescheduler.WorkerEvent{Type: "cancelled"}); err != nil {
 		t.Fatalf("emit cancelled: %v", err)
 	}
 	created, _, updated := fake.Stats()
@@ -186,8 +186,8 @@ func TestWorkerCardRenderer_CloseIsIdempotent(t *testing.T) {
 	err := r.EmitWorkerEvent(context.Background(), WorkerCardOptions{
 		SessionID:  "s",
 		TaskID:     "t",
-		WorkerType: wave.WorkerSubAgent,
-	}, wave.WorkerEvent{Type: "thinking", Content: "x"})
+		WorkerType: wavescheduler.WorkerSubAgent,
+	}, wavescheduler.WorkerEvent{Type: "thinking", Content: "x"})
 	if !errors.Is(err, ErrWorkerCardClosed) {
 		t.Fatalf("expected ErrWorkerCardClosed, got %v", err)
 	}
