@@ -1,3 +1,11 @@
+// Package mockctx provides test doubles for D2 ContextEngine ports.
+//
+// P2-T3 status: kept in domain for now. Originally targeted for move to
+// tests/testutil/contextengine/, but cmd/obs-verify/main.go imports mockctx
+// directly as a smoke-test fixture (not a _test.go file). Moving the package
+// out of domain would force cmd to import tests/testutil/, which violates
+// Go's test-only-imports convention. Leaving mock/ here is the pragmatic
+// trade-off; the P2-T3 doc is updated accordingly.
 package mockctx
 
 import (
