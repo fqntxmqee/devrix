@@ -198,9 +198,9 @@
 
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
+| `devrix-d2-structure-closure` | DM-20260619-007 | **S2_Clarified**（待 S3-Gate） | `openspec/changes/devrix-d2-structure-closure/` |
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
-| `chore/d2-dsaft-layout-refactor` | — | PR [#104](https://github.com/fqntxmqee/devrix/pull/104) OPEN | D2 facade 迁移 |
-| `chore/d2-sandbox-rename` | — | PR [#103](https://github.com/fqntxmqee/devrix/pull/103) OPEN | D2 sandbox 重命名 |
+| `chore/d2-sandbox-rename` | — | PR [#103](https://github.com/fqntxmqee/devrix/pull/103) CLOSED | 并入 DM-20260619-007 P3 |
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -43,23 +44,16 @@ func (e *ContextEngine) ExportSessionSnapshot(sessionID string) ([]byte, error) 
 // D2 Memory. Lazily initializes the session if it does not yet exist (D7 path
 // first-write scenario).
 func (e *ContextEngine) AppendAndTrimMessages(sessionID string, msgs []types.Message) error {
-	if len(msgs) == 0 {
-		return nil
-	}
-	sc, ok := e.memory.Get(sessionID)
-	if !ok || sc == nil {
-		stub := &types.Session{SessionID: sessionID}
-		var initOK bool
-		sc, initOK = e.loadOrInitSession(context.Background(), stub, noopEmit)
-		if !initOK || sc == nil {
-			return fmt.Errorf("append+trim: cannot init session %s", sessionID)
-		}
-	}
-	for i := range msgs {
-		e.memory.AppendFullMessage(sc, msgs[i])
-	}
-	e.memory.TrimMessages(sc)
-	return nil
+	return persist.AppendAndTrimMessages(persist.CommitDeps{
+		Store: e.memory,
+		Bootstrap: func(sid string) (*types.SessionContext, error) {
+			sc, ok := e.loadOrInitSession(context.Background(), &types.Session{SessionID: sid}, noopEmit)
+			if !ok || sc == nil {
+				return nil, fmt.Errorf("cannot init session %s", sid)
+			}
+			return sc, nil
+		},
+	}, sessionID, msgs)
 }
 
 // noopEmit is used by AppendAndTrimMessages when calling loadOrInitSession
