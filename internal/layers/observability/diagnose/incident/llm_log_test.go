@@ -1,4 +1,4 @@
-package observability
+package incident
 
 import (
 	"encoding/json"

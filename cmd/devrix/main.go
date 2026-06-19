@@ -30,6 +30,7 @@ import (
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/incident"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 
 	// Spans self-registration (trigger init() to register domain spans)
@@ -111,7 +112,7 @@ func main() {
 			obsCfg = loaded
 		}
 	}
-	observability.ConfigureLLMLogging(observability.LLMLogSettings{
+	incident.ConfigureLLMLogging(incident.LLMLogSettings{
 		LogContent: obsCfg.LLM.LogContent,
 		LogDir:     obsCfg.LLM.LogDir,
 	})

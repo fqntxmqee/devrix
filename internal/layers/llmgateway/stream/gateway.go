@@ -15,6 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway/route"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/observability/diagnose/incident"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -139,7 +140,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		streamSpan.SetAttributes(attrs...)
 		streamSpan.End()
-		observability.RecordGenAITokenUsage(g.obs.Meter(), model, observability.GenAITokenBreakdown{
+		metrics.RecordGenAITokenUsage(g.obs.Meter(), model, metrics.GenAITokenBreakdown{
 			Input:     usage.PromptTokens,
 			Output:    usage.CompletionTokens,
 			CacheRead: usage.CacheReadTokens,
@@ -393,7 +394,7 @@ func (g *Gateway) recordStreamRequest(span tracer.Span, req *llmgateway.Request)
 	if req == nil {
 		return
 	}
-	full := observability.LLMLogContentEnabled()
+	full := incident.LLMLogContentEnabled()
 	msgs := make([]map[string]string, 0, len(req.Messages))
 	limit := 500
 	if full {
@@ -417,7 +418,7 @@ func (g *Gateway) recordStreamRequest(span tracer.Span, req *llmgateway.Request)
 		info["system_prompt"] = req.SystemPrompt
 	}
 	bz, _ := json.Marshal(info)
-	observability.RecordLLMSpanPayload(
+	incident.RecordLLMSpanPayload(
 		span, "", "request", "llm.request", "llm.request_json", string(bz),
 		0, req.Model,
 		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
@@ -436,7 +437,7 @@ func (g *Gateway) recordStreamResponse(span tracer.Span, err error, usage llmgat
 		info["error"] = err.Error()
 	}
 	bz, _ := json.Marshal(info)
-	observability.RecordLLMSpanPayload(
+	incident.RecordLLMSpanPayload(
 		span, "", "response", "llm.response", "llm.response_json", string(bz),
 		0, model,
 		tracer.Attribute{Key: "llm.provider", Value: provider},

@@ -1,13 +1,11 @@
-package observability
+package metrics
 
 import (
 	"fmt"
 	"sync"
-
-	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
 
-var genAITokenCounters sync.Map // key: meterName|model|tokenType → metrics.Counter
+var genAITokenCounters sync.Map // key: meterName|model|tokenType → Counter
 
 // GenAITokenBreakdown holds token counts for gen_ai.client.token.usage metrics.
 type GenAITokenBreakdown struct {
@@ -18,7 +16,7 @@ type GenAITokenBreakdown struct {
 }
 
 // RecordGenAITokenUsage increments gen_ai.client.token.usage by token_type.
-func RecordGenAITokenUsage(meter *metrics.Meter, model string, usage GenAITokenBreakdown) {
+func RecordGenAITokenUsage(meter *Meter, model string, usage GenAITokenBreakdown) {
 	if meter == nil {
 		return
 	}
@@ -36,19 +34,19 @@ func RecordGenAITokenUsage(meter *metrics.Meter, model string, usage GenAITokenB
 	}
 }
 
-func addGenAITokenUsage(meter *metrics.Meter, model, tokenType string, n int) {
+func addGenAITokenUsage(meter *Meter, model, tokenType string, n int) {
 	if n <= 0 {
 		return
 	}
 	key := fmt.Sprintf("%p|%s|%s", meter, model, tokenType)
 	if raw, ok := genAITokenCounters.Load(key); ok {
-		if counter, ok := raw.(metrics.Counter); ok && counter != nil {
+		if counter, ok := raw.(Counter); ok && counter != nil {
 			counter.Add(int64(n))
 		}
 		return
 	}
 	c, err := meter.Int64Counter("gen_ai.client.token.usage",
-		metrics.WithLabels(metrics.LabelMap{
+		WithLabels(LabelMap{
 			"token_type": tokenType,
 			"model":      model,
 		}))
@@ -56,7 +54,7 @@ func addGenAITokenUsage(meter *metrics.Meter, model, tokenType string, n int) {
 		return
 	}
 	if existing, loaded := genAITokenCounters.LoadOrStore(key, c); loaded {
-		if counter, ok := existing.(metrics.Counter); ok && counter != nil {
+		if counter, ok := existing.(Counter); ok && counter != nil {
 			counter.Add(int64(n))
 		}
 		return
