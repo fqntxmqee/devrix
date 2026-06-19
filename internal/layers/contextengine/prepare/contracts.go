@@ -12,14 +12,25 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+// SpanStarter is the hook used by orchestrator and adapters to emit OTel spans.
+// Defined here (in the contracts package) to avoid an import cycle: adapters
+// and orchestrator both depend on this type; the concrete implementation lives
+// in facade/engine_compression.go::startSpan.
+type SpanStarter func(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span)
+
 // SessionLoader loads or initializes a session context from snapshot.
+//
+// Returns (sc, isNew, error):
+//   - isNew = true when the session was just initialized (no prior snapshot);
+//   - isNew = false when an existing snapshot was restored.
 //
 // DSAFT: D2-S1-A01 (LoadSession)
 type SessionLoader interface {
-	LoadOrInit(session *types.Session, model string) (*types.SessionContext, error)
+	LoadOrInit(session *types.Session, model string) (sc *types.SessionContext, isNew bool, err error)
 }
 
 // MemoryRecaller retrieves long-term memory entries relevant to a query.

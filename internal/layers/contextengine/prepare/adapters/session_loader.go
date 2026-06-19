@@ -45,9 +45,12 @@ func NewSessionLoaderAdapter(manager *memory.Manager, opts ...HooksOption) *Sess
 // LoadOrInit loads or initializes the session context. On snapshot corruption
 // it resets the snapshot, clears dynamic caches, and retries once.
 //
+// Returns (sc, isNew, err) where isNew is true on first init (no prior
+// snapshot existed), false on snapshot restore.
+//
 // The `model` parameter is accepted for interface compatibility (legacy facade
 // signature); the underlying Manager.LoadOrInit uses the session's stored model.
-func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) (*types.SessionContext, error) {
+func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) (*types.SessionContext, bool, error) {
 	ctx := context.Background()
 	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Snapshot_Load, tracer.SpanKindInternal)
 	if span != nil {
@@ -55,6 +58,7 @@ func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) 
 	}
 
 	hadSnapshot := session.ContextSnapshot != nil
+	isNew := !hadSnapshot
 	sc, err := a.manager.LoadOrInit(session, "")
 	if err != nil {
 		// Snapshot was corrupt → reset, clear caches, retry.
@@ -62,13 +66,14 @@ func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) 
 		session.ContextSnapshot = nil
 		prompt.ClearDynamicSectionCache(session.SessionID)
 		prompt.ClearAgentsCache()
+		isNew = true
 		sc, err = a.manager.LoadOrInit(session, "")
 		if err != nil {
 			if span != nil {
 				span.RecordError(err)
 			}
 			a.hooks.emit(errorEvent(session.SessionID, errors.NewSnapshotCorruptError(err), false))
-			return nil, fmt.Errorf("snapshot load failed after reset: %w", err)
+			return nil, false, fmt.Errorf("snapshot load failed after reset: %w", err)
 		}
 		a.hooks.emit(snapshotRestoredEvent(session.SessionID, false))
 	}
@@ -77,9 +82,10 @@ func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) 
 		span.SetAttributes(
 			tracer.Attribute{Key: "snapshot.message_count", Value: fmt.Sprintf("%d", len(sc.Messages))},
 			tracer.Attribute{Key: "snapshot.restored", Value: fmt.Sprintf("%t", hadSnapshot)},
+			tracer.Attribute{Key: "snapshot.is_new", Value: boolStr(isNew)},
 		)
 	}
-	return sc, nil
+	return sc, isNew, nil
 }
 
 // --- event helpers (mirror facade/engine_events.go shape, no business logic) ---

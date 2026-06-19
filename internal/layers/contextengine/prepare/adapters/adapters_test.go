@@ -91,7 +91,7 @@ func TestSessionLoaderAdapter_LoadOrInit_NilManager_PanicsOrErrors(t *testing.T)
 			t.Error("expected panic when manager is nil")
 		}
 	}()
-	_, _ = a.LoadOrInit(&types.Session{SessionID: "s1"}, "")
+	_, _, _ = a.LoadOrInit(&types.Session{SessionID: "s1"}, "")
 }
 
 // --- MemoryRecaller adapter tests ---
