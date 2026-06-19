@@ -9,7 +9,7 @@
 
 ## Closure Summary
 
-D2 `query/loop.go`、D2 `QueryLLMCaller`、`d2_query_loop_legacy_invocations_total` 与 `query_loop.enabled` 配置均已删除。所有 LLM↔Tool 循环由 D7 `RunTurn` / `SubTurn` 持有；D2 仅提供 Prepare / ToolRound / Persist 原语。
+D2 `query/loop.go`、D2 `QueryLLMCaller`、`d2_query_loop_legacy_invocations_total` 与 `query_loop.enabled` 配置均已删除；`contextengine/query/` 孤儿目录亦于 residual cleanup 移除。所有 LLM↔Tool 循环由 D7 `RunTurn` / `SubTurn` 持有；D2 仅提供 Prepare / ToolRound / Persist 原语。
 
 | Z 阶段 | 原目标 | 结果 |
 |--------|--------|------|

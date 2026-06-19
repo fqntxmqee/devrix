@@ -11,7 +11,7 @@ import (
 )
 
 // T: D2-S10-A01-T34 (engine integration via D7 PreparedTurnRunner)
-func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
+func TestContextEngine_prepared_turn_runner_multi_turn(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Harness.Enabled = false
 	cfg.TurnRuntime.MaxTurns = 5

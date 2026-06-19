@@ -1,6 +1,6 @@
 // D2 Thin boundary tests (DM-20260614-009 v1.1).
 //
-// T: D2-S16-A01-T03 — query package must not import orchestration or multiagent.
+// T: D2-S16-A01-T03 — D2 contextengine must not import orchestration or multiagent.
 package layer
 
 import (
@@ -17,12 +17,6 @@ var d2ThinForbiddenImportPrefixes = []string{
 
 func isD2ThinExcludedPath(dir string) bool {
 	return false
-}
-
-// TestD2Thin_QueryPackage_NoOrchestrationOrMultiAgent verifies the D2-S16
-// execution primitive stays free of D7/D4 orchestration imports.
-func TestD2Thin_QueryPackage_NoOrchestrationOrMultiAgent(t *testing.T) {
-	assertNoForbiddenImports(t, filepath.Join(repoRootFromTest(t), "internal", "layers", "contextengine", "query"))
 }
 
 // TestD2Thin_EnforcePackage_NoOrchestrationOrMultiAgent verifies D2-S18 enforce

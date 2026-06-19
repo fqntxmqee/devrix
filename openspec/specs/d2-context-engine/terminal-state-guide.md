@@ -99,7 +99,7 @@ sequenceDiagram
 | S | 路径 |
 |---|------|
 | S15 | `prepare/` |
-| S16 | `query/loop.go` + `engine.go` |
+| S16 | **REMOVED** → D7 `orchestration/turn/` |
 | S17 | `persist/` + `engine_persist.go` |
 | S18 | `enforce/` |
 

@@ -52,16 +52,18 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 ---
 
-## D2-S2 ExecuteQuery
+## D2-S2 ExecuteQuery — REMOVED (Legacy)
+
+> **DM-20260618-010：** LLM↔Tool 循环归 D7-S2-A06；下列 F 点仅作追溯。
 
 ### D2-S2-A01 RunLoop
 
 | F ID | Name | Input | Output | Code Location |
 |------|------|-------|--------|---------------|
-| D2-S2-A01-F01 | RunLoop | ctx, session, params | *Result | `query/loop.go` |
-| D2-S2-A01-F02 | CallLLM | request | <-chan LLMChunk | `query/loop.go` |
-| D2-S2-A01-F03 | RecoverFrom413 | oversized | retry_msgs | `query/recovery.go` |
-| D2-S2-A01-F04 | FallbackOnOverload | error | fallback_llm | `query/recovery.go` |
+| D2-S2-A01-F01 | RunLoop | — | — | **REMOVED** → `orchestration/turn/orchestrator.go` |
+| D2-S2-A01-F02 | CallLLM | — | — | **REMOVED** → D7 `GatewayInvoker` |
+| D2-S2-A01-F03 | RecoverFrom413 | — | — | **REMOVED** → `orchestration/turn/recovery.go` |
+| D2-S2-A01-F04 | FallbackOnOverload | — | — | **REMOVED** → D7 turn runtime |
 
 ### D2-S2-A02 ExecuteToolRound
 
@@ -74,7 +76,7 @@ D2 F 层注册表 v3.0。F 点按 Canonical S1–S5 重新索引。
 
 | F ID | Name | Input | Output | Code Location |
 |------|------|-------|--------|---------------|
-| D2-S2-A03-F01 | StreamEmit | text_chunk | EngineEvent | `query/loop.go` |
+| D2-S2-A03-F01 | StreamEmit | — | — | **REMOVED** → D7 turn runtime |
 
 ---
 

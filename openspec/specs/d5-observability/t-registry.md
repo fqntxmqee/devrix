@@ -41,7 +41,7 @@
 | T ID | 描述 | canonical_s | Priority | Test 位置 | Status | Legacy T ID |
 |------|------|-------------|----------|-----------|--------|-------------|
 | D5-S22-A01-T01 | OTLP span 事件属性序列化 | S22 | P1 | `internal/layers/observability/export/otlp_event_test.go` | IMPLEMENTED | D5-S4-A01-T01 |
-| D5-S22-A01-T02 | D7 Turn 产生 canonical Operation span | S22 | P0 | `internal/layers/orchestration/turn/orchestrator.go` | IMPLEMENTED | D5-S4-A01-T02 |
+| D5-S22-A01-T02 | D7 Turn 产生 canonical Operation span | S22 | P0 | `internal/layers/orchestration/turn/orchestrator_test.go` | IMPLEMENTED | D5-S4-A01-T02 |
 | D5-S22-A01-T03 | Adapter→Gateway trace_id 继承 | S22 | P0 | `tests/integration/obs_trace_propagation_test.go` | IMPLEMENTED | D5-S4-A01-T03 |
 
 ## D5-S23: Diagnose（诊断辅助）

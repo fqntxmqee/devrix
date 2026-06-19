@@ -80,12 +80,12 @@ context.process
 ### P0 必跑清单
 
 ```bash
-# QueryLoop removed + D7 turn path
-go test ./internal/layers/contextengine/ -run 'QueryLoopRemoved|PathRegression' -v
+# QueryLoop removal guard + D7 turn path
+go test ./internal/layers/contextengine/ -run 'QueryLoopRemoved|NoQueryLoop|PathRegression' -v
 go test ./internal/layers/orchestration/turn/ -run RunTurn -v
 
-# D2→D3 import ban
-go test ./internal/lint/layer/ -run D2_D3 -v
+# D2 thin boundary + D2→D3 import ban
+go test ./internal/lint/layer/ -run 'D2Thin|D2_D3' -v
 
 # Permission / PlanMode
 go test ./internal/layers/contextengine/enforce/permission/ -v

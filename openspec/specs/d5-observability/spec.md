@@ -97,7 +97,7 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 | Domain | 依赖内容 | 使用位置 |
 |--------|---------|---------|
 | D1 Communication | 入站创建 root span、`SessionBridge.ActiveSessions` | `gateway/`, `adapters/` |
-| D2 Context Engine | `observability.Bridge` tracer/meter/logger | `engine.go`, `query/loop.go`, `harness/` |
+| D2 Context Engine | `observability.Bridge` tracer/meter/logger | `engine.go`, `enforce/`, `prepare/` |
 | D3 LLM Gateway | `llm.stream` span、`RecordGenAITokenUsage` | `gateway/gateway.go`, `adapter/` |
 | D4 Multi-Agent | `agent.*` spans、Fork policy metrics sink | `multiagent/observability/` |
 | D7 Orchestration | `orchestration.*` spans | `orchestration/wavescheduler/`, `executionflow/` |
