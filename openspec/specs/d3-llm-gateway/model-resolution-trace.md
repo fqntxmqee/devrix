@@ -4,7 +4,9 @@
 
 本文追踪 Devrix 中 **模型名** 及 **provider 运行时参数**（`max_tokens`、`temperature` 等）从配置文件到出站 HTTP JSON 的完整路径。
 
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-19
+
+> **v2.0 状态**（DM-20260619-002 同步）：本文档描述的代码路径已迁移至 v2.0 物理路径（DM-20260614-019, 2026-06-14 落地）。Tier 解析与路由逻辑仍为 `Router.Resolve()` + `Router.ResolveTier()`，**仅 import 路径变更**：`internal/layers/llmgateway/gateway/router.go` → `internal/layers/llmgateway/route/router.go`；`internal/layers/llmgateway/gateway/gateway.go` → `internal/layers/llmgateway/stream/gateway.go`；`internal/layers/llmgateway/adapter/openai_*.go` → `internal/layers/llmgateway/stream/adapter/openai_*.go`；`internal/shared/config/llmgateway.go` → `internal/layers/llmgateway/configure/shared_config.go`。
 
 ---
 
