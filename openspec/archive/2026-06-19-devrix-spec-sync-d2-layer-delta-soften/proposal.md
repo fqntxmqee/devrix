@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-spec-sync-d2-layer-delta-soften
 **Demand ID:** DM-20260619-004
-**Status:** S2_Proposal
+**Status:** S7_Archived (2026-06-19)
 **Date:** 2026-06-19
 **Author:** Devrix Team
 
