@@ -2,10 +2,12 @@
 
 **Domain:** D6 Evolution
 **DSAFT Type:** Supporting
-**Version:** 2.1.0
-**Last Updated:** 2026-06-14
+**Version:** 2.2.0
+**Last Updated:** 2026-06-19
 **Status:** Active
 **Parent:** `openspec/specs/d6-evolution/spec.md`
+
+> **v2.2.0 状态**（DM-20260619-003 同步）：v2.0 物理路径迁移已完成（DM-20260615-003, 2026-06-15），`eval/` → `evaluate/`、`orchestration/` → `guard/`、`exporter/` → `export/`、新增 `verify/`。`bridge.go` 桥接文件在 v2.0.1 cleanup 后全部删除（11 个）。
 
 ---
 
@@ -13,7 +15,7 @@
 
 ```
 internal/layers/evolution/
-├── eval/                                    # D6-S3 评测引擎
+├── evaluate/                                 # D6-S3 评测引擎（v2.0 改名前 eval/）
 │   ├── engine.go                            # EvalEngine — 评测管道编排
 │   ├── types.go                             # 所有类型定义
 │   ├── probe.go                             # Probe 接口 + 全局注册表
@@ -33,15 +35,18 @@ internal/layers/evolution/
 │   ├── layer_violation_probe.go             # Probe: layer_violation (v2.1.0)
 │   ├── session_isolation_probe.go           # Probe: session_isolation (v2.1.0)
 │   └── *_test.go                            # 14 个测试文件
-└── orchestration/                           # D6-S4 编排校验
-    ├── validator.go                         # RuntimeOrchestrationValidator
-    ├── intervention.go                      # InterventionExecutor
-    ├── observer.go                          # OrchestrationObserver
-    ├── judge_adapter.go                     # RuntimeJudge — 跨模型校验
-    ├── types.go                             # DecisionRecord, ValidationResult 等
-    ├── config.go                            # 配置类型别名
-    ├── metrics.go                           # OpenTelemetry 指标
-    └── validator_test.go                    # 校验器测试
+├── guard/                                    # D6-S4 Guard 韧性（v2.0 改名前 orchestration/）
+│   ├── validator.go                         # RuntimeGuardValidator
+│   ├── intervention.go                      # InterventionExecutor
+│   ├── observer.go                          # GuardObserver
+│   ├── judge_adapter.go                     # RuntimeJudge — 跨模型校验
+│   ├── types.go                             # DecisionRecord, ValidationResult 等
+│   ├── config.go                            # 配置类型别名
+│   ├── metrics.go                           # OpenTelemetry 指标
+│   └── validator_test.go                    # 校验器测试
+└── verify/                                   # D6-S5 Invariant 验证（v2.0 新增物理独立）
+    ├── _invariant.go                        # Invariant 接口 + 注册表
+    └── plan.go                              # VerifyPlan — 验证计划编排
 ```
 
 ---
@@ -127,21 +132,21 @@ Score(ctx, item, rubric)
 
 ---
 
-## D6-S4: Orchestration
+## D6-S4: GuardRuntime
 
 ### 校验管道
 
 ```
-RuntimeOrchestrationValidator.OnDecision(ctx, rec, session)
+RuntimeGuardValidator.OnDecision(ctx, rec, session)
   ├─ enabled=false: return immediately
   ├─ Start tracing span (`D6_S4_Validation_Decision`)
-  ├─ Record metrics (orch_decisions_total)
+  ├─ Record metrics (guard_decisions_total)
   ├─ preFilter(rec):
-  │   ├─ Trusted tool allowlist match → skip (orch_decisions_by_stage: prefilter_skip)
+  │   ├─ Trusted tool allowlist match → skip (guard_decisions_by_stage: prefilter_skip)
   │   ├─ Min interval since last judge → skip
   │   └─ Max calls per minute exceeded → skip
   ├─ judge.ValidateDecision(ctx, rec) → *ValidationResult
-  ├─ Record metrics (orch_validations_total, orch_judge_latency_seconds)
+  ├─ Record metrics (guard_validations_total, guard_judge_latency_seconds)
   ├─ If valid OR confidence ≥ InterventionThreshold: return
   └─ Build Intervention → if AutoIntervene: executor.Execute(ctx, iv, session)
 ```
@@ -190,7 +195,7 @@ Execute(ctx, iv, session)
   └─ "update_state": tasks.Fail(sessionID, reason)
 ```
 
-### OrchestrationObserver 事件桥接
+### GuardObserver 事件桥接
 
 实现 `multiagent.AgentObserver`，捕获两类事件：
 
@@ -202,7 +207,7 @@ Execute(ctx, iv, session)
 ### 配置
 
 ```go
-type OrchestrationConfig struct {
+type GuardConfig struct {
     Enabled                bool
     AutoIntervene          bool
     PreFilterEnabled       bool
@@ -216,16 +221,66 @@ type OrchestrationConfig struct {
 
 ---
 
+## D6-S5: VerifyInvariant
+
+Invariant 验证子系统，v2.0 物理独立（从 evaluate/ 拆出）。
+
+### 验证管道
+
+```
+VerifyPlan.Run(ctx, target)
+  ├─ Load invariant set from registry
+  ├─ For each invariant:
+  │     invariant.Check(ctx, target) → *InvariantResult
+  ├─ Aggregate → *VerifyReport
+  └─ If fail: emit Guard event (D6-S4 联动)
+```
+
+### 核心接口
+
+```go
+// Invariant — 不变量检查器接口
+type Invariant interface {
+    ID() string
+    Check(ctx context.Context, target Target) (*InvariantResult, error)
+}
+
+// VerifyPlan — 验证计划
+type VerifyPlan struct {
+    Invariants []Invariant
+    OnFail     func(*InvariantResult)
+}
+```
+
+### 与 D6-S4 Guard 联动
+
+当 VerifyPlan 检测到 invariant 失败时，emit Guard 事件：
+- `DecisionCategory = "invariant_violation"`
+- `RiskClass = Critical`
+- 由 `RuntimeGuardValidator` 走相同校验管道
+
+---
+
 ## 依赖关系
 
 ```
 D6 Evolution
   ├── D2 Context Engine  (compression_recall, path_regression 探针目标)
   ├── D3 LLM Gateway     (GatewayLLMClient, RuntimeJudge 底层)
-  ├── D4 Multi-Agent     (agent_forkjoin 探针目标, OrchestrationObserver 事件源)
+  ├── D4 Multi-Agent     (agent_forkjoin 探针目标, GuardObserver 事件源)
   ├── D5 Observability   (session_isolation 交叉校验, OpenTelemetry 集成)
   └── D7 Orchestration   (InterventionExecutor 状态变更)
 ```
+
+---
+
+## 修订历史
+
+| 版本 | 日期 | 变更摘要 | 关联 DM |
+|------|------|---------|---------|
+| 2.2.0 | 2026-06-19 | v2.0 物理路径迁移同步：eval→evaluate / orchestration→guard / 新增 verify/；RuntimeOrchestrationValidator→RuntimeGuardValidator；新增 D6-S5 VerifyInvariant 章节 | DM-20260619-003 |
+| 2.1.0 | 2026-06-14 | path_regression + layer_violation + session_isolation 三个新探针 | DM-20260614-XXX |
+| 2.0.0 | 2026-06-XX | 初版 | — |
 
 ---
 
@@ -233,6 +288,7 @@ D6 Evolution
 
 - [spec.md](./spec.md) — D6 域规范
 - [layer-delta.md](./layer-delta.md) — 层增量变更记录
+- [d6-domain.md](./d6-domain.md) — D6 域描述 + 价值流 + 跨域契约
 - [a-registry.md](./a-registry.md) — A 层活动注册表
 - [f-registry.md](./f-registry.md) — F 层功能点注册表
 - [t-registry.md](./t-registry.md) — T 层测试点注册表

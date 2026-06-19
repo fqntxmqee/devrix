@@ -2,11 +2,12 @@
 
 **Domain:** D6 Evolution
 **DSAFT Type:** Supporting
-**Version:** 2.2.0
-**Last Updated:** 2026-06-14
+**Version:** 2.3.0
+**Last Updated:** 2026-06-19
 **Status:** Canonical — source of truth
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；D2-B 决议 probe #3 推迟 v1.2）
+**Domain SoT:** `d6-domain.md`（2026-06-19 新建，对齐 D2/D4/D5/D7 结构）
+**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；D2-B 决议 probe #3 推迟 v1.2）+ devrix-d5-d6-sa-refine-v2.0（DM-20260615-003 / 物理路径迁移 2026-06-15）+ devrix-spec-sync-d6-evolution-registration（DM-20260619-003 / 物理路径同步 + d6-domain.md 新建）
 
 ---
 
@@ -14,8 +15,9 @@
 
 D6 演化域负责 Devrix 系统的自我评估与运行时行为校验。包含两大子系统：
 
-- **D6-S3 评测引擎**：离线评测管道，10 类探针覆盖各域质量维度（v2.2.0 新增 3 个 D3 探针），LLM-as-Judge 评分，Delta 回归检测，CI 门禁
-- **D6-S4 编排校验**：运行时校验智能体路由决策（tool_call / permit / fork），LLM Judge 交叉验证，自动干预执行
+- **D6-S3 评测引擎**：离线评测管道，10 类探针覆盖各域质量维度（v2.2.0 新增 3 个 D3 探针），LLM-as-Judge 评分，Delta 回归检测，CI 门禁；v2.0 物理路径 `evaluate/`
+- **D6-S4 GuardRuntime**：运行时校验智能体路由决策（tool_call / permit / fork），LLM Judge 交叉验证，自动干预执行；v2.0 重命名自 Orchestration，物理路径 `guard/`（**曾因重命名误删从 42bf1d7 恢复**）
+- **D6-S5 VerifyInvariant**（v2.0 新增物理独立）：Invariant 验证 + Plan 验证；物理路径 `verify/`
 
 D6-S1（版本检测）与 D6-S2（配置热更新）仍处于规划阶段。
 
@@ -29,7 +31,8 @@ D6-S1（版本检测）与 D6-S2（配置热更新）仍处于规划阶段。
 | S | D6-S1 | Version | PLANNED |
 | S | D6-S2 | Config | PLANNED |
 | S | D6-S3 | Eval Engine | IMPLEMENTED |
-| S | D6-S4 | Orchestration | IMPLEMENTED |
+| S | D6-S4 | GuardRuntime | IMPLEMENTED（v2.0 重命名自 Orchestration）|
+| S | D6-S5 | VerifyInvariant | IMPLEMENTED（v2.0 物理独立自 evaluate）|
 
 ---
 
@@ -49,29 +52,29 @@ LoadDataset → StratifiedSample → RunProbes(×N) → AggregateReport → Delt
 
 | 组件 | 文件 | 职责 |
 |------|------|------|
-| EvalEngine | `eval/engine.go` | 评测管道编排：加载→抽样→探针→聚合→delta→基线 |
-| JudgeManager | `eval/judge.go` | LLM-as-Judge 评分，双模型交叉验证，Cohen's kappa 校准 |
-| DeltaAnalyzer | `eval/delta.go` | 当前评分 vs 基线对比，回归检测 |
-| TuneGenerator | `eval/tune.go` | 回归维度 → 配置调优建议映射 |
-| DatasetManager | `eval/dataset.go` | YAML 评测集加载、分层抽样、基线读写 |
-| ProbeRegistry | `eval/probe.go` | 全局探针注册表，按 ID 查找 |
-| GatewayLLMClient | `eval/gateway_llm.go` | 经 D3 LLM Gateway 的真实 Judge 调用 |
-| StaticLLMClient | `eval/mock_llm.go` | 固定响应 Judge，用于测试/CLI |
+| EvalEngine | `evaluate/engine.go` | 评测管道编排：加载→抽样→探针→聚合→delta→基线（v2.0 重命名自 `eval/`）|
+| JudgeManager | `evaluate/judge.go` | LLM-as-Judge 评分，双模型交叉验证，Cohen's kappa 校准 |
+| DeltaAnalyzer | `evaluate/delta.go` | 当前评分 vs 基线对比，回归检测 |
+| TuneGenerator | `evaluate/tune.go` | 回归维度 → 配置调优建议映射 |
+| DatasetManager | `evaluate/dataset.go` | YAML 评测集加载、分层抽样、基线读写 |
+| ProbeRegistry | `evaluate/probe.go` | 全局探针注册表，按 ID 查找 |
+| GatewayLLMClient | `evaluate/gateway_llm.go` | 经 D3 LLM Gateway 的真实 Judge 调用 |
+| StaticLLMClient | `evaluate/mock_llm.go` | 固定响应 Judge，用于测试/CLI |
 
 ### 10 类探针（v2.2.0：7 + 3）
 
 | Probe ID | 文件 | 目标域 | 评分方式 | 说明 |
 |----------|------|--------|----------|------|
-| compression_recall | `eval/compression_recall_probe.go` | D2 | Judge + 确定性 | 压缩前后事实保留率（must_keep recall + LLM 语义评分） |
-| tool_accuracy | `eval/tool_accuracy_probe.go` | D2 | 确定性 | Tool 选择 precision/recall/F1（expected_tools vs actual_tools） |
-| provider_quality | `eval/provider_quality_probe.go` | D3 | Judge + 确定性 | 语义相似度（wordJaccard）+ 指令遵循率 + Judge 保守融合 |
-| agent_forkjoin | `eval/agent_forkjoin_probe.go` | D4 | 确定性 | 子 Agent 消息隔离（isolation）+ Join 结果完整度 |
-| path_regression | `eval/path_regression_probe.go` | D2 | 确定性 | 代码路径快照对比（runtime.Snapshot() LegacyHarness=0） |
-| layer_violation | `eval/layer_violation_probe.go` | D6 | 确定性 | 分层违规扫描（0 违规→1.0, 1→0.5, 2+→0.0） |
-| session_isolation | `eval/session_isolation_probe.go` | D6 | 确定性 | COW 隔离评估（fork/join/metadata 计数 + D5 交叉校验） |
-| **tier_resolution** _(v2.2.0)_ | `eval/tier_resolution_probe.go` | D3 | 确定性 | Tier 解析正确性 ≥ 99%（D2-B 决议；接 `llm_tier_resolve_total{outcome=hit/fallback/error}` 桶） |
-| **breaker_anomaly_transition** _(v2.2.0)_ | `eval/breaker_anomaly_transition_probe.go` | D3 | 确定性 | Breaker 状态切换异常告警（frequent-flip / 异常 open 序列；接 `llm_breaker_transitions_total{from,to}`） |
-| **safety_latency** _(v2.2.0)_ | `eval/safety_latency_probe.go` | D3 | 确定性 | Safety filter P99 < 1ms（D5-A 决议；接 `safety.check.duration_ms` span event） |
+| compression_recall | `evaluate/compression_recall_probe.go` | D2 | Judge + 确定性 | 压缩前后事实保留率（must_keep recall + LLM 语义评分） |
+| tool_accuracy | `evaluate/tool_accuracy_probe.go` | D2 | 确定性 | Tool 选择 precision/recall/F1（expected_tools vs actual_tools） |
+| provider_quality | `evaluate/provider_quality_probe.go` | D3 | Judge + 确定性 | 语义相似度（wordJaccard）+ 指令遵循率 + Judge 保守融合 |
+| agent_forkjoin | `evaluate/agent_forkjoin_probe.go` | D4 | 确定性 | 子 Agent 消息隔离（isolation）+ Join 结果完整度 |
+| path_regression | `evaluate/path_regression_probe.go` | D2 | 确定性 | 代码路径快照对比（runtime.Snapshot() LegacyHarness=0） |
+| layer_violation | `evaluate/layer_violation_probe.go` | D6 | 确定性 | 分层违规扫描（0 违规→1.0, 1→0.5, 2+→0.0） |
+| session_isolation | `evaluate/session_isolation_probe.go` | D6 | 确定性 | COW 隔离评估（fork/join/metadata 计数 + D5 交叉校验） |
+| **tier_resolution** _(v2.2.0)_ | `evaluate/tier_resolution_probe.go` | D3 | 确定性 | Tier 解析正确性 ≥ 99%（D2-B 决议；接 `llm_tier_resolve_total{outcome=hit/fallback/error}` 桶） |
+| **breaker_anomaly_transition** _(v2.2.0)_ | `evaluate/breaker_anomaly_transition_probe.go` | D3 | 确定性 | Breaker 状态切换异常告警（frequent-flip / 异常 open 序列；接 `llm_breaker_transitions_total{from,to}`） |
+| **safety_latency** _(v2.2.0)_ | `evaluate/safety_latency_probe.go` | D3 | 确定性 | Safety filter P99 < 1ms（D5-A 决议；接 `safety.check.duration_ms` span event） |
 
 > **probe #3 Token 预算触发率**：D2-B 决议推迟至 v1.2（依赖 D3-S4 BudgetTokens 注入 span event `budget.check.exceeded`，需先期落地）。v2.2.0 不实施。
 
@@ -110,12 +113,12 @@ LoadDataset → StratifiedSample → RunProbes(×N) → AggregateReport → Delt
 
 ---
 
-## D6-S4: Orchestration
+## D6-S4: GuardRuntime（v2.0 重命名自 Orchestration）
 
 ### 校验管道
 
 ```
-Agent Decision → OrchestrationObserver → preFilter → Judge Validation → Intervention
+Agent Decision → GuardObserver → preFilter → Judge Validation → Intervention
                      (D4 observer)        (allowlist)   (cross-model)    (terminate/reroute)
 ```
 
@@ -123,10 +126,17 @@ Agent Decision → OrchestrationObserver → preFilter → Judge Validation → 
 
 | 组件 | 文件 | 职责 |
 |------|------|------|
-| RuntimeOrchestrationValidator | `orchestration/validator.go` | 决策入口：预过滤→Judge 校验→干预触发 |
-| InterventionExecutor | `orchestration/intervention.go` | 干预执行：terminate / terminateAndReroute / updateState |
-| OrchestrationObserver | `orchestration/observer.go` | D4 AgentObserver 桥接，捕获 agent 决策事件 |
-| RuntimeJudge | `orchestration/judge_adapter.go` | 经 D3 LLM Gateway 的跨模型决策校验 |
+| RuntimeGuardValidator | `guard/validator.go` | 决策入口：预过滤→Judge 校验→干预触发（v2.0 重命名自 `RuntimeOrchestrationValidator`） |
+| InterventionExecutor | `guard/intervention.go` | 干预执行：terminate / terminateAndReroute / updateState |
+| GuardObserver | `guard/observer.go` | D4 AgentObserver 桥接，捕获 agent 决策事件（v2.0 重命名自 `OrchestrationObserver`） |
+| RuntimeJudge | `guard/judge_adapter.go` | 经 D3 LLM Gateway 的跨模型决策校验 |
+
+### D6-S5: VerifyInvariant（v2.0 新增物理独立）
+
+| 组件 | 文件 | 职责 |
+|------|------|------|
+| InvariantRegistry | `verify/_invariant.go` | 系统级不变量注册 + 校验（fail-closed） |
+| PlanVerifier | `verify/plan.go` | Plan 路径验证（与 D7 PlanMode 联动） |
 
 ### 决策分类与风险
 
@@ -152,13 +162,13 @@ Agent Decision → OrchestrationObserver → preFilter → Judge Validation → 
 
 ### 可观测性
 
-OpenTelemetry 指标（`orchestration/metrics.go`）：
-- `orch_decisions_total` — 决策计数（按 category/risk）
-- `orch_validations_total` — 校验计数（按 result）
-- `orch_interventions_total` — 干预计数（按 action）
-- `orch_judge_latency_seconds` — Judge 调用延迟
-- `orch_observer_active` — Observer 活跃状态
-- `orch_decisions_by_stage` — 各阶段决策分布
+OpenTelemetry 指标（`guard/metrics.go`，v2.0 重命名自 `orchestration/metrics.go`）：
+- `guard_decisions_total` — 决策计数（按 category/risk，v2.0 重命名自 `orch_decisions_total`）
+- `guard_validations_total` — 校验计数（按 result）
+- `guard_interventions_total` — 干预计数（按 action）
+- `guard_judge_latency_seconds` — Judge 调用延迟
+- `guard_observer_active` — Observer 活跃状态
+- `guard_decisions_by_stage` — 各阶段决策分布
 
 ---
 
@@ -382,15 +392,15 @@ Safety Filter Latency Probe 必须验证 D3-S5 safety filter P99 < 1ms。
 
 > **依赖**：D3-S5-A01 F04 `EmitSafetyLatencyEvent` 在 `llm.stream` span 上 emit `safety.check.duration_ms`（D5-A 决议，v1.1 落地，默认 `d3_safety_latency_event_enabled` ON）。
 
-### D6-S4: Orchestration
+### D6-S4: GuardRuntime（v2.0 重命名）
 
 <!-- D6-S4-A01-T01 -->
 #### Requirement: 运行时决策校验
-编排校验器必须对 Agent 路由决策进行 LLM 交叉验证。
+Guard 校验器必须对 Agent 路由决策进行 LLM 交叉验证。
 
 **Scenario: 决策校验通过**
 - GIVEN Agent 发出 tool_call 决策
-- WHEN RuntimeOrchestrationValidator.OnDecision 被调用
+- WHEN RuntimeGuardValidator.OnDecision 被调用
 - THEN preFilter 检查通过后调用 Judge 校验
 - AND 校验通过时决策正常执行
 
@@ -415,13 +425,13 @@ Safety Filter Latency Probe 必须验证 D3-S5 safety filter P99 < 1ms。
 
 <!-- D6-S4-A03-T01 -->
 #### Requirement: Agent 事件观测
-编排观察器必须作为 D4 AgentObserver 桥接决策事件。
+Guard 观察器必须作为 D4 AgentObserver 桥接决策事件。
 
 **Scenario: 捕获 Fork 决策**
 - GIVEN agent.forked 事件
-- WHEN OrchestrationObserver 收到事件
+- WHEN GuardObserver 收到事件
 - THEN 构造 DecisionRecord{Category: fork}
-- AND 送入 RuntimeOrchestrationValidator
+- AND 送入 RuntimeGuardValidator
 
 <!-- D6-S4-A04-T01 -->
 #### Requirement: 跨模型 Judge 适配
@@ -432,6 +442,23 @@ RuntimeJudge 必须经 D3 LLM Gateway 进行决策校验。
 - WHEN RuntimeJudge.ValidateDecision 被调用
 - THEN 构造 JSON prompt 发送到 D3 Gateway
 - AND 主模型失败时自动 fallback
+
+### D6-S5: VerifyInvariant（v2.0 新增）
+
+<!-- D6-S5-A01-T01 -->
+#### Requirement: 系统级不变量注册与校验
+InvariantRegistry 必须支持 fail-closed 校验。
+
+**Scenario: 不变量注册**
+- GIVEN 启动时通过 `RegisterInvariant` 注册 N 条不变量
+- WHEN 系统状态变更触发 `Check()`
+- THEN 逐条执行不变量校验
+- AND 任意不变量失败 → 返回 error + 触发干预
+
+**Scenario: Plan 路径验证**
+- GIVEN Plan 工具调用 (D7 PlanMode)
+- WHEN PlanVerifier.Verify 被调用
+- THEN 校验 Plan 路径不违反不变量（如文件写入白名单）
 
 ---
 
@@ -446,7 +473,7 @@ evolution:
       primary_model: "deepseek-v4-flash"
       secondary_model: "minimax-M2.7-highspeed"
       max_concurrency: 4
-  orchestration:
+  guard:
     enabled: false
     judge:
       primary_model: "deepseek-v4-pro"
@@ -455,6 +482,9 @@ evolution:
       trusted_tools: ["read_file", "list_directory", "search_code"]
       min_interval_between_judges: "2s"
       max_judge_calls_per_minute: 10
+  verify:
+    enabled: true
+    fail_closed: true  # v2.0 物理独立；D6-S5
 ```
 
 ---
@@ -478,3 +508,4 @@ evolution:
 | 2.0.0 | 2026-06-14 | 初版：7 类探针 + S4 Orchestration |
 | 2.1.0 | 2026-06-14 | 新增 Path Regression / Layer Violation / Session Isolation 3 类探针（T16/T17/T18） |
 | 2.2.0 | 2026-06-14 | 落地 devrix-d3-sa-refine-v1.1 D6 探针 #1 / #2 / #4：Tier Resolution ≥ 99%（T19，D2-B 决议）+ Breaker Anomaly Transition（T20）+ Safety Latency P99 < 1ms（T21，D5-A 决议）；probe #3 Token 预算触发率 推迟至 v1.2（D2-B 决议） |
+| **2.3.0** | **2026-06-19** | **v2.0 物理路径迁移同步**（DM-20260615-003, 2026-06-15 落地；DM-20260619-003 spec 同步）：§D6-S3 组件路径 `eval/` → `evaluate/`（8 个文件）；§D6-S4 重命名 Orchestration → GuardRuntime，路径 `orchestration/` → `guard/`（4 个文件 + 6 metric 重命名 `orch_*` → `guard_*`）；新增 §D6-S5 VerifyInvariant（v2.0 物理独立自 `evaluate/`）；DSAFT 表格同步；Domain SoT `d6-domain.md` 新建（对齐 D2/D4/D5/D7 结构） |
