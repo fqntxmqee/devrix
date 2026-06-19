@@ -28,7 +28,7 @@
 | Domain ID | 名称 | 缩写 | Responsibility |
 |-----------|------|------|----------------|
 | **D1** | Communication Domain | COMM | IM Gateway, WebSocket, CLI adapter |
-| **D2** | Context Engine Domain | CTX | QueryLoop 主路径、七步压缩、分层记忆、会话修复 |
+| **D2** | Context Engine Domain | CTX | Prepare / ToolRound / Persist、七步压缩、分层记忆、会话修复 |
 | **D3** | LLM Gateway Domain | LLM | Model adapter, circuit breaker, token counter |
 | **D4** | Multi-Agent Domain | AGENT | Agent lifecycle, fork, collaboration modes |
 | **D5** | Observability Domain | OBS | Tracing, metrics, logging |
@@ -88,11 +88,11 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 | Scenario ID | Scenario | 用户/系统目标 | Status |
 |-------------|----------|---------------|--------|
 | D2-S15 | PrepareExecutionContext | Turn 前：加载、修复、压缩、组装 Prompt | REGISTRY |
-| D2-S16 | RunQueryLoop | LLM↔Tool 多轮执行原语（D2 Thin） | REGISTRY |
+| D2-S16 | ~~RunQueryLoop~~ | ~~LLM↔Tool 多轮执行原语~~ | **REMOVED → D7-S2-A06** |
 | D2-S17 | PersistSessionState | Turn 后：快照/transcript durable + deferred complete | REGISTRY |
 | D2-S18 | EnforceExecutionPolicy | 权限、沙箱、工具面、Plan 写限制 | REGISTRY |
 | D2-S19 | NestedExecution | SubQuery / Background / Fork / Sidechain | REGISTRY |
-| D2-S20 | LegacyHarnessFallback | 显式 `query_loop.enabled=false` Harness 路径 | REGISTRY |
+| D2-S20 | ~~LegacyHarnessFallback~~ | ~~Harness 路径~~ | **REMOVED v6.5.0** |
 
 #### Legacy Module Index — 冻结（D2-S1–S14）
 
@@ -107,7 +107,7 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 | D2-S7 | Prompt | Section 加载 + assembler | IMPLEMENTED | → S15 |
 | D2-S8 | Sandbox | 工具沙箱隔离 | IMPLEMENTED | → S18 |
 | D2-S9 | Harness | Bootstrap（legacy fallback） | IMPLEMENTED | → S20 |
-| D2-S10 | QueryLoop | QueryLoop + TaskTools + SubQuery 等 | IMPLEMENTED | → S16/S18/S19 |
+| D2-S10 | QueryLoop | **REMOVED → D7-S2-A06** | — | → S16/S18/S19 |
 | D2-S11 | Queue | SessionQueue、delegate-progress | IMPLEMENTED | → **D7-S4** |
 | D2-S12 | Worktree | 沙箱工作目录 | IMPLEMENTED | → S18 |
 | D2-S13 | Conversation | Tool chain repair / compact | IMPLEMENTED | → S15 |
@@ -291,7 +291,7 @@ Spec: `openspec/specs/d7-orchestration/d7-domain.md` · Guides: `terminal-state-
 - **D2 = Follower（后手）**：在给定参数下执行 Prepare / ToolRound / Persist，不拥有 LLM 调用权
 - **D4 = Follower（后手，对称）**：执行 Worker，不拥有 Spoke 派发决策权
 
-**Legacy 兼容（v2.0-f，1 发布周期）：** `QueryLoopExecutor` adapter 委托至 `TurnOrchestrator`，旧 T 层注释不改。
+**Legacy 兼容（v2.0-f，已闭合 DM-20260618-010）：** `TurnExecutor` 适配 `TurnOrchestrator`；~~`QueryLoopExecutor`~~ 已删除。
 
 ---
 
@@ -357,7 +357,7 @@ func RegisterMultiAgentMetrics(...) *MultiAgentMetrics  // ✓ not "RegisterD5Mu
 | `func NewD6ValidationMetrics(...)` | `func NewValidationMetrics(...)` | 构造函数带域 ID |
 | `func IncD5(...)` | `func IncRuntimeMetric(...)` | 公开函数带域 ID |
 | `ConfigFile.D7` 字段 | `ConfigFile.Coordinator` 字段 | 字段名带域 ID（YAML tag 保持 `d7` 以兼容存量配置） |
-| `type D2Executor interface` | `type QueryLoopExecutor interface` | D2 契约名带域 ID；语义「query loop 入口」更清晰 |
+| `type D2Executor interface` | `type TurnExecutor interface` | D7 契约：Turn 运行时入口 |
 | `type D4Executor interface` | `type DelegateExecutor interface` | D4 契约名带域 ID；语义「delegate 委派」更清晰 |
 | `type D1EventSink interface` | `type EventPublisher interface` | D1 契约名带域 ID；语义「事件发布者」已足够 |
 | `type D6Validator interface` | `type AdvisoryValidator interface` | D6 契约名带域 ID；语义「advisory 验证器」更清晰 |
@@ -422,7 +422,7 @@ layers/
 │   ├── prompt/                    # D2-S7
 │   ├── toolrunner/                # D2-S5/D2-S8 工具执行与沙箱
 │   ├── harness/                   # D2-S9 (V5)
-│   ├── query/                     # D2-S10 QueryLoop
+│   ├── query/                     # D2 legacy types（loop 已删，DM-20260618-010）
 │   ├── usercontext/               # D2-S10 UserContext
 │   ├── attachments/               # D2-S10 Attachments
 │   ├── permission/                # D2-S10 PermissionMode

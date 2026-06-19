@@ -2,8 +2,8 @@
 
 **Capability:** d2-context-engine
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-16
+**Version:** 3.0.0
+**Last Updated:** 2026-06-19
 **Parent:** `d2-domain.md`
 **Complements:** `d7-boundary.md` · `../d7-orchestration/terminal-state-guide.md`
 
@@ -32,7 +32,7 @@
 | S | Scenario | A 数 | 关键 A |
 |---|----------|------|--------|
 | **S15** | PrepareExecutionContext | 4 | LoadSession · CompressContext · AssemblePrompt |
-| **S16** | RunQueryLoop | 2 | RunLoop · StreamResponse（**LEGACY FREEZE**） |
+| **S16** | ~~RunQueryLoop~~ | — | **REMOVED → D7-S2-A06 RunTurn** |
 | **S17** | PersistSessionState | 4 | SaveSnapshot · WriteTranscript · CommitWindow |
 | **S18** | EnforceExecutionPolicy | 8 | CheckPermission · ExecuteToolRound · SpawnSubquery |
 

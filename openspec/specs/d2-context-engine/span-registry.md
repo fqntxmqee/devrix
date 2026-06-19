@@ -37,13 +37,15 @@
 | `context.harness.route` | INTERNAL | harness | 5.0.0 | — |
 | `context.system_prompt.build` | INTERNAL | harness | 5.0.0 | version, template_hash, agents_md_hash |
 
-### QueryLoop（3 ops）
+### QueryLoop（3 ops）— **REMOVED (DM-20260618-010)**
 
-| Operation | Kind | Component | Canonical S | Since |
-|-----------|------|-----------|-------------|-------|
-| `query.loop.run` | INTERNAL | query_loop | **S16** | 2.1.0 |
-| `query.loop.turn` | INTERNAL | query_loop | **S16** | 2.1.0 |
-| `query.loop.llm.call` | CLIENT | query_loop | **S16** | 2.1.0 |
+> LLM↔Tool span 归 D7 `orchestration.turn.*`。下列 op 不再出现在生产路径。
+
+| Operation | Kind | Component | Canonical S | Since | Status |
+|-----------|------|-----------|-------------|-------|--------|
+| `query.loop.run` | INTERNAL | query_loop | ~~S16~~ | 2.1.0 | **REMOVED** |
+| `query.loop.turn` | INTERNAL | query_loop | ~~S16~~ | 2.1.0 | **REMOVED** |
+| `query.loop.llm.call` | CLIENT | query_loop | ~~S16~~ | 2.1.0 | **REMOVED** |
 
 ### Tool Execution（2 ops）
 
@@ -68,36 +70,33 @@
 
 ## Trace Tree
 
-### 主路径：QueryLoop
+### 主路径：D7 Turn（经 PreparedTurnRunner）
 
 ```
 context.process
 ├── context.snapshot.load
 ├── context.system_prompt.load
 ├── context.longterm.recall                  [if longterm.enabled]
-├── context.compression.run                  [if shouldCompress]
+├── context.compression.run                  [if shouldCompress at entry]
 │   └── context.compression.step             [per pipeline step]
-├── query.loop.run                           [if query_loop.enabled]
-│   └── query.loop.turn                      [per turn]
-│       ├── query.loop.llm.call
-│       │   └── (→ D3 llm.stream subtree)
+├── (→ D7 orchestration.turn.run)            [PreparedTurnRunner]
+│   └── orchestration.turn.iteration         [per turn — see D7 span-registry]
+│       ├── orchestration.llm.invoke
 │       └── tool.execute.single              [if tool_calls]
 │           └── tool.execute.permission      [if CRITICAL]
 ├── context.memory.snapshot.save
 └── context.longterm.store                   [if auto_store]
 ```
 
-### 条件路径：Legacy Harness（`query_loop.enabled=false`）
+### 历史路径（已删除）
+
+<details>
+<summary>QueryLoop / Legacy Harness（pre-v8.0.0）</summary>
 
 ```
-context.process
-├── context.harness.bootstrap.run
-│   └── context.harness.bootstrap.stage
-├── context.harness.preflight
-├── context.harness.tool_pool
-├── context.harness.route
-└── context.system_prompt.build
+# REMOVED: query.loop.run / harness bootstrap paths (DM-20260618-010)
 ```
+</details>
 
 ---
 

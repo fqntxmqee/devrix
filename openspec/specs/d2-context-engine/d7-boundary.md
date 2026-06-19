@@ -2,10 +2,10 @@
 
 **Capability:** d2-d7-boundary  
 **Status:** Active  
-**Version:** 1.1.0  
-**Last Updated:** 2026-06-15  
-**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）  
-**Demand ID:** DM-20260614-009 / DM-20260614-020  
+**Version:** 2.0.0  
+**Last Updated:** 2026-06-19  
+**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）+ devrix-d2-queryloop-dismantle（DM-20260618-010）  
+**Demand ID:** DM-20260614-009 / DM-20260614-020 / DM-20260618-010  
 **Parent (D2):** `openspec/specs/d2-context-engine/d2-domain.md`  
 **Parent (D7):** `openspec/specs/d7-orchestration/d7-domain.md`
 
@@ -15,34 +15,36 @@
 
 | 域 | 角色 | 一句话 |
 |----|------|--------|
-| **D7** | Orchestration Mediator / **Leader** | 决定做什么、顺序、谁做、进度如何广播 |
-| **D2** | Execution Follower | 在给定参数下完成 Prepare → QueryLoop → Persist |
+| **D7** | Orchestration Mediator / **Leader** | 决定做什么、顺序、谁做、进度如何广播；**拥有 Turn 主循环与 LLM 调用权** |
+| **D2** | Execution Follower | 在给定参数下完成 Prepare → ToolRound → Persist |
 
 **ingress：** D1 → D7 `ProcessMessage` only（DM-20260614-007）。D2 **不被** D1 直接调用。
 
 ---
 
-## 2. 调用链 SoT（DM-020 修订）
+## 2. 调用链 SoT（v8.0.0）
 
 ```text
 D1.Gateway.RouteInbound
     └── D7.IOrchestrationEntry.ProcessMessage
             ├── [S2/S5] 路由 / 分类 / TaskGraph
-            ├── [S2-A06] RunTurnLoop（D7 Turn Leader）
+            ├── [S2-A06] RunTurn（D7 Turn Leader）
             │       ├── D2.Prepare（D2-S15）
             │       ├── D7.InvokeLLM → D3.StreamChat（D7 直调 D3）
             │       ├── D2.ExecuteToolRound（D2-S18）
             │       └── D2.PersistTurn（D2-S17）
+            ├── [FastPath] TurnExecutor.RunTurn → turn.DefaultOrchestrator
             ├── [S3] WaveScheduler → Worker(D2|D4)
             ├── [S4] ExecutionFlowHub → D1 IM
-            └── d2Executor.RunQueryLoop (bootstrap, Legacy freeze)
-                    └── D2.IEngine.Process
-                            ├── D2-S15 PrepareExecutionContext
-                            ├── D2-S16 RunQueryLoop（Legacy freeze → D7-S2-A06）
-                            └── D2-S17 PersistSessionState
+            └── D2.IEngine.Process（PreparedTurnRunner 委托 D7）
+                    ├── D2-S15 PrepareExecutionContext
+                    ├── D7 RunTurn / SubTurn（经 PreparedTurnRunner）
+                    └── D2-S17 PersistSessionState
 ```
 
 **实现：** `internal/bootstrap/wire_coordinator.go`
+
+> **DM-20260618-010：** `query/loop.go`、`QueryLLMCaller`、`d2Executor.RunQueryLoop` 已删除。FastPath 经 `TurnExecutor`（`turnOrchExecutor`）调用 D7 `RunTurn`。
 
 ---
 
@@ -58,10 +60,10 @@ D1.Gateway.RouteInbound
 | PlanMode / PlanAgent | ✅ S5（目标） | 🔶 暂托管 | — | — | — |
 | delegate_* 路由 | ✅ F（目标） | 🔶 暂存 | — | ✅ 执行 | — |
 | Session 上下文 / 压缩 | ❌ | ✅ S15/S17 | — | — | — |
-| QueryLoop LLM↔Tool | 编排调用（Turn Leader） | ✅ S16（Legacy freeze → D7-S2-A06） | — | — | — |
+| Turn 主循环 LLM↔Tool | ✅ S2-A06 RunTurn | ❌（**REMOVED S16**） | — | — | — |
 | LLM 调用（StreamChat） | ✅ S2-A07 InvokeLLM → D3 | ❌（禁止 D2→D3） | — | — | — |
 | Permission / Sandbox | 策略下发 | ✅ S18 机制 | — | — | — |
-| SubQuery / Background | 触发 | ✅ S19 | — | — | — |
+| SubQuery / Background | 触发 | ✅ S19 机制 | — | — | — |
 | EngineEvent | 转发 | ✅ 产出 | ✅ 展示 | — | — |
 | 结论质量 Judge | ❌ | ❌ | — | — | ✅ |
 
@@ -74,13 +76,14 @@ D1.Gateway.RouteInbound
 | 接口 | 定义位置 | 实现 | 消费 | 状态 |
 |------|----------|------|------|------|
 | `IOrchestrationEntry` | `shared/contracts` | D7 `coordinator.Entry` | D1 Gateway | ACTIVE |
-| `QueryLoopExecutor` | `coordinator` | `bootstrap.d2Executor` | D7 Orchestrator | ACTIVE |
+| `TurnExecutor` | `coordinator` | `bootstrap.turnOrchExecutor` → `turn.TurnOrchestrator` | D7 FastPath | ACTIVE |
+| `PreparedTurnRunner` | `shared/contracts` | `turn.PreparedTurnAdapter` | D2 `engine.Process` | ACTIVE |
 | `IEngine` | `shared/contracts` | `contextengine.Engine` | D7 via adapter | ACTIVE |
-| `Loop.Run` | `query/loop.go` | D2 Loop | (fallback only) | **DEPRECATED** (2026-06-17 DM-001; `loopFirst=false` 路径；canonical=D7-S2-A06 RunTurnLoop) |
-| `LoopHooks` | `query/loop.go` | D7 注入 | D2 Loop | **DEPRECATED** (同上) |
+| `Loop.Run` | ~~`query/loop.go`~~ | — | — | **REMOVED** (DM-20260618-010) |
+| `QueryLoopExecutor` | ~~`coordinator`~~ | — | — | **REMOVED** → `TurnExecutor` |
 | `ExecutionFlowHub` | `shared/contracts` | D7 flow | D2/D4 发布 | ACTIVE |
 
-### 4.1 依赖规则（DM-020 修订）
+### 4.1 依赖规则（DM-020 + DM-20260618-010）
 
 ```text
 ✅ D7 → D2（ContextPreparer / ToolRoundExecutor / SessionPersister）
@@ -98,19 +101,19 @@ D1.Gateway.RouteInbound
 | D7 Canonical S | 与 D2 关系 | D2 Canonical |
 |----------------|-----------|----------------|
 | D7-S1 Work Model | 调用 D2 task tools（v2.0 代码归 D7） | Legacy S10 task F |
-| D7-S2 Session Orchestrator | 调用 `d2Executor` | S15–S17 整链 |
-| D7-S3 Wave Scheduler | 调度 D2 Worker Loop | S16 per worker |
+| D7-S2 Session Orchestrator | 拆面调用 D2 + 自持 RunTurn | S15–S17 |
+| D7-S3 Wave Scheduler | 调度 D2 Worker | S18 per worker |
 | D7-S4 Execution Flow | 聚合 D2 SubQuery FlowEvent | S19 产出；S11→D7 |
 | D7-S5 Decision & Planning | 下发 permission/plan 参数 | S18 执行约束 |
 
-| D2 Canonical S | 与 D7 关系 |
-|----------------|-----------|
-| D2-S15 | 每次 Process 前；D7 不替代 |
-| D2-S16 | D7 主要 Follower 调用点 |
-| D2-S17 | complete 前持久化；与 D7-S4 进度正交 |
-| D2-S18 | 接收 D7 下发的 mode/tools |
-| D2-S19 | 嵌套执行；Flow 归 D7-S4 |
-| D2-S20 | 不经 D7 的 legacy 配置路径 |
+| D2 Canonical S | 与 D7 关系 | 状态 |
+|----------------|-----------|------|
+| D2-S15 | 每次 Process / Turn 前；D7 不替代 | ACTIVE |
+| D2-S16 | ~~RunQueryLoop~~ | **REMOVED → D7-S2-A06** |
+| D2-S17 | complete 前持久化；与 D7-S4 进度正交 | ACTIVE |
+| D2-S18 | 接收 D7 下发的 mode/tools | ACTIVE |
+| D2-S19 | 嵌套执行；Flow 归 D7-S4 | ACTIVE |
+| D2-S20 | Legacy Harness | **REMOVED v6.5.0** |
 
 ---
 
@@ -124,14 +127,7 @@ D1.Gateway.RouteInbound
 | 4 | ~~`contextengine/queue/`~~ delegate-progress | Flow drain | D7-S4 `sessionqueue/` | ✅ DM-013 |
 | 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `toolpolicy/` | ✅ DM-015 |
 | 6 | `contextengine/nested/flow_report.go` | SubQuery FlowEvent 发布 | D7-S4 `hubspoke/subquery_bridge.go` | ⬜ DM-018 slice-c |
-
-v1.0：**仅登记**，不移动代码。  
-v2.0 slice-1（DM-011）：`delegate_tools` **已迁移**。  
-v2.0 slice-2（DM-012）：`contextengine/tasks/` → `orchestration/workmodel/` **已迁移**。  
-v2.0 slice-3（DM-013）：`contextengine/queue/` → `orchestration/sessionqueue/` **已迁移**。  
-v2.0 slice-4（DM-015）：`worker_tools.go` → `orchestration/toolpolicy/` **已迁移**。  
-v2.0 slice-5（DM-014）：D2 物理目录 `prepare/` `persist/` `policy/` `nested/` **已收敛**。  
-v2.0 slice-c（DM-018）：`nested/flow_report.go` SubQuery Flow 发布 **待迁** D7 `hubspoke/subquery_bridge.go`（D2-S19 仅保留嵌套 QueryLoop 执行机制）。
+| 7 | ~~`contextengine/query/loop.go`~~ | LLM↔Tool loop | D7 `turn/orchestrator.go` | ✅ DM-20260618-010 |
 
 ---
 
@@ -139,7 +135,7 @@ v2.0 slice-c（DM-018）：`nested/flow_report.go` SubQuery Flow 发布 **待迁
 
 ### Requirement: D7-Only Ingress to D2
 
-D2 `IEngine.Process` MUST be invoked by D7 (via `QueryLoopExecutor`) or test/bootstrap harness. D1 MUST NOT call `D2.Process` directly.
+D2 `IEngine.Process` MUST be invoked by D7 (via `PreparedTurnRunner` / turn adapters) or test/bootstrap harness. D1 MUST NOT call `D2.Process` directly.
 
 #### Scenario: Gateway routes to D7 not D2
 
@@ -154,7 +150,7 @@ D2 `query` package MUST NOT import D4 multi-agent orchestration packages. Orches
 
 #### Scenario: Static import boundary
 
-- GIVEN `internal/layers/contextengine/query/` sources
+- GIVEN `internal/layers/contextengine/` sources (excluding `query/types.go` legacy types)
 - WHEN package import graph is analyzed
 - THEN `multiagent` and `orchestration` packages are not imported
 - AND regression test `internal/lint/layer/d2_thin_test.go` passes (DM-20260614-010)
@@ -183,10 +179,10 @@ Unified `FlowEvent` aggregation and delegate-progress drain Canonical ownership 
 
 | 文档 | 用途 |
 |------|------|
+| `archive/2026-06-18-devrix-d2-queryloop-dismantle/` | QueryLoop 物理删除变更包 |
 | `archive/2026-06-14-devrix-d2-sa-refine/gaming-analysis.md` | 博弈推导 |
-| `archive/2026-06-14-devrix-d2-sa-refine/design.md` §12 | 设计 Decision |
-| `openspec/archive/2026-06-14-devrix-d2-sa-refine/` | Change 包（S7 已归档） |
 | DM-20260614-008 | D7 Leader 规格 |
 | DM-20260614-007 | D1→D7 ingress |
-| **DM-20260614-020** | **D7 Turn 编排上移（D2→D3 禁止、D2-S16 Legacy Freeze）** |
-| `openspec/specs/d7-orchestration/d3-boundary.md` | **D7↔D3 边界 SoT（DM-020 v1.0 Registry）** |
+| **DM-20260614-020** | **D7 Turn 编排上移（D2→D3 禁止）** |
+| **DM-20260618-010** | **QueryLoop dismantle（S16 REMOVED）** |
+| `openspec/specs/d7-orchestration/d3-boundary.md` | **D7↔D3 边界 SoT** |

@@ -2,8 +2,8 @@
 
 **Capability:** d2-context-engine
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-16
+**Version:** 2.0.0
+**Last Updated:** 2026-06-19
 **Parent:** `d2-domain.md` · `span-registry.md` · `t-registry.md`
 **Complements:** `terminal-state-guide.md` · `../d7-orchestration/observability-guide.md`
 
@@ -32,8 +32,8 @@
 | `context.longterm.store` | S17 | |
 | `context.tools.register` | S18 | |
 | `context.memory.snapshot.save` | S17 | |
-| `query.loop.run` / `turn` | S16 | Legacy；DM-020 主路径在 D7 |
-| `query.loop.llm.call` | S16 | **Legacy** — 新路径 D3 挂在 D7 |
+| ~~`query.loop.run` / `turn`~~ | ~~S16~~ | **REMOVED** — 见 D7 `orchestration.turn.*` |
+| ~~`query.loop.llm.call`~~ | ~~S16~~ | **REMOVED** — LLM span 在 D7→D3 |
 | `tool.execute.single` | S18 | D7→D2 ToolRound |
 | `tool.execute.permission` | S18 | |
 
@@ -72,7 +72,7 @@ context.process
 | S | 覆盖重点 | 代表 T |
 |---|----------|--------|
 | S15 | 压缩、Prompt、RepairToolChain | D2-S13-A01-T01 → S15 |
-| S16 | Thin Loop、多轮 tool | D2-S10-A01-T34 |
+| S16 | ~~Thin Loop~~ → D7 RunTurn | D7-S2-A06-T09, `queryloop_removed_test.go` |
 | S17 | Snapshot、Transcript | D2-S6 映射 T |
 | S18 | Permission、PlanMode 拒绝、BGTask | D2-S10-A01-T37, D2-S9-A01-T16..T18 |
 | 契约 | D2→D3 ban、D7 ingress | D2-THIN-T01, path_regression |
@@ -80,8 +80,9 @@ context.process
 ### P0 必跑清单
 
 ```bash
-# Thin Loop + 编排字段守卫
-go test ./internal/layers/contextengine/query/ -run 'Loop|Thin' -v
+# QueryLoop removed + D7 turn path
+go test ./internal/layers/contextengine/ -run 'QueryLoopRemoved|PathRegression' -v
+go test ./internal/layers/orchestration/turn/ -run RunTurn -v
 
 # D2→D3 import ban
 go test ./internal/lint/layer/ -run D2_D3 -v

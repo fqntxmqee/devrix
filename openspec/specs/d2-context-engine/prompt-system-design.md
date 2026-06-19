@@ -6,7 +6,7 @@
 **状态:** Active
 **基于:** Claude Code Prompt System Design · 组装实现：`prompt/assembler.go`（自 harness 包迁移）
 
-> **与运行时关系：** `ContextEngine.Process` 在 QueryLoop 之前调用 `SystemPromptAssembler.Build`；`user_context.mode=prepend` 时 AGENTS.md 经 `usercontext.PrependForAPI` 注入 API 消息，不写入 snapshot。
+> **与运行时关系：** `ContextEngine.Process` 在 D7 Turn 之前调用 `SystemPromptAssembler.Build`；`user_context.mode=prepend` 时 AGENTS.md 经 `usercontext.PrependForAPI` 注入 API 消息，不写入 snapshot。
 
 ### 痛点与解决方案
 
@@ -178,7 +178,7 @@ const DynamicBoundary = "<!-- DYNAMIC_CONTENT_BOUNDARY -->"
           │
           ▼
 ┌─────────────────────┐
-│   QueryLoop.Run()   │
+│   D7 RunTurn()      │
 │  SystemPrompt +     │
 │  prepend UserContext│
 └─────────────────────┘

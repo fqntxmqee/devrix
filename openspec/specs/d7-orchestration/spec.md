@@ -141,7 +141,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 
 | D7 拥有 | D7 编排（不拥有） | D7 不拥有 |
 |---------|------------------|----------|
-| WorkPlan 读模型（D7-S4） | D2 RunQueryLoop | 会话上下文（D2） |
+| WorkPlan 读模型（D7-S4） | D7 RunTurn / D2 Prepare | 会话上下文（D2） |
 | Wave DAG 调度（D7-S3） | D4 Delegate RunAgent | Agent 生命周期（D4） |
 | FlowEvent 契约（contracts） | — | LLM 调用（D3） |
 | Task/Plan 写模型（D7-S1） | | |
@@ -282,7 +282,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 | D7-S5-P2 ClassifyIntent | 规则 + command-first + LLM fallback | ✅ IMPLEMENTED |
 | D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG（规则 + LLM） | ✅ IMPLEMENTED |
 | D7-S5 SelectExecutor | D2/D4 执行器选择 | ✅ IMPLEMENTED |
-| D2 Thin QueryLoop | loop.go ≤200 行、无 D4 import | ✅ IMPLEMENTED |
+| D2 Thin / QueryLoop removed | loop 已删；D2 无 D4 import | ✅ DM-20260618-010 |
 | D7 package identity | `internal/layers/orchestration/coordinator/` (package `coordinator`) | ✅ IMPLEMENTED |
 | D7 Migration Coexistence | 4 组合回归 | ✅ IMPLEMENTED |
 | D7-S2 Turn Leader (DM-020) | A06 RunTurnLoop + A07 InvokeLLM | ✅ IMPLEMENTED（wired by `wire_coordinator.go`） |

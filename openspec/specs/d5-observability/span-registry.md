@@ -9,31 +9,30 @@
 
 ---
 
-## 全局 Trace Tree（QueryLoop 主路径）
+## 全局 Trace Tree（D7 Turn 主路径 — DM-20260618-010）
 
 ```
 gateway.message.receive                          [SERVER]
-└── context.process                              [INTERNAL]
-    ├── context.snapshot.load
-    ├── context.system_prompt.load
-    ├── context.longterm.recall                  [if longterm.enabled]
-    ├── context.compression.run                  [if shouldCompress]
-    │   └── context.compression.step             [per pipeline step]
-    ├── d7.turn.run                                [D7 RunTurn primary path]
-    │   └── query.loop.turn                      [per turn]
-    │       ├── query.loop.llm.call              [CLIENT]
-    │       │   └── llm.stream                   [CLIENT]
-    │       │       ├── llm.provider.route
-    │       │       ├── llm.circuit_breaker
-    │       │       ├── llm.retry
-    │       │       └── llm.adapter.stream       [CLIENT]
-    │       └── tool.execute.single              [if tool_calls]
-    │           └── tool.execute.permission      [if CRITICAL]
-    ├── context.memory.snapshot.save
-    └── context.longterm.store                   [if auto_store]
+└── orchestration.turn.run                       [INTERNAL]
+    └── orchestration.turn.iteration             [per turn]
+        ├── orchestration.llm.invoke             [CLIENT]
+        │   └── llm.stream                       [CLIENT]
+        └── context.process                      [INTERNAL, caller=d7]
+            ├── context.snapshot.load
+            ├── context.compression.run          [if entry compress]
+            └── tool.execute.single              [if tool_calls]
+                └── tool.execute.permission      [if CRITICAL]
 ```
 
-## 条件路径：Legacy Harness
+<details>
+<summary>历史 QueryLoop Trace Tree（已删除）</summary>
+
+```
+# REMOVED: query.loop.run / query.loop.llm.call (DM-20260618-010)
+```
+</details>
+
+## 条件路径：Legacy Harness — **REMOVED (D2-S20 v6.5.0)**
 
 ```
 context.process

@@ -58,7 +58,7 @@
 
 | 路由 | 触发 | 调度 | 执行 |
 |------|------|------|------|
-| FastPath | Classify=simple | D7-S2 | D2 QueryLoop |
+| FastPath | Classify=simple | D7-S2 | D7 RunTurn（TurnExecutor） |
 | CommandPath | `/plan` `/task` `/stop` | D7-S2（优先于 Classify） | 命令处理器 |
 | PlanPath | `/plan` 或 PlanMode active | D7-S2 → S5-P1 | PlanAgent → PlanTask |
 | SerialExplore | orchestrate + 单步 | D7-S2 串行 | D2 readonly |
@@ -112,7 +112,7 @@ D7 是**横向协调层**：D1 拥有 ingress，D7 拥有 routing decision；通
 | 多 Agent 并行执行不可见 | Hub-Spoke 读模型 + IM 进度树 | Leader `delegate_status` 与飞书 worker 卡 |
 | 写冲突导致并行任务互相覆盖 | ConflictGuard + file_scope | 同 conflict_group 不并行 |
 | DAG 依赖任务派发顺序错误 | TaskGraph.ReadyNodes | 仅 ready 节点被派发 |
-| 规划与执行混杂在 QueryLoop | PlanMode 只读探索 + Task 列表 | `/plan` 工作流 |
+| 规划与执行混杂 | PlanMode 只读探索 + Task 列表 | `/plan` 工作流 |
 | D2 承担编排职责导致分层侵蚀 | D7 域升格 + D2 瘦身 | loop.go ≤200 行、零 D4 import |
 
 ### 技术目标（量化）

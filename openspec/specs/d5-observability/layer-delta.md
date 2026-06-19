@@ -4,36 +4,35 @@
 **Affects:** observability, tracing, metrics, logging, coverage, incident export, runtime metrics
 **Version:** 3.0.0
 **Status:** Active
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-19
 
----
-
-## Current State Summary
-
-D5 可观测性域已从 V1 基础能力演进为完整的 V2 实现：56 条 canonical Operation、QueryLoop 主路径 span 族、W3C Baggage、GenAI token 细分 metrics、Session incident export、Runtime path metric。PEV 引擎退役后，Registry 与文档已移除 `context.pev.*` 族。
+D5 可观测性域 V3：56 条 canonical Operation、**D7 Turn 主路径** span 族、W3C Baggage、GenAI token 细分 metrics、Session incident export、Runtime path metric（`d7_turn`）。~~QueryLoop~~ span 族已 REMOVED（DM-20260618-010）。
 
 ---
 
 ## ADDED (V2.0 — 2026-06-14)
 
-### Requirement: QueryLoop Span Family
+### Requirement: QueryLoop Span Family — **REMOVED (DM-20260618-010)**
 
-QueryLoop 主路径 MUST 注册并创建以下 canonical Operation span：
+> 主路径 span 见 **D7 Turn Span Family**（`orchestration.turn.*`）。下列 op 不再创建：
 
-| Operation | Component | SpanKind |
-|-----------|-----------|----------|
-| `query.loop.run` | query_loop | INTERNAL |
-| `query.loop.turn` | query_loop | INTERNAL |
-| `query.loop.llm.call` | query_loop | CLIENT |
+| Operation | Component | Status |
+|-----------|-----------|--------|
+| ~~`query.loop.run`~~ | query_loop | REMOVED |
+| ~~`query.loop.turn`~~ | query_loop | REMOVED |
+| ~~`query.loop.llm.call`~~ | query_loop | REMOVED |
 
-#### Scenario: QueryLoop span hierarchy
+### Requirement: D7 Turn Span Family
 
-- GIVEN `query_loop.enabled=true` and tracing enabled
-- WHEN `ContextEngine.Process` completes one turn with LLM call
-- THEN span `query.loop.run` exists under `context.process`
-- AND `query.loop.turn` parent is `query.loop.run`
-- AND `query.loop.llm.call` parent is `query.loop.turn`
-- AND `llm.stream` parent is `query.loop.llm.call`
+D7 Turn 主路径 MUST 注册 `orchestration.turn.run`, `orchestration.turn.iteration`, `orchestration.llm.invoke` under D7 component.
+
+#### Scenario: Turn span hierarchy
+
+- GIVEN tracing enabled and D7 FastPath active
+- WHEN `TurnExecutor.RunTurn` completes one iteration with LLM call
+- THEN span `orchestration.turn.run` exists
+- AND `orchestration.llm.invoke` parent is turn iteration
+- AND `llm.stream` parent is `orchestration.llm.invoke`
 
 ---
 
@@ -41,7 +40,7 @@ QueryLoop 主路径 MUST 注册并创建以下 canonical Operation span：
 
 | Operation | Component | 触发点 |
 |-----------|-----------|--------|
-| `tool.execute.single` | tool_runner | QueryLoop 工具执行 |
+| `tool.execute.single` | tool_runner | D7→D2 ToolRound |
 | `tool.execute.permission` | tool_runner | CRITICAL 工具权限检查 |
 
 ---
@@ -68,13 +67,13 @@ QueryLoop 主路径 MUST 注册并创建以下 canonical Operation span：
 
 ### Requirement: Runtime Path Metric
 
-系统 MUST 注册 `devrix_runtime_path_resolved_total` Counter，labels `path` ∈ {`query_loop`, `legacy_harness`}，与 in-process `PathResolver` 同步。
+系统 MUST 注册 `devrix_runtime_path_resolved_total` Counter，labels `path` ∈ {`d7_turn`, `legacy_harness`}，与 in-process `PathResolver` 同步。
 
 #### Scenario: Path counter increments on Process
 
 - GIVEN observability metrics enabled and RegisterRuntimeMetric called
-- WHEN ContextEngine routes to QueryLoop path
-- THEN `devrix_runtime_path_resolved_total{path="query_loop"}` increments by 1
+- WHEN ContextEngine routes via PreparedTurnRunner (D7 Turn path)
+- THEN `devrix_runtime_path_resolved_total{path="d7_turn"}` increments by 1
 
 ---
 

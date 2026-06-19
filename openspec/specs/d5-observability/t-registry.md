@@ -41,7 +41,7 @@
 | T ID | 描述 | canonical_s | Priority | Test 位置 | Status | Legacy T ID |
 |------|------|-------------|----------|-----------|--------|-------------|
 | D5-S22-A01-T01 | OTLP span 事件属性序列化 | S22 | P1 | `internal/layers/observability/export/otlp_event_test.go` | IMPLEMENTED | D5-S4-A01-T01 |
-| D5-S22-A01-T02 | QueryLoop 产生 canonical Operation span | S22 | P0 | `internal/layers/contextengine/query/loop.go` | IMPLEMENTED | D5-S4-A01-T02 |
+| D5-S22-A01-T02 | D7 Turn 产生 canonical Operation span | S22 | P0 | `internal/layers/orchestration/turn/orchestrator.go` | IMPLEMENTED | D5-S4-A01-T02 |
 | D5-S22-A01-T03 | Adapter→Gateway trace_id 继承 | S22 | P0 | `tests/integration/obs_trace_propagation_test.go` | IMPLEMENTED | D5-S4-A01-T03 |
 
 ## D5-S23: Diagnose（诊断辅助）
@@ -76,7 +76,7 @@
 | T ID | 描述 | canonical_s | Priority | Test 位置 | Status | Legacy T ID |
 |------|------|-------------|----------|-----------|--------|-------------|
 | D5-S24-A03-T01 | RegisterRuntimeMetric 幂等注册 path counter | S24 | P1 | `internal/layers/observability/configure/runtime/runtime_metric_test.go` | IMPLEMENTED | D5-S9-A01-T01 |
-| D5-S24-A03-T02 | IncRuntimeMetric 桥接 query_loop/legacy_harness 计数 | S24 | P1 | `internal/layers/observability/configure/runtime/runtime_metric_test.go` | IMPLEMENTED | D5-S9-A01-T02 |
+| D5-S24-A03-T02 | IncRuntimeMetric 桥接 d7_turn/legacy_harness 计数 | S24 | P1 | `internal/layers/observability/configure/runtime/runtime_metric_test.go` | IMPLEMENTED | D5-S9-A01-T02 |
 | D5-S24-A03-T03 | PathResolver 并发 Record 安全 | S24 | P1 | `internal/layers/observability/configure/runtime/path_resolver_test.go` | IMPLEMENTED | D5-S9-A01-T03 |
 | **D5-S24-A02-T04** | **~~legacy QueryLoop counter~~ REMOVED (DM-20260618-010)** | **S24** | **P0** | **—** | **REMOVED** | **DM-20260617-001** |
 | **D5-S24-A02-T05** | **~~Loop.Run slog.Warn~~ REMOVED (DM-20260618-010)** | **S24** | **P0** | **—** | **REMOVED** | **DM-20260617-001** |

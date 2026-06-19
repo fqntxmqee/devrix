@@ -146,7 +146,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S11-A01-T01 | `query_loop` turn defaults (max_turns, compress_per_turn) | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
+| D2-S11-A01-T01 | `turn_runtime` turn defaults (max_turns, compress_per_turn) | HarnessUnification | `internal/shared/config/turn_runtime_test.go` | IMPLEMENTED | P0 |
 | D2-S11-A01-T02 | harnessEnabled 分支不再被生产路径触发 | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S11-A01-T03 | 旧路径调用计数基线=0 | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S11-A01-T04 | 压缩入口统一：D7 turn 走 messages-only 七步管道 | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
