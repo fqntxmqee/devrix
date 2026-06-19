@@ -2,16 +2,18 @@
 
 **Change ID:** devrix-foundation → devrix-context-engine (archived) → devrix-queryloop-context (archived) → devrix-unified-task-registry (archived)
 **Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v7.1.0)
-**Status:** Merged — reflects production path as of 2026-06-13
-**Affects:** QueryLoop runtime, compression pipeline, layered memory, harness bootstrap (legacy fallback), conversation repair, main transcript
+**Status:** Merged — reflects production path as of 2026-06-13 (updated 2026-06-19: QueryLoop 软化为 DEPRECATED, canonical=D7-S2-A06)
+**Affects:** QueryLoop runtime (DEPRECATED `loopFirst=false` 路径), compression pipeline, layered memory, harness bootstrap (legacy fallback), conversation repair, main transcript
 
 ---
 
 ## ADDED
 
-### Requirement: QueryLoop Primary Runtime
+### Requirement: QueryLoop Default Runtime ⚠️ DEPRECATED in `loopFirst=false` path
 
-When `context_engine.query_loop.enabled=true` (default since DM-20260611-004), `ContextEngine.Process` MUST route all LLM↔Tool rounds through `query.Loop.Run` instead of the retired PEV engine.
+> **DEPRECATED (2026-06-17, DM-20260617-001)**: canonical 主路径已迁至 D7-S2-A06 `turn.RunTurnLoop`（`internal/layers/orchestration/turn/orchestrator.go`）。`loopFirst=true` 是默认（Default），`loopFirst=false` 路径下本 Requirement **DEPRECATED**。本 Requirement 与 D2-S10 所有 Scenario **保留** 用于紧急回滚兜底，新能力**不得**依赖本路径。
+
+When `context_engine.query_loop.enabled=true` (default since DM-20260611-004) AND `loopFirst=true` (default since DM-20260614-020), `ContextEngine.Process` routes LLM↔Tool rounds through `query.Loop.Run`. **Default 路径**——但 canonical 主路径是 D7-S2-A06 `turn.RunTurnLoop`。
 
 #### Scenario: Multi-turn tool loop
 - GIVEN `query_loop.enabled=true` and LLM returns tool_use until final text
