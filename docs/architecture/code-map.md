@@ -112,9 +112,22 @@ Fork/Join 逻辑主要在 `agent/forkjoin*.go`（映射 D4-S3）。
 
 ## 7. D5 / D6
 
+### D5 Observability（v2.1 Terminal — S21–S24+S0）
+
+| S ID | 场景 | 物理路径 | 说明 |
+|------|------|----------|------|
+| D5-S21 | Instrument | `observability/instrument/{tracer,metrics,logger,telemetry}/` | Span/Metric/Log 生成、DebugFilter、genai_tokens |
+| D5-S22 | Export | `observability/export/` | Console/OTLP/Memory SpanExporter |
+| D5-S23 | Diagnose | `observability/diagnose/{coverage,incident,doctor,tracker,faultinject}/` + `health.go` | Coverage 对账、Incident 导出、Doctor 环境检查、Tracker 变更追踪、FaultInject(test) |
+| D5-S24 | Configure | `observability/configure/{settings,runtime}/` + `config.go` `load.go` | yaml 配置、Runtime path 指标 |
+| D5-S0 | Facade | `observability.go` `bridge.go` | Init/Shutdown/Bridge/SessionGauge |
+
+> **v2.1 Terminal (2026-06-19):** S21–S24+S0 号段冻结；9 bridge 包待 Phase B 删除（`tracer/ metrics/ logger/ telemetry/ exporter/ coverage/ incident/ settings/ runtime/`）。领域 SoT：`openspec/specs/d5-observability/d5-domain.md`。
+
+### D6 Evolution
+
 | 域 | 包 | 说明 |
 |----|-----|------|
-| D5 | `observability/` | `Bridge`, `telemetry/names.go`（Operation 常量）, `coverage/` |
 | D6-S3 | `evolution/eval/` | EvalRun、探针（含 `tool_accuracy`） |
 | D6-S4 | `evolution/orchestration/` | 运行时判官 / 干预 |
 | — | `internal/lint/layer/` | DSAFT import 规则 lint |

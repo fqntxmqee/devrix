@@ -3,20 +3,22 @@
 **Capability:** observability
 **Domain:** D5
 **DSAFT Type:** 公共域 (Common Domain)
-**Version:** 2.0.0
-**Status:** Canonical — source of truth
-**Last Updated:** 2026-06-14
+**Version:** 3.0.0
+**Status:** Canonical — source of truth (v2.1 Terminal)
+**Last Updated:** 2026-06-19
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 
 **Archived Changes:** devrix-observability (2026-06-07), devrix-observability-fix (2026-06-07), devrix-observability-coverage (2026-06-08), devrix-harness-bootstrap (2026-06-10), devrix-observability-enhancement P0–P3 (2026-06-10), devrix-queryloop-spans-v1.1
+
+> **阅读优先级：MUST** — 本文档是 D5 的 Gherkin 验收 SoT。先读 `d5-domain.md`（领域全景），再读本文档（验收用例）。
 
 ---
 
 ## Overview
 
-D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成、Operation 代码染色（Coverage）、Session Incident Export 与运行时路径指标。对齐 OpenTelemetry 语义，通过 `{layer}.{module}.{action}` canonical Operation 名称贯穿 Jaeger/OTLP 与 Prometheus。
+D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成、Operation 代码染色（Coverage）、诊断工具链（Tracker / Doctor / FaultInject / DebugFilter）、Session Incident Export 与运行时路径指标。对齐 OpenTelemetry 语义，通过 `{layer}.{module}.{action}` canonical Operation 名称贯穿 Jaeger/OTLP 与 Prometheus。
 
-**现行主路径（2026-06-14）：** `context.process` → `query.loop.*` → `llm.stream`。**PEV 引擎与 `context.pev.*` span 族已退役**（见 D2-S1 RETIRED）。
+**现行主路径（2026-06-19）：** D7 Turn 主路径（`orchestration.turn.*`）。**`query.loop.*` span 族已退役**（DM-20260618-010），仅保留 RETIRED 节追溯。
 
 | 版本里程碑 | 能力 |
 |-----------|------|
@@ -28,6 +30,7 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 | V1.5–V1.7 | Log-Trace-LLM 关联、`gen_ai.*` 双写、tool_latency/compression metrics、debug export |
 | V1.8–V1.9 | W3C Baggage、`cache_read`/`reasoning` token 细分 |
 | V2.0 | QueryLoop span 族、Orchestration span、Runtime path metric；PEV 文档退役 |
+| **V2.1** | **Terminal：S21–S24 号段冻结、bridge 删除、诊断工具链 A/F/T 注册、D7 Turn 主路径** |
 
 ---
 
@@ -35,16 +38,12 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 
 | 层级 | ID | 名称 | 说明 |
 |------|-----|------|------|
-| D | D5 | Observability | 公共域，横向 Tracing/Metrics/Logging 能力 |
-| S | D5-S1 | Tracer | 分布式追踪、W3C 传播、Baggage |
-| S | D5-S2 | Metrics | Counter/Histogram/Gauge、Prometheus 导出 |
-| S | D5-S3 | Logger | 结构化日志、slog 桥接、采样与脱敏 |
-| S | D5-S4 | Exporter | Console / OTLP / Memory span 导出 |
-| S | D5-S5 | Coverage | Operation 注册表、Runtime Hit、日报 |
-| S | D5-S6 | Telemetry | Operation 常量、`SpanAttrs`、Layer/Component 映射 |
-| S | D5-S7 | Settings | Tracing/Metrics 配置 schema |
-| S | D5-S8 | Incident | Session incident bundle 导出 |
-| S | D5-S9 | Runtime | QueryLoop vs LegacyHarness 路径计数 |
+| D | D5 | Observability | 公共域/裁判域，横向 Tracing/Metrics/Logging/诊断能力 |
+| S | D5-S21 | Instrument | 遥测生成：Span + Metric + Log + 属性构建 |
+| S | D5-S22 | Export | 遥测导出：OTLP/Prometheus/Console |
+| S | D5-S23 | Diagnose | 诊断辅助：Coverage + Incident + Doctor + Tracker + FaultInject |
+| S | D5-S24 | Configure | 配置与运行时管理：yaml 切换 + runtime path 计数 |
+| S | D5-S0 | Facade | 横切：Init/Shutdown/Bridge/SessionGauge |
 
 ---
 
@@ -52,15 +51,11 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 
 | ID | Scenario | Responsibility | Status |
 |----|----------|----------------|--------|
-| D5-S1 | Tracer | Span 生命周期、采样、Shutdown flush、W3C/Baggage 传播 | IMPLEMENTED |
-| D5-S2 | Metrics | 指标注册、Label 白名单、Prometheus `/metrics` | IMPLEMENTED |
-| D5-S3 | Logger | JSON/Text 日志、trace 注入、error stack、per-span 采样 | IMPLEMENTED |
-| D5-S4 | Exporter | Console/OTLP/Memory SpanExporter | IMPLEMENTED |
-| D5-S5 | Coverage | 56 Operation 注册表、Runtime Hit、Health 对账 | IMPLEMENTED |
-| D5-S6 | Telemetry | `telemetry/names.go` canonical Operation + `LayerAndComponent` | IMPLEMENTED |
-| D5-S7 | Settings | `settings/` Tracing/Metrics 配置 | IMPLEMENTED |
-| D5-S8 | Incident | `debug export` schema v1 bundle | IMPLEMENTED |
-| D5-S9 | Runtime | `runtime_path_resolved_total{path}` 路径分流指标 | IMPLEMENTED |
+| D5-S21 | Instrument | Span 生命周期、Metrics 注册/Label 白名单、结构化日志、DebugFilter、W3C/Baggage 传播 | IMPLEMENTED |
+| D5-S22 | Export | Console/OTLP/Memory SpanExporter | IMPLEMENTED |
+| D5-S23 | Diagnose | Coverage 对账、Incident 导出、Doctor 环境检查、Tracker 代码变更追踪、FaultInject(test) | IMPLEMENTED |
+| D5-S24 | Configure | 配置加载/校验、Runtime path 指标 | IMPLEMENTED |
+| D5-S0 | Facade | Init/Shutdown/Bridge/SessionGauge；观测失败不阻断业务 | IMPLEMENTED |
 
 ---
 
@@ -69,8 +64,13 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 ```
 D1 Gateway ──→ root span (gateway.message.receive)
                     │
+D7 Orchestration ──→ orchestration.turn.run
+                    ├─→ orchestration.turn.iteration
+                    ├─→ orchestration.llm.invoke
+                    │   └─→ llm.stream (D3)
+                    └─→ context.process (D2, caller=d7)
+                    │
 D2 ContextEngine ──→ context.process
-                    ├─→ query.loop.run → query.loop.turn → query.loop.llm.call
                     ├─→ context.compression.run (+ step spans)
                     ├─→ context.harness.* (legacy path, harness.enabled)
                     └─→ tool.execute.*
@@ -79,13 +79,11 @@ D3 LLMGateway ─────→ llm.stream → llm.adapter.stream
                     │
 D4 MultiAgent ─────→ agent.run / agent.tool.call / agent.fork|join
                     │
-D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
-                    │
                     ▼
          ┌──────────────────────────────────────┐
          │  Observability Facade (D5)             │
-         │  Tracer │ Metrics │ Logger │ Coverage │
-         │  Bridge │ LLMLog │ Incident │ Runtime │
+         │  Instrument │ Export │ Diagnose        │
+         │  Configure │ Bridge │ Incident         │
          └──────────────────────────────────────┘
                     │
                     ▼
@@ -100,31 +98,33 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 | D2 Context Engine | `observability.Bridge` tracer/meter/logger | `engine.go`, `enforce/`, `prepare/` |
 | D3 LLM Gateway | `llm.stream` span、`RecordGenAITokenUsage` | `gateway/gateway.go`, `adapter/` |
 | D4 Multi-Agent | `agent.*` spans、Fork policy metrics sink | `multiagent/observability/` |
-| D7 Orchestration | `orchestration.*` spans | `orchestration/wavescheduler/`, `executionflow/` |
+| D7 Orchestration | `orchestration.*` spans | `orchestration/turn/`, `sessionorchestrator/` |
 | Shared | `config`, `types` | 全子包 |
 
 ## Package Map
 
 | 子包 / 根文件 | 场景 | 职责 |
 |--------------|------|------|
-| `observability.go`, `bridge.go` | D5-S1~S3 | Facade、`Bridge`/`ToolBridge`/`SessionBridge` |
-| `tracer/` | D5-S1 | TracerProvider、Span、采样、W3C Propagator、Baggage |
-| `metrics/` | D5-S2 | Meter、Counter/Histogram/Gauge、Prometheus 导出 |
-| `logger/` | D5-S3 | StructuredLogger、slog 桥接、脱敏、采样 |
-| `exporter/` | D5-S4 | Console、OTLP、Memory、Null exporter |
-| `coverage/` | D5-S5 | Registry、Counter、Reporter、Persistence、CLI |
-| `telemetry/` | D5-S6 | `Op*` 常量、`SpanAttrs`、`LayerAndComponent`、`GenAI*` attrs |
-| `settings/` | D5-S7 | TracingConfig、MetricsConfig、OTLP 配置 |
-| `incident/` | D5-S8 | `BuildBundle` schema v1 |
-| `runtime/` | D5-S9 | PathResolver、`runtime_path_resolved_total` D5 bridge |
-| `llm_log.go`, `genai_tokens.go` | D5-S2/S3 | LLM JSONL、gen_ai token metrics |
+| `observability.go`, `bridge.go` | D5-S0 | Facade、`Bridge`/`ToolBridge`/`SessionBridge` |
+| `instrument/tracer/` | D5-S21 | TracerProvider、Span、采样、W3C Propagator、Baggage |
+| `instrument/metrics/` | D5-S21 | Meter、Counter/Histogram/Gauge、Prometheus 导出、genai_tokens |
+| `instrument/logger/` | D5-S21 | StructuredLogger、slog 桥接、脱敏、采样、DebugFilter |
+| `instrument/telemetry/` | D5-S21 | `Op*` 常量、`SpanAttrs`、`LayerAndComponent`、`GenAI*` attrs |
+| `export/` | D5-S22 | Console、OTLP、Memory、Null exporter |
+| `diagnose/coverage/` | D5-S23 | Registry、Counter、Reporter、Persistence、CLI |
+| `diagnose/incident/` | D5-S23 | `BuildBundle` schema v1、LLM JSONL |
+| `diagnose/doctor/` | D5-S23 | 环境健康检查 |
+| `diagnose/tracker/` | D5-S23 | 代码变更追踪、LRU diff、linter 集成 |
+| `diagnose/faultinject/` | D5-S23 | 故障注入（testbuild only） |
+| `configure/settings/` | D5-S24 | TracingConfig、MetricsConfig、OTLP 配置 |
+| `configure/runtime/` | D5-S24 | PathResolver、`runtime_path_resolved_total` |
 | `health.go`, `config.go`, `load.go` | — | HealthCheck、配置加载 |
 
 ---
 
 ## Key Design Patterns
 
-1. **Canonical Operation Naming**: Span name = Jaeger Operation = `{layer}.{module}.{action}`，常量于 `telemetry/names.go`，注册于 `coverage/registry.go`（当前 **56** 条）。
+1. **Canonical Operation Naming**: Span name = Jaeger Operation = `{layer}.{module}.{action}`，常量于 `instrument/telemetry/names.go`，注册于 `diagnose/coverage/registry.go`（当前 **56** 条）。
 2. **Coverage 独立于采样**: `Tracer.Start` 无条件 `RecordHit`，`always_off` 采样仍计数。
 3. **Bridge 零侵入集成**: 各域注入 `*observability.Bridge`，`IsEnabled()` 守卫避免 nil 开销。
 4. **Metrics 前缀**: Meter name `devrix` → Prometheus 名 `devrix_{instrument}`（如 `devrix_tool_latency`）。
@@ -137,9 +137,9 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 
 ### Requirement: Operation Registry (P0)
 
-系统 MUST 维护 canonical Operation 静态注册表（`coverage/registry.go`），与 `telemetry/names.go` `Op*` 常量全集一致。
+系统 MUST 维护 canonical Operation 静态注册表（`diagnose/coverage/registry.go`），与 `instrument/telemetry/names.go` `Op*` 常量全集一致。
 
-**T:** D5-S5-A01-T01
+**T:** D5-S23-A01-T01
 
 #### Scenario: Registry 与 names.go 对账
 
@@ -161,7 +161,7 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 
 `Tracer.Start` MUST 无条件递增对应 Operation 的进程内命中计数，不受 trace 采样影响。
 
-**T:** D5-S5-A01-T02, D5-S5-A01-T03
+**T:** D5-S23-A01-T02, D5-S23-A01-T03
 
 #### Scenario: 采样关闭仍计数
 
@@ -181,7 +181,7 @@ D7 Orchestration ──→ orchestration.wave.* / orchestration.flow.*
 
 `HealthCheck()` MUST 暴露 `coverage` 对象：`operations_total`、`operations_hit`、`coverage_ratio`、`zero_hit_count`。
 
-**T:** D5-S5-A01-T02
+**T:** D5-S23-A01-T02
 
 ---
 
@@ -198,7 +198,7 @@ OTLP Resource MUST 包含 `service.name`（默认 `devrix`）与 `service.versio
 | Layer | Components |
 |-------|------------|
 | `communication` | `gateway`, `adapter` |
-| `context` | `context_engine`, `harness`, `query_loop`, `tool_runner`, `plan_agent`, `plan_mode`, `task_manager` |
+| `context` | `context_engine`, `harness`, `tool_runner`, `plan_agent`, `plan_mode`, `task_manager` |
 | `llm` | `llm_gateway`, `llm_adapter` |
 | `agent` | `agent_tool` |
 | `orchestration` | `orchestrator` |
@@ -207,7 +207,7 @@ OTLP Resource MUST 包含 `service.name`（默认 `devrix`）与 `service.versio
 
 ### Requirement: D7 Turn Span Hierarchy (P0)
 
-> **Supersedes QueryLoop Span Hierarchy (DM-20260618-010).** 主路径 LLM↔Tool span 在 D7：
+> **Canonical 主路径（v2.1 Terminal）。** 主路径 LLM↔Tool span 在 D7：
 
 ```
 gateway.message.receive [SERVER]
@@ -215,15 +215,31 @@ gateway.message.receive [SERVER]
     └── orchestration.turn.iteration [INTERNAL]
         ├── orchestration.llm.invoke [CLIENT]
         │   └── llm.stream [CLIENT]
-        └── tool.execute.single [INTERNAL]
-            └── context.process [INTERNAL]   ← D2 Prepare (caller=d7)
+        └── context.process [INTERNAL]   ← D2 Prepare (caller=d7)
+            └── tool.execute.single [INTERNAL]
 ```
 
-**T:** D5-S4-A01-T02, D7-S2-A06 span tests
+**T:** D5-S22-A01-T02, D7-S2-A06 span tests
 
 ### Requirement: QueryLoop Span Hierarchy — **REMOVED (DM-20260618-010)**
 
-~~QueryLoop 主路径~~ 已删除。历史 `query.loop.*` span 仅作追溯登记。
+~~QueryLoop 主路径~~ 已删除。历史 `query.loop.*` span 仅作 RETIRED 追溯登记。
+
+---
+
+### Requirement: Diagnostic Tools (P0)
+
+D5-S23 Diagnose 包含以下诊断子能力（S23 子承诺 C3a–C3e）：
+
+| 子承诺 | 能力 | A ID | 时间属性 |
+|--------|------|------|---------|
+| C3a Coverage | Operation 注册表对账、Runtime Hit、Health zero_hit | D5-S23-A01/A02/A03 | 事中 |
+| C3b Incident | Session incident bundle 导出 | D5-S23-A04/A05 | 事后（不可补救） |
+| C3c Doctor | 环境健康检查（7 项） | D5-S23-A10 | 事前+事中 |
+| C3d Tracker | 代码变更追踪、LRU diff、linter 集成 | D5-S23-A07 | 事中 |
+| C3e FaultInject | 故障注入（testbuild only） | D5-S23-A09 | 测试（与生产隔离） |
+
+**T:** D5-S23-A03-T01/T02 (Doctor), D5-S23-A07-T01/T02 (Tracker), D5-S23-A08-T01/T02 (DebugFilter), D5-S23-A09-T01/T02 (FaultInject)
 
 ---
 
@@ -231,7 +247,7 @@ gateway.message.receive [SERVER]
 
 当 `harness.enabled=true` 时，`context.harness.*` 与 `context.system_prompt.build` span MUST 作为 `context.process` 子 span 创建。
 
-**T:** D5-S5-A01-T02 (integration `context_harness_obs_test.go`)
+**T:** D5-S23-A01-T05 (integration `context_harness_obs_test.go`)
 
 ---
 
@@ -239,7 +255,7 @@ gateway.message.receive [SERVER]
 
 slog 与 LLM JSONL MUST 携带 `trace_id`/`span_id`，与 Jaeger span 可交叉引用。
 
-**T:** D5-S3-A01-T04 (slog bridge), D5-S8-A01-T01 (LLM JSONL in bundle)
+**T:** D5-S21-A09-T01 (slog bridge), D5-S23-A04-T01 (LLM JSONL in bundle)
 
 ---
 
@@ -247,7 +263,7 @@ slog 与 LLM JSONL MUST 携带 `trace_id`/`span_id`，与 Jaeger span 可交叉�
 
 LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 
-**T:** D5-S2-A01-T08
+**T:** D5-S21-A07-T01
 
 ---
 
@@ -257,7 +273,7 @@ LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 - `devrix_compression_ratio` Histogram: 压缩成功后 observe ratio
 - `context.compression.run` span: `compression.trigger_reason`, `compression.ratio`
 
-**T:** D5-S2-A01-T03, D5-S2-A01-T09
+**T:** D5-S21-A05-T06, D5-S21-A05-T03
 
 ---
 
@@ -265,7 +281,7 @@ LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 
 `devrix_gen_ai.client.token.usage` Counter: labels `token_type`（`input`/`output`/`cache_read`/`reasoning`）, `model`。
 
-**T:** D5-S2-A01-T08
+**T:** D5-S21-A07-T01
 
 ---
 
@@ -273,7 +289,7 @@ LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 
 主二进制 MUST 支持 `devrix debug export --session <id>`，输出 schema v1 JSON（`llm_rounds`, 可选 `trace`, `coverage_hits`）。
 
-**T:** D5-S8-A01-T01, D5-S8-A01-T02
+**T:** D5-S23-A04-T01, D5-S23-A04-T02
 
 ---
 
@@ -281,7 +297,7 @@ LLM call spans MUST 双写 OTel `gen_ai.*` 属性（与 `llm.*` 并存）。
 
 Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CLI 子进程通过 `TRACEPARENT` + `BAGGAGE` 环境变量继承。
 
-**T:** D5-S1-A01-T03
+**T:** D5-S21-A03-T03
 
 ---
 
@@ -289,7 +305,7 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 
 `TracerProvider.Shutdown` MUST 结束所有 active spans 并刷写 exporter。
 
-**T:** D5-S1-A01-T01
+**T:** D5-S21-A01-T01
 
 ---
 
@@ -299,7 +315,7 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 - Histogram 仅递增第一个匹配桶
 - `Int64UpDownCounter` 返回 Gauge 语义
 
-**T:** D5-S2-A01-T03, D5-S2-A01-T04, D5-S2-A01-T05
+**T:** D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05
 
 ---
 
@@ -308,7 +324,7 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 - Error 日志 MUST 附加 `stack` 字段
 - `max_entries_per_span` 采样超限 MUST 发 WARN
 
-**T:** D5-S3-A01-T02, D5-S3-A01-T03, D5-S3-A01-T04
+**T:** D5-S21-A08-T02, D5-S21-A08-T03, D5-S21-A08-T04
 
 ---
 
@@ -316,7 +332,9 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 
 `devrix_runtime_path_resolved_total{path="d7_turn|legacy_harness"}` MUST 与 in-process `PathResolver` 同步。
 
-**T:** D5-S9-A01-T01
+> **v2.1 Terminal:** `legacy_harness` metric help text 标 DEPRECATED。退役计划：v2.1 DEPRECATED → v2.3 自爆机制（详见 `design.md` §12）。
+
+**T:** D5-S24-A03-T01
 
 ---
 
@@ -324,17 +342,20 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 
 | Item | 退役日期 | 替代 |
 |------|----------|------|
-| `context.pev.*` operation 族 | 2026-06-13 | `query.loop.*` |
-| PEV Span Hierarchy requirements | 2026-06-13 | QueryLoop Span Hierarchy |
+| `context.pev.*` operation 族 | 2026-06-13 | `query.loop.*` → `orchestration.turn.*` |
+| PEV Span Hierarchy requirements | 2026-06-13 | QueryLoop Span Hierarchy → D7 Turn Span Hierarchy |
 | `context.plan.generate` / `context.milestone.run` (旧 PEV plan) | 2026-06-13 | `task.plan.*` / `task.manager.*` |
+| `query.loop.run` / `query.loop.turn` / `query.loop.llm.call` | 2026-06-18 | `orchestration.turn.*` (D7 Turn 主路径) |
+| QueryLoop Span Hierarchy requirements | 2026-06-18 | D7 Turn Span Hierarchy |
+| `legacy_harness` runtime path | 2026-06-19 | `d7_turn`（DEPRECATED，v2.3 移除） |
 
 ---
 
 ## Registries
 
-- **A 层**: `a-registry.md` — 18 Activities
-- **F 层**: `f-registry.md` — 39 Function Points
-- **T 层**: `t-registry.md` — Test Points
+- **A 层**: `a-registry.md` — 30 Activities (v4.0)
+- **F 层**: `f-registry.md` — 45 Function Points (v3.0)
+- **T 层**: `t-registry.md` — 41 Test Points (v3.2)
 
 ## Revision History
 
@@ -342,3 +363,4 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 |---------|------|---------|
 | 1.0.0–1.9.0 | 2026-06-07–10 | V1 基线 → Baggage + token breakdown |
 | 2.0.0 | 2026-06-14 | QueryLoop/Orchestration span 族、PEV 退役、全文档 DSAFT 对齐 |
+| **3.0.0** | **2026-06-19** | **v2.1 Terminal**：Canonical S21–S24+S0 主表；D7 Turn 主路径；query.loop 全部下沉 RETIRED；诊断工具链 A/F/T 注册；legacy_harness DEPRECATED；阅读优先级标注 |

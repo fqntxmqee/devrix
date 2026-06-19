@@ -210,6 +210,26 @@ internal/layers/observability/
 
 > **T↔A 错位说明:** `D5-S23-A03-T01/T02`（Doctor）创建时 A03 已被 GenerateDailyReport 占用。终态方案：**T ID 冻结**，`canonical_a` 列指向 A10，不在 T ID 中改号。
 
+### S23 硬边界（语义/数量/依赖 — 写入本 design §5）
+
+| 边界 | 规则 |
+|------|------|
+| 语义边界 | S23 只含"事后审计/举证"；"实时准入控制"归 D7，"即时执行决策"归 D2/D4 |
+| 数量边界 | 子承诺数 ≤ 7（超过则拆 S25） |
+| 依赖边界 | S23 不 import D2/D4/D7（除 contracts 接口） |
+
+### S25 触发条件（预先承诺）
+
+| 触发条件 | 含义 |
+|----------|------|
+| Tracker 独立产品化（被外部系统消费） | 不再是内部审计 → 新 S |
+| C3e FaultInject 被要求生产可用 | 不再是 testbuild-only → 新博弈语义 |
+| C3 子承诺数 > 7 | Schelling 点：S 层语义不再清晰 |
+
+### S23 子承诺新增的举证责任
+
+提议新增 C3f 时必须证明：① 无法归入现有 C3a–C3e；② 消费者不同；③ 不超过 7 上限。
+
 ### Statistics（终态目标）
 
 | Scenarios | Activities | F | T |
@@ -325,11 +345,62 @@ gateway.message.receive                    [SERVER, D1]
 
 ## 10. Phase 划分与 PR 策略
 
+### Phase 总览
+
 | Phase | 范围 | PR | Gate |
 |-------|------|-----|------|
-| A | 规格终态（docs-only） | `docs/d5-v2-terminal-spec` | S3-Gate 文档一致性 |
-| B | bridge 删除 + 根目录归位 | `chore/d5-bridge-cleanup` | 41 T + integration 全绿 |
+| A | 规格终态（docs + registry 代码锚点） | `docs/d5-v2-terminal-spec` | S3-Gate 文档一致性 |
+| B2a | bridge.go import 改 canonical（不删包） | `chore/d5-bridge-import-fix` | go build + test |
+| B2b | 删除 9 bridge 包（不留 shim） | `chore/d5-bridge-removal` | grep 0 命中 + 41 T + integration 全绿 |
+| B1 | 根目录 git mv 归位 | `chore/d5-root-file-relocate` | go build |
+| B3 | T canonical 列校正 + PLANNED 闭合 | `chore/d5-t-canonical-fix` | t-registry review |
 | C | S7 归档回写 | archive PR | demand-archive-index |
+
+### Phase A 代码锚点（≥1 个代码变更）
+
+纯文档 Phase A 的承诺强度为零（cheap talk）。Phase A 必须包含至少一个代码锚点：
+
+| 锚点 | 任务 | 说明 |
+|------|------|------|
+| a-registry v4.0 路径更新 | A6 | Code Location 从 bridge 路径更新为 `instrument/` 等 canonical 路径 |
+| t-registry canonical_s/a 列校正 | A10 | 数据文件修改，零业务风险，不可逆承诺信号 |
+
+**为何需要代码锚点：** 纯文档承诺在 v1.0 时期已证明不可信（spec 写 S21–S24，代码仍 bridge）。代码锚点将文档承诺与可验证的代码变更绑定。
+
+### Phase B2 拆步策略（不留 shim）
+
+**采纳 Claude DSAFT Review §7.2 拆步建议，拒绝留 shim。**
+
+| 决策 | 结论 | 理由 |
+|------|------|------|
+| B2a 改 import + B2b 删包 | ✅ 拆步降低爆炸半径 | 与 §13.7 Phase 强度一致 |
+| 中间留 1 release shim | ❌ **拒绝** | shim = 名义删除 + 实质保留 = 道德风险：B2b 紧迫感下降，被无限期推迟 |
+
+**替代 shim 的保护装置（CI 硬门禁）：**
+- `grep -r "observability/tracer\|observability/metrics/legacy\|observability/logger/legacy" --exclude-dir=archive` = 0 命中
+- Release notes 显式宣告 "D5 v2.1 移除 9 个 bridge 包，无 shim"
+- ADR 留档 `docs/adr/0007-d5-bridge-removal.md`（理由段含"让协调变得不必要"的博弈含义）
+
+### Phase B 启动对账条件
+
+Phase B 启动前必须满足：
+1. Phase A 文档已合并到 `openspec/specs/d5-observability/`
+2. `grep query.loop` 仅 Legacy/RETIRED 节命中
+3. Phase A 文档与 `git grep <canonical_s>` 对账完成（代码侧无冲突 import）
+4. Phase A 合并后立即打 tag `docs/d5-v2-terminal-spec`
+
+### 跨 Change 依赖标注
+
+D5 v2.1 是**序贯信息级联的第三步**（非同期相关均衡）：
+
+```
+D6 v2.0.1（2026-06-15，先行验证 bridge 可删）
+  → D7 v2（2026-06-19，终态闭合模式参考）
+    → D5 v2.1（本 change，第三步级联跟随者）
+```
+
+- D5↔D2 v2.2 为**平行级联**（同期但独立，互相观察但不互相阻塞）
+- 若 D7 v2 closure 延期，D5 仍可独立推进（级联不是强依赖），但在 PR 描述中标注"无 D7 终态先例"
 
 **不建议合并 A+B：** docs PR 可并行 review；code PR 依赖 A 定稿的 canonical 路径。
 
@@ -345,7 +416,54 @@ gateway.message.receive                    [SERVER, D1]
 
 ---
 
-## 12. Grill Review 预判
+## 12. `legacy_harness` Metric 退役计划
+
+`runtime_path_resolved_total{path="legacy_harness"}` 是观测新旧均衡迁移的唯一客观指标。
+
+| 阶段 | 动作 | 条件 |
+|------|------|------|
+| v2.1 | 标 DEPRECATED（文档 + metric help text） | — |
+| v2.2 | 观察期 | 连续 2 release `legacy_harness` 计数 = 0 |
+| v2.3 | 自动删除（自爆机制） | harness 代码已物理删除 + 2 release 零计数 |
+
+**自爆机制：** 连续 2 release 计数 = 0 后自动删除 metric 定义，不需要人工决策。防止 OQ-6 长期挂账。
+
+---
+
+## 13. 回归风险评估
+
+| 变更 | 风险 | 检测 |
+|------|------|------|
+| 删除 bridge 包 | 中 — 遗漏 import | `grep observability/tracer` + 全量 `go test` |
+| 根目录 git mv | 低 — import 路径 | `go build ./...` |
+| 仅文档 Phase A | 无运行时风险 | `grep query.loop` 文档 AC |
+| T canonical 列校正 | 无测试行为变更 | t-registry review |
+
+### Bridge 防回归 CI 规则
+
+```
+# layer-lint 或 CI workflow 中：
+grep -r "observability/tracer\|observability/metrics/legacy\|observability/logger/legacy\|observability/exporter/legacy\|observability/coverage/legacy\|observability/incident/legacy\|observability/settings/legacy\|observability/runtime/legacy\|observability/telemetry/legacy" --exclude-dir=archive --exclude-dir=vendor
+# 结果必须 = 0 命中，否则 CI 拒绝
+```
+
+---
+
+## 14. 回滚计划
+
+| Phase | 回滚 |
+|-------|------|
+| Phase A | revert docs PR |
+| Phase B2a | revert import changes |
+| Phase B2b | restore bridge 目录（git revert）— 但需 CI 规则同步移除 |
+| Phase B1 | revert git mv + imports |
+| Phase B3 | revert t-registry status only |
+
+不可逆点：bridge 删除后外部若新增 bridge import 需改 canonical — 当前无外部依赖。
+
+---
+
+## 15. Grill Review 预判
 
 | 挑战 | 回应 |
 |------|------|
@@ -360,26 +478,8 @@ gateway.message.receive                    [SERVER, D1]
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-06-19 | 博弈论共识落地：§5 新增 S23 硬边界 + S25 触发条件 + 子承诺举证责任；§10 Phase B2 拆步（不留 shim）+ CI 防回归 + Phase A 代码锚点 + Phase B 启动对账 + 跨 Change 级联标注；§12 legacy_harness 退役计划（自爆机制）；§13 Bridge 防回归 CI 规则 |
 | 1.0.0 | 2026-06-19 | 初稿：DM-20260619-006 最优终态方案 |
 
 ---
 
-## 13. 回归风险评估
-
-| 变更 | 风险 | 检测 |
-|------|------|------|
-| 删除 bridge 包 | 中 — 遗漏 import | `grep observability/tracer` + 全量 `go test` |
-| 根目录 git mv | 低 — import 路径 | `go build ./...` |
-| 仅文档 Phase A | 无运行时风险 | `grep query.loop` 文档 AC |
-| T canonical 列校正 | 无测试行为变更 | t-registry review |
-
-## 14. 回滚计划
-
-| Phase | 回滚 |
-|-------|------|
-| Phase A | revert docs PR |
-| Phase B1 | revert git mv + imports |
-| Phase B2 | restore bridge 目录（git revert） |
-| Phase B3 | revert t-registry status only |
-
-不可逆点：bridge 删除后外部若新增 bridge import 需改 canonical — 当前无外部依赖。

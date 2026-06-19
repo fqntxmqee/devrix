@@ -14,6 +14,7 @@
 | S3 | `design.md` | Decision ×6 + 回归/回滚 |
 | S3 | `tasks.md` | Phase A/B/C 任务 |
 | S3-Gate | `design-review.md` | 审查清单 |
+| S3-Gate | `claude-dsaft-review.md` | Claude DSAFT 五层对焦（Owner 待审参考） |
 | S3 | `specs/d5-observability/spec.md` | Gherkin delta |
 | S5 | `acceptance-report.md` | **待 S5** |
 | S7 | `openspec/archive/...` | **待归档** |
@@ -25,6 +26,7 @@
 | 优先级 | 文件 | 读什么 |
 |--------|------|--------|
 | **P0** | `gaming-analysis.md` | 玩家、错配、Commitment、OQ-1~6、§11 Grill 1~6、§13 MiniMax 第二轮增量、§14 Claude 第二轮对焦（含 15 条合并落地清单 §14.9） |
+| P0 | `claude-dsaft-review.md` | Claude DSAFT 五层对焦（§三 追溯规则 + §五 D/S/A/F/T 定义 + 跨域边界 + 5 条 Owner 建议） |
 | P0 | `d5-requirements-clarifications.md` | Grill Review §6 六个问题 |
 | P1 | `specs/d5-boundary.md` | 跨域激励（D7 Turn vs D5 Referee） |
 | P1 | `specs/d5-domain.md` | 博弈角色表 |

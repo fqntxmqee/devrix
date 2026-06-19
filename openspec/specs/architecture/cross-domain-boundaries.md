@@ -337,7 +337,83 @@
 
 ---
 
-## 3. 跨域 SoT 决策原则
+## 4. D5 Observability 跨域边界
+
+> D5 作为**公共域 / 裁判域（Referee + Auditor）**，被 D1–D7 全员消费。本节明确 D5 与其他域的 SoT 划分与证据移交规则。领域 SoT：`openspec/specs/d5-observability/d5-domain.md`。
+
+### 4.1 D5 vs D7 (Orchestration)
+
+| 概念 | D5 SoT | D7 SoT | 备注 |
+|------|--------|--------|------|
+| Span 名 / Attribute 名 | D5 注册 `Op*` 常量（`instrument/telemetry/names.go`） | D7 使用 `telemetry.Op*` 创建 span | D5 是命名 owner |
+| Metric 名 / Label 维度 | D5 注册 Prometheus exporter | D7 emit metric（如 `intent_dispatch_total`） | D7 是业务语义 owner |
+| Turn 主路径 Trace | D5 提供 Span 基础设施 | **D7**（`orchestration.turn.*` span） | D7 创建 Turn span |
+| OTel SDK 选型 / Exporter 配置 | **D5** | D7 不参与 | D5 公共能力 |
+| Coverage 对账 | **D5**（无条件 RecordHit） | D7 不感知 | 独立于 D7 采样决策 |
+
+### 4.2 D5 vs D2 (Context Engine)
+
+| 概念 | D5 SoT | D2 SoT | 备注 |
+|------|--------|--------|------|
+| `context.process` span | D5 注册 Op 常量 | **D2** 创建 span | D2 是 span 创建者 |
+| Tracker 代码变更追踪 | **D5**（`diagnose/tracker/`） | D2 不参与 | D5 独立诊断能力 |
+| Compression metrics | D5 提供 Histogram | **D2** emit `compression_ratio` | D2 是业务语义 owner |
+
+### 4.3 D5 vs D3 (LLM Gateway)
+
+| 概念 | D5 SoT | D3 SoT | 备注 |
+|------|--------|--------|------|
+| `llm.stream` span | D5 注册 Op 常量 | **D3** 创建 span | — |
+| `gen_ai.*` token metrics | D5 提供 Counter | **D3** emit usage | D3 是 LLM 调用 owner |
+| Breaker 状态 metric | D5 持久化 | **D3** emit metric | D3 定义命名 + 维度（详 §2.2.4） |
+
+### 4.4 D5 vs D6 (Evolution) — D5→D6 证据移交规则
+
+> **场景**：D6 作为 Judge（评测/守卫），需要消费 D5 输出的 Span/Metric/Coverage 数据进行评测。D5 输出作为 D6 的**证据输入**。
+
+**证据移交契约：**
+
+| 证据类型 | D5 产出 | D6 消费方式 | 移交时机 |
+|----------|---------|------------|----------|
+| Span 数据 | Jaeger/OTLP trace | D6 probe 读 span attribute | 事后（ex-post） |
+| Coverage 数据 | `~/.devrix/coverage/` JSON | D6 probe 解析覆盖率报表 | 事后（ex-post） |
+| Metric 数据 | Prometheus metrics | D6 probe 统计时序 | 事后（ex-post） |
+| Incident bundle | `devrix debug export` JSON | D6 评测回归测试 | 按需 |
+
+**移交约束：**
+- D5 **不主动推送**数据给 D6（无 D5→D6 直接契约）
+- D6 **只读** D5 输出（D6 不修改 D5 数据）
+- D5 输出格式变更（如 schema version bump）需通知 D6
+
+### 4.5 D5 vs D1/D4
+
+| 概念 | D5 SoT | D1/D4 SoT | 备注 |
+|------|--------|-----------|------|
+| SessionBridge ActiveSessions | **D5**（S0-A03 Gauge） | D1 调 `SessionBridge.Add/Remove` | D1 是调用方 |
+| `agent.*` span | D5 注册 Op 常量 | **D4** 创建 span | D4 是 span 创建者 |
+| Fork policy metrics | D5 持久化 | D4 emit | D4 hook → D5 写入 |
+
+### 4.6 D5 灰区声明
+
+| # | 灰区 | 涉及域 | 决议 | 文档位置 |
+|---|------|--------|------|----------|
+| G1 | Coverage 指标被博弈（Goodhart's Law） | D5 | 多维指标（ratio/completeness/link_integrity/recency），非单一 KPI | `d5-domain.md` §完备性边界 |
+| G2 | Bridge 删除后回退风险 | D5 全员 | CI 防回归规则（grep 9 旧路径 = 0）+ 序贯级联先例（D6→D7→D5） | `design.md` §8–§9 |
+| G3 | S23 子承诺膨胀 | D5 | 硬边界 ≤ 7 + S25 触发条件 + 新增举证责任 | `d5-domain.md` §S23 硬边界 |
+| G4 | Doctor 启动阻塞 vs Graceful Degradation | D5 | Doctor 事前阻塞（环境不可用则观测无意义），运行时非阻塞 | `d5-domain.md` §时间属性矩阵 |
+
+### 4.7 D5 跨域锚点
+
+| 锚点 | 路径 | D5 责任 | 消费方责任 |
+|------|------|---------|-----------|
+| `observability.Bridge` | `bridge.go` | 暴露 `Tracer()` / `Meter()` / `Logger()` | D1/D2/D3/D4/D7 import 使用 |
+| `telemetry.Op*` | `instrument/telemetry/names.go` | 56 canonical Operation 常量 | 各域使用常量创建 span |
+| `coverage.RecordHit` | `diagnose/coverage/coverage.go` | 无条件计数 | `Tracer.Start` 自动调用 |
+| `SessionBridge` | `bridge.go` | ActiveSessions Gauge | D1 调 Add/Remove |
+| `HealthCheck` | `health.go` | coverage + component 状态 | 各域 `/health` endpoint |
+
+---
+## 5. 跨域 SoT 决策原则
 
 > **playbook 原则 4「跨域问题在 D 边界决策」**
 
@@ -349,7 +425,7 @@
 
 ---
 
-## 4. 灰区处理总览
+## 6. 灰区处理总览
 
 | # | 灰区 | 涉及域 | 决议 | 文档位置 |
 |---|------|--------|------|----------|
@@ -359,15 +435,23 @@
 | 4 | Breaker 事件命名 | D3 + D7 | **D6-A 决议固化**：`flow.breaker.opened` / `closed` / `halfopened`（v1.1 实施） | §2.4.3 |
 | 5 | D3→D5 metric 命名边界 | D3 + D5 | **v1.1 新增**：D3 定义命名 + 维度；D5 仅持久化 | §2.2.4 |
 | 6 | **D7 Intent 路径正交化（DM-20260615-004）** | D7 + D2 + D4 | **4 IntentKind = 4 独立执行链**：IntentSkip 内联 / IntentCommand 走 `CommandHandler`（零 LLM）/ IntentFast 走 `FastPath.Run` → D3 + D2 / IntentOrchestrate 走 `OrchestratePath.Run` → SynthesizeTaskGraph + WaveScheduler（→D2/D4） | §2.4.4 + `d7-orchestration/spec.md` v2.5.0 + `d7-orchestration/dsaft-architecture.md` §意图分类 |
+| 7 | **D5 Coverage 指标博弈（Goodhart's Law）** | D5 | 多维指标（ratio/completeness/link_integrity/recency），非单一 KPI；过程指标 + 验证指标双轨 | §4.6 G1 + `d5-domain.md` §完备性边界 |
+| 8 | **D5 Bridge 删除回退风险** | D5 全员 | CI 防回归规则（grep 9 旧路径 = 0）+ 序贯级联先例（D6→D7→D5）；B2a+B2b 不留 shim | §4.6 G2 + `design.md` §8–§9 |
+| 9 | **D5 S23 子承诺膨胀** | D5 | 硬边界 ≤ 7 + S25 触发条件 + 新增举证责任（证明无法归入 C3a–C3e + 消费者不同 + 不超 7） | §4.6 G3 + `d5-domain.md` §S23 硬边界 |
+| 10 | **D5 Doctor 启动阻塞 vs Graceful Degradation** | D5 | Doctor 事前阻塞（环境不可用则观测无意义），运行时非阻塞（兜底 no-op） | §4.6 G4 + `d5-domain.md` §时间属性矩阵 |
 
 ---
 
-## 5. 关联文档
+## 7. 关联文档
 
 | 文档 | 路径 | 关系 |
 |------|------|------|
 | 分层 | `openspec/specs/architecture/layering.md` | D 域 SoT 划分 |
 | 代码布局 | `openspec/specs/architecture/code-layout.md` | scenario-slug 与跨域锚点路径 |
+| D5 领域 SoT | `openspec/specs/d5-observability/d5-domain.md` | D5 裁判域定位、博弈论玩家表、完备性边界 |
+| D5 跨域契约 | `openspec/specs/d5-observability/d5-boundary.md` | D5↔D6 证据移交规则、各域契约详情 |
+| D5 设计 | `openspec/specs/d5-observability/design.md` | 六段式架构设计 + Bridge 删除策略 |
+| D5 spec | `openspec/specs/d5-observability/spec.md` | D5 Gherkin 验收（v3.0 S21–S24） |
 | D3 spec | `openspec/specs/d3-llm-gateway/spec.md` | D3 域内 SoT（含 5+1 S） |
 | D3 design | `openspec/specs/d3-llm-gateway/design.md` | D3 编排时序与跨域 emit |
 | D3 span-registry | `openspec/specs/d3-llm-gateway/span-registry.md` | 跨 D5 span / metric 名 SoT |
@@ -381,14 +465,15 @@
 
 ---
 
-## 6. 变更记录
+## 8. 变更记录
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0.0 | 2026-06-14 | 初版：v3.7.0 layering.md 配套；D3 vs D1/D2/D4/D5/D6/D7 跨域 SoT 划分；4 项灰区契约化（D3-S5/D2-S18 / Breaker 状态 / D6 probe / Breaker 事件命名）；D3-X 跨域锚点声明 `internal/bridges/llm/` |
-| 1.1.0 | 2026-06-14 | v1.1 子 change 落地：§2.4.3 Breaker 事件命名 D6-A 决议固化；§2.4.4 D3→D5 metric；§2.3.2 D6 probe；§4 灰区第 5 项 |
+| 1.1.0 | 2026-06-14 | v1.1 子 change 落地：§2.4.3 Breaker 事件命名 D6-A 决议固化；§2.4.4 D3→D5 metric；§2.3.2 D6 probe；§6 灰区第 5 项 |
 | 1.2.0 | 2026-06-14 | §3 D4 跨域边界（Hub-Spoke 全归 D7；D4 vs D7/D2/D1/D5）；灰区 Hub-Spoke 双头收敛表（DM-20260614-018） |
 | 1.3.0 | 2026-06-15 | 双边共识落盘：§2.1 D3 vs D2 DM-020 修订（D2→D3 禁止、ILLMGateway 消费方 D7）；§2.4 D3 vs D7 DM-020 修订（D7 直调 D3）；§3.6 Follower 对称性声明 + 影子编排风险交叉引用 |
 | 1.4.0 | 2026-06-15 | D5 SA Refine v1.0（DM-001 4+1 价值流 S21–S24）+ D6 SA Refine v1.0（DM-002 S11–S14；S4 Orchestration → S12 GuardRuntime）；现有 D5/D6 跨域边界（§2.2/§2.3）已在 D3 视角下覆盖，无需修改 |
-| 1.5.0 | 2026-06-15 | DM-20260615-004 D7 Intent 路径正交化跨域登记：§2.4.4 新增 4 IntentKind × 跨域 SoT 表（D3 调用 / D2 参与 / D4 参与 + v1.0 → v1.1.0 关键变化 + 禁止退化）；§4 灰区新增第 6 项（D7 + D2 + D4 涉及）；意图分类合约化，禁止重启 v1.0 占位 + hint 实现 |
-| 1.6.0 | 2026-06-16 | §5 关联文档新增 `d1-communication/d1-domain.md`（D1 Trusted Intermediary、ingress D7-only） |
+| 1.5.0 | 2026-06-15 | DM-20260615-004 D7 Intent 路径正交化跨域登记：§2.4.4 新增 4 IntentKind × 跨域 SoT 表（D3 调用 / D2 参与 / D4 参与 + v1.0 → v1.1.0 关键变化 + 禁止退化）；§6 灰区新增第 6 项（D7 + D2 + D4 涉及）；意图分类合约化，禁止重启 v1.0 占位 + hint 实现 |
+| 1.6.0 | 2026-06-16 | §7 关联文档新增 `d1-communication/d1-domain.md`（D1 Trusted Intermediary、ingress D7-only） |
+| **1.7.0** | **2026-06-19** | **D5 v2.1 Terminal（DM-20260619-006）**：§4 新增 D5 跨域边界（vs D7/D2/D3/D6/D1/D4）；§4.4 D5→D6 证据移交规则（Span/Coverage/Metric/Incident 四种证据类型 + 移交约束）；§4.6 D5 灰区声明（Goodhart's Law/Bridge 回退/S23 膨胀/Doctor 阻塞）；§4.7 D5 跨域锚点（Bridge/Op*/RecordHit/SessionBridge/HealthCheck）；§6 灰区新增 G1–G4（D5）；全部章节重编号（§4 D5 插入 → §5–§8 后移） |
