@@ -29,15 +29,15 @@
 
 | Operation | S | 绑定 T（P0 加粗） |
 |-----------|---|------------------|
-| `D7_S2_Orchestration_Session_Process` | S2 | **D7-S2-T01**, **D7-D1-T01**, **D7-MIG-T01** |
-| `D7_S2_Orchestration_Intent_Classify` | S2/S5 | **D7-S2-T02b**, **D7-S5-T03**, **D7-S5-T06**, **D7-S5-A01-T01** |
-| `D7_S2_Orchestration_Turn_Run` | S2 | **D7-S2-A06-T01** … **T04** |
-| `D7_S2_Orchestration_Turn_Iteration` | S2 | **D7-S2-A06-T03**（multi-turn tool loop） |
-| `D7_S2_Orchestration_LLM_Invoke` | S2 | **D7-S2-A07-T01**, **D7-S2-A07-T02** |
-| `D7_S2_Orchestration_Orchestrate_Run` | S2 | **D7-S2-T03**, **D7-S2-A01-T05** |
-| `D7_S3_Orchestration_Wave_Schedule` | S3 | **D7-S3-T01** … **D7-S3-T10** |
-| `D7_S3_Orchestration_Wave_Task_Execute` | S3 | **D7-S3-T04** … **T07** |
-| `D7_S3_Orchestration_Flow_Event_Publish` | S4 | **D7-S4-T02**, **D7-S4-T03**, **D7-S4-T08**, **D7-S4-T09** |
+| `D7_Orchestration_Session_Process` | S2 | **D7-S2-T01**, **D7-D1-T01**, **D7-MIG-T01** |
+| `D7_Orchestration_Intent_Classify` | S2/S5 | **D7-S2-T02b**, **D7-S5-T03**, **D7-S5-T06**, **D7-S5-A01-T01** |
+| `D7_Orchestration_Turn_Run` | S2 | **D7-S2-A06-T01** … **T04** |
+| `D7_Orchestration_Turn_Iteration` | S2 | **D7-S2-A06-T03**（multi-turn tool loop） |
+| `D7_Orchestration_LLM_Invoke` | S2 | **D7-S2-A07-T01**, **D7-S2-A07-T02** |
+| `D7_Orchestration_Orchestrate_Run` | S2 | **D7-S2-T03**, **D7-S2-A01-T05** |
+| `D7_Orchestration_Wave_Schedule` | S3 | **D7-S3-T01** … **D7-S3-T10** |
+| `D7_Orchestration_Wave_Task_Execute` | S3 | **D7-S3-T04** … **T07** |
+| `D7_Orchestration_Flow_Event_Publish` | S4 | **D7-S4-T02**, **D7-S4-T03**, **D7-S4-T08**, **D7-S4-T09** |
 
 ### 关键 Span 属性
 
@@ -52,7 +52,7 @@
 | `context.caller=d7` | D2 span（被调侧） | 区分 D7 编排 vs Legacy D2 路径 |
 | `event_kind` / `worker_id` | Flow_Event_Publish | Flow 生命周期 |
 
-> **DM-020：** Jaeger 中 D3 `D3_S3_LLM_Stream` 应挂在 `D7_S2_Orchestration_LLM_Invoke` 下，而非 D2 `Query_Loop_*`（Legacy 路径）。
+> **DM-020：** Jaeger 中 D3 `D3_LLM_Stream` 应挂在 `D7_Orchestration_LLM_Invoke` 下，而非 D2 `Query_Loop_*`（Legacy 路径）。
 
 ---
 
@@ -61,38 +61,38 @@
 ### 2.1 IntentFast（D7 → D2 → D7 → D3）
 
 ```text
-D1_S13_Capture_Message_Receive
-└── D1_S13_Dispatch_Route {target=d7}
-    └── D7_S2_Orchestration_Session_Process  {route=fast}
-        ├── D7_S2_Orchestration_Intent_Classify
-        └── D7_S2_Orchestration_Turn_Run
-            ├── D2_S2_Context_Process          ← Prepare (context.caller=d7)
-            └── D7_S2_Orchestration_Turn_Iteration
-                ├── D7_S2_Orchestration_LLM_Invoke
-                │   └── D3_S3_LLM_Stream
-                └── D2_S5_Tool_Execute_Single    ← optional
+D1_Capture_Message_Receive
+└── D1_Dispatch_Route {target=d7}
+    └── D7_Orchestration_Session_Process  {route=fast}
+        ├── D7_Orchestration_Intent_Classify
+        └── D7_Orchestration_Turn_Run
+            ├── D2_Context_Process          ← Prepare (context.caller=d7)
+            └── D7_Orchestration_Turn_Iteration
+                ├── D7_Orchestration_LLM_Invoke
+                │   └── D3_LLM_Stream
+                └── D2_Tool_Execute_Single    ← optional
 ```
 
 ### 2.2 IntentOrchestrate（D7 → S5 → S3 → D4/D2）
 
 ```text
-D1_S13_Capture_Message_Receive
-└── D1_S13_Dispatch_Route
-    └── D7_S2_Orchestration_Session_Process  {route=orchestrate}
-        ├── D7_S2_Orchestration_Intent_Classify
-        └── D7_S2_Orchestration_Orchestrate_Run
-            └── D7_S3_Orchestration_Wave_Schedule
-                └── D7_S3_Orchestration_Wave_Task_Execute
-                    ├── D2_S2_Context_Process
-                    └── D4_S4_Agent_Run
-                        └── D7_S3_Orchestration_Flow_Event_Publish
-                            └── D1_S15_Signal_Task / worker_progress
+D1_Capture_Message_Receive
+└── D1_Dispatch_Route
+    └── D7_Orchestration_Session_Process  {route=orchestrate}
+        ├── D7_Orchestration_Intent_Classify
+        └── D7_Orchestration_Orchestrate_Run
+            └── D7_Orchestration_Wave_Schedule
+                └── D7_Orchestration_Wave_Task_Execute
+                    ├── D2_Context_Process
+                    └── D4_Agent_Run
+                        └── D7_Orchestration_Flow_Event_Publish
+                            └── D1_Signal_Task / worker_progress
 ```
 
 ### 2.3 IntentCommand（零 LLM）
 
 ```text
-D7_S2_Orchestration_Session_Process  {route=command}
+D7_Orchestration_Session_Process  {route=command}
 └── (无 Intent_Classify LLM span)
     └── CommandHandler → S1 PlanMode / Task / S2 HandleInterrupt
 ```
@@ -202,11 +202,11 @@ go test ./tests/integration/d7/ -run Interrupt -v
 
 | 检查项 | 查询 / 条件 | 期望 |
 |--------|------------|------|
-| D7 入口 | `D7_S2_Orchestration_Session_Process` 每用户消息 1 个 | 无 D1→D2 直连 |
+| D7 入口 | `D7_Orchestration_Session_Process` 每用户消息 1 个 | 无 D1→D2 直连 |
 | Fast 路由 | `orchestration.route=fast` | Intent_Classify source=rule |
-| LLM 产权 | `D7_S2_Orchestration_LLM_Invoke` → `D3_S3_LLM_Stream` | 不在 D2 Query_Loop 下 |
+| LLM 产权 | `D7_Orchestration_LLM_Invoke` → `D3_LLM_Stream` | 不在 D2 Query_Loop 下 |
 | Orchestrate 链 | Orchestrate_Run → Wave_Schedule → Task_Execute | Flow_Event_Publish 存在 |
-| Flow 到 D1 | D7 Flow_Event_Publish → D1_S15_Signal_* | worker_id 一致 |
+| Flow 到 D1 | D7 Flow_Event_Publish → D1_Signal_* | worker_id 一致 |
 | Interrupt | `/stop` 后 Wave span 终止 | stopped EngineEvent |
 
 ### 建议告警
@@ -226,7 +226,7 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | 缺口 | 现状 | 建议 |
 |------|------|------|
 | IntentSkip span | 无独立 operation | 合并在 Session_Process `{route=skip}` |
-| S1 Task span | 无显式 OTel op | D5 补 `D7_S1_WorkModel_*` |
+| S1 Task span | 无显式 OTel op | D5 补 `D7_WorkModel_*` |
 | Orchestrate LLM Decompose | llm.purpose=decompose 无独立 span 文档 | span-registry 补登记 |
 | BackgroundRun | QueryWorkPlan 可见，trace 未标准化 | S1-T07 扩展 integration trace |
 

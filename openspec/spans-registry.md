@@ -7,21 +7,20 @@
 
 ---
 
-## 命名规范 {D}{S}{A}_{F}
+## 命名规范：`D{N}_{场景名称}_{动作}_{细节}`
 
-所有 Span Operation 名称遵循 `{D}{S}_{A}_{F}` 格式：
+| 段 | 含义 | DSAFT 对应 | 示例 |
+|----|------|-----------|------|
+| `D{N}` | 域编号 | D 层 | `D1`, `D7` |
+| `{场景名称}` | 场景语义名（非 S 编号） | S 层 | `Capture`, `Orchestration` |
+| `{动作}` | 业务动作 | A 层 | `Message`, `Turn` |
+| `{细节}` | 操作细节（可多层） | F 层 | `Receive`, `Run` |
 
-| 组件 | 说明 | 示例 |
-|------|------|------|
-| D | 域编号 | D1, D2, D3, D4, D7 |
-| S | Scenario 场景名 | Capture, Context, LLM, Agent, Orchestration |
-| A | Activity 活动名 | Process, Stream, Route, Execute |
-| F | Function 功能名（可选） | Receive, Load, Schedule |
+**重要：不在运行时字符串中插入 S 编号。** 场景名称已唯一标识场景，`D1_S13_Capture_...` 中 `S13` 与 `Capture` 重复。Go 常量名保留 `OpD{N}_S{N}_...` 格式用于 DSAFT 追溯。
 
 **格式规则：**
-- 全部大写
-- 组件间用下划线分隔
-- 示例：`D1_Capture_Message_Receive` → D1 + Capture + Message + Receive
+- 全部大写，`_` 分隔
+- 示例：`D1_Capture_Message_Receive` → D1 + Capture 场景 + Message 动作 + Receive 细节
 
 ---
 

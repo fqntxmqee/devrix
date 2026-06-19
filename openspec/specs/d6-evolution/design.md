@@ -139,7 +139,7 @@ Score(ctx, item, rubric)
 ```
 RuntimeGuardValidator.OnDecision(ctx, rec, session)
   ├─ enabled=false: return immediately
-  ├─ Start tracing span (`D6_S4_Validation_Decision`)
+  ├─ Start tracing span (`D6_Validation_Decision`)
   ├─ Record metrics (guard_decisions_total)
   ├─ preFilter(rec):
   │   ├─ Trusted tool allowlist match → skip (guard_decisions_by_stage: prefilter_skip)

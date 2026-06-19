@@ -13,7 +13,7 @@
 
 | Operation | Kind | Component | Canonical S | Since | Key Attributes |
 |-----------|------|-----------|-------------|-------|----------------|
-| `D6_S4_Validation_Decision` | INTERNAL | validation | D6-S4-A01 | 2.1.0 | decision_id, category, risk_class, session_id, agent_id |
+| `D6_Validation_Decision` | INTERNAL | validation | D6-S4-A01 | 2.1.0 | decision_id, category, risk_class, session_id, agent_id |
 
 **Readable alias:** `evolution.decision.validate`
 
@@ -25,7 +25,7 @@
 
 ```
 agent.tool.call
-└── D6_S4_Validation_Decision
+└── D6_Validation_Decision
     ├── prefilter_skip (event, optional)
     ├── judge_start → judge_complete
     └── intervention_triggered → intervention_exec_* (optional)
@@ -37,7 +37,7 @@ agent.tool.call
 
 | 场景 | 格式 | 示例 |
 |------|------|------|
-| Span Operation | `D6_S{scenario}_{Activity}_{Function}` | `D6_S4_Validation_Decision` |
+| Span Operation | `D6_S{scenario}_{Activity}_{Function}` | `D6_Validation_Decision` |
 | Readable alias | `evolution.{module}.{action}` | `evolution.decision.validate` |
 
 ---

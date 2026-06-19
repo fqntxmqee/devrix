@@ -48,7 +48,7 @@ context.process
 
 ```
 agent.run → agent.tool.call → agent.fork|join|terminate
-  └── D6_S4_Validation_Decision              [if evolution.orchestration.enabled]
+  └── D6_Validation_Decision              [if evolution.orchestration.enabled]
 orchestration.wave.schedule → orchestration.wave.task.execute
 orchestration.flow.event.publish
 ```
@@ -70,7 +70,7 @@ orchestration.flow.event.publish
 | llm | llm_adapter | 1 | `llm.adapter.stream` |
 | agent | agent_tool | 6 | `agent.tool.call`, `agent.run`, `agent.fork`, `agent.join`, `agent.terminate`, `agent.state.transition` |
 | orchestration | orchestrator | 3 | `orchestration.wave.schedule`, `orchestration.wave.task.execute`, `orchestration.flow.event.publish` |
-| evolution | validation | 1 | `D6_S4_Validation_Decision` |
+| evolution | validation | 1 | `D6_Validation_Decision` |
 
 ---
 

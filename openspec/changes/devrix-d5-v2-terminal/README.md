@@ -24,7 +24,7 @@
 
 | 优先级 | 文件 | 读什么 |
 |--------|------|--------|
-| **P0** | `gaming-analysis.md` | 玩家、错配、Commitment、OQ-1~6 |
+| **P0** | `gaming-analysis.md` | 玩家、错配、Commitment、OQ-1~6、§11 Grill 1~6、§13 MiniMax 第二轮增量、§14 Claude 第二轮对焦（含 15 条合并落地清单 §14.9） |
 | P0 | `d5-requirements-clarifications.md` | Grill Review §6 六个问题 |
 | P1 | `specs/d5-boundary.md` | 跨域激励（D7 Turn vs D5 Referee） |
 | P1 | `specs/d5-domain.md` | 博弈角色表 |

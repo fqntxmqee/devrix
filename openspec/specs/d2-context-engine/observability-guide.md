@@ -46,14 +46,14 @@
 ### 2.1 DM-020 Follower（挂在 D7 Turn 下）
 
 ```text
-D7_S2_Orchestration_Turn_Run
-├── D2_S2_Context_Process          (S15 Prepare)
+D7_Orchestration_Turn_Run
+├── D2_Context_Process          (S15 Prepare)
 │   ├── context.snapshot.load
 │   ├── context.compression.run
 │   └── context.system_prompt.load
-├── D7_S2_Orchestration_LLM_Invoke → D3   ← 非 D2
-└── D7_S2_Orchestration_Turn_Iteration
-    └── D2_S5_Tool_Execute_Single  (S18)
+├── D7_Orchestration_LLM_Invoke → D3   ← 非 D2
+└── D7_Orchestration_Turn_Iteration
+    └── D2_Tool_Execute_Single  (S18)
         └── tool.execute.permission
 ```
 
@@ -117,7 +117,7 @@ go test ./internal/layers/contextengine/ -run PathRegression -v
 
 | 缺口 | 建议 |
 |------|------|
-| S15–S18 统一 OTel 常量名 | 与 `D2_S15_*` 命名对齐 span-registry |
+| S15–S18 统一 OTel 常量名 | 与 `D2_*` 命名对齐 span-registry |
 | Task/Plan span 仍在 D2 登记 | 迁 D7 workmodel span 登记 |
 
 ---
