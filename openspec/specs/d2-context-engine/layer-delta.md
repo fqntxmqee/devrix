@@ -1,9 +1,9 @@
 # Delta: Domain D2 (CTX)
 
-**Change ID:** devrix-foundation → devrix-queryloop-context (archived) → devrix-d2-queryloop-dismantle (archived)
-**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v8.0.0)
-**Status:** Merged — D7 owns LLM↔Tool loop as of DM-20260618-010
-**Affects:** D7 turn runtime, compression pipeline, layered memory, conversation repair, main transcript
+**Change ID:** devrix-foundation → devrix-queryloop-context (archived) → devrix-d2-queryloop-dismantle (archived) → **devrix-d2-structure-closure** (v8.0.0 → **v8.2.0**)
+**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v8.2.0)
+**Status:** v8.2.0 merged — D2 v2.2 structure closure (DM-20260619-007)
+**Affects:** D7 turn runtime, compression pipeline, layered memory, conversation repair, main transcript, **enforce/tools/ rename (P3-T2)**, **memory split (P4)**, **legacy retirement (P5)**
 
 ---
 
@@ -70,3 +70,45 @@ Physical order: 1 → 2 → 3 → 4 → [6] → 5 → 7. Operates on **messages 
 Prior versions routed Process through `query.Loop.Run` when `query_loop.enabled=true`. Harness bootstrap ran when `query_loop.enabled=false`. Both paths removed in v8.0.0.
 
 </details>
+
+---
+
+## v8.0.0 → v8.2.0 (DM-20260619-007 devrix-d2-structure-closure)
+
+### Requirement: P3 enforce 归位
+
+- `enforce/toolrunner/` → `enforce/tools/` (scenario slug rename, package `package tools`)
+- `enforce/sandbox/` 物理迁入 `enforce/` 子树（保留 `sandbox/` 子目录名）
+- 删除 `enforce/orchestrator.go`（92 行 PolicyOrchestrator stub，由 `turn_adapter.ExecuteRound` 接管）
+- D2-STRUCT-T01..T03 layout guards activated in `internal/lint/layer/d2_layout_test.go`
+
+#### Scenario: 旧 toolrunner package name 残留
+- GIVEN `enforce/tools/` 目录下任一 `.go` 文件首行 `package toolrunner`
+- WHEN `go test ./internal/lint/layer/...`
+- THEN D2-STRUCT-T03 fails
+
+### Requirement: P4 memory 读写分离
+
+- `prepare/memory/longterm.go` (combined ILongTermMemory) → `prepare/memory/recall.go` (S15-A02 read-side port) + `persist/memory/store.go` (S17-A03 SQLite impl)
+- `MemoryEntry` 提升至 `internal/shared/types/memory.go`（共享类型，无域拥有）
+- `LongTermRecaller` / `LongTermStore` 端口提升至 `internal/shared/contracts/memory.go`
+- `prepare/memory.Manager` 字段从 `longTerm ILongTermMemory` 拆为 `recaller` + `writer` 两个独立注入
+- D2-STRUCT-T04 cyclic-import guard activated
+
+#### Scenario: prepare/memory ↔ persist/memory 循环导入
+- GIVEN 任一 `prepare/memory/*.go` 文件 import `persist/memory` (反之亦然)
+- WHEN `go test ./internal/lint/layer/...`
+- THEN D2-STRUCT-T04 fails
+
+### Requirement: P5 legacy 退役
+
+- `facade/` → `legacy/` (物理迁移 + 包名 `package legacy`)
+- `legacy.ContextEngine.Process()` 标记 `// Deprecated:` 注释 + 运行时 `slog.Warn`
+- `contextengine.ContextEngine` / `EngineDeps` / `NewContextEngine` 重新导出为 `legacy.*` 的 type aliases，保留 `// Deprecated:` 注释
+- D2-STRUCT-T07 no-new-legacy-Process-callers guard activated (allowlist: cmd/llm-smoke, multiagent/run, tests/*, communication mocks)
+- legacy/ 目录删除触发条件: 所有 Process caller 已迁 D7 路径 + 集成测试全绿持续 ≥7 天 (AC-P5-4)
+
+#### Scenario: 新增生产代码调用 legacy.Process()
+- GIVEN 任意 `cmd/` / `internal/` 下非白名单生产文件包含 `.Process(ctx` 调用
+- WHEN `go test ./internal/lint/layer/...`
+- THEN D2-STRUCT-T07 fails，提示迁移到 D7 SessionOrchestrator 或 turn_adapter.ExecuteRound

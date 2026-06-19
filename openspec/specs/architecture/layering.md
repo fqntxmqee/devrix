@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.6.0
-**Last Updated:** 2026-06-16
+**Version:** 4.7.0
+**Last Updated:** 2026-06-19
 
 ---
 
@@ -413,26 +413,39 @@ layers/
 │   └── delivery/                  # S18 GuaranteeDelivery
 │       └── eventbus/
 │
-├── contextengine/                 # D2
-│   ├── compression/               # D2-S2
-│   ├── memory/                    # D2-S3
-│   ├── token/                     # D2-S4
-│   ├── registry/                  # D2-S5
-│   ├── snapshot/                  # D2-S6
-│   ├── prompt/                    # D2-S7
-│   ├── toolrunner/                # D2-S5/D2-S8 工具执行与沙箱
-│   ├── harness/                   # D2-S9 (V5)
-│   ├── query/                     # D2 legacy types（loop 已删，DM-20260618-010）
-│   ├── usercontext/               # D2-S10 UserContext
-│   ├── attachments/               # D2-S10 Attachments
-│   ├── permission/                # D2-S10 PermissionMode
-│   ├── tasks/                     # D2-S10 TaskTools
-│   ├── transcript/                # D2-S6 Main + D2-S10 Sidechain
-│   ├── queue/                     # D2-S11 SessionQueue
-│   ├── worktree/                  # D2-S12 Worktree
-│   ├── conversation/              # D2-S13 Conversation repair / compact boundary
-│   └── mock/                      # D2-S14 Mock Engine
-│   # engine.go 根包：Process 编排、commitActiveWindow、delegate_tools
+├── contextengine/                 # D2 (v2.2 final)
+│   ├── prepare/                   # D2-S15 (orchestrator + adapters)
+│   │   ├── memory/                # S15-A01+A02 read-side: recall.go (port only)
+│   │   ├── compression/           # S15-A03
+│   │   ├── conversation/          # S15 fork + repair
+│   │   ├── prompt/                # S15-A04
+│   │   ├── attachments/           # S10 attachments
+│   │   ├── token/                 # S4 + windowanalyzer
+│   │   ├── usercontext/           # S10
+│   │   └── adapters/              # P1-b concrete port implementations
+│   ├── persist/                   # D2-S17 (orchestrator + commit)
+│   │   ├── snapshot/              # S6 snapshot
+│   │   ├── transcript/            # S6 main + S10 sidechain
+│   │   ├── commit.go              # S17-A04 CommitWindow
+│   │   ├── orchestrator.go        # S17 wiring
+│   │   └── memory/                # S17-A03 StoreLongTerm (P4 split)
+│   ├── enforce/                   # D2-S18 (P3 物理归位)
+│   │   ├── tools/                 # S5/S8 工具执行（was toolrunner/, P3-T2 rename）
+│   │   │   └── surface/           # TOOL-SURFACE-1 v3 (DM-20260618-002)
+│   │   ├── permission/            # S10 PermissionMode
+│   │   ├── sandbox/               # S8 sandbox (P3-T1: was sandbox/)
+│   │   ├── registry/              # S5 tool registry
+│   │   ├── background_task_tools.go
+│   │   ├── planmode_tools.go
+│   │   ├── tool_filter.go
+│   │   └── agent_role_filter.go
+│   ├── kernel/                    # D2 contracts + span registry
+│   ├── legacy/                    # P5 deprecated Process() entry (D2-STRUCT-T07)
+│   │   └── engine.go              # Process() with slog.Warn
+│   ├── mock/                      # D2 mockctx (test-only ports, kept in domain for cmd/obs-verify)
+│   ├── contracts.go               # D2 root public API
+│   ├── aliases.go                 # ContextEngine/EngineDeps deprecated aliases → legacy/
+│   └── tool_context.go            # type alias → enforce/tools/context.go
 │
 ├── orchestration/                # D7 Orchestration
 │   ├── coordinator/               # D7 Session Orchestrator (package coordinator)

@@ -3,8 +3,8 @@
 **Domain ID:** D2
 **Slug:** `contextengine`
 **Type:** Core Domain
-**Status:** Active — Canonical S15–S18 (v2.0 final, S19 dismantled, S20 removed)
-**Version:** 8.1.0
+**Status:** Active — Canonical S15–S18 (v2.2 final, S19 dismantled, S20 removed)
+**Version:** 8.2.0
 **Last Updated:** 2026-06-19
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
@@ -79,20 +79,29 @@
 
 | Canonical S | Scenario | 物理路径 |
 |-------------|----------|---------|
-| D2-S15 | PrepareExecutionContext | `prepare/` (memory/, compression/, prompt/, conversation/fork.go+fork_worker.go, attachments/, usercontext/) |
+| D2-S15 | PrepareExecutionContext | `prepare/` (memory/recall.go, compression/, prompt/, conversation/fork.go+fork_worker.go, attachments/, usercontext/) |
 | D2-S16 | RunQueryLoop | **REMOVED** — loop 归 D7 `turn/orchestrator.go` |
-| D2-S17 | PersistSessionState | `persist/` (snapshot/, transcript/) + `facade/engine_persist.go` |
-| D2-S18 | EnforceExecutionPolicy | `enforce/` (permission/, toolrunner/, registry/, tool_filter.go, agent_role_filter.go, background.go, subquery.go, background_task_tools.go, planmode_tools.go) |
-| — | Process facade (S15→D7→S17 glue) | `facade/` (`engine.go`, `engine_prepare.go`, `engine_persist.go`, …) |
+| D2-S17 | PersistSessionState | `persist/` (snapshot/, transcript/, commit.go, commit_window.go, orchestrator.go, **memory/store.go**) |
+| D2-S18 | EnforceExecutionPolicy | `enforce/` (permission/, **tools/** (was toolrunner/), registry/, tool_filter.go, agent_role_filter.go, background.go, subquery.go, background_task_tools.go, planmode_tools.go, **sandbox/**) |
+| — | Process legacy (S15→D7→S17 glue) | **`legacy/`** (`engine.go`, `engine_builder.go`, `engine_persist_v2.go`, `prepared_turn_*.go`, `engine_*.go`) — **P5 Deprecated** (slog.Warn + T07 guard) |
 | D2-S4 (Legacy Token) | Token counting | `prepare/token/` (+ `windowanalyzer/`) |
 | D2 kernel | Domain contracts + span registry | `kernel/` (`contracts.go`, `spans.go`) |
-| D2 root | Public API re-exports | `contracts.go`, `aliases.go`, `tool_context.go`（3 生产文件） |
+| D2 root | Public API re-exports | `contracts.go`, `aliases.go`, `tool_context.go`（3 生产文件，type alias only） |
 | D2-S19 | ~~NestedExecution~~ → S15+S18 | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` |
 | D2-S20 | ~~LegacyHarnessFallback~~ | **REMOVED（v6.5.0）**: `fallback/` 目录已删除，所有 harness 相关代码已清理 |
 
-> **v2.0 重命名记录：**
-> - `policy/` → `enforce/`（2026-06-16，对齐 D1 capture/channel/delivery 模式）
-> - `harness/` → `fallback/`（2026-06-16，语义化 LEGACY 标记）
+> **v8.2 重命名记录（DM-20260619-007 devrix-d2-structure-closure）：**
+> - `enforce/toolrunner/` → `enforce/tools/`（P3-T2，scenario slug 重命名，package 名同步 `package tools`）
+> - `enforce/sandbox/` 物理迁入 `enforce/sandbox/`（P3-T1，逻辑归属 `enforce/`，与 D1 capture/channel/delivery 模式对齐）
+> - `enforce/orchestrator.go`（92 行 stub）**删除**（P3-T4，dispatch 由 `turn_adapter.ExecuteRound` 接管）
+> - `prepare/memory/longterm.go` 拆分为 `prepare/memory/recall.go`（S15 端口）+ `persist/memory/store.go`（S17 实现）（P4 split）
+> - `MemoryEntry` 提升至 `internal/shared/types/memory.go`（共享类型，无域拥有）
+> - `LongTermRecaller` / `LongTermStore` 提升至 `internal/shared/contracts/memory.go`（端口接口，D2-STRUCT-T04 解耦）
+> - `facade/` → `legacy/`（P5 retirement，Deprecated + slog.Warn + T07 layer-lint 硬阻断）
+>
+> **v2.0 历史重命名：**
+> - `policy/` → `enforce/`（2026-06-16）
+> - `harness/` → `fallback/`（2026-06-16，已删除 v6.5.0）
 > - `attachments/` → `prepare/attachments/`（2026-06-16）
 > - `usercontext/` → `prepare/usercontext/`（2026-06-16）
 
@@ -183,6 +192,7 @@ D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断
 | **S20 LegacyHarnessFallback 移除** | ✅ 所有 harness 代码、类型、测试已删除 |
 | **S19 NestedExecution 拆解** | ✅ fork→prepare/conversation/, subquery+background→enforce/ |
 | **v2.0 根目录瘦身** | ✅ 根 3 生产文件 + `facade/` 编排包（`engine.go` Process glue） |
+| **P5 legacy 退役** | ✅ `facade/` → `legacy/`，`legacy.Process()` 加 `slog.Warn` + D2-STRUCT-T07 layout guard 硬阻断 |
 | **工具注册迁入 enforce/** | ✅ `background_task_tools.go` + `queryloop_tools.go` → `enforce/` |
 
 ---
@@ -191,6 +201,7 @@ D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 8.2.0 | 2026-06-19 | **v2.2 closure (DM-20260619-007)**: (1) `enforce/toolrunner/` → `enforce/tools/` (package `tools`); (2) `enforce/sandbox/` 物理迁入 enforce/; (3) 删除 `enforce/orchestrator.go` (92 行 stub); (4) `prepare/memory/longterm.go` 拆分 recall.go + persist/memory/store.go; (5) `MemoryEntry` 提升至 shared/types; (6) `facade/` → `legacy/` (Deprecated + slog.Warn + T07 guard) |
 | 8.1.0 | 2026-06-19 | **DSAFT Structure 重构**: (1) `engine_*.go` + `prepared_turn_*.go` → `facade/`; (2) 根包仅 `contracts.go` + `aliases.go` + `tool_context.go`; (3) `token/` → `prepare/token/`; (4) `spans.go` → `kernel/spans.go` |
 | 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
 | 7.0.0 | 2026-06-16 | **v2.0 终态**: (1) `background_task_tools.go` + `queryloop_tools.go` → `enforce/`; (2) 根目录合并 `tool_register.go`→`tool_context.go`; (3) `spans.go` 清理 harness span 死引用; (4) 根目录 11 生产文件 `engine.go` 212行 Facade |
