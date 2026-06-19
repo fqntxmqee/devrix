@@ -1,5 +1,11 @@
 name: ci
 
+# 精简策略（DM-20260619-005）：
+# - 本地每次合入前跑全量测试（unit + integration + e2e + acceptance + coverage）
+# - CI 仅保留 unit tests 作为 PR smoke check，避免每次 PR ~45min 重复跑全量
+# - 删除 gate (integration / e2e / acceptance) + coverage job
+# - layer-lint 移到独立 workflow（layer-lint.yml），只保留 warn（不阻断）
+
 on:
   push:
     branches: [main, master]
@@ -53,77 +59,8 @@ jobs:
           CI_COVERAGE: "1"
         run: ./scripts/test-unit.sh
 
-      - name: Eval fast check (mock judge)
-        run: ./scripts/eval/run-eval.sh
-
-      - name: Upload coverage profile
+      - name: Upload coverage profile (informational only)
         uses: actions/upload-artifact@v4
         with:
           name: coverage-out
           path: coverage.out
-
-  gate:
-    name: gate (${{ matrix.suite }})
-    runs-on: ubuntu-latest
-    needs: unit
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suite: integration
-            script: ./scripts/test-integration.sh
-          - suite: e2e
-            script: ./scripts/test-e2e.sh
-          - suite: acceptance
-            script: ./scripts/test-acceptance.sh
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-
-      - name: Run ${{ matrix.suite }} tests
-        run: ${{ matrix.script }}
-
-  coverage:
-    name: coverage
-    runs-on: ubuntu-latest
-    needs: unit
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-
-      - name: Download coverage profile
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-out
-
-      - name: Coverage threshold
-        run: |
-          total="$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($3, 1, length($3)-1)}')"
-          echo "Total coverage: ${total}%"
-          echo "::notice::Coverage target is 80% (project.md). Raise CI gate when baseline improves."
-          min=20
-          awk -v c="${total}" -v m="${min}" 'BEGIN { exit !(c+0 >= m+0) }' || {
-            echo "::error::Coverage ${total}% is below minimum ${min}%"
-            exit 1
-          }
-
-      - name: Coverage by domain (D1-D5)
-        run: ./scripts/coverage-domains.sh
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: |
-            coverage.out
-            coverage-reports/
