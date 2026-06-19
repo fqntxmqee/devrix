@@ -80,11 +80,11 @@
 
 | 操作名                                | 位置                                      | 父子关系                                  | 关键属性                                                                               |
 | ---------------------------------- | --------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| `orchestration.wave.schedule`      | `orchestration/wave/scheduler.go`       | 父: `context.process`                  | `wave.task_count`, `wave.worker_count`                                             |
-| `orchestration.wave.task.execute`  | `orchestration/wave/scheduler.go`       | 父: `orchestration.wave.schedule`      | `task.id`, `task.title`, `task.worker_type`, `task.depends_on`, `task.duration_ms` |
-| `orchestration.wave.worker.run`    | `orchestration/wave/pool.go`            | 父: `orchestration.wave.task.execute`  | `worker.type`, `worker.slot`                                                       |
-| `orchestration.flow.event.publish` | `orchestration/flow/hub.go` `Publish()` | 父: 按上下文                               | `event.type`, `event.session_id`                                                   |
-| `orchestration.workplan.record`    | `orchestration/workplan/service.go`     | 父: `orchestration.flow.event.publish` | `workplan.event_type`                                                              |
+| `orchestration.wave.schedule`      | `orchestration/wavescheduler/scheduler.go`       | 父: `context.process`                  | `wave.task_count`, `wave.worker_count`                                             |
+| `orchestration.wave.task.execute`  | `orchestration/wavescheduler/scheduler.go`       | 父: `orchestration.wave.schedule`      | `task.id`, `task.title`, `task.worker_type`, `task.depends_on`, `task.duration_ms` |
+| `orchestration.wave.worker.run`    | `orchestration/wavescheduler/pool.go`            | 父: `orchestration.wave.task.execute`  | `worker.type`, `worker.slot`                                                       |
+| `orchestration.flow.event.publish` | `orchestration/executionflow/hub/hub.go` `Publish()` | 父: 按上下文                               | `event.type`, `event.session_id`                                                   |
+| `orchestration.workplan.record`    | `orchestration/executionflow/workplan/service.go`     | 父: `orchestration.flow.event.publish` | `workplan.event_type`                                                              |
 
 
 ### 2.6 Delegate 域（D4）

@@ -101,10 +101,10 @@ Fork/Join 逻辑主要在 `agent/forkjoin*.go`（映射 D4-S3）。
 
 | S ID | 包 | 职责 |
 |------|-----|------|
-| ORCH-S1 | `orchestration/workplan/` | Task + Flow 读模型 |
-| ORCH-S2 | `orchestration/flow/` | `Hub`, FlowEvent 发布 |
-| ORCH-S2 | `orchestration/imsink/` | Flow → D1 Gateway 卡片 |
-| ORCH-S3 | `orchestration/wave/` | DAG 调度、ConflictGuard |
+| ORCH-S1 | `orchestration/executionflow/workplan/` | Task + Flow 读模型 |
+| ORCH-S2 | `orchestration/executionflow/hub/` | `Hub`, FlowEvent 发布 |
+| ORCH-S2 | `orchestration/executionflow/imsink/` | Flow → D1 Gateway 卡片 |
+| ORCH-S3 | `orchestration/wavescheduler/` | DAG 调度、ConflictGuard |
 
 **Bootstrap：** `internal/bootstrap/execution_flow.go`, `delegate.go`
 
@@ -129,7 +129,7 @@ Fork/Join 逻辑主要在 `agent/forkjoin*.go`（映射 D4-S3）。
 | D2-S8 Sandbox | `toolrunner/sandbox_test.go`, `tests/security/shell_injection_test.go` |
 | D2-S12 Worktree | `contextengine/worktree/manager_test.go` |
 | D4-S10 Delegate | `multiagent/delegate/*_test.go` |
-| ORCH | `orchestration/flow/hub_test.go` |
+| ORCH | `orchestration/executionflow/hub/hub_test.go` |
 | 跨域集成 | `tests/integration/`, `tests/acceptance/` |
 
 Build tags 见 `openspec/specs/testing-framework/spec.md`。

@@ -111,7 +111,7 @@ FlowCompleted       → TaskManager.status=completed
 FlowFailed          → TaskManager.status=failed
 ```
 
-实现：`orchestration/flow/hub.go` linkTask()
+实现：`orchestration/executionflow/hub/hub.go` linkTask()
 
 ---
 
@@ -129,7 +129,7 @@ FlowFailed          → TaskManager.status=failed
 /task dep <task_id> <blocked_by>   # 添加依赖
 ```
 
-**实现：** `contextengine/tasks/cli_commands.go`
+**实现：** `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go`
 
 ### 规划命令 (`/plan`)
 
@@ -142,7 +142,7 @@ FlowFailed          → TaskManager.status=failed
 /plan show     # 显示当前计划
 ```
 
-**实现：** `contextengine/tasks/cli_commands.go` + `plan_mode.go`
+**实现：** `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` + `plan_mode.go`
 
 ---
 
@@ -242,23 +242,30 @@ internal/layers/contextengine/tasks/
 ├── tool_suite.go            # Task/Plan 工具注册
 └── cli_commands.go          # /task /plan CLI
 
-internal/layers/orchestration/flow/
+internal/layers/orchestration/executionflow/hub/
 └── hub.go                   # linkTask → TaskManager 联动
+
+internal/layers/orchestration/sessionorchestrator/
+└── command_handler.go       # /task /plan CLI dispatch
 
 internal/shared/config/
 ├── queryloop.go             # TasksConfig
 └── execution_flow.go        # ExecutionFlowConfig
 ```
 
-### 目标迁移（D7 v1.1）
+### v2.0 结构（DM-20260619-005，已落地）
 
 ```
-internal/layers/orchestration/coordinator/
-├── workmodel.go             # ← task_manager.go
-├── plan_mode.go             # ← plan_mode.go
-├── plan_agent.go            # ← plan_agent.go
-└── workmodel_store.go       # ← disk_store.go
+internal/layers/orchestration/sessionorchestrator/
+└── workmodel.go             # CreateWorkPlan facade
+
+internal/layers/orchestration/workmodel/
+├── task_manager.go          # Task CRUD + DAG
+├── plan_mode.go             # PlanMode 状态机
+└── plan_agent.go            # PlanAgent 只读探索
 ```
+
+### 目标迁移（D7 v1.1，历史）
 
 ---
 
@@ -280,7 +287,9 @@ internal/layers/orchestration/coordinator/
 ```bash
 # 单元测试
 go test ./internal/layers/contextengine/tasks/...
-go test ./internal/layers/orchestration/flow/...
+go test ./internal/layers/orchestration/workmodel/...
+go test ./internal/layers/orchestration/sessionorchestrator/...
+go test ./internal/layers/orchestration/executionflow/...
 
 # CLI 手动验收
 # 启动 devrix 后：

@@ -183,7 +183,7 @@ See `d7-requirements-clarifications.md` §Migration Coexistence Contract. T: D7-
 
 Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain separate in v1.0 with unified QueryWorkPlan. T: D7-S1-T07.
 
-**Current:** PlanTask in D2 tasks/; Wave in orchestration/wave/; Background in query/background.go
+**Current:** PlanTask in `workmodel/`; Wave dispatch projection in `wavescheduler/`（WorkTree SoT，TD-WT-02 部分闭合）；Background in `workmodel/` + D2 nested
 
 ---
 
@@ -193,11 +193,11 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 ---
 
-### Requirement: D7 Package Identity
+### Requirement: D7 Package Identity（HISTORICAL）
 
 `internal/layers/orchestration/coordinator/` MUST exist as D7 coordinator sub-package.
 
-**Current:** IMPLEMENTED 2026-06-14 — package `coordinator` lives at `internal/layers/orchestration/coordinator/` (16 files: types/contracts/config/classifier/fastpath/orchestrator/interrupt/workmodel/helpers/shadow_classifier/d6_metrics + tests).
+**Current (v2.0):** `coordinator/` 降为 1-release type-alias shim（`aliases.go`）；S2/S5 实现分别在 `sessionorchestrator/`、`decisionplanning/`；共享类型在 `orchtypes/`（DM-20260619-005）。
 
 ---
 

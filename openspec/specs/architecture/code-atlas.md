@@ -28,13 +28,13 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | L4 ID | 名称 | D-S | 包路径 | 关键类型 |
 |-------|------|-----|--------|----------|
 | **D7 主入口与编排** |||||
-| coordinator_entry | D7 SessionOrchestrator 主入口 | D7-S2 | `orchestration/coordinator/` | `Entry`, `Orchestrator` |
-| classifier | Intent 分类器 | D7-S2-A02 | `orchestration/coordinator/classifier.go` | `RuleClassifier`, `LLMClassifier`, `ShadowClassifier` |
-| classifier_fallback | LLM 兜底分类 | D7-S2-A02 | `orchestration/coordinator/classifier_fallback.go` | `LLMClassifierFallback` |
-| command_handler | IntentCommand 显式 dispatch | D7-S2-A03 | `orchestration/coordinator/command_handler.go` | `Handle` |
-| orchestrate_path | IntentOrchestrate SynthesizeTaskGraph → Wave | D7-S2-A03 | `orchestration/coordinator/orchestrate_path.go` | `Run` |
-| fast_path | IntentFast → turn.RunTurn | D7-S2-A03 | `orchestration/coordinator/fastpath.go` | `Run` |
-| llm_decomposer | LLM 拆 DAG | D7-S5-A03 | `orchestration/coordinator/llm_decomposer.go` | `LLMDecomposer`, `SynthesizeTaskGraph` |
+| coordinator_entry | D7 SessionOrchestrator 主入口 | D7-S2 | `orchestration/sessionorchestrator/` | `Entry`, `SessionOrchestrator` |
+| classifier | Intent 分类器 | D7-S5-A01 | `orchestration/decisionplanning/classifier.go` | `RuleClassifier`, `ShadowClassifier` |
+| classifier_fallback | LLM 兜底分类 | D7-S5-A01 | `orchestration/decisionplanning/classifier_fallback.go` | `LLMClassifierFallback` |
+| command_handler | IntentCommand 显式 dispatch | D7-S2-A01 | `orchestration/sessionorchestrator/command_handler.go` | `Handle` |
+| orchestrate_path | IntentOrchestrate SynthesizeTaskGraph → Wave | D7-S2-A01 | `orchestration/sessionorchestrator/orchestrate_path.go` | `Run` |
+| fast_path | IntentFast → turn.RunTurn | D7-S2-A01 | `orchestration/sessionorchestrator/fastpath.go` | `Run` |
+| llm_decomposer | LLM 拆 DAG | D7-S5-A03 | `orchestration/decisionplanning/llm_decomposer.go` | `LLMDecomposer`, `SynthesizeTaskGraph` |
 | turn_orchestrator | RunTurn 主循环（resolve/decompose）| D7-S2-A06 | `orchestration/turn/orchestrator.go` | `DefaultOrchestrator`, `RunTurn`, `ResolveHint` |
 | llm_invoker | D7 直调 D3 | D7-S2-A07 | `orchestration/turn/llm.go` | `GatewayInvoker`, `InvokeStream` |
 | compression_summarizer | Summarizer 拆面出口 | D7-S2-A07 | `orchestration/turn/compression_summarizer.go` | `CompressionSummarizer` |
@@ -51,15 +51,16 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | cross_session | 跨 session 任务 | D7-S1 | `orchestration/workmodel/cross_session.go` | `CrossSessionManager` |
 | decompose | 规则化任务拆解 | D7-S5-A02 | `orchestration/workmodel/decompose.go` | `decomposeGoal` |
 | **D7 多任务调度与执行流** |||||
-| wave_scheduler | DAG 调度 + WorkerPool + ConflictGuard | D7-S3 | `orchestration/wave/scheduler.go` | `Start`, `WaitForCompletion` |
-| wave_subagent_runner | Subagent Worker | D7-S3 | `orchestration/wave/runners/subagent.go` | `SubagentRunner` |
-| wave_agent_tool_runner | Agent Tool Worker | D7-S3 | `orchestration/wave/runners/agent_tool.go` | `AgentToolRunner` |
-| conflict_guard | 冲突组互斥仲裁 | D7-S3 | `orchestration/wave/conflict_guard.go` | `Allow` |
-| context_resolver | 上下文策略解析 | D7-S3 | `orchestration/wave/context_resolver.go` | `Resolve` (fresh/resume/upstream) |
-| execution_hub | FlowEvent 聚合 + 双通道 | D7-S4 | `orchestration/flow/hub.go` | `GlobalHub`, `Publish` |
-| workplan_service | WorkPlan 读模型 | D7-S4 | `orchestration/workplan/service.go` | `Service`, `Snapshot` |
-| im_sink | 飞书 worker_progress 推送 | D7-S4 | `orchestration/imsink/gateway_sink.go` | `GatewaySink` |
-| hubspoke | Hub-Spoke 委派 | D7-S2-A04 | `orchestration/hubspoke/` | `Dispatcher`, `SpokeBridge` |
+| wave_scheduler | DAG 调度 + WorkerPool + ConflictGuard | D7-S3 | `orchestration/wavescheduler/scheduler.go` | `Start`, `WaitForCompletion` |
+| wave_subagent_runner | Subagent Worker | D7-S3 | `orchestration/wavescheduler/runners/subagent.go` | `SubagentRunner` |
+| wave_agent_tool_runner | Agent Tool Worker | D7-S3 | `orchestration/wavescheduler/runners/agent_tool.go` | `AgentToolRunner` |
+| conflict_guard | 冲突组互斥仲裁 | D7-S3 | `orchestration/wavescheduler/conflict.go` | `Allow`, `AllowAndRegister` |
+| context_resolver | 上下文策略解析 | D7-S3 | `orchestration/wavescheduler/context.go` | `Resolve` (fresh/resume/upstream) |
+| execution_hub | FlowEvent 聚合 + 双通道 | D7-S4 | `orchestration/executionflow/hub/hub.go` | `GlobalHub`, `Publish` |
+| workplan_service | WorkPlan 读模型 | D7-S4 | `orchestration/executionflow/workplan/service.go` | `Service`, `Snapshot` |
+| im_sink | 飞书 worker_progress 推送 | D7-S4 | `orchestration/executionflow/imsink/gateway.go` | `GatewaySink` |
+| hubspoke_dispatch | Hub-Spoke 委派（S2） | D7-S2-A04 | `orchestration/sessionorchestrator/dispatch.go` | `Dispatcher` |
+| hubspoke_bridge | Spoke 写侧桥接（S4） | D7-S4-A04/A05 | `orchestration/executionflow/bridge/` | `AgentBridge`, `SubQueryBridge` |
 | milestone | D6↔D7 Milestone Bridge | D7-S4 | `orchestration/milestone/` | `Service`, `TaskFlow` |
 | **D2 Follower（D7 编排对象）** |||||
 | context_preparer | 上下文装配 + CompressHint | D2-S15 | `contextengine/prepare/` | `ContextPreparer` |
@@ -100,7 +101,7 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | `WorkItem`, `WorkTree` v2 | `orchestration/workmodel/workitem.go` | D7-S1 TaskManager, D7-S2-A06 turn.RunTurn, D7-S5 LLMDecomposer |
 | `RunRegistry` | `orchestration/workmodel/run_registry.go` | D7-S1 + D7-S2-A06 |
 | `ResolveAwaiter`, `FocusHint` | `orchestration/workmodel/awaiter.go` | D7-S2-A06 turn.RunTurn (v2.0 unified blocking) |
-| `IntentKind`, `IntentClassification` | `orchestration/coordinator/types.go` | D7-S2-A02 ClassifyIntent, D7-S2-A03 Dispatch |
+| `IntentKind`, `IntentClassification` | `orchestration/orchtypes/intent.go` | D7-S5-A01 ClassifyIntent, D7-S2-A01 Dispatch |
 | `ContextPreparer`, `ToolRoundExecutor`, `SessionPersister` | `contextengine/contracts.go` | D7-S2-A06 turn.RunTurn (DM-020 D2 Follower 拆面契约) |
 | `ExecutionFlowConfig` | `shared/config/execution_flow.go` | bootstrap, Hub |
 | `WorktreeConfig` | `shared/config/worktree.go` | delegate, worktree |
@@ -114,7 +115,7 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 
 | 文件 | 职责 |
 |------|------|
-| **`internal/bootstrap/wire_coordinator.go::WireD7`** | **D7 全 wiring**（PR #36 + #30 v1.0 closure）：`coordinator.Entry` + `turn.NewOrchestrator` + `workmodel.TaskManager` + `wave.Scheduler` + `hubspoke.Dispatcher` + `milestone.Service` 一次性注入 |
+| **`internal/bootstrap/wire_coordinator.go::WireD7`** | **D7 全 wiring**：`sessionorchestrator.Entry`（`coordinator.Entry` shim）+ `turn.NewOrchestrator` + `workmodel.TaskManager` + `wavescheduler.Scheduler` + `sessionorchestrator.Dispatcher` + `milestone.Service` |
 | `internal/bootstrap/execution_flow.go` | ExecutionFlowHub 全局注册、WorkPlan 注入 |
 | `internal/bootstrap/delegate.go` | DelegateService、SubQuery fallback、worktree |
 | `internal/bootstrap/cli_events.go` | CLI worker_progress 渲染 |
@@ -161,14 +162,14 @@ D7-S2-A07 LLMInvoker ──direct──► D3 ILLMGateway (D2→D3 import ban CI
 
 | T 层域 | 测试目录 |
 |--------|----------|
-| D7-S2 SessionOrchestrator | `orchestration/coordinator/orchestrator_test.go`, `entry_test.go`, `command_handler_test.go`, `orchestrate_path_test.go`, `process_message_test.go` |
-| D7-S2-A02 ClassifyIntent | `orchestration/coordinator/classifier_test.go`, `classifier_fallback_test.go`, `shadow_classifier_test.go` |
+| D7-S2 SessionOrchestrator | `orchestration/sessionorchestrator/orchestrator_test.go`, `entry_test.go`, `command_handler_test.go`, `orchestrate_path_test.go` |
+| D7-S5 ClassifyIntent | `orchestration/decisionplanning/classifier_test.go`, `classifier_fallback_test.go`, `shadow_classifier_test.go` |
 | D7-S2-A06 turn.RunTurn | `orchestration/turn/orchestrator_test.go`, `loop_legacy_test.go` |
 | D7-S2-A07 LLMInvoker | `orchestration/turn/llm_test.go`, `query_llm_caller_test.go` |
 | D7-S1 WorkModel v2 | `orchestration/workmodel/{workitem,run_registry,awaiter,task_manager,plan_mode,plan_agent}_test.go` |
-| D7-S3 Wave | `orchestration/wave/scheduler_test.go`, `conflict_guard_test.go` |
-| D7-S4 Flow Hub | `orchestration/flow/hub_test.go`, `orchestration/workplan/service_test.go` |
-| D7-S2-A04 Hub-Spoke | `orchestration/hubspoke/dispatcher_test.go` |
+| D7-S3 Wave | `orchestration/wavescheduler/scheduler_test.go`, `conflict_test.go` |
+| D7-S4 Flow Hub | `orchestration/executionflow/hub/hub_test.go`, `executionflow/workplan/service_test.go` |
+| D7-S2-A04 Hub-Spoke | `orchestration/hubspoke/hubspoke_test.go`, `sessionorchestrator/dispatch.go` |
 | D2-S10 QueryLoop (REMOVED) | `orchestration/turn/orchestrator_test.go`, `turn/subturn_test.go` |
 | D2-S12 Worktree | `contextengine/worktree/manager_test.go` |
 | D2-S15/S17/S18 D2 Follower | `contextengine/{prepare,persist,enforce}/*_test.go` |
@@ -182,4 +183,5 @@ D7-S2-A07 LLMInvoker ──direct──► D3 ILLMGateway (D2→D3 import ban CI
 |---------|------|---------|
 | 1.0.0 | 2026-06-10 | QueryLoop v2 module index (DM-20260610-012) |
 | 1.1.0 | 2026-06-13 | +toolrunner; docs/architecture 可读版同步 |
+| **1.3.0** | **2026-06-19** | **D7 v2.0 Structure 路径对齐**（DM-20260619-005）：sessionorchestrator / decisionplanning / wavescheduler / executionflow / orchtypes |
 | **1.2.0** | **2026-06-19** | **D7 v2.0 unified 主索引替换**（DM-20260619-001, PR docs-only）：D7-S2 主入口 / 4 IntentKind / turn.RunTurn / WorkItem v2 / WaveScheduler / 5 surface；QueryLoop / SubQuery / sidechain_transcript 标 DEPRECATED；D2→D3 import ban 显式标注；Bootstrap Wiring 加 wire_coordinator.go |

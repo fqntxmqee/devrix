@@ -8,9 +8,9 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.10.0
-**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE + D7-S5 LLM Decomposer (S5-A03 v1.1) ✅ DONE
-**Last Updated:** 2026-06-15
+**Version:** 2.11.0
+**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE + D7-S5 LLM Decomposer (S5-A03 v1.1) ✅ DONE + **v2.0 Structure (DM-20260619-005)**
+**Last Updated:** 2026-06-19
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
@@ -46,24 +46,26 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 
 **注：** D7-S5 决策的是**结构路径**（goal → TaskNode DAG），不是**内容质量**。Explore Workers 的 FlowEvent 通过 D7-S4 广播后被 D7-S5 吸收。
 
-### 实现状态（2026-06-15 代码审计）
+### 实现状态（2026-06-19，v2.0 Structure 同步）
+
+> **路径 SoT：** `spec.md` Overview + `code-layout.md` §4.2。下表为现行物理路径；本文件其余章节为 Review R1/R2 历史澄清。
 
 | Scenario | 状态 | 现行代码位置 |
 |----------|------|-------------|
-| D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wave/` |
-| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/flow/`, `workplan/`, `imsink/`, `sessionqueue/` |
-| D7-S1 Work Model | ✅ IMPLEMENTED | `internal/layers/orchestration/workmodel/{task_manager,task_store,plan_mode,plan_agent}.go` + `coordinator/workmodel.go`（DM-20260614-009 v1.1 closure） |
-| D7-S5 Decision & Planning | ✅ IMPLEMENTED | `coordinator/{classifier,classifier_fallback,shadow_classifier,decomposer,executor}.go` + `workmodel/plan_*.go` |
-| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/` + `bootstrap/wire_coordinator.go` + `turn/` |
-| D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,classifier_fallback,shadow_classifier}.go`（80/20 采样 LLM shadow） |
+| D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wavescheduler/` |
+| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/executionflow/{hub,workplan,imsink,bridge}/` + `sessionqueue/` |
+| D7-S1 Work Model | ✅ IMPLEMENTED | `internal/layers/orchestration/workmodel/` + `sessionorchestrator/workmodel.go` |
+| D7-S5 Decision & Planning | ✅ IMPLEMENTED | `decisionplanning/{classifier,decomposer,executor,shadow_classifier,llm_decomposer}.go` + `workmodel/plan_*.go` |
+| D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/sessionorchestrator/` + `bootstrap/wire_coordinator.go` + `turn/` |
+| D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `decisionplanning/{classifier,classifier_fallback,shadow_classifier}.go` |
 | **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/turn/orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
 | **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/turn/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
 | **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | D2 `EngineDeps.Summarizer` 由 D7 注入（`query_llm_caller` 已删，DM-20260618-010） |
 | **FastPath → turn.RunTurn 切换** | ✅ IMPLEMENTED | `turnOrchExecutor` 适配 `coordinator.TurnExecutor`；`FastPath.Run` 走 `turn.RunTurn`（DM-020 + DM-20260618-010） |
-| **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wave/runners/{subagent,agent_tool}.go`（worker runner 子包） |
+| **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wavescheduler/runners/{subagent,agent_tool}.go` |
 | **D6↔D7 Milestone Bridge** | ✅ IMPLEMENTED | `orchestration/milestone/{service,taskflow}.go` → D6 `guard.InterventionExecutor.tasks`（`Fail` / `Complete` 方法实现 `TaskController` 接口；wired via `cmd/devrix/main.go:125`） |
 | D2 Loop 瘦身 / 删除 | ✅ REMOVED | `query/loop.go` 物理删除（DM-20260618-010）；`queryloop_removed_test.go` 守卫 |
-| **D7-S5 LLM Decomposer (S5-A03 v1.1)** | ✅ IMPLEMENTED | `orchestration/coordinator/llm_decomposer.go::LLMDecomposer` + `coordinator.WithLLMDecomposer` + `bootstrap/wire_coordinator.go::WireD7` 用同一个 `GatewayInvoker` 注入；JSON DAG 解析 + enum coercion + unknown-dep drop + 5s 超时回退到 rule-based `decomposeGoal` |
+| **D7-S5 LLM Decomposer (S5-A03 v1.1)** | ✅ IMPLEMENTED | `decisionplanning/llm_decomposer.go::LLMDecomposer` + `sessionorchestrator.WithLLMDecomposer` + `bootstrap/wire_coordinator.go::WireD7` |
 
 **域边界**：
 - D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**Task/Plan 写模型（D7-S1, DM-20260614-009 v1.1 closure）**
@@ -198,9 +200,9 @@ v1.0 OrchestratePath：**不依赖** S5-P3；可路由至 PlanMode 或已有 del
 
 ### Requirement: D7 Domain Identity
 
-D7 MUST exist as a top-level domain under `internal/layers/orchestration/coordinator/` with defined DSAFT S/A/F/T mapping. Domain type MUST be "核心".
+D7 MUST exist as a top-level domain under `internal/layers/orchestration/` with defined DSAFT S/A/F/T mapping. Domain type MUST be "核心".
 
-**Implementation Status (2026-06-14):** ✅ IMPLEMENTED — `internal/layers/orchestration/coordinator/` 已落地（package `coordinator`）；与 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 协同构成 D7 完整实现。
+**Implementation Status (2026-06-19, v2.0):** ✅ IMPLEMENTED — S2 `sessionorchestrator/`、S5 `decisionplanning/`、S3 `wavescheduler/`、S4 `executionflow/{hub,workplan,imsink,bridge}/`、S1 `workmodel/`；`coordinator/` 为 1-release type-alias shim（DM-20260619-005）。历史路径见下方 Scenario 条文。
 
 <!-- T: D7-IDENTITY-T01 (IMPLEMENTED) — covered by repo tree existence check + t-registry -->
 
@@ -354,7 +356,7 @@ D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request ent
 
 D7-S3 MUST provide DAG-based multi-agent scheduling, worker pool management, conflict guarding, and context resolution.
 
-**Implementation Status (2026-06-14):** ✅ IMPLEMENTED at `internal/layers/orchestration/wave/`. 12/11 T 测试点 IMPLEMENTED（D7-S3-T01…T10, T11 PARTIAL）。
+**Implementation Status (2026-06-19):** ✅ IMPLEMENTED at `internal/layers/orchestration/wavescheduler/`（原 `wave/`）。12/11 T 测试点 IMPLEMENTED（D7-S3-T01…T10, T11 PARTIAL）。
 
 <!-- T: D7-S3-T01 … D7-S3-T11 -->
 
@@ -378,7 +380,7 @@ D7-S3 MUST provide DAG-based multi-agent scheduling, worker pool management, con
 
 D7-S4 MUST aggregate FlowEvent from D2 SubQuery and D4 Delegate into WorkPlan snapshots, and publish to D1 Gateway.
 
-**Implementation Status (2026-06-14):** ✅ IMPLEMENTED at `orchestration/flow/hub.go`, `workplan/service.go`, `imsink/gateway.go`. 7 T 测试点 IMPLEMENTED。
+**Implementation Status (2026-06-19):** ✅ IMPLEMENTED at `executionflow/hub/hub.go`, `executionflow/workplan/service.go`, `executionflow/imsink/gateway.go`（原 `flow/`、`workplan/`、`imsink/` 顶格包）。7 T 测试点 IMPLEMENTED。
 
 <!-- T: D7-S4-T01 … D7-S4-T07 -->
 

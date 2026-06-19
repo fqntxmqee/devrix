@@ -155,7 +155,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `WaveScheduler` MUST provide DAG-based multi-agent scheduling with fixed WorkerPool capacity, ConflictGuard, and ContextPolicy resolution.
 
 **Priority:** P0  
-**Package:** `internal/layers/orchestration/wave/`  
+**Package:** `internal/layers/orchestration/wavescheduler/`  
 **T:** D7-S3-T01 … D7-S3-T10
 
 #### Scenario: DAG ready-node dispatch
@@ -195,7 +195,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `ExecutionFlowHub` MUST aggregate `FlowEvent` from D2 SubQuery and D4 Delegate into WorkPlan snapshots, enqueue Leader delegate-progress, and optionally emit IM worker_progress.
 
 **Priority:** P0  
-**Package:** `internal/layers/orchestration/flow/hub.go`  
+**Package:** `internal/layers/orchestration/executionflow/hub/hub.go`  
 **Contract:** `internal/shared/contracts/execution_flow.go`  
 **T:** D7-S4-T01 … D7-S4-T04
 
@@ -234,7 +234,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 `TaskManager` MUST provide session-scoped Task CRUD with optional disk persistence and dependency tracking. PlanMode MUST support inactive → active → pending_approval lifecycle.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/workmodel/` + `coordinator/workmodel.go`（v1.1 闭环，layer-delta Phase I/J）
+**Package:** `internal/layers/orchestration/workmodel/` + `sessionorchestrator/workmodel.go`（v1.1 闭环，layer-delta Phase I/J）
 **T:** D7-S1-T01 … D7-S1-T08（其中 T06 升 IMPLEMENTED via decomposer_test.go::validateGraph）
 
 #### Scenario: Task create and persist
@@ -283,7 +283,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 | D7-S5-P3 SynthesizeTaskGraph | 目标拆解为 DAG（规则 + LLM） | ✅ IMPLEMENTED |
 | D7-S5 SelectExecutor | D2/D4 执行器选择 | ✅ IMPLEMENTED |
 | D2 Thin / QueryLoop removed | loop 已删；D2 无 D4 import | ✅ DM-20260618-010 |
-| D7 package identity | `internal/layers/orchestration/coordinator/` (package `coordinator`) | ✅ IMPLEMENTED |
+| D7 package identity | `sessionorchestrator/` + `decisionplanning/` + `orchtypes/`；`coordinator/` shim（DM-20260619-005） | ✅ IMPLEMENTED |
 | D7 Migration Coexistence | 4 组合回归 | ✅ IMPLEMENTED |
 | D7-S2 Turn Leader (DM-020) | A06 RunTurnLoop + A07 InvokeLLM | ✅ IMPLEMENTED（wired by `wire_coordinator.go`） |
 | D7-S2 Hub-Spoke (DM-018) | A04 DispatchWorker + A04/A05 SpokeBridge | ✅ IMPLEMENTED（wired by `delegate.go`） |
@@ -354,7 +354,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `ConflictGuard.AllowAndRegister()` MUST atomically check conflict and register a task, eliminating the TOCTOU window between `Allow()` and `Register()`. Returns `true` if registered, `false` if conflict prevents registration.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/wave/conflict.go`
+**Package:** `internal/layers/orchestration/wavescheduler/conflict.go`
 **T:** D7-S3-A01-F03-T01 … D7-S3-A01-F03-T04
 
 #### Scenario: AllowAndRegister succeeds when no conflict
@@ -391,7 +391,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `emit()` MUST push FlowEvent to the EventPublisher sink for IM/WebSocket notifications, while also writing to the caller channel. Both paths respect context cancellation; nil sink is gracefully tolerated.
 
 **Priority:** P0
-**Package:** `internal/layers/orchestration/coordinator/orchestrate_path.go`
+**Package:** `internal/layers/orchestration/sessionorchestrator/orchestrate_path.go`
 **T:** D7-S3-A01-F04-T01 … D7-S3-A01-F04-T02
 
 #### Scenario: emit pushes to sink when available
@@ -416,7 +416,7 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 `LLMFallbackClassifier` and `ExecutorSelector` MUST carry `Deprecated:` comments documenting they are deferred to v1.1, so future readers understand they are intentionally dead code rather than bugs.
 
 **Priority:** P1
-**Package:** `internal/layers/orchestration/coordinator/classifier_fallback.go`, `internal/layers/orchestration/coordinator/executor.go`
+**Package:** `internal/layers/orchestration/decisionplanning/classifier_fallback.go`, `internal/layers/orchestration/decisionplanning/executor.go`
 **T:** D7-S2-A03-F06-T01 … D7-S2-A03-F06-T02
 
 #### Scenario: LLMFallbackClassifier has Deprecated marker
@@ -456,7 +456,7 @@ D2 `query.Loop`, `QueryLLMCaller`, and `d2_query_loop_legacy_invocations_total` 
 The `PlanModeApproveGate` config field has been removed across all config layers — Approve/Reject is driven by explicit CLI commands, not an extra config switch.
 
 **Priority:** P0
-**Packages:** `internal/layers/orchestration/coordinator/config.go`, `internal/shared/config/coordinator.go`, `internal/shared/config/loader.go`, `internal/bootstrap/wire_coordinator.go`
+**Packages:** `internal/layers/orchestration/orchtypes/config.go`, `internal/shared/config/coordinator.go`, `internal/shared/config/loader.go`, `internal/bootstrap/wire_coordinator.go`
 **T:** D7-S5-A02-F05-T01 … D7-S5-A02-F05-T02
 
 #### Scenario: Config struct no longer contains the field

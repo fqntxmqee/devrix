@@ -108,8 +108,8 @@
 | D4-S10-A01-T07 | D4 未启用 delegate 降级 SubQuery | Delegate | `internal/layers/contextengine/delegate_fallback_flow_test.go` | IMPLEMENTED | P0 |
 | D4-S10-A02-T08 | delegate-progress 仅 Leader Drain | Delegate | `internal/layers/contextengine/queue/delegate_progress_test.go` | IMPLEMENTED | P0 |
 | D4-S10-A02-T09 | worker_progress 到达 Gateway/IM | Delegate | `internal/layers/orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
-| D4-S10-A02-T10 | SubQuery 与 D4 Worker 共用 FlowEvent schema | Delegate | `internal/layers/orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
-| D4-S10-A02-T11 | FlowStarted 自动 task owner + in_progress | Delegate | `internal/layers/orchestration/flow/hub_test.go` | IMPLEMENTED | P0 |
+| D4-S10-A02-T10 | SubQuery 与 D4 Worker 共用 FlowEvent schema | Delegate | `internal/layers/orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 |
+| D4-S10-A02-T11 | FlowStarted 自动 task owner + in_progress | Delegate | `internal/layers/orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 |
 | D4-S10-A01-T12 | 用户单会话：无第二对话入口 | Delegate | `internal/bootstrap/cli_events_test.go` | IMPLEMENTED | P0 |
 
 ## D4: Cross-Scenario Tests

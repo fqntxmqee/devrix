@@ -378,8 +378,8 @@ type ExecutionFlowHub interface {
 | 现行 (ORCH) | 目标 (D7) | 代码现状 |
 |-------------|-----------|----------|
 | ORCH-S1 WorkPlan | D7-S4 + D7-S1 读投影 | `orchestration/workplan/` |
-| ORCH-S2 ExecutionFlowHub | D7-S4 | `orchestration/flow/hub.go` |
-| ORCH-S3 WaveScheduler | D7-S3 | `orchestration/wave/` |
+| ORCH-S2 ExecutionFlowHub | D7-S4 | `orchestration/executionflow/hub/hub.go` |
+| ORCH-S3 WaveScheduler | D7-S3 | `orchestration/wavescheduler/` |
 | D2 tasks/ | D7-S1 写模型 | `contextengine/tasks/` |
 | D2 engine.Process | D7-S2 ProcessMessage | 未迁移 |
 
