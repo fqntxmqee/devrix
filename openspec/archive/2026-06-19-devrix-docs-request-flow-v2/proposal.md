@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-docs-request-flow-v2
 **Demand ID:** DM-20260619-001
-**Status:** S1_Proposal → S7_Archived（docs-only 快速通道）
+**Status:** S7_Archived（2026-06-19，docs-only 快速通道；PR #89 merged）
 **Date:** 2026-06-19
 **Author:** Devrix Team
 
