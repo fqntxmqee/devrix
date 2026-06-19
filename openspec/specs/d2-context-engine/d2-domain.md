@@ -5,10 +5,10 @@
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S18 (v2.0 final, S19 dismantled, S20 removed)
 **Version:** 8.0.0
-**Last Updated:** 2026-06-18
+**Last Updated:** 2026-06-19
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
-**Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
+**Depended By:** D1 (EngineEvent consumer), **D7 (TurnExecutor / PreparedTurnRunner consumer)**
 **Cross-Domain SoT:** `d7-boundary.md`
 
 ---
@@ -102,8 +102,8 @@
 
 | | D7 | D2 |
 |---|----|----|
-| Stackelberg | **Leader** — 先选路径与 Executor | **Follower** — 后执行 Loop |
-| 回答 | 做什么、顺序、谁做、进度广播 | 上下文如何准备、Loop 如何跑、状态如何持久化 |
+| Stackelberg | **Leader** — 先选路径与 Executor | **Follower** — 后执行 Prepare/ToolRound/Persist |
+| 回答 | 做什么、顺序、谁做、进度广播 | 上下文如何准备、工具如何执行、状态如何持久化 |
 | 不保证 | 结论质量（D6） | 编排决策正确（D7-S5） |
 
 ### 调用链（DM-020 修订）
@@ -125,8 +125,8 @@ D1 → D7.ProcessMessage → D7.RunTurnLoop（D7-S2-A06）
 
 | D7 路径 | D2 Canonical |
 |---------|--------------|
-| FastPath | S15→S16→S17 |
-| Wave Worker (D2) | S16 + S18 per worker |
+| FastPath | S15→D7 RunTurn→S17 |
+| Wave Worker (D2) | S18 per worker（Turn 由 D7 调度） |
 | SubQuery / Background | S15（fork）+ S18（subquery/background） |
 | PlanMode（决策在 D7-S5） | S18 机制执行 |
 
@@ -134,8 +134,7 @@ D1 → D7.ProcessMessage → D7.RunTurnLoop（D7-S2-A06）
 
 | 注入 | 用途 | v2.0 |
 |------|------|------|
-| `QueryRequest` | session、message、system | 保持 |
-| `LoopHooks` | 编排回调 | D7 定义策略 |
+| `PreparedTurnRequest` | session、message、system、tools | 保持 |
 | `SessionQueue` | progress drain | 迁 D7-S4 |
 
 ### 跨域漂移（v1.0 登记 / v2.0 迁移）
@@ -151,28 +150,27 @@ D1 → D7.ProcessMessage → D7.RunTurnLoop（D7-S2-A06）
 ## 与 D7 接口（实现锚点）
 
 ```text
-v2.0 目标（DM-020）:
+v2.0（DM-020 + DM-20260618-010）:
   wire_coordinator.go: ContextPreparer / ToolRoundExecutor / SessionPersister → D2
+  wire_coordinator.go: turnOrchExecutor (TurnExecutor) → D7 RunTurn
+  engine.Process: PreparedTurnRunner → D7 RunTurn / SubTurn
   D7-S2-A07 InvokeLLM → bridges/llm → D3（D7 直调，D2 不参与）
-
-v1.0 Legacy（现行）:
-  wire_coordinator.go: d2Executor.RunQueryLoop → engine.Process
 ```
 
-D7 注入 `LoopHooks`、`SessionQueue`；D2 **不** import `orchestration` 包。
-**D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）。**
+D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断）。
 
 ---
 
-## 实现状态（2026-06-16, v7.0.0）
+## 实现状态（2026-06-19, v8.0.0）
 
 | 项 | 状态 |
 |----|------|
-| QueryLoop 主路径 | ✅ IMPLEMENTED |
-| Per-turn compression | ✅ IMPLEMENTED |
+| D7 Turn 主路径（PreparedTurnRunner） | ✅ IMPLEMENTED |
+| Per-turn compression (`turn_runtime.compress_per_turn`) | ✅ IMPLEMENTED |
 | Deferred complete | ✅ IMPLEMENTED |
-| D2 Thin（query 无 orchestration/multiagent） | ✅ IMPLEMENTED |
+| D2 Thin（无 orchestration/multiagent import） | ✅ IMPLEMENTED |
 | D7 ingress（capture 无 contextengine） | ✅ IMPLEMENTED |
+| QueryLoop 物理删除（S16 REMOVED） | ✅ DM-20260618-010 |
 | tasks/ 归 D7 | ✅ 已迁入 `orchestration/workmodel/` |
 | scenario 物理路径 S15/S17/S18 | ✅ IMPLEMENTED |
 | **D2-S16 Legacy Freeze（→ D7-S2-A06）** | ✅ v1.0 Registry（DM-020） |

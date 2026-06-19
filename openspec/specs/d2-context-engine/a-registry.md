@@ -33,14 +33,14 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 
 > **S19 拆解迁入：** `prepare/conversation/fork.go` + `fork_worker.go`（fork 侧车，仍属 S15 准备面）
 
-### D2-S16: RunQueryLoop — LEGACY FREEZE ✅
+### D2-S16: RunQueryLoop — **REMOVED (DM-20260618-010)**
 
-> **DM-020：** Turn 主循环迁 **D7-S2-A06**；本 S 保留 Thin Loop + Legacy `engine.Process` 追溯。
+> Turn 主循环归 **D7-S2-A06 RunTurn**；`contextengine/query/loop.go` 已删除。
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| D2-S16-A01 | RunLoop | A-BE | session, params | loop_result | `query/loop.go` |
-| D2-S16-A02 | StreamResponse | A-BE | text_chunks | events | `query/loop.go` |
+| ~~D2-S16-A01~~ | ~~RunLoop~~ | — | — | — | ~~`query/loop.go`~~ **REMOVED** |
+| ~~D2-S16-A02~~ | ~~StreamResponse~~ | — | — | — | ~~`query/loop.go`~~ **REMOVED** |
 
 ### D2-S17: PersistSessionState ✅
 

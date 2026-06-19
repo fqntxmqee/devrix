@@ -141,7 +141,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 
 | D7 拥有 | D7 编排（不拥有） | D7 不拥有 |
 |---------|------------------|----------|
-| WorkPlan 读模型（D7-S4） | D2 RunQueryLoop | 会话上下文（D2） |
+| WorkPlan 读模型（D7-S4） | D7 RunTurn / D2 Prepare | 会话上下文（D2） |
 | Wave DAG 调度（D7-S3） | D4 Delegate RunAgent | Agent 生命周期（D4） |
 | FlowEvent 契约（contracts） | — | LLM 调用（D3） |
 | Task/Plan 写模型（D7-S1） | | |

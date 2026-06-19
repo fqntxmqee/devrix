@@ -17,7 +17,7 @@
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 **D7 Turn Leader:** `openspec/changes/devrix-d7-turn-orchestration/` (DM-20260614-020)
 **Hub-Spoke SoT:** `openspec/changes/devrix-d4-sa-refine/` (DM-20260614-018)
-**Depends On:** D2-S15–S16 (QueryLoop Follower), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)  
+**Depends On:** D2-S15–S18 (Context Follower), D4-S2 (Agent Lifecycle), D4-S10 (Delegate), D1-S1 (Gateway)  
 **D2 Boundary SoT:** `openspec/specs/d2-context-engine/d7-boundary.md` (DM-20260614-009)
 
 ---
@@ -58,11 +58,11 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `internal/layers/orchestration/coordinator/{classifier,classifier_fallback,shadow_classifier}.go`（80/20 采样 LLM shadow） |
 | **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/turn/orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
 | **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/turn/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
-| **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | `turn/query_llm_caller.go` + `turn/compression_summarizer.go`（DM-020 拆面出口，注入 D2 EngineDeps） |
-| **FastPath → turn.RunTurn 切换** | ✅ IMPLEMENTED | `bootstrap/wire_coordinator.go::WireD7` 用 `turn.NewOrchestrator(d2Adapter{Prepare,ToolRound,Persist})` + `turnOrchExecutor` 适配 `coordinator.QueryLoopExecutor`；`FastPath.Run` 走 `turn.RunTurn`（DM-020 D-c 完整闭环，commit a6356bc 移除 legacy `d2Executor`） |
+| **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | D2 `EngineDeps.Summarizer` 由 D7 注入（`query_llm_caller` 已删，DM-20260618-010） |
+| **FastPath → turn.RunTurn 切换** | ✅ IMPLEMENTED | `turnOrchExecutor` 适配 `coordinator.TurnExecutor`；`FastPath.Run` 走 `turn.RunTurn`（DM-020 + DM-20260618-010） |
 | **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wave/runners/{subagent,agent_tool}.go`（worker runner 子包） |
 | **D6↔D7 Milestone Bridge** | ✅ IMPLEMENTED | `orchestration/milestone/{service,taskflow}.go` → D6 `guard.InterventionExecutor.tasks`（`Fail` / `Complete` 方法实现 `TaskController` 接口；wired via `cmd/devrix/main.go:125`） |
-| D2 Loop 瘦身 | ✅ IMPLEMENTED | `query/loop.go` **239行**（目标≤200 略超；orchestration 字段已清零）— `LoopHooks` struct 删除；`Hooks` / `Attachments` / `SessionQueue` 4 字段已移除；per-turn 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` 防回插（详见 §Requirement: D2 Thin） |
+| D2 Loop 瘦身 / 删除 | ✅ REMOVED | `query/loop.go` 物理删除（DM-20260618-010）；`queryloop_removed_test.go` 守卫 |
 | **D7-S5 LLM Decomposer (S5-A03 v1.1)** | ✅ IMPLEMENTED | `orchestration/coordinator/llm_decomposer.go::LLMDecomposer` + `coordinator.WithLLMDecomposer` + `bootstrap/wire_coordinator.go::WireD7` 用同一个 `GatewayInvoker` 注入；JSON DAG 解析 + enum coercion + unknown-dep drop + 5s 超时回退到 rule-based `decomposeGoal` |
 
 **域边界**：
@@ -144,10 +144,10 @@ v1.0 不强制非法转换拒绝；v1.1 引入 `TransitionTaskState` 校验（D7
 
 | 路由 | 条件 | 调度者 | 执行者 |
 |------|------|--------|--------|
-| FastPath | ClassifyIntent=simple, confidence≥threshold | D7-S2 | D2 QueryLoop |
+| FastPath | ClassifyIntent=simple, confidence≥threshold | D7-S2 | D7 RunTurn |
 | CommandPath | `/plan` `/task` `/stop` 等 | D7-S2（command-first，优先于 Classify） | 各命令处理器 |
 | PlanPath | PlanMode active 或用户 `/plan` | D7-S2 → S5-P1 | PlanAgent → approve → PlanTask |
-| SerialExplore | orchestrate + 单步 explore/plan | D7-S2 串行 | D2 QueryLoop（只读工具） |
+| SerialExplore | orchestrate + 单步 explore/plan | D7-S2 串行 | D7 RunTurn（只读工具） |
 | WaveExecute | orchestrate + 多 Worker 并行 | **D7-S3** WaveScheduler | D2/D4 via runners |
 | BackgroundRun | SubQuery async | D7-S1 | D2 SubQuery（不经 Wave） |
 
@@ -301,7 +301,7 @@ D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request ent
 - GIVEN a simple user message (e.g. "hello", "what time is it")
 - WHEN D7-S2-A02 EvaluateIntent returns "simple" with confidence ≥ 90% (rules only, no LLM)
 - WHEN D7-S2-A01 routes through fast path
-- THEN D2.RunQueryLoop is called directly
+- THEN TurnExecutor.RunTurn is called directly
 - AND no Plan or Wave Task is created
 - AND FastPath proxy overhead P99 ≤ 2ms after classify (D7-S2-T02a)
 - AND rule classify P99 ≤ 1ms (D7-S2-T02b)

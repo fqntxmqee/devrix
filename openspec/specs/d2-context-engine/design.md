@@ -1,10 +1,10 @@
 # 上下文引擎详细设计（Layer 2）
 
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
-**Change ID:** devrix-context-engine → devrix-queryloop-context → devrix-unified-task-registry
-**Demand ID:** DM-20260607-002, DM-20260610-012, DM-20260611-004
-**版本:** 2.0.0
-**状态:** Active — 主路径 **QueryLoop**（D2-S10）；PEV（D2-S1）已退役
+**Change ID:** devrix-context-engine → devrix-queryloop-context → devrix-d2-queryloop-dismantle
+**Demand ID:** DM-20260607-002, DM-20260610-012, DM-20260611-004, DM-20260618-010
+**版本:** 8.0.0
+**状态:** Active — D2 为 **Prepare / ToolRound / Persist** Follower；Turn 主循环归 **D7**（DM-20260618-010）
 **关联 OpenSpec:** 规格 SoT：`openspec/specs/d2-context-engine/spec.md` · Delta：`layer-delta.md`
 
 ---
@@ -34,7 +34,7 @@
 | Stub 引擎仅 Echo，无法真正「开发助手」 | 真实对话循环 + 工具调用 | 用户提问后获得 LLM 推理与工具执行结果 |
 | 长对话 Token 爆炸、LLM 调用失败 | 七步压缩管道 | 超长会话仍可继续，不丢最近关键上下文 |
 | 会话重启丢失历史 | ContextSnapshot 持久化 | `/new` 之前的历史可恢复（同 Session） |
-| 工具执行结果不可信 | QueryLoop 多轮 tool_use + 权限门 | 工具失败可重试；权限拒绝明确报错 |
+| 工具执行结果不可信 | D7 Turn 多轮 tool_use + D2 权限门 | 工具失败可重试；权限拒绝明确报错 |
 | 通信层四流无内容源 | 引擎统一产出 EngineEvent | CLI/飞书可见 thinking、进度、错误 |
 
 ### 技术目标（量化）
@@ -67,12 +67,12 @@
 
 | 原则 | 上下文引擎落地 |
 |------|----------------|
-| **高内聚低耦合** | `contextengine` 包内聚 QueryLoop/压缩/记忆；对外仅 `Process` + 依赖接口 |
-| **面向失败设计** | Token 超限 → `CTX_EXCEEDED`；快照损坏 → 降级空上下文；QueryLoop max_turns → 保留 partial |
+| **高内聚低耦合** | `contextengine` 包内聚压缩/记忆/工具执行；对外仅 `Process` + 依赖接口 |
+| **面向失败设计** | Token 超限 → `CTX_EXCEEDED`；快照损坏 → 降级空上下文；D7 max_turns → 保留 partial |
 | **数据所有权** | 消息历史归 `SessionContext`；`Session` 只持快照字节；通信层不直接改 history |
 | **单向依赖** | L2 → L3/L4/L5 接口；L1 → L2 接口；禁止 L2 import `adapters` |
 | **Accept Interfaces, Return Structs** | Go 惯例：依赖注入接口，返回具体 Engine/Memory 结构 |
-| **可观测内建** | 每步压缩、QueryLoop span 通过 `IObserver` / Jaeger 上报 |
+| **可观测内建** | 每步压缩、D7 Turn span 通过 `IObserver` / Jaeger 上报 |
 
 ### 命名规范
 
@@ -96,45 +96,48 @@
 
 ## ③ 业务流程
 
-### 3.1 核心用例：处理用户消息（Happy Path — QueryLoop）
+### 3.1 核心用例：处理用户消息（Happy Path — D7 Turn）
 
-> **默认配置**（`query_loop.enabled=true`）：Harness Bootstrap / Preflight / Routing 仅在显式 `query_loop.enabled=false` 时作为 legacy fallback 执行。
+> **v8.0.0（DM-20260618-010）：** D1 → D7 `ProcessMessage` → D2 `Process` 经 `PreparedTurnRunner` 委托 D7 `RunTurn`。D2 负责 Prepare / 持久化；LLM↔Tool 循环在 D7。
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
     participant A as Adapter
     participant G as Gateway
+    participant O as D7 Orchestrator
     participant C as ContextEngine
     participant M as MemoryManager
     participant P as CompressionPipeline
     participant A2 as SystemPromptAssembler
-    participant Q as QueryLoop
-    participant L as ILLMGateway
+    participant T as D7 TurnOrchestrator
+    participant L as D3 LLMGateway
 
     U->>A: 输入消息
     A->>G: RouteInbound(InboundMessage)
-    G->>C: Process(ctx, session, content)
+    G->>O: ProcessMessage
+    O->>C: Process(ctx, session, content)
 
     C->>M: LoadOrInit(session)
     M-->>C: SessionContext
     C->>M: AppendUserMessage
     Note over C: RepairToolMessageChain + MessagesAfterCompactBoundary
-    opt compress_per_turn=false 且超预算
+    opt turn_runtime.compress_per_turn=false 且超预算
         C->>P: Run(messages-only)
         P-->>C: compressed messages
     end
     C->>A2: Build(Layer 0–3)
     A2-->>C: sc.SystemPrompt
-    C->>Q: Run(system, messages, tools)
+    C->>T: PreparedTurnRunner.RunPreparedTurn
     loop max_turns
-        Q->>L: ChatStream
-        L-->>Q: chunks
-        Q-->>C: EngineEvent(thinking/text)
+        T->>C: Prepare (D2-S15)
+        T->>L: InvokeStream (D7→D3)
+        L-->>T: chunks
+        T-->>C: EngineEvent(thinking/text)
         C-->>G: event stream
         opt tool_calls
-            Q->>Q: Permission + ExecuteTools
-            Q-->>C: tool_call / tool_result
+            T->>C: ExecuteToolRound (D2-S18)
+            T-->>C: tool_call / tool_result
         end
     end
     C->>M: AppendFullMessage / TrimMessages
@@ -182,7 +185,7 @@ sequenceDiagram
 | LLM 熔断 | ILLMGateway | `CTX_LLM_4004`，recoverable | 用户重发消息 |
 | 工具执行失败 | IToolRunner | Loop 下一轮或 max_turns 终止 | 工具需幂等设计 |
 | 权限拒绝 | IPermissionGate | `error` + `recoverable=false` | 用户换指令重试 |
-| QueryLoop max_turns | turn == max | 保留 partial 回复 | — |
+| D7 max_turns | turn == max | 保留 partial 回复 | — |
 | context 取消 | ctx.Done / `/stop` | Gateway.Stop → cancel，不发 complete | — |
 | 快照写入失败 | PersistSnapshot | 日志告警，内存态仍可用 | 下次消息重试持久化 |
 
@@ -191,9 +194,9 @@ sequenceDiagram
 ```
 用户消息到达
   → RepairToolMessageChain(MessagesAfterCompactBoundary)
-  → compress_per_turn=false 且 Count(tokens) > CompressionTarget?
-       否 → SystemPromptAssembler.Build → QueryLoop.Run
-       是 → 七步管道(messages-only) → Build → QueryLoop.Run
+  → turn_runtime.compress_per_turn=false 且 Count(tokens) > CompressionTarget?
+       否 → SystemPromptAssembler.Build → PreparedTurnRunner.RunPreparedTurn
+       是 → 七步管道(messages-only) → Build → PreparedTurnRunner.RunPreparedTurn
   → 成功后 commitActiveWindow（per-turn 压缩 + compact_boundary 可选）
 ```
 
@@ -217,7 +220,7 @@ sequenceDiagram
 │  Devrix 系统                                                 │
 │  ┌─────────────────┐    ┌─────────────────────────────┐   │
 │  │ Communication   │    │ Context Engine (本上下文)    │   │
-│  │ 会话/适配/路由   │───▶│ 历史/压缩/QueryLoop/快照      │   │
+│  │ 会话/适配/路由   │───▶│ 历史/压缩/工具执行/快照      │   │
 │  └─────────────────┘    └───────────┬─────────────────┘   │
 │                                        │                     │
 │         ┌──────────────────────────────┼──────────────┐     │
@@ -312,7 +315,7 @@ ContextEngine.Process ───────────────────�
   ├─ MemoryManager.LoadOrInit          <10ms      │
   ├─ CompressionPipeline.Run (可选)    <100ms     │ P99 <200ms
   ├─ SystemPromptAssembler.Build       <20ms      │ (不含 LLM)
-  ├─ QueryLoop.Run ────────────────────────────────┤
+  ├─ PreparedTurnRunner → D7 RunTurn ──────────────┤
   │     └─ ILLMGateway.ChatStream      【外部】   │
   ├─ commitActiveWindow (per-turn)     <100ms     │
   └─ SnapshotStore.Persist               <20ms      │
@@ -528,8 +531,9 @@ SoT 与 `design.md` §2.4 一致；JSON 字段使用 camelCase：
 |------|-----------|-----------|-----------|
 | V1 | 替换 Stub，压缩 1-5+7 | Execute→Verify | Working+ShortTerm |
 | V2 | Autocompact + Token 统一 | Verify commands（executable+args） | 管道 1-4→6→5→7；OpenSpec: `openspec/archive/2026-06-07-devrix-context-engine-v2/` |
-| V6 | QueryLoop + UserContext + Task v2 + SubQuery | QueryLoop.Run | D2-S10 |
-| V7 | Harness 退役主路径；`query_loop.enabled` 默认 true；per-turn 压缩；main transcript；conversation repair | `commitActiveWindow` | DM-20260611-004 |
+| V6 | UserContext + Task v2 + SubQuery（历史 QueryLoop 运行时） | ~~QueryLoop.Run~~ | D2-S10 **REMOVED** |
+| V7 | Harness 退役；per-turn 压缩；main transcript；conversation repair | `commitActiveWindow` | DM-20260611-004 |
+| V8 | QueryLoop 物理删除；Turn 归 D7 | `PreparedTurnRunner` | DM-20260618-010 |
 
 ### V2 增量摘要（DM-20260607-003，Grill 2026-06-07）
 
@@ -619,10 +623,9 @@ go test -tags='acceptance && p0 && d2' ./tests/acceptance/p0/ -run Harness -coun
 |------|------|
 | 主路径 | D7 RunTurn；`obsruntime.PathD7Turn` 计数 |
 | Legacy fallback | **REMOVED**（harness + QueryLoop 均已删除） |
-| Per-turn 压缩 | `compress_per_turn=true`（默认）跳过 Process 入口压缩；`commitActiveWindow` 在回合结束后压缩 active window |
-| Conversation | `RepairToolMessageChain` + `MessagesAfterCompactBoundary` 保证 API 消息合法 |
+| Per-turn 压缩 | `turn_runtime.compress_per_turn=true`（默认）跳过 Process 入口压缩；`commitActiveWindow` 在回合结束后压缩 active window |
 | Main transcript | `main_transcript.enabled` → `{base_dir}/{sessionId}/transcript.jsonl` append-only |
-| Complete 延迟 | QueryLoop 拦截 `complete`；快照与 `sc.Messages` 落盘后再 emit |
+| Complete 延迟 | D7 Turn 延迟 `complete`；快照与 `sc.Messages` 落盘后再 emit |
 | D6 探针 | `PathRegressionProbe`：`legacy_harness > 0` ⇒ score 0 |
 
 **源码锚点：** `internal/layers/contextengine/engine.go`（`runProcess`）、`conversation/repair.go`、`transcript/main_thread.go`

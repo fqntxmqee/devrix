@@ -205,21 +205,25 @@ OTLP Resource MUST 包含 `service.name`（默认 `devrix`）与 `service.versio
 
 ---
 
-### Requirement: QueryLoop Span Hierarchy (P0)
+### Requirement: D7 Turn Span Hierarchy (P0)
 
-QueryLoop 主路径 MUST 形成以下层级（PEV 已退役）：
+> **Supersedes QueryLoop Span Hierarchy (DM-20260618-010).** 主路径 LLM↔Tool span 在 D7：
 
 ```
 gateway.message.receive [SERVER]
-└── context.process [INTERNAL]
-    └── query.loop.run [INTERNAL]
-        └── query.loop.turn [INTERNAL]
-            ├── query.loop.llm.call [CLIENT]
-            │   └── llm.stream [CLIENT]
-            └── tool.execute.single [INTERNAL]
+└── orchestration.turn.run [INTERNAL]
+    └── orchestration.turn.iteration [INTERNAL]
+        ├── orchestration.llm.invoke [CLIENT]
+        │   └── llm.stream [CLIENT]
+        └── tool.execute.single [INTERNAL]
+            └── context.process [INTERNAL]   ← D2 Prepare (caller=d7)
 ```
 
-**T:** D5-S4-A01-T02
+**T:** D5-S4-A01-T02, D7-S2-A06 span tests
+
+### Requirement: QueryLoop Span Hierarchy — **REMOVED (DM-20260618-010)**
+
+~~QueryLoop 主路径~~ 已删除。历史 `query.loop.*` span 仅作追溯登记。
 
 ---
 
@@ -310,7 +314,7 @@ Gateway 入站 MUST 写入 baggage `session.id`；`user.id` 可用时写入。CL
 
 ### Requirement: Runtime Path Metric (P1)
 
-`devrix_runtime_path_resolved_total{path="query_loop|legacy_harness"}` MUST 与 in-process `PathResolver` 同步。
+`devrix_runtime_path_resolved_total{path="d7_turn|legacy_harness"}` MUST 与 in-process `PathResolver` 同步。
 
 **T:** D5-S9-A01-T01
 

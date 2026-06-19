@@ -3,9 +3,9 @@
 **Capability:** context-engine
 **Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-queryloop-context (archived 2026-06-10)
 **Layer:** 2
-**Version:** 7.2.0
+**Version:** 8.0.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-14
+**Last Updated:** 2026-06-19
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md` (D2-S15–S20, DM-20260614-009)  
 **D7 Boundary:** `openspec/specs/d2-context-engine/d7-boundary.md`
 
@@ -13,9 +13,9 @@
 
 ## Overview
 
-上下文引擎负责会话级消息历史、Token 预算、七步压缩与 **QueryLoop** 多轮工具执行，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
+上下文引擎负责会话级消息历史、Token 预算、七步压缩与工具执行原语（Prepare / ToolRound / Persist），并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。**LLM↔Tool 多轮循环归 D7**。
 
-> **V8（2026-06-18，DM-20260618-010）**：D2-S10/S16 QueryLoop **物理删除**。所有 LLM↔Tool 循环归 D7 `RunTurn` / `SubTurn`；D2 `Process()` 经 `PreparedTurnRunner` 委托 D7。`query_loop.enabled` 配置项删除；`query_loop.max_turns` 与 `compress_per_turn` 仍供 D7 读取。详见 `openspec/archive/2026-06-18-devrix-d2-queryloop-dismantle/`。
+> **V8（2026-06-18，DM-20260618-010）**：D2-S10/S16 QueryLoop **物理删除**。所有 LLM↔Tool 循环归 D7 `RunTurn` / `SubTurn`；D2 `Process()` 经 `PreparedTurnRunner` 委托 D7。`query_loop.enabled` 已删除；`turn_runtime.max_turns` 与 `compress_per_turn` 供 D7 读取（yaml 兼容别名 `query_loop`）。详见 `openspec/archive/2026-06-18-devrix-d2-queryloop-dismantle/`。
 
 > **~~LEGACY 标记（2026-06-17，DM-20260617-001）~~**：已由 DM-20260618-010 闭合；`query/loop.go` 不再存在。
 
@@ -873,7 +873,7 @@ When `subquery.fork_subagent_enabled=true`, fork children MUST share identical a
 When `query_loop.streaming_tools=true`, concurrency-safe tools in the same batch MAY execute in parallel; results MUST remain ordered in the transcript.
 
 **Priority:** P1  
-**L4:** query_loop
+**L4:** turn_runtime
 
 ---
 
@@ -971,7 +971,7 @@ Production Process MUST delegate LLM↔Tool rounds to D7 via `PreparedTurnRunner
 
 ### Requirement: Per-Turn Active Window Compression
 
-When `query_loop.compress_per_turn=true`, Process MUST skip entry compression and MUST run `commitActiveWindow` after successful turns when message count or token budget exceeds limits.
+When `turn_runtime.compress_per_turn=true`, Process MUST skip entry compression and MUST run `commitActiveWindow` after successful turns when message count or token budget exceeds limits.
 
 **Priority:** P1  
 **L4:** compression  
@@ -998,7 +998,7 @@ When `main_transcript.enabled=true`, Process MUST append message deltas to appen
 Process MUST emit `complete` only after `sc.Messages` and `session.ContextSnapshot` persistence completes (or after user cancel clean exit).
 
 **Priority:** P0  
-**L4:** query_loop
+**L4:** turn_runtime
 
 ---
 
