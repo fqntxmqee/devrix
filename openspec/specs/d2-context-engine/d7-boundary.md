@@ -71,13 +71,14 @@ D1.Gateway.RouteInbound
 
 ## 4. 契约接口
 
-| 接口 | 定义位置 | 实现 | 消费 |
-|------|----------|------|------|
-| `IOrchestrationEntry` | `shared/contracts` | D7 `coordinator.Entry` | D1 Gateway |
-| `QueryLoopExecutor` | `coordinator` | `bootstrap.d2Executor` | D7 Orchestrator |
-| `IEngine` | `shared/contracts` | `contextengine.Engine` | D7 via adapter |
-| `LoopHooks` | `query/loop.go` | D7 注入 | D2 Loop |
-| `ExecutionFlowHub` | `shared/contracts` | D7 flow | D2/D4 发布 |
+| 接口 | 定义位置 | 实现 | 消费 | 状态 |
+|------|----------|------|------|------|
+| `IOrchestrationEntry` | `shared/contracts` | D7 `coordinator.Entry` | D1 Gateway | ACTIVE |
+| `QueryLoopExecutor` | `coordinator` | `bootstrap.d2Executor` | D7 Orchestrator | ACTIVE |
+| `IEngine` | `shared/contracts` | `contextengine.Engine` | D7 via adapter | ACTIVE |
+| `Loop.Run` | `query/loop.go` | D2 Loop | (fallback only) | **DEPRECATED** (2026-06-17 DM-001; `loopFirst=false` 路径；canonical=D7-S2-A06 RunTurnLoop) |
+| `LoopHooks` | `query/loop.go` | D7 注入 | D2 Loop | **DEPRECATED** (同上) |
+| `ExecutionFlowHub` | `shared/contracts` | D7 flow | D2/D4 发布 | ACTIVE |
 
 ### 4.1 依赖规则（DM-020 修订）
 

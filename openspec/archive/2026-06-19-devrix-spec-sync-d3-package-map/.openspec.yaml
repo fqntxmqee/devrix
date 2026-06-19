@@ -1,0 +1,28 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-spec-sync-d3-package-map
+  demand_id: DM-20260619-002
+  title: "D3 LLM Gateway spec 补登 — protect/ 子包 + configure v2.0 路径 + design v2.0 状态"
+  status: s2_proposal
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-19"
+  updated_at: "2026-06-19"
+
+scope:
+  layers:
+    - id: D3
+      name: LLM Gateway
+      affected: true
+      reason: "docs-only 改动：D3 spec.md Package Map 补 protect/ 子包、configure v2.0 路径、§13 FR-5 状态；design.md v3.2.0 → v3.3.0 标 v2.0 Phase F 已完成"
+
+context:
+  trigger: "审计（2026-06-19，7 域 spec vs code 核对）发现 D3 spec 与代码 4 处不一致：(1) protect/ 子包完整实现但 Package Map 未列；(2) configure/shared_config.go v2.0 路径迁移未跟进，spec 仍标 v1 shared/config/llmgateway.go；(3) stream/adapter/protocol.go 已实现但 spec §13 FR-5 仍标'待实施'；(4) design.md v3.2.0 自称 v2.0 Phase F 实施中，实际已落地"
+  motivation: "D3 spec 作为架构 SoT 与代码不同步会导致新人 oncall 与架构 review 时误判（特别是 protect/ 韧性能力与 v2.0 物理路径）"
+  out_of_scope:
+    - "D3 域代码改动（保持 v2.0 不动）"
+    - "新增 / 删除 / 重命名 D-S 编号"
+    - "D3 spec Scenarios 行为变更（仅同步状态与目录树）"

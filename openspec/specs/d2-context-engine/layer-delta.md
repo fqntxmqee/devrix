@@ -26,7 +26,7 @@
 - THEN D7 RunTurn continues until no pending tool calls or `max_turns` reached
 
 #### Scenario: Per-turn compression
-- GIVEN `query_loop.compress_per_turn=true` (default)
+- GIVEN `turn_runtime.compress_per_turn=true` (default)
 - WHEN Process starts
 - THEN entry compression is skipped (`skipEntryCompress`)
 - AND `commitActiveWindow` runs messages-only seven-step pipeline after each successful turn when budget exceeded

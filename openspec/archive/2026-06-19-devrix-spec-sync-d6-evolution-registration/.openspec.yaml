@@ -1,0 +1,28 @@
+version: "1.0"
+status: s7_archived
+kind: change
+
+meta:
+  change_id: devrix-spec-sync-d6-evolution-registration
+  demand_id: DM-20260619-003
+  title: "D6 Evolution spec 补登 — evaluate/guard/verify 子包 + d6-domain.md + v2.0 物理路径迁移记录"
+  status: s2_proposal
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-19"
+  updated_at: "2026-06-19"
+
+scope:
+  layers:
+    - id: D6
+      name: Evolution
+      affected: true
+      reason: "docs-only 改动：D6 spec.md Package Map 补 evaluate/guard/verify 三个子包；新建 d6-domain.md 对齐 D2/D4/D5/D7 结构；layer-delta.md 追加 v2.0 物理路径迁移条目（eval→evaluate, orchestration→guard, 新增 verify/）"
+
+context:
+  trigger: "审计（2026-06-19）发现 D6 spec 三份文档（spec.md / design.md / layer-delta.md）完全未记录 evaluate/guard/verify 三个已落地的子包；spec 仍列 orchestration/ 但代码已迁至 guard/；D6 是项目唯一缺 d6-domain.md 的支撑域；guard 子包曾因 orchestration→guard 重命名误删后从 42bf1d7 恢复，spec 对此变更零记录存在文档-代码完全脱钩风险"
+  motivation: "D6 是支撑层（含 Self-Eval 引擎与 Guard 韧性），但 spec 文档严重不完整，新增维护者无法理解 D6 实际职责；guard 子包历史误删教训需要明确 spec 留痕"
+  out_of_scope:
+    - "D6 域代码改动（保持 v2.0 不动）"
+    - "新增 / 删除 / 重命名 D-S 编号"
+    - "D6 spec Scenarios 行为变更（仅同步状态与目录树）"

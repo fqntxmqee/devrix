@@ -1,12 +1,13 @@
 name: layer-lint
 
+# 精简策略（DM-20260619-005）：
+# - 删除 strict job（CI 阻断），仅保留 warn job（不阻断，仅报告违规）
+# - 分层 import 硬门禁（strict gate）从 GitHub branch protection 移除
+# - 架构 lint 违规仍会在 PR 评论展示，但不再阻断 PR merge
+# - 本地开发者自检：`go run ./cmd/devrix-layer-lint --root=internal/layers --strict`
+
 # Covers: CROSS-T03  (CI gate that blocks reverse D{N}→D{M} imports)
-#
-# This workflow runs the devrix-layer-lint scanner on every PR. In WARN mode
-# the scanner reports violations but exits 0; the strict job in the same file
-# runs with --strict and exits 1 on any violation. Future change sets can flip
-# the default to --strict once the violation count is at zero (see
-# devrix-layer-isolation / DM-20260611-002).
+# In WARN mode the scanner reports violations but exits 0.
 
 on:
   pull_request:
@@ -33,18 +34,3 @@ jobs:
 
       - name: Run layer-lint (report only)
         run: go run ./cmd/devrix-layer-lint --root=internal/layers --format=text
-
-  strict:
-    name: layer-lint (strict gate)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-
-      - name: Run layer-lint (block on violation)
-        run: go run ./cmd/devrix-layer-lint --root=internal/layers --format=text --strict

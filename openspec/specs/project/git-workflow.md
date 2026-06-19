@@ -1,8 +1,8 @@
 # Git 与 PR 工作流规范（单人团队）
 
-**版本:** 1.0.0
+**版本:** 1.1.0
 **状态:** Active
-**最后更新:** 2026-06-16
+**最后更新:** 2026-06-19
 **所属阶段:** S4 实现 → S6 交付
 **关联规范:** `master.md` · `review-code.md` · `archiving.md`
 **适用对象:** 人类开发者 · **Cursor Agent** · **Claude Code** · 其他 IDE Agent
@@ -18,7 +18,7 @@ Devrix 当前为 **单人维护**（solo maintainer）。GitHub **不允许 PR �
 | 门禁层 | 单人团队策略 | 说明 |
 |--------|-------------|------|
 | **必须走 PR** | ✅ 保留 | 禁止直接 push `master` |
-| **CI 全绿** | ✅ 保留 | 3 项 required checks（见 §4） |
+| **CI 全绿** | ✅ 保留 | 1 项 required check（见 §4） |
 | **他人 Approve** | ❌ 关闭（count = 0） | 用 **Agent 自检 + CI** 替代人工 Review |
 | **S4-Gate 代码审查** | ✅ 保留（流程内） | Agent 按 `review-code.md` 清单自检并写入 PR 描述 |
 
@@ -35,7 +35,7 @@ Devrix 当前为 **单人维护**（solo maintainer）。GitHub **不允许 PR �
 | 项 | 值 |
 |----|-----|
 | Require PR before merging | ✅ |
-| Required status checks (strict) | `unit tests` · `integration / e2e / acceptance` · `layer-lint (strict gate)` |
+| Required status checks (strict) | `unit tests` |
 | Require approvals | ✅（count = **0**） |
 | Dismiss stale reviews | ✅ |
 | Require code owner reviews | ❌ |
@@ -83,11 +83,15 @@ PR 合并前以下检查必须 **SUCCESS**：
 
 | Check | Workflow | 说明 |
 |-------|----------|------|
-| `unit tests` | `ci` | 单元测试 |
-| `integration / e2e / acceptance` | `ci` | 集成 / 验收 |
-| `layer-lint (strict gate)` | `layer-lint` | 分层 import 硬门禁 |
+| `unit tests` | `ci` | 单元测试（`./scripts/test-unit.sh`） |
 
-可选参考（非 required）：`layer-lint (warn)`、`coverage`。
+可选参考（非 required，PR 评论区展示但不阻断 merge）：
+
+| Check | Workflow | 说明 |
+|-------|----------|------|
+| `layer-lint (warn)` | `layer-lint` | 分层 import 检查（warn-only） |
+
+> **精简策略（DM-20260619-005）：** 本地每次合入前跑全量测试（unit + integration + e2e + acceptance + coverage），CI 仅保留 `unit tests` 作为 PR smoke check，避免每次 PR 重复跑全量导致 ~45min 浪费。架构 lint 违规仍会展示，但不再阻断 merge。本地开发者自检架构门禁：`go run ./cmd/devrix-layer-lint --root=internal/layers --strict`。
 
 查看状态：
 
@@ -180,7 +184,7 @@ git pull origin master
 3. **Push** — `git push -u origin HEAD`
 4. **开 PR** — `gh pr create --base master`；body 含 §5.2 章节
 5. **开 Auto-merge** — `gh pr merge <N> --auto --squash`
-6. **盯 CI** — `gh pr checks <N>` 直至 required 三项全 pass
+6. **盯 CI** — `gh pr checks <N>` 直至 `unit tests` pass
 7. **汇报** — 给出 PR URL、CI 结果、合入 commit SHA；合入后提醒 `git pull`
 
 **不得：** 直接 `git push origin master`；未经用户要求 `git push --force`；在 CI 失败时绕过保护合并。
@@ -239,9 +243,7 @@ gh api repos/fqntxmqee/devrix/branches/master/protection -X PUT --input - <<'EOF
   "required_status_checks": {
     "strict": true,
     "checks": [
-      {"context": "unit tests", "app_id": 15368},
-      {"context": "integration / e2e / acceptance", "app_id": 15368},
-      {"context": "layer-lint (strict gate)", "app_id": 15368}
+      {"context": "unit tests", "app_id": 15368}
     ]
   },
   "enforce_admins": true,
@@ -260,7 +262,7 @@ EOF
 
 ### 9.2 仍建议保留
 
-- PR 门禁 + 3 项 CI
+- PR 门禁 + 1 项 CI（`unit tests`）
 - Squash merge
 - Auto-merge（Review 通过后自动合入）
 
@@ -271,3 +273,4 @@ EOF
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0.0 | 2026-06-16 | 初版：单人团队 PR + CI + Auto-merge；固化 master 分支保护与 Agent 清单 |
+| 1.1.0 | 2026-06-19 | CI 精简（DM-20260619-005）：删除 `integration / e2e / acceptance` 与 `layer-lint (strict gate)` required check；仅保留 `unit tests` 作为 PR smoke check；`layer-lint` 降为 warn-only |

@@ -1,8 +1,8 @@
 # Delta: Domain D6 (Evolution)
 
 **Change ID:** devrix-d6-evolution
-**Affects:** evolution layer — eval engine, orchestration validator
-**Last Updated:** 2026-06-14
+**Affects:** evolution layer — eval engine, guard validator, verify invariant
+**Last Updated:** 2026-06-19
 
 ---
 
@@ -81,6 +81,8 @@ CI 脚本：`scripts/eval/run-eval.sh`
 | OrchestrationObserver | `orchestration/observer.go` | D4 AgentObserver 桥接，捕获 fork/permit 事件 |
 | RuntimeJudge | `orchestration/judge_adapter.go` | 经 D3 Gateway 的跨模型决策校验 |
 
+> **v2.0 物理路径迁移后**（见下文 V2.2）：`orchestration/` → `guard/`，`RuntimeOrchestrationValidator` → `RuntimeGuardValidator`，`OrchestrationObserver` → `GuardObserver`，指标名 `orch_*` → `guard_*`。
+
 支持特性：
 - 预过滤器（可信工具允许列表、最小 Judge 间隔、最大 Judge 速率）
 - 三种干预动作（terminate、terminateAndReroute、updateState）
@@ -115,3 +117,53 @@ evolution:
 ### REMOVED
 
 (None — V2.1 为纯增量)
+
+---
+
+## V2.2 (2026-06-15, devrix-d6-evolution-v2.0-physical-paths)
+
+> docs-only 同步条目（DM-20260619-003 同步到 layer-delta.md）。代码 v2.0 已于 2026-06-15 落地（DM-20260615-003），本章节仅为路径迁移的事实记录。
+
+### ADDED — D6 v2.0 物理路径迁移
+
+v2.0 物理路径迁移落地 3 包重命名 + 1 包新增：
+
+| 旧路径 | 新路径 | 原因 |
+|--------|--------|------|
+| `eval/` | `evaluate/` | 与 D3 evaluate/ 命名对齐；避免 eval 关键字歧义 |
+| `orchestration/` | `guard/` | 与 D7 orchestration/ 同名冲突；guard 更准确反映"决策入口 + 干预触发"职责 |
+| `exporter/` | `export/` | 命名统一（其他域均无 -er 后缀） |
+| (无) | `verify/` | Invariant 验证从 evaluate 物理独立 |
+
+#### Scenario: 路径迁移完整
+
+- GIVEN 6 个重命名/新增子包
+- WHEN v2.0 落地（DM-20260615-003, 2026-06-15）
+- THEN `internal/layers/evolution/` 含 `eval/ + evaluate/ + guard/ + orchestration/ + verify/ + export/ + exporter/ + spans.go`（含 bridge 桥接）
+- AND bridge.go 在 v2.0.1 cleanup 后全部删除（11 个 bridge.go 移除）
+
+#### Scenario: guard 误删恢复
+
+- GIVEN guard 子包曾因 orchestration→guard 重命名误删
+- WHEN 42bf1d7 提交恢复
+- THEN guard 子包 7 个 .go 文件完整存在（validator.go / intervention.go / observer.go / judge_adapter.go / types.go / config.go / metrics.go）
+- AND spec `d6-domain.md` §历史留痕 显式标注该事件
+- AND `validator_test.go` 在恢复范围内
+
+#### Scenario: D6-S4 名称与组件映射
+
+- GIVEN v2.0 路径迁移
+- WHEN spec 文档同步
+- THEN 章节名 `D6-S4: Orchestration` → `D6-S4: GuardRuntime`
+- AND 组件 `RuntimeOrchestrationValidator` → `RuntimeGuardValidator`
+- AND 组件 `OrchestrationObserver` → `GuardObserver`
+- AND 配置 `evolution.orchestration.*` → `evolution.guard.*`
+- AND 指标名 `orch_*` → `guard_*`（6 个指标计数器）
+
+#### Scenario: D6-S5 VerifyInvariant 物理独立
+
+- GIVEN v2.0 新增 `verify/` 子包
+- WHEN spec 同步
+- THEN 新增章节 `D6-S5: VerifyInvariant`
+- AND 列出 `_invariant.go` (Invariant 接口 + 注册表) + `plan.go` (VerifyPlan 编排)
+- AND 与 D6-S4 Guard 联动：invariant 失败时 emit `DecisionCategory = "invariant_violation"`, `RiskClass = Critical`
