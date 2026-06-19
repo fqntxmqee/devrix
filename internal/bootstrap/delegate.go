@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/worktree"
+	"github.com/devrix/devrix/internal/layers/contextengine/sandbox"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
@@ -62,12 +62,12 @@ func WireDelegate(
 			FlowReporter: fr,
 		})
 	}
-	var wt *worktree.Manager
-	if ctxCfg.Worktree.Enabled {
-		wt = worktree.NewManager(ctxCfg.Worktree)
+	var sb *sandbox.Manager
+	if ctxCfg.Sandbox.Enabled {
+		sb = sandbox.NewManager(ctxCfg.Sandbox)
 	}
 
-	exec := execute.NewExecutor(maCfg.Delegate, wt, nil)
+	exec := execute.NewExecutor(maCfg.Delegate, sb, nil)
 	disp := hubspoke.NewDispatcher(
 		maCfg.Delegate,
 		exec,
@@ -95,6 +95,6 @@ func WireDelegate(
 	}
 	slog.Info("d4 delegate enabled (hubspoke)",
 		"allow_async", maCfg.Delegate.AllowAsync,
-		"worktree", ctxCfg.Worktree.Enabled,
+		"sandbox", ctxCfg.Sandbox.Enabled,
 	)
 }

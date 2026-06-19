@@ -69,7 +69,7 @@
 | D2-S9 | Harness | Legacy | → **REMOVED** |
 | D2-S10 | QueryLoop | Legacy | **REMOVED → D7-S2-A06** |
 | D2-S11 | Queue | Legacy | → **D7-S4** |
-| D2-S12 | Worktree | Legacy | → S18 |
+| D2-S12 | WorkerDirSandbox | Legacy | → S18 (`contextengine/sandbox/`) |
 | D2-S13 | Conversation | Legacy | → S15 |
 | D2-S14 | Mock | Legacy | 测试辅助 |
 

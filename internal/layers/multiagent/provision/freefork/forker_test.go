@@ -16,16 +16,16 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// stubWorktree 简单 worktree sandbox mock:用 t.TempDir() 作 base。
-type stubWorktree struct {
+// stubWorkerSandbox 简单 worktree sandbox mock:用 t.TempDir() 作 base。
+type stubWorkerSandbox struct {
 	enabled bool
 	base    string
 	mu      sync.Mutex
 	entered []string
 }
 
-func (s *stubWorktree) Enabled() bool { return s.enabled }
-func (s *stubWorktree) Enter(_ context.Context, sessionID, slug, _ string) (string, error) {
+func (s *stubWorkerSandbox) Enabled() bool { return s.enabled }
+func (s *stubWorkerSandbox) Enter(_ context.Context, sessionID, slug, _ string) (string, error) {
 	if !s.enabled {
 		return "", errors.New("disabled")
 	}
@@ -38,7 +38,7 @@ func (s *stubWorktree) Enter(_ context.Context, sessionID, slug, _ string) (stri
 	s.mu.Unlock()
 	return p, nil
 }
-func (s *stubWorktree) Exit(_ context.Context, path string, _ bool) error {
+func (s *stubWorkerSandbox) Exit(_ context.Context, path string, _ bool) error {
 	return os.RemoveAll(path)
 }
 
@@ -131,8 +131,8 @@ func intToStr(n int) string {
 // TestFork_SpawnsAll — 批量 fork 全部成功。
 func TestFork_SpawnsAll(t *testing.T) {
 	fac := &stubFactory{}
-	wt := &stubWorktree{enabled: true, base: t.TempDir()}
-	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: wt})
+	wt := &stubWorkerSandbox{enabled: true, base: t.TempDir()}
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Sandbox: wt})
 
 	handles, err := f.Fork(context.Background(), "sess-A", []ForkRequest{
 		{Name: "alpha", Prompt: "do A", Worktree: true},
@@ -150,14 +150,14 @@ func TestFork_SpawnsAll(t *testing.T) {
 	for _, h := range handles {
 		byName[h.Name] = h
 	}
-	if byName["alpha"].Worktree == "" {
+	if byName["alpha"].SandboxPath == "" {
 		t.Errorf("alpha should have worktree, got empty")
 	}
-	if byName["beta"].Worktree == "" {
+	if byName["beta"].SandboxPath == "" {
 		t.Errorf("beta should have worktree, got empty")
 	}
-	if byName["gamma"].Worktree != "" {
-		t.Errorf("gamma should not have worktree, got %q", byName["gamma"].Worktree)
+	if byName["gamma"].SandboxPath != "" {
+		t.Errorf("gamma should not have worktree, got %q", byName["gamma"].SandboxPath)
 	}
 	// factory 收到 3 个 cfg
 	if got := len(fac.snapshot()); got != 3 {
@@ -176,7 +176,7 @@ func TestFork_EmptyParentSessionRejected(t *testing.T) {
 
 // TestFork_NilFactoryRejected — 缺工厂 → 拒绝。
 func TestFork_NilFactoryRejected(t *testing.T) {
-	f := NewDefaultForker(ForkerDeps{Worktree: &stubWorktree{}})
+	f := NewDefaultForker(ForkerDeps{Sandbox: &stubWorkerSandbox{}})
 	_, err := f.Fork(context.Background(), "s", []ForkRequest{{Name: "x"}})
 	if err == nil {
 		t.Fatal("expected error for nil factory")
@@ -208,8 +208,8 @@ func TestFork_NameRequired(t *testing.T) {
 func TestFork_FactoryFailureRollsBack(t *testing.T) {
 	fac := &stubFactory{}
 	fac.failNext.Store(true) // 全部 Create 都失败
-	wt := &stubWorktree{enabled: true, base: t.TempDir()}
-	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: wt})
+	wt := &stubWorkerSandbox{enabled: true, base: t.TempDir()}
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Sandbox: wt})
 
 	_, err := f.Fork(context.Background(), "s", []ForkRequest{
 		{Name: "alpha", Worktree: true},
@@ -225,8 +225,8 @@ func TestFork_FailureMidBatchRollsBack(t *testing.T) {
 	fac := &stubFactory{nextID: atomic.Int32{}}
 	// 第一次 Create 成功,第二次失败
 	fac.failNext.Store(true)
-	wt := &stubWorktree{enabled: true, base: t.TempDir()}
-	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: wt})
+	wt := &stubWorkerSandbox{enabled: true, base: t.TempDir()}
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Sandbox: wt})
 
 	_, err := f.Fork(context.Background(), "s", []ForkRequest{
 		{Name: "alpha", Worktree: true},
@@ -247,7 +247,7 @@ func TestFork_FailureMidBatchRollsBack(t *testing.T) {
 // TestFork_PromptPassedToAgent — prompt → cfg.InitialInput。
 func TestFork_PromptPassedToAgent(t *testing.T) {
 	fac := &stubFactory{}
-	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: nil})
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Sandbox: nil})
 	_, err := f.Fork(context.Background(), "s", []ForkRequest{
 		{Name: "p", Prompt: "build the rocket", Worktree: false},
 	})
@@ -286,10 +286,10 @@ func TestSlugify_BasicCases(t *testing.T) {
 // TestFork_WorktreeDisabledSkipsSandbox — Worktree=true 但 wt disabled → 走 default WorkDir。
 func TestFork_WorktreeDisabledSkipsSandbox(t *testing.T) {
 	fac := &stubFactory{}
-	wt := &stubWorktree{enabled: false} // disabled
+	wt := &stubWorkerSandbox{enabled: false} // disabled
 	f := NewDefaultForker(ForkerDeps{
 		Factory:  fac,
-		Worktree: wt,
+		Sandbox: wt,
 		DefaultConfig: multiagent.AgentConfig{WorkDir: "/tmp/orig"},
 	})
 	handles, err := f.Fork(context.Background(), "s", []ForkRequest{
@@ -301,8 +301,8 @@ func TestFork_WorktreeDisabledSkipsSandbox(t *testing.T) {
 	if len(handles) != 1 {
 		t.Fatalf("expected 1 handle, got %d", len(handles))
 	}
-	if handles[0].Worktree != "" {
-		t.Errorf("expected no worktree, got %q", handles[0].Worktree)
+	if handles[0].SandboxPath != "" {
+		t.Errorf("expected no worktree, got %q", handles[0].SandboxPath)
 	}
 	// WorkDir 应保留 default
 	if got := fac.snapshot()[0].WorkDir; got != "/tmp/orig" {
@@ -330,8 +330,8 @@ func TestKernelImport(t *testing.T) {
 // 全部由 multiagent/provision/freefork/forker.go + shared/contracts/worktree.go 实现。
 func TestW8_10_FreeForkStack_T_CrossRef(t *testing.T) {
 	fac := &stubFactory{}
-	wt := &stubWorktree{enabled: true, base: t.TempDir()}
-	f := NewDefaultForker(ForkerDeps{Factory: fac, Worktree: wt})
+	wt := &stubWorkerSandbox{enabled: true, base: t.TempDir()}
+	f := NewDefaultForker(ForkerDeps{Factory: fac, Sandbox: wt})
 
 	// W8: Fork 批量 (T: free-fork T01)
 	handles, err := f.Fork(context.Background(), "sess-W8", []ForkRequest{

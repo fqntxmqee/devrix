@@ -6,25 +6,22 @@ import (
 	"strings"
 )
 
-// WorktreeConfig controls D2-S12 isolated worker directories.
-type WorktreeConfig struct {
+// SandboxConfig controls D2-S18 isolated worker directories (filesystem sandbox).
+type SandboxConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	BaseDir string `yaml:"base_dir"`
 }
 
-// DefaultWorktreeConfig returns v2 defaults (disabled until explicitly enabled).
-func DefaultWorktreeConfig() WorktreeConfig {
+func DefaultSandboxConfig() SandboxConfig {
 	home, _ := os.UserHomeDir()
-	base := filepath.Join(home, ".devrix", "worktrees")
-	return WorktreeConfig{
+	return SandboxConfig{
 		Enabled: false,
-		BaseDir: base,
+		BaseDir: filepath.Join(home, ".devrix", "sandboxes"),
 	}
 }
 
-// NormalizeWorktreeConfig applies defaults to zero values.
-func NormalizeWorktreeConfig(cfg WorktreeConfig) WorktreeConfig {
-	def := DefaultWorktreeConfig()
+func NormalizeSandboxConfig(cfg SandboxConfig) SandboxConfig {
+	def := DefaultSandboxConfig()
 	if strings.TrimSpace(cfg.BaseDir) == "" {
 		cfg.BaseDir = def.BaseDir
 	}

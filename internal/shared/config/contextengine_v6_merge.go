@@ -11,7 +11,8 @@ func mergeContextEngineV6(base, file ContextEngineConfig) ContextEngineConfig {
 	out.Tasks = mergeTasksConfig(out.Tasks, file.Tasks)
 	out.SubQuery = mergeSubQueryConfig(out.SubQuery, file.SubQuery)
 	out.ExecutionFlow = mergeExecutionFlowConfig(out.ExecutionFlow, file.ExecutionFlow)
-	out.Worktree = mergeWorktreeConfig(out.Worktree, file.Worktree)
+	out.Sandbox = mergeSandboxConfig(out.Sandbox, file.Sandbox)
+	out.Sandbox = mergeSandboxConfig(out.Sandbox, file.Worktree)
 	return out
 }
 
@@ -122,7 +123,7 @@ func mergeExecutionFlowConfig(base, override ExecutionFlowConfig) ExecutionFlowC
 	return out
 }
 
-func mergeWorktreeConfig(base, override WorktreeConfig) WorktreeConfig {
+func mergeSandboxConfig(base, override SandboxConfig) SandboxConfig {
 	out := base
 	if override.Enabled {
 		out.Enabled = true

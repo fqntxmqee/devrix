@@ -24,13 +24,13 @@ type WorkerObserver interface {
 // DSAFT: D4-S14-A01 (ExecuteWorker)
 type Executor struct {
 	cfg      config.DelegateConfig
-	worktree contracts.WorktreeSandbox
+	sandbox contracts.WorkerDirSandbox
 	observer WorkerObserver
 }
 
 // NewExecutor creates a WorkerExecutor.
-func NewExecutor(cfg config.DelegateConfig, wt contracts.WorktreeSandbox, obs WorkerObserver) *Executor {
-	return &Executor{cfg: cfg, worktree: wt, observer: obs}
+func NewExecutor(cfg config.DelegateConfig, sb contracts.WorkerDirSandbox, obs WorkerObserver) *Executor {
+	return &Executor{cfg: cfg, sandbox: sb, observer: obs}
 }
 
 // ExecuteSync forks a worker, runs it synchronously, joins, and returns the result.
@@ -45,12 +45,12 @@ func (e *Executor) ExecuteSync(ctx context.Context, leader multiagent.Agent, spe
 	if leader == nil {
 		return WorkerResult{}, fmt.Errorf("execute: leader is nil")
 	}
-	child, wtPath, err := e.forkWorker(ctx, leader, spec)
+	child, sbPath, err := e.forkWorker(ctx, leader, spec)
 	if err != nil {
 		return WorkerResult{}, err
 	}
-	if wtPath != "" && e.worktree != nil {
-		defer func() { _ = e.worktree.Exit(context.Background(), wtPath, false) }()
+	if sbPath != "" && e.sandbox != nil {
+		defer func() { _ = e.sandbox.Exit(context.Background(), sbPath, false) }()
 	}
 
 	obs := e.resolveObserver(spec)
@@ -88,7 +88,7 @@ func (e *Executor) ExecuteAsync(ctx context.Context, leader multiagent.Agent, sp
 	if !e.cfg.AllowAsync {
 		return "", fmt.Errorf("execute: async not enabled")
 	}
-	child, wtPath, err := e.forkWorker(ctx, leader, spec)
+	child, sbPath, err := e.forkWorker(ctx, leader, spec)
 	if err != nil {
 		return "", err
 	}
@@ -102,8 +102,8 @@ func (e *Executor) ExecuteAsync(ctx context.Context, leader multiagent.Agent, sp
 	go func(l multiagent.Agent) {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
-		if wtPath != "" && e.worktree != nil {
-			defer func() { _ = e.worktree.Exit(bgCtx, wtPath, false) }()
+		if sbPath != "" && e.sandbox != nil {
+			defer func() { _ = e.sandbox.Exit(bgCtx, sbPath, false) }()
 		}
 		result, runErr := child.Run(bgCtx)
 		summary := extractSummary(result)
@@ -123,13 +123,13 @@ func (e *Executor) forkWorker(ctx context.Context, leader multiagent.Agent, spec
 		maxTurns = 50
 	}
 	workDir := leader.Config().WorkDir
-	var wtPath string
-	if e.worktree != nil && e.worktree.Enabled() && strings.TrimSpace(spec.WorktreeSlug) != "" {
-		path, err := e.worktree.Enter(ctx, leader.Config().SessionID, spec.WorktreeSlug, workDir)
+	var sbPath string
+	if e.sandbox != nil && e.sandbox.Enabled() && strings.TrimSpace(spec.SandboxSlug) != "" {
+		path, err := e.sandbox.Enter(ctx, leader.Config().SessionID, spec.SandboxSlug, workDir)
 		if err != nil {
 			return nil, "", err
 		}
-		wtPath = path
+		sbPath = path
 		workDir = path
 	}
 	childCfg := multiagent.AgentConfig{
@@ -145,12 +145,12 @@ func (e *Executor) forkWorker(ctx context.Context, leader multiagent.Agent, spec
 	}
 	child, err := leader.Fork(ctx, childCfg)
 	if err != nil {
-		if wtPath != "" && e.worktree != nil {
-			_ = e.worktree.Exit(ctx, wtPath, false)
+		if sbPath != "" && e.sandbox != nil {
+			_ = e.sandbox.Exit(ctx, sbPath, false)
 		}
 		return nil, "", err
 	}
-	return child, wtPath, nil
+	return child, sbPath, nil
 }
 
 func systemPromptForRole(role string) string {

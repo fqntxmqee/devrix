@@ -20,16 +20,17 @@ const maxFreeForkRequests = 5
 type FreeForkRequestDTO struct {
 	Name     string
 	Prompt   string
-	Worktree bool
+	Sandbox  bool
+	Worktree bool // deprecated alias
 	Mode     string
 }
 
-// FreeForkHandleDTO toolrunner 层的句柄 DTO, 隔离 multiagent.Agent 依赖。
-// 注入方负责在包装时把 *multiagent.Agent 转成 AgentID 字符串。
+func (r FreeForkRequestDTO) WantsSandbox() bool { return r.Sandbox || r.Worktree }
+
 type FreeForkHandleDTO struct {
-	AgentID  string
-	Worktree string
-	Name     string
+	AgentID     string
+	SandboxPath string
+	Name        string
 }
 
 // FreeForkerFunc 是 free_fork 工具的注入签名。

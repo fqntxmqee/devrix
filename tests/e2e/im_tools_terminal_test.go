@@ -58,10 +58,10 @@ func TestE2E_IMToolsTerminal_5Steps(t *testing.T) {
 		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
 			wt := ""
-			if r.Worktree {
+			if r.WantsSandbox() {
 				wt = r.Name + ".wt"
 			}
-			handles = append(handles, toolrunner.FreeForkHandleDTO{AgentID: r.Name, Name: r.Name, Worktree: wt})
+			handles = append(handles, toolrunner.FreeForkHandleDTO{AgentID: r.Name, Name: r.Name, SandboxPath: wt})
 		}
 		return handles, nil
 	}

@@ -158,7 +158,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S12-A01-T01 | Worktree enter 后 write 不污染主 WorkDir | Worktree | `internal/layers/contextengine/worktree/manager_test.go` | IMPLEMENTED | P0 |
+| D2-S12-A01-T01 | Sandbox enter 后 write 不污染主 WorkDir | D2-S18 | `internal/layers/contextengine/sandbox/manager_test.go` | IMPLEMENTED | P0 |
 
 ## D2-S6: Snapshot & Main Transcript
 

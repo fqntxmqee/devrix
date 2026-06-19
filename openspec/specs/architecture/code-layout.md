@@ -135,7 +135,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S2    | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` |
 | D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/`           |
 | D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4)      |
-| D2-S12   | `worktree`    | `contextengine/worktree/`                                               |
+| D2-S12   | `sandbox`    | `contextengine/sandbox/`                                               |
 
 ### 4.4 D3 LLM Gateway（canonical S1–S6 / 5+1 价值流）
 

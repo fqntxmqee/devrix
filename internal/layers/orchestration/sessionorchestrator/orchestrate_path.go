@@ -121,7 +121,7 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 		if op.taskManager != nil {
 			batchRootID, err := op.taskManager.SyncWaveNodes(req.SessionID, result.Nodes)
 			if err != nil {
-				emitError(ctx, op.sink, out, req.SessionID, "worktree_sync", err)
+				emitError(ctx, op.sink, out, req.SessionID, "sandbox_sync", err)
 				return
 			}
 			if batchRootID != "" {

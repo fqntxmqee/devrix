@@ -62,7 +62,7 @@ func (r *delegateToolRunner) Schema() toolrunner.ToolSchema {
 }
 
 func delegateToolParameters() string {
-	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"worktree_slug":{"type":"string","description":"Optional isolated worktree slug for parallel implement tasks."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."}}}`
+	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"sandbox_slug":{"type":"string","description":"Optional isolated worker directory slug for parallel implement tasks."},"worktree_slug":{"type":"string","description":"Deprecated alias for sandbox_slug."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."}}}`
 }
 
 func delegateToolDescription(role WorkerRole) string {
@@ -117,7 +117,7 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		Role:         string(r.role),
 		Directive:    directive,
 		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role))),
-		WorktreeSlug: fields["worktree_slug"],
+		SandboxSlug: resolveSandboxSlug(fields),
 		Async:        fields["async"] == "true",
 	}
 
@@ -208,4 +208,11 @@ func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.W
 		return tm.Create(sessionID, subject, directive).ID
 	}
 	return item.ID
+}
+
+func resolveSandboxSlug(fields map[string]string) string {
+	if v := strings.TrimSpace(fields["sandbox_slug"]); v != "" {
+		return v
+	}
+	return strings.TrimSpace(fields["worktree_slug"])
 }

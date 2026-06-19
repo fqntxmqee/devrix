@@ -236,9 +236,9 @@ context_engine:
     enabled: true
     link_tasks: true
     im_progress: true
-  worktree:
+  sandbox:
     enabled: true
-    base_dir: "~/.devrix/worktrees"
+    base_dir: "~/.devrix/sandboxes"
   user_context:
     mode: prepend
   attachments:
