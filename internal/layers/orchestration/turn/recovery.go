@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -65,6 +66,53 @@ func (o *DefaultOrchestrator) compressMessagesForRecovery(ctx context.Context, r
 		Role:      types.MessageRoleSystem,
 		Content:   result.Summary,
 	}}
+}
+
+const maxOutputTokenRecoveryAttempts = 3
+
+// MaxOutputTokensRecoveryMessage is injected when the provider stops with
+// finish_reason=length so the model can continue without orphan UI chunks.
+const MaxOutputTokensRecoveryMessage = "Your previous response was truncated due to output token limits. Continue from where you left off without repeating content already shown."
+
+// NeedsMaxOutputTokenRecovery reports finish_reason=length truncation (TD-QL-02).
+func NeedsMaxOutputTokenRecovery(finishReason string) bool {
+	return finishReason == "length"
+}
+
+// partialStreamEmit tracks events already sent to the UI during a stream
+// attempt that may be rolled back before recovery retry (TD-QL-06).
+type partialStreamEmit struct {
+	hadThinking bool
+	hadText     bool
+	toolCalls   []llmgateway.ToolCall
+}
+
+func emitStreamRecoveryTombstones(out chan<- *contracts.EngineEvent, sessionID string, partial partialStreamEmit) {
+	if partial.hadThinking {
+		out <- &contracts.EngineEvent{
+			Type:      "tombstone",
+			SessionID: sessionID,
+			Metadata:  map[string]string{"rollback": "thinking"},
+		}
+	}
+	if partial.hadText {
+		out <- &contracts.EngineEvent{
+			Type:      "tombstone",
+			SessionID: sessionID,
+			Metadata:  map[string]string{"rollback": "text"},
+		}
+	}
+	for _, tc := range partial.toolCalls {
+		out <- &contracts.EngineEvent{
+			Type:      "tombstone",
+			ToolName:  tc.Name,
+			SessionID: sessionID,
+			Metadata: map[string]string{
+				"rollback":  "tool_call",
+				"tool_name": tc.Name,
+			},
+		}
+	}
 }
 
 func (o *DefaultOrchestrator) invokeStreamWithRecovery(

@@ -34,7 +34,7 @@ import (
 type SessionOrchestrator struct {
 	cfg              *Config
 	classifier       IntentClassifier
-	executor         QueryLoopExecutor
+	executor         TurnExecutor
 	fastPath         *FastPath
 	workModel        WorkModel
 	validator        AdvisoryValidator
@@ -174,7 +174,7 @@ func WithClassifier(c IntentClassifier) OrchestratorOption {
 // instance), so the FastPath is built lazily on first ProcessMessage.
 // This avoids the bug where WithSink would have been ignored because the
 // FastPath was constructed before the option was applied.
-func NewSessionOrchestrator(cfg *Config, executor QueryLoopExecutor, opts ...OrchestratorOption) *SessionOrchestrator {
+func NewSessionOrchestrator(cfg *Config, executor TurnExecutor, opts ...OrchestratorOption) *SessionOrchestrator {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}

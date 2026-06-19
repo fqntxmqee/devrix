@@ -228,7 +228,7 @@ context_engine:
       mode: auto-repair
 
   # V6 turn runtime (max_turns / compress_per_turn consumed by D7)
-  query_loop:
+  turn_runtime:
     max_turns: 50
     compress_per_turn: true
     streaming_tools: true

@@ -123,7 +123,7 @@ func NewContextEngine(
 		contextengine.NewToolLimiter(toolCfg.ConcurrentMax),
 	)
 
-	// DM-020: D7-supplied summarizer for D2 compression (no QueryLoop in D2).
+// DM-020: D7-supplied summarizer for D2 compression (turn loop lives in D7).
 	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
 		Gateway:      stack.RawGateway,
 		TierResolver: stack.TierResolver,

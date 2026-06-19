@@ -224,50 +224,78 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
 			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
 		)
-		chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
-			SessionID:    req.SessionID,
-			SystemPrompt: systemPrompt,
-			Messages:     messages,
-			Tools:        tools,
-		})
-		if err != nil {
-			endSpanWithError(llmSpan, err)
-			endSpan(turnSpan)
-			o.emitError(out, req.SessionID, fmt.Sprintf("llm invoke failed: %v", err))
-			return
-		}
-
-		// Process stream chunks. SSE accumulator emits the full merged tool-call
-		// snapshot on every delta frame — replace, do not append (MiniMax rejects
-		// duplicate tool_call ids in the follow-up request).
 		var contentBuf strings.Builder
 		var toolCalls []llmgateway.ToolCall
 		var iterUsage llmgateway.TokenUsage
+		var finishReason string
 
-		for chunk := range chunkCh {
-			if chunk.Thinking != "" {
-				out <- &contracts.EngineEvent{
-					Type:      "thinking",
-					Content:   chunk.Thinking,
-					SessionID: req.SessionID,
+		streamRecoveryAttempts := 0
+		streamRecoveryLoop:
+		for {
+			chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
+				SessionID:    req.SessionID,
+				SystemPrompt: systemPrompt,
+				Messages:     messages,
+				Tools:        tools,
+			})
+			if err != nil {
+				endSpanWithError(llmSpan, err)
+				endSpan(turnSpan)
+				o.emitError(out, req.SessionID, fmt.Sprintf("llm invoke failed: %v", err))
+				return
+			}
+
+			contentBuf.Reset()
+			toolCalls = nil
+			finishReason = ""
+			iterUsage = llmgateway.TokenUsage{}
+			var partial partialStreamEmit
+
+			for chunk := range chunkCh {
+				if chunk.FinishReason != "" {
+					finishReason = chunk.FinishReason
+				}
+				if chunk.Thinking != "" {
+					partial.hadThinking = true
+					out <- &contracts.EngineEvent{
+						Type:      "thinking",
+						Content:   chunk.Thinking,
+						SessionID: req.SessionID,
+					}
+				}
+				if chunk.Content != "" {
+					partial.hadText = true
+					contentBuf.WriteString(chunk.Content)
+					out <- &contracts.EngineEvent{
+						Type:      "text",
+						Content:   chunk.Content,
+						SessionID: req.SessionID,
+					}
+				}
+				if len(chunk.ToolCalls) > 0 {
+					toolCalls = chunk.ToolCalls
+					partial.toolCalls = chunk.ToolCalls
+				}
+				if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+					iterUsage = chunk.Usage
+				} else if chunk.Usage.TotalTokens > 0 && iterUsage.PromptTokens == 0 && iterUsage.CompletionTokens == 0 {
+					iterUsage = chunk.Usage
 				}
 			}
-			if chunk.Content != "" {
-				contentBuf.WriteString(chunk.Content)
-				out <- &contracts.EngineEvent{
-					Type:      "text",
-					Content:   chunk.Content,
-					SessionID: req.SessionID,
-				}
+
+			if !NeedsMaxOutputTokenRecovery(finishReason) {
+				break streamRecoveryLoop
 			}
-			if len(chunk.ToolCalls) > 0 {
-				toolCalls = chunk.ToolCalls
+			if streamRecoveryAttempts >= maxOutputTokenRecoveryAttempts {
+				break streamRecoveryLoop
 			}
-			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
-				iterUsage = chunk.Usage
-			} else if chunk.Usage.TotalTokens > 0 && iterUsage.PromptTokens == 0 && iterUsage.CompletionTokens == 0 {
-				iterUsage = chunk.Usage
-			}
+			emitStreamRecoveryTombstones(out, req.SessionID, partial)
+			messages = append(messages, types.Message{
+				SessionID: req.SessionID,
+				Role:      types.MessageRoleUser,
+				Content:   MaxOutputTokensRecoveryMessage,
+			})
+			streamRecoveryAttempts++
 		}
 		totalUsage.PromptTokens += iterUsage.PromptTokens
 		totalUsage.CompletionTokens += iterUsage.CompletionTokens

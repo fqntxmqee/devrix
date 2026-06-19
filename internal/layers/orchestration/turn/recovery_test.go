@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	sherrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -71,6 +72,80 @@ func TestInvokeStreamWithRecovery_CompressesOn413(t *testing.T) {
 	}
 	if llm.calls < 2 {
 		t.Fatalf("llm calls = %d, want >= 2 (retry after compress)", llm.calls)
+	}
+}
+
+func TestNeedsMaxOutputTokenRecovery(t *testing.T) {
+	if !NeedsMaxOutputTokenRecovery("length") {
+		t.Fatal("finish_reason=length should trigger recovery")
+	}
+	if NeedsMaxOutputTokenRecovery("stop") {
+		t.Fatal("finish_reason=stop should not trigger recovery")
+	}
+}
+
+func TestEmitStreamRecoveryTombstones(t *testing.T) {
+	out := make(chan *contracts.EngineEvent, 4)
+	emitStreamRecoveryTombstones(out, "s1", partialStreamEmit{
+		hadText:     true,
+		hadThinking: true,
+		toolCalls:   []llmgateway.ToolCall{{Name: "read", ID: "c1"}},
+	})
+	close(out)
+	var types []string
+	for ev := range out {
+		types = append(types, ev.Type+":"+ev.Metadata["rollback"])
+	}
+	want := []string{"tombstone:thinking", "tombstone:text", "tombstone:tool_call"}
+	if len(types) != len(want) {
+		t.Fatalf("events = %v, want %v", types, want)
+	}
+	for i := range want {
+		if types[i] != want[i] {
+			t.Fatalf("events = %v, want %v", types, want)
+		}
+	}
+}
+
+func TestRunTurn_MaxOutputTokensRecovery_TombstoneAndRetry(t *testing.T) {
+	calls := 0
+	llm := &stubLLM{fn: func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		calls++
+		ch := make(chan llmgateway.Chunk, 2)
+		if calls == 1 {
+			ch <- llmgateway.Chunk{Content: "partial", FinishReason: "length", Done: true}
+		} else {
+			ch <- llmgateway.Chunk{Content: "continued", FinishReason: "stop", Done: true}
+		}
+		close(ch)
+		return ch, nil
+	}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm,
+		Context: &stubContext{prepared: PreparedContext{
+			SystemPrompt: "sys",
+			Messages:     nil,
+		}},
+		Tools:    &stubTools{},
+		Persist:  &stubPersist{},
+		MaxTurns: 1,
+	})
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "s1",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	if calls < 2 {
+		t.Fatalf("llm calls = %d, want >= 2", calls)
+	}
+	if !hasType(evs, "tombstone") {
+		t.Fatalf("expected tombstone event, got %v", eventTypes(evs))
+	}
+	if !hasType(evs, "complete") {
+		t.Fatalf("expected complete event, got %v", eventTypes(evs))
 	}
 }
 

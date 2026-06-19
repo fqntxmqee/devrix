@@ -16,7 +16,7 @@ import (
 func TestContextEngine_Process_UsesPreparedTurnRunner(t *testing.T) {
 	runtime.Reset()
 	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.MaxTurns = 3
+	cfg.TurnRuntime.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &multiTurnPreparedTurnRunner{},

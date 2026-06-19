@@ -23,7 +23,7 @@ type fakeD2 struct {
 	mu           sync.Mutex
 }
 
-func (f *fakeD2) RunQueryLoop(_ context.Context, req QueryRequest) (<-chan *contracts.EngineEvent, error) {
+func (f *fakeD2) RunTurn(_ context.Context, req QueryRequest) (<-chan *contracts.EngineEvent, error) {
 	f.mu.Lock()
 	f.calls++
 	f.executedMsgs = append(f.executedMsgs, req.Messages[0].Content)
@@ -188,7 +188,7 @@ func TestSessionOrchestrator_FastPath_NoSinkMirrorOnStream(t *testing.T) {
 	}
 }
 
-// T: D7-S2-T03 — QueryLoopExecutor returns an error; orchestrator propagates.
+// T: D7-S2-T03 — TurnExecutor returns an error; orchestrator propagates.
 func TestSessionOrchestrator_FastPath_D2Error(t *testing.T) {
 	exec := &errD2{}
 	orch := NewSessionOrchestrator(DefaultConfig(), exec)
@@ -203,7 +203,7 @@ func TestSessionOrchestrator_FastPath_D2Error(t *testing.T) {
 
 type errD2 struct{}
 
-func (errD2) RunQueryLoop(_ context.Context, _ QueryRequest) (<-chan *contracts.EngineEvent, error) {
+func (errD2) RunTurn(_ context.Context, _ QueryRequest) (<-chan *contracts.EngineEvent, error) {
 	return nil, errors.New("simulated d2 error")
 }
 
@@ -382,7 +382,7 @@ func TestSessionOrchestrator_FastPath_NoWaveScheduled(t *testing.T) {
 	for range ch {
 		// drain
 	}
-	// FastPath 直接走 D2.RunQueryLoop，无 Wave 创建
+	// FastPath 直接走 TurnExecutor.RunTurn，无 Wave 创建
 	// 验证方式：fakeD2.calls == 1 且无 Wave 相关调用
 	if exec.calls != 1 {
 		t.Fatalf("want 1 D2 call (FastPath), got %d", exec.calls)

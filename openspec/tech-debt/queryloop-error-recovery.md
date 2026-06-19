@@ -16,7 +16,10 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 - **归属：** D7 `turn/recovery.go` + `invokeStreamWithRecovery`
 - **验收：** `turn/recovery_test.go`
 
-### TD-QL-02: max_output_tokens 恢复（P1） — OPEN
+### TD-QL-02: max_output_tokens 恢复（P1） — **CLOSED (DM-20260618-010)**
+
+- **归属：** D7 `turn/recovery.go` + `orchestrator.go` stream recovery loop
+- **验收：** `turn/recovery_test.go` — tombstone + retry on finish_reason=length
 
 ### TD-QL-03: Loop 级 fallback model（P1） — **CLOSED (DM-20260618-010)**
 
@@ -33,13 +36,12 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 - **背景：** YOLO + tool calls 曾 suppress `complete`，导致飞书无 Done（已修复 `query_loop_run.go`）
 - **目标：** T 层回归：`complete` 事件在 QueryLoop 所有模式（含 YOLO）下必达 IM 层
 
-### TD-QL-06: 恢复时 orphan message tombstone（P1）
+### TD-QL-06: 恢复时 orphan message tombstone（P1） — **CLOSED (DM-20260618-010)**
 
 **参考：** clawcode `query.ts` — recovery 前 yield tombstone 移除 UI/transcript 中孤儿 assistant messages
 
-- **现状：** 仅有入口 `FilterIncompleteToolCalls`，Loop 内 API 失败恢复时不清理已 yield 的 assistant chunk
-- **目标：** 413/fallback/max_tokens 恢复路径上，对已 emit 但未配对的 assistant tool_use 发 tombstone/rollback 事件
-- **验收：** 集成测试 recovery 后 transcript 无 dangling tool_use
+- **归属：** D7 `turn/recovery.go` — `emitStreamRecoveryTombstones` on max_tokens recovery
+- **验收：** `turn/recovery_test.go` — tombstone events for text/thinking/tool_call rollback
 
 ### TD-QL-07: fallback 与 StreamingToolExecutor 联动（P1）
 

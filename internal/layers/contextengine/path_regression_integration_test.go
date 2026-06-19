@@ -17,7 +17,7 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	runtime.Reset()
 
 	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.MaxTurns = 3
+	cfg.TurnRuntime.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
@@ -48,7 +48,7 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	runtime.Reset()
 
 	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.MaxTurns = 2
+	cfg.TurnRuntime.MaxTurns = 2
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},

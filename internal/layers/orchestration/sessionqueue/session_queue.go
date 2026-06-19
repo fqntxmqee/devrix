@@ -1,6 +1,6 @@
 // Package sessionqueue — D7-S4 session command queue (Hub-Spoke drain).
 //
-// DSAFT: D7-S4 F — enqueues delegate-progress from flow.Hub; D2 QueryLoop drains
+// DSAFT: D7-S4 F — enqueues delegate-progress from flow.Hub; D7 turn runtime drains
 // via contracts.SessionCommandQueue injection (no D2→D7 import).
 package sessionqueue
 

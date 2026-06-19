@@ -8,7 +8,7 @@ import (
 // ComputeCtxPct is a thin shim kept for backward compatibility with any caller
 // that still imports the function from D1. The canonical implementation lives
 // in shared/contracts (CROSS-A02-T03: cross-layer contract surface must be free of
-// D{N}→D{N} imports). D2 QueryLoop calls contracts.ComputeCtxPct directly.
+// D{N}→D{N} imports). D7 turn runtime calls contracts.ComputeCtxPct directly.
 // New code should import the shared helper.
 func ComputeCtxPct(promptTokens, maxContextTokens int) int {
 	return contracts.ComputeCtxPct(promptTokens, maxContextTokens)

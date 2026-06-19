@@ -17,7 +17,8 @@ type ContextEngineConfig struct {
 	Harness            HarnessConfig      `yaml:"harness"`
 	Preflight          PreflightConfig    `yaml:"preflight"`
 	Workspace          WorkspacePromptConfig `yaml:"workspace"`
-	QueryLoop          QueryLoopConfig    `yaml:"query_loop"`
+	TurnRuntime        TurnRuntimeConfig `yaml:"turn_runtime"`
+	QueryLoop          TurnRuntimeConfig `yaml:"query_loop"` // deprecated alias; merged into TurnRuntime at load
 	UserContext        UserContextConfig  `yaml:"user_context"`
 	Attachments        AttachmentsConfig  `yaml:"attachments"`
 	Permission         ContextPermissionConfig `yaml:"permission"`
@@ -147,7 +148,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		Harness:    DefaultHarnessConfig(),
 		Preflight:  DefaultPreflightConfig(),
 		Workspace:   DefaultWorkspacePromptConfig(),
-		QueryLoop:   DefaultQueryLoopConfig(),
+		TurnRuntime: DefaultTurnRuntimeConfig(),
 		UserContext: DefaultUserContextConfig(),
 		Attachments: DefaultAttachmentsConfig(),
 		Permission:  DefaultContextPermissionConfig(),

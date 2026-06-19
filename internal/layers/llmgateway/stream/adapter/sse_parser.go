@@ -20,8 +20,9 @@ type streamAccumulator struct {
 	toolCalls map[int]*mergedToolCall
 	// lastUsage 缓存最近一次出现的 Usage（OpenAI 兼容协议中通常出现在
 	// finish_reason 帧或独立 usage 帧，且早于 [DONE] 哨兵）。
-	lastUsage    llmgateway.TokenUsage
-	hasUsage     bool
+	lastUsage        llmgateway.TokenUsage
+	hasUsage         bool
+	lastFinishReason string
 }
 
 type mergedToolCall struct {
@@ -75,6 +76,8 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 		}
 		if choice.FinishReason != nil && *choice.FinishReason != "" {
 			chunk.Done = true
+			chunk.FinishReason = *choice.FinishReason
+			a.lastFinishReason = *choice.FinishReason
 		}
 	}
 
@@ -144,7 +147,7 @@ func streamOpenAISSE(reader io.Reader, emit func(*llmgateway.Chunk) error) error
 		}
 		payload := strings.TrimSpace(strings.TrimPrefix(line, sseDataPrefix))
 		if payload == "[DONE]" {
-			final := &llmgateway.Chunk{Done: true}
+			final := &llmgateway.Chunk{Done: true, FinishReason: acc.lastFinishReason}
 			if acc.hasUsage {
 				final.Usage = acc.lastUsage
 			}

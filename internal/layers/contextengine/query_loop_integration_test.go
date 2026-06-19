@@ -14,7 +14,7 @@ import (
 func TestContextEngine_query_loop_enabled_multi_turn(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Harness.Enabled = false
-	cfg.QueryLoop.MaxTurns = 5
+	cfg.TurnRuntime.MaxTurns = 5
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
 		PreparedTurnRunner: &multiTurnPreparedTurnRunner{},

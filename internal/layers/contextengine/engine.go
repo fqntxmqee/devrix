@@ -243,7 +243,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		SystemPrompt: sc.SystemPrompt,
 		Messages:     messages,
 		Tools:        toolSchemas,
-		MaxTurns:     e.cfg.QueryLoop.MaxTurns,
+		MaxTurns:     e.cfg.TurnRuntime.MaxTurns,
 		Emit: func(ev *contracts.EngineEvent) {
 			if ev.Type == "complete" {
 				pendingComplete = ev

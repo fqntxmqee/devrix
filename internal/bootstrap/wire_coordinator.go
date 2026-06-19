@@ -94,7 +94,7 @@ func InitOrchestration(
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	toolrunner.SetTodoSync(todoBackend.Sync)
 
-	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
+	// DM-020 D-c: wire TurnOrchestrator as the TurnExecutor.
 	// This replaces the legacy executor with the orchestration turn loop that
 	// calls D3 directly for LLM and D2 via adapters for tools/persist.
 	ctxAdapter := newContextEngineAdapter(gw, ctxEngine, llmStack.TokenCounter)
@@ -185,7 +185,7 @@ func InitOrchestration(
 	return nil
 }
 
-// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
+// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.TurnExecutor.
 // DM-020 D-c: this replaces the legacy executor as the FastPath executor.
 type turnOrchExecutor struct {
 	orch turn.TurnOrchestrator
@@ -195,7 +195,7 @@ func newTurnOrchExecutor(orch turn.TurnOrchestrator) *turnOrchExecutor {
 	return &turnOrchExecutor{orch: orch}
 }
 
-func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
+func (e *turnOrchExecutor) RunTurn(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
 	if len(req.Messages) == 0 {
 		return nil, fmt.Errorf("turn executor: at least one message required")
 	}

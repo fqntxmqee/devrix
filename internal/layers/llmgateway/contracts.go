@@ -20,11 +20,12 @@ type Request struct {
 
 // Chunk is a streaming LLM response fragment.
 type Chunk struct {
-	Content   string
-	Thinking  string
-	ToolCalls []ToolCall
-	Done      bool
-	Usage     TokenUsage
+	Content      string
+	Thinking     string
+	ToolCalls    []ToolCall
+	Done         bool
+	FinishReason string // stop | length | tool_calls | ...
+	Usage        TokenUsage
 }
 
 // TokenUsage reports token consumption from the provider.

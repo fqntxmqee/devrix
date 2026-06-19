@@ -1,7 +1,7 @@
 package config
 
-// QueryLoopConfig holds QueryLoop runtime settings (Claude Code queryLoop aligned).
-type QueryLoopConfig struct {
+// TurnRuntimeConfig holds D7 turn-runtime settings (max turns, per-turn compression).
+type TurnRuntimeConfig struct {
 	MaxTurns        int  `yaml:"max_turns"`
 	CompressPerTurn bool `yaml:"compress_per_turn"`
 	StreamingTools  bool `yaml:"streaming_tools"`
@@ -18,7 +18,7 @@ type AttachmentsConfig struct {
 	PlanModeFullEvery int  `yaml:"plan_mode_full_every"`
 }
 
-// ContextPermissionConfig holds permission mode defaults for QueryLoop.
+// ContextPermissionConfig holds permission mode defaults for turn runtime.
 type ContextPermissionConfig struct {
 	DefaultMode string           `yaml:"default_mode"`
 	Plan        PlanModeConfig   `yaml:"plan"`
@@ -39,16 +39,14 @@ type TasksConfig struct {
 
 // SubQueryConfig holds sub-agent runtime settings.
 type SubQueryConfig struct {
-	ForkSubagentEnabled    bool `yaml:"fork_subagent_enabled"`
-	SidechainTranscript    bool `yaml:"sidechain_transcript"`
-	DefaultSubagentMaxTurns int `yaml:"default_subagent_max_turns"`
+	ForkSubagentEnabled     bool `yaml:"fork_subagent_enabled"`
+	SidechainTranscript     bool `yaml:"sidechain_transcript"`
+	DefaultSubagentMaxTurns int  `yaml:"default_subagent_max_turns"`
 }
 
-// DefaultQueryLoopConfig returns turn-runtime defaults consumed by D7
-// (max turns, per-turn compression). The query_loop.enabled switch was
-// removed in DM-20260618-010; all LLM↔Tool loops run through D7.
-func DefaultQueryLoopConfig() QueryLoopConfig {
-	return QueryLoopConfig{
+// DefaultTurnRuntimeConfig returns turn-runtime defaults consumed by D7.
+func DefaultTurnRuntimeConfig() TurnRuntimeConfig {
+	return TurnRuntimeConfig{
 		MaxTurns:        50,
 		CompressPerTurn: true,
 	}

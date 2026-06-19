@@ -37,7 +37,7 @@ func SetBackgroundTaskToolsDeps(deps BackgroundTaskToolsDeps) {
 }
 
 // RegisterBackgroundTaskTools registers task_stop / task_output as LLM tools.
-// Safe to call when QueryLoop is enabled. No-op if registry is nil.
+// Safe to call when turn runtime is active. No-op if registry is nil.
 func RegisterBackgroundTaskTools(reg *toolrunner.ToolRegistry) error {
 	if reg == nil {
 		return nil

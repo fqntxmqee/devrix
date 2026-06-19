@@ -76,7 +76,7 @@ func systemPromptForRole(role string) string {
 	}
 }
 
-// BuildSubQueryRunner creates a hubspoke.SubQueryRunner from QueryLoop deps.
+// BuildSubQueryRunner creates a hubspoke.SubQueryRunner from turn-runtime deps.
 func BuildSubQueryRunner(deps enforce.SubQueryDeps) hubspoke.SubQueryRunner {
 	return &SubQueryRunner{LoopDeps: deps}
 }
