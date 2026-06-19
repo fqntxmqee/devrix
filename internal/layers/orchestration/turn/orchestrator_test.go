@@ -901,9 +901,15 @@ func TestOrchestrator_RunTurn_CompressHint_TruncationFallback(t *testing.T) {
 	}
 }
 
-// --- MaxTurns default when request has 0 ---
+// --- MaxTurns fallback: request 0 + orchestrator default → orchestrator's bound ---
+//
+// When the caller sets a positive MaxTurns on the orchestrator but leaves
+// req.MaxTurns at 0, the orchestrator's bound is the safety net. The
+// converse (orchestrator=0) leaves the request unbounded — covered by
+// TestNewOrchestrator_DefaultMaxTurns. Both surfaces must agree with the
+// "no magic default" rule: callers that want a bound set it explicitly.
 
-func TestOrchestrator_RunTurn_DefaultMaxTurns(t *testing.T) {
+func TestOrchestrator_RunTurn_RequestMaxTurnsZero_FallsBackToOrchestratorBound(t *testing.T) {
 	llm := &stubLLM{chunks: []llmgateway.Chunk{textChunk("ok"), doneChunk()}}
 	ctxPrep := &stubContext{prepared: PreparedContext{}}
 	persist := &stubPersist{}
@@ -916,7 +922,7 @@ func TestOrchestrator_RunTurn_DefaultMaxTurns(t *testing.T) {
 	ch, err := orch.RunTurn(context.Background(), TurnRequest{
 		SessionID: "sess-default",
 		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
-		MaxTurns:    0, // should use default 5
+		MaxTurns:    0, // orchestrator's MaxTurns=5 is the effective safety net
 	})
 	if err != nil {
 		t.Fatalf("RunTurn: %v", err)
@@ -928,15 +934,21 @@ func TestOrchestrator_RunTurn_DefaultMaxTurns(t *testing.T) {
 	}
 }
 
-// --- Default MaxTurns in constructor when 0 passed ---
+// --- MaxTurns in constructor: 0 / negative stays unbounded ---
+//
+// Aligned with claude-code semantics: the main conversation has no hard
+// turn limit. MaxTurns is an optional safety net that callers opt into.
+// NewOrchestrator must NOT substitute a magic default when the caller
+// leaves MaxTurns at 0 — that would re-introduce the hard ceiling that
+// the alignment removed.
 
 func TestNewOrchestrator_DefaultMaxTurns(t *testing.T) {
 	orch := NewOrchestrator(OrchestratorDeps{
 		LLM: &stubLLM{}, Context: &stubContext{}, Tools: &stubTools{}, Persist: &stubPersist{},
 		MaxTurns: 0,
 	})
-	if orch.maxTurns != 8 {
-		t.Errorf("expected default maxTurns=8, got %d", orch.maxTurns)
+	if orch.maxTurns != 0 {
+		t.Errorf("expected maxTurns=0 (unbounded) when caller passes 0, got %d", orch.maxTurns)
 	}
 }
 
@@ -1245,54 +1257,113 @@ func TestOrchestrator_RunTurn_EmitsResolveAwaitSummary(t *testing.T) {
 // empty finalText and renders a blank conclusion card. The helper must
 // promote the most recent non-empty thinking into finalText and strip
 // <think> defensively in case the splitter ever leaks a tag boundary.
+//
+// The helper also handles the MaxTurns truncation notice: when the loop
+// exited on the safety net AND the caller set a positive MaxTurns, a
+// user-visible "[max-turns reached...]" prefix is prepended so the IM
+// card shows the bound was hit rather than a quiet final-text drop.
+// Unbounded turns (MaxTurns ≤ 0) never carry the notice regardless of
+// how they exited.
 func TestResolveFinalText(t *testing.T) {
 	cases := []struct {
 		name      string
 		finalText string
 		thinking  string
+		reason    ExitReason
+		maxTurns  int
 		want      string
 	}{
 		{
 			name:      "non_empty_finalText_wins",
 			finalText: "the answer is 42",
 			thinking:  "i should think about this",
+			reason:    ExitReasonNatural,
 			want:      "the answer is 42",
 		},
 		{
 			name:      "whitespace_finalText_falls_back_to_thinking",
 			finalText: "\n\n\n",
 			thinking:  "let me think: 6*7=42",
+			reason:    ExitReasonNatural,
 			want:      "let me think: 6*7=42",
 		},
 		{
 			name:      "empty_thinking_keeps_blank",
 			finalText: "",
 			thinking:  "",
+			reason:    ExitReasonNatural,
 			want:      "",
 		},
 		{
 			name:      "think_tags_in_thinking_are_stripped",
 			finalText: "",
 			thinking:  "<think>working notes</think>the final answer",
+			reason:    ExitReasonNatural,
 			want:      "the final answer",
 		},
 		{
 			name:      "unclosed_think_tag_is_dropped_safely",
 			finalText: "",
 			thinking:  "<think>incomplete working notes",
+			reason:    ExitReasonNatural,
 			// StripThinkingTags drops unclosed <think> blocks entirely
 			// (no matching closing tag → no safe partial). The helper
 			// returns blank in that case, which the IM adapter then
 			// handles via the empty-summary footer (D1 fallback).
 			want: "",
 		},
+		{
+			name:      "max_turns_with_text_prepends_notice",
+			finalText: "third attempt summary",
+			thinking:  "",
+			reason:    ExitReasonMaxTurns,
+			maxTurns:  3,
+			want:      "[max-turns reached after 3 iterations; turn truncated]\nthird attempt summary",
+		},
+		{
+			name:      "max_turns_with_thinking_prepends_notice",
+			finalText: "",
+			thinking:  "已多次调用工具触达 max-turns 兜底",
+			reason:    ExitReasonMaxTurns,
+			maxTurns:  3,
+			want:      "[max-turns reached after 3 iterations; turn truncated]\n已多次调用工具触达 max-turns 兜底",
+		},
+		{
+			name:      "max_turns_with_empty_returns_only_notice",
+			finalText: "",
+			thinking:  "",
+			reason:    ExitReasonMaxTurns,
+			maxTurns:  3,
+			want:      "[max-turns reached after 3 iterations; turn truncated]",
+		},
+		{
+			name:      "non_max_turns_reason_does_not_prepend_notice",
+			finalText: "ok",
+			thinking:  "",
+			reason:    ExitReasonRepeatedTool,
+			maxTurns:  3,
+			// Even with MaxTurns>0, the loop exited for a different
+			// reason (e.g. repeated tool) — the user did not hit the
+			// safety net, so no truncation notice.
+			want: "ok",
+		},
+		{
+			name:      "max_turns_unbounded_skips_notice",
+			finalText: "ok",
+			thinking:  "",
+			reason:    ExitReasonMaxTurns,
+			maxTurns:  0,
+			// Unbounded turns cannot legitimately hit MaxTurns; the
+			// helper still treats maxTurns=0 as "no notice" defensively.
+			want: "ok",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resolveFinalText(tc.finalText, tc.thinking)
+			got := resolveFinalText(tc.finalText, tc.thinking, tc.reason, tc.maxTurns)
 			if got != tc.want {
-				t.Errorf("resolveFinalText(%q, %q) = %q, want %q",
-					tc.finalText, tc.thinking, got, tc.want)
+				t.Errorf("resolveFinalText(%q, %q, %q, %d) = %q, want %q",
+					tc.finalText, tc.thinking, tc.reason, tc.maxTurns, got, tc.want)
 			}
 		})
 	}
@@ -1401,6 +1472,390 @@ func TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank_NoToolCalls(t *te
 	}
 	if !strings.Contains(complete.Content, tailThinking) {
 		t.Errorf("complete.Content = %q, want substring %q", complete.Content, tailThinking)
+	}
+}
+
+// ============================================================================
+// ExitReason coverage — one test per deterministic exit reason (clawcode alignment).
+//
+// Each test pins the behaviour the orchestrator must guarantee when that exit
+// reason fires. Together they cover every branch in runLoop's terminal block:
+//   - natural
+//   - max_turns (positive bound + cumulative iteration counter)
+//   - repeated_tool (3x same signature in last 5 turns)
+//   - tool_failure (3x same tool error)
+//   - aborted_user (ctx cancellation between turns)
+//   - token_diminishing (≥90% budget + 2 consecutive deltas <500 tokens)
+// ============================================================================
+
+// findCompleteEvent returns the first complete event in the slice, or nil.
+func findCompleteEvent(evs []*contracts.EngineEvent) *contracts.EngineEvent {
+	for _, e := range evs {
+		if e.Type == "complete" {
+			return e
+		}
+	}
+	return nil
+}
+
+func findErrorEvent(evs []*contracts.EngineEvent) *contracts.EngineEvent {
+	for _, e := range evs {
+		if e.Type == "error" {
+			return e
+		}
+	}
+	return nil
+}
+
+// --- natural ---
+
+// LLM emits no tool calls on the first iteration → exit_reason=natural,
+// no truncation notice, no detector trip. Mirrors the simplest happy path
+// and pins the metadata contract for downstream consumers.
+func TestOrchestrator_RunTurn_NaturalCompletion_NoMaxTurns(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("hello world"), doneChunk(),
+	}}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: &stubTools{}, Persist: &stubPersist{},
+		// MaxTurns=0 → unbounded; the loop must terminate on the
+		// natural LLM finish, not on the safety net.
+	})
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-natural",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	complete := findCompleteEvent(evs)
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonNatural) {
+		t.Errorf("exit_reason = %q, want %q", got, ExitReasonNatural)
+	}
+	if strings.Contains(complete.Content, "max-turns") {
+		t.Errorf("natural completion should not carry truncation notice, got %q", complete.Content)
+	}
+	if llm.calls.Load() != 1 {
+		t.Errorf("expected 1 LLM call, got %d", llm.calls.Load())
+	}
+}
+
+// --- max_turns ---
+
+// With a positive MaxTurns the loop must break on iteration N+1 with
+// exit_reason=max_turns, and the final complete.Content must carry the
+// "[max-turns reached after N iterations; turn truncated]" notice so
+// the IM card surfaces the bound to the user. Last iteration's text
+// is preserved after the notice.
+func TestOrchestrator_RunTurn_MaxTurnsReached_EmitsTruncationNotice(t *testing.T) {
+	const lastIterText = "third attempt summary"
+
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 4)
+		ch <- textChunk(lastIterText)
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: "{}"}},
+			Done:      true,
+			Usage:     llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "tx", Output: "ok"}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: persist, MaxTurns: 3,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-maxturns",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "loop"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	complete := findCompleteEvent(evs)
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonMaxTurns) {
+		t.Errorf("exit_reason = %q, want %q", got, ExitReasonMaxTurns)
+	}
+	if !strings.Contains(complete.Content, "[max-turns reached after 3 iterations; turn truncated]") {
+		t.Errorf("complete.Content missing truncation notice, got %q", complete.Content)
+	}
+	if !strings.Contains(complete.Content, lastIterText) {
+		t.Errorf("complete.Content = %q, want substring %q", complete.Content, lastIterText)
+	}
+	if turnIdx.Load() != 3 {
+		t.Errorf("expected 3 LLM calls (MaxTurns), got %d", turnIdx.Load())
+	}
+}
+
+// --- repeated_tool ---
+
+// The same (tool_name|input) signature appears 3+ times in the last
+// 5 turns → loop must break with exit_reason=repeated_tool, no
+// truncation notice (this is not a MaxTurns exit). 4th iteration
+// is the one that fires the detector (history has 3 occurrences).
+func TestOrchestrator_RunTurn_RepeatedTool_TriggersAbortedRepeatedTool(t *testing.T) {
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: `{"path":"/f"}`}},
+			Done:      true,
+			Usage:     llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "tx", Output: "ok"}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: persist, MaxTurns: 20,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-repeated",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "stuck"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	complete := findCompleteEvent(evs)
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonRepeatedTool) {
+		t.Errorf("exit_reason = %q, want %q", got, ExitReasonRepeatedTool)
+	}
+	if strings.Contains(complete.Content, "max-turns") {
+		t.Errorf("repeated_tool exit should not carry truncation notice, got %q", complete.Content)
+	}
+	// 4th iteration: history holds 3 occurrences of the signature, the
+	// 4th triggers the detector. Bound is 20 so the safety net never fires.
+	if turnIdx.Load() != 4 {
+		t.Errorf("expected 4 LLM calls (3 build history + 1 trips detector), got %d", turnIdx.Load())
+	}
+}
+
+// --- tool_failure ---
+
+// 3 consecutive tool rounds return the same error fingerprint → loop
+// must break with exit_reason=tool_failure. A clean round in between
+// resets the counter (covered in TestOrchestrator_RunTurn_ToolErrorResets
+// in the implementation if needed; here we focus on the streak case).
+func TestOrchestrator_RunTurn_ConsecutiveToolErrors_TriggersAbortedToolFailure(t *testing.T) {
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: `{"path":"/f"}`}},
+			Done:      true,
+			Usage:     llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	// Each ExecuteRound returns the SAME error string → same fingerprint.
+	tools := &stubTools{results: []ToolResult{{
+		ToolCallID: "tx",
+		Error:      "permission denied: /f",
+	}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: persist, MaxTurns: 20,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-toolfail",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "loop"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	complete := findCompleteEvent(evs)
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonToolFailure) {
+		t.Errorf("exit_reason = %q, want %q", got, ExitReasonToolFailure)
+	}
+	// 3 iterations: 1st sets fp+count=1, 2nd increments to 2, 3rd trips
+	// detector at count=3.
+	if turnIdx.Load() != 3 {
+		t.Errorf("expected 3 LLM calls (3rd trips detector), got %d", turnIdx.Load())
+	}
+}
+
+// --- aborted_user (context cancel between turns) ---
+
+// Cancelling the context between turns must produce an `error` event
+// with "turn cancelled" in the content and NO `complete` event. The
+// orchestrator detects cancellation at the top of the run-loop body
+// and short-circuits with the explicit error event so the IM adapter
+// can render the cancellation rather than waiting for an unobservable
+// stream close.
+//
+// To isolate the cancel exit from the other detectors, each iteration
+// emits a UNIQUE tool-call signature (so repeated_tool never trips),
+// MaxTurns is 0 (unbounded — safety net never fires), tools always
+// succeed, and no maxContextTokens is configured (token_diminishing
+// stays disabled). With all other exits neutralized, the only way
+// the loop can terminate is via the cancel check at the top of the
+// run-loop body.
+func TestOrchestrator_RunTurn_UserCancel_TriggersAbortedUser(t *testing.T) {
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := turnIdx.Add(1)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{
+				Name:  "read",
+				ID:    fmt.Sprintf("tx-%d", n),
+				Input: fmt.Sprintf(`{"iter":%d}`, n),
+			}},
+			Done:  true,
+			Usage: llmgateway.TokenUsage{PromptTokens: 1, CompletionTokens: 1},
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	ctxPrep := &stubContext{prepared: PreparedContext{}}
+	tools := &stubTools{results: []ToolResult{{Output: "ok"}}}
+	persist := &stubPersist{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: tools, Persist: persist,
+		// MaxTurns=0 → unbounded; cancel is the only way out.
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := orch.RunTurn(ctx, TurnRequest{
+		SessionID:   "sess-cancel",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+
+	// Wait for the first iteration to complete, then cancel before the
+	// next iteration's cancel check fires.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	evs := collectEvents(ch)
+	// Contract: no `complete` event is emitted, and an `error` event
+	// with "cancelled" must appear.
+	if findCompleteEvent(evs) != nil {
+		t.Errorf("user cancel must NOT emit complete event, got %v", eventTypes(evs))
+	}
+	errEv := findErrorEvent(evs)
+	if errEv == nil {
+		t.Fatalf("expected error event for cancelled context, got %v", eventTypes(evs))
+	}
+	if !strings.Contains(errEv.Content, "cancel") {
+		t.Errorf("error event missing cancel signal, got %q", errEv.Content)
+	}
+	// The loop must have run at least one iteration before the cancel
+	// check fired (otherwise the test is a no-op).
+	if turnIdx.Load() < 1 {
+		t.Errorf("expected at least 1 LLM call before cancel, got %d", turnIdx.Load())
+	}
+}
+
+// --- token_diminishing ---
+
+// Cumulative usage crosses 90% of the context budget AND the last
+// 2 per-turn deltas are both <500 tokens → loop must break with
+// exit_reason=token_diminishing. The detector is the clawcode
+// "marginal utility" stop condition in src/query/tokenBudget.ts.
+//
+// We pre-set maxContextTokens=1000 via the prepared context. Per-turn
+// deltas of 400, 400, 200 give cumulative 400, 800, 1000 — 1000 ≥ 90%
+// of 1000 (the 90% threshold). The last 2 deltas in the rolling
+// window (400, 200) are both <500. Detector fires after the 3rd
+// iteration's tool round.
+func TestOrchestrator_RunTurn_TokenBudgetDiminishing_StopsLoop(t *testing.T) {
+	turnIdx := atomic.Int64{}
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := turnIdx.Add(1)
+		var usage llmgateway.TokenUsage
+		switch n {
+		case 1:
+			usage = llmgateway.TokenUsage{PromptTokens: 100, CompletionTokens: 300} // total 400
+		case 2:
+			usage = llmgateway.TokenUsage{PromptTokens: 100, CompletionTokens: 300} // total 800
+		default:
+			usage = llmgateway.TokenUsage{PromptTokens: 100, CompletionTokens: 100} // total 1000
+		}
+		ch := make(chan llmgateway.Chunk, 4)
+		ch <- llmgateway.Chunk{
+			ToolCalls: []llmgateway.ToolCall{{Name: "read", ID: "tx", Input: "{}"}},
+			Done:      true,
+			Usage:     usage,
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	tools := &stubTools{results: []ToolResult{{ToolCallID: "tx", Output: "ok"}}}
+	persist := &stubPersist{}
+
+	// maxContextTokens=1000 comes from PreparedContext, not the deps.
+	// The deps-level MaxContextTokens is just a fallback for emitComplete.
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm,
+		Context: &stubContext{prepared: PreparedContext{
+			MaxContextTokens: 1000,
+		}},
+		Tools:            tools,
+		Persist:          persist,
+		MaxTurns:         20, // generous so the safety net never fires
+		MaxContextTokens: 1000,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-diminishing",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "loop with diminishing returns"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	complete := findCompleteEvent(evs)
+	if complete == nil {
+		t.Fatal("expected complete event")
+	}
+	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonTokenDiminishing) {
+		t.Errorf("exit_reason = %q, want %q", got, ExitReasonTokenDiminishing)
+	}
+	if turnIdx.Load() != 3 {
+		t.Errorf("expected 3 LLM calls (3rd trips detector), got %d", turnIdx.Load())
 	}
 }
 

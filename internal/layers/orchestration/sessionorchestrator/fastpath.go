@@ -47,7 +47,10 @@ func (fp *FastPath) Run(ctx context.Context, req orchtypes.ProcessRequest, syste
 		SessionID:    req.SessionID,
 		SystemPrompt: systemPrompt,
 		Messages:     []types.Message{{Role: "user", Content: req.Message}},
-		MaxTurns:     8,
+		// MaxTurns=0 → unbounded. FastPath is the main-conversation
+		// fast-track; termination follows the same deterministic exit
+		// reasons as the full orchestrator path.
+		MaxTurns: 0,
 	}
 	out, err := fp.executor.RunTurn(ctx, qreq)
 	if err != nil {
