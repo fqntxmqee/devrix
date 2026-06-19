@@ -32,7 +32,7 @@ func TestWireFromConfig_obs_nil_returns_ErrObservabilityRequired(t *testing.T) {
 // DSAFT: D3-X-A02-T01 (negative control: obsBridge == nil at the
 // top-level context wiring must also fail fast with the same sentinel).
 func TestWireContextLLM_obs_nil_returns_ErrObservabilityRequired(t *testing.T) {
-	stack, err := llmbridge.WireContextLLM("", nil)
+	stack, err := llmbridge.WireContextLLM("", nil, nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

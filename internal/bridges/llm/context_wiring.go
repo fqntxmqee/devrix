@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -32,11 +33,24 @@ type ContextLLMStack struct {
 // is returned to the caller, which is expected to surface it to the user
 // at startup. Use llmgateway.NewFromConfig directly if you need a different
 // recovery strategy.
-func WireContextLLM(configFile string, obsBridge *observability.Bridge) (ContextLLMStack, error) {
+//
+// `userOverride` is the user-level LLM gateway config (typically from
+// UserConfig.LLMGateway). It is deep-merged on top of the project file
+// before validation. nil is fine — it means "no user override" and the
+// project file / compiled defaults take effect.
+func WireContextLLM(configFile string, userOverride *configure.LLMGatewayFileConfig, obsBridge *observability.Bridge) (ContextLLMStack, error) {
 	if obsBridge == nil {
 		return ContextLLMStack{}, sharederrors.ErrObservabilityRequired
 	}
-	llmCfg, err := config.LoadLLMGatewayConfig(configFile)
+	var projectFile *configure.LLMGatewayFileConfig
+	if configFile != "" {
+		cf, err := config.LoadConfigFile(configFile)
+		if err != nil {
+			return ContextLLMStack{}, err
+		}
+		projectFile = &cf.LLMGateway
+	}
+	llmCfg, err := configure.BuildLLMGatewayConfigWithUser(projectFile, userOverride)
 	if err != nil {
 		return ContextLLMStack{}, err
 	}

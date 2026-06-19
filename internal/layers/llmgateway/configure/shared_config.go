@@ -116,23 +116,30 @@ type LLMRetryConfig struct {
 	Backoff      float64
 }
 
-// DefaultLLMGatewayConfig returns V1 defaults.
+// DefaultLLMGatewayConfig returns infrastructure-only defaults.
+//
+// DSAFT: D3-S6-A03 (model catalog, v2.x). The defaults deliberately contain
+// NO model-name strings. Provider INFRASTRUCTURE (base_url, api_key_env,
+// timeout, retry, headers) is shipped because it is not a "model choice" —
+// it describes the provider's transport contract. Model *names* are
+// resolved exclusively from the layered config:
+//
+//	compiled defaults (this fn, empty)
+//	  ← project config (devrix.yaml llm_gateway section, optional)
+//	  ← user config  ( ~/.devrix/config.yaml llm_gateway section, optional)
+//	  ← environment  (DEVRIX_LLM_* vars, optional)
+//
+// If the resolved config still has empty default_model / default_provider
+// after all layers, ValidateLLMGatewayConfig fails fast at startup and
+// points the user to devrix.yaml or ~/.devrix/config.yaml.
 func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 	return &LLMGatewayConfig{
-		DefaultProvider: "minimax",
-		DefaultModel:    "MiniMax-M2.7-highspeed",
+		DefaultProvider: "",
+		DefaultModel:    "",
 		DefaultTier:     "default",
 		FeatureFlags:    DefaultFeatureFlags(),
-		ModelTiers: map[string]string{
-			"fast":     "MiniMax-M2.7-highspeed",
-			"default":  "MiniMax-M2.7-highspeed",
-			"powerful": "deepseek-v4-latest",
-		},
-		ModelRouting: map[string]string{
-			"deepseek-*": "deepseek",
-			"minimax-*":  "minimax",
-			"MiniMax-*":  "minimax",
-		},
+		ModelTiers:      map[string]string{},
+		ModelRouting:    map[string]string{},
 		CircuitBreaker: LLMCircuitBreakerConfig{
 			FailureThreshold:  5,
 			SuccessThreshold:  2,
@@ -142,14 +149,13 @@ func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 		},
 		Providers: map[string]LLMProviderRuntimeConfig{
 			"deepseek": {
-				Type:          "deepseek",
-				BaseURL:       "https://api.deepseek.com/v1",
-				APIKeyEnv:     "DEEPSEEK_API_KEY",
-				DefaultModel:  "deepseek-v4-flash",
-				FallbackModel: "deepseek-v4-pro",
-				Timeout:       60 * time.Second,
-				MaxTokens:     8192,
-				Temperature:   0.7,
+				Type:         "deepseek",
+				BaseURL:      "https://api.deepseek.com/v1",
+				APIKeyEnv:    "DEEPSEEK_API_KEY",
+				DefaultModel: "",
+				Timeout:      60 * time.Second,
+				MaxTokens:    8192,
+				Temperature:  0.7,
 				Retry: LLMRetryConfig{
 					MaxAttempts:  3,
 					InitialDelay: time.Second,
@@ -158,14 +164,13 @@ func DefaultLLMGatewayConfig() *LLMGatewayConfig {
 				},
 			},
 			"minimax": {
-				Type:          "minimax",
-				BaseURL:       "https://api.minimaxi.com/v1",
-				APIKeyEnv:     "MINIMAX_API_KEY",
-				DefaultModel:  "MiniMax-M2.7-highspeed",
-				FallbackModel: "MiniMax-M2.5-highspeed",
-				Timeout:       60 * time.Second,
-				MaxTokens:     8192,
-				Temperature:   0.7,
+				Type:         "minimax",
+				BaseURL:      "https://api.minimaxi.com/v1",
+				APIKeyEnv:    "MINIMAX_API_KEY",
+				DefaultModel: "",
+				Timeout:      60 * time.Second,
+				MaxTokens:    8192,
+				Temperature:  0.7,
 				Retry: LLMRetryConfig{
 					MaxAttempts:  3,
 					InitialDelay: time.Second,
@@ -257,4 +262,30 @@ func BuildLLMGatewayConfig(file *LLMGatewayFileConfig) *LLMGatewayConfig {
 		cfg.Providers[name] = existing
 	}
 	return cfg
+}
+
+// BuildLLMGatewayConfigWithUser is the full layered-config entry point.
+//
+// Merge order (highest priority wins):
+//  1. user  — from internal/shared/config.UserConfig.LLMGateway
+//  2. file  — from project config (devrix.yaml llm_gateway section)
+//  3. defaults — from DefaultLLMGatewayConfig (infrastructure only, no model names)
+//
+// `user` may be nil (no user override declared). `file` may be nil
+// (no project config found). The merged result is validated via
+// ValidateLLMGatewayConfig; a nil DefaultModel / DefaultProvider fails
+// fast with ErrLLMConfigMissing so the user sees a clear pointer to
+// where to set it.
+//
+// DSAFT: D3-S6-A03 (model catalog, v2.x). The function is the single
+// production entry point for resolving an LLMGatewayConfig — callers
+// MUST go through this (or its sibling BuildLLMGatewayConfig) instead
+// of stitching configs themselves.
+func BuildLLMGatewayConfigWithUser(file, user *LLMGatewayFileConfig) (*LLMGatewayConfig, error) {
+	merged := MergeLLMGatewayFileConfig(file, user)
+	resolved := BuildLLMGatewayConfig(merged)
+	if err := ValidateLLMGatewayConfig(resolved); err != nil {
+		return nil, err
+	}
+	return resolved, nil
 }

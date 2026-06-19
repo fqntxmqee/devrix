@@ -35,6 +35,15 @@ func testGateway(t *testing.T, handler func(model string) (<-chan *llmgateway.Ad
 		t.Fatalf("counter: %v", err)
 	}
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	// DSAFT: D3-S6-A03 (v2.x). Compiled defaults no longer ship model routing
+	// or a default provider; tests must set up the active route explicitly.
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
+	ds := cfg.Providers["deepseek"]
+	ds.DefaultModel = "deepseek-v4-flash"
+	ds.FallbackModel = "deepseek-v4-pro"
+	cfg.Providers["deepseek"] = ds
 	reg := streamadapter.NewRegistry()
 	_ = reg.Register(stubAdapter{provider: "deepseek", handler: handler})
 	return stream.New(stream.Deps{
@@ -99,6 +108,9 @@ func TestGateway_should_fallback_model_on_primary_failure(t *testing.T) {
 // T: D3-S2-A01-T04
 func TestGateway_should_not_open_circuit_on_context_cancel(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
 	cfg.CircuitBreaker.FailureThreshold = 1
 	counter, err := budget.NewCounter()
 	if err != nil {
@@ -136,6 +148,9 @@ func TestGateway_should_not_open_circuit_on_context_cancel(t *testing.T) {
 // T: D3-S2-A01-T05
 func TestGateway_should_inject_provider_timeout_when_no_deadline(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
 	cfg.Providers["deepseek"] = sharedconfig.LLMProviderRuntimeConfig{
 		Type: "deepseek", DefaultModel: "deepseek-v4-flash", Timeout: 50 * time.Millisecond,
 		Retry: sharedconfig.LLMRetryConfig{MaxAttempts: 1},
@@ -177,6 +192,9 @@ func TestGateway_should_inject_provider_timeout_when_no_deadline(t *testing.T) {
 // T: D3-S2-A01-T05
 func TestGateway_should_respect_existing_context_deadline(t *testing.T) {
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
 	cfg.Providers["deepseek"] = sharedconfig.LLMProviderRuntimeConfig{
 		Type: "deepseek", DefaultModel: "deepseek-v4-flash", Timeout: 200 * time.Millisecond,
 		Retry: sharedconfig.LLMRetryConfig{MaxAttempts: 1},

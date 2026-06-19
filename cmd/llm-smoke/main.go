@@ -10,6 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
+	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -28,7 +29,12 @@ func main() {
 
 	obs := observability.NewNoOp()
 	obsBridge := observability.NewBridge(obs)
-	llmStack, err := llmbridge.WireContextLLM(configFile, obsBridge)
+	userCfg, _ := config.LoadUserConfig()
+	var userOverride *configure.LLMGatewayFileConfig
+	if userCfg != nil {
+		userOverride = userCfg.LLMGateway
+	}
+	llmStack, err := llmbridge.WireContextLLM(configFile, userOverride, obsBridge)
 	if err != nil {
 		if llmbridge.IsObservabilityRequiredError(err) {
 			fmt.Fprintln(os.Stderr, "llm gateway wiring failed: observability bridge is required")
@@ -54,7 +60,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	userCfg, _ := config.LoadUserConfig()
 	permMgr := capture.NewPermissionManager(&commCfg.Permission)
 	if userCfg != nil {
 		permMgr.SetUserConfig(userCfg)

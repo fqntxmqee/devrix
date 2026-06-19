@@ -35,7 +35,7 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 
 // T: D3-X-A02-T01 — nil obs bridge must fail fast (v1.1 BREAKING).
 func TestIntegration_WireContextLLM_obs_nil_returns_ErrObservabilityRequired(t *testing.T) {
-	stack, err := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil)
+	stack, err := llmbridge.WireContextLLM("/nonexistent/devrix.yaml", nil, nil)
 	if err == nil {
 		t.Fatal("expected error when obs bridge is nil")
 	}

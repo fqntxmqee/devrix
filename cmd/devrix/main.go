@@ -171,7 +171,7 @@ func main() {
 	permissionMgr.SetUserConfig(userCfg)
 
 	obsBridge := observability.NewBridge(obs)
-	llmStack, err := llmbridge.WireContextLLM(configFile, obsBridge)
+	llmStack, err := llmbridge.WireContextLLM(configFile, userCfg.LLMGateway, obsBridge)
 	if err != nil {
 		if llmbridge.IsObservabilityRequiredError(err) {
 			slog.Error("llm gateway wiring failed: observability bridge is required", "error", err)

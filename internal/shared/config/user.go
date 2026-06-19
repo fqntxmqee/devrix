@@ -9,16 +9,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// UserConfig represents user-specific configuration
+// UserConfig represents user-specific configuration.
+//
+// Most fields are "user identity" / "UI preference" data that does not
+// influence server-side routing. The LLMGateway field is the user-level
+// override for the project-level llm_gateway section — see
+// internal/layers/llmgateway/configure for the merge rules.
 type UserConfig struct {
-	User      UserInfoConfig      `yaml:"user"`
-	UI        UIConfig            `yaml:"ui"`
-	Model     ModelConfig         `yaml:"model"`
-	Shortcuts ShortcutsConfig     `yaml:"shortcuts"`
-	Plugins   PluginsConfig       `yaml:"plugins"`
-	Privacy   PrivacyConfig       `yaml:"privacy"`
-	YOLO      YOLOConfig         `yaml:"yolo"`       // YOLO mode - permission auto-approve
-	IM        IMConfig            `yaml:"im"`        // IM 平台配置
+	User      UserInfoConfig         `yaml:"user"`
+	UI        UIConfig               `yaml:"ui"`
+	Model     ModelConfig            `yaml:"model"`
+	Shortcuts ShortcutsConfig        `yaml:"shortcuts"`
+	Plugins   PluginsConfig          `yaml:"plugins"`
+	Privacy   PrivacyConfig          `yaml:"privacy"`
+	YOLO      YOLOConfig             `yaml:"yolo"`   // YOLO mode - permission auto-approve
+	IM        IMConfig               `yaml:"im"`     // IM 平台配置
+	// LLMGateway 是用户态对项目级 llm_gateway 的覆盖层（深合并）。
+	// nil 表示用户未声明任何 LLM gateway 字段，将完全沿用项目配置 / 编译期默认值。
+	// 通过 DEVRIX_LLM_* 环境变量或 ~/.devrix/config.yaml 的 llm_gateway 段设置。
+	LLMGateway *LLMGatewayFileConfig `yaml:"llm_gateway,omitempty"`
 }
 
 // IMConfig IM 平台配置
@@ -333,6 +342,65 @@ func applyUserEnvOverrides(cfg *UserConfig) {
 	}
 	if val := os.Getenv("DINGTALK_BOT_CODE"); val != "" {
 		cfg.IM.DingTalk.BotCode = val
+	}
+
+	// LLM gateway 覆盖层。任意一个 DEVRIX_LLM_* 被设置都会让 cfg.LLMGateway
+	// 从 nil 变为非 nil，使得下游 deep-merge 知道"用户态有声明"并启动合并。
+	// 单变量映射见 applyLLMEnvOverrides 函数注释。
+	applyLLMEnvOverrides(cfg)
+}
+
+// applyLLMEnvOverrides 将 6 个 DEVRIX_LLM_* 环境变量写入 cfg.LLMGateway。
+//
+// 语义：
+//   - 任一 env 被设置 → 整个 LLMGateway 覆盖层被视为"存在"（即使只设了一个字段）
+//   - 字段语义与项目级 llm_gateway.yaml 完全一致（default_* / model_tiers.*）
+//   - 优先级：env > ~/.devrix/config.yaml.llm_gateway > devrix.yaml.llm_gateway > 编译期默认
+//
+// 详细 env 列表：
+//
+//	DEVRIX_LLM_DEFAULT_MODEL    → llm_gateway.default_model
+//	DEVRIX_LLM_DEFAULT_PROVIDER → llm_gateway.default_provider
+//	DEVRIX_LLM_DEFAULT_TIER     → llm_gateway.default_tier
+//	DEVRIX_LLM_MODEL_FAST       → llm_gateway.model_tiers.fast
+//	DEVRIX_LLM_MODEL_DEFAULT    → llm_gateway.model_tiers.default
+//	DEVRIX_LLM_MODEL_POWERFUL   → llm_gateway.model_tiers.powerful
+func applyLLMEnvOverrides(cfg *UserConfig) {
+	getOrInit := func() *LLMGatewayFileConfig {
+		if cfg.LLMGateway == nil {
+			cfg.LLMGateway = &LLMGatewayFileConfig{}
+		}
+		return cfg.LLMGateway
+	}
+	if val := os.Getenv("DEVRIX_LLM_DEFAULT_MODEL"); val != "" {
+		getOrInit().DefaultModel = val
+	}
+	if val := os.Getenv("DEVRIX_LLM_DEFAULT_PROVIDER"); val != "" {
+		getOrInit().DefaultProvider = val
+	}
+	if val := os.Getenv("DEVRIX_LLM_DEFAULT_TIER"); val != "" {
+		getOrInit().DefaultTier = val
+	}
+	if val := os.Getenv("DEVRIX_LLM_MODEL_FAST"); val != "" {
+		g := getOrInit()
+		if g.ModelTiers == nil {
+			g.ModelTiers = map[string]string{}
+		}
+		g.ModelTiers["fast"] = val
+	}
+	if val := os.Getenv("DEVRIX_LLM_MODEL_DEFAULT"); val != "" {
+		g := getOrInit()
+		if g.ModelTiers == nil {
+			g.ModelTiers = map[string]string{}
+		}
+		g.ModelTiers["default"] = val
+	}
+	if val := os.Getenv("DEVRIX_LLM_MODEL_POWERFUL"); val != "" {
+		g := getOrInit()
+		if g.ModelTiers == nil {
+			g.ModelTiers = map[string]string{}
+		}
+		g.ModelTiers["powerful"] = val
 	}
 }
 

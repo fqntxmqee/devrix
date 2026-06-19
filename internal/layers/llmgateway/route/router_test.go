@@ -11,7 +11,10 @@ import (
 
 // T: D3-S2-A01-T02
 func TestRouter_should_resolve_deepseek_model(t *testing.T) {
-	r := route.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
+	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "deepseek"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
+	r := route.NewRouter(cfg)
 	provider, model, err := r.Resolve("deepseek-v4-flash")
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -23,7 +26,10 @@ func TestRouter_should_resolve_deepseek_model(t *testing.T) {
 
 // T: D3-S2-A01-T02
 func TestRouter_should_resolve_minimax_model(t *testing.T) {
-	r := route.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
+	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "minimax"
+	cfg.ModelRouting = map[string]string{"minimax-*": "minimax"}
+	r := route.NewRouter(cfg)
 	provider, model, err := r.Resolve("minimax-3")
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -35,7 +41,10 @@ func TestRouter_should_resolve_minimax_model(t *testing.T) {
 
 // T: D3-S2-A01-T02
 func TestRouter_should_use_provider_default_when_model_empty(t *testing.T) {
-	r := route.NewRouter(sharedconfig.DefaultLLMGatewayConfig())
+	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "minimax"
+	cfg.DefaultModel = "MiniMax-M2.7-highspeed"
+	r := route.NewRouter(cfg)
 	provider, model, err := r.Resolve("")
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
