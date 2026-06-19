@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/shared/textutil"
 )
 
 const sseDataPrefix = "data: "
@@ -23,6 +24,12 @@ type streamAccumulator struct {
 	lastUsage        llmgateway.TokenUsage
 	hasUsage         bool
 	lastFinishReason string
+	// thinkSplitter routes XML <think>...</think> blocks out of delta.Content
+	// when the provider lacks a native reasoning field (e.g. minimax M2.7).
+	// Stateful across all events in the stream so chunks that straddle a
+	// tag boundary still split correctly. Provider-native fields
+	// (delta.ReasoningContent / delta.Thinking) bypass the splitter.
+	thinkSplitter *textutil.ThinkTagSplitter
 }
 
 type mergedToolCall struct {
@@ -32,7 +39,10 @@ type mergedToolCall struct {
 }
 
 func newStreamAccumulator() *streamAccumulator {
-	return &streamAccumulator{toolCalls: make(map[int]*mergedToolCall)}
+	return &streamAccumulator{
+		toolCalls:     make(map[int]*mergedToolCall),
+		thinkSplitter: &textutil.ThinkTagSplitter{},
+	}
 }
 
 func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
@@ -45,17 +55,33 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 
 	for _, choice := range event.Choices {
 		delta := choice.Delta
-		if delta.Content != "" {
-			chunk.Content += delta.Content
-			hasDelta = true
-		}
 		thinking := delta.ReasoningContent
 		if thinking == "" {
 			thinking = delta.Thinking
 		}
 		if thinking != "" {
+			// Provider-native reasoning field (DeepSeek-R1 reasoning_content,
+			// Anthropic thinking). Trust the protocol: content is clean.
 			chunk.Thinking += thinking
 			hasDelta = true
+			if delta.Content != "" {
+				chunk.Content += delta.Content
+				hasDelta = true
+			}
+		} else if delta.Content != "" {
+			// No provider-native field — the LLM is using inline <think> tags
+			// (minimax M2.7, Qwen, DeepSeek-R1 w/ chat template, etc.).
+			// Route through the stateful splitter so chunks straddling a
+			// <think> / </think> boundary still separate correctly.
+			thinkDelta, contentDelta := a.thinkSplitter.Push(delta.Content)
+			if thinkDelta != "" {
+				chunk.Thinking += thinkDelta
+				hasDelta = true
+			}
+			if contentDelta != "" {
+				chunk.Content += contentDelta
+				hasDelta = true
+			}
 		}
 		for _, tc := range delta.ToolCalls {
 			merged := a.toolCalls[tc.Index]
@@ -147,6 +173,18 @@ func streamOpenAISSE(reader io.Reader, emit func(*llmgateway.Chunk) error) error
 		}
 		payload := strings.TrimSpace(strings.TrimPrefix(line, sseDataPrefix))
 		if payload == "[DONE]" {
+			// Flush any trailing thinking/content that the splitter was still
+			// holding when the stream ended (e.g. a <think> block that never
+			// closed — the splitter buffers it until Flush()).
+			if thinkTail, contentTail := acc.thinkSplitter.Flush(); thinkTail != "" || contentTail != "" {
+				tail := &llmgateway.Chunk{
+					Thinking: thinkTail,
+					Content:  contentTail,
+				}
+				if err := emit(tail); err != nil {
+					return err
+				}
+			}
 			final := &llmgateway.Chunk{Done: true, FinishReason: acc.lastFinishReason}
 			if acc.hasUsage {
 				final.Usage = acc.lastUsage

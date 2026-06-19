@@ -12,6 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -514,7 +515,12 @@ func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, 
 				summaryBuilder.WriteString(chunk.Content)
 			}
 		}
-		if summary := summaryBuilder.String(); summary != "" {
+		// Strip <think>...</think> blocks before storing. The LLM may emit
+		// its working notes inside XML tags (minimax / DeepSeek-R1 w/o
+		// native reasoning field) and those would otherwise be re-injected
+		// into the next turn as a system message, polluting context and
+		// teaching the LLM to wrap subsequent answers in <think> too.
+		if summary := textutil.StripThinkingTags(summaryBuilder.String()); summary != "" {
 			return compressResult{Summary: summary, Degradation: CompressLLM}
 		}
 	}

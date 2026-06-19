@@ -755,6 +755,93 @@ func TestOrchestrator_RunTurn_CompressHint_LLM(t *testing.T) {
 	}
 }
 
+// --- CompressHint strips <think> from LLM-generated summary ---
+//
+// Regression: a previous build stored the LLM's compression summary verbatim
+// into the next-turn system message. When the LLM emitted its working notes
+// inside <think>...</think> (minimax M2.7, DeepSeek-R1 w/ chat template),
+// the system message was polluted with thinking content, which the LLM
+// then mirrored in subsequent turns ("<think>用户想...</think>" wrapping
+// every answer). Fix: runCompress must call textutil.StripThinkingTags on
+// the LLM summary before returning it.
+
+func TestOrchestrator_RunTurn_CompressHint_StripsThinkTags(t *testing.T) {
+	callCount := atomic.Int64{}
+	var secondCallMessages []types.Message
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, req LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := callCount.Add(1)
+		if n == 1 {
+			// Compression call: LLM emits thinking + actual summary
+			ch := make(chan llmgateway.Chunk, 4)
+			ch <- llmgateway.Chunk{Content: "<think>"}
+			ch <- llmgateway.Chunk{Content: "user asked me to summarize, let me think..."}
+			ch <- llmgateway.Chunk{Content: "</think>\n\nThe user is debugging devrix."}
+			ch <- llmgateway.Chunk{Done: true}
+			close(ch)
+			return ch, nil
+		}
+		// Main turn call: capture what the orchestrator actually sent us
+		secondCallMessages = append([]types.Message(nil), req.Messages...)
+		ch := make(chan llmgateway.Chunk, 2)
+		ch <- textChunk("got it")
+		ch <- doneChunk()
+		close(ch)
+		return ch, nil
+	}
+
+	ctxPrep := &stubContext{prepared: PreparedContext{
+		CompressHint: &CompressHint{
+			MessagesToSummarize: []types.Message{
+				{Role: types.MessageRoleUser, Content: "long history"},
+			},
+			TargetTokenBudget: 2000,
+		},
+	}}
+	persist := &stubPersist{}
+	tools := &stubTools{}
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: ctxPrep, Tools: tools, Persist: persist, MaxTurns: 4,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-strip-think",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "continue"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	if callCount.Load() != 2 {
+		t.Fatalf("expected 2 LLM calls, got %d", callCount.Load())
+	}
+	if !hasType(evs, "complete") {
+		t.Error("expected complete event after compress")
+	}
+
+	// Find the system message injected from the compression summary.
+	var systemContent string
+	for _, m := range secondCallMessages {
+		if m.Role == types.MessageRoleSystem {
+			systemContent = m.Content
+			break
+		}
+	}
+	if systemContent == "" {
+		t.Fatal("no system message found in second LLM call")
+	}
+	if strings.Contains(systemContent, "<think>") {
+		t.Errorf("system message still contains <think>: %q", systemContent)
+	}
+	if strings.Contains(systemContent, "</think>") {
+		t.Errorf("system message still contains </think>: %q", systemContent)
+	}
+	if !strings.Contains(systemContent, "The user is debugging devrix.") {
+		t.Errorf("system message lost the actual summary: %q", systemContent)
+	}
+}
+
 // --- CompressHint empty summary falls through to truncation ---
 
 func TestOrchestrator_RunTurn_CompressHint_TruncationFallback(t *testing.T) {
