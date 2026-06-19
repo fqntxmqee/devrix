@@ -11,6 +11,8 @@
 // T: D2-STRUCT-T04 — prepare/memory/ and persist/memory/ have no cyclic import
 // T: D2-STRUCT-T05 — enforce/orchestrator.go removed (stub gone, turn_adapter is SoT)
 // T: D2-STRUCT-T06 — scenario subdirectories at most 2 levels deep
+// T: D2-STRUCT-T07 — no new legacy.Process() callers (P5 retirement guard)
+// T: D2-STRUCT-T08 — query/ package removed (DM-20260618-010 QueryLoop decommission)
 package layer
 
 import (
@@ -369,6 +371,23 @@ func TestD2Layout_NoNewLegacyProcessCallers(t *testing.T) {
 		t.Errorf("D2-STRUCT-T07 (P5): new legacy.Process() callers detected: %v. "+
 			"Migrate to D7 SessionOrchestrator.ProcessMessage or turn_adapter.ExecuteRound.",
 			violations)
+	}
+}
+
+// TestD2Layout_NoQueryDir verifies D2-STRUCT-T08:
+// after DM-20260618-010 QueryLoop subsystem archival, the query/ package
+// must not reappear at D2 root. The canonical hot path is D7 SessionOrchestrator
+// → D7-S2-A06 RunTurn → D2 turn adapters.
+//
+// Migrated from internal/layers/contextengine/queryloop_removed_test.go
+// during the 2026-06-19 D2 root test cleanup.
+func TestD2Layout_NoQueryDir(t *testing.T) {
+	root := filepath.Join(d2RepoRoot(t), "internal", "layers", "contextengine")
+	queryDir := filepath.Join(root, "query")
+	if _, err := os.Stat(queryDir); err == nil {
+		t.Errorf("D2-STRUCT-T08: query/ directory reappeared at %s after QueryLoop archival", queryDir)
+	} else if !os.IsNotExist(err) {
+		t.Errorf("D2-STRUCT-T08: stat query dir: %v", err)
 	}
 }
 

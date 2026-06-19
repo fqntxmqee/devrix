@@ -5,11 +5,23 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// mustBuiltinRegistry is inlined here after the 2026-06-19 D2 root test cleanup.
+// Was previously shared via engine_accessor_test.go (deleted with that file).
+func mustBuiltinRegistry(t *testing.T) *registry.BuiltinRegistry {
+	t.Helper()
+	reg, err := registry.NewBuiltinRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reg
+}
 
 // D2-S11-A01-T02: Process() delegates to D7 PreparedTurnRunner; legacy_harness
 // counter must stay at zero.
