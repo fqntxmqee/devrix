@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d5-v2-terminal  
 **Demand ID:** DM-20260619-006  
-**Status:** S3_Design  
+**Status:** S7_Archived (2026-06-19 — DM-20260619-006 v2.1 Terminal 闭环，PR #118+#119+#120+#121+#122 全合入)  
 **Methodology:** `docs/methodology/dsaft-refactoring-playbook.md` §3–§6
 
 ---

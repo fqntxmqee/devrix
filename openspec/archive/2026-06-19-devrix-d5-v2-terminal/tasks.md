@@ -13,10 +13,10 @@
 | S1 需求 | ✅ 完成 | `demand.md` |
 | S2 提案 | ✅ 完成 | `proposal.md`, `.openspec.yaml` |
 | S3 设计 | ✅ 完成 | `design.md`, `specs/**`, `design-review.md` |
-| **S3-Gate** | ⏳ 待 Owner 确认 | `design-review.md` → Approved |
-| S4 实现 | 🚫 **未启动**（Owner：先不开发） | 代码 + tests |
-| S5 验收 | — | `acceptance-report.md` |
-| S6/S7 归档 | — | `openspec/archive/` + specs 回写 |
+| **S3-Gate** | ✅ Approved 2026-06-19 | `design-review.md` §11 |
+| S4 实现 | ✅ 完成 | PR #118 (A) · #119 (B2a) · #120 (B2b) · #121 (B1) · #122 (B3) |
+| S5 验收 | ✅ ACCEPTED | `acceptance-report.md` (17/17 AC PASS) |
+| S6/S7 归档 | ⏳ 当前 | `openspec/archive/2026-06-19-devrix-d5-v2-terminal/` (this PR) |
 
 **S4 前置条件：** S3-Gate Approved + 创建 Draft PR（`docs/d5-v2-terminal-spec`）。
 

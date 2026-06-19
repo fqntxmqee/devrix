@@ -1,7 +1,15 @@
 change_id: devrix-d5-v2-terminal
 priority: P0
 demand_id: DM-20260619-006
-status: s3_design
+status: s7_archived
+archived_at: 2026-06-19
+archive_pr: "#122 + S6 archive PR (this branch)"
+s4_prs:
+  - "#118 docs/d5-v2-terminal-spec"
+  - "#119 chore/d5-bridge-import-fix"
+  - "#120 chore/d5-bridge-removal"
+  - "#121 chore/d5-root-file-relocate"
+  - "#122 chore/d5-t-canonical-fix"
 domains: [D5]
 dsaft_scenarios: [D5-S0, D5-S21, D5-S22, D5-S23, D5-S24]
 dsaft_activities:
@@ -16,11 +24,22 @@ parent_changes:
   - devrix-d5-sa-refine          # DM-20260615-001 v1.0 Registry
   - devrix-d5-d6-sa-refine-v2.0  # DM-20260615-003 v2.0 物理迁移
 t_points:
-  reuse: "41 T ID 不变；canonical_s/canonical_a 校正；2 PLANNED 闭合"
+  reuse: "41 T ID 不变；canonical_s/canonical_a 校正；3 PLANNED 闭合（A05-T01/T02 + A06-T02）"
+  final_total: 43
+  final_status: "41 IMPLEMENTED / 0 PLANNED / 2 REMOVED"
 s3_gate:
   review: design-review.md
   conclusion: approved_with_suggestions
   s4_blocked_until: owner_confirms_review
+  s3_gate_owner_confirmed: 2026-06-19
+s5_gate:
+  acceptance_report: acceptance-report.md
+  conclusion: ACCEPTED
+  ac_total: 17
+  ac_passed: 17
+s7_artifacts:
+  acceptance_report: acceptance-report.md
+  archive_path: openspec/archive/2026-06-19-devrix-d5-v2-terminal/
 s3_artifacts:
   gaming: gaming-analysis.md
   clarifications: d5-requirements-clarifications.md
