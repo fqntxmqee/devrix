@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-spec-sync-d6-evolution-registration
 **Demand ID:** DM-20260619-003
-**Status:** S2_Proposal
+**Status:** S7_Archived (2026-06-19)
 **Date:** 2026-06-19
 **Author:** Devrix Team
 
