@@ -29,7 +29,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "Hello from context engine"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "Hello from context engine"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   mustBuiltinRegistry(t),
@@ -77,7 +77,7 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: mockctx.LLMCallerWithTools(),
+		PreparedTurnRunner: mockctx.PreparedTurnRunnerWithTools(),
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools: &mockctx.ToolRunner{},
 		ToolsReg: mustBuiltinRegistry(t),

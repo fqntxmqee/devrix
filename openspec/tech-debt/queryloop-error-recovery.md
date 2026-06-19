@@ -11,23 +11,17 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 
 ## 待办项
 
-### TD-QL-01: Prompt Too Long (413) 恢复链（P1）
+### TD-QL-01: Prompt Too Long (413) 恢复链（P1） — **CLOSED (DM-20260618-010)**
 
-- **现状：** QueryLoop 路径无 413 → collapse drain → reactive compact → 重试
-- **目标：** 复用现有 `compression/` 七步管道，在 `query/loop.go` 捕获 413 后依次触发
-- **验收：** 集成测试：超限上下文自动压缩后成功完成 tool 轮次
+- **归属：** D7 `turn/recovery.go` + `invokeStreamWithRecovery`
+- **验收：** `turn/recovery_test.go`
 
-### TD-QL-02: max_output_tokens 恢复（P1）
+### TD-QL-02: max_output_tokens 恢复（P1） — OPEN
 
-- **现状：** 无 64k 扩容 + recovery message 渐进恢复
-- **目标：** LLM 返回 truncation 信号时注入 recovery user message 并重试（最多 3 次）
-- **验收：** 单测 + mock provider truncation 场景
+### TD-QL-03: Loop 级 fallback model（P1） — **CLOSED (DM-20260618-010)**
 
-### TD-QL-03: Loop 级 fallback model（P1）
-
-- **现状：** `llmgateway/retry` 有 fallback，QueryLoop 未统一接入 overload/5xx 恢复
-- **目标：** `query/loop.go` 在 primary 失败时经 gateway retry executor 切换 fallback
-- **验收：** 集成测试 mock primary 失败 → fallback 成功
+- **归属：** D3 `llmgateway` protect/retry（`GatewayInvoker.InvokeStream`）
+- **说明：** D7 不再维护独立 fallback 链
 
 ### TD-QL-04: D6 评测探针（P2）
 

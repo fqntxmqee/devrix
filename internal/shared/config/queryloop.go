@@ -2,7 +2,6 @@ package config
 
 // QueryLoopConfig holds QueryLoop runtime settings (Claude Code queryLoop aligned).
 type QueryLoopConfig struct {
-	Enabled         bool `yaml:"enabled"`
 	MaxTurns        int  `yaml:"max_turns"`
 	CompressPerTurn bool `yaml:"compress_per_turn"`
 	StreamingTools  bool `yaml:"streaming_tools"`
@@ -45,16 +44,11 @@ type SubQueryConfig struct {
 	DefaultSubagentMaxTurns int `yaml:"default_subagent_max_turns"`
 }
 
-// DefaultQueryLoopConfig returns v1.0 defaults.
-//
-// As of DM-20260611-004 (Legacy Harness 退役), QueryLoop is the *only*
-// supported primary LLM↔Tool path. Enabled defaults to true so that
-// production deployments get the QueryLoop path without any extra
-// configuration. Operators who genuinely need the legacy harness path
-// can still flip `query_loop.enabled: false` explicitly.
+// DefaultQueryLoopConfig returns turn-runtime defaults consumed by D7
+// (max turns, per-turn compression). The query_loop.enabled switch was
+// removed in DM-20260618-010; all LLM↔Tool loops run through D7.
 func DefaultQueryLoopConfig() QueryLoopConfig {
 	return QueryLoopConfig{
-		Enabled:         true,
 		MaxTurns:        50,
 		CompressPerTurn: true,
 	}

@@ -11,7 +11,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -24,7 +23,7 @@ func (e *ContextEngine) finalizeTurn(
 	ctx context.Context,
 	session *types.Session,
 	sc *types.SessionContext,
-	res *query.Result,
+	res *preparedTurnLoopResult,
 	runErr error,
 	working *memory.WorkingMemory,
 	message string,

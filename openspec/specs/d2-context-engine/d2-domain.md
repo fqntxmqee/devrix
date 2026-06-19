@@ -4,8 +4,8 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S18 (v2.0 final, S19 dismantled, S20 removed)
-**Version:** 7.0.0
-**Last Updated:** 2026-06-16
+**Version:** 8.0.0
+**Last Updated:** 2026-06-18
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
@@ -20,7 +20,7 @@
 | 可验证承诺 | Canonical S |
 |-----------|-------------|
 | Turn 前上下文合法、在预算内 | D2-S15 PrepareExecutionContext |
-| LLM↔Tool 多轮（Legacy 冻结 → D7-S2-A06） | ~~D2-S16 RunQueryLoop~~ |
+| LLM↔Tool 多轮 | ~~D2-S16 RunQueryLoop~~ → **D7-S2-A06 RunTurnLoop**（DM-20260618-010 REMOVED） |
 | Tool 权限/沙箱先于执行 | D2-S18 EnforceExecutionPolicy |
 | Turn 后状态 durable + deferred complete | D2-S17 PersistSessionState |
 | 嵌套 SubQuery/Background 有边界 | ~~D2-S19 NestedExecution~~ → S15+S18 拆分 |

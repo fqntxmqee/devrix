@@ -360,7 +360,7 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 	}
 	registryBuiltin := mustBuiltinRegistryForAdapter(t)
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          realReg,
 		ToolsReg:       registryBuiltin,

@@ -16,8 +16,8 @@ func newTestEngine(t *testing.T) *contextengine.ContextEngine {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	return contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
-		Summarizer:     &mockctx.StaticSummarizer{},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:           &mockctx.StaticSummarizer{},
 		Tools:          &mockctx.ToolRunner{Output: "ok"},
 		ToolsReg:       mustBuiltinRegistry(t),
 		Permission:     mockctx.AllowAllPermission{},

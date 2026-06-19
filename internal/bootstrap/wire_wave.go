@@ -32,11 +32,11 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wave.WaveScheduler {
 	artifacts := wave.NewArtifactStore()
 	runnerMap := make(map[wave.WorkerType]wave.WorkerRunner)
 
-	if ce := contextEngineFrom(deps.Engine); ce != nil && ce.QueryLoop() != nil {
-		runnerMap[wave.WorkerSubAgent] = runners.NewSubAgentRunner(buildSubAgentDeps(ce, deps.GW))
+	if WiredSubTurn() != nil || contextEngineFrom(deps.Engine) != nil {
+		runnerMap[wave.WorkerSubAgent] = runners.NewSubAgentRunner(buildSubAgentDeps(deps.GW, deps.Engine))
 		slog.Info("d7: wave subagent runner wired")
 	} else {
-		slog.Warn("d7: wave subagent runner skipped (context engine loop unavailable)")
+		slog.Warn("d7: wave subagent runner skipped (SubTurn executor unavailable)")
 	}
 
 	if deps.AgentTools != nil {
@@ -86,10 +86,15 @@ func contextEngineFrom(engine contracts.IEngine) *contextengine.ContextEngine {
 	return ce
 }
 
-func buildSubAgentDeps(ce *contextengine.ContextEngine, gw *capture.CommunicationGateway) runners.SubAgentDeps {
+func buildSubAgentDeps(gw *capture.CommunicationGateway, engine contracts.IEngine) runners.SubAgentDeps {
 	reg := enforce.GlobalBackgroundRegistry
+	ce := contextEngineFrom(engine)
 	return runners.SubAgentDeps{
 		Start: func(ctx context.Context, params runners.SubAgentParams) (string, error) {
+			subTurn := WiredSubTurn()
+			if subTurn == nil {
+				return "", fmt.Errorf("wave subagent: SubTurn executor not wired")
+			}
 			parentSC, err := resolveParentSessionContext(ce, gw, params.SessionID)
 			if err != nil {
 				return "", err
@@ -106,7 +111,9 @@ func buildSubAgentDeps(ce *contextengine.ContextEngine, gw *capture.Communicatio
 			if maxTurns <= 0 {
 				maxTurns = 30
 			}
-			return enforce.RunBackground(ctx, enforce.LoopDeps{Loop: ce.QueryLoop()}, enforce.SubQueryParams{
+			return enforce.RunBackground(ctx, enforce.SubQueryDeps{
+				SubTurn: subTurn,
+			}, enforce.SubQueryParams{
 				ParentSC:       parentSC,
 				AgentID:        params.AgentID,
 				AgentName:      params.AgentName,

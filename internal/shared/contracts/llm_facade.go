@@ -9,7 +9,7 @@ import (
 // LLMCaller performs one streaming LLM call with optional user context prepend.
 //
 // DSAFT: D7-S2-A07 (InvokeLLM) → D2 query loop 拆面出口
-// Implemented by D7 turn.QueryLLMCaller; consumed by D2 query.Loop via EngineDeps.
+// Implemented by D7 turn.CompressionSummarizer; consumed by D2 compression pipeline.
 type LLMCaller interface {
 	Call(ctx context.Context, req LLMRequest) (<-chan LLMChunk, error)
 }

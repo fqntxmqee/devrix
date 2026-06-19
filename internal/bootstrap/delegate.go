@@ -52,13 +52,13 @@ func WireDelegate(
 		return
 	}
 	var subQuery hubspoke.SubQueryRunner
-	if engine != nil && ctxCfg.QueryLoop.Enabled {
+	if st := WiredSubTurn(); st != nil {
 		var fr contracts.SubQueryFlowReporter
 		if hub != nil {
 			fr = hubspoke.NewFlowReporter(hub)
 		}
-		subQuery = delegatetools.BuildSubQueryRunner(enforce.LoopDeps{
-			Loop:         engine.QueryLoop(),
+		subQuery = delegatetools.BuildSubQueryRunner(enforce.SubQueryDeps{
+			SubTurn:      st,
 			FlowReporter: fr,
 		})
 	}

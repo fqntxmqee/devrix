@@ -28,9 +28,7 @@ import (
 // agentToolReg is nil when agent tools are disabled.
 //
 // DM-020: D2→D3 拆面 is enforced by constructing D7 turn adapters from llmStack
-// and injecting them via EngineDeps.QueryLLMCaller / EngineDeps.Summarizer.
-// EngineDeps.LLM is left nil so production wiring cannot fall through to the
-// deprecated D2→D3 direct path.
+// and injecting them via EngineDeps.Summarizer (compression only).
 //
 // DM-20260617-005: register the same diagnostic tool surface that
 // buildWithGate exposes to per-agent engines. The main engine used by
@@ -125,12 +123,7 @@ func NewContextEngine(
 		contextengine.NewToolLimiter(toolCfg.ConcurrentMax),
 	)
 
-	// DM-020: D7-supplied adapters for the two D2 LLM拆面 contracts.
-	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
-		Gateway:      stack.RawGateway,
-		TierResolver: stack.TierResolver,
-		DefaultTier:  stack.DefaultModel,
-	})
+	// DM-020: D7-supplied summarizer for D2 compression (no QueryLoop in D2).
 	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
 		Gateway:      stack.RawGateway,
 		TierResolver: stack.TierResolver,
@@ -173,7 +166,6 @@ func NewContextEngine(
 		DefaultModel:        stack.DefaultModel,
 		TierResolver:        stack.TierResolver,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
-		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).
@@ -184,7 +176,6 @@ func NewContextEngine(
 
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
-	_ contracts.LLMCaller       = (*turn.QueryLLMCaller)(nil)
 	_ contracts.Summarizer      = (*turn.CompressionSummarizer)(nil)
 	_ contracts.IEngine         = (*contextengine.ContextEngine)(nil)
 	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)

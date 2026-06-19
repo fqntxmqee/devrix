@@ -96,64 +96,112 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 // Cross-domain calls: D7→D2 (prepare/tools/persist), D7→D3 (LLM invoke).
 func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) {
 	start := time.Now()
-	// Step 1: PREPARE — D7 calls D2 for context assembly
-	ctx, prepSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
-		tracer.Attribute{Key: "session_id", Value: req.SessionID},
-		tracer.Attribute{Key: "context.phase", Value: "prepare"},
-		tracer.Attribute{Key: "context.caller", Value: "d7"},
-	)
-	prepared, err := o.context.Prepare(ctx, PrepareRequest{
-		SessionID: req.SessionID,
-		Message:   req.UserMessage,
-		Mode:      req.Mode,
-	})
-	endSpan(prepSpan)
-	if err != nil {
-		o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
-		return
-	}
+	nested := isNestedScope(req.Scope) || len(req.PreloadedMessages) > 0
 
-	systemPrompt := mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt)
-	if o.focusHint != nil {
-		if hint := strings.TrimSpace(o.focusHint.FocusHint(ctx, req.SessionID)); hint != "" {
-			systemPrompt = mergeSystemPrompt(systemPrompt, hint)
+	var (
+		prepared         PreparedContext
+		err              error
+		systemPrompt     string
+		messages         []types.Message
+		tools            []ToolSchema
+		model            string
+		maxContextTokens int
+		persister        SessionPersister = o.persist
+	)
+
+	if nested {
+		systemPrompt = strings.TrimSpace(req.SystemPrompt)
+		messages = append([]types.Message{}, req.PreloadedMessages...)
+		if len(req.UserMessage.Content) > 0 || req.UserMessage.Role != "" {
+			messages = append(messages, req.UserMessage)
 		}
-	}
-	if o.resolveAwait != nil {
-		if summary := strings.TrimSpace(o.resolveAwait.AwaitRunningChildren(ctx, req.SessionID)); summary != "" {
-			systemPrompt = mergeSystemPrompt(systemPrompt, summary)
-			out <- &contracts.EngineEvent{
-				Type:      "resolve",
-				Content:   summary,
+		if len(req.OverrideTools) > 0 {
+			tools = req.OverrideTools
+		} else {
+			ctx, prepSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
+				tracer.Attribute{Key: "session_id", Value: req.SessionID},
+				tracer.Attribute{Key: "context.phase", Value: "prepare"},
+				tracer.Attribute{Key: "context.caller", Value: "d7"},
+				tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+			)
+			prepared, err = o.context.Prepare(ctx, PrepareRequest{
 				SessionID: req.SessionID,
+				Message:   req.UserMessage,
+				Mode:      req.Mode,
+			})
+			endSpan(prepSpan)
+			if err != nil {
+				o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
+				return
+			}
+			tools = prepared.Tools
+		}
+		model = req.Model
+		if model == "" && prepared.Model != "" {
+			model = prepared.Model
+		}
+		maxContextTokens = prepared.MaxContextTokens
+		if req.SkipPersist {
+			persister = noopPersister{}
+		}
+	} else {
+		// Step 1: PREPARE — D7 calls D2 for context assembly
+		ctx, prepSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Process, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "context.phase", Value: "prepare"},
+			tracer.Attribute{Key: "context.caller", Value: "d7"},
+		)
+		prepared, err = o.context.Prepare(ctx, PrepareRequest{
+			SessionID: req.SessionID,
+			Message:   req.UserMessage,
+			Mode:      req.Mode,
+		})
+		endSpan(prepSpan)
+		if err != nil {
+			o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
+			return
+		}
+
+		systemPrompt = mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt)
+		if o.focusHint != nil {
+			if hint := strings.TrimSpace(o.focusHint.FocusHint(ctx, req.SessionID)); hint != "" {
+				systemPrompt = mergeSystemPrompt(systemPrompt, hint)
 			}
 		}
+		if o.resolveAwait != nil {
+			if summary := strings.TrimSpace(o.resolveAwait.AwaitRunningChildren(ctx, req.SessionID)); summary != "" {
+				systemPrompt = mergeSystemPrompt(systemPrompt, summary)
+				out <- &contracts.EngineEvent{
+					Type:      "resolve",
+					Content:   summary,
+					SessionID: req.SessionID,
+				}
+			}
+		}
+
+		// D-e: handle CompressHint — D7 calls D3 for summarization.
+		if prepared.CompressHint != nil {
+			compressCtx, compressSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
+				tracer.Attribute{Key: "session_id", Value: req.SessionID},
+				tracer.Attribute{Key: "llm.purpose", Value: "compress"},
+			)
+			result := o.runCompress(compressCtx, req, prepared.CompressHint)
+			endSpan(compressSpan)
+			prepared.Messages = []types.Message{{
+				SessionID: req.SessionID,
+				Role:      types.MessageRoleSystem,
+				Content:   result.Summary,
+			}}
+			prepared.CompressHint = nil
+		}
+
+		messages = make([]types.Message, 0, len(prepared.Messages)+1)
+		messages = append(messages, prepared.Messages...)
+		messages = append(messages, req.UserMessage)
+		tools = prepared.Tools
+		model = prepared.Model
+		maxContextTokens = prepared.MaxContextTokens
 	}
-
-	// D-e: handle CompressHint — D7 calls D3 for summarization.
-	if prepared.CompressHint != nil {
-		compressCtx, compressSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
-			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "llm.purpose", Value: "compress"},
-		)
-		result := o.runCompress(compressCtx, req, prepared.CompressHint)
-		endSpan(compressSpan)
-		prepared.Messages = []types.Message{{
-			SessionID: req.SessionID,
-			Role:      types.MessageRoleSystem,
-			Content:   result.Summary,
-		}}
-		prepared.CompressHint = nil
-	}
-
-	// Messages accumulate across turns. Start with prepared context + user message.
-	messages := make([]types.Message, 0, len(prepared.Messages)+1)
-	messages = append(messages, prepared.Messages...)
-	messages = append(messages, req.UserMessage)
-
-	tools := prepared.Tools
-	model := prepared.Model
-	maxContextTokens := prepared.MaxContextTokens
 	var totalUsage llmgateway.TokenUsage
 	var lastPromptTokens int
 	var finalText string
@@ -176,7 +224,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turn)},
 			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
 		)
-		chunkCh, err := o.llm.InvokeStream(turnCtx, LLMInvokeRequest{
+		chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
 			SessionID:    req.SessionID,
 			SystemPrompt: systemPrompt,
 			Messages:     messages,
@@ -238,7 +286,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				tracer.Attribute{Key: "session_id", Value: req.SessionID},
 				tracer.Attribute{Key: "context.caller", Value: "d7"},
 			)
-			_ = o.persist.PersistTurn(turnCtx, PersistRequest{
+			_ = persister.PersistTurn(turnCtx, PersistRequest{
 				SessionID: req.SessionID,
 				Messages:  messages,
 				TurnCount: turn + 1,
@@ -328,7 +376,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
-	_ = o.persist.PersistTurn(ctx, PersistRequest{
+	_ = persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  messages,
 		TurnCount: req.MaxTurns,

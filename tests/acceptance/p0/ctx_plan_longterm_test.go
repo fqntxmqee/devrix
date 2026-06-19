@@ -17,18 +17,16 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-type accPlanLLM struct {
+type accPlanPreparedTurn struct {
 	lastSystemPrompt string
 }
 
-func (p *accPlanLLM) Call(_ context.Context, req contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
+func (p *accPlanPreparedTurn) RunPreparedTurn(_ context.Context, req contracts.PreparedTurnRequest) (*contracts.PreparedTurnResult, error) {
 	p.lastSystemPrompt = req.SystemPrompt
-	ch := make(chan contracts.LLMChunk, 2)
-	go func() {
-		ch <- contracts.LLMChunk{Content: "Done.", Done: true}
-		close(ch)
-	}()
-	return ch, nil
+	if req.Emit != nil {
+		req.Emit(&contracts.EngineEvent{Type: "complete", SessionID: req.SessionID, Content: "Done."})
+	}
+	return &contracts.PreparedTurnResult{AssistantText: "Done."}, nil
 }
 
 // T: D2-S3-A01-T03
@@ -49,7 +47,7 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 		t.Fatalf("store: %v", err)
 	}
 
-	llm := &accPlanLLM{}
+	turn := &accPlanPreparedTurn{}
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = true
 	ctxCfg.LongTerm.RecallMaxEntries = 5
@@ -61,8 +59,8 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 	}
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: llm,
-		Summarizer:     &mockctx.StaticSummarizer{},
+		PreparedTurnRunner: turn,
+		Summarizer:         &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   toolsReg,
 		Permission: mockctx.AllowAllPermission{},
@@ -80,10 +78,10 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 	for range ch {
 	}
 
-	if !strings.Contains(llm.lastSystemPrompt, "<memory_context>") {
-		t.Fatalf("expected memory_context block in system prompt, got: %q", llm.lastSystemPrompt)
+	if !strings.Contains(turn.lastSystemPrompt, "<memory_context>") {
+		t.Fatalf("expected memory_context block in system prompt, got: %q", turn.lastSystemPrompt)
 	}
-	if !strings.Contains(llm.lastSystemPrompt, "[architecture]") {
-		t.Fatalf("expected recalled topic in system prompt, got: %q", llm.lastSystemPrompt)
+	if !strings.Contains(turn.lastSystemPrompt, "[architecture]") {
+		t.Fatalf("expected recalled topic in system prompt, got: %q", turn.lastSystemPrompt)
 	}
 }

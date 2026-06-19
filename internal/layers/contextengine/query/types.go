@@ -47,7 +47,7 @@ type CompressFunc func(ctx context.Context, msgs []types.Message) ([]types.Messa
 // LLMCaller performs one streaming LLM call with optional user context prepend.
 //
 // Re-exported from shared/contracts (DM-020拆面契约). Implemented by
-// D7 turn.QueryLLMCaller; may also be implemented by D2-internal fakes for tests.
+// D7 GatewayInvoker; may also be implemented by D2-internal fakes for tests.
 type LLMCaller = contracts.LLMCaller
 
 // LLMRequest is the per-iteration LLM input.

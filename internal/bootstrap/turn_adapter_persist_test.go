@@ -41,7 +41,7 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          &mockctx.ToolRunner{Output: "ok"},
 		ToolsReg:       mustBuiltinRegistryForAdapter(t),
@@ -94,7 +94,7 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          &mockctx.ToolRunner{Output: "ok"},
 		ToolsReg:       mustBuiltinRegistryForAdapter(t),
@@ -168,7 +168,7 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          &mockctx.ToolRunner{Output: "ok"},
 		ToolsReg:       mustBuiltinRegistryForAdapter(t),
@@ -217,7 +217,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 		t.Fatalf("real reg: %v", err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          realReg,
 		ToolsReg:       mustBuiltinRegistryForAdapter(t),
@@ -286,7 +286,7 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 		t.Fatalf("real reg: %v", err)
 	}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:          realReg,
 		ToolsReg:       mustBuiltinRegistryForAdapter(t),

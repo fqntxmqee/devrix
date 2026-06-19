@@ -16,17 +16,11 @@ func mergeContextEngineV6(base, file ContextEngineConfig) ContextEngineConfig {
 
 func mergeQueryLoopConfig(base, override QueryLoopConfig) QueryLoopConfig {
 	out := base
-	if override.Enabled {
-		out.Enabled = true
-	}
 	if override.MaxTurns != 0 {
 		out.MaxTurns = override.MaxTurns
 	}
 	if override.CompressPerTurn {
 		out.CompressPerTurn = true
-	}
-	if !override.CompressPerTurn && override.Enabled {
-		out.CompressPerTurn = override.CompressPerTurn
 	}
 	if override.StreamingTools {
 		out.StreamingTools = true

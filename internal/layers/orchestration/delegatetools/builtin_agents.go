@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
@@ -18,17 +18,17 @@ const (
 )
 
 // RunExplore runs a read-only exploration sub-query via D2 nested execution.
-func RunExplore(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
+func RunExplore(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentExplore, agent.ExplorePrompt, prompt, tools, maxTurns, true)
 }
 
 // RunPlan runs a read-only planning sub-query via D2 nested execution.
-func RunPlan(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
+func RunPlan(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	return runBuiltin(ctx, deps, parent, AgentPlan, agent.PlanPrompt, prompt, tools, maxTurns, true)
 }
 
 // RunImplement runs a read-write implementation sub-query via D2 nested execution.
-func RunImplement(ctx context.Context, deps enforce.LoopDeps, parent *types.SessionContext, prompt string, tools []query.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
+func RunImplement(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", AgentImplement)
 	}
@@ -53,10 +53,10 @@ func RunImplement(ctx context.Context, deps enforce.LoopDeps, parent *types.Sess
 
 func runBuiltin(
 	ctx context.Context,
-	deps enforce.LoopDeps,
+	deps enforce.SubQueryDeps,
 	parent *types.SessionContext,
 	name, systemPrompt, prompt string,
-	tools []query.ToolSchema,
+	tools []contracts.ToolSchema,
 	maxTurns int,
 	readOnly bool,
 ) (*enforce.SubQueryResult, error) {

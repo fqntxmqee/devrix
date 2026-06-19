@@ -14,11 +14,6 @@ func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.
 	if ctxCfg == nil {
 		ctxCfg = config.DefaultContextEngineConfig()
 	}
-	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
-		Gateway:      stack.RawGateway,
-		TierResolver: stack.TierResolver,
-		DefaultTier:  stack.DefaultModel,
-	})
 	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
 		Gateway:      stack.RawGateway,
 		TierResolver: stack.TierResolver,
@@ -26,22 +21,21 @@ func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.
 		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
 	})
 	return contextengine.EngineDeps{
-		QueryLLMCaller: queryCaller,
-		Summarizer:     summarizer,
-		TokenCounter:   stack.TokenCounter,
-		TierResolver:   stack.TierResolver,
-		DefaultModel:   stack.DefaultModel,
-		Config:         ctxCfg,
+		Summarizer:   summarizer,
+		TokenCounter: stack.TokenCounter,
+		TierResolver: stack.TierResolver,
+		DefaultModel: stack.DefaultModel,
+		Config:       ctxCfg,
 	}
 }
 
 // MergeEngineDeps overlays non-zero fields from patch onto base.
 func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDeps) contextengine.EngineDeps {
-	if patch.QueryLLMCaller != nil {
-		base.QueryLLMCaller = patch.QueryLLMCaller
-	}
 	if patch.Summarizer != nil {
 		base.Summarizer = patch.Summarizer
+	}
+	if patch.PreparedTurnRunner != nil {
+		base.PreparedTurnRunner = patch.PreparedTurnRunner
 	}
 	if patch.TokenCounter != nil {
 		base.TokenCounter = patch.TokenCounter
@@ -79,23 +73,33 @@ func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDe
 	return base
 }
 
-// EnsureLLMDeps panics if QueryLLMCaller or Summarizer are missing.
+// EnsureLLMDeps panics if Summarizer or PreparedTurnRunner are missing.
 func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
-	if deps.QueryLLMCaller == nil || deps.Summarizer == nil {
-		panic("test EngineDeps missing QueryLLMCaller/Summarizer")
+	if deps.Summarizer == nil {
+		panic("test EngineDeps missing Summarizer")
+	}
+	if deps.PreparedTurnRunner == nil {
+		deps.PreparedTurnRunner = &mockctx.StaticPreparedTurnRunner{}
 	}
 	return deps
 }
 
-// EngineDepsWithLLM returns minimal EngineDeps with caller + default summarizer.
-func EngineDepsWithLLM(caller contracts.LLMCaller) contextengine.EngineDeps {
+// EngineDepsWithPreparedTurn returns minimal EngineDeps with a static prepared-turn runner.
+func EngineDepsWithPreparedTurn(runner contracts.PreparedTurnRunner) contextengine.EngineDeps {
+	if runner == nil {
+		runner = &mockctx.StaticPreparedTurnRunner{}
+	}
 	return contextengine.EngineDeps{
-		QueryLLMCaller: caller,
-		Summarizer:     &mockctx.StaticSummarizer{},
+		PreparedTurnRunner: runner,
+		Summarizer:         &mockctx.StaticSummarizer{},
 	}
 }
 
-// StaticLLMDeps returns deps with only LLM contracts filled (for minimal unit tests).
+// StaticLLMDeps returns deps with a static prepared-turn runner (legacy name kept for tests).
 func StaticLLMDeps(caller contracts.LLMCaller) contextengine.EngineDeps {
-	return EngineDepsWithLLM(caller)
+	runner := &mockctx.StaticPreparedTurnRunner{}
+	if c, ok := caller.(*mockctx.StaticLLMCaller); ok {
+		runner = mockctx.PreparedTurnRunnerFromCaller(c).(*mockctx.StaticPreparedTurnRunner)
+	}
+	return EngineDepsWithPreparedTurn(runner)
 }

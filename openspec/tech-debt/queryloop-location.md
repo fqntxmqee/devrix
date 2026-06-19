@@ -1,11 +1,11 @@
 # Tech Debt: D2 QueryLoop 位置错位 — Legacy Path Decommission
 
 **TD ID:** TD-QL-LOC
-**Status:** OPEN
+**Status:** **CLOSED** (2026-06-18) — implemented by `devrix-d2-queryloop-dismantle` on branch `feat/d2-queryloop-dismantle`
 **Severity:** Medium（架构债，不影响功能但限制演进）
 **Created:** 2026-06-17
 **Owner:** —（待指派）
-**Linked Change:** `devrix-diagnostic-tools-parity` (DM-20260616-003) sub-change-Z0
+**Linked Change:** `devrix-diagnostic-tools-parity` (DM-20260616-003) sub-change-Z0; **`devrix-d2-queryloop-dismantle` (DM-20260618-010)** — Z1/Z2 implementation
 **Related:** DM-020 (D7 Turn 编排上移), DM-20260616-001 (D7 Uncertainty Gaps), DM-20260616-002 (D7 Loop-First Routing)
 
 ---
