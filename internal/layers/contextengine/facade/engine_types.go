@@ -1,8 +1,11 @@
-package contextengine
+package facade
 
 import (
 	"sync"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
@@ -12,6 +15,14 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+)
+
+type (
+	IToolRunner          = toolrunner.IToolRunner
+	IToolRegistry        = toolrunner.IToolRegistry
+	IObserver            = kernel.IObserver
+	ICompressionObserver = kernel.ICompressionObserver
+	AgentRoleToolFilter  = enforce.AgentRoleToolFilter
 )
 
 // EngineDeps holds dependencies for ContextEngine.

@@ -1,4 +1,4 @@
-package contextengine
+package kernel
 
 import "github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 

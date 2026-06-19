@@ -3,7 +3,7 @@ package compression
 import (
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 )
 
 // Option configures a compression Pipeline.
