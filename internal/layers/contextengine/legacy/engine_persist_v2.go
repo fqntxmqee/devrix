@@ -7,7 +7,7 @@
 // move into persist.PersistOrchestrator.Persist().
 //
 // DSAFT: D2-S17 (PersistSessionState) — facade scenario-orthogonal hooks.
-package facade
+package legacy
 
 import (
 	"context"

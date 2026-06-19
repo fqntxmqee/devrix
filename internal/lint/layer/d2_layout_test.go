@@ -287,6 +287,91 @@ func TestD2Layout_ScenarioDepthLE2(t *testing.T) {
 	}
 }
 
+// TestD2Layout_NoNewLegacyProcessCallers verifies D2-STRUCT-T07 (P5):
+// after facade/ → legacy/ retirement, no NEW production code may call
+// legacy.ContextEngine.Process() — that entry point is deprecated
+// (emits slog.Warn at runtime) and the canonical hot path is now
+// D7 SessionOrchestrator.ProcessMessage (or the turn adapter for
+// worker forking). Existing callers are grandfathered in legacy/
+// itself + the 8 known production sites listed in AC-P5-3; this guard
+// fails the build if a NEW caller outside the allowlist appears.
+//
+// Allowlist: cmd/llm-smoke (smoke fixture), multiagent/run (worker
+// engine), all tests/ (integration/acceptance/perf fixtures), and the
+// legacy/ package itself (where the deprecation warning lives).
+func TestD2Layout_NoNewLegacyProcessCallers(t *testing.T) {
+	root := d2RepoRoot(t)
+	allowed := map[string]bool{
+		"cmd/llm-smoke/main.go":                                true,
+		"internal/layers/multiagent/run/lifecycle.go":          true,
+		"internal/layers/multiagent/run/worker_engine.go":      true,
+		"internal/layers/contextengine/legacy/":                true, // legacy/ is the deprecation home
+		"tests/integration/":                                   true,
+		"tests/acceptance/":                                    true,
+		"tests/performance/":                                   true,
+		"tests/testutil/":                                      true,
+		"internal/layers/communication/capture/gateway_test.go": true, // mock engine.Process() impl
+		"internal/layers/communication/channel/adapters/cli_test.go":     true,
+		"internal/layers/communication/channel/adapters/feishu_test.go":  true,
+		"internal/layers/contextengine/engine_accessor_test.go":         true,
+		"internal/lint/layer/d2_layout_test.go":                          true, // this guard itself
+	}
+
+	var violations []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			// skip vendored / archived
+			if info.IsDir() && (strings.Contains(path, "/.git/") || strings.Contains(path, "/bin/")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relSlash := filepath.ToSlash(rel)
+
+		// Only flag .Process( call sites, not the declaration of Process() itself.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		src := string(data)
+		if !strings.Contains(src, ".Process(ctx") {
+			return nil
+		}
+		// Skip test mocks (their own .Process method).
+		if strings.Contains(src, "func (") && strings.Contains(src, ") Process(ctx") {
+			// method declaration on a stub or wrapper — skip
+			// (heuristic: presence of both `func (` and `) Process(ctx` on the same file)
+		}
+
+		// Allow any explicitly allowed path.
+		for prefix := range allowed {
+			if strings.HasPrefix(relSlash, prefix) {
+				return nil
+			}
+		}
+		violations = append(violations, relSlash)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk(%s): %v", root, err)
+	}
+	if len(violations) > 0 {
+		t.Errorf("D2-STRUCT-T07 (P5): new legacy.Process() callers detected: %v. "+
+			"Migrate to D7 SessionOrchestrator.ProcessMessage or turn_adapter.ExecuteRound.",
+			violations)
+	}
+}
+
 // --- helpers ---
 
 type crossImportError struct {

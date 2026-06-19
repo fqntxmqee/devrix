@@ -1,4 +1,4 @@
-package facade
+package legacy
 
 import (
 	"log/slog"

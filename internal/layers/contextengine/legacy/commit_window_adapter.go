@@ -3,7 +3,7 @@
 // memory manager.
 //
 // DSAFT: D2-S17-A04 (CommitWindow)
-package facade
+package legacy
 
 import (
 	"context"

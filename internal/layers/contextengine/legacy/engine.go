@@ -1,4 +1,4 @@
-package facade
+package legacy
 
 import (
 	"context"
@@ -82,7 +82,22 @@ func (e *ContextEngine) ToolRunner() IToolRunner { return e.tools }
 func (e *ContextEngine) PermissionGate() contracts.IPermissionGate { return e.permission }
 
 // Process implements contracts.IEngine.
+//
+// Deprecated: P5 legacy retirement. New code MUST go through the D7
+// SessionOrchestrator (orchestration/sessionorchestrator) or the turn
+// adapter (D7-S2-A06 in bootstrap/turn_adapter.go). This entry point is
+// kept only to give the 8 known production callers (cmd/llm-smoke,
+// multiagent/run/lifecycle.go, integration tests, etc.) time to migrate
+// during the deprecation window. Removal is gated by AC-P5-4 (all
+// callers migrated + integration tests green ≥7 days).
+//
+// Each call emits a slog.Warn so the deprecation is visible in
+// production logs without breaking behavior.
 func (e *ContextEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
+	slog.Warn("contextengine.legacy.Process called (deprecated)",
+		"sessionID", session.SessionID,
+		"migration", "D7 SessionOrchestrator or turn_adapter.ExecuteRound",
+	)
 	ch := make(chan *contracts.EngineEvent, 32)
 	go e.runProcess(ctx, session, message, ch)
 	return ch

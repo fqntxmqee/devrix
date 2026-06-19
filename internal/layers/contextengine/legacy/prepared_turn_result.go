@@ -1,4 +1,4 @@
-package facade
+package legacy
 
 import (
 	"github.com/devrix/devrix/internal/shared/contracts"

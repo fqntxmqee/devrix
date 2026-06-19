@@ -352,5 +352,6 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-STRUCT-T04** | `prepare/memory/` 与 `persist/memory/` 无循环依赖（Recall 与 Store 接口解耦） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
 | **D2-STRUCT-T05** | `enforce/orchestrator.go` 已删除（stub 移除，dispatch 由 `turn_adapter` 接管） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
 | **D2-STRUCT-T06** | scenario 下目录深度 ≤2 层（`enforce/tools/surface/` ✅；更深需 F-registry 登记） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T07** | P5 legacy 退役：禁止新增 `legacy.ContextEngine.Process()` 生产引用（CI 硬阻断）；现有 8 个 caller 在 allowlist（cmd/llm-smoke + multiagent/run + tests/* + communication mocks） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P1 |
 
 > 全部由 `internal/lint/layer/d2_layout_test.go` 单一守卫测试驱动。

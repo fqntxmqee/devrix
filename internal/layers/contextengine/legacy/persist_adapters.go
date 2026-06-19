@@ -2,7 +2,7 @@
 // interfaces so the persist.Orchestrator can be wired up.
 //
 // DSAFT: D2-S17 (PersistSessionState) — facade→orchestrator port adapters.
-package facade
+package legacy
 
 import (
 	"context"
