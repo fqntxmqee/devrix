@@ -52,10 +52,11 @@
 | ID | 任务 | 说明 |
 |----|------|------|
 | P3-T1 | `git mv sandbox/` → `enforce/sandbox/` | S18-A03 |
-| P3-T2 | `git mv toolrunner/` → `enforce/tools/` | 包名同步 |
-| P3-T3 | 更新 bootstrap / multiagent / delegatetools import | 机械替换 |
-| P3-T4 | `enforce/orchestrator.go` 与 ExecuteRound 语义文档化 | 删 stub 或 wired |
+| P3-T2 | `git mv toolrunner/` → `enforce/tools/` | 包名同步为 `package tools` |
+| P3-T3 | 更新 bootstrap / multiagent / delegatetools import | 机械替换，全仓库 `go build ./...` 验证 |
+| P3-T4 | **删除 `enforce/orchestrator.go`**（92 行 stub）。决策：`turn_adapter.ExecuteRound` 已是真实 dispatch SoT，enforce/orchestrator 无独立存在理由，删除后由 `turn_adapter` 组装调用 enforce 子模块 | **见 design.md Decision** |
 | P3-T5 | `code-layout.md` §4.3 深度规则 + 终态树 | 文档 |
+| P3-T6 | `enforce/tools/` 目录下包名一致性验证：目录 `tools/`，包名 `package tools`，`grep -r "package toolrunner" enforce/tools/` 零命中 | AC-P3-6 |
 
 ---
 
@@ -84,18 +85,21 @@
 | ID | 任务 | 文件 |
 |----|------|------|
 | P6-T1 | 终态路径表 v8.2 | `d2-domain.md` |
-| P6-T2 | Code Location 全量同步 | `a-registry.md`, `f-registry.md` |
+| P6-T2 | Code Location 全量同步（逐项 grep 验证指向文件存在） | `a-registry.md`, `f-registry.md` |
 | P6-T3 | 目录树更新 | `layering.md`, `design.md` |
 | P6-T4 | S5 后 delta 合入 `openspec/specs/d2-context-engine/` | S7 门禁 |
+| P6-T5 | `layer-delta.md` (v8.0.0 → v8.2.0) + `span-registry.md` 路径同步 | AC-P6-5 |
 
 ---
 
-## 测试门禁（每 Phase）
+## 跨 Phase 门禁（每个 Phase 合入时执行）
 
-```bash
-go test -short ./internal/layers/contextengine/...
-go test -short ./internal/bootstrap/...
-go test -short ./internal/lint/layer/...
-```
+| ID | 命令 | 覆盖 AC |
+|----|------|---------|
+| GATE-T1 | `./scripts/test-domain.sh d2` | AC-GATE-1 |
+| GATE-T2 | `go build ./... && go vet ./...` | AC-GATE-2 |
+| GATE-T3 | `go test -race -count=1 ./internal/layers/contextengine/... ./internal/bootstrap/... ./internal/lint/layer/...` | AC-GATE-3 |
+| GATE-T4 | `go test -tags='integration && cross' ./tests/integration/ -run 'Turn' -count=1` | AC-GATE-4 |
+| GATE-T5 | `./scripts/lint-layer.sh d2`（验证 D2→D3/D4/D7 无 import） | AC-GATE-5 |
 
-P0 T 点：关联 `t-registry.md` D2-S15/S17/S18 条目；新增 layout 守卫 T（待登记）。
+P0 T 点：关联 `t-registry.md` D2-S15/S17/S18 条目；新增 layout 守卫 T `D2-STRUCT-T01`（待登记）。

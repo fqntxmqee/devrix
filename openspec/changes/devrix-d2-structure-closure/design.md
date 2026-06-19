@@ -49,6 +49,19 @@
 **理由:** scenario slug，非技术分层名  
 **影响:** 全仓库 import 机械替换；layer-lint 更新
 
+### Decision: enforce/orchestrator 终态
+
+当前 `enforce/orchestrator.go` 是独立于 `contracts.ToolSurface`/`contracts.Decision` 体系之外的 92 行 stub（自定义 `PermissionGate`/`ToolFilter`/`ToolSandbox` 简化接口），与 `turn_adapter` 真实 dispatch 零交集。
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| A: 升级为 contracts 接口 | enforce 成为 ToolSurface 体系第一等 orchestrator | 需重写接口签名，与 turn_adapter 部分功能重叠 |
+| **B: 删除 orchestrator，由 turn_adapter + contracts 链直接 dispatch** | 零冗余；turn_adapter 已是真实 dispatch SoT | turn_adapter 在 bootstrap，不在 D2 enforce 内 |
+
+**选择:** B  
+**理由:** `turn_adapter.ExecuteRound` 已经是 enforce 的真实实现（2-phase dispatch via `contracts.ToolSurface.CheckPermission` + `contracts.ToolFilter.ShouldDefer`）。enforce/orchestrator 作为 stub 没有独立存在的理由。删除后，`enforce/` 目录保留 A01-A08 各子模块（permission/、sandbox/、tools/、subquery.go、background.go 等），由 `turn_adapter` 组装调用  
+**影响:** AC-P3-3 从"对齐"改为"删除 orchestrator.go；turn_adapter 为 enforce 唯一 dispatch 路径"
+
 ### Decision: T 层
 
 **选择:** T ID 不变；新增 layout 守卫 T（待登记 `D2-STRUCT-T01`）  
@@ -136,6 +149,8 @@ grep 'persist/commit.go' openspec/specs/d2-context-engine/a-registry.md
 - [x] 终态目录树（demand.md §4）
 - [x] P1 slice 顺序与 Decision 记录
 - [x] T 策略
-- [ ] Owner 确认 P1-b 前是否扩 PrepareOrchestrator span/emit（建议：P1-c 做）
+- [x] Owner 确认 P1-b 前是否扩 PrepareOrchestrator span/emit → **P1-c 阶段做 span/emit 扩展**，P1-b 不阻塞（owner 拍板 2026-06-19）
 
-**Gate 结论:** Approved for S4 P1-a（persist/commit）；P1-d 待 P1-c 完成。
+**Gate 结论:**
+- **2026-06-19:** Approved for S4 P1-a（persist/commit）✅（commit 23c6145）
+- P1-d 待 P1-c 完成。

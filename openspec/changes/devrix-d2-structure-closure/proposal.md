@@ -2,7 +2,8 @@
 
 **Change ID:** devrix-d2-structure-closure  
 **Demand ID:** DM-20260619-007  
-**Status:** S2_Clarified  
+**Status:** S3_Approved  
+**S3-Gate:** P1-a Approved 2026-06-19（owner 确认；P1-b/c 推进中）  
 **Methodology:** `docs/methodology/dsaft-refactoring-playbook.md` §3–§6
 
 ---

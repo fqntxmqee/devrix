@@ -1,7 +1,8 @@
 change_id: devrix-d2-structure-closure
 priority: P0
 demand_id: DM-20260619-007
-status: s3_design
+status: s4_active
+s3_gate_approved_at: "2026-06-19"
 domains: [D2]
 dsaft_scenarios: [D2-S15, D2-S17, D2-S18]
 dsaft_activities:
@@ -29,5 +30,8 @@ parent_changes:
   # partial: PR #104 facade/token/kernel（无独立 demand，本 change 闭合终态）
 t_points:
   policy: "T ID 不变；测试随物理路径迁移；新增布局守卫 T"
+  layout_guard: D2-STRUCT-T01
 s3_gate:
-  blocked_until: owner_confirms_target_tree
+  approved_at: "2026-06-19"
+  approved_scope: "P1-a"
+  blocked_until: cleared

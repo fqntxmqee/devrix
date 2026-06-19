@@ -3,7 +3,9 @@ demand-id: DM-20260619-007
 title: D2 v2.2 Structure 终态 — Scenario 编排收敛 + 物理路径双锚点闭合
 source: DSAFT Refactoring Playbook v2.0 Structure + D2 领域对焦（2026-06-19）
 priority: P0
-status: S2_Clarified
+status: S3_Approved
+s3_gate_approved_at: 2026-06-19
+s3_gate_scope: P1-a（persist/commit.go + a-registry S17-A04 sync）
 dsaft_domain: contextengine
 created: 2026-06-19
 ---
@@ -169,28 +171,34 @@ legacy.Process() → @Deprecated → 仅兼容测试；lint 禁止新增生产�
 
 | AC | 描述 | 优先级 |
 |----|------|--------|
-| AC-P1-1 | `facade/legacy` Prepare 路径改调 `prepare.Orchestrator` | P0 |
-| AC-P1-2 | Persist 路径改调 `persist.Orchestrator` + `commit.go` | P0 |
-| AC-P1-3 | `turn_adapter` Prepare/PersistTurn 与 orchestrator 对齐，无 duplicate inline | P0 |
-| AC-P1-4 | 关联 T 全绿 + D7 turn 集成测试全绿 | P0 |
+| AC-P1-1 | `facade/legacy` Prepare 路径改调 `prepare.Orchestrator.Prepare()`。行为等价验证：`prepare.Orchestrator` 必须补齐 RepairToolChain、fork/worker prefix、compress_per_turn 判定（当前简化版缺口见 `design.md` §3 P1-b/c） | P0 |
+| AC-P1-2 | Persist 路径改调 `persist.Orchestrator.Persist()`，且 orchestrator 必须调用 `CommitWindow` (A04)。当前 persist.Orchestrator 缺此调用 | P0 |
+| AC-P1-3 | `turn_adapter` Prepare/PersistTurn 委托 orchestrator，删除 inline duplicate。验收方式：逐项列出 facade 中待删除函数清单 → 勾销 | P0 |
+| AC-P1-4 | D2 单元测试 + prepare/persist 测试全绿 | P0 |
+| AC-P1-5 | `TestIntegration_SessionContextAccumulation` 修复通过（当前失败：PreparedTurnRunner not wired） | P0 |
+| AC-P1-6 | facade→orchestrator 切换后，`prepare.Orchestrator.Prepare` 与 `facade/engine_prepare.go` 的输出 golden test 一致（同输入 → 同 SessionContext / Messages / SystemPrompt） | P0 |
+| AC-P1-7 | facade 中待删除的 duplicate 函数有明确清单（`engine_prepare.go`: buildPrepareContext / appendUserMessage / applyCompressPerTurn / forkContext；`engine_persist.go`: finalizeTurn / commitActiveWindow / appendFullMessages） | P1 |
 
 ### Phase P2 — 根目录清零
 
 | AC | 描述 | 优先级 |
 |----|------|--------|
-| AC-P2-1 | 根生产文件仅 `contracts.go` + `aliases.go` | P0 |
-| AC-P2-2 | 根 `*_test.go` 全部迁出 | P0 |
-| AC-P2-3 | `mock/` 迁 `tests/testutil/contextengine/` | P1 |
-| AC-P2-4 | `TestD2_RootProductionFiles` + layout lint 守卫 | P0 |
+| AC-P2-1 | 根生产文件仅 `contracts.go` + `aliases.go`（`tool_context.go` 核心逻辑迁 `enforce/tools/context.go`，根留 type alias） | P0 |
+| AC-P2-2 | 根 10 个 `*_test.go` 全部迁出（`tests/integration/d2/` 或对应 scenario 包） | P0 |
+| AC-P2-3 | `mock/` → `tests/testutil/contextengine/`，迁移后 `grep -r "contextengine/mock" internal/` 零命中 | P1 |
+| AC-P2-4 | `TestD2_RootProductionFiles` 升级（仅 2 生产文件 + `aliases.go` 中 type alias 编译验证） | P0 |
+| AC-P2-5 | `tool_context.go` 迁出后全仓库 `go build ./...` 通过（所有 `contextengine.ToolContext` → `contextengine.ToolContext` alias 无断裂） | P0 |
 
 ### Phase P3 — enforce 归位
 
 | AC | 描述 | 优先级 |
 |----|------|--------|
 | AC-P3-1 | `sandbox/` → `enforce/sandbox/` | P0 |
-| AC-P3-2 | `toolrunner/` → `enforce/tools/` | P0 |
-| AC-P3-3 | `enforce/orchestrator` 与 ExecuteRound 语义对齐 | P1 |
-| AC-P3-4 | `code-layout.md` 深度规则 ≤2 层写入 | P0 |
+| AC-P3-2 | `toolrunner/` → `enforce/tools/`，包名同步为 `package tools` | P0 |
+| AC-P3-3 | **`enforce/orchestrator.go` 升级为使用 `contracts.ToolSurface` + `contracts.ToolFilter` + `contracts.Decision`（删除当前 92 行自定义简化接口 `PermissionGate`/`ToolFilter`/`ToolSandbox`），或明确删除由 `turn_adapter` 替代** | **P0** |
+| AC-P3-4 | `code-layout.md` §4.3 深度规则 ≤2 层写入（例：`enforce/tools/surface/` ✅；更深需 F-registry 登记） | P0 |
+| AC-P3-5 | 全仓库 `go build ./...` + `go test ./...` 通过（P3 涉及 49+ 文件迁移，import 路径机械替换覆盖 bootstrap / multiagent / delegatetools） | P0 |
+| AC-P3-6 | `enforce/tools/` 目录下包名一致性：目录 `tools/`，包名 `package tools`，禁止旧 `package toolrunner` 残留 | P1 |
 
 ### Phase P4 — Memory 读写分离
 
@@ -198,22 +206,36 @@ legacy.Process() → @Deprecated → 仅兼容测试；lint 禁止新增生产�
 |----|------|--------|
 | AC-P4-1 | `StoreLongTerm` 迁 `persist/memory/store.go` | P0 |
 | AC-P4-2 | a-registry S17-A03/A04 Code Location 更新 | P0 |
+| AC-P4-3 | 拆分后 `prepare/memory/` 与 `persist/memory/` 无循环依赖。接口解耦：Recall 与 Store 不共享同一个 LongTerm 实例，通过接口注入 | P0 |
 
 ### Phase P5 — Legacy 退役
 
 | AC | 描述 | 优先级 |
 |----|------|--------|
-| AC-P5-1 | `facade/` → `legacy/`；`Process()` Deprecated | P1 |
-| AC-P5-2 | lint 禁止新增 `Process()` 生产引用 | P1 |
+| AC-P5-1 | `facade/` → `legacy/`；`Process()` 加 Deprecated 注释 + slog warn | P1 |
+| AC-P5-2 | layer-lint 禁止新增 `legacy.Process()` 生产引用（CI 硬阻断） | P1 |
+| AC-P5-3 | 列出 `Process()` 所有现有生产调用方 + 每项的 D7 替换方案（`cmd/devrix/main.go` 的 CLI adapter / IM adapter 路径） | P1 |
+| AC-P5-4 | `legacy/` 删除触发条件明确定义：所有 Process caller 已迁 D7 路径 + 集成测试全绿持续 ≥7 天 | P2 |
 
 ### Phase P6 — 规格双锚点
 
 | AC | 描述 | 优先级 |
 |----|------|--------|
 | AC-P6-1 | `d2-domain.md` v8.2 终态路径表 | P0 |
-| AC-P6-2 | `a-registry` / `f-registry` Code Location 全量同步 | P0 |
+| AC-P6-2 | `a-registry` / `f-registry` Code Location 全量同步（逐项 grep 验证 Code Location 指向的文件存在） | P0 |
 | AC-P6-3 | `design.md` / `layering.md` 目录树更新 | P1 |
 | AC-P6-4 | S5 验收后 `openspec/specs/d2-context-engine/` delta 合入 | P0 |
+| AC-P6-5 | `layer-delta.md` (v8.0.0 → v8.2.0) + `span-registry.md` 路径同步更新 | P0 |
+
+### 跨 Phase 门禁（每个 Phase 合入时验证）
+
+| AC | 描述 | 优先级 |
+|----|------|--------|
+| AC-GATE-1 | `./scripts/test-domain.sh d2` 全绿（单元 + 集成 + 回归） | P0 |
+| AC-GATE-2 | `go build ./...` + `go vet ./...` 全绿，无新增 warning | P0 |
+| AC-GATE-3 | `go test -race -count=1 ./...` 全绿（至少 internal/layers/contextengine/ + internal/bootstrap/ + internal/lint/layer/） | P0 |
+| AC-GATE-4 | D7 turn 集成测试不退化（`go test -tags='integration && cross' ./tests/integration/ -run 'Turn' -count=1`） | P1 |
+| AC-GATE-5 | 无新引入的 import 循环（`go mod graph` 或 layer-lint 验证 D2→D3/D4/D7 方向正确） | P0 |
 
 ## 8. 非目标
 
@@ -243,8 +265,11 @@ legacy.Process() → @Deprecated → 仅兼容测试；lint 禁止新增生产�
 
 ## 11. 风险
 
-| 风险 | 缓解 |
-|------|------|
-| 编排收敛改动面大 | 分 2 PR；每 PR <400 行；T 先行 |
-| import 路径 churn | git mv + 机械替换；layer-lint |
-| bootstrap 与 D2 边界 | turn_adapter 只做 wiring，逻辑留 enforce |
+| 风险 | 严重程度 | 缓解 |
+|------|----------|------|
+| 编排收敛改动面大 | HIGH | 分 slice PR（P1-a→f），每 PR <400 行；T 先行 |
+| import 路径 churn（P3 49+ 文件迁移） | HIGH | git mv + 机械替换；`go build ./...` 逐 PR 验证 |
+| **`enforce/orchestrator` 是独立于 `contracts.ToolSurface` 体系之外的 92 行 stub，与真实 turn_adapter 零交集** | **CRITICAL** | P3 升级为 contracts 接口或删除；需在 P1 启动前决策（见 design.md Decision） |
+| `prepare.Orchestrator` 功能不全（缺 RepairToolChain / fork / span hook） | HIGH | P1-b→c 补全后才 wired；golden test 对比 facade 输出 |
+| bootstrap 与 D2 边界模糊 | MEDIUM | turn_adapter 只做 wiring assembly，逻辑留 D2 scenario orchestrator |
+| `TestIntegration_SessionContextAccumulation` 已确认失败 | MEDIUM | P1 golden test 阶段修复（AC-P1-5） |
