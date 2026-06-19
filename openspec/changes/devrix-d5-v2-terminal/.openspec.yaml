@@ -1,0 +1,29 @@
+change_id: devrix-d5-v2-terminal
+priority: P0
+demand_id: DM-20260619-006
+status: s3_design
+domains: [D5]
+dsaft_scenarios: [D5-S0, D5-S21, D5-S22, D5-S23, D5-S24]
+dsaft_activities:
+  - D5-S0-A03          # TrackActiveSessions (新增登记)
+  - D5-S21-A14         # FilterDebugLog (新增登记)
+  - D5-S23-A07         # TrackFileDiagnostics
+  - D5-S23-A09         # InjectFault
+  - D5-S23-A10         # RunDoctorChecks
+version_scope:
+  v2.1-terminal: "规格终态对齐 + S23 语义闭合 + bridge 删除 + 根目录归位"
+parent_changes:
+  - devrix-d5-sa-refine          # DM-20260615-001 v1.0 Registry
+  - devrix-d5-d6-sa-refine-v2.0  # DM-20260615-003 v2.0 物理迁移
+t_points:
+  reuse: "41 T ID 不变；canonical_s/canonical_a 校正；2 PLANNED 闭合"
+s3_gate:
+  review: design-review.md
+  conclusion: approved_with_suggestions
+  s4_blocked_until: owner_confirms_review
+s3_artifacts:
+  gaming: gaming-analysis.md
+  clarifications: d5-requirements-clarifications.md
+  index: README.md
+  spec_delta: specs/d5-observability/spec.md
+  registries: [specs/a-registry.md, specs/f-registry.md, specs/t-registry-canonical-draft.md]
