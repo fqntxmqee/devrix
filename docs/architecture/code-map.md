@@ -125,7 +125,7 @@ Fork/Join 逻辑主要在 `agent/forkjoin*.go`（映射 D4-S3）。
 
 | T 域 | 目录 |
 |------|------|
-| D2-S10 QueryLoop | `contextengine/query/*_test.go`, `tests/integration/query_loop_*` |
+| D2-S10 QueryLoop (removed) | `contextengine/queryloop_removed_test.go`, `contextengine/prepared_turn_integration_test.go` |
 | D2-S8 Sandbox | `toolrunner/sandbox_test.go`, `tests/security/shell_injection_test.go` |
 | D2-S12 Worktree | `contextengine/worktree/manager_test.go` |
 | D4-S10 Delegate | `multiagent/delegate/*_test.go` |

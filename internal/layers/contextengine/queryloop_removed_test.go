@@ -16,15 +16,11 @@ func TestD2_QueryLoopRemoved(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	root := filepath.Join(filepath.Dir(file), "query")
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		t.Fatalf("read query dir: %v", err)
-	}
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "loop") {
-			t.Fatalf("query loop file still present: %s", e.Name())
-		}
+	queryDir := filepath.Join(filepath.Dir(file), "query")
+	if _, err := os.Stat(queryDir); err == nil {
+		t.Fatalf("query package directory still present: %s", queryDir)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat query dir: %v", err)
 	}
 }
 

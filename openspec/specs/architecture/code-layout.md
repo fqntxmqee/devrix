@@ -120,12 +120,11 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | S ID       | Scenario                        | scenario-slug   | 当前路径                                                                               | v2.0 目标                                       |
 | ---------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
 | D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014                                      |
-| D2-S16     | ~~RunQueryLoop~~                  | `query`         | `contextengine/query/`（types only）                                               | **REMOVED（DM-20260618-010）→ D7 turn/**            |
+| D2-S16     | ~~RunQueryLoop~~                | —               | **REMOVED**（DM-20260618-010）；`contextengine/query/` 已删除 → D7 `orchestration/turn/` | ✅ D7-S2-A06                                   |
 | D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/`                                         | ✅ DM-014                                      |
 | D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/planmode_tools.go` | ✅ DM-014                                      |
 | D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ DM-014                                      |
 | D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ DM-014                                      |
-| **D2-S16** | **~~RunQueryLoop~~** | **`query`**     | **`contextengine/query/`**（legacy types）                                         | **REMOVED → D7-S2-A06 RunTurn** |
 
 > **DM-020 bootstrap 注释（v1.0 Registry）：** `WireContextLLM` 当前在 `internal/bootstrap/` 为 D2 接线 ILLMGateway。v2.0-b 迁移后，D7 持有 ILLMGateway（`WireContextLLM → TurnOrchestrator deps`），D2 仅保留 ContextPreparer（`WireContextEngine → ContextPreparer only，无 LLM 字段`）。
 

@@ -135,9 +135,9 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | D7-S2-A06 | `internal/layers/orchestration/turn/orchestrator_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T35 | UserContext prepend 不在 snapshot | S15 | `internal/layers/contextengine/prepare/usercontext/provider_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | S15 | `internal/layers/contextengine/prepare/attachments/registry.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | S18 | `internal/layers/contextengine/enforce/permission/mode_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | S18 | `internal/layers/contextengine/plan_mode_tools_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | D7-S1 | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T39 | PreparedTurnRunner multi-turn | D7 | `internal/layers/contextengine/query_loop_integration_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T39 | PreparedTurnRunner multi-turn | D7 | `internal/layers/contextengine/prepared_turn_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | S18 | `internal/layers/contextengine/enforce/subquery_test.go` | IMPLEMENTED | P1 |
 | D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | S15 | `internal/layers/contextengine/prepare/conversation/fork_test.go` | IMPLEMENTED | P1 |
 | D2-S10-A01-T42 | sidechain transcript resume 重建 messages | S17 | `internal/layers/contextengine/persist/transcript/sidechain_test.go` | IMPLEMENTED | P1 |

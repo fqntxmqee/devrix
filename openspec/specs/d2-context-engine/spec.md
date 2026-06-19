@@ -1596,6 +1596,6 @@ IM 模式 (飞书/钉钉/企微):
 
 ### Requirement: D2-S10/S16 QueryLoop Module (DM-20260618-010)
 
-Physical module `contextengine/query/loop.go`, `QueryLLMCaller`, and `query_loop.enabled` config removed. Capabilities: D7 `RunTurn`/`SubTurn`, D2-S18 tool rounds.
+Physical module `contextengine/query/` (including `loop.go`), `QueryLLMCaller`, and `query_loop.enabled` config removed. Capabilities: D7 `RunTurn`/`SubTurn`, D2-S18 tool rounds.
 
 ---

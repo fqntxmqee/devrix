@@ -146,11 +146,11 @@ D2 `IEngine.Process` MUST be invoked by D7 (via `PreparedTurnRunner` / turn adap
 
 ### Requirement: D2 Thin Execution Primitive
 
-D2 `query` package MUST NOT import D4 multi-agent orchestration packages. Orchestration routing MUST remain in D7.
+D2 `contextengine` production packages MUST NOT import D4 multi-agent or D7 orchestration packages. Orchestration routing MUST remain in D7.
 
 #### Scenario: Static import boundary
 
-- GIVEN `internal/layers/contextengine/` sources (excluding `query/types.go` legacy types)
+- GIVEN `internal/layers/contextengine/` production sources
 - WHEN package import graph is analyzed
 - THEN `multiagent` and `orchestration` packages are not imported
 - AND regression test `internal/lint/layer/d2_thin_test.go` passes (DM-20260614-010)
