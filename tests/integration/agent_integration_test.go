@@ -32,30 +32,30 @@ func (r *criticalBashRegistry) RiskLevel(tool string) types.RiskLevel {
 	return r.BuiltinRegistry.RiskLevel(tool)
 }
 
-// bashOnceThenDoneLLM requests bash once, then completes (avoids infinite loop).
-type bashOnceThenDoneLLM struct {
+// bashOncePreparedTurn requests bash once via PreparedTurnRunner, then completes.
+type bashOncePreparedTurn struct {
 	calls atomic.Int32
 }
 
-func (m *bashOnceThenDoneLLM) Call(ctx context.Context, _ contracts.LLMRequest) (<-chan contracts.LLMChunk, error) {
-	ch := make(chan contracts.LLMChunk, 2)
-	go func() {
-		defer close(ch)
-		select {
-		case <-ctx.Done():
-			return
-		default:
+func (m *bashOncePreparedTurn) RunPreparedTurn(ctx context.Context, req contracts.PreparedTurnRequest) (*contracts.PreparedTurnResult, error) {
+	if m.calls.Add(1) > 1 {
+		if req.Emit != nil {
+			req.Emit(&contracts.EngineEvent{Type: "complete", SessionID: req.SessionID, Content: "done"})
 		}
-		if m.calls.Add(1) > 1 {
-			ch <- contracts.LLMChunk{Content: "done", Done: true}
-			return
-		}
-		ch <- contracts.LLMChunk{
-			ToolCalls: []contracts.ToolCall{{ID: "tc1", Name: "bash", Input: "ls"}},
-			Done:      true,
-		}
-	}()
-	return ch, nil
+		return &contracts.PreparedTurnResult{AssistantText: "done"}, nil
+	}
+	if req.Emit != nil {
+		req.Emit(&contracts.EngineEvent{
+			Type:      "tool_call",
+			SessionID: req.SessionID,
+			ToolName:  "bash",
+			ToolInput: "ls",
+		})
+		req.Emit(&contracts.EngineEvent{Type: "complete", SessionID: req.SessionID})
+	}
+	return &contracts.PreparedTurnResult{
+		ToolCallHistory: []types.ToolCallRecord{{CallID: "tc1", ToolName: "bash", Input: "ls"}},
+	}, nil
 }
 
 // T: D4-S0-A01-T03 — critical tool permission blocks until PermissionManager.Resolve on D7 ingress.
@@ -73,8 +73,8 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &bashOnceThenDoneLLM{},
-		Summarizer:     &mockctx.StaticSummarizer{},
+		PreparedTurnRunner: &bashOncePreparedTurn{},
+		Summarizer:         &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{},
 		ToolsReg:   reg,
 		Permission: permMgr,

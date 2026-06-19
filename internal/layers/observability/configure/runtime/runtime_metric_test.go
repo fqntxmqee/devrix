@@ -73,8 +73,8 @@ func TestIncRuntimeMetric_BridgesToCounter(t *testing.T) {
 	if err := RegisterRuntimeMetric(m); err != nil {
 		t.Fatalf("RegisterRuntimeMetric: %v", err)
 	}
-	IncRuntimeMetric(PathQueryLoop)
-	IncRuntimeMetric(PathQueryLoop)
+	IncRuntimeMetric(PathD7Turn)
+	IncRuntimeMetric(PathD7Turn)
 	IncRuntimeMetric(PathLegacyHarness)
 
 	// We can't directly look up the counter by label here (the meter
@@ -88,6 +88,6 @@ func TestIncRuntimeMetric_BridgesToCounter(t *testing.T) {
 func TestIncRuntimeMetric_NoopWhenUnregistered(t *testing.T) {
 	ResetRuntimeMetric()
 	// Should not panic
-	IncRuntimeMetric(PathQueryLoop)
+	IncRuntimeMetric(PathD7Turn)
 	IncRuntimeMetric(PathLegacyHarness)
 }

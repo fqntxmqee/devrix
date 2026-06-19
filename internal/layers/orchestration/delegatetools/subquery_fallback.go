@@ -12,7 +12,7 @@ import (
 // SubQueryRunner runs D2 SubQuery when D4 delegate is unavailable.
 // Implements hubspoke.SubQueryRunner.
 type SubQueryRunner struct {
-	LoopDeps enforce.LoopDeps
+	LoopDeps enforce.SubQueryDeps
 }
 
 // RunSubQuery implements hubspoke.SubQueryRunner.
@@ -76,7 +76,7 @@ func systemPromptForRole(role string) string {
 	}
 }
 
-// BuildSubQueryRunner creates a hubspoke.SubQueryRunner from QueryLoop deps.
-func BuildSubQueryRunner(deps enforce.LoopDeps) hubspoke.SubQueryRunner {
+// BuildSubQueryRunner creates a hubspoke.SubQueryRunner from turn-runtime deps.
+func BuildSubQueryRunner(deps enforce.SubQueryDeps) hubspoke.SubQueryRunner {
 	return &SubQueryRunner{LoopDeps: deps}
 }

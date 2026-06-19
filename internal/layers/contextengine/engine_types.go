@@ -8,7 +8,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -29,9 +28,9 @@ type EngineDeps struct {
 	DefaultModel        string
 	TierResolver        contracts.TierResolver
 	AgentRoleToolFilter AgentRoleToolFilter
-	QueryLLMCaller      contracts.LLMCaller
 	Summarizer          contracts.Summarizer
 	SessionCommandQueue contracts.SessionCommandQueue
+	PreparedTurnRunner  contracts.PreparedTurnRunner
 	// Surfaces and Filters are the new TOOL-SURFACE-1 inputs (W8).
 	// When non-nil, the engine stores them for use by the surface
 	// dispatch path (W9 replaces turn_adapter IToolRunner.Execute).
@@ -49,7 +48,7 @@ type EngineDeps struct {
 type ContextEngine struct {
 	memory              *memory.Manager
 	counter             contracts.ITokenCounter
-	queryLoop           *query.Loop
+	preparedTurnRunner  contracts.PreparedTurnRunner
 	tools               IToolRunner
 	toolsReg            IToolRegistry
 	permission          contracts.IPermissionGate
@@ -66,7 +65,6 @@ type ContextEngine struct {
 	defaultModel        string
 	tierResolver        contracts.TierResolver
 	agentRoleToolFilter AgentRoleToolFilter
-	queryCaller         contracts.LLMCaller
 	summarizer          contracts.Summarizer
 	// surfaces and filters are the new TOOL-SURFACE-1 fields (W8).
 	// nil in phase 1 means the legacy Tools/ToolsReg path is still in

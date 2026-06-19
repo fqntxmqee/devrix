@@ -118,7 +118,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014                                      |
 | D2-S16     | RunQueryLoop                    | `query`         | `contextengine/query/`                                                             | 保持（loop 瘦身）                                   |
 | D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/`                                         | ✅ DM-014                                      |
-| D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/queryloop_tools.go` | ✅ DM-014                                      |
+| D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/planmode_tools.go` | ✅ DM-014                                      |
 | D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ DM-014                                      |
 | D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ DM-014                                      |
 | **D2-S16** | **RunQueryLoop（Legacy Freeze）** | **`query`**     | **`contextengine/query/`**                                                         | **Legacy freeze（DM-020）；Turn 主循环迁 D7-S2-A06** |

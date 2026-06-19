@@ -23,7 +23,7 @@ import (
 // v1.0 实现：
 //  1. wave.CancelAll(sessionID)  （D7-S3）— 若有 Wave 在跑
 //  2. d4.CancelAll(sessionID)    （D4）— 若有 delegate worker 在跑
-//  3. orchestrator.cancel(sessionID)  — 取消 D2 RunQueryLoop
+//  3. orchestrator.cancel(sessionID)  — 取消 D7 RunTurn
 //  4. 发射 "stopped" EngineEvent 到 sink
 //  5. 任务状态联动：running → cancelled （由 caller / WorkModel 触发）
 //
@@ -70,7 +70,7 @@ func (h *InterruptHandler) Handle(ctx context.Context, sessionID string) error {
 			slog.Warn("orchestrator: HandleInterrupt delegate cancel failed", "sessionID", sessionID, "err", err)
 		}
 	}
-	// Step 3: orchestrator (D2 RunQueryLoop) cancel.
+	// Step 3: orchestrator (D7 RunTurn) cancel.
 	if h.opts.ProcessCanceler != nil {
 		if err := h.opts.ProcessCanceler(sessionID); err != nil {
 			slog.Warn("orchestrator: HandleInterrupt process cancel failed", "sessionID", sessionID, "err", err)

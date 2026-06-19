@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -26,7 +25,7 @@ type SubQueryParams struct {
 	ForkMessages   []types.Message
 	ForkEnabled    bool
 	ForkDirective  string
-	Tools          []query.ToolSchema
+	Tools          []contracts.ToolSchema
 	MaxTurns       int
 	Model          string
 	ModelTier      string
@@ -40,21 +39,24 @@ type SubQueryParams struct {
 
 // SubQueryResult is the outcome of SubQuery.Run.
 type SubQueryResult struct {
-	Result  *query.Result
+	Result  *contracts.SubTurnResult
 	ChildSC *types.SessionContext
 }
 
-// LoopDeps wires dependencies for SubQuery.
-type LoopDeps struct {
-	Loop         *query.Loop
+// SubQueryDeps wires dependencies for SubQuery (D7 loop via contracts.SubTurnExecutor).
+type SubQueryDeps struct {
+	SubTurn      contracts.SubTurnExecutor
 	Sidechain    SidechainRecorder
 	FlowReporter contracts.SubQueryFlowReporter
 }
 
-// Run executes a sub-agent query using the shared QueryLoop.
-func Run(ctx context.Context, deps LoopDeps, params SubQueryParams) (*SubQueryResult, error) {
-	if deps.Loop == nil {
-		return nil, fmt.Errorf("subquery: loop is nil")
+// LoopDeps is deprecated; use SubQueryDeps.
+type LoopDeps = SubQueryDeps
+
+// Run executes a sub-agent query via D7 SubTurnExecutor.
+func Run(ctx context.Context, deps SubQueryDeps, params SubQueryParams) (*SubQueryResult, error) {
+	if deps.SubTurn == nil {
+		return nil, fmt.Errorf("subquery: SubTurn executor is nil")
 	}
 	if params.ParentSC == nil {
 		return nil, fmt.Errorf("subquery: parent session context is nil")
@@ -92,17 +94,19 @@ func Run(ctx context.Context, deps LoopDeps, params SubQueryParams) (*SubQueryRe
 		reporter.OnStarted(ctx, flowParams, params.AgentName)
 	}
 
-	emit := contracts.EngineEmitFunc(nil)
-	if reporter != nil {
-		emit = reporter.WrapEmit(ctx, flowParams, nil)
-	}
-
-	res, err := deps.Loop.Run(ctx, child, query.Params{
+	res, err := deps.SubTurn.RunSubTurn(ctx, contracts.SubTurnRequest{
+		SessionID:    child.SessionID,
+		AgentID:      params.AgentID,
+		AgentName:    params.AgentName,
 		SystemPrompt: params.SystemPrompt,
 		Messages:     initial,
 		Tools:        tools,
 		MaxTurns:     params.MaxTurns,
-	}, query.EmitFunc(emit))
+		Scope:        contracts.SubTurnScopeSubQuery,
+		ChildContext: child,
+		FlowParams:   flowParams,
+		FlowReporter: reporter,
+	})
 	if err != nil {
 		if reporter != nil {
 			reporter.OnFailed(ctx, flowParams, err.Error())
@@ -181,11 +185,11 @@ func buildSubQueryMessages(params SubQueryParams, sidechain SidechainRecorder) [
 	return out
 }
 
-func filterReadOnlyTools(tools []query.ToolSchema) []query.ToolSchema {
+func filterReadOnlyTools(tools []contracts.ToolSchema) []contracts.ToolSchema {
 	allowed := map[string]bool{
 		"read_file": true, "glob": true, "grep": true, "list_dir": true, "bash": true,
 	}
-	out := make([]query.ToolSchema, 0, len(tools))
+	out := make([]contracts.ToolSchema, 0, len(tools))
 	for _, t := range tools {
 		if allowed[t.Name] {
 			out = append(out, t)

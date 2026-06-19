@@ -21,20 +21,8 @@ func normalizeRoutingMode(mode RoutingMode) RoutingMode {
 	}
 }
 
-// IsLoopFirst reports whether the configured routing mode dispatches
-// ingress through D7-S2-A06 RunTurnLoop (the canonical main path) or
-// falls back to the D2 QueryLoop.Run legacy path.
-//
-// # ⚠️ LEGACY PATH WARNING (DM-20260617-001)
-//
-// When this returns false, ingress hits D2.QueryLoop.Run, which is
-// Deprecated. Returning true is the supported production state and
-// the default. Operators who flip RoutingMode to rule_orchestrate
-// must accept the deprecation contract: a one-shot `slog.Warn` per
-// process, and bumps of
-// `d2_query_loop_legacy_invocations_total` on every legacy Run().
-// See openspec/specs/d7-orchestration/spec.md "D2 QueryLoop Legacy
-// Path Decommission" for the full contract and decommission triggers.
+// IsLoopFirst reports whether ingress uses loop_first (default) or
+// rule_orchestrate (FastPath threshold gating + OrchestratePath).
 func (c *Config) IsLoopFirst() bool {
 	if c == nil {
 		return true

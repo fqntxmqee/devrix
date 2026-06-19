@@ -227,9 +227,8 @@ context_engine:
       enabled: true
       mode: auto-repair
 
-  # V6 QueryLoop（Claude Code queryLoop 对齐）
-  query_loop:
-    enabled: true
+  # V6 turn runtime (max_turns / compress_per_turn consumed by D7)
+  turn_runtime:
     max_turns: 50
     compress_per_turn: true
     streaming_tools: true

@@ -283,7 +283,7 @@ func (a *Impl) processEngine() contracts.IEngine {
 	return a.deps.Engine
 }
 
-// PermissionGate exposes the agent permission gate for QueryLoop tool execution.
+// PermissionGate exposes the agent permission gate for turn-runtime tool execution.
 func (a *Impl) PermissionGate() multiagent.PermissionGate {
 	return a.permGate
 }

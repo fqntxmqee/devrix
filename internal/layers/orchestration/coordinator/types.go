@@ -25,7 +25,7 @@ import (
 
 // IntentKind is the routing decision produced by ClassifyIntent.
 //
-// "fast":       short/simple message → direct D2 RunQueryLoop, no Plan/Wave.
+// "fast":       short/simple message → direct D7 RunTurn, no Plan/Wave.
 // "command":    recognized command (e.g. /plan, /stop) → handled by command-first path.
 // "orchestrate": multi-step goal → Plan / Wave.
 // "skip":       empty / no-op message.
@@ -44,7 +44,7 @@ const (
 // orchestration.fast_path.confidence_threshold (default 90). Routes:
 //   - skip        : always skip (no LLM call)
 //   - command     : always go command-first (no LLM call, no FastPath proxy)
-//   - fast        : go to D2.RunQueryLoop directly (FastPath proxy)
+//   - fast        : go to TurnExecutor.RunTurn directly (FastPath proxy)
 //   - orchestrate : SynthesizeTaskGraph (v1.1+) or PlanMode/manual
 type IntentClassification struct {
 	Kind       IntentKind

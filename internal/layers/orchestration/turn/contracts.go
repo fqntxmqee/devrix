@@ -12,9 +12,11 @@ import (
 type TurnScope string
 
 const (
-	TurnScopeMain     TurnScope = "main"
-	TurnScopeSubQuery TurnScope = "subquery"
-	TurnScopeCompress TurnScope = "compress"
+	TurnScopeMain       TurnScope = "main"
+	TurnScopeSubQuery   TurnScope = "subquery"
+	TurnScopeBackground TurnScope = "background"
+	TurnScopeWaveWorker TurnScope = "wave_worker"
+	TurnScopeCompress   TurnScope = "compress"
 )
 
 // TurnRequest is the input to RunTurn.
@@ -27,6 +29,14 @@ type TurnRequest struct {
 	// Mode is the agent mode for this turn ("plan_mode" | "build_mode" | ...).
 	// Empty means no mode-specific constraint.
 	Mode string
+	// PreloadedMessages bypasses Prepare message assembly for nested turns.
+	PreloadedMessages []types.Message
+	// OverrideTools replaces Prepare tool list when non-empty.
+	OverrideTools []ToolSchema
+	// SkipPersist skips SessionPersister for nested turns (sidechain owns transcript).
+	SkipPersist bool
+	// Model overrides prepared model for nested turns.
+	Model string
 }
 
 // CompressHint signals that D2 detected a token budget overrun and D7 should

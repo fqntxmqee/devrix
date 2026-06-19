@@ -18,7 +18,7 @@ type LLMScript struct {
 	ToolCalls []ToolCall
 }
 
-// Call implements LLMCaller.
+// Call implements contracts.LLMCaller for test doubles.
 func (m *SequentialLLM) Call(ctx context.Context, _ LLMRequest) (<-chan LLMChunk, error) {
 	m.mu.Lock()
 	idx := m.Calls

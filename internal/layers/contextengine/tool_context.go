@@ -106,9 +106,9 @@ func RegisterBackgroundTaskTools(reg *ToolRegistry) error {
 	return enforce.RegisterBackgroundTaskTools(reg)
 }
 
-// RegisterQueryLoopTools registers plan-mode tools when QueryLoop is enabled.
-func RegisterQueryLoopTools(reg *ToolRegistry, cfg *ContextEngineConfig) error {
-	return enforce.RegisterQueryLoopTools(reg, cfg)
+// RegisterPlanModeTools registers enter/exit plan mode tools on the engine registry.
+func RegisterPlanModeTools(reg *ToolRegistry, cfg *ContextEngineConfig) error {
+	return enforce.RegisterPlanModeTools(reg, cfg)
 }
 
 // withToolStreamEmitter bridges ToolStreamEmitter events to EngineEvent emit.

@@ -1,8 +1,7 @@
 package config
 
-// QueryLoopConfig holds QueryLoop runtime settings (Claude Code queryLoop aligned).
-type QueryLoopConfig struct {
-	Enabled         bool `yaml:"enabled"`
+// TurnRuntimeConfig holds D7 turn-runtime settings (max turns, per-turn compression).
+type TurnRuntimeConfig struct {
 	MaxTurns        int  `yaml:"max_turns"`
 	CompressPerTurn bool `yaml:"compress_per_turn"`
 	StreamingTools  bool `yaml:"streaming_tools"`
@@ -19,7 +18,7 @@ type AttachmentsConfig struct {
 	PlanModeFullEvery int  `yaml:"plan_mode_full_every"`
 }
 
-// ContextPermissionConfig holds permission mode defaults for QueryLoop.
+// ContextPermissionConfig holds permission mode defaults for turn runtime.
 type ContextPermissionConfig struct {
 	DefaultMode string           `yaml:"default_mode"`
 	Plan        PlanModeConfig   `yaml:"plan"`
@@ -40,21 +39,14 @@ type TasksConfig struct {
 
 // SubQueryConfig holds sub-agent runtime settings.
 type SubQueryConfig struct {
-	ForkSubagentEnabled    bool `yaml:"fork_subagent_enabled"`
-	SidechainTranscript    bool `yaml:"sidechain_transcript"`
-	DefaultSubagentMaxTurns int `yaml:"default_subagent_max_turns"`
+	ForkSubagentEnabled     bool `yaml:"fork_subagent_enabled"`
+	SidechainTranscript     bool `yaml:"sidechain_transcript"`
+	DefaultSubagentMaxTurns int  `yaml:"default_subagent_max_turns"`
 }
 
-// DefaultQueryLoopConfig returns v1.0 defaults.
-//
-// As of DM-20260611-004 (Legacy Harness 退役), QueryLoop is the *only*
-// supported primary LLM↔Tool path. Enabled defaults to true so that
-// production deployments get the QueryLoop path without any extra
-// configuration. Operators who genuinely need the legacy harness path
-// can still flip `query_loop.enabled: false` explicitly.
-func DefaultQueryLoopConfig() QueryLoopConfig {
-	return QueryLoopConfig{
-		Enabled:         true,
+// DefaultTurnRuntimeConfig returns turn-runtime defaults consumed by D7.
+func DefaultTurnRuntimeConfig() TurnRuntimeConfig {
+	return TurnRuntimeConfig{
 		MaxTurns:        50,
 		CompressPerTurn: true,
 	}

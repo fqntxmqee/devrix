@@ -99,7 +99,7 @@ func (e *ContextEngine) prepareMessages(
 ) ([]types.Message, bool) {
 	msgs := conversation.RepairToolMessageChain(conversation.MessagesAfterCompactBoundary(sc.Messages))
 	compSystemPrompt := sc.SystemPrompt
-	skipEntryCompress := e.cfg.QueryLoop.Enabled && e.cfg.QueryLoop.CompressPerTurn
+	skipEntryCompress := e.cfg.TurnRuntime.CompressPerTurn
 	if !skipEntryCompress && e.shouldCompress(msgs, sc.TokenBudget) {
 		compCtx, compSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Run, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(msgs))},

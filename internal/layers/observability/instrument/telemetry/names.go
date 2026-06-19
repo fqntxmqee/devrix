@@ -67,11 +67,6 @@ const (
 	OpD2_S5_Context_Harness_Route = "D2_S5_Context_Harness_Route"
 	OpD2_S5_Context_Harness_SystemPrompt_Build = "D2_S5_Context_Harness_SystemPrompt_Build"
 
-	// D2 Context Engine - QueryLoop (D2-S10)
-	OpD2_S10_Query_Loop_Run = "D2_S10_Query_Loop_Run"
-	OpD2_S10_Query_Loop_Turn = "D2_S10_Query_Loop_Turn"
-	OpD2_S10_Query_Loop_LLM_Call = "D2_S10_Query_Loop_LLM_Call"
-
 	// D2 Context Engine - Tool Execution (D2-S5)
 	OpD2_S5_Tool_Execute_Single = "D2_S5_Tool_Execute_Single"
 	OpD2_S5_Tool_Execute_Permission = "D2_S5_Tool_Execute_Permission"
@@ -158,8 +153,6 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerContext, "plan_agent"
 	case strings.HasPrefix(operation, "D2_S8_Task_Manager_"):
 		return LayerContext, "task_manager"
-	case strings.HasPrefix(operation, "D2_S10_Query_"):
-		return LayerContext, "query_loop"
 
 	// D3 LLM Gateway
 	case strings.HasPrefix(operation, "D3_S3_LLM_"):

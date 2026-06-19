@@ -78,8 +78,8 @@
 | D5-S24-A03-T01 | RegisterRuntimeMetric 幂等注册 path counter | S24 | P1 | `internal/layers/observability/configure/runtime/runtime_metric_test.go` | IMPLEMENTED | D5-S9-A01-T01 |
 | D5-S24-A03-T02 | IncRuntimeMetric 桥接 query_loop/legacy_harness 计数 | S24 | P1 | `internal/layers/observability/configure/runtime/runtime_metric_test.go` | IMPLEMENTED | D5-S9-A01-T02 |
 | D5-S24-A03-T03 | PathResolver 并发 Record 安全 | S24 | P1 | `internal/layers/observability/configure/runtime/path_resolver_test.go` | IMPLEMENTED | D5-S9-A01-T03 |
-| **D5-S24-A02-T04** | **`d2_query_loop_legacy_invocations_total` counter 已注册到 registry** | **S24** | **P0** | **`internal/layers/observability/instrument/metrics/legacy_test.go::TestLegacyD2Metrics_QueryLoopInvocations_registered_in_registry`** | **IMPLEMENTED** | **DM-20260617-001** |
-| **D5-S24-A02-T05** | **legacy 路径日志警告 sync.Once 一次（每 Loop 实例）** | **S24** | **P0** | **`internal/layers/contextengine/query/loop_warn_test.go::TestLoopRun_warnLegacyOnce_{emits_exactly_one_warning,payload_is_well_formed}`** | **IMPLEMENTED** | **DM-20260617-001** |
+| **D5-S24-A02-T04** | **~~legacy QueryLoop counter~~ REMOVED (DM-20260618-010)** | **S24** | **P0** | **—** | **REMOVED** | **DM-20260617-001** |
+| **D5-S24-A02-T05** | **~~Loop.Run slog.Warn~~ REMOVED (DM-20260618-010)** | **S24** | **P0** | **—** | **REMOVED** | **DM-20260617-001** |
 
 ## CROSS: 跨域性能测试（从 D5-S2 迁出）
 

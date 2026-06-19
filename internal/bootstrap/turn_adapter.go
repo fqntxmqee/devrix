@@ -238,7 +238,9 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 
 	toolCtx := ctx
 	if req.SessionID != "" {
-		if prov, ok := a.engine.(sessionContextProvider); ok {
+		if sc, ok := contracts.SubAgentSessionFromContext(ctx); ok {
+			toolCtx = contextengine.ToolContextWithGate(toolCtx, sc, a.perm)
+		} else if prov, ok := a.engine.(sessionContextProvider); ok {
 			if sc, ok := prov.SessionContext(req.SessionID); ok && sc != nil {
 				toolCtx = contextengine.ToolContextWithGate(toolCtx, sc, a.perm)
 			}

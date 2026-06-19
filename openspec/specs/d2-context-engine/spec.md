@@ -15,9 +15,11 @@
 
 上下文引擎负责会话级消息历史、Token 预算、七步压缩与 **QueryLoop** 多轮工具执行，并通过 `IContextEngine.Process` 向通信层输出 `EngineEvent` 流。
 
-> **⚠️ LEGACY 标记（2026-06-17，DM-20260617-001）**：D2-S10 QueryLoop 主循环（`internal/layers/contextengine/query/loop.go::Loop.Run`）在 `loopFirst=false` 路径下被标 Deprecated。**canonical 主路径是 D7-S2-A06 RunTurnLoop**（`internal/layers/orchestration/turn/orchestrator.go`），`loopFirst=true` 是默认。Loop.Run 函数体逻辑保留（紧急回滚兜底），仅顶部加 metric 递增 + 一次性 slog.Warn。本 spec 章节（D2-S10）所有 Requirement 与 Scenario **保留** 用于回滚兼容，新能力**不得**依赖本路径。详见 `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC) 与 `openspec/changes/devrix-queryloop-legacy-decommission/`。
+> **V8（2026-06-18，DM-20260618-010）**：D2-S10/S16 QueryLoop **物理删除**。所有 LLM↔Tool 循环归 D7 `RunTurn` / `SubTurn`；D2 `Process()` 经 `PreparedTurnRunner` 委托 D7。`query_loop.enabled` 配置项删除；`query_loop.max_turns` 与 `compress_per_turn` 仍供 D7 读取。详见 `openspec/archive/2026-06-18-devrix-d2-queryloop-dismantle/`。
 
-> **V7（2026-06-13，DM-20260611-004）**：`query_loop.enabled` 默认 `true`；Harness Bootstrap 降为 legacy fallback（仅 `query_loop.enabled=false` 时）。PEV（D2-S1）已退役。主路径为 QueryLoop（D2-S10）+ per-turn `commitActiveWindow` 压缩 + `conversation.RepairToolMessageChain`。
+> **~~LEGACY 标记（2026-06-17，DM-20260617-001）~~**：已由 DM-20260618-010 闭合；`query/loop.go` 不再存在。
+
+> **V7（2026-06-13，DM-20260611-004）**：Harness Bootstrap legacy 路径已移除；主路径为 D7 Turn + per-turn 压缩。
 
 V2（DM-20260607-003）增强：Autocompact 步骤 6、PEV Verify `commands` 模式、Gateway `ITokenCounter` 统一、压缩/验证可观测性、主路径真实 LLM Gateway 接线。
 
@@ -777,27 +779,11 @@ Transcript 分离 MUST 支持 compact view 与 append-only full log 双轨（对
 
 ## ADDED Requirements (V6 QueryLoop — v1.0/v1.1)
 
+> **⚠️ REMOVED (DM-20260618-010)**：本节 Requirement/Scenario 为历史归档。QueryLoop 物理模块已删除；行为由 D7 `RunTurn` / `SubTurn` 承接。新能力不得引用 `query.Loop` 或 `query_loop.enabled`。
+
 ### Requirement: QueryLoop Runtime
 
-When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool rounds to `query.Loop` instead of the legacy fixed-iteration execute loop. When `enabled=false`, behavior MUST remain bit-identical to V5.
-
-**Priority:** P0  
-**L3:** L3-BE-CTX-QueryLoop  
-**L4:** query_loop  
-**T:** D2-CTX-T34, D2-CTX-T39
-
-#### Scenario: Multi-turn tool loop
-
-- GIVEN `query_loop.enabled=true` and LLM returns tool_use until final text
-- WHEN Process runs
-- THEN Loop continues until no pending tool calls or `max_turns` reached
-- AND `TurnCount` reflects tool rounds executed
-
-#### Scenario: V5 regression with query loop disabled
-
-- GIVEN `query_loop.enabled=false`
-- WHEN any V5 T 层 scenario runs
-- THEN behavior is unchanged from V5
+**Status:** REMOVED (DM-20260618-010). See archive `openspec/archive/2026-06-18-devrix-d2-queryloop-dismantle/`.
 
 ---
 
@@ -965,12 +951,14 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 
 ## ADDED Requirements (V7 Harness Unification)
 
-### Requirement: QueryLoop Default Primary Path
+> **修订 (DM-20260618-010)**：`query_loop.enabled` 已删除。Production Process 记录 `obsruntime.PathD7Turn`。
 
-`context_engine.query_loop.enabled` MUST default to `true`. Production Process MUST record `obsruntime.PathQueryLoop` unless operator explicitly sets `query_loop.enabled=false`.
+### Requirement: D7 Turn Primary Path
+
+Production Process MUST delegate LLM↔Tool rounds to D7 via `PreparedTurnRunner` and MUST record `obsruntime.PathD7Turn`. Legacy harness bootstrap MUST NOT run.
 
 **Priority:** P0  
-**L4:** query_loop  
+**L4:** d7_turn  
 **T:** D2-S11-A01-T01, D2-S11-A01-T02, D2-S11-A01-D6PR
 
 #### Scenario: Legacy harness path not taken by default
@@ -979,6 +967,7 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 - WHEN Process runs
 - THEN legacy harness bootstrap branch is not executed
 - AND PathRegressionProbe legacy_harness counter remains 0
+- AND `obsruntime.PathD7Turn` is incremented
 
 ### Requirement: Per-Turn Active Window Compression
 
@@ -1458,8 +1447,7 @@ turn.Orchestrator (D7)                              [wire_coordinator.go:141]
   ↓ for each turn:
       ├─ Prepare   → contextEngineAdapter.Prepare   [turn_adapter.go:64]
       │              └─ 聚合 surface.Tools() + toolReg.ListTools() 去重
-      ├─ Invoke    → turn.Orchestrator 调 D3 LLM    [context_engine.go:125]
-      │              (QueryLLMCaller, 不经过 turn_adapter)
+      ├─ Invoke    → turn.GatewayInvoker → D3 LLM       [turn/llm.go]
       └─ ExecuteRound → contextEngineAdapter.ExecuteRound  [turn_adapter.go:186]
                         │
                         ├─ 1) IPermissionGate.Request(risk)        [turn_adapter.go:207]
@@ -1606,4 +1594,8 @@ IM 模式 (飞书/钉钉/企微):
 
 ## REMOVED Requirements
 
-(None)
+### Requirement: D2-S10/S16 QueryLoop Module (DM-20260618-010)
+
+Physical module `contextengine/query/loop.go`, `QueryLLMCaller`, and `query_loop.enabled` config removed. Capabilities: D7 `RunTurn`/`SubTurn`, D2-S18 tool rounds.
+
+---

@@ -100,7 +100,7 @@ func WithCompressionConfig(cfg config.CompressionConfig) Option {
 	}
 }
 
-// WithSkipAssembly skips step 5 system prompt assembly (QueryLoop passes system separately).
+// WithSkipAssembly skips step 5 system prompt assembly (D7 passes system separately).
 func WithSkipAssembly(skip bool) Option {
 	return func(p *Pipeline) {
 		p.skipAssembly = skip

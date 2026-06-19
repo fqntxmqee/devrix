@@ -17,7 +17,7 @@ type IEngine interface {
 //
 // DSAFT: D2-S1-A01-F02
 type EngineEvent struct {
-	Type      string // thinking | text | tool_call | tool_result | permission | status | complete | error
+	Type      string // thinking | text | tool_call | tool_result | permission | status | complete | error | tombstone
 	Content   string
 	ToolName  string
 	ToolInput string

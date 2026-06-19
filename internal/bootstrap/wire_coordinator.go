@@ -60,16 +60,10 @@ func InitOrchestration(
 	if coordCfg.RoutingMode == "rule_orchestrate" {
 		routingMode = coordinator.RoutingModeRuleOrchestrate
 	}
-	// DM-20260617-001: when the operator opts into rule_orchestrate
-	// (legacy routing) the boot log carries a deprecation warning so
-	// the choice is visible without scraping metrics. The corresponding
-	// per-Run() warning lives in `query.Loop.Run` and is gated by
-	// sync.Once.
 	if routingMode == coordinator.RoutingModeRuleOrchestrate {
-		slog.Warn("d7: routing_mode=rule_orchestrate is DEPRECATED; ingress will reach D2.QueryLoop.Run and bump d2_query_loop_legacy_invocations_total. Set routing_mode=loop_first (default) to silence this warning.",
-			"change", "devrix-queryloop-legacy-decommission",
-			"dm", "DM-20260617-001",
-			"canonical_path", "D7-S2-A06 RunTurnLoop",
+		slog.Info("d7: routing_mode=rule_orchestrate enables FastPath confidence threshold gating to OrchestratePath",
+			"change", "devrix-d2-queryloop-dismantle",
+			"dm", "DM-20260618-010",
 		)
 	}
 	coordinatorFileCfg := coordinator.FileConfig{
@@ -100,7 +94,7 @@ func InitOrchestration(
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	toolrunner.SetTodoSync(todoBackend.Sync)
 
-	// DM-020 D-c: wire TurnOrchestrator as the QueryLoopExecutor.
+	// DM-020 D-c: wire TurnOrchestrator as the TurnExecutor.
 	// This replaces the legacy executor with the orchestration turn loop that
 	// calls D3 directly for LLM and D2 via adapters for tools/persist.
 	ctxAdapter := newContextEngineAdapter(gw, ctxEngine, llmStack.TokenCounter)
@@ -162,6 +156,11 @@ func InitOrchestration(
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
 	})
+	subTurn := turn.NewSubTurnRunner(turnOrch)
+	setWiredSubTurn(subTurn)
+	if ce := contextEngineFrom(ctxEngine); ce != nil {
+		ce.SetPreparedTurnRunner(turn.NewPreparedTurnAdapter(turnOrch))
+	}
 	executor := newTurnOrchExecutor(turnOrch)
 
 	orch := coordinator.NewSessionOrchestrator(
@@ -186,7 +185,7 @@ func InitOrchestration(
 	return nil
 }
 
-// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.QueryLoopExecutor.
+// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.TurnExecutor.
 // DM-020 D-c: this replaces the legacy executor as the FastPath executor.
 type turnOrchExecutor struct {
 	orch turn.TurnOrchestrator
@@ -196,7 +195,7 @@ func newTurnOrchExecutor(orch turn.TurnOrchestrator) *turnOrchExecutor {
 	return &turnOrchExecutor{orch: orch}
 }
 
-func (e *turnOrchExecutor) RunQueryLoop(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
+func (e *turnOrchExecutor) RunTurn(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
 	if len(req.Messages) == 0 {
 		return nil, fmt.Errorf("turn executor: at least one message required")
 	}

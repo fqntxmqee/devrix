@@ -11,17 +11,16 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// D2-S11-A01-T02: 当 query_loop.enabled=true（默认）时，Process() 必须走
-// query_loop 路径，runtime 计数 legacy_harness 增量 = 0。
+// D2-S11-A01-T02: Process() delegates to D7 PreparedTurnRunner; legacy_harness
+// counter must stay at zero.
 func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	runtime.Reset()
 
 	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.Enabled = true
-	cfg.QueryLoop.MaxTurns = 3
+	cfg.TurnRuntime.MaxTurns = 3
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool out"},
 		ToolsReg:   mustBuiltinRegistry(t),
@@ -39,8 +38,8 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	if snap.LegacyHarness != 0 {
 		t.Errorf("legacy_harness = %d, want 0 (QueryLoop must not touch legacy path)", snap.LegacyHarness)
 	}
-	if snap.QueryLoop < 1 {
-		t.Errorf("query_loop = %d, want >= 1 (Process() must record the path it took)", snap.QueryLoop)
+	if snap.D7Turn < 1 {
+		t.Errorf("d7_turn = %d, want >= 1 (Process() must record the path it took)", snap.D7Turn)
 	}
 }
 
@@ -49,11 +48,10 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	runtime.Reset()
 
 	cfg := config.DefaultContextEngineConfig()
-	cfg.QueryLoop.Enabled = true
-	cfg.QueryLoop.MaxTurns = 2
+	cfg.TurnRuntime.MaxTurns = 2
 
 	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
-		QueryLLMCaller: &mockctx.StaticLLMCaller{Response: "ok"},
+		PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:     &mockctx.StaticSummarizer{},
 		Tools:      &mockctx.ToolRunner{Output: "tool out"},
 		ToolsReg:   mustBuiltinRegistry(t),
@@ -74,8 +72,8 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	if snap.LegacyHarness != 0 {
 		t.Errorf("legacy_harness = %d, want 0 after %d iterations", snap.LegacyHarness, iterations)
 	}
-	if snap.QueryLoop != int64(iterations) {
-		t.Errorf("query_loop = %d, want %d (every Process() should record 1)", snap.QueryLoop, iterations)
+	if snap.D7Turn != int64(iterations) {
+		t.Errorf("d7_turn = %d, want %d (every Process() should record 1)", snap.D7Turn, iterations)
 	}
 }
 

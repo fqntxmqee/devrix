@@ -279,7 +279,7 @@ func (w *BackgroundWaiter) Wait(taskID string, timeout time.Duration) (*Backgrou
 }
 
 // RunBackground starts SubQuery asynchronously and registers notification on completion.
-func RunBackground(ctx context.Context, deps LoopDeps, params SubQueryParams, reg *BackgroundRegistry, q contracts.SessionCommandQueue) (string, error) {
+func RunBackground(ctx context.Context, deps SubQueryDeps, params SubQueryParams, reg *BackgroundRegistry, q contracts.SessionCommandQueue) (string, error) {
 	if reg == nil {
 		return "", fmt.Errorf("background registry is nil")
 	}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -23,18 +22,20 @@ func (h *captureFlowHub) Snapshot(string) contracts.WorkPlanSnapshot {
 	return contracts.WorkPlanSnapshot{}
 }
 
+type stubSubTurn struct {
+	text string
+}
+
+func (s *stubSubTurn) RunSubTurn(_ context.Context, _ contracts.SubTurnRequest) (*contracts.SubTurnResult, error) {
+	return &contracts.SubTurnResult{AssistantText: s.text}, nil
+}
+
 // T: D4-S10-A01-T08 (legacy; canonical → D7-S4)
-//
-// DM-20260617-008 W2: caller injects FlowReporter via LoopDeps (no global).
 func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T) {
 	hub := &captureFlowHub{}
 
-	loop := &query.Loop{
-		LLM:        &query.SequentialLLM{Responses: []query.LLMScript{{Content: "fallback summary"}}},
-		Permission: query.AllowPermission{},
-	}
-	adapter := &SubQueryRunner{LoopDeps: enforce.LoopDeps{
-		Loop:         loop,
+	adapter := &SubQueryRunner{LoopDeps: enforce.SubQueryDeps{
+		SubTurn:      &stubSubTurn{text: "fallback summary"},
 		FlowReporter: hubspoke.NewFlowReporter(hub),
 	}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}

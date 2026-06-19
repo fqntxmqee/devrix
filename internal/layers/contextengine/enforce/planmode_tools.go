@@ -10,9 +10,9 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// RegisterQueryLoopTools registers plan-mode tools when QueryLoop is enabled.
+// RegisterPlanModeTools registers enter/exit plan mode tools.
 // Task tools (task_*) are registered via workmodel.RegisterTaskTools in bootstrap.
-func RegisterQueryLoopTools(reg *toolrunner.ToolRegistry, cfg *config.ContextEngineConfig) error {
+func RegisterPlanModeTools(reg *toolrunner.ToolRegistry, cfg *config.ContextEngineConfig) error {
 	if reg == nil || cfg == nil {
 		return nil
 	}

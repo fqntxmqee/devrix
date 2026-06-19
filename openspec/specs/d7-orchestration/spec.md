@@ -431,68 +431,21 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 - THEN the file contains a `Deprecated:` comment
 - AND the existing tests still pass
 
-### Requirement: D2 QueryLoop Legacy Path Decommission (devrix-queryloop-legacy-decommission)
+### Requirement: D2 QueryLoop Legacy Path Removal (devrix-d2-queryloop-dismantle)
 
-The D7 RunTurnLoop canonical path MUST remain the default (loopFirst=true) and is unaffected by this change. The LEGACY D2.QueryLoop.Run path (loopFirst=false) MUST emit a deprecation warning and increment a metric counter, but MUST continue to function for emergency rollback.
+D2 `query.Loop`, `QueryLLMCaller`, and `d2_query_loop_legacy_invocations_total` MUST NOT exist. All LLM↔Tool loops MUST run through D7 `RunTurn` / `SubTurn`. Supersedes DM-20260617-001 Z0 deprecation.
 
-See `openspec/tech-debt/queryloop-location.md` (TD-QL-LOC) for full context.
+**Priority**: P0  
+**T mapping**: D7-S2-A06-T09, `contextengine/queryloop_removed_test.go`
 
-**Priority**: P0
-**T mapping**: D7-S2-A06-T09, D7-S2-A06-T10, D5-S24-A02-T04, D5-S24-A02-T05
+#### Scenario: Production default uses D7 only
 
-#### Scenario: LoopFirst=true — D2 QueryLoop never invoked
+- GIVEN default devrix configuration
+- WHEN a session completes a full turn
+- THEN D7 RunTurn handles all LLM↔Tool iterations
+- AND `grep QueryLLMCaller internal/` returns zero production hits
 
-- GIVEN devrix.yaml has loopFirst=true (default)
-- WHEN 100 independent sessions complete a full turn
-- THEN `d2_query_loop_legacy_invocations_total` counter == 0
-- AND the D2→D3 facade adapter (`internal/shared/contracts/llm_facade.go`) is loaded but never invoked
-- AND `internal/layers/orchestration/turn/query_llm_caller.go` is loaded but never invoked
-
-<!-- T: D7-S2-A06-T09, D7-S2-A06-T10 -->
-
-#### Scenario: LoopFirst=false — deprecation warning emitted once per process
-
-- GIVEN devrix.yaml explicitly sets loopFirst=false
-- WHEN `D2.QueryLoop.Run()` is invoked multiple times in the same process
-- THEN slog.Warn is emitted exactly once with message "D2.QueryLoop.Run is deprecated; use D7 RunTurnLoop (loopFirst=true)"
-- AND `d2_query_loop_legacy_invocations_total` increments on every invocation
-
-<!-- T: D5-S24-A02-T05 -->
-
-#### Scenario: Legacy metric exposed on /metrics endpoint
-
-- GIVEN devrix is running with observability enabled
-- WHEN the `/metrics` endpoint is scraped
-- THEN `d2_query_loop_legacy_invocations_total` appears in the response
-- AND the metric type is `counter`
-- AND the metric has no labels
-
-<!-- T: D5-S24-A02-T04 -->
-
-#### Scenario: LoopFirst=false CLI flag warning visible
-
-- GIVEN the user runs `devrix --help`
-- WHEN the help text for `--loop-first` is displayed
-- THEN the text contains "WARNING", "LEGACY", and "ONLY for temporary rollback"
-- AND it references `openspec/tech-debt/queryloop-location.md`
-
-#### Scenario: Main path code unchanged
-
-- GIVEN the diff between this change and the previous release tag
-- WHEN files in the main path are inspected
-- THEN `internal/layers/orchestration/turn/orchestrator.go` has 0 line changes
-- AND `internal/layers/orchestration/turn/llm.go` has 0 line changes
-- AND `internal/bootstrap/wire_coordinator.go` has 0 line changes
-- AND `internal/shared/contracts/llm_facade.go` has 0 line changes
-- AND `internal/layers/orchestration/turn/query_llm_caller.go` has 0 line changes
-
-#### Scenario: D2-S10 spec.md marked LEGACY
-
-- GIVEN `openspec/specs/d2-context-engine/spec.md`
-- WHEN the D2-S10 Requirement section is read
-- THEN it begins with "⚠️ LEGACY PATH" marker
-- AND the marker links to `openspec/tech-debt/queryloop-location.md`
-- AND existing Scenarios are preserved (no deletions)
+<!-- T: D7-S2-A06-T09 -->
 
 ---
 

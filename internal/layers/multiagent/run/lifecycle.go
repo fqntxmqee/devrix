@@ -134,7 +134,7 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 			if strings.TrimSpace(ev.Content) == "" {
 				break
 			}
-			// QueryLoop streams deltas with is_complete=false; only legacy paths
+			// Turn runtime streams deltas with is_complete=false; only legacy paths
 			// emit a final is_complete=true frame.
 			if ev.Metadata["is_complete"] == "true" {
 				finalText.Reset()

@@ -87,7 +87,7 @@ type SessionContext struct {
 	SystemPrompt   string
 	LastRequestID  string
 	UpdatedAt      time.Time
-	// QueryLoop / permission state (Claude Code aligned).
+	// Turn runtime / permission state (Claude Code aligned).
 	PermissionMode PermissionMode
 	PrePlanMode    PermissionMode
 	PlanFilePath   string

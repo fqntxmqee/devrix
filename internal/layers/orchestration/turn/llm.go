@@ -32,7 +32,8 @@ func NewGatewayInvoker(deps LLMInvokerDeps) *GatewayInvoker {
 
 // InvokeStream performs one D3 streaming call (D7-S2-A07).
 //
-// v2.0-a: skeleton — resolves tier then delegates to gateway.Stream.
+// Overload / 5xx / rate-limit fallback is handled inside llmgateway
+// (protect/retry); TD-QL-03 is satisfied at the gateway layer.
 func (g *GatewayInvoker) InvokeStream(ctx context.Context, req LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
 	tier := req.Tier
 	if tier == "" {

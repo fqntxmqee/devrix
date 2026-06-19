@@ -26,7 +26,7 @@ type Params struct {
 // ToolSchema re-exported from shared/contracts.ToolSchema.
 type ToolSchema = contracts.ToolSchema
 
-// Result is the outcome of a QueryLoop run.
+// Result is the outcome of a nested subquery batch (legacy query package types).
 type Result struct {
 	Messages        []types.Message
 	AssistantText   string
@@ -44,16 +44,10 @@ type EmitFunc func(*contracts.EngineEvent)
 // CompressFunc runs messages-only compression for one iteration.
 type CompressFunc func(ctx context.Context, msgs []types.Message) ([]types.Message, error)
 
-// LLMCaller performs one streaming LLM call with optional user context prepend.
-//
-// Re-exported from shared/contracts (DM-020拆面契约). Implemented by
-// D7 turn.QueryLLMCaller; may also be implemented by D2-internal fakes for tests.
-type LLMCaller = contracts.LLMCaller
-
-// LLMRequest is the per-iteration LLM input.
+// LLMRequest is the per-iteration LLM input (test helpers only).
 type LLMRequest = contracts.LLMRequest
 
-// LLMChunk streaming fragment.
+// LLMChunk streaming fragment (test helpers only).
 type LLMChunk = contracts.LLMChunk
 
 // ToolCall requested tool invocation.

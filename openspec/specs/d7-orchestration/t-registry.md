@@ -217,8 +217,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_{SubQueryScope,SameOrchestratorForMainAndSubQuery}` | IMPLEMENTED | P0 |
 | D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_LLMInvokeError`; `orchestration/turn/llm_test.go::TestGatewayInvoker_InvokeStream_BreakerOpen` | IMPLEMENTED | P0 |
 | D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/turn/llm_test.go::TestGatewayInvoker_InvokeStream_{ContextCanceled,ContextDeadlineExceeded}`, `TestOrchestrator_RunTurn_StreamTimeout_EngineEvent` | IMPLEMENTED | P0 |
-| **D7-S2-A06-T09** | **D7 RunTurn never touches D2.QueryLoop.Run** | **D7-S2-A06** | **`orchestration/turn/loop_legacy_test.go::TestOrchestrator_RunTurn_DoesNotInvokeLegacyQueryLoop`** | **IMPLEMENTED** | **P0** |
-| **D7-S2-A06-T10** | **D2.QueryLoop.Run bumps `d2_query_loop_legacy_invocations_total` per call** | **D7-S2-A06** | **`contextengine/query/loop_legacy_test.go::TestLoopRun_legacy_counter_bumps_on_every_invocation`, `TestLoopRun_legacy_counter_nil_safe`** | **IMPLEMENTED** | **P0** |
+| **D7-S2-A06-T09** | **D7 RunTurn never touches removed D2 QueryLoop** | **D7-S2-A06** | **`orchestration/turn/loop_legacy_test.go::TestOrchestrator_RunTurn_MainPathOnly`** | **IMPLEMENTED** | **P0** |
+| **D7-S2-A06-T10** | **~~D2.QueryLoop legacy counter~~ REMOVED (DM-20260618-010)** | **D7-S2-A06** | **`contextengine/queryloop_removed_test.go::TestD2_NoQueryLoopProductionReferences`** | **IMPLEMENTED** | **P0** |
 
 ### Legacy T 映射（DM-020 — v1.0 Registry，v2.0 实施）
 

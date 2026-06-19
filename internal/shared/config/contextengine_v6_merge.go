@@ -1,9 +1,10 @@
 package config
 
-// mergeContextEngineV6 merges QueryLoop v1/v2 fields from file config over defaults.
+// mergeContextEngineV6 merges turn-runtime v1/v2 fields from file config over defaults.
 func mergeContextEngineV6(base, file ContextEngineConfig) ContextEngineConfig {
 	out := base
-	out.QueryLoop = mergeQueryLoopConfig(out.QueryLoop, file.QueryLoop)
+	out.TurnRuntime = mergeTurnRuntimeConfig(out.TurnRuntime, file.TurnRuntime)
+	out.TurnRuntime = mergeTurnRuntimeConfig(out.TurnRuntime, file.QueryLoop)
 	out.UserContext = mergeUserContextConfig(out.UserContext, file.UserContext)
 	out.Attachments = mergeAttachmentsConfig(out.Attachments, file.Attachments)
 	out.Permission = mergeContextPermissionConfig(out.Permission, file.Permission)
@@ -14,19 +15,13 @@ func mergeContextEngineV6(base, file ContextEngineConfig) ContextEngineConfig {
 	return out
 }
 
-func mergeQueryLoopConfig(base, override QueryLoopConfig) QueryLoopConfig {
+func mergeTurnRuntimeConfig(base, override TurnRuntimeConfig) TurnRuntimeConfig {
 	out := base
-	if override.Enabled {
-		out.Enabled = true
-	}
 	if override.MaxTurns != 0 {
 		out.MaxTurns = override.MaxTurns
 	}
 	if override.CompressPerTurn {
 		out.CompressPerTurn = true
-	}
-	if !override.CompressPerTurn && override.Enabled {
-		out.CompressPerTurn = override.CompressPerTurn
 	}
 	if override.StreamingTools {
 		out.StreamingTools = true

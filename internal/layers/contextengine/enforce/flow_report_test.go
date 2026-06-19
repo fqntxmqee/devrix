@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -80,12 +79,10 @@ func TestSubQuery_should_publish_flow_lifecycle(t *testing.T) {
 	hub := &captureHub{}
 	reporter := &testFlowReporter{hub: hub}
 
-	llm := &query.SequentialLLM{Responses: []query.LLMScript{{Content: "done"}}}
-	loop := &query.Loop{LLM: llm}
 	parent := &types.SessionContext{SessionID: "sess_flow", Model: "test"}
 
-	_, err := enforce.Run(context.Background(), enforce.LoopDeps{
-		Loop:         loop,
+	_, err := enforce.Run(context.Background(), enforce.SubQueryDeps{
+		SubTurn:      &stubSubTurn{text: "done"},
 		FlowReporter: reporter,
 	}, enforce.SubQueryParams{
 		ParentSC:     parent,

@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -112,7 +111,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		defer processSpan.End()
 	}
 
-	obsruntime.Record(obsruntime.PathQueryLoop)
+	obsruntime.Record(obsruntime.PathD7Turn)
 	agentsRaw := e.prompt.Load(session.WorkDir)
 	{
 		_, spSpan := e.startSpan(ctx, telemetry.OpD2_S2_Context_SystemPrompt_Load, tracer.SpanKindInternal,
@@ -225,21 +224,47 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		tools = e.agentRoleToolFilter.Filter(sc, tools)
 	}
 
-	res, runErr := e.queryLoop.Run(ctx, sc, query.Params{
+	if e.preparedTurnRunner == nil {
+		emit(mapProcessError(session.SessionID, fmt.Errorf("contextengine: PreparedTurnRunner not wired (use D7 InitOrchestration)")))
+		return
+	}
+
+	toolSchemas := make([]contracts.ToolSchema, len(tools))
+	for i, t := range tools {
+		toolSchemas[i] = contracts.ToolSchema{
+			Name:        t.Name,
+			Description: t.Description,
+			Parameters:  t.Parameters,
+		}
+	}
+
+	res, runErr := e.preparedTurnRunner.RunPreparedTurn(ctx, contracts.PreparedTurnRequest{
+		SessionID:    session.SessionID,
 		SystemPrompt: sc.SystemPrompt,
 		Messages:     messages,
-		Tools:        query.ToolSchemasFromRunner(tools),
-		MaxTurns:     e.cfg.QueryLoop.MaxTurns,
-	}, func(ev *contracts.EngineEvent) {
-		if ev.Type == "complete" {
-			pendingComplete = ev
-			return
-		}
-		if ev.Type == "text" && ev.Metadata["is_complete"] == "false" {
-			working.AppendStream(ev.Content)
-		}
-		emit(ev)
+		Tools:        toolSchemas,
+		MaxTurns:     e.cfg.TurnRuntime.MaxTurns,
+		Emit: func(ev *contracts.EngineEvent) {
+			if ev.Type == "complete" {
+				pendingComplete = ev
+				return
+			}
+			if ev.Type == "text" && ev.Metadata["is_complete"] == "false" {
+				working.AppendStream(ev.Content)
+			}
+			emit(ev)
+		},
 	})
 
-	e.finalizeTurn(ctx, session, sc, res, runErr, working, message, workerLocal, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
+	var loopResult *preparedTurnLoopResult
+	if res != nil {
+		loopResult = &preparedTurnLoopResult{
+			AssistantText:   res.AssistantText,
+			Usage:           res.Usage,
+			TurnCount:       res.TurnCount,
+			ToolCallHistory: res.ToolCallHistory,
+		}
+	}
+
+	e.finalizeTurn(ctx, session, sc, loopResult, runErr, working, message, workerLocal, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
 }

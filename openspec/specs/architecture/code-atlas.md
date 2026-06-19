@@ -37,8 +37,8 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | llm_decomposer | LLM 拆 DAG | D7-S5-A03 | `orchestration/coordinator/llm_decomposer.go` | `LLMDecomposer`, `SynthesizeTaskGraph` |
 | turn_orchestrator | RunTurn 主循环（resolve/decompose）| D7-S2-A06 | `orchestration/turn/orchestrator.go` | `DefaultOrchestrator`, `RunTurn`, `ResolveHint` |
 | llm_invoker | D7 直调 D3 | D7-S2-A07 | `orchestration/turn/llm.go` | `GatewayInvoker`, `InvokeStream` |
-| query_llm_caller | LLMCaller 拆面出口 | D7-S2-A07 | `orchestration/turn/query_llm_caller.go` | `QueryLLMCaller` |
 | compression_summarizer | Summarizer 拆面出口 | D7-S2-A07 | `orchestration/turn/compression_summarizer.go` | `CompressionSummarizer` |
+| subturn_runner | SubQuery/Background/Wave 嵌套轮次 | D7-S2-A06 | `orchestration/turn/subturn.go` | `SubTurnRunner`, `RunSubTurn` |
 | **D7 任务/计划模型（v2.0 unified）** |||||
 | workitem | 任务统一抽象 | D7-S1 | `orchestration/workmodel/workitem.go` | `WorkItem`, `WorkTree` |
 | run_registry | 任务注册表 | D7-S1 | `orchestration/workmodel/run_registry.go` | `RunRegistry` |
@@ -79,7 +79,7 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 
 | L4 ID | 状态 | 替代路径 | 退役依据 |
 |-------|------|---------|---------|
-| query_loop (D2-S10) | **DEPRECATED** | D7-S2-A06 turn.RunTurn | DM-20260616-004（PR #54 emit legacy invocation metric）|
+| query_loop (D2-S10) | **REMOVED** | D7-S2-A06 turn.RunTurn | DM-20260618-010 |
 | subquery | **DEPRECATED** | D7-S2-A04 hubspoke.Dispatcher | DM-20260616-004（PR #55 archive）|
 | sidechain_transcript | **DEPRECATED** | WorkItem v2 unified | DM-20260616-004（queryloop legacy decommission）|
 | harness (D2-S9) | **DEPRECATED** | — | D6 PathRegressionProbe 监控 legacy 计数 |
@@ -169,7 +169,7 @@ D7-S2-A07 LLMInvoker ──direct──► D3 ILLMGateway (D2→D3 import ban CI
 | D7-S3 Wave | `orchestration/wave/scheduler_test.go`, `conflict_guard_test.go` |
 | D7-S4 Flow Hub | `orchestration/flow/hub_test.go`, `orchestration/workplan/service_test.go` |
 | D7-S2-A04 Hub-Spoke | `orchestration/hubspoke/dispatcher_test.go` |
-| D2-S10 QueryLoop (DEPRECATED) | `contextengine/query/loop_test.go` (legacy regression only) |
+| D2-S10 QueryLoop (REMOVED) | `orchestration/turn/orchestrator_test.go`, `turn/subturn_test.go` |
 | D2-S12 Worktree | `contextengine/worktree/manager_test.go` |
 | D2-S15/S17/S18 D2 Follower | `contextengine/{prepare,persist,enforce}/*_test.go` |
 | D4-S10 Delegate | `multiagent/delegate/*_test.go`, `contextengine/delegate_*_test.go` |

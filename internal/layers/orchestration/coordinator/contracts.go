@@ -7,15 +7,15 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// QueryLoopExecutor is the context-engine contract consumed by the
-// orchestrator. It runs a single LLM↔Tool loop and streams EngineEvent.
+// TurnExecutor is the D7 turn-runtime contract consumed by the orchestrator.
+// It runs a single LLM↔Tool loop and streams EngineEvent.
 // The orchestrator must NOT call into contextengine internals (no
 // import of contextengine/prepare/attachments or prepare/usercontext).
-type QueryLoopExecutor interface {
-	// RunQueryLoop runs a single LLM↔Tool interaction and returns a
-	// streaming channel of EngineEvent. The channel is closed on terminal
+type TurnExecutor interface {
+	// RunTurn runs a single LLM↔Tool interaction and returns a streaming
+	// channel of EngineEvent. The channel is closed on terminal
 	// (completed | failed | cancelled).
-	RunQueryLoop(ctx context.Context, req QueryRequest) (<-chan *contracts.EngineEvent, error)
+	RunTurn(ctx context.Context, req QueryRequest) (<-chan *contracts.EngineEvent, error)
 }
 
 // QueryRequest is the minimal D2 input the orchestrator needs.

@@ -11,23 +11,20 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 
 ## 待办项
 
-### TD-QL-01: Prompt Too Long (413) 恢复链（P1）
+### TD-QL-01: Prompt Too Long (413) 恢复链（P1） — **CLOSED (DM-20260618-010)**
 
-- **现状：** QueryLoop 路径无 413 → collapse drain → reactive compact → 重试
-- **目标：** 复用现有 `compression/` 七步管道，在 `query/loop.go` 捕获 413 后依次触发
-- **验收：** 集成测试：超限上下文自动压缩后成功完成 tool 轮次
+- **归属：** D7 `turn/recovery.go` + `invokeStreamWithRecovery`
+- **验收：** `turn/recovery_test.go`
 
-### TD-QL-02: max_output_tokens 恢复（P1）
+### TD-QL-02: max_output_tokens 恢复（P1） — **CLOSED (DM-20260618-010)**
 
-- **现状：** 无 64k 扩容 + recovery message 渐进恢复
-- **目标：** LLM 返回 truncation 信号时注入 recovery user message 并重试（最多 3 次）
-- **验收：** 单测 + mock provider truncation 场景
+- **归属：** D7 `turn/recovery.go` + `orchestrator.go` stream recovery loop
+- **验收：** `turn/recovery_test.go` — tombstone + retry on finish_reason=length
 
-### TD-QL-03: Loop 级 fallback model（P1）
+### TD-QL-03: Loop 级 fallback model（P1） — **CLOSED (DM-20260618-010)**
 
-- **现状：** `llmgateway/retry` 有 fallback，QueryLoop 未统一接入 overload/5xx 恢复
-- **目标：** `query/loop.go` 在 primary 失败时经 gateway retry executor 切换 fallback
-- **验收：** 集成测试 mock primary 失败 → fallback 成功
+- **归属：** D3 `llmgateway` protect/retry（`GatewayInvoker.InvokeStream`）
+- **说明：** D7 不再维护独立 fallback 链
 
 ### TD-QL-04: D6 评测探针（P2）
 
@@ -39,13 +36,12 @@ QueryLoop v1/v2 已交付 while-true 循环、StreamingToolExecutor、孤儿 too
 - **背景：** YOLO + tool calls 曾 suppress `complete`，导致飞书无 Done（已修复 `query_loop_run.go`）
 - **目标：** T 层回归：`complete` 事件在 QueryLoop 所有模式（含 YOLO）下必达 IM 层
 
-### TD-QL-06: 恢复时 orphan message tombstone（P1）
+### TD-QL-06: 恢复时 orphan message tombstone（P1） — **CLOSED (DM-20260618-010)**
 
 **参考：** clawcode `query.ts` — recovery 前 yield tombstone 移除 UI/transcript 中孤儿 assistant messages
 
-- **现状：** 仅有入口 `FilterIncompleteToolCalls`，Loop 内 API 失败恢复时不清理已 yield 的 assistant chunk
-- **目标：** 413/fallback/max_tokens 恢复路径上，对已 emit 但未配对的 assistant tool_use 发 tombstone/rollback 事件
-- **验收：** 集成测试 recovery 后 transcript 无 dangling tool_use
+- **归属：** D7 `turn/recovery.go` — `emitStreamRecoveryTombstones` on max_tokens recovery
+- **验收：** `turn/recovery_test.go` — tombstone events for text/thinking/tool_call rollback
 
 ### TD-QL-07: fallback 与 StreamingToolExecutor 联动（P1）
 

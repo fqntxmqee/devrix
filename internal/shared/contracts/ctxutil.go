@@ -1,7 +1,7 @@
 // Package contracts exposes the cross-layer contract surface used by all D{N} layers.
 //
 // ComputeCtxPct was previously defined in D1 (communication/capture) but is a pure
-// arithmetic helper that D2 QueryLoop also needs. It lives here so that no D{N}
+// arithmetic helper shared by D1 summary cards and D7 complete events. It lives here so that no D{N}
 // has to import another D{N} just to compute a context-window percentage.
 //
 // DSAFT: CROSS-A02-F01
@@ -10,7 +10,7 @@ package contracts
 // ComputeCtxPct returns the current prompt tokens as a percentage of the context
 // window (0-100, clamped). It returns 0 when either input is non-positive.
 //
-// D1 summary cards ("ctx: X%") and D2 QueryLoop complete events both use this
+// D1 summary cards ("ctx: X%") and D7 complete events both use this
 // helper to keep the two sides byte-identical. See DM-20260611-008.
 //
 // DSAFT: CROSS-A02-F01

@@ -16,7 +16,7 @@ const (
 	ModeDelegateProgress CommandMode = "delegate-progress"
 )
 
-// QueuedCommand is a pending prompt or task notification for QueryLoop drain.
+// QueuedCommand is a pending prompt or task notification for turn-runtime drain.
 type QueuedCommand struct {
 	Value   string
 	Mode    CommandMode

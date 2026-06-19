@@ -1,37 +1,40 @@
 # Delta: Domain D2 (CTX)
 
-**Change ID:** devrix-foundation → devrix-context-engine (archived) → devrix-queryloop-context (archived) → devrix-unified-task-registry (archived)
-**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v7.1.0)
-**Status:** Merged — reflects production path as of 2026-06-13 (updated 2026-06-19: QueryLoop 软化为 DEPRECATED, canonical=D7-S2-A06)
-**Affects:** QueryLoop runtime (DEPRECATED `loopFirst=false` 路径), compression pipeline, layered memory, harness bootstrap (legacy fallback), conversation repair, main transcript
+**Change ID:** devrix-foundation → devrix-queryloop-context (archived) → devrix-d2-queryloop-dismantle (archived)
+**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v8.0.0)
+**Status:** Merged — D7 owns LLM↔Tool loop as of DM-20260618-010
+**Affects:** D7 turn runtime, compression pipeline, layered memory, conversation repair, main transcript
+
+---
+
+## REMOVED (DM-20260618-010)
+
+- `query.Loop.Run` and `query_loop.enabled` config
+- Runtime label renamed: `PathD7Turn` (`d7_turn`) replaces `PathQueryLoop`
 
 ---
 
 ## ADDED
 
-### Requirement: QueryLoop Default Runtime ⚠️ DEPRECATED in `loopFirst=false` path
+### Requirement: D7 Turn Primary Path
 
-> **DEPRECATED (2026-06-17, DM-20260617-001)**: canonical 主路径已迁至 D7-S2-A06 `turn.RunTurnLoop`（`internal/layers/orchestration/turn/orchestrator.go`）。`loopFirst=true` 是默认（Default），`loopFirst=false` 路径下本 Requirement **DEPRECATED**。本 Requirement 与 D2-S10 所有 Scenario **保留** 用于紧急回滚兜底，新能力**不得**依赖本路径。
+`ContextEngine.Process` MUST delegate LLM↔Tool rounds to D7 `PreparedTurnRunner` and record `obsruntime.PathD7Turn`.
 
-When `context_engine.query_loop.enabled=true` (default since DM-20260611-004) AND `loopFirst=true` (default since DM-20260614-020), `ContextEngine.Process` routes LLM↔Tool rounds through `query.Loop.Run`. **Default 路径**——但 canonical 主路径是 D7-S2-A06 `turn.RunTurnLoop`。
-
-#### Scenario: Multi-turn tool loop
-- GIVEN `query_loop.enabled=true` and LLM returns tool_use until final text
+#### Scenario: Multi-turn tool loop via D7
+- GIVEN LLM returns tool_use until final text
 - WHEN Process runs
-- THEN Loop continues until no pending tool calls or `max_turns` reached
-- AND tool results are ordered in transcript
+- THEN D7 RunTurn continues until no pending tool calls or `max_turns` reached
 
 #### Scenario: Per-turn compression
-- GIVEN `query_loop.compress_per_turn=true` (default)
+- GIVEN `turn_runtime.compress_per_turn=true` (default)
 - WHEN Process starts
 - THEN entry compression is skipped (`skipEntryCompress`)
 - AND `commitActiveWindow` runs messages-only seven-step pipeline after each successful turn when budget exceeded
 
 #### Scenario: Deferred complete event
-- GIVEN QueryLoop completes successfully
+- GIVEN D7 turn completes successfully
 - WHEN snapshot and `sc.Messages` are persisted
 - THEN `complete` EngineEvent is emitted only after durable writes
-- AND Metadata includes `duration`, `usage`, `model`, optional `ctx_pct`
 
 ### Requirement: Conversation Integrity
 
@@ -39,154 +42,31 @@ When `context_engine.query_loop.enabled=true` (default since DM-20260611-004) AN
 - GIVEN snapshot messages contain orphan tool results or incomplete tool rounds
 - WHEN Process prepares API messages
 - THEN `conversation.RepairToolMessageChain` removes invalid pairs
-- AND provider APIs receive valid assistant/tool_call_id sequences
 
 #### Scenario: Compact boundary preserves tail
 - GIVEN prior compaction inserted a `compact_boundary` system marker
 - WHEN messages are read for LLM or compression
 - THEN only messages after the last boundary are used
-- AND full history remains in snapshot for audit
 
 ### Requirement: Main Thread Transcript
 
 When `context_engine.main_transcript.enabled=true`, full message deltas MUST append to `{base_dir}/{sessionId}/transcript.jsonl`.
 
-#### Scenario: Append-only main transcript
-- GIVEN main transcript enabled and Process completes
-- WHEN assistant/tool messages are persisted
-- THEN delta messages append to JSONL without replacing snapshot
-- AND Worker overlay sessions do not write main transcript
-
-### Requirement: Harness Bootstrap (Legacy Fallback)
-
-Bootstrap stages run only when `harness.enabled=true` AND `query_loop.enabled=false` (explicit legacy path).
-
-#### Scenario: Production default skips legacy harness path
-- GIVEN default config (`query_loop.enabled=true`)
-- WHEN Process runs
-- THEN `obsruntime.PathQueryLoop` is recorded
-- AND full bootstrap/preflight/routing harness branch is not taken on primary path
-
-#### Scenario: Bootstrap when explicitly legacy
-- GIVEN `query_loop.enabled=false` and `harness.enabled=true`
-- WHEN first Process for session
-- THEN prefetch → guards → setup → deferred_init → tool_pool stages run
-- AND session is marked harness-initialized
-
 ### Requirement: System Prompt Assembly
 
-Four-layer assembly via `prompt.SystemPromptAssembler` (not harness package).
-
-#### Scenario: Build before QueryLoop
-- GIVEN non-worker Process turn
-- WHEN memory recall and optional preflight complete
-- THEN assembler builds Layer 0–3 prompt into `sc.SystemPrompt`
-- AND CompressedView system message equals assembler output
+Four-layer assembly via `prompt.SystemPromptAssembler`.
 
 ### Requirement: Seven-Step Compression Pipeline
 
-Physical order: 1 → 2 → 3 → 4 → [6] → 5 → 7. Operates on **messages only** (system prompt excluded on QueryLoop path).
-
-#### Scenario: Step 6 Autocompact async placeholder
-- GIVEN async autocompact wired
-- WHEN step 6 runs under budget pressure
-- THEN placeholder returns within 50ms
-- AND background goroutine may replace with LLM summary via `OnAutocompactComplete`
-
-#### Scenario: Step 7 Token Block
-- GIVEN compressed context still exceeds max budget
-- WHEN TokenBlock runs
-- THEN `ContextExceededError` is returned
-
-### Requirement: Layered Memory
-
-#### Scenario: Short-term snapshot with Snappy compression
-- GIVEN snapshot compression enabled and payload exceeds threshold
-- WHEN Serialize runs
-- THEN output uses Snappy magic header `\xfe\x53`
-- AND Deserialize accepts legacy raw JSON
-
-#### Scenario: LongTerm recall and auto_store
-- GIVEN `longterm.enabled=true`
-- WHEN Process starts / completes
-- THEN Recall injects entries into assembler Layer 3 within token budget
-- AND optional auto_store persists SQLite entries on success
-
-### Requirement: UserContext Prepend Boundary
-
-#### Scenario: AGENTS.md not in snapshot
-- GIVEN `user_context.mode=prepend`
-- WHEN Loop builds API messages
-- THEN prepend block appears in API call only
-- AND snapshot `Messages` exclude prepend meta-user block
-
-### Requirement: Permission Plan Mode
-
-#### Scenario: Write restricted to plan file
-- GIVEN `PermissionMode=plan`
-- WHEN write tools target paths outside `PlanFilePath`
-- THEN tool returns plan-mode denial without writing
-
-### Requirement: SubQuery and Sidechain
-
-#### Scenario: Sidechain JSONL resume
-- GIVEN existing `{sessions}/{sessionId}/subagents/{agentId}.jsonl`
-- WHEN SubQuery runs with `Resume=true`
-- THEN initial messages include loaded sidechain history
-
-### Requirement: Worktree Sandbox
-
-#### Scenario: Isolated worker writes
-- GIVEN worktree enabled
-- WHEN Worker runs write tools
-- THEN files are created under worktree path only
-- AND primary session WorkDir is unchanged
+Physical order: 1 → 2 → 3 → 4 → [6] → 5 → 7. Operates on **messages only**.
 
 ---
 
-## MODIFIED
+## Historical (pre-20260618)
 
-### Requirement: IContextEngine Ownership
+<details>
+<summary>Legacy QueryLoop / Harness requirements (superseded)</summary>
 
-`ContextEngine` implements `contracts.IEngine` in `internal/layers/contextengine/engine.go`. Communication layer depends on interface only.
+Prior versions routed Process through `query.Loop.Run` when `query_loop.enabled=true`. Harness bootstrap ran when `query_loop.enabled=false`. Both paths removed in v8.0.0.
 
-### Requirement: Gateway Event Contract
-
-`complete` event Metadata MUST include millisecond `duration` and total token `usage` for gateway completion summary.
-
----
-
-## REMOVED
-
-| Item | Reason | Successor |
-|------|--------|-----------|
-| PEV Engine (Plan/Execute/Verify) | Retired 2026-06-13 | D2-S10 QueryLoop |
-| PEVEngine.Run in Process hot path | DM-20260611-004 | `query.Loop.Run` |
-| `harness/system_prompt_assembler.go` | Moved to `prompt/assembler.go` | `prompt.SystemPromptAssembler` |
-| Entry compression on every Process when QueryLoop enabled | `compress_per_turn` defers to post-turn `commitActiveWindow` | D2-S11 harness unification |
-
----
-
-## ADDED (DM-20260614-009 — devrix-d2-sa-refine)
-
-### Requirement: D2 Canonical Value Stream S15–S20
-
-D2 MUST register canonical scenarios by execution lifecycle (Prepare → Execute → Persist → Policy → Nested → Legacy). Legacy S1–S14 MUST remain frozen.
-
-See: `openspec/specs/d2-context-engine/d2-domain.md`, `d7-boundary.md`.
-
-### Requirement: D2↔D7 Leader/Follower Boundary
-
-D2 MUST be Execution Follower; D7 MUST be sole ingress orchestrator to D2 Process in production. Cross-domain drift (tasks/, delegate_tools, queue delegate-progress) MUST be documented with D7 migration targets.
-
-See: `openspec/archive/2026-06-14-devrix-d2-sa-refine/specs/d2-context-engine/layer-delta.md`.
-
-### Requirement: D2 Thin Query Package (v1.1)
-
-`contextengine/query` MUST NOT import `orchestration` or `multiagent`. FlowHub MUST be injected via `LoopDeps` / `SubQueryParams`, not resolved from `flow.GlobalHub` inside query.
-
-#### Scenario: D2 Thin regression test green
-
-- GIVEN `go test ./internal/lint/layer/...`
-- WHEN D2 Thin tests run
-- THEN zero import violations in query package
+</details>

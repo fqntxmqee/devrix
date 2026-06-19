@@ -130,7 +130,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		slog.Error("create builtin tool registry", "error", err)
 		toolReg = contextengine.NewToolRegistry()
 	}
-	if err := enforce.RegisterQueryLoopTools(toolReg, b.ctxCfg); err != nil {
+	if err := enforce.RegisterPlanModeTools(toolReg, b.ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
 	if err := workmodel.RegisterTaskTools(toolReg, b.ctxCfg, tm); err != nil {
@@ -212,11 +212,6 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if perm == nil {
 		perm = capture.NewPermissionGateAdapter(nil)
 	}
-	queryCaller := turn.NewQueryLLMCaller(turn.QueryLLMCallerDeps{
-		Gateway:      b.stack.RawGateway,
-		TierResolver: b.stack.TierResolver,
-		DefaultTier:  b.stack.DefaultModel,
-	})
 	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
 		Gateway:      b.stack.RawGateway,
 		TierResolver: b.stack.TierResolver,
@@ -249,7 +244,6 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		DefaultModel:        b.stack.DefaultModel,
 		TierResolver:        b.stack.TierResolver,
 		AgentRoleToolFilter: toolpolicy.NewFilter(),
-		QueryLLMCaller:      queryCaller,
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		Surfaces:            surfaces,

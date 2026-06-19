@@ -4,8 +4,8 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S18 (v2.0 final, S19 dismantled, S20 removed)
-**Version:** 7.0.0
-**Last Updated:** 2026-06-16
+**Version:** 8.0.0
+**Last Updated:** 2026-06-18
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (QueryLoopExecutor consumer)**
@@ -20,7 +20,7 @@
 | 可验证承诺 | Canonical S |
 |-----------|-------------|
 | Turn 前上下文合法、在预算内 | D2-S15 PrepareExecutionContext |
-| LLM↔Tool 多轮（Legacy 冻结 → D7-S2-A06） | ~~D2-S16 RunQueryLoop~~ |
+| LLM↔Tool 多轮 | ~~D2-S16 RunQueryLoop~~ → **D7-S2-A06 RunTurnLoop**（DM-20260618-010 REMOVED） |
 | Tool 权限/沙箱先于执行 | D2-S18 EnforceExecutionPolicy |
 | Turn 后状态 durable + deferred complete | D2-S17 PersistSessionState |
 | 嵌套 SubQuery/Background 有边界 | ~~D2-S19 NestedExecution~~ → S15+S18 拆分 |
@@ -48,7 +48,7 @@
 | S ID | Scenario | Responsibility | Status |
 |------|----------|----------------|--------|
 | D2-S15 | PrepareExecutionContext | Load, repair, compress, assemble prompt | REGISTRY |
-| D2-S16 | RunQueryLoop | LLM↔Tool 执行原语（Thin Loop） | **LEGACY FREEZE（DM-020）** |
+| D2-S16 | RunQueryLoop | ~~LLM↔Tool 执行原语~~ | **REMOVED（v8.0.0，DM-20260618-010）→ D7-S2-A06** |
 | D2-S17 | PersistSessionState | Snapshot, transcript, commit window | REGISTRY |
 | D2-S18 | EnforceExecutionPolicy | Permission, sandbox, tool surface | **REGISTRY（自 S16 拆出 tool 面，DM-020）** |
 | D2-S19 | NestedExecution | ~~SubQuery, background, fork, sidechain~~ → S15+S18 拆分 | **DISMANTLED（v6.4.0）** |
@@ -67,7 +67,7 @@
 | D2-S7 | Prompt | Legacy | → S15 |
 | D2-S8 | Sandbox | Legacy | → S18 |
 | D2-S9 | Harness | Legacy | → **REMOVED** |
-| D2-S10 | QueryLoop | Legacy | → S16, S18, S19 |
+| D2-S10 | QueryLoop | Legacy | **REMOVED → D7-S2-A06** |
 | D2-S11 | Queue | Legacy | → **D7-S4** |
 | D2-S12 | Worktree | Legacy | → S18 |
 | D2-S13 | Conversation | Legacy | → S15 |
@@ -80,9 +80,9 @@
 | Canonical S | Scenario | 物理路径 |
 |-------------|----------|---------|
 | D2-S15 | PrepareExecutionContext | `prepare/` (memory/, compression/, prompt/, conversation/fork.go+fork_worker.go, attachments/, usercontext/) |
-| D2-S16 | RunQueryLoop | `query/` (loop.go) + `engine.go` (facade) |
+| D2-S16 | RunQueryLoop | **REMOVED** — loop 归 D7 `turn/orchestrator.go` |
 | D2-S17 | PersistSessionState | `persist/` (snapshot/, transcript/) + `engine_persist.go` |
-| D2-S18 | EnforceExecutionPolicy | `enforce/` (permission/, toolrunner/, registry/, tool_filter.go, agent_role_filter.go, background.go, subquery.go, background_task_tools.go, queryloop_tools.go) |
+| D2-S18 | EnforceExecutionPolicy | `enforce/` (permission/, toolrunner/, registry/, tool_filter.go, agent_role_filter.go, background.go, subquery.go, background_task_tools.go, planmode_tools.go) |
 | D2-S19 | ~~NestedExecution~~ → S15+S18 | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` |
 | D2-S20 | ~~LegacyHarnessFallback~~ | **REMOVED（v6.5.0）**: `fallback/` 目录已删除，所有 harness 相关代码已清理 |
 

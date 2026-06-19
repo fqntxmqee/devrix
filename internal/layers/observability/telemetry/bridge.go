@@ -80,14 +80,6 @@ const (
 	OpD2_S5_Context_Harness_SystemPrompt_Build = telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build
 )
 
-// Constants — D2 Context Engine - QueryLoop (D2-S10)
-
-const (
-	OpD2_S10_Query_Loop_Run     = telemetry.OpD2_S10_Query_Loop_Run
-	OpD2_S10_Query_Loop_Turn    = telemetry.OpD2_S10_Query_Loop_Turn
-	OpD2_S10_Query_Loop_LLM_Call = telemetry.OpD2_S10_Query_Loop_LLM_Call
-)
-
 // Constants — D2 Context Engine - Tool Execution (D2-S5)
 
 const (

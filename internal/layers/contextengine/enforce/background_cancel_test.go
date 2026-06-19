@@ -6,37 +6,26 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/query"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// blockingLLM blocks on ctx.Done() then emits a final chunk.
-type blockingLLM struct {
-	query.SequentialLLM // not actually used; required to keep call site clean
-	started             chan struct{}
-	once                bool
+type blockingSubTurn struct {
+	started chan struct{}
+	once    bool
 }
 
-func newBlockingLLM() *blockingLLM {
-	return &blockingLLM{started: make(chan struct{})}
+func newBlockingSubTurn() *blockingSubTurn {
+	return &blockingSubTurn{started: make(chan struct{})}
 }
 
-func (b *blockingLLM) Call(ctx context.Context, _ query.LLMRequest) (<-chan query.LLMChunk, error) {
-	ch := make(chan query.LLMChunk, 1)
-	go func() {
-		defer close(ch)
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-		if !b.once {
-			b.once = true
-			close(b.started)
-		}
-		<-ctx.Done()
-	}()
-	return ch, nil
+func (b *blockingSubTurn) RunSubTurn(ctx context.Context, _ contracts.SubTurnRequest) (*contracts.SubTurnResult, error) {
+	if !b.once {
+		b.once = true
+		close(b.started)
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
 }
 
 // D2-S9-A01-T16: stop running task → cancelled (idempotent).
@@ -69,13 +58,14 @@ func TestBackgroundRegistry_Cancel_running_task_marks_cancelled(t *testing.T) {
 
 // D2-S9-A01-T19: cancel 后 SessionQueue 不发 completed notification (tombstone 协议).
 func TestRunBackground_cancel_suppresses_completed_notification(t *testing.T) {
-	llm := newBlockingLLM()
-	loop := &query.Loop{LLM: llm, Permission: query.AllowPermission{}}
+	subTurn := newBlockingSubTurn()
 	reg := enforce.NewBackgroundRegistry()
 	sq := newTestSessionQueue()
 	parent := &types.SessionContext{SessionID: "sess_cancel", Model: "test"}
 
-	taskID, err := enforce.RunBackground(context.Background(), enforce.LoopDeps{Loop: loop}, enforce.SubQueryParams{
+	taskID, err := enforce.RunBackground(context.Background(), enforce.SubQueryDeps{
+		SubTurn: subTurn,
+	}, enforce.SubQueryParams{
 		ParentSC:       parent,
 		AgentID:        "explore_slow",
 		AgentName:      "Slow",
@@ -89,7 +79,7 @@ func TestRunBackground_cancel_suppresses_completed_notification(t *testing.T) {
 
 	// wait for goroutine to start
 	select {
-	case <-llm.started:
+	case <-subTurn.started:
 	case <-time.After(2 * time.Second):
 		t.Fatal("background goroutine never started")
 	}

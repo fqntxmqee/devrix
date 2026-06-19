@@ -9,22 +9,22 @@ import (
 )
 
 // FastPath is a zero-allocation proxy that forwards a ProcessRequest to
-// D2.RunQueryLoop and returns its event stream.
+// TurnExecutor.RunTurn and returns its event stream.
 //
 // The "≤2ms added latency" target is the P99 of Classify completion → first
-// emit of any EngineEvent from the D2.RunQueryLoop channel. The proxy itself
+// emit of any EngineEvent from the RunTurn channel. The proxy itself
 // does not introduce allocations beyond a single channel buffer.
 //
 // v1.0 metrics: orchestration.fast_path.count (counter).
 type FastPath struct {
 	cfg      *Config
-	executor QueryLoopExecutor
+	executor TurnExecutor
 	sink     EventPublisher
 }
 
 // NewFastPath builds the proxy. executor is required; sink is optional
 // (nil sink → events flow only to the returned channel).
-func NewFastPath(cfg *Config, executor QueryLoopExecutor, sink EventPublisher) *FastPath {
+func NewFastPath(cfg *Config, executor TurnExecutor, sink EventPublisher) *FastPath {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
@@ -40,7 +40,7 @@ func NewFastPath(cfg *Config, executor QueryLoopExecutor, sink EventPublisher) *
 // the decision.
 func (fp *FastPath) Run(ctx context.Context, req ProcessRequest, systemPrompt string) (<-chan *contracts.EngineEvent, error) {
 	if fp.executor == nil {
-		return nil, fmt.Errorf("orchestrator: FastPath requires a QueryLoopExecutor")
+		return nil, fmt.Errorf("orchestrator: FastPath requires a TurnExecutor")
 	}
 	qreq := QueryRequest{
 		SessionID:    req.SessionID,
@@ -48,9 +48,9 @@ func (fp *FastPath) Run(ctx context.Context, req ProcessRequest, systemPrompt st
 		Messages:     []types.Message{{Role: "user", Content: req.Message}},
 		MaxTurns:     8,
 	}
-	out, err := fp.executor.RunQueryLoop(ctx, qreq)
+	out, err := fp.executor.RunTurn(ctx, qreq)
 	if err != nil {
-		return nil, fmt.Errorf("orchestrator: FastPath.RunQueryLoop: %w", err)
+		return nil, fmt.Errorf("orchestrator: FastPath.RunTurn: %w", err)
 	}
 	return out, nil
 }
