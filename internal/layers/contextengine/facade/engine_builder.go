@@ -3,6 +3,8 @@ package facade
 import (
 	"log/slog"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
@@ -11,7 +13,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
-	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -82,6 +83,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		surfaces:            deps.Surfaces,
 		filters:             deps.Filters,
 		prepareOrchestrator: nil, // wired in wirePrepareOrchestrator after construction
+		persistOrchestrator: nil, // wired in wirePersistOrchestrator after construction
 	}
 }
 
@@ -110,5 +112,21 @@ func (e *ContextEngine) wirePrepareOrchestrator() {
 		MemoryRecaller:  recaller,
 		Compressor:      compressor,
 		PromptAssembler: assemblerAdapter,
+	})
+}
+
+// wirePersistOrchestrator builds the persist.PersistOrchestrator with facade
+// adapters for snapshot / transcript / long-term / commit-window (P1-e).
+//
+// Called lazily on first Process() to defer allocation until actually needed.
+func (e *ContextEngine) wirePersistOrchestrator() {
+	if e.persistOrchestrator != nil {
+		return
+	}
+	e.persistOrchestrator = persist.NewPersistOrchestrator(persist.PersistDeps{
+		SnapshotPersister: newSnapshotAdapter(e),
+		TranscriptWriter:  newTranscriptAdapter(e),
+		LongTermStorer:    newLongTermAdapter(e),
+		CommitWindow:      newCommitWindowAdapter(e),
 	})
 }

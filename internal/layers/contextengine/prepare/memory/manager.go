@@ -6,20 +6,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // Manager manages in-memory session contexts and persistence.
 type Manager struct {
-	mu          sync.RWMutex
-	messagesMu  sync.RWMutex // protects sc.Messages concurrent reads/writes
-	contexts    map[string]*types.SessionContext
-	store       *snapshot.Store
-	cfg         *config.ContextEngineConfig
-	longTerm    ILongTermMemory
+	mu         sync.RWMutex
+	messagesMu sync.RWMutex // protects sc.Messages concurrent reads/writes
+	contexts   map[string]*types.SessionContext
+	store      *snapshot.Store
+	cfg        *config.ContextEngineConfig
+	longTerm   ILongTermMemory
 }
 
 // NewManager creates a memory manager.
@@ -109,10 +109,10 @@ func (m *Manager) LoadOrInit(session *types.Session, systemPrompt string) (*type
 	} else {
 		max, reserved, toolResult, target, snipTarget := m.cfg.ToTokenBudget()
 		sc = &types.SessionContext{
-			SessionID:    session.SessionID,
-			WorkDir:      session.WorkDir,
-			Model:        session.Model,
-			Messages:     []types.Message{},
+			SessionID: session.SessionID,
+			WorkDir:   session.WorkDir,
+			Model:     session.Model,
+			Messages:  []types.Message{},
 			TokenBudget: types.TokenBudget{
 				MaxContextTokens:  max,
 				ReservedOutput:    reserved,
@@ -231,6 +231,13 @@ func (m *Manager) PersistSnapshot(sc *types.SessionContext) ([]byte, error) {
 		return data, nil
 	}
 	return data, nil
+}
+
+// WriteSnapshotBytes writes already-serialized snapshot bytes to disk.
+// Used by persist.Orchestrator when the snapshot was serialized upstream
+// (e.g. by facade memory.PersistSnapshot).
+func (m *Manager) WriteSnapshotBytes(sessionID string, data []byte) error {
+	return m.store.WriteBackup(sessionID, data)
 }
 
 // Get returns cached context.

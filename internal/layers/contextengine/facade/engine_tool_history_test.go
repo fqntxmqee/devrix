@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -14,8 +14,8 @@ func TestEngineToolHistorySync_should_not_duplicate_tool_messages_without_call_i
 	cfg := config.DefaultContextEngineConfig()
 	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
 	sc := &types.SessionContext{
-		SessionID: "sess_tool_hist",
-		Messages:  []types.Message{{Role: types.MessageRoleUser, Content: "first"}},
+		SessionID:   "sess_tool_hist",
+		Messages:    []types.Message{{Role: types.MessageRoleUser, Content: "first"}},
 		TokenBudget: types.DefaultTokenBudget(),
 	}
 

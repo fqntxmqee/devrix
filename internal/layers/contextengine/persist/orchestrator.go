@@ -10,6 +10,8 @@ package persist
 
 import (
 	"context"
+
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // PersistDeps bundles dependencies for the persist orchestration.
@@ -17,6 +19,8 @@ type PersistDeps struct {
 	SnapshotPersister SnapshotPersister
 	TranscriptWriter  TranscriptWriter
 	LongTermStorer    LongTermStorer
+	// CommitWindow runs A04 trim/compress logic. Optional; nil disables A04.
+	CommitWindow CommitWindowRunner
 }
 
 // PersistInput carries the inputs for a persist orchestration run.
@@ -28,6 +32,9 @@ type PersistInput struct {
 	Query            string
 	AssistantSummary string
 	IsWorker         bool
+	// SessionContext is the in-memory session state; passed to A04 CommitWindow.
+	// When nil, A04 is skipped.
+	SessionContext *types.SessionContext
 }
 
 // PersistOrchestrator orchestrates the D2-S17 PersistSessionState scenario.
@@ -43,7 +50,16 @@ func NewPersistOrchestrator(deps PersistDeps) *PersistOrchestrator {
 }
 
 // Persist runs the full PersistSessionState pipeline.
+//
+// Order: A04 CommitWindow → A01 Snapshot → A02 Transcript → A03 LongTerm.
+// A04 runs first so the snapshot captures the trimmed view.
 func (o *PersistOrchestrator) Persist(ctx context.Context, input PersistInput) error {
+	if !input.IsWorker && o.deps.CommitWindow != nil && input.SessionContext != nil {
+		if _, err := o.deps.CommitWindow.RunCommitWindow(ctx, input.SessionContext); err != nil {
+			return err
+		}
+	}
+
 	if len(input.SnapshotData) > 0 && o.deps.SnapshotPersister != nil {
 		if err := o.deps.SnapshotPersister.Persist(input.SnapshotData, input.SessionID); err != nil {
 			return err

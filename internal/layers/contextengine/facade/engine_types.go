@@ -6,6 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
@@ -82,6 +83,10 @@ type ContextEngine struct {
 	// to replace the legacy inline engine_prepare.go helpers. Built lazily
 	// on first Process() via wirePrepareOrchestrator().
 	prepareOrchestrator *prepare.PrepareOrchestrator
+	// persistOrchestrator is the D2-S17 scenario orchestrator wired in P1-e
+	// to replace the legacy finalizeTurn helpers in engine_persist.go. Built
+	// lazily on first Process() via wirePersistOrchestrator().
+	persistOrchestrator *persist.PersistOrchestrator
 	// surfaces and filters are the new TOOL-SURFACE-1 fields (W8).
 	// nil in phase 1 means the legacy Tools/ToolsReg path is still in
 	// use; non-nil enables the surface dispatch path in W9.

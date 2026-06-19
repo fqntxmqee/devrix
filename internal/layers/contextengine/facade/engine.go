@@ -122,6 +122,12 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	// prompt → CompressedView wrap (AfterPrepare hook).
 	e.wirePrepareOrchestrator()
 
+	// P1-e: persist orchestrator handles A01-A04 persistence (snapshot,
+	// transcript, long-term store, CommitWindow). Wired lazily so unit tests
+	// that exercise Process() without going through D7 InitOrchestration
+	// still get a working persist path.
+	e.wirePersistOrchestrator()
+
 	workerLocal := false
 	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
 		workerLocal = true
@@ -244,5 +250,5 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		}
 	}
 
-	e.finalizeTurn(ctx, session, sc, loopResult, runErr, working, message, workerLocal, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
+	e.persistTurn(ctx, session, sc, loopResult, runErr, working, message, workerLocal, transcriptFrom, pendingComplete, ch, emit, processSpan, start)
 }

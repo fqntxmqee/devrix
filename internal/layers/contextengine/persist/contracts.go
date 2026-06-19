@@ -41,5 +41,13 @@ type MessageStore interface {
 	TrimMessages(sc *types.SessionContext)
 }
 
+// CommitWindowRunner executes the A04 CommitWindow logic (D2-S17-A04).
+// Implementations typically wrap a compression pipeline + message store.
+//
+// DSAFT: D2-S17-A04 (CommitWindow)
+type CommitWindowRunner interface {
+	RunCommitWindow(ctx context.Context, sc *types.SessionContext) (types.CompressionReport, error)
+}
+
 // SessionBootstrap lazily initializes a session for first-write persist paths.
 type SessionBootstrap func(sessionID string) (*types.SessionContext, error)
