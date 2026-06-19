@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/sandbox"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/sandbox"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
