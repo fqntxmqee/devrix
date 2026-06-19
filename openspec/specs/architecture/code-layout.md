@@ -90,16 +90,20 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | S ID          | Scenario                | scenario-slug         | 目标路径                                 | 当前路径（迁移中）                          |
 | ------------- | ----------------------- | --------------------- | ------------------------------------ | ---------------------------------- |
 | D7-S1         | Work Model              | `workmodel`           | `orchestration/workmodel/`           | ✅ DM-012                           |
-| D7-S2         | Session Orchestrator    | `sessionorchestrator` | `orchestration/sessionorchestrator/` | `orchestration/coordinator/`       |
-| D7-S3         | Wave Scheduler          | `wavescheduler`       | `orchestration/wavescheduler/`       | `orchestration/wave/`              |
-| D7-S4         | Execution Flow          | `executionflow`       | `orchestration/executionflow/`       | `flow/`, `workplan/`, `imsink/`    |
-| D7-S5         | Decision & Planning     | `decisionplanning`    | `orchestration/decisionplanning/`    | `coordinator/classifier*`          |
+| D7-S2         | Session Orchestrator    | `sessionorchestrator` | `orchestration/sessionorchestrator/` | ✅ DM-20260619-005                  |
+| D7-S3         | Wave Scheduler          | `wavescheduler`       | `orchestration/wavescheduler/`       | ✅ DM-20260619-005                  |
+| D7-S4         | Execution Flow          | `executionflow`       | `orchestration/executionflow/`       | ✅ DM-20260619-005                  |
+| D7-S5         | Decision & Planning     | `decisionplanning`    | `orchestration/decisionplanning/`    | ✅ DM-20260619-005                  |
+| —             | Hub-Spoke dispatch (S2) | —                     | `sessionorchestrator/dispatch.go`    | ✅ DM-20260619-005（自 `hubspoke/`） |
+| —             | Hub-Spoke bridge (S4)   | `bridge`              | `executionflow/bridge/`              | ✅ DM-20260619-005（自 `hubspoke/`） |
+| —             | Legacy shim             | `coordinator`         | `orchestration/coordinator/`         | 🔶 1-release aliases only           |
+| —             | Legacy shim             | `hubspoke`            | `orchestration/hubspoke/`            | 🔶 1-release aliases only           |
 | —             | Worker tool policy F    | `toolpolicy`          | `orchestration/toolpolicy/`          | ✅ DM-015                           |
 | —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
 | —             | Session command queue F | `sessionqueue`        | `orchestration/sessionqueue/`        | ✅ DM-013                           |
 | —             | Milestone DAG           | `milestone`           | `orchestration/milestone/`           | ✅ 已迁入                              |
-| **D7-S2-A06** | **RunTurnLoop**         | `turn`                | `orchestration/turn/orchestrator.go` | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
-| **D7-S2-A07** | **InvokeLLM**           | `turn`                | `orchestration/turn/llm.go`          | **⬜ v2.0-a（DM-020 v1.0 Registry）** |
+| **D7-S2-A06** | **RunTurnLoop**         | `turn`                | `orchestration/turn/orchestrator.go` | ✅ DM-020                           |
+| **D7-S2-A07** | **InvokeLLM**           | `turn`                | `orchestration/turn/llm.go`          | ✅ DM-020                           |
 
 > **DM-020 bootstrap 注释（v1.0 Registry / v2.0-b 实施）：** `bootstrap/main.go` 目标接线：
 > 

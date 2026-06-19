@@ -339,7 +339,8 @@ func (c *PlanCLICommands) Handle(args []string, sessionID, workDir string, tools
 	case "show":
 		return c.show()
 	default:
-		return fmt.Sprintf("Unknown subcommand: %s\n%s", args[0], c.help())
+		// /plan <goal> — treat unrecognized first token as goal text.
+		return c.enter(args, sessionID)
 	}
 }
 

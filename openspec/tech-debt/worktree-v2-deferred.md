@@ -1,7 +1,7 @@
 # Tech Debt: Unified Work Tree v2.1+ Deferred Items
 
 **TD ID:** TD-WT-DEF
-**Status:** OPEN
+**Status:** PARTIAL CLOSED (TD-WT-02/03 closed DM-20260619-005; TD-WT-01/04/05/06 remain OPEN)
 **Severity:** Low–Medium（功能已可用；遗留为演进与清理债）
 **Created:** 2026-06-18
 **Owner:** —（待指派）

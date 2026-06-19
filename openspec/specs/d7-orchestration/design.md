@@ -3,15 +3,16 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 2.3.0
+**Version:** 3.0.0
 **Status:** Active
-**Last Updated:** 2026-06-16
+**Last Updated:** 2026-06-19
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
 **Wave 设计参考:** `openspec/changes/devrix-wave-scheduler/design.md`
 
-> **实现说明（2026-06-16）：** D7-S3/S4 在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；D7-S2 SessionOrchestrator + Turn Leader（A06/A07）在 `coordinator/` + `turn/` 落地；D7-S5 ClassifyIntent/ShadowClassifier/LLM Decomposer 在 `coordinator/` 落地；D7-S1 WorkModel + D7-S5 PlanMode 已迁入 `orchestration/workmodel/`（v1.1 完成）。v1.2 + v2.0-b/c/f 全部闭环，t-registry 66/66 IMPLEMENTED。
+> **实现说明（2026-06-19）：** D7 v2.0 Structure 落地（DM-20260619-005）：S2→`sessionorchestrator/`、S3→`wavescheduler/`、S4→`executionflow/{hub,workplan,imsink,bridge}/`、S5→`decisionplanning/`；`coordinator/` 与 `hubspoke/` 保留 type-alias shim；`orchtypes/` 承载共享 Config/Intent 类型；WorkTree TD-WT-02/03 部分闭合。Turn Leader 仍在 `turn/`。t-registry 66/66 IMPLEMENTED 保持。
 
 ---
 
@@ -122,7 +123,7 @@ D7 是**横向协调层**：D1 拥有 ingress，D7 拥有 routing decision；通
 | WorkerPool 峰值并发 | ≤5（1+1+3 slots） | `scheduler_test.go` ORCH-S2-T10 ✅ |
 | 槽位释放后立即重派发 | <1 dispatch loop tick | `scheduler_test.go` ORCH-S2-T15 ✅ |
 | FlowEvent 双通道延迟 | 同步 Apply + 异步 IM | `hub_test.go` ✅ |
-| D7 快速路径开销（规划） | ≤2ms vs 直连 D2 | 未实现（T02a+T02b+T02c） |
+| D7 快速路径开销（规划） | ≤2ms vs 直连 D2 | `orchestrator_test.go` D7-S2-T02c ✅ |
 | QueryLoop 行数（规划） | ≤200 行 | 当前 414 行 |
 
 ### 约束条件
@@ -224,7 +225,7 @@ Plan Engine / delegate_tools
 ```mermaid
 graph TB
     subgraph D7_Orchestration["D7 Orchestration Domain"]
-        subgraph S1["D7-S1 Work Model (PARTIAL)"]
+        subgraph S1["D7-S1 Work Model (IMPLEMENTED)"]
             Task["Task"]
             PlanMode["PlanMode"]
         end
@@ -262,11 +263,11 @@ graph TB
 
 | 实体 | 归属 | 生命周期 | 持久化 |
 |------|------|----------|--------|
-| `Task` | D7-S1（现 D2） | pending → in_progress → completed/failed | DiskStore (v2 mode) |
-| `TaskNode` | D7-S3 | pending → running → completed/failed/cancelled | 内存（Plan Engine 输入） |
+| `Task` | D7-S1 | pending → in_progress → completed/failed | DiskStore (v2 mode) via `workmodel/` |
+| `TaskNode` | D7-S3 | pending → running → completed/failed/cancelled | WorkTree 投影（TD-WT-02；非独立 SoT） |
 | `FlowEvent` | D7-S4 | append-only 事件流 | 内存 ring buffer (RecentEvents) |
 | `Artifact` | D7-S3 | 写入于 worker terminal | 内存 ArtifactStore |
-| `PlanMode` | D7-S5 | inactive → active → pending_approval → inactive | 会话内存 |
+| `PlanMode` | D7-S1 | inactive → active → pending_approval → inactive | 会话内存（`workmodel/plan_mode.go`） |
 
 ### TaskNode 关键字段
 

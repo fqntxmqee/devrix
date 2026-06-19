@@ -3,11 +3,11 @@ package workmodel
 import (
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
 // SyncWaveNodes writes wave TaskNodes into the work tree under a batch root.
-func (m *TaskManager) SyncWaveNodes(sessionID string, nodes []wave.TaskNode) (batchRootID string, err error) {
+func (m *TaskManager) SyncWaveNodes(sessionID string, nodes []wavescheduler.TaskNode) (batchRootID string, err error) {
 	if m == nil || len(nodes) == 0 {
 		return "", nil
 	}
@@ -50,9 +50,9 @@ func (m *TaskManager) SyncWaveNodes(sessionID string, nodes []wave.TaskNode) (ba
 }
 
 // WaveNodesFromSubtree projects ready implement items to wave TaskNodes.
-func (m *TaskManager) WaveNodesFromSubtree(sessionID, batchRootID string) []wave.TaskNode {
+func (m *TaskManager) WaveNodesFromSubtree(sessionID, batchRootID string) []wavescheduler.TaskNode {
 	subtree := m.tree.ListSubtree(sessionID, batchRootID)
-	var nodes []wave.TaskNode
+	var nodes []wavescheduler.TaskNode
 	for _, item := range subtree {
 		if item == nil || item.Kind != WorkKindImplement {
 			continue
@@ -60,12 +60,12 @@ func (m *TaskManager) WaveNodesFromSubtree(sessionID, batchRootID string) []wave
 		if item.Status != TaskStatusPending {
 			continue
 		}
-		nodes = append(nodes, wave.TaskNode{
+		nodes = append(nodes, wavescheduler.TaskNode{
 			ID:            item.ID,
 			Title:         item.Title,
 			Directive:     item.Directive,
-			WorkerType:    wave.WorkerSubAgent,
-			ContextPolicy: wave.ContextFresh,
+			WorkerType:    wavescheduler.WorkerSubAgent,
+			ContextPolicy: wavescheduler.ContextFresh,
 			DependsOn:     append([]string(nil), item.BlockedBy...),
 			Metadata:      map[string]any{"work_item_id": item.ID},
 		})

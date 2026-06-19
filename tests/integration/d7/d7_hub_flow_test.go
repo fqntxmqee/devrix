@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/flow"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/hub"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/tests/testutil"
@@ -22,9 +22,9 @@ func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 		t.Fatal("expected task")
 	}
 
-	hub, ok := stack.FlowHub.(*flow.Hub)
+	hub, ok := stack.FlowHub.(*hub.Hub)
 	if !ok {
-		t.Fatalf("expected wired flow.Hub, got %T", stack.FlowHub)
+		t.Fatalf("expected wired hub.Hub, got %T", stack.FlowHub)
 	}
 	_ = hub
 

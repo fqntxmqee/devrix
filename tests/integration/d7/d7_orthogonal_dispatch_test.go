@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
-	"github.com/devrix/devrix/internal/layers/orchestration/wave"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -109,7 +109,7 @@ func TestIntegration_D7ProcessMessage_FastPathUsesLLM(t *testing.T) {
 func TestIntegration_D7ProcessMessage_OrchestratePathDispatchesToScheduler(t *testing.T) {
 	stub := &testutil.D7LLMStub{Response: "should-not-be-called"}
 	fake := &fakeWaveScheduler{
-		artifacts: []wave.Artifact{{
+		artifacts: []wavescheduler.Artifact{{
 			TaskID:    "task_1",
 			SessionID: "sess",
 			Summary:   "fake artifact summary",
@@ -175,10 +175,10 @@ type fakeWaveScheduler struct {
 	mu         sync.Mutex
 	startCount int
 	waitCount  int
-	artifacts  []wave.Artifact
+	artifacts  []wavescheduler.Artifact
 }
 
-func (f *fakeWaveScheduler) Start(_ context.Context, sessionID string, _ *wave.TaskGraph) error {
+func (f *fakeWaveScheduler) Start(_ context.Context, sessionID string, _ *wavescheduler.TaskGraph) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.startCount++
@@ -186,7 +186,7 @@ func (f *fakeWaveScheduler) Start(_ context.Context, sessionID string, _ *wave.T
 	return nil
 }
 
-func (f *fakeWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wave.Artifact, error) {
+func (f *fakeWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wavescheduler.Artifact, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.waitCount++

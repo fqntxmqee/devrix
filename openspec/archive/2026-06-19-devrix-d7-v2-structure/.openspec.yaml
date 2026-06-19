@@ -1,0 +1,10 @@
+change_id: devrix-d7-v2-structure
+priority: P0
+demand_id: DM-20260619-005
+status: s7_archived
+domains: [D7]
+dsaft_scenarios: [D7-S1, D7-S2, D7-S3, D7-S4, D7-S5]
+version_scope:
+  v2.0-structure: "物理路径对齐 S 层 + coordinator/hubspoke shim + WorkTree TD-WT-02/03 部分闭合"
+t_points:
+  reuse: "66/66 IMPLEMENTED — T ID 不变，测试随实现迁移"

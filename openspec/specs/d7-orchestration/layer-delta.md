@@ -2,17 +2,15 @@
 
 **Change ID:** devrix-d7-orchestration-domain → current
 **Affects:** orchestration, contextengine/tasks, gateway entry, query loop
-**Version:** 3.0.0
+**Version:** 4.0.0
 **Status:** Active
-**Last Updated:** 2026-06-16
+**Last Updated:** 2026-06-19
 
 ---
 
 ## Current State Summary
 
-D7 编排域 **v1.0 + v1.1 + v1.2 + v2.0-b/c/f 全部闭环**：WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）在 `internal/layers/orchestration/{wave,flow,workplan,imsink}/` 完整实现；Session Orchestrator（D7-S2）+ ClassifyIntent/ShadowClassifier + LLM Decomposer（D7-S5）在 `internal/layers/orchestration/coordinator/` 落地（package `coordinator`）；Turn Leader（D7-S2-A06/A07）在 `internal/layers/orchestration/turn/` 完整实现；D1 主入口通过 `bootstrap/wire_coordinator.go` 的 `WireD7` 函数切换至 `coordinator.Entry.ProcessMessage`（`d7.enabled=true` 激活）。
-
-D2 Loop 已瘦身至 170 行（LoopHooks 结构体删除，4 个编排字段迁出：`PlanMode`/`TaskManager`/`Orchestration`/`Hub`）；Task/Plan 写模型已迁入 `orchestration/workmodel/`；t-registry 3.0.0 全部 66 个 T 点 IMPLEMENTED。
+D7 编排域 **v2.0 Structure 闭环**（DM-20260619-005）：物理路径与 S 层 1:1 对齐——S2 `sessionorchestrator/`、S3 `wavescheduler/`、S4 `executionflow/{hub,workplan,imsink,bridge}/`、S5 `decisionplanning/`；`coordinator/` 与 `hubspoke/` 保留 1-release type-alias shim；`orchtypes/` 承载共享 Config/Intent 类型。WaveScheduler（D7-S3）+ ExecutionFlowHub（D7-S4）完整实现；Session Orchestrator（D7-S2）+ Turn Leader（A06/A07）在 `sessionorchestrator/` + `turn/`；ClassifyIntent/ShadowClassifier/LLM Decomposer（D7-S5）在 `decisionplanning/`；D1 主入口经 `sessionorchestrator.Entry.ProcessMessage`（`coordinator.Entry` shim，`bootstrap/wire_coordinator.go::WireD7`）。WorkTree TD-WT-02/03 部分闭合；t-registry 66/66 IMPLEMENTED。
 
 ### S 层博弈角色（切法 A — 按用户价值流）
 
@@ -34,7 +32,7 @@ D2 Loop 已瘦身至 170 行（LoopHooks 结构体删除，4 个编排字段迁�
 
 `WaveScheduler` MUST provide DAG scheduling with 5-slot WorkerPool, ConflictGuard, and three ContextPolicy modes.
 
-**Package:** `internal/layers/orchestration/wave/`
+**Package:** `internal/layers/orchestration/wavescheduler/`
 **DSAFT:** D7-S3-A01 ScheduleWave, D7-S3-A02 ResolveWorkerContext, D7-S3-A03 GuardConflict
 
 #### Scenario: Peak concurrency capped at 5
@@ -63,7 +61,7 @@ D2 Loop 已瘦身至 170 行（LoopHooks 结构体删除，4 个编排字段迁�
 
 `Hub` MUST implement `contracts.ExecutionFlowHub` with WorkPlan aggregation and dual-channel fan-out.
 
-**Package:** `internal/layers/orchestration/flow/hub.go`
+**Package:** `internal/layers/orchestration/executionflow/hub/hub.go`
 
 #### Scenario: WorkPlan snapshot includes flows
 
@@ -212,6 +210,34 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 ---
 
+## v2.0-Structure（DM-20260619-005）— IMPLEMENTED
+
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| A | 规格同步（design/layer-delta/d7-boundary/code-layout/a-registry） | ✅ |
+| B1 | `wave/` → `wavescheduler/` | ✅ |
+| B2 | S4 收敛 `executionflow/{hub,workplan,imsink}/` | ✅ |
+| B3 | `coordinator` 拆 `sessionorchestrator` + `decisionplanning` + `orchtypes` | ✅ |
+| B4 | `hubspoke` 拆 dispatch→S2、bridge→S4 | ✅ |
+| C | WorkTree TD-WT-02/03 部分闭合 | ✅ PARTIAL |
+
+**Shim（1 release）：** `coordinator/aliases.go`、`hubspoke/aliases.go` 重导出类型与构造函数；新代码应直接 import 目标包。
+
+---
+
+## HISTORICAL（PLANNED 已闭合）
+
+以下条目在 v1.x 标为 PLANNED/PARTIAL，v2.0 Structure 后归入 HISTORICAL：
+
+| 项 | 原状态 | 现态 |
+|----|--------|------|
+| D7-S2/S5 同包 `coordinator/` | PLANNED 拆分 | ✅ 已拆至 sessionorchestrator + decisionplanning |
+| `wave/` / `flow/` Legacy 路径 | 迁移中 | ✅ 已迁至 wavescheduler / executionflow |
+| hubspoke 整包 | 待拆分 | ✅ dispatch→S2，bridge→S4 |
+| TaskNode 独立 SoT | PARTIAL | 🔶 TD-WT-02 投影化（TD-WT-01/04/05/06 defer） |
+
+---
+
 ## Migration Checklist (D7 v1.0 — Review R1)
 
 | Phase | 内容 | 状态 |
@@ -246,7 +272,8 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 | 2.4.0 | 2026-06-14 | SynthesizeTaskGraph 规则版实现 (D7-S5-A02)；Phase H 全部完成 |
 | 2.5.0 | 2026-06-14 | v1.1 全部完成：DiskStore 持久化、SelectExecutor、LLM fallback、LLM-based 拆解 |
 | 2.6.0 | 2026-06-15 | DM-020 Turn Leader wired + Hub-Spoke SoT + D2 Thin 进行中 |
-| 3.0.0 | 2026-06-16 | **v1.2 + v2.0-b/c/f 全部闭环**：(1) Task 写模型已迁入 `workmodel/`，D2 托管标注清除；(2) S 层表补 D7-S1 State Authority；(3) D7-S2 Turn Leader 角色补登；(4) Task Model Trinity PARTIAL→DONE；(5) D2 Thin 标注 170 行最终态；(6) Phase N 闭环 |
+| 3.0.0 | 2026-06-16 | **v1.2 + v2.0-b/c/f 全部闭环** |
+| **4.0.0** | **2026-06-19** | **v2.0 Structure（DM-20260619-005）**：物理路径对齐 S 层；coordinator/hubspoke shim；WorkTree TD-WT-02/03 部分闭合 |
 
 ---
 

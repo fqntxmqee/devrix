@@ -1,30 +1,30 @@
 # 任务规划系统设计
 
 **文档类型:** 详细架构设计
-**Domain:** D7-S1 / D7-S5（现行托管 D2 `contextengine/tasks/`）
+**Domain:** D7-S1（`workmodel/`）；PlanAgent 编排面 D7-S5（`decisionplanning/` 消费）
 **Change ID:** devrix-task-planning
-**版本:** 2.1.0
-**状态:** Active — IMPLEMENTED (PlanMode + TaskManager)
-**Last Updated:** 2026-06-14
+**版本:** 2.2.0
+**状态:** Active — IMPLEMENTED (PlanMode + TaskManager in D7 workmodel)
+**Last Updated:** 2026-06-19
 **对标:** Claude Code Plan Mode
 **关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`, `demand.md` (DM-20260613-001)
 
 ---
 
-## 实现状态（2026-06-14）
+## 实现状态（2026-06-19）
 
 | 组件 | 状态 | 代码位置 |
 |------|------|----------|
-| TaskManager | ✅ | `contextengine/tasks/task_manager.go` |
-| DiskStore (v2) | ✅ | `contextengine/tasks/disk_store.go` |
-| PlanMode 状态机 | ✅ | `contextengine/tasks/plan_mode.go` |
-| PlanAgent 只读探索 | ✅ | `contextengine/tasks/plan_agent.go` |
-| VerificationAgent | 🔶 设计完成 | `contextengine/tasks/verification_agent.go`（若存在） |
-| CLI `/task` `/plan` | ✅ | `contextengine/tasks/cli_commands.go` |
-| D7-S5 ClassifyIntent | ✅ | `orchestration/coordinator/classifier.go` |
-| D7-S1 CreateWorkPlan | ⬜ | v1.1 计划（v1.0 仍由 `contextengine/tasks/` 托管） |
+| TaskManager | ✅ | `orchestration/workmodel/task_manager.go` |
+| DiskStore (v2) | ✅ | `orchestration/workmodel/task_store.go` |
+| PlanMode 状态机 | ✅ | `orchestration/workmodel/plan_mode.go` |
+| PlanAgent 只读探索 | ✅ | `orchestration/workmodel/plan_agent.go` |
+| VerificationAgent | 🔶 设计完成 | 待独立 change |
+| CLI `/task` `/plan` | ✅ | `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` |
+| D7-S5 ClassifyIntent | ✅ | `orchestration/decisionplanning/classifier.go` |
+| D7-S1 CreateWorkPlan | ✅ | `sessionorchestrator/workmodel.go` + `workmodel/plan_mode.go` |
 
-> **迁移说明：** 本模块目标迁入 `internal/layers/orchestration/coordinator/`（D7-S1 Work Model + D7-S5 PlanMode），迁移期间保持 D2 包路径。
+> **迁移说明：** Task/Plan 写模型已完全迁入 `internal/layers/orchestration/workmodel/`（DM-012 + DM-20260619-005）。`contextengine/tasks/` 仅为历史 shim。
 
 ---
 
