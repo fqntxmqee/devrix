@@ -7,6 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -77,6 +78,10 @@ type ContextEngine struct {
 	tierResolver        contracts.TierResolver
 	agentRoleToolFilter AgentRoleToolFilter
 	summarizer          contracts.Summarizer
+	// prepareOrchestrator is the D2-S15 scenario orchestrator wired in P1-d
+	// to replace the legacy inline engine_prepare.go helpers. Built lazily
+	// on first Process() via wirePrepareOrchestrator().
+	prepareOrchestrator *prepare.PrepareOrchestrator
 	// surfaces and filters are the new TOOL-SURFACE-1 fields (W8).
 	// nil in phase 1 means the legacy Tools/ToolsReg path is still in
 	// use; non-nil enables the surface dispatch path in W9.

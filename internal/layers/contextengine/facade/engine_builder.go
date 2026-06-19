@@ -5,6 +5,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/adapters"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -53,8 +55,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		}
 	}
 
+	memMgr := memory.NewManager(cfg, store, deps.LongTerm)
+	assembler := prompt.NewSystemPromptAssembler(cfg.Workspace)
+
 	return &ContextEngine{
-		memory:              memory.NewManager(cfg, store, deps.LongTerm),
+		memory:              memMgr,
 		counter:             counter,
 		preparedTurnRunner:  deps.PreparedTurnRunner,
 		prompt:              prompt.NewLoader(&cfg.SystemPrompt),
@@ -66,7 +71,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		tools:               deps.Tools,
 		toolsReg:            toolsReg,
 		permission:          deps.Permission,
-		assembler:           prompt.NewSystemPromptAssembler(cfg.Workspace),
+		assembler:           assembler,
 		mainTranscript:      mainTranscript,
 		attachReg:           attachments.NewRegistry(cfg.Attachments),
 		sessionQueue:        deps.SessionCommandQueue,
@@ -76,5 +81,34 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		summarizer:          summarizer,
 		surfaces:            deps.Surfaces,
 		filters:             deps.Filters,
+		prepareOrchestrator: nil, // wired in wirePrepareOrchestrator after construction
 	}
+}
+
+// wirePrepareOrchestrator builds the prepare.PrepareOrchestrator with the
+// four concrete adapters (P1-b) and registers facade lifecycle hooks
+// (worker fork, permission init, tier resolution, prompt → CompressedView wrap).
+//
+// Called lazily on first Process() to defer allocation until actually needed.
+func (e *ContextEngine) wirePrepareOrchestrator() {
+	if e.prepareOrchestrator != nil {
+		return
+	}
+	hooks := []adapters.HooksOption{
+		adapters.WithSpanStarter(e.startSpan),
+		// Emit is set per-call in runProcess via the emit closure.
+	}
+
+	sessionLoader := adapters.NewSessionLoaderAdapter(e.memory, hooks...)
+	recaller := adapters.NewMemoryRecallerAdapter(e.memory, hooks...)
+	compressor := adapters.NewCompressorAdapter(e.compressionPipeline, hooks...).
+		WithCompressPerTurnSkip(func() bool { return !e.cfg.TurnRuntime.CompressPerTurn })
+	assemblerAdapter := adapters.NewAssemblerAdapter(e.assembler, hooks...)
+
+	e.prepareOrchestrator = prepare.NewPrepareOrchestrator(prepare.PrepareDeps{
+		SessionLoader:   sessionLoader,
+		MemoryRecaller:  recaller,
+		Compressor:      compressor,
+		PromptAssembler: assemblerAdapter,
+	})
 }

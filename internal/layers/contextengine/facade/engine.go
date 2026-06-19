@@ -9,14 +9,13 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
-	"github.com/devrix/devrix/internal/shared/buildinfo"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -117,16 +116,46 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		}
 	}
 
-	sc, ok := e.loadOrInitSession(ctx, session, emit)
-	if !ok {
-		return
-	}
+	// P1-d: scenario orchestrator is the production wired path for
+	// A01-A04. Facade retains responsibility for worker fork, permission
+	// init, tier resolution (AfterLoad hook) and the final
+	// prompt → CompressedView wrap (AfterPrepare hook).
+	e.wirePrepareOrchestrator()
+
 	workerLocal := false
 	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
-		sc = conversation.ForkWorkerSessionContext(sc, ov)
 		workerLocal = true
 	}
-	permission.InitSessionPermission(sc, e.cfg.Permission)
+
+	output, err := e.prepareOrchestrator.Prepare(ctx, prepare.PrepareInput{
+		Session:         session,
+		Message:         message,
+		WorkerLocal:     workerLocal,
+		CompressPerTurn: e.cfg.TurnRuntime.CompressPerTurn,
+	}, e.startSpan)
+	if err != nil {
+		emit(mapProcessError(session.SessionID, err))
+		return
+	}
+
+	sc := output.SessionContext
+	requestID := session.RequestID
+	if !e.memory.AppendUserMessage(sc, requestID, message) {
+		slog.Debug("contextengine: duplicate request skipped", "sessionID", session.SessionID, "requestID", requestID)
+	}
+	transcriptFrom := len(sc.Messages)
+
+	// Worker fork happens AFTER Prepare (facade retains responsibility for
+	// the fork because ForkWorkerSessionContext is a D7-aware concept).
+	if workerLocal {
+		if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
+			sc = conversation.ForkWorkerSessionContext(sc, ov)
+		}
+	}
+
+	if !workerLocal {
+		permission.InitSessionPermission(sc, e.cfg.Permission)
+	}
 	if sc.Model == "" && e.defaultModel != "" {
 		sc.Model = e.defaultModel
 	}
@@ -141,59 +170,14 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 		}
 	}
 
-	memoryEntries, ok := e.recallLongTermMemory(ctx, session.SessionID, message, workerLocal, processSpan, emit)
-	if !ok {
-		return
-	}
-
-	requestID := session.RequestID
-	if !e.memory.AppendUserMessage(sc, requestID, message) {
-		slog.Debug("contextengine: duplicate request skipped", "sessionID", session.SessionID, "requestID", requestID)
-	}
-	transcriptFrom := len(sc.Messages)
-
-	msgs, ok := e.prepareMessages(ctx, sc, session.SessionID, workerLocal, emit)
-	if !ok {
-		return
-	}
-
-	if !workerLocal {
-		omitAgents := e.cfg.UserContext.Mode == "prepend"
-		buildInput := prompt.SystemPromptBuildInput{
-			WorkDir: session.WorkDir,
-			Session: session,
-			Runtime: prompt.ProcessRuntimeContext{
-				SessionID: session.SessionID,
-				RequestID: session.RequestID,
-				UserID:    session.UserID,
-			},
-			AgentsRaw:            agentsRaw,
-			MemoryEntries:        memoryEntries,
-			OmitAgentsFromSystem: omitAgents,
-			RecallMaxTokens:      e.cfg.LongTerm.RecallMaxTokens,
-		}
-		_, buildSpan := e.startSpan(ctx, telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build, tracer.SpanKindInternal)
-		builtPrompt, buildReport := e.assembler.Build(buildInput)
-		if buildSpan != nil {
-			buildSpan.SetAttributes(
-				tracer.Attribute{Key: "system_prompt.total_tokens", Value: fmt.Sprintf("%d", buildReport.TotalTokens)},
-				tracer.Attribute{Key: "system_prompt.memory_truncated", Value: fmt.Sprintf("%t", buildReport.MemoryTruncated)},
-			)
-			buildSpan.SetAttributes(telemetry.GenAIPromptAttrs(
-				buildinfo.Version,
-				buildReport.TemplateHash,
-				buildReport.AgentsMDHash,
-			)...)
-			buildSpan.End()
-		}
-		sc.SystemPrompt = builtPrompt
-	}
-
-	view := append([]types.Message{}, msgs...)
-	if sc.SystemPrompt != "" {
-		view = append([]types.Message{{Role: types.MessageRoleSystem, Content: sc.SystemPrompt}}, view...)
+	// System prompt is now in output.SystemPrompt (built by orchestrator's
+	// AssemblerAdapter). Wrap it into a System-role Message for the LLM view.
+	view := append([]types.Message{}, output.Messages...)
+	if output.SystemPrompt != "" {
+		view = append([]types.Message{{Role: types.MessageRoleSystem, Content: output.SystemPrompt}}, view...)
 	}
 	e.memory.SetCompressedView(sc, view)
+	sc.SystemPrompt = output.SystemPrompt
 
 	working := memory.NewWorkingMemory()
 	var pendingComplete *contracts.EngineEvent
