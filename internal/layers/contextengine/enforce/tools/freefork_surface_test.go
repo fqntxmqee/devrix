@@ -1,8 +1,8 @@
-package toolrunner_test
+package tools_test
 
 // W11 phase 2c migration: free_fork tool 单元测试 now exercises the
 // surface path (FreeForkSurface) instead of the deleted legacy
-// toolrunner.freeforkRunner + toolrunner.SetFreeForker path.
+// tools.freeforkRunner + tools.SetFreeForker path.
 //
 // The semantics are identical: pass a FreeForkerFunc into
 // surface.NewFreeForkSurface, then call surface.Execute. The previous
@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 )
 
 // stubFreeforkFunc 是直接构造给 surface.NewFreeForkSurface 的 stub 函数。
@@ -26,14 +26,14 @@ type stubFreeforkFunc struct {
 	calls  int32
 }
 
-func (s *stubFreeforkFunc) Fork(ctx context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+func (s *stubFreeforkFunc) Fork(ctx context.Context, parentSession string, reqs []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 	n := atomic.AddInt32(&s.calls, 1)
 	if s.failOn > 0 && n == s.failOn {
 		return nil, errors.New("stub: factory failed on request")
 	}
-	handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
+	handles := make([]tools.FreeForkHandleDTO, 0, len(reqs))
 	for i, r := range reqs {
-		handles = append(handles, toolrunner.FreeForkHandleDTO{
+		handles = append(handles, tools.FreeForkHandleDTO{
 			AgentID:  "agent-" + r.Name,
 			SandboxPath: "/wt/" + r.Name,
 			Name:     r.Name,
@@ -43,7 +43,7 @@ func (s *stubFreeforkFunc) Fork(ctx context.Context, parentSession string, reqs 
 	return handles, nil
 }
 
-func executeFreeFork(t *testing.T, forker toolrunner.FreeForkerFunc, input string) (string, string) {
+func executeFreeFork(t *testing.T, forker tools.FreeForkerFunc, input string) (string, string) {
 	t.Helper()
 	s := surface.NewFreeForkSurface(forker)
 	res, err := s.Execute(context.Background(), "free_fork", input, "")

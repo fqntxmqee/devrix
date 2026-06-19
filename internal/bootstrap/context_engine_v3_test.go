@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	persistmemory "github.com/devrix/devrix/internal/layers/contextengine/persist/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -11,9 +11,12 @@ func TestWireContextV3_should_return_longterm_memory(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = true
 
-	longTerm := WireContextV3(ctxCfg)
-	if longTerm == nil {
-		t.Fatal("expected long-term memory instance")
+	recaller, store := WireContextV3(ctxCfg)
+	if recaller == nil {
+		t.Fatal("expected long-term recaller instance")
+	}
+	if store == nil {
+		t.Fatal("expected long-term store instance")
 	}
 }
 
@@ -21,8 +24,8 @@ func TestWireContextV3_should_return_disabled_memory_when_longterm_disabled(t *t
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = false
 
-	longTerm := WireContextV3(ctxCfg)
-	if _, ok := longTerm.(*memory.DisabledLongTermMemory); !ok {
-		t.Fatalf("expected disabled long-term memory, got %T", longTerm)
+	recaller, _ := WireContextV3(ctxCfg)
+	if _, ok := recaller.(*persistmemory.DisabledLongTerm); !ok {
+		t.Fatalf("expected disabled long-term memory, got %T", recaller)
 	}
 }

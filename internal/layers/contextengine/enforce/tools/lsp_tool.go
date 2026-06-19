@@ -1,4 +1,4 @@
-package toolrunner
+package tools
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// LSPConfig 单个 LSP server 注入到 toolrunner 的配置。
+// LSPConfig 单个 LSP server 注入到 tools 的配置。
 type LSPConfig struct {
 	Enabled         bool
 	MaxServers      int
@@ -29,7 +29,7 @@ type lspRunner struct {
 }
 
 // LSPRunnerAlias is an exported wrapper used by the surface package.
-// It is a type alias so callers outside toolrunner can hold a stable
+// It is a type alias so callers outside tools can hold a stable
 // reference to an LSP runner without importing the package-private
 // lspRunner type. (DM-20260617-007 devrix-tool-surface-contract)
 type LSPRunnerAlias = lspRunner

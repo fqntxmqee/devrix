@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/sandbox"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
@@ -82,7 +82,7 @@ func WireDelegate(
 		Tasks:      tm,
 	})
 
-	if reg, ok := toolReg.(*toolrunner.ToolRegistry); ok {
+	if reg, ok := toolReg.(*tools.ToolRegistry); ok {
 		if err := delegatetools.RegisterTools(reg, maCfg); err != nil {
 			slog.Error("register delegate tools", "error", err)
 		}

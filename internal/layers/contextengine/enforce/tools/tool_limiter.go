@@ -1,4 +1,4 @@
-package toolrunner
+package tools
 
 import "context"
 

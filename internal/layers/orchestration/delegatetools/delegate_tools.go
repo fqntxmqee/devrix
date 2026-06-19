@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -27,11 +27,11 @@ const (
 )
 
 // RegisterTools registers hub-spoke delegate tools when enabled.
-func RegisterTools(reg *toolrunner.ToolRegistry, maCfg *config.MultiAgentConfig) error {
+func RegisterTools(reg *tools.ToolRegistry, maCfg *config.MultiAgentConfig) error {
 	if reg == nil || maCfg == nil || !maCfg.Delegate.Enabled {
 		return nil
 	}
-	for _, runner := range []toolrunner.PluginRunner{
+	for _, runner := range []tools.PluginRunner{
 		&delegateToolRunner{name: "delegate_explore", role: WorkerRoleExplore},
 		&delegateToolRunner{name: "delegate_plan", role: WorkerRolePlan},
 		&delegateToolRunner{name: "delegate_implement", role: WorkerRoleImplement},
@@ -53,8 +53,8 @@ func (r *delegateToolRunner) Name() string { return r.name }
 
 func (r *delegateToolRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
-func (r *delegateToolRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (r *delegateToolRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name:        r.name,
 		Description: delegateToolDescription(r.role),
 		Parameters:  delegateToolParameters(),
@@ -86,22 +86,22 @@ func delegateToolDescription(role WorkerRole) string {
 	}
 }
 
-func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*toolrunner.ToolResult, error) {
-	sc := toolrunner.ToolSessionContextFromContext(ctx)
+func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*tools.ToolResult, error) {
+	sc := tools.ToolSessionContextFromContext(ctx)
 	if sc == nil {
-		return &toolrunner.ToolResult{Error: r.name + ": session context unavailable"}, nil
+		return &tools.ToolResult{Error: r.name + ": session context unavailable"}, nil
 	}
 	if sc.IsWorker || sc.AgentID != "" {
-		return &toolrunner.ToolResult{Error: r.name + ": not allowed from worker context"}, nil
+		return &tools.ToolResult{Error: r.name + ": not allowed from worker context"}, nil
 	}
 	disp := globalDeps.Dispatcher
 	if disp == nil {
-		return &toolrunner.ToolResult{Error: r.name + ": dispatcher not configured"}, nil
+		return &tools.ToolResult{Error: r.name + ": dispatcher not configured"}, nil
 	}
-	fields := toolrunner.ParseToolInput(input)
+	fields := tools.ParseToolInput(input)
 	directive := fields["directive"]
 	if directive == "" {
-		return &toolrunner.ToolResult{Error: r.name + ": directive is required"}, nil
+		return &tools.ToolResult{Error: r.name + ": directive is required"}, nil
 	}
 
 	sessionID := sc.SessionID
@@ -128,7 +128,7 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		if runID != "" && runregistry.Global != nil {
 			runregistry.Global.SetTerminal(runID, runregistry.StatusFailed, "", err.Error())
 		}
-		return &toolrunner.ToolResult{Error: err.Error()}, nil
+		return &tools.ToolResult{Error: err.Error()}, nil
 	}
 	if runID != "" && runregistry.Global != nil && !req.Async {
 		st := runregistry.StatusCompleted
@@ -144,7 +144,7 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 	if out == "" && res.Error == nil {
 		out = "(subagent completed without a textual summary)"
 	}
-	return &toolrunner.ToolResult{Output: out}, nil
+	return &tools.ToolResult{Output: out}, nil
 }
 
 type delegateStatusRunner struct{}
@@ -155,8 +155,8 @@ func (r *delegateStatusRunner) Name() string { return "delegate_status" }
 
 func (r *delegateStatusRunner) RiskLevel() types.RiskLevel { return types.RiskLevelLow }
 
-func (r *delegateStatusRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (r *delegateStatusRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name: "delegate_status",
 		Description: "Read the WorkPlan snapshot for this session (running/completed workers, summaries, errors). " +
 			"Use after async delegate_* calls instead of re-delegating blindly; use when the user asks for progress " +
@@ -165,17 +165,17 @@ func (r *delegateStatusRunner) Schema() toolrunner.ToolSchema {
 	}
 }
 
-func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*toolrunner.ToolResult, error) {
-	sc := toolrunner.ToolSessionContextFromContext(ctx)
+func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*tools.ToolResult, error) {
+	sc := tools.ToolSessionContextFromContext(ctx)
 	if sc == nil {
-		return &toolrunner.ToolResult{Error: "delegate_status: session context unavailable"}, nil
+		return &tools.ToolResult{Error: "delegate_status: session context unavailable"}, nil
 	}
 	snap := globalDeps.Dispatcher.Hub().Snapshot(sc.SessionID)
 	data, err := json.Marshal(snap)
 	if err != nil {
-		return &toolrunner.ToolResult{Error: err.Error()}, nil
+		return &tools.ToolResult{Error: err.Error()}, nil
 	}
-	return &toolrunner.ToolResult{Output: string(data)}, nil
+	return &tools.ToolResult{Output: string(data)}, nil
 }
 
 func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.WorkKind) string {

@@ -1,7 +1,7 @@
 package surface
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 )
 
 // BackgroundTaskSurface is a type alias for PluginSurface configured with
@@ -20,6 +20,6 @@ type BackgroundTaskSurface = PluginSurface
 //
 // Passing zero runners is safe — the surface reports "no tools" and
 // returns "unknown tool" for any Execute call.
-func NewBackgroundTaskSurface(runners ...toolrunner.PluginRunner) *BackgroundTaskSurface {
+func NewBackgroundTaskSurface(runners ...tools.PluginRunner) *BackgroundTaskSurface {
 	return NewPluginSurface("background", runners)
 }

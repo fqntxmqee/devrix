@@ -14,17 +14,17 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // BuiltinSurface exposes the file I/O + search tools registered by
-// toolrunner.NewBuiltinToolRegistry (bash, read_file, write_file, edit_file,
+// tools.NewBuiltinToolRegistry (bash, read_file, write_file, edit_file,
 // glob, grep). It is the safe-default surface; per-agent filters typically
 // do not reduce this set (explore/plan/worker all need at least read).
 //
-// The surface is constructed from an existing *toolrunner.ToolRegistry so
+// The surface is constructed from an existing *tools.ToolRegistry so
 // the existing test suite for builtin tools (sandbox, edit, glob, grep) does
 // not need to be rewritten.
 //
@@ -33,19 +33,19 @@ import (
 // CheckPermission returns Allow (no AST enforcement) — this is the
 // graceful-degradation path for unit tests that don't wire the policy.
 type BuiltinSurface struct {
-	reg     *toolrunner.ToolRegistry
+	reg     *tools.ToolRegistry
 	bashAST *BashASTPolicy
 }
 
 // NewBuiltinSurface constructs a surface backed by a tool registry. If reg
 // is nil, the surface is empty (no tools) but still safe to call.
-func NewBuiltinSurface(reg *toolrunner.ToolRegistry) *BuiltinSurface {
+func NewBuiltinSurface(reg *tools.ToolRegistry) *BuiltinSurface {
 	return &BuiltinSurface{reg: reg}
 }
 
 // NewBuiltinSurfaceWithBashAST wires the AST policy (DM-20260618-002).
 // Pass nil to keep CheckPermission in graceful-degradation mode.
-func NewBuiltinSurfaceWithBashAST(reg *toolrunner.ToolRegistry, bashAST *BashASTPolicy) *BuiltinSurface {
+func NewBuiltinSurfaceWithBashAST(reg *tools.ToolRegistry, bashAST *BashASTPolicy) *BuiltinSurface {
 	return &BuiltinSurface{reg: reg, bashAST: bashAST}
 }
 
@@ -95,13 +95,13 @@ func (s *BuiltinSurface) RiskLevel(name string) types.RiskLevel {
 }
 
 // Execute implements contracts.ToolSurface. It delegates to the
-// underlying toolrunner.ToolRegistry, preserving the existing
+// underlying tools.ToolRegistry, preserving the existing
 // behaviour for all builtin tools (including sandbox policy).
 func (s *BuiltinSurface) Execute(ctx context.Context, name, input, workDir string) (*contracts.ToolResult, error) {
 	if s.reg == nil {
 		return &contracts.ToolResult{Error: "builtin: registry not initialized"}, nil
 	}
-	res, err := s.reg.Execute(ctx, toolrunner.ToolCall{
+	res, err := s.reg.Execute(ctx, tools.ToolCall{
 		ID:        "",
 		Name:      name,
 		Input:     input,

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/bash"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/bash"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 )
 
 // T: TOOL-SURFACE-1-A01-T27 — BashASTPolicy denies dangerous commands

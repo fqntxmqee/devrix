@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/filter"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/filter"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )

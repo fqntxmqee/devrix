@@ -4,40 +4,40 @@ import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Tool types and registry constructors re-exported from toolrunner (D2-S3).
+// Tool types and registry constructors re-exported from tools (D2-S3).
 type (
-	ToolSchema    = toolrunner.ToolSchema
-	ToolCall      = toolrunner.ToolCall
-	ToolResult    = toolrunner.ToolResult
-	IToolRunner   = toolrunner.IToolRunner
-	IToolRegistry = toolrunner.IToolRegistry
-	PluginRunner  = toolrunner.PluginRunner
-	ToolRegistry  = toolrunner.ToolRegistry
-	ToolLimiter   = toolrunner.ToolLimiter
+	ToolSchema    = tools.ToolSchema
+	ToolCall      = tools.ToolCall
+	ToolResult    = tools.ToolResult
+	IToolRunner   = tools.IToolRunner
+	IToolRegistry = tools.IToolRegistry
+	PluginRunner  = tools.PluginRunner
+	ToolRegistry  = tools.ToolRegistry
+	ToolLimiter   = tools.ToolLimiter
 
 	// AgentRoleToolFilter 从 enforce 包 re-export。
 	AgentRoleToolFilter = enforce.AgentRoleToolFilter
 )
 
 var (
-	NewToolRegistry                  = toolrunner.NewToolRegistry
-	NewBuiltinToolRegistry           = toolrunner.NewBuiltinToolRegistry
-	NewBuiltinToolRunner             = toolrunner.NewBuiltinToolRunner
-	NewBuiltinToolRunnerFromConfig   = toolrunner.NewBuiltinToolRunnerFromConfig
-	NewLimitedToolRunner             = toolrunner.NewLimitedToolRunner
-	NewTodoWriteRunner               = toolrunner.NewTodoWriteRunner
-	NewToolLimiter                   = toolrunner.NewToolLimiter
-	WithToolWorkDir                  = toolrunner.WithToolWorkDir
-	WithToolSessionID                = toolrunner.WithToolSessionID
-	WithToolSessionContext           = toolrunner.WithToolSessionContext
-	WithFilesAutoApproved            = toolrunner.WithFilesAutoApproved
-	DefaultCommandPolicy             = toolrunner.DefaultCommandPolicy
-	NewCommandPolicy                 = toolrunner.NewCommandPolicy
+	NewToolRegistry                  = tools.NewToolRegistry
+	NewBuiltinToolRegistry           = tools.NewBuiltinToolRegistry
+	NewBuiltinToolRunner             = tools.NewBuiltinToolRunner
+	NewBuiltinToolRunnerFromConfig   = tools.NewBuiltinToolRunnerFromConfig
+	NewLimitedToolRunner             = tools.NewLimitedToolRunner
+	NewTodoWriteRunner               = tools.NewTodoWriteRunner
+	NewToolLimiter                   = tools.NewToolLimiter
+	WithToolWorkDir                  = tools.WithToolWorkDir
+	WithToolSessionID                = tools.WithToolSessionID
+	WithToolSessionContext           = tools.WithToolSessionContext
+	WithFilesAutoApproved            = tools.WithFilesAutoApproved
+	DefaultCommandPolicy             = tools.DefaultCommandPolicy
+	NewCommandPolicy                 = tools.NewCommandPolicy
 )
 
 // ToolStreamEvent is a mid-execution event from an agent tool (e.g. Claude Code).
@@ -70,15 +70,15 @@ func ToolStreamEmitterFromContext(ctx context.Context) ToolStreamEmitter {
 
 // Bridge helpers for contextengine callers still in the same domain package.
 func ToolSessionContextFromContext(ctx context.Context) *types.SessionContext {
-	return toolrunner.ToolSessionContextFromContext(ctx)
+	return tools.ToolSessionContextFromContext(ctx)
 }
 
 func ToolWorkDirFromContext(ctx context.Context) string {
-	return toolrunner.ToolWorkDirFromContext(ctx)
+	return tools.ToolWorkDirFromContext(ctx)
 }
 
 func ToolSessionIDFromContext(ctx context.Context) string {
-	return toolrunner.ToolSessionIDFromContext(ctx)
+	return tools.ToolSessionIDFromContext(ctx)
 }
 
 func ToolContext(ctx context.Context, sc *types.SessionContext) context.Context {
@@ -90,12 +90,12 @@ func ToolContextWithGate(ctx context.Context, sc *types.SessionContext, gate con
 	if sc == nil {
 		return ctx
 	}
-	ctx = toolrunner.WithToolWorkDir(ctx, sc.WorkDir)
-	ctx = toolrunner.WithToolSessionID(ctx, sc.SessionID)
-	ctx = toolrunner.WithToolSessionContext(ctx, sc)
+	ctx = tools.WithToolWorkDir(ctx, sc.WorkDir)
+	ctx = tools.WithToolSessionID(ctx, sc.SessionID)
+	ctx = tools.WithToolSessionContext(ctx, sc)
 	if gate != nil {
 		if fa, ok := gate.(contracts.FileAutoApprover); ok {
-			ctx = toolrunner.WithFilesAutoApproved(ctx, fa.AutoApproveFiles())
+			ctx = tools.WithFilesAutoApproved(ctx, fa.AutoApproveFiles())
 		}
 	}
 	return ctx

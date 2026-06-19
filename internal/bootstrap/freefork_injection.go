@@ -9,17 +9,17 @@ package bootstrap
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 )
 
-// freeforkGlobalFunc wraps a freefork.Forker in the toolrunner.FreeForkerFunc
+// freeforkGlobalFunc wraps a freefork.Forker in the tools.FreeForkerFunc
 // signature. The returned closure captures f by value; if f is nil the closure
 // returns freeforkNotInitializedError so the surface still produces a stable
 // error string for the LLM.
-func freeforkGlobalFunc(f freefork.Forker) toolrunner.FreeForkerFunc {
-	return func(ctx context.Context, parentSession string, reqs []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+func freeforkGlobalFunc(f freefork.Forker) tools.FreeForkerFunc {
+	return func(ctx context.Context, parentSession string, reqs []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 		if f == nil {
 			return nil, &freeforkNotInitializedError{}
 		}
@@ -41,9 +41,9 @@ func freeforkGlobalFunc(f freefork.Forker) toolrunner.FreeForkerFunc {
 		if err != nil {
 			return nil, err
 		}
-		out := make([]toolrunner.FreeForkHandleDTO, 0, len(handles))
+		out := make([]tools.FreeForkHandleDTO, 0, len(handles))
 		for _, h := range handles {
-			dto := toolrunner.FreeForkHandleDTO{
+			dto := tools.FreeForkHandleDTO{
 				SandboxPath: h.SandboxPath,
 				Name:        h.Name,
 			}

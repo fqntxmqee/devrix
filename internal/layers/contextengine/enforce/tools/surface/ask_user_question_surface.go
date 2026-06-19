@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -179,7 +179,7 @@ func (s *AskUserQuestionSurface) Execute(ctx context.Context, _, input, _ string
 		return &contracts.ToolResult{Error: fmt.Sprintf("ask_user_question: %s", err.Error())}, nil
 	}
 
-	sessionID := toolrunner.ToolSessionIDFromContext(ctx)
+	sessionID := tools.ToolSessionIDFromContext(ctx)
 
 	formatted := renderQuestionsForIM(in.Questions)
 
@@ -273,7 +273,7 @@ func renderQuestionsForIM(qs []Question) string {
 }
 
 // askSessionIDKey is no longer used — the surface reads the session id
-// via toolrunner.ToolSessionIDFromContext, the same path every other
+// via tools.ToolSessionIDFromContext, the same path every other
 // surface uses. Kept as a private type for future cross-package handoff
 // experiments; safe to remove if the design stays.
 type askSessionIDKey struct{}

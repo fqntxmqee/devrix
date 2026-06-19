@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/bootstrap"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -53,7 +53,7 @@ func BuildFromConfig(ctxCfg *config.ContextEngineConfig, agentType string) ([]co
 		ctxCfg = config.DefaultContextEngineConfig()
 	}
 	toolCfg := config.DefaultToolConfig()
-	reg, err := toolrunner.NewBuiltinToolRegistry(toolCfg)
+	reg, err := tools.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("build builtin registry: %w", err)
 	}

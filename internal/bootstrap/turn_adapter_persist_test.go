@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	mockctx "github.com/devrix/devrix/internal/layers/contextengine/mock"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
@@ -212,7 +212,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	cfg.Snapshot.Enabled = false
-	realReg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	realReg, err := tools.NewBuiltinToolRegistry(nil)
 	if err != nil {
 		t.Fatalf("real reg: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
 	cfg.Snapshot.Enabled = false
-	realReg, err := toolrunner.NewBuiltinToolRegistry(nil)
+	realReg, err := tools.NewBuiltinToolRegistry(nil)
 	if err != nil {
 		t.Fatalf("real reg: %v", err)
 	}

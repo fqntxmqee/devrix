@@ -57,7 +57,7 @@ func goldenMemoryManager(t *testing.T, cfg *config.ContextEngineConfig) *memory.
 	cfg.Snapshot.Enabled = false
 	cfg.Snapshot.BackupDir = ""
 	store := snapshot.NewStore(&cfg.Snapshot)
-	mgr := memory.NewManager(cfg, store, nil)
+	mgr := memory.NewManager(cfg, store, nil, nil)
 	return mgr
 }
 

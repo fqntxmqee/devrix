@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// PluginSurface wraps a fixed set of toolrunner.PluginRunner instances and
+// PluginSurface wraps a fixed set of tools.PluginRunner instances and
 // exposes them through contracts.ToolSurface. The dispatch table is built
 // once at construction (O(N)) and Execute is O(1) by name lookup.
 //
@@ -19,7 +19,7 @@ import (
 // mechanism, just with different runner sets.
 type PluginSurface struct {
 	name    string
-	runners map[string]toolrunner.PluginRunner
+	runners map[string]tools.PluginRunner
 	order   []string // preserves Tools() order across calls
 }
 
@@ -27,10 +27,10 @@ type PluginSurface struct {
 // Duplicates (by runner.Name()) are not deduplicated — the first one wins
 // and the rest are dropped. Empty name is allowed (e.g. for surfaces that
 // only need a logical grouping).
-func NewPluginSurface(name string, runners []toolrunner.PluginRunner) *PluginSurface {
+func NewPluginSurface(name string, runners []tools.PluginRunner) *PluginSurface {
 	s := &PluginSurface{
 		name:    name,
-		runners: make(map[string]toolrunner.PluginRunner, len(runners)),
+		runners: make(map[string]tools.PluginRunner, len(runners)),
 		order:   make([]string, 0, len(runners)),
 	}
 	for _, r := range runners {

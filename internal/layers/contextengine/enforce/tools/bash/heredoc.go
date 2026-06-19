@@ -3,7 +3,7 @@ package bash
 import (
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/sandboxast"
 )
 
 // HeredocAudit 审计 AST 中所有 heredoc 节点。

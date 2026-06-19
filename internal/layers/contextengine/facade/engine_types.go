@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
@@ -20,14 +20,19 @@ import (
 )
 
 type (
-	IToolRunner          = toolrunner.IToolRunner
-	IToolRegistry        = toolrunner.IToolRegistry
+	IToolRunner          = tools.IToolRunner
+	IToolRegistry        = tools.IToolRegistry
 	IObserver            = kernel.IObserver
 	ICompressionObserver = kernel.ICompressionObserver
 	AgentRoleToolFilter  = enforce.AgentRoleToolFilter
 )
 
 // EngineDeps holds dependencies for ContextEngine.
+//
+// P4 split (AC-P4-3): LongTerm is now two independent ports — a
+// read-side LongTermRecaller and a write-side LongTermStore. The
+// production wiring passes a single shared *SQLiteLongTerm as both
+// arguments; tests can inject narrower doubles.
 type EngineDeps struct {
 	TokenCounter        contracts.ITokenCounter
 	Tools               IToolRunner
@@ -35,7 +40,8 @@ type EngineDeps struct {
 	Permission          contracts.IPermissionGate
 	Observer            IObserver
 	CompressionObserver ICompressionObserver
-	LongTerm            memory.ILongTermMemory
+	LongTermRecaller    contracts.LongTermRecaller
+	LongTermStore       contracts.LongTermStore
 	Config              *config.ContextEngineConfig
 	ObsBridge           *observability.Bridge
 	DefaultModel        string

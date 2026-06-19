@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -30,24 +30,24 @@ func (s *stubPluginRunner) RiskLevel() types.RiskLevel {
 	}
 	return s.risk
 }
-func (s *stubPluginRunner) Schema() toolrunner.ToolSchema {
-	return toolrunner.ToolSchema{
+func (s *stubPluginRunner) Schema() tools.ToolSchema {
+	return tools.ToolSchema{
 		Name:        s.name,
 		Description: "stub " + s.name,
 		Parameters:  `{"type":"object"}`,
 	}
 }
-func (s *stubPluginRunner) Execute(_ context.Context, _, _ string) (*toolrunner.ToolResult, error) {
+func (s *stubPluginRunner) Execute(_ context.Context, _, _ string) (*tools.ToolResult, error) {
 	if s.fail != nil {
 		return nil, s.fail
 	}
-	return &toolrunner.ToolResult{Output: s.out, Error: s.err}, nil
+	return &tools.ToolResult{Output: s.out, Error: s.err}, nil
 }
 
 // T: TOOL-SURFACE-1-T05 — PluginSurface dispatches by name and returns
 // the runner's output verbatim.
 func TestPluginSurface_Dispatch_HappyPath(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		&stubPluginRunner{name: "alpha", out: "alpha-out"},
 		&stubPluginRunner{name: "beta", out: "beta-out"},
 	})
@@ -66,7 +66,7 @@ func TestPluginSurface_Dispatch_HappyPath(t *testing.T) {
 // T: TOOL-SURFACE-1-T05 — PluginSurface returns "unknown tool" envelope
 // for names not in the dispatch table.
 func TestPluginSurface_Dispatch_UnknownTool(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		&stubPluginRunner{name: "alpha"},
 	})
 	res, _ := s.Execute(context.Background(), "missing", `{}`, "")
@@ -78,7 +78,7 @@ func TestPluginSurface_Dispatch_UnknownTool(t *testing.T) {
 // T: TOOL-SURFACE-1-T05 — PluginSurface propagates runner Go errors as
 // the wrapped error return (NOT into the ToolResult envelope).
 func TestPluginSurface_Dispatch_RunnerGoError(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		&stubPluginRunner{name: "alpha", fail: errors.New("boom")},
 	})
 	_, err := s.Execute(context.Background(), "alpha", `{}`, "")
@@ -90,7 +90,7 @@ func TestPluginSurface_Dispatch_RunnerGoError(t *testing.T) {
 // T: TOOL-SURFACE-1-T05 — PluginSurface.Tools preserves the order the
 // runners were passed in (NOT map iteration order).
 func TestPluginSurface_Tools_OrderPreserved(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		&stubPluginRunner{name: "c"},
 		&stubPluginRunner{name: "a"},
 		&stubPluginRunner{name: "b"},
@@ -110,7 +110,7 @@ func TestPluginSurface_Tools_OrderPreserved(t *testing.T) {
 // T: TOOL-SURFACE-1-T05 — Duplicate runner names: the first wins, the
 // rest are silently dropped.
 func TestPluginSurface_DuplicateRunners_FirstWins(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		&stubPluginRunner{name: "x", out: "first"},
 		&stubPluginRunner{name: "x", out: "second"},
 	})
@@ -126,7 +126,7 @@ func TestPluginSurface_DuplicateRunners_FirstWins(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T05 — nil runners in the input are dropped, not stored.
 func TestPluginSurface_NilRunnersIgnored(t *testing.T) {
-	s := surface.NewPluginSurface("test", []toolrunner.PluginRunner{
+	s := surface.NewPluginSurface("test", []tools.PluginRunner{
 		nil,
 		&stubPluginRunner{name: "x"},
 		nil,

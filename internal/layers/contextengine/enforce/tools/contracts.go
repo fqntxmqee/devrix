@@ -1,7 +1,7 @@
-// Package toolrunner — D2-S5 tool execution contracts and implementations.
+// Package tools — D2-S5 tool execution contracts and implementations.
 //
 // DSAFT: D2-S5 (Registry) tool execution surface consumed by D2-S1/D2-S10.
-package toolrunner
+package tools
 
 import (
 	"context"

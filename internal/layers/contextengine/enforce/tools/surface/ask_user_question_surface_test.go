@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -67,7 +67,7 @@ func TestAskUserQuestionSurface_RiskLevel_OnlyOwnTool(t *testing.T) {
 // T: ASK-Q-T02 — validation: empty questions array.
 func TestAskUserQuestionSurface_Execute_EmptyQuestions(t *testing.T) {
 	s := surface.NewAskUserQuestionSurface()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess-v1")
+	ctx := tools.WithToolSessionID(context.Background(), "sess-v1")
 	res, err := s.Execute(ctx, "ask_user_question", `{"questions":[]}`, "")
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ func TestAskUserQuestionSurface_Execute_HappyPath(t *testing.T) {
 	t.Cleanup(func() { surface.SetAskUserQuestionSender(nil) })
 
 	s := surface.NewAskUserQuestionSurface()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess-h1")
+	ctx := tools.WithToolSessionID(context.Background(), "sess-h1")
 	in := `{"questions":[
 		{"question":"你要查的是文件诊断还是工具调用历史？","header":"工具选择","options":[
 			{"label":"文件诊断","description":"query_diagnostics (linter 报错)"},
@@ -226,7 +226,7 @@ func TestAskUserQuestionSurface_Execute_HappyPath(t *testing.T) {
 func TestAskUserQuestionSurface_Execute_NoSender(t *testing.T) {
 	surface.SetAskUserQuestionSender(nil)
 	s := surface.NewAskUserQuestionSurface()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess-h2")
+	ctx := tools.WithToolSessionID(context.Background(), "sess-h2")
 	in := `{"questions":[
 		{"question":"q1","options":[
 			{"label":"a","description":"x"},
@@ -254,7 +254,7 @@ func TestAskUserQuestionSurface_Execute_SenderError(t *testing.T) {
 	t.Cleanup(func() { surface.SetAskUserQuestionSender(nil) })
 
 	s := surface.NewAskUserQuestionSurface()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess-h3")
+	ctx := tools.WithToolSessionID(context.Background(), "sess-h3")
 	in := `{"questions":[
 		{"question":"q1","options":[
 			{"label":"a","description":"x"},
@@ -287,7 +287,7 @@ func TestAskUserQuestionSurface_RenderMultiple(t *testing.T) {
 	t.Cleanup(func() { surface.SetAskUserQuestionSender(nil) })
 
 	s := surface.NewAskUserQuestionSurface()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess-h4")
+	ctx := tools.WithToolSessionID(context.Background(), "sess-h4")
 	in := `{"questions":[
 		{"question":"q1","header":"Header A","options":[
 			{"label":"a","description":"x"},

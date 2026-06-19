@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -201,7 +201,7 @@ func TestDelegateSurface_InterruptBehavior_ReturnsCancel(t *testing.T) {
 // from OrthogonalFlagFor for each builtin tool, including the
 // non-obvious cases (write_file = destructive but not concurrencySafe).
 func TestBuiltinSurface_OrthogonalFlags_PerTool(t *testing.T) {
-	reg, err := toolrunner.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	reg, err := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	if err != nil {
 		t.Fatalf("NewBuiltinToolRegistry: %v", err)
 	}

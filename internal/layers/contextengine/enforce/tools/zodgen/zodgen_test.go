@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/zodgen"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/zodgen"
 )
 
 // T: TOOL-SURFACE-1-T30 — Schema() handles basic struct → object/properties/required.

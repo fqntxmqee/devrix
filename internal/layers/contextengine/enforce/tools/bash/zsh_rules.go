@@ -1,7 +1,7 @@
 package bash
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/sandboxast"
 )
 
 // RulesByID 把 20+ zsh 攻击规则按 ID 索引 (TOOL-SEC-2-A02-F03)。

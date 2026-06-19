@@ -12,7 +12,7 @@ import (
 
 func TestEngineToolHistorySync_should_not_duplicate_tool_messages_without_call_id(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
-	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil)
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
 	sc := &types.SessionContext{
 		SessionID:   "sess_tool_hist",
 		Messages:    []types.Message{{Role: types.MessageRoleUser, Content: "first"}},

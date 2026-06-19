@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
@@ -106,7 +106,7 @@ func TestMapProcessError_WrappedSentinelError(t *testing.T) {
 }
 
 func TestFilterToolsByPermissionMode_NonPlanMode(t *testing.T) {
-	tools := []toolrunner.ToolSchema{{Name: "bash"}, {Name: "read"}}
+	tools := []tools.ToolSchema{{Name: "bash"}, {Name: "read"}}
 	got := enforce.FilterToolsByPermissionMode(types.PermissionDefault, tools, "")
 	if len(got) != 2 {
 		t.Errorf("non-plan mode should not filter, got %d", len(got))
@@ -114,7 +114,7 @@ func TestFilterToolsByPermissionMode_NonPlanMode(t *testing.T) {
 }
 
 func TestFilterToolsByPermissionMode_PlanMode(t *testing.T) {
-	tools := []toolrunner.ToolSchema{
+	tools := []tools.ToolSchema{
 		{Name: "bash"},
 		{Name: "read"},
 		{Name: "write"},

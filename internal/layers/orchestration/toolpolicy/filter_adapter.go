@@ -34,7 +34,7 @@ type toolpolicyFilterAdapter struct{}
 
 // delegateToolNames is duplicated from filter.go because the adapter is
 // intentionally independent (the existing Filter still works on
-// toolrunner.ToolSchema; this one works on contracts.ToolSpec).
+// tools.ToolSchema; this one works on contracts.ToolSpec).
 var adapterDelegateToolNames = map[string]bool{
 	"delegate_explore":   true,
 	"delegate_plan":      true,

@@ -56,14 +56,14 @@ func (s *VerifySurface) RiskLevel(name string) types.RiskLevel {
 	return ""
 }
 
-// verifyInput mirrors toolrunner.verifyInput.
+// verifyInput mirrors tools.verifyInput.
 type verifyInput struct {
 	ChangeID string `json:"change_id"`
 	RepoRoot string `json:"repo_root"`
 }
 
 // Execute implements contracts.ToolSurface. Behavior is identical to the
-// toolrunner.verifyRunner it replaces.
+// tools.verifyRunner it replaces.
 func (s *VerifySurface) Execute(ctx context.Context, _, input, workDir string) (*contracts.ToolResult, error) {
 	var in verifyInput
 	if input != "" {

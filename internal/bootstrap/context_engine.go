@@ -46,7 +46,7 @@ func NewContextEngine(
 	agentToolReg *external.Registry,
 	forker freefork.Forker,
 ) *contextengine.ContextEngine {
-	longTerm := WireContextV3(ctxCfg)
+	longTermRecaller, longTermStore := WireContextV3(ctxCfg)
 	// DM-20260617-008 W4: TaskManager constructed locally and passed to
 	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
 	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
@@ -97,7 +97,7 @@ func NewContextEngine(
 	//
 	// W11 phase 2c: lsp / verify_plan_execution / free_fork are now exposed
 	// exclusively via the surface list built in BuildSurfaces below. The
-	// legacy toolrunner.RegisterLSPTool / RegisterVerifyTool / RegisterFreeForkTool
+	// legacy tools.RegisterLSPTool / RegisterVerifyTool / RegisterFreeForkTool
 	// helpers are removed; turn_adapter.Prepare aggregates tool specs from
 	// the engine's surface list (TOOL-SURFACE-1 SoT) and the per-tool
 	// dispatch goes through surface.Execute (W9). The schema + execution
@@ -107,7 +107,7 @@ func NewContextEngine(
 	diagCfg := ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
 	// W11 phase 2: query_diagnostics is exposed via surface.TrackerSurface
-	// (built in BuildSurfaces below). The legacy toolrunner.RegisterTrackerTool
+	// (built in BuildSurfaces below). The legacy tools.RegisterTrackerTool
 	// + tracker.SetGlobalTracker path is removed; the surface holds the
 	// tracker instance explicitly so production code no longer relies on the
 	// process-wide singleton.
@@ -160,7 +160,8 @@ func NewContextEngine(
 		ToolsReg:            toolReg,
 		Permission:          capture.NewPermissionGateAdapter(permMgr),
 		Observer:            contextengine.NoOpObserver{},
-		LongTerm:            longTerm,
+		LongTermRecaller:    longTermRecaller,
+		LongTermStore:       longTermStore,
 		Config:              ctxCfg,
 		ObsBridge:           obsBridge,
 		DefaultModel:        stack.DefaultModel,

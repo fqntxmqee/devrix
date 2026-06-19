@@ -5,7 +5,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/bash"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/bash"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 

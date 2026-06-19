@@ -12,7 +12,7 @@
 // 用法:
 //
 //	go run ./tools/ci-lint-invariant \
-//	    -roots ./internal/layers/contextengine/enforce/toolrunner/surface,./internal/layers/multiagent/provision/freefork,./internal/layers/observability/diagnose/tracker,./internal/layers/evolution/verify \
+//	    -roots ./internal/layers/contextengine/enforce/tools/surface,./internal/layers/multiagent/provision/freefork,./internal/layers/observability/diagnose/tracker,./internal/layers/evolution/verify \
 //	    -fail-on-warn
 //
 // 退出码: 0 全部通过; 1 有 error; 2 有 warn (且 -fail-on-warn)。
@@ -32,7 +32,7 @@ import (
 
 // 默认扫描 root (与 W15 tasks.md 列表对齐)。
 var defaultRoots = []string{
-	"./internal/layers/contextengine/enforce/toolrunner/surface",
+	"./internal/layers/contextengine/enforce/tools/surface",
 	"./internal/layers/multiagent/provision/freefork",
 	"./internal/layers/observability/diagnose/tracker",
 	"./internal/layers/evolution/verify",

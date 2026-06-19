@@ -3,14 +3,14 @@ package toolpolicy_test
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // T: D4-S10-A01-T03
 func TestFilterToolsForAgentRole_should_hide_delegate_from_worker(t *testing.T) {
-	tools := []toolrunner.ToolSchema{
+	tools := []tools.ToolSchema{
 		{Name: "read_file"},
 		{Name: "delegate_explore"},
 		{Name: "delegate_plan"},
@@ -25,7 +25,7 @@ func TestFilterToolsForAgentRole_should_hide_delegate_from_worker(t *testing.T) 
 }
 
 func TestFilterToolsForAgentRole_should_keep_delegate_for_leader(t *testing.T) {
-	tools := []toolrunner.ToolSchema{
+	tools := []tools.ToolSchema{
 		{Name: "read_file"},
 		{Name: "delegate_explore"},
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // ToolSpec is a neutral LLM tool schema (decoupled from D3 llmgateway.ToolCall
-// and D2 toolrunner.ToolSchema). All cross-layer tool exchanges use ToolSpec.
+// and D2 tools.ToolSchema). All cross-layer tool exchanges use ToolSpec.
 //
 // DSAFT: TOOL-SURFACE-1-A01 (DM-20260617-007 devrix-tool-surface-contract)
 // TOOL-SURFACE-1-A01-F02 (DM-20260618-001 devrix-tool-spec-enrichment):
@@ -85,7 +85,7 @@ const (
 // implementations. Library packages (freefork / tracker / verify / etc.) do
 // not depend on this contract — the dependency direction is:
 //
-//	contracts ← surface (in toolrunner/surface) ← library
+//	contracts ← surface (in tools/surface) ← library
 //
 // Design principles:
 //   - Accept interfaces, return structs (ToolSpec / ToolResult are structs)

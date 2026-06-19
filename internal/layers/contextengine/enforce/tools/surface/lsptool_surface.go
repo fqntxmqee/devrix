@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -20,13 +20,13 @@ import (
 // lsp_workspace_symbol) 让 LLM 单独调用, 而非 1 个 spec 配 operation 参数。
 // 同时每个 method 调用通过 LSPMethodLatency metrics (D5 SUG-2) 记录延迟。
 type LSPToolSurface struct {
-	cfg  *toolrunner.LSPConfig
-	runn *toolrunner.LSPRunnerAlias
+	cfg  *tools.LSPConfig
+	runn *tools.LSPRunnerAlias
 }
 
 // NewLSPToolSurface constructs an LSP surface from an LSPConfig.
-func NewLSPToolSurface(cfg *toolrunner.LSPConfig) *LSPToolSurface {
-	return &LSPToolSurface{cfg: cfg, runn: toolrunner.NewLSPRunnerForSurface(cfg)}
+func NewLSPToolSurface(cfg *tools.LSPConfig) *LSPToolSurface {
+	return &LSPToolSurface{cfg: cfg, runn: tools.NewLSPRunnerForSurface(cfg)}
 }
 
 // Name implements contracts.ToolSurface.

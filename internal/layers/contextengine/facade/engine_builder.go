@@ -56,7 +56,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		}
 	}
 
-	memMgr := memory.NewManager(cfg, store, deps.LongTerm)
+	memMgr := memory.NewManager(cfg, store, deps.LongTermRecaller, deps.LongTermStore)
 	assembler := prompt.NewSystemPromptAssembler(cfg.Workspace)
 
 	return &ContextEngine{

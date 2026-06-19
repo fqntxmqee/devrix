@@ -1,4 +1,4 @@
-package toolrunner
+package tools
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/sandboxast"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

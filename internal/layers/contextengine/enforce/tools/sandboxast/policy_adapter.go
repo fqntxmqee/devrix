@@ -1,6 +1,6 @@
 package sandboxast
 
-// PolicyAnalyzer 把 sandboxast.Analyzer 适配成 toolrunner.CommandPolicy.ASTAnalyzer 接口。
+// PolicyAnalyzer 把 sandboxast.Analyzer 适配成 tools.CommandPolicy.ASTAnalyzer 接口。
 type PolicyAnalyzer struct {
 	A *Analyzer
 }

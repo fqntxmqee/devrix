@@ -2,12 +2,12 @@
 //
 // Per the DSAFT Refactoring Playbook §6 双锚点对齐, D2 root must remain
 // scenario-organized: prepare/ persist/ enforce/ legacy/. Anything that drifts
-// back to Pre-v2.2 form (engine_*.go files at root, toolrunner package name,
+// back to Pre-v2.2 form (engine_*.go files at root, tools package name,
 // orchestrate stub) is a layout violation that must be caught at CI time.
 //
 // T: D2-STRUCT-T01 — root production files only `contracts.go` + `aliases.go`
 // T: D2-STRUCT-T02 — no engine_persist.go outside facade/ (now persist/commit.go)
-// T: D2-STRUCT-T03 — enforce/tools/ package is `package tools`, not `toolrunner`
+// T: D2-STRUCT-T03 — enforce/tools/ package is `package tools`, not `tools`
 // T: D2-STRUCT-T04 — prepare/memory/ and persist/memory/ have no cyclic import
 // T: D2-STRUCT-T05 — enforce/orchestrator.go removed (stub gone, turn_adapter is SoT)
 // T: D2-STRUCT-T06 — scenario subdirectories at most 2 levels deep
@@ -127,8 +127,8 @@ func TestD2Layout_NoEnginePersistOutsideFacade(t *testing.T) {
 }
 
 // TestD2Layout_EnforceToolsPackage verifies D2-STRUCT-T03:
-// after P3 git mv toolrunner/ → enforce/tools/, the package name must be `package tools`,
-// never `package toolrunner`.
+// after P3 git mv tools/ → enforce/tools/, the package name must be `package tools`,
+// never `package tools`.
 func TestD2Layout_EnforceToolsPackage(t *testing.T) {
 	root := filepath.Join(d2RepoRoot(t), "internal", "layers", "contextengine", "enforce", "tools")
 	if _, err := os.Stat(root); os.IsNotExist(err) {
@@ -159,7 +159,7 @@ func TestD2Layout_EnforceToolsPackage(t *testing.T) {
 		t.Fatalf("Walk(%s): %v", root, err)
 	}
 	if len(violations) > 0 {
-		t.Errorf("D2-STRUCT-T03: package toolrunner remains in enforce/tools/: %v", violations)
+		t.Errorf("D2-STRUCT-T03: package tools remains in enforce/tools/: %v", violations)
 	}
 }
 

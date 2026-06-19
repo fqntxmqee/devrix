@@ -1,8 +1,8 @@
-package toolrunner_test
+package tools_test
 
 // W11 phase 2a migration: query_diagnostics tool 单元测试 now exercises the
 // surface path (TrackerSurface) instead of the deleted legacy
-// toolrunner.trackerRunner + tracker.SetGlobalTracker path.
+// tools.trackerRunner + tracker.SetGlobalTracker path.
 //
 // The semantics are identical: pass a *tracker.Tracker into
 // surface.NewTrackerSurface, then call surface.Execute. The previous
@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 )
 

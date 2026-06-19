@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// queryDiagLimitCap mirrors toolrunner.queryDiagLimitCap.
+// queryDiagLimitCap mirrors tools.queryDiagLimitCap.
 const queryDiagLimitCap = 256
 
 // TrackerSurface exposes the query_diagnostics tool. The tracker is held
@@ -70,14 +70,14 @@ func (s *TrackerSurface) RiskLevel(name string) types.RiskLevel {
 	return ""
 }
 
-// queryDiagInput mirrors toolrunner.queryDiagInput.
+// queryDiagInput mirrors tools.queryDiagInput.
 type queryDiagInput struct {
 	Limit    int    `json:"limit"`
 	File     string `json:"file"`
 	Severity string `json:"severity"`
 }
 
-// queryDiagOutput mirrors toolrunner.queryDiagOutput.
+// queryDiagOutput mirrors tools.queryDiagOutput.
 type queryDiagOutput struct {
 	Count       int                  `json:"count"`
 	TotalInBuf  int                  `json:"total_in_buffer"`
@@ -85,7 +85,7 @@ type queryDiagOutput struct {
 }
 
 // Execute implements contracts.ToolSurface. Behaves identically to the
-// toolrunner.trackerRunner it replaces.
+// tools.trackerRunner it replaces.
 func (s *TrackerSurface) Execute(_ context.Context, _, input, _ string) (*contracts.ToolResult, error) {
 	if s.tr == nil {
 		return &contracts.ToolResult{Error: "query_diagnostics: tracker not initialized"}, nil

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -13,7 +13,7 @@ import (
 
 // T: TOOL-SURFACE-1-T03 — BuiltinSurface exposes 6 tools.
 func TestBuiltinSurface_Tools(t *testing.T) {
-	reg, err := toolrunner.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	reg, err := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	if err != nil {
 		t.Fatalf("NewBuiltinToolRegistry: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestBuiltinSurface_Tools(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T03 — BuiltinSurface.RiskLevel delegates to registry.
 func TestBuiltinSurface_RiskLevel(t *testing.T) {
-	reg, _ := toolrunner.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	s := surface.NewBuiltinSurface(reg)
 	if s.RiskLevel("bash") == types.RiskLevelLow {
 		t.Errorf("bash should not be LOW (sandbox-mediated)")
@@ -56,7 +56,7 @@ func TestBuiltinSurface_RiskLevel(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T03 — BuiltinSurface.Execute delegates to registry.
 func TestBuiltinSurface_Execute_Glob(t *testing.T) {
-	reg, _ := toolrunner.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	s := surface.NewBuiltinSurface(reg)
 	res, err := s.Execute(context.Background(), "glob", `{"pattern":"*"}`, t.TempDir())
 	if err != nil {
@@ -85,6 +85,6 @@ func TestBuiltinSurface_NilRegistry(t *testing.T) {
 // T: TOOL-SURFACE-1-T04 — BuiltinSurface implements contracts.ToolSurface
 // (compile-time check, but also runtime sanity).
 func TestBuiltinSurface_InterfaceCompliance(t *testing.T) {
-	reg, _ := toolrunner.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	var _ contracts.ToolSurface = surface.NewBuiltinSurface(reg)
 }

@@ -10,5 +10,5 @@
 package enforce
 
 // PermissionChecker 由 enforce/permission 子包实现。
-// ToolRunner/ToolRegistry 合约定义在 enforce/toolrunner/contracts.go。
+// ToolRunner/ToolRegistry 合约定义在 enforce/tools/contracts.go。
 // AgentRoleToolFilter 合约定义在 orchestration/toolpolicy（D7 注入）。

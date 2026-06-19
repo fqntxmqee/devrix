@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 )
 
 func TestTaskStopRunner_cancels_running_task(t *testing.T) {
@@ -17,13 +17,13 @@ func TestTaskStopRunner_cancels_running_task(t *testing.T) {
 	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
-	reg2 := toolrunner.NewToolRegistry()
+	reg2 := tools.NewToolRegistry()
 	if err := RegisterBackgroundTaskTools(reg2); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess_ts")
-	res, err := reg2.Execute(ctx, toolrunner.ToolCall{Name: "task_stop", Input: `{"task_id":"` + handle.ID + `"}`})
+	ctx := tools.WithToolSessionID(context.Background(), "sess_ts")
+	res, err := reg2.Execute(ctx, tools.ToolCall{Name: "task_stop", Input: `{"task_id":"` + handle.ID + `"}`})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,11 +50,11 @@ func TestTaskStopRunner_rejects_cross_session(t *testing.T) {
 	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
-	reg2 := toolrunner.NewToolRegistry()
+	reg2 := tools.NewToolRegistry()
 	_ = RegisterBackgroundTaskTools(reg2)
 
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess_b")
-	res, _ := reg2.Execute(ctx, toolrunner.ToolCall{Name: "task_stop", Input: `{"task_id":"` + handle.ID + `"}`})
+	ctx := tools.WithToolSessionID(context.Background(), "sess_b")
+	res, _ := reg2.Execute(ctx, tools.ToolCall{Name: "task_stop", Input: `{"task_id":"` + handle.ID + `"}`})
 	if res.Error == "" {
 		t.Fatal("expected cross-session error")
 	}
@@ -68,11 +68,11 @@ func TestTaskOutputRunner_block_false_returns_running(t *testing.T) {
 	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
-	reg2 := toolrunner.NewToolRegistry()
+	reg2 := tools.NewToolRegistry()
 	_ = RegisterBackgroundTaskTools(reg2)
 
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess_out")
-	res, _ := reg2.Execute(ctx, toolrunner.ToolCall{Name: "task_output", Input: `{"task_id":"` + handle.ID + `","block":false}`})
+	ctx := tools.WithToolSessionID(context.Background(), "sess_out")
+	res, _ := reg2.Execute(ctx, tools.ToolCall{Name: "task_output", Input: `{"task_id":"` + handle.ID + `","block":false}`})
 	if res.Error != "" {
 		t.Fatalf("expected no error, got %q", res.Error)
 	}
@@ -90,7 +90,7 @@ func TestTaskOutputRunner_block_true_waits_until_terminal(t *testing.T) {
 	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
-	reg2 := toolrunner.NewToolRegistry()
+	reg2 := tools.NewToolRegistry()
 	_ = RegisterBackgroundTaskTools(reg2)
 
 	go func() {
@@ -99,8 +99,8 @@ func TestTaskOutputRunner_block_true_waits_until_terminal(t *testing.T) {
 	}()
 
 	start := time.Now()
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess_wait")
-	res, _ := reg2.Execute(ctx, toolrunner.ToolCall{Name: "task_output", Input: `{"task_id":"` + handle.ID + `","block":true,"timeout_ms":2000}`})
+	ctx := tools.WithToolSessionID(context.Background(), "sess_wait")
+	res, _ := reg2.Execute(ctx, tools.ToolCall{Name: "task_output", Input: `{"task_id":"` + handle.ID + `","block":true,"timeout_ms":2000}`})
 	elapsed := time.Since(start)
 	if res.Error != "" {
 		t.Fatalf("expected no error, got %q", res.Error)
@@ -130,11 +130,11 @@ func TestTaskListBackgroundRunner_returns_session_tasks(t *testing.T) {
 	SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{Registry: reg, Waiter: NewBackgroundWaiter(reg)})
 	defer SetBackgroundTaskToolsDeps(BackgroundTaskToolsDeps{})
 
-	reg2 := toolrunner.NewToolRegistry()
+	reg2 := tools.NewToolRegistry()
 	_ = RegisterBackgroundTaskTools(reg2)
 
-	ctx := toolrunner.WithToolSessionID(context.Background(), "sess_l")
-	res, _ := reg2.Execute(ctx, toolrunner.ToolCall{Name: "task_list_background", Input: "{}"})
+	ctx := tools.WithToolSessionID(context.Background(), "sess_l")
+	res, _ := reg2.Execute(ctx, tools.ToolCall{Name: "task_list_background", Input: "{}"})
 	var out struct {
 		Count int `json:"count"`
 		Tasks []struct {

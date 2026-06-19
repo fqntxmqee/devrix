@@ -11,7 +11,7 @@ package mockctx
 import (
 	"context"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -23,7 +23,7 @@ type ToolRunner struct {
 }
 
 // Execute returns configured output.
-func (t *ToolRunner) Execute(ctx context.Context, call toolrunner.ToolCall) (*toolrunner.ToolResult, error) {
+func (t *ToolRunner) Execute(ctx context.Context, call tools.ToolCall) (*tools.ToolResult, error) {
 	if t.Err != nil {
 		return nil, t.Err
 	}
@@ -31,7 +31,7 @@ func (t *ToolRunner) Execute(ctx context.Context, call toolrunner.ToolCall) (*to
 	if out == "" {
 		out = "ok"
 	}
-	return &toolrunner.ToolResult{Output: out}, nil
+	return &tools.ToolResult{Output: out}, nil
 }
 
 // AllowAllPermission always approves.

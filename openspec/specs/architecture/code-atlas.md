@@ -65,7 +65,7 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | **D2 Follower（D7 编排对象）** |||||
 | context_preparer | 上下文装配 + CompressHint | D2-S15 | `contextengine/prepare/` | `ContextPreparer` |
 | tool_round_executor | 工具权限门控 + 沙箱 | D2-S18 | `contextengine/enforce/` | `ToolRoundExecutor`, `IToolRunner`, `Sandbox` |
-| tool_registry | 工具注册表 | D2-S3-A03 | `contextengine/enforce/toolrunner/` | `ToolRegistry`, builtins (bash, read_file, glob, grep, edit) |
+| tool_registry | 工具注册表 | D2-S3-A03 | `contextengine/enforce/tools/` | `ToolRegistry`, builtins (bash, read_file, glob, grep, edit) |
 | session_persister | 快照 + transcript + commit | D2-S17 | `contextengine/persist/` | `SessionPersister` |
 | nested_execution | 嵌套执行 (SubQuery/Background) | D2-S18 | `contextengine/enforce/` | `SubQuery`, `BackgroundTask` |
 | worker_dir_sandbox | delegate worker 目录沙箱 | D2-S18 | `contextengine/sandbox/` | `Manager`, `Enter`, `Exit` |
@@ -96,8 +96,8 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | `WorkPlanSnapshot` | `shared/contracts/execution_flow.go` | D7-S4 WorkPlan, delegate_status |
 | `IPermissionGate`, `FileAutoApprover` | `shared/contracts/permission.go` | D2 ContextEngine, D1 Gateway, D4 Agent |
 | `ILLMGateway`, `ITierResolver` | `llmgateway/contracts.go` | **D7-S2-A07 LLMInvoker** via `bridges/llm`（D2→D3 import ban）|
-| `IToolRunner`, `IToolRegistry` | `contextengine/enforce/toolrunner/` | D2 ToolRoundExecutor, D7-S2-A06 turn.RunTurn |
-| `ToolRegistry`, builtins | `contextengine/enforce/toolrunner/` | bash, read_file, glob, grep, edit, **5 surface** (DM-20260618-007) |
+| `IToolRunner`, `IToolRegistry` | `contextengine/enforce/tools/` | D2 ToolRoundExecutor, D7-S2-A06 turn.RunTurn |
+| `ToolRegistry`, builtins | `contextengine/enforce/tools/` | bash, read_file, glob, grep, edit, **5 surface** (DM-20260618-007) |
 | `WorkItem`, `WorkTree` v2 | `orchestration/workmodel/workitem.go` | D7-S1 TaskManager, D7-S2-A06 turn.RunTurn, D7-S5 LLMDecomposer |
 | `RunRegistry` | `orchestration/workmodel/run_registry.go` | D7-S1 + D7-S2-A06 |
 | `ResolveAwaiter`, `FocusHint` | `orchestration/workmodel/awaiter.go` | D7-S2-A06 turn.RunTurn (v2.0 unified blocking) |

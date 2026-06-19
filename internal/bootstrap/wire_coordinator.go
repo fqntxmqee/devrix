@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -92,7 +92,7 @@ func InitOrchestration(
 	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
 	runregistry.SetGlobal(runregistry.NewRegistry("~/.devrix/runs"))
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
-	toolrunner.SetTodoSync(todoBackend.Sync)
+	tools.SetTodoSync(todoBackend.Sync)
 
 	// DM-020 D-c: wire TurnOrchestrator as the TurnExecutor.
 	// This replaces the legacy executor with the orchestration turn loop that

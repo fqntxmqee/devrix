@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -15,11 +15,11 @@ import (
 
 // ----- FreeForkSurface -----
 
-func okForker(_ context.Context, _ string, _ []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
-	return []toolrunner.FreeForkHandleDTO{{AgentID: "a1"}, {AgentID: "a2"}, {AgentID: "a3"}}, nil
+func okForker(_ context.Context, _ string, _ []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
+	return []tools.FreeForkHandleDTO{{AgentID: "a1"}, {AgentID: "a2"}, {AgentID: "a3"}}, nil
 }
 
-func failForker(_ context.Context, _ string, _ []toolrunner.FreeForkRequestDTO) ([]toolrunner.FreeForkHandleDTO, error) {
+func failForker(_ context.Context, _ string, _ []tools.FreeForkRequestDTO) ([]tools.FreeForkHandleDTO, error) {
 	return nil, errors.New("factory failure")
 }
 

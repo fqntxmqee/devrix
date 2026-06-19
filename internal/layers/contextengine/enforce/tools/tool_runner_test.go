@@ -1,4 +1,4 @@
-package toolrunner_test
+package tools_test
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 )
 
-func mustBuiltinToolRunner(t *testing.T) toolrunner.IToolRunner {
-	runner, err := toolrunner.NewBuiltinToolRunner()
+func mustBuiltinToolRunner(t *testing.T) tools.IToolRunner {
+	runner, err := tools.NewBuiltinToolRunner()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,9 +22,9 @@ func mustBuiltinToolRunner(t *testing.T) toolrunner.IToolRunner {
 func TestBuiltinToolRunner_should_run_bash_pwd_when_workdir_set(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
 
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "bash",
 		Input: `{"command":"pwd"}`,
 	})
@@ -48,8 +48,8 @@ func TestBuiltinToolRunner_should_read_file_in_workspace(t *testing.T) {
 	}
 
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "read_file",
 		Input: `{"path":"hello.txt"}`,
 	})
@@ -67,8 +67,8 @@ func TestBuiltinToolRunner_should_read_file_in_workspace(t *testing.T) {
 func TestBuiltinToolRunner_should_reject_path_escape(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "read_file",
 		Input: `{"path":"../../etc/passwd"}`,
 	})
@@ -84,9 +84,9 @@ func TestBuiltinToolRunner_should_reject_path_escape(t *testing.T) {
 func TestBuiltinToolRunner_should_reject_disallowed_bash_command(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
 
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "bash",
 		Input: `{"command":"shutdown -h now"}`,
 	})
@@ -113,8 +113,8 @@ func TestBuiltinToolRunner_should_accept_bash_with_workdir_absolute_path(t *test
 	}
 
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "bash",
 		Input: `{"command":"cat ` + filepath.Join(dir, "pkg", "note.txt") + `"}`,
 	})
@@ -137,8 +137,8 @@ func TestBuiltinToolRunner_should_read_file_with_file_path_alias(t *testing.T) {
 	}
 
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "read_file",
 		Input: `{"file_path":"hello.txt"}`,
 	})
@@ -156,8 +156,8 @@ func TestBuiltinToolRunner_should_read_file_with_file_path_alias(t *testing.T) {
 func TestBuiltinToolRunner_should_write_file_in_workspace(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "write_file",
 		Input: `{"path":"out.txt","content":"written"}`,
 	})
@@ -180,8 +180,8 @@ func TestBuiltinToolRunner_should_write_file_in_workspace(t *testing.T) {
 func TestBuiltinToolRunner_should_redirect_glob_json_from_bash(t *testing.T) {
 	dir := t.TempDir()
 	runner := mustBuiltinToolRunner(t)
-	ctx := toolrunner.WithToolWorkDir(context.Background(), dir)
-	result, err := runner.Execute(ctx, toolrunner.ToolCall{
+	ctx := tools.WithToolWorkDir(context.Background(), dir)
+	result, err := runner.Execute(ctx, tools.ToolCall{
 		Name:  "bash",
 		Input: `{"pattern":"**/*.go","path":"."}`,
 	})

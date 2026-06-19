@@ -438,7 +438,7 @@ func (r *HookRegistry) PrepareTimed() (time.Duration, error)  // 含 latency 监
 
 ```bash
 go run ./tools/ci-lint-invariant \
-    -roots ./internal/layers/contextengine/enforce/toolrunner/surface,./internal/layers/multiagent/provision/freefork,./internal/layers/observability/diagnose/tracker,./internal/layers/evolution/verify \
+    -roots ./internal/layers/contextengine/enforce/tools/surface,./internal/layers/multiagent/provision/freefork,./internal/layers/observability/diagnose/tracker,./internal/layers/evolution/verify \
     -fail-on-warn
 ```
 

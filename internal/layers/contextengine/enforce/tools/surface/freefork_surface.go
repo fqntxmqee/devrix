@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -13,25 +13,25 @@ import (
 // FreeForkSurface exposes the free_fork tool. It holds an explicit
 // FreeForkerFunc (NOT the package-level globalFreeForker), so the
 // dependency is visible in the constructor. This is the replacement for
-// toolrunner.globalFreeForker / SetFreeForker.
+// tools.globalFreeForker / SetFreeForker.
 //
 // TOOL-SURFACE-1-A01-F07 (DM-20260618-002): permGate is the
 // IPermissionGate used by CheckPermission. A nil gate is the
 // conservative default (Ask).
 type FreeForkSurface struct {
-	forker   toolrunner.FreeForkerFunc
+	forker   tools.FreeForkerFunc
 	permGate contracts.IPermissionGate
 }
 
 // NewFreeForkSurface wires a forker into the surface.
-func NewFreeForkSurface(f toolrunner.FreeForkerFunc) *FreeForkSurface {
+func NewFreeForkSurface(f tools.FreeForkerFunc) *FreeForkSurface {
 	return &FreeForkSurface{forker: f}
 }
 
 // NewFreeForkSurfaceWithGate wires both the forker and the permission
 // gate. Use this in production (DM-002 requires a gate); the
 // 1-arg constructor is the legacy compat path for unit tests.
-func NewFreeForkSurfaceWithGate(f toolrunner.FreeForkerFunc, gate contracts.IPermissionGate) *FreeForkSurface {
+func NewFreeForkSurfaceWithGate(f tools.FreeForkerFunc, gate contracts.IPermissionGate) *FreeForkSurface {
 	return &FreeForkSurface{forker: f, permGate: gate}
 }
 
@@ -83,7 +83,7 @@ func (s *FreeForkSurface) RiskLevel(name string) types.RiskLevel {
 	return ""
 }
 
-// freeforkInput / Request / Output / Handle mirror the toolrunner types.
+// freeforkInput / Request / Output / Handle mirror the tools types.
 type freeforkInput struct {
 	ParentSession string            `json:"parent_session"`
 	Requests      []freeforkRequest `json:"requests"`
@@ -105,7 +105,7 @@ type freeforkOutput struct {
 const freeforkMaxRequests = 5
 
 // Execute implements contracts.ToolSurface. Behavior is identical to the
-// toolrunner.freeforkRunner it replaces.
+// tools.freeforkRunner it replaces.
 func (s *FreeForkSurface) Execute(ctx context.Context, _, input, _ string) (*contracts.ToolResult, error) {
 	if s.forker == nil {
 		return &contracts.ToolResult{Error: "free_fork: forker not initialized"}, nil
@@ -120,12 +120,12 @@ func (s *FreeForkSurface) Execute(ctx context.Context, _, input, _ string) (*con
 	if n := len(in.Requests); n < 1 || n > freeforkMaxRequests {
 		return &contracts.ToolResult{Error: fmt.Sprintf("free_fork: requests count must be in [1,%d], got %d", freeforkMaxRequests, n)}, nil
 	}
-	dtos := make([]toolrunner.FreeForkRequestDTO, 0, len(in.Requests))
+	dtos := make([]tools.FreeForkRequestDTO, 0, len(in.Requests))
 	for _, r := range in.Requests {
 		if r.Name == "" {
 			return &contracts.ToolResult{Error: "free_fork: each request must have a non-empty name"}, nil
 		}
-		dtos = append(dtos, toolrunner.FreeForkRequestDTO{
+		dtos = append(dtos, tools.FreeForkRequestDTO{
 			Name:     r.Name,
 			Prompt:   r.Prompt,
 			Sandbox:  r.Sandbox || r.Worktree,

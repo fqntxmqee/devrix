@@ -1,4 +1,4 @@
-package toolrunner
+package tools
 
 // W4 — TOOL-SEC-2-A02 (alias G2) Bash AST 注入 bootstrap 单元测试。
 //

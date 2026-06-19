@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/shared/lsp"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -42,7 +42,7 @@ func TestLSPToolSurface_Disabled(t *testing.T) {
 // T: D2-S4-A01-T04 — enabled with no servers still returns 5 specs (schemas
 // 永远暴露; Execute 报 "no servers configured" 错误)。
 func TestLSPToolSurface_EnabledNoServers(t *testing.T) {
-	cfg := &toolrunner.LSPConfig{Enabled: true}
+	cfg := &tools.LSPConfig{Enabled: true}
 	s := surface.NewLSPToolSurface(cfg)
 	specs := s.Tools(context.Background(), "", "")
 	if len(specs) != 5 {
@@ -53,7 +53,7 @@ func TestLSPToolSurface_EnabledNoServers(t *testing.T) {
 // T: D2-S4-A01-T04 — enabled with at least one server returns 5 specs with
 // LOW risk + ReadOnly flags。
 func TestLSPToolSurface_EnabledWithServers(t *testing.T) {
-	cfg := &toolrunner.LSPConfig{
+	cfg := &tools.LSPConfig{
 		Enabled: true,
 		Servers: []lsp.ServerConfig{{LanguageID: "go", Command: []string{"gopls"}}},
 	}

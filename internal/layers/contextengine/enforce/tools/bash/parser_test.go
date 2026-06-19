@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner/sandboxast"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/sandboxast"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 

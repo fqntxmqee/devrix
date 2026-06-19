@@ -1,7 +1,7 @@
 package surface
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 )
 
 // DelegateSurface is a type alias for PluginSurface configured with the
@@ -22,6 +22,6 @@ type DelegateSurface = PluginSurface
 //
 // Passing zero runners is safe — the surface reports "no tools" and
 // returns "unknown tool" for any Execute call.
-func NewDelegateSurface(runners ...toolrunner.PluginRunner) *DelegateSurface {
+func NewDelegateSurface(runners ...tools.PluginRunner) *DelegateSurface {
 	return NewPluginSurface("delegate", runners)
 }
