@@ -32,10 +32,14 @@ func (m *StaticPreparedTurnRunner) RunPreparedTurn(ctx context.Context, req cont
 				ToolInput: m.ToolCall.Input,
 			})
 		} else {
+			// Streaming text chunks must carry is_complete="false" so the
+			// engine's working-memory aggregator (engine.go:236) flushes
+			// them into sc.Messages on persist. See D2 spec §event types.
 			req.Emit(&contracts.EngineEvent{
 				Type:      "text",
 				Content:   text,
 				SessionID: req.SessionID,
+				Metadata:  map[string]string{"is_complete": "false"},
 			})
 		}
 		req.Emit(&contracts.EngineEvent{

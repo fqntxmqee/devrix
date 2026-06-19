@@ -10,6 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/adapters"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -42,12 +43,18 @@ func (e *ContextEngine) ExportSessionSnapshot(sessionID string) ([]byte, error) 
 // DM-20260617-003 (devrix-d7-turn-history-persist): bridges D7 turn bridge to
 // D2 Memory. Lazily initializes the session if it does not yet exist (D7 path
 // first-write scenario).
+//
+// P1-f (AC-P1-7): bootstrap path now goes through adapters.SessionLoaderAdapter
+// (the orchestrator's session loader port) instead of the legacy
+// engine_prepare.go::loadOrInitSession helper. The latter is now dead code
+// and removed.
 func (e *ContextEngine) AppendAndTrimMessages(sessionID string, msgs []types.Message) error {
 	return persist.AppendAndTrimMessages(persist.CommitDeps{
 		Store: e.memory,
 		Bootstrap: func(sid string) (*types.SessionContext, error) {
-			sc, ok := e.loadOrInitSession(context.Background(), &types.Session{SessionID: sid}, noopEmit)
-			if !ok || sc == nil {
+			loader := adapters.NewSessionLoaderAdapter(e.memory)
+			sc, _, err := loader.LoadOrInit(&types.Session{SessionID: sid}, "")
+			if err != nil || sc == nil {
 				return nil, fmt.Errorf("cannot init session %s", sid)
 			}
 			return sc, nil

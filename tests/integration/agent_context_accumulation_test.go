@@ -62,6 +62,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
 		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
 		contextengine.EngineDeps{
+			PreparedTurnRunner: &mockctx.StaticPreparedTurnRunner{Response: "Echo: agent route"},
 			Tools:      &mockctx.ToolRunner{},
 			ToolsReg:   mustBuiltinRegistry(t),
 			Permission: mockctx.AllowAllPermission{},
