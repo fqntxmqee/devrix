@@ -149,7 +149,12 @@ func InitOrchestration(
 		Context:          ctxPrep,
 		Tools:            toolExec,
 		Persist:          ctxAdapter,
-		MaxTurns:         8,
+		// MaxTurns=0 → unbounded. The main conversation loop terminates
+		// on natural LLM finish or one of the deterministic exit reasons
+		// (repeated_tool / tool_failure / token_diminishing / ctx cancel).
+		// Child agents (subqueries, plan/implement, workers) set their own
+		// MaxTurns based on expected workload.
+		MaxTurns:         0,
 		DefaultModel:     llmStack.DefaultModel,
 		MaxContextTokens: maxContextTokens,
 		ObsBridge:        obsBridge,
