@@ -1,6 +1,9 @@
 package runtime
 
 import (
+	"bytes"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -63,5 +66,40 @@ func TestPathResolver_Reset(t *testing.T) {
 	Reset()
 	if s := Snapshot(); s.D7Turn != 0 || s.LegacyHarness != 0 {
 		t.Errorf("after Reset, want zeros, got %+v", s)
+	}
+}
+
+
+func captureSlogResolver(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	return &buf, func() { slog.SetDefault(prev) }
+}
+
+// D5 v2.1 Terminal (DM-20260619-006): Record on PathLegacyHarness must emit a
+// DEPRECATED slog.Warn so on-call can spot live stragglers.
+func TestRecord_LegacyHarness_LogsDeprecation(t *testing.T) {
+	buf, restore := captureSlogResolver(t)
+	defer restore()
+	Reset()
+	Record(PathLegacyHarness)
+	if !strings.Contains(buf.String(), "DEPRECATED") {
+		t.Fatalf("expected DEPRECATED warning, got: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "legacy_harness") {
+		t.Fatalf("expected legacy_harness in warning, got: %s", buf.String())
+	}
+}
+
+// Record on PathD7Turn must NOT emit the deprecation warning.
+func TestRecord_D7Turn_NoDeprecationLog(t *testing.T) {
+	buf, restore := captureSlogResolver(t)
+	defer restore()
+	Reset()
+	Record(PathD7Turn)
+	if strings.Contains(buf.String(), "DEPRECATED") {
+		t.Fatalf("PathD7Turn must not log DEPRECATED, got: %s", buf.String())
 	}
 }

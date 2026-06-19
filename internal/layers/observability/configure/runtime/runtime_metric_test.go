@@ -1,7 +1,10 @@
 package runtime
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
@@ -90,4 +93,49 @@ func TestIncRuntimeMetric_NoopWhenUnregistered(t *testing.T) {
 	// Should not panic
 	IncRuntimeMetric(PathD7Turn)
 	IncRuntimeMetric(PathLegacyHarness)
+}
+
+
+// captureSlog redirects slog.Default() to a buffer at WARN level, restoring
+// the previous default at test cleanup. Used to assert DEPRECATED warnings.
+func captureSlog(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	return &buf, func() { slog.SetDefault(prev) }
+}
+
+// D5 v2.1 Terminal (DM-20260619-006): IncRuntimeMetric on PathLegacyHarness
+// must emit a DEPRECATED slog.Warn so on-call can spot live stragglers.
+func TestIncRuntimeMetric_LegacyHarness_LogsDeprecation(t *testing.T) {
+	buf, restore := captureSlog(t)
+	defer restore()
+	ResetRuntimeMetric()
+	m := newFakeMeter()
+	if err := RegisterRuntimeMetric(m); err != nil {
+		t.Fatalf("RegisterRuntimeMetric: %v", err)
+	}
+	IncRuntimeMetric(PathLegacyHarness)
+	if !strings.Contains(buf.String(), "DEPRECATED") {
+		t.Fatalf("expected DEPRECATED warning, got: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "legacy_harness") {
+		t.Fatalf("expected legacy_harness in warning, got: %s", buf.String())
+	}
+}
+
+// IncRuntimeMetric on PathD7Turn must NOT emit the deprecation warning.
+func TestIncRuntimeMetric_D7Turn_NoDeprecationLog(t *testing.T) {
+	buf, restore := captureSlog(t)
+	defer restore()
+	ResetRuntimeMetric()
+	m := newFakeMeter()
+	if err := RegisterRuntimeMetric(m); err != nil {
+		t.Fatalf("RegisterRuntimeMetric: %v", err)
+	}
+	IncRuntimeMetric(PathD7Turn)
+	if strings.Contains(buf.String(), "DEPRECATED") {
+		t.Fatalf("PathD7Turn must not log DEPRECATED, got: %s", buf.String())
+	}
 }

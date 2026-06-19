@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
@@ -43,6 +44,10 @@ func RegisterRuntimeMetric(m metricRegistrar) error {
 	if err != nil {
 		return err
 	}
+	// DEPRECATED counter (D5 v2.1 Terminal / DM-20260619-006): kept for
+	// migration observability only. Auto-removal planned in v2.3 after 2
+	// consecutive releases of zero counts. See PathLegacyHarness godoc for
+	// the migration target.
 	lh, err := m.Int64Counter(PathResolvedTotalMetric, metrics.WithLabels(metrics.LabelMap{
 		PathLabelKey: PathLabelLegacyHarness,
 	}))
@@ -82,6 +87,9 @@ func IncRuntimeMetric(p PathKind) {
 	case PathD7Turn:
 		d7.Inc()
 	case PathLegacyHarness:
+		slog.Warn("DEPRECATED path invoked: migrate to PathD7Turn",
+			"path", string(p),
+			"metric", PathResolvedTotalMetric)
 		lh.Inc()
 	}
 }

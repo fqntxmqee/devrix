@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"log/slog"
 	"sync"
 	"sync/atomic"
 )
@@ -19,6 +20,11 @@ const (
 	// PathD7Turn is the primary LLM↔Tool path (D7 RunTurn / PreparedTurnRunner).
 	PathD7Turn PathKind = "d7_turn"
 	// PathLegacyHarness is the retired harness bootstrap path (removed v6.5.0).
+	//
+	// DEPRECATED since D5 v2.1 Terminal (DM-20260619-006): emit of this
+	// path logs a slog.Warn so on-call sees live stragglers. Auto-removal
+	// scheduled for v2.3 after 2 consecutive releases of zero counts.
+	// All call sites must migrate to PathD7Turn.
 	PathLegacyHarness PathKind = "legacy_harness"
 )
 
@@ -67,6 +73,8 @@ func Record(p PathKind) {
 	case PathD7Turn:
 		Global().d7Turn.Add(1)
 	case PathLegacyHarness:
+		slog.Warn("DEPRECATED path invoked: migrate to PathD7Turn",
+			"path", string(p))
 		Global().legacyHarness.Add(1)
 	}
 }
