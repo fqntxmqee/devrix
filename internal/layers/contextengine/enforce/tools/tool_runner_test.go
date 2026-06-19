@@ -2,6 +2,7 @@ package tools_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -193,5 +194,60 @@ func TestBuiltinToolRunner_should_redirect_glob_json_from_bash(t *testing.T) {
 	}
 	if !strings.Contains(result.Error, "glob tool") {
 		t.Fatalf("error = %q", result.Error)
+	}
+}
+
+// TestBuiltinToolRunner_BashSchemaDeclaresParameters reproduces the
+// 2026-06-20 tool-call arg bleed: the bash tool was previously sent to the
+// LLM without a Parameters JSON schema, so the model emitted
+// `arguments: "{}"` for every bash call (visible in
+// sess_1781908264924_6000.json — 4 successive bash calls with empty args,
+// each rejected with "invalid command"). The fix adds Parameters so the
+// LLM knows to send {"command": "..."}.
+func TestBuiltinToolRunner_BashSchemaDeclaresParameters(t *testing.T) {
+	reg, err := tools.NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
+	schemas, err := reg.ListTools(context.Background(), "")
+	if err != nil {
+		t.Fatalf("ListTools: %v", err)
+	}
+	var found bool
+	for _, s := range schemas {
+		if s.Name != "bash" {
+			continue
+		}
+		found = true
+		if s.Parameters == "" {
+			t.Fatal("bash ToolSchema.Parameters is empty — LLM will see no schema and emit empty arguments")
+		}
+		var schema struct {
+			Type       string         `json:"type"`
+			Required   []string       `json:"required"`
+			Properties map[string]any `json:"properties"`
+		}
+		if err := json.Unmarshal([]byte(s.Parameters), &schema); err != nil {
+			t.Fatalf("bash Parameters is not valid JSON: %v\n%s", err, s.Parameters)
+		}
+		if schema.Type != "object" {
+			t.Errorf("bash schema type = %q, want %q", schema.Type, "object")
+		}
+		hasCommand := false
+		for _, r := range schema.Required {
+			if r == "command" {
+				hasCommand = true
+				break
+			}
+		}
+		if !hasCommand {
+			t.Errorf("bash schema required fields = %v, want \"command\" included", schema.Required)
+		}
+		if _, ok := schema.Properties["command"]; !ok {
+			t.Errorf("bash schema missing properties.command: %#v", schema.Properties)
+		}
+	}
+	if !found {
+		t.Fatal("bash not present in BuiltinToolRegistry")
 	}
 }
