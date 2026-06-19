@@ -1,6 +1,7 @@
 package memory_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -366,5 +367,51 @@ func TestManager_Get_returns_nil_for_missing(t *testing.T) {
 	}
 	if sc != nil {
 		t.Fatal("expected nil for missing session")
+	}
+}
+
+// T: D2-S3-A01-T03 (tool message dedup without call_id)
+// Migrated from internal/layers/contextengine/legacy/engine_tool_history_test.go
+// during the 2026-06-19 D2 legacy test cleanup. The legacy file tested
+// real production code (`memory.Manager.AppendFullMessage`) that belongs
+// next to its source in prepare/memory/, not in the legacy/ deprecation home.
+func TestManager_AppendFullMessage_should_not_duplicate_tool_messages_without_call_id(t *testing.T) {
+	cfg := config.DefaultContextEngineConfig()
+	mgr := memory.NewManager(cfg, snapshot.NewStore(&cfg.Snapshot), nil, nil)
+	sc := &types.SessionContext{
+		SessionID:   "sess_tool_hist",
+		Messages:    []types.Message{{Role: types.MessageRoleUser, Content: "first"}},
+		TokenBudget: types.DefaultTokenBudget(),
+	}
+
+	callID := "call_cursor_0"
+	tcJSON, _ := json.Marshal([]map[string]string{
+		{
+			"id":   callID,
+			"type": "function",
+		},
+	})
+	tcMsg := types.Message{
+		Role:     types.MessageRoleAssistant,
+		Metadata: map[string]string{"tool_calls": string(tcJSON)},
+	}
+	mgr.AppendFullMessage(sc, tcMsg)
+
+	resultMsg := types.Message{
+		Role:     types.MessageRoleTool,
+		Content:  "ok",
+		Metadata: map[string]string{"tool_call_id": callID},
+	}
+	mgr.AppendFullMessage(sc, resultMsg)
+
+	if len(sc.Messages) != 3 {
+		t.Fatalf("message count = %d, want 3", len(sc.Messages))
+	}
+	toolMsg := sc.Messages[2]
+	if toolMsg.Role != types.MessageRoleTool {
+		t.Fatalf("third message role = %s", toolMsg.Role)
+	}
+	if toolMsg.Metadata["tool_call_id"] != callID {
+		t.Fatalf("tool_call_id = %q", toolMsg.Metadata["tool_call_id"])
 	}
 }
