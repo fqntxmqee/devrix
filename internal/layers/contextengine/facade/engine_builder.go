@@ -1,4 +1,4 @@
-package contextengine
+package facade
 
 import (
 	"log/slog"
@@ -9,7 +9,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -21,11 +22,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 	observer := deps.Observer
 	if observer == nil {
-		observer = NoOpObserver{}
+		observer = kernel.NoOpObserver{}
 	}
 	compObserver := deps.CompressionObserver
 	if compObserver == nil {
-		compObserver = NoOpCompressionObserver{}
+		compObserver = kernel.NoOpCompressionObserver{}
 	}
 	counter := token.ResolveCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)

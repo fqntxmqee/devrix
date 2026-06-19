@@ -1,0 +1,75 @@
+# Devrix model catalog (data, NOT defaults).
+#
+# This file lists model IDs and their capabilities so devrix can adapt its
+# streaming / thinking-splitting behavior per model. It does NOT pick a
+# default model — model selection is the user's responsibility.
+#
+# To add a private / preview model, copy this file to
+# ~/.devrix/models.yaml and load it via LoadCatalogFromFile in your bootstrap
+# (or override DefaultCatalog via env var DEVRIX_MODEL_CATALOG).
+#
+# Capability semantics:
+#   native_thinking: true  — provider returns reasoning as a separate field
+#                            (delta.ReasoningContent / delta.Thinking). The SSE
+#                            parser bypasses the inline-<think> splitter.
+#   native_thinking: false — provider emits reasoning inline in delta.Content
+#                            using <think>...</think> tags. The stateful
+#                            splitter MUST be active to avoid tag-boundary
+#                            leakage across chunks.
+#   multimodal: true       — model accepts image / audio inputs (display only;
+#                            routing is governed by the request payload, not
+#                            this catalog).
+
+providers:
+  minimax:
+    - id: MiniMax-M3
+      display_name: M3 (frontier)
+      context_window: 1000000
+      native_thinking: true
+      multimodal: true
+    - id: MiniMax-M3-highspeed
+      display_name: M3 Highspeed
+      context_window: 1000000
+      native_thinking: true
+    - id: MiniMax-M2.7-highspeed
+      display_name: M2.7 Highspeed
+      context_window: 196608
+      native_thinking: false
+    - id: MiniMax-M2.7
+      display_name: M2.7
+      context_window: 196608
+      native_thinking: false
+    - id: MiniMax-M2.5-highspeed
+      display_name: M2.5 Highspeed (legacy fallback)
+      context_window: 131072
+      native_thinking: false
+  deepseek:
+    - id: deepseek-v4-latest
+      display_name: DeepSeek V4
+      context_window: 128000
+      native_thinking: true
+    - id: deepseek-v4-flash
+      display_name: DeepSeek V4 Flash
+      context_window: 128000
+      native_thinking: true
+    - id: deepseek-v4-pro
+      display_name: DeepSeek V4 Pro
+      context_window: 128000
+      native_thinking: true
+  anthropic:
+    - id: claude-sonnet-4-20250514
+      display_name: Claude Sonnet 4
+      context_window: 200000
+      native_thinking: true
+      multimodal: true
+    - id: claude-opus-4-20250514
+      display_name: Claude Opus 4
+      context_window: 200000
+      native_thinking: true
+      multimodal: true
+  openai:
+    - id: gpt-5
+      display_name: GPT-5
+      context_window: 400000
+      native_thinking: true
+      multimodal: true

@@ -32,6 +32,7 @@ func freeforkGlobalFunc(f freefork.Forker) toolrunner.FreeForkerFunc {
 			conv = append(conv, freefork.ForkRequest{
 				Name:     r.Name,
 				Prompt:   r.Prompt,
+				Sandbox:  r.WantsSandbox(),
 				Worktree: r.Worktree,
 				Mode:     mode,
 			})
@@ -43,8 +44,8 @@ func freeforkGlobalFunc(f freefork.Forker) toolrunner.FreeForkerFunc {
 		out := make([]toolrunner.FreeForkHandleDTO, 0, len(handles))
 		for _, h := range handles {
 			dto := toolrunner.FreeForkHandleDTO{
-				Worktree: h.Worktree,
-				Name:     h.Name,
+				SandboxPath: h.SandboxPath,
+				Name:        h.Name,
 			}
 			if h.Agent != nil {
 				dto.AgentID = h.Agent.ID()

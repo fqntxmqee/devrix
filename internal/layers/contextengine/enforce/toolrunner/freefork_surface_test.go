@@ -35,7 +35,7 @@ func (s *stubFreeforkFunc) Fork(ctx context.Context, parentSession string, reqs 
 	for i, r := range reqs {
 		handles = append(handles, toolrunner.FreeForkHandleDTO{
 			AgentID:  "agent-" + r.Name,
-			Worktree: "/wt/" + r.Name,
+			SandboxPath: "/wt/" + r.Name,
 			Name:     r.Name,
 		})
 		_ = i

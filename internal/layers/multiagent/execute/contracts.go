@@ -24,7 +24,7 @@ type WorkerRunSpec struct {
 	Role         string
 	Directive    string
 	TaskID       string
-	WorktreeSlug string
+	SandboxSlug string
 	MaxTurns     int
 	ModelTier    string
 	Observer     WorkerObserver

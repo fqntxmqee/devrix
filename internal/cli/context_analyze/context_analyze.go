@@ -15,7 +15,7 @@ import (
 	"os"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine/token/windowanalyzer"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token/windowanalyzer"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 

@@ -43,8 +43,8 @@ func (s *FreeForkSurface) Tools(_ context.Context, _, _ string) []contracts.Tool
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("free_fork")
 	return []contracts.ToolSpec{{
 		Name:            "free_fork",
-		Description:     "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id but runs in an isolated worktree (default). Returns agent_ids list.",
-		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "worktree": true, "mode": "default"}]}`,
+		Description:     "Batch fork N child agents (1..5) under a parent session. Each child runs in an isolated worker directory sandbox by default.",
+		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "sandbox": true, "mode": "default"}]}`,
 		Risk:            types.RiskLevelHigh,
 		ReadOnly:        rOnly,
 		Destructive:     dest,
@@ -92,6 +92,7 @@ type freeforkInput struct {
 type freeforkRequest struct {
 	Name     string `json:"name"`
 	Prompt   string `json:"prompt"`
+	Sandbox  bool   `json:"sandbox"`
 	Worktree bool   `json:"worktree"`
 	Mode     string `json:"mode,omitempty"`
 }
@@ -127,6 +128,7 @@ func (s *FreeForkSurface) Execute(ctx context.Context, _, input, _ string) (*con
 		dtos = append(dtos, toolrunner.FreeForkRequestDTO{
 			Name:     r.Name,
 			Prompt:   r.Prompt,
+			Sandbox:  r.Sandbox || r.Worktree,
 			Worktree: r.Worktree,
 			Mode:     r.Mode,
 		})

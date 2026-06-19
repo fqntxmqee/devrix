@@ -10,9 +10,24 @@ import (
 )
 
 // T: D3-S6-A01-T01
+//
+// DSAFT: D3-S6-A03 (v2.x). The compiled default no longer ships model names
+// or a default provider; callers must supply them via config (project or
+// user-level). This test verifies that the *infrastructure* part of the
+// default (provider catalog with BaseURL/APIKeyEnv, circuit breaker values)
+// still loads cleanly when the file config provides the model metadata.
 func TestLoader_should_load_default_provider_config(t *testing.T) {
+	// Apply a file config that picks the active provider + a model.
+	file := &sharedconfig.LLMGatewayFileConfig{
+		DefaultProvider: "minimax",
+		DefaultModel:    "MiniMax-M3",
+		Providers: map[string]sharedconfig.LLMProviderConfig{
+			"minimax": {DefaultModel: "MiniMax-M3"},
+		},
+	}
+	resolved := sharedconfig.BuildLLMGatewayConfig(file)
 	loader := llmconfig.NewLoader()
-	cfg, err := loader.Load(sharedconfig.DefaultLLMGatewayConfig())
+	cfg, err := loader.Load(resolved)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

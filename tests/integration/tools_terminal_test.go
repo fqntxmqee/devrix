@@ -107,13 +107,13 @@ func TestFreeFork_3Directions(t *testing.T) {
 		handles := make([]toolrunner.FreeForkHandleDTO, 0, len(reqs))
 		for _, r := range reqs {
 			wt := ""
-			if r.Worktree {
+			if r.WantsSandbox() {
 				wt = r.Name + ".wt"
 			}
 			handles = append(handles, toolrunner.FreeForkHandleDTO{
 				AgentID:  "agent-" + r.Name,
 				Name:     r.Name,
-				Worktree: wt,
+				SandboxPath: wt,
 			})
 		}
 		return handles, nil

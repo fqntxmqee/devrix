@@ -3,7 +3,7 @@ package token_test
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 )
 
 // T: D2-S4-A01-T01

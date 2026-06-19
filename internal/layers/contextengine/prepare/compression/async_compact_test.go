@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

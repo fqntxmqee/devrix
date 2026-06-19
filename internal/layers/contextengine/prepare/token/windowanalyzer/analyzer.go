@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/token"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 

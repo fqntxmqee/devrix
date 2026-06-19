@@ -24,6 +24,34 @@ func TestD2_QueryLoopRemoved(t *testing.T) {
 	}
 }
 
+func TestD2_RootProductionFiles_ThinFacade(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Dir(file)
+	allowed := map[string]bool{
+		"aliases.go":      true,
+		"contracts.go":    true,
+		"tool_context.go": true,
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		if !allowed[e.Name()] {
+			t.Errorf("unexpected production file at D2 root: %s (engine logic belongs in facade/ or scenario dirs)", e.Name())
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "facade", "engine.go")); err != nil {
+		t.Fatalf("facade/engine.go missing: %v", err)
+	}
+}
+
 func TestD2_EngineUsesPreparedTurnRunner(t *testing.T) {
 	e := NewContextEngine(EngineDeps{
 		Summarizer: &staticSummarizer{},

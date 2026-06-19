@@ -1,10 +1,12 @@
-package contextengine
+package facade
 
 import (
 	stderrors "errors"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/toolrunner"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -104,7 +106,7 @@ func TestMapProcessError_WrappedSentinelError(t *testing.T) {
 }
 
 func TestFilterToolsByPermissionMode_NonPlanMode(t *testing.T) {
-	tools := []ToolSchema{{Name: "bash"}, {Name: "read"}}
+	tools := []toolrunner.ToolSchema{{Name: "bash"}, {Name: "read"}}
 	got := enforce.FilterToolsByPermissionMode(types.PermissionDefault, tools, "")
 	if len(got) != 2 {
 		t.Errorf("non-plan mode should not filter, got %d", len(got))
@@ -112,7 +114,7 @@ func TestFilterToolsByPermissionMode_NonPlanMode(t *testing.T) {
 }
 
 func TestFilterToolsByPermissionMode_PlanMode(t *testing.T) {
-	tools := []ToolSchema{
+	tools := []toolrunner.ToolSchema{
 		{Name: "bash"},
 		{Name: "read"},
 		{Name: "write"},
@@ -164,7 +166,7 @@ func TestLastAssistantContent(t *testing.T) {
 }
 
 func TestNoOpObserver(t *testing.T) {
-	var obs NoOpObserver
+	var obs kernel.NoOpObserver
 	obs.EmitContextCompressed(types.CompressionReport{})
 	obs.EmitSnapshotRestored("s", true)
 	obs.EmitErrorOccurred("s", "E", nil)

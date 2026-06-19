@@ -158,7 +158,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S12-A01-T01 | Worktree enter 后 write 不污染主 WorkDir | Worktree | `internal/layers/contextengine/worktree/manager_test.go` | IMPLEMENTED | P0 |
+| D2-S12-A01-T01 | Sandbox enter 后 write 不污染主 WorkDir | D2-S18 | `internal/layers/contextengine/sandbox/manager_test.go` | IMPLEMENTED | P0 |
 
 ## D2-S6: Snapshot & Main Transcript
 
@@ -313,8 +313,8 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-DIAG-T01 | D2-S23-A01-T01 | S23 LSP Tool | D2 | LSP `definition` operation 返回 location | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
 | D2-DIAG-T02 | D2-S23-A01-T02 | S23 LSP Tool | D2 | LSP `references` operation 返回引用列表 | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P0 |
 | D2-DIAG-T03 | D2-S23-A01-T03 | S23 LSP Tool | D2 | LSP `incoming_calls` 返回 call hierarchy | `internal/layers/contextengine/enforce/toolrunner/lsp_tool_test.go` | IMPLEMENTED | P1 |
-| D2-DIAG-T04 | D2-S23-A02-T01 | S23 WindowAnalyzer | D2 | WindowAnalyzer 按 5 类拆分 token | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
-| D2-DIAG-T05 | D2-S23-A02-T02 | S23 WindowAnalyzer | D2 | WindowAnalyzer role 路由（system/tool/thinking/reminder） | `internal/layers/contextengine/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T04 | D2-S23-A02-T01 | S23 WindowAnalyzer | D2 | WindowAnalyzer 按 5 类拆分 token | `internal/layers/contextengine/prepare/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
+| D2-DIAG-T05 | D2-S23-A02-T02 | S23 WindowAnalyzer | D2 | WindowAnalyzer role 路由（system/tool/thinking/reminder） | `internal/layers/contextengine/prepare/token/windowanalyzer/analyzer_test.go` | IMPLEMENTED | P0 |
 | D2-SEC-T01 | TS-AST-T01 | tool-security AST | shared | Bash AST 阻止 heredoc 注入 | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
 | D2-SEC-T02 | TS-AST-T02 | tool-security AST | shared | Bash AST 阻止 zsh attack surface | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |
 | D2-SEC-T03 | TS-AST-T03 | tool-security AST | shared | Bash AST 阻止 process/command substitution | `internal/layers/contextengine/enforce/toolrunner/sandboxast/analyzer_test.go` | IMPLEMENTED | P0 |

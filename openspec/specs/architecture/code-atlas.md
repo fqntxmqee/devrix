@@ -68,7 +68,7 @@ Devrix 代码图谱：D-S 到包路径的快速索引。新建文件时 MUST 先
 | tool_registry | 工具注册表 | D2-S3-A03 | `contextengine/enforce/toolrunner/` | `ToolRegistry`, builtins (bash, read_file, glob, grep, edit) |
 | session_persister | 快照 + transcript + commit | D2-S17 | `contextengine/persist/` | `SessionPersister` |
 | nested_execution | 嵌套执行 (SubQuery/Background) | D2-S18 | `contextengine/enforce/` | `SubQuery`, `BackgroundTask` |
-| worktree | 沙箱工作目录 + per-handle wt | D2-S12 | `contextengine/worktree/` | `Manager`, `Enter`, `Exit` |
+| worker_dir_sandbox | delegate worker 目录沙箱 | D2-S18 | `contextengine/sandbox/` | `Manager`, `Enter`, `Exit` |
 | compression | 七步压缩管道 | D2-S2 | `contextengine/compression/` | `RunPipeline` |
 | memory | LongTerm Recall + 快照 | D2-S3 | `contextengine/memory/` | `LoadOrInit`, `PersistSnapshot` |
 | **D4 多智能体（D7 编排对象）** |||||

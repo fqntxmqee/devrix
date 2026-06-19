@@ -35,6 +35,11 @@ func classifyingGateway(t *testing.T, c errorclass.Classifier, failErr error) *s
 		t.Fatalf("counter: %v", err)
 	}
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	// DSAFT: D3-S6-A03 (v2.x). Compiled defaults no longer ship a default
+	// provider or model routing — tests must opt in.
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
 	reg := streamadapter.NewRegistry()
 	_ = reg.Register(stubAdapter{provider: "deepseek", handler: func(model string) (<-chan *llmgateway.AdapterChunk, error) {
 		return nil, failErr
@@ -139,6 +144,9 @@ func TestInvoke_Success_NoClassification(t *testing.T) {
 		t.Fatalf("counter: %v", err)
 	}
 	cfg := sharedconfig.DefaultLLMGatewayConfig()
+	cfg.DefaultProvider = "deepseek"
+	cfg.DefaultModel = "deepseek-v4-flash"
+	cfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
 	reg := streamadapter.NewRegistry()
 	_ = reg.Register(stubAdapter{provider: "deepseek", handler: func(model string) (<-chan *llmgateway.AdapterChunk, error) {
 		ch := make(chan *llmgateway.AdapterChunk, 1)

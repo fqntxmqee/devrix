@@ -25,10 +25,16 @@ type streamAccumulator struct {
 	hasUsage         bool
 	lastFinishReason string
 	// thinkSplitter routes XML <think>...</think> blocks out of delta.Content
-	// when the provider lacks a native reasoning field (e.g. minimax M2.7).
-	// Stateful across all events in the stream so chunks that straddle a
-	// tag boundary still split correctly. Provider-native fields
-	// (delta.ReasoningContent / delta.Thinking) bypass the splitter.
+	// when the provider lacks a native reasoning field. The decision is
+	// made per-event from the SSE payload: if delta.ReasoningContent or
+	// delta.Thinking is non-empty, that wins and the splitter is bypassed.
+	// Only when the provider sends reasoning inline (catalog capability
+	// native_thinking: false) does the splitter run. The catalog itself
+	// is consulted by the upstream adapter (see internal/layers/llmgateway/
+	// configure/catalog.go) but the splitter stays on for safety — providers
+	// can change behavior, and the worst case is "extra splitter work".
+	// Stateful across all events so chunks straddling a tag boundary still
+	// split correctly.
 	thinkSplitter *textutil.ThinkTagSplitter
 }
 
@@ -69,9 +75,10 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 				hasDelta = true
 			}
 		} else if delta.Content != "" {
-			// No provider-native field — the LLM is using inline <think> tags
-			// (minimax M2.7, Qwen, DeepSeek-R1 w/ chat template, etc.).
-			// Route through the stateful splitter so chunks straddling a
+			// No provider-native reasoning field on this delta — the provider
+			// either uses inline <think> tags (catalog capability
+			// native_thinking: false) or is unknown to the catalog. Route
+			// through the stateful splitter so chunks straddling a
 			// <think> / </think> boundary still separate correctly.
 			thinkDelta, contentDelta := a.thinkSplitter.Push(delta.Content)
 			if thinkDelta != "" {

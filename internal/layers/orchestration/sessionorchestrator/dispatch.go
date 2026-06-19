@@ -29,7 +29,7 @@ type DispatchRequest struct {
 	Role         string
 	Directive    string
 	TaskID       string
-	WorktreeSlug string
+	SandboxSlug string
 	Async        bool
 	MaxTurns     int
 	ModelTier    string
@@ -107,7 +107,7 @@ func (d *Dispatcher) dispatchToD4(ctx context.Context, leader multiagent.Agent, 
 		Role:         req.Role,
 		Directive:    req.Directive,
 		TaskID:       req.TaskID,
-		WorktreeSlug: req.WorktreeSlug,
+		SandboxSlug: req.SandboxSlug,
 		MaxTurns:     maxTurns,
 		ModelTier:    req.ModelTier,
 		Observer:     ab,

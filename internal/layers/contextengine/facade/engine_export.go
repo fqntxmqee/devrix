@@ -1,4 +1,4 @@
-package contextengine
+package facade
 
 import "github.com/devrix/devrix/internal/shared/contracts"
 

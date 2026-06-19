@@ -25,7 +25,8 @@ type ContextEngineConfig struct {
 	Tasks              TasksConfig        `yaml:"tasks"`
 	SubQuery           SubQueryConfig     `yaml:"subquery"`
 	ExecutionFlow      ExecutionFlowConfig `yaml:"execution_flow"`
-	Worktree           WorktreeConfig     `yaml:"worktree"`
+	Sandbox            SandboxConfig      `yaml:"sandbox"`
+	Worktree           SandboxConfig      `yaml:"worktree"` // deprecated alias; merged into Sandbox at load
 	TodoWrite          TodoWriteConfig    `yaml:"todo_write"`
 	MainTranscript     MainTranscriptConfig `yaml:"main_transcript"`
 	// Diagnostics DM-20260617-002 W13 (AC14) — 诊断 / 通知 / LSP / transcript 集中配置。
@@ -155,7 +156,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		Tasks:       DefaultTasksConfig(),
 		SubQuery:    DefaultSubQueryConfig(),
 		ExecutionFlow: DefaultExecutionFlowConfig(),
-		Worktree:      DefaultWorktreeConfig(),
+		Sandbox:       DefaultSandboxConfig(),
 		TodoWrite:      DefaultTodoWriteConfig(),
 		MainTranscript: DefaultMainTranscriptConfig(),
 		Diagnostics:    DefaultDiagnosticsConfig(),

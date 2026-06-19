@@ -119,10 +119,13 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 | S ID       | Scenario                        | scenario-slug   | 当前路径                                                                               | v2.0 目标                                       |
 | ---------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
-| D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` | ✅ DM-014                                      |
+| D2-S15     | PrepareExecutionContext         | `prepare`       | `prepare/memory/` `prepare/compression/` `prepare/prompt/` `prepare/conversation/` `prepare/token/` | ✅ DM-014                                      |
 | D2-S16     | ~~RunQueryLoop~~                | —               | **REMOVED**（DM-20260618-010）；`contextengine/query/` 已删除 → D7 `orchestration/turn/` | ✅ D7-S2-A06                                   |
-| D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/`                                         | ✅ DM-014                                      |
+| D2-S17     | PersistSessionState             | `persist`       | `persist/snapshot/`, `persist/transcript/` + `facade/engine_persist.go`          | ✅ DM-014                                      |
 | D2-S18     | EnforceExecutionPolicy          | `enforce`       | `enforce/permission/`, `enforce/toolrunner/`, `enforce/tool_filter.go`, `enforce/background_task_tools.go`, `enforce/planmode_tools.go` | ✅ DM-014                                      |
+| —          | Process facade (S15→D7→S17)     | `facade`        | `facade/engine.go`, `facade/engine_prepare.go`, `facade/engine_persist.go`, …      | ✅ DSAFT v2.0                                  |
+| —          | Domain kernel                   | `kernel`        | `kernel/contracts.go`, `kernel/spans.go`                                           | ✅ DSAFT v2.0                                  |
+| D2 root    | Public API re-exports           | —               | `contracts.go`, `aliases.go`, `tool_context.go`（3 生产文件）                         | ✅ DSAFT v2.0                                  |
 | D2-S19     | ~~NestedExecution~~ → S15+S18           | —               | **DISMANTLED**: fork→`prepare/conversation/`, subquery+background→`enforce/` | ✅ DM-014                                      |
 | D2-S20     | ~~LegacyHarnessFallback~~              | —               | **REMOVED**: harness 路径已移除，`fallback/` 目录已删除，`query_loop.enabled=false` 不再有效 | ✅ DM-014                                      |
 
@@ -134,8 +137,9 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | -------- | ------------- | ----------------------------------------------------------------------- |
 | D2-S2    | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` |
 | D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/`           |
+| D2-S4    | `token`       | ~~`contextengine/token/`~~ → `contextengine/prepare/token/`              |
 | D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4)      |
-| D2-S12   | `worktree`    | `contextengine/worktree/`                                               |
+| D2-S12   | `sandbox`    | `contextengine/sandbox/`                                               |
 
 ### 4.4 D3 LLM Gateway（canonical S1–S6 / 5+1 价值流）
 
