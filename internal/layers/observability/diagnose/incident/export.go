@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 )
 
@@ -69,7 +68,7 @@ func BuildBundle(sessionID string, opts ExportOptions) (*Bundle, error) {
 
 	logDir := opts.LLMLogDir
 	if logDir == "" {
-		logDir = observability.CurrentLLMLogSettings().LogDir
+		logDir = CurrentLLMLogSettings().LogDir
 	}
 
 	rounds, traceID, err := readLLMRounds(logDir, sessionID)

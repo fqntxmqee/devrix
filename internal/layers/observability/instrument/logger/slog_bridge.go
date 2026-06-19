@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
@@ -37,4 +38,15 @@ func (h *ContextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 func (h *ContextHandler) WithGroup(name string) slog.Handler {
 	return &ContextHandler{inner: h.inner.WithGroup(name)}
+}
+
+// InstallSlogBridge wraps the default slog handler to inject traceId/spanId from context.
+// Idempotent wrapper stack: subsequent calls re-wrap the latest default handler rather than
+// the original, preventing handler duplication across repeated init paths.
+func InstallSlogBridge() {
+	inner := slog.Default().Handler()
+	if inner == nil {
+		inner = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
+	}
+	slog.SetDefault(slog.New(NewContextHandler(inner)))
 }

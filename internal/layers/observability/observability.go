@@ -248,3 +248,11 @@ func (o *Observability) GenerateCoverageReport() (*coverage.DailyReport, error) 
 	}
 	return nil, fmt.Errorf("coverage reporter not enabled")
 }
+
+// InstallSlogBridge wires the trace-context-aware slog handler via instrument/logger.
+// Facade entry point — implementation lives in `instrument/logger` so the handler
+// stack is colocated with the rest of the slog machinery (context handler, redactor, etc.).
+// Idempotent at process startup; safe to call once before any slog.Default() writes.
+func InstallSlogBridge() {
+	logger.InstallSlogBridge()
+}
