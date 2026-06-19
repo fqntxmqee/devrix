@@ -46,7 +46,7 @@
 ### 2.1 D7 Invoke（Canonical）
 
 ```text
-D7_S2_Orchestration_LLM_Invoke
+D7_Orchestration_LLM_Invoke
 ├── llm.provider.route          (S1)
 └── llm.stream                  (S2)
     ├── safety.check.duration_ms (S5 event)

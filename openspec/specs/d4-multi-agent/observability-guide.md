@@ -41,8 +41,8 @@
 ### 2.1 D7 派发 Worker（挂在 D7 下）
 
 ```text
-D7_S2_Orchestration_Delegate_Dispatch
-└── D4_S14_Execute_Worker
+D7_Orchestration_Delegate_Dispatch
+└── D4_Execute_Worker
     ├── agent.fork
     ├── agent.run
     │   ├── agent.state.transition

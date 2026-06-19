@@ -105,6 +105,37 @@
 
 ---
 
+## Operation / Span 命名规范
+
+D5 作为 Operation Registry 的拥有者，定义全仓统一的 Span 命名规范。
+
+**格式：** `D{N}_{场景名称}_{动作}_{细节}`
+
+| 段 | 含义 | DSAFT 对应 | 示例 |
+|----|------|-----------|------|
+| `D{N}` | 域编号 | D 层 | `D1`, `D7` |
+| `{场景名称}` | 场景语义名（非 S 编号） | S 层 | `Capture`, `Orchestration` |
+| `{动作}` | 业务动作 | A 层 | `Message`, `Turn` |
+| `{细节}` | 操作细节（可多层） | F 层 | `Receive`, `Run` |
+
+**示例：**
+
+| Span 名称 | 拆解 |
+|-----------|------|
+| `D1_Capture_Message_Receive` | D1 · Capture 场景 · Message 动作 · Receive 细节 |
+| `D7_Orchestration_Turn_Run` | D7 · Orchestration 场景 · Turn 动作 · Run 细节 |
+| `D2_Context_Process` | D2 · Context 场景 · Process 动作 |
+| `D3_LLM_Stream` | D3 · LLM 场景 · Stream 动作 |
+
+**规则：**
+- 全部大写，`_` 分隔
+- **不在中间插入 S 编号**（场景名称已唯一标识场景，`D1_S13_Capture_...` 中 `S13` 与 `Capture` 重复）
+- Go 常量名仍保留 `OpD{N}_S{N}_...` 前缀以保持 DSAFT 追溯（如 `OpD1_S13_Capture_Message_Receive`），但**运行时字符串值**使用本规范
+
+**归属：** 所有 Span name 必须在 `names.go` 中以 `Op*` 常量定义，在 `coverage/registry.go` 中注册。各域使用 `telemetry.Op*` 常量，禁止 ad-hoc 字符串。
+
+---
+
 ## 跨域契约（摘要）
 
 见 `d5-boundary.md`。要点：D7 创建 Turn span；D5 提供 Op 常量；D2 Tracker 只读；RecordHit 独立于采样。

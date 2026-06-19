@@ -82,6 +82,17 @@
 **理由:** 39 IMPLEMENTED T 是硬约束（Playbook 原则 3）  
 **影响:** Doctor T（D5-S23-A03-T01/T02）canonical_a → A10 RunDoctorChecks
 
+### Decision: Span 运行时命名规范（Q7）
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| A: `D{N}_S{N}_{场景}_{动作}_{细节}` | DSAFT S 编号显式可见 | S 编号与场景语义名重复（`D1_S13_Capture_...` → `S13` = `Capture`）；Jaeger 中冗余 |
+| **B: `D{N}_{场景}_{动作}_{细节}`** | 简洁；场景名已唯一标识 S；一眼可读 | Go 常量名需保留 S 编号用于 DSAFT 追溯 |
+
+**选择:** B  
+**理由:** 场景语义名（`Capture`/`Orchestration`/`Context`）本身已唯一映射到 S 层，运行时字符串无需重复编号；Jaeger 展示更清晰  
+**影响:** `names.go` 中 Go 常量名格式不变（`OpD1_S13_Capture_Message_Receive`），运行时字符串值采用 `D1_Capture_Message_Receive`；`spans-registry.md` 同步更新格式描述
+
 ### Decision: 主路径 Trace 树 SoT
 
 **选择:** D7 Turn span 族为 Canonical；`query.loop.*` 仅 RETIRED 登记  

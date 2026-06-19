@@ -30,17 +30,17 @@
 
 | 文档 Operation | 代码常量 | S | 绑定 T（P0 加粗） |
 |----------------|----------|---|------------------|
-| `d1.capture.persist` | `D1_S13_Capture_Persist` | S13 | **D1-S13-A02-T01** |
-| `d1.dispatch.route` | `D1_S13_Dispatch_Route` | S13 | **D1-S13-A03-T01**, **D1-S13-A03-T02** |
-| `d1.signal.thinking` | `D1_S14_Signal_Thinking` | S14 | **D1-S14-A01-F01-T01** |
-| `d1.signal.task` | `D1_S15_Signal_Task` | S15 | D1-S15-A01-F01-T01 |
-| `d1.signal.conclusion` | `D1_S16_Signal_Conclusion` | S16 | **D1-S16-A02-T01**, **D1-S16-A02-T02** |
-| `d1.signal.chain_integrity` | `D1_S14_Signal_ChainIntegrity` | S14–S16 | 与结论 T 同跑 |
-| `d1.signal.task.work_proof` | `D1_S15_Signal_TaskWorkProof` | S15 | **D1-S15-A02-F01-T01** |
-| `d1.signal.user_feedback` | `D1_S16_UserFeedback_ConclusionRejected` | S16 | ⬜ 待补 T |
+| `d1.capture.persist` | `D1_Capture_Persist` | S13 | **D1-S13-A02-T01** |
+| `d1.dispatch.route` | `D1_Dispatch_Route` | S13 | **D1-S13-A03-T01**, **D1-S13-A03-T02** |
+| `d1.signal.thinking` | `D1_Signal_Thinking` | S14 | **D1-S14-A01-F01-T01** |
+| `d1.signal.task` | `D1_Signal_Task` | S15 | D1-S15-A01-F01-T01 |
+| `d1.signal.conclusion` | `D1_Signal_Conclusion` | S16 | **D1-S16-A02-T01**, **D1-S16-A02-T02** |
+| `d1.signal.chain_integrity` | `D1_Signal_ChainIntegrity` | S14–S16 | 与结论 T 同跑 |
+| `d1.signal.task.work_proof` | `D1_Signal_TaskWorkProof` | S15 | **D1-S15-A02-F01-T01** |
+| `d1.signal.user_feedback` | `D1_UserFeedback_ConclusionRejected` | S16 | ⬜ 待补 T |
 | `eventbus.publish_critical` | （bus 内隐式） | S18 | **D1-S18-A01-F02-T01** |
 | `eventbus.drain` | （bus 内隐式） | S18 | **D1-S18-A01-F03-T01** |
-| `adapter.feishu.encode` | `D1_S17_Adapter_Feishu_Outbound` | S17 | D1-S17-A01-T01 |
+| `adapter.feishu.encode` | `D1_Adapter_Feishu_Outbound` | S17 | D1-S17-A01-T01 |
 
 ### 出站信号 Span 必填属性
 
@@ -65,30 +65,30 @@ Emit 位置：`capture/signal_hooks.go` `emitOutboundSignalSpans`。
 一次普通对话（IntentFast）的预期 span 层次：
 
 ```text
-[D1] D1_S13_Capture_Message_Receive
-  ├─ D1_S13_Capture_Store_Update
-  ├─ D1_S13_Capture_Persist
-  ├─ D1_S13_Dispatch_Route {dispatch.target=d7}
+[D1] D1_Capture_Message_Receive
+  ├─ D1_Capture_Store_Update
+  ├─ D1_Capture_Persist
+  ├─ D1_Dispatch_Route {dispatch.target=d7}
   │
-  ├─ [D7] D7_S2_Orchestration_Session_Process
-  │    ├─ D7_S2_Orchestration_Intent_Classify
+  ├─ [D7] D7_Orchestration_Session_Process
+  │    ├─ D7_Orchestration_Intent_Classify
   │    └─ D7 Turn / D3 Stream / D2 Prepare·ToolRound
   │
-  ├─ D1_S13_Capture_EngineEvent_Handle（每事件）
-  │    ├─ D1_S14_Signal_Thinking + ChainIntegrity
-  │    ├─ D1_S15_Signal_Task + TaskWorkProof
-  │    └─ D1_S16_Signal_Conclusion + ChainIntegrity
+  ├─ D1_Capture_EngineEvent_Handle（每事件）
+  │    ├─ D1_Signal_Thinking + ChainIntegrity
+  │    ├─ D1_Signal_Task + TaskWorkProof
+  │    └─ D1_Signal_Conclusion + ChainIntegrity
   │
-  └─ D1_S17_Adapter_*_Outbound
+  └─ D1_Adapter_*_Outbound
 ```
 
 ### 延迟 SLO
 
 | 指标 | 目标 | 观测 Span |
 |------|------|-----------|
-| IM 入口启动 | P99 < 500ms | `D1_S17_Adapter_*_Outbound` |
-| 入站 → 首 thinking | P99 < 800ms | `D1_S14_Signal_Thinking` |
-| complete 必达 | P99 < 800ms from inbound | `D1_S16_Signal_Conclusion` |
+| IM 入口启动 | P99 < 500ms | `D1_Adapter_*_Outbound` |
+| 入站 → 首 thinking | P99 < 800ms | `D1_Signal_Thinking` |
+| complete 必达 | P99 < 800ms from inbound | `D1_Signal_Conclusion` |
 
 Legacy Gateway span（11 ops）与 Adapter span（3 ops）登记见 `span-registry.md` §Legacy；Coverage 全表见 `observability/diagnose/coverage/registry_test.go`。
 
@@ -209,11 +209,11 @@ go test ./internal/layers/communication/capture/ -run Permission -v
 
 | 检查项 | 查询 / 条件 | 期望 |
 |--------|------------|------|
-| 入站可追溯 | `D1_S13_Capture_Persist` 存在 | 每用户消息 1 个 |
-| D7 路由 | `D1_S13_Dispatch_Route{target=d7}` | 无 legacy D2 路径 |
+| 入站可追溯 | `D1_Capture_Persist` 存在 | 每用户消息 1 个 |
+| D7 路由 | `D1_Dispatch_Route{target=d7}` | 无 legacy D2 路径 |
 | 信号锚点 | `D1_S14/15/16_Signal_*` | `source_event_id` 非空 |
-| Fast 链完整 | `D1_S14_Signal_ChainIntegrity` | `chain.intact=true` |
-| 必达时效 | inbound → `D1_S16_Signal_Conclusion` | P99 ≤ 800ms |
+| Fast 链完整 | `D1_Signal_ChainIntegrity` | `chain.intact=true` |
+| 必达时效 | inbound → `D1_Signal_Conclusion` | P99 ≤ 800ms |
 | Drain 不丢结论 | Drain 期间仍有 Conclusion span | 无 gap |
 
 ### 建议告警（D5 metric 层）
@@ -231,7 +231,7 @@ go test ./internal/layers/communication/capture/ -run Permission -v
 
 | 缺口 | 现状 | 建议 |
 |------|------|------|
-| `D1_S16_UserFeedback_ConclusionRejected` | span 已 emit，无绑定 T | 新增 P1 T + acceptance 用例 |
+| `D1_UserFeedback_ConclusionRejected` | span 已 emit，无绑定 T | 新增 P1 T + acceptance 用例 |
 | `eventbus.publish_critical` / `eventbus.drain` | 文档已登记，bus 内无显式 OTel span | D5-S21 补 span |
 | IntentOrchestrate 链完整性 | `chain.intact` 未单独定义 worker 洪流语义 | 扩展 `ChainReport` |
 | 空消息拒绝 | spec Gherkin 有描述 | 新增 `D1-S13-A01-T01` |
