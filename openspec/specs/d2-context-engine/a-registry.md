@@ -51,7 +51,7 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 | D2-S17-A01 | SaveSnapshot | A-BE | session | snapshot_bytes | `persist/snapshot/store.go` |
 | D2-S17-A02 | WriteTranscript | A-BE | session_id, delta | jsonl | `persist/transcript/main_thread.go` |
 | D2-S17-A03 | StoreLongTerm | A-BE | session, query, summary | — | `prepare/memory/longterm.go` |
-| D2-S17-A04 | CommitWindow | A-BE | session, budget | trimmed | `engine_persist.go` |
+| D2-S17-A04 | CommitWindow | A-BE | session, budget | trimmed | `persist/commit.go` |
 
 ### D2-S18: EnforceExecutionPolicy ✅
 

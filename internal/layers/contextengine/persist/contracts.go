@@ -7,7 +7,11 @@
 //   - A04 CommitWindow: 消息截断 + Active Window 提交
 package persist
 
-import "context"
+import (
+	"context"
+
+	"github.com/devrix/devrix/internal/shared/types"
+)
 
 // SnapshotPersister serializes and persists session context snapshots.
 //
@@ -29,3 +33,13 @@ type TranscriptWriter interface {
 type LongTermStorer interface {
 	AutoStore(ctx context.Context, sessionID, query, summary string) error
 }
+
+// MessageStore reads and mutates in-memory session messages (S17-A04).
+type MessageStore interface {
+	Get(sessionID string) (*types.SessionContext, bool)
+	AppendFullMessage(sc *types.SessionContext, msg types.Message)
+	TrimMessages(sc *types.SessionContext)
+}
+
+// SessionBootstrap lazily initializes a session for first-write persist paths.
+type SessionBootstrap func(sessionID string) (*types.SessionContext, error)

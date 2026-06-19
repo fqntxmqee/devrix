@@ -327,7 +327,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 95 | 95 | 0 | 49 |
+| 96 | 96 | 0 | 49 |
 
 > TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
 > TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。
@@ -335,4 +335,22 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 > **TOOL-SURFACE-1 v3 (DM-20260618-002) 新增 4 项 P0 T26-T29（88 - 84 = 4）**
 > **PERMISSION-GATE-1 (DM-20260618-002) 新增 2 项 P0 T01-T02（90 - 88 = 2）**
 > **TOOL-SURFACE-1 Lazy Loading (DM-20260618-003) 新增 5 项 P0 T30-T34（95 - 90 = 5）**
+> **D2-STRUCT-T01 (DM-20260619-007) 新增 1 项 P0 layout 守卫（96 - 95 = 1）**
 > 全部 IMPLEMENTED。
+
+---
+
+## D2-STRUCT: Layout Guard (DM-20260619-007)
+
+> **D2 v2.2 Structure 终态（devrix-d2-structure-closure）** — 防止目录漂移回到 Pre-v2.2 形态。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status |
+|------|------|--------|-----------|--------|
+| **D2-STRUCT-T01** | 根目录生产文件仅 `contracts.go` + `aliases.go`（`tool_context.go` 核心逻辑迁出后保留 type alias） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T02** | 无 `engine_persist.go` 在根或 `facade/` 外（v2.2 后功能归属 `persist/commit.go`） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T03** | `enforce/tools/` 包名为 `package tools`，禁止 `package toolrunner` 残留 | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T04** | `prepare/memory/` 与 `persist/memory/` 无循环依赖（Recall 与 Store 接口解耦） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T05** | `enforce/orchestrator.go` 已删除（stub 移除，dispatch 由 `turn_adapter` 接管） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+| **D2-STRUCT-T06** | scenario 下目录深度 ≤2 层（`enforce/tools/surface/` ✅；更深需 F-registry 登记） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P0 |
+
+> 全部由 `internal/lint/layer/d2_layout_test.go` 单一守卫测试驱动。
