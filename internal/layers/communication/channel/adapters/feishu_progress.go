@@ -25,19 +25,19 @@ type toolCallEntry struct {
 }
 
 type feishuSessionStream struct {
-	mu             sync.Mutex
-	progressMsgID  string
-	responseMsgID  string
-	thinkingMsgID  string
-	agentOutputMsgID string
-	toolsMsgID     string
-	toolCalls      []toolCallEntry
-	textBuffer     strings.Builder
-	thinkingBuffer strings.Builder
+	mu                sync.Mutex
+	progressMsgID     string
+	responseMsgID     string
+	thinkingMsgID     string
+	agentOutputMsgID  string
+	toolsMsgID        string
+	toolCalls         []toolCallEntry
+	textBuffer        strings.Builder
+	thinkingBuffer    strings.Builder
 	agentOutputBuffer strings.Builder
-	summaries      []string
-	progressPct    int
-	taskName       string
+	summaries         []string
+	progressPct       int
+	taskName          string
 
 	replyCardID        string
 	cardkitEnabled     bool
@@ -354,6 +354,19 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 			Build()
 		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
 	}
+	// Fallback: LLM did not produce a final summary (e.g. max-turns reached
+	// mid-tool-call while the LLM was still looping, or the D7 orchestrator
+	// emitted a blank finalText). Without this, the reply card stays in
+	// whatever partial state the LLM last wrote and the user sees no
+	// "任务完成" affordance at all. Emit a minimal completion footer so the
+	// conclusion is never silently lost.
+	if responseMsgID != "" {
+		footer := responseText + "\n\n---\n_✅ 任务已完成_"
+		card := NewCard().
+			Markdown(footer).
+			Build()
+		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
+	}
 	return nil
 }
 
@@ -368,6 +381,13 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	content := stream.textBuffer.String()
 	if strings.TrimSpace(summary) != "" {
 		content += "\n\n---\n" + strings.TrimSpace(summary)
+	} else if strings.TrimSpace(content) != "" {
+		// Empty summary fallback: when the LLM never produced a final
+		// conclusion (D7 max-turns mid-tool-call, or D7 resolveFinalText
+		// fallback also returned empty), append a minimal completion marker
+		// so the user sees the task finished instead of a dangling partial
+		// card with no closure.
+		content += "\n\n---\n_✅ 任务已完成_"
 	}
 
 	stream.cardkitSequence++
