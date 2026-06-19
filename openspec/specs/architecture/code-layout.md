@@ -242,23 +242,20 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 
 ### 4.6 D5 Observability
 
-> **2026-06-15 SA Refine v1.0**: 从 9 技术包重切为 4+1 价值流（DM-20260615-001）。v1.0 仅注册表，v2.0 物理迁移。
+> **v2.1 Terminal (2026-06-19):** 4+1 价值流 S21–S24+S0 号段冻结。物理路径 canonical 化完成。9 bridge 包 Deprecated → Phase B 删除。诊断工具链（doctor/tracker/faultinject）已落地。**Change:** devrix-d5-v2-terminal（DM-20260619-006）。
 
-| S ID   | Scenario   | scenario-slug | v2.0 目标                     | 当前路径                                                                                    | 状态            |
-| ------ | ---------- | ------------- | --------------------------- | --------------------------------------------------------------------------------------- | ------------- |
-| D5-S21 | Instrument | `instrument`  | `observability/instrument/` | `instrument/tracer/` `instrument/metrics/` `instrument/logger/` `instrument/telemetry/` | v2.0 PHYSICAL |
-| D5-S22 | Export     | `export`      | `observability/export/`     | `export/`                                                                               | v2.0 PHYSICAL |
-| D5-S23 | Diagnose   | `diagnose`    | `observability/diagnose/`   | `diagnose/coverage/` `diagnose/incident/`                                               | v2.0 PHYSICAL |
-| D5-S24 | Configure  | `configure`   | `observability/configure/`  | `configure/settings/` `configure/runtime/`                                              | v2.0 PHYSICAL |
-| D5-S0  | Facade     | —             | `observability/` 根          | `observability.go`                                                                      | v2.0 PHYSICAL |
+| S ID   | Scenario   | scenario-slug | 物理路径                                                                                                                              | 状态               |
+| ------ | ---------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| D5-S21 | Instrument | `instrument`  | `instrument/tracer/` `instrument/metrics/`（含 `genai_tokens.go`）`instrument/logger/`（含 `debugfilter/`）`instrument/telemetry/` | v2.1 TERMINAL |
+| D5-S22 | Export     | `export`      | `export/`                                                                                                                             | v2.1 TERMINAL |
+| D5-S23 | Diagnose   | `diagnose`    | `diagnose/coverage/` `diagnose/incident/` `diagnose/doctor/` `diagnose/tracker/` `diagnose/faultinject/` + `health.go`        | v2.1 TERMINAL |
+| D5-S24 | Configure  | `configure`   | `configure/settings/` `configure/runtime/` + `config.go` `load.go`                                                                   | v2.1 TERMINAL |
+| D5-S0  | Facade     | —             | `observability.go` `bridge.go`                                                                                                        | v2.1 TERMINAL |
 
-**关键 v2.0 迁移（DM-20260615-003，已完成）：**
+**关键迁移历史：**
 
-- `tracer/` + `metrics/` + `logger/` + `telemetry/` → `observability/instrument/`（包名不变）
-- `exporter/` → `observability/export/`（package export）
-- `coverage/` + `incident/` → `observability/diagnose/`（包名不变）
-- `settings/` + `runtime/` → `observability/configure/`（包名不变）
-- 旧路径保留 9 个 bridge.go（Deprecated，v2.1 移除）
+- v2.0 (2026-06-15)：`tracer/` + `metrics/` + `logger/` + `telemetry/` → `instrument/`；`exporter/` → `export/`；`coverage/` + `incident/` → `diagnose/`；`settings/` + `runtime/` → `configure/`（DM-20260615-003）。旧路径保留 9 bridge。
+- **v2.1 Terminal (2026-06-19)：** 诊断工具链（doctor/tracker/faultinject/debugfilter）落地；`genai_tokens.go` → `instrument/metrics/`；`llm_log.go` → `diagnose/incident/`；Bridge 删除（Phase B）；S21–S24+S0 号段冻结。
 
 ### 4.7 D6 Evolution
 
@@ -355,3 +352,4 @@ internal/layers/communication/
 | **1.9.0** | **2026-06-15** | **D5+D6 SA Refine v2.0 物理路径迁移完成**（DM-20260615-003）：D5 4 个 scenario 物理迁移（instrument/export/diagnose/configure）+ D6 2 个 scenario 物理迁移（evaluate/guard）；~106 文件移动 + ~133 import 路径更新；3 个包重命名（eval→evaluate, exporter→export, orchestration→guard）；11 个 bridge.go（Deprecated, v2.1 移除）                                                 |
 | **1.10.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化文档同步**：layering.md v4.4.0 D7 目录树新增 `coordinator/command_handler.go`（IntentCommand 零 LLM 分发）+ `coordinator/orchestrate_path.go`（IntentOrchestrate 显式调 SynthesizeTaskGraph + WaveScheduler）；两文件位于 `internal/layers/orchestration/coordinator/` 包内，PR #35 引入；§3 目录决策树 §6 D1 终态示例同步不需更新（D7 目录树属于 layering.md 职责） |
 | **1.11.0** | **2026-06-16** | **D1 领域文档同步**：§7 OpenSpec 对应表增加 `d1-domain.md` 领域 SoT 与 `terminal-state-guide` / `observability-guide` 指南路径 |
+| **1.12.0** | **2026-06-19** | **D5 v2.1 Terminal（DM-20260619-006）**：§4.6 D5 物理路径表更新为 v2.1 TERMINAL；diagnose 子目录补全 doctor/tracker/faultinject；instrument 子目录补全 debugfilter；genai_tokens.go → instrument/metrics/ + llm_log.go → diagnose/incident/；Bridge 删除路线标注 |

@@ -76,27 +76,32 @@ internal/layers/observability/
 
 ## 5. 验收标准（AC）
 
-### Phase A — 规格终态（docs-only）
+### Phase A — 规格终态（docs + registry 代码锚点）
 
-| AC | 描述 | 优先级 |
-|----|------|--------|
-| AC-A1 | 新建 `d5-domain.md`：North Star + 4 承诺 + Out of Scope + 物理路径表 | P0 |
-| AC-A2 | `spec.md` v3.0：DSAFT 主表 S21–S24；query.loop 仅 RETIRED 节 | P0 |
-| AC-A3 | 新建 `observability-guide.md`：D7 Turn Trace 树 + Span↔T P0 矩阵 + Runbook | P0 |
-| AC-A4 | 新建 `terminal-state-guide.md` + `dsaft-architecture.md` Stub | P1 |
-| AC-A5 | 新建 `d5-boundary.md`；更新 `cross-domain-boundaries.md` D5 段 | P0 |
-| AC-A6 | `a-registry` v4.0 + `f-registry` v3.0 + `design.md` v3.0 同步 | P0 |
-| AC-A7 | `code-layout.md` §4.6 diagnose 子目录完整；`grep query.loop` 仅 Legacy/RETIRED | P0 |
+| AC | 描述 | 优先级 | 博弈论来源 |
+|----|------|--------|-----------|
+| AC-A1 | 新建 `d5-domain.md`：Tl;DR + North Star + 4 承诺 + 完备性边界 + 博弈论玩家表（含 SRE/on-call）+ 时间属性×承诺强度交叉矩阵 + S23 子承诺（按时间分组）+ S25 触发条件 + 子承诺举证责任 + Terminal 冻结声明 + 各域 Bridge 删除时间线 + Out of Scope + 物理路径表 + 文档阅读优先级标注 | P0 | G1,G7,G8,G12,G13,G16,G20 |
+| AC-A2 | `spec.md` v3.0：DSAFT 主表 S21–S24；D7 Turn 主路径；query.loop 仅 RETIRED 节 | P0 | — |
+| AC-A3 | 新建 `observability-guide.md`：D7 Turn Trace 树 + Span↔T P0 矩阵 + P0 Runbook（含 on-call 排障动线 + SRE 验收清单）+ Coverage 多维指标（ratio/completeness/link_integrity/recency）+ WARN metric 聚合说明 + D5 成功指标双轨声明（过程指标 + 验证指标） | P0 | G15,G17 |
+| AC-A4 | 新建 `terminal-state-guide.md` + `dsaft-architecture.md` Stub | P1 | — |
+| AC-A5 | 新建 `d5-boundary.md`；更新 `cross-domain-boundaries.md` D5 段（含 D5→D6 证据移交规则） | P0 | G9 |
+| AC-A6 | `a-registry` v4.0 + `f-registry` v3.0 + `design.md` v3.0 同步（design.md §5 含 S23 硬边界 + S25 触发条件 + 子承诺举证责任；§10 含 Phase B2 拆步不留 shim + Phase A 代码锚点 + Phase B 启动对账条件 + 跨 Change 级联标注；§12 含 legacy_harness 退役计划） | P0 | G1,G6,G10,G11,G13,G16 |
+| AC-A7 | `code-layout.md` §4.6 diagnose 子目录完整；`grep query.loop` 仅 Legacy/RETIRED | P0 | — |
+| AC-A8 | Phase A 包含 ≥1 个代码锚点（a-registry v4.0 Code Location 更新 或 t-registry canonical 列校正），不可推迟到 Phase B | P0 | G10 |
+| AC-A9 | 所有新建 spec 文档包含阅读优先级标注（MUST/SHOULD/REFERENCE） | P1 | — |
 
 ### Phase B — 代码清债
 
-| AC | 描述 | 优先级 |
-|----|------|--------|
-| AC-B1 | 删除 9 个 bridge 包；`bridge.go`/`slog_bridge.go` 改 canonical import | P0 |
-| AC-B2 | `genai_tokens.go` → `instrument/metrics/`；`llm_log.go` → `diagnose/incident/` | P1 |
-| AC-B3 | `t-registry` canonical_s 校正（A08→S21, A06→S0）；2 PLANNED T 闭合或删 | P1 |
-| AC-B4 | 41/41 T IMPLEMENTED 或 PLANNED 有明确 sad path 说明 | P0 |
-| AC-B5 | `go test` + race + layer-lint + obs integration 全绿 | P0 |
+| AC | 描述 | 优先级 | 博弈论来源 |
+|----|------|--------|-----------|
+| AC-B1 | Phase B2a：`bridge.go` import 改 `instrument/*` 直连，`go build ./...` 通过 | P0 | G11 |
+| AC-B2 | Phase B2b：删除 9 个 bridge 包（不留 shim）；全仓 `grep` 旧 bridge 路径 = 0 命中（除 archive/docs）；`go test ./... -race` 全绿 | P0 | G11 |
+| AC-B3 | CI 包含 bridge 防回归规则（grep 9 个旧路径 = 0 命中，否则 CI 拒绝） | P0 | G11 |
+| AC-B4 | `genai_tokens.go` → `instrument/metrics/`；`llm_log.go` → `diagnose/incident/`；`slog_bridge.go` 调 `instrument/logger` 安装桥 | P1 | — |
+| AC-B5 | `t-registry` canonical_s 校正（A08→S21, A06→S0）；canonical_a 校正（Doctor T→A10）；**3** PLANNED T 闭合（D5-S21-A05-T01, D5-S21-A05-T02, D5-S23-A06-T02） | P1 | — |
+| AC-B6 | 41/41 T IMPLEMENTED（PLANNED 全部闭合后），每条 P0 T 有明确 Span 证据或 sad path 说明 | P0 | — |
+| AC-B7 | `go test ./... -race` + layer-lint + obs integration 全绿 | P0 | — |
+| AC-B8 | `legacy_harness` metric help text 标 DEPRECATED；退役计划写入 `design.md` §12（v2.1 DEPRECATED → v2.3 自爆机制） | P1 | G6 |
 
 ## 6. 不在范围
 
@@ -160,7 +165,7 @@ D2/D7 实现 · Operation 56 条 · S 号段 S21–S24
 | L2 Scenario | S0 + S21–S24；S23 子承诺 C3a–C3e | `spec.md` Scenarios |
 | L3 Activity | +5 A（A14, A03, A07, A09, A10） | `a-registry.md` v4.0 |
 | L4 Function | +诊断 F；全路径 canonical_s | `f-registry.md` v3.0 |
-| L5 Test | canonical_s/a 列；2 PLANNED 闭合 | `t-registry.md` v3.2 |
+| L5 Test | canonical_s/a 列；3 PLANNED 闭合 | `t-registry.md` v3.2 |
 
 ## 11. 风险评估
 

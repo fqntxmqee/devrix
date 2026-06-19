@@ -1435,3 +1435,537 @@ D1_S13_Capture_Message_Receive
 | 1.3.0 | 2026-06-19 | Claude 第二轮对焦：对 §13.1–13.7 逐条回应 + 两轮合并落地清单（15 条） |
 | 1.2.0 | 2026-06-19 | MiniMax 第二轮增量：§13.1–13.7（信息不对称/ESS/SRE 缺位/时间属性/公共物品/多 Referee/Phase 强度）+ 总结表 + 落地建议 |
 | 1.1.0 | 2026-06-19 | Claude 博弈论对焦：OQ 1–6 + Grill 1–6 + 补充视角 + 总结表 |
+
+## 17. 第三轮增量视角 — MiniMax 回应 Claude DSAFT Review（2026-06-19）
+
+**对象:** `claude-dsaft-review.md`（Claude 2026-06-19 S3-Gate DSAFT 五层对焦）
+
+**目的:** §13（信息不对称/ESS/SRE/时间/公共物品/多 Referee/Phase 强度）+ §16（DSAFT 分层体检 + 命名规范校正）**未覆盖的结构性盲区**，并对 Claude §7.2 / §八.2 的「Phase B2 拆步 + 1 release shim」提议做正式博弈论回应。**不重复 §11 OQ/Grill 与 §13 既有论点。**
+
+---
+
+### 17.1 立场总览：Claude DSAFT 与 §11.3.1 烧船承诺的对冲
+
+Claude §7.2 / §八.2 提议：
+
+> "Phase B2 拆为 2 步：B2a 改 bridge.go import 到 canonical、B2b 删 9 包（**中间留 1 release shim**）"
+
+**MiniMax 立场：** **部分接受 B2 拆步形式，**反对**留 shim。** 理由如下，三方对焦：
+
+| 视角 | Claude（DSAFT） | MiniMax（博弈论 §11.3.1） | 综合建议 |
+|------|---------------|--------------------------|----------|
+| 拆步 | ✅ 降低爆炸半径 | ✅ 与 §13.7 Phase 强度一致 | **采纳 B2a/B2b 拆步** |
+| 留 shim | ⚠️ D2 v2.2 留 1 release 是成熟先例 | ❌ **违反烧船承诺**——shim 就是新 bridge | **不留 shim；用 CI 防回归替代** |
+| 删 9 包时机 | B2b 单独删 | B2b 删 + 同 release 内 grep 全仓 import | **B2b 必须 0 残留** |
+
+**为什么不能用 shim？**
+
+§11.3.1 已经确立：删 bridge 是**烧船承诺**——通过消除撤退选项来强制新均衡。
+
+- shim = 名义删除 + 实质保留 = **cheap talk**。开发者会发现 `import observability/tracer` 仍能编译通过 → 局部最优继续走 shim → 半年后 shim 重新长成桥 → 终态失败。
+- D2 v2.2 留 shim 的先例（DM-20260619-007）适用于 D2 语境（D2 是 Follower，依赖外部消费者少），不直接迁移到 D5（D5 是公共域，被 D1/D2/D3/D4/D6/D7 全员依赖，shim 暴露面大一个数量级）。
+
+**机制等价物（替代 shim 的保护装置）：**
+
+1. **CI 硬门禁：** `grep -r "observability/tracer\|observability/metrics/legacy\|observability/logger/legacy" --exclude-dir=archive` = 0 命中（类似 §16.7 建议的 `grep query.loop` layer-lint）
+2. **Release notes 显式宣告：** "D5 v2.1 移除 9 个 bridge 包，无 shim。"——可验证承诺
+3. **ADR 留档：** 在 `docs/adr/0007-d5-bridge-removal-no-shim.md` 写明"不引入过渡 shim"的决策与理由，防止下一轮重构者"出于善意"恢复
+
+**这一对焦必须在 Owner S3-Gate 决议前完成，否则 Phase B2 启动后博弈结构已锁定。**
+
+---
+
+### 17.2 跨 Change 相关均衡（Correlated Equilibrium）
+
+**§13.6 讨论了多 Referee 协调**，但未分析**多个并行 change 之间的相关均衡**。
+
+**问题：** D5 v2.1（DM-20260619-006）不是孤立落地。它与以下 change **同期归档、互相引用**：
+
+| Change | DM | 对 D5 v2.1 的依赖 |
+|--------|-----|------------------|
+| D7 v2 structure | DM-20260619-005 | D5 `d5-boundary.md` §4 引用 D7 Turn 主路径为 canonical |
+| D2 v2.2 closure | DM-20260619-007 | D2 删 shim 的成功经验被 D5 v2.1 复用 |
+| D6 v2.0.1 | DM-20260615-003 | D6 已删 bridge，D5 跟进是 signal correlation |
+| D7 v2.1 closure | DM-20260619-005 | Turn 主路径 span 已落地，D5 仅采不创建 |
+
+**博弈论含义：** 这不是 4 个独立决策，而是**一个相关均衡**——4 个 change 的 Owner 通过非正式渠道（每日 standup / DM 编号对齐）协调出"同时落地"策略向量。
+
+**相关均衡 ≠ 纳什均衡的强加：**
+- 纳什：每个 Owner 独立决策，无协调 → D5 可能等 D6 先删 bridge 再删（互相等待 → 永不启动）
+- 相关均衡：所有 Owner 看到"4 个 change 同一周归档"信号 → 任何一方单独延期会破坏信号 → 强制同步
+
+**风险：** 相关均衡依赖**信号的可信度**。如果 D7 v2.1 closure 延期 1 周：
+- D5 v2.1 的 §八.4 引用 D7 closure 模式 → 失去参考先例
+- §十六.5 的"DSAFT 分层体检对比 D7 终态"对比基准动摇
+- 相关均衡崩溃 → 4 个 Owner 各自重新评估 → 可能引发 D5 也延期
+
+**对策：**
+
+1. **公开信号源：** 在每个 change 的 `proposal.md` 显式声明"依赖同周归档的 change 列表"——把隐性相关均衡形式化
+2. **错峰归档：** 不要追求"同一天合并"，目标是"同 1 个 release cycle 内"（如 `v0.42.0`）。错峰给每个 change 独立验证窗口
+3. **单向依赖优于双向依赖：** D5 v2.1 已正确做到"只引用 D7 终态作为参考"，**不**被 D7 反向引用——单向依赖降低相关均衡脆弱性
+
+**新增 OQ-7（供 Owner / Claude 对焦）：**
+
+| # | 问题 | 选项 | 倾向 |
+|---|------|------|------|
+| OQ-7 | 4 个并行 change 是否需要正式归档协调人？ | 不需要（隐式协调足够）/ 设立 release captain | **倾向 release captain**——避免单点延期引发相关均衡崩溃 |
+
+---
+
+### 17.3 Goodhart's Law on Spans：「覆盖率为指标」后的逆向激励
+
+**§13.5 讨论了 Coverage 报告的公共物品属性**，但未分析**指标化后的激励扭曲**。
+
+**问题：** 当 Coverage 命中率（`covered_ops / total_ops`）从「诊断信号」变成「KPI」后，业务域的局部最优会从「真实埋点」漂移到「让指标好看」：
+
+| 行为漂移 | 触发条件 | 检测难度 |
+|---------|---------|---------|
+| **Span inflation（冗余埋点）** | "多创 span 拉高 numerator" | 中——Operation Registry 56 条上限可约束 |
+| **Coverage 报告伪造** | "写脚本生成假 Coverage JSON" | 高——需要审计 Coverage 输出与 runtime 调用对照 |
+| **低价值 span 注册** | "为了命中，把常用 log 也注册成 op" | 中——可通过 SpanAttrs richness 检测 |
+| **Zero-hit 业务避谈** | "本周报告零命中，明周再说" | 高——与 §17.4 逆向选择同源 |
+
+**Goodhart 强版本：** "When a measure becomes a target, it ceases to be a good measure."——一旦覆盖率成为 on-call 仪表板的指标，**真实可观测性** 与 **覆盖率指标** 就会脱钩。
+
+**机制设计对策：**
+
+1. **多维指标而非单一覆盖率：**
+   - `coverage_ratio`（命中比例）
+   - `span_attr_completeness`（属性完整度，§16.6 命名规范一致率）
+   - `trace_link_integrity`（trace_id 可串联率，跨 D1-D7 不断裂）
+   - `coverage_recency`（最近 7 天有命中的 op 比例，防"陈旧命中"）
+   - 这 4 个指标联合诊断，避免任何单一指标被优化
+
+2. **Coverage 报告双向签名：**
+   - 业务域 Owner 在 Coverage 报告上签字（"本周新增未注册 op：X 个，原因：Y"）
+   - D5 不验证业务理由，但**记录异常声明**——事后审计可追溯
+
+3. **指标暴露但不当 KPI：**
+   - 仪表板显示但不设阈值门禁
+   - 周会上**人工 review** 而非 CI gate（与 §11.2 Grill-2 advisory 立场一致）
+   - 把"覆盖率"从"目标"重新定义为"诊断起点"
+
+**与 §13.5 的接力：** §13.5 解决"没人主动消费 Coverage"，§17.3 解决"消费激励过强后的指标扭曲"——两端对称。
+
+---
+
+### 17.4 逆向选择：业务域的「装不知道」策略
+
+**§13.1 讨论了业务域的信息不对称**，§13.2 讨论了 ESS。本节聚焦**逆向选择**（Adverse Selection）——业务域利用信息不对称做出对 D5 不利的选择。
+
+**机制：** 业务域开发者 A 写了未注册的 op X，他知道 D5 的 WARN + Coverage 报告会暴露 X。他有两种策略：
+
+| 策略 | 短期收益 | 长期收益 | D5 损失 |
+|------|---------|---------|---------|
+| S1 注册 X | 0（合规） | 享受 Registry 一致性 | 0 |
+| S2 保留 X 不注册 | 0（无额外收益） | 0 | D5 Coverage 漏报 |
+| **S3 故意用一次性 op 名漂移** | 0（绕过 WARN） | 0 | **D5 Coverage 不可信** |
+| **S4 不写任何埋点** | 上线快（局部最优） | 排障难 | **D5 信号全黑** |
+
+S3/S4 是逆向选择的典型——**D5 越想可见，业务域越想不可见**。
+
+**§13.2 ESS 分析的盲区：** §13.2 假设业务域策略空间是 {A1 漂移, A2 合规}，但实际是 {A1, A2, A3 漂移 + 漂移掩护}。A3 比 A1 更难被 D5 发现（因为每次 op 名都不同）。
+
+**对策：**
+
+1. **Runtime call site 采样审计：** 每周随机抽取 5% 的 runtime span，逆向追溯到 source code call site，与 `telemetry.Op*` 常量 grep 对账——不依赖 Coverage 自报
+2. **Span→Registry 强校验（轻量版）：** 不强制硬拒绝（§11.2 Grill-4 已拒），但加 **span 创建时的 caller file:line 落盘**——审计时有线索
+3. **"装不知道"的元指标：** 监控 `unknown_op_total{domain}` 在 SRE 周会 review，发现某域长期高水位 → 触发主动诊断
+4. **正向激励对齐：** 业务域 Owner 在 PR review 时获得 "Coverage contributor" 标记（类比开源贡献者墙）——把 S1 策略的隐性收益外显
+
+**与 §13.1 的接力：** §13.1 解决"信息不对称让 D5 看不见"，§17.4 解决"D5 看不见的部分可能是业务域主动隐藏"。
+
+---
+
+### 17.5 对抗性内部开发者：FaultInject 之外的威胁模型
+
+**§11.2 Grill-5 已讨论 FaultInject 的生产安全边界**，但只覆盖了"故障注入"。**真正的对抗性内部开发者**有更广的威胁模型：
+
+| 威胁 | 攻击面 | 现有防御 | 缺口 |
+|------|--------|---------|------|
+| T1 故意关闭关键 span | `telemetry.NoOp()` 被滥用 | NewNoOp() 仅在单测 mock 用 | 生产代码误用 NoOp → 信号黑洞 |
+| T2 伪造 Coverage 报告 | 写脚本生成假 JSON | 无 | §17.3 已涵盖 |
+| T3 用 PII 当 SpanAttr | `session_id` 做 label | §d5-boundary §5 已 blocklist | 但 enforcement 在哪里？grep？ |
+| T4 在 Trace 中插入误导 span 名 | `orchestration.turn.run.fake` | WARN unknown op | 命名相似但合法 → bypass |
+| T5 绕过 Bridge 直接 new Tracer | import 私有包 | bridge 删除后路径不存在 | 但 `instrument/tracer.New()` 仍可裸用 |
+| T6 在 `legacy_harness` metric 永远 > 0 | 维持 deprecated 路径存活 | §11.1 OQ-6 DEPRECATED | 但谁保证 2 release 后真的会清？ |
+
+**威胁模型 T1-T6 的共同特征：** 都是**对 D5 信任机制的逆向利用**。
+
+**对策：**
+
+1. **NoOp 使用的 CI 检测：** `grep -r "telemetry.NewNoOp\|tracer.NoOp\|meter.NoOp" internal/layers/{d1,d2,d3,d4,d7}/` = 0 命中（生产代码）。仅 `*_test.go` 与 `tests/` 允许。
+2. **SpanAttr PII lint：** 扩展 layer-lint，检测 SpanAttr 字符串是否含已知 PII pattern（email / phone / token 前缀）
+3. **相似命名检测：** 注册 op 时，验证新 op 名 Levenshtein 距离 ≥ 3 距所有现有 op（防 T4）
+4. **Direct Tracer 构造禁：** 在 `instrument/tracer.New()` 加 build tag：`_testbuild` 才可裸用，生产编译失败——类似 FaultInject 的编译时硬边界
+5. **legacy_harness metric 自爆机制：** 连续 2 release 计数 = 0 自动删除（不需要人工决策）。防 §11.1 OQ-6 长期挂账。
+
+**FaultInject 不是唯一对抗场景：** D5 需要把 FaultInject 的"编译期硬边界"思路泛化到 T1-T6。这是 §11.2 Grill-5 落地清单可扩展的方向。
+
+---
+
+### 17.6 D5 反 Bridge 复活机制：删除不是终态，抑制再生才是
+
+**§11.3.1 烧船承诺讨论了删 bridge 的机制**，但未讨论**未来新需求到来时如何防止 bridge 复活**。
+
+**博弈论观察：** 删 bridge 是单次行为；阻止复活是持续博弈。
+
+**bridge 复活的典型场景：**
+- 新功能作者 X 加入项目，看到 import 路径繁琐 → "我建个 shim 包简化一下"（善意但破坏终态）
+- 紧急修复 Bug Y 时，开发者 Z 直接复制旧代码到 bridge 路径下 → bridge 复活
+- 跨域集成的临时胶水代码 → 沉淀为新 bridge
+
+**机制设计对策：**
+
+1. **layer-lint 反 bridge 规则：** 任何新 `package <name>` 出现在 `internal/layers/observability/` 根目录且 import 路径跨越 S21/S22/S23/S24 → CI 拒绝
+2. **PR 模板必填项：** "本次变更是否新增 /observability/ 下的 import path？" + "若新增，是否通过 D5 Owner 审批？"（与 §14.2 §14.9.15 PR 模板勾选项互补）
+3. **半年度 audit：** 每 6 个月执行 `find internal/layers/observability -type d | xargs -I {} grep -l "package.*bridge\|deprecated" {}` —— 任何命中触发 D5 Owner review
+4. **新作者 onboarding 显式 mention：** `docs/contributing/d5-anti-patterns.md` 列出"不要做的事"+ 理由（避免新作者因不知情而复活 bridge）
+
+**与 §11.3.1 的接力：** §11.3.1 是一次性烧船；§17.6 是持续守船。两者结合才是终态承诺。
+
+---
+
+### 17.7 机制鲁棒性（Mechanism Robustness）：失败时的 Fallback
+
+**§16.3 评估了机制是否落地**，但**未分析"机制失败时的 fallback"**——即鲁棒性问题。
+
+**问题：** D5 v2.1 整组承诺（WARN + Coverage + Bridge 0 + canonical_s 校正 + 41 T ID + ...）中，**任何单一承诺失效时**，系统行为如何？
+
+| 承诺 | 失效场景 | 当前 fallback | 缺口 |
+|------|---------|--------------|------|
+| WARN unknown op | WARN 日志被静默丢弃 | 无——日志管道下游不可控 | 需 §14.9.14 metric 聚合兜底 |
+| Coverage 报告 | Coverage 子系统宕机 | 无——影响 on-call 仪表板 | 需 Coverage 不可用时降级到 SRE 主动检查 |
+| Bridge 0 命中 | 新 PR 重新引入 bridge import | §17.1 CI grep 拒 | ✅ |
+| canonical_s 校正 | 某 F 漏标 canonical_s | t-registry lint 报警 | ✅ |
+| 41 T ID 冻结 | 有人提议改 T ID | Schelling 点共识抵抗 | ⚠️ 抵抗成本高，需 ADR 留档 |
+| FaultInject 生产禁用 | testbuild 标签被绕过 | 编译时硬边界 | ✅ |
+| Operation Registry 56 ops 上限 | 新 op 注册超限 | 无——目前无强制上限 | ⚠️ 需 layer-lint 监控 |
+
+**鲁棒性原则：** 任何承诺应有"silent failure → loud failure"的降级路径，而非"silent failure → silent acceptance"。
+
+**新增 OQ-8（供 Owner / Claude 对焦）：**
+
+| # | 问题 | 选项 | 倾向 |
+|---|------|------|------|
+| OQ-8 | D5 v2.1 的承诺装置是否需要「承诺失效登记表」（commitment degradation log）？ | 不需要（信任 layer-lint） / 需要 | **倾向需要**——记录每次承诺失效的时间/原因/恢复方式，作为 §16.7 一句话总结中「承诺强度」的具体度量 |
+
+---
+
+### 17.8 第三轮增量视角总结表
+
+| 子节 | 议题 | 立场 | 与既有结论关系 |
+|------|------|------|----------------|
+| 17.1 | Claude B2 拆步 + shim 提议 | 拆步采纳 / **不留 shim** | 对冲 §11.3.1 烧船承诺；提供 CI 防回归替代 |
+| 17.2 | 跨 change 相关均衡 | 需 release captain 显式协调 | 扩展 §13.6 多 Referee 协调到 change 维度 |
+| 17.3 | Goodhart on spans | 多维指标 + 双向签名 + 不当 KPI | 扩展 §13.5 公共物品到指标化场景 |
+| 17.4 | 逆向选择（装不知道） | Runtime 采样审计 + 元指标 | 扩展 §13.1 信息不对称到主动隐藏场景 |
+| 17.5 | 对抗性内部开发者 | 把 FaultInject 编译期硬边界思路泛化到 T1-T6 | 扩展 §11.2 Grill-5 到全威胁模型 |
+| 17.6 | 反 bridge 复活机制 | layer-lint + PR 模板 + 半年度 audit | 接力 §11.3.1 一次性烧船到持续守船 |
+| 17.7 | 机制鲁棒性 + fallback | 承诺失效登记表 | 扩展 §16.3 机制评估到鲁棒性维度；新增 OQ-8 |
+
+---
+
+### 17.9 第三轮建议写入 design.md / domain.md 的补充清单
+
+| # | 条目 | 写入位置 | 来源 |
+|---|------|----------|------|
+| 16 | Phase B2 拆步（B2a 改 import / B2b 删 9 包），**不留 shim** | `design.md` §10 Phase B | §17.1 对冲 Claude §7.2 |
+| 17 | bridge 防回归 CI 规则（grep 0 命中） | `design.md` §10 / `.github/workflows/layer-lint.yml` | §17.1 + §17.6 |
+| 18 | ADR 留档「不引入过渡 shim」决策 | `docs/adr/0007-d5-bridge-removal-no-shim.md` | §17.1 |
+| 19 | 跨 change 相关均衡显式协调（release captain 或错峰归档） | `design.md` §依赖 | §17.2 |
+| 20 | Coverage 多维指标（4 个：ratio / completeness / link_integrity / recency） | `observability-guide.md` | §17.3 |
+| 21 | Coverage 报告双向签名（业务域 Owner 签字 + 异常声明） | `observability-guide.md` | §17.3 |
+| 22 | Runtime call site 采样审计（5%/周） | `diagnose/coverage/README.md` | §17.4 |
+| 23 | 「装不知道」元指标 `unknown_op_total{domain}` 周会 review | `observability-guide.md` | §17.4 |
+| 24 | NoOp 生产使用 CI 检测（仅 _test.go 与 tests/ 允许） | `.github/workflows/layer-lint.yml` | §17.5 T1 |
+| 25 | SpanAttr PII lint | `layer-lint` 规则集 | §17.5 T3 |
+| 26 | 相似 op 名 Levenshtein ≥ 3 校验 | `names.go` 注册函数 | §17.5 T4 |
+| 27 | `instrument/tracer.New()` 加 build tag `testbuild` | `instrument/tracer/*.go` | §17.5 T5 |
+| 28 | `legacy_harness` metric 自爆机制（连续 2 release 计数 0 自动删） | `metrics/legacy_harness.go` | §17.5 T6 + §11.1 OQ-6 |
+| 29 | 半年度 anti-bridge audit 脚本 | `scripts/audit-d5-bridges.sh` | §17.6 |
+| 30 | 新作者 onboarding 文档 `docs/contributing/d5-anti-patterns.md` | `docs/contributing/` | §17.6 |
+| 31 | 承诺失效登记表 `COMMITMENT_DEGRADATION.md` | `openspec/changes/devrix-d5-v2-terminal/` | §17.7 + OQ-8 |
+
+---
+
+## 18. §17 落地与修订记录
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.5.0 | 2026-06-19 | §17 第三轮增量（MiniMax 回应 Claude DSAFT Review）：① §17.1 对冲 Claude B2 拆步+shim 提议，确立"不留 shim"立场（CI+ADR 替代）；② §17.2 跨 change 相关均衡 + OQ-7；③ §17.3 Goodhart on spans + 多维指标；④ §17.4 逆向选择（装不知道）+ Runtime 审计；⑤ §17.5 对抗性内部开发者 T1-T6 威胁模型；⑥ §17.6 反 bridge 复活机制（接力 §11.3.1 一次性烧船到持续守船）；⑦ §17.7 机制鲁棒性 + fallback + OQ-8；§17.8 总结表；§17.9 落地清单 16 条 |
+| 1.4.1 | 2026-06-19 | §16.6：Span 运行时命名规范校正（`D{N}_{场景}_{动作}_{细节}`，去 S 编号冗余）；同步更新 `design.md` §2 Decision Q7 + `d5-domain.md` 命名规范节 + `spans-registry.md` |
+| 1.4.0 | 2026-06-19 | DSAFT 架构方法论 Review（§16）：四条分析轴 × 分层体检 + 发现清单（2C/6W/3I） |
+| 1.3.0 | 2026-06-19 | Claude 第二轮对焦：对 §13.1–13.7 逐条回应 + 两轮合并落地清单（15 条） |
+| 1.2.0 | 2026-06-19 | MiniMax 第二轮增量：§13.1–13.7（信息不对称/ESS/SRE 缺位/时间属性/公共物品/多 Referee/Phase 强度）+ 总结表 + 落地建议 |
+| 1.1.0 | 2026-06-19 | Claude 博弈论对焦：OQ 1–6 + Grill 1–6 + 补充视角 + 总结表 |
+
+## 19. 第四轮回应 — MiniMax 整合 Claude 独立博弈论分析（2026-06-19）
+
+**对象:** `gaming-analysis-independent.md`（Claude 2026-06-19 第三模型补充，8 维度）
+
+**立场总览：** 这一轮 Claude 没有给出与 §17 核心立场（不留 shim / 烧船承诺 / 对抗性威胁 / 鲁棒性）冲突的观点，而是**模型精度的 4 项升级** + **落地清单 7 项增补**。MiniMax **接受所有升级与清单**，并对 §17 中的 3 处假设做精确化校正，新增 1 个 Claude 未覆盖的延伸维度。
+
+---
+
+### 19.1 Claude 8 维度逐项评估
+
+| # | Claude 维度 | MiniMax 评估 | 与既有分析的接力点 |
+|---|------------|-------------|------------------|
+| 1 | 多重均衡与临界质量 | ✅ **接受**——v2.1 是"均衡迁移"而非"修复"的定性更精确 | §3.1 S 包名绑架 + §17.6 反 bridge 复活 |
+| 2 | 信号博弈与域名誉 | ✅ **接受**——观测债务概念是机制设计的强新增 | §17.3 Goodhart 多维指标的延伸 |
+| 3 | 重复博弈与未来影子（δ 贴现率） | ✅ **接受**——冷冻声明 + 制度性约束是 δ 修复的具体机制 | §11.3.2 T ID 冻结 Schelling 点的精确化 |
+| 4 | CPR 治理（Operation Registry 是 CPR） | ✅ **接受并校正 §13.5**——Registry 是竞争性+非排他性的 CPR，非纯公共物品 | §13.5 需加校正脚注；§17.6 反 bridge 与 CPR 治理同源 |
+| 5 | 无强制力的机制设计 + 基准测试排行榜 | ✅ **强烈接受**——横向声誉竞争 > 纵向 KPI，是 D5 Referee 定位的最佳实现 | §17.3 Goodhart 防护的最优装置 |
+| 6 | 信息级联与迁移次序（D6→D7→D5） | ✅ **接受并校正 §17.2**——这是序贯级联，不是同期相关均衡 | §17.2 需明确"级联 vs 相关均衡"区分 |
+| 7 | Bridge 作为关联均衡装置 | ✅ **接受并深化 §17.1 + §11.3.1**——删除不是烧船，是让协调变得不必要 | §17.1 烧船 → 关联均衡装置过渡 |
+| 8 | S23 子承诺菜单效应（举证责任） | ✅ **接受**——是 Grill-3 硬边界的"供给方"侧约束 | §11.2 Grill-3 双向边界（需求方+供给方） |
+
+---
+
+### 19.2 §17 中 3 处假设的精确化校正
+
+#### 19.2.1 §17.2 跨 change 相关均衡 → 信息级联（Claude §6 校正）
+
+**§17.2 现状：** 把 D5 v2.1 / D6 v2.0.1 / D7 v2 / D2 v2.2 建模为同期**相关均衡**。
+
+**Claude §6 校正：** 这不是同期协调，而是**序贯信息级联**：
+
+```
+D6 v2.0.1（2026-06-15）→ D7 v2（2026-06-19）→ D5 v2.1（本 change）
+                     ↘ D2 v2.2（2026-06-19）
+```
+
+- **相关均衡**：4 个 Owner 同时决策，互相观察对方信号（同期）
+- **信息级联**：D6 先动 → D7 观察 D6 结果 → D5 观察 D6+D7 结果（序贯）
+
+D5 的实际位置是**信息级联的第三步**，不是相关均衡的第 4 个 player。这意味着 §17.2 提议的"release captain"在 D5 这一步**不需要**——D5 只需要跟随 D6+D7 形成的级联信号即可。
+
+**校正后建议：**
+
+1. 删除 §17.2 OQ-7 "release captain" 提议——D5 不需要主动协调，是级联跟随者
+2. 但需在 `design.md` §依赖 中显式标注"D5 v2.1 跟随 D6 v2.0.1 + D7 v2 的级联信号"——保留级联可追溯性
+3. 新增：信息级联的**脆弱性管理**——如果 D7 v2 closure 延期，D5 仍可独立推进（级联不是强依赖），但需在 PR 描述中标注"无 D7 终态先例"
+
+#### 19.2.2 §13.5 Coverage 是公共物品 → Operation Registry 是 CPR（Claude §4 校正）
+
+**§13.5 现状：** 把 Coverage 报告建模为公共物品（非竞争性 + 非排他性）。
+
+**Claude §4 校正：** Coverage 报告是公共物品没问题，但 §13.5 范围之外讨论的 **Operation Registry** 是 **CPR（Common Pool Resource，竞争性 + 非排他性）**：
+
+| 资源 | 竞争性 | 排他性 | 类型 |
+|------|--------|--------|------|
+| Coverage 报告（读） | 非 | 非 | 纯公共物品 |
+| Operation Registry（注册 op） | **是**（每加 op 增加维护成本） | 非 | **CPR** |
+
+**校正后建议：**
+
+1. §13.5 限定范围为"Coverage 报告是公共物品"
+2. 新增 §13.10「Operation Registry 的 CPR 属性」：56 ops 治理、≤100 ops 上限、Ostrom 八原则
+3. §17.6 反 bridge 复活与 CPR 治理**同源**——都是防止公共资源的"公地悲剧"，可统一表述为"D5 公共资源治理"
+
+#### 19.2.3 §17.1 烧船 → 关联均衡装置过渡（Claude §7 深化）
+
+**§17.1 现状：** "Bridge 删除 = 烧船承诺"——通过消除撤退选项强制新均衡。
+
+**Claude §7 深化：** 烧船只是表象，更深的含义是**从关联均衡到纳什均衡的过渡**：
+
+```
+Legacy:    Bridge = 关联均衡装置 → 跨域低成本协调
+Canonical: 直连 = 纳什均衡        → 每个域独立选择（instrument/tracer 是唯一谢林点）
+```
+
+**为什么这个深化重要？** 烧船承诺有"硬切断"的负面语义，可能让 Owner 担心"万一新均衡失败回不去"。而关联均衡装置的视角更积极：**新均衡下协调变得不必要**——不是"我们烧了桥"，而是"桥本来就不需要了"。
+
+**校正后建议：**
+
+1. §17.1 立场**保留**（不留 shim），但表述优化：
+   - 删除"烧船"作为单一隐喻
+   - 改为"删除 Bridge = 让关联均衡装置变得多余，新均衡下协调成本降低"
+   - 这与 §17.6 反 bridge 复活形成**正反两面**：删除是手段，降低协调必要性是目的
+2. ADR `0007-d5-bridge-removal-no-shim.md` 标题改为"0007-d5-bridge-removal.md"，理由段加"让协调变得不必要"的博弈含义
+
+---
+
+### 19.3 接受 Claude 的 7 条落地清单（编号 #32–#38）
+
+| # | 条目 | 写入位置 | 来源 | 与 §14.9 / §17.9 接力关系 |
+|---|------|----------|------|--------------------------|
+| 32 | 各域 Bridge 删除时间线（公共知识） | `d5-domain.md` §迁移记录 | Claude §1 | 扩展 §17.6 反 bridge 复活 |
+| 33 | Terminal 冻结声明（S 号段/物理路径/56 ops 长期冻结） | `d5-domain.md` §修订记录 | Claude §3 | 扩展 §11.3.2 T ID Schelling 点 + §17.7 OQ-8 |
+| 34 | T 层宪法化（任何 T ID 变更需跨域 NACK 权） | `t-registry.md` 或 `cross-domain-boundaries.md` | Claude §3 | 扩展 §11.3.2 |
+| 35 | 观测债务概念 + PR 模板"观测债务声明" | `observability-guide.md` + `.github/PULL_REQUEST_TEMPLATE.md` | Claude §2 | 扩展 §17.3 Goodhart 防护 + §14.9.15 PR 模板 |
+| 36 | Registry 容量上限（≤100 ops）+ 超限审计触发 | `span-registry.md` | Claude §4 | 扩展 §13.10 CPR 治理（新增） |
+| 37 | Op 新增决策流程（D5 Owner Review + "新增理由" 模板） | `span-registry.md` | Claude §4 §8 | 扩展 §11.2 Grill-3 供给方侧 + §13.10 |
+| 38 | S23 子承诺新增的举证责任制度 | `design.md` §5 | Claude §8 | 扩展 §11.2 Grill-3 硬边界（双向：需求方 + 供给方） |
+
+---
+
+### 19.4 第四轮新增：Claude 未覆盖的延伸维度
+
+#### 19.4.1 知识沉淀悖论：v2.1 越"Terminal"，新人越读不完
+
+**问题：** §19.1.1 接受 Claude 的"Terminal 冻结声明"（#33），但**冻结本身加剧了阅读负担**：
+
+- `d5-domain.md` + `d5-boundary.md` + `observability-guide.md` + `terminal-state-guide.md` + `dsaft-architecture.md` + `gaming-analysis.md`（本文件，1700+ 行）+ `design.md` + 4 个 registries + …
+- 新人 onboarding 不知从哪读起 → 与 §17.6 反 bridge 复活同源（新作者可能重新发明 bridge）
+
+**机制设计对策：**
+
+1. **"新人入口"路径：** 在 `d5-domain.md` 顶部加"Tl;DR"段（≤ 200 字），新人读完这一段即可获得 80% 必要知识
+2. **文档分层标注：** 每篇文档顶部标 `[MUST]` / `[SHOULD]` / `[REFERENCE]`——MUST 必读，REFERENCE 按需查阅
+3. **Onboarding 清单：** `docs/contributing/d5-onboarding.md`（与 #30 互补），按"5 步入门"路径走，每步标预期耗时
+4. **季度文档审计：** 长期未读 / 未引用的文档进入 `DEPRECATED_CANDIDATE.md`，由 D5 Owner Review 删除或合并
+
+#### 19.4.2 §17.4 逆向选择 vs Claude §2 信号博弈：谁更悲观？
+
+| 视角 | 业务域行为假设 | 治理倾向 |
+|------|--------------|---------|
+| §17.4 逆向选择（MiniMax） | 业务域**主动隐藏**——S3 op 名漂移、S4 不写埋点 | 偏重 Runtime 采样审计、caller file:line 落盘 |
+| Claude §2 信号博弈 | 业务域**被动披露**——通过信号分离高低质量域 | 偏重按域分组 Coverage dashboard + 观测债务 |
+
+**不是谁对谁错，是治理装置的不同侧重：**
+
+- **逆向选择视角**适合**对抗性场景**（§17.5 T1-T6 威胁模型）——防御机制为主
+- **信号博弈视角**适合**合作性场景**（Claude §1 均衡迁移）——激励装置为主
+
+**整合建议：** D5 应同时部署两类装置：
+
+| 装置类型 | 对应威胁 | 代表清单条目 |
+|---------|---------|------------|
+| 防御型（逆向选择视角） | §17.5 T1-T6 | #22 Runtime 采样审计、#24 NoOp CI、#26 相似名检测、#27 build tag |
+| 激励型（信号博弈视角） | §17.4 装不知道 | #23 unknown_op 元指标、#35 观测债务、#38 子承诺举证责任 |
+
+**两类装置互为冗余**——单一视角会失之偏颇。
+
+#### 19.4.3 跨域声誉传染：Referee 失败如何不被归因
+
+**Claude §2 信号博弈未充分展开的问题：** 信号博弈中 Receiver 是 D5/SRE，但**实际归因对象是业务域**。如果 D5 的信号本身有误（Coverage 报告写错、Tracker 污染），业务域的"声誉受损"会被"反转"——业务域会说"是 D5 的 Coverage 不准，不是我们埋点差"。
+
+**机制设计对策：**
+
+1. **D5 信号的双盲校验：** Coverage 报告生成时同时生成"测量元数据"（采样率、覆盖率计算公式、时间窗）——业务域可独立复现
+2. **反向申诉机制：** 业务域可在 SRE 周会上对 Coverage 报告申诉，需提供"未埋点的合理理由"（如：该 op 是内部工具，无外部消费者）
+3. **D5 自身的可信度审计：** 类似 §17.7 承诺失效登记表，D5 也需对自己的信号准确性负责——防止"狼来了"
+
+---
+
+### 19.5 第四轮总结表
+
+| 子节 | 议题 | 立场 |
+|------|------|------|
+| 19.1 | Claude 8 维度评估 | 全部接受，4 项升级 §17 模型精度 |
+| 19.2.1 | §17.2 跨 change 相关均衡 → 信息级联 | 校正为序贯级联，删除 OQ-7 release captain |
+| 19.2.2 | §13.5 Coverage 公共物品 → Operation Registry CPR | 校正 §13.5 范围，新增 §13.10 CPR 治理 |
+| 19.2.3 | §17.1 烧船 → 关联均衡装置过渡 | 保留不留 shim 立场，表述优化为"让协调变不必要" |
+| 19.3 | Claude 7 条落地清单 | 全部接受，编号 #32–#38 |
+| 19.4.1 | 知识沉淀悖论 + 新人入口 | 新增 #39–#42 |
+| 19.4.2 | 逆向选择 vs 信号博弈 | 不是冲突，是互补；防御+激励双装置 |
+| 19.4.3 | 跨域声誉传染 | 新增 #43 D5 信号双盲校验 |
+
+---
+
+### 19.6 §19 建议写入设计文档的补充清单（编号 #39–#43）
+
+| # | 条目 | 写入位置 | 来源 |
+|---|------|----------|------|
+| 39 | "Tl;DR" 顶部摘要（≤200 字） | `d5-domain.md` 顶部 | §19.4.1 |
+| 40 | 文档分层标注（MUST/SHOULD/REFERENCE） | `d5-domain.md` + 所有 specs | §19.4.1 |
+| 41 | Onboarding 5 步清单 | `docs/contributing/d5-onboarding.md` | §19.4.1 |
+| 42 | 季度文档审计 + DEPRECATED_CANDIDATE.md | `scripts/audit-d5-docs.sh` | §19.4.1 |
+| 43 | D5 信号双盲校验（元数据 + 申诉机制） | `observability-guide.md` §可信度 | §19.4.3 |
+
+---
+
+## 18. §19 落地与修订记录
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.6.0 | 2026-06-19 | §19 第四轮回应（MiniMax 整合 Claude 独立博弈论分析）：① §19.1 评估 Claude 8 维度全部接受；② §19.2 三处 §17 假设精确化校正（§17.2 相关均衡→信息级联 / §13.5 公共物品→CPR / §17.1 烧船→关联均衡装置过渡）；③ §19.3 接受 Claude 7 条落地清单（#32–#38）；④ §19.4 新增 Claude 未覆盖的 3 个延伸（知识沉淀悖论+新人入口 / 逆向选择 vs 信号博弈互补 / 跨域声誉传染）；⑤ §19.5 总结表；⑥ §19.6 落地清单 #39–#43 |
+| 1.5.0 | 2026-06-19 | §17 第三轮增量（MiniMax 回应 Claude DSAFT Review）：① §17.1 对冲 Claude B2 拆步+shim 提议，确立"不留 shim"立场（CI+ADR 替代）；② §17.2 跨 change 相关均衡 + OQ-7；③ §17.3 Goodhart on spans + 多维指标；④ §17.4 逆向选择（装不知道）+ Runtime 审计；⑤ §17.5 对抗性内部开发者 T1-T6 威胁模型；⑥ §17.6 反 bridge 复活机制；⑦ §17.7 机制鲁棒性 + fallback + OQ-8；§17.8 总结表；§17.9 落地清单 16 条 |
+| 1.4.1 | 2026-06-19 | §16.6：Span 运行时命名规范校正（`D{N}_{场景}_{动作}_{细节}`，去 S 编号冗余）；同步更新 `design.md` §2 Decision Q7 + `d5-domain.md` 命名规范节 + `spans-registry.md` |
+| 1.4.0 | 2026-06-19 | DSAFT 架构方法论 Review（§16）：四条分析轴 × 分层体检 + 发现清单（2C/6W/3I） |
+| 1.3.0 | 2026-06-19 | Claude 第二轮对焦：对 §13.1–13.7 逐条回应 + 两轮合并落地清单（15 条） |
+| 1.2.0 | 2026-06-19 | MiniMax 第二轮增量：§13.1–13.7（信息不对称/ESS/SRE 缺位/时间属性/公共物品/多 Referee/Phase 强度）+ 总结表 + 落地建议 |
+| 1.1.0 | 2026-06-19 | Claude 博弈论对焦：OQ 1–6 + Grill 1–6 + 补充视角 + 总结表 |
+
+---
+
+## 20. 四轮博弈论对焦 — 最终共识总结（2026-06-19）
+
+> **参与者：** Claude（第一/二轮 + DSAFT Review + 独立分析）、MiniMax（第二/三/四轮增量 + 整合回应）
+> **共识状态：** 三方（Claude × MiniMax × Claude 独立分析）就核心立场达成一致；已落地到 `d5-domain.md` v1.1.0 和 `design.md` v1.1.0
+
+---
+
+### 20.1 完全共识（三方合一，已落地）
+
+| # | 议题 | 共识结论 | 落地位置 |
+|---|------|---------|----------|
+| G1 | S23 不拆 S25 | 子承诺 C3a–C3e + S25 触发条件（3 条预先承诺） | `d5-domain.md` §S25 触发条件 |
+| G2 | Doctor 失败策略 | 仅 warn，不阻塞 Turn（Referee 吹哨不终止比赛） | `d5-domain.md` §博弈定位 |
+| G3 | Coverage 分级 | 区分条件/路径/可疑零命中；advisory 不硬阻断 CI | `gaming-analysis.md` §11 OQ-3 |
+| G4 | FaultInject 安全边界 | testbuild only + 编译时验证 + 生产二进制检查 | `design.md` §15 |
+| G5 | D6↔D5 metric 边界 | D6 经 Bridge → D5 meter，不直连 OTel | `d5-domain.md` §跨域契约 |
+| G6 | legacy_harness 退役 | v2.1 DEPRECATED → v2.3 自爆机制（2 release 零计数自动删） | `design.md` §12 |
+| G7 | SRE/on-call 玩家表 | 显式加入 §2 玩家表，主权消费者地位确认 | `d5-domain.md` §博弈论玩家表 |
+| G8 | 时间属性分层 | 事前/事中/事后 + 时间×承诺强度交叉矩阵 | `d5-domain.md` §时间属性 |
+| G9 | D5→D6 证据移交 | Coverage 可疑零命中 → D6 advisory 输入；D5 证人 + D6 法官 | `cross-domain-boundaries.md` |
+| G10 | Phase A 代码锚点 | ≥1 个代码变更（a-registry v4.0 + t-registry canonical 列） | `design.md` §10 |
+| G11 | Phase B2 不留 shim | 拆步（B2a 改 import / B2b 删包）但**不留 shim**；CI grep 0 命中替代 | `design.md` §10 |
+| G12 | Terminal 冻结声明 | S21–S24 号段 + 物理路径 + 56 ops + 41 T ID 长期冻结 | `d5-domain.md` §Terminal 冻结声明 |
+| G13 | 跨 change 信息级联 | D6→D7→D5 序贯级联（非相关均衡），D5↔D2 平行级联 | `design.md` §10 跨 Change 依赖 |
+| G14 | Bridge 删除博弈含义 | 从关联均衡 → 纳什均衡过渡（"让协调变得不必要"） | `gaming-analysis.md` §19.2.3 |
+| G15 | WARN → metric 聚合 | `devrix_unknown_op_total{operation,layer}` 进入 on-call dashboard | `observability-guide.md` |
+| G16 | S23 硬边界 | 语义/数量/依赖三边界 + 子承诺新增举证责任 | `design.md` §5 + `d5-domain.md` §S23 |
+| G17 | Coverage 多维指标 | ratio / completeness / link_integrity / recency 四维联合诊断 | `observability-guide.md` |
+| G18 | Goodhart 防护 | Coverage 不当 KPI，保留为诊断起点；不当 CI 硬门禁 | `gaming-analysis.md` §17.3 |
+| G19 | 信号博弈 + 逆向选择互补 | 防御型装置（对抗性场景）+ 激励型装置（合作性场景）双轨 | `gaming-analysis.md` §19.4.2 |
+| G20 | D5 完备性边界 | D5 保证"可观测过程诚实"，不保证"业务决策正确" | `d5-domain.md` §完备性边界 |
+
+---
+
+### 20.2 校正记录（已修正的初始假设）
+
+| # | 初始假设 | 校正后 | 校正来源 |
+|---|---------|--------|---------|
+| C1 | Phase B 中间可留 1 release shim | 不留 shim，用 CI grep 0 命中替代 | Claude DSAFT Review → MiniMax §17.1 拒绝 → Claude 独立分析确认（道德风险理由） |
+| C2 | 4 个 change 是同期相关均衡 | D6→D7→D5 是序贯信息级联，D5↔D2 是平行级联 | Claude 独立分析 §6 → MiniMax §19.2.1 接受 |
+| C3 | Bridge 删除 = 烧船承诺 | Bridge 删除 = 从关联均衡过渡到纳什均衡（桥变得不必要） | Claude 独立分析 §7 → MiniMax §19.2.3 接受 |
+| C4 | Coverage 报告是公共物品 | Coverage 报告是公共物品 ✓；但 Operation Registry 是 CPR（竞争性 + 非排他性） | Claude 独立分析 §4 → MiniMax §19.2.2 接受 |
+| C5 | 埋点自检 SDK 推送到业务域 | 拒绝；改为 Coverage 报告反向推送 + WARN metric 聚合 | Claude §14.1 拒绝 → 三方共识 |
+| C6 | MTTR 作为 D5 KPI | MTTR 作为验证指标（lagging），覆盖率 + trace 完整度作为过程指标（leading） | Claude §14.3 保留 → 三方共识：双轨指标 |
+
+---
+
+### 20.3 残余开放问题（OQ 状态）
+
+| OQ | 状态 | 结论 |
+|----|------|------|
+| OQ-1 S23 拆 S25 | ✅ 已关闭 | 不拆；3 条触发条件已写入 |
+| OQ-2 Doctor 阻塞 Turn | ✅ 已关闭 | 仅 warn |
+| OQ-3 Coverage 阻断 CI | ✅ 已关闭 | advisory + 分级 |
+| OQ-4 FaultInject 生产 | ✅ 已关闭 | testbuild only |
+| OQ-5 D6↔D5 metric | ✅ 已关闭 | 经 Bridge |
+| OQ-6 legacy_harness | ✅ 已关闭 | 自爆机制已写入 design.md §12 |
+| OQ-7 release captain | ✅ 已关闭 | 删除（信息级联不需要） |
+| OQ-8 承诺失效登记表 | ⚠️ 待 Owner 决策 | 倾向需要，写入 `COMMITMENT_DEGRADATION.md` |
+
+---
+
+### 20.4 落地清单执行状态
+
+| 来源 | 编号范围 | 条数 | 已落地 |
+|------|---------|------|--------|
+| §14.9 Claude 第二轮 | #1–#15 | 15 | G1–G6, G9 核心条目已落地 d5-domain + design |
+| §17.9 MiniMax 第三轮 | #16–#31 | 16 | G11, G17, G18 核心条目已落地 |
+| §19.3 Claude 独立分析 | #32–#38 | 7 | 全部接受，G7, G12, G14 核心条目已落地 |
+| §19.6 MiniMax 第四轮 | #39–#43 | 5 | G1 新人入口已落地（Tl;DR + 阅读优先级） |
+| **合计** | | **43** | **核心结构性条目已落地 d5-domain.md v1.1.0 + design.md v1.1.0** |
+
+---
+
+### 20.5 一句话总结
+
+**三方（Claude × MiniMax × Claude 独立分析）在四轮对焦后就 D5 v2.1 Terminal 的博弈论基础达成完全共识：D5 = Referee + Auditor（吹哨不终止比赛），S21–S24 + 56 ops + 41 T ID 长期冻结，Bridge 删除是让关联均衡装置变得不必要，不留 shim，用 CI 硬门禁 + 双轨指标（过程+验证）+ 双装置互补（防御+激励）替代强制力。共识已写入 `d5-domain.md` v1.1.0 和 `design.md` v1.1.0。**
