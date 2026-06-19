@@ -1,0 +1,28 @@
+version: "1.0"
+status: s2_proposal
+kind: change
+
+meta:
+  change_id: devrix-spec-sync-d2-layer-delta-soften
+  demand_id: DM-20260619-004
+  title: "D2 spec 退役标记完整性 — layer-delta.md 措辞软化 + d7-boundary.md Loop.Run Deprecated"
+  status: s2_proposal
+  priority: P0
+  owner: devrix-team
+  created_at: "2026-06-19"
+  updated_at: "2026-06-19"
+
+scope:
+  layers:
+    - id: D2
+      name: Context Engine
+      affected: true
+      reason: "docs-only 改动：D2 layer-delta.md 'QueryLoop Primary Runtime' 措辞软化（DM-20260617-001 之后 Loop.Run 在 loopFirst=false 路径已 Deprecated）；d7-boundary.md 补 Loop.Run Deprecated 状态标注"
+
+context:
+  trigger: "审计（2026-06-19）发现 D2 spec.md §18 已有 LEGACY 标记（DM-20260617-001），但 layer-delta.md ADDED — QueryLoop Primary Runtime（line 12-14）措辞仍说'MUST route all LLM↔Tool rounds through query.Loop.Run'，与 LEGACY 标记矛盾；d7-boundary.md §79 LoopHooks 引用存在但无 Loop.Run Deprecated 状态"
+  motivation: "D2 退役标记三层（spec.md LEGACY + layer-delta.md ADDED + d7-boundary.md 契约）需保持一致；新维护者读 layer-delta.md 时不应被 Primary Runtime 措辞误导"
+  out_of_scope:
+    - "D2 域代码改动（保持 v7.2.0 不动）"
+    - "新增 / 删除 / 重命名 D-S 编号"
+    - "D2 Scenarios 删除（仅措辞软化，Requirement 保留回滚兼容）"
