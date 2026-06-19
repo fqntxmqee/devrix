@@ -779,6 +779,8 @@ Transcript 分离 MUST 支持 compact view 与 append-only full log 双轨（对
 
 ## ADDED Requirements (V6 QueryLoop — v1.0/v1.1)
 
+> **⚠️ REMOVED (DM-20260618-010)**：本节 Requirement/Scenario 为历史归档。QueryLoop 物理模块已删除；行为由 D7 `RunTurn` / `SubTurn` 承接。新能力不得引用 `query.Loop` 或 `query_loop.enabled`。
+
 ### Requirement: QueryLoop Runtime
 
 When `context_engine.query_loop.enabled=true`, PEV MUST delegate LLM↔Tool rounds to `query.Loop` instead of the legacy fixed-iteration execute loop. When `enabled=false`, behavior MUST remain bit-identical to V5.
@@ -966,6 +968,8 @@ When `context_engine.worktree.enabled=true`, delegate or implement workers MAY b
 ---
 
 ## ADDED Requirements (V7 Harness Unification)
+
+> **修订 (DM-20260618-010)**：`query_loop.enabled` 已删除。`PathQueryLoop` runtime 标签仍用于 `engine.Process()` 路径计数（语义上为 D7 PreparedTurnRunner）。
 
 ### Requirement: QueryLoop Default Primary Path
 

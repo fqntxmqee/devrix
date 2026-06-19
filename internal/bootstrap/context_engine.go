@@ -56,7 +56,7 @@ func NewContextEngine(
 		slog.Error("create builtin tool registry", "error", err)
 		toolReg = contextengine.NewToolRegistry()
 	}
-	if err := enforce.RegisterQueryLoopTools(toolReg, ctxCfg); err != nil {
+	if err := enforce.RegisterPlanModeTools(toolReg, ctxCfg); err != nil {
 		slog.Error("register query loop tools", "error", err)
 	}
 	if err := workmodel.RegisterTaskTools(toolReg, ctxCfg, tm); err != nil {

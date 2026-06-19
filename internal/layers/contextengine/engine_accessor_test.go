@@ -106,25 +106,25 @@ func TestEngine_SessionContext_AfterProcess(t *testing.T) {
 	}
 }
 
-func TestRegisterQueryLoopTools(t *testing.T) {
+func TestRegisterPlanModeTools(t *testing.T) {
 	reg := contextengine.NewToolRegistry()
-	err := contextengine.RegisterQueryLoopTools(reg, config.DefaultContextEngineConfig())
+	err := contextengine.RegisterPlanModeTools(reg, config.DefaultContextEngineConfig())
 	if err != nil {
-		t.Errorf("RegisterQueryLoopTools: %v", err)
+		t.Errorf("RegisterPlanModeTools: %v", err)
 	}
 }
 
-func TestRegisterQueryLoopTools_NilRegistry(t *testing.T) {
-	err := contextengine.RegisterQueryLoopTools(nil, config.DefaultContextEngineConfig())
+func TestRegisterPlanModeTools_NilRegistry(t *testing.T) {
+	err := contextengine.RegisterPlanModeTools(nil, config.DefaultContextEngineConfig())
 	if err != nil {
-		t.Errorf("RegisterQueryLoopTools nil reg: %v", err)
+		t.Errorf("RegisterPlanModeTools nil reg: %v", err)
 	}
 }
 
-func TestRegisterQueryLoopTools_NilConfig(t *testing.T) {
+func TestRegisterPlanModeTools_NilConfig(t *testing.T) {
 	reg := contextengine.NewToolRegistry()
-	err := contextengine.RegisterQueryLoopTools(reg, nil)
+	err := contextengine.RegisterPlanModeTools(reg, nil)
 	if err != nil {
-		t.Errorf("RegisterQueryLoopTools nil cfg: %v", err)
+		t.Errorf("RegisterPlanModeTools nil cfg: %v", err)
 	}
 }

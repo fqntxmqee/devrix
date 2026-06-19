@@ -126,30 +126,32 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S9-A01-T19 | cancel 后 SessionQueue 不发 completed notification（tombstone 协议） | BGTask | `internal/layers/contextengine/enforce/background_cancel_test.go` | IMPLEMENTED | P1 |
 | D2-S9-A01-T20 | IsTerminal 对 running/cancelled/completed/failed 正确报告（Phase 3 Wave WorkerCancelRegistry） | BGTask | `internal/layers/contextengine/enforce/background_cancel_test.go` | IMPLEMENTED | P1 |
 
-## D2-S10: QueryLoop Module
+## D2-S10: QueryLoop Module — **REMOVED (DM-20260618-010)**
+
+> 多轮 LLM↔Tool 循环已迁移至 D7 `RunTurn` / `SubTurn`。下列 T 点中机制类测试仍有效，loop 专属测试见 D7-S2-A06。
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | QueryLoop | `internal/layers/contextengine/query/loop_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T35 | UserContext prepend 不在 snapshot | QueryLoop | `internal/layers/contextengine/prepare/usercontext/provider_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | QueryLoop | `internal/layers/contextengine/attachments/registry.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | QueryLoop | `internal/layers/contextengine/enforce/permission/mode_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | QueryLoop | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T39 | query_loop.enabled=false V4 回归 | QueryLoop | `tests/integration/query_loop_integration_test.go` | IMPLEMENTED | P0 |
-| D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | QueryLoop | `internal/layers/contextengine/enforce/subquery_test.go` | IMPLEMENTED | P1 |
-| D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | QueryLoop | `internal/layers/contextengine/prepare/conversation/fork_test.go` | IMPLEMENTED | P1 |
-| D2-S10-A01-T42 | sidechain transcript resume 重建 messages | QueryLoop | `internal/layers/contextengine/persist/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T34 | 多轮 tool_use 直至无 tool | D7-S2-A06 | `internal/layers/orchestration/turn/orchestrator_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T35 | UserContext prepend 不在 snapshot | S15 | `internal/layers/contextengine/prepare/usercontext/provider_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T36 | plan_mode attachment full/sparse throttle | S15 | `internal/layers/contextengine/prepare/attachments/registry.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T37 | plan mode 拒绝 Write 非 plan 文件 | S18 | `internal/layers/contextengine/enforce/permission/mode_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T38 | task_create 磁盘持久 + list 一致 | D7-S1 | `internal/layers/orchestration/workmodel/disk_store_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T39 | PreparedTurnRunner multi-turn | D7 | `internal/layers/contextengine/query_loop_integration_test.go` | IMPLEMENTED | P0 |
+| D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | S18 | `internal/layers/contextengine/enforce/subquery_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | S15 | `internal/layers/contextengine/prepare/conversation/fork_test.go` | IMPLEMENTED | P1 |
+| D2-S10-A01-T42 | sidechain transcript resume 重建 messages | S17 | `internal/layers/contextengine/persist/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
 
 ## D2-S11: Harness Unification
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
-| D2-S11-A01-T01 | `query_loop.enabled` 默认 true | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
+| D2-S11-A01-T01 | `query_loop` turn defaults (max_turns, compress_per_turn) | HarnessUnification | `internal/shared/config/queryloop_test.go` | IMPLEMENTED | P0 |
 | D2-S11-A01-T02 | harnessEnabled 分支不再被生产路径触发 | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
 | D2-S11-A01-T03 | 旧路径调用计数基线=0 | HarnessUnification | `internal/layers/contextengine/path_regression_integration_test.go` | IMPLEMENTED | P0 |
-| D2-S11-A01-T04 | 压缩入口统一：QueryLoop 走 messages-only 七步管道 | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
-| D2-S11-A01-TD01 | TD-QL-01: 413 → 一轮 messages-only 压缩 → 重试 | HarnessUnification | `internal/layers/contextengine/query/loop_recovery_test.go` | IMPLEMENTED | P1 |
-| D2-S11-A01-TD03 | TD-QL-03: overload/5xx → 切换 fallback model (生产未接线) | HarnessUnification | `internal/layers/contextengine/query/loop_fallback_test.go` | PARTIAL | P1 |
+| D2-S11-A01-T04 | 压缩入口统一：D7 turn 走 messages-only 七步管道 | HarnessUnification | `internal/layers/contextengine/compression_unified_test.go` | IMPLEMENTED | P1 |
+| D2-S11-A01-TD01 | TD-QL-01: 413 → compress → 重试 | D7 | `internal/layers/orchestration/turn/recovery_test.go` | IMPLEMENTED | P1 |
+| D2-S11-A01-TD03 | TD-QL-03: overload/5xx → gateway retry | D3 | `internal/layers/orchestration/turn/llm.go` (GatewayInvoker) | IMPLEMENTED | P1 |
 | D2-S11-A01-D6PR | D6 PathRegressionProbe: legacy_harness > 0 ⇒ score 0 | HarnessUnification | `internal/layers/evolution/evaluate/path_regression_probe_test.go` | IMPLEMENTED | P0 |
 
 ## D2-S12: Worktree Module

@@ -16,13 +16,11 @@ import (
 type PathKind string
 
 const (
-	// PathQueryLoop is the canonical LLM↔Tool primary path (DM-20260610-012).
-	// This is the only path that production traffic should be taking after
-	// DM-20260611-004 (Legacy Harness 退役).
+	// PathQueryLoop labels the primary LLM↔Tool path counter. After
+	// DM-20260618-010 the loop runs in D7; D2 Process() still records
+	// this label when delegating to PreparedTurnRunner.
 	PathQueryLoop PathKind = "query_loop"
-	// PathLegacyHarness is the legacy harness bootstrap path. As of
-	// DM-20260611-004 it is gated behind `query_loop.enabled=false` and
-	// only ever fires for explicit opt-in deployments. The
+	// PathLegacyHarness is the retired harness bootstrap path (removed v6.5.0).
 	// PathRegressionProbe (D6) will fail the build if any production
 	// request takes this path.
 	PathLegacyHarness PathKind = "legacy_harness"
