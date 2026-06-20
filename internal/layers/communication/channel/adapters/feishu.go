@@ -58,6 +58,11 @@ type FeishuAdapter struct {
 	streamingEnabled bool
 	streamThrottle   streamThrottleConfig
 
+	// cardPrecheck (DM-20260620-001 / AC5): inspects card content before send.
+	// When non-nil, checks for table-count / size limits and may trigger
+	// fallback to plain-text path. See card_precheck.go.
+	cardPrecheck CardContentPrecheck
+
 	cardkit *cardkitClient
 
 	sessionMsgMap   sync.Map // sessionID -> userMessageID mapping
@@ -468,6 +473,7 @@ func NewFeishuAdapter(
 		showToolResults:  feishuCfg.ShowToolResults,
 		streamingEnabled: feishuCfg.Streaming.Enabled,
 		streamThrottle:   feishuCfg.Streaming.throttleConfig(),
+		cardPrecheck:     NewFeishuTableCountPrecheck(DefaultCardPrecheckConfig()),
 	}
 
 	// Apply functional options
@@ -967,6 +973,11 @@ func (a *FeishuAdapter) sendMessageToSession(ctx context.Context, sessionID, cha
 }
 
 // SendCard sends an interactive card to Feishu user (standalone, no reply context).
+//
+// DM-20260620-001 / AC5: a cardPrecheck is consulted before sending. If the
+// content exceeds table-count or size limits, we fall back to sending a
+// plain-text representation (flattened tables) so the user still gets the
+// message instead of the API rejecting it silently (ErrCode 11310 / 30KB cap).
 func (a *FeishuAdapter) SendCard(ctx context.Context, chatID string, card *kernel.Card) error {
 	feishuChatID, err := parseFeishuChatID(chatID)
 	if err != nil {
@@ -974,6 +985,13 @@ func (a *FeishuAdapter) SendCard(ctx context.Context, chatID string, card *kerne
 	}
 
 	cardJSON := BuildCardJSON(card)
+	if a.cardPrecheck != nil {
+		if precheckErr := a.cardPrecheck.Check(cardJSON); precheckErr != nil {
+			slog.Warn(FormatPrecheckError(a.cardPrecheck, cardJSON, precheckErr),
+				"chat_id", feishuChatID, "fallback", "plain-text")
+			return a.SendMessage(ctx, chatID, cardFallbackText(card, precheckErr))
+		}
+	}
 
 	req := larkim.NewCreateMessageReqBuilder().
 		ReceiveIdType("chat_id").
@@ -1004,8 +1022,56 @@ func (a *FeishuAdapter) SendCard(ctx context.Context, chatID string, card *kerne
 
 func (a *FeishuAdapter) sendCardToSession(ctx context.Context, sessionID, chatID string, card *kernel.Card) error {
 	cardJSON := BuildCardJSON(card)
+	if a.cardPrecheck != nil {
+		if precheckErr := a.cardPrecheck.Check(cardJSON); precheckErr != nil {
+			slog.Warn(FormatPrecheckError(a.cardPrecheck, cardJSON, precheckErr),
+				"session_id", sessionID, "chat_id", chatID, "fallback", "plain-text")
+			return a.sendMessageToSession(ctx, sessionID, chatID, cardFallbackText(card, precheckErr))
+		}
+	}
 	_, err := a.sendCardReplyAndGetID(ctx, sessionID, chatID, cardJSON)
 	return err
+}
+
+// cardFallbackText produces a plain-text representation of a Card suitable
+// for sending as a fallback when the interactive card exceeds channel limits
+// (e.g. too many tables or too long).
+//
+// The output preserves header title and concatenates all CardMarkdown content
+// (with pipe-table rows flattened) plus any CardNote footers, so the user
+// receives the same information without the table-count / size constraints.
+func cardFallbackText(card *kernel.Card, precheckErr error) string {
+	var b strings.Builder
+	if card != nil && card.Header != nil && card.Header.Title != "" {
+		b.WriteString(card.Header.Title)
+		b.WriteString("\n\n")
+	}
+	if card != nil {
+		for _, elem := range card.Elements {
+			switch e := elem.(type) {
+			case kernel.CardMarkdown:
+				b.WriteString(flattenMarkdownTablesForFeishu(e.Content))
+				b.WriteString("\n\n")
+			case kernel.CardNote:
+				if e.Text != "" {
+					b.WriteString("> ")
+					b.WriteString(e.Text)
+					if e.Tag != "" {
+						b.WriteString(" [")
+						b.WriteString(e.Tag)
+						b.WriteString("]")
+					}
+					b.WriteString("\n\n")
+				}
+			}
+		}
+	}
+	if precheckErr != nil {
+		b.WriteString("\n[card auto-flattened: ")
+		b.WriteString(precheckErr.Error())
+		b.WriteString("]")
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // AddReaction adds a Feishu emoji reaction to a message.
