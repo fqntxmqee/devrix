@@ -78,7 +78,7 @@ func TestIntegration_LLMCircuitBreaker_state_transitions(t *testing.T) {
 	if reopenErr == nil {
 		t.Fatal("expected open rejection")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(reopenErr, &llmErr) || llmErr.Code != sharederrors.CodeLLMCircuitOpen {
 		t.Fatalf("err: %v", reopenErr)
 	}

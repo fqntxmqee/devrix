@@ -245,7 +245,7 @@ func TestIntegration_G3_NotifyPrompt(t *testing.T) {
 func TestIntegration_A6_ErrorClassify(t *testing.T) {
 	bizErr := sharederrors.NewLLMAuthFailedError(errors.New("401 unauthorized"))
 	wrapped := sharederrors.WithShortStack(bizErr, 3)
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(wrapped, &llmErr) {
 		t.Errorf("A6: expected errors.As to extract LLMError from wrapped chain, got %T", wrapped)
 	}

@@ -85,7 +85,7 @@ func TestIntegration_DeepSeekVCR_SSEParseError(t *testing.T) {
 			parseErr = chunk.Error
 		}
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(parseErr, &llmErr) {
 		t.Fatalf("expected LLMError, got %v", parseErr)
 	}
@@ -105,7 +105,7 @@ func TestIntegration_MiniMaxVCR_RateLimit429(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected provider unavailable error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) {
 		t.Fatalf("expected LLMError, got %T %v", err, err)
 	}
@@ -125,7 +125,7 @@ func TestIntegration_MiniMaxVCR_ServerError500(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected provider unavailable error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) {
 		t.Fatalf("expected LLMError, got %T", err)
 	}
