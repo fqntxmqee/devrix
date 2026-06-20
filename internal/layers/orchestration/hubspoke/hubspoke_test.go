@@ -433,6 +433,6 @@ type stubSubQueryRunner struct {
 	err     error
 }
 
-func (s *stubSubQueryRunner) RunSubQuery(ctx context.Context, parent *types.SessionContext, role, directive, taskID string, maxTurns int) (string, error) {
+func (s *stubSubQueryRunner) RunSubQuery(ctx context.Context, parent *types.SessionContext, role, directive, taskID string, maxTurns int, mode contracts.SubAgentMode) (string, error) {
 	return s.summary, s.err
 }

@@ -136,3 +136,58 @@ func TestOrchestrationToolSchemas_FreeFork_Parameters(t *testing.T) {
 		}
 	}
 }
+
+// T: DM-20260620-001-B / B.2.3 (D4-S4-A07-T02) — free_fork schema declares
+// `mode` enum [brief|fork|full] in request items, default brief, with
+// description referencing Phase B sub-agent isolation.
+func TestOrchestrationToolSchemas_FreeFork_ModeEnum(t *testing.T) {
+	schemas := orchestrationToolSchemas()
+	var ff *turn.ToolSchema
+	for i := range schemas {
+		if schemas[i].Name == "free_fork" {
+			ff = &schemas[i]
+			break
+		}
+	}
+	if ff == nil {
+		t.Fatal("free_fork schema not found in orchestrationToolSchemas")
+	}
+	props, ok := ff.Parameters["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork schema: properties missing: %+v", ff.Parameters)
+	}
+	requests, ok := props["requests"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork schema: requests missing or wrong type: %+v", props["requests"])
+	}
+	items, ok := requests["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork schema: requests.items missing: %+v", requests)
+	}
+	itemProps, ok := items["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork schema: requests.items.properties missing")
+	}
+	mode, ok := itemProps["mode"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork schema: requests.items.mode missing")
+	}
+	enum, ok := mode["enum"].([]any)
+	if !ok {
+		t.Fatalf("free_fork schema: mode.enum missing or wrong type: %+v", mode)
+	}
+	got := map[string]bool{}
+	for _, e := range enum {
+		if s, ok := e.(string); ok {
+			got[s] = true
+		}
+	}
+	for _, want := range []string{"brief", "fork", "full"} {
+		if !got[want] {
+			t.Errorf("free_fork schema: mode.enum missing %q; got %v", want, enum)
+		}
+	}
+	if def, _ := mode["default"].(string); def != "brief" {
+		t.Errorf("free_fork schema: mode.default = %q, want \"brief\"", def)
+	}
+}

@@ -40,7 +40,7 @@ func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T
 	}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}
 
-	_, err := adapter.RunSubQuery(context.Background(), parent, "explore", "scan repo", "task_fb", 0)
+	_, err := adapter.RunSubQuery(context.Background(), parent, "explore", "scan repo", "task_fb", 0, "")
 	if err != nil {
 		t.Fatalf("RunSubQuery: %v", err)
 	}

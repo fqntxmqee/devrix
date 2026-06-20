@@ -19,7 +19,9 @@ type LeaderResolver interface {
 
 // SubQueryRunner is the D2 fallback when D4 delegate is unavailable.
 type SubQueryRunner interface {
-	RunSubQuery(ctx context.Context, parent *types.SessionContext, role, directive, taskID string, maxTurns int) (summary string, err error)
+	// RunSubQuery executes a D2 sub-agent. mode (DM-20260620-001-B / AC6+AC10)
+	// selects sub-agent context inheritance; empty defers to default.
+	RunSubQuery(ctx context.Context, parent *types.SessionContext, role, directive, taskID string, maxTurns int, mode contracts.SubAgentMode) (summary string, err error)
 }
 
 // DispatchRequest is the unified entry for delegate_* tool calls.
@@ -33,6 +35,9 @@ type DispatchRequest struct {
 	Async        bool
 	MaxTurns     int
 	ModelTier    string
+	// Mode DM-20260620-001-B (AC6+AC10) — sub-agent context inheritance mode.
+	// Empty → D2 enforce resolves via SubagentConfig.DefaultMode.
+	Mode contracts.SubAgentMode
 }
 
 // DispatchResult is returned after a Spoke completes execution.
@@ -137,7 +142,7 @@ func (d *Dispatcher) dispatchToD2(ctx context.Context, req DispatchRequest) (Dis
 	if d.subQuery == nil || req.ParentSC == nil {
 		return DispatchResult{}, fmt.Errorf("hubspoke: no leader and no subquery fallback")
 	}
-	summary, err := d.subQuery.RunSubQuery(ctx, req.ParentSC, req.Role, req.Directive, req.TaskID, req.MaxTurns)
+	summary, err := d.subQuery.RunSubQuery(ctx, req.ParentSC, req.Role, req.Directive, req.TaskID, req.MaxTurns, req.Mode)
 	return DispatchResult{Role: req.Role, Summary: summary, Error: err}, err
 }
 

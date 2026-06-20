@@ -18,17 +18,20 @@ const (
 )
 
 // RunExplore runs a read-only exploration sub-query via D2 nested execution.
-func RunExplore(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
-	return runBuiltin(ctx, deps, parent, AgentExplore, agent.ExplorePrompt, prompt, tools, maxTurns, true)
+//
+// DM-20260620-001-B (AC6 + AC10) — mode (brief/fork/full) selects sub-agent
+// context inheritance; empty defers to SubagentConfig.DefaultMode.
+func RunExplore(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int, mode contracts.SubAgentMode) (*enforce.SubQueryResult, error) {
+	return runBuiltin(ctx, deps, parent, AgentExplore, agent.ExplorePrompt, prompt, tools, maxTurns, true, mode)
 }
 
 // RunPlan runs a read-only planning sub-query via D2 nested execution.
-func RunPlan(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
-	return runBuiltin(ctx, deps, parent, AgentPlan, agent.PlanPrompt, prompt, tools, maxTurns, true)
+func RunPlan(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int, mode contracts.SubAgentMode) (*enforce.SubQueryResult, error) {
+	return runBuiltin(ctx, deps, parent, AgentPlan, agent.PlanPrompt, prompt, tools, maxTurns, true, mode)
 }
 
 // RunImplement runs a read-write implementation sub-query via D2 nested execution.
-func RunImplement(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int) (*enforce.SubQueryResult, error) {
+func RunImplement(ctx context.Context, deps enforce.SubQueryDeps, parent *types.SessionContext, prompt string, tools []contracts.ToolSchema, maxTurns int, mode contracts.SubAgentMode) (*enforce.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", AgentImplement)
 	}
@@ -47,6 +50,7 @@ func RunImplement(ctx context.Context, deps enforce.SubQueryDeps, parent *types.
 		OmitClaudeMd:   false,
 		ReadOnlyTools:  false,
 		ModelTier:      parent.ModelTier,
+		Mode:           mode,
 		FlowReporter:   deps.FlowReporter,
 	})
 }
@@ -59,6 +63,7 @@ func runBuiltin(
 	tools []contracts.ToolSchema,
 	maxTurns int,
 	readOnly bool,
+	mode contracts.SubAgentMode,
 ) (*enforce.SubQueryResult, error) {
 	if parent == nil {
 		return nil, fmt.Errorf("builtin %s: parent context is nil", name)
@@ -78,6 +83,7 @@ func runBuiltin(
 		OmitClaudeMd:   true,
 		ReadOnlyTools:  readOnly,
 		ModelTier:      parent.ModelTier,
+		Mode:           mode,
 		FlowReporter:   deps.FlowReporter,
 	})
 }

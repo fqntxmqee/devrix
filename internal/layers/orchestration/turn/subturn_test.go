@@ -179,6 +179,73 @@ func TestSubTurnRunner_FullMode_BackwardCompat(t *testing.T) {
 	}
 }
 
+// TestSubTurnRunner_FullMode_EquivalentToLegacy (D2-S15-A08-T07) —
+// AC8 invariant: mode=full is byte-equivalent to the pre-Phase-B legacy
+// behavior (PreloadedMessages = messagesWithoutLastUser). This guards
+// against accidental drift in the dispatch when refactoring applyMode.
+//
+// We construct the expected PreloadedMessages + UserMessage from the
+// legacy helpers directly and assert that the LLM saw exactly those
+// messages (in the same order, with the same content).
+func TestSubTurnRunner_FullMode_EquivalentToLegacy(t *testing.T) {
+	llm, runner := buildSubTurnFixture(t)
+	parent := []types.Message{
+		{Role: types.MessageRoleSystem, Content: "you are devrix"},
+		{Role: types.MessageRoleUser, Content: "first user"},
+		{Role: types.MessageRoleAssistant, Content: "first asst", Metadata: map[string]string{"k": "v"}},
+		{Role: types.MessageRoleUser, Content: "second user", Metadata: map[string]string{"tool_results": `[{"call_id":"t1","content":"tr"}]`}},
+		{Role: types.MessageRoleAssistant, Content: "second asst"},
+		{Role: types.MessageRoleUser, Content: "directive"},
+	}
+	_, err := runner.RunSubTurn(context.Background(), contracts.SubTurnRequest{
+		SessionID: "s",
+		Messages:  parent,
+		Mode:      contracts.SubAgentModeFull,
+	})
+	if err != nil {
+		t.Fatalf("RunSubTurn: %v", err)
+	}
+	got := llm.lastMessages()
+
+	// Build expected (legacy) using the same helper the legacy code path used.
+	expected := append([]types.Message(nil), messagesWithoutLastUser(parent)...)
+	lastUser := lastUserMessage(parent)
+	expected = append(expected, lastUser)
+
+	if len(got) != len(expected) {
+		t.Fatalf("full ≡ legacy: length mismatch got=%d expected=%d", len(got), len(expected))
+	}
+	for i := range got {
+		if got[i].Role != expected[i].Role {
+			t.Errorf("full ≡ legacy: msg[%d] role got=%s want=%s", i, got[i].Role, expected[i].Role)
+		}
+		if got[i].Content != expected[i].Content {
+			t.Errorf("full ≡ legacy: msg[%d] content got=%q want=%q", i, got[i].Content, expected[i].Content)
+		}
+	}
+}
+
+// TestSubTurnRunner_FullMode_EmptyParent (D2-S15-A08-T07 boundary) —
+// when parent has no pre-last-user content, mode=full should send only
+// the last user message (no error, no nil panic).
+func TestSubTurnRunner_FullMode_EmptyParent(t *testing.T) {
+	llm, runner := buildSubTurnFixture(t)
+	_, err := runner.RunSubTurn(context.Background(), contracts.SubTurnRequest{
+		SessionID: "s",
+		Messages: []types.Message{
+			{Role: types.MessageRoleUser, Content: "only directive"},
+		},
+		Mode: contracts.SubAgentModeFull,
+	})
+	if err != nil {
+		t.Fatalf("RunSubTurn: %v", err)
+	}
+	got := llm.lastMessages()
+	if len(got) != 1 || got[0].Content != "only directive" {
+		t.Fatalf("full empty parent: expected single directive, got %+v", got)
+	}
+}
+
 // --- T17: default mode from config ---
 
 // TestSubTurnRunner_DefaultModeFromConfig (D7-S2-A06-T17) — when req.Mode

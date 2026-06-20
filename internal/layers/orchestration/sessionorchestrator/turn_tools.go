@@ -204,6 +204,10 @@ func orchestrationToolSchemas() []turn.ToolSchema {
 		// under loop_first so users saying "用 free_fork 启 N 个 worker" reach a
 		// real registered tool. Execution is delegated to the base adapter's
 		// ExecuteRound fallback path (freeforkRunner in D2 ToolRegistry).
+		//
+		// DM-20260620-001-B (AC10) — `mode` field selects sub-agent context
+		// inheritance: brief (default, no parent history), fork (cache-friendly
+		// prefix), full (legacy — full parent history).
 		{
 			Name:        "free_fork",
 			Description: "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id and runs in an isolated worktree. Returns {spawned_count, agent_ids:[...]}.",
@@ -219,7 +223,7 @@ func orchestrationToolSchemas() []turn.ToolSchema {
 								"name":     map[string]any{"type": "string", "description": "Short name for the worker (used in logs)."},
 								"prompt":   map[string]any{"type": "string", "description": "Self-contained instruction for the worker."},
 								"worktree": map[string]any{"type": "boolean", "description": "Run in isolated worktree (default true)."},
-								"mode":     map[string]any{"type": "string", "description": "Collaboration mode (default: 'default')."},
+								"mode":     map[string]any{"type": "string", "enum": []any{"brief", "fork", "full"}, "default": "brief", "description": "Sub-agent context inheritance mode (DM-20260620-001-B / AC10). brief = no parent history (default); fork = cache-friendly prefix for sibling workers; full = full parent history (legacy)."},
 							},
 							"required": []any{"name", "prompt"},
 						},

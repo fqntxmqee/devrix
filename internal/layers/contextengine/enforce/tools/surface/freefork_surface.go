@@ -44,7 +44,7 @@ func (s *FreeForkSurface) Tools(_ context.Context, _, _ string) []contracts.Tool
 	return []contracts.ToolSpec{{
 		Name:            "free_fork",
 		Description:     "Batch fork N child agents (1..5) under a parent session. Each child runs in an isolated worker directory sandbox by default.",
-		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "sandbox": true, "mode": "default"}]}`,
+		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "sandbox": true, "mode": "brief|fork|full (default: brief)"}]}`,
 		Risk:            types.RiskLevelHigh,
 		ReadOnly:        rOnly,
 		Destructive:     dest,
