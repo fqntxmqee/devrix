@@ -62,6 +62,7 @@
 | D5-S23-A04-T02 | CLI `devrix debug export` 行为一致 | S23 | A04 | P2 | `internal/cli/debug/export_test.go` | IMPLEMENTED | D5-S8-A01-T02 |
 | D5-S23-A06-T01 | SessionBridge ActiveSessions gauge 增减 | **S0** ⬅️ | **A03** ⬅️ | P1 | `tests/integration/obs_session_bridge_test.go` | IMPLEMENTED | D5-S0-A02-T01 |
 | D5-S23-A06-T02 | HealthCheck 含 coverage 摘要字段 | S23 | A06 | P1 | `internal/layers/observability/health_test.go` | IMPLEMENTED | D5-S0-A02-T02 |
+| **D5-S23-A06-T03** | **Observability.Shutdown 错误聚合改用 `errors.Join` + `%w`，保留 typed chain（DM-20260620-003 PR-C M3）** | **S23** | **A06** | **P0** | **`internal/layers/observability/observability.go::Shutdown` (lines 165-184)** | **IMPLEMENTED** | **—** |
 | **D5-S23-A02-F01-T01** | **Tracker diff 收集 (W6)** | **S23** | **A07** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW6_DiffCollection_T01_CrossRef)** | **IMPLEMENTED** | **—** |
 | **D5-S23-A02-F02-T01** | **Tracker LRU dedup 跨文件 (W6)** | **S23** | **A07** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW6_LRUDedup_T02_CrossRef)** | **IMPLEMENTED** | **—** |
 | **D5-S23-A02-F03-T01** | **Tracker 异步 Linter 集成 (.go → go vet) + WatchFile (W7)** | **S23** | **A07** | **P0** | **`internal/layers/observability/diagnose/tracker/tracker_test.go` (TestW7_LinterIntegration_T03_CrossRef) + tests/integration/tools_terminal_test.go (TestTracker_NonBlocking)** | **IMPLEMENTED** | **—** |
@@ -112,13 +113,13 @@
 
 | Total | IMPLEMENTED | PLANNED | REMOVED |
 |-------|-------------|---------|---------|
-| 43 | 41 | 0 | 2 |
+| 44 | 42 | 0 | 2 |
 
 > **v2.1 Terminal:** 41/41 T IMPLEMENTED（3 PLANNED 全部闭合：D5-S21-A05-T01 propagation 集成测试已存在、D5-S21-A05-T02 Counter 单元测试已存在、D5-S23-A06-T02 HealthCheck coverage 字段已验证）。2 REMOVED 为 QueryLoop legacy（DM-20260618-010）。D5-S21-A01-T03 为历史缺口（原始 S1-A01 无 T03），非本 change 引入。
 
 ## P0 测试点清单
 
-D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, D5-S21-A09-T01, D5-S21-A11-T01, D5-S21-A12-T01, D5-S22-A01-T02, D5-S22-A01-T03, D5-S23-A01-T01, D5-S23-A01-T02, D5-S23-A01-T03, D5-S23-A01-T04, D5-S23-A03-T01, D5-S23-A03-T02, D5-S23-A07-T01, D5-S23-A07-T02, D5-S23-A08-T01, D5-S23-A08-T02, D5-S23-A09-T01, D5-S23-A09-T02, D5-S23-A02-F01-T01, D5-S23-A02-F02-T01, D5-S23-A02-F03-T01, D5-S23-A02-F03-T02
+D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, D5-S21-A09-T01, D5-S21-A11-T01, D5-S21-A12-T01, D5-S22-A01-T02, D5-S22-A01-T03, D5-S23-A01-T01, D5-S23-A01-T02, D5-S23-A01-T03, D5-S23-A01-T04, D5-S23-A03-T01, D5-S23-A03-T02, D5-S23-A06-T03, D5-S23-A07-T01, D5-S23-A07-T02, D5-S23-A08-T01, D5-S23-A08-T02, D5-S23-A09-T01, D5-S23-A09-T02, D5-S23-A02-F01-T01, D5-S23-A02-F02-T01, D5-S23-A02-F03-T01, D5-S23-A02-F03-T02
 
 ## Revision History
 
@@ -128,3 +129,4 @@ D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, 
 | 3.0.0 | 2026-06-15 | SA Refine v1.0：Canonical S21–S24 重排；增 canonical_s + Legacy T ID 列；2 性能 T 迁 CROSS 段 |
 | 3.1.0 | 2026-06-17 | devrix-queryloop-legacy-decommission (DM-20260617-001)：(1) D5-S24-A02-T04 legacy counter 已注册；(2) D5-S24-A02-T05 一次警告 sync.Once。IMPLEMENTED 38→40 |
 | **3.2.0** | **2026-06-19** | **v2.1 Terminal（代码锚点）**：增 canonical_a 列（全量填充）；canonical_s 校正 A08→S21 (DebugFilter)、A06→S0 (SessionBridge)；canonical_a 校正 Doctor T→A10、DebugFilter T→A14、SessionBridge T→A03；3 PLANNED 全部闭合 → 41/41 IMPLEMENTED；Statistics 更新 IMPLEMENTED 40→41 |
+| **3.3.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D5-S23-A06-T03 Observability.Shutdown errors.Join typed chain (PR-C M3)。IMPLEMENTED 41→42, P0 26→27 |

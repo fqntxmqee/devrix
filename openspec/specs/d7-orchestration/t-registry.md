@@ -7,7 +7,7 @@
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
 **Complements:** `terminal-state-guide.md` · `observability-guide.md`
-**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74.
+**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74. **2026-06-20-devrix-error-handling-tier1-tier2** (DM-20260620-003) — error handling PR-A/PR-B/PR-C: invariant migration to shared/errors (D7-S2-A06-T24), task_manager.Create signature (`(*Task, error)`) (D7-S1-A02-T18), orchestrator.emitError sanitize+code (D7-S2-A02-T18), subagent stream sentinels (D7-S2-A06-T25/T26), retry nil-sentinel (D7-S2-A06-T27), resolveDelegateTaskID `(string, error)` (D7-S1-T19); IMPLEMENTED 109→116, P0 80→83.
 
 ---
 
@@ -88,6 +88,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S1-T15** | **Decompose 24h 频率上限 (5/kind/session)** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestDecomposeChildren_DailyLimit`** | **IMPLEMENTED** | **P1** |
 | **D7-S1-T16** | **ResolveHint 高 uncertainty decompose 引导** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestResolveHint_HighUncertainty`** | **IMPLEMENTED** | **P1** |
 | **D7-S1-T17** | **RunTurn blocking await running children** | **D7-S1-A02** | **`workmodel/resolve_await_test.go::TestAwaitRunningChildren_BlocksUntilTerminal`** | **IMPLEMENTED** | **P1** |
+| **D7-S1-T18** | **TaskManager.Create returns `(*Task, error)` instead of silent nil (DM-20260620-003 PR-C H3)** | **D7-S1-A02-F01** | **`workmodel/task_manager_test.go::TestTaskManager_Create`; `cli_commands.go`; `tool_suite.go`** | **IMPLEMENTED** | **P0** |
+| **D7-S1-T19** | **resolveDelegateTaskID returns `(string, error)` so delegate tools surface creation failure** | **D7-S1-A02-F01** | **`delegatetools/delegate_tools.go`; `tests/integration/d7/d7_hub_flow_test.go`** | **IMPLEMENTED** | **P1** |
 | **D7-S3-T12** | **OrchestratePath SyncWaveNodes 挂树** | **D7-S3-A01** | **`sessionorchestrator/orchestrate_path.go`; bootstrap wiring** | **IMPLEMENTED** | **P1** |
 
 ---
@@ -223,6 +225,42 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S2-A06-T22** | **AC1 nested-branch fallback 路径：req=0 → `o.maxContextTokens`（Phase A wiring 32000）audit 仍触发** | **D7-S2-A06** | **`orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
 | **D7-S2-A06-T23** | **AC2 4-parallel deep review 端到端：4 路 `SubQuery.Run` 并行（80K+96K+32K）全部完成，capture adapter 验证 max 消息 1186 chars (folded)** | **D7-S2-A06** | **`tests/integration/d7/d7_nested_budget_test.go::TestIntegration_D7NestedBudget_4ParallelDeepReview`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
 
+### Error Handling Tier 1+2 (DM-20260620-003)
+
+> **devrix-error-handling-tier1-tier2 (DM-20260620-003) — 错误处理 PR-A (Tier 1) + PR-B (C2 type merge) + PR-C (H3+M1..M4) 落地。**
+>
+> **Tier 1 (PR-A)**: `SanitizeForUser` redacts API keys/tokens/paths before IM render;
+> `emitError` signature gains variadic `code ...string` for `error_code` metadata;
+> `subturn.go` adds `ErrSubagentStreamError` + `ErrSubagentStreamClosed` (codes
+> AGT_STREAM_5013/5014) so callers retain error type information;
+> `retry.go:91` nil-sentinel fix wraps a real `errors.New(...)` cause instead of `nil`.
+>
+> **Tier 2 (PR-B)**: `LLMError` becomes a type alias for `*SentinelError`;
+> all factories return `*SentinelError`; `SentinelError.Error()` falls back to
+> inner Err then Code (preserving LLMError's permissive semantics); `migrate.go`
+> provides build-time guard + deprecated helpers.
+>
+> **Tier 2 (PR-C)**: `TaskManager.Create` returns `(*Task, error)` (silent
+> fallback fix); `turn_adapter.ErrInvariantViolation` migrated to
+> `sharederrors.ErrInvariantViolation` (code AGT_INVARIANT_5013) with deprecated
+> alias; `classifyAndWrap` + `Gateway.classify` take ctx so downstream spans
+> can read cached Classification via `ClassifyResultFromCtx`;
+> `Observability.Shutdown` uses `errors.Join` + `%w` so callers retain typed chain;
+> `decisionplanning.LLMFallbackClassifier.Classify` logs `slog.Warn` when LLM
+> classify fails (was silent).
+>
+> Cross-cutting docs: `docs/error-handling.md`. Shared spec lives at
+> `internal/shared/errors/` (no `shared-errors` D-domain — cross-cutting per
+> `openspec/specs/architecture/cross-domain-boundaries.md`).
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
+|------|------|----------|-----------|--------|----------|
+| **D7-S2-A06-T24** | **AC6 `turn_adapter.ErrInvariantViolation` migrated to `sharederrors.ErrInvariantViolation` (code AGT_INVARIANT_5013); `Prepare` wraps via `NewInvariantViolationError`; legacy alias kept** | **D7-S2-A06** | **`internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` (still match via alias)** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
+| **D7-S2-A06-T25** | **AC2 `subturn.go:collectSubTurnResult` error case: when event has `error_code` metadata, wrap via `derrors.WithCode(code, ...)`; otherwise fall back to `NewSubagentStreamError`** | **D7-S2-A06** | **`internal/shared/errors/subturn.go`; `internal/layers/orchestration/turn/subturn.go`** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
+| **D7-S2-A06-T26** | **AC2 `subturn.go:collectSubTurnResult` channel-closed-without-complete branch returns `NewSubagentStreamClosedError()` (code AGT_STREAM_5014)** | **D7-S2-A06** | **`internal/shared/errors/subturn.go::NewSubagentStreamClosedError`** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
+| **D7-S2-A06-T27** | **AC2/H3 `protect/retry.go:91` nil-sentinel fix: defensive fallback wraps `errors.New("retry loop completed without recording an error: ...")` instead of `nil`** | **D7-S2-A06** | **`internal/layers/llmgateway/protect/retry.go`** | **IMPLEMENTED (DM-20260620-003)** | **P0** |
+| **D7-S2-A02-T18** | **AC1 `orchestrator.emitError` variadic `code ...string` adds `Metadata["error_code"]`; all 5 call sites pass `SanitizeForUser(err)` + `ErrorCode(err)`** | **D7-S2-A02** | **`internal/layers/orchestration/turn/orchestrator.go::emitError` + call sites (256, 292, 371, 428, 581)** | **IMPLEMENTED (DM-20260620-003)** | **P0** |
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
 | **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** |
@@ -306,7 +344,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 109 | 109 | 0 | 0 | 80 |
+| 116 | 116 | 0 | 0 | 83 |
 
 ### 按 Scenario
 
@@ -330,6 +368,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > **v3.7 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001-B) Phase B 归档**：+4 T 点 IMPLEMENTED（D7-S2-A06-T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74。配套 D2 域 +3 T 点（D2-S15-A08 T06-T08 BuildForkedMessages byte-level prefix stability）见 d2 t-registry；D4 域 +2 T 点（D4-S14-A07 T01-T02 mode field schema）见 d4 t-registry。AC12 D5 spans 22-step replay P95=21707 ≤ 40K（Phase A baseline 51K）。
 >
 > **v3.8 closure (2026-06-20):** **devrix-context-budget-phase-c-nested (DM-20260620-002) Phase C 归档**：+6 T 点 IMPLEMENTED（D7-S2-A06-T18 TurnRequest.MaxContextTokens 字段 + T19 nested 分支读取 + T20 SubTurnRunner Cfg + bootstrap 注入 + T21 显式注入单测 + T22 fallback 单测 + T23 4-parallel integration）。IMPLEMENTED 103→109，P0 74→80。配套 D2 域 +2 T 点（D2-S15-A08 T09 SubTurnRequest→TurnRequest propagation + T10 SubQueryParams→SubTurnRequest pass-through）见 d2 t-registry。AC2 4-parallel deep-review sub-agents 全绿（capture adapter 验证 max 消息 1186 chars folded from 80000）。D7TestStack 同步修复 deepseek DefaultModel / ModelRouting 默认空值（unblocks 所有 D7 integration test）。
+>
+> **v3.9 closure (2026-06-20):** **devrix-error-handling-tier1-tier2 (DM-20260620-003) 归档**：+7 T 点 IMPLEMENTED（D7-S1-T18 TaskManager.Create `(*Task, error)` + D7-S1-T19 resolveDelegateTaskID `(string, error)` + D7-S2-A06-T24 turn_adapter invariant migration to sharederrors + T25 subturn error_code wrap + T26 subturn channel-closed sentinel + T27 retry nil-sentinel defensive wrap + D7-S2-A02-T18 orchestrator.emitError variadic code）。IMPLEMENTED 109→116，P0 80→83。配套 D3 域 +1 T 点（D3-S3-A01-T16 retry nil-sentinel）见 d3 t-registry；D5 域 +1 T 点（D5-S23-A06-T03 Observability.Shutdown errors.Join）见 d5 t-registry。Tier 1 (PR-A #141) + Tier 2 C2 (PR-B #142) + Tier 2 H3+M1..M4 (PR-C #143) 全部 merged；跨切面 `docs/error-handling.md` v1.0 落地。
 
 ---
 
@@ -355,4 +395,5 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.6.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) Phase A 归档**：D7-S2-A06 +3 T 点（T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70 |
 | **3.7.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) Phase B 归档**：D7-S2-A06 +4 T 点（T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74 |
 | **3.8.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-phase-c-nested (devrix-context-budget-phase-c-nested / DM-20260620-002) Phase C 归档**：D7-S2-A06 +6 T 点（T18 TurnRequest.MaxContextTokens 字段 + T19 nested 分支读取 + T20 SubTurnRunner Cfg + bootstrap 注入 + T21 显式注入单测 + T22 fallback 单测 + T23 4-parallel integration）。IMPLEMENTED 103→109，P0 74→80。D7TestStack 同步修复 deepseek DefaultModel / ModelRouting 默认空值。 |
+| **3.9.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003) 归档**：D7-S1 +2 T 点 (T18 TaskManager.Create `(*Task, error)` + T19 resolveDelegateTaskID `(string, error)`) + D7-S2-A06 +4 T 点 (T24 invariant migration + T25 subturn error_code wrap + T26 channel-closed sentinel + T27 retry nil-sentinel) + D7-S2-A02 +1 T 点 (T18 emitError variadic code)。IMPLEMENTED 109→116, P0 80→83。 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
