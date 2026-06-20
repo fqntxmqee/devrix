@@ -6,6 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -19,11 +20,15 @@ type SubQueryRunner struct {
 //
 // DM-20260617-008 W2: caller is responsible for setting LoopDeps.FlowReporter
 // (was previously auto-derived from flow.GlobalHub when nil).
+//
+// DM-20260620-001-B (AC6 + AC10) — mode selects sub-agent context inheritance;
+// empty defers to SubagentConfig.DefaultMode.
 func (f *SubQueryRunner) RunSubQuery(
 	ctx context.Context,
 	parent *types.SessionContext,
 	role, directive, taskID string,
 	maxTurns int,
+	mode contracts.SubAgentMode,
 ) (string, error) {
 	if f == nil || parent == nil {
 		return "", fmt.Errorf("subquery fallback: parent context is nil")
@@ -38,11 +43,11 @@ func (f *SubQueryRunner) RunSubQuery(
 	)
 	switch WorkerRole(role) {
 	case WorkerRoleExplore:
-		res, err = RunExplore(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunExplore(ctx, deps, parent, directive, nil, maxTurns, mode)
 	case WorkerRolePlan:
-		res, err = RunPlan(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunPlan(ctx, deps, parent, directive, nil, maxTurns, mode)
 	case WorkerRoleImplement:
-		res, err = RunImplement(ctx, deps, parent, directive, nil, maxTurns)
+		res, err = RunImplement(ctx, deps, parent, directive, nil, maxTurns, mode)
 	default:
 		res, err = enforce.Run(ctx, deps, enforce.SubQueryParams{
 			ParentSC:       parent,
@@ -53,6 +58,7 @@ func (f *SubQueryRunner) RunSubQuery(
 			SystemPrompt:   systemPromptForRole(role),
 			PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: directive, SessionID: parent.SessionID}},
 			MaxTurns:       maxTurns,
+			Mode:           mode,
 			FlowReporter:   deps.FlowReporter,
 		})
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -62,7 +63,10 @@ func (r *delegateToolRunner) Schema() tools.ToolSchema {
 }
 
 func delegateToolParameters() string {
-	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"sandbox_slug":{"type":"string","description":"Optional isolated worker directory slug for parallel implement tasks."},"worktree_slug":{"type":"string","description":"Deprecated alias for sandbox_slug."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."}}}`
+	// DM-20260620-001-B (AC10) — `mode` field selects sub-agent context
+	// inheritance: brief (default, no parent history), fork (cache-friendly
+	// prefix), full (legacy — full parent history).
+	return `{"type":"object","required":["directive"],"properties":{"directive":{"type":"string","description":"Clear, self-contained instruction for the worker (goal, scope, files/modules, expected output)."},"task_id":{"type":"string","description":"Optional TaskManager id; omit to auto-create from directive."},"sandbox_slug":{"type":"string","description":"Optional isolated worker directory slug for parallel implement tasks."},"worktree_slug":{"type":"string","description":"Deprecated alias for sandbox_slug."},"async":{"type":"boolean","description":"When true, return immediately and poll delegate_status for progress. Prefer async for explore/plan that may take many tool rounds."},"mode":{"type":"string","enum":["brief","fork","full"],"default":"brief","description":"Sub-agent context inheritance mode (DM-20260620-001-B / AC10). brief = no parent history (default); fork = cache-friendly prefix for sibling workers; full = full parent history (legacy)."}}}`
 }
 
 func delegateToolDescription(role WorkerRole) string {
@@ -119,6 +123,9 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role))),
 		SandboxSlug: resolveSandboxSlug(fields),
 		Async:        fields["async"] == "true",
+		// DM-20260620-001-B (AC6 + AC10) — read `mode` from tool input; empty
+		// defers to SubagentConfig.DefaultMode.
+		Mode:         parseSubAgentMode(fields["mode"]),
 	}
 
 	runID, _ := workmodel.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
@@ -215,4 +222,20 @@ func resolveSandboxSlug(fields map[string]string) string {
 		return v
 	}
 	return strings.TrimSpace(fields["worktree_slug"])
+}
+
+// parseSubAgentMode normalizes the tool-input `mode` string into a
+// contracts.SubAgentMode. Unknown / empty values yield "" so SubTurnRunner
+// falls back to Cfg.DefaultMode (DM-20260620-001-B / AC6).
+func parseSubAgentMode(raw string) contracts.SubAgentMode {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(contracts.SubAgentModeBrief):
+		return contracts.SubAgentModeBrief
+	case string(contracts.SubAgentModeFork):
+		return contracts.SubAgentModeFork
+	case string(contracts.SubAgentModeFull):
+		return contracts.SubAgentModeFull
+	default:
+		return ""
+	}
 }
