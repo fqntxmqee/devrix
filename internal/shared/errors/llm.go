@@ -34,25 +34,11 @@ const (
 )
 
 // LLMError is a typed LLM gateway error with a stable code.
-type LLMError struct {
-	Code    string
-	Message string
-	Err     error
-}
-
-func (e *LLMError) Error() string {
-	if e.Message != "" {
-		return e.Message
-	}
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return e.Code
-}
-
-func (e *LLMError) Unwrap() error {
-	return e.Err
-}
+//
+// DM-20260620-003 (PR-B tier 2 C2): LLMError is now a deprecated type alias
+// for SentinelError so all devrix errors share one shape. Existing callers
+// can keep using *LLMError; new code should use *SentinelError directly.
+type LLMError = SentinelError
 
 // FormatLLMError unwraps the full error chain for logging and tracing.
 func FormatLLMError(err error) string {
@@ -77,15 +63,6 @@ func FormatLLMError(err error) string {
 
 // IsRetryable reports whether the error may be retried.
 func IsRetryable(err error) bool {
-	var llmErr *LLMError
-	if errors.As(err, &llmErr) {
-		switch llmErr.Code {
-		case CodeLLMTimeout, CodeLLMProviderUnavailable, CodeLLMParseError:
-			return true
-		default:
-			return false
-		}
-	}
 	var sentinel *SentinelError
 	if errors.As(err, &sentinel) {
 		switch sentinel.Code {
@@ -98,32 +75,32 @@ func IsRetryable(err error) bool {
 	return err != nil
 }
 
-func newLLMError(code, message string, err error) *LLMError {
-	return &LLMError{Code: code, Message: message, Err: err}
+func newLLMError(code, message string, err error) *SentinelError {
+	return &SentinelError{Code: code, Message: message, Err: err}
 }
 
 // NewProviderUnavailableError returns a provider unavailable error.
-func NewProviderUnavailableError(err error) *LLMError {
+func NewProviderUnavailableError(err error) *SentinelError {
 	return newLLMError(CodeLLMProviderUnavailable, "llm provider unavailable", err)
 }
 
 // NewCircuitOpenError returns a circuit breaker open error.
-func NewCircuitOpenError(provider string) *LLMError {
+func NewCircuitOpenError(provider string) *SentinelError {
 	return newLLMError(CodeLLMCircuitOpen, fmt.Sprintf("llm circuit open for provider %s", provider), ErrCircuitOpen)
 }
 
 // NewLLMTimeoutError returns a timeout error.
-func NewLLMTimeoutError(err error) *LLMError {
+func NewLLMTimeoutError(err error) *SentinelError {
 	return newLLMError(CodeLLMTimeout, "llm request timeout", err)
 }
 
 // NewLLMAuthFailedError returns an authentication error.
-func NewLLMAuthFailedError(err error) *LLMError {
+func NewLLMAuthFailedError(err error) *SentinelError {
 	return newLLMError(CodeLLMAuthFailed, "llm authentication failed", err)
 }
 
 // NewTokenBudgetExceededError returns a token budget exceeded error.
-func NewTokenBudgetExceededError(count, budget int) *LLMError {
+func NewTokenBudgetExceededError(count, budget int) *SentinelError {
 	return newLLMError(
 		CodeLLMTokenBudgetExceeded,
 		fmt.Sprintf("token count %d exceeds budget %d", count, budget),
@@ -132,12 +109,12 @@ func NewTokenBudgetExceededError(count, budget int) *LLMError {
 }
 
 // NewLLMParseError returns a response parse error.
-func NewLLMParseError(err error) *LLMError {
+func NewLLMParseError(err error) *SentinelError {
 	return newLLMError(CodeLLMParseError, "llm response parse error", err)
 }
 
 // NewUnsupportedProviderError returns an unsupported provider error.
-func NewUnsupportedProviderError(provider string) *LLMError {
+func NewUnsupportedProviderError(provider string) *SentinelError {
 	return newLLMError(
 		CodeLLMUnsupportedProvider,
 		fmt.Sprintf("unsupported llm provider: %s", provider),
@@ -146,7 +123,7 @@ func NewUnsupportedProviderError(provider string) *LLMError {
 }
 
 // NewUnsupportedModelError returns an unsupported model error.
-func NewUnsupportedModelError(model string) *LLMError {
+func NewUnsupportedModelError(model string) *SentinelError {
 	return newLLMError(
 		CodeLLMUnsupportedModel,
 		fmt.Sprintf("unsupported llm model: %s", model),

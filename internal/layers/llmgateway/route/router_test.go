@@ -64,9 +64,9 @@ func TestRouter_should_return_error_for_unknown_model(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) {
-		t.Fatalf("expected LLMError, got %T", err)
+		t.Fatalf("expected SentinelError, got %T", err)
 	}
 	if llmErr.Code != sharederrors.CodeLLMUnsupportedModel {
 		t.Errorf("code: got %s", llmErr.Code)

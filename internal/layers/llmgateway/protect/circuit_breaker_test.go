@@ -61,7 +61,7 @@ func TestCircuitBreaker_should_open_after_failure_threshold(t *testing.T) {
 	if allowed || err == nil {
 		t.Fatalf("expected circuit open rejection, allowed=%v err=%v", allowed, err)
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMCircuitOpen {
 		t.Errorf("err: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestCircuitBreaker_should_limit_half_open_concurrent_probes(t *testing.T) {
 	if allowed || err == nil {
 		t.Fatalf("expected second probe rejected, allowed=%v err=%v", allowed, err)
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMCircuitOpen {
 		t.Fatalf("err: %v", err)
 	}

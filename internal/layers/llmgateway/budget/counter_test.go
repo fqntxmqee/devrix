@@ -92,9 +92,9 @@ func TestCounter_should_fail_budget_when_over_limit(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected budget error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) {
-		t.Fatalf("expected LLMError, got %T", err)
+		t.Fatalf("expected SentinelError, got %T", err)
 	}
 	if llmErr.Code != sharederrors.CodeLLMTokenBudgetExceeded {
 		t.Errorf("code: got %s", llmErr.Code)

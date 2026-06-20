@@ -34,7 +34,12 @@ var (
 	ErrGatewayAdapt = errors.New("gateway adapter error")
 )
 
-// SentinelError wraps an error with code and message
+// SentinelError wraps an error with code and message.
+//
+// DM-20260620-003 (PR-B tier 2 C2): unified with the legacy LLMError shape
+// so all devrix errors use the same type. Error() now falls back to the
+// inner Err (and finally Code) when Message is empty, matching the more
+// permissive LLMError semantics callers relied on.
 type SentinelError struct {
 	Code    string
 	Message string
@@ -42,7 +47,13 @@ type SentinelError struct {
 }
 
 func (e *SentinelError) Error() string {
-	return e.Message
+	if e.Message != "" {
+		return e.Message
+	}
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return e.Code
 }
 
 func (e *SentinelError) Unwrap() error {

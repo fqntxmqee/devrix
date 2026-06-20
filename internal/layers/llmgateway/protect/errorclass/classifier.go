@@ -92,7 +92,7 @@ func NewDefaultClassifier() *DefaultClassifier {
 }
 
 func (c *DefaultClassifier) registerSentinels() {
-	// 通过 wrap 后的 *SentinelError 标识 + LLMError.Code 双通道映射
+	// 通过 wrap 后的 *SentinelError 标识 + SentinelError.Code 双通道映射
 	c.sentinelSentinels = append(c.sentinelSentinels, sentinelMatch{
 		target: sharederrors.ErrLLMTimeout,
 		llmCode: sharederrors.CodeLLMTimeout,
@@ -207,7 +207,7 @@ func (c *DefaultClassifier) registerRegexRules() {
 
 // Classify 三层匹配：错误 sentinel → HTTP 状态码 → 正则 body。
 func (c *DefaultClassifier) Classify(err error, httpStatus int, raw string) Classification {
-	// Layer 1: 既有 sentinel (errors.Is + LLMError.Code 双通道)
+	// Layer 1: 既有 sentinel (errors.Is + SentinelError.Code 双通道)
 	if err != nil {
 		for _, s := range c.sentinelSentinels {
 			if stderrors.Is(err, s.target) {
@@ -219,8 +219,8 @@ func (c *DefaultClassifier) Classify(err error, httpStatus int, raw string) Clas
 				}
 			}
 		}
-		// LLMError.Code 直接映射（devrix llmgateway 包装的错误）
-		var llmErr *sharederrors.LLMError
+		// SentinelError.Code 直接映射（devrix llmgateway 包装的错误）
+		var llmErr *sharederrors.SentinelError
 		if stderrors.As(err, &llmErr) {
 			for _, s := range c.sentinelSentinels {
 				if s.llmCode == llmErr.Code {

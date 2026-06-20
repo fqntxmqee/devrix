@@ -160,7 +160,7 @@ func TestDeepSeekAdapter_should_fail_without_api_key(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected auth error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMAuthFailed {
 		t.Errorf("err: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestDeepSeekAdapter_should_map_auth_http_status(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	var llmErr *sharederrors.LLMError
+	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMAuthFailed {
 		t.Errorf("err: %v", err)
 	}
