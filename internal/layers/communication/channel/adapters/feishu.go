@@ -1284,12 +1284,28 @@ func (a *FeishuAdapter) ReplyMessage(ctx context.Context, messageID, content str
 
 func parseFeishuChatID(sessionKey string) (string, error) {
 	// sessionKey format: feishu_{chat_id}_{user_id}
-	// chat_id may contain underscores (e.g. oc_xxxxx), so use LastIndex instead of Split.
+	// chat_id format: "oc_xxxx" (may contain underscores, e.g. "oc_stop_flow")
+	// user_id format: "ou_xxxx" (open_id, preferred) or "u_xxxx" (user_id fallback)
+	// A naive LastIndex("_") splits at the wrong boundary whenever the
+	// chat_id has extra underscores, producing an invalid receive_id that
+	// Feishu rejects with code 230001. Anchor on "_ou_" instead.
 	prefix := "feishu_"
 	if !strings.HasPrefix(sessionKey, prefix) {
 		return "", fmt.Errorf("invalid session key: %s", sessionKey)
 	}
 	trimmed := strings.TrimPrefix(sessionKey, prefix)
+	if idx := strings.LastIndex(trimmed, "_ou_"); idx > 0 {
+		return trimmed[:idx], nil
+	}
+	// Fallback: user_id may be a plain "u_xxxx" when open_id is unavailable.
+	// Verify the tail matches the "u_xxxx" shape so a chat_id that itself
+	// ends in "_u_" (rare but possible) is not split prematurely.
+	if idx := strings.LastIndex(trimmed, "_u_"); idx > 0 {
+		rest := trimmed[idx+1:]
+		if strings.HasPrefix(rest, "u_") && len(rest) > 2 {
+			return trimmed[:idx], nil
+		}
+	}
 	lastUnderscore := strings.LastIndex(trimmed, "_")
 	if lastUnderscore <= 0 {
 		return "", fmt.Errorf("invalid session key: %s", sessionKey)
