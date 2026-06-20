@@ -336,6 +336,12 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	var totalUsage llmgateway.TokenUsage
 	var lastPromptTokens int
 	var finalText string
+	// accumulatedText retains the LLM-emitted text from EVERY turn, not just
+	// the last. Without this, the finalText/complete event only carries the
+	// very last turn's content; a deep-review report emitted across many
+	// earlier turns would be silently discarded at emitComplete, leaving the
+	// IM card without its conclusion.
+	var accumulatedText strings.Builder
 	// lastThinkingTail retains the most recent LLM thinking content, post-strip.
 	// Used as a finalText fallback at emitComplete time when the LLM never
 	// emitted a clean summary (e.g. a provider without native reasoning emits
@@ -485,7 +491,13 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		}
 		endSpan(llmSpan)
 
-		finalText = contentBuf.String()
+		// Persist this turn's accumulated text into accumulatedText BEFORE
+		// overwriting finalText, so the complete event carries the full
+		// cross-turn report rather than only the last turn's content.
+		if t := contentBuf.String(); t != "" {
+			accumulatedText.WriteString(t)
+		}
+		finalText = accumulatedText.String()
 		// Preserve this turn's accumulated thinking for the emitComplete
 		// fallback below. Stash as lastThinkingTail AFTER finalText is set so
 		// the most recent non-empty thinking is always the fallback source.

@@ -2,11 +2,16 @@ package capture
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/communication/delivery/eventbus"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -470,6 +475,81 @@ func TestCommunicationGateway_RouteOutbound(t *testing.T) {
 	}
 	if handler.messages[0].Content != "Hello from gateway!" {
 		t.Errorf("expected content 'Hello from gateway!', got '%s'", handler.messages[0].Content)
+	}
+}
+
+// TestCommunicationGateway_handleEngineEvent_PersistsTranscript verifies that
+// streaming events (text / thinking / tool_call / tool_result / complete)
+// are written to the per-session transcript jsonl so the full report text
+// survives process restarts and feishu cardkit-stream failures. Non-content
+// events (e.g. milestone) are intentionally skipped.
+func TestCommunicationGateway_handleEngineEvent_PersistsTranscript(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	writerDir := t.TempDir()
+	w, err := transcript.NewWriter(writerDir)
+	if err != nil {
+		t.Fatalf("transcript.NewWriter: %v", err)
+	}
+
+	handler := newMockEventHandler()
+	cfg := config.DefaultConfig()
+	gw := NewCommunicationGateway(store, handler, nil, cfg, w)
+
+	session, err := gw.CreateSession("chat_tx", "/tmp")
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	events := []*EngineEvent{
+		{Type: "text", Content: "hello world", SessionID: session.SessionID},
+		{Type: "thinking", Content: "let me think", SessionID: session.SessionID},
+		{Type: "tool_call", ToolName: "bash", ToolInput: `{"cmd":"ls"}`, SessionID: session.SessionID},
+		{Type: "tool_result", Content: "file1\nfile2", SessionID: session.SessionID},
+		{Type: "milestone_progress", Content: "20%", SessionID: session.SessionID},
+		{Type: "complete", Content: "final report", SessionID: session.SessionID},
+	}
+	for _, ev := range events {
+		gw.handleEngineEvent(context.Background(), session, ev)
+	}
+
+	// Drain on-disk transcript and assert every content event made it.
+	transcriptPath := filepath.Join(writerDir, session.SessionID+".jsonl")
+	data, err := os.ReadFile(transcriptPath)
+	if err != nil {
+		t.Fatalf("read transcript: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) != 5 {
+		t.Fatalf("expected 5 transcript lines (skipping milestone), got %d:\n%s", len(lines), string(data))
+	}
+
+	wantKinds := []string{"assistant", "thinking", "tool_call", "tool_result", "complete"}
+	wantBodies := []string{
+		"hello world",
+		"let me think",
+		"bash {\"cmd\":\"ls\"}",
+		"file1\nfile2",
+		"final report",
+	}
+	for i, line := range lines {
+		var got transcript.Event
+		if err := json.Unmarshal([]byte(line), &got); err != nil {
+			t.Fatalf("line %d json: %v: %s", i, err, line)
+		}
+		if got.Kind != wantKinds[i] {
+			t.Errorf("line %d kind=%q, want %q", i, got.Kind, wantKinds[i])
+		}
+		if got.Body != wantBodies[i] {
+			t.Errorf("line %d body=%q, want %q", i, got.Body, wantBodies[i])
+		}
+		if got.Role != "assistant" {
+			t.Errorf("line %d role=%q, want assistant", i, got.Role)
+		}
 	}
 }
 
