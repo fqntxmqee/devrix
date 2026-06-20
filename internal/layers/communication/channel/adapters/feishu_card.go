@@ -268,10 +268,12 @@ func flattenMarkdownTablesForFeishu(content string) string {
 				}
 				parts = append(parts, cell)
 			}
-			if len(parts) > 0 {
-				out = append(out, strings.Join(parts, " · "))
+			if len(parts) == 0 {
+				// pure separator row (e.g. "|---|---|") — drop entirely.
 				continue
 			}
+			out = append(out, strings.Join(parts, " · "))
+			continue
 		}
 		out = append(out, line)
 	}
