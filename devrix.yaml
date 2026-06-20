@@ -257,6 +257,13 @@ context_engine:
     fork_subagent_enabled: true
     sidechain_transcript: true
     default_subagent_max_turns: 50
+  # DM-20260620-001-B (Phase B — AC6 + AC9) — sub-agent context inheritance
+  # mode (brief / fork / full) + recursion depth cap. Default brief 节省 token;
+  # legacy_mode=full 留作旧调用方显式切换 (后续 minor release 移除)。
+  subagent:
+    default_mode: brief
+    legacy_mode: ""  # 留空走 default_mode
+    max_depth: 3
 
   workspace:
     max_context_tokens: 8000
