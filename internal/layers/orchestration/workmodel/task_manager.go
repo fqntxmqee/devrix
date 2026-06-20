@@ -105,13 +105,18 @@ func (m *TaskManager) EnsureGoal(sessionID, directive string) (*WorkItem, error)
 }
 
 // Create creates a new implement work item under session goal.
-func (m *TaskManager) Create(sessionID, subject, description string) *Task {
+//
+// DM-20260620-003 (PR-C H3): returns (*Task, error) instead of silently
+// swallowing tree.Create errors. Callers must handle the error; v1.x
+// callers that ignore it via `task := m.Create(...)` should be updated
+// to `task, err := m.Create(...)` and decide whether to log/return.
+func (m *TaskManager) Create(sessionID, subject, description string) (*Task, error) {
 	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
 	if span != nil {
 		defer span.End()
 	}
 
-	goal, _ := m.tree.EnsureGoal(sessionID, subject)
+	goal, goalErr := m.tree.EnsureGoal(sessionID, subject)
 	parentID := ""
 	if goal != nil {
 		parentID = goal.ID
@@ -124,7 +129,16 @@ func (m *TaskManager) Create(sessionID, subject, description string) *Task {
 		Directive: description,
 	})
 	if err != nil {
-		return nil
+		if span != nil {
+			span.SetAttributes(
+				tracer.Attribute{Key: "task.create.error", Value: err.Error()},
+				tracer.Attribute{Key: "task.ensure_goal.error", Value: goalErrString(goalErr)},
+			)
+		}
+		if goalErr != nil {
+			return nil, fmt.Errorf("taskmanager: ensure goal (session=%s): %w; create work item: %w", sessionID, goalErr, err)
+		}
+		return nil, fmt.Errorf("taskmanager: create work item (session=%s, subject=%q): %w", sessionID, subject, err)
 	}
 
 	if span != nil {
@@ -133,7 +147,14 @@ func (m *TaskManager) Create(sessionID, subject, description string) *Task {
 			tracer.Attribute{Key: "task.subject", Value: truncateSubject(subject, 200)},
 		)
 	}
-	return item.ToTask()
+	return item.ToTask(), nil
+}
+
+func goalErrString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // CreateWorkItem creates a work item with full control.

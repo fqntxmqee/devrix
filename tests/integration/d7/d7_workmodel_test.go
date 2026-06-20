@@ -16,7 +16,10 @@ import (
 func TestIntegration_D7WorkModel_DiskPersistAndReload(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{})
 
-	created := stack.TaskManager.Create("sess_wm", "Wire D7 integration tests", "Add P0 vertical slices")
+	created, err := stack.TaskManager.Create("sess_wm", "Wire D7 integration tests", "Add P0 vertical slices")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	if created == nil || created.ID == "" {
 		t.Fatal("expected created task")
 	}

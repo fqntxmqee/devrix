@@ -40,7 +40,10 @@ func TestTaskManager_InheritFromSession(t *testing.T) {
 func TestTaskManager_QueryHistoricalWorkItem(t *testing.T) {
 	dir := t.TempDir()
 	tm := NewTaskManagerFromConfig(config.TasksConfig{Mode: "v2", StoreDir: dir}, nil)
-	item := tm.Create("hist", "subject", "desc")
+	item, err := tm.Create("hist", "subject", "desc")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	path := filepath.Join(dir, "hist.json")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected persisted file: %v", err)

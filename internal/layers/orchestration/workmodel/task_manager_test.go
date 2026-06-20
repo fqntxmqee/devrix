@@ -7,8 +7,13 @@ import (
 
 func TestTaskManager_Create(t *testing.T) {
 	m := NewTaskManager()
-	task := m.Create("session1", "Fix bug", "Fix authentication bug")
-
+	task, err := m.Create("session1", "Fix bug", "Fix authentication bug")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task == nil {
+		t.Fatal("expected non-nil task")
+	}
 	if task.ID == "" {
 		t.Error("expected task ID")
 	}
@@ -22,8 +27,12 @@ func TestTaskManager_Create(t *testing.T) {
 
 func TestTaskManager_List(t *testing.T) {
 	m := NewTaskManager()
-	m.Create("session1", "Task 1", "Desc 1")
-	m.Create("session1", "Task 2", "Desc 2")
+	if _, err := m.Create("session1", "Task 1", "Desc 1"); err != nil {
+		t.Fatalf("Create #1: %v", err)
+	}
+	if _, err := m.Create("session1", "Task 2", "Desc 2"); err != nil {
+		t.Fatalf("Create #2: %v", err)
+	}
 
 	tasks := m.List("session1")
 	if len(tasks) != 2 {
@@ -33,10 +42,12 @@ func TestTaskManager_List(t *testing.T) {
 
 func TestTaskManager_UpdateStatus(t *testing.T) {
 	m := NewTaskManager()
-	task := m.Create("session1", "Task", "Desc")
-
-	err := m.UpdateStatus("session1", task.ID, TaskStatusInProgress)
+	task, err := m.Create("session1", "Task", "Desc")
 	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if err := m.UpdateStatus("session1", task.ID, TaskStatusInProgress); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -48,11 +59,16 @@ func TestTaskManager_UpdateStatus(t *testing.T) {
 
 func TestTaskManager_Dependency(t *testing.T) {
 	m := NewTaskManager()
-	task1 := m.Create("session1", "Task 1", "First task")
-	task2 := m.Create("session1", "Task 2", "Second task")
-
-	err := m.AddDependency("session1", task2.ID, task1.ID)
+	task1, err := m.Create("session1", "Task 1", "First task")
 	if err != nil {
+		t.Fatalf("Create #1: %v", err)
+	}
+	task2, err := m.Create("session1", "Task 2", "Second task")
+	if err != nil {
+		t.Fatalf("Create #2: %v", err)
+	}
+
+	if err := m.AddDependency("session1", task2.ID, task1.ID); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -72,8 +88,12 @@ func TestTaskManager_Dependency(t *testing.T) {
 
 func TestTaskManager_ClearSession(t *testing.T) {
 	m := NewTaskManager()
-	m.Create("session1", "Task", "Desc")
-	m.Create("session1", "Task 2", "Desc 2")
+	if _, err := m.Create("session1", "Task", "Desc"); err != nil {
+		t.Fatalf("Create #1: %v", err)
+	}
+	if _, err := m.Create("session1", "Task 2", "Desc 2"); err != nil {
+		t.Fatalf("Create #2: %v", err)
+	}
 
 	m.ClearSession("session1")
 	tasks := m.List("session1")
@@ -129,7 +149,10 @@ func TestIsLegalTransition(t *testing.T) {
 
 func TestTaskManager_UpdateStatus_IllegalTransition(t *testing.T) {
 	m := NewTaskManager()
-	task := m.Create("s1", "Task", "Desc")
+	task, err := m.Create("s1", "Task", "Desc")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 
 	// pending → in_progress (legal)
 	if err := m.UpdateStatus("s1", task.ID, TaskStatusInProgress); err != nil {
@@ -141,7 +164,7 @@ func TestTaskManager_UpdateStatus_IllegalTransition(t *testing.T) {
 	}
 
 	// completed → pending (illegal)
-	err := m.UpdateStatus("s1", task.ID, TaskStatusPending)
+	err = m.UpdateStatus("s1", task.ID, TaskStatusPending)
 	if err == nil {
 		t.Fatal("expected error for completed→pending, got nil")
 	}
@@ -170,7 +193,10 @@ func TestTaskManager_UpdateStatus_LegalTransitions(t *testing.T) {
 	for _, p := range paths {
 		t.Run(p.name, func(t *testing.T) {
 			m := NewTaskManager()
-			task := m.Create("s1", "Task", p.name)
+			task, err := m.Create("s1", "Task", p.name)
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
 			for _, target := range p.path {
 				if err := m.UpdateStatus("s1", task.ID, target); err != nil {
 					t.Fatalf("legal transition to %s failed: %v", target, err)

@@ -1,9 +1,11 @@
 package decisionplanning
 
 import (
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"context"
+	"log/slog"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 
 // LLMFallbackClassifier wraps a rule-based IntentClassifier and falls back
@@ -70,7 +72,17 @@ func (c *LLMFallbackClassifier) Classify(ctx context.Context, message string) (o
 
 	llmResult, err := c.llm.ClassifyIntent(ctx, message)
 	if err != nil {
-		// LLM failed - fall back to rule result
+		// DM-20260620-003 (PR-C M4): previously silent fallback. Now log a
+		// structured warning so ops can spot classification degradation
+		// without grepping through stderr. Control flow unchanged: rule
+		// result is still returned.
+		slog.Warn("decisionplanning: LLM classify failed, using rule fallback",
+			"error", err,
+			"message_len", len(message),
+			"min_confidence", c.minConfidence,
+			"rule_confidence", ruleResult.Confidence,
+			"rule_kind", ruleResult.Kind,
+		)
 		return ruleResult, nil
 	}
 

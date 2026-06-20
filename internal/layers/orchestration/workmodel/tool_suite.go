@@ -72,7 +72,13 @@ func (t *ToolSuite) Create(_ context.Context, input TaskToolInput) (*TaskToolOut
 		}, nil
 	}
 
-	task := t.manager.Create(input.SessionID, input.Subject, input.Description)
+	task, err := t.manager.Create(input.SessionID, input.Subject, input.Description)
+	if err != nil {
+		return &TaskToolOutput{
+			Success: false,
+			Message: fmt.Sprintf("failed to create task: %v", err),
+		}, nil
+	}
 
 	return &TaskToolOutput{
 		Success: true,

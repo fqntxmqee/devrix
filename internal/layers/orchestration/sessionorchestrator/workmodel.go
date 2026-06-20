@@ -105,7 +105,13 @@ func (m *LocalWorkModel) CreateTask(ctx context.Context, spec orchtypes.TaskSpec
 	if sessionID == "" {
 		return "", fmt.Errorf("LocalWorkModel: sessionID not found in context")
 	}
-	task := m.tasks.Create(sessionID, spec.Subject, spec.Goal)
+	task, err := m.tasks.Create(sessionID, spec.Subject, spec.Goal)
+	if err != nil {
+		return "", fmt.Errorf("LocalWorkModel.CreateTask: %w", err)
+	}
+	if task == nil {
+		return "", fmt.Errorf("LocalWorkModel.CreateTask: nil task without error")
+	}
 	return task.ID, nil
 }
 
@@ -170,9 +176,12 @@ func (m *LocalWorkModel) CreateWorkPlan(ctx context.Context, sessionID, goal str
 	}
 
 	// v1.1: single task from goal (SynthesizeTaskGraph deferred to future)
-	task := m.tasks.Create(sessionID, goal, goal)
+	task, err := m.tasks.Create(sessionID, goal, goal)
+	if err != nil {
+		return nil, fmt.Errorf("CreateWorkPlan: failed to create task: %w", err)
+	}
 	if task == nil {
-		return nil, fmt.Errorf("CreateWorkPlan: failed to create task")
+		return nil, fmt.Errorf("CreateWorkPlan: failed to create task (nil task without error)")
 	}
 	taskID := task.ID
 

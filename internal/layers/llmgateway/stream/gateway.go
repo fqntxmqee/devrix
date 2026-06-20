@@ -57,13 +57,16 @@ func (g *Gateway) WithClassifier(c errorclass.Classifier) *Gateway {
 }
 
 // classify 是 classifyAndWrap 在 Gateway 上的便捷方法。
-func (g *Gateway) classify(err error) error {
-	return classifyAndWrap(g.classifier, err, 0, "")
+//
+// DM-20260620-003 (PR-C M2): ctx is now passed so downstream code can pull
+// the cached Classification via ClassifyResultFromCtx.
+func (g *Gateway) classify(ctx context.Context, err error) error {
+	return classifyAndWrap(ctx, g.classifier, err, 0, "")
 }
 
 // classifyWithStatus 带 HTTP status 的错误分类（adapter 层有非零 status 时用）。
-func (g *Gateway) classifyWithStatus(err error, status int, raw string) error {
-	return classifyAndWrap(g.classifier, err, status, raw)
+func (g *Gateway) classifyWithStatus(ctx context.Context, err error, status int, raw string) error {
+	return classifyAndWrap(ctx, g.classifier, err, status, raw)
 }
 
 // New creates a gateway from dependencies.
@@ -166,7 +169,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		if err != nil {
 			finishStream(err, llmgateway.TokenUsage{}, false, "", "")
-			return nil, g.classify(err)
+			return nil, g.classify(streamCtx, err)
 		}
 		provider, model = p, m
 	}
@@ -175,13 +178,13 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	if !ok {
 		err := fmt.Errorf("provider config missing: %s", provider)
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, g.classify(err)
+		return nil, g.classify(streamCtx, err)
 	}
 
 	count := g.counter.CountWithSystemPrompt(req.SystemPrompt, req.Messages)
 	if err := g.counter.CheckBudget(count, defaultPromptTokenBudget); err != nil {
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, g.classify(err)
+		return nil, g.classify(streamCtx, err)
 	}
 
 	// llm.circuit_breaker child span
@@ -196,18 +199,18 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		}
 		if err != nil {
 			finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-			return nil, g.classify(err)
+			return nil, g.classify(streamCtx, err)
 		}
 		if !allowed {
 			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, false, provider, model)
-			return nil, g.classify(fmt.Errorf("circuit breaker rejected: %s", provider))
+			return nil, g.classify(streamCtx, fmt.Errorf("circuit breaker rejected: %s", provider))
 		}
 	}
 
 	ad, err := g.reg.Get(provider)
 	if err != nil {
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, g.classify(err)
+		return nil, g.classify(streamCtx, err)
 	}
 
 	// Timeout setup
@@ -275,7 +278,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			retrySpan.End()
 		}
 		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
-		return nil, g.classify(err)
+		return nil, g.classify(streamCtx, err)
 	}
 
 	out := make(chan llmgateway.Chunk, 32)
@@ -329,7 +332,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			// DM-20260617-002 W1: classify + shortstack wrapper on stream errors.
 			// 流错误通过 finishStream(span RecordError + RecordLLMSpanPayload) 落库，
 			// out channel 正常关闭让 consumer 拿到 io.EOF 风格的语义。
-			classified := g.classify(streamErr)
+			classified := g.classify(streamCtx, streamErr)
 			finishStream(classified, usage, usageReceived, provider, model)
 			return
 		}
