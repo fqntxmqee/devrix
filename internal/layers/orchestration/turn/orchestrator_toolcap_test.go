@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
+	"github.com/devrix/devrix/internal/layers/llmgateway"
 )
 
 func TestOrchestrator_BuildToolResultMsgWithCap_BelowLimit(t *testing.T) {
@@ -118,5 +119,72 @@ func TestOrchestrator_BuildToolResultMsgWithCap_ErrorSanitised(t *testing.T) {
 	}
 	if !strings.Contains(msg.Content, "stdout") {
 		t.Errorf("expected stdout preserved, got %q", msg.Content)
+	}
+}
+
+func TestOrchestrator_BuildAssistantToolCallMsgFolded_BelowLimit(t *testing.T) {
+	dir := t.TempDir()
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   persist.NewToolResultStore(dir),
+		MaxAssistantChars: 8000,
+	})
+
+	calls := []llmgateway.ToolCall{{ID: "c1", Name: "read_file", Input: "{}"}}
+	msg := orch.buildAssistantToolCallMsgFolded("s1", calls, "short reply", 1)
+	if msg.Content != "short reply" {
+		t.Errorf("expected unchanged short content, got %q", msg.Content)
+	}
+}
+
+func TestOrchestrator_BuildAssistantToolCallMsgFolded_AboveLimit(t *testing.T) {
+	dir := t.TempDir()
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   persist.NewToolResultStore(dir),
+		MaxAssistantChars: 200,
+	})
+
+	calls := []llmgateway.ToolCall{{ID: "c1", Name: "read_file", Input: "{}"}}
+	long := strings.Repeat("abcdefghij", 1000) // 10000 bytes
+	msg := orch.buildAssistantToolCallMsgFolded("s1", calls, long, 1)
+
+	if !strings.Contains(msg.Content, "<prior-output-summary>") {
+		t.Errorf("expected summary marker, got %q", msg.Content)
+	}
+	if !strings.Contains(msg.Content, "chars truncated") {
+		t.Errorf("expected truncation marker, got %q", msg.Content)
+	}
+	if len(msg.Content) >= len(long) {
+		t.Errorf("expected in-band content shorter than original (%d vs %d)",
+			len(msg.Content), len(long))
+	}
+	// Tool call metadata must be preserved.
+	if msg.Metadata["tool_calls"] == "" {
+		t.Error("expected tool_calls metadata preserved")
+	}
+}
+
+func TestOrchestrator_BuildAssistantToolCallMsgFolded_NoStore(t *testing.T) {
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   nil,
+		MaxAssistantChars: 100,
+	})
+
+	calls := []llmgateway.ToolCall{{ID: "c1", Name: "read_file", Input: "{}"}}
+	long := strings.Repeat("x", 1000)
+	msg := orch.buildAssistantToolCallMsgFolded("s1", calls, long, 1)
+	if msg.Content != long {
+		t.Errorf("expected unchanged content with no store, got %q", msg.Content)
 	}
 }

@@ -46,6 +46,10 @@ type OrchestratorDeps struct {
 	// MaxToolResultChars is the soft cap above which a tool result is
 	// persisted. 0 → persist.DefaultMaxChars (12000).
 	MaxToolResultChars int
+	// MaxAssistantChars is the soft cap above which an assistant
+	// message is folded head/tail (DM-20260620-001 / AC2). 0 →
+	// persist.DefaultMaxAssistantChars (8000).
+	MaxAssistantChars int
 }
 
 // ExitReason captures *why* the turn loop stopped. Surfaced on the final
@@ -117,6 +121,7 @@ type DefaultOrchestrator struct {
 	resolveAwait     ResolveAwaiter
 	toolResultStore  *persist.ToolResultStore
 	maxToolResultCh  int
+	maxAssistantCh   int
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -134,6 +139,10 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 	if maxChars == 0 && deps.ToolResultStore != nil {
 		maxChars = persist.DefaultMaxChars
 	}
+	assistChars := deps.MaxAssistantChars
+	if assistChars == 0 && deps.ToolResultStore != nil {
+		assistChars = persist.DefaultMaxAssistantChars
+	}
 	return &DefaultOrchestrator{
 		llm:              deps.LLM,
 		context:          deps.Context,
@@ -147,6 +156,7 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		resolveAwait:     deps.ResolveAwait,
 		toolResultStore:  deps.ToolResultStore,
 		maxToolResultCh:  maxChars,
+		maxAssistantCh:   assistChars,
 	}
 }
 
@@ -578,7 +588,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		}
 
 		// Build assistant tool-call message and tool result messages for the next turn.
-		messages = append(messages, buildAssistantToolCallMsg(req.SessionID, toolCalls, finalText))
+		//
+		// DM-20260620-001 / AC2: when the assistant text exceeds
+		// maxAssistantChars (default 8K) the body is folded head/tail
+		// style and the full content is persisted to disk.
+		messages = append(messages, o.buildAssistantToolCallMsgFolded(req.SessionID, toolCalls, finalText, turnCount))
 		for _, r := range toolResult.Results {
 			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
 			messages = append(messages, o.buildToolResultMsgWithCap(req.SessionID, r, toolName))
@@ -810,6 +824,45 @@ func buildAssistantToolCallMsg(sessionID string, calls []llmgateway.ToolCall, te
 		Content:   text,
 		Metadata:  map[string]string{"tool_calls": string(raw)},
 	}
+}
+
+// buildAssistantToolCallMsgFolded wraps buildAssistantToolCallMsg with
+// DM-20260620-001 / AC2 head/tail folding when the text exceeds
+// maxAssistantChars. The full content is persisted to disk via the
+// shared ToolResultStore so it can be re-read on demand.
+//
+// A fold failure falls back to the raw message (no truncation) — better
+// to send a long message than to drop the response entirely.
+func (o *DefaultOrchestrator) buildAssistantToolCallMsgFolded(
+	sessionID string,
+	calls []llmgateway.ToolCall,
+	text string,
+	turnNum int,
+) types.Message {
+	msg := buildAssistantToolCallMsg(sessionID, calls, text)
+	if o.toolResultStore == nil || o.maxAssistantCh <= 0 {
+		return msg
+	}
+	if utf8.RuneCountInString(text) <= o.maxAssistantCh {
+		return msg
+	}
+	folded, err := persist.FoldAssistantOutput(
+		o.toolResultStore,
+		sessionID,
+		turnNum,
+		"assistant",
+		text,
+		o.maxAssistantCh,
+		0, // head → default
+		0, // tail → default
+	)
+	if err != nil {
+		slog.Warn("orchestrator: assistant output fold failed, leaving content untruncated",
+			"session_id", sessionID, "turn", turnNum, "size", len(text), "error", err)
+		return msg
+	}
+	msg.Content = folded
+	return msg
 }
 
 // buildToolResultMsg creates a tool result message.
