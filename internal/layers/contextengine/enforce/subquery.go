@@ -35,6 +35,9 @@ type SubQueryParams struct {
 	TaskID         string
 	Role           string
 	FlowReporter   contracts.SubQueryFlowReporter
+	// Mode DM-20260620-001-B (AC6) — sub-agent context inheritance mode.
+	// Empty → SubTurnRunner falls back to Cfg.DefaultMode (typically "brief").
+	Mode contracts.SubAgentMode
 }
 
 // SubQueryResult is the outcome of SubQuery.Run.
@@ -106,6 +109,10 @@ func Run(ctx context.Context, deps SubQueryDeps, params SubQueryParams) (*SubQue
 		ChildContext: child,
 		FlowParams:   flowParams,
 		FlowReporter: reporter,
+		// DM-20260620-001-B (AC6 + AC9) — pass Mode/Depth to SubTurnRunner
+		// so dispatch + recursion limit apply uniformly.
+		Mode:  params.Mode,
+		Depth: child.QueryDepth,
 	})
 	if err != nil {
 		if reporter != nil {

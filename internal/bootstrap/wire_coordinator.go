@@ -76,9 +76,13 @@ func InitOrchestration(
 	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
 
 	maxContextTokens := config.DefaultContextEngineConfig().MaxContextTokens
+	subagentCfg := config.DefaultSubagentConfig()
 	if configFile != "" {
 		if fileCfg, err := config.LoadConfigFile(configFile); err == nil && fileCfg.ContextEngine.MaxContextTokens > 0 {
 			maxContextTokens = fileCfg.ContextEngine.MaxContextTokens
+		}
+		if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
+			subagentCfg = ctxFileCfg.Subagent.Normalized()
 		}
 	}
 
@@ -166,7 +170,11 @@ func InitOrchestration(
 		// marker so they do not blow up the LLM context budget.
 		ToolResultStore: persist.NewToolResultStore(""),
 	})
-	subTurn := turn.NewSubTurnRunner(turnOrch)
+	subTurn := turn.NewSubTurnRunner(turnOrch, turn.SubTurnConfig{
+		DefaultMode: subagentCfg.DefaultMode,
+		LegacyMode:  subagentCfg.LegacyMode,
+		MaxDepth:    subagentCfg.MaxDepth,
+	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {
 		ce.SetPreparedTurnRunner(turn.NewPreparedTurnAdapter(turnOrch))

@@ -34,6 +34,55 @@ type ContextEngineConfig struct {
 	// Tools DM-20260617-007 W12 (AC12) — tool surface 可见性 / 风险阈值配置。
 	// 空 map / 未配置 = 所有 surface 全开, 风险阈值由每个 tool 自己声明。
 	Tools              ToolsConfig        `yaml:"tools"`
+	// Subagent DM-20260620-001-B (Phase B) — sub-agent 上下文隔离配置
+	// (mode 选型 + 递归深度限制)。Phase A 已修单 turn 体积, Phase B
+	// 治子 agent 递归。
+	Subagent           SubagentConfig     `yaml:"subagent"`
+}
+
+// SubagentConfig DM-20260620-001-B Phase B (AC6 + AC9) — 控制子 agent
+// 上下文继承模式与递归深度上限。
+type SubagentConfig struct {
+	// DefaultMode 是 SubTurnRequest.Mode 为空时的回落值; 取值
+	// "brief" / "fork" / "full"。缺省 "brief" (Phase B.1 推荐, 节省 token)。
+	DefaultMode string `yaml:"default_mode"`
+	// LegacyMode 是"老调用方"显式切换的旧行为, 留空则走 DefaultMode;
+	// 取值与 DefaultMode 相同。后续 minor release 移除。
+	LegacyMode string `yaml:"legacy_mode"`
+	// MaxDepth 子 agent 递归深度上限; Depth >= MaxDepth 时 SubTurnRunner
+	// 返回 ErrSubagentDepthExceeded 并提示改 brief。默认 3。
+	MaxDepth int `yaml:"max_depth"`
+}
+
+// DefaultSubagentConfig returns Phase B.1 defaults (brief + depth=3).
+func DefaultSubagentConfig() SubagentConfig {
+	return SubagentConfig{
+		DefaultMode: "brief",
+		LegacyMode:  "",
+		MaxDepth:    3,
+	}
+}
+
+// Normalized fills in 0/empty fields with defaults; explicit values preserved.
+func (c SubagentConfig) Normalized() SubagentConfig {
+	def := DefaultSubagentConfig()
+	out := c
+	if out.DefaultMode == "" {
+		out.DefaultMode = def.DefaultMode
+	}
+	if out.MaxDepth <= 0 {
+		out.MaxDepth = def.MaxDepth
+	}
+	return out
+}
+
+// ResolvedMode returns the effective default mode (LegacyMode overrides
+// DefaultMode when set). Empty string when neither is configured.
+func (c SubagentConfig) ResolvedMode() string {
+	if c.LegacyMode != "" {
+		return c.LegacyMode
+	}
+	return c.DefaultMode
 }
 
 // MainTranscriptConfig controls append-only JSONL persistence for main sessions.
@@ -161,6 +210,7 @@ func DefaultContextEngineConfig() *ContextEngineConfig {
 		MainTranscript: DefaultMainTranscriptConfig(),
 		Diagnostics:    DefaultDiagnosticsConfig(),
 		Tools:          DefaultToolsConfig(),
+		Subagent:       DefaultSubagentConfig(),
 	}
 }
 
