@@ -1,11 +1,13 @@
 package turn
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 func TestOrchestrator_BuildToolResultMsgWithCap_BelowLimit(t *testing.T) {
@@ -186,5 +188,77 @@ func TestOrchestrator_BuildAssistantToolCallMsgFolded_NoStore(t *testing.T) {
 	msg := orch.buildAssistantToolCallMsgFolded("s1", calls, long, 1)
 	if msg.Content != long {
 		t.Errorf("expected unchanged content with no store, got %q", msg.Content)
+	}
+}
+
+func TestOrchestrator_RunTokenAudit_OverBudget_FoldsInPlace(t *testing.T) {
+	dir := t.TempDir()
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   persist.NewToolResultStore(dir),
+		MaxAssistantChars: 100,
+	})
+
+	messages := []types.Message{
+		{Role: types.MessageRoleUser, Content: strings.Repeat("u", 100)},
+		{Role: types.MessageRoleAssistant, Content: strings.Repeat("a", 4000)},
+	}
+
+	orig := messages[1].Content
+	orch.runTokenAudit(context.Background(), "sys", messages, 50, 1, nil)
+
+	if messages[1].Content == orig {
+		t.Error("expected assistant message to be folded, still unchanged")
+	}
+	if !strings.Contains(messages[1].Content, "<prior-output-summary>") {
+		t.Errorf("expected folded marker in assistant message, got %q", messages[1].Content)
+	}
+}
+
+func TestOrchestrator_RunTokenAudit_BelowBudget_NoOp(t *testing.T) {
+	dir := t.TempDir()
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   persist.NewToolResultStore(dir),
+		MaxAssistantChars: 100,
+	})
+
+	messages := []types.Message{
+		{Role: types.MessageRoleUser, Content: "hi"},
+	}
+
+	orig := messages[0].Content
+	orch.runTokenAudit(context.Background(), "sys", messages, 10000, 1, nil)
+
+	if messages[0].Content != orig {
+		t.Errorf("expected user message unchanged, got %q", messages[0].Content)
+	}
+}
+
+func TestOrchestrator_RunTokenAudit_NoStore_Skips(t *testing.T) {
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               &stubLLM{},
+		Context:           &stubContext{},
+		Tools:             &stubTools{},
+		Persist:           &stubPersist{},
+		ToolResultStore:   nil,
+		MaxAssistantChars: 100,
+	})
+
+	messages := []types.Message{
+		{Role: types.MessageRoleAssistant, Content: strings.Repeat("a", 1000)},
+	}
+
+	orig := messages[0].Content
+	orch.runTokenAudit(context.Background(), "sys", messages, 50, 1, nil)
+
+	if messages[0].Content != orig {
+		t.Errorf("expected no fold when store nil, got %q", messages[0].Content)
 	}
 }

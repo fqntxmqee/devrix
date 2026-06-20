@@ -10,8 +10,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/audit"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -363,10 +365,22 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			break
 		}
 
+		// DM-20260620-001 / AC4 + AC13: per-iteration token audit and
+		// proactive fold. Runs BEFORE the LLM invoke so the request
+		// payload is already trimmed. The audit result is attached to
+		// the turn span and emitted as structured slog so post-hoc
+		// analysis can correlate runaway sessions with budget pressure.
+		//
+		// AC3 (per-iter Prepare) is intentionally NOT moved inside the
+		// loop: the Prepare → LLM → Tool pipeline is expensive to repeat
+		// and the systemPrompt + Tools set is stable across a turn. The
+		// audit is the high-leverage piece; a follow-up OpenSpec can
+		// re-evaluate the Prepare cadence if needed.
 		turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
 		)
+		o.runTokenAudit(ctx, systemPrompt, messages, maxContextTokens, turnCount, turnSpan)
 
 		// D7→D3 LLM invoke (D7-S2-A07)
 		turnCtx, llmSpan := o.startSpan(turnCtx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
@@ -863,6 +877,87 @@ func (o *DefaultOrchestrator) buildAssistantToolCallMsgFolded(
 	}
 	msg.Content = folded
 	return msg
+}
+
+// runTokenAudit implements DM-20260620-001 / AC4 + AC13: every iteration
+// audits the in-loop messages against maxContextTokens and decides
+// whether to proactively fold the largest assistant message.
+//
+// When ShouldFoldProactively fires, the largest assistant message is
+// folded in-place (via buildAssistantToolCallMsgFolded reuse pattern,
+// mutating the messages slice). The audit result is attached to the
+// turn span and emitted as a structured slog entry so post-hoc analysis
+// can correlate runaway sessions with budget pressure.
+//
+// Safe no-op when o.toolResultStore / o.maxAssistantCh / maxContextTokens
+// are unset (legacy wiring).
+func (o *DefaultOrchestrator) runTokenAudit(
+	ctx context.Context,
+	systemPrompt string,
+	messages []types.Message,
+	maxContextTokens int,
+	turnNum int,
+	turnSpan interface{ SetAttributes(...tracer.Attribute) },
+) {
+	if o.toolResultStore == nil || o.maxAssistantCh <= 0 || maxContextTokens <= 0 {
+		return
+	}
+	counter := token.NewCounter()
+	res := audit.AuditMessages(counter, systemPrompt, messages, maxContextTokens)
+	proactive := audit.ShouldFoldProactively(res, o.maxAssistantCh, audit.DefaultProactiveFoldPercent)
+
+	// AC13: span attributes + structured slog.
+	attrs := []tracer.Attribute{
+		{Key: "audit.total_tokens", Value: res.TotalTokens},
+		{Key: "audit.system_tokens", Value: res.SystemTokens},
+		{Key: "audit.messages_tokens", Value: res.MessagesTokens},
+		{Key: "audit.largest_msg_tokens", Value: res.LargestMsgTokens},
+		{Key: "audit.budget_percent", Value: res.BudgetPercent},
+		{Key: "audit.over_budget", Value: res.OverBudget},
+		{Key: "audit.proactive_fold_triggered", Value: proactive},
+	}
+	if turnSpan != nil {
+		turnSpan.SetAttributes(attrs...)
+	}
+	slog.Info("orchestrator: token audit",
+		"turn", turnNum,
+		"total_tokens", res.TotalTokens,
+		"system_tokens", res.SystemTokens,
+		"messages_tokens", res.MessagesTokens,
+		"largest_msg_tokens", res.LargestMsgTokens,
+		"largest_msg_idx", res.LargestMsgIdx,
+		"budget", maxContextTokens,
+		"budget_percent", res.BudgetPercent,
+		"over_budget", res.OverBudget,
+		"proactive_fold", proactive,
+	)
+
+	if !proactive || res.LargestMsgIdx < 0 || res.LargestMsgIdx >= len(messages) {
+		return
+	}
+	target := &messages[res.LargestMsgIdx]
+	if target.Role != types.MessageRoleAssistant {
+		return // AC4 only folds assistant messages.
+	}
+	folded, err := persist.FoldAssistantOutput(
+		o.toolResultStore,
+		"", // session ID is not in scope here; persist under root.
+		turnNum,
+		"assistant",
+		target.Content,
+		o.maxAssistantCh,
+		0, 0,
+	)
+	if err != nil || folded == target.Content {
+		return
+	}
+	slog.Info("orchestrator: proactive fold applied",
+		"turn", turnNum,
+		"msg_idx", res.LargestMsgIdx,
+		"orig_chars", len(target.Content),
+		"folded_chars", len(folded),
+	)
+	target.Content = folded
 }
 
 // buildToolResultMsg creates a tool result message.
