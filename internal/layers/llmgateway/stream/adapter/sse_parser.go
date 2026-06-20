@@ -95,6 +95,17 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 			if merged == nil {
 				merged = &mergedToolCall{}
 				a.toolCalls[tc.Index] = merged
+			} else if tc.ID != "" && merged.id != "" && tc.ID != merged.id {
+				// Defensive: provider reused an index for a new tool_call.
+				// Some providers (e.g., minimax M2.7) emit index=0 for a second
+				// parallel tool_use block instead of advancing to index=1.
+				// Without this guard, the parser overwrites the first call's
+				// id/name and concatenates the two args JSON objects into a
+				// single garbled string, which the provider then rejects with
+				// HTTP 400 "invalid function arguments json string".
+				// Allocate a new synthetic index so both calls survive.
+				merged = &mergedToolCall{}
+				a.toolCalls[a.allocateSyntheticIndex()] = merged
 			}
 			if tc.ID != "" {
 				merged.id = tc.ID
@@ -141,6 +152,21 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 		return nil
 	}
 	return chunk
+}
+
+// allocateSyntheticIndex returns an unused int key for a.toolCalls. Used
+// when a provider reuses an existing index for a new tool_call, so the
+// second call gets its own slot instead of clobbering the first. Picks
+// one more than the highest currently allocated index so that the
+// synthetic entry sorts after the originals in mergedToolCalls().
+func (a *streamAccumulator) allocateSyntheticIndex() int {
+	max := -1
+	for idx := range a.toolCalls {
+		if idx > max {
+			max = idx
+		}
+	}
+	return max + 1
 }
 
 func (a *streamAccumulator) mergedToolCalls() []llmgateway.ToolCall {
