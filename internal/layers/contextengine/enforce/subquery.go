@@ -38,6 +38,10 @@ type SubQueryParams struct {
 	// Mode DM-20260620-001-B (AC6) — sub-agent context inheritance mode.
 	// Empty → SubTurnRunner falls back to Cfg.DefaultMode (typically "brief").
 	Mode contracts.SubAgentMode
+	// MaxContextTokens DM-20260620-002 (AC1) — explicit budget passed through
+	// to SubTurnRequest so the nested runLoop gets a non-zero
+	// maxContextTokens. 0 = SubTurnRunner uses Cfg.MaxContextTokens.
+	MaxContextTokens int
 }
 
 // SubQueryResult is the outcome of SubQuery.Run.
@@ -113,6 +117,10 @@ func Run(ctx context.Context, deps SubQueryDeps, params SubQueryParams) (*SubQue
 		// so dispatch + recursion limit apply uniformly.
 		Mode:  params.Mode,
 		Depth: child.QueryDepth,
+		// DM-20260620-002 (AC1) — propagate explicit budget so the nested
+		// turn loop gets a non-zero maxContextTokens. 0 lets SubTurnRunner
+		// fall back to Cfg.MaxContextTokens.
+		MaxContextTokens: params.MaxContextTokens,
 	})
 	if err != nil {
 		if reporter != nil {

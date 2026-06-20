@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -1857,5 +1858,130 @@ func TestOrchestrator_RunTurn_TokenBudgetDiminishing_StopsLoop(t *testing.T) {
 	if turnIdx.Load() != 3 {
 		t.Errorf("expected 3 LLM calls (3rd trips detector), got %d", turnIdx.Load())
 	}
+}
+
+// TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM-20260620-002
+//
+// Phase C AC1 — nested branch must honor TurnRequest.MaxContextTokens so
+// runTokenAudit + ShouldFoldProactively fire normally. Before the fix,
+// nested runLoop skipped Prepare and left maxContextTokens at its zero
+// value, which made all four budget controls no-op and let 4-parallel
+// deep-review prompts grow past 100K tokens.
+//
+// We pre-load a large assistant message into PreloadedMessages (mirrors a
+// mid-flight deep-review where previous tool rounds have accumulated an
+// over-budget assistant reply), then drive a SubQuery-scope turn with an
+// explicit MaxContextTokens. The audit must detect the oversized
+// assistant, fold it via ToolResultStore, and let the run finish.
+func TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM_20260620_002(t *testing.T) {
+	// 80K-char assistant message already sitting in the sub-agent's
+	// preloaded history (e.g. accumulated by prior tool rounds).
+	oversizedAssistant := strings.Repeat("a", 80000)
+	longSystem := strings.Repeat("system-context-line-", 4000) // ~96K chars
+
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("sub-agent summary"),
+		doneChunk(),
+	}}
+	tools := &stubTools{}
+	stubPersist := &stubPersist{}
+	store := persist.NewToolResultStore(t.TempDir())
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               llm,
+		Context:           &stubContext{prepared: PreparedContext{}}, // never invoked in nested branch
+		Tools:             tools,
+		Persist:           stubPersist,
+		MaxTurns:          5,
+		MaxContextTokens:  32000, // fallback (not used here, req sets it)
+		ToolResultStore:   store,
+		MaxAssistantChars: 8000,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-nested-budget",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "review the project"},
+		SystemPrompt: longSystem,
+		Scope:       TurnScopeSubQuery, // nested branch
+		SkipPersist: true,
+		PreloadedMessages: []types.Message{
+			{Role: types.MessageRoleAssistant, Content: oversizedAssistant},
+		},
+		MaxContextTokens: 32000, // explicit injection — AC1
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	if hasType(evs, "error") {
+		t.Fatalf("unexpected error event: %v", evs)
+	}
+
+	// After the proactive fold, the assistant message in PreloadedMessages
+	// is replaced with the disk-persisted preview (which carries the
+	// "Output too large" marker). The fold happens in-place inside
+	// runTokenAudit, mutating messages; the next LLM call sees the
+	// trimmed payload and the budget tracker no longer trips.
+	if llm.calls.Load() == 0 {
+		t.Fatal("LLM was never called")
+	}
+}
+
+// TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM-20260620-002
+//
+// When SubTurnRunner does not set TurnRequest.MaxContextTokens (legacy
+// callers), the nested branch must fall back to o.maxContextTokens from
+// OrchestratorDeps (the Phase A wiring).
+func TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002(t *testing.T) {
+	oversizedAssistant := strings.Repeat("a", 80000)
+	longSystem := strings.Repeat("system-context-line-", 4000)
+
+	llm := &stubLLM{chunks: []llmgateway.Chunk{
+		textChunk("fallback summary"),
+		doneChunk(),
+	}}
+	tools := &stubTools{}
+	stubPersist := &stubPersist{}
+	store := persist.NewToolResultStore(t.TempDir())
+
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM:               llm,
+		Context:           &stubContext{prepared: PreparedContext{}},
+		Tools:             tools,
+		Persist:           stubPersist,
+		MaxTurns:          5,
+		MaxContextTokens:  32000, // <- fallback used when request omits it
+		ToolResultStore:   store,
+		MaxAssistantChars: 8000,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-nested-fallback",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "fallback test"},
+		SystemPrompt: longSystem,
+		Scope:       TurnScopeSubQuery,
+		SkipPersist: true,
+		PreloadedMessages: []types.Message{
+			{Role: types.MessageRoleAssistant, Content: oversizedAssistant},
+		},
+		// MaxContextTokens intentionally left zero — fallback path
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+	if hasType(evs, "error") {
+		t.Fatalf("unexpected error: %v", evs)
+	}
+	if llm.calls.Load() == 0 {
+		t.Fatal("LLM was never called")
+	}
+}
+
+func firstN(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 

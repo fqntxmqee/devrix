@@ -37,6 +37,12 @@ type TurnRequest struct {
 	SkipPersist bool
 	// Model overrides prepared model for nested turns.
 	Model string
+	// MaxContextTokens DM-20260620-002 (AC1) — explicit budget injection for
+	// the nested branch. Nested turns skip o.context.Prepare, so the budget
+	// must travel with the request. 0 = fallback to o.maxContextTokens
+	// (Phase A wiring, default 128000). Main-scope turns ignore this field
+	// and use prepared.MaxContextTokens instead.
+	MaxContextTokens int
 }
 
 // CompressHint signals that D2 detected a token budget overrun and D7 should

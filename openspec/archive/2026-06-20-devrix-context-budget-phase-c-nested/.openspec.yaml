@@ -1,0 +1,32 @@
+change_id: 2026-06-20-devrix-context-budget-phase-c-nested
+priority: P0
+demand_id: DM-20260620-002
+status: s7_archived
+parent_changes:
+  - 2026-06-20-devrix-context-budget-and-isolation         # Phase A (PR #128 + #129, S7_Archived)
+  - 2026-06-20-devrix-context-budget-and-isolation-phase-b  # Phase B (PR #130-#132, S7_Archived)
+domains: [D2, D7]
+dsaft_scenarios: [D2-S15, D7-S2]
+dsaft_activities:
+  - D2-S15-A08-T09: SubTurnRequest.MaxContextTokens → TurnRequest.MaxContextTokens propagation
+  - D2-S15-A08-T10: SubQueryParams.MaxContextTokens → SubTurnRequest.MaxContextTokens pass-through
+  - D7-S2-A06-T18: TurnRequest.MaxContextTokens field
+  - D7-S2-A06-T19: runLoop nested branch reads req.MaxContextTokens with fallback
+  - D7-S2-A06-T20: SubTurnRunner.Cfg.MaxContextTokens + bootstrap wire-up
+  - D7-S2-A06-T21: TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM_20260620_002
+  - D7-S2-A06-T22: TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002
+  - D7-S2-A06-T23: TestIntegration_D7NestedBudget_4ParallelDeepReview
+version_scope:
+  v2026-06-20-phase-c: "Sub-agent nested branch budget injection — maxContextTokens 透传 SubTurnRequest → TurnRequest → nested 分支读取,触发 audit/proactive fold/tool result cap"
+parent_changes: []
+t_points:
+  new: 8
+  reuse: "Phase A D7-S2-A06-T11/T12/T13 (turn loop integration) + D2-S15-A08-T01..T05 (audit + fold) + Phase B D7-S2-A06-T14..T17 (mode + depth)"
+  final_total: 8
+  final_status: "8 IMPLEMENTED / 0 PLANNED / 0 DEFERRED"
+s3_gate:
+  review: design.md
+  conclusion: approved
+s5_gate:
+  acceptance_report: acceptance-report.md
+  conclusion: accepted

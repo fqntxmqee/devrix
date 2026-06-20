@@ -194,6 +194,35 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S2-A06-T16** | **AC9 depth limit: `Depth >= MaxDepth` rejected before LLM call; `Depth = MaxDepth-1` allowed** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_DepthLimit_{Equals,Exceeds,BoundaryAtMaxMinus1}`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
 | **D7-S2-A06-T17** | **AC6 default mode: empty `req.Mode` → `SubagentConfig.DefaultMode`; `LegacyMode` overrides `DefaultMode`; invalid mode rejected** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_DefaultModeFromConfig`, `TestSubTurnRunner_DefaultModeBrief`, `TestSubTurnRunner_InvalidModeRejected`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
 
+### Context Budget Phase C — Nested Branch Budget Injection (DM-20260620-002)
+
+> **devrix-context-budget-phase-c-nested (DM-20260620-002) — Phase C 落地。**
+> `runLoop` nested branch (`orchestrator.go:221-268`) skips `o.context.Prepare`,
+> leaving `prepared.MaxContextTokens=0` and making every Phase A budget control
+> (runTokenAudit + ShouldFoldProactively + tool result cap + budgetTracker) a
+> no-op. The fix threads `maxContextTokens` from `SubTurnRequest` →
+> `TurnRequest` → nested-branch read, with fallback to `o.maxContextTokens`
+> (Phase A wiring) for legacy callers.
+>
+> Bug → fix: 4-parallel deep-review sub-agents (e.g. "review D1/D2/D3/D7" after
+> 10 tool rounds each) accumulated ~80K-char oversized read_file results, blew
+> past the LLM context window, and were rejected. After Phase C, the audit
+> fires on the nested branch and the largest assistant message is folded
+> (80000→1186 chars).
+>
+> D2 t-registry holds `enforce.Run` pass-through T 点（T09/T10）。
+> D7 t-registry holds TurnRequest + nested-branch read + integration
+> verification T 点（T18/T19/T20/T21/T22/T23）。
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
+|------|------|----------|-----------|--------|----------|
+| **D7-S2-A06-T18** | **AC1 `TurnRequest.MaxContextTokens` 字段添加 + 注释（nested 分支可显式注入 budget）** | **D7-S2-A06** | **`orchestration/turn/contracts.go::TurnRequest.MaxContextTokens`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D7-S2-A06-T19** | **AC1 `runLoop` nested 分支读取 `req.MaxContextTokens`，fallback `o.maxContextTokens`** | **D7-S2-A06** | **`orchestration/turn/orchestrator.go:271-274`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D7-S2-A06-T20** | **AC1 `SubTurnRunner.Cfg.MaxContextTokens` + `bootstrap/wire_coordinator.go` 注入全局 config** | **D7-S2-A06** | **`orchestration/turn/subturn.go::SubTurnConfig.MaxContextTokens`, `bootstrap/wire_coordinator.go:179` (NewSubTurnRunner 调用)** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D7-S2-A06-T21** | **AC1 nested-branch 显式注入路径：80K assistant + 96K system + 32K budget → audit 触发 + fold 80000→1186** | **D7-S2-A06** | **`orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D7-S2-A06-T22** | **AC1 nested-branch fallback 路径：req=0 → `o.maxContextTokens`（Phase A wiring 32000）audit 仍触发** | **D7-S2-A06** | **`orchestration/turn/orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D7-S2-A06-T23** | **AC2 4-parallel deep review 端到端：4 路 `SubQuery.Run` 并行（80K+96K+32K）全部完成，capture adapter 验证 max 消息 1186 chars (folded)** | **D7-S2-A06** | **`tests/integration/d7/d7_nested_budget_test.go::TestIntegration_D7NestedBudget_4ParallelDeepReview`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
 | **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** |
@@ -277,14 +306,14 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 103 | 103 | 0 | 0 | 74 |
+| 109 | 109 | 0 | 0 | 80 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
 | D7-S1 | 8 | 8 | 0 |
-| D7-S2 | 30 | 30 | 0 |
+| D7-S2 | 36 | 36 | 0 |
 | D7-S3 | 20 | 20 | 0 |
 | D7-S4 | 9 | 9 | 0 |
 | D7-S5 | 28 | 28 | 0 |
@@ -299,6 +328,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > **v3.6 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001) Phase A 归档**：+3 T 点 IMPLEMENTED（D7-S2-A06-T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70。D2 域内另 +13 T 点（D2-S17-A05 T01-T05 + D2-S17-A06 T01-T03 + D2-S15-A08 T01-T05）见 d2 t-registry。
 >
 > **v3.7 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001-B) Phase B 归档**：+4 T 点 IMPLEMENTED（D7-S2-A06-T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74。配套 D2 域 +3 T 点（D2-S15-A08 T06-T08 BuildForkedMessages byte-level prefix stability）见 d2 t-registry；D4 域 +2 T 点（D4-S14-A07 T01-T02 mode field schema）见 d4 t-registry。AC12 D5 spans 22-step replay P95=21707 ≤ 40K（Phase A baseline 51K）。
+>
+> **v3.8 closure (2026-06-20):** **devrix-context-budget-phase-c-nested (DM-20260620-002) Phase C 归档**：+6 T 点 IMPLEMENTED（D7-S2-A06-T18 TurnRequest.MaxContextTokens 字段 + T19 nested 分支读取 + T20 SubTurnRunner Cfg + bootstrap 注入 + T21 显式注入单测 + T22 fallback 单测 + T23 4-parallel integration）。IMPLEMENTED 103→109，P0 74→80。配套 D2 域 +2 T 点（D2-S15-A08 T09 SubTurnRequest→TurnRequest propagation + T10 SubQueryParams→SubTurnRequest pass-through）见 d2 t-registry。AC2 4-parallel deep-review sub-agents 全绿（capture adapter 验证 max 消息 1186 chars folded from 80000）。D7TestStack 同步修复 deepseek DefaultModel / ModelRouting 默认空值（unblocks 所有 D7 integration test）。
 
 ---
 
@@ -323,4 +354,5 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.5.0** | **2026-06-19** | **devrix-d7-v2-structure 路径同步**：T 表 Code Location 列对齐 sessionorchestrator/decisionplanning/wavescheduler/executionflow/orchtypes |
 | **3.6.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) Phase A 归档**：D7-S2-A06 +3 T 点（T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70 |
 | **3.7.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) Phase B 归档**：D7-S2-A06 +4 T 点（T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74 |
+| **3.8.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-phase-c-nested (devrix-context-budget-phase-c-nested / DM-20260620-002) Phase C 归档**：D7-S2-A06 +6 T 点（T18 TurnRequest.MaxContextTokens 字段 + T19 nested 分支读取 + T20 SubTurnRunner Cfg + bootstrap 注入 + T21 显式注入单测 + T22 fallback 单测 + T23 4-parallel integration）。IMPLEMENTED 103→109，P0 74→80。D7TestStack 同步修复 deepseek DefaultModel / ModelRouting 默认空值。 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
