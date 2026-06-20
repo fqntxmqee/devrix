@@ -267,6 +267,70 @@ func TestBuildSessionKey(t *testing.T) {
 	}
 }
 
+// TestParseFeishuChatID covers session key parsing. The sessionKey format
+// is `feishu_{chat_id}_{user_id}` where chat_id is `oc_xxx` (and may
+// itself contain underscores — e.g. `oc_stop_flow`) while user_id is
+// `ou_xxx` (open_id) or `u_xxx` (user_id fallback). The naive
+// LastIndex("_") splits at the wrong boundary whenever the chat_id has
+// extra underscores, producing an invalid receive_id that Feishu rejects
+// with code 230001.
+func TestParseFeishuChatID(t *testing.T) {
+	tests := []struct {
+		name      string
+		sessionKey string
+		want      string
+		wantErr   bool
+	}{
+		{
+			name:       "simple",
+			sessionKey: "feishu_oc_123_ou_456",
+			want:       "oc_123",
+		},
+		{
+			name:       "chat_id contains underscore",
+			sessionKey: "feishu_oc_stop_flow_ou_456",
+			want:       "oc_stop_flow",
+		},
+		{
+			name:       "real-world chat_id",
+			sessionKey: "feishu_oc_a444ebe708203fb4d38b18a902ac9859_ou_c96f59b4ef0e51f7d4d2678363a75ce8",
+			want:       "oc_a444ebe708203fb4d38b18a902ac9859",
+		},
+		{
+			name:       "user_id without ou prefix (user_id fallback)",
+			sessionKey: "feishu_oc_123_u_456",
+			want:       "oc_123",
+		},
+		{
+			name:       "missing feishu prefix",
+			sessionKey: "oc_123_ou_456",
+			wantErr:    true,
+		},
+		{
+			name:       "empty key",
+			sessionKey: "",
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseFeishuChatID(tt.sessionKey)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("parseFeishuChatID(%q) error = nil, want err", tt.sessionKey)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseFeishuChatID(%q) error = %v", tt.sessionKey, err)
+			}
+			if got != tt.want {
+				t.Errorf("parseFeishuChatID(%q) = %q, want %q", tt.sessionKey, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestParseCommand 测试命令解析
 func TestParseCommand(t *testing.T) {
 	tests := []struct {
