@@ -19,6 +19,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -253,7 +254,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			})
 			endSpan(prepSpan)
 			if err != nil {
-				o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
+				o.emitError(out, req.SessionID,
+					sharederrors.SanitizeForUser(fmt.Errorf("prepare failed: %w", err)),
+					sharederrors.ErrorCode(err),
+				)
 				return
 			}
 			tools = prepared.Tools
@@ -289,7 +293,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		})
 		endSpan(prepSpan)
 		if err != nil {
-			o.emitError(out, req.SessionID, fmt.Sprintf("prepare failed: %v", err))
+			o.emitError(out, req.SessionID,
+				sharederrors.SanitizeForUser(fmt.Errorf("prepare failed: %w", err)),
+				sharederrors.ErrorCode(err),
+			)
 			return
 		}
 
@@ -368,7 +375,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// event so the IM adapter renders the cancellation rather than
 		// waiting for an unobservable stream close.
 		if err := ctx.Err(); err != nil {
-			o.emitError(out, req.SessionID, fmt.Sprintf("turn cancelled: %v", err))
+			o.emitError(out, req.SessionID,
+				sharederrors.SanitizeForUser(fmt.Errorf("turn cancelled: %w", err)),
+				"CTX_CANCELLED",
+			)
 			return
 		}
 
@@ -425,7 +435,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			if err != nil {
 				endSpanWithError(llmSpan, err)
 				endSpan(turnSpan)
-				o.emitError(out, req.SessionID, fmt.Sprintf("llm invoke failed: %v", err))
+				o.emitError(out, req.SessionID,
+					sharederrors.SanitizeForUser(fmt.Errorf("llm invoke failed: %w", err)),
+					sharederrors.ErrorCode(err),
+				)
 				return
 			}
 
@@ -565,7 +578,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		if err != nil {
 			endSpanWithError(toolSpan, err)
 			endSpan(turnSpan)
-			o.emitError(out, req.SessionID, fmt.Sprintf("tool round failed: %v", err))
+			o.emitError(out, req.SessionID,
+				sharederrors.SanitizeForUser(fmt.Errorf("tool round failed: %w", err)),
+				sharederrors.ErrorCode(err),
+			)
 			return
 		}
 		endSpan(toolSpan)
@@ -689,11 +705,23 @@ func resolveFinalText(finalText, thinkingTail string, exitReason ExitReason, max
 	return promoted
 }
 
-func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string) {
+// emitError emits a user-facing error event. The content MUST be pre-sanitized
+// via sharederrors.SanitizeForUser — callers should NOT pass raw err.Error().
+//
+// DM-20260620-003 (AC2 + H1 + H4): variadic code parameter optionally carries
+// the sentinel code (e.g. "LLM_AUTH_1004") so D1 IM adapters can render
+// error-type-aware messages via event.Metadata["error_code"]. Existing call
+// sites that pass only 3 args continue to work unchanged.
+func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string, code ...string) {
+	var metadata map[string]string
+	if len(code) > 0 && code[0] != "" {
+		metadata = map[string]string{"error_code": code[0]}
+	}
 	out <- &contracts.EngineEvent{
 		Type:      "error",
 		Content:   content,
 		SessionID: sessionID,
+		Metadata:  metadata,
 	}
 }
 

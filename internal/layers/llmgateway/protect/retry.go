@@ -2,6 +2,7 @@ package protect
 
 import (
 	"context"
+	"errors"
 	"math"
 	"math/rand"
 	"time"
@@ -89,7 +90,8 @@ func (e *Executor) Stream(
 		}
 	}
 	if lastErr == nil {
-		lastErr = sharederrors.NewProviderUnavailableError(nil)
+		lastErr = sharederrors.NewProviderUnavailableError(
+			errors.New("retry loop completed without recording an error: all attempts returned nil"))
 	}
 	return nil, lastErr
 }
