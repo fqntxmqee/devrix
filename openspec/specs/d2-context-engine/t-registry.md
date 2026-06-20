@@ -12,6 +12,7 @@
 **Change:** devrix-surface-lazy-loading (DM-20260618-003) — DeferLoading + ShouldDefer + ToolSearchSurface + zodgen (T30-T34)
 **Change:** devrix-ask-user-question (DM-20260618-006) — AskUserQuestionSurface (9th) + IM 推送 sender 桥接 (T35-T38)
 **Change:** devrix-tools-terminal-architecture (DM-20260618-007) — LSP 5 typed method spec (T02-T04) + BashAST fail-closed + zsh 22+ rules (T05-T06) + cross-cutting LTL-Lite framework
+**Change:** 2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) — Phase A: AC1 tool result size cap (D2-S17-A05 T01-T05) + AC2 assistant fold (D2-S17-A06 T01-T03) + AC4+AC13 per-iter token audit + proactive fold (D2-S15-A08 T01-T05); TruncateToTokens dead-code upgraded to required.
 
 ---
 
@@ -141,6 +142,40 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | D2-S10-A01-T40 | SubQuery Explore omitClaudeMd + read-only | S18 | `internal/layers/contextengine/enforce/subquery_test.go` | IMPLEMENTED | P1 |
 | D2-S10-A01-T41 | Fork subagent placeholder tool_results 一致 | S15 | `internal/layers/contextengine/prepare/conversation/fork_test.go` | IMPLEMENTED | P1 |
 | D2-S10-A01-T42 | sidechain transcript resume 重建 messages | S17 | `internal/layers/contextengine/persist/transcript/sidechain_test.go` | IMPLEMENTED | P1 |
+
+## D2-S17: Context Budget Persistence (DM-20260620-001, Phase A)
+
+> **devrix-context-budget-and-isolation (DM-20260620-001) — Phase A 落地。**
+> 两条新价值流子能力：(1) S17-A05 `ToolResultStore` 把 oversized 工具结果
+> 落盘并返回 `<persisted-output>` 预览标记；(2) S17-A06 `FoldAssistantOutput`
+> 把 assistant 长输出 head/tail 折叠并返回 `<prior-output-summary>` 标记。
+> 两条均服务于 turn loop (D7-S2-A06) 防 51K-token 失控。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| **D2-S17-A05-T01** | **AC1 below-limit passthrough: `ToolResultStore.Persist` 短结果原样返回 + 不落盘** | **S17-A05 ToolResultStore (new)** | **`internal/layers/contextengine/prepare/persist/tool_result_store_test.go::TestToolResultStore_Persist_BelowLimit`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A05-T02** | **AC1 above-limit persists with preview: 超 `MaxToolResultChars` 落 `~/.devrix/tool-results/<sessionID>/<stamp>-<id>.txt` + 返回 `<persisted-output>` 标记（含 size + 路径 + preview head）** | **S17-A05 ToolResultStore (new)** | **`tool_result_store_test.go::TestToolResultStore_Persist_AboveLimit_WhitelistedTool` + `TestToolResultStore_Persist_GeneratesPersistedOutputMarker`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A05-T03** | **AC1 allowlist enforced: 非白名单 tool (task_create / delegate_worker 等) 不 cap, 原内容保留** | **S17-A05 ShouldCap (new)** | **`tool_result_store_test.go::TestToolResultStore_ShouldCap_AllowlistEnforced` + `TestToolResultStore_Persist_NonWhitelistedTool_NoCap`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A05-T04** | **AC1 session ID sanitised: sessionID 含 `/` `\` `..` 时替换为 `_`，路径不能逃逸 root** | **S17-A05 sanitizeSegment (new)** | **`tool_result_store_test.go::TestToolResultStore_Persist_SessionIDSanitised` + `TestToolResultStore_Persist_PathTraversalBlocked`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A05-T05** | **AC1 persist failure falls back to head truncation: I/O error → head truncate + "[truncated, persist failed]" trailer; turn loop 不中止** | **S17-A05 Persist (failure path)** | **`tool_result_store_test.go::TestToolResultStore_Persist_IOError_FallsBackToHeadTruncate` + `internal/layers/orchestration/turn/orchestrator_toolcap_test.go::TestOrchestrator_BuildToolResultMsgWithCap_PersistFailure`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A06-T01** | **AC2 below-limit passthrough: `FoldAssistantOutput` 短结果原样返回 + 不落盘** | **S17-A06 FoldAssistantOutput (new)** | **`internal/layers/contextengine/prepare/persist/turn_output_store_test.go::TestFoldAssistantOutput_BelowLimit`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A06-T02** | **AC2 above-limit folds head + tail: 超 `MaxAssistantChars` 落 `~/.devrix/tool-results/<sessionID>/turn-outputs/t<n>-<stamp>-<id>.txt` + 返回 `<prior-output-summary>` (前 800 + middle marker + 后 200 runes)** | **S17-A06 FoldAssistantOutput (new)** | **`turn_output_store_test.go::TestFoldAssistantOutput_AboveLimit_HeadTail` + `TestFoldAssistantOutput_GeneratesPriorOutputSummaryMarker`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S17-A06-T03** | **AC2 tool_calls metadata preserved: `buildAssistantToolCallMsgFolded` 保留 `Metadata["tool_calls"]`，仅替换 Content** | **S17-A06 buildAssistantToolCallMsgFolded (new)** | **`orchestrator_toolcap_test.go::TestOrchestrator_BuildAssistantToolCallMsgFolded_PreservesToolCalls`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+
+## D2-S15: Prepare — Token Audit (DM-20260620-001, Phase A)
+
+> **devrix-context-budget-and-isolation (DM-20260620-001) — Phase A 落地。**
+> AC4 + AC13：turn loop 每 iteration 开头调 `AuditMessages` +
+> `ShouldFoldProactively`；Proactive 阈值 60% (DefaultProactiveFoldPercent)；
+> TruncateToTokens 从 dead-code 升级为 turn loop 必调。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|-------|------|---------|-----------|--------|----------|
+| **D2-S15-A08-T01** | **AC4 audit fires per iteration: `runTokenAudit` 计算 TotalTokens / SystemTokens / MessagesTokens / LargestMsgTokens / LargestMsgIdx / BudgetPercent / OverBudget + 挂 `audit.*` span attrs + 结构化 slog `orchestrator: token audit`** | **S15-A08 TokenAudit (new)** | **`internal/layers/contextengine/prepare/audit/token_audit_test.go::TestAuditMessages_*` + `internal/layers/orchestration/turn/orchestrator_toolcap_test.go::TestOrchestrator_RunTokenAudit_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S15-A08-T02** | **AC4 proactive fold fires at 60% threshold: `TotalTokens / Budget >= 0.6` 且最大消息 > `MaxAssistantChars` → fold in-place via `FoldAssistantOutput` BEFORE LLM invoke** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_AboveProactiveThreshold` + `TestShouldFoldProactively_BelowThreshold` + `TestShouldFoldProactively_LargestUnderCap_NoFold`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S15-A08-T03** | **AC4 proactive fold fires on over-budget: `TotalTokens > Budget` → `true` 无视百分比阈值** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_OverBudget`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S15-A08-T04** | **AC4 proactive fold no-op when below threshold: `TotalTokens / Budget < 0.6` 且 `<= Budget` → `false` + buffer 留空** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_BelowThreshold`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D2-S15-A08-T05** | **AC4 largest message under cap → no fold: 最大消息短于 `MaxAssistantChars` 即使 budget 60% 也返 `false`（避免无意义折叠）** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_LargestUnderCap_NoFold`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 
 ## D2-S11: Harness Unification
 
@@ -327,7 +362,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 96 | 96 | 0 | 49 |
+| 109 | 109 | 0 | 56 |
 
 > TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
 > TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。
@@ -336,6 +371,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 > **PERMISSION-GATE-1 (DM-20260618-002) 新增 2 项 P0 T01-T02（90 - 88 = 2）**
 > **TOOL-SURFACE-1 Lazy Loading (DM-20260618-003) 新增 5 项 P0 T30-T34（95 - 90 = 5）**
 > **D2-STRUCT-T01 (DM-20260619-007) 新增 1 项 P0 layout 守卫（96 - 95 = 1）**
+> **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) 新增 13 项 P0 T 点 (109 - 96 = 13)**
 > 全部 IMPLEMENTED。
 
 ---

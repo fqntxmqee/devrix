@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.5.0
-**Last Updated:** 2026-06-19
+**Version:** 3.6.0
+**Last Updated:** 2026-06-20
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -159,6 +159,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 **Change:** devrix-tools-terminal-architecture (DM-20260618-007) — LTL-Lite runtime check + CI lint + turn_adapter HookRegistry (PERMISSION-GATE-1-T01/T02/T03) + BackgroundTaskSurface ToolEventStream (D7-S2-A08-T01)
 
+### Context Budget Phase A — Turn Loop Integration (DM-20260620-001)
+
+> **devrix-context-budget-and-isolation (DM-20260620-001) — Phase A 落地。**
+> AC1+AC2+AC4 turn loop 集成（D2-S17-A05/S17-A06/S15-A08 helpers 消费方）：
+> tool result cap + assistant fold + per-iter audit + bootstrap wiring。
+> D2 t-registry 持有 helper 自身的 T 点（T01-T05/T01-T03/T01-T05）；
+> 本表持有 turn loop 集成 + bootstrap 接线 T 点（T11-T13）。
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
+|------|------|----------|-----------|--------|----------|
+| **D7-S2-A06-T11** | **AC1+AC2 turn loop integration: tool result cap + assistant fold wired into RunTurn** | **D7-S2-A06** | **`orchestration/turn/orchestrator_toolcap_test.go::TestOrchestrator_BuildToolResultMsgWithCap_*`, `TestOrchestrator_BuildAssistantToolCallMsgFolded_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D7-S2-A06-T12** | **AC4 per-iter audit + proactive fold + span attrs + slog** | **D7-S2-A06** | **`orchestration/turn/orchestrator_toolcap_test.go::TestOrchestrator_RunTokenAudit_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D7-S2-A06-T13** | **WireD7 bootstrap constructs ToolResultStore** | **D7-S2-A06** | **`bootstrap/wire_coordinator.go::NewOrchestrator(OrchestratorDeps{ToolResultStore: …})`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
 | **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** |
@@ -242,14 +256,14 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 96 | 96 | 0 | 0 | 67 |
+| 99 | 99 | 0 | 0 | 70 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
 | D7-S1 | 8 | 8 | 0 |
-| D7-S2 | 23 | 23 | 0 |
+| D7-S2 | 26 | 26 | 0 |
 | D7-S3 | 20 | 20 | 0 |
 | D7-S4 | 9 | 9 | 0 |
 | D7-S5 | 28 | 28 | 0 |
@@ -260,6 +274,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > **v3.1 closure (2026-06-16):** **devrix-d7-uncertainty-gaps (DM-20260616-001) 归档**：+26 T 点全部 IMPLEMENTED（PlanAgent runtime gate 4 + PlanMode LLM guard 2 + ConflictGuard TOCTOU 4 + FlowEvent sink 2 + PlanModeApproveGate removal 2 + dead code markers 2 + 积分测试 10）。IMPLEMENTED 66→92，P0 44→63。
 >
 > **v3.2 closure (2026-06-17):** **devrix-d7-turn-history-persist (DM-20260617-003) 归档**：+2 T 点 IMPLEMENTED（D7-S5-A04-T01/T02 turn adapter persist + 3-轮集成）。IMPLEMENTED 94→96，P0 65→67。
+>
+> **v3.6 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001) Phase A 归档**：+3 T 点 IMPLEMENTED（D7-S2-A06-T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70。D2 域内另 +13 T 点（D2-S17-A05 T01-T05 + D2-S17-A06 T01-T03 + D2-S15-A08 T01-T05）见 d2 t-registry。
 
 ---
 
@@ -282,4 +298,5 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.2.0** | **2026-06-16** | **devrix-d7-loop-first-routing (DM-20260616-002) 归档**：Loop-First L5 登记 D7-S2-L5-01..06（6 P0/P1） |
 | **3.3.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) D7-S2-A06-T09 登记（orchestrator 不触 D2.QueryLoop.Run）；(2) D7-S2-A06-T10 登记（Run() 必增 metric）。IMPLEMENTED 92→94 |
 | **3.5.0** | **2026-06-19** | **devrix-d7-v2-structure 路径同步**：T 表 Code Location 列对齐 sessionorchestrator/decisionplanning/wavescheduler/executionflow/orchtypes |
+| **3.6.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) Phase A 归档**：D7-S2-A06 +3 T 点（T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
