@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -394,6 +395,31 @@ func (g *Gateway) recordStreamRequest(span tracer.Span, req *llmgateway.Request)
 	if req == nil {
 		return
 	}
+	info, toolNames := buildStreamRequestInfo(req)
+	bz, _ := json.Marshal(info)
+	incident.RecordLLMSpanPayload(
+		span, "", "request", "llm.request", "llm.request_json", string(bz),
+		0, req.Model,
+		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
+		tracer.Attribute{Key: "llm.tools_count", Value: len(req.Tools)},
+		tracer.Attribute{Key: "llm.tools_names", Value: toolNames},
+	)
+}
+
+// buildStreamRequestInfo assembles the JSON payload + compact tool-name
+// summary that recordStreamRequest attaches to the LLM stream span.
+//
+// The payload mirrors the `tools_json` shape sent to the provider: a
+// `tools` array with name + description always present, and the JSON
+// Schema `parameters` block included only when the operator enabled
+// `observability.llm.log_content` (otherwise each tool's schema can
+// be 5KB+ and would bloat every span).
+//
+// The compact `toolNames` returned separately is a comma-separated
+// list of tool names for fast span-attribute queries (e.g. Jaeger
+// filters `llm.tools_names=bash,read`). The full `tools` array is
+// available in the JSON payload for detailed inspection.
+func buildStreamRequestInfo(req *llmgateway.Request) (info map[string]interface{}, toolNames string) {
 	full := incident.LLMLogContentEnabled()
 	msgs := make([]map[string]string, 0, len(req.Messages))
 	limit := 500
@@ -407,23 +433,81 @@ func (g *Gateway) recordStreamRequest(span tracer.Span, req *llmgateway.Request)
 		}
 		msgs = append(msgs, map[string]string{"role": string(m.Role), "content": content})
 	}
-	info := map[string]interface{}{
+
+	tools := summarizeToolsForTrace(req.Tools, full)
+	names := make([]string, 0, len(req.Tools))
+	for _, t := range req.Tools {
+		if t.Name == "" {
+			continue
+		}
+		names = append(names, t.Name)
+	}
+	toolNames = strings.Join(names, ",")
+
+	info = map[string]interface{}{
 		"model":                req.Model,
 		"message_count":        len(req.Messages),
 		"tool_count":           len(req.Tools),
+		"tool_names":           names,
 		"system_prompt_length": len(req.SystemPrompt),
 		"messages":             msgs,
+		"tools":                tools,
 	}
 	if full {
 		info["system_prompt"] = req.SystemPrompt
 	}
-	bz, _ := json.Marshal(info)
-	incident.RecordLLMSpanPayload(
-		span, "", "request", "llm.request", "llm.request_json", string(bz),
-		0, req.Model,
-		tracer.Attribute{Key: "llm.messages_count", Value: len(req.Messages)},
-		tracer.Attribute{Key: "llm.tools_count", Value: len(req.Tools)},
-	)
+	return info, toolNames
+}
+
+// summarizeToolsForTrace turns the LLM-side `req.Tools` into the same
+// shape sent in the provider `tools_json` body, minus the wire
+// `type:"function"` wrapper which is implicit. Name and description
+// are always included; the JSON Schema `parameters` are only included
+// when `full` is true (governed by observability.llm.log_content).
+//
+// Descriptions are truncated to 200 chars in the summary-only path
+// to keep span payloads compact when many tools are offered.
+func summarizeToolsForTrace(tools []llmgateway.ToolSchema, full bool) []map[string]interface{} {
+	if len(tools) == 0 {
+		return []map[string]interface{}{}
+	}
+	out := make([]map[string]interface{}, 0, len(tools))
+	for _, t := range tools {
+		entry := map[string]interface{}{
+			"name": t.Name,
+		}
+		desc := strings.TrimSpace(t.Description)
+		if !full && len(desc) > 200 {
+			desc = desc[:200] + "..."
+		}
+		if desc != "" {
+			entry["description"] = desc
+		}
+		if full {
+			if params, ok := parseToolParametersJSON(t.Parameters); ok {
+				entry["parameters"] = params
+			} else if t.Parameters != "" {
+				// Schema didn't parse — keep the raw string so the
+				// trace still has the original payload the provider
+				// was given (or would have been given, if it failed
+				// at adapter time).
+				entry["parameters_raw"] = t.Parameters
+			}
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+func parseToolParametersJSON(raw string) (any, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, false
+	}
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		return nil, false
+	}
+	return v, true
 }
 
 func (g *Gateway) recordStreamResponse(span tracer.Span, err error, usage llmgateway.TokenUsage, provider, model string) {
