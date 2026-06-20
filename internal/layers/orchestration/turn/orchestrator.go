@@ -262,7 +262,16 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		if model == "" && prepared.Model != "" {
 			model = prepared.Model
 		}
-		maxContextTokens = prepared.MaxContextTokens
+		// DM-20260620-002 (AC1) — nested turns skip o.context.Prepare so
+		// prepared stays at its zero value, which would leave
+		// maxContextTokens=0 and disable runTokenAudit / proactive fold
+		// / budgetTracker. Inject req.MaxContextTokens (carried by
+		// SubTurnRunner from Cfg) and fall back to o.maxContextTokens
+		// (Phase A wiring) when both are unset.
+		maxContextTokens = req.MaxContextTokens
+		if maxContextTokens <= 0 {
+			maxContextTokens = o.maxContextTokens
+		}
 		if req.SkipPersist {
 			persister = noopPersister{}
 		}

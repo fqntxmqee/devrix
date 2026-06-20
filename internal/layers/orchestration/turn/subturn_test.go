@@ -382,3 +382,85 @@ func TestSubTurnRunner_DepthLimit_BoundaryAtMaxMinus1(t *testing.T) {
 		t.Fatalf("LLM should have been called for depth=MaxDepth-1, calls=%d", llm.mu.Load())
 	}
 }
+
+// captureTurnReqStub records the TurnRequest that the orchestrator received,
+// used by Phase C AC1 to verify SubTurnRunner propagates MaxContextTokens.
+type captureTurnReqStub struct {
+	lastReq atomic.Pointer[TurnRequest]
+	// delegate to a real orchestrator so RunSubTurn actually completes
+	inner *DefaultOrchestrator
+}
+
+func (c *captureTurnReqStub) RunTurn(ctx context.Context, req TurnRequest) (<-chan *contracts.EngineEvent, error) {
+	c.lastReq.Store(&req)
+	return c.inner.RunTurn(ctx, req)
+}
+
+// TestSubTurnRunner_MaxContextTokens_Propagated (D7-S2-A06-T21+T22) — Phase C
+// AC1. SubTurnRequest.MaxContextTokens flows into TurnRequest.MaxContextTokens.
+// When the inbound request omits it, the SubTurnRunner falls back to
+// Cfg.MaxContextTokens (wired by bootstrap from wire_coordinator.go).
+func TestSubTurnRunner_MaxContextTokens_Propagated_DM_20260620_002(t *testing.T) {
+	llm := &stubLLM{chunks: []llmgateway.Chunk{textChunk("ok"), doneChunk()}}
+	inner := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: &stubTools{}, Persist: &stubPersist{}, MaxTurns: 2,
+	})
+	capture := &captureTurnReqStub{inner: inner}
+
+	// Case 1: explicit SubTurnRequest.MaxContextTokens wins.
+	runner := NewSubTurnRunner(capture, SubTurnConfig{
+		DefaultMode:      "brief",
+		MaxContextTokens: 10000, // fallback value, must NOT win when request sets one
+	})
+	if _, err := runner.RunSubTurn(context.Background(), contracts.SubTurnRequest{
+		SessionID:         "s",
+		SystemPrompt:      "p",
+		Messages:          []types.Message{{Role: types.MessageRoleUser, Content: "x"}},
+		Mode:              contracts.SubAgentModeBrief,
+		MaxContextTokens:  64000,
+	}); err != nil {
+		t.Fatalf("RunSubTurn: %v", err)
+	}
+	if got := capture.lastReq.Load(); got == nil || got.MaxContextTokens != 64000 {
+		t.Errorf("expected TurnRequest.MaxContextTokens=64000, got %+v", got)
+	}
+
+	// Case 2: SubTurnRequest.MaxContextTokens=0 → fallback to Cfg.
+	capture.lastReq.Store(nil)
+	runner2 := NewSubTurnRunner(capture, SubTurnConfig{
+		DefaultMode:      "brief",
+		MaxContextTokens: 42000,
+	})
+	if _, err := runner2.RunSubTurn(context.Background(), contracts.SubTurnRequest{
+		SessionID: "s",
+		SystemPrompt: "p",
+		Messages:  []types.Message{{Role: types.MessageRoleUser, Content: "x"}},
+		Mode:      contracts.SubAgentModeBrief,
+		// MaxContextTokens omitted (=0)
+	}); err != nil {
+		t.Fatalf("RunSubTurn (fallback): %v", err)
+	}
+	if got := capture.lastReq.Load(); got == nil || got.MaxContextTokens != 42000 {
+		t.Errorf("expected fallback TurnRequest.MaxContextTokens=42000, got %+v", got)
+	}
+
+	// Case 3: both zero → orchestrator-level fallback path (no assertion
+	// on TurnRequest value, just ensure no panic).
+	capture.lastReq.Store(nil)
+	runner3 := NewSubTurnRunner(capture, SubTurnConfig{DefaultMode: "brief"})
+	if _, err := runner3.RunSubTurn(context.Background(), contracts.SubTurnRequest{
+		SessionID: "s",
+		SystemPrompt: "p",
+		Messages:  []types.Message{{Role: types.MessageRoleUser, Content: "x"}},
+		Mode:      contracts.SubAgentModeBrief,
+	}); err != nil {
+		t.Fatalf("RunSubTurn (zero/zero): %v", err)
+	}
+	case3Req := capture.lastReq.Load()
+	if case3Req == nil {
+		t.Fatal("expected TurnRequest captured")
+	}
+	if case3Req.MaxContextTokens != 0 {
+		t.Errorf("expected TurnRequest.MaxContextTokens=0 when both unset, got %d", case3Req.MaxContextTokens)
+	}
+}

@@ -86,7 +86,23 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 
 	llmCfg := configure.DefaultLLMGatewayConfig()
 	llmCfg.DefaultProvider = "deepseek"
+	// DefaultModel must be non-empty so the LLMInvoker's defaultTier
+	// is populated (otherwise bridge.ResolveTier("") errors out and
+	// every nested turn call short-circuits). The production default
+	// is intentionally empty (operator fills it via env / config),
+	// but for tests we want a deterministic stub target.
+	if p, ok := llmCfg.Providers["deepseek"]; ok && p.DefaultModel == "" {
+		p.DefaultModel = "deepseek-v4-flash"
+		llmCfg.Providers["deepseek"] = p
+	}
 	llmCfg.DefaultModel = llmCfg.Providers["deepseek"].DefaultModel
+	// ModelRouting must be populated so the gateway's router can map
+	// model names → providers. The default map is empty, which causes
+	// "unsupported llm model" for any LLM call. Tests use the same
+	// "deepseek-*" prefix match as production routing.
+	if len(llmCfg.ModelRouting) == 0 {
+		llmCfg.ModelRouting = map[string]string{"deepseek-*": "deepseek"}
+	}
 	reg := adapter.NewRegistry()
 	if err := reg.Register(stub); err != nil {
 		t.Fatalf("register llm stub: %v", err)

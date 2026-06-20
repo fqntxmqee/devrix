@@ -171,9 +171,10 @@ func InitOrchestration(
 		ToolResultStore: persist.NewToolResultStore(""),
 	})
 	subTurn := turn.NewSubTurnRunner(turnOrch, turn.SubTurnConfig{
-		DefaultMode: subagentCfg.DefaultMode,
-		LegacyMode:  subagentCfg.LegacyMode,
-		MaxDepth:    subagentCfg.MaxDepth,
+		DefaultMode:      subagentCfg.DefaultMode,
+		LegacyMode:       subagentCfg.LegacyMode,
+		MaxDepth:         subagentCfg.MaxDepth,
+		MaxContextTokens: maxContextTokens,
 	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {

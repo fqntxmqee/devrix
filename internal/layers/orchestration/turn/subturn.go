@@ -24,6 +24,12 @@ type SubTurnConfig struct {
 	// MaxDepth 子 agent 递归深度上限; Depth >= MaxDepth 时拒绝。
 	// <=0 = 3。
 	MaxDepth int
+	// MaxContextTokens DM-20260620-002 (AC1) — sub-agent runLoop budget.
+	// Wired into TurnRequest.MaxContextTokens when the inbound
+	// SubTurnRequest does not set one, so nested runTokenAudit /
+	// proactive fold / budgetTracker fire normally. <=0 = unset, lets
+	// the orchestrator fall back to o.maxContextTokens (Phase A wiring).
+	MaxContextTokens int
 }
 
 // ResolvedMode returns the effective default mode (LegacyMode overrides
@@ -103,6 +109,15 @@ func (r *SubTurnRunner) RunSubTurn(ctx context.Context, req contracts.SubTurnReq
 
 	preloaded, lastUser := r.applyMode(mode, req.Messages)
 
+	// DM-20260620-002 (AC1) — propagate explicit budget. SubTurnRequest
+	// wins when set, otherwise we fall back to Cfg so the nested runLoop
+	// gets a non-zero maxContextTokens (otherwise runTokenAudit /
+	// proactive fold are no-ops).
+	maxCtx := req.MaxContextTokens
+	if maxCtx <= 0 {
+		maxCtx = r.Cfg.MaxContextTokens
+	}
+
 	ch, err := r.Orch.RunTurn(runCtx, TurnRequest{
 		SessionID:         req.SessionID,
 		UserMessage:       lastUser,
@@ -113,6 +128,7 @@ func (r *SubTurnRunner) RunSubTurn(ctx context.Context, req contracts.SubTurnReq
 		OverrideTools:     mapToolSchemas(req.Tools),
 		SkipPersist:       true,
 		Model:             modelFromChild(req.ChildContext),
+		MaxContextTokens:  maxCtx,
 	})
 	if err != nil {
 		return nil, err

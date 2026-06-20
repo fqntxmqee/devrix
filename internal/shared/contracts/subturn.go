@@ -58,6 +58,11 @@ type SubTurnRequest struct {
 	// SubTurnRunner rejects requests with Depth >= MaxSubagentDepth
 	// (Phase B AC9).
 	Depth int
+	// MaxContextTokens DM-20260620-002 (AC1) — explicit budget for the nested
+	// turn. 0 defers to SubTurnRunner.Cfg.MaxContextTokens. Wired through
+	// SubTurnRequest → TurnRequest so nested runLoop gets a non-zero
+	// budget and runTokenAudit / proactive fold trigger normally.
+	MaxContextTokens int
 }
 
 // SubTurnResult is the synchronous outcome of a nested turn.
