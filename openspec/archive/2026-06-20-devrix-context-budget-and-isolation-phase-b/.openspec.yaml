@@ -1,0 +1,52 @@
+change_id: 2026-06-20-devrix-context-budget-and-isolation-phase-b
+priority: P0
+demand_id: DM-20260620-001-B
+status: s7_archived
+archived_at: 2026-06-20
+parent_changes:
+  - 2026-06-20-devrix-context-budget-and-isolation   # Phase A (PR #128 + #129)
+s4_prs:
+  - "#130 feat(d2/d7): sub-agent context isolation phase B.1 (mode + depth)"
+  - "#131 feat(d4/d7): expose sub-agent mode field on delegate/free_fork tools (Phase B.2)"
+  - "#132 docs(d2/d4/d7): context budget phase B.4+B.5 — spec sync + t-registry + AC12 regression"
+domains: [D2, D4, D7]
+dsaft_scenarios: [D2-S15, D4-S14, D7-S2]
+dsaft_activities:
+  # D2: AC11a fork prefix byte-level stability (BuildForkedMessages)
+  - D2-S15-A08-T06         # BuildForkedMessages basic (cloned assistant + directive with placeholders)
+  - D2-S15-A08-T07         # NoToolCallsFallback — single directive-only message
+  - D2-S15-A08-T08         # MultipleToolCallPlaceholders — N tool_calls → N placeholder blocks
+  # D4: AC10 mode field exposed on delegate/free_fork tool schemas
+  - D4-S14-A07-T01         # delegate_* schema accepts mode field (brief|fork|full)
+  - D4-S14-A07-T02         # free_fork schema accepts mode field
+  # D7: AC6/AC8/AC9 SubTurn 3-mode dispatch + depth limit
+  - D7-S2-A06-T14          # brief mode → PreloadedMessages=nil
+  - D7-S2-A06-T15          # fork mode dispatches + full mode byte-equivalent legacy
+  - D7-S2-A06-T16          # depth limit (>= MaxDepth returns ErrSubagentDepthExceeded)
+  - D7-S2-A06-T17          # default mode resolution chain (req.Mode → LegacyMode → DefaultMode → "brief")
+version_scope:
+  v2026-06-20-phase-b: "Sub-agent 3-mode context isolation (brief/fork/full) + depth cap + cache-friendly fork prefix — AC6+AC8+AC9+AC10+AC11a+AC12"
+  vNEXT-phase-c: "AC11b (Anthropic cache_control: ephemeral anchor) + AC3 (per-iter Prepare cadence) — separate follow-up OpenSpecs"
+parent_changes: []
+t_points:
+  new: 9  # 3 D2 + 2 D4 + 4 D7
+  reuse: "Phase A D7-S2-A06-T11/T12/T13 (turn loop integration) + D2-S15-A08-T01..T05 (audit + fold)"
+  final_total: 9
+  final_status: "9 IMPLEMENTED / 0 PLANNED / 0 DEFERRED (AC11b + AC3 deferred to separate OpenSpecs)"
+s3_gate:
+  review: design.md
+  conclusion: approved
+  s3_gate_owner_confirmed: 2026-06-20
+s5_gate:
+  acceptance_report: acceptance-report.md
+  conclusion: ACCEPTED
+  ac_total: 6  # AC6+AC8+AC9+AC10+AC11a+AC12 (Phase B scope)
+  ac_passed: 6
+  ac_deferred: 2  # AC11b (Anthropic cache anchor) + AC3 (per-iter Prepare)
+s7_artifacts:
+  acceptance_report: acceptance-report.md
+  archive_path: openspec/archive/2026-06-20-devrix-context-budget-and-isolation-phase-b/
+s3_artifacts:
+  index: README.md
+  spec_delta: specs/d{2,4,7}-*/spec.md
+pr: "[#130](https://github.com/fqntxmqee/devrix/pull/130) · [#131](https://github.com/fqntxmqee/devrix/pull/131) · [#132](https://github.com/fqntxmqee/devrix/pull/132)"

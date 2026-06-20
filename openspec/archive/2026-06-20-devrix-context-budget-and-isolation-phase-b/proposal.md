@@ -3,7 +3,8 @@
 **Change ID:** 2026-06-20-devrix-context-budget-and-isolation-phase-b
 **Demand ID:** DM-20260620-001-B
 **Created:** 2026-06-20
-**Status:** S2_Proposal
+**Status:** S7_Archived (2026-06-20)
+**Archived PRs:** #130 (B.1) + #131 (B.2) + #132 (B.4+B.5, includes B.3 commits)
 **Parent:** DM-20260620-001 Phase A (S7_Archived 2026-06-20, PR #128 + #129)
 **Base:** clawcode 3-mode sub-agent pattern (reference `/Users/fukai/workspace/clawcode/src/tools/AgentTool/AgentTool.tsx:495-602`)
 

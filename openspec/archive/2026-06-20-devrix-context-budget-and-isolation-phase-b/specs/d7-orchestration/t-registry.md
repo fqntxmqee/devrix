@@ -1,13 +1,12 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.7.0
+**Version:** 3.6.0
 **Last Updated:** 2026-06-20
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
 **Complements:** `terminal-state-guide.md` · `observability-guide.md`
-**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74.
 
 ---
 
@@ -277,18 +276,18 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 103 | 103 | 0 | 0 | 74 |
+| 99 | 99 | 0 | 0 | 70 |
 
 ### 按 Scenario
 
 | Scenario | Total | IMPLEMENTED | PLANNED |
 |----------|-------|-------------|---------|
 | D7-S1 | 8 | 8 | 0 |
-| D7-S2 | 30 | 30 | 0 |
+| D7-S2 | 26 | 26 | 0 |
 | D7-S3 | 20 | 20 | 0 |
 | D7-S4 | 9 | 9 | 0 |
 | D7-S5 | 28 | 28 | 0 |
-| 契约/迁移 | 8 | 8 | 0 |
+| 契约/迁移 | 6 | 6 | 0 |
 
 > **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。
 >
@@ -297,8 +296,6 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > **v3.2 closure (2026-06-17):** **devrix-d7-turn-history-persist (DM-20260617-003) 归档**：+2 T 点 IMPLEMENTED（D7-S5-A04-T01/T02 turn adapter persist + 3-轮集成）。IMPLEMENTED 94→96，P0 65→67。
 >
 > **v3.6 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001) Phase A 归档**：+3 T 点 IMPLEMENTED（D7-S2-A06-T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70。D2 域内另 +13 T 点（D2-S17-A05 T01-T05 + D2-S17-A06 T01-T03 + D2-S15-A08 T01-T05）见 d2 t-registry。
->
-> **v3.7 closure (2026-06-20):** **devrix-context-budget-and-isolation (DM-20260620-001-B) Phase B 归档**：+4 T 点 IMPLEMENTED（D7-S2-A06-T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74。配套 D2 域 +3 T 点（D2-S15-A08 T06-T08 BuildForkedMessages byte-level prefix stability）见 d2 t-registry；D4 域 +2 T 点（D4-S14-A07 T01-T02 mode field schema）见 d4 t-registry。AC12 D5 spans 22-step replay P95=21707 ≤ 40K（Phase A baseline 51K）。
 
 ---
 
@@ -322,5 +319,4 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.3.0** | **2026-06-17** | **devrix-queryloop-legacy-decommission (DM-20260617-001)**：(1) D7-S2-A06-T09 登记（orchestrator 不触 D2.QueryLoop.Run）；(2) D7-S2-A06-T10 登记（Run() 必增 metric）。IMPLEMENTED 92→94 |
 | **3.5.0** | **2026-06-19** | **devrix-d7-v2-structure 路径同步**：T 表 Code Location 列对齐 sessionorchestrator/decisionplanning/wavescheduler/executionflow/orchtypes |
 | **3.6.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) Phase A 归档**：D7-S2-A06 +3 T 点（T11 turn loop 集成 AC1+AC2 + T12 AC4 per-iter audit + T13 bootstrap 接线）。IMPLEMENTED 96→99，P0 67→70 |
-| **3.7.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) Phase B 归档**：D7-S2-A06 +4 T 点（T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |

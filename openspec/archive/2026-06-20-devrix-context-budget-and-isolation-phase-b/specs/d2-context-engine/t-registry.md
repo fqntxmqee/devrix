@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.8.0
-**Last Updated:** 2026-06-20
+**Version:** 2.7.0
+**Last Updated:** 2026-06-18
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地：7 surface + 3 filter + turn_adapter dispatch 路径
@@ -13,7 +13,6 @@
 **Change:** devrix-ask-user-question (DM-20260618-006) — AskUserQuestionSurface (9th) + IM 推送 sender 桥接 (T35-T38)
 **Change:** devrix-tools-terminal-architecture (DM-20260618-007) — LSP 5 typed method spec (T02-T04) + BashAST fail-closed + zsh 22+ rules (T05-T06) + cross-cutting LTL-Lite framework
 **Change:** 2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) — Phase A: AC1 tool result size cap (D2-S17-A05 T01-T05) + AC2 assistant fold (D2-S17-A06 T01-T03) + AC4+AC13 per-iter token audit + proactive fold (D2-S15-A08 T01-T05); TruncateToTokens dead-code upgraded to required.
-**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC11a fork prefix byte-level stability via `BuildForkedMessages` (D2-S15-A08 T06-T08); IMPLEMENTED 109→112, P0 56→59.
 
 ---
 
