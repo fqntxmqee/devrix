@@ -1,9 +1,12 @@
 # Proposal: Context Budget & Isolation
 
-**Change ID:** `2026-06-20-devrix-context-budget-and-isolation`  
-**Demand ID:** DM-20260620-001  
-**Created:** 2026-06-20  
-**Status:** S2_Clarified
+**Change ID:** `2026-06-20-devrix-context-budget-and-isolation`
+**Demand ID:** DM-20260620-001
+**Created:** 2026-06-20
+**Status:** Archived
+**Archived:** 2026-06-20
+**Archive Path:** `openspec/archive/2026-06-20-devrix-context-budget-and-isolation/`
+**Delivered PR:** [#128](https://github.com/fqntxmqee/devrix/pull/128) (Phase A: AC1+AC2+AC4+AC5+AC13)
 
 ---
 

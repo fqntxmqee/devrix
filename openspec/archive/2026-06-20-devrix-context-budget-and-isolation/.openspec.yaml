@@ -1,0 +1,61 @@
+change_id: 2026-06-20-devrix-context-budget-and-isolation
+priority: P0
+demand_id: DM-20260620-001
+status: s7_archived
+archived_at: 2026-06-20
+archive_pr: "S6 archive PR (this branch)"
+s4_prs:
+  - "#128 chore(d1/d2/d7): context budget phase A (AC1+AC2+AC4+AC5+AC13)"
+domains: [D1, D2, D7]
+dsaft_scenarios: [D1-S5, D2-S15, D2-S17, D7-S2]
+dsaft_activities:
+  # D1: AC5 feishu card precheck + plain-text fallback
+  - D1-S5-A07-T05         # table-count precheck
+  - D1-S5-A07-T06         # size precheck (28KB)
+  - D1-S5-A07-T07         # NewFeishuAdapter default wiring
+  - D1-S5-A07-T08         # cardFallbackText preserves header + markdown
+  # D2: AC1 tool result size cap + persist
+  - D2-S17-A05-T01         # below-limit passthrough
+  - D2-S17-A05-T02         # above-limit persists with preview
+  - D2-S17-A05-T03         # allowlist enforced
+  - D2-S17-A05-T04         # session ID sanitised
+  - D2-S17-A05-T05         # persist failure falls back to head truncation
+  # D2: AC2 assistant output head/tail fold
+  - D2-S17-A06-T01         # below-limit passthrough
+  - D2-S17-A06-T02         # above-limit folds head + tail (800+200)
+  - D2-S17-A06-T03         # tool_calls metadata preserved
+  # D2: AC4 + AC13 per-iter token audit + proactive fold
+  - D2-S15-A08-T01         # audit fires per iteration + span attrs + slog
+  - D2-S15-A08-T02         # proactive fold fires at 60% threshold
+  - D2-S15-A08-T03         # proactive fold fires on over-budget
+  - D2-S15-A08-T04         # proactive fold no-op when below threshold
+  - D2-S15-A08-T05         # largest message under cap → no fold
+  # D7: turn loop integration + bootstrap wiring
+  - D7-S2-A06-T11          # AC1+AC2 turn loop integration
+  - D7-S2-A06-T12          # AC4 per-iter audit + proactive fold
+  - D7-S2-A06-T13          # WireD7 bootstrap constructs ToolResultStore
+version_scope:
+  v2026-06-20-phase-a: "Context budget governance + per-iter token audit (Phase A) — AC1+AC2+AC4+AC5+AC13"
+  vNEXT-phase-b: "Phase B (AC6-AC11 sub-agent mode + cache anchor) + AC12 D5-spans replay (separate follow-up)"
+parent_changes: []
+t_points:
+  new: 20  # 4 D1 + 13 D2 + 3 D7
+  reuse: "AC13: TruncateToTokens dead-code → required; AC1+AC2+AC4+AC5 turn loop 集成使用 19 existing D2/D7 audit + cap tests"
+  final_total: 20
+  final_status: "20 IMPLEMENTED / 0 PLANNED / 0 DEFERRED (AC3 deferred to Phase B per design.md)"
+s3_gate:
+  review: design-review.md
+  conclusion: approved_with_suggestions
+  s3_gate_owner_confirmed: 2026-06-20
+s5_gate:
+  acceptance_report: acceptance-report.md
+  conclusion: ACCEPTED
+  ac_total: 5  # AC1+AC2+AC4+AC5+AC13 (Phase A scope)
+  ac_passed: 5
+s7_artifacts:
+  acceptance_report: acceptance-report.md
+  archive_path: openspec/archive/2026-06-20-devrix-context-budget-and-isolation/
+s3_artifacts:
+  index: README.md
+  spec_delta: specs/d{1,2,7}-*/spec.md
+pr: "[#128](https://github.com/fqntxmqee/devrix/pull/128)"

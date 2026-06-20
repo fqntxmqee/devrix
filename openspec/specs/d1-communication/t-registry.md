@@ -5,7 +5,7 @@
 **Last Updated:** 2026-06-14
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring / 2026-06-20-devrix-context-budget-and-isolation (DM-20260620-001) — AC5 feishu card table-count/size precheck + plain-text fallback (T05-T08)
 
 ---
 
@@ -37,6 +37,10 @@
 | D1-S19-A01-T02 | Transcript ListSessions 按 mtime 倒序 | S19-A01 ListSessions | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P0 |
 | D1-S19-A01-T03 | Transcript path traversal 防御 | S19-A01 SanitizeFilename | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P0 |
 | D1-S19-A01-T04 | Transcript 并发 100 goroutine 追加无丢行 | S19-A01 ConcurrentAppend | `internal/layers/communication/capture/transcript/writer_test.go` | IMPLEMENTED | P1 |
+| **D1-S5-A07-T05** | **AC5 feishu table-count precheck: `countTableTags` 命中 `<table>` 标签后 SendCard fall back to plain text (ErrCode 11310 防护)** | **S5-A07 SendCard (extended)** | **`internal/layers/communication/channel/adapters/{card_precheck,feishu_card_precheck,feishu}_test.go`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D1-S5-A07-T06** | **AC5 feishu size precheck: 序列化 JSON 超 28KB 触发 fall back to truncated plain text (Feishu 30KB hard limit 防护)** | **S5-A07 SendCard (extended)** | **`card_precheck_test.go::TestFeishuTableCountPrecheck_SizeOverLimit`, `feishu_test.go::TestSendCard_SizeFallback`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D1-S5-A07-T07** | **AC5 default precheck wired in NewFeishuAdapter: `cardPrecheck = NewFeishuTableCountPrecheck(DefaultCardPrecheckConfig())` (MaxTables=5, MaxChars=28000)** | **S5-A07 NewFeishuAdapter (extended)** | **`feishu_test.go::TestNewFeishuAdapter_DefaultPrecheckWired`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| **D1-S5-A07-T08** | **AC5 plain-text fallback preserves header + markdown: `cardFallbackText` returns title + content + "[card auto-flattened]" trailer** | **S5-A07 cardFallbackText (new)** | **`feishu_test.go::TestCardFallbackText_{HeaderAndMarkdown,FlattensPipeTable,TrailerMarker}`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 
 ---
 
@@ -133,5 +137,7 @@
 | Category | Total | IMPLEMENTED | PLANNED | P0 |
 |----------|-------|-------------|---------|-----|
 | Legacy T | 44 | 44 | 0 | 19 |
-| Canonical T（新增） | 12 | 12 | 0 | 7 |
-| **合计** | **56** | **56** | **0** | **26** |
+| Canonical T（新增） | 16 | 16 | 0 | 11 |
+| **合计** | **60** | **60** | **0** | **30** |
+
+> **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) — AC5 feishu precheck 新增 4 项 P0 T 点 T05-T08（16 - 12 = 4）**，全部 IMPLEMENTED。
