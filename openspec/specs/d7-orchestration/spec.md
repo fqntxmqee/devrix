@@ -449,6 +449,101 @@ D2 `query.Loop`, `QueryLLMCaller`, and `d2_query_loop_legacy_invocations_total` 
 
 ---
 
+### Requirement: SubTurn 3-Mode Context Isolation (devrix-context-budget-phase-b)
+
+`SubTurnRunner.RunSubTurn` (D7-S2-A06) MUST dispatch sub-agent context
+inheritance by `req.Mode` and reject requests that exceed the configured
+recursion depth. Three modes align with the clawcode 3-mode pattern:
+
+- `brief` (default) — `PreloadedMessages=nil`; child starts with a fresh
+  history. Saves tokens at the cost of parent context visibility.
+- `fork` — `PreloadedMessages=BuildForkedMessages(parent, directive)`;
+  byte-level stable prefix shared across sibling fork children (prompt
+  cache friendly). Includes the synthesized `"Fork started — processing
+  in background"` placeholder.
+- `full` — `PreloadedMessages=messagesWithoutLastUser(parent)`; legacy
+  behavior, opt-in only for callers that need full parent history (D5
+  evaluation).
+
+When `req.Mode` is empty, `SubTurnRunner` falls back to
+`SubagentConfig.DefaultMode` (or `LegacyMode` when set). When
+`req.Depth >= SubagentConfig.MaxDepth`, the runner MUST return
+`ErrSubagentDepthExceeded` (code `AGT_DEPTH_5011`) WITHOUT invoking the
+LLM. Supersedes Phase A `SubTurnRunner` legacy default.
+
+**Priority**: P0  
+**T mapping**: D7-S2-A06-T14 … T17, `internal/layers/orchestration/turn/subturn_test.go`
+
+#### Scenario: brief mode drops parent history
+
+- GIVEN a parent session with N messages and `req.Mode=brief`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN the LLM sees exactly 1 message (the last user / directive)
+- AND `PreloadedMessages` is nil
+
+<!-- T: D7-S2-A06-T14 -->
+
+#### Scenario: fork mode produces cache-friendly prefix
+
+- GIVEN a parent session with assistant + tool_result messages
+- WHEN `req.Mode=fork` and 10 sibling children are spawned in parallel
+- THEN each child sees the same byte-level identical prefix
+- AND the prefix contains the literal `"Fork started — processing in background"`
+
+<!-- T: D7-S2-A06-T15 -->
+
+#### Scenario: full mode preserves legacy behavior
+
+- GIVEN `req.Mode=full`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN `PreloadedMessages` equals `messagesWithoutLastUser(req.Messages)`
+- AND the result is byte-equal to the pre-Phase-B legacy dispatch
+
+<!-- T: D7-S2-A06-T15 (D2-S15-A08-T07 boundary) -->
+
+#### Scenario: empty Mode falls back to DefaultMode
+
+- GIVEN `req.Mode=""` and `Cfg.DefaultMode="brief"`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN the runner dispatches as if `Mode=brief`
+
+<!-- T: D7-S2-A06-T17 -->
+
+#### Scenario: LegacyMode override wins over DefaultMode
+
+- GIVEN `Cfg.DefaultMode="brief"` and `Cfg.LegacyMode="full"`
+- WHEN `req.Mode=""` is sent
+- THEN the runner dispatches as `Mode=full` (legacy back-compat)
+
+<!-- T: D7-S2-A06-T17 -->
+
+#### Scenario: invalid Mode is rejected before LLM call
+
+- GIVEN `req.Mode="unknown"`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN the runner returns `ErrSubagentInvalidMode` (code `AGT_DEPTH_5012`)
+- AND the LLM is not invoked
+
+#### Scenario: Depth at MaxDepth is rejected
+
+- GIVEN `Cfg.MaxDepth=3` and `req.Depth=3`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN the runner returns `ErrSubagentDepthExceeded` (code `AGT_DEPTH_5011`)
+- AND the error message hints to retry with `mode=brief`
+- AND the LLM is not invoked
+
+<!-- T: D7-S2-A06-T16 -->
+
+#### Scenario: Depth at MaxDepth-1 is allowed
+
+- GIVEN `Cfg.MaxDepth=3` and `req.Depth=2`
+- WHEN `SubTurnRunner.RunSubTurn` is called
+- THEN the LLM is invoked normally
+
+<!-- T: D7-S2-A06-T16 -->
+
+---
+
 ## REMOVED Requirements
 
 ### Requirement: PlanModeApproveGate Config (devrix-d7-uncertainty-gaps)

@@ -145,6 +145,62 @@ CLI/Cursor tools MUST isolate subprocess per D1 session.
 
 ---
 
+### Requirement: Sub-Agent Mode Field on delegate/free_fork Tools (devrix-context-budget-phase-b)
+
+The `delegate_*` and `free_fork` LLM tools MUST expose a `mode` field in
+their input schema with enum values `[brief, fork, full]`, default
+`brief`. The mode controls sub-agent context inheritance via
+`SubTurnRunner` (D7-S2-A06 3-mode dispatch). Empty / unknown values
+MUST defer to `SubagentConfig.DefaultMode`.
+
+This is the surface-level counterpart to the SubTurnRunner 3-mode
+dispatch — without exposing `mode` to the LLM, callers cannot opt
+out of the new `brief` default. The D4 worker spec mirrors the same
+field for the D4-execution path.
+
+**Priority**: P0
+**T mapping**: D4-S14-A07-T01 (delegate schema), D4-S14-A07-T02 (free_fork schema),
+`internal/layers/orchestration/delegatetools/delegate_schema_test.go`,
+`internal/layers/orchestration/sessionorchestrator/turn_tools_test.go`
+
+#### Scenario: delegate_* schema declares mode enum
+
+- GIVEN the `delegate_explore` / `delegate_plan` / `delegate_implement`
+  tool input schema
+- THEN the schema has a `mode` property
+- AND its `enum` is `[brief, fork, full]`
+- AND its `default` is `brief`
+
+<!-- T: D4-S14-A07-T01 -->
+
+#### Scenario: free_fork schema declares mode enum on request items
+
+- GIVEN the `free_fork` tool input schema
+- THEN `requests[].properties.mode` exists
+- AND its `enum` is `[brief, fork, full]`
+- AND its `default` is `brief`
+
+<!-- T: D4-S14-A07-T02 -->
+
+#### Scenario: mode propagates from delegate tool input to SubTurnRequest
+
+- GIVEN a delegate_* call with `mode=full` in input
+- WHEN the dispatcher resolves to the D2 SubQuery fallback
+- THEN `SubTurnRequest.Mode` equals `full`
+- AND `SubTurnRunner` dispatches as `mode=full` (legacy behavior)
+
+<!-- T: D4-S14-A07-T01 boundary -->
+
+#### Scenario: missing mode defers to SubagentConfig default
+
+- GIVEN a delegate_* call with no `mode` in input
+- AND `SubagentConfig.DefaultMode="brief"`
+- WHEN the dispatcher resolves to the D2 SubQuery fallback
+- THEN `SubTurnRequest.Mode` is empty
+- AND `SubTurnRunner` resolves via DefaultMode → `brief`
+
+---
+
 ## Registries
 
 - **Domain:** `d4-domain.md`

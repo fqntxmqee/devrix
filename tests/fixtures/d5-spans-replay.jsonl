@@ -1,0 +1,22 @@
+{"step": 1, "kind": "chat", "prompt": "design the observability trace pipeline for devrix", "history_chars": 400, "delegates": 0}
+{"step": 2, "kind": "delegate_explore", "prompt": "explore current trace emit sites in D1/D2/D3", "mode": "brief", "history_chars": 6400, "delegates": 1}
+{"step": 3, "kind": "chat", "prompt": "summarize findings from explore", "history_chars": 9000, "delegates": 0}
+{"step": 4, "kind": "delegate_plan", "prompt": "plan the trace pipeline migration", "mode": "brief", "history_chars": 11600, "delegates": 1}
+{"step": 5, "kind": "chat", "prompt": "review the plan and identify dependencies", "history_chars": 14200, "delegates": 0}
+{"step": 6, "kind": "delegate_implement", "prompt": "implement the trace pipeline phase 1", "mode": "brief", "history_chars": 16800, "delegates": 1}
+{"step": 7, "kind": "chat", "prompt": "verify implementation against test plan", "history_chars": 19400, "delegates": 0}
+{"step": 8, "kind": "free_fork", "prompts": ["audit existing spans in D5", "audit existing spans in observability", "audit existing spans in tracing"], "mode": "fork", "history_chars": 25000, "delegates": 3}
+{"step": 9, "kind": "chat", "prompt": "merge fork results into unified analysis", "history_chars": 30400, "delegates": 0}
+{"step": 10, "kind": "delegate_explore", "prompt": "find callers of the legacy trace emit", "mode": "brief", "history_chars": 34000, "delegates": 1}
+{"step": 11, "kind": "chat", "prompt": "list migration blockers per file", "history_chars": 37600, "delegates": 0}
+{"step": 12, "kind": "delegate_plan", "prompt": "plan migration of legacy emit in phases", "mode": "brief", "history_chars": 41000, "delegates": 1}
+{"step": 13, "kind": "delegate_implement", "prompt": "implement migration step 1 \u2014 replace emit signature", "mode": "brief", "history_chars": 44000, "delegates": 1}
+{"step": 14, "kind": "chat", "prompt": "run tests after migration step 1", "history_chars": 47000, "delegates": 0}
+{"step": 15, "kind": "delegate_explore", "prompt": "find broken tests post-migration", "mode": "brief", "history_chars": 50000, "delegates": 1}
+{"step": 16, "kind": "chat", "prompt": "fix the broken tests with new emit API", "history_chars": 53000, "delegates": 0}
+{"step": 17, "kind": "delegate_implement", "prompt": "fix test setup for new emit signature", "mode": "brief", "history_chars": 56400, "delegates": 1}
+{"step": 18, "kind": "chat", "prompt": "re-run tests and verify all green", "history_chars": 60000, "delegates": 0}
+{"step": 19, "kind": "free_fork", "prompts": ["verify D1 spans format", "verify D2 spans format", "verify D5 spans format"], "mode": "fork", "history_chars": 73000, "delegates": 3}
+{"step": 20, "kind": "chat", "prompt": "merge verification results into rollout doc", "history_chars": 85000, "delegates": 0}
+{"step": 21, "kind": "delegate_implement", "prompt": "finalize migration \u2014 update sample fixtures", "mode": "brief", "history_chars": 89000, "delegates": 1}
+{"step": 22, "kind": "chat", "prompt": "ship it", "history_chars": 92000, "delegates": 0}

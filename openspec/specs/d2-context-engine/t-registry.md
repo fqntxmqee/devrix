@@ -177,6 +177,21 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-S15-A08-T04** | **AC4 proactive fold no-op when below threshold: `TotalTokens / Budget < 0.6` 且 `<= Budget` → `false` + buffer 留空** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_BelowThreshold`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D2-S15-A08-T05** | **AC4 largest message under cap → no fold: 最大消息短于 `MaxAssistantChars` 即使 budget 60% 也返 `false`（避免无意义折叠）** | **S15-A08 ShouldFoldProactively (new)** | **`token_audit_test.go::TestShouldFoldProactively_LargestUnderCap_NoFold`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 
+### D2-S15: BuildForkedMessages — Fork Mode Helpers (DM-20260620-001-B, Phase B)
+
+> **devrix-context-budget-and-isolation (DM-20260620-001-B) — Phase B 落地（待 B.5 验证 + S6 归档）。**
+> AC11a fork mode prefix byte-level stability：`BuildForkedMessages` 输出
+> `[cloned_assistant, directive_user_with_placeholder]`；`ForkPrefixFingerprint`
+> 在 sibling 间 byte-identical；placeholder 文本 `"Fork started — processing in background"`
+> 必须 byte-exact 不变（未来 Anthropic `cache_control` 锚点）。
+> 无 tool_calls fallback 文档化（SubTurnRunner 上层拒绝非 fork 候选请求）。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D2-S15-A08-T06** | **AC11a fork prefix stable: sibling siblings 走同一 parent → `BuildForkedMessages` 输出 + `ForkPrefixFingerprint` byte-identical** | **S15-A08 BuildForkedMessages** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_should_use_identical_placeholder_results`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D2-S15-A08-T07** | **fork mode boundary: parent 无 tool_calls → `BuildForkedMessages` 返回 1 条 directive-only user message，无 placeholder（SubTurnRunner 上层拒绝非 fork 候选）** | **S15-A08 BuildForkedMessages (fallback)** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_NoToolCallsFallback`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D2-S15-A08-T08** | **AC11a multi-call placeholder: parent 含 N 个 tool_calls → directive user 含 N 个 `[tool_result id=X]\nForkPlaceholderResult` 块（每个 ID 一份）** | **S15-A08 BuildForkedMessages (multi-call)** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_MultipleToolCallPlaceholders`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+
 ## D2-S11: Harness Unification
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
@@ -362,7 +377,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 109 | 109 | 0 | 56 |
+| 112 | 112 | 0 | 59 |
 
 > TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
 > TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。
@@ -372,6 +387,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 > **TOOL-SURFACE-1 Lazy Loading (DM-20260618-003) 新增 5 项 P0 T30-T34（95 - 90 = 5）**
 > **D2-STRUCT-T01 (DM-20260619-007) 新增 1 项 P0 layout 守卫（96 - 95 = 1）**
 > **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) 新增 13 项 P0 T 点 (109 - 96 = 13)**
+> **DM-20260620-001-B (devrix-context-budget-and-isolation, Phase B) 新增 3 项 P0 T 点 (112 - 109 = 3)：D2-S15-A08-T06/T07/T08 BuildForkedMessages helper 边界**
 > 全部 IMPLEMENTED。
 
 ---
