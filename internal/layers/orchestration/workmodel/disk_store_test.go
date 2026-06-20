@@ -14,7 +14,10 @@ func TestTaskManager_disk_persist_and_list_consistent(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.TasksConfig{Mode: "v2", StoreDir: dir}
 	m1 := workmodel.NewTaskManagerFromConfig(cfg, nil)
-	created := m1.Create("sess_disk", "Implement QueryLoop", "Wire loop into engine")
+	created, err := m1.Create("sess_disk", "Implement QueryLoop", "Wire loop into engine")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	if created == nil || created.ID == "" {
 		t.Fatal("expected created task")
 	}

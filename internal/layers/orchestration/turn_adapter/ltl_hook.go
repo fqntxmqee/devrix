@@ -14,18 +14,23 @@
 package turn_adapter
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/ltllite"
 )
 
-// ErrInvariantViolation — invariant 验证失败的 sentinel error。
-// turn_adapter.Prepare 收到 violation 时 wrap 此 error 返回; 上层 (D7
-// orchestrator) 据此决定 retry / report / abort。
-var ErrInvariantViolation = errors.New("turn_adapter: ltl-lite invariant violation")
+// ErrInvariantViolation — DM-20260620-003 (PR-C M1) deprecated alias.
+// The canonical sentinel is now sharederrors.ErrInvariantViolation (code
+// AGT_INVARIANT_5013). This package-level variable is kept so existing
+// callers using `turn_adapter.ErrInvariantViolation` keep compiling and
+// errors.Is still matches (errors.Is compares the wrapped chain, and
+// turn_adapter.Prepare now wraps sharederrors.ErrInvariantViolation).
+//
+// Deprecated: use sharederrors.ErrInvariantViolation.
+var ErrInvariantViolation = sharederrors.ErrInvariantViolation
 
 // SurfaceHook 注册一个 surface 的 invariant set + state provider。
 //
@@ -86,12 +91,21 @@ func (r *HookRegistry) Prepare() error {
 	if len(allViolations) == 0 {
 		return nil
 	}
-	// wrap violations 到 error message
+	// DM-20260620-003 (PR-C M1): wrap violations into a typed
+	// sharederrors.NewInvariantViolationError so callers retain code
+	// AGT_INVARIANT_5013 + errors.Is(err, sharederrors.ErrInvariantViolation).
+	violations := make([]string, 0, len(allViolations))
+	for _, v := range allViolations {
+		violations = append(violations, v.String())
+	}
+	wrapped := sharederrors.NewInvariantViolationError(violations)
+	// Preserve legacy string format "%d invariant violations:\n  - ..." for
+	// backward-compat with existing tests that match on the prefix.
 	msg := fmt.Sprintf("%d invariant violations:", len(allViolations))
 	for _, v := range allViolations {
 		msg += "\n  - " + v.String()
 	}
-	return fmt.Errorf("%w: %s", ErrInvariantViolation, msg)
+	return fmt.Errorf("%w: %s", wrapped, msg)
 }
 
 // BeforeExecute 阶段: 单 surface.Execute 前的快速重检。
@@ -117,11 +131,17 @@ func (r *HookRegistry) BeforeExecute(surfaceName string) error {
 		if len(vs) == 0 {
 			continue
 		}
+		violations := make([]string, 0, len(vs))
+		for _, v := range vs {
+			violations = append(violations, v.String())
+		}
+		wrapped := sharederrors.NewInvariantViolationError(violations)
+		// Preserve legacy string format for backward-compat with existing tests.
 		msg := fmt.Sprintf("%s invariant violation:", surfaceName)
 		for _, v := range vs {
 			msg += "\n  - " + v.String()
 		}
-		return fmt.Errorf("%w: %s", ErrInvariantViolation, msg)
+		return fmt.Errorf("%w: %s", wrapped, msg)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ package delegatetools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
@@ -120,7 +121,10 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		ParentSC:     sc,
 		Role:         string(r.role),
 		Directive:    directive,
-		TaskID:       resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role))),
+		TaskID: func() string {
+			id, _ := resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role)))
+			return id
+		}(),
 		SandboxSlug: resolveSandboxSlug(fields),
 		Async:        fields["async"] == "true",
 		// DM-20260620-001-B (AC6 + AC10) — read `mode` from tool input; empty
@@ -185,13 +189,13 @@ func (r *delegateStatusRunner) Execute(ctx context.Context, _, _ string) (*tools
 	return &tools.ToolResult{Output: string(data)}, nil
 }
 
-func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.WorkKind) string {
+func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.WorkKind) (string, error) {
 	if id := strings.TrimSpace(taskID); id != "" {
-		return id
+		return id, nil
 	}
 	tm := globalDeps.Tasks
 	if tm == nil || sessionID == "" {
-		return ""
+		return "", nil
 	}
 	subject := strings.TrimSpace(directive)
 	if subject == "" {
@@ -212,9 +216,16 @@ func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.W
 		Directive: directive,
 	})
 	if err != nil || item == nil {
-		return tm.Create(sessionID, subject, directive).ID
+		fallback, ferr := tm.Create(sessionID, subject, directive)
+		if ferr != nil {
+			return "", fmt.Errorf("delegate: failed to create task (subject=%q): %w", subject, ferr)
+		}
+		if fallback == nil {
+			return "", fmt.Errorf("delegate: failed to create task (subject=%q): nil task without error", subject)
+		}
+		return fallback.ID, nil
 	}
-	return item.ID
+	return item.ID, nil
 }
 
 func resolveSandboxSlug(fields map[string]string) string {

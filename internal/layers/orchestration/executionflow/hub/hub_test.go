@@ -50,7 +50,10 @@ func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
 func TestHub_should_link_task_owner_on_started(t *testing.T) {
 	q := sessionqueue.NewSessionQueue()
 	tm := workmodel.NewTaskManager()
-	task := tm.Create("sess1", "explore auth", "")
+	task, err := tm.Create("sess1", "explore auth", "")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true, IMProgress: false},
 		Queue:  q,
@@ -78,7 +81,10 @@ func TestHub_should_link_task_owner_on_started(t *testing.T) {
 // T: D4-S10-A02-T07
 func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	tm := workmodel.NewTaskManager()
-	task := tm.Create("sess1", "implement feature", "")
+	task, err := tm.Create("sess1", "implement feature", "")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
 		Queue:  sessionqueue.NewSessionQueue(),
@@ -112,7 +118,10 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 // T: D4-S10-A02-T04 (WorkPlan includes task projection)
 func TestHub_snapshot_should_include_tasks(t *testing.T) {
 	tm := workmodel.NewTaskManager()
-	task := tm.Create("sess1", "auth audit", "")
+	task, err := tm.Create("sess1", "auth audit", "")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
 		Queue:  sessionqueue.NewSessionQueue(),

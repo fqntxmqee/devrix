@@ -17,7 +17,10 @@ import (
 func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
 
-	task := stack.TaskManager.Create("sess_hub", "explore module", "")
+	task, err := stack.TaskManager.Create("sess_hub", "explore module", "")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	if task == nil {
 		t.Fatal("expected task")
 	}

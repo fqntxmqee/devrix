@@ -17,6 +17,10 @@ var (
 	ErrAgentPermissionDenied  = errors.New("agent permission denied")
 	ErrAgentContextCancelled  = errors.New("agent context cancelled")
 	ErrAgentMaxTotal          = errors.New("agent max total exceeded")
+	// ErrInvariantViolation DM-20260620-003 (PR-C M1) — moved from
+	// turn_adapter/ltl_hook.go so cross-package error handling is
+	// consistent. Code AGT_INVARIANT_5013.
+	ErrInvariantViolation = errors.New("turn_adapter: ltl-lite invariant violation")
 )
 
 const (
@@ -30,7 +34,29 @@ const (
 	CodeAgentPermissionDenied  = "AGT_PERMISSION_5008"
 	CodeAgentContextCancelled  = "AGT_CONTEXT_5009"
 	CodeAgentMaxTotal          = "AGT_FACTORY_5010"
+	// CodeInvariantViolation DM-20260620-003 (PR-C M1) — stable code for
+	// LTL-Lite invariant violation across all devrix layers.
+	CodeInvariantViolation = "AGT_INVARIANT_5013"
 )
+
+// NewInvariantViolationError wraps a list of violation descriptions so
+// callers can errors.Is(err, sharederrors.ErrInvariantViolation) for
+// retry/abort decisions (DM-20260620-003 PR-C M1).
+func NewInvariantViolationError(violations []string) *SentinelError {
+	msg := fmt.Sprintf("%d invariant violations: %s", len(violations), joinLines(violations))
+	return WithCode(CodeInvariantViolation, msg, ErrInvariantViolation)
+}
+
+func joinLines(items []string) string {
+	out := ""
+	for i, s := range items {
+		if i > 0 {
+			out += "; "
+		}
+		out += s
+	}
+	return out
+}
 
 // NewAgentInvalidTransitionError returns an invalid state transition error.
 func NewAgentInvalidTransitionError(from, to string) *SentinelError {

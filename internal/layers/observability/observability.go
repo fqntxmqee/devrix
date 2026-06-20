@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -161,7 +162,22 @@ func (o *Observability) Shutdown(ctx context.Context) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("shutdown errors: %v", errs)
+		// DM-20260620-003 (PR-C M3): wrap each shutdown error individually
+		// via errors.Join so callers can errors.Is / errors.As against the
+		// underlying typed sentinels. The legacy single string format
+		// "shutdown errors: [err1 err2]" is preserved via the joined message
+		// so log scrapers keep matching the existing pattern.
+		combined := make([]error, 0, len(errs))
+		for _, e := range errs {
+			if e != nil {
+				combined = append(combined, e)
+			}
+		}
+		if len(combined) == 0 {
+			return nil
+		}
+		joined := errors.Join(combined...)
+		return fmt.Errorf("shutdown errors: %w", joined)
 	}
 
 	return nil

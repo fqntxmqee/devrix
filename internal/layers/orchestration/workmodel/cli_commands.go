@@ -121,7 +121,10 @@ func (c *CLICommands) create(sessionID string, args []string) string {
 		description = strings.Join(args[1:], " ")
 	}
 
-	task := c.manager.Create(sessionID, subject, description)
+	task, err := c.manager.Create(sessionID, subject, description)
+	if err != nil {
+		return fmt.Sprintf("✗ Task creation failed: %v", err)
+	}
 	return fmt.Sprintf("✓ Task created: %s\n  Subject: %s\n  Status: %s",
 		task.ID, task.Subject, task.Status)
 }

@@ -123,7 +123,10 @@ func TestDiskWorkItemStore_EmptyFile(t *testing.T) {
 
 func TestTaskManager_DelegatesToWorkTree(t *testing.T) {
 	m := NewTaskManager()
-	task := m.Create("s1", "Task", "Desc")
+	task, err := m.Create("s1", "Task", "Desc")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 	item, ok := m.Tree().Get("s1", task.ID)
 	if !ok || item.Kind != WorkKindImplement {
 		t.Fatal("expected implement work item")
