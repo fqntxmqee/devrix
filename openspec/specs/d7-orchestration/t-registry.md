@@ -173,6 +173,26 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S2-A06-T12** | **AC4 per-iter audit + proactive fold + span attrs + slog** | **D7-S2-A06** | **`orchestration/turn/orchestrator_toolcap_test.go::TestOrchestrator_RunTokenAudit_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D7-S2-A06-T13** | **WireD7 bootstrap constructs ToolResultStore** | **D7-S2-A06** | **`bootstrap/wire_coordinator.go::NewOrchestrator(OrchestratorDeps{ToolResultStore: …})`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 
+### Context Budget Phase B — SubTurn 3-Mode Dispatch (DM-20260620-001-B)
+
+> **devrix-context-budget-and-isolation (DM-20260620-001-B) — Phase B 落地（待 B.5 验证 + S6 归档）。**
+> AC6+AC8+AC9+AC10+AC11a SubTurn 3-mode 派发（brief/fork/full）：
+> `SubTurnRunner` 按 `req.Mode` 选 `applyMode` 分支；empty → `SubagentConfig.DefaultMode`；
+> `LegacyMode` 覆盖 `DefaultMode`；`Depth >= MaxDepth` 拒绝；
+> fork mode 走 `conversation.BuildForkedMessages` 保证 prefix byte-level stable
+> （cache anchor for future Anthropic `cache_control`）；
+> `delegate_*` / `free_fork` LLM tool schema 暴露 `mode` 字段。
+> D4 t-registry 持有 schema 侧的 T 点（T01/T02）；
+> D2 t-registry 持有 BuildForkedMessages 自身的 T 点（T06/T07/T08）；
+> 本表持有 SubTurnRunner 派发 + depth + default-mode T 点（T14/T15/T16/T17）。
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
+|------|------|----------|-----------|--------|----------|
+| **D7-S2-A06-T14** | **AC6 brief mode drops parent history: LLM sees only last user message** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_BriefMode_PreloadedMessagesNil`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D7-S2-A06-T15** | **AC8+AC11a fork mode = BuildForkedMessages (cache-friendly prefix) + full mode = legacy parity** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_ForkMode_DispatchesAsFork`, `TestSubTurnRunner_FullMode_BackwardCompat`, `TestSubTurnRunner_FullMode_EquivalentToLegacy`, `TestSubTurnRunner_FullMode_EmptyParent`; `subturn_fork_test.go::TestSubTurnRunner_ForkSiblingPrefixStable`, `TestSubTurnRunner_ForkPrefix_ContainsPlaceholder`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D7-S2-A06-T16** | **AC9 depth limit: `Depth >= MaxDepth` rejected before LLM call; `Depth = MaxDepth-1` allowed** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_DepthLimit_{Equals,Exceeds,BoundaryAtMaxMinus1}`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D7-S2-A06-T17** | **AC6 default mode: empty `req.Mode` → `SubagentConfig.DefaultMode`; `LegacyMode` overrides `DefaultMode`; invalid mode rejected** | **D7-S2-A06** | **`orchestration/turn/subturn_test.go::TestSubTurnRunner_DefaultModeFromConfig`, `TestSubTurnRunner_DefaultModeBrief`, `TestSubTurnRunner_InvalidModeRejected`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+
 | T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|------|----------|-----------|--------|----------|
 | **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** |

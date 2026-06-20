@@ -1,9 +1,9 @@
 # D4 Multi-Agent Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.1.0
-**Last Updated:** 2026-06-18
-**Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify / devrix-diagnostic-tools-wiring (DM-20260617-002) — Free Fork DI + Notify consume / devrix-tools-terminal-architecture (DM-20260618-007) — FreeFork W8-W10 + BackgroundTaskSurface W13 (D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01)
+**Version:** 3.2.0
+**Last Updated:** 2026-06-20
+**Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify / devrix-diagnostic-tools-wiring (DM-20260617-002) — Free Fork DI + Notify consume / devrix-tools-terminal-architecture (DM-20260618-007) — FreeFork W8-W10 + BackgroundTaskSurface W13 (D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01) / devrix-context-budget-phase-b (DM-20260620-001-B) — SubAgent mode field on delegate/free_fork tools (D4-S14-A07-T01/T02)
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -15,7 +15,7 @@
 | D4-S11 ProvisionAgent | S1, S4 | 7 |
 | D4-S12 RunAgentLoop | S2 | 4 |
 | D4-S13 IsolateAndMerge | S3, S9 | 8 |
-| D4-S14 ExecuteWorker | S10（执行面） | 8 |
+| D4-S14 ExecuteWorker | S10（执行面） | 10 |
 | D4-S15 InvokeExternalAgent | S6 | 14 |
 | D4-S16 ConfigureAgents | config | 0（v1.1 补） |
 | D4-S0 Cross | — | 4 |
@@ -133,6 +133,8 @@
 | **D4-S11-A02-T04** | **maxChildren 并发 budget enforcement (FreeFork W8)** | **`internal/layers/multiagent/provision/freefork/forker_test.go`** | **IMPLEMENTED** | **P0** |
 | **D4-S13-A02-T01** | **Worktree 隔离 per-handle (FreeFork W10)** | **`internal/layers/multiagent/provision/freefork/forker_test.go`** | **IMPLEMENTED** | **P0** |
 | **D4-S12-A03-T01** | **BackgroundTaskSurface ToolEventStream context 推送 (D4-S12 W13)** | **`internal/layers/orchestration/turn/tool_stream_test.go`** | **IMPLEMENTED** | **P0** |
+| **D4-S14-A07-T01** | **AC10 delegate_* tool schema exposes `mode` enum [brief/fork/full] (default brief)** | **`internal/layers/orchestration/delegatetools/delegate_schema_test.go::TestDelegateToolParameters_ModeEnum`, `TestParseSubAgentMode`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| **D4-S14-A07-T02** | **AC10 free_fork tool schema exposes `mode` enum on request items (default brief)** | **`internal/layers/orchestration/sessionorchestrator/turn_tools_test.go`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
 
 ---
 
@@ -140,7 +142,7 @@
 
 | Total | IMPLEMENTED | P0 |
 |-------|-------------|-----|
-| 38 | 38 | 19 |
+| 40 | 40 | 21 |
 
 ---
 
@@ -184,3 +186,5 @@
 | 1.0.0 | 2026-06-13 | Initial T registry (24 test points) |
 | 2.0.0 | 2026-06-14 | 38 total, 19 P0 |
 | 3.0.0 | 2026-06-14 | Canonical 索引 + §Legacy Archive；Hub-Spoke T 重归属 D7（DM-20260614-018） |
+| 3.1.0 | 2026-06-18 | FreeFork W8-W10 + BackgroundTaskSurface W13 + TaskNotify 闭环（D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01） |
+| 3.2.0 | 2026-06-20 | devrix-context-budget-phase-b (DM-20260620-001-B) — `mode` field on delegate/free_fork schemas (D4-S14-A07-T01/T02); total 38→40, P0 19→21 |
