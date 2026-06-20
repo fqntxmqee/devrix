@@ -1,18 +1,5 @@
 # Devrix Project Context
 
-Multi-agent development assistant. 6-layer architecture, OpenSpec S1-S6 workflow.
-
-## Architecture
-
-| Domain | Domain | Path |
-|----|-------|------|
-| D1 | Communication | `internal/layers/communication/` |
-| D2 | Context Engine | `internal/layers/contextengine/` |
-| D3 | LLM Gateway | `internal/layers/llmgateway/` |
-| D4 | Multi-Agent | `internal/layers/multiagent/` |
-| D5 | Observability | `internal/layers/observability/` |
-| D6 | Evolution | `internal/layers/evolution/` |
-
 ## Development Workflow (OpenSpec S1-S6)
 
 ```
@@ -23,16 +10,18 @@ S1 Demand → S2 Proposal → S3 Design → S3-Gate(Review) → S4 Implementatio
 
 Before starting any task, determine the stage and load the corresponding spec from `openspec/specs/project/`:
 
-| Stage | Specs to Load | Gate |
-|-------|---------------|------|
-| S1 Demand | `requirements.md` | DM ID valid |
-| S2 Proposal | `requirements.md` + `architecture-design.md` | Files complete |
-| S3 Design | `architecture-design.md` | — |
-| S3-Gate | `review-design.md` | Design review passed |
-| S4 Implementation | `coding.md` + `testing.md` | go vet + test-unit |
-| S4-Gate | `review-code.md` | Code review passed |
-| S5 Acceptance | `testing.md` | P0 T-layer 100% + coverage ≥ 80% |
-| S6 Archive | `archiving.md` | Archive checklist |
+
+| Stage             | Specs to Load                                | Gate                             |
+| ----------------- | -------------------------------------------- | -------------------------------- |
+| S1 Demand         | `requirements.md`                            | DM ID valid                      |
+| S2 Proposal       | `requirements.md` + `architecture-design.md` | Files complete                   |
+| S3 Design         | `architecture-design.md`                     | —                                |
+| S3-Gate           | `review-design.md`                           | Design review passed             |
+| S4 Implementation | `coding.md` + `testing.md`                   | go vet + test-unit               |
+| S4-Gate           | `review-code.md`                             | Code review passed               |
+| S5 Acceptance     | `testing.md`                                 | P0 T-layer 100% + coverage ≥ 80% |
+| S6 Archive        | `archiving.md`                               | Archive checklist                |
+
 
 Authority: `openspec/specs/project/master.md`
 
@@ -45,3 +34,4 @@ Authority: `openspec/specs/project/master.md`
 - **Git**: GitHub Flow, `feat/<change-id>` branches, squash merge
 - **T-layer tests**: Format `D{D}-S{S}-T{NN}` (DSAFT), registered in `openspec/t-registry.md`
 - **Changes**: `openspec/changes/<change-id>/`, archived to `openspec/archive/<YYYY-MM-DD>-<change-id>/`
+
