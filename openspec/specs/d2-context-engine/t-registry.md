@@ -1,7 +1,7 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.8.0
+**Version:** 2.9.0
 **Last Updated:** 2026-06-20
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
@@ -14,6 +14,7 @@
 **Change:** devrix-tools-terminal-architecture (DM-20260618-007) — LSP 5 typed method spec (T02-T04) + BashAST fail-closed + zsh 22+ rules (T05-T06) + cross-cutting LTL-Lite framework
 **Change:** 2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) — Phase A: AC1 tool result size cap (D2-S17-A05 T01-T05) + AC2 assistant fold (D2-S17-A06 T01-T03) + AC4+AC13 per-iter token audit + proactive fold (D2-S15-A08 T01-T05); TruncateToTokens dead-code upgraded to required.
 **Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC11a fork prefix byte-level stability via `BuildForkedMessages` (D2-S15-A08 T06-T08); IMPLEMENTED 109→112, P0 56→59.
+**Change:** 2026-06-20-devrix-context-budget-phase-c-nested (devrix-context-budget-phase-c-nested / DM-20260620-002) — Phase C: nested-branch budget injection via `SubTurnRequest.MaxContextTokens` → `TurnRequest.MaxContextTokens` (D2-S15-A08 T09-T10); IMPLEMENTED 112→114, P0 59→61.
 
 ---
 
@@ -192,6 +193,20 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-S15-A08-T06** | **AC11a fork prefix stable: sibling siblings 走同一 parent → `BuildForkedMessages` 输出 + `ForkPrefixFingerprint` byte-identical** | **S15-A08 BuildForkedMessages** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_should_use_identical_placeholder_results`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
 | **D2-S15-A08-T07** | **fork mode boundary: parent 无 tool_calls → `BuildForkedMessages` 返回 1 条 directive-only user message，无 placeholder（SubTurnRunner 上层拒绝非 fork 候选）** | **S15-A08 BuildForkedMessages (fallback)** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_NoToolCallsFallback`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
 | **D2-S15-A08-T08** | **AC11a multi-call placeholder: parent 含 N 个 tool_calls → directive user 含 N 个 `[tool_result id=X]\nForkPlaceholderResult` 块（每个 ID 一份）** | **S15-A08 BuildForkedMessages (multi-call)** | **`internal/layers/contextengine/prepare/conversation/fork_test.go::TestBuildForkedMessages_MultipleToolCallPlaceholders`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+
+### D2-S15: Nested-Branch Budget Propagation (DM-20260620-002, Phase C)
+
+> **devrix-context-budget-phase-c-nested (DM-20260620-002) — Phase C 落地。**
+> AC1 nested 分支 maxContextTokens 注入：SubTurnRequest → TurnRequest → nested
+> branch 读 `req.MaxContextTokens` + fallback `o.maxContextTokens`；enforce.Run
+> 把 SubQueryParams.MaxContextTokens 透传到 SubTurnRequest。无 nested-branch
+> fallback 时 `runTokenAudit` / `ShouldFoldProactively` / tool result cap 全部
+> no-op（maxContextTokens=0 触发三守卫短路）。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D2-S15-A08-T09** | **AC1 SubTurnRequest→TurnRequest 透传: `SubTurnRequest.MaxContextTokens` 经 `SubTurnRunner.RunSubTurn` 注入 `TurnRequest.MaxContextTokens`（`req.MaxContextTokens` 优先，否则 `Cfg.MaxContextTokens`，否则 0）** | **S15-A08 SubTurnRequest.MaxContextTokens (new)** | **`internal/layers/orchestration/turn/subturn_test.go::TestSubTurnRunner_MaxContextTokens_Propagated_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| **D2-S15-A08-T10** | **AC1 enforce.Run 透传: `SubQueryParams.MaxContextTokens` 在 `enforce.Run` 中写入 `SubTurnRequest.MaxContextTokens`（无 `MaxContextTokens` 时 0，让 SubTurnRunner 走 `Cfg.MaxContextTokens` fallback）** | **S15-A08 SubQueryParams.MaxContextTokens (new)** | **`internal/layers/contextengine/enforce/subquery_test.go::TestSubQuery_MaxContextTokens_PassedToSubTurn_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
 
 ## D2-S11: Harness Unification
 
@@ -378,7 +393,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 112 | 112 | 0 | 59 |
+| 114 | 114 | 0 | 61 |
 
 > TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
 > TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。
@@ -389,6 +404,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 > **D2-STRUCT-T01 (DM-20260619-007) 新增 1 项 P0 layout 守卫（96 - 95 = 1）**
 > **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) 新增 13 项 P0 T 点 (109 - 96 = 13)**
 > **DM-20260620-001-B (devrix-context-budget-and-isolation, Phase B) 新增 3 项 P0 T 点 (112 - 109 = 3)：D2-S15-A08-T06/T07/T08 BuildForkedMessages helper 边界**
+> **DM-20260620-002 (devrix-context-budget-phase-c-nested, Phase C) 新增 2 项 P0 T 点 (114 - 112 = 2)：D2-S15-A08-T09/T10 SubTurnRequest / SubQueryParams 透传 MaxContextTokens**
 > 全部 IMPLEMENTED。
 
 ---
@@ -408,3 +424,14 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-STRUCT-T07** | P5 legacy 退役：禁止新增 `legacy.ContextEngine.Process()` 生产引用（CI 硬阻断）；现有 8 个 caller 在 allowlist（cmd/llm-smoke + multiagent/run + tests/* + communication mocks） | Structure | `internal/lint/layer/d2_layout_test.go` | **IMPLEMENTED** | P1 |
 
 > 全部由 `internal/lint/layer/d2_layout_test.go` 单一守卫测试驱动。
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.7.0 | 2026-06-19 | devrix-d2-structure-closure (DM-20260619-007) 归档：D2-STRUCT-T01..T07 layout guards |
+| 2.8.0 | 2026-06-20 | DM-20260620-001 Phase A 归档：D2-S17-A05 T01-T05 (tool result cap) + D2-S17-A06 T01-T03 (assistant fold) + D2-S15-A08 T01-T05 (token audit + proactive fold)。IMPLEMENTED 96→109, P0 56→56 |
+| 2.8.1 | 2026-06-20 | DM-20260620-001-B Phase B 归档：D2-S15-A08 T06-T08 (BuildForkedMessages helpers)。IMPLEMENTED 109→112, P0 56→59 |
+| **2.9.0** | **2026-06-20** | **DM-20260620-002 Phase C 归档**：D2-S15-A08 T09-T10 (SubTurnRequest/SubQueryParams MaxContextTokens 透传)。IMPLEMENTED 112→114, P0 59→61 |

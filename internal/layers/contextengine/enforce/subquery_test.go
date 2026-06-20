@@ -22,6 +22,21 @@ func (s *stubSubTurn) RunSubTurn(_ context.Context, _ contracts.SubTurnRequest) 
 	return &contracts.SubTurnResult{AssistantText: s.text}, nil
 }
 
+// captureSubTurn records the last SubTurnRequest it received and returns canned text.
+// Used by T10 to assert that enforce.Run forwards SubQueryParams.MaxContextTokens
+// into SubTurnRequest.MaxContextTokens (DM-20260620-002 AC1).
+type captureSubTurn struct {
+	text  string
+	last  contracts.SubTurnRequest
+	calls int
+}
+
+func (c *captureSubTurn) RunSubTurn(_ context.Context, req contracts.SubTurnRequest) (*contracts.SubTurnResult, error) {
+	c.last = req
+	c.calls++
+	return &contracts.SubTurnResult{AssistantText: c.text}, nil
+}
+
 // T: D2-S10-A01-T40
 func TestSubQuery_should_filter_read_only_tools_and_set_agent_id(t *testing.T) {
 	parent := &types.SessionContext{SessionID: "sess_sub", Model: "test", WorkDir: t.TempDir()}
@@ -81,5 +96,49 @@ func TestSubQuery_resume_should_load_sidechain_messages(t *testing.T) {
 	}
 	if res.Result.AssistantText != "plan ready" {
 		t.Fatalf("unexpected assistant text: %q", res.Result.AssistantText)
+	}
+}
+
+// T: D2-S15-A08-T10 — DM-20260620-002 (Phase C AC1)
+// enforce.Run must forward SubQueryParams.MaxContextTokens into
+// SubTurnRequest.MaxContextTokens verbatim, so the nested runLoop branch
+// gets a non-zero budget. Before Phase C, this field didn't exist; nested
+// turn loops ran with maxContextTokens=0, which short-circuited
+// runTokenAudit / ShouldFoldProactively / tool result cap.
+func TestSubQuery_MaxContextTokens_PassedToSubTurn_DM_20260620_002(t *testing.T) {
+	capt := &captureSubTurn{text: "ok"}
+
+	cases := []struct {
+		name string
+		set  int // params.MaxContextTokens
+		want int // expected SubTurnRequest.MaxContextTokens
+	}{
+		{"explicit_budget", 32000, 32000},
+		{"explicit_budget_large", 128000, 128000},
+		{"zero_means_let_runner_fallback", 0, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := &types.SessionContext{SessionID: "sess-" + tc.name, Model: "test"}
+			_, err := enforce.Run(context.Background(), enforce.SubQueryDeps{
+				SubTurn: capt,
+			}, enforce.SubQueryParams{
+				ParentSC:         parent,
+				AgentID:          "smoke",
+				AgentName:        "smoke",
+				SystemPrompt:     "smoke",
+				PromptMessages:   []types.Message{{Role: types.MessageRoleUser, Content: "smoke"}},
+				MaxTurns:         1,
+				MaxContextTokens: tc.set,
+			})
+			if err != nil {
+				t.Fatalf("Run returned err: %v", err)
+			}
+			if capt.last.MaxContextTokens != tc.want {
+				t.Errorf("MaxContextTokens not propagated: got %d, want %d",
+					capt.last.MaxContextTokens, tc.want)
+			}
+		})
 	}
 }
