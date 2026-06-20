@@ -8,6 +8,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
@@ -160,6 +161,10 @@ func InitOrchestration(
 		ObsBridge:        obsBridge,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
+		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
+		// cat / etc.) are persisted to disk and replaced with a preview
+		// marker so they do not blow up the LLM context budget.
+		ToolResultStore: persist.NewToolResultStore(""),
 	})
 	subTurn := turn.NewSubTurnRunner(turnOrch)
 	setWiredSubTurn(subTurn)

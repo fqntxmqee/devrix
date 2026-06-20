@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -35,6 +39,13 @@ type OrchestratorDeps struct {
 	ObsBridge        *observability.Bridge
 	FocusHint        FocusHintProvider
 	ResolveAwait     ResolveAwaiter
+	// ToolResultStore persists oversized tool results to disk so they do
+	// not blow up the LLM context budget (DM-20260620-001 / AC1). Nil
+	// disables the cap (legacy behaviour).
+	ToolResultStore *persist.ToolResultStore
+	// MaxToolResultChars is the soft cap above which a tool result is
+	// persisted. 0 → persist.DefaultMaxChars (12000).
+	MaxToolResultChars int
 }
 
 // ExitReason captures *why* the turn loop stopped. Surfaced on the final
@@ -104,6 +115,8 @@ type DefaultOrchestrator struct {
 	obsBridge        *observability.Bridge
 	focusHint        FocusHintProvider
 	resolveAwait     ResolveAwaiter
+	toolResultStore  *persist.ToolResultStore
+	maxToolResultCh  int
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -117,6 +130,10 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 	// Leave deps.MaxTurns at 0 / negative — the orchestrator treats those
 	// as "no safety net" rather than substituting a magic default. See
 	// OrchestratorDeps.MaxTurns doc for the rationale.
+	maxChars := deps.MaxToolResultChars
+	if maxChars == 0 && deps.ToolResultStore != nil {
+		maxChars = persist.DefaultMaxChars
+	}
 	return &DefaultOrchestrator{
 		llm:              deps.LLM,
 		context:          deps.Context,
@@ -128,6 +145,8 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		obsBridge:        deps.ObsBridge,
 		focusHint:        deps.FocusHint,
 		resolveAwait:     deps.ResolveAwait,
+		toolResultStore:  deps.ToolResultStore,
+		maxToolResultCh:  maxChars,
 	}
 }
 
@@ -561,7 +580,8 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// Build assistant tool-call message and tool result messages for the next turn.
 		messages = append(messages, buildAssistantToolCallMsg(req.SessionID, toolCalls, finalText))
 		for _, r := range toolResult.Results {
-			messages = append(messages, buildToolResultMsg(req.SessionID, r))
+			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
+			messages = append(messages, o.buildToolResultMsgWithCap(req.SessionID, r, toolName))
 		}
 
 		// NOTE: finalText is intentionally NOT cleared here — it must
@@ -804,6 +824,64 @@ func buildToolResultMsg(sessionID string, r ToolResult) types.Message {
 		Content:   content,
 		Metadata:  map[string]string{"tool_call_id": r.ToolCallID},
 	}
+}
+
+// buildToolResultMsgWithCap is DM-20260620-001 / AC1: when the result
+// belongs to a size-capped tool and exceeds maxToolResultChars, the
+// content is persisted to disk via toolResultStore and replaced with a
+// small preview marker so the LLM context budget does not blow up.
+//
+// Falls back to a head truncation (no disk write) when the store call
+// errors — a transient I/O failure must not abort the turn.
+//
+// Tool errors are routed through FormatToolResultContent so the existing
+// error sanitisation applies (config-path stripping, length cap).
+func (o *DefaultOrchestrator) buildToolResultMsgWithCap(sessionID string, r ToolResult, toolName string) types.Message {
+	content := FormatToolResultContentForLLM(toolName, r.Output, r.Error)
+	if o.toolResultStore != nil && o.maxToolResultCh > 0 &&
+		persist.ShouldCap(toolName) &&
+		utf8.RuneCountInString(content) > o.maxToolResultCh {
+		previewed, err := o.toolResultStore.Persist(context.Background(), sessionID, toolName, r.ToolCallID, content, o.maxToolResultCh)
+		if err != nil {
+			slog.Warn("orchestrator: tool result persist failed, falling back to head truncation",
+				"tool", toolName, "session_id", sessionID, "size", len(content), "error", err)
+			content = truncatePreview(content, o.maxToolResultCh) + "\n...[truncated, persist failed]"
+		} else {
+			content = previewed
+		}
+	}
+	return types.Message{
+		SessionID: sessionID,
+		Role:      types.MessageRoleTool,
+		Content:   content,
+		Metadata:  map[string]string{"tool_call_id": r.ToolCallID},
+	}
+}
+
+// FormatToolResultContentForLLM centralises the formatting rules for
+// tool result content. Errors are shortened via the existing helper; for
+// success-only results the content is returned unchanged.
+func FormatToolResultContentForLLM(toolName, output, errMsg string) string {
+	if strings.TrimSpace(errMsg) == "" {
+		return output
+	}
+	return conversation.FormatToolResultContent(toolName, output, errMsg)
+}
+
+// truncatePreview returns the first n runes of s followed by a tail
+// marker. Used as a fallback when the persistent store is unavailable.
+func truncatePreview(s string, n int) string {
+	if n <= 0 {
+		return s
+	}
+	count := 0
+	for i := range s {
+		if count == n {
+			return s[:i]
+		}
+		count++
+	}
+	return s
 }
 
 func mergeSystemPrompt(prepared, extra string) string {
