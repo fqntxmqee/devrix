@@ -1,7 +1,7 @@
 change_id: devrix-error-handling-tier1-tier2
 priority: P0
 demand_id: DM-20260620-003
-status: s2_proposal
+status: s7_archived
 parent_changes:
   - devrix-context-budget-and-isolation             # DM-20260620-001 Phase A (PR #128, S7_Archived)
   - devrix-context-budget-and-isolation-phase-b    # DM-20260620-001-B Phase B (PR #130-#132, S7_Archived)
@@ -45,7 +45,7 @@ version_scope:
   v2026-06-20-tier2: "C2 + H3 + M1..M4 design: type merge + silent fallback + ctx inject + invariant migration"
 s3_gate:
   review: design.md
-  conclusion: pending
+  conclusion: passed
 s5_gate:
   acceptance_report: acceptance-report.md
-  conclusion: pending
+  conclusion: passed

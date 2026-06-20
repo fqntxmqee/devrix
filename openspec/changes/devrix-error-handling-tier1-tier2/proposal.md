@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-error-handling-tier1-tier2
 **Demand ID:** DM-20260620-003
-**Status:** S2_Proposal
+**Status:** S7_Archived
 **Priority:** P0
 **Date:** 2026-06-20
 

@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-error-handling-tier1-tier2
 **Demand ID:** DM-20260620-003
-**Status:** S3_Design
+**Status:** S7_Archived
 **Date:** 2026-06-20
 
 ## 1. Root Cause Analysis

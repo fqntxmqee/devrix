@@ -1,7 +1,7 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.5.0
+**Version:** 4.6.0
 **Last Updated:** 2026-06-20
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
@@ -23,13 +23,16 @@
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 60 | 60 | 0 | 30 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 114 | 114 | 0 | 61 |
-| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 35 | 34 | 1 | 19 |
+| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 36 | 35 | 1 | 20 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
-| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 43 | 41 | 0 | 23 |
+| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 109 | 109 | 0 | 80 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 115 | 115 | 0 | 86 |
 
-**总计**: 425 · IMPLEMENTED 420 · PLANNED 3 · PARTIAL 0 · P0 240
+**总计**: 433 · IMPLEMENTED 428 · PLANNED 3 · PARTIAL 0 · P0 251
+
+> 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
+> 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
 
 > 2026-06-20 增量：DM-20260620-001 (Phase A) + DM-20260620-001-B (Phase B) + DM-20260620-002 (Phase C) — 三个 change 共加 22 个 P0 T 点（D1-S2-A05-T05~T08 = 4 + D2-S17-A05 T01-T05 + D2-S17-A06 T01-T03 + D2-S15-A08 T01-T10 = 18）— 全 IMPLEMENTED。
 > 详见 `docs/context-budget.md` §9 (Phase C nested-branch budget injection) + §1-8 (Phase A/B 入口隔离 + 多 turn budget audit)。

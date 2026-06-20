@@ -2,26 +2,27 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.1
-**Last Updated:** 2026-06-14
+**Version:** 3.2.0
+**Last Updated:** 2026-06-20
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring
+**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / **devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16)**
 **Companion Docs:** `a-registry.md` · `f-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---
 
-## 0. 变更摘要（v3.0.0 → v3.1.0 → v3.1.1）
+## 0. 变更摘要（v3.0.0 → v3.1.0 → v3.1.1 → v3.2.0）
 
-| 维度 | v3.0.0 | v3.1.0（spec 设计） | **v3.1.1（S5 验收后）** |
-|------|--------|--------|--------|
-| T 总数 | 26 | 35 | **35**（不变） |
-| T 编号规则 | 新 S/A 顺序 + `<!-- Mechanism: -->` | 继承 v3.0.0 + v1.1 新 T 标注 `<!-- v1.1 Fx -->` | **继承** v3.1.0 |
-| Legacy 兼容 | §Legacy Archive 26 条 100% 覆盖 | 继承 100%（v1.1 不增不删旧 T） | **继承** 100% |
-| IMPLEMENTED T | 25 | 26 | **34**（v1.1 9 T PLANNED→IMPLEMENTED；与 §1 S 段合计 34 一致） |
-| PLANNED T | 1 | 9 | **1**（仅 T08 持久化仍 PLANNED） |
-| v1.1 新 T 编号 | — | D3-S1-A01-T03 / D3-S2-A01-T06 / D3-S3-A01-T13~T15 / D3-S5-A01-T03 / D3-S6-A01-T02 / D3-X-A02-T01 | **继承** |
+| 维度 | v3.0.0 | v3.1.0（spec 设计） | v3.1.1（S5 验收后） | **v3.2.0（DM-20260620-003）** |
+|------|--------|--------|--------|--------|
+| T 总数 | 26 | 35 | 35 | **36**（+1 D3-S3-A01-T16） |
+| T 编号规则 | 新 S/A 顺序 + `<!-- Mechanism: -->` | 继承 v3.0.0 + v1.1 新 T 标注 `<!-- v1.1 Fx -->` | 继承 v3.1.0 | 继承 v3.1.1 + 新 T 标注 `<!-- v3.2.0 -->` |
+| Legacy 兼容 | §Legacy Archive 26 条 100% 覆盖 | 继承 100%（v1.1 不增不删旧 T） | 继承 100% | 继承 100%（v3.2.0 增新 T 不删旧） |
+| IMPLEMENTED T | 25 | 26 | 34 | **35**（+1 T16） |
+| PLANNED T | 1 | 9 | 1 | 1（仅 T08 持久化仍 PLANNED） |
+| v1.1 新 T 编号 | — | D3-S1-A01-T03 / D3-S2-A01-T06 / D3-S3-A01-T13~T15 / D3-S5-A01-T03 / D3-S6-A01-T02 / D3-X-A02-T01 | 继承 | 继承 + D3-S3-A01-T16 |
 
 > **v1.1 T 编号连续性**：v1.1 新增 T 紧接 v3.0.0 末尾 T 编号；不重启 S 编号池；不破坏 `§Legacy Archive` 100% 覆盖。
+> **v3.2.0**：仅 +1 T (D3-S3-A01-T16 retry nil-sentinel)；不破坏 PLANNED/IMPLEMENTED 比例；不破坏 Legacy Archive 100%。
 
 ---
 
@@ -116,6 +117,7 @@ D3-S2-A01 StreamChatCompletion
 | **D3-S3-A01-T13** | **Breaker 状态切换 emit `llm_breaker_state{provider,state}`** `<!-- v1.1 F1 + F2 -->` | **P0** | F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit | Metric | `internal/layers/llmgateway/protect/circuit_breaker_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，2 provider × 3 state = 6 series） |
 | **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/protect/events_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
 | **D3-S3-A01-T15** | **D6 probe #2 Breaker 异常切换告警** `<!-- v1.1 F7 -->` | **P1** | F07 + F08（D6 探针统计 `llm_breaker_transitions_total`） | Probe | `tests/integration/d6_breaker_probe_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T21 配套） |
+| **D3-S3-A01-T16** | **Retry loop nil-sentinel 防御：`retry.go:91` 在所有 attempt 返回 nil 时包真实 `errors.New("retry loop completed without recording an error")`（DM-20260620-003 PR-A L4 / PR-C H3）** `<!-- v3.2.0 -->` | **P0** | F05 StreamWithFallback（defensive fallback path） | Retry | `internal/layers/llmgateway/protect/retry.go:91` | **IMPLEMENTED**（DM-20260620-003） |
 
 **F 覆盖**：
 
@@ -130,6 +132,7 @@ D3-S3-A01 ShieldAndRetry
   ├─ F07 EmitBreakerStateMetric      → T13 (v1.1 P0) 状态切换 emit llm_breaker_state
   ├─ F08 OnStateTransitionEmit       → T13 (v1.1 P0) 状态机钩子
   ├─ F09 ReuseEngineEvent            → T14 (v1.1 P1) emit flow.breaker.*
+  ├─ (DM-20260620-003 L4/H3)         → T16 (P0) retry nil-sentinel defensive wrap
   └─ (D6 probe #2)                   → T15 (v1.1 P1) 异常切换告警
 ```
 
@@ -231,16 +234,16 @@ D3-S3-A01 ShieldAndRetry
 
 ## 10. Statistics
 
-| 维度 | v3.0.0 | v3.1.0 |
-|------|--------|--------|
-| Total T | 26 | **35**（+9 v1.1） |
-| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） |
-| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） |
-| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） |
-| P1 | 13 | **15**（+2 v1.1：F3/F7） |
-| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） |
-| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） |
-| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） |
+| 维度 | v3.0.0 | v3.1.0 | v3.2.0 |
+|------|--------|--------|--------|
+| Total T | 26 | **35**（+9 v1.1） | **36**（+1 DM-20260620-003 T16） |
+| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） | **35**（T16 IMPLEMENTED） |
+| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） | 1（不变） |
+| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） | **20**（+1 DM-20260620-003 T16） |
+| P1 | 13 | **15**（+2 v1.1：F3/F7） | 15（不变） |
+| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） | 1（不变） |
+| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） | 26 / 26 (100%)（v3.2.0 不破坏追溯） |
+| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） | 9 / 9（继承） |
 
 ---
 
@@ -264,3 +267,4 @@ D3-S3-A01 ShieldAndRetry
 | 3.0.0 | 2026-06-14 | 5+1 S × 1 A × 26 T；T ID 按 F 编排顺序重排；§Legacy Archive 26 条 100% 覆盖；T 末尾 `<!-- Mechanism: -->` 注释（R2 命题 A）；Bridge T07 移至 D3-X-A01-T01 |
 | 3.1.0 | 2026-06-14 | 5+1 S × 1 A × 35 T（v1.1 净增 9）；新增 T03 (D3-S1 F6 probe) + T06 (D3-S2 F5 Protocol) + T13/T14/T15 (D3-S3 F1/F2/F3 + F7) + T03 (D3-S5 F8 latency) + T02 (D3-S6 F9 flag) + T01 (D3-X-A02 F4 fail-fast)；§Legacy Archive 26/26 (100%) 继承；8 v1.1 新 T 标注 `<!-- v1.1 Fx -->` |
 | **3.1.1** | 2026-06-14 | **v1.1 S5 验收后**：9 v1.1 T PLANNED→IMPLEMENTED；IMPLEMENTED 25 → 34，PLANNED 9 → 1（仅 T08 持久化）；§0/§1/§10 统计与详细条目对齐 |
+| **3.2.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D3-S3-A01-T16 retry nil-sentinel defensive wrap (PR-A L4 / PR-C H3)。Total 35→36, IMPLEMENTED 34→35, P0 19→20 |
