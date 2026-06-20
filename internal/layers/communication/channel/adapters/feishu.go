@@ -17,6 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
@@ -234,7 +235,7 @@ func (a *FeishuAdapter) OnError(err error, sessionID string) {
 
 	card := NewCard().
 		Title("错误", "red").
-		Markdown(err.Error()).
+		Markdown(sharederrors.SanitizeForUser(err)).
 		Build()
 	if sendErr := a.sendCardToSession(ctx, sessionID, chatID, card); sendErr != nil {
 		slog.Error("feishu: failed to send error card", "sessionID", sessionID, "error", sendErr)
@@ -824,7 +825,7 @@ func (a *FeishuAdapter) onMessage(ctx context.Context, event *larkim.P2MessageRe
 		)
 		if messageID != "" {
 			_ = a.replyAckToUser(ctx, messageID, sessionKey,
-				"⚠️ 消息处理失败："+err.Error()+"\n请重试，或发送 /new 开启新会话。")
+				"⚠️ 消息处理失败："+sharederrors.SanitizeForUser(err)+"\n请重试，或发送 /new 开启新会话。")
 		}
 	}
 

@@ -29,6 +29,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 // WaveSchedulerRunner abstracts the WaveScheduler methods OrchestratePath
@@ -115,7 +116,9 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 		}
 		if result.Validation != nil && !result.Validation.Valid {
 			emitError(ctx, op.sink, out, req.SessionID, "validate_task_graph",
-				fmt.Errorf("graph invalid: %v", result.Validation.Errors))
+				fmt.Errorf("graph invalid: %d error(s): %s",
+					len(result.Validation.Errors),
+					strings.Join(result.Validation.Errors, "; ")))
 			return
 		}
 		if op.taskManager != nil {
@@ -248,7 +251,7 @@ func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.Engine
 func emitError(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, sessionID, label string, err error) {
 	emit(ctx, sink, out, &contracts.EngineEvent{
 		Type:      "error",
-		Content:   fmt.Sprintf("%s: %s", label, err.Error()),
+		Content:   fmt.Sprintf("%s: %s", label, sharederrors.SanitizeForUser(err)),
 		SessionID: sessionID,
 	})
 }

@@ -320,7 +320,17 @@ func collectSubTurnResult(ch <-chan *contracts.EngineEvent, sessionID string, em
 			})
 			turnCount++
 		case "error":
-			return nil, fmt.Errorf("subturn: %s", ev.Content)
+			// DM-20260620-003 (AC2) — wrap with code extracted from
+			// metadata so callers retain error type information. Falls
+			// back to ErrSubagentStreamError sentinel when no code is present.
+			code := ""
+			if ev.Metadata != nil {
+				code = ev.Metadata["error_code"]
+			}
+			if code != "" {
+				return nil, derrors.WithCode(code, "subturn: "+ev.Content, nil)
+			}
+			return nil, derrors.NewSubagentStreamError(ev.Content)
 		case "complete":
 			if strings.TrimSpace(ev.Content) != "" {
 				assistantText.Reset()
@@ -351,7 +361,9 @@ func collectSubTurnResult(ch <-chan *contracts.EngineEvent, sessionID string, em
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("subturn: turn ended without complete event")
+	// DM-20260620-003 (AC2) — return a typed error with sentinel so callers
+	// can errors.Is(err, derrors.ErrSubagentStreamClosed) for differentiation.
+	return nil, derrors.NewSubagentStreamClosedError()
 }
 
 type noopPersister struct{}

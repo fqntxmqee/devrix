@@ -1,0 +1,51 @@
+change_id: devrix-error-handling-tier1-tier2
+priority: P0
+demand_id: DM-20260620-003
+status: s2_proposal
+parent_changes:
+  - devrix-context-budget-and-isolation             # DM-20260620-001 Phase A (PR #128, S7_Archived)
+  - devrix-context-budget-and-isolation-phase-b    # DM-20260620-001-B Phase B (PR #130-#132, S7_Archived)
+  - devrix-context-budget-phase-c-nested            # DM-20260620-002 Phase C (PR #134, S7_Archived)
+domains: [D1, D2, D3, D7]
+dsaft_scenarios:
+  - D1-S2   # Communication channel adapters
+  - D2-S15  # Context engine Prepare
+  - D3-S4   # LLM Gateway stream + protect
+  - D7-S2   # Orchestration turn loop
+dsaft_activities:
+  # === Tier 1: C1 + H1 ===
+  - D1-S2-A07-T01: feishu Markdown sanitize at error card (AC1)
+  - D1-S2-A07-T02: feishu replyAck sanitize at RouteInbound failure (AC1)
+  - D7-S2-A06-T24: orchestrator emitError sanitize 5 sites (AC2)
+  - D7-S2-A06-T25: subturn wrap preserve sentinel chain (AC2)
+  - D7-S2-A06-T26: orchestrate_path %v→%w (AC2)
+  - D3-S4-A02-T01: retry.go:91-93 nil-sentinel fix (AC5)
+  # === Tier 2: C2 + H3 ===
+  - SHARED-ERRORS-A01-T01: errors.Error unified type (AC3)
+  - SHARED-ERRORS-A01-T02: errors.IsRetryable single-channel (AC3)
+  - SHARED-ERRORS-A01-T03: errors.migrate.go deprecated alias (AC3)
+  - D7-S2-A05-T01: task_manager return (*Task, error) (AC4)
+  - D7-S2-A05-T02: classifier_fallback slog.Warn (AC4)
+  - D7-S2-A05-T03: EnsureGoal error propagation (AC4)
+  - D3-S4-A02-T02: errorclass.InjectClassification in Gateway.Stream (AC8)
+  - D7-S2-A06-T27: turn_adapter ErrInvariantViolation move to shared (AC6)
+  - D5-S2-A05-T01: observability fmt.Errorf → Wrap (AC7)
+  # === Tests ===
+  - SHARED-ERRORS-A01-T04: redact_test.go 8+ cases (AC9)
+  - SHARED-ERRORS-A01-T05: error_test.go unified type behavior (AC10)
+  - SHARED-ERRORS-A01-T06: retry_test.go nil-sentinel coverage (AC11)
+  - D7-S2-A05-T04: task_manager_test.go signature coverage (AC11)
+t_points:
+  new: 17
+  reuse: "D2-S15-A08-T01..T10 (Phase A+C audit) + D7-S2-A06-T11..T23 (Phase A+B+C turn loop) + D1-S5-A07-T05..T08 (Phase A feishu precheck) + D3-S4-A02-T01..T03 (Phase A retry base)"
+  final_total: 17
+  final_status: "17 PLANNED (this change)"
+version_scope:
+  v2026-06-20-tier1: "C1 + H1 + H2 hot-fix: IM sanitize + sentinel chain recovery + retry nil-sentinel"
+  v2026-06-20-tier2: "C2 + H3 + M1..M4 design: type merge + silent fallback + ctx inject + invariant migration"
+s3_gate:
+  review: design.md
+  conclusion: pending
+s5_gate:
+  acceptance_report: acceptance-report.md
+  conclusion: pending
