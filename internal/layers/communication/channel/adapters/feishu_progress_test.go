@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
@@ -530,5 +531,246 @@ func TestAppendAgentStreamText_UsesDedicatedCard(t *testing.T) {
 	}
 	if got := stream.agentOutputBuffer.String(); got != "line 1\nline 2" {
 		t.Fatalf("agentOutputBuffer = %q", got)
+	}
+}
+
+// ============================================================================
+// LLM-stream replay dedup (PR #139)
+//
+// minimax M2.7 (and similar models with streaming artifacts) occasionally
+// re-emits a previously streamed prefix from scratch. The feishu reply
+// card must show the report only once. The two helpers below plus their
+// hook points (appendResponseText + finalizeReplyCardStreaming /
+// finalizeStructuredSession) implement that dedup. These tests pin the
+// behavior so the next refactor doesn't silently regress.
+// ============================================================================
+
+func TestDetectDuplicateReplay(t *testing.T) {
+	// Build a long buffer of a representative LLM reply: 600+ runes
+	// describing a deep review, structured as the transcript chunks
+	// show. We then construct a "replayed" chunk that re-emits the
+	// opening narration and assert detectDuplicateReplay catches it.
+	buffer := strings.Repeat("我先快速摸清项目结构与规模。", 5) +
+		"这是一个 Go 项目（Devrix 多智能体协作助手），6 域架构，规模较大。\n" +
+		"由于域之间是相对独立的（D1-D7 分别对应一个层），适合按域并行 review。\n" +
+		"我设计如下并行策略。"
+
+	cases := []struct {
+		name  string
+		chunk string
+		want  bool
+	}{
+		{
+			name:  "replay-of-opening-narration",
+			chunk: "我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。\n接下来要做的是：",
+			want:  true,
+		},
+		{
+			name:  "natural-continuation",
+			chunk: "继续探索第二个域 D3 LLM 网关的子包分布。",
+			want:  false,
+		},
+		{
+			name:  "short-chunk-passes-through",
+			chunk: "OK",
+			want:  false,
+		},
+		{
+			name:  "long-unique-chunk-passes-through",
+			chunk: "接下来将分两路执行：路径 A 走人工 review 路径 B 走自动化覆盖率验证，两路并行完成后我会汇总报告。",
+			want:  false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := detectDuplicateReplay(buffer, tc.chunk); got != tc.want {
+				t.Fatalf("detectDuplicateReplay() = %v, want %v (buffer runes=%d, chunk runes=%d)",
+					got, tc.want, utf8.RuneCountInString(buffer), utf8.RuneCountInString(tc.chunk))
+			}
+		})
+	}
+}
+
+func TestDetectDuplicateReplay_ShortBufferSkips(t *testing.T) {
+	// Buffer shorter than dedupReplayMinBufferRunes (100) → always false
+	// even if the chunk is a verbatim prefix. This avoids false positives
+	// at the very start of a session when the LLM legitimately repeats
+	// short opening phrases.
+	shortBuffer := "我先快速摸清项目结构与规模。"
+	chunk := "我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。\n接下来"
+	if detectDuplicateReplay(shortBuffer, chunk) {
+		t.Fatalf("detectDuplicateReplay() = true on short buffer, want false")
+	}
+}
+
+func TestDedupRepeatedText(t *testing.T) {
+	opening := "由于域之间是相对独立的（D1-D7 分别对应一个层），适合按域并行 review。我设计如下并行策略。我先快速摸清项目结构与规模。" + strings.Repeat("补", 20)
+	cases := []struct {
+		name    string
+		in      string
+		want    string
+		minGap  int
+	}{
+		{
+			name:   "no-duplicate-passthrough",
+			in:     "段落 A 描述 deep review 的总体策略。段落 B 描述具体 worker 分配方案。",
+			want:   "段落 A 描述 deep review 的总体策略。段落 B 描述具体 worker 分配方案。",
+			minGap: 2,
+		},
+		{
+			name:   "duplicate-mid-block-truncated",
+			in:     opening + "\n\n" + opening + "\n",
+			want:   opening + "\n\n",
+			minGap: 2,
+		},
+		{
+			name: "duplicate-with-tail-after",
+			in: "我先快速摸清项目结构与规模。这是一段长描述，" + strings.Repeat("x", 200) + "结束。\n" +
+				"\n我先快速摸清项目结构与规模。这是一段长描述，" + strings.Repeat("x", 200) + "结束。\n" +
+				"\n后续的结论部分应该保留下来。",
+			want:   "我先快速摸清项目结构与规模。这是一段长描述，" + strings.Repeat("x", 200) + "结束。\n\n后续的结论部分应该保留下来。",
+			minGap: 2,
+		},
+		{
+			name:   "tiny-overlap-below-threshold",
+			in:     "ABC\n\nabc\n",
+			want:   "ABC\n\nabc\n",
+			minGap: 2,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := dedupRepeatedText(tc.in, 60, tc.minGap)
+			if got != tc.want {
+				t.Fatalf("dedupRepeatedText() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestFeishuAdapter_AppendResponseText_DropsReplayedChunk pins the
+// streaming-time dedup. The LLM replays a 200-rune opening narration
+// (the same text it just streamed in the first two text events). The
+// adapter must drop the replay and NOT increment textBuffer / NOT call
+// the cardkit stream PUT. Without this fix, the live cardkit stream
+// would show the opening twice while the LLM is still talking.
+func TestFeishuAdapter_AppendResponseText_DropsReplayedChunk(t *testing.T) {
+	opening := "我先快速摸清项目结构与规模。这是一段开场白描述，描述项目的总体情况与策略选择依据。"
+	openingFull := opening + strings.Repeat("补", 80) + "结束。"
+
+	var streamPutCount int
+	mockAPI := &mockFeishuAPI{
+		postFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			// cardkit CreateCard is called once when the streaming reply
+			// card starts. We don't count this against "stream PUTs".
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0,"data":{"card_id":"card_dd"}}`)}, nil
+		},
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			if strings.Contains(path, "/elements/") {
+				streamPutCount++
+			}
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: &mockMessageAPI{}, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI.imAPI = mockImAPI
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.streamingEnabled = true
+	adapter.sessionReplyCtx.Store("sess_replay", feishuReplyContext{userMessageID: "om_root"})
+
+	// First text event: open the streaming card and stream the opening.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_replay", ChatID: "feishu_oc_1",
+		Content: openingFull, Metadata: map[string]string{"event_type": "text"},
+	})
+	stream := adapter.sessionStream("sess_replay")
+	stream.mu.Lock()
+	bufferAfterFirst := stream.textBuffer.String()
+	stream.mu.Unlock()
+	if bufferAfterFirst != openingFull {
+		t.Fatalf("after first emit, buffer = %q, want %q", bufferAfterFirst, openingFull)
+	}
+
+	// Second text event: LLM replays the same opening from scratch.
+	// Adapter MUST drop this chunk.
+	streamPutCount = 0
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_replay", ChatID: "feishu_oc_1",
+		Content: openingFull + "接着是新的内容。",
+		Metadata: map[string]string{"event_type": "text"},
+	})
+	stream.mu.Lock()
+	bufferAfterReplay := stream.textBuffer.String()
+	stream.mu.Unlock()
+	if bufferAfterReplay != openingFull {
+		t.Fatalf("replay was not dropped: buffer grew to %q, want unchanged %q", bufferAfterReplay, openingFull)
+	}
+}
+
+// TestFeishuAdapter_FinalizeReplyCardStreaming_DedupsReplayedTextBuffer
+// pins the post-hoc dedup safety net. If a duplicate slipped past the
+// streaming-time check (e.g. only the suffix overlapped, not the
+// prefix), the final cardkit UpdateCard must still drop the duplicate
+// before sending to Feishu. We assert by inspecting the last UpdateCard
+// PUT body's `card.data` payload.
+func TestFeishuAdapter_FinalizeReplyCardStreaming_DedupsReplayedTextBuffer(t *testing.T) {
+	opening := "我先快速摸清项目结构与规模。这是一段开场白描述，描述项目的总体情况与策略选择依据。"
+	openingFull := opening + strings.Repeat("补", 80) + "结束。"
+
+	var updateCardData string
+	mockAPI := &mockFeishuAPI{
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			if !strings.Contains(path, "/elements/") {
+				// UpdateCard path. body is map[string]any{"card":{"type":"card_json","data":<cardJSON string>}, "sequence":N}.
+				if m, ok := body.(map[string]any); ok {
+					if card, ok := m["card"].(map[string]any); ok {
+						if data, ok := card["data"].(string); ok {
+							updateCardData = data
+						}
+					}
+				}
+			}
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+
+	const sessionID = "sess_finalize_dedup"
+	stream := adapter.sessionStream(sessionID)
+	stream.mu.Lock()
+	stream.replyCardID = "card_dd"
+	stream.cardkitEnabled = true
+	// Simulate a buffer where the LLM streamed its full report, then
+	// re-emitted the same opening narration verbatim (suffix overlap
+	// pattern that detectDuplicateReplay's prefix-based heuristic
+	// might miss).
+	stream.textBuffer.WriteString(openingFull)
+	stream.textBuffer.WriteString("\n\n我接下来对各域做并行 review。\n")
+	stream.textBuffer.WriteString(openingFull) // duplicate suffix
+	stream.textBuffer.WriteString("\n\n最终结论：4 路并行都成功完成。")
+	stream.mu.Unlock()
+
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "汇总报告"); err != nil {
+		t.Fatalf("finalizeReplyCardStreaming: %v", err)
+	}
+
+	if updateCardData == "" {
+		t.Fatalf("UpdateCard card.data was not captured")
+	}
+	// The duplicate opening must appear only once in the sent body.
+	if got := strings.Count(updateCardData, opening); got != 1 {
+		t.Errorf("opening appears %d times in UpdateCard card.data, want 1. card.data=%s", got, updateCardData)
+	}
+	// The conclusion must be present.
+	if !strings.Contains(updateCardData, "最终结论：4 路并行都成功完成") {
+		t.Errorf("UpdateCard card.data missing conclusion: %s", updateCardData)
 	}
 }

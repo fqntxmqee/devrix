@@ -18,6 +18,112 @@ import (
 
 const progressStyleStructured = "structured"
 
+// dedupReplayMinBufferRunes / dedupReplayMinChunkRunes / dedupReplayMinOverlapRunes
+// bound the LLM-stream-replay dedup. When the LLM re-emits a previously
+// streamed prefix from scratch (a minimax M2.7 streaming artifact: the
+// model occasionally regenerates the same opening narration it just
+// finished), the second copy must not be appended to the feishu reply
+// card. The thresholds are intentionally conservative: a duplicate must
+// already have a non-trivial buffer AND the new chunk must contain at
+// least 30 runes of an exact substring that appears in the recent
+// buffer. Short chunks and short buffers are passed through unchanged
+// to avoid false positives on legitimate restarts.
+const (
+	dedupReplayMinBufferRunes = 100
+	dedupReplayMinChunkRunes = 50
+	dedupReplayMinOverlapRunes = 30
+	dedupReplayMaxPrefixRunes = 200
+	dedupReplayBufferTailRunes = 4000
+)
+
+// detectDuplicateReplay returns true when chunk's prefix is already
+// present in buffer (within the last dedupReplayBufferTailRunes runes),
+// indicating the LLM has started re-emitting text it just streamed.
+// chunk must be at least dedupReplayMinChunkRunes runes, buffer at
+// least dedupReplayMinBufferRunes runes, and the matching prefix at
+// least dedupReplayMinOverlapRunes runes for the signal to fire.
+func detectDuplicateReplay(buffer, chunk string) bool {
+	if utf8.RuneCountInString(buffer) < dedupReplayMinBufferRunes {
+		return false
+	}
+	chunkRunes := []rune(chunk)
+	if len(chunkRunes) < dedupReplayMinChunkRunes {
+		return false
+	}
+	maxPrefix := len(chunkRunes)
+	if maxPrefix > dedupReplayMaxPrefixRunes {
+		maxPrefix = dedupReplayMaxPrefixRunes
+	}
+	// Only scan the tail of the buffer — the duplicate, if any, is the
+	// LLM's most recent narration, not something from many turns ago.
+	bufferRunes := []rune(buffer)
+	searchStart := len(bufferRunes) - dedupReplayBufferTailRunes
+	if searchStart < 0 {
+		searchStart = 0
+	}
+	tail := string(bufferRunes[searchStart:])
+	for n := maxPrefix; n >= dedupReplayMinOverlapRunes; n-- {
+		if strings.Contains(tail, string(chunkRunes[:n])) {
+			return true
+		}
+	}
+	return false
+}
+
+// dedupRepeatedText removes a duplicate long substring from buffer. It
+// finds the longest repeated substring S of length ≥ minDupRunes that
+// appears at two non-overlapping positions, then removes the second
+// occurrence (and keeps the prefix and any tail). Returns the original
+// buffer unchanged when no qualifying duplicate is found. This is the
+// post-hoc safety net for the streaming-time dedup: if
+// detectDuplicateReplay missed (e.g. the chunk's prefix didn't match
+// cleanly during streaming), the final card still shows the user's
+// report only once.
+func dedupRepeatedText(buffer string, minDupRunes, minGapRunes int) string {
+	if minDupRunes < 8 {
+		minDupRunes = 8
+	}
+	if minGapRunes < 0 {
+		minGapRunes = 0
+	}
+	runes := []rune(buffer)
+	n := len(runes)
+	if n < minDupRunes*2+minGapRunes {
+		return buffer
+	}
+	// Find the longest LCP pair (i, j) with i < j, j - i ≥ minDupRunes,
+	// and j - (i + LCP) ≥ minGapRunes. The first and second occurrences
+	// of the matched substring are at i and j. The O(n^2) scan is fine
+	// for buffer sizes up to ~64K runes (a reply card).
+	bestLen := 0
+	bestSecondStart := 0
+	for i := 0; i <= n-minDupRunes*2-minGapRunes; i++ {
+		for j := i + minDupRunes + minGapRunes; j <= n-minDupRunes; j++ {
+			if runes[i] != runes[j] {
+				continue
+			}
+			k := 0
+			for i+k < n && j+k < n && runes[i+k] == runes[j+k] {
+				k++
+			}
+			if k > bestLen {
+				bestLen = k
+				bestSecondStart = j
+			}
+		}
+	}
+	if bestLen < minDupRunes {
+		return buffer
+	}
+	// Remove the duplicate block at [bestSecondStart, bestSecondStart+bestLen),
+	// keeping both the prefix before the second occurrence and any
+	// legitimate tail that may continue after it.
+	result := make([]rune, 0, n-bestLen)
+	result = append(result, runes[:bestSecondStart]...)
+	result = append(result, runes[bestSecondStart+bestLen:]...)
+	return string(result)
+}
+
 type toolCallEntry struct {
 	name   string
 	input  string
@@ -343,6 +449,12 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	}
 	stream.mu.Lock()
 	cardkitActive := stream.cardkitEnabled && stream.replyCardID != ""
+	// Post-hoc dedup: same reasoning as in finalizeReplyCardStreaming
+	// — the LLM sometimes re-emits text it just streamed, and the
+	// non-cardkit finalize path constructs the footer from the same
+	// textBuffer. Without this, the user sees the report twice on
+	// the final card.
+	responseText = dedupRepeatedText(responseText, 60, 2)
 	stream.mu.Unlock()
 	if cardkitActive {
 		return a.finalizeReplyCardStreaming(ctx, stream, summary)
@@ -379,6 +491,11 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	}
 
 	content := stream.textBuffer.String()
+	// Post-hoc dedup: catch any duplicate that slipped past
+	// detectDuplicateReplay during streaming (e.g. the LLM re-emitted
+	// a suffix rather than a prefix, or the overlap didn't clear the
+	// 30-rune minimum). The reply card must show the report only once.
+	content = dedupRepeatedText(content, 60, 2)
 	if strings.TrimSpace(summary) != "" {
 		content += "\n\n---\n" + strings.TrimSpace(summary)
 	} else if strings.TrimSpace(content) != "" {
@@ -481,6 +598,21 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 
 	stream := a.sessionStream(sessionID)
 	stream.mu.Lock()
+	if detectDuplicateReplay(stream.textBuffer.String(), chunk) {
+		// The LLM (notably minimax M2.7) occasionally re-emits a long
+		// prefix of text it just streamed. Appending the duplicate
+		// causes the feishu reply card to show the user's report
+		// twice. Drop the replay at the source so neither the live
+		// stream nor the final UpdateCard carries the duplicate.
+		existing := stream.textBuffer.String()
+		stream.mu.Unlock()
+		slog.Debug("feishu: dropped LLM-stream replay chunk",
+			"session", slog.String("sessionID", sessionID),
+			"bufferRunes", utf8.RuneCountInString(existing),
+			"chunkRunes", utf8.RuneCountInString(chunk),
+		)
+		return nil
+	}
 	stream.textBuffer.WriteString(chunk)
 	content := stream.textBuffer.String()
 	stream.mu.Unlock()
