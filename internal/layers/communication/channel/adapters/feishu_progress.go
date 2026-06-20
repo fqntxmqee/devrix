@@ -395,8 +395,14 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 		if errors.Is(err, ErrFeishuCardRateLimited) {
 			// rate-limited — skip final stream, try updateCard directly
 		} else if errors.Is(err, ErrFeishuCardStreamClosed) {
-			// card already closed, nothing to finalize
-			return nil
+			// Card's streaming channel was closed by Feishu (idle timeout
+			// or prior finalization) but the card itself still exists.
+			// Previously this branch returned nil and left the card stale —
+			// the user saw a partial / no-op reply when the deep-review
+			// LLM took >30min. Fall through to UpdateCard so the full
+			// textBuffer + summary content still reaches the user.
+			slog.Warn("feishu: card stream closed at finalize, falling back to UpdateCard",
+				"session", slog.String("cardID", stream.replyCardID))
 		} else {
 			return err
 		}

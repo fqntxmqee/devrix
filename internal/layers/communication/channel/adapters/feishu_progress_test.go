@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
@@ -367,6 +368,70 @@ func TestFeishuAdapter_FinalizeStructuredSession_EmptySummaryPatchesFooter(t *te
 // extractPatchedCardJSON was removed; see the simpler
 // TestFeishuAdapter_FinalizeStructuredSession_EmptySummaryPatchesFooter
 // which validates behavior via the patch call count + stream state.
+
+// TestFeishuAdapter_FinalizeReplyCardStreaming_UpdateCardFallbackOnStreamClosed
+// verifies that when the cardkit streaming channel is closed by Feishu at
+// finalize time (idle timeout or prior finalization), the finalize path
+// falls through to UpdateCard instead of silently leaving the reply card
+// stale. Without this fallback, deep-review sessions that took longer
+// than the cardkit stream lifetime (>30min) lost the conclusion — the
+// user saw no report on the feishu card.
+func TestFeishuAdapter_FinalizeReplyCardStreaming_UpdateCardFallbackOnStreamClosed(t *testing.T) {
+	var streamPutCount int
+	var updateCount int
+
+	mockAPI := &mockFeishuAPI{
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			// Distinguish the two endpoints by path:
+			//   /open-apis/cardkit/v1/cards/{id}/elements/{eid}/content  → stream element
+			//   /open-apis/cardkit/v1/cards/{id}                          → update card
+			if strings.Contains(path, "/elements/") {
+				streamPutCount++
+				// Simulate Feishu closing the streaming channel mid-session.
+				return &larkcore.ApiResp{
+					StatusCode: 200,
+					RawBody:    []byte(`{"code":300309,"msg":"card stream closed"}`),
+				}, nil
+			}
+			updateCount++
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+
+	// Pre-populate the cardkit state so finalizeReplyCardStreaming thinks
+	// the session already has a live cardkit reply card with streamed
+	// text. This mirrors what appendResponseText → startStreamingReplyCard
+	// would have built during a real session.
+	const sessionID = "sess_cardkit_closed"
+	stream := adapter.sessionStream(sessionID)
+	stream.mu.Lock()
+	stream.replyCardID = "card_xyz"
+	stream.cardkitEnabled = true
+	stream.textBuffer.WriteString("first: exploring repo\n")
+	stream.textBuffer.WriteString("second: analyzing tools\n")
+	stream.textBuffer.WriteString("third: writing report")
+	stream.mu.Unlock()
+
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "conclusion summary"); err != nil {
+		t.Fatalf("finalizeReplyCardStreaming: %v", err)
+	}
+
+	// The stream PUT to /elements/.../content must have been attempted.
+	if streamPutCount != 1 {
+		t.Errorf("streamPutCount = %d, want 1 (stream PUT must be attempted before fallback)", streamPutCount)
+	}
+	// The bug: without the fix, updateCount == 0 and the user never
+	// sees the report. With the fix, UpdateCard fires after the stream
+	// PUT returns ErrFeishuCardStreamClosed.
+	if updateCount != 1 {
+		t.Errorf("updateCount = %d, want 1 (UpdateCard fallback after stream-closed)", updateCount)
+	}
+}
 
 func cardBodyMarkdown(card *kernel.Card) string {
 	var parts []string
