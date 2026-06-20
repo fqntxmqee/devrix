@@ -2,7 +2,7 @@ package adapters
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 )
 
 // FeishuTableCountPrecheck enforces feishu card content limits.
@@ -50,10 +50,18 @@ func (p *FeishuTableCountPrecheck) Check(content string) error {
 	return nil
 }
 
-// countTableTags counts `<table` occurrences in content.
-// We use `<table` (not `<table>`) to avoid matching `<table_view>` etc.
-// This is a heuristic but adequate for feishu card JSON which only uses
-// canonical `<table>` tags in cardkit schemas.
+// tableTagRegex matches a `<table>` (or self-closing `<table/>`) tag but
+// not other tags whose names happen to start with "table" (e.g.
+// `<table_view>`). Anchored to a word boundary: either a `>` (open or
+// close) or a `/` (self-close) immediately after "table".
+var tableTagRegex = regexp.MustCompile(`<table(>|/>|[\s][^>]*>)`)
+
+// countTableTags counts `<table>` (and self-closing `<table/>`) elements
+// in content. The regex anchors to `>` or `/>` after "table" so we do
+// not match `<table_view>` style false-positives.
 func countTableTags(content string) int {
-	return strings.Count(content, "<table")
+	if content == "" {
+		return 0
+	}
+	return len(tableTagRegex.FindAllString(content, -1))
 }
