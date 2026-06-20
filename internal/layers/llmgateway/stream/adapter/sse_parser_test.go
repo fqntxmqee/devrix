@@ -99,6 +99,64 @@ func TestStreamOpenAISSE_should_merge_tool_call_deltas(t *testing.T) {
 	}
 }
 
+// TestStreamOpenAISSE_should_separate_distinct_tool_calls_with_same_index
+// covers a provider (minimax M2.7) bug: when the model emits two parallel
+// tool_use blocks in the same assistant turn, the second delta incorrectly
+// reuses index=0 instead of advancing to index=1. A naive parser would
+// overwrite the first call's id/name and concatenate the args into a single
+// garbled JSON object, which then fails validation server-side with HTTP
+// 400 "invalid function arguments json string" (provider code 2013).
+func TestStreamOpenAISSE_should_separate_distinct_tool_calls_with_same_index(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_function_aaa","function":{"name":"bash","arguments":"{\"description\": \"list repo\", \"command\": \"ls -la\"}"}}]}}]}`,
+		``,
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_function_bbb","function":{"name":"glob","arguments":"{\"pattern\": \"**/*.go\"}"}}]}}]}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	var lastTools []llmgateway.ToolCall
+	err := streamOpenAISSE(strings.NewReader(body), func(chunk *llmgateway.Chunk) error {
+		if len(chunk.ToolCalls) > 0 {
+			lastTools = chunk.ToolCalls
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(lastTools) != 2 {
+		t.Fatalf("expected 2 distinct tool calls, got %d: %+v", len(lastTools), lastTools)
+	}
+	var bash, globCall *llmgateway.ToolCall
+	for i := range lastTools {
+		switch lastTools[i].ID {
+		case "call_function_aaa":
+			bash = &lastTools[i]
+		case "call_function_bbb":
+			globCall = &lastTools[i]
+		}
+	}
+	if bash == nil || globCall == nil {
+		t.Fatalf("missing call ids in: %+v", lastTools)
+	}
+	if bash.Name != "bash" {
+		t.Errorf("bash name = %q, want bash", bash.Name)
+	}
+	wantBashArgs := `{"description": "list repo", "command": "ls -la"}`
+	if bash.Input != wantBashArgs {
+		t.Errorf("bash args = %q, want %q", bash.Input, wantBashArgs)
+	}
+	if globCall.Name != "glob" {
+		t.Errorf("glob name = %q, want glob", globCall.Name)
+	}
+	wantGlobArgs := `{"pattern": "**/*.go"}`
+	if globCall.Input != wantGlobArgs {
+		t.Errorf("glob args = %q, want %q", globCall.Input, wantGlobArgs)
+	}
+}
+
 func TestStreamOpenAISSE_should_return_error_on_error_event(t *testing.T) {
 	body := strings.Join([]string{
 		`data: {"error":{"message":"tool call result does not follow tool call (2013)","type":"invalid_request_error","code":"2013"}}`,
