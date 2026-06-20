@@ -625,6 +625,14 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 		}
 	}
 
+	// Persist the engine event to the on-disk transcript so the full
+	// assistant text stream survives process restarts and can be replayed
+	// after a feishu cardkit / IM card display loss. The writer is best-
+	// effort (nil-safe) — see ExpireSession for the established pattern.
+	if w := g.writer; w != nil {
+		g.appendTranscriptEvent(w, session.SessionID, event)
+	}
+
 	// Record outbound metric
 	if g.metricOutboundMsgs != nil {
 		g.metricOutboundMsgs.Inc()
@@ -840,6 +848,50 @@ func (g *CommunicationGateway) ExpireSession(sessionID string) error {
 	}
 
 	return nil
+}
+
+// appendTranscriptEvent writes a single engine event to the session
+// transcript jsonl. Only streaming-relevant event types are recorded
+// (text/thinking/tool_call/tool_result/complete); non-content events
+// like milestones are intentionally skipped to keep the file small and
+// replay-friendly.
+func (g *CommunicationGateway) appendTranscriptEvent(w *transcript.Writer, sessionID string, event *EngineEvent) {
+	if w == nil || sessionID == "" || event == nil {
+		return
+	}
+	var kind string
+	var body string
+	switch event.Type {
+	case "text":
+		kind = "assistant"
+		body = event.Content
+	case "thinking":
+		kind = "thinking"
+		body = event.Content
+	case "tool_call":
+		kind = "tool_call"
+		body = event.ToolInput
+		if event.ToolName != "" {
+			body = event.ToolName + " " + body
+		}
+	case "tool_result":
+		kind = "tool_result"
+		body = event.Content
+	case "complete":
+		kind = "complete"
+		body = event.Content
+	default:
+		// not a content event — skip
+		return
+	}
+	if body == "" {
+		return
+	}
+	_ = w.Append(sessionID, transcript.Event{
+		Kind: kind,
+		Role: "assistant",
+		Body: body,
+	})
 }
 
 func (g *CommunicationGateway) startSessionExpireSpan(ctx context.Context, sessionID string) (context.Context, tracer.Span) {

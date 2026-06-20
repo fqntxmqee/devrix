@@ -54,10 +54,14 @@ type stubTools struct {
 	results   []ToolResult
 	err       error
 	lastCalls []llmgateway.ToolCall
+	fn        func(ctx context.Context, req ToolRoundRequest) (ToolRoundResult, error)
 }
 
-func (s *stubTools) ExecuteRound(_ context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
+func (s *stubTools) ExecuteRound(ctx context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
 	s.lastCalls = append([]llmgateway.ToolCall(nil), req.ToolCalls...)
+	if s.fn != nil {
+		return s.fn(ctx, req)
+	}
 	if s.err != nil {
 		return ToolRoundResult{}, s.err
 	}
@@ -359,6 +363,103 @@ func TestOrchestrator_RunTurn_MultiTurn_ToolLoop(t *testing.T) {
 	}
 	if !hasType(evs, "complete") {
 		t.Error("expected complete event")
+	}
+}
+
+// TestOrchestrator_RunTurn_FinalTextAccumulatesAcrossTurns verifies that the
+// complete event's Content carries the LLM-emitted text from EVERY turn of
+// the run, not just the last one. Regression guard for the deep-review
+// scenario where the conclusion is emitted across multiple turns; without
+// accumulation the IM card receives only the final turn's snippet.
+func TestOrchestrator_RunTurn_FinalTextAccumulatesAcrossTurns(t *testing.T) {
+	// fnCalls is incremented only inside the fn closure so it stays in
+	// sync with the per-call switch. llm.calls is incremented by
+	// InvokeStream itself and would double-count.
+	var fnCalls atomic.Int64
+	llm := &stubLLM{}
+	llm.fn = func(_ context.Context, _ LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+		n := fnCalls.Add(1)
+		ch := make(chan llmgateway.Chunk, 4)
+		switch n {
+		case 1:
+			ch <- textChunk("first: exploring repo")
+			ch <- toolCallChunk("read_1", `{"path":"/a"}`)
+		case 2:
+			ch <- textChunk("second: analyzing tools")
+			ch <- toolCallChunk("grep_2", `{"pat":"ctx.TODO"}`)
+		case 3:
+			ch <- textChunk("third: writing report")
+			ch <- doneChunk()
+		default:
+			ch <- doneChunk()
+		}
+		close(ch)
+		return ch, nil
+	}
+
+	// Each turn's toolCall has a unique ID so stubTools can return a
+	// matching result without bleeding across turns.
+	tools := &stubTools{}
+	tools.fn = func(_ context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
+		var results []ToolResult
+		for _, c := range req.ToolCalls {
+			results = append(results, ToolResult{ToolCallID: c.ID, Output: "ok:" + c.Name})
+		}
+		return ToolRoundResult{Results: results}, nil
+	}
+	orch := NewOrchestrator(OrchestratorDeps{
+		LLM: llm, Context: &stubContext{}, Tools: tools, Persist: &stubPersist{}, MaxTurns: 6,
+	})
+
+	ch, err := orch.RunTurn(context.Background(), TurnRequest{
+		SessionID:   "sess-finaltext",
+		UserMessage: types.Message{Role: types.MessageRoleUser, Content: "deep review"},
+	})
+	if err != nil {
+		t.Fatalf("RunTurn: %v", err)
+	}
+	evs := collectEvents(ch)
+
+	if got := fnCalls.Load(); got != 3 {
+		var summaries []string
+		for _, e := range evs {
+			summaries = append(summaries, fmt.Sprintf("%s:%q", e.Type, e.Content))
+		}
+		t.Fatalf("expected 3 LLM calls, got %d\nevents: %v", got, summaries)
+	}
+
+	var complete *contracts.EngineEvent
+	for _, e := range evs {
+		if e.Type == "complete" {
+			complete = e
+		}
+	}
+	if complete == nil {
+		t.Fatal("no complete event emitted")
+	}
+
+	// Each turn emitted its own text chunk via textChunk(...); the final
+	// Content must contain ALL three snippets, in order.
+	wantSubs := []string{
+		"first: exploring repo",
+		"second: analyzing tools",
+		"third: writing report",
+	}
+	joined := complete.Content
+	if joined == "" {
+		t.Fatalf("complete.Content is empty; want accumulated %v", wantSubs)
+	}
+	prev := -1
+	for _, sub := range wantSubs {
+		idx := strings.Index(joined, sub)
+		if idx < 0 {
+			t.Errorf("complete.Content missing %q; got: %q", sub, joined)
+			continue
+		}
+		if idx <= prev {
+			t.Errorf("complete.Content out of order for %q at %d (prev %d)", sub, idx, prev)
+		}
+		prev = idx
 	}
 }
 
@@ -1205,10 +1306,22 @@ func TestOrchestrator_RunTurn_CompleteCarriesLastIterationText_MaxTurns(t *testi
 	if !strings.Contains(complete.Content, lastIterText) {
 		t.Errorf("complete.Content = %q, want substring %q (last iteration's text)", complete.Content, lastIterText)
 	}
-	// Verify previous iteration's text is NOT present (finalText must be the
-	// last iteration's value, not an accumulator).
-	if strings.Contains(complete.Content, "first iter") {
-		t.Errorf("complete.Content should not contain earlier iteration's text, got %q", complete.Content)
+	// Cross-turn accumulation (DM-20260620-002 follow-up): the complete
+	// event now carries text from EVERY iteration, not just the last. This
+	// is what makes deep-review-style reports render on the IM card even
+	// when the LLM emits the conclusion across multiple turns before
+	// hitting MaxTurns.
+	if !strings.Contains(complete.Content, "first iter") {
+		t.Errorf("complete.Content should contain earlier iteration's text (accumulator), got %q", complete.Content)
+	}
+	if !strings.Contains(complete.Content, "second iter") {
+		t.Errorf("complete.Content should contain middle iteration's text (accumulator), got %q", complete.Content)
+	}
+	// Order is preserved — earlier text must precede later text.
+	idxFirst := strings.Index(complete.Content, "first iter")
+	idxLast := strings.Index(complete.Content, lastIterText)
+	if idxFirst < 0 || idxLast < 0 || idxFirst > idxLast {
+		t.Errorf("complete.Content order wrong: first@%d last@%d, got %q", idxFirst, idxLast, complete.Content)
 	}
 }
 
