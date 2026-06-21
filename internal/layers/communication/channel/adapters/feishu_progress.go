@@ -437,8 +437,9 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	hasTaskCard := stream.progressMsgID != "" || stream.taskName != "" || stream.progressPct > 0
 	responseMsgID := stream.responseMsgID
 	responseText := stream.textBuffer.String()
-	if hasTaskCard && strings.TrimSpace(summary) != "" {
-		stream.summaries = append(stream.summaries, strings.TrimSpace(summary))
+	trimmedSummary := strings.TrimSpace(summary)
+	if hasTaskCard && trimmedSummary != "" {
+		stream.summaries = append(stream.summaries, trimmedSummary)
 	}
 	stream.mu.Unlock()
 
@@ -457,27 +458,53 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	responseText = dedupRepeatedText(responseText, 60, 2)
 	stream.mu.Unlock()
 	if cardkitActive {
-		return a.finalizeReplyCardStreaming(ctx, stream, summary)
+		// The summary is intentionally NOT appended to the streaming card —
+		// finalizeStructuredSession sends it as a separate card below so the
+		// user sees a distinct "总结" card after the report card rather than
+		// the report + summary glued together with a `---` separator.
+		if err := a.finalizeReplyCardStreaming(ctx, stream, ""); err != nil {
+			return err
+		}
+	} else if responseMsgID != "" && trimmedSummary == "" {
+		// Fallback: LLM did not produce a final summary (e.g. max-turns
+		// reached mid-tool-call while the LLM was still looping, or the
+		// D7 orchestrator emitted a blank finalText). Without this, the
+		// reply card stays in whatever partial state the LLM last wrote
+		// and the user sees no "任务完成" affordance at all. Emit a minimal
+		// completion footer so the conclusion is never silently lost.
+		//
+		// When a non-empty summary is available, the response card is left
+		// untouched — the summary is delivered as its own card so the user
+		// sees a distinct "总结" message after the report card, not the
+		// report and summary glued together on the same card.
+		if strings.TrimSpace(responseText) != "" {
+			footer := responseText + "\n\n---\n_✅ 任务已完成_"
+			card := NewCard().
+				Markdown(footer).
+				Build()
+			if err := a.patchMessage(ctx, responseMsgID, BuildCardJSON(card)); err != nil {
+				return err
+			}
+		}
 	}
-	if responseMsgID != "" && strings.TrimSpace(summary) != "" {
-		footer := responseText + "\n\n---\n" + strings.TrimSpace(summary)
-		card := NewCard().
-			Markdown(footer).
-			Build()
-		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
+	if trimmedSummary != "" {
+		return a.sendSummaryCard(ctx, sessionID, chatID, trimmedSummary)
 	}
-	// Fallback: LLM did not produce a final summary (e.g. max-turns reached
-	// mid-tool-call while the LLM was still looping, or the D7 orchestrator
-	// emitted a blank finalText). Without this, the reply card stays in
-	// whatever partial state the LLM last wrote and the user sees no
-	// "任务完成" affordance at all. Emit a minimal completion footer so the
-	// conclusion is never silently lost.
-	if responseMsgID != "" {
-		footer := responseText + "\n\n---\n_✅ 任务已完成_"
-		card := NewCard().
-			Markdown(footer).
-			Build()
-		return a.patchMessage(ctx, responseMsgID, BuildCardJSON(card))
+	return nil
+}
+
+// sendSummaryCard delivers the D7 final summary as a standalone "任务总结"
+// card so it appears as a separate message in the user's chat history instead
+// of being glued onto the previous reply / progress card with a `---`
+// separator. The card honors the standard precheck + plain-text fallback
+// path via sendCardToSession.
+func (a *FeishuAdapter) sendSummaryCard(ctx context.Context, sessionID, chatID, summary string) error {
+	card := NewCard().
+		Title("任务总结", "blue").
+		Markdown(summary).
+		Build()
+	if err := a.sendCardToSession(ctx, sessionID, chatID, card); err != nil {
+		return fmt.Errorf("feishu: send summary card failed: %w", err)
 	}
 	return nil
 }
@@ -496,14 +523,17 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// a suffix rather than a prefix, or the overlap didn't clear the
 	// 30-rune minimum). The reply card must show the report only once.
 	content = dedupRepeatedText(content, 60, 2)
-	if strings.TrimSpace(summary) != "" {
-		content += "\n\n---\n" + strings.TrimSpace(summary)
-	} else if strings.TrimSpace(content) != "" {
-		// Empty summary fallback: when the LLM never produced a final
-		// conclusion (D7 max-turns mid-tool-call, or D7 resolveFinalText
-		// fallback also returned empty), append a minimal completion marker
-		// so the user sees the task finished instead of a dangling partial
-		// card with no closure.
+	// The summary argument is intentionally ignored here: the caller
+	// (finalizeStructuredSession) is responsible for delivering the
+	// summary as a separate card so the user sees a distinct "总结" card
+	// after the streaming report, not the report + summary glued onto
+	// the same card. We keep `summary` in the signature for backwards
+	// compatibility with the existing test surface.
+	_ = summary
+	if strings.TrimSpace(content) != "" {
+		// Minimal completion marker on the streaming card so the user
+		// sees the task finished even when the D7 orchestrator did not
+		// produce a final summary.
 		content += "\n\n---\n_✅ 任务已完成_"
 	}
 
@@ -517,7 +547,7 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 			// Previously this branch returned nil and left the card stale —
 			// the user saw a partial / no-op reply when the deep-review
 			// LLM took >30min. Fall through to UpdateCard so the full
-			// textBuffer + summary content still reaches the user.
+			// textBuffer content still reaches the user.
 			slog.Warn("feishu: card stream closed at finalize, falling back to UpdateCard",
 				"session", slog.String("cardID", stream.replyCardID))
 		} else {
