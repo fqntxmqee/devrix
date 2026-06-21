@@ -197,13 +197,20 @@ Plan Engine / delegate_tools
 
 ### 异常补偿
 
-| 场景 | 行为 | 幂等 |
-|------|------|------|
-| Wave reentry（同 session 新 graph） | 取消 prior wave → 启动新 wave | `cancelWaveLocked` |
-| CancelWorker | context.Cancel → slot release → status=cancelled | 双 Release 静默忽略 |
-| CancelAll | 聚合所有 cancel func → 全部 terminal | `closed` flag 守卫 |
-| Hub disabled | Publish 早返回 | NoOp |
-| Upstream artifact 缺失 | Resolve 返回 error，task failed | ArtifactStore.Get |
+| 场景 | 行为 | 幂等 | 观测 (DM-20260621-010) |
+|------|------|------|------------------------|
+| Wave reentry（同 session 新 graph） | 取消 prior wave → 启动新 wave | `cancelWaveLocked` | `SchedulerMetrics.WaveReentryCancelled += 1` + slog.Info |
+| CancelWorker | context.Cancel → slot release → status=cancelled | 双 Release 静默忽略 | — |
+| CancelAll | 聚合所有 cancel func → 全部 terminal | `closed` flag 守卫 | — |
+| Hub disabled | Publish 早返回 | NoOp | — |
+| Upstream artifact 缺失 | Resolve 返回 error，task failed | ArtifactStore.Get | — |
+| Worker panic | defer recover → completeTask with ExitCode=-1 | recover 命中 → `SchedulerMetrics.WorkerPanics += 1` + slog.Error |
+| taskCtx leak | completeTask 检查 `h.cancel != nil && ExitCode == 0 && Error == ""` | best-effort 检测 → `SchedulerMetrics.TaskCtxLeaked += 1` + slog.Warn（误报率 < 5%） |
+| DispatchLoop wakeup | ticker (20ms) + wakeupCh 触发 ready 重检 | 计数器 → `SchedulerMetrics.DispatchLoopWakeups += 1`（每次 wakeup） |
+| **HandleInterrupt cancel 失败** | Wave → D4 → Process 任一失败 | `errors.Join(waveErr, d4Err, procErr)` + `InterruptMetrics.{Wave,D4,Process}CancelFailed += 1` + slog.Warn |
+| **Sandbox Exit 失败（freefork）** | Fork 失败回滚 或 spawnOne 失败清理 | `ForkerMetrics.SandboxExitFailed += 1` + slog.Warn（13 调用方兼容） |
+| **Sandbox Exit 失败（execute）** | ExecuteSync/Async defer + forkWorker 失败清理 | `ExecutorMetrics.SandboxExitFailed += 1` + slog.Warn（3 调用位点） |
+| **TaskManager.publishCompletion panic** | notify.GlobalBus().Publish 抛 panic | `TaskManagerMetrics.PublishCompletionPanics += 1` + slog.Error |
 
 ### Plan Mode 分支（D7-S5 部分）
 
@@ -382,6 +389,97 @@ type ExecutionFlowHub interface {
 | ORCH-S3 WaveScheduler | D7-S3 | `orchestration/wavescheduler/` |
 | D2 tasks/ | D7-S1 写模型 | `contextengine/tasks/` |
 | D2 engine.Process | D7-S2 ProcessMessage | 未迁移 |
+
+---
+
+## Worktree 全链路可观测性（DM-20260621-010）
+
+> **来源 Change:** `devrix-d7-error-aggregation-and-metrics` (PR-A/B/C, 2026-06-21)
+
+D7 编排层在 worktree 调用链路上存在 5 类 silent failure：cancel 步骤返回 nil、sandbox Exit 失败被 `_ =` 吞掉、worker panic 仅 slog.Error、taskCtx leak 无感知、publishCompletion panic 黑盒化。**DM-20260621-010** 引入 3 个 metric 结构（`InterruptMetrics` / `ForkerMetrics` / `ExecutorMetrics` + `TaskManagerMetrics`）+ WaveScheduler 4 新字段，统一替换为「atomic counter + slog + errors.Join」三联模式。
+
+### Metrics 总览
+
+| Metrics | 字段 | 来源文件 | T 编号 |
+|---------|------|----------|--------|
+| `InterruptMetrics` | `WaveCancelFailed` / `D4CancelFailed` / `ProcessCancelFailed` / `HandleErrored` / `HandleCompleted` | `sessionorchestrator/metrics.go` | D7-S6-A11-T01/T02/T03 |
+| `ForkerMetrics` | `Spawned` / `SpawnFailed` / `SandboxEnterFailed` / `SandboxExitFailed` / `FactoryCreateFailed` / `RollbackTriggered` | `multiagent/provision/freefork/metrics.go` | D7-S6-A12-T04 |
+| `ExecutorMetrics` | `SandboxExitFailed` | `multiagent/execute/metrics.go` | D7-S6-A12-T05 |
+| `TaskManagerMetrics` | `PublishCompletionPanics` | `workmodel/task_manager_metrics.go` | D7-S6-A12-T06 |
+| `SchedulerMetrics` (扩展) | `WorkerPanics` / `TaskCtxLeaked` / `WaveReentryCancelled` / `DispatchLoopWakeups` | `wavescheduler/scheduler.go` (内置) | 配套 P1 |
+| `ForkerMetrics` 聚合 | 多错误 `errors.Join(err1, err2, ..., errN)` | `multiagent/provision/freefork/forker.go` | D7-S6-A13-T07 |
+
+### errors.Join 聚合点
+
+```
+HandleInterrupt (3 步 cancel):
+   wave.CancelAll(sessionID) ──fail──┐
+   d4.CancelAll(sessionID)   ──fail──┼─→ errors.Join(waveErr, d4Err, procErr)
+   orchestrator.cancel(sid)  ──fail──┘
+   ├─ emit "stopped" event (best-effort)
+   └─ InterruptMetrics.HandleErrored += 1
+
+DefaultForker.Fork (N 并发 spawn):
+   for _, req := range reqs:
+     go spawnOne(ctx, parentSession, req)  ──fail──┐
+                                                  │
+   if len(errs) > 0:                             │
+     rollback:                                    ├─→ errors.Join(err1, err2, ..., errN)
+       for each handle:                          │
+         h.Agent.Terminate(ctx)                  │
+         sandbox.Exit(ctx, sbPath, false)        │
+   return errors.Join(errs...)                  ─┘
+```
+
+### 调用链路图
+
+```
+D1 Gateway.StopProcess
+   └── SessionOrchestrator.HandleInterrupt
+         ├── WaveCanceler.CancelAll(sessionID)         [InterruptMetrics.WaveCancelFailed]
+         ├── DelegateCanceler.CancelAll(sessionID)     [InterruptMetrics.D4CancelFailed]
+         ├── ProcessCanceler.Cancel(sessionID)         [InterruptMetrics.ProcessCancelFailed]
+         ├── Sink.Publish(stopped EngineEvent)         [best-effort, 错误不外传]
+         └── return errors.Join(...) | nil             [InterruptMetrics.HandleErrored/HandleCompleted]
+
+WaveScheduler (独立调用路径)
+   ├── Start (reentry)                                 [SchedulerMetrics.WaveReentryCancelled]
+   ├── dispatchLoop (ticker + wakeupCh)                [SchedulerMetrics.DispatchLoopWakeups]
+   ├── spawnOne (worker goroutine)
+   │     ├── recover()                                 [SchedulerMetrics.WorkerPanics]
+   │     └── completeTask → cleanup cancel             [SchedulerMetrics.TaskCtxLeaked]
+   └── WaveRunner.Run → Sandbox.Exit (defer)           [ExecutorMetrics.SandboxExitFailed]
+
+DefaultForker.Fork (并行 batch)
+   ├── sandbox.Enter                                   [ForkerMetrics.SandboxEnterFailed]
+   ├── factory.Create                                  [ForkerMetrics.FactoryCreateFailed]
+   ├── on failure:
+   │     ├── rollback:
+   │     │     ├── h.Agent.Terminate                   [slog.Warn]
+   │     │     └── sandbox.Exit                        [ForkerMetrics.SandboxExitFailed]
+   │     └── return errors.Join(err1..N)               [ForkerMetrics.RollbackTriggered]
+
+TaskManager.UpdateStatus (terminal)
+   └── publishCompletion (goroutine)
+         └── bus.Publish                                [TaskManagerMetrics.PublishCompletionPanics]
+```
+
+### Backward Compatibility 策略
+
+- **Setter pattern**：`WithMetrics(*Metrics)` / `SetMetrics(*Metrics)` 链式调用，所有 13+ 现有 `New*` 构造器零修改
+- **nil-safe**：所有 record 方法 `if m != nil { m.Counter.Add(1) }`，nil metrics 不影响业务逻辑
+- **errors.Join (Go 1.20+)**：devrix `go.mod` ≥ 1.21，无编译兼容性问题
+- **field name 稳定性**：`SchedulerMetricsSnapshot` / `ForkerMetricsSnapshot` JSON 字段已纳入 D5 observability 契约，D5 接入是手动 work（与本 PR 并行跟踪）
+
+### Regression Risk 评估
+
+| 风险 | 概率 | 影响 | 缓解 |
+|------|------|------|------|
+| `errors.Join` 误用导致 N-1 error 丢失 | None | — | 全单元测试覆盖 AllStepsFail/PartialFailure/AllSuccess 三场景 |
+| ForkerMetrics nil-setter 漏掉 caller | Low | Low | grep `NewDefaultForker` 验证 13 调用方零改动 |
+| SchedulerMetrics int→atomic 破坏 test | Low | Low | 保留 int + sync.Mutex（已有 metricsMu 保护） |
+| TaskCtxLeaked 误报 | Med | Low | S5 acceptance 验证 < 5%，可后续在 completeTask 强化清理 |
+| D5 dashboard 未及时更新 | Low | Low | D5 接入是手动 work（DM-20260621-010 文档同步后启动） |
 
 ---
 

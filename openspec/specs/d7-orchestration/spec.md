@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 3.9.0
+**Version:** 4.0.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-19
+**Last Updated:** 2026-06-21
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics)
 
 ---
 
@@ -98,6 +98,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard | IMPLEMENTED | `wavescheduler/` |
 | D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | IMPLEMENTED | `executionflow/{hub,workplan,imsink,bridge}/` |
 | D7-S5 | Decision & Planning | PlanAgent 只读探索、规则+LLM 分类、SynthesizeTaskGraph、SelectExecutor | **IMPLEMENTED** | `decisionplanning/` + `workmodel/plan_*.go` |
+| **D7-S6** | **Error Aggregation & Metrics** | **HandleInterrupt errors.Join 聚合 + InterruptMetrics; sandbox cleanup observability (freefork + execute); WaveScheduler 4 新 metrics 字段; TaskManager panic counter** | **IMPLEMENTED** | `sessionorchestrator/{interrupt,metrics}.go` + `multiagent/provision/freefork/{forker,metrics}.go` + `multiagent/execute/{worker,metrics}.go` + `wavescheduler/scheduler.go` + `workmodel/task_manager{,_metrics}.go` |
 
 ---
 
@@ -544,6 +545,102 @@ LLM. Supersedes Phase A `SubTurnRunner` legacy default.
 
 ---
 
+### Requirement: HandleInterrupt errors.Join Aggregation (devrix-d7-error-aggregation-and-metrics)
+
+`InterruptHandler.Handle` MUST aggregate errors from the 3 cancel steps (Wave → D4 → Process) via `errors.Join` instead of the previous "warn all + return nil" anti-pattern. The "stopped" EngineEvent emission remains best-effort regardless of cancel outcomes.
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/sessionorchestrator/`
+**T:** D7-S6-A11-T01, T02, T03
+
+#### Scenario: All 3 cancel steps fail
+
+- GIVEN WaveCanceler / DelegateCanceler / ProcessCanceler all return non-nil errors
+- WHEN `InterruptHandler.Handle(ctx, sessionID)` is called
+- THEN the returned error is `errors.Join(waveErr, d4Err, procErr)`
+- AND `errors.Is(returned, waveErr)` is true for each underlying error
+- AND `InterruptMetrics.Snapshot.WaveCancelFailed == 1`
+- AND `InterruptMetrics.Snapshot.D4CancelFailed == 1`
+- AND `InterruptMetrics.Snapshot.ProcessCancelFailed == 1`
+- AND `InterruptMetrics.Snapshot.HandleErrored == 1`
+- AND the "stopped" EngineEvent is still emitted best-effort
+
+#### Scenario: Partial failure
+
+- GIVEN 1 of 3 cancelers fails (others return nil)
+- WHEN `Handle` is called
+- THEN the returned error contains only the failed step's wrapped error
+- AND `InterruptMetrics.HandleErrored == 1`
+
+#### Scenario: Backward-compat with nil Metrics
+
+- GIVEN `InterruptOptions{Metrics: nil}` (pre-PR-A callers)
+- WHEN `Handle` is called
+- THEN `errors.Join` is still returned (no panic, no metric increments)
+- AND the "stopped" event is still emitted if Sink is non-nil
+
+### Requirement: Sandbox Cleanup Observability (devrix-d7-error-aggregation-and-metrics)
+
+All `Sandbox.Exit` call sites across `freefork.Forker`, `execute.Executor`, and `wavescheduler.WorkerRunner` MUST surface Exit failures via atomic counter + `slog.Warn`, replacing the previous `_ = Sandbox.Exit(...)` silent-swallow pattern.
+
+**Priority:** P0
+**Package:** `internal/layers/multiagent/provision/freefork/` + `internal/layers/multiagent/execute/` + `internal/layers/orchestration/wavescheduler/`
+**T:** D7-S6-A12-T04, T05, T06
+
+#### Scenario: Forker sandbox Exit failure
+
+- GIVEN `DefaultForker.WithMetrics(&ForkerMetrics{})` is set
+- AND a rollback path triggers `Sandbox.Exit` that returns an error
+- WHEN the rollback completes
+- THEN `ForkerMetrics.Snapshot.SandboxExitFailed == 1`
+- AND `slog.Warn("freefork: sandbox exit failed", ...)` is emitted
+
+#### Scenario: Executor sandbox Exit failure
+
+- GIVEN `Executor.WithMetrics(&ExecutorMetrics{})` is set
+- WHEN `ExecuteSync` / `ExecuteAsync` / `forkWorker` cleanup paths trigger `Sandbox.Exit` failures
+- THEN `ExecutorMetrics.Snapshot.SandboxExitFailed` is incremented (3 potential sites)
+- AND each failure emits `slog.Warn("execute: sandbox exit failed", where=..., sessionID=..., ...)` with `where` distinguishing the call site
+
+#### Scenario: TaskManager.publishCompletion panic
+
+- GIVEN `notify.GlobalBus().Publish` (or a panicking subscriber) panics during `publishCompletion`
+- WHEN the deferred recover catches the panic
+- THEN `TaskManagerMetrics.Snapshot.PublishCompletionPanics.Add(1)` is incremented
+- AND `slog.Error("taskmanager: publishCompletion panic", session=..., item_id=..., panic=..., metric="publish_completion_panics")` is emitted
+- AND the publishCompletion goroutine does not crash the process
+
+### Requirement: Forker errors.Join Aggregation + Backward Compatibility (devrix-d7-error-aggregation-and-metrics)
+
+`DefaultForker.Fork` MUST aggregate errors from N concurrent spawn failures via `errors.Join`, replacing the previous `return nil, errs[0]` pattern that dropped N-1 errors. The `WithMetrics` setter MUST be backward-compatible with the 13 existing `NewDefaultForker` callers that don't explicitly wire metrics.
+
+**Priority:** P0
+**Package:** `internal/layers/multiagent/provision/freefork/`
+**T:** D7-S6-A13-T07
+
+#### Scenario: All N forks fail
+
+- GIVEN N ForkRequests with a stub factory that fails every Create
+- WHEN `Fork(ctx, parent, reqs)` is called
+- THEN the returned error is `errors.Join(err1, err2, ..., errN)`
+- AND each fork's name appears in the joined error message
+- AND `errors.Is(returned, factoryErr)` is reachable
+
+#### Scenario: Backward-compat with nil metrics
+
+- GIVEN `NewDefaultForker(deps)` without `WithMetrics` call
+- WHEN `Fork` is called
+- THEN the call does not panic
+- AND errors.Join aggregation still works (zero overhead)
+
+#### Scenario: Hard assertion on leftover sandbox
+
+- GIVEN a failed fork batch where rollback cleans up sandbox dirs
+- WHEN the test inspects `wt.base` for leftover subdirectories
+- THEN `t.Errorf` fires on any leftover (was `t.Logf` pre-PR-A, masking latent cleanup failures)
+
+---
+
 ## REMOVED Requirements
 
 ### Requirement: PlanModeApproveGate Config (devrix-d7-uncertainty-gaps)
@@ -656,6 +753,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.7.0** | **2026-06-17** | **devrix-unified-work-tree (DM-20260617-009)**：(1) ADDED WorkItem + WorkTree 统一工作语义；(2) WorkTree ⊥ RunRegistry 分离（`run_ref` 外键）；(3) todo_write→checklist ephemeral 子节点 + sc.Todos 投影；(4) Wave OrchestratePath SyncWaveNodes；(5) legacy TaskManager 适配器；(6) 跨 session 只读查询 baseline |
 | **3.8.0** | **2026-06-18** | **devrix-unified-work-tree v1.5–v2.0 闭环 (PR #85–#87)**：(1) 统一工具 alias task_write/spawn/await；(2) RunTurn decompose + ResolveHint + depth/daily limits；(3) RunTurn blocking await (`ResolveAwaiter`)；(4) v2.1+ defer → `openspec/tech-debt/worktree-v2-deferred.md` |
 | **3.9.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：(1) S 层物理路径对齐 `code-layout.md` §4.2；(2) coordinator→sessionorchestrator+decisionplanning+orchtypes；(3) wave→wavescheduler、S4→executionflow；(4) hubspoke dispatch/bridge 拆分；(5) WorkTree TD-WT-02/03 部分闭合 |
+| **4.0.0** | **2026-06-21** | **devrix-d7-error-aggregation-and-metrics (DM-20260621-010)**：(1) D7-S6 新增 Scenario「Error Aggregation & Metrics」覆盖 HandleInterrupt errors.Join + sandbox cleanup observability + Forker errors.Join；(2) ADDED Requirements：D7-S6-A11 (interrupt errors.Join 3 步 cancel 聚合) + D7-S6-A12 (sandbox cleanup observability freefork+execute+taskmanager) + D7-S6-A13 (forker errors.Join + 13 调用方 backward compat)；(3) Scenarios 表新增 D7-S6 行；(4) Archived Changes 表新增 DM-20260621-010 引用 |
 
 ---
 
