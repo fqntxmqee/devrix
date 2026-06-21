@@ -15,6 +15,11 @@ import (
 )
 
 // SchedulerMetrics captures aggregate counters surfaced for testing / observability.
+//
+// DM-20260621-010 PR-B: 4 new counters added — WorkerPanics (recover hits),
+// TaskCtxLeaked (cancel still non-nil after normal completion),
+// WaveReentryCancelled (Start invoked while a wave is active),
+// DispatchLoopWakeups (ticker + wakeupCh total wakeup events).
 type SchedulerMetrics struct {
 	Started         int
 	Completed       int
@@ -22,6 +27,12 @@ type SchedulerMetrics struct {
 	Cancelled       int
 	PeakRunning     int
 	TotalDispatches int
+
+	// New in PR-B.
+	WorkerPanics         int
+	TaskCtxLeaked        int
+	WaveReentryCancelled int
+	DispatchLoopWakeups  int
 }
 
 // ContextResolverIface is the minimal contract WaveScheduler needs from a
@@ -167,6 +178,14 @@ func (s *WaveScheduler) incMetric(field string) {
 		s.metrics.Cancelled++
 	case "dispatch":
 		s.metrics.TotalDispatches++
+	case "worker_panic":
+		s.metrics.WorkerPanics++
+	case "task_ctx_leaked":
+		s.metrics.TaskCtxLeaked++
+	case "wave_reentry_cancelled":
+		s.metrics.WaveReentryCancelled++
+	case "dispatch_wakeup":
+		s.metrics.DispatchLoopWakeups++
 	}
 }
 
@@ -215,6 +234,7 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 	if hasExisting {
 		slog.Info("wave: reentry — cancelling prior wave", "session", sessionID)
 		s.cancelWaveLocked(existing)
+		s.incMetric("wave_reentry_cancelled")
 	}
 
 	// Register release hooks on the pool so we wake up the dispatch loop.
@@ -283,8 +303,10 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 			return
 		case <-state.wakeupCh:
 			// A slot was released OR a task completed — re-check ready tasks.
+			s.incMetric("dispatch_wakeup")
 		case <-ticker.C:
 			// Periodic check.
+			s.incMetric("dispatch_wakeup")
 		}
 	}
 }
@@ -389,8 +411,11 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 		)
 		defer func() {
 			if r := recover(); r != nil {
+				s.incMetric("worker_panic")
 				slog.Error("wave: worker panic",
-					"session", sessionID, "task", node.ID, "panic", r)
+					"session", sessionID, "task", node.ID, "panic", r,
+					"worker_id", workerID,
+					"metric", "worker_panics")
 				s.completeTask(sessionID, state, node.ID, slotID, Artifact{
 					TaskID:    node.ID,
 					SessionID: sessionID,
@@ -475,7 +500,18 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 
 	// Update handle.
 	state.mu.Lock()
-	if h, ok := state.handles[taskID]; ok {
+	h, hOK := state.handles[taskID]
+	if hOK {
+		// taskCtx leak detection: if task reached normal completion (no error,
+		// exit 0) but cancel is still non-nil, the caller didn't drive the
+		// cancel lifecycle — flag it for observability.
+		if h.cancel != nil && art.ExitCode == 0 && art.Error == "" {
+			s.incMetric("task_ctx_leaked")
+			slog.Warn("wave: taskCtx not cleaned up after normal completion",
+				"session", sessionID, "task", taskID,
+				"worker_id", h.taskID,
+				"metric", "task_ctx_leaked")
+		}
 		h.cancel = nil
 		delete(state.handles, taskID)
 	}
