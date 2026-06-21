@@ -61,6 +61,10 @@ type ContextEngineBuilder struct {
 	// ctx 用于 startTrackerTick 等后台 goroutine 的生命周期管理;
 	// nil 时回退到 context.Background (不会主动退出, 适用于单例启动场景).
 	ctx context.Context
+	// preparedTurnRunner is the D7 turn loop wired by bootstrap.InitOrchestration
+	// on the main context engine. Per-agent engines created by Build() will
+	// mirror this runner so forked workers can execute Process() (DM-20260618-010).
+	preparedTurnRunner contracts.PreparedTurnRunner
 }
 
 // NewContextEngineBuilder creates a reusable engine builder.
@@ -104,6 +108,21 @@ func (b *ContextEngineBuilder) WithContext(ctx context.Context) *ContextEngineBu
 func (b *ContextEngineBuilder) WithForker(f freefork.Forker) *ContextEngineBuilder {
 	if b != nil {
 		b.forker = f
+	}
+	return b
+}
+
+// WithPreparedTurnRunner wires the per-agent engines created by Build with
+// the same PreparedTurnRunner as the main context engine. This is required
+// so forked workers can run their Process() turn loop (DM-20260618-010
+// follow-up: per-agent engine must mirror the main engine's runner or
+// Process() returns "PreparedTurnRunner not wired").
+//
+// Callers should invoke this AFTER bootstrap.InitOrchestration has wired
+// the main engine, typically by passing contextEngine.PreparedTurnRunner().
+func (b *ContextEngineBuilder) WithPreparedTurnRunner(r contracts.PreparedTurnRunner) *ContextEngineBuilder {
+	if b != nil {
+		b.preparedTurnRunner = r
 	}
 	return b
 }
@@ -232,7 +251,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		Forker:    freeforkGlobalFunc(b.forker),
 	})
 
-	return contextengine.NewContextEngine(contextengine.EngineDeps{
+	ce := contextengine.NewContextEngine(contextengine.EngineDeps{
 		TokenCounter:        b.stack.TokenCounter,
 		Tools:               tools,
 		ToolsReg:            toolReg,
@@ -250,6 +269,10 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		Surfaces:            surfaces,
 		Filters:             DefaultFilters(),
 	})
+	if b.preparedTurnRunner != nil {
+		ce.SetPreparedTurnRunner(b.preparedTurnRunner)
+	}
+	return ce
 }
 
 // startTrackerTick 在后台 goroutine 中按 interval 调 TickOnce。

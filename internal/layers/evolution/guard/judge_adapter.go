@@ -26,7 +26,8 @@ func NewRuntimeJudge(gw llmgateway.IGateway, config OrchestrationConfig) *Runtim
 func (rj *RuntimeJudge) ValidateDecision(ctx context.Context, rec DecisionRecord) (*ValidationResult, error) {
 	prompt := rj.buildJudgePrompt(rec)
 	req := &llmgateway.Request{
-		Model:        rj.config.JudgeProvider + "/" + rj.config.JudgeModel,
+		Provider:     rj.config.JudgeProvider,
+		Model:        rj.config.JudgeModel,
 		SystemPrompt: "You are a routing decision validator. Respond in JSON only.",
 		Messages: []types.Message{
 			{Role: "user", Content: prompt},
@@ -59,7 +60,8 @@ func (rj *RuntimeJudge) tryFallback(ctx context.Context, rec DecisionRecord, ori
 	}
 
 	req := &llmgateway.Request{
-		Model:        rj.config.FallbackJudgeProvider + "/" + rj.config.FallbackJudgeModel,
+		Provider:     rj.config.FallbackJudgeProvider,
+		Model:        rj.config.FallbackJudgeModel,
 		SystemPrompt: "You are a routing decision validator. Respond in JSON only.",
 		Messages: []types.Message{
 			{Role: "user", Content: rj.buildJudgePrompt(rec)},

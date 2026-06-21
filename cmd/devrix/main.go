@@ -293,6 +293,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// DM-20260618-010 follow-up: mirror the main engine's PreparedTurnRunner
+	// onto the per-agent engine builder so forked workers (D4 ParentID != "")
+	// can run Process() without "PreparedTurnRunner not wired" errors.
+	if engineBuilder != nil {
+		if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+			if runner := ce.PreparedTurnRunner(); runner != nil {
+				engineBuilder.WithPreparedTurnRunner(runner)
+			}
+		}
+	}
+
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
 
 	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
