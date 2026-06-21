@@ -261,7 +261,15 @@ func TestFormatWorkerProgressSummary_SkipsToolCall(t *testing.T) {
 	}
 }
 
-func TestFeishuAdapter_StructuredProgress_SimpleReplyNoEmptyTaskCard(t *testing.T) {
+// TestFeishuAdapter_StructuredProgress_SimpleReplySummaryAsSeparateCard
+// pins the non-streaming path behavior after the DM-20260621-001 fix.
+// For a simple text → complete flow:
+//   1. The response card is created via Reply (1 reply).
+//   2. The non-empty summary is delivered as a SEPARATE reply (2nd
+//      reply) — the legacy "summary glued onto the response card with
+//      `---`" behavior is intentionally removed.
+//   3. No Patch is needed since the response card is left untouched.
+func TestFeishuAdapter_StructuredProgress_SimpleReplySummaryAsSeparateCard(t *testing.T) {
 	var replyCount int
 	var patchCount int
 
@@ -297,11 +305,14 @@ func TestFeishuAdapter_StructuredProgress_SimpleReplyNoEmptyTaskCard(t *testing.
 		Content: "用时: 8s, 消耗: 1500 tokens, 模型: claude-sonnet-4-6", Metadata: map[string]string{"event_type": "complete"},
 	})
 
-	if replyCount != 1 {
-		t.Fatalf("replyCount = %d, want 1 (response only)", replyCount)
+	// 1 reply for the response card + 1 reply for the separate summary card.
+	if replyCount != 2 {
+		t.Fatalf("replyCount = %d, want 2 (1 response card + 1 separate summary card)", replyCount)
 	}
-	if patchCount != 1 {
-		t.Fatalf("patchCount = %d, want 1 (complete footer on response)", patchCount)
+	// Response card is left untouched; no Patch is needed for the
+	// summary glue (the summary lives on its own card now).
+	if patchCount != 0 {
+		t.Fatalf("patchCount = %d, want 0 (response card not patched; summary is a separate card)", patchCount)
 	}
 }
 
@@ -717,6 +728,11 @@ func TestFeishuAdapter_AppendResponseText_DropsReplayedChunk(t *testing.T) {
 // prefix), the final cardkit UpdateCard must still drop the duplicate
 // before sending to Feishu. We assert by inspecting the last UpdateCard
 // PUT body's `card.data` payload.
+//
+// Note: per the DM-20260621-001 fix, the summary arg is now passed empty
+// by finalizeStructuredSession — the summary is delivered as a separate
+// card, not appended to the streaming reply card. This test asserts that
+// the streaming card carries only the deduped report + completion marker.
 func TestFeishuAdapter_FinalizeReplyCardStreaming_DedupsReplayedTextBuffer(t *testing.T) {
 	opening := "我先快速摸清项目结构与规模。这是一段开场白描述，描述项目的总体情况与策略选择依据。"
 	openingFull := opening + strings.Repeat("补", 80) + "结束。"
@@ -758,7 +774,7 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_DedupsReplayedTextBuffer(t *te
 	stream.textBuffer.WriteString("\n\n最终结论：4 路并行都成功完成。")
 	stream.mu.Unlock()
 
-	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "汇总报告"); err != nil {
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, ""); err != nil {
 		t.Fatalf("finalizeReplyCardStreaming: %v", err)
 	}
 
@@ -772,5 +788,100 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_DedupsReplayedTextBuffer(t *te
 	// The conclusion must be present.
 	if !strings.Contains(updateCardData, "最终结论：4 路并行都成功完成") {
 		t.Errorf("UpdateCard card.data missing conclusion: %s", updateCardData)
+	}
+	// Empty-summary path: the streaming card carries the minimal
+	// "✅ 任务已完成" completion marker so the user sees the task
+	// closed even when no D7 final summary was emitted.
+	if !strings.Contains(updateCardData, "✅ 任务已完成") {
+		t.Errorf("UpdateCard card.data missing completion marker: %s", updateCardData)
+	}
+}
+
+// TestFeishuAdapter_FinalizeStructuredSession_SendsSummaryAsSeparateCard
+// pins the user-reported fix
+// ("最后总结信息不是一个单独的恢复卡片，而是追加到前面的卡片了"):
+// when the D7 orchestrator emits a non-empty final summary, the IM
+// adapter MUST deliver it as a standalone "任务总结" card (new message)
+// rather than gluing it onto the existing response / streaming card with
+// a `---` separator. This test exercises the cardkit streaming path
+// (the most common case for the user) and asserts:
+//   1. the streaming reply card does NOT contain the summary text,
+//   2. a new interactive message is sent (replyCount == 2: 1 streaming
+//      card + 1 summary card), and
+//   3. the streaming card carries the minimal "✅ 任务已完成" completion
+//      marker so the user still sees a closed task when a separate
+//      summary card follows.
+//
+// Note: the larkim library stores the request body in the private
+// apiReq.Body field (the public Body field is reserved for response
+// deserialization), so the test cannot inspect the reply body directly.
+// The behavioral assertions above are sufficient: a separate card
+// cannot be created without invoking a second Reply, and the absence of
+// the summary text from the streaming card's body proves the report and
+// summary are no longer glued together.
+func TestFeishuAdapter_FinalizeStructuredSession_SendsSummaryAsSeparateCard(t *testing.T) {
+	const summary = "4 路并行 deep review 全部 PASS：架构 / 测试 / 安全 / 性能 / 命名 各域无 Critical 问题。"
+
+	var streamingUpdateCardData string
+	var summaryReplyCount int
+	msgID := "om_summary"
+
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			summaryReplyCount++
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{
+		imAPI: mockImAPI,
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			if !strings.Contains(path, "/elements/") {
+				if m, ok := body.(map[string]any); ok {
+					if card, ok := m["card"].(map[string]any); ok {
+						if data, ok := card["data"].(string); ok {
+							streamingUpdateCardData = data
+						}
+					}
+				}
+			}
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+		Streaming: FeishuStreamingConfig{Enabled: true},
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_summary_card", feishuReplyContext{userMessageID: "om_root"})
+
+	// Stream a short report so a cardkit reply card is created.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_summary_card", ChatID: "feishu_oc_1",
+		Content: "我已完成 4 路并行 review：架构 / 测试 / 安全 / 性能 / 命名。", Metadata: map[string]string{"event_type": "text"},
+	})
+	// Emit the complete event with the final summary.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_summary_card", ChatID: "feishu_oc_1",
+		Content: summary, Metadata: map[string]string{"event_type": "complete"},
+	})
+
+	// The streaming card must NOT contain the summary text — that would
+	// reproduce the original bug (summary glued onto the report card).
+	if streamingUpdateCardData != "" && strings.Contains(streamingUpdateCardData, summary) {
+		t.Errorf("streaming card contains summary text — should be sent as a separate card. card.data=%s", streamingUpdateCardData)
+	}
+	// A separate interactive message MUST be sent carrying the summary.
+	// replyCount == 2 means: (1) streaming card + (2) summary card.
+	if summaryReplyCount != 2 {
+		t.Fatalf("summaryReplyCount = %d, want 2 (1 streaming card + 1 summary card)", summaryReplyCount)
+	}
+	// The streaming card must carry the completion marker so the user
+	// sees the task closed even when the summary lives on a separate card.
+	if !strings.Contains(streamingUpdateCardData, "✅ 任务已完成") {
+		t.Errorf("streaming card missing completion marker: %s", streamingUpdateCardData)
 	}
 }
