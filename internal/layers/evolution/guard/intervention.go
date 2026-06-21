@@ -35,7 +35,8 @@ type InterventionExecutor struct {
 
 	// PR-A: H-3 silent swallow 修复（DM-20260621-011）
 	// 通过 WithMetrics 注入, nil-safe（默认 nil 不计数, 不影响现有调用方）
-	metrics *orchMetrics
+	// PR-B: 类型从 *orchMetrics 重命名为 *guardMetrics (alias 保留兼容).
+	metrics *guardMetrics
 }
 
 // NewInterventionExecutor creates an executor with the required controllers.
@@ -43,9 +44,9 @@ func NewInterventionExecutor(agents AgentController, tasks TaskController, facto
 	return &InterventionExecutor{agents: agents, tasks: tasks, factory: factory}
 }
 
-// WithMetrics injects the orchMetrics for error aggregation observability.
+// WithMetrics injects the guardMetrics for error aggregation observability.
 // Returns the executor for chaining. Nil-safe: nil disables recording.
-func (ie *InterventionExecutor) WithMetrics(m *orchMetrics) *InterventionExecutor {
+func (ie *InterventionExecutor) WithMetrics(m *guardMetrics) *InterventionExecutor {
 	ie.metrics = m
 	return ie
 }

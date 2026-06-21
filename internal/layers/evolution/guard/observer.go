@@ -12,26 +12,33 @@ import (
 // AgentObserver is the public interface that other packages can use.
 type AgentObserver = multiagent.AgentObserver
 
-// OrchestrationObserver implements multiagent.AgentObserver and bridges agent
+// GuardObserver implements multiagent.AgentObserver and bridges agent
 // lifecycle events into the validation pipeline.
-type OrchestrationObserver struct {
-	validator *RuntimeOrchestrationValidator
+//
+// PR-B (DM-20260621-011): renamed from OrchestrationObserver to align with
+// guard/ domain naming (v2.0 物理路径迁移时仅迁移目录, 类型名未同步).
+type GuardObserver struct {
+	validator *RuntimeGuardValidator
 	ctx       context.Context
 	session   *types.Session
 }
 
-// NewOrchestrationObserver creates an observer that feeds agent events into the validator.
-func NewOrchestrationObserver(
-	validator *RuntimeOrchestrationValidator,
+// NewGuardObserver creates an observer that feeds agent events into the validator.
+func NewGuardObserver(
+	validator *RuntimeGuardValidator,
 	ctx context.Context,
 	session *types.Session,
-) *OrchestrationObserver {
-	slog.Info("orchestration: observer created",
-		"session_id", session.SessionID,
-		"validator_enabled", validator.config.Enabled,
-	)
-	validator.metrics.signalObserverActive()
-	return &OrchestrationObserver{
+) *GuardObserver {
+	if validator != nil && session != nil {
+		slog.Info("guard: observer created",
+			"session_id", session.SessionID,
+			"validator_enabled", validator.config.Enabled,
+		)
+	}
+	if validator != nil {
+		validator.metrics.signalObserverActive()
+	}
+	return &GuardObserver{
 		validator: validator,
 		ctx:       ctx,
 		session:   session,
@@ -39,7 +46,7 @@ func NewOrchestrationObserver(
 }
 
 // EmitAgentEvent implements multiagent.AgentObserver.
-func (o *OrchestrationObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
+func (o *GuardObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
 	var rec *DecisionRecord
 
 	switch ev.EventType {
@@ -84,4 +91,22 @@ func (o *OrchestrationObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
 	o.validator.OnDecision(o.ctx, *rec, o.session)
 }
 
-var _ multiagent.AgentObserver = (*OrchestrationObserver)(nil)
+var _ multiagent.AgentObserver = (*GuardObserver)(nil)
+
+// OrchestrationObserver is an alias for GuardObserver kept for backward compatibility.
+//
+// Deprecated: use GuardObserver. This alias will be removed in v2.5.0 (DM-20260621-011).
+//go:deprecated
+type OrchestrationObserver = GuardObserver
+
+// NewOrchestrationObserver is the deprecated constructor for GuardObserver.
+//
+// Deprecated: use NewGuardObserver. This alias will be removed in v2.5.0 (DM-20260621-011).
+//go:deprecated
+func NewOrchestrationObserver(
+	validator *RuntimeGuardValidator,
+	ctx context.Context,
+	session *types.Session,
+) *GuardObserver {
+	return NewGuardObserver(validator, ctx, session)
+}
