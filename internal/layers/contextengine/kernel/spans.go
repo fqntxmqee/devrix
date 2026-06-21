@@ -19,6 +19,16 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D2_Context_Longterm_Recall", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "D2_Context_Longterm_Store", Layer: "context", Component: "context_engine", SinceVersion: "1.3.0", Instrumented: true},
 		{Name: "D2_Context_Tools_Register", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "D2_Context_Tools_List", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Tools_Filter_Permission", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Tools_Filter_AgentRole", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Worker_Fork", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Permission_Init", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Tier_Resolve", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Memory_Append", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_CompressedView_Set", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Attachments_Collect", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D2_Context_Queue_Drain", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D2_Context_Memory_Snapshot_Save", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
 		// D2 Context Engine - Tool Execution (D2-S5)

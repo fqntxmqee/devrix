@@ -37,7 +37,7 @@
 | 痛点 | 目标能力 | 可观测结果 |
 |------|----------|------------|
 | 多域 Agent 请求链路不可追踪 | W3C Trace Context + Jaeger Operation 树 | 单次会话完整 span 树 |
-| 问题定位不知发生在哪一层 | `devrix.layer` / `devrix.component` 属性 | Jaeger 按层/组件过滤 |
+| 问题定位不知发生在哪一层 | Operation 名 `D{N}_*` 前缀解析 layer/component | Jaeger 按 operation 前缀过滤 |
 | 埋点遗漏无法发现 | Operation Registry + Runtime Hit 对账 | Health `coverage.zero_hit_count` |
 | LLM 调试缺乏上下文 | LLM JSONL + trace 关联 + incident export | `devrix debug export` bundle |
 | 新旧执行路径混用难量化 | Runtime path metric | `runtime_path_resolved_total` |
@@ -83,13 +83,12 @@
 |------|------|------|
 | Span / Jaeger Operation | `{layer}.{module}.{action}` | `orchestration.turn.run` |
 | Prometheus metric | `devrix_{instrument}` | `devrix_tool_latency` |
-| Layer attribute | `devrix.layer` | `orchestration` |
-| Component attribute | `devrix.component` | `orchestrator` |
+| Layer × Component | 由 Operation 名 `D{N}_*` 前缀推导 | `telemetry.LayerAndComponent(op)` → `orchestration/orchestrator` |
 
 ### 代码风格
 
 - 各域通过 `Bridge` 注入，禁止直接 `new Tracer`
-- Span 属性使用 `telemetry.SpanAttrs()` 统一注入 layer/component
+- Span 属性由 `telemetry.SpanAttrs(operation, extra...)` 透传业务字段；layer/component 由 Operation 名蕴含
 - 错误日志经 `StructuredLogger`，error 类型自动附加 stack
 
 ---

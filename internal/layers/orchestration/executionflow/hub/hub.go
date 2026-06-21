@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -75,6 +76,11 @@ func (h *Hub) Publish(ctx context.Context, ev contracts.FlowEvent) {
 		tracer.Attribute{Key: "flow.session_id", Value: ev.SessionID},
 		tracer.Attribute{Key: "flow.kind", Value: string(ev.Kind)},
 		tracer.Attribute{Key: "flow.worker_id", Value: ev.WorkerID},
+		tracer.Attribute{Key: "flow.task_id", Value: ev.TaskID},
+		tracer.Attribute{Key: "flow.flow_id", Value: ev.FlowID},
+		tracer.Attribute{Key: "flow.summary_len", Value: fmt.Sprintf("%d", len(ev.Summary))},
+		tracer.Attribute{Key: "flow.role", Value: ev.Role},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 	if span != nil {
 		defer span.End()

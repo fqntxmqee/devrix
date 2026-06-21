@@ -57,6 +57,16 @@ const (
 	OpD2_S2_Context_Longterm_Recall = "D2_Context_Longterm_Recall"
 	OpD2_S2_Context_Longterm_Store = "D2_Context_Longterm_Store"
 	OpD2_S2_Context_Tools_Register = "D2_Context_Tools_Register"
+	OpD2_S2_Context_Tools_List = "D2_Context_Tools_List"
+	OpD2_S2_Context_Tools_Filter_Permission = "D2_Context_Tools_Filter_Permission"
+	OpD2_S2_Context_Tools_Filter_AgentRole = "D2_Context_Tools_Filter_AgentRole"
+	OpD2_S2_Context_Worker_Fork = "D2_Context_Worker_Fork"
+	OpD2_S2_Context_Permission_Init = "D2_Context_Permission_Init"
+	OpD2_S2_Context_Tier_Resolve = "D2_Context_Tier_Resolve"
+	OpD2_S2_Context_Memory_Append = "D2_Context_Memory_Append"
+	OpD2_S2_Context_CompressedView_Set = "D2_Context_CompressedView_Set"
+	OpD2_S2_Context_Attachments_Collect = "D2_Context_Attachments_Collect"
+	OpD2_S2_Context_Queue_Drain = "D2_Context_Queue_Drain"
 	OpD2_S2_Context_Memory_Snapshot_Save = "D2_Context_Memory_Snapshot_Save"
 
 	// D2 Context Engine - Harness (D2-S5)
@@ -116,14 +126,12 @@ const (
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
 )
 
-// SpanAttrs returns standard devrix.layer / devrix.component attributes plus extras.
+// SpanAttrs returns the extra attributes only. Layer/component are intentionally
+// omitted because the canonical operation name (D{N}_* prefix) already encodes
+// the layer and component — see LayerAndComponent for ad-hoc lookups.
 func SpanAttrs(operation string, extra ...tracer.Attribute) []tracer.Attribute {
-	layer, component := LayerAndComponent(operation)
-	attrs := []tracer.Attribute{
-		{Key: "devrix.layer", Value: layer},
-		{Key: "devrix.component", Value: component},
-	}
-	return append(attrs, extra...)
+	_ = operation
+	return extra
 }
 
 // LayerAndComponent maps an operation name to Jaeger filter dimensions.

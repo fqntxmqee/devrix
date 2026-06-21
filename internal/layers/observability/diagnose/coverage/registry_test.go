@@ -56,6 +56,16 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S2_Context_Longterm_Recall,
 		telemetry.OpD2_S2_Context_Longterm_Store,
 		telemetry.OpD2_S2_Context_Tools_Register,
+		telemetry.OpD2_S2_Context_Tools_List,
+		telemetry.OpD2_S2_Context_Tools_Filter_Permission,
+		telemetry.OpD2_S2_Context_Tools_Filter_AgentRole,
+		telemetry.OpD2_S2_Context_Worker_Fork,
+		telemetry.OpD2_S2_Context_Permission_Init,
+		telemetry.OpD2_S2_Context_Tier_Resolve,
+		telemetry.OpD2_S2_Context_Memory_Append,
+		telemetry.OpD2_S2_Context_CompressedView_Set,
+		telemetry.OpD2_S2_Context_Attachments_Collect,
+		telemetry.OpD2_S2_Context_Queue_Drain,
 		telemetry.OpD2_S2_Context_Memory_Snapshot_Save,
 
 		// D2 Context Engine - Tool Execution (D2-S5)

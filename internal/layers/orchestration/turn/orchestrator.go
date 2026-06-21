@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
+	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -201,7 +202,13 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 		ctx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Run, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+			tracer.Attribute{Key: "turn.mode", Value: req.Mode},
 			tracer.Attribute{Key: "turn.max_turns", Value: fmt.Sprintf("%d", req.MaxTurns)},
+			tracer.Attribute{Key: "turn.model", Value: req.Model},
+			tracer.Attribute{Key: "turn.nested", Value: boolStr(isNestedScope(req.Scope) || len(req.PreloadedMessages) > 0)},
+			tracer.Attribute{Key: "turn.skip_persist", Value: boolStr(req.SkipPersist)},
+			tracer.Attribute{Key: "context.caller", Value: "d7"},
+			tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
 		)
 		defer endSpan(turnSpan)
 		o.runLoop(ctx, req, ch)
@@ -245,7 +252,9 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				tracer.Attribute{Key: "session_id", Value: req.SessionID},
 				tracer.Attribute{Key: "context.phase", Value: "prepare"},
 				tracer.Attribute{Key: "context.caller", Value: "d7"},
+				tracer.Attribute{Key: "context.worker_local", Value: boolStr(false)},
 				tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+				tracer.Attribute{Key: "turn.mode", Value: req.Mode},
 			)
 			prepared, err = o.context.Prepare(ctx, PrepareRequest{
 				SessionID: req.SessionID,
@@ -285,6 +294,8 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "context.phase", Value: "prepare"},
 			tracer.Attribute{Key: "context.caller", Value: "d7"},
+			tracer.Attribute{Key: "context.worker_local", Value: boolStr(false)},
+			tracer.Attribute{Key: "turn.mode", Value: req.Mode},
 		)
 		prepared, err = o.context.Prepare(ctx, PrepareRequest{
 			SessionID: req.SessionID,
@@ -322,6 +333,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			compressCtx, compressSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
 				tracer.Attribute{Key: "session_id", Value: req.SessionID},
 				tracer.Attribute{Key: "llm.purpose", Value: "compress"},
+				tracer.Attribute{Key: "llm.trigger_reason", Value: "token_budget_exceeded"},
+				tracer.Attribute{Key: "llm.target_token_budget", Value: fmt.Sprintf("%d", prepared.CompressHint.TargetTokenBudget)},
+				tracer.Attribute{Key: "llm.messages_to_summarize", Value: fmt.Sprintf("%d", len(prepared.CompressHint.MessagesToSummarize))},
+				tracer.Attribute{Key: "llm.model", Value: model},
 			)
 			result := o.runCompress(compressCtx, req, prepared.CompressHint)
 			endSpan(compressSpan)
@@ -401,9 +416,25 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// and the systemPrompt + Tools set is stable across a turn. The
 		// audit is the high-leverage piece; a follow-up OpenSpec can
 		// re-evaluate the Prepare cadence if needed.
+		// streamRecoveryAttempts tracks how many times we've retried the stream
+		// for max-output-token recovery in THIS turn. It is hoisted above the
+		// turn + llm spans so the pre-invoke attributes capture the value
+		// carried into the next iteration (most often 0; > 0 after a previous
+		// iteration retried).
+		streamRecoveryAttempts := 0
+
 		turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
+			tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+			tracer.Attribute{Key: "turn.mode", Value: req.Mode},
+			tracer.Attribute{Key: "llm.model", Value: model},
+			tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
+			tracer.Attribute{Key: "context.message_count", Value: fmt.Sprintf("%d", len(messages))},
+			tracer.Attribute{Key: "context.system_prompt_len", Value: fmt.Sprintf("%d", len(systemPrompt))},
+			tracer.Attribute{Key: "context.tool_count", Value: fmt.Sprintf("%d", len(tools))},
+			tracer.Attribute{Key: "context.nested", Value: boolStr(nested)},
+			tracer.Attribute{Key: "context.budget_tracker_active", Value: boolStr(maxContextTokens > 0)},
 		)
 		o.runTokenAudit(ctx, systemPrompt, messages, maxContextTokens, turnCount, turnSpan)
 
@@ -412,6 +443,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
 			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
+			tracer.Attribute{Key: "llm.model", Value: model},
+			tracer.Attribute{Key: "llm.pre_message_count", Value: fmt.Sprintf("%d", len(messages))},
+			tracer.Attribute{Key: "llm.pre_tool_count", Value: fmt.Sprintf("%d", len(tools))},
+			tracer.Attribute{Key: "llm.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
+			tracer.Attribute{Key: "llm.stream_recovery_attempts", Value: fmt.Sprintf("%d", streamRecoveryAttempts)},
 		)
 		var contentBuf strings.Builder
 		var toolCalls []llmgateway.ToolCall
@@ -423,7 +459,6 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// finalText fallback below (see emitComplete call sites).
 		var turnThinking strings.Builder
 
-		streamRecoveryAttempts := 0
 	streamRecoveryLoop:
 		for {
 			chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
@@ -560,7 +595,10 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		_, toolSpan := o.startSpan(turnCtx, telemetry.OpD2_S5_Tool_Execute_Single, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
 			tracer.Attribute{Key: "tool.count", Value: fmt.Sprintf("%d", len(toolCalls))},
+			tracer.Attribute{Key: "tool.names", Value: joinToolNames(toolCalls)},
+			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
 			tracer.Attribute{Key: "context.caller", Value: "d7"},
+			tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
 		)
 		toolCtx := WithToolEventStream(turnCtx, func(ev *contracts.EngineEvent) {
 			if ev == nil {
@@ -664,7 +702,15 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	_, persistSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
+		tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
 		tracer.Attribute{Key: string(metadataKeyExitReason), Value: string(exitReason)},
+		tracer.Attribute{Key: "context.turn_count", Value: fmt.Sprintf("%d", turnCount)},
+		tracer.Attribute{Key: "context.usage_prompt_tokens", Value: fmt.Sprintf("%d", totalUsage.PromptTokens)},
+		tracer.Attribute{Key: "context.usage_completion_tokens", Value: fmt.Sprintf("%d", totalUsage.CompletionTokens)},
+		tracer.Attribute{Key: "context.usage_total_tokens", Value: fmt.Sprintf("%d", totalUsage.TotalTokens)},
+		tracer.Attribute{Key: "context.llm_model", Value: model},
+		tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
+		tracer.Attribute{Key: "context.final_text_len", Value: fmt.Sprintf("%d", len(finalText))},
 	)
 	resolvedFinal := resolveFinalText(finalText, lastThinkingTail.String(), exitReason, req.MaxTurns)
 	_ = persister.PersistTurn(ctx, PersistRequest{
@@ -1250,4 +1296,31 @@ func (b *budgetTracker) shouldStopDiminishing(maxContextTokens int) bool {
 		}
 	}
 	return true
+}
+
+// boolStr renders a boolean as a span-attribute friendly string.
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// joinToolNames concatenates tool-call names for span attributes. Caps the
+// rendered length at 8 names + an overflow suffix so the attribute stays
+// cheap to index in Jaeger even for batches of many tool calls.
+func joinToolNames(tcs []llmgateway.ToolCall) string {
+	const max = 8
+	if len(tcs) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, max+1)
+	for i, tc := range tcs {
+		if i >= max {
+			parts = append(parts, fmt.Sprintf("+%d_more", len(tcs)-max))
+			break
+		}
+		parts = append(parts, tc.Name)
+	}
+	return strings.Join(parts, ",")
 }

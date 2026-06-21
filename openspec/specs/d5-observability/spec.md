@@ -191,9 +191,19 @@ OTLP Resource MUST 包含 `service.name`（默认 `devrix`）与 `service.versio
 
 ---
 
-### Requirement: Devrix Layer Attributes (P0)
+### Requirement: Layer/Component Encoded in Operation Name
 
-每个 span MUST 包含 `devrix.layer` 与 `devrix.component`，由 `telemetry.SpanAttrs` 注入。
+Operation 命名规范（`D{N}_{...}` 前缀）已蕴含 layer 与 component 信息。
+
+- `D1_*` → communication/gateway（`D1_Adapter_*` → communication/adapter）
+- `D2_Context_Harness_*` → context/harness（其他 `D2_*` 见 LayerAndComponent 映射表）
+- `D3_LLM_Adapter_*` → llm/llm_adapter（其他 `D3_LLM_*` → llm/llm_gateway）
+- `D4_*` → agent/agent_tool
+- `D6_*` → evolution/validation
+- `D7_*` → orchestration/orchestrator
+
+`devrix.layer` / `devrix.component` 不再作为强制 span attribute 注入；需要时调用
+`telemetry.LayerAndComponent(operation)` 显式查询（如 OTLP ScopeSpans.scope.name、调试 dump）。
 
 | Layer | Components |
 |-------|------------|

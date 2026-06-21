@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 )
 
 func TestLayerAndComponent_should_map_gateway_operation(t *testing.T) {
@@ -22,16 +23,27 @@ func TestLayerAndComponent_should_map_evolution_validation_operation(t *testing.
 	}
 }
 
-func TestSpanAttrs_should_include_layer_and_component(t *testing.T) {
+func TestSpanAttrs_should_not_inject_layer_or_component(t *testing.T) {
 	attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream)
-	if len(attrs) < 2 {
-		t.Fatalf("attrs: %+v", attrs)
+	for _, a := range attrs {
+		if a.Key == "devrix.layer" || a.Key == "devrix.component" {
+			t.Fatalf("SpanAttrs must not inject %q (encoded in operation name)", a.Key)
+		}
 	}
-	if attrs[0].Key != "devrix.layer" || attrs[0].Value != telemetry.LayerLLM {
-		t.Fatalf("layer attr: %+v", attrs[0])
+}
+
+func TestSpanAttrs_should_pass_through_extras(t *testing.T) {
+	extra := tracer.Attribute{Key: "tool.name", Value: "read_file"}
+	attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream, extra)
+	if len(attrs) != 1 || attrs[0].Key != "tool.name" || attrs[0].Value != "read_file" {
+		t.Fatalf("extras passthrough failed: %+v", attrs)
 	}
-	if attrs[1].Key != "devrix.component" || attrs[1].Value != "llm_gateway" {
-		t.Fatalf("component attr: %+v", attrs[1])
+}
+
+func TestLayerAndComponent_should_still_resolve_for_explicit_lookups(t *testing.T) {
+	layer, component := telemetry.LayerAndComponent(telemetry.OpD3_S3_LLM_Stream)
+	if layer != telemetry.LayerLLM || component != "llm_gateway" {
+		t.Fatalf("LayerAndComponent regressed: layer=%q component=%q", layer, component)
 	}
 }
 

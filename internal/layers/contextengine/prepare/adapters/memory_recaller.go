@@ -14,6 +14,7 @@ package adapters
 import (
 	"context"
 	stderrors "errors"
+	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -60,13 +61,19 @@ func (a *MemoryRecallerAdapter) WithTopicsProvider(fn func() []string) *MemoryRe
 // RecallLongTermEntries returns the long-term memory entries relevant to query.
 // Returns nil + nil error (not an error) when worker-local is in effect.
 func (a *MemoryRecallerAdapter) RecallLongTermEntries(ctx context.Context, query string) ([]memory.MemoryEntry, error) {
-	attrs := []tracer.Attribute{}
+	attrs := []tracer.Attribute{
+		{Key: "longterm.query_len", Value: fmt.Sprintf("%d", len(query))},
+		{Key: "context.caller", Value: "d7"},
+	}
 	if a.enabled != nil {
 		attrs = append(attrs, tracer.Attribute{Key: "longterm.enabled", Value: boolStr(a.enabled())})
 	}
 	if a.topics != nil {
 		topics := a.topics()
 		attrs = append(attrs, tracer.Attribute{Key: "longterm.recall_topics", Value: joinStrings(topics, ",")})
+	}
+	if a.workerLocal != nil {
+		attrs = append(attrs, tracer.Attribute{Key: "longterm.worker_local", Value: boolStr(a.workerLocal())})
 	}
 	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Longterm_Recall, tracer.SpanKindInternal, attrs...)
 	if span != nil {
@@ -90,6 +97,11 @@ func (a *MemoryRecallerAdapter) RecallLongTermEntries(ctx context.Context, query
 		wrapped := errors.NewLongTermDBError(err)
 		a.hooks.emit(errorEvent("", wrapped, false))
 		return nil, wrapped
+	}
+	if span != nil {
+		span.SetAttributes(
+			tracer.Attribute{Key: "longterm.result_count", Value: fmt.Sprintf("%d", len(entries))},
+		)
 	}
 	return entries, nil
 }
