@@ -110,7 +110,7 @@ func (o *PrepareOrchestrator) Prepare(ctx context.Context, input PrepareInput, p
 		defer span.End()
 	}
 
-	sc, isNew, err := o.deps.SessionLoader.LoadOrInit(input.Session, input.Model)
+	sc, isNew, err := o.deps.SessionLoader.LoadOrInit(ctx, input.Session, input.Model)
 	if err != nil {
 		if span != nil {
 			span.RecordError(err)
@@ -142,7 +142,7 @@ func (o *PrepareOrchestrator) Prepare(ctx context.Context, input PrepareInput, p
 	var systemPrompt string
 	if o.deps.PromptAssembler != nil {
 		buildInput := input.toSystemPromptBuildInput(sc, memoryEntries)
-		sp, _ := o.deps.PromptAssembler.Build(buildInput)
+		sp, _ := o.deps.PromptAssembler.Build(ctx, buildInput)
 		systemPrompt = sp
 	}
 

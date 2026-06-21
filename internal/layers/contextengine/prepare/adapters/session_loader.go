@@ -50,8 +50,7 @@ func NewSessionLoaderAdapter(manager *memory.Manager, opts ...HooksOption) *Sess
 //
 // The `model` parameter is accepted for interface compatibility (legacy facade
 // signature); the underlying Manager.LoadOrInit uses the session's stored model.
-func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) (*types.SessionContext, bool, error) {
-	ctx := context.Background()
+func (a *SessionLoaderAdapter) LoadOrInit(ctx context.Context, session *types.Session, model string) (*types.SessionContext, bool, error) {
 	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Snapshot_Load, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session.id", Value: session.SessionID},
 		tracer.Attribute{Key: "session.request_id", Value: session.RequestID},

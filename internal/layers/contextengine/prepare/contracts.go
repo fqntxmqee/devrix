@@ -30,7 +30,7 @@ type SpanStarter func(ctx context.Context, operation string, kind tracer.SpanKin
 //
 // DSAFT: D2-S1-A01 (LoadSession)
 type SessionLoader interface {
-	LoadOrInit(session *types.Session, model string) (sc *types.SessionContext, isNew bool, err error)
+	LoadOrInit(ctx context.Context, session *types.Session, model string) (sc *types.SessionContext, isNew bool, err error)
 }
 
 // MemoryRecaller retrieves long-term memory entries relevant to a query.
@@ -52,5 +52,5 @@ type ContextCompressor interface {
 //
 // DSAFT: D2-S1-A04 (AssemblePrompt)
 type PromptAssembler interface {
-	Build(input prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport)
+	Build(ctx context.Context, input prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport)
 }

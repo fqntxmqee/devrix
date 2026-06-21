@@ -31,8 +31,7 @@ func NewAssemblerAdapter(assembler *prompt.SystemPromptAssembler, opts ...HooksO
 
 // Build assembles the system prompt, optionally emitting a span tagged with
 // total_tokens + memory_truncated + template hashes.
-func (a *AssemblerAdapter) Build(in prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport) {
-	ctx := context.Background()
+func (a *AssemblerAdapter) Build(ctx context.Context, in prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport) {
 	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build, tracer.SpanKindInternal)
 	if span != nil {
 		defer span.End()
