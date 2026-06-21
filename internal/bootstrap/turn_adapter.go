@@ -15,8 +15,16 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// compressThreshold is the per-message token budget above which a CompressHint is generated.
-const compressThreshold = 4000
+// compressThreshold is the per-message token budget above which a CompressHint is
+// generated. DM-20260621-009: raised 4000 → 32000. The old 4000 threshold
+// fired prematurely on real multi-turn conversations (a 2-turn session with
+// bash tool results easily exceeds 4K tokens), replacing the full prior
+// history with a single summary. The LLM then lost conversational state
+// like "please pick 1 or 2" — the next short reply (e.g. "2") could not
+// be matched back to its antecedent. 32K stays under 25% of the default
+// 128K LLM context, leaving room for system prompt, tools, response, and
+// tool results.
+const compressThreshold = 32000
 
 // contextEngineAdapter implements turn.ContextPreparer, turn.ToolRoundExecutor,
 // and turn.SessionPersister by delegating to the context engine internals.

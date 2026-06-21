@@ -36,6 +36,51 @@ const (
 	dedupReplayBufferTailRunes = 4000
 )
 
+// stripTrailingSummary removes a trailing summary segment from content
+// when content ends with summary (with whitespace tolerance). The
+// streaming reply / response card and the standalone "任务总结" card
+// would otherwise duplicate the LLM's last turn text: the LLM emits the
+// summary as ordinary text events (which land in textBuffer), and
+// resolveFinalText also packs lastTurnText into the summary card. Strip
+// the trailing summary here so the streaming card shows only the working
+// report, while the summary card owns the conclusion.
+//
+// Returns content unchanged when:
+//   - summary is empty / whitespace-only,
+//   - content does not end with summary (modulo trailing whitespace).
+//
+// This is the D1-side half of the DM-20260621-008 fix: D7 still emits
+// both lastTurnText (as text) and the summary, but D1 deduplicates at
+// the IM boundary instead of showing the user the same paragraph twice.
+func stripTrailingSummary(content, summary string) string {
+	contentRunes := []rune(content)
+	summaryRunes := []rune(summary)
+	if len(summaryRunes) == 0 {
+		return content
+	}
+	// Trim trailing whitespace from content before the suffix check, so
+	// the LLM streaming a summary that ends in a newline does not
+	// defeat the match.
+	tail := len(contentRunes)
+	for tail > 0 && (contentRunes[tail-1] == ' ' || contentRunes[tail-1] == '\t' || contentRunes[tail-1] == '\n' || contentRunes[tail-1] == '\r') {
+		tail--
+	}
+	if tail < len(summaryRunes) {
+		return content
+	}
+	start := tail - len(summaryRunes)
+	for i := 0; i < len(summaryRunes); i++ {
+		if contentRunes[start+i] != summaryRunes[i] {
+			return content
+		}
+	}
+	// Match — strip the trailing summary plus any whitespace after the
+	// prefix that bounded the summary (so the streaming card does not
+	// end on a stray newline before the completion marker).
+	trimmed := strings.TrimRight(string(contentRunes[:start]), " \t\n\r")
+	return trimmed
+}
+
 // detectDuplicateReplay returns true when chunk's prefix is already
 // present in buffer (within the last dedupReplayBufferTailRunes runes),
 // indicating the LLM has started re-emitting text it just streamed.
@@ -468,9 +513,16 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	responseMsgID := stream.responseMsgID
 	responseText := stream.textBuffer.String()
 	trimmedSummary := strings.TrimSpace(summary)
-	if hasTaskCard && trimmedSummary != "" {
-		stream.summaries = append(stream.summaries, trimmedSummary)
-	}
+	// DM-20260621-008: do NOT append trimmedSummary to stream.summaries.
+	// stream.summaries is rendered on the "任务进度" / "任务完成" progress
+	// card (buildTaskProgressCard), and that card already coexists with
+	// the standalone "任务总结" card sent below. Pushing trimmedSummary in
+	// here used to duplicate the LLM's final paragraph on the progress
+	// card (the user sees the same "需要我针对其中某条..." line twice —
+	// once on the green "任务完成" card, once on the blue "任务总结"
+	// card). The progress card now lists only streaming-time worker /
+	// info summaries; the conclusion lives exclusively on the "任务总结"
+	// card.
 	stream.mu.Unlock()
 
 	if hasTaskCard {
@@ -488,33 +540,41 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	responseText = dedupRepeatedText(responseText, 60, 2)
 	stream.mu.Unlock()
 	if cardkitActive {
-		// The summary is intentionally NOT appended to the streaming card —
-		// finalizeStructuredSession sends it as a separate card below so the
-		// user sees a distinct "总结" card after the report card rather than
-		// the report + summary glued together with a `---` separator.
-		if err := a.finalizeReplyCardStreaming(ctx, stream, ""); err != nil {
+		// Pass trimmedSummary so finalizeReplyCardStreaming can strip it
+		// from the streaming card's tail (DM-20260621-008). The LLM emits
+		// the summary as ordinary text events, so textBuffer already ends
+		// with the same paragraph; without the strip, the user sees the
+		// summary twice — once at the tail of the streaming reply card,
+		// once in the standalone 任务总结 card.
+		if err := a.finalizeReplyCardStreaming(ctx, stream, trimmedSummary); err != nil {
 			return err
 		}
-	} else if responseMsgID != "" && trimmedSummary == "" {
-		// Fallback: LLM did not produce a final summary (e.g. max-turns
-		// reached mid-tool-call while the LLM was still looping, or the
-		// D7 orchestrator emitted a blank finalText). Without this, the
-		// reply card stays in whatever partial state the LLM last wrote
-		// and the user sees no "任务完成" affordance at all. Emit a minimal
-		// completion footer so the conclusion is never silently lost.
+	} else if responseMsgID != "" {
+		// Non-cardkit path: patch the response card with the LLM's report
+		// (with trailing summary stripped) plus a completion footer.
 		//
-		// When a non-empty summary is available, the response card is left
-		// untouched — the summary is delivered as its own card so the user
-		// sees a distinct "总结" message after the report card, not the
-		// report and summary glued together on the same card.
-		if strings.TrimSpace(responseText) != "" {
-			footer := responseText + "\n\n---\n_✅ 任务已完成_"
-			card := NewCard().
-				Markdown(footer).
-				Build()
-			if err := a.patchMessage(ctx, responseMsgID, BuildCardJSON(card)); err != nil {
-				return err
-			}
+		// DM-20260621-008: when the LLM emits the summary as text events
+		// (the common minimax M2.7 pattern), the response card already
+		// carries report + summary on its tail. Strip the summary so the
+		// user sees the report only once on this card; the standalone
+		// 任务总结 card still carries the summary as a separate message.
+		//
+		// When trimmedSummary is empty (e.g. max-turns reached mid-tool-
+		// call while the LLM was still looping), the response card is
+		// still patched with a minimal "✅ 任务已完成" footer so the user
+		// never sees a dangling partial card with no closure.
+		stripped := stripTrailingSummary(responseText, trimmedSummary)
+		var footer string
+		if strings.TrimSpace(stripped) != "" {
+			footer = stripped + "\n\n---\n_✅ 任务已完成_"
+		} else {
+			footer = "_✅ 任务已完成_"
+		}
+		card := NewCard().
+			Markdown(footer).
+			Build()
+		if err := a.patchMessage(ctx, responseMsgID, BuildCardJSON(card)); err != nil {
+			return err
 		}
 	}
 	if trimmedSummary != "" {
@@ -567,13 +627,13 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// in long replies, e.g. a deep-review tool loop) does not leak into
 	// the final reply card.
 	content = textutil.StripPriorOutputSummary(content)
-	// The summary argument is intentionally ignored here: the caller
-	// (finalizeStructuredSession) is responsible for delivering the
-	// summary as a separate card so the user sees a distinct "总结" card
-	// after the streaming report, not the report + summary glued onto
-	// the same card. We keep `summary` in the signature for backwards
-	// compatibility with the existing test surface.
-	_ = summary
+	// DM-20260621-008: the LLM emits the D7 final summary as ordinary
+	// text events, so textBuffer already ends with the same paragraph
+	// that the standalone 任务总结 card will carry. Strip the trailing
+	// summary here so the streaming card shows the report only once.
+	// When summary is empty (e.g. max-turns reached mid-tool-call) this
+	// is a no-op and the streaming card keeps the full report.
+	content = stripTrailingSummary(content, summary)
 	if strings.TrimSpace(content) != "" {
 		// Minimal completion marker on the streaming card so the user
 		// sees the task finished even when the D7 orchestrator did not
