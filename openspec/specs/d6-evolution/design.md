@@ -2,12 +2,14 @@
 
 **Domain:** D6 Evolution
 **DSAFT Type:** Supporting
-**Version:** 2.2.0
-**Last Updated:** 2026-06-19
+**Version:** 2.3.0
+**Last Updated:** 2026-06-21
 **Status:** Active
 **Parent:** `openspec/specs/d6-evolution/spec.md`
 
-> **v2.2.0 状态**（DM-20260619-003 同步）：v2.0 物理路径迁移已完成（DM-20260615-003, 2026-06-15），`eval/` → `evaluate/`、`orchestration/` → `guard/`、`exporter/` → `export/`、新增 `verify/`。`bridge.go` 桥接文件在 v2.0.1 cleanup 后全部删除（11 个）。
+> **v2.3.0 状态**（DM-20260621-011 同步）：v2.4 deep review 修复落地。bridge 清债：`eval/bridge.go` + `orchestration/bridge.go` 已删除（spec v2.2.0 已声明）。命名一致性收敛：guard/ 内 `Orchestration*` 类型/函数重命名为 `Guard*`（type alias 保留 v2.5 删），6 个 OTel 指标 `orch_*` → `guard_*`。错误处理三联固化：`verify/_invariant.go` panic → log.Fatalf（同时重命名为 `invariant.go` 激活 Go 工具链忽略 `_` 前缀文件的 dead code），`intervention.go` Wait/tasks.Fail 失败 metric + slog.Warn + errors.Join。新增 `scripts/check-orch-rename.sh` CI guard 阻断漏用。
+>
+> **v2.2.0 状态**（DM-20260619-003 同步）：v2.0 物理路径迁移已完成（DM-20260615-003, 2026-06-15），`eval/` → `evaluate/`、`orchestration/` → `guard/`、`exporter/` → `export/`、新增 `verify/`。
 
 ---
 
@@ -45,7 +47,7 @@ internal/layers/evolution/
 │   ├── metrics.go                           # OpenTelemetry 指标
 │   └── validator_test.go                    # 校验器测试
 └── verify/                                   # D6-S5 Invariant 验证（v2.0 新增物理独立）
-    ├── _invariant.go                        # Invariant 接口 + 注册表
+    ├── invariant.go                         # Invariant 接口 + 注册表（v2.4.0 由 `_invariant.go` 重命名 — Go 工具链忽略 `_` 前缀文件；启动期 `init()` → log.Fatalf 替代 panic）
     └── plan.go                              # VerifyPlan — 验证计划编排
 ```
 
@@ -278,6 +280,7 @@ D6 Evolution
 
 | 版本 | 日期 | 变更摘要 | 关联 DM |
 |------|------|---------|---------|
+| **2.3.0** | **2026-06-21** | **deep review 修复**：bridge 清债 (`eval/bridge.go` + `orchestration/bridge.go` 删除)；命名一致性收敛 (guard/ 内 `Orchestration*` → `Guard*` + 6 指标 `orch_*` → `guard_*` + type alias 兼容)；错误处理三联固化 (`_invariant.go` → `invariant.go` panic → log.Fatalf + `intervention.go` Wait/tasks.Fail metric + slog + errors.Join)；新增 `scripts/check-orch-rename.sh` CI guard；新增 D6-S11-A02-T09 + D6-S12-A01-T01/T02 + D6-S12-A02-T04 + D6-S12-A03-T03/T04/T05 6 P0 T 点 | **DM-20260621-011** |
 | 2.2.0 | 2026-06-19 | v2.0 物理路径迁移同步：eval→evaluate / orchestration→guard / 新增 verify/；RuntimeOrchestrationValidator→RuntimeGuardValidator；新增 D6-S5 VerifyInvariant 章节 | DM-20260619-003 |
 | 2.1.0 | 2026-06-14 | path_regression + layer_violation + session_isolation 三个新探针 | DM-20260614-XXX |
 | 2.0.0 | 2026-06-XX | 初版 | — |

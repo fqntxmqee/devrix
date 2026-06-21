@@ -2,12 +2,12 @@
 
 **Domain:** D6 Evolution
 **DSAFT Type:** Supporting
-**Version:** 2.3.0
-**Last Updated:** 2026-06-19
+**Version:** 2.4.0
+**Last Updated:** 2026-06-21
 **Status:** Canonical — source of truth
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d6-domain.md`（2026-06-19 新建，对齐 D2/D4/D5/D7 结构）
-**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；D2-B 决议 probe #3 推迟 v1.2）+ devrix-d5-d6-sa-refine-v2.0（DM-20260615-003 / 物理路径迁移 2026-06-15）+ devrix-spec-sync-d6-evolution-registration（DM-20260619-003 / 物理路径同步 + d6-domain.md 新建）
+**Change:** devrix-d3-sa-refine-v1.1（DM-20260614-017 / D6 探针 #1 / #2 / #4 落地；D2-B 决议 probe #3 推迟 v1.2）+ devrix-d5-d6-sa-refine-v2.0（DM-20260615-003 / 物理路径迁移 2026-06-15）+ devrix-spec-sync-d6-evolution-registration（DM-20260619-003 / 物理路径同步 + d6-domain.md 新建）+ **devrix-d6-evolution-review-fixes（DM-20260621-011 / 2026-06-21 落地 / bridge 清债 + Orchestration* → Guard* 重命名 + panic → log.Fatal + silent swallow 修复；PR-A #156 + PR-B #157）**
 
 ---
 
@@ -135,7 +135,7 @@ Agent Decision → GuardObserver → preFilter → Judge Validation → Interven
 
 | 组件 | 文件 | 职责 |
 |------|------|------|
-| InvariantRegistry | `verify/_invariant.go` | 系统级不变量注册 + 校验（fail-closed） |
+| InvariantRegistry | `verify/invariant.go`（v2.4.0 由 `_invariant.go` 重命名 — 激活 Go 工具链忽略 `_` 前缀文件的 dead code） | 系统级不变量注册 + 校验（fail-closed，启动期 `init()` → `log.Fatalf` 替代 panic） |
 | PlanVerifier | `verify/plan.go` | Plan 路径验证（与 D7 PlanMode 联动） |
 
 ### 决策分类与风险
@@ -460,6 +460,98 @@ InvariantRegistry 必须支持 fail-closed 校验。
 - WHEN PlanVerifier.Verify 被调用
 - THEN 校验 Plan 路径不违反不变量（如文件写入白名单）
 
+### D6-S11: 韧性域新增需求 (v2.4.0, DM-20260621-011)
+
+<!-- D6-S11-A02-T09 -->
+#### Requirement: Verify Invariant 启动期 fail-safe
+`InvariantRegistry` 必须在启动期 fail-safe, 解析失败时进程退出码非 0 由 systemd 重启。
+
+**Scenario: ParseStruct 失败 → log.Fatalf**
+- GIVEN `verifyInvariants` struct 标签格式错误
+- WHEN `init()` 调用 `parseVerifyInvariants()`
+- THEN 返回 error 而非 panic
+- AND `init()` 调用 `log.Fatalf` 退出码 1
+- AND `git grep "panic.*verify invariant"` 0 命中
+
+**Scenario: 正常启动路径**
+- GIVEN 默认 `verifyInvariants` struct 标签合法
+- WHEN `init()` 调用 `parseVerifyInvariants()`
+- THEN `verifyInvariantSet` 包含 N 条 invariant
+- AND `CheckVerifyInvariants(state)` 可正常调用
+
+### D6-S12: Guard 名空间收敛 (v2.4.0, DM-20260621-011)
+
+<!-- D6-S12-A02-T04 -->
+#### Requirement: bridge 文件零残留
+`internal/layers/evolution/eval/bridge.go` + `orchestration/bridge.go` 必须不存在。
+
+**Scenario: bridge 文件 git ls-files 0 命中**
+- GIVEN spec.md v2.2.0 已声明 bridge 在 v2.0.1 cleanup 后全部删除
+- WHEN PR-B 完成清理
+- THEN `git ls-files internal/layers/evolution/eval/bridge.go` 0 命中
+- AND `git ls-files internal/layers/evolution/orchestration/bridge.go` 0 命中
+
+<!-- D6-S12-A03-T03 -->
+#### Requirement: Orchestration* → Guard* 全量重命名
+guard/ 内 `Orchestration*` 标识符仅允许出现在 type alias 定义点。
+
+**Scenario: guard/ 内仅 alias 点**
+- GIVEN spec.md v2.4.0 引入 Guard* 命名
+- WHEN PR-B 完成 rename
+- THEN 全仓 `git grep "Orchestration" internal/layers/evolution/guard/` 仅命中 alias 定义点（≤ 6 处）
+- AND `bash scripts/check-orch-rename.sh` exit 0
+
+<!-- D6-S12-A03-T04 -->
+#### Requirement: orch_* OTel 指标 → guard_*
+guard/ 内 6 个 OTel 指标名 `orch_*` → `guard_*` 全量重命名, 与 spec v2.4.0 一致。
+
+**Scenario: 指标名注册使用新名**
+- GIVEN metrics.go 中已迁移
+- WHEN `initGuardMetrics(obs)` 被调用
+- THEN 注册 6 个 `guard_*` 指标, 不注册 `orch_*`
+- AND `orch_decisions_total` 等旧名仅在 Deprecated 注释中保留
+
+**Scenario: 全仓 grep 0 命中旧指标名**
+- WHEN CI 运行 `check-orch-rename.sh`
+- THEN 全仓 `grep -r '"orch_[a-z_]"'` 在 metrics.go 之外 0 命中
+
+<!-- D6-S12-A03-T05 -->
+#### Requirement: type alias 向后兼容
+v2.4 引入新名 + `//go:deprecated` type alias, v2.5 删除。
+
+**Scenario: 旧构造函数仍可用**
+- GIVEN `OrchestrationConfig` / `RuntimeOrchestrationValidator` / `OrchestrationObserver` 是 alias
+- WHEN 外部调用方使用旧名
+- THEN 编译通过, `go vet` 给出 `//go:deprecated` 告警
+- AND 实例与新名构造的实例底层类型相同（type alias 而非 type def）
+
+<!-- D6-S12-A01-T01 -->
+#### Requirement: InterventionExecutor Wait 失败可观测
+`InterventionExecutor.terminateAndReroute` 中 Wait 失败必须有 metric + slog.Warn + errors.Join 上抛。
+
+**Scenario: Wait 失败三联固化**
+- GIVEN agent.Wait 返回 error
+- WHEN `terminateAndReroute` 执行
+- THEN `metrics.WaitFailed.Add(1)`（nil-safe）
+- AND `slog.Warn("wait current agent failed", ...)`
+- AND errors.Join 聚合后上抛, errors.Is 仍可命中原始 error
+
+**Scenario: 静默吞错反模式根除**
+- GIVEN 全仓 grep `_, _ = current.Wait\|_, _ = ie.tasks.Fail`
+- WHEN PR-A 修复后
+- THEN 0 命中
+
+<!-- D6-S12-A01-T02 -->
+#### Requirement: InterventionExecutor tasks.Fail 失败可观测
+`InterventionExecutor.terminateAndReroute` 中 `tasks.Fail` 失败必须有 metric + slog.Warn 上抛。
+
+**Scenario: tasks.Fail 失败三联固化**
+- GIVEN TaskController.Fail 返回 error
+- WHEN `terminateAndReroute` 在 `iv.MilestoneFail` 分支执行
+- THEN `metrics.TaskFailFailed.Add(1)`
+- AND `slog.Warn("task fail failed", ...)`
+- AND errors.Join 聚合后上抛
+
 ---
 
 ## 配置参考
@@ -509,3 +601,4 @@ evolution:
 | 2.1.0 | 2026-06-14 | 新增 Path Regression / Layer Violation / Session Isolation 3 类探针（T16/T17/T18） |
 | 2.2.0 | 2026-06-14 | 落地 devrix-d3-sa-refine-v1.1 D6 探针 #1 / #2 / #4：Tier Resolution ≥ 99%（T19，D2-B 决议）+ Breaker Anomaly Transition（T20）+ Safety Latency P99 < 1ms（T21，D5-A 决议）；probe #3 Token 预算触发率 推迟至 v1.2（D2-B 决议） |
 | **2.3.0** | **2026-06-19** | **v2.0 物理路径迁移同步**（DM-20260615-003, 2026-06-15 落地；DM-20260619-003 spec 同步）：§D6-S3 组件路径 `eval/` → `evaluate/`（8 个文件）；§D6-S4 重命名 Orchestration → GuardRuntime，路径 `orchestration/` → `guard/`（4 个文件 + 6 metric 重命名 `orch_*` → `guard_*`）；新增 §D6-S5 VerifyInvariant（v2.0 物理独立自 `evaluate/`）；DSAFT 表格同步；Domain SoT `d6-domain.md` 新建（对齐 D2/D4/D5/D7 结构） |
+| **2.4.0** | **2026-06-21** | **deep review 修复**（DM-20260621-011 / devrix-d6-evolution-review-fixes PR-A #156 + PR-B #157）：C-1 删除残留 `eval/bridge.go` + `orchestration/bridge.go`；H-1 guard/ 内 6 处 `Orchestration*` 类型/函数重命名为 `Guard*`（type alias 保留 v2.5 删）；6 个 OTel 指标 `orch_*` → `guard_*`；H-2 `verify/_invariant.go` panic → `log.Fatalf`（同时 `_invariant.go` → `invariant.go` 重命名激活 dead code）；H-3 `intervention.go` Wait 失败 metric + slog.Warn + errors.Join；新增 D6-S11-A02-T09 + D6-S12-A01-T01/T02 + D6-S12-A02-T04 + D6-S12-A03-T03/T04/T05 6 个 P0 T 点；scripts/check-orch-rename.sh CI guard |
