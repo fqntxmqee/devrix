@@ -22,6 +22,77 @@ func TestStripOuterCodeFence(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// stripTrailingSummary (DM-20260621-008)
+//
+// The LLM (notably minimax M2.7) emits the D7 final summary as ordinary
+// text events, so the streaming reply card's textBuffer ends with the same
+// paragraph that the standalone 任务总结 card will carry. Without the
+// strip, the user sees the same conclusion twice. Pin the helper so a
+// future refactor of finalizeReplyCardStreaming / finalizeStructuredSession
+// doesn't regress the duplicate-display bug.
+// ============================================================================
+
+func TestStripTrailingSummary(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		summary string
+		want    string
+	}{
+		{
+			name:    "empty_summary_returns_content_unchanged",
+			content: "我已完成 4 路 review。",
+			summary: "",
+			want:    "我已完成 4 路 review。",
+		},
+		{
+			name:    "whitespace_only_summary_returns_content_unchanged",
+			content: "我已完成 4 路 review。",
+			summary: "   \t\n  ",
+			want:    "我已完成 4 路 review。",
+		},
+		{
+			name:    "content_ends_with_summary_strips_it",
+			content: "我已完成 4 路 review。\n\n最终结论：4 路并行 deep review 全部 PASS。",
+			summary: "最终结论：4 路并行 deep review 全部 PASS。",
+			want:    "我已完成 4 路 review。",
+		},
+		{
+			name:    "trailing_whitespace_between_report_and_summary_stripped",
+			content: "我已完成 4 路 review。\n\n\n   \n最终结论：4 路并行 deep review 全部 PASS。\n",
+			summary: "最终结论：4 路并行 deep review 全部 PASS。",
+			want:    "我已完成 4 路 review。",
+		},
+		{
+			name:    "content_does_not_end_with_summary_returns_unchanged",
+			content: "我已完成 4 路 review。\n\n接下来做归档。",
+			summary: "最终结论：4 路并行 deep review 全部 PASS。",
+			want:    "我已完成 4 路 review。\n\n接下来做归档。",
+		},
+		{
+			name:    "content_shorter_than_summary_returns_unchanged",
+			content: "短文本",
+			summary: "这是一段很长的最终结论：4 路并行 deep review 全部 PASS。",
+			want:    "短文本",
+		},
+		{
+			name:    "exact_match_no_trailing_newline_strips",
+			content: "report正文最终结论：4 路并行 deep review 全部 PASS。",
+			summary: "最终结论：4 路并行 deep review 全部 PASS。",
+			want:    "report正文",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := stripTrailingSummary(tc.content, tc.summary)
+			if got != tc.want {
+				t.Errorf("stripTrailingSummary(%q, %q) = %q, want %q", tc.content, tc.summary, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeProgressStyle_DefaultStructured(t *testing.T) {
 	if got := normalizeProgressStyle(""); got != progressStyleStructured {
 		t.Fatalf("normalizeProgressStyle(\"\") = %q, want %q", got, progressStyleStructured)
@@ -262,13 +333,17 @@ func TestFormatWorkerProgressSummary_SkipsToolCall(t *testing.T) {
 }
 
 // TestFeishuAdapter_StructuredProgress_SimpleReplySummaryAsSeparateCard
-// pins the non-streaming path behavior after the DM-20260621-001 fix.
-// For a simple text → complete flow:
+// pins the non-streaming path behavior after the DM-20260621-001 /
+// DM-20260621-008 fixes. For a simple text → complete flow where the
+// LLM text does NOT end with the summary:
 //   1. The response card is created via Reply (1 reply).
 //   2. The non-empty summary is delivered as a SEPARATE reply (2nd
 //      reply) — the legacy "summary glued onto the response card with
 //      `---`" behavior is intentionally removed.
-//   3. No Patch is needed since the response card is left untouched.
+//   3. The response card IS patched with a minimal "✅ 任务已完成"
+//      completion footer (DM-20260621-008: previously left untouched, but
+//      that made the card feel dangling when a separate summary card
+//      followed). The patch body must NOT contain the summary text.
 func TestFeishuAdapter_StructuredProgress_SimpleReplySummaryAsSeparateCard(t *testing.T) {
 	var replyCount int
 	var patchCount int
@@ -309,10 +384,11 @@ func TestFeishuAdapter_StructuredProgress_SimpleReplySummaryAsSeparateCard(t *te
 	if replyCount != 2 {
 		t.Fatalf("replyCount = %d, want 2 (1 response card + 1 separate summary card)", replyCount)
 	}
-	// Response card is left untouched; no Patch is needed for the
-	// summary glue (the summary lives on its own card now).
-	if patchCount != 0 {
-		t.Fatalf("patchCount = %d, want 0 (response card not patched; summary is a separate card)", patchCount)
+	// DM-20260621-008: the response card is patched with a minimal
+	// "✅ 任务已完成" completion marker so the user still sees the task
+	// closed when a separate summary card follows.
+	if patchCount < 1 {
+		t.Fatalf("patchCount = %d, want >=1 (response card patched with completion marker)", patchCount)
 	}
 }
 
@@ -964,5 +1040,309 @@ func TestFeishuAdapter_FinalizeStructuredSession_SendsSummaryAsSeparateCard(t *t
 	// sees the task closed even when the summary lives on a separate card.
 	if !strings.Contains(streamingUpdateCardData, "✅ 任务已完成") {
 		t.Errorf("streaming card missing completion marker: %s", streamingUpdateCardData)
+	}
+}
+
+// ============================================================================
+// DM-20260621-008: LLM text events whose tail duplicates the D7 final
+// summary must not leak into the streaming reply card.
+//
+// User-reported scenario: "飞书思考卡片又有总结数据了，这个不需要，因为
+// 最后总结卡片也有." The LLM (minimax M2.7 in particular) emits the
+// final summary as ordinary text events during streaming. textBuffer
+// therefore ends with the same paragraph that the standalone 任务总结
+// card will carry. Without the strip, the user sees the conclusion
+// twice — once at the tail of the streaming reply card, once on the
+// 任务总结 card.
+//
+// The tests below cover both the cardkit (streaming) and non-cardkit
+// (simple-reply) paths. The strip is keyed off exact-match of the
+// trimmed tail; whitespace-only tolerance is built in. Pinning the
+// exact-match behavior here so a future fuzzy-match change can't
+// silently regress to either under-strip (duplication) or over-strip
+// (data loss).
+// ============================================================================
+
+// TestFeishuAdapter_FinalizeStructuredSession_LLMTextEndsWithSummary_StripsDuplicate
+// pins the cardkit streaming path. The streaming reply card's
+// UpdateCard body must contain the report + completion marker, but
+// NOT the summary paragraph.
+func TestFeishuAdapter_FinalizeStructuredSession_LLMTextEndsWithSummary_StripsDuplicate(t *testing.T) {
+	const summary = "4 路并行 deep review 全部 PASS：架构 / 测试 / 安全 / 性能 / 命名 各域无 Critical 问题。"
+
+	var streamingUpdateCardData string
+	var summaryReplyCount int
+	msgID := "om_summary_strip"
+
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			summaryReplyCount++
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{
+		imAPI: mockImAPI,
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			if !strings.Contains(path, "/elements/") {
+				if m, ok := body.(map[string]any); ok {
+					if card, ok := m["card"].(map[string]any); ok {
+						if data, ok := card["data"].(string); ok {
+							streamingUpdateCardData = data
+						}
+					}
+				}
+			}
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+		Streaming: FeishuStreamingConfig{Enabled: true},
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_dup_strip", feishuReplyContext{userMessageID: "om_root"})
+
+	// Simulate the LLM streaming the report, then the summary as
+	// ordinary text events (the minimax M2.7 pattern that triggered
+	// the user-visible duplicate).
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_dup_strip", ChatID: "feishu_oc_1",
+		Content: "我已完成 4 路并行 review：架构 / 测试 / 安全 / 性能 / 命名。\n\n", Metadata: map[string]string{"event_type": "text"},
+	})
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_dup_strip", ChatID: "feishu_oc_1",
+		Content: summary, Metadata: map[string]string{"event_type": "text"},
+	})
+	// Then the D7 complete event with the same summary.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_dup_strip", ChatID: "feishu_oc_1",
+		Content: summary, Metadata: map[string]string{"event_type": "complete"},
+	})
+
+	// The streaming card MUST NOT contain the summary text — the
+	// strip must have removed the LLM-emitted tail. Without the
+	// strip, the user would see the same paragraph twice (once on
+	// the streaming card, once on the 任务总结 card).
+	if streamingUpdateCardData == "" {
+		t.Fatal("UpdateCard card.data was not captured — streaming path did not run")
+	}
+	if strings.Contains(streamingUpdateCardData, summary) {
+		t.Errorf("streaming card still contains the summary text — stripTrailingSummary regression.\ncard.data=%s", streamingUpdateCardData)
+	}
+	// The report prefix must still be present (the strip targets
+	// the tail, not the whole buffer).
+	if !strings.Contains(streamingUpdateCardData, "我已完成 4 路并行 review") {
+		t.Errorf("streaming card missing report prefix after strip: %s", streamingUpdateCardData)
+	}
+	// The completion marker must be present so the user still sees
+	// the task closed.
+	if !strings.Contains(streamingUpdateCardData, "✅ 任务已完成") {
+		t.Errorf("streaming card missing completion marker: %s", streamingUpdateCardData)
+	}
+	// A separate summary card MUST be sent carrying the summary.
+	// replyCount == 2 means: (1) streaming card + (2) summary card.
+	if summaryReplyCount != 2 {
+		t.Fatalf("summaryReplyCount = %d, want 2 (1 streaming card + 1 summary card)", summaryReplyCount)
+	}
+}
+
+// TestFeishuAdapter_StructuredProgress_LLMTextEndsWithSummary_StripsDuplicate
+// pins the non-cardkit (simple-reply) path. The response card must
+// still be patched (with report + footer, no summary) so the user
+// doesn't see the conclusion twice.
+func TestFeishuAdapter_StructuredProgress_LLMTextEndsWithSummary_StripsDuplicate(t *testing.T) {
+	const summary = "用时: 8s, 消耗: 1500 tokens, 模型: claude-sonnet-4-6"
+
+	var replyCount int
+	var patchCount int
+
+	msgID := "om_response_dup_strip"
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			replyCount++
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+			patchCount++
+			return &larkim.PatchMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:         "test_app",
+		AppSecret:     "test_secret",
+		ProgressStyle: progressStyleStructured,
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_simple_dup_strip", feishuReplyContext{userMessageID: "om_root"})
+
+	// Simulate LLM streaming the report and the summary as plain
+	// text events (this is what the non-cardkit path accumulates into
+	// textBuffer via appendResponseText).
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_simple_dup_strip", ChatID: "feishu_oc_1",
+		Content: "已处理 5 个文件。\n\n", Metadata: map[string]string{"event_type": "text"},
+	})
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_simple_dup_strip", ChatID: "feishu_oc_1",
+		Content: summary, Metadata: map[string]string{"event_type": "text"},
+	})
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_simple_dup_strip", ChatID: "feishu_oc_1",
+		Content: summary, Metadata: map[string]string{"event_type": "complete"},
+	})
+
+	// 1 reply for the response card + 1 reply for the separate summary card.
+	if replyCount != 2 {
+		t.Fatalf("replyCount = %d, want 2 (1 response card + 1 separate summary card)", replyCount)
+	}
+	// The response card MUST be patched with the report (summary
+	// stripped) + completion marker. Without the strip fix, the
+	// response card stays untouched and the user sees the same
+	// paragraph twice.
+	if patchCount < 1 {
+		t.Fatalf("patchCount = %d, want >=1 (response card must be patched with stripped report + footer)", patchCount)
+	}
+}
+
+// TestFeishuAdapter_FinalizeStructuredSession_TaskCardDoesNotIncludeSummary
+// pins DM-20260621-008 part 2: when a task ("进度") card exists, the
+// finalize step must NOT push the LLM's final summary into the card's
+// 小结 list. Otherwise the user sees the same conclusion paragraph
+// twice — once on the green "任务完成" card, once on the blue "任务总结"
+// card. The standalone "任务总结" card is the single owner of the
+// conclusion.
+//
+// We invoke finalizeStructuredSession directly so we can inspect
+// stream.summaries mid-finalize. clearSessionStream is what the
+// production OnMessage path calls after finalizeStructuredSession
+// returns; without that here, the stream stays alive and we can
+// assert what buildTaskProgressCard would have rendered for the
+// finalize-completed=true patch.
+func TestFeishuAdapter_FinalizeStructuredSession_TaskCardDoesNotIncludeSummary(t *testing.T) {
+	const summary = "deep review 全部 PASS：4 路并行无 Critical 问题。"
+	const workerLine = "[code-reviewer/w1] reading guard sources"
+
+	var summaryReplyCount int
+	var patchCount int
+
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			summaryReplyCount++
+			msgID := "om_msg"
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+			patchCount++
+			return &larkim.PatchMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI := &mockFeishuAPI{imAPI: mockImAPI}
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:         "test_app",
+		AppSecret:     "test_secret",
+		ProgressStyle: progressStyleStructured,
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.sessionReplyCtx.Store("sess_no_dup", feishuReplyContext{userMessageID: "om_root"})
+
+	// Streaming-time worker progress summary (legit 小结 content).
+	// First worker_progress creates the progress card via ReplyMessage;
+	// the second one re-patches it (this is when PatchMessage first fires
+	// in the test trace, and where the regression — pushing the D7
+	// summary into stream.summaries — would surface in the card body).
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_no_dup", ChatID: "feishu_oc_1",
+		Content: "reading guard sources",
+		Metadata: map[string]string{
+			"event_type": "worker_progress",
+			"role":       "code-reviewer",
+			"worker_id":  "w1",
+			"kind":       "started",
+		},
+	})
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_no_dup", ChatID: "feishu_oc_1",
+		Content: "reading guard sources",
+		Metadata: map[string]string{
+			"event_type": "worker_progress",
+			"role":       "code-reviewer",
+			"worker_id":  "w1",
+			"kind":       "in_progress",
+		},
+	})
+
+	// Snapshot the stream BEFORE finalize so we can compare.
+	preStream, _ := adapter.sessionStreams.Load("sess_no_dup")
+	pre := preStream.(*feishuSessionStream)
+	pre.mu.Lock()
+	preSummaries := append([]string(nil), pre.summaries...)
+	pre.mu.Unlock()
+	if len(preSummaries) != 1 || preSummaries[0] != workerLine {
+		t.Fatalf("pre-finalize summaries = %v, want [%s]", preSummaries, workerLine)
+	}
+
+	// Invoke finalizeStructuredSession directly. clearSessionStream
+	// (the production OnMessage step) is NOT called here, so the
+	// stream stays alive for inspection after.
+	if err := adapter.finalizeStructuredSession(context.Background(), "sess_no_dup", "feishu_oc_1", summary); err != nil {
+		t.Fatalf("finalizeStructuredSession: %v", err)
+	}
+
+	// Behavior: 2 patches (worker_progress #1 creates via Reply, #2
+	// patches, finalize patches again with completed=true) + 2 replies
+	// (worker_progress #1's initial Reply for the progress card +
+	// finalize's standalone summary Reply).
+	if patchCount != 2 {
+		t.Errorf("patchCount = %d, want 2 (1 worker_progress re-patch + 1 finalize completed=true patch)", patchCount)
+	}
+	if summaryReplyCount != 2 {
+		t.Errorf("summaryReplyCount = %d, want 2 (1 progress card + 1 summary card)", summaryReplyCount)
+	}
+
+	// State: stream.summaries after finalize MUST NOT contain the D7
+	// final summary. This is the direct regression guard for
+	// `stream.summaries = append(stream.summaries, trimmedSummary)`.
+	// buildTaskProgressCard reads stream.summaries to render the "小结"
+	// list — if the summary were here, the patched progress card would
+	// duplicate the LLM's final paragraph.
+	postStream, ok := adapter.sessionStreams.Load("sess_no_dup")
+	if !ok {
+		t.Fatal("session stream was cleared during finalize — test cannot verify state")
+	}
+	post := postStream.(*feishuSessionStream)
+	post.mu.Lock()
+	postSummaries := append([]string(nil), post.summaries...)
+	post.mu.Unlock()
+	for _, s := range postSummaries {
+		if s == summary {
+			t.Errorf("regression: stream.summaries contains D7 final summary after finalize.\nsummaries=%v", postSummaries)
+		}
+	}
+	if len(postSummaries) != len(preSummaries) {
+		t.Errorf("stream.summaries length changed: pre=%d post=%d (finalize must not append)", len(preSummaries), len(postSummaries))
+	}
+
+	// Rendering: buildTaskProgressCard on the post-finalize stream
+	// produces the exact body that was patched onto the progress card.
+	// Pin it so the user-visible card cannot regress to carry the D7
+	// summary.
+	card := buildTaskProgressCard(post, true)
+	cardBody := BuildCardJSON(card)
+	if strings.Contains(cardBody, summary) {
+		t.Errorf("rendered progress card body contains D7 final summary — DM-20260621-008 regression.\nbody=%s", cardBody)
+	}
+	if !strings.Contains(cardBody, workerLine) {
+		t.Errorf("rendered progress card body missing worker progress summary.\nbody=%s", cardBody)
 	}
 }
