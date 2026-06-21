@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-metrics-and-concurrency-hardening`
 **Demand ID:** DM-20260622-001
-**Status:** S2_Proposal
+**Status:** S7_Archived (PR #160 squash-merged 2026-06-22)
 **Priority:** P1
 **Date:** 2026-06-22
 **Author:** Deep review session (DM-20260621-009 follow-up)
