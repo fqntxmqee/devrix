@@ -2,6 +2,8 @@ package sessionorchestrator
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -34,6 +36,10 @@ type InterruptOptions struct {
 	DelegateCanceler func(sessionID string) error
 	ProcessCanceler  func(sessionID string) error
 	Sink             EventPublisher
+	// Metrics is an optional counters sink. When nil, the Handle method
+	// still returns errors.Join aggregated errors but does not increment
+	// any counters. DM-20260621-010 PR-A.
+	Metrics *InterruptMetrics
 }
 
 // InterruptHandler is the v1.0 HandleInterrupt entry point.
@@ -52,32 +58,51 @@ func NewInterruptHandler(orch *SessionOrchestrator, opts InterruptOptions) *Inte
 // Handle runs the cancel sequence. It is idempotent: calling it on a
 // session with no active orchestration is a no-op.
 //
-// Returns when the cancel sequence has completed (best-effort). Emits a
-// "stopped" EngineEvent with kind=stopped to the sink (if configured).
+// DM-20260621-010 PR-A: returns errors.Join aggregated error if any of the
+// 3 canceler steps fails (previously returned nil silently). The "stopped"
+// EngineEvent is still emitted best-effort regardless of cancel outcomes.
 func (h *InterruptHandler) Handle(ctx context.Context, sessionID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	var errs []error
+
 	// Step 1: Wave CancelAll. wave/scheduler.go deliberately detaches from
 	// the parent ctx, so we must call its public CancelAll.
 	if h.opts.WaveCanceler != nil {
 		if err := h.opts.WaveCanceler(sessionID); err != nil {
+			if h.opts.Metrics != nil {
+				h.opts.Metrics.WaveCancelFailed.Add(1)
+			}
 			slog.Warn("orchestrator: HandleInterrupt wave cancel failed", "sessionID", sessionID, "err", err)
+			errs = append(errs, fmt.Errorf("wave cancel: %w", err))
 		}
 	}
 	// Step 2: D4 delegate cancel. Best-effort; d4 may have no worker.
 	if h.opts.DelegateCanceler != nil {
 		if err := h.opts.DelegateCanceler(sessionID); err != nil {
+			if h.opts.Metrics != nil {
+				h.opts.Metrics.D4CancelFailed.Add(1)
+			}
 			slog.Warn("orchestrator: HandleInterrupt delegate cancel failed", "sessionID", sessionID, "err", err)
+			errs = append(errs, fmt.Errorf("d4 cancel: %w", err))
 		}
 	}
 	// Step 3: orchestrator (D7 RunTurn) cancel.
 	if h.opts.ProcessCanceler != nil {
 		if err := h.opts.ProcessCanceler(sessionID); err != nil {
+			if h.opts.Metrics != nil {
+				h.opts.Metrics.ProcessCancelFailed.Add(1)
+			}
 			slog.Warn("orchestrator: HandleInterrupt process cancel failed", "sessionID", sessionID, "err", err)
+			errs = append(errs, fmt.Errorf("process cancel: %w", err))
 		}
 	}
 	// Step 4: emit stopped event. EngineEvent.Type is an open string in the
 	// contracts package; "stopped" is the v1.0 D7 value (per d7-domain.md).
+	// Best-effort: even if all 3 cancel steps failed above, we still try
+	// to publish the "stopped" event so downstream consumers know the
+	// orchestration is terminating.
 	if h.opts.Sink != nil {
 		ev := &contracts.EngineEvent{
 			Type:      "stopped",
@@ -89,6 +114,16 @@ func (h *InterruptHandler) Handle(ctx context.Context, sessionID string) error {
 			},
 		}
 		h.opts.Sink.Publish(ctx, ev)
+	}
+
+	if len(errs) > 0 {
+		if h.opts.Metrics != nil {
+			h.opts.Metrics.HandleErrored.Add(1)
+		}
+		return errors.Join(errs...)
+	}
+	if h.opts.Metrics != nil {
+		h.opts.Metrics.HandleCompleted.Add(1)
 	}
 	return nil
 }
