@@ -2,7 +2,9 @@ package freefork
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -40,9 +42,58 @@ type ForkerDeps struct {
 	DefaultConfig multiagent.AgentConfig
 }
 
-type DefaultForker struct{ deps ForkerDeps }
+type DefaultForker struct {
+	deps    ForkerDeps
+	metrics *ForkerMetrics
+}
 
 func NewDefaultForker(deps ForkerDeps) *DefaultForker { return &DefaultForker{deps: deps} }
+
+// WithMetrics attaches a metrics sink. Backward-compatible setter for
+// callers that constructed DefaultForker via NewDefaultForker; safe to
+// call before Fork. nil disables metric recording.
+func (f *DefaultForker) WithMetrics(m *ForkerMetrics) *DefaultForker {
+	f.metrics = m
+	return f
+}
+
+func (f *DefaultForker) recordSpawned() {
+	if f.metrics != nil {
+		f.metrics.Spawned.Add(1)
+	}
+}
+
+func (f *DefaultForker) recordSpawnFailed() {
+	if f.metrics != nil {
+		f.metrics.SpawnFailed.Add(1)
+	}
+}
+
+func (f *DefaultForker) recordSandboxEnterFailed() {
+	if f.metrics != nil {
+		f.metrics.SandboxEnterFailed.Add(1)
+	}
+}
+
+func (f *DefaultForker) recordSandboxExitFailed(name, path string, err error) {
+	if f.metrics != nil {
+		f.metrics.SandboxExitFailed.Add(1)
+	}
+	slog.Warn("freefork: sandbox exit failed",
+		"forkName", name, "sandboxPath", path, "err", err)
+}
+
+func (f *DefaultForker) recordFactoryCreateFailed() {
+	if f.metrics != nil {
+		f.metrics.FactoryCreateFailed.Add(1)
+	}
+}
+
+func (f *DefaultForker) recordRollbackTriggered() {
+	if f.metrics != nil {
+		f.metrics.RollbackTriggered.Add(1)
+	}
+}
 
 func (f *DefaultForker) Fork(ctx context.Context, parentSession string, reqs []ForkRequest) ([]Handle, error) {
 	if f == nil || f.deps.Factory == nil {
@@ -70,21 +121,29 @@ func (f *DefaultForker) Fork(ctx context.Context, parentSession string, reqs []F
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
+				f.recordSpawnFailed()
 				errs = append(errs, fmt.Errorf("fork %q: %w", req.Name, err))
 				return
 			}
+			f.recordSpawned()
 			handles = append(handles, h)
 		}()
 	}
 	wg.Wait()
 	if len(errs) > 0 {
+		f.recordRollbackTriggered()
 		for _, h := range handles {
-			_ = h.Agent.Terminate(ctx)
+			if err := h.Agent.Terminate(ctx); err != nil {
+				slog.Warn("freefork: rollback Terminate failed",
+					"forkName", h.Name, "err", err)
+			}
 			if h.SandboxPath != "" && f.deps.Sandbox != nil {
-				_ = f.deps.Sandbox.Exit(ctx, h.SandboxPath, false)
+				if err := f.deps.Sandbox.Exit(ctx, h.SandboxPath, false); err != nil {
+					f.recordSandboxExitFailed(h.Name, h.SandboxPath, err)
+				}
 			}
 		}
-		return nil, errs[0]
+		return nil, errors.Join(errs...)
 	}
 	return handles, nil
 }
@@ -105,6 +164,7 @@ func (f *DefaultForker) spawnOne(ctx context.Context, parentSession string, req 
 	if req.WantsSandbox() && f.deps.Sandbox != nil && f.deps.Sandbox.Enabled() {
 		p, err := f.deps.Sandbox.Enter(ctx, parentSession, slugify(req.Name), cfg.WorkDir)
 		if err != nil {
+			f.recordSandboxEnterFailed()
 			return Handle{}, fmt.Errorf("sandbox enter: %w", err)
 		}
 		sbPath = p
@@ -112,8 +172,11 @@ func (f *DefaultForker) spawnOne(ctx context.Context, parentSession string, req 
 	}
 	agent, err := f.deps.Factory.Create(ctx, cfg, nil)
 	if err != nil {
+		f.recordFactoryCreateFailed()
 		if sbPath != "" && f.deps.Sandbox != nil {
-			_ = f.deps.Sandbox.Exit(ctx, sbPath, false)
+			if exitErr := f.deps.Sandbox.Exit(ctx, sbPath, false); exitErr != nil {
+				f.recordSandboxExitFailed(req.Name, sbPath, exitErr)
+			}
 		}
 		return Handle{}, fmt.Errorf("factory create: %w", err)
 	}
