@@ -581,11 +581,11 @@ LLM. Supersedes Phase A `SubTurnRunner` legacy default.
 
 ### Requirement: Sandbox Cleanup Observability (devrix-d7-error-aggregation-and-metrics)
 
-All `Sandbox.Exit` call sites across `freefork.Forker`, `execute.Executor`, and `wavescheduler.WorkerRunner` MUST surface Exit failures via atomic counter + `slog.Warn`, replacing the previous `_ = Sandbox.Exit(...)` silent-swallow pattern.
+All `Sandbox.Exit` call sites across `freefork.Forker`, `execute.Executor`, and `wavescheduler.WorkerRunner` MUST surface Exit failures via atomic counter + `slog.Warn`, replacing the previous `_ = Sandbox.Exit(...)` silent-swallow pattern. **Note (2026-06-22):** the `sandbox_exit_failed` counter is owned by D4 (`multiagent/execute/worker.go::recordSandboxExitFailed`); the D7 wavescheduler does NOT emit it. See D7-S6-A14-T03 for the cross-domain clarification.
 
 **Priority:** P0
 **Package:** `internal/layers/multiagent/provision/freefork/` + `internal/layers/multiagent/execute/` + `internal/layers/orchestration/wavescheduler/`
-**T:** D7-S6-A12-T04, T05, T06
+**T:** D7-S6-A12-T01 (OBSOLETE — see D7-S6-A14-T03), D7-S6-A12-T02, T03, T04, T05, T06
 
 #### Scenario: Forker sandbox Exit failure
 
@@ -638,6 +638,75 @@ All `Sandbox.Exit` call sites across `freefork.Forker`, `execute.Executor`, and 
 - GIVEN a failed fork batch where rollback cleans up sandbox dirs
 - WHEN the test inspects `wt.base` for leftover subdirectories
 - THEN `t.Errorf` fires on any leftover (was `t.Logf` pre-PR-A, masking latent cleanup failures)
+
+---
+
+### Requirement: Metrics Naming Alignment & Concurrency Hardening (devrix-d7-metrics-and-concurrency-hardening)
+
+D7-S6-A14 closes the remaining P0/P1 follow-ups from DM-20260621-010 (PR-B worktree
+metrics) and the DM-20260621-009 deep review. It (1) aligns metric names with the
+spec text so D5 dashboards can filter by name, (2) hands `sandbox_exit_failed`
+ownership to its real emitter in D4, (3) bounds `state.cancels` and
+`state.handles` so long-lived sessions with repeated wave re-entries do not
+leak context-cancel references, (4) routes the dispatchLoop hot path through
+`ConflictGuard.AllowAndRegister` to eliminate the TOCTOU window, and (5) hardens
+`CommandHandler` against consumer stalls via `select-default` emit.
+
+**Priority:** P1
+**Package:** `internal/layers/orchestration/wavescheduler/` + `internal/layers/orchestration/sessionorchestrator/`
+**T:** D7-S6-A14-T01 … D7-S6-A14-T06
+
+#### Scenario: dispatch_loop_wakeups spec-aligned plural
+
+- GIVEN `WaveScheduler.dispatchLoop` is running
+- WHEN either `<-state.wakeupCh` or `<-ticker.C` fires
+- THEN `s.incMetric("dispatch_loop_wakeups")` is invoked (plural, matches spec)
+- AND D5 dashboards keyed on `dispatch_loop_wakeups` observe the count
+
+#### Scenario: worker_panics spec-aligned plural
+
+- GIVEN a worker goroutine inside `dispatchOne`
+- WHEN the deferred recover catches a panic
+- THEN `s.incMetric("worker_panics")` is invoked (plural, matches spec)
+- AND `slog.Error(..., "metric", "worker_panics")` carries the matching key
+
+#### Scenario: sandbox_exit_failed owned by D4 (cross-domain reference)
+
+- GIVEN `multiagent/execute/worker.go::recordSandboxExitFailed` is the only emitter
+- WHEN `sandbox_exit_failed` appears on the D5 dashboard
+- THEN the counter comes from `ExecutorMetrics.SandboxExitFailed` (D4-S6-*)
+- AND the D7 `SchedulerMetrics` struct does NOT carry a `sandbox_exit_failed`
+  field (D7-S6-A12-T01 is OBSOLETE)
+- AND `openspec/specs/d7-orchestration/t-registry.md` references D4-S6-A12-Txx
+  for the actual owner
+
+#### Scenario: state.cancels released after wave completion
+
+- GIVEN a wave with N dispatched tasks
+- WHEN `markWaveDone` runs (any terminal path: all-complete, ctx-cancel,
+  or zero ready nodes)
+- THEN `state.cancels` is `nil` (length 0)
+- AND `state.handles` is an empty map
+- AND a follow-up wave re-entry on the same session starts with empty bookkeeping
+
+#### Scenario: ConflictGuard hot path uses AllowAndRegister
+
+- GIVEN `WaveScheduler.dispatchLoop` iterating over ready nodes
+- WHEN `dispatchOne` is called for each candidate
+- THEN the conflict check is the atomic `AllowAndRegister` (single mutex
+  acquisition covering both the conflict scan and the slot registration)
+- AND `dispatchLoop` no longer pre-checks `guard.Allow` (which would leave
+  a TOCTOU window between Allow and Register)
+- AND the `go test -race` run for `TestD7S6A14T05_DispatchLoop_HotPathUsesAllowAndRegister`
+  completes without race-detector findings
+
+#### Scenario: CommandHandler emit drops events when consumer is wedged
+
+- GIVEN `CommandHandler.Handle` returning a buffered channel (cap=4)
+- WHEN the consumer fails to drain within the buffer capacity
+- THEN `emit` uses `select { case out <- ev: default: slog.Warn(...) }`
+- AND the Handle goroutine returns within bounded latency
+- AND a `slog.Warn("command_handler: out channel full, drop event", ...)` is emitted
 
 ---
 
