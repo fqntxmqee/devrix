@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d6-evolution-review-fixes
 **Demand ID:** DM-20260621-011
-**Status:** S2_Proposal
+**Status:** S7_Archived (2026-06-21)
 **Priority:** P1
 **Date:** 2026-06-21
 

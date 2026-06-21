@@ -1,9 +1,10 @@
 id: devrix-d6-evolution-review-fixes
 demand_id: DM-20260621-011
 title: "D6 Evolution Review Fixes — bridge 删除 + Orchestration* 重命名 + panic/静默吞错"
-status: S2_Proposal
+status: s7_archived
 priority: P1
 created: 2026-06-21
+archived: 2026-06-21
 author: orchestrator (D6 deep review session)
 
 # DSAFT 层归属
