@@ -182,6 +182,70 @@ func findCaseInsensitive(haystack, needle string) (idx int, length int) {
 	return idx, len(needle)
 }
 
+// StripPriorOutputSummary removes <prior-output-summary>…</prior-output-summary>
+// blocks from assistant text. The marker is an internal D2 context-budget
+// fold artifact (see internal/layers/contextengine/prepare/persist/
+// turn_output_store.go FoldAssistantOutput) used to bound oversized prior
+// turns in the LLM's context window. When the LLM echoes it back into its
+// own reply (which it does — the marker is part of its own conversation
+// history), the echo leaks to the user via the streaming card, the thinking
+// card, and the standalone "任务总结" card.
+//
+// We strip it at the D1 IM adapter boundary so all downstream renderers see
+// clean text. Unbalanced markers (LLM emitted the open tag but not the
+// close) are dropped entirely — better to lose a tail fragment than to
+// render half a tag to the user.
+//
+// This is a static-text stripper. For streaming delta splitting, the
+// ThinkTagSplitter is the source of truth for <think> blocks; if a future
+// change needs to split <prior-output-summary> at the stream layer, follow
+// the same splitter pattern.
+func StripPriorOutputSummary(text string) string {
+	const openTag = "<prior-output-summary>"
+	const closeTag = "</prior-output-summary>"
+	out := text
+	for {
+		lower := strings.ToLower(out)
+		openIdx := strings.Index(lower, openTag)
+		if openIdx < 0 {
+			return strings.TrimSpace(out)
+		}
+		rest := out[openIdx+len(openTag):]
+		closeIdx, closeLen := findCaseInsensitive(rest, closeTag)
+		var rebuilt string
+		if closeIdx < 0 {
+			// Unbalanced — drop the open tag and everything after it.
+			rebuilt = strings.TrimSpace(out[:openIdx])
+		} else {
+			prefix := strings.TrimSpace(out[:openIdx])
+			suffix := strings.TrimSpace(rest[closeIdx+closeLen:])
+			switch {
+			case prefix == "":
+				rebuilt = suffix
+			case suffix == "":
+				rebuilt = prefix
+			default:
+				rebuilt = prefix + "\n" + suffix
+			}
+		}
+		if rebuilt == out {
+			// No progress — avoid infinite loop on pathological input.
+			return strings.TrimSpace(out)
+		}
+		out = rebuilt
+	}
+}
+
+// StripAssistantInternalMarkers removes both <think> blocks and
+// <prior-output-summary> markers in one pass. Use this at the D1 IM
+// adapter boundary so neither thinking content nor context-budget fold
+// artifacts leak to the user. Order matters: thinking blocks may contain
+// embedded <prior-output-summary> markers when the LLM quotes its own
+// prior reasoning, so we strip thinking first.
+func StripAssistantInternalMarkers(text string) string {
+	return StripPriorOutputSummary(StripThinkingTags(text))
+}
+
 func partialTagSuffix(raw, tag string) int {
 	if tag == "" || raw == "" {
 		return 0
