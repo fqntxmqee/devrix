@@ -1,7 +1,7 @@
 id: devrix-d7-metrics-and-concurrency-hardening
 demand_id: DM-20260622-001
 title: "D7 Metrics Naming Alignment & Concurrency Hardening"
-status: s2_proposal
+status: s7_archived
 priority: P1
 created: 2026-06-22
 author: deep review session (DM-20260621-009 follow-up)
