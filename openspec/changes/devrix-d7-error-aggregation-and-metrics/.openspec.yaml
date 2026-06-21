@@ -1,0 +1,88 @@
+id: devrix-d7-error-aggregation-and-metrics
+demand_id: DM-20260621-010
+title: "D7 Error Aggregation & Worktree Metrics"
+status: S2_Proposal
+priority: P1
+created: 2026-06-21
+author: orchestrator (deep review session)
+
+# DSAFT 层归属
+layers:
+  - D7  # orchestration
+  - D5  # observability (metrics 接线)
+
+# 能力维度（devrix-error-handling-tier1-tier2 风格）
+capabilities:
+  - id: D7-S6-A11
+    name: HandleInterrupt error aggregation
+    description: Aggregate errors from Wave/D4/Process cancelers via errors.Join, return aggregated error instead of nil
+  - id: D7-S6-A12
+    name: Worktree cleanup observability
+    description: Sandbox Exit / worker panic / taskCtx leak / reentry cancel 全部走 metric + slog.Warn，不静默吞
+  - id: D7-S6-A13
+    name: Forker batch error surfacing
+    description: DefaultForker.Fork 的并发失败用 errors.Join 取代 errs[0] 单点返回
+
+# 测试点（占位，S4 实现时按需补充）
+test_points:
+  - id: D7-S6-A11-T01
+    name: HandleInterrupt 4-step cancel 全部失败 → 返回 errors.Join(error1, error2, error3)
+    status: PLANNED
+  - id: D7-S6-A12-T01
+    name: Sandbox Exit 失败 → metric.Inc("sandbox_exit_failed") + slog.Warn 不返回 err
+    status: PLANNED
+  - id: D7-S6-A12-T02
+    name: Worker panic → metric.Inc("worker_panics")（不是仅 slog.Error）
+    status: PLANNED
+  - id: D7-S6-A12-T03
+    name: taskCtx leak 检测 → completeTask 时如果 cancel != nil && ExitCode == 0 → metric.Inc("task_ctx_leaked")
+    status: PLANNED
+  - id: D7-S6-A13-T01
+    name: Forker 3 个并发失败 → 返回 errors.Join(err1, err2, err3) 而非 errs[0]
+    status: PLANNED
+
+# 范围
+in_scope:
+  - interrupt.go HandleInterrupt 错误聚合
+  - wavescheduler/scheduler.go panic/metrics 化
+  - freefork/forker.go sandbox 退出 + 错误聚合
+  - task_manager.go publishCompletion panic 修复
+  - forker_test.go 硬断言补充
+
+out_of_scope:
+  - coordinator/aliases.go 弃用审计（建议独立 change）
+  - Dispatcher.Dispatch 孤儿模块决策（建议独立 change）
+  - summarizeArtifacts metadata 增强（建议独立 change）
+  - 三流格式统一（建议独立 change）
+  - UncertaintyCoord 实现（DM-20260620-001-B 已规划）
+  - AdaptiveThreshold 接入 RunTurn（TD-WT-01 P2 延期到 v3.0）
+
+# PR 拆分（参照 devrix-error-handling-tier1-tier2 4-PR 模式，简化为 3 PR）
+pr_breakdown:
+  - pr: PR-A
+    scope: "Error aggregation + Sandbox cleanup hardening"
+    files: 7
+    estimated_loc: +180 / -30
+    risk: Low
+  - pr: PR-B
+    scope: "Worktree full-chain metrics (5+ counter)"
+    files: 9
+    estimated_loc: +200 / -40
+    risk: Low
+  - pr: PR-C
+    scope: "Docs + spec sync + t-registry + S6 archive"
+    files: 4
+    estimated_loc: +120 / 0
+    risk: Low
+
+# 关联
+related_changes:
+  - devrix-error-handling-tier1-tier2  # S7_Archived 2026-06-20，SanitizeForUser + Error 类型合并
+  - devrix-context-budget-phase-a-pr128  # PR #128 squash merged 2026-06-20
+  - devrix-tool-surface-phase2-full-pr64  # PR #64 关闭 12→0 global loop
+
+# 参考
+references:
+  - openspec/archive/2026-06-17-devrix-unified-work-tree/  # uncertainty/AdaptiveThreshold 来源
+  - openspec/tech-debt/worktree-v2-deferred.md  # TD-WT-01 P2 延期
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
