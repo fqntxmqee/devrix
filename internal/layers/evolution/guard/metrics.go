@@ -2,6 +2,7 @@ package guard
 
 import (
 	"strconv"
+	"sync/atomic"
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
@@ -15,6 +16,11 @@ type orchMetrics struct {
 	judgeLatency       metrics.Histogram
 	observerActive     metrics.Gauge
 	decisionsByStage   metrics.Counter
+
+	// PR-A: H-3 silent swallow 修复（DM-20260621-011）
+	// intervention.go 中 Wait/Tasks.Fail 失败时累加, 用于 SLO 报警
+	waitFailed     atomic.Int64
+	taskFailFailed atomic.Int64
 }
 
 func initOrchMetrics(obs *observability.Observability) *orchMetrics {
@@ -100,4 +106,36 @@ func (m *orchMetrics) signalObserverActive() {
 		return
 	}
 	m.observerActive.Add(1)
+}
+
+// recordWaitFailed increments the wait failure counter (nil-safe).
+func (m *orchMetrics) recordWaitFailed() {
+	if m == nil {
+		return
+	}
+	m.waitFailed.Add(1)
+}
+
+// recordTaskFailFailed increments the task fail failure counter (nil-safe).
+func (m *orchMetrics) recordTaskFailFailed() {
+	if m == nil {
+		return
+	}
+	m.taskFailFailed.Add(1)
+}
+
+// SnapshotWaitFailed returns the current wait failure count (nil-safe).
+func (m *orchMetrics) SnapshotWaitFailed() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.waitFailed.Load()
+}
+
+// SnapshotTaskFailFailed returns the current task fail failure count (nil-safe).
+func (m *orchMetrics) SnapshotTaskFailFailed() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.taskFailFailed.Load()
 }

@@ -79,6 +79,13 @@ func mustParseVerifyInvariants() ltllite.InvariantSet {
 - 进程被 panic 污染，recover 链路过深时可能绕过 shutdown hooks
 - 与 D5/D7 域的 fatal 处理风格不一致（`shared/log/fatal.go` 提供 `log.Fatal`）
 
+**额外发现**：`_invariant.go` 文件以 `_` 开头，Go 工具链（`go build`/`go test`/`go install`）**会忽略此类文件**。这意味着：
+- `CheckVerifyInvariants` / `verifyInvariantSet` / `parseVerifyInvariants` 这些 export **从未被编译进 verify 包二进制**
+- 整个 `_invariant.go` 是 latent dead code（spec.md / design.md 都假设该文件 active）
+- 必须重命名为 `invariant.go`（去掉 `_` 前缀）才能真正进入包
+
+PR-A 同时修复 **panic 反模式** + **dead code 激活**。
+
 ### Problem 4 (P1 — HIGH): 静默吞错 `intervention.go:74`
 
 **位置**：`internal/layers/evolution/guard/intervention.go:74`

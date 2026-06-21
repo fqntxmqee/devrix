@@ -48,8 +48,8 @@ test_points:
 in_scope:
   - C-1: 删除 eval/bridge.go + orchestration/bridge.go（2 个文件移除）
   - H-1: guard/ 内 6 处 Orchestration* → Guard* + 6 个 orch_* → guard_* 指标
-  - H-2: verify/_invariant.go:24 panic 替换为 slog.Fatal + errors.Join
-  - H-3: guard/intervention.go:74 静默吞错改为 metric + slog.Warn + 上抛
+  - H-2: verify/_invariant.go:24 panic 替换为 log.Fatalf（额外：_invariant.go → invariant.go 重命名激活 dead code）
+  - H-3: guard/intervention.go:74 静默吞错改为 metric + slog.Warn + errors.Join
 
 out_of_scope:
   - H-4: SentinelError 引入（Phase 2，本 change 仅完成 Phase 1）

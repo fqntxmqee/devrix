@@ -23,16 +23,21 @@
 
 ### A1. verify/_invariant.go panic → log.Fatal
 
-- [ ] **A1.1** 修改 `internal/layers/evolution/verify/_invariant.go`
+- [ ] **A1.1** **重命名** `internal/layers/evolution/verify/_invariant.go` → `internal/layers/evolution/verify/invariant.go`
+  - **根因**：Go 工具链忽略 `_` 前缀文件，原文件从未编译进包二进制（latent dead code）
+  - `git mv` 保留历史
+- [ ] **A1.2** 修改 `internal/layers/evolution/verify/invariant.go`
   - `mustParseVerifyInvariants()` 改为 `parseVerifyInvariants() (ltllite.InvariantSet, error)`
   - 移除 `panic("ltllite: verify invariant parse failed: ...")`
   - 新增 `init()` 函数调用 `parseVerifyInvariants()`，失败走 `log.Fatalf`
   - `var verifyInvariantSet ltllite.InvariantSet` 改为 package-level var
-- [ ] **A1.2** 确认 `verify/plan.go` 等其他文件对 `verifyInvariantSet` 的引用无需改签名（仅 init 时机变化）
-- [ ] **A1.3** 新建 `verify/_invariant_test.go`
+- [ ] **A1.3** 确认 `verify/plan.go` 等其他文件对 `verifyInvariantSet` 的引用无需改签名（仅 init 时机变化）
+- [ ] **A1.4** 新建 `verify/invariant_test.go`
   - `TestParseVerifyInvariants_BadStruct_ReturnsError` — 标签错误返回 error
   - `TestParseVerifyInvariants_GoodStruct_Succeeds` — 默认 verifyInvariants{} 可解析
   - `TestVerifyInvariants_InitSucceeds` — init() 不 panic（默认 struct 合法）
+  - `TestCheckVerifyInvariants_NoViolations` — 满足态不返回 violation
+  - `TestCheckVerifyInvariants_ViolationDetected` — 不满足态返回 violation
 
 ### A2. guard/intervention.go silent swallow → metric + errors.Join
 
@@ -57,6 +62,7 @@
 - [ ] **A3.1** `cd /Users/fukai/workspace/devrix && go vet ./internal/layers/evolution/...`
 - [ ] **A3.2** `go test -race ./internal/layers/evolution/...`
 - [ ] **A3.3** 全仓 `git grep "_, _ = current.Wait\|_, _ = ie.tasks.Fail"` 验证 0 命中
+- [ ] **A3.4** `go build ./...` 全仓 0 错（invariant.go 实际进入包二进制）
 
 ---
 

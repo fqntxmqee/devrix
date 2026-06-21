@@ -66,12 +66,7 @@ var verifyInvariantSet = mustParseVerifyInvariants()
 
 **After**:
 ```go
-//go:embed invariants.go  // 注释：invariant 配置外部化（非必须，本 PR 不动）
-func parseVerifyInvariants() (ltllite.InvariantSet, error) {
-    return ltllite.ParseStruct(verifyInvariants{})
-}
-
-// var verifyInvariantSet: 仅在 init() 解析失败时 log.Fatal 退出
+// init() runs at package load; on parse failure → log.Fatalf (exit 1).
 func init() {
     set, err := parseVerifyInvariants()
     if err != nil {
@@ -80,31 +75,67 @@ func init() {
     verifyInvariantSet = set
 }
 
+func parseVerifyInvariants() (ltllite.InvariantSet, error) {
+    return ltllite.ParseStruct(verifyInvariants{})
+}
+
 var verifyInvariantSet ltllite.InvariantSet
+```
+
+**额外步骤（dead code 激活）**：
+
+`_invariant.go` 是死代码 —— Go 工具链忽略 `_` 前缀文件。**重命名为 `invariant.go`** 让 export 真正进入包二进制。
+
+```bash
+git mv internal/layers/evolution/verify/_invariant.go internal/layers/evolution/verify/invariant.go
+git mv internal/layers/evolution/verify/_invariant_test.go internal/layers/evolution/verify/invariant_test.go
 ```
 
 **测试**：
 ```go
-// verify/_invariant_test.go
-func TestParseVerifyInvariants_BadStruct_ReturnsError(t *testing.T) {
-    // 构造一个标签错误的 struct
-    type badStruct struct {
-        X string `invariant:"!@#"`
-    }
-    _, err := ltllite.ParseStruct(badStruct{})
-    if err == nil {
-        t.Fatal("expected parse error for bad invariant tag")
-    }
-}
-
-func TestVerifyInvariants_InitSucceeds(t *testing.T) {
-    // 验证默认 verifyInvariants{} 可解析（确保 init() 不会 log.Fatal）
+// verify/invariant_test.go
+func TestParseVerifyInvariants_GoodStruct_Succeeds(t *testing.T) {
     set, err := parseVerifyInvariants()
     if err != nil {
         t.Fatalf("default invariant parse failed: %v", err)
     }
-    if len(set) == 0 {
+    if len(set.Invariants) == 0 {
         t.Error("expected non-empty invariant set")
+    }
+}
+
+func TestParseVerifyInvariants_BadStruct_ReturnsError(t *testing.T) {
+    type badStruct struct {
+        X string `invariant:""`  // 空标签触发 ErrInvalidInvariant
+    }
+    _, err := ltllite.ParseStruct(badStruct{})
+    if err == nil {
+        t.Fatal("expected parse error for empty invariant tag")
+    }
+}
+
+func TestVerifyInvariants_InitSucceeds(t *testing.T) {
+    if len(verifyInvariantSet.Invariants) == 0 {
+        t.Error("verifyInvariantSet should be populated after init()")
+    }
+}
+
+func TestCheckVerifyInvariants_NoViolations(t *testing.T) {
+    state := ltllite.MapState{ /* all propositions true */ }
+    if v := CheckVerifyInvariants(state); len(v) != 0 {
+        t.Errorf("expected no violations, got %d", len(v))
+    }
+}
+
+func TestCheckVerifyInvariants_ViolationDetected(t *testing.T) {
+    // ReadOnly invariant: verify_called => no_plan_mutation
+    // 故意让 post 为 false, 期望检测到 violation
+    state := ltllite.MapState{
+        "verify_called": true, "no_plan_mutation": false,
+        // ... 其余 true
+    }
+    if v := CheckVerifyInvariants(state); len(v) == 0 {
+        t.Error("expected violation, got 0")
     }
 }
 ```
@@ -113,6 +144,7 @@ func TestVerifyInvariants_InitSucceeds(t *testing.T) {
 - 使用 `log.Fatalf` 而非 `panic`：符合 D5/D7 规范约定（业务 fatal 走 log）
 - 启动期失败进程退出码非 0，systemd / k8s 会重启，避免静默启动后 invariant 缺失
 - 移除 `mustXxx` 命名约定（Go 习惯用法之一，本项目遵循"显式 error 返回"原则）
+- **`_invariant.go` → `invariant.go` 重命名不可省略** —— 不然 export 永远进不了包二进制
 
 ### 3.2 H-3 silent swallow → metric + errors.Join
 

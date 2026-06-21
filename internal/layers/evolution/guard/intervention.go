@@ -2,6 +2,8 @@ package guard
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -30,11 +32,22 @@ type InterventionExecutor struct {
 	agents  AgentController
 	tasks   TaskController
 	factory AgentFactory
+
+	// PR-A: H-3 silent swallow 修复（DM-20260621-011）
+	// 通过 WithMetrics 注入, nil-safe（默认 nil 不计数, 不影响现有调用方）
+	metrics *orchMetrics
 }
 
 // NewInterventionExecutor creates an executor with the required controllers.
 func NewInterventionExecutor(agents AgentController, tasks TaskController, factory AgentFactory) *InterventionExecutor {
 	return &InterventionExecutor{agents: agents, tasks: tasks, factory: factory}
+}
+
+// WithMetrics injects the orchMetrics for error aggregation observability.
+// Returns the executor for chaining. Nil-safe: nil disables recording.
+func (ie *InterventionExecutor) WithMetrics(m *orchMetrics) *InterventionExecutor {
+	ie.metrics = m
+	return ie
 }
 
 // Execute applies the given intervention.
@@ -65,18 +78,36 @@ func (ie *InterventionExecutor) terminate(ctx context.Context, session *types.Se
 	return nil
 }
 
+// terminateAndReroute stops the current agent, optionally fails the task,
+// then creates + starts a new agent. Errors from Terminate/Wait/Tasks.Fail
+// are aggregated via errors.Join (DM-20260621-011 H-3, matches D7 error
+// aggregation "atomic counter + slog + errors.Join" pattern).
 func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session *types.Session, iv Intervention) error {
+	var errs []error
+
 	current := ie.agents.SessionAgent(session.SessionID)
 	if current != nil {
-		if err := current.Terminate(ctx); err != nil {
-			slog.Warn("terminate current agent on reroute", "error", err)
+		if termErr := current.Terminate(ctx); termErr != nil {
+			slog.Warn("terminate current agent on reroute",
+				"session_id", session.SessionID, "error", termErr)
+			errs = append(errs, fmt.Errorf("terminate: %w", termErr))
 		}
-		_, _ = current.Wait(ctx)
+		if _, waitErr := current.Wait(ctx); waitErr != nil {
+			ie.metrics.recordWaitFailed()
+			slog.Warn("wait current agent failed",
+				"session_id", session.SessionID, "error", waitErr)
+			errs = append(errs, fmt.Errorf("wait: %w", waitErr))
+		}
 	}
 
 	if iv.MilestoneFail || iv.TaskFail {
 		taskID := iv.FailReason
-		_ = ie.tasks.Fail(taskID, iv.Reason)
+		if failErr := ie.tasks.Fail(taskID, iv.Reason); failErr != nil {
+			ie.metrics.recordTaskFailFailed()
+			slog.Warn("task fail failed",
+				"task_id", taskID, "reason", iv.Reason, "error", failErr)
+			errs = append(errs, fmt.Errorf("task_fail: %w", failErr))
+		}
 	}
 
 	cfg := iv.AgentConfig
@@ -88,7 +119,8 @@ func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session
 	}
 	newAgent, err := ie.factory.Create(ctx, *cfg, session)
 	if err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("create: %w", err))
+		return errors.Join(errs...)
 	}
 
 	ie.agents.RegisterSessionAgent(session.SessionID, newAgent)
@@ -97,7 +129,7 @@ func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session
 			slog.Error("reroute agent run", "error", runErr)
 		}
 	}()
-	return nil
+	return errors.Join(errs...)
 }
 
 func (ie *InterventionExecutor) updateState(ctx context.Context, session *types.Session, iv Intervention) error {

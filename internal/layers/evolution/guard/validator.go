@@ -232,6 +232,9 @@ func (v *RuntimeOrchestrationValidator) OnInterveneHook(fn InterventionHook) { v
 func (v *RuntimeOrchestrationValidator) SetObservability(obs *observability.Observability) {
 	v.obs = obs
 	v.metrics = initOrchMetrics(obs)
+	if v.executor != nil {
+		v.executor.WithMetrics(v.metrics)
+	}
 	if obs != nil {
 		slog.Info("orchestration: observability initialized",
 			"tracing_enabled", obs.Tracer() != nil,
