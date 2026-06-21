@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-d7-error-aggregation-and-metrics
 **Demand ID:** DM-20260621-010
-**Status:** S2_Proposal
+**Status:** S7_Archived
 **Priority:** P1
 **Date:** 2026-06-21
 

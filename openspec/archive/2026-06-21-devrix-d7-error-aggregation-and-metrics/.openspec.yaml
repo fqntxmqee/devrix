@@ -1,12 +1,14 @@
 id: devrix-d7-error-aggregation-and-metrics
 demand_id: DM-20260621-010
 title: "D7 Error Aggregation & Worktree Metrics"
-status: S2_Proposal
+status: s7_archived
 priority: P1
 created: 2026-06-21
+archived: 2026-06-21
 author: orchestrator (deep review session)
 
 # DSAFT 层归属
+domains: [D7, D5]
 layers:
   - D7  # orchestration
   - D5  # observability (metrics 接线)
