@@ -188,13 +188,18 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		}
 	}
 
+	s.mu.Lock()
+	existing, hasExisting := s.waves[sessionID]
+	s.mu.Unlock()
+
 	waveCtx, scheduleSpan := s.startOrchSpan(ctx, telemetry.OpD7_S3_Orchestration_Wave_Schedule, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "wave.session_id", Value: sessionID},
 		tracer.Attribute{Key: "wave.task_count", Value: fmt.Sprintf("%d", len(graph.nodes))},
+		tracer.Attribute{Key: "wave.reentry", Value: boolStr(hasExisting)},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 
 	s.mu.Lock()
-	existing, hasExisting := s.waves[sessionID]
 	state := &schedulerWaveState{
 		sessionID:    sessionID,
 		graph:        graph,
@@ -376,6 +381,11 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			tracer.Attribute{Key: "wave.session_id", Value: sessionID},
 			tracer.Attribute{Key: "wave.task_id", Value: node.ID},
 			tracer.Attribute{Key: "wave.worker_type", Value: string(node.WorkerType)},
+			tracer.Attribute{Key: "wave.worker_id", Value: workerID},
+			tracer.Attribute{Key: "wave.slot_id", Value: string(slotID)},
+			tracer.Attribute{Key: "wave.model_tier", Value: string(node.ModelTier)},
+			tracer.Attribute{Key: "wave.directive_len", Value: fmt.Sprintf("%d", len(node.Directive))},
+			tracer.Attribute{Key: "context.caller", Value: "d7"},
 		)
 		defer func() {
 			if r := recover(); r != nil {
@@ -599,4 +609,11 @@ func (s *WaveScheduler) PeakRunning() int {
 	s.metricsMu.Lock()
 	defer s.metricsMu.Unlock()
 	return s.metrics.PeakRunning
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

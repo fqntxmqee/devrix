@@ -103,7 +103,9 @@ ctx, span := bridge.Tracer().Start(ctx, telemetry.OpOrchestrationTurnRun,
 defer span.End()
 ```
 
-Span 属性通过 `telemetry.SpanAttrs()` 自动注入 `devrix.layer` 和 `devrix.component`。
+Span 属性由 `telemetry.SpanAttrs(operation, extra...)` 透传 — 不再注入
+`devrix.layer` / `devrix.component`，因为 Operation 名（`D{N}_*` 前缀）已蕴含
+这两个维度。需要显式查询时调用 `telemetry.LayerAndComponent(operation)`。
 
 ---
 

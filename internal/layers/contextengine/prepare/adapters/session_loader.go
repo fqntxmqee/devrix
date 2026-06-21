@@ -52,7 +52,13 @@ func NewSessionLoaderAdapter(manager *memory.Manager, opts ...HooksOption) *Sess
 // signature); the underlying Manager.LoadOrInit uses the session's stored model.
 func (a *SessionLoaderAdapter) LoadOrInit(session *types.Session, model string) (*types.SessionContext, bool, error) {
 	ctx := context.Background()
-	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Snapshot_Load, tracer.SpanKindInternal)
+	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Snapshot_Load, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session.id", Value: session.SessionID},
+		tracer.Attribute{Key: "session.request_id", Value: session.RequestID},
+		tracer.Attribute{Key: "snapshot.had_snapshot", Value: boolStr(session.ContextSnapshot != nil)},
+		tracer.Attribute{Key: "snapshot.model", Value: model},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
+	)
 	if span != nil {
 		defer span.End()
 	}

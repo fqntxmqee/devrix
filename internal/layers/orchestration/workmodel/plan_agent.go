@@ -159,7 +159,12 @@ func (a *PlanAgent) Plan(ctx context.Context, req PlanRequest) *PlanResult {
 	start := time.Now()
 	ctx, planSpan := a.startSpan(ctx, telemetry.OpD2_S8_Task_Plan_Generate, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "task.user_goal", Value: truncateStr(req.UserGoal, 200)},
+		tracer.Attribute{Key: "task.user_goal_len", Value: fmt.Sprintf("%d", len(req.UserGoal))},
 		tracer.Attribute{Key: "task.tool_count", Value: fmt.Sprintf("%d", len(req.Tools))},
+		tracer.Attribute{Key: "task.work_dir", Value: req.WorkDir},
+		tracer.Attribute{Key: "task.context_len", Value: fmt.Sprintf("%d", len(req.Context))},
+		tracer.Attribute{Key: "plan_mode.readonly_tools", Value: strings.Join(PlanAgentReadOnlyTools, ",")},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 
 	if a.llm == nil {

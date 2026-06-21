@@ -105,6 +105,7 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 
 		ctx, orchSpan := startObsSpan(op.obsBridge, ctx, telemetry.OpD7_S2_Orchestration_Orchestrate_Run, tracer.SpanKindInternal,
 			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "context.caller", Value: "d7"},
 		)
 		defer endSpan(orchSpan)
 
@@ -120,6 +121,13 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 					len(result.Validation.Errors),
 					strings.Join(result.Validation.Errors, "; ")))
 			return
+		}
+		if orchSpan != nil {
+			orchSpan.SetAttributes(
+				tracer.Attribute{Key: "task.node_count", Value: fmt.Sprintf("%d", len(result.Nodes))},
+				tracer.Attribute{Key: "task.validation_valid", Value: boolStr(result.Validation.Valid)},
+				tracer.Attribute{Key: "task.validation_errors", Value: fmt.Sprintf("%d", len(result.Validation.Errors))},
+			)
 		}
 		if op.taskManager != nil {
 			batchRootID, err := op.taskManager.SyncWaveNodes(req.SessionID, result.Nodes)
@@ -285,4 +293,11 @@ func newDefaultOrchestratePath(sink EventPublisher, llmDecomp decisionplanning.L
 		Artifacts: artifacts,
 	})
 	return NewOrchestratePath(decomp, sched, sink)
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

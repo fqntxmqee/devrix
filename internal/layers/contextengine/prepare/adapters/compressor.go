@@ -97,6 +97,10 @@ func (a *CompressorAdapter) Run(
 
 	ctx, span := a.hooks.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Run, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "context.tokens_before", Value: fmt.Sprintf("%d", len(repaired))},
+		tracer.Attribute{Key: "context.compress_per_turn", Value: boolStr(a.compressPerTurn == nil || a.compressPerTurn())},
+		tracer.Attribute{Key: "context.budget", Value: fmt.Sprintf("%d", budget)},
+		tracer.Attribute{Key: "context.should_compress", Value: boolStr(a.ShouldCompress(repaired, budget))},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 	if span != nil {
 		defer span.End()

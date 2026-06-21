@@ -154,8 +154,8 @@ D7 Turn 主路径 MUST 注册 `orchestration.turn.run`, `orchestration.turn.iter
 ### Requirement: Jaeger Alignment
 
 - `service.name` / `service.version` Resource 属性
-- `devrix.layer` / `devrix.component` span 属性
-- OTLP ScopeSpans.scope.name 取自 `devrix.component`
+- Operation 名（`D{N}_*` 前缀）承载 layer/component 维度
+- OTLP ScopeSpans.scope.name 由 `telemetry.LayerAndComponent(op)` 派生（`{layer}/{component}`）
 
 ### Requirement: Log-Trace-LLM Correlation
 

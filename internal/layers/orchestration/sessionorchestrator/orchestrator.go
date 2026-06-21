@@ -229,6 +229,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	ctx, sessionSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Session_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(req.Message))},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
 	// Keep sessionCtx for downstream routing. classifySpan mutates ctx; using
 	// that ctx after End() would attach Turn/Wave spans to the ended classify
