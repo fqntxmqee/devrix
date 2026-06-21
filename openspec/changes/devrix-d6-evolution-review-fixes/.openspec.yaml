@@ -1,0 +1,91 @@
+id: devrix-d6-evolution-review-fixes
+demand_id: DM-20260621-011
+title: "D6 Evolution Review Fixes — bridge 删除 + Orchestration* 重命名 + panic/静默吞错"
+status: S2_Proposal
+priority: P1
+created: 2026-06-21
+author: orchestrator (D6 deep review session)
+
+# DSAFT 层归属
+domains: [D6]
+layers:
+  - D6  # evolution
+
+# 能力维度
+capabilities:
+  - id: D6-S11-A02
+    name: Verify invariant parse failsafe (panic → error)
+    description: verify/_invariant.go:24 panic 替换为 errors.Join 聚合 + slog.Fatal，确保 invariant 解析失败不污染进程
+  - id: D6-S12-A01
+    name: InterventionExecutor silent swallow 修复
+    description: intervention.go:74 `_, _ = current.Wait(ctx)` 改为 metric 计数器 + slog.Warn + errors.Join 上抛
+  - id: D6-S12-A02
+    name: bridge.go 完全删除（spec/code 一致性）
+    description: 删除 eval/bridge.go + orchestration/bridge.go，spec v2.2.0 已声明 bridge 在 v2.0.1 cleanup 后全部删除但仍有 2 个残留
+  - id: D6-S12-A03
+    name: Orchestration* → Guard* 全量重命名
+    description: guard/ 内 6 处 Orchestration* 类型 / 函数 + 6 个 orch_* OpenTelemetry 指标重命名为 guard_*，与 v2.0 物理路径迁移保持一致
+
+# 测试点（占位，S4 实现时按需补充）
+test_points:
+  - id: D6-S11-A02-T01
+    name: verify/_invariant.go ParseStruct 失败不再 panic，改为 slog.Fatal + 退出码非 0
+    status: PLANNED
+  - id: D6-S11-A02-T02
+    name: intervention.go Wait 失败时 metric.Inc("intervention_wait_failed") + slog.Warn
+    status: PLANNED
+  - id: D6-S12-A02-T01
+    name: 删除 eval/bridge.go + orchestration/bridge.go 后所有引用方迁移至直接 import guard/
+    status: PLANNED
+  - id: D6-S12-A03-T01
+    name: guard/ 全部 Orchestration* 类型 / 函数重命名后所有 import 方 grep 0 命中旧名
+    status: PLANNED
+  - id: D6-S12-A03-T02
+    name: 6 个 orch_* 指标重命名为 guard_*，与 spec.md v2.3.0 一致
+    status: PLANNED
+
+# 范围
+in_scope:
+  - C-1: 删除 eval/bridge.go + orchestration/bridge.go（2 个文件移除）
+  - H-1: guard/ 内 6 处 Orchestration* → Guard* + 6 个 orch_* → guard_* 指标
+  - H-2: verify/_invariant.go:24 panic 替换为 slog.Fatal + errors.Join
+  - H-3: guard/intervention.go:74 静默吞错改为 metric + slog.Warn + 上抛
+
+out_of_scope:
+  - H-4: SentinelError 引入（Phase 2，本 change 仅完成 Phase 1）
+  - H-5: evaluate.Run 函数拆分（Phase 2）
+  - H-6: validator.OnDecision 函数拆分（Phase 2）
+  - M-1~M-7: 7 项 MEDIUM（Phase 2/3）
+  - L-1~L-5: 5 项 LOW（Phase 3）
+  - 完整 review 报告见 `openspec/changes/d6-deep-review/d6-review-report.md`（不归档，作为参考资料保留）
+
+# PR 拆分（3 PR 联动，镜像 devrix-d7-error-aggregation-and-metrics 模式）
+pr_breakdown:
+  - pr: PR-A
+    scope: "H-2 panic 修复 + H-3 silent swallow 修复（最小风险、独立单元）"
+    files: 2
+    estimated_loc: +30 / -10
+    risk: Low
+  - pr: PR-B
+    scope: "C-1 bridge 删除 + H-1 Orchestration* → Guard* 重命名 + orch_* → guard_* 指标"
+    files: 6
+    estimated_loc: +50 / -180
+    risk: Medium  # 跨域 import 迁移需确认 0 旧名残留
+  - pr: PR-C
+    scope: "Spec v2.3.0→v2.4.0 + t-registry v3.1.0→v3.2.0 + acceptance-report + S6 archive"
+    files: 4
+    estimated_loc: +120 / -10
+    risk: Low
+
+# 关联
+related_changes:
+  - devrix-d7-error-aggregation-and-metrics  # S7_Archived 2026-06-21，PR #152-#155 姊妹篇
+  - devrix-d5-v2-terminal  # S7_Archived 2026-06-19，bridge 清除 + 物理路径归位模板
+  - devrix-spec-sync-d6-evolution-registration  # S7_Archived 2026-06-19，DM-20260619-003 spec v2.3.0 + d6-domain.md
+
+# 参考
+references:
+  - openspec/changes/d6-deep-review/d6-review-report.md  # 完整 review 报告（19 个问题）
+  - openspec/specs/d6-evolution/spec.md  # D6 域规范 v2.3.0
+  - openspec/specs/d6-evolution/design.md  # D6 设计 v2.2.0
+  - openspec/specs/d6-evolution/t-registry.md  # D6 T 注册表 v3.1.0
