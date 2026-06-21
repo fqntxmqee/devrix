@@ -14,11 +14,11 @@ import (
 // RuntimeJudge wraps the D3 LLM Gateway for cross-model validation of routing decisions.
 type RuntimeJudge struct {
 	gw     llmgateway.IGateway
-	config OrchestrationConfig
+	config GuardConfig
 }
 
 // NewRuntimeJudge creates a judge that routes validation prompts through the LLM capture.
-func NewRuntimeJudge(gw llmgateway.IGateway, config OrchestrationConfig) *RuntimeJudge {
+func NewRuntimeJudge(gw llmgateway.IGateway, config GuardConfig) *RuntimeJudge {
 	return &RuntimeJudge{gw: gw, config: config}
 }
 

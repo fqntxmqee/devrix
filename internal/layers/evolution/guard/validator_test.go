@@ -92,15 +92,15 @@ func decisionRecord() DecisionRecord {
 	}
 }
 
-func newTestValidator(cfg OrchestrationConfig, gw llmgateway.IGateway) *RuntimeOrchestrationValidator {
+func newTestValidator(cfg GuardConfig, gw llmgateway.IGateway) *RuntimeGuardValidator {
 	judge := NewRuntimeJudge(gw, cfg)
 	exec := NewInterventionExecutor(&mockAgentCtrl{}, &mockTaskCtrl{}, &mockAgentFactory{})
-	return NewRuntimeOrchestrationValidator(cfg, judge, exec)
+	return NewRuntimeGuardValidator(cfg, judge, exec)
 }
 
 func TestOnDecision_Disabled(t *testing.T) {
-	v := NewRuntimeOrchestrationValidator(
-		OrchestrationConfig{Enabled: false},
+	v := NewRuntimeGuardValidator(
+		GuardConfig{Enabled: false},
 		nil, nil,
 	)
 	v.OnDecision(context.Background(), decisionRecord(), session())
@@ -108,7 +108,7 @@ func TestOnDecision_Disabled(t *testing.T) {
 
 func TestOnDecision_PreFilterSkipsTrustedTool(t *testing.T) {
 	v := newTestValidator(
-		OrchestrationConfig{
+		GuardConfig{
 			Enabled:          true,
 			PreFilterEnabled: true,
 			TrustedToolAllowlist: []string{"read", "ls"},
@@ -122,7 +122,7 @@ func TestOnDecision_PreFilterSkipsTrustedTool(t *testing.T) {
 
 func TestOnDecision_ValidDecisionPasses(t *testing.T) {
 	v := newTestValidator(
-		OrchestrationConfig{
+		GuardConfig{
 			Enabled:              true,
 			PreFilterEnabled:     false,
 			InterventionThreshold: 0.5,
@@ -138,7 +138,7 @@ func TestOnDecision_Hooks(t *testing.T) {
 
 	gw := &mockGateway{response: `{"valid":true,"confidence":0.95}`}
 	v := newTestValidator(
-		OrchestrationConfig{Enabled: true, PreFilterEnabled: false},
+		GuardConfig{Enabled: true, PreFilterEnabled: false},
 		gw,
 	)
 	v.OnDecisionHook(func(rec DecisionRecord) { decisionHookCalled = true })
@@ -154,11 +154,11 @@ func TestOnDecision_Hooks(t *testing.T) {
 	}
 }
 
-func TestNewOrchestrationObserver(t *testing.T) {
+func TestNewGuardObserver(t *testing.T) {
 	gw := &mockGateway{response: `{"valid":true,"confidence":0.95}`}
 	v := newTestValidator(config.DefaultOrchestrationConfig(), gw)
 
-	obs := NewOrchestrationObserver(v, context.Background(), session())
+	obs := NewGuardObserver(v, context.Background(), session())
 	if obs == nil {
 		t.Fatal("expected non-nil observer")
 	}
@@ -186,7 +186,7 @@ func TestNewOrchestrationObserver(t *testing.T) {
 
 func TestPreFilter_RateLimit(t *testing.T) {
 	v := newTestValidator(
-		OrchestrationConfig{
+		GuardConfig{
 			Enabled:                true,
 			PreFilterEnabled:       true,
 			MinIntervalBetweenJudges: 1 * time.Hour,
@@ -201,7 +201,7 @@ func TestPreFilter_RateLimit(t *testing.T) {
 
 func TestPreFilter_TrustedToolAllowlist(t *testing.T) {
 	v := newTestValidator(
-		OrchestrationConfig{
+		GuardConfig{
 			Enabled:          true,
 			PreFilterEnabled: true,
 			TrustedToolAllowlist: []string{"read", "ls"},

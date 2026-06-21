@@ -418,12 +418,12 @@ func initOrchestration(
 
 	runtimeJudge := guard.NewRuntimeJudge(rawGateway, orchCfg)
 	executor := guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)
-	orchValidator := guard.NewRuntimeOrchestrationValidator(orchCfg, runtimeJudge, executor)
-	orchValidator.SetObservability(obs)
+	guardValidator := guard.NewRuntimeGuardValidator(orchCfg, runtimeJudge, executor)
+	guardValidator.SetObservability(obs)
 	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) guard.AgentObserver {
-		return guard.NewOrchestrationObserver(orchValidator, ctx, session)
+		return guard.NewGuardObserver(guardValidator, ctx, session)
 	})
-	slog.Info("orchestration validator enabled",
+	slog.Info("guard validator enabled",
 		"judge_provider", orchCfg.JudgeProvider,
 		"auto_intervene", orchCfg.AutoIntervene,
 	)

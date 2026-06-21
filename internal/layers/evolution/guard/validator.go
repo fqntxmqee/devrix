@@ -23,9 +23,12 @@ type ValidationHook func(ValidationResult)
 // InterventionHook is called when an intervention is triggered.
 type InterventionHook func(Intervention)
 
-// RuntimeOrchestrationValidator is the top-level orchestrator for runtime decision validation.
-type RuntimeOrchestrationValidator struct {
-	config   OrchestrationConfig
+// RuntimeGuardValidator is the top-level orchestrator for runtime decision validation.
+//
+// PR-B (DM-20260621-011): renamed from RuntimeOrchestrationValidator to align with
+// guard/ domain naming (v2.0 物理路径迁移时仅迁移目录, 类型名未同步).
+type RuntimeGuardValidator struct {
+	config   GuardConfig
 	judge    *RuntimeJudge
 	executor *InterventionExecutor
 
@@ -37,17 +40,17 @@ type RuntimeOrchestrationValidator struct {
 	onValidate  ValidationHook
 	onIntervene InterventionHook
 
-	metrics *orchMetrics
+	metrics *guardMetrics
 	obs     *observability.Observability
 }
 
-// NewRuntimeOrchestrationValidator creates a validator.
-func NewRuntimeOrchestrationValidator(
-	config OrchestrationConfig,
+// NewRuntimeGuardValidator creates a validator.
+func NewRuntimeGuardValidator(
+	config GuardConfig,
 	judge *RuntimeJudge,
 	executor *InterventionExecutor,
-) *RuntimeOrchestrationValidator {
-	return &RuntimeOrchestrationValidator{
+) *RuntimeGuardValidator {
+	return &RuntimeGuardValidator{
 		config:   config,
 		judge:    judge,
 		executor: executor,
@@ -55,7 +58,7 @@ func NewRuntimeOrchestrationValidator(
 }
 
 // OnDecision is the main entry point for runtime decision validation.
-func (v *RuntimeOrchestrationValidator) OnDecision(ctx context.Context, rec DecisionRecord, session *types.Session) {
+func (v *RuntimeGuardValidator) OnDecision(ctx context.Context, rec DecisionRecord, session *types.Session) {
 	if !v.config.Enabled {
 		return
 	}
@@ -188,7 +191,7 @@ func (v *RuntimeOrchestrationValidator) OnDecision(ctx context.Context, rec Deci
 	}
 }
 
-func (v *RuntimeOrchestrationValidator) preFilter(rec DecisionRecord) bool {
+func (v *RuntimeGuardValidator) preFilter(rec DecisionRecord) bool {
 	if !v.config.PreFilterEnabled {
 		return false
 	}
@@ -224,21 +227,39 @@ func (v *RuntimeOrchestrationValidator) preFilter(rec DecisionRecord) bool {
 	return false
 }
 
-func (v *RuntimeOrchestrationValidator) OnDecisionHook(fn DecisionHook)     { v.onDecision = fn }
-func (v *RuntimeOrchestrationValidator) OnValidateHook(fn ValidationHook)    { v.onValidate = fn }
-func (v *RuntimeOrchestrationValidator) OnInterveneHook(fn InterventionHook) { v.onIntervene = fn }
+func (v *RuntimeGuardValidator) OnDecisionHook(fn DecisionHook)     { v.onDecision = fn }
+func (v *RuntimeGuardValidator) OnValidateHook(fn ValidationHook)    { v.onValidate = fn }
+func (v *RuntimeGuardValidator) OnInterveneHook(fn InterventionHook) { v.onIntervene = fn }
 
 // SetObservability configures OpenTelemetry metrics and tracing for the validator.
-func (v *RuntimeOrchestrationValidator) SetObservability(obs *observability.Observability) {
+func (v *RuntimeGuardValidator) SetObservability(obs *observability.Observability) {
 	v.obs = obs
-	v.metrics = initOrchMetrics(obs)
+	v.metrics = initGuardMetrics(obs)
 	if v.executor != nil {
 		v.executor.WithMetrics(v.metrics)
 	}
 	if obs != nil {
-		slog.Info("orchestration: observability initialized",
+		slog.Info("guard: observability initialized",
 			"tracing_enabled", obs.Tracer() != nil,
 			"metrics_enabled", obs.Meter() != nil,
 		)
 	}
+}
+
+// RuntimeOrchestrationValidator is an alias for RuntimeGuardValidator kept for backward compatibility.
+//
+// Deprecated: use RuntimeGuardValidator. This alias will be removed in v2.5.0 (DM-20260621-011).
+//go:deprecated
+type RuntimeOrchestrationValidator = RuntimeGuardValidator
+
+// NewRuntimeOrchestrationValidator is the deprecated constructor for RuntimeGuardValidator.
+//
+// Deprecated: use NewRuntimeGuardValidator. This alias will be removed in v2.5.0 (DM-20260621-011).
+//go:deprecated
+func NewRuntimeOrchestrationValidator(
+	config GuardConfig,
+	judge *RuntimeJudge,
+	executor *InterventionExecutor,
+) *RuntimeGuardValidator {
+	return NewRuntimeGuardValidator(config, judge, executor)
 }

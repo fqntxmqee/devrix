@@ -11,9 +11,9 @@ import (
 
 // newTestInterventionExecutor returns an executor pre-wired with a single
 // mock agent and metrics. The mockAgent field is injected into mockAgentCtrl.
-func newTestInterventionExecutor(t *testing.T, ag multiagent.Agent, tasks TaskController) (*InterventionExecutor, *orchMetrics) {
+func newTestInterventionExecutor(t *testing.T, ag multiagent.Agent, tasks TaskController) (*InterventionExecutor, *guardMetrics) {
 	t.Helper()
-	m := &orchMetrics{}
+	m := &guardMetrics{}
 	ctrl := &mockAgentCtrl{agents: map[string]multiagent.Agent{"test-session": ag}}
 	exec := NewInterventionExecutor(ctrl, tasks, &mockAgentFactory{}).WithMetrics(m)
 	return exec, m
@@ -153,7 +153,7 @@ func TestInterventionExecutor_BothWaitAndTaskFailFail_AggregateBoth(t *testing.T
 
 func TestInterventionExecutor_WithMetrics_Chainable(t *testing.T) {
 	exec := NewInterventionExecutor(&mockAgentCtrl{}, &mockTaskCtrl{}, &mockAgentFactory{})
-	m := &orchMetrics{}
+	m := &guardMetrics{}
 	got := exec.WithMetrics(m)
 	if got != exec {
 		t.Errorf("WithMetrics should return same pointer for chaining, got %p want %p", got, exec)
