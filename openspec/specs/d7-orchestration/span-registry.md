@@ -1,8 +1,8 @@
 # D7 Orchestration Span 注册表
 
 **Domain:** D7 Orchestration
-**Version:** 2.3.0
-**Status:** Active (2026-06-16)
+**Version:** 2.4.0
+**Status:** Active (2026-06-22)
 **Domain SoT:** `d7-domain.md`
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 
@@ -91,3 +91,18 @@ D1_Capture_Message_Receive
 - D2 Context Engine：`openspec/specs/d2-context-engine/span-registry.md`
 - 全局 Spans 索引：`openspec/spans-registry.md`
 - **Span↔T / Runbook：** `observability-guide.md`
+
+---
+
+## D7-S6-A14 硬化对 Span 的影响（DM-20260622-001）
+
+> 本节登记 A14 修复对既有 span 行为的局部影响。**不新增 span operation**，仅说明 5 fix 如何改变既有 span 的子路径或 emit 行为。
+
+| 既有 span | 受 A14 哪个 fix 影响 | 行为变化 |
+|-----------|----------------------|---------|
+| `D7_Orchestration_Wave_Task_Execute` | **A4**（`AllowAndRegister` 原子化） | 子路径由 `ConflictGuard.Allow` → `Register` 两段式合并为单 `AllowAndRegister`；span 内部 mutex 锁区间缩短 1 个（`g.mu` 仅持一次），子属性 `conflict.allowed=true/false` 不变 |
+| `D7_Orchestration_Session_Process`（route=command） | **A5**（`CommandHandler.emit` select-default） | `command_reply` → `text` → `complete` 三事件 emit 在 consumer stall 时可能丢包；`slog.Warn("command_handler: out channel full, drop event", ...)` 出现频率可作为 backpressure 信号 |
+| `D7_Orchestration_Wave_Schedule` | **A3**（`markWaveDone` 释放 state.cancels/handles） | span 结束前 `state.cancels = nil` + `state.handles = make(map)`，但 span 自身不变；D5 GC 指标可观察 wave state 内存 footprint 收敛 |
+| 全部 7 ops | **A1**（metric plural） | `metric=worker_panics` / `metric=dispatch_loop_wakeups`（plural，与 spec 一致）；旧 singular key（`worker_panic` / `dispatch_wakeup`）从此 0 流量 |
+
+**未变：** span operation 名、kind、component、key attributes 全部保持；A14 不引入新 span，纯粹对既有 span 的子路径与日志做收敛。

@@ -2,8 +2,8 @@
 
 **Capability:** d7-orchestration
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-16
+**Version:** 1.1.0
+**Last Updated:** 2026-06-22
 **Parent:** `d7-domain.md` · `span-registry.md` · `t-registry.md`
 **Complements:** `terminal-state-guide.md` · `../d5-observability/span-registry.md`
 
@@ -232,6 +232,37 @@ go test ./tests/integration/d7/ -run Interrupt -v
 
 ---
 
+## 10. D5 Dashboard 过滤规则变更（DM-20260622-001）
+
+> 5 fix 中 **A1**（metric 命名 spec/code 对齐）直接影响 D5 Grafana dashboard 的 metric 过滤规则。
+
+### 10.1 已废弃 singular key（0 流量，保留兼容 30 天）
+
+| 旧 key（已废弃） | 新 key（spec/code 一致） | T ID |
+|-----------------|------------------------|------|
+| `worker_panic` | `worker_panics` | D7-S6-A14-T02 |
+| `dispatch_wakeup` | `dispatch_loop_wakeups` | D7-S6-A14-T01 |
+
+**迁移窗口：** 2026-06-22 → 2026-07-22 旧 key 仍可被 emit（caller 写 0），建议 D5 dashboard 维护者将 panel 全部切到新 key 后再关闭旧 key 兼容。
+
+### 10.2 新增 backpressure 信号
+
+`CommandHandler.emit` 改 `select-default` 后，**新信号** `slog.Warn("command_handler: out channel full, drop event", ...)` 可作为 consumer 端 backpressure 的早期指标：
+
+| Log level | 查询条件 | 期望 |
+|-----------|---------|------|
+| WARN | `command_handler: out channel full, drop event` | 0（正常）；持续出现 → consumer stall 或 IM 展示端拖慢 |
+
+**建议告警：** drop rate > 1/min 持续 5min 触发 P2 通知（飞书 / 邮件），不阻塞业务。
+
+### 10.3 跨域 metric 归属澄清
+
+| Metric | 实际 emitter | 备注 |
+|--------|------------|------|
+| `sandbox_exit_failed` | **D4** `multiagent/execute/worker.go::recordSandboxExitFailed` | D7 spec D7-S6-A12-T01 标 OBSOLETE 2026-06-22；D5 dashboard 必须从 D4 域 panel 取数（详见 D7-S6-A14-T03） |
+
+---
+
 ## 9. 关联文档
 
 | 文档 | 关系 |
@@ -250,3 +281,4 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-16 | 初版：Span↔T、Trace 树、Hub Flow、T 分组摘要、P0 Runbook、D6 metric |
+| **1.1.0** | **2026-06-22** | **DM-20260622-001 D5 Dashboard 过滤规则变更**：metric 名 plural 对齐（`worker_panic` → `worker_panics`，`dispatch_wakeup` → `dispatch_loop_wakeups`），详见 §10；新增 CommandHandler emit backpressure 观测信号 |
