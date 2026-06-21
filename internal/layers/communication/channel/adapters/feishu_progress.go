@@ -195,12 +195,39 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	stream := a.sessionStream(msg.SessionID)
 	stream.mu.Lock()
 	if msg.Content != "" {
-		// Strip D2 context-budget fold markers so the LLM's echo of its own
-		// prior <prior-output-summary> blocks (which it sees in its context
-		// and sometimes regurgitates) does not leak into the thinking card.
-		stream.thinkingBuffer.WriteString(textutil.StripPriorOutputSummary(msg.Content))
+		chunk := textutil.StripPriorOutputSummary(msg.Content)
+		// minimax M2.7 streaming replay dedup (DM-20260621-006): same
+		// double-layer dedup as appendResponseText. The LLM occasionally
+		// re-emits a long prefix of its own thinking, which would render
+		// as the same paragraph repeated 2-3 times on the thinking card.
+		// detectDuplicateReplay drops the replay at the source so the
+		// thinkingBuffer never carries it; dedupRepeatedText is the
+		// post-hoc safety net for duplicates that slipped through (e.g.
+		// the chunk didn't match a clean prefix during streaming).
+		if detectDuplicateReplay(stream.thinkingBuffer.String(), chunk) {
+			existing := stream.thinkingBuffer.String()
+			stream.mu.Unlock()
+			slog.Debug("feishu: dropped LLM-stream replay chunk in thinking",
+				"session", slog.String("sessionID", msg.SessionID),
+				"bufferRunes", utf8.RuneCountInString(existing),
+				"chunkRunes", utf8.RuneCountInString(chunk),
+			)
+			return a.patchThinkingCard(ctx, stream, msg.SessionID, msg.ChatID)
+		}
+		stream.thinkingBuffer.WriteString(chunk)
 	}
-	text := strings.TrimSpace(stream.thinkingBuffer.String())
+	stream.mu.Unlock()
+
+	return a.patchThinkingCard(ctx, stream, msg.SessionID, msg.ChatID)
+}
+
+// patchThinkingCard renders the current thinkingBuffer (after dedup) and
+// sends/patches the thinking card. Used by sendStructuredThinkingCard on
+// every event (with the dedup logic upstream) so a single render path owns
+// the create-or-patch branching.
+func (a *FeishuAdapter) patchThinkingCard(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
+	stream.mu.Lock()
+	text := strings.TrimSpace(dedupRepeatedText(stream.thinkingBuffer.String(), 60, 2))
 	thinkingMsgID := stream.thinkingMsgID
 	stream.mu.Unlock()
 
@@ -213,7 +240,7 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	cardJSON := BuildCardJSON(card)
 
 	if thinkingMsgID == "" {
-		msgID, err := a.sendCardReplyAndGetID(ctx, msg.SessionID, msg.ChatID, cardJSON)
+		msgID, err := a.sendCardReplyAndGetID(ctx, sessionID, chatID, cardJSON)
 		if err != nil {
 			return err
 		}
