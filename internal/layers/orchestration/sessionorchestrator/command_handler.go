@@ -20,6 +20,7 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -97,8 +98,23 @@ func (h *CommandHandler) Handle(ctx context.Context, req orchtypes.ProcessReques
 				Metadata:  map[string]string{"command": cmd},
 			})
 		}
-		out <- &contracts.EngineEvent{Type: "text", Content: reply, SessionID: req.SessionID}
-		out <- &contracts.EngineEvent{Type: "complete", SessionID: req.SessionID}
+		// A5 (DM-20260622-001): select-default guards against consumer stalls.
+		// The Handle goroutine must not block indefinitely when the consumer is
+		// slow or wedged; the user-facing /stop, /help responses are
+		// best-effort and slog.Warn preserves an audit trail. See design.md §2.5.
+		emit := func(ev *contracts.EngineEvent) {
+			select {
+			case out <- ev:
+			default:
+				slog.Warn("command_handler: out channel full, drop event",
+					"type", ev.Type,
+					"session", ev.SessionID,
+					"channel_size", cap(out),
+				)
+			}
+		}
+		emit(&contracts.EngineEvent{Type: "text", Content: reply, SessionID: req.SessionID})
+		emit(&contracts.EngineEvent{Type: "complete", SessionID: req.SessionID})
 	}()
 	return out, nil
 }
