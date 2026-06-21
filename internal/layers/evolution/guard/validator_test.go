@@ -41,9 +41,11 @@ func (m *mockAgentCtrl) RegisterSessionAgent(sessionID string, ag multiagent.Age
 	m.agents[sessionID] = ag
 }
 
-type mockTaskCtrl struct{}
+type mockTaskCtrl struct {
+	failErr error
+}
 
-func (m *mockTaskCtrl) Fail(_ string, _ string) error  { return nil }
+func (m *mockTaskCtrl) Fail(_ string, _ string) error  { return m.failErr }
 func (m *mockTaskCtrl) Complete(_ string) error         { return nil }
 
 type mockAgentFactory struct{}
@@ -52,7 +54,10 @@ func (m *mockAgentFactory) Create(_ context.Context, _ multiagent.AgentConfig, _
 	return &mockAgent{}, nil
 }
 
-type mockAgent struct{}
+type mockAgent struct {
+	terminateErr error
+	waitErr      error
+}
 
 func (m *mockAgent) ID() string                                        { return "mock-agent" }
 func (m *mockAgent) State() multiagent.AgentState                      { return multiagent.AgentStateCreated }
@@ -60,8 +65,8 @@ func (m *mockAgent) Config() multiagent.AgentConfig                    { return 
 func (m *mockAgent) Run(_ context.Context) (*multiagent.AgentResult, error) { return nil, nil }
 func (m *mockAgent) Fork(_ context.Context, _ multiagent.AgentConfig) (multiagent.Agent, error) { return nil, nil }
 func (m *mockAgent) Join(_ context.Context, _ multiagent.Agent) error  { return nil }
-func (m *mockAgent) Terminate(_ context.Context) error                  { return nil }
-func (m *mockAgent) Wait(_ context.Context) (*multiagent.AgentResult, error) { return nil, nil }
+func (m *mockAgent) Terminate(_ context.Context) error                  { return m.terminateErr }
+func (m *mockAgent) Wait(_ context.Context) (*multiagent.AgentResult, error) { return nil, m.waitErr }
 func (m *mockAgent) ResolvePermission(_ string, _ bool)                 {}
 func (m *mockAgent) GetMessages() []types.Message                       { return nil }
 func (m *mockAgent) SetAgentObserver(_ multiagent.AgentObserver)        {}

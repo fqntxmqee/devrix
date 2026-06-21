@@ -7,7 +7,11 @@
 //   - Report JSON: 输出 schema 稳定 (change_id + verified + unverified + skipped + summary)
 package verify
 
-import "github.com/devrix/devrix/internal/shared/ltllite"
+import (
+	"log"
+
+	"github.com/devrix/devrix/internal/shared/ltllite"
+)
 
 type verifyInvariants struct {
 	ReadOnly         string `invariant:"verify_called => no_plan_mutation"`
@@ -16,14 +20,18 @@ type verifyInvariants struct {
 	ReportSchema     string `invariant:"report_emitted => required_fields_present"`
 }
 
-var verifyInvariantSet = mustParseVerifyInvariants()
+var verifyInvariantSet ltllite.InvariantSet
 
-func mustParseVerifyInvariants() ltllite.InvariantSet {
-	set, err := ltllite.ParseStruct(verifyInvariants{})
+func init() {
+	set, err := parseVerifyInvariants()
 	if err != nil {
-		panic("ltllite: verify invariant parse failed: " + err.Error())
+		log.Fatalf("verify: ltllite invariant parse failed: %v", err)
 	}
-	return set
+	verifyInvariantSet = set
+}
+
+func parseVerifyInvariants() (ltllite.InvariantSet, error) {
+	return ltllite.ParseStruct(verifyInvariants{})
 }
 
 // CheckVerifyInvariants 验证 verify 状态是否满足所有 invariant。
