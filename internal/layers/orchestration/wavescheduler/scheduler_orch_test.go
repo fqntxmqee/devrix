@@ -47,7 +47,8 @@ func TestWaveScheduler_ConflictGroup(t *testing.T) {
 	}
 	// Inspect via guard that no two tasks of this group were registered
 	// simultaneously. The test's primary assertion is correctness of result;
-	// the parallel-avoidance is enforced by Guard.Allow in dispatchOne.
+	// the parallel-avoidance is enforced atomically by Guard.AllowAndRegister
+	// inside dispatchOne (DM-20260622-001 A4).
 }
 
 func TestWaveScheduler_UpstreamArtifact(t *testing.T) {

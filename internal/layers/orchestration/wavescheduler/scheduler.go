@@ -178,13 +178,13 @@ func (s *WaveScheduler) incMetric(field string) {
 		s.metrics.Cancelled++
 	case "dispatch":
 		s.metrics.TotalDispatches++
-	case "worker_panic":
+	case "worker_panics":
 		s.metrics.WorkerPanics++
 	case "task_ctx_leaked":
 		s.metrics.TaskCtxLeaked++
 	case "wave_reentry_cancelled":
 		s.metrics.WaveReentryCancelled++
-	case "dispatch_wakeup":
+	case "dispatch_loop_wakeups":
 		s.metrics.DispatchLoopWakeups++
 	}
 }
@@ -280,15 +280,18 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 		ready := state.graph.ReadyNodes()
 		dispatched := 0
 		for _, node := range ready {
-			if !s.guard.Allow(node, s.guard.Running()) {
-				continue
-			}
+			// A4 (DM-20260622-001): Conflict check is atomic inside dispatchOne via
+			// AllowAndRegister; the prior split Allow + Register left a TOCTOU
+			// window. See design.md §2.4.
 			slotID, ok := s.pool.Acquire(node.WorkerType, node.ID)
 			if !ok {
 				// No slot for this type — try another ready task.
 				continue
 			}
-			s.dispatchOne(ctx, sessionID, state, node, slotID)
+			if !s.dispatchOne(ctx, sessionID, state, node, slotID) {
+				s.pool.Release(slotID)
+				continue
+			}
 			dispatched++
 		}
 
@@ -303,15 +306,23 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 			return
 		case <-state.wakeupCh:
 			// A slot was released OR a task completed — re-check ready tasks.
-			s.incMetric("dispatch_wakeup")
+			s.incMetric("dispatch_loop_wakeups")
 		case <-ticker.C:
 			// Periodic check.
-			s.incMetric("dispatch_wakeup")
+			s.incMetric("dispatch_loop_wakeups")
 		}
 	}
 }
 
-func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string, state *schedulerWaveState, node TaskNode, slotID SlotID) {
+// dispatchOne atomically reserves the conflict slot and dispatches a worker
+// for the given node. Returns true when the task was registered (whether it
+// succeeds or fails); returns false when the conflict guard rejected the
+// dispatch (the caller must release the slot).
+//
+// A4 (DM-20260622-001): Replaces the prior split Allow (dispatchLoop) +
+// Register (dispatchOne) with a single atomic AllowAndRegister, eliminating
+// the TOCTOU window. See design.md §2.4.
+func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string, state *schedulerWaveState, node TaskNode, slotID SlotID) bool {
 	runner, ok := s.runners[node.WorkerType]
 	if !ok {
 		// No runner — fail immediately, persist artifact, release slot.
@@ -325,7 +336,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			StartedAt:  now,
 			EndedAt:    now,
 		})
-		return
+		return true
 	}
 
 	// Resolve context.
@@ -341,7 +352,13 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			StartedAt:  now,
 			EndedAt:    now,
 		})
-		return
+		return true
+	}
+
+	// Atomic conflict check + register; eliminates the prior Allow/Register
+	// TOCTOU window.
+	if !s.guard.AllowAndRegister(node, slotID, s.guard.Running()) {
+		return false
 	}
 
 	// Build a per-task context that the scheduler can cancel via CancelWorker.
@@ -349,7 +366,6 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	// Wave_Task_Execute stays under Wave_Schedule in Jaeger.
 	taskCtx, cancel := context.WithCancel(tracer.Detach(parentCtx))
 	state.graph.SetState(node.ID, StateRunning)
-	s.guard.Register(RunningTask{Node: node, SlotID: slotID})
 	s.incMetric("dispatch")
 
 	workerID := "wkr-" + uuid.New().String()[:8]
@@ -411,7 +427,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 		)
 		defer func() {
 			if r := recover(); r != nil {
-				s.incMetric("worker_panic")
+				s.incMetric("worker_panics")
 				slog.Error("wave: worker panic",
 					"session", sessionID, "task", node.ID, "panic", r,
 					"worker_id", workerID,
@@ -464,6 +480,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 		}
 		s.completeTask(sessionID, state, node.ID, slotID, art)
 	}()
+	return true
 }
 
 func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState, taskID string, slotID SlotID, art Artifact) {
@@ -544,6 +561,15 @@ func (s *WaveScheduler) recordPeakRunning(state *schedulerWaveState) {
 	s.metricsMu.Unlock()
 }
 
+// markWaveDone transitions the wave to terminal state. It also clears the
+// accumulated cancel-func slice and the per-task handles map so that
+// long-lived sessions with repeated wave re-entries do not grow these
+// collections unboundedly.
+//
+// A3 (DM-20260622-001): state.cancels and state.handles were previously
+// appended on every dispatch but never released after CancelAll / wave
+// completion. markWaveDone is the single wave-terminal point, making it
+// the natural place to release those references. See design.md §2.3.
 func (s *WaveScheduler) markWaveDone(state *schedulerWaveState) {
 	state.mu.Lock()
 	if state.done {
@@ -554,6 +580,11 @@ func (s *WaveScheduler) markWaveDone(state *schedulerWaveState) {
 	scheduleSpan := state.scheduleSpan
 	state.scheduleSpan = nil
 	close(state.doneCh)
+	// Release per-wave cancel/handle bookkeeping. cancel funcs are already
+	// invoked via cancelWaveLocked (or never needed for naturally completing
+	// tasks), so dropping the references does not strand any context.
+	state.cancels = nil
+	state.handles = make(map[string]*workerHandle)
 	state.mu.Unlock()
 	if scheduleSpan != nil {
 		scheduleSpan.End()

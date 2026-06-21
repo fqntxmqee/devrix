@@ -21,7 +21,7 @@ func TestSchedulerMetrics_IncMetric_NewFields(t *testing.T) {
 
 	// Drive each new metric via incMetric.
 	for i := 0; i < 3; i++ {
-		s.incMetric("worker_panic")
+		s.incMetric("worker_panics")
 	}
 	for i := 0; i < 7; i++ {
 		s.incMetric("task_ctx_leaked")
@@ -30,7 +30,7 @@ func TestSchedulerMetrics_IncMetric_NewFields(t *testing.T) {
 		s.incMetric("wave_reentry_cancelled")
 	}
 	for i := 0; i < 11; i++ {
-		s.incMetric("dispatch_wakeup")
+		s.incMetric("dispatch_loop_wakeups")
 	}
 
 	got := s.Metrics()
@@ -65,7 +65,7 @@ func TestSchedulerMetrics_IncMetric_ConcurrentNewFields(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < incsPerGoroutine; j++ {
-				s.incMetric("worker_panic")
+				s.incMetric("worker_panics")
 			}
 		}()
 	}
