@@ -195,7 +195,10 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	stream := a.sessionStream(msg.SessionID)
 	stream.mu.Lock()
 	if msg.Content != "" {
-		stream.thinkingBuffer.WriteString(msg.Content)
+		// Strip D2 context-budget fold markers so the LLM's echo of its own
+		// prior <prior-output-summary> blocks (which it sees in its context
+		// and sometimes regurgitates) does not leak into the thinking card.
+		stream.thinkingBuffer.WriteString(textutil.StripPriorOutputSummary(msg.Content))
 	}
 	text := strings.TrimSpace(stream.thinkingBuffer.String())
 	thinkingMsgID := stream.thinkingMsgID
@@ -499,6 +502,15 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 // separator. The card honors the standard precheck + plain-text fallback
 // path via sendCardToSession.
 func (a *FeishuAdapter) sendSummaryCard(ctx context.Context, sessionID, chatID, summary string) error {
+	// Strip D2 context-budget fold markers so the LLM's echo of its own
+	// prior <prior-output-summary> blocks (which the D7 lastTurnText may
+	// carry over from a long tool loop) does not leak into the 任务总结 card.
+	summary = textutil.StripPriorOutputSummary(summary)
+	if strings.TrimSpace(summary) == "" {
+		// Nothing left after stripping — fall through; the caller will
+		// patch the reply card with a "✅ 任务已完成" footer instead.
+		return nil
+	}
 	card := NewCard().
 		Title("任务总结", "blue").
 		Markdown(summary).
@@ -523,6 +535,11 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// a suffix rather than a prefix, or the overlap didn't clear the
 	// 30-rune minimum). The reply card must show the report only once.
 	content = dedupRepeatedText(content, 60, 2)
+	// Strip D2 context-budget fold markers so the LLM's echo of its own
+	// prior <prior-output-summary> blocks (which it sometimes regurgitates
+	// in long replies, e.g. a deep-review tool loop) does not leak into
+	// the final reply card.
+	content = textutil.StripPriorOutputSummary(content)
 	// The summary argument is intentionally ignored here: the caller
 	// (finalizeStructuredSession) is responsible for delivering the
 	// summary as a separate card so the user sees a distinct "总结" card
@@ -621,7 +638,7 @@ func parseProgressPercent(raw string) int {
 }
 
 func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatID, chunk string) error {
-	chunk = textutil.StripThinkingTags(chunk)
+	chunk = textutil.StripAssistantInternalMarkers(chunk)
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}
@@ -813,7 +830,7 @@ func (a *FeishuAdapter) ensureAgentStreamCard(ctx context.Context, msg *types.Ou
 }
 
 func (a *FeishuAdapter) appendAgentStreamText(ctx context.Context, msg *types.OutboundMessage) error {
-	chunk := textutil.StripThinkingTags(msg.Content)
+	chunk := textutil.StripAssistantInternalMarkers(msg.Content)
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}
