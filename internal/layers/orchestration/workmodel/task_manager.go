@@ -3,6 +3,7 @@ package workmodel
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -47,11 +48,16 @@ func NewTask(subject, description string) *Task {
 type TaskManager struct {
 	tree      *WorkTree
 	obsBridge *observability.Bridge
+
+	// metrics is an optional counter sink for publishCompletion panics.
+	// DM-20260621-010 PR-B: nil-safe; non-nil counters are incremented on
+	// recover() in publishCompletion.
+	metrics *TaskManagerMetrics
 }
 
 // NewTaskManager creates a new in-memory task manager.
 func NewTaskManager() *TaskManager {
-	return &TaskManager{tree: NewWorkTree()}
+	return &TaskManager{tree: NewWorkTree(), metrics: &TaskManagerMetrics{}}
 }
 
 // NewTaskManagerFromConfig creates a task manager with optional disk persistence.
@@ -65,6 +71,18 @@ func NewTaskManagerFromConfig(cfg config.TasksConfig, obsBridge *observability.B
 		}
 	}
 	return m
+}
+
+// SetMetrics attaches a metrics sink. Safe to call before any publish.
+// Passing nil disables metric recording. Returns the receiver for chaining.
+func (m *TaskManager) SetMetrics(metrics *TaskManagerMetrics) *TaskManager {
+	m.metrics = metrics
+	return m
+}
+
+// Metrics returns the metrics sink (nil if not set).
+func (m *TaskManager) Metrics() *TaskManagerMetrics {
+	return m.metrics
 }
 
 // Tree returns the underlying work tree.
@@ -216,7 +234,19 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 }
 
 func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, status TaskStatus) {
-	defer func() { _ = recover() }()
+	// DM-20260621-010 PR-B: replace `_ = recover()` silent-swallow with
+	// structured counter + slog.Error. notify.GlobalBus().Publish can panic
+	// (e.g. nil-bus misuse, panicking subscriber); we want to count and log.
+	defer func() {
+		if r := recover(); r != nil {
+			if m.metrics != nil {
+				m.metrics.PublishCompletionPanics.Add(1)
+			}
+			slog.Error("taskmanager: publishCompletion panic",
+				"session", sessionID, "item_id", taskID, "panic", r,
+				"metric", "publish_completion_panics")
+		}
+	}()
 	bus := notify.GlobalBus()
 	if bus == nil {
 		return
