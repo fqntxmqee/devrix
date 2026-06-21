@@ -195,9 +195,39 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	stream := a.sessionStream(msg.SessionID)
 	stream.mu.Lock()
 	if msg.Content != "" {
-		stream.thinkingBuffer.WriteString(msg.Content)
+		chunk := textutil.StripPriorOutputSummary(msg.Content)
+		// minimax M2.7 streaming replay dedup (DM-20260621-006): same
+		// double-layer dedup as appendResponseText. The LLM occasionally
+		// re-emits a long prefix of its own thinking, which would render
+		// as the same paragraph repeated 2-3 times on the thinking card.
+		// detectDuplicateReplay drops the replay at the source so the
+		// thinkingBuffer never carries it; dedupRepeatedText is the
+		// post-hoc safety net for duplicates that slipped through (e.g.
+		// the chunk didn't match a clean prefix during streaming).
+		if detectDuplicateReplay(stream.thinkingBuffer.String(), chunk) {
+			existing := stream.thinkingBuffer.String()
+			stream.mu.Unlock()
+			slog.Debug("feishu: dropped LLM-stream replay chunk in thinking",
+				"session", slog.String("sessionID", msg.SessionID),
+				"bufferRunes", utf8.RuneCountInString(existing),
+				"chunkRunes", utf8.RuneCountInString(chunk),
+			)
+			return a.patchThinkingCard(ctx, stream, msg.SessionID, msg.ChatID)
+		}
+		stream.thinkingBuffer.WriteString(chunk)
 	}
-	text := strings.TrimSpace(stream.thinkingBuffer.String())
+	stream.mu.Unlock()
+
+	return a.patchThinkingCard(ctx, stream, msg.SessionID, msg.ChatID)
+}
+
+// patchThinkingCard renders the current thinkingBuffer (after dedup) and
+// sends/patches the thinking card. Used by sendStructuredThinkingCard on
+// every event (with the dedup logic upstream) so a single render path owns
+// the create-or-patch branching.
+func (a *FeishuAdapter) patchThinkingCard(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
+	stream.mu.Lock()
+	text := strings.TrimSpace(dedupRepeatedText(stream.thinkingBuffer.String(), 60, 2))
 	thinkingMsgID := stream.thinkingMsgID
 	stream.mu.Unlock()
 
@@ -210,7 +240,7 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	cardJSON := BuildCardJSON(card)
 
 	if thinkingMsgID == "" {
-		msgID, err := a.sendCardReplyAndGetID(ctx, msg.SessionID, msg.ChatID, cardJSON)
+		msgID, err := a.sendCardReplyAndGetID(ctx, sessionID, chatID, cardJSON)
 		if err != nil {
 			return err
 		}
@@ -499,6 +529,15 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 // separator. The card honors the standard precheck + plain-text fallback
 // path via sendCardToSession.
 func (a *FeishuAdapter) sendSummaryCard(ctx context.Context, sessionID, chatID, summary string) error {
+	// Strip D2 context-budget fold markers so the LLM's echo of its own
+	// prior <prior-output-summary> blocks (which the D7 lastTurnText may
+	// carry over from a long tool loop) does not leak into the 任务总结 card.
+	summary = textutil.StripPriorOutputSummary(summary)
+	if strings.TrimSpace(summary) == "" {
+		// Nothing left after stripping — fall through; the caller will
+		// patch the reply card with a "✅ 任务已完成" footer instead.
+		return nil
+	}
 	card := NewCard().
 		Title("任务总结", "blue").
 		Markdown(summary).
@@ -523,6 +562,11 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// a suffix rather than a prefix, or the overlap didn't clear the
 	// 30-rune minimum). The reply card must show the report only once.
 	content = dedupRepeatedText(content, 60, 2)
+	// Strip D2 context-budget fold markers so the LLM's echo of its own
+	// prior <prior-output-summary> blocks (which it sometimes regurgitates
+	// in long replies, e.g. a deep-review tool loop) does not leak into
+	// the final reply card.
+	content = textutil.StripPriorOutputSummary(content)
 	// The summary argument is intentionally ignored here: the caller
 	// (finalizeStructuredSession) is responsible for delivering the
 	// summary as a separate card so the user sees a distinct "总结" card
@@ -621,7 +665,7 @@ func parseProgressPercent(raw string) int {
 }
 
 func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatID, chunk string) error {
-	chunk = textutil.StripThinkingTags(chunk)
+	chunk = textutil.StripAssistantInternalMarkers(chunk)
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}
@@ -813,7 +857,7 @@ func (a *FeishuAdapter) ensureAgentStreamCard(ctx context.Context, msg *types.Ou
 }
 
 func (a *FeishuAdapter) appendAgentStreamText(ctx context.Context, msg *types.OutboundMessage) error {
-	chunk := textutil.StripThinkingTags(msg.Content)
+	chunk := textutil.StripAssistantInternalMarkers(msg.Content)
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}

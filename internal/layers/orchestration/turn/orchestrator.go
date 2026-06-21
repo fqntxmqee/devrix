@@ -358,6 +358,11 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	var totalUsage llmgateway.TokenUsage
 	var lastPromptTokens int
 	var finalText string
+	// lastTurnText retains the most recent turn's LLM text (not accumulated
+	// across turns). Surfaced on the complete event as meta["summary"] so
+	// the IM "任务总结" card shows only the LLM's final synthesis, not the
+	// full multi-turn report that the user already saw via streaming.
+	var lastTurnText string
 	// accumulatedText retains the LLM-emitted text from EVERY turn, not just
 	// the last. Without this, the finalText/complete event only carries the
 	// very last turn's content; a deep-review report emitted across many
@@ -544,6 +549,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// cross-turn report rather than only the last turn's content.
 		if t := contentBuf.String(); t != "" {
 			accumulatedText.WriteString(t)
+			lastTurnText = t
 		}
 		finalText = accumulatedText.String()
 		// Preserve this turn's accumulated thinking for the emitComplete
@@ -713,6 +719,13 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		tracer.Attribute{Key: "context.final_text_len", Value: fmt.Sprintf("%d", len(finalText))},
 	)
 	resolvedFinal := resolveFinalText(finalText, lastThinkingTail.String(), exitReason, req.MaxTurns)
+	// resolvedSummary is the brief conclusion that IM adapters render on the
+	// standalone "任务总结" card. Distinct from resolvedFinal (the full
+	// multi-turn transcript) so the card doesn't dump 75K chars of in-flight
+	// tool-loop output that the user already saw via streaming text chunks.
+	// We apply the same MaxTurns notice as resolvedFinal so the brief and
+	// full paths agree on loop-bound signalling.
+	resolvedSummary := resolveFinalText(lastTurnText, lastThinkingTail.String(), exitReason, req.MaxTurns)
 	_ = persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  messages,
@@ -722,7 +735,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 	})
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
-		resolvedFinal, exitReason)
+		resolvedFinal, resolvedSummary, exitReason)
 }
 
 // resolveFinalText promotes the most recent accumulated thinking into
@@ -780,6 +793,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	model string,
 	maxContextTokens int,
 	finalText string,
+	summary string,
 	exitReason ExitReason,
 ) {
 	if model == "" {
@@ -798,6 +812,15 @@ func (o *DefaultOrchestrator) emitComplete(
 	}
 	if pct := contracts.ComputeCtxPct(lastPromptTokens, maxContextTokens); pct > 0 {
 		meta["ctx_pct"] = fmt.Sprintf("%d", pct)
+	}
+	// summary is the brief conclusion surfaced on meta["summary"] so IM
+	// adapters (Feishu) can render a concise "任务总结" card. Distinct from
+	// Content (the full multi-turn transcript) which is preserved for the
+	// session transcript jsonl + CLI stdout fallback path. When summary is
+	// empty (e.g. provider that never emitted text), adapters fall back to
+	// Content or the stats line so the user still gets a non-empty card.
+	if summary != "" {
+		meta["summary"] = summary
 	}
 	// Surface the last LLM-generated text on the complete event so IM adapters
 	// (Feishu cardkit streaming finalize, CLI plain stdout) can render the

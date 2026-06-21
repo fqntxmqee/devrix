@@ -91,7 +91,7 @@ func TestSessionLoaderAdapter_LoadOrInit_NilManager_PanicsOrErrors(t *testing.T)
 			t.Error("expected panic when manager is nil")
 		}
 	}()
-	_, _, _ = a.LoadOrInit(&types.Session{SessionID: "s1"}, "")
+	_, _, _ = a.LoadOrInit(context.Background(), &types.Session{SessionID: "s1"}, "")
 }
 
 // --- MemoryRecaller adapter tests ---
@@ -185,7 +185,7 @@ func TestAssemblerAdapter_Build_NilAssembler_Panics(t *testing.T) {
 			t.Error("expected panic when assembler is nil")
 		}
 	}()
-	_, _ = a.Build(prompt.SystemPromptBuildInput{})
+	_, _ = a.Build(context.Background(), prompt.SystemPromptBuildInput{})
 }
 
 // --- helpers ---

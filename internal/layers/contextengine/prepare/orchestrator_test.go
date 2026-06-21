@@ -11,14 +11,16 @@ import (
 )
 
 type stubSessionLoader struct {
-	sc     *types.SessionContext
-	isNew  bool
-	err    error
-	called bool
+	sc      *types.SessionContext
+	isNew   bool
+	err     error
+	called  bool
+	gotCtx  context.Context
 }
 
-func (s *stubSessionLoader) LoadOrInit(_ *types.Session, _ string) (*types.SessionContext, bool, error) {
+func (s *stubSessionLoader) LoadOrInit(ctx context.Context, _ *types.Session, _ string) (*types.SessionContext, bool, error) {
 	s.called = true
+	s.gotCtx = ctx
 	return s.sc, s.isNew, s.err
 }
 
@@ -52,10 +54,12 @@ func (s *stubCompressor) Run(_ context.Context, _ []types.Message, _ string, _ t
 type stubPromptAssembler struct {
 	prompt string
 	called bool
+	gotCtx context.Context
 }
 
-func (s *stubPromptAssembler) Build(_ prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport) {
+func (s *stubPromptAssembler) Build(ctx context.Context, _ prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport) {
 	s.called = true
+	s.gotCtx = ctx
 	return s.prompt, prompt.SystemPromptBuildReport{}
 }
 
@@ -268,3 +272,51 @@ var errSentinel = sentinelErr("session load failed")
 type sentinelErr string
 
 func (e sentinelErr) Error() string { return string(e) }
+
+// T: D2-S15-A01-T70 (DM-20260621-005) — orchestrator forwards its incoming
+// ctx to SessionLoader so the A01 D2_Context_Snapshot_Load span attaches
+// under the parent's span context (was previously context.Background()).
+func TestPrepareOrchestrator_Prepare_forwards_ctx_to_session_loader(t *testing.T) {
+	sc := &types.SessionContext{SessionID: "s1", Messages: []types.Message{}}
+	loader := &stubSessionLoader{sc: sc}
+	orch := prepare.NewPrepareOrchestrator(prepare.PrepareDeps{SessionLoader: loader})
+
+	type ctxKey struct{}
+	parent := context.WithValue(context.Background(), ctxKey{}, "marker")
+	_, err := orch.Prepare(parent, prepare.PrepareInput{Session: &types.Session{SessionID: "s1"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if loader.gotCtx == nil {
+		t.Fatal("expected SessionLoader to receive non-nil ctx")
+	}
+	if v, _ := loader.gotCtx.Value(ctxKey{}).(string); v != "marker" {
+		t.Fatalf("ctx value lost: got %q, want %q", v, "marker")
+	}
+}
+
+// T: D2-S15-A01-T71 (DM-20260621-005) — orchestrator forwards its incoming
+// ctx to PromptAssembler so the A04 D2_Context_Harness_SystemPrompt_Build
+// span attaches under the parent's span context (was previously
+// context.Background()).
+func TestPrepareOrchestrator_Prepare_forwards_ctx_to_prompt_assembler(t *testing.T) {
+	sc := &types.SessionContext{SessionID: "s1", Messages: []types.Message{}}
+	assembler := &stubPromptAssembler{prompt: "hi"}
+	orch := prepare.NewPrepareOrchestrator(prepare.PrepareDeps{
+		SessionLoader:   &stubSessionLoader{sc: sc},
+		PromptAssembler: assembler,
+	})
+
+	type ctxKey struct{}
+	parent := context.WithValue(context.Background(), ctxKey{}, "marker")
+	_, err := orch.Prepare(parent, prepare.PrepareInput{Session: &types.Session{SessionID: "s1"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if assembler.gotCtx == nil {
+		t.Fatal("expected PromptAssembler to receive non-nil ctx")
+	}
+	if v, _ := assembler.gotCtx.Value(ctxKey{}).(string); v != "marker" {
+		t.Fatalf("ctx value lost: got %q, want %q", v, "marker")
+	}
+}

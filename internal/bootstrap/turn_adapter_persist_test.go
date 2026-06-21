@@ -271,6 +271,55 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 
 // T: D7-S2-A06-T02 — ExecuteRound with no matching sc must not panic and
 // must still execute the tool (falling back to os.Getwd()).
+
+// T: D7-S2-A06-T03 (DM-20260621-005 devrix-d7-d2-prepare-wire)
+// When the engine is *contextengine.ContextEngine, Prepare must route through
+// ContextEngine.PrepareForTurn → D2 PrepareOrchestrator. The orchestrator
+// runs A04 AssemblePrompt, which produces a non-empty SystemPrompt. Before
+// this wire, Prepare copied sc.Messages directly without invoking the
+// orchestrator, so SystemPrompt was always empty.
+func TestPrepareForTurn_RoutesThroughPrepareOrchestrator(t *testing.T) {
+	store, err := capture.NewFileSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("session store: %v", err)
+	}
+	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
+
+	cfg := config.DefaultContextEngineConfig()
+	cfg.Compression.Autocompact.Enabled = false
+	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
+		Summarizer:         &contextengine.StaticSummarizer{},
+		Tools:              &enforce.ToolRunner{Output: "ok"},
+		ToolsReg:           mustBuiltinRegistryForAdapter(t),
+		Permission:         enforce.AllowAllPermission{},
+		Config:             cfg,
+	})
+	adapter := newContextEngineAdapter(gw, engine, nil)
+	sid := "sess-prepare-wire"
+
+	if err := adapter.PersistTurn(context.Background(), turn.PersistRequest{
+		SessionID: sid,
+		Messages: []types.Message{
+			{Role: types.MessageRoleUser, Content: "ping", SessionID: sid},
+			{Role: types.MessageRoleAssistant, Content: "pong", SessionID: sid},
+		},
+		TurnCount: 1,
+	}); err != nil {
+		t.Fatalf("PersistTurn: %v", err)
+	}
+
+	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+		SessionID: sid,
+		Message:   types.Message{Role: types.MessageRoleUser, Content: "follow"},
+	})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if prepared.SystemPrompt == "" {
+		t.Fatal("expected non-empty SystemPrompt when Prepare routes through PrepareOrchestrator (A04 AssemblePrompt)")
+	}
+}
 func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 	store, err := capture.NewFileSessionStore(t.TempDir())
 	if err != nil {

@@ -15,6 +15,9 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+// compressThreshold is the per-message token budget above which a CompressHint is generated.
+const compressThreshold = 4000
+
 // contextEngineAdapter implements turn.ContextPreparer, turn.ToolRoundExecutor,
 // and turn.SessionPersister by delegating to the context engine internals.
 //
@@ -62,9 +65,6 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 	return a
 }
 
-// compressThreshold is the per-message token budget above which a CompressHint is generated.
-const compressThreshold = 4000
-
 // Prepare implements turn.ContextPreparer.
 // D-e: checks token budget and returns CompressHint when exceeded.
 //
@@ -73,6 +73,17 @@ const compressThreshold = 4000
 // toolReg only for tools that no surface claims. This lets the LLM
 // see free_fork / query_diagnostics / verify_plan_execution / lsp
 // without those tools being registered in toolReg.
+//
+// D2 prepare orchestrator wire (DM-20260621-005 / hotfix): routes the
+// D7 turn Prepare call through ContextEngine.PrepareForTurn → D2
+// PrepareOrchestrator (A01 Snapshot_Load / A02 Longterm_Recall / A03
+// Compression_Run / A04 SystemPrompt_Build). This brings back the 4
+// A-level sub-spans under the D7-created D2_Context_Process span AND
+// runs the Compressor pipeline (ShouldCompress → snip → autocompact)
+// so messages are trimmed/compressed before the LLM call. Previously
+// this method read sc.Messages directly, which both bypassed
+// compression (LLM input grew unbounded across turns) and skipped
+// the A01-A04 spans (Jaeger only showed the outer D2_Context_Process).
 func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
 	var session *types.Session
 	if a.gw != nil {
@@ -132,14 +143,35 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 	result := turn.PreparedContext{
 		Tools: toolSchemas,
 	}
-	if prov, ok := a.engine.(sessionContextProvider); ok {
+
+	// D2 prepare orchestrator wire (DM-20260621-005): route through
+	// PrepareForTurn so D2 A01-A04 spans + Compressor pipeline run.
+	// Fall back to legacy direct sc.Messages read only when the engine
+	// is not the production *contextengine.ContextEngine (test mocks
+	// use other IEngine implementations).
+	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+		prepared, err := ce.PrepareForTurn(ctx, session, req.Message.Content)
+		if err != nil {
+			return turn.PreparedContext{}, fmt.Errorf("turn adapter: PrepareForTurn: %w", err)
+		}
+		if prepared != nil {
+			result.Messages = prepared.Messages
+			result.SystemPrompt = prepared.SystemPrompt
+			if prepared.SessionContext != nil {
+				if prepared.SessionContext.Model != "" {
+					result.Model = prepared.SessionContext.Model
+				}
+				result.MaxContextTokens = prepared.SessionContext.TokenBudget.MaxContextTokens
+			}
+		}
+	} else if prov, ok := a.engine.(sessionContextProvider); ok {
 		if sc, ok := prov.SessionContext(req.SessionID); ok && sc != nil {
 			result.Messages = copySessionMessages(sc.Messages)
 			result.Model = sc.Model
 			result.MaxContextTokens = sc.TokenBudget.MaxContextTokens
 		}
 	}
-	if session != nil && session.Model != "" {
+	if session != nil && session.Model != "" && result.Model == "" {
 		result.Model = session.Model
 	}
 

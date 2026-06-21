@@ -35,6 +35,34 @@ func (e *ContextEngine) ExportSessionSnapshot(sessionID string) ([]byte, error) 
 	return e.memory.PersistSnapshot(sc)
 }
 
+// PrepareForTurn is the synchronous Prepare entrypoint used by D7's
+// turn.ContextPreparer (bootstrap/turn_adapter.go::contextEngineAdapter).
+// Runs the full D2 PrepareOrchestrator (A01 Snapshot_Load / A02 Longterm_Recall
+// / A03 Compression_Run / A04 SystemPrompt_Build) so the LLM call site sees
+// compressed messages + assembled system prompt, and the D2_Context_Process
+// span carries its 4 A-level sub-spans.
+//
+// Replaces contextEngineAdapter.Prepare's previous direct sc.Messages read,
+// which bypassed compression (root cause of untrimmed 58-message LLM input)
+// and skipped A01-A04 spans (root cause of the single-span trace).
+//
+// Returns the prepare.PrepareOutput; the D7 caller (contextEngineAdapter)
+// maps Messages / SystemPrompt / Model / MaxContextTokens into its own
+// turn.PreparedContext struct.
+func (e *ContextEngine) PrepareForTurn(ctx context.Context, session *types.Session, message string) (*prepare.PrepareOutput, error) {
+	e.wirePrepareOrchestrator()
+	workerLocal := false
+	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
+		workerLocal = true
+	}
+	return e.prepareOrchestrator.Prepare(ctx, prepare.PrepareInput{
+		Session:         session,
+		Message:         message,
+		WorkerLocal:     workerLocal,
+		CompressPerTurn: e.cfg.TurnRuntime.CompressPerTurn,
+	}, e.startSpan)
+}
+
 // AppendAndTrimMessages writes a batch of messages into the session context's
 // Messages and then trims to the configured token budget. Used by D7 turn
 // orchestrator's SessionPersister.PersistTurn to commit a turn's transcript
@@ -53,7 +81,7 @@ func (e *ContextEngine) AppendAndTrimMessages(sessionID string, msgs []types.Mes
 		Store: e.memory,
 		Bootstrap: func(sid string) (*types.SessionContext, error) {
 			loader := adapters.NewSessionLoaderAdapter(e.memory)
-			sc, _, err := loader.LoadOrInit(&types.Session{SessionID: sid}, "")
+			sc, _, err := loader.LoadOrInit(context.Background(), &types.Session{SessionID: sid}, "")
 			if err != nil || sc == nil {
 				return nil, fmt.Errorf("cannot init session %s", sid)
 			}

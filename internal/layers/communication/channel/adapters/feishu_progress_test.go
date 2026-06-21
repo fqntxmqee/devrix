@@ -546,7 +546,88 @@ func TestAppendAgentStreamText_UsesDedicatedCard(t *testing.T) {
 }
 
 // ============================================================================
-// LLM-stream replay dedup (PR #139)
+// Thinking-card replay dedup (DM-20260621-006)
+//
+// Without these dedup layers, minimax M2.7 streaming replay causes the
+// thinking card to render the same paragraph 2-3 times. Pin the fix so a
+// future refactor of sendStructuredThinkingCard doesn't regress.
+// ============================================================================
+
+func TestSendStructuredThinkingCard_DropsReplayChunk(t *testing.T) {
+	msgID := "om_thinking"
+	mockMsgAPI := &mockMessageAPI{
+		replyFunc: func(ctx context.Context, req *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+			return &larkim.ReplyMessageResp{
+				Data: &larkim.ReplyMessageRespData{MessageId: &msgID},
+			}, nil
+		},
+		patchFunc: func(ctx context.Context, req *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+			return &larkim.PatchMessageResp{}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID: "test_app", AppSecret: "test_secret",
+		ProgressStyle: progressStyleStructured,
+	}, &config.CommunicationConfig{}, WithFeishuAPI(&mockFeishuAPI{imAPI: mockImAPI}))
+	adapter.sessionReplyCtx.Store("sess_thinking", feishuReplyContext{userMessageID: "om_root"})
+
+	opening := strings.Repeat("我先快速摸清项目结构与规模。", 5) +
+		"这是一个 Go 项目（Devrix 多智能体协作助手），6 域架构，规模较大。\n" +
+		"由于域之间是相对独立的（D1-D7 分别对应一个层），适合按域并行 review。\n" +
+		"我设计如下并行策略。"
+
+	// First event: legitimate long opening narration.
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_thinking", ChatID: "feishu_oc_123456_ou_654321",
+		Content:   opening,
+		Metadata:  map[string]string{"event_type": "thinking"},
+	})
+
+	// Second event: LLM re-emits the opening (replay). Must be dropped.
+	replayChunk := "我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。我先快速摸清项目结构与规模。\n接下来要做的是："
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_thinking", ChatID: "feishu_oc_123456_ou_654321",
+		Content:   replayChunk,
+		Metadata:  map[string]string{"event_type": "thinking"},
+	})
+
+	stream := adapter.sessionStream("sess_thinking")
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	got := stream.thinkingBuffer.String()
+	if strings.Contains(got, "接下来要做的是") {
+		t.Fatalf("thinkingBuffer contains replay chunk text — dedup missed:\n%s", got)
+	}
+	if !strings.Contains(got, "6 域架构") {
+		t.Fatalf("thinkingBuffer missing legitimate opening content:\n%s", got)
+	}
+}
+
+func TestSendStructuredThinkingCard_DedupRepeatedTextSafetyNet(t *testing.T) {
+	// Pin the render-time safety net used by patchThinkingCard:
+	//   text := strings.TrimSpace(dedupRepeatedText(buffer, 60, 2))
+	//
+	// The streaming-time path (detectDuplicateReplay) is exercised by
+	// TestSendStructuredThinkingCard_DropsReplayChunk; this test
+	// covers the post-hoc safety net for cases where the streaming
+	// dedup missed (e.g. chunk too short). When the buffer carries a
+	// verbatim duplicate, the dedupRepeatedText call must collapse it
+	// to a single copy before the card is rendered.
+	opening := "由于域之间是相对独立的（D1-D7 分别对应一个层），适合按域并行 review。" +
+		"我设计如下并行策略。我先快速摸清项目结构与规模。" +
+		strings.Repeat("补", 80)
+	duplicated := opening + opening
+
+	got := dedupRepeatedText(duplicated, 60, 2)
+	if c := strings.Count(got, "适合按域并行 review"); c != 1 {
+		t.Fatalf("dedupRepeatedText on duplicated buffer keeps opening %d times, want 1:\n%s", c, got)
+	}
+	// The non-duplicated content (the tail padding) must survive.
+	if !strings.HasSuffix(got, strings.Repeat("补", 80)) {
+		t.Errorf("dedupRepeatedText dropped the non-duplicated tail:\n%s", got)
+	}
+}
 //
 // minimax M2.7 (and similar models with streaming artifacts) occasionally
 // re-emits a previously streamed prefix from scratch. The feishu reply
