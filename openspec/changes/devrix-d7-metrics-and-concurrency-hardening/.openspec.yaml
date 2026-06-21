@@ -1,0 +1,117 @@
+id: devrix-d7-metrics-and-concurrency-hardening
+demand_id: DM-20260622-001
+title: "D7 Metrics Naming Alignment & Concurrency Hardening"
+status: s2_proposal
+priority: P1
+created: 2026-06-22
+author: deep review session (DM-20260621-009 follow-up)
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S6-A14
+    name: Metrics naming alignment + concurrency hardening
+    description: |
+      (1) 修复 PR-B (DM-20260621-010) 落地的 5 个 counter 中 2 个 spec/code 命名漂移
+      (dispatch_wakeup → dispatch_loop_wakeups, worker_panic → worker_panics)；
+      (2) sandbox_exit_failed 归属澄清（D7 vs D4）；
+      (3) wavescheduler/scheduler.go state.cancels 切 cancelWaveLocked 后清空；
+      (4) ConflictGuard 热路径改 AllowAndRegister 原子调用，关 TOCTOU 窗口；
+      (5) command_handler.go:100 阻塞 send 加 select-default 保护。
+    rationale: |
+      DM-20260621-009 深度 review 遗留的 P0/P1 问题 + PR-B 已交付的 metrics 实际未与 spec
+      对齐（D5 dashboard 按 spec 名过滤将看到零流量）。本 change 在 PR-B 基础上
+      "改名 + 修齐 + 加固"，目标是把 D7 编排层从 B+ 重新拉回 A-，并为后续
+      devrix-d7-certainty-architecture 立项清除物理依赖。
+
+# 测试点（S4 实现时按需补充）
+test_points:
+  - id: D7-S6-A14-T01
+    name: |
+      dispatchLoop wakeup counter rename：incMetric("dispatch_wakeup") → "dispatch_loop_wakeups"
+      （spec 与代码对齐，D5 dashboard 按新名过滤有数据）
+    status: PLANNED
+  - id: D7-S6-A14-T02
+    name: |
+      Worker panic counter rename：incMetric("worker_panic") → "worker_panics"
+      （spec D7-S6-A12-T02 与代码对齐）
+    status: PLANNED
+  - id: D7-S6-A14-T03
+    name: |
+      sandbox_exit_failed 归属：spec.md 显式标注该 counter 由 D4 multiagent/execute 提供
+      （D7 spec 移除该条或注明 "out of D7 scope"），D7 不重复声明
+    status: PLANNED
+  - id: D7-S6-A14-T04
+    name: |
+      state.cancels 无界增长修复：cancelWaveLocked 完成后清空 state.cancels slice，
+      防止长会话多 wave 重入时累积 cancel funcs
+    status: PLANNED
+  - id: D7-S6-A14-T05
+    name: |
+      ConflictGuard TOCTOU 修复：scheduler.go dispatchLoop hot path (lines 283+352)
+      改用 AllowAndRegister 原子调用，消除原 Allow+Register 拆分引入的窗口
+    status: PLANNED
+  - id: D7-S6-A14-T06
+    name: |
+      command_handler.go:100 阻塞 send 加 select-default 保护，out channel 满时不永久阻塞
+    status: PLANNED
+
+# 范围
+in_scope:
+  - wavescheduler/scheduler.go metric 名 rename（2 处）
+  - wavescheduler/scheduler.go state.cancels bound cleanup
+  - wavescheduler/scheduler.go dispatchLoop 改用 AllowAndRegister
+  - sessionorchestrator/command_handler.go out channel send 加 select-default
+  - openspec/specs/d7-orchestration/spec.md 命名 / 归属更新
+  - openspec/specs/d7-orchestration/t-registry.md 新增 6 个 P0 T 点
+  - 配套 unit/integration tests（6 个新增/修改）
+
+out_of_scope:
+  - coordinator/aliases.go 退役（130 行 shim，12 bootstrap import）—— DM-20260621-009 已 defer，独立 change
+  - turn/orchestrator.go 1349 行拆分 —— 独立 change（devrix-d7-orchestrator-decomposition 候选）
+  - UncertaintyCoord + AdaptiveThreshold wiring —— DM-20260620-005 P0 遗留，独立 change
+  - 三流格式统一（FastPath vs OrchestratePath）—— spec.md:210 defer 到下季度
+  - CommandHandler systemPrompt 永远空参数 —— spec.md:210 defer（PR 不动）
+  - DispatchLoop 唤醒语义切分（tick vs slot-release）—— P3 优化，独立 change
+  - fork 命令系统提示词 FastPath systemPrompt 注入 —— spec.md:210 defer
+  - worktree/sandbox 长描述差异（worktree_slug vs Worktree）—— 已澄清非 bug（NM-2 GOOD）
+
+# PR 拆分（单 PR 模式，候选 A）
+pr_breakdown:
+  - pr: PR-A
+    scope: "Metrics naming alignment + state.cancels bound + AllowAndRegister hot path + select-default hardening + spec sync + t-registry"
+    files: ~8
+    estimated_loc: +200 / -30
+    risk: Low
+    branches:
+      - feat/devrix-d7-metrics-and-concurrency-hardening (from master)
+
+# 关联
+related_changes:
+  - devrix-d7-error-aggregation-and-metrics  # S7_Archived 2026-06-21, PR #152-#155, 本 change 修复 PR-B 残留
+  - devrix-error-handling-tier1-tier2  # S7_Archived 2026-06-20, 公共 errors 域修复
+  - devrix-d6-evolution-review-fixes  # S7_Archived 2026-06-21, 同期姊妹 change
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-deep-review-2026-06-21.md  # 深度 review 报告
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-error-aggregation-s7-archived.md  # PR-B 已交付但 spec 漂移
+  - openspec/archive/2026-06-21-devrix-d7-error-aggregation-and-metrics/specs/d7-orchestration/spec.md  # 当前 spec 漂移源
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race ./internal/layers/orchestration/...
+    - go test -race ./internal/layers/multiagent/...
+  s5_gate:
+    - ./scripts/test-unit.sh  # 全量 unit ≥80%
+    - 6 个新 P0 T 点全部 IMPLEMENTED
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-metrics-and-concurrency-hardening
