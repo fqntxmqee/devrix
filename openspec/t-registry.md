@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.6.0
-**Last Updated:** 2026-06-20
+**Version:** 4.7.0
+**Last Updated:** 2026-06-22
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 115 | 115 | 0 | 86 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 129 | 129 | 0 | 96 |
 
-**总计**: 433 · IMPLEMENTED 428 · PLANNED 3 · PARTIAL 0 · P0 251
+**总计**: 447 · IMPLEMENTED 442 · PLANNED 3 · PARTIAL 0 · P0 261
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -42,6 +42,9 @@
 
 > 2026-06-18 增量：DM-20260618-007 (devrix-tools-terminal-architecture) 5 Surface × 跨切面 LTL-Lite — 加 25 个 T 点 (D2-S4-A01-T01~T06 + TOOL-SEC-2-A02-T01~T03 + D5-S23-A02-T01~T04 + D4-S11-A02-T01~T04 + D4-S13-A02-T01 + D6-S11-A02-T01~T03 + D4-S12-A03-T01 + PERMISSION-GATE-1-T01/T02/T03) — 全 IMPLEMENTED。
 > 详见 `openspec/changes/devrix-tools-terminal-architecture/acceptance-report.md` §2 T 层验证。
+
+> 2026-06-22 增量：DM-20260622-001 (devrix-d7-metrics-and-concurrency-hardening) — D7 编排层 metric 命名 spec/code 对齐 + 并发硬化：加 6 个 P0 T 点（D7-S6-A14-T01 dispatch_loop_wakeups plural + T02 worker_panics plural + T03 sandbox_exit_failed 跨域归属 D4 + T04 state.cancels/handles markWaveDone 释放 + T05 ConflictGuard hot path AllowAndRegister 原子化 + T06 CommandHandler emit select-default 防阻塞）— 全 IMPLEMENTED。D7 t-registry v3.7.0 → v3.8.0 (P0 90→96, IMPLEMENTED 123→129)。
+> 详见 `openspec/archive/2026-06-22-devrix-d7-metrics-and-concurrency-hardening/acceptance-report.md` §2 T 层验证 + `openspec/changes/devrix-d7-metrics-and-concurrency-hardening/proposal.md` §2 5 fix 清单。
 
 ---
 

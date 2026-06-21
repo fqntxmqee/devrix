@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.0
-**Last Updated:** 2026-06-19
+**Version:** 3.2.0
+**Last Updated:** 2026-06-22
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 **Domain SoT:** `d7-domain.md`
@@ -104,8 +104,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S3-A03-F01 | CheckConflict | F-BE | candidate, running | allowed/blocked | ✅ | `orchestration/wavescheduler/conflict.go` Allow |
-| D7-S3-A03-F02 | RegisterTaskGuard | F-BE | task_node, slot | — | ✅ | `orchestration/wavescheduler/conflict.go` Register |
+| D7-S3-A03-F01 | CheckConflict | F-BE | candidate, running | allowed/blocked | ✅ | `orchestration/wavescheduler/conflict.go` Allow（legacy，DM-20260622-001 A4 标记 deprecated） |
+| D7-S3-A03-F02 | RegisterTaskGuard | F-BE | task_node, slot | — | ✅ | `orchestration/wavescheduler/conflict.go` Register（legacy，DM-20260622-001 A4 标记 deprecated） |
 | D7-S3-A03-F03 | CheckFileScopeOverlap | F-BE | file_scope[] | bool | ✅ | `orchestration/wavescheduler/conflict.go` pathsOverlap |
 
 ## D7-S3 基础设施 ✅
@@ -188,11 +188,24 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
+## D7-S6-A14 HardenMetricsAndConcurrency ✅ (DM-20260622-001)
+
+> 5 P0/P1 fix 一揽子 F 层登记。横切 S2/S3，不属于纵向业务流。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S6-A14-F01** | **AllowAndRegisterAtomic** | **F-BE** | **candidate, slot, running** | **bool** | **✅** | **`orchestration/wavescheduler/conflict.go::AllowAndRegister` (atomic) — 替代原 `Allow` + `Register` 拆分，消除 TOCTOU 窗口** |
+| **D7-S6-A14-F02** | **MarkWaveDoneRelease** | **F-BE** | **state** | **—** | **✅** | **`orchestration/wavescheduler/scheduler.go::markWaveDone` — wave terminal 时将 `state.cancels = nil` + `state.handles = make(map)`，防跨 wave 重入累积** |
+| **D7-S6-A14-F03** | **EmitSelectDefault** | **F-BE** | **event** | **—** | **✅** | **`orchestration/sessionorchestrator/command_handler.go::emit` 闭包 — `out <- ev` 包 `select { case out <- ev: default: slog.Warn(...) }`，防 consumer stall 永久阻塞** |
+| **D7-S6-A14-F04** | **IncMetricPlural** | **F-BE** | **field** | **—** | **✅** | **`orchestration/wavescheduler/scheduler.go::incMetric` switch case 复数化：`worker_panics` / `dispatch_loop_wakeups`（与 spec 一致）；调用方同步改 plural** |
+
+---
+
 ## Statistics
 
 | Activities with F | Total F Points | Implemented | Planned |
 |-------------------|----------------|-------------|---------|
-| 15 + 2 Canonical | 44 + 7 Canonical | 44 + 7 | 0 |
+| 16 + 2 Canonical | 48 + 7 Canonical | 48 + 7 | 0 |
 
 ---
 
@@ -204,3 +217,4 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | 2.0.0 | 2026-06-14 | 对齐真实代码路径、实现状态、新增 wave 基础设施 F 点 |
 | 3.0.0 | 2026-06-14 | Legacy 双轨建立（devrix-d7-sa-refine）；Canonical D7-S2/S5 F 层按 design.md §5 新增 |
 | 3.0.1 | 2026-06-15 | **v1.1 closure 同步**：D7-S1-A01/S1-A04/A05 F 层 ✅；D7-S2-A01/A02 F 层 ✅；D7-S5-A01-F02 路径修正（classifier_fallback.go 而非 shadow_classifier.go）；D7-S5-A02/A03 F 层全 ✅；Canonical D7-S2 F 层全 ✅。统计 44+7/44+7/0 |
+| **3.2.0** | **2026-06-22** | **DM-20260622-001 D7 Metrics & Concurrency Hardening**：新增 D7-S6-A14 横切 F 层 4 项（AllowAndRegisterAtomic + MarkWaveDoneRelease + EmitSelectDefault + IncMetricPlural）；D7-S3-A03-F01/F02 legacy 标记 deprecated（hot path 已切 AllowAndRegisterAtomic）。统计 48+7/48+7/0 |

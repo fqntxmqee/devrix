@@ -3,10 +3,10 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Status:** Active
-**Last Updated:** 2026-06-19
-**Change ID:** devrix-d7-v2-structure (DM-20260619-005)
+**Last Updated:** 2026-06-22
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
@@ -188,12 +188,14 @@ Plan Engine / delegate_tools
             └── dispatchLoop (continuous)
                     ├── TaskGraph.ReadyNodes()
                     ├── WorkerPool.Acquire(workerType)
-                    ├── ConflictGuard.Allow(candidate)
+                    ├── ConflictGuard.AllowAndRegister(candidate, slot, running)  ← DM-20260622-001 A4 原子化
                     ├── ContextResolver.Resolve(node)
                     ├── WorkerRunner.Run(spec)  [goroutine]
                     │       └── WorkerEvent stream → FlowHub
                     └── on terminal → ArtifactStore.Put → pool.Release → re-dispatch
 ```
+
+> **A4 (DM-20260622-001):** 原 `ConflictGuard.Allow` + `Register` 拆分有 TOCTOU 窗口（两个调用之间 `running` 集合可能变化）。`dispatchOne` 内已切原子 `AllowAndRegister` —— 持 `g.mu` 后 union `g.running` + 外部 `running` 集合再 register，hot path 零窗口。Legacy `Allow`/`Register` 入口保留兼容，但**禁止新调用**。
 
 ### 异常补偿
 
@@ -211,6 +213,7 @@ Plan Engine / delegate_tools
 | **Sandbox Exit 失败（freefork）** | Fork 失败回滚 或 spawnOne 失败清理 | `ForkerMetrics.SandboxExitFailed += 1` + slog.Warn（13 调用方兼容） |
 | **Sandbox Exit 失败（execute）** | ExecuteSync/Async defer + forkWorker 失败清理 | `ExecutorMetrics.SandboxExitFailed += 1` + slog.Warn（3 调用位点） |
 | **TaskManager.publishCompletion panic** | notify.GlobalBus().Publish 抛 panic | `TaskManagerMetrics.PublishCompletionPanics += 1` + slog.Error |
+| **Wave terminal state 累积泄漏** | 同 session 跨 wave 重入 → `state.cancels` slice / `state.handles` map 无界增长 | `markWaveDone` 内 `state.cancels = nil` + `state.handles = make(map[string]*workerHandle)` 释放，引用进入 pure-terminal 可被 GC（DM-20260622-001 A3） |
 
 ### Plan Mode 分支（D7-S5 部分）
 
@@ -223,7 +226,23 @@ Plan Engine / delegate_tools
                             └── /plan reject  → state=inactive
 ```
 
----
+### CommandHandler 分支（D7-S2-A04, 零 LLM）
+
+```
+用户 /help | /plan | /task | /stop
+    └── CommandHandler.Handle(req, intent)
+            ├── dispatch(ctx, cmd, args)
+            │     ├── /plan → workmodel.PlanCLICommands.Handle
+            │     ├── /task → workmodel.CLICommands.Handle
+            │     ├── /help → cli.Help()
+            │     └── /stop → interruptHandle(ctx, sessionID)
+            └── emit goroutine:  ← DM-20260622-001 A5 硬化
+                  sink.Publish(command_reply)  [不阻塞消费者]
+                  emit(text event)             ← select-default 保护
+                  emit(complete event)          ← select-default 保护
+```
+
+> **A5 (DM-20260622-001):** 原 `out <- ev` 在 buffered channel (cap=4) 满时会永久阻塞 goroutine，consumer stall 时直接造成泄漏。`emit` 闭包改为 `select { case out <- ev: default: slog.Warn("command_handler: out channel full, drop event", "type", ev.Type, "session", ev.SessionID, "channel_size", cap(out)) }` —— drop 可接受（命令回复是 best-effort UI 反馈），slog.Warn 留 audit trail。---
 
 ## ④ 领域模型
 
@@ -480,6 +499,54 @@ TaskManager.UpdateStatus (terminal)
 | SchedulerMetrics int→atomic 破坏 test | Low | Low | 保留 int + sync.Mutex（已有 metricsMu 保护） |
 | TaskCtxLeaked 误报 | Med | Low | S5 acceptance 验证 < 5%，可后续在 completeTask 强化清理 |
 | D5 dashboard 未及时更新 | Low | Low | D5 接入是手动 work（DM-20260621-010 文档同步后启动） |
+
+---
+
+## D7-S6-A14 Hardening Addendum（DM-20260622-001）
+
+> 横切硬化条目，承载 PR-B (DM-20260621-010) 落地 5 个 counter 的 spec 收敛 + 3 个并发缺陷修复。
+
+### A1 — Metric 命名 spec/code 对齐
+
+`SchedulerMetrics` 字段（`wavescheduler/scheduler.go` 内置）：
+
+| 字段 | spec 名（已对齐） | 旧名（deprecated） | 修复 |
+|------|------------------|--------------------|------|
+| `WorkerPanics` | `worker_panics` | `worker_panic` | `incMetric` switch case + 调用方均改 plural |
+| `DispatchLoopWakeups` | `dispatch_loop_wakeups` | `dispatch_wakeup` | 同上 |
+
+**根因：** PR-B 落地时只改了 `incMetric` 调用方，但 `incMetric` 函数内 switch case 仍用 singular 字符串，命中 default no-op —— D5 dashboard 按 spec 名过滤时永远零流量。修复采用 **caller-side + switch case 双修**（仅改调用方不修 switch case literal 等于不修）。
+
+### A3 — Wave terminal state 释放
+
+`markWaveDone` 是 wave 唯一终态入口。修复后语义：
+
+```go
+func (s *WaveScheduler) markWaveDone(state *schedulerWaveState) {
+    state.mu.Lock()
+    if state.done { state.mu.Unlock(); return }
+    state.done = true
+    scheduleSpan := state.scheduleSpan
+    state.scheduleSpan = nil
+    close(state.doneCh)
+    // 释放 per-wave cancel/handle 簿记
+    state.cancels = nil                                 // []context.CancelFunc
+    state.handles = make(map[string]*workerHandle)     // 清空但不 nil 化 map（保 nil-safe 读）
+    state.mu.Unlock()
+    if scheduleSpan != nil { scheduleSpan.End() }
+}
+```
+
+**收益：** 长会话多 wave 重入（reentry 场景，spec §6.2 IntentOrchestrate）下 `state.cancels`/`state.handles` 不再无界增长；wave 结束后引用进入 pure-terminal 可被 GC。
+
+### A6 — `sandbox_exit_failed` 跨域归属澄清
+
+| 域 | 文件 | metric |
+|----|------|--------|
+| **D4** | `multiagent/execute/worker.go::recordSandboxExitFailed` | `sandbox_exit_failed`（实际 emitter） |
+| D7 | `wavescheduler/scheduler.go` | **不携带** `sandbox_exit_failed`（spec D7-S6-A12-T01 标 OBSOLETE 2026-06-22） |
+
+详见 `spec.md` §D7-S6-A12-T01（OBSOLETE）+ `t-registry.md` D7-S6-A14-T03。
 
 ---
 

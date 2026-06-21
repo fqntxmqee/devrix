@@ -2,8 +2,8 @@
 
 **Capability:** d7-orchestration
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-16
+**Version:** 1.1.0
+**Last Updated:** 2026-06-22
 **Parent:** `d7-domain.md`
 **Complements:** `spec.md` · `a-registry.md` · `f-registry.md` · `../d2-context-engine/d7-boundary.md`
 
@@ -206,6 +206,24 @@ sequenceDiagram
 
 正常 Process 结束 **不** 取消 Wave（D7-S2-T05 幂等边界）。
 
+### 6.5 markWaveDone 终态时序（DM-20260622-001 A3）
+
+Wave 终态唯一入口 `markWaveDone(state)`，执行顺序固定：
+
+```
+1. state.mu.Lock
+2. if state.done → return (幂等)
+3. state.done = true                ← 防重入
+4. scheduleSpan := state.scheduleSpan; state.scheduleSpan = nil
+5. close(state.doneCh)              ← 唤醒 WaitForCompletion
+6. state.cancels = nil              ← 释放 per-wave cancel funcs（D7-S6-A14-T04）
+7. state.handles = make(map[string]*workerHandle)  ← 清空 handle 簿记
+8. state.mu.Unlock
+9. if scheduleSpan != nil { scheduleSpan.End() }
+```
+
+**Step 6/7 关键性（DM-20260622-001 A3）：** 长会话中 wave reentry 频繁（同 session 多次新 TaskGraph → 旧 wave 取消），旧实现下 `state.cancels` slice 与 `state.handles` map 无界增长。Step 6/7 把所有引用切到 pure-terminal，wave state 可被 Go GC 安全回收。`markWaveDone` 是**唯一**做此释放的位置（不在 `CancelAll`、不在 `WaitForCompletion`），保证收集器触发点集中。
+
 ---
 
 ## 7. 路由矩阵（S2 vs S3）
@@ -267,3 +285,12 @@ T  — 66 Test Points，44 P0（见 t-registry.md）
 | `../d1-communication/terminal-state-guide.md` | D1 展示侧对称指南 |
 | `observability-guide.md` | Span↔T、Trace 树、P0 Runbook |
 | `dsaft-architecture.md` | Stub（历史 DSAFT 入口，计数表 only） |
+
+---
+
+## 修订记录
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-16 | 初版：Canonical 主路径、IntentKind 四链、跨域时序、HandleInterrupt 顺序 |
+| **1.1.0** | **2026-06-22** | **DM-20260622-001 A3**：新增 §6.5 `markWaveDone` 终态时序（step 6/7 释放 `state.cancels`/`state.handles` 防跨 wave 累积） |
