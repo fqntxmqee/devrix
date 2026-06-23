@@ -1,0 +1,41 @@
+name: devrix-d7-mups-v4-review-fixes
+demand_id: DM-20260625-002
+status: s7_archived
+created: 2026-06-25
+archived: 2026-06-25
+priority: P0
+change_type: PATCH
+affected_domains: [D7]
+affected_scenarios: [D7-S5, D7-S9, D7-S10, D7-S11, D7-S13]
+pr:
+  number: 192
+  url: https://github.com/fqntxmqee/devrix/pull/192
+  branch: feat/devrix-d7-mups-v4-review-fixes
+  merge_method: squash
+  merged_at: 2026-06-25
+summary: 修复 MUPS v4 5 节点管道全量 review 发现的 3 Critical + 10 High + 1 doc = 14 个 isolated fix
+metrics:
+  critical_fixed: 3
+  high_fixed: 10
+  doc_added: 1
+  commits: 13
+  files_changed: 26
+  insertions: 5195
+  deletions: 66
+  test_packages_passed: 22
+  test_packages_total: 22
+references:
+  - openspec/changes/devrix-d7-mups-v4-review-fixes/proposal.md
+  - openspec/changes/devrix-d7-mups-v4-review-fixes/design.md
+  - openspec/changes/devrix-d7-mups-v4-review-fixes/tasks.md
+  - openspec/specs/d7-orchestration/pipeline-architecture.md
+related_archives:
+  - 2026-06-20-devrix-context-budget-and-isolation-phase-b
+  - 2026-06-23-devrix-d7-mups-v4-phase2-observe-plan
+  - 2026-06-23-devrix-d7-mups-v4-phase2-plan
+  - 2026-06-23-devrix-d7-mups-v4-phase3-execute
+  - 2026-06-23-devrix-d7-mups-v4-phase3-channels
+  - 2026-06-23-devrix-d7-mups-v4-phase4-verify-promotion
+  - 2026-06-23-devrix-d7-mups-v4-phase5-learn
+  - 2026-06-24-devrix-d7-mups-v4-phase6-observe-learner-wiring
+  - 2026-06-25-devrix-d7-mups-v4-phase7-verify-auto-close
