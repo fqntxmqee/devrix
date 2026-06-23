@@ -1,10 +1,13 @@
 package decisionplanning
 
 import (
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 
 // IntentClassifier produces an orchtypes.IntentClassification from a raw user message.
@@ -167,4 +170,42 @@ func (c *RuleClassifier) ClassifyLegacyTail(_ context.Context, message string) (
 	return orchtypes.IntentClassification{
 		Kind: orchtypes.IntentOrchestrate, Confidence: 60, Reason: "no fast pattern matched",
 	}, nil
+}
+
+// ClassifyWithPrior applies AdaptivePrior.PriorBeta.Mean() as a confidence
+// multiplier on top of the baseline Classify output.
+//
+// Phase 6 PR-F1 (D7-S12-A41-T03 + A41 ClassifyWithPrior part). Used by
+// SessionOrchestrator.ProcessMessage to inject the user's cross-session
+// reputation into intent classification.
+//
+// Behavior:
+//   - prior == nil → returns Classify (no adjustment).
+//   - prior.PriorBeta.Alpha+Beta == 0 (cold start) → Mean == 0 → no adjustment.
+//   - prior.PriorBeta.Mean() > 0 → multiplies baseline confidence, clamped to [0, 100].
+//
+// Immutable: prior is not mutated. The returned IntentClassification is a
+// new value (Reason is updated to include the prior mean for observability).
+func (c *RuleClassifier) ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
+	result, err := c.Classify(ctx, message)
+	if err != nil {
+		return result, err
+	}
+	if prior == nil {
+		return result, nil
+	}
+	mean := prior.PriorBeta.Mean()
+	if mean == 0 {
+		return result, nil
+	}
+	adjusted := int(float64(result.Confidence) * mean)
+	if adjusted > 100 {
+		adjusted = 100
+	}
+	if adjusted < 0 {
+		adjusted = 0
+	}
+	result.Confidence = adjusted
+	result.Reason = fmt.Sprintf("%s [prior.Mean=%.3f]", result.Reason, mean)
+	return result, nil
 }
