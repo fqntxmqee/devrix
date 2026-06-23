@@ -160,5 +160,34 @@ func TestBuildAdaptivePrior_BayesianMerge(t *testing.T) {
 	}
 }
 
+func TestBetaPrior_Mean(t *testing.T) {
+	cases := []struct {
+		p    BetaPrior
+		want float64
+	}{
+		{BetaPrior{Alpha: 5, Beta: 3}, 5.0 / 8.0},
+		{BetaPrior{Alpha: 8, Beta: 1}, 8.0 / 9.0},
+		{BetaPrior{Alpha: 0, Beta: 0}, 0},   // cold start → 0 (fail-safe)
+		{BetaPrior{Alpha: 1, Beta: 0}, 1.0}, // all positive
+		{BetaPrior{Alpha: 0, Beta: 1}, 0.0}, // all negative
+		{BetaPrior{Alpha: 100, Beta: 50}, 100.0 / 150.0},
+	}
+	for _, tc := range cases {
+		got := tc.p.Mean()
+		if got != tc.want {
+			t.Errorf("BetaPrior%+v.Mean() = %f, want %f", tc.p, got, tc.want)
+		}
+	}
+}
+
+func TestBetaPrior_Mean_ColdStart_ZeroTotal(t *testing.T) {
+	// When Alpha+Beta=0 (cold start), Mean must be 0 to prevent
+	// downstream Observer submodules from multiplying by NaN/Inf.
+	p := BetaPrior{Alpha: 0, Beta: 0}
+	if got := p.Mean(); got != 0 {
+		t.Errorf("Cold start Mean() = %f, want 0", got)
+	}
+}
+
 // Reference to types package (compile-time dependency).
 var _ = types.VerdictKind(0)

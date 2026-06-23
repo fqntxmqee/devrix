@@ -14,6 +14,21 @@ func (p BetaPrior) String() string {
 	return fmt.Sprintf("Beta(%d,%d)", p.Alpha, p.Beta)
 }
 
+// Mean returns the Beta distribution's expected value α/(α+β). When
+// α+β == 0 (cold start), returns 0 (fail-safe: cold-start prior carries
+// no information, so the multiplier is a no-op).
+//
+// This is the canonical Phase 6 PR-F1 hook for downstream Observer
+// submodules (IntentQuantizer / AnomalyDetector / RuleClassifier) to
+// read the prior as a confidence / threshold multiplier.
+func (p BetaPrior) Mean() float64 {
+	total := p.Alpha + p.Beta
+	if total == 0 {
+		return 0
+	}
+	return float64(p.Alpha) / float64(total)
+}
+
 // DefaultPriors — from doc 25 §四.
 var (
 	// DefaultDeveloperPrior — slightly positive prior for developers.
