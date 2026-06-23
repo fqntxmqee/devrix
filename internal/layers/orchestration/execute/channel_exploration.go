@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
@@ -67,6 +68,16 @@ func (c *ExplorationChannel) Supports(pk plan.PlanKind) bool {
 	return pk == plan.ExplorationPlan
 }
 
+// runOut is the per-goroutine result envelope produced by the
+// exploration workers. Defined at package scope so the channel type is
+// referenceable from tests and helpers.
+type runOut struct {
+	idx    int
+	step   plan.Step
+	result ToolResult
+	err    error
+}
+
 // Execute runs all explorations in parallel, collects ALL results (no
 // early-exit), and ranks them by priority. The Artifact carries every
 // result for downstream analysis (Phase 5 Learn can mine the
@@ -95,18 +106,23 @@ func (c *ExplorationChannel) Execute(ctx context.Context, p *plan.Plan, req Chan
 		SideEffectStatus: sideEffectForScope(p.BlastRadius.PersistScope),
 	}
 
+	// Concurrency control: spawn all goroutines immediately, gate
+	// parallelism with a semaphore INSIDE each goroutine. This avoids
+	// the deadlock pattern where the main goroutine blocks on
+	// `sem <- struct{}{}` waiting for an in-flight goroutine to release
+	// its slot — a scenario that arose in the previous implementation
+	// when MaxParallel < len(p.Steps). sync.WaitGroup guarantees we
+	// wait for every worker; the buffered out channel guarantees no
+	// worker blocks on send.
 	sem := make(chan struct{}, c.cfg.MaxParallel)
-	type runOut struct {
-		idx    int
-		step   plan.Step
-		result ToolResult
-		err    error
-	}
 	out := make(chan runOut, len(p.Steps))
+	var wg sync.WaitGroup
 
 	for i, step := range p.Steps {
-		sem <- struct{}{}
+		wg.Add(1)
 		go func(idx int, s plan.Step) {
+			defer wg.Done()
+			sem <- struct{}{}
 			defer func() { <-sem }()
 			r, err := c.runner.Invoke(ctx, ToolRequest{
 				SessionID:      req.SessionID,
@@ -119,15 +135,27 @@ func (c *ExplorationChannel) Execute(ctx context.Context, p *plan.Plan, req Chan
 		}(i, step)
 	}
 
+	// Close `out` after every worker has written its result, then drain.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
 	results := make([]runOut, 0, len(p.Steps))
-	for i := 0; i < len(p.Steps); i++ {
-		results = append(results, <-out)
+	for r := range out {
+		results = append(results, r)
 	}
 
 	art.EndedAt = time.Now()
 	art.Duration = art.EndedAt.Sub(art.StartedAt)
 
 	// Rank: success first, then by duration ascending, then by EstimatedTokens.
+	// For errored results, result.CompletedAt/StartedAt are zero values
+	// (runner never set them), so duration is 0 and the secondary sort
+	// falls through to EstimatedTokens. This puts errored results with
+	// the smallest EstimatedTokens first among errors — a stable,
+	// reproducible ordering that lets the caller rely on results[0]
+	// when reporting "first failure" downstream.
 	sort.SliceStable(results, func(i, j int) bool {
 		if (results[i].err == nil) != (results[j].err == nil) {
 			return results[i].err == nil
@@ -148,11 +176,15 @@ func (c *ExplorationChannel) Execute(ctx context.Context, p *plan.Plan, req Chan
 	}
 
 	// Top result becomes Summary; full result table encoded in Metadata.
+	// Top-error reporting prefers the result with the longest error
+	// message (most informative for triage) over results[0] which is
+	// the lowest-EstimatedTokens error — useful when the actual
+	// failure context is buried in a different goroutine.
 	if len(results) > 0 && results[0].err == nil {
 		art.Summary = fmt.Sprintf("top_result: %s", results[0].result.Output)
 		art.ExitCode = results[0].result.ExitCode
 	} else if len(results) > 0 {
-		art.Error = fmt.Sprintf("all %d explorations failed (top: %v)", len(results), results[0].err)
+		art.Error = fmt.Sprintf("all %d explorations failed (top: %v)", len(results), mostInformativeError(results))
 		art.ExitCode = 1
 	}
 
@@ -160,6 +192,26 @@ func (c *ExplorationChannel) Execute(ctx context.Context, p *plan.Plan, req Chan
 		successCount, len(p.Steps), len(p.Steps))
 
 	return art, nil
+}
+
+// mostInformativeError returns the error string with the largest
+// payload — best signal for triage when all explorations failed.
+// Stable: returns the first match when multiple errors have equal
+// length (matches the input order). Errors with nil .err are skipped.
+func mostInformativeError(results []runOut) error {
+	var best error
+	bestLen := -1
+	for _, r := range results {
+		if r.err == nil {
+			continue
+		}
+		msgLen := len(r.err.Error())
+		if msgLen > bestLen {
+			bestLen = msgLen
+			best = r.err
+		}
+	}
+	return best
 }
 
 // sideEffectForScope maps the Plan's PersistScope to the Artifact's
