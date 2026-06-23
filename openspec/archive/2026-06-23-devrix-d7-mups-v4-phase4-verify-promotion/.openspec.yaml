@@ -1,0 +1,238 @@
+id: devrix-d7-mups-v4-phase4-verify-promotion
+demand_id: DM-20260623-002
+title: "D7 MUPS v4.3 Phase 4 Verify 节点升格 (PR-D1..PR-D4, 8 P0 T 点)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 4 Verify 节点升格
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S10-A32
+    name: VerdictKind typed enum + AggregateVerdicts (G3-1)
+    description: |
+      Phase 4 Verify 节点的 G3-1 数据契约层。(1) shared/types/verdict.go 引入
+      VerdictKind 4 态 typed enum (VerdictPass/Partial/Indeterminate/Fail) +
+      String/Parse/MarshalJSON/UnmarshalJSON + 空字符串零值兼容 (VerdictPass)
+      向后兼容 Phase 2 UncertaintyCoord.FromVerifier 内联字符串 switch；
+      (2) workmodel/aggregate_verdicts.go 引入 AggregationStrategy 4 策略
+      (WeakConjunction/StrongConjunction/Majority/ThresholdByPass) +
+      AggregateVerdicts 函数 + 边界处理 (空切片 → VerdictIndeterminate，
+      单元素 → 直接返回，同质 → 直接返回) + 4 With* 不可变方法。
+      orchtypes/uncertainty_coord.go 通过 type alias `type VerdictKind =
+      types.VerdictKind` 重新导出，避免 import cycle。
+    rationale: |
+      DM-20260623-002 立项需求。Phase 2 PR-A1 FromVerifier 内联字符串 switch
+      替换为 typed enum switch；与 Phase 3 PR-C1 SideEffectStatus precedent
+      一致 (跨域类型上提 shared/types)。
+  - id: D7-S10-A33
+    name: VerdictToExitReason + 14 ExitReason + G8-1 P0-3 修复
+    description: |
+      (1) turn/verdict_to_exit_reason.go VerdictToExitReason 4 Verdict →
+      4 ExitReason 映射 + SystemAnomaly 覆盖 (ExitReasonSystemAnomaly)；
+      (2) turn/orchestrator.go ExitReason 8 → 14 扩展 (6 新 enum:
+      partial_verified/verifier_abstain/verifier_fail/system_anomaly/
+      unresolved/abstain) + ParseExitReason + AllExitReasons；
+      (3) workmodel/verify_with_retry.go VerifyWithRetry parse failure →
+      INDETERMINATE (NOT error, NOT FAIL) — G8-1 P0-3 bug 修复。
+    rationale: |
+      G8-1 P0-3 修复。原 parser 失败 → error → orchestrator 误判为 FAIL；
+      修复后 parse failure → INDETERMINATE → ExitReasonVerifierAbstain →
+      人工复核。混淆 "parser problem" 与 "verdict problem" 是 P0 风险。
+  - id: D7-S10-A34
+    name: Evidence struct + EvidenceExtractor
+    description: |
+      (1) workmodel/evidence.go Evidence struct 5 字段
+      (Reason/Confidence/Counterexample/SourceRef/ExtractedAt) +
+      NewEvidence 工厂方法 (必填字段 fail-fast) + Validate +
+      WithCounterexample + WithConfidence 不可变 + MarshalJSON/UnmarshalJSON；
+      (2) workmodel/evidence_extractor.go EvidenceExtractor interface
+      (Extract + Validate) + LLMEvidenceExtractor (list form + single
+      form fallback) + StubEvidenceExtractor (test double)。
+    rationale: |
+      Phase 5 Learn 节点的输入数据契约。本 PR 仅定义 Evidence 数据结构
+      + EvidenceExtractor 抽象；具体调用方在 PR-D4 wiring + Phase 5 PR-E1..E5
+      集成。
+  - id: D7-S10-A35
+    name: SystemAnomaly 异常聚合 + ObserveNode wiring
+    description: |
+      (1) workmodel/system_anomaly.go AnomalyCategory interface (避免
+      orchtypes ↔ workmodel import cycle) + CatBusinessValue/CatSystemValue
+      uint8 常量 + SystemAnomalyConfig {AnomalyThreshold, MinCatSystemRatio}
+      + SystemAnomalyAggregator (sync.Mutex guarded RecordCatSystem/Reset) +
+      DefaultAnomalyThreshold=3 + DefaultMinCatSystemRatio=0.5 +
+      EvaluateSystemAnomalyFromCategories 无状态包装；
+      (2) orchtypes/system_anomaly_wiring.go observationAdapter (在
+      orchtypes 包内, 其中 workmodel → orchtypes 单向依赖已存在) +
+      AsWorkmodelAnomalyCategories + EvaluateSystemAnomaly(report) +
+      BuildUncertaintyCoordFromReport (Observe→Verify→Coord 统一入口)。
+      SystemAnomaly=true 强制 UncertaintyCoord.Value=0.95。
+    rationale: |
+      闭环 Phase 2 PR-A1 缺失的 SystemAnomaly wiring。Phase 2 FromVerifier
+      的 systemAnomaly 参数始终为 false，导致 Phase 3/4 调用方无法传播
+      系统异常信号。本 PR 闭合该 wiring：SystemAnomaly=true → FromVerifierTyped
+      强制 Value=0.95 → 高不确定性 → 触发 ExitReasonSystemAnomaly。
+
+# 测试点（PR-D1..D4 实际实现 8 个）
+test_points:
+  - id: D7-S10-A32-T01
+    name: |
+      VerdictKind 4 态 typed enum (VerdictPass/Partial/Indeterminate/Fail)
+      + String() + ParseVerdictKind() + MarshalJSON + UnmarshalJSON +
+      空字符串零值兼容 (VerdictPass 向后兼容)。
+    status: IMPLEMENTED
+  - id: D7-S10-A32-T02
+    name: |
+      AggregationStrategy 4 策略枚举 + AggregateVerdicts 函数 +
+      边界处理 (空切片 → VerdictIndeterminate，单元素 → 直接返回，
+      同质 Kind → 直接返回) + 4 With* 不可变方法 + 4 策略
+      (WeakConjunction OR / StrongConjunction AND / Majority / ThresholdByPass)
+      完整覆盖。
+    status: IMPLEMENTED
+  - id: D7-S10-A33-T03
+    name: |
+      VerdictToExitReason 4 Verdict → 4 ExitReason 映射 + SystemAnomaly=true
+      覆盖 (返回 ExitReasonSystemAnomaly) + 14 ExitReason 8 → 14 扩展
+      (6 新增: partial_verified / verifier_abstain / verifier_fail /
+      system_anomaly / unresolved / abstain) + ParseExitReason +
+      AllExitReasons。
+    status: IMPLEMENTED
+  - id: D7-S10-A33-T04
+    name: |
+      VerifyWithRetry parse failure → INDETERMINATE (NOT error, NOT FAIL) —
+      G8-1 P0-3 修复 + DefaultMaxParseRetries=3 + RetryCount 记录尝试次数。
+    status: IMPLEMENTED
+  - id: D7-S10-A34-T05
+    name: |
+      Evidence struct 5 字段 (Reason/Confidence/Counterexample/SourceRef/
+      ExtractedAt) + NewEvidence 必填字段 fail-fast + Validate 强制
+      3 不变式 (Reason/SourceRef 非空 + Confidence ∈ [0,1]) + WithCounterexample
+      + WithConfidence 不可变 + MarshalJSON/UnmarshalJSON wire format。
+    status: IMPLEMENTED
+  - id: D7-S10-A34-T06
+    name: |
+      EvidenceExtractor interface 2 方法 (Extract + Validate) +
+      LLMEvidenceExtractor 实现 (list form + single form fallback +
+      ctx cancel propagation + 缺 SourceID 占位) +
+      StubEvidenceExtractor 实现 (test double)。
+    status: IMPLEMENTED
+  - id: D7-S10-A35-T07
+    name: |
+      SystemAnomalyAggregator 阈值触发
+      (AnomaliesCount ≥ AnomalyThreshold AND CatSystem/AnomaliesCount
+      ≥ MinCatSystemRatio) + RecordCatSystem 累积 + Reset 清空 +
+      DefaultAnomalyThreshold=3 + DefaultMinCatSystemRatio=0.5 +
+      EvaluateSystemAnomalyFromCategories 无状态包装。
+    status: IMPLEMENTED
+  - id: D7-S10-A35-T08
+    name: |
+      ObserveNode wiring SystemAnomaly → FromVerifierTyped 统一入口 +
+      BuildUncertaintyCoordFromReport(report, verifier) 集成 +
+      SystemAnomaly=true 强制 UncertaintyCoord.Value=0.95 (override
+      VerdictPass baseline)。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/shared/types/verdict.go (NEW): VerdictKind 4 态 typed enum + String/Parse/Marshal/UnmarshalJSON
+  - internal/shared/types/verdict_test.go (NEW): 10 tests
+  - internal/layers/orchestration/workmodel/aggregate_verdicts.go (NEW): AggregationStrategy 4 策略 + AggregateVerdicts + 4 With* methods
+  - internal/layers/orchestration/workmodel/aggregate_verdicts_test.go (NEW): 20 tests
+  - internal/layers/orchestration/orchtypes/uncertainty_coord.go (MODIFY): VerdictKind type alias + FromVerifierTyped 扩展
+  - internal/layers/orchestration/turn/orchestrator.go (MODIFY): 6 new ExitReason consts + ParseExitReason + AllExitReasons
+  - internal/layers/orchestration/turn/verdict_to_exit_reason.go (NEW): VerdictToExitReason 函数
+  - internal/layers/orchestration/turn/verdict_to_exit_reason_test.go (NEW): 14 tests
+  - internal/layers/orchestration/workmodel/verify_with_retry.go (NEW): VerifierOutput + ParseVerifierOutput + VerifyWithRetry + DefaultMaxParseRetries=3
+  - internal/layers/orchestration/workmodel/verify_with_retry_test.go (NEW): 10 tests
+  - internal/layers/orchestration/workmodel/evidence.go (NEW): Evidence struct + NewEvidence + Validate + 2 With* methods
+  - internal/layers/orchestration/workmodel/evidence_test.go (NEW): 10 tests
+  - internal/layers/orchestration/workmodel/evidence_extractor.go (NEW): EvidenceExtractor interface + LLM + Stub 实现
+  - internal/layers/orchestration/workmodel/evidence_extractor_test.go (NEW): 11 tests
+  - internal/layers/orchestration/workmodel/system_anomaly.go (NEW): AnomalyCategory interface + SystemAnomalyConfig + SystemAnomalyAggregator
+  - internal/layers/orchestration/workmodel/system_anomaly_test.go (NEW): 9 tests
+  - internal/layers/orchestration/orchtypes/system_anomaly_wiring.go (NEW): observationAdapter + AsWorkmodelAnomalyCategories + EvaluateSystemAnomaly + BuildUncertaintyCoordFromReport
+  - internal/layers/orchestration/orchtypes/system_anomaly_wiring_test.go (NEW): 9 tests
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S10-A32/A33/A34/A35 Requirement (D7 v4.4.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S10-A32-T01/T02 + A33-T03/T04 + A34-T05/T06 + A35-T07/T08 (v3.12.0)
+
+out_of_scope:
+  - Phase 5 Learn 节点 (PR-E1..E5): 后续 OpenSpec change 推进，强依赖本 PR 的 VerdictKind + Evidence + SystemAnomaly 数据契约
+  - 不修改 Phase 2 UncertaintyCoord.FromVerifier 调用方: 通过 type alias 保持二进制兼容
+  - 不引入新 LLM 模型: LLMEvidenceExtractor 复用现有 verifier prompt 的 JSON 输出约定
+  - 不实现 Evidence.PersistScope 字段: Phase 5 Learn 才决定持久化范围
+  - 不修改 EvidenceExtractor 调用方: PR-D4 wiring 才集成；PR-E1 集成
+  - Verifier 实际 LLM prompt 模板: 现有 prompts/verifier_v1.json 已支持，本 PR 不动
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-D1
+    scope: "VerdictKind 4 态 typed enum + AggregationStrategy 4 策略 + AggregateVerdicts"
+    files: 4
+    estimated_loc: "+927 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase4-verify-promotion (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/170
+  - pr: PR-D2
+    scope: "VerdictToExitReason + 14 ExitReason 8→14 + VerifyWithRetry G8-1 P0-3 修复"
+    files: 4
+    estimated_loc: "+251 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase4-verify-promotion (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/171
+  - pr: PR-D3
+    scope: "Evidence struct 5 字段 + EvidenceExtractor interface + LLM + Stub 实现"
+    files: 3
+    estimated_loc: "+443 / -10"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase4-verify-promotion (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/172
+  - pr: PR-D4
+    scope: "SystemAnomaly aggregation + ObserveNode wiring + BuildUncertaintyCoordFromReport 统一入口"
+    files: 4
+    estimated_loc: "+485 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase4-verify-promotion (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/173
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（Observation/Plan/Verify 雏形 + UncertaintyCoord precedent）
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF（Observation 4 类 + UncertaintyReport + UncertaintyCoord）
+  - devrix-d7-mups-v4-phase2-plan  # Phase 2 PR-B1（Plan 4 类 + PlanKind + Planner interface）
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1（ArtifactKind 4 类 + SideEffectStatus 5 态 + 跨域类型上提 shared/types precedent）
+  - devrix-d7-mups-v4-phase3-channels  # Phase 3 PR-C2（Execute 4 Channel + ChannelRouter + SourcePlanID）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-openspec.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-openspec.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase4-phase5-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase4-verify-promotion/{demand,proposal,design,tasks,acceptance-report}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v4.4.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v3.12.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race ./internal/shared/types/...
+    - go test -race ./internal/layers/orchestration/orchtypes/...
+    - go test -race ./internal/layers/orchestration/workmodel/...
+    - go test -race ./internal/layers/orchestration/turn/...
+  s5_gate:
+    - CI_COVERAGE=1 go test ./internal/... -race -timeout 300s  # 全 internal 覆盖率维持
+    - 8 个 Phase 4 P0 T 点全部 IMPLEMENTED (D7-S10-A32-T01/T02 + A33-T03/T04 + A34-T05/T06 + A35-T07/T08)
+    - 50 个新增 tests (10+20+14+10+11+9+9) 100% PASS 含 race
+    - 0 race detector warnings
+    - 0 v2 regression (Phase 1/2/3 既有 tests 全部 PASS)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase4-verify-promotion  # 12 项检查 12/12 PASS

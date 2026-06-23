@@ -3,7 +3,7 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.4.0
+**Version:** 4.3.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-23
 **Domain SoT:** `d7-domain.md`
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级), devrix-d7-mups-v4-phase2-observe-plan (2026-06-23, DM-20260623-001, Phase 2 PR-A1 + PR-RF: Observation 4 类 + UncertaintyReport + UncertaintyCoord), devrix-d7-mups-v4-phase2-plan (2026-06-23, DM-20260623-001-PRB1, Phase 2 PR-B1: Plan 4 类 + Planner interface + MatchKind 4 Rules), devrix-d7-mups-v4-phase3-channels (2026-06-23, DM-20260625-001-PRC2, Phase 3 PR-C2: Execute 4 Channel + ChannelRouter), devrix-d7-mups-v4-phase4-verify-promotion (2026-06-23, DM-20260623-002, Phase 4 Verify 节点升格: VerdictKind 4 态 + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + 14 ExitReason + G8-1 修复)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级), devrix-d7-mups-v4-phase2-observe-plan (2026-06-23, DM-20260623-001, Phase 2 PR-A1 + PR-RF: Observation 4 类 + UncertaintyReport + UncertaintyCoord), devrix-d7-mups-v4-phase2-plan (2026-06-23, DM-20260623-001-PRB1, Phase 2 PR-B1: Plan 4 类 + Planner interface + MatchKind 4 Rules), devrix-d7-mups-v4-phase3-channels (2026-06-23, DM-20260625-001-PRC2, Phase 3 PR-C2: Execute 4 Channel + ChannelRouter)
 
 ---
 
