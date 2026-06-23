@@ -78,40 +78,92 @@
 
 ### 任务
 - [ ] 创建 `arbitrator.go`：
-  - [ ] `EscapeAction` enum（5 类）
-  - [ ] `EscapeDecision` struct（4 字段）
+  - [ ] `EscapeAction` enum（**6 类** 含新增 `EscapePendingHuman` 中间态）
+  - [ ] `EscapeDecision` struct（**5 字段** 含 `PendingID`）
   - [ ] `EscapeArbitrator` interface
   - [ ] `LLMArbitrator`：
     - [ ] 调 LLM（注入 prompt + PlanKindSwitchCount）
     - [ ] 5s timeout（context.WithTimeout）
     - [ ] Continue / Exit 二选一
   - [ ] `RuleArbitrator`：
-    - [ ] 检查 `hasUnrecoverableFailure(ctx)` 
+    - [ ] 检查 `hasUnrecoverableFailure(ctx)`
     - [ ] 不可恢复 → AbortWithAudit (AuditLevel=2)
     - [ ] 可恢复 → EscalateToHuman
-  - [ ] `HumanArbitrator`：
-    - [ ] 异步 prompt 用户（A/B/C）
-    - [ ] 10s timeout 兜底 ForceExit
-    - [ ] A → Continue, B → ForceExit, C → AbortWithAudit
+  - [ ] `HumanArbitrator`（**异步化，详见 T-03.1**）：
+    - [ ] 注册 pendingID + 异步通知 user
+    - [ ] 启动 10s timer goroutine
+    - [ ] 立即返回 `EscapePendingHuman`（不阻塞）
+    - [ ] user 提前响应 → 应用 choice
+    - [ ] 10s timeout → ForceExit 兜底
+    - [ ] ctx 取消 → ForceExit 兜底
   - [ ] `ChainedArbitrator`（3 层链式）
+- [ ] 创建 `notifier.go`（**新增 T-03.1 任务**）：
+  - [ ] `Notifier` interface
+  - [ ] `FeishuCardNotifier`（dev 默认，3 按钮 A/B/C + ExpiresAt 10s）
+  - [ ] `CLINotifier`（terminal 降级 fallback）
+  - [ ] `EmailNotifier`（可选，备用）
+  - [ ] `ChainedNotifier`（Feishu → CLI → Email 链式 fallback）
+- [ ] 创建 `pending_resolution.go`（**新增 T-03.1 任务**）：
+  - [ ] `PendingResolutionStore` interface
+  - [ ] `InMemoryPendingResolutionStore`（dev 默认）
+  - [ ] `DBPendingResolutionStore`（生产可换 DB/Redis）
+  - [ ] `Save / Load / Delete` 3 方法
 - [ ] 创建 `arbitrator_test.go`：
   - [ ] `TestLLMArbitrator_Continue` mock LLM 选 Continue
   - [ ] `TestLLMArbitrator_Exit` mock LLM 选 Exit
   - [ ] `TestLLMArbitrator_Timeout` 5s 超时 → ForceExit
   - [ ] `TestRuleArbitrator_Unrecoverable` → AbortWithAudit
   - [ ] `TestRuleArbitrator_Recoverable` → EscalateToHuman
-  - [ ] `TestHumanArbitrator_ChoiceA` → Continue
-  - [ ] `TestHumanArbitrator_Timeout` → ForceExit
+  - [ ] `TestHumanArbitrator_ChoiceA` SubmitUserChoice("A") → Continue
+  - [ ] `TestHumanArbitrator_ChoiceB` SubmitUserChoice("B") → ForceExit
+  - [ ] `TestHumanArbitrator_ChoiceC` SubmitUserChoice("C") → AbortWithAudit
+  - [ ] `TestHumanArbitrator_Timeout` 10s 不响应 → ForceExit
+  - [ ] `TestHumanArbitrator_CtxCancel` ctx 取消 → ForceExit
+  - [ ] `TestHumanArbitrator_PendingResolution_Save` Save → Load 命中
+  - [ ] `TestHumanArbitrator_PendingResolution_Load_NotFound` 首次 ProcessMessage
+  - [ ] `TestHumanArbitrator_SubmitUserChoice_Expired` pendingID 已 cleanup → 丢弃
+  - [ ] `TestHumanArbitrator_NotBlockProcessMessage` Arbitrate 立即返回 <100ms
   - [ ] `TestChainedArbitrator_LLMContinue` LLM 选 Continue → 立即返回
   - [ ] `TestChainedArbitrator_LLMExit_Rule` LLM Exit → Rule
   - [ ] `TestChainedArbitrator_RuleHuman` Rule Human → Human
+  - [ ] `TestChainedArbitrator_HumanPending` → 返回 EscapePendingHuman
+- [ ] 创建 `notifier_test.go`：
+  - [ ] `TestFeishuCardNotifier_BuildCard` 验证卡片结构（3 按钮 + ExpiresAt）
+  - [ ] `TestChainedNotifier_FeishuSuccess` Feishu 成功 → 不 fallback
+  - [ ] `TestChainedNotifier_FeishuFail_CLISuccess` Feishu 失败 → CLI 成功
+  - [ ] `TestChainedNotifier_AllFail` 全部失败 → 返回 error
 - [ ] 单元测试 100% PASS
 - [ ] 提交 + 开 PR
 
 ### 验收
-- **AC3**：3 层仲裁（LLM/Rule/Human）+ 5 类 EscapeAction
+- **AC3**：3 层仲裁（LLM/Rule/Human）+ 6 类 EscapeAction（含 EscapePendingHuman 中间态）
 - **依赖**：T-01
-- **风险**：中，timeout 兜底 + Human 异步化
+- **风险**：中，timeout 兜底 + Human 异步化 + Notifier 链式 fallback
+
+### T-03.1: HumanArbitrator 异步化实现要点（PR-V5.3 子任务）
+
+**核心约束**（与 Phase 7 Auto-Close 协同）：
+- `ProcessMessage` 是**同步接口**（飞书卡片立即显示）
+- HumanArbitrator **不能同步等待 user 响应**（10s 阻塞会破坏飞书卡片体验）
+- 必须**异步注册 + 立即返回 + goroutine 兜底**
+
+**3 个关键设计决策**：
+- **D1**：Evaluate 同步 vs 异步？ → **同步返回 + 内部异步**（`EscapePendingHuman` 中间态）
+- **D2**：user 响应后 decision 怎么应用？ → **audit 持久化 + 下次 ProcessMessage 续跑**
+- **D3**：notifyUser 通道？ → **可插拔 `Notifier` interface**（FeishuCard 默认 + CLI fallback）
+
+**4 类边界场景兜底**：
+| 场景 | 行为 | 兜底机制 |
+|------|------|---------|
+| 10s 内 user 点 A/B/C | 应用 user choice | 正常路径 |
+| 10s 内 user 不响应 | EscapeForceExit + AuditLevel=2 | 10s timer 兜底 |
+| ProcessMessage 客户端断开 | EscapeForceExit + AuditLevel=2 | ctx.Done() 兜底 |
+| user 响应但 pendingID 已 timeout/cleanup | SubmitUserChoice 丢弃 | map cleanup 兜底 |
+| Notifier 发送失败 | 降级为 CLI prompt | Notifier 链式 fallback |
+| LLMArbitrator 自身 panic | recover + ForceExit | 失败降级（同 Phase 7 模式）|
+
+**详细 Go 骨架**：见 `design.md` §5.3.1
+**完整决策流程**：见 `design.md` §5.3.2
 
 ---
 

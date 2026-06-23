@@ -126,7 +126,7 @@ LLMArbitrator (5s timeout) → EscapeContinue
 RuleArbitrator (规则检查)
   ├─ 不可恢复失败 → AbortWithAudit
   └─ 可恢复失败 → EscalateToHuman
-HumanArbitrator (用户接管 A/B/C)
+HumanArbitrator (用户接管 A/B/C, 10s timeout)
   ├─ A. 继续 → EscapeContinue
   ├─ B. 接受 → ForceExit
   └─ C. 取消 → AbortWithAudit
@@ -134,8 +134,249 @@ HumanArbitrator (用户接管 A/B/C)
 
 **devrix 落地差异**：
 - LLMArbitrator 5s timeout 兜底 ForceExit（不阻塞主链路）
-- HumanArbitrator 异步化（不阻塞 ProcessMessage 同步返回）
+- HumanArbitrator 异步化（不阻塞 ProcessMessage 同步返回）— 详见 §5.3.1
 - 失败降级：EscapeEngine.Evaluate error → slog.Warn + EscapeContinue
+
+### 5.3.1 HumanArbitrator 详细设计（devrix 落地）
+
+**核心约束**（与 Phase 7 Auto-Close 协同）：
+- `ProcessMessage` 是**同步接口**（飞书卡片立即显示）
+- HumanArbitrator **不能同步等待 user 响应**（10s 阻塞会破坏飞书卡片体验）
+- 必须**异步注册 + 立即返回 + goroutine 兜底**
+
+**关键设计决策**：
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| **D1**：Evaluate 同步 vs 异步？ | 同步返回 + 内部异步 | ProcessMessage 同步约束；用 `EscapePendingHuman` 中间态立即返回 |
+| **D2**：user 响应后 decision 怎么应用？ | audit 持久化 + 下次 ProcessMessage 续跑 | 类似 Phase 6 buildObserveRequest 模式 |
+| **D3**：notifyUser 通道？ | 可插拔 `Notifier` interface | dev 默认 `FeishuCardNotifier`（3 按钮 A/B/C），可扩展 `CLINotifier`/`EmailNotifier` |
+
+**EscapeAction 扩展**：在 doc 38 §21.3.3 5 类基础上新增 1 个中间态：
+
+```go
+const (
+    EscapeContinue      EscapeAction = iota  // 继续（未到上限）
+    EscalateToRule                            // 升级到规则强制
+    EscalateToHuman                           // 升级到人工接管
+    EscapeForceExit                           // 强制退出（带 ExitReason）
+    EscapeAbortWithAudit                      // 强制终止 + 完整审计
+    EscapePendingHuman                        // 中间态：等待用户响应（v5 dev 扩展）
+)
+```
+
+**EscapeDecision 扩展**：
+
+```go
+type EscapeDecision struct {
+    Action     EscapeAction
+    Reason     string
+    AuditLevel int       // 0=无审计, 1=记录, 2=完整审计
+    Depth      int       // 当前回路深度
+    PendingID  string    // 仅 EscapePendingHuman 时填充
+}
+```
+
+**HumanArbitrator 实现**：
+
+```go
+type HumanArbitrator struct {
+    timeout  time.Duration           // 默认 10s
+    notifier Notifier                 // 可插拔（FeishuCard/CLI/Email）
+    audit    *EscapeAuditLog
+    mu       sync.Mutex
+    pending  map[string]chan UserChoice  // pendingID → user input channel
+    resume   PendingResolutionStore   // session 状态（DB / Memory / 内存）
+}
+
+type UserChoice struct {
+    Value     string  // "A" | "B" | "C"
+    PendingID string
+    Timestamp time.Time
+}
+
+// Arbitrate 同步调用，立即返回
+func (a *HumanArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, decisions []EscapeDecision) EscapeDecision {
+    // 1. 注册 pending decision
+    pendingID := uuid.New().String()
+    userInputCh := make(chan UserChoice, 1)  // buffered=1 防 goroutine 泄漏
+    a.mu.Lock()
+    a.pending[pendingID] = userInputCh
+    a.mu.Unlock()
+    
+    // 2. 异步通知 user（不阻塞）
+    go a.notifier.Notify(loopCtx, pendingID, decisions)
+    
+    // 3. 启动 goroutine 等待 user 响应或 timeout
+    go a.waitForUserResponse(ctx, pendingID, userInputCh, loopCtx, decisions)
+    
+    // 4. 立即返回中间态（ProcessMessage 不阻塞）
+    return EscapeDecision{
+        Action:     EscapePendingHuman,
+        Reason:     "human_review_required",
+        PendingID:  pendingID,
+        AuditLevel: 1,
+    }
+}
+
+func (a *HumanArbitrator) waitForUserResponse(ctx context.Context, pendingID string, ch chan UserChoice, loopCtx LoopContext, decisions []EscapeDecision) {
+    timer := time.NewTimer(a.timeout)
+    defer timer.Stop()
+    defer a.cleanupPending(pendingID)
+    
+    var finalDecision EscapeDecision
+    select {
+    case choice := <-ch:
+        // 路径 1: user 提前响应
+        finalDecision = mapToEscapeDecision(choice.Value, loopCtx)
+    case <-timer.C:
+        // 路径 2: 10s timeout 兜底
+        finalDecision = EscapeDecision{
+            Action:     EscapeForceExit,
+            Reason:     "human_timeout_10s",
+            AuditLevel: 2,
+        }
+    case <-ctx.Done():
+        // 路径 3: ctx 取消（ProcessMessage 客户端断开）
+        finalDecision = EscapeDecision{
+            Action:     EscapeForceExit,
+            Reason:     "ctx_cancelled",
+            AuditLevel: 2,
+        }
+    }
+    
+    // 持久化 decision（下次 ProcessMessage 续跑）
+    a.audit.Record(loopCtx, decisions, finalDecision)
+    a.resume.Save(loopCtx.SessionID, finalDecision)
+}
+
+// SubmitUserChoice：user 响应入口（feishu 按钮 callback / CLI handler 调用）
+func (a *HumanArbitrator) SubmitUserChoice(pendingID string, choice UserChoice) {
+    a.mu.Lock()
+    ch, ok := a.pending[pendingID]
+    a.mu.Unlock()
+    if !ok {
+        return  // expired 或不存在，丢弃
+    }
+    select {
+    case ch <- choice:  // non-blocking（buffered=1）
+    default:
+        // pending 已被 consume，丢弃
+    }
+}
+
+func mapToEscapeDecision(value string, loopCtx LoopContext) EscapeDecision {
+    switch value {
+    case "A":
+        return EscapeDecision{Action: EscapeContinue, Reason: "user_continue", AuditLevel: 1}
+    case "B":
+        return EscapeDecision{Action: EscapeForceExit, Reason: "user_accept", AuditLevel: 1}
+    case "C":
+        return EscapeDecision{Action: EscapeAbortWithAudit, Reason: "user_cancel", AuditLevel: 2}
+    default:
+        return EscapeDecision{Action: EscapeForceExit, Reason: "user_invalid_choice", AuditLevel: 2}
+    }
+}
+```
+
+**Notifier 接口**（可插拔）：
+
+```go
+type Notifier interface {
+    Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error
+}
+
+// dev 默认实现：飞书卡片 + 3 按钮 A/B/C
+type FeishuCardNotifier struct {
+    cardClient FeishuCardClient
+    userID     string
+}
+
+func (n *FeishuCardNotifier) Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error {
+    card := FeishuCard{
+        Title: "🔧 回路需要人工接管",
+        Body:  buildHumanReviewBody(loopCtx, decisions),
+        Buttons: []FeishuButton{
+            {Label: "A. 继续尝试", Value: "A", PendingID: pendingID},
+            {Label: "B. 接受当前", Value: "B", PendingID: pendingID},
+            {Label: "C. 取消",     Value: "C", PendingID: pendingID},
+        },
+        ExpiresAt: time.Now().Add(10 * time.Second),
+    }
+    return n.cardClient.UpdateCard(n.userID, card)
+}
+```
+
+**PendingResolutionStore 接口**（续跑）：
+
+```go
+type PendingResolutionStore interface {
+    Save(sessionID string, decision EscapeDecision) error
+    Load(sessionID string) (EscapeDecision, bool, error)  // found
+    Delete(sessionID string) error
+}
+
+// dev 默认：内存实现（可替换为 DB / Redis）
+type InMemoryPendingResolutionStore struct {
+    mu   sync.RWMutex
+    data map[string]EscapeDecision
+}
+```
+
+### 5.3.2 完整决策流程（含 Human 异步）
+
+```
+[T1] ProcessMessage 触发
+  └─ Observe → Plan → Execute → Verify → FAIL
+       └─ EscapeEngine.Evaluate(ctx)
+            ├─ tracker.ShouldContinue → Continue
+            ├─ loopBudget.Evaluate → Continue
+            ├─ circuitBreaker.Evaluate → Continue
+            └─ 全部 Continue → EscapeContinue → 继续回路
+
+[T1.5] ProcessMessage 触发
+  └─ Observe → Plan → Execute → Verify → FAIL (4 回路已尽)
+       └─ EscapeEngine.Evaluate(ctx)
+            ├─ tracker.ShouldContinue → ForceExit (loop_depth_exceeded)
+            ├─ 决策非空 → ChainedArbitrator.Arbitrate
+            │    ├─ LLMArbitrator (5s)
+            │    │    ├─ LLM 选 Continue → EscapeContinue
+            │    │    └─ LLM 选 Exit / timeout → 下层
+            │    ├─ RuleArbitrator
+            │    │    ├─ 不可恢复 → AbortWithAudit (AuditLevel=2)
+            │    │    └─ 可恢复 → 下层
+            │    └─ HumanArbitrator
+            │         ├─ 注册 pendingID + 异步通知 feishu 卡片
+            │         ├─ 启动 10s timer goroutine
+            │         └─ 立即返回 EscapePendingHuman (ProcessMessage 同步返回)
+            │
+            └─ ProcessMessage 立即返回（飞书卡片显示"已升级到人工"）
+
+[后台] goroutine 等待：
+  ├─ 路径 1: feishu 按钮 callback → SubmitUserChoice → 收到 choice
+  │    └─ mapToEscapeDecision → 写 audit + session 状态
+  ├─ 路径 2: 10s timeout
+  │    └─ EscapeForceExit + AuditLevel=2 + 写 session 状态
+  └─ 路径 3: ProcessMessage 客户端断开
+       └─ EscapeForceExit + AuditLevel=2 + 写 session 状态
+
+[T2] user 下次 ProcessMessage 进入
+  └─ resume.Load(sessionID) → 命中
+       ├─ user_choice=A → 继续回路（重跑 Plan → Execute → Verify）
+       ├─ user_choice=B → ForceExit（已 ForceExit，无新动作）
+       └─ user_choice=C → AbortWithAudit（已终止）
+```
+
+### 5.3.3 4 类边界场景兜底
+
+| 场景 | 行为 | 兜底机制 |
+|------|------|---------|
+| 10s 内 user 点 A/B/C | 应用 user choice | 正常路径 |
+| 10s 内 user 不响应 | EscapeForceExit + AuditLevel=2 | 10s timer 兜底 |
+| ProcessMessage 客户端断开 | EscapeForceExit + AuditLevel=2 | ctx.Done() 兜底 |
+| user 响应但 pendingID 已 timeout/cleanup | SubmitUserChoice 丢弃（map 已 cleanup）| map cleanup 兜底 |
+| LLMArbitrator 自身 panic | recover + ForceExit | 失败降级（同 Phase 7 模式）|
+| Notifier 发送失败 | 降级为 CLI prompt（terminal 用户）| Notifier 链式 fallback |
 
 ## 6. 5 节点接线
 
