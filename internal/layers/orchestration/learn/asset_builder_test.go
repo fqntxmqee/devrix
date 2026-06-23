@@ -288,13 +288,43 @@ func TestAssetBuilder_EmptySessionID_FailFast(t *testing.T) {
 
 func TestAssetBuilder_SOPMissingSteps_ReturnsNil(t *testing.T) {
 	b := NewAssetBuilder()
-	// Pass verdict with no Plan and no Artifact → no steps → builder returns nil.
-	req := makeReq(t, types.VerdictPass, "sess_1", "v_pass", "")
+	// Pass verdict with no Plan, no Artifact, AND empty SourceID → no name
+	// (no Plan → no plan: name, no Artifact → no summary: name, no SourceID
+	// → no autoclose: name) → builder returns nil.
+	// (Phase 7 PR-7.1: with a non-empty SourceID, the Auto-Close fallback
+	//  kicks in and produces a storable SOP. See TestAssetBuilder_AutoCloseFallback.)
+	req := makeReq(t, types.VerdictPass, "sess_1", "", "")
 	asset, err := b.Build(context.Background(), req, LearningClass(types.LearningSOP))
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if asset != nil {
-		t.Error("SOP without Plan or Artifact should return nil (signals ErrAssetBuildFailed)")
+		t.Error("SOP without Plan/Artifact/SourceID should return nil (signals ErrAssetBuildFailed)")
+	}
+}
+
+// TestAssetBuilder_AutoCloseFallback verifies Phase 7 PR-7.1 (D7-S13-A47-T02):
+// when a VerdictPass comes through processAutoClose (no Plan, no Artifact, but
+// SourceID is set), the AssetBuilder falls back to the autoclose: name +
+// synthetic step so the Learn deposit completes end-to-end.
+func TestAssetBuilder_AutoCloseFallback(t *testing.T) {
+	b := NewAssetBuilder()
+	req := makeReq(t, types.VerdictPass, "sess_ac", "autoclose:sess_ac:12345", "process complete")
+	asset, err := b.Build(context.Background(), req, LearningClass(types.LearningSOP))
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if asset == nil {
+		t.Fatal("Auto-Close fallback should produce a non-nil asset when SourceID is set")
+	}
+	sop, ok := asset.Content.(*SOPAssetContent)
+	if !ok {
+		t.Fatalf("Content type = %T, want *SOPAssetContent", asset.Content)
+	}
+	if !strings.HasPrefix(sop.Name, "sop:autoclose:") {
+		t.Errorf("Name = %q, want prefix sop:autoclose:", sop.Name)
+	}
+	if len(sop.Steps) != 1 || sop.Steps[0] != "autoclose-completion" {
+		t.Errorf("Steps = %v, want [autoclose-completion]", sop.Steps)
 	}
 }

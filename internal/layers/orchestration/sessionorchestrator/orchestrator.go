@@ -398,7 +398,14 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	if sessionSpan != nil {
 		sessionSpan.SetStatus(tracer.StatusCodeOk, "")
 	}
-	return endSpanWhenChannelClosed(ch, sessionSpan), nil
+	// Phase 7 PR-7.1 (D7-S13-A47-T01/T02): processAutoClose wraps the
+	// path-returned channel so that, after the channel closes, the last
+	// EngineEvent.Type is synthesized into a Verdict and learner.Learn is
+	// called asynchronously. This closes the LP-1 loop in production
+	// without requiring tests to manually invoke Learn. When o.learner is
+	// nil, processAutoClose falls through to endSpanWhenChannelClosed (the
+	// v1.0 behavior, unchanged).
+	return o.processAutoClose(ch, sessionCtx, sessionSpan, req.SessionID, intent), nil
 }
 
 // callAdvisoryValidator invokes the optional advisory validator, times
