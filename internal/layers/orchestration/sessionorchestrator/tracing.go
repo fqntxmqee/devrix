@@ -1,13 +1,14 @@
 package sessionorchestrator
 
 import (
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"context"
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -74,6 +75,47 @@ func intentClassifyAttrs(intent orchtypes.IntentClassification, source string) [
 		attrs = append(attrs, tracer.Attribute{Key: "orchestration.command", Value: intent.Command})
 	}
 	return attrs
+}
+
+// priorSessionSpanAttrs returns the 5 prior-related attributes that
+// ProcessMessage writes onto the sessionSpan for D5 observability
+// (Phase 7 PR-7.3, D7-S13-A49-T06). The 6th attribute
+// (learn.classifier_source) is set after the classify path resolves and
+// is not part of this helper because it depends on whether the shadow
+// classifier is wired.
+//
+//	alpha         — string (e.g. "8")
+//	beta          — string (e.g. "1")
+//	mean          — string formatted to 3 decimals (e.g. "0.889")
+//	track_mode    — "developer" / "operator"
+//	injected_at   — "phase6_lp1" (real injection) or
+//	                "cold_start_failsafe" (no prior was injected)
+//
+// TrackMode resolution (3-tier policy):
+//  1. prior.Reputation != nil && prior.Reputation.TrackMode != "" → use rep
+//  2. req.TrackMode != ""                                         → use hint
+//  3. else                                                        → "developer"
+func priorSessionSpanAttrs(prior *learn.AdaptivePrior, observeReq orchtypes.ObserveRequest, req orchtypes.ProcessRequest) []tracer.Attribute {
+	if prior == nil {
+		return nil
+	}
+	priorInjectedAt := "cold_start_failsafe"
+	if observeReq.Prior != nil {
+		priorInjectedAt = "phase6_lp1"
+	}
+	priorTrackMode := string(learn.TrackModeDeveloper)
+	if prior.Reputation != nil && prior.Reputation.TrackMode != "" {
+		priorTrackMode = string(prior.Reputation.TrackMode)
+	} else if req.TrackMode != "" {
+		priorTrackMode = req.TrackMode
+	}
+	return []tracer.Attribute{
+		{Key: "learn.prior.alpha", Value: fmt.Sprintf("%d", prior.PriorBeta.Alpha)},
+		{Key: "learn.prior.beta", Value: fmt.Sprintf("%d", prior.PriorBeta.Beta)},
+		{Key: "learn.prior.mean", Value: fmt.Sprintf("%.3f", prior.PriorBeta.Mean())},
+		{Key: "learn.prior.track_mode", Value: priorTrackMode},
+		{Key: "learn.prior.injected_at", Value: priorInjectedAt},
+	}
 }
 
 func endSpan(span tracer.Span) {
