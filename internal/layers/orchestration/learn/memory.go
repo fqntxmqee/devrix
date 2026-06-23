@@ -328,15 +328,30 @@ func (m *ScheduledMemory) List(ctx context.Context, filter MemoryFilter) ([]*Lea
 	return filterAssets(asMap, filter), nil
 }
 
-// ListDue returns retry envelopes whose TriggerAt ≤ now. Used by
-// ScheduledTick (PR-E5 E5.3).
+// ListDue returns deep copies of retry envelopes whose TriggerAt ≤ now.
+// Used by ScheduledTick (PR-E5 E5.3).
+//
+// Copies are returned (not references) so callers can mutate the
+// envelopes (RetryCount++, TriggerAt update) without holding the
+// ScheduledMemory lock for the entire Learn/Escalate write path. The
+// caller is responsible for re-applying mutations via Delete (escalate)
+// or by computing the new TriggerAt and re-Storing the asset with
+// updated PendingAssetContent.NextRetryAt (re-queue). The wrapper
+// (DefaultLearner.ScheduledTick) is the only production caller and
+// handles this contract.
 func (m *ScheduledMemory) ListDue(now time.Time) []*ScheduledRetry {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	out := make([]*ScheduledRetry, 0)
 	for _, v := range m.store {
 		if !v.TriggerAt.After(now) {
-			out = append(out, v)
+			out = append(out, &ScheduledRetry{
+				Asset:       v.Asset,
+				TriggerAt:   v.TriggerAt,
+				RetryCount:  v.RetryCount,
+				MaxRetries:  v.MaxRetries,
+				LastRetryAt: v.LastRetryAt,
+			})
 		}
 	}
 	return out

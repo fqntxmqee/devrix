@@ -52,6 +52,19 @@ var (
 	// ErrChannelToolRunnerNil: Channel constructed without a ToolRunner.
 	// Indicates a constructor bug at wiring time.
 	ErrChannelToolRunnerNil = errors.New("execute: tool runner is nil")
+
+	// ErrChannelStepInvalid: a Step's fields are invalid for its channel
+	// (e.g. CommitChannel with empty ToolName, missing IdempotencyKey on a
+	// side-effecting step). Distinct from ErrChannelStepCountMismatch
+	// which covers cardinality violations — these are per-step field
+	// violations that warrant their own triage code.
+	ErrChannelStepInvalid = errors.New("execute: plan step has invalid field")
+
+	// ErrChannelToolCallTimedOut: the tool call hit the channel's
+	// timeout. Distinct from ErrChannelStepInvalid so callers can route
+	// inflight side effects to StrategyAskNow (PR-C3) without confusing
+	// them with malformed-Plan errors.
+	ErrChannelToolCallTimedOut = errors.New("execute: tool call timed out")
 )
 
 // -----------------------------------------------------------------------------
@@ -94,5 +107,26 @@ func NewChannelToolRunnerNilError(channelName string) *sharederrors.SentinelErro
 		"EXEC_CHANNEL_9004",
 		fmt.Sprintf("execute: channel=%s constructed without a ToolRunner", channelName),
 		fmt.Errorf("%w: channel=%s", ErrChannelToolRunnerNil, channelName),
+	)
+}
+
+// NewChannelStepInvalidError returns a SentinelError for per-step field
+// violations (empty ToolName, missing IdempotencyKey, etc.).
+func NewChannelStepInvalidError(channelName, toolName, reason string) *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"EXEC_CHANNEL_9005",
+		fmt.Sprintf("execute: channel=%s step (tool=%s) invalid: %s", channelName, toolName, reason),
+		fmt.Errorf("%w: channel=%s tool=%s: %s", ErrChannelStepInvalid, channelName, toolName, reason),
+	)
+}
+
+// NewChannelToolCallTimedOutError returns a SentinelError when the tool
+// call hit the channel's timeout. The StrategyDecider (PR-C3) routes
+// these to StrategyAskNow because the side effect may have committed.
+func NewChannelToolCallTimedOutError(channelName, toolName string) *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"EXEC_CHANNEL_9006",
+		fmt.Sprintf("execute: channel=%s tool=%s call timed out (side-effect status uncertain)", channelName, toolName),
+		fmt.Errorf("%w: channel=%s tool=%s", ErrChannelToolCallTimedOut, channelName, toolName),
 	)
 }

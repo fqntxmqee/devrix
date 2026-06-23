@@ -124,7 +124,7 @@ func (p *Plan) ValidateWithOpts(opts ValidateOpts) error {
 			ErrPlanStrengthOutOfRange,
 		)
 	}
-	if p.BlastRadius.PersistScope != "" && !p.BlastRadius.PersistScope.Valid() {
+	if !p.BlastRadius.PersistScope.Valid() {
 		return sharederrors.WithCode(
 			"PLAN_PERSIST_8012",
 			fmt.Sprintf("plan: PersistScope=%q is not one of transient/session/permanent", p.BlastRadius.PersistScope),

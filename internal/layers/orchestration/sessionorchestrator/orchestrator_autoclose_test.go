@@ -340,6 +340,17 @@ func TestProcessMessage_Verify2Learn_AutoClose_PassAlpha(t *testing.T) {
 	}
 	for range ch2 {
 	}
+	// Wait briefly for the Round 2 async Learn call to land.
+	deadline2 := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline2) {
+		fl.mu.Lock()
+		calls := fl.learningCalls
+		fl.mu.Unlock()
+		if calls >= 2 {
+			break
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
 	fl.mu.Lock()
 	round2Calls := fl.learningCalls
 	fl.mu.Unlock()

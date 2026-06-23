@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/learn"
@@ -37,9 +38,19 @@ import (
 // result to learn from, and no terminal EngineEvent to synthesize a Verdict
 // from.
 //
-// Span lifecycle is preserved: the inner endSpanWhenChannelClosed is the
-// canonical span-closing hook. processAutoClose only adds a post-close
-// Verdict-synthesis + Learn side effect.
+// Non-blocking guarantee: the channel returned to ProcessMessage's caller is
+// closed as soon as the last event has been forwarded — Learn runs in a
+// SEPARATE goroutine after close(out), so a slow Learn does not delay the
+// caller from observing the channel close. Span.End() fires when the proxy
+// channel drains (via endSpanWhenChannelClosed), which happens after close(out)
+// and therefore before Learn completes. This is intentional: the sessionSpan
+// tracks ProcessMessage lifecycle (the user-visible response stream), not
+// Learn (a background LP-1 close-loop side effect).
+//
+// Double-End guard: span.End is wrapped in sync.Once so a caller that
+// misuses processAutoClose (e.g. by calling it twice with the same span)
+// cannot double-end the span. The strict tracer implementations panic on
+// double End; sync.Once is cheaper than relying on tracer-level idempotency.
 func (o *SessionOrchestrator) processAutoClose(
 	ch <-chan *contracts.EngineEvent,
 	sessionCtx context.Context,
@@ -53,15 +64,17 @@ func (o *SessionOrchestrator) processAutoClose(
 	}
 	out := make(chan *contracts.EngineEvent, 32)
 	go func() {
-		defer close(out)
 		var lastEvent *contracts.EngineEvent
 		for ev := range ch {
 			lastEvent = ev
 			out <- ev
 		}
-		// Channel closed. Real-span close is delegated to endSpanWhenChannelClosed
-		// wrapping `out` below; here we only handle the Auto-Close side effect.
-		//
+		// Close out BEFORE calling Learn so the consumer sees the channel
+		// close immediately and the span.End() (in endSpanWhenChannelClosed)
+		// fires promptly. Learn runs in a separate goroutine after close
+		// so it cannot block the caller.
+		close(out)
+
 		// Layer 2: empty channel or context cancellation → no Verdict, skip Learn.
 		if lastEvent == nil {
 			slog.Warn("orchestrator: processAutoClose skipped (empty channel, likely skip path or context cancel)",
@@ -82,18 +95,48 @@ func (o *SessionOrchestrator) processAutoClose(
 			SessionID: sessionID,
 			Verdict:   *verdict,
 		}
-		// Layer 3: Learn error → log + skip, caller unaffected.
-		if _, err := o.learner.Learn(sessionCtx, req); err != nil {
-			slog.Warn("orchestrator: processAutoClose learner.Learn failed",
-				"session_id", sessionID,
-				"verdict_kind", verdict.Kind,
-				"verdict_reason", verdict.Reason,
-				"err", err)
-		}
+		// Run Learn in its own goroutine so the channel close above is not
+		// blocked on Learn's lifetime. Use a fresh context (Background
+		// derived with a sane timeout) because sessionCtx may be cancelled
+		// by the time we get here (e.g. ProcessMessage returned, the
+		// caller hung up). Learn must still complete to keep Reputation
+		// state consistent.
+		go func() {
+			learnCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if _, err := o.learner.Learn(learnCtx, req); err != nil {
+				// Layer 3: Learn error → log + skip, caller unaffected.
+				slog.Warn("orchestrator: processAutoClose learner.Learn failed",
+					"session_id", sessionID,
+					"verdict_kind", verdict.Kind,
+					"verdict_reason", verdict.Reason,
+					"err", err)
+			}
+		}()
 	}()
 	// Wrap out with the real span closer so span lifecycle is identical to v1.0
 	// endSpanWhenChannelClosed behavior (End fires when the proxy channel drains).
-	return endSpanWhenChannelClosed(out, sessionSpan)
+	return endSpanWithOnce(out, sessionSpan)
+}
+
+// endSpanWithOnce is endSpanWhenChannelClosed with a sync.Once guard
+// around span.End. This protects against double-end if processAutoClose
+// is called twice with the same span (e.g. a misuse pattern that some
+// strict tracer implementations flag with a panic).
+func endSpanWithOnce(ch <-chan *contracts.EngineEvent, span tracer.Span) <-chan *contracts.EngineEvent {
+	if span == nil {
+		return ch
+	}
+	out := make(chan *contracts.EngineEvent, 32)
+	var endOnce sync.Once
+	go func() {
+		defer endOnce.Do(func() { span.End() })
+		defer close(out)
+		for ev := range ch {
+			out <- ev
+		}
+	}()
+	return out
 }
 
 // synthesizeVerdict maps the last EngineEvent.Type to a workmodel.Verdict for
