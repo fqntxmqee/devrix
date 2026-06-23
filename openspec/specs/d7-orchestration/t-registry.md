@@ -1,13 +1,13 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.9.0
+**Version:** 3.10.0
 **Last Updated:** 2026-06-23
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
 **Complements:** `terminal-state-guide.md` · `observability-guide.md`
-**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74. **2026-06-20-devrix-error-handling-tier1-tier2** (DM-20260620-003) — error handling PR-A/PR-B/PR-C: invariant migration to shared/errors (D7-S2-A06-T24), task_manager.Create signature (`(*Task, error)`) (D7-S1-A02-T18), orchestrator.emitError sanitize+code (D7-S2-A02-T18), subagent stream sentinels (D7-S2-A06-T25/T26), retry nil-sentinel (D7-S2-A06-T27), resolveDelegateTaskID `(string, error)` (D7-S1-T19); IMPLEMENTED 109→116, P0 80→83. **2026-06-21-devrix-d7-error-aggregation-and-metrics** (DM-20260621-010) — D7 编排层错误聚合 + worktree 全链路 metrics: interrupt errors.Join aggregation (D7-S6-A11-T01/T02/T03), sandbox cleanup observability (D7-S6-A12-T04/T05/T06), forker errors.Join + 13 callers backward compat (D7-S6-A13-T07); IMPLEMENTED 116→123, P0 83→90. **2026-06-22-devrix-d7-metrics-and-concurrency-hardening** (DM-20260622-001) — D7 编排层 metric 命名 spec/code 对齐 + 并发硬化: dispatch_loop_wakeups / worker_panics 复数化 (D7-S6-A14-T01/T02), sandbox_exit_failed 跨域归属 D4 (D7-S6-A14-T03, D7-S6-A12-T01 OBSOLETE), state.cancels + state.handles markWaveDone 清空 (D7-S6-A14-T04), ConflictGuard hot path AllowAndRegister 原子调用 (D7-S6-A14-T05), CommandHandler emit select-default 防阻塞 (D7-S6-A14-T06); IMPLEMENTED 123→129, P0 90→96. **2026-06-23-devrix-d7-mups-v4-phase3-execute** (DM-20260625-001) — Phase 3 PR-C1 (最小风险入口): ArtifactKind 4 类枚举 (D7-S9-A25-T01), SideEffectStatus 5 态 + IsTerminal/NeedsAttention (D7-S9-A25-T02), wavescheduler.Artifact +5 字段 omitempty 向后兼容 (D7-S9-A25-T03), 跨域类型上提 shared/types 打破 import cycle (D7-S9-A25-T04); IMPLEMENTED 129→133, P0 96→100.
+**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74. **2026-06-20-devrix-error-handling-tier1-tier2** (DM-20260620-003) — error handling PR-A/PR-B/PR-C: invariant migration to shared/errors (D7-S2-A06-T24), task_manager.Create signature (`(*Task, error)`) (D7-S1-A02-T18), orchestrator.emitError sanitize+code (D7-S2-A02-T18), subagent stream sentinels (D7-S2-A06-T25/T26), retry nil-sentinel (D7-S2-A06-T27), resolveDelegateTaskID `(string, error)` (D7-S1-T19); IMPLEMENTED 109→116, P0 80→83. **2026-06-21-devrix-d7-error-aggregation-and-metrics** (DM-20260621-010) — D7 编排层错误聚合 + worktree 全链路 metrics: interrupt errors.Join aggregation (D7-S6-A11-T01/T02/T03), sandbox cleanup observability (D7-S6-A12-T04/T05/T06), forker errors.Join + 13 callers backward compat (D7-S6-A13-T07); IMPLEMENTED 116→123, P0 83→90. **2026-06-22-devrix-d7-metrics-and-concurrency-hardening** (DM-20260622-001) — D7 编排层 metric 命名 spec/code 对齐 + 并发硬化: dispatch_loop_wakeups / worker_panics 复数化 (D7-S6-A14-T01/T02), sandbox_exit_failed 跨域归属 D4 (D7-S6-A14-T03, D7-S6-A12-T01 OBSOLETE), state.cancels + state.handles markWaveDone 清空 (D7-S6-A14-T04), ConflictGuard hot path AllowAndRegister 原子调用 (D7-S6-A14-T05), CommandHandler emit select-default 防阻塞 (D7-S6-A14-T06); IMPLEMENTED 123→129, P0 90→96. **2026-06-23-devrix-d7-mups-v4-phase3-execute** (DM-20260625-001) — Phase 3 PR-C1 (最小风险入口): ArtifactKind 4 类枚举 (D7-S9-A25-T01), SideEffectStatus 5 态 + IsTerminal/NeedsAttention (D7-S9-A25-T02), wavescheduler.Artifact +5 字段 omitempty 向后兼容 (D7-S9-A25-T03), 跨域类型上提 shared/types 打破 import cycle (D7-S9-A25-T04); IMPLEMENTED 129→133, P0 96→100. **2026-06-23-devrix-d7-mups-v4-phase2-observe-plan** (DM-20260623-001) — Phase 2 PR-A1 + PR-RF (A15 模块): Observation 4 类 × 2 Category + sealed Payload (D7-S8-A15-T01), UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness + defaults half (D7-S8-A15-T02), UncertaintyCoord Phase 2 扩展 + FromVerifier fail-fast (D7-S8-A15-T03), UncertaintyReport Partition 不变式 (D7-S8-A15-T04), FilterByKind 遍历全集 (D7-S8-A15-T05), Observation 不可变 + clamp01Float + validateFact fmt.Errorf wrap (D7-S8-A15-T06); IMPLEMENTED 133→139, P0 100→106。
 
 ---
 
@@ -172,6 +172,25 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S9-A25-T04** | **跨域类型上提 shared/types 打破 import cycle（orchtypes.SideEffectStatus 改为 type alias = types.SideEffectStatus，与 UncertaintyCoord 共享同一定义）+ shared/types → orchtypes 单向依赖无 cycle** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_ReusesUncertaintyCoordType` + `internal/lint/layer` PASS + `go test -race ./internal/...` 19/19 PASS** | **IMPLEMENTED** | **P0** |
 
 > 配套 P0 验证：`internal/shared/types/execute.go` 包内独立测试覆盖（`TestArtifactKind_4Types_String` + `TestSideEffectStatus_5States_String` 在新包内 PASS，验证上提后无 cycle）；`go vet ./...` 0 issue；19/19 internal packages `go test -race` 0 race warnings；orchtypes 包覆盖率 72.2%（与 Phase 2 baseline 持平）。
+
+---
+
+## D7-S8: Observe Node (MUPS v4.3 Phase 2)
+
+> **v3.10 closure (2026-06-23):** devrix-d7-mups-v4-phase2-observe-plan (DM-20260623-001) — Phase 2 PR-A1 + PR-RF（A15 模块）：Observation 4 类 × 2 Category + sealed Payload + UncertaintyReport Partition 不变式 + UncertaintyCoord Phase 2 扩展 + PR-RF 5 项 review fix（C1 IntentKind enum + C3 FromVerifier fail-fast + W2 fmt.Errorf wrap + W3 clamp01Float 合并 + W6/I8 Partition clamp 末尾）。IMPLEMENTED 133→139，P0 100→106。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase2-observe-plan/specs/d7-orchestration/spec.md` §D7-S8-A15。
+
+### D7-S8-A15: Observation + UncertaintyReport (PR-A1 + PR-RF)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D7-S8-A15-T01** | **Observation 4 类（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）× 2 Category（CatBusiness/CatSystem）+ sealed Payload interface（4 concrete types: FactPayload/SignalPayload/DeviationPayload/UncertaintyPayload）+ 不可变（WithKind/WithStrength 返回新副本）+ Strength ∈ [0,1] 边界保护（clamp01Float panic on out-of-range）+ DetectedAt 非零 + MarshalJSON wire format 嵌套对象 + JSON roundtrip** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{4Kinds_4Categories,Immutability,Payload_TypeAssertion,Validate_StrengthOutOfRange,Validate_DetectedAtZero,JSON_Roundtrip,WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError,MarshalJSON_WireFormat,Clamp01Float_NaN_Fallback}`（12 functions / 13 subtests）** | **IMPLEMENTED** | **P0** |
+| **D7-S8-A15-T02** | **UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness Observations（不包含 CatSystem 避免系统异常污染整体 Strength）+ CatBusiness 为空时 defaults 0.5（避免 NaN via clamp01Float NaN 兜底）** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{ComputeOverallStrength_BusinessOnly,ComputeOverallStrength_EmptyBusiness_DefaultsHalf,ComputeOverallStrength_IgnoresCatSystem,Overall_NaN_Fallback}`（4 functions）** | **IMPLEMENTED** | **P0** |
+| **D7-S8-A15-T03** | **UncertaintyCoord Phase 2 增量扩展：FromVerifier 工厂方法（verdict/confidence/reason → Coord，含 Source: SourceVerifier）+ IsColdStart + Equal + With* + Phase 1 JSON wire format 向后兼容（FromVerifier=false + SideEffectStatus="" 零值，MarshalJSON 用 omitempty）+ 未知 verdict 失败兜底 + FromVerifier fail-fast (ORCH_COORD_VERDICT_7004 错误码 + sharederrors.WithCode)** | **D7-S8-A15** | **`orchtypes/uncertainty_coord_test.go::TestUncertaintyCoord_{FromVerifier_SetsFromVerifierTrue,FromVerifier_SourceIsVerifier,JSON_Phase1_Compatibility,JSON_Omitempty_NewFields,FromVerifier_UnknownKind}` + 4 既有 baseline test PASS** | **IMPLEMENTED** | **P0** |
+| **D7-S8-A15-T04** | **UncertaintyReport Partition 不变式强制保证（CatBusiness ∪ CatSystem == Observations）+ 违反不变式返回 ErrUncertaintyReportPartitionInvariant + 空 Observations 边界（Partition invariant holds vacuously）+ CatBusiness/CatSystem disjoint 不变式** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{PartitionInvariant_BusinessUnionSystemEqualsObservations,PartitionInvariant_Violation_ReturnsError,PartitionInvariant_EmptyObservations}`（3 functions）** | **IMPLEMENTED** | **P0** |
+| **D7-S8-A15-T05** | **UncertaintyReport FilterByKind 故意遍历全集（不限 Category，跨 CatBusiness/CatSystem 都返回）+ 返回所有指定 Kind 的 Observation + 空输入返回空切片 + ALL kind 返回全集** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{FilterByKind_IncludesCatSystem,FilterByKind_Empty,FilterByKind_AllObservations}`（3 functions）** | **IMPLEMENTED** | **P0** |
+| **D7-S8-A15-T06** | **Observation 不可变（WithKind 返回新副本，原实例未修改）+ Strength ∈ [0,1] panic on out-of-range + validateFact FailureCriteria 包装 fmt.Errorf（"orchtypes: FactPayload.Statement empty: %w", ErrObservationPayloadInvalid）+ UnmarshalJSON graceful degrade（forward-compat 字段缺失不回 error）** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError}`（4 functions）** | **IMPLEMENTED** | **P0** |
+
+> 配套 P0 验证：`internal/layers/orchestration/orchtypes/` 包内 23 baseline + 6 新增测试函数 + 33 subtests 100% PASS；`go vet ./...` 0 issue；orchtypes 包 `go test -race` 0 race warnings；覆盖率 72.2%（持平 PR-A1 baseline）。Phase 1 调用方零修改（Phase 1 UncertaintyCoord 字段 + JSON wire format 保持）；Phase 2 后续 PR-A2 (IntentQuantizer) / PR-A3 (AnomalyDetector) / PR-A4 (ObserveNode wiring) / PR-B1 (Plan 4 类) / PR-B2 (Plan.Validate) / PR-B3 (DefaultPlanner) 作为独立 OpenSpec change 推进（D7-S8-A19/A20/A21/A22/A23/A24 模块 PLANNED）。
 
 ---
 
@@ -388,7 +407,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 133 | 133 | 0 | 0 | 100 |
+| 139 | 139 | 0 | 0 | 106 |
 
 ### 按 Scenario
 
@@ -400,6 +419,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S4 | 9 | 9 | 0 |
 | D7-S5 | 28 | 28 | 0 |
 | **D7-S6** | **7** | **7** | **0** |
+| **D7-S8** | **6** | **6** | **0** |
 | **D7-S9** | **4** | **4** | **0** |
 | 契约/迁移 | 8 | 8 | 0 |
 
@@ -445,4 +465,5 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.9.0** | **2026-06-21** | **devrix-d7-error-aggregation-and-metrics (DM-20260621-010) 归档**：D7-S6-A11 +3 T 点（interrupt errors.Join aggregation T01/T02/T03）+ D7-S6-A12 +3 T 点（sandbox cleanup observability T04/T05/T06）+ D7-S6-A13 +1 T 点（forker errors.Join + 13 callers backward compat T07）。IMPLEMENTED 116→123, P0 83→90。 |
 | **3.9.0** | **2026-06-22** | **devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) 归档**：D7-S6-A14 +6 T 点（T01 dispatch_loop_wakeups + T02 worker_panics + T03 sandbox_exit_failed OBSOLETE + T04 state.cancels/handles bound + T05 AllowAndRegister hot path + T06 select-default）。IMPLEMENTED 123→129, P0 90→96。 |
 | **3.9.0** | **2026-06-23** | **devrix-d7-mups-v4-phase3-execute (DM-20260625-001) Phase 3 PR-C1 归档**：D7-S9-A25 +4 T 点（T01 ArtifactKind 4 类枚举 + T02 SideEffectStatus 5 态 + T03 wavescheduler.Artifact +5 字段 omitempty 向后兼容 + T04 跨域类型上提 shared/types 打破 import cycle）。IMPLEMENTED 129→133, P0 96→100。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/specs/d7-orchestration/spec.md` §D7-S9-A25。 |
+| **3.10.0** | **2026-06-23** | **devrix-d7-mups-v4-phase2-observe-plan (DM-20260623-001) Phase 2 PR-A1 + PR-RF 归档**：D7-S8-A15 +6 T 点（T01 Observation 4 类 + 2 Category + sealed Payload + 不可变 + Strength 边界 + JSON wire format + T02 UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness + defaults half + T03 UncertaintyCoord FromVerifier + IsColdStart + Phase 1 JSON 向后兼容 + 未知 verdict fail-fast + T04 UncertaintyReport Partition 不变式强制保证 + 违反 ErrUncertaintyReportPartitionInvariant + T05 UncertaintyReport FilterByKind 故意遍历全集 + T06 Observation 字段校验 + 不可变 + clamp01Float + validateFact fmt.Errorf wrap）。IMPLEMENTED 133→139, P0 100→106。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase2-observe-plan/specs/d7-orchestration/spec.md` §D7-S8-A15。 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |

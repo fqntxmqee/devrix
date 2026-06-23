@@ -3,7 +3,7 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.1.0
+**Version:** 4.2.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-23
 **Domain SoT:** `d7-domain.md`
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级), devrix-d7-mups-v4-phase2-observe-plan (2026-06-23, DM-20260623-001, Phase 2 PR-A1 + PR-RF: Observation 4 类 + UncertaintyReport + UncertaintyCoord)
 
 ---
 
@@ -100,6 +100,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | D7-S5 | Decision & Planning | PlanAgent 只读探索、规则+LLM 分类、SynthesizeTaskGraph、SelectExecutor | **IMPLEMENTED** | `decisionplanning/` + `workmodel/plan_*.go` |
 | **D7-S6** | **Error Aggregation & Metrics** | **HandleInterrupt errors.Join 聚合 + InterruptMetrics; sandbox cleanup observability (freefork + execute); WaveScheduler 4 新 metrics 字段; TaskManager panic counter** | **IMPLEMENTED** | `sessionorchestrator/{interrupt,metrics}.go` + `multiagent/provision/freefork/{forker,metrics}.go` + `multiagent/execute/{worker,metrics}.go` + `wavescheduler/scheduler.go` + `workmodel/task_manager{,_metrics}.go` |
 | **D7-S9** | **Execute Artifact Data Contract (PR-C1)** | **ArtifactKind 4 类枚举（StateChangeCert/ResponseRecord/ProbeReport/ExperimentData）+ SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）+ wavescheduler.Artifact +5 字段 omitempty 向后兼容 + 跨域类型上提 shared/types 打破 import cycle** | **IMPLEMENTED (PR-C1)** | `internal/shared/types/execute.go` + `orchtypes/artifact_kind_alias.go` + `wavescheduler/types.go` |
+| **D7-S8** | **Observation + UncertaintyReport (PR-A1 + PR-RF)** | **Observation 4 类（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）× 2 Category（CatBusiness/CatSystem）+ sealed Payload interface + UncertaintyReport Partition 不变式 + UncertaintyCoord Phase 2 扩展（FromVerifier/IsColdStart/Equal/With*）+ PR-RF 5 项 review fix（C1 IntentKind enum + C3 FromVerifier fail-fast + W2 fmt.Errorf wrap + W3 clamp01Float 合并 + W6/I8 Partition clamp 末尾）** | **IMPLEMENTED (PR-A1 + PR-RF, A15 模块)** | `internal/layers/orchestration/orchtypes/{observation,uncertainty_report,uncertainty_coord,errors}.go` |
 
 ---
 
@@ -271,6 +272,77 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 - THEN state transitions to `active`
 - AND PlanAgent runs in read-only mode
 - AND on completion state becomes `pending_approval`
+
+---
+
+### Requirement: D7-S8-A15 Observation + UncertaintyReport + UncertaintyCoord ✅ IMPLEMENTED
+
+MUPS v4.3 Phase 2 Observe 节点的首批落地（PR-A1 + PR-RF）。Observe 节点必须有统一的数据契约：Observation struct + 4 类 `ObservationKind`（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）× 2 类 `Category`（CatBusiness/CatSystem）+ sealed `Payload` interface + `UncertaintyReport` 聚合 + `UncertaintyCoord` 增量扩展。本 Requirement 不引入 ProcessMessage wiring（PR-A4 范围），仅落地数据契约层。
+
+**Priority:** P0
+**Package:** `internal/layers/orchestration/orchtypes/{observation,uncertainty_report,uncertainty_coord,errors}.go`
+**T:** D7-S8-A15-T01 … D7-S8-A15-T06
+**Design:** `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase2-observe-plan/`
+
+#### Scenario: Observation 4 类 × 2 Category + 不可变
+
+- GIVEN 定义 `ObservationKind{ObsFact, ObsSignal, ObsDeviation, ObsUncertainty}` 与 `Category{CatBusiness, CatSystem}`
+- WHEN 调用 `Observation.WithKind()` / `WithStrength()`
+- THEN 返回新 Observation 实例，原实例未被修改
+- AND 4 类 Kind 与 2 类 Category 正交（4×2 = 8 种组合，每种绑定 sealed Payload concrete type）
+- AND `Strength ∈ [0, 1]` 边界保护（越界 panic via `clamp01Float(v, onNaN)`）
+- AND `DetectedAt` 非零（零值 → `ErrObservationDetectedAtZero`）
+- AND `MarshalJSON` wire format 为嵌套对象 `{"id": ..., "kind": ..., "category": ..., "strength": ..., "detected_at": ..., "payload": {...}}`
+
+#### Scenario: UncertaintyReport Partition 不变式 + ComputeOverallStrength 仅遍历 CatBusiness
+
+- GIVEN 10 个 Observation（6 CatBusiness + 4 CatSystem）
+- WHEN 调用 `NewUncertaintyReport(observations)`
+- THEN `report.BusinessObservations` 含 6 个，`report.SystemObservations` 含 4 个
+- AND 6 + 4 == `len(report.Observations)` == 10
+- AND 不变式被破坏时返回 `ErrUncertaintyReportPartitionInvariant`
+- AND `report.ComputeOverallStrength()` 仅遍历 `BusinessObservations`，返回 avg(CatBusiness.Strength)
+- AND CatBusiness 为空时 defaults 0.5（避免 NaN）
+
+#### Scenario: UncertaintyCoord Phase 2 扩展（FromVerifier + Phase 1 兼容）
+
+- GIVEN `VerdictKind=Pass, Confidence=0.9, Reason="ok"`
+- WHEN 调用 `UncertaintyCoord.FromVerifier(verdict, confidence, reason)`
+- THEN 返回 `UncertaintyCoord{Score: 0.9, Verdict: Pass, FromVerifier: true, Source: SourceVerifier, Reason: "ok"}`
+
+- GIVEN 一个旧版本 JSON（仅有 `Value/UpdatedAt` 字段，Phase 1 wire format）
+- WHEN `Unmarshal` 到新 `UncertaintyCoord`
+- THEN `FromVerifier=false`（零值）+ `SideEffectStatus=""`（零值）
+- AND `MarshalJSON` 使用 `omitempty` 不写零值字段，保持 Phase 1 调用方零修改
+
+- GIVEN 一个未知 `VerdictKind` 值（不在白名单）
+- WHEN 调用 `UncertaintyCoord.FromVerifier(unknown, ...)`
+- THEN fail-fast 返回 `NewUncertaintyCoordInvalidVerdictKindError` + 错误码 `ORCH_COORD_VERDICT_7004`
+- AND 不静默兜底（不返回零值 Coord）
+
+#### Scenario: UncertaintyReport Anomalies subset + FilterByKind 跨 Category
+
+- GIVEN 10 个 Observation 含 3 个 `ObsDeviation`（不论 Category）
+- WHEN 调用 `report.Anomalies`
+- THEN 返回 3 个 `ObsDeviation` Observation
+- AND 调用 `report.FilterByKind(ObsDeviation)` 返回同样的 3 个（FilterByKind 故意遍历全集）
+
+#### Scenario: Observation 字段校验 + 错误码
+
+- GIVEN `FactPayload{Statement: ""}` 触发的 `validateFact` 失败
+- WHEN 调用 `Observation.Validate()`
+- THEN 返回 `fmt.Errorf("orchtypes: FactPayload.Statement empty: %w", ErrObservationPayloadInvalid)`（W2 包装）
+- AND 错误可被 `errors.Is` 判定为 `ErrObservationPayloadInvalid`
+
+#### Scenario: PR-RF 5 项 review fix 闭环
+
+- **C1**: `QuantizedIntent.Kind` 从 `string` 改为 `IntentKind` enum（消除 PR-A2 translation shim）
+- **C3**: `FromVerifier` 未知 verdict fail-fast + `ORCH_COORD_VERDICT_7004` 错误码
+- **W2**: `validateFact` 改 `fmt.Errorf("orchtypes: FactPayload.Statement empty: %w", ErrObservationPayloadInvalid)` 包装
+- **W3**: `clamp01` + `clamp01Coord` 合并为 `clamp01Float(v, onNaN)` 单函数
+- **W6/I8**: `Partition` 末尾 `r.Overall = clamp01Float(r.ComputeOverallStrength(), 0.5)`（NaN safe）
+
+注：C2/W8（`MatchKind` 签名收紧为 `(*UncertaintyReport)`）落点为后续 PR-B1，本 Requirement 不涉及。
 
 ---
 
@@ -874,6 +946,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.9.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：(1) S 层物理路径对齐 `code-layout.md` §4.2；(2) coordinator→sessionorchestrator+decisionplanning+orchtypes；(3) wave→wavescheduler、S4→executionflow；(4) hubspoke dispatch/bridge 拆分；(5) WorkTree TD-WT-02/03 部分闭合 |
 | **4.0.0** | **2026-06-21** | **devrix-d7-error-aggregation-and-metrics (DM-20260621-010)**：(1) D7-S6 新增 Scenario「Error Aggregation & Metrics」覆盖 HandleInterrupt errors.Join + sandbox cleanup observability + Forker errors.Join；(2) ADDED Requirements：D7-S6-A11 (interrupt errors.Join 3 步 cancel 聚合) + D7-S6-A12 (sandbox cleanup observability freefork+execute+taskmanager) + D7-S6-A13 (forker errors.Join + 13 调用方 backward compat)；(3) Scenarios 表新增 D7-S6 行；(4) Archived Changes 表新增 DM-20260621-010 引用 |
 | **4.1.0** | **2026-06-23** | **devrix-d7-mups-v4-phase3-execute (DM-20260625-001) Phase 3 PR-C1**：(1) ADDED Requirement D7-S9-A25 (Execute Artifact Data Contract): ArtifactKind 4 类枚举 + SideEffectStatus 5 态 + SideEffectDetail + wavescheduler.Artifact +5 字段 (Kind/SourcePlanID/AnomaliesCount/SideEffectStatus/SideEffectDetail) omitempty 向后兼容；(2) 跨域类型上提 shared/types/execute.go 打破 orchtypes→workmodel→wavescheduler 潜在 import cycle（Phase 1 MemoryEntry precedent）；(3) 4 个新 P0 T 点 D7-S9-A25-T01..T04 IMPLEMENTED；(4) t-registry v3.8.0→v3.9.0 (T 129→133, P0 96→100)；(5) Archived Changes 新增 DM-20260625-001 引用 |
+| **4.2.0** | **2026-06-23** | **devrix-d7-mups-v4-phase2-observe-plan (DM-20260623-001) Phase 2 PR-A1 + PR-RF**：(1) ADDED Requirement D7-S8-A15 (Observation + UncertaintyReport + UncertaintyCoord): Observation 4 类 ObservationKind × 2 Category + sealed Payload interface + UncertaintyReport Partition 不变式 + ComputeOverallStrength 仅遍历 CatBusiness + UncertaintyCoord Phase 2 扩展 (FromVerifier/IsColdStart/Equal/With*) + 11 SentinelError + 4 错误码 (7001-7004)；(2) PR-RF 5 项 review fix 闭环（C1 IntentKind enum + C3 FromVerifier fail-fast + W2 fmt.Errorf wrap + W3 clamp01Float 合并 + W6/I8 Partition clamp 末尾）；(3) 6 个新 P0 T 点 D7-S8-A15-T01..T06 IMPLEMENTED；(4) t-registry v3.9.0→v3.10.0 (T 133→139, P0 100→106)；(5) Scenarios 表新增 D7-S8 行（Observation + UncertaintyReport PR-A1 + PR-RF, A15 模块）；(6) Archived Changes 新增 DM-20260623-001 引用 |
 
 ---
 

@@ -2,10 +2,20 @@
 
 **Change ID:** `devrix-d7-mups-v4-phase2-observe-plan`
 **Demand ID:** DM-20260623-001
-**Status:** S2_Proposal
+**Status:** S7_Archived
 **Priority:** P0
 **Date:** 2026-06-23
 **Author:** MUPS v4.3 落地梳理 (doc 42 §Observe + doc 43 §Plan + doc 47 Phase 2)
+
+> **S7 归档时间线**：
+> - **S1 需求**（2026-06-23）— DM-20260623-001 立项；需求：`demand.md`
+> - **S2 提案**（2026-06-23）— 本 proposal.md + `tasks.md`；6 PR + 18 T 点 + 10 天工作量
+> - **S3 设计**（2026-06-23）— `design.md` §0-§14；§0.6 S3-Gate 5 维度自检 + §0.7 S4-Gate 4 维度自检 + §14 Review Decisions
+> - **S3-Gate A-**（2026-06-23）— design.md §0.6 5/5 维度 PASS
+> - **S4 实现**（2026-06-23）— PR #163 (PR-A1 + PR-RF)；7 files +5193/-0；Phase 2 PR-A1 (Observation + UncertaintyReport + UncertaintyCoord) + PR-RF (5 review fix 闭环)
+> - **S4-Gate A-**（2026-06-23）— design.md §0.7 4/4 维度 PASS + go vet + go test -race 0 issue
+> - **S5 验收**（2026-06-23）— `acceptance-report.md`；11/11 P0 AC + 8/8 设计同步 + 33/33 tests PASS + 6/6 决议闭环；✅ ACCEPTED
+> - **S6 归档**（2026-06-23）— 本 archive；spec.md v4.1.0→v4.2.0 + t-registry.md v3.9.0→v3.10.0 + D7-S8-A15 IMPLEMENTED + demand-archive-index.md DM-20260623-001 行 + verify-archive.sh 12/12 PASS
 
 ---
 
