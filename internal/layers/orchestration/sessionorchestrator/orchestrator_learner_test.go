@@ -6,6 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
@@ -228,5 +231,114 @@ func TestSessionOrchestrator_ProcessMessage_UsePriorInClassification(t *testing.
 	defer fl.mu.Unlock()
 	if fl.injectCalls != 1 {
 		t.Errorf("Inject calls = %d, want 1", fl.injectCalls)
+	}
+}
+
+// priorRecordingClassifier is a recording IntentClassifier that captures
+// the prior seen on each ClassifyWithPrior call. It is used by the
+// shadow-prior wiring test to assert ProcessMessage threaded prior to
+// the shadow path (when both WithLearner + WithShadowClassifier are
+// wired).
+type priorRecordingClassifier struct {
+	mu        sync.Mutex
+	calls     int
+	lastPrior *learn.AdaptivePrior
+}
+
+func (p *priorRecordingClassifier) Classify(_ context.Context, _ string) (orchtypes.IntentClassification, error) {
+	return orchtypes.IntentClassification{
+		Kind:       orchtypes.IntentFast,
+		Confidence: 95,
+		Reason:     "prior-recorder-baseline",
+	}, nil
+}
+
+func (p *priorRecordingClassifier) ClassifyWithPrior(_ context.Context, _ string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls++
+	p.lastPrior = prior
+	result, _ := p.Classify(context.Background(), "")
+	if prior != nil && prior.PriorBeta.Mean() > 0 {
+		// Mirror RuleClassifier.ClassifyWithPrior multiplier so the
+		// shadow path reflects the prior-adjusted confidence (proves
+		// prior really was threaded to shadow).
+		adjusted := int(float64(result.Confidence) * prior.PriorBeta.Mean())
+		if adjusted > 100 {
+			adjusted = 100
+		}
+		result.Confidence = adjusted
+	}
+	return result, nil
+}
+
+// T: D7-S12-A42-T04 — ProcessMessage threads prior to the shadow path
+// when BOTH WithLearner and WithShadowClassifier are wired. The
+// classifier is wrapped in a ShadowClassifier, and ProcessMessage
+// must call ShadowClassifier.ClassifyWithPrior (which delegates to
+// rule.ClassifyWithPrior) — observable via the recorder seeing the
+// injected prior.
+//
+// Note: ShadowClassifier.ClassifyWithPrior does NOT fire the async
+// LLM shadow in v1.0 (see TestShadowClassifier_ClassifyWithPrior_AsyncShadowNotFired
+// in decisionplanning/shadow_classifier_test.go and the comment in
+// shadow_classifier.go). This test only asserts the synchronous
+// prior threading, not the async shadow path.
+func TestSessionOrchestrator_WithShadowClassifier_PriorThreadedToShadow(t *testing.T) {
+	exec := &fakeD2{}
+	recorder := &priorRecordingClassifier{}
+
+	// Real RuleClassifier + ShadowClassifier wrapping the recorder.
+	// The recorder is the "rule" the shadow delegates to.
+	mtr := metrics.NewMeterProvider(&settings.MetricsConfig{}).Meter("d7-shadow-prior-test")
+	shadowM := decisionplanning.NewShadowMetrics(mtr)
+	shadow := decisionplanning.NewShadowClassifier(recorder, nil, shadowM, 500) // nil LLM → no async shadow
+
+	// Inject a custom prior (Beta(8,3) → Mean = 0.727) via fakeLearner.
+	fl := &fakeLearner{}
+	fl.prior = learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)
+	fl.prior.PriorBeta = learn.BetaPrior{Alpha: 8, Beta: 3}
+
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(), exec,
+		WithLearner(fl),
+		WithShadowClassifier(shadow),
+	)
+
+	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
+		SessionID: "sess-prior-shadow",
+		Message:   "hello",
+	})
+	if err != nil {
+		t.Fatalf("ProcessMessage: %v", err)
+	}
+	for range ch {
+	}
+
+	// LP-1: learner.Inject MUST have been called.
+	fl.mu.Lock()
+	injectCalls := fl.injectCalls
+	fl.mu.Unlock()
+	if injectCalls != 1 {
+		t.Errorf("learner.Inject calls = %d, want 1 (Phase 6 PR-F2 wiring)", injectCalls)
+	}
+
+	// LP-1 → shadow: the recorder (acting as rule inside shadow) MUST
+	// have seen the prior via ClassifyWithPrior. ProcessMessage's
+	// shadow branch (orchestrator.go:318-325) calls
+	// shadowClassifier.ClassifyWithPrior, which delegates to
+	// recorder.ClassifyWithPrior — capturing the prior.
+	recorder.mu.Lock()
+	calls := recorder.calls
+	lastPrior := recorder.lastPrior
+	recorder.mu.Unlock()
+	if calls != 1 {
+		t.Errorf("recorder.ClassifyWithPrior calls = %d, want 1 (shadow branch invoked)", calls)
+	}
+	if lastPrior == nil {
+		t.Fatal("recorder lastPrior: nil, want prior injected (LP-1 not threaded to shadow path)")
+	}
+	if lastPrior.PriorBeta != (learn.BetaPrior{Alpha: 8, Beta: 3}) {
+		t.Errorf("recorder lastPrior.PriorBeta = %+v, want Beta(8,3)", lastPrior.PriorBeta)
 	}
 }
