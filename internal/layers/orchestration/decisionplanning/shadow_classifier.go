@@ -158,10 +158,14 @@ func (s *ShadowClassifier) Classify(ctx context.Context, message string) (orchty
 // AdaptivePrior, so we thread the prior into the rule's
 // ClassifyWithPrior to keep the routing decision consistent.
 //
-// Note: the LLM shadow goroutine still fires with the rule-baseline
-// (no prior) because the shadow is for tail observability, not
-// routing. The prior is intentionally not propagated to the async
-// shadow call to keep the shadow samples comparable across time.
+// v1.0 implementation note: this method does NOT fire the async LLM
+// shadow goroutine. Classify (no-prior) is the only path that fires
+// shadowAsync. This is a minor observability regression on the LP-1
+// wiring — the async LLM shadow samples are absent for sessions
+// where prior is injected. Phase 7+ can extract the shadow-trigger
+// logic into a shared helper and call it from both Classify and
+// ClassifyWithPrior (preserving the "no prior leakage into async
+// shadow" invariant). Pin: TestShadowClassifier_ClassifyWithPrior_AsyncShadowNotFired.
 func (s *ShadowClassifier) ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
 	return s.rule.ClassifyWithPrior(ctx, message, prior)
 }

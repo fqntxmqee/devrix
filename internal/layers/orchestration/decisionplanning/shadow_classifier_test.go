@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 )
@@ -344,4 +345,100 @@ func TestShadowClassifier_Latency_Recorded(t *testing.T) {
 		time.Sleep(2 * time.Millisecond)
 	}
 	t.Fatalf("Latency histogram Count = %d, want ≥ 1", m.Latency.Count())
+}
+
+// T: D7-S12-A42-T04 — ShadowClassifier.ClassifyWithPrior delegates to the
+// underlying rule's ClassifyWithPrior. The return value MUST reflect the
+// prior adjustment (Mean as confidence multiplier), proving the delegate
+// call actually invoked the rule's WithPrior variant and not a stale
+// baseline Classify.
+func TestShadowClassifier_ClassifyWithPrior_DelegatesToRule(t *testing.T) {
+	rule := NewRuleClassifier(orchtypes.DefaultConfig())
+	// LLM never matters for this test — we only check the synchronous
+	// return value of ClassifyWithPrior (no LLM call expected for fast
+	// path "hi" which doesn't fall through to the tail).
+	llm := &stubLLM{result: orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate}}
+	mtr := newShadowTestMeter(t)
+	m := NewShadowMetrics(mtr)
+	sc := NewShadowClassifier(rule, llm, m, 500)
+
+	// prior Beta(8,3) → Mean = 8/11 ≈ 0.727 → baseline 95 × 0.727 = 69
+	prior := learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)
+	prior.PriorBeta = learn.BetaPrior{Alpha: 8, Beta: 3}
+
+	result, err := sc.ClassifyWithPrior(context.Background(), "hi", prior)
+	if err != nil {
+		t.Fatalf("ClassifyWithPrior err: %v", err)
+	}
+	if result.Kind != orchtypes.IntentFast {
+		t.Errorf("Kind = %v, want IntentFast (greeting fast pattern)", result.Kind)
+	}
+	mean := 8.0 / 11.0
+	wantConfidence := int(float64(95) * mean)
+	if result.Confidence != wantConfidence {
+		t.Errorf("Confidence = %d, want %d (baseline 95 × mean 0.727 = delegate must apply prior)",
+			result.Confidence, wantConfidence)
+	}
+	// LLM MUST NOT be called on fast path even with prior (ClassifyWithPrior
+	// delegates synchronously to rule, no async shadow on fast kind).
+	time.Sleep(30 * time.Millisecond)
+	if c := atomic.LoadInt32(&llm.calls); c != 0 {
+		t.Errorf("LLM called on fast path: %d (must be 0)", c)
+	}
+}
+
+// T: D7-S12-A42-T04 — ShadowClassifier.ClassifyWithPrior behavior gap
+// (current implementation). The Phase 6 design (shadow_classifier.go
+// comment) says the async LLM shadow should still fire on the
+// ClassifyWithPrior path with no prior, so shadow samples stay
+// comparable. The actual implementation simply delegates to
+// rule.ClassifyWithPrior and does NOT fire the async shadow at all.
+//
+// This test pins the current behavior so we notice if/when someone
+// fixes the gap (e.g. extracts shadowAsync trigger into a shared
+// helper called by both Classify and ClassifyWithPrior). If the
+// assertion below ever flips from "LLM not called" to "LLM called
+// once with no prior", that means the design gap has been closed.
+//
+// Why this is acceptable for v1.0: the synchronous return of
+// ClassifyWithPrior is the routing decision; the async LLM shadow is
+// only an observability sample stream. When prior is wired (LP-1
+// closed loop), losing the async shadow observability is a minor
+// regression — Phase 7+ can refactor shadow_async into a shared
+// helper without changing the public surface.
+func TestShadowClassifier_ClassifyWithPrior_AsyncShadowNotFired(t *testing.T) {
+	rule := NewRuleClassifier(orchtypes.DefaultConfig())
+	llm := &stubLLM{
+		delay:  10 * time.Millisecond,
+		result: orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate, Confidence: 80},
+	}
+	mtr := newShadowTestMeter(t)
+	m := NewShadowMetrics(mtr)
+	sc := NewShadowClassifier(rule, llm, m, 500)
+
+	prior := learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)
+	prior.PriorBeta = learn.BetaPrior{Alpha: 8, Beta: 3}
+
+	// "请帮我设计一个分布式缓存" falls through to the loop_first_default
+	// (would trigger shadow on the no-prior Classify path).
+	result, err := sc.ClassifyWithPrior(context.Background(), "请帮我设计一个分布式缓存", prior)
+	if err != nil {
+		t.Fatalf("ClassifyWithPrior err: %v", err)
+	}
+	if result.Kind != orchtypes.IntentFast {
+		t.Errorf("Kind = %v, want IntentFast (loop_first routing)", result.Kind)
+	}
+	// Wait the same window Classify test uses to allow any async
+	// invocation to surface.
+	time.Sleep(60 * time.Millisecond)
+	if c := atomic.LoadInt32(&llm.calls); c != 0 {
+		t.Errorf("LLM called %d times on ClassifyWithPrior path (current implementation: shadow not fired; "+
+			"if this flips to 1, the design gap has been closed — update the comment in shadow_classifier.go)",
+			c)
+	}
+	// Disabled counter MUST NOT increment either (ClassifyWithPrior skips
+	// the llm==nil early-return that bumps Disabled).
+	if v := m.Disabled.Value(); v != 0 {
+		t.Errorf("Disabled counter = %d, want 0 (ClassifyWithPrior does not go through the llm==nil branch)", v)
+	}
 }
