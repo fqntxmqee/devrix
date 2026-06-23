@@ -61,6 +61,18 @@ type ObservationLookup interface {
 	GetID() string
 }
 
+// Auto-Close fallback constants (Phase 7 PR-7.1, D7-S13-A47).
+//
+// When processAutoClose synthesizes a Verdict from a terminal EngineEvent
+// (no Plan, no Artifact available), the AssetBuilder falls back to
+// Verdict.SourceID as the SOP name and a synthetic step list. This keeps
+// the LP-1 deposit (BayesianUpdate + ReputationStore) alive in production
+// even when the Auto-Close path runs without a full Phase 2 Plan.
+const (
+	autoCloseSOPNamePrefix = "sop:autoclose:"
+	autoCloseSOPSyntheticStep = "autoclose-completion"
+)
+
 // AssetBuilder is the (Verdict → LearningAsset) factory. It is stateless and
 // safe for concurrent use.
 type AssetBuilder struct{}
@@ -245,12 +257,22 @@ func extractSOPName(req LearnRequest) string {
 	if req.Artifact != nil && req.Artifact.Summary != "" {
 		return "sop:summary:" + truncate(req.Artifact.Summary, 64)
 	}
+	// Auto-Close fallback (Phase 7 PR-7.1, D7-S13-A47-T02): when neither
+	// Plan nor Artifact is available (processAutoClose synthesized the
+	// Verdict from a terminal EngineEvent), key the SOP on Verdict.SourceID
+	// so the Learn deposit still produces a storable asset.
+	if req.Verdict.SourceID != "" {
+		return autoCloseSOPNamePrefix + req.Verdict.SourceID
+	}
 	return ""
 }
 
 func extractStepsFromPlan(p *plan.Plan) []string {
 	if p == nil {
-		return nil
+		// Auto-Close fallback (Phase 7 PR-7.1, D7-S13-A47-T02): synthesize a
+		// single placeholder step so the SOPAssetContent has Steps > 0 and
+		// the AssetBuilder.Build path succeeds end-to-end.
+		return []string{autoCloseSOPSyntheticStep}
 	}
 	steps := make([]string, 0, len(p.Steps))
 	for _, s := range p.Steps {
