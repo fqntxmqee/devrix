@@ -1,0 +1,321 @@
+id: devrix-d7-mups-v4-phase5-learn
+demand_id: DM-20260623-003
+title: "D7 MUPS v4.3 Phase 5 Learn 节点升格 (PR-E1..PR-E5, 13 P0 T 点 + LP-1 闭环)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 5 Learn 节点升格
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S11-A36
+    name: LearningAsset 5 类 + AssetContent + LearningClass 5 枚举
+    description: |
+      Phase 5 Learn 节点的核心数据契约。(1) internal/shared/types/learning.go
+      引入 LearningClass 5 态 typed enum (LearningSOP/LearningProtocol/
+      LearningKnowledge/LearningConclusion/LearningPending) + String/Parse/
+      MarshalJSON/UnmarshalJSON + 空字符串零值兼容 (LearningSOP 默认)；
+      (2) learn/learning_asset.go LearningAsset struct 15 字段
+      (ID/SessionID/Class/Strength/SourceSessionIDs/SourceVerdictIDs/Content/
+      AssetKey/ContentHash/FailureCriterion/ExpiryAt/CreatedAt/LastUsedAt/
+      UseCount/TraceID) + 不可变 deep copy + 自动时间戳；
+      (3) learn/asset_content.go 5 类 AssetContent 实现 (SOPAssetContent ★5 /
+      ProtocolAssetContent ★4 / KnowledgeAssetContent ★3 /
+      ConclusionAssetContent ★2 / PendingAssetContent ⭐★1) + Validate() +
+      SchemaVersion() + ByteSize() + 必填字段 fail-fast；
+      (4) PendingAssetContent 新增 MVEState 字段 (nullable *execute.MVEState)
+      + Question + Options 支持 Learn 节点 ↔ Execute MVE checkpoint 互通。
+      learn/learning_asset.go 通过 type alias `type LearningClass =
+      types.LearningClass` 重新导出，避免 import cycle。
+    rationale: |
+      DM-20260623-003 立项需求。Phase 5 Learn 节点的最小入口；与 Phase 3
+      SideEffectStatus + Phase 4 VerdictKind precedent 一致 (跨域类型上提
+      shared/types)。
+  - id: D7-S11-A37
+    name: ReputationEvidence + Bayesian Update + Wilson Score + G8-1 修复
+    description: |
+      (1) learn/reputation_evidence.go ReputationEvidence struct 12 字段
+      (SessionID/TrackMode/Alpha/Beta/Mean/Variance/ConfidenceLow/
+      ConfidenceHigh/LastUpdated/UpdateCount/SourceVerdictIDs/
+      VerifierFailureCount/IndeterminateCount) + 不可变 + Wilson Score 95% 置信
+      区间 + 冷启动除零防御；(2) BayesianUpdate(prior, verdict) 函数实现
+      Pass/Partial→α++ / Fail→β++ / Indeterminate 分支处理；(3) ⭐G8-1 P0-3
+      修复 (Phase 4 VerifyWithRetry parse failure → INDETERMINATE) 的 Learn
+      端延伸：verdict.IndeterminateReason=="verifier_parse_failure" 时仅
+      VerifierFailureCount++，绝不动 α/β；避免 LLM 输出格式异常污染用户信誉。
+    rationale: |
+      G8-1 P0-3 修复（DM-20260623-002 Phase 4 VerifyWithRetry parse failure
+      → INDETERMINATE）的 Learn 端延伸。混淆 "用户行为失败" 与 "Verifier
+      输出格式问题" 是 P0 信誉风险。
+  - id: D7-S11-A38
+    name: AdaptivePrior + DefaultPriors + BuildAdaptivePrior
+    description: |
+      (1) learn/adaptive_prior.go AdaptivePrior struct 3 字段 (Reputation +
+      PriorBeta + InjectTargets) + BetaPrior (Alpha + Beta + String "Beta(α,β)")
+      + InjectTarget 3 枚举 (InjectIntentQuantizer/InjectHistoricalDetector/
+      InjectRuleClassifier) + 不可变；(2) DefaultDeveloperPrior = Beta(5,3) +
+      DefaultOperatorPrior = Beta(8,1) + DefaultInjectTargets 3 个；(3)
+      BuildAdaptivePrior(rep, trackMode) Bayesian 合并公式 + rep==nil 兜底 +
+      trackMode=="" 兜底 (默认 Developer)。
+    rationale: |
+      LP-1 闭环的"读"侧入口 (Learn 节点 → 下一轮 Observe)。Phase 2 PR-A1
+      UncertaintyReport.ComputeOverallStrength 与 AdaptivePrior.PriorBeta
+      形成 Bayesian 双源：用户历史信誉 (Alpha/Beta) + 当前 UncertainCoord。
+  - id: D7-S11-A39
+    name: Memory 3 通道接口 + 3 实现（LP-2 隔离）
+    description: |
+      (1) learn/memory.go Memory interface 4 方法 (Store/Retrieve/Delete/List)
+      + MemoryChannel 3 枚举 (MemorySkill/MemoryFeedback/MemoryScheduled) +
+      MemoryFilter 4 字段 (Class/SessionID/MinStrength/Expired) +
+      allowedClasses() 编译期保证 LP-2 通道 ↔ LearningClass partition；
+      (2) SkillMemory (LearningSOP + LearningProtocol) + FeedbackMemory
+      (LearningKnowledge + LearningConclusion) + ScheduledMemory
+      (LearningPending) 3 实现 + ScheduledRetry envelope (Asset/TriggerAt/
+      RetryCount/MaxRetries/LastRetryAt) + IsExhausted() + ListDue(now)；
+      (3) filterAssets 共享 helper (Class/SessionID/MinStrength/Expired 4 维
+      过滤) + sync.RWMutex 并发安全 + LP-2 ErrAssetClassMismatch 路由错位
+      兜底；(4) DefaultScheduledMaxRetries=3 (matches PendingAssetContent
+      validator upper bound)。
+    rationale: |
+      LP-2 隔离原则落地。5 类 LearningAsset ↔ 3 通道 Memory partition：
+      确定性 Skill (★4-5) / 软知识 Feedback (★2-3) / 延迟重试 Scheduled
+      (★1)。通道错位 (e.g. SOP 写入 FeedbackMemory) → fail-fast
+      ErrAssetClassMismatch。
+  - id: D7-S11-A40
+    name: Learner interface + DefaultLearner + AssetBuilder + ReputationStore + LP-1 闭环
+    description: |
+      (1) learn/learner.go Learner interface 3 方法 (Learn/Inject/ScheduledTick)
+      + DefaultLearner struct 6 字段 (3 Memory + ReputationStore + AssetBuilder
+      + BayesianUpdater 可注入) + Learn 5 步流程 (class 选择 → AssetBuilder →
+      Memory 路由 LP-2 → ScheduledMemory 兜底 → BayesianUpdate LP-3) + Inject
+      流程 (ReputationStore.Get → BuildAdaptivePrior LP-1) + ScheduledTick 流程
+      (TriggerAt ≤ now → RetryCount++ → MaxRetries 耗尽 → FeedbackMemory 警告
+      escalation) + 4 Verdict → 5 LearningClass 路由 (Pass→SOP/Partial→
+      Protocol/Fail→Knowledge/Indeterminate→Pending)；
+      (2) learn/asset_builder.go AssetBuilder 5 类 Content 构造 + classToStrength
+      5 等级映射 + hashContentBytes SHA-256 hex 截断 16 + AssetKey 格式
+      ({class}:{sourceID}:{hash}) 幂等去重；
+      (3) learn/reputation_store.go ReputationStore interface 3 方法
+      (Get/Update/List) + InMemoryReputationStore 默认实现 (sync.RWMutex 并发
+      安全 + defensive copy)；
+      (4) in-package LP-1 闭环测试 (Learn ×3 Pass → ReputationStore.Alpha=3 →
+      Inject → AdaptivePrior.PriorBeta = Beta(8,3) = Developer Beta(5,3) +
+      rep(3,0)) 替代 spec 中 Observe.QuantizeWithPrior/DetectWithPrior/
+      ClassifyWithPrior 跨域 wiring 留待 Phase 6 集成。
+    rationale: |
+      LP-1 闭环节点级落地。Learner.Inject 是 5 节点管道 Observe → Plan →
+      Execute → Verify → Learn → 下一轮 Observe 的关键回写入口。
+      AssetBuilder 把 Plan/Observation/Artifact 跨域信息归一为 LearningAsset；
+      ReputationStore 累积跨会话信誉；LP-1 闭环测试证明 Alpha 累积 → Bayesian
+      合并公式正确。
+
+# 测试点（PR-E1..E5 实际实现 13 个）
+test_points:
+  - id: D7-S11-A36-T01
+    name: |
+      LearningAsset struct 15 字段 + NewLearningAsset fail-fast + deep copy +
+      自动时间戳 (CreatedAt/ExpiryAt/ContentHash)。
+    status: IMPLEMENTED
+  - id: D7-S11-A36-T02
+    name: |
+      5 类 AssetContent (SOPAssetContent / ProtocolAssetContent /
+      KnowledgeAssetContent / ConclusionAssetContent / PendingAssetContent
+      含 MVEState) + Validate() + SchemaVersion() + ByteSize() + 必填字段
+      fail-fast + Confidence [0,1] clamp + RetryAttempts 0-3 边界。
+    status: IMPLEMENTED
+  - id: D7-S11-A36-T03
+    name: |
+      LearningClass 5 态 typed enum + String/Parse/Marshal/Unmarshal
+      (空字符串零值 LearningSOP 兼容) + LearningUnknown 禁用 + 跨域类型上提
+      shared/types/learning.go。
+    status: IMPLEMENTED
+  - id: D7-S11-A37-T04
+    name: |
+      ReputationEvidence struct 12 字段 + NewReputationEvidence fail-fast +
+      TrackMode 2 字符串解析 + 冷启动默认值 (Alpha=Beta=0 + Mean=0 + Variance=0
+      + ConfidenceLow=0 + ConfidenceHigh=1)。
+    status: IMPLEMENTED
+  - id: D7-S11-A37-T05
+    name: |
+      BayesianUpdate 函数 + 不可变性 (prior 不变) + Pass/Partial/Fail →
+      α/β++ + ⭐G8-1 修复 (INDETERMINATE "verifier_parse_failure" 仅
+      VerifierFailureCount++ 不污染 α/β) + 其他 INDETERMINATE →
+      IndeterminateCount++ + 冷启动除零防御 (Mean=prior.Mean) + Wilson Score
+      95% 置信区间 + Mean 50 次 PASS 后收敛 ≈ 1.0。
+    status: IMPLEMENTED
+  - id: D7-S11-A38-T06
+    name: |
+      AdaptivePrior + BetaPrior (String "Beta(α,β)") + InjectTarget 3 枚举
+      (IntentQuantizer/HistoricalDetector/RuleClassifier) + 不可变 (无 setter)
+      + DefaultInjectTargets。
+    status: IMPLEMENTED
+  - id: D7-S11-A38-T07
+    name: |
+      DefaultDeveloperPrior Beta(5,3) + DefaultOperatorPrior Beta(8,1) +
+      BuildAdaptivePrior(rep, trackMode) Bayesian 合并公式 + rep==nil 兜底 +
+      trackMode=="" 兜底 + DefaultDeveloperPrior + InjectTargets=
+      DefaultInjectTargets。
+    status: IMPLEMENTED
+  - id: D7-S11-A39-T08
+    name: |
+      Memory interface 4 方法 (Store/Retrieve/Delete/List) + MemoryChannel 3
+      枚举 + MemoryFilter 4 字段 (Class/SessionID/MinStrength/Expired) +
+      SkillMemory 实现 (SOP/Protocol 路由 + ErrAssetClassMismatch) +
+      FeedbackMemory 实现 (Knowledge/Conclusion 路由) + 并发安全
+      (sync.RWMutex)。
+    status: IMPLEMENTED
+  - id: D7-S11-A39-T09
+    name: |
+      ScheduledMemory 实现 (LearningPending 路由) + ScheduledRetry
+      (Asset/TriggerAt/RetryCount/MaxRetries/LastRetryAt) + TriggerAt 默认
+      = asset.ExpiryAt + MaxRetries 默认 3 + 并发安全 + List filter +
+      IsExhausted()。
+    status: IMPLEMENTED
+  - id: D7-S11-A40-T10
+    name: |
+      Learner interface 3 方法 (Learn/Inject/ScheduledTick) + LearnRequest
+      struct 5 字段 + DefaultLearner struct 6 字段 + Learn 流程 5 步 (class
+      选择 → AssetBuilder → Memory 路由 → ScheduledMemory 兜底 →
+      BayesianUpdate) + Inject 流程 (ReputationStore.Get → BuildAdaptivePrior)
+      + ScheduledTick 流程 (TriggerAt ≤ now → RetryCount++ → MaxRetries 耗尽
+      → FeedbackMemory 警告) + 4 Verdict 路由 (Pass→SOP/Partial→Protocol/
+      Fail→Knowledge/INDETERMINATE→Pending)。
+    status: IMPLEMENTED
+  - id: D7-S11-A40-T11
+    name: |
+      AssetBuilder 5 类 Content 构造 + hashContentBytes SHA-256 hex 截断 16 +
+      classToStrength 5 等级映射 (LearningSOP→5/Protocol→4/Knowledge→3/
+      Conclusion→2/Pending→1) + AssetKey 格式 (sop:PlanKind:hash /
+      pending:ArtifactID:hash 等) + ContentHash 幂等 (同 Content 产生同 hash)
+      + Build nil 边界。
+    status: IMPLEMENTED
+  - id: D7-S11-A40-T12
+    name: |
+      ReputationStore interface 3 方法 (Get/Update/List) +
+      InMemoryReputationStore 实现 (sync.RWMutex 并发安全) + Get cold start
+      返回 nil,nil + Update nil/empty SessionID 返回
+      ErrReputationStoreUnavailable + List trackMode 过滤 + limit 上限。
+    status: IMPLEMENTED
+  - id: D7-S11-A40-T13
+    name: |
+      in-package LP-1 闭环测试 (Learn×3 Pass → ReputationStore.Alpha=3 →
+      Inject → AdaptivePrior.PriorBeta=Beta(8,3)) + INDETERMINATE +
+      verifier_parse_failure G8-1 闭环 (α/β 不污染，VerifierFailureCount++)。
+      Observe 节点 QuantizeWithPrior/DetectWithPrior/ClassifyWithPrior +
+      Orchestrator.ProcessMessage LP-1 时序 wiring 留待 Phase 6 集成。
+    status: PARTIAL
+
+# 范围
+in_scope:
+  - internal/shared/types/learning.go (NEW): LearningClass 5 态 typed enum + String/Parse/Marshal/Unmarshal
+  - internal/shared/types/learning_test.go (NEW): 6 tests
+  - internal/layers/orchestration/learn/learning_asset.go (NEW): LearningAsset struct 15 字段 + NewLearningAsset 工厂 + 不可变
+  - internal/layers/orchestration/learn/learning_asset_test.go (NEW): 9 tests
+  - internal/layers/orchestration/learn/asset_content.go (NEW): AssetContent interface + 5 类实现 + SchemaVersion + ByteSize
+  - internal/layers/orchestration/learn/asset_content_test.go (NEW): 11 tests
+  - internal/layers/orchestration/learn/reputation_evidence.go (NEW): ReputationEvidence struct 12 字段 + NewReputationEvidence + Wilson Score
+  - internal/layers/orchestration/learn/reputation_evidence_test.go (NEW): 12 tests
+  - internal/layers/orchestration/learn/bayesian_update.go (NEW): BayesianUpdate 函数 + G8-1 修复
+  - internal/layers/orchestration/learn/bayesian_update_test.go (NEW): 12 tests
+  - internal/layers/orchestration/learn/adaptive_prior.go (NEW): AdaptivePrior + BetaPrior + InjectTarget + DefaultPriors + BuildAdaptivePrior
+  - internal/layers/orchestration/learn/adaptive_prior_test.go (NEW): 8 tests
+  - internal/layers/orchestration/learn/build_adaptive_prior_test.go (NEW): 9 tests
+  - internal/layers/orchestration/learn/memory.go (NEW): Memory interface + MemoryChannel + MemoryFilter + 3 实现 + ScheduledRetry
+  - internal/layers/orchestration/learn/memory_test.go (NEW): 21 tests
+  - internal/layers/orchestration/learn/asset_builder.go (NEW): AssetBuilder 5 类 Content 构造 + classToStrength + hashContentBytes + AssetKey
+  - internal/layers/orchestration/learn/asset_builder_test.go (NEW): 10 tests
+  - internal/layers/orchestration/learn/reputation_store.go (NEW): ReputationStore interface + InMemoryReputationStore
+  - internal/layers/orchestration/learn/reputation_store_test.go (NEW): 9 tests
+  - internal/layers/orchestration/learn/learner.go (NEW): Learner interface + DefaultLearner + Learn/Inject/ScheduledTick 流程
+  - internal/layers/orchestration/learn/learner_test.go (NEW): 15+ tests (含 LP-1 闭环 + G8-1 修复)
+  - internal/layers/orchestration/learn/testhelpers_test.go (NEW): waveschedulerArtifactStub + timePast
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S11-A36/A37/A38/A39/A40 Requirement (D7 v4.5.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S11-A36-T01/T02/T03 + A37-T04/T05 + A38-T06/T07 + A39-T08/T09 + A40-T10/T11/T12/T13 (v3.13.0)
+
+out_of_scope:
+  - Phase 6 集成 (T13 PARTIAL 续): Orchestrator.ProcessMessage 调用 Learner.Inject + 3 Observer 子模块 QuantizeWithPrior/DetectWithPrior/ClassifyWithPrior 的实际 wiring 留待 Phase 6 推进
+  - 不修改 Phase 4 VerdictKind type alias: 通过 workmodel 直接 import 保持二进制兼容
+  - 不引入新 LLM 模型: LP-1 闭环 in-package 测试已证明 Bayesian 合并公式正确
+  - 不实现 LearningAsset.PersistScope 字段: Phase 6/7 决定持久化范围 (跨会话追踪)
+  - 不修改 InMemoryReputationStore 之外的实现: D2 ContextEngine-backed 实现留待 Phase 7
+  - Verifier 实际 LLM prompt 模板: 现有 prompts/verifier_v1.json 已支持，本 PR 不动
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-E1
+    scope: "LearningAsset 5 类 + AssetContent + LearningClass 5 枚举"
+    files: 6
+    estimated_loc: "+1380 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase5-learn (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/176
+  - pr: PR-E2
+    scope: "ReputationEvidence + Bayesian Update + Wilson Score + G8-1 修复"
+    files: 4
+    estimated_loc: "+845 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase5-learn (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/177
+  - pr: PR-E3
+    scope: "AdaptivePrior + DefaultPriors + BuildAdaptivePrior"
+    files: 4
+    estimated_loc: "+535 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase5-learn (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/178
+  - pr: PR-E4
+    scope: "Memory 3 通道接口 + 3 实现 (SkillMemory + FeedbackMemory + ScheduledMemory)"
+    files: 2
+    estimated_loc: "+580 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase5-learn (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/179
+  - pr: PR-E5
+    scope: "Learner + DefaultLearner + AssetBuilder + ReputationStore + LP-1 闭环"
+    files: 6
+    estimated_loc: "+1180 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase5-learn (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/180
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（Observation/Plan/Verify 雏形 + UncertaintyCoord precedent）
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF（Observation 4 类 + UncertaintyReport + UncertaintyCoord）
+  - devrix-d7-mups-v4-phase2-plan  # Phase 2 PR-B1（Plan 4 类 + PlanKind + Planner interface）
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1（ArtifactKind 4 类 + SideEffectStatus 5 态 + 跨域类型上提 shared/types precedent）
+  - devrix-d7-mups-v4-phase3-channels  # Phase 3 PR-C2（Execute 4 Channel + ChannelRouter + SourcePlanID）
+  - devrix-d7-mups-v4-phase4-verify-promotion  # Phase 4 PR-D1..D4（VerdictKind + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + G8-1 P0-3 修复）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase4-phase5-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase5-learn/{demand,proposal,design,tasks}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v4.5.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v3.13.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./internal/shared/types/...
+    - go vet ./internal/layers/orchestration/learn/...
+    - go test -race ./internal/shared/types/...
+    - go test -race ./internal/layers/orchestration/learn/...
+  s5_gate:
+    - CI_COVERAGE=1 go test ./internal/... -race -timeout 300s  # 全 internal 覆盖率维持
+    - 13 个 Phase 5 P0 T 点 IMPLEMENTED (D7-S11-A36-T01/T02/T03 + A37-T04/T05 + A38-T06/T07 + A39-T08/T09 + A40-T10/T11/T12 + T13 PARTIAL)
+    - 122+ 个新增 tests (含 in-package LP-1 闭环) 100% PASS 含 race
+    - 0 race detector warnings
+    - 0 v2 regression (Phase 1/2/3/4 既有 tests 全部 PASS)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase5-learn  # 13 项检查 13/13 PASS
