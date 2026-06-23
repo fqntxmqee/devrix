@@ -23,6 +23,21 @@ const (
 	SideEffectRolledBack = types.SideEffectRolledBack
 )
 
+// VerdictKind is a type alias re-exported from shared/types so that
+// UncertaintyCoord (Phase 2 PR-A1) and Verdict (Phase 4 PR-D1) can share
+// the same wire format. The concrete enum + String/Parse live in
+// shared/types/verdict.go. Phase 4 PR-D2 will migrate FromVerifier from
+// string switch to typed enum switch; this alias keeps PR-D1 zero-impact
+// on existing callers.
+type VerdictKind = types.VerdictKind
+
+const (
+	VerdictPass          = types.VerdictPass
+	VerdictPartial       = types.VerdictPartial
+	VerdictIndeterminate = types.VerdictIndeterminate
+	VerdictFail          = types.VerdictFail
+)
+
 // UncertaintyCoord is the per-item uncertainty value attached to Plans and
 // propagated through Execute/Verify. Phase 1 introduced a float-only
 // representation; Phase 2 extends it with provenance + side-effect coupling
