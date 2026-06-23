@@ -174,13 +174,13 @@ func TestSkillMemory_Retrieve_Delete_List(t *testing.T) {
 	}
 
 	// List (zero filter = all 2).
-	all := m.List(ctx, MemoryFilter{})
+	all, _ := m.List(ctx, MemoryFilter{})
 	if len(all) != 2 {
 		t.Errorf("List zero filter: len = %d, want 2", len(all))
 	}
 
 	// Filter by Class.
-	sopOnly := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningSOP)})
+	sopOnly, _ := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningSOP)})
 	if len(sopOnly) != 1 || sopOnly[0] != sop {
 		t.Errorf("List Class=SOP: got %d items, want 1 (the SOP)", len(sopOnly))
 	}
@@ -205,25 +205,25 @@ func TestSkillMemory_List_FilterBySessionID_AndStrength(t *testing.T) {
 	}
 
 	// SessionID match.
-	matched := m.List(ctx, MemoryFilter{SessionID: "sess_test"})
+	matched, _ := m.List(ctx, MemoryFilter{SessionID: "sess_test"})
 	if len(matched) != 1 {
 		t.Errorf("SessionID match: len = %d, want 1", len(matched))
 	}
 
 	// SessionID miss.
-	missed := m.List(ctx, MemoryFilter{SessionID: "other_sess"})
+	missed, _ := m.List(ctx, MemoryFilter{SessionID: "other_sess"})
 	if len(missed) != 0 {
 		t.Errorf("SessionID miss: len = %d, want 0", len(missed))
 	}
 
 	// MinStrength filter (SOP=StrengthSOP=5, set MinStrength=4 → still match).
-	matched = m.List(ctx, MemoryFilter{MinStrength: StrengthProtocol})
+	matched, _ = m.List(ctx, MemoryFilter{MinStrength: StrengthProtocol})
 	if len(matched) != 1 {
 		t.Errorf("MinStrength=4: len = %d, want 1", len(matched))
 	}
 
 	// MinStrength too high.
-	missed = m.List(ctx, MemoryFilter{MinStrength: StrengthSOP + 1})
+	missed, _ = m.List(ctx, MemoryFilter{MinStrength: StrengthSOP + 1})
 	if len(missed) != 0 {
 		t.Errorf("MinStrength>SOP: len = %d, want 0", len(missed))
 	}
@@ -239,13 +239,13 @@ func TestSkillMemory_List_ExpiredFilter(t *testing.T) {
 	}
 
 	// Default Expired=false → skip expired (none in fresh asset).
-	all := m.List(ctx, MemoryFilter{})
+	all, _ := m.List(ctx, MemoryFilter{})
 	if len(all) != 1 {
 		t.Errorf("default filter: len = %d, want 1", len(all))
 	}
 
 	// Expired=true → no expired assets in fresh store.
-	expired := m.List(ctx, MemoryFilter{Expired: true})
+	expired, _ := m.List(ctx, MemoryFilter{Expired: true})
 	if len(expired) != 0 {
 		t.Errorf("Expired=true (fresh): len = %d, want 0", len(expired))
 	}
@@ -256,13 +256,13 @@ func TestSkillMemory_List_ExpiredFilter(t *testing.T) {
 	m.mu.Unlock()
 
 	// Default filter → expired skipped.
-	all = m.List(ctx, MemoryFilter{})
+	all, _ = m.List(ctx, MemoryFilter{})
 	if len(all) != 0 {
 		t.Errorf("default filter (after expiry): len = %d, want 0", len(all))
 	}
 
 	// Expired=true → returns it.
-	expired = m.List(ctx, MemoryFilter{Expired: true})
+	expired, _ = m.List(ctx, MemoryFilter{Expired: true})
 	if len(expired) != 1 {
 		t.Errorf("Expired=true (after expiry): len = %d, want 1", len(expired))
 	}
@@ -290,7 +290,7 @@ func TestSkillMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				_, _ = m.Retrieve(ctx, "concurrent_k_A_a")
-				_ = m.List(ctx, MemoryFilter{})
+				_, _ = m.List(ctx, MemoryFilter{})
 			}
 		}(g)
 	}
@@ -343,12 +343,12 @@ func TestFeedbackMemory_Retrieve_Delete_List(t *testing.T) {
 		t.Fatalf("Store k2: %v", err)
 	}
 
-	all := m.List(ctx, MemoryFilter{})
+	all, _ := m.List(ctx, MemoryFilter{})
 	if len(all) != 2 {
 		t.Errorf("List zero filter: len = %d, want 2", len(all))
 	}
 
-	knowOnly := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningKnowledge)})
+	knowOnly, _ := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningKnowledge)})
 	if len(knowOnly) != 1 || knowOnly[0] != know {
 		t.Errorf("List Class=Knowledge: got %d items", len(knowOnly))
 	}
@@ -384,7 +384,7 @@ func TestFeedbackMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				_, _ = m.Retrieve(ctx, "fb_k_A_a")
-				_ = m.List(ctx, MemoryFilter{})
+				_, _ = m.List(ctx, MemoryFilter{})
 			}
 		}(g)
 	}
@@ -497,7 +497,7 @@ func TestScheduledMemory_Retrieve_Delete_List(t *testing.T) {
 		t.Fatalf("Store k2: %v", err)
 	}
 
-	all := m.List(ctx, MemoryFilter{})
+	all, _ := m.List(ctx, MemoryFilter{})
 	if len(all) != 2 {
 		t.Errorf("List zero filter: len = %d, want 2", len(all))
 	}
@@ -577,7 +577,7 @@ func TestScheduledMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				_, _ = m.Retrieve(ctx, "sched_k_A_a")
-				_ = m.List(ctx, MemoryFilter{})
+				_, _ = m.List(ctx, MemoryFilter{})
 				_ = m.ListDue(time.Now())
 			}
 		}(g)
