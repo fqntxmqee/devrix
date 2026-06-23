@@ -22,8 +22,16 @@ import (
 //   - Be deterministic: same input → same output (rule order is the source
 //     of priority).
 //   - Honor CommandFirst: recognized commands short-circuit.
+//
+// Phase 6 PR-F2 (D7-S12-A42-T05) adds ClassifyWithPrior to the
+// interface so SessionOrchestrator can inject AdaptivePrior uniformly
+// across all classifier implementations (RuleClassifier +
+// ShadowClassifier). The ShadowClassifier's ClassifyWithPrior
+// delegates to the wrapped rule; the prior is treated as a routing
+// input, not a shadow input.
 type IntentClassifier interface {
 	Classify(ctx context.Context, message string) (orchtypes.IntentClassification, error)
+	ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error)
 }
 
 // RuleClassifier is the rule-only implementation. It is concurrency-safe
