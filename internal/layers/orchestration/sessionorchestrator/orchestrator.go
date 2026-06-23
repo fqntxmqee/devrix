@@ -308,11 +308,12 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		return nil, fmt.Errorf("orchestrator: build observe request: %w", err)
 	}
 	prior := observeReq.EffectivePrior()
+	// Phase 7 PR-7.3 (D7-S13-A49-T06): sessionSpan carries 5 prior attributes
+	// (alpha, beta, mean, track_mode, injected_at) for D5 observability. The
+	// 6th attribute (learn.classifier_source) is set after the classify path
+	// resolves (rule vs shadow) below.
 	if sessionSpan != nil {
-		sessionSpan.SetAttributes(
-			tracer.Attribute{Key: "learn.prior.alpha", Value: fmt.Sprintf("%d", prior.PriorBeta.Alpha)},
-			tracer.Attribute{Key: "learn.prior.beta", Value: fmt.Sprintf("%d", prior.PriorBeta.Beta)},
-		)
+		sessionSpan.SetAttributes(priorSessionSpanAttrs(prior, observeReq, req)...)
 	}
 
 	classifySource := "rule"
@@ -333,6 +334,14 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		// Classify. When prior is nil or zero-mean, ClassifyWithPrior
 		// degenerates to the baseline Classify behavior.
 		intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
+	}
+	// Phase 7 PR-7.3 (D7-S13-A49-T06): mirror classifier_source onto the
+	// sessionSpan for D5 observability. This lets operators correlate
+	// "shadow" classifications with prior attributes when reading traces.
+	if sessionSpan != nil {
+		sessionSpan.SetAttributes(
+			tracer.Attribute{Key: "learn.classifier_source", Value: classifySource},
+		)
 	}
 	if classifySpan != nil {
 		classifySpan.SetAttributes(telemetry.SpanAttrs(telemetry.OpD7_S2_Orchestration_Intent_Classify,
