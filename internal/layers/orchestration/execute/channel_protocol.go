@@ -143,7 +143,18 @@ func (c *ProtocolChannel) Execute(ctx context.Context, p *plan.Plan, req Channel
 
 	// Failure path: rollback executed steps in reverse.
 	if len(executedSteps) < len(p.Steps) {
-		c.rollback(ctx, p, executedSteps)
+		if rollbackErr := c.rollback(p, executedSteps); rollbackErr != nil {
+			// Compensation failed — the protocol is left in a partially
+			// committed state. Surface this so the caller can decide to
+			// escalate (manual review, audit log, etc.) rather than
+			// silently swallowing it and over-reporting a clean rollback.
+			art.SideEffectStatus = types.SideEffectUnknown
+			art.Error = fmt.Sprintf("step %d (%s) failed: %v; rollback failed: %v",
+				len(executedSteps), p.Steps[len(executedSteps)].ToolName,
+				stepErrs[len(executedSteps)], rollbackErr)
+			return art, fmt.Errorf("protocol_channel: rollback failed after %d/%d steps: %w (original: %v)",
+				len(p.Steps)-len(executedSteps), len(p.Steps), rollbackErr, stepErrs[len(executedSteps)])
+		}
 		art.SideEffectStatus = types.SideEffectRolledBack
 		return art, fmt.Errorf("protocol_channel: %d/%d steps failed (rolled back)",
 			len(p.Steps)-len(executedSteps), len(p.Steps))
@@ -156,7 +167,24 @@ func (c *ProtocolChannel) Execute(ctx context.Context, p *plan.Plan, req Channel
 // rollback re-invokes the completed steps in reverse order with a
 // __rollback hint. PR-C2 uses this minimal scheme; PR-C4 ToolSpec v3
 // will add the explicit CompensationTool field.
-func (c *ProtocolChannel) rollback(ctx context.Context, p *plan.Plan, executedSteps []int) {
+//
+// Uses context.Background() (with a per-call timeout) instead of the
+// passed-in ctx because the caller-supplied ctx may already be cancelled
+// at this point (the failure that triggered the rollback often cancels
+// the upstream ctx). Compensation must run to completion to keep the
+// protocol in a consistent state — aborting compensation mid-rollback
+// would leave the system in a worse state than not rolling back at all.
+//
+// Returns the first non-nil rollback error (if any). All rollback
+// attempts are still attempted; the function does not short-circuit on
+// error so a single failed compensation does not strand the rest of
+// the in-flight side effects. The first error is sufficient because
+// the caller already reports the original failure to the user; the
+// rollback error is appended for observability only.
+func (c *ProtocolChannel) rollback(p *plan.Plan, executedSteps []int) error {
+	rollbackCtx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
+	defer cancel()
+	var firstErr error
 	for i := len(executedSteps) - 1; i >= 0; i-- {
 		idx := executedSteps[i]
 		step := p.Steps[idx]
@@ -165,12 +193,16 @@ func (c *ProtocolChannel) rollback(ctx context.Context, p *plan.Plan, executedSt
 			rollbackArgs[k] = v
 		}
 		rollbackArgs["__rollback"] = true
-		_, _ = c.runner.Invoke(ctx, ToolRequest{
+		_, err := c.runner.Invoke(rollbackCtx, ToolRequest{
 			SessionID:      "",
 			ToolName:       step.ToolName,
 			Args:           rollbackArgs,
 			IdempotencyKey: step.IdempotencyKey + ":rollback",
 			StepID:         step.ID + ":rollback",
 		})
+		if err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("rollback step %d (%s): %w", idx, step.ToolName, err)
+		}
 	}
+	return firstErr
 }
