@@ -1,0 +1,128 @@
+id: devrix-d7-mups-v4-phase2-plan
+demand_id: DM-20260623-001-PRB1
+title: "D7 MUPS v4.3 Phase 2 PR-B1 (Plan 4 类 + Planner interface + MatchKind 4 Rules)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 2 Plan 节点落地梳理
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S8-A22
+    name: Plan Data Contract + Planner (Phase 2 PR-B1)
+    description: |
+      MUPS v4.3 Phase 2 Plan 节点的数据契约层（PR-B1）。落地：
+      (1) 新建 internal/layers/orchestration/plan 包；
+      (2) PlanKind 4 类枚举（CommitmentPlan / ProtocolPlan / ScenarioPlan /
+      ExplorationPlan）+ snake_case wire format + MarshalJSON/UnmarshalJSON
+      + ParsePlanKind CLI 反向解析；
+      (3) BlastRadius（FileCount/APICallCount/TokenCost/PersistScope 3 态）
+      + FailureCriterion（PP-2 可证伪性）+ Step（IdempotencyKey）；
+      (4) Plan struct + 不可变 With* 模式（WithKind/WithStrength/WithFailureCriteria/
+      WithBlastRadius/WithAnomaliesCount）+ Validate() 强制 PP-1 强度范围 + PP-2
+      FailureCriteria 非空 + Op 白名单 + Field 可观察 + PP-3 BlastRadius 阈值；
+      (5) ReverseLookupObservations Phase 4 Verify 反向追溯入口；
+      (6) Planner interface + DefaultPlanner + PlanInput struct + MatchKind
+      4 规则分类器（intent_orchestrate/high-anomaly/single-step/
+      intent_command+multi-step/scenario-default）+ uncertainty-first tie-break；
+      (7) strengthFloor 公式（0.7 base − 0.1·anomalies + min(observations·0.02, 0.2)）；
+      (8) 9 SentinelError + 3 helpers（PLAN_KIND_8001 / PLAN_LINEAGE_8002 /
+      PLAN_BLAST_8003）。
+    rationale: |
+      Phase 2 PR-B1 是 MUPS v4.3 Phase 2（Observe → Plan → Execute）的第二步，
+      也是 PR-RF（C2/W8 MatchKind 签名收紧）的落点。本 PR 单独成立的原因：
+      (a) Plan 4 类 + Planner interface 是 Phase 3 PR-C2 ChannelRouter 的直接
+      依赖；(b) Plan.SourceObservationIDs 是 Phase 4 Verify 反向追溯的入口；
+      (c) C2/W8 决议：MatchKind 签名收紧为 `(*UncertaintyReport)`，从 PR-A1
+      stub（`[]Observation`）升级，避免后续 PR-C2 再次破坏 API；
+      (d) PlanKind wire format 与 shared/types.ArtifactKind（PR-C1）同款
+      snake_case 约定，D5 dashboard 字符串过滤可统一。
+
+# 测试点（PR-B1 实际实现 3 个 P0 + 6 补充）
+test_points:
+  - id: D7-S8-A22-T01
+    name: |
+      PlanKind 4 类枚举（CommitmentPlan/ProtocolPlan/ScenarioPlan/ExplorationPlan）
+      + String() snake_case wire format + MarshalJSON 输出字符串 +
+      UnmarshalJSON 未知值 fail-fast + KindUnset omitempty + ParsePlanKind
+      CLI 反向解析。
+    status: IMPLEMENTED
+  - id: D7-S8-A22-T02
+    name: |
+      Plan.SourceObservationIDs 必填（空 → ErrPlanSourceObservationIDsRequired +
+      错误码 PLAN_LINEAGE_8002）+ NewPlan 防御性拷贝（外部 mutation 不影响
+      Plan 内字段）+ ReverseLookupObservations Phase 4 Verify 反向追溯入口
+      （按 ID 集合求交）+ 重复 ID 不产生重复结果 + 空输入边界（nil/empty）。
+    status: IMPLEMENTED
+  - id: D7-S8-A22-T03
+    name: |
+      MatchKind 4 规则分类器（Rule 1: intent_orchestrate OR anomaliesCount≥3 →
+      ExplorationPlan; Rule 2: stepCount==1 → CommitmentPlan; Rule 3:
+      intent_command OR stepCount≤3 → ProtocolPlan; Rule 4: default →
+      ScenarioPlan）+ uncertainty-first tie-break + DefaultPlanner.Plan()
+      完整集成（强度公式 / 校验失败传递 / BlastRadius 透传 / 空
+      ObservationIDs fast-fail）。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/plan/plan.go (NEW): PlanKind enum + String/Marshal/Unmarshal/Parse
+  - internal/layers/orchestration/plan/blast_radius.go (NEW): BlastRadius + PersistScope + FailureCriterion + Step
+  - internal/layers/orchestration/plan/errors.go (NEW): 9 sentinel + 3 helpers
+  - internal/layers/orchestration/plan/plan_struct.go (NEW): Plan + With* + Validate + ReverseLookupObservations
+  - internal/layers/orchestration/plan/planner.go (NEW): Planner interface + DefaultPlanner + MatchKind + strengthFloor
+  - internal/layers/orchestration/plan/plan_test.go (NEW): 30 tests / 93.5% coverage
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S8-A22 Requirement (D7 v4.3.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S8-A22-T01..T03 (v3.11.0)
+
+out_of_scope:
+  - PR-A2 IntentQuantizer: 待 Phase 2 PR-A2 独立 change
+  - PR-A3 AnomalyDetector: 待 Phase 2 PR-A3 独立 change
+  - PR-A4 ObserveNode wiring (ProcessMessage 集成): 待 Phase 2 PR-A4 独立 change
+  - PR-B2 Plan.Validate 校验细化（Field 可观察性扩展）: 待 Phase 2 PR-B2 独立 change
+  - PR-B3 LLMPlanner: 待 Phase 2 PR-B3 独立 change
+  - Phase 3 Execute 4 Channel (PR-C2): 并行 PR，依赖本 PR 落地
+  - Phase 4 Verify ReverseLookup consumer: 待 Phase 4 独立 change
+  - Phase 5 Learn ReputationEvidence consumer: 待 Phase 5 独立 change
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-B1
+    scope: "Plan 4 类 + Planner interface + MatchKind 4 Rules + Plan.Validate PP-1/2/3"
+    files: 6
+    estimated_loc: +1458 / -0
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase2-pr-b1 (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/167
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（UncertaintyCoord precedent）
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF（Observation 4 类 + UncertaintyReport）
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1（Artifact 4 类 + SideEffect 5 态，wire format 协同）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase2-observe-plan/{demand,proposal,design,tasks}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race -count=1 ./internal/layers/orchestration/plan/...
+    - go build ./...
+  s5_gate:
+    - go test -cover ./internal/layers/orchestration/plan/...  # coverage 93.5% ≥ 80% gate
+    - 30 个测试 100% PASS（0 race detector warnings）
+    - 3 个 P0 T 点全部 IMPLEMENTED（D7-S8-A22-T01/T02/T03）
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase2-plan

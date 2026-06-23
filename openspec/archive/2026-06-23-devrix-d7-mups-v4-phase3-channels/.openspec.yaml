@@ -1,0 +1,140 @@
+id: devrix-d7-mups-v4-phase3-channels
+demand_id: DM-20260625-001-PRC2
+title: "D7 MUPS v4.3 Phase 3 PR-C2 (Execute 4 Channel + ChannelRouter + 5 T 点)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 3 Execute 节点 4 Channel 落地梳理
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S9-A26
+    name: Execute 4 Channel + ChannelRouter (Phase 3 PR-C2)
+    description: |
+      MUPS v4.3 Phase 3 Execute 节点 4 Channel + ChannelRouter 落地（PR-C2）。
+      落地：
+      (1) 新建 internal/layers/orchestration/execute 包；
+      (2) Channel interface（Name/Supports/Execute）+ ChannelRegistry
+      （PlanKind → Channel 1:1 绑定 + 冲突检测）+ ChannelRouter（无状态分发）；
+      (3) CommitChannel（CommitmentPlan → ArtifactStateChangeCert，1-Step 同步 +
+      IdempotencyKey 强制 + 超时 SideEffectInflight）；
+      (4) ProtocolChannel（ProtocolPlan → ArtifactResponseRecord，顺序多步 +
+      失败 reverse-order rollback）；
+      (5) ScenarioChannel（ScenarioPlan → ArtifactProbeReport，并行探测 +
+      多数派投票 MaxParallel=5）；
+      (6) ExplorationChannel（ExplorationPlan → ArtifactExperimentData，
+      多 agent 并行 + 优先级排序 + PersistScope 派生 SideEffectStatus）；
+      (7) 5 SentinelError + 4 helpers（EXEC_CHANNEL_9001..9004）；
+      (8) PlanKind ↔ ArtifactKind 1:1 映射（C2/W8 决议落地）；
+      (9) 5 P0 T 点 + 22 测试（88.1% 覆盖率）。
+    rationale: |
+      Phase 3 PR-C2 是 MUPS v4.3 Phase 3（Execute 节点）的第二步，
+      紧接 PR-C1（Artifact 数据契约）。本 PR 单独成立的原因：
+      (a) 4 Channel + ChannelRouter 是 Phase 3 7 PR 拆解（PR-C1..C7）
+      中 PR-C2..C7 的执行入口；(b) Channel 抽象使得后续 PR-C3 StrategyDecider
+      可以插桩在 ChannelRouter.Route 与 Channel.Execute 之间；(c) PlanKind →
+      ArtifactKind 1:1 映射是 D5 dashboard 字符串过滤的基础；(d) 4 Channel
+      共享 ToolRunner interface 解耦 PR-C4 ToolSpec v3，PR-C2 可独立落地
+      不依赖后续 PR。
+
+# 测试点（PR-C2 实际实现 5 个 P0 + 2 补充）
+test_points:
+  - id: D7-S9-A26-T01
+    name: |
+      Channel interface + ChannelRegistry（Register 4 Channel 0 冲突 + Get
+      not-found ErrChannelNotFound + Register 重复 ErrChannelUnsupported）
+      + ChannelRouter.Route 4 PlanKind → 4 ArtifactKind 1:1 映射 +
+      defensive checks（nil Plan / unknown Kind）。
+    status: IMPLEMENTED
+  - id: D7-S9-A26-T02
+    name: |
+      CommitChannel（CommitmentPlan → ArtifactStateChangeCert）+ Supports 仅
+      CommitmentPlan + 多步 Plan → ErrChannelStepCountMismatch + 无
+      IdempotencyKey → fail-fast + 超时 → SideEffectInflight + nil runner
+      constructor → ErrChannelToolRunnerNil。
+    status: IMPLEMENTED
+  - id: D7-S9-A26-T03
+    name: |
+      ProtocolChannel（ProtocolPlan → ArtifactResponseRecord）+ 顺序多步 +
+      失败 reverse-order rollback（含 __rollback hint 标记）+ Supports guard
+      + 空 Steps rejection。
+    status: IMPLEMENTED
+  - id: D7-S9-A26-T04
+    name: |
+      ScenarioChannel（ScenarioPlan → ArtifactProbeReport）+ MaxParallel=5
+      并行执行 + 多数派投票（success > len/2 → pass）+ 失败多数派触发
+      ErrChannelStepCountMismatch + SideEffectStatus=None（read-only）。
+    status: IMPLEMENTED
+  - id: D7-S9-A26-T05
+    name: |
+      ExplorationChannel（ExplorationPlan → ArtifactExperimentData）+ MaxParallel=3
+      并行 + 容忍部分失败（free-fork 语义）+ 优先级排序（success → duration
+      → EstimatedTokens）+ PersistScope → SideEffectStatus 派生（transient
+      → None, session/permanent → Committed, unknown → Unknown）。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/execute/channel.go (NEW): Channel interface + ChannelRegistry + ChannelRouter
+  - internal/layers/orchestration/execute/channel_commit.go (NEW): CommitChannel (1-Step sync)
+  - internal/layers/orchestration/execute/channel_protocol.go (NEW): ProtocolChannel (sequential + rollback)
+  - internal/layers/orchestration/execute/channel_scenario.go (NEW): ScenarioChannel (parallel + majority vote)
+  - internal/layers/orchestration/execute/channel_exploration.go (NEW): ExplorationChannel (multi-agent + priority)
+  - internal/layers/orchestration/execute/errors.go (NEW): 5 sentinels + 4 helpers
+  - internal/layers/orchestration/execute/execute_test.go (NEW): 22 tests / 88.1% coverage
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S9-A26 Requirement (D7 v4.3.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S9-A26-T01..T05 (v3.11.0)
+
+out_of_scope:
+  - PR-C3 StrategyDecider + RetryPolicy: 待 Phase 3 PR-C3 独立 change
+  - PR-C4 ToolSpec v3 (10 fields): 待 Phase 3 PR-C4 独立 change（PR-C2 用本地 ToolRunner interface 隔离）
+  - PR-C5 ExecutionEvidence 结构化: 待 Phase 3 PR-C5 独立 change
+  - PR-C6 VerifyTrigger wiring: 待 Phase 3 PR-C6 独立 change
+  - PR-C7 Executor + DispatchWorker v2: 待 Phase 3 PR-C7 独立 change（包装 ChannelRouter + ChannelRegistry）
+  - Phase 4 Verify ReverseLookup consumer: 待 Phase 4 独立 change
+  - Phase 5 Learn ExperimentData consumer: 待 Phase 5 独立 change
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-C2
+    scope: "Execute 4 Channel + ChannelRouter + 5 P0 T 点"
+    files: 7
+    estimated_loc: +1728 / -0
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase3-pr-c2 (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/168
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（UncertaintyCoord precedent）
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF（Observation 4 类）
+  - devrix-d7-mups-v4-phase2-plan  # Phase 2 PR-B1（Plan 4 类 + Planner + MatchKind 4 Rules — 直接前置依赖）
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1（ArtifactKind 4 类 + SideEffectStatus 5 态 — 直接前置依赖）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase3-execute/{demand,proposal,design,tasks}.md
+  - openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/design.md  # PR-C2 原始 design 在 §3
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race -count=1 ./internal/layers/orchestration/execute/...
+    - go build ./...
+    - go test -race ./internal/lint/layer/...  # layer-lint 0 violations
+  s5_gate:
+    - go test -cover ./internal/layers/orchestration/execute/...  # coverage 88.1% ≥ 80% gate
+    - 22 个测试 100% PASS（0 race detector warnings）
+    - 5 个 P0 T 点全部 IMPLEMENTED（D7-S9-A26-T01/T02/T03/T04/T05）
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase3-channels
