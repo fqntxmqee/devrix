@@ -3,6 +3,8 @@ package workmodel
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"strings"
 
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -217,6 +219,18 @@ func AggregateVerdicts(verdicts []Verdict, strategy AggregationStrategy) Verdict
 
 // aggregateMeta computes averaged Confidence + longest Reason for a
 // homogeneous-kind verdict slice.
+//
+// Metadata preservation (homogeneous shortcut only):
+//
+//	SourceID            — comma-joined deduplicated union of all
+//	                      non-empty SourceIDs (the original "first
+//	                      wins" silently dropped cross-source provenance).
+//	IndeterminateReason — longest non-empty value across the slice
+//	                      (matches the Reason aggregation policy).
+//	SystemAnomaly       — OR-aggregate (any true → true) so a single
+//	                      anomaly in the set propagates to the result.
+//	Kind                 — preserved from verdicts[0] (homogeneous
+//	                      invariant guarantees all entries match).
 func aggregateMeta(verdicts []Verdict) Verdict {
 	if len(verdicts) == 0 {
 		return Verdict{Kind: types.VerdictIndeterminate}
@@ -224,14 +238,60 @@ func aggregateMeta(verdicts []Verdict) Verdict {
 	out := verdicts[0]
 	confSum := out.Confidence
 	longestReason := out.Reason
+	seenSource := map[string]struct{}{}
+	if out.SourceID != "" {
+		seenSource[out.SourceID] = struct{}{}
+	}
+	systemAnomaly := out.SystemAnomaly
+	longestIndet := out.IndeterminateReason
 	for i := 1; i < len(verdicts); i++ {
 		confSum += verdicts[i].Confidence
 		if len(verdicts[i].Reason) > len(longestReason) {
 			longestReason = verdicts[i].Reason
 		}
+		if verdicts[i].SystemAnomaly {
+			systemAnomaly = true
+		}
+		if len(verdicts[i].IndeterminateReason) > len(longestIndet) {
+			longestIndet = verdicts[i].IndeterminateReason
+		}
+		if verdicts[i].SourceID != "" {
+			if _, dup := seenSource[verdicts[i].SourceID]; !dup {
+				seenSource[verdicts[i].SourceID] = struct{}{}
+			}
+		}
 	}
 	out.Confidence = confSum / float64(len(verdicts))
 	out.Reason = longestReason
+	out.SystemAnomaly = systemAnomaly
+	out.IndeterminateReason = longestIndet
+	// Build the deduplicated SourceID union (preserve first-seen order).
+	if len(seenSource) == 0 {
+		out.SourceID = ""
+	} else if len(seenSource) == 1 {
+		for id := range seenSource {
+			out.SourceID = id
+		}
+	} else {
+		ids := make([]string, 0, len(seenSource))
+		// First-seen order: re-walk verdicts so the joined SourceID
+		// matches the input order, not the map iteration order.
+		ordered := make(map[string]struct{}, len(seenSource))
+		for _, v := range verdicts {
+			if v.SourceID == "" {
+				continue
+			}
+			if _, dup := ordered[v.SourceID]; dup {
+				continue
+			}
+			if _, present := seenSource[v.SourceID]; !present {
+				continue
+			}
+			ordered[v.SourceID] = struct{}{}
+			ids = append(ids, v.SourceID)
+		}
+		out.SourceID = strings.Join(ids, ",")
+	}
 	return out
 }
 
@@ -358,7 +418,17 @@ func aggregateThresholdByPass(verdicts []Verdict, threshold int) Verdict {
 // clamp01OrFallback clamps v into [0,1]. If the value is NaN or out of
 // range, the fallback is used. Mirrors the helper from PR-A1
 // uncertainty.go so the behaviour is consistent across packages.
+//
+// NaN handling: NaN comparisons always return false (including <, >, ==
+// and !=), so without an explicit IsNaN check NaN would leak through
+// and pollute downstream aggregates (sum-of-confidence, Bayesian
+// inputs, etc.) with NaN, propagating the failure to all subsequent
+// computations. Catching NaN at the boundary is cheaper than the
+// alternative — defensive checks in every consumer.
 func clamp01OrFallback(v, fallback float64) float64 {
+	if math.IsNaN(v) {
+		return fallback
+	}
 	if v < 0 || v > 1 {
 		return fallback
 	}
