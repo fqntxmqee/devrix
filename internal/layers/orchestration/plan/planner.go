@@ -1,5 +1,12 @@
 package plan
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+
+	"github.com/google/uuid"
+)
+
 // Planner constructs a Plan from an UncertaintyReport. This is the core
 // Phase 2 PR-B1 surface; Phase 4 Verify and Phase 5 Learn consume the
 // resulting Plan.
@@ -77,7 +84,7 @@ func (p *DefaultPlanner) Plan(input PlanInput) (*Plan, error) {
 		fc = []FailureCriterion{}
 	}
 
-	planID := "plan_" + input.SessionID + "_" + input.ObservationIDs[0]
+	planID := NewPlanID(input.SessionID, input.ObservationIDs)
 	pl := NewPlan(planID, input.SessionID, kind, input.ObservationIDs, steps, strength).
 		WithFailureCriteria(fc).
 		WithBlastRadius(input.BlastRadius).
@@ -145,4 +152,56 @@ func strengthFloor(anomaliesCount, observationCount int) float64 {
 		floor = 1
 	}
 	return floor
+}
+
+// NewPlanID generates a stable, collision-resistant Plan ID.
+//
+// Format: "plan_<uuid-prefix>_<input-hash-prefix>"
+//   - uuid-prefix: 8-char UUID segment (16M values per session, collision-safe)
+//   - input-hash-prefix: 8-char SHA-256 hex of (sessionID + sorted obsIDs).
+//     The hash makes the ID deterministic for the same input set — useful
+//     for caching / re-derivation in tests and trace dedup, while the
+//     UUID segment ensures different Plan invocations for the same input
+//     (e.g. a Plan re-Planned after a Verify retry) get distinct IDs.
+//
+// The previous format ("plan_" + sessionID + "_" + obsIDs[0]) had two
+// problems:
+//  1. If sessionID or obsID contained '_' or ':' or '.', the format
+//     became ambiguous on round-trip parsing (LogReader split on '_').
+//  2. If two Plan calls in the same session used the same first obsID
+//     (a legitimate occurrence, e.g. replanning after Verify retry),
+//     the IDs collided — silent dedup in downstream trace queries.
+func NewPlanID(sessionID string, observationIDs []string) string {
+	// Sorted, deduped input set for the deterministic hash.
+	uniq := make(map[string]struct{}, len(observationIDs))
+	for _, id := range observationIDs {
+		if id == "" {
+			continue
+		}
+		uniq[id] = struct{}{}
+	}
+	ordered := make([]string, 0, len(uniq))
+	for id := range uniq {
+		ordered = append(ordered, id)
+	}
+	sortStrings(ordered)
+
+	h := sha256.New()
+	h.Write([]byte(sessionID))
+	for _, id := range ordered {
+		h.Write([]byte{0})
+		h.Write([]byte(id))
+	}
+	hashHex := hex.EncodeToString(h.Sum(nil))
+	return "plan_" + uuid.New().String()[:8] + "_" + hashHex[:8]
+}
+
+// sortStrings sorts a string slice in ascending order. Local helper to
+// avoid importing "sort" at file scope for one call site.
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j-1] > s[j]; j-- {
+			s[j-1], s[j] = s[j], s[j-1]
+		}
+	}
 }
