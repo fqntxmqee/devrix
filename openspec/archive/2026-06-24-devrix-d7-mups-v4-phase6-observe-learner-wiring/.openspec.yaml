@@ -1,0 +1,215 @@
+id: devrix-d7-mups-v4-phase6-observe-learner-wiring
+demand_id: DM-20260624-001
+title: "D7 MUPS v4.3 Phase 6 Observe-Learner 跨域闭环集成 (PR-F1/F2/F3 + LP-1 闭环)"
+status: s7_archived
+priority: P0
+created: 2026-06-24
+author: MUPS v4.3 Phase 6 Observe-Learner 跨域闭环集成
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S12-A41
+    name: ObserveRequest + IntentQuantizer + AnomalyDetector + ClassifyWithPrior (Observer 子模块 + WithPrior 变体)
+    description: |
+      Phase 6 PR-F1 (D7-S12-A41-T01/T02/T03) 闭环 Phase 5 PR-E5 E5.4 T13 PARTIAL。
+      (1) orchtypes/observe_request.go ObserveRequest struct 3 字段 (SessionID + Message +
+      Prior *learn.AdaptivePrior) + NewObserveRequest fail-fast 校验 + EffectivePrior()
+      返回 DefaultDeveloperPrior 兜底 + Validate()；
+      (2) orchtypes/intent_quantizer.go IntentQuantizer struct + 4 IntentClass 枚举
+      (IntentClassFact / IntentClassCommand / IntentClassOrchestrate / IntentClassSkip)
+      + IntentPayload 4 字段 (Class + Confidence + Reason + SubClass) +
+      Quantize baseline + QuantizeWithPrior (prior.PriorBeta.Mean() 作为 confidence
+      乘数, clamp [0,100])；
+      (3) orchtypes/anomaly_detector.go Anomaly + AnomalyReport + AnomalyDetector +
+      HistoricalDetector + Detect baseline + DetectWithPrior (threshold = 0.5 × mean,
+      Mean 越高阈值越高 = 更信任用户 = 更易放过异常)；
+      (4) decisionplanning/classifier.go RuleClassifier.ClassifyWithPrior (在 Classify
+      baseline 上叠加 prior.PriorBeta.Mean() 乘数) + IntentClassifier 接口扩展
+      ClassifyWithPrior 方法 (RuleClassifier + ShadowClassifier + 测试 mock 均实现)。
+      不可变模式: prior 不被 Observer 子模块修改, EffectivePrior 返回新对象。
+    rationale: |
+      Phase 5 PR-E5 T13 PARTIAL 续。Observe 节点需要 WithPrior 变体才能消化 LP-1
+      注入的 AdaptivePrior。3 通道观察 (intent / anomaly / classify) 是 Phase 2
+      PR-A1 4×4 象限的具体 Observer 实现。
+  - id: D7-S12-A42
+    name: SessionOrchestrator.buildObserveRequest + WithLearner + 3 层 fail-safe
+    description: |
+      Phase 6 PR-F2 (D7-S12-A42-T04/T05) 闭环 Phase 5 LP-1 读侧入口。
+      (1) sessionorchestrator/orchestrator.go 新增 `learner learn.Learner` 字段 +
+      `WithLearner(l learn.Learner) OrchestratorOption` (懒构造 default learner)；
+      (2) 新增 `buildObserveRequest(ctx, req) (orchtypes.ObserveRequest, error)` 方法:
+      调用 o.learner.Inject 拿 AdaptivePrior → 3 层 fail-safe (nil learner /
+      Inject error / 正常路径) → 统一返回 DefaultDeveloperPrior Beta(5,3) 兜底；
+      (3) ProcessMessage 在 classifySpan 之前调用 buildObserveRequest, 把
+      observeReq.Prior 传给 classifier.ClassifyWithPrior (替换原 Classify)；
+      (4) ShadowClassifier.ClassifyWithPrior 委托给底层 rule.ClassifyWithPrior
+      (LP-1 不影响 shadow 异步路径, 保持 sample 可比性)；
+      (5) IntentClassifier 接口扩展 ClassifyWithPrior 方法, 既有 RuleClassifier
+      / ShadowClassifier / 测试 mock 全部实现。
+    rationale: |
+      LP-1 节点级落地最后一步。Learner.Inject → AdaptivePrior → Orchestrator
+      → 3 Observer 子模块 形成 5 节点管道 Observe → Plan → Execute → Verify →
+      Learn → 下一轮 Observe 的关键回写路径。
+  - id: D7-S12-A43
+    name: LP-1 闭环 E2E 集成测试 (4 scenarios)
+    description: |
+      Phase 6 PR-F3 (D7-S12-A43-T06) 端到端验证 LP-1 + LP-5 跨域集成。
+      tests/integration/d7/learn_observe_closure_test.go 4 E2E 测试:
+      (1) TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior — 3 × VerdictPass 累积
+      Alpha=3, Round 2 观察 Beta(8,3) Mean=8/11 ≈ 0.727;
+      (2) TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution —
+      ⭐G8-1 fix: VerdictIndeterminate + verifier_parse_failure 仅
+      VerifierFailureCount++, Alpha/Beta 不污染, Round 2 仍 Beta(5,3) 冷启动;
+      (3) TestE2E_LP1_ClosedLoop_PendingAssetScheduledMemory — ⭐LP-2:
+      VerdictIndeterminate + env_limited → PendingAsset 仅在 ScheduledMemory,
+      不在 Skill/Feedback, ListDue 在 TriggerAt 之后返回;
+      (4) TestE2E_5NodePipeline_End2End — ⭐LP-5: 完整 5 节点 1 轮端到端 +
+      反向追溯 (Plan.SourceObservationIDs / Verdict.SourceArtifactID /
+      Asset.SourceSessionIDs)。
+      使用 in-memory mocks (InMemoryReputationStore + 3 Memory 通道 +
+      recordingExecutor + recordingClassifier), 无外部 LLM/D2/D3 依赖。
+    rationale: |
+      Phase 5 PR-E5 T13 PARTIAL 闭环验证。E2E 集成测试比 unit test 更能证明
+      LP-1 闭环在真实 orchestrator wiring 下 work (Observe → ClassifyWithPrior
+      → Engine → Verdict → Learn → ReputationStore → 下一轮 Inject → 再 Observe)。
+
+# 测试点 (PR-F1/F2/F3 实际实现 6 个)
+test_points:
+  - id: D7-S12-A41-T01
+    name: |
+      ObserveRequest struct + NewObserveRequest fail-fast 校验 (SessionID/Message
+      非空) + EffectivePrior() 兜底 DefaultDeveloperPrior + Validate() + 不可变。
+    status: IMPLEMENTED
+  - id: D7-S12-A41-T02
+    name: |
+      IntentQuantizer struct + 4 IntentClass 枚举 + IntentPayload 4 字段 +
+      Quantize baseline + QuantizeWithPrior (prior.PriorBeta.Mean() 作为 confidence
+      乘数, clamp [0,100]) + 不可变 + 并发安全。
+    status: IMPLEMENTED
+  - id: D7-S12-A41-T03
+    name: |
+      AnomalyDetector + Anomaly + AnomalyReport + HistoricalDetector.Detect
+      baseline + HistoricalDetector.DetectWithPrior (threshold = 0.5 × mean,
+      Mean 越高阈值越高 = 更信任用户 = 更易放过异常) + 不可变 + 并发安全。
+    status: IMPLEMENTED
+  - id: D7-S12-A42-T04
+    name: |
+      SessionOrchestrator 新增 `learner learn.Learner` 字段 + `WithLearner` option
+      + buildObserveRequest 方法 (调用 Learner.Inject, 3 层 fail-safe) +
+      ProcessMessage 在 classifySpan 之前调用 buildObserveRequest +
+      IntentClassifier 接口扩展 ClassifyWithPrior + RuleClassifier.ClassifyWithPrior
+      (PR-F1) + ShadowClassifier.ClassifyWithPrior 委托给底层 rule。
+    status: IMPLEMENTED
+  - id: D7-S12-A42-T05
+    name: |
+      buildObserveRequest 3 层 fail-safe 单元测试 (nil learner / Inject error /
+      正常路径 全部返回 DefaultDeveloperPrior Beta(5,3) 兜底) +
+      ProcessMessage UsePriorInClassification 集成测试 (prior 影响 confidence)。
+    status: IMPLEMENTED
+  - id: D7-S12-A43-T06
+    name: |
+      E2E LP-1 闭环集成测试 4 scenarios (Learn Pass Accumulate + INDETERMINATE
+      parse_failure No Pollution + PendingAsset ScheduledMemory + 5-Node Pipeline
+      End2End) + 完整 LP-5 反向追溯链验证。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/orchtypes/observe_request.go (NEW): ObserveRequest + NewObserveRequest + EffectivePrior + Validate
+  - internal/layers/orchestration/orchtypes/observe_request_test.go (NEW): 4 tests
+  - internal/layers/orchestration/orchtypes/intent_quantizer.go (NEW): IntentClass 4 枚举 + IntentPayload + IntentQuantizer + Quantize + QuantizeWithPrior
+  - internal/layers/orchestration/orchtypes/intent_quantizer_test.go (NEW): 8 tests
+  - internal/layers/orchestration/orchtypes/anomaly_detector.go (NEW): Anomaly + AnomalyReport + AnomalyDetector + HistoricalDetector + Detect + DetectWithPrior
+  - internal/layers/orchestration/orchtypes/anomaly_detector_test.go (NEW): 6 tests
+  - internal/layers/orchestration/decisionplanning/classifier.go (MODIFIED): RuleClassifier.ClassifyWithPrior (prior.PriorBeta.Mean() 乘数)
+  - internal/layers/orchestration/decisionplanning/classifier_with_prior_test.go (NEW): 4 tests
+  - internal/layers/orchestration/decisionplanning/shadow_classifier.go (MODIFIED): ShadowClassifier.ClassifyWithPrior (委托给底层 rule)
+  - internal/layers/orchestration/sessionorchestrator/orchestrator.go (MODIFIED): learner 字段 + WithLearner option + buildObserveRequest + ProcessMessage ClassifyWithPrior 调用
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_learner_test.go (NEW): 8 tests (WithLearner wiring + fail-safe + buildObserveRequest variants)
+  - internal/layers/orchestration/sessionorchestrator/entry_test.go (MODIFIED): errClassifier + forcedKindClassifier mocks 实现 ClassifyWithPrior
+  - internal/layers/orchestration/learn/adaptive_prior.go (MODIFIED): BetaPrior.Mean() 方法 (α+β==0 → 0 兜底)
+  - internal/layers/orchestration/learn/adaptive_prior_test.go (MODIFIED): Mean() 单测
+  - tests/integration/d7/learn_observe_closure_test.go (NEW): 4 E2E 集成测试 + helpers (recordingExecutor + recordingClassifier + artifactStub + obsStub)
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S12-A41/A42/A43 Requirement (D7 v4.6.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S12-A41-T01/T02/T03 + A42-T04/T05 + A43-T06 (v3.14.0)
+
+out_of_scope:
+  - 不修改 Phase 5 Learn 节点核心契约: LearningAsset / ReputationEvidence / Memory 3 通道 / Learner 已有契约保持稳定, 仅在 AdaptivePrior 上加 Mean() 方法
+  - 不引入新 LLM 模型: 3 层 fail-safe + DefaultDeveloperPrior Beta(5,3) 兜底已足够
+  - 不实现 D2 ContextEngine-backed ReputationStore: InMemoryReputationStore 仍为 v1.0 实现, 持久化留待 Phase 7+
+  - 不实现 Orchestrator 的 prior 注入可观测化 (D5 spans/M5 metrics 已有 sessionSpan.SetAttributes prior.alpha/beta 标注)
+  - 不修复 Stage 5 PR-E5 T13 PARTIAL 之外的任何 Phase 5 范围: Phase 6 仅闭环 LP-1 wiring, 不动 LearningAsset / Memory / BayesianUpdate
+  - 不修改 ShadowClassifier 异步路径: ShadowClassifier.ClassifyWithPrior 委托给 rule, 异步 shadow 调用保持无 prior 路径以保证样本可比性
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-F1
+    scope: "Observer 子模块 + WithPrior 变体 (ObserveRequest + IntentQuantizer + AnomalyDetector + RuleClassifier.ClassifyWithPrior)"
+    files: 5 NEW + 1 MODIFIED
+    estimated_loc: "+700 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase6-observe-learner-wiring (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/183
+  - pr: PR-F2
+    scope: "Orchestrator 集成 Learner (learner 字段 + WithLearner + buildObserveRequest + ProcessMessage ClassifyWithPrior)"
+    files: 1 NEW + 1 MODIFIED
+    estimated_loc: "+200 / -30"
+    risk: Medium
+    branches:
+      - feat/devrix-d7-mups-v4-phase6-observe-learner-wiring (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/184
+  - pr: PR-F3
+    scope: "端到端 LP-1 闭环集成测试 (4 E2E scenarios + in-memory mocks)"
+    files: 1 NEW
+    estimated_loc: "+529 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase6-observe-learner-wiring (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/185
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase5-learn  # Phase 5 PR-E5 (LP-1 closed loop wired, T13 PARTIAL 留 Phase 6)
+  - devrix-d7-mups-v4-phase4-verify-promotion  # Phase 4 PR-D4 (ObserveNode wiring + SystemAnomaly aggregation)
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1 (跨域类型上提 shared/types precedent)
+  - devrix-d7-mups-v4-phase3-channels  # Phase 3 PR-C2 (4 Channel + ChannelRouter)
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 (Observation 4 类 + UncertaintyReport)
+  - devrix-d7-mups-v4-phase2-plan  # Phase 2 PR-B1 (Plan 4 类 + PlanKind + Planner)
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 (UncertaintyCoord + AdaptiveThreshold wiring + Verifier + ExitReason)
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-prar-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-prb1-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-prc1-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-prc2-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase4-s7-archived.md
+  - openspec/changes/devrix-d7-mups-v4-phase6-observe-learner-wiring/{demand,proposal,design,tasks}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v4.6.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v3.14.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./internal/layers/orchestration/orchtypes/...
+    - go vet ./internal/layers/orchestration/decisionplanning/...
+    - go vet ./internal/layers/orchestration/sessionorchestrator/...
+    - go vet ./internal/layers/orchestration/learn/...
+    - go test -race ./internal/layers/orchestration/orchtypes/...
+    - go test -race ./internal/layers/orchestration/decisionplanning/...
+    - go test -race ./internal/layers/orchestration/sessionorchestrator/...
+    - go test -race ./internal/layers/orchestration/learn/...
+  s5_gate:
+    - go test -race -tags="integration d7" -count=1 -run "TestE2E_LP1|TestE2E_5Node" ./tests/integration/d7/  # 4/4 PASS
+    - 6 个 Phase 6 P0 T 点 IMPLEMENTED (D7-S12-A41-T01/T02/T03 + A42-T04/T05 + A43-T06)
+    - 30+ 个新增 tests (observe_request + intent_quantizer + anomaly_detector + classifier_with_prior + orchestrator_learner + learn_observe_closure E2E) 100% PASS 含 race
+    - 0 race detector warnings
+    - 0 v2 regression (Phase 1/2/3/4/5 既有 tests 全部 PASS)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase6-observe-learner-wiring  # 13 项检查 13/13 PASS
