@@ -373,6 +373,7 @@ func TestDefaultPlanner_Plan_CommitmentFromSingleStep(t *testing.T) {
 		AnomaliesCount:  0,
 		Steps:           steps,
 		FailureCriteria: []FailureCriterion{{Field: "exit_code", Op: "eq", Value: 0}},
+		BlastRadius:     BlastRadius{PersistScope: PersistSession},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -398,6 +399,7 @@ func TestDefaultPlanner_Plan_ExplorationFromAnomalies(t *testing.T) {
 		AnomaliesCount:  5,
 		Steps:           []Step{{ID: "step_1", Directive: "explore"}},
 		FailureCriteria: []FailureCriterion{{Field: "exit_code", Op: "eq", Value: 0}},
+		BlastRadius:     BlastRadius{PersistScope: PersistTransient},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -438,6 +440,7 @@ func TestDefaultPlanner_Plan_StrengthMatchesFormula(t *testing.T) {
 			AnomaliesCount:  c.anomalies,
 			Steps:           validPlanSteps(),
 			FailureCriteria: []FailureCriterion{{Field: "exit_code", Op: "eq", Value: 0}},
+			BlastRadius:     BlastRadius{PersistScope: PersistSession},
 		})
 		if err != nil {
 			t.Fatalf("anomalies=%d obs=%d unexpected error: %v", c.anomalies, c.obs, err)
@@ -461,6 +464,7 @@ func TestDefaultPlanner_Plan_ValidationFailurePropagates(t *testing.T) {
 		QuantizedKind:  "intent_fast",
 		AnomaliesCount: 0,
 		Steps:          validPlanSteps(),
+		BlastRadius:    BlastRadius{PersistScope: PersistSession},
 		// FailureCriteria empty → PP-2 violation
 	})
 	if err == nil {
