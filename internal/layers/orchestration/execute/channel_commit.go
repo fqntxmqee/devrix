@@ -81,13 +81,13 @@ func (c *CommitChannel) Execute(ctx context.Context, p *plan.Plan, req ChannelRe
 	}
 	step := p.Steps[0]
 	if step.ToolName == "" {
-		return nil, fmt.Errorf("%w: commit step has empty ToolName", ErrChannelStepCountMismatch)
+		return nil, NewChannelStepInvalidError(c.Name(), "", "ToolName is empty")
 	}
 	if step.IdempotencyKey == "" {
 		// Side-effecting tool without idempotency key — fail-fast.
 		// PR-C7 will move this to the IdempotencyCache check, but PR-C2
 		// already enforces the contract at the Channel level.
-		return nil, fmt.Errorf("%w: commit step (tool=%s) requires IdempotencyKey", ErrChannelStepCountMismatch, step.ToolName)
+		return nil, NewChannelStepInvalidError(c.Name(), step.ToolName, "IdempotencyKey required for side-effecting tool")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
@@ -129,7 +129,7 @@ func (c *CommitChannel) Execute(ctx context.Context, p *plan.Plan, req ChannelRe
 			}
 			// Return the artifact (with inflight marker) + error so the
 			// caller can decide whether to retry / compensate.
-			return art, fmt.Errorf("%w: commit tool call timed out", ErrChannelStepCountMismatch)
+			return art, NewChannelToolCallTimedOutError(c.Name(), step.ToolName)
 		}
 		art.SideEffectStatus = types.SideEffectUnknown
 		art.Error = err.Error()
