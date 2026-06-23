@@ -1,0 +1,135 @@
+id: devrix-d7-mups-v4-phase2-observe-plan
+demand_id: DM-20260623-001
+title: "D7 MUPS v4.3 Phase 2 PR-A1 + PR-RF (Observation 4 类 + UncertaintyReport + UncertaintyCoord)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 2 Observe 节点落地梳理
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S8-A15
+    name: Observation + UncertaintyReport + UncertaintyCoord (Phase 2 PR-A1 + PR-RF)
+    description: |
+      MUPS v4.3 Phase 2 Observe 节点的首批落地（PR-A1 + PR-RF）。仅落地 S8 Subdomain A15 模块：
+      (1) orchtypes/observation.go 引入 Observation struct + 4 类 ObservationKind × 2 Category × sealed
+      Payload interface（4 concrete types: FactPayload/SignalPayload/DeviationPayload/UncertaintyPayload）；
+      (2) orchtypes/uncertainty_report.go 引入 UncertaintyReport + Partition 不变式 + ComputeOverallStrength
+      仅遍历 CatBusiness + Anomalies subset；
+      (3) orchtypes/uncertainty_coord.go Phase 2 扩展 FromVerifier + IsColdStart + Equal + With*；
+      (4) orchtypes/errors.go 11 个 SentinelError + 4 个错误码 (7001-7004)；
+      (5) PR-RF 5 项 review fix（C1 IntentKind enum + C3 FromVerifier fail-fast + W2 fmt.Errorf wrap +
+      W3 clamp01Float 合并 + W6/I8 Partition clamp 末尾）。
+      PR-A2 (IntentQuantizer) / PR-A3 (AnomalyDetector) / PR-A4 (ObserveNode wiring) / PR-B1 (Plan 4 类) /
+      PR-B2 (Plan.Validate) / PR-B3 (DefaultPlanner) 作为后续独立 OpenSpec change 推进。
+    rationale: |
+      DM-20260623-001 立项需求。Phase 2 Observe + Plan 节点首 PR 子集，目的：
+      (a) 为后续 PR-A2..B3 锁定 Observe 节点基础数据契约（Observation + UncertaintyReport +
+      UncertaintyCoord）；(b) PR-RF 闭环 design.md §14 Review Decisions 的 5 项 fix（C1+C3+W2+W3+W6/I8），
+      保证 wire format / 错误处理 / NaN 兜底 / IntentKind enum 等契约面一致；(c) UncertaintyCoord 扩展
+      保持 Phase 1 JSON wire format 向后兼容（FromVerifier=false + SideEffectStatus="" 零值）保证
+      Phase 1 调用方零修改。
+
+# 测试点（PR-A1 + PR-RF 实际实现 6 个）
+test_points:
+  - id: D7-S8-A15-T01
+    name: |
+      Observation 4 类（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）+ 2 Category
+      (CatBusiness/CatSystem) + sealed Payload interface（4 concrete types）
+      + 不可变（WithKind/WithStrength 返回新副本）+ Strength ∈ [0,1] +
+      DetectedAt 非零 + JSON roundtrip。
+    status: IMPLEMENTED
+  - id: D7-S8-A15-T02
+    name: |
+      UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness Observations
+      （不包含 CatSystem，避免系统异常污染整体 Strength）+ CatSystem 缺失时 defaults half (0.5)。
+    status: IMPLEMENTED
+  - id: D7-S8-A15-T03
+    name: |
+      UncertaintyCoord Phase 2 增量扩展：FromVerifier 工厂方法 + IsColdStart + Equal + With* +
+      Phase 1 JSON wire format 向后兼容（FromVerifier=false + SideEffectStatus="" 零值）
+      + MarshalJSON 用 omitempty 不写零值字段 + 未知 verdict 失败兜底 + FromVerifier fail-fast
+      (ORCH_COORD_VERDICT_7004 错误码)。
+    status: IMPLEMENTED
+  - id: D7-S8-A15-T04
+    name: |
+      UncertaintyReport Partition 不变式强制保证（CatBusiness ∪ CatSystem == Observations）
+      + 违反不变式返回 ErrUncertaintyReportPartitionInvariant + 空 Observations 边界。
+    status: IMPLEMENTED
+  - id: D7-S8-A15-T05
+    name: |
+      UncertaintyReport FilterByKind 故意遍历全集（不限 Category），返回所有指定 Kind 的
+      Observation（不论 CatBusiness 或 CatSystem），便于 Phase 4 Verify 阶段跨异常类别聚合。
+    status: IMPLEMENTED
+  - id: D7-S8-A15-T06
+    name: |
+      Observation 不可变 + 字段校验（Strength ∈ [0,1] panic on out-of-range +
+      validateFact/FailureCriteria 包装 fmt.Errorf + MarshalJSON wire format 嵌套对象
+      + UnmarshalJSON graceful degrade）。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/orchtypes/errors.go (NEW): 11 sentinels + 4 错误码 7001-7004
+  - internal/layers/orchestration/orchtypes/observation.go (NEW): Observation + 4 Kinds + 2 Categories + sealed Payload
+  - internal/layers/orchestration/orchtypes/observation_test.go (NEW): 6 functions / 13 subtests
+  - internal/layers/orchestration/orchtypes/uncertainty_coord.go (NEW): Phase 2 扩展 FromVerifier + IsColdStart
+  - internal/layers/orchestration/orchtypes/uncertainty_coord_test.go (NEW): 5 functions / 11 subtests
+  - internal/layers/orchestration/orchtypes/uncertainty_report.go (NEW): UncertaintyReport + Partition + Anomalies
+  - internal/layers/orchestration/orchtypes/uncertainty_report_test.go (NEW): 7 functions / 15 subtests
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S8-A15 Requirement (D7 v4.2.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S8-A15-T01..T06 (v3.10.0)
+
+out_of_scope:
+  - PR-A2 IntentQuantizer (D7-S8-A19): 独立 OpenSpec change, 待 Phase 2 PR-A1 + PR-RF 落地后开新 change
+  - PR-A3 AnomalyDetector 4 实现 + Composite (D7-S8-A20): 独立 OpenSpec change
+  - PR-A4 ObserveNode + ProcessMessage wiring (D7-S8-A21): 独立 OpenSpec change, 依赖 PR-A2/A3
+  - PR-B1 Plan 4 类 + Planner interface (D7-S8-A22): 独立 OpenSpec change, C2/W8 MatchKind 签名收紧落点
+  - PR-B2 Plan.Validate() + 3 项强制约束 (D7-S8-A23): 独立 OpenSpec change
+  - PR-B3 BlastRadiusCalculator + DefaultPlanner (D7-S8-A24): 独立 OpenSpec change, 终点 PR
+  - Phase 3 (DM-20260625-001) S6 archive: 独立 PR 推进
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-A1 + PR-RF
+    scope: "Observation 4 类 + UncertaintyReport + UncertaintyCoord（Phase 2 PR-A1 + design.md §14 review fix 闭环 PR-RF）"
+    files: 7
+    estimated_loc: +5193 / -0
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase2-observe-plan (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/163
+    sub_prs:
+      - PR-A1: initial Observation + UncertaintyReport + UncertaintyCoord
+      - PR-RF: 5 review fix（C1 IntentKind enum + C3 FromVerifier fail-fast + W2 fmt.Errorf wrap + W3 clamp01Float 合并 + W6/I8 Partition clamp 末尾）
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（UncertaintyCoord baseline + 4 个 P0 修复点）
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 Execute 节点（依赖本 Phase 2 UncertaintyCoord + AnomaliesCount）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase2-observe-plan/{demand,proposal,design,tasks,acceptance-report}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race ./internal/layers/orchestration/orchtypes/...
+  s5_gate:
+    - CI_COVERAGE=1 go test ./internal/... -race -timeout 300s  # 全 internal ≥ 72.2% (baseline)
+    - 6 个 PR-A1 + PR-RF P0 T 点全部 IMPLEMENTED
+    - 6 个新增 test functions + 39 subtests 100% PASS
+    - 23 既有 baseline tests 0 regression
+    - 0 race detector warnings
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase2-observe-plan
