@@ -1,0 +1,237 @@
+id: devrix-d7-mups-v4-phase7-verify-auto-close
+demand_id: DM-20260625-001
+title: "D7 MUPS v4.3 Phase 7 运行时 5 节点闭环 — Verify→Learn Auto-Close + Operator TrackMode + D5 可观测化增强 (PR-7.1/7.2/7.3)"
+status: s7_archived
+priority: P0
+created: 2026-06-25
+author: MUPS v4.3 Phase 7 运行时 5 节点闭环
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S13-A47
+    name: SessionOrchestrator.processAutoClose — Verify→Learn 运行时闭环
+    description: |
+      Phase 7 PR-7.1 (D7-S13-A47-T01/T02/T03) 闭环 Phase 6 PR-F3 E2E 测试中
+      手工模拟的 Verify→Learn 步骤，**生产 SessionOrchestrator.ProcessMessage
+      自动触发 learner.Learn**。
+      (1) sessionorchestrator/autoclose.go 新增 `processAutoClose(ch, sessionCtx,
+      sessionID, intent) <-chan *contracts.EngineEvent` 私有方法，包装路径
+      channel，启动 goroutine 透传 events，channel 关闭后调用 synthesizeVerdict
+      + o.learner.Learn(LearnRequest{Verdict, SessionID}) 异步；
+      (2) sessionorchestrator/autoclose.go 新增 `synthesizeVerdict(last, sessionID)
+      *workmodel.Verdict` 私有函数：complete → VerdictPass / error → VerdictFail
+      (Reason=event.Content) / tombstone → VerdictIndeterminate
+      (IndeterminateReason="interrupt") / 其他 Type → nil；
+      (3) orchestrator.go 替换 `endSpanWhenChannelClosed(ch, sessionSpan)` 改为
+      `o.processAutoClose(ch, sessionCtx, sessionSpan, req.SessionID, intent)`，
+      保持 span 关闭语义不变；
+      (4) 3 层 fail-safe：nil learner → 透传 endSpanWhenChannelClosed /
+      Learn error → slog.Warn + skip / channel 提前关闭 → slog.Warn + skip，
+      永不阻塞 ProcessMessage 同步返回；
+      (5) IntentSkip 路径不调用 processAutoClose（无执行结果可学）；
+      (6) AssetBuilder Auto-Close fallback：当 req.Plan/Artifact 为 nil 时，
+      `extractSOPName` 返回 `sop:autoclose:<SourceID>` + `extractStepsFromPlan`
+      返回 `["autoclose-completion"]` 合成步骤，保证 LP-1 闭环在生产中真实可
+      走通。
+    rationale: |
+      Phase 6 PR-F3 E2E 测试 `learn_observe_closure_test.go:204-214` 在测试代码里
+      手工循环调用 Learn 模拟了闭环，但生产代码路径上这一步是缺的。本次 PR-7.1
+      把这一步补上，让 5 节点管道在生产运行时自动闭环，ReputationStore 真正
+      跨会话累积。
+  - id: D7-S13-A48
+    name: ProcessRequest.TrackMode — Operator 角色支持 + buildObserveRequest 透传
+    description: |
+      Phase 7 PR-7.2 (D7-S13-A48-T04/T05) 暴露 Phase 5 PR-E5 E5.3 已定义的
+      DefaultOperatorPrior Beta(8,1)。
+      (1) orchtypes/process.go 新增 `TrackMode string` 字段到 ProcessRequest
+      (`""` 表示 developer 兜底) + `TrackModeDeveloper = "developer"` /
+      `TrackModeOperator = "operator"` 常量 + `NewProcessRequest(sessionID,
+      message, trackMode string)` fail-fast 构造函数；
+      (2) orchtypes/errors.go 新增 3 个 sentinel error:
+      ErrProcessRequestSessionIDEmpty / ErrProcessRequestMessageEmpty /
+      ErrProcessRequestInvalidTrackMode；
+      (3) learn/learner.go 扩展 `Inject(ctx, sessionID, trackModeHint string)`
+      签名，新增 3 层解析策略：(a) prior.Reputation.TrackMode != "" → 用 rep；
+      (b) hint ∈ {"", "developer", "operator"} → 用 hint；(c) 其他 → slog.Warn
+      + 兜底 Developer；
+      (4) orchestrator.go buildObserveRequest 调用 `o.learner.Inject(ctx,
+      req.SessionID, req.TrackMode)` 透传 hint 到 BuildAdaptivePrior；
+      (5) DefaultLearner.Inject TrackMode operator → DefaultOperatorPrior
+      Beta(8,1) Mean=0.889，developer → Beta(5,3) Mean=0.625。
+    rationale: |
+      Phase 5 PR-E5 E5.3 (D7-S11-A38-T07) 已定义 `DefaultOperatorPrior Beta(8,1)`
+      但 Orchestrator 没用上，PR-7.2 暴露这个能力给 caller（D1 gateway 飞书
+      适配器层未来版本可按用户角色注入 TrackMode），3 层 fail-safe 保持
+      Operator 角色支持不影响 Developer 兜底。
+  - id: D7-S13-A49
+    name: sessionSpan 6 prior attributes — D5 可观测化增强
+    description: |
+      Phase 7 PR-7.3 (D7-S13-A49-T06) 扩展 sessionSpan trace 信息。
+      (1) sessionorchestrator/tracing.go 新增 `priorSessionSpanAttrs(prior,
+      observeReq, req)` 纯 helper 函数返回 5 attributes：
+      - learn.prior.alpha (string, e.g. "8")
+      - learn.prior.beta (string, e.g. "1")
+      - learn.prior.mean (string "%.3f", e.g. "0.889")
+      - learn.prior.track_mode (string, "developer" / "operator")
+      - learn.prior.injected_at (string, "phase6_lp1" / "cold_start_failsafe")
+      (2) 第 6 个 attribute `learn.classifier_source` (string, "rule" /
+      "shadow") 在 ProcessMessage classifySpan 关闭前直接 mirror；
+      (3) TrackMode 3-tier 解析 (prior.Reputation 优先 > req.TrackMode hint >
+      "developer" 兜底) 在 helper 内部统一；
+      (4) injected_at 标识: `observeReq.Prior != nil` → "phase6_lp1" (真实注入)
+      否则 "cold_start_failsafe" (DefaultDeveloperPrior 兜底)。
+    rationale: |
+      Phase 6 PR-F2 只加了 alpha/beta 两个数字，运维同学 trace 排查时看不出
+      prior 是真实注入还是冷启动兜底，看不出 classifier 用的是 rule 还是
+      shadow。6 字段一气呵成让 trace 排查一目了然，Jaeger UI 自然支持。
+
+# 测试点 (PR-7.1/7.2/7.3 实际实现 6 个)
+test_points:
+  - id: D7-S13-A47-T01
+    name: |
+      processAutoClose 包装 channel + 异步触发 learner.Learn + 替换
+      endSpanWhenChannelClosed 调用 + IntentSkip 路径不调用 + 3 层
+      fail-safe (nil learner / Learn error / channel cancel) 全部 log +
+      skip 不阻塞 caller。
+    status: IMPLEMENTED
+  - id: D7-S13-A47-T02
+    name: |
+      synthesizeVerdict 规则 (complete → VerdictPass / error → VerdictFail /
+      tombstone → VerdictIndeterminate + IndeterminateReason="interrupt" /
+      其他 Type → nil) + SourceID 格式 `autoclose:{sessionID}:{nanosecond}`
+      + 10 个 sub-case table-driven 单测。
+    status: IMPLEMENTED
+  - id: D7-S13-A47-T03
+    name: |
+      集成测试 ProcessMessage 完整跑 → Alpha++ + 下一轮 prior 更新
+      (TestProcessMessage_Verify2Learn_AutoClose_PassAlpha Round 1 冷启动
+      Beta(5,3) → Learn VerdictPass → Alpha=1 → Round 2 Beta(6,3) Mean=0.667)
+      + TestAutoClose_FullLP1Loop 端到端 LP-1 闭环在生产 wiring 验证。
+    status: IMPLEMENTED
+  - id: D7-S13-A48-T04
+    name: |
+      ProcessRequest 新增 TrackMode string 字段 (默认 "" 兜底 developer) +
+      TrackModeDeveloper / TrackModeOperator 常量 + NewProcessRequest
+      fail-fast 校验 + 3 个 sentinel error (ErrProcessRequestSessionIDEmpty
+      / ErrProcessRequestMessageEmpty / ErrProcessRequestInvalidTrackMode)
+      + 8 个单测覆盖 zero value + fail-fast + 各合法/非法值。
+    status: IMPLEMENTED
+  - id: D7-S13-A48-T05
+    name: |
+      buildObserveRequest 透传 req.TrackMode → o.learner.Inject(ctx, sessionID,
+      req.TrackMode) → BuildAdaptivePrior (Operator track → DefaultOperatorPrior
+      Beta(8,1) Mean=0.889，Developer → Beta(5,3) Mean=0.625，空字符串/未知
+      → 兜底 Developer) + 6 个 TrackMode 单测覆盖 operator/developer/empty/
+      invalid/DefaultLearner cold-start。
+    status: IMPLEMENTED
+  - id: D7-S13-A49-T06
+    name: |
+      sessionSpan 6 prior attributes (alpha/beta/mean/track_mode/classifier_source
+      /injected_at) 全部写入 + priorSessionSpanAttrs 纯 helper 便于单元测试
+      + 5 个单测覆盖 real injection 5 attributes + cold_start_failsafe 标记
+      + TrackMode hint resolution + Reputation wins over hint + 字符串类型
+      校验。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/sessionorchestrator/autoclose.go (NEW): processAutoClose + synthesizeVerdict
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_autoclose_test.go (NEW): 11 tests (3 unit + 8 integration)
+  - internal/layers/orchestration/sessionorchestrator/orchestrator.go (MODIFIED): endSpanWhenChannelClosed → processAutoClose 调用替换
+  - internal/layers/orchestration/learn/asset_builder.go (MODIFIED): Auto-Close fallback (sop:autoclose:<SourceID> + autoclose-completion synthetic step)
+  - internal/layers/orchestration/orchtypes/process.go (MODIFIED): TrackMode 字段 + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast
+  - internal/layers/orchestration/orchtypes/process_test.go (NEW): 8 tests (zero value / fail-fast / 各合法/非法值)
+  - internal/layers/orchestration/orchtypes/errors.go (MODIFIED): 3 sentinel errors
+  - internal/layers/orchestration/learn/learner.go (MODIFIED): Inject 签名 + (ctx, sessionID, trackModeHint) + 3 层解析策略 + log/slog 引入
+  - internal/layers/orchestration/sessionorchestrator/orchestrator.go (MODIFIED): buildObserveRequest 调用 o.learner.Inject(ctx, sessionID, req.TrackMode)
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_trackmode_test.go (NEW): 6 tests (operator/developer/empty/invalid/DefaultLearner cold-start + unknown falls back)
+  - internal/layers/orchestration/sessionorchestrator/tracing.go (MODIFIED): priorSessionSpanAttrs 纯 helper 函数
+  - internal/layers/orchestration/sessionorchestrator/orchestrator.go (MODIFIED): sessionSpan 6 attributes 写入 + learn.classifier_source mirror
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_priorspan_test.go (NEW): 5 tests (real injection / cold_start_failsafe / operator from hint / reputation wins / 字符串类型)
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S13-A47/A48/A49 Requirement (D7 v4.7.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S13-A47-T01/T02/T03 + A48-T04/T05 + A49-T06 (v3.15.0)
+
+out_of_scope:
+  - 不修改 Phase 5 Learn 节点核心契约: LearningAsset / ReputationEvidence / Memory 3 通道 / Learner 已有契约保持稳定
+  - 不引入新 LLM 模型: Auto-Close + TrackMode + D5 attribute 增强不依赖 LLM
+  - 不实现 D2 ContextEngine-backed ReputationStore: InMemoryReputationStore 仍为 v1.0 实现
+  - 不修复 Stage 6 P2/P3 audit closure: D5 span attribute 测试 + ctx cancellation + error propagation + 5 SentinelError 集成 + WithLearner(nil) 显式禁用, 独立 hotfix
+  - 不修改 ShadowClassifier 异步路径: LP-1 不影响 shadow 异步路径, 保持样本可比性 (Phase 6 既定)
+  - 不实现 Plan/Artifact 反向追溯: LearnRequest.Plan/Artifact/Observations 暂时为 nil, 由 PR-7.4+ 后续补
+  - 不引入 Auto-Close 异步超时配置: Phase 7 v1.0 hardcode 5s, 由 PR-7.4+ 后续补
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-7.1
+    scope: "Verify→Learn Auto-Close (processAutoClose + synthesizeVerdict + 3 层 fail-safe + AssetBuilder Auto-Close fallback)"
+    files: 2 NEW + 1 MODIFIED
+    estimated_loc: "+440 / -20"
+    risk: Medium
+    branches:
+      - feat/devrix-d7-mups-v4-phase7-verify-auto-close (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/188
+  - pr: PR-7.2
+    scope: "Operator TrackMode (ProcessRequest.TrackMode 字段 + NewProcessRequest + 3 sentinel errors + DefaultLearner.Inject 3 层解析 + buildObserveRequest 透传)"
+    files: 3 NEW + 3 MODIFIED
+    estimated_loc: "+280 / -10"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase7-verify-auto-close (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/189
+  - pr: PR-7.3
+    scope: "D5 可观测化增强 (priorSessionSpanAttrs helper + sessionSpan 6 attributes + learn.classifier_source mirror + 5 单元测试)"
+    files: 2 NEW + 2 MODIFIED
+    estimated_loc: "+180 / -10"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase7-verify-auto-close (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/190
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase6-observe-learner-wiring  # Phase 6 PR-F3 (E2E LP-1 闭环, 手工模拟 Learn 调用, 生产 wiring 留 Phase 7)
+  - devrix-d7-mups-v4-phase5-learn  # Phase 5 PR-E5 (Learner interface + DefaultLearner + BayesianUpdate + T13 PARTIAL 闭环入口)
+  - devrix-d7-mups-v4-phase4-verify-promotion  # Phase 4 PR-D (Verify 节点升格 + SystemAnomaly)
+  - devrix-d7-mups-v4-phase3-execute  # Phase 3 PR-C1/C2 (Execute 4 Channel + Artifact)
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF (Observation 4 类 + UncertaintyReport)
+  - devrix-d7-mups-v4-phase2-plan  # Phase 2 PR-B1 (Plan 4 类 + Planner)
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 (UncertaintyCoord + AdaptiveThreshold wiring + Verifier + ExitReason)
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-prar-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-prb1-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-prc1-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-prc2-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase4-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase5-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase6-s7-archived.md
+  - openspec/changes/devrix-d7-mups-v4-phase7-verify-auto-close/{demand,proposal,design,tasks}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v4.7.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v3.15.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./internal/layers/orchestration/sessionorchestrator/...
+    - go vet ./internal/layers/orchestration/orchtypes/...
+    - go vet ./internal/layers/orchestration/learn/...
+    - go test -race ./internal/layers/orchestration/sessionorchestrator/...
+    - go test -race ./internal/layers/orchestration/orchtypes/...
+    - go test -race ./internal/layers/orchestration/learn/...
+  s5_gate:
+    - 20+ 个新增 tests (11 autoclose + 8 process + 6 trackmode + 5 priorspan) 100% PASS 含 race
+    - 6 个 Phase 7 P0 T 点 IMPLEMENTED (D7-S13-A47-T01/T02/T03 + A48-T04/T05 + A49-T06)
+    - 0 race detector warnings
+    - 0 v2 regression (Phase 1/2/3/4/5/6 既有 tests 全部 PASS)
+    - LP-1 闭环在生产 wiring (processAutoClose) 验证 (TestProcessMessage_Verify2Learn_AutoClose_PassAlpha)
+    - AssetBuilder Auto-Close fallback (sop:autoclose:<SourceID> + ["autoclose-completion"]) 保证 LP-1 真实可走通
+    - TrackMode 3-tier 解析 (Reputation wins > hint > developer 兜底)
+    - sessionSpan 6 attributes (alpha/beta/mean/track_mode/classifier_source/injected_at) 全部写入 + Jaeger UI 自然支持
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase7-verify-auto-close  # 14 项检查 14/14 PASS
