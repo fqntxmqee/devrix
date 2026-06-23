@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.0.0
+**Version:** 4.1.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-21
+**Last Updated:** 2026-06-23
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级)
 
 ---
 
@@ -99,6 +99,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | IMPLEMENTED | `executionflow/{hub,workplan,imsink,bridge}/` |
 | D7-S5 | Decision & Planning | PlanAgent 只读探索、规则+LLM 分类、SynthesizeTaskGraph、SelectExecutor | **IMPLEMENTED** | `decisionplanning/` + `workmodel/plan_*.go` |
 | **D7-S6** | **Error Aggregation & Metrics** | **HandleInterrupt errors.Join 聚合 + InterruptMetrics; sandbox cleanup observability (freefork + execute); WaveScheduler 4 新 metrics 字段; TaskManager panic counter** | **IMPLEMENTED** | `sessionorchestrator/{interrupt,metrics}.go` + `multiagent/provision/freefork/{forker,metrics}.go` + `multiagent/execute/{worker,metrics}.go` + `wavescheduler/scheduler.go` + `workmodel/task_manager{,_metrics}.go` |
+| **D7-S9** | **Execute Artifact Data Contract (PR-C1)** | **ArtifactKind 4 类枚举（StateChangeCert/ResponseRecord/ProbeReport/ExperimentData）+ SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）+ wavescheduler.Artifact +5 字段 omitempty 向后兼容 + 跨域类型上提 shared/types 打破 import cycle** | **IMPLEMENTED (PR-C1)** | `internal/shared/types/execute.go` + `orchtypes/artifact_kind_alias.go` + `wavescheduler/types.go` |
 
 ---
 
@@ -270,6 +271,55 @@ PlanMode MUST support `/plan` command workflow: enter → explore (read-only) �
 - THEN state transitions to `active`
 - AND PlanAgent runs in read-only mode
 - AND on completion state becomes `pending_approval`
+
+---
+
+### Requirement: D7-S9-A25 Execute Artifact Data Contract ✅ IMPLEMENTED
+
+Phase 3 Execute 节点的最小风险入口（PR-C1）。提供跨域共享的 Artifact 数据契约：
+ArtifactKind 4 类枚举 + SideEffectStatus 5 态 + SideEffectDetail 结构 + Artifact struct 5 字段升级。
+本 Requirement 不引入执行链路变更（PR-C2..C7 范围），仅落地数据契约层。
+
+**Priority:** P0
+**Package:** `internal/shared/types/` + `internal/layers/orchestration/orchtypes/` + `internal/layers/orchestration/wavescheduler/`
+**T:** D7-S9-A25-T01 … D7-S9-A25-T04
+**Design:** `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/`
+
+#### Scenario: ArtifactKind 4 类枚举 + snake_case wire format
+
+- GIVEN 定义 `shared/types.ArtifactKind{StateChangeCert, ResponseRecord, ProbeReport, ExperimentData}`
+- WHEN 任意 Artifact 实例
+- THEN `Kind` 字段为 4 枚举之一（uint8 0-3）
+- AND `String()` 输出 snake_case wire format：`"state_change_cert"` / `"response_record"` / `"probe_report"` / `"experiment_data"`
+- AND `MarshalJSON()` 输出字符串（不是数字），便于 D5 dashboard 字符串过滤
+- AND `UnmarshalJSON()` 接收字符串，未知值 fail-fast 返回带 kind 名称的 error（不静默兜底）
+
+#### Scenario: SideEffectStatus 5 态 + IsTerminal/NeedsAttention 派生
+
+- GIVEN 定义 `shared/types.SideEffectStatus{None, Unknown, Inflight, Committed, RolledBack}`（string alias）
+- WHEN 任意 Artifact / UncertaintyCoord 实例
+- THEN `SideEffectStatus` 字段为 5 枚举之一（字符串值 `"none"` / `"unknown"` / `"inflight"` / `"committed"` / `"rolled_back"`）
+- AND `IsTerminal()` 返回 true 当 status ∈ {None, Committed, RolledBack}
+- AND `NeedsAttention()` 返回 true 当 status ∈ {Unknown, Inflight}
+- AND `orchtypes.SideEffectStatus = types.SideEffectStatus` type alias，Phase 2 UncertaintyCoord 调用方零修改
+
+#### Scenario: wavescheduler.Artifact struct 5 字段升级（v2 JSON 向后兼容）
+
+- GIVEN `wavescheduler.Artifact` 扩展 5 字段：`Kind` / `SourcePlanID` / `AnomaliesCount` / `SideEffectStatus` / `SideEffectDetail`
+- WHEN 任意 Artifact 实例序列化
+- THEN 5 字段全部带 `omitempty` JSON tag
+- AND zero value（Kind=0/SourcePlanID=""/AnomaliesCount=0/SideEffectStatus=""/*SideEffectDetail=nil）不出现在 JSON 输出
+- AND v2 调用方（仅写 v2 字段）序列化结果与升级前**字节相同**
+- AND Unmarshal 接收 v2 JSON（5 字段缺失）不报错，零值默认到 `Kind=0 (StateChangeCert)` / `SideEffectStatus="" (None)` 等
+
+#### Scenario: 跨域类型上提 shared/types 打破 import cycle
+
+- GIVEN orchtypes → workmodel → wavescheduler 单向依赖链
+- WHEN Artifact.SideEffectStatus 需要与 UncertaintyCoord.SideEffectStatus 同类型（跨域 wire format 统一）
+- AND 直接 wavescheduler → orchtypes 双向引用会破环
+- THEN 把 `ArtifactKind` + `SideEffectStatus` + `SideEffectDetail` 上提到 `internal/shared/types/execute.go`（Phase 1 `MemoryEntry` precedent）
+- AND `orchtypes` 提供 type alias + const re-export（`type SideEffectStatus = types.SideEffectStatus`）保持 Phase 2 调用方零修改
+- AND `shared/types` → orchtypes 单向依赖，无 cycle
 
 ---
 
@@ -823,6 +873,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **3.8.0** | **2026-06-18** | **devrix-unified-work-tree v1.5–v2.0 闭环 (PR #85–#87)**：(1) 统一工具 alias task_write/spawn/await；(2) RunTurn decompose + ResolveHint + depth/daily limits；(3) RunTurn blocking await (`ResolveAwaiter`)；(4) v2.1+ defer → `openspec/tech-debt/worktree-v2-deferred.md` |
 | **3.9.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：(1) S 层物理路径对齐 `code-layout.md` §4.2；(2) coordinator→sessionorchestrator+decisionplanning+orchtypes；(3) wave→wavescheduler、S4→executionflow；(4) hubspoke dispatch/bridge 拆分；(5) WorkTree TD-WT-02/03 部分闭合 |
 | **4.0.0** | **2026-06-21** | **devrix-d7-error-aggregation-and-metrics (DM-20260621-010)**：(1) D7-S6 新增 Scenario「Error Aggregation & Metrics」覆盖 HandleInterrupt errors.Join + sandbox cleanup observability + Forker errors.Join；(2) ADDED Requirements：D7-S6-A11 (interrupt errors.Join 3 步 cancel 聚合) + D7-S6-A12 (sandbox cleanup observability freefork+execute+taskmanager) + D7-S6-A13 (forker errors.Join + 13 调用方 backward compat)；(3) Scenarios 表新增 D7-S6 行；(4) Archived Changes 表新增 DM-20260621-010 引用 |
+| **4.1.0** | **2026-06-23** | **devrix-d7-mups-v4-phase3-execute (DM-20260625-001) Phase 3 PR-C1**：(1) ADDED Requirement D7-S9-A25 (Execute Artifact Data Contract): ArtifactKind 4 类枚举 + SideEffectStatus 5 态 + SideEffectDetail + wavescheduler.Artifact +5 字段 (Kind/SourcePlanID/AnomaliesCount/SideEffectStatus/SideEffectDetail) omitempty 向后兼容；(2) 跨域类型上提 shared/types/execute.go 打破 orchtypes→workmodel→wavescheduler 潜在 import cycle（Phase 1 MemoryEntry precedent）；(3) 4 个新 P0 T 点 D7-S9-A25-T01..T04 IMPLEMENTED；(4) t-registry v3.8.0→v3.9.0 (T 129→133, P0 96→100)；(5) Archived Changes 新增 DM-20260625-001 引用 |
 
 ---
 

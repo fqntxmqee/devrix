@@ -1,0 +1,120 @@
+id: devrix-d7-mups-v4-phase3-execute
+demand_id: DM-20260625-001
+title: "D7 MUPS v4.3 Phase 3 PR-C1 (Execute Artifact 4 类 + SideEffect 5 态)"
+status: s7_archived
+priority: P0
+created: 2026-06-23
+author: MUPS v4.3 Phase 3 Execute 节点落地梳理
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S9-A25
+    name: Execute Artifact Data Contract (Phase 3 PR-C1)
+    description: |
+      MUPS v4.3 Phase 3 Execute 节点的最小风险入口（PR-C1）。仅落地数据契约层：
+      (1) shared/types/execute.go 引入 ArtifactKind 4 类枚举 + SideEffectStatus 5 态
+      （None/Unknown/Inflight/Committed/RolledBack）+ SideEffectDetail 结构；
+      (2) orchtypes/artifact_kind_alias.go 提供 type alias + const re-export，保持 Phase 2
+      UncertaintyCoord 调用方零修改；
+      (3) wavescheduler.Artifact 升级 5 字段（Kind/SourcePlanID/AnomaliesCount/
+      SideEffectStatus/SideEffectDetail），omitempty 保持 v2 JSON wire format 兼容。
+      PR-C2..C7（4 Channel / StrategyDecider / ToolSpec v3 / ExecutionEvidence /
+      VerifyTrigger / Executor + DispatchWorker v2）作为独立 OpenSpec change 在 PR-B1
+      （plan.PlanKind）落地后开启。
+    rationale: |
+      DM-20260625-001 立项需求。Phase 3 Execute 节点 7 PR 拆解中的最小子集，
+      目的：(a) 为 PR-C2..C7 锁定共享数据模型；(b) 借助 Phase 1 MemoryEntry
+      precedent 把跨域类型上提到 shared/types 打破 orchtypes→workmodel→wavescheduler
+      潜在 import cycle；(c) v2 Artifact JSON 字节兼容保证 Phase 2 已上线的
+      UncertaintyCoord + AdaptiveThreshold 调用方零修改。
+
+# 测试点（PR-C1 实际实现 4 个）
+test_points:
+  - id: D7-S9-A25-T01
+    name: |
+      ArtifactKind 4 类枚举（StateChangeCert/ResponseRecord/ProbeReport/ExperimentData）
+      + String() snake_case wire format + MarshalJSON/UnmarshalJSON roundtrip
+      + 未知值 fail-fast（不静默兜底）。
+    status: IMPLEMENTED
+  - id: D7-S9-A25-T02
+    name: |
+      SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）
+      + IsTerminal()/NeedsAttention() 派生 + SideEffectDetail 5 字段
+      （IdempotencyKey/SentAt/ConfirmedAt/CompensationLog/CompensationTool）。
+    status: IMPLEMENTED
+  - id: D7-S9-A25-T03
+    name: |
+      wavescheduler.Artifact 升级 5 字段（Kind/SourcePlanID/AnomaliesCount/
+      SideEffectStatus/SideEffectDetail）+ omitempty 向后兼容 + zero Kind
+      不出现在 JSON。
+    status: IMPLEMENTED
+  - id: D7-S9-A25-T04
+    name: |
+      跨域类型上提 shared/types 打破 import cycle（orchtypes.SideEffectStatus
+      改为 type alias = types.SideEffectStatus，与 UncertaintyCoord 共享同一定义）。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/shared/types/execute.go (NEW): ArtifactKind + SideEffectStatus + SideEffectDetail
+  - internal/layers/orchestration/orchtypes/artifact_kind_alias.go (NEW): type alias + const re-export
+  - internal/layers/orchestration/orchtypes/uncertainty_coord.go (MODIFY): SideEffectStatus 改 type alias
+  - internal/layers/orchestration/orchtypes/artifact_kind_test.go (NEW): 4 test functions / 9 subtests
+  - internal/layers/orchestration/orchtypes/side_effect_status_test.go (NEW): 6 test functions / 11 subtests
+  - internal/layers/orchestration/wavescheduler/types.go (MODIFY): Artifact +5 fields
+  - internal/layers/orchestration/wavescheduler/artifact_test.go (MODIFY): 3 new test functions
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S9-A25 Requirement (D7 v4.1.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S9-A25-T01..T04 (v3.9.0)
+
+out_of_scope:
+  - PR-C2 4 Channel (CommitChannel/AsyncChannel/ProbeChannel/ExploreChannel): 待 Phase 2 PR-B1 (plan.PlanKind) 落地后开新 change
+  - PR-C3 StrategyDecider + RetryPolicy: L0 硬规则可独立 PR，L1 LLM 决策等 Phase 5 Learn 闭环
+  - PR-C4 ToolSpec v3: 单 PR 可推进，依赖 Phase 2 PR-B1
+  - PR-C5 ExecutionEvidence: 单 PR 可推进
+  - PR-C6 VerifyTrigger wiring: 需 PR-C1 + PR-C5 先行
+  - PR-C7 Executor + DispatchWorker v2: 终点 PR，依赖前 6 个
+  - Phase 2 (DM-20260623-001) S6 archive: 独立 PR 推进
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-C1
+    scope: "Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级（PR-C1 最小风险入口）"
+    files: 7
+    estimated_loc: +549 / -9
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v4-phase3-execute (from master)
+    pr_url: https://github.com/fqntxmqee/devrix/pull/164
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-phase1-foundation  # Phase 1 OpenSpec（Observation/Plan/Verify 雏形 + UncertaintyCoord precedent）
+  - devrix-d7-mups-v4-phase2-observe-plan  # Phase 2 PR-A1 + PR-RF（Observation 4 类 + UncertaintyReport + UncertaintyCoord）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase2-openspec.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase3-openspec.md
+  - openspec/changes/devrix-d7-mups-v4-phase3-execute/{demand,proposal,design,tasks,acceptance-report}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...
+    - go test -race ./internal/shared/types/...
+    - go test -race ./internal/layers/orchestration/orchtypes/...
+    - go test -race ./internal/layers/orchestration/wavescheduler/...
+  s5_gate:
+    - CI_COVERAGE=1 go test ./internal/... -race -timeout 300s  # 全 internal ≥ 72.2% (baseline)
+    - 4 个 PR-C1 P0 T 点全部 IMPLEMENTED
+    - 9 个新增 test functions + 20 subtests 100% PASS
+    - 0 race detector warnings
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v4-phase3-execute

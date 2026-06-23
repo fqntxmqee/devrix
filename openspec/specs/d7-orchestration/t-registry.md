@@ -1,13 +1,13 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.8.0
-**Last Updated:** 2026-06-22
+**Version:** 3.9.0
+**Last Updated:** 2026-06-23
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
 **Complements:** `terminal-state-guide.md` · `observability-guide.md`
-**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74. **2026-06-20-devrix-error-handling-tier1-tier2** (DM-20260620-003) — error handling PR-A/PR-B/PR-C: invariant migration to shared/errors (D7-S2-A06-T24), task_manager.Create signature (`(*Task, error)`) (D7-S1-A02-T18), orchestrator.emitError sanitize+code (D7-S2-A02-T18), subagent stream sentinels (D7-S2-A06-T25/T26), retry nil-sentinel (D7-S2-A06-T27), resolveDelegateTaskID `(string, error)` (D7-S1-T19); IMPLEMENTED 109→116, P0 80→83. **2026-06-21-devrix-d7-error-aggregation-and-metrics** (DM-20260621-010) — D7 编排层错误聚合 + worktree 全链路 metrics: interrupt errors.Join aggregation (D7-S6-A11-T01/T02/T03), sandbox cleanup observability (D7-S6-A12-T04/T05/T06), forker errors.Join + 13 callers backward compat (D7-S6-A13-T07); IMPLEMENTED 116→123, P0 83→90. **2026-06-22-devrix-d7-metrics-and-concurrency-hardening** (DM-20260622-001) — D7 编排层 metric 命名 spec/code 对齐 + 并发硬化: dispatch_loop_wakeups / worker_panics 复数化 (D7-S6-A14-T01/T02), sandbox_exit_failed 跨域归属 D4 (D7-S6-A14-T03, D7-S6-A12-T01 OBSOLETE), state.cancels + state.handles markWaveDone 清空 (D7-S6-A14-T04), ConflictGuard hot path AllowAndRegister 原子调用 (D7-S6-A14-T05), CommandHandler emit select-default 防阻塞 (D7-S6-A14-T06); IMPLEMENTED 123→129, P0 90→96.
+**Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC6 + AC8 + AC9 SubTurn 3-mode dispatch + depth cap (D7-S2-A06-T14/T15/T16/T17); IMPLEMENTED 99→103, P0 70→74. **2026-06-20-devrix-error-handling-tier1-tier2** (DM-20260620-003) — error handling PR-A/PR-B/PR-C: invariant migration to shared/errors (D7-S2-A06-T24), task_manager.Create signature (`(*Task, error)`) (D7-S1-A02-T18), orchestrator.emitError sanitize+code (D7-S2-A02-T18), subagent stream sentinels (D7-S2-A06-T25/T26), retry nil-sentinel (D7-S2-A06-T27), resolveDelegateTaskID `(string, error)` (D7-S1-T19); IMPLEMENTED 109→116, P0 80→83. **2026-06-21-devrix-d7-error-aggregation-and-metrics** (DM-20260621-010) — D7 编排层错误聚合 + worktree 全链路 metrics: interrupt errors.Join aggregation (D7-S6-A11-T01/T02/T03), sandbox cleanup observability (D7-S6-A12-T04/T05/T06), forker errors.Join + 13 callers backward compat (D7-S6-A13-T07); IMPLEMENTED 116→123, P0 83→90. **2026-06-22-devrix-d7-metrics-and-concurrency-hardening** (DM-20260622-001) — D7 编排层 metric 命名 spec/code 对齐 + 并发硬化: dispatch_loop_wakeups / worker_panics 复数化 (D7-S6-A14-T01/T02), sandbox_exit_failed 跨域归属 D4 (D7-S6-A14-T03, D7-S6-A12-T01 OBSOLETE), state.cancels + state.handles markWaveDone 清空 (D7-S6-A14-T04), ConflictGuard hot path AllowAndRegister 原子调用 (D7-S6-A14-T05), CommandHandler emit select-default 防阻塞 (D7-S6-A14-T06); IMPLEMENTED 123→129, P0 90→96. **2026-06-23-devrix-d7-mups-v4-phase3-execute** (DM-20260625-001) — Phase 3 PR-C1 (最小风险入口): ArtifactKind 4 类枚举 (D7-S9-A25-T01), SideEffectStatus 5 态 + IsTerminal/NeedsAttention (D7-S9-A25-T02), wavescheduler.Artifact +5 字段 omitempty 向后兼容 (D7-S9-A25-T03), 跨域类型上提 shared/types 打破 import cycle (D7-S9-A25-T04); IMPLEMENTED 129→133, P0 96→100.
 
 ---
 
@@ -155,6 +155,23 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S6-A14-T06** | **CommandHandler emit 用 select-default 防 consumer 阻塞** | **D7-S6-A14** | **`sessionorchestrator/d7_s6_a14_t06_test.go::TestD7S6A14T06_CommandHandler_OutChannelFull_DropsEvent`** | **IMPLEMENTED** | **P0** |
 
 > 配套 P1：WaveScheduler `WorkerPanics` / `TaskCtxLeaked` / `WaveReentryCancelled` / `DispatchLoopWakeups` 4 字段为 `wavescheduler/scheduler_metrics_test.go` 7 单元 + 端到端测试覆盖（panickingRunner / reentry / wakeup ticker）；`TestFork_Metrics_*` 3 场景覆盖 SandboxEnterFailed / FactoryCreateFailed / RollbackTriggered 触发路径。
+
+---
+
+## D7-S9: Execute Node (MUPS v4.3 Phase 3)
+
+> **v3.9 closure (2026-06-23):** devrix-d7-mups-v4-phase3-execute (DM-20260625-001) — Phase 3 PR-C1（最小风险入口）：ArtifactKind 4 类枚举 + SideEffectStatus 5 态 + wavescheduler.Artifact +5 字段 omitempty 向后兼容 + 跨域类型上提 shared/types 打破 import cycle。IMPLEMENTED 129→133，P0 96→100。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/specs/d7-orchestration/spec.md` §D7-S9-A25。
+
+### D7-S9-A25: Execute Artifact Data Contract (PR-C1)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D7-S9-A25-T01** | **ArtifactKind 4 类枚举 + String() snake_case wire format + MarshalJSON/UnmarshalJSON roundtrip + 未知值 fail-fast** | **D7-S9-A25** | **`orchtypes/artifact_kind_test.go::TestArtifactKind_{4Types_String,4Types_ParseRoundTrip,UnknownValue_ParseError,JSON_WireFormat,UnmarshalEmptyString_DefaultsToZero,UnmarshalUnknownString_FailsLoudly}`（6 functions / 9 subtests）** | **IMPLEMENTED** | **P0** |
+| **D7-S9-A25-T02** | **SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）+ IsTerminal/NeedsAttention 派生 + SideEffectDetail 5 字段（IdempotencyKey/SentAt/ConfirmedAt/CompensationLog/CompensationTool）** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_{5States_String,5States_RoundTrip,IsTerminal,NeedsAttention,ReusesUncertaintyCoordType}` + `TestSideEffectDetail_JSON_RoundTrip`（6 functions / 11 subtests）** | **IMPLEMENTED** | **P0** |
+| **D7-S9-A25-T03** | **wavescheduler.Artifact +5 字段（Kind/SourcePlanID/AnomaliesCount/SideEffectStatus/SideEffectDetail）+ omitempty 向后兼容 + zero Kind 不出现在 JSON** | **D7-S9-A25** | **`wavescheduler/artifact_test.go::TestArtifact_{NewFields_PrC1,BackwardCompat_PrC1,KindZeroValue_OmittedFromJSON}`（3 new functions）+ 4 既有 ArtifactStore 测试 0 regression** | **IMPLEMENTED** | **P0** |
+| **D7-S9-A25-T04** | **跨域类型上提 shared/types 打破 import cycle（orchtypes.SideEffectStatus 改为 type alias = types.SideEffectStatus，与 UncertaintyCoord 共享同一定义）+ shared/types → orchtypes 单向依赖无 cycle** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_ReusesUncertaintyCoordType` + `internal/lint/layer` PASS + `go test -race ./internal/...` 19/19 PASS** | **IMPLEMENTED** | **P0** |
+
+> 配套 P0 验证：`internal/shared/types/execute.go` 包内独立测试覆盖（`TestArtifactKind_4Types_String` + `TestSideEffectStatus_5States_String` 在新包内 PASS，验证上提后无 cycle）；`go vet ./...` 0 issue；19/19 internal packages `go test -race` 0 race warnings；orchtypes 包覆盖率 72.2%（与 Phase 2 baseline 持平）。
 
 ---
 
@@ -371,7 +388,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 123 | 123 | 0 | 0 | 90 |
+| 133 | 133 | 0 | 0 | 100 |
 
 ### 按 Scenario
 
@@ -383,6 +400,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S4 | 9 | 9 | 0 |
 | D7-S5 | 28 | 28 | 0 |
 | **D7-S6** | **7** | **7** | **0** |
+| **D7-S9** | **4** | **4** | **0** |
 | 契约/迁移 | 8 | 8 | 0 |
 
 > **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。
@@ -424,4 +442,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.7.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) Phase B 归档**：D7-S2-A06 +4 T 点（T14 brief mode PreloadedMessages=nil + T15 fork/full mode parity + T16 depth limit + T17 default mode resolution chain）。IMPLEMENTED 99→103，P0 70→74 |
 | **3.8.0** | **2026-06-20** | **2026-06-20-devrix-context-budget-phase-c-nested (devrix-context-budget-phase-c-nested / DM-20260620-002) Phase C 归档**：D7-S2-A06 +6 T 点（T18 TurnRequest.MaxContextTokens 字段 + T19 nested 分支读取 + T20 SubTurnRunner Cfg + bootstrap 注入 + T21 显式注入单测 + T22 fallback 单测 + T23 4-parallel integration）。IMPLEMENTED 103→109，P0 74→80。D7TestStack 同步修复 deepseek DefaultModel / ModelRouting 默认空值。 |
 | **3.9.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003) 归档**：D7-S1 +2 T 点 (T18 TaskManager.Create `(*Task, error)` + T19 resolveDelegateTaskID `(string, error)`) + D7-S2-A06 +4 T 点 (T24 invariant migration + T25 subturn error_code wrap + T26 channel-closed sentinel + T27 retry nil-sentinel) + D7-S2-A02 +1 T 点 (T18 emitError variadic code)。IMPLEMENTED 109→116, P0 80→83。 |
+| **3.9.0** | **2026-06-21** | **devrix-d7-error-aggregation-and-metrics (DM-20260621-010) 归档**：D7-S6-A11 +3 T 点（interrupt errors.Join aggregation T01/T02/T03）+ D7-S6-A12 +3 T 点（sandbox cleanup observability T04/T05/T06）+ D7-S6-A13 +1 T 点（forker errors.Join + 13 callers backward compat T07）。IMPLEMENTED 116→123, P0 83→90。 |
+| **3.9.0** | **2026-06-22** | **devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) 归档**：D7-S6-A14 +6 T 点（T01 dispatch_loop_wakeups + T02 worker_panics + T03 sandbox_exit_failed OBSOLETE + T04 state.cancels/handles bound + T05 AllowAndRegister hot path + T06 select-default）。IMPLEMENTED 123→129, P0 90→96。 |
+| **3.9.0** | **2026-06-23** | **devrix-d7-mups-v4-phase3-execute (DM-20260625-001) Phase 3 PR-C1 归档**：D7-S9-A25 +4 T 点（T01 ArtifactKind 4 类枚举 + T02 SideEffectStatus 5 态 + T03 wavescheduler.Artifact +5 字段 omitempty 向后兼容 + T04 跨域类型上提 shared/types 打破 import cycle）。IMPLEMENTED 129→133, P0 96→100。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/specs/d7-orchestration/spec.md` §D7-S9-A25。 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
