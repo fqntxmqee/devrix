@@ -104,6 +104,18 @@ type Verdict struct {
 	Reason       string            `json:"reason,omitempty"`
 	SourceID     string            `json:"source_id,omitempty"`
 	SystemAnomaly bool             `json:"system_anomaly,omitempty"`
+
+	// IndeterminateReason — Phase 5 G8-1 fix extension. When Kind ==
+	// VerdictIndeterminate, this field distinguishes the cause so that the
+	// BayesianUpdate in the Learn node does NOT pollute α/β on
+	// verifier_parse_failure (verifier LLM output format issue ≠ user fault).
+	// Possible values (defined as learn-package constants in
+	// PendingAssetContent.IndeterminateReason):
+	//   ""                   — not INDETERMINATE / no specific cause
+	//   "verifier_parse_failure" — Phase 5 G8-1 fix path
+	//   "env_limited"        — env-level transient failure (network / IO)
+	//   "user_decision_pending" — MVE checkpoint pending (Phase 5 PR-E5)
+	IndeterminateReason string `json:"indeterminate_reason,omitempty"`
 }
 
 // WithKind returns a copy with the new Kind.
@@ -136,6 +148,14 @@ func (v Verdict) WithSourceID(id string) Verdict {
 // consumes it as an override that forces ExitReasonSystemAnomaly.
 func (v Verdict) WithSystemAnomaly(sa bool) Verdict {
 	v.SystemAnomaly = sa
+	return v
+}
+
+// WithIndeterminateReason returns a copy with the IndeterminateReason set.
+// Used by Phase 5 Learn node's BayesianUpdate to distinguish
+// verifier_parse_failure (G8-1 fix) from env-limited INDETERMINATE.
+func (v Verdict) WithIndeterminateReason(reason string) Verdict {
+	v.IndeterminateReason = reason
 	return v
 }
 
