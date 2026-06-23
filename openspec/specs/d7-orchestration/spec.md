@@ -109,6 +109,8 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 
 ## Architecture
 
+> **5 节点管道端到端链路 + LP-1/2/5 闭环 + Auto-Close 异步触发的完整运行时序**，见 `pipeline-architecture.md`（MUPS v4.3 Phase 1-7 全部 S7_Archived 后的端到端总图）。
+
 ```
 D1 Gateway.RouteInbound
     └── D7-S2 SessionOrchestrator.ProcessMessage    ← v1.0 主入口（wired by wire_coordinator.go::WireD7）
