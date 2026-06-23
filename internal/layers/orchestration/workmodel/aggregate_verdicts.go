@@ -99,10 +99,11 @@ func (s *AggregationStrategy) UnmarshalJSON(data []byte) error {
 // by constructing a new Verdict (mirrors Plan/Step immutability from
 // Phase 2 PR-B1).
 type Verdict struct {
-	Kind       types.VerdictKind `json:"kind"`
-	Confidence float64           `json:"confidence,omitempty"`
-	Reason     string            `json:"reason,omitempty"`
-	SourceID   string            `json:"source_id,omitempty"`
+	Kind         types.VerdictKind `json:"kind"`
+	Confidence   float64           `json:"confidence,omitempty"`
+	Reason       string            `json:"reason,omitempty"`
+	SourceID     string            `json:"source_id,omitempty"`
+	SystemAnomaly bool             `json:"system_anomaly,omitempty"`
 }
 
 // WithKind returns a copy with the new Kind.
@@ -126,6 +127,15 @@ func (v Verdict) WithReason(r string) Verdict {
 // WithSourceID returns a copy with the new SourceID.
 func (v Verdict) WithSourceID(id string) Verdict {
 	v.SourceID = id
+	return v
+}
+
+// WithSystemAnomaly returns a copy with the SystemAnomaly flag set.
+// Phase 4 PR-D4 (SystemAnomaly aggregation + ObserveNode wiring) populates
+// this flag from SystemAnomalyAggregator.Evaluate; PR-D2 (VerdictToExitReason)
+// consumes it as an override that forces ExitReasonSystemAnomaly.
+func (v Verdict) WithSystemAnomaly(sa bool) Verdict {
+	v.SystemAnomaly = sa
 	return v
 }
 

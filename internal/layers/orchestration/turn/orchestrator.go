@@ -94,7 +94,99 @@ const (
 	// below the diminishing delta floor. Mirrors clawcode's
 	// checkTokenBudget "marginal utility" stop condition.
 	ExitReasonTokenDiminishing ExitReason = "token_diminishing"
+
+	// Phase 4 PR-D2 additions (DM-20260623-002). The 8 reasons above are
+	// unchanged for backward compatibility; the 6 below extend the
+	// taxonomy with Verify-derived stop conditions so downstream D5
+	// dashboards and Phase 5 Learn's ReputationEvidence can distinguish
+	// "verifier said pass" from "verifier said partial" from "verifier
+	// abstained" etc. See doc 45 §三 + doc 17/18 L1+L2 verifier.
+
+	// ExitReasonPartialVerified: VerdictKind=Partial (some criteria met,
+	// some missed — needs human review before downstream action).
+	ExitReasonPartialVerified ExitReason = "partial_verified"
+	// ExitReasonVerifierAbstain: VerdictKind=Indeterminate (verifier
+	// could not reach a conclusion — parse failure / no consensus /
+	// VerifyWithRetry exhausted 3 attempts). Requires human review.
+	ExitReasonVerifierAbstain ExitReason = "verifier_abstain"
+	// ExitReasonVerifierFail: VerdictKind=Fail (criteria violated — the
+	// plan / artifact / evidence is rejected by the verifier).
+	ExitReasonVerifierFail ExitReason = "verifier_fail"
+	// ExitReasonSystemAnomaly: SystemAnomaly=true override (CatSystem
+	// anomalies exceeded threshold). Forced UncertaintyCoord.Value=0.95
+	// per Phase 4 PR-D4.
+	ExitReasonSystemAnomaly ExitReason = "system_anomaly"
+	// ExitReasonUnresolved: failure is recoverable on retry — surfaced
+	// when Phase 3 Channel returns SideEffectInflight or Unknown and
+	// Phase 4 Verifier cannot conclude. Distinct from VerifierFail
+	// (definitive rejection) and VerifierAbstain (no signal).
+	ExitReasonUnresolved ExitReason = "unresolved"
+	// ExitReasonAbstain: explicit abstain (verifier decided NOT to
+	// render judgement, e.g. out-of-scope plan). Distinct from
+	// VerifierAbstain which is parser-level failure.
+	ExitReasonAbstain ExitReason = "abstain"
 )
+
+// ParseExitReason reverses the wire format to recover the ExitReason enum
+// value. Returns an error on unknown input. Phase 4 PR-D2 introduces this
+// so persisted turn records and D5 dashboard filters can parse arbitrary
+// reason strings without compile-time coupling.
+func ParseExitReason(s string) (ExitReason, error) {
+	switch s {
+	case string(ExitReasonNatural):
+		return ExitReasonNatural, nil
+	case string(ExitReasonMaxTurns):
+		return ExitReasonMaxTurns, nil
+	case string(ExitReasonAbortedUser):
+		return ExitReasonAbortedUser, nil
+	case string(ExitReasonAbortedLLM):
+		return ExitReasonAbortedLLM, nil
+	case string(ExitReasonAbortedTool):
+		return ExitReasonAbortedTool, nil
+	case string(ExitReasonRepeatedTool):
+		return ExitReasonRepeatedTool, nil
+	case string(ExitReasonToolFailure):
+		return ExitReasonToolFailure, nil
+	case string(ExitReasonTokenDiminishing):
+		return ExitReasonTokenDiminishing, nil
+	case string(ExitReasonPartialVerified):
+		return ExitReasonPartialVerified, nil
+	case string(ExitReasonVerifierAbstain):
+		return ExitReasonVerifierAbstain, nil
+	case string(ExitReasonVerifierFail):
+		return ExitReasonVerifierFail, nil
+	case string(ExitReasonSystemAnomaly):
+		return ExitReasonSystemAnomaly, nil
+	case string(ExitReasonUnresolved):
+		return ExitReasonUnresolved, nil
+	case string(ExitReasonAbstain):
+		return ExitReasonAbstain, nil
+	default:
+		return "", fmt.Errorf("turn: unknown ExitReason %q", s)
+	}
+}
+
+// AllExitReasons returns the exhaustive list of 14 ExitReason enum values.
+// Used by tests, dashboards, and verification tools that need to enumerate
+// the complete taxonomy (e.g. D5 dashboard filter dropdowns).
+func AllExitReasons() []ExitReason {
+	return []ExitReason{
+		ExitReasonNatural,
+		ExitReasonMaxTurns,
+		ExitReasonAbortedUser,
+		ExitReasonAbortedLLM,
+		ExitReasonAbortedTool,
+		ExitReasonRepeatedTool,
+		ExitReasonToolFailure,
+		ExitReasonTokenDiminishing,
+		ExitReasonPartialVerified,
+		ExitReasonVerifierAbstain,
+		ExitReasonVerifierFail,
+		ExitReasonSystemAnomaly,
+		ExitReasonUnresolved,
+		ExitReasonAbstain,
+	}
+}
 
 // Deterministic-exit thresholds. Aligned with clawcode's hard-coded
 // constants in src/query/tokenBudget.ts and src/query.ts.

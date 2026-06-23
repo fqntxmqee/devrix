@@ -60,6 +60,41 @@ func NewUncertaintyCoord(value float64) UncertaintyCoord {
 	}
 }
 
+// FromVerifierTyped projects a typed VerdictKind (Phase 4 PR-D1 enum) into
+// an UncertaintyCoord. The mapping is identical to FromVerifier (string
+// form): Pass→0.0 / Partial→0.4 / Indeterminate→0.7 / Fail→0.9, with
+// SystemAnomaly overriding to 0.95.
+//
+// This is the typed-enum companion to FromVerifier; new callers should
+// prefer this over FromVerifier. FromVerifier is retained as a string-
+// form shim for callers that already pass kind as a string (e.g.
+// ParseVerifierOutputWithRetry's Raw payload).
+func FromVerifierTyped(kind VerdictKind, confidence float64, reason string, systemAnomaly bool) (UncertaintyCoord, error) {
+	base := 0.5
+	switch kind {
+	case VerdictPass:
+		base = 0.0
+	case VerdictPartial:
+		base = 0.4
+	case VerdictIndeterminate:
+		base = 0.7
+	case VerdictFail:
+		base = 0.9
+	default:
+		return UncertaintyCoord{}, NewUncertaintyCoordInvalidVerdictKindError(kind.String())
+	}
+	if systemAnomaly {
+		base = 0.95
+	}
+	return UncertaintyCoord{
+		Value:        clamp01Float(base, 0.5),
+		Confidence:   clamp01Float(confidence, 0.5),
+		Reason:       reason,
+		FromVerifier: true,
+		UpdatedAt:    time.Now(),
+	}, nil
+}
+
 // FromVerifier projects a Verifier verdict into an UncertaintyCoord. The
 // verdict kind maps to coord value as follows:
 //   - Pass          → 0.0  (low uncertainty, the plan worked)
@@ -75,30 +110,16 @@ func NewUncertaintyCoord(value float64) UncertaintyCoord {
 // so the ORCH_COORD_VERDICT_7004 error code actually fires and noisy
 // upstream typos surface immediately rather than being silently coerced
 // to the 0.5 neutral default.
+//
+// Phase 4 PR-D2 retains this string-form function for backward compat
+// with v2 callers (notably ParseVerifierOutputWithRetry's Raw payload)
+// but new code should prefer FromVerifierTyped.
 func FromVerifier(verdictKind string, confidence float64, reason string, systemAnomaly bool) (UncertaintyCoord, error) {
-	base := 0.5
-	switch verdictKind {
-	case "pass":
-		base = 0.0
-	case "partial":
-		base = 0.4
-	case "indeterminate":
-		base = 0.7
-	case "fail":
-		base = 0.9
-	default:
+	kind, err := types.ParseVerdictKind(verdictKind)
+	if err != nil {
 		return UncertaintyCoord{}, NewUncertaintyCoordInvalidVerdictKindError(verdictKind)
 	}
-	if systemAnomaly {
-		base = 0.95
-	}
-	return UncertaintyCoord{
-		Value:        clamp01Float(base, 0.5),
-		Confidence:   clamp01Float(confidence, 0.5),
-		Reason:       reason,
-		FromVerifier: true,
-		UpdatedAt:    time.Now(),
-	}, nil
+	return FromVerifierTyped(kind, confidence, reason, systemAnomaly)
 }
 
 // WithValue returns a copy with the new value (clamped). UpdatedAt is bumped.
