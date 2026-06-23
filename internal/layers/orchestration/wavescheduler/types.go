@@ -128,6 +128,14 @@ func (s TaskState) Terminal() bool {
 
 // Artifact is the outcome of a worker run; written to ArtifactStore on terminal
 // transitions and consumed by downstream tasks with context_policy=upstream.
+//
+// Phase 3 PR-C1 (DM-20260625-001) added 5 optional fields: Kind (4-class
+// classifier for the Verify/Plan routing layer), SourcePlanID (reverse-trace
+// back to the originating Plan), AnomaliesCount (forward-trace from the
+// originating Plan's AnomaliesCount), SideEffectStatus + SideEffectDetail
+// (side-effect state machine for rollback / StrategyDecider decisions).
+// All five use omitempty so v2 callers that do not set them continue to
+// serialize byte-identical JSON.
 type Artifact struct {
 	TaskID       string         `json:"task_id"`
 	SessionID    string         `json:"session_id,omitempty"`
@@ -140,6 +148,13 @@ type Artifact struct {
 	EndedAt      time.Time      `json:"ended_at"`
 	Duration     time.Duration  `json:"duration"`
 	Metadata     map[string]any `json:"metadata,omitempty"`
+
+	// Phase 3 PR-C1: 4-class kind + side-effect tracking. All omitempty.
+	Kind             types.ArtifactKind           `json:"kind,omitempty"`
+	SourcePlanID     string                       `json:"source_plan_id,omitempty"`
+	AnomaliesCount   int                          `json:"anomalies_count,omitempty"`
+	SideEffectStatus types.SideEffectStatus       `json:"side_effect_status,omitempty"`
+	SideEffectDetail *types.SideEffectDetail      `json:"side_effect_detail,omitempty"`
 }
 
 // ResolvedContext is the materialized context handed to a worker runner.
