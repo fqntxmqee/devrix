@@ -16,11 +16,12 @@ import (
 // succeeded). Callers can use this metric to flag "verifier flaky" in D5
 // dashboards.
 type VerifierOutput struct {
-	Raw         string            `json:"raw"`
-	ParsedKind  types.VerdictKind `json:"parsed_kind"`
-	Confidence  float64           `json:"confidence,omitempty"`
-	Reason      string            `json:"reason,omitempty"`
-	RetryCount  int               `json:"retry_count,omitempty"`
+	Raw        string            `json:"raw"`
+	ParsedKind types.VerdictKind `json:"parsed_kind"`
+	Confidence float64           `json:"confidence,omitempty"`
+	Reason     string            `json:"reason,omitempty"`
+	RetryCount int               `json:"retry_count,omitempty"`
+	SourceID   string            `json:"source_id,omitempty"`
 }
 
 // ParseVerifierOutput parses a single Verifier LLM output (JSON format
