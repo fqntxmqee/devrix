@@ -5,19 +5,22 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// SideEffectStatus is the type alias for Phase 3 propagation. The concrete
-// enum lives in wavescheduler/artifact.go and is referenced by name only
-// here to avoid an import cycle. We declare a placeholder constant set that
-// mirrors the Phase 3 contract.
-type SideEffectStatus string
+// SideEffectStatus is a type alias re-exported from shared/types so that
+// UncertaintyCoord (Phase 2 PR-A1) and Artifact (Phase 3 PR-C1) can share
+// the same wire format. The concrete enum + IsTerminal/NeedsAttention
+// helpers live in shared/types/execute.go.
+type SideEffectStatus = types.SideEffectStatus
 
 const (
-	SideEffectUnknown   SideEffectStatus = "unknown"
-	SideEffectInflight  SideEffectStatus = "inflight"
-	SideEffectCommitted SideEffectStatus = "committed"
-	SideEffectRolledBack SideEffectStatus = "rolled_back"
+	SideEffectNone       = types.SideEffectNone
+	SideEffectUnknown    = types.SideEffectUnknown
+	SideEffectInflight   = types.SideEffectInflight
+	SideEffectCommitted  = types.SideEffectCommitted
+	SideEffectRolledBack = types.SideEffectRolledBack
 )
 
 // UncertaintyCoord is the per-item uncertainty value attached to Plans and
