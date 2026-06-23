@@ -1,10 +1,12 @@
 package decisionplanning
 
 import (
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 )
@@ -148,6 +150,20 @@ func (s *ShadowClassifier) Classify(ctx context.Context, message string) (orchty
 	// does not abort the shadow (R2 §5 命题 C: shadow 仅作 v1.1 准备).
 	go s.shadowAsync(context.WithoutCancel(ctx), message, shadowBaseline)
 	return result, nil
+}
+
+// ClassifyWithPrior implements the Phase 6 PR-F2 IntentClassifier
+// extension. ShadowClassifier delegates the prior to the underlying
+// rule classifier (LP-1 closed loop) — the shadow is not aware of
+// AdaptivePrior, so we thread the prior into the rule's
+// ClassifyWithPrior to keep the routing decision consistent.
+//
+// Note: the LLM shadow goroutine still fires with the rule-baseline
+// (no prior) because the shadow is for tail observability, not
+// routing. The prior is intentionally not propagated to the async
+// shadow call to keep the shadow samples comparable across time.
+func (s *ShadowClassifier) ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
+	return s.rule.ClassifyWithPrior(ctx, message, prior)
 }
 
 // shadowAsync is the goroutine body. It never panics out: a deferred

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -212,6 +213,10 @@ func (errClassifier) Classify(_ context.Context, _ string) (orchtypes.IntentClas
 	return orchtypes.IntentClassification{}, errors.New("simulated classify failure")
 }
 
+func (errClassifier) ClassifyWithPrior(_ context.Context, _ string, _ *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
+	return orchtypes.IntentClassification{}, errors.New("simulated classify failure")
+}
+
 // T: NewFastPath with nil cfg falls back to defaults.
 func TestNewFastPath_NilCfg(t *testing.T) {
 	exec := &fakeD2{}
@@ -250,6 +255,10 @@ func TestProcessMessage_UnknownIntent(t *testing.T) {
 type forcedKindClassifier struct{ kind orchtypes.IntentKind }
 
 func (f *forcedKindClassifier) Classify(_ context.Context, _ string) (orchtypes.IntentClassification, error) {
+	return orchtypes.IntentClassification{Kind: f.kind}, nil
+}
+
+func (f *forcedKindClassifier) ClassifyWithPrior(_ context.Context, _ string, _ *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
 	return orchtypes.IntentClassification{Kind: f.kind}, nil
 }
 

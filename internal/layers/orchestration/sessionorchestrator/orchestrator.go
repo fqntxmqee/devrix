@@ -3,11 +3,14 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -55,6 +58,13 @@ type SessionOrchestrator struct {
 	// taskManager is the D7 task store injected at construction (DM-20260617-008 W4).
 	// nil → a fresh in-memory taskmanager is created in NewSessionOrchestrator.
 	taskManager *workmodel.TaskManager
+
+	// learner is the Phase 6 PR-F2 (D7-S12-A42-T04) LP-1 closed-loop
+	// component. When non-nil, ProcessMessage calls learner.Inject at
+	// entry to obtain the AdaptivePrior for the next Observe call.
+	// nil → no prior injection (ObserveRequest.EffectivePrior returns
+	// DefaultDeveloperPrior as fail-safe).
+	learner learn.Learner
 
 	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
 	// When non-nil, the default OrchestratePath's decisionplanning.TaskDecomposer uses it
@@ -145,6 +155,19 @@ func WithTaskManager(tm *workmodel.TaskManager) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.taskManager = tm }
 }
 
+// WithLearner wires the Phase 5 LP-1 closed-loop Learner. When wired,
+// ProcessMessage calls o.learner.Inject(ctx, req.SessionID) at entry
+// to obtain an AdaptivePrior and threads it into intent classification
+// via ClassifyWithPrior.
+//
+// Phase 6 PR-F2 (D7-S12-A42-T04). When omitted, no prior injection
+// happens (ObserveRequest.EffectivePrior returns DefaultDeveloperPrior
+// as fail-safe). Pass nil explicitly to remove a previously-wired
+// learner.
+func WithLearner(l learn.Learner) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.learner = l }
+}
+
 // WithClassifier replaces the default decisionplanning.RuleClassifier. The default is
 // decisionplanning.NewRuleClassifier(cfg) (rule-only). Tests use this to inject stubs;
 // v1.1+ may inject a LLM-first classifier that satisfies
@@ -213,7 +236,35 @@ func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts .
 	return o
 }
 
-// ProcessMessage is the D1→D7 entry point.
+// buildObserveRequest constructs the ObserveRequest for the next Observe
+// call, with AdaptivePrior injection from Learner.Inject. This is the
+// Phase 6 PR-F2 (D7-S12-A42-T05) LP-1 closed-loop entry point.
+//
+// Failure handling (3-layer fail-safe, ordered):
+//  1. learner == nil → ObserveRequest.Prior stays nil →
+//     EffectivePrior() returns DefaultDeveloperPrior (Beta(5,3)).
+//  2. learner != nil but Inject returns err → log warning + ObserveRequest.Prior
+//     stays nil → EffectivePrior() returns DefaultDeveloperPrior.
+//  3. learner != nil and Inject succeeds → ObserveRequest.Prior set to injected
+//     AdaptivePrior (may still be Beta(0,0) if ReputationStore has no row).
+//
+// The returned error is reserved for ObserveRequest validation failures
+// (e.g. empty SessionID); in normal operation, buildObserveRequest
+// always returns a non-nil error only on the underlying NewObserveRequest
+// validation, which is a fail-fast on the D1 gateway contract.
+func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orchtypes.ProcessRequest) (orchtypes.ObserveRequest, error) {
+	var prior *learn.AdaptivePrior
+	if o.learner != nil {
+		injected, err := o.learner.Inject(ctx, req.SessionID)
+		if err != nil {
+			slog.Warn("orchestrator: learner.Inject failed, using DefaultDeveloperPrior",
+				"session_id", req.SessionID, "err", err)
+		} else {
+			prior = injected
+		}
+	}
+	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
+}
 //
 // Routing (v1.1.0+ orthogonal dispatch, see
 // devrix-d7-orthogonal-intent-paths):
@@ -225,6 +276,13 @@ func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts .
 // Each orchtypes.IntentKind maps to an independent execution chain. v1.0 closure
 // had Command/Orchestrate collapsed to FastPath with system-prompt hints;
 // that v1.0 simplification is removed (see design.md §2.5).
+//
+// Phase 6 PR-F2 (D7-S12-A42-T05): at entry, buildObserveRequest calls
+// Learner.Inject (when wired) to obtain an AdaptivePrior. The prior
+// is threaded into intent classification via ClassifyWithPrior (LP-1
+// closed loop). When learner is nil, prior defaults to
+// DefaultDeveloperPrior (Beta(5,3)) and ClassifyWithPrior degenerates
+// to a baseline-equivalent path.
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.ProcessRequest) (<-chan *contracts.EngineEvent, error) {
 	ctx, sessionSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Session_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
@@ -236,17 +294,40 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// span instead of Session_Process (registry: Turn is sibling of Classify).
 	sessionCtx := ctx
 
+	// Phase 6 PR-F2 LP-1: build observe request with AdaptivePrior injection
+	// BEFORE classification. Failures from learner.Inject are logged but do
+	// not block — EffectivePrior() returns DefaultDeveloperPrior (Beta(5,3)).
+	observeReq, err := o.buildObserveRequest(ctx, req)
+	if err != nil {
+		endSpanWithError(sessionSpan, err)
+		return nil, fmt.Errorf("orchestrator: build observe request: %w", err)
+	}
+	prior := observeReq.EffectivePrior()
+	if sessionSpan != nil {
+		sessionSpan.SetAttributes(
+			tracer.Attribute{Key: "learn.prior.alpha", Value: fmt.Sprintf("%d", prior.PriorBeta.Alpha)},
+			tracer.Attribute{Key: "learn.prior.beta", Value: fmt.Sprintf("%d", prior.PriorBeta.Beta)},
+		)
+	}
+
 	classifySource := "rule"
 	_, classifySpan := o.startSpan(sessionCtx, telemetry.OpD7_S2_Orchestration_Intent_Classify, tracer.SpanKindInternal)
 	var (
 		intent orchtypes.IntentClassification
-		err    error
 	)
 	if o.shadowClassifier != nil {
 		classifySource = "shadow"
-		intent, err = o.shadowClassifier.Classify(ctx, req.Message)
+		// Phase 6 PR-F2: shadow path also uses ClassifyWithPrior.
+		// ShadowClassifier.ClassifyWithPrior delegates to the rule's
+		// ClassifyWithPrior (prior applied to routing decision). The
+		// async LLM shadow goroutine still uses baseline (no prior) for
+		// comparable samples — see ShadowClassifier.ClassifyWithPrior.
+		intent, err = o.shadowClassifier.ClassifyWithPrior(ctx, req.Message, prior)
 	} else {
-		intent, err = o.classifier.Classify(ctx, req.Message)
+		// Phase 6 PR-F2: ClassifyWithPrior (LP-1 closed loop) replaces
+		// Classify. When prior is nil or zero-mean, ClassifyWithPrior
+		// degenerates to the baseline Classify behavior.
+		intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
 	}
 	if classifySpan != nil {
 		classifySpan.SetAttributes(telemetry.SpanAttrs(telemetry.OpD7_S2_Orchestration_Intent_Classify,
@@ -287,6 +368,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	}
 
 	var ch <-chan *contracts.EngineEvent
+	err = nil
 	switch intent.Kind {
 	case orchtypes.IntentSkip:
 		skipCh := make(chan *contracts.EngineEvent)
