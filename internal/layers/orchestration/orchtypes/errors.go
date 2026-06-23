@@ -24,6 +24,11 @@ var (
 	ErrUncertaintyCoordValueOutOfRange      = errors.New("orchtypes: uncertainty coord value out of [0,1]")
 	ErrUncertaintyCoordConfidenceOutOfRange = errors.New("orchtypes: uncertainty coord confidence out of [0,1]")
 	ErrUncertaintyCoordInvalidVerdictKind   = errors.New("orchtypes: uncertainty coord invalid verdict kind")
+
+	// Phase 7 PR-7.2 (D7-S13-A48-T04): ProcessRequest validation.
+	ErrProcessRequestSessionIDEmpty   = errors.New("orchtypes: ProcessRequest SessionID is empty")
+	ErrProcessRequestMessageEmpty     = errors.New("orchtypes: ProcessRequest Message is empty")
+	ErrProcessRequestInvalidTrackMode = errors.New("orchtypes: ProcessRequest TrackMode must be \"developer\", \"operator\", or empty")
 )
 
 // Wrap helpers — produce a *sharederrors.SentinelError with a stable code.

@@ -182,7 +182,7 @@ func TestLearner_Inject_ColdStart_DefaultDeveloperPrior(t *testing.T) {
 	l, _ := newTestLearner(t)
 	ctx := context.Background()
 
-	prior, err := l.Inject(ctx, "fresh_session")
+	prior, err := l.Inject(ctx, "fresh_session", "")
 	if err != nil {
 		t.Fatalf("Inject: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestLearner_Inject_BuildsAdaptivePrior(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 
-	prior, err := l.Inject(ctx, "sess_1")
+	prior, err := l.Inject(ctx, "sess_1", "")
 	if err != nil {
 		t.Fatalf("Inject: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestLearner_Inject_BuildsAdaptivePrior(t *testing.T) {
 
 func TestLearner_Inject_EmptySession_FailFast(t *testing.T) {
 	l, _ := newTestLearner(t)
-	_, err := l.Inject(context.Background(), "")
+	_, err := l.Inject(context.Background(), "", "")
 	if !errors.Is(err, ErrAdaptivePriorNotReady) {
 		t.Errorf("Inject('') err = %v, want ErrAdaptivePriorNotReady", err)
 	}
@@ -328,7 +328,7 @@ func TestLP1_ClosedLoop_LearnThenInject(t *testing.T) {
 		}
 	}
 	// Step 2: Inject reads the updated ReputationStore → builds AdaptivePrior.
-	prior, err := l.Inject(ctx, "sess_1")
+	prior, err := l.Inject(ctx, "sess_1", "")
 	if err != nil {
 		t.Fatalf("Inject: %v", err)
 	}

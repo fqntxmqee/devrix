@@ -16,20 +16,22 @@ import (
 // fakeLearner is a test double for learn.Learner. It records the
 // Inject calls and returns a programmable AdaptivePrior (or error).
 type fakeLearner struct {
-	mu              sync.Mutex
-	injectCalls     int
-	lastSessionID   string
-	prior           *learn.AdaptivePrior
-	injectErr       error
-	learningCalls   int
-	lastLearnReq    learn.LearnRequest
+	mu               sync.Mutex
+	injectCalls      int
+	lastSessionID    string
+	lastTrackModeHint string
+	prior            *learn.AdaptivePrior
+	injectErr        error
+	learningCalls    int
+	lastLearnReq     learn.LearnRequest
 }
 
-func (f *fakeLearner) Inject(_ context.Context, sessionID string) (*learn.AdaptivePrior, error) {
+func (f *fakeLearner) Inject(_ context.Context, sessionID, trackModeHint string) (*learn.AdaptivePrior, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.injectCalls++
 	f.lastSessionID = sessionID
+	f.lastTrackModeHint = trackModeHint
 	if f.injectErr != nil {
 		return nil, f.injectErr
 	}

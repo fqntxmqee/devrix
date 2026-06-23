@@ -240,6 +240,11 @@ func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts .
 // call, with AdaptivePrior injection from Learner.Inject. This is the
 // Phase 6 PR-F2 (D7-S12-A42-T05) LP-1 closed-loop entry point.
 //
+// Phase 7 PR-7.2 (D7-S13-A48-T05): plumbs req.TrackMode into Learner.Inject
+// so the per-request hint ("developer" / "operator" / "") can select the
+// prior Beta. Reputation's stored TrackMode (if any) takes precedence over
+// the hint (see learn/learner.go:DefaultLearner.Inject).
+//
 // Failure handling (3-layer fail-safe, ordered):
 //  1. learner == nil → ObserveRequest.Prior stays nil →
 //     EffectivePrior() returns DefaultDeveloperPrior (Beta(5,3)).
@@ -255,10 +260,10 @@ func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts .
 func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orchtypes.ProcessRequest) (orchtypes.ObserveRequest, error) {
 	var prior *learn.AdaptivePrior
 	if o.learner != nil {
-		injected, err := o.learner.Inject(ctx, req.SessionID)
+		injected, err := o.learner.Inject(ctx, req.SessionID, req.TrackMode)
 		if err != nil {
 			slog.Warn("orchestrator: learner.Inject failed, using DefaultDeveloperPrior",
-				"session_id", req.SessionID, "err", err)
+				"session_id", req.SessionID, "track_mode", req.TrackMode, "err", err)
 		} else {
 			prior = injected
 		}

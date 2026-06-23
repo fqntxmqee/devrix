@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -41,7 +42,17 @@ type Learner interface {
 	// Inject returns an AdaptivePrior for the next Observe call. Reads
 	// ReputationStore (no writes); returns a fail-safe prior when the store
 	// has no row for sessionID (cold start) or returns an error.
-	Inject(ctx context.Context, sessionID string) (*AdaptivePrior, error)
+	//
+	// Phase 7 PR-7.2 (D7-S13-A48-T05): trackModeHint is a per-request hint
+	// ("developer" / "operator" / "") that selects the prior Beta:
+	//   - "" (zero value) → use Reputation's TrackMode if present, else Developer
+	//   - "developer"     → use DefaultDeveloperPrior (Beta(5,3))
+	//   - "operator"      → use DefaultOperatorPrior (Beta(8,1))
+	//   - other non-empty → log warn + fall back to Developer
+	// When the ReputationStore has a row for sessionID, the Reputation's
+	// TrackMode takes precedence over the hint (cross-session state wins
+	// over the per-request hint, since the row is the persistent record).
+	Inject(ctx context.Context, sessionID, trackModeHint string) (*AdaptivePrior, error)
 
 	// ScheduledTick drains ScheduledMemory entries whose TriggerAt has
 	// passed. Exhausted retries are escalated to FeedbackMemory (warning
@@ -152,7 +163,13 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 }
 
 // Inject is the LP-1 read phase: read ReputationStore → BuildAdaptivePrior.
-func (l *DefaultLearner) Inject(ctx context.Context, sessionID string) (*AdaptivePrior, error) {
+//
+// Phase 7 PR-7.2 (D7-S13-A48-T05): trackModeHint is a per-request hint
+// ("developer" / "operator" / "") that selects the prior Beta. When the
+// ReputationStore has a row for sessionID, the row's TrackMode wins over
+// the hint (cross-session state takes precedence over a per-request
+// suggestion). Empty / unknown hints are normalized to Developer.
+func (l *DefaultLearner) Inject(ctx context.Context, sessionID, trackModeHint string) (*AdaptivePrior, error) {
 	if sessionID == "" {
 		return nil, ErrAdaptivePriorNotReady
 	}
@@ -166,9 +183,30 @@ func (l *DefaultLearner) Inject(ctx context.Context, sessionID string) (*Adaptiv
 			return nil, fmt.Errorf("learn: ReputationStore.Get: %w", err)
 		}
 	}
+	// Phase 7 PR-7.2: track-mode resolution policy (3 cases):
+	//
+	// 1. rep != nil && rep.TrackMode != ""  → use rep.TrackMode (persisted state wins)
+	// 2. rep == nil or rep.TrackMode == ""  → use normalized hint
+	// 3. hint empty / unknown                → log warn (only when non-empty but
+	//                                          unknown) + fall back to Developer
 	trackMode := TrackModeDeveloper
 	if rep != nil && rep.TrackMode != "" {
 		trackMode = rep.TrackMode
+	} else {
+		switch trackModeHint {
+		case "":
+			// Default (zero value) → no log, use Developer.
+			trackMode = TrackModeDeveloper
+		case string(TrackModeOperator):
+			trackMode = TrackModeOperator
+		case string(TrackModeDeveloper):
+			trackMode = TrackModeDeveloper
+		default:
+			// Unknown non-empty hint → log warn + fall back to Developer.
+			slog.Warn("learn: Inject trackModeHint is unknown, falling back to Developer",
+				"session_id", sessionID, "track_mode_hint", trackModeHint)
+			trackMode = TrackModeDeveloper
+		}
 	}
 	return BuildAdaptivePrior(rep, trackMode), nil
 }
