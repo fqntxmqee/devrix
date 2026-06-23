@@ -165,10 +165,10 @@ func (m *SkillMemory) Delete(ctx context.Context, key string) error {
 }
 
 // List returns assets matching the filter.
-func (m *SkillMemory) List(ctx context.Context, filter MemoryFilter) []*LearningAsset {
+func (m *SkillMemory) List(ctx context.Context, filter MemoryFilter) ([]*LearningAsset, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return filterAssets(m.store, filter)
+	return filterAssets(m.store, filter), nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -222,10 +222,10 @@ func (m *FeedbackMemory) Delete(ctx context.Context, key string) error {
 }
 
 // List returns assets matching the filter.
-func (m *FeedbackMemory) List(ctx context.Context, filter MemoryFilter) []*LearningAsset {
+func (m *FeedbackMemory) List(ctx context.Context, filter MemoryFilter) ([]*LearningAsset, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return filterAssets(m.store, filter)
+	return filterAssets(m.store, filter), nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -318,14 +318,14 @@ func (m *ScheduledMemory) Delete(ctx context.Context, key string) error {
 }
 
 // List returns the assets (envelope.Asset) matching the filter.
-func (m *ScheduledMemory) List(ctx context.Context, filter MemoryFilter) []*LearningAsset {
+func (m *ScheduledMemory) List(ctx context.Context, filter MemoryFilter) ([]*LearningAsset, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	asMap := make(map[string]*LearningAsset, len(m.store))
 	for k, v := range m.store {
 		asMap[k] = v.Asset
 	}
-	return filterAssets(asMap, filter)
+	return filterAssets(asMap, filter), nil
 }
 
 // ListDue returns retry envelopes whose TriggerAt ≤ now. Used by
