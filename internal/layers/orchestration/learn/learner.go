@@ -119,6 +119,41 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 		return nil, ErrAssetBuildFailed
 	}
 
+	// LP-3: Bayesian update on ReputationStore.
+	//
+	// Order matters: update Reputation FIRST so the Bayesian evidence is
+	// committed before the asset becomes visible. The previous order —
+	// Memory.Store then Reputation.Update — left a partial-state window
+	// where a crash between Store and Update produced an asset in Memory
+	// without its corresponding Bayesian evidence. On the next Observe,
+	// the asset was retrieved as if it had been "learned" but the
+	// Reputation row reflected only the prior state, so Inject would
+	// replay with stale statistics. Updating Reputation first means a
+	// crash before Memory.Store leaves the Reputation row one step ahead
+	// of Memory (over-count by one), which Inject handles correctly via
+	// the BayesianUpdate mechanics — over-counting is a benign
+	// statistical artifact, while under-counting (the old bug) means
+	// Inject ignores a Learn that the rest of the system already
+	// acknowledged. The caller retries on error; ReputationStore.Update
+	// is idempotent for the same prior+verdict pair (same next state).
+	if l.Reputation != nil && l.BayesianUpdater != nil {
+		prior, err := l.Reputation.Get(ctx, req.SessionID)
+		if err != nil && !errors.Is(err, ErrReputationStoreUnavailable) {
+			return nil, fmt.Errorf("learn: ReputationStore.Get: %w", err)
+		}
+		if prior == nil {
+			// Cold start: bootstrap with Developer track (fail-safe).
+			prior, err = NewReputationEvidence(req.SessionID, TrackModeDeveloper)
+			if err != nil {
+				return nil, fmt.Errorf("learn: cold-start reputation: %w", err)
+			}
+		}
+		next := l.BayesianUpdater(prior, req.Verdict)
+		if err := l.Reputation.Update(ctx, next); err != nil {
+			return nil, fmt.Errorf("learn: ReputationStore.Update: %w", err)
+		}
+	}
+
 	// LP-2: route to the correct Memory channel.
 	switch class {
 	case LearningClass(types.LearningSOP), LearningClass(types.LearningProtocol):
@@ -138,25 +173,6 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 		}
 	default:
 		return nil, ErrAssetClassMismatch
-	}
-
-	// LP-3: Bayesian update on ReputationStore.
-	if l.Reputation != nil && l.BayesianUpdater != nil {
-		prior, err := l.Reputation.Get(ctx, req.SessionID)
-		if err != nil && !errors.Is(err, ErrReputationStoreUnavailable) {
-			return nil, fmt.Errorf("learn: ReputationStore.Get: %w", err)
-		}
-		if prior == nil {
-			// Cold start: bootstrap with Developer track (fail-safe).
-			prior, err = NewReputationEvidence(req.SessionID, TrackModeDeveloper)
-			if err != nil {
-				return nil, fmt.Errorf("learn: cold-start reputation: %w", err)
-			}
-		}
-		next := l.BayesianUpdater(prior, req.Verdict)
-		if err := l.Reputation.Update(ctx, next); err != nil {
-			return nil, fmt.Errorf("learn: ReputationStore.Update: %w", err)
-		}
 	}
 
 	return []*LearningAsset{asset}, nil
@@ -216,6 +232,16 @@ func (l *DefaultLearner) Inject(ctx context.Context, sessionID, trackModeHint st
 //   - RetryCount >= MaxRetries → escalate to FeedbackMemory + delete from
 //     ScheduledMemory
 //
+// ListDue returns DEEP COPIES of retry envelopes (see
+// ScheduledMemory.ListDue), so we cannot mutate the underlying store
+// in place. The re-queue path therefore: (a) Deletes the existing
+// envelope, (b) builds a new PendingAssetContent with the updated
+// NextRetryAt, (c) Re-Stores the asset under the same AssetKey. The
+// PendingAssetContent validator caps NextRetryAt at ExpiryAt, so this
+// loop respects the asset TTL contract. The escalate path is simpler —
+// it Stores a new asset in FeedbackMemory (different AssetKey, prefixed
+// "escalated:") and Deletes the original.
+//
 // This method is idempotent — calling it twice in the same instant is a
 // no-op (no entries past TriggerAt).
 func (l *DefaultLearner) ScheduledTick(ctx context.Context) error {
@@ -254,10 +280,29 @@ func (l *DefaultLearner) ScheduledTick(ctx context.Context) error {
 			}
 			continue
 		}
-		// Increment retry counter + push TriggerAt forward by 5 minutes.
-		retry.RetryCount++
-		retry.LastRetryAt = now
-		retry.TriggerAt = now.Add(5 * time.Minute)
+		// Re-queue: delete the old envelope, build a new asset with
+		// NextRetryAt pushed forward by 5 minutes, re-store under the
+		// same AssetKey.
+		if err := l.ScheduledMem.Delete(ctx, retry.Asset.AssetKey); err != nil {
+			return fmt.Errorf("learn: ScheduledMem.Delete (requeue): %w", err)
+		}
+		pending, ok := retry.Asset.Content.(*PendingAssetContent)
+		if !ok {
+			// Defensive: a LearningPending asset must have a
+			// PendingAssetContent payload. If it does not (corruption /
+			// future evolution), skip rather than panic — the operator
+			// can investigate via logs.
+			slog.Warn("learn: ScheduledTick requeue skipped (non-pending content)",
+				"asset_key", retry.Asset.AssetKey, "session_id", retry.Asset.SessionID)
+			continue
+		}
+		pending.RetryAttempts = retry.RetryCount + 1
+		pending.NextRetryAt = now.Add(5 * time.Minute)
+		retry.Asset.Content = pending
+		retry.Asset.LastUsedAt = now
+		if err := l.ScheduledMem.Store(ctx, retry.Asset); err != nil {
+			return fmt.Errorf("learn: ScheduledMem.Store (requeue): %w", err)
+		}
 	}
 	return nil
 }
