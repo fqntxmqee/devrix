@@ -20,6 +20,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 )
 
 // LoopContext is the input to LoopDepthTracker.ShouldContinue.
@@ -43,10 +45,10 @@ type LoopContext struct {
 	ExitReason      ExitReason
 }
 
-// PlanKind is a typed enum re-exported from shared/types so that escape
+// PlanKind is a typed enum re-exported from plan/plan.go so that escape
 // package can consume PlanKind values without circular imports. The
-// concrete enum + String/Parse live in shared/types/plan.go (Phase 2 PR-B1).
-type PlanKind = uint8
+// concrete enum + String/Parse live in plan/plan.go (Phase 2 PR-B1).
+type PlanKind = plan.PlanKind
 
 // ObservationKind is a typed enum re-exported from shared/types (Phase 2
 // PR-A1).
