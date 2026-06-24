@@ -51,14 +51,28 @@ internal/layers/orchestration/escape/
 // escape/types.go
 
 // LoopContext 回路上下文（按"模式 hash"计数的输入）
+// 11 字段：7 核心（hash 输入） + 4 状态（不参与 hash，由 tracker/CB 内部维护）
 type LoopContext struct {
+    // 7 核心字段（参与 hashLoopContext，模式识别用）
     SessionID           string
     PlanKind            PlanKind         // 4 类：CommitmentPlan / ProtocolPlan / ScenarioPlan / ExplorationPlan
-    PrevPlanKind        PlanKind         // 用于切换计数
+    PrevPlanKind        PlanKind         // 用于切换计数（不参与 hash）
     ObservationKind     ObservationKind  // 4 类：ObsFact/ObsSignal/ObsDeviation/ObsUncertainty
     FailureCriterion    string           // Plan 失败判据
     ArtifactType        ArtifactType     // 4 类：StateChangeCert/ResponseRecord/ProbeReport/ExperimentData
-    PlanKindSwitchCount int              // 累计切换次数
+    PlanKindSwitchCount int              // 累计切换次数（不参与 hash）
+
+    // 4 状态字段（不参与 hash，3 类深度限制用）
+    LoopBudgetState     LoopBudgetState    // DenialBudget 状态（consecutive=3, total=20）
+    ReputationEvidence  *ReputationEvidence // Phase 5 信誉先验（影响 PlanKind 推荐）
+    ExitReason          ExitReason         // 14 类现有 ExitReason 映射（接线点 2/3 注入）
+    CircuitBreakerState map[CBLevel]bool   // 5 层 CB open/closed 快照（L0-L5）
+}
+
+// LoopBudgetState DenialBudget 累计状态
+type LoopBudgetState struct {
+    ConsecutiveFails int  // 连续失败次数（达到 3 触发 ForceExit）
+    TotalFails       int  // 累计失败次数（达到 20 触发 AbortWithAudit）
 }
 
 // EscapeAction 6 类动作（5 类正式 + 1 个 dev 扩展中间态）
@@ -75,11 +89,20 @@ const (
 )
 
 // EscapeDecision 逃逸决策
+// 9 字段：5 核心 + 4 审计/续跑关键
 type EscapeDecision struct {
+    // 5 核心字段
     Action     EscapeAction
     Reason     string
     AuditLevel int  // 0=无审计, 1=记录, 2=完整审计
     Depth      int  // 当前回路深度
+    PendingID  string  // 仅 EscapePendingHuman 时填充
+
+    // 4 审计/续跑关键字段
+    ExitReason         ExitReason  // 14 类现有 ExitReason 映射（保留兼容）
+    SessionID          string      // audit 持久化 key
+    CreatedAt          time.Time   // 审计时间戳
+    SourceDecisionIDs  []string    // 上游决策链（用于 audit 追溯）
 }
 
 // PlanKindSwitchPolicy 3 档策略
@@ -110,6 +133,11 @@ func hashLoopContext(ctx LoopContext) string {
 ```
 
 **关键设计**：**按"模式 hash"计数，而非"按轮数"计数**。这意味着 LLM 切换 Plan.Kind 算作新回路（depth=1），但同一模式重复会被累积计数。
+
+**MaxDepth 判定规则**（明确边界）：
+- `depth < MaxDepth` → EscapeContinue（继续回路）
+- `depth >= MaxDepth` → EscapeForceExit（强制退出）
+- 例：MaxDepth=3 时，depth=1/2 → Continue，depth=3 → ForceExit
 
 ### 5.2 PlanKindSwitchPolicy（doc 38 §21.4.2）
 
@@ -322,6 +350,54 @@ func (n *FeishuCardNotifier) Notify(loopCtx LoopContext, pendingID string, decis
     }
     return n.cardClient.UpdateCard(n.userID, card)
 }
+
+// SubmitOverrideCard 覆盖已发卡片（ctx.Done() 兜底用）
+func (n *FeishuCardNotifier) SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error {
+    return n.cardClient.UpdateCard(n.userID, FeishuCard{
+        Title: "⚠️ " + msg,
+        Buttons: buttons,
+    })
+}
+
+// ChainedNotifier 链式 fallback 装饰器（M2 实现）
+// 顺序：FeishuCard → CLI → Email，任一成功立即返回，全部失败返回最后 error
+type ChainedNotifier struct {
+    notifiers []Notifier
+}
+
+func (c *ChainedNotifier) Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error {
+    var lastErr error
+    for _, n := range c.notifiers {
+        if err := n.Notify(loopCtx, pendingID, decisions); err == nil {
+            return nil  // 任一成功立即返回
+        } else {
+            slog.Warn("notifier fallback", "pending_id", pendingID, "error", err)
+            lastErr = err
+        }
+    }
+    return lastErr  // 全部失败
+}
+
+func (c *ChainedNotifier) SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error {
+    for _, n := range c.notifiers {
+        if override, ok := n.(OverrideCardNotifier); ok {
+            if err := override.SubmitOverrideCard(pendingID, msg, buttons); err == nil {
+                return nil
+            }
+        }
+    }
+    return fmt.Errorf("all notifiers failed to override card")
+}
+
+// OverrideCardNotifier 可选接口（不是所有 Notifier 都支持覆盖）
+type OverrideCardNotifier interface {
+    SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error
+}
+
+// 完整 Notifier interface（合并 Notify + 可选 Override）
+type Notifier interface {
+    Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error
+}
 ```
 
 **PendingResolutionStore 接口**（续跑）：
@@ -381,12 +457,21 @@ type InMemoryPendingResolutionStore struct {
   └─ EscapeEngine.ResumeSession(sessionID) → 委托给 HumanArbitrator.ResumeSession
        ├─ resume.Load(sessionID) → 未命中 → 走完整 5 节点流程
        └─ resume.Load(sessionID) → 命中（消费后 Delete，防重复续跑）
-            ├─ user_choice=A → 继续回路（重跑 Plan → Execute → Verify，depth 续 T1.5 状态 +1）
+            ├─ user_choice=A → 继续回路（重跑 Plan → Execute → Verify，**depth 续 T1.5 状态**）
+            │    具体：LoopDepthTracker.SessionID 维度保留 depth=3，下次回路 +1=4 → ForceExit
+            │    （即 depth 跨 ProcessMessage 边界不重置，符合"模式 hash"语义）
             ├─ user_choice=B → ForceExit（已 ForceExit，无新动作）
             └─ user_choice=C → AbortWithAudit（已终止）
+
+**depth 续 T1 状态机制**（M4 明确）：
+- `LoopDepthTracker` 内部按 `SessionID` 维度保留 History map（不随 ProcessMessage 结束清空）
+- T1.5 触发 EscapePendingHuman 时，depth=3 状态保留
+- T2 续跑 user 选 A → 重跑回路 → depth=4 → ForceExit
+- 避免"重置 depth 让回路无限续命"的漏洞
+- 唯一清空时机：`tracker.Reset()`（仅在 session 彻底结束 / admin reset 调用）
 ```
 
-### 5.3.3 4 类边界场景兜底
+### 5.3.3 7 类边界场景兜底
 
 | 场景 | 行为 | 兜底机制 |
 |------|------|---------|
@@ -395,7 +480,121 @@ type InMemoryPendingResolutionStore struct {
 | ProcessMessage 客户端断开 | EscapeForceExit + AuditLevel=2 | ctx.Done() 兜底 |
 | user 响应但 pendingID 已 timeout/cleanup | SubmitUserChoice 丢弃（map 已 cleanup）| map cleanup 兜底 |
 | LLMArbitrator 自身 panic | recover + ForceExit | 失败降级（同 Phase 7 模式）|
-| Notifier 发送失败 | 降级为 CLI prompt（terminal 用户）| Notifier 链式 fallback |
+| Notifier 发送失败 | 降级为下一个 Notifier | Notifier 链式 fallback（见 ChainedNotifier）|
+| **ctx.Done() 后飞书卡片已发**（UI/状态不一致）| ctx.Done() 兜底分支同步发"已强制退出"覆盖卡片 | submitOverrideCard(pendingID, "已强制退出") 同步调用；user 响应过期也写 audit("user_late_response") |
+
+**M6 LLM 仲裁 4 类异常处理**（设计补全）：
+
+```go
+func (a *LLMArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, decisions []EscapeDecision) (EscapeDecision, error) {
+    defer func() {
+        if r := recover(); r != nil {
+            slog.Error("llm_arbitrator_panic", "panic", r, "session_id", loopCtx.SessionID)
+            // 兜底：panic → ForceExit
+        }
+    }()
+
+    // 1. 构造 prompt（注入 LoopContext + PlanKindSwitchCount）
+    prompt := buildArbitratorPrompt(loopCtx, decisions)
+
+    // 2. 5s timeout 调用 LLM
+    llmCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+    defer cancel()
+
+    rawRespCh := make(chan string, 1)
+    var rawResp string
+    var llmErr error
+    go func() {
+        resp, err := a.llmClient.Generate(llmCtx, prompt)
+        rawRespCh <- resp
+        llmErr = err
+    }()
+
+    select {
+    case rawResp = <-rawRespCh:
+        // 路径 1: LLM 正常返回
+    case <-llmCtx.Done():
+        if ctx.Err() != nil {
+            // M6 关键：ctx 取消语义优先于 LLM timeout
+            return EscapeDecision{Action: EscapeForceExit, Reason: "ctx_cancelled", AuditLevel: 2}, ctx.Err()
+        }
+        return EscapeDecision{Action: EscapeForceExit, Reason: "llm_timeout_5s", AuditLevel: 2}, llmCtx.Err()
+    case <-time.After(6 * time.Second):
+        // 双保险：ctx 已 cancel 但 LLM 没退出，强制兜底
+        return EscapeDecision{Action: EscapeForceExit, Reason: "llm_stuck_force_exit", AuditLevel: 2}, nil
+    }
+
+    if llmErr != nil {
+        return EscapeDecision{Action: EscapeForceExit, Reason: "llm_error", AuditLevel: 1}, llmErr
+    }
+
+    // 3. 解析 LLM 响应（JSON 格式：{"action": "Continue|Exit", "reason": "..."}）
+    action, reason, parseErr := parseArbitratorResponse(rawResp)
+    if parseErr != nil {
+        // M6: 1 次重试（注入格式示例）
+        retryResp, retryErr := a.llmClient.Generate(llmCtx, prompt+"\n\n必须返回 JSON: {\"action\":\"Continue|Exit\",\"reason\":\"...\"}")
+        if retryErr != nil {
+            return EscapeDecision{Action: EscapeForceExit, Reason: "llm_non_json_after_retry", AuditLevel: 1}, retryErr
+        }
+        action, reason, parseErr = parseArbitratorResponse(retryResp)
+        if parseErr != nil {
+            return EscapeDecision{Action: EscapeForceExit, Reason: "llm_invalid_format", AuditLevel: 1}, parseErr
+        }
+    }
+
+    // 4. 校验 action 合法性
+    if action != "Continue" && action != "Exit" {
+        // M6: 非法 action 直接 ForceExit（不传给 ChainedArbitrator 下层）
+        return EscapeDecision{Action: EscapeForceExit, Reason: "llm_invalid_action_" + action, AuditLevel: 1}, nil
+    }
+
+    if action == "Continue" {
+        return EscapeDecision{Action: EscapeContinue, Reason: reason, AuditLevel: 0}, nil
+    }
+    return EscapeDecision{Action: EscalateToRule, Reason: reason, AuditLevel: 1}, nil
+}
+```
+
+**M6 关键设计**：
+- **panic 优先 recover**：不阻塞主链路
+- **ctx 取消语义优先**：ctx.Err() != nil 时 reason=ctx_cancelled（不是 llm_timeout）
+- **LLM 解析失败 1 次重试**：注入格式示例，仍失败 → ForceExit
+- **非法 action 拦截**：LLM 返回 "Continue|Exit" 之外的值 → ForceExit（不污染 ChainedArbitrator 下层）
+- **6s 双保险 timer**：防 LLM 卡死（5s timeout + 1s grace）
+
+**7 类 UI/状态一致性兜底**（H4 关键修复）：
+
+```go
+// ctx.Done() 路径不仅要写 audit，还要覆盖飞书卡片防 UI 误导
+case <-ctx.Done():
+    finalDecision = EscapeDecision{
+        Action: EscapeForceExit, Reason: "ctx_cancelled", AuditLevel: 2,
+        ExitReason: ExitReasonCtxCancelled, SessionID: loopCtx.SessionID, CreatedAt: time.Now(),
+    }
+    a.audit.Record(loopCtx, decisions, finalDecision)
+    a.resume.Save(loopCtx.SessionID, finalDecision)
+    // 关键：同步覆盖飞书卡片（防 user 看到"已升级"但实际已退出）
+    a.notifier.SubmitOverrideCard(pendingID, "已强制退出（客户端断开）", []FeishuButton{})
+
+// SubmitUserChoice 已过期时仍写 audit（保留 user 响应记录）
+func (a *HumanArbitrator) SubmitUserChoice(pendingID string, choice UserChoice) {
+    a.mu.Lock()
+    ch, ok := a.pending[pendingID]
+    a.mu.Unlock()
+    if !ok {
+        // 关键：已 expired 也要写 audit（user 响应记录不能丢）
+        a.audit.Record(nil, nil, EscapeDecision{
+            Action: EscapePendingHuman, Reason: "user_late_response",
+            PendingID: pendingID, AuditLevel: 1, CreatedAt: time.Now(),
+        })
+        return
+    }
+    select {
+    case ch <- choice:
+    default:
+    }
+}
+```
 
 ## 6. 5 节点接线
 
@@ -541,15 +740,23 @@ func (o *Orchestrator) processEscapeDecision(decision EscapeDecision, baseErr er
 
 **结论**：v5 复用 Phase 1-7 全部数据契约，**零破坏性变更**。
 
-## 9. 失败降级策略
+## 9. 失败降级策略（M1 完整覆盖）
 
 | 失败点 | 降级行为 | 原因 |
 |--------|---------|------|
 | EscapeEngine.Evaluate panic | recover + slog.Warn + EscapeContinue | 不阻塞主链路 |
 | EscapeEngine.Evaluate error | slog.Warn + EscapeContinue | 监控缺失但不影响流程 |
+| buildLoopContext 失败（plan/observe 为 nil）| slog.Warn + default LoopContext + Continue | 降级但可继续 |
+| **CircuitBreaker 拉 metric 阻塞** | 200ms timeout + slog.Warn + 不触发 | 避免主链路卡住 |
+| **CircuitBreaker.Evaluate panic** | recover + slog.Warn + 不触发 | 监控缺失但不影响流程 |
+| **audit.Record 失败** | slog.Warn + fail-open | 不阻塞主流程；audit 丢失但决策应用 |
 | LLMArbitrator timeout (5s) | ForceExit 兜底 | 避免无限等待 LLM |
+| **LLMArbitrator 返回非法 Action**（>5）| slog.Warn + ForceExit | 防意外枚举值污染回路 |
+| **LLMArbitrator 返回非 JSON** | 1 次重试 + 仍失败 → ForceExit | LLM 偶发格式错 |
+| **LLM 5s timeout + ctx 取消同时发生** | 优先 ctx 取消 → ForceExit(reason=ctx_cancelled) | ctx 取消语义优先级最高 |
 | HumanArbitrator 不响应 | 10s 后 ForceExit 兜底 | 同 Phase 7 Auto-Close |
-| CircuitBreaker.Evaluate error | slog.Warn + 不触发 | 监控缺失但不影响流程 |
+| **PendingResolutionStore.Save 失败** | slog.Warn + audit 仍写（仅 session 续跑丢失）| audit 优先，续跑可降级 |
+| **ResumeSession.Load 失败** | slog.Warn + 走完整 5 节点 | 续跑失败不阻塞 |
 
 ## 10. References
 
