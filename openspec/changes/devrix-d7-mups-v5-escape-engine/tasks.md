@@ -308,7 +308,7 @@
 | # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 覆盖 PR |
 |---|---------|---------|---------|-----------|---------|---------|
 | L3-01 | `TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit` | 守护"PlanKind 切换累计 ≤ 4"硬约束（doc 38 §21.4.2）——防止 LLM "试探模式"无限循环 | 如果删了，PlanKindSwitchPolicy Constrained 4 次边界无人守护，doc 38 §21.4.2 漏洞重现 | 4 次切换 → OK，5 次切换 → ForceExit，混合 Constrained/Allowed/Frobidden policy？ | L3 | V5.2 + V5.3 + V5.4 + V5.5 |
-| L3-02 | `TestL3_SameMode_4Times_ForcesExit` | 守护"回路深度 v2 按模式 hash 计数"承诺（doc 38 §21.3.2）——同模式不增长不逃避 | 如果删了，LoopDepthTracker v2 计数器失灵，资源耗尽/计费爆炸、用户体验卡死 | 同模式 3 次 → Continue，4 次 → ForceExit？跨 SessionID 重置？ | L3 | V5.1 + V5.4 |
+| L3-02 | `TestL3_SameMode_4Times_ForcesExit` | 守护"回路深度 v2 按模式 hash 计数"承诺（doc 38 §21.3.2）——同模式不增长不逃避 | 如果删了，LoopDepthTracker v2 计数器失灵，资源耗尽/计费爆炸、用户体验卡死 | MaxDepth=3 语义：depth=1/2 → Continue，depth=3 → ForceExit（采纳 design §5.1 SoT）；跨 SessionID 重置？同 SessionID 跨 ProcessMessage 续跑？ | L3 | V5.1 + V5.4 |
 | L3-03 | `TestL3_AnomalyDetector_5Nil_OpensL0` | 守护"CircuitBreaker 5 层接线"承诺（design §7）——异常被默默吞掉的兜底 | 如果删了，L0 AnomalyDetectorCB 不触发，下游节点持续异常输入无人告警 | 5 次连续 nil → open？open 后 LLM 仲裁？close 后恢复？ | L3 | V5.4 + V5.5 |
 | L3-04 | `TestL3_Verifier_3Times2s_OpensL2` | 守护"Verifier 性能降级"承诺（design §7）——不拖慢主链路 | 如果删了，L2 VerifierCB 不触发，用户等待超时，飞书卡片无反馈 | 3 次连续 > 2s → open？降级策略？close 阈值？ | L3 | V5.4 |
 | L3-05 | `TestL3_Human10s_Async_FeishuNotBlocked` | 守护"HumanArbitrator 异步化"承诺（design §5.3.1）——同步返回 + 内部异步 | 如果删了，可能误改回同步等待，ProcessMessage 阻塞 10s | A/B/C 选项响应？10s timeout 兜底？ctx 取消语义？ | L3 | V5.3 + V5.5 |
@@ -339,7 +339,7 @@
 | L1-01 | `TestLoopDepthTracker_FirstCall` | 守护首回路计数语义（depth=1）| 首回路 depth=1 行为无守护 | 首次调用 session 状态？ | L1 | 现有 |
 | L1-02 | `TestLoopDepthTracker_SameMode` | 守护同模式 depth++ | 核心计数语义失守 | 同模式连续调用 | L1 | 现有 |
 | L1-03 | `TestLoopDepthTracker_DifferentMode` | 守护异模式 reset | 回路污染，跨模式误计数 | 模式切换 | L1 | 现有 |
-| L1-04 | `TestLoopDepthTracker_ExceedMax` | 守护 MaxDepth=3 边界 | 超过 3 不触发 ForceExit | depth=4 边界 | L1 | 现有 |
+| L1-04 | `TestLoopDepthTracker_ExceedMax` | 守护 MaxDepth=3 边界（采纳 design §5.1 SoT：`depth >= MaxDepth` 触发 ForceExit）| 超过 3 不触发 ForceExit | 断言：depth=1/2 → EscapeContinue；depth=3 → EscapeForceExit(reason=loop_depth_exceeded)；depth=4 → 同 ForceExit（兜底）| L1 | 现有 |
 | L1-05 | `TestHashLoopContext_Deterministic` | 守护 hash 稳定性 | 同输入产生不同 hash，History 失效 | 同输入多次 hash | L1 | 现有 |
 | L1-06 | `TestHashLoopContext_DifferentInput` | 守护 hash 区分性 | 不同输入产生相同 hash，误判同模式 | 5 字段任一不同 | L1 | 现有 |
 | L1-07 | `TestLoopDepthTracker_SessionID_Isolated` ⭐NEW | 守护跨 session 隔离（codex review M4 明确）| sessionA 的 depth 污染 sessionB，"重置 depth 让回路无限续命"漏洞重现 | 跨 session 同模式调用 | L1 | 新增 |
@@ -462,7 +462,7 @@
 | L1-78 | `TestOrchestrator_BuildLoopContext` | 守护 LoopContext 5 hash 字段构造 | hash 字段遗漏 | 字段缺失 | L1 | 新增 |
 | L1-79 | `TestOrchestrator_ProcessEscapeDecision` | 守护 6 类 action 处理 | action 处理漏 | 各类 action | L1 | 新增 |
 | L1-80 | `TestOrchestrator_EvaluateError_Fallback` | 守护 Evaluate error → slog.Warn + Continue | error 阻塞主链路 | Evaluate panic | L1 | 新增 |
-| L1-81 | `TestOrchestrator_5WiringPoint_Observe` | 守护接线点 0 Observe 失败 | 接线点 0 漏 | Observe 失败 | L1 | 新增 |
+| L1-81 | `TestOrchestrator_5WiringPoint_Observe` | 守护接线点 0 Observe 失败（含 observe==nil 和 observe 空列表两个 sub-case）| 接线点 0 漏 | case 1：Observe 返回 err + observe=nil → Plan 立即失败（1a 触发）；case 2：Observe 返回 err + observe=空列表 → Plan 走默认分支 | L1 | 新增 |
 | L1-82 | `TestOrchestrator_5WiringPoint_PlanFailure` | 守护接线点 1a Plan 失败 | 接线点 1a 漏 | Plan 失败 | L1 | 新增 |
 | L1-83 | `TestOrchestrator_5WiringPoint_PlanBefore` | 守护接线点 1b Plan 前 | 接线点 1b 漏 | Plan 前 | L1 | 新增 |
 | L1-84 | `TestOrchestrator_5WiringPoint_PlanFailureShortCircuit` | 守护 1a 短路不调 1b（codex review R4 修复）| 同 ProcessMessage 内重复 Evaluate | Plan 失败 + Plan 前 | L1 | 新增 |
@@ -622,7 +622,7 @@
 
 | # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
 |---|---------|---------|---------|-----------|---------|
-| L2-07 | `TestIntegration_4IntentKind_5NodePaths` | 守护 4 IntentKind（Skip/Command/Fast/Orchestrate）走 5 节点管道一致行为（design §3.5）| 某 IntentKind 路径下 5 节点行为不一致 | 4 IntentKind × 5 节点 矩阵覆盖？ | L2 |
+| L2-07 | `TestIntegration_4IntentKind_5NodePaths` | 守护 4 IntentKind 都能正确触发 EscapeEngine 接线点（采纳 review-r3 ISSUE-6 建议：表驱动 4×关键节点 = 12 case，非 4×5=20 矩阵）| 某 IntentKind 路径下 EscapeEngine 触发不一致 | 表驱动：4 IntentKind × {Observe, Plan, Execute, Verify} 关键节点；Skip IntentKind 应跳过 Plan/Execute/Verify 仅 1 次 Evaluate（Observe 边界）；Orchestrate IntentKind 应完整触发 5 节点 Evaluate | L2 |
 
 ### 补测后覆盖率
 

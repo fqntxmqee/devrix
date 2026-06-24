@@ -172,6 +172,74 @@ HumanArbitrator (用户接管 A/B/C, 10s timeout)
 - HumanArbitrator 异步化（不阻塞 ProcessMessage 同步返回）— 详见 §5.3.1
 - 失败降级：EscapeEngine.Evaluate error → slog.Warn + EscapeContinue
 
+**ChainedArbitrator.Arbitrate 完整 Go 骨架**（采纳 review-r3 ISSUE-2 建议）：
+
+```go
+// ChainedArbitrator 链式调度 3 层仲裁
+// 调度顺序：LLM → Rule → Human，每层根据 Action 决定下一步
+type ChainedArbitrator struct {
+    llm   *LLMArbitrator
+    rule  *RuleArbitrator
+    human *HumanArbitrator
+}
+
+// Arbitrate 链式调用 3 层仲裁，返回最终 EscapeDecision
+// 关键不变式：
+//   1. 返回值 Action ∈ {EscapeContinue, EscapePendingHuman, EscapeForceExit, EscapeAbortWithAudit}
+//   2. EscalateToRule / EscalateToHuman 中间态绝不返回给 caller（由本函数消化）
+//   3. 任何一层 panic / error → 降级到下一层（不阻塞主链路）
+func (c *ChainedArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, decisions []EscapeDecision) EscapeDecision {
+    chain := append([]EscapeDecision{}, decisions...)
+
+    // 第 1 层：LLMArbitrator
+    llmDecision, err := c.llm.Arbitrate(ctx, loopCtx, chain)
+    if err == nil {
+        switch llmDecision.Action {
+        case EscapeContinue:
+            return llmDecision  // LLM 选 Continue 立即返回
+        case EscapeForceExit, EscapeAbortWithAudit:
+            return llmDecision  // LLM 选终止直接返回（timeout/panic 兜底）
+        }
+    } else {
+        // LLM error → 降级为 EscalateToRule 走下一层
+        llmDecision = EscapeDecision{
+            Action:     EscapeForceExit,  // 兜底终止
+            Reason:     "llm_error_" + err.Error(),
+            AuditLevel: 1,
+        }
+        return llmDecision
+    }
+
+    // llmDecision.Action == EscalateToRule（继续向下）
+    chain = append(chain, llmDecision)
+
+    // 第 2 层：RuleArbitrator
+    ruleDecision, err := c.rule.Arbitrate(ctx, loopCtx, chain)
+    if err == nil {
+        switch ruleDecision.Action {
+        case EscapeAbortWithAudit:
+            return ruleDecision  // Rule 不可恢复 → 终止
+        case EscapeContinue, EscapeForceExit:
+            return ruleDecision  // Rule 终止决策（少见但允许）
+        }
+    } else {
+        // Rule error → 降级为 EscalateToHuman 走下一层
+        ruleDecision = EscapeDecision{
+            Action:     EscapeForceExit,  // 兜底终止
+            Reason:     "rule_error_" + err.Error(),
+            AuditLevel: 1,
+        }
+        return ruleDecision
+    }
+
+    // ruleDecision.Action == EscalateToHuman（继续向下）
+    chain = append(chain, ruleDecision)
+
+    // 第 3 层：HumanArbitrator（异步路径，立即返回中间态）
+    return c.human.Arbitrate(ctx, loopCtx, chain)
+}
+```
+
 ### 5.3.1 HumanArbitrator 详细设计（devrix 落地）
 
 **核心约束**（与 Phase 7 Auto-Close 协同）：
@@ -403,24 +471,29 @@ func (c *ChainedNotifier) Notify(loopCtx LoopContext, pendingID string, decision
 
 func (c *ChainedNotifier) SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error {
     for _, n := range c.notifiers {
-        if override, ok := n.(OverrideCardNotifier); ok {
-            if err := override.SubmitOverrideCard(pendingID, msg, buttons); err == nil {
-                return nil
-            }
+        override, ok := n.(OverrideCardNotifier)
+        if !ok {
+            // 采纳 review-r3 ISSUE-4 建议：类型断言失败时 slog.Warn 降级
+            slog.Warn("notifier_does_not_support_override",
+                "notifier_type", fmt.Sprintf("%T", n),
+                "pending_id", pendingID)
+            continue
+        }
+        if err := override.SubmitOverrideCard(pendingID, msg, buttons); err == nil {
+            return nil
         }
     }
     return fmt.Errorf("all notifiers failed to override card")
 }
 
 // OverrideCardNotifier 可选接口（不是所有 Notifier 都支持覆盖）
+// 采纳 review-r3 ISSUE-4 建议：明确为可选 interface，与 Notifier 完全独立
 type OverrideCardNotifier interface {
     SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error
 }
 
-// 完整 Notifier interface（合并 Notify + 可选 Override）
-type Notifier interface {
-    Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error
-}
+// Notifier interface 定义见上方 line 421-423（仅 Notify 方法，无重复定义）
+// 完整 Notifier interface 已在首次定义处声明，避免重复声明导致的编译错误
 ```
 
 **PendingResolutionStore 接口**（续跑）：
@@ -492,6 +565,86 @@ type InMemoryPendingResolutionStore struct {
 - T2 续跑 user 选 A → 重跑回路 → depth=4 → ForceExit
 - 避免"重置 depth 让回路无限续命"的漏洞
 - 唯一清空时机：`tracker.Reset()`（仅在 session 彻底结束 / admin reset 调用）
+
+**applyResumeDecision 完整 Go 骨架**（采纳 review-r3 ISSUE-3 建议）：
+
+```go
+// applyResumeSession T2 续跑入口
+// 由 EscapeEngine.ResumeSession 委托调用，ProcessMessage 开头检查
+// 返回值: error → caller 应 return（终止 ProcessMessage）
+//
+// 关键不变式：
+//   1. decision.Action ∈ {EscapeContinue, EscapeForceExit, EscapeAbortWithAudit}
+//      （EscalateTo* 中间态已由 ChainedArbitrator 消化，不会出现在此处）
+//   2. user_choice=A → Continue：进入 runLoopWithResume 重跑回路（depth 续 T1 状态）
+//   3. user_choice=B → ForceExit：等价于正常终止（user 已接受当前）
+//   4. user_choice=C → AbortWithAudit：不可恢复终止 + 补写 audit
+func (o *Orchestrator) applyResumeSession(ctx context.Context, decision EscapeDecision) error {
+    switch decision.Action {
+    case EscapeContinue:
+        // user_choice=A：续跑回路
+        // depth 由 LoopDepthTracker 按 SessionID 维度自动续 T1 状态
+        return o.runLoopWithResume(ctx, decision)
+    case EscapeForceExit:
+        // user_choice=B：用户接受当前 → 等价于正常 ForceExit
+        return newExitError(decision.Reason)
+    case EscapeAbortWithAudit:
+        // user_choice=C：用户取消 → 不可恢复终止
+        o.escapeEngine.AuditLog().Record(decision)  // 补写 audit（保留 user_cancel 决策痕迹）
+        return newExitError(decision.Reason)
+    default:
+        // 兜底：不应出现的 Action 值（EscalateTo* 中间态）
+        slog.Error("invalid_resume_decision",
+            "action", decision.Action,
+            "reason", decision.Reason,
+            "session_id", decision.SessionID)
+        return newExitError("invalid_resume_decision_" + decision.Reason)
+    }
+}
+
+// runLoopWithResume 续跑回路（复用 ProcessMessage 内层 for 循环逻辑）
+// depth 续 T1 状态由 LoopDepthTracker 自动保证
+func (o *Orchestrator) runLoopWithResume(ctx context.Context, resumeDecision EscapeDecision) error {
+    for {
+        plan, err := o.plan(ctx, nil)  // T2 入口重新规划
+        if err != nil {
+            // 接线点 1a：Plan 失败 → EscapeEngine 升级
+            loopCtx := buildLoopContext(ctx, nil, nil)
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            return o.processEscapeDecision(decision, err)
+        }
+
+        artifact, err := o.execute(ctx, plan)
+        if err != nil {
+            loopCtx := buildLoopContext(ctx, plan, nil)
+            loopCtx.PrevPlanKind = plan.Kind
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+                return derr
+            }
+            continue
+        }
+
+        verdict := o.verify(ctx, artifact, plan)
+        if verdict.Kind == VerdictFail || verdict.Kind == VerdictIndeterminate {
+            loopCtx := buildLoopContext(ctx, plan, nil)
+            loopCtx.FailureCriterion = verdict.Reason
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+                return derr
+            }
+            continue
+        }
+
+        // Verify 通过 → 跳出回路
+        return nil
+    }
+}
+```
+
+**与 Phase 7 Auto-Close 的差异**：
+- Auto-Close：同步返回 + 内部异步（不续跑，仅本次 ProcessMessage 异步通知）
+- T2 Resume：同步返回 + 下次 ProcessMessage 续跑（user 响应跨 ProcessMessage 边界应用）
 ```
 
 ### 5.3.3 7 类边界场景兜底
@@ -640,7 +793,12 @@ func (o *Orchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) e
         if terminate, derr := o.processEscapeDecision(decision, err); terminate {
             return derr
         }
-        // Observe 失败但未到上限，observe 仍可用，继续回路
+        // Observe 失败但未到上限 → continue 路径细分（采纳 review-r3 ISSUE-5 建议）：
+        //   case 1: observe != nil 但 Observations == []（AnomalyDetector 全 nil 但函数未返 err）
+        //           → 进 for 循环调 o.plan(ctx, observe)，Plan 走默认分支（无 ObservationKind）
+        //   case 2: observe == nil（Observe 函数 panic/recover 后返回 nil）
+        //           → 进 for 循环调 o.plan(ctx, nil)，Plan 立即失败 → 接线点 1a 触发
+        // 两者都不破坏主链路（失败降级已覆盖）
     }
 
     for {
