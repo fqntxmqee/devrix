@@ -383,8 +383,8 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		if o.escapeEngine != nil {
 			loopCtx := o.buildEscapeLoopContext(req.SessionID, 0, "")
 			decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
-			if o.processEscapeDecision(decision, err) {
-				return nil, fmt.Errorf("orchestrator: classify: %w", err)
+			if term, augErr := o.processEscapeDecision(decision, err); term {
+				return nil, fmt.Errorf("orchestrator: classify: %w", augErr)
 			}
 		}
 		return nil, fmt.Errorf("orchestrator: classify: %w", err)
@@ -417,9 +417,13 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	if o.escapeEngine != nil {
 		loopCtx := o.buildEscapeLoopContext(req.SessionID, planKindFromIntent(intent.Kind), "")
 		decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
-		if o.processEscapeDecision(decision, nil) {
-			endSpanWithError(sessionSpan, escapeErr(decision.Reason))
-			return nil, escapeErr(decision.Reason)
+		if term, augErr := o.processEscapeDecision(decision, nil); term {
+			escErr := escapeErr(decision.Reason)
+			if augErr != nil {
+				escErr = fmt.Errorf("%w: %w", escErr, augErr)
+			}
+			endSpanWithError(sessionSpan, escErr)
+			return nil, escErr
 		}
 	}
 
@@ -452,9 +456,10 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	if err != nil && o.escapeEngine != nil {
 		loopCtx := o.buildEscapeLoopContext(req.SessionID, planKindFromIntent(intent.Kind), err.Error())
 		decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
-		if o.processEscapeDecision(decision, err) {
-			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: escape_force_exit_post_execute: %w", err))
-			return nil, fmt.Errorf("orchestrator: escape_force_exit_post_execute: %w", err)
+		if term, augErr := o.processEscapeDecision(decision, err); term {
+			escErr := fmt.Errorf("orchestrator: escape_force_exit_post_execute: %w", augErr)
+			endSpanWithError(sessionSpan, escErr)
+			return nil, escErr
 		}
 	}
 	if err != nil {

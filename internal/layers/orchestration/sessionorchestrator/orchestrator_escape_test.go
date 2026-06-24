@@ -272,9 +272,36 @@ func TestProcessEscapeDecision(t *testing.T) {
 	}
 	for _, tt := range tests {
 		d := escape.EscapeDecision{Action: tt.action, Reason: "test"}
-		got := orch.processEscapeDecision(d, nil)
+		got, _ := orch.processEscapeDecision(d, nil)
 		if got != tt.want {
 			t.Errorf("processEscapeDecision(%v) = %v, want %v", tt.action, got, tt.want)
 		}
+	}
+}
+
+// TestProcessEscapeDecision_AugmentsError verifies that the S4-Gate review
+// C-1 fix (C-1 silent error swallowing) is correctly applied: when baseErr
+// is non-nil and action is EscalateTo*, the returned error includes both
+// the base and the escalation annotation.
+func TestProcessEscapeDecision_AugmentsError(t *testing.T) {
+	orch := &SessionOrchestrator{}
+	baseErr := errors.New("classifier failed")
+	d := escape.EscapeDecision{Action: escape.EscalateToHuman, Reason: "needs human review"}
+
+	_, augErr := orch.processEscapeDecision(d, baseErr)
+	if augErr == nil {
+		t.Fatal("EscalateToHuman with baseErr: want augmented error, got nil")
+	}
+	if !strings.Contains(augErr.Error(), "classifier failed") {
+		t.Errorf("augErr=%q, want contains 'classifier failed'", augErr)
+	}
+	if !strings.Contains(augErr.Error(), "needs human review_unhandled_escalation") {
+		t.Errorf("augErr=%q, want contains 'needs human review_unhandled_escalation'", augErr)
+	}
+
+	// EscapeContinue should pass through baseErr unchanged.
+	_, passthrough := orch.processEscapeDecision(escape.EscapeDecision{Action: escape.EscapeContinue}, baseErr)
+	if passthrough != baseErr {
+		t.Errorf("EscapeContinue passthrough: got %v, want %v", passthrough, baseErr)
 	}
 }

@@ -54,35 +54,38 @@ func planKindFromIntent(kind orchtypes.IntentKind) escape.PlanKind {
 	}
 }
 
-// processEscapeDecision converts an EscapeDecision to (terminate, err).
+// processEscapeDecision converts an EscapeDecision to (terminate, augmentedErr).
 //
 // Returns:
-//   - terminate=true  → caller should return err
+//   - terminate=true  → caller should return augmentedErr (or baseErr if augmentedErr is nil)
 //   - terminate=false → caller should continue (EscapeContinue)
+//   - augmentedErr    → error wrapped with the escape reason, or baseErr if no augmentation needed
 //
 // 处理 6 类 EscapeAction:
-//   - EscapeContinue       → continue
-//   - EscalateTo*          → terminate (unhandled escalation, joined with baseErr)
-//   - EscapePendingHuman   → terminate (Human 异步, session 状态已持久化)
-//   - EscapeForceExit      → terminate (joined with baseErr)
-//   - EscapeAbortWithAudit → terminate (joined with baseErr)
-func (o *SessionOrchestrator) processEscapeDecision(decision escape.EscapeDecision, baseErr error) bool {
+//   - EscapeContinue       → continue, augmentedErr=baseErr
+//   - EscalateTo*          → terminate, augmentedErr=join(baseErr, "decision.Reason + unhandled escalation")
+//   - EscapePendingHuman   → terminate, augmentedErr=baseErr (Human 异步, session 状态已持久化)
+//   - EscapeForceExit      → terminate, augmentedErr=baseErr
+//   - EscapeAbortWithAudit → terminate, augmentedErr=baseErr
+//
+// 设计要点: 透传 augmentedErr 给 caller, 避免静默吞错 (S4-Gate review C-1 修复).
+func (o *SessionOrchestrator) processEscapeDecision(decision escape.EscapeDecision, baseErr error) (bool, error) {
 	switch decision.Action {
 	case escape.EscapeContinue:
-		return false
+		return false, baseErr
 	case escape.EscalateToRule, escape.EscalateToHuman:
-		// ChainedArbitrator 链式裁决后已收敛; 兜底为 terminate
+		// ChainedArbitrator 链式裁决后已收敛; 兜底为 terminate, augment error 透传
 		if baseErr != nil {
-			_ = errors.Join(baseErr, errors.New(decision.Reason+"_unhandled_escalation"))
+			return true, errors.Join(baseErr, errors.New(decision.Reason+"_unhandled_escalation"))
 		}
-		return true
+		return true, errors.New(decision.Reason + "_unhandled_escalation")
 	case escape.EscapePendingHuman:
 		// Human 异步路径: session 状态已持久化, 等下次 ProcessMessage 续跑
-		return true
+		return true, baseErr
 	case escape.EscapeForceExit, escape.EscapeAbortWithAudit:
-		return true
+		return true, baseErr
 	default:
-		return true
+		return true, baseErr
 	}
 }
 
