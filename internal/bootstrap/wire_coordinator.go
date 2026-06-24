@@ -11,12 +11,14 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -57,23 +59,23 @@ func InitOrchestration(
 		"command_first", coordCfg.CommandFirst,
 	)
 
-	routingMode := coordinator.RoutingModeLoopFirst
+	routingMode := orchtypes.RoutingModeLoopFirst
 	if coordCfg.RoutingMode == "rule_orchestrate" {
-		routingMode = coordinator.RoutingModeRuleOrchestrate
+		routingMode = orchtypes.RoutingModeRuleOrchestrate
 	}
-	if routingMode == coordinator.RoutingModeRuleOrchestrate {
+	if routingMode == orchtypes.RoutingModeRuleOrchestrate {
 		slog.Info("d7: routing_mode=rule_orchestrate enables FastPath confidence threshold gating to OrchestratePath",
 			"change", "devrix-d2-queryloop-dismantle",
 			"dm", "DM-20260618-010",
 		)
 	}
-	coordinatorFileCfg := coordinator.FileConfig{
+	coordinatorFileCfg := orchtypes.FileConfig{
 		Enabled:           boolPtr(coordCfg.Enabled),
 		RoutingMode:       strPtr(string(routingMode)),
 		FastPathThreshold: intPtr(coordCfg.FastPathThreshold),
 		CommandFirst:      boolPtr(coordCfg.CommandFirst),
 	}
-	coordinatorCfg := coordinator.BuildConfig(&coordinatorFileCfg)
+	coordinatorCfg := orchtypes.BuildConfig(&coordinatorFileCfg)
 
 	maxContextTokens := config.DefaultContextEngineConfig().MaxContextTokens
 	subagentCfg := config.DefaultSubagentConfig()
@@ -108,18 +110,18 @@ func InitOrchestration(
 
 	sink := newGatewayEventPublisher(gw)
 
-	wm := coordinator.NewLocalWorkModel(tm)
+	wm := sessionorchestrator.NewLocalWorkModel(tm)
 	if enforce.GlobalBackgroundRegistry == nil {
 		enforce.SetGlobalBackgroundRegistry()
 	}
-	wm.SetBackgroundProvider(func(sessionID string) []coordinator.BackgroundLite {
+	wm.SetBackgroundProvider(func(sessionID string) []sessionorchestrator.BackgroundLite {
 		tasks := enforce.GlobalBackgroundRegistry.List(sessionID)
 		if len(tasks) == 0 {
 			return nil
 		}
-		out := make([]coordinator.BackgroundLite, 0, len(tasks))
+		out := make([]sessionorchestrator.BackgroundLite, 0, len(tasks))
 		for _, t := range tasks {
-			out = append(out, coordinator.BackgroundLite{
+			out = append(out, sessionorchestrator.BackgroundLite{
 				RunID:  t.ID,
 				Status: mapBackgroundStatus(t.Status),
 				Output: t.Result,
@@ -128,7 +130,7 @@ func InitOrchestration(
 		return out
 	})
 
-	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
 		LLM:         llmInvoker,
 		DefaultTier: llmStack.DefaultModel,
 	})
@@ -142,12 +144,12 @@ func InitOrchestration(
 	orchPath.SetTaskManager(tm)
 
 	planMode := workmodel.NewPlanMode(newPlanLLMCompleter(llmInvoker, llmStack.DefaultModel), obsBridge)
-	toolExec := coordinator.NewTurnToolExecutor(ctxAdapter, orchPath, planMode, loopFirst)
+	toolExec := sessionorchestrator.NewTurnToolExecutor(ctxAdapter, orchPath, planMode, loopFirst)
 	if obsBridge != nil {
-		toolExec.SetTurnToolMetrics(coordinator.NewTurnToolMetrics(obsBridge.Meter()))
+		toolExec.SetTurnToolMetrics(sessionorchestrator.NewTurnToolMetrics(obsBridge.Meter()))
 	}
 
-	ctxPrep := &coordinator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
+	ctxPrep := &sessionorchestrator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
 
 	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
 		LLM:              llmInvoker,
@@ -182,18 +184,18 @@ func InitOrchestration(
 	}
 	executor := newTurnOrchExecutor(turnOrch)
 
-	orch := coordinator.NewSessionOrchestrator(
+	orch := sessionorchestrator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
-		coordinator.WithSink(sink),
-		coordinator.WithObservability(obsBridge),
-		coordinator.WithWorkModel(wm),
-		coordinator.WithOrchestratePath(orchPath),
-		coordinator.WithTurnToolExecutor(toolExec),
-		coordinator.WithTaskManager(tm),
+		sessionorchestrator.WithSink(sink),
+		sessionorchestrator.WithObservability(obsBridge),
+		sessionorchestrator.WithWorkModel(wm),
+		sessionorchestrator.WithOrchestratePath(orchPath),
+		sessionorchestrator.WithTurnToolExecutor(toolExec),
+		sessionorchestrator.WithTaskManager(tm),
 	)
 
-	entry := coordinator.NewEntry(orch)
+	entry := sessionorchestrator.NewEntry(orch)
 	gw.SetOrchestrationEntry(entry)
 	if exp, ok := ctxEngine.(contracts.ISessionSnapshotExporter); ok {
 		gw.SetSessionSnapshotExporter(exp)
@@ -214,7 +216,7 @@ func newTurnOrchExecutor(orch turn.TurnOrchestrator) *turnOrchExecutor {
 	return &turnOrchExecutor{orch: orch}
 }
 
-func (e *turnOrchExecutor) RunTurn(ctx context.Context, req coordinator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
+func (e *turnOrchExecutor) RunTurn(ctx context.Context, req sessionorchestrator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
 	if len(req.Messages) == 0 {
 		return nil, fmt.Errorf("turn executor: at least one message required")
 	}
@@ -258,9 +260,9 @@ func strPtr(s string) *string {
 // coordinator TaskStatus. BackgroundRegistry uses "running" while the work
 // model uses "in_progress"; all other values ("completed", "failed",
 // "cancelled") match directly.
-func mapBackgroundStatus(s string) coordinator.TaskStatus {
+func mapBackgroundStatus(s string) orchtypes.TaskStatus {
 	if s == "running" {
-		return coordinator.TaskStatusInProgress
+		return orchtypes.TaskStatusInProgress
 	}
-	return coordinator.TaskStatus(s)
+	return orchtypes.TaskStatus(s)
 }

@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -68,8 +69,8 @@ func TestIntegration_D7WaveScheduler_RealDispatch(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(
-			coordinator.NewTaskDecomposer(),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(
+			decisionplanning.NewTaskDecomposer(),
 			sched,
 			nil,
 		),
@@ -126,8 +127,8 @@ func TestIntegration_D7WaveScheduler_EmptyGraph(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(
-			coordinator.NewTaskDecomposer(),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(
+			decisionplanning.NewTaskDecomposer(),
 			sched,
 			nil,
 		),
@@ -179,8 +180,8 @@ func TestIntegration_D7WaveScheduler_ConflictGuard(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(
-			coordinator.NewTaskDecomposer(),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(
+			decisionplanning.NewTaskDecomposer(),
 			sched,
 			nil,
 		),

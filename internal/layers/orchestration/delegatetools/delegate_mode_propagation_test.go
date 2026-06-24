@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -88,4 +88,4 @@ func (n noopFlowReporter) WrapEmit(_ context.Context, _ contracts.SubQueryFlowPa
 }
 
 // silence unused warning
-var _ = hubspoke.NewFlowReporter
+var _ = bridge.NewFlowReporter

@@ -10,11 +10,12 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler/runners"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -64,16 +65,16 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wavescheduler.WaveScheduler {
 
 // BuildOrchestratePath wires TaskDecomposer + WaveScheduler for IntentOrchestrate.
 func BuildOrchestratePath(
-	sink coordinator.EventPublisher,
-	llmDecomp coordinator.LLMTaskDecomposer,
+	sink sessionorchestrator.EventPublisher,
+	llmDecomp decisionplanning.LLMTaskDecomposer,
 	deps WaveSchedulerDeps,
-) *coordinator.OrchestratePath {
-	decomp := coordinator.NewTaskDecomposer()
+) *sessionorchestrator.OrchestratePath {
+	decomp := decisionplanning.NewTaskDecomposer()
 	if llmDecomp != nil {
 		decomp.SetLLMDecomposer(llmDecomp)
 	}
 	sched := WireWaveScheduler(deps)
-	op := coordinator.NewOrchestratePath(decomp, sched, sink)
+	op := sessionorchestrator.NewOrchestratePath(decomp, sched, sink)
 	op.SetObsBridge(deps.ObsBridge)
 	return op
 }

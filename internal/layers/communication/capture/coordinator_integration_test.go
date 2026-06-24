@@ -9,9 +9,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -190,7 +190,7 @@ func TestGateway_StopProcess_D7Cancel(t *testing.T) {
 }
 
 // Compile-time check: coordinator.Entry satisfies contracts.IOrchestrationEntry.
-var _ contracts.IOrchestrationEntry = (*coordinator.Entry)(nil)
+var _ contracts.IOrchestrationEntry = (*sessionorchestrator.Entry)(nil)
 
 // newTestGateway is a minimal helper that builds a gateway without a
 // real context engine. The d7-enabled tests don't need one; the

@@ -34,7 +34,6 @@ import (
 
 	// Spans self-registration (trigger init() to register domain spans)
 	_ "github.com/devrix/devrix/internal/layers/communication"
-	_ "github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )

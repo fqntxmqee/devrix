@@ -12,7 +12,14 @@ import (
 	_ "github.com/devrix/devrix/internal/layers/evolution"
 	_ "github.com/devrix/devrix/internal/layers/llmgateway"
 	_ "github.com/devrix/devrix/internal/layers/multiagent"
-	_ "github.com/devrix/devrix/internal/layers/orchestration/coordinator"
+	// D7 orchestration spans were previously loaded via
+	// `_ ".../orchestration/coordinator"` which transitively pulled in
+	// sessionorchestrator + decisionplanning + workmodel + orchtypes init().
+	// Now load sessionorchestrator directly (the canonical owner).
+	_ "github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
+	_ "github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	_ "github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	_ "github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 
 func TestAllOperations_should_match_telemetry_constants(t *testing.T) {

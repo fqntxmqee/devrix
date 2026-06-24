@@ -8,8 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -119,8 +120,8 @@ func TestIntegration_D7ProcessMessage_OrchestratePathDispatchesToScheduler(t *te
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		LLMStub: stub,
 		RoutingMode: "rule_orchestrate",
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(
-			coordinator.NewTaskDecomposer(),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(
+			decisionplanning.NewTaskDecomposer(),
 			fake,
 			nil,
 		),
@@ -206,4 +207,4 @@ func (f *fakeWaveScheduler) waitCalled() bool {
 }
 
 // Compile-time guard: fakeWaveScheduler must implement WaveSchedulerRunner.
-var _ coordinator.WaveSchedulerRunner = (*fakeWaveScheduler)(nil)
+var _ sessionorchestrator.WaveSchedulerRunner = (*fakeWaveScheduler)(nil)
