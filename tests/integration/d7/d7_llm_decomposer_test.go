@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -69,7 +70,7 @@ func TestIntegration_D7LLMDecomposer_EndToEnd(t *testing.T) {
 	]`
 
 	llmInvoker := &stubLLMInvoker{jsonDAG: jsonDAG}
-	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
 		LLM:         llmInvoker,
 		DefaultTier: "default",
 	})
@@ -92,13 +93,13 @@ func TestIntegration_D7LLMDecomposer_EndToEnd(t *testing.T) {
 		},
 	})
 
-	decomp := coordinator.NewTaskDecomposer()
+	decomp := decisionplanning.NewTaskDecomposer()
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(decomp, sched, nil),
 	})
 
 	session, err := stack.Gateway.CreateSession("cli", stack.WorkDir)
@@ -146,7 +147,7 @@ func TestIntegration_D7LLMDecomposer_EndToEnd(t *testing.T) {
 func TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON(t *testing.T) {
 	// Return invalid JSON (missing closing bracket).
 	llmInvoker := &stubLLMInvoker{jsonDAG: `[`} // deliberately broken
-	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
 		LLM: llmInvoker,
 	})
 
@@ -168,13 +169,13 @@ func TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON(t *testing.T) {
 		},
 	})
 
-	decomp := coordinator.NewTaskDecomposer()
+	decomp := decisionplanning.NewTaskDecomposer()
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(decomp, sched, nil),
 	})
 
 	session, err := stack.Gateway.CreateSession("cli", stack.WorkDir)
@@ -196,7 +197,7 @@ func TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON(t *testing.T) {
 func TestIntegration_D7LLMDecomposer_EmptyTaskList(t *testing.T) {
 	// Return empty JSON array — parseDecomposedTasks returns error.
 	llmInvoker := &stubLLMInvoker{jsonDAG: `[]`}
-	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
 		LLM: llmInvoker,
 	})
 
@@ -218,13 +219,13 @@ func TestIntegration_D7LLMDecomposer_EmptyTaskList(t *testing.T) {
 		},
 	})
 
-	decomp := coordinator.NewTaskDecomposer()
+	decomp := decisionplanning.NewTaskDecomposer()
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(decomp, sched, nil),
 	})
 
 	session, err := stack.Gateway.CreateSession("cli", stack.WorkDir)
@@ -253,7 +254,7 @@ Here is my plan:
 1. First, design the module
 2. Then implement it
 3. Finally, test everything`}
-	llmDecomp := coordinator.NewLLMDecomposer(coordinator.LLMDecomposerDeps{
+	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
 		LLM: llmInvoker,
 	})
 
@@ -275,13 +276,13 @@ Here is my plan:
 		},
 	})
 
-	decomp := coordinator.NewTaskDecomposer()
+	decomp := decisionplanning.NewTaskDecomposer()
 	decomp.SetLLMDecomposer(llmDecomp)
 
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		RoutingMode: "rule_orchestrate",
 		LLMStub: &testutil.D7LLMStub{Response: "should-not-be-called"},
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(decomp, sched, nil),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(decomp, sched, nil),
 	})
 
 	session, err := stack.Gateway.CreateSession("cli", stack.WorkDir)

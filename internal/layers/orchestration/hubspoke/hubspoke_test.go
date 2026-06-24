@@ -8,16 +8,17 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // --- AgentBridge tests ---
 
 func TestNewAgentBridge(t *testing.T) {
-	b := hubspoke.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
 	if b == nil {
 		t.Fatal("NewAgentBridge returned nil")
 	}
@@ -26,7 +27,7 @@ func TestNewAgentBridge(t *testing.T) {
 func TestAgentBridge_OnWorkerForked_wiresObserver(t *testing.T) {
 	rec := &recordingObserver{}
 	ag := &testAgent{id: "worker-1"}
-	b := hubspoke.NewAgentBridge(nil, "sess-1", "", "", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "", "", "task-1", "plan")
 
 	b.OnWorkerForked(ag.ID(), "sess-1", ag)
 
@@ -41,7 +42,7 @@ func TestAgentBridge_OnWorkerForked_wiresObserver(t *testing.T) {
 
 func TestAgentBridge_OnWorkerCompleted_success(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 
 	b.OnWorkerCompleted("w-1", "sess-1", "all done", nil)
 
@@ -58,7 +59,7 @@ func TestAgentBridge_OnWorkerCompleted_success(t *testing.T) {
 
 func TestAgentBridge_OnWorkerCompleted_error(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 
 	b.OnWorkerCompleted("w-1", "sess-1", "", errors.New("boom"))
 
@@ -71,20 +72,20 @@ func TestAgentBridge_OnWorkerCompleted_error(t *testing.T) {
 }
 
 func TestAgentBridge_OnWorkerCompleted_nilBridge(t *testing.T) {
-	var b *hubspoke.AgentBridge
+	var b *bridge.AgentBridge
 	// Should not panic
 	b.OnWorkerCompleted("w", "s", "summary", nil)
 }
 
 func TestAgentBridge_OnWorkerCompleted_nilHub(t *testing.T) {
-	b := hubspoke.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
 	// Should not panic
 	b.OnWorkerCompleted("w-1", "sess-1", "done", nil)
 }
 
 func TestAgentBridge_EmitAgentEvent(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "agent.started"})
 
@@ -98,7 +99,7 @@ func TestAgentBridge_EmitAgentEvent(t *testing.T) {
 
 func TestAgentBridge_EmitAgentEvent_permission(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "permission_required"})
 
@@ -111,14 +112,14 @@ func TestAgentBridge_EmitAgentEvent_permission(t *testing.T) {
 }
 
 func TestAgentBridge_EmitAgentEvent_nilBridge(t *testing.T) {
-	var b *hubspoke.AgentBridge
+	var b *bridge.AgentBridge
 	// Should not panic
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "agent.started"})
 }
 
 func TestAgentBridge_EmitAgentEvent_unknownType(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "unknown.event"})
 
@@ -129,7 +130,7 @@ func TestAgentBridge_EmitAgentEvent_unknownType(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_toolCall(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 	sink := b.EngineEventSink()
 
 	sink(&contracts.EngineEvent{Type: "tool_call", ToolName: "read_file"})
@@ -144,7 +145,7 @@ func TestAgentBridge_EngineEventSink_toolCall(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_nonToolCall(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 	sink := b.EngineEventSink()
 
 	sink(&contracts.EngineEvent{Type: "text", Content: "hello"})
@@ -156,7 +157,7 @@ func TestAgentBridge_EngineEventSink_nonToolCall(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_nilEvent(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
 	sink := b.EngineEventSink()
 
 	// Should not panic
@@ -167,7 +168,7 @@ func TestAgentBridge_EngineEventSink_nilEvent(t *testing.T) {
 
 func TestNewSubQueryBridge(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
+	b := bridge.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
 	if b == nil {
 		t.Fatal("NewSubQueryBridge returned nil")
 	}
@@ -175,7 +176,7 @@ func TestNewSubQueryBridge(t *testing.T) {
 
 func TestSubQueryBridge_PublishStarted(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
+	b := bridge.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
 
 	b.PublishStarted("subquery began")
 
@@ -196,7 +197,7 @@ func TestSubQueryBridge_PublishStarted(t *testing.T) {
 
 func TestSubQueryBridge_PublishCompleted(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
+	b := bridge.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
 
 	b.PublishCompleted("done")
 
@@ -210,7 +211,7 @@ func TestSubQueryBridge_PublishCompleted(t *testing.T) {
 
 func TestSubQueryBridge_PublishFailed(t *testing.T) {
 	hub := &recordingHub{}
-	b := hubspoke.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
+	b := bridge.NewSubQueryBridge(hub, "sess-1", "sq-1", "task-1")
 
 	b.PublishFailed("error occurred")
 
@@ -223,7 +224,7 @@ func TestSubQueryBridge_PublishFailed(t *testing.T) {
 }
 
 func TestSubQueryBridge_nilBridge(t *testing.T) {
-	var b *hubspoke.SubQueryBridge
+	var b *bridge.SubQueryBridge
 	// Should not panic
 	b.PublishStarted("")
 	b.PublishCompleted("")
@@ -231,7 +232,7 @@ func TestSubQueryBridge_nilBridge(t *testing.T) {
 }
 
 func TestSubQueryBridge_nilHub(t *testing.T) {
-	b := hubspoke.NewSubQueryBridge(nil, "sess-1", "sq-1", "task-1")
+	b := bridge.NewSubQueryBridge(nil, "sess-1", "sq-1", "task-1")
 	// Should not panic
 	b.PublishStarted("start")
 	b.PublishCompleted("done")
@@ -240,7 +241,7 @@ func TestSubQueryBridge_nilHub(t *testing.T) {
 // --- Dispatcher tests ---
 
 func TestNewDispatcher(t *testing.T) {
-	d := hubspoke.NewDispatcher(
+	d := sessionorchestrator.NewDispatcher(
 		config.DelegateConfig{Enabled: true},
 		nil, // executor
 		nil, // subQuery
@@ -257,9 +258,9 @@ func TestDispatcher_Dispatch_D4_enabled_withLeader(t *testing.T) {
 	res := &staticLeaderResolver{leader: leader, ok: true}
 	exec := &stubExecutor{result: execute.WorkerResult{WorkerID: "w-1", Summary: "done"}}
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, hub, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, hub, res)
 
-	result, err := d.Dispatch(context.Background(), hubspoke.DispatchRequest{
+	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
 		Role:      "plan",
 		Directive: "plan it",
@@ -278,9 +279,9 @@ func TestDispatcher_Dispatch_D4_async(t *testing.T) {
 	res := &staticLeaderResolver{leader: leader, ok: true}
 	exec := &stubExecutor{workerID: "w-async"}
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, hub, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, hub, res)
 
-	result, err := d.Dispatch(context.Background(), hubspoke.DispatchRequest{
+	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
 		Role:      "plan",
 		Directive: "async plan",
@@ -299,9 +300,9 @@ func TestDispatcher_Dispatch_D4_disabled_fallsToD2(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: true}
 	sub := &stubSubQueryRunner{summary: "subquery result"}
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, sub, hub, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, sub, hub, res)
 
-	result, err := d.Dispatch(context.Background(), hubspoke.DispatchRequest{
+	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
 		ParentSC:  &types.SessionContext{SessionID: "sess-1"},
 		Role:      "plan",
@@ -320,9 +321,9 @@ func TestDispatcher_Dispatch_D4_enabled_noLeader_fallsToD2(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: false}
 	sub := &stubSubQueryRunner{summary: "d2 fallback"}
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{Enabled: true}, nil, sub, hub, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, nil, sub, hub, res)
 
-	result, err := d.Dispatch(context.Background(), hubspoke.DispatchRequest{
+	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
 		ParentSC:  &types.SessionContext{SessionID: "sess-1"},
 		Role:      "implement",
@@ -340,9 +341,9 @@ func TestDispatcher_Dispatch_D4_enabled_noLeader_fallsToD2(t *testing.T) {
 func TestDispatcher_Dispatch_noFallback(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: false}
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, nil, hub, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, nil, hub, res)
 
-	_, err := d.Dispatch(context.Background(), hubspoke.DispatchRequest{
+	_, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
 		Role:      "plan",
 		TaskID:    "task-1",
@@ -354,7 +355,7 @@ func TestDispatcher_Dispatch_noFallback(t *testing.T) {
 
 func TestDispatcher_Hub(t *testing.T) {
 	hub := &recordingHub{}
-	d := hubspoke.NewDispatcher(config.DelegateConfig{}, nil, nil, hub, nil)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{}, nil, nil, hub, nil)
 	if d.Hub() != hub {
 		t.Fatal("Hub() returned wrong hub")
 	}

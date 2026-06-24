@@ -11,11 +11,11 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -116,7 +116,7 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 		}
 	}
 
-	req := hubspoke.DispatchRequest{
+	req := sessionorchestrator.DispatchRequest{
 		SessionID:    sessionID,
 		ParentSC:     sc,
 		Role:         string(r.role),

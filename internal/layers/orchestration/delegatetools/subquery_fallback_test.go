@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -36,7 +36,7 @@ func TestSubQueryRunner_should_publish_flow_events_when_d4_disabled(t *testing.T
 
 	adapter := &SubQueryRunner{LoopDeps: enforce.SubQueryDeps{
 		SubTurn:      &stubSubTurn{text: "fallback summary"},
-		FlowReporter: hubspoke.NewFlowReporter(hub),
+		FlowReporter: bridge.NewFlowReporter(hub),
 	}}
 	parent := &types.SessionContext{SessionID: "sess_fb", WorkDir: t.TempDir(), Model: "test"}
 

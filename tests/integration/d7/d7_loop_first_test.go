@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/coordinator"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
@@ -55,8 +56,8 @@ func TestIntegration_D7LoopFirst_DelegateWaveTool(t *testing.T) {
 	}
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{
 		LLMStub: stub,
-		OverrideOrchestratePath: coordinator.NewOrchestratePath(
-			coordinator.NewTaskDecomposer(),
+		OverrideOrchestratePath: sessionorchestrator.NewOrchestratePath(
+			decisionplanning.NewTaskDecomposer(),
 			fake,
 			nil,
 		),

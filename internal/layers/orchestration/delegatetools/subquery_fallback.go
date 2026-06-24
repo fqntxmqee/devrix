@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -83,6 +83,6 @@ func systemPromptForRole(role string) string {
 }
 
 // BuildSubQueryRunner creates a hubspoke.SubQueryRunner from turn-runtime deps.
-func BuildSubQueryRunner(deps enforce.SubQueryDeps) hubspoke.SubQueryRunner {
+func BuildSubQueryRunner(deps enforce.SubQueryDeps) sessionorchestrator.SubQueryRunner {
 	return &SubQueryRunner{LoopDeps: deps}
 }

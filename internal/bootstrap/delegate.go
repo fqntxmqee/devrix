@@ -11,9 +11,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -51,11 +52,11 @@ func WireDelegate(
 	if ctxCfg == nil || maCfg == nil || !maCfg.Delegate.Enabled {
 		return
 	}
-	var subQuery hubspoke.SubQueryRunner
+	var subQuery sessionorchestrator.SubQueryRunner
 	if st := WiredSubTurn(); st != nil {
 		var fr contracts.SubQueryFlowReporter
 		if hub != nil {
-			fr = hubspoke.NewFlowReporter(hub)
+			fr = bridge.NewFlowReporter(hub)
 		}
 		subQuery = delegatetools.BuildSubQueryRunner(enforce.SubQueryDeps{
 			SubTurn:      st,
@@ -68,7 +69,7 @@ func WireDelegate(
 	}
 
 	exec := execute.NewExecutor(maCfg.Delegate, sb, nil)
-	disp := hubspoke.NewDispatcher(
+	disp := sessionorchestrator.NewDispatcher(
 		maCfg.Delegate,
 		exec,
 		subQuery,

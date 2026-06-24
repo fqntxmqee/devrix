@@ -7,9 +7,9 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/orchestration/hubspoke"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -66,7 +66,7 @@ func TestDelegateTool_Execute_PropagatesModeEnd2End(t *testing.T) {
 
 			cap := &modeCapturingSubQueryRunner{summary: "ok"}
 			hub := &recordingHubForMode{}
-			disp := hubspoke.NewDispatcher(
+			disp := sessionorchestrator.NewDispatcher(
 				config.DelegateConfig{Enabled: false}, // D2 subquery fallback path
 				nil,                                   // executor (unused)
 				cap,                                   // subQuery runner (captures mode)
