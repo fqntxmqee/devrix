@@ -17,9 +17,11 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -34,34 +36,10 @@ import (
 // type: the in-memory store's Load returns (zero, false, nil) on miss
 // and (zero, false, err) on store-error. We construct a custom
 // PendingResolutionStore shim that always errors.
-type stubResume struct {
-	decision escape.EscapeDecision
-	found    bool
-	err      error
-	calls    int
-}
+// Test error injection uses a real HumanArbitrator backed by a custom
+// errStore (defined below) — this exercises the real Load→Delete path
+// instead of a mock, avoiding mock drift.
 
-func (s *stubResume) Save(sessionID string, d escape.EscapeDecision) error {
-	s.decision = d
-	return nil
-}
-func (s *stubResume) Load(sessionID string) (escape.EscapeDecision, bool, error) {
-	s.calls++
-	return s.decision, s.found, s.err
-}
-func (s *stubResume) Delete(sessionID string) error { return nil }
-
-// newResumeEngineFromStore builds an EscapeEngine whose ResumeSession
-// delegates to a stubPendingStore so we control found/err directly.
-//
-// Note: We can NOT use the in-memory store with a real HumanArbitrator
-// (the HumanArbitrator takes a `*HumanArbitrator` for its resume field
-// in EscapeEngine, not the raw store). To avoid pulling in the real
-// HumanArbitrator, we use newFakeEscapeEngine with a custom resume.
-//
-// Simpler: build a fresh EscapeEngine using the real in-memory store,
-// then populate the store via direct Save() and call ResumeSession via
-// the engine.
 func newResumeEngine(t *testing.T, store escape.PendingResolutionStore) *escape.EscapeEngine {
 	t.Helper()
 	if store == nil {
@@ -390,5 +368,314 @@ func TestProcessMessage_WithResume_UserCancel_EarlyClose(t *testing.T) {
 	}
 	if events[0].Metadata["escape.action"] != "abort_with_audit" {
 		t.Errorf("event.Metadata[escape.action]: want abort_with_audit, got %q", events[0].Metadata["escape.action"])
+	}
+}
+
+// --- H-4 fixtures --------------------------------------------------------
+
+// recordingExecutor wraps completingExecutor but records RunTurn call count,
+// so H-4 integration tests can assert that short-circuit path never invokes
+// the underlying TurnExecutor (5 节点 pipeline fully skipped).
+type recordingExecutor struct {
+	eventType    string
+	eventContent string
+	calls        int
+}
+
+func (e *recordingExecutor) RunTurn(_ context.Context, _ QueryRequest) (<-chan *contracts.EngineEvent, error) {
+	e.calls++
+	out := make(chan *contracts.EngineEvent, 1)
+	out <- &contracts.EngineEvent{Type: e.eventType, Content: e.eventContent}
+	close(out)
+	return out, nil
+}
+
+// recordingSpan implements tracer.Span by capturing SetAttributes calls.
+// Used by H-3 sub-tests to assert which attributes applyResumeSession sets
+// along each decision path. Non-essential methods are no-ops.
+type recordingSpan struct {
+	mu    sync.Mutex
+	attrs map[string]interface{}
+}
+
+func newRecordingSpan() *recordingSpan {
+	return &recordingSpan{attrs: map[string]interface{}{}}
+}
+
+func (s *recordingSpan) End(_ ...tracer.SpanEndOption)                         {}
+func (s *recordingSpan) SetStatus(_ tracer.SpanStatusCode, _ string)          {}
+func (s *recordingSpan) RecordError(_ error, _ ...tracer.RecordErrorOption)   {}
+func (s *recordingSpan) AddEvent(_ string, _ ...tracer.EventOption)           {}
+func (s *recordingSpan) SpanContext() tracer.SpanContext                       { return tracer.SpanContext{} }
+func (s *recordingSpan) IsRecording() bool                                    { return true }
+
+func (s *recordingSpan) SetAttributes(kv ...tracer.Attribute) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range kv {
+		s.attrs[a.Key] = a.Value
+	}
+}
+
+func (s *recordingSpan) Get(key string) (interface{}, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.attrs[key]
+	return v, ok
+}
+
+// --- M-1: empty SessionID → silent fall through (no slog.Warn) ------------
+
+// DM-20260625-004 review-fixes: empty SessionID is a contract violation
+// (ProcessRequest constructor requires non-empty), not a transient error —
+// must silently fall through without slog.Warn to avoid log noise / misdiagnosis.
+// 验证: span 仍收到 attempted='false' (虽然没尝试),不调用 engine.ResumeSession
+// (用 errStore 注入即可:若误调了 Load 会 panic;事实上不会 panic 即说明未调)。
+func TestApplyResumeSession_EmptySessionID_FallThrough(t *testing.T) {
+	ha := escape.NewHumanArbitrator(nil, nil, errStore{})
+	engine := escape.NewEscapeEngine(
+		&stubDepthChecker{decision: escape.EscapeDecision{
+			Action: escape.EscapeContinue, Reason: "no_op",
+		}},
+		nil,
+		escape.NewCircuitBreakerSet(),
+		nil,
+		ha,
+	)
+	orch := &SessionOrchestrator{escapeEngine: engine}
+	span := newRecordingSpan()
+
+	ch, short, err := orch.applyResumeSession(context.Background(),
+		orchtypes.ProcessRequest{SessionID: ""}, span)
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if short {
+		t.Error("shortCircuit: want false (empty SessionID → fall through), got true")
+	}
+	if ch != nil {
+		t.Error("ch: want nil (fall through), got non-nil")
+	}
+	// span must record attempted='false' (we did NOT call engine.ResumeSession)
+	if v, ok := span.Get("escape.resume.attempted"); !ok || v != "false" {
+		t.Errorf("span[escape.resume.attempted]: want false, got %v (ok=%v)", v, ok)
+	}
+	// decision_action and decision_pending_id must NOT be set
+	if _, ok := span.Get("escape.resume.decision_action"); ok {
+		t.Error("span[escape.resume.decision_action]: should NOT be set on empty SessionID")
+	}
+}
+
+// --- H-3: 4 类 SetAttributes 路径全覆盖 -----------------------------------
+
+// TestApplyResumeSession_SessionSpanAttrs 守护 4 类 SetAttributes 路径:
+//   1. nil engine              → attempted='false' (且不设 decision_action)
+//   2. err failsafe            → attempted='true', decision_action='error_failsafe'
+//   3. not found (TTL 过期)     → attempted='true' (且不设 decision_action)
+//   4. found terminal decision → attempted='true', decision_action=<action>, decision_pending_id=<id>
+func TestApplyResumeSession_SessionSpanAttrs(t *testing.T) {
+	t.Run("nil_engine", func(t *testing.T) {
+		orch := &SessionOrchestrator{escapeEngine: nil}
+		span := newRecordingSpan()
+		_, short, err := orch.applyResumeSession(context.Background(),
+			orchtypes.ProcessRequest{SessionID: "sess-attr-1"}, span)
+		if err != nil || short {
+			t.Fatalf("fall through expected, got err=%v short=%v", err, short)
+		}
+		if v, _ := span.Get("escape.resume.attempted"); v != "false" {
+			t.Errorf("attempted: want false, got %v", v)
+		}
+		if _, ok := span.Get("escape.resume.decision_action"); ok {
+			t.Error("decision_action: should NOT be set on nil engine")
+		}
+	})
+	t.Run("err_failsafe", func(t *testing.T) {
+		ha := escape.NewHumanArbitrator(nil, nil, errStore{})
+		engine := escape.NewEscapeEngine(
+			&stubDepthChecker{decision: escape.EscapeDecision{
+				Action: escape.EscapeContinue, Reason: "no_op",
+			}},
+			nil,
+			escape.NewCircuitBreakerSet(),
+			nil, ha,
+		)
+		orch := &SessionOrchestrator{escapeEngine: engine}
+		span := newRecordingSpan()
+		_, short, err := orch.applyResumeSession(context.Background(),
+			orchtypes.ProcessRequest{SessionID: "sess-attr-2"}, span)
+		if err != nil || short {
+			t.Fatalf("fall through expected, got err=%v short=%v", err, short)
+		}
+		if v, _ := span.Get("escape.resume.attempted"); v != "true" {
+			t.Errorf("attempted: want true, got %v", v)
+		}
+		if v, _ := span.Get("escape.resume.decision_action"); v != "error_failsafe" {
+			t.Errorf("decision_action: want error_failsafe, got %v", v)
+		}
+	})
+	t.Run("not_found", func(t *testing.T) {
+		store := escape.NewInMemoryPendingResolutionStore()
+		engine := newResumeEngine(t, store) // 空 store → Load 返回 (zero,false,nil)
+		orch := &SessionOrchestrator{escapeEngine: engine}
+		span := newRecordingSpan()
+		_, short, err := orch.applyResumeSession(context.Background(),
+			orchtypes.ProcessRequest{SessionID: "sess-attr-3"}, span)
+		if err != nil || short {
+			t.Fatalf("fall through expected, got err=%v short=%v", err, short)
+		}
+		if v, _ := span.Get("escape.resume.attempted"); v != "true" {
+			t.Errorf("attempted: want true, got %v", v)
+		}
+		// not_found: 故意不设 decision_action
+		if _, ok := span.Get("escape.resume.decision_action"); ok {
+			t.Error("decision_action: should NOT be set on not_found (TTL expired)")
+		}
+	})
+	t.Run("found_terminal", func(t *testing.T) {
+		store := escape.NewInMemoryPendingResolutionStore()
+		engine := newResumeEngine(t, store)
+		orch := &SessionOrchestrator{escapeEngine: engine}
+		saveDecision(t, store, "sess-attr-4", escape.EscapeDecision{
+			Action:     escape.EscapeForceExit,
+			Reason:     "user_accept",
+			AuditLevel: 1,
+			PendingID:  "p-attr-4",
+			SessionID:  "sess-attr-4",
+			CreatedAt:  time.Now(),
+		})
+		span := newRecordingSpan()
+		_, short, err := orch.applyResumeSession(context.Background(),
+			orchtypes.ProcessRequest{SessionID: "sess-attr-4"}, span)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if !short {
+			t.Fatal("shortCircuit: want true, got false")
+		}
+		if v, _ := span.Get("escape.resume.attempted"); v != "true" {
+			t.Errorf("attempted: want true, got %v", v)
+		}
+		if v, _ := span.Get("escape.resume.decision_action"); v != "force_exit" {
+			t.Errorf("decision_action: want force_exit, got %v", v)
+		}
+		if v, _ := span.Get("escape.resume.decision_pending_id"); v != "p-attr-4" {
+			t.Errorf("decision_pending_id: want p-attr-4, got %v", v)
+		}
+	})
+}
+
+// --- H-4 增强: 端到端短路 → TurnExecutor 完全未被调用 + 5 字段 Metadata ---
+
+// TestProcessMessage_WithResume_UserAccept_EarlyClose_NoExecutorCall
+// 守护: 短路早退路径完全不进入 5 节点 (TurnExecutor.RunTurn 永远不应被调)。
+// H-4 (DM-20260625-004): recordingExecutor.calls 必须严格 == 0。
+func TestProcessMessage_WithResume_UserAccept_EarlyClose_NoExecutorCall(t *testing.T) {
+	store := escape.NewInMemoryPendingResolutionStore()
+	engine := newResumeEngine(t, store)
+	saveDecision(t, store, "sess-e2e-rec-b", escape.EscapeDecision{
+		Action:     escape.EscapeForceExit,
+		Reason:     "user_accept",
+		AuditLevel: 1,
+		PendingID:  "p-rec-b",
+		SessionID:  "sess-e2e-rec-b",
+		CreatedAt:  time.Now(),
+	})
+	rec := &recordingExecutor{eventType: "complete"}
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		rec,
+		WithEscapeEngine(engine),
+	)
+	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
+		SessionID: "sess-e2e-rec-b",
+		Message:   "hi",
+	})
+	if err != nil {
+		t.Fatalf("ProcessMessage: %v", err)
+	}
+	events := []*contracts.EngineEvent{}
+	for ev := range ch {
+		events = append(events, ev)
+	}
+	// H-4 key assertion: RunTurn 一次都不应被调
+	if rec.calls != 0 {
+		t.Errorf("recordingExecutor.calls: want 0 (short-circuit path), got %d", rec.calls)
+	}
+	// 1 个 complete event + 5 字段 metadata
+	if len(events) != 1 {
+		t.Fatalf("events: want 1, got %d", len(events))
+	}
+	ev := events[0]
+	if ev.Type != "complete" {
+		t.Errorf("Type: want complete, got %q", ev.Type)
+	}
+	wantMeta := map[string]string{
+		"escape.resume":      "true",
+		"escape.action":      "force_exit",
+		"escape.reason":      "user_accept",
+		"escape.pending_id":  "p-rec-b",
+		"exit_reason_source": "user_resume",
+	}
+	for k, want := range wantMeta {
+		if got := ev.Metadata[k]; got != want {
+			t.Errorf("Metadata[%s]: want %q, got %q", k, want, got)
+		}
+	}
+	if ev.SessionID != "sess-e2e-rec-b" {
+		t.Errorf("SessionID: want sess-e2e-rec-b, got %q", ev.SessionID)
+	}
+}
+
+// TestProcessMessage_WithResume_UserCancel_EarlyClose_NoExecutorCall 同 H-4
+// 用例,守护 user_cancel 短路早退路径 + 5 字段 metadata。
+func TestProcessMessage_WithResume_UserCancel_EarlyClose_NoExecutorCall(t *testing.T) {
+	store := escape.NewInMemoryPendingResolutionStore()
+	engine := newResumeEngine(t, store)
+	saveDecision(t, store, "sess-e2e-rec-c", escape.EscapeDecision{
+		Action:     escape.EscapeAbortWithAudit,
+		Reason:     "user_cancel",
+		AuditLevel: 2,
+		PendingID:  "p-rec-c",
+		SessionID:  "sess-e2e-rec-c",
+		CreatedAt:  time.Now(),
+	})
+	rec := &recordingExecutor{eventType: "complete"}
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		rec,
+		WithEscapeEngine(engine),
+	)
+	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
+		SessionID: "sess-e2e-rec-c",
+		Message:   "hi",
+	})
+	if err != nil {
+		t.Fatalf("ProcessMessage: %v", err)
+	}
+	events := []*contracts.EngineEvent{}
+	for ev := range ch {
+		events = append(events, ev)
+	}
+	if rec.calls != 0 {
+		t.Errorf("recordingExecutor.calls: want 0 (short-circuit path), got %d", rec.calls)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events: want 1, got %d", len(events))
+	}
+	ev := events[0]
+	if ev.Type != "complete" {
+		t.Errorf("Type: want complete, got %q", ev.Type)
+	}
+	wantMeta := map[string]string{
+		"escape.resume":      "true",
+		"escape.action":      "abort_with_audit",
+		"escape.reason":      "user_cancel",
+		"escape.pending_id":  "p-rec-c",
+		"exit_reason_source": "user_resume",
+	}
+	for k, want := range wantMeta {
+		if got := ev.Metadata[k]; got != want {
+			t.Errorf("Metadata[%s]: want %q, got %q", k, want, got)
+		}
 	}
 }

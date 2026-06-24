@@ -336,6 +336,13 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// - terminal decision (B/C) → 短路返回 "complete" EngineEvent, 不走 5 节点
 	// - A user_continue / 未找到 / nil engine → fall through (不破坏主链路)
 	if resumeCh, shortCircuit, _ := o.applyResumeSession(ctx, req, sessionSpan); shortCircuit {
+		// H-2 (DM-20260625-004 review-fixes): short-circuit path also writes prior
+		// attrs so D5 trace has consistent learn.prior.{alpha,beta,mean,track_mode,
+		// injected_at} for resume decisions (user_accept / user_cancel short-circuit
+		// would otherwise permanently miss these attrs in Jaeger trace).
+		if sessionSpan != nil {
+			sessionSpan.SetAttributes(priorSessionSpanAttrs(prior, observeReq, req)...)
+		}
 		endSpan(sessionSpan)
 		return resumeCh, nil
 	}
