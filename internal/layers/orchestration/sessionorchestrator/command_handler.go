@@ -177,9 +177,6 @@ func splitCommand(raw string) (string, []string) {
 // TaskManager and a fresh PlanMode. It is the v1.1.0+ default for
 // NewSessionOrchestrator when no WithCommandHandler option is supplied.
 //
-// DM-20260617-008 W4: TaskManager is injected explicitly (was: read from
-// the workmodel.GlobalTaskManager process-wide singleton).
-//
 // The default is intentionally minimal — production callers that need a
 // shared PlanMode state across sessions should still wire explicitly.
 func newDefaultCommandHandler(_ WorkModel, sink EventPublisher, tm *workmodel.TaskManager) *CommandHandler {

@@ -98,9 +98,8 @@ func (m *TaskManager) SetRegistry(reg *runregistry.Registry) *TaskManager {
 	return m
 }
 
-// Registry returns the run registry (nil if not wired). Use via the manager
-// rather than the legacy process-wide singleton (DM-20260625-013 C1).
-// Nil-safe: returns nil if the receiver is nil.
+// Registry returns the run registry (nil if not wired). Nil-safe: returns
+// nil if the receiver is nil.
 func (m *TaskManager) Registry() *runregistry.Registry {
 	if m == nil {
 		return nil

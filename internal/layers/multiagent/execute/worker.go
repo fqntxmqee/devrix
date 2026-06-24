@@ -10,10 +10,11 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// WorkerObserver is a callback interface so D7 hubspoke can wire
+// WorkerObserver is a callback interface so D7 dispatcher can wire
 // its own FlowBridge without the execute package importing flow.
 type WorkerObserver interface {
 	OnWorkerForked(workerID, sessionID string, agent multiagent.Agent)
@@ -172,7 +173,7 @@ func (e *Executor) forkWorker(ctx context.Context, leader multiagent.Agent, spec
 		SessionID:    leader.Config().SessionID,
 		WorkDir:      workDir,
 		InitialInput: spec.Directive,
-		SystemPrompt: systemPromptForRole(spec.Role),
+		SystemPrompt: agent.SystemPromptForRole(spec.Role),
 		MaxIter:      maxTurns,
 		MaxChildren:  0,
 		WorkerRole:   spec.Role,
@@ -189,17 +190,6 @@ func (e *Executor) forkWorker(ctx context.Context, leader multiagent.Agent, spec
 		return nil, "", err
 	}
 	return child, sbPath, nil
-}
-
-func systemPromptForRole(role string) string {
-	switch role {
-	case "explore":
-		return explorePrompt
-	case "plan":
-		return planPrompt
-	default:
-		return implementPrompt
-	}
 }
 
 func extractSummary(result *multiagent.AgentResult) string {

@@ -147,7 +147,7 @@ func (d *Dispatcher) dispatchToD4(ctx context.Context, leader multiagent.Agent, 
 
 func (d *Dispatcher) dispatchToD2(ctx context.Context, req DispatchRequest) (DispatchResult, error) {
 	if d.subQuery == nil || req.ParentSC == nil {
-		return DispatchResult{}, fmt.Errorf("hubspoke: no leader and no subquery fallback")
+		return DispatchResult{}, fmt.Errorf("dispatcher: no leader and no subquery fallback")
 	}
 	summary, err := d.subQuery.RunSubQuery(ctx, req.ParentSC, req.Role, req.Directive, req.TaskID, req.MaxTurns, req.Mode)
 	return DispatchResult{Role: req.Role, Summary: summary, Error: err}, err

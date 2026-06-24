@@ -6,10 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
-// Deps wires delegate tool handlers.
-//
-// DM-20260617-008 W4: Tasks is the explicit task store (was: read from
-// workmodel.GlobalTaskManager process-wide singleton).
+// Deps wires delegate tool handlers. Tasks is the explicit task store.
 type Deps struct {
 	Dispatcher *sessionorchestrator.Dispatcher
 	Leader     LeaderResolver

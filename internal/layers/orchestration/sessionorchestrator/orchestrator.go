@@ -143,10 +143,7 @@ func WithLLMDecomposer(d decisionplanning.LLMTaskDecomposer) OrchestratorOption 
 }
 
 // WithTaskManager wires the *workmodel.TaskManager that backs /task CLI
-// commands and the default CommandHandler.
-//
-// DM-20260617-008 W4: replaces the previous process-wide
-// workmodel.GlobalTaskManager singleton. When this option is omitted,
+// commands and the default CommandHandler. When this option is omitted,
 // NewSessionOrchestrator creates a fresh in-memory TaskManager.
 func WithTaskManager(tm *workmodel.TaskManager) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.taskManager = tm }
@@ -347,8 +344,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// degenerates to the baseline Classify behavior.
 	intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
 	// Phase 7 PR-7.3 (D7-S13-A49-T06): mirror classifier_source onto the
-	// sessionSpan for D5 observability. Always "rule" since ShadowClassifier
-	// was removed in DM-20260625-011.
+	// sessionSpan for D5 observability. Rule classifier is the only source.
 	if sessionSpan != nil {
 		sessionSpan.SetAttributes(
 			tracer.Attribute{Key: "learn.classifier_source", Value: "rule"},
@@ -587,8 +583,7 @@ func (o *SessionOrchestrator) SetOrchestratePath(p *OrchestratePath) {
 
 // SetCommandHandler replaces the CommandHandler. Same rationale as
 // SetOrchestratePath — primarily a test seam so integration tests can
-// verify the orthogonal dispatch without depending on the lazy default
-// binding to workmodel.GlobalTaskManager.
+// verify the orthogonal dispatch without depending on the lazy default.
 func (o *SessionOrchestrator) SetCommandHandler(h *CommandHandler) {
 	o.commandHandler = h
 }

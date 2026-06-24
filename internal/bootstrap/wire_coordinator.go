@@ -93,12 +93,10 @@ func InitOrchestration(
 		obsBridge = b
 	}
 
-	// DM-20260617-008 W4: TaskManager constructed locally and shared with
-	// NewLocalWorkModel + NewSessionOrchestrator (via WithTaskManager).
-	// Replaces workmodel.GlobalTaskManager process-wide singleton.
+	// TaskManager constructed locally and DI'd to NewLocalWorkModel +
+	// NewSessionOrchestrator via WithTaskManager.
 	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
-	// DM-20260625-013 C1: registry 由 bootstrap 创建并 DI 到 TaskManager,
-	// 取代 process-wide runregistry.Global singleton.
+	// Registry created by bootstrap and DI'd to TaskManager.
 	tm.SetRegistry(runregistry.NewRegistry("~/.devrix/runs"))
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	tools.SetTodoSync(todoBackend.Sync)

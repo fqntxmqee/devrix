@@ -163,7 +163,10 @@ func buildContent(req LearnRequest, class LearningClass) (AssetContent, string, 
 func buildSOPContent(req LearnRequest) (*SOPAssetContent, string, error) {
 	name := extractSOPName(req)
 	steps := extractStepsFromPlan(req.Plan)
-	tools := extractTools(req.Artifact)
+	var tools []string
+	if req.Artifact != nil {
+		tools = req.Artifact.FilesChanged
+	}
 	if name == "" || len(steps) == 0 {
 		return nil, "", nil // signals ErrAssetBuildFailed to caller
 	}
@@ -179,7 +182,10 @@ func buildSOPContent(req LearnRequest) (*SOPAssetContent, string, error) {
 func buildProtocolContent(req LearnRequest) (*ProtocolAssetContent, string, error) {
 	name := extractProtocolName(req)
 	trigger := extractTriggerFromVerdict(req.Verdict)
-	actions := extractActions(req.Artifact)
+	var actions []string
+	if req.Artifact != nil && req.Artifact.WorkerType != "" {
+		actions = []string{string(req.Artifact.WorkerType)}
+	}
 	if trigger == "" {
 		return nil, "", nil
 	}
@@ -196,13 +202,17 @@ func buildProtocolContent(req LearnRequest) (*ProtocolAssetContent, string, erro
 func buildKnowledgeContent(req LearnRequest) (*KnowledgeAssetContent, string, error) {
 	topic := extractTopic(req.Verdict)
 	hypothesis := extractHypothesis(req.Verdict)
+	var evidence []string
+	if req.Artifact != nil && req.Artifact.Summary != "" {
+		evidence = []string{req.Artifact.Summary}
+	}
 	if topic == "" || hypothesis == "" {
 		return nil, "", nil
 	}
 	content := &KnowledgeAssetContent{
 		Topic:      topic,
 		Hypothesis: hypothesis,
-		Evidence:   extractEvidence(req),
+		Evidence:   evidence,
 		Confidence: clampConfidence(req.Verdict.Confidence),
 	}
 	return content, hashContentJSON(content), nil
@@ -231,13 +241,17 @@ func buildPendingContent(req LearnRequest) (*PendingAssetContent, string, error)
 	if req.Artifact != nil {
 		originalArtifactID = req.Artifact.TaskID
 	}
+	planID := ""
+	if req.Plan != nil {
+		planID = req.Plan.ID
+	}
 	content := &PendingAssetContent{
 		IndeterminateReason: reason,
 		OriginalArtifactID:  originalArtifactID,
 		RetryAttempts:       0,
 		MaxRetries:          DefaultScheduledMaxRetries,
 		NextRetryAt:         time.Now().Add(5 * time.Minute),
-		PlanID:              planIDOf(req.Plan),
+		PlanID:              planID,
 		SessionID:           req.SessionID,
 	}
 	return content, hashContentJSON(content), nil
@@ -283,13 +297,6 @@ func extractStepsFromPlan(p *plan.Plan) []string {
 	return steps
 }
 
-func extractTools(art *wavescheduler.Artifact) []string {
-	if art == nil {
-		return nil
-	}
-	return art.FilesChanged
-}
-
 func extractProtocolName(req LearnRequest) string {
 	if req.Plan != nil && req.Plan.ID != "" {
 		return "proto:plan:" + req.Plan.ID
@@ -302,16 +309,6 @@ func extractTriggerFromVerdict(v workmodel.Verdict) string {
 		return "on:" + v.SourceID
 	}
 	return ""
-}
-
-func extractActions(art *wavescheduler.Artifact) []string {
-	if art == nil {
-		return nil
-	}
-	if art.WorkerType != "" {
-		return []string{string(art.WorkerType)}
-	}
-	return nil
 }
 
 func extractTopic(v workmodel.Verdict) string {
@@ -328,28 +325,11 @@ func extractHypothesis(v workmodel.Verdict) string {
 	return "hypothesis:" + string(v.Kind)
 }
 
-func extractEvidence(req LearnRequest) []string {
-	if req.Artifact == nil {
-		return nil
-	}
-	if req.Artifact.Summary != "" {
-		return []string{req.Artifact.Summary}
-	}
-	return nil
-}
-
 func extractConclusion(v workmodel.Verdict) string {
 	if v.Reason == "" {
 		return "conclusion:" + string(v.Kind)
 	}
 	return v.Reason
-}
-
-func planIDOf(p *plan.Plan) string {
-	if p == nil {
-		return ""
-	}
-	return p.ID
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -12,11 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
 )
 
-// recordingHub captures FlowEvents published during tests. Moved from
-// internal/layers/orchestration/hubspoke/hubspoke_test.go when hubspoke/ was
-// retired as a package boundary (the directory only held tests after
-// PR-C2 migrated all hubspoke.* production code to sessionorchestrator/ +
-// bridge/).
+// recordingHub captures FlowEvents published during tests.
 type recordingHub struct {
 	mu     sync.Mutex
 	events []contracts.FlowEvent
@@ -37,7 +33,7 @@ type recordingObserver struct {
 func (r *recordingObserver) OnWorkerForked(string, string, multiagent.Agent) { r.forkCalls++ }
 func (r *recordingObserver) OnWorkerCompleted(string, string, string, error) { r.completeCalls++ }
 
-// testAgent is a minimal multiagent.Agent stub. Moved from hubspoke_test.go.
+// testAgent is a minimal multiagent.Agent stub.
 type testAgent struct {
 	id       string
 	cfg      multiagent.AgentConfig

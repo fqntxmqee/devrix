@@ -30,7 +30,7 @@ func (r gatewayLeaderResolver) Leader(sessionID string) (multiagent.Agent, bool)
 	return ag, ag != nil
 }
 
-// WireDelegate wires D4 delegate execution and D7 hubspoke dispatch.
+// WireDelegate wires D4 delegate execution and D7 dispatcher dispatch.
 //
 // DM-20260617-008 W2: accepts the ExecutionFlowHub explicitly (caller
 // receives it from WireExecutionFlow). No longer reads flow.GlobalHub.
@@ -89,7 +89,7 @@ func WireDelegate(
 			slog.Error("register delegate tools", "error", err)
 		}
 	}
-	slog.Info("d4 delegate enabled (hubspoke)",
+	slog.Info("d4 delegate enabled",
 		"allow_async", maCfg.Delegate.AllowAsync,
 		"sandbox", ctxCfg.Sandbox.Enabled,
 	)

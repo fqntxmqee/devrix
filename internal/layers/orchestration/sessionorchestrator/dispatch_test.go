@@ -12,11 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 )
 
-// Dispatcher tests. Moved from internal/layers/orchestration/hubspoke/
-// when hubspoke/ was retired as a package boundary (the directory only held
-// tests after PR-C2 migrated all hubspoke.* production code to
-// sessionorchestrator/ + bridge/).
-
 // recordingHub is intentionally duplicated here rather than imported from
 // bridge_test, because bridge_test uses *_test package suffix and the dispatcher
 // tests run in sessionorchestrator_test — cross-package reuse would require

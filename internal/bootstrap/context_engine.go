@@ -48,12 +48,10 @@ func NewContextEngine(
 	forker freefork.Forker,
 ) *contextengine.ContextEngine {
 	longTermRecaller, longTermStore := WireContextV3(ctxCfg)
-	// DM-20260617-008 W4: TaskManager constructed locally and passed to
-	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
-	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
+	// TaskManager constructed locally and DI'd to RegisterTaskTools +
+	// NewSessionOrchestrator via WithTaskManager option.
 	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
-	// DM-20260625-013 C4: bus 由 bootstrap 创建并 DI 到 TaskManager + drainer,
-	// 取代 process-wide notify.GlobalBus singleton.
+	// bus is created by bootstrap and DI'd to TaskManager + drainer.
 	bus := notify.NewInMemoryBus(64)
 	tm.SetBus(bus)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
@@ -171,7 +169,7 @@ func NewContextEngine(
 		ObsBridge:           obsBridge,
 		DefaultModel:        stack.DefaultModel,
 		TierResolver:        stack.TierResolver,
-		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		AgentRoleToolFilter: toolpolicy.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).

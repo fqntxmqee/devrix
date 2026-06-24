@@ -1,6 +1,6 @@
-// Package delegatetools — D7 orchestration F: delegate_* tool routing (DM-20260614-011).
+// Package delegatetools — D7 orchestration F: delegate_* tool routing.
 //
-// DSAFT: D7-S2/S5 F — routes Leader tool calls through hubspoke.Dispatcher.
+// DSAFT: D7-S2/S5 F — routes Leader tool calls through sessionorchestrator.Dispatcher.
 // Moved from contextengine (v2.0) to keep D2 as Execution Follower only.
 package delegatetools
 

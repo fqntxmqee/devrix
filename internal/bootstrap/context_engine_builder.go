@@ -142,11 +142,9 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		return nil
 	}
 	longTermRecaller, longTermStore := WireContextV3(b.ctxCfg)
-	// DM-20260617-008 W4: TaskManager constructed locally and passed to
-	// RegisterTaskTools. Replaces workmodel.GlobalTaskManager singleton.
+	// TaskManager constructed locally and DI'd to RegisterTaskTools.
 	tm := workmodel.NewTaskManagerFromConfig(b.ctxCfg.Tasks, b.obsBridge)
-	// DM-20260625-013 C4: bus 由 builder 创建并 DI 到 TaskManager + drainer,
-	// 取代 process-wide notify.GlobalBus singleton.
+	// bus is created by builder and DI'd to TaskManager + drainer.
 	bus := notify.NewInMemoryBus(64)
 	tm.SetBus(bus)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
@@ -264,7 +262,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		ObsBridge:           b.obsBridge,
 		DefaultModel:        b.stack.DefaultModel,
 		TierResolver:        b.stack.TierResolver,
-		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		AgentRoleToolFilter: toolpolicy.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		Surfaces:            surfaces,
