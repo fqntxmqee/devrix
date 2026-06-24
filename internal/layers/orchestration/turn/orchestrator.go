@@ -247,16 +247,199 @@ func (o *DefaultOrchestrator) RunTurn(ctx context.Context, req TurnRequest) (<-c
 	return ch, nil
 }
 
+// runLoopState is the loop-local mutable state of runLoop. Threaded
+// through the prepare, runLLMStream, executeToolRound, exit-condition,
+// and finalize helpers so the orchestration reads as a pipeline of
+// small operations rather than a 500-line god function.
+type runLoopState struct {
+	// Prepare-phase output (immutable across the loop).
+	systemPrompt     string
+	messages         []types.Message
+	tools            []ToolSchema
+	model            string
+	maxContextTokens int
+	persister        SessionPersister
+	nested           bool
+
+	// Cross-turn accumulators (mutated each iteration).
+	totalUsage       llmgateway.TokenUsage
+	lastPromptTokens int
+	// finalText is rebuilt from accumulatedText each iteration. Surfaced
+	// on the complete event's Content.
+	finalText string
+	// lastTurnText retains only the most recent turn's LLM text.
+	// Surfaced on the complete event as meta["summary"] so the IM
+	// "任务总结" card shows only the LLM's final synthesis, not the
+	// full multi-turn report that the user already saw via streaming.
+	lastTurnText string
+	// accumulatedText retains the LLM-emitted text from EVERY turn, not
+	// just the last. Without this, the finalText/complete event only
+	// carries the very last turn's content; a deep-review report emitted
+	// across many earlier turns would be silently discarded at
+	// emitComplete, leaving the IM card without its conclusion.
+	accumulatedText strings.Builder
+	// lastThinkingTail retains the most recent LLM thinking content,
+	// post-strip. Used as a finalText fallback at emitComplete time when
+	// the LLM never emitted a clean summary (e.g. a provider without
+	// native reasoning emits its working notes inside <think> tags and
+	// the splitter routed them to thinking, leaving content empty — the
+	// user would otherwise see a blank conclusion card).
+	lastThinkingTail strings.Builder
+
+	// Deterministic-exit state (mutated each iteration).
+	exitReason            ExitReason
+	turnCount             int
+	recentToolSignatures  []string
+	consecutiveErrorFP    string
+	consecutiveErrorCount int
+	budgetTracker         *budgetTracker
+}
+
 // runLoop is the internal state machine: PREPARE → LLM ↔ TOOL_ROUND → PERSIST.
 // Cross-domain calls: D7→D2 (prepare/tools/persist), D7→D3 (LLM invoke).
 //
 // The main loop is `for { ... }` with no implicit turn bound (matching
 // clawcode/src/query.ts:307 `while (true)`); the only hard cap is the
-// optional MaxTurns safety net. Termination reasons are captured in the
-// exitReason variable and surfaced on the final `complete` event's
+// optional MaxTurns safety net. Termination reasons are captured in
+// st.exitReason and surfaced on the final `complete` event's
 // Metadata["exit_reason"] (see ExitReason constants).
+//
+// Refactored in DM-20260625-012 from a 513-line god function into a slim
+// driver that calls prepareContext, runLLMStream, executeToolRound, the
+// exit-condition helpers, and finalizeLoop. State flows through
+// runLoopState.
 func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) {
 	start := time.Now()
+
+	st, err := o.prepareContext(ctx, req, out)
+	if err != nil {
+		return // error already emitted
+	}
+	st.budgetTracker = newBudgetTracker(st.maxContextTokens)
+
+	for {
+		st.turnCount++
+
+		// ctx cancellation / deadline — aborts with an explicit error
+		// event so the IM adapter renders the cancellation rather than
+		// waiting for an unobservable stream close.
+		if err := ctx.Err(); err != nil {
+			o.emitError(out, req.SessionID,
+				sharederrors.SanitizeForUser(fmt.Errorf("turn cancelled: %w", err)),
+				"CTX_CANCELLED",
+			)
+			return
+		}
+
+		// Safety net: only fires when the caller explicitly set a positive
+		// MaxTurns. An unbounded turn (MaxTurns ≤ 0) is governed solely by
+		// the natural-finish + deterministic-exit reasons below.
+		if req.MaxTurns > 0 && st.turnCount > req.MaxTurns {
+			st.exitReason = ExitReasonMaxTurns
+			break
+		}
+
+		// turn span + per-iter token audit
+		turnCtx, turnSpan := o.startTurnSpan(ctx, req, st)
+		o.runTokenAudit(ctx, st.systemPrompt, st.messages, st.maxContextTokens, st.turnCount, turnSpan)
+
+		// LLM stream (with max-output-token recovery)
+		text, toolCalls, usage, err := o.runLLMStream(turnCtx, req, st, out)
+		if err != nil {
+			endSpan(turnSpan)
+			return // error already emitted
+		}
+		st.totalUsage.PromptTokens += usage.PromptTokens
+		st.totalUsage.CompletionTokens += usage.CompletionTokens
+		st.totalUsage.TotalTokens += usage.TotalTokens
+		if usage.PromptTokens > 0 {
+			st.lastPromptTokens = usage.PromptTokens
+		}
+
+		// Persist this turn's accumulated text into accumulatedText BEFORE
+		// overwriting finalText, so the complete event carries the full
+		// cross-turn report rather than only the last turn's content.
+		if t := text; t != "" {
+			st.accumulatedText.WriteString(t)
+			st.lastTurnText = t
+		}
+		st.finalText = st.accumulatedText.String()
+		// Preserve this turn's accumulated thinking for the emitComplete
+		// fallback below. Stash as lastThinkingTail AFTER finalText is set so
+		// the most recent non-empty thinking is always the fallback source.
+		if t := strings.TrimSpace(st.lastThinkingTail.String()); t != "" {
+			st.lastThinkingTail.Reset()
+			st.lastThinkingTail.WriteString(t)
+		}
+		toolCalls = dedupeToolCalls(toolCalls)
+
+		// Pre-tool exit conditions (natural / repeated tool).
+		if o.checkPreToolExits(st, toolCalls) {
+			endSpan(turnSpan)
+			break
+		}
+
+		// Emit tool call events + execute tool round + emit results.
+		toolResult, err := o.executeToolRound(turnCtx, req, st, toolCalls, out)
+		if err != nil {
+			endSpan(turnSpan)
+			return // error already emitted
+		}
+
+		// Post-tool exit conditions (consecutive error / diminishing returns).
+		if o.checkPostToolExits(st, toolResult) {
+			endSpan(turnSpan)
+			break
+		}
+
+		// Build assistant tool-call message and tool result messages for
+		// the next turn. DM-20260620-001 / AC2: when the assistant text
+		// exceeds maxAssistantChars (default 8K) the body is folded
+		// head/tail style and the full content is persisted to disk.
+		st.messages = append(st.messages,
+			o.buildAssistantToolCallMsgFolded(req.SessionID, toolCalls, st.finalText, st.turnCount))
+		for _, r := range toolResult.Results {
+			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
+			st.messages = append(st.messages, o.buildToolResultMsgWithCap(req.SessionID, r, toolName))
+		}
+
+		// NOTE: finalText is intentionally NOT cleared here — it must
+		// survive to the emitComplete call below, so MaxTurns-exceeded
+		// (or any other non-natural exit after a tool round) emits the
+		// last iteration's LLM text instead of an empty conclusion.
+		endSpan(turnSpan)
+	}
+
+	o.finalizeLoop(ctx, req, st, out, start)
+}
+
+// startTurnSpan opens the per-iteration telemetry span and attaches the
+// cross-turn attributes (turn index, scope, model, context sizes). The
+// stream-recovery counter is initialized to 0 here (carried into the
+// pre-invoke attributes for the LLM span).
+func (o *DefaultOrchestrator) startTurnSpan(ctx context.Context, req TurnRequest, st *runLoopState) (context.Context, tracer.Span) {
+	turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", st.turnCount)},
+		tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
+		tracer.Attribute{Key: "turn.mode", Value: req.Mode},
+		tracer.Attribute{Key: "llm.model", Value: st.model},
+		tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", st.maxContextTokens)},
+		tracer.Attribute{Key: "context.message_count", Value: fmt.Sprintf("%d", len(st.messages))},
+		tracer.Attribute{Key: "context.system_prompt_len", Value: fmt.Sprintf("%d", len(st.systemPrompt))},
+		tracer.Attribute{Key: "context.tool_count", Value: fmt.Sprintf("%d", len(st.tools))},
+		tracer.Attribute{Key: "context.nested", Value: boolStr(st.nested)},
+		tracer.Attribute{Key: "context.budget_tracker_active", Value: boolStr(st.maxContextTokens > 0)},
+	)
+	return turnCtx, turnSpan
+}
+
+// prepareContext runs the D2 Prepare call (with nested vs top-level
+// branching), applies focus hint / resolve-await enrichment, and runs
+// CompressHint summarization. Returns the loop state ready for the
+// LLM↔tool loop. Emits an error event and returns a non-nil error on
+// prepare failure (caller should return immediately).
+func (o *DefaultOrchestrator) prepareContext(ctx context.Context, req TurnRequest, out chan<- *contracts.EngineEvent) (*runLoopState, error) {
 	nested := isNestedScope(req.Scope) || len(req.PreloadedMessages) > 0
 
 	var (
@@ -298,7 +481,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 					sharederrors.SanitizeForUser(fmt.Errorf("prepare failed: %w", err)),
 					sharederrors.ErrorCode(err),
 				)
-				return
+				return nil, err
 			}
 			tools = prepared.Tools
 		}
@@ -339,7 +522,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 				sharederrors.SanitizeForUser(fmt.Errorf("prepare failed: %w", err)),
 				sharederrors.ErrorCode(err),
 			)
-			return
+			return nil, err
 		}
 
 		systemPrompt = mergeSystemPrompt(prepared.SystemPrompt, req.SystemPrompt)
@@ -386,387 +569,354 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		model = prepared.Model
 		maxContextTokens = prepared.MaxContextTokens
 	}
-	var totalUsage llmgateway.TokenUsage
-	var lastPromptTokens int
-	var finalText string
-	// lastTurnText retains the most recent turn's LLM text (not accumulated
-	// across turns). Surfaced on the complete event as meta["summary"] so
-	// the IM "任务总结" card shows only the LLM's final synthesis, not the
-	// full multi-turn report that the user already saw via streaming.
-	var lastTurnText string
-	// accumulatedText retains the LLM-emitted text from EVERY turn, not just
-	// the last. Without this, the finalText/complete event only carries the
-	// very last turn's content; a deep-review report emitted across many
-	// earlier turns would be silently discarded at emitComplete, leaving the
-	// IM card without its conclusion.
-	var accumulatedText strings.Builder
-	// lastThinkingTail retains the most recent LLM thinking content, post-strip.
-	// Used as a finalText fallback at emitComplete time when the LLM never
-	// emitted a clean summary (e.g. a provider without native reasoning emits
-	// its working notes inside <think> tags and the splitter routed them to
-	// thinking, leaving content empty — the user would otherwise see a blank
-	// conclusion card).
-	var lastThinkingTail strings.Builder
 
-	// Step 2+3: LLM↔Tool loop. Termination is driven by the exitReason
-	// local below; the loop body uses `break` (or `return` for fatal
-	// aborts that already emit an error event) to land in the unified
-	// finalize block at the bottom.
-	exitReason := ExitReasonNatural
-	turnCount := 0
-	recentToolSignatures := make([]string, 0, repeatedToolLookback)
-	var consecutiveErrorFP string
-	consecutiveErrorCount := 0
-	budgetTracker := newBudgetTracker(maxContextTokens)
+	return &runLoopState{
+		systemPrompt:            systemPrompt,
+		messages:                messages,
+		tools:                   tools,
+		model:                   model,
+		maxContextTokens:        maxContextTokens,
+		persister:               persister,
+		nested:                  nested,
+		exitReason:              ExitReasonNatural,
+		recentToolSignatures:    make([]string, 0, repeatedToolLookback),
+	}, nil
+}
 
+// runLLMStream invokes the LLM, processes the streaming chunks, and
+// runs the max-output-token recovery loop (up to
+// maxOutputTokenRecoveryAttempts retries). Emits `thinking` / `text`
+// events to the UI. Returns the turn's accumulated text, tool calls,
+// and final usage. On invoke failure, emits an error event and returns
+// a non-nil error.
+//
+// st.lastThinkingTail is updated with the most recent non-empty turn's
+// thinking content (post-strip), used as the finalText fallback in
+// finalizeLoop.
+func (o *DefaultOrchestrator) runLLMStream(
+	turnCtx context.Context,
+	req TurnRequest,
+	st *runLoopState,
+	out chan<- *contracts.EngineEvent,
+) (text string, toolCalls []llmgateway.ToolCall, usage llmgateway.TokenUsage, err error) {
+	_, llmSpan := o.startSpan(turnCtx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", st.turnCount)},
+		tracer.Attribute{Key: "llm.purpose", Value: "turn"},
+		tracer.Attribute{Key: "llm.model", Value: st.model},
+		tracer.Attribute{Key: "llm.pre_message_count", Value: fmt.Sprintf("%d", len(st.messages))},
+		tracer.Attribute{Key: "llm.pre_tool_count", Value: fmt.Sprintf("%d", len(st.tools))},
+		tracer.Attribute{Key: "llm.max_context_tokens", Value: fmt.Sprintf("%d", st.maxContextTokens)},
+		tracer.Attribute{Key: "llm.stream_recovery_attempts", Value: "0"},
+	)
+
+	// DM-20260620-001 / AC4 + AC13: per-iteration token audit and
+	// proactive fold. Runs BEFORE the LLM invoke so the request
+	// payload is already trimmed. The audit result is attached to
+	// the turn span and emitted as structured slog so post-hoc
+	// analysis can correlate runaway sessions with budget pressure.
+	//
+	// AC3 (per-iter Prepare) is intentionally NOT moved inside the
+	// loop: the Prepare → LLM → Tool pipeline is expensive to repeat
+	// and the systemPrompt + Tools set is stable across a turn. The
+	// audit is the high-leverage piece; a follow-up OpenSpec can
+	// re-evaluate the Prepare cadence if needed.
+	// streamRecoveryAttempts tracks how many times we've retried the stream
+	// for max-output-token recovery in THIS turn. It is hoisted above the
+	// turn + llm spans so the pre-invoke attributes capture the value
+	// carried into the next iteration (most often 0; > 0 after a previous
+	// iteration retried).
+	streamRecoveryAttempts := 0
+
+	var contentBuf strings.Builder
+	// turnThinking accumulates all thinking chunks emitted in this turn.
+	// After the inner stream loop, the most recent non-empty turn's
+	// turnThinking.String() is preserved as lastThinkingTail for the
+	// finalText fallback below (see emitComplete call sites).
+	var turnThinking strings.Builder
+	var finishReason string
+	var iterUsage llmgateway.TokenUsage
+
+streamRecoveryLoop:
 	for {
-		turnCount++
-
-		// ctx cancellation / deadline — aborts with an explicit error
-		// event so the IM adapter renders the cancellation rather than
-		// waiting for an unobservable stream close.
-		if err := ctx.Err(); err != nil {
-			o.emitError(out, req.SessionID,
-				sharederrors.SanitizeForUser(fmt.Errorf("turn cancelled: %w", err)),
-				"CTX_CANCELLED",
-			)
-			return
-		}
-
-		// Safety net: only fires when the caller explicitly set a positive
-		// MaxTurns. An unbounded turn (MaxTurns ≤ 0) is governed solely by
-		// the natural-finish + deterministic-exit reasons below.
-		if req.MaxTurns > 0 && turnCount > req.MaxTurns {
-			exitReason = ExitReasonMaxTurns
-			break
-		}
-
-		// DM-20260620-001 / AC4 + AC13: per-iteration token audit and
-		// proactive fold. Runs BEFORE the LLM invoke so the request
-		// payload is already trimmed. The audit result is attached to
-		// the turn span and emitted as structured slog so post-hoc
-		// analysis can correlate runaway sessions with budget pressure.
-		//
-		// AC3 (per-iter Prepare) is intentionally NOT moved inside the
-		// loop: the Prepare → LLM → Tool pipeline is expensive to repeat
-		// and the systemPrompt + Tools set is stable across a turn. The
-		// audit is the high-leverage piece; a follow-up OpenSpec can
-		// re-evaluate the Prepare cadence if needed.
-		// streamRecoveryAttempts tracks how many times we've retried the stream
-		// for max-output-token recovery in THIS turn. It is hoisted above the
-		// turn + llm spans so the pre-invoke attributes capture the value
-		// carried into the next iteration (most often 0; > 0 after a previous
-		// iteration retried).
-		streamRecoveryAttempts := 0
-
-		turnCtx, turnSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Turn_Iteration, tracer.SpanKindInternal,
-			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
-			tracer.Attribute{Key: "turn.scope", Value: string(req.Scope)},
-			tracer.Attribute{Key: "turn.mode", Value: req.Mode},
-			tracer.Attribute{Key: "llm.model", Value: model},
-			tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
-			tracer.Attribute{Key: "context.message_count", Value: fmt.Sprintf("%d", len(messages))},
-			tracer.Attribute{Key: "context.system_prompt_len", Value: fmt.Sprintf("%d", len(systemPrompt))},
-			tracer.Attribute{Key: "context.tool_count", Value: fmt.Sprintf("%d", len(tools))},
-			tracer.Attribute{Key: "context.nested", Value: boolStr(nested)},
-			tracer.Attribute{Key: "context.budget_tracker_active", Value: boolStr(maxContextTokens > 0)},
-		)
-		o.runTokenAudit(ctx, systemPrompt, messages, maxContextTokens, turnCount, turnSpan)
-
-		// D7→D3 LLM invoke (D7-S2-A07)
-		turnCtx, llmSpan := o.startSpan(turnCtx, telemetry.OpD7_S2_Orchestration_LLM_Invoke, tracer.SpanKindClient,
-			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
-			tracer.Attribute{Key: "llm.purpose", Value: "turn"},
-			tracer.Attribute{Key: "llm.model", Value: model},
-			tracer.Attribute{Key: "llm.pre_message_count", Value: fmt.Sprintf("%d", len(messages))},
-			tracer.Attribute{Key: "llm.pre_tool_count", Value: fmt.Sprintf("%d", len(tools))},
-			tracer.Attribute{Key: "llm.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
-			tracer.Attribute{Key: "llm.stream_recovery_attempts", Value: fmt.Sprintf("%d", streamRecoveryAttempts)},
-		)
-		var contentBuf strings.Builder
-		var toolCalls []llmgateway.ToolCall
-		var iterUsage llmgateway.TokenUsage
-		var finishReason string
-		// turnThinking accumulates all thinking chunks emitted in this turn.
-		// After the inner stream loop, the most recent non-empty turn's
-		// turnThinking.String() is preserved as lastThinkingTail for the
-		// finalText fallback below (see emitComplete call sites).
-		var turnThinking strings.Builder
-
-	streamRecoveryLoop:
-		for {
-			chunkCh, err := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
-				SessionID:    req.SessionID,
-				SystemPrompt: systemPrompt,
-				Messages:     messages,
-				Tools:        tools,
-			})
-			if err != nil {
-				endSpanWithError(llmSpan, err)
-				endSpan(turnSpan)
-				o.emitError(out, req.SessionID,
-					sharederrors.SanitizeForUser(fmt.Errorf("llm invoke failed: %w", err)),
-					sharederrors.ErrorCode(err),
-				)
-				return
-			}
-
-			contentBuf.Reset()
-			toolCalls = nil
-			finishReason = ""
-			iterUsage = llmgateway.TokenUsage{}
-			turnThinking.Reset()
-			var partial partialStreamEmit
-
-			for chunk := range chunkCh {
-				if chunk.FinishReason != "" {
-					finishReason = chunk.FinishReason
-				}
-				if chunk.Thinking != "" {
-					partial.hadThinking = true
-					turnThinking.WriteString(chunk.Thinking)
-					out <- &contracts.EngineEvent{
-						Type:      "thinking",
-						Content:   chunk.Thinking,
-						SessionID: req.SessionID,
-					}
-				}
-				if chunk.Content != "" {
-					partial.hadText = true
-					contentBuf.WriteString(chunk.Content)
-					out <- &contracts.EngineEvent{
-						Type:      "text",
-						Content:   chunk.Content,
-						SessionID: req.SessionID,
-					}
-				}
-				if len(chunk.ToolCalls) > 0 {
-					toolCalls = chunk.ToolCalls
-					partial.toolCalls = chunk.ToolCalls
-				}
-				if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
-					iterUsage = chunk.Usage
-				} else if chunk.Usage.TotalTokens > 0 && iterUsage.PromptTokens == 0 && iterUsage.CompletionTokens == 0 {
-					iterUsage = chunk.Usage
-				}
-			}
-
-			if !NeedsMaxOutputTokenRecovery(finishReason) {
-				break streamRecoveryLoop
-			}
-			if streamRecoveryAttempts >= maxOutputTokenRecoveryAttempts {
-				break streamRecoveryLoop
-			}
-			emitStreamRecoveryTombstones(out, req.SessionID, partial)
-			messages = append(messages, types.Message{
-				SessionID: req.SessionID,
-				Role:      types.MessageRoleUser,
-				Content:   MaxOutputTokensRecoveryMessage,
-			})
-			streamRecoveryAttempts++
-		}
-		totalUsage.PromptTokens += iterUsage.PromptTokens
-		totalUsage.CompletionTokens += iterUsage.CompletionTokens
-		totalUsage.TotalTokens += iterUsage.TotalTokens
-		if iterUsage.PromptTokens > 0 {
-			lastPromptTokens = iterUsage.PromptTokens
-		}
-		endSpan(llmSpan)
-
-		// Persist this turn's accumulated text into accumulatedText BEFORE
-		// overwriting finalText, so the complete event carries the full
-		// cross-turn report rather than only the last turn's content.
-		if t := contentBuf.String(); t != "" {
-			accumulatedText.WriteString(t)
-			lastTurnText = t
-		}
-		finalText = accumulatedText.String()
-		// Preserve this turn's accumulated thinking for the emitComplete
-		// fallback below. Stash as lastThinkingTail AFTER finalText is set so
-		// the most recent non-empty thinking is always the fallback source.
-		if t := strings.TrimSpace(turnThinking.String()); t != "" {
-			lastThinkingTail.Reset()
-			lastThinkingTail.WriteString(t)
-		}
-		toolCalls = dedupeToolCalls(toolCalls)
-
-		// No tool calls → natural LLM finish. The terminal `complete`
-		// event below carries exit_reason=natural.
-		if len(toolCalls) == 0 {
-			exitReason = ExitReasonNatural
-			break
-		}
-
-		// Repeated-tool detector: same (tool_name|input) signature
-		// appears ≥ repeatedToolThreshold times in the last
-		// repeatedToolLookback turns. The LLM is stuck retrying the
-		// same action; continuing would burn tokens without progress.
-		sig := toolCallsSignature(toolCalls)
-		if isRepeatedToolSignature(sig, recentToolSignatures) {
-			exitReason = ExitReasonRepeatedTool
-			break
-		}
-		recentToolSignatures = append(recentToolSignatures, sig)
-		if len(recentToolSignatures) > repeatedToolLookback {
-			// Keep the most recent N signatures (drop the oldest).
-			recentToolSignatures = recentToolSignatures[len(recentToolSignatures)-repeatedToolLookback:]
-		}
-
-		// Emit tool call events
-		for _, tc := range toolCalls {
-			out <- &contracts.EngineEvent{
-				Type:      "tool_call",
-				ToolName:  tc.Name,
-				ToolInput: tc.Input,
-				SessionID: req.SessionID,
-				Metadata: map[string]string{
-					"tool_name": tc.Name,
-					"input":     tc.Input,
-				},
-			}
-		}
-
-		// D7→D2 tool execution
-		_, toolSpan := o.startSpan(turnCtx, telemetry.OpD2_S5_Tool_Execute_Single, tracer.SpanKindInternal,
-			tracer.Attribute{Key: "session_id", Value: req.SessionID},
-			tracer.Attribute{Key: "tool.count", Value: fmt.Sprintf("%d", len(toolCalls))},
-			tracer.Attribute{Key: "tool.names", Value: joinToolNames(toolCalls)},
-			tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", turnCount)},
-			tracer.Attribute{Key: "context.caller", Value: "d7"},
-			tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
-		)
-		toolCtx := WithToolEventStream(turnCtx, func(ev *contracts.EngineEvent) {
-			if ev == nil {
-				return
-			}
-			select {
-			case out <- ev:
-			case <-turnCtx.Done():
-			}
+		chunkCh, invokeErr := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
+			SessionID:    req.SessionID,
+			SystemPrompt: st.systemPrompt,
+			Messages:     st.messages,
+			Tools:        st.tools,
 		})
-		toolResult, err := o.tools.ExecuteRound(toolCtx, ToolRoundRequest{
+		if invokeErr != nil {
+			endSpanWithError(llmSpan, invokeErr)
+			o.emitError(out, req.SessionID,
+				sharederrors.SanitizeForUser(fmt.Errorf("llm invoke failed: %w", invokeErr)),
+				sharederrors.ErrorCode(invokeErr),
+			)
+			return "", nil, llmgateway.TokenUsage{}, invokeErr
+		}
+
+		contentBuf.Reset()
+		toolCalls = nil
+		finishReason = ""
+		iterUsage = llmgateway.TokenUsage{}
+		turnThinking.Reset()
+		var partial partialStreamEmit
+
+		for chunk := range chunkCh {
+			if chunk.FinishReason != "" {
+				finishReason = chunk.FinishReason
+			}
+			if chunk.Thinking != "" {
+				partial.hadThinking = true
+				turnThinking.WriteString(chunk.Thinking)
+				out <- &contracts.EngineEvent{
+					Type:      "thinking",
+					Content:   chunk.Thinking,
+					SessionID: req.SessionID,
+				}
+			}
+			if chunk.Content != "" {
+				partial.hadText = true
+				contentBuf.WriteString(chunk.Content)
+				out <- &contracts.EngineEvent{
+					Type:      "text",
+					Content:   chunk.Content,
+					SessionID: req.SessionID,
+				}
+			}
+			if len(chunk.ToolCalls) > 0 {
+				toolCalls = chunk.ToolCalls
+				partial.toolCalls = chunk.ToolCalls
+			}
+			if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+				iterUsage = chunk.Usage
+			} else if chunk.Usage.TotalTokens > 0 && iterUsage.PromptTokens == 0 && iterUsage.CompletionTokens == 0 {
+				iterUsage = chunk.Usage
+			}
+		}
+
+		if !NeedsMaxOutputTokenRecovery(finishReason) {
+			break streamRecoveryLoop
+		}
+		if streamRecoveryAttempts >= maxOutputTokenRecoveryAttempts {
+			break streamRecoveryLoop
+		}
+		emitStreamRecoveryTombstones(out, req.SessionID, partial)
+		st.messages = append(st.messages, types.Message{
 			SessionID: req.SessionID,
-			ToolCalls: toolCalls,
+			Role:      types.MessageRoleUser,
+			Content:   MaxOutputTokensRecoveryMessage,
 		})
-		if err != nil {
-			endSpanWithError(toolSpan, err)
-			endSpan(turnSpan)
-			o.emitError(out, req.SessionID,
-				sharederrors.SanitizeForUser(fmt.Errorf("tool round failed: %w", err)),
-				sharederrors.ErrorCode(err),
-			)
-			return
-		}
-		endSpan(toolSpan)
+		streamRecoveryAttempts++
+	}
+	usage = iterUsage
+	endSpan(llmSpan)
 
-		// Emit tool result events
-		for _, r := range toolResult.Results {
-			content := r.Output
-			if r.Error != "" {
-				content = r.Error
-			}
-			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
-			out <- &contracts.EngineEvent{
-				Type:      "tool_result",
-				ToolName:  toolName,
-				Content:   content,
-				SessionID: req.SessionID,
-				Metadata: map[string]string{
-					"tool_name": toolName,
-				},
-			}
-		}
+	// Preserve this turn's accumulated thinking for the finalizeLoop
+	// fallback. Stash as lastThinkingTail so the most recent non-empty
+	// thinking is always the fallback source.
+	if t := strings.TrimSpace(turnThinking.String()); t != "" {
+		st.lastThinkingTail.Reset()
+		st.lastThinkingTail.WriteString(t)
+	}
+	text = contentBuf.String()
+	return text, toolCalls, usage, nil
+}
 
-		// Consecutive-tool-error detector: ≥ consecutiveToolErrorThreshold
-		// consecutive turns produced at least one tool result with the
-		// same non-empty error fingerprint. The LLM cannot recover from
-		// this error pattern; further turns just repeat the same
-		// rejection.
-		if fp := toolResultErrorFingerprint(toolResult.Results); fp != "" {
-			if fp == consecutiveErrorFP {
-				consecutiveErrorCount++
-			} else {
-				consecutiveErrorFP = fp
-				consecutiveErrorCount = 1
-			}
-			if consecutiveErrorCount >= consecutiveToolErrorThreshold {
-				exitReason = ExitReasonToolFailure
-				break
-			}
-		} else {
-			consecutiveErrorFP = ""
-			consecutiveErrorCount = 0
+// executeToolRound emits the per-tool `tool_call` events, runs the
+// tool round via the D2 executor, and emits `tool_result` events. On
+// executor failure, emits an error event and returns a non-nil error.
+func (o *DefaultOrchestrator) executeToolRound(
+	turnCtx context.Context,
+	req TurnRequest,
+	st *runLoopState,
+	toolCalls []llmgateway.ToolCall,
+	out chan<- *contracts.EngineEvent,
+) (ToolRoundResult, error) {
+	// Emit tool call events
+	for _, tc := range toolCalls {
+		out <- &contracts.EngineEvent{
+			Type:      "tool_call",
+			ToolName:  tc.Name,
+			ToolInput: tc.Input,
+			SessionID: req.SessionID,
+			Metadata: map[string]string{
+				"tool_name": tc.Name,
+				"input":     tc.Input,
+			},
 		}
-
-		// Token-budget diminishing-returns detector. Mirrors
-		// clawcode/src/query/tokenBudget.ts checkTokenBudget:
-		// once cumulative usage crosses 90% of the context budget AND
-		// the last two per-turn deltas are both below the floor,
-		// continuing yields marginal value → stop. Disabled when
-		// maxContextTokens is 0 / unset (the orchestrator has no
-		// budget signal in that case).
-		budgetTracker.observe(totalUsage)
-		if budgetTracker.shouldStopDiminishing(maxContextTokens) {
-			exitReason = ExitReasonTokenDiminishing
-			break
-		}
-
-		// Build assistant tool-call message and tool result messages for the next turn.
-		//
-		// DM-20260620-001 / AC2: when the assistant text exceeds
-		// maxAssistantChars (default 8K) the body is folded head/tail
-		// style and the full content is persisted to disk.
-		messages = append(messages, o.buildAssistantToolCallMsgFolded(req.SessionID, toolCalls, finalText, turnCount))
-		for _, r := range toolResult.Results {
-			toolName := toolNameForCallID(toolCalls, r.ToolCallID)
-			messages = append(messages, o.buildToolResultMsgWithCap(req.SessionID, r, toolName))
-		}
-
-		// NOTE: finalText is intentionally NOT cleared here — it must
-		// survive to the emitComplete call below, so MaxTurns-exceeded
-		// (or any other non-natural exit after a tool round) emits the
-		// last iteration's LLM text instead of an empty conclusion.
-		endSpan(turnSpan)
 	}
 
-	// Finalize: persist + emit complete with the resolved exit reason.
-	// The aborted_* paths already returned above with their own error
-	// event; everything else (natural / max_turns / repeated_tool /
-	// tool_failure / token_diminishing) reaches here and emits a
-	// single terminal `complete` whose Metadata carries exit_reason.
+	// D7→D2 tool execution
+	_, toolSpan := o.startSpan(turnCtx, telemetry.OpD2_S5_Tool_Execute_Single, tracer.SpanKindInternal,
+		tracer.Attribute{Key: "session_id", Value: req.SessionID},
+		tracer.Attribute{Key: "tool.count", Value: fmt.Sprintf("%d", len(toolCalls))},
+		tracer.Attribute{Key: "tool.names", Value: joinToolNames(toolCalls)},
+		tracer.Attribute{Key: "turn.index", Value: fmt.Sprintf("%d", st.turnCount)},
+		tracer.Attribute{Key: "context.caller", Value: "d7"},
+		tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
+	)
+	toolCtx := WithToolEventStream(turnCtx, func(ev *contracts.EngineEvent) {
+		if ev == nil {
+			return
+		}
+		select {
+		case out <- ev:
+		case <-turnCtx.Done():
+		}
+	})
+	toolResult, err := o.tools.ExecuteRound(toolCtx, ToolRoundRequest{
+		SessionID: req.SessionID,
+		ToolCalls: toolCalls,
+	})
+	if err != nil {
+		endSpanWithError(toolSpan, err)
+		o.emitError(out, req.SessionID,
+			sharederrors.SanitizeForUser(fmt.Errorf("tool round failed: %w", err)),
+			sharederrors.ErrorCode(err),
+		)
+		return ToolRoundResult{}, err
+	}
+	endSpan(toolSpan)
+
+	// Emit tool result events
+	for _, r := range toolResult.Results {
+		content := r.Output
+		if r.Error != "" {
+			content = r.Error
+		}
+		toolName := toolNameForCallID(toolCalls, r.ToolCallID)
+		out <- &contracts.EngineEvent{
+			Type:      "tool_result",
+			ToolName:  toolName,
+			Content:   content,
+			SessionID: req.SessionID,
+			Metadata: map[string]string{
+				"tool_name": toolName,
+			},
+		}
+	}
+	return toolResult, nil
+}
+
+// checkPreToolExits applies the pre-tool-round exit detectors: the
+// LLM's natural finish (no tool calls → ExitReasonNatural) and the
+// repeated-tool detector (same signature ≥ repeatedToolThreshold
+// times in the last repeatedToolLookback turns → ExitReasonRepeatedTool).
+// Updates st.recentToolSignatures as a side effect. Returns true if
+// the loop should break.
+func (o *DefaultOrchestrator) checkPreToolExits(st *runLoopState, toolCalls []llmgateway.ToolCall) bool {
+	// No tool calls → natural LLM finish. The terminal `complete`
+	// event below carries exit_reason=natural.
+	if len(toolCalls) == 0 {
+		st.exitReason = ExitReasonNatural
+		return true
+	}
+
+	// Repeated-tool detector: same (tool_name|input) signature
+	// appears ≥ repeatedToolThreshold times in the last
+	// repeatedToolLookback turns. The LLM is stuck retrying the
+	// same action; continuing would burn tokens without progress.
+	sig := toolCallsSignature(toolCalls)
+	if isRepeatedToolSignature(sig, st.recentToolSignatures) {
+		st.exitReason = ExitReasonRepeatedTool
+		return true
+	}
+	st.recentToolSignatures = append(st.recentToolSignatures, sig)
+	if len(st.recentToolSignatures) > repeatedToolLookback {
+		// Keep the most recent N signatures (drop the oldest).
+		st.recentToolSignatures = st.recentToolSignatures[len(st.recentToolSignatures)-repeatedToolLookback:]
+	}
+	return false
+}
+
+// checkPostToolExits applies the post-tool-round exit detectors: the
+// consecutive-tool-error detector (≥ consecutiveToolErrorThreshold
+// turns with the same error fingerprint → ExitReasonToolFailure) and
+// the token-budget diminishing-returns detector (cumulative usage
+// crosses 90% of the context budget AND last two deltas below the
+// floor → ExitReasonTokenDiminishing). Updates
+// st.consecutiveErrorFP/Count and st.budgetTracker as side effects.
+// Returns true if the loop should break.
+func (o *DefaultOrchestrator) checkPostToolExits(st *runLoopState, toolResult ToolRoundResult) bool {
+	// Consecutive-tool-error detector: ≥ consecutiveToolErrorThreshold
+	// consecutive turns produced at least one tool result with the
+	// same non-empty error fingerprint. The LLM cannot recover from
+	// this error pattern; further turns just repeat the same
+	// rejection.
+	if fp := toolResultErrorFingerprint(toolResult.Results); fp != "" {
+		if fp == st.consecutiveErrorFP {
+			st.consecutiveErrorCount++
+		} else {
+			st.consecutiveErrorFP = fp
+			st.consecutiveErrorCount = 1
+		}
+		if st.consecutiveErrorCount >= consecutiveToolErrorThreshold {
+			st.exitReason = ExitReasonToolFailure
+			return true
+		}
+	} else {
+		st.consecutiveErrorFP = ""
+		st.consecutiveErrorCount = 0
+	}
+
+	// Token-budget diminishing-returns detector. Mirrors
+	// clawcode/src/query/tokenBudget.ts checkTokenBudget:
+	// once cumulative usage crosses 90% of the context budget AND
+	// the last two per-turn deltas are both below the floor,
+	// continuing yields marginal value → stop. Disabled when
+	// maxContextTokens is 0 / unset (the orchestrator has no
+	// budget signal in that case).
+	st.budgetTracker.observe(st.totalUsage)
+	if st.budgetTracker.shouldStopDiminishing(st.maxContextTokens) {
+		st.exitReason = ExitReasonTokenDiminishing
+		return true
+	}
+	return false
+}
+
+// finalizeLoop persists the turn and emits the terminal `complete`
+// event. The aborted_* paths already returned above with their own
+// error event; everything else (natural / max_turns / repeated_tool /
+// tool_failure / token_diminishing) reaches here and emits a single
+// terminal `complete` whose Metadata carries exit_reason.
+func (o *DefaultOrchestrator) finalizeLoop(
+	ctx context.Context,
+	req TurnRequest,
+	st *runLoopState,
+	out chan<- *contracts.EngineEvent,
+	start time.Time,
+) {
 	_, persistSpan := o.startSpan(ctx, telemetry.OpD2_S2_Context_Memory_Snapshot_Save, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
 		tracer.Attribute{Key: "context.runtime_path", Value: string(obsruntime.PathD7Turn)},
-		tracer.Attribute{Key: string(metadataKeyExitReason), Value: string(exitReason)},
-		tracer.Attribute{Key: "context.turn_count", Value: fmt.Sprintf("%d", turnCount)},
-		tracer.Attribute{Key: "context.usage_prompt_tokens", Value: fmt.Sprintf("%d", totalUsage.PromptTokens)},
-		tracer.Attribute{Key: "context.usage_completion_tokens", Value: fmt.Sprintf("%d", totalUsage.CompletionTokens)},
-		tracer.Attribute{Key: "context.usage_total_tokens", Value: fmt.Sprintf("%d", totalUsage.TotalTokens)},
-		tracer.Attribute{Key: "context.llm_model", Value: model},
-		tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", maxContextTokens)},
-		tracer.Attribute{Key: "context.final_text_len", Value: fmt.Sprintf("%d", len(finalText))},
+		tracer.Attribute{Key: string(metadataKeyExitReason), Value: string(st.exitReason)},
+		tracer.Attribute{Key: "context.turn_count", Value: fmt.Sprintf("%d", st.turnCount)},
+		tracer.Attribute{Key: "context.usage_prompt_tokens", Value: fmt.Sprintf("%d", st.totalUsage.PromptTokens)},
+		tracer.Attribute{Key: "context.usage_completion_tokens", Value: fmt.Sprintf("%d", st.totalUsage.CompletionTokens)},
+		tracer.Attribute{Key: "context.usage_total_tokens", Value: fmt.Sprintf("%d", st.totalUsage.TotalTokens)},
+		tracer.Attribute{Key: "context.llm_model", Value: st.model},
+		tracer.Attribute{Key: "context.max_context_tokens", Value: fmt.Sprintf("%d", st.maxContextTokens)},
+		tracer.Attribute{Key: "context.final_text_len", Value: fmt.Sprintf("%d", len(st.finalText))},
 	)
-	resolvedFinal := resolveFinalText(finalText, lastThinkingTail.String(), exitReason, req.MaxTurns)
+	resolvedFinal := resolveFinalText(st.finalText, st.lastThinkingTail.String(), st.exitReason, req.MaxTurns)
 	// resolvedSummary is the brief conclusion that IM adapters render on the
 	// standalone "任务总结" card. Distinct from resolvedFinal (the full
 	// multi-turn transcript) so the card doesn't dump 75K chars of in-flight
 	// tool-loop output that the user already saw via streaming text chunks.
 	// We apply the same MaxTurns notice as resolvedFinal so the brief and
 	// full paths agree on loop-bound signalling.
-	resolvedSummary := resolveFinalText(lastTurnText, lastThinkingTail.String(), exitReason, req.MaxTurns)
-	_ = persister.PersistTurn(ctx, PersistRequest{
+	resolvedSummary := resolveFinalText(st.lastTurnText, st.lastThinkingTail.String(), st.exitReason, req.MaxTurns)
+	_ = st.persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
-		Messages:  messages,
-		TurnCount: turnCount,
-		Usage:     totalUsage,
+		Messages:  st.messages,
+		TurnCount: st.turnCount,
+		Usage:     st.totalUsage,
 		FinalText: resolvedFinal,
 	})
 	endSpan(persistSpan)
-	o.emitComplete(out, req.SessionID, start, totalUsage, lastPromptTokens, model, maxContextTokens,
-		resolvedFinal, resolvedSummary, exitReason)
+	o.emitComplete(out, req.SessionID, start, st.totalUsage, st.lastPromptTokens, st.model, st.maxContextTokens,
+		resolvedFinal, resolvedSummary, st.exitReason)
 }
 
 // resolveFinalText promotes the most recent accumulated thinking into
