@@ -91,22 +91,16 @@ func (s CertaintyStrength) String() string {
 	}
 }
 
-// ClassToStrength maps a LearningClass to its ordinal CertaintyStrength.
+// ClassToStrength maps a LearningClass to its CertaintyStrength ★ rating.
+// The LearningClass enum is declared with iota starting at LearningUnknown=0
+// then LearningSOP=1, ..., LearningPending=5 — i.e. enum ordinal and ★
+// rating are inverted (SOP=1 → ★5, Pending=5 → ★1). The formula
+// `Strength = 6 - class` reflects that inversion. LP-4 衍生.
 func ClassToStrength(class types.LearningClass) CertaintyStrength {
-	switch class {
-	case types.LearningSOP:
-		return StrengthSOP
-	case types.LearningProtocol:
-		return StrengthProtocol
-	case types.LearningKnowledge:
-		return StrengthKnowledge
-	case types.LearningConclusion:
-		return StrengthConclusion
-	case types.LearningPending:
-		return StrengthPending
-	default:
+	if class < types.LearningSOP || class > types.LearningPending {
 		return StrengthUnknown
 	}
+	return CertaintyStrength(6 - int(class))
 }
 
 // CurrentAssetSchemaVersion is the current AssetContent schema version. Bump

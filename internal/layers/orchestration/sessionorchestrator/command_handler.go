@@ -1,20 +1,13 @@
 // CommandHandler is the D7-S2 orchtypes.IntentCommand explicit-dispatch path.
 //
-// v1.0 closure (2026-06-15) routed orchtypes.IntentCommand to FastPath.Run with a
-// "[command:xxx]" system-prompt hint, letting the LLM interpret the
-// command. That was a v1.0 simplification; v1.1+ dispatches commands
-// directly to the D7-internal CLI/PlanMode handlers, achieving:
-//
-//   - zero LLM cost on the command path
-//   - command semantics owned by D7 (PlanMode state machine, TaskManager
-//     CRUD), not by an LLM guessing
-//   - intent_kind=command metric samples are now comparable to
-//     intent_kind=fast/orchestrate (different paths)
+// Dispatches commands directly to D7-internal CLI/PlanMode handlers
+// (zero LLM cost on the command path; command semantics owned by D7 —
+// PlanMode state machine + TaskManager CRUD — not by an LLM guessing).
 //
 // Wiring: bootstrap injects CLICommands and PlanCLICommands via
 // NewCommandHandler. The handler is then attached to SessionOrchestrator
 // via WithCommandHandler. ProcessMessage's orchtypes.IntentCommand case calls
-// Handle directly (no FastPath).
+// Handle directly.
 package sessionorchestrator
 
 import (

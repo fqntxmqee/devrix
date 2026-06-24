@@ -1,11 +1,6 @@
 // OrchestratePath is the D7-S2 orchtypes.IntentOrchestrate explicit-orchestration
 // path.
 //
-// v1.0 closure (2026-06-15) routed orchtypes.IntentOrchestrate to FastPath.Run with
-// a "[orchestrate: please decompose and execute step by step]" system
-// prompt, letting the LLM decompose the goal and execute in a single
-// loop. That was a v1.0 simplification; v1.1+ dispatches to:
-//
 //  1. decisionplanning.TaskDecomposer.SynthesizeTaskGraph (D7-S5-A02) — goal → TaskNode DAG
 //  2. WaveScheduler.Start (D7-S3-A01) — DAG → 5-slot pool dispatch
 //  3. WaveScheduler.WaitForCompletion — block until all nodes terminal
@@ -13,7 +8,7 @@
 //
 // Wiring: bootstrap injects decisionplanning.TaskDecomposer + WaveScheduler via
 // NewOrchestratePath. ProcessMessage's orchtypes.IntentOrchestrate case calls
-// Run directly (no FastPath).
+// Run directly.
 package sessionorchestrator
 
 import (

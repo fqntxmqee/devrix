@@ -6,7 +6,25 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// fromVerifierForTest wraps FromVerifierTyped with string-kind parsing so
+// tests can keep table-driven string fixtures (mirrors the deleted string
+// shim FromVerifier signature, but routes through the typed enum path).
+func fromVerifierForTest(t *testing.T, verdict string, confidence float64, reason string, anomaly bool) UncertaintyCoord {
+	t.Helper()
+	kind, err := types.ParseVerdictKind(verdict)
+	if err != nil {
+		t.Fatalf("ParseVerdictKind(%q): %v", verdict, err)
+	}
+	c, err := FromVerifierTyped(kind, confidence, reason, anomaly)
+	if err != nil {
+		t.Fatalf("FromVerifierTyped(%q, %.3f, %q, %v): %v", verdict, confidence, reason, anomaly, err)
+	}
+	return c
+}
 
 func TestNewUncertaintyCoord_ClampsValue(t *testing.T) {
 	c := NewUncertaintyCoord(1.5)
@@ -39,10 +57,7 @@ func TestFromVerifier_VerdictKinds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.verdict+"_anomaly="+boolStr(tt.anomaly), func(t *testing.T) {
-			c, err := FromVerifier(tt.verdict, tt.confidence, tt.reason, tt.anomaly)
-			if err != nil {
-				t.Fatalf("FromVerifier returned unexpected error: %v", err)
-			}
+			c := fromVerifierForTest(t, tt.verdict, tt.confidence, tt.reason, tt.anomaly)
 			if c.Value != tt.wantValue {
 				t.Errorf("Value = %.3f, want %.3f", c.Value, tt.wantValue)
 			}
@@ -115,10 +130,7 @@ func TestUncertaintyCoord_JSON_Phase1ShapeStillWorks(t *testing.T) {
 }
 
 func TestUncertaintyCoord_JSON_RoundTrip_NewFields(t *testing.T) {
-	c, err := FromVerifier("fail", 0.9, "criteria_missed", false)
-	if err != nil {
-		t.Fatalf("FromVerifier: %v", err)
-	}
+	c := fromVerifierForTest(t, "fail", 0.9, "criteria_missed", false)
 	c = c.WithSideEffect(SideEffectRolledBack)
 	data, err := json.Marshal(c)
 	if err != nil {
@@ -161,10 +173,7 @@ func TestUncertaintyCoord_IsColdStart(t *testing.T) {
 	if c2.IsColdStart() {
 		t.Error("0.6 coord should not be cold-start")
 	}
-	c3, err := FromVerifier("pass", 0.9, "x", false)
-	if err != nil {
-		t.Fatalf("FromVerifier: %v", err)
-	}
+	c3 := fromVerifierForTest(t, "pass", 0.9, "x", false)
 	if c3.IsColdStart() {
 		t.Error("verifier-derived coord should not be cold-start")
 	}
@@ -185,23 +194,22 @@ func TestUncertaintyCoord_NaN_ClampsToHalf(t *testing.T) {
 // the ORCH_COORD_VERDICT_7004 error code actually fires and noisy upstream
 // typos surface immediately rather than being silently coerced to the
 // 0.5 neutral default.
-func TestUncertaintyCoord_FromVerifier_UnknownKind(t *testing.T) {
-	c, err := FromVerifier("pass-ish", 0.9, "typo", false)
+func TestUncertaintyCoord_FromVerifierTyped_UnknownKind(t *testing.T) {
+	// ⭐ RF.3.3 C3: FromVerifierTyped must FAIL-FAST on unknown verdict
+	// kinds so the ORCH_COORD_VERDICT_7004 error code actually fires and
+	// noisy upstream typos surface immediately rather than being silently
+	// coerced to the 0.5 neutral default.
+	_, err := FromVerifierTyped(99, 0.9, "typo", false)
 	if err == nil {
-		t.Fatalf("expected error for unknown verdict %q, got coord=%+v", "pass-ish", c)
+		t.Fatalf("expected error for unknown verdict kind 99")
 	}
 	if !errors.Is(err, ErrUncertaintyCoordInvalidVerdictKind) {
 		t.Errorf("errors.Is should match sentinel, got %v", err)
 	}
 	// The error message should echo back the bad kind so logs are
 	// traceable to the offending call site.
-	if !strings.Contains(err.Error(), "pass-ish") {
+	if !strings.Contains(err.Error(), "VerdictKind(99)") {
 		t.Errorf("error message should echo the bad verdict kind, got: %s", err.Error())
-	}
-	// Coord value should be the zero value (we never construct it on the
-	// error path).
-	if c.Value != 0 || c.FromVerifier {
-		t.Errorf("error-path coord should be zero-valued, got %+v", c)
 	}
 }
 
