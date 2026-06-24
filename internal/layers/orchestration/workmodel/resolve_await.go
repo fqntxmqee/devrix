@@ -38,15 +38,16 @@ func (a *ResolveAwaiter) AwaitRunningChildren(ctx context.Context, sessionID str
 	}
 
 	var parts []string
+	reg := a.Manager.Registry()
 	for _, child := range children {
 		runID := child.RunRef
-		if runID == "" && runregistry.Global != nil {
-			runID, _ = runregistry.Global.GetByWorkItem(child.ID)
+		if runID == "" && reg != nil {
+			runID, _ = reg.GetByWorkItem(child.ID)
 		}
 		if runID == "" {
 			continue
 		}
-		out, err := runregistry.Await(ctx, runID, true, timeout)
+		out, err := runregistry.Await(ctx, reg, runID, true, timeout)
 		if err != nil {
 			parts = append(parts, fmt.Sprintf("%s: await error: %v", child.ID, err))
 			continue
@@ -62,10 +63,14 @@ func (a *ResolveAwaiter) AwaitRunningChildren(ctx context.Context, sessionID str
 }
 
 func (a *ResolveAwaiter) ensureSynced(sessionID, workItemID, runID, awaitOut string) {
-	if a == nil || a.Manager == nil || runregistry.Global == nil {
+	if a == nil || a.Manager == nil {
 		return
 	}
-	entry, ok := runregistry.Global.Get(runID)
+	reg := a.Manager.Registry()
+	if reg == nil {
+		return
+	}
+	entry, ok := reg.Get(runID)
 	if !ok {
 		return
 	}
@@ -81,6 +86,7 @@ func (a *ResolveAwaiter) ensureSynced(sessionID, workItemID, runID, awaitOut str
 
 func runningChildrenWithRun(tm *TaskManager, sessionID, parentID string) []*WorkItem {
 	var out []*WorkItem
+	reg := tm.Registry()
 	for _, c := range tm.Tree().ListChildren(sessionID, parentID) {
 		if c == nil || (c.Kind == WorkKindChecklist && c.Ephemeral) {
 			continue
@@ -92,8 +98,8 @@ func runningChildrenWithRun(tm *TaskManager, sessionID, parentID string) []*Work
 			out = append(out, c)
 			continue
 		}
-		if runregistry.Global != nil {
-			if _, ok := runregistry.Global.GetByWorkItem(c.ID); ok {
+		if reg != nil {
+			if _, ok := reg.GetByWorkItem(c.ID); ok {
 				out = append(out, c)
 			}
 		}

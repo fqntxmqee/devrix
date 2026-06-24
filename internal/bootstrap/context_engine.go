@@ -15,6 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 
@@ -51,6 +52,10 @@ func NewContextEngine(
 	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
 	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
 	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
+	// DM-20260625-013 C4: bus 由 bootstrap 创建并 DI 到 TaskManager + drainer,
+	// 取代 process-wide notify.GlobalBus singleton.
+	bus := notify.NewInMemoryBus(64)
+	tm.SetBus(bus)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -102,7 +107,7 @@ func NewContextEngine(
 	// the engine's surface list (TOOL-SURFACE-1 SoT) and the per-tool
 	// dispatch goes through surface.Execute (W9). The schema + execution
 	// surface is no longer dependent on a package-level global singleton.
-	wireTaskNotifDrainer()
+	wireTaskNotifDrainer(bus)
 
 	diagCfg := ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)

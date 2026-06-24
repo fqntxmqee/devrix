@@ -142,8 +142,7 @@ func TestIntentQuantizer_QuantizeWithPrior_ZeroMean_NoChange(t *testing.T) {
 	q := NewIntentQuantizer(DefaultConfig())
 	// Manually constructed prior with Mean=0 (e.g. adversarial injection)
 	prior := &learn.AdaptivePrior{
-		PriorBeta:     learn.BetaPrior{Alpha: 0, Beta: 0},
-		InjectTargets: learn.DefaultInjectTargets,
+		PriorBeta: learn.BetaPrior{Alpha: 0, Beta: 0},
 	}
 	baseline, _ := q.Quantize(context.Background(), "hello")
 	withZero, err := q.QuantizeWithPrior(context.Background(), "hello", prior)

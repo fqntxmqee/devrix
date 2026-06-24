@@ -75,6 +75,7 @@ func WireDelegate(
 		subQuery,
 		hub,
 		gatewayLeaderResolver{gw: gw},
+		tm.Registry(),
 	)
 
 	delegatetools.SetDeps(delegatetools.Deps{

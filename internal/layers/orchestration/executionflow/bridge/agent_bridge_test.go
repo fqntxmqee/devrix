@@ -65,7 +65,7 @@ func (a *testAgent) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multi
 func (a *testAgent) Join(ctx context.Context, child multiagent.Agent) error { return nil }
 
 func TestNewAgentBridge(t *testing.T) {
-	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 	if b == nil {
 		t.Fatal("NewAgentBridge returned nil")
 	}
@@ -74,7 +74,7 @@ func TestNewAgentBridge(t *testing.T) {
 func TestAgentBridge_OnWorkerForked_wiresObserver(t *testing.T) {
 	rec := &recordingObserver{}
 	ag := &testAgent{id: "worker-1"}
-	b := bridge.NewAgentBridge(nil, "sess-1", "", "", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "", "", "task-1", "plan", nil)
 
 	b.OnWorkerForked(ag.ID(), "sess-1", ag)
 
@@ -89,7 +89,7 @@ func TestAgentBridge_OnWorkerForked_wiresObserver(t *testing.T) {
 
 func TestAgentBridge_OnWorkerCompleted_success(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 
 	b.OnWorkerCompleted("w-1", "sess-1", "all done", nil)
 
@@ -106,7 +106,7 @@ func TestAgentBridge_OnWorkerCompleted_success(t *testing.T) {
 
 func TestAgentBridge_OnWorkerCompleted_error(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 
 	b.OnWorkerCompleted("w-1", "sess-1", "", errors.New("boom"))
 
@@ -125,14 +125,14 @@ func TestAgentBridge_OnWorkerCompleted_nilBridge(t *testing.T) {
 }
 
 func TestAgentBridge_OnWorkerCompleted_nilHub(t *testing.T) {
-	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(nil, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 	// Should not panic
 	b.OnWorkerCompleted("w-1", "sess-1", "done", nil)
 }
 
 func TestAgentBridge_EmitAgentEvent(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "agent.started"})
 
@@ -146,7 +146,7 @@ func TestAgentBridge_EmitAgentEvent(t *testing.T) {
 
 func TestAgentBridge_EmitAgentEvent_permission(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "permission_required"})
 
@@ -166,7 +166,7 @@ func TestAgentBridge_EmitAgentEvent_nilBridge(t *testing.T) {
 
 func TestAgentBridge_EmitAgentEvent_unknownType(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 
 	b.EmitAgentEvent(multiagent.AgentEvent{EventType: "unknown.event"})
 
@@ -177,7 +177,7 @@ func TestAgentBridge_EmitAgentEvent_unknownType(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_toolCall(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 	sink := b.EngineEventSink()
 
 	sink(&contracts.EngineEvent{Type: "tool_call", ToolName: "read_file"})
@@ -192,7 +192,7 @@ func TestAgentBridge_EngineEventSink_toolCall(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_nonToolCall(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 	sink := b.EngineEventSink()
 
 	sink(&contracts.EngineEvent{Type: "text", Content: "hello"})
@@ -204,7 +204,7 @@ func TestAgentBridge_EngineEventSink_nonToolCall(t *testing.T) {
 
 func TestAgentBridge_EngineEventSink_nilEvent(t *testing.T) {
 	hub := &recordingHub{}
-	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan")
+	b := bridge.NewAgentBridge(hub, "sess-1", "flow-1", "w-1", "task-1", "plan", nil)
 	sink := b.EngineEventSink()
 
 	// Should not panic

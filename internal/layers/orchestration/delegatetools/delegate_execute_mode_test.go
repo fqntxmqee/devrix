@@ -72,6 +72,7 @@ func TestDelegateTool_Execute_PropagatesModeEnd2End(t *testing.T) {
 				cap,                                   // subQuery runner (captures mode)
 				hub,                                   // hub for FlowEvents
 				nil,                                   // leaderRes
+				nil,                                   // registry (unused in subquery path)
 			)
 			globalDeps = Deps{Dispatcher: disp, Tasks: nil}
 

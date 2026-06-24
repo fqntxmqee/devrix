@@ -11,8 +11,7 @@ import (
 
 func TestAwaitRunningChildren_BlocksUntilTerminal(t *testing.T) {
 	reg := runregistry.NewRegistry("")
-	runregistry.SetGlobal(reg)
-	tm := NewTaskManager()
+	tm := NewTaskManager().SetRegistry(reg)
 	goal, _ := tm.EnsureGoal("s1", "g")
 	parent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "p", Directive: "p"})
 	child, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: parent.ID, Kind: WorkKindExplore, Title: "c", Directive: "c"})
@@ -39,8 +38,7 @@ func TestAwaitRunningChildren_BlocksUntilTerminal(t *testing.T) {
 }
 
 func TestAwaitRunningChildren_NoRunningChildren(t *testing.T) {
-	runregistry.SetGlobal(runregistry.NewRegistry(""))
-	tm := NewTaskManager()
+	tm := NewTaskManager().SetRegistry(runregistry.NewRegistry(""))
 	_, _ = tm.EnsureGoal("s1", "g")
 	awaiter := &ResolveAwaiter{Manager: tm}
 	if got := awaiter.AwaitRunningChildren(context.Background(), "s1"); got != "" {
@@ -49,8 +47,7 @@ func TestAwaitRunningChildren_NoRunningChildren(t *testing.T) {
 }
 
 func TestRunningChildrenWithRun_SkipsPending(t *testing.T) {
-	runregistry.SetGlobal(runregistry.NewRegistry(""))
-	tm := NewTaskManager()
+	tm := NewTaskManager().SetRegistry(runregistry.NewRegistry(""))
 	goal, _ := tm.EnsureGoal("s1", "g")
 	parent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "p", Directive: "p"})
 	pending, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: parent.ID, Kind: WorkKindImplement, Title: "pending", Directive: "x"})

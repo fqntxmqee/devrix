@@ -97,7 +97,9 @@ func InitOrchestration(
 	// NewLocalWorkModel + NewSessionOrchestrator (via WithTaskManager).
 	// Replaces workmodel.GlobalTaskManager process-wide singleton.
 	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
-	runregistry.SetGlobal(runregistry.NewRegistry("~/.devrix/runs"))
+	// DM-20260625-013 C1: registry 由 bootstrap 创建并 DI 到 TaskManager,
+	// 取代 process-wide runregistry.Global singleton.
+	tm.SetRegistry(runregistry.NewRegistry("~/.devrix/runs"))
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	tools.SetTodoSync(todoBackend.Sync)
 

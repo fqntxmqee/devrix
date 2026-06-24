@@ -19,6 +19,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -144,6 +145,10 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// DM-20260617-008 W4: TaskManager constructed locally and passed to
 	// RegisterTaskTools. Replaces workmodel.GlobalTaskManager singleton.
 	tm := workmodel.NewTaskManagerFromConfig(b.ctxCfg.Tasks, b.obsBridge)
+	// DM-20260625-013 C4: bus 由 builder 创建并 DI 到 TaskManager + drainer,
+	// 取代 process-wide notify.GlobalBus singleton.
+	bus := notify.NewInMemoryBus(64)
+	tm.SetBus(bus)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(b.toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -203,7 +208,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// surface, not in a global var).
 	// DM-20260617-002 W12 (AC11) + S4-Gate H-3: G3 notify drainer 通过 prompt
 	// 注入点接入, 避免 prompt 包 import orchestration/workmodel/notify.
-	wireTaskNotifDrainer()
+	wireTaskNotifDrainer(bus)
 
 	// DM-20260617-002 W8 (AC6): G6 query_diagnostics tool — 通过 surface 注入。
 	// 同一 buildWithGate 中创建 tracker 实例 + 启动 tick goroutine。tracker 实例

@@ -8,8 +8,7 @@ import (
 
 func TestSpawnForWorkItem_SyncTerminal(t *testing.T) {
 	reg := runregistry.NewRegistry("")
-	runregistry.SetGlobal(reg)
-	tm := NewTaskManager()
+	tm := NewTaskManager().SetRegistry(reg)
 	goal, _ := tm.EnsureGoal("s1", "g")
 	item, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindExplore, Title: "x", Directive: "x"})
 	runID, _ := SpawnForWorkItem("s1", item.ID, "explore", tm)
