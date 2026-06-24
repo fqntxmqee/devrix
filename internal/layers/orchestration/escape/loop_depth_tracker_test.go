@@ -272,16 +272,18 @@ func TestLoopDepthTracker_PanicRecovery(t *testing.T) {
 
 	// 强制 internal panic: 在 shouldContinueLocked 内注入 panic
 	// 通过替换 nowFunc 在 CreatedAt 时刻 panic，验证 recover
-	originalNow := nowFunc
-	defer func() { nowFunc = originalNow }()
+	// (PR-B race fix: nowFuncPtr 是 atomic.Pointer, Store/Load 安全并发)
+	originalNow := *nowFuncPtr.Load()
+	defer func() { nowFuncPtr.Store(&originalNow) }()
 	panicCount := 0
-	nowFunc = func() (t time.Time) {
+	panickingNow := func() (t time.Time) {
 		panicCount++
 		if panicCount <= 2 { // 第 1, 2 次 panic
 			panic("simulated panic in nowFunc")
 		}
 		return originalNow()
 	}
+	nowFuncPtr.Store(&panickingNow)
 
 	d2 := tracker.ShouldContinue(ctx)
 	if d2.Action != EscapeContinue {
