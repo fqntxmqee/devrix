@@ -16,8 +16,8 @@ type PlanModeState string
 
 const (
 	PlanModeInactive PlanModeState = "inactive"
-	PlanModeActive  PlanModeState = "active"
-	PlanModePending PlanModeState = "pending_approval"
+	PlanModeActive   PlanModeState = "active"
+	PlanModePending  PlanModeState = "pending_approval"
 )
 
 // PlanMode represents the plan mode manager.
@@ -131,7 +131,7 @@ func (p *PlanMode) GetPlan() *PlanResult {
 }
 
 // Approve approves the plan and returns tasks.
-func (p *PlanMode) Approve() []*Task {
+func (p *PlanMode) Approve() []*WorkItem {
 	_, span := p.startSpan(context.Background(), telemetry.OpD2_S8_Task_PlanMode_Approve, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "plan_mode.task_count", Value: fmt.Sprintf("%d", len(p.planResult.Tasks))},
 	)
@@ -141,11 +141,11 @@ func (p *PlanMode) Approve() []*Task {
 		}
 		return nil
 	}
-	tasks := p.planResult.Tasks
+	items := p.planResult.Tasks
 	if span != nil {
 		span.End()
 	}
-	return tasks
+	return items
 }
 
 // Reject rejects the plan.
@@ -184,9 +184,9 @@ func (p *PlanMode) GetDisplayPlan() string {
 	b.WriteString(p.planResult.Exploration)
 	b.WriteString("\n\n## Tasks\n\n")
 
-	for i, task := range p.planResult.Tasks {
-		b.WriteString(fmt.Sprintf("### %d. %s\n\n", i+1, task.Subject))
-		b.WriteString(task.Description + "\n\n")
+	for i, item := range p.planResult.Tasks {
+		b.WriteString(fmt.Sprintf("### %d. %s\n\n", i+1, item.Title))
+		b.WriteString(item.Directive + "\n\n")
 	}
 
 	if len(p.planResult.CriticalFiles) > 0 {

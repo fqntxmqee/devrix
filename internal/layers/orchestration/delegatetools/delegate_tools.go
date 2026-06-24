@@ -12,10 +12,10 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -117,19 +117,19 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 	}
 
 	req := sessionorchestrator.DispatchRequest{
-		SessionID:    sessionID,
-		ParentSC:     sc,
-		Role:         string(r.role),
-		Directive:    directive,
+		SessionID: sessionID,
+		ParentSC:  sc,
+		Role:      string(r.role),
+		Directive: directive,
 		TaskID: func() string {
 			id, _ := resolveDelegateTaskID(sc.SessionID, fields["task_id"], directive, workmodel.ResolveFocusKind(string(r.role)))
 			return id
 		}(),
 		SandboxSlug: resolveSandboxSlug(fields),
-		Async:        fields["async"] == "true",
+		Async:       fields["async"] == "true",
 		// DM-20260620-001-B (AC6 + AC10) — read `mode` from tool input; empty
 		// defers to SubagentConfig.DefaultMode.
-		Mode:         parseSubAgentMode(fields["mode"]),
+		Mode: parseSubAgentMode(fields["mode"]),
 	}
 
 	runID, _ := workmodel.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
@@ -205,19 +205,23 @@ func resolveDelegateTaskID(sessionID, taskID, directive string, kind workmodel.W
 	if len(subject) > 120 {
 		subject = subject[:117] + "..."
 	}
-	goal, _ := tm.EnsureGoal(sessionID, subject)
+	goal, _ := tm.Tree().EnsureGoal(sessionID, subject)
 	parentID := ""
 	if goal != nil {
 		parentID = goal.ID
 	}
-	item, err := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{
+	item, err := tm.Tree().Create(sessionID, workmodel.CreateWorkItemInput{
 		ParentID:  parentID,
 		Kind:      kind,
 		Title:     subject,
 		Directive: directive,
 	})
 	if err != nil || item == nil {
-		fallback, ferr := tm.Create(sessionID, subject, directive)
+		fallback, ferr := tm.Tree().Create(sessionID, workmodel.CreateWorkItemInput{
+			Kind:      workmodel.WorkKindImplement,
+			Title:     subject,
+			Directive: directive,
+		})
 		if ferr != nil {
 			return "", fmt.Errorf("delegate: failed to create task (subject=%q): %w", subject, ferr)
 		}

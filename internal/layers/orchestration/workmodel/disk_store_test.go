@@ -14,7 +14,11 @@ func TestTaskManager_disk_persist_and_list_consistent(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.TasksConfig{Mode: "v2", StoreDir: dir}
 	m1 := workmodel.NewTaskManagerFromConfig(cfg, nil)
-	created, err := m1.Create("sess_disk", "Implement QueryLoop", "Wire loop into engine")
+	created, err := m1.Tree().Create("sess_disk", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "Implement QueryLoop",
+		Directive: "Wire loop into engine",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -23,12 +27,25 @@ func TestTaskManager_disk_persist_and_list_consistent(t *testing.T) {
 	}
 
 	m2 := workmodel.NewTaskManagerFromConfig(cfg, nil)
-	list := m2.List("sess_disk")
-	if len(list) != 1 {
-		t.Fatalf("expected 1 task from disk, got %d", len(list))
+	list := m2.Tree().List("sess_disk")
+	if len(list) == 0 {
+		t.Fatal("expected at least one item from disk")
 	}
-	if list[0].Subject != "Implement QueryLoop" {
-		t.Fatalf("unexpected subject: %s", list[0].Subject)
+	var found *workmodel.WorkItem
+	for _, item := range list {
+		if item == nil || item.Kind == workmodel.WorkKindGoal {
+			continue
+		}
+		if item.ID == created.ID {
+			found = item
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected created item in disk reload, got %d items", len(list))
+	}
+	if found.Title != "Implement QueryLoop" {
+		t.Fatalf("unexpected title: %s", found.Title)
 	}
 
 	storePath := filepath.Join(dir, "sess_disk.json")

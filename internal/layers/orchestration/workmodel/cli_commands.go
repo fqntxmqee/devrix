@@ -105,9 +105,6 @@ Examples:
 `
 }
 
-// help is the unexported alias retained for backward compatibility with
-// internal callers that may have used it. v1.1.0+ external code should
-// use Help() instead.
 func (c *CLICommands) help() string { return c.Help() }
 
 func (c *CLICommands) create(sessionID string, args []string) string {
@@ -121,25 +118,29 @@ func (c *CLICommands) create(sessionID string, args []string) string {
 		description = strings.Join(args[1:], " ")
 	}
 
-	task, err := c.manager.Create(sessionID, subject, description)
+	item, err := c.manager.Tree().Create(sessionID, CreateWorkItemInput{
+		Kind:      WorkKindImplement,
+		Title:     subject,
+		Directive: description,
+	})
 	if err != nil {
 		return fmt.Sprintf("✗ Task creation failed: %v", err)
 	}
 	return fmt.Sprintf("✓ Task created: %s\n  Subject: %s\n  Status: %s",
-		task.ID, task.Subject, task.Status)
+		item.ID, item.Title, item.Status)
 }
 
 func (c *CLICommands) list(sessionID string) string {
-	tasks := c.manager.List(sessionID)
-	if len(tasks) == 0 {
+	items := c.listWorkItems(sessionID)
+	if len(items) == 0 {
 		return "No tasks found. Use /task create to add tasks."
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Tasks (%d):\n", len(tasks)))
+	b.WriteString(fmt.Sprintf("Tasks (%d):\n", len(items)))
 	b.WriteString(strings.Repeat("-", 40) + "\n")
 
-	for _, t := range tasks {
+	for _, t := range items {
 		status := "○"
 		switch t.Status {
 		case TaskStatusInProgress:
@@ -149,9 +150,9 @@ func (c *CLICommands) list(sessionID string) string {
 		case TaskStatusFailed:
 			status = "✗"
 		}
-		b.WriteString(fmt.Sprintf("%s %s [%s]\n", status, t.ID, t.Subject))
+		b.WriteString(fmt.Sprintf("%s %s [%s]\n", status, t.ID, t.Title))
 		if t.Status == TaskStatusInProgress {
-			b.WriteString(fmt.Sprintf("  └─ %s\n", t.Description))
+			b.WriteString(fmt.Sprintf("  └─ %s\n", t.Directive))
 		}
 		if len(t.BlockedBy) > 0 {
 			b.WriteString(fmt.Sprintf("  └─ blocked by: %s\n", strings.Join(t.BlockedBy, ", ")))
@@ -160,33 +161,50 @@ func (c *CLICommands) list(sessionID string) string {
 	return b.String()
 }
 
+// listWorkItems returns the implement-class work items visible to the
+// /task list command (excludes session goal and ephemeral checklist rows).
+func (c *CLICommands) listWorkItems(sessionID string) []*WorkItem {
+	all := c.manager.Tree().List(sessionID)
+	out := make([]*WorkItem, 0, len(all))
+	for _, item := range all {
+		if item == nil || item.Kind == WorkKindGoal {
+			continue
+		}
+		if item.Kind == WorkKindChecklist && item.Ephemeral {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 func (c *CLICommands) get(sessionID string, args []string) string {
 	if len(args) < 1 {
 		return "Usage: /task get <task_id>"
 	}
 
 	taskID := args[0]
-	task, ok := c.manager.Get(sessionID, taskID)
+	item, ok := c.manager.Tree().Get(sessionID, taskID)
 	if !ok {
 		return fmt.Sprintf("Task not found: %s", taskID)
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Task: %s\n", task.ID))
-	b.WriteString(fmt.Sprintf("Subject: %s\n", task.Subject))
-	b.WriteString(fmt.Sprintf("Status: %s\n", task.Status))
-	b.WriteString(fmt.Sprintf("Description: %s\n", task.Description))
-	if task.Owner != "" {
-		b.WriteString(fmt.Sprintf("Owner: %s\n", task.Owner))
+	b.WriteString(fmt.Sprintf("Task: %s\n", item.ID))
+	b.WriteString(fmt.Sprintf("Subject: %s\n", item.Title))
+	b.WriteString(fmt.Sprintf("Status: %s\n", item.Status))
+	b.WriteString(fmt.Sprintf("Description: %s\n", item.Directive))
+	if item.Owner != "" {
+		b.WriteString(fmt.Sprintf("Owner: %s\n", item.Owner))
 	}
-	if len(task.BlockedBy) > 0 {
-		b.WriteString(fmt.Sprintf("Blocked by: %s\n", strings.Join(task.BlockedBy, ", ")))
+	if len(item.BlockedBy) > 0 {
+		b.WriteString(fmt.Sprintf("Blocked by: %s\n", strings.Join(item.BlockedBy, ", ")))
 	}
-	if len(task.Blocks) > 0 {
-		b.WriteString(fmt.Sprintf("Blocks: %s\n", strings.Join(task.Blocks, ", ")))
+	if len(item.Blocks) > 0 {
+		b.WriteString(fmt.Sprintf("Blocks: %s\n", strings.Join(item.Blocks, ", ")))
 	}
-	b.WriteString(fmt.Sprintf("Created: %s\n", task.CreatedAt.Format("2006-01-02 15:04")))
-	b.WriteString(fmt.Sprintf("Updated: %s\n", task.UpdatedAt.Format("2006-01-02 15:04")))
+	b.WriteString(fmt.Sprintf("Created: %s\n", item.CreatedAt.Format("2006-01-02 15:04")))
+	b.WriteString(fmt.Sprintf("Updated: %s\n", item.UpdatedAt.Format("2006-01-02 15:04")))
 	return b.String()
 }
 
@@ -200,7 +218,7 @@ func (c *CLICommands) update(sessionID string, args []string) string {
 
 	if len(args) > 1 {
 		status := TaskStatus(args[1])
-		err = c.manager.UpdateStatus(sessionID, taskID, status)
+		err = c.manager.Tree().UpdateStatus(sessionID, taskID, status)
 		if err != nil {
 			return fmt.Sprintf("Error: %v", err)
 		}
@@ -208,14 +226,17 @@ func (c *CLICommands) update(sessionID string, args []string) string {
 
 	if len(args) > 2 {
 		owner := args[2]
-		err = c.manager.SetOwner(sessionID, taskID, owner)
+		err = c.manager.Tree().SetOwner(sessionID, taskID, owner)
 		if err != nil {
 			return fmt.Sprintf("Error: %v", err)
 		}
 	}
 
-	task, _ := c.manager.Get(sessionID, taskID)
-	return fmt.Sprintf("✓ Task updated: %s (status: %s)", task.ID, task.Status)
+	item, _ := c.manager.Tree().Get(sessionID, taskID)
+	if item == nil {
+		return fmt.Sprintf("✓ Task updated: %s", taskID)
+	}
+	return fmt.Sprintf("✓ Task updated: %s (status: %s)", item.ID, item.Status)
 }
 
 func (c *CLICommands) delete(sessionID string, args []string) string {
@@ -224,7 +245,7 @@ func (c *CLICommands) delete(sessionID string, args []string) string {
 	}
 
 	taskID := args[0]
-	err := c.manager.RemoveTask(sessionID, taskID)
+	err := c.manager.Tree().Remove(sessionID, taskID)
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err)
 	}
@@ -232,16 +253,16 @@ func (c *CLICommands) delete(sessionID string, args []string) string {
 }
 
 func (c *CLICommands) ready(sessionID string) string {
-	tasks := c.manager.GetReadyTasks(sessionID)
-	if len(tasks) == 0 {
+	items := c.manager.Tree().GetReadyItems(sessionID)
+	if len(items) == 0 {
 		return "No ready tasks. All tasks are blocked or completed."
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Ready tasks (%d):\n", len(tasks)))
+	b.WriteString(fmt.Sprintf("Ready tasks (%d):\n", len(items)))
 	b.WriteString(strings.Repeat("-", 40) + "\n")
-	for _, t := range tasks {
-		b.WriteString(fmt.Sprintf("○ %s [%s]\n", t.ID, t.Subject))
+	for _, t := range items {
+		b.WriteString(fmt.Sprintf("○ %s [%s]\n", t.ID, t.Title))
 	}
 	return b.String()
 }
@@ -254,7 +275,7 @@ func (c *CLICommands) addDep(sessionID string, args []string) string {
 	taskID := args[0]
 	blockedByID := args[1]
 
-	err := c.manager.AddDependency(sessionID, taskID, blockedByID)
+	err := c.manager.Tree().AddDependency(sessionID, taskID, blockedByID)
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err)
 	}
@@ -393,27 +414,27 @@ func (c *PlanCLICommands) approve(sessionID string) string {
 		return "Plan mode is not active"
 	}
 
-	tasks := c.planMode.Approve()
-	if len(tasks) == 0 {
+	items := c.planMode.Approve()
+	if len(items) == 0 {
 		return "No tasks in the plan"
 	}
 
 	if c.manager != nil {
-		goal, _ := c.manager.EnsureGoal(sessionID, c.planMode.userGoal)
+		goal, _ := c.manager.Tree().EnsureGoal(sessionID, c.planMode.userGoal)
 		parentID := ""
 		if goal != nil {
 			parentID = goal.ID
 		}
 		_, _ = c.manager.Tree().PromoteChecklist(sessionID, parentID)
-		for _, task := range tasks {
-			if task == nil {
+		for _, item := range items {
+			if item == nil {
 				continue
 			}
-			_, _ = c.manager.CreateWorkItem(sessionID, CreateWorkItemInput{
+			_, _ = c.manager.Tree().Create(sessionID, CreateWorkItemInput{
 				ParentID:  parentID,
 				Kind:      WorkKindImplement,
-				Title:     task.Subject,
-				Directive: task.Description,
+				Title:     item.Title,
+				Directive: item.Directive,
 			})
 		}
 	}
@@ -422,8 +443,8 @@ func (c *PlanCLICommands) approve(sessionID string) string {
 
 	var b strings.Builder
 	b.WriteString("Plan approved. Creating tasks:\n\n")
-	for _, task := range tasks {
-		b.WriteString(fmt.Sprintf("✓ %s: %s\n", task.ID, task.Subject))
+	for _, item := range items {
+		b.WriteString(fmt.Sprintf("✓ %s: %s\n", item.ID, item.Title))
 	}
 	b.WriteString("\nTasks have been added to the task list.")
 

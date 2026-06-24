@@ -50,7 +50,11 @@ func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
 func TestHub_should_link_task_owner_on_started(t *testing.T) {
 	q := sessionqueue.NewSessionQueue()
 	tm := workmodel.NewTaskManager()
-	task, err := tm.Create("sess1", "explore auth", "")
+	task, err := tm.Tree().Create("sess1", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "explore auth",
+		Directive: "",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -69,7 +73,7 @@ func TestHub_should_link_task_owner_on_started(t *testing.T) {
 		Kind:      contracts.FlowStarted,
 	})
 
-	got, ok := tm.Get("sess1", task.ID)
+	got, ok := tm.Tree().Get("sess1", task.ID)
 	if !ok {
 		t.Fatal("task not found")
 	}
@@ -81,7 +85,11 @@ func TestHub_should_link_task_owner_on_started(t *testing.T) {
 // T: D4-S10-A02-T07
 func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	tm := workmodel.NewTaskManager()
-	task, err := tm.Create("sess1", "implement feature", "")
+	task, err := tm.Tree().Create("sess1", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "implement feature",
+		Directive: "",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -106,7 +114,7 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 		Kind:      contracts.FlowCompleted,
 	})
 
-	got, ok := tm.Get("sess1", task.ID)
+	got, ok := tm.Tree().Get("sess1", task.ID)
 	if !ok {
 		t.Fatal("task not found")
 	}
@@ -118,7 +126,11 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 // T: D4-S10-A02-T04 (WorkPlan includes task projection)
 func TestHub_snapshot_should_include_tasks(t *testing.T) {
 	tm := workmodel.NewTaskManager()
-	task, err := tm.Create("sess1", "auth audit", "")
+	task, err := tm.Tree().Create("sess1", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "auth audit",
+		Directive: "",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

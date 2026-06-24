@@ -12,40 +12,11 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
-	"github.com/google/uuid"
 )
 
-// Task represents a single task item in the D7 work model.
-// Legacy flat view; new code should use WorkItem via TaskManager.Tree().
-type Task struct {
-	ID          string     `json:"id"`
-	Subject     string     `json:"subject"`
-	Description string     `json:"description"`
-	Status      TaskStatus `json:"status"`
-	Owner       string     `json:"owner,omitempty"`
-	BlockedBy   []string   `json:"blocked_by,omitempty"`
-	Blocks      []string   `json:"blocks,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
-// NewTask creates a new task with generated ID.
-func NewTask(subject, description string) *Task {
-	now := time.Now()
-	return &Task{
-		ID:          "task_" + uuid.New().String()[:8],
-		Subject:     subject,
-		Description: description,
-		Status:      TaskStatusPending,
-		BlockedBy:   []string{},
-		Blocks:      []string{},
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
-}
-
-// TaskManager manages task lists for sessions in D7-S1.
-// Internally delegates to WorkTree; Task methods remain for backward compatibility.
+// TaskManager is the canonical D7 work-item manager. It owns a WorkTree
+// (the unified hierarchical model) and provides narrow side effects
+// (notification bus, run registry, metrics) wired at construction.
 type TaskManager struct {
 	tree      *WorkTree
 	obsBridge *observability.Bridge
@@ -129,15 +100,6 @@ func (m *TaskManager) SetObservability(obs *observability.Bridge) {
 	m.obsBridge = obs
 }
 
-// SetStore wires optional disk persistence (legacy TaskStore adapter).
-func (m *TaskManager) SetStore(store TaskStore) {
-	if store == nil {
-		m.tree.SetStore(nil)
-		return
-	}
-	m.tree.SetStore(&taskStoreAdapter{store: store})
-}
-
 func (m *TaskManager) startSpan(operation string) (context.Context, tracer.Span) {
 	if m.obsBridge == nil || !m.obsBridge.IsEnabled() {
 		return nil, nil
@@ -156,71 +118,21 @@ func (m *TaskManager) EnsureGoal(sessionID, directive string) (*WorkItem, error)
 	return m.tree.EnsureGoal(sessionID, directive)
 }
 
-// Create creates a new implement work item under session goal.
-//
-// DM-20260620-003 (PR-C H3): returns (*Task, error) instead of silently
-// swallowing tree.Create errors. Callers must handle the error; v1.x
-// callers that ignore it via `task := m.Create(...)` should be updated
-// to `task, err := m.Create(...)` and decide whether to log/return.
-func (m *TaskManager) Create(sessionID, subject, description string) (*Task, error) {
-	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
-	if span != nil {
-		defer span.End()
-	}
-
-	goal, goalErr := m.tree.EnsureGoal(sessionID, subject)
-	parentID := ""
-	if goal != nil {
-		parentID = goal.ID
-	}
-
-	item, err := m.tree.Create(sessionID, CreateWorkItemInput{
-		ParentID:  parentID,
-		Kind:      WorkKindImplement,
-		Title:     subject,
-		Directive: description,
-	})
+// CreateWorkItem creates a work item with full control.
+func (m *TaskManager) CreateWorkItem(sessionID string, in CreateWorkItemInput) (*WorkItem, error) {
+	item, err := m.tree.Create(sessionID, in)
 	if err != nil {
-		if span != nil {
-			span.SetAttributes(
-				tracer.Attribute{Key: "task.create.error", Value: err.Error()},
-				tracer.Attribute{Key: "task.ensure_goal.error", Value: goalErrString(goalErr)},
-			)
-		}
-		if goalErr != nil {
-			return nil, fmt.Errorf("taskmanager: ensure goal (session=%s): %w; create work item: %w", sessionID, goalErr, err)
-		}
-		return nil, fmt.Errorf("taskmanager: create work item (session=%s, subject=%q): %w", sessionID, subject, err)
+		return nil, err
 	}
-
+	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
 	if span != nil {
 		span.SetAttributes(
 			tracer.Attribute{Key: "task.id", Value: item.ID},
-			tracer.Attribute{Key: "task.subject", Value: truncateSubject(subject, 200)},
+			tracer.Attribute{Key: "task.subject", Value: truncateSubject(in.Title, 200)},
 		)
+		span.End()
 	}
-	return item.ToTask(), nil
-}
-
-func goalErrString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
-
-// CreateWorkItem creates a work item with full control.
-func (m *TaskManager) CreateWorkItem(sessionID string, in CreateWorkItemInput) (*WorkItem, error) {
-	return m.tree.Create(sessionID, in)
-}
-
-// Get retrieves a task by ID.
-func (m *TaskManager) Get(sessionID, taskID string) (*Task, bool) {
-	item, ok := m.tree.Get(sessionID, taskID)
-	if !ok {
-		return nil, false
-	}
-	return item.ToTask(), true
+	return item, nil
 }
 
 // GetWorkItem retrieves a work item by ID.
@@ -228,41 +140,25 @@ func (m *TaskManager) GetWorkItem(sessionID, itemID string) (*WorkItem, bool) {
 	return m.tree.Get(sessionID, itemID)
 }
 
-// List returns legacy task view items (excludes session goal and ephemeral checklist).
-func (m *TaskManager) List(sessionID string) []*Task {
-	items := m.tree.List(sessionID)
-	out := make([]*Task, 0, len(items))
-	for _, item := range items {
-		if item == nil || item.Kind == WorkKindGoal {
-			continue
-		}
-		if item.Kind == WorkKindChecklist && item.Ephemeral {
-			continue
-		}
-		out = append(out, item.ToTask())
-	}
-	return out
-}
-
-// UpdateStatus updates task status.
-func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) error {
+// UpdateStatus updates a work-item status and, on terminal transitions,
+// publishes a completion event to the notification bus.
+func (m *TaskManager) UpdateStatus(sessionID, itemID string, status TaskStatus) error {
 	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Update)
 	if span != nil {
 		defer span.End()
 	}
 
-	item, ok := m.tree.Get(sessionID, taskID)
+	item, ok := m.tree.Get(sessionID, itemID)
 	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
+		return fmt.Errorf("task not found: %s", itemID)
 	}
 
-	if err := m.tree.UpdateStatus(sessionID, taskID, status); err != nil {
+	if err := m.tree.UpdateStatus(sessionID, itemID, status); err != nil {
 		return err
 	}
 
 	if status == TaskStatusCompleted || status == TaskStatusFailed {
-		task := item.ToTask()
-		go m.publishCompletion(sessionID, taskID, task.Subject, status)
+		go m.publishCompletion(sessionID, itemID, item.Title, status)
 	}
 	return nil
 }
@@ -295,31 +191,6 @@ func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, statu
 		Error:   errStr,
 		Time:    time.Now(),
 	})
-}
-
-// SetOwner assigns owner to task.
-func (m *TaskManager) SetOwner(sessionID, taskID, owner string) error {
-	return m.tree.SetOwner(sessionID, taskID, owner)
-}
-
-// AddDependency adds a blocked-by dependency.
-func (m *TaskManager) AddDependency(sessionID, taskID, blockedByID string) error {
-	return m.tree.AddDependency(sessionID, taskID, blockedByID)
-}
-
-// RemoveTask removes a task.
-func (m *TaskManager) RemoveTask(sessionID, taskID string) error {
-	return m.tree.Remove(sessionID, taskID)
-}
-
-// GetReadyTasks returns tasks that are not blocked.
-func (m *TaskManager) GetReadyTasks(sessionID string) []*Task {
-	return TasksFromWorkItems(m.tree.GetReadyItems(sessionID))
-}
-
-// ClearSession removes all tasks for session.
-func (m *TaskManager) ClearSession(sessionID string) {
-	m.tree.ClearSession(sessionID)
 }
 
 // FormatTaskSummary returns a formatted summary string.

@@ -7,51 +7,58 @@ import (
 
 func TestTaskManager_Create(t *testing.T) {
 	m := NewTaskManager()
-	task, err := m.Create("session1", "Fix bug", "Fix authentication bug")
+	item, err := m.Tree().Create("session1", CreateWorkItemInput{
+		Kind:      WorkKindImplement,
+		Title:     "Fix bug",
+		Directive: "Fix authentication bug",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if task == nil {
-		t.Fatal("expected non-nil task")
+	if item == nil {
+		t.Fatal("expected non-nil item")
 	}
-	if task.ID == "" {
-		t.Error("expected task ID")
+	if item.ID == "" {
+		t.Error("expected item ID")
 	}
-	if task.Subject != "Fix bug" {
-		t.Errorf("expected subject 'Fix bug', got %s", task.Subject)
+	if item.Title != "Fix bug" {
+		t.Errorf("expected title 'Fix bug', got %s", item.Title)
 	}
-	if task.Status != TaskStatusPending {
-		t.Errorf("expected status pending, got %s", task.Status)
+	if item.Status != TaskStatusPending {
+		t.Errorf("expected status pending, got %s", item.Status)
 	}
 }
 
 func TestTaskManager_List(t *testing.T) {
 	m := NewTaskManager()
-	if _, err := m.Create("session1", "Task 1", "Desc 1"); err != nil {
+	if _, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task 1"}); err != nil {
 		t.Fatalf("Create #1: %v", err)
 	}
-	if _, err := m.Create("session1", "Task 2", "Desc 2"); err != nil {
+	if _, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task 2"}); err != nil {
 		t.Fatalf("Create #2: %v", err)
 	}
 
-	tasks := m.List("session1")
-	if len(tasks) != 2 {
-		t.Errorf("expected 2 tasks, got %d", len(tasks))
+	items := m.Tree().List("session1")
+	if len(items) != 2 {
+		t.Errorf("expected 2 items, got %d", len(items))
 	}
 }
 
 func TestTaskManager_UpdateStatus(t *testing.T) {
 	m := NewTaskManager()
-	task, err := m.Create("session1", "Task", "Desc")
+	item, err := m.Tree().Create("session1", CreateWorkItemInput{
+		Kind:  WorkKindImplement,
+		Title: "Task",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if err := m.UpdateStatus("session1", task.ID, TaskStatusInProgress); err != nil {
+	if err := m.UpdateStatus("session1", item.ID, TaskStatusInProgress); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	updated, _ := m.Get("session1", task.ID)
+	updated, _ := m.Tree().Get("session1", item.ID)
 	if updated.Status != TaskStatusInProgress {
 		t.Errorf("expected in_progress, got %s", updated.Status)
 	}
@@ -59,46 +66,45 @@ func TestTaskManager_UpdateStatus(t *testing.T) {
 
 func TestTaskManager_Dependency(t *testing.T) {
 	m := NewTaskManager()
-	task1, err := m.Create("session1", "Task 1", "First task")
+	item1, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task 1"})
 	if err != nil {
 		t.Fatalf("Create #1: %v", err)
 	}
-	task2, err := m.Create("session1", "Task 2", "Second task")
+	item2, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task 2"})
 	if err != nil {
 		t.Fatalf("Create #2: %v", err)
 	}
 
-	if err := m.AddDependency("session1", task2.ID, task1.ID); err != nil {
+	if err := m.Tree().AddDependency("session1", item2.ID, item1.ID); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// Get ready tasks - task1 should be ready, task2 should not
-	ready := m.GetReadyTasks("session1")
+	ready := m.Tree().GetReadyItems("session1")
 	found := false
-	for _, readyTask := range ready {
-		if readyTask.ID == task1.ID {
+	for _, readyItem := range ready {
+		if readyItem.ID == item1.ID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("task1 should be ready")
+		t.Error("item1 should be ready")
 	}
 }
 
 func TestTaskManager_ClearSession(t *testing.T) {
 	m := NewTaskManager()
-	if _, err := m.Create("session1", "Task", "Desc"); err != nil {
+	if _, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task"}); err != nil {
 		t.Fatalf("Create #1: %v", err)
 	}
-	if _, err := m.Create("session1", "Task 2", "Desc 2"); err != nil {
+	if _, err := m.Tree().Create("session1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task 2"}); err != nil {
 		t.Fatalf("Create #2: %v", err)
 	}
 
-	m.ClearSession("session1")
-	tasks := m.List("session1")
-	if len(tasks) != 0 {
-		t.Errorf("expected 0 tasks after clear, got %d", len(tasks))
+	m.Tree().ClearSession("session1")
+	items := m.Tree().List("session1")
+	if len(items) != 0 {
+		t.Errorf("expected 0 items after clear, got %d", len(items))
 	}
 }
 
@@ -149,22 +155,22 @@ func TestIsLegalTransition(t *testing.T) {
 
 func TestTaskManager_UpdateStatus_IllegalTransition(t *testing.T) {
 	m := NewTaskManager()
-	task, err := m.Create("s1", "Task", "Desc")
+	item, err := m.Tree().Create("s1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "Task"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
 	// pending → in_progress (legal)
-	if err := m.UpdateStatus("s1", task.ID, TaskStatusInProgress); err != nil {
+	if err := m.UpdateStatus("s1", item.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("legal transition failed: %v", err)
 	}
 	// in_progress → completed (legal)
-	if err := m.UpdateStatus("s1", task.ID, TaskStatusCompleted); err != nil {
+	if err := m.UpdateStatus("s1", item.ID, TaskStatusCompleted); err != nil {
 		t.Fatalf("legal transition failed: %v", err)
 	}
 
 	// completed → pending (illegal)
-	err = m.UpdateStatus("s1", task.ID, TaskStatusPending)
+	err = m.UpdateStatus("s1", item.ID, TaskStatusPending)
 	if err == nil {
 		t.Fatal("expected error for completed→pending, got nil")
 	}
@@ -173,7 +179,7 @@ func TestTaskManager_UpdateStatus_IllegalTransition(t *testing.T) {
 	}
 
 	// Verify status unchanged
-	updated, _ := m.Get("s1", task.ID)
+	updated, _ := m.Tree().Get("s1", item.ID)
 	if updated.Status != TaskStatusCompleted {
 		t.Errorf("status should be unchanged (completed), got %s", updated.Status)
 	}
@@ -193,12 +199,15 @@ func TestTaskManager_UpdateStatus_LegalTransitions(t *testing.T) {
 	for _, p := range paths {
 		t.Run(p.name, func(t *testing.T) {
 			m := NewTaskManager()
-			task, err := m.Create("s1", "Task", p.name)
+			item, err := m.Tree().Create("s1", CreateWorkItemInput{
+				Kind:  WorkKindImplement,
+				Title: p.name,
+			})
 			if err != nil {
 				t.Fatalf("Create: %v", err)
 			}
 			for _, target := range p.path {
-				if err := m.UpdateStatus("s1", task.ID, target); err != nil {
+				if err := m.UpdateStatus("s1", item.ID, target); err != nil {
 					t.Fatalf("legal transition to %s failed: %v", target, err)
 				}
 			}

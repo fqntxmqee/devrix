@@ -39,7 +39,7 @@ func (s *DiskWorkItemStore) path(sessionID string) string {
 	return filepath.Join(s.dir, sessionID+".json")
 }
 
-// Load reads work items; migrates v1 tasks; tolerates empty/corrupt files.
+// Load reads work items; tolerates empty/corrupt files.
 func (s *DiskWorkItemStore) Load(sessionID string) ([]*WorkItem, error) {
 	if s == nil || sessionID == "" {
 		return nil, nil
@@ -67,13 +67,7 @@ func (s *DiskWorkItemStore) Load(sessionID string) ([]*WorkItem, error) {
 		return nil, fmt.Errorf("work item store: unsupported schema version %d", file.SchemaVersion)
 	}
 
-	if len(file.Items) > 0 {
-		return file.Items, nil
-	}
-	if len(file.Tasks) > 0 {
-		return WorkItemsFromTasks(file.Tasks), nil
-	}
-	return nil, nil
+	return file.Items, nil
 }
 
 // Save writes work items atomically (tmp + rename).
@@ -105,23 +99,6 @@ type sessionWorkFile struct {
 	SessionID     string      `json:"session_id"`
 	SchemaVersion int         `json:"schema_version,omitempty"`
 	Items         []*WorkItem `json:"items,omitempty"`
-	Tasks         []*Task     `json:"tasks,omitempty"`
-}
-
-type taskStoreAdapter struct {
-	store TaskStore
-}
-
-func (a *taskStoreAdapter) Load(sessionID string) ([]*WorkItem, error) {
-	tasks, err := a.store.Load(sessionID)
-	if err != nil {
-		return nil, err
-	}
-	return WorkItemsFromTasks(tasks), nil
-}
-
-func (a *taskStoreAdapter) Save(sessionID string, items []*WorkItem) error {
-	return a.store.Save(sessionID, TasksFromWorkItems(items))
 }
 
 // FindByItemID scans all session files in the store directory.
@@ -149,4 +126,12 @@ func (s *DiskWorkItemStore) FindByItemID(itemID string) (*WorkItem, string, bool
 		}
 	}
 	return nil, "", false
+}
+
+func expandStorePath(path string) string {
+	if len(path) > 0 && path[0] == '~' {
+		home, _ := os.UserHomeDir()
+		path = filepath.Join(home, path[1:])
+	}
+	return os.ExpandEnv(path)
 }

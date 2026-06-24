@@ -10,9 +10,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/workplan"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
-	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/workplan"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -24,11 +24,11 @@ type IMSink interface {
 
 // Hub implements contracts.ExecutionFlowHub with dual-channel dispatch.
 type Hub struct {
-	cfg      config.ExecutionFlowConfig
-	q        *sessionqueue.SessionQueue
-	workPlan *workplan.Service
-	tasks    *workmodel.TaskManager
-	im       IMSink
+	cfg       config.ExecutionFlowConfig
+	q         *sessionqueue.SessionQueue
+	workPlan  *workplan.Service
+	tasks     *workmodel.TaskManager
+	im        IMSink
 	obsBridge *observability.Bridge
 
 	mu           sync.Mutex
@@ -150,14 +150,15 @@ func (h *Hub) linkTask(ev contracts.FlowEvent) {
 		return
 	}
 	sessionID := ev.SessionID
+	tree := h.tasks.Tree()
 	switch ev.Kind {
 	case contracts.FlowStarted:
-		_ = h.tasks.SetOwner(sessionID, ev.TaskID, ev.WorkerID)
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusInProgress)
+		_ = tree.SetOwner(sessionID, ev.TaskID, ev.WorkerID)
+		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusInProgress)
 	case contracts.FlowCompleted, contracts.FlowJoined:
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusCompleted)
+		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusCompleted)
 	case contracts.FlowFailed:
-		_ = h.tasks.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusFailed)
+		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusFailed)
 	}
 }
 
@@ -175,7 +176,7 @@ func (h *Hub) taskSnapshots(sessionID string) []contracts.TaskSnapshot {
 	if h == nil || h.tasks == nil || sessionID == "" {
 		return nil
 	}
-	list := h.tasks.List(sessionID)
+	list := h.tasks.Tree().List(sessionID)
 	if len(list) == 0 {
 		return nil
 	}
@@ -186,7 +187,7 @@ func (h *Hub) taskSnapshots(sessionID string) []contracts.TaskSnapshot {
 		}
 		out = append(out, contracts.TaskSnapshot{
 			ID:      t.ID,
-			Subject: t.Subject,
+			Subject: t.Title,
 			Status:  string(t.Status),
 			Owner:   t.Owner,
 		})

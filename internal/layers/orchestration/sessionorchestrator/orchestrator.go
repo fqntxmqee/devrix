@@ -273,7 +273,7 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 	}
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
 }
-//
+
 // Routing (v1.1.0+ orthogonal dispatch, see
 // devrix-d7-orthogonal-intent-paths):
 //   - skip        → return empty channel (inlined, no executor)
@@ -375,7 +375,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	}
 
 	if o.taskManager != nil && req.SessionID != "" && strings.TrimSpace(req.Message) != "" && intent.Kind != orchtypes.IntentSkip {
-		_, _ = o.taskManager.EnsureGoal(req.SessionID, req.Message)
+		_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, req.Message)
 	}
 
 	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but
