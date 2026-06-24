@@ -156,7 +156,7 @@ func (f *fakeAdvisoryValidator) ValidateOrchestration(_ context.Context, _ Orche
 // stores on the field.
 func TestWithWorkModel_StoresModel(t *testing.T) {
 	exec := &fakeD2{}
-	wm := NewDelegatedWorkModel()
+	wm := NewLocalWorkModel(nil)
 	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithWorkModel(wm))
 	if orch.workModel == nil {
 		t.Fatalf("WithWorkModel should store the WorkModel")
@@ -315,61 +315,6 @@ func TestDurationOrDefault(t *testing.T) {
 	}
 	if durationOrDefault(-1) != 50*time.Millisecond {
 		t.Fatalf("negative should fall back to default")
-	}
-}
-
-// T: DelegatedWorkModel methods return errors when not wired.
-func TestDelegatedWorkModel_NotWired(t *testing.T) {
-	wm := NewDelegatedWorkModel().(*DelegatedWorkModel)
-	ctx := context.Background()
-	if _, err := wm.CreateTask(ctx, orchtypes.TaskSpec{Subject: "s", Goal: "g"}); err == nil {
-		t.Fatalf("CreateTask without wiring should error")
-	}
-	if err := wm.UpdateStatus(ctx, "t1", orchtypes.TaskStatusCompleted); err == nil {
-		t.Fatalf("UpdateStatus without wiring should error")
-	}
-	// QueryWorkPlan returns an empty snapshot rather than an error in v1.0.
-	snap, err := wm.QueryWorkPlan(ctx, "sess-q")
-	if err != nil {
-		t.Fatalf("QueryWorkPlan should not error in v1.0: %v", err)
-	}
-	if snap.SessionID != "sess-q" {
-		t.Fatalf("QueryWorkPlan session = %q, want sess-q", snap.SessionID)
-	}
-}
-
-// T: DelegatedWorkModel wired delegates forward correctly.
-func TestDelegatedWorkModel_Wired(t *testing.T) {
-	wm := NewDelegatedWorkModel().(*DelegatedWorkModel)
-	wm.SetCreateTask(func(_ context.Context, subject, goal string) (string, error) {
-		if subject != "s" || goal != "g" {
-			return "", errors.New("mismatch")
-		}
-		return "t-1", nil
-	})
-	wm.SetUpdateStatus(func(_ context.Context, id string, st orchtypes.TaskStatus) error {
-		if id != "t-1" || st != orchtypes.TaskStatusCompleted {
-			return errors.New("mismatch")
-		}
-		return nil
-	})
-	wm.SetQueryPlan(func(_ context.Context, sid string) (WorkPlanSnapshot, error) {
-		return WorkPlanSnapshot{SessionID: sid, Tasks: []orchtypes.TaskSpec{{ID: "t-1"}}}, nil
-	})
-	ctx := context.Background()
-	id, err := wm.CreateTask(ctx, orchtypes.TaskSpec{Subject: "s", Goal: "g"})
-	if err != nil || id != "t-1" {
-		t.Fatalf("CreateTask: id=%q err=%v", id, err)
-	}
-	if err := wm.UpdateStatus(ctx, "t-1", orchtypes.TaskStatusCompleted); err != nil {
-		t.Fatalf("UpdateStatus: %v", err)
-	}
-	snap, err := wm.QueryWorkPlan(ctx, "sess")
-	if err != nil {
-		t.Fatalf("QueryWorkPlan: %v", err)
-	}
-	if len(snap.Tasks) != 1 || snap.Tasks[0].ID != "t-1" {
-		t.Fatalf("snap.Tasks = %+v", snap.Tasks)
 	}
 }
 

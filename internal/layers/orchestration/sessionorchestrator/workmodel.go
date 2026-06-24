@@ -71,7 +71,7 @@ type BackgroundLite struct {
 }
 
 // LocalWorkModel is the v1.1 implementation: it uses the coordinator's
-// TaskManager directly. This replaces DelegatedWorkModel which delegated to D2.
+// TaskManager directly.
 type LocalWorkModel struct {
 	tasks   *workmodel.TaskManager
 	flowHub interface {
@@ -199,61 +199,4 @@ func (m *LocalWorkModel) CreateWorkPlan(ctx context.Context, sessionID, goal str
 	}
 
 	return plan, nil
-}
-
-// DelegatedWorkModel is the v1.0 implementation: it forwards to D2
-// TaskManager. The wire-up happens in bootstrap (D7-D1 Contract).
-// Deprecated: v1.1 uses LocalWorkModel instead.
-type DelegatedWorkModel struct {
-	createTask func(ctx context.Context, subject, goal string) (string, error)
-	updateStat func(ctx context.Context, taskID string, status orchtypes.TaskStatus) error
-	queryPlan  func(ctx context.Context, sessionID string) (WorkPlanSnapshot, error)
-}
-
-// NewDelegatedWorkModel returns a WorkModel that calls into D2 TaskManager
-// (v1.0 not migrated; the bridge is wired in bootstrap).
-// Deprecated: Use NewLocalWorkModel for v1.1.
-func NewDelegatedWorkModel() WorkModel {
-	return &DelegatedWorkModel{}
-}
-
-// CreateTask is a no-op stub in v1.0 — bootstrap wires the delegate. This
-// signature is kept so the interface is stable for the v1.1 storage
-// migration.
-func (d *DelegatedWorkModel) CreateTask(ctx context.Context, spec orchtypes.TaskSpec) (string, error) {
-	if d.createTask == nil {
-		return "", fmt.Errorf("orchestrator: DelegatedWorkModel.CreateTask not wired (bootstrap missing)")
-	}
-	return d.createTask(ctx, spec.Subject, spec.Goal)
-}
-
-// UpdateStatus is a no-op stub in v1.0.
-func (d *DelegatedWorkModel) UpdateStatus(ctx context.Context, taskID string, status orchtypes.TaskStatus) error {
-	if d.updateStat == nil {
-		return fmt.Errorf("orchestrator: DelegatedWorkModel.UpdateStatus not wired (bootstrap missing)")
-	}
-	return d.updateStat(ctx, taskID, status)
-}
-
-// QueryWorkPlan returns an empty snapshot in v1.0 if not wired.
-func (d *DelegatedWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (WorkPlanSnapshot, error) {
-	if d.queryPlan == nil {
-		return WorkPlanSnapshot{SessionID: sessionID}, nil
-	}
-	return d.queryPlan(ctx, sessionID)
-}
-
-// SetCreateTask wires the TaskManager delegate. Called from bootstrap.
-func (d *DelegatedWorkModel) SetCreateTask(f func(ctx context.Context, subject, goal string) (string, error)) {
-	d.createTask = f
-}
-
-// SetUpdateStatus wires the TaskManager status-update delegate.
-func (d *DelegatedWorkModel) SetUpdateStatus(f func(ctx context.Context, taskID string, status orchtypes.TaskStatus) error) {
-	d.updateStat = f
-}
-
-// SetQueryPlan wires the unified read-model delegate.
-func (d *DelegatedWorkModel) SetQueryPlan(f func(ctx context.Context, sessionID string) (WorkPlanSnapshot, error)) {
-	d.queryPlan = f
 }
