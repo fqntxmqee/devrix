@@ -6,6 +6,7 @@
 **Sprint:** mups-v5
 **Estimated Effort:** 6.5 天
 **PR Count:** 5
+**Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S7_Archived (2026-06-25, T12 PARTIAL 留待 PR-V5.6)
 **SoT:** `brain/.../core-concepts/38-mature-uncertainty-methodology.md §21` (400 行 v5 完整设计)
 
 ---

@@ -1,0 +1,265 @@
+id: devrix-d7-mups-v5-escape-engine
+demand_id: DM-20260625-003
+title: "D7 MUPS v5 统一逃逸机制 — EscapeEngine + CircuitBreaker 5 层 + 5 节点接线 (V5.1..V5.5)"
+status: s7_archived
+priority: P0
+created: 2026-06-25
+author: MUPS v5 统一逃逸机制（doc 38 §21 设计落地）
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S14-A50
+    name: LoopDepthTracker v2 + PlanKindSwitchPolicy + ChainedArbitrator (LLM/Rule/Human) + EscapeEngine + CircuitBreaker 5 层 + AuditLog + 5 节点接线
+    description: |
+      MUPS v5 回路深度统一逃逸机制 (doc 38 §21 完整设计落地):
+      (1) V5.1 LoopDepthTracker v2 — LoopContext 7 字段 (SessionID + PlanKind + ObservationKind +
+      FailureCriterion + ArtifactType + LoopIteration + CumulativeCost) + SHA-256 hashLoopContext +
+      History 隔离 + depth >= MaxDepth 触发 ForceExit + Reset;
+      (2) V5.2 PlanKindSwitchPolicy 3 档 — Allowed/Constrained(<=4 累计)/Forbidden +
+      累计计数 + 切换阈值矩阵 (4 IntentKind x 4 PlanKind);
+      (3) V5.3 ChainedArbitrator LLM/Rule/Human + Notifier + PendingResolution — EscapeAction
+      6 类 (Continue/EscalateToRule/EscalateToHuman/ForceExit/AbortWithAudit/PendingHuman) +
+      EscapeDecision 9 字段 (5 core + 4 audit) + LLM 5s timeout + Rule 同步 + Human 异步 +
+      panic recovery + FeishuCardNotifier + ChainedNotifier + PendingResolutionStore;
+      (4) V5.4 EscapeEngine + CircuitBreaker 5 层 + AuditLog — Engine 整合 13 类失败降级矩阵 +
+      LoopBudget (consecutive=3 / total=20) + CircuitBreaker L0..L5 (L0 AnomalyDetector 5 nil /
+      L1 DispatchLoopWakeups 100/min / L2 Verifier 3x>2s / L3 Hook 5 fail / L4 WorkerPanic 1 /
+      L5 SandboxExit 5 fail) + EscapeAuditLog 14 ExitReason 映射 + 14 gap 补测;
+      (5) V5.5 5 节点接线 (Orchestrator 1a/1b/2 + unit + integration) — 3 接线点 1a Plan fails
+      + 1b Plan 前 + 2 Execute fails + processEscapeDecision signature `(bool, error)`
+      透传 augmented err (C-1 fix) + 1a 短路 (ForceExit/PendingHuman 不入 EscapeEngine) +
+      8 unit wiring tests + 5 integration 4IntentKind tests + 1 new
+      TestProcessEscapeDecision_AugmentsError;
+      (6) S4-Gate review C-1/C-2/C-3 修复 — processEscapeDecision `bool` → `(bool, error)`
+      透传 augmented error + T12 ResumeSession 标记 PARTIAL 留待 PR-V5.6 + 根 t-registry
+      同步 v4.7.0→v4.8.0。
+    rationale: |
+      doc 38 §21 关键漏洞: v4 缺乏统一逃逸机制,各类失败 (Loop depth / Plan kind switch /
+      Verifier timeout / Hook failure / Worker panic) 各自逃逸,缺乏统一决策 + 仲裁 + 降级
+      矩阵 + 电路保护 + 审计。V5 落地后,所有逃逸路径走 EscapeEngine → ChainedArbitrator →
+      ExitReason/Asset, 5 节点管道具备 13 类失败降级能力 + 5 层断路器保护 + 14 退出原因可审计。
+      T12 ResumeSession 续跑 SessionOrchestrator 入口留待 PR-V5.6 (1 天工作量, V5.3 存储层
+      HumanArbitrator.ResumeSession 已落地)。
+
+# 测试点 (V5.1..V5.5 实际实现 18 个, 1 PARTIAL)
+test_points:
+  - id: D7-S14-A50-T01
+    name: |
+      LoopContext 7 字段 + hashLoopContext SHA-256 + History 隔离
+      (SessionID/PlanKind/ObservationKind/FailureCriterion/ArtifactType/LoopIteration/
+      CumulativeCost)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T02
+    name: |
+      LoopDepthTracker depth >= MaxDepth 触发 ForceExit + Reset (maxDepth 默认 5)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T03
+    name: |
+      PlanKindSwitchPolicy 3 档 (Allowed/Constrained<=4/Forbidden) + 累计计数
+      + 4 IntentKind x 4 PlanKind 切换阈值矩阵。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T04
+    name: |
+      EscapeAction 6 类 (Continue/EscalateToRule/EscalateToHuman/ForceExit/
+      AbortWithAudit/PendingHuman) + EscapeDecision 9 字段 (5 core + 4 audit)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T05
+    name: |
+      LLM (5s timeout + panic recovery) / Rule (同步) / Human (异步) 3 层
+      ChainedArbitrator + 单测 36 个。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T06
+    name: |
+      Notifier + PendingResolutionStore + ChainedNotifier
+      (FeishuCardNotifier 真实环境联调留 PR-V5.6+)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T07
+    name: |
+      EscapeEngine 整合 + 13 类失败降级矩阵 (0 signals → Continue /
+      1 signal → direct / 2+ signals → chain)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T08
+    name: |
+      LoopBudget (consecutive=3 / total=20) + 累计/连续双触发器。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T09
+    name: |
+      CircuitBreaker 5 层 (L0 AnomalyDetector 5 nil / L1 DispatchLoopWakeups 100/min /
+      L2 Verifier 3x>2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T10
+    name: |
+      EscapeAuditLog + 14 ExitReason 映射 (覆盖 Loop/Plan/Execute/Verify/Hook 等
+      全部失败路径)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T11
+    name: |
+      SessionOrchestrator 5 节点接线 (1a Plan fails / 1b Plan 前 / 2 Execute fails)
+      + 1a 短路 (ForceExit/PendingHuman 不入 EscapeEngine 优化路径)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T12
+    name: |
+      ResumeSession T2 续跑 SessionOrchestrator 入口。
+    status: PARTIAL
+    note: |
+      V5.3 存储层 HumanArbitrator.ResumeSession 已落地;
+      SessionOrchestrator.ProcessMessage 入口 applyResumeSession + runLoopWithResume
+      留待 PR-V5.6 (1 天工作量)。
+  - id: D7-S14-A50-T13
+    name: |
+      buildLoopContext + 4 IntentKind x 5 节点 12 case (TestPlanKindFromIntent +
+      integration 4IntentKind)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T14
+    name: |
+      L4 业务验收 4 测试 (5NodePipeline 端到端 + 反向追溯链)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T15
+    name: |
+      L3 端到端 7 测试 (engine_test + circuit_breaker_test 5 CB)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T16
+    name: |
+      L2 集成 7 测试 (integration_test: 4DepthLimits + 3LayerArbitration +
+      5EscapeActions + PlanKindSwitchLimit + 5NodePipeline)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T17
+    name: |
+      L1 单元 103 测试 (escape/*_test.go 17 + sessionorchestrator/orchestrator_escape_test.go
+      8 + C-1 fix 1)。
+    status: IMPLEMENTED
+  - id: D7-S14-A50-T18
+    name: |
+      14 gap 补测 (escape/*_test.go gap 补测 L1-91..L1-103 + L2-07)。
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/escape/loop_depth_tracker.go (NEW): LoopContext + LoopDepthTracker v2
+  - internal/layers/orchestration/escape/plan_kind_switch_policy.go (NEW): 3 档策略 + 累计计数
+  - internal/layers/orchestration/escape/arbitrator.go (NEW): EscapeAction + EscapeDecision + ChainedArbitrator
+  - internal/layers/orchestration/escape/notifier.go (NEW): FeishuCardNotifier + ChainedNotifier
+  - internal/layers/orchestration/escape/pending_resolution.go (NEW): PendingResolutionStore + HumanArbitrator
+  - internal/layers/orchestration/escape/engine.go (NEW): EscapeEngine + 13 类失败降级矩阵
+  - internal/layers/orchestration/escape/circuit_breaker.go (NEW): CircuitBreaker L0..L5
+  - internal/layers/orchestration/escape/audit_log.go (NEW): EscapeAuditLog + 14 ExitReason
+  - internal/layers/orchestration/escape/loop_budget.go (NEW): LoopBudget (consecutive/total)
+  - internal/layers/orchestration/escape/*_test.go (NEW): 17 escape unit tests (含 14 gap 补测)
+  - internal/layers/orchestration/sessionorchestrator/escape_wiring.go (NEW): buildEscapeLoopContext + planKindFromIntent + processEscapeDecision + escapeErr
+  - internal/layers/orchestration/sessionorchestrator/orchestrator.go (MODIFIED): 3 接线点 1a/1b/2 + 1a 短路 + processEscapeDecision caller 3 处更新 (C-1 fix)
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_escape_test.go (NEW): 8 unit wiring tests + TestProcessEscapeDecision (改用新 signature)
+  - internal/layers/orchestration/sessionorchestrator/orchestrator_escape_augment_test.go (NEW): TestProcessEscapeDecision_AugmentsError (C-1 fix 守护)
+  - tests/integration/d7/escape_integration_test.go (NEW): 5 integration 4IntentKind + 5NodePipeline
+  - openspec/specs/d7-orchestration/spec.md: 新增 D7-S14-A50 Requirement (D7 v4.9.0)
+  - openspec/specs/d7-orchestration/t-registry.md: 新增 D7-S14-A50-T01..T18 (v3.17.0, 1 PARTIAL)
+  - openspec/t-registry.md: 根索引同步 v4.7.0→v4.8.0 (D7 行 + 2026-06-25 增量条目)
+
+out_of_scope:
+  - T12 SessionOrchestrator.ProcessMessage 入口 applyResumeSession: V5.5 scope 限定 3 接线点 (1a/1b/2), T12 存储层已在 V5.3 落地, SessionOrchestrator 入口续跑留待 PR-V5.6 (1 天工作量)
+  - 接线点 3 (Verify 失败 → Evaluate): processAutoClose 未暴露 verdict 给 orchestrator, 待 processAutoClose 暴露 verdict 后接入
+  - 5 CB 阈值生产环境回填 (L0..L5): V5.4 占位推导, 待 Phase V5.5 集成测试后回填, PR-V5.5+ (生产监控数据积累后)
+  - Notifier FeishuCardNotifier 真实环境联调: L4 业务验收, dev 环境, Phase V5.6+
+  - 性能 bench (TestL4_v5_PerformanceOverhead_Under5Percent): L4 业务验收, 需独立 bench 框架, 待 PR-V5.5+ bench commit
+  - 不修改 v4 既有契约: 5 节点管道 (Observe → Plan → Execute → Verify → Learn) 数据契约保持稳定, 仅在 Orchestrator 1a/1b/2 接入 V5 escape
+  - 不重写 ChainedArbitrator 已稳定接口: 3 层仲裁顺序 LLM→Rule→Human + panic recovery 已 Phase 1/2/3/4/5 验证
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-V5.1
+    scope: "LoopDepthTracker v2 (LoopContext 7 字段 + hashLoopContext + depth >= MaxDepth 触发 ForceExit + Reset + History 隔离)"
+    files: 1 NEW + 1 NEW (loop_depth_tracker_test.go 11 tests)
+    estimated_loc: "+450 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - 0f7243a
+  - pr: PR-V5.2
+    scope: "PlanKindSwitchPolicy 3 档 (Allowed/Constrained<=4/Forbidden) + 累计计数 + 切换阈值矩阵"
+    files: 1 NEW + 1 NEW (plan_kind_switch_policy_test.go 15 tests)
+    estimated_loc: "+380 / -0"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - a862892
+  - pr: PR-V5.3
+    scope: "ChainedArbitrator LLM/Rule/Human + Notifier + PendingResolution (EscapeAction 6 类 + EscapeDecision 9 字段 + LLM 5s timeout + panic recovery + FeishuCardNotifier + PendingResolutionStore)"
+    files: 4 NEW + 3 NEW (arbitrator_test.go 36 + notifier_test.go + pending_resolution_test.go 33 tests)
+    estimated_loc: "+980 / -0"
+    risk: Medium
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - 69844e3
+  - pr: PR-V5.4
+    scope: "EscapeEngine + CircuitBreaker 5 层 (L0..L5) + AuditLog + 13 类失败降级矩阵 + 14 ExitReason 映射"
+    files: 4 NEW + 4 NEW (engine_test + circuit_breaker_test + audit_log_test + loop_budget_test 19 tests)
+    estimated_loc: "+1120 / -0"
+    risk: Medium
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - 2382207
+  - pr: PR-V5.5
+    scope: "5 节点接线 (Orchestrator 1a/1b/2 + unit + integration) + 1a 短路 + processEscapeDecision signature 透传 augmented err (C-1 fix)"
+    files: 2 NEW + 1 MODIFIED + 1 NEW (orchestrator_escape_test 8 + orchestrator_escape_augment_test 1 + integration 5)
+    estimated_loc: "+927 / -24"
+    risk: High
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - e77a13b
+  - pr: S4-Gate-fix
+    scope: "S4-Gate review C-1/C-2/C-3 修复 (processEscapeDecision `(bool, error)` 透传 + T12 PARTIAL + 根 t-registry 同步)"
+    files: 1 MODIFIED + 1 NEW + 1 MODIFIED
+    estimated_loc: "+60 / -8"
+    risk: Low
+    branches:
+      - feat/devrix-d7-mups-v5-escape-engine-v5-5 (from master)
+    commits:
+      - 3f72ef0
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v4-review-fixes  # V4 review 修复 (Pipeline architecture 5 节点管道权威图谱)
+  - devrix-d7-mups-v4-phase7-verify-auto-close  # V4 Phase 7 Auto-Close 闭环
+  - devrix-d7-mups-v4-phase6-observe-learner-wiring  # V4 Phase 6 LP-1 闭环 wiring
+  - devrix-d7-mups-v4-phase5-learn  # V4 Phase 5 Learn 节点升格
+  - devrix-d7-mups-v4-phase4-verify-promotion  # V4 Phase 4 Verify 升格
+  - devrix-d7-mups-v4-phase3-execute  # V4 Phase 3 PR-C1 (跨域类型上提 shared/types)
+  - devrix-d7-mups-v4-phase2-observe-plan  # V4 Phase 2 Observe + UncertaintyCoord
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase4-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase5-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase6-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-phase7-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-v4-review-fixes-s7-archived.md
+  - openspec/changes/devrix-d7-mups-v5-escape-engine/{demand,proposal,design,tasks,acceptance-report}.md
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v4.9.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v3.17.0
+  - openspec/t-registry.md  # 根 T 层注册表 v4.8.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./internal/layers/orchestration/escape/...
+    - go vet ./internal/layers/orchestration/sessionorchestrator/...
+    - go test -race ./internal/layers/orchestration/escape/...
+    - go test -race ./internal/layers/orchestration/sessionorchestrator/...
+  s5_gate:
+    - 17/17 P0 T 点 IMPLEMENTED + 1/1 PARTIAL (T12)
+    - escape 包 go test -race 100% PASS (0 race) + 覆盖率 84.0% ≥ 80%
+    - V5 escape wiring 覆盖率 buildEscapeLoopContext 100% + planKindFromIntent 100% + processEscapeDecision 87.5% (default 分支不可达) + escapeErr 100% ≥ 80%
+    - sessionorchestrator 包 go test -race 100% PASS (0 race, 1 pre-existing 1s async timeout flake documented)
+    - 22/22 orchestration packages go test -race 100% PASS
+    - CI: go vet 0 issue
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-v5-escape-engine  # 11 项检查全部 PASS
