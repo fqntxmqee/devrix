@@ -3,7 +3,7 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.8.0
+**Version:** 4.9.0
 **Status:** Canonical — source of truth
 **Last Updated:** 2026-06-25
 **Domain SoT:** `d7-domain.md`
@@ -1712,6 +1712,77 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **DM-020 LLMCaller 拆面** | **D7 → D2** | `contracts.LLMCaller` ← `turn.QueryLLMCaller` | **IMPLEMENTED** |
 | **DM-020 Summarizer 拆面** | **D7 → D2** | `contracts.Summarizer` ← `turn.CompressionSummarizer` | **IMPLEMENTED** |
 | **DM-20260617-008 Tool 端到端链路** | **D7 → D2** | `turn_adapter.ExecuteRound` (派发闸口) | **IMPLEMENTED** — 完整链路 SoT 在 `openspec/specs/d2-context-engine/spec.md` §"Tool Call End-to-End Flow" (Chain A/B/C + 5 surface 派发表 + 跨域拓扑) |
+| **DM-20260625-003 MUPS v5 EscapeEngine 5 节点接线** | **D7 内部** | `escape.EscapeEngine` (5 wiring points 1a/1b/2/3 + 5 CB layers) | **IMPLEMENTED** — 5 节点统一逃逸机制, Plan/Execute 失败短路, Verify 失败跟进 (后续 PR 接入) |
+
+---
+
+## MUPS v5 EscapeEngine (DM-20260625-003, PR-V5.1 ~ V5.5)
+
+### 5 节点统一逃逸机制
+
+MUPS v5 在 5 节点管道 (Observe → Plan → Execute → Verify → Learn) 上落地统一逃逸机制, 通过 4 类深度限制 + 6 类 EscapeAction + 5 层 CircuitBreaker 实现回路深度不可被 LLM 操纵的硬保证.
+
+#### 4 类深度限制 (V5.1-V5.2)
+
+| 类型 | 实现 | 触发 | 文档 |
+|------|------|------|------|
+| 回路深度 | `LoopDepthTracker v2` (mode-hash SHA-256) | depth=3 → ForceExit | doc 38 §21.2 |
+| PlanKind 切换累计 | `PlanKindSwitchPolicy` (3 档: Allowed/Constrained ≤ 4/Forbidden) | 累计超限 → ForceExit | doc 38 §21.4.2 |
+| 仲裁深度 | `ChainedArbitrator` (LLM 5s → Rule → Human 10s) | 链式 3 层降级 | doc 38 §21.3.4 |
+| CircuitBreaker 5 层 | `CircuitBreakerSet` (L0-L5) | 阈值触发 → open | doc 38 §21.13 |
+
+#### 6 类 EscapeAction
+
+| Action | 语义 | 触发 |
+|--------|------|------|
+| `EscapeContinue` | 继续回路 (正常路径) | 0 信号 / chain 裁决通过 |
+| `EscalateToRule` | LLM 升级到 Rule | LLM 决定需要规则检查 |
+| `EscalateToHuman` | 升级到 Human | 不可恢复失败需要人类介入 |
+| `EscapeForceExit` | 强制退出 | 硬信号 / chain 兜底 |
+| `EscapeAbortWithAudit` | 终止 + 完整审计 | 不可恢复错误 |
+| `EscapePendingHuman` | Human 异步入口 | T2 ResumeSession 续跑 |
+
+#### 5 层 CircuitBreaker (V5.4)
+
+| 层 | 名称 | 阈值 | 触发场景 |
+|----|------|------|---------|
+| L0 | AnomalyDetector | 5 次连续 nil | 异常检测失效 |
+| L1 | DispatchLoopWakeups | 100 次/分钟 | 派发回路失控 |
+| L2 | Verifier | 3 次 > 2s | LLM 调用延迟降级 |
+| L3 | Hook | 5 次连续 fail | Hook 失败 |
+| L4 | WorkerPanic | 1 次 panic | Worker 严重错误 |
+| L5 | SandboxExit | 5 次连续 fail | 沙箱失败 |
+
+#### 5 节点接线点 (V5.5)
+
+`SessionOrchestrator` 通过 `WithEscapeEngine` option 接入 EscapeEngine, 4 个接线点:
+
+| # | 触发点 | EscapeEngine.Evaluate 行为 | 失败降级 |
+|---|--------|---------------------------|---------|
+| 1a | Plan 失败 (classifier error) | 1 信号 → 直接 ForceExit | err 透传 |
+| 1b | Plan 前 (before dispatch) | 1 信号 → 直接返回 | 短路 return |
+| 2 | Execute 失败 (path error) | 1 信号 → 直接 ForceExit | err 透传 |
+| 3 | Verify 失败 (verdict FAIL/INDET) | 1 信号 → 直接 ForceExit | err 透传 (待 processAutoClose 暴露 verdict) |
+
+Engine 决策合并逻辑 (V5.4):
+- 0 非 Continue 信号 → EscapeContinue (正常回路)
+- 1 信号 → 直接返回 (硬信号优先级, 跳过 LLM)
+- 2+ 信号 → ChainedArbitrator 仲裁 (多源冲突, LLM 介入)
+
+#### 关键设计不变式 (V5.x)
+
+1. **失败降级**: 任何内部 panic/error → slog.Warn + 继续 (不阻塞主链路)
+2. **200ms 评估超时**: CircuitBreaker 拉 metric 阻塞 → slog.Warn + 不触发
+3. **panic recovery**: Evaluate 内部 panic → EscapeContinue (不向上传)
+4. **T2 续跑入口**: HumanArbitrator.ResumeSession 由 EscapeEngine.ResumeSession 委托
+5. **向后兼容**: `WithEscapeEngine(nil)` → V5.4- 行为 (不评估, 不破坏现有)
+
+#### 与 Phase 1-7 数据契约兼容
+
+- 14 ExitReason (Phase 4): v5 决策不影响 ExitReason 字段
+- 4 VerdictKind (Phase 4): v5 不修改 verdict 合成
+- ProcessRequest.TrackMode (Phase 7): v5 不影响 TrackMode 处理
+- buildObserveRequest 3 层 fail-safe (Phase 6): v5 不修改 AdaptivePrior 注入
 
 ---
 
@@ -1747,6 +1818,7 @@ When `routing_mode=rule_orchestrate`, DM-20260615-004 ingress behavior is preser
 | **4.6.0** | **2026-06-24** | **devrix-d7-mups-v4-phase6-observe-learner-wiring (DM-20260624-001) Phase 6 Observe-Learner 跨域闭环集成**：(1) ADDED Requirement D7-S12-A41 (ObserveRequest + IntentQuantizer + AnomalyDetector + ClassifyWithPrior): ObserveRequest struct 3 字段 (SessionID/Message/Prior) + NewObserveRequest fail-fast + EffectivePrior 兜底 DefaultDeveloperPrior + Validate + IntentQuantizer 4 IntentClass (Fact/Command/Orchestrate/Skip) + IntentPayload + Quantize baseline + QuantizeWithPrior (prior.PriorBeta.Mean() 作为 confidence 乘数, clamp [0,100]) + AnomalyDetector + Anomaly + AnomalyReport + HistoricalDetector.Detect baseline + HistoricalDetector.DetectWithPrior (threshold = 0.5 × Mean, Mean 越高阈值越高 = 更信任用户 = 更易放过) + RuleClassifier.ClassifyWithPrior + IntentClassifier 接口扩展 ClassifyWithPrior + ShadowClassifier.ClassifyWithPrior 委托给 rule + AdaptivePrior.BetaPrior.Mean() 方法；(2) ADDED Requirement D7-S12-A42 (SessionOrchestrator.buildObserveRequest + WithLearner + 3 层 fail-safe): SessionOrchestrator 新增 `learner learn.Learner` 字段 + `WithLearner(l learn.Learner) OrchestratorOption` + `buildObserveRequest(ctx, req)` 方法调用 Learner.Inject 拿 AdaptivePrior + 3 层 fail-safe (nil learner / Inject error / 正常 → 全部 DefaultDeveloperPrior Beta(5,3) 兜底) + ProcessMessage 在 classifySpan 之前调用 buildObserveRequest + ClassifyWithPrior 替换 Classify + sessionSpan.SetAttributes("learn.prior.alpha" + "learn.prior.beta") 记录 prior 到 D5 span；(3) ADDED Requirement D7-S12-A43 (LP-1 闭环 E2E 集成测试): 4 E2E 测试 (TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior / TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution / TestE2E_LP1_ClosedLoop_PendingAssetScheduledMemory / TestE2E_5NodePipeline_End2End) + in-memory mocks (InMemoryReputationStore + 3 Memory 通道 + recordingExecutor + recordingClassifier) + LP-1 闭环 (Learn × 3 Pass → Alpha=3 → Round 2 观察 Beta(8,3)) + G8-1 修复闭环 (parse_failure 不污染 α/β) + LP-2 隔离 (PendingAsset 仅在 ScheduledMemory) + LP-5 反向追溯；(4) 6 个新 P0 T 点 D7-S12-A41-T01/T02/T03 + A42-T04/T05 + A43-T06 IMPLEMENTED；(5) t-registry v3.13.0→v3.14.0 (T 168→174, P0 135→141)；(6) Scenarios 表新增 D7-S12 行（Observe-Learner 跨域闭环集成）；(7) Archived Changes 新增 DM-20260624-001 引用；(8) 闭环 Phase 5 PR-E5 T13 PARTIAL（Observe 跨域 wiring 全部完成） |
 | **4.7.0** | **2026-06-24** | **devrix-d7-mups-v4-phase7-verify-auto-close (DM-20260625-001) Phase 7 运行时 5 节点闭环**：(1) ADDED Requirement D7-S13-A47 (SessionOrchestrator.processAutoClose — Verify→Learn 运行时闭环): processAutoClose 包装 channel + 异步触发 learner.Learn + 替换 endSpanWhenChannelClosed 调用 + synthesizeVerdict 4 规则 (complete→VerdictPass / error→VerdictFail Reason=Content / tombstone→VerdictIndeterminate IndeterminateReason="interrupt" / 其他 Type→nil) + SourceID `autoclose:{sessionID}:{nanosecond}` + 3 层 fail-safe (nil learner / Learn error / channel cancel → 全部 log + skip 不阻塞 caller) + IntentSkip 路径不调用 processAutoClose + AssetBuilder Auto-Close fallback (sop:autoclose:<SourceID> + ["autoclose-completion"] 合成步骤) 保证 LP-1 闭环在生产 wiring 真实可走通；(2) ADDED Requirement D7-S13-A48 (ProcessRequest.TrackMode — Operator 角色支持 + buildObserveRequest 透传): ProcessRequest 新增 TrackMode string 字段 + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast 校验 + 3 sentinel error (ErrProcessRequestSessionIDEmpty / MessageEmpty / InvalidTrackMode) + DefaultLearner.Inject 3-tier 解析策略 (Reputation 持久状态 > req.TrackMode hint > Developer 兜底 + slog.Warn 未知值) + buildObserveRequest 透传 TrackMode → Operator track → DefaultOperatorPrior Beta(8,1) Mean=0.889；(3) ADDED Requirement D7-S13-A49 (sessionSpan 6 prior attributes — D5 可观测化增强): priorSessionSpanAttrs 纯 helper 函数 + sessionSpan 6 attributes (learn.prior.alpha / beta / mean / track_mode / classifier_source / injected_at) + injected_at "phase6_lp1" (真实注入) vs "cold_start_failsafe" (兜底) + learn.classifier_source mirror (rule/shadow) + 30+ 单测/集成测试 100% PASS；(4) 6 个新 P0 T 点 D7-S13-A47-T01/T02/T03 + A48-T04/T05 + A49-T06 IMPLEMENTED；(5) t-registry v3.14.0→v3.15.0 (T 174→180, P0 141→147)；(6) Scenarios 表新增 D7-S13 行（运行时 5 节点闭环 Verify→Learn Auto-Close + Operator TrackMode + D5 可观测化增强）；(7) Archived Changes 表新增 DM-20260625-001 引用；(8) 闭环 Phase 6 PR-F3 E2E 测试中手工模拟的 Verify→Learn 步骤, 生产 wiring 真实可走通 LP-1 闭环 |
 | **4.8.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine (DM-20260625-003) MUPS v5 统一逃逸机制**：(1) PLANNED Requirement D7-S14 (5 PR 拆分 PR-V5.1..V5.5): LoopDepthTracker v2 + PlanKindSwitchPolicy + EscapeAction 6 类 + ChainedArbitrator + EscapeEngine + CircuitBreaker 5 层 + AuditLog + 5 节点 EscapeEngine 接线点 + T2 ResumeSession 续跑 + 13 类失败降级矩阵；(2) Scenarios 表新增 D7-S14 行（MUPS v5 统一逃逸机制 PLANNED）；(3) Archived Changes 表新增 DM-20260625-003 引用；(4) t-registry v3.15.0→v3.16.0（PLANNED 18 P0 T 点：LoopDepthTracker 7 + PlanKindSwitchPolicy 4 + ChainedArbitrator 4 + EscapeEngine 2 + AuditLog 1）；(5) review-r3.md 6 ISSUE 已修复（ISSUE-1 MaxDepth 边界 / ISSUE-2 ChainedArbitrator 骨架 / ISSUE-3 applyResumeDecision 骨架 / ISSUE-4 Notifier 清理 / ISSUE-5 Observe 失败 Continue / ISSUE-6 L2-07 表驱动）；(6) 121 个测试用例设计（L4 4 + L3 7 + L2 7 + L1 103），覆盖率 85%→97% |
+| **4.9.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine IMPLEMENTED (DM-20260625-003, PR-V5.1..V5.5 全部落地)**：(1) IMPLEMENTED 5 个 PR 全部 squash merge: V5.1 LoopDepthTracker v2 (commit 0f7243a, 15 T) + V5.2 PlanKindSwitchPolicy (a862892, 18 T) + V5.3 ChainedArbitrator LLM/Rule/Human 3 层 + Notifier + PendingResolution (69844e3, 33 T) + V5.4 EscapeEngine + CircuitBreaker 5 层 (2382207, 19 T) + V5.5 5 节点接线 (Orchestrator 1a/1b/2 + unit + integration 8 T)；(2) Engine 决策合并逻辑: 0 信号 → Continue / 1 信号 → 直接返回 (硬信号优先级) / 2+ 信号 → ChainedArbitrator 仲裁；(3) ADDED Section "MUPS v5 EscapeEngine" 详细 5 节点 + 4 类深度限制 + 6 类 EscapeAction + 5 层 CircuitBreaker + 5 节点接线点；(4) SessionOrchestrator 新增 WithEscapeEngine option + escapeEngine 字段 + 4 接线点（1a Plan 失败 / 1b Plan 前 / 2 Execute 失败 / 3 Verify 失败 — 接线点 3 待 processAutoClose 暴露 verdict 后落地）；(5) integration_test.go 5 个集成测试 (4DepthLimits + 3LayerArbitration + 5EscapeActions + PlanKindSwitchLimit + 5NodePipeline_End2End) 100% PASS；(6) 22/22 orchestration 包 go test -race 100% PASS（pre-existing TestAutoClose_FullLP1Loop 1s timeout 不影响 V5.5）；(7) t-registry v3.16.0→v3.17.0；(8) Scenarios 表 D7-S14 行从 PLANNED → IMPLEMENTED 状态刷新 |
 
 ---
 
