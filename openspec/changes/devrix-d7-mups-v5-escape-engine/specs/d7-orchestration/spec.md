@@ -49,7 +49,7 @@
 - **ScenarioPlan** 允许切换：并行多假设是合法的
 - **CommitmentPlan** 禁止切换：一旦承诺就要执行到底
 
-### 2.3 EscapeAction 5 类（按严重程度递增）
+### 2.3 EscapeAction 6 类（5 类正式 + 1 个 dev 扩展中间态）
 
 ```
 EscapeContinue     → 继续回路
@@ -57,7 +57,16 @@ EscalateToRule     → 升级到规则强制
 EscalateToHuman    → 升级到人工接管
 EscapeForceExit    → 强制退出（带 ExitReason）
 EscapeAbortWithAudit → 强制终止 + 完整审计（最严重）
+EscapePendingHuman → 中间态：等待用户响应（v5 dev 扩展，决策携带 PendingID）
 ```
+
+**EscapePendingHuman 中间态**（dev 特有）：
+- 由 `HumanArbitrator` 异步通知飞书卡片 + 10s timeout 兜底
+- `EscapeDecision.PendingID` 字段填充 pending decision ID
+- `ProcessMessage` 同步返回 nil（不阻塞），session 状态持久化
+- 下次 `ProcessMessage` 入口检查 `ResumeSession` 命中 → 续跑（详见 design.md §6）
+
+**6 类原因**：devrix `HumanArbitrator` 不能同步等待 10s user 响应（破坏飞书卡片体验），必须异步注册 + 立即返回中间态。这是 v5 dev 相对 doc 38 §21.3.3 原版 5 类的扩展。
 
 ### 2.4 3 层仲裁（LLM/Rule/Human）
 

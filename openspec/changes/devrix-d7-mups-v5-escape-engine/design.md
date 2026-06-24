@@ -61,7 +61,8 @@ type LoopContext struct {
     PlanKindSwitchCount int              // 累计切换次数
 }
 
-// EscapeAction 5 类兜底动作（按严重程度递增）
+// EscapeAction 6 类动作（5 类正式 + 1 个 dev 扩展中间态）
+// 详见 §5.3.1 — 6 类原因：devrix HumanArbitrator 异步化新增 EscapePendingHuman 中间态
 type EscapeAction int
 
 const (
@@ -70,6 +71,7 @@ const (
     EscalateToHuman                          // 升级到人工接管
     EscapeForceExit                          // 强制退出（带 ExitReason）
     EscapeAbortWithAudit                     // 强制终止 + 完整审计（最严重）
+    EscapePendingHuman                       // 中间态：等待用户响应（v5 dev 扩展）
 )
 
 // EscapeDecision 逃逸决策
@@ -265,6 +267,21 @@ func (a *HumanArbitrator) SubmitUserChoice(pendingID string, choice UserChoice) 
     }
 }
 
+// ResumeSession：T2 续跑入口
+// 由 EscapeEngine.ResumeSession 委托调用，ProcessMessage 开头检查
+// 返回 (decision, found)：
+//   found=true  → 上次 ProcessMessage 升级到 Human 已持久化，续跑
+//   found=false → 走完整 5 节点流程
+func (a *HumanArbitrator) ResumeSession(sessionID string) (EscapeDecision, bool) {
+    decision, found, err := a.resume.Load(sessionID)
+    if err != nil || !found {
+        return EscapeDecision{}, false
+    }
+    // 消费后立即删除（防重复续跑）
+    _ = a.resume.Delete(sessionID)
+    return decision, true
+}
+
 func mapToEscapeDecision(value string, loopCtx LoopContext) EscapeDecision {
     switch value {
     case "A":
@@ -361,10 +378,12 @@ type InMemoryPendingResolutionStore struct {
        └─ EscapeForceExit + AuditLevel=2 + 写 session 状态
 
 [T2] user 下次 ProcessMessage 进入
-  └─ resume.Load(sessionID) → 命中
-       ├─ user_choice=A → 继续回路（重跑 Plan → Execute → Verify）
-       ├─ user_choice=B → ForceExit（已 ForceExit，无新动作）
-       └─ user_choice=C → AbortWithAudit（已终止）
+  └─ EscapeEngine.ResumeSession(sessionID) → 委托给 HumanArbitrator.ResumeSession
+       ├─ resume.Load(sessionID) → 未命中 → 走完整 5 节点流程
+       └─ resume.Load(sessionID) → 命中（消费后 Delete，防重复续跑）
+            ├─ user_choice=A → 继续回路（重跑 Plan → Execute → Verify，depth 续 T1.5 状态 +1）
+            ├─ user_choice=B → ForceExit（已 ForceExit，无新动作）
+            └─ user_choice=C → AbortWithAudit（已终止）
 ```
 
 ### 5.3.3 4 类边界场景兜底
@@ -380,48 +399,117 @@ type InMemoryPendingResolutionStore struct {
 
 ## 6. 5 节点接线
 
-每个 Plan→Execute→Verify→[Compensation] 路径前调用 `EscapeEngine.Evaluate(ctx)`：
+**5 个接线点**（Observe 失败 + Plan 失败 + Plan 前 + Execute 失败 + Verify 失败），每个调用 `EscapeEngine.Evaluate(ctx)`：
 
 ```go
 // 5 节点伪代码（具体见 PR-V5.5）
 func (o *Orchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) error {
-    observe := o.observe(ctx, req)
-    
+    // T2 续跑检查：上次 ProcessMessage 升级到 Human 且 session 状态已持久化
+    if decision, ok := o.escapeEngine.ResumeSession(req.SessionID); ok {
+        return o.applyResumeDecision(ctx, decision)
+    }
+
+    // ─── 节点 1: Observe ───
+    observe, err := o.observe(ctx, req)
+    if err != nil {
+        // ★ 接线点 0: Observe 失败
+        loopCtx := buildLoopContextFromObserve(req.SessionID, observe)
+        decision := o.escapeEngine.Evaluate(loopCtx)
+        if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+            return derr
+        }
+        // Observe 失败但未到上限，observe 仍可用，继续回路
+    }
+
     for {
+        // ─── 节点 2: Plan ───
         plan, err := o.plan(ctx, observe)
         if err != nil {
-            return err
+            // ★ 接线点 1a: Plan 失败
+            loopCtx := buildLoopContext(ctx, nil, observe)
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            return o.processEscapeDecision(decision, err)
         }
-        
-        // ★ EscapeEngine 接线点 1: Plan 前
+
+        // ★ 接线点 1b: Plan 前
         loopCtx := buildLoopContext(ctx, plan, observe)
         decision := o.escapeEngine.Evaluate(loopCtx)
-        if decision.Action == EscapeForceExit {
-            return newExitError(decision.Reason)
+        if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+            return derr
         }
-        
+
+        // ─── 节点 3: Execute ───
         artifact, err := o.execute(ctx, plan)
         if err != nil {
-            // ★ EscapeEngine 接线点 2: Execute 失败
+            // ★ 接线点 2: Execute 失败
             loopCtx.PrevPlanKind = plan.Kind
             decision := o.escapeEngine.Evaluate(loopCtx)
-            ...
+            if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+                return derr
+            }
+            continue  // 非终止决策 → 重新规划
         }
-        
+
+        // ─── 节点 4: Verify ───
         verdict := o.verify(ctx, artifact, plan)
         if verdict.Kind == VerdictFail || verdict.Kind == VerdictIndeterminate {
-            // ★ EscapeEngine 接线点 3: Verify 失败
-            ...
+            // ★ 接线点 3: Verify 失败
+            loopCtx.FailureCriterion = verdict.Reason
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+                return derr
+            }
+            continue  // 非终止决策 → 重新规划
         }
-        
-        if decision.Action == EscapeContinue {
-            break
-        }
+
+        // Verify 通过 → 跳出回路（EscapeContinue 在 processEscapeDecision 内已处理）
+        return nil
     }
-    
-    return nil
+}
+
+// processEscapeDecision 统一处理 6 类 EscapeAction
+// 返回 (terminate, err)：
+//   terminate=true  → caller 应 return err
+//   terminate=false → caller 应 continue 回路（仅 EscapeContinue）
+func (o *Orchestrator) processEscapeDecision(decision EscapeDecision, baseErr error) (terminate bool, err error) {
+    switch decision.Action {
+    case EscapeContinue:
+        return false, nil  // 继续回路（caller 重新跑 Plan）
+    case EscalateToRule, EscalateToHuman:
+        // 经 ChainedArbitrator 链式裁决后已收敛；若 Evaluate 直接返回，兜底为 ForceExit
+        return true, errors.Join(baseErr, newExitError(decision.Reason+"_unhandled_escalation"))
+    case EscapePendingHuman:
+        // Human 异步路径：session 状态已持久化，等下次 ProcessMessage 续跑
+        return true, nil
+    case EscapeForceExit, EscapeAbortWithAudit:
+        if baseErr != nil {
+            return true, errors.Join(baseErr, newExitError(decision.Reason))
+        }
+        return true, newExitError(decision.Reason)
+    default:
+        return true, newExitError("unknown_escape_action")
+    }
 }
 ```
+
+**接线点清单**（5 个）：
+
+| # | 触发点 | LoopContext 关键字段 | 失败降级 |
+|---|--------|----------------------|---------|
+| 0 | Observe 失败 | SessionID + ObservationKind | slog.Warn + Continue（observe 仍可部分用） |
+| 1a | Plan 失败 | SessionID + PrevPlanKind=nil | slog.Warn + 决策 |
+| 1b | Plan 前 | SessionID + PlanKind + PrevPlanKind + ObservationKind | Evaluate error → Continue |
+| 2 | Execute 失败 | PrevPlanKind=plan.Kind | Evaluate error → Continue |
+| 3 | Verify 失败 | FailureCriterion=verdict.Reason | Evaluate error → Continue |
+
+**关键修复（相对 v4 旧版本）**：
+- **Plan 失败不再裸 return**：加 EscapeEngine 升级机会（关键漏洞 — Plan 失败可能正是 PlanKind 切换时机）
+- **Observe 失败加接线点 0**：覆盖 AnomalyDetector 5 nil 等异常检测
+- **break 改为 continue + return**：EscapeContinue = "继续回路"应回到 for 顶部重跑 Plan，不是 break
+- **统一 processEscapeDecision 函数**：解决嵌套 scope 问题，全 6 类 Action 分支
+- **Verify 通过显式 return**：避免"for 循环无 break 出口"歧义
+
+**T2 续跑入口**（见 §5.3.2）：`ResumeSession` 在 ProcessMessage 开头检查；命中 → `applyResumeDecision` 恢复状态；未命中 → 走完整 5 节点流程。
 
 ## 7. CircuitBreaker 5 层接线（基于现有 5 metrics）
 
