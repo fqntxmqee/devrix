@@ -39,7 +39,7 @@ func TestD6Rename_AliasesAreTypeAliases(t *testing.T) {
 func TestD6Rename_OldNewConstructorsEquivalent(t *testing.T) {
 	cfg := guard.GuardConfig{Enabled: true}
 	judge := guard.NewRuntimeJudge(nil, cfg)
-	exec := guard.NewInterventionExecutor(nil, nil, nil)
+	exec := guard.NewInterventionExecutor(nil, nil)
 
 	v1 := guard.NewRuntimeGuardValidator(cfg, judge, exec)
 	v2 := guard.NewRuntimeOrchestrationValidator(cfg, judge, exec)
@@ -56,7 +56,7 @@ func TestD6Rename_OldNewConstructorsEquivalent(t *testing.T) {
 func TestD6Rename_OldNewObserverConstructorsEquivalent(t *testing.T) {
 	cfg := guard.GuardConfig{Enabled: true}
 	judge := guard.NewRuntimeJudge(nil, cfg)
-	exec := guard.NewInterventionExecutor(nil, nil, nil)
+	exec := guard.NewInterventionExecutor(nil, nil)
 	v := guard.NewRuntimeGuardValidator(cfg, judge, exec)
 
 	o1 := guard.NewGuardObserver(v, nil, nil)
@@ -74,7 +74,7 @@ func TestD6Rename_OldNewObserverConstructorsEquivalent(t *testing.T) {
 func TestD6Rename_SharedConfigCompatibleWithGuardConfig(t *testing.T) {
 	cfg := config.DefaultOrchestrationConfig()
 	judge := guard.NewRuntimeJudge(nil, cfg)
-	exec := guard.NewInterventionExecutor(nil, nil, nil)
+	exec := guard.NewInterventionExecutor(nil, nil)
 
 	v := guard.NewRuntimeGuardValidator(cfg, judge, exec)
 	if v == nil {

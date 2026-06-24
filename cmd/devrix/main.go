@@ -21,7 +21,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/instance"
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
-	"github.com/devrix/devrix/internal/layers/orchestration/milestone"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
@@ -166,7 +165,6 @@ func main() {
 	connManager := connection.NewConnectionManager(60*time.Second, 10*time.Second)
 	metricsCollector := metrics.NewMetricsCollector()
 	instanceRegistry := instance.NewInstanceRegistry(60 * time.Second)
-	milestoneService := milestone.NewMilestoneService(nil)
 
 	permissionMgr := capture.NewPermissionManager(&commCfg.Permission)
 	permissionMgr.SetUserConfig(userCfg)
@@ -304,7 +302,7 @@ func main() {
 		}
 	}
 
-	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, milestoneService, agentFactory, obs)
+	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, agentFactory, obs)
 
 	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
@@ -393,12 +391,14 @@ func main() {
 }
 
 // initOrchestration wires cross-model decision validation.
+//
+// DM-20260625-008: milestoneSvc 参数移除 (D7 5 节点管道下 D6 演化不再
+// 依赖 milestone-based task fail).
 func initOrchestration(
 	configFile string,
 	multiAgentEnabled bool,
 	rawGateway llmgateway.IGateway,
 	gw *capture.CommunicationGateway,
-	milestoneSvc *milestone.MilestoneService,
 	agentFactory multiagent.IAgentFactory,
 	obs *observability.Observability,
 ) {
@@ -417,7 +417,7 @@ func initOrchestration(
 	}
 
 	runtimeJudge := guard.NewRuntimeJudge(rawGateway, orchCfg)
-	executor := guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)
+	executor := guard.NewInterventionExecutor(gw, agentFactory)
 	guardValidator := guard.NewRuntimeGuardValidator(orchCfg, runtimeJudge, executor)
 	guardValidator.SetObservability(obs)
 	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) guard.AgentObserver {

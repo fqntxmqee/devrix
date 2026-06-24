@@ -41,13 +41,6 @@ func (m *mockAgentCtrl) RegisterSessionAgent(sessionID string, ag multiagent.Age
 	m.agents[sessionID] = ag
 }
 
-type mockTaskCtrl struct {
-	failErr error
-}
-
-func (m *mockTaskCtrl) Fail(_ string, _ string) error  { return m.failErr }
-func (m *mockTaskCtrl) Complete(_ string) error         { return nil }
-
 type mockAgentFactory struct{}
 
 func (m *mockAgentFactory) Create(_ context.Context, _ multiagent.AgentConfig, _ *types.Session) (multiagent.Agent, error) {
@@ -94,7 +87,7 @@ func decisionRecord() DecisionRecord {
 
 func newTestValidator(cfg GuardConfig, gw llmgateway.IGateway) *RuntimeGuardValidator {
 	judge := NewRuntimeJudge(gw, cfg)
-	exec := NewInterventionExecutor(&mockAgentCtrl{}, &mockTaskCtrl{}, &mockAgentFactory{})
+	exec := NewInterventionExecutor(&mockAgentCtrl{}, &mockAgentFactory{})
 	return NewRuntimeGuardValidator(cfg, judge, exec)
 }
 
@@ -233,9 +226,8 @@ func TestDecisionRecordJSON(t *testing.T) {
 
 func TestInterventionExecutor_Execute(t *testing.T) {
 	ctrl := &mockAgentCtrl{}
-	taskCtrl := &mockTaskCtrl{}
 	factory := &mockAgentFactory{}
-	exec := NewInterventionExecutor(ctrl, taskCtrl, factory)
+	exec := NewInterventionExecutor(ctrl, factory)
 
 	iv := Intervention{
 		DecisionID: "test-iv-1",
