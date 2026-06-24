@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.15.0
+**Version:** 3.16.0
 **Last Updated:** 2026-06-25
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -538,3 +538,59 @@ D7-S13  Phase 7 Verify→Learn Auto-Close + Operator TrackMode + D5 增强
 ```
 
 **Total**: 6 P0 T points, 6 IMPLEMENTED, 0 PARTIAL.
+
+---
+
+## D7-S14: MUPS v5 统一逃逸机制 (DM-20260625-003, PLANNED)
+
+> **Change:** 2026-06-25-devrix-d7-mups-v5-escape-engine (DM-20260625-003) — MUPS v5 统一逃逸机制: LoopDepthTracker v2 + PlanKindSwitchPolicy + EscapeAction 6 类 + ChainedArbitrator LLM/Rule/Human + EscapeEngine + CircuitBreaker 5 层 + AuditLog + 5 节点 EscapeEngine 接线点 + T2 ResumeSession 续跑 + 13 类失败降级矩阵. 18 PLANNED P0 T points (5 PR 拆分 PR-V5.1..V5.5, 1.2+0.5+2.2+1.8+3.0=8.7 天工作量). review-r3.md 6 ISSUE 已修复 (ISSUE-1 MaxDepth 边界 / ISSUE-2 ChainedArbitrator 骨架 / ISSUE-3 applyResumeDecision 骨架 / ISSUE-4 Notifier 清理 / ISSUE-5 Observe 失败 Continue / ISSUE-6 L2-07 表驱动). 121 tests 设计 (L4 4 + L3 7 + L2 7 + L1 103), 覆盖率 85%→97%.
+
+### D7-S14-A50: LoopDepthTracker v2 + PlanKindSwitchPolicy + ChainedArbitrator + EscapeEngine + CircuitBreaker + AuditLog
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S14-A50-T01** | LoopContext struct (7 字段: 5 hash 输入 + 2 状态) + hashLoopContext SHA-256 + History 按 SessionID 隔离 | PLANNED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) |
+| **D7-S14-A50-T02** | LoopDepthTracker.ShouldContinue 严格按 `depth >= MaxDepth` 触发 ForceExit (MaxDepth=3, depth=1/2 Continue, depth=3 ForceExit) + Reset 按 SessionID 维度清空 | PLANNED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) |
+| **D7-S14-A50-T03** | PlanKindSwitchPolicy 3 档 enum + determineSwitchPolicy (Exploration→Constrained ≤4 / Scenario→Allowed / Protocol→Constrained ≤4 / Commitment→Forbidden) + 累计计数 (Commitment 1 次→ForceExit, Constrained 5 次→ForceExit) | PLANNED | `orchestration/escape/plan_kind_switch_policy.go` (PR-V5.2) |
+| **D7-S14-A50-T04** | EscapeAction 6 类 typed enum (Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / EscapePendingHuman) + EscapeDecision 9 字段 (5 核心 Action/Reason/AuditLevel/Depth/PendingID + 4 审计 ExitReason/SessionID/CreatedAt/SourceDecisionIDs) | PLANNED | `orchestration/escape/arbitrator.go` (PR-V5.3) |
+| **D7-S14-A50-T05** | LLMArbitrator (5s timeout 兜底 ForceExit + 1 次格式重试 + 非 JSON / 非法 action 拦截 + ctx 取消语义优先 + recover panic) + RuleArbitrator (不可恢复→AbortWithAudit, 可恢复→EscalateToHuman) + HumanArbitrator (10s timeout + 异步化立即返回 EscapePendingHuman + SubmitUserChoice 缓冲 1 + SubmitOverrideCard 防 UI 误导) + ChainedArbitrator (LLM→Rule→Human 链式调用, EscalateTo* 中间态消化绝不返回 caller) | PLANNED | `orchestration/escape/arbitrator.go` (PR-V5.3) |
+| **D7-S14-A50-T06** | Notifier interface + FeishuCardNotifier (3 按钮 A/B/C + ExpiresAt 10s) + ChainedNotifier (FeishuCard→CLI→Email fallback) + OverrideCardNotifier 可选 interface + PendingResolutionStore interface + InMemoryPendingResolutionStore (TTL=10s 过期清理) + ResumeSession 委托 HumanArbitrator (Save/Load/Delete 闭环) | PLANNED | `orchestration/escape/notifier.go` + `pending_resolution_store.go` (PR-V5.3) |
+| **D7-S14-A50-T07** | EscapeEngine.Evaluate 整合入口 (3 类深度限制串联: tracker → loopBudget → circuitBreaker, 全部 Continue → EscapeContinue, 任一非 Continue → ChainedArbitrator) + AuditLevel 0/1/2 (记录次数递增) + 13 类失败降级矩阵 (Evaluate panic/error + audit fail-open + LLM timeout + ctx cancel + CB metric timeout + ...) | PLANNED | `orchestration/escape/engine.go` (PR-V5.4) |
+| **D7-S14-A50-T08** | LoopBudget struct (ConsecutiveFails=3 触发 ForceExit + TotalFails=20 触发 AbortWithAudit, doc 38 §19.2 DenialBudget 概念) + LoopBudget.Evaluate | PLANNED | `orchestration/escape/loop_budget.go` (PR-V5.4) |
+| **D7-S14-A50-T09** | CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + State machine Open→HalfOpen→Close + 阈值占位推导 (V5.5 集成测试后回填) + CB 拉 metric 200ms timeout 防御 | PLANNED | `orchestration/escape/circuit_breaker.go` (PR-V5.4) |
+| **D7-S14-A50-T10** | EscapeAuditLog (AuditLevel 0/1/2) + InMemoryEscapeAuditLog (含 SourceDecisionIDs + CreatedAt) + EscapeDecision.ExitReason 14 类 Phase 4 映射 | PLANNED | `orchestration/escape/audit_log.go` (PR-V5.4) |
+| **D7-S14-A50-T11** | SessionOrchestrator.ProcessMessage 5 节点接线 (Observe 失败 / Plan 失败 1a / Plan 前 1b / Execute 失败 / Verify 失败) + 1a 短路不调 1b (codex R4 修复) + processEscapeDecision 6 类 action 统一处理 (Continue→continue 回路 / PendingHuman→return nil 异步 / ForceExit/Abort→return error / EscalateTo*→兜底 ForceExit) | PLANNED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
+| **D7-S14-A50-T12** | ResumeSession T2 续跑入口 (ProcessMessage 开头检查 → applyResumeSession) + applyResumeSession (user_choice=A→runLoopWithResume Continue / B→ForceExit / C→AbortWithAudit + 补写 audit) + runLoopWithResume (depth 续 T1 状态由 LoopDepthTracker 自动保证) | PLANNED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
+| **D7-S14-A50-T13** | buildLoopContext 5 hash 字段构造 (SessionID + PlanKind + ObservationKind + FailureCriterion + ArtifactType) + buildLoopContextFromObserve (Observe 失败 case) + 4 IntentKind × 5 节点 12 case 集成测试 (Skip→1 次 Evaluate, Orchestrate→完整 5 节点) | PLANNED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
+| **D7-S14-A50-T14** | L4 业务验收 4 测试 (TestL4_v5_Compatible_With_Phase1_7 / TestL4_v5_PerformanceOverhead_Under5Percent / TestL4_FeishuCard_NotBlocked_ByHuman10s + TestL4_LLMSwitchPlanKind_5Times_ForcesExit) | PLANNED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
+| **D7-S14-A50-T15** | L3 端到端 7 测试 (TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit / TestL3_SameMode_4Times_ForcesExit / TestL3_AnomalyDetector_5Nil_OpensL0 / TestL3_Verifier_3Times2s_OpensL2 / TestL3_Human10s_Async_FeishuNotBlocked / TestL3_PlanKindSwitch_Constrained_4Limit / TestL3_CB5Layers_Open_Independently) | PLANNED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
+| **D7-S14-A50-T16** | L2 集成 7 测试 (TestIntegration_4DepthLimits / TestIntegration_3LayerArbitration / TestIntegration_5EscapeActions / TestIntegration_PlanKindSwitchLimit / TestIntegration_5NodePipeline_End2End / TestIntegration_5WiringPoints + TestIntegration_4IntentKind_5NodePaths) | PLANNED | `orchestration/escape/*_integration_test.go` (PR-V5.5) |
+| **D7-S14-A50-T17** | L1 单元 103 测试 (LoopDepthTracker 11 + PlanKindSwitchPolicy 15 + ChainedArbitrator 36 + EscapeEngine + CB 22 + Orchestrator 接线 19) | PLANNED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) |
+| **D7-S14-A50-T18** | 14 gap 补测 (LoopDepthTracker panic L1-91 / PendingResolutionStore TTL L1-92 / 14 ExitReason 映射 L1-93 / AuditLog 持久化 L1-94/95 / LoopBudget 2 个 L1-96/97 / CB panic L1-98 / ResumeSession + ApplyDecision 5 个 L1-99..103 + 4 IntentKind × 5 节点 L2-07) | PLANNED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) |
+
+## Scenario D7-S14 Detail (test points summary)
+
+```
+D7-S14  MUPS v5 统一逃逸机制 (PLANNED, 5 PR 拆分)
+├── A50  LoopDepthTracker + PlanKindSwitch + ChainedArbitrator + EscapeEngine + CircuitBreaker + AuditLog + 5 节点接线 + T2 Resume
+│   ├── T01  LoopContext 7 字段 + hashLoopContext SHA-256 + History 隔离         [PLANNED]
+│   ├── T02  LoopDepthTracker depth < MaxDepth Continue / >= MaxDepth ForceExit   [PLANNED]
+│   ├── T03  PlanKindSwitchPolicy 3 档 + 累计计数 (≤4 / 0 forbidden)             [PLANNED]
+│   ├── T04  EscapeAction 6 类 enum + EscapeDecision 9 字段                       [PLANNED]
+│   ├── T05  3 层仲裁 (LLM 5s / Rule / Human 10s 异步)                          [PLANNED]
+│   ├── T06  Notifier + PendingResolutionStore + ChainedNotifier fallback       [PLANNED]
+│   ├── T07  EscapeEngine 整合 + 13 类失败降级矩阵                               [PLANNED]
+│   ├── T08  LoopBudget (consecutive=3 / total=20, doc 38 §19.2)                  [PLANNED]
+│   ├── T09  CircuitBreaker 5 层接线 (L0..L5 阈值 + state machine)               [PLANNED]
+│   ├── T10  EscapeAuditLog (AuditLevel 0/1/2 + 14 ExitReason 映射)              [PLANNED]
+│   ├── T11  SessionOrchestrator 5 节点接线 + 1a 短路不调 1b                       [PLANNED]
+│   ├── T12  ResumeSession + applyResumeSession + runLoopWithResume               [PLANNED]
+│   ├── T13  buildLoopContext + 4 IntentKind × 5 节点 12 case                     [PLANNED]
+│   ├── T14  L4 业务验收 4 测试                                                  [PLANNED]
+│   ├── T15  L3 端到端 7 测试                                                    [PLANNED]
+│   ├── T16  L2 集成 7 测试                                                      [PLANNED]
+│   ├── T17  L1 单元 103 测试                                                    [PLANNED]
+│   └── T18  14 gap 补测 (LoopDepthTracker panic + AuditLog 持久化 + ResumeSession 5 个 + ...)  [PLANNED]
+```
+
+**Total**: 18 PLANNED P0 T points, 0 IMPLEMENTED, 0 PARTIAL.
