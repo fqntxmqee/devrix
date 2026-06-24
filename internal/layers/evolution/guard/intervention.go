@@ -16,21 +16,20 @@ type AgentController interface {
 	RegisterSessionAgent(sessionID string, ag multiagent.Agent)
 }
 
-// TaskController provides milestone state management.
-type TaskController interface {
-	Fail(id string, reason string) error
-	Complete(id string) error
-}
-
 // AgentFactory creates new agent instances during reroute.
 type AgentFactory interface {
 	Create(ctx context.Context, cfg multiagent.AgentConfig, session *types.Session) (multiagent.Agent, error)
 }
 
 // InterventionExecutor applies corrective actions when validation fails.
+//
+// DM-20260625-008: TaskController 移除。D7 5 节点管道下, 任务失败由
+// Execute 节点通过 4 Channel (synchronous/async/probe/exploration) 上报,
+// 不再依赖 milestone-based TaskController. Intervention.TaskFail/MilestoneFail
+// 字段保留用于 D6 演化层传递意图, 但 executor 内部仅 slog.Warn 记录
+// 不再触发任何 task fail 动作.
 type InterventionExecutor struct {
 	agents  AgentController
-	tasks   TaskController
 	factory AgentFactory
 
 	// PR-A: H-3 silent swallow 修复（DM-20260621-011）
@@ -40,8 +39,8 @@ type InterventionExecutor struct {
 }
 
 // NewInterventionExecutor creates an executor with the required controllers.
-func NewInterventionExecutor(agents AgentController, tasks TaskController, factory AgentFactory) *InterventionExecutor {
-	return &InterventionExecutor{agents: agents, tasks: tasks, factory: factory}
+func NewInterventionExecutor(agents AgentController, factory AgentFactory) *InterventionExecutor {
+	return &InterventionExecutor{agents: agents, factory: factory}
 }
 
 // WithMetrics injects the guardMetrics for error aggregation observability.
@@ -79,10 +78,13 @@ func (ie *InterventionExecutor) terminate(ctx context.Context, session *types.Se
 	return nil
 }
 
-// terminateAndReroute stops the current agent, optionally fails the task,
-// then creates + starts a new agent. Errors from Terminate/Wait/Tasks.Fail
+// terminateAndReroute stops the current agent, optionally logs task-fail
+// intent, then creates + starts a new agent. Errors from Terminate/Wait
 // are aggregated via errors.Join (DM-20260621-011 H-3, matches D7 error
 // aggregation "atomic counter + slog + errors.Join" pattern).
+//
+// DM-20260625-008: Tasks.Fail 移除, 改为 slog.Warn 记录 D6 演化的
+// task-fail 意图, 不再触发任何 milestone-based fail 动作.
 func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session *types.Session, iv Intervention) error {
 	var errs []error
 
@@ -102,13 +104,13 @@ func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session
 	}
 
 	if iv.MilestoneFail || iv.TaskFail {
-		taskID := iv.FailReason
-		if failErr := ie.tasks.Fail(taskID, iv.Reason); failErr != nil {
-			ie.metrics.recordTaskFailFailed()
-			slog.Warn("task fail failed",
-				"task_id", taskID, "reason", iv.Reason, "error", failErr)
-			errs = append(errs, fmt.Errorf("task_fail: %w", failErr))
-		}
+		slog.Warn("task fail requested but no TaskController wired (D7 5-node pipeline replaces milestone-based fail)",
+			"session_id", session.SessionID,
+			"task_id", iv.FailReason,
+			"reason", iv.Reason,
+			"milestone_fail", iv.MilestoneFail,
+			"task_fail", iv.TaskFail,
+		)
 	}
 
 	cfg := iv.AgentConfig
@@ -135,7 +137,12 @@ func (ie *InterventionExecutor) terminateAndReroute(ctx context.Context, session
 
 func (ie *InterventionExecutor) updateState(ctx context.Context, session *types.Session, iv Intervention) error {
 	if iv.MilestoneFail {
-		return ie.tasks.Fail(session.SessionID, iv.Reason)
+		// DM-20260625-008: TaskController 移除, 不再触发 fail.
+		// 保留字段用于 D6 演化层意图传递, executor 内部仅 warn.
+		slog.Warn("milestone fail requested but no TaskController wired (D7 5-node pipeline replaces milestone-based fail)",
+			"session_id", session.SessionID,
+			"reason", iv.Reason,
+		)
 	}
 	return nil
 }

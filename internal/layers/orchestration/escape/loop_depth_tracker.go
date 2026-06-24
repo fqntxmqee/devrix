@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
@@ -266,5 +267,17 @@ func (t *LoopDepthTracker) ResetSession(sessionID string) bool {
 	return hadDepth || hadMode
 }
 
-// nowFunc is overridable for tests.
-var nowFunc = func() time.Time { return time.Now() }
+// nowFunc is overridable for tests. Stored in an atomic.Pointer so test
+// overrides (e.g. TestLoopDepthTracker_PanicRecovery swapping nowFunc to
+// inject a panic) don't race with concurrent reads from production code
+// paths (e.g. HumanArbitrator.Arbitrate → shouldContinueLocked → nowFunc()).
+var nowFuncPtr atomic.Pointer[func() time.Time]
+
+func init() {
+	defaultNow := func() time.Time { return time.Now() }
+	nowFuncPtr.Store(&defaultNow)
+}
+
+func nowFunc() time.Time {
+	return (*nowFuncPtr.Load())()
+}

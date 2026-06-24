@@ -23,9 +23,11 @@ type guardMetrics struct {
 	decisionsByStage   metrics.Counter
 
 	// PR-A: H-3 silent swallow 修复（DM-20260621-011）
-	// intervention.go 中 Wait/Tasks.Fail 失败时累加, 用于 SLO 报警
-	waitFailed     atomic.Int64
-	taskFailFailed atomic.Int64
+	// intervention.go 中 Wait 失败时累加, 用于 SLO 报警
+	waitFailed atomic.Int64
+	// DM-20260625-008: taskFailFailed 已移除. D7 5 节点管道下
+	// Tasks.Fail 调用被 slog.Warn 替代, 无 task-fail 失败场景
+	// (MilestoneFail/TaskFail 字段保留但不再触发 fail 动作).
 }
 
 func initGuardMetrics(obs *observability.Observability) *guardMetrics {
@@ -121,28 +123,12 @@ func (m *guardMetrics) recordWaitFailed() {
 	m.waitFailed.Add(1)
 }
 
-// recordTaskFailFailed increments the task fail failure counter (nil-safe).
-func (m *guardMetrics) recordTaskFailFailed() {
-	if m == nil {
-		return
-	}
-	m.taskFailFailed.Add(1)
-}
-
 // SnapshotWaitFailed returns the current wait failure count (nil-safe).
 func (m *guardMetrics) SnapshotWaitFailed() int64 {
 	if m == nil {
 		return 0
 	}
 	return m.waitFailed.Load()
-}
-
-// SnapshotTaskFailFailed returns the current task fail failure count (nil-safe).
-func (m *guardMetrics) SnapshotTaskFailFailed() int64 {
-	if m == nil {
-		return 0
-	}
-	return m.taskFailFailed.Load()
 }
 
 // orchMetrics is an alias for guardMetrics kept for backward compatibility.
