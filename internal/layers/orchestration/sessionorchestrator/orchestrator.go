@@ -15,6 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -65,6 +66,13 @@ type SessionOrchestrator struct {
 	// nil → no prior injection (ObserveRequest.EffectivePrior returns
 	// DefaultDeveloperPrior as fail-safe).
 	learner learn.Learner
+
+	// escapeEngine is the MUPS v5 (DM-20260625-003, PR-V5.5) 5-node
+	// escape evaluator. nil → no escape evaluation (V5.4- behavior).
+	// When wired, ProcessMessage invokes Evaluate at 3-4 wiring points
+	// (1a/1b/2/3) to enforce the unified depth-limit / circuit-breaker /
+	// PlanKind-switch policies. See escape.Engine for details.
+	escapeEngine *escape.EscapeEngine
 
 	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
 	// When non-nil, the default OrchestratePath's decisionplanning.TaskDecomposer uses it
@@ -166,6 +174,20 @@ func WithTaskManager(tm *workmodel.TaskManager) OrchestratorOption {
 // learner.
 func WithLearner(l learn.Learner) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.learner = l }
+}
+
+// WithEscapeEngine wires the MUPS v5 (DM-20260625-003) EscapeEngine.
+//
+// PR-V5.5 wiring points (5-node pipeline):
+//   - 1a: Plan fails (classifier error) → Evaluate → may ForceExit
+//   - 1b: Plan前 (before dispatch)      → Evaluate → may ForceExit
+//   - 2:  Execute fails (path error)    → Evaluate → may ForceExit
+//   - 3:  Verify fails (FAIL/INDET)     → Evaluate → may ForceExit
+//
+// nil → no escape evaluation (V5.4- behavior, backward compatible).
+// Pass nil explicitly to remove a previously-wired engine.
+func WithEscapeEngine(e *escape.EscapeEngine) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.escapeEngine = e }
 }
 
 // WithClassifier replaces the default decisionplanning.RuleClassifier. The default is
@@ -356,6 +378,15 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	}
 	if err != nil {
 		endSpanWithError(sessionSpan, err)
+		// PR-V5.5 wiring point 1a: Plan fails (classifier error).
+		// Evaluate escape decision; may ForceExit.
+		if o.escapeEngine != nil {
+			loopCtx := o.buildEscapeLoopContext(req.SessionID, 0, "")
+			decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
+			if term, augErr := o.processEscapeDecision(decision, err); term {
+				return nil, fmt.Errorf("orchestrator: classify: %w", augErr)
+			}
+		}
 		return nil, fmt.Errorf("orchestrator: classify: %w", err)
 	}
 	if sessionSpan != nil {
@@ -381,6 +412,21 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		}
 	}
 
+	// PR-V5.5 wiring point 1b: Plan前 (before dispatch).
+	// Evaluate escape decision; may ForceExit.
+	if o.escapeEngine != nil {
+		loopCtx := o.buildEscapeLoopContext(req.SessionID, planKindFromIntent(intent.Kind), "")
+		decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
+		if term, augErr := o.processEscapeDecision(decision, nil); term {
+			escErr := escapeErr(decision.Reason)
+			if augErr != nil {
+				escErr = fmt.Errorf("%w: %w", escErr, augErr)
+			}
+			endSpanWithError(sessionSpan, escErr)
+			return nil, escErr
+		}
+	}
+
 	var ch <-chan *contracts.EngineEvent
 	err = nil
 	switch intent.Kind {
@@ -390,20 +436,31 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		ch = skipCh
 	case orchtypes.IntentCommand:
 		if o.commandHandler == nil {
-			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: orchtypes.IntentCommand received but commandHandler is nil (bootstrap missing wiring)"))
-			return nil, fmt.Errorf("orchestrator: orchtypes.IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
+			err = fmt.Errorf("orchestrator: orchtypes.IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
+		} else {
+			ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 		}
-		ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 	case orchtypes.IntentFast:
 		ch, err = o.fastPath.Run(sessionCtx, req, decisionplanning.TurnSystemPrompt(o.cfg, ""))
 	case orchtypes.IntentOrchestrate:
 		if o.orchestratePath == nil {
-			endSpanWithError(sessionSpan, fmt.Errorf("orchestrator: orchtypes.IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)"))
-			return nil, fmt.Errorf("orchestrator: orchtypes.IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)")
+			err = fmt.Errorf("orchestrator: orchtypes.IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)")
+		} else {
+			ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
 		}
-		ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
 	default:
 		err = fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
+	}
+
+	// PR-V5.5 wiring point 2: Execute fails (path error).
+	if err != nil && o.escapeEngine != nil {
+		loopCtx := o.buildEscapeLoopContext(req.SessionID, planKindFromIntent(intent.Kind), err.Error())
+		decision := o.escapeEngine.Evaluate(sessionCtx, loopCtx)
+		if term, augErr := o.processEscapeDecision(decision, err); term {
+			escErr := fmt.Errorf("orchestrator: escape_force_exit_post_execute: %w", augErr)
+			endSpanWithError(sessionSpan, escErr)
+			return nil, escErr
+		}
 	}
 	if err != nil {
 		endSpanWithError(sessionSpan, err)

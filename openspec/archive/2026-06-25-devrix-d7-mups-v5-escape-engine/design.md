@@ -51,28 +51,33 @@ internal/layers/orchestration/escape/
 // escape/types.go
 
 // LoopContext 回路上下文（按"模式 hash"计数的输入）
-// 11 字段：7 核心（hash 输入） + 4 状态（不参与 hash，由 tracker/CB 内部维护）
+// 7 字段：5 hash 输入 + 2 状态（采纳 codex review §3.3 建议，11→7 精简）
+// 注：PrevPlanKind / PlanKindSwitchCount 不在 LoopContext，由 PlanKindSwitchPolicy 模块自管
 type LoopContext struct {
-    // 7 核心字段（参与 hashLoopContext，模式识别用）
-    SessionID           string
-    PlanKind            PlanKind         // 4 类：CommitmentPlan / ProtocolPlan / ScenarioPlan / ExplorationPlan
-    PrevPlanKind        PlanKind         // 用于切换计数（不参与 hash）
-    ObservationKind     ObservationKind  // 4 类：ObsFact/ObsSignal/ObsDeviation/ObsUncertainty
-    FailureCriterion    string           // Plan 失败判据
-    ArtifactType        ArtifactType     // 4 类：StateChangeCert/ResponseRecord/ProbeReport/ExperimentData
-    PlanKindSwitchCount int              // 累计切换次数（不参与 hash）
+    // 5 hash 输入字段（参与 hashLoopContext，模式识别用）
+    SessionID        string
+    PlanKind         PlanKind         // 4 类：CommitmentPlan / ProtocolPlan / ScenarioPlan / ExplorationPlan
+    ObservationKind  ObservationKind  // 4 类：ObsFact/ObsSignal/ObsDeviation/ObsUncertainty
+    FailureCriterion string           // Plan 失败判据
+    ArtifactType     ArtifactType     // 4 类：StateChangeCert/ResponseRecord/ProbeReport/ExperimentData
 
-    // 4 状态字段（不参与 hash，3 类深度限制用）
-    LoopBudgetState     LoopBudgetState    // DenialBudget 状态（consecutive=3, total=20）
-    ReputationEvidence  *ReputationEvidence // Phase 5 信誉先验（影响 PlanKind 推荐）
-    ExitReason          ExitReason         // 14 类现有 ExitReason 映射（接线点 2/3 注入）
-    CircuitBreakerState map[CBLevel]bool   // 5 层 CB open/closed 快照（L0-L5）
+    // 2 状态字段（不参与 hash，但作为 LoopContext 一部分传入 Evaluate）
+    LoopBudgetState  LoopBudgetState  // DenialBudget 状态（consecutive=3, total=20）
+    ExitReason       ExitReason       // 14 类现有 ExitReason 映射（接线点 2/3 注入）
 }
 
 // LoopBudgetState DenialBudget 累计状态
 type LoopBudgetState struct {
     ConsecutiveFails int  // 连续失败次数（达到 3 触发 ForceExit）
     TotalFails       int  // 累计失败次数（达到 20 触发 AbortWithAudit）
+}
+
+// PlanKindSwitchPolicy 内部 state（不在 LoopContext）
+// PrevPlanKind / PlanKindSwitchCount 由 policy 模块自管，避免污染 LoopContext
+type planKindSwitchState struct {
+    mu            sync.Mutex
+    lastPlanKind  PlanKind  // 用于检测切换
+    switchCount   int       // 累计切换次数（达到 4 触发 ForceExit / CommitmentPlan 0 触发）
 }
 
 // EscapeAction 6 类动作（5 类正式 + 1 个 dev 扩展中间态）
@@ -167,6 +172,74 @@ HumanArbitrator (用户接管 A/B/C, 10s timeout)
 - HumanArbitrator 异步化（不阻塞 ProcessMessage 同步返回）— 详见 §5.3.1
 - 失败降级：EscapeEngine.Evaluate error → slog.Warn + EscapeContinue
 
+**ChainedArbitrator.Arbitrate 完整 Go 骨架**（采纳 review-r3 ISSUE-2 建议）：
+
+```go
+// ChainedArbitrator 链式调度 3 层仲裁
+// 调度顺序：LLM → Rule → Human，每层根据 Action 决定下一步
+type ChainedArbitrator struct {
+    llm   *LLMArbitrator
+    rule  *RuleArbitrator
+    human *HumanArbitrator
+}
+
+// Arbitrate 链式调用 3 层仲裁，返回最终 EscapeDecision
+// 关键不变式：
+//   1. 返回值 Action ∈ {EscapeContinue, EscapePendingHuman, EscapeForceExit, EscapeAbortWithAudit}
+//   2. EscalateToRule / EscalateToHuman 中间态绝不返回给 caller（由本函数消化）
+//   3. 任何一层 panic / error → 降级到下一层（不阻塞主链路）
+func (c *ChainedArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, decisions []EscapeDecision) EscapeDecision {
+    chain := append([]EscapeDecision{}, decisions...)
+
+    // 第 1 层：LLMArbitrator
+    llmDecision, err := c.llm.Arbitrate(ctx, loopCtx, chain)
+    if err == nil {
+        switch llmDecision.Action {
+        case EscapeContinue:
+            return llmDecision  // LLM 选 Continue 立即返回
+        case EscapeForceExit, EscapeAbortWithAudit:
+            return llmDecision  // LLM 选终止直接返回（timeout/panic 兜底）
+        }
+    } else {
+        // LLM error → 降级为 EscalateToRule 走下一层
+        llmDecision = EscapeDecision{
+            Action:     EscapeForceExit,  // 兜底终止
+            Reason:     "llm_error_" + err.Error(),
+            AuditLevel: 1,
+        }
+        return llmDecision
+    }
+
+    // llmDecision.Action == EscalateToRule（继续向下）
+    chain = append(chain, llmDecision)
+
+    // 第 2 层：RuleArbitrator
+    ruleDecision, err := c.rule.Arbitrate(ctx, loopCtx, chain)
+    if err == nil {
+        switch ruleDecision.Action {
+        case EscapeAbortWithAudit:
+            return ruleDecision  // Rule 不可恢复 → 终止
+        case EscapeContinue, EscapeForceExit:
+            return ruleDecision  // Rule 终止决策（少见但允许）
+        }
+    } else {
+        // Rule error → 降级为 EscalateToHuman 走下一层
+        ruleDecision = EscapeDecision{
+            Action:     EscapeForceExit,  // 兜底终止
+            Reason:     "rule_error_" + err.Error(),
+            AuditLevel: 1,
+        }
+        return ruleDecision
+    }
+
+    // ruleDecision.Action == EscalateToHuman（继续向下）
+    chain = append(chain, ruleDecision)
+
+    // 第 3 层：HumanArbitrator（异步路径，立即返回中间态）
+    return c.human.Arbitrate(ctx, loopCtx, chain)
+}
+```
+
 ### 5.3.1 HumanArbitrator 详细设计（devrix 落地）
 
 **核心约束**（与 Phase 7 Auto-Close 协同）：
@@ -194,6 +267,24 @@ const (
     EscapePendingHuman                        // 中间态：等待用户响应（v5 dev 扩展）
 )
 ```
+
+**6 类对外/对内语义分层**（采纳 codex review §3.2 建议，澄清冗余疑问）：
+
+| EscapeAction | 对外 API 暴露？ | 对内链式传递？ | 说明 |
+|--------------|---------------|---------------|------|
+| `EscapeContinue` | ✅ 4 类核心之一 | ✅ | LLM/Rule/Human 任一层选 Continue → 立即返回，继续回路 |
+| `EscapePendingHuman` | ✅ 4 类核心之一 | ✅ | Human 异步路径立即返回，session 状态持久化 |
+| `EscapeForceExit` | ✅ 4 类核心之一 | ✅ | 强制退出，最终决策（兜底/超时/panic）|
+| `EscapeAbortWithAudit` | ✅ 4 类核心之一 | ✅ | 强制终止 + 完整审计，最严重（不可恢复失败）|
+| `EscalateToRule` | ❌ 对外不暴露 | ✅ | ChainedArbitrator 内部链式传递："LLM 选 Exit → Rule 还没裁决"中间态 |
+| `EscalateToHuman` | ❌ 对外不暴露 | ✅ | ChainedArbitrator 内部链式传递："Rule 选 Human → Human 还没裁决"中间态 |
+
+**澄清 codex 担心**：
+- `EscalateToRule` / `EscalateToHuman` 作为 enum 值**保留**，因为：
+  - ChainedArbitrator 内部链式传递需要中间值（避免 Rule 还没跑就 return EscalateToHuman 给 caller）
+  - audit log 追溯有语义价值（"LLM 拒了 → Rule 拒了 → Human 接了" vs 直接 "Human 接了"）
+- 对外 API（EscapeEngine.Evaluate 返回值）实际只暴露 4 类核心，调用方不应见到 EscalateToRule/Human
+- 实现约束：caller 在 `processEscapeDecision` switch 时**不应**有 `case EscalateToRule, EscalateToHuman` 分支（由 ChainedArbitrator 内部消化），若有则视为 bug（兜底为 ForceExit）
 
 **EscapeDecision 扩展**：
 
@@ -380,24 +471,29 @@ func (c *ChainedNotifier) Notify(loopCtx LoopContext, pendingID string, decision
 
 func (c *ChainedNotifier) SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error {
     for _, n := range c.notifiers {
-        if override, ok := n.(OverrideCardNotifier); ok {
-            if err := override.SubmitOverrideCard(pendingID, msg, buttons); err == nil {
-                return nil
-            }
+        override, ok := n.(OverrideCardNotifier)
+        if !ok {
+            // 采纳 review-r3 ISSUE-4 建议：类型断言失败时 slog.Warn 降级
+            slog.Warn("notifier_does_not_support_override",
+                "notifier_type", fmt.Sprintf("%T", n),
+                "pending_id", pendingID)
+            continue
+        }
+        if err := override.SubmitOverrideCard(pendingID, msg, buttons); err == nil {
+            return nil
         }
     }
     return fmt.Errorf("all notifiers failed to override card")
 }
 
 // OverrideCardNotifier 可选接口（不是所有 Notifier 都支持覆盖）
+// 采纳 review-r3 ISSUE-4 建议：明确为可选 interface，与 Notifier 完全独立
 type OverrideCardNotifier interface {
     SubmitOverrideCard(pendingID string, msg string, buttons []FeishuButton) error
 }
 
-// 完整 Notifier interface（合并 Notify + 可选 Override）
-type Notifier interface {
-    Notify(loopCtx LoopContext, pendingID string, decisions []EscapeDecision) error
-}
+// Notifier interface 定义见上方 line 421-423（仅 Notify 方法，无重复定义）
+// 完整 Notifier interface 已在首次定义处声明，避免重复声明导致的编译错误
 ```
 
 **PendingResolutionStore 接口**（续跑）：
@@ -469,6 +565,86 @@ type InMemoryPendingResolutionStore struct {
 - T2 续跑 user 选 A → 重跑回路 → depth=4 → ForceExit
 - 避免"重置 depth 让回路无限续命"的漏洞
 - 唯一清空时机：`tracker.Reset()`（仅在 session 彻底结束 / admin reset 调用）
+
+**applyResumeDecision 完整 Go 骨架**（采纳 review-r3 ISSUE-3 建议）：
+
+```go
+// applyResumeSession T2 续跑入口
+// 由 EscapeEngine.ResumeSession 委托调用，ProcessMessage 开头检查
+// 返回值: error → caller 应 return（终止 ProcessMessage）
+//
+// 关键不变式：
+//   1. decision.Action ∈ {EscapeContinue, EscapeForceExit, EscapeAbortWithAudit}
+//      （EscalateTo* 中间态已由 ChainedArbitrator 消化，不会出现在此处）
+//   2. user_choice=A → Continue：进入 runLoopWithResume 重跑回路（depth 续 T1 状态）
+//   3. user_choice=B → ForceExit：等价于正常终止（user 已接受当前）
+//   4. user_choice=C → AbortWithAudit：不可恢复终止 + 补写 audit
+func (o *Orchestrator) applyResumeSession(ctx context.Context, decision EscapeDecision) error {
+    switch decision.Action {
+    case EscapeContinue:
+        // user_choice=A：续跑回路
+        // depth 由 LoopDepthTracker 按 SessionID 维度自动续 T1 状态
+        return o.runLoopWithResume(ctx, decision)
+    case EscapeForceExit:
+        // user_choice=B：用户接受当前 → 等价于正常 ForceExit
+        return newExitError(decision.Reason)
+    case EscapeAbortWithAudit:
+        // user_choice=C：用户取消 → 不可恢复终止
+        o.escapeEngine.AuditLog().Record(decision)  // 补写 audit（保留 user_cancel 决策痕迹）
+        return newExitError(decision.Reason)
+    default:
+        // 兜底：不应出现的 Action 值（EscalateTo* 中间态）
+        slog.Error("invalid_resume_decision",
+            "action", decision.Action,
+            "reason", decision.Reason,
+            "session_id", decision.SessionID)
+        return newExitError("invalid_resume_decision_" + decision.Reason)
+    }
+}
+
+// runLoopWithResume 续跑回路（复用 ProcessMessage 内层 for 循环逻辑）
+// depth 续 T1 状态由 LoopDepthTracker 自动保证
+func (o *Orchestrator) runLoopWithResume(ctx context.Context, resumeDecision EscapeDecision) error {
+    for {
+        plan, err := o.plan(ctx, nil)  // T2 入口重新规划
+        if err != nil {
+            // 接线点 1a：Plan 失败 → EscapeEngine 升级
+            loopCtx := buildLoopContext(ctx, nil, nil)
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            return o.processEscapeDecision(decision, err)
+        }
+
+        artifact, err := o.execute(ctx, plan)
+        if err != nil {
+            loopCtx := buildLoopContext(ctx, plan, nil)
+            loopCtx.PrevPlanKind = plan.Kind
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+                return derr
+            }
+            continue
+        }
+
+        verdict := o.verify(ctx, artifact, plan)
+        if verdict.Kind == VerdictFail || verdict.Kind == VerdictIndeterminate {
+            loopCtx := buildLoopContext(ctx, plan, nil)
+            loopCtx.FailureCriterion = verdict.Reason
+            decision := o.escapeEngine.Evaluate(loopCtx)
+            if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+                return derr
+            }
+            continue
+        }
+
+        // Verify 通过 → 跳出回路
+        return nil
+    }
+}
+```
+
+**与 Phase 7 Auto-Close 的差异**：
+- Auto-Close：同步返回 + 内部异步（不续跑，仅本次 ProcessMessage 异步通知）
+- T2 Resume：同步返回 + 下次 ProcessMessage 续跑（user 响应跨 ProcessMessage 边界应用）
 ```
 
 ### 5.3.3 7 类边界场景兜底
@@ -617,7 +793,12 @@ func (o *Orchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) e
         if terminate, derr := o.processEscapeDecision(decision, err); terminate {
             return derr
         }
-        // Observe 失败但未到上限，observe 仍可用，继续回路
+        // Observe 失败但未到上限 → continue 路径细分（采纳 review-r3 ISSUE-5 建议）：
+        //   case 1: observe != nil 但 Observations == []（AnomalyDetector 全 nil 但函数未返 err）
+        //           → 进 for 循环调 o.plan(ctx, observe)，Plan 走默认分支（无 ObservationKind）
+        //   case 2: observe == nil（Observe 函数 panic/recover 后返回 nil）
+        //           → 进 for 循环调 o.plan(ctx, nil)，Plan 立即失败 → 接线点 1a 触发
+        // 两者都不破坏主链路（失败降级已覆盖）
     }
 
     for {
@@ -625,12 +806,14 @@ func (o *Orchestrator) ProcessMessage(ctx context.Context, req ProcessRequest) e
         plan, err := o.plan(ctx, observe)
         if err != nil {
             // ★ 接线点 1a: Plan 失败
+            // 关键短路：1a 失败后立即 return，**不再调 1b**（Plan 阶段已结束，1b 无 plan 输入，语义模糊）
+            // 采纳 codex review §3.5 建议：1a/1b 不合并但 1a 短路不调 1b
             loopCtx := buildLoopContext(ctx, nil, observe)
             decision := o.escapeEngine.Evaluate(loopCtx)
-            return o.processEscapeDecision(decision, err)
+            return o.processEscapeDecision(decision, err)  // 1a 短路出口
         }
 
-        // ★ 接线点 1b: Plan 前
+        // ★ 接线点 1b: Plan 前（仅在 1a 成功后执行）
         loopCtx := buildLoopContext(ctx, plan, observe)
         decision := o.escapeEngine.Evaluate(loopCtx)
         if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
@@ -712,16 +895,23 @@ func (o *Orchestrator) processEscapeDecision(decision EscapeDecision, baseErr er
 
 ## 7. CircuitBreaker 5 层接线（基于现有 5 metrics）
 
-| 层 | doc 38 §21 SoT | devrix 现有 metric | 触发条件 |
-|----|----------------|-------------------|----------|
-| L0 | AnomalyDetector 5 nil | `anomaly_detector_nil_total` | 5 次连续 |
-| L1 | (新增) | `dispatch_loop_wakeups_total` | 100 次/分钟 |
-| L2 | Verifier 3 > 2s | `verifier_latency_p95_seconds` | 3 次 > 2s |
-| L3 | Hook 5 fail | `hook_failure_total` | 5 次连续 |
-| L4 | (新增) | `worker_panics_total` | 1 次 panic |
-| L5 | (新增) | `sandbox_exit_failed_total` | 5 次连续 |
+| 层 | doc 38 §21 SoT | devrix 现有 metric | 触发条件 | 阈值推导（采纳 codex review §3.4 建议，V5.1 阶段写占位推导）|
+|----|----------------|-------------------|----------|------|
+| L0 | AnomalyDetector 5 nil | `anomaly_detector_nil_total` | 5 次连续 | **占位**：连续 5 次 nil 表示异常检测彻底失效，必须升级（doc 38 §18.2.1 P0 盲点修补已用此阈值）；待 V5.5 集成测试后回填实际数据 |
+| L1 | (新增) | `dispatch_loop_wakeups_total` | 100 次/分钟 | **占位**：基于 doc 38 §21.13 诚实声明"估计值，需根据实际场景调优"；100/min 是 P99 估算 × 1.5 安全系数；待 V5.5 查 Prometheus 历史 P99 后回填 |
+| L2 | Verifier 3 > 2s | `verifier_latency_p95_seconds` | 3 次 > 2s | **占位**：3 次 > 2s 触发降级，对齐 doc 38 §18.2.2 LLM 调用延迟阈值；2s = devrix SLO P95 目标 |
+| L3 | Hook 5 fail | `hook_failure_total` | 5 次连续 | **占位**：与 L0 AnomalyDetector 同模式（连续 5 次失败 = 系统性问题）；doc 38 §18.2.3 已用此阈值 |
+| L4 | (新增) | `worker_panics_total` | 1 次 panic | **占位**：worker panic 是严重错误（devrix §2 §errors.go panic 协议规定 panic = 立即升级）；单次 panic 即可触发，避免 panic 累积掩盖根因 |
+| L5 | (新增) | `sandbox_exit_failed_total` | 5 次连续 | **占位**：与 L3 Hook 阈值对齐（doc 38 §18.2.3 沙箱失败阈值） |
 
-**devrix 现有 5 metrics 中保留**：`state.cancels` / `state.handles` 是状态追踪不是故障指标，不升级为 circuit breaker。
+**devrix 现有 5 metrics 中保留**（采纳 codex review §3.4 澄清）：
+- `state.cancels` / `state.handles` 是**状态追踪**不是故障指标（per devrix observability 命名规范），不升级为 circuit breaker
+- 升级为 CB 的 5 metrics 选自"故障/异常"语义明确的指标
+
+**阈值分两阶段校准**（采纳 codex review §3.4 建议）：
+- **V5.1 阶段（短期）**：使用 doc 38 §21.13 占位推导（如上表"阈值推导"列），标注"占位"
+- **V5.5 集成测试后（长期）**：查 devrix Prometheus 历史 P99 / P95，回填正式推导
+  - 具体查询：`sum(rate(dispatch_loop_wakeups_total[5m]))` P99（建议查询脚本见 `scripts/cb-threshold-calibrate.sh`，V5.5 产出）
 
 ## 8. 与 Phase 1-7 数据契约的兼容
 

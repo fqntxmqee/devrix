@@ -6,6 +6,7 @@
 **Sprint:** mups-v5
 **Estimated Effort:** 6.5 天
 **PR Count:** 5
+**Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S7_Archived (2026-06-25, T12 PARTIAL 留待 PR-V5.6)
 **SoT:** `brain/.../core-concepts/38-mature-uncertainty-methodology.md §21` (400 行 v5 完整设计)
 
 ---
@@ -64,13 +65,54 @@
 
 **结论**：P0 缺 11 项 + P1 缺 1 项 = **12 项落地**，5 PR 6.5 天。
 
+### 3.4 不实施 v5 的备选方案对比（采纳 codex review §3.1 建议）
+
+**问题**：6.5 天工作量是否值得？需要明确"没有 v5 会发生什么具体 bug"。
+
+**7 个具体 bug 场景**（按发生频度排序）：
+
+| # | Bug 场景 | 没有 v5 的后果 | 频度估计 |
+|---|---------|--------------|---------|
+| 1 | **LLM 切换 Plan.Kind 绕过回路深度计数**（doc 38 §21.2 关键漏洞）| 回路无限循环，单 ProcessMessage 消耗 token 100k+，飞书卡片超时 | 中（LLM 操纵真实存在）|
+| 2 | **同一模式重复 4 次仍继续**（LoopDepthTracker 缺失）| 资源耗尽、计费爆炸、用户体验卡死 | 中（Verify 失败时常见）|
+| 3 | **AnomalyDetector 连续 5 次 nil 不触发升级**（CB L0 缺失）| 异常被默默吞掉，下游节点持续异常输入 | 高（异常检测是常态）|
+| 4 | **Verifier p95 > 2s 连续 3 次不触发降级**（CB L2 缺失）| 用户等待超时，飞书卡片无反馈 | 中（高并发时常见）|
+| 5 | **HumanArbitrator 同步等待 10s 阻塞 ProcessMessage**（同步约束违反）| 飞书卡片体验崩溃（已显示但实际卡 10s）| 高（每次升级到人工都触发）|
+| 6 | **PlanKindSwitchPolicy 缺失导致 LLM 反复切换 Plan 类型**（doc 38 §21.4.2 关键漏洞）| LLM "试探模式"无限循环 | 中（探索型 Plan 常见）|
+| 7 | **CircuitBreaker 与现有 5 metrics 重叠无升级触发**（CB 缺失）| 已知 5 metrics 仅作 metric 展示，无 circuit breaker 保护 | 高（dispatch_loop_wakeups 等高频）|
+
+**不实施 v5 的备选方案**（评估 4 个）：
+
+| 备选方案 | 工作量 | 缺点 | 评估 |
+|---------|--------|------|------|
+| **A. 维持现状**（依赖 Phase 1-7 + Auto-Close）| 0 天 | 5 个 P0 bug 不解决（场景 1/2/5/6/7）| ❌ 不可接受 |
+| **B. 仅实现 LoopDepthTracker v2 + 同步 HumanArbitrator** | 2 天 | 解决 3 个 bug（1/2/6），但飞书卡片体验差（5），CB 缺失（3/4/7）| ⚠️ 部分缓解 |
+| **C. 实现 v5 但砍掉异步 Human + CB 5 层** | 3 天 | 解决 4 个 bug（1/2/5/6），但 CB 缺失（3/4/7）| ⚠️ 部分缓解 |
+| **D. 完整 v5**（本方案）| 6.5 天 | 解决 7 个 bug | ✅ 推荐 |
+
+**结论**：6.5 天投入可解决 7 个 P0 bug，平均每个 bug 0.93 天，远低于"单独修"的累计成本（每个 1-2 天 + 协调成本）。
+
+### 3.5 v5 与 Phase 1-7 是叠加关系（采纳 codex review §3.1 澄清）
+
+**关键澄清**：v5 **不取代** Phase 1-7 任何已落地能力，而是**叠加**统一逃逸层。
+
+| 现有沉淀 | v5 关系 | 协同方式 |
+|---------|---------|---------|
+| **Phase 4 14 ExitReason** | 保留为底层事实，v5 的 EscapeAction 5 类是上层抽象 | EscapeDecision.ExitReason 字段映射 14 类 |
+| **Phase 6 buildObserveRequest 3 层 fail-safe** | 保留，v5 的 Evaluate error 降级为同一模式 | Evaluate panic → recover + Continue（同 fail-safe 模式）|
+| **Phase 7 Auto-Close** | 保留，v5 的 HumanArbitrator 异步化复用 Auto-Close 模式 | "同步返回 + 内部异步" 是 Auto-Close 已有模式，v5 复用 |
+| **Phase 4 14 ExitReason 隐式存在** | 升级为 CompensationAction 5 类抽象（V5.5）| ExitReason → CompensationAction 映射表 |
+| **CircuitBreaker 与 5 metrics** | 显式选择 5 个升级为 circuit breaker，其余保留为纯 metric | 5 metrics 中 L0/L1/L2/L3/L4/L5 升级，其余 state.cancels/handles 保留 |
+
+**结论**：v5 复用 Phase 1-7 全部数据契约，**零破坏性变更**（design §8 已声明，本节强化"叠加"语义）。
+
 ## 4. PR 拆分
 
 ### 4.1 PR-V5.1: LoopDepthTracker v2（1 天）
 
 **内容**：
 - `internal/layers/orchestration/escape/loop_depth_tracker.go`（NEW）
-- `LoopContext` struct（SessionID + PlanKind + PrevPlanKind + ObservationKind + FailureCriterion + ArtifactType + PlanKindSwitchCount）
+- `LoopContext` struct（7 字段：5 hash 输入 + 2 状态；PrevPlanKind/PlanKindSwitchCount 移到 policy 模块）
 - `LoopDepthTracker` struct（MaxDepth=3 + History map + LoopBudget + SessionID）
 - `hashLoopContext(ctx) string` SHA-256 算模式 hash
 - `ShouldContinue(ctx LoopContext) EscapeDecision`
