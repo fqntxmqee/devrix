@@ -50,20 +50,6 @@ func NewPlan(id, sessionID string, kind PlanKind, sourceObservationIDs []string,
 	}
 }
 
-// WithKind returns a copy with the new Kind (immutable update pattern).
-// Original Plan is unchanged — matches the Phase 2 PR-A1 With* contract.
-func (p Plan) WithKind(k PlanKind) Plan {
-	p.Kind = k
-	return p
-}
-
-// WithStrength returns a copy with the new Strength (immutable update pattern).
-// Strength is not clamped here — Validate() enforces the [0, 1] range.
-func (p Plan) WithStrength(s float64) Plan {
-	p.Strength = s
-	return p
-}
-
 // WithFailureCriteria returns a copy with the new FailureCriteria slice.
 func (p Plan) WithFailureCriteria(fc []FailureCriterion) Plan {
 	p.FailureCriteria = append([]FailureCriterion(nil), fc...)

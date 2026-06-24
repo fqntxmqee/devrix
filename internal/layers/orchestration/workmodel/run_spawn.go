@@ -9,26 +9,29 @@ import (
 
 // SpawnForWorkItem registers a run, attaches run_ref, and wires terminal → WorkItem sync.
 func SpawnForWorkItem(sessionID, workItemID, kind string, tm *TaskManager) (runID string, cancel func()) {
-	if runregistry.Global == nil || tm == nil || workItemID == "" {
+	reg := tm.Registry()
+	if reg == nil || tm == nil || workItemID == "" {
 		return "", func() {}
 	}
-	runID, cancel = runregistry.Global.Register(sessionID, workItemID, kind)
+	runID, cancel = reg.Register(sessionID, workItemID, kind)
 	_ = tm.Tree().SetRunRef(sessionID, workItemID, runID)
 	if err := tm.Tree().UpdateStatus(sessionID, workItemID, TaskStatusInProgress); err != nil {
 		slog.Warn("workmodel: mark in_progress", "work_item", workItemID, "err", err)
 	}
-	runregistry.Global.OnTerminal(runID, func(e runregistry.Entry) {
+	reg.OnTerminal(runID, func(e runregistry.Entry) {
 		syncTerminalWithRetry(tm, sessionID, workItemID, e)
 	})
 	return runID, cancel
 }
 
-// CompleteByWorkItem marks the run for a work item terminal (async worker completion).
-func CompleteByWorkItem(sessionID, workItemID, summary string, runErr error) {
-	if runregistry.Global == nil || workItemID == "" {
+// CompleteByWorkItem marks the run for a work item terminal (async worker
+// completion). reg is the run registry — nil disables the call.
+func CompleteByWorkItem(reg *runregistry.Registry, sessionID, workItemID, summary string, runErr error) {
+	if reg == nil || workItemID == "" {
 		return
 	}
-	runID, ok := runregistry.Global.GetByWorkItem(workItemID)
+	_ = sessionID
+	runID, ok := reg.GetByWorkItem(workItemID)
 	if !ok {
 		return
 	}
@@ -38,8 +41,7 @@ func CompleteByWorkItem(sessionID, workItemID, summary string, runErr error) {
 		status = runregistry.StatusFailed
 		errStr = runErr.Error()
 	}
-	runregistry.Global.SetTerminal(runID, status, summary, errStr)
-	_ = sessionID
+	reg.SetTerminal(runID, status, summary, errStr)
 }
 
 func syncTerminalWithRetry(tm *TaskManager, sessionID, workItemID string, e runregistry.Entry) {

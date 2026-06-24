@@ -7,22 +7,21 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
+	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // SubQueryRunner runs D2 SubQuery when D4 delegate is unavailable.
-// Implements hubspoke.SubQueryRunner.
 type SubQueryRunner struct {
 	LoopDeps enforce.SubQueryDeps
 }
 
-// RunSubQuery implements hubspoke.SubQueryRunner.
+// RunSubQuery runs the D2 SubQuery path.
 //
-// DM-20260617-008 W2: caller is responsible for setting LoopDeps.FlowReporter
-// (was previously auto-derived from flow.GlobalHub when nil).
+// Caller is responsible for setting LoopDeps.FlowReporter.
 //
-// DM-20260620-001-B (AC6 + AC10) — mode selects sub-agent context inheritance;
-// empty defers to SubagentConfig.DefaultMode.
+// Mode selects sub-agent context inheritance; empty defers to
+// SubagentConfig.DefaultMode.
 func (f *SubQueryRunner) RunSubQuery(
 	ctx context.Context,
 	parent *types.SessionContext,
@@ -55,7 +54,7 @@ func (f *SubQueryRunner) RunSubQuery(
 			AgentName:      "implement",
 			Role:           role,
 			TaskID:         taskID,
-			SystemPrompt:   systemPromptForRole(role),
+			SystemPrompt:   agent.SystemPromptForRole(string(role)),
 			PromptMessages: []types.Message{{Role: types.MessageRoleUser, Content: directive, SessionID: parent.SessionID}},
 			MaxTurns:       maxTurns,
 			Mode:           mode,
@@ -71,18 +70,7 @@ func (f *SubQueryRunner) RunSubQuery(
 	return res.Result.AssistantText, nil
 }
 
-func systemPromptForRole(role string) string {
-	switch WorkerRole(role) {
-	case WorkerRoleExplore:
-		return explorePrompt
-	case WorkerRolePlan:
-		return planPrompt
-	default:
-		return implementPrompt
-	}
-}
-
-// BuildSubQueryRunner creates a hubspoke.SubQueryRunner from turn-runtime deps.
+// BuildSubQueryRunner creates a SubQueryRunner from turn-runtime deps.
 func BuildSubQueryRunner(deps enforce.SubQueryDeps) sessionorchestrator.SubQueryRunner {
 	return &SubQueryRunner{LoopDeps: deps}
 }

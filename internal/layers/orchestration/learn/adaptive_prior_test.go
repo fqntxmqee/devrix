@@ -1,7 +1,6 @@
 package learn
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/devrix/devrix/internal/shared/types"
@@ -23,44 +22,11 @@ func TestBetaPrior_String_BetaFormat(t *testing.T) {
 	}
 }
 
-func TestInjectTarget_String_3Targets(t *testing.T) {
-	cases := []struct {
-		target InjectTarget
-		want   string
-	}{
-		{InjectIntentQuantizer, "intent_quantizer"},
-		{InjectHistoricalDetector, "historical_detector"},
-		{InjectRuleClassifier, "rule_classifier"},
-	}
-	for _, tc := range cases {
-		if got := tc.target.String(); got != tc.want {
-			t.Errorf("InjectTarget(%d).String() = %q, want %q", int(tc.target), got, tc.want)
-		}
-	}
-}
-
-func TestInjectTarget_UnknownValue(t *testing.T) {
-	unknown := InjectTarget(99)
-	got := unknown.String()
-	want := "InjectTarget(99)"
-	if got != want {
-		t.Errorf("unknown InjectTarget.String() = %q, want %q", got, want)
-	}
-}
-
-func TestDefaultInjectTargets_AllThree(t *testing.T) {
-	want := []InjectTarget{InjectIntentQuantizer, InjectHistoricalDetector, InjectRuleClassifier}
-	if !reflect.DeepEqual(DefaultInjectTargets, want) {
-		t.Errorf("DefaultInjectTargets = %v, want %v", DefaultInjectTargets, want)
-	}
-}
-
 func TestAdaptivePrior_Immutable(t *testing.T) {
 	// Compile-time: AdaptivePrior has no setter methods.
 	prior := &AdaptivePrior{
-		Reputation:    nil,
-		PriorBeta:     BetaPrior{Alpha: 5, Beta: 3},
-		InjectTargets: DefaultInjectTargets,
+		Reputation: nil,
+		PriorBeta:  BetaPrior{Alpha: 5, Beta: 3},
 	}
 	if prior.Reputation != nil {
 		t.Error("Reputation should be nil for cold start")
@@ -84,9 +50,6 @@ func TestBuildAdaptivePrior_DeveloperMode_DefaultDeveloperPrior(t *testing.T) {
 	}
 	if ap.Reputation != rep {
 		t.Error("Reputation field should reference the input rep")
-	}
-	if !reflect.DeepEqual(ap.InjectTargets, DefaultInjectTargets) {
-		t.Errorf("InjectTargets = %v, want %v", ap.InjectTargets, DefaultInjectTargets)
 	}
 }
 

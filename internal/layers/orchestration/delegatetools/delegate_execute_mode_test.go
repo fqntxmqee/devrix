@@ -14,8 +14,7 @@ import (
 )
 
 // modeCapturingSubQueryRunner captures the Mode field of every DispatchRequest
-// that flows through the D4-disabled fallback path. Mirrors the contract used
-// by hubspoke_test.go::stubSubQueryRunner.
+// that flows through the D4-disabled fallback path.
 type modeCapturingSubQueryRunner struct {
 	mu        sync.Mutex
 	lastMode  contracts.SubAgentMode
@@ -33,7 +32,7 @@ func (m *modeCapturingSubQueryRunner) RunSubQuery(_ context.Context, _ *types.Se
 
 // T: D7-S2-A06-T14+T15+T17 (B.4.7) — delegate_explore end-to-end mode propagation.
 //
-// Wires the full path: delegateToolRunner.Execute → hubspoke.Dispatcher
+// Wires the full path: delegateToolRunner.Execute → sessionorchestrator.Dispatcher
 // (D4 disabled) → SubQueryRunner.RunSubQuery. Asserts that the `mode` field
 // from the tool input flows byte-exact through to SubQueryRunner.
 //
@@ -72,6 +71,7 @@ func TestDelegateTool_Execute_PropagatesModeEnd2End(t *testing.T) {
 				cap,                                   // subQuery runner (captures mode)
 				hub,                                   // hub for FlowEvents
 				nil,                                   // leaderRes
+				nil,                                   // registry (unused in subquery path)
 			)
 			globalDeps = Deps{Dispatcher: disp, Tasks: nil}
 
@@ -149,7 +149,7 @@ func TestDelegateTool_Execute_ModeFull_ReachesSubTurnRunner(t *testing.T) {
 }
 
 // recordingHubForMode is a minimal FlowHub stub that swallows emits. We don't
-// assert FlowEvents here — that's covered by hubspoke_test.go.
+// assert FlowEvents here.
 type recordingHubForMode struct{}
 
 func (r *recordingHubForMode) Publish(_ context.Context, _ contracts.FlowEvent) {}

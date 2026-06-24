@@ -15,6 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
 	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 
@@ -47,10 +48,12 @@ func NewContextEngine(
 	forker freefork.Forker,
 ) *contextengine.ContextEngine {
 	longTermRecaller, longTermStore := WireContextV3(ctxCfg)
-	// DM-20260617-008 W4: TaskManager constructed locally and passed to
-	// downstream wiring (RegisterTaskTools + NewSessionOrchestrator via
-	// WithTaskManager option). Replaces workmodel.GlobalTaskManager.
+	// TaskManager constructed locally and DI'd to RegisterTaskTools +
+	// NewSessionOrchestrator via WithTaskManager option.
 	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
+	// bus is created by bootstrap and DI'd to TaskManager + drainer.
+	bus := notify.NewInMemoryBus(64)
+	tm.SetBus(bus)
 	toolReg, err := contextengine.NewBuiltinToolRegistry(toolCfg)
 	if err != nil {
 		slog.Error("create builtin tool registry", "error", err)
@@ -102,7 +105,7 @@ func NewContextEngine(
 	// the engine's surface list (TOOL-SURFACE-1 SoT) and the per-tool
 	// dispatch goes through surface.Execute (W9). The schema + execution
 	// surface is no longer dependent on a package-level global singleton.
-	wireTaskNotifDrainer()
+	wireTaskNotifDrainer(bus)
 
 	diagCfg := ctxCfg.Diagnostics.Normalized()
 	diagTracker := tracker.New(diagCfg.TrackerLRUCapacity)
@@ -166,7 +169,7 @@ func NewContextEngine(
 		ObsBridge:           obsBridge,
 		DefaultModel:        stack.DefaultModel,
 		TierResolver:        stack.TierResolver,
-		AgentRoleToolFilter: toolpolicy.NewFilter(),
+		AgentRoleToolFilter: toolpolicy.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).

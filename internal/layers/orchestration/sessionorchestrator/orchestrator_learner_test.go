@@ -274,9 +274,6 @@ func (p *priorRecordingClassifier) ClassifyWithPrior(_ context.Context, _ string
 // when BOTH WithLearner and WithClassifier are wired. ProcessMessage must
 // call classifier.ClassifyWithPrior — observable via the recorder seeing
 // the injected prior.
-//
-// (Renamed from WithShadowClassifier to WithClassifier in DM-20260625-011
-// after ShadowClassifier was removed as dead code.)
 func TestSessionOrchestrator_WithClassifier_PriorThreadedToClassifier(t *testing.T) {
 	exec := &fakeD2{}
 	recorder := &priorRecordingClassifier{}

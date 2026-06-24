@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/google/uuid"
@@ -53,6 +54,14 @@ type TaskManager struct {
 	// DM-20260621-010 PR-B: nil-safe; non-nil counters are incremented on
 	// recover() in publishCompletion.
 	metrics *TaskManagerMetrics
+
+	// bus notifies background task completion to subscribers (e.g. task_output
+	// tool, prepareTurn drainer). Optional; nil disables publishing.
+	bus notify.Bus
+
+	// registry tracks run observation handles (DM-011). Optional; nil
+	// disables run tracking (SpawnForWorkItem becomes a no-op).
+	registry *runregistry.Registry
 }
 
 // NewTaskManager creates a new in-memory task manager.
@@ -71,6 +80,31 @@ func NewTaskManagerFromConfig(cfg config.TasksConfig, obsBridge *observability.B
 		}
 	}
 	return m
+}
+
+// SetBus wires the notification bus. Optional; nil disables completion
+// publishing. Returns the receiver for chaining. Bootstrap calls this once
+// after constructing the TaskManager.
+func (m *TaskManager) SetBus(bus notify.Bus) *TaskManager {
+	m.bus = bus
+	return m
+}
+
+// SetRegistry wires the run registry. Optional; nil disables run tracking.
+// Returns the receiver for chaining. Bootstrap calls this once after
+// constructing the TaskManager.
+func (m *TaskManager) SetRegistry(reg *runregistry.Registry) *TaskManager {
+	m.registry = reg
+	return m
+}
+
+// Registry returns the run registry (nil if not wired). Nil-safe: returns
+// nil if the receiver is nil.
+func (m *TaskManager) Registry() *runregistry.Registry {
+	if m == nil {
+		return nil
+	}
+	return m.registry
 }
 
 // SetMetrics attaches a metrics sink. Safe to call before any publish.
@@ -235,8 +269,8 @@ func (m *TaskManager) UpdateStatus(sessionID, taskID string, status TaskStatus) 
 
 func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, status TaskStatus) {
 	// DM-20260621-010 PR-B: replace `_ = recover()` silent-swallow with
-	// structured counter + slog.Error. notify.GlobalBus().Publish can panic
-	// (e.g. nil-bus misuse, panicking subscriber); we want to count and log.
+	// structured counter + slog.Error. m.bus.Publish can panic (e.g. nil-bus
+	// misuse, panicking subscriber); we want to count and log.
 	defer func() {
 		if r := recover(); r != nil {
 			if m.metrics != nil {
@@ -247,15 +281,14 @@ func (m *TaskManager) publishCompletion(sessionID, taskID, subject string, statu
 				"metric", "publish_completion_panics")
 		}
 	}()
-	bus := notify.GlobalBus()
-	if bus == nil {
+	if m.bus == nil {
 		return
 	}
 	errStr := ""
 	if status == TaskStatusFailed {
 		errStr = "task failed"
 	}
-	bus.Publish(sessionID, notify.CompletionEvent{
+	m.bus.Publish(sessionID, notify.CompletionEvent{
 		TaskID:  taskID,
 		Kind:    "workmodel",
 		Summary: fmt.Sprintf("%s → %s", subject, status),

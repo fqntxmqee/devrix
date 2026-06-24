@@ -12,11 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 )
 
-// Dispatcher tests. Moved from internal/layers/orchestration/hubspoke/
-// when hubspoke/ was retired as a package boundary (the directory only held
-// tests after PR-C2 migrated all hubspoke.* production code to
-// sessionorchestrator/ + bridge/).
-
 // recordingHub is intentionally duplicated here rather than imported from
 // bridge_test, because bridge_test uses *_test package suffix and the dispatcher
 // tests run in sessionorchestrator_test — cross-package reuse would require
@@ -68,6 +63,7 @@ func TestNewDispatcher(t *testing.T) {
 		nil, // subQuery
 		nil, // hub → defaults to NoOp (flow.GlobalHub removed DM-20260617-008 W2)
 		nil, // leaderRes
+		nil, // registry → optional, nil disables run tracking
 	)
 	if d == nil {
 		t.Fatal("NewDispatcher returned nil")
@@ -78,7 +74,7 @@ func TestDispatcher_Dispatch_D4_enabled_withLeader(t *testing.T) {
 	leader := &stubAgent{id: "leader-1"}
 	res := &staticLeaderResolver{leader: leader, ok: true}
 	exec := &stubExecutor{result: execute.WorkerResult{WorkerID: "w-1", Summary: "done"}}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, nil, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, nil, res, nil)
 
 	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
@@ -98,7 +94,7 @@ func TestDispatcher_Dispatch_D4_async(t *testing.T) {
 	leader := &stubAgent{id: "leader-1"}
 	res := &staticLeaderResolver{leader: leader, ok: true}
 	exec := &stubExecutor{workerID: "w-async"}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, nil, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, exec, nil, nil, res, nil)
 
 	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
@@ -118,7 +114,7 @@ func TestDispatcher_Dispatch_D4_async(t *testing.T) {
 func TestDispatcher_Dispatch_D4_disabled_fallsToD2(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: true}
 	sub := &stubSubQueryRunner{summary: "subquery result"}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, sub, nil, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, sub, nil, res, nil)
 
 	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
@@ -138,7 +134,7 @@ func TestDispatcher_Dispatch_D4_disabled_fallsToD2(t *testing.T) {
 func TestDispatcher_Dispatch_D4_enabled_noLeader_fallsToD2(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: false}
 	sub := &stubSubQueryRunner{summary: "d2 fallback"}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, nil, sub, nil, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: true}, nil, sub, nil, res, nil)
 
 	result, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
@@ -157,7 +153,7 @@ func TestDispatcher_Dispatch_D4_enabled_noLeader_fallsToD2(t *testing.T) {
 
 func TestDispatcher_Dispatch_noFallback(t *testing.T) {
 	res := &staticLeaderResolver{leader: nil, ok: false}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, nil, nil, res)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{Enabled: false}, nil, nil, nil, res, nil)
 
 	_, err := d.Dispatch(context.Background(), sessionorchestrator.DispatchRequest{
 		SessionID: "sess-1",
@@ -171,7 +167,7 @@ func TestDispatcher_Dispatch_noFallback(t *testing.T) {
 
 func TestDispatcher_Hub(t *testing.T) {
 	hub := &recordingHub{}
-	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{}, nil, nil, hub, nil)
+	d := sessionorchestrator.NewDispatcher(config.DelegateConfig{}, nil, nil, hub, nil, nil)
 	if got := d.Hub(); got != hub {
 		t.Fatalf("Hub() = %v, want %v", got, hub)
 	}

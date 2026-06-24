@@ -249,11 +249,3 @@ func expandPath(p string) string {
 	}
 	return os.ExpandEnv(p)
 }
-
-// Global is the process-wide run registry.
-var Global *Registry
-
-// SetGlobal installs the process-wide registry.
-func SetGlobal(r *Registry) {
-	Global = r
-}

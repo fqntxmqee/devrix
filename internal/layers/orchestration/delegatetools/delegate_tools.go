@@ -1,6 +1,6 @@
-// Package delegatetools — D7 orchestration F: delegate_* tool routing (DM-20260614-011).
+// Package delegatetools — D7 orchestration F: delegate_* tool routing.
 //
-// DSAFT: D7-S2/S5 F — routes Leader tool calls through hubspoke.Dispatcher.
+// DSAFT: D7-S2/S5 F — routes Leader tool calls through sessionorchestrator.Dispatcher.
 // Moved from contextengine (v2.0) to keep D2 as Execution Follower only.
 package delegatetools
 
@@ -133,22 +133,23 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 	}
 
 	runID, _ := workmodel.SpawnForWorkItem(sessionID, req.TaskID, string(r.role), globalDeps.Tasks)
+	reg := globalDeps.Tasks.Registry()
 
 	res, err := disp.Dispatch(ctx, req)
 	if err != nil {
-		if runID != "" && runregistry.Global != nil {
-			runregistry.Global.SetTerminal(runID, runregistry.StatusFailed, "", err.Error())
+		if runID != "" && reg != nil {
+			reg.SetTerminal(runID, runregistry.StatusFailed, "", err.Error())
 		}
 		return &tools.ToolResult{Error: err.Error()}, nil
 	}
-	if runID != "" && runregistry.Global != nil && !req.Async {
+	if runID != "" && reg != nil && !req.Async {
 		st := runregistry.StatusCompleted
 		errStr := ""
 		if res.Error != nil {
 			st = runregistry.StatusFailed
 			errStr = res.Error.Error()
 		}
-		runregistry.Global.SetTerminal(runID, st, res.Summary, errStr)
+		reg.SetTerminal(runID, st, res.Summary, errStr)
 	}
 
 	out := strings.TrimSpace(res.Summary)

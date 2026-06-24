@@ -1,6 +1,8 @@
 package toolpolicy
 
 import (
+	"strings"
+
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -32,35 +34,6 @@ func AsToolFilter() contracts.ToolFilter {
 
 type toolpolicyFilterAdapter struct{}
 
-// delegateToolNames is duplicated from filter.go because the adapter is
-// intentionally independent (the existing Filter still works on
-// tools.ToolSchema; this one works on contracts.ToolSpec).
-var adapterDelegateToolNames = map[string]bool{
-	"delegate_explore":   true,
-	"delegate_plan":      true,
-	"delegate_implement": true,
-	"delegate_status":    true,
-	"task_spawn":         true,
-}
-
-var adapterReadOnlyWorkerTools = map[string]bool{
-	"read_file":       true,
-	"glob":            true,
-	"grep":            true,
-	"list_dir":        true,
-	"bash":            true,
-	"enter_plan_mode": true,
-	"exit_plan_mode":  true,
-	"todo_write":      true,
-	"task_write":      true,
-	"task_list":       true,
-	"task_await":      true,
-	"edit_file":       true,
-	"task_create":     true,
-	"task_get":        true,
-	"task_update":     true,
-}
-
 // Apply implements contracts.ToolFilter.
 //
 // Mapping rules (mirrors FilterToolsForAgentRole):
@@ -76,7 +49,7 @@ func (a *toolpolicyFilterAdapter) Apply(specs []contracts.ToolSpec, ctx contract
 	case "delegate":
 		out := make([]contracts.ToolSpec, 0, len(specs))
 		for _, s := range specs {
-			if adapterDelegateToolNames[s.Name] {
+			if DelegateToolNames[s.Name] {
 				out = append(out, s)
 			}
 		}
@@ -94,7 +67,7 @@ func (a *toolpolicyFilterAdapter) Apply(specs []contracts.ToolSpec, ctx contract
 func (a *toolpolicyFilterAdapter) hideDelegate(specs []contracts.ToolSpec) []contracts.ToolSpec {
 	out := make([]contracts.ToolSpec, 0, len(specs))
 	for _, s := range specs {
-		if adapterDelegateToolNames[s.Name] {
+		if DelegateToolNames[s.Name] {
 			continue
 		}
 		out = append(out, s)
@@ -105,7 +78,7 @@ func (a *toolpolicyFilterAdapter) hideDelegate(specs []contracts.ToolSpec) []con
 func (a *toolpolicyFilterAdapter) applyWorkerReadOnly(specs []contracts.ToolSpec) []contracts.ToolSpec {
 	out := make([]contracts.ToolSpec, 0, len(specs))
 	for _, s := range specs {
-		if adapterReadOnlyWorkerTools[s.Name] {
+		if readOnlyWorkerTools[strings.ToLower(s.Name)] {
 			out = append(out, s)
 		}
 	}

@@ -310,8 +310,9 @@ Model: %s
 // 返回空字符串。bus.Drain 一次性消费 + 清空 pending, 不会重复注入。
 //
 // S4-Gate H-3 fix: D2 Thin — prompt 包不 import orchestration/workmodel/notify,
-// 用 function-based DI: 注入点 SetTaskNotifDrainer, 真实实现 (调用 notify.GlobalBus()
-// + FormatReminder) 放在 bootstrap 层. 默认实现返回空字符串, 单元测试不依赖 D7.
+// 用 function-based DI: 注入点 SetTaskNotifDrainer, 真实实现 (调用 bus.Drain +
+// FormatReminder, bus 由 bootstrap 创建并传入) 放在 bootstrap 层.
+// 默认实现返回空字符串, 单元测试不依赖 D7.
 func drainTaskNotifications(sessionID string) string {
 	if sessionID == "" {
 		return ""

@@ -1,6 +1,6 @@
 // Package execute — D4-S14 ExecuteWorker: pure worker execution contract.
 //
-// WorkerExecutor accepts a WorkerRunSpec from D7 hubspoke dispatcher,
+// WorkerExecutor accepts a WorkerRunSpec from D7 dispatcher,
 // performs fork→run→join, and returns WorkerResult.
 // It does NOT select Spokes, publish FlowEvents, or interact with ExecutionFlowHub directly.
 //
@@ -16,9 +16,9 @@ import (
 
 // WorkerRunSpec is the D7 → D4 worker execution request.
 // It contains only execution parameters — orchestration decisions
-// (Spoke selection, FlowBridge wiring) belong to D7 hubspoke.
+// (Spoke selection, FlowBridge wiring) belong to D7 dispatcher.
 //
-// Observer is wired per-call by D7 hubspoke so each dispatch
+// Observer is wired per-call by D7 dispatcher so each dispatch
 // creates its own AgentBridge without shared mutable state.
 type WorkerRunSpec struct {
 	Role         string
@@ -40,7 +40,7 @@ type WorkerResult struct {
 
 // WorkerExecutor performs fork→run→join for a single worker agent.
 //
-// D7 hubspoke owns FlowBridge wiring and Spoke selection;
+// D7 dispatcher owns FlowBridge wiring and Spoke selection;
 // WorkerExecutor owns mechanism correctness (COW isolation, PermissionGate, dedup).
 type WorkerExecutor interface {
 	ExecuteSync(ctx context.Context, leader multiagent.Agent, spec WorkerRunSpec) (WorkerResult, error)

@@ -8,8 +8,8 @@ import (
 )
 
 // Await polls a run until terminal or timeout.
-func Await(ctx context.Context, runID string, block bool, timeout time.Duration) (string, error) {
-	if Global == nil {
+func Await(ctx context.Context, reg *Registry, runID string, block bool, timeout time.Duration) (string, error) {
+	if reg == nil {
 		return "", fmt.Errorf("runregistry not initialized")
 	}
 	deadline := time.Now().Add(timeout)
@@ -18,12 +18,12 @@ func Await(ctx context.Context, runID string, block bool, timeout time.Duration)
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
-		delta, newOff, status, err := Global.GetOutputDelta(runID, offset)
+		delta, newOff, status, err := reg.GetOutputDelta(runID, offset)
 		if err != nil {
 			return "", err
 		}
 		offset = newOff
-		entry, ok := Global.Get(runID)
+		entry, ok := reg.Get(runID)
 		if !ok {
 			return "", fmt.Errorf("run not found: %s", runID)
 		}

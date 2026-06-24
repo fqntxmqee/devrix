@@ -77,7 +77,7 @@ func (s *PluginSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 }
 
 // InterruptBehavior implements contracts.ToolSurface. delegate_* tools are
-// long-run (they spawn hubspoke child agents), so they opt into
+// long-run (they spawn Dispatcher child agents), so they opt into
 // InterruptCancel; everything else blocks.
 func (s *PluginSurface) InterruptBehavior(name string) contracts.InterruptMode {
 	return InterruptBehaviorFor(name)

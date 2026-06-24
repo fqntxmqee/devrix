@@ -67,8 +67,7 @@ func TestRuleClassifier_ClassifyWithPrior_ZeroMean_NoChange(t *testing.T) {
 	c := NewRuleClassifier(orchtypes.DefaultConfig())
 	// Manually constructed prior with Mean=0 (e.g. adversarial injection)
 	prior := &learn.AdaptivePrior{
-		PriorBeta:     learn.BetaPrior{Alpha: 0, Beta: 0},
-		InjectTargets: learn.DefaultInjectTargets,
+		PriorBeta: learn.BetaPrior{Alpha: 0, Beta: 0},
 	}
 	baseline, _ := c.Classify(context.Background(), "hello")
 	withZero, err := c.ClassifyWithPrior(context.Background(), "hello", prior)

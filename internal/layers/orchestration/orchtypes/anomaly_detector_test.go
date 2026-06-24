@@ -144,8 +144,7 @@ func TestAnomalyDetector_DetectWithPrior_ZeroMean_Baseline(t *testing.T) {
 	d := NewAnomalyDetector()
 	// Manually constructed prior with Mean=0 (e.g. adversarial injection)
 	prior := &learn.AdaptivePrior{
-		PriorBeta:     learn.BetaPrior{Alpha: 0, Beta: 0},
-		InjectTargets: learn.DefaultInjectTargets,
+		PriorBeta: learn.BetaPrior{Alpha: 0, Beta: 0},
 	}
 	anomalies := []Anomaly{{Category: AnomalyCategoryRate, Severity: 0.7, Evidence: "x"}}
 	r, err := d.DetectWithPrior(context.Background(), anomalies, prior)

@@ -40,53 +40,14 @@ var (
 	DefaultOperatorPrior = BetaPrior{Alpha: 8, Beta: 1}
 )
 
-// InjectTarget identifies where to inject the AdaptivePrior in the next
-// Observe.All() call. The 3 standard targets are LP-1 衍生 (Phase 5 PR-E5).
-type InjectTarget int
-
-const (
-	// InjectIntentQuantizer — inject into IntentQuantizer.Quantize.
-	InjectIntentQuantizer InjectTarget = iota
-
-	// InjectHistoricalDetector — inject into AnomalyDetector.HistoricalDetector.
-	InjectHistoricalDetector
-
-	// InjectRuleClassifier — inject into RuleClassifier.Classify.
-	InjectRuleClassifier
-)
-
-// String returns the wire format name.
-func (t InjectTarget) String() string {
-	switch t {
-	case InjectIntentQuantizer:
-		return "intent_quantizer"
-	case InjectHistoricalDetector:
-		return "historical_detector"
-	case InjectRuleClassifier:
-		return "rule_classifier"
-	default:
-		return fmt.Sprintf("InjectTarget(%d)", int(t))
-	}
-}
-
-// DefaultInjectTargets — the 3 standard injection points.
-var DefaultInjectTargets = []InjectTarget{
-	InjectIntentQuantizer,
-	InjectHistoricalDetector,
-	InjectRuleClassifier,
-}
-
 // AdaptivePrior is the immutable output of BuildAdaptivePrior. Carries the
-// merged Beta prior + Reputation + InjectTargets list (LP-1 衍生).
+// merged Beta prior + Reputation (LP-1 衍生).
 type AdaptivePrior struct {
 	// Reputation — current ReputationEvidence (nullable for cold start).
 	Reputation *ReputationEvidence
 
 	// PriorBeta — Bayesian-merged Beta prior (DefaultPrior + Reputation).
 	PriorBeta BetaPrior
-
-	// InjectTargets — the list of injection targets.
-	InjectTargets []InjectTarget
 }
 
 // BuildAdaptivePrior constructs an AdaptivePrior from a ReputationEvidence
@@ -115,9 +76,8 @@ func BuildAdaptivePrior(rep *ReputationEvidence, trackMode TrackMode) *AdaptiveP
 	}
 
 	return &AdaptivePrior{
-		Reputation:    rep,
-		PriorBeta:     prior,
-		InjectTargets: DefaultInjectTargets,
+		Reputation: rep,
+		PriorBeta:  prior,
 	}
 }
 

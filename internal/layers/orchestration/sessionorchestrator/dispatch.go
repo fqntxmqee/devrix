@@ -7,6 +7,7 @@ import (
 	flowbridge "github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
+	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -60,6 +61,7 @@ type Dispatcher struct {
 	subQuery  SubQueryRunner
 	hub       contracts.ExecutionFlowHub
 	leaderRes LeaderResolver
+	registry  *runregistry.Registry
 }
 
 // NewDispatcher creates a SpokeDispatcher.
@@ -67,12 +69,16 @@ type Dispatcher struct {
 // hub: the ExecutionFlowHub used for publishing flow events. When nil, a
 // NoOpExecutionFlowHub is used (was: flow.GlobalHub default in PR #63;
 // DM-20260617-008 W2 removes the process-wide global).
+//
+// registry: the run registry used to mark delegated worker runs terminal.
+// Optional; nil disables run tracking in AgentBridge.
 func NewDispatcher(
 	cfg config.DelegateConfig,
 	exec execute.WorkerExecutor,
 	subQuery SubQueryRunner,
 	hub contracts.ExecutionFlowHub,
 	leaderRes LeaderResolver,
+	registry *runregistry.Registry,
 ) *Dispatcher {
 	if hub == nil {
 		hub = contracts.NoOpExecutionFlowHub{}
@@ -83,6 +89,7 @@ func NewDispatcher(
 		subQuery:  subQuery,
 		hub:       hub,
 		leaderRes: leaderRes,
+		registry:  registry,
 	}
 }
 
@@ -106,7 +113,7 @@ func (d *Dispatcher) dispatchToD4(ctx context.Context, leader multiagent.Agent, 
 	}
 
 	// Create a per-call AgentBridge so D7 owns FlowEvent publishing.
-	ab := flowbridge.NewAgentBridge(d.hub, req.SessionID, "", "", req.TaskID, req.Role)
+	ab := flowbridge.NewAgentBridge(d.hub, req.SessionID, "", "", req.TaskID, req.Role, d.registry)
 
 	spec := execute.WorkerRunSpec{
 		Role:         req.Role,
@@ -140,7 +147,7 @@ func (d *Dispatcher) dispatchToD4(ctx context.Context, leader multiagent.Agent, 
 
 func (d *Dispatcher) dispatchToD2(ctx context.Context, req DispatchRequest) (DispatchResult, error) {
 	if d.subQuery == nil || req.ParentSC == nil {
-		return DispatchResult{}, fmt.Errorf("hubspoke: no leader and no subquery fallback")
+		return DispatchResult{}, fmt.Errorf("dispatcher: no leader and no subquery fallback")
 	}
 	summary, err := d.subQuery.RunSubQuery(ctx, req.ParentSC, req.Role, req.Directive, req.TaskID, req.MaxTurns, req.Mode)
 	return DispatchResult{Role: req.Role, Summary: summary, Error: err}, err

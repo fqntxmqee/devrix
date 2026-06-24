@@ -523,35 +523,39 @@ func TestStrengthFloor_Unit(t *testing.T) {
 // paths, MarshalJSON, helper errors.
 // -----------------------------------------------------------------------------
 
-// TestPlan_WithKind_Immutable guards the Phase 2 PR-A1 WithKind contract.
-func TestPlan_WithKind_Immutable(t *testing.T) {
+// TestPlan_KindAssignment guards that direct field assignment on a Plan
+// copy is value-safe (Plan is a value type, so the receiver copy is independent).
+func TestPlan_KindAssignment(t *testing.T) {
 	p1 := validPlan(t)
-	p2 := p1.WithKind(ExplorationPlan)
+	p2 := *p1
+	p2.Kind = ExplorationPlan
 	if p1.Kind == ExplorationPlan {
-		t.Error("WithKind mutated original Plan")
+		t.Error("direct Kind assignment leaked through Plan value copy")
 	}
 	if p2.Kind != ExplorationPlan {
-		t.Errorf("WithKind copy broken: kind=%v", p2.Kind)
+		t.Errorf("copy.Kind = %v, want %v", p2.Kind, ExplorationPlan)
 	}
 }
 
-// TestPlan_WithStrength_Immutable guards the same contract for Strength.
+// TestPlan_StrengthAssignment guards the same value-copy contract for Strength.
 // Validate also enforces the [0,1] range so out-of-range values must fail.
-func TestPlan_WithStrength_Immutable(t *testing.T) {
+func TestPlan_StrengthAssignment(t *testing.T) {
 	p1 := validPlan(t)
-	p2 := p1.WithStrength(0.42)
+	p2 := *p1
+	p2.Strength = 0.42
 	if p1.Strength == 0.42 {
-		t.Error("WithStrength mutated original Plan")
+		t.Error("direct Strength assignment leaked through Plan value copy")
 	}
 	if p2.Strength != 0.42 {
-		t.Errorf("WithStrength copy broken: strength=%v", p2.Strength)
+		t.Errorf("copy.Strength = %v, want %v", p2.Strength, 0.42)
 	}
 }
 
-// TestPlan_WithStrength_OutOfRange_Fails guards the Validate() range check.
-func TestPlan_WithStrength_OutOfRange_Fails(t *testing.T) {
+// TestPlan_Strength_OutOfRange_Fails guards the Validate() range check.
+func TestPlan_Strength_OutOfRange_Fails(t *testing.T) {
 	for _, s := range []float64{-0.01, 1.01} {
-		p := validPlan(t).WithStrength(s)
+		p := *validPlan(t)
+		p.Strength = s
 		err := p.Validate()
 		if err == nil {
 			t.Errorf("expected range error for Strength=%v", s)
@@ -659,7 +663,8 @@ func TestPlan_Validate_BlastRadiusExceeded(t *testing.T) {
 
 // TestPlan_Validate_KindUnset covers the structural Kind check.
 func TestPlan_Validate_KindUnset(t *testing.T) {
-	p := validPlan(t).WithKind(KindUnset)
+	p := *validPlan(t)
+	p.Kind = KindUnset
 	err := p.Validate()
 	if err == nil {
 		t.Fatal("expected KindUnset validation error")

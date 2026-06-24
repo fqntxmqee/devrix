@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -21,12 +22,14 @@ type AgentBridge struct {
 	taskID   string
 	workerID string
 	role     string
+	registry *runregistry.Registry
 }
 
 // NewAgentBridge creates a FlowBridge for a D4 delegated worker.
 func NewAgentBridge(
 	hub contracts.ExecutionFlowHub,
 	sessionID, flowID, workerID, taskID, role string,
+	registry *runregistry.Registry,
 ) *AgentBridge {
 	return &AgentBridge{
 		hub:      hub,
@@ -35,6 +38,7 @@ func NewAgentBridge(
 		workerID: workerID,
 		taskID:   taskID,
 		role:     role,
+		registry: registry,
 	}
 }
 
@@ -58,7 +62,7 @@ func (b *AgentBridge) OnWorkerCompleted(workerID, sessionID string, summary stri
 	if b == nil || b.hub == nil {
 		return
 	}
-	workmodel.CompleteByWorkItem(sessionID, b.taskID, summary, runErr)
+	workmodel.CompleteByWorkItem(b.registry, sessionID, b.taskID, summary, runErr)
 	kind := contracts.FlowCompleted
 	if runErr != nil {
 		kind = contracts.FlowFailed

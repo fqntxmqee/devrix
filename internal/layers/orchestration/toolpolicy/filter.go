@@ -6,11 +6,14 @@ package toolpolicy
 import (
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-var delegateToolNames = map[string]bool{
+// DelegateToolNames is the set of tool names hidden from workers/sub-agents.
+// Exported so filter_adapter.go can reuse the same set for contracts.ToolSpec.
+var DelegateToolNames = map[string]bool{
 	"delegate_explore":   true,
 	"delegate_plan":      true,
 	"delegate_implement": true,
@@ -18,12 +21,38 @@ var delegateToolNames = map[string]bool{
 	"task_spawn":         true,
 }
 
-// Filter implements contextengine.AgentRoleToolFilter.
-type Filter struct{}
+// readOnlyWorkerTools is the allowed tool set for explore/plan workers.
+// Lowercased; matched case-insensitively against tool.Name.
+var readOnlyWorkerTools = map[string]bool{
+	"read_file":       true,
+	"glob":            true,
+	"grep":            true,
+	"list_dir":        true,
+	"bash":            true,
+	"enter_plan_mode": true,
+	"exit_plan_mode":  true,
+	"todo_write":      true,
+	"task_write":      true,
+	"task_list":       true,
+	"task_await":      true,
+	"edit_file":       true,
+	"task_create":     true,
+	"task_get":        true,
+	"task_update":     true,
+}
 
-// NewFilter returns the default agent-role tool filter.
-func NewFilter() *Filter {
-	return &Filter{}
+// AsAgentRoleToolFilter adapts FilterToolsForAgentRole to the
+// enforce.AgentRoleToolFilter interface so bootstrap can inject the policy
+// without an empty Filter wrapper struct.
+func AsAgentRoleToolFilter() enforce.AgentRoleToolFilter {
+	return agentRoleFilterFunc(FilterToolsForAgentRole)
+}
+
+type agentRoleFilterFunc func(sc *types.SessionContext, ts []tools.ToolSchema) []tools.ToolSchema
+
+// Filter implements enforce.AgentRoleToolFilter.
+func (f agentRoleFilterFunc) Filter(sc *types.SessionContext, ts []tools.ToolSchema) []tools.ToolSchema {
+	return f(sc, ts)
 }
 
 // FilterToolsForAgentRole hides delegate tools from workers and sub-agents.
@@ -37,7 +66,7 @@ func FilterToolsForAgentRole(sc *types.SessionContext, ts []tools.ToolSchema) []
 	}
 	out := make([]tools.ToolSchema, 0, len(ts))
 	for _, t := range ts {
-		if delegateToolNames[t.Name] {
+		if DelegateToolNames[t.Name] {
 			continue
 		}
 		out = append(out, t)
@@ -51,29 +80,11 @@ func FilterToolsForAgentRole(sc *types.SessionContext, ts []tools.ToolSchema) []
 	return out
 }
 
-// Filter satisfies contextengine.AgentRoleToolFilter using D2 ToolSchema aliases.
-func (f *Filter) Filter(sc *types.SessionContext, ts []tools.ToolSchema) []tools.ToolSchema {
-	if f == nil {
-		return ts
-	}
-	return FilterToolsForAgentRole(sc, ts)
-}
-
 func filterReadOnlyWorkerTools(ts []tools.ToolSchema) []tools.ToolSchema {
-	allowed := map[string]bool{
-		"read_file": true, "glob": true, "grep": true, "list_dir": true, "bash": true,
-		"enter_plan_mode": true, "exit_plan_mode": true,
-		"todo_write":      true,
-		"task_write":      true,
-		"task_list":       true,
-		"task_await":      true,
-		"edit_file":       true,
-		"task_create":     true, "task_get": true, "task_update": true,
-	}
 	out := make([]tools.ToolSchema, 0, len(ts))
 	for _, t := range ts {
 		name := strings.ToLower(t.Name)
-		if allowed[name] {
+		if readOnlyWorkerTools[name] {
 			out = append(out, t)
 		}
 	}

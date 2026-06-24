@@ -223,16 +223,15 @@ func TestIntegration_A3_TranscriptOnSessionClose(t *testing.T) {
 }
 
 // TestIntegration_G3_NotifyPrompt — G3 闭环: notify publish → FormatReminder 渲染。
+// DM-20260625-013 C4: 用本地 bus 替代 process-wide notify.GlobalBus singleton.
 func TestIntegration_G3_NotifyPrompt(t *testing.T) {
-	prev := notify.GlobalBus()
-	notify.SetGlobalBus(notify.NewInMemoryBus(8))
-	t.Cleanup(func() { notify.SetGlobalBus(prev) })
-	notify.GlobalBus().Publish("sess-int-3", notify.CompletionEvent{
+	bus := notify.NewInMemoryBus(8)
+	bus.Publish("sess-int-3", notify.CompletionEvent{
 		TaskID:  "task-int",
 		Kind:    "bash",
 		Summary: "did work",
 	})
-	out := notify.FormatReminder(notify.GlobalBus().Drain("sess-int-3"))
+	out := notify.FormatReminder(bus.Drain("sess-int-3"))
 	if !strings.Contains(out, "<task_notifications>") {
 		t.Errorf("G3: expected <task_notifications> block, got %q", out)
 	}
