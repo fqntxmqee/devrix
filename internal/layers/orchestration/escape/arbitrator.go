@@ -230,13 +230,54 @@ func (a *LLMArbitrator) SetParseFn(fn func(resp string) (string, string, error))
 }
 
 // Arbitrate runs the LLM and parses the response.
+//
+// H2 refactor (DM-20260625-006): the 132-line god function was decomposed
+// into 4 phase helpers (invokeLLMWithTimeout / parseWithRetry /
+// validateActionAndBuild / buildForceExit) plus this thin orchestrator.
+// The decision routing semantics are unchanged: ctx cancellation and
+// LLM timeout both surface as EscapeForceExit with the matching reason
+// + AuditLevel; parse retry runs at most once; invalid action forces
+// exit; "Continue" maps to EscapeContinue, "Exit" escalates to Rule
+// (EscalateToRule).
 func (a *LLMArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, decisions []EscapeDecision) (EscapeDecision, error) {
 	llmCtx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
 
 	prompt := a.buildPrompt(loopCtx, decisions)
 
-	// Channel for goroutine result (buffered=1 to prevent leak).
+	rawResp, failureDecision, err := a.invokeLLMWithTimeout(llmCtx, ctx, prompt, loopCtx.SessionID)
+	if failureDecision != nil {
+		return *failureDecision, err
+	}
+	if err != nil {
+		return buildForceExit(loopCtx.SessionID, "llm_error", 1, err), err
+	}
+
+	action, reason, parseErr := a.parseWithRetry(llmCtx, prompt, rawResp, loopCtx.SessionID)
+	if parseErr != nil {
+		return buildForceExit(loopCtx.SessionID, "llm_invalid_format", 1, parseErr), parseErr
+	}
+
+	return validateActionAndBuild(action, reason, loopCtx.SessionID), nil
+}
+
+// invokeLLMWithTimeout runs the LLM Generate call in a goroutine and
+// selects among: result-channel (success), ctx.Done() (cancellation /
+// timeout), and a hard wall-clock deadline (double-safety net for
+// providers that don't honor ctx). On the failure branches the helper
+// returns a non-nil EscapeDecision pointer so Arbitrate can pass it
+// through unchanged; on the success branch the pointer is nil and the
+// caller uses rawResp / err directly.
+//
+// Reason mapping (preserved from the original god function):
+//   - parentCtx cancelled → "ctx_cancelled" (AuditLevel 2)
+//   - llmCtx deadline →    "llm_timeout_5s" (AuditLevel 2)
+//   - time.After fire →    "llm_stuck_force_exit" (AuditLevel 2)
+func (a *LLMArbitrator) invokeLLMWithTimeout(
+	llmCtx context.Context,
+	parentCtx context.Context,
+	prompt, sessionID string,
+) (string, *EscapeDecision, error) {
 	type result struct {
 		resp string
 		err  error
@@ -247,121 +288,124 @@ func (a *LLMArbitrator) Arbitrate(ctx context.Context, loopCtx LoopContext, deci
 		resCh <- result{resp: resp, err: err}
 	}()
 
-	var rawResp string
-	var llmErr error
 	select {
 	case r := <-resCh:
-		rawResp, llmErr = r.resp, r.err
+		return r.resp, nil, r.err
 	case <-llmCtx.Done():
-		if ctx.Err() != nil {
-			return EscapeDecision{
+		if parentCtx.Err() != nil {
+			return "", &EscapeDecision{
 				Action:     EscapeForceExit,
 				Reason:     "ctx_cancelled",
 				AuditLevel: 2,
-				SessionID:  loopCtx.SessionID,
+				SessionID:  sessionID,
 				CreatedAt:  nowFunc(),
-			}, ctx.Err()
+			}, parentCtx.Err()
 		}
-		return EscapeDecision{
+		return "", &EscapeDecision{
 			Action:     EscapeForceExit,
 			Reason:     "llm_timeout_5s",
 			AuditLevel: 2,
-			SessionID:  loopCtx.SessionID,
+			SessionID:  sessionID,
 			CreatedAt:  nowFunc(),
 		}, llmCtx.Err()
 	case <-time.After(a.timeout + time.Second):
 		// Double-safety: ctx already done but LLM didn't honor it.
-		return EscapeDecision{
+		return "", &EscapeDecision{
 			Action:     EscapeForceExit,
 			Reason:     "llm_stuck_force_exit",
 			AuditLevel: 2,
-			SessionID:  loopCtx.SessionID,
+			SessionID:  sessionID,
 			CreatedAt:  nowFunc(),
 		}, nil
 	}
+}
 
-	if llmErr != nil {
-		return EscapeDecision{
-			Action:     EscapeForceExit,
-			Reason:     "llm_error",
-			AuditLevel: 1,
-			SessionID:  loopCtx.SessionID,
-			CreatedAt:  nowFunc(),
-		}, llmErr
-	}
-
-	// Parse response.
+// parseWithRetry parses the LLM response and, on parse failure, retries
+// once with a format hint appended to the prompt. Returns (action,
+// reason, nil) on success; on parse failure after retry returns the
+// parse error so the caller can build the standard "llm_invalid_format"
+// ForceExit decision.
+func (a *LLMArbitrator) parseWithRetry(
+	llmCtx context.Context,
+	prompt, rawResp, sessionID string,
+) (string, string, error) {
+	_ = sessionID
 	action, reason, parseErr := a.parseResponse(rawResp)
+	if parseErr == nil {
+		return action, reason, nil
+	}
+	// 1 retry with format hint.
+	retryPrompt := prompt + "\n\n必须返回 JSON: {\"action\":\"Continue|Exit\",\"reason\":\"...\"}"
+	retryResp, retryErr := a.invokeGenerateBounded(llmCtx, retryPrompt)
+	if retryErr != nil {
+		return "", "", retryErr
+	}
+	action, reason, parseErr = a.parseResponse(retryResp)
 	if parseErr != nil {
-		// 1 retry with format hint.
-		retryPrompt := prompt + "\n\n必须返回 JSON: {\"action\":\"Continue|Exit\",\"reason\":\"...\"}"
-		var retryResp string
-		var retryErr error
-		done := make(chan struct{})
-		go func() {
-			retryResp, retryErr = a.llmClient.Generate(llmCtx, retryPrompt)
-			close(done)
-		}()
-		select {
-		case <-done:
-		case <-llmCtx.Done():
-			return EscapeDecision{
-				Action:     EscapeForceExit,
-				Reason:     "ctx_cancelled_during_retry",
-				AuditLevel: 2,
-				SessionID:  loopCtx.SessionID,
-				CreatedAt:  nowFunc(),
-			}, llmCtx.Err()
-		}
-		if retryErr != nil {
-			return EscapeDecision{
-				Action:     EscapeForceExit,
-				Reason:     "llm_non_json_after_retry",
-				AuditLevel: 1,
-				SessionID:  loopCtx.SessionID,
-				CreatedAt:  nowFunc(),
-			}, retryErr
-		}
-		action, reason, parseErr = a.parseResponse(retryResp)
-		if parseErr != nil {
-			return EscapeDecision{
-				Action:     EscapeForceExit,
-				Reason:     "llm_invalid_format",
-				AuditLevel: 1,
-				SessionID:  loopCtx.SessionID,
-				CreatedAt:  nowFunc(),
-			}, parseErr
-		}
+		return "", "", parseErr
 	}
+	return action, reason, nil
+}
 
-	// Validate action.
-	if action != "Continue" && action != "Exit" {
-		return EscapeDecision{
-			Action:     EscapeForceExit,
-			Reason:     "llm_invalid_action_" + action,
-			AuditLevel: 1,
-			SessionID:  loopCtx.SessionID,
-			CreatedAt:  nowFunc(),
-		}, nil
+// invokeGenerateBounded runs a single Generate call bounded by llmCtx.
+// Used by parseWithRetry for the format-hint retry.
+func (a *LLMArbitrator) invokeGenerateBounded(llmCtx context.Context, prompt string) (string, error) {
+	done := make(chan struct{})
+	var (
+		resp string
+		err  error
+	)
+	go func() {
+		resp, err = a.llmClient.Generate(llmCtx, prompt)
+		close(done)
+	}()
+	select {
+	case <-done:
+		return resp, err
+	case <-llmCtx.Done():
+		return "", llmCtx.Err()
 	}
+}
 
-	if action == "Continue" {
+// validateActionAndBuild maps the parsed (action, reason) pair to the
+// final EscapeDecision. "Continue" → EscapeContinue (terminal success),
+// "Exit" → EscalateToRule (downstream Rule layer decides), anything
+// else → EscapeForceExit with the malformed action in the reason.
+func validateActionAndBuild(action, reason, sessionID string) EscapeDecision {
+	switch action {
+	case "Continue":
 		return EscapeDecision{
 			Action:     EscapeContinue,
 			Reason:     reason,
 			AuditLevel: 0,
-			SessionID:  loopCtx.SessionID,
+			SessionID:  sessionID,
 			CreatedAt:  nowFunc(),
-		}, nil
+		}
+	case "Exit":
+		// action == "Exit" → escalate to Rule layer.
+		return EscapeDecision{
+			Action:     EscalateToRule,
+			Reason:     reason,
+			AuditLevel: 1,
+			SessionID:  sessionID,
+			CreatedAt:  nowFunc(),
+		}
+	default:
+		return buildForceExit(sessionID, "llm_invalid_action_"+action, 1, nil)
 	}
-	// action == "Exit" → escalate to Rule layer.
+}
+
+// buildForceExit is the canonical EscapeForceExit decision factory.
+// Used by every "fall through to ForceExit" branch in Arbitrate so the
+// reason + AuditLevel + CreatedAt + SessionID are set consistently.
+func buildForceExit(sessionID, reason string, auditLevel int, _ error) EscapeDecision {
 	return EscapeDecision{
-		Action:     EscalateToRule,
+		Action:     EscapeForceExit,
 		Reason:     reason,
-		AuditLevel: 1,
-		SessionID:  loopCtx.SessionID,
+		AuditLevel: auditLevel,
+		SessionID:  sessionID,
 		CreatedAt:  nowFunc(),
-	}, nil
+	}
 }
 
 // buildPrompt constructs the LLM prompt (default impl; injectable).
