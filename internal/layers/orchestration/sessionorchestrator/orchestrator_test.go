@@ -3,16 +3,14 @@ package sessionorchestrator
 import (
 	"context"
 	"errors"
-	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
-	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -313,46 +311,9 @@ func TestInterruptHandler_Handle_Idempotent(t *testing.T) {
 	}
 }
 
-// T: D7-S5-T06 — Command-first 路径在 decisionplanning.ShadowClassifier 启用时不触发 LLM
-// classify。 decisionplanning.ShadowClassifier 内部 tail-only 短路（rule != orchtypes.IntentOrchestrate
-// 直接返回，不启 goroutine），命令路径自然零 LLM 成本。
+// T: D7-S5-T06 — Command-first 路径不触发 LLM classify; 命令路径走
+// CommandHandler (v1.1.0+ orthogonal dispatch)，完全绕过 D2，零 LLM 成本。
 //
-// v1.1.0+ (orthogonal dispatch): 命令路径走 CommandHandler，不调 D2。
-// 本测试断言：(1) D2 不被调用；(2) LLM 分类器不被触发（shadow 自然也不会）。
-func TestSessionOrchestrator_CommandFirst_ShadowNotCalled(t *testing.T) {
-	exec := &fakeD2{}
-	cli := workmodel.NewCLICommands(workmodel.NewTaskManager())
-	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
-	chHandler := NewCommandHandler(cli, plan, nil)
-	rule := decisionplanning.NewRuleClassifier(orchtypes.DefaultConfig())
-	llm := &testLLMClassifier{result: orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate, Confidence: 80}}
-	mtr := metrics.NewMeterProvider(&settings.MetricsConfig{}).Meter("d7-shadow-orch-test")
-	m := decisionplanning.NewShadowMetrics(mtr)
-	shadow := decisionplanning.NewShadowClassifier(rule, llm, m, 500)
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec,
-		WithShadowClassifier(shadow),
-		WithCommandHandler(chHandler))
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-cmd-shadow",
-		Message:   "/plan add auth",
-	})
-	if err != nil {
-		t.Fatalf("ProcessMessage err: %v", err)
-	}
-	for range ch {
-	}
-	// Allow any errant async shadow path a window to fire (it must NOT).
-	time.Sleep(30 * time.Millisecond)
-	if calls := atomic.LoadInt32(&llm.calls); calls != 0 {
-		t.Fatalf("LLM called on command path: calls=%d (must be 0)", calls)
-	}
-	// v1.1.0+ (orthogonal dispatch): command path goes through
-	// CommandHandler, NOT D2. D2 is not called.
-	if exec.calls != 0 {
-		t.Fatalf("D2 must NOT be called for command path (v1.1+ orthogonal), got %d calls", exec.calls)
-	}
-}
-
 // T: types are exported and immutability of With* can be tested.
 // (Immutability is enforced at the value-object layer in shared/types.)
 func TestTaskSpec_Immutability(t *testing.T) {

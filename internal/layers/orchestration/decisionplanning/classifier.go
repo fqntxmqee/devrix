@@ -12,9 +12,8 @@ import (
 
 // IntentClassifier produces an orchtypes.IntentClassification from a raw user message.
 //
-// The v1.0 decision path is rule-only (per R2 OQ-3 resolution B-improved:
-// tail shadow only — see ShadowClassifier). LLM-based classification
-// surfaces via SetLLMClassifier (rule-and-LLM merge) when wired.
+// The v1.1 decision path is rule-only (per R2 OQ-3 resolution B-improved).
+// Tests can swap in a custom IntentClassifier via SessionOrchestrator.WithClassifier.
 //
 // The classifier must:
 //   - Be safe for the FastPath hot path: no allocations beyond the result;
@@ -25,18 +24,14 @@ import (
 //
 // Phase 6 PR-F2 (D7-S12-A42-T05) adds ClassifyWithPrior to the
 // interface so SessionOrchestrator can inject AdaptivePrior uniformly
-// across all classifier implementations (RuleClassifier +
-// ShadowClassifier). The ShadowClassifier's ClassifyWithPrior
-// delegates to the wrapped rule; the prior is treated as a routing
-// input, not a shadow input.
+// across all classifier implementations.
 type IntentClassifier interface {
 	Classify(ctx context.Context, message string) (orchtypes.IntentClassification, error)
 	ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error)
 }
 
 // RuleClassifier is the rule-only implementation. It is concurrency-safe
-// (no internal state mutated during Classify). For LLM-augmented paths,
-// see classifier_fallback.go.
+// (no internal state mutated during Classify).
 type RuleClassifier struct {
 	cfg            *orchtypes.Config
 	commandRegexes []*regexp.Regexp
@@ -142,41 +137,6 @@ func (c *RuleClassifier) Classify(_ context.Context, message string) (orchtypes.
 		Kind:       orchtypes.IntentOrchestrate,
 		Confidence: 60,
 		Reason:     "no fast pattern matched",
-	}, nil
-}
-
-// ClassifyLegacyTail applies rule_orchestrate tail logic (skip loop_first default).
-// Used by ShadowClassifier to decide loop_first shadow samples without affecting routing.
-func (c *RuleClassifier) ClassifyLegacyTail(_ context.Context, message string) (orchtypes.IntentClassification, error) {
-	if c.emptyPattern.MatchString(message) {
-		return orchtypes.IntentClassification{Kind: orchtypes.IntentSkip, Confidence: 100, Reason: "empty message"}, nil
-	}
-	trimmed := strings.TrimSpace(message)
-	if c.cfg != nil && c.cfg.CommandFirst {
-		for _, re := range c.commandRegexes {
-			if re.MatchString(trimmed) {
-				cmd := trimmed
-				if idx := strings.IndexAny(trimmed, " \t\n"); idx >= 0 {
-					cmd = trimmed[:idx]
-				}
-				return orchtypes.IntentClassification{
-					Kind: orchtypes.IntentCommand, Confidence: 100, Reason: "command whitelist match", Command: cmd,
-				}, nil
-			}
-		}
-	}
-	for _, r := range c.fastPatterns {
-		if r.pattern.MatchString(trimmed) {
-			return orchtypes.IntentClassification{Kind: orchtypes.IntentFast, Confidence: 95, Reason: r.reason}, nil
-		}
-	}
-	if len(trimmed) <= 32 && !strings.ContainsAny(trimmed, "\n;") {
-		return orchtypes.IntentClassification{
-			Kind: orchtypes.IntentFast, Confidence: 70, Reason: "short single-line message",
-		}, nil
-	}
-	return orchtypes.IntentClassification{
-		Kind: orchtypes.IntentOrchestrate, Confidence: 60, Reason: "no fast pattern matched",
 	}, nil
 }
 

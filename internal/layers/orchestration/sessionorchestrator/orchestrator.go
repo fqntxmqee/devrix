@@ -47,9 +47,6 @@ type SessionOrchestrator struct {
 	sink             EventPublisher
 	validationMetric *ValidationMetrics
 	obsBridge        *observability.Bridge
-	// shadowClassifier wraps classifier (when wired) with an async LLM
-	// shadow on the orchtypes.IntentOrchestrate tail. nil → behavior unchanged.
-	shadowClassifier *decisionplanning.ShadowClassifier
 
 	// v1.1.0+ orthogonal paths
 	commandHandler  *CommandHandler
@@ -102,8 +99,9 @@ func WithValidator(v AdvisoryValidator) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.validator = v }
 }
 
-// WithWorkModel wires a custom WorkModel. v1.0 uses NewDelegatedWorkModel()
-// which forwards to D2 TaskManager.
+// WithWorkModel wires a custom WorkModel. v1.1 defaults to nil (D7-S1
+// workmodel.TaskManager is the canonical storage; the WorkModel facade is
+// only needed when callers want to query the unified work plan).
 func WithWorkModel(w WorkModel) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.workModel = w }
 }
@@ -113,15 +111,6 @@ func WithWorkModel(w WorkModel) OrchestratorOption {
 // timeout_rate; nil metric is treated as no-op.
 func WithMetrics(m *ValidationMetrics) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.validationMetric = m }
-}
-
-// WithShadowClassifier wires the optional LLM classify shadow. The
-// shadow runs asynchronously on the orchtypes.IntentOrchestrate tail (~20% of
-// messages the rule does not fast-match); v1.0 decision path is the
-// rule + command-first matrix, so the shadow never affects the
-// ProcessMessage return value. See R2 §5 命题 C.
-func WithShadowClassifier(s *decisionplanning.ShadowClassifier) OrchestratorOption {
-	return func(o *SessionOrchestrator) { o.shadowClassifier = s }
 }
 
 // WithCommandHandler wires the orchtypes.IntentCommand explicit-dispatch path.
@@ -196,9 +185,7 @@ func WithEscapeEngine(e *escape.EscapeEngine) OrchestratorOption {
 // decisionplanning.IntentClassifier directly.
 //
 // Invariant: the option must be applied before any ProcessMessage
-// call. Re-invoking replaces the active classifier; if a decisionplanning.ShadowClassifier
-// is also wired, WithShadowClassifier takes precedence at the call site
-// (ProcessMessage checks shadow first).
+// call. Re-invoking replaces the active classifier.
 func WithClassifier(c decisionplanning.IntentClassifier) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.classifier = c }
 }
@@ -210,7 +197,7 @@ func WithClassifier(c decisionplanning.IntentClassifier) OrchestratorOption {
 //
 // v1.1.0+ orthogonal paths: if WithCommandHandler / WithOrchestratePath
 // are not provided, defaults are constructed (CommandHandler bound to
-// workmodel.GlobalTaskManager + a fresh PlanMode; OrchestratePath bound
+// workmodel.TaskManager + a fresh PlanMode; OrchestratePath bound
 // to a fresh decisionplanning.TaskDecomposer + fresh WaveScheduler). Tests that want
 // control over the wave scheduler or the plan mode should still wire
 // the options explicitly. Bootstrap does NOT need to wire these in
@@ -229,7 +216,6 @@ func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts .
 		cfg:            cfg,
 		classifier:     decisionplanning.NewRuleClassifier(cfg),
 		executor:       executor,
-		workModel:      NewDelegatedWorkModel(),
 		activeSessions: make(map[string]context.CancelFunc),
 	}
 	for _, opt := range opts {
@@ -347,43 +333,30 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		return resumeCh, nil
 	}
 	// Phase 7 PR-7.3 (D7-S13-A49-T06): sessionSpan carries 5 prior attributes
-	// (alpha, beta, mean, track_mode, injected_at) for D5 observability. The
-	// 6th attribute (learn.classifier_source) is set after the classify path
-	// resolves (rule vs shadow) below.
+	// (alpha, beta, mean, track_mode, injected_at) for D5 observability.
 	if sessionSpan != nil {
 		sessionSpan.SetAttributes(priorSessionSpanAttrs(prior, observeReq, req)...)
 	}
 
-	classifySource := "rule"
 	_, classifySpan := o.startSpan(sessionCtx, telemetry.OpD7_S2_Orchestration_Intent_Classify, tracer.SpanKindInternal)
 	var (
 		intent orchtypes.IntentClassification
 	)
-	if o.shadowClassifier != nil {
-		classifySource = "shadow"
-		// Phase 6 PR-F2: shadow path also uses ClassifyWithPrior.
-		// ShadowClassifier.ClassifyWithPrior delegates to the rule's
-		// ClassifyWithPrior (prior applied to routing decision). The
-		// async LLM shadow goroutine still uses baseline (no prior) for
-		// comparable samples — see ShadowClassifier.ClassifyWithPrior.
-		intent, err = o.shadowClassifier.ClassifyWithPrior(ctx, req.Message, prior)
-	} else {
-		// Phase 6 PR-F2: ClassifyWithPrior (LP-1 closed loop) replaces
-		// Classify. When prior is nil or zero-mean, ClassifyWithPrior
-		// degenerates to the baseline Classify behavior.
-		intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
-	}
+	// Phase 6 PR-F2: ClassifyWithPrior (LP-1 closed loop) replaces
+	// Classify. When prior is nil or zero-mean, ClassifyWithPrior
+	// degenerates to the baseline Classify behavior.
+	intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
 	// Phase 7 PR-7.3 (D7-S13-A49-T06): mirror classifier_source onto the
-	// sessionSpan for D5 observability. This lets operators correlate
-	// "shadow" classifications with prior attributes when reading traces.
+	// sessionSpan for D5 observability. Always "rule" since ShadowClassifier
+	// was removed in DM-20260625-011.
 	if sessionSpan != nil {
 		sessionSpan.SetAttributes(
-			tracer.Attribute{Key: "learn.classifier_source", Value: classifySource},
+			tracer.Attribute{Key: "learn.classifier_source", Value: "rule"},
 		)
 	}
 	if classifySpan != nil {
 		classifySpan.SetAttributes(telemetry.SpanAttrs(telemetry.OpD7_S2_Orchestration_Intent_Classify,
-			intentClassifyAttrs(intent, classifySource)...)...)
+			intentClassifyAttrs(intent, "rule")...)...)
 		if err != nil {
 			classifySpan.RecordError(err)
 			classifySpan.SetStatus(tracer.StatusCodeError, err.Error())
