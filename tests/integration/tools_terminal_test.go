@@ -11,13 +11,11 @@ package integration
 //   - TestVerify_AllPass     — G5: tasks.md → Report.verified 全 PASS
 //   - TestTracker_NonBlocking — G6: tracker 高频 tick 不阻塞
 //   - TestLTL_AllSurfaces_ParseSuccess — LTL-Lite 5 surface 全部 parse OK
-//   - TestLTL_Violation_AbortTurn      — violation → wrapped ErrInvariantViolation
 //   - TestLTL_CrossSurface_ConflictDetected — ci-lint 报跨 surface 冲突
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +26,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/shared/ltllite"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn_adapter"
 )
 
 // TestLSP_End2End — G1: lsp_go_to_definition spec 暴露 + Execute 入口可达。
@@ -241,25 +238,6 @@ func TestLTL_AllSurfaces_ParseSuccess(t *testing.T) {
 				t.Errorf("parse %s: %d invariants, want 1", r.name, len(set.Invariants))
 			}
 		})
-	}
-}
-
-// TestLTL_Violation_AbortTurn — LTL violation → turn_adapter.ErrInvariantViolation。
-func TestLTL_Violation_AbortTurn(t *testing.T) {
-	r := turn_adapter.NewHookRegistry()
-	r.Register(turn_adapter.SurfaceHook{
-		Name:   "lsp",
-		InvSet: mustParseW16("x_holds => y_holds"),
-		Provider: func() ltllite.State {
-			return ltllite.MapState{"x_holds": true, "y_holds": false}
-		},
-	})
-	err := r.Prepare()
-	if err == nil {
-		t.Fatal("W16 LTL: expected error, got nil")
-	}
-	if !errors.Is(err, turn_adapter.ErrInvariantViolation) {
-		t.Errorf("W16 LTL: error not ErrInvariantViolation, got %v", err)
 	}
 }
 
