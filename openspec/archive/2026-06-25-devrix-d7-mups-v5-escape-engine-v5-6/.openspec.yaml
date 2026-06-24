@@ -1,0 +1,132 @@
+id: devrix-d7-mups-v5-escape-engine-v5-6
+demand_id: DM-20260625-003
+title: "D7 MUPS v5 统一逃逸机制 — PR-V5.6 T2 ResumeSession SessionOrchestrator 入口收口"
+status: s7_archived
+priority: P0
+created: 2026-06-25
+archived: 2026-06-25
+author: MUPS v5 PR-V5.6 续跑入口收口（DM-20260625-003, T12 PARTIAL → IMPLEMENTED）
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 父 Change
+parent_change: devrix-d7-mups-v5-escape-engine
+parent_status: s7_archived  # V5.1..V5.5 已 S7_Archived (PR #195..#198)
+parent_prs: [195, 196, 197, 198]
+
+# 能力维度
+capabilities:
+  - id: D7-S14-A50
+    name: T2 ResumeSession SessionOrchestrator 入口收口
+    description: |
+      MUPS v5 V5.6 PR (T12 PARTIAL → IMPLEMENTED): SessionOrchestrator.applyResumeSession
+      在 ProcessMessage 入口 (after buildObserveRequest, before classify) 检查
+      PendingResolutionStore → 3 层 fail-safe (nil engine / ResumeSession error /
+      TTL expired → fall through) → terminal decision (B=user_accept → EscapeForceExit,
+      C=user_cancel → EscapeAbortWithAudit) emit single "complete" EngineEvent +
+      补写 audit + close channel early / A=user_continue fall through to full 5-node
+      pipeline. sessionSpan 3 attributes (escape.resume.attempted / decision_action /
+      decision_pending_id) D5 可观测化追踪.
+
+      测试覆盖:
+      - 6 单元测试 (TestApplyResumeSession_NoEngine / NoPending / UserAccept /
+        UserCancel / UserContinue / ResumeError_Failsafe)
+      - 2 集成测试 (TestProcessMessage_WithResume_UserAccept_EarlyClose /
+        UserCancel_EarlyClose)
+      - 8/8 PASS, 3/3 稳定性验证
+
+      T 层更新:
+      - D7-S14-A50-T12: PARTIAL → IMPLEMENTED
+      - D7-S14 5 节点: 18/18 IMPLEMENTED, 0 PARTIAL (MUPS v5 完整闭环)
+      - 域 t-registry: v3.17.0 → v3.18.0 (T 180→186, P0 147→153)
+      - 根 t-registry: v4.8.0 → v4.9.0 (D7 184→186 IMPLEMENTED, PARTIAL 2→0)
+      - spec.md: v4.9.0 → v4.10.0 (新增 4.10.0 entry)
+
+# PR 列表
+prs:
+  - pr_number: TBD  # V5.6 待用户确认 push + 开 PR
+    branch: feat/devrix-d7-mups-v5-escape-engine-v5-6
+    title: "feat(d7): MUPS v5 EscapeEngine PR-V5.6 T2 ResumeSession SessionOrchestrator 入口收口 (DM-20260625-003)"
+    files_changed: 6
+    lines_added: 552
+    lines_removed: 10
+    commits: 1
+    tests_added: 8
+    tests_passed: 8
+
+# DSAFT 元素清单 (PR-V5.6 新增)
+dsa_ft:
+  activities: []  # 入口收口, 不新增 A
+  features:
+    - id: D7-S14-A50-F12
+      name: applyResumeSession
+      file: internal/layers/orchestration/sessionorchestrator/escape_wiring.go
+      description: T2 ResumeSession SessionOrchestrator 入口收口
+  tasks:  # 6 T
+    - id: D7-S14-A50-T01
+      name: applyResumeSession + resumeContentForDecision 实现
+      status: implemented
+    - id: D7-S14-A50-T02
+      name: TestApplyResumeSession_NoEngine 单元测试
+      status: implemented
+    - id: D7-S14-A50-T03
+      name: TestApplyResumeSession_NoPending 单元测试
+      status: implemented
+    - id: D7-S14-A50-T04
+      name: TestApplyResumeSession_UserAccept 单元测试
+      status: implemented
+    - id: D7-S14-A50-T05
+      name: TestApplyResumeSession_UserCancel 单元测试
+      status: implemented
+    - id: D7-S14-A50-T06
+      name: TestApplyResumeSession_UserContinue + ResumeError_Failsafe 单元测试
+      status: implemented
+    - id: D7-S14-A50-T07
+      name: TestProcessMessage_WithResume_UserAccept_EarlyClose 集成测试
+      status: implemented
+    - id: D7-S14-A50-T08
+      name: TestProcessMessage_WithResume_UserCancel_EarlyClose 集成测试
+      status: implemented
+
+# 失败降级
+failure_modes:
+  - mode: nil engine
+    behavior: fall through (兼容 V5.4-)
+    test: TestApplyResumeSession_NoEngine
+  - mode: ResumeSession error
+    behavior: slog.Warn + fall through
+    test: TestApplyResumeSession_ResumeError_Failsafe
+  - mode: TTL expired
+    behavior: fall through (正常续跑)
+    test: TestApplyResumeSession_NoPending
+  - mode: A user_continue
+    behavior: fall through (用户希望继续)
+    test: TestApplyResumeSession_UserContinue
+  - mode: B user_accept
+    behavior: emit "complete" + EscapeForceExit + close channel
+    test: TestApplyResumeSession_UserAccept + TestProcessMessage_WithResume_UserAccept_EarlyClose
+  - mode: C user_cancel
+    behavior: emit "complete" + EscapeAbortWithAudit + close channel
+    test: TestApplyResumeSession_UserCancel + TestProcessMessage_WithResume_UserCancel_EarlyClose
+
+# 验收结果
+acceptance:
+  s5_status: accepted
+  t12_promoted: PARTIAL → IMPLEMENTED
+  d7_s14_status: 18/18 IMPLEMENTED, 0 PARTIAL
+  test_pass_rate: 100% (8/8)
+  test_stability: 100% (3/3)
+  regression: none
+  docs_synced: true
+  go_vet: clean
+
+# 索引引用
+related:
+  - openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine/  # V5.1..V5.5 parent
+  - openspec/specs/d7-orchestration/spec.md  # spec.md v4.10.0
+  - openspec/specs/d7-orchestration/t-registry.md  # 域 t-registry v3.18.0
+  - openspec/t-registry.md  # 根 t-registry v4.9.0
+  - brain/.../core-concepts/38-mature-uncertainty-methodology.md  # V5.6 设计 SoT (doc 38 §21.3.6)
