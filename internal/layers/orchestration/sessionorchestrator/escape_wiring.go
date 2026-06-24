@@ -131,13 +131,26 @@ func escapeErr(reason string) error {
 //
 // 3 类 terminal decision 映射 (设计稿):
 //   - A user_continue → fall through (用户希望继续走完整 5 节点)
-//   - B user_accept → EscapeForceExit → emit "complete" + 补写 audit
-//   - C user_cancel → EscapeAbortWithAudit → emit "complete" + 补写 audit
+//   - B user_accept → EscapeForceExit → emit "complete" (audit already recorded
+//     at SubmitUserChoice time (V5.4); resume is read-only, 不重复写 audit)
+//   - C user_cancel → EscapeAbortWithAudit → emit "complete" (audit already recorded)
 func (o *SessionOrchestrator) applyResumeSession(
 	_ context.Context, // reserved for future audit/tracing
 	req orchtypes.ProcessRequest,
 	sessionSpan tracer.Span,
 ) (<-chan *contracts.EngineEvent, bool, error) {
+	// M-1 (DM-20260625-004 review-fixes): guard against empty SessionID.
+	// Empty SessionID is a contract violation (ProcessRequest constructor
+	// requires non-empty), not a transient error — silently fall through
+	// without triggering slog.Warn to avoid log noise / misdiagnosis.
+	if req.SessionID == "" {
+		if sessionSpan != nil {
+			sessionSpan.SetAttributes(tracer.Attribute{
+				Key: "escape.resume.attempted", Value: "false",
+			})
+		}
+		return nil, false, nil
+	}
 	if o.escapeEngine == nil {
 		if sessionSpan != nil {
 			sessionSpan.SetAttributes(tracer.Attribute{
@@ -187,7 +200,7 @@ func (o *SessionOrchestrator) applyResumeSession(
 	}
 
 	// Terminal decision (B=user_accept → ForceExit, C=user_cancel → AbortWithAudit):
-	// emit single "complete" EngineEvent + 补写 audit + close channel early.
+	// emit single "complete" EngineEvent (audit already written at SubmitUserChoice time) + close channel early.
 	out := make(chan *contracts.EngineEvent, 1)
 	out <- &contracts.EngineEvent{
 		Type:      "complete",
