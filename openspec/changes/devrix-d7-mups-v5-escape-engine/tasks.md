@@ -64,6 +64,11 @@
   - [ ] `TestDetermineSwitchPolicy_Protocol` → Constrained
   - [ ] `TestDetermineSwitchPolicy_Commitment` → Forbidden
   - [ ] `TestPlanKindSwitchCount_ExceedLimit` 4 → OK, 5 → error
+  - [ ] `TestPlanKindSwitchCount_ZeroStart` 0 次切换 → OK（首次切换合法）
+  - [ ] `TestPlanKindSwitchPolicy_Forbidden_NoSwitch` CommitmentPlan 0 次切换 → OK
+  - [ ] `TestPlanKindSwitchPolicy_Forbidden_OneSwitch` CommitmentPlan 1 次切换 → ForceExit
+  - [ ] `TestPlanKindSwitchPolicy_Constrained_Boundary` Constrained 4 次切换 → OK, 5 → ForceExit
+  - [ ] `TestPlanKindSwitchPolicy_Allowed_NoLimit` Allowed 100 次切换 → OK（无上限）
 - [ ] 单元测试 100% PASS
 - [ ] 提交 + 开 PR
 

@@ -29,7 +29,7 @@
 ### 2.1 回路深度按"模式 hash"计数
 
 **旧行为**：v4 没有显式回路深度计数器。
-**新行为**：v5 按 `hash(SessionID:PlanKind:ObsKind:FailureCriterion:ArtifactType)` 计数，同模式重复 depth++，不同模式 reset。MaxDepth=3。
+**新行为**：v5 按 `hash(SessionID:PlanKind:ObsKind:FailureCriterion:ArtifactType)` 计数，同模式重复 depth++，不同模式 reset。**MaxDepth=3，判定规则：depth < MaxDepth → Continue，depth >= MaxDepth → ForceExit**。
 
 **关键修复**（doc 38 §21.2）：v4 中 LLM 可通过切换 Plan.Kind 绕过回路深度计数。v5 通过"模式 hash"使 Plan.Kind 切换算作新回路（depth=1），但同一模式重复仍会被累积计数。
 
@@ -102,24 +102,81 @@ HumanArbitrator (10s timeout)
 
 **保留为纯 metric**：`state.cancels` / `state.handles`（状态追踪不是故障指标）
 
-### 2.6 5 节点接线（3 个接线点）
+### 2.6 5 节点接线（5 个接线点）
 
 ```go
-// 1. Plan 前
-loopCtx := buildLoopContext(ctx, plan, observe)
-decision := o.escapeEngine.Evaluate(loopCtx)
-if decision.Action == EscapeForceExit { return }
+// 入口：T2 续跑检查
+if decision, ok := o.escapeEngine.ResumeSession(req.SessionID); ok {
+    return o.applyResumeDecision(ctx, decision)
+}
 
-// 2. Execute 失败
-loopCtx.PrevPlanKind = plan.Kind
-decision := o.escapeEngine.Evaluate(loopCtx)
+// 1. Observe 失败
+observe, err := o.observe(ctx, req)
+if err != nil {
+    loopCtx := buildLoopContextFromObserve(req.SessionID, observe)
+    decision := o.escapeEngine.Evaluate(loopCtx)
+    if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+        return derr
+    }
+}
 
-// 3. Verify 失败
-loopCtx.FailureCriterion = verdict.Reason
-decision := o.escapeEngine.Evaluate(loopCtx)
+for {
+    // 2. Plan 失败 / Plan 前
+    plan, err := o.plan(ctx, observe)
+    if err != nil {
+        loopCtx := buildLoopContext(ctx, nil, observe)
+        decision := o.escapeEngine.Evaluate(loopCtx)
+        return o.processEscapeDecision(decision, err)
+    }
+    loopCtx := buildLoopContext(ctx, plan, observe)
+    decision := o.escapeEngine.Evaluate(loopCtx)
+    if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+        return derr
+    }
+
+    // 3. Execute 失败
+    artifact, err := o.execute(ctx, plan)
+    if err != nil {
+        loopCtx.PrevPlanKind = plan.Kind
+        decision := o.escapeEngine.Evaluate(loopCtx)
+        if terminate, derr := o.processEscapeDecision(decision, err); terminate {
+            return derr
+        }
+        continue
+    }
+
+    // 4. Verify 失败
+    verdict := o.verify(ctx, artifact, plan)
+    if verdict.Kind == VerdictFail || verdict.Kind == VerdictIndeterminate {
+        loopCtx.FailureCriterion = verdict.Reason
+        decision := o.escapeEngine.Evaluate(loopCtx)
+        if terminate, derr := o.processEscapeDecision(decision, nil); terminate {
+            return derr
+        }
+        continue
+    }
+
+    return nil  // Verify 通过
+}
 ```
 
+**5 接线点清单**：
+
+| # | 触发点 | LoopContext 关键字段 |
+|---|--------|---------------------|
+| 0 | Observe 失败 | SessionID + ObservationKind |
+| 1a | Plan 失败 | SessionID + PrevPlanKind=nil |
+| 1b | Plan 前 | SessionID + PlanKind + PrevPlanKind + ObservationKind |
+| 2 | Execute 失败 | PrevPlanKind=plan.Kind |
+| 3 | Verify 失败 | FailureCriterion=verdict.Reason |
+
 **失败降级**：Evaluate error → slog.Warn + EscapeContinue（不阻塞主链路）
+
+**EscapeAction 全 6 类分支处理**（统一 processEscapeDecision 函数）：
+- `EscapeContinue` → continue 回路（重跑 Plan）
+- `EscapePendingHuman` → 异步 return nil（session 状态已持久化）
+- `EscapeForceExit` / `EscapeAbortWithAudit` → return error
+- `EscalateToRule` / `EscalateToHuman` → 应被 ChainedArbitrator 链式裁决收敛，若直接返回则兜底为 ForceExit
 
 ## 3. 兼容性
 
