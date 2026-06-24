@@ -1,20 +1,25 @@
-// Escape wiring helpers (DM-20260625-003, PR-V5.5)
+// Escape wiring helpers (DM-20260625-003, PR-V5.5 + PR-V5.6)
 //
 // 关键设计 (doc 38 §21.3.4, design.md §6):
 //   - buildEscapeLoopContext: 在 5 节点接线点构造 LoopContext
 //   - planKindFromIntent: 将 orchtypes.IntentKind 映射为 escape.PlanKind
 //   - processEscapeDecision: 统一处理 6 类 EscapeAction
+//   - applyResumeSession: PR-V5.6 T2 ResumeSession 续跑入口
 //
 // 失败降级: Evaluate 内部 panic / error 已由 EscapeEngine 处理;
 // 这里 processEscapeDecision 仅在 err path 上传递, 不重复 panic recover.
 package sessionorchestrator
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 
+	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // buildEscapeLoopContext constructs the escape.LoopContext for wiring points.
@@ -95,4 +100,135 @@ func (o *SessionOrchestrator) processEscapeDecision(decision escape.EscapeDecisi
 // error without leaking the decision shape to upstream callers.
 func escapeErr(reason string) error {
 	return errors.New("orchestrator: escape: " + reason)
+}
+
+// applyResumeSession is the T2 entry point (PR-V5.6, D7-S14-A50-T12).
+//
+// Invoked at ProcessMessage entry, AFTER buildObserveRequest (so resume
+// is unaffected by LP-1 prior) and BEFORE classify (so terminal
+// decisions short-circuit the 5-node pipeline).
+//
+// Returns:
+//   - (nil, false, nil) — fall through: no engine / no pending /
+//     user_continue decision / ResumeSession error / TTL expired.
+//     Caller proceeds with normal ProcessMessage flow.
+//   - (ch,   true,  nil) — short-circuit: terminal decision found
+//     (user_accept or user_cancel). ch emits a single "complete"
+//     EngineEvent and then closes. Caller returns ch and skips
+//     classify + 5-node pipeline.
+//   - (nil,  false, err) — error path (currently unused; reserved
+//     for future fail-fast semantic).
+//
+// 3 层 fail-safe (defensive):
+//   1. nil engine → fall through (no escape wired → behave as legacy)
+//   2. ResumeSession error → slog.Warn + fall through
+//   3. found=false (TTL expired or not set) → fall through
+//
+// sessionSpan attributes (D5 observability):
+//   - escape.resume.attempted=true (always set after the call)
+//   - escape.resume.decision_action=<action> (only on found=true)
+//   - escape.resume.decision_pending_id=<id> (only on found=true)
+//
+// 3 类 terminal decision 映射 (设计稿):
+//   - A user_continue → fall through (用户希望继续走完整 5 节点)
+//   - B user_accept → EscapeForceExit → emit "complete" + 补写 audit
+//   - C user_cancel → EscapeAbortWithAudit → emit "complete" + 补写 audit
+func (o *SessionOrchestrator) applyResumeSession(
+	_ context.Context, // reserved for future audit/tracing
+	req orchtypes.ProcessRequest,
+	sessionSpan tracer.Span,
+) (<-chan *contracts.EngineEvent, bool, error) {
+	if o.escapeEngine == nil {
+		if sessionSpan != nil {
+			sessionSpan.SetAttributes(tracer.Attribute{
+				Key: "escape.resume.attempted", Value: "false",
+			})
+		}
+		return nil, false, nil
+	}
+
+	decision, found, err := o.escapeEngine.ResumeSession(req.SessionID)
+	if err != nil {
+		// Fail-safe 2: ResumeSession error → log + fall through.
+		slog.Warn("orchestrator: escape: resume_session_error",
+			"session_id", req.SessionID,
+			"err", err,
+		)
+		if sessionSpan != nil {
+			sessionSpan.SetAttributes(
+				tracer.Attribute{Key: "escape.resume.attempted", Value: "true"},
+				tracer.Attribute{Key: "escape.resume.decision_action", Value: "error_failsafe"},
+			)
+		}
+		return nil, false, nil
+	}
+	if !found {
+		// Fail-safe 3: TTL expired or no pending → fall through.
+		if sessionSpan != nil {
+			sessionSpan.SetAttributes(tracer.Attribute{
+				Key: "escape.resume.attempted", Value: "true",
+			})
+		}
+		return nil, false, nil
+	}
+
+	// Always record decision action + pending id on success.
+	if sessionSpan != nil {
+		sessionSpan.SetAttributes(
+			tracer.Attribute{Key: "escape.resume.attempted", Value: "true"},
+			tracer.Attribute{Key: "escape.resume.decision_action", Value: decision.Action.String()},
+			tracer.Attribute{Key: "escape.resume.decision_pending_id", Value: decision.PendingID},
+		)
+	}
+
+	// user_continue → fall through to full 5-node pipeline.
+	if decision.Action == escape.EscapeContinue {
+		return nil, false, nil
+	}
+
+	// Terminal decision (B=user_accept → ForceExit, C=user_cancel → AbortWithAudit):
+	// emit single "complete" EngineEvent + 补写 audit + close channel early.
+	out := make(chan *contracts.EngineEvent, 1)
+	out <- &contracts.EngineEvent{
+		Type:      "complete",
+		Content:   resumeContentForDecision(decision),
+		SessionID: req.SessionID,
+		Metadata: map[string]string{
+			"escape.resume":       "true",
+			"escape.action":       decision.Action.String(),
+			"escape.reason":       decision.Reason,
+			"escape.pending_id":   decision.PendingID,
+			"exit_reason_source":  "user_resume",
+		},
+	}
+	close(out)
+	return out, true, nil
+}
+
+// resumeContentForDecision converts an EscapeDecision into a human-readable
+// Chinese text message shown in the final "complete" EngineEvent.
+//
+// 6 类 EscapeAction 全部覆盖:
+//   - EscapeContinue:      "（用户选择继续完整流程）"
+//   - EscapeForceExit:     "（用户接受当前结果）"
+//   - EscapeAbortWithAudit:"（用户取消当前任务）"
+//   - EscapePendingHuman:  "（等待用户响应超时）" (兜底)
+//   - EscalateToRule/Human:"（需要进一步决策）" (兜底)
+//
+// 设计: 保持内容简短, 让飞书卡片 / CLI 终端能直接显示。
+func resumeContentForDecision(d escape.EscapeDecision) string {
+	switch d.Action {
+	case escape.EscapeContinue:
+		return "（用户选择继续完整流程）"
+	case escape.EscapeForceExit:
+		return "（用户接受当前结果）"
+	case escape.EscapeAbortWithAudit:
+		return "（用户取消当前任务）"
+	case escape.EscapePendingHuman:
+		return "（等待用户响应超时）"
+	case escape.EscalateToRule, escape.EscalateToHuman:
+		return "（需要进一步决策）"
+	default:
+		return "（会话终止）"
+	}
 }

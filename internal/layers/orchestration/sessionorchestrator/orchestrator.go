@@ -330,6 +330,15 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		return nil, fmt.Errorf("orchestrator: build observe request: %w", err)
 	}
 	prior := observeReq.EffectivePrior()
+
+	// PR-V5.6 (DM-20260625-003, D7-S14-A50-T12): T2 ResumeSession 续跑入口.
+	// 在 buildObserveRequest 之后 / classify 之前检查 PendingResolutionStore.
+	// - terminal decision (B/C) → 短路返回 "complete" EngineEvent, 不走 5 节点
+	// - A user_continue / 未找到 / nil engine → fall through (不破坏主链路)
+	if resumeCh, shortCircuit, _ := o.applyResumeSession(ctx, req, sessionSpan); shortCircuit {
+		endSpan(sessionSpan)
+		return resumeCh, nil
+	}
 	// Phase 7 PR-7.3 (D7-S13-A49-T06): sessionSpan carries 5 prior attributes
 	// (alpha, beta, mean, track_mode, injected_at) for D5 observability. The
 	// 6th attribute (learn.classifier_source) is set after the classify path
