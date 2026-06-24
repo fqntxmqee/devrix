@@ -1,0 +1,138 @@
+id: devrix-d7-mups-v5-escape-engine-v5-6-review-fixes
+name: D7 MUPS v5 PR-V5.6 Review 修复
+demand_id: DM-20260625-004
+parent_change: devrix-d7-mups-v5-escape-engine-v5-6
+parent_status: s7_archived  # PR-V5.6 (PR #200) T12 PARTIAL → IMPLEMENTED 闭环
+parent_prs: [200]
+
+status: s7_archived
+priority: P0
+change_type: PATCH
+affected_domains: [D7]
+affected_scenarios: [D7-S14]
+
+created: 2026-06-25
+archived: 2026-06-25
+effort_days: 0.4
+
+# 父 change 引用
+references:
+  - openspec/changes/devrix-d7-mups-v5-escape-engine-v5-6-review-fixes/proposal.md
+  - openspec/changes/devrix-d7-mups-v5-escape-engine-v5-6-review-fixes/design.md
+  - openspec/changes/devrix-d7-mups-v5-escape-engine-v5-6-review-fixes/tasks.md
+  - openspec/specs/d7-orchestration/t-registry.md  # 域 t-registry v3.18.0
+
+related_archives:
+  - 2026-06-25-devrix-d7-mups-v5-escape-engine        # V5.1..V5.5
+  - 2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6   # V5.6 (parent)
+  - 2026-06-25-devrix-d7-mups-v4-review-fixes         # 同期 v4 review-fixes (DM-002, 参考 hotfix 路径)
+
+# PR 列表
+prs:
+  - pr_number: 202
+    url: https://github.com/fqntxmqee/devrix/pull/202
+    branch: feat/d7-mups-v5-escape-engine-v5-6-review-fixes
+    title: "docs(t-registry): fix V5.6 statistics + remove nonexistent runLoopWithResume (DM-20260625-004)"
+    step: "Step 1 (docs-only)"
+    merge_method: squash
+    merge_commit: b46612d
+    merged_at: 2026-06-25
+    files_changed: 1
+    lines_added: 6
+    lines_removed: 5
+    commits: 1
+    fixes_applied: [C-1, C-2]
+  - pr_number: 203
+    url: https://github.com/fqntxmqee/devrix/pull/203
+    branch: feat/d7-mups-v5-escape-engine-v5-6-review-fixes-step2
+    title: "fix(d7-mups): PR-V5.6 review-fixes (H-1/H-2/H-3/H-4/M-1/M-3) (DM-20260625-004)"
+    step: "Step 2 (code+test)"
+    merge_method: squash
+    merge_commit: 3001ff3
+    merged_at: 2026-06-25
+    files_changed: 3
+    lines_added: 337
+    lines_removed: 30
+    commits: 1
+    fixes_applied: [H-1, H-2, H-3, H-4, M-1, M-3]
+    tests_added: 5
+    tests_passed: 11  # 6 base + 2 e2e + 1 M-1 + 1 H-3 (4 sub) + 2 H-4
+
+# 修复分类
+fixes_summary:
+  critical:
+    - id: C-1
+      title: "t-registry 删除不存在的 `runLoopWithResume`"
+      fixed_in: "Step 1 (PR #202)"
+      file: openspec/specs/d7-orchestration/t-registry.md
+    - id: C-2
+      title: "t-registry Statistics 表 4 处数字 + Revision History v3.18.0 条目"
+      fixed_in: "Step 1 (PR #202)"
+      file: openspec/specs/d7-orchestration/t-registry.md
+  high:
+    - id: H-1
+      title: "audit 注释对齐 (V5.4 SubmitUserChoice 已写, resume read-only)"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/escape_wiring.go
+    - id: H-2
+      title: "短路早退补写 prior attrs (5 字段) — D5 trace 一致性"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/orchestrator.go
+    - id: H-3
+      title: "新增 span attr 单测 (4 sub-test: nil_engine/err_failsafe/not_found/found_terminal)"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/orchestrator_resume_test.go
+    - id: H-4
+      title: "集成测试增强 (recordingExecutor + 5 字段 Metadata 断言)"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/orchestrator_resume_test.go
+  medium:
+    - id: M-1
+      title: "空 SessionID 守卫 (契约违反 vs 瞬时错误)"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/escape_wiring.go
+    - id: M-3
+      title: "删除 dead code stubResume (用 errStore + 真实 HumanArbitrator 替代)"
+      fixed_in: "Step 2 (PR #203)"
+      file: internal/layers/orchestration/sessionorchestrator/orchestrator_resume_test.go
+  info: []
+
+deferred_to_cleanup_change:
+  - id: M-2
+    title: "fail-safe attr symmetry (low priority)"
+    note: "V5.6 短路早退未写 decision_action=error_failsafe 的对称性 (对称 not_found 路径) — 不影响功能"
+  - id: M-4
+    title: "V5.5 archive description (immutable)"
+    note: "已 s7_archived 不可变,留待下次 archive 迁移时修正"
+  - id: I-1
+    title: "escape.resume marker (forward-compat, no-op)"
+  - id: I-2
+    title: "table-driven test refactor (style)"
+  - id: I-3
+    title: "unused error return (V5.7)"
+  - id: I-4
+    title: "sessionSpan endSpan err design.md comment (style)"
+
+# 验收结果
+acceptance:
+  s5_status: accepted
+  fixes_total: 14
+  fixes_applied: 8       # 2 Critical + 4 High + 2 Medium
+  fixes_deferred: 6      # 2 Medium (M-2/M-4) + 4 Info
+  pr_count: 2
+  files_changed_total: 4
+  lines_added_total: 343
+  lines_removed_total: 35
+  test_packages_passed: 22
+  test_packages_total: 22
+  test_pass_rate: 100%   # 11/11 in sessionorchestrator
+  test_stability: 100%   # 3/3 重复跑全部 PASS
+  regression: none
+  go_vet: clean
+  layer_lint: clean
+
+# 索引引用
+related:
+  - openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6/  # parent
+  - openspec/specs/d7-orchestration/t-registry.md  # 域 t-registry v3.18.0
+  - openspec/t-registry.md  # 根 t-registry v4.9.0
