@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -153,12 +154,24 @@ func (h *Hub) linkTask(ev contracts.FlowEvent) {
 	tree := h.tasks.Tree()
 	switch ev.Kind {
 	case contracts.FlowStarted:
-		_ = tree.SetOwner(sessionID, ev.TaskID, ev.WorkerID)
-		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusInProgress)
+		if err := tree.SetOwner(sessionID, ev.TaskID, ev.WorkerID); err != nil {
+			slog.Warn("hub: linkTask SetOwner failed; worker/task linkage may be stale",
+				"session_id", sessionID, "task_id", ev.TaskID, "worker_id", ev.WorkerID, "error", err)
+		}
+		if err := tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusInProgress); err != nil {
+			slog.Warn("hub: linkTask UpdateStatus in_progress failed",
+				"session_id", sessionID, "task_id", ev.TaskID, "error", err)
+		}
 	case contracts.FlowCompleted, contracts.FlowJoined:
-		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusCompleted)
+		if err := tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusCompleted); err != nil {
+			slog.Warn("hub: linkTask UpdateStatus completed failed",
+				"session_id", sessionID, "task_id", ev.TaskID, "kind", string(ev.Kind), "error", err)
+		}
 	case contracts.FlowFailed:
-		_ = tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusFailed)
+		if err := tree.UpdateStatus(sessionID, ev.TaskID, workmodel.TaskStatusFailed); err != nil {
+			slog.Warn("hub: linkTask UpdateStatus failed failed",
+				"session_id", sessionID, "task_id", ev.TaskID, "error", err)
+		}
 	}
 }
 

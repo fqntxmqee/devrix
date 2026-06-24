@@ -2,6 +2,7 @@ package workmodel
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"sync"
@@ -634,7 +635,13 @@ func (t *WorkTree) ClearSession(sessionID string) {
 	defer t.mu.Unlock()
 	delete(t.items, sessionID)
 	if store, ok := t.store.(*DiskWorkItemStore); ok && store != nil {
-		_ = os.Remove(store.path(sessionID))
+		p := store.path(sessionID)
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			slog.Warn("worktree: clear session disk file failed; in-memory state cleared",
+				"session_id", sessionID,
+				"path", p,
+				"error", err)
+		}
 	}
 }
 

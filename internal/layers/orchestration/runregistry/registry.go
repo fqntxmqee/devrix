@@ -3,6 +3,7 @@ package runregistry
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -49,7 +50,12 @@ type Registry struct {
 func NewRegistry(outputDir string) *Registry {
 	if outputDir != "" {
 		outputDir = expandPath(outputDir)
-		_ = os.MkdirAll(outputDir, 0o755)
+		if err := os.MkdirAll(outputDir, 0o755); err != nil {
+			slog.Warn("runregistry: failed to create output dir; run entries will have no OutputPath",
+				"output_dir", outputDir,
+				"error", err)
+			outputDir = ""
+		}
 	}
 	return &Registry{
 		entries: make(map[string]*Entry),

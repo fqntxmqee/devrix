@@ -840,13 +840,19 @@ func (o *DefaultOrchestrator) finalizeLoop(
 	// We apply the same MaxTurns notice as resolvedFinal so the brief and
 	// full paths agree on loop-bound signalling.
 	resolvedSummary := resolveFinalText(st.lastTurnText, st.lastThinkingTail.String(), st.exitReason, req.MaxTurns)
-	_ = st.persister.PersistTurn(ctx, PersistRequest{
+	if err := st.persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  st.messages,
 		TurnCount: st.turnCount,
 		Usage:     st.totalUsage,
 		FinalText: resolvedFinal,
-	})
+	}); err != nil {
+		slog.Warn("orchestrator: persist turn failed; emitting complete with in-memory state only",
+			"session_id", req.SessionID,
+			"turn_count", st.turnCount,
+			"exit_reason", string(st.exitReason),
+			"error", err)
+	}
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, st.totalUsage, st.lastPromptTokens, st.model, st.maxContextTokens,
 		resolvedFinal, resolvedSummary, st.exitReason)

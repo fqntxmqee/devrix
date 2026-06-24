@@ -559,7 +559,12 @@ func (a *HumanArbitrator) waitForUserResponse(ctx context.Context, pendingID str
 		a.audit.Record(loopCtx, decisions, finalDecision)
 	}
 	if a.resume != nil {
-		_ = a.resume.Save(loopCtx.SessionID, finalDecision)
+		if err := a.resume.Save(loopCtx.SessionID, finalDecision); err != nil {
+			slog.Warn("escape: resume store Save failed; decision not durable for resume",
+				"session_id", loopCtx.SessionID,
+				"action", string(finalDecision.Action),
+				"error", err)
+		}
 	}
 }
 
@@ -618,8 +623,15 @@ func (a *HumanArbitrator) ResumeSession(sessionID string) (EscapeDecision, bool,
 	if err != nil || !found {
 		return EscapeDecision{}, false, err
 	}
-	// One-shot consumption.
-	_ = a.resume.Delete(sessionID)
+	// One-shot consumption. A delete failure here leaves the decision in
+	// the store; on the next resume we'd return it again. The caller has
+	// already received (decision, true, nil), so re-returning the same
+	// decision is the safer behavior than silently dropping it.
+	if delErr := a.resume.Delete(sessionID); delErr != nil {
+		slog.Warn("escape: resume store Delete failed; decision may re-surface on next resume",
+			"session_id", sessionID,
+			"error", delErr)
+	}
 	return decision, true, nil
 }
 
