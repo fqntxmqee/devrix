@@ -10,14 +10,16 @@
 
 ## 任务总览
 
-| Task ID | 内容 | 工作量 | 依赖 | PR | AC |
-|---------|------|--------|------|-----|-----|
-| T-01 | LoopDepthTracker v2 | 1 天 | doc 38 §19.2 | V5.1 | AC1 |
-| T-02 | PlanKindSwitchPolicy 3 档 | 0.5 天 | 无 | V5.2 | AC2 |
-| T-03 | ChainedArbitrator 3 层 | 2 天 | T-01 | V5.3 | AC3 |
-| T-04 | EscapeEngine 整合 + CircuitBreaker 5 层 | 1 天 | T-03 | V5.4 | AC4, AC7 |
-| T-05 | 5 节点接线 + 集成测试 + 文档同步 | 2 天 | 全部 | V5.5 | AC5, AC6, AC8 |
-| **总计** | | **6.5 天** | | | 8 AC |
+| Task ID | 内容 | 工作量 | 依赖 | PR | AC | L1 测试 |
+|---------|------|--------|------|-----|-----|--------|
+| T-01 | LoopDepthTracker v2 | 1 天 | doc 38 §19.2 | V5.1 | AC1 | 10 |
+| T-02 | PlanKindSwitchPolicy 3 档 | 0.5 天 | 无 | V5.2 | AC2 | 15 |
+| T-03 | ChainedArbitrator 3 层 | 2 天 | T-01 | V5.3 | AC3 | 35 |
+| T-04 | EscapeEngine 整合 + CircuitBreaker 5 层 | 1 天 | T-03 | V5.4 | AC4, AC7 | 15 |
+| T-05 | 5 节点接线 + 集成测试 + 文档同步 | 2 天 | 全部 | V5.5 | AC5, AC6, AC8 | 14 |
+| **总计** | | **6.5 天** | | | 8 AC | **89 L1 + 1 单元 e2e = 90 L1** |
+
+> **测试用例全面性**：详见下文 `## 测试用例全面性设计（4 层金字塔）` 章节，共 107 个测试（L4 4 + L3 7 + L2 6 + L1 90），每条含 4 必填字段（业务目标/删除后果/攻击者视角/金字塔层）。
 
 ---
 
@@ -255,6 +257,289 @@
 - **AC8**：单元测试 100% PASS + 集成测试覆盖 + 0 race
 - **依赖**：T-01 ~ T-04
 - **风险**：中，5 节点接线改动面大
+
+---
+
+## 测试用例全面性设计（4 层金字塔）
+
+### 设计原则
+
+**核心立场**：测试用例本质上从"v5 定位和目标"出发，**不能仅限于代码覆盖**。v5 的核心防御价值（防 LLM 操纵 PlanKind 绕过回路深度、防 Human 异步化破坏飞书卡片体验、防 CB 5 层漏接）只有用业务/攻击者视角才能设计出守护承诺的测试。
+
+#### 4 层金字塔（business-driven，非 code-driven）
+
+| 层 | 数量 | 守护对象 | 漏测影响 | 覆盖 |
+|----|------|---------|---------|------|
+| **L4 业务验收** | 4 | v5 立项的 4 大业务承诺 | doc 38 §21.2 漏洞重现、Phase 1-7 兼容破坏、飞书卡片体验崩溃、性能退化 | proposal.md §3 + design.md §3 |
+| **L3 端到端场景** | 7 | 7 个关键故障链路（PlanKind 切换/同模式/异常检测/性能降级/Human 异步/策略约束/CB 独立）| 7 类具体 P0 bug | 5 节点 + 5 接线点 + 跨模块 |
+| **L2 集成** | 6 | 4 类深度限制 + 3 层仲裁 + 5 类兜底动作 + 5 节点 + 5 接线点 | 跨 PR 集成回归 | 跨 PR 协同 |
+| **L1 单元** | 89 | 状态机/分支/边界/错误/并发/降级 | 单点 bug | 单模块函数/方法 |
+
+#### 4 必填字段（每条测试都必须有）
+
+- **业务目标**：这个测试守护什么业务承诺？（一句话锚定到 v5 §21.x 需求）
+- **删除后果**：如果删了这条测试，会漏掉哪个具体 bug？（回归时无感知）
+- **攻击者视角**：LLM/Rule/Human/CB 异常/外部输入下被绕过？（v5 防御价值）
+- **金字塔层**：L1/L2/L3/L4（决定测试位置 + 维护优先级）
+
+#### 设计原则（避免常见误区）
+
+- **业务驱动 > 代码驱动**：不是"测了什么函数"而是"守护了什么承诺"
+- **守护承诺 > 验证实现**：删了不破坏 = 没守护（重构时也得跑）
+- **跨层引用 > 单点测试**：L3 引用 L2/L1（避免重复 + 加快定位）
+- **攻击者视角 > happy path**：v5 核心防御价值（防 LLM 操纵、防逃逸）
+- **零破坏性兼容 > 增强功能**：L4-02 守护 v5 不破坏 Phase 1-7
+
+---
+
+### L4 业务验收（4 个）
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L4-01 | `TestL4_v5_Solves_Sec21_2_Vulnerability` | 守护 v5 立项"最核心承诺"——不再让 LLM 通过 PlanKind 切换绕过回路深度（doc 38 §21.2 关键漏洞）| 如果删了，doc 38 §21.2 漏洞（回路深度计数可被 LLM 操纵）就无人守护，回归时无法发现；sess_xxx 单 ProcessMessage 消耗 token 100k+、飞书卡片超时 | 恶意 LLM 切换 4 次 PlanKind 后能否继续？4 次以上能否继续？边界 4/5 次呢？ | L4 |
+| L4-02 | `TestL4_v5_Compatible_With_Phase1_7` | 守护 v5 "叠加而非取代" Phase 1-7 的核心承诺（design §8 + proposal §3.5）| 如果删了，v5 落地可能误覆盖 Phase 4 14 ExitReason、Phase 6 buildObserveRequest 3 层 fail-safe、Phase 7 Auto-Close 等关键能力 | v5 接线是否误吞了 Phase 1-7 的 ExitReason？Evaluate error 降级是否破坏了 Auto-Close 同步返回？ | L4 |
+| L4-03 | `TestL4_v5_PerformanceOverhead_Under5Percent` | 守护 v5 性能承诺——不破坏飞书卡片体验（每 ProcessMessage 增加 < 5% 延迟）| 如果删了，性能回归时无感知，3 层仲裁 + CB 5 层可能拖慢主链路 | Evaluate 调用 5 次/ProcessMessage + 5 个 CB 状态查询 = 总开销？LLM 仲裁 5s timeout 兜底对正常路径影响？ | L4 |
+| L4-04 | `TestL4_FeishuCard_NotBlocked_ByHuman10s` | 守护 v5 HumanArbitrator 异步化承诺（design §5.3.1 + tasks §T-03.1）——飞书卡片立即显示，不被 10s 等待阻塞 | 如果删了，HumanArbitrator 可能误改回同步等待，ProcessMessage 阻塞 10s，飞书卡片体验崩溃 | 用户点 A/B/C 前飞书卡片是否已显示？10s 不响应是否兜底 ForceExit？客户端断开是否同步覆盖卡片？ | L4 |
+
+---
+
+### L3 端到端场景（7 个）
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 覆盖 PR |
+|---|---------|---------|---------|-----------|---------|---------|
+| L3-01 | `TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit` | 守护"PlanKind 切换累计 ≤ 4"硬约束（doc 38 §21.4.2）——防止 LLM "试探模式"无限循环 | 如果删了，PlanKindSwitchPolicy Constrained 4 次边界无人守护，doc 38 §21.4.2 漏洞重现 | 4 次切换 → OK，5 次切换 → ForceExit，混合 Constrained/Allowed/Frobidden policy？ | L3 | V5.2 + V5.3 + V5.4 + V5.5 |
+| L3-02 | `TestL3_SameMode_4Times_ForcesExit` | 守护"回路深度 v2 按模式 hash 计数"承诺（doc 38 §21.3.2）——同模式不增长不逃避 | 如果删了，LoopDepthTracker v2 计数器失灵，资源耗尽/计费爆炸、用户体验卡死 | 同模式 3 次 → Continue，4 次 → ForceExit？跨 SessionID 重置？ | L3 | V5.1 + V5.4 |
+| L3-03 | `TestL3_AnomalyDetector_5Nil_OpensL0` | 守护"CircuitBreaker 5 层接线"承诺（design §7）——异常被默默吞掉的兜底 | 如果删了，L0 AnomalyDetectorCB 不触发，下游节点持续异常输入无人告警 | 5 次连续 nil → open？open 后 LLM 仲裁？close 后恢复？ | L3 | V5.4 + V5.5 |
+| L3-04 | `TestL3_Verifier_3Times2s_OpensL2` | 守护"Verifier 性能降级"承诺（design §7）——不拖慢主链路 | 如果删了，L2 VerifierCB 不触发，用户等待超时，飞书卡片无反馈 | 3 次连续 > 2s → open？降级策略？close 阈值？ | L3 | V5.4 |
+| L3-05 | `TestL3_Human10s_Async_FeishuNotBlocked` | 守护"HumanArbitrator 异步化"承诺（design §5.3.1）——同步返回 + 内部异步 | 如果删了，可能误改回同步等待，ProcessMessage 阻塞 10s | A/B/C 选项响应？10s timeout 兜底？ctx 取消语义？ | L3 | V5.3 + V5.5 |
+| L3-06 | `TestL3_PlanKindSwitch_Constrained_4Limit` | 守护"3 档策略 + 累计 ≤ 4"承诺（design §5.2）——同策略内累计计数 | 如果删了，Constrained policy 失效，LLM 可在 Constrained 内无限切换 | Constrained 4 次 → OK，5 次 → ForceExit？多次 ProcessMessage 累计？ | L3 | V5.2 + V5.5 |
+| L3-07 | `TestL3_CB5Layers_Open_Independently` | 守护"5 个 CB 互不干扰"承诺（design §7）——单层 open 不应影响其他层 | 如果删了，5 个 CB 共用状态可能误触发连锁反应 | L0 open 时 L1/L2/L3/L4/L5 状态？reset 时序？ | L3 | V5.4 |
+
+---
+
+### L2 集成测试（6 个）
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 覆盖 PR |
+|---|---------|---------|---------|-----------|---------|---------|
+| L2-01 | `TestIntegration_4DepthLimits` | 守护 3 类深度限制（回路深度 + LoopBudget + CircuitBreaker）协同（doc 38 §21.1）| 如果删了，3 类深度限制各自独立，无法验证串联决策 | 回路深度超限 + LoopBudget 耗尽 + CB open 同时发生？决策优先级？ | L2 | V5.4 + V5.5 |
+| L2-02 | `TestIntegration_3LayerArbitration` | 守护 ChainedArbitrator 链式调用契约（design §5.3.2）| 如果删了，链式调用语义可能错（Rule 在 LLM 之前？Human 在 Rule 之前？）| LLM 选 Continue → 立即返回？LLM 选 Exit → Rule？Rule Human → Human？ | L2 | V5.3 |
+| L2-03 | `TestIntegration_5EscapeActions` | 守护 6 类 EscapeAction 决策路径完整（含 EscapePendingHuman 中间态）| 如果删了，6 类动作覆盖不全，新增 EscapePendingHuman 中间态可能误用 | Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / PendingHuman 各 1 个 case？ | L2 | V5.3 + V5.4 |
+| L2-04 | `TestIntegration_PlanKindSwitchLimit` | 守护 PlanKindSwitchPolicy 累计约束（L3-06 已含，此处独立集成）| 如果删了，跨 PR 集成时累计逻辑可能丢失 | 单 PR 内累计？跨 PR？ | L2 | V5.2 + V5.5 |
+| L2-05 | `TestIntegration_5NodePipeline_End2End` | 守护 v5 5 节点完整接线（Observe→Plan→Execute→Verify→[Compensation]→EscapeEngine）| 如果删了，5 节点接线可能漏接 | 每个节点前 Evaluate 调用？失败降级？ | L2 | V5.5 |
+| L2-06 | `TestIntegration_5WiringPoints` ⭐NEW | 守护 5 个接线点（Observe 失败/Plan 失败/Plan 前/Execute 失败/Verify 失败）独立工作（design §6）| 如果删了，5 个接线点可能互相覆盖或漏接 | 1a 短路后 1b 不调？其他 4 个独立触发？ | L2 | V5.5 |
+
+---
+
+### L1 单元测试（89 个，按 PR 分布）
+
+#### T-01 LoopDepthTracker (PR-V5.1): 10 tests = 6 现有 + 4 新增
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-01 | `TestLoopDepthTracker_FirstCall` | 守护首回路计数语义（depth=1）| 首回路 depth=1 行为无守护 | 首次调用 session 状态？ | L1 | 现有 |
+| L1-02 | `TestLoopDepthTracker_SameMode` | 守护同模式 depth++ | 核心计数语义失守 | 同模式连续调用 | L1 | 现有 |
+| L1-03 | `TestLoopDepthTracker_DifferentMode` | 守护异模式 reset | 回路污染，跨模式误计数 | 模式切换 | L1 | 现有 |
+| L1-04 | `TestLoopDepthTracker_ExceedMax` | 守护 MaxDepth=3 边界 | 超过 3 不触发 ForceExit | depth=4 边界 | L1 | 现有 |
+| L1-05 | `TestHashLoopContext_Deterministic` | 守护 hash 稳定性 | 同输入产生不同 hash，History 失效 | 同输入多次 hash | L1 | 现有 |
+| L1-06 | `TestHashLoopContext_DifferentInput` | 守护 hash 区分性 | 不同输入产生相同 hash，误判同模式 | 5 字段任一不同 | L1 | 现有 |
+| L1-07 | `TestLoopDepthTracker_SessionID_Isolated` ⭐NEW | 守护跨 session 隔离（codex review M4 明确）| sessionA 的 depth 污染 sessionB，"重置 depth 让回路无限续命"漏洞重现 | 跨 session 同模式调用 | L1 | 新增 |
+| L1-08 | `TestLoopDepthTracker_Concurrent` ⭐NEW | 守护并发安全（race 0）| race 条件，depth 计数错误 | 100 并发同模式调用 | L1 | 新增 |
+| L1-09 | `TestLoopDepthTracker_Reset` ⭐NEW | 守护 Reset 清空 History | History map 残留，session 内污染 | Reset 后再调用 | L1 | 新增 |
+| L1-10 | `TestLoopDepthTracker_HashCollision_Resilience` ⭐NEW | 守护 hash 冲突时的降级行为 | hash 冲突时回路误判 | 构造 hash 冲突输入 | L1 | 新增 |
+
+#### T-02 PlanKindSwitchPolicy (PR-V5.2): 15 tests = 10 现有 + 5 新增
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-11 | `TestDetermineSwitchPolicy_Exploration` | 守护 Exploration → Constrained 映射 | 映射关系错乱 | Exploration Plan | L1 | 现有 |
+| L1-12 | `TestDetermineSwitchPolicy_Scenario` | 守护 Scenario → Allowed 映射 | 映射关系错乱 | Scenario Plan | L1 | 现有 |
+| L1-13 | `TestDetermineSwitchPolicy_Protocol` | 守护 Protocol → Constrained 映射 | 映射关系错乱 | Protocol Plan | L1 | 现有 |
+| L1-14 | `TestDetermineSwitchPolicy_Commitment` | 守护 Commitment → Forbidden 映射 | 映射关系错乱 | Commitment Plan | L1 | 现有 |
+| L1-15 | `TestPlanKindSwitchCount_ExceedLimit` | 守护 4/5 累计边界 | 边界判断失守 | 4 → OK, 5 → error | L1 | 现有 |
+| L1-16 | `TestPlanKindSwitchCount_ZeroStart` | 守护 0 次切换合法（首次）| 误判首次切换违规 | 0 次切换 | L1 | 现有 |
+| L1-17 | `TestPlanKindSwitchPolicy_Forbidden_NoSwitch` | 守护 CommitmentPlan 0 次切换合法 | 误判 0 次违规 | Commitment 0 次 | L1 | 现有 |
+| L1-18 | `TestPlanKindSwitchPolicy_Forbidden_OneSwitch` | 守护 CommitmentPlan 1 次切换 → ForceExit | 1 次未触发 | Commitment 1 次 | L1 | 现有 |
+| L1-19 | `TestPlanKindSwitchPolicy_Constrained_Boundary` | 守护 Constrained 4/5 边界 | 4 → OK, 5 → ForceExit | Constrained 4/5 次 | L1 | 现有 |
+| L1-20 | `TestDetermineSwitchPolicy_Allowed_NoLimit` | 守护 Allowed 无上限 | 误加限制 | Allowed 100 次 | L1 | 现有 |
+| L1-21 | `TestPlanKindSwitchPolicy_PreReset_Boundary` ⭐NEW | 守护 Reset 后首次切换合法 | 误判首次切换违规 | Reset 后切换 | L1 | 新增 |
+| L1-22 | `TestPlanKindSwitchPolicy_Concurrent` ⭐NEW | 守护并发计数 | 累计计数 race | 100 并发切换 | L1 | 新增 |
+| L1-23 | `TestPlanKindSwitchPolicy_Integration_With_Planner` ⭐NEW | 守护与 planner.go MatchKind 集成 | MatchKind 之后未接 policy | planner 调用链 | L1 | 新增 |
+| L1-24 | `TestPlanKindSwitchPolicy_EdgeCase_SameKindSwitch` ⭐NEW | 守护"同 Kind 重选"语义 | 重选不计数 vs 误计数 | 同一 Kind 连续选 | L1 | 新增 |
+| L1-25 | `TestPlanKindSwitchPolicy_Allowed_NoUpperLimit` ⭐NEW | 守护 Allowed 无上限边界 | 误加 100/200 上限 | Allowed 1000 次 | L1 | 新增 |
+
+#### T-03 ChainedArbitrator (PR-V5.3): 35 tests = 22 现有 + 13 新增
+
+**arbitrator_test.go**: 18 现有 + 8 新增 = 26 tests
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-26 | `TestLLMArbitrator_Continue` | 守护 LLM 选 Continue | LLM Continue 路径失守 | mock Continue | L1 | 现有 |
+| L1-27 | `TestLLMArbitrator_Exit` | 守护 LLM 选 Exit → 链式 Rule | LLM Exit 路径失守 | mock Exit | L1 | 现有 |
+| L1-28 | `TestLLMArbitrator_Timeout` | 守护 5s 超时 → ForceExit 兜底 | LLM 阻塞 5s 不兜底 | mock 5s 不响应 | L1 | 现有 |
+| L1-29 | `TestRuleArbitrator_Unrecoverable` | 守护不可恢复 → AbortWithAudit | 不可恢复场景失守 | mock 不可恢复 | L1 | 现有 |
+| L1-30 | `TestRuleArbitrator_Recoverable` | 守护可恢复 → EscalateToHuman | 可恢复场景失守 | mock 可恢复 | L1 | 现有 |
+| L1-31 | `TestHumanArbitrator_ChoiceA` | 守护 A 选项 → Continue | A 选项响应失守 | SubmitUserChoice("A") | L1 | 现有 |
+| L1-32 | `TestHumanArbitrator_ChoiceB` | 守护 B 选项 → ForceExit | B 选项响应失守 | SubmitUserChoice("B") | L1 | 现有 |
+| L1-33 | `TestHumanArbitrator_ChoiceC` | 守护 C 选项 → AbortWithAudit | C 选项响应失守 | SubmitUserChoice("C") | L1 | 现有 |
+| L1-34 | `TestHumanArbitrator_Timeout` | 守护 10s 不响应 → ForceExit | 10s timeout 失守 | 10s 不响应 | L1 | 现有 |
+| L1-35 | `TestHumanArbitrator_CtxCancel` | 守护 ctx 取消 → ForceExit | ctx 取消语义失守 | ctx.Done() | L1 | 现有 |
+| L1-36 | `TestHumanArbitrator_PendingResolution_Save` | 守护 Save → Load 命中 | PendingResolution 存储失守 | Save 后 Load | L1 | 现有 |
+| L1-37 | `TestHumanArbitrator_PendingResolution_Load_NotFound` | 守护首次 ProcessMessage Load 失败 | Load 失败处理失守 | 首次 Load | L1 | 现有 |
+| L1-38 | `TestHumanArbitrator_SubmitUserChoice_Expired` | 守护过期 pendingID 丢弃 | 过期响应覆盖新 pendingID | cleanup 后提交 | L1 | 现有 |
+| L1-39 | `TestHumanArbitrator_NotBlockProcessMessage` | 守护 Arbitrate 立即返回 <100ms | 10s 阻塞主链路 | Arbitrate 同步性 | L1 | 现有 |
+| L1-40 | `TestChainedArbitrator_LLMContinue` | 守护 LLM Continue 立即返回 | 链式 LLM 路径失守 | LLM Continue | L1 | 现有 |
+| L1-41 | `TestChainedArbitrator_LLMExit_Rule` | 守护 LLM Exit → Rule | 链式 LLM→Rule 失守 | LLM Exit | L1 | 现有 |
+| L1-42 | `TestChainedArbitrator_RuleHuman` | 守护 Rule Human → Human | 链式 Rule→Human 失守 | Rule Human | L1 | 现有 |
+| L1-43 | `TestChainedArbitrator_HumanPending` | 守护 Human → 返回 EscapePendingHuman | 中间态语义失守 | Human 调用 | L1 | 现有 |
+| L1-44 | `TestLLMArbitrator_InvalidAction` ⭐NEW | 守护 LLM 返回非法 action 降级 | 非法 action 阻塞 | LLM 输出乱码 | L1 | 新增 |
+| L1-45 | `TestLLMArbitrator_PanicRecovery` ⭐NEW | 守护 LLM panic 兜底 | 崩溃主链路 | LLM SDK panic | L1 | 新增 |
+| L1-46 | `TestLLMArbitrator_ConcurrentCalls` ⭐NEW | 守护并发 LLM 仲裁 | race | 100 并发 | L1 | 新增 |
+| L1-47 | `TestLLMArbitrator_PromptInjectingPlanKindSwitch` ⭐NEW | 守护 prompt 注入防御 | 注入攻击 | prompt 包含 SwitchCount=999 | L1 | 新增 |
+| L1-48 | `TestRuleArbitrator_NilContext` ⭐NEW | 守护 nil context | panic | nil 输入 | L1 | 新增 |
+| L1-49 | `TestHumanArbitrator_SubmitAfterCleanup` ⭐NEW | 守护过期提交丢弃 | 过期响应覆盖新 pendingID | cleanup 后提交 | L1 | 新增 |
+| L1-50 | `TestChainedArbitrator_LLM_Panic_Recovery` ⭐NEW | 守护 LLM panic 后链式降级 | 链式调用中断 | LLM panic | L1 | 新增 |
+| L1-51 | `TestChainedArbitrator_Order_Invariant` ⭐NEW | 守护链式顺序 LLM→Rule→Human | 顺序错乱 | 调用顺序 | L1 | 新增 |
+
+**notifier_test.go**: 4 现有 + 2 新增 = 6 tests
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-52 | `TestFeishuCardNotifier_BuildCard` | 守护卡片结构（3 按钮 + ExpiresAt）| 卡片结构错乱 | 构建卡片 | L1 | 现有 |
+| L1-53 | `TestChainedNotifier_FeishuSuccess` | 守护 Feishu 成功 → 不 fallback | 链式 fallback 失守 | Feishu 成功 | L1 | 现有 |
+| L1-54 | `TestChainedNotifier_FeishuFail_CLISuccess` | 守护 Feishu 失败 → CLI 成功 | fallback 路径失守 | Feishu 失败 | L1 | 现有 |
+| L1-55 | `TestChainedNotifier_AllFail` | 守护全部失败 → error | 错误传播失守 | 全部失败 | L1 | 现有 |
+| L1-56 | `TestFeishuCardNotifier_NotImpl_DefaultsToCLI` ⭐NEW | 守护 Feishu 未配置时降级 | dev 环境无 fallback | 无 Feishu 配置 | L1 | 新增 |
+| L1-57 | `TestChainedNotifier_PartialFail` ⭐NEW | 守护部分失败 fallback | 第一通道失败中断 | 第一通道失败 | L1 | 新增 |
+
+**pending_resolution_test.go**: 0 现有 + 3 新增 = 3 tests（T-03 现有未列，补全）
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-58 | `TestInMemoryPendingResolutionStore_SaveLoad` ⭐NEW | 守护 Save → Load 命中语义 | 存储语义失守 | Save 后 Load | L1 | 新增（补全 T-03 缺失）|
+| L1-59 | `TestInMemoryPendingResolutionStore_Delete` ⭐NEW | 守护 Delete 清理语义 | cleanup 不彻底 | Delete 后 Load | L1 | 新增（补全 T-03 缺失）|
+| L1-60 | `TestInMemoryPendingResolutionStore_Concurrent` ⭐NEW | 守护并发读写 | race | 100 并发 | L1 | 新增（补全 T-03 缺失）|
+
+#### T-04 EscapeEngine + CB (PR-V5.4): 15 tests = 9 现有 + 6 新增
+
+**engine_test.go**: 4 现有 + 4 新增 = 8 tests
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-61 | `TestEscapeEngine_AllContinue` | 守护全部 Continue | 整合入口决策失守 | 三类都 Continue | L1 | 现有 |
+| L1-62 | `TestEscapeEngine_TrackerExceed` | 守护回路超限 → ForceExit | tracker 集成失守 | depth 超过 | L1 | 现有 |
+| L1-63 | `TestEscapeEngine_CircuitBreakerOpen` | 守护 CB open → LLM 仲裁 | CB 集成失守 | CB open | L1 | 现有 |
+| L1-64 | `TestEscapeEngine_AuditLog_Record` | 守护 audit 记录 | audit 持久化失守 | decision 写入 | L1 | 现有 |
+| L1-65 | `TestEscapeEngine_PanicRecovery` ⭐NEW | 守护 Engine panic 降级 | 主链路崩溃 | 子模块 panic | L1 | 新增 |
+| L1-66 | `TestEscapeEngine_Concurrent` ⭐NEW | 守护并发 Evaluate | race | 100 并发 | L1 | 新增 |
+| L1-67 | `TestEscapeEngine_ErrorFallback_Continue` ⭐NEW | 守护 error 降级为 Continue | error 阻塞主链路 | 子模块 error | L1 | 新增 |
+| L1-68 | `TestEscapeEngine_5CircuitBreakers_Independent` ⭐NEW | 守护 5 CB 独立触发 | 1 open 触发全部 | L0 open | L1 | 新增 |
+
+**circuit_breaker_test.go**: 5 现有 + 1 新增 = 6 tests
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-69 | `TestAnomalyDetectorCB_5Nil_Open` | 守护 L0 5 次 nil → open | 异常检测 CB 失守 | 5 次 nil | L1 | 现有 |
+| L1-70 | `TestDispatchLoopWakeupsCB_100PerMin_Open` | 守护 L1 100/分 → open | dispatch loop CB 失守 | 100/min | L1 | 现有 |
+| L1-71 | `TestVerifierCB_3Times2s_Open` | 守护 L2 3 次 > 2s → open | verifier CB 失守 | 3 次 > 2s | L1 | 现有 |
+| L1-72 | `TestHookCB_5Fail_Open` | 守护 L3 5 次 fail → open | hook CB 失守 | 5 次 fail | L1 | 现有 |
+| L1-73 | `TestWorkerPanicCB_1Panic_Open` | 守护 L4 1 次 panic → open | worker panic CB 失守 | 1 次 panic | L1 | 现有 |
+| L1-74 | `TestSandboxExitCB_5Fail_Open` | 守护 L5 5 次 fail → open | sandbox exit CB 失守 | 5 次 fail | L1 | 现有 |
+| L1-75 | `TestCircuitBreaker_StateMachine_OpenHalfOpenClose` ⭐NEW | 守护 state machine 转换 | 状态机错乱 | open/half-open/close | L1 | 新增 |
+
+**audit_log_test.go**: 0 现有 + 1 新增 = 1 test
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-76 | `TestEscapeAuditLog_AuditLevel_0_1_2` ⭐NEW | 守护 3 个 AuditLevel 区分 | level 区分失效 | 各类 decision 写入 | L1 | 新增（补全 T-04 缺失）|
+
+#### T-05 Orchestrator 接线 (PR-V5.5): 14 tests = 0 现有 + 14 新增（全部 new）
+
+**orchestrator_escape_test.go**: 10 tests
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-77 | `TestOrchestrator_WithEscapeEngine_Option` | 守护 option 模式集成 | 未启用时静默失效 | 不传 option | L1 | 新增 |
+| L1-78 | `TestOrchestrator_BuildLoopContext` | 守护 LoopContext 5 hash 字段构造 | hash 字段遗漏 | 字段缺失 | L1 | 新增 |
+| L1-79 | `TestOrchestrator_ProcessEscapeDecision` | 守护 6 类 action 处理 | action 处理漏 | 各类 action | L1 | 新增 |
+| L1-80 | `TestOrchestrator_EvaluateError_Fallback` | 守护 Evaluate error → slog.Warn + Continue | error 阻塞主链路 | Evaluate panic | L1 | 新增 |
+| L1-81 | `TestOrchestrator_5WiringPoint_Observe` | 守护接线点 0 Observe 失败 | 接线点 0 漏 | Observe 失败 | L1 | 新增 |
+| L1-82 | `TestOrchestrator_5WiringPoint_PlanFailure` | 守护接线点 1a Plan 失败 | 接线点 1a 漏 | Plan 失败 | L1 | 新增 |
+| L1-83 | `TestOrchestrator_5WiringPoint_PlanBefore` | 守护接线点 1b Plan 前 | 接线点 1b 漏 | Plan 前 | L1 | 新增 |
+| L1-84 | `TestOrchestrator_5WiringPoint_PlanFailureShortCircuit` | 守护 1a 短路不调 1b（codex review R4 修复）| 同 ProcessMessage 内重复 Evaluate | Plan 失败 + Plan 前 | L1 | 新增 |
+| L1-85 | `TestOrchestrator_5WiringPoint_Execute` | 守护接线点 2 Execute 失败 | 接线点 2 漏 | Execute 失败 | L1 | 新增 |
+| L1-86 | `TestOrchestrator_5WiringPoint_Verify` | 守护接线点 3 Verify 失败 | 接线点 3 漏 | Verify 失败 | L1 | 新增 |
+
+**planner_switch_policy_test.go**: 1 test
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-87 | `TestPlanner_PlanKindSwitchPolicy_Integration` | 守护 MatchKind → PlanKindSwitchPolicy 集成 | MatchKind 之后未接 policy | planner 调用链 | L1 | 新增 |
+
+**aggregate_verdicts_escape_test.go**: 1 test
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-88 | `TestAggregateVerdicts_EscapeEngine_Integration` | 守护 AggregateVerdicts → EscapeEngine 集成 | Verify 失败未触发 Evaluate | Verdict FAIL | L1 | 新增 |
+
+**learner_escape_test.go**: 1 test
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-89 | `TestLearner_EscapeEngine_Integration` | 守护 Learn → EscapeEngine 集成 | Learn 后未触发 Evaluate | Learn 异常 | L1 | 新增 |
+
+**orchestrator_e2e_test.go**: 1 test
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 | 状态 |
+|---|---------|---------|---------|-----------|---------|------|
+| L1-90 | `TestOrchestrator_End2End_5NodePipeline` | 守护 5 节点完整 e2e（含 EscapeEngine 接线）| 接线回归无感知 | 完整 5 节点调用 | L1 | 新增 |
+
+> **注**：L1-90 即是 L1-89 之上的端到端封装，等价于 L2-05 的单元化版本；为保持"5 节点接线"单测完整性而保留。
+
+---
+
+### 统计校验
+
+| 层级 | 数量 | 计算 |
+|------|------|------|
+| L4 业务验收 | 4 | L4-01..L4-04 |
+| L3 端到端场景 | 7 | L3-01..L3-07 |
+| L2 集成 | 6 | L2-01..L2-06 |
+| L1 单元 | 90 | L1-01..L1-90 |
+| **总计** | **107** | 4+7+6+90 |
+
+#### L1 按 PR 分布
+
+| PR | 现有 | 新增 | 小计 |
+|----|------|------|------|
+| V5.1 (T-01) | 6 | 4 | 10 |
+| V5.2 (T-02) | 10 | 5 | 15 |
+| V5.3 (T-03) | 22 | 13 | 35 |
+| V5.4 (T-04) | 9 | 6 | 15 |
+| V5.5 (T-05) | 0 | 14 | 14 |
+| **L1 合计** | **47** | **42** | **89** ⚠️ |
+
+> ⚠️ L1 总计 89 + L1-90 单元 e2e 1 个 = 90。
+> - **L1-90** `TestOrchestrator_End2End_5NodePipeline`：在 `orchestrator_e2e_test.go` 内的"单测 e2e"（mock LLM/Rule/Human，无 DB 无飞书），跑得快、CI 必过
+> - **L2-05** `TestIntegration_5NodePipeline_End2End`：在 `escape_integration_test.go` 内的"集成 e2e"（真实 LLM 网关 + DB + 飞书），跑得慢、S5 验收
+>
+> 两者**不重复**：覆盖不同 fixture 层级 + 不同执行时间窗。
+
+#### 新增测试（42 + 1 L2 + 11 L3+L4 = 54）
+
+- L1 新增 42 个（含 3 个 T-03 补全 + 1 个 T-04 补全 + 1 个 L1-90 单元 e2e）
+- L2 新增 1 个（L2-06 5WiringPoints）
+- L3 新增 7 个（端到端故障链路）
+- L4 新增 4 个（业务验收）
+
+#### 与 codex review §3 担心点的对应
+
+| Codex 担心 | 守护测试 |
+|-----------|---------|
+| §3.1 不实施 v5 的备选对比缺失 | L4-01..L4-04 业务验收 |
+| §3.2 6 类 EscapeAction 设计冗余 | L2-03 5 类兜底动作 + L1-79 6 类 action 处理 |
+| §3.3 LoopContext 11 字段冗余 | L1-78 BuildLoopContext 5 字段构造 |
+| §3.4 CB 5 层阈值不严谨 | L3-03/L3-04 + L1-69..L1-75 7 个 CB 单测 |
+| §3.5 5 接线点重复 Evaluate | L1-84 1a 短路不调 1b + L2-06 5WiringPoints |
 
 ---
 
