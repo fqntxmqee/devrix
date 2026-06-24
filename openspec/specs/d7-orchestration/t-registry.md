@@ -431,7 +431,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 186 | 184 | 2 | 0 | 153 |
+| 186 | 186 | 0 | 0 | 153 |
 
 ### 按 Scenario
 
@@ -446,8 +446,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S8** | **9** | **9** | **0** | **0** |
 | **D7-S9** | **9** | **9** | **0** | **0** |
 | **D7-S10** | **8** | **8** | **0** | **0** |
-| **D7-S11** | **13** | **12** | **1** | **0** |
-| **D7-S14** | **18** | **17** | **1** | **0** |
+| **D7-S11** | **13** | **13** | **0** | **0** |
+| **D7-S14** | **18** | **18** | **0** | **0** |
 | 契约/迁移 | 8 | 8 | 0 | 0 |
 
 > **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。
@@ -500,6 +500,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.11.0** | **2026-06-23** | **devrix-d7-mups-v4-phase2-plan (DM-20260623-001-PRB1) Phase 2 PR-B1 归档**：D7-S8-A22 +3 T 点（T01 PlanKind 4 类枚举 + String/Marshal/Unmarshal/Parse + T02 Plan.SourceObservationIDs 必填 + 防御性拷贝 + ReverseLookupObservations Phase 4 入口 + T03 MatchKind 4 规则分类器 + uncertainty-first tie-break + DefaultPlanner.Plan 集成 + strengthFloor 公式）。**devrix-d7-mups-v4-phase3-channels (DM-20260625-001-PRC2) Phase 3 PR-C2 归档**：D7-S9-A26 +5 T 点（T01 ChannelRegistry 1:1 绑定 + ChannelRouter 4 PlanKind → 4 ArtifactKind 1:1 映射 + defensive checks + T02 CommitChannel 1-Step 同步 + IdempotencyKey 强制 + 超时 SideEffectInflight + T03 ProtocolChannel 顺序多步 + reverse-order rollback + T04 ScenarioChannel MaxParallel=5 并行探测 + 多数派投票 + T05 ExplorationChannel MaxParallel=3 多 agent + 优先级排序 + PersistScope 派生 SideEffectStatus）。IMPLEMENTED 139→147, P0 106→114。详见 `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase2-plan/specs/d7-orchestration/spec.md` §D7-S8-A22 + `openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-channels/specs/d7-orchestration/spec.md` §D7-S9-A26。 |
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
 | **3.17.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine (DM-20260625-003) V5.1..V5.5 归档 (17 IMPLEMENTED + 1 PARTIAL)**：D7-S14-A50 +18 T 点（T01 LoopContext 7 字段 + T02 LoopDepthTracker ForceExit 边界 + T03 PlanKindSwitchPolicy 3 档 + T04 EscapeAction 6 类 + T05 LLM/Rule/Human 3 层仲裁 + T06 Notifier + PendingResolutionStore + T07 EscapeEngine 整合 + T08 LoopBudget + T09 CircuitBreaker 5 层 + T10 EscapeAuditLog + T11 Orchestrator 5 节点接线 + T12 ResumeSession ⚠️PARTIAL + T13 buildLoopContext + T14..T18 L4/L3/L2/L1/gap 测试）。IMPLEMENTED 168→184, P0 135→153, PARTIAL 1→2, Scenarios D7-S14 0→1。S4-Gate review 修复: C-1 processEscapeDecision 返回 augmented error 避免静默吞错 (signature `bool` → `(bool, error)`)。T12 PARTIAL 原因: V5.5 仅完成 V5.3 HumanArbitrator.ResumeSession 存储层，SessionOrchestrator.ProcessMessage 入口 applyResumeSession + runLoopWithResume 留待 PR-V5.6。V5.4 修复: Engine 决策合并逻辑 0/1/2+ 信号分层 (0→Continue / 1→直接返回硬信号 / 2+→ChainedArbitrator)。V5.5 落地 3 接线点 (1a Plan 失败 / 1b Plan 前 / 2 Execute 失败；3 Verify 失败 待 processAutoClose 暴露 verdict 后接入) + 8 wiring 单元测试 + 5 集成测试 100% PASS。详见 `openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine/specs/d7-orchestration/spec.md` §D7-S14-A50。 |
+| **3.18.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine-v5-6 (DM-20260625-003) PR-V5.6 T12 PARTIAL→IMPLEMENTED**：(D7-S14-A50-T12 IMPLEMENTED。SessionOrchestrator.applyResumeSession 实现 + 3 层 fail-safe (nil engine / ResumeSession error / TTL expired) + 3 决策路由 (A user_continue fall through / B user_accept→ForceExit 短路 emit "complete" / C user_cancel→AbortWithAudit 短路 emit "complete") + 3 sessionSpan attrs (escape.resume.attempted / decision_action / decision_pending_id) + resumeContentForDecision helper (6 类 EscapeAction → 中文 text) + 6 单元测试 (NoEngine / NoPending / UserAccept / UserCancel / UserContinue / ResumeError_Failsafe) + 2 集成测试 (TestProcessMessage_WithResume_UserAccept_EarlyClose / UserCancel_EarlyClose) 8/8 PASS 含 race + 3/3 稳定性验证。spec.md v4.9.0 → v4.10.0 + 域 t-registry v3.17.0 → v3.18.0 同步。IMPLEMENTED 184→186, PARTIAL 2→0, Scenarios D7-S11 T13 PARTIAL→0 + D7-S14 T12 PARTIAL→0, 总 PARTIAL 2→0, 总 18/18 IMPLEMENTED 0 PARTIAL。runLoopWithResume 在 V5.6 实现中被简化合并到 EscapeContinue fall through 路径, 不需要独立 wrapper 函数; LoopDepthTracker 自动保证 depth 续 T1 状态。详见 `openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6/specs/d7-orchestration/spec.md` §D7-S14-A50。**v3.18.0 review fix (DM-20260625-004)**：C-1 t-registry 删除 `runLoopWithResume` 描述 (代码 0 命中) + C-2 Statistics 表 4 处数字刷新 + v3.18.0 条目追加 (本条)。 |
 
 ---
 
@@ -564,7 +565,7 @@ D7-S13  Phase 7 Verify→Learn Auto-Close + Operator TrackMode + D5 增强
 | **D7-S14-A50-T09** | CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + State machine Open→HalfOpen→Close + 阈值占位推导 (V5.5 集成测试后回填) + CB 拉 metric 200ms timeout 防御 | IMPLEMENTED | `orchestration/escape/circuit_breaker.go` (PR-V5.4) |
 | **D7-S14-A50-T10** | EscapeAuditLog (AuditLevel 0/1/2) + InMemoryEscapeAuditLog (含 SourceDecisionIDs + CreatedAt) + EscapeDecision.ExitReason 14 类 Phase 4 映射 | IMPLEMENTED | `orchestration/escape/audit_log.go` (PR-V5.4) |
 | **D7-S14-A50-T11** | SessionOrchestrator.ProcessMessage 5 节点接线 (Observe 失败 / Plan 失败 1a / Plan 前 1b / Execute 失败 / Verify 失败) + 1a 短路不调 1b (codex R4 修复) + processEscapeDecision 6 类 action 统一处理 (Continue→continue 回路 / PendingHuman→return nil 异步 / ForceExit/Abort→return error / EscalateTo*→兜底 ForceExit) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
-| **D7-S14-A50-T12** | ResumeSession T2 续跑入口 (ProcessMessage 开头检查 → applyResumeSession) + applyResumeSession (user_choice=A→runLoopWithResume Continue / B→ForceExit / C→AbortWithAudit + 补写 audit) + runLoopWithResume (depth 续 T1 状态由 LoopDepthTracker 自动保证) | **IMPLEMENTED** | `orchestration/escape/arbitrator.go` (PR-V5.3) + `sessionorchestrator/escape_wiring.go` (PR-V5.6) |
+| **D7-S14-A50-T12** | ResumeSession T2 续跑入口 (ProcessMessage 开头检查 → applyResumeSession) + applyResumeSession (user_choice=A→EscapeContinue fall through to 5-node pipeline / B→ForceExit 短路 emit "complete" / C→AbortWithAudit 短路 emit "complete" — audit already recorded at SubmitUserChoice time V5.4, resume is read-only) + 3 层 fail-safe (nil engine / ResumeSession error / TTL expired → 静默 fall through) + 3 sessionSpan attrs (escape.resume.attempted / decision_action / decision_pending_id) + resumeContentForDecision helper (6 类 EscapeAction → 中文 text 消息) | **IMPLEMENTED** | `orchestration/escape/arbitrator.go` (PR-V5.3 ResumeSession one-shot consume) + `sessionorchestrator/escape_wiring.go` (PR-V5.6 applyResumeSession + resumeContentForDecision) + `sessionorchestrator/orchestrator.go` (PR-V5.6 ProcessMessage 入口插入) |
 | **D7-S14-A50-T13** | buildLoopContext 5 hash 字段构造 (SessionID + PlanKind + ObservationKind + FailureCriterion + ArtifactType) + buildLoopContextFromObserve (Observe 失败 case) + 4 IntentKind × 5 节点 12 case 集成测试 (Skip→1 次 Evaluate, Orchestrate→完整 5 节点) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
 | **D7-S14-A50-T14** | L4 业务验收 4 测试 (TestL4_v5_Compatible_With_Phase1_7 / TestL4_v5_PerformanceOverhead_Under5Percent / TestL4_FeishuCard_NotBlocked_ByHuman10s + TestL4_LLMSwitchPlanKind_5Times_ForcesExit) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
 | **D7-S14-A50-T15** | L3 端到端 7 测试 (TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit / TestL3_SameMode_4Times_ForcesExit / TestL3_AnomalyDetector_5Nil_OpensL0 / TestL3_Verifier_3Times2s_OpensL2 / TestL3_Human10s_Async_FeishuNotBlocked / TestL3_PlanKindSwitch_Constrained_4Limit / TestL3_CB5Layers_Open_Independently) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
@@ -588,7 +589,7 @@ D7-S14  MUPS v5 统一逃逸机制 (IMPLEMENTED, 5 PR 拆分)
 │   ├── T09  CircuitBreaker 5 层接线 (L0..L5 阈值 + state machine)               [IMPLEMENTED]
 │   ├── T10  EscapeAuditLog (AuditLevel 0/1/2 + 14 ExitReason 映射)              [IMPLEMENTED]
 │   ├── T11  SessionOrchestrator 5 节点接线 + 1a 短路不调 1b                       [IMPLEMENTED]
-│   ├── T12  ResumeSession + applyResumeSession + runLoopWithResume               [IMPLEMENTED]
+│   ├── T12  ResumeSession + applyResumeSession + resumeContentForDecision        [IMPLEMENTED]
 │   ├── T13  buildLoopContext + 4 IntentKind × 5 节点 12 case                     [IMPLEMENTED]
 │   ├── T14  L4 业务验收 4 测试                                                  [IMPLEMENTED]
 │   ├── T15  L3 端到端 7 测试                                                    [IMPLEMENTED]
