@@ -222,6 +222,7 @@
 | **devrix-d7-mups-v4-phase7-verify-auto-close** | **`openspec/archive/2026-06-25-devrix-d7-mups-v4-phase7-verify-auto-close/`** |
 | **devrix-d7-mups-v4-review-fixes** | **`openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes/`** |
 | **devrix-d7-mups-v5-escape-engine** | **`openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine/`** |
+| **devrix-d7-mups-v5-escape-engine-v5-6** | **`openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6/`** |
 
 ## Active Changes (未归档)
 
