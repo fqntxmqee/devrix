@@ -105,14 +105,18 @@ func (m *LocalWorkModel) CreateTask(ctx context.Context, spec orchtypes.TaskSpec
 	if sessionID == "" {
 		return "", fmt.Errorf("LocalWorkModel: sessionID not found in context")
 	}
-	task, err := m.tasks.Create(sessionID, spec.Subject, spec.Goal)
+	item, err := m.tasks.Tree().Create(sessionID, workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     spec.Subject,
+		Directive: spec.Goal,
+	})
 	if err != nil {
 		return "", fmt.Errorf("LocalWorkModel.CreateTask: %w", err)
 	}
-	if task == nil {
-		return "", fmt.Errorf("LocalWorkModel.CreateTask: nil task without error")
+	if item == nil {
+		return "", fmt.Errorf("LocalWorkModel.CreateTask: nil item without error")
 	}
-	return task.ID, nil
+	return item.ID, nil
 }
 
 // UpdateStatus updates task status using the local TaskManager.
@@ -121,7 +125,7 @@ func (m *LocalWorkModel) UpdateStatus(ctx context.Context, taskID string, status
 	if sessionID == "" {
 		return fmt.Errorf("LocalWorkModel: sessionID not found in context")
 	}
-	return m.tasks.UpdateStatus(sessionID, taskID, status)
+	return m.tasks.Tree().UpdateStatus(sessionID, taskID, status)
 }
 
 // QueryWorkPlan returns a snapshot combining local tasks, flow state, and
@@ -130,12 +134,12 @@ func (m *LocalWorkModel) QueryWorkPlan(ctx context.Context, sessionID string) (W
 	snapshot := WorkPlanSnapshot{SessionID: sessionID}
 
 	// Tasks
-	tasks := m.tasks.List(sessionID)
-	for _, t := range tasks {
+	items := m.tasks.Tree().List(sessionID)
+	for _, t := range items {
 		spec := orchtypes.TaskSpec{
 			ID:      t.ID,
-			Subject: t.Subject,
-			Goal:    t.Description,
+			Subject: t.Title,
+			Goal:    t.Directive,
 		}
 		snapshot.Tasks = append(snapshot.Tasks, spec)
 	}
@@ -176,27 +180,23 @@ func (m *LocalWorkModel) CreateWorkPlan(ctx context.Context, sessionID, goal str
 	}
 
 	// v1.1: single task from goal (SynthesizeTaskGraph deferred to future)
-	task, err := m.tasks.Create(sessionID, goal, goal)
+	item, err := m.tasks.Tree().Create(sessionID, workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     goal,
+		Directive: goal,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("CreateWorkPlan: failed to create task: %w", err)
 	}
-	if task == nil {
-		return nil, fmt.Errorf("CreateWorkPlan: failed to create task (nil task without error)")
+	if item == nil {
+		return nil, fmt.Errorf("CreateWorkPlan: failed to create task (nil item without error)")
 	}
-	taskID := task.ID
 
-	// Build orchtypes.TaskSpec for the created task
-	tasks := m.tasks.List(sessionID)
-	for _, t := range tasks {
-		if t.ID == taskID {
-			plan.Tasks = append(plan.Tasks, orchtypes.TaskSpec{
-				ID:      t.ID,
-				Subject: t.Subject,
-				Goal:    t.Description,
-			})
-			break
-		}
-	}
+	plan.Tasks = append(plan.Tasks, orchtypes.TaskSpec{
+		ID:      item.ID,
+		Subject: item.Title,
+		Goal:    item.Directive,
+	})
 
 	return plan, nil
 }

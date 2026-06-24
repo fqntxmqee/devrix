@@ -26,9 +26,7 @@ const (
 // VerdictKind is a type alias re-exported from shared/types so that
 // UncertaintyCoord (Phase 2 PR-A1) and Verdict (Phase 4 PR-D1) can share
 // the same wire format. The concrete enum + String/Parse live in
-// shared/types/verdict.go. Phase 4 PR-D2 will migrate FromVerifier from
-// string switch to typed enum switch; this alias keeps PR-D1 zero-impact
-// on existing callers.
+// shared/types/verdict.go.
 type VerdictKind = types.VerdictKind
 
 const (
@@ -60,15 +58,26 @@ func NewUncertaintyCoord(value float64) UncertaintyCoord {
 	}
 }
 
-// FromVerifierTyped projects a typed VerdictKind (Phase 4 PR-D1 enum) into
-// an UncertaintyCoord. The mapping is identical to FromVerifier (string
-// form): Pass→0.0 / Partial→0.4 / Indeterminate→0.7 / Fail→0.9, with
-// SystemAnomaly overriding to 0.95.
+// FromVerifierTyped projects a typed VerdictKind into an UncertaintyCoord.
+// Verdict kind maps to coord value as:
 //
-// This is the typed-enum companion to FromVerifier; new callers should
-// prefer this over FromVerifier. FromVerifier is retained as a string-
-// form shim for callers that already pass kind as a string (e.g.
-// ParseVerifierOutputWithRetry's Raw payload).
+//	Pass          → 0.0  (low uncertainty, the plan worked)
+//	Partial       → 0.4
+//	Indeterminate → 0.7  (high uncertainty, verifier abstained)
+//	Fail          → 0.9
+//
+// SystemAnomaly=true forces a clamped 0.95 to signal orchestrator-level
+// distrust.
+//
+// Unknown verdict kinds are FAIL-FAST: returns
+// (UncertaintyCoord{}, NewUncertaintyCoordInvalidVerdictKindError(kind))
+// so the ORCH_COORD_VERDICT_7004 error code fires and upstream typos
+// surface immediately rather than being silently coerced to the 0.5
+// neutral default.
+//
+// This is the canonical entry point for Verify→Coord wiring. Callers
+// that have a string kind (e.g. parsed from wire payloads) should
+// convert via types.ParseVerdictKind first.
 func FromVerifierTyped(kind VerdictKind, confidence float64, reason string, systemAnomaly bool) (UncertaintyCoord, error) {
 	base := 0.5
 	switch kind {
@@ -93,33 +102,6 @@ func FromVerifierTyped(kind VerdictKind, confidence float64, reason string, syst
 		FromVerifier: true,
 		UpdatedAt:    time.Now(),
 	}, nil
-}
-
-// FromVerifier projects a Verifier verdict into an UncertaintyCoord. The
-// verdict kind maps to coord value as follows:
-//   - Pass          → 0.0  (low uncertainty, the plan worked)
-//   - Partial       → 0.4
-//   - Indeterminate → 0.7  (high uncertainty, verifier abstained)
-//   - Fail          → 0.9
-//
-// SystemAnomaly=true forces a clamped 0.95 to signal orchestrator-level
-// distrust.
-//
-// Unknown verdict kinds are now FAIL-FAST: the function returns
-// (UncertaintyCoord{}, NewUncertaintyCoordInvalidVerdictKindError(kind))
-// so the ORCH_COORD_VERDICT_7004 error code actually fires and noisy
-// upstream typos surface immediately rather than being silently coerced
-// to the 0.5 neutral default.
-//
-// Phase 4 PR-D2 retains this string-form function for backward compat
-// with v2 callers (notably ParseVerifierOutputWithRetry's Raw payload)
-// but new code should prefer FromVerifierTyped.
-func FromVerifier(verdictKind string, confidence float64, reason string, systemAnomaly bool) (UncertaintyCoord, error) {
-	kind, err := types.ParseVerdictKind(verdictKind)
-	if err != nil {
-		return UncertaintyCoord{}, NewUncertaintyCoordInvalidVerdictKindError(verdictKind)
-	}
-	return FromVerifierTyped(kind, confidence, reason, systemAnomaly)
 }
 
 // WithValue returns a copy with the new value (clamped). UpdatedAt is bumped.

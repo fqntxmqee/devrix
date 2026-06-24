@@ -27,11 +27,11 @@ func ReevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress)
 	}
 	if stats.Failed > 0 {
-		_ = tm.UpdateStatus(sessionID, parent.ID, TaskStatusFailed)
+		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusFailed)
 		return
 	}
 	if stats.Total > 0 && stats.Completed == stats.Total {
-		_ = tm.UpdateStatus(sessionID, parent.ID, TaskStatusCompleted)
+		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusCompleted)
 	}
 }
 

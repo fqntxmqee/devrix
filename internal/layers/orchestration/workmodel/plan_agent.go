@@ -147,9 +147,9 @@ type PlanRequest struct {
 
 // PlanResult is the output from plan generation.
 type PlanResult struct {
-	Tasks         []*Task  // 计划的任务列表
-	Exploration   string   // 探索发现
-	CriticalFiles []string // 关键文件列表
+	Tasks         []*WorkItem // 计划的任务列表
+	Exploration   string      // 探索发现
+	CriticalFiles []string    // 关键文件列表
 	Err           error
 }
 
@@ -402,11 +402,11 @@ func extractFilesFromJSON(json string) []string {
 	return files
 }
 
-func parseTasksFromJSON(json string) []*Task {
-	var tasks []*Task
+func parseTasksFromJSON(json string) []*WorkItem {
+	var items []*WorkItem
 	idx := strings.Index(json, `"tasks"`)
 	if idx < 0 {
-		return tasks
+		return items
 	}
 
 	// Find array start
@@ -415,7 +415,7 @@ func parseTasksFromJSON(json string) []*Task {
 		start++
 	}
 	if start >= len(json) {
-		return tasks
+		return items
 	}
 	start++
 
@@ -432,7 +432,7 @@ func parseTasksFromJSON(json string) []*Task {
 
 	arrayContent := json[start : pos-1]
 	if len(arrayContent) == 0 {
-		return tasks
+		return items
 	}
 
 	// Split by object
@@ -449,9 +449,9 @@ func parseTasksFromJSON(json string) []*Task {
 				}
 				if depth == 0 {
 					obj := arrayContent[objStart : j+1]
-					task := parseTaskObject(obj)
-					if task != nil {
-						tasks = append(tasks, task)
+					item := parseTaskObject(obj)
+					if item != nil {
+						items = append(items, item)
 					}
 					i = j
 				}
@@ -459,14 +459,14 @@ func parseTasksFromJSON(json string) []*Task {
 		}
 	}
 
-	return tasks
+	return items
 }
 
-func parseTaskObject(obj string) *Task {
+func parseTaskObject(obj string) *WorkItem {
 	subject := extractField(obj, "subject")
 	description := extractField(obj, "description")
 	if subject == "" {
 		return nil
 	}
-	return NewTask(subject, description)
+	return NewWorkItem(WorkKindImplement, subject, description)
 }

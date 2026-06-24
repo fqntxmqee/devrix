@@ -7,15 +7,6 @@ import (
 	"testing"
 )
 
-func TestWorkItem_ToTaskRoundTrip(t *testing.T) {
-	item := NewWorkItem(WorkKindImplement, "Fix bug", "Fix auth bug")
-	task := item.ToTask()
-	back := WorkItemFromTask(task)
-	if back.Title != item.Title {
-		t.Fatalf("title mismatch")
-	}
-}
-
 func TestWorkTree_CreateAndHierarchy(t *testing.T) {
 	tree := NewWorkTree()
 	goal, _ := tree.EnsureGoal("s1", "Build system")
@@ -94,17 +85,19 @@ func TestWorkTree_UpsertChecklist(t *testing.T) {
 	}
 }
 
-func TestDiskWorkItemStore_V1Migration(t *testing.T) {
+func TestDiskWorkItemStore_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	v1, _ := NewDiskTaskStore(dir)
-	task := NewTask("Legacy", "desc")
-	if err := v1.Save("sess", []*Task{task}); err != nil {
+	store, _ := NewDiskWorkItemStore(dir)
+	want := NewWorkItem(WorkKindImplement, "Build feature", "Direct")
+	if err := store.Save("sess", []*WorkItem{want}); err != nil {
 		t.Fatal(err)
 	}
-	v2, _ := NewDiskWorkItemStore(dir)
-	items, err := v2.Load("sess")
-	if err != nil || len(items) != 1 {
-		t.Fatalf("load: %v len=%d", err, len(items))
+	got, err := store.Load("sess")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("load: %v len=%d", err, len(got))
+	}
+	if got[0].ID != want.ID || got[0].Title != want.Title || got[0].Directive != want.Directive {
+		t.Fatalf("round-trip mismatch: %+v", got[0])
 	}
 }
 
@@ -123,16 +116,25 @@ func TestDiskWorkItemStore_EmptyFile(t *testing.T) {
 
 func TestTaskManager_DelegatesToWorkTree(t *testing.T) {
 	m := NewTaskManager()
-	task, err := m.Create("s1", "Task", "Desc")
+	goal, err := m.Tree().EnsureGoal("s1", "build something")
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+	item, err := m.Tree().Create("s1", CreateWorkItemInput{
+		ParentID:  goal.ID,
+		Kind:      WorkKindImplement,
+		Title:     "Task",
+		Directive: "Desc",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	item, ok := m.Tree().Get("s1", task.ID)
-	if !ok || item.Kind != WorkKindImplement {
+	got, ok := m.Tree().Get("s1", item.ID)
+	if !ok || got.Kind != WorkKindImplement {
 		t.Fatal("expected implement work item")
 	}
-	if item.ParentID == "" {
-		t.Fatal("expected parent goal")
+	if got.ParentID != goal.ID {
+		t.Fatalf("expected parent goal %q, got %q", goal.ID, got.ParentID)
 	}
 }
 

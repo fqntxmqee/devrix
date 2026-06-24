@@ -38,11 +38,11 @@ type TaskToolOutput struct {
 
 // Tool names
 const (
-	ToolNameTaskCreate   = "task_create"
-	ToolNameTaskGet     = "task_get"
-	ToolNameTaskList    = "task_list"
-	ToolNameTaskUpdate  = "task_update"
-	ToolNameTaskDelete  = "task_delete"
+	ToolNameTaskCreate = "task_create"
+	ToolNameTaskGet    = "task_get"
+	ToolNameTaskList   = "task_list"
+	ToolNameTaskUpdate = "task_update"
+	ToolNameTaskDelete = "task_delete"
 )
 
 // Execute runs a task tool by name.
@@ -72,7 +72,11 @@ func (t *ToolSuite) Create(_ context.Context, input TaskToolInput) (*TaskToolOut
 		}, nil
 	}
 
-	task, err := t.manager.Create(input.SessionID, input.Subject, input.Description)
+	item, err := t.manager.Tree().Create(input.SessionID, CreateWorkItemInput{
+		Kind:      WorkKindImplement,
+		Title:     input.Subject,
+		Directive: input.Description,
+	})
 	if err != nil {
 		return &TaskToolOutput{
 			Success: false,
@@ -82,8 +86,8 @@ func (t *ToolSuite) Create(_ context.Context, input TaskToolInput) (*TaskToolOut
 
 	return &TaskToolOutput{
 		Success: true,
-		Message: fmt.Sprintf("Task created: %s", task.ID),
-		Data:    task,
+		Message: fmt.Sprintf("Task created: %s", item.ID),
+		Data:    item,
 	}, nil
 }
 
@@ -96,7 +100,7 @@ func (t *ToolSuite) Get(_ context.Context, input TaskToolInput) (*TaskToolOutput
 		}, nil
 	}
 
-	task, ok := t.manager.Get(input.SessionID, input.TaskID)
+	item, ok := t.manager.Tree().Get(input.SessionID, input.TaskID)
 	if !ok {
 		return &TaskToolOutput{
 			Success: false,
@@ -107,7 +111,7 @@ func (t *ToolSuite) Get(_ context.Context, input TaskToolInput) (*TaskToolOutput
 	return &TaskToolOutput{
 		Success: true,
 		Message: "Task found",
-		Data:    task,
+		Data:    item,
 	}, nil
 }
 
@@ -121,12 +125,12 @@ func (t *ToolSuite) List(_ context.Context, input TaskToolInput) (*TaskToolOutpu
 			Data:    tree,
 		}, nil
 	}
-	tasks := t.manager.List(input.SessionID)
+	items := t.manager.Tree().List(input.SessionID)
 
 	return &TaskToolOutput{
 		Success: true,
-		Message: fmt.Sprintf("Found %d tasks", len(tasks)),
-		Data:    tasks,
+		Message: fmt.Sprintf("Found %d tasks", len(items)),
+		Data:    items,
 	}, nil
 }
 
@@ -144,7 +148,7 @@ func (t *ToolSuite) Update(_ context.Context, input TaskToolInput) (*TaskToolOut
 
 	// Update status if provided
 	if input.Status != "" {
-		err = t.manager.UpdateStatus(input.SessionID, input.TaskID, TaskStatus(input.Status))
+		err = t.manager.Tree().UpdateStatus(input.SessionID, input.TaskID, TaskStatus(input.Status))
 		if err != nil {
 			return &TaskToolOutput{
 				Success: false,
@@ -156,7 +160,7 @@ func (t *ToolSuite) Update(_ context.Context, input TaskToolInput) (*TaskToolOut
 
 	// Update owner if provided
 	if input.Owner != "" {
-		err = t.manager.SetOwner(input.SessionID, input.TaskID, input.Owner)
+		err = t.manager.Tree().SetOwner(input.SessionID, input.TaskID, input.Owner)
 		if err != nil {
 			return &TaskToolOutput{
 				Success: false,
@@ -171,7 +175,7 @@ func (t *ToolSuite) Update(_ context.Context, input TaskToolInput) (*TaskToolOut
 
 	// Add dependency if provided
 	if input.BlockedBy != "" {
-		err = t.manager.AddDependency(input.SessionID, input.TaskID, input.BlockedBy)
+		err = t.manager.Tree().AddDependency(input.SessionID, input.TaskID, input.BlockedBy)
 		if err != nil {
 			return &TaskToolOutput{
 				Success: false,
@@ -203,7 +207,7 @@ func (t *ToolSuite) Delete(_ context.Context, input TaskToolInput) (*TaskToolOut
 		}, nil
 	}
 
-	err := t.manager.RemoveTask(input.SessionID, input.TaskID)
+	err := t.manager.Tree().Remove(input.SessionID, input.TaskID)
 	if err != nil {
 		return &TaskToolOutput{
 			Success: false,

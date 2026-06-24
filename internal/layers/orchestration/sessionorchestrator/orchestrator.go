@@ -24,7 +24,7 @@ import (
 //
 // D1 RouteInbound (when d7_enabled=true) calls ProcessMessage. The
 // orchestrator:
-//  1. Classifies the intent (rule-only in v1.0).
+//  1. Classifies the intent (decisionplanning.IntentClassifier; default rule-based).
 //  2. Routes to one of 4 real execution paths per the routing matrix:
 //     - orchtypes.IntentSkip        → close channel
 //     - orchtypes.IntentCommand     → CommandHandler (zero LLM, plan/task CLI)
@@ -32,9 +32,7 @@ import (
 //     - orchtypes.IntentOrchestrate → OrchestratePath (SynthesizeTaskGraph → Wave)
 //  3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
 //
-// v1.1.0: each orchtypes.IntentKind has its own execution chain (orthogonal paths).
-// v1.0 had Command/Orchestrate collapsed to FastPath with system-prompt
-// hints; that v1.0 simplification is removed.
+// Each orchtypes.IntentKind has its own execution chain (orthogonal paths).
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
@@ -275,7 +273,7 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 	}
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
 }
-//
+
 // Routing (v1.1.0+ orthogonal dispatch, see
 // devrix-d7-orthogonal-intent-paths):
 //   - skip        → return empty channel (inlined, no executor)
@@ -283,9 +281,7 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 //   - fast        → FastPath.Run (D2 single-turn LLM↔Tool loop)
 //   - orchestrate → OrchestratePath.Run (SynthesizeTaskGraph → Wave)
 //
-// Each orchtypes.IntentKind maps to an independent execution chain. v1.0 closure
-// had Command/Orchestrate collapsed to FastPath with system-prompt hints;
-// that v1.0 simplification is removed (see design.md §2.5).
+// Each orchtypes.IntentKind maps to an independent execution chain.
 //
 // Phase 6 PR-F2 (D7-S12-A42-T05): at entry, buildObserveRequest calls
 // Learner.Inject (when wired) to obtain an AdaptivePrior. The prior
@@ -379,7 +375,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	}
 
 	if o.taskManager != nil && req.SessionID != "" && strings.TrimSpace(req.Message) != "" && intent.Kind != orchtypes.IntentSkip {
-		_, _ = o.taskManager.EnsureGoal(req.SessionID, req.Message)
+		_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, req.Message)
 	}
 
 	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but

@@ -48,7 +48,7 @@ func syncTerminalWithRetry(tm *TaskManager, sessionID, workItemID string, e runr
 	status := mapRunStatus(e.Status)
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
-		lastErr = tm.UpdateStatus(sessionID, workItemID, status)
+		lastErr = tm.Tree().UpdateStatus(sessionID, workItemID, status)
 		if lastErr == nil {
 			ReevaluateParentAfterChild(sessionID, workItemID, tm)
 			return

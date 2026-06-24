@@ -40,7 +40,11 @@ func TestTaskManager_InheritFromSession(t *testing.T) {
 func TestTaskManager_QueryHistoricalWorkItem(t *testing.T) {
 	dir := t.TempDir()
 	tm := NewTaskManagerFromConfig(config.TasksConfig{Mode: "v2", StoreDir: dir}, nil)
-	item, err := tm.Create("hist", "subject", "desc")
+	item, err := tm.Tree().Create("hist", CreateWorkItemInput{
+		Kind:      WorkKindImplement,
+		Title:     "subject",
+		Directive: "desc",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
