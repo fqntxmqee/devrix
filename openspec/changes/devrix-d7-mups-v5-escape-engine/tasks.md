@@ -12,14 +12,14 @@
 
 | Task ID | 内容 | 工作量 | 依赖 | PR | AC | L1 测试 |
 |---------|------|--------|------|-----|-----|--------|
-| T-01 | LoopDepthTracker v2 | 1 天 | doc 38 §19.2 | V5.1 | AC1 | 10 |
+| T-01 | LoopDepthTracker v2 | 1 天 | doc 38 §19.2 | V5.1 | AC1 | 10 + 1 gap = 11 |
 | T-02 | PlanKindSwitchPolicy 3 档 | 0.5 天 | 无 | V5.2 | AC2 | 15 |
-| T-03 | ChainedArbitrator 3 层 | 2 天 | T-01 | V5.3 | AC3 | 35 |
-| T-04 | EscapeEngine 整合 + CircuitBreaker 5 层 | 1 天 | T-03 | V5.4 | AC4, AC7 | 15 |
-| T-05 | 5 节点接线 + 集成测试 + 文档同步 | 2 天 | 全部 | V5.5 | AC5, AC6, AC8 | 14 |
-| **总计** | | **6.5 天** | | | 8 AC | **89 L1 + 1 单元 e2e = 90 L1** |
+| T-03 | ChainedArbitrator 3 层 | 2 天 | T-01 | V5.3 | AC3 | 35 + 1 gap = 36 |
+| T-04 | EscapeEngine 整合 + CircuitBreaker 5 层 | 1 天 | T-03 | V5.4 | AC4, AC7 | 16 + 6 gap = 22 |
+| T-05 | 5 节点接线 + 集成测试 + 文档同步 | 2 天 | 全部 | V5.5 | AC5, AC6, AC8 | 14 + 5 gap = 19 |
+| **总计** | | **6.5 天 + 2.2 gap = 8.7 天** | | | 8 AC | **90 L1 + 13 gap = 103 L1** |
 
-> **测试用例全面性**：详见下文 `## 测试用例全面性设计（4 层金字塔）` 章节，共 107 个测试（L4 4 + L3 7 + L2 6 + L1 90），每条含 4 必填字段（业务目标/删除后果/攻击者视角/金字塔层）。
+> **测试用例全面性**：详见下文 `## 测试用例全面性设计（4 层金字塔）` 章节，共 121 个测试（L4 4 + L3 7 + L2 7 + L1 103），每条含 4 必填字段（业务目标/删除后果/攻击者视角/金字塔层）。
 
 ---
 
@@ -503,33 +503,38 @@
 |------|------|------|
 | L4 业务验收 | 4 | L4-01..L4-04 |
 | L3 端到端场景 | 7 | L3-01..L3-07 |
-| L2 集成 | 6 | L2-01..L2-06 |
-| L1 单元 | 90 | L1-01..L1-90 |
-| **总计** | **107** | 4+7+6+90 |
+| L2 集成 | 7 | L2-01..L2-07（含 L2-07 gap 补测）|
+| L1 单元 | 103 | L1-01..L1-90 + L1-91..L1-103（13 gap 补测）|
+| **总计** | **121** | 4+7+7+103 |
 
 #### L1 按 PR 分布
 
-| PR | 现有 | 新增 | 小计 |
-|----|------|------|------|
-| V5.1 (T-01) | 6 | 4 | 10 |
-| V5.2 (T-02) | 10 | 5 | 15 |
-| V5.3 (T-03) | 22 | 13 | 35 |
-| V5.4 (T-04) | 9 | 6 | 15 |
-| V5.5 (T-05) | 0 | 14 | 14 |
-| **L1 合计** | **47** | **42** | **89** ⚠️ |
+| PR | 现有 | 新增（4-layer）| gap 补测 | 小计 |
+|----|------|------|------|------|
+| V5.1 (T-01) | 6 | 4 | +1 (L1-91) | 11 |
+| V5.2 (T-02) | 10 | 5 | 0 | 15 |
+| V5.3 (T-03) | 22 | 13 | +1 (L1-92) | 36 |
+| V5.4 (T-04) | 9 | 7 | +6 (L1-93..98) | 22 |
+| V5.5 (T-05) | 0 | 14 | +5 (L1-99..103) | 19 |
+| **L1 合计** | **47** | **43** | **+13** | **103** |
 
-> ⚠️ L1 总计 89 + L1-90 单元 e2e 1 个 = 90。
+> **L1-90 vs L2-05 互补不重复**：
 > - **L1-90** `TestOrchestrator_End2End_5NodePipeline`：在 `orchestrator_e2e_test.go` 内的"单测 e2e"（mock LLM/Rule/Human，无 DB 无飞书），跑得快、CI 必过
 > - **L2-05** `TestIntegration_5NodePipeline_End2End`：在 `escape_integration_test.go` 内的"集成 e2e"（真实 LLM 网关 + DB + 飞书），跑得慢、S5 验收
 >
-> 两者**不重复**：覆盖不同 fixture 层级 + 不同执行时间窗。
+> 两者**不重复**：覆盖不同 fixture 层级 + 不同执行时间窗。L1-90 已计入 T-05 的 14 新增中（最后一行）。
 
-#### 新增测试（42 + 1 L2 + 11 L3+L4 = 54）
+#### 新增测试统计（基线 54 + gap 补测 14 = 68）
 
+**基线 54**（之前已加）：
 - L1 新增 42 个（含 3 个 T-03 补全 + 1 个 T-04 补全 + 1 个 L1-90 单元 e2e）
 - L2 新增 1 个（L2-06 5WiringPoints）
 - L3 新增 7 个（端到端故障链路）
 - L4 新增 4 个（业务验收）
+
+**gap 补测 14**（本次追加，详见 `## 覆盖 gap 补测设计` 章节）：
+- L1 补测 13 个（L1-91..L1-103，3 P0 + 8 P1 + 2 P2）
+- L2 补测 1 个（L2-07 4 IntentKind × 5 节点）
 
 #### 与 codex review §3 担心点的对应
 
@@ -540,6 +545,115 @@
 | §3.3 LoopContext 11 字段冗余 | L1-78 BuildLoopContext 5 字段构造 |
 | §3.4 CB 5 层阈值不严谨 | L3-03/L3-04 + L1-69..L1-75 7 个 CB 单测 |
 | §3.5 5 接线点重复 Evaluate | L1-84 1a 短路不调 1b + L2-06 5WiringPoints |
+
+---
+
+## 覆盖 gap 补测设计（追加 14 tests, 2.2 天）
+
+### 背景
+
+经过 `## 测试用例全面性设计` 章节 107 个测试对 76 个设计元素的覆盖分析，识别出 **8 个 gap**（3 个 P0 + 4 个 P1 + 1 个 P2），整体覆盖率 **85%**。本节追加 **14 个测试**将覆盖率提升至 **97%**。
+
+### 8 gap → 14 tests 映射
+
+| Gap | 严重性 | 设计点 | 补测数 | 归属 PR |
+|-----|--------|--------|--------|---------|
+| G1 LoopBudget 无 explicit 测试 | 🔴 P0 | design §3 3 类决策源之一 | 2 | V5.4 |
+| G2 ResumeSession / applyResumeDecision | 🔴 P0 | design §6 T2 续跑入口 | 5 | V5.5 |
+| G3 AuditLog 持久化 | 🔴 P0 | design §5.3.2 T2 续跑前提 | 2 | V5.4 |
+| G4 14 ExitReason 映射 | 🟡 P1 | design §4 ExitReason 字段 | 1 | V5.4 |
+| G5 LoopDepthTracker panic | 🟡 P1 | design §9 失败降级矩阵 | 1 | V5.1 |
+| G6 CircuitBreaker panic | 🟡 P1 | design §9 失败降级矩阵 | 1 | V5.4 |
+| G7 PendingResolutionStore TTL | 🟡 P1 | design §5.3.1 10s 过期 | 1 | V5.3 |
+| G8 4-way IntentKind × 5 节点 | 🟢 P2 | design §3.5 4 IntentKind 协同 | 1 | V5.5 |
+| **合计** | | | **14** | |
+
+### 补测清单（L1-91..L1-103 + L2-07）
+
+#### G1 LoopBudget（2 tests, V5.4）— 解决 3 类决策源之一的覆盖盲点
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-96 | `TestLoopBudget_ConsecutiveExceeded` | 守护 LoopBudget 连续 3 次超限触发（design §3 doc 38 §19.2）| 3 类决策源中 1 类无守护，恶意回路 3 次内不被拦截 | 同 PlanKind 失败 3 次？跨 PlanKind 失败 3 次？混合 1+1+1？ | L1 |
+| L1-97 | `TestLoopBudget_TotalExceeded` | 守护 LoopBudget 累计 20 次触发（设计冗余保护）| 累计超限不兜底，资源耗尽 | 累计 19 → OK, 20 → 触发？跨 SessionID 重置？ | L1 |
+
+#### G2 ResumeSession / applyResumeDecision（5 tests, V5.5）— T2 续跑机制核心
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-99 | `TestResumeSession_Hit` | 守护 ResumeSession 命中续跑（design §6 T2 续跑入口）| T2 续跑入口失守，doc 38 §21.5 关键创新（Human 异步化）无守护 | 上次 ProcessMessage 升级到 Human，本次进入 → 命中？ | L1 |
+| L1-100 | `TestResumeSession_Miss` | 守护 ResumeSession 未命中走完整 5 节点 | 误命中导致状态错乱 | 首次 ProcessMessage → 未命中？ | L1 |
+| L1-101 | `TestApplyResumeDecision_Continue` | 守护 user 选 A → Continue 续跑 | A 选项响应失守（异步路径下）| SubmitUserChoice("A") 命中 pendingID | L1 |
+| L1-102 | `TestApplyResumeDecision_ForceExit` | 守护 user 选 B → ForceExit 续跑 | B 选项响应失守 | SubmitUserChoice("B") 命中 pendingID | L1 |
+| L1-103 | `TestApplyResumeDecision_AbortWithAudit` | 守护 user 选 C → AbortWithAudit 续跑 | C 选项响应失守 | SubmitUserChoice("C") 命中 pendingID | L1 |
+
+#### G3 AuditLog 持久化（2 tests, V5.4）— T2 续跑前提
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-94 | `TestAuditLog_Persistence_RoundTrip` | 守护 audit 写入后能读出（设计 §5.3.2）| T2 续跑前提失守，pending 状态丢失 | Save → Load 立即命中？ | L1 |
+| L1-95 | `TestAuditLog_Persistence_AfterRestart` | 守护重启后 audit 仍可读（DBPendingResolutionStore）| 重启后 T2 续跑失败 | Save → 模拟重启 → Load 命中？ | L1 |
+
+#### G4 14 ExitReason 映射（1 test, V5.4）— Phase 4 兼容
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-93 | `TestEscapeDecision_ExitReason_Mapping_14` | 守护 14 类 Phase 4 ExitReason 全映射到 EscapeDecision.ExitReason（design §4 + L4-02 兼容承诺）| 14 类 ExitReason 部分失映射，Phase 4 兼容破坏 | 14 类逐一映射？新增 ExitReason 行为？ | L1 |
+
+#### G5 LoopDepthTracker panic（1 test, V5.1）— 子模块 panic 降级
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-91 | `TestLoopDepthTracker_PanicRecovery` | 守护 LoopDepthTracker panic 降级为 Continue（design §9）| 子模块 panic 阻塞主链路 | 构造 tracker.ShouldContinue panic？ | L1 |
+
+#### G6 CircuitBreaker panic（1 test, V5.4）— 子模块 panic 降级
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-98 | `TestCircuitBreaker_PanicRecovery` | 守护 CircuitBreaker panic 降级为 Continue（design §9）| 子模块 panic 阻塞主链路 | 构造 CB 状态查询 panic？ | L1 |
+
+#### G7 PendingResolutionStore TTL（1 test, V5.3）— 过期清理
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L1-92 | `TestPendingResolutionStore_TTL_Expired` | 守护 TTL=10s 过期清理（design §5.3.1 HumanArbitrator 异步化）| 过期 pending 占用内存，过期后误用 | Save → 等 11s → Load 失败？ | L1 |
+
+#### G8 4-way IntentKind × 5 节点（1 test, V5.5）— 协同覆盖
+
+| # | Test ID | 业务目标 | 删除后果 | 攻击者视角 | 金字塔层 |
+|---|---------|---------|---------|-----------|---------|
+| L2-07 | `TestIntegration_4IntentKind_5NodePaths` | 守护 4 IntentKind（Skip/Command/Fast/Orchestrate）走 5 节点管道一致行为（design §3.5）| 某 IntentKind 路径下 5 节点行为不一致 | 4 IntentKind × 5 节点 矩阵覆盖？ | L2 |
+
+### 补测后覆盖率
+
+| 类别 | 补测前 | 补测后 | 变化 |
+|------|--------|--------|------|
+| A. 数据契约 | 62% | 75% | +13%（ExitReason 映射）|
+| F. AuditLog | 67% | 100% | +33%（持久化）|
+| G. EscapeEngine 整合 | 92% | 100% | +8%（子模块 panic）|
+| I. T2 续跑机制 | 60% | 100% | +40%（ResumeSession + ApplyDecision）|
+| J. 失败降级矩阵 | 69% | 85% | +16%（子模块 panic + TTL）|
+| K. IntentKind 协同 | 75% | 100% | +25%（4-way × 5 节点）|
+| M. 兼容 Phase 1-7 | 50% | 75% | +25%（14 ExitReason 映射）|
+| **总计** | **85%** | **97%** | **+12%** |
+
+### 新增文件
+
+| 文件 | 归属 | 用途 |
+|------|------|------|
+| `loop_budget.go` | V5.4 | LoopBudget struct（consec=3, total=20）|
+| `loop_budget_test.go` | V5.4 | L1-96/97 |
+| `orchestrator_resume_test.go` | V5.5 | L1-99..103 |
+
+### 工作量分布（追加 2.2 天）
+
+| PR | 现有 | gap 补测 | 合计 | 说明 |
+|----|------|---------|------|------|
+| V5.1 | 1.0 天 | +0.2 天 | 1.2 天 | L1-91 LoopDepthTracker panic |
+| V5.3 | 2.0 天 | +0.2 天 | 2.2 天 | L1-92 PendingResolution TTL |
+| V5.4 | 1.0 天 | +0.8 天 | 1.8 天 | L1-93..98（ExitReason 映射 + AuditLog 持久化 + LoopBudget + CB panic）|
+| V5.5 | 2.0 天 | +1.0 天 | 3.0 天 | L1-99..103（ResumeSession）+ L2-07（4 IntentKind × 5 节点）|
+| **合计** | **6.5 天** | **+2.2 天** | **8.7 天** | |
 
 ---
 
