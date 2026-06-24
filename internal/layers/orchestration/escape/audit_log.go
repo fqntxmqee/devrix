@@ -39,9 +39,14 @@ func NewEscapeAuditLog() *EscapeAuditLog {
 	}
 }
 
-// Record writes a new audit entry. No-op for AuditLevel 0 (silent).
+// Record writes a new audit entry.
+//
+// 记录规则:
+//   - final.AuditLevel > 0 → always record (ForceExit / AbortWithAudit)
+//   - any upstream decision is non-Continue → record (chain 协调, 即便最终 Continue)
+//   - all Continue → skip (正常回路, 无审计)
 func (l *EscapeAuditLog) Record(loopCtx LoopContext, decisions []EscapeDecision, final EscapeDecision) {
-	if final.AuditLevel == 0 {
+	if final.AuditLevel == 0 && !hasNonContinueSignal(decisions) {
 		return
 	}
 
@@ -53,6 +58,15 @@ func (l *EscapeAuditLog) Record(loopCtx LoopContext, decisions []EscapeDecision,
 		RecordedAt:        nowFunc(),
 	})
 	l.mu.Unlock()
+}
+
+func hasNonContinueSignal(decisions []EscapeDecision) bool {
+	for _, d := range decisions {
+		if d.Action != EscapeContinue {
+			return true
+		}
+	}
+	return false
 }
 
 // Entries returns a snapshot of all audit entries (for tests).
