@@ -1,0 +1,73 @@
+change_id: devrix-d7-mups-package-migration
+priority: P1
+demand_id: DM-20260626-002
+status: s3_design
+domains: [D7]
+dsaft_scenarios:
+  - D7-S6  # MUPS Pipeline
+dsaft_activities:
+  - D7-S6-A51  # NEW: mups package migration (execute/ + learn/ → mups/)
+
+# T 层测试点 (4 个 P0，全部 IMPLEMENTED 后状态变更)
+t_points:
+  - id: D7-S6-A51-T01
+    name: mups/execute package directory exists with original 7 .go files
+    status: PLANNED
+  - id: D7-S6-A51-T02
+    name: mups/learn package directory exists with original 17 .go files
+    status: PLANNED
+  - id: D7-S6-A51-T03
+    name: 零残留 import（全仓 grep "orchestration/execute\"" 与 "orchestration/learn\"" 均为 0 命中）
+    status: PLANNED
+  - id: D7-S6-A51-T04
+    name: go build/vet/test -race 全绿（22/22 orchestration packages PASS）
+    status: PLANNED
+
+version_scope:
+  v1.0: "execute/ + learn/ → mups/execute/ + mups/learn/ 物理目录迁移，import path 替换，22 包回归 0 race"
+  v1.1: "(预留) follow-up #2-#6 hardening/ + 6s-package-merge + 6s-verify-promotion + 6s-observe-merge + 6s-bootstrap-slim"
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/mups/execute/ (NEW dir, 7 .go files 迁移自 orchestration/execute/)
+  - internal/layers/orchestration/mups/learn/ (NEW dir, 17 .go files 迁移自 orchestration/learn/)
+  - internal/layers/orchestration/decisionplanning/classifier.go (import path 替换)
+  - internal/layers/orchestration/orchtypes/ (4 files + 4 _test.go files import path 替换)
+  - internal/layers/orchestration/sessionorchestrator/ (orchestrator.go + autoclose.go + tracing.go + 7 _test.go files import path 替换)
+  - internal/bootstrap/wire_coordinator.go (import path 替换若涉及)
+  - openspec/specs/d7-orchestration/d7-domain.md v2.0.0 §MUPS 5 节点管道挂载章节 (包路径描述更新)
+  - openspec/specs/d7-orchestration/design.md v4.0.0 §⑦ MUPS 5-node 6 S 归类 (包路径描述更新)
+  - openspec/specs/d7-orchestration/t-registry.md v4.0.0 (新增 4 个 P0 T)
+  - openspec/t-registry.md (root) v5.0.0 (新增 DM-20260626-002 增量条目 + D7 行更新)
+  - internal/layers/orchestration/execute/ (DELETE 整个目录)
+  - internal/layers/orchestration/learn/ (DELETE 整个目录)
+
+out_of_scope:
+  - 函数签名 / 行为 / 对外接口 0 变化
+  - package execute / package learn 声明 0 变化
+  - 14 S → 6 S 文档语义保持 (devrix-d7-six-s-simplification 已落地)
+  - 5 个新 P0/P1 Span emit 路径 0 变化 (channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select)
+  - shared/types/ 跨域类型不动
+  - internal/layers/multiagent/execute/ 不动 (不同域不同职责)
+  - 5 个其他 follow-up PR (hardening-cross-cutting / 6s-package-merge / 6s-verify-promotion / 6s-observe-merge / 6s-bootstrap-slim) 不在本次范围
+  - LP-1 / LP-2 / LP-5 路径 0 变化
+
+# DSAFT 层归属
+dsaft_layer: orchestration
+dsaft_type: refactor
+
+# 前置依赖
+related_changes:
+  - devrix-d7-six-s-simplification  # DM-20260626-001 S7_Archived 前置 (Step 1 已落地，Step 2 = 本次)
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...  # 0 issue
+    - go build ./...  # 0 error
+  s5_gate:
+    - go test ./internal/layers/orchestration/... -race -count=1  # 22/22 PASS (与 baseline 持平)
+    - 4 新 P0 T (D7-S6-A51-T01..T04) IMPLEMENTED
+    - 全仓 grep "orchestration/execute\"" 与 "orchestration/learn\"" 均为 0 命中
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-mups-package-migration  # 11 项检查全部 PASS
