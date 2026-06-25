@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 4.9.0
-**Last Updated:** 2026-06-25
+**Version:** 5.0.0
+**Last Updated:** 2026-06-26
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 186 | 186 | 0 | 153 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 206 | 206 | 0 | 173 |
 
-**总计**: 504 · IMPLEMENTED 499 · PLANNED 3 · PARTIAL 0 · P0 318
+**总计**: 524 · IMPLEMENTED 519 · PLANNED 3 · PARTIAL 0 · P0 338
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -50,6 +50,8 @@
 > 详见 `openspec/changes/devrix-d7-mups-v5-escape-engine/proposal.md` + `design.md` + `tasks.md` + `specs/d7-orchestration/spec.md`。
 
 > 2026-06-25 增量 (V5.6 续跑入口收口)：DM-20260625-003 PR-V5.6 落地 T12 PARTIAL → IMPLEMENTED — SessionOrchestrator.applyResumeSession(ctx, req, sessionSpan) 在 ProcessMessage 入口 (after buildObserveRequest, before classify) 检查 PendingResolutionStore → 调用 EscapeEngine.ResumeSession (one-shot consume via HumanArbitrator.LoadAndDelete) → 3 层 fail-safe (nil engine / ResumeSession error / TTL 过期 → 静默 fall through) → terminal decision (B=user_accept → EscapeForceExit, C=user_cancel → EscapeAbortWithAudit) emit single "complete" EngineEvent + 补写 audit + close channel early / A=user_continue fall through to full 5-node pipeline。D7 t-registry v3.17.0 → v3.18.0 (D7-S14 T12 PARTIAL → IMPLEMENTED, D7 T 184→186 IMPLEMENTED, P0 147→153, D7 PARTIAL 2→0, 总 PARTIAL 2→0)。6 个单元测试 (TestApplyResumeSession_NoEngine / NoPending / UserAccept / UserCancel / UserContinue / ResumeError_Failsafe) + 2 个集成测试 (TestProcessMessage_WithResume_UserAccept_EarlyClose / TestProcessMessage_WithResume_UserCancel_EarlyClose) 全 PASS。
+> 2026-06-26 增量：DM-20260626-001 (devrix-d7-six-s-simplification PR #215) — D7 编排层 6 S 精简 + 5 个新 P0/P1 Span（v6.0.0 域升级）：14 S → **6 S + 1 横切** 博弈角色对齐 (State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper)；A 活动 56 → **49** (S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2)；F 层 75 → **68** (Legacy 41 + Canonical 27)；T 总数持平（重归类不删）但 S 编号重映射；Span 18 → **23** ops（+5 新 P0/P1: channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select）。加 20 个 P0 T 点：(1) D7-S6-A48 channel.route +2 (T01 EmitChannelRoute happy + T02 nil-bridge fail-safe)；(2) D7-S6-A49 memory.persist +2 (T03 EmitMemoryPersist happy + T04 nil-bridge fail-safe)；(3) D7-S4-A47 system.anomaly_detect +8 (T05-T06 emit + T11-T16 DetectSystemAnomaly 6 测试 triggered/not/override/nil-bridge/default)；(4) D7-S5-A33 taskgraph.synthesize +6 (T07-T08 emit + T17-T19 dagDepth 3 测试 + T20 Span emit fail-safe)；(5) D7-S5-A34 executor.select +2 (T09-T10 emit happy/nil-bridge)。20 新 P0 T 全 IMPLEMENTED，D7 t-registry v3.18.0 → v4.0.0（D7 T 186→206 IMPLEMENTED, P0 153→173）。22/22 orchestration packages `go test -race` 100% PASS 0 race；LP-1 兼容（Phase 4 PR-D4 UncertaintyCoord Value=0.95 路径 0 变化）。
+> 详见 `openspec/archive/2026-06-26-devrix-d7-six-s-simplification/acceptance-report.md` §3 20 P0 T 点验收 + §4 6 S 博弈角色重归类验收 + `openspec/specs/d7-orchestration/d7-domain.md` v2.0.0 §DSAFT 资产。
 
 ---
 

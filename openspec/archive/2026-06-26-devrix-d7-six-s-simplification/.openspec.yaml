@@ -1,0 +1,208 @@
+id: devrix-d7-six-s-simplification
+demand_id: DM-20260626-001
+title: "D7 编排层 6 S 精简 — 14 S → 6 S + 1 横切博弈角色对齐 + 5 个新 P0/P1 Span (v6.0.0 域升级)"
+status: s7_archived
+priority: P0
+created: 2026-06-26
+author: D7 6 S 精简 + Span 推进 (用户反馈"理想的架构应该不需要 14 S 场景，定位不要变")
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S6-A48
+    name: channel.route Span (S6 MUPS Pipeline P0)
+    description: |
+      v6.0.0 6 S 精简新增 P0 Span。在 ChannelRouter.Route 入口发射 D7_Channel_Route
+      Span (session_id / channel.kind / plan.kind / score / fallback)，让 Jaeger
+      记录 channel 选择路径（commit / protocol / scenario / exploration）和
+      fallback 决策。Plan.Strength (float64 [0,1]) 用 3-decimal 格式字符串化。
+    rationale: |
+      14 S 阶段未补齐的 core-link Span 之一。ChannelRouter 是 S6 MUPS
+      Pipeline 角色的关键决策点（4 通道 1:1 映射），无 Span 覆盖时 D7
+      Execute 路径在 Jaeger 看不到入口选择。
+  - id: D7-S6-A49
+    name: memory.persist Span (S6 MUPS Pipeline P0)
+    description: |
+      v6.0.0 6 S 精简新增 P0 Span。在 SkillMemory.Store 入口发射
+      D7_Memory_Persist Span (session_id / channel / asset.kind / ttl_ms /
+      payload_size)，让 Jaeger 记录 LP-2 三通道（skill/feedback/scheduled）
+      的资产持久化。ttl_ms 来自 ttlRemainingMs helper，payload_size 来自
+      assetPayloadSize helper（AssetKey + ContentHash + SessionID 长度加总）。
+    rationale: |
+      14 S 阶段未补齐的 core-link Span 之一。SkillMemory 是 S6 Memory
+      Curator 角色的核心存储（3 通道 LP-2 隔离），无 Span 覆盖时
+      Learn 节点持久化路径在 Jaeger 看不到资产分类。
+  - id: D7-S4-A47
+    name: system.anomaly_detect Span (S4 ExecutionFlow+Verify P0)
+    description: |
+      v6.0.0 6 S 精简新增 P0 Span。新增 executionflow/verify/anomaly.go
+      package + DetectSystemAnomaly 函数，发射 D7_System_Anomaly_Detect
+      Span (anomaly.kind / severity / threshold / evidence_id)。4 AnomalyKind
+      常量预留 v6.1 (cat_system_aggregate / rate_spike / quota_exceeded /
+      schema_violation / verifier_abstain_loop)，4 Severity (none / low /
+      medium / high) 由 ratio 派生。
+    rationale: |
+      14 S 阶段未补齐的 core-link Span 之一。S4 Certifier 角色是 anomaly
+      分类的核心判定点，无 Span 覆盖时 system anomaly 在 Jaeger 看不到
+      严重程度和 kind 分类。保持 LP-1 兼容：wrapper 复用
+      orchtypes.EvaluateSystemAnomaly 避免破坏 Phase 4 PR-D4 的
+      UncertaintyCoord Value=0.95 路径。
+  - id: D7-S5-A33
+    name: taskgraph.synthesize Span (S5 DecisionPlanning+Observe P1)
+    description: |
+      v6.0.0 6 S 精简新增 P1 Span。在 TaskDecomposer.SynthesizeTaskGraph
+      入口发射 D7_TaskGraph_Synthesize Span (session_id / node_count /
+      edge_count / dag_depth / cycle_detected)。新增 dagDepth helper 计算
+      最长路径 BFS，cycle 时 cap 在 len(nodes)。
+    rationale: |
+      14 S 阶段未补齐的 core-link Span 之一。S5 Information Producer
+      角色的核心是合成 task DAG，无 Span 覆盖时 Plan 节点在 Jaeger
+      看不到 DAG 拓扑（节点数/边数/深度/是否有环）。在 validation 后
+      emit，cycle_detected 是 validated truth 而非 raw input。
+  - id: D7-S5-A34
+    name: executor.select Span (S5 DecisionPlanning+Observe P1)
+    description: |
+      v6.0.0 6 S 精简新增 P1 Span。在 WaveScheduler.dispatchOne 入口发射
+      D7_Executor_Select Span (candidates_count / selected_kind / score /
+      policy="kind_match")。当前 selection 是 map lookup（runner by
+      WorkerType），score 1.000/0.000 二态。
+    rationale: |
+      14 S 阶段未补齐的 core-link Span 之一。S5 Information Producer
+      角色 + S3 WaveScheduler 的衔接点，selection 路径在 Jaeger 看不到
+      candidate pool size 和命中与否。
+
+# 测试点 (5 个新 Span + dagDepth helper 共 20 个 T 点)
+test_points:
+  - id: D7-S6-A48-T01
+    name: EmitChannelRoute happy path（Plan → Channel 命中）
+    status: IMPLEMENTED
+  - id: D7-S6-A48-T02
+    name: EmitChannelRoute nil-bridge fail-safe（不 panic）
+    status: IMPLEMENTED
+  - id: D7-S6-A49-T03
+    name: EmitMemoryPersist happy path（SkillMemory.Store）
+    status: IMPLEMENTED
+  - id: D7-S6-A49-T04
+    name: EmitMemoryPersist nil-bridge fail-safe
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T05
+    name: EmitSystemAnomalyDetect happy path（wrapper 调用）
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T06
+    name: EmitSystemAnomalyDetect nil-bridge fail-safe
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T07
+    name: EmitTaskGraphSynthesize happy path（DAG 合成）
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T08
+    name: EmitTaskGraphSynthesize nil-bridge fail-safe
+    status: IMPLEMENTED
+  - id: D7-S5-A34-T09
+    name: EmitExecutorSelect happy path（runner 命中）
+    status: IMPLEMENTED
+  - id: D7-S5-A34-T10
+    name: EmitExecutorSelect nil-bridge fail-safe
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T11
+    name: DetectSystemAnomaly triggered (CatSystem 100%, SeverityHigh)
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T12
+    name: DetectSystemAnomaly triggered (mixed ratio, SeverityMedium)
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T13
+    name: DetectSystemAnomaly not triggered (SeverityNone)
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T14
+    name: DetectSystemAnomaly overrideKind (forward-compat for v6.1)
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T15
+    name: DetectSystemAnomaly nil-bridge fail-safe
+    status: IMPLEMENTED
+  - id: D7-S4-A47-T16
+    name: DetectSystemAnomaly default thresholds (count=0, ratio=0)
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T17
+    name: dagDepth empty graph (= 0)
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T18
+    name: dagDepth linear chain (t1→t2→t3→t4 = 4)
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T19
+    name: dagDepth branching graph (diamond = 3)
+    status: IMPLEMENTED
+  - id: D7-S5-A33-T20
+    name: SynthesizeTaskGraph Span emit fail-safe (无 bridge 不 panic)
+    status: IMPLEMENTED
+
+# 范围
+in_scope:
+  - 9 个 spec 文档 14 S → 6 S + 1 横切重写 (d7-domain.md / a-registry.md / f-registry.md / span-registry.md / t-registry.md / terminal-state-guide.md / observability-guide.md / layer-delta.md / design.md)
+  - internal/layers/orchestration/d7spans/emitter.go (NEW): 5 emit helpers + SetBridge setter
+  - internal/layers/orchestration/d7spans/emitter_test.go (NEW): 10 emit + fail-safe tests (T01-T10)
+  - internal/layers/orchestration/executionflow/verify/anomaly.go (NEW): DetectSystemAnomaly + AnomalyKind × Severity
+  - internal/layers/orchestration/executionflow/verify/anomaly_test.go (NEW): 6 tests (T11-T16)
+  - internal/layers/orchestration/decisionplanning/decomposer.go (MODIFIED): taskgraph.synthesize Span emit + dagDepth helper
+  - internal/layers/orchestration/decisionplanning/decomposer_test.go (MODIFIED): 4 new tests (T17-T20)
+  - internal/layers/orchestration/execute/channel.go (MODIFIED): channel.route Span emit
+  - internal/layers/orchestration/learn/memory.go (MODIFIED): memory.persist Span emit + ttlRemainingMs + assetPayloadSize helpers
+  - internal/layers/orchestration/wavescheduler/scheduler.go (MODIFIED): executor.select Span emit
+  - internal/layers/observability/instrument/telemetry/names.go (MODIFIED): 5 new OpD7_* constants + LayerAndComponent mapping
+  - internal/bootstrap/wire_coordinator.go (MODIFIED): d7spans.SetBridge(obsBridge) wiring
+
+out_of_scope:
+  - 14 S 文档中 v1.x 历史保留（a-registry.md §V1..V5 历史段不删）
+  - 已有 PR 编号引用（V4.3 + V5 + V5.6 + V5.6 review fixes）保持原貌
+  - 5 个未推进的 Span (bridge.agent_spoke / bridge.subquery_spoke / subtask.decompose / subtask.merge) 留作 P2/P3
+  - Phase 4 PR-D4 的 UncertaintyCoord Value=0.95 路径（保持 LP-1 兼容，0 改动）
+  - orchtypes.EvaluateSystemAnomaly 已有实现（新增 executionflow/verify/anomaly.go 仅是 wrapper，0 改原函数）
+  - 14 → 6 S 的"代码包路径迁移"（Step 2）：本 PR 仅做 spec 文档精简 + 5 Span 落地；包路径合并（execute/ + learn/ → mups/）留作后续 PR
+
+# PR 拆分
+pr_breakdown:
+  - pr: "#215"
+    scope: "14 S → 6 S 博弈角色对齐 (9 spec 文档) + 5 个新 P0/P1 Span (3 改 + 2 NEW)"
+    files: 22 files (2 NEW dirs: d7spans/ + executionflow/verify/)
+    estimated_loc: "+2590 / -199"
+    risk: Low
+    branches:
+      - feat/devrix-d7-six-s-simplification-2026-06-26 (from master)
+    commits:
+      - f5cd62d (squashed at 0ce5e52)
+
+# 关联
+related_changes:
+  - devrix-d7-mups-v5-escape-engine-v5-6-review-fixes  # V5.6 review fixes (Phase 5 Learn + V5 Escape 闭环)
+  - devrix-d7-mups-v5-escape-engine  # V5 统一逃逸机制 (S14 A50)
+  - devrix-d7-mups-v4-phase7-verify-auto-close  # V4 Phase 7 Auto-Close
+  - devrix-d7-mups-v4-phase6-observe-learner-wiring  # V4 Phase 6 LP-1 闭环
+  - devrix-d7-metrics-and-concurrency-hardening  # DM-20260622-001 5 P0/P1 hardening
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-six-s-simplification.md
+  - /Users/fukai/.claude/plans/iterative-dazzling-locket.md
+  - openspec/specs/d7-orchestration/d7-domain.md  # v2.0.0 (14 S → 6 S)
+  - openspec/specs/d7-orchestration/span-registry.md  # v4.0.0 (18 → 23 ops)
+  - openspec/specs/d7-orchestration/t-registry.md  # v4.0.0 (T 180 持平)
+  - openspec/specs/d7-orchestration/a-registry.md  # v5.0.0 (56 → 49 A)
+  - openspec/specs/d7-orchestration/f-registry.md  # v5.0.0 (75 → 68 F)
+  - openspec/specs/d7-orchestration/terminal-state-guide.md  # v2.0.0
+  - openspec/specs/d7-orchestration/observability-guide.md  # v2.0.0
+  - openspec/specs/d7-orchestration/layer-delta.md  # v6.0.0
+  - openspec/specs/d7-orchestration/design.md  # v4.0.0
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...  # 0 issue
+    - go build ./...  # 0 error
+  s5_gate:
+    - go test ./internal/layers/orchestration/... -race -count=1  # 22/22 PASS
+    - 20 新 P0 T (D7-S6-A48-T01..T10 + D7-S4-A47-T11..T16 + D7-S5-A33-T17..T20) IMPLEMENTED
+    - LP-1 兼容: orchtypes.EvaluateSystemAnomaly 调用方 0 变化
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-six-s-simplification  # 11 项检查全部 PASS
