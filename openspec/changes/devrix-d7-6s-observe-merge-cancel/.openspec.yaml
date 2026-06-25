@@ -1,0 +1,84 @@
+id: devrix-d7-6s-observe-merge-cancel
+demand_id: DM-20260626-006
+title: "D7 observe-merge follow-up #5' 取消声明 — observe/orchtypes/ 从未存在, Observe 类型正确归属在 orchtypes/"
+status: s1_cancelled
+priority: P3
+created: 2026-06-26
+author: D7 编排层 v6.0.0 follow-up 序列调研（2026-06-26）
+
+# 取消原因 (取消状态记录)
+cancellation:
+  reason: |
+    原 follow-up #5 假设存在独立的 `orchestration/observe/orchtypes/` 目录需物理合并到 `decisionplanning/`。
+    但 v6.0.0 实施过程（Phase 2 Observe-Plan + Phase 3 Execute Channels + Phase 4 Verify 升格）中，
+    Observe 相关类型（ObserveRequest / UncertaintyReport / IntentQuantizer / AnomalyDetector /
+    UncertaintyCoord / Observation / SystemAnomalyWiring）从一开始就被设计性放置在
+    `orchestration/orchtypes/` 共享类型包中，而非独立的 observe/orchtypes/ 目录。
+
+    验证证据（2026-06-26）：
+    - `ls internal/layers/orchestration/observe/` → "No such file or directory"
+    - `git log --all --oneline -- 'internal/layers/orchestration/observe/*'` → 0 commit
+    - Observe 类型物理位置：`orchtypes/{observe_request,uncertainty_report,intent_quantizer,anomaly_detector,observation,uncertainty_coord,system_anomaly_wiring}.go`
+    - Observe 类型消费者：17+ 文件跨 3 个 S 层（sessionorchestrator/ + decisionplanning/ + executionflow/verify/）
+
+    如果按原 follow-up #5 把 Observe 类型从 `orchtypes/` 移到 `decisionplanning/`：
+    (1) sessionorchestrator/ 必须 import decisionplanning/ 来获取 ObserveRequest
+        （破坏 sessionorchestrator/ 0 依赖 decisionplanning/ 的清洁边界）
+    (2) executionflow/verify/ 必须 import decisionplanning/ 来获取 UncertaintyReport 和 AnomalyDetector
+        （产生 S4 → S5 反向依赖）
+    (3) decisionplanning/ 自身使用 UncertaintyReport.ComputeOverallStrength 但其作为共享类型被 S2 + S4 共同消费
+
+    结论：Observe 类型正确归属在 orchtypes/ 共享包，无需迁移。本 follow-up 取消。
+  evidence:
+    - file: internal/layers/orchestration/orchtypes/observe_request.go
+      lines: "115 lines (ObserveRequest struct + NewObserveRequest + EffectivePrior + Validate + 4 with-prior methods)"
+    - file: internal/layers/orchestration/orchtypes/uncertainty_report.go
+      lines: "Observation 4 类 + UncertaintyReport + ComputeOverallStrength + Partition + FilterByKind"
+    - file: internal/layers/orchestration/orchtypes/intent_quantizer.go
+      lines: "IntentQuantizer + IntentClass 4 + IntentPayload + QuantizeWithPrior"
+    - file: internal/layers/orchestration/orchtypes/anomaly_detector.go
+      lines: "AnomalyDetector + Anomaly + AnomalyReport + HistoricalDetector.Detect(WithPrior)"
+    - file: internal/layers/orchestration/orchtypes/uncertainty_coord.go
+      lines: "UncertaintyCoord (state authority, used by S1 WorkModel)"
+    - file: internal/layers/orchestration/orchtypes/observation.go
+      lines: "Observation 不可变 + sealed Payload + 4 类 (Fact/Skill/Memory/Intent)"
+    - file: internal/layers/orchestration/orchtypes/system_anomaly_wiring.go
+      lines: "S5 → S4 SystemAnomaly wiring (跨 S 层共享)"
+    - file: openspec/archive/2026-06-23-devrix-d7-mups-v4-phase2-observe-plan/
+      lines: "Phase 2 Observe-Plan PR-A1 + PR-RF 把 Observe 类型直接放到 orchtypes/（共享类型包）"
+    - file: openspec/archive/2026-06-23-devrix-d7-mups-v4-phase3-execute/
+      lines: "Phase 3 Execute PR-C1 + PR-C2 同样使用 orchtypes.ObserveRequest / UncertaintyReport"
+
+# DSAFT 层归属 (历史)
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 关联 (历史)
+related_changes:
+  - devrix-d7-six-s-simplification  # #1 v6.0.0 域升级 spec 层 14 S → 6 S
+  - devrix-d7-6s-bootstrap-slim  # #6 后续 follow-up (本 change 取消后, #6 不再依赖 #5')
+
+# 后续 follow-up 状态
+followup_status:
+  - id: "#1 devrix-d7-six-s-simplification"
+    status: s7_archived
+    pr: "#215"
+  - id: "#2 devrix-d7-mups-package-migration"
+    status: s7_archived
+    pr: "#216+#217"
+  - id: "#3 devrix-d7-hardening-cross-cutting"
+    status: s7_archived
+    pr: "#218+#219"
+  - id: "#4 devrix-d7-6s-package-merge"
+    status: s7_archived
+    pr: "#220+#221"
+  - id: "#5 devrix-d7-6s-verify-promotion"
+    status: s7_archived
+    pr: "#222+#223"
+  - id: "#5' devrix-d7-6s-observe-merge (本 change)"
+    status: s1_cancelled
+    pr: "(无, 取消)"
+  - id: "#6 devrix-d7-6s-bootstrap-slim"
+    status: s1_activating
+    pr: "(待启动)"
