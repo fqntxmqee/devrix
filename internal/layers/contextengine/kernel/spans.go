@@ -34,6 +34,7 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		// D2 Context Engine - Tool Execution (D2-S5)
 		{Name: "D2_Tool_Execute_Single", Layer: "context", Component: "tool_runner", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "D2_Tool_Execute_Permission", Layer: "context", Component: "tool_runner", SinceVersion: "2.1.0", Instrumented: true},
+		{Name: "D2_Context_Harness_SystemPrompt_Build", Layer: "context", Component: "harness", SinceVersion: "2.2.0", Instrumented: true},
 
 		// D2 Context Engine - Task / Plan (D2-S8)
 		{Name: "D2_Task_Plan_Generate", Layer: "context", Component: "plan_agent", SinceVersion: "2.1.0", Instrumented: true},
