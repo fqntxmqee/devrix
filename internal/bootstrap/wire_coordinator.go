@@ -250,26 +250,3 @@ func (p *gatewayEventPublisher) Publish(ctx context.Context, ev *contracts.Engin
 	}
 	p.gw.PublishEngineEvent(ev)
 }
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-// mapBackgroundStatus converts a BackgroundRegistry status string to a
-// coordinator TaskStatus. BackgroundRegistry uses "running" while the work
-// model uses "in_progress"; all other values ("completed", "failed",
-// "cancelled") match directly.
-func mapBackgroundStatus(s string) orchtypes.TaskStatus {
-	if s == "running" {
-		return orchtypes.TaskStatusInProgress
-	}
-	return orchtypes.TaskStatus(s)
-}
