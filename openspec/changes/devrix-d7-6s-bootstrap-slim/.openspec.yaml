@@ -1,0 +1,182 @@
+id: devrix-d7-6s-bootstrap-slim
+demand_id: DM-20260626-007
+title: "D7 bootstrap 拓扑收口 (v6.0.0 follow-up #6 落地) - 6 S × 1 wire + 1 横切 × 0 wire"
+status: s2_proposal
+priority: P2
+created: 2026-06-26
+author: D7 编排层 v6.0.0 follow-up 序列收官
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S2-A51
+    name: Bootstrap Wire 拓扑收口 (6 S × 1 wire + 1 横切 × 0 wire)
+    description: |
+      v6.0.0 follow-up #6 (6s-bootstrap-slim) 落地。
+      把 `internal/bootstrap/wire_coordinator.go` InitOrchestration 函数 (275 行) 内部
+      散落的 3 个 adapter 函数 (newContextEngineAdapter + newTurnOrchExecutor +
+      newGatewayEventPublisher) 拆到独立文件 `internal/bootstrap/adapters.go`，
+      4 个 util 函数 (boolPtr + intPtr + strPtr + mapBackgroundStatus) 拆到
+      `internal/bootstrap/util.go`，30 行 config 加载抽到 `loadOrchestratorConfigs()`
+      辅助函数；新增 `WireDecisionPlanning` 和 `WireMUPSPipeline` 包装让 6 S × WireFunc
+      命名一致；让 InitOrchestration 主体降到 ≤ 200 行 6 S 组合入口清晰。
+
+      **0 行为变化** (pure refactor, InitOrchestration 外部接口 + 内部 S 层调用顺序
+      100% 不变)；调用方 0 变化 (cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go
+      0 改动)；hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go
+      git diff 0 变化 (baseline stability 保持)。
+
+      本次是 v6.0.0 follow-up 序列的**最终收官 PR**:
+      5/6 S7_Archived + 1/6 S1_Cancelled (observe-merge) + 1/1 S7_Archived (本次)。
+    rationale: |
+      v6.0.0 域升级 14 S → 6 S + 1 横切博弈角色对齐后，bootstrap 拓扑应同步收口。
+      当前 InitOrchestration 275 行混杂 config 加载 + 6 S 构造 + 3 个内嵌 adapter
+      + 4 个 util，文件组织与 6 S 博弈角色不直接对应：
+      (a) 6 S wire 函数命名不一致：S2 (WireTurnInvoker) + S3 (WireWaveScheduler) +
+          S4 (WireExecutionFlow) 已有 Wire* 命名，但 S5 (LLMDecomposer inline) +
+          S6 (TurnToolExecutor+SubTurnRunner inline) 没有 Wire* 包装；
+      (b) 3 个内嵌 adapter 函数无独立文件 → 不可单测；
+      (c) 4 个 util 函数散落 + 52 行 config 加载 inline → InitOrchestration 函数体
+          读起来像"流水账"；
+      (d) 横切 Hardening (Discipline Keeper) 的 wire 入口未明确文档化 (当前是
+          `d7spans.SetBridge` 隐式调用，新人难以理解)。
+      收口后 6 S 拓扑可读性 +1 + 可测试性 +1 + 可演进性 +1 + 文档对齐 +1。
+
+# 测试点 (本次 PR 实际实现 4 个)
+test_points:
+  - id: D7-S2-A51-T01
+    name: |
+      6 S × WireFunc 命名一致 (S1 0 wire + S2 WireTurnInvoker + S3 WireWaveScheduler +
+      S4 WireExecutionFlow + S5 WireDecisionPlanning (NEW) + S6 WireMUPSPipeline (NEW))
+      + 1 横切 × 0 wire (Discipline Keeper Hardening 通过 Observability.Bridge 隐式注入)。
+      `grep -E "^func Wire" internal/bootstrap/*.go` 列出 5 个 Wire* + 1 BuildOrchestratePath。
+    status: PLANNED
+  - id: D7-S2-A51-T02
+    name: |
+      InitOrchestration 主体 ≤ 200 行 + 6 S 组合入口清晰 (含 §1 config 加载 +
+      §2 横切 obs bridge 解析 + §3 S1 WorkModel 注入 + §4 S2 SessionOrchestrator +
+      §5 S5 DecisionPlanning + §6 S3 WaveScheduler + §7 S6 MUPS Pipeline +
+      §8 S2 编排入口 + §9 横切 d7spans bridge)。`wc -l internal/bootstrap/wire_coordinator.go`
+      ≤ 250 行 (含 helper + import + 注释)。
+    status: PLANNED
+  - id: D7-S2-A51-T03
+    name: |
+      3 个内嵌 adapter 函数 (newContextEngineAdapter + newTurnOrchExecutor +
+      newGatewayEventPublisher) 已拆到独立文件 `internal/bootstrap/adapters.go` +
+      0 残留内嵌。`grep "^func new\|^type turnOrchExecutor\|^type gatewayEventPublisher\|^type contextEngineAdapter" internal/bootstrap/wire_coordinator.go` 0 命中。
+      4 个 util 函数 (boolPtr + intPtr + strPtr + mapBackgroundStatus) 已拆到
+      `internal/bootstrap/util.go`。`grep "func boolPtr\|func intPtr\|func strPtr\|func mapBackgroundStatus" internal/bootstrap/wire_coordinator.go` 0 命中。
+    status: PLANNED
+  - id: D7-S2-A51-T04
+    name: |
+      `go build ./...` 0 错误 + `go vet ./...` 0 警告 +
+      `go test -race -count=1 ./internal/layers/orchestration/...` 22/22 包全部 PASS
+      (与 DM-20260626-005 baseline 持平)；
+      LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session
+      traceability) 集成测试 100% 兼容；
+      `cmd/devrix/main.go` + `cmd/obs-verify/main.go` + `tests/testutil/d7_stack.go`
+      git diff 0 变化 (调用方 0 变化)；
+      `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go`
+      git diff 0 变化 (baseline stability 保持)。
+    status: PLANNED
+
+# 范围
+in_scope:
+  - internal/bootstrap/util.go (NEW, ~30 行) - 4 个 util 函数
+  - internal/bootstrap/adapters.go (NEW, ~80 行) - 3 个 adapter 类型 + 构造器 + 方法
+  - internal/bootstrap/decision_planning.go (NEW, ~30 行) - WireDecisionPlanning 包装
+  - internal/bootstrap/mups_pipeline.go (NEW, ~80 行) - WireMUPSPipeline 包装 + MUPSPipelinesDeps
+  - internal/bootstrap/wire_coordinator.go (MODIFY: 275 → ≤ 200 行, 抽 loadOrchestratorConfigs + resolveObsBridge 辅助)
+  - openspec/specs/d7-orchestration/d7-domain.md v2.3.0 → v2.4.0 (新增 §"Bootstrap Wire 拓扑" 章节 + 6 S × WireFunc 表格)
+  - openspec/specs/d7-orchestration/design.md v4.3.0 → v4.4.0 (§"Bootstrap" 章节展开 6 S × WireFunc 函数清单)
+  - openspec/specs/d7-orchestration/t-registry.md v4.5.0 → v4.6.0 (新增 D7-S2-A51 T01-T04, Statistics 222→226 IMPLEMENTED, P0 185→189)
+  - openspec/t-registry.md (root) v5.5.0 → v5.6.0 (新增 DM-20260626-007 增量条目, 总 P0 350→354)
+
+out_of_scope:
+  - InitOrchestration 外部接口 (输入参数 6 个 + 输出 error 保持不变)
+  - InitOrchestration 调用方 (cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 0 变化)
+  - 其他域 wire 函数 (WireIM + WireAgentFactory + WireDefaultForker + WireMultiAgent + WireContextV3 + WireAgentToolRegistry 保持原样)
+  - 引入 DI 框架 (wire.go / fx 等不引入)
+  - 重组 bootstrap 子目录 (保持扁平结构)
+  - 删任何 wire 函数 (5 个 Wire* + 1 BuildOrchestratePath + 1 WireDelegate 全部保留)
+  - 6 S 博弈角色定义 (S1-S6 + 1 横切 保持不变)
+  - escape/circuit_breaker.go (V5 EscapeEngine 核心机制)
+  - hardening/ (横切 Discipline Keeper 0 变化)
+  - sessionorchestrator/autoclose.go (DM-20260626-003 baseline)
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-1 #225
+    scope: "util.go 抽离 (4 个 util 函数)"
+    files: 2 (util.go NEW + wire_coordinator.go MODIFY)
+    estimated_loc: +30 (util.go) -14 (wire_coordinator.go 删 4 个 util) ≈ +16
+    risk: Low
+    branches:
+      - feat/devrix-d7-6s-bootstrap-slim-util
+  - pr: PR-2 #226
+    scope: "adapters.go 抽离 (3 个 adapter 类型 + 构造器 + 方法)"
+    files: 2 (adapters.go NEW + wire_coordinator.go MODIFY)
+    estimated_loc: +80 (adapters.go) -61 (wire_coordinator.go 删 3 个 adapter) ≈ +19
+    risk: Low
+    branches:
+      - feat/devrix-d7-6s-bootstrap-slim-adapters
+  - pr: PR-3 #227
+    scope: "S5 + S6 Wire 包装 (WireDecisionPlanning + WireMUPSPipeline)"
+    files: 3 (decision_planning.go NEW + mups_pipeline.go NEW + wire_coordinator.go MODIFY)
+    estimated_loc: +110 (2 new files) -30 (inline 替换) ≈ +80
+    risk: Medium
+    branches:
+      - feat/devrix-d7-6s-bootstrap-slim-s5-s6-wire
+  - pr: PR-4 #228
+    scope: "config + obsBridge 抽取 + 4 文档同步 + 4 P0 T 注册"
+    files: 5 (wire_coordinator.go MODIFY + 4 doc MODIFY)
+    estimated_loc: +60 (helper 函数 + changelog rows) -10 (inline 替换) ≈ +50
+    risk: Low
+    branches:
+      - feat/devrix-d7-6s-bootstrap-slim
+
+# 关联
+related_changes:
+  - devrix-d7-six-s-simplification  # #1 v6.0.0 域升级 spec 层 14 S → 6 S
+  - devrix-d7-6s-package-merge  # #4 turn/ 整包合并到 sessionorchestrator/
+  - devrix-d7-6s-verify-promotion  # #5 exit_reason + verdict_to_exit_reason promote
+  - devrix-d7-6s-observe-merge-cancel  # #5' observe-merge 取消 (observe/orchtypes/ 从未存在)
+
+# 后续 follow-up
+followup_changes: []  # v6.0.0 follow-up 序列收官
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-six-s-simplification.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-6s-package-merge-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-6s-verify-promotion-s7-archived.md
+  - openspec/archive/2026-06-26-devrix-d7-6s-verify-promotion/  # #5 模板
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v2.2.0
+  - openspec/specs/d7-orchestration/design.md  # D7 设计文档 v4.2.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v4.4.0
+  - internal/bootstrap/wire_coordinator.go  # 当前 275 行 InitOrchestration (改前)
+
+# 验证
+verification:
+  s3_gate:
+    - 用户确认 design.md Decision 1 (不重组 bootstrap 子目录) + Decision 2 (6 S × WireFunc 函数定义在 bootstrap/ 包内) + Decision 3 (3 个 adapter 合并到 adapters.go) + Decision 4 (4 个 util 合并到 util.go) + Decision 5 (config 抽到 loadOrchestratorConfigs 辅助) + Decision 6 (obsBridge 抽到 resolveObsBridge 辅助)
+  s4_gate:
+    - go vet ./...  # 0 warnings
+    - go build ./...  # 0 errors
+    - go test -race -count=1 ./internal/layers/orchestration/...  # 22/22 PASS
+    - LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session traceability) 集成测试 100% 兼容
+    - hardening/ 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - escape/circuit_breaker.go 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - sessionorchestrator/autoclose.go 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 0 变化 (调用方 0 变化)
+  s5_gate:
+    - 4 个 P0 T 点 (D7-S2-A51-T01..T04) 全部 IMPLEMENTED
+    - acceptance-report.md §1-§10 全部 13 AC 验收
+    - 0 race detector warnings
+    - 覆盖率 ≥ baseline (DM-20260626-005 落地后 80%)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-6s-bootstrap-slim  # 12/12 PASS
