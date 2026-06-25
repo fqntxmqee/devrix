@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 

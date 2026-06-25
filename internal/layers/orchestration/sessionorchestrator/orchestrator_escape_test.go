@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 )

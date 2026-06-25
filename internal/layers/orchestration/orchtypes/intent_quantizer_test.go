@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 )
 
 func TestIntentQuantizer_Quantize_Empty(t *testing.T) {

@@ -3,7 +3,7 @@ package orchtypes
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 )
 
 func TestObserveRequest_New_Success(t *testing.T) {
