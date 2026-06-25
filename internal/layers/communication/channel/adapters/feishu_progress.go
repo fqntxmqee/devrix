@@ -747,8 +747,37 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 		)
 		return nil
 	}
+	// DM-20260625-007: chunk-self dedup. detectDuplicateReplay only
+	// catches "cross-chunk prefix replay" (chunk's prefix is already in
+	// the buffer). When the LLM emits a single chunk that itself
+	// contains the same 60+ rune paragraph twice — e.g. minimax M2.7
+	// streaming artifacts where the model concatenates "A B A B" into
+	// one event — the prefix is new, so detectDuplicateReplay stays
+	// silent and the verbatim duplicate lands in textBuffer. Run
+	// dedupRepeatedText on the chunk before writing so the live
+	// cardkit stream never carries the duplicate.
+	chunk = dedupRepeatedText(chunk, 60, 2)
+	if strings.TrimSpace(chunk) == "" {
+		stream.mu.Unlock()
+		return nil
+	}
 	stream.textBuffer.WriteString(chunk)
-	content := stream.textBuffer.String()
+	// DM-20260625-007: buffer-self dedup. The LLM also "loops back" and
+	// rewrites the same opening across many small consecutive chunks
+	// (sess_1782381569430_3000 19:22:07-19:22:18 pattern: 5-7 chunks
+	// each carrying a different slice of the same opening). Each
+	// individual chunk's prefix is technically new so detectDuplicateReplay
+	// is silent, but the running buffer accumulates 2-3 copies of the
+	// same opening. Collapse them on every write so the live reply
+	// card never shows a verbatim duplicate. The finalize step already
+	// runs dedupRepeatedText as a safety net; this layer just moves the
+	// dedup from "after the user saw it" to "while the LLM is still
+	// talking".
+	content := dedupRepeatedText(stream.textBuffer.String(), 60, 2)
+	if content != stream.textBuffer.String() {
+		stream.textBuffer.Reset()
+		stream.textBuffer.WriteString(content)
+	}
 	stream.mu.Unlock()
 
 	if !a.streamingEnabled {
