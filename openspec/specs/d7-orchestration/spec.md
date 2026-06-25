@@ -1391,7 +1391,7 @@ When `req.Mode` is empty, `SubTurnRunner` falls back to
 LLM. Supersedes Phase A `SubTurnRunner` legacy default.
 
 **Priority**: P0  
-**T mapping**: D7-S2-A06-T14 … T17, `internal/layers/orchestration/turn/subturn_test.go`
+**T mapping**: D7-S2-A06-T14 … T17, `internal/layers/orchestration/sessionorchestrator/subturn_test.go`
 
 #### Scenario: brief mode drops parent history
 

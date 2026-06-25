@@ -9,20 +9,20 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/tests/testutil"
 )
 
-// stubLLMInvoker implements turn.LLMInvoker by returning a pre-canned JSON
+// stubLLMInvoker implements orchtypes.LLMInvoker by returning a pre-canned JSON
 // DAG string. Used to test the LLMDecomposer without a real LLM.
 type stubLLMInvoker struct {
 	jsonDAG string
 }
 
-func (s *stubLLMInvoker) InvokeStream(ctx context.Context, req turn.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+func (s *stubLLMInvoker) InvokeStream(ctx context.Context, req orchtypes.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
 	ch := make(chan llmgateway.Chunk, 2)
 	if s.jsonDAG != "" {
 		ch <- llmgateway.Chunk{Content: s.jsonDAG}

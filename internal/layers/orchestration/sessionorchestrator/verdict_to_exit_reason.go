@@ -1,4 +1,4 @@
-package turn
+package sessionorchestrator
 
 import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"

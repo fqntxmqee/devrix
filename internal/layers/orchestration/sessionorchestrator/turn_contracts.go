@@ -1,9 +1,10 @@
-package turn
+package sessionorchestrator
 
 import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -91,20 +92,15 @@ type PersistRequest struct {
 }
 
 // ToolSchema mirrors query.ToolSchema for the D7→D2 contract boundary.
-type ToolSchema struct {
-	Name        string
-	Description string
-	Parameters  map[string]any
-}
+//
+// DM-20260626-004: type alias to orchtypes.ToolSchema to break the
+// sessionorchestrator ↔ decisionplanning import cycle (see orchtypes/llm_invoker.go).
+type ToolSchema = orchtypes.ToolSchema
 
 // LLMInvokeRequest is the input to D7-S2-A07 InvokeLLM.
-type LLMInvokeRequest struct {
-	SessionID    string
-	Tier         string
-	SystemPrompt string
-	Messages     []types.Message
-	Tools        []ToolSchema
-}
+//
+// DM-20260626-004: type alias to orchtypes.LLMInvokeRequest for the same reason.
+type LLMInvokeRequest = orchtypes.LLMInvokeRequest
 
 // TurnOrchestrator owns the LLM↔Tool turn loop (D7-S2-A06).
 type TurnOrchestrator interface {
@@ -112,9 +108,9 @@ type TurnOrchestrator interface {
 }
 
 // LLMInvoker performs one D3 streaming call (D7-S2-A07).
-type LLMInvoker interface {
-	InvokeStream(ctx context.Context, req LLMInvokeRequest) (<-chan llmgateway.Chunk, error)
-}
+//
+// DM-20260626-004: type alias to orchtypes.LLMInvoker for the same reason.
+type LLMInvoker = orchtypes.LLMInvoker
 
 // ContextPreparer assembles legal context for one iteration (D2-S15).
 type ContextPreparer interface {

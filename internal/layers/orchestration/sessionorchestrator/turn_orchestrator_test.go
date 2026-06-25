@@ -1,4 +1,4 @@
-package turn
+package sessionorchestrator
 
 import (
 	"context"
@@ -101,14 +101,6 @@ func doneChunk() llmgateway.Chunk {
 
 func usageDoneChunk(prompt, completion int) llmgateway.Chunk {
 	return llmgateway.Chunk{Done: true, Usage: llmgateway.TokenUsage{PromptTokens: prompt, CompletionTokens: completion}}
-}
-
-func collectEvents(ch <-chan *contracts.EngineEvent) []*contracts.EngineEvent {
-	var evs []*contracts.EngineEvent
-	for e := range ch {
-		evs = append(evs, e)
-	}
-	return evs
 }
 
 func eventTypes(evs []*contracts.EngineEvent) []string {

@@ -3,9 +3,9 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 4.0.0
+**Version:** 4.2.0
 **Status:** Active
-**Last Updated:** 2026-06-26 (v4.3 post-cleanup + MUPS 5 节点 + v5 EscapeEngine + v6.0.0 6 S 精简)
+**Last Updated:** 2026-06-26 (v4.3 post-cleanup + MUPS 5 节点 + v5 EscapeEngine + v6.0.0 6 S 精简 + v4.2 turn/ 整包合并)
 **Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
@@ -753,3 +753,4 @@ D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子
 | 3.3.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 落地（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）：§⑦ MUPS 5 节点管道 + §⑧ v5 EscapeEngine；§⑨ 关联文档指针更新；56 A + 75 F 登记；t-registry 66 → 180 |
 | **4.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：§⑦ MUPS 5 节点管道节标题加 `（v6.0.0 6 S 归类）`，5 节点关系图子节点 S 编号按 v6.0.0 重归类（Observe/Plan → S5，Execute/Learn → S6，Verify → S4，AutoClose/EscapeEngine入口 → S2）；§⑨ 关联文档指针更新为 6 S + 1 横切；新增 §Revision History 段；A/F 数量同步 v6.0.0 精简（56 → 49 / 75 → 68）。详细 A/S 重映射见 `a-registry.md §v6.0.0 6 S 精简映射` |
 | **4.1.0** | **2026-06-26** | **Hardening 横切包物理落地（DM-20260626-003）**：`orchestration/hardening/` 目录新建（5 .go: doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go），承接 v6.0.0 6 S + 1 横切 Discipline Keeper 横切角色；`sessionorchestrator/metrics.go` + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；`escape/circuit_breaker.go` 留 escape/（V5 EscapeEngine 核心机制，Decision 1）；receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）保留 turn/ 紧耦合 *DefaultOrchestrator（Decision 2）；§Cross-cutting Hardening 包路径描述 v4.0.0 → v4.1.0；D7-S7-A01/A02 4 新 P0 T（hardening dir + subset split + 0 residual import + build+vet+test 23/23 PASS）IMPLEMENTED → 域 t-registry v4.3.0 |
+| **4.2.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并（DM-20260626-004）**：§② 包结构 S2 节描述从"S2 主目录 + turn/ 子包"改为"S2 单一博弈角色单一 Go 包"；§⑨ 关联文档指针同步更新（orchestration/turn/ → orchestration/sessionorchestrator/）；A/F 表中所有 turn/ 路径 → sessionorchestrator/ + turn_ 前缀（5 重命名文件）；§Cross-cutting Hardening 关系图更新（hardening/ ↔ sessionorchestrator/ 单一入口）；D7-S2-A50 4 新 P0 T（int_path_replace / test_cycle_break / 0_signatures / 0_residual_pkg）IMPLEMENTED → 域 t-registry v4.4.0 |

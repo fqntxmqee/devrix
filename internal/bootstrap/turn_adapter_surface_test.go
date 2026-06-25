@@ -11,7 +11,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -101,7 +101,7 @@ func TestExecuteRound_GoesThroughSurface_NotThroughIToolRunner(t *testing.T) {
 		surfaces: surfaces,
 		// tools left nil on purpose: any call here would NPE
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-x",
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "alpha", Input: `{}`}},
 	})
@@ -181,7 +181,7 @@ func TestExecuteRound_SurfaceGoError_PropagatesToResult(t *testing.T) {
 			&stubSurface{name: "alpha", hits: hits, failGo: true},
 		},
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "alpha", Input: `{}`}},
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func TestExecuteRound_ParallelDispatch_ConcurrencySafe(t *testing.T) {
 		},
 	}
 	adapter := &contextEngineAdapter{surfaces: surfaces}
-	req := turn.ToolRoundRequest{
+	req := sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{
 			{ID: "t1", Name: "slow", Input: `{}`},
 			{ID: "t2", Name: "slow", Input: `{}`},
@@ -271,7 +271,7 @@ func TestExecuteRound_ParallelDispatch_MixedSafeAndUnsafe(t *testing.T) {
 		&stubSurface{name: "unsafe", risk: types.RiskLevelHigh, concSafe: false, execDuration: sleep, hits: hits},
 	}
 	adapter := &contextEngineAdapter{surfaces: surfaces}
-	req := turn.ToolRoundRequest{
+	req := sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{
 			{ID: "t1", Name: "safe", Input: `{}`},
 			{ID: "t2", Name: "unsafe", Input: `{}`},
@@ -345,7 +345,7 @@ func TestPrepare_FilterDeferLoading(t *testing.T) {
 	}
 	// Prepare needs session lookup to succeed — use a fake via gw nil path
 	// (which falls back to types.NewSession(req.SessionID, ...)).
-	res, err := a.Prepare(context.Background(), turn.PrepareRequest{SessionID: "sess-x"})
+	res, err := a.Prepare(context.Background(), sessionorchestrator.PrepareRequest{SessionID: "sess-x"})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestPrepare_FilterDeferDecider(t *testing.T) {
 		surfaces:     surfaces,
 		deferDecider: contracts.AlwaysDefer("openworld"),
 	}
-	res, err := a.Prepare(context.Background(), turn.PrepareRequest{SessionID: "sess-y"})
+	res, err := a.Prepare(context.Background(), sessionorchestrator.PrepareRequest{SessionID: "sess-y"})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestExecuteRound_CheckPermission_DenyBlocksExecute(t *testing.T) {
 			},
 		},
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "danger", Input: `{}`}},
 	})
 	if err != nil {
@@ -433,7 +433,7 @@ func TestExecuteRound_CheckPermission_AskDelegatesToGate_Allows(t *testing.T) {
 		},
 		perm: enforce.AllowAllPermission{},
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
 	})
 	if err != nil {
@@ -460,7 +460,7 @@ func TestExecuteRound_CheckPermission_AskDelegatesToGate_Denies(t *testing.T) {
 		},
 		perm: enforce.DenyAllPermission{},
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
 	})
 	if err != nil {
@@ -487,7 +487,7 @@ func TestExecuteRound_CheckPermission_AskWithNoGate(t *testing.T) {
 		},
 		// perm is nil
 	}
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		ToolCalls: []llmgateway.ToolCall{{ID: "t1", Name: "maybe", Input: `{}`}},
 	})
 	if err != nil {

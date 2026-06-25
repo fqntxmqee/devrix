@@ -58,8 +58,8 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | D7-S5 Decision & Planning | ✅ IMPLEMENTED | `decisionplanning/{classifier,decomposer,executor,shadow_classifier,llm_decomposer}.go` + `workmodel/plan_*.go` |
 | D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/sessionorchestrator/` + `bootstrap/wire_coordinator.go` + `turn/` |
 | D7-S5 ClassifyIntent / Shadow | ✅ IMPLEMENTED | `decisionplanning/{classifier,classifier_fallback,shadow_classifier}.go` |
-| **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/turn/orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
-| **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/turn/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
+| **D7-S2-A06 RunTurnLoop** | ✅ IMPLEMENTED | `orchestration/sessionorchestrator/turn_orchestrator.go::DefaultOrchestrator.RunTurn`（DM-020 实际实现） |
+| **D7-S2-A07 InvokeLLM** | ✅ IMPLEMENTED | `orchestration/sessionorchestrator/llm.go::GatewayInvoker.InvokeStream`（DM-020 实际实现） |
 | **D7-S2-A07 LLMCaller/Summarizer 拆面** | ✅ IMPLEMENTED | D2 `EngineDeps.Summarizer` 由 D7 注入（`query_llm_caller` 已删，DM-20260618-010） |
 | **FastPath → turn.RunTurn 切换** | ✅ IMPLEMENTED | `turnOrchExecutor` 适配 `coordinator.TurnExecutor`；`FastPath.Run` 走 `turn.RunTurn`（DM-020 + DM-20260618-010） |
 | **D7-S3 Wave Sub-Runners** | ✅ IMPLEMENTED | `wavescheduler/runners/{subagent,agent_tool}.go` |

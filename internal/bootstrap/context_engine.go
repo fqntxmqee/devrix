@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -127,7 +127,7 @@ func NewContextEngine(
 	)
 
 // DM-020: D7-supplied summarizer for D2 compression (turn loop lives in D7).
-	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+	summarizer := sessionorchestrator.NewCompressionSummarizer(sessionorchestrator.CompressionSummarizerDeps{
 		Gateway:      stack.RawGateway,
 		TierResolver: stack.TierResolver,
 		DefaultTier:  stack.DefaultModel,
@@ -180,7 +180,7 @@ func NewContextEngine(
 
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
-	_ contracts.Summarizer      = (*turn.CompressionSummarizer)(nil)
+	_ contracts.Summarizer      = (*sessionorchestrator.CompressionSummarizer)(nil)
 	_ contracts.IEngine         = (*contextengine.ContextEngine)(nil)
 	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)
 )

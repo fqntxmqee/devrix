@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
-// fakeLLMInvoker is a minimal turn.LLMInvoker that streams canned
+// fakeLLMInvoker is a minimal orchtypes.LLMInvoker that streams canned
 // content back through the chunk channel. It supports multiple chunks
 // to verify collectChunkContent concatenates correctly.
 type fakeLLMInvoker struct {
@@ -18,7 +18,7 @@ type fakeLLMInvoker struct {
 	calls  int
 }
 
-func (f *fakeLLMInvoker) InvokeStream(ctx context.Context, req turn.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+func (f *fakeLLMInvoker) InvokeStream(ctx context.Context, req orchtypes.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
 	f.calls++
 	out := make(chan llmgateway.Chunk, len(f.chunks)+1)
 	go func() {

@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -19,7 +19,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -152,7 +151,7 @@ func InitOrchestration(
 
 	ctxPrep := &sessionorchestrator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
 
-	turnOrch := turn.NewOrchestrator(turn.OrchestratorDeps{
+	turnOrch := sessionorchestrator.NewOrchestrator(sessionorchestrator.OrchestratorDeps{
 		LLM:              llmInvoker,
 		Context:          ctxPrep,
 		Tools:            toolExec,
@@ -173,7 +172,7 @@ func InitOrchestration(
 		// marker so they do not blow up the LLM context budget.
 		ToolResultStore: persist.NewToolResultStore(""),
 	})
-	subTurn := turn.NewSubTurnRunner(turnOrch, turn.SubTurnConfig{
+	subTurn := sessionorchestrator.NewSubTurnRunner(turnOrch, sessionorchestrator.SubTurnConfig{
 		DefaultMode:      subagentCfg.DefaultMode,
 		LegacyMode:       subagentCfg.LegacyMode,
 		MaxDepth:         subagentCfg.MaxDepth,
@@ -181,7 +180,7 @@ func InitOrchestration(
 	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {
-		ce.SetPreparedTurnRunner(turn.NewPreparedTurnAdapter(turnOrch))
+		ce.SetPreparedTurnRunner(sessionorchestrator.NewPreparedTurnAdapter(turnOrch))
 	}
 	executor := newTurnOrchExecutor(turnOrch)
 
@@ -214,13 +213,13 @@ func InitOrchestration(
 	return nil
 }
 
-// turnOrchExecutor adapts turn.TurnOrchestrator to coordinator.TurnExecutor.
+// turnOrchExecutor adapts sessionorchestrator.TurnOrchestrator to coordinator.TurnExecutor.
 // DM-020 D-c: this replaces the legacy executor as the FastPath executor.
 type turnOrchExecutor struct {
-	orch turn.TurnOrchestrator
+	orch sessionorchestrator.TurnOrchestrator
 }
 
-func newTurnOrchExecutor(orch turn.TurnOrchestrator) *turnOrchExecutor {
+func newTurnOrchExecutor(orch sessionorchestrator.TurnOrchestrator) *turnOrchExecutor {
 	return &turnOrchExecutor{orch: orch}
 }
 
@@ -228,12 +227,12 @@ func (e *turnOrchExecutor) RunTurn(ctx context.Context, req sessionorchestrator.
 	if len(req.Messages) == 0 {
 		return nil, fmt.Errorf("turn executor: at least one message required")
 	}
-	return e.orch.RunTurn(ctx, turn.TurnRequest{
+	return e.orch.RunTurn(ctx, sessionorchestrator.TurnRequest{
 		SessionID:    req.SessionID,
 		UserMessage:  req.Messages[0],
 		SystemPrompt: req.SystemPrompt,
 		MaxTurns:     req.MaxTurns,
-		Scope:        turn.TurnScopeMain,
+		Scope:        sessionorchestrator.TurnScopeMain,
 	})
 }
 

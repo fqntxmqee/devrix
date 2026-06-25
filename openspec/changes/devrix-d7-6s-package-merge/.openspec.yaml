@@ -1,7 +1,7 @@
 id: devrix-d7-6s-package-merge
 demand_id: DM-20260626-004
 title: "D7 turn/ 包合并到 sessionorchestrator/ (v6.0.0 follow-up #3 落地)"
-status: s2_proposal
+status: s4_implementation
 priority: P1
 created: 2026-06-26
 author: D7 编排层 turn/ 物理包迁移梳理
@@ -46,20 +46,20 @@ test_points:
     name: |
       `internal/layers/orchestration/turn/` 目录物理消失（25 个 .go 文件全部
       git mv 至 `internal/layers/orchestration/sessionorchestrator/`）。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A50-T02
     name: |
       sessionorchestrator/ 包扩展至 ~60 文件 ~15000 行（35 原文件 + 25 turn 迁移），
       `package sessionorchestrator` 声明一致；turn.X 与 sessionorchestrator.X 无
       同名冲突（type/func 名全部保留原样，DefaultOrchestrator / SessionOrchestrator
       不同 type，OrchestratorOption 同名问题通过 design.md Decision 2 解决）。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A50-T03
     name: |
       全仓 `grep -rln "orchestration/turn\""` 0 命中（12 个 importer 全部更新）；
       `grep -rln "turn\.NewOrchestrator\|turn\.DefaultOrchestrator\|turn\.SubTurnRunner"`
       等 11 个核心 type/func 跨包调用全部改为 `sessionorchestrator.X`。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A50-T04
     name: |
       `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test
@@ -67,7 +67,7 @@ test_points:
       （与 hardening 落地后 baseline 持平，含 sessionorchestrator/ 扩展后 60 文件）。
       LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session
       traceability) 路径 0 变化。
-    status: PLANNED
+    status: IMPLEMENTED
 
 # 范围
 in_scope:
