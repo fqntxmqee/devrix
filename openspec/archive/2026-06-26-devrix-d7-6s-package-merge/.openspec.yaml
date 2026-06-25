@@ -1,7 +1,7 @@
 id: devrix-d7-6s-package-merge
 demand_id: DM-20260626-004
 title: "D7 turn/ 包合并到 sessionorchestrator/ (v6.0.0 follow-up #3 落地)"
-status: s4_implementation
+status: s7_archived
 priority: P1
 created: 2026-06-26
 author: D7 编排层 turn/ 物理包迁移梳理
