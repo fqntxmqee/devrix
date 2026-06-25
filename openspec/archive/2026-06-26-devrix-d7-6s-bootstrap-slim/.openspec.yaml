@@ -1,7 +1,7 @@
 id: devrix-d7-6s-bootstrap-slim
 demand_id: DM-20260626-007
 title: "D7 bootstrap 拓扑收口 (v6.0.0 follow-up #6 落地) - 6 S × 1 wire + 1 横切 × 0 wire"
-status: s2_proposal
+status: s7_archived
 priority: P2
 created: 2026-06-26
 author: D7 编排层 v6.0.0 follow-up 序列收官
@@ -54,7 +54,7 @@ test_points:
       S4 WireExecutionFlow + S5 WireDecisionPlanning (NEW) + S6 WireMUPSPipeline (NEW))
       + 1 横切 × 0 wire (Discipline Keeper Hardening 通过 Observability.Bridge 隐式注入)。
       `grep -E "^func Wire" internal/bootstrap/*.go` 列出 5 个 Wire* + 1 BuildOrchestratePath。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A51-T02
     name: |
       InitOrchestration 主体 ≤ 200 行 + 6 S 组合入口清晰 (含 §1 config 加载 +
@@ -62,7 +62,7 @@ test_points:
       §5 S5 DecisionPlanning + §6 S3 WaveScheduler + §7 S6 MUPS Pipeline +
       §8 S2 编排入口 + §9 横切 d7spans bridge)。`wc -l internal/bootstrap/wire_coordinator.go`
       ≤ 250 行 (含 helper + import + 注释)。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A51-T03
     name: |
       3 个内嵌 adapter 函数 (newContextEngineAdapter + newTurnOrchExecutor +
@@ -70,7 +70,7 @@ test_points:
       0 残留内嵌。`grep "^func new\|^type turnOrchExecutor\|^type gatewayEventPublisher\|^type contextEngineAdapter" internal/bootstrap/wire_coordinator.go` 0 命中。
       4 个 util 函数 (boolPtr + intPtr + strPtr + mapBackgroundStatus) 已拆到
       `internal/bootstrap/util.go`。`grep "func boolPtr\|func intPtr\|func strPtr\|func mapBackgroundStatus" internal/bootstrap/wire_coordinator.go` 0 命中。
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S2-A51-T04
     name: |
       `go build ./...` 0 错误 + `go vet ./...` 0 警告 +
@@ -82,7 +82,7 @@ test_points:
       git diff 0 变化 (调用方 0 变化)；
       `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go`
       git diff 0 变化 (baseline stability 保持)。
-    status: PLANNED
+    status: IMPLEMENTED
 
 # 范围
 in_scope:

@@ -1,7 +1,7 @@
 # Demand: devrix-d7-6s-bootstrap-slim (DM-20260626-007)
 
 **Demand ID:** DM-20260626-007
-**Status:** S1_Activating
+**Status:** S7_Archived
 **Priority:** P2
 **Created:** 2026-06-26
 **Change ID:** devrix-d7-6s-bootstrap-slim
