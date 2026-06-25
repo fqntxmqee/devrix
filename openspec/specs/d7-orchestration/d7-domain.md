@@ -4,8 +4,8 @@
 **Slug:** `orchestration`
 **Type:** Core Domain
 **Status:** Active — Canonical S1–S6 + 1 横切（v6.0.0 博弈角色对齐精简，14 S → 6 S + 1 横切；MUPS 5 节点管道 + v5 EscapeEngine 完整保留）
-**Version:** 2.3.0
-**Last Updated:** 2026-06-26 (verify-promotion)
+**Version:** 2.4.0
+**Last Updated:** 2026-06-26 (bootstrap-slim)
 **Depends On:** D1（ingress `ProcessMessage`）、D2（Follower 拆面）、D3（`IGateway`，D7 直调）、D4（Delegate Follower）
 **Depended By:** D1（EngineEvent / Flow 展示）、D6（`ValidateOrchestration` advisory）
 **Hard Ban:** D1→D2 直连 `IEngine.Process`（DM-007）；D2→D3 import（DM-020）；D4 直 Publish FlowEvent（DM-018）
@@ -97,6 +97,26 @@ D7-S5 Observe 节点 ── UncertaintyReport ──▶ D7-S5 Plan 节点 ──
 
 ---
 
+## Bootstrap Wire 拓扑 (v2.4.0)
+
+InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色在 `internal/bootstrap/` 包内通过 6 Wire 函数 + 1 BuildOrchestratePath helper 完成装配：
+
+| S 层 | 博弈角色 | Wire 函数 | 物理位置 |
+|------|----------|-----------|----------|
+| S1 WorkModel | State Authority | 0 wire (inline) | InitOrchestration |
+| S2 SessionOrchestrator | Mediator+Turn Leader | `WireTurnInvoker` | `bootstrap/turn_wiring.go` |
+| S3 WaveScheduler | Mechanism Designer | `WireWaveScheduler` + `BuildOrchestratePath` | `bootstrap/wire_wave.go` |
+| S4 ExecutionFlow+Verify | Costly Signaler+Certifier | `WireExecutionFlow` | `bootstrap/execution_flow.go` |
+| S5 DecisionPlanning+Observe | Info Producer+Quantizer | `WireDecisionPlanning` (NEW) | `bootstrap/decision_planning.go` |
+| S6 MUPS Pipeline | Pipeline Coord+Memory | `WireMUPSPipeline` (NEW) | `bootstrap/mups_pipeline.go` |
+| 横切 Hardening | Discipline Keeper | 0 wire (隐式) | `d7spans.SetBridge` 隐式注入 |
+
+**总入口**: `InitOrchestration` (单点) ≤ 200 行 (现状 140 行)，6 S 组合入口清晰。`loadOrchestratorConfigs` + `resolveObsBridge` 2 辅助函数抽离 52 行 config 加载 + 4 行类型断言；3 个内嵌 adapter (`turnOrchExecutor` + `gatewayEventPublisher` + 已在 `turn_adapter.go` 的 `contextEngineAdapter`) 拆到 2 个独立文件 (`adapters.go` + `turn_adapter.go`)；4 个 util 函数 (`boolPtr` + `intPtr` + `strPtr` + `mapBackgroundStatus`) 抽到 `util.go`。
+
+详见 `design.md` §"Bootstrap" v4.4.0 展开 + `t-registry.md` v4.6.0 D7-S2-A51 4 P0 T。
+
+---
+
 ## 规格文档索引
 
 | 文档 | 用途 |
@@ -126,3 +146,4 @@ D7-S5 Observe 节点 ── UncertaintyReport ──▶ D7-S5 Plan 节点 ──
 | **2.1.0** | **2026-06-26** | **Hardening 横切包物理落地**（DM-20260626-003）：(1) `orchestration/hardening/` 目录新建，5 .go 文件（doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go）；(2) `sessionorchestrator/metrics.go` + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；(3) `escape/circuit_breaker.go` **留 escape/**（Decision 1：V5 EscapeEngine 核心机制）；(4) `turn/recovery.go` KEEP：receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）+ partialStreamEmit + emitStreamRecoveryTombstones（Decision 2：紧耦合 *DefaultOrchestrator）；(5) D7-S7 4 新 P0 T IMPLEMENTED（D7-S7-A01-T01..T04）→ 域 t-registry v4.3.0 / 根 v5.3.0；(6) 23/23 orchestration packages go test -race PASS |
 | **2.2.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并**（DM-20260626-004）：(1) `orchestration/turn/` 整包 git mv → `orchestration/sessionorchestrator/`（24 .go 文件，6467 行），5 同名冲突文件加 turn_ 前缀（contracts/doc/orchestrator/orchestrator_test/tracing）；(2) 跨包 import cycle 打破：`LLMInvoker + LLMInvokeRequest + ToolSchema` 上提至 `orchtypes/llm_invoker.go`，sessionorchestrator 用 type alias；(3) 14 importer 文件 import path + identifier 全替换（10 bootstrap + 2 decisionplanning + 2 sessionorchestrator）；(4) `sessionorchestrator/{exit_reason,verdict_to_exit_reason}.go` 临时留 sessionorchestrator/（follow-up #4 promote）；(5) D7-S2-A50 4 新 P0 T IMPLEMENTED（D7-S2-A50-T01..T04）→ 域 t-registry v4.4.0 / 根 v5.4.0；(6) **0 函数签名变化**（pure physical migration + import path replace），(7) `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` 0 变更，22/22 orchestration packages go test -race PASS |
 | **2.3.0** | **2026-06-26** | **verify-promotion 包归属迁移**（DM-20260626-005）：(1) DM-20260626-004 临时留存的 `sessionorchestrator/{exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go (97 行)}` 3 文件 (218 行) git mv → `executionflow/verify/`；(2) 3 文件 `package sessionorchestrator` → `package verify` 改名 + sessionorchestrator/turn_orchestrator.go 11 处 `ExitReason*` 跨包引用替换为 `verify.ExitReason*`（state 字段 + 6 常量 + 2 函数参数 + 1 type assertion）+ turn_orchestrator_test.go 2 处 `ExitReasonNatural` → `verify.ExitReasonNatural`；(3) S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的可验证承诺（14 ExitReason + VerdictToExitReason 4 态映射）在 spec/code 完全对齐；(4) 跨包 DAG 单向（sessionorchestrator → verify，无反向 import cycle 风险）；(5) D7-S4-A50 4 新 P0 T PLANNED（D7-S4-A50-T01..T04）→ 域 t-registry v4.5.0 / 根 v5.5.0；(6) **0 函数签名变化**（pure physical migration，安全网与 DM-20260626-004 一致），14 ExitReason 字符串值 + 6 测试函数测试矩阵全不变；(7) `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` git diff 0 变化（baseline stability），22/22 orchestration packages go test -race PASS |
+| **2.4.0** | **2026-06-26** | **Bootstrap Wire 拓扑收口**（DM-20260626-007 / devrix-d7-6s-bootstrap-slim）：(1) `internal/bootstrap/wire_coordinator.go` InitOrchestration (275 → 215 行) 内部 4 util 函数 (`boolPtr` / `intPtr` / `strPtr` / `mapBackgroundStatus`) 抽至 `internal/bootstrap/util.go`（30 行）；(2) 2 内嵌 adapter 类型 (`turnOrchExecutor` / `gatewayEventPublisher`) 抽至 `internal/bootstrap/adapters.go`（48 行）；(3) 6 S × WireFunc 命名一致：新增 `WireDecisionPlanning` (S5 / `decision_planning.go` 16 行) + `WireMUPSPipeline` + `MUPSPipelinesDeps` (S6 / `mups_pipeline.go` 75 行) 包装；3rd adapter `contextEngineAdapter` 已在 `turn_adapter.go`（502 行）独立；(4) `loadOrchestratorConfigs` + `resolveObsBridge` 辅助函数抽离 52 行 config 加载 + 4 行类型断言；(5) InitOrchestration 函数体 275 → 140 行（≤ 200 目标达成）；(6) `cmd/devrix` + `cmd/obs-verify` + `tests/testutil/d7_stack.go` 0 变化（调用方 0 变化），`hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` git diff 0 变化（baseline stability）；(7) D7-S2-A51 4 新 P0 T IMPLEMENTED（D7-S2-A51-T01..T04）→ 域 t-registry v4.6.0 / 根 v5.6.0；(8) **0 函数签名变化**（pure physical refactor，InitOrchestration 外部接口 100% 不变）；(9) 4 PR 落地（PR-1 #225 util + PR-2 #226 adapters + PR-3 #227 S5+S6 wire + PR-4 #228 config+obsBridge+docs），22/22 orchestration packages go test -race PASS；(10) v6.0.0 follow-up 序列收官（5/6 S7_Archived + 1/6 S1_Cancelled + 1/1 S7_Archived = #007 bootstrap-slim） |

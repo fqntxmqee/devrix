@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.5.0
-**Last Updated:** 2026-06-26 (verify-promotion)
+**Version:** 5.6.0
+**Last Updated:** 2026-06-26 (bootstrap-slim)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 218 | 214 | 4 | 181 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 222 | 218 | 4 | 185 |
 
-**总计**: 540 · IMPLEMENTED 531 · PLANNED 7 · PARTIAL 0 · P0 350
+**总计**: 544 · IMPLEMENTED 535 · PLANNED 7 · PARTIAL 0 · P0 354
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -61,6 +61,8 @@
 > 详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` §3 T 层验证 + §4 22 包回归验证 + §5 LP-1/LP-2/LP-5 兼容验证（待 S6 归档生成）。
 
 > 2026-06-26 增量（verify-promotion 包归属迁移 PLANNED 预登记）：DM-20260626-005 (devrix-d7-6s-verify-promotion) — v6.0.0 域升级 Step 5 follow-up 立项：DM-20260626-004 turn/ → sessionorchestrator/ 时为避免单 PR scope 膨胀临时留存的 `sessionorchestrator/{exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go (97 行)}` 3 文件 (218 行) 物理 promote 到 `executionflow/verify/`；让 S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的可验证承诺 (14 ExitReason + VerdictToExitReason 4 态映射) 在 spec/code 完全对齐；`sessionorchestrator/turn_orchestrator.go` 11 处 `ExitReason*` → `verify.ExitReason*` 跨包引用替换 + `turn_orchestrator_test.go` 2 处替换。**0 函数签名变化**（pure physical migration，安全网与 DM-20260626-004 一致）；14 ExitReason 字符串值 + 6 测试函数测试矩阵全不变。加 **4 新 P0 T** PLANNED：D7-S4-A50-T01 3 文件 git mv + git log --follow 100% rename detection / D7-S4-A50-T02 3 文件 package 改名 + 13 处 ExitReason* 全替换 + grep 0 残留 / D7-S4-A50-T03 executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 cycle 0 风险 / D7-S4-A50-T04 go build/vet/test -race 22/22 PASS + LP-1/LP-2/LP-5 集成测试 100% 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化。Total 540, PLANNED 3→7, P0 350（IMPLEMENTED 531, P0 350）。D7 t-registry v4.4.0 → v4.5.0。22 包 baseline 持平（DM-20260626-004 PR #220+#221 验证），0 函数签名变化。
+
+> 2026-06-26 增量（Bootstrap Wire 拓扑收口 PLANNED 预登记）：DM-20260626-007 (devrix-d7-6s-bootstrap-slim) — v6.0.0 域升级 follow-up 序列收官（5/6 S7_Archived + 1/6 S1_Cancelled + 1/1 S7_Archived = #007 bootstrap-slim）：6 S × WireFunc 命名一致（新增 `WireDecisionPlanning` 16 行 S5 + `WireMUPSPipeline` + `MUPSPipelinesDeps` 75 行 S6 包装，6 个 wire 函数对齐）；3rd adapter `contextEngineAdapter` 已在 `turn_adapter.go` 独立，PR-2 抽 `turnOrchExecutor` + `gatewayEventPublisher` 2 内嵌 adapter 到 `adapters.go` (48 行)；PR-1 抽 4 util 函数 (`boolPtr` + `intPtr` + `strPtr` + `mapBackgroundStatus`) 到 `util.go` (30 行)；PR-4 抽 `loadOrchestratorConfigs` (24 行) + `resolveObsBridge` (6 行) 辅助函数分离 config 加载与类型断言；InitOrchestration 函数体 275 → **140 行**（≤ 200 目标达成）+ cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 调用方 0 变化 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 baseline stability。加 **4 新 P0 T** PLANNED：D7-S2-A51-T01 6 S × WireFunc 命名一致（`grep -E "^func Wire" internal/bootstrap/*.go` 应列 5 Wire* + 1 BuildOrchestratePath）/ D7-S2-A51-T02 InitOrchestration 主体 ≤ 200 行 + 6 S 组合入口清晰（`wc -l internal/bootstrap/wire_coordinator.go` ≤ 250；函数体 140 行 ≤ 200）/ D7-S2-A51-T03 3 内嵌 adapter + 4 util 函数已抽到独立文件（grep 0 命中 wire_coordinator.go）/ D7-S2-A51-T04 go build/vet/test -race 22/22 PASS + 0 函数签名变化（pure physical refactor, InitOrchestration 外部接口 100% 不变）+ hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 baseline stability。Total 544, PLANNED 7（持平）, P0 354（IMPLEMENTED 535→535 持平, P0 350→354）。D7 t-registry v4.5.0 → v4.6.0。22 包 baseline 持平（DM-20260626-005 PR #222+#223 验证），0 函数签名变化。
 
 ---
 
