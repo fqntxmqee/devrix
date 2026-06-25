@@ -1,7 +1,7 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.1.0
+**Version:** 5.2.0
 **Last Updated:** 2026-06-26
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 210 | 206 | 4 | 177 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 210 | 210 | 0 | 177 |
 
-**总计**: 528 · IMPLEMENTED 519 · PLANNED 7 · PARTIAL 0 · P0 342
+**总计**: 528 · IMPLEMENTED 523 · PLANNED 3 · PARTIAL 0 · P0 342
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -53,8 +53,8 @@
 > 2026-06-26 增量：DM-20260626-001 (devrix-d7-six-s-simplification PR #215) — D7 编排层 6 S 精简 + 5 个新 P0/P1 Span（v6.0.0 域升级）：14 S → **6 S + 1 横切** 博弈角色对齐 (State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper)；A 活动 56 → **49** (S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2)；F 层 75 → **68** (Legacy 41 + Canonical 27)；T 总数持平（重归类不删）但 S 编号重映射；Span 18 → **23** ops（+5 新 P0/P1: channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select）。加 20 个 P0 T 点：(1) D7-S6-A48 channel.route +2 (T01 EmitChannelRoute happy + T02 nil-bridge fail-safe)；(2) D7-S6-A49 memory.persist +2 (T03 EmitMemoryPersist happy + T04 nil-bridge fail-safe)；(3) D7-S4-A47 system.anomaly_detect +8 (T05-T06 emit + T11-T16 DetectSystemAnomaly 6 测试 triggered/not/override/nil-bridge/default)；(4) D7-S5-A33 taskgraph.synthesize +6 (T07-T08 emit + T17-T19 dagDepth 3 测试 + T20 Span emit fail-safe)；(5) D7-S5-A34 executor.select +2 (T09-T10 emit happy/nil-bridge)。20 新 P0 T 全 IMPLEMENTED，D7 t-registry v3.18.0 → v4.0.0（D7 T 186→206 IMPLEMENTED, P0 153→173）。22/22 orchestration packages `go test -race` 100% PASS 0 race；LP-1 兼容（Phase 4 PR-D4 UncertaintyCoord Value=0.95 路径 0 变化）。
 > 详见 `openspec/archive/2026-06-26-devrix-d7-six-s-simplification/acceptance-report.md` §3 20 P0 T 点验收 + §4 6 S 博弈角色重归类验收 + `openspec/specs/d7-orchestration/d7-domain.md` v2.0.0 §DSAFT 资产。
 
-> 2026-06-26 增量（mups 包路径迁移 PLANNED 预登记）：DM-20260626-002 (devrix-d7-mups-package-migration) — v6.0.0 域升级 Step 2 follow-up：execute/ + learn/ → mups/ 子树物理目录迁移（保持 `package execute` / `package learn` 声明不变 + 函数签名/行为 0 变化，纯目录迁移 + import path 替换）。D7 加 4 个 PLANNED P0 T 点：D7-S6-A51 T01 mups/execute/ 目录 + 7 .go git mv 迁移 / T02 mups/learn/ 目录 + 17 .go git mv 迁移 / T03 15 处 import path 全仓替换（decisionplanning 1 + orchtypes 4+4 _test.go + sessionorchestrator 3+7 _test.go）+ grep `orchestration/execute"` 与 `orchestration/learn"` 双 0 残留 / T04 `go build/vet/test -race` 全绿（22/22 orchestration packages PASS）+ LP-1/LP-2/LP-5 路径 0 变化。Total 524→528, PLANNED 3→7, P0 338→342（IMPLEMENTED 持平 519）。D7 t-registry v4.0.0 → v4.1.0。
-> 详见 `openspec/changes/devrix-d7-mups-package-migration/proposal.md` §3 Solution + `demand.md` §3 验收标准 + `acceptance-report.md`（S5 阶段落地后）。
+> 2026-06-26 增量（mups 包路径迁移 IMPLEMENTED 收口）：DM-20260626-002 (devrix-d7-mups-package-migration) — v6.0.0 域升级 Step 2 follow-up 落地：execute/ + learn/ → mups/ 子树物理目录迁移完成 (commit cb965d9: 24 文件 git mv rename 100%) + 17 处 import path 全仓替换完成 (commit e22ef5d: decisionplanning 2 + orchtypes 6 + sessionorchestrator 9) + go build/vet/test -race 全绿 (22/22 orchestration packages PASS + 130 全仓包 0 FAIL)。D7 加 4 个 P0 T 点全部 IMPLEMENTED：D7-S6-A51 T01 mups/execute/ 目录 + 7 .go git mv / T02 mups/learn/ 目录 + 17 .go git mv / T03 17 处 import path 全仓替换 + grep 0 残留 / T04 go build/vet/test -race 全绿 (22/22 orchestration pkgs) + LP-1/LP-2/LP-5 路径 0 变化。Total 528, PLANNED 7→3, P0 342（IMPLEMENTED 519→523）。D7 t-registry v4.1.0 → v4.2.0。22 包 baseline 持平 (PR #215 验证)，LP-1/LP-2/LP-5 集成测试 100% 兼容。
+> 详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` §3 T 层验证 + §4 22 包回归验证 + §5 LP-1/LP-2/LP-5 兼容验证（待 S6 归档生成）。
 
 ---
 
