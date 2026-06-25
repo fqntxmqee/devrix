@@ -1,4 +1,4 @@
-package sessionorchestrator
+package hardening
 
 import (
 	"sync"

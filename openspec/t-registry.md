@@ -1,7 +1,7 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.2.0
+**Version:** 5.3.0
 **Last Updated:** 2026-06-26
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 210 | 210 | 0 | 177 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 214 | 214 | 0 | 181 |
 
-**总计**: 528 · IMPLEMENTED 523 · PLANNED 3 · PARTIAL 0 · P0 342
+**总计**: 532 · IMPLEMENTED 527 · PLANNED 3 · PARTIAL 0 · P0 346
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -54,6 +54,8 @@
 > 详见 `openspec/archive/2026-06-26-devrix-d7-six-s-simplification/acceptance-report.md` §3 20 P0 T 点验收 + §4 6 S 博弈角色重归类验收 + `openspec/specs/d7-orchestration/d7-domain.md` v2.0.0 §DSAFT 资产。
 
 > 2026-06-26 增量（mups 包路径迁移 IMPLEMENTED 收口）：DM-20260626-002 (devrix-d7-mups-package-migration) — v6.0.0 域升级 Step 2 follow-up 落地：execute/ + learn/ → mups/ 子树物理目录迁移完成 (commit cb965d9: 24 文件 git mv rename 100%) + 17 处 import path 全仓替换完成 (commit e22ef5d: decisionplanning 2 + orchtypes 6 + sessionorchestrator 9) + go build/vet/test -race 全绿 (22/22 orchestration packages PASS + 130 全仓包 0 FAIL)。D7 加 4 个 P0 T 点全部 IMPLEMENTED：D7-S6-A51 T01 mups/execute/ 目录 + 7 .go git mv / T02 mups/learn/ 目录 + 17 .go git mv / T03 17 处 import path 全仓替换 + grep 0 残留 / T04 go build/vet/test -race 全绿 (22/22 orchestration pkgs) + LP-1/LP-2/LP-5 路径 0 变化。Total 528, PLANNED 7→3, P0 342（IMPLEMENTED 519→523）。D7 t-registry v4.1.0 → v4.2.0。22 包 baseline 持平 (PR #215 验证)，LP-1/LP-2/LP-5 集成测试 100% 兼容。
+
+> 2026-06-26 增量（Hardening 横切包物理落地）：DM-20260626-003 (devrix-d7-hardening-cross-cutting) — v6.0.0 域升级 Step 3 follow-up 落地：`orchestration/hardening/` 目录新建（5 .go: doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go），承接 6 S + 1 横切 Discipline Keeper 横切角色；`sessionorchestrator/metrics.go` (61 行 InterruptMetrics) + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；`escape/circuit_breaker.go` 留 escape/（V5 EscapeEngine 核心机制，Decision 1，git diff 0 变化）；receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）保留 turn/ 紧耦合 *DefaultOrchestrator（Decision 2）。D7 加 4 个 P0 T 点全部 IMPLEMENTED：D7-S7-A01-T01 hardening/metrics 目录 + 4 测试 git mv / D7-S7-A02-T02 hardening/recovery 子集拆分 + 3 测试 / D7-S7-A01-T03 0 残留 import path 全仓替换 + grep 0 命中 / D7-S7-A01-T04 go build/vet/test -race 全绿 (23/23 orchestration pkgs, 含 hardening 1 新包) + LP-1（Bayesian reputation TestAutoClose_FullLP1Loop）/ LP-2（5 节点 TestIntegration_5NodePipeline_End2End）/ LP-5（Cross-session traceability）100% 兼容。Total 532, P0 346（IMPLEMENTED 523→527, P0 342→346）。D7 t-registry v4.2.0 → v4.3.0。详见 `openspec/archive/2026-06-26-devrix-d7-hardening-cross-cutting/` (S6 归档阶段)。
 > 详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` §3 T 层验证 + §4 22 包回归验证 + §5 LP-1/LP-2/LP-5 兼容验证（待 S6 归档生成）。
 
 ---

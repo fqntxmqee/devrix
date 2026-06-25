@@ -1,0 +1,81 @@
+change_id: devrix-d7-hardening-cross-cutting
+priority: P1
+demand_id: DM-20260626-003
+status: s2_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S7  # NEW: Cross-cutting Discipline Keeper
+dsaft_activities:
+  - D7-S7-A01  # NEW: MetricsCollector (InterruptMetrics + Snapshot)
+  - D7-S7-A02  # NEW: ErrorRecoveryPolicy (LLM 错误恢复 helpers)
+
+# T 层测试点 (4 个 P0，全部 IMPLEMENTED 后状态变更)
+t_points:
+  - id: D7-S7-A01-T01
+    name: hardening/metrics package directory exists with InterruptMetrics (原 sessionorchestrator/metrics.go 61 行)
+    status: PLANNED
+  - id: D7-S7-A02-T02
+    name: hardening/recovery package directory exists with 6 functions + 1 struct (原 turn/recovery.go 133 行)
+    status: PLANNED
+  - id: D7-S7-A01-T03
+    name: 全仓 grep "orchestration/sessionorchestrator/metrics" 与 "orchestration/turn/recovery" 均为 0 命中
+    status: PLANNED
+  - id: D7-S7-A01-T04
+    name: go build/vet/test -race 全绿（23/23 orchestration packages PASS, 含 hardening 1 新包）
+    status: PLANNED
+
+version_scope:
+  v1.0: "metrics.go + recovery.go → hardening/ 物理目录迁移，import path 替换，circuit_breaker.go 留 escape/, 23 包回归 0 race"
+  v1.1: "(预留) follow-up #4-#6 hardening CB observability + 6s-package-merge + 6s-verify-promotion + 6s-observe-merge + 6s-bootstrap-slim"
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/hardening/ (NEW dir, 2 .go files + 1 doc.go)
+  - internal/layers/orchestration/hardening/metrics.go ← sessionorchestrator/metrics.go
+  - internal/layers/orchestration/hardening/recovery.go ← turn/recovery.go
+  - internal/layers/orchestration/hardening/doc.go (NEW, 说明横切职责)
+  - internal/layers/orchestration/hardening/metrics_test.go ← sessionorchestrator/metrics_test.go (git mv)
+  - internal/layers/orchestration/hardening/recovery_test.go ← turn/recovery_test.go (git mv)
+  - internal/layers/orchestration/sessionorchestrator/interrupt.go (import hardening + Metrics 字段类型更新)
+  - internal/layers/orchestration/sessionorchestrator/interrupt_test.go (import hardening)
+  - internal/layers/orchestration/turn/orchestrator.go (import hardening)
+  - internal/layers/orchestration/sessionorchestrator/metrics.go (DELETE)
+  - internal/layers/orchestration/sessionorchestrator/metrics_test.go (DELETE)
+  - internal/layers/orchestration/turn/recovery.go (DELETE)
+  - internal/layers/orchestration/turn/recovery_test.go (DELETE)
+  - openspec/specs/d7-orchestration/d7-domain.md v2.0.0 (横切章节包路径描述更新)
+  - openspec/specs/d7-orchestration/design.md v4.0.0 (横切章节包路径描述更新)
+  - openspec/specs/d7-orchestration/t-registry.md v4.2.0 → v4.3.0 (新增 4 个 P0 T)
+  - openspec/t-registry.md (root) v5.2.0 → v5.3.0 (新增 DM-20260626-003 增量条目 + D7 行更新)
+
+out_of_scope:
+  - escape/circuit_breaker.go (420 行) 保持原状 (V5 EscapeEngine 核心机制)
+  - 函数签名 / 行为 / 对外接口 0 变化
+  - package hardening 声明全新 (metrics.go + recovery.go 全部 rename 为 package hardening)
+  - bootstrap wire_coordinator.go 14 wire 不动 (follow-up #6 单独处理)
+  - 5 个新 P0/P1 Span emit 路径 0 变化 (channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select)
+  - shared/types/ 跨域类型不动
+  - 4 个其他 follow-up PR (6s-package-merge + 6s-verify-promotion + 6s-observe-merge + 6s-bootstrap-slim) 不在本次范围
+  - LP-1 / LP-2 / LP-5 路径 0 变化
+
+# DSAFT 层归属
+dsaft_layer: orchestration
+dsaft_type: refactor
+
+# 前置依赖
+related_changes:
+  - devrix-d7-six-s-simplification  # DM-20260626-001 S7_Archived 前置 (Step 1 已落地)
+  - devrix-d7-mups-package-migration  # DM-20260626-002 S7_Archived 前置 (Step 2 已落地)
+
+# 验证
+verification:
+  s4_gate:
+    - go vet ./...  # 0 issue
+    - go build ./...  # 0 error
+  s5_gate:
+    - go test ./internal/layers/orchestration/... -race -count=1  # 23/23 PASS (含 hardening 1 新包)
+    - 4 新 P0 T (D7-S7-A01-T01..T04) IMPLEMENTED
+    - 全仓 grep "orchestration/sessionorchestrator/metrics" 与 "orchestration/turn/recovery" 均为 0 命中
+    - circuit_breaker.go 0 变化 (git diff 无变更)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-hardening-cross-cutting  # 12 项检查全部 PASS

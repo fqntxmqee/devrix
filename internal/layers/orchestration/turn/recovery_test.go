@@ -7,38 +7,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	sherrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
-
-func TestIsContextLengthError(t *testing.T) {
-	cases := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil", nil, false},
-		{"code", sherrors.WithCode(sherrors.CodeContextExceeded, "ctx exceeded", errors.New("x")), true},
-		{"413 text", errors.New("HTTP 413 prompt too long"), true},
-		{"other", errors.New("500 internal"), false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsContextLengthError(tc.err); got != tc.want {
-				t.Fatalf("IsContextLengthError() = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestIsOverloadOr5xx(t *testing.T) {
-	if !IsOverloadOr5xx(errors.New("503 service unavailable")) {
-		t.Fatal("expected overload detection")
-	}
-	if IsOverloadOr5xx(sherrors.WithCode(sherrors.CodeContextExceeded, "ctx exceeded", errors.New("x"))) {
-		t.Fatal("context length must not count as overload")
-	}
-}
 
 func TestInvokeStreamWithRecovery_CompressesOn413(t *testing.T) {
 	msgs := make([]types.Message, 21)
@@ -72,15 +42,6 @@ func TestInvokeStreamWithRecovery_CompressesOn413(t *testing.T) {
 	}
 	if llm.calls < 2 {
 		t.Fatalf("llm calls = %d, want >= 2 (retry after compress)", llm.calls)
-	}
-}
-
-func TestNeedsMaxOutputTokenRecovery(t *testing.T) {
-	if !NeedsMaxOutputTokenRecovery("length") {
-		t.Fatal("finish_reason=length should trigger recovery")
-	}
-	if NeedsMaxOutputTokenRecovery("stop") {
-		t.Fatal("finish_reason=stop should not trigger recovery")
 	}
 }
 

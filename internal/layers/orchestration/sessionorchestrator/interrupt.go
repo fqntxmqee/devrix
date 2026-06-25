@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -39,7 +40,7 @@ type InterruptOptions struct {
 	// Metrics is an optional counters sink. When nil, the Handle method
 	// still returns errors.Join aggregated errors but does not increment
 	// any counters. DM-20260621-010 PR-A.
-	Metrics *InterruptMetrics
+	Metrics *hardening.InterruptMetrics
 }
 
 // InterruptHandler is the v1.0 HandleInterrupt entry point.

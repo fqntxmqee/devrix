@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -625,7 +626,7 @@ streamRecoveryLoop:
 			}
 		}
 
-		if !NeedsMaxOutputTokenRecovery(finishReason) {
+		if !hardening.NeedsMaxOutputTokenRecovery(finishReason) {
 			break streamRecoveryLoop
 		}
 		if streamRecoveryAttempts >= maxOutputTokenRecoveryAttempts {
@@ -635,7 +636,7 @@ streamRecoveryLoop:
 		st.messages = append(st.messages, types.Message{
 			SessionID: req.SessionID,
 			Role:      types.MessageRoleUser,
-			Content:   MaxOutputTokensRecoveryMessage,
+			Content:   hardening.MaxOutputTokensRecoveryMessage,
 		})
 		streamRecoveryAttempts++
 	}
