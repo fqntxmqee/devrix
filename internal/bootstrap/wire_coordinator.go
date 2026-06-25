@@ -17,6 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -203,6 +204,13 @@ func InitOrchestration(
 
 	slog.Info("d7: SessionOrchestrator wired to gateway, D1→D7.ProcessMessage path active")
 	slog.Info("d7: TurnOrchestrator wired (D7-S2-A06+A07)", "max_turns", turnOrch.MaxTurns())
+
+	// v6.0.0 6 S 精简 (DM-20260626-001): wire d7spans package-level bridge so
+	// the 5 new P0/P1 Span ops (channel.route / memory.persist / system.anomaly_detect /
+	// taskgraph.synthesize / executor.select) emit even though their call sites
+	// live in sub-packages that don't hold a SessionOrchestrator reference.
+	d7spans.SetBridge(obsBridge)
+
 	return nil
 }
 

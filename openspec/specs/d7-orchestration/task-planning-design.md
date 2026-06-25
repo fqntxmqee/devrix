@@ -1,30 +1,34 @@
 # 任务规划系统设计
 
 **文档类型:** 详细架构设计
-**Domain:** D7-S1（`workmodel/`）；PlanAgent 编排面 D7-S5（`decisionplanning/` 消费）
+**Domain:** D7-S1（`workmodel/`）；PlanAgent 编排面 D7-S5（`decisionplanning/` 消费）；**MUPS 5 节点管道** D7-S8 Observe / D7-S8 PR-B1 Plan / D7-S9 Execute / D7-S10 Verify / D7-S11 Learn
 **Change ID:** devrix-task-planning
-**版本:** 2.2.0
-**状态:** Active — IMPLEMENTED (PlanMode + TaskManager in D7 workmodel)
-**Last Updated:** 2026-06-19
+**版本:** 2.3.0
+**状态:** Active — IMPLEMENTED (PlanMode + WorkItem + MUPS v4.3)
+**Last Updated:** 2026-06-25
 **对标:** Claude Code Plan Mode
 **关联:** `openspec/specs/d7-orchestration/spec.md`, `design.md`, `demand.md` (DM-20260613-001)
 
 ---
 
-## 实现状态（2026-06-19）
+## 实现状态（2026-06-25）
 
 | 组件 | 状态 | 代码位置 |
 |------|------|----------|
-| TaskManager | ✅ | `orchestration/workmodel/task_manager.go` |
-| DiskStore (v2) | ✅ | `orchestration/workmodel/task_store.go` |
+| WorkItemManager（v4.3 起,TaskManager 退化为 Tree() facade） | ✅ | `orchestration/workmodel/work_tree.go` + `task_manager.go` |
+| DiskWorkItemStore (schema v2) | ✅ | `orchestration/workmodel/workitem_store.go` |
 | PlanMode 状态机 | ✅ | `orchestration/workmodel/plan_mode.go` |
 | PlanAgent 只读探索 | ✅ | `orchestration/workmodel/plan_agent.go` |
-| VerificationAgent | 🔶 设计完成 | 待独立 change |
-| CLI `/task` `/plan` | ✅ | `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` |
+| VerificationAgent | ✅ | `orchestration/verify/verifier.go`（Phase 4 升格自 D7-S1-A06 ExecutePlanAgent）|
+| CLI `/worktree` `/plan` | ✅ | `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go` |
 | D7-S5 ClassifyIntent | ✅ | `orchestration/decisionplanning/classifier.go` |
 | D7-S1 CreateWorkPlan | ✅ | `sessionorchestrator/workmodel.go` + `workmodel/plan_mode.go` |
+| **MUPS 5 节点管道（v4.3）** | ✅ | `orchestration/{observe,execute,verify,learn}/` + `shared/types/` |
+| **D7-S12 LP-1 闭环集成** | ✅ | `sessionorchestrator/observe_request.go::buildObserveRequest`（3 层 fail-safe）|
+| **D7-S13 Verify Auto-Close** | ✅ | `orchestration/verify/auto_close.go::processAutoClose` |
+| **D7-S14 EscapeEngine** | ✅ | `orchestration/escape/{engine,circuit_breaker}.go` |
 
-> **迁移说明：** Task/Plan 写模型已完全迁入 `internal/layers/orchestration/workmodel/`（DM-012 + DM-20260619-005）。`contextengine/tasks/` 仅为历史 shim。
+> **v4.3 迁移说明：** WorkItem 是唯一 canonical 写模型（v4.3 起 Task flat-view + TaskStore + TaskManager conversion helpers 全删）。`contextengine/tasks/` 仅为历史 shim。MUPS 5 节点管道（Observe → Plan → Execute → Verify → Learn）以 D7-S8/S9/S10/S11 升格为顶层场景，Plan 是 5 节点管道的第 2 节点。
 
 ---
 
@@ -58,7 +62,7 @@
 
 ## ② 核心流程
 
-### Plan Mode 工作流
+### Plan Mode 工作流（CLI 入口，PlanAgent only）
 
 ```
 用户输入 /plan <goal>
@@ -76,8 +80,28 @@ PlanAgent 执行（只读模式）
     ↓
 用户审批 (/plan approve / /plan reject)
     ↓
-approve → TaskManager 批量创建 Task
+approve → WorkItemManager 批量创建 WorkItem
 reject  → 回到 inactive
+```
+
+### MUPS 5 节点管道工作流（自动触发，Observe/Plan/Execute/Verify/Learn）
+
+> 与 Plan Mode 的区别：**MUPS 5 节点管道是自动触发的端到端编排主线**，Plan 是其中第 2 节点（不经过 `/plan` CLI 入口）。PlanAgent 只服务于 `/plan` CLI 命令，MUPS Plan 节点走更轻量的 `Planner` 接口。
+
+```
+用户消息（无 /plan 前缀）
+    ↓
+D7-S8 Observe 节点 → UncertaintyReport{Observations, UncertaintyCoord, QuantizedIntent}
+    ↓
+D7-S8 PR-B1 Plan 节点 → Plan{ID, Kind, Strength, Steps, FailureCriteria, BlastRadius, SourceObservationIDs}
+    ↓
+D7-S9 Execute 节点 → Artifact{ID, Kind, Payload, Evidence, SourcePlanID}
+    ↓
+D7-S10 Verify 节点 → Verdict{Kind, Evidence, Reason, SourceArtifactID}
+    ↓
+D7-S11 Learn 节点 → LearningAsset + ReputationEvidence
+    ↓
+(下轮) D7-S8 Observe ← ReputationEvidence 注入 AdaptivePrior（D7-S12 跨域闭环）
 ```
 
 ### 状态机
@@ -117,16 +141,16 @@ FlowFailed          → TaskManager.status=failed
 
 ## ③ CLI 命令
 
-### 任务命令 (`/task`)
+### WorkItem 命令 (`/worktree`，v4.3 起取代旧 `/task`)
 
 ```bash
-/task create <subject> [description]  # 创建任务
-/task list                            # 列出所有任务
-/task get <task_id>                  # 获取任务详情
-/task update <task_id> [status]      # 更新状态
-/task delete <task_id>               # 删除任务
-/task ready                          # 显示就绪任务
-/task dep <task_id> <blocked_by>   # 添加依赖
+/worktree create <subject> [description]  # 创建 WorkItem
+/worktree list                            # 列出所有 WorkItem
+/worktree get <item_id>                   # 获取 WorkItem 详情
+/worktree update <item_id> [status]      # 更新状态
+/worktree delete <item_id>               # 删除 WorkItem
+/worktree ready                          # 显示就绪 WorkItem
+/worktree dep <item_id> <blocked_by>     # 添加依赖
 ```
 
 **实现：** `orchestration/workmodel/cli_commands.go` + `sessionorchestrator/command_handler.go`
@@ -239,8 +263,8 @@ internal/layers/contextengine/tasks/
 ├── plan_mode.go             # D7-S1-A04/A05 PlanMode 状态机
 ├── plan_agent.go            # D7-S5-A04 RunPlanAgent
 ├── verification_agent.go      # VerificationAgent（若存在）
-├── tool_suite.go            # Task/Plan 工具注册
-└── cli_commands.go          # /task /plan CLI
+├── tool_suite.go            # WorkItem 工具注册
+└── cli_commands.go          # /worktree /plan CLI（v4.3 起 /task 已并入 /worktree）
 
 internal/layers/orchestration/executionflow/hub/
 └── hub.go                   # linkTask → TaskManager 联动
@@ -304,3 +328,75 @@ go test ./internal/layers/orchestration/executionflow/...
 ---
 
 **维护：** 功能变更需同步更新 `spec.md`、`a-registry.md`、`f-registry.md`、`t-registry.md` 与本文档。
+
+---
+
+## ⑩ MUPS Plan 节点（Phase 2 PR-B1, 2026-06-23 落地）
+
+> MUPS 5 节点管道的 **第 2 节点**，与 `/plan` CLI 入口的 PlanAgent 是**两个不同的 Plan 实现**：CLI 入口的 PlanAgent 是只读探索 + 用户审批的人工流程；MUPS Plan 节点是自动触发的算法流程（Planner + Plan.Validate + MatchKind）。
+
+### 1. 节点定位
+
+```
+Observe (S8) ── UncertaintyReport ──▶ Plan (S8 PR-B1) ── Plan ──▶ Execute (S9)
+   ↑                                          │
+   └── ReputationEvidence (D7-S12 LP-1) ─────┘
+```
+
+- **上游契约（D7-S8 Observe → D7-S8 Plan）：** `UncertaintyReport{Observations, UncertaintyCoord, QuantizedIntent, Anomalies}` 是 Plan 节点的输入。
+- **下游契约（D7-S8 Plan → D7-S9 Execute）：** `Plan{ID, Kind, Strength, Steps, FailureCriteria, BlastRadius, SourceObservationIDs}` 是 Execute 节点的输入。
+
+### 2. 4 类 Plan
+
+| PlanKind | 触发条件（ObsKind） | 强度范围 | 配套 FailureCriteria | 爆炸半径 |
+|----------|--------------------|---------|---------------------|---------|
+| **CommitmentPlan** | ObsFact strength ≥ ★★★ | 严格（4 步硬约束）| Artifact.Hash 必须匹配预期 | 小（无副作用）|
+| **ProtocolPlan** | ObsSignal strength ≥ ★★ | 中（3 步软约束）| Tool 调用序列必须符合 protocol | 中（依赖 Tool 副作用）|
+| **ScenarioPlan** | ObsAnomaly strength ≥ ★ | 弱（2 步弹性约束）| 必须触发兜底分支 | 大（可能产生外部副作用）|
+| **ExplorationPlan** | ObsUser strength < ★ | 探索（无约束）| N/A（只读探索）| 零（只读）|
+
+### 3. 3 项强制约束
+
+| 约束 | 含义 | 代码实现 |
+|------|------|---------|
+| **强度匹配** | Plan.Strength ≤ min(Observations.Strength) | `Plan.Validate.PP-1` |
+| **可证伪性** | Plan.FailureCriteria 至少含 1 条可观测判定 | `Plan.Validate.PP-2` |
+| **爆炸半径** | Plan.BlastRadius 与 Plan.Kind 配对 | `Plan.Validate.PP-3` |
+
+### 4. Kind 匹配规则（MatchKind）
+
+```go
+// MatchKind: 从 Observation 推导 Plan.Kind
+func MatchKind(obs Observation) PlanKind {
+    switch obs.Kind {
+    case ObsFact:    return CommitmentPlan
+    case ObsSignal:  return ProtocolPlan
+    case ObsAnomaly: return ScenarioPlan
+    case ObsUser:    return ExplorationPlan
+    }
+}
+```
+
+### 5. 代码入口
+
+- **Planner interface：** `orchestration/observe/plan/planner.go::Plan`
+- **Plan.Validate：** `orchestration/observe/plan/plan.go::Validate`（PP-1/PP-2/PP-3 三项约束）
+- **MatchKind：** `orchestration/observe/plan/kind.go::MatchKind`（4 条规则）
+- **BlastRadiusCalculator：** `orchestration/observe/plan/blast_radius.go::Calculate`
+
+### 6. T 点绑定（Phase 2 PR-B1）
+
+- D7-S8-A22-T01：4 类 Plan 落地 + Validate 触发
+- D7-S8-A22-T02：MatchKind 4 条规则覆盖率 100%
+- D7-S8-A22-T03：PP-1/PP-2/PP-3 三项约束检测
+
+---
+
+## 关联文档
+
+- `d7-domain.md`：MUPS 5 节点管道 SoT
+- `a-registry.md` §D7-S8：MUPS Plan 节点 A 活动登记
+- `f-registry.md` §D7-S8-A15..A22：MUPS Plan 节点 F 层登记
+- `span-registry.md` §Operations：MUPS 5 节点 span 登记
+- `terminal-state-guide.md` §3：D7-S8 D7-S11 节点博弈角色与职责
+- `../d7-orchestration/observability-guide.md` §1：D7-S8-A22-T01..T03 T 层绑定

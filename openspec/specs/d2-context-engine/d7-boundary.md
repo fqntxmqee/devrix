@@ -2,10 +2,10 @@
 
 **Capability:** d2-d7-boundary  
 **Status:** Active  
-**Version:** 2.0.0  
-**Last Updated:** 2026-06-19  
-**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）+ devrix-d2-queryloop-dismantle（DM-20260618-010）  
-**Demand ID:** DM-20260614-009 / DM-20260614-020 / DM-20260618-010  
+**Version:** 2.1.0  
+**Last Updated:** 2026-06-25  
+**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）+ devrix-d2-queryloop-dismantle（DM-20260618-010）+ devrix-d7-mups-v4-phase3-execute（DM-20260625-001，PR-C1 跨域类型上提 shared/types）  
+**Demand ID:** DM-20260614-009 / DM-20260614-020 / DM-20260618-010 / DM-20260625-001  
 **Parent (D2):** `openspec/specs/d2-context-engine/d2-domain.md`  
 **Parent (D7):** `openspec/specs/d7-orchestration/d7-domain.md`
 
@@ -185,4 +185,76 @@ Unified `FlowEvent` aggregation and delegate-progress drain Canonical ownership 
 | DM-20260614-007 | D1→D7 ingress |
 | **DM-20260614-020** | **D7 Turn 编排上移（D2→D3 禁止）** |
 | **DM-20260618-010** | **QueryLoop dismantle（S16 REMOVED）** |
+| **DM-20260625-001** | **MUPS Phase 3 PR-C1（跨域类型上提 shared/types.Artifact）** |
 | `openspec/specs/d7-orchestration/d3-boundary.md` | **D7↔D3 边界 SoT** |
+
+---
+
+## 9. MUPS 5 节点管道 × D2 跨域边界（2026-06-25 落地）
+
+> MUPS v4.3 5 节点管道（Observe / Plan / Execute / Verify / Learn）落地后，D2 与 D7 的跨域边界新增 1 个共享类型 + 4 类 Artifact 的 D2 消费路径。
+
+### 9.1 共享类型上提（PR-C1）
+
+`Artifact` 类型从 D7 Execute 节点独占升格为**跨域共享类型**，由 D2/D4/D7 共同消费：
+
+```go
+// internal/shared/types/artifact.go
+type Artifact struct {
+    ID             string
+    Kind           ArtifactKind  // state_change / response / probe / experiment
+    Payload        []byte
+    Evidence       Evidence
+    SourcePlanID   string        // 反向追溯 Plan
+}
+
+// 4 类 Artifact
+const (
+    ArtifactStateChange ArtifactKind = "state_change"
+    ArtifactResponse    ArtifactKind = "response"
+    ArtifactProbe       ArtifactKind = "probe"
+    ArtifactExperiment  ArtifactKind = "experiment"
+)
+```
+
+**D2 消费路径：**
+
+| Artifact Kind | D2 消费者 | 用途 |
+|--------------|----------|------|
+| `state_change` | D2-S17 PersistTurn | 状态变更落盘 |
+| `response` | D2-S16 Loop | 直接返回用户 |
+| `probe` | D2-S19 SubQuery | 试探结果合并 |
+| `experiment` | D2-S19 SubQuery | 实验数据汇总 |
+
+### 9.2 D2 → D7 Verify 节点接口
+
+D7-S10 Verify 节点（`verify/verifier.go::Verify`）是 D2 投递 Artifact 的目标。**D2 → D7 Verify 的调用模式**与 D7 → D2 拆面契约对称：
+
+```
+D2 SubQuery / D4 Worker
+    └── 投递 Artifact 到 D7 Verify (S10-A32)
+            ├── VerifyWithRetry (3 次重试)
+            ├── ExtractEvidence (与 Plan.FailureCriteria 对齐)
+            ├── VerdictKind 提取（compliance/timeliness/root_cause/statistical）
+            └── 返回 Verdict + ExitReason (14 态之一)
+```
+
+### 9.3 D2 ↔ MUPS Plan 节点
+
+MUPS Plan 节点（D7-S8 PR-B1）的输入是 `UncertaintyReport`，D2 不直接产出 UncertaintyReport；但 D2-S15 PrepareContext 输出的 context snapshot 是 Observe 节点的输入信号之一（Observation.Kind=ObsFact）。
+
+### 9.4 D2 ↔ MUPS Learn 节点
+
+MUPS Learn 节点（D7-S11）通过 `Memory.Persist` 3 通道（skill / feedback / scheduled）落 LearningAsset。**D2 不参与** Learn 节点，但 D2-S17 PersistTurn 输出的 transcript 是 Learn 节点的输入信号之一（追溯链 Verification）。
+
+### 9.5 边界硬约束
+
+| 约束 | 含义 |
+|------|------|
+| D2→D7 import | **允许**（D7-S10 Verify 消费 D2 投递的 Artifact） |
+| D7→D2 import | **允许**（拆面调用 D2-S15/S17/S18） |
+| D2→D3 import | **白名单 4/4 已满，禁止新增**（DM-020 + DM-20260618-010） |
+| D7→D3 import | **允许**（D7-S2-A07 InvokeLLM 直调 D3） |
+| shared/types/Artifact import | **所有域允许**（PR-C1 跨域共享类型） |
+
+详见 `openspec/specs/d7-orchestration/d7-domain.md` §MUPS 5 节点管道 与 `design.md` §⑦ 跨域类型上提。

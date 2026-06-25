@@ -3,8 +3,10 @@ package execute
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
@@ -208,12 +210,23 @@ func (r *ChannelRouter) Route(ctx context.Context, p *plan.Plan, req ChannelRequ
 	if p == nil {
 		return nil, fmt.Errorf("%w", ErrChannelPlanNil)
 	}
+	// v6.0.0 S6-A48 P0: emit channel.route Span before channel lookup so Jaeger
+	// records both successful routes and the rare Kind-mismatch / nil-plan paths.
+	// Plan.Strength is float64 in [0,1]; surface as 3-decimal string for the Jaeger UI.
+	score := strconv.FormatFloat(p.Strength, 'f', 3, 64)
+	end := d7spans.EmitChannelRoute(ctx, p.SessionID, p.Kind.String(), "", score, "false")
 	if !p.Kind.IsKnown() {
-		return nil, NewChannelUnsupportedError("<router>", p.Kind.String())
+		err := NewChannelUnsupportedError("<router>", p.Kind.String())
+		end(err)
+		return nil, err
 	}
 	ch, err := r.registry.Get(p.Kind)
 	if err != nil {
+		end(err)
 		return nil, err
 	}
-	return ch.Execute(ctx, p, req)
+	art, err := ch.Execute(ctx, p, req)
+	// success path: close span (err may still be non-nil from ch.Execute)
+	end(err)
+	return art, err
 }

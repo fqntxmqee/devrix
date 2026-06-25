@@ -3,16 +3,17 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 3.1.0
+**Version:** 4.0.0
 **Status:** Active
-**Last Updated:** 2026-06-22
-**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001)
+**Last Updated:** 2026-06-26 (v4.3 post-cleanup + MUPS 5 节点 + v5 EscapeEngine + v6.0.0 6 S 精简)
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
 **Wave 设计参考:** `openspec/changes/devrix-wave-scheduler/design.md`
+**调用链路图:** `openspec/specs/d7-orchestration/pipeline-architecture.md` v1.1.0（端到端总图）
 
-> **实现说明（2026-06-19）：** D7 v2.0 Structure 落地（DM-20260619-005）：S2→`sessionorchestrator/`、S3→`wavescheduler/`、S4→`executionflow/{hub,workplan,imsink,bridge}/`、S5→`decisionplanning/`；`coordinator/` 与 `hubspoke/` 保留 type-alias shim；`orchtypes/` 承载共享 Config/Intent 类型；WorkTree TD-WT-02/03 部分闭合。Turn Leader 仍在 `turn/`。t-registry 66/66 IMPLEMENTED 保持。
+> **实现说明（2026-06-25，v4.3 post-cleanup）：** D7 v2.0 Structure（DM-20260619-005）+ devrix-d7-dead-files-cleanup（DM-20260625-013..016, PR #214 squash-merged 2026-06-24）合流：S2→`sessionorchestrator/`、S3→`wavescheduler/`、S4→`executionflow/{hub,workplan,imsink,bridge}/`、S5→`plan/` + `decisionplanning/`（PlanAgent 仅 `/plan` 命令入口）；`coordinator/` `hubspoke/` type-alias shim 已并入源包，0 残留；`orchtypes/` 承载共享 Config/Intent 类型；WorkTree TD-WT-02/03 完全闭合（Task flat-view + TaskStore + conversion helpers + taskStoreAdapter 全删，WorkItem 是唯一 canonical 模型）。Turn Leader 仍在 `turn/`，`turn/exit_reason.go`（89 行）从 `turn/orchestrator.go` 抽出。t-registry 186/186 IMPLEMENTED 保持。
 
 ---
 
@@ -60,7 +61,7 @@
 | 路由 | 触发 | 调度 | 执行 |
 |------|------|------|------|
 | FastPath | Classify=simple | D7-S2 | D7 RunTurn（TurnExecutor） |
-| CommandPath | `/plan` `/task` `/stop` | D7-S2（优先于 Classify） | 命令处理器 |
+| CommandPath | `/plan` `/worktree` `/stop` | D7-S2（优先于 Classify） | 命令处理器 |
 | PlanPath | `/plan` 或 PlanMode active | D7-S2 → S5-P1 | PlanAgent → PlanTask |
 | SerialExplore | orchestrate + 单步 | D7-S2 串行 | D2 readonly |
 | WaveExecute | orchestrate + 并行 | **D7-S3** | runners → D2/D4 |
@@ -229,11 +230,11 @@ Plan Engine / delegate_tools
 ### CommandHandler 分支（D7-S2-A04, 零 LLM）
 
 ```
-用户 /help | /plan | /task | /stop
+用户 /help | /plan | /worktree | /stop
     └── CommandHandler.Handle(req, intent)
             ├── dispatch(ctx, cmd, args)
             │     ├── /plan → workmodel.PlanCLICommands.Handle
-            │     ├── /task → workmodel.CLICommands.Handle
+            │     ├── /worktree → workmodel.CLICommands.Handle
             │     ├── /help → cli.Help()
             │     └── /stop → interruptHandle(ctx, sessionID)
             └── emit goroutine:  ← DM-20260622-001 A5 硬化
@@ -386,7 +387,7 @@ type ExecutionFlowHub interface {
 
 | 命令 | Activity | 状态 |
 |------|----------|------|
-| `/task create\|list\|get\|update\|delete\|ready\|dep` | D7-S1 ManageTask | IMPLEMENTED |
+| `/worktree create\|list\|get\|update\|delete\|ready\|dep` | D7-S1 ManageWorkItem | IMPLEMENTED（v4.3 post-cleanup，/task 已并入 /worktree） |
 | `/plan <goal>\|enter\|approve\|reject\|status\|show` | D7-S5 PlanMode | IMPLEMENTED |
 
 ### 目标 API（D7 v1.0 规划）
@@ -551,3 +552,203 @@ func (s *WaveScheduler) markWaveDone(state *schedulerWaveState) {
 ---
 
 **维护：** 功能变更需同步更新 `spec.md`、注册表与本文档对应章节。
+
+---
+
+## ⑦ MUPS 5 节点管道（v4.3，2026-06-25 落地；v6.0.0 6 S 归类）
+
+> D7 v4.3 起把 **Observe → Plan → Execute → Verify → Learn** 5 节点升格为顶层 Canonical 场景，与传统 D7-S1~S5（WorkModel / SessionOrchestrator / WaveScheduler / ExecutionFlow / DecisionPlanning）正交互补。前者负责**端到端自动编排**，后者负责**调度基础设施**。
+>
+> **v6.0.0 6 S 精简（DM-20260626-001）归类：** Observe + Plan 归 **S5**（Information Producer + Quantizer），Execute + Learn 归 **S6**（Pipeline Coordinator + Memory Curator），Verify 归 **S4**（Certifier），AutoClose + Resume + EscapeEngine 入口 归 **S2**（Mediator + Error Recovery；Engine 物理独立）。
+
+### 7.1 5 节点关系图（v6.0.0 6 S 归类）
+
+```
+D7-S5 Observe ── UncertaintyReport ──▶ D7-S5 Plan ── Plan ──▶ D7-S6 Execute
+   ▲                                          │                       │
+   │                                          │                       ▼
+   │                                  D7-S2 (LP-1 入口)       D7-S4 Verify
+   │                                          │                       │
+   │                                          │                       ▼
+   │                                          │              D7-S6 Learn
+   │                                          │                       │
+   │  ┌───────────────────────────────────────┘                       │
+   │  │                                                               │
+   ▼  ▼                                                               ▼
+D7-S5 Observe ◀── ReputationEvidence (Bayesian) ◀────────────────────┘
+
+D7-S6 AutoClose ──┐
+D7-S2 EscapeEngine入口 ──┼── 横切兜底（任意节点 stall/error 触发；Engine 物理独立）
+                       ─┘
+```
+
+### 7.2 节点契约表
+
+| 节点 | 输入类型 | 输出类型 | 关键约束 |
+|------|---------|---------|---------|
+| **Observe** | SessionID + UserMessage + (可选) AdaptivePrior | UncertaintyReport{Observations, UncertaintyCoord, Anomalies, QuantizedIntent} | 4 类 Observation 必须落 UncertaintyCoord |
+| **Plan** | UncertaintyReport | Plan{ID, Kind, Strength, Steps, FailureCriteria, BlastRadius, SourceObservationIDs} | Plan.SourceObservationIDs 必须可反向追溯 Observation；3 项强制约束（强度匹配/可证伪性/爆炸半径）|
+| **Execute** | Plan | Artifact{ID, Kind, Payload, Evidence, SourcePlanID} | Artifact.SourcePlanID 必须可反向追溯 Plan；4 Channel C2/W8 1:1 映射 |
+| **Verify** | Artifact + Plan | Verdict{Kind, Evidence, Reason, SourceArtifactID} + ExitReason (14 态) | Verdict.SourceArtifactID 必须可反向追溯 Artifact |
+| **Learn** | Verdict + Plan + Observation (追溯链) | LearningAsset + ReputationEvidence | ReputationEvidence 必须能注入下一轮 Observe 作 AdaptivePrior |
+
+### 7.3 跨域类型上提（PR-C1，DM-20260625-001）
+
+Artifact 是 5 节点管道的核心交付物，但**同时被 D7 Execute / D7 Verify / D4 Worker / D2 SubQuery** 四个域消费。原设计里 `Artifact` 类型被各域独立定义，导致 import cycle（Execute 不能直接 import Verify / D4 Worker）。
+
+**PR-C1 解决方案：** 把 `Artifact` 类型上提至 `internal/shared/types/artifact.go`，作为跨域共享类型：
+
+```go
+// internal/shared/types/artifact.go
+type Artifact struct {
+    ID             string
+    Kind           ArtifactKind  // state_change / response / probe / experiment
+    Payload        []byte
+    Evidence       Evidence
+    SourcePlanID   string        // 反向追溯 Plan
+}
+
+type ArtifactKind string
+
+const (
+    ArtifactStateChange ArtifactKind = "state_change"
+    ArtifactResponse    ArtifactKind = "response"
+    ArtifactProbe       ArtifactKind = "probe"
+    ArtifactExperiment  ArtifactKind = "experiment"
+)
+```
+
+**收益：**
+
+- Execute/Verify/D4/D2 都直接 `import "internal/shared/types"`，零 import cycle
+- Plan/Artifact/Verdict/ReputationEvidence 全链路可序列化（用于 audit log 与跨 session 传递）
+
+### 7.4 LP-1 Bayesian Reputation 闭环（Phase 6）
+
+`buildObserveRequest` 通过 3 层 fail-safe 注入 AdaptivePrior 到 ObserveRequest：
+
+```go
+// internal/layers/sessionorchestrator/observe_request.go
+func (s *SessionOrchestrator) buildObserveRequest(ctx context.Context, sessionID string, msg InboundMessage) ObserveRequest {
+    // Layer 1: 从 ReputationStore 加载历史
+    prior := s.reputationStore.LoadLatest(sessionID)
+    // Layer 2: nil → DefaultDeveloperPrior Beta(5,3)
+    if prior == nil {
+        prior = DefaultDeveloperPrior()  // Beta(5,3)
+    }
+    // Layer 3: 仍 nil → Beta(1,1) uniform 兜底（不应触发，理论防御）
+    if prior == nil {
+        prior = NewUniformPrior()  // Beta(1,1)
+    }
+    return ObserveRequest{
+        SessionID:    sessionID,
+        Message:      msg,
+        AdaptivePrior: prior,
+    }
+}
+```
+
+**闭环效果：**
+
+```
+Round N: Observe(prior=Beta(5,3)) → Plan → Execute → Verify(verdict=PASS)
+                                                  ↓
+                                       Learn(BayesianUpdate → Beta(6,3))
+                                                  ↓
+Round N+1: Observe(prior=Beta(6,3)) ←────────────┘
+```
+
+每轮 Observe 的 prior 会随 ReputationEvidence 累积而调整，Devrix 越用越"懂"用户偏好。
+
+### 7.5 5 节点 vs PlanMode CLI 入口
+
+| 维度 | MUPS 5 节点管道 | `/plan` CLI 入口（PlanAgent）|
+|------|----------------|---------------------------|
+| 触发方式 | 自动（任意用户消息）| 显式（`/plan <goal>`）|
+| Plan 类型 | 4 类（Commitment / Protocol / Scenario / Exploration）| 1 类（PlanAgent 自由生成）|
+| 用户审批 | 无（自动执行 + Verify 兜底）| 有（`/plan approve` / `/plan reject`）|
+| 闭环 | LP-1 Bayesian Reputation | 无（一次性 Plan）|
+| 失败处理 | EscapeEngine 5 层 CircuitBreaker | PlanAgent 仅返回 PlanResult，不执行 |
+
+**两者并存：** PlanMode CLI 入口用于"用户主动规划"（如大型重构），MUPS 5 节点用于"用户日常对话"。MUPS 5 节点不经过 `/plan` CLI，PlanAgent 不参与 MUPS 流程。
+
+---
+
+## ⑧ v5 EscapeEngine（Phase v5，2026-06-25 落地）
+
+> MUPS 5 节点管道的兜底机制。当 Observe/Plan/Execute/Verify 任一节点 stall 或 error 超过阈值时，EscapeEngine 触发 5 层 CircuitBreaker；用户 `/resume` 后通过 3 决策路由恢复。
+
+### 8.1 5 层 CircuitBreaker
+
+| Level | 触发条件 | 行为 | ExitReason |
+|-------|---------|------|-----------|
+| L0 | 正常 | observe → plan → execute → verify → learn | （正常流程）|
+| L1 | 单节点 1 次 error | retry once | （重试后回到 L0）|
+| L2 | 单节点 3 次 error | 切换 fallback path | （fallback 后回到 L0）|
+| L3 | 跨节点 2 次 stall | 缩窄 plan 范围 | （缩窄后回到 L0）|
+| L4 | 跨节点 5 次 stall | pause + ask user | `paused`（待 `/resume`）|
+| L5 | 跨节点 10 次 stall | hard escape → abort + audit | `aborted` |
+
+### 8.2 3 决策路由（ResumeSession）
+
+```
+用户 /resume <choice>
+   │
+   ├─ continue         → A: fall through → 跳过 CircuitBreaker，续跑 Plan → resumed
+   ├─ accept-abort     → B: user_accept → 强制退出 → force_exited
+   └─ cancel           → C: user_cancel → AbortWithAudit → aborted
+```
+
+3 层 fail-safe 保证即使用户输入异常也能落到 3 决策之一：
+
+```go
+func (s *SessionOrchestrator) applyResumeSession(ctx context.Context, sessionID string, userChoice string) ResumeDecision {
+    // Layer 1: 解析 user_choice → 决策 A/B/C
+    decision := routeResumeDecision(userChoice)
+    if decision.IsValid() {
+        return decision
+    }
+    // Layer 2: fall through 兜底（默认 A 决策）
+    decision = DecisionA_FallThrough
+    if s.canResume(sessionID) {
+        return decision
+    }
+    // Layer 3: AbortWithAudit（默认 C 决策，写 audit log）
+    return DecisionC_AbortWithAudit(s.auditLog)
+}
+```
+
+### 8.3 sessionSpan 9 attributes（Phase 7 + V5.6）
+
+`D7_Orchestration_Session_Process` 父 span 注入：
+
+- **6 prior attributes（Phase 7, D7-S13-A49）：** `prior.adaptive_kind` / `prior.beta_alpha` / `prior.beta_beta` / `prior.evidence_count` / `prior.cycle_count` / `prior.last_update`
+- **3 resume attributes（V5.6, D7-S14-A52）：** `resume.decision` / `resume.circuit_level` / `resume.user_choice`
+
+D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子 span。
+
+---
+
+## ⑨ 关联文档
+
+- `d7-domain.md`：MUPS 5 节点管道 SoT + 6 S + 1 横切（v6.0.0，14 S 已精简）
+- `spec.md` / `t-registry.md`：180 T 层绑定
+- `a-registry.md` / `f-registry.md`：49 A + 68 F 登记（v6.0.0 6 S 精简：56 → 49 / 75 → 68）
+- `span-registry.md`：MUPS 5 节点 + 9 sessionSpan attributes + 5 新 P0/P1 ops（v6.0.0）
+- `terminal-state-guide.md`：14 ExitReason + Auto-Close 4 规则 + ResumeSession 3 决策路由 + §3 6 S 精简
+- `observability-guide.md`：5 节点 Trace 树 + P0 Runbook + Span↔T 6 S 归类
+- `task-planning-design.md`：MUPS Plan 节点专项设计（Phase 2 PR-B1）
+- `pipeline-architecture.md`：端到端调用链路总图
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-13 | 初版（详细架构设计） |
+| 2.0.0 | 2026-06-19 | v2.0 Structure（DM-20260619-005）：物理路径对齐 S 层；coordinator/hubspoke shim；WorkTree TD-WT-02/03 部分闭合 |
+| 3.0.0 | 2026-06-22 | DM-20260622-001 D7 Metrics & Concurrency Hardening 落地；markWaveDone 释放 state.cancels/handles（§6.5）|
+| 3.2.0 | 2026-06-24 | devrix-d7-dead-files-cleanup（DM-20260625-013..016, PR #214）：Task flat-view + TaskStore + conversion helpers + taskStoreAdapter 全删，WorkItem 唯一 canonical 模型 |
+| 3.3.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 落地（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）：§⑦ MUPS 5 节点管道 + §⑧ v5 EscapeEngine；§⑨ 关联文档指针更新；56 A + 75 F 登记；t-registry 66 → 180 |
+| **4.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：§⑦ MUPS 5 节点管道节标题加 `（v6.0.0 6 S 归类）`，5 节点关系图子节点 S 编号按 v6.0.0 重归类（Observe/Plan → S5，Execute/Learn → S6，Verify → S4，AutoClose/EscapeEngine入口 → S2）；§⑨ 关联文档指针更新为 6 S + 1 横切；新增 §Revision History 段；A/F 数量同步 v6.0.0 精简（56 → 49 / 75 → 68）。详细 A/S 重映射见 `a-registry.md §v6.0.0 6 S 精简映射` |

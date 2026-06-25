@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
@@ -85,6 +86,23 @@ func (d *TaskDecomposer) SynthesizeTaskGraph(ctx context.Context, sessionID, goa
 
 	// Validate the graph
 	validation := d.validateGraph(nodes)
+
+	// v6.0.0 6 S 精简 S5-A33 P1: emit taskgraph.synthesize Span so Jaeger
+	// captures the synthesised graph's shape (node_count / edge_count /
+	// dag_depth) and whether a cycle was detected. Emitted after validation
+	// so cycle_detected reflects the validated truth, not the raw input.
+	nodeCount := len(nodes)
+	edgeCount := 0
+	for _, n := range nodes {
+		edgeCount += len(n.DependsOn)
+	}
+	cycleDetected := hasCycle(nodes)
+	end := d7spans.EmitTaskGraphSynthesize(
+		ctx, sessionID,
+		nodeCount, edgeCount, dagDepth(nodes),
+		cycleDetected,
+	)
+	end(nil)
 
 	return &DecompositionResult{
 		Nodes:      nodes,
@@ -256,6 +274,67 @@ func hasCycle(nodes []wavescheduler.TaskNode) bool {
 	}
 
 	return false
+}
+
+// dagDepth returns the longest path length from any root node (no
+// DependsOn) to any descendant. Returns 0 for empty graphs and 1 for
+// single-node graphs. Used by the taskgraph.synthesize Span (S5-A33
+// P1) attribute taskgraph.dag_depth.
+//
+// Implements a topological-style longest-path BFS: nodes with no
+// DependsOn start at depth 1, each dependent node's depth is the max
+// of (1 + depth of its dependency). On cycles the function caps at
+// len(nodes) to avoid infinite recursion (cycle detection is a
+// separate signal — taskgraph.cycle_detected).
+func dagDepth(nodes []wavescheduler.TaskNode) int {
+	if len(nodes) == 0 {
+		return 0
+	}
+	nodeMap := make(map[string]wavescheduler.TaskNode, len(nodes))
+	for _, n := range nodes {
+		nodeMap[n.ID] = n
+	}
+
+	depth := make(map[string]int, len(nodes))
+	var depthOf func(id string, visited map[string]bool) int
+	depthOf = func(id string, visited map[string]bool) int {
+		if d, ok := depth[id]; ok {
+			return d
+		}
+		if visited[id] {
+			// Cycle: return 0 so the cap at len(nodes) prevents runaway.
+			return 0
+		}
+		visited[id] = true
+		node, ok := nodeMap[id]
+		if !ok || len(node.DependsOn) == 0 {
+			depth[id] = 1
+			return 1
+		}
+		max := 0
+		for _, dep := range node.DependsOn {
+			d := depthOf(dep, visited)
+			if d > max {
+				max = d
+			}
+		}
+		depth[id] = max + 1
+		return depth[id]
+	}
+
+	maxDepth := 0
+	for _, n := range nodes {
+		d := depthOf(n.ID, make(map[string]bool))
+		if d > maxDepth {
+			maxDepth = d
+		}
+	}
+	// Cap at len(nodes) — on cycles maxDepth can under-report; the
+	// cycle_detected Span attribute carries the truth.
+	if maxDepth > len(nodes) {
+		maxDepth = len(nodes)
+	}
+	return maxDepth
 }
 
 // truncateTitle truncates a title to a reasonable length.

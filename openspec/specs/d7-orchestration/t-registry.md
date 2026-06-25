@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.18.0
-**Last Updated:** 2026-06-25
+**Version:** 4.0.0
+**Last Updated:** 2026-06-26
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -501,6 +501,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **3.4.0** | **2026-06-19** | **devrix-d7-v2-structure (DM-20260619-005)**：T ID 不变（66/66 IMPLEMENTED）；测试文件随实现迁移 |
 | **3.17.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine (DM-20260625-003) V5.1..V5.5 归档 (17 IMPLEMENTED + 1 PARTIAL)**：D7-S14-A50 +18 T 点（T01 LoopContext 7 字段 + T02 LoopDepthTracker ForceExit 边界 + T03 PlanKindSwitchPolicy 3 档 + T04 EscapeAction 6 类 + T05 LLM/Rule/Human 3 层仲裁 + T06 Notifier + PendingResolutionStore + T07 EscapeEngine 整合 + T08 LoopBudget + T09 CircuitBreaker 5 层 + T10 EscapeAuditLog + T11 Orchestrator 5 节点接线 + T12 ResumeSession ⚠️PARTIAL + T13 buildLoopContext + T14..T18 L4/L3/L2/L1/gap 测试）。IMPLEMENTED 168→184, P0 135→153, PARTIAL 1→2, Scenarios D7-S14 0→1。S4-Gate review 修复: C-1 processEscapeDecision 返回 augmented error 避免静默吞错 (signature `bool` → `(bool, error)`)。T12 PARTIAL 原因: V5.5 仅完成 V5.3 HumanArbitrator.ResumeSession 存储层，SessionOrchestrator.ProcessMessage 入口 applyResumeSession + runLoopWithResume 留待 PR-V5.6。V5.4 修复: Engine 决策合并逻辑 0/1/2+ 信号分层 (0→Continue / 1→直接返回硬信号 / 2+→ChainedArbitrator)。V5.5 落地 3 接线点 (1a Plan 失败 / 1b Plan 前 / 2 Execute 失败；3 Verify 失败 待 processAutoClose 暴露 verdict 后接入) + 8 wiring 单元测试 + 5 集成测试 100% PASS。详见 `openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine/specs/d7-orchestration/spec.md` §D7-S14-A50。 |
 | **3.18.0** | **2026-06-25** | **devrix-d7-mups-v5-escape-engine-v5-6 (DM-20260625-003) PR-V5.6 T12 PARTIAL→IMPLEMENTED**：(D7-S14-A50-T12 IMPLEMENTED。SessionOrchestrator.applyResumeSession 实现 + 3 层 fail-safe (nil engine / ResumeSession error / TTL expired) + 3 决策路由 (A user_continue fall through / B user_accept→ForceExit 短路 emit "complete" / C user_cancel→AbortWithAudit 短路 emit "complete") + 3 sessionSpan attrs (escape.resume.attempted / decision_action / decision_pending_id) + resumeContentForDecision helper (6 类 EscapeAction → 中文 text) + 6 单元测试 (NoEngine / NoPending / UserAccept / UserCancel / UserContinue / ResumeError_Failsafe) + 2 集成测试 (TestProcessMessage_WithResume_UserAccept_EarlyClose / UserCancel_EarlyClose) 8/8 PASS 含 race + 3/3 稳定性验证。spec.md v4.9.0 → v4.10.0 + 域 t-registry v3.17.0 → v3.18.0 同步。IMPLEMENTED 184→186, PARTIAL 2→0, Scenarios D7-S11 T13 PARTIAL→0 + D7-S14 T12 PARTIAL→0, 总 PARTIAL 2→0, 总 18/18 IMPLEMENTED 0 PARTIAL。runLoopWithResume 在 V5.6 实现中被简化合并到 EscapeContinue fall through 路径, 不需要独立 wrapper 函数; LoopDepthTracker 自动保证 depth 续 T1 状态。详见 `openspec/archive/2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6/specs/d7-orchestration/spec.md` §D7-S14-A50。**v3.18.0 review fix (DM-20260625-004)**：C-1 t-registry 删除 `runLoopWithResume` 描述 (代码 0 命中) + C-2 Statistics 表 4 处数字刷新 + v3.18.0 条目追加 (本条)。 |
+| **4.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：14 S → **6 S + 1 横切** 重归类（S 编号变化，T ID 保持稳定以便追溯）；A 活动 **56 → 49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）；F 层按新 S 重归类（F 总数 75 → 68，Legacy 41 + Canonical 27）；MUPS 5 节点挂载：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2；7 Legacy A 全部并入 Canonical；版本号 v3.18.0 → v4.0.0（minor 升 major，反映 14 S → 6 S 精简是结构性变更）。详细 A/T 重映射见 `a-registry.md §v6.0.0 6 S 精简映射` + `span-registry.md §Operations`（v6.0.0 已落地 23 ops + 9 sessionSpan attributes）|
 
 ---
 
