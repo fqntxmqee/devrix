@@ -1,0 +1,145 @@
+id: devrix-d7-6s-package-merge
+demand_id: DM-20260626-004
+title: "D7 turn/ 包合并到 sessionorchestrator/ (v6.0.0 follow-up #3 落地)"
+status: s2_proposal
+priority: P1
+created: 2026-06-26
+author: D7 编排层 turn/ 物理包迁移梳理
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S2-A50
+    name: SessionOrchestrator 物理包扩展 (turn/ + autoclose → sessionorchestrator/)
+    description: |
+      v6.0.0 follow-up #3 (6s-package-merge)。把 D7 编排层中独立存在的 `turn/` 子包
+      (25 .go, 6467 行, 包含 DefaultOrchestrator + RunTurn 主循环 + 11 个核心 type + 6 个核心函数)
+      物理合并到 `sessionorchestrator/` 包。`sessionorchestrator/autoclose.go` 已在 #1 落地。
+      物理合并后 sessionorchestrator/ 包扩展到 ~60 文件 ~15000 行，对应 S2 SessionOrchestrator
+      (Mediator + Turn Leader + Error Recovery) 复合博弈角色。
+      exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go
+      (97 行) 临时随 turn/ 迁入 sessionorchestrator/，由后续 follow-up #4
+      (devrix-d7-6s-verify-promotion) 从 sessionorchestrator/ promote 到 executionflow/verify/。
+      hardening/recovery.go 已是 receiver methods 子集 (4 纯函数 + 1 const 已迁 hardening/)，
+      迁 sessionorchestrator/ 时 hardening/ 调用 0 变化。
+    rationale: |
+      v6.0.0 域升级 follow-up 序列的物理包收口（#1 spec + #2 mups + #3 hardening + 本次 turn 合并）。
+      S2 SessionOrchestrator = Mediator + Turn Leader + Error Recovery 是单一博弈角色，
+      但代码侧 turn/ 子包独立存在导致：
+      (a) 目录命名与博弈角色不对齐；
+      (b) turn_tools.go 已在 sessionorchestrator/，但 turn/orchestrator.go 还在 turn/，
+          导致 sessionorchestrator/ 包内部职责不完整；
+      (c) bootstrap wire_coordinator.go 中需分别 wire turn.NewOrchestrator 与
+          sessionorchestrator.NewSessionOrchestrator 两个独立包，未来 6 S 全部落地后
+          还需要再做一次 wire 收敛；
+      (d) turn/ 11 个核心 type 跨包调用频繁（12 个 importer），打破 S2 单包封装。
+      物理合并后 S2 单包封装恢复，#6 (devrix-d7-6s-bootstrap-slim) 14 wire → 6 wire
+      的前置条件 #4 完成。
+
+# 测试点（本次 PR 实际实现 4 个）
+test_points:
+  - id: D7-S2-A50-T01
+    name: |
+      `internal/layers/orchestration/turn/` 目录物理消失（25 个 .go 文件全部
+      git mv 至 `internal/layers/orchestration/sessionorchestrator/`）。
+    status: PLANNED
+  - id: D7-S2-A50-T02
+    name: |
+      sessionorchestrator/ 包扩展至 ~60 文件 ~15000 行（35 原文件 + 25 turn 迁移），
+      `package sessionorchestrator` 声明一致；turn.X 与 sessionorchestrator.X 无
+      同名冲突（type/func 名全部保留原样，DefaultOrchestrator / SessionOrchestrator
+      不同 type，OrchestratorOption 同名问题通过 design.md Decision 2 解决）。
+    status: PLANNED
+  - id: D7-S2-A50-T03
+    name: |
+      全仓 `grep -rln "orchestration/turn\""` 0 命中（12 个 importer 全部更新）；
+      `grep -rln "turn\.NewOrchestrator\|turn\.DefaultOrchestrator\|turn\.SubTurnRunner"`
+      等 11 个核心 type/func 跨包调用全部改为 `sessionorchestrator.X`。
+    status: PLANNED
+  - id: D7-S2-A50-T04
+    name: |
+      `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test
+      ./internal/layers/orchestration/... -race -count=1` 23/23 包全部 PASS
+      （与 hardening 落地后 baseline 持平，含 sessionorchestrator/ 扩展后 60 文件）。
+      LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session
+      traceability) 路径 0 变化。
+    status: PLANNED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/turn/ → internal/layers/orchestration/sessionorchestrator/ (25 .go git mv)
+  - internal/layers/orchestration/sessionorchestrator/turn_tools.go + turn_tools_test.go (MODIFY: 内部 turn.X → sessionorchestrator.X 引用更新)
+  - internal/bootstrap/wire_coordinator.go + turn_wiring.go + turn_adapter.go + 4 test files + context_engine.go + context_engine_builder.go + plan_llm_completer.go (10 bootstrap 文件 MODIFY: import path)
+  - internal/layers/orchestration/decisionplanning/llm_decomposer.go + llm_decomposer_test.go (MODIFY: import path)
+  - openspec/specs/d7-orchestration/d7-domain.md v2.1.0 → v2.2.0 §① S2 SessionOrchestrator 章节包路径描述更新
+  - openspec/specs/d7-orchestration/design.md v4.1.0 → v4.2.0 §① S2 SessionOrchestrator 包路径描述更新
+  - openspec/specs/d7-orchestration/t-registry.md v4.3.0 → v4.4.0 (新增 D7-S2-A50-T01..T04)
+  - openspec/t-registry.md (root) v5.3.0 → v5.4.0 (新增 DM-20260626-004 增量条目)
+
+out_of_scope:
+  - exit_reason.go + verdict_to_exit_reason.go + verdict_to_exit_reason_test.go 从 sessionorchestrator/ promote 到 executionflow/verify/：待 follow-up #4 (devrix-d7-6s-verify-promotion / DM-20260626-005) 单独处理
+  - observe/orchtypes → decisionplanning/ 合并：待 follow-up #5 (devrix-d7-6s-observe-merge / DM-20260626-006)
+  - bootstrap wire 14 → 6 收敛：待 follow-up #6 (devrix-d7-6s-bootstrap-slim / DM-20260626-007) 依赖 #4+#5+#6 完成
+  - hardening/ 横切包 0 变化：receiver methods 现在随 turn/ 迁入 sessionorchestrator/，但调用 hardening.IsContextLengthError 不变
+  - escape/circuit_breaker.go 不动 (V5 EscapeEngine 核心机制)
+  - autoclose.go 不动 (已在 sessionorchestrator/)
+  - D7 14 S → 6 S 文档语义保持不变
+  - 5 个新 P0/P1 Span emit 路径 0 变化
+  - multiagent/ 域不动 (不同域不同职责)
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-main
+    scope: "turn/ 整包 git mv 到 sessionorchestrator/ + package 改名 + 12 importer import path 替换 + build/vet/race 全绿 + LP-1/2/5 兼容"
+    files: ~50 (25 git mv + 12 importer + 4 doc + .openspec.yaml)
+    estimated_loc: +6467 (turn/ 整体) + ~50 (importer import 替换) + ~80 (4 doc 同步) - 0 (turn/ 删除被 git mv 抵消)
+    risk: Medium
+    branches:
+      - feat/devrix-d7-6s-package-merge (from master)
+    pr_url: TBD
+
+# 关联
+related_changes:
+  - devrix-d7-six-s-simplification  # #1 v6.0.0 域升级 spec 层 14 S → 6 S
+  - devrix-d7-mups-package-migration  # #1.5 execute/ + learn/ → mups/
+  - devrix-d7-hardening-cross-cutting  # #2 hardening/ 横切包物理落地
+
+# 后续 follow-up
+followup_changes:
+  - devrix-d7-6s-verify-promotion  # #4 exit_reason + verdict_to_exit_reason 从 sessionorchestrator/ promote 到 executionflow/verify/
+  - devrix-d7-6s-observe-merge  # #5 observe/orchtypes → decisionplanning/
+  - devrix-d7-6s-bootstrap-slim  # #6 wire 14 → 6（依赖 #4+#5+#6 完成）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-mups-package-migration-s7-archived.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-hardening-cross-cutting-s7-archived.md
+  - openspec/archive/2026-06-26-devrix-d7-mups-package-migration/  # #2 模板
+  - openspec/archive/2026-06-26-devrix-d7-hardening-cross-cutting/  # #3 模板
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v2.1.0
+  - openspec/specs/d7-orchestration/design.md  # D7 设计文档 v4.1.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v4.3.0
+
+# 验证
+verification:
+  s3_gate:
+    - 用户确认 design.md Decision 1 (turn/ 整体迁移, 不拆 exit_reason) + Decision 2 (OrchestratorOption 同名冲突解决) + Decision 3 (type 名不改)
+  s4_gate:
+    - go vet ./...  # 0 warnings
+    - go build ./...  # 0 errors
+    - go test ./internal/layers/orchestration/... -race -count=1  # 23/23 PASS
+    - LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session traceability) 集成测试 100% 兼容
+    - escape/circuit_breaker.go 0 变化 (git diff 空, hardening 落地后 baseline)
+    - hardening/ 0 变化 (receiver methods 调用 hardening 不变)
+    - sessionorchestrator/autoclose.go 0 变化 (已在 sessionorchestrator/)
+  s5_gate:
+    - 4 个 P0 T 点 (D7-S2-A50-T01..T04) 全部 IMPLEMENTED
+    - acceptance-report.md §1-§10 全部 13 AC 验收
+    - 0 race detector warnings
+    - 覆盖率 ≥ baseline (hardening 落地后 80%)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-6s-package-merge  # 12/12 PASS
