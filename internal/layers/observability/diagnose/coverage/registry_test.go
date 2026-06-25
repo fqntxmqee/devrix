@@ -126,6 +126,8 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD7_S5_TaskGraph_Synthesize,
 		telemetry.OpD7_S6_Channel_Route,
 		telemetry.OpD7_S6_Memory_Persist,
+		// D7 5 节点 pipeline root span (D7-S6)
+		telemetry.OpD7_S6_MUPS_Pipeline,
 
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,

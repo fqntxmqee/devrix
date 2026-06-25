@@ -38,5 +38,10 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D7_TaskGraph_Synthesize", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D7_Channel_Route", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D7_Memory_Persist", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+
+		// v6.0.0 5 节点 pipeline root span (D7-S6). Parent of the 4 sync 5-node spans.
+		// Started in OrchestratePath.Run; async Learn node (memory.persist) is associated
+		// by sessionID rather than trace tree.
+		{Name: "D7_MUPS_Pipeline", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
 	}
 }
