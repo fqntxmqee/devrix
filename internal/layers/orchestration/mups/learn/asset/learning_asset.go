@@ -6,7 +6,7 @@
 //
 // Promoted from doc 46 (D7 Learn 节点详细技术方案 2026-06-22) as Phase 5 of
 // devrix-d7-mups-v4-phase5-learn (DM-20260623-003).
-package learn
+package asset
 
 import (
 	"crypto/sha256"
@@ -39,11 +39,11 @@ var (
 	// could not be translated into a LearningAsset).
 	ErrAssetBuildFailed = errors.New("learn: failed to build asset from verdict")
 
-	// ErrReputationStoreUnavailable — ReputationStore IO failure.
-	ErrReputationStoreUnavailable = errors.New("learn: reputation store unavailable")
+	// ErrReputationStoreUnavailable moved to mups/learn/reputation/evidence.go
+	// (v6.0.0 subpackage split; logically belongs to ReputationStore).
 
-	// ErrAdaptivePriorNotReady — AdaptivePrior not ready (cold start).
-	ErrAdaptivePriorNotReady = errors.New("learn: adaptive prior not ready (cold start)")
+	// ErrAdaptivePriorNotReady moved to mups/learn/prior/adaptive_prior.go
+	// (v6.0.0 subpackage split; logically belongs to AdaptivePrior).
 
 	// ErrScheduledRetryExhausted — ScheduledMemory entry exceeded MaxRetries.
 	ErrScheduledRetryExhausted = errors.New("learn: scheduled retry exhausted")
@@ -109,6 +109,13 @@ const CurrentAssetSchemaVersion = "1.0.0"
 
 // DefaultAssetTTL is the default LearningAsset TTL (LP-4 衍生).
 const DefaultAssetTTL = 24 * time.Hour
+
+// DefaultPendingMaxRetries is the default MaxRetries for PendingAssetContent
+// (LP-4 衍生: matches PendingAssetContent.Validate upper bound). Owned by
+// asset (PendingAssetContent semantics); memory.ScheduledMemory and
+// AssetBuilder.buildPendingContent both consume this constant so the value
+// stays single-sourced here.
+const DefaultPendingMaxRetries = 3
 
 // LearningAsset is the unified output entity of the Learn node (immutable).
 // Construct via NewLearningAsset; do not mutate fields after creation (LP-1-5

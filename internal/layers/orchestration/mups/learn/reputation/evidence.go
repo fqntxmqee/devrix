@@ -1,6 +1,7 @@
-package learn
+package reputation
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -19,6 +20,11 @@ const (
 	// TrackModeOperator — strongly positive prior (Beta(8,1)).
 	TrackModeOperator TrackMode = "operator"
 )
+
+// ErrReputationStoreUnavailable — ReputationStore IO failure.
+// Moved from mups/learn/asset/learning_asset.go in v6.0.0 subpackage split
+// (logically belongs to ReputationStore, not Asset).
+var ErrReputationStoreUnavailable = errors.New("learn: reputation store unavailable")
 
 // ParseTrackMode parses a wire-format track mode string.
 func ParseTrackMode(s string) (TrackMode, error) {

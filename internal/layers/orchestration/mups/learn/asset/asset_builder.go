@@ -14,7 +14,7 @@
 //
 // All constructors are pure (no side effects) so AssetBuilder is trivially
 // testable. NewLearningAsset enforces fail-fast validation (LP-4 衍生).
-package learn
+package asset
 
 import (
 	"context"
@@ -249,7 +249,7 @@ func buildPendingContent(req LearnRequest) (*PendingAssetContent, string, error)
 		IndeterminateReason: reason,
 		OriginalArtifactID:  originalArtifactID,
 		RetryAttempts:       0,
-		MaxRetries:          DefaultScheduledMaxRetries,
+		MaxRetries:          DefaultPendingMaxRetries,
 		NextRetryAt:         time.Now().Add(5 * time.Minute),
 		PlanID:              planID,
 		SessionID:           req.SessionID,
@@ -391,6 +391,14 @@ func classFromVerdictKind(kind types.VerdictKind, reason string) LearningClass {
 	default:
 		return LearningClass(types.LearningUnknown)
 	}
+}
+
+// ClassFromVerdictKind is the public version of classFromVerdictKind. The
+// learn.DefaultLearner needs to pre-compute the routing class before calling
+// AssetBuilder.Build (to short-circuit unknown kinds early). Keeping the
+// public version here avoids duplicating the switch in two packages.
+func ClassFromVerdictKind(kind types.VerdictKind, reason string) LearningClass {
+	return classFromVerdictKind(kind, reason)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

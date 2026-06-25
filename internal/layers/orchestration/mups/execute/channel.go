@@ -56,10 +56,10 @@ type ToolRequest struct {
 // free-fork) and returns an Artifact consumable by Phase 4 Verify.
 //
 // Implementations:
-//   - CommitChannel      (channel_commit.go): synchronous 1-Step direct tool call
-//   - ProtocolChannel    (channel_protocol.go): sequential multi-Step with rollback
-//   - ScenarioChannel    (channel_scenario.go): parallel probes with majority vote
-//   - ExplorationChannel (channel_exploration.go): multi-agent free-fork
+//   - CommitChannel      (commit.go): synchronous 1-Step direct tool call
+//   - ProtocolChannel    (protocol.go): sequential multi-Step with rollback
+//   - ScenarioChannel    (scenario.go): parallel probes with majority vote
+//   - ExplorationChannel (exploration.go): multi-agent free-fork
 //
 // All channels return *wavescheduler.Artifact (the PR-C1 4-class output)
 // plus a non-nil error if anything failed. Partial completion is reported

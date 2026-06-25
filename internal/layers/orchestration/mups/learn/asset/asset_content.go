@@ -1,4 +1,4 @@
-package learn
+package asset
 
 import (
 	"errors"
