@@ -1,7 +1,7 @@
 change_id: devrix-d7-mups-package-migration
 priority: P1
 demand_id: DM-20260626-002
-status: s5_acceptance
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S6  # MUPS Pipeline
