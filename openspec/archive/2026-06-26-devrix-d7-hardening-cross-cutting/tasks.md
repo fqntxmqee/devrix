@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-hardening-cross-cutting`
 **Demand ID:** DM-20260626-003
-**Status:** S3_Design
+**Status:** S5_Accepted → S7_Archived
 **Sprint:** d7-v6 follow-up
 **PR Count:** 1
 **前置:** devrix-d7-six-s-simplification (DM-20260626-001) S7_Archived + devrix-d7-mups-package-migration (DM-20260626-002) S7_Archived
