@@ -122,6 +122,18 @@ const (
 	OpD7_S1_Task_Manager_Create = "D7_Task_Manager_Create"
 	OpD7_S1_Task_Manager_Update = "D7_Task_Manager_Update"
 
+	// D7 Orchestration - 6 S 精简 v6.0.0 新增 5 个 P0/P1 Span ops (2026-06-26)
+	// D7-S3 WaveScheduler (executor.select P1)
+	OpD7_S3_Executor_Select = "D7_Executor_Select"
+	// D7-S4 ExecutionFlow + Verify (system.anomaly_detect P0)
+	OpD7_S4_System_Anomaly_Detect = "D7_System_Anomaly_Detect"
+	// D7-S5 DecisionPlanning + Observe (taskgraph.synthesize P1)
+	OpD7_S5_TaskGraph_Synthesize = "D7_TaskGraph_Synthesize"
+	// D7-S6 MUPS Pipeline (channel.route P0)
+	OpD7_S6_Channel_Route = "D7_Channel_Route"
+	// D7-S6 MUPS Pipeline (memory.persist P0)
+	OpD7_S6_Memory_Persist = "D7_Memory_Persist"
+
 	// D6 Evolution - Runtime Validation (D6-S4)
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
 )
@@ -172,6 +184,13 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerOrchestration, "orchestrator"
 	case strings.HasPrefix(operation, "D7_Task_Manager_"):
 		return LayerOrchestration, "task_manager"
+	case strings.HasPrefix(operation, "D7_Executor_Select"),
+		strings.HasPrefix(operation, "D7_System_Anomaly_Detect"),
+		strings.HasPrefix(operation, "D7_TaskGraph_Synthesize"),
+		strings.HasPrefix(operation, "D7_Channel_Route"),
+		strings.HasPrefix(operation, "D7_Memory_Persist"):
+		// v6.0.0 6 S 精简新增 5 ops (channel.kind / memory / system / taskgraph / executor)
+		return LayerOrchestration, "orchestrator"
 
 	// D6 Evolution
 	case strings.HasPrefix(operation, "D6_Validation_"):

@@ -8,9 +8,9 @@
 **Change ID:** devrix-d7-orchestration-domain
 **Demand ID:** DM-20260613-001
 **Layer:** 7 (Orchestration Domain)
-**Version:** 2.11.0
-**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE + D7-S5 LLM Decomposer (S5-A03 v1.1) ✅ DONE + **v2.0 Structure (DM-20260619-005)**
-**Last Updated:** 2026-06-19
+**Version:** 2.12.0
+**Status:** Active — IMPLEMENTED (S1/S2/S3/S4/S5) + D7 Turn Leader (DM-020) + Hub-Spoke SoT (DM-018) + D2 Loop 瘦身 ✅ DONE + D1→D7-only ingress (DM-20260614-007) ✅ DONE + D7-S5 LLM Decomposer (S5-A03 v1.1) ✅ DONE + **v2.0 Structure (DM-20260619-005)** + **MUPS v4.3 5 节点管道 + v5 EscapeEngine (2026-06-25)**
+**Last Updated:** 2026-06-25
 **Implementation Audit:** `layer-delta.md`
 **Demand:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
@@ -68,7 +68,7 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | **D7-S5 LLM Decomposer (S5-A03 v1.1)** | ✅ IMPLEMENTED | `decisionplanning/llm_decomposer.go::LLMDecomposer` + `sessionorchestrator.WithLLMDecomposer` + `bootstrap/wire_coordinator.go::WireD7` |
 
 **域边界**：
-- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**Task/Plan 写模型（D7-S1, DM-20260614-009 v1.1 closure）**
+- D7 **拥有**：WorkPlan 读模型（D7-S4）、Wave DAG 调度（D7-S3）、**LLM 调用权（DM-020）**、**Hub-Spoke 编排权（DM-018）**、**Turn 主循环（D7-S2-A06 RunTurnLoop）**、**LLM 调用执行（D7-S2-A07 InvokeLLM）**、**WorkItem 写模型（D7-S1, DM-20260614-009 v1.1 closure + v4.3 post-cleanup Task flat-view 删除）**
 - D7 **编排**：D2（Context Follower — PrepareContext / ToolRound / PersistTurn）、D4（Execution Follower）
 - D7 **直调**：D3（ILLMGateway via bridges/llm，替代 D2→D3 旧路径）
 - D7 **不拥有**：会话上下文（**D2-S15–S17**）、agent 生命周期（D4）
@@ -147,7 +147,7 @@ v1.0 不强制非法转换拒绝；v1.1 引入 `TransitionTaskState` 校验（D7
 | 路由 | 条件 | 调度者 | 执行者 |
 |------|------|--------|--------|
 | FastPath | ClassifyIntent=simple, confidence≥threshold | D7-S2 | D7 RunTurn |
-| CommandPath | `/plan` `/task` `/stop` 等 | D7-S2（command-first，优先于 Classify） | 各命令处理器 |
+| CommandPath | `/plan` `/worktree` `/stop` 等 | D7-S2（command-first，优先于 Classify） | 各命令处理器 |
 | PlanPath | PlanMode active 或用户 `/plan` | D7-S2 → S5-P1 | PlanAgent → approve → PlanTask |
 | SerialExplore | orchestrate + 单步 explore/plan | D7-S2 串行 | D7 RunTurn（只读工具） |
 | WaveExecute | orchestrate + 多 Worker 并行 | **D7-S3** WaveScheduler | D2/D4 via runners |
@@ -319,7 +319,7 @@ D7-S2-A01 ProcessMessage MUST replace D1→D2.Process as the primary request ent
 
 #### Scenario: Command-first routing takes precedence
 
-- GIVEN a user message starting with `/plan`, `/task`, or `/stop`
+- GIVEN a user message starting with `/plan`, `/worktree`, or `/stop`
 - WHEN D7-S2-A01 ProcessMessage runs
 - THEN command handler is invoked before ClassifyIntent
 - AND LLM classification is NOT invoked for routing (D7-S5-T06)
@@ -687,6 +687,8 @@ orchestration:
 | D7-S2 Orchestrator | 0 | 7 | 7 |
 | 契约/瘦身/迁移 | 0 | 6 | 4 |
 
+> **MUPS v4.3 5 节点管道 + v5 EscapeEngine 增量（2026-06-25）：** 上述统计为 v2.x 历史 snapshot。最新统计（含 MUPS 5 节点 + 横切）见 `d7-domain.md` §登记规模：56 A / 75 F / 180 T / 18 Span ops，14 S 层全部 IMPLEMENTED。
+
 ---
 
 ## Revision History
@@ -705,3 +707,5 @@ orchestration:
 | 2.8.0 | 2026-06-15 | **P4 死代码清理（撤回）**：原计划删除 `internal/layers/orchestration/milestone/`（967 行），但发现 `cmd/devrix/main.go:125` → `initOrchestration` → `guard.NewInterventionExecutor(gw, milestoneSvc, agentFactory)` 实际消费 `*MilestoneService`（实现 `TaskController` 接口：line 79 `ie.tasks.Fail`、line 105 `ie.tasks.Fail`），用于 D6 干预执行；该包非死代码，是 D6↔D7 集成锚点。后续若 D6 改用 D7-S1 TaskManager 替代可再清理；spec 不变 |
 | 2.9.0 | 2026-06-15 | **D2 Loop 瘦身闭环（DM-020 拆面）**：`query/loop.go` 267→239 行；删除 `LoopHooks` struct + `Hooks` / `Attachments` / `SessionQueue` 4 字段 + 4 call sites（BeforeComplete / AfterToolRound / Collect / Drain）；per-turn attachment 采集与 Hub-Spoke drain 迁至 D2 Prepare（`engine.runProcess`），EngineDeps.SessionCommandQueue 通过 `contracts.SessionCommandQueue` 接口注入（避免 D2→D7 直接 import，d2_thin_test 守护）；reflection 守卫 `TestQueryLoop_ForbidsOrchestrationFields` + `TestQueryLoop_ForbidsLegacyHookSubFields` 防字段回插；实现状态表 D2 Loop 瘦身 cell 改 🔶 IN PROGRESS → ✅ IMPLEMENTED |
 | 2.10.0 | 2026-06-15 | **D7-S5 LLM Decomposer (S5-A03 v1.1) 闭环**：`orchestration/coordinator/llm_decomposer.go`（新增，~225 行）实现 `LLMDecomposer.Decompose` — LLM JSON DAG 解析 + enum coercion（未知 `worker_type` / `context_policy` 默认到 `cursor` / `fresh`）+ unknown-dep drop + 5s 超时回退到 rule-based `decomposeGoal`；通过 `coordinator.WithLLMDecomposer` 选项 + `bootstrap/wire_coordinator.go::WireD7` 注入（复用 leader path 同一 `GatewayInvoker`）；7 T 覆盖（`llm_decomposer_test.go`：T01 happy path、T02 bad JSON、T03 enum coercion、T04 unknown deps drop、T05 extractJSON 6 case、T06 nil-LLM 守卫、T07 SynthesizeTaskGraph 路由）；D7-S5 Implementation Status cell 改 🔶 PARTIAL → ✅ IMPLEMENTED；D7-S2-A07（InvokeLLM）兼作 S5 LLM Decomposer LLM 入口 |
+| 2.11.0 | 2026-06-19 | **v2.0 Structure（DM-20260619-005）**：物理路径与 S 层 1:1 对齐；coordinator/hubspoke 1-release shim；orchtypes 共享类型；Task 写模型完全迁入 D7-S1 workmodel/ |
+| **2.12.0** | **2026-06-25** | **MUPS v4.3 5 节点管道 + v5 EscapeEngine 落地**：14 S 层（D7-S1~S14）全部 IMPLEMENTED。新增 D7-S7 Pipeline Coordinator + D7-S8 Observe（D7-S8-A15 4 类 Observation + UncertaintyReport + UncertaintyCoord Phase 2 PR-A1/PR-RF）+ D7-S9 Execute（D7-S9-A25/A26 4 Artifact + 4 Channel + 跨域类型上提 shared/types Phase 3 PR-C1/PR-C2）+ D7-S10 Verify（D7-S10-A32..A35 4 态 Verdict + 14 ExitReason Phase 4）+ D7-S11 Learn（D7-S11-A36..A40 Bayesian Beta 更新 Phase 5）+ D7-S12 Observe-Learner 跨域闭环（LP-1 + 3 层 fail-safe Phase 6）+ D7-S13 Verify Auto-Close（4 规则 + sessionSpan 6 prior attributes Phase 7）+ D7-S14 EscapeEngine（5 层 CircuitBreaker L0..L5 + ResumeSession 3 决策路由 + sessionSpan 3 resume attributes Phase v5）。t-registry 66 → 180（v4.9.0 闭环）；Span 9 → 18 ops；sessionSpan 9 attributes（6 prior + 3 resume）。跨域类型上提（PR-C1）：`Artifact` 共享类型在 `internal/shared/types/` 引入，打破 import cycle。详见 `d7-domain.md` §MUPS 5 节点管道。 |

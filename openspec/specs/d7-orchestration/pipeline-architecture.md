@@ -3,12 +3,21 @@
 **文档类型:** 运行时序 + 调用链路（pipeline architecture & call-chain reference）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Active
-**Last Updated:** 2026-06-25
+**Last Updated:** 2026-06-25 (post-cleanup PR #214)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`（DSAFT 规范 SoT）
 **领域 SoT:** `openspec/specs/d7-orchestration/d7-domain.md`（North Star / Out of Scope）
 **详细设计:** `openspec/specs/d7-orchestration/design.md`（六段式架构设计）
+**理想态蓝图:** `openspec/specs/d7-orchestration/call-chain-v4.3.md`（端到端 ASCII 全图 + 不变量验证清单）
+
+> **v1.1.0 更新（2026-06-25，PR #214 squash-merged）**：
+> - **D7-S1 重命名**：Task/Plan 数据模型 → **WorkItem** 数据模型（canonical 单一来源）
+> - **§6.3 代码路径**与 `internal/layers/orchestration/` 物理结构 1:1 对齐
+> - **§3 IntentCommand 分支**：`/task` CLI 已并入 `/worktree` workmodel 统一接口
+> - **新增 §7 清理变更日志**：devrix-d7-dead-files-cleanup (DM-20260625-016) + DM-20260625-013..015 10 项 DM
+> - **新增 §8 验证清单**：5/5 节点 entry func / 不可变 / 血缘 / 14 ExitReason / 4 VerdictKind 等强保证
+
 **Change IDs:**
 - devrix-d7-mups-v4-phase1-foundation (DM-20260620-001) — Phase 1 Foundation + 3 项不变式
 - devrix-d7-mups-v4-phase2-observe-plan (DM-20260623-001) — Phase 2 PR-A1 + PR-RF (D7-S8)
@@ -19,6 +28,7 @@
 - devrix-d7-mups-v4-phase5-learn (DM-20260623-003) — Phase 5 (D7-S11)
 - devrix-d7-mups-v4-phase6-observe-learner-wiring (DM-20260624-001) — Phase 6 (D7-S12 LP-1 wiring)
 - devrix-d7-mups-v4-phase7-verify-auto-close (DM-20260625-001) — Phase 7 (D7-S13 Auto-Close)
+- devrix-d7-dead-files-cleanup (DM-20260625-013..016) — 10 项 D7 清理 + 3 commits squash-merged PR #214
 
 > **本文档定位：** D7 编排域运行时序与调用链路的**单一权威图谱**。spec.md 各 Scenario 章节是局部契约，本文件是端到端总图。MUPS v4 全部 7 个 Phase 完成后的全景视图。
 
@@ -108,7 +118,7 @@ D7 域共 **13 个 S 场景**（S1-S6 + S8-S13，S7 留空 N/A），按"5 节点
 
 | S 场景 | 名称 | 职责 | 状态 | 节点归属 |
 |--------|------|------|------|----------|
-| D7-S1 | Work Model | Task/Plan 数据模型 + 磁盘持久化 + PlanMode 状态机 | IMPLEMENTED (v1.0) | 基础 |
+| D7-S1 | Work Model | **WorkItem** 数据模型 + WorkTree 持久化 + PlanMode 状态机 | IMPLEMENTED (v1.0+post-cleanup v1.1) | 基础 |
 | D7-S2 | Session Orchestrator | ProcessMessage 入口 + Turn 主循环 + 4 IntentKind 正交分发 | IMPLEMENTED (v1.0) | 基础 |
 | D7-S3 | Wave Scheduler | TaskGraph DAG + 5-slot WorkerPool + ConflictGuard + ContextPolicy | IMPLEMENTED (v1.1) | 基础 |
 | D7-S4 | Execution Flow | Hub 双通道（WorkPlan + SessionQueue + IM）+ SpokeBridge | IMPLEMENTED (v1.0+v1.1 closure) | 基础 |
@@ -143,7 +153,7 @@ D7 域共 **13 个 S 场景**（S1-S6 + S8-S13，S7 留空 N/A），按"5 节点
   │                       D7-S13 Auto-Close (processAutoClose + synthesizeVerdict)
   │                         channel 关闭时异步触发 Learn
   │
-  ├── 基础：D7-S1 WorkModel (Task/Plan 持久化 + 状态机)
+  ├── 基础：D7-S1 WorkModel (**WorkItem 持久化** + 状态机)
   ├── 执行：D7-S3 WaveScheduler (DAG + WorkerPool + ConflictGuard) ─→ 喂给 D7-S9
   ├── 事件：D7-S4 ExecutionFlow (Hub 双通道 + SpokeBridge) ─→ IM 广播
   └── 横切：D7-S6 Error Aggregation & Metrics (errors.Join + 6 metric)
@@ -153,7 +163,7 @@ D7 域共 **13 个 S 场景**（S1-S6 + S8-S13，S7 留空 N/A），按"5 节点
 
 1. **D7-S2 是唯一入口** — 4 IntentKind 决定走哪条路径：
    - `IntentSkip` → close channel（不触发 Auto-Close）
-   - `IntentCommand` → CommandHandler（/plan, /task, /help, /stop）
+   - `IntentCommand` → CommandHandler（/plan, /worktree, /help, /stop）
    - `IntentFast` → FastPath → D3 (LLM) + D2 (Prepare/ToolRound/Persist)
    - `IntentOrchestrate` → OrchestratePath → **5 节点管道**
 2. **D7-S8 / S5 / S9 / S10 / S11 是 5 节点管道主干**，按 LP-5 反向追溯链串联
@@ -208,8 +218,8 @@ D7-S2 SessionOrchestrator.ProcessMessage(ctx, req)
           │                     ↑ D7-S13 processAutoClose 不触发
           │
           ├─ IntentCommand    → CommandHandler.Handle
-          │                     ├─ /plan → PlanCLICommands → PlanMode
-          │                     ├─ /task → CLICommands → TaskManager (D7-S1)
+          │                     ├─ /plan → PlanCLICommands → PlanMode (D7-S5 PlanAgent 只读探索)
+          │                     ├─ /worktree → CLICommands → TaskManager.Tree() (D7-S1)
           │                     └─ /help, /stop → explicit handlers
           │
           ├─ IntentFast       → FastPath.Run
@@ -554,18 +564,33 @@ ProcessRequest
 - **Phase 6 Observe-Learner Wiring** — `openspec/archive/2026-06-24-devrix-d7-mups-v4-phase6-observe-learner-wiring/` (D7-S12)
 - **Phase 7 Auto-Close** — `openspec/archive/2026-06-25-devrix-d7-mups-v4-phase7-verify-auto-close/` (D7-S13)
 
-### 6.3 代码实现位置
+### 6.3 代码实现位置（v4.3 post-cleanup, PR #214）
 
 | 节点 | 代码位置 |
 |------|---------|
-| D7-S8 Observe | `internal/layers/orchestration/orchtypes/{observation,uncertainty_report,uncertainty_coord,observe_request,intent_quantizer,anomaly_detector}.go` |
-| D7-S5 Plan | `internal/layers/orchestration/decisionplanning/` + `internal/layers/orchestration/workmodel/plan_*.go` |
-| D7-S9 Execute | `internal/layers/orchestration/execute/` + `internal/shared/types/execute.go` + `internal/layers/orchestration/orchtypes/artifact_kind_alias.go` |
-| D7-S10 Verify | `internal/shared/types/verdict.go` + `internal/layers/orchestration/workmodel/aggregate_verdicts.go` + `internal/layers/orchestration/orchtypes/verifier.go` |
-| D7-S11 Learn | `internal/layers/orchestration/learn/{learning_asset,asset_content,reputation_evidence,bayesian_update,adaptive_prior,memory,asset_builder,reputation_store,learner}.go` + `internal/shared/types/learning.go` |
+| D7-S8 Observe | `internal/layers/orchestration/orchtypes/{observation,uncertainty_report,uncertainty_coord,observe_request,intent_quantizer,anomaly_detector,system_anomaly_wiring}.go` |
+| D7-S5 Plan | `internal/layers/orchestration/plan/{plan,plan_struct,planner,blast_radius,errors}.go` + `internal/layers/orchestration/workmodel/{plan_agent,plan_mode}.go`（PlanAgent 仅 /plan 命令入口） |
+| D7-S9 Execute | `internal/layers/orchestration/execute/{channel,channel_commit,channel_protocol,channel_scenario,channel_exploration,errors}.go` + `internal/shared/types/execute.go` + `internal/layers/orchestration/orchtypes/artifact_kind_alias.go` |
+| D7-S10 Verify | `internal/shared/types/verdict.go` + `internal/layers/orchestration/workmodel/{aggregate_verdicts,verify_with_retry,evidence,evidence_extractor,system_anomaly}.go` + `internal/layers/orchestration/turn/verdict_to_exit_reason.go` |
+| D7-S11 Learn | `internal/layers/orchestration/learn/{learning_asset,asset_content,asset_builder,reputation_evidence,adaptive_prior,memory,reputation_store,learner}.go` + `internal/shared/types/learning.go` |
 | D7-S12 wiring | `internal/layers/orchestration/sessionorchestrator/orchestrator.go::buildObserveRequest` + `internal/layers/orchestration/orchtypes/{observe_request,errors}.go` |
 | D7-S13 Auto-Close | `internal/layers/orchestration/sessionorchestrator/{autoclose,tracing,orchestrator}.go` + `internal/layers/orchestration/learn/{learner,asset_builder}.go` + `internal/layers/orchestration/orchtypes/process.go` |
+| Turn Loop | `internal/layers/orchestration/turn/{orchestrator,exit_reason,verdict_to_exit_reason,recovery,subturn,tool_stream,compression_summarizer,llm,focus_hint,tracing,contracts}.go` |
+| WorkTree | `internal/layers/orchestration/workmodel/{work_tree,workitem,workitem_store,task_manager,task_manager_metrics,run_spawn,plan_agent,plan_mode,tool_suite,cli_commands}.go` |
+| Escape | `internal/layers/orchestration/escape/` + `internal/layers/orchestration/sessionorchestrator/escape_wiring.go` |
 | 生产 wiring | `internal/bootstrap/wire_coordinator.go::WireD7` + `internal/bootstrap/wire_wave.go` |
+
+**清理变更（v4.3 post-cleanup, PR #214 squash-merged 2026-06-24）**：
+
+| 删除项 | 替代方案 | 备注 |
+|--------|---------|------|
+| `workmodel/task_store.go` | `workmodel/workitem_store.go`（DiskWorkItemStore 直接） | Task flat-view 整层删除 |
+| `workmodel/workitem.go` 内 `ToTask/FromTask` conversion | 无（pure WorkItem 模型） | conversion helper 0 残留 |
+| `workitem_store.taskStoreAdapter` | `WorkItemStore` interface 直接实现 | adapter 模式去除 |
+| `orchtypes/uncertainty_coord.go::FromVerifier` 字符串版 | `FromVerifierTyped` typed enum | shim 去除 |
+| `coordinator/` `hubspoke/` type-alias shim | 已并入 `sessionorchestrator/` `orchtypes/` | 历史过渡层去除 |
+| `turn/orchestrator.go` 内 ExitReason 枚举（70 行） | `turn/exit_reason.go` 89 行独立 | 文件按职责拆分 |
+| `turn/loop_legacy_test.go` | `turn/runturn_main_path_test.go` | 测试名去"legacy"误导 |
 
 ### 6.4 E2E 集成测试
 
@@ -587,3 +612,64 @@ ProcessRequest
 - **D4 Multi-Agent** — Delegate RunAgent 由 D7 编排；Agent 生命周期归 D4
 - **D5 Observability** — Span / Trace / Metric 接收端；D7-S6 横切 + D7-S13 sessionSpan 6 prior attributes
 - **D6 Evolution** — `ValidateOrchestration` advisory 入口
+
+---
+
+## §7 清理变更日志（v4.3 post-cleanup, PR #214 squash-merged 2026-06-24T22:37:02Z）
+
+**DM 序列**: devrix-d7-dead-files-cleanup (DM-20260625-013..016) + 10 项过渡清理 DM
+
+### 7.1 3 commits squash-merged
+
+| Commit | DM | 摘要 | 行数 |
+|--------|------|------|------|
+| `5c09aef` | DM-20260625-014 | typed-enum FromVerifierTyped + ordinal ClassToStrength + v1.0 history cleanup | +X/-Y |
+| `3f29b5a` | DM-20260625-015 | **delete Task flat-view + TaskStore**, collapse to WorkTree (19 files) | +X/-Y |
+| `7d32f4b` | DM-20260625-016 | split ExitReason enum (`turn/exit_reason.go`) + rename `loop_legacy_test` | +X/-Y |
+
+**净变化**: 24 files, +498/-751 = **-253 行**
+
+### 7.2 后续 10 项过渡清理 DM（已分别 PR 合入 master）
+
+| DM | 主题 | 影响范围 |
+|------|------|----------|
+| DM-20260625-007 | drop 3 orphan code paths from pre-MUPS-v4 era | chore(d7) |
+| DM-20260625-008 | drop milestone service + TaskController | chore(d6/d7) |
+| DM-20260625-009 | drop dead `turn_adapter` + `unified_tools` | chore(d7) |
+| DM-20260625-010 | migrate `coordinator.*` + `hubspoke.*` to source pkgs | refactor(d7) |
+| DM-20260625-011 | retire `hubspoke/` + drop 4 dead code paths | refactor(d7) |
+| DM-20260625-012 | split `runLoop` god function into 7 helpers (D3) | refactor(d7) |
+| DM-20260625-013 | DI-migrate process singletons + drop dead code | refactor(d7) |
+
+### 7.3 关键不变量
+
+清理后所有不变式依然成立：
+
+- **WorkItem 单一来源**：TaskManager 只是 facade，`Tree()` 是唯一访问路径
+- **5/5 节点不可变契约**：Verdict/Plan/Artifact/LearningAsset 全部 `With*` 副本
+- **LP-5 血缘回溯链**：Plan→Obs, Artifact→Plan, Verdict→Artifact, Asset→Session 完整
+- **类型强一致**：14 ExitReason + 4 VerdictKind + 5 LearningClass + 4 Channel 全 typed enum
+- **跨域低耦合**：`shared/types` 上提打破潜在 import cycle
+
+---
+
+## §8 验证清单（v4.3 post-cleanup 强保证）
+
+| 项 | 状态 | 证据 |
+|----|------|------|
+| 5/5 节点唯一 entry func | ✅ | Observe=buildObserveRequest, Plan=DefaultPlanner.Plan, Execute=ChannelRouter.Route, Verify=VerifyWithRetry, Learn=DefaultLearner.Learn |
+| 跨节点值对象不可变 | ✅ | `With*` 系列 (Verdict.WithKind/WithSourceID, Plan.With*, LearningAsset.WithSourceVerdictIDs/WithTraceID) |
+| 血缘回溯 5 节点全覆盖 | ✅ | SourceObservationIDs / SourcePlanID / SourceArtifactID / SourceVerdictIDs / SourceSessionIDs |
+| 14 ExitReason enum 独立 | ✅ | `turn/exit_reason.go` 89 行（从 orchestrator.go 抽出） |
+| 4 VerdictKind typed enum | ✅ | `shared/types/verdict.go` + String/Parse/Marshal/Unmarshal |
+| 5 LearningClass typed enum | ✅ | `shared/types/learning.go` + ordinal ClassToStrength 公式 |
+| 4 Channel 1:1 绑定 | ✅ | `execute/channel.go` ChannelRegistry + ChannelRouter |
+| 3 层 fail-safe 5/5 | ✅ | buildObserveRequest / VerifyWithRetry / synthesizeVerdict / applyResumeSession |
+| WorkTree 唯一根 | ✅ | `TaskManager.Tree()` facade，无 Task flat-view |
+| 0 字符串 shim 残留 | ✅ | FromVerifierTyped typed enum 取代 FromVerifier |
+| 0 type-alias shim | ✅ | coordinator/hubspoke 已并入 sessionorchestrator/orchtypes |
+| 0 Task conversion helper | ✅ | `workitem.go` 内无 `ToTask/FromTask` 等 helper |
+| 0 taskStoreAdapter | ✅ | `WorkItemStore` interface 直接实现 |
+| go vet `./...` | ✅ | 全包 clean |
+| `go test -race ./internal/layers/orchestration/...` | ✅ | 22/22 packages PASS |
+| `scripts/verify-archive.sh` | ✅ | 12/12 PASS（escape v5 + 之前 11 项归档） |

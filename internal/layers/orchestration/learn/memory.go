@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -136,6 +137,7 @@ func NewSkillMemory() *SkillMemory {
 }
 
 // Store — LP-2 enforcement: Class MUST be LearningSOP or LearningProtocol.
+// v6.0.0 S6-A49 P0: emit memory.persist Span around the in-memory write.
 func (m *SkillMemory) Store(ctx context.Context, asset *LearningAsset) error {
 	if asset == nil {
 		return ErrAssetIncomplete
@@ -143,9 +145,12 @@ func (m *SkillMemory) Store(ctx context.Context, asset *LearningAsset) error {
 	if !MemorySkill.allowedClasses()[asset.Class] {
 		return ErrAssetClassMismatch
 	}
+	ttlMs := ttlRemainingMs(asset)
+	end := d7spans.EmitMemoryPersist(ctx, asset.SessionID, MemorySkill.String(), asset.Class.String(), ttlMs, assetPayloadSize(asset))
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.store[asset.AssetKey] = asset
+	end(nil)
 	return nil
 }
 
@@ -394,4 +399,28 @@ func filterAssets(store map[string]*LearningAsset, filter MemoryFilter) []*Learn
 		out = append(out, a)
 	}
 	return out
+}
+
+// ttlRemainingMs returns the asset's remaining TTL in milliseconds (clamped
+// at 0 if already expired). Used as a Span attribute for memory.persist.
+func ttlRemainingMs(a *LearningAsset) int {
+	if a == nil {
+		return 0
+	}
+	remaining := time.Until(a.ExpiryAt)
+	if remaining < 0 {
+		return 0
+	}
+	return int(remaining / time.Millisecond)
+}
+
+// assetPayloadSize returns a coarse size estimate for the asset's content
+// suitable for the memory.persist Span attribute. We avoid reflecting into
+// the AssetContent interface (5 polymorphic classes) and instead use the
+// AssetKey + ContentHash as a proxy length so the attribute is always cheap.
+func assetPayloadSize(a *LearningAsset) int {
+	if a == nil {
+		return 0
+	}
+	return len(a.AssetKey) + len(a.ContentHash) + len(a.SessionID)
 }

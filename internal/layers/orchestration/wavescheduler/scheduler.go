@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -323,7 +324,22 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 // Register (dispatchOne) with a single atomic AllowAndRegister, eliminating
 // the TOCTOU window. See design.md §2.4.
 func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string, state *schedulerWaveState, node TaskNode, slotID SlotID) bool {
+	// v6.0.0 6 S 精简 S5-A34 P1: emit executor.select Span before the
+	// runner lookup so Jaeger captures the candidate pool size, the
+	// selected kind, and the selection score. Policy is "kind_match" —
+	// the current selection logic is a direct map lookup by node.WorkerType.
+	candidatesCount := len(s.runners)
+	selectedKind := string(node.WorkerType)
+	score := "0.000"
+	if _, ok := s.runners[node.WorkerType]; ok {
+		score = "1.000"
+	} else {
+		selectedKind = "none"
+	}
+	endExecSelect := d7spans.EmitExecutorSelect(parentCtx, sessionID, candidatesCount, selectedKind, score, "kind_match")
+
 	runner, ok := s.runners[node.WorkerType]
+	endExecSelect(nil)
 	if !ok {
 		// No runner — fail immediately, persist artifact, release slot.
 		now := time.Now()

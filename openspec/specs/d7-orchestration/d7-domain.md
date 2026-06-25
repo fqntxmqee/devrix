@@ -3,9 +3,9 @@
 **Domain ID:** D7
 **Slug:** `orchestration`
 **Type:** Core Domain
-**Status:** Active — Canonical S1–S5（v1.0+ value-stream，无需像 D1 重编号）
-**Version:** 1.1.0
-**Last Updated:** 2026-06-18
+**Status:** Active — Canonical S1–S6 + 1 横切（v6.0.0 博弈角色对齐精简，14 S → 6 S + 1 横切；MUPS 5 节点管道 + v5 EscapeEngine 完整保留）
+**Version:** 2.0.0
+**Last Updated:** 2026-06-26
 **Depends On:** D1（ingress `ProcessMessage`）、D2（Follower 拆面）、D3（`IGateway`，D7 直调）、D4（Delegate Follower）
 **Depended By:** D1（EngineEvent / Flow 展示）、D6（`ValidateOrchestration` advisory）
 **Hard Ban:** D1→D2 直连 `IEngine.Process`（DM-007）；D2→D3 import（DM-020）；D4 直 Publish FlowEvent（DM-018）
@@ -15,15 +15,17 @@
 
 ## North Star
 
-**作为 Orchestration Mediator / Turn Leader，决定做什么、按什么顺序、谁来做，并把执行进度信号化送达 D1——不拥有 Session 上下文与 Agent 生命周期。**
+**作为 Orchestration Mediator / Turn Leader / 5 节点管道 Owner，决定做什么、按什么顺序、谁来做，并把执行进度信号化送达 D1；同时通过 Observe → Plan → Execute → Verify → Learn 5 节点管道闭环交付可信结论——不拥有 Session 上下文与 Agent 生命周期。**
 
-| 可验证承诺 | Canonical S |
-|-----------|-------------|
-| Task/Plan 事实与状态机单一权威 | D7-S1 Work Model（**WorkItem + WorkTree**，`run_ref` → RunRegistry） |
-| 用户消息统一入口 + Turn 主循环 + LLM 调用权 + **RunTurn resolve/decompose/await** | D7-S2 Session Orchestrator |
-| 多 Worker 并行 DAG，冲突与上下文隔离 | D7-S3 Wave Scheduler |
-| FlowEvent / WorkPlan 聚合，进度广播 | D7-S4 Execution Flow |
-| 意图分类、任务拆解、执行器选择 | D7-S5 Decision & Planning |
+| 可验证承诺 | Canonical S | 博弈角色 |
+|-----------|-------------|----------|
+| WorkItem 事实与状态机单一权威 + UncertaintyCoord/ReputationEvidence/AdaptivePrior 状态归属 | **D7-S1 WorkModel**（State Authority） | State Authority |
+| 用户消息统一入口 + Turn 主循环 + LLM 调用权 + RunTurn resolve/decompose/await + ResumeSession 3 决策路由 + AutoClose 4 规则 + EscapeEngine 调度 | **D7-S2 SessionOrchestrator**（Mediator + Turn Leader + Error Recovery） | Mediator + Turn Leader + Error Recovery |
+| 多 Worker 并行 DAG，冲突与上下文隔离 | **D7-S3 WaveScheduler** | Mechanism Designer |
+| FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + 14 ExitReason + SystemAnomaly 检测 | **D7-S4 ExecutionFlow + Verify** | Costly Signaler + Certifier |
+| ClassifyIntent (Command-first) + UncertaintyReport + IntentQuantize + AnomalyDetector + 4 IntentKind | **D7-S5 DecisionPlanning + Observe** | Information Producer + Quantizer |
+| 4 Channel + ChannelRouter + C2/W8 1:1 映射 + 4 LearningClass + 3 通道记忆 + ReputationEvidence Bayesian | **D7-S6 MUPS Pipeline** | Pipeline Coordinator + Memory Curator |
+| metric 命名 spec/code 对齐 + 并发硬化 + CircuitBreaker 监控 + ErrorRecoveryPolicy | **Cross-cutting: Hardening**（非 S） | Discipline Keeper |
 
 ---
 
@@ -42,24 +44,56 @@
 
 ## DSAFT 资产
 
-### Canonical 价值流 — D7-S1–S5
+### Canonical 价值流 — D7-S1–S6（v6.0.0 博弈角色对齐精简）
 
 | S ID | Scenario | 博弈角色 | Status |
 |------|----------|----------|--------|
-| D7-S1 | Work Model | State Authority | IMPLEMENTED |
-| D7-S2 | Session Orchestrator | Screening + Turn Leader | IMPLEMENTED |
-| D7-S3 | Wave Scheduler | Mechanism Designer | IMPLEMENTED |
-| D7-S4 | Execution Flow | Costly Signaler | IMPLEMENTED |
-| D7-S5 | Decision & Planning | Information Producer | IMPLEMENTED |
+| **D7-S1** | **WorkModel** | **State Authority** | **✅ IMPLEMENTED** |
+| **D7-S2** | **SessionOrchestrator** | **Mediator + Turn Leader + Error Recovery** | **✅ IMPLEMENTED** |
+| **D7-S3** | **WaveScheduler** | **Mechanism Designer** | **✅ IMPLEMENTED** |
+| **D7-S4** | **ExecutionFlow + Verify** | **Costly Signaler + Certifier** | **✅ IMPLEMENTED** |
+| **D7-S5** | **DecisionPlanning + Observe** | **Information Producer + Quantizer** | **✅ IMPLEMENTED** |
+| **D7-S6** | **MUPS Pipeline** | **Pipeline Coordinator + Memory Curator** | **✅ IMPLEMENTED** |
 
-### 登记规模（Canonical）
+### Cross-cutting（横切，不占 S 位）
+
+| 组件 | 博弈角色 | 物理位置 | Status |
+|------|----------|----------|--------|
+| **Hardening** | **Discipline Keeper** | `orchestration/hardening/`（含 metrics.go + circuit_breaker.go + error_recovery.go） | **✅ IMPLEMENTED** |
+
+### 登记规模（Canonical，v6.0.0）
 
 | 层 | 数量 | SoT 文件 |
 |----|------|----------|
-| A | 24（S1:6 · S2:6 · S3:3 · S4:5 · S5:4） | `a-registry.md` |
-| F | 51（Legacy 44 + Canonical 7） | `f-registry.md` |
-| T | 69（47 P0） | `t-registry.md` |
-| Span | 9 ops | `span-registry.md` |
+| A | **49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）| `a-registry.md` |
+| F | **68**（Legacy 41 + Canonical 27） | `f-registry.md` |
+| T | **180**（v4.9.0 2026-06-25 闭环，6 S 重归类不删测试点） | `t-registry.md` |
+| Span | **23 ops**（18 旧 + **5 新 P0/P1**）+ 9 sessionSpan attributes | `span-registry.md` |
+
+> **6 S 精简说明（v6.0.0）：** 14 S → 6 S + 1 横切的合并依据见 `dsaft-architecture.md` §14 S 冗余分析。MUPS 5 节点管道（Observe/Plan/Execute/Verify/Learn）+ v5 EscapeEngine 完整保留；A/F 重映射，T 180 重归类不删；Span 18→23（5 个新 P0/P1）。
+
+### MUPS 5 节点管道（v6.0.0，挂在 S5/S6 下）
+
+```
+D7-S5 Observe 节点 ── UncertaintyReport ──▶ D7-S5 Plan 节点 ── Plan ──▶ D7-S6 Execute
+                                                                      │
+                                                                      ▼
+                                                            D7-S4 Verify 节点
+                                                                      │
+                                                                      ▼
+                                                            D7-S6 Learn 节点
+                                                                      │
+                                                                      ▼
+                    (下轮) D7-S5 Observe ◀── ReputationEvidence ─────┘
+                                                                      ▲
+                                                  D7-S2 buildObserveRequest（LP-1 闭环）
+```
+
+**约束：**
+
+- 节点间依赖契约：每节点的输入必须能在上游节点的输出 Schema 中找到（UncertaintyReport、Plan、Artifact、Verdict、ReputationEvidence）
+- 跨域类型上提（PR-C1）：`Artifact` 共享类型在 `internal/shared/types/` 引入，打破 import cycle
+- Reverse Traceability（LP-5）：每个 Artifact.SourcePlanID 必须能反向追溯到 Plan；每个 Verdict.SourceArtifactID 必须能反向追溯到 Artifact；Learn 节点的追溯链必须覆盖 Observe
 
 ---
 
@@ -68,14 +102,14 @@
 | 文档 | 用途 |
 |------|------|
 | `spec.md` | Gherkin 验收规格 |
-| `terminal-state-guide.md` | 终态流程、IntentKind 四链、A→F 编排树、跨域时序 |
-| `observability-guide.md` | Span↔T、Trace 树、FastPath SLA、P0 Runbook |
-| `design.md` | 六段式详细设计（Wave、Hub、PlanMode 等） |
+| `terminal-state-guide.md` | 终态流程、IntentKind 四链、A→F 编排树、跨域时序、14 ExitReason、Auto-Close 4 规则、ResumeSession 3 决策路由 |
+| `observability-guide.md` | Span↔T、Trace 树、FastPath SLA、P0 Runbook、5 节点 Trace 树、9 sessionSpan attributes |
+| `design.md` | 六段式详细设计（Wave、Hub、PlanMode、5 节点管道等） |
 | `d7-requirements-clarifications.md` | Review R1/R2 完整澄清（历史归档） |
 | `dsaft-architecture.md` | Stub — DSAFT 五层计数 |
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 登记 SoT |
-| `span-registry.md` | Span operation 登记 SoT |
-| `layer-delta.md` | V1→V2 演进 Delta |
+| `span-registry.md` | Span operation 登记 SoT（含 MUPS 5 节点 + 9 sessionSpan attributes） |
+| `layer-delta.md` | V1→V5 演进 Delta（含 MUPS 5 节点管道 IMPLEMENTED 段） |
 | `../../tech-debt/worktree-v2-deferred.md` | WorkTree v2.1+ 技术债务（TD-WT-01..06） |
 | `../architecture/code-layout.md` §4.2 | scenario-slug 物理路径 |
 
@@ -85,5 +119,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.1.0 | 2026-06-18 | DM-20260617-009 闭环：WorkItem/WorkTree 写入 North Star；RunTurn resolve/decompose/await；tech-debt 索引 |
 | 1.0.0 | 2026-06-16 | 初版：薄领域 SoT；厚版迁至 `d7-requirements-clarifications.md`；对齐 D1 `*-domain.md` 模式 |
+| 1.1.0 | 2026-06-18 | DM-20260617-009 闭环：WorkItem/WorkTree 写入 North Star；RunTurn resolve/decompose/await；tech-debt 索引 |
+| 1.2.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 升格：14 S 层（D7-S1~S14）全部 IMPLEMENTED；North Star 新增 8 行可验证承诺（S6-S14）；DSAFT 资产规模 24 A → 56 A，66 T → 180 T，9 Span → 18 Span；新增 §MUPS 5 节点管道依赖契约；跨域类型上提 PR-C1；Reverse Traceability LP-5 |
+| **2.0.0** | **2026-06-26** | **6 S 博弈角色对齐精简**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；(2) North Star 14 行 → 6 行（每个 S 含全部合并角色）；(3) DSAFT 资产规模 56 A → **49 A**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2），75 F → **68 F**，180 T 持平（重归类不删），18 Span → **23 Span**（**+5 新 P0/P1**：channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select）；(4) MUPS 5 节点管道挂载调整（Observe/Plan 归 S5，Execute/Learn 归 S6，Verify 归 S4，ResumeSession 归 S2）；(5) 新增 §Cross-cutting Hardening 表，定位明确为非 S；(6) 14 S 冗余分析详见 `dsaft-architecture.md` |

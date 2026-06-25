@@ -136,3 +136,54 @@ func TestTaskDecomposer_decomposeGoal(t *testing.T) {
 		})
 	}
 }
+
+// ─── v6.0.0 6 S 精简 S5-A33 P1 taskgraph.synthesize 测试 ────────────────
+
+func TestDagDepth_EmptyGraph(t *testing.T) {
+	if got := dagDepth(nil); got != 0 {
+		t.Errorf("dagDepth(nil) = %d, want 0", got)
+	}
+}
+
+func TestDagDepth_LinearChain(t *testing.T) {
+	// Linear chain: t1 → t2 → t3 → t4 (depth 4)
+	nodes := []wavescheduler.TaskNode{
+		{ID: "t1", Directive: "1", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh},
+		{ID: "t2", Directive: "2", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t1"}},
+		{ID: "t3", Directive: "3", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t2"}},
+		{ID: "t4", Directive: "4", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t3"}},
+	}
+	if got := dagDepth(nodes); got != 4 {
+		t.Errorf("dagDepth(linear chain of 4) = %d, want 4", got)
+	}
+}
+
+func TestDagDepth_BranchingGraph(t *testing.T) {
+	// Diamond: t1 → t2, t1 → t3, t2 → t4, t3 → t4 (depth 3)
+	nodes := []wavescheduler.TaskNode{
+		{ID: "t1", Directive: "1", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh},
+		{ID: "t2", Directive: "2", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t1"}},
+		{ID: "t3", Directive: "3", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t1"}},
+		{ID: "t4", Directive: "4", WorkerType: wavescheduler.WorkerCursor, ContextPolicy: wavescheduler.ContextFresh, DependsOn: []string{"t2", "t3"}},
+	}
+	if got := dagDepth(nodes); got != 3 {
+		t.Errorf("dagDepth(diamond) = %d, want 3", got)
+	}
+}
+
+func TestTaskDecomposer_SynthesizeTaskGraph_SpanEmitFailSafe(t *testing.T) {
+	// Verify the taskgraph.synthesize Span emit path is a no-op when the
+	// d7spans bridge is unset (the default in tests). The function must
+	// still return a valid result.
+	d := NewTaskDecomposer()
+	result, err := d.SynthesizeTaskGraph(context.Background(), "sess_span", "A → B → C")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Nodes) != 3 {
+		t.Fatalf("expected 3 nodes, got %v", result)
+	}
+	if result.Validation == nil || !result.Validation.Valid {
+		t.Errorf("expected valid graph, got %v", result.Validation)
+	}
+}
