@@ -115,58 +115,13 @@ func detectDuplicateReplay(buffer, chunk string) bool {
 	return false
 }
 
-// dedupRepeatedText removes a duplicate long substring from buffer. It
-// finds the longest repeated substring S of length ≥ minDupRunes that
-// appears at two non-overlapping positions, then removes the second
-// occurrence (and keeps the prefix and any tail). Returns the original
-// buffer unchanged when no qualifying duplicate is found. This is the
-// post-hoc safety net for the streaming-time dedup: if
-// detectDuplicateReplay missed (e.g. the chunk's prefix didn't match
-// cleanly during streaming), the final card still shows the user's
-// report only once.
+// dedupRepeatedText is a thin alias for textutil.DedupRepeatedText kept
+// here so the call sites read like "dedup the streaming buffer". The
+// implementation lives in internal/shared/textutil so the same dedup
+// can be applied at D2 fold time (FoldAssistantOutput) without
+// duplicating the O(n^2) LCP scan.
 func dedupRepeatedText(buffer string, minDupRunes, minGapRunes int) string {
-	if minDupRunes < 8 {
-		minDupRunes = 8
-	}
-	if minGapRunes < 0 {
-		minGapRunes = 0
-	}
-	runes := []rune(buffer)
-	n := len(runes)
-	if n < minDupRunes*2+minGapRunes {
-		return buffer
-	}
-	// Find the longest LCP pair (i, j) with i < j, j - i ≥ minDupRunes,
-	// and j - (i + LCP) ≥ minGapRunes. The first and second occurrences
-	// of the matched substring are at i and j. The O(n^2) scan is fine
-	// for buffer sizes up to ~64K runes (a reply card).
-	bestLen := 0
-	bestSecondStart := 0
-	for i := 0; i <= n-minDupRunes*2-minGapRunes; i++ {
-		for j := i + minDupRunes + minGapRunes; j <= n-minDupRunes; j++ {
-			if runes[i] != runes[j] {
-				continue
-			}
-			k := 0
-			for i+k < n && j+k < n && runes[i+k] == runes[j+k] {
-				k++
-			}
-			if k > bestLen {
-				bestLen = k
-				bestSecondStart = j
-			}
-		}
-	}
-	if bestLen < minDupRunes {
-		return buffer
-	}
-	// Remove the duplicate block at [bestSecondStart, bestSecondStart+bestLen),
-	// keeping both the prefix before the second occurrence and any
-	// legitimate tail that may continue after it.
-	result := make([]rune, 0, n-bestLen)
-	result = append(result, runes[:bestSecondStart]...)
-	result = append(result, runes[bestSecondStart+bestLen:]...)
-	return string(result)
+	return textutil.DedupRepeatedText(buffer, minDupRunes, minGapRunes)
 }
 
 type toolCallEntry struct {
@@ -272,7 +227,7 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 // the create-or-patch branching.
 func (a *FeishuAdapter) patchThinkingCard(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
 	stream.mu.Lock()
-	text := strings.TrimSpace(dedupRepeatedText(stream.thinkingBuffer.String(), 60, 2))
+	text := strings.TrimSpace(dedupRepeatedText(stream.thinkingBuffer.String(), 20, 2))
 	thinkingMsgID := stream.thinkingMsgID
 	stream.mu.Unlock()
 
@@ -537,7 +492,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	// non-cardkit finalize path constructs the footer from the same
 	// textBuffer. Without this, the user sees the report twice on
 	// the final card.
-	responseText = dedupRepeatedText(responseText, 60, 2)
+	responseText = dedupRepeatedText(responseText, 20, 2)
 	stream.mu.Unlock()
 	if cardkitActive {
 		// Pass trimmedSummary so finalizeReplyCardStreaming can strip it
@@ -621,7 +576,7 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// detectDuplicateReplay during streaming (e.g. the LLM re-emitted
 	// a suffix rather than a prefix, or the overlap didn't clear the
 	// 30-rune minimum). The reply card must show the report only once.
-	content = dedupRepeatedText(content, 60, 2)
+	content = dedupRepeatedText(content, 20, 2)
 	// Strip D2 context-budget fold markers so the LLM's echo of its own
 	// prior <prior-output-summary> blocks (which it sometimes regurgitates
 	// in long replies, e.g. a deep-review tool loop) does not leak into
@@ -747,8 +702,37 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 		)
 		return nil
 	}
+	// DM-20260625-007: chunk-self dedup. detectDuplicateReplay only
+	// catches "cross-chunk prefix replay" (chunk's prefix is already in
+	// the buffer). When the LLM emits a single chunk that itself
+	// contains the same 60+ rune paragraph twice — e.g. minimax M2.7
+	// streaming artifacts where the model concatenates "A B A B" into
+	// one event — the prefix is new, so detectDuplicateReplay stays
+	// silent and the verbatim duplicate lands in textBuffer. Run
+	// dedupRepeatedText on the chunk before writing so the live
+	// cardkit stream never carries the duplicate.
+	chunk = dedupRepeatedText(chunk, 20, 2)
+	if strings.TrimSpace(chunk) == "" {
+		stream.mu.Unlock()
+		return nil
+	}
 	stream.textBuffer.WriteString(chunk)
-	content := stream.textBuffer.String()
+	// DM-20260625-007: buffer-self dedup. The LLM also "loops back" and
+	// rewrites the same opening across many small consecutive chunks
+	// (sess_1782381569430_3000 19:22:07-19:22:18 pattern: 5-7 chunks
+	// each carrying a different slice of the same opening). Each
+	// individual chunk's prefix is technically new so detectDuplicateReplay
+	// is silent, but the running buffer accumulates 2-3 copies of the
+	// same opening. Collapse them on every write so the live reply
+	// card never shows a verbatim duplicate. The finalize step already
+	// runs dedupRepeatedText as a safety net; this layer just moves the
+	// dedup from "after the user saw it" to "while the LLM is still
+	// talking".
+	content := dedupRepeatedText(stream.textBuffer.String(), 20, 2)
+	if content != stream.textBuffer.String() {
+		stream.textBuffer.Reset()
+		stream.textBuffer.WriteString(content)
+	}
 	stream.mu.Unlock()
 
 	if !a.streamingEnabled {

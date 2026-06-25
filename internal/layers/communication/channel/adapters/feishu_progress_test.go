@@ -1346,3 +1346,155 @@ func TestFeishuAdapter_FinalizeStructuredSession_TaskCardDoesNotIncludeSummary(t
 		t.Errorf("rendered progress card body missing worker progress summary.\nbody=%s", cardBody)
 	}
 }
+
+// ============================================================================
+// DM-20260625-007 (review代码 reply-card streaming-time dedup)
+//
+// User reported the feishu "思考卡片" (actually the live streaming reply
+// card, render=blue, content=textBuffer) showing the same paragraph 2-3
+// times while the LLM is still talking. Transcript of sess_1782381569430_3000
+// shows the LLM (minimax M2.7) re-generating the same opening narration
+// across consecutive streaming chunks:
+//
+//   19:22:07.260  "限制。换用安全方式：\n\n"
+//   19:22:07.837  "我来对D2领域代码进行一次全面审查。这是个多"
+//   19:22:08.422  "维度的代码审查任务（架构边界、代码质量、"
+//   19:22:09.088  "测试覆盖、规范一致性），适合并行分解执行。\n\n我来对D2领域代码进行一次全面审查。这是个多维度的代码审查任务（架构边界、代码质量、测试覆盖、规范一致性），适合并..."
+//   19:22:09.095  "对D2领域代码进行一次全面审查。这是个多维"
+//   ...
+//
+// detectDuplicateReplay only catches "cross-chunk prefix replay" (the
+// chunk's prefix already in buffer). It misses two patterns:
+//
+//   1. The duplicate is INSIDE the same chunk (chunk = "A B A B"). The
+//      chunk's prefix is "A B" which is new — no trigger.
+//   2. The LLM rewrites the same opening across many chunks. Each new
+//      chunk's prefix is the same as the tail of the previous chunk's
+//      output but not exactly equal — the racy overlap check misses.
+//
+// Fix: add two streaming-time dedup layers in appendResponseText:
+//
+//   - chunk-self dedup: run dedupRepeatedText on the incoming chunk
+//     before writing to the buffer, so internal-chunk duplication is
+//     caught at the source.
+//   - buffer-self dedup: after writing the chunk, run dedupRepeatedText
+//     on the full buffer (cheap O(n²) only when buffer runes are
+//     bounded — we already cap the visible content via streaming
+//     throttling).
+//
+// These two layers plus the existing detectDuplicateReplay form a
+// three-layer safety net:
+//   (a) detectDuplicateReplay — drops the whole chunk if its prefix
+//       is a known replay (already implemented).
+//   (b) chunk-self dedupRepeatedText — collapses internal-chunk
+//       duplicates before they enter the buffer.
+//   (c) buffer-self dedupRepeatedText — collapses the running buffer
+//       so the live cardkit stream never carries a verbatim duplicate.
+// ============================================================================
+
+// TestAppendResponseText_DedupsChunkSelfDuplication pins pattern (1):
+// a single text event carries the same 60+ rune paragraph twice. The
+// streaming reply card must render only one copy. Before the fix,
+// detectDuplicateReplay would not fire (chunk's prefix is new), and
+// the entire "A B A B" chunk landed in textBuffer verbatim.
+func TestAppendResponseText_DedupsChunkSelfDuplication(t *testing.T) {
+	opening := "我来对D2领域代码进行一次全面审查。这是个多维度的代码审查任务（架构边界、代码质量、测试覆盖、规范一致性），适合并行分解执行。"
+	// Single text event that contains the opening twice back-to-back
+	// — the exact pattern from sess_1782381569430_3000 line 460-480.
+	chunk := opening + "\n\n" + opening
+
+	mockAPI := &mockFeishuAPI{
+		postFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0,"data":{"card_id":"card_dd"}}`)}, nil
+		},
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: &mockMessageAPI{}, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI.imAPI = mockImAPI
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.streamingEnabled = true
+	adapter.sessionReplyCtx.Store("sess_chunkdup", feishuReplyContext{userMessageID: "om_root"})
+
+	adapter.OnMessage(&types.OutboundMessage{
+		SessionID: "sess_chunkdup", ChatID: "feishu_oc_1",
+		Content: chunk, Metadata: map[string]string{"event_type": "text"},
+	})
+
+	stream := adapter.sessionStream("sess_chunkdup")
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	got := stream.textBuffer.String()
+	if c := strings.Count(got, "适合并行分解执行"); c != 1 {
+		t.Fatalf("textBuffer keeps opening %d times, want 1:\n%s", c, got)
+	}
+}
+
+// TestAppendResponseText_DedupsBufferLevelReplay pins pattern (2):
+// across many consecutive chunks the LLM rewrites the same opening
+// paragraph. Each individual chunk's prefix is technically new (just
+// the next few runes of the LLM's stream), so detectDuplicateReplay
+// never fires, but the running buffer accumulates 2-3 copies of the
+// same opening. The live cardkit stream carries every copy. The
+// buffer-level dedupRepeatedText must collapse them.
+func TestAppendResponseText_DedupsBufferLevelReplay(t *testing.T) {
+	// Simulate the LLM splitting the same opening across many chunks
+	// (the 19:22:07-19:22:18 transcript pattern: 5-7 small chunks each
+	// carrying a slice of the same opening).
+	chunks := []string{
+		"\n\n我来对D2领域",
+		"代码进行一次全面审查。这是个多维度的代码审查任务",
+		"（架构边界、代码质量、测试覆盖、规范一致性），",
+		"适合并行分解执行。\n\n",
+		// LLM "loops back" and re-streams the same opening across many
+		// small chunks. Each chunk's prefix is NEW (it's a different
+		// slice of the opening), so detectDuplicateReplay is silent —
+		// but the running buffer ends up with 3 copies of the opening.
+		"我来对D2领域代码进行一次全面审查。",
+		"这是个多维度的代码审查任务",
+		"（架构边界、代码质量、",
+		"测试覆盖、规范一致性），适合并行分解执行。\n\n",
+		"我来对D2领域代码进行一次全面审查。",
+		"这是个多维度的代码审查任务（架构边界、代码质量、",
+		"测试覆盖、规范一致性），适合并行分解执行。\n\n",
+	}
+
+	mockAPI := &mockFeishuAPI{
+		postFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0,"data":{"card_id":"card_dd"}}`)}, nil
+		},
+		putFunc: func(ctx context.Context, path string, body interface{}, tokenType larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+			return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+		},
+	}
+	mockImAPI := &mockImAPI{messageAPI: &mockMessageAPI{}, messageReactionAPI: &mockMessageReactionAPI{}}
+	mockAPI.imAPI = mockImAPI
+
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+	adapter.streamingEnabled = true
+	adapter.sessionReplyCtx.Store("sess_bufdup", feishuReplyContext{userMessageID: "om_root"})
+
+	for i, c := range chunks {
+		adapter.OnMessage(&types.OutboundMessage{
+			SessionID: "sess_bufdup", ChatID: "feishu_oc_1",
+			Content: c, Metadata: map[string]string{"event_type": "text"},
+		})
+		_ = i
+	}
+
+	stream := adapter.sessionStream("sess_bufdup")
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	got := stream.textBuffer.String()
+	if c := strings.Count(got, "适合并行分解执行"); c != 1 {
+		t.Fatalf("textBuffer keeps '适合并行分解执行' %d times, want 1:\n%s", c, got)
+	}
+}

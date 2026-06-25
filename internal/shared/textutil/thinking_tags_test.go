@@ -131,7 +131,86 @@ func TestStripThinkingTags_should_preserve_plain_text(t *testing.T) {
 
 	raw := "plain answer"
 	got := StripThinkingTags(raw)
-	if got != "plain answer" {
-		t.Fatalf("StripThinkingTags() = %q, want %q", got, "plain answer")
+	if got != raw {
+		t.Fatalf("StripThinkingTags() = %q, want %q", got, raw)
+	}
+}
+
+func TestPriorOutputSummarySplitter_should_split_complete_block(t *testing.T) {
+	t.Parallel()
+
+	var splitter PriorOutputSummarySplitter
+	summary, visible := splitter.Push("prefix<prior-output-summary>fold content</prior-output-summary>suffix")
+	if summary != "fold content" {
+		t.Fatalf("summary = %q, want %q", summary, "fold content")
+	}
+	if visible != "prefixsuffix" {
+		t.Fatalf("visible = %q, want %q", visible, "prefixsuffix")
+	}
+}
+
+func TestPriorOutputSummarySplitter_should_split_across_chunks(t *testing.T) {
+	t.Parallel()
+
+	var splitter PriorOutputSummarySplitter
+	summary, visible := splitter.Push("Hello <prior-output-summa")
+	if summary != "" {
+		t.Fatalf("chunk 1 should not emit summary yet, got %q", summary)
+	}
+	if visible != "Hello " {
+		t.Fatalf("chunk 1 should emit visible prefix only, got %q", visible)
+	}
+
+	summary, visible = splitter.Push("ry>fold body</prior-output-summary>world")
+	if summary != "fold body" {
+		t.Fatalf("summary = %q, want %q", summary, "fold body")
+	}
+	if visible != "world" {
+		t.Fatalf("visible = %q, want %q", visible, "world")
+	}
+}
+
+func TestPriorOutputSummarySplitter_should_drop_unbalanced_open(t *testing.T) {
+	t.Parallel()
+
+	var splitter PriorOutputSummarySplitter
+	_, visible := splitter.Push("good prefix<prior-output-summary>orphaned fold body")
+	if visible != "good prefix" {
+		t.Fatalf("mid-stream visible = %q, want %q", visible, "good prefix")
+	}
+
+	summary, visible := splitter.Flush()
+	if summary != "orphaned fold body" {
+		t.Fatalf("Flush summary = %q, want %q", summary, "orphaned fold body")
+	}
+	if visible != "" {
+		t.Fatalf("Flush visible = %q, want empty (unbalanced fold body must not surface)", visible)
+	}
+}
+
+func TestPriorOutputSummarySplitter_should_handle_chained_blocks(t *testing.T) {
+	t.Parallel()
+
+	var splitter PriorOutputSummarySplitter
+	_, visible := splitter.Push("A<prior-output-summary>fold 1</prior-output-summary>")
+	summary, visible := splitter.Push("B<prior-output-summary>fold 2</prior-output-summary>C")
+	if summary != "fold 2" {
+		t.Fatalf("summary = %q, want %q", summary, "fold 2")
+	}
+	if visible != "BC" {
+		t.Fatalf("visible = %q, want %q", visible, "BC")
+	}
+}
+
+func TestPriorOutputSummarySplitter_should_preserve_plain_text(t *testing.T) {
+	t.Parallel()
+
+	var splitter PriorOutputSummarySplitter
+	summary, visible := splitter.Push("just plain visible text with no markers")
+	if summary != "" {
+		t.Fatalf("summary = %q, want empty", summary)
+	}
+	if visible != "just plain visible text with no markers" {
+		t.Fatalf("visible = %q, want verbatim input", visible)
 	}
 }
