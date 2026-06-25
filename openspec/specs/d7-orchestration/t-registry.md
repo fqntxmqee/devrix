@@ -694,3 +694,27 @@ D7-S7  Cross-cutting Hardening (Discipline Keeper, IMPLEMENTED 子集 4 T)
 ```
 
 **Total (D7-S6 mups 包迁移子集)**: 4 IMPLEMENTED P0 T points, 0 PLANNED, 0 PARTIAL.
+
+## Scenario D7-S6 IMPLEMENTED Detail (子包清理热身 Sprint 子集)
+
+> **devrix-d7-package-cleanup-sprint (DM-20260625-018) S7_Archived 2026-06-25**
+
+```
+D7-S6  子包清理热身 Sprint (4 遗留小子包物理合并, IMPLEMENTED 子集 4 T)
+└── A50  D7 子包清理热身 Sprint (runregistry/toolpolicy/d7spans/sessionqueue → 父包)
+    ├── T01  PR-1 runregistry/ → workmodel/ 物理合并: 3 git mv + 9 importer + CI 资源清理 [IMPLEMENTED]
+    ├── T02  PR-2 toolpolicy/ → decisionplanning/ 物理合并: 6 git mv + 5 跨域 importer + D2 注释 [IMPLEMENTED]
+    ├── T03  PR-3a d7spans/ → hardening/ 物理合并: 2 git mv + 7 importer + 4 spec 同步         [IMPLEMENTED]
+    └── T04  PR-3b sessionqueue/ → executionflow/ 父级扁平: 3 git mv + 7 importer + doc.go    [IMPLEMENTED]
+```
+
+**Total (D7-S6 子包清理热身子集)**: 4 IMPLEMENTED P0 T points, 0 PLANNED, 0 PARTIAL.
+
+**3 PR 联动**:
+- PR #231 (PR-1 runregistry → workmodel, MERGED 2026-06-25T14:11:52Z)
+- PR #232 (PR-2 toolpolicy → decisionplanning, MERGED 2026-06-25T14:18:00Z)
+- PR #233 (PR-3 d7spans + sessionqueue, MERGED 2026-06-25T14:34:36Z)
+
+**D7 编排层目录结构终态**: 15 → 11 子目录（移除 4 遗留小子包）。
+**0 函数签名变化 + 0 业务逻辑变化** (pure physical migration)。
+归档：`openspec/archive/2026-06-25-devrix-d7-package-cleanup-sprint/`。
