@@ -504,6 +504,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.0.0** | **2026-06-26** | **6 S 精简 + 5 个新 P0/P1 Span（DM-20260626-001 / devrix-d7-six-s-simplification PR #215）**：14 S → **6 S + 1 横切** 重归类（S 编号变化，T ID 保持稳定以便追溯）；A 活动 **56 → 49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）；F 层按新 S 重归类（F 总数 75 → 68，Legacy 41 + Canonical 27）；MUPS 5 节点挂载：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2；7 Legacy A 全部并入 Canonical；版本号 v3.18.0 → v4.0.0（minor 升 major，反映 14 S → 6 S 精简是结构性变更）；新增 20 P0 T：(1) D7-S6-A48 channel.route +2 (T01 EmitChannelRoute happy + T02 nil-bridge fail-safe)；(2) D7-S6-A49 memory.persist +2 (T03 EmitMemoryPersist happy + T04 nil-bridge fail-safe)；(3) D7-S4-A47 system.anomaly_detect +8 (T05 EmitSystemAnomalyDetect happy + T06 nil-bridge + T11 DetectSystemAnomaly triggered High + T12 triggered Medium + T13 not triggered None + T14 overrideKind forward-compat v6.1 + T15 nil-bridge + T16 default thresholds)；(4) D7-S5-A33 taskgraph.synthesize +6 (T07 EmitTaskGraphSynthesize happy + T08 nil-bridge + T17 dagDepth empty + T18 linear chain t1→t4=4 + T19 branching diamond=3 + T20 SynthesizeTaskGraph Span emit fail-safe)；(5) D7-S5-A34 executor.select +2 (T09 EmitExecutorSelect happy + T10 nil-bridge)。20 新 P0 T 全 IMPLEMENTED，D7 T 186→206（重归类不删测试点），D7 P0 153→173。详细 A/T 重映射见 `a-registry.md §v6.0.0 6 S 精简映射` + `span-registry.md §Operations`（v6.0.0 已落地 23 ops + 9 sessionSpan attributes）|
 | **4.1.0** | **2026-06-26** | **mups 包路径迁移 PLANNED 预登记（DM-20260626-002 / devrix-d7-mups-package-migration）**：Step 2 (v6.0.0 follow-up) — execute/ + learn/ → mups/ 子树物理目录迁移，纯目录迁移 + import path 替换（保持 `package execute` / `package learn` 声明不变 + 函数签名/行为 0 变化）；加 4 P0 T 点：D7-S6-A51 T01 mups/execute/ 目录 + 7 .go git mv / T02 mups/learn/ 目录 + 17 .go git mv / T03 15 处 import path 全仓替换 + grep 0 残留 / T04 go build/vet/test -race 22/22 PASS + LP-1/LP-2/LP-5 路径 0 变化。Total 206→210, PLANNED 0→4, P0 173→177（IMPLEMENTED 持平 206）。收口后 v4.1.0 → v4.2.0。详见 `openspec/changes/devrix-d7-mups-package-migration/proposal.md` + `demand.md`。 |
 | **4.2.0** | **2026-06-26** | **mups 包路径迁移 IMPLEMENTED 收口（DM-20260626-002 落地）**：execute/ + learn/ → mups/ 子树物理目录迁移完成 (commit cb965d9: 24 文件 git mv rename 100%) + 17 处 import path 全仓替换完成 (commit e22ef5d: decisionplanning 2 + orchtypes 6 + sessionorchestrator 9) + go build/vet/test -race 全绿 (22/22 orchestration packages PASS + 130 全仓包 0 FAIL + 0 panic)。4 新 P0 T (D7-S6-A51-T01..T04) PLANNED → IMPLEMENTED, Total 210, IMPLEMENTED 206→210, PLANNED 4→0, P0 177。22 包 baseline 持平 (PR #215 验证)，LP-1/LP-2/LP-5 集成测试 100% 兼容 (Phase 6 TestAutoClose_FullLP1Loop + Phase 7 Verify Auto-Close 集成测试全部通过)。版本号 v4.1.0 → v4.2.0。详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` (S6 归档阶段)。 |
+| **4.3.0** | **2026-06-26** | **Hardening 横切包物理落地（DM-20260626-003 / devrix-d7-hardening-cross-cutting 落地）**：`orchestration/hardening/` 目录新建（5 .go: doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go），承接 v6.0.0 6 S + 1 横切 Discipline Keeper 横切角色；`sessionorchestrator/metrics.go` (61 行 InterruptMetrics) + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；`escape/circuit_breaker.go` 留 escape/（V5 EscapeEngine 核心机制，Decision 1，git diff 0 变化）；receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）保留 turn/ 紧耦合 *DefaultOrchestrator（Decision 2）；4 新 P0 T（D7-S7-A01-T01 + D7-S7-A02-T02 + D7-S7-A01-T03 + D7-S7-A01-T04）PLANNED → IMPLEMENTED, Total 210→214, IMPLEMENTED 210→214, PLANNED 0→0, P0 177→181；go build/vet/test -race 23/23 PASS（含 hardening 1 新包）+ LP-1（TestAutoClose_FullLP1Loop）+ LP-2（TestIntegration_5NodePipeline_End2End）100% 兼容。详见 `openspec/archive/2026-06-26-devrix-d7-hardening-cross-cutting/acceptance-report.md` (S6 归档阶段)。 |
 
 ---
 
@@ -618,6 +619,29 @@ D7-S14  MUPS v5 统一逃逸机制 (IMPLEMENTED, 5 PR 拆分)
 | **D7-S6-A51-T03** | 全仓 import path 替换：17 处 `internal/layers/orchestration/learn"` → `internal/layers/orchestration/mups/learn"`（decisionplanning 2 + orchtypes 6 + sessionorchestrator 9）；execute 包 0 外部 import 跳过；`grep -rl "orchestration/execute\""` + `grep -rl "orchestration/learn\""` 双 0 命中 | IMPLEMENTED | 全仓 import path 替换 |
 | **D7-S6-A51-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` 22/22 PASS（与 baseline 持平）+ LP-1/LP-2/LP-5 路径 0 变化 | IMPLEMENTED | 全仓 build/vet/test 验证 |
 
+---
+
+### Cross-cutting Hardening（横切，不占 S 位）
+
+### D7-S7-A01: hardening/metrics Package Directory Exists
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S7-A01-T01** | `internal/layers/orchestration/hardening/metrics.go` 目录创建，原 `sessionorchestrator/metrics.go` (61 行 InterruptMetrics struct + Snapshot + TotalCancelFailures) `git mv` 迁移完成，`package hardening` 声明（取代 `package sessionorchestrator`）；同包 `metrics_test.go` (4 测试: TestInterruptMetrics_Snapshot_AtomicIncrement / TestInterruptMetrics_NilSafe / TestInterruptMetrics_TotalCancelFailures / TestInterruptMetrics_Snapshot_AllFields) 同步迁 | IMPLEMENTED | `internal/layers/orchestration/hardening/{metrics.go,metrics_test.go,doc.go}` |
+| **D7-S7-A01-T03** | 全仓 import path 替换：`sessionorchestrator/interrupt.go` Metrics 字段类型 `*InterruptMetrics` → `*hardening.InterruptMetrics` (1 处) + `interrupt_test.go` 4 处 `&InterruptMetrics{}` → `&hardening.InterruptMetrics{}`；`grep -rln "sessionorchestrator\.InterruptMetrics"` + `grep -rln "sessionorchestrator/metrics"` 双 0 命中 | IMPLEMENTED | `sessionorchestrator/interrupt.go` + `sessionorchestrator/interrupt_test.go` |
+
+### D7-S7-A02: hardening/recovery Package Directory Exists
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S7-A02-T02** | `internal/layers/orchestration/hardening/recovery.go` 子集拆分（Decision 2）：原 `turn/recovery.go` (133 行) 拆 4 纯函数 + 1 const → hardening/ (`IsContextLengthError` + `IsOverloadOr5xx` + `NeedsMaxOutputTokenRecovery` + `MaxOutputTokensRecoveryMessage` const)，`package hardening` 声明；receiver methods（`compressMessagesForRecovery` + `invokeStreamWithRecovery`）+ `partialStreamEmit` struct + `emitStreamRecoveryTombstones` + `maxOutputTokenRecoveryAttempts` const 留 `turn/`；同包 `recovery_test.go` 3 纯函数测试（TestIsContextLengthError + TestIsOverloadOr5xx + TestNeedsMaxOutputTokenRecovery）同步迁；`grep -rln "turn\.IsContextLengthError"` + `grep -rln "turn/recovery"` 双 0 命中 | IMPLEMENTED | `internal/layers/orchestration/hardening/{recovery.go,recovery_test.go}` + `turn/recovery.go` (KEEP) + `turn/recovery_test.go` (KEEP 3 orchestrator-coupled tests + `recoveryStubLLM`) |
+
+### D7-S7-A01 (续): Build, Vet, Test All Green
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S7-A01-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` **23/23 PASS**（原 22 + 新 hardening 1 包，0 race condition）+ LP-1（Bayesian reputation `TestAutoClose_FullLP1Loop`）+ LP-2（`TestIntegration_5NodePipeline_End2End`）100% 兼容 + `escape/circuit_breaker.go` 0 变化（git diff HEAD 空，Decision 1） | IMPLEMENTED | 全仓 build/vet/test 验证 + escape/circuit_breaker.go 保持原状 |
+
 ## Scenario D7-S6 PLANNED Detail (mups 包迁移子集)
 
 ```
@@ -627,6 +651,18 @@ D7-S6  MUPS Pipeline (mups 包路径迁移, IMPLEMENTED 子集 4 T)
 │   ├── T02  mups/learn/ 目录 + 17 .go 文件 git mv 迁移               [IMPLEMENTED]
 │   ├── T03  17 处 import path 全仓替换 + grep 0 残留                  [IMPLEMENTED]
 │   └── T04  go build/vet/test -race 全绿 (22/22 orchestration pkgs)  [IMPLEMENTED]
+```
+
+## Scenario D7-S7 IMPLEMENTED Detail (Hardening 横切包物理落地子集)
+
+```
+D7-S7  Cross-cutting Hardening (Discipline Keeper, IMPLEMENTED 子集 4 T)
+├── A01  hardening/metrics Package Directory Exists
+│   ├── T01  hardening/metrics.go + metrics_test.go git mv 迁移       [IMPLEMENTED]
+│   ├── T03  0 残留 import path 全仓替换 + grep 0 命中                [IMPLEMENTED]
+│   └── T04  go build/vet/test -race 全绿 (23/23 orchestration pkgs)  [IMPLEMENTED]
+└── A02  hardening/recovery Package Directory Exists
+    └── T02  hardening/recovery.go subset split (4 纯函数 + 1 const)  [IMPLEMENTED]
 ```
 
 **Total (D7-S6 mups 包迁移子集)**: 4 IMPLEMENTED P0 T points, 0 PLANNED, 0 PARTIAL.

@@ -59,7 +59,7 @@
 
 | 组件 | 博弈角色 | 物理位置 | Status |
 |------|----------|----------|--------|
-| **Hardening** | **Discipline Keeper** | `orchestration/hardening/`（含 metrics.go + circuit_breaker.go + error_recovery.go） | **✅ IMPLEMENTED** |
+| **Hardening** | **Discipline Keeper** | `orchestration/hardening/`（含 metrics.go + recovery.go subset；`circuit_breaker.go` 留 `escape/`，见 Decision 1） | **✅ IMPLEMENTED** |
 
 ### 登记规模（Canonical，v6.0.0）
 
@@ -123,3 +123,4 @@ D7-S5 Observe 节点 ── UncertaintyReport ──▶ D7-S5 Plan 节点 ──
 | 1.1.0 | 2026-06-18 | DM-20260617-009 闭环：WorkItem/WorkTree 写入 North Star；RunTurn resolve/decompose/await；tech-debt 索引 |
 | 1.2.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 升格：14 S 层（D7-S1~S14）全部 IMPLEMENTED；North Star 新增 8 行可验证承诺（S6-S14）；DSAFT 资产规模 24 A → 56 A，66 T → 180 T，9 Span → 18 Span；新增 §MUPS 5 节点管道依赖契约；跨域类型上提 PR-C1；Reverse Traceability LP-5 |
 | **2.0.0** | **2026-06-26** | **6 S 博弈角色对齐精简**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；(2) North Star 14 行 → 6 行（每个 S 含全部合并角色）；(3) DSAFT 资产规模 56 A → **49 A**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2），75 F → **68 F**，180 T 持平（重归类不删），18 Span → **23 Span**（**+5 新 P0/P1**：channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select）；(4) MUPS 5 节点管道挂载调整（Observe/Plan 归 S5，Execute/Learn 归 S6，Verify 归 S4，ResumeSession 归 S2）；(5) 新增 §Cross-cutting Hardening 表，定位明确为非 S；(6) 14 S 冗余分析详见 `dsaft-architecture.md` |
+| **2.1.0** | **2026-06-26** | **Hardening 横切包物理落地**（DM-20260626-003）：(1) `orchestration/hardening/` 目录新建，5 .go 文件（doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go）；(2) `sessionorchestrator/metrics.go` + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；(3) `escape/circuit_breaker.go` **留 escape/**（Decision 1：V5 EscapeEngine 核心机制）；(4) `turn/recovery.go` KEEP：receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）+ partialStreamEmit + emitStreamRecoveryTombstones（Decision 2：紧耦合 *DefaultOrchestrator）；(5) D7-S7 4 新 P0 T IMPLEMENTED（D7-S7-A01-T01..T04）→ 域 t-registry v4.3.0 / 根 v5.3.0；(6) 23/23 orchestration packages go test -race PASS |
