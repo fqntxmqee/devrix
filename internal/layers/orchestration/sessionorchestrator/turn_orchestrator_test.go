@@ -11,6 +11,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/verify"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -1375,7 +1376,7 @@ func TestResolveFinalText(t *testing.T) {
 		name      string
 		finalText string
 		thinking  string
-		reason    ExitReason
+		reason    verify.ExitReason
 		maxTurns  int
 		want      string
 	}{
@@ -1383,35 +1384,35 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "non_empty_finalText_wins",
 			finalText: "the answer is 42",
 			thinking:  "i should think about this",
-			reason:    ExitReasonNatural,
+			reason:    verify.ExitReasonNatural,
 			want:      "the answer is 42",
 		},
 		{
 			name:      "whitespace_finalText_falls_back_to_thinking",
 			finalText: "\n\n\n",
 			thinking:  "let me think: 6*7=42",
-			reason:    ExitReasonNatural,
+			reason:    verify.ExitReasonNatural,
 			want:      "let me think: 6*7=42",
 		},
 		{
 			name:      "empty_thinking_keeps_blank",
 			finalText: "",
 			thinking:  "",
-			reason:    ExitReasonNatural,
+			reason:    verify.ExitReasonNatural,
 			want:      "",
 		},
 		{
 			name:      "think_tags_in_thinking_are_stripped",
 			finalText: "",
 			thinking:  "<think>working notes</think>the final answer",
-			reason:    ExitReasonNatural,
+			reason:    verify.ExitReasonNatural,
 			want:      "the final answer",
 		},
 		{
 			name:      "unclosed_think_tag_is_dropped_safely",
 			finalText: "",
 			thinking:  "<think>incomplete working notes",
-			reason:    ExitReasonNatural,
+			reason:    verify.ExitReasonNatural,
 			// StripThinkingTags drops unclosed <think> blocks entirely
 			// (no matching closing tag → no safe partial). The helper
 			// returns blank in that case, which the IM adapter then
@@ -1422,7 +1423,7 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "max_turns_with_text_prepends_notice",
 			finalText: "third attempt summary",
 			thinking:  "",
-			reason:    ExitReasonMaxTurns,
+			reason:    verify.ExitReasonMaxTurns,
 			maxTurns:  3,
 			want:      "[max-turns reached after 3 iterations; turn truncated]\nthird attempt summary",
 		},
@@ -1430,7 +1431,7 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "max_turns_with_thinking_prepends_notice",
 			finalText: "",
 			thinking:  "已多次调用工具触达 max-turns 兜底",
-			reason:    ExitReasonMaxTurns,
+			reason:    verify.ExitReasonMaxTurns,
 			maxTurns:  3,
 			want:      "[max-turns reached after 3 iterations; turn truncated]\n已多次调用工具触达 max-turns 兜底",
 		},
@@ -1438,7 +1439,7 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "max_turns_with_empty_returns_only_notice",
 			finalText: "",
 			thinking:  "",
-			reason:    ExitReasonMaxTurns,
+			reason:    verify.ExitReasonMaxTurns,
 			maxTurns:  3,
 			want:      "[max-turns reached after 3 iterations; turn truncated]",
 		},
@@ -1446,7 +1447,7 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "non_max_turns_reason_does_not_prepend_notice",
 			finalText: "ok",
 			thinking:  "",
-			reason:    ExitReasonRepeatedTool,
+			reason:    verify.ExitReasonRepeatedTool,
 			maxTurns:  3,
 			// Even with MaxTurns>0, the loop exited for a different
 			// reason (e.g. repeated tool) — the user did not hit the
@@ -1457,7 +1458,7 @@ func TestResolveFinalText(t *testing.T) {
 			name:      "max_turns_unbounded_skips_notice",
 			finalText: "ok",
 			thinking:  "",
-			reason:    ExitReasonMaxTurns,
+			reason:    verify.ExitReasonMaxTurns,
 			maxTurns:  0,
 			// Unbounded turns cannot legitimately hit MaxTurns; the
 			// helper still treats maxTurns=0 as "no notice" defensively.
@@ -1582,7 +1583,7 @@ func TestOrchestrator_RunTurn_PromotesThinkingWhenContentBlank_NoToolCalls(t *te
 }
 
 // ============================================================================
-// ExitReason coverage — one test per deterministic exit reason (clawcode alignment).
+// verify.ExitReason coverage — one test per deterministic exit reason (clawcode alignment).
 //
 // Each test pins the behaviour the orchestrator must guarantee when that exit
 // reason fires. Together they cover every branch in runLoop's terminal block:
@@ -1639,8 +1640,8 @@ func TestOrchestrator_RunTurn_NaturalCompletion_NoMaxTurns(t *testing.T) {
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonNatural) {
-		t.Errorf("exit_reason = %q, want %q", got, ExitReasonNatural)
+	if got := complete.Metadata["exit_reason"]; got != string(verify.ExitReasonNatural) {
+		t.Errorf("exit_reason = %q, want %q", got, verify.ExitReasonNatural)
 	}
 	if strings.Contains(complete.Content, "max-turns") {
 		t.Errorf("natural completion should not carry truncation notice, got %q", complete.Content)
@@ -1694,8 +1695,8 @@ func TestOrchestrator_RunTurn_MaxTurnsReached_EmitsTruncationNotice(t *testing.T
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonMaxTurns) {
-		t.Errorf("exit_reason = %q, want %q", got, ExitReasonMaxTurns)
+	if got := complete.Metadata["exit_reason"]; got != string(verify.ExitReasonMaxTurns) {
+		t.Errorf("exit_reason = %q, want %q", got, verify.ExitReasonMaxTurns)
 	}
 	if !strings.Contains(complete.Content, "[max-turns reached after 3 iterations; turn truncated]") {
 		t.Errorf("complete.Content missing truncation notice, got %q", complete.Content)
@@ -1748,8 +1749,8 @@ func TestOrchestrator_RunTurn_RepeatedTool_TriggersAbortedRepeatedTool(t *testin
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonRepeatedTool) {
-		t.Errorf("exit_reason = %q, want %q", got, ExitReasonRepeatedTool)
+	if got := complete.Metadata["exit_reason"]; got != string(verify.ExitReasonRepeatedTool) {
+		t.Errorf("exit_reason = %q, want %q", got, verify.ExitReasonRepeatedTool)
 	}
 	if strings.Contains(complete.Content, "max-turns") {
 		t.Errorf("repeated_tool exit should not carry truncation notice, got %q", complete.Content)
@@ -1805,8 +1806,8 @@ func TestOrchestrator_RunTurn_ConsecutiveToolErrors_TriggersAbortedToolFailure(t
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonToolFailure) {
-		t.Errorf("exit_reason = %q, want %q", got, ExitReasonToolFailure)
+	if got := complete.Metadata["exit_reason"]; got != string(verify.ExitReasonToolFailure) {
+		t.Errorf("exit_reason = %q, want %q", got, verify.ExitReasonToolFailure)
 	}
 	// 3 iterations: 1st sets fp+count=1, 2nd increments to 2, 3rd trips
 	// detector at count=3.
@@ -1957,8 +1958,8 @@ func TestOrchestrator_RunTurn_TokenBudgetDiminishing_StopsLoop(t *testing.T) {
 	if complete == nil {
 		t.Fatal("expected complete event")
 	}
-	if got := complete.Metadata["exit_reason"]; got != string(ExitReasonTokenDiminishing) {
-		t.Errorf("exit_reason = %q, want %q", got, ExitReasonTokenDiminishing)
+	if got := complete.Metadata["exit_reason"]; got != string(verify.ExitReasonTokenDiminishing) {
+		t.Errorf("exit_reason = %q, want %q", got, verify.ExitReasonTokenDiminishing)
 	}
 	if turnIdx.Load() != 3 {
 		t.Errorf("expected 3 LLM calls (3rd trips detector), got %d", turnIdx.Load())

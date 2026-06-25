@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.4.0
-**Last Updated:** 2026-06-26
+**Version:** 4.5.0
+**Last Updated:** 2026-06-26 (verify-promotion)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -428,6 +428,10 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2-A50-T02 | 24 文件 `package turn` → `package sessionorchestrator` 全替换 | D7-S2-A50 | `grep -l "^package turn$" internal/layers/orchestration/sessionorchestrator/` 应 0 结果 | IMPLEMENTED | P0 |
 | D7-S2-A50-T03 | 14 importer 文件 import path + identifier 全替换 + 跨包 import cycle 打破 | D7-S2-A50 | `grep -rn "orchestration/turn" internal/` 应 0 命中；sessionorchestrator ↔ decisionplanning cycle 经 orchtypes 上提修复 | IMPLEMENTED | P0 |
 | D7-S2-A50-T04 | hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go 0 变更 + 22/22 orchestration packages go test -race PASS | D7-S2-A50 | `git diff --stat hardening/ escape/ sessionorchestrator/autoclose.go` 应空；`go test -race -count=1 ./internal/layers/orchestration/...` 应 22/22 PASS | IMPLEMENTED | P0 |
+| D7-S4-A50-T01 | sessionorchestrator/{exit_reason,verdict_to_exit_reason,verdict_to_exit_reason_test}.go 3 文件 git mv → executionflow/verify/（218 行） | D7-S4-A50 | `git log --follow` 100% rename detection；`ls sessionorchestrator/ \| grep -E "exit_reason\|verdict_to"` 0 命中 | PLANNED | P0 |
+| D7-S4-A50-T02 | 3 文件 `package sessionorchestrator` → `package verify` + sessionorchestrator/turn_orchestrator.go 11 处 `ExitReason*` → `verify.ExitReason*` + turn_orchestrator_test.go 2 处 `ExitReasonNatural` → `verify.ExitReasonNatural` | D7-S4-A50 | `grep -rn "ExitReason[^a-zA-Z]" sessionorchestrator/*.go \| grep -v "verify\."` 0 命中 | PLANNED | P0 |
+| D7-S4-A50-T03 | executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 import cycle 0 风险（单向 DAG: sessionorchestrator → verify） | D7-S4-A50 | `go list -deps ./internal/layers/orchestration/executionflow/verify \| grep sessionorchestrator` 0 命中 | PLANNED | P0 |
+| D7-S4-A50-T04 | go build/vet/test -race 22/22 orchestration packages 全绿 + LP-1/2/5 集成测试 100% 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化 | D7-S4-A50 | `git diff hardening/ escape/ sessionorchestrator/autoclose.go` 空；`go test -race -count=1 ./internal/layers/orchestration/...` 22/22 PASS | PLANNED | P0 |
 
 ---
 
@@ -435,7 +439,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 218 | 218 | 0 | 0 | 185 |
+| 222 | 218 | 0 | 4 | 185 |
 
 ### 按 Scenario
 
@@ -444,7 +448,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S1 | 8 | 8 | 0 | 0 |
 | D7-S2 | 36 | 36 | 0 | 0 |
 | D7-S3 | 20 | 20 | 0 | 0 |
-| D7-S4 | 9 | 9 | 0 | 0 |
+| D7-S4 | 13 | 9 | 0 | 4 |
 | D7-S5 | 28 | 28 | 0 | 0 |
 | **D7-S6** | **7** | **7** | **0** | **0** |
 | **D7-S8** | **9** | **9** | **0** | **0** |
@@ -510,6 +514,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.2.0** | **2026-06-26** | **mups 包路径迁移 IMPLEMENTED 收口（DM-20260626-002 落地）**：execute/ + learn/ → mups/ 子树物理目录迁移完成 (commit cb965d9: 24 文件 git mv rename 100%) + 17 处 import path 全仓替换完成 (commit e22ef5d: decisionplanning 2 + orchtypes 6 + sessionorchestrator 9) + go build/vet/test -race 全绿 (22/22 orchestration packages PASS + 130 全仓包 0 FAIL + 0 panic)。4 新 P0 T (D7-S6-A51-T01..T04) PLANNED → IMPLEMENTED, Total 210, IMPLEMENTED 206→210, PLANNED 4→0, P0 177。22 包 baseline 持平 (PR #215 验证)，LP-1/LP-2/LP-5 集成测试 100% 兼容 (Phase 6 TestAutoClose_FullLP1Loop + Phase 7 Verify Auto-Close 集成测试全部通过)。版本号 v4.1.0 → v4.2.0。详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` (S6 归档阶段)。 |
 | **4.3.0** | **2026-06-26** | **Hardening 横切包物理落地（DM-20260626-003 / devrix-d7-hardening-cross-cutting 落地）**：`orchestration/hardening/` 目录新建（5 .go: doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go），承接 v6.0.0 6 S + 1 横切 Discipline Keeper 横切角色；`sessionorchestrator/metrics.go` (61 行 InterruptMetrics) + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；`escape/circuit_breaker.go` 留 escape/（V5 EscapeEngine 核心机制，Decision 1，git diff 0 变化）；receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）保留 turn/ 紧耦合 *DefaultOrchestrator（Decision 2）；4 新 P0 T（D7-S7-A01-T01 + D7-S7-A02-T02 + D7-S7-A01-T03 + D7-S7-A01-T04）PLANNED → IMPLEMENTED, Total 210→214, IMPLEMENTED 210→214, PLANNED 0→0, P0 177→181；go build/vet/test -race 23/23 PASS（含 hardening 1 新包）+ LP-1（TestAutoClose_FullLP1Loop）+ LP-2（TestIntegration_5NodePipeline_End2End）100% 兼容。详见 `openspec/archive/2026-06-26-devrix-d7-hardening-cross-cutting/acceptance-report.md` (S6 归档阶段)。 |
 | **4.4.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并（DM-20260626-004 / devrix-d7-6s-package-merge 落地）**：D7-S2 SessionOrchestrator 单一博弈角色单一 Go 包封装（pure physical migration + import path replace）。24 .go 文件 git mv + 14 importer 文件 import path replace + 跨包 import cycle 打破（LLMInvoker/LLMInvokeRequest/ToolSchema 上提 `orchtypes/` + sessionorchestrator 用 type alias）。**0 函数签名变化** + 0 行为变化 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` 0 变更验证。22/22 orchestration packages go test -race PASS + go build + go vet 全绿。**4 新 P0 T** IMPLEMENTED：D7-S2-A50-T01 `orchestration/turn/` 24 .go 文件 git mv → `orchestration/sessionorchestrator/`（contracts/doc/orchestrator/orchestrator_test/tracing 5 文件加 turn_ 前缀解决同名冲突）/ D7-S2-A50-T02 24 .go 文件 `package turn` → `package sessionorchestrator` 替换 / D7-S2-A50-T03 14 importer 文件 import path + identifier 全替换（10 bootstrap + 2 decisionplanning + 2 sessionorchestrator）+ 跨包 import cycle 打破（orchtypes 上提）/ D7-S2-A50-T04 `orchestration/turn/` 目录 0 残留验证 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` git diff 0 变更。Total 214→218, IMPLEMENTED 214→218, PLANNED 0→0, P0 181→185。详见 `openspec/archive/2026-06-26-devrix-d7-6s-package-merge/acceptance-report.md` (S6 归档阶段)。 |
+| **4.5.0** | **2026-06-26** | **verify-promotion 包归属迁移 PLANNED 预登记（DM-20260626-005 / devrix-d7-6s-verify-promotion）**：Step 5 (v6.0.0 follow-up) — DM-20260626-004 turn/ → sessionorchestrator/ 时为避免单 PR scope 膨胀临时留存的 `sessionorchestrator/{exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go (97 行)}` 3 文件 (218 行) 物理 promote 到 `executionflow/verify/`；让 S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的可验证承诺 (14 ExitReason + VerdictToExitReason 4 态映射) 在 spec/code 完全对齐；`sessionorchestrator/turn_orchestrator.go` 11 处 `ExitReason*` → `verify.ExitReason*` 跨包引用替换（state 字段 + 6 常量 + 2 函数参数 + 1 type assertion）+ `turn_orchestrator_test.go` 2 处替换。**0 函数签名变化**（pure physical migration，安全网与 DM-20260626-004 一致）；14 ExitReason 字符串值全不变；6 测试函数测试矩阵全不变；加 4 P0 T 点 PLANNED：D7-S4-A50 T01 3 文件 git mv + git log --follow 100% rename detection / T02 3 文件 package 改名 + 13 处 ExitReason* 全替换 + grep 0 残留 / T03 executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 cycle 0 风险 / T04 go build/vet/test -race 22/22 PASS + LP-1/LP-2/LP-5 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化。Total 218→222, PLANNED 0→4, P0 185 (IMPLEMENTED 持平 218)。收口后 v4.5.0 → v4.6.0。详见 `openspec/changes/devrix-d7-6s-verify-promotion/proposal.md` + `demand.md` + `design.md` + `tasks.md`。 |
 
 ---
 
@@ -657,6 +662,19 @@ D7-S6  MUPS Pipeline (mups 包路径迁移, IMPLEMENTED 子集 4 T)
 │   ├── T03  17 处 import path 全仓替换 + grep 0 残留                  [IMPLEMENTED]
 │   └── T04  go build/vet/test -race 全绿 (22/22 orchestration pkgs)  [IMPLEMENTED]
 ```
+
+## Scenario D7-S4 PLANNED Detail (verify-promotion 包归属迁移子集)
+
+```
+D7-S4  ExecutionFlow + Verify (verify-promotion, PLANNED 子集 4 T)
+└── A50  Verify Package Directory Exists (exit_reason + verdict_to_exit_reason from sessionorchestrator/)
+    ├── T01  3 文件 git mv + git log --follow 100% rename detection   [PLANNED]
+    ├── T02  3 文件 package 改名 + 13 处 ExitReason* 全替换            [PLANNED]
+    ├── T03  executionflow/verify/ 包 0 sessionorchestrator 反向依赖    [PLANNED]
+    └── T04  go build/vet/test -race 22/22 PASS + LP-1/2/5 兼容         [PLANNED]
+```
+
+**Total (D7-S4 verify-promotion 子集)**: 4 PLANNED P0 T points, 0 IMPLEMENTED, 0 PARTIAL.
 
 ## Scenario D7-S7 IMPLEMENTED Detail (Hardening 横切包物理落地子集)
 

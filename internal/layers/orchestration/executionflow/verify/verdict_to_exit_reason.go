@@ -1,4 +1,4 @@
-package sessionorchestrator
+package verify
 
 import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"

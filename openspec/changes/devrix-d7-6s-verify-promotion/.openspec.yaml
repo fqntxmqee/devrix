@@ -1,0 +1,157 @@
+id: devrix-d7-6s-verify-promotion
+demand_id: DM-20260626-005
+title: "D7 verify/ 包归属 promote (v6.0.0 follow-up #4 落地)"
+status: s2_proposal
+priority: P1
+created: 2026-06-26
+author: D7 编排层 Certifier 包归属梳理（v6.0.0 follow-up #4）
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S4-A50
+    name: Verify 包归属 promote (exit_reason + verdict_to_exit_reason 从 sessionorchestrator/ → executionflow/verify/)
+    description: |
+      v6.0.0 follow-up #4 (6s-verify-promotion)。把 D7 编排层中临时留存在
+      `sessionorchestrator/` 包内的 3 文件 (`exit_reason.go` 72 行 +
+      `verdict_to_exit_reason.go` 49 行 + `verdict_to_exit_reason_test.go` 97 行,
+      共 218 行) 物理 promote 到 `executionflow/verify/`。
+      DM-20260626-004 (`devrix-d7-6s-package-merge`) 把 turn/ → sessionorchestrator/
+      时为避免单 PR scope 膨胀 (60 文件), 3 个 Verify-衍生文件临时留 sessionorchestrator/;
+      本次独立 PR 收口, 0 函数签名变化 (pure physical migration)。
+      promote 后 S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的
+      可验证承诺 (14 ExitReason + VerdictToExitReason 4 态映射) 在 spec 层与代码层
+      完全对齐。
+    rationale: |
+      v6.0.0 域升级 follow-up 序列的物理包收口（#1 spec + #2 mups + #3 hardening +
+      #4 turn-merge + 本次 #5 verify-promotion）。
+      S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 是单一博弈角色,
+      但 `ExitReason` 14 枚举值里 6 个 (partial_verified / verifier_abstain /
+      verifier_fail / system_anomaly / unresolved / abstain) 是 Phase 4 Verify
+      升格后新增的 Verify-derived stop conditions, 代码侧全在 sessionorchestrator/
+      导致:
+      (a) 角色与代码归属不对齐: S4 Certifier 的可验证承诺在 spec 层与代码层脱钩;
+      (b) `VerdictToExitReason` 跨角色调用方向反了: 未来 verify/anomaly.go 调用
+          `sessionorchestrator.VerdictToExitReason` 是 S4 → S2 反向依赖 (Certifier
+          是 S4, SessionOrchestrator 是 S2, S4 不应依赖 S2 实现细节);
+      (c) 测试点归属错位: verdict_to_exit_reason_test.go 5 个 test function 测试
+          Certifier 行为, 但 package sessionorchestrator 与 A 层 D7-S10-A33
+          VerdictToExitReason 注册到 S4 不一致;
+      (d) follow-up #6 (6s-bootstrap-slim) wire 14 → 6 收敛的前置条件。
+      promote 后 S4 Certifier 单一包封装恢复, 跨包 DAG 单向 (sessionorchestrator → verify)。
+
+# 测试点（本次 PR 实际实现 4 个）
+test_points:
+  - id: D7-S4-A50-T01
+    name: |
+      `internal/layers/orchestration/sessionorchestrator/{exit_reason.go,verdict_to_exit_reason.go,verdict_to_exit_reason_test.go}`
+      3 文件 `git mv` 到 `internal/layers/orchestration/executionflow/verify/`。
+      `git log --follow` 100% rename detection, `ls sessionorchestrator/ | grep -E "exit_reason|verdict_to"`
+      0 命中, `ls executionflow/verify/` 显示新 3 文件 + 原 anomaly.go + anomaly_test.go。
+    status: PLANNED
+  - id: D7-S4-A50-T02
+    name: |
+      3 文件 `package sessionorchestrator` → `package verify` 改名一致；
+      sessionorchestrator/turn_orchestrator.go 加 `executionflow/verify` import
+      并 11 处 `ExitReason*` 引用替换为 `verify.ExitReason*`（state 字段类型 +
+      6 个常量 + 2 个函数参数类型 + 1 个 type assertion）；
+      sessionorchestrator/turn_orchestrator_test.go 2 处 `ExitReasonNatural` →
+      `verify.ExitReasonNatural`。
+      `grep -rn "ExitReason[^a-zA-Z]" sessionorchestrator/*.go | grep -v "verify\."` 0 命中。
+    status: PLANNED
+  - id: D7-S4-A50-T03
+    name: |
+      executionflow/verify/ 包 0 sessionorchestrator 反向依赖；
+      跨包 import cycle 0 风险（单向 DAG: sessionorchestrator → verify）。
+      `go list -deps ./internal/layers/orchestration/executionflow/verify | grep sessionorchestrator` 0 命中。
+      `go list -deps ./internal/layers/orchestration/sessionorchestrator | grep executionflow/verify` 命中（确认正向引用）。
+    status: PLANNED
+  - id: D7-S4-A50-T04
+    name: |
+      `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test
+      ./internal/layers/orchestration/... -race -count=1` 22/22 包全部 PASS
+      （与 DM-20260626-004 baseline 持平, 含 verify/ 扩展后 5 文件）；
+      LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session
+      traceability) 集成测试 100% 兼容；
+      `sessionorchestrator/autoclose.go` + `hardening/` + `escape/circuit_breaker.go`
+      git diff 0 变化（baseline stability 保持）。
+    status: PLANNED
+
+# 范围
+in_scope:
+  - internal/layers/orchestration/sessionorchestrator/{exit_reason,verdict_to_exit_reason,verdict_to_exit_reason_test}.go → internal/layers/orchestration/executionflow/verify/ (3 .go git mv)
+  - 3 文件 package 改名 (sed)
+  - internal/layers/orchestration/sessionorchestrator/turn_orchestrator.go (MODIFY: 加 import + 11 处 ExitReason* → verify.ExitReason*)
+  - internal/layers/orchestration/sessionorchestrator/turn_orchestrator_test.go (MODIFY: 2 处 ExitReasonNatural → verify.ExitReasonNatural)
+  - openspec/specs/d7-orchestration/d7-domain.md v2.2.0 → v2.3.0 (新增 v2.3.0 changelog row + verify/ 包角色描述更新)
+  - openspec/specs/d7-orchestration/design.md v4.2.0 → v4.3.0 (§1.2 S4 ExecutionFlow+Verify 包结构描述更新 + VerdictToExitReason 实现位置更新)
+  - openspec/specs/d7-orchestration/t-registry.md v4.4.0 → v4.5.0 (新增 D7-S4-A50-T01..T04 + Statistics 域 218 → 222 IMPLEMENTED, P0 181 → 185)
+  - openspec/t-registry.md (root) v5.4.0 → v5.5.0 (新增 DM-20260626-005 增量条目, 总 P0 350 → 354)
+
+out_of_scope:
+  - ExitReason 14 枚举值重设计 / 字符串重命名（本次不动语义, 只搬位置, 0 函数签名变化）
+  - VerdictToExitReason 函数签名变化（保持 (v workmodel.Verdict, sessionID string) ExitReason 不变）
+  - S4 ExecutionFlow + Verify 其他文件 promote（anomaly.go + 其他 verify 文件已在 verify/）
+  - D7-S10-A33 `MapVerdictToExitReason` 单独 spec 入口（后续 v6.0.1 follow-up; 本次 promote 是 pure physical migration, 不重命名函数）
+  - D7 14 S → 6 S 文档语义保持不变（本次不影响 S 层归类）
+  - 5 个新 P0/P1 Span emit 路径 0 变化
+  - multiagent/ 域不动 (不同域不同职责)
+  - hardening/ 横切包 0 变化 (本次 promote 不影响 hardening 调用 hardening.IsContextLengthError)
+  - escape/circuit_breaker.go 不动 (V5 EscapeEngine 核心机制)
+  - sessionorchestrator/autoclose.go 不动 (已在 sessionorchestrator/, 与 ExitReason 无关)
+  - bootstrap wire_coordinator.go 不动 (本次 promote 不改 wire 拓扑; follow-up #6 6s-bootstrap-slim 统一处理 14 wire → 6 wire)
+
+# PR 拆分
+pr_breakdown:
+  - pr: PR-main
+    scope: "3 文件 git mv + package 改名 + 13 处 ExitReason* 跨包引用替换 + build/vet/race 全绿 + LP-1/2/5 兼容"
+    files: ~9 (3 git mv + 2 turn_orchestrator MODIFY + 4 doc MODIFY + .openspec.yaml)
+    estimated_loc: +218 (3 files promote) + ~25 (2 turn_orchestrator MODIFY) + ~80 (4 doc 同步) - 218 (3 files git mv source rename 抵消) ≈ 105 net
+    risk: Low
+    branches:
+      - feat/devrix-d7-6s-verify-promotion (from master)
+    pr_url: TBD
+
+# 关联
+related_changes:
+  - devrix-d7-six-s-simplification  # #1 v6.0.0 域升级 spec 层 14 S → 6 S
+  - devrix-d7-6s-package-merge  # #4 turn/ 整包合并到 sessionorchestrator/ (本次 #5 是其前置欠账收口)
+
+# 后续 follow-up
+followup_changes:
+  - devrix-d7-6s-observe-merge  # #5 observe/orchtypes/ → decisionplanning/
+  - devrix-d7-6s-bootstrap-slim  # #6 wire 14 → 6（依赖 #4+#5+#6 完成）
+
+# 参考
+references:
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-six-s-simplification.md
+  - ~/.claude/projects/-Users-fukai-workspace/memory/devrix-d7-6s-package-merge-s7-archived.md
+  - openspec/archive/2026-06-26-devrix-d7-6s-package-merge/  # #4 模板
+  - openspec/specs/d7-orchestration/spec.md  # D7 域规范 v2.2.0
+  - openspec/specs/d7-orchestration/design.md  # D7 设计文档 v4.2.0
+  - openspec/specs/d7-orchestration/t-registry.md  # D7 T 层注册表 v4.4.0
+
+# 验证
+verification:
+  s3_gate:
+    - 用户确认 design.md Decision 1 (git mv, not create+delete) + Decision 2 (0 函数签名变化) + Decision 3 (8 处 ExitReason* 全替换) + Decision 4 (14 枚举值全留 verify/) + Decision 5 (T 编号 D7-S4-A50)
+  s4_gate:
+    - go vet ./...  # 0 warnings
+    - go build ./...  # 0 errors
+    - go test ./internal/layers/orchestration/... -race -count=1  # 22/22 PASS
+    - LP-1 (Bayesian reputation) / LP-2 (Memory 3 通道) / LP-5 (Cross-session traceability) 集成测试 100% 兼容
+    - sessionorchestrator/autoclose.go 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - hardening/ 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - escape/circuit_breaker.go 0 变化 (git diff 空, DM-20260626-003 baseline)
+    - go list -deps executionflow/verify 不含 sessionorchestrator (单向 DAG 验证)
+  s5_gate:
+    - 4 个 P0 T 点 (D7-S4-A50-T01..T04) 全部 IMPLEMENTED
+    - acceptance-report.md §1-§10 全部 13 AC 验收
+    - 0 race detector warnings
+    - 覆盖率 ≥ baseline (DM-20260626-004 落地后 80%)
+  s6_gate:
+    - ./scripts/verify-archive.sh devrix-d7-6s-verify-promotion  # 12/12 PASS

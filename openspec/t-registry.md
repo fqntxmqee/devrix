@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.4.0
-**Last Updated:** 2026-06-26
+**Version:** 5.5.0
+**Last Updated:** 2026-06-26 (verify-promotion)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 214 | 214 | 0 | 181 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 218 | 214 | 4 | 181 |
 
-**总计**: 536 · IMPLEMENTED 531 · PLANNED 3 · PARTIAL 0 · P0 350
+**总计**: 540 · IMPLEMENTED 531 · PLANNED 7 · PARTIAL 0 · P0 350
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -59,6 +59,8 @@
 
 > 2026-06-26 增量（turn/ → sessionorchestrator/ 整包物理合并）：DM-20260626-004 (devrix-d7-6s-package-merge) — v6.0.0 域升级 Step 4 follow-up 落地：D7-S2 SessionOrchestrator 单一博弈角色单一 Go 包封装（pure physical migration + import path replace）。24 .go 文件 git mv + 14 importer 文件 import path replace + 跨包 import cycle 打破（LLMInvoker/LLMInvokeRequest/ToolSchema 上提 `orchtypes/` + sessionorchestrator 用 type alias）。**0 函数签名变化** + 0 行为变化 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` 0 变更验证。22/22 orchestration packages go test -race PASS + go build + go vet 全绿。**4 新 P0 T** IMPLEMENTED：D7-S2-A50-T01 `orchestration/turn/` 24 .go git mv → `orchestration/sessionorchestrator/`（5 文件 turn_ 前缀解决同名）/ D7-S2-A50-T02 24 文件 `package turn` → `package sessionorchestrator` / D7-S2-A50-T03 14 importer import path + identifier 全替换 + 跨包 import cycle 打破 / D7-S2-A50-T04 `orchestration/turn/` 0 残留 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` git diff 0 + 22/22 PASS。Total 536, P0 350（IMPLEMENTED 527→531, P0 346→350）。D7 t-registry v4.3.0 → v4.4.0。
 > 详见 `openspec/archive/2026-06-26-devrix-d7-mups-package-migration/acceptance-report.md` §3 T 层验证 + §4 22 包回归验证 + §5 LP-1/LP-2/LP-5 兼容验证（待 S6 归档生成）。
+
+> 2026-06-26 增量（verify-promotion 包归属迁移 PLANNED 预登记）：DM-20260626-005 (devrix-d7-6s-verify-promotion) — v6.0.0 域升级 Step 5 follow-up 立项：DM-20260626-004 turn/ → sessionorchestrator/ 时为避免单 PR scope 膨胀临时留存的 `sessionorchestrator/{exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go (97 行)}` 3 文件 (218 行) 物理 promote 到 `executionflow/verify/`；让 S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的可验证承诺 (14 ExitReason + VerdictToExitReason 4 态映射) 在 spec/code 完全对齐；`sessionorchestrator/turn_orchestrator.go` 11 处 `ExitReason*` → `verify.ExitReason*` 跨包引用替换 + `turn_orchestrator_test.go` 2 处替换。**0 函数签名变化**（pure physical migration，安全网与 DM-20260626-004 一致）；14 ExitReason 字符串值 + 6 测试函数测试矩阵全不变。加 **4 新 P0 T** PLANNED：D7-S4-A50-T01 3 文件 git mv + git log --follow 100% rename detection / D7-S4-A50-T02 3 文件 package 改名 + 13 处 ExitReason* 全替换 + grep 0 残留 / D7-S4-A50-T03 executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 cycle 0 风险 / D7-S4-A50-T04 go build/vet/test -race 22/22 PASS + LP-1/LP-2/LP-5 集成测试 100% 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化。Total 540, PLANNED 3→7, P0 350（IMPLEMENTED 531, P0 350）。D7 t-registry v4.4.0 → v4.5.0。22 包 baseline 持平（DM-20260626-004 PR #220+#221 验证），0 函数签名变化。
 
 ---
 

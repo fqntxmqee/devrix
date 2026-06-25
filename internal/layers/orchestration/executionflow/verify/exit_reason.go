@@ -1,4 +1,4 @@
-package sessionorchestrator
+package verify
 
 // ExitReason captures *why* the turn loop stopped. Surfaced on the final
 // `complete` EngineEvent's Metadata["exit_reason"] and on the persisted

@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/verify"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -57,7 +58,7 @@ type OrchestratorDeps struct {
 	MaxAssistantChars int
 }
 
-// ExitReason is defined in exit_reason.go.
+// verify.ExitReason is defined in exit_reason.go.
 
 // Deterministic-exit thresholds. Aligned with clawcode's hard-coded
 // constants in src/query/tokenBudget.ts and src/query.ts.
@@ -143,7 +144,7 @@ func (o *DefaultOrchestrator) MaxTurns() int {
 //	                    ↑                       │
 //	                    └───────────────────────┘
 //
-// The loop runs until one of the ExitReason conditions fires:
+// The loop runs until one of the verify.ExitReason conditions fires:
 //   - natural (LLM end_turn, no tool calls)
 //   - max_turns (only when req.MaxTurns > 0 AND exceeded)
 //   - aborted_user / aborted_llm / aborted_tool (fatal errors)
@@ -219,7 +220,7 @@ type runLoopState struct {
 	lastThinkingTail strings.Builder
 
 	// Deterministic-exit state (mutated each iteration).
-	exitReason            ExitReason
+	exitReason            verify.ExitReason
 	turnCount             int
 	recentToolSignatures  []string
 	consecutiveErrorFP    string
@@ -234,7 +235,7 @@ type runLoopState struct {
 // clawcode/src/query.ts:307 `while (true)`); the only hard cap is the
 // optional MaxTurns safety net. Termination reasons are captured in
 // st.exitReason and surfaced on the final `complete` event's
-// Metadata["exit_reason"] (see ExitReason constants).
+// Metadata["exit_reason"] (see verify.ExitReason constants).
 //
 // Refactored in DM-20260625-012 from a 513-line god function into a slim
 // driver that calls prepareContext, runLLMStream, executeToolRound, the
@@ -267,7 +268,7 @@ func (o *DefaultOrchestrator) runLoop(ctx context.Context, req TurnRequest, out 
 		// MaxTurns. An unbounded turn (MaxTurns ≤ 0) is governed solely by
 		// the natural-finish + deterministic-exit reasons below.
 		if req.MaxTurns > 0 && st.turnCount > req.MaxTurns {
-			st.exitReason = ExitReasonMaxTurns
+			st.exitReason = verify.ExitReasonMaxTurns
 			break
 		}
 
@@ -510,7 +511,7 @@ func (o *DefaultOrchestrator) prepareContext(ctx context.Context, req TurnReques
 		maxContextTokens:     maxContextTokens,
 		persister:            persister,
 		nested:               nested,
-		exitReason:           ExitReasonNatural,
+		exitReason:           verify.ExitReasonNatural,
 		recentToolSignatures: make([]string, 0, repeatedToolLookback),
 	}, nil
 }
@@ -731,16 +732,16 @@ func (o *DefaultOrchestrator) executeToolRound(
 }
 
 // checkPreToolExits applies the pre-tool-round exit detectors: the
-// LLM's natural finish (no tool calls → ExitReasonNatural) and the
+// LLM's natural finish (no tool calls → verify.ExitReasonNatural) and the
 // repeated-tool detector (same signature ≥ repeatedToolThreshold
-// times in the last repeatedToolLookback turns → ExitReasonRepeatedTool).
+// times in the last repeatedToolLookback turns → verify.ExitReasonRepeatedTool).
 // Updates st.recentToolSignatures as a side effect. Returns true if
 // the loop should break.
 func (o *DefaultOrchestrator) checkPreToolExits(st *runLoopState, toolCalls []llmgateway.ToolCall) bool {
 	// No tool calls → natural LLM finish. The terminal `complete`
 	// event below carries exit_reason=natural.
 	if len(toolCalls) == 0 {
-		st.exitReason = ExitReasonNatural
+		st.exitReason = verify.ExitReasonNatural
 		return true
 	}
 
@@ -750,7 +751,7 @@ func (o *DefaultOrchestrator) checkPreToolExits(st *runLoopState, toolCalls []ll
 	// same action; continuing would burn tokens without progress.
 	sig := toolCallsSignature(toolCalls)
 	if isRepeatedToolSignature(sig, st.recentToolSignatures) {
-		st.exitReason = ExitReasonRepeatedTool
+		st.exitReason = verify.ExitReasonRepeatedTool
 		return true
 	}
 	st.recentToolSignatures = append(st.recentToolSignatures, sig)
@@ -763,10 +764,10 @@ func (o *DefaultOrchestrator) checkPreToolExits(st *runLoopState, toolCalls []ll
 
 // checkPostToolExits applies the post-tool-round exit detectors: the
 // consecutive-tool-error detector (≥ consecutiveToolErrorThreshold
-// turns with the same error fingerprint → ExitReasonToolFailure) and
+// turns with the same error fingerprint → verify.ExitReasonToolFailure) and
 // the token-budget diminishing-returns detector (cumulative usage
 // crosses 90% of the context budget AND last two deltas below the
-// floor → ExitReasonTokenDiminishing). Updates
+// floor → verify.ExitReasonTokenDiminishing). Updates
 // st.consecutiveErrorFP/Count and st.budgetTracker as side effects.
 // Returns true if the loop should break.
 func (o *DefaultOrchestrator) checkPostToolExits(st *runLoopState, toolResult ToolRoundResult) bool {
@@ -783,7 +784,7 @@ func (o *DefaultOrchestrator) checkPostToolExits(st *runLoopState, toolResult To
 			st.consecutiveErrorCount = 1
 		}
 		if st.consecutiveErrorCount >= consecutiveToolErrorThreshold {
-			st.exitReason = ExitReasonToolFailure
+			st.exitReason = verify.ExitReasonToolFailure
 			return true
 		}
 	} else {
@@ -800,7 +801,7 @@ func (o *DefaultOrchestrator) checkPostToolExits(st *runLoopState, toolResult To
 	// budget signal in that case).
 	st.budgetTracker.observe(st.totalUsage)
 	if st.budgetTracker.shouldStopDiminishing(st.maxContextTokens) {
-		st.exitReason = ExitReasonTokenDiminishing
+		st.exitReason = verify.ExitReasonTokenDiminishing
 		return true
 	}
 	return false
@@ -857,17 +858,17 @@ func (o *DefaultOrchestrator) finalizeLoop(
 // in case the gateway splitter ever leaks a tag boundary.
 //
 // When the loop terminated on the MaxTurns safety net (exitReason ==
-// ExitReasonMaxTurns), a truncation notice is prepended so the user can
+// verify.ExitReasonMaxTurns), a truncation notice is prepended so the user can
 // see the loop hit its bound rather than mistaking a quiet final-text
 // for a normal end. Unbounded turns (maxTurns ≤ 0) never carry this
 // notice regardless of how they exited.
-func resolveFinalText(finalText, thinkingTail string, exitReason ExitReason, maxTurns int) string {
+func resolveFinalText(finalText, thinkingTail string, exitReason verify.ExitReason, maxTurns int) string {
 	promoted := finalText
 	if strings.TrimSpace(promoted) == "" {
 		promoted = textutil.StripThinkingTags(thinkingTail)
 	}
 	promoted = strings.TrimSpace(promoted)
-	if exitReason == ExitReasonMaxTurns && maxTurns > 0 {
+	if exitReason == verify.ExitReasonMaxTurns && maxTurns > 0 {
 		notice := fmt.Sprintf("[max-turns reached after %d iterations; turn truncated]", maxTurns)
 		if promoted == "" {
 			return notice
@@ -907,7 +908,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	maxContextTokens int,
 	finalText string,
 	summary string,
-	exitReason ExitReason,
+	exitReason verify.ExitReason,
 ) {
 	if model == "" {
 		model = o.defaultModel
@@ -1334,7 +1335,7 @@ func toolCallsSignature(calls []llmgateway.ToolCall) string {
 // already appeared ≥ repeatedToolThreshold times in the lookback window.
 // The LLM is considered stuck when it keeps retrying the same action
 // regardless of intervening context — the orchestrator breaks the loop
-// and surfaces ExitReasonRepeatedTool on the final complete event.
+// and surfaces verify.ExitReasonRepeatedTool on the final complete event.
 func isRepeatedToolSignature(sig string, history []string) bool {
 	if sig == "" {
 		return false
