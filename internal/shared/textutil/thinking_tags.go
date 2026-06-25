@@ -263,6 +263,110 @@ func partialTagSuffix(raw, tag string) int {
 	return 0
 }
 
+// PriorOutputSummarySplitter separates embedded
+// <prior-output-summary>...</prior-output-summary> blocks from visible
+// assistant text during streaming. Unlike <think>...</think> which is
+// shown in the thinking card, this marker is an internal D2 fold
+// artifact (see persist/turn_output_store.go FoldAssistantOutput) that
+// must NEVER reach the user. It is also handled statically by
+// StripPriorOutputSummary at the D1 IM boundary, but adding the
+// streaming-time split here prevents chunk-boundary artifacts from
+// interacting badly with downstream dedup logic and provides a defense
+// in depth if a future change bypasses the static stripper.
+//
+// The splitter is stateful across calls so chunks straddling an open
+// or close tag boundary still split correctly. Unbalanced markers
+// (open without close) are dropped entirely — better to lose the fold
+// summary than to render half a tag to the user.
+type PriorOutputSummarySplitter struct {
+	buf        strings.Builder
+	summaryBuf strings.Builder
+	inSummary  bool
+}
+
+// Push processes the next streaming delta and returns extracted fold
+// summary content (to be discarded) and visible assistant text (to be
+// rendered).
+func (s *PriorOutputSummarySplitter) Push(delta string) (summary string, visible string) {
+	if delta == "" {
+		return "", ""
+	}
+	s.buf.WriteString(delta)
+	raw := s.buf.String()
+	s.buf.Reset()
+
+	const openTag = "<prior-output-summary>"
+	const closeTag = "</prior-output-summary>"
+
+	var visibleOut strings.Builder
+	var summaryOut strings.Builder
+
+	for len(raw) > 0 {
+		if s.inSummary {
+			closeIdx, closeLen := findCaseInsensitive(raw, closeTag)
+			if closeIdx >= 0 {
+				s.summaryBuf.WriteString(raw[:closeIdx])
+				if s.summaryBuf.Len() > 0 {
+					summaryOut.WriteString(s.summaryBuf.String())
+					s.summaryBuf.Reset()
+				}
+				raw = raw[closeIdx+closeLen:]
+				s.inSummary = false
+				continue
+			}
+			keep := partialTagSuffix(raw, closeTag)
+			if keep > 0 {
+				s.summaryBuf.WriteString(raw[:len(raw)-keep])
+				s.buf.WriteString(raw[len(raw)-keep:])
+			} else {
+				s.summaryBuf.WriteString(raw)
+			}
+			break
+		}
+
+		openIdx := strings.Index(strings.ToLower(raw), strings.ToLower(openTag))
+		if openIdx >= 0 {
+			visibleOut.WriteString(raw[:openIdx])
+			raw = raw[openIdx+len(openTag):]
+			s.inSummary = true
+			continue
+		}
+
+		keep := partialTagSuffix(raw, openTag)
+		if keep > 0 {
+			visibleOut.WriteString(raw[:len(raw)-keep])
+			s.buf.WriteString(raw[len(raw)-keep:])
+		} else {
+			visibleOut.WriteString(raw)
+		}
+		break
+	}
+
+	return summaryOut.String(), visibleOut.String()
+}
+
+// Flush returns any buffered tail at the end of a stream.
+func (s *PriorOutputSummarySplitter) Flush() (summary string, visible string) {
+	raw := s.buf.String()
+	s.buf.Reset()
+	if raw == "" {
+		if s.inSummary && s.summaryBuf.Len() > 0 {
+			summary = s.summaryBuf.String()
+			s.summaryBuf.Reset()
+			s.inSummary = false
+		}
+		return summary, ""
+	}
+	if s.inSummary {
+		s.summaryBuf.WriteString(raw)
+		summary = s.summaryBuf.String()
+		s.summaryBuf.Reset()
+		s.inSummary = false
+		return summary, ""
+	}
+	return "", raw
+}
+
 func partialOpenTagSuffix(raw string) int {
 	maxKeep := 0
 	for _, pair := range thinkTagPairs {

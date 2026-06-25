@@ -36,6 +36,14 @@ type streamAccumulator struct {
 	// Stateful across all events so chunks straddling a tag boundary still
 	// split correctly.
 	thinkSplitter *textutil.ThinkTagSplitter
+	// priorSummarySplitter routes <prior-output-summary>...</prior-output-summary>
+	// fold-marker blocks out of delta.Content. The static stripper at the
+	// D1 IM boundary (textutil.StripPriorOutputSummary) is still the
+	// primary defense, but routing at the SSE layer prevents the marker
+	// from leaking into the live reply card during the streaming window
+	// before the static pass runs, and shields downstream dedup from
+	// chunk-boundary artifacts.
+	priorSummarySplitter *textutil.PriorOutputSummarySplitter
 }
 
 type mergedToolCall struct {
@@ -47,7 +55,8 @@ type mergedToolCall struct {
 func newStreamAccumulator() *streamAccumulator {
 	return &streamAccumulator{
 		toolCalls:     make(map[int]*mergedToolCall),
-		thinkSplitter: &textutil.ThinkTagSplitter{},
+		thinkSplitter:        &textutil.ThinkTagSplitter{},
+		priorSummarySplitter: &textutil.PriorOutputSummarySplitter{},
 	}
 }
 
@@ -86,8 +95,15 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 				hasDelta = true
 			}
 			if contentDelta != "" {
-				chunk.Content += contentDelta
-				hasDelta = true
+				// DM-20260625-008: route through the prior-output-summary
+				// splitter so chunks straddling a <prior-output-summary> /
+				// </prior-output-summary> boundary still separate correctly.
+				// The discarded fold summary is intentionally not surfaced.
+				_, visibleDelta := a.priorSummarySplitter.Push(contentDelta)
+				if visibleDelta != "" {
+					chunk.Content += visibleDelta
+					hasDelta = true
+				}
 			}
 		}
 		for _, tc := range delta.ToolCalls {
@@ -214,6 +230,15 @@ func streamOpenAISSE(reader io.Reader, emit func(*llmgateway.Chunk) error) error
 					Thinking: thinkTail,
 					Content:  contentTail,
 				}
+				if err := emit(tail); err != nil {
+					return err
+				}
+			}
+			// Flush the prior-output-summary splitter — any buffered visible
+			// tail still needs to reach the user; discarded fold summaries are
+			// intentionally not re-emitted.
+			if _, visibleTail := acc.priorSummarySplitter.Flush(); visibleTail != "" {
+				tail := &llmgateway.Chunk{Content: visibleTail}
 				if err := emit(tail); err != nil {
 					return err
 				}
