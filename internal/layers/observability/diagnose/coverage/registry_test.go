@@ -78,6 +78,7 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		// D2 Context Engine - Tool Execution (D2-S5)
 		telemetry.OpD2_S5_Tool_Execute_Single,
 		telemetry.OpD2_S5_Tool_Execute_Permission,
+		telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build,
 
 		// D2 Context Engine - Task / Plan (D2-S8)
 		telemetry.OpD2_S8_Task_Plan_Generate,
