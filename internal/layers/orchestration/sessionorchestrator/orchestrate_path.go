@@ -104,7 +104,28 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 		)
 		defer endSpan(orchSpan)
 
-		// 1) SynthesizeTaskGraph (D7-S5-A02)
+		// v6.0.0 5 节点 MUPS Pipeline root span (D7-S6-A50). Started AFTER Orchestrate_Run
+		// so it shows up as a child of the orchestrate path root. The 4 sync 5-node spans
+		// (taskgraph.synthesize / executor.select / channel.route / system.anomaly_detect)
+		// inherit it as parent via ctx propagation. The async 5th node (memory.persist in
+		// processAutoClose) is associated by sessionID rather than trace tree.
+		//
+		// 5 nodes mapped to spans:
+		//   Observe → orchestrator.buildObserveRequest writes prior attrs to sessionSpan
+		//             (no independent Span; shares Session_Process trace context)
+		//   Plan    → decisionplanning/decomposer.go    : EmitTaskGraphSynthesize
+		//   Wave    → wavescheduler/scheduler.go         : EmitExecutorSelect
+		//   Execute → mups/execute/channel.go            : EmitChannelRoute
+		//   Verify  → executionflow/verify/anomaly.go    : EmitSystemAnomalyDetect
+		//   Learn   → mups/learn/memory.go               : EmitMemoryPersist (async)
+		ctx, mupsSpan := startObsSpan(op.obsBridge, ctx, telemetry.OpD7_S6_MUPS_Pipeline, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "session_id", Value: req.SessionID},
+			tracer.Attribute{Key: "pipeline.intent", Value: string(orchtypes.IntentOrchestrate)},
+			tracer.Attribute{Key: "pipeline.nodes", Value: "observe,plan,wave,execute,verify,learn"},
+		)
+		defer endSpan(mupsSpan)
+
+		// 1) SynthesizeTaskGraph (D7-S5-A02) — Plan node
 		result, err := op.decomposer.SynthesizeTaskGraph(ctx, req.SessionID, req.Message)
 		if err != nil {
 			emitError(ctx, op.sink, out, req.SessionID, "synthesize_task_graph", err)
