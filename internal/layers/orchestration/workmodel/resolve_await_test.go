@@ -5,12 +5,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 )
 
 func TestAwaitRunningChildren_BlocksUntilTerminal(t *testing.T) {
-	reg := runregistry.NewRegistry("")
+	reg := NewRegistry("")
 	tm := NewTaskManager().SetRegistry(reg)
 	goal, _ := tm.EnsureGoal("s1", "g")
 	parent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "p", Directive: "p"})
@@ -20,7 +18,7 @@ func TestAwaitRunningChildren_BlocksUntilTerminal(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		reg.SetTerminal(runID, runregistry.StatusCompleted, "explored", "")
+		reg.SetTerminal(runID, StatusCompleted, "explored", "")
 		close(done)
 	}()
 
@@ -38,7 +36,7 @@ func TestAwaitRunningChildren_BlocksUntilTerminal(t *testing.T) {
 }
 
 func TestAwaitRunningChildren_NoRunningChildren(t *testing.T) {
-	tm := NewTaskManager().SetRegistry(runregistry.NewRegistry(""))
+	tm := NewTaskManager().SetRegistry(NewRegistry(""))
 	_, _ = tm.EnsureGoal("s1", "g")
 	awaiter := &ResolveAwaiter{Manager: tm}
 	if got := awaiter.AwaitRunningChildren(context.Background(), "s1"); got != "" {
@@ -47,7 +45,7 @@ func TestAwaitRunningChildren_NoRunningChildren(t *testing.T) {
 }
 
 func TestRunningChildrenWithRun_SkipsPending(t *testing.T) {
-	tm := NewTaskManager().SetRegistry(runregistry.NewRegistry(""))
+	tm := NewTaskManager().SetRegistry(NewRegistry(""))
 	goal, _ := tm.EnsureGoal("s1", "g")
 	parent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "p", Directive: "p"})
 	pending, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: parent.ID, Kind: WorkKindImplement, Title: "pending", Directive: "x"})

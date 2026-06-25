@@ -12,7 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
@@ -69,7 +68,7 @@ func InitOrchestration(
 	// NewSessionOrchestrator via WithTaskManager.
 	tm := workmodel.NewTaskManagerFromConfig(coordCfg.tasksCfg, obsBridge)
 	// Registry created by bootstrap and DI'd to TaskManager.
-	tm.SetRegistry(runregistry.NewRegistry("~/.devrix/runs"))
+	tm.SetRegistry(workmodel.NewRegistry("~/.devrix/runs"))
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	tools.SetTodoSync(todoBackend.Sync)
 

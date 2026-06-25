@@ -9,7 +9,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -32,7 +31,7 @@ type TaskManager struct {
 
 	// registry tracks run observation handles (DM-011). Optional; nil
 	// disables run tracking (SpawnForWorkItem becomes a no-op).
-	registry *runregistry.Registry
+	registry *Registry
 }
 
 // NewTaskManager creates a new in-memory task manager.
@@ -64,14 +63,14 @@ func (m *TaskManager) SetBus(bus notify.Bus) *TaskManager {
 // SetRegistry wires the run registry. Optional; nil disables run tracking.
 // Returns the receiver for chaining. Bootstrap calls this once after
 // constructing the TaskManager.
-func (m *TaskManager) SetRegistry(reg *runregistry.Registry) *TaskManager {
+func (m *TaskManager) SetRegistry(reg *Registry) *TaskManager {
 	m.registry = reg
 	return m
 }
 
 // Registry returns the run registry (nil if not wired). Nil-safe: returns
 // nil if the receiver is nil.
-func (m *TaskManager) Registry() *runregistry.Registry {
+func (m *TaskManager) Registry() *Registry {
 	if m == nil {
 		return nil
 	}

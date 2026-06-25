@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 )
 
 // DefaultResolveAwaitTimeout is the per-child blocking await budget at RunTurn start.
@@ -47,7 +45,7 @@ func (a *ResolveAwaiter) AwaitRunningChildren(ctx context.Context, sessionID str
 		if runID == "" {
 			continue
 		}
-		out, err := runregistry.Await(ctx, reg, runID, true, timeout)
+		out, err := Await(ctx, reg, runID, true, timeout)
 		if err != nil {
 			parts = append(parts, fmt.Sprintf("%s: await error: %v", child.ID, err))
 			continue
@@ -126,5 +124,5 @@ func awaitStatusSummary(awaitJSON string) string {
 }
 
 func isRunTerminalStatus(s string) bool {
-	return s == runregistry.StatusCompleted || s == runregistry.StatusFailed || s == runregistry.StatusCancelled
+	return s == StatusCompleted || s == StatusFailed || s == StatusCancelled
 }

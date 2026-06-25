@@ -23,7 +23,7 @@ echo
 echo "--- New *Registry / *Manager types outside orchestration (AC23) ---"
 while IFS= read -r line; do
   file="${line%%:*}"
-  if [[ "$file" == *orchestration/runregistry/* ]] || [[ "$file" == *orchestration/workmodel/* ]]; then
+  if [[ "$file" == *orchestration/workmodel/* ]]; then
     continue
   fi
   if [[ "$file" == *nested/background.go* ]] || [[ "$file" == *multiagent/* ]]; then
