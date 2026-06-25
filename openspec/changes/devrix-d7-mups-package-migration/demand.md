@@ -106,12 +106,12 @@ S1 阶段已完成的 import 关系调研（2026-06-26）：
 - 仅自身 `execute_test.go` 使用
 - **全仓 0 个外部 import**（极简迁移）
 
-**`orchestration/learn/` 包引用情况（共 15 处 import）：**
-- `orchestration/decisionplanning/classifier.go` (1 处)
-- `orchestration/orchtypes/` 4 文件 + 4 测试文件 (8 处)
-- `orchestration/sessionorchestrator/` orchestrator.go + autoclose.go + tracing.go + 7 测试文件 (10 处)
+**`orchestration/learn/` 包引用情况（共 17 处 import）：**
+- `orchestration/decisionplanning/classifier.go` + `classifier_with_prior_test.go` (2 处)
+- `orchestration/orchtypes/` 3 impl 文件 + 3 测试文件 (6 处: anomaly_detector.go/test.go + intent_quantizer.go/test.go + observe_request.go/test.go)
+- `orchestration/sessionorchestrator/` 3 impl 文件 + 6 测试文件 (9 处: orchestrator.go + autoclose.go + tracing.go + entry_test.go + orchestrator_autoclose_test.go + orchestrator_escape_test.go + orchestrator_learner_test.go + orchestrator_priorspan_test.go + orchestrator_trackmode_test.go)
 
-**结论：** 本次迁移影响面 = 15 个 import path 替换 + 2 个目录迁移（execute 极简 / learn 中等）。
+**结论：** 本次迁移影响面 = 17 个 import path 替换 + 2 个目录迁移（execute 极简 0 外部 import / learn 中等 17 外部 import）。
 
 ## 8. 关联
 

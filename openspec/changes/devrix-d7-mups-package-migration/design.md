@@ -53,7 +53,7 @@
 | 性能影响已评估 | ✅ N/A | 0 运行时行为变化 |
 
 **Grill Review 决策点：**
-1. **为什么选 B (保留 package execute / package learn) 不选 A (改 package mups)？** — Agreed。理由：Go 包名与目录名解耦是语言特性；改 A 会导致 17 处内部 cross-file 引用 + 15 处外部 import 全改，变更面放大 2x+。
+1. **为什么选 B (保留 package execute / package learn) 不选 A (改 package mups)？** — Agreed。理由：Go 包名与目录名解耦是语言特性；改 A 会导致 17 处内部 cross-file 引用 + 17 处外部 import 全改，变更面放大 2x+。
 2. **为什么不在本次 PR 合并 execute + learn 为单 mups 包？** — Agreed。理由：保留 Channel vs Memory 语义分离 (Pipeline Coordinator + Memory Curator 双角色)；6 S 文档语义已对齐，物理合并会破坏语义分离。
 3. **为什么不在本次 PR 改 bootstrap wire？** — Agreed。理由：14→6 wire 收口需要其他 5 个 follow-up 全部落地后才能安全收敛；本次抢先会引入与未来 PR 的冲突风险。
 
@@ -118,28 +118,35 @@ orchestration/                         orchestration/
 
 | 方案 | 优点 | 缺点 | 选择 |
 |------|------|------|------|
-| A. 改 `package mups` | 物理目录与包名一致 | 内部 17 处 cross-file 引用 + 15 处外部 import 全改；测试 fixture 全失效 | ❌ |
-| **B. 保持 `package execute` / `package learn`** | **内部 cross-file 引用 0 改动；只改 15 处外部 import path** | **包名与目录名不一致** | ✅ |
+| A. 改 `package mups` | 物理目录与包名一致 | 内部 17 处 cross-file 引用 + 17 处外部 import 全改；测试 fixture 全失效 | ❌ |
+| **B. 保持 `package execute` / `package learn`** | **内部 cross-file 引用 0 改动；只改 17 处外部 import path** | **包名与目录名不一致** | ✅ |
 
 **理由：**
 - 内部 cross-file 引用（如 `learn/learning_asset.go` 引用 `learn/asset_content.go`）基于 package name 而非 import path，迁移目录不影响
 - 外部调用方只关心 `internal/layers/orchestration/mups/learn` 这一个 import path，与子包声明名无关
 - 最小变更面 = 0 行为变化 + 0 函数签名变化 + 0 测试 fixture 失效
 
-### 2.2 import path 替换映射（15 处）
+### 2.2 import path 替换映射（17 处）
 
 | 调用方文件 | import 旧 | import 新 |
 | ---------- | --------- | --------- |
 | `orchestration/decisionplanning/classifier.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/decisionplanning/classifier_with_prior_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/orchtypes/anomaly_detector.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/orchtypes/intent_quantizer.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/orchtypes/observe_request.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
-| `orchestration/orchtypes/process.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
-| `orchestration/orchtypes/*_test.go` (4 files) | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/orchtypes/anomaly_detector_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/orchtypes/intent_quantizer_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/orchtypes/observe_request_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/sessionorchestrator/orchestrator.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/sessionorchestrator/autoclose.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 | `orchestration/sessionorchestrator/tracing.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
-| `orchestration/sessionorchestrator/*_test.go` (7 files) | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/entry_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/orchestrator_autoclose_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/orchestrator_escape_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/orchestrator_learner_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/orchestrator_priorspan_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
+| `orchestration/sessionorchestrator/orchestrator_trackmode_test.go` | `orchestration/learn"` | `orchestration/mups/learn"` |
 
 **execute 包：0 外部 import**（仅 `execute_test.go` 内部引用）
 
@@ -226,20 +233,27 @@ BuildAdaptivePrior (S6-A08) → MemoryPersist (S6-A09) → RunLearner (S6-A10)
 | `internal/layers/orchestration/mups/execute/` | 7 .go files（git mv from orchestration/execute/） |
 | `internal/layers/orchestration/mups/learn/` | 17 .go files（git mv from orchestration/learn/） |
 
-### 5.2 修改文件（15 处 import path 替换）
+### 5.2 修改文件（17 处 import path 替换）
 
 | 路径 | 修改 |
 | ---- | ---- |
 | `internal/layers/orchestration/decisionplanning/classifier.go` | 1 import 替换 |
+| `internal/layers/orchestration/decisionplanning/classifier_with_prior_test.go` | 1 import 替换 |
 | `internal/layers/orchestration/orchtypes/anomaly_detector.go` | 1 import 替换 |
 | `internal/layers/orchestration/orchtypes/intent_quantizer.go` | 1 import 替换 |
 | `internal/layers/orchestration/orchtypes/observe_request.go` | 1 import 替换 |
-| `internal/layers/orchestration/orchtypes/process.go` | 1 import 替换 |
-| `internal/layers/orchestration/orchtypes/*_test.go` (4 files) | 4 import 替换 |
+| `internal/layers/orchestration/orchtypes/anomaly_detector_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/orchtypes/intent_quantizer_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/orchtypes/observe_request_test.go` | 1 import 替换 |
 | `internal/layers/orchestration/sessionorchestrator/orchestrator.go` | 1 import 替换 |
 | `internal/layers/orchestration/sessionorchestrator/autoclose.go` | 1 import 替换 |
 | `internal/layers/orchestration/sessionorchestrator/tracing.go` | 1 import 替换 |
-| `internal/layers/orchestration/sessionorchestrator/*_test.go` (7 files) | 7 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/entry_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/orchestrator_autoclose_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/orchestrator_escape_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/orchestrator_learner_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/orchestrator_priorspan_test.go` | 1 import 替换 |
+| `internal/layers/orchestration/sessionorchestrator/orchestrator_trackmode_test.go` | 1 import 替换 |
 | `internal/bootstrap/wire_coordinator.go` | 若涉及 execute/learn 引用，同步替换（目前 0 引用） |
 
 ### 5.3 修改文档

@@ -69,11 +69,11 @@ orchestration/                     orchestration/
 - 内部 cross-file 引用（`learn/learning_asset.go` 引用 `learn/asset_content.go`）无需改动
 - 对外 import path 只改 `internal/layers/orchestration/learn` → `internal/layers/orchestration/mups/learn`
 
-**Import path 替换（15 处）：**
-- `orchestration/decisionplanning/classifier.go` (1)
-- `orchestration/orchtypes/` 4 impl + 4 test (8)
-- `orchestration/sessionorchestrator/` 3 impl + 7 test (10)
-- 总计 15 处 import 替换（部分文件 0 引用本次 change 范围）
+**Import path 替换（17 处）：**
+- `orchestration/decisionplanning/classifier.go` + `classifier_with_prior_test.go` (2)
+- `orchestration/orchtypes/` 3 impl + 3 test (6)
+- `orchestration/sessionorchestrator/` 3 impl + 6 test (9)
+- 总计 17 处 import 替换
 
 ## 4. Success Metrics
 
@@ -82,10 +82,10 @@ orchestration/                     orchestration/
 | **D7 orchestration 子包数** | 14 | 13 (本次 -1) |
 | **`orchestration/mups/` 子目录** | 0 | 2 (execute + learn) |
 | **orchestration/execute 直接外部 import** | 0 | 0 (位置迁移，无外部调用方需更新) |
-| **orchestration/learn 直接外部 import** | 15 处 | 0 (全部更新为 mups/learn) |
+| **orchestration/learn 直接外部 import** | 17 处 | 0 (全部更新为 mups/learn) |
 | **go test -race 通过包数** | 22/22 | 22/22 (持平 baseline) |
 | **`grep "orchestration/execute\""` 命中数** | 1 (execute_test.go 自身) | 0 |
-| **`grep "orchestration/learn\""` 命中数** | 15 | 0 |
+| **`grep "orchestration/learn\""` 命中数** | 17 | 0 |
 | **D7-S6-A51 新 T 点** | 0 | 4 PLANNED → 4 IMPLEMENTED |
 | **LP-1 / LP-2 / LP-5 路径变化** | — | 0 (行为不变) |
 

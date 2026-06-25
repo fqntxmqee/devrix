@@ -50,19 +50,19 @@
 
 ### Requirement: Zero Residual Old-Name Imports
 
-全仓 `grep -rl "orchestration/execute\""` 和 `grep -rl "orchestration/learn\""` 必须 0 命中；15 处外部 import 全部更新为 `orchestration/mups/learn"`。
+全仓 `grep -rl "orchestration/execute\""` 和 `grep -rl "orchestration/learn\""` 必须 0 命中；17 处外部 import 全部更新为 `orchestration/mups/learn"`。
 
 <!-- T: D7-S6-A51-T03 -->
 
 #### Scenario: All external imports of orchestration/learn/ are migrated
 
-- GIVEN 15 处外部 import 引用 `internal/layers/orchestration/learn"`：
-  - `decisionplanning/classifier.go` (1 处)
-  - `orchtypes/` 4 文件 + 4 _test.go (8 处)
-  - `sessionorchestrator/` 3 文件 + 7 _test.go (10 处)
+- GIVEN 17 处外部 import 引用 `internal/layers/orchestration/learn"`：
+  - `decisionplanning/classifier.go` + `classifier_with_prior_test.go` (2 处)
+  - `orchtypes/` 3 impl + 3 _test.go (6 处: anomaly_detector.go/test.go + intent_quantizer.go/test.go + observe_request.go/test.go)
+  - `sessionorchestrator/` 3 impl + 6 _test.go (9 处: orchestrator.go + autoclose.go + tracing.go + entry_test.go + orchestrator_autoclose_test.go + orchestrator_escape_test.go + orchestrator_learner_test.go + orchestrator_priorspan_test.go + orchestrator_trackmode_test.go)
 - WHEN 执行 `grep -rl "internal/layers/orchestration/learn\"" internal/ cmd/ | xargs sed -i 's|internal/layers/orchestration/learn"|internal/layers/orchestration/mups/learn"|g'`
 - THEN `grep -rln "internal/layers/orchestration/learn\"" internal/ cmd/` 返回 0 命中
-- AND `grep -rln "internal/layers/orchestration/mups/learn\"" internal/ cmd/` 返回 15 命中
+- AND `grep -rln "internal/layers/orchestration/mups/learn\"" internal/ cmd/` 返回 17 命中
 - AND execute 包 0 外部 import，跳过替换步骤
 
 #### Scenario: execute package has zero external imports
@@ -73,18 +73,18 @@
 
 #### Scenario: orchtypes test fixtures use new import path
 
-- GIVEN `internal/layers/orchestration/orchtypes/` 包含 4 个 _test.go 文件（anomaly_detector_test.go + intent_quantizer_test.go + observe_request_test.go + process_test.go）
+- GIVEN `internal/layers/orchestration/orchtypes/` 包含 3 个 _test.go 文件（anomaly_detector_test.go + intent_quantizer_test.go + observe_request_test.go）
 - AND 这些测试文件原本 import `internal/layers/orchestration/learn"`
 - WHEN 完成全仓 import path 替换
-- THEN 4 个 _test.go 文件全部使用 `internal/layers/orchestration/mups/learn"`
+- THEN 3 个 _test.go 文件全部使用 `internal/layers/orchestration/mups/learn"`
 - AND 测试 fixture 通过 `go test ./internal/layers/orchestration/orchtypes/...` 验证
 
 #### Scenario: sessionorchestrator test fixtures use new import path
 
-- GIVEN `internal/layers/orchestration/sessionorchestrator/` 包含 7 个 _test.go 文件
+- GIVEN `internal/layers/orchestration/sessionorchestrator/` 包含 6 个 _test.go 文件（entry_test.go + orchestrator_autoclose_test.go + orchestrator_escape_test.go + orchestrator_learner_test.go + orchestrator_priorspan_test.go + orchestrator_trackmode_test.go）
 - AND 这些测试文件原本 import `internal/layers/orchestration/learn"`
 - WHEN 完成全仓 import path 替换
-- THEN 7 个 _test.go 文件全部使用 `internal/layers/orchestration/mups/learn"`
+- THEN 6 个 _test.go 文件全部使用 `internal/layers/orchestration/mups/learn"`
 - AND 测试 fixture 通过 `go test ./internal/layers/orchestration/sessionorchestrator/... -race` 验证
 
 ---
