@@ -15,7 +15,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -129,10 +128,7 @@ func InitOrchestration(
 		return out
 	})
 
-	llmDecomp := decisionplanning.NewLLMDecomposer(decisionplanning.LLMDecomposerDeps{
-		LLM:         llmInvoker,
-		DefaultTier: llmStack.DefaultModel,
-	})
+	llmDecomp := WireDecisionPlanning(llmInvoker, llmStack.DefaultModel)
 
 	orchPath := BuildOrchestratePath(sink, llmDecomp, WaveSchedulerDeps{
 		GW:         gw,
@@ -143,39 +139,23 @@ func InitOrchestration(
 	orchPath.SetTaskManager(tm)
 
 	planMode := workmodel.NewPlanMode(newPlanLLMCompleter(llmInvoker, llmStack.DefaultModel), obsBridge)
-	toolExec := sessionorchestrator.NewTurnToolExecutor(ctxAdapter, orchPath, planMode, loopFirst)
-	if obsBridge != nil {
-		toolExec.SetTurnToolMetrics(sessionorchestrator.NewTurnToolMetrics(obsBridge.Meter()))
-	}
 
-	ctxPrep := &sessionorchestrator.TurnPrepareWrapper{Inner: ctxAdapter, LoopFirst: loopFirst}
-
-	turnOrch := sessionorchestrator.NewOrchestrator(sessionorchestrator.OrchestratorDeps{
-		LLM:              llmInvoker,
-		Context:          ctxPrep,
-		Tools:            toolExec,
-		Persist:          ctxAdapter,
-		// MaxTurns=0 → unbounded. The main conversation loop terminates
-		// on natural LLM finish or one of the deterministic exit reasons
-		// (repeated_tool / tool_failure / token_diminishing / ctx cancel).
-		// Child agents (subqueries, plan/implement, workers) set their own
-		// MaxTurns based on expected workload.
-		MaxTurns:         0,
+	toolExec, turnOrch, subTurn := WireMUPSPipeline(MUPSPipelinesDeps{
+		CtxAdapter:       ctxAdapter,
+		OrchPath:         orchPath,
+		LLMInvoker:       llmInvoker,
 		DefaultModel:     llmStack.DefaultModel,
-		MaxContextTokens: maxContextTokens,
+		LoopFirst:        loopFirst,
 		ObsBridge:        obsBridge,
+		PlanMode:         planMode,
+		SubagentCfg:      subagentCfg,
+		MaxContextTokens: maxContextTokens,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
 		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
 		// cat / etc.) are persisted to disk and replaced with a preview
 		// marker so they do not blow up the LLM context budget.
 		ToolResultStore: persist.NewToolResultStore(""),
-	})
-	subTurn := sessionorchestrator.NewSubTurnRunner(turnOrch, sessionorchestrator.SubTurnConfig{
-		DefaultMode:      subagentCfg.DefaultMode,
-		LegacyMode:       subagentCfg.LegacyMode,
-		MaxDepth:         subagentCfg.MaxDepth,
-		MaxContextTokens: maxContextTokens,
 	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {
