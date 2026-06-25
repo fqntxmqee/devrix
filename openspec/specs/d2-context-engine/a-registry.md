@@ -70,8 +70,8 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
-| D2-S18-A01 | CheckPermission (3-tier) | A-BE | tool_call, ctx | Decision (allow/deny/ask) | `contracts/permission.go` + `surface/{bash_ast,permission}.go` + `orchestration/toolpolicy/plan_mode.go` |
-| D2-S18-A02 | FilterTools + ShouldDefer | A-BE | all_tools, mode, ctx | visible (defer-aware) | `enforce/toolrunner/filter/{per_agent,per_risk}.go` + `toolpolicy/filter_adapter.go` |
+| D2-S18-A01 | CheckPermission (3-tier) | A-BE | tool_call, ctx | Decision (allow/deny/ask) | `contracts/permission.go` + `surface/{bash_ast,permission}.go` + `orchestration/decisionplanning/plan_mode.go` |
+| D2-S18-A02 | FilterTools + ShouldDefer | A-BE | all_tools, mode, ctx | visible (defer-aware) | `enforce/toolrunner/filter/{per_agent,per_risk}.go` + `decisionplanning/filter_adapter.go` |
 | D2-S18-A03 | SandboxExecution | A-BE | tool_call, workdir | sandboxed | `enforce/toolrunner/sandbox.go` |
 | D2-S18-A04 | BuildSurfaces (8 surface) | A-BE | config, opts | sorted []ToolSurface | `bootstrap/surfaces.go` + `surface/{builtin,lsptool,freefork,tracker,verify,delegate,background_task,tool_search}_surface.go` |
 | D2-S18-A05 | ExecuteToolRound (2-phase) | A-BE | tool_calls, ctx | tool_results (indexed) | `bootstrap/turn_adapter.go` |

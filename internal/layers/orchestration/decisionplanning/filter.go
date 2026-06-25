@@ -1,7 +1,7 @@
-// Package toolpolicy — D7 worker/leader tool visibility (DM-20260614-015).
+// Package decisionplanning — D7 worker/leader tool visibility (DM-20260614-015).
 //
 // DSAFT: D7-S5 F — hides delegate_* from workers and constrains explore/plan read-only sets.
-package toolpolicy
+package decisionplanning
 
 import (
 	"strings"

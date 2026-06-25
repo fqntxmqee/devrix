@@ -243,7 +243,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 > **devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地。**
 > 7 个 surface (Builtin / LSP / FreeFork / Tracker / Verify / Delegate /
-> BackgroundTask) + 3 个 filter (PerAgent / PerRisk / toolpolicy
+> BackgroundTask) + 3 个 filter (PerAgent / PerRisk / decisionplanning
 > adapter) + 1 个 dispatch path (turn_adapter.findSurface).
 > 完整列表见 `openspec/changes/devrix-tool-surface-contract/design.md` §2.5-§2.6。
 
@@ -257,7 +257,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | TOOL-FILTER-1-T01 | PerAgentFilter 5 agent + WithAllowlist + 不可变 + 未知 agent | Filter Impl | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
 | TOOL-FILTER-1-T02 | PerRiskFilter 4 阈值 + 空阈值 pass-through | Filter Impl | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P0 |
 | TOOL-FILTER-1-T03 | Composite FIFO 顺序 + 顺序敏感性 | Filter Composition | `internal/layers/contextengine/enforce/tools/filter/w6_filters_test.go` | IMPLEMENTED | P1 |
-| TOOL-FILTER-1-T04 | toolpolicy.AsToolFilter 5 agent 适配 | Adapter | `internal/layers/orchestration/toolpolicy/filter_adapter_test.go` | IMPLEMENTED | P0 |
+| TOOL-FILTER-1-T04 | decisionplanning.AsToolFilter 5 agent 适配 | Adapter | `internal/layers/orchestration/decisionplanning/filter_adapter_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T08 | NewContextEngine 收编 surface 列表 (BuildSurfaces + DefaultFilters) | Engine Wiring | `internal/bootstrap/surfaces_test.go` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T09 | turn_adapter.ExecuteRound 走 surface.Execute (findSurface 线性扫) | Dispatch Path | `internal/bootstrap/turn_adapter_surface_test.go` | IMPLEMENTED | P0 |
 
@@ -304,8 +304,8 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 |-------|------|--------|-----------|--------|----------|
 | TOOL-SURFACE-1-T26 | Surface.CheckPermission 5 short-run surface=DecisionAllow；Surface 返回 Ask 时 turn_adapter 调 IPermissionGate 进一步决策 | Surface Permission | `internal/bootstrap/turn_adapter_surface_test.go::TestCheckPermission_Ask_EscalatesToIPermissionGate` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T27 | BashASTPolicy 默认 deny-list (rm -rf /, dd, mkfs, sudo, chmod 777 /) → DecisionDeny；parse 错误 → Ask | BashAST | `internal/layers/contextengine/enforce/tools/surface/bash_ast_test.go` (7 cases) | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T28 | IPermissionGate.CheckPermission 消费 ToolSpec.OpenWorld 字段 (4 bool orthogonal flags) | Permission Gate | `internal/layers/orchestration/toolpolicy/plan_mode_test.go` (consume spec flags) | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T29 | turn_adapter.ExecuteRound dispatch 前 CheckPermission；PlanModeOpenWorldPolicy 在 plan_mode + OpenWorld + not-allowlist 时 Deny | Two-phase Dispatch | `internal/bootstrap/turn_adapter_surface_test.go` + `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanModeOpenWorldPolicy` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T28 | IPermissionGate.CheckPermission 消费 ToolSpec.OpenWorld 字段 (4 bool orthogonal flags) | Permission Gate | `internal/layers/orchestration/decisionplanning/plan_mode_test.go` (consume spec flags) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T29 | turn_adapter.ExecuteRound dispatch 前 CheckPermission；PlanModeOpenWorldPolicy 在 plan_mode + OpenWorld + not-allowlist 时 Deny | Two-phase Dispatch | `internal/bootstrap/turn_adapter_surface_test.go` + `internal/layers/orchestration/decisionplanning/plan_mode_test.go::TestPlanModeOpenWorldPolicy` | IMPLEMENTED | P0 |
 
 ## PERMISSION-GATE-1: Permission Gate Policy (DM-20260618-002)
 
@@ -315,7 +315,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|--------|-----------|--------|----------|
 | PERMISSION-GATE-1-T01 | Permission policy 决策 path 单元测试 (Risk→Decision 映射 Low=Allow / Med+High=Ask / Critical=Deny) | Permission Policy | `internal/shared/contracts/permission_check_test.go` + `internal/layers/communication/capture/permission_test.go` | IMPLEMENTED | P0 |
-| PERMISSION-GATE-1-T02 | Plan mode 自动 deny OpenWorld=true 的 tool（per-risk 收紧），除非 in allowlist (wildcard) | PlanMode Policy | `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanMode_AllowListBypassesDeny` | IMPLEMENTED | P0 |
+| PERMISSION-GATE-1-T02 | Plan mode 自动 deny OpenWorld=true 的 tool（per-risk 收紧），除非 in allowlist (wildcard) | PlanMode Policy | `internal/layers/orchestration/decisionplanning/plan_mode_test.go::TestPlanMode_AllowListBypassesDeny` | IMPLEMENTED | P0 |
 
 ## TOOL-SURFACE-1: Lazy Loading (DM-20260618-003)
 
@@ -330,7 +330,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | TOOL-SURFACE-1-T31 | ShouldDeferByDefault 返回 true for 6 hardcoded candidates (delegate_*, task_output_background) | DeferLoading Static | `internal/layers/contextengine/enforce/tools/surface/tool_search_surface_test.go::TestShouldDeferByDefault` | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T32 | ToolSearchSurface.Tools() 返回 1 个 spec (DeferLoading=false 强制)；search() 匹配 exact > glob > substring，top-5 cap | ToolSearchSurface | `internal/layers/contextengine/enforce/tools/surface/tool_search_surface_test.go` (6 cases) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T33 | turn_adapter.Prepare 过滤 DeferLoading=true 的 tools (tool_search 必须保留)；deferDecider chain 加 runtime defer | Prepare Filter | `internal/bootstrap/turn_adapter_surface_test.go::TestPrepare_FiltersDeferred` | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T34 | PlanModeOpenWorldPolicy.ShouldDefer runtime defer (mode=plan_mode + OpenWorld + !allowlist → defer) | ShouldDefer Runtime | `internal/layers/orchestration/toolpolicy/plan_mode_test.go::TestPlanModeOpenWorldPolicy_ShouldDefer` | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T34 | PlanModeOpenWorldPolicy.ShouldDefer runtime defer (mode=plan_mode + OpenWorld + !allowlist → defer) | ShouldDefer Runtime | `internal/layers/orchestration/decisionplanning/plan_mode_test.go::TestPlanModeOpenWorldPolicy_ShouldDefer` | IMPLEMENTED | P0 |
 
 ## TOOL-SURFACE-1: ask_user_question (DM-20260618-006)
 

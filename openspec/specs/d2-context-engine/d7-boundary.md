@@ -125,7 +125,7 @@ D1.Gateway.RouteInbound
 | 2 | ~~`contextengine/tasks/plan_*.go`~~ | Plan 策略 | D7-S5 `workmodel/plan_*.go` | ✅ DM-012 |
 | 3 | ~~`contextengine/delegate_tools.go`~~ | D4 路由 | `orchestration/delegatetools/` | ✅ DM-011 |
 | 4 | ~~`contextengine/queue/`~~ delegate-progress | Flow drain | D7-S4 `sessionqueue/` | ✅ DM-013 |
-| 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `toolpolicy/` | ✅ DM-015 |
+| 5 | ~~`contextengine/worker_tools.go`~~ | Worker 编排面 | D7 `decisionplanning/` (filter_adapter) | ✅ DM-015 |
 | 6 | `contextengine/nested/flow_report.go` | SubQuery FlowEvent 发布 | D7-S4 `executionflow/bridge/subquery_bridge.go` | ⬜ DM-018 slice-c |
 | 7 | ~~`contextengine/query/loop.go`~~ | LLM↔Tool loop | D7 `turn/orchestrator.go` | ✅ DM-20260618-010 |
 

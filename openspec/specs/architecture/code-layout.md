@@ -98,7 +98,6 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | —             | Hub-Spoke bridge (S4)   | `bridge`              | `executionflow/bridge/`              | ✅ DM-20260619-005（自 `hubspoke/`） |
 | —             | Legacy shim             | `coordinator`         | `orchestration/coordinator/`         | 🔶 1-release aliases only           |
 | —             | Legacy shim             | `hubspoke`            | `orchestration/hubspoke/`            | 🔶 1-release aliases only           |
-| —             | Worker tool policy F    | `toolpolicy`          | `orchestration/toolpolicy/`          | ✅ DM-015                           |
 | —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
 | —             | Session command queue F | `sessionqueue`        | `orchestration/sessionqueue/`        | ✅ DM-013                           |
 | —             | Milestone DAG           | `milestone`           | `orchestration/milestone/`           | ✅ 已迁入                              |

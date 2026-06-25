@@ -12,7 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
@@ -169,7 +169,7 @@ func NewContextEngine(
 		ObsBridge:           obsBridge,
 		DefaultModel:        stack.DefaultModel,
 		TierResolver:        stack.TierResolver,
-		AgentRoleToolFilter: toolpolicy.AsAgentRoleToolFilter(),
+		AgentRoleToolFilter: decisionplanning.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).

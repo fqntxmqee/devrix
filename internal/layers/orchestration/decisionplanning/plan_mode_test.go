@@ -1,10 +1,10 @@
-package toolpolicy_test
+package decisionplanning_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -32,9 +32,9 @@ func TestPlanModeOpenWorldPolicy_ApplyWithContext(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
 			if c.mode != "" {
-				ctx = context.WithValue(ctx, toolpolicy.ModeKey{}, c.mode)
+				ctx = context.WithValue(ctx, decisionplanning.ModeKey{}, c.mode)
 			}
-			p := toolpolicy.NewPlanModeOpenWorldPolicy(c.allowList)
+			p := decisionplanning.NewPlanModeOpenWorldPolicy(c.allowList)
 			spec := contracts.ToolSpec{Name: c.tool, OpenWorld: c.openWorld, Risk: types.RiskLevelHigh}
 			got := p.ApplyWithContext(ctx, spec, contracts.DecisionAllow)
 			if got != c.want {
@@ -47,7 +47,7 @@ func TestPlanModeOpenWorldPolicy_ApplyWithContext(t *testing.T) {
 // T: TOOL-SURFACE-1-A01-T29 — NewPlanModeOpenWorldPolicy normalizes the
 // allowlist (trims whitespace, drops empty entries).
 func TestNewPlanModeOpenWorldPolicy_Normalizes(t *testing.T) {
-	p := toolpolicy.NewPlanModeOpenWorldPolicy([]string{"", "  ", "web_fetch", "\t"})
+	p := decisionplanning.NewPlanModeOpenWorldPolicy([]string{"", "  ", "web_fetch", "\t"})
 	if len(p.AllowList) != 1 {
 		t.Errorf("normalization: got %d entries, want 1", len(p.AllowList))
 	}
@@ -79,9 +79,9 @@ func TestPlanModeOpenWorldPolicy_ShouldDefer(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
 			if c.mode != "" {
-				ctx = context.WithValue(ctx, toolpolicy.ModeKey{}, c.mode)
+				ctx = context.WithValue(ctx, decisionplanning.ModeKey{}, c.mode)
 			}
-			p := toolpolicy.NewPlanModeOpenWorldPolicy(c.allowList)
+			p := decisionplanning.NewPlanModeOpenWorldPolicy(c.allowList)
 			spec := contracts.ToolSpec{Name: c.tool, OpenWorld: c.openWorld}
 			got := p.ShouldDefer(ctx, spec)
 			if got != c.want {

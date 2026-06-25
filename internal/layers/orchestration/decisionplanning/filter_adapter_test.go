@@ -1,10 +1,10 @@
-package toolpolicy_test
+package decisionplanning_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -49,7 +49,7 @@ func fullSet() []contracts.ToolSpec {
 
 // T: TOOL-FILTER-1-T04 — main/fix/empty: pass-through (no filter applied).
 func TestAdapter_Main_PassThrough(t *testing.T) {
-	f := toolpolicy.AsToolFilter()
+	f := decisionplanning.AsToolFilter()
 	specs := fullSet()
 	got := f.Apply(specs, contracts.FilterCtx{AgentType: "main"})
 	if !reflect.DeepEqual(specNames(got), specNames(specs)) {
@@ -67,7 +67,7 @@ func TestAdapter_Main_PassThrough(t *testing.T) {
 
 // T: TOOL-FILTER-1-T04 — delegate: only delegate_* tools.
 func TestAdapter_Delegate_OnlyDelegates(t *testing.T) {
-	f := toolpolicy.AsToolFilter()
+	f := decisionplanning.AsToolFilter()
 	got := f.Apply(fullSet(), contracts.FilterCtx{AgentType: "delegate"})
 	want := []string{"delegate_explore", "delegate_plan", "delegate_implement", "delegate_status"}
 	if !reflect.DeepEqual(specNames(got), want) {
@@ -77,7 +77,7 @@ func TestAdapter_Delegate_OnlyDelegates(t *testing.T) {
 
 // T: TOOL-FILTER-1-T04 — explore/plan: read-only worker set, no delegate_*.
 func TestAdapter_Explore_ReadOnlyNoDelegate(t *testing.T) {
-	f := toolpolicy.AsToolFilter()
+	f := decisionplanning.AsToolFilter()
 	for _, role := range []string{"explore", "plan"} {
 		got := f.Apply(fullSet(), contracts.FilterCtx{AgentType: role})
 		for _, s := range got {
@@ -100,7 +100,7 @@ func TestAdapter_Explore_ReadOnlyNoDelegate(t *testing.T) {
 
 // T: TOOL-FILTER-1-T04 — worker: hides delegate_*, keeps full worker set.
 func TestAdapter_Worker_NoDelegate(t *testing.T) {
-	f := toolpolicy.AsToolFilter()
+	f := decisionplanning.AsToolFilter()
 	got := f.Apply(fullSet(), contracts.FilterCtx{AgentType: "worker"})
 	for _, s := range got {
 		if s.Name == "delegate_explore" || s.Name == "delegate_plan" || s.Name == "delegate_implement" || s.Name == "delegate_status" {
@@ -121,7 +121,7 @@ func TestAdapter_Worker_NoDelegate(t *testing.T) {
 
 // T: TOOL-FILTER-1-T04 — unknown agent: conservative (hide delegate_* + read-only).
 func TestAdapter_Unknown_Conservative(t *testing.T) {
-	f := toolpolicy.AsToolFilter()
+	f := decisionplanning.AsToolFilter()
 	got := f.Apply(fullSet(), contracts.FilterCtx{AgentType: "hypothetical"})
 	for _, s := range got {
 		if s.Name == "delegate_explore" || s.Name == "delegate_plan" || s.Name == "delegate_implement" || s.Name == "delegate_status" {
@@ -142,5 +142,5 @@ func TestAdapter_Unknown_Conservative(t *testing.T) {
 
 // T: TOOL-FILTER-1-T04 — Adapter is a valid contracts.ToolFilter.
 func TestAdapter_InterfaceCompliance(t *testing.T) {
-	var _ contracts.ToolFilter = toolpolicy.AsToolFilter()
+	var _ contracts.ToolFilter = decisionplanning.AsToolFilter()
 }

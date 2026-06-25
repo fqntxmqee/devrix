@@ -1,4 +1,4 @@
-package toolpolicy
+package decisionplanning
 
 import (
 	"strings"

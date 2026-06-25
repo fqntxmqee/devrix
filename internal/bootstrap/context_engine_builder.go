@@ -16,7 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
@@ -262,7 +262,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		ObsBridge:           b.obsBridge,
 		DefaultModel:        b.stack.DefaultModel,
 		TierResolver:        b.stack.TierResolver,
-		AgentRoleToolFilter: toolpolicy.AsAgentRoleToolFilter(),
+		AgentRoleToolFilter: decisionplanning.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
 		SessionCommandQueue: sessionqueue.NewSessionQueue(),
 		Surfaces:            surfaces,

@@ -8,7 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/filter"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -48,7 +48,7 @@ func TestIntegration_ToolSurface_AllModes(t *testing.T) {
 
 	ctx3 := contracts.FilterCtx{SessionID: "sess-1", AgentType: "delegate"}
 	delegateVisible := visibleSpecNames(contracts.ApplyFilters(surfaces, []contracts.ToolFilter{
-		toolpolicy.AsToolFilter(),
+		decisionplanning.AsToolFilter(),
 	}, ctx3))
 	// delegate mode: only delegate_* tools
 	for _, n := range delegateVisible {

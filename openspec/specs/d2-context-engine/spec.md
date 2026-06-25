@@ -1194,7 +1194,7 @@ Commands that fail to parse MUST result in `DecisionAsk` (conservative).
 > **devrix-surface-permission-extension (DM-20260618-002).**
 
 The `IPermissionGate.CheckPermission(ctx, spec)` method (defined in
-`internal/layers/orchestration/toolpolicy/plan_mode.go`) MUST apply the
+`internal/layers/orchestration/decisionplanning/plan_mode.go`) MUST apply the
 `PlanModeOpenWorldPolicy`: when `ctx.Value(ModeKey) == "plan_mode"` AND
 `spec.OpenWorld == true`, return `DecisionDeny` UNLESS `spec.Name` is
 in `cfg.PlanMode.OpenWorldAllowList`. The allowlist MUST support
@@ -1370,7 +1370,7 @@ filter implementations:
 |--------|------|-----------------|
 | PerAgentFilter | `filter/per_agent.go` | `AgentType` |
 | PerRiskFilter | `filter/per_risk.go` | `RiskThreshold` |
-| toolpolicy.AsToolFilter | `toolpolicy/filter_adapter.go` | `AgentType` |
+| decisionplanning.AsToolFilter | `decisionplanning/filter_adapter.go` | `AgentType` |
 
 `Composite(perAgent, perRisk)` is the canonical per-mode chain. Filter
 order is significant: per-agent first (drops dangerous tools), per-risk
