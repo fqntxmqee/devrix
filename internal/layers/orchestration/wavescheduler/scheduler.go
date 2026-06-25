@@ -528,7 +528,6 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 	}
 	s.guard.Unregister(slotID)
 	s.pool.Release(slotID)
-	s.finalizeTask(sessionID, state, taskID, art)
 	state.graph.SetState(taskID, terminal)
 
 	// Update handle.
@@ -557,13 +556,11 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 	}
 }
 
-// finalizeTask is a no-op extension point for IM / metrics side effects.
-func (s *WaveScheduler) finalizeTask(sessionID string, state *schedulerWaveState, taskID string, art Artifact) {
-	_ = sessionID
-	_ = state
-	_ = taskID
-	_ = art
-}
+// finalizeTask (removed 2026-06-24): was a no-op extension point for
+// IM / metrics side effects that was never implemented. The actual side
+// effects (artifacts.Put, metric increments, guard.Unregister, pool.Release,
+// graph.SetState) already happen at the call site. If/when a real
+// extension point is needed, re-introduce it with concrete behaviour.
 
 func (s *WaveScheduler) recordPeakRunning(state *schedulerWaveState) {
 	if state == nil {

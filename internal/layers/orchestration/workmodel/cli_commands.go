@@ -395,7 +395,9 @@ func (c *PlanCLICommands) enter(args []string, sessionID string) string {
 		return "Please provide a goal: /plan <goal description>"
 	}
 
-	_ = c.planMode.Enter(nil, sessionID, goal)
+	if err := c.planMode.Enter(nil, sessionID, goal); err != nil {
+		return fmt.Sprintf("Failed to enter plan mode: %v", err)
+	}
 
 	return fmt.Sprintf(`Entered plan mode.
 

@@ -136,7 +136,11 @@ func (h *CommandHandler) dispatch(ctx context.Context, req orchtypes.ProcessRequ
 		return h.cli.Help(), nil
 	case "/stop":
 		if h.interruptHandle != nil {
-			_ = h.interruptHandle(ctx, req.SessionID)
+			if err := h.interruptHandle(ctx, req.SessionID); err != nil {
+				slog.Warn("command_handler: /stop interrupt handler returned error; reporting 'stopped' anyway",
+					"session_id", req.SessionID,
+					"error", err)
+			}
 			return "stopped", nil
 		}
 		return "stopped (no interrupt handler wired)", nil

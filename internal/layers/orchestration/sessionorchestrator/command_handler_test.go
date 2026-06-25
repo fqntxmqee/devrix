@@ -11,6 +11,13 @@ import (
 )
 
 // T: D7-S2-A01-T04 — CommandHandler 显式分发到 PlanCLICommands（/plan）。
+//
+// H7 fix (2026-06-24 review-fixes): previously this test asserted the
+// user saw "Entered plan mode" even when PlanMode.Enter failed (LLM not
+// configured). The old code discarded the error with `_ =`, so a user
+// who typed `/plan ...` without a wired LLM believed they had entered
+// plan mode while no agent would ever run. The regression guard now
+// asserts the error is surfaced to the user.
 func TestCommandHandler_Handle_PlanCommand(t *testing.T) {
 	cli := workmodel.NewCLICommands(workmodel.NewTaskManager())
 	plan := workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, nil))
@@ -33,7 +40,6 @@ func TestCommandHandler_Handle_PlanCommand(t *testing.T) {
 	if len(events) < 2 {
 		t.Fatalf("want ≥ 2 events, got %d", len(events))
 	}
-	// Expect text + complete (command_reply goes to sink, not channel).
 	var types []string
 	for _, ev := range events {
 		types = append(types, ev.Type)
@@ -41,15 +47,17 @@ func TestCommandHandler_Handle_PlanCommand(t *testing.T) {
 	if !contains(types, "text") || !contains(types, "complete") {
 		t.Fatalf("want text+complete events, got %v", types)
 	}
-	// text content should mention PlanMode (the canonical "orchtypes.Plan mode:" prefix).
 	var text string
 	for _, ev := range events {
 		if ev.Type == "text" {
 			text = ev.Content
 		}
 	}
-	if !strings.Contains(text, "Entered plan mode") {
-		t.Fatalf("text should confirm plan mode entry, got %q", text)
+	if !strings.Contains(text, "Failed to enter plan mode") {
+		t.Fatalf("text should surface Enter error, got %q", text)
+	}
+	if strings.Contains(text, "Entered plan mode") {
+		t.Fatalf("text should NOT claim success when Enter failed, got %q", text)
 	}
 }
 
