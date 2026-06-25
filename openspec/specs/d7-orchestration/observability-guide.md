@@ -169,7 +169,7 @@ D4 Agent / D2 SubQuery / D7 Wave
     → S4-A04/A05 SpokeBridge
     → S4-A01 PublishFlowEvent (GlobalHub)
         ├─ workplan.Service.Apply
-        ├─ sessionqueue (delegate-progress)
+        ├─ executionflow (delegate-progress)
         └─ imsink.GatewaySink → D1 EngineEvent
             └─ D1-S15 PresentTaskProgress
 ```

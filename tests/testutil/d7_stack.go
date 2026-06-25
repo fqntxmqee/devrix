@@ -20,7 +20,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
@@ -59,7 +59,7 @@ type D7TestStack struct {
 	WorkDir      string
 	TaskManager  *workmodel.TaskManager
 	FlowHub      contracts.ExecutionFlowHub
-	SessionQueue *sessionqueue.SessionQueue
+	SessionQueue *executionflow.SessionQueue
 }
 
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
@@ -178,7 +178,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	var flowHub contracts.ExecutionFlowHub
-	var sessionQ *sessionqueue.SessionQueue
+	var sessionQ *executionflow.SessionQueue
 	if opt.ExecutionFlow || opt.Delegate {
 		flowHub, sessionQ = bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
 	}

@@ -756,7 +756,7 @@ D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子
 | S4 ExecutionFlow+Verify | Costly Signaler+Certifier | `WireExecutionFlow` | `bootstrap/execution_flow.go` | 14 ExitReason + VerdictToExitReason |
 | S5 DecisionPlanning+Observe | Info Producer+Quantizer | `WireDecisionPlanning` | `bootstrap/decision_planning.go` | **NEW** (PR-3) |
 | S6 MUPS Pipeline | Pipeline Coord+Memory | `WireMUPSPipeline` (+ `MUPSPipelinesDeps`) | `bootstrap/mups_pipeline.go` | **NEW** (PR-3) |
-| 横切 Hardening | Discipline Keeper | 0 wire | `d7spans.SetBridge` 隐式 | 5 新 Span ops 通过桥接隐式注入 |
+| 横切 Hardening | Discipline Keeper | 0 wire | `hardening.SetBridge` 隐式 | 5 新 Span ops 通过桥接隐式注入 |
 
 `grep -E "^func Wire" internal/bootstrap/*.go` 列出 5 个 `Wire*`：
 1. `WireTurnInvoker` (S2)

@@ -284,7 +284,7 @@
 | Spoke 派发 / fallback | ❌ | **D7-S2** DispatchWorker | v2.0 `hubspoke/dispatch.go` |
 | Worker fork/run/join | **D4-S14** ExecuteWorker | 派发 | D7 → D4 契约 |
 | FlowEvent 发布 | ❌（v2.0 后） | **D7-S4** SpokeBridge | v1.0 临时：D4 bridge + D2 flow_report |
-| WorkPlan / delegate-progress | ❌ | **D7-S4** | `flow/`, `sessionqueue/` |
+| WorkPlan / delegate-progress | ❌ | **D7-S4** | `flow/`, `executionflow/` (formerly `sessionqueue/`) |
 | Wave SubAgent 调度 | ❌ | **D7-S3** | 经 Dispatch 统一 |
 
 ### 3.2 D4 vs D2 (Context Engine)

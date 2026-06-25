@@ -17,7 +17,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
@@ -139,7 +139,7 @@ func DetectSystemAnomaly(ctx context.Context, sessionID string, report orchtypes
 		EvidenceID: evidenceID,
 	}
 
-	end := d7spans.EmitSystemAnomalyDetect(
+	end := hardening.EmitSystemAnomalyDetect(
 		ctx,
 		sessionID,
 		string(kind),

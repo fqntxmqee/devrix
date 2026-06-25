@@ -11,8 +11,8 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/workplan"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -26,7 +26,7 @@ type IMSink interface {
 // Hub implements contracts.ExecutionFlowHub with dual-channel dispatch.
 type Hub struct {
 	cfg       config.ExecutionFlowConfig
-	q         *sessionqueue.SessionQueue
+	q         *executionflow.SessionQueue
 	workPlan  *workplan.Service
 	tasks     *workmodel.TaskManager
 	im        IMSink
@@ -39,7 +39,7 @@ type Hub struct {
 // HubDeps wires Hub dependencies.
 type HubDeps struct {
 	Config    config.ExecutionFlowConfig
-	Queue     *sessionqueue.SessionQueue
+	Queue     *executionflow.SessionQueue
 	WorkPlan  *workplan.Service
 	Tasks     *workmodel.TaskManager
 	IM        IMSink
@@ -55,7 +55,7 @@ func NewHub(deps HubDeps) *Hub {
 	}
 	q := deps.Queue
 	if q == nil {
-		q = sessionqueue.NewSessionQueue()
+		q = executionflow.NewSessionQueue()
 	}
 	return &Hub{
 		cfg:          cfg,

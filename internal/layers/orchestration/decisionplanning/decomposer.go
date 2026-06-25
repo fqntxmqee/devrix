@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
@@ -97,7 +97,7 @@ func (d *TaskDecomposer) SynthesizeTaskGraph(ctx context.Context, sessionID, goa
 		edgeCount += len(n.DependsOn)
 	}
 	cycleDetected := hasCycle(nodes)
-	end := d7spans.EmitTaskGraphSynthesize(
+	end := hardening.EmitTaskGraphSynthesize(
 		ctx, sessionID,
 		nodeCount, edgeCount, dagDepth(nodes),
 		cycleDetected,

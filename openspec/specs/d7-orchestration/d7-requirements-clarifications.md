@@ -53,7 +53,7 @@ D7 Orchestration Domain 是 DSAFT 架构的第七域，作为**横向协调层**
 | Scenario | 状态 | 现行代码位置 |
 |----------|------|-------------|
 | D7-S3 Wave Scheduler | ✅ IMPLEMENTED | `internal/layers/orchestration/wavescheduler/` |
-| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/executionflow/{hub,workplan,imsink,bridge}/` + `sessionqueue/` |
+| D7-S4 Execution Flow | ✅ IMPLEMENTED | `internal/layers/orchestration/executionflow/{hub,workplan,imsink,bridge}/` + `executionflow/{session_queue,delegate_progress}_*.go` |
 | D7-S1 Work Model | ✅ IMPLEMENTED | `internal/layers/orchestration/workmodel/` + `sessionorchestrator/workmodel.go` |
 | D7-S5 Decision & Planning | ✅ IMPLEMENTED | `decisionplanning/{classifier,decomposer,executor,shadow_classifier,llm_decomposer}.go` + `workmodel/plan_*.go` |
 | D7-S2 Session Orchestrator | ✅ IMPLEMENTED | `internal/layers/orchestration/sessionorchestrator/` + `bootstrap/wire_coordinator.go` + `turn/` |

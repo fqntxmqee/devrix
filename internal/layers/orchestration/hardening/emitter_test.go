@@ -1,4 +1,4 @@
-// Package d7spans emit tests: 5 P0/P1 Span ops × 2 (emit + nil-bridge
+// Package hardening (emitter_test.go) emit tests: 5 P0/P1 Span ops × 2 (emit + nil-bridge
 // fail-safe) = 10 T points. v6.0.0 6 S 精简 S4 验收要求。
 //
 // T 点编号规则（DSAFT 标准 D{X}-S{X}-A{XX}-T{XX}）：
@@ -17,7 +17,7 @@
 // nil for fail-safe tests. Tests use the observability package's built-
 // in no-op tracer (default when IsEnabled() returns false), so emit
 // never crashes even when the bridge is genuinely nil.
-package d7spans
+package hardening
 
 import (
 	"context"

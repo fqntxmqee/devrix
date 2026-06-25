@@ -1,14 +1,14 @@
-package sessionqueue_test
+package executionflow_test
 
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 func TestSessionQueue_drain_main_thread_only_own_commands(t *testing.T) {
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	q.Enqueue("sess", contracts.QueuedCommand{Value: "user prompt", Mode: contracts.ModePrompt})
 	q.Enqueue("sess", contracts.QueuedCommand{Value: "subagent note", Mode: contracts.ModeTaskNotification, AgentID: "agent_1"})
 

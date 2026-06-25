@@ -1428,8 +1428,9 @@ not in any surface, and finally to `RiskLevelLow` as the safe default.
 > references back here for dispatch details. Updated 2026-06-17 after
 > `devrix-tool-surface-phase2-full` (DM-20260617-008) — all 5
 > remaining global singletons (transcript / flow / workmodel /
-> sessionqueue / freefork) deleted; ToolSurface is the single dispatch
-> path. See D7 spec §"DSAFT 结构" for the orchestration-side view.
+> sessionqueue [now in executionflow] / freefork) deleted; ToolSurface
+> is the single dispatch path. See D7 spec §"DSAFT 结构" for the
+> orchestration-side view.
 
 The system MUST route tool calls through exactly **three logical chain
 classes**, each ending at a runner that produces a `ToolResult` returned

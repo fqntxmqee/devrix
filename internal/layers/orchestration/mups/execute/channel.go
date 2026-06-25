@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
@@ -214,7 +214,7 @@ func (r *ChannelRouter) Route(ctx context.Context, p *plan.Plan, req ChannelRequ
 	// records both successful routes and the rare Kind-mismatch / nil-plan paths.
 	// Plan.Strength is float64 in [0,1]; surface as 3-decimal string for the Jaeger UI.
 	score := strconv.FormatFloat(p.Strength, 'f', 3, 64)
-	end := d7spans.EmitChannelRoute(ctx, p.SessionID, p.Kind.String(), "", score, "false")
+	end := hardening.EmitChannelRoute(ctx, p.SessionID, p.Kind.String(), "", score, "false")
 	if !p.Kind.IsKnown() {
 		err := NewChannelUnsupportedError("<router>", p.Kind.String())
 		end(err)

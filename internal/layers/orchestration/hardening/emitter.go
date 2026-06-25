@@ -1,15 +1,15 @@
-// Package d7spans provides v6.0.0 5 new P0/P1 Span emit helpers for D7 6 S 精简.
+// Package hardening (emitter.go) provides v6.0.0 5 new P0/P1 Span emit helpers for D7 6 S 精简.
 // Each function is a thin wrapper around observability.Bridge.Tracer().Start
 // that no-ops when the bridge is nil or disabled.
 //
-// Why a package: avoids each consumer (execute / learn / decisionplanning /
+// Why in hardening package: avoids each consumer (execute / learn / decisionplanning /
 // wavescheduler / verify) re-implementing the same start/end dance. Centralised
 // attribute naming keeps the Jaeger UI consistent.
 //
 // Why no constructor changes: a package-level setter is set once at bootstrap,
 // then any caller in any orchestration sub-package can emit a Span without
 // threading an obsBridge through every constructor.
-package d7spans
+package hardening
 
 import (
 	"context"
