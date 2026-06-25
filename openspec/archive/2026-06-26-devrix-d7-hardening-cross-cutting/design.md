@@ -5,7 +5,7 @@
 **Priority:** P1
 **Sprint:** d7-v6 follow-up
 **PR Count:** 1
-**Status:** S3_Design
+**Status:** S3_Design → S3-Gate Approved → S4_Implemented → S5_Accepted → S7_Archived
 **SoT:** `devrix-d7-six-s-simplification` (DM-20260626-001) design.md §① + acceptance-report.md §7
 
 ---

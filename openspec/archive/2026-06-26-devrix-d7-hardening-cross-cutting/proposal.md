@@ -5,7 +5,7 @@
 **Priority:** P1
 **Sprint:** d7-v6 follow-up
 **PR Count:** 1
-**Status:** S2_Proposal
+**Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S7_Archived
 **SoT:** `devrix-d7-six-s-simplification` (DM-20260626-001) acceptance-report.md §7 后续工作 + §3 Cross-cutting Hardening 章节
 
 ---

@@ -1,7 +1,7 @@
 change_id: devrix-d7-hardening-cross-cutting
 priority: P1
 demand_id: DM-20260626-003
-status: s2_proposal
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S7  # NEW: Cross-cutting Discipline Keeper
@@ -13,16 +13,16 @@ dsaft_activities:
 t_points:
   - id: D7-S7-A01-T01
     name: hardening/metrics package directory exists with InterruptMetrics (原 sessionorchestrator/metrics.go 61 行)
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S7-A02-T02
     name: hardening/recovery package directory exists with 6 functions + 1 struct (原 turn/recovery.go 133 行)
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S7-A01-T03
     name: 全仓 grep "orchestration/sessionorchestrator/metrics" 与 "orchestration/turn/recovery" 均为 0 命中
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S7-A01-T04
     name: go build/vet/test -race 全绿（23/23 orchestration packages PASS, 含 hardening 1 新包）
-    status: PLANNED
+    status: IMPLEMENTED
 
 version_scope:
   v1.0: "metrics.go + recovery.go → hardening/ 物理目录迁移，import path 替换，circuit_breaker.go 留 escape/, 23 包回归 0 race"
