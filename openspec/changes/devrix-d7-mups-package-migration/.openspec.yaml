@@ -1,7 +1,7 @@
 change_id: devrix-d7-mups-package-migration
 priority: P1
 demand_id: DM-20260626-002
-status: s3_design
+status: s5_acceptance
 domains: [D7]
 dsaft_scenarios:
   - D7-S6  # MUPS Pipeline
@@ -12,16 +12,16 @@ dsaft_activities:
 t_points:
   - id: D7-S6-A51-T01
     name: mups/execute package directory exists with original 7 .go files
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S6-A51-T02
     name: mups/learn package directory exists with original 17 .go files
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S6-A51-T03
     name: 零残留 import（全仓 grep "orchestration/execute\"" 与 "orchestration/learn\"" 均为 0 命中）
-    status: PLANNED
+    status: IMPLEMENTED
   - id: D7-S6-A51-T04
     name: go build/vet/test -race 全绿（22/22 orchestration packages PASS）
-    status: PLANNED
+    status: IMPLEMENTED
 
 version_scope:
   v1.0: "execute/ + learn/ → mups/execute/ + mups/learn/ 物理目录迁移，import path 替换，22 包回归 0 race"

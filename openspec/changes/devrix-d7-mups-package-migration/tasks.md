@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-mups-package-migration`
 **Demand ID:** DM-20260626-002
-**Status:** S4_Implemented
+**Status:** S5_Accepted
 **Sprint:** d7-v6 follow-up
 **PR Count:** 1
 **前置:** devrix-d7-six-s-simplification (DM-20260626-001) S7_Archived (PR #215)

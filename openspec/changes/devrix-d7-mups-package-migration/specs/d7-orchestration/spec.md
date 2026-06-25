@@ -2,7 +2,7 @@
 
 **Module:** D7 Orchestration / S6 MUPS Pipeline
 **Change:** `devrix-d7-mups-package-migration` (DM-20260626-002)
-**Status:** S3_Design
+**Status:** S5_Accepted
 **Spec Version:** v1.0
 **依赖:** devrix-d7-six-s-simplification (DM-20260626-001) S7_Archived
 
