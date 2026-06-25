@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 )
 
 // AnomalyCategory classifies the kind of anomaly detected by

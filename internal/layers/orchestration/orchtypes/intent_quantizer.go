@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 )
 
 // IntentClass is the 4-class quantized intent produced by IntentQuantizer.

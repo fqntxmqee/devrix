@@ -3,7 +3,7 @@ package orchtypes
 import (
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 )
 
 // ObserveRequest is the unified input to all Observer submodules
