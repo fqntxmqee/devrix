@@ -6,7 +6,7 @@
 // Verdicts #1..N-1. The Learn node owns Get/Update/List semantics; concrete
 // stores (in-memory, file-backed, D2 ContextEngine-backed) implement the
 // interface.
-package learn
+package reputation
 
 import (
 	"context"

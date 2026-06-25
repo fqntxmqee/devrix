@@ -4,7 +4,7 @@
 //
 //   Learn          — translate a Verdict (+ Plan + Observation + Artifact)
 //                    into a typed LearningAsset, route it to the right
-//                    Memory channel (LP-2), and update ReputationStore
+//                    memory.Memory channel (LP-2), and update ReputationStore
 //                    (LP-3).
 //   Inject         — build an AdaptivePrior for the next Observe call
 //                    (LP-1 closed loop). Read-side; no writes.
@@ -24,9 +24,128 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/asset"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/memory"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/prior"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/reputation"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// Re-export commonly used subpackage types so callers (DefaultLearner, tests,
+// external packages) can keep using the short learn.XXX qualifier.
+type (
+	// LearnRequest — re-exported from asset.AssetBuilder.
+	LearnRequest = asset.LearnRequest
+
+	// LearningAsset — re-exported from asset.
+	LearningAsset = asset.LearningAsset
+
+	// LearningClass — re-exported from asset (= types.LearningClass).
+	LearningClass = asset.LearningClass
+
+	// AssetBuilder — re-exported from asset.
+	AssetBuilder = asset.AssetBuilder
+
+	// KnowledgeAssetContent / PendingAssetContent — re-exported from asset.
+	KnowledgeAssetContent = asset.KnowledgeAssetContent
+	PendingAssetContent   = asset.PendingAssetContent
+
+	// AdaptivePrior — re-exported from prior.
+	AdaptivePrior = prior.AdaptivePrior
+
+	// ReputationEvidence / ReputationStore — re-exported from reputation.
+	ReputationEvidence = reputation.ReputationEvidence
+	ReputationStore    = reputation.ReputationStore
+
+	// ScheduledMemory — re-exported from memory (concrete type, not the
+	// memory.Memory interface, so DefaultLearner can call ListDue).
+	ScheduledMemory = memory.ScheduledMemory
+)
+
+// Re-export constructor + error + helper symbols used by callers.
+var (
+	ErrAssetIncomplete         = asset.ErrAssetIncomplete
+	ErrAssetClassMismatch      = asset.ErrAssetClassMismatch
+	ErrAssetBuildFailed        = asset.ErrAssetBuildFailed
+	ErrScheduledRetryExhausted = asset.ErrScheduledRetryExhausted
+	ErrAdaptivePriorNotReady   = prior.ErrAdaptivePriorNotReady
+	ErrReputationStoreUnavailable = reputation.ErrReputationStoreUnavailable
+)
+
+// Strength re-exports from asset.
+const (
+	StrengthUnknown   = asset.StrengthUnknown
+	StrengthPending   = asset.StrengthPending
+	StrengthConclusion = asset.StrengthConclusion
+	StrengthKnowledge = asset.StrengthKnowledge
+	StrengthProtocol  = asset.StrengthProtocol
+	StrengthSOP       = asset.StrengthSOP
+)
+
+// DefaultAssetTTL re-export.
+const DefaultAssetTTL = asset.DefaultAssetTTL
+
+// Track mode re-exports.
+const (
+	TrackModeDeveloper = reputation.TrackModeDeveloper
+	TrackModeOperator  = reputation.TrackModeOperator
+)
+
+// Learning asset class re-exports (so callers can do
+// learn.LearningSOP / learn.LearningProtocol / etc).
+const (
+	LearningUnknown   = types.LearningUnknown
+	LearningSOP       = types.LearningSOP
+	LearningProtocol  = types.LearningProtocol
+	LearningKnowledge = types.LearningKnowledge
+	LearningConclusion = types.LearningConclusion
+	LearningPending   = types.LearningPending
+)
+
+// Constructor re-exports.
+var (
+	NewAssetBuilder        = asset.NewAssetBuilder
+	NewAssetID             = asset.NewAssetID
+	NewReputationEvidence  = reputation.NewReputationEvidence
+	BayesianUpdate         = reputation.BayesianUpdate
+	BuildAdaptivePrior     = prior.BuildAdaptivePrior
+
+	// Memory constructors (re-exported from memory package so callers
+	// don't need to import the subpackage just to construct the default
+	// in-memory implementations).
+	NewSkillMemory     = memory.NewSkillMemory
+	NewFeedbackMemory  = memory.NewFeedbackMemory
+	NewScheduledMemory = memory.NewScheduledMemory
+	NewInMemoryReputationStore = reputation.NewInMemoryReputationStore
+)
+
+// Re-export MemoryFilter so callers (e.g. tests) can build filters without
+// importing the memory subpackage.
+type MemoryFilter = memory.MemoryFilter
+
+// Prior constants + BetaPrior re-exported from prior package.
+// (DefaultDeveloperPrior / DefaultOperatorPrior are vars, not consts, since
+// BetaPrior is a struct; re-export as var to preserve mutability semantics.)
+var (
+	DefaultDeveloperPrior = prior.DefaultDeveloperPrior
+	DefaultOperatorPrior  = prior.DefaultOperatorPrior
+)
+type BetaPrior = prior.BetaPrior
+
+// InMemoryReputationStore re-exported from reputation.
+type InMemoryReputationStore = reputation.InMemoryReputationStore
+
+// Memory (LP-2 channel contract interface) re-exported from memory.
+type Memory = memory.Memory
+type MemoryChannel = memory.MemoryChannel
+
+// Concrete memory channel types re-exported from memory.
+type SkillMemory = memory.SkillMemory
+type FeedbackMemory = memory.FeedbackMemory
+
+// ObservationLookup re-exported from asset (AssetBuilder input).
+type ObservationLookup = asset.ObservationLookup
 
 // Learner is the LP-1 closed-loop node contract.
 type Learner interface {
@@ -34,7 +153,7 @@ type Learner interface {
 	// constructed (typically 1; LearningPending produces 1 in ScheduledMemory
 	// plus an optional feedback entry on retry-exhaustion).
 	//
-	// Side effects (Memory.Store + ReputationStore.Update) happen in this
+	// Side effects (memory.Memory.Store + ReputationStore.Update) happen in this
 	// call. The Bayesian update uses the prior returned by
 	// ReputationStore.Get.
 	Learn(ctx context.Context, req LearnRequest) ([]*LearningAsset, error)
@@ -63,9 +182,9 @@ type Learner interface {
 // DefaultLearner is the production Learner implementation. All dependencies
 // are injected so tests can swap in in-memory mocks.
 type DefaultLearner struct {
-	SkillMem     Memory
-	FeedbackMem  Memory
-	ScheduledMem *ScheduledMemory // typed (not Memory) so we can call ListDue
+	SkillMem     memory.Memory
+	FeedbackMem  memory.Memory
+	ScheduledMem *ScheduledMemory // typed (not memory.Memory) so we can call ListDue
 	Reputation   ReputationStore
 	Builder      *AssetBuilder
 	// BayesianUpdater is the verdict → prior-evidence mutator. Injected so
@@ -76,7 +195,7 @@ type DefaultLearner struct {
 // NewDefaultLearner wires the 3 memory channels + reputation store +
 // builder + BayesianUpdater (defaults to BayesianUpdate if nil).
 func NewDefaultLearner(
-	skill, feedback Memory,
+	skill, feedback memory.Memory,
 	scheduled *ScheduledMemory,
 	rep ReputationStore,
 	builder *AssetBuilder,
@@ -106,16 +225,16 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 		return nil, ErrAssetBuildFailed
 	}
 
-	class := classFromVerdictKind(req.Verdict.Kind, req.Verdict.Reason)
+	class := asset.ClassFromVerdictKind(req.Verdict.Kind, req.Verdict.Reason)
 	if class == LearningClass(types.LearningUnknown) {
 		return nil, fmt.Errorf("%w: unsupported verdict kind %v", ErrAssetBuildFailed, req.Verdict.Kind)
 	}
 
-	asset, err := l.Builder.Build(ctx, req, class)
+	builtAsset, err := l.Builder.Build(ctx, req, class)
 	if err != nil {
 		return nil, err
 	}
-	if asset == nil {
+	if builtAsset == nil {
 		return nil, ErrAssetBuildFailed
 	}
 
@@ -123,59 +242,59 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 	//
 	// Order matters: update Reputation FIRST so the Bayesian evidence is
 	// committed before the asset becomes visible. The previous order —
-	// Memory.Store then Reputation.Update — left a partial-state window
-	// where a crash between Store and Update produced an asset in Memory
+	// memory.Memory.Store then Reputation.Update — left a partial-state window
+	// where a crash between Store and Update produced an asset in memory.Memory
 	// without its corresponding Bayesian evidence. On the next Observe,
 	// the asset was retrieved as if it had been "learned" but the
 	// Reputation row reflected only the prior state, so Inject would
 	// replay with stale statistics. Updating Reputation first means a
-	// crash before Memory.Store leaves the Reputation row one step ahead
-	// of Memory (over-count by one), which Inject handles correctly via
+	// crash before memory.Memory.Store leaves the Reputation row one step ahead
+	// of memory.Memory (over-count by one), which Inject handles correctly via
 	// the BayesianUpdate mechanics — over-counting is a benign
 	// statistical artifact, while under-counting (the old bug) means
 	// Inject ignores a Learn that the rest of the system already
 	// acknowledged. The caller retries on error; ReputationStore.Update
 	// is idempotent for the same prior+verdict pair (same next state).
 	if l.Reputation != nil && l.BayesianUpdater != nil {
-		prior, err := l.Reputation.Get(ctx, req.SessionID)
+		priorEv, err := l.Reputation.Get(ctx, req.SessionID)
 		if err != nil && !errors.Is(err, ErrReputationStoreUnavailable) {
 			return nil, fmt.Errorf("learn: ReputationStore.Get: %w", err)
 		}
-		if prior == nil {
+		if priorEv == nil {
 			// Cold start: bootstrap with Developer track (fail-safe).
-			prior, err = NewReputationEvidence(req.SessionID, TrackModeDeveloper)
+			priorEv, err = NewReputationEvidence(req.SessionID, TrackModeDeveloper)
 			if err != nil {
 				return nil, fmt.Errorf("learn: cold-start reputation: %w", err)
 			}
 		}
-		next := l.BayesianUpdater(prior, req.Verdict)
+		next := l.BayesianUpdater(priorEv, req.Verdict)
 		if err := l.Reputation.Update(ctx, next); err != nil {
 			return nil, fmt.Errorf("learn: ReputationStore.Update: %w", err)
 		}
 	}
 
-	// LP-2: route to the correct Memory channel.
+	// LP-2: route to the correct memory.Memory channel.
 	switch class {
 	case LearningClass(types.LearningSOP), LearningClass(types.LearningProtocol):
-		if err := l.SkillMem.Store(ctx, asset); err != nil {
+		if err := l.SkillMem.Store(ctx, builtAsset); err != nil {
 			return nil, fmt.Errorf("learn: SkillMemory.Store: %w", err)
 		}
 	case LearningClass(types.LearningKnowledge), LearningClass(types.LearningConclusion):
-		if err := l.FeedbackMem.Store(ctx, asset); err != nil {
+		if err := l.FeedbackMem.Store(ctx, builtAsset); err != nil {
 			return nil, fmt.Errorf("learn: FeedbackMemory.Store: %w", err)
 		}
 	case LearningClass(types.LearningPending):
 		// LearningPending always goes to ScheduledMemory (LP-2). It may
 		// later be escalated to FeedbackMemory by ScheduledTick on
 		// MaxRetries exhaustion.
-		if err := l.ScheduledMem.Store(ctx, asset); err != nil {
+		if err := l.ScheduledMem.Store(ctx, builtAsset); err != nil {
 			return nil, fmt.Errorf("learn: ScheduledMemory.Store: %w", err)
 		}
 	default:
 		return nil, ErrAssetClassMismatch
 	}
 
-	return []*LearningAsset{asset}, nil
+	return []*LearningAsset{builtAsset}, nil
 }
 
 // Inject is the LP-1 read phase: read ReputationStore → BuildAdaptivePrior.

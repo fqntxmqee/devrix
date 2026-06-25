@@ -1,6 +1,16 @@
-package learn
+package prior
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/reputation"
+)
+
+// ErrAdaptivePriorNotReady — AdaptivePrior not ready (cold start).
+// Moved from mups/learn/asset/learning_asset.go in v6.0.0 subpackage split
+// (logically belongs to AdaptivePrior, not Asset).
+var ErrAdaptivePriorNotReady = errors.New("learn: adaptive prior not ready (cold start)")
 
 // BetaPrior is a Beta distribution prior (α, β). Used as the default prior
 // for new sessions (doc 25 §四: Developer Beta(5,3) / Operator Beta(8,1)).
@@ -32,32 +42,32 @@ func (p BetaPrior) Mean() float64 {
 // DefaultPriors — from doc 25 §四.
 var (
 	// DefaultDeveloperPrior — slightly positive prior for developers.
-	// Used when TrackMode == "developer" (or empty / unknown — fail-safe).
+	// Used when reputation.TrackMode == "developer" (or empty / unknown — fail-safe).
 	DefaultDeveloperPrior = BetaPrior{Alpha: 5, Beta: 3}
 
 	// DefaultOperatorPrior — strongly positive prior for operators.
-	// Used when TrackMode == "operator".
+	// Used when reputation.TrackMode == "operator".
 	DefaultOperatorPrior = BetaPrior{Alpha: 8, Beta: 1}
 )
 
 // AdaptivePrior is the immutable output of BuildAdaptivePrior. Carries the
 // merged Beta prior + Reputation (LP-1 衍生).
 type AdaptivePrior struct {
-	// Reputation — current ReputationEvidence (nullable for cold start).
-	Reputation *ReputationEvidence
+	// Reputation — current reputation.ReputationEvidence (nullable for cold start).
+	Reputation *reputation.ReputationEvidence
 
 	// PriorBeta — Bayesian-merged Beta prior (DefaultPrior + Reputation).
 	PriorBeta BetaPrior
 }
 
-// BuildAdaptivePrior constructs an AdaptivePrior from a ReputationEvidence
+// BuildAdaptivePrior constructs an AdaptivePrior from a reputation.ReputationEvidence
 // and track mode.
 //
 // Behavior:
 //
 //   - rep == nil → uses DefaultPrior only; Reputation field is nil.
-//   - trackMode == TrackModeDeveloper (or "") → DefaultDeveloperPrior (fail-safe).
-//   - trackMode == TrackModeOperator → DefaultOperatorPrior.
+//   - trackMode == reputation.TrackModeDeveloper (or "") → DefaultDeveloperPrior (fail-safe).
+//   - trackMode == reputation.TrackModeOperator → DefaultOperatorPrior.
 //   - other trackMode → DefaultDeveloperPrior (fail-safe, matches phase 5
 //     PR-E3 design).
 //
@@ -67,7 +77,7 @@ type AdaptivePrior struct {
 //	mergedBeta  = prior.Beta + rep.Beta
 //
 // When rep == nil, the merged prior is just DefaultPrior (no combination).
-func BuildAdaptivePrior(rep *ReputationEvidence, trackMode TrackMode) *AdaptivePrior {
+func BuildAdaptivePrior(rep *reputation.ReputationEvidence, trackMode reputation.TrackMode) *AdaptivePrior {
 	prior := defaultPriorForTrackMode(trackMode)
 
 	if rep != nil {
@@ -81,11 +91,11 @@ func BuildAdaptivePrior(rep *ReputationEvidence, trackMode TrackMode) *AdaptiveP
 	}
 }
 
-func defaultPriorForTrackMode(trackMode TrackMode) BetaPrior {
+func defaultPriorForTrackMode(trackMode reputation.TrackMode) BetaPrior {
 	switch trackMode {
-	case TrackModeOperator:
+	case reputation.TrackModeOperator:
 		return DefaultOperatorPrior
-	case TrackModeDeveloper, "":
+	case reputation.TrackModeDeveloper, "":
 		return DefaultDeveloperPrior
 	default:
 		// Unknown / non-empty → fail-safe to Developer prior (doc 25 §四

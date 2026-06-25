@@ -1,4 +1,4 @@
-package learn
+package asset
 
 import (
 	"context"
@@ -176,8 +176,8 @@ func TestAssetBuilder_BuildPendingAsset(t *testing.T) {
 	if pending.OriginalArtifactID != "art_orig" {
 		t.Errorf("OriginalArtifactID = %q, want art_orig", pending.OriginalArtifactID)
 	}
-	if pending.MaxRetries != DefaultScheduledMaxRetries {
-		t.Errorf("MaxRetries = %d, want %d", pending.MaxRetries, DefaultScheduledMaxRetries)
+	if pending.MaxRetries != DefaultPendingMaxRetries {
+		t.Errorf("MaxRetries = %d, want %d", pending.MaxRetries, DefaultPendingMaxRetries)
 	}
 	if pending.RetryAttempts != 0 {
 		t.Errorf("RetryAttempts = %d, want 0", pending.RetryAttempts)

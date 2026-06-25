@@ -1,8 +1,9 @@
-package learn
+package prior
 
 import (
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/reputation"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -37,11 +38,11 @@ func TestAdaptivePrior_Immutable(t *testing.T) {
 }
 
 func TestBuildAdaptivePrior_DeveloperMode_DefaultDeveloperPrior(t *testing.T) {
-	rep, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
+	rep, _ := reputation.NewReputationEvidence("sess_1", reputation.TrackModeDeveloper)
 	rep.Alpha = 10
 	rep.Beta = 2
 
-	ap := BuildAdaptivePrior(rep, TrackModeDeveloper)
+	ap := BuildAdaptivePrior(rep, reputation.TrackModeDeveloper)
 
 	// Developer: Beta(5,3) + rep(10,2) = Beta(15, 5)
 	want := BetaPrior{Alpha: 15, Beta: 5}
@@ -54,11 +55,11 @@ func TestBuildAdaptivePrior_DeveloperMode_DefaultDeveloperPrior(t *testing.T) {
 }
 
 func TestBuildAdaptivePrior_OperatorMode_DefaultOperatorPrior(t *testing.T) {
-	rep, _ := NewReputationEvidence("sess_1", TrackModeOperator)
+	rep, _ := reputation.NewReputationEvidence("sess_1", reputation.TrackModeOperator)
 	rep.Alpha = 5
 	rep.Beta = 1
 
-	ap := BuildAdaptivePrior(rep, TrackModeOperator)
+	ap := BuildAdaptivePrior(rep, reputation.TrackModeOperator)
 
 	// Operator: Beta(8,1) + rep(5,1) = Beta(13, 2)
 	want := BetaPrior{Alpha: 13, Beta: 2}
@@ -68,7 +69,7 @@ func TestBuildAdaptivePrior_OperatorMode_DefaultOperatorPrior(t *testing.T) {
 }
 
 func TestBuildAdaptivePrior_NilReputation_UseDefaultPrior(t *testing.T) {
-	ap := BuildAdaptivePrior(nil, TrackModeDeveloper)
+	ap := BuildAdaptivePrior(nil, reputation.TrackModeDeveloper)
 
 	if ap.Reputation != nil {
 		t.Error("Reputation should be nil for cold start")
@@ -82,11 +83,11 @@ func TestBuildAdaptivePrior_NilReputation_UseDefaultPrior(t *testing.T) {
 
 func TestBuildAdaptivePrior_EmptyTrackMode_DefaultDeveloper(t *testing.T) {
 	// Empty trackMode → fail-safe to Developer prior
-	rep, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
+	rep, _ := reputation.NewReputationEvidence("sess_1", reputation.TrackModeDeveloper)
 	rep.Alpha = 3
 	rep.Beta = 0
 
-	ap := BuildAdaptivePrior(rep, TrackMode(""))
+	ap := BuildAdaptivePrior(rep, reputation.TrackMode(""))
 
 	// Empty → Developer Beta(5,3) + rep(3,0) = Beta(8,3)
 	want := BetaPrior{Alpha: 8, Beta: 3}
@@ -96,11 +97,11 @@ func TestBuildAdaptivePrior_EmptyTrackMode_DefaultDeveloper(t *testing.T) {
 }
 
 func TestBuildAdaptivePrior_UnknownTrackMode_FailSafe(t *testing.T) {
-	rep, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
+	rep, _ := reputation.NewReputationEvidence("sess_1", reputation.TrackModeDeveloper)
 	rep.Alpha = 1
 	rep.Beta = 0
 
-	ap := BuildAdaptivePrior(rep, TrackMode("unknown_mode"))
+	ap := BuildAdaptivePrior(rep, reputation.TrackMode("unknown_mode"))
 
 	// Unknown trackMode → fail-safe Developer Beta(5,3) + rep(1,0) = Beta(6,3)
 	want := BetaPrior{Alpha: 6, Beta: 3}
@@ -110,11 +111,11 @@ func TestBuildAdaptivePrior_UnknownTrackMode_FailSafe(t *testing.T) {
 }
 
 func TestBuildAdaptivePrior_BayesianMerge(t *testing.T) {
-	rep, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
+	rep, _ := reputation.NewReputationEvidence("sess_1", reputation.TrackModeDeveloper)
 	rep.Alpha = 100
 	rep.Beta = 20
 
-	ap := BuildAdaptivePrior(rep, TrackModeDeveloper)
+	ap := BuildAdaptivePrior(rep, reputation.TrackModeDeveloper)
 
 	// Developer Beta(5,3) + rep(100, 20) = Beta(105, 23)
 	want := BetaPrior{Alpha: 105, Beta: 23}

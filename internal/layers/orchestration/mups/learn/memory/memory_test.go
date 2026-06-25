@@ -1,4 +1,4 @@
-package learn
+package memory
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/asset"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -15,31 +16,31 @@ import (
 // Test helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-// newTestAsset creates a minimal valid LearningAsset for the given class.
+// newTestAsset creates a minimal valid asset.LearningAsset for the given class.
 // Returns the asset; callers should ignore the error for valid classes.
-func newTestAsset(t *testing.T, class LearningClass, key string) *LearningAsset {
+func newTestAsset(t *testing.T, class asset.LearningClass, key string) *asset.LearningAsset {
 	t.Helper()
-	var content AssetContent
+	var content asset.AssetContent
 	switch class {
-	case LearningClass(types.LearningSOP):
-		content = &SOPAssetContent{Name: "test-sop", Steps: []string{"step1"}}
-	case LearningClass(types.LearningProtocol):
-		content = &ProtocolAssetContent{Trigger: "trigger.test"}
-	case LearningClass(types.LearningKnowledge):
-		content = &KnowledgeAssetContent{Topic: "t", Hypothesis: "h", Confidence: 0.5}
-	case LearningClass(types.LearningConclusion):
-		content = &ConclusionAssetContent{Statement: "s"}
-	case LearningClass(types.LearningPending):
-		content = &PendingAssetContent{
+	case asset.LearningClass(types.LearningSOP):
+		content = &asset.SOPAssetContent{Name: "test-sop", Steps: []string{"step1"}}
+	case asset.LearningClass(types.LearningProtocol):
+		content = &asset.ProtocolAssetContent{Trigger: "trigger.test"}
+	case asset.LearningClass(types.LearningKnowledge):
+		content = &asset.KnowledgeAssetContent{Topic: "t", Hypothesis: "h", Confidence: 0.5}
+	case asset.LearningClass(types.LearningConclusion):
+		content = &asset.ConclusionAssetContent{Statement: "s"}
+	case asset.LearningClass(types.LearningPending):
+		content = &asset.PendingAssetContent{
 			IndeterminateReason: "env_limited",
 			OriginalArtifactID:  "art_1",
 		}
 	default:
 		t.Fatalf("unsupported class: %v", class)
 	}
-	asset, err := NewLearningAsset("asset_test", "sess_test", class, content, key)
+	asset, err := asset.NewLearningAsset("asset_test", "sess_test", class, content, key)
 	if err != nil {
-		t.Fatalf("NewLearningAsset: %v", err)
+		t.Fatalf("asset.NewLearningAsset: %v", err)
 	}
 	return asset
 }
@@ -66,7 +67,7 @@ func TestMemoryChannel_String_3Channels(t *testing.T) {
 
 func TestMemoryFilter_ZeroValue(t *testing.T) {
 	var f MemoryFilter
-	if f.Class != LearningClass(types.LearningUnknown) {
+	if f.Class != asset.LearningClass(types.LearningUnknown) {
 		t.Errorf("zero Class = %v, want LearningUnknown", f.Class)
 	}
 	if f.SessionID != "" {
@@ -82,19 +83,19 @@ func TestMemoryFilter_ZeroValue(t *testing.T) {
 
 func TestMemoryFilter_4Fields(t *testing.T) {
 	f := MemoryFilter{
-		Class:       LearningClass(types.LearningSOP),
+		Class:       asset.LearningClass(types.LearningSOP),
 		SessionID:   "sess_1",
-		MinStrength: StrengthProtocol,
+		MinStrength: asset.StrengthProtocol,
 		Expired:     true,
 	}
-	if f.Class != LearningClass(types.LearningSOP) {
+	if f.Class != asset.LearningClass(types.LearningSOP) {
 		t.Errorf("Class = %v, want LearningSOP", f.Class)
 	}
 	if f.SessionID != "sess_1" {
 		t.Errorf("SessionID = %q, want sess_1", f.SessionID)
 	}
-	if f.MinStrength != StrengthProtocol {
-		t.Errorf("MinStrength = %d, want StrengthProtocol", f.MinStrength)
+	if f.MinStrength != asset.StrengthProtocol {
+		t.Errorf("MinStrength = %d, want asset.StrengthProtocol", f.MinStrength)
 	}
 	if !f.Expired {
 		t.Error("Expired = false, want true")
@@ -108,9 +109,9 @@ func TestMemoryFilter_4Fields(t *testing.T) {
 func TestSkillMemory_Store_AcceptsSOPAndProtocol(t *testing.T) {
 	m := NewSkillMemory()
 	ctx := context.Background()
-	for _, class := range []LearningClass{
-		LearningClass(types.LearningSOP),
-		LearningClass(types.LearningProtocol),
+	for _, class := range []asset.LearningClass{
+		asset.LearningClass(types.LearningSOP),
+		asset.LearningClass(types.LearningProtocol),
 	} {
 		asset := newTestAsset(t, class, "key_"+class.String())
 		if err := m.Store(ctx, asset); err != nil {
@@ -122,23 +123,23 @@ func TestSkillMemory_Store_AcceptsSOPAndProtocol(t *testing.T) {
 func TestSkillMemory_Store_RejectsKnowledgeAndConclusionAndPending(t *testing.T) {
 	m := NewSkillMemory()
 	ctx := context.Background()
-	for _, class := range []LearningClass{
-		LearningClass(types.LearningKnowledge),
-		LearningClass(types.LearningConclusion),
-		LearningClass(types.LearningPending),
+	for _, class := range []asset.LearningClass{
+		asset.LearningClass(types.LearningKnowledge),
+		asset.LearningClass(types.LearningConclusion),
+		asset.LearningClass(types.LearningPending),
 	} {
-		asset := newTestAsset(t, class, "key_"+class.String())
-		err := m.Store(ctx, asset)
-		if !errors.Is(err, ErrAssetClassMismatch) {
-			t.Errorf("Store(%s) err = %v, want ErrAssetClassMismatch", class, err)
+		a := newTestAsset(t, class, "key_"+class.String())
+		err := m.Store(ctx, a)
+		if !errors.Is(err, asset.ErrAssetClassMismatch) {
+			t.Errorf("Store(%s) err = %v, want asset.ErrAssetClassMismatch", class, err)
 		}
 	}
 }
 
 func TestSkillMemory_Store_NilAsset(t *testing.T) {
 	m := NewSkillMemory()
-	if err := m.Store(context.Background(), nil); !errors.Is(err, ErrAssetIncomplete) {
-		t.Errorf("nil asset err = %v, want ErrAssetIncomplete", err)
+	if err := m.Store(context.Background(), nil); !errors.Is(err, asset.ErrAssetIncomplete) {
+		t.Errorf("nil asset err = %v, want asset.ErrAssetIncomplete", err)
 	}
 }
 
@@ -146,8 +147,8 @@ func TestSkillMemory_Retrieve_Delete_List(t *testing.T) {
 	m := NewSkillMemory()
 	ctx := context.Background()
 
-	sop := newTestAsset(t, LearningClass(types.LearningSOP), "k1")
-	proto := newTestAsset(t, LearningClass(types.LearningProtocol), "k2")
+	sop := newTestAsset(t, asset.LearningClass(types.LearningSOP), "k1")
+	proto := newTestAsset(t, asset.LearningClass(types.LearningProtocol), "k2")
 	if err := m.Store(ctx, sop); err != nil {
 		t.Fatalf("Store k1: %v", err)
 	}
@@ -180,7 +181,7 @@ func TestSkillMemory_Retrieve_Delete_List(t *testing.T) {
 	}
 
 	// Filter by Class.
-	sopOnly, _ := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningSOP)})
+	sopOnly, _ := m.List(ctx, MemoryFilter{Class: asset.LearningClass(types.LearningSOP)})
 	if len(sopOnly) != 1 || sopOnly[0] != sop {
 		t.Errorf("List Class=SOP: got %d items, want 1 (the SOP)", len(sopOnly))
 	}
@@ -199,7 +200,7 @@ func TestSkillMemory_List_FilterBySessionID_AndStrength(t *testing.T) {
 	m := NewSkillMemory()
 	ctx := context.Background()
 
-	sop := newTestAsset(t, LearningClass(types.LearningSOP), "k1")
+	sop := newTestAsset(t, asset.LearningClass(types.LearningSOP), "k1")
 	if err := m.Store(ctx, sop); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
@@ -216,14 +217,14 @@ func TestSkillMemory_List_FilterBySessionID_AndStrength(t *testing.T) {
 		t.Errorf("SessionID miss: len = %d, want 0", len(missed))
 	}
 
-	// MinStrength filter (SOP=StrengthSOP=5, set MinStrength=4 → still match).
-	matched, _ = m.List(ctx, MemoryFilter{MinStrength: StrengthProtocol})
+	// MinStrength filter (SOP=asset.StrengthSOP=5, set MinStrength=4 → still match).
+	matched, _ = m.List(ctx, MemoryFilter{MinStrength: asset.StrengthProtocol})
 	if len(matched) != 1 {
 		t.Errorf("MinStrength=4: len = %d, want 1", len(matched))
 	}
 
 	// MinStrength too high.
-	missed, _ = m.List(ctx, MemoryFilter{MinStrength: StrengthSOP + 1})
+	missed, _ = m.List(ctx, MemoryFilter{MinStrength: asset.StrengthSOP + 1})
 	if len(missed) != 0 {
 		t.Errorf("MinStrength>SOP: len = %d, want 0", len(missed))
 	}
@@ -233,7 +234,7 @@ func TestSkillMemory_List_ExpiredFilter(t *testing.T) {
 	m := NewSkillMemory()
 	ctx := context.Background()
 
-	sop := newTestAsset(t, LearningClass(types.LearningSOP), "k1")
+	sop := newTestAsset(t, asset.LearningClass(types.LearningSOP), "k1")
 	if err := m.Store(ctx, sop); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
@@ -282,7 +283,7 @@ func TestSkillMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				key := "concurrent_k_" + string(rune('A'+id)) + "_" + string(rune('a'+i%26))
-				asset := newTestAsset(t, LearningClass(types.LearningSOP), key)
+				asset := newTestAsset(t, asset.LearningClass(types.LearningSOP), key)
 				_ = m.Store(ctx, asset)
 			}
 		}(g)
@@ -304,9 +305,9 @@ func TestSkillMemory_Concurrent_StoreRetrieve(t *testing.T) {
 func TestFeedbackMemory_Store_AcceptsKnowledgeAndConclusion(t *testing.T) {
 	m := NewFeedbackMemory()
 	ctx := context.Background()
-	for _, class := range []LearningClass{
-		LearningClass(types.LearningKnowledge),
-		LearningClass(types.LearningConclusion),
+	for _, class := range []asset.LearningClass{
+		asset.LearningClass(types.LearningKnowledge),
+		asset.LearningClass(types.LearningConclusion),
 	} {
 		asset := newTestAsset(t, class, "key_"+class.String())
 		if err := m.Store(ctx, asset); err != nil {
@@ -318,15 +319,15 @@ func TestFeedbackMemory_Store_AcceptsKnowledgeAndConclusion(t *testing.T) {
 func TestFeedbackMemory_Store_RejectsSOPAndProtocolAndPending(t *testing.T) {
 	m := NewFeedbackMemory()
 	ctx := context.Background()
-	for _, class := range []LearningClass{
-		LearningClass(types.LearningSOP),
-		LearningClass(types.LearningProtocol),
-		LearningClass(types.LearningPending),
+	for _, class := range []asset.LearningClass{
+		asset.LearningClass(types.LearningSOP),
+		asset.LearningClass(types.LearningProtocol),
+		asset.LearningClass(types.LearningPending),
 	} {
-		asset := newTestAsset(t, class, "key_"+class.String())
-		err := m.Store(ctx, asset)
-		if !errors.Is(err, ErrAssetClassMismatch) {
-			t.Errorf("Store(%s) err = %v, want ErrAssetClassMismatch", class, err)
+		a := newTestAsset(t, class, "key_"+class.String())
+		err := m.Store(ctx, a)
+		if !errors.Is(err, asset.ErrAssetClassMismatch) {
+			t.Errorf("Store(%s) err = %v, want asset.ErrAssetClassMismatch", class, err)
 		}
 	}
 }
@@ -334,8 +335,8 @@ func TestFeedbackMemory_Store_RejectsSOPAndProtocolAndPending(t *testing.T) {
 func TestFeedbackMemory_Retrieve_Delete_List(t *testing.T) {
 	m := NewFeedbackMemory()
 	ctx := context.Background()
-	know := newTestAsset(t, LearningClass(types.LearningKnowledge), "k1")
-	conc := newTestAsset(t, LearningClass(types.LearningConclusion), "k2")
+	know := newTestAsset(t, asset.LearningClass(types.LearningKnowledge), "k1")
+	conc := newTestAsset(t, asset.LearningClass(types.LearningConclusion), "k2")
 	if err := m.Store(ctx, know); err != nil {
 		t.Fatalf("Store k1: %v", err)
 	}
@@ -348,7 +349,7 @@ func TestFeedbackMemory_Retrieve_Delete_List(t *testing.T) {
 		t.Errorf("List zero filter: len = %d, want 2", len(all))
 	}
 
-	knowOnly, _ := m.List(ctx, MemoryFilter{Class: LearningClass(types.LearningKnowledge)})
+	knowOnly, _ := m.List(ctx, MemoryFilter{Class: asset.LearningClass(types.LearningKnowledge)})
 	if len(knowOnly) != 1 || knowOnly[0] != know {
 		t.Errorf("List Class=Knowledge: got %d items", len(knowOnly))
 	}
@@ -376,7 +377,7 @@ func TestFeedbackMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				key := "fb_k_" + string(rune('A'+id)) + "_" + string(rune('a'+i%26))
-				asset := newTestAsset(t, LearningClass(types.LearningKnowledge), key)
+				asset := newTestAsset(t, asset.LearningClass(types.LearningKnowledge), key)
 				_ = m.Store(ctx, asset)
 			}
 		}(g)
@@ -399,21 +400,21 @@ func TestScheduledMemory_Store_AcceptsOnlyPending(t *testing.T) {
 	m := NewScheduledMemory()
 	ctx := context.Background()
 
-	pending := newTestAsset(t, LearningClass(types.LearningPending), "k1")
+	pending := newTestAsset(t, asset.LearningClass(types.LearningPending), "k1")
 	if err := m.Store(ctx, pending); err != nil {
 		t.Errorf("Store(LearningPending): %v", err)
 	}
 
-	for _, class := range []LearningClass{
-		LearningClass(types.LearningSOP),
-		LearningClass(types.LearningProtocol),
-		LearningClass(types.LearningKnowledge),
-		LearningClass(types.LearningConclusion),
+	for _, class := range []asset.LearningClass{
+		asset.LearningClass(types.LearningSOP),
+		asset.LearningClass(types.LearningProtocol),
+		asset.LearningClass(types.LearningKnowledge),
+		asset.LearningClass(types.LearningConclusion),
 	} {
-		asset := newTestAsset(t, class, "key_"+class.String())
-		err := m.Store(ctx, asset)
-		if !errors.Is(err, ErrAssetClassMismatch) {
-			t.Errorf("Store(%s) err = %v, want ErrAssetClassMismatch", class, err)
+		a := newTestAsset(t, class, "key_"+class.String())
+		err := m.Store(ctx, a)
+		if !errors.Is(err, asset.ErrAssetClassMismatch) {
+			t.Errorf("Store(%s) err = %v, want asset.ErrAssetClassMismatch", class, err)
 		}
 	}
 }
@@ -422,7 +423,7 @@ func TestScheduledMemory_DefaultMaxRetries_3(t *testing.T) {
 	m := NewScheduledMemory()
 	ctx := context.Background()
 
-	pending := newTestAsset(t, LearningClass(types.LearningPending), "k1")
+	pending := newTestAsset(t, asset.LearningClass(types.LearningPending), "k1")
 	if err := m.Store(ctx, pending); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
@@ -434,11 +435,11 @@ func TestScheduledMemory_DefaultMaxRetries_3(t *testing.T) {
 	if retry == nil {
 		t.Fatal("Retrieve returned nil envelope")
 	}
-	if retry.MaxRetries != DefaultScheduledMaxRetries {
-		t.Errorf("MaxRetries = %d, want %d", retry.MaxRetries, DefaultScheduledMaxRetries)
+	if retry.MaxRetries != asset.DefaultPendingMaxRetries {
+		t.Errorf("MaxRetries = %d, want %d", retry.MaxRetries, asset.DefaultPendingMaxRetries)
 	}
 	if retry.MaxRetries != 3 {
-		t.Errorf("DefaultScheduledMaxRetries = %d, want 3", retry.MaxRetries)
+		t.Errorf("asset.DefaultPendingMaxRetries = %d, want 3", retry.MaxRetries)
 	}
 }
 
@@ -446,15 +447,15 @@ func TestScheduledMemory_MaxRetriesFromPendingContent(t *testing.T) {
 	m := NewScheduledMemory()
 	ctx := context.Background()
 
-	content := &PendingAssetContent{
+	content := &asset.PendingAssetContent{
 		IndeterminateReason: "env_limited",
 		OriginalArtifactID:  "art_1",
 		MaxRetries:          2, // override default
 		NextRetryAt:         time.Now().Add(30 * time.Minute),
 	}
-	asset, err := NewLearningAsset("asset_x", "sess_x", LearningClass(types.LearningPending), content, "kx")
+	asset, err := asset.NewLearningAsset("asset_x", "sess_x", asset.LearningClass(types.LearningPending), content, "kx")
 	if err != nil {
-		t.Fatalf("NewLearningAsset: %v", err)
+		t.Fatalf("asset.NewLearningAsset: %v", err)
 	}
 	if err := m.Store(ctx, asset); err != nil {
 		t.Fatalf("Store: %v", err)
@@ -473,8 +474,8 @@ func TestScheduledMemory_TriggerAt_DefaultsToExpiryAt(t *testing.T) {
 	m := NewScheduledMemory()
 	ctx := context.Background()
 
-	// PendingAssetContent without NextRetryAt → TriggerAt = asset.ExpiryAt.
-	pending := newTestAsset(t, LearningClass(types.LearningPending), "k1")
+	// asset.PendingAssetContent without NextRetryAt → TriggerAt = asset.ExpiryAt.
+	pending := newTestAsset(t, asset.LearningClass(types.LearningPending), "k1")
 	if err := m.Store(ctx, pending); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
@@ -488,8 +489,8 @@ func TestScheduledMemory_Retrieve_Delete_List(t *testing.T) {
 	m := NewScheduledMemory()
 	ctx := context.Background()
 
-	p1 := newTestAsset(t, LearningClass(types.LearningPending), "k1")
-	p2 := newTestAsset(t, LearningClass(types.LearningPending), "k2")
+	p1 := newTestAsset(t, asset.LearningClass(types.LearningPending), "k1")
+	p2 := newTestAsset(t, asset.LearningClass(types.LearningPending), "k2")
 	if err := m.Store(ctx, p1); err != nil {
 		t.Fatalf("Store k1: %v", err)
 	}
@@ -517,7 +518,7 @@ func TestScheduledMemory_ListDue(t *testing.T) {
 
 	now := time.Now()
 	// due: TriggerAt < now
-	due := newTestAsset(t, LearningClass(types.LearningPending), "due")
+	due := newTestAsset(t, asset.LearningClass(types.LearningPending), "due")
 	if err := m.Store(ctx, due); err != nil {
 		t.Fatalf("Store due: %v", err)
 	}
@@ -526,7 +527,7 @@ func TestScheduledMemory_ListDue(t *testing.T) {
 	m.mu.Unlock()
 
 	// not due: TriggerAt > now
-	future := newTestAsset(t, LearningClass(types.LearningPending), "future")
+	future := newTestAsset(t, asset.LearningClass(types.LearningPending), "future")
 	if err := m.Store(ctx, future); err != nil {
 		t.Fatalf("Store future: %v", err)
 	}
@@ -569,7 +570,7 @@ func TestScheduledMemory_Concurrent_StoreRetrieve(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < opsPerG; i++ {
 				key := "sched_k_" + string(rune('A'+id)) + "_" + string(rune('a'+i%26))
-				asset := newTestAsset(t, LearningClass(types.LearningPending), key)
+				asset := newTestAsset(t, asset.LearningClass(types.LearningPending), key)
 				_ = m.Store(ctx, asset)
 			}
 		}(g)
@@ -590,9 +591,9 @@ func TestScheduledMemory_Concurrent_StoreRetrieve(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────
 
 func TestLP2_ExhaustiveChannelPartition(t *testing.T) {
-	// All 5 LearningClass values must map to exactly one channel.
+	// All 5 asset.LearningClass values must map to exactly one channel.
 	channels := []MemoryChannel{MemorySkill, MemoryFeedback, MemoryScheduled}
-	seen := make(map[LearningClass]MemoryChannel)
+	seen := make(map[asset.LearningClass]MemoryChannel)
 	for _, ch := range channels {
 		for class := range ch.allowedClasses() {
 			if prev, ok := seen[class]; ok {
@@ -628,12 +629,12 @@ func TestNewMemories_NonNil(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────
 
 func TestErrAssetClassMismatch_NotConfused(t *testing.T) {
-	// Sanity: ensure ErrAssetClassMismatch is distinct from ErrAssetIncomplete
+	// Sanity: ensure asset.ErrAssetClassMismatch is distinct from asset.ErrAssetIncomplete
 	// (otherwise fail-fast at the boundary becomes ambiguous).
-	if errors.Is(ErrAssetClassMismatch, ErrAssetIncomplete) {
-		t.Error("ErrAssetClassMismatch must NOT match ErrAssetIncomplete")
+	if errors.Is(asset.ErrAssetClassMismatch, asset.ErrAssetIncomplete) {
+		t.Error("asset.ErrAssetClassMismatch must NOT match asset.ErrAssetIncomplete")
 	}
-	if !strings.Contains(ErrAssetClassMismatch.Error(), "class") {
-		t.Errorf("ErrAssetClassMismatch message should contain 'class': %q", ErrAssetClassMismatch.Error())
+	if !strings.Contains(asset.ErrAssetClassMismatch.Error(), "class") {
+		t.Errorf("asset.ErrAssetClassMismatch message should contain 'class': %q", asset.ErrAssetClassMismatch.Error())
 	}
 }

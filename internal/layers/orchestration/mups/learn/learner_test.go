@@ -277,16 +277,11 @@ func TestLearner_ScheduledTick_ExhaustedMaxRetries_Escalate(t *testing.T) {
 	}
 	assetKey := assets[0].AssetKey
 
-	// Force the retry to be exhausted.
-	retry, _ := l.ScheduledMem.Retrieve(ctx, assetKey)
-	if retry == nil {
-		t.Fatal("ScheduledMemory should have the retry envelope")
+	// Force the retry to be exhausted (test-only helper from memory
+	// package — keeps the unexported store/mu private in production).
+	if _, err := l.ScheduledMem.ForceExhaustRetry(assetKey); err != nil {
+		t.Fatalf("ForceExhaustRetry: %v", err)
 	}
-	retry.RetryCount = retry.MaxRetries
-	retry.TriggerAt = timePast() // make it due
-	l.ScheduledMem.mu.Lock()
-	l.ScheduledMem.store[assetKey] = retry
-	l.ScheduledMem.mu.Unlock()
 
 	if err := l.ScheduledTick(ctx); err != nil {
 		t.Fatalf("ScheduledTick: %v", err)
