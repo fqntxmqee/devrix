@@ -1,4 +1,4 @@
-package runregistry
+package workmodel
 
 import (
 	"testing"

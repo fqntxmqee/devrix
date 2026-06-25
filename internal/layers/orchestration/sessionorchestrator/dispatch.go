@@ -7,7 +7,7 @@ import (
 	flowbridge "github.com/devrix/devrix/internal/layers/orchestration/executionflow/bridge"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/execute"
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -61,7 +61,7 @@ type Dispatcher struct {
 	subQuery  SubQueryRunner
 	hub       contracts.ExecutionFlowHub
 	leaderRes LeaderResolver
-	registry  *runregistry.Registry
+	registry  *workmodel.Registry
 }
 
 // NewDispatcher creates a SpokeDispatcher.
@@ -78,7 +78,7 @@ func NewDispatcher(
 	subQuery SubQueryRunner,
 	hub contracts.ExecutionFlowHub,
 	leaderRes LeaderResolver,
-	registry *runregistry.Registry,
+	registry *workmodel.Registry,
 ) *Dispatcher {
 	if hub == nil {
 		hub = contracts.NoOpExecutionFlowHub{}

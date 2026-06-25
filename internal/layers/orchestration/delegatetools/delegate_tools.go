@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -138,15 +137,15 @@ func (r *delegateToolRunner) Execute(ctx context.Context, _, input string) (*too
 	res, err := disp.Dispatch(ctx, req)
 	if err != nil {
 		if runID != "" && reg != nil {
-			reg.SetTerminal(runID, runregistry.StatusFailed, "", err.Error())
+			reg.SetTerminal(runID, workmodel.StatusFailed, "", err.Error())
 		}
 		return &tools.ToolResult{Error: err.Error()}, nil
 	}
 	if runID != "" && reg != nil && !req.Async {
-		st := runregistry.StatusCompleted
+		st := workmodel.StatusCompleted
 		errStr := ""
 		if res.Error != nil {
-			st = runregistry.StatusFailed
+			st = workmodel.StatusFailed
 			errStr = res.Error.Error()
 		}
 		reg.SetTerminal(runID, st, res.Summary, errStr)

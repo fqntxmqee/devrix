@@ -3,8 +3,6 @@ package workmodel
 import (
 	"log/slog"
 	"time"
-
-	"github.com/devrix/devrix/internal/layers/orchestration/runregistry"
 )
 
 // SpawnForWorkItem registers a run, attaches run_ref, and wires terminal → WorkItem sync.
@@ -18,7 +16,7 @@ func SpawnForWorkItem(sessionID, workItemID, kind string, tm *TaskManager) (runI
 	if err := tm.Tree().UpdateStatus(sessionID, workItemID, TaskStatusInProgress); err != nil {
 		slog.Warn("workmodel: mark in_progress", "work_item", workItemID, "err", err)
 	}
-	reg.OnTerminal(runID, func(e runregistry.Entry) {
+	reg.OnTerminal(runID, func(e Entry) {
 		syncTerminalWithRetry(tm, sessionID, workItemID, e)
 	})
 	return runID, cancel
@@ -26,7 +24,7 @@ func SpawnForWorkItem(sessionID, workItemID, kind string, tm *TaskManager) (runI
 
 // CompleteByWorkItem marks the run for a work item terminal (async worker
 // completion). reg is the run registry — nil disables the call.
-func CompleteByWorkItem(reg *runregistry.Registry, sessionID, workItemID, summary string, runErr error) {
+func CompleteByWorkItem(reg *Registry, sessionID, workItemID, summary string, runErr error) {
 	if reg == nil || workItemID == "" {
 		return
 	}
@@ -35,16 +33,16 @@ func CompleteByWorkItem(reg *runregistry.Registry, sessionID, workItemID, summar
 	if !ok {
 		return
 	}
-	status := runregistry.StatusCompleted
+	status := StatusCompleted
 	errStr := ""
 	if runErr != nil {
-		status = runregistry.StatusFailed
+		status = StatusFailed
 		errStr = runErr.Error()
 	}
 	reg.SetTerminal(runID, status, summary, errStr)
 }
 
-func syncTerminalWithRetry(tm *TaskManager, sessionID, workItemID string, e runregistry.Entry) {
+func syncTerminalWithRetry(tm *TaskManager, sessionID, workItemID string, e Entry) {
 	status := mapRunStatus(e.Status)
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
@@ -61,11 +59,11 @@ func syncTerminalWithRetry(tm *TaskManager, sessionID, workItemID string, e runr
 
 func mapRunStatus(s string) TaskStatus {
 	switch s {
-	case runregistry.StatusCompleted:
+	case StatusCompleted:
 		return TaskStatusCompleted
-	case runregistry.StatusFailed:
+	case StatusFailed:
 		return TaskStatusFailed
-	case runregistry.StatusCancelled:
+	case StatusCancelled:
 		return TaskStatusCancelled
 	default:
 		return TaskStatusInProgress
