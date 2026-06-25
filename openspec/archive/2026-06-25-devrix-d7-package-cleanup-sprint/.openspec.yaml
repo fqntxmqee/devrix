@@ -1,0 +1,153 @@
+id: devrix-d7-package-cleanup-sprint
+demand_id: DM-20260625-018
+title: "D7 子包清理热身 Sprint — 4 遗留小子包物理合并到父包"
+status: s7_archived
+priority: P1
+created: 2026-06-25
+author: D7 编排层 v6.0.x 维护阶段热身
+
+# DSAFT 层归属
+domains: [D7]
+layers:
+  - D7  # orchestration
+
+# 能力维度
+capabilities:
+  - id: D7-S6-A50
+    name: D7 子包清理热身 Sprint (4 遗留小子包物理合并)
+    description: |
+      v6.0.0 域升级（DM-20260626-001/002/003/004/005/007）已经把 D7 编排层从
+      14 S 精简为 6 S + 1 横切（hardening），并把大型子包（turn/、execute/、learn/、
+      exit_reason/、observe/）做了物理合并。
+
+      本 Sprint 是 v6.0.0 follow-up 序列收尾热身：清理剩余 4 个小子包遗留
+      （runregistry/、toolpolicy/、sessionqueue/、d7spans/），每个只有 2-3 个文件、
+      零独立测试价值。每个子包做物理合并（git mv + import 路径替换 + package 改名），
+      不改任何函数签名、不动任何业务逻辑。
+
+      **0 行为变化** (pure physical migration)：4 子包 importer 变 in-package，
+      路径更短；D7 编排 15 → 11 子目录；hardening 5 → 7 文件；executionflow 父级
+      0 → 4 文件（+session_queue.go + 2 test + doc.go）。
+    rationale: |
+      v6.0.0 follow-up 序列（大 PR #218 + #220 + #222 + #225-#228 + #164-#169 +
+      #170-#173）已完成 14 S → 6 S + 1 横切的目录结构博弈角色对齐。但 4 个小子包
+      是 v6.0.0 之前的"逻辑分离"产物，遗留目录浏览噪音：
+      (a) 读 D7 目录需要下钻一层才知道逻辑，14 个子目录 = 6 S + 1 横切 + 4 遗留
+          + 3 工具（escape/mups/wavescheduler）；
+      (b) import 路径碎片化：workmodel/run_spawn.go 已 import workmodel 父包却还要
+          import runregistry 子包（同级不同包，跨包访问）；
+      (c) 新成员认知负担：每个子包都要解释一次"为什么独立"；
+      (d) review 噪音：4 个子包导致 4 个独立的 import graph 节点需要 review。
+      合并后 D7 编排层目录结构目标态（11 子目录 = 6 S + 1 横切 hardening + 4 工具
+      [decisionplanning/delegatetools/escape/orchtypes/plan/sessionorchestrator/
+      wavescheduler/mups]）。
+
+# 范围
+scope:
+  in_scope:
+    - 4 个子包物理合并到父包（git mv + import 路径替换 + package 改名）
+    - CODEOWNERS + audit-property-rights.sh 中 runregistry 兜底分支清理
+    - 相关 spec/docs 同步（12 文件）
+  out_of_scope:
+    - 不改任何函数签名（pure physical migration）
+    - 不动任何业务逻辑
+    - 不动 test 框架 / 断言
+    - 不动跨域契约（toolpolicy 与 D2 的接口签名不变）
+
+# 测试点 (本次 PR 实际实现 4 个 P0 T)
+test_points:
+  - id: D7-S6-A50-T01
+    name: |
+      PR-1 runregistry/ → workmodel/ 物理合并完成：3 文件 git mv 100% rename
+      detection + package rename + 9 importer 同步（6 in-package + 3 跨包）+ CI 资源清理
+      (CODEOWNERS + audit-property-rights.sh) + 1 spec 同步 (t-registry.md:85)。
+      `ls internal/layers/orchestration/runregistry` 报 No such file or directory；
+      `go test -race -count=1 ./internal/layers/orchestration/workmodel/...` PASS。
+    status: IMPLEMENTED
+  - id: D7-S6-A50-T02
+    name: |
+      PR-2 toolpolicy/ → decisionplanning/ 物理合并完成：6 文件 git mv 100%
+      rename detection + package rename (3 prod + 3 test) + 5 跨域 importer 同步
+      (19 处 toolpolicy.XXX 引用) + D2→D7 注释路径清理 (enforce/contracts.go:14) +
+      5 spec 同步。`ls internal/layers/orchestration/toolpolicy` 报 No such file or directory；
+      `rg "toolpolicy" internal/layers/contextengine/` 0 命中。
+    status: IMPLEMENTED
+  - id: D7-S6-A50-T03
+    name: |
+      PR-3a d7spans/ → hardening/ 物理合并完成：2 文件 git mv 100% rename + package
+      rename + 7 importer 同步 (decisionplanning/decomposer + mups/execute/channel +
+      mups/learn/memory + wavescheduler/scheduler + executionflow/verify/anomaly
+      + bootstrap/wire_coordinator) + 4 spec 同步 (design.md:759 + d7-domain.md:112
+      + t-registry.md:435 + decomposer_test.go:176 comment)。`ls internal/layers/orchestration/d7spans`
+      报 No such file or directory。
+    status: IMPLEMENTED
+  - id: D7-S6-A50-T04
+    name: |
+      PR-3b sessionqueue/ → executionflow/ 父级扁平完成：3 文件 git mv 100% rename
+      + package rename (1 prod + 2 test) + 4 bootstrap importer 同步 (context_engine
+      + context_engine_builder + execution_flow + wire_wave) + 2 in-package hub 文件
+      (hub.go + hub_test.go path + prefix) + 1 跨域 testutil (tests/testutil/d7_stack.go)
+      + NEW executionflow/doc.go (解释父级出现 .go 文件) + 7 spec 同步。
+      `ls internal/layers/orchestration/sessionqueue` 报 No such file or directory；
+      `ls internal/layers/orchestration/executionflow/session_queue.go` 存在；
+      `go test -race -count=1 ./internal/layers/orchestration/...` 19/19 PASS。
+    status: IMPLEMENTED
+
+# 验收
+acceptance:
+  total_ac: 12
+  pass_count: 11  # AC1-9, AC11 verified by CI evidence
+  fail_count: 0
+  warn_count: 1  # AC12 飞书验收 pending (与 hotfix DM-20260625-008 联动)
+  pending:
+    - AC12: devrix 二进制已构建，飞书主路径验收与 hotfix DM-20260625-008 联动
+  verification:
+    - AC1: PR-1 ls runregistry 报 No such file ✓
+    - AC2: PR-1 workmodel -race PASS ✓
+    - AC3: PR-1 audit baseline 6 WARNs (= master) ✓
+    - AC4: PR-2 ls toolpolicy 报 No such file ✓
+    - AC5: PR-2 tests/integration/tool_surface PASS ✓
+    - AC6: PR-2 rg toolpolicy D2 0 命中 ✓
+    - AC7: PR-3a ls d7spans 报 No such file ✓
+    - AC8: PR-3b executionflow/session_queue.go 存在 ✓
+    - AC9: 19/19 orchestration -race PASS ✓
+    - AC10: verify-archive.sh 12/12 PASS ✓
+    - AC11: go vet 0 警告 ✓
+    - AC12: pending 飞书实测 (parallel with DM-20260625-008)
+
+# PR 联动
+pull_requests:
+  - number: 231
+    title: "refactor(d7): runregistry package merge into workmodel (DM-20260625-018 PR-1)"
+    merged_at: "2026-06-25T14:11:52Z"
+    commit: ad52513
+    files_changed: 20
+    additions: 760
+    deletions: 46
+  - number: 232
+    title: "refactor(d7): toolpolicy package merge into decisionplanning (DM-20260625-018 PR-2)"
+    merged_at: "2026-06-25T14:18:00Z"
+    commit: 8047d84
+    files_changed: 17
+    additions: 47
+    deletions: 48
+  - number: 233
+    title: "refactor(d7): d7spans + sessionqueue package merge (DM-20260625-018 PR-3)"
+    merged_at: "2026-06-25T14:34:36Z"
+    commit: 8ca56a9
+    files_changed: 33
+    additions: 103
+    deletions: 71
+
+# 关联
+related_changes:
+  - devrix-d7-six-s-simplification (DM-20260626-001) — 14 S → 6 S + 1 横切博弈角色对齐
+  - devrix-d7-mups-package-migration (DM-20260626-002) — execute/ + learn/ → mups/{execute,learn}/
+  - devrix-d7-hardening-cross-cutting (DM-20260626-003) — hardening/ 横切包物理落地
+  - devrix-d7-6s-package-merge (DM-20260626-004) — turn/ → sessionorchestrator/ 同模式参考
+  - devrix-d7-6s-verify-promotion (DM-20260626-005) — verify/ promote 同模式参考
+  - devrix-d7-6s-bootstrap-slim (DM-20260626-007) — InitOrchestration 275 → 140 行
+
+# 归档
+archive_path: openspec/archive/2026-06-25-devrix-d7-package-cleanup-sprint/
+archived_at: "2026-06-25"
