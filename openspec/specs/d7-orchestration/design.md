@@ -3,10 +3,10 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 4.3.0
+**Version:** 4.4.0
 **Status:** Active
-**Last Updated:** 2026-06-26 (v4.3 verify-promotion)
-**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214)
+**Last Updated:** 2026-06-26 (v4.4 bootstrap-slim)
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214) + devrix-d7-6s-bootstrap-slim (DM-20260626-007)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
@@ -742,6 +742,66 @@ D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子
 
 ---
 
+## ⑩ Bootstrap Wire 拓扑（v4.4.0，2026-06-26 落地；DM-20260626-007）
+
+`internal/bootstrap/wire_coordinator.go` InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色在 `internal/bootstrap/` 包内通过 6 Wire 函数 + 1 BuildOrchestratePath helper 完成装配。
+
+### 6 S × WireFunc 函数清单
+
+| S 层 | 博弈角色 | Wire 函数 | 物理位置 | 备注 |
+|------|----------|-----------|----------|------|
+| S1 WorkModel | State Authority | 0 wire | InitOrchestration 内联 | NewLocalWorkModel + NewTaskManagerFromConfig inline |
+| S2 SessionOrchestrator | Mediator+Turn Leader | `WireTurnInvoker` | `bootstrap/turn_wiring.go` | DM-020 D-c 入口 |
+| S3 WaveScheduler | Mechanism Designer | `WireWaveScheduler` + `BuildOrchestratePath` | `bootstrap/wire_wave.go` | S3 helper |
+| S4 ExecutionFlow+Verify | Costly Signaler+Certifier | `WireExecutionFlow` | `bootstrap/execution_flow.go` | 14 ExitReason + VerdictToExitReason |
+| S5 DecisionPlanning+Observe | Info Producer+Quantizer | `WireDecisionPlanning` | `bootstrap/decision_planning.go` | **NEW** (PR-3) |
+| S6 MUPS Pipeline | Pipeline Coord+Memory | `WireMUPSPipeline` (+ `MUPSPipelinesDeps`) | `bootstrap/mups_pipeline.go` | **NEW** (PR-3) |
+| 横切 Hardening | Discipline Keeper | 0 wire | `d7spans.SetBridge` 隐式 | 5 新 Span ops 通过桥接隐式注入 |
+
+`grep -E "^func Wire" internal/bootstrap/*.go` 列出 5 个 `Wire*`：
+1. `WireTurnInvoker` (S2)
+2. `WireWaveScheduler` (S3)
+3. `WireExecutionFlow` (S4)
+4. `WireDecisionPlanning` (S5, NEW)
+5. `WireMUPSPipeline` (S6, NEW)
+
++ 1 个 `BuildOrchestratePath` (S3 helper)
++ 1 个 `WireDelegate` (D2 legacy 保留)
+
+### InitOrchestration 主体（≤ 200 行）
+
+PR-4 落地后，InitOrchestration 函数体 **140 行**（从原始 275 行下降到 140 行，-49%）。
+
+### 辅助函数清单
+
+| 函数 | 物理位置 | 行数 | 用途 |
+|------|----------|------|------|
+| `loadOrchestratorConfigs(configFile) *orchestratorConfigs` | `wire_coordinator.go` | 24 | 52 行 config 加载 → 1 行调用 |
+| `resolveObsBridge(arg) *observability.Bridge` | `wire_coordinator.go` | 6 | 4 行类型断言 → 1 行调用 |
+| `boolPtr(b) *bool` / `intPtr(i) *int` / `strPtr(s) *string` | `util.go` | 6 | pointer helpers |
+| `mapBackgroundStatus(s) orchtypes.TaskStatus` | `util.go` | 7 | BackgroundRegistry 状态 → TaskStatus 映射 |
+
+### Adapter 拓扑
+
+3 个 adapter 类型分散在 2 文件（contextEngineAdapter 早已在 turn_adapter.go）：
+
+| Adapter | 物理位置 | 行数 | 来源 |
+|---------|----------|------|------|
+| `contextEngineAdapter` (Prepare + ExecuteRound + PersistTurn + ...) | `bootstrap/turn_adapter.go` | 502 | DM-20260617-006 已独立 |
+| `turnOrchExecutor` (RunTurn) | `bootstrap/adapters.go` | 13 | **PR-2 NEW** |
+| `gatewayEventPublisher` (Publish) | `bootstrap/adapters.go` | 11 | **PR-2 NEW** |
+
+### PR 落地序列（4 PR）
+
+| PR | 分支 | scope | 文件 |
+|----|------|-------|------|
+| #225 | `feat/devrix-d7-6s-bootstrap-slim-util` | util.go 抽离 | 2 |
+| #226 | `feat/devrix-d7-6s-bootstrap-slim-adapters` | adapters.go 抽离 | 2 |
+| #227 | `feat/devrix-d7-6s-bootstrap-slim-s5-s6-wire` | S5 + S6 Wire 包装 | 3 |
+| #228 | `feat/devrix-d7-6s-bootstrap-slim` | config + obsBridge + 4 文档同步 | 9 |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -755,3 +815,4 @@ D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子
 | **4.1.0** | **2026-06-26** | **Hardening 横切包物理落地（DM-20260626-003）**：`orchestration/hardening/` 目录新建（5 .go: doc.go + metrics.go + metrics_test.go + recovery.go + recovery_test.go），承接 v6.0.0 6 S + 1 横切 Discipline Keeper 横切角色；`sessionorchestrator/metrics.go` + `turn/recovery.go` subset（4 纯函数 + 1 const）git mv 迁 hardening/；`escape/circuit_breaker.go` 留 escape/（V5 EscapeEngine 核心机制，Decision 1）；receiver methods（compressMessagesForRecovery + invokeStreamWithRecovery）保留 turn/ 紧耦合 *DefaultOrchestrator（Decision 2）；§Cross-cutting Hardening 包路径描述 v4.0.0 → v4.1.0；D7-S7-A01/A02 4 新 P0 T（hardening dir + subset split + 0 residual import + build+vet+test 23/23 PASS）IMPLEMENTED → 域 t-registry v4.3.0 |
 | **4.2.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并（DM-20260626-004）**：§② 包结构 S2 节描述从"S2 主目录 + turn/ 子包"改为"S2 单一博弈角色单一 Go 包"；§⑨ 关联文档指针同步更新（orchestration/turn/ → orchestration/sessionorchestrator/）；A/F 表中所有 turn/ 路径 → sessionorchestrator/ + turn_ 前缀（5 重命名文件）；§Cross-cutting Hardening 关系图更新（hardening/ ↔ sessionorchestrator/ 单一入口）；D7-S2-A50 4 新 P0 T（int_path_replace / test_cycle_break / 0_signatures / 0_residual_pkg）IMPLEMENTED → 域 t-registry v4.4.0 |
 | **4.3.0** | **2026-06-26** | **verify-promotion 包归属迁移（DM-20260626-005）**：§② 包结构 S4 节描述从"S4 ExecutionFlow + Verify（Costly Signaler + Certifier）= FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + 14 ExitReason + SystemAnomaly 检测"改为 "S4 ExecutionFlow + Verify = FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + **executionflow/verify/{exit_reason.go + verdict_to_exit_reason.go} 14 ExitReason + VerdictToExitReason 4 态映射** + SystemAnomaly 检测"；§⑤ Verify 章节 `VerdictToExitReason` 实现位置 `sessionorchestrator/verdict_to_exit_reason.go::VerdictToExitReason` → `executionflow/verify/verdict_to_exit_reason.go::VerdictToExitReason`（pure physical migration, 0 函数签名变化）；§⑨ 关联文档指针同步更新（orchestration/sessionorchestrator/exit_reason.go → orchestration/executionflow/verify/exit_reason.go + orchestration/sessionorchestrator/verdict_to_exit_reason.go → orchestration/executionflow/verify/verdict_to_exit_reason.go）；D7-S4-A50 4 新 P0 T（3 files git mv / package rename + 13 处 replace / 0 cycle / 22-22 PASS）PLANNED → 域 t-registry v4.5.0 |
+| **4.4.0** | **2026-06-26** | **Bootstrap Wire 拓扑收口（DM-20260626-007 / devrix-d7-6s-bootstrap-slim）**：新增 §⑩ Bootstrap Wire 拓扑章节，详细描述 (1) **6 S × WireFunc 函数清单**：5 个 `Wire*` 函数（`WireTurnInvoker` S2 / `WireWaveScheduler` S3 / `WireExecutionFlow` S4 / `WireDecisionPlanning` S5 NEW / `WireMUPSPipeline` S6 NEW）+ 1 个 `BuildOrchestratePath` S3 helper；(2) **InitOrchestration 主体 ≤ 200 行**（PR-4 落地后 140 行，-49%）；(3) **辅助函数清单**：`loadOrchestratorConfigs` (24 行) + `resolveObsBridge` (6 行) + 4 个 util 函数在 `util.go` (30 行)；(4) **Adapter 拓扑**：3 个 adapter 分散在 2 文件（`turn_adapter.go` 502 行已独立 + `adapters.go` 48 行 NEW）；(5) **PR 落地序列**：4 PR (#225 util + #226 adapters + #227 S5+S6 wire + #228 config+obsBridge+docs)；D7-S2-A51 4 新 P0 T IMPLEMENTED → 域 t-registry v4.6.0 |

@@ -33,32 +33,20 @@ func InitOrchestration(
 	llmStack llmbridge.ContextLLMStack,
 	agentToolReg *external.Registry,
 ) error {
-	coordCfg := config.DefaultCoordinatorConfig()
-	tasksCfg := config.DefaultTasksConfig()
-	if configFile != "" {
-		if fileCfg, err := config.LoadConfigFile(configFile); err == nil {
-			coordCfg = config.BuildCoordinatorConfig(&fileCfg.Coordinator)
-			if fileCfg.ContextEngine.Tasks.Mode != "" || fileCfg.ContextEngine.Tasks.StoreDir != "" {
-				tasksCfg = fileCfg.ContextEngine.Tasks
-			}
-		}
-		if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
-			tasksCfg = ctxFileCfg.Tasks
-		}
-	}
+	coordCfg := loadOrchestratorConfigs(configFile)
 
-	if !coordCfg.Enabled {
+	if !coordCfg.coordCfg.Enabled {
 		return fmt.Errorf("d7: disabled (d7.enabled=false); D1 ingress requires orchestration entry")
 	}
 
 	slog.Info("d7: initializing SessionOrchestrator",
-		"routing_mode", coordCfg.RoutingMode,
-		"fast_path_threshold", coordCfg.FastPathThreshold,
-		"command_first", coordCfg.CommandFirst,
+		"routing_mode", coordCfg.coordCfg.RoutingMode,
+		"fast_path_threshold", coordCfg.coordCfg.FastPathThreshold,
+		"command_first", coordCfg.coordCfg.CommandFirst,
 	)
 
 	routingMode := orchtypes.RoutingModeLoopFirst
-	if coordCfg.RoutingMode == "rule_orchestrate" {
+	if coordCfg.coordCfg.RoutingMode == "rule_orchestrate" {
 		routingMode = orchtypes.RoutingModeRuleOrchestrate
 	}
 	if routingMode == orchtypes.RoutingModeRuleOrchestrate {
@@ -68,32 +56,18 @@ func InitOrchestration(
 		)
 	}
 	coordinatorFileCfg := orchtypes.FileConfig{
-		Enabled:           boolPtr(coordCfg.Enabled),
+		Enabled:           boolPtr(coordCfg.coordCfg.Enabled),
 		RoutingMode:       strPtr(string(routingMode)),
-		FastPathThreshold: intPtr(coordCfg.FastPathThreshold),
-		CommandFirst:      boolPtr(coordCfg.CommandFirst),
+		FastPathThreshold: intPtr(coordCfg.coordCfg.FastPathThreshold),
+		CommandFirst:      boolPtr(coordCfg.coordCfg.CommandFirst),
 	}
 	coordinatorCfg := orchtypes.BuildConfig(&coordinatorFileCfg)
 
-	maxContextTokens := config.DefaultContextEngineConfig().MaxContextTokens
-	subagentCfg := config.DefaultSubagentConfig()
-	if configFile != "" {
-		if fileCfg, err := config.LoadConfigFile(configFile); err == nil && fileCfg.ContextEngine.MaxContextTokens > 0 {
-			maxContextTokens = fileCfg.ContextEngine.MaxContextTokens
-		}
-		if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
-			subagentCfg = ctxFileCfg.Subagent.Normalized()
-		}
-	}
-
-	var obsBridge *observability.Bridge
-	if b, ok := obsBridgeArg.(*observability.Bridge); ok {
-		obsBridge = b
-	}
+	obsBridge := resolveObsBridge(obsBridgeArg)
 
 	// TaskManager constructed locally and DI'd to NewLocalWorkModel +
 	// NewSessionOrchestrator via WithTaskManager.
-	tm := workmodel.NewTaskManagerFromConfig(tasksCfg, obsBridge)
+	tm := workmodel.NewTaskManagerFromConfig(coordCfg.tasksCfg, obsBridge)
 	// Registry created by bootstrap and DI'd to TaskManager.
 	tm.SetRegistry(runregistry.NewRegistry("~/.devrix/runs"))
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
@@ -148,8 +122,8 @@ func InitOrchestration(
 		LoopFirst:        loopFirst,
 		ObsBridge:        obsBridge,
 		PlanMode:         planMode,
-		SubagentCfg:      subagentCfg,
-		MaxContextTokens: maxContextTokens,
+		SubagentCfg:      coordCfg.subagentCfg,
+		MaxContextTokens: coordCfg.maxContextTokens,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
 		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
@@ -189,5 +163,53 @@ func InitOrchestration(
 	// live in sub-packages that don't hold a SessionOrchestrator reference.
 	d7spans.SetBridge(obsBridge)
 
+	return nil
+}
+
+// orchestratorConfigs bundles the 4 orchestrator-level config values loaded
+// from configFile (or their defaults). Extracted in DM-20260626-007 / PR-4
+// to keep InitOrchestration readable.
+type orchestratorConfigs struct {
+	coordCfg         config.CoordinatorConfig
+	tasksCfg         config.TasksConfig
+	subagentCfg      config.SubagentConfig
+	maxContextTokens int
+}
+
+// loadOrchestratorConfigs loads the 4 orchestrator configs from configFile.
+// Silently falls back to defaults when configFile is empty or any load
+// returns an error (preserves the pre-PR-4 behavior).
+func loadOrchestratorConfigs(configFile string) *orchestratorConfigs {
+	cfg := &orchestratorConfigs{
+		coordCfg:         config.DefaultCoordinatorConfig(),
+		tasksCfg:         config.DefaultTasksConfig(),
+		subagentCfg:      config.DefaultSubagentConfig(),
+		maxContextTokens: config.DefaultContextEngineConfig().MaxContextTokens,
+	}
+	if configFile == "" {
+		return cfg
+	}
+	if fileCfg, err := config.LoadConfigFile(configFile); err == nil {
+		cfg.coordCfg = config.BuildCoordinatorConfig(&fileCfg.Coordinator)
+		if fileCfg.ContextEngine.Tasks.Mode != "" || fileCfg.ContextEngine.Tasks.StoreDir != "" {
+			cfg.tasksCfg = fileCfg.ContextEngine.Tasks
+		}
+		if fileCfg.ContextEngine.MaxContextTokens > 0 {
+			cfg.maxContextTokens = fileCfg.ContextEngine.MaxContextTokens
+		}
+	}
+	if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
+		cfg.tasksCfg = ctxFileCfg.Tasks
+		cfg.subagentCfg = ctxFileCfg.Subagent.Normalized()
+	}
+	return cfg
+}
+
+// resolveObsBridge type-asserts arg to *observability.Bridge. Returns nil when
+// the assertion fails (preserves the pre-PR-4 behavior).
+func resolveObsBridge(arg interface{}) *observability.Bridge {
+	if b, ok := arg.(*observability.Bridge); ok {
+		return b
+	}
 	return nil
 }

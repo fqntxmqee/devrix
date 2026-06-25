@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.5.0
-**Last Updated:** 2026-06-26 (verify-promotion)
+**Version:** 4.6.0
+**Last Updated:** 2026-06-26 (bootstrap-slim)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -432,6 +432,10 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S4-A50-T02 | 3 文件 `package sessionorchestrator` → `package verify` + sessionorchestrator/turn_orchestrator.go 11 处 `ExitReason*` → `verify.ExitReason*` + turn_orchestrator_test.go 2 处 `ExitReasonNatural` → `verify.ExitReasonNatural` | D7-S4-A50 | `grep -rn "ExitReason[^a-zA-Z]" sessionorchestrator/*.go \| grep -v "verify\."` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T03 | executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 import cycle 0 风险（单向 DAG: sessionorchestrator → verify） | D7-S4-A50 | `go list -deps ./internal/layers/orchestration/executionflow/verify \| grep sessionorchestrator` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T04 | go build/vet/test -race 22/22 orchestration packages 全绿 + LP-1/2/5 集成测试 100% 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化 | D7-S4-A50 | `git diff hardening/ escape/ sessionorchestrator/autoclose.go` 空；`go test -race -count=1 ./internal/layers/orchestration/...` 22/22 PASS | PLANNED | P0 |
+| D7-S2-A51-T01 | 6 S × WireFunc 命名一致 (S1 0 wire + S2-S6 各 1 wire + 横切 0 wire)：`grep -E "^func Wire" internal/bootstrap/*.go` 列出 5 个 `Wire*` (`WireTurnInvoker` + `WireWaveScheduler` + `WireExecutionFlow` + `WireDecisionPlanning` NEW + `WireMUPSPipeline` NEW) + 1 个 `BuildOrchestratePath` (S3 helper)；横切 Hardening 通过 `d7spans.SetBridge` 隐式注入 | D7-S2-A51 | `grep -E "^func Wire" internal/bootstrap/*.go` 应列出 5 个 Wire* + 1 个 BuildOrchestratePath | IMPLEMENTED | P0 |
+| D7-S2-A51-T02 | InitOrchestration 主体 ≤ 200 行 + 6 S 组合入口清晰：`wc -l internal/bootstrap/wire_coordinator.go` ≤ 250 行 (含 helper + import + 注释)；`awk '/^func InitOrchestration/,/^}/' wire_coordinator.go \| wc -l` ≤ 200 行 | D7-S2-A51 | `wc -l internal/bootstrap/wire_coordinator.go` ≤ 250；InitOrchestration 函数体 140 行 ≤ 200 | IMPLEMENTED | P0 |
+| D7-S2-A51-T03 | 3 个内嵌 adapter 函数已拆到 `internal/bootstrap/adapters.go` + 4 个 util 函数 (boolPtr + intPtr + strPtr + mapBackgroundStatus) 已拆到 `internal/bootstrap/util.go`；contextEngineAdapter 已在 `internal/bootstrap/turn_adapter.go` 独立（DM-20260617-006）；0 残留内嵌 | D7-S2-A51 | `grep "^func new\|^type turnOrchExecutor\|^type gatewayEventPublisher\|^func boolPtr\|^func intPtr\|^func strPtr\|^func mapBackgroundStatus" internal/bootstrap/wire_coordinator.go` 0 命中 | IMPLEMENTED | P0 |
+| D7-S2-A51-T04 | 22/22 orchestration packages go test -race PASS + LP-1 (TestAutoClose_FullLP1Loop) + LP-2 (TestIntegration_5NodePipeline_End2End) + LP-5 (Cross-session traceability) 100% 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化 + cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 0 变化 | D7-S2-A51 | `go test -race -count=1 ./internal/layers/orchestration/...` 22/22 PASS；`git diff --stat hardening/ escape/circuit_breaker.go internal/layers/orchestration/sessionorchestrator/autoclose.go cmd/devrix/main.go cmd/obs-verify/main.go tests/testutil/d7_stack.go` 空 | IMPLEMENTED | P0 |
 
 ---
 
