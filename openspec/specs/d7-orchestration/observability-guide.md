@@ -217,7 +217,7 @@ go test ./internal/layers/orchestration/sessionorchestrator/ -v
 go test ./internal/layers/orchestration/decisionplanning/ -v
 
 # Turn Leader + LLM Invoker（DM-020）
-go test ./internal/layers/orchestration/turn/ -v
+go test ./internal/layers/orchestration/sessionorchestrator/ -v
 
 # Wave DAG 调度
 go test ./internal/layers/orchestration/wavescheduler/ -v

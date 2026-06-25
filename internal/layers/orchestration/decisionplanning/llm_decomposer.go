@@ -8,19 +8,19 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // LLMDecomposerDeps wires the LLM-based task decomposer (D7-S5-A03 — LLM
-// augmentation of SynthesizeTaskGraph). It uses the D7 turn.LLMInvoker
+// augmentation of SynthesizeTaskGraph). It uses the D7 orchtypes.LLMInvoker
 // interface so coordinator does not import the D3 gateway directly to
 // invoke LLMs; the gateway.Chunk struct is imported only to consume the
 // streaming contract value returned by InvokeStream.
 type LLMDecomposerDeps struct {
 	// LLM is the D7-S2-A07 streaming LLM entry point. Required.
-	LLM turn.LLMInvoker
+	LLM orchtypes.LLMInvoker
 	// DefaultTier is used when Decompose is invoked without an explicit
 	// tier in the goal context. Optional; defaults to "default".
 	DefaultTier string
@@ -37,7 +37,7 @@ type LLMDecomposerDeps struct {
 // falls back to the rule-based decomposeGoal when this returns an error
 // or empty result.
 type LLMDecomposer struct {
-	llm              turn.LLMInvoker
+	llm              orchtypes.LLMInvoker
 	defaultTier      string
 	systemPromptBase string
 }
@@ -80,7 +80,7 @@ func (d *LLMDecomposer) Decompose(ctx context.Context, sessionID, goal string) (
 		},
 	}
 
-	stream, err := d.llm.InvokeStream(ctx, turn.LLMInvokeRequest{
+	stream, err := d.llm.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    sessionID,
 		Tier:         d.defaultTier,
 		SystemPrompt: d.systemPromptBase,

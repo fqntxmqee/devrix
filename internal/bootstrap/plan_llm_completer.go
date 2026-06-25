@@ -4,18 +4,18 @@ import (
 	"context"
 	"strings"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// planLLMCompleter adapts turn.LLMInvoker to workmodel.LLMCompleter.
+// planLLMCompleter adapts sessionorchestrator.LLMInvoker to workmodel.LLMCompleter.
 type planLLMCompleter struct {
-	invoker turn.LLMInvoker
+	invoker sessionorchestrator.LLMInvoker
 	tier    string
 }
 
-func newPlanLLMCompleter(invoker turn.LLMInvoker, defaultTier string) workmodel.LLMCompleter {
+func newPlanLLMCompleter(invoker sessionorchestrator.LLMInvoker, defaultTier string) workmodel.LLMCompleter {
 	return &planLLMCompleter{invoker: invoker, tier: defaultTier}
 }
 
@@ -23,7 +23,7 @@ func (p *planLLMCompleter) Complete(ctx context.Context, prompt string) (string,
 	if p == nil || p.invoker == nil {
 		return "", workmodel.ErrLLMNotConfigured
 	}
-	ch, err := p.invoker.InvokeStream(ctx, turn.LLMInvokeRequest{
+	ch, err := p.invoker.InvokeStream(ctx, sessionorchestrator.LLMInvokeRequest{
 		Tier: p.tier,
 		Messages: []types.Message{{
 			Role:    types.MessageRoleUser,

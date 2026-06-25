@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -26,8 +26,8 @@ import (
 // tool results.
 const compressThreshold = 32000
 
-// contextEngineAdapter implements turn.ContextPreparer, turn.ToolRoundExecutor,
-// and turn.SessionPersister by delegating to the context engine internals.
+// contextEngineAdapter implements sessionorchestrator.ContextPreparer, sessionorchestrator.ToolRoundExecutor,
+// and sessionorchestrator.SessionPersister by delegating to the context engine internals.
 //
 // DM-020 D-c+d+e: temporary adapter that bridges orchestration interfaces to
 // the existing context engine. Token counter (D-e) enables CompressHint generation.
@@ -73,7 +73,7 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 	return a
 }
 
-// Prepare implements turn.ContextPreparer.
+// Prepare implements sessionorchestrator.ContextPreparer.
 // D-e: checks token budget and returns CompressHint when exceeded.
 //
 // TOOL-SURFACE-1 (W11 phase 2b): tool schema aggregation prefers the
@@ -92,7 +92,7 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 // this method read sc.Messages directly, which both bypassed
 // compression (LLM input grew unbounded across turns) and skipped
 // the A01-A04 spans (Jaeger only showed the outer D2_Context_Process).
-func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
+func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestrator.PrepareRequest) (sessionorchestrator.PreparedContext, error) {
 	var session *types.Session
 	if a.gw != nil {
 		s, err := a.gw.GetSession(req.SessionID)
@@ -105,7 +105,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 	}
 
 	seen := map[string]bool{}
-	var toolSchemas []turn.ToolSchema
+	var toolSchemas []sessionorchestrator.ToolSchema
 	for _, s := range a.surfaces {
 		for _, sp := range s.Tools(ctx, session.WorkDir, "") {
 			if seen[sp.Name] {
@@ -123,7 +123,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 				continue
 			}
 			params := parseToolParams(sp.Parameters)
-			toolSchemas = append(toolSchemas, turn.ToolSchema{
+			toolSchemas = append(toolSchemas, sessionorchestrator.ToolSchema{
 				Name:        sp.Name,
 				Description: sp.Description,
 				Parameters:  params,
@@ -139,7 +139,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 				}
 				seen[s.Name] = true
 				params := parseToolParams(s.Parameters)
-				toolSchemas = append(toolSchemas, turn.ToolSchema{
+				toolSchemas = append(toolSchemas, sessionorchestrator.ToolSchema{
 					Name:        s.Name,
 					Description: s.Description,
 					Parameters:  params,
@@ -148,7 +148,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 		}
 	}
 
-	result := turn.PreparedContext{
+	result := sessionorchestrator.PreparedContext{
 		Tools: toolSchemas,
 	}
 
@@ -160,7 +160,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
 		prepared, err := ce.PrepareForTurn(ctx, session, req.Message.Content)
 		if err != nil {
-			return turn.PreparedContext{}, fmt.Errorf("turn adapter: PrepareForTurn: %w", err)
+			return sessionorchestrator.PreparedContext{}, fmt.Errorf("turn adapter: PrepareForTurn: %w", err)
 		}
 		if prepared != nil {
 			result.Messages = prepared.Messages
@@ -193,7 +193,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req turn.PrepareRequ
 		if len(toCount) > 0 {
 			tokens := a.counter.CountMessages(toCount)
 			if tokens > compressThreshold {
-				result.CompressHint = &turn.CompressHint{
+				result.CompressHint = &sessionorchestrator.CompressHint{
 					MessagesToSummarize: result.Messages,
 					TargetTokenBudget:   compressThreshold / 2,
 				}
@@ -229,7 +229,7 @@ func parseToolParams(raw string) map[string]any {
 	return m
 }
 
-// ExecuteRound implements turn.ToolRoundExecutor.
+// ExecuteRound implements sessionorchestrator.ToolRoundExecutor.
 //
 // DM-20260617-004 (devrix-d7-tool-ctx-inject): D7 path doesn't go through
 // D2 queryloop's WrapToolContext hook, so the live SessionContext (and its
@@ -271,9 +271,9 @@ func parseToolParams(raw string) map[string]any {
 //	  through this path).
 //	Phase 2: parallel / sequential dispatch of the remaining
 //	  Allow tools, identical to DM-001 F06.
-func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
+func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorchestrator.ToolRoundRequest) (sessionorchestrator.ToolRoundResult, error) {
 	if a.tools == nil && len(a.surfaces) == 0 {
-		return turn.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
+		return sessionorchestrator.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
 	}
 
 	toolCtx := ctx
@@ -288,7 +288,7 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 	}
 
 	concSafe := a.concurrencyMap()
-	results := make([]turn.ToolResult, len(req.ToolCalls))
+	results := make([]sessionorchestrator.ToolResult, len(req.ToolCalls))
 
 	// Phase 1: CheckPermission pre-dispatch (DM-002 F07).
 	for i, tc := range req.ToolCalls {
@@ -322,7 +322,7 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 		_ = g.Wait()
 	}
 
-	return turn.ToolRoundResult{Results: results}, nil
+	return sessionorchestrator.ToolRoundResult{Results: results}, nil
 }
 
 // checkPermission runs surface.CheckPermission → IPermissionGate.CheckPermission
@@ -331,10 +331,10 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req turn.ToolRo
 // proceed to Phase 2.
 //
 // TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
-func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) (turn.ToolResult, bool) {
+func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) (sessionorchestrator.ToolResult, bool) {
 	surf, ok := a.findSurface(tc.Name)
 	if !ok {
-		return turn.ToolResult{}, false
+		return sessionorchestrator.ToolResult{}, false
 	}
 	spec, _ := a.findSpec(toolCtx, tc.Name)
 	var specVal contracts.ToolSpec
@@ -343,13 +343,13 @@ func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionI
 	}
 	decision := surf.CheckPermission(toolCtx, specVal, json.RawMessage(tc.Input))
 	if decision == contracts.DecisionAllow {
-		return turn.ToolResult{}, false
+		return sessionorchestrator.ToolResult{}, false
 	}
 	if decision == contracts.DecisionAsk && a.perm != nil {
 		decision = a.perm.CheckPermission(toolCtx, specVal)
 	}
 	if decision == contracts.DecisionAllow {
-		return turn.ToolResult{}, false
+		return sessionorchestrator.ToolResult{}, false
 	}
 	reason := ""
 	switch decision {
@@ -359,7 +359,7 @@ func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionI
 		reason = "ask required"
 	}
 	if decision == contracts.DecisionDeny {
-		return turn.ToolResult{
+		return sessionorchestrator.ToolResult{
 			ToolCallID: tc.ID,
 			Error: (&contracts.PermissionDeniedError{
 				Spec:   specVal,
@@ -368,7 +368,7 @@ func (a *contextEngineAdapter) checkPermission(toolCtx context.Context, sessionI
 			}).Error(),
 		}, true
 	}
-	return turn.ToolResult{
+	return sessionorchestrator.ToolResult{
 		ToolCallID: tc.ID,
 		Error: (&contracts.PermissionAskRequiredError{
 			Spec:   specVal,
@@ -396,26 +396,26 @@ func (a *contextEngineAdapter) findSpec(ctx context.Context, name string) (*cont
 
 // executeOne runs the full gate → surface → fallback chain for a single
 // tool call. Shared by both the sequential and parallel dispatch paths.
-func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) turn.ToolResult {
+func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) sessionorchestrator.ToolResult {
 	// DM-20260617-006: gate via IPermissionGate (suggestion 3) and
 	// propagate risk into the D2 ToolCall (suggestion 4 partial). When
 	// a.perm is nil we leave the gate open — adapter is shared with
 	// tests/mocks that don't wire permission state.
 	risk := a.riskForTool(tc.Name)
 	if a.perm != nil && !a.perm.Request(toolCtx, sessionID, tc.Name, tc.Input, risk) {
-		return turn.ToolResult{ToolCallID: tc.ID, Error: "permission denied"}
+		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: "permission denied"}
 	}
 	// TOOL-SURFACE-1 (W9): prefer surface dispatch when available.
 	if surf, ok := a.findSurface(tc.Name); ok {
 		res, err := surf.Execute(toolCtx, tc.Name, tc.Input, "")
 		if err != nil {
-			return turn.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
+			return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
 		}
-		return turn.ToolResult{ToolCallID: tc.ID, Output: res.Output, Error: res.Error}
+		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Output: res.Output, Error: res.Error}
 	}
 	// Fall back to the legacy IToolRunner path (W11 removes this).
 	if a.tools == nil {
-		return turn.ToolResult{
+		return sessionorchestrator.ToolResult{
 			ToolCallID: tc.ID,
 			Error:      fmt.Sprintf("turn adapter: no surface or runner for tool %q", tc.Name),
 		}
@@ -427,9 +427,9 @@ func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID str
 		RiskLevel: risk,
 	})
 	if err != nil {
-		return turn.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
+		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
 	}
-	return turn.ToolResult{ToolCallID: tc.ID, Output: result.Output, Error: result.Error}
+	return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Output: result.Output, Error: result.Error}
 }
 
 // concurrencyMap builds a toolName → ConcurrencySafe lookup from the
@@ -485,14 +485,14 @@ func (a *contextEngineAdapter) findSurface(toolName string) (contracts.ToolSurfa
 	return nil, false
 }
 
-// PersistTurn implements turn.SessionPersister.
+// PersistTurn implements sessionorchestrator.SessionPersister.
 //
 // DM-20260617-003 (devrix-d7-turn-history-persist): commit this turn's
 // transcript (user + assistant + tool_calls + tool_results) into D2 memory
 // so the next Prepare call can read it back. Previous implementation was a
 // stub that discarded req.Messages, causing multi-turn conversation context
 // loss under the loop_first routing mode.
-func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req turn.PersistRequest) error {
+func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req sessionorchestrator.PersistRequest) error {
 	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
 		if err := ce.AppendAndTrimMessages(req.SessionID, req.Messages); err != nil {
 			return fmt.Errorf("turn adapter: persist: %w", err)

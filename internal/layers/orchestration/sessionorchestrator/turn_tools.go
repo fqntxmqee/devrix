@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
@@ -21,7 +20,7 @@ const (
 // TurnToolExecutor handles loop-first orchestration tools and delegates all
 // other tool calls to the base executor (D2 tool runner).
 type TurnToolExecutor struct {
-	Base        turn.ToolRoundExecutor
+	Base        ToolRoundExecutor
 	Orchestrate *OrchestratePath
 	PlanMode    *workmodel.PlanMode
 	LoopFirst   bool
@@ -32,7 +31,7 @@ type TurnToolExecutor struct {
 
 // NewTurnToolExecutor wraps base with orchestration tools when loopFirst is true.
 func NewTurnToolExecutor(
-	base turn.ToolRoundExecutor,
+	base ToolRoundExecutor,
 	op *OrchestratePath,
 	pm *workmodel.PlanMode,
 	loopFirst bool,
@@ -52,37 +51,37 @@ func (e *TurnToolExecutor) SetTurnToolMetrics(m *TurnToolMetrics) {
 	}
 }
 
-func (e *TurnToolExecutor) ExecuteRound(ctx context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
+func (e *TurnToolExecutor) ExecuteRound(ctx context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
 	if e == nil || e.Base == nil {
-		return turn.ToolRoundResult{}, fmt.Errorf("turn tool executor: base is nil")
+		return ToolRoundResult{}, fmt.Errorf("turn tool executor: base is nil")
 	}
 	if !e.LoopFirst {
 		return e.Base.ExecuteRound(ctx, req)
 	}
 
-	results := make([]turn.ToolResult, len(req.ToolCalls))
+	results := make([]ToolResult, len(req.ToolCalls))
 	for i, tc := range req.ToolCalls {
 		switch tc.Name {
 		case toolDelegateWave:
 			out, err := e.runDelegateWave(ctx, req.SessionID, tc.Input)
-			results[i] = turn.ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
+			results[i] = ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
 		case toolEnterPlanMode:
 			out, err := e.runEnterPlanMode(ctx, req.SessionID, tc.Input)
-			results[i] = turn.ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
+			results[i] = ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
 		default:
-			single, err := e.Base.ExecuteRound(ctx, turn.ToolRoundRequest{
+			single, err := e.Base.ExecuteRound(ctx, ToolRoundRequest{
 				SessionID: req.SessionID,
 				ToolCalls: []llmgateway.ToolCall{tc},
 			})
 			if err != nil {
-				return turn.ToolRoundResult{}, err
+				return ToolRoundResult{}, err
 			}
 			if len(single.Results) > 0 {
 				results[i] = single.Results[0]
 			}
 		}
 	}
-	return turn.ToolRoundResult{Results: results}, nil
+	return ToolRoundResult{Results: results}, nil
 }
 
 func (e *TurnToolExecutor) runDelegateWave(ctx context.Context, sessionID, input string) (string, error) {
@@ -97,7 +96,7 @@ func (e *TurnToolExecutor) runDelegateWave(ctx context.Context, sessionID, input
 	if e.Metrics != nil && e.Metrics.DelegateWave != nil {
 		e.Metrics.DelegateWave.Inc()
 	}
-	emit := turn.ToolEventStreamFrom(ctx)
+	emit := ToolEventStreamFrom(ctx)
 	ch, err := e.Orchestrate.Run(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: goal}, orchtypes.IntentClassification{})
 	if err != nil {
 		return "", err
@@ -161,11 +160,11 @@ func errString(err error) string {
 
 // TurnPrepareWrapper adds orchestration tool schemas when loop-first is active.
 type TurnPrepareWrapper struct {
-	Inner     turn.ContextPreparer
+	Inner     ContextPreparer
 	LoopFirst bool
 }
 
-func (w *TurnPrepareWrapper) Prepare(ctx context.Context, req turn.PrepareRequest) (turn.PreparedContext, error) {
+func (w *TurnPrepareWrapper) Prepare(ctx context.Context, req PrepareRequest) (PreparedContext, error) {
 	pc, err := w.Inner.Prepare(ctx, req)
 	if err != nil {
 		return pc, err
@@ -176,8 +175,8 @@ func (w *TurnPrepareWrapper) Prepare(ctx context.Context, req turn.PrepareReques
 	return pc, nil
 }
 
-func orchestrationToolSchemas() []turn.ToolSchema {
-	return []turn.ToolSchema{
+func orchestrationToolSchemas() []ToolSchema {
+	return []ToolSchema{
 		{
 			Name:        toolEnterPlanMode,
 			Description: "Enter plan mode when the implementation approach is ambiguous and user approval is needed before coding.",
@@ -237,5 +236,5 @@ func orchestrationToolSchemas() []turn.ToolSchema {
 	}
 }
 
-var _ turn.ToolRoundExecutor = (*TurnToolExecutor)(nil)
-var _ turn.ContextPreparer = (*TurnPrepareWrapper)(nil)
+var _ ToolRoundExecutor = (*TurnToolExecutor)(nil)
+var _ ContextPreparer = (*TurnPrepareWrapper)(nil)

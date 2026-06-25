@@ -3,7 +3,7 @@ package testutil
 import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/contextengine"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -13,7 +13,7 @@ func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.
 	if ctxCfg == nil {
 		ctxCfg = config.DefaultContextEngineConfig()
 	}
-	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+	summarizer := sessionorchestrator.NewCompressionSummarizer(sessionorchestrator.CompressionSummarizerDeps{
 		Gateway:      stack.RawGateway,
 		TierResolver: stack.TierResolver,
 		DefaultTier:  stack.DefaultModel,

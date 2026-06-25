@@ -23,7 +23,7 @@ D7 编排域 A 层活动注册表。
 - `internal/layers/orchestration/decisionplanning/`（D7-S5）
 - `internal/layers/orchestration/wavescheduler/` + `executionflow/`（D7-S3 + D7-S4）
 - `internal/layers/orchestration/workmodel/`（D7-S1）
-- `internal/layers/orchestration/turn/`（D7-S2-A06/A07 Turn Leader）
+- `internal/layers/orchestration/sessionorchestrator/`（D7-S2-A06/A07 Turn Leader）
 - `internal/layers/orchestration/sessionorchestrator/`、`hubspoke/`（1-release legacy shim）
 
 **状态图例：** ✅ IMPLEMENTED · 🔶 PARTIAL · ⬜ PLANNED
@@ -152,8 +152,8 @@ Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
 | D7-S2-A02 | EvaluateIntent | — | A-BE | message, context | IntentClassification | — | ✅ | `orchestration/decisionplanning/classifier.go` + `classifier_fallback.go` |
 | D7-S2-A03 | HandleInterrupt | D7-S2-A03-LEGACY | A-BE | session_id, reason | — | session.interrupted | ✅ | `orchestration/sessionorchestrator/interrupt.go` |
 | D7-S2-A04 | DispatchWorker | D4-S10-A01（编排面） | A-BE | leader, worker_spec | spoke_id, executor | task.{delegated,completed,failed} | ✅ | `sessionorchestrator/dispatch.go`（v1.0 路径：`bootstrap/delegate.go` 已 wired） |
-| **D7-S2-A06** | **RunTurnLoop** | — | **A-BE** | **session, TurnRequest** | **<-chan EngineEvent** | **turn.{started,completed,failed}** | **✅** | **`orchestration/turn/orchestrator.go`**（DM-020 v1.0-c；wired by `bootstrap/wire_coordinator.go:60`） |
-| **D7-S2-A07** | **InvokeLLM** | — | **A-BE** | **LLMInvokeRequest** | **<-chan Chunk** | **llm.{invoked,streaming,completed}** | **✅** | **`orchestration/turn/llm.go`**（DM-020 v1.0-b；wired by `bootstrap/wire_coordinator.go:59`）。**兼作 D2→D3 拆面出口**：`turn.QueryLLMCaller` + `turn.CompressionSummarizer` 由同一 `llmgateway.IGateway` 驱动，单一注入点 `bootstrap/context_engine.go` wired 至 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`（DM-020 v2.3 拆面闭合） |
+| **D7-S2-A06** | **RunTurnLoop** | — | **A-BE** | **session, TurnRequest** | **<-chan EngineEvent** | **turn.{started,completed,failed}** | **✅** | **`orchestration/sessionorchestrator/turn_orchestrator.go`**（DM-020 v1.0-c；wired by `bootstrap/wire_coordinator.go:60`） |
+| **D7-S2-A07** | **InvokeLLM** | — | **A-BE** | **LLMInvokeRequest** | **<-chan Chunk** | **llm.{invoked,streaming,completed}** | **✅** | **`orchestration/sessionorchestrator/llm.go`**（DM-020 v1.0-b；wired by `bootstrap/wire_coordinator.go:59`）。**兼作 D2→D3 拆面出口**：`turn.QueryLLMCaller` + `turn.CompressionSummarizer` 由同一 `llmgateway.IGateway` 驱动，单一注入点 `bootstrap/context_engine.go` wired 至 `EngineDeps.QueryLLMCaller` / `EngineDeps.Summarizer`（DM-020 v2.3 拆面闭合） |
 
 > **D7-S2-A04**（DM-20260614-018）：Hub-Spoke 派发矩阵 + fallback 路由。v1.0 逻辑在 D4 `delegate/service.go`；v2.0 迁 `sessionorchestrator/dispatch.go`。
 

@@ -14,4 +14,4 @@
 //	d: D2 removes ILLMGateway + import lint
 //	e: Autocompact D7→D3
 //	f: Legacy adapter + all T green
-package turn
+package sessionorchestrator

@@ -13,7 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -53,7 +53,7 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 	sid := "sess-persist-1"
 
 	// Turn 1
-	if err := adapter.PersistTurn(context.Background(), turn.PersistRequest{
+	if err := adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 		SessionID: sid,
 		Messages: []types.Message{
 			{Role: types.MessageRoleUser, Content: "记住数字 42", SessionID: sid},
@@ -65,7 +65,7 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 	}
 
 	// Prepare should now return the 2 messages as history.
-	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+	prepared, err := adapter.Prepare(context.Background(), sessionorchestrator.PrepareRequest{
 		SessionID: sid,
 		Message:   types.Message{Role: types.MessageRoleUser, Content: "我刚才让你记的数字是几？"},
 	})
@@ -112,7 +112,7 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 		{"我两个秘密分别是什么？", "42 和蓝色"},
 	}
 	for i, tn := range turns {
-		if err := adapter.PersistTurn(context.Background(), turn.PersistRequest{
+		if err := adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 			SessionID: sid,
 			Messages: []types.Message{
 				{Role: types.MessageRoleUser, Content: tn.user, SessionID: sid},
@@ -125,7 +125,7 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 	}
 
 	// After 3 turns, history should have 6 messages.
-	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+	prepared, err := adapter.Prepare(context.Background(), sessionorchestrator.PrepareRequest{
 		SessionID: sid,
 		Message:   types.Message{Role: types.MessageRoleUser, Content: "follow up"},
 	})
@@ -147,7 +147,7 @@ func TestPersistTurn_NilEngine(t *testing.T) {
 
 	// pass a stub that is NOT *contextengine.ContextEngine — adapter must no-op.
 	adapter := newContextEngineAdapter(gw, &stubSessionEngine{}, nil)
-	if err := adapter.PersistTurn(context.Background(), turn.PersistRequest{
+	if err := adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 		SessionID: "sess-nil-engine",
 		Messages:  []types.Message{{Role: types.MessageRoleUser, Content: "x"}},
 	}); err != nil {
@@ -185,7 +185,7 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			sid := "sess-conc-" + string(rune('A'+i))
-			_ = adapter.PersistTurn(context.Background(), turn.PersistRequest{
+			_ = adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 				SessionID: sid,
 				Messages: []types.Message{
 					{Role: types.MessageRoleUser, Content: "u", SessionID: sid},
@@ -246,7 +246,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 	// Call bash via ExecuteRound; bash reads workdir from ctx. If sc is not
 	// injected, bash falls back to os.Getwd() (the test process cwd) and the
 	// output will NOT contain workDir.
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: sid,
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-bash-1",
@@ -298,7 +298,7 @@ func TestPrepareForTurn_RoutesThroughPrepareOrchestrator(t *testing.T) {
 	adapter := newContextEngineAdapter(gw, engine, nil)
 	sid := "sess-prepare-wire"
 
-	if err := adapter.PersistTurn(context.Background(), turn.PersistRequest{
+	if err := adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 		SessionID: sid,
 		Messages: []types.Message{
 			{Role: types.MessageRoleUser, Content: "ping", SessionID: sid},
@@ -309,7 +309,7 @@ func TestPrepareForTurn_RoutesThroughPrepareOrchestrator(t *testing.T) {
 		t.Fatalf("PersistTurn: %v", err)
 	}
 
-	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+	prepared, err := adapter.Prepare(context.Background(), sessionorchestrator.PrepareRequest{
 		SessionID: sid,
 		Message:   types.Message{Role: types.MessageRoleUser, Content: "follow"},
 	})
@@ -345,7 +345,7 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 	adapter := newContextEngineAdapter(gw, engine, nil)
 
 	// No Process() call → no sc in memory.
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-no-sc",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-bash-noop",

@@ -1,4 +1,4 @@
-package turn
+package sessionorchestrator
 
 import (
 	"context"
@@ -1432,14 +1432,6 @@ func (b *budgetTracker) shouldStopDiminishing(maxContextTokens int) bool {
 		}
 	}
 	return true
-}
-
-// boolStr renders a boolean as a span-attribute friendly string.
-func boolStr(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // joinToolNames concatenates tool-call names for span attributes. Caps the

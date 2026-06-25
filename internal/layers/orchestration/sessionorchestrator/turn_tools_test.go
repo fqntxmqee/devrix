@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -16,13 +15,13 @@ type stubToolBase struct {
 	calls atomic.Int32
 }
 
-func (s *stubToolBase) ExecuteRound(_ context.Context, req turn.ToolRoundRequest) (turn.ToolRoundResult, error) {
+func (s *stubToolBase) ExecuteRound(_ context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
 	s.calls.Add(1)
-	results := make([]turn.ToolResult, len(req.ToolCalls))
+	results := make([]ToolResult, len(req.ToolCalls))
 	for i, tc := range req.ToolCalls {
-		results[i] = turn.ToolResult{ToolCallID: tc.ID, Output: "ok"}
+		results[i] = ToolResult{ToolCallID: tc.ID, Output: "ok"}
 	}
-	return turn.ToolRoundResult{Results: results}, nil
+	return ToolRoundResult{Results: results}, nil
 }
 
 type fakeWaveForTools struct {
@@ -46,13 +45,13 @@ func TestTurnToolExecutor_DelegateWave(t *testing.T) {
 	exec := NewTurnToolExecutor(base, op, nil, true)
 
 	var streamed int
-	ctx := turn.WithToolEventStream(context.Background(), func(ev *contracts.EngineEvent) {
+	ctx := WithToolEventStream(context.Background(), func(ev *contracts.EngineEvent) {
 		if ev != nil {
 			streamed++
 		}
 	})
 
-	_, err := exec.ExecuteRound(ctx, turn.ToolRoundRequest{
+	_, err := exec.ExecuteRound(ctx, ToolRoundRequest{
 		SessionID: "sess-1",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "tc1",
@@ -96,7 +95,7 @@ func TestOrchestrationToolSchemas_ExposesFreeFork(t *testing.T) {
 // required name/prompt, matching the D2 freeforkRunner input contract.
 func TestOrchestrationToolSchemas_FreeFork_Parameters(t *testing.T) {
 	schemas := orchestrationToolSchemas()
-	var ff *turn.ToolSchema
+	var ff *ToolSchema
 	for i := range schemas {
 		if schemas[i].Name == "free_fork" {
 			ff = &schemas[i]
@@ -142,7 +141,7 @@ func TestOrchestrationToolSchemas_FreeFork_Parameters(t *testing.T) {
 // description referencing Phase B sub-agent isolation.
 func TestOrchestrationToolSchemas_FreeFork_ModeEnum(t *testing.T) {
 	schemas := orchestrationToolSchemas()
-	var ff *turn.ToolSchema
+	var ff *ToolSchema
 	for i := range schemas {
 		if schemas[i].Name == "free_fork" {
 			ff = &schemas[i]

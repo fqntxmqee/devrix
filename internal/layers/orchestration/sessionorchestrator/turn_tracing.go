@@ -1,4 +1,4 @@
-package turn
+package sessionorchestrator
 
 import (
 	"context"
@@ -24,21 +24,4 @@ func (o *DefaultOrchestrator) startSpan(
 		opts = append(opts, tracer.WithParent(*parentSC))
 	}
 	return o.obsBridge.Tracer().Start(ctx, operation, opts...)
-}
-
-func endSpan(span tracer.Span) {
-	if span != nil {
-		span.End()
-	}
-}
-
-func endSpanWithError(span tracer.Span, err error) {
-	if span == nil {
-		return
-	}
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(tracer.StatusCodeError, err.Error())
-	}
-	span.End()
 }

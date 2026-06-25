@@ -18,7 +18,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -130,7 +130,7 @@ func TestExecuteRound_PermissionDenied_ToolNotCalled(t *testing.T) {
 		perm:     perm,
 	}
 
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-denied",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-1",
@@ -191,7 +191,7 @@ func TestExecuteRound_PermissionAllowed_PropagatesRisk(t *testing.T) {
 		perm:     perm,
 	}
 
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-allowed",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-2",
@@ -246,7 +246,7 @@ func TestExecuteRound_NilPermission_StillExecutes(t *testing.T) {
 		perm:     nil, // gate intentionally absent
 	}
 
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-noperm",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-3",
@@ -291,7 +291,7 @@ func TestExecuteRound_PermissionMixed_OnlyAllowedRuns(t *testing.T) {
 		perm:     perm,
 	}
 
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-mixed",
 		ToolCalls: []llmgateway.ToolCall{
 			{ID: "c1", Name: "bash", Input: `{"command":"rm -rf /"}`},
@@ -369,7 +369,7 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 	})
 	adapter := newContextEngineAdapter(gw, engine, nil)
 
-	res, err := adapter.ExecuteRound(context.Background(), turn.ToolRoundRequest{
+	res, err := adapter.ExecuteRound(context.Background(), sessionorchestrator.ToolRoundRequest{
 		SessionID: "sess-realdn",
 		ToolCalls: []llmgateway.ToolCall{{
 			ID:    "call-x",

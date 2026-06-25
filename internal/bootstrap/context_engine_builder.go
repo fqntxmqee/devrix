@@ -17,7 +17,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/delegatetools"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel/notify"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -230,7 +230,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	if perm == nil {
 		perm = capture.NewPermissionGateAdapter(nil)
 	}
-	summarizer := turn.NewCompressionSummarizer(turn.CompressionSummarizerDeps{
+	summarizer := sessionorchestrator.NewCompressionSummarizer(sessionorchestrator.CompressionSummarizerDeps{
 		Gateway:      b.stack.RawGateway,
 		TierResolver: b.stack.TierResolver,
 		DefaultTier:  b.stack.DefaultModel,

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/orchestration/turn"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -28,7 +28,7 @@ func (s *stubSessionEngine) SessionContext(sessionID string) (*types.SessionCont
 	return nil, false
 }
 
-// T: D7-S2-A06 — Prepare returns transcript history only; TurnOrchestrator appends the current user turn.
+// T: D7-S2-A06 — Prepare returns transcript history only; TurnOrchestrator appends the current user sessionorchestrator.
 func TestContextEngineAdapter_Prepare_excludes_current_user_message(t *testing.T) {
 	store, err := capture.NewFileSessionStore(t.TempDir())
 	if err != nil {
@@ -57,7 +57,7 @@ func TestContextEngineAdapter_Prepare_excludes_current_user_message(t *testing.T
 		Content:   "d5和d6重构需求应该交付了，请结合代码判断一下",
 		SessionID: "sess-turn",
 	}
-	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+	prepared, err := adapter.Prepare(context.Background(), sessionorchestrator.PrepareRequest{
 		SessionID: "sess-turn",
 		Message:   current,
 	})
@@ -148,7 +148,7 @@ func TestContextEngineAdapter_Prepare_noCompressHint_underThreshold(t *testing.T
 	}
 	adapter := newContextEngineAdapter(gw, engine, stubTokenCounter{})
 
-	prepared, err := adapter.Prepare(context.Background(), turn.PrepareRequest{
+	prepared, err := adapter.Prepare(context.Background(), sessionorchestrator.PrepareRequest{
 		SessionID: "sess-multiturn",
 		Message:   types.Message{Role: types.MessageRoleUser, Content: "2", SessionID: "sess-multiturn"},
 	})
