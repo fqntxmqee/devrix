@@ -99,7 +99,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | —             | Legacy shim             | `coordinator`         | `orchestration/coordinator/`         | 🔶 1-release aliases only           |
 | —             | Legacy shim             | `hubspoke`            | `orchestration/hubspoke/`            | 🔶 1-release aliases only           |
 | —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
-| —             | Session command queue F | `sessionqueue`        | `orchestration/sessionqueue/`        | ✅ DM-013                           |
+| —             | Session command queue F | `executionflow`       | `orchestration/executionflow/`       | ✅ DM-013 + DM-20260625-018 PR-3b（物理合并到 executionflow 父级）|
 | —             | Milestone DAG           | `milestone`           | `orchestration/milestone/`           | ✅ 已迁入                              |
 | **D7-S2-A06** | **RunTurnLoop**         | `turn`                | `orchestration/turn/orchestrator.go` | ✅ DM-020                           |
 | **D7-S2-A07** | **InvokeLLM**           | `turn`                | `orchestration/turn/llm.go`          | ✅ DM-020                           |
@@ -152,7 +152,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D2-S2    | `compression` | ~~`contextengine/compression/`~~ → `contextengine/prepare/compression/` |
 | D2-S3    | `memory`      | ~~`contextengine/memory/`~~ → `contextengine/prepare/memory/` (read) + `contextengine/persist/memory/` (write, v2.2) |
 | D2-S4    | `token`       | ~~`contextengine/token/`~~ → `contextengine/prepare/token/`              |
-| D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/sessionqueue/` (D7-S4)      |
+| D2-S11   | `queue`       | ~~`contextengine/queue/`~~ → `orchestration/executionflow/` (D7-S4, formerly `sessionqueue/`, DM-20260625-018 PR-3b)      |
 | D2-S12   | `sandbox`    | `contextengine/sandbox/` → `contextengine/enforce/sandbox/` (v2.2, P3-T1) |
 | D2-S5/S8 | `toolrunner`  | `contextengine/enforce/toolrunner/` → `contextengine/enforce/tools/` (v2.2, P3-T2, package renamed) |
 | —        | `facade`      | `contextengine/facade/` → `contextengine/legacy/` (v2.2, P5 retired) |
@@ -205,7 +205,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | ----------------------- | ------------------------------------- | ---------------------------------- | -------- |
 | ~~delegate_tools~~      | ~~`contextengine/delegate_tools.go`~~ | `orchestration/delegatetools/`     | ✅ DM-011 |
 | TaskManager             | ~~`contextengine/tasks/`~~            | `orchestration/workmodel/` (D7-S1) | ✅ DM-012 |
-| queue delegate-progress | ~~`contextengine/queue/`~~            | D7-S4 `sessionqueue/`              | ✅ DM-013 |
+| queue delegate-progress | ~~`contextengine/queue/`~~            | D7-S4 `executionflow/` (formerly `sessionqueue/`) | ✅ DM-013 + DM-20260625-018 PR-3b |
 
 ### 4.5 D4 Multi-Agent（canonical S11–S16 / 5+1 价值流）
 

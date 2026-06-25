@@ -173,7 +173,7 @@ func TestDagDepth_BranchingGraph(t *testing.T) {
 
 func TestTaskDecomposer_SynthesizeTaskGraph_SpanEmitFailSafe(t *testing.T) {
 	// Verify the taskgraph.synthesize Span emit path is a no-op when the
-	// d7spans bridge is unset (the default in tests). The function must
+	// hardening bridge is unset (the default in tests). The function must
 	// still return a valid result.
 	d := NewTaskDecomposer()
 	result, err := d.SynthesizeTaskGraph(context.Background(), "sess_span", "A → B → C")

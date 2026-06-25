@@ -32,7 +32,7 @@
 | Agent FlowBridge | D4 `delegate/bridge.go` | **D7-S4** | `hubspoke/agent_bridge.go` |
 | SubQuery Flow 发布 | D2 `nested/flow_report.go` | **D7-S4** | `hubspoke/subquery_bridge.go` |
 | WorkPlan | D7 `workplan/` | D7-S4 | 保持 |
-| sessionqueue drain | D7 `sessionqueue/` | D7-S4 | 保持 |
+| sessionqueue drain | D7 `executionflow/` (formerly `sessionqueue/`) | D7-S4 | DM-20260625-018 PR-3b |
 
 **唯一 `hub.Publish` 出口：** D7 `SpokeBridge`（v2.0 目标态）。
 
@@ -47,7 +47,7 @@ D1.Gateway.RouteInbound
             │       ├── Spoke=D4Worker → D4.WorkerExecutor.Execute
             │       └── Spoke=D2SubQuery → D2.NestedExecutor.Run
             ├── D7-S4 SpokeBridge.Publish(FlowEvent)
-            │       └── WorkPlan + sessionqueue + imsink → D1
+            │       └── WorkPlan + executionflow + imsink → D1
             └── [optional] D4-S12 RunAgentLoop（Leader Agent 本体）
 ```
 

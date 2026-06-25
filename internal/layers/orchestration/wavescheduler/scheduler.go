@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -336,7 +336,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	} else {
 		selectedKind = "none"
 	}
-	endExecSelect := d7spans.EmitExecutorSelect(parentCtx, sessionID, candidatesCount, selectedKind, score, "kind_match")
+	endExecSelect := hardening.EmitExecutorSelect(parentCtx, sessionID, candidatesCount, selectedKind, score, "kind_match")
 
 	runner, ok := s.runners[node.WorkerType]
 	endExecSelect(nil)

@@ -12,17 +12,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 
-// resetBridgeAndDefer clears the package-level d7spans bridge before
+// resetBridgeAndDefer clears the package-level hardening bridge before
 // the test and restores it after — keeps state from leaking between
 // TestDetectSystemAnomaly_* cases.
 func resetBridgeAndDefer(t *testing.T) {
 	t.Helper()
-	d7spans.SetBridge(nil)
-	t.Cleanup(func() { d7spans.SetBridge(nil) })
+	hardening.SetBridge(nil)
+	t.Cleanup(func() { hardening.SetBridge(nil) })
 }
 
 // makeObsPayload returns a minimal payload appropriate for the

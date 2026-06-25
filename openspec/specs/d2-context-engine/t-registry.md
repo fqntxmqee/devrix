@@ -264,15 +264,16 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 ## TOOL-SURFACE-1: Phase 2 Full — Global Singleton Cleanup (DM-20260617-008)
 
 > **devrix-tool-surface-phase2-full (DM-20260617-008) — W1-W5 阶段 2 落地。**
-> 删除 5 个剩余 global singleton (transcript / flow / sessionqueue /
-> workmodel / freefork-in-pkg), 全部 caller 改构造期显式 dep 注入。
+> 删除 5 个剩余 global singleton (transcript / flow / sessionqueue [now
+> in executionflow] / workmodel / freefork-in-pkg), 全部 caller 改构造期
+> 显式 dep 注入。
 > 父 change AC4 (6+ global 全删) + AC14 (SetGlobalXxx API 全删) 由 PARTIAL 转 PASS。
 
 | T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
 |-------|------|---------|-----------|--------|----------|
 | TOOL-SURFACE-1-T15 | transcript.GlobalWriter 零引用 + Gateway.Writer 字段注入 | Global Cleanup | git grep + `internal/layers/communication/capture/gateway.go` (Writer field) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T16 | flow.GlobalHub 零引用 + delegatetools.Deps.Hub 字段注入 | Global Cleanup | git grep + `internal/layers/orchestration/delegatetools/deps.go` (Hub field) | IMPLEMENTED | P0 |
-| TOOL-SURFACE-1-T17 | sessionqueue.GlobalSessionQueue 零引用 + 5 caller 局部 NewSessionQueue() | Global Cleanup | git grep + `internal/layers/orchestration/sessionqueue/session_queue.go` (no Global var) | IMPLEMENTED | P0 |
+| TOOL-SURFACE-1-T17 | sessionqueue.GlobalSessionQueue 零引用 + 5 caller 局部 NewSessionQueue() | Global Cleanup | git grep + `internal/layers/orchestration/executionflow/session_queue.go` (no Global var) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T18 | workmodel.GlobalTaskManager 零引用 + 6+ caller ctor 注入 (Orchestrator.tasks / CommandHandler.tasks / delegatetools.Deps.Tasks / cli.NewCLIAdapter) | Global Cleanup | git grep + `internal/layers/orchestration/workmodel/task_manager.go` (no Global var) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T19 | freefork.SetGlobalForker 零引用 + freeforkGlobalFunc 参数化 Forker | Global Cleanup | git grep + `internal/layers/multiagent/provision/freefork/freefork_injection.go` (factory pattern) | IMPLEMENTED | P0 |
 | TOOL-SURFACE-1-T20 | git grep 验证 5 global + 5 setter 全删 (production-code 0 命中) | Static Verify | `git grep -nE "SetGlobal\|GlobalSessionQueue\|GlobalTaskManager\|GlobalHub\|GlobalWriter\|GlobalForker" internal/` (only comment matches) | IMPLEMENTED | P0 |

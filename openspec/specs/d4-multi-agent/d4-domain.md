@@ -33,7 +33,7 @@
 | Hub-Spoke 路由 / delegate_* 工具 | D7-S2 | `delegatetools/` |
 | Spoke 派发矩阵 / fallback 决策 | D7-S2 | v2.0 `hubspoke/dispatch.go` |
 | FlowEvent 发布 / FlowBridge | D7-S4 | v2.0 自 D4/D2 迁入 |
-| WorkPlan / delegate-progress drain | D7-S4 | `flow/`, `sessionqueue/` |
+| WorkPlan / delegate-progress drain | D7-S4 | `flow/`, `executionflow/` (formerly `sessionqueue/`) |
 | SubQuery Flow 发布 | D7-S4 | v2.0 自 D2 `flow_report` 迁入 |
 | 权限 UI | D1 | Gateway 注入 ResolvePermission |
 | Span/Metric 定义 | D5 | D4 仅 emit hook |

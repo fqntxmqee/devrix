@@ -10,7 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler/runners"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -123,7 +123,7 @@ func buildSubAgentDeps(gw *capture.CommunicationGateway, engine contracts.IEngin
 				MaxTurns:       maxTurns,
 				ModelTier:      params.ModelTier,
 				ReadOnlyTools:  params.ReadOnlyTools,
-			}, reg, sessionqueue.NewSessionQueue())
+			}, reg, executionflow.NewSessionQueue())
 		},
 		Cancel: func(taskID string) bool {
 			if reg == nil {

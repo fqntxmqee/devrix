@@ -1,8 +1,13 @@
-// Package sessionqueue — D7-S4 session command queue (Hub-Spoke drain).
+// Package executionflow (session_queue.go) — D7-S4 session command queue (Hub-Spoke drain).
 //
 // DSAFT: D7-S4 F — enqueues delegate-progress from flow.Hub; D7 turn runtime drains
 // via contracts.SessionCommandQueue injection (no D2→D7 import).
-package sessionqueue
+//
+// Why in executionflow parent package: sessionqueue is the shared Hub↔runtime
+// bridge for delegate-progress drain. Promoting it to the parent keeps the
+// bridge/hub sub-packages as thin protocol adapters and removes a
+// directory layer that added cognitive overhead without independent test value.
+package executionflow
 
 import (
 	"sync"

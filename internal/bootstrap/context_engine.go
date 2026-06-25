@@ -11,7 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -171,7 +171,7 @@ func NewContextEngine(
 		TierResolver:        stack.TierResolver,
 		AgentRoleToolFilter: decisionplanning.AsAgentRoleToolFilter(),
 		Summarizer:          summarizer,
-		SessionCommandQueue: sessionqueue.NewSessionQueue(),
+		SessionCommandQueue: executionflow.NewSessionQueue(),
 		// TOOL-SURFACE-1 (W8): surface list (no filter on main engine).
 		Surfaces: surfaces,
 		Filters:  nil,

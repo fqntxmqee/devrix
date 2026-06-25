@@ -1,9 +1,9 @@
-package sessionqueue_test
+package executionflow_test
 
 import (
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -21,7 +21,7 @@ func TestDelegateProgressReminder_should_render_flow_event(t *testing.T) {
 }
 
 func TestSessionQueue_delegate_progress_routes_to_leader_only(t *testing.T) {
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	q.Enqueue("sess1", contracts.QueuedCommand{
 		Value: "delegate update",
 		Mode:  contracts.ModeDelegateProgress,

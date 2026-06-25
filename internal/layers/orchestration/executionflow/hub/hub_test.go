@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/hub"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -20,7 +20,7 @@ func (c *captureIM) EmitWorkerProgress(ev contracts.FlowEvent) {
 }
 
 func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	im := &captureIM{}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: false, IMProgress: true},
@@ -48,7 +48,7 @@ func TestHub_should_dual_publish_queue_and_im(t *testing.T) {
 }
 
 func TestHub_should_link_task_owner_on_started(t *testing.T) {
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	tm := workmodel.NewTaskManager()
 	task, err := tm.Tree().Create("sess1", workmodel.CreateWorkItemInput{
 		Kind:      workmodel.WorkKindImplement,
@@ -95,7 +95,7 @@ func TestHub_should_mark_task_completed_on_flow_done(t *testing.T) {
 	}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
-		Queue:  sessionqueue.NewSessionQueue(),
+		Queue:  executionflow.NewSessionQueue(),
 		Tasks:  tm,
 	})
 
@@ -136,7 +136,7 @@ func TestHub_snapshot_should_include_tasks(t *testing.T) {
 	}
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{Enabled: true, LinkTasks: true},
-		Queue:  sessionqueue.NewSessionQueue(),
+		Queue:  executionflow.NewSessionQueue(),
 		Tasks:  tm,
 	})
 	hub.Publish(context.Background(), contracts.FlowEvent{
@@ -158,7 +158,7 @@ func TestHub_snapshot_should_include_tasks(t *testing.T) {
 
 func TestHub_should_not_emit_tool_call_to_im(t *testing.T) {
 	im := &captureIM{}
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	hub := hub.NewHub(hub.HubDeps{
 		Config: config.ExecutionFlowConfig{
 			Enabled:               true,

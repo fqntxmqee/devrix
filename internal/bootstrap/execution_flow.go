@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/hub"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/imsink"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionqueue"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -23,7 +23,7 @@ func WireExecutionFlow(
 	gw *capture.CommunicationGateway,
 	obsBridge *observability.Bridge,
 	tm *workmodel.TaskManager,
-) (contracts.ExecutionFlowHub, *sessionqueue.SessionQueue) {
+) (contracts.ExecutionFlowHub, *executionflow.SessionQueue) {
 	if ctxCfg == nil {
 		return contracts.NoOpExecutionFlowHub{}, nil
 	}
@@ -35,7 +35,7 @@ func WireExecutionFlow(
 	if cfg.IMProgress && gw != nil {
 		im = imsink.NewGatewaySink(gatewayEngineSink{gw: gw})
 	}
-	q := sessionqueue.NewSessionQueue()
+	q := executionflow.NewSessionQueue()
 	tasks := tm
 	if tasks == nil {
 		tasks = workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)

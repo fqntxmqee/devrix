@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/d7spans"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -146,7 +146,7 @@ func (m *SkillMemory) Store(ctx context.Context, asset *LearningAsset) error {
 		return ErrAssetClassMismatch
 	}
 	ttlMs := ttlRemainingMs(asset)
-	end := d7spans.EmitMemoryPersist(ctx, asset.SessionID, MemorySkill.String(), asset.Class.String(), ttlMs, assetPayloadSize(asset))
+	end := hardening.EmitMemoryPersist(ctx, asset.SessionID, MemorySkill.String(), asset.Class.String(), ttlMs, assetPayloadSize(asset))
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.store[asset.AssetKey] = asset

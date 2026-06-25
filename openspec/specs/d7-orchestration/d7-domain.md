@@ -109,7 +109,7 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 | S4 ExecutionFlow+Verify | Costly Signaler+Certifier | `WireExecutionFlow` | `bootstrap/execution_flow.go` |
 | S5 DecisionPlanning+Observe | Info Producer+Quantizer | `WireDecisionPlanning` (NEW) | `bootstrap/decision_planning.go` |
 | S6 MUPS Pipeline | Pipeline Coord+Memory | `WireMUPSPipeline` (NEW) | `bootstrap/mups_pipeline.go` |
-| 横切 Hardening | Discipline Keeper | 0 wire (隐式) | `d7spans.SetBridge` 隐式注入 |
+| 横切 Hardening | Discipline Keeper | 0 wire (隐式) | `hardening.SetBridge` 隐式注入 |
 
 **总入口**: `InitOrchestration` (单点) ≤ 200 行 (现状 140 行)，6 S 组合入口清晰。`loadOrchestratorConfigs` + `resolveObsBridge` 2 辅助函数抽离 52 行 config 加载 + 4 行类型断言；3 个内嵌 adapter (`turnOrchExecutor` + `gatewayEventPublisher` + 已在 `turn_adapter.go` 的 `contextEngineAdapter`) 拆到 2 个独立文件 (`adapters.go` + `turn_adapter.go`)；4 个 util 函数 (`boolPtr` + `intPtr` + `strPtr` + `mapBackgroundStatus`) 抽到 `util.go`。
 
