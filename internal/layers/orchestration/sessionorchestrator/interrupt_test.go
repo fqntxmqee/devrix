@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -33,7 +34,7 @@ func TestHandleInterrupt_AllStepsFail_JoinsErrors(t *testing.T) {
 	procErr := errors.New("process cancel failed")
 
 	sink := &stubEventSink{}
-	metrics := &InterruptMetrics{}
+	metrics := &hardening.InterruptMetrics{}
 	h := NewInterruptHandler(nil, InterruptOptions{
 		WaveCanceler:     func(string) error { return waveErr },
 		DelegateCanceler: func(string) error { return d4Err },
@@ -92,7 +93,7 @@ func TestHandleInterrupt_AllStepsFail_JoinsErrors(t *testing.T) {
 func TestHandleInterrupt_PartialFailure_ReturnsPartialErr(t *testing.T) {
 	waveErr := errors.New("wave cancel failed")
 	sink := &stubEventSink{}
-	metrics := &InterruptMetrics{}
+	metrics := &hardening.InterruptMetrics{}
 
 	h := NewInterruptHandler(nil, InterruptOptions{
 		WaveCanceler:     func(string) error { return waveErr },
@@ -130,7 +131,7 @@ func TestHandleInterrupt_PartialFailure_ReturnsPartialErr(t *testing.T) {
 // succeed, Handle returns nil and increments handle_completed.
 func TestHandleInterrupt_AllSuccess_ReturnsNil(t *testing.T) {
 	sink := &stubEventSink{}
-	metrics := &InterruptMetrics{}
+	metrics := &hardening.InterruptMetrics{}
 
 	h := NewInterruptHandler(nil, InterruptOptions{
 		WaveCanceler:     func(string) error { return nil },
@@ -183,7 +184,7 @@ func TestHandleInterrupt_NilMetrics(t *testing.T) {
 // are skipped silently (no error, no metric increment).
 func TestHandleInterrupt_NoCancelerWired(t *testing.T) {
 	sink := &stubEventSink{}
-	metrics := &InterruptMetrics{}
+	metrics := &hardening.InterruptMetrics{}
 	h := NewInterruptHandler(nil, InterruptOptions{
 		Sink:    sink,
 		Metrics: metrics,

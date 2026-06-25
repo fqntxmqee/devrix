@@ -1,5 +1,5 @@
-// Package sessionorchestrator metrics counters.
-package sessionorchestrator
+// Package hardening metrics counters (moved from sessionorchestrator/ in v6.0.0).
+package hardening
 
 import "sync/atomic"
 
