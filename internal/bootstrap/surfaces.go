@@ -7,7 +7,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -100,12 +100,12 @@ func collectAllSpecs(surfaces []contracts.ToolSurface) []contracts.ToolSpec {
 //
 // Current chain (from design.md §2.5 / §2.6):
 //
-//	toolpolicy.AsToolFilter  (per-agent: hide delegate_*, read-only workers)
+//	decisionplanning.AsToolFilter  (per-agent: hide delegate_*, read-only workers)
 //	filter.NewPerRiskFilter  (per-mode: threshold cap)
 //
 // PerSessionFilter is P1 and not yet implemented.
 func DefaultFilters() []contracts.ToolFilter {
 	return []contracts.ToolFilter{
-		toolpolicy.AsToolFilter(),
+		decisionplanning.AsToolFilter(),
 	}
 }

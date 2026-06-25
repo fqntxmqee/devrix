@@ -20,7 +20,7 @@ import (
 
 	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/orchestration/toolpolicy"
+	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -45,7 +45,7 @@ type ListCmd struct {
 //     write_file, glob, grep, edit_file). No side effects, no I/O.
 //   - LSP/Verify are always added (BuildSurfaces contract). FreeFork /
 //     Tracker are nil-safe (BuildSurfaces drops them when nil).
-//   - Filters come from DefaultFilters (toolpolicy.AsToolFilter per-agent
+//   - Filters come from DefaultFilters (decisionplanning.AsToolFilter per-agent
 //     drop delegate_*). Main engine has nil filter chain → all surfaces
 //     pass through.
 func BuildFromConfig(ctxCfg *config.ContextEngineConfig, agentType string) ([]contracts.ToolSurface, []contracts.ToolFilter, error) {
@@ -70,7 +70,7 @@ func BuildFromConfig(ctxCfg *config.ContextEngineConfig, agentType string) ([]co
 	// Filter to agent-specific view if requested.
 	var filters []contracts.ToolFilter
 	if agentType != "" && agentType != "main" {
-		filters = append(filters, toolpolicy.AsToolFilter())
+		filters = append(filters, decisionplanning.AsToolFilter())
 	}
 	return surfaces, filters, nil
 }
