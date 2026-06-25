@@ -1,0 +1,54 @@
+name: devrix-d7-mups-v4-review-fixes-series
+demand_id: DM-20260625-005
+additional_demands: [DM-20260625-006]
+status: s7_archived
+created: 2026-06-25
+archived: 2026-06-25
+priority: P0
+change_type: PATCH
+affected_domains: [D7]
+affected_scenarios: [D7-S2, D7-S4, D7-S5, D7-S9, D7-S10, D7-S11, D7-S14]
+prs:
+  - number: 205
+    url: https://github.com/fqntxmqee/devrix/pull/205
+    branch: feat/devrix-d7-error-surfacing-and-deadcode-removal-2026-06-24
+    merge_method: squash
+    merged_at: 2026-06-25
+    title: fix(d7): surface swallowed errors + drop dead extension point
+    commit: 0313238f119cf38df19b5195d17efa2df21c584a
+  - number: 206
+    url: https://github.com/fqntxmqee/devrix/pull/206
+    branch: feat/devrix-d7-god-function-refactor-2026-06-24
+    merge_method: squash
+    merged_at: 2026-06-25
+    title: refactor(d7): decompose 3 god functions into phase helpers
+    commit: 97a4ace78ffd271cb1b65a6c8338518e144f089b
+summary: |
+  2026-06-24 D7 层 4-agent 并行深度 review 发现 14 个问题，本 series 分 2 个 DM 处理：
+  DM-20260625-005（hotfix 路径）9 处错误吞咽 + 1 处死代码扩展点
+  DM-20260625-006（标准 S1-S6 路径）3 个 god function 拆分（C4/H1/H2）
+metrics:
+  hotfix_fixes: 10
+  god_function_refactors: 3
+  total_files_changed: 11
+  insertions: 208
+  deletions: 105
+  test_packages_passed: 22
+  test_packages_total: 22
+  build: PASS
+  vet: PASS
+  race: 0
+references:
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/demand.md
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/proposal.md
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/design.md
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/tasks.md
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/acceptance-report.md
+  - openspec/archive/2026-06-25-devrix-d7-mups-v4-review-fixes-series/specs/d7-orchestration/spec.md
+related_archives:
+  - 2026-06-24-devrix-d7-mups-v4-phase6-observe-learner-wiring
+  - 2026-06-25-devrix-d7-mups-v4-phase7-verify-auto-close
+  - 2026-06-25-devrix-d7-mups-v4-review-fixes
+  - 2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6
+  - 2026-06-25-devrix-d7-mups-v5-escape-engine-v5-6-review-fixes
+  - 2026-06-26-devrix-d7-6s-bootstrap-slim
