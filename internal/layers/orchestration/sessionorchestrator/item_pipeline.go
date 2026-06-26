@@ -316,20 +316,27 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 		errMsg = execErr.Error()
 	}
 	art := &wavescheduler.Artifact{
-		TaskID:        item.ID,
-		SessionID:     sessionID,
-		WorkerType:    wavescheduler.WorkerWorkItem,
-		Summary:       truncateForArtifact(content, 200),
-		ExitCode:      exit,
-		Error:         errMsg,
-		StartedAt:     started,
-		EndedAt:       ended,
-		Duration:      ended.Sub(started),
+		TaskID:     item.ID,
+		SessionID:  sessionID,
+		WorkerType: wavescheduler.WorkerWorkItem,
+		// DM-20260626-009 follow-up: WorkerWorkItem artifacts carry the LLM's
+		// full ReAct response — this IS the user's answer, not a brief task
+		// digest. Truncating at 200 chars (the wave-worker summary cap) cut
+		// long reviews short and the feishu reply card showed only the first
+		// 200 chars + ellipsis. Skip truncation here; Learn node truncates
+		// evidence further (asset_builder.go:272 truncates to 64) so the
+		// downstream path is unaffected.
+		Summary:   content,
+		ExitCode:  exit,
+		Error:     errMsg,
+		StartedAt: started,
+		EndedAt:   ended,
+		Duration:  ended.Sub(started),
 		Metadata: map[string]any{
-			"source":     WorkItemSourceLabel,
+			"source":      WorkItemSourceLabel,
 			"stop_reason": stopReason,
-			"iterations": iterations,
-			"tool_calls": toolCalls,
+			"iterations":  iterations,
+			"tool_calls":  toolCalls,
 		},
 	}
 	if pl != nil {

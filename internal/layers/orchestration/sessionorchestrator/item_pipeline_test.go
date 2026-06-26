@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
@@ -47,6 +48,23 @@ func (s *capturingWorkItemExecutor) ExecuteWorkItem(_ context.Context, sessionID
 	})
 	return &WorkItemResult{
 		Content:    "ok",
+		Done:       true,
+		Iterations: 1,
+		StopReason: "final_answer",
+	}, nil
+}
+
+// contentWorkItemExecutor is a stub that returns a fixed Content. Used by
+// the regression test for Artifact truncation (DM-20260626-009 follow-up):
+// the ItemPipelineRunner must propagate the full Content into round.ArtifactSummary
+// so feishu shows the entire LLM response, not just a 200-char prefix.
+type contentWorkItemExecutor struct {
+	content string
+}
+
+func (c *contentWorkItemExecutor) ExecuteWorkItem(_ context.Context, _, _, _ string) (*WorkItemResult, error) {
+	return &WorkItemResult{
+		Content:    c.content,
 		Done:       true,
 		Iterations: 1,
 		StopReason: "final_answer",
@@ -216,5 +234,46 @@ func TestRunItemPipeline_WorkItemExecutorReceivesDirective(t *testing.T) {
 	if got.Directive != directive {
 		t.Fatalf("Directive = %q, want %q (regression: ItemPipelineRunner.Run must inject the WorkItem's directive straight into WorkItemExecutor.ExecuteWorkItem)",
 			got.Directive, directive)
+	}
+}
+
+// TestRunItemPipeline_LongLLMResponseSurvivesArtifact is the regression
+// test for the post-PR-#251 truncation bug: buildArtifactFromWorkItemResult
+// used truncateForArtifact(content, 200), which cut long LLM reviews down
+// to 200 chars + ellipsis. The user then saw only the truncated prefix in
+// the feishu reply card (sess_1782472901145 — LLM emitted a 700-char review
+// after 8 bash tool calls; the user received only the first 203 bytes).
+//
+// DM-20260626-009 follow-up: WorkerWorkItem artifacts hold the user's
+// answer verbatim. Skip truncation for WorkerWorkItem; downstream Learn
+// truncates evidence further (asset_builder.go:272).
+func TestRunItemPipeline_LongLLMResponseSurvivesArtifact(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	longContent := strings.Repeat("Devrix D2 上下文引擎层. ", 50) // ~1400 chars
+	if len(longContent) < 500 {
+		t.Fatalf("test fixture too short: %d chars", len(longContent))
+	}
+	exec := &contentWorkItemExecutor{content: longContent}
+	r, err := NewItemPipelineRunner(ItemPipelineDeps{
+		Executor: exec,
+		Tasks:    tm,
+	})
+	if err != nil {
+		t.Fatalf("NewItemPipelineRunner: %v", err)
+	}
+	sessionID := "sess-long-content"
+	goal, err := tm.EnsureGoal(sessionID, "review d2领域代码")
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.1)
+
+	round, err := r.Run(context.Background(), sessionID, goal, "")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if round.ArtifactSummary != longContent {
+		t.Fatalf("ArtifactSummary truncated: len=%d, want=%d (regression: WorkerWorkItem artifact must hold the full LLM response)",
+			len(round.ArtifactSummary), len(longContent))
 	}
 }
