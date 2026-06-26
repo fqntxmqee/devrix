@@ -22,6 +22,7 @@ type MUPSPipelinesDeps struct {
 	FocusHint        *workmodel.FocusHintProvider
 	ResolveAwait     *workmodel.ResolveAwaiter
 	ToolResultStore  *persist.ToolResultStore
+	PromptLanguage   string
 }
 
 // WireMUPSPipeline wires TurnToolExecutor + SubTurnRunner.
@@ -45,7 +46,11 @@ func WireMUPSPipeline(deps MUPSPipelinesDeps) (*sessionorchestrator.TurnToolExec
 		ObsBridge:        deps.ObsBridge,
 		FocusHint:        deps.FocusHint,
 		ResolveAwait:     deps.ResolveAwait,
-		ToolResultStore:  deps.ToolResultStore,
+		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
+		// cat / etc.) are persisted to disk and replaced with a preview
+		// marker so they do not blow up the LLM context budget.
+		ToolResultStore: deps.ToolResultStore,
+		PromptLanguage:  deps.PromptLanguage,
 	})
 	subTurn := sessionorchestrator.NewSubTurnRunner(turnOrch, sessionorchestrator.SubTurnConfig{
 		DefaultMode:      deps.SubagentCfg.DefaultMode,

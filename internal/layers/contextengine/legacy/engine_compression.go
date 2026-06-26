@@ -3,6 +3,7 @@ package legacy
 import (
 	"context"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
@@ -21,6 +22,7 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 		compression.WithAutocompactConfig(e.cfg.Compression.Autocompact),
 		compression.WithCompressionConfig(e.cfg.Compression),
 		compression.WithSummarizer(e.summarizer),
+		compression.WithLocale(i18n.ParseLanguage(e.cfg.Workspace.Language)),
 	}
 	if sessionID != "" {
 		opts = append(opts,

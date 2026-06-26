@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -30,6 +31,7 @@ func runAutocompact(
 	summarizer Summarizer,
 	observer StepObserver,
 	async *AsyncAutocompacter,
+	loc i18n.Locale,
 ) ([]types.Message, string, error) {
 	if !shouldAutocompact(msgs, budget, counter, cfg) {
 		return msgs, stepAutocompact + ":skipped", nil
@@ -53,7 +55,7 @@ func runAutocompact(
 
 	if async != nil && sessionID != "" {
 		out := buildAutocompactPlaceholder(turns, head, tail)
-		async.StartAsync(sessionID, cfg, turns, head, tail, observer)
+		async.StartAsync(sessionID, cfg, turns, head, tail, observer, loc)
 		return out, stepAutocompact, nil
 	}
 
@@ -67,7 +69,7 @@ func runAutocompact(
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	summary, err := summarizeWithRetry(runCtx, summarizer, cfg, middle)
+	summary, err := summarizeWithRetry(runCtx, summarizer, cfg, middle, loc)
 	if err != nil {
 		if observer != nil {
 			observer.OnAutocompact(AutocompactMeta{Degraded: true, Model: cfg.Model})
@@ -77,7 +79,7 @@ func runAutocompact(
 
 	summaryMsg := types.Message{
 		Role:    types.MessageRoleAssistant,
-		Content: formatSummaryContent(summary),
+		Content: formatSummaryContent(summary, loc),
 		Metadata: map[string]string{
 			"compressed_by":  "autocompact",
 			"original_count": fmt.Sprintf("%d", len(middle)),
@@ -88,7 +90,7 @@ func runAutocompact(
 	for i := 0; i < head; i++ {
 		out = append(out, turns[i]...)
 	}
-	out = append(out, conversation.NewCompactBoundaryMessage(sessionID, "auto", len(middle)))
+	out = append(out, conversation.NewCompactBoundaryMessage(sessionID, "auto", len(middle), loc))
 	out = append(out, summaryMsg)
 	for i := len(turns) - tail; i < len(turns); i++ {
 		out = append(out, turns[i]...)
@@ -121,12 +123,12 @@ func shouldAutocompact(msgs []types.Message, budget types.TokenBudget, counter c
 	return counter.CountMessages(msgs) > budget.CompressionTarget
 }
 
-func summarizeWithRetry(ctx context.Context, summarizer Summarizer, cfg config.AutocompactConfig, segment []types.Message) (string, error) {
+func summarizeWithRetry(ctx context.Context, summarizer Summarizer, cfg config.AutocompactConfig, segment []types.Message, loc i18n.Locale) (string, error) {
 	maxTok := cfg.SummaryMaxTokens
 	if maxTok <= 0 {
 		maxTok = 512
 	}
-	prompt := buildAutocompactPrompt(segment)
+	prompt := buildAutocompactPrompt(segment, loc)
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		raw, err := summarizer.Summarize(ctx, cfg.Model, prompt, maxTok)
@@ -143,33 +145,23 @@ func summarizeWithRetry(ctx context.Context, summarizer Summarizer, cfg config.A
 	return "", lastErr
 }
 
-func buildAutocompactPrompt(segment []types.Message) string {
+func buildAutocompactPrompt(segment []types.Message, loc i18n.Locale) string {
 	var b strings.Builder
-	b.WriteString(`You are a conversation summarizer. Below is the middle segment of a developer-AI conversation.
-Summarize ONLY what was explicitly discussed. Do NOT invent any details not present in the input.
-
-Output strict JSON:
-{
-  "topics": ["list of technical topics discussed"],
-  "decisions": ["list of decisions made or actions agreed"],
-  "open_items": ["list of unresolved questions or pending tasks"]
-}
-
-Rules:
-- If unsure about any detail, omit it rather than guess.
-- Do NOT mention file paths, code, or tool outputs unless they appear in the input.
-- Limit each array to at most 5 items.
-- If a category has nothing to report, use an empty array.
-
-Conversation segment:
-`)
 	for _, m := range segment {
 		b.WriteString(string(m.Role))
 		b.WriteString(": ")
 		b.WriteString(m.Content)
 		b.WriteString("\n")
 	}
-	return b.String()
+	return i18n.BuildAutocompactPrompt(loc, b.String())
+}
+
+func formatSummaryContent(raw string, loc i18n.Locale) string {
+	parsed, err := parseSummaryJSON(raw)
+	if err != nil {
+		return i18n.FormatAutocompactSummaryContent(loc, nil, nil, nil, raw)
+	}
+	return i18n.FormatAutocompactSummaryContent(loc, parsed.Topics, parsed.Decisions, parsed.OpenItems, raw)
 }
 
 func parseSummaryJSON(raw string) (*summaryOutput, error) {
@@ -184,29 +176,4 @@ func parseSummaryJSON(raw string) (*summaryOutput, error) {
 		return nil, err
 	}
 	return &out, nil
-}
-
-func formatSummaryContent(raw string) string {
-	parsed, err := parseSummaryJSON(raw)
-	if err != nil {
-		return "[autocompact summary]\n" + raw
-	}
-	var b strings.Builder
-	b.WriteString("[autocompact summary]\n")
-	if len(parsed.Topics) > 0 {
-		b.WriteString("Topics: ")
-		b.WriteString(strings.Join(parsed.Topics, "; "))
-		b.WriteString("\n")
-	}
-	if len(parsed.Decisions) > 0 {
-		b.WriteString("Decisions: ")
-		b.WriteString(strings.Join(parsed.Decisions, "; "))
-		b.WriteString("\n")
-	}
-	if len(parsed.OpenItems) > 0 {
-		b.WriteString("Open items: ")
-		b.WriteString(strings.Join(parsed.OpenItems, "; "))
-		b.WriteString("\n")
-	}
-	return strings.TrimSpace(b.String())
 }

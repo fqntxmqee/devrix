@@ -8,6 +8,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/permission"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/adapters"
@@ -434,11 +435,13 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 	}
 
 	toolSchemas := make([]contracts.ToolSchema, len(tools))
+	loc := e.PromptLocale()
 	for i, t := range tools {
+		desc, params := i18n.LocalizeTool(t.Name, t.Description, t.Parameters, loc)
 		toolSchemas[i] = contracts.ToolSchema{
 			Name:        t.Name,
-			Description: t.Description,
-			Parameters:  t.Parameters,
+			Description: desc,
+			Parameters:  params,
 		}
 	}
 

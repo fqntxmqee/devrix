@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
@@ -244,10 +245,11 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 	// dependency (DM-20260617-008 W5). When the surface set covers all
 	// callers, the global injection can be removed.
 	surfaces := BuildSurfaces(SurfaceBuildOpts{
-		ToolReg:   toolReg,
-		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
-		Tracker:   diagTracker,
-		Forker:    freeforkGlobalFunc(b.forker),
+		ToolReg:      toolReg,
+		LSPConfig:    nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:      diagTracker,
+		Forker:       freeforkGlobalFunc(b.forker),
+		PromptLocale: i18n.ParseLanguage(b.ctxCfg.Workspace.Language),
 	})
 
 	ce := contextengine.NewContextEngine(contextengine.EngineDeps{

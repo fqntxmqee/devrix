@@ -117,7 +117,11 @@ func InitOrchestration(
 		MaxContextTokens: coordCfg.maxContextTokens,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
-		ToolResultStore:  persist.NewToolResultStore(""),
+		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
+		// cat / etc.) are persisted to disk and replaced with a preview
+		// marker so they do not blow up the LLM context budget.
+		ToolResultStore: persist.NewToolResultStore(""),
+		PromptLanguage:  coordCfg.promptLanguage,
 	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {
@@ -172,6 +176,7 @@ type orchestratorConfigs struct {
 	tasksCfg         config.TasksConfig
 	subagentCfg      config.SubagentConfig
 	maxContextTokens int
+	promptLanguage   string
 }
 
 // loadOrchestratorConfigs loads the 4 orchestrator configs from configFile.
@@ -199,6 +204,7 @@ func loadOrchestratorConfigs(configFile string) *orchestratorConfigs {
 	if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
 		cfg.tasksCfg = ctxFileCfg.Tasks
 		cfg.subagentCfg = ctxFileCfg.Subagent.Normalized()
+		cfg.promptLanguage = ctxFileCfg.Workspace.Language
 	}
 	return cfg
 }

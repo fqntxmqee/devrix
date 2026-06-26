@@ -6,6 +6,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -22,6 +23,7 @@ type SurfaceBuildOpts struct {
 	Tracker   *tracker.Tracker          // TrackerSurface input (nil → omit)
 	Forker    tools.FreeForkerFunc // FreeForkSurface input (nil → omit)
 	WorkDir   string                    // for VerifySurface fallback (optional)
+	PromptLocale i18n.Locale            // LLM-facing tool/prompt language (default zh-CN)
 }
 
 // BuildSurfaces assembles the canonical surface list for a main/per-agent
@@ -72,7 +74,11 @@ func BuildSurfaces(opts SurfaceBuildOpts) []contracts.ToolSurface {
 	// findSurface() short-circuits on it ONLY when the caller explicitly
 	// asks for "tool_search" (it returns "" for every other name).
 	allSpecs := collectAllSpecs(out)
-	out = append(out, surface.NewToolSearchSurface(allSpecs))
+	loc := opts.PromptLocale
+	if loc == "" {
+		loc = i18n.DefaultLocale
+	}
+	out = append(out, surface.NewToolSearchSurface(allSpecs, loc))
 	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
 	return out
 }

@@ -144,6 +144,7 @@ func main() {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+	config.ApplyUILanguage(ctxCfg, userCfg.UI.Language)
 	toolCfg, err := config.LoadToolConfig(configFile)
 	if err != nil {
 		slog.Error("failed to load tool config", "error", err)

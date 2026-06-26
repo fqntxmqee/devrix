@@ -12,6 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/config"
@@ -63,7 +64,7 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 		memory:              memMgr,
 		counter:             counter,
 		preparedTurnRunner:  deps.PreparedTurnRunner,
-		prompt:              prompt.NewLoader(&cfg.SystemPrompt),
+		prompt:              prompt.NewLoader(&cfg.SystemPrompt, i18n.ParseLanguage(cfg.Workspace.Language)),
 		cfg:                 cfg,
 		observer:            observer,
 		compObserver:        compObserver,

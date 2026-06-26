@@ -370,6 +370,9 @@ func mergeWorkspaceConfig(base, override WorkspacePromptConfig) WorkspacePromptC
 	if !override.EmbedCoreTemplate {
 		out.EmbedCoreTemplate = false
 	}
+	if override.Language != "" {
+		out.Language = override.Language
+	}
 	return out
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -45,7 +46,7 @@ func MessagesAfterCompactBoundary(msgs []types.Message) []types.Message {
 }
 
 // NewCompactBoundaryMessage creates a system marker for a compaction event.
-func NewCompactBoundaryMessage(sessionID, trigger string, messagesSummarized int) types.Message {
+func NewCompactBoundaryMessage(sessionID, trigger string, messagesSummarized int, loc i18n.Locale) types.Message {
 	meta := map[string]string{
 		MetaCompactBoundary:      trigger,
 		MetaMessagesSummarized: fmt.Sprintf("%d", messagesSummarized),
@@ -54,7 +55,7 @@ func NewCompactBoundaryMessage(sessionID, trigger string, messagesSummarized int
 		ID:        fmt.Sprintf("compact_%d", time.Now().UnixNano()),
 		SessionID: sessionID,
 		Role:      types.MessageRoleSystem,
-		Content:   "Conversation compacted",
+		Content:   i18n.CompactBoundaryMessage(loc),
 		Metadata:  meta,
 		Timestamp: time.Now(),
 	}

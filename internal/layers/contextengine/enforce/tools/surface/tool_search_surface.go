@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -41,15 +42,19 @@ type ToolSearchResult struct {
 // DSAFT: TOOL-SURFACE-1-A02 (DM-20260618-003 devrix-surface-lazy-loading).
 type ToolSearchSurface struct {
 	allSpecs []contracts.ToolSpec
+	locale   i18n.Locale
 }
 
 // NewToolSearchSurface builds the surface from the full tool catalog.
 // The catalog is filtered at search time so callers don't have to
 // rebuild when surfaces mutate.
-func NewToolSearchSurface(specs []contracts.ToolSpec) *ToolSearchSurface {
+func NewToolSearchSurface(specs []contracts.ToolSpec, locale i18n.Locale) *ToolSearchSurface {
+	if locale == "" {
+		locale = i18n.DefaultLocale
+	}
 	cp := make([]contracts.ToolSpec, len(specs))
 	copy(cp, specs)
-	return &ToolSearchSurface{allSpecs: cp}
+	return &ToolSearchSurface{allSpecs: cp, locale: locale}
 }
 
 // Name implements contracts.ToolSurface.
@@ -146,7 +151,7 @@ func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {
 				continue
 			}
 			if strings.ToLower(sp.Name) == q {
-				out = append(out, toResult(sp))
+				out = append(out, toResult(sp, s.locale))
 				seen[sp.Name] = true
 				if len(out) >= maxResults {
 					return out
@@ -168,7 +173,7 @@ func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {
 				continue
 			}
 			if ok, _ := filepath.Match(q, strings.ToLower(sp.Name)); ok {
-				out = append(out, toResult(sp))
+				out = append(out, toResult(sp, s.locale))
 				seen[sp.Name] = true
 				if len(out) >= maxResults {
 					return out
@@ -187,7 +192,7 @@ func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {
 				continue
 			}
 			if strings.Contains(strings.ToLower(sp.Name), q) {
-				out = append(out, toResult(sp))
+				out = append(out, toResult(sp, s.locale))
 				seen[sp.Name] = true
 				if len(out) >= maxResults {
 					return out
@@ -203,7 +208,7 @@ func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {
 				continue
 			}
 			if strings.HasPrefix(sp.Name, cat) {
-				out = append(out, toResult(sp))
+				out = append(out, toResult(sp, s.locale))
 				seen[sp.Name] = true
 				if len(out) >= maxResults {
 					return out
@@ -215,15 +220,16 @@ func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {
 	return out
 }
 
-func toResult(sp contracts.ToolSpec) ToolSearchResult {
+func toResult(sp contracts.ToolSpec, loc i18n.Locale) ToolSearchResult {
 	cat := ""
 	if i := strings.Index(sp.Name, "_"); i > 0 {
 		cat = sp.Name[:i]
 	}
+	desc, params := i18n.LocalizeTool(sp.Name, sp.Description, sp.Parameters, loc)
 	return ToolSearchResult{
 		Name:        sp.Name,
-		Description: sp.Description,
-		Parameters:  sp.Parameters,
+		Description: desc,
+		Parameters:  params,
 		Risk:        string(sp.Risk),
 		Category:    cat,
 	}

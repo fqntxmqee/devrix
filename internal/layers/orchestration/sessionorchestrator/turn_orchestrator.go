@@ -12,6 +12,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/audit"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -56,6 +57,8 @@ type OrchestratorDeps struct {
 	// message is folded head/tail (DM-20260620-001 / AC2). 0 →
 	// persist.DefaultMaxAssistantChars (8000).
 	MaxAssistantChars int
+	// PromptLanguage controls LLM-facing compression prompts (zh-CN | en-US).
+	PromptLanguage string
 }
 
 // verify.ExitReason is defined in exit_reason.go.
@@ -90,6 +93,7 @@ type DefaultOrchestrator struct {
 	toolResultStore  *persist.ToolResultStore
 	maxToolResultCh  int
 	maxAssistantCh   int
+	promptLanguage   string
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -125,6 +129,7 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		toolResultStore:  deps.ToolResultStore,
 		maxToolResultCh:  maxChars,
 		maxAssistantCh:   assistChars,
+		promptLanguage:   deps.PromptLanguage,
 	}
 }
 
@@ -983,7 +988,7 @@ func (o *DefaultOrchestrator) runCompress(ctx context.Context, req TurnRequest, 
 	}
 
 	// Level 1: D3 LLM summarization.
-	systemPrompt := "Summarize the following conversation compactly, preserving key decisions, tool outputs, and facts. Keep the summary concise enough to fit within the remaining token budget."
+	systemPrompt := i18n.CompressSystemPrompt(i18n.ParseLanguage(o.promptLanguage))
 	var contentBuilder strings.Builder
 	for _, m := range hint.MessagesToSummarize {
 		contentBuilder.WriteString(string(m.Role))

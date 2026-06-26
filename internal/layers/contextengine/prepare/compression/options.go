@@ -1,9 +1,10 @@
 package compression
 
 import (
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 )
 
 // Option configures a compression Pipeline.
@@ -107,6 +108,15 @@ func WithSkipAssembly(skip bool) Option {
 	}
 }
 
+// WithLocale sets the language for LLM-facing compression prompts.
+func WithLocale(loc i18n.Locale) Option {
+	return func(p *Pipeline) {
+		if loc != "" {
+			p.locale = loc
+		}
+	}
+}
+
 func defaultPipeline() *Pipeline {
 	return &Pipeline{
 		counter:           token.NewCounter(),
@@ -116,5 +126,6 @@ func defaultPipeline() *Pipeline {
 		maxMessages:       config.DefaultCompressionConfig().MaxMessages,
 		keepTailMessages:  config.DefaultCompressionConfig().KeepTailMessages,
 		preserveHeadTurns: config.DefaultAutocompactConfig().PreserveHeadTurns,
+		locale:            i18n.DefaultLocale,
 	}
 }

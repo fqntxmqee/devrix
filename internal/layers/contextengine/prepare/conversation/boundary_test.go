@@ -3,12 +3,13 @@ package conversation_test
 import (
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 func TestMessagesAfterCompactBoundary_should_return_from_last_boundary(t *testing.T) {
-	boundary := conversation.NewCompactBoundaryMessage("s", "auto", 10)
+	boundary := conversation.NewCompactBoundaryMessage("s", "auto", 10, i18n.LocaleEN)
 	msgs := []types.Message{
 		{Role: types.MessageRoleUser, Content: "old task"},
 		{Role: types.MessageRoleAssistant, Content: "old reply"},

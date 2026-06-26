@@ -3,18 +3,19 @@ package prompt
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
 const maxGitStatusChars = 2000
 
 // computeGitStatus returns a git snapshot for the dynamic system prompt section.
 // Returns ("", false) when workDir is not a git repository or git is unavailable.
-func computeGitStatus(workDir string) (string, bool) {
+func computeGitStatus(workDir string, loc i18n.Locale) (string, bool) {
 	if strings.TrimSpace(workDir) == "" {
 		return "", false
 	}
@@ -33,25 +34,17 @@ func computeGitStatus(workDir string) (string, bool) {
 		return "", false
 	}
 
-	var b strings.Builder
-	b.WriteString("This is the git status at the start of the conversation. ")
-	b.WriteString("Note that this status is a snapshot in time, and will not update during the conversation.\n\n")
-	if branch != "" {
-		fmt.Fprintf(&b, "Current branch: %s\n\n", branch)
+	statusOut := status
+	truncated := false
+	if len(statusOut) > maxGitStatusChars {
+		statusOut = statusOut[:maxGitStatusChars]
+		truncated = true
 	}
-	if status == "" {
-		b.WriteString("Status:\n(clean)\n\n")
-	} else {
-		truncated := status
-		if len(truncated) > maxGitStatusChars {
-			truncated = truncated[:maxGitStatusChars] + "\n... (truncated — run git status for full output)"
-		}
-		fmt.Fprintf(&b, "Status:\n%s\n\n", truncated)
+	out := i18n.FormatGitStatus(loc, branch, statusOut, logLines, truncated)
+	if out == "" {
+		return "", false
 	}
-	if logLines != "" {
-		fmt.Fprintf(&b, "Recent commits:\n%s", logLines)
-	}
-	return strings.TrimSpace(b.String()), true
+	return out, true
 }
 
 func gitInsideWorkTree(ctx context.Context, workDir string) bool {

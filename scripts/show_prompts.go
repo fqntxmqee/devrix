@@ -4,11 +4,13 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
 )
 
 func main() {
-	loader := prompt.NewLoader(nil)
+	loader := prompt.NewLoader(nil, i18n.DefaultLocale)
 	
 	fmt.Println("=== Static Sections ===")
 	sections := loader.LoadAsSections("/tmp")

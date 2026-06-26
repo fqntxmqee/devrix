@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -15,7 +16,7 @@ import (
 // spec for `tool_search` with DeferLoading=false (must always be in-pack
 // or the LLM can't escape the deferred set).
 func TestToolSearchSurface_Tools(t *testing.T) {
-	s := surface.NewToolSearchSurface([]contracts.ToolSpec{
+	s := newSearchSurface([]contracts.ToolSpec{
 		{Name: "delegate_research", DeferLoading: true},
 	})
 	tools := s.Tools(context.Background(), "", "")
@@ -33,7 +34,7 @@ func TestToolSearchSurface_Tools(t *testing.T) {
 // T: TOOL-SURFACE-1-T28 — search() returns up to 5 deferred tools
 // matching the query (exact > glob > substring).
 func TestToolSearchSurface_Search(t *testing.T) {
-	s := surface.NewToolSearchSurface([]contracts.ToolSpec{
+	s := newSearchSurface([]contracts.ToolSpec{
 		{Name: "delegate_research", DeferLoading: true, Description: "research agent"},
 		{Name: "delegate_explore", DeferLoading: true, Description: "explore agent"},
 		{Name: "delegate_status", DeferLoading: true, Description: "status check"},
@@ -64,7 +65,7 @@ func TestToolSearchSurface_Search(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T28 — category filter narrows results to a name prefix.
 func TestToolSearchSurface_Search_Category(t *testing.T) {
-	s := surface.NewToolSearchSurface([]contracts.ToolSpec{
+	s := newSearchSurface([]contracts.ToolSpec{
 		{Name: "delegate_research", DeferLoading: true},
 		{Name: "delegate_explore", DeferLoading: true},
 		{Name: "task_output_background", DeferLoading: true},
@@ -89,7 +90,7 @@ func TestToolSearchSurface_Search_Top5(t *testing.T) {
 			DeferLoading: true,
 		})
 	}
-	s := surface.NewToolSearchSurface(specs)
+	s := newSearchSurface(specs)
 	res := executeSearch(t, s, `{"query":"delegate_*"}`)
 	if len(res) != 5 {
 		t.Errorf("top-5 cap: got %d, want 5", len(res))
@@ -99,7 +100,7 @@ func TestToolSearchSurface_Search_Top5(t *testing.T) {
 // T: TOOL-SURFACE-1-T28 — Execute() round-trip: input JSON → matching
 // ToolSearchResult JSON.
 func TestToolSearchSurface_Execute(t *testing.T) {
-	s := surface.NewToolSearchSurface([]contracts.ToolSpec{
+	s := newSearchSurface([]contracts.ToolSpec{
 		{Name: "delegate_research", DeferLoading: true, Description: "research", Risk: types.RiskLevelHigh},
 	})
 	out, err := s.Execute(context.Background(), "tool_search", `{"query":"delegate_research"}`, "")
@@ -117,7 +118,7 @@ func TestToolSearchSurface_Execute(t *testing.T) {
 
 // T: TOOL-SURFACE-1-T28 — Execute() with unknown tool name returns Error envelope.
 func TestToolSearchSurface_Execute_UnknownName(t *testing.T) {
-	s := surface.NewToolSearchSurface(nil)
+	s := newSearchSurface(nil)
 	out, err := s.Execute(context.Background(), "not_tool_search", `{}`, "")
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -153,6 +154,10 @@ func TestShouldDeferByDefault(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newSearchSurface(specs []contracts.ToolSpec) *surface.ToolSearchSurface {
+	return surface.NewToolSearchSurface(specs, i18n.LocaleEN)
 }
 
 func names(rs []surface.ToolSearchResult) []string {
