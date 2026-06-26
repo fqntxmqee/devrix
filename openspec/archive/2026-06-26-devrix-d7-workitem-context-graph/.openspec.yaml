@@ -1,0 +1,19 @@
+change_id: devrix-d7-workitem-context-graph
+priority: P1
+demand_id: DM-20260626-020
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S1
+related_changes:
+  - devrix-d7-workitem-pipeline-unification  # PR #243 prerequisite ingress
+
+version_scope:
+  v1.0: "F1–F6 ContextGraph contracts, evaluators, pipeline decide wiring, wave upstream, CLI"
+
+verification:
+  s5_gate:
+    - go test ./internal/layers/orchestration/workmodel/... -count=1
+    - go test ./internal/layers/orchestration/sessionorchestrator/... -count=1
+  s6_gate:
+    - PR #244 CI unit tests + layer-lint PASS
