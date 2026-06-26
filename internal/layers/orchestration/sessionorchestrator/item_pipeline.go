@@ -16,12 +16,13 @@ import (
 
 // ItemPipelineRunner executes Observe→Plan→Execute→Verify→Learn→Decide for one WorkItem.
 type ItemPipelineRunner struct {
-	Classifier decisionplanning.IntentClassifier
-	Planner    plan.Planner
-	Router     *execute.ChannelRouter
-	Learner    learn.Learner
-	Tasks      *workmodel.TaskManager
-	TrackMode  string
+	Classifier        decisionplanning.IntentClassifier
+	Planner           plan.Planner
+	Router            *execute.ChannelRouter
+	Learner           learn.Learner
+	Tasks             *workmodel.TaskManager
+	TrackMode         string
+	ContextProposer   workmodel.ContextProposer
 	// Verify overrides deterministic artifact verification (tests / future LLM verifier).
 	Verify func(*wavescheduler.Artifact) workmodel.Verdict
 }
@@ -111,7 +112,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseObserve)
 
-	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode)
+	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +248,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	treeCtx.DailyLimitExceeded = workmodel.DecomposeDailyLimitWouldExceed(sessionID, item.Kind, 1)
 
-	workmodel.EvaluateSpawnPolicy(round, treeCtx)
+	ctxOut := workmodel.ProposeContextPipelineOutput(sessionID, item, round, r.Tasks, r.ContextProposer)
+	workmodel.ApplyPipelineDecide(sessionID, item, round, ctxOut, treeCtx, r.Tasks)
 	if round.VerdictKind == types.VerdictIndeterminate {
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}

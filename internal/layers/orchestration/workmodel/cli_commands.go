@@ -81,6 +81,9 @@ func (c *CLICommands) Handle(cmd *Command, sessionID string) string {
 	case "review":
 		return c.review(sessionID, cmd.Args)
 
+	case "context":
+		return c.contextShow(sessionID, cmd.Args)
+
 	default:
 		return fmt.Sprintf("Unknown command: %s\nType /task help for usage.", cmd.Name)
 	}
@@ -100,6 +103,7 @@ func (c *CLICommands) Help() string {
   /task plan <goal>                   - Generate plan for goal
   /task verify [files...]              - Verify changes
   /task review approve <work_item_id>  - Approve a human-review gate item
+  /task context show [work_item_id]    - Show ContextScope and link records
 
 Examples:
   /task create "Fix bug" "Fix authentication issue"
@@ -324,6 +328,51 @@ func (c *CLICommands) review(sessionID string, args []string) string {
 	}
 	ReevaluateParentAfterChild(sessionID, itemID, c.manager)
 	return fmt.Sprintf("✓ Human review approved for %s", itemID)
+}
+
+func (c *CLICommands) contextShow(sessionID string, args []string) string {
+	if !FeatureWorkItemContextGraphEnabled() {
+		return "ContextGraph is disabled. Set D7_WORKITEM_CONTEXT_GRAPH=1 to enable."
+	}
+	if len(args) < 1 || args[0] != "show" {
+		return "Usage: /task context show [work_item_id]"
+	}
+	itemID := ""
+	if len(args) > 1 {
+		itemID = args[1]
+	}
+	if itemID == "" {
+		focus, err := ResolveFocus(sessionID, c.manager)
+		if err != nil || focus == nil {
+			return "No focus work item. Usage: /task context show <work_item_id>"
+		}
+		itemID = focus.ID
+	}
+	item, ok := c.manager.GetWorkItem(sessionID, itemID)
+	if !ok {
+		return fmt.Sprintf("Work item not found: %s", itemID)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Context for %s (%s)\n", item.ID, item.Title)
+	if item.ContextScopeID != "" {
+		fmt.Fprintf(&b, "  scope_id: %s\n", item.ContextScopeID)
+		fmt.Fprintf(&b, "  sidechain: %s\n", ContextScopeSidechainKey(item.ID))
+	} else {
+		b.WriteString("  scope_id: (none)\n")
+	}
+	if item.ContextPolicy != "" {
+		fmt.Fprintf(&b, "  policy: %s\n", item.ContextPolicy)
+	}
+	links := c.manager.LinksForWorkItem(sessionID, itemID)
+	if len(links) == 0 {
+		b.WriteString("  links: (none)\n")
+		return b.String()
+	}
+	b.WriteString("  links:\n")
+	for _, l := range links {
+		fmt.Fprintf(&b, "    %s → %s kind=%s by=%s\n", l.FromWorkItemID, l.ToWorkItemID, l.Kind, l.ProposedBy)
+	}
+	return b.String()
 }
 
 func (c *CLICommands) verify(args []string) string {

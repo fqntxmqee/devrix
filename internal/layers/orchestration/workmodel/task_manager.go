@@ -152,6 +152,9 @@ func (m *TaskManager) CreateWorkItem(sessionID string, in CreateWorkItemInput) (
 	if err != nil {
 		return nil, err
 	}
+	if FeatureWorkItemContextGraphEnabled() {
+		m.EnsureContextScope(sessionID, item)
+	}
 	_, span := m.startSpan(telemetry.OpD7_S1_Task_Manager_Create)
 	if span != nil {
 		span.SetAttributes(

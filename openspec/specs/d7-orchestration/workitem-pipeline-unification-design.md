@@ -6,6 +6,7 @@
 **Version:** 0.6.0
 **Last Updated:** 2026-06-26
 **Parent:** `d7-domain.md` · `pipeline-architecture.md` · `task-planning-design.md`
+**Related:** `workitem-pipeline-unification-design.md` · `workitem-context-graph-design.md`
 **Related Tech Debt:** `openspec/tech-debt/worktree-v2-deferred.md` (TD-WT-01/05/06)
 
 > **Change 意图（工作标题）：** `devrix-d7-workitem-pipeline-unification`
@@ -340,6 +341,8 @@ Scenario: Turn Loop 驱动 focus 切换 (G5)
 **Phase D 状态（2026-06-26）：** Bootstrap `WireItemPipeline` + `ItemToolRunner` 生产接线；TD-WT-01 `AdaptiveThreshold` 接入 `DefaultTreeEvalContext`；TD-WT-05 `SpawnEscalateHuman` → verify 子 WorkItem；TD-WT-06 父节点 re-eval 互斥；`RunParallelExplore` ephemeral 写回 `LastRound.SpawnRationale`。启用：`D7_WORKITEM_PIPELINE=1`。
 
 **Phase E 状态（2026-06-26）：** `ProcessRequest.UserID` + baggage `user.id` 接入 per-user 阈值；`/task review approve` 人机门控闭环；`human_review` 事件 + Turn Loop 暂停；`SessionOrchestrator.TaskManager()` + `D7StackOptions.WorkItemPipeline` 集成测试脚手架。
+
+**后续（ContextGraph）：** 见 `workitem-context-graph-design.md` v0.1.1（Review 通过；F1 契约已落地，F2–F6 待实现）。
 
 ---
 

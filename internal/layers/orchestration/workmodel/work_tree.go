@@ -476,6 +476,42 @@ func (t *WorkTree) SetUncertainty(sessionID, itemID string, u float64) error {
 	return nil
 }
 
+// SetContextScopeID binds a WorkItem to its ContextScope (CG1).
+func (t *WorkTree) SetContextScopeID(sessionID, itemID, scopeID string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	item, ok := t.items[sessionID][itemID]
+	if !ok {
+		return fmt.Errorf("work item not found: %s", itemID)
+	}
+	if err := t.checkMutable(item); err != nil {
+		return err
+	}
+	item.ContextScopeID = scopeID
+	t.touch(item)
+	t.persistLocked(sessionID)
+	return nil
+}
+
+// SetContextPolicy writes materialized link policy on a WorkItem (OQ-CG-4).
+func (t *WorkTree) SetContextPolicy(sessionID, itemID string, policy ContextLinkKind) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	item, ok := t.items[sessionID][itemID]
+	if !ok {
+		return fmt.Errorf("work item not found: %s", itemID)
+	}
+	if err := t.checkMutable(item); err != nil {
+		return err
+	}
+	item.ContextPolicy = policy
+	t.touch(item)
+	t.persistLocked(sessionID)
+	return nil
+}
+
 // AddDependency adds a blocked-by edge; rejects cycles.
 func (t *WorkTree) AddDependency(sessionID, itemID, blockedByID string) error {
 	t.mu.Lock()
