@@ -141,9 +141,14 @@ func (m *TaskManager) EnsureSession(sessionID string) {
 	m.tree.EnsureSession(sessionID)
 }
 
-// EnsureGoal ensures session root goal exists.
+// EnsureGoal ensures session root goal exists and binds ContextScope when absent.
 func (m *TaskManager) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
-	return m.tree.EnsureGoal(sessionID, directive)
+	item, err := m.tree.EnsureGoal(sessionID, directive)
+	if err != nil {
+		return nil, err
+	}
+	m.EnsureContextScope(sessionID, item)
+	return item, nil
 }
 
 // CreateWorkItem creates a work item with full control.
