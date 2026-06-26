@@ -80,6 +80,31 @@ func DedupRepeatedText(buffer string, minDupRunes, minGapRunes int) string {
 	return string(result)
 }
 
+// DedupRepeatedTextIterative applies DedupRepeatedText repeatedly until
+// the buffer stops shrinking or maxPasses is reached. The single-pass
+// DedupRepeatedText only removes ONE longest-LCP pair, so a buffer
+// where the same phrase appears 3+ times (e.g. minimax M2.7 streaming
+// loops: "我来帮你review" emitted 4-5 times) keeps the leftover
+// duplicates after one pass. Iterating collapses the rest. Each pass
+// is O(n^2) on the shrinking buffer, so we cap maxPasses.
+//
+// maxPasses <= 0 is treated as 8 — a generous cap that handles the
+// 4-5x duplicates observed in practice without risking runaway cost
+// on adversarial inputs.
+func DedupRepeatedTextIterative(buffer string, minDupRunes, minGapRunes, maxPasses int) string {
+	if maxPasses <= 0 {
+		maxPasses = 8
+	}
+	for pass := 0; pass < maxPasses; pass++ {
+		next := DedupRepeatedText(buffer, minDupRunes, minGapRunes)
+		if next == buffer {
+			return next
+		}
+		buffer = next
+	}
+	return buffer
+}
+
 // minUniqueRunes returns the minimum number of unique runes that a
 // candidate LCP of length k must contain to be considered a real
 // duplicate. The threshold combines a fixed floor of 5 (so short LCPs

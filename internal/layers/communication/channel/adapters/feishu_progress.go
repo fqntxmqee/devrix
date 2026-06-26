@@ -227,7 +227,7 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 // the create-or-patch branching.
 func (a *FeishuAdapter) patchThinkingCard(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
 	stream.mu.Lock()
-	text := strings.TrimSpace(dedupRepeatedText(stream.thinkingBuffer.String(), 20, 2))
+	text := strings.TrimSpace(textutil.DedupRepeatedTextIterative(stream.thinkingBuffer.String(), 8, 2, 6))
 	thinkingMsgID := stream.thinkingMsgID
 	stream.mu.Unlock()
 
@@ -492,7 +492,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	// non-cardkit finalize path constructs the footer from the same
 	// textBuffer. Without this, the user sees the report twice on
 	// the final card.
-	responseText = dedupRepeatedText(responseText, 20, 2)
+	responseText = textutil.DedupRepeatedTextIterative(responseText, 8, 2, 6)
 	stream.mu.Unlock()
 	if cardkitActive {
 		// Pass trimmedSummary so finalizeReplyCardStreaming can strip it
@@ -576,7 +576,11 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	// detectDuplicateReplay during streaming (e.g. the LLM re-emitted
 	// a suffix rather than a prefix, or the overlap didn't clear the
 	// 30-rune minimum). The reply card must show the report only once.
-	content = dedupRepeatedText(content, 20, 2)
+	//
+	// 2026-06-26 hotfix: iterate. Single-pass dedup only removes one
+	// longest-LCP pair, but minimax M2.7 emits the same short opening
+	// 3-5 times; iterating collapses the leftovers.
+	content = textutil.DedupRepeatedTextIterative(content, 8, 2, 6)
 	// Strip D2 context-budget fold markers so the LLM's echo of its own
 	// prior <prior-output-summary> blocks (which it sometimes regurgitates
 	// in long replies, e.g. a deep-review tool loop) does not leak into
@@ -711,7 +715,7 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	// silent and the verbatim duplicate lands in textBuffer. Run
 	// dedupRepeatedText on the chunk before writing so the live
 	// cardkit stream never carries the duplicate.
-	chunk = dedupRepeatedText(chunk, 20, 2)
+	chunk = textutil.DedupRepeatedTextIterative(chunk, 8, 2, 6)
 	if strings.TrimSpace(chunk) == "" {
 		stream.mu.Unlock()
 		return nil
@@ -728,7 +732,14 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	// runs dedupRepeatedText as a safety net; this layer just moves the
 	// dedup from "after the user saw it" to "while the LLM is still
 	// talking".
-	content := dedupRepeatedText(stream.textBuffer.String(), 20, 2)
+	//
+	// 2026-06-26 hotfix: use the iterative variant. The single-pass
+	// dedup only removes ONE longest-LCP pair, but minimax M2.7 has
+	// started emitting the same short opening 3-5 times in a row
+	// ("我来帮你review" × 4-5), which leaves 3-4 leftover copies after
+	// the first pass. Iterating collapses them all so the user no
+	// longer sees the same sentence repeated 3+ times on the live card.
+	content := textutil.DedupRepeatedTextIterative(stream.textBuffer.String(), 8, 2, 6)
 	if content != stream.textBuffer.String() {
 		stream.textBuffer.Reset()
 		stream.textBuffer.WriteString(content)
