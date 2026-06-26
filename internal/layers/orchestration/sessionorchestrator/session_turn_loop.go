@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -140,10 +141,20 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 
 			switch round.SpawnPolicy {
 			case workmodel.SpawnParallelExplore:
+				// SubWorktree span (DM-20260626-009 follow-up): wraps the
+				// RunParallelExplore call so a parallel-explore round shows
+				// up as a child span under the surrounding MUPS Pipeline
+				// root. RunParallelExplore is currently a no-op stub; the
+				// span is wired here so the trace shape is in place when a
+				// successor that drives ephemeral probes via
+				// WorkItemExecutor lands.
+				endSpan := hardening.EmitSubWorktreeRun(ctx, sessionID, focus.ID, "", "spawn_parallel_explore")
 				if err := o.itemPipeline.RunParallelExplore(ctx, sessionID, focus, round); err != nil {
+					endSpan(err)
 					emitError(ctx, o.sink, out, sessionID, "parallel_explore", err)
 					return
 				}
+				endSpan(nil)
 			case workmodel.SpawnEscalateHuman, workmodel.SpawnNone:
 				// focus may be terminal; loop picks next item or exits
 			}

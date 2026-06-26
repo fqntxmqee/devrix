@@ -140,6 +140,21 @@ const (
 	// the outer Orchestrate_Run span; the 4 sync nodes inherit it as parent via ctx.
 	OpD7_S6_MUPS_Pipeline = "D7_MUPS_Pipeline"
 
+	// D7 Orchestration - inner observability spans (DM-20260626-009 follow-up,
+	// 2026-06-26). The 5-node MUPS spans cover top-level pipeline nodes; the
+	// three ops below cover the inner layers that were invisible in Jaeger:
+	// the WorkItem task tree mutations (worktree), parallel-explore / child
+	// WorkItem runs (subworktree), and the per-WorkItem ReAct loop iterations
+	// (subturn). Without these, debugging a slow WorkItem meant reading the
+	// code instead of inspecting traces.
+	//
+	// D7-S1 Worktree (worktree.op P1)
+	OpD7_S1_Worktree_Op = "D7_Worktree_Op"
+	// D7-S1 SubWorktree (subworktree.run P2)
+	OpD7_S1_SubWorktree_Run = "D7_SubWorktree_Run"
+	// D7-S5 SubTurn (subturn.iteration P1)
+	OpD7_S5_SubTurn_Iteration = "D7_SubTurn_Iteration"
+
 	// D6 Evolution - Runtime Validation (D6-S4)
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
 )

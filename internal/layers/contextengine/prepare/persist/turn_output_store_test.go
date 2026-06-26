@@ -121,12 +121,20 @@ var _ = context.Background
 // into <prior-output-summary> and biases the next LLM call toward
 // replaying the same loop (pattern lock), which is exactly why the
 // "fix P0 issues" follow-up was misunderstood in sess_1782381569430_3000.
-func TestFoldAssistantOutput_DedupsLLMLoopInFoldedHead(t *testing.T) {
+//
+// DM-20260626-009 follow-up: rewritten as a "no-dedup" regression test.
+// The 3-layer LCP-based dedup that previously collapsed the duplicate
+// loop was removed because it false-positived on natural Chinese
+// repetition (the LCP ≥ 30 rune heuristic couldn't distinguish a
+// real LLM loop from the LLM legitimately restating itself across
+// segments). The fold now preserves all head/tail content verbatim
+// and lets the LLM-side dedup (D3 streaming) handle replay cases.
+// This test pins the new behaviour: duplicates at the head survive.
+func TestFoldAssistantOutput_NoDedup_LLMLoopInFoldedHead(t *testing.T) {
 	dir := t.TempDir()
 	store := NewToolResultStore(dir)
 
-	// Loop matching the minimax M2.7 streaming-loop pattern. Length
-	// must exceed the fold dedup threshold (30 runes).
+	// Loop matching the minimax M2.7 streaming-loop pattern.
 	loop := "优先修复 — Work focus 已经标注。让我先找出 D2 域当前的 P0 问题。"
 	if n := utf8.RuneCountInString(loop); n < 30 {
 		t.Fatalf("fixture invariant: expected loop length >= 30 runes, got %d", n)
@@ -143,14 +151,13 @@ func TestFoldAssistantOutput_DedupsLLMLoopInFoldedHead(t *testing.T) {
 		t.Fatalf("FoldAssistantOutput: %v", err)
 	}
 
-	// Core assertion: the duplicate loop was collapsed before being
-	// placed in the fold summary, so the loop appears exactly once
-	// in the result instead of twice.
-	if count := strings.Count(got, loop); count != 1 {
-		t.Errorf("expected loop to appear exactly once after fold dedup, got %d occurrences in:\n%s", count, got)
+	// Post-dedup-removal: the loop appears twice in the head (no collapse).
+	// This is intentional — the LLM-side dedup is responsible for replay.
+	if count := strings.Count(got, loop); count != 2 {
+		t.Errorf("expected loop to appear twice (no dedup applied), got %d occurrences in:\n%s", count, got)
 	}
 
-	// Sanity: truncation marker and tail survive dedup.
+	// Sanity: truncation marker and tail survive.
 	if !strings.Contains(got, "chars truncated; see ") {
 		t.Errorf("expected truncation marker, got %q", got)
 	}
@@ -159,11 +166,11 @@ func TestFoldAssistantOutput_DedupsLLMLoopInFoldedHead(t *testing.T) {
 	}
 }
 
-// TestFoldAssistantOutput_DedupsLLMLoopInFoldedTail verifies the
-// symmetric case: when the duplicate sits at the tail end of the
-// content, the fold summary's tail segment is also deduped so the
-// loop does not propagate forward.
-func TestFoldAssistantOutput_DedupsLLMLoopInFoldedTail(t *testing.T) {
+// TestFoldAssistantOutput_NoDedup_LLMLoopInFoldedTail mirrors the head
+// case for the tail. After DM-20260626-009 the tail keeps both copies
+// of the duplicate; the D3 streaming dedup is the only layer that
+// collapses an LLM replay loop now.
+func TestFoldAssistantOutput_NoDedup_LLMLoopInFoldedTail(t *testing.T) {
 	dir := t.TempDir()
 	store := NewToolResultStore(dir)
 
@@ -181,25 +188,23 @@ func TestFoldAssistantOutput_DedupsLLMLoopInFoldedTail(t *testing.T) {
 		t.Fatalf("FoldAssistantOutput: %v", err)
 	}
 
-	if count := strings.Count(got, loop); count != 1 {
-		t.Errorf("expected loop to appear exactly once after fold dedup, got %d occurrences in:\n%s", count, got)
+	if count := strings.Count(got, loop); count != 2 {
+		t.Errorf("expected loop to appear twice (no dedup applied), got %d occurrences in:\n%s", count, got)
 	}
 }
 
-// TestFoldAssistantOutput_DoesNotDedupAcrossSegments ensures dedup is
-// applied per-segment (head and tail separately) and never matches
-// across the fold boundary. If it matched across, the truncation
-// marker would lose content on either side.
-func TestFoldAssistantOutput_DoesNotDedupAcrossSegments(t *testing.T) {
+// TestFoldAssistantOutput_NoDedup_AcrossSegments asserts that the
+// fold preserves content verbatim across the head/tail boundary.
+// Trivially true after DM-20260626-009 (no dedup at all), but pinned
+// here so a future re-introduction of dedup has to handle the cross-
+// segment case explicitly.
+func TestFoldAssistantOutput_NoDedup_AcrossSegments(t *testing.T) {
 	dir := t.TempDir()
 	store := NewToolResultStore(dir)
 
-	// Same phrase at head and at tail. Per-segment dedup should NOT
-	// consider these as duplicates of each other; they survive both
-	// dedup passes independently.
 	phrase := "P0 fold dedup missing across turn boundary"
-	if n := utf8.RuneCountInString(phrase); n < DefaultFoldDedupMinDup {
-		t.Fatalf("fixture invariant: phrase must exceed dedup threshold (%d runes), got %d", DefaultFoldDedupMinDup, n)
+	if n := utf8.RuneCountInString(phrase); n < 30 {
+		t.Fatalf("fixture invariant: phrase must be >= 30 runes, got %d", n)
 	}
 
 	middle := strings.Repeat("x", 9000)
@@ -210,9 +215,8 @@ func TestFoldAssistantOutput_DoesNotDedupAcrossSegments(t *testing.T) {
 		t.Fatalf("FoldAssistantOutput: %v", err)
 	}
 
-	// Both copies should survive: one in head, one in tail. If
-	// cross-segment dedup ran, only one would remain.
+	// Both copies survive (one in head, one in tail).
 	if count := strings.Count(got, phrase); count != 2 {
-		t.Errorf("expected phrase to appear twice (head + tail), got %d occurrences in:\n%s", count, got)
+		t.Errorf("expected phrase to appear twice (no dedup applied), got %d occurrences in:\n%s", count, got)
 	}
 }

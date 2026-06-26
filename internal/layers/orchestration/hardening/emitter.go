@@ -162,6 +162,66 @@ func EmitExecutorSelect(ctx context.Context, sessionID string, candidatesCount i
 	return c, func(err error) { endSpanWithError(span, err) }
 }
 
+// --- DM-20260626-009 follow-up inner observability spans ---
+//
+// The 5-node MUPS spans cover the top-level pipeline; the three below
+// cover the inner layers that were invisible in Jaeger until this fix.
+// Without them, debugging "why did this WorkItem take 16s?" meant reading
+// code instead of inspecting traces. All three follow the same package-
+// level bridge pattern as the 5-node emitters (no-op when bridge nil).
+
+// EmitWorktreeOp wraps a single r.Tasks.Tree().Xxx() mutation. v6.0.0 S1
+// worktree.op P1. The op attribute (set_round_phase / apply_pipeline_round
+// / update_status / list_children) names the mutation; itemID + phase /
+// status give the trace enough context to reconstruct the round sequence
+// without re-reading the workmodel types.
+func EmitWorktreeOp(ctx context.Context, sessionID, op, itemID, phaseOrStatus string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "worktree.op", Value: op},
+		{Key: "worktree.item_id", Value: itemID},
+		{Key: "worktree.phase_or_status", Value: phaseOrStatus},
+	}
+	_, span := start(ctx, telemetry.OpD7_S1_Worktree_Op, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitSubWorktreeRun wraps a child WorkItem run from RunParallelExplore
+// or SpawnDecompose. v6.0.0 S1 subworktree.run P2. parentID + childID let
+// the trace show the parent → child relationship; spawned_by attribute
+// names the caller (parallel_explore / spawn_decompose) so dashboards can
+// filter by spawn path.
+func EmitSubWorktreeRun(ctx context.Context, sessionID, parentID, childID, spawnedBy string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "subworktree.parent_id", Value: parentID},
+		{Key: "subworktree.child_id", Value: childID},
+		{Key: "subworktree.spawned_by", Value: spawnedBy},
+	}
+	_, span := start(ctx, telemetry.OpD7_S1_SubWorktree_Run, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitSubTurnIteration wraps one iteration of the per-WorkItem ReAct loop
+// in DefaultWorkItemExecutor.ExecuteWorkItem. v6.0.0 S5 subturn.iteration
+// P1. iter is the 1-based iteration number; finishReason captures the LLM
+// finish reason ("stop" / "tool_calls" / "length" / ...). The ReAct loop
+// emits one span per iteration, all siblings under the surrounding
+// EmitMUPSPipeline Execute phase — Jaeger shows the iter-level latency
+// distribution directly, which is what was missing when "16s session" had
+// no per-iter breakdown.
+func EmitSubTurnIteration(ctx context.Context, sessionID, itemID string, iter int, finishReason, stopReason string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "subturn.item_id", Value: itemID},
+		{Key: "subturn.iter", Value: intToString(iter)},
+		{Key: "subturn.finish_reason", Value: finishReason},
+		{Key: "subturn.stop_reason", Value: stopReason},
+	}
+	_, span := start(ctx, telemetry.OpD7_S5_SubTurn_Iteration, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
 func intToString(n int) string {
 	if n == 0 {
 		return "0"

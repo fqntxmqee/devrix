@@ -1,5 +1,5 @@
-// Package hardening (emitter_test.go) emit tests: 5 P0/P1 Span ops × 2 (emit + nil-bridge
-// fail-safe) = 10 T points. v6.0.0 6 S 精简 S4 验收要求。
+// Package hardening (emitter_test.go) emit tests: 8 P0/P1 Span ops × 2 (emit + nil-bridge
+// fail-safe) = 16 T points. v6.0.0 6 S 精简 S4 验收要求 + DM-20260626-009 follow-up inner spans.
 //
 // T 点编号规则（DSAFT 标准 D{X}-S{X}-A{XX}-T{XX}）：
 //   D7-S6-A48-T01 channel.route  emit happy path
@@ -12,6 +12,12 @@
 //   D7-S5-A33-T08 taskgraph.synthesize nil-bridge fail-safe
 //   D7-S5-A34-T09 executor.select emit happy path
 //   D7-S5-A34-T10 executor.select nil-bridge fail-safe
+//   D7-S1-A52-T11 worktree.op  emit happy path
+//   D7-S1-A52-T12 worktree.op  nil-bridge fail-safe
+//   D7-S1-A53-T13 subworktree.run  emit happy path
+//   D7-S1-A53-T14 subworktree.run  nil-bridge fail-safe
+//   D7-S5-A54-T15 subturn.iteration  emit happy path
+//   D7-S5-A54-T16 subturn.iteration  nil-bridge fail-safe
 //
 // Bridge is wired via SetBridge for emit-happy-path tests and reset to
 // nil for fail-safe tests. Tests use the observability package's built-
@@ -187,4 +193,88 @@ func TestD7S6A50T12_EmitMUPSPipeline_NilBridgeFailSafe(t *testing.T) {
 		t.Fatal("emit must return the input ctx unchanged when bridge is nil")
 	}
 	end(nil)
+}
+
+// ─── D7-S1-A52 worktree.op (DM-20260626-009 follow-up inner spans) ──
+
+// TestD7S1A52T11_EmitWorktreeOp_HappyPath verifies EmitWorktreeOp returns
+// a non-nil end func and accepts both nil and non-nil error. The span
+// itself is the inner layer instrumentation for ItemPipelineRunner's
+// r.Tasks.Tree().Xxx() mutations (set_round_phase / list_children /
+// apply_pipeline_round / update_status). Without this, Jaeger shows the
+// MUPS pipeline root but not which phase transitions actually happened.
+func TestD7S1A52T11_EmitWorktreeOp_HappyPath(t *testing.T) {
+	wireNoopBridge()
+	defer resetBridge()
+
+	end := EmitWorktreeOp(context.Background(), "sess_x", "set_round_phase", "item_1", "observe")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func")
+	}
+	end(nil)
+}
+
+// TestD7S1A52T12_EmitWorktreeOp_NilBridgeFailSafe ensures the helper is
+// safe to call when the bootstrap has not wired a bridge yet (e.g. unit
+// tests, dry-run mode, or when observability is disabled in config). All
+// 11 wired call sites in item_pipeline.go rely on this no-op behaviour.
+func TestD7S1A52T12_EmitWorktreeOp_NilBridgeFailSafe(t *testing.T) {
+	resetBridge()
+
+	end := EmitWorktreeOp(context.Background(), "sess_x", "apply_pipeline_round", "item_1", "await_child")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func even when bridge is nil")
+	}
+	end(nil) // must not panic
+}
+
+// ─── D7-S1-A53 subworktree.run ─────────────────────────────────────
+
+func TestD7S1A53T13_EmitSubWorktreeRun_HappyPath(t *testing.T) {
+	wireNoopBridge()
+	defer resetBridge()
+
+	end := EmitSubWorktreeRun(context.Background(), "sess_x", "parent_1", "child_2", "spawn_parallel_explore")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func")
+	}
+	end(nil)
+}
+
+func TestD7S1A53T14_EmitSubWorktreeRun_NilBridgeFailSafe(t *testing.T) {
+	resetBridge()
+
+	end := EmitSubWorktreeRun(context.Background(), "sess_x", "parent_1", "child_2", "spawn_parallel_explore")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func even when bridge is nil")
+	}
+	end(nil) // must not panic
+}
+
+// ─── D7-S5-A54 subturn.iteration ───────────────────────────────────
+
+// TestD7S5A54T15_EmitSubTurnIteration_HappyPath verifies the per-iter span
+// fires for both a normal iter (finish_reason = "stop", stop_reason = "" or
+// "ok") and a cap-hit iter (finish_reason = "tool_calls", stop_reason =
+// "max_iters"). Both shapes need to be exercised because the helper
+// itself doesn't validate — the caller chooses which combo to pass.
+func TestD7S5A54T15_EmitSubTurnIteration_HappyPath(t *testing.T) {
+	wireNoopBridge()
+	defer resetBridge()
+
+	end := EmitSubTurnIteration(context.Background(), "sess_x", "item_1", 3, "stop", "ok")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func")
+	}
+	end(nil)
+}
+
+func TestD7S5A54T16_EmitSubTurnIteration_NilBridgeFailSafe(t *testing.T) {
+	resetBridge()
+
+	end := EmitSubTurnIteration(context.Background(), "sess_x", "item_1", 5, "tool_calls", "max_iters")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func even when bridge is nil")
+	}
+	end(nil) // must not panic
 }
