@@ -25,6 +25,29 @@ func (stubItemToolRunner) Invoke(_ context.Context, req execute.ToolRequest) (ex
 	}, nil
 }
 
+// capturingItemToolRunner records the Args of each Invoke call. Used by the
+// regression test for the work_item_execute ToolArgs propagation bug
+// (DM-20260626-009): ItemPipelineRunner.Run must inject the WorkItem's
+// directive into Step.ToolArgs so ItemToolRunner.invokeWorkItemExecute can
+// read it via req.Args["directive"]. The 2026-06-26 hotfix wired the LLM
+// call but forgot to populate ToolArgs, so the directive arrived empty and
+// every session returned the "requires a non-empty directive arg" error.
+type capturingItemToolRunner struct {
+	calls []execute.ToolRequest
+}
+
+func (s *capturingItemToolRunner) Invoke(_ context.Context, req execute.ToolRequest) (execute.ToolResult, error) {
+	s.calls = append(s.calls, req)
+	now := time.Now()
+	return execute.ToolResult{
+		ToolName:    req.ToolName,
+		ExitCode:    0,
+		Output:      "ok",
+		StartedAt:   now,
+		CompletedAt: now.Add(5 * time.Millisecond),
+	}, nil
+}
+
 func newItemPipelineTestRunner(t *testing.T) (*ItemPipelineRunner, *workmodel.TaskManager, *learn.InMemoryReputationStore) {
 	t.Helper()
 	tm := workmodel.NewTaskManager()
@@ -137,5 +160,55 @@ func TestRunItemPipeline_LP5_LineageFields(t *testing.T) {
 	}
 	if round.ExitReason == "" {
 		t.Fatal("ExitReason required")
+	}
+}
+
+// TestRunItemPipeline_WorkItemExecuteReceivesDirective is the regression test
+// for DM-20260626-009: ItemPipelineRunner.Run must populate
+// PlanInput.Steps[0].ToolArgs["directive"] with the WorkItem's directive so
+// ItemToolRunner.invokeWorkItemExecute can read it (the LLM call path that
+// replaced the synthetic stub in PR #249). Without ToolArgs the channel
+// propagates an empty map → ItemToolRunner fails with "requires a non-empty
+// directive arg" and the user sees an instant error card with no LLM call.
+func TestRunItemPipeline_WorkItemExecuteReceivesDirective(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	runner := &capturingItemToolRunner{}
+	r, err := NewItemPipelineRunner(ItemPipelineDeps{
+		Runner: runner,
+		Tasks:  tm,
+	})
+	if err != nil {
+		t.Fatalf("NewItemPipelineRunner: %v", err)
+	}
+
+	sessionID := "sess-item-pipeline-directive"
+	const directive = "review d2领域代码"
+	goal, err := tm.EnsureGoal(sessionID, directive)
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.1)
+
+	if _, err := r.Run(context.Background(), sessionID, goal, ""); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if len(runner.calls) == 0 {
+		t.Fatal("ItemToolRunner.Invoke was never called (no pipeline round reached execute)")
+	}
+	var workItemCall *execute.ToolRequest
+	for i := range runner.calls {
+		if runner.calls[i].ToolName == "work_item_execute" {
+			workItemCall = &runner.calls[i]
+			break
+		}
+	}
+	if workItemCall == nil {
+		t.Fatalf("work_item_execute not invoked; calls = %+v", runner.calls)
+	}
+	got, _ := workItemCall.Args["directive"].(string)
+	if got != directive {
+		t.Fatalf("directive arg = %q, want %q (regression: ItemPipelineRunner.Run must inject directive via Step.ToolArgs so ItemToolRunner.invokeWorkItemExecute can read it)",
+			got, directive)
 	}
 }
