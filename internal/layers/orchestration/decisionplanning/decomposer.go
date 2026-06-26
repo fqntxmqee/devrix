@@ -97,7 +97,7 @@ func (d *TaskDecomposer) SynthesizeTaskGraph(ctx context.Context, sessionID, goa
 		edgeCount += len(n.DependsOn)
 	}
 	cycleDetected := hasCycle(nodes)
-	end := hardening.EmitTaskGraphSynthesize(
+	_, end := hardening.EmitTaskGraphSynthesize(
 		ctx, sessionID,
 		nodeCount, edgeCount, dagDepth(nodes),
 		cycleDetected,

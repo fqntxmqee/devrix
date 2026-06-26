@@ -51,7 +51,7 @@ func TestD7S6A48T01_EmitChannelRoute_HappyPath(t *testing.T) {
 	wireNoopBridge()
 	defer resetBridge()
 
-	end := EmitChannelRoute(context.Background(), "sess_x", "commit", "commit", "0.987", "false")
+	_, end := EmitChannelRoute(context.Background(), "sess_x", "commit", "commit", "0.987", "false")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func")
 	}
@@ -61,7 +61,7 @@ func TestD7S6A48T01_EmitChannelRoute_HappyPath(t *testing.T) {
 func TestD7S6A48T02_EmitChannelRoute_NilBridgeFailSafe(t *testing.T) {
 	resetBridge()
 
-	end := EmitChannelRoute(context.Background(), "sess_x", "commit", "commit", "0.987", "false")
+	_, end := EmitChannelRoute(context.Background(), "sess_x", "commit", "commit", "0.987", "false")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func even when bridge is nil")
 	}
@@ -74,7 +74,7 @@ func TestD7S6A49T03_EmitMemoryPersist_HappyPath(t *testing.T) {
 	wireNoopBridge()
 	defer resetBridge()
 
-	end := EmitMemoryPersist(context.Background(), "sess_x", "skill", "LearningSOP", 60000, 256)
+	_, end := EmitMemoryPersist(context.Background(), "sess_x", "skill", "LearningSOP", 60000, 256)
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func")
 	}
@@ -84,7 +84,7 @@ func TestD7S6A49T03_EmitMemoryPersist_HappyPath(t *testing.T) {
 func TestD7S6A49T04_EmitMemoryPersist_NilBridgeFailSafe(t *testing.T) {
 	resetBridge()
 
-	end := EmitMemoryPersist(context.Background(), "sess_x", "skill", "LearningSOP", 60000, 256)
+	_, end := EmitMemoryPersist(context.Background(), "sess_x", "skill", "LearningSOP", 60000, 256)
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func even when bridge is nil")
 	}
@@ -97,7 +97,7 @@ func TestD7S4A47T05_EmitSystemAnomalyDetect_HappyPath(t *testing.T) {
 	wireNoopBridge()
 	defer resetBridge()
 
-	end := EmitSystemAnomalyDetect(context.Background(), "sess_x", "rate_spike", "high", "3", "sess_x:5:5")
+	_, end := EmitSystemAnomalyDetect(context.Background(), "sess_x", "rate_spike", "high", "3", "sess_x:5:5")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func")
 	}
@@ -107,7 +107,7 @@ func TestD7S4A47T05_EmitSystemAnomalyDetect_HappyPath(t *testing.T) {
 func TestD7S4A47T06_EmitSystemAnomalyDetect_NilBridgeFailSafe(t *testing.T) {
 	resetBridge()
 
-	end := EmitSystemAnomalyDetect(context.Background(), "sess_x", "rate_spike", "high", "3", "sess_x:5:5")
+	_, end := EmitSystemAnomalyDetect(context.Background(), "sess_x", "rate_spike", "high", "3", "sess_x:5:5")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func even when bridge is nil")
 	}
@@ -120,7 +120,7 @@ func TestD7S5A33T07_EmitTaskGraphSynthesize_HappyPath(t *testing.T) {
 	wireNoopBridge()
 	defer resetBridge()
 
-	end := EmitTaskGraphSynthesize(context.Background(), "sess_x", 4, 3, 2, false)
+	_, end := EmitTaskGraphSynthesize(context.Background(), "sess_x", 4, 3, 2, false)
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func")
 	}
@@ -130,7 +130,7 @@ func TestD7S5A33T07_EmitTaskGraphSynthesize_HappyPath(t *testing.T) {
 func TestD7S5A33T08_EmitTaskGraphSynthesize_NilBridgeFailSafe(t *testing.T) {
 	resetBridge()
 
-	end := EmitTaskGraphSynthesize(context.Background(), "sess_x", 4, 3, 2, false)
+	_, end := EmitTaskGraphSynthesize(context.Background(), "sess_x", 4, 3, 2, false)
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func even when bridge is nil")
 	}
@@ -143,7 +143,7 @@ func TestD7S5A34T09_EmitExecutorSelect_HappyPath(t *testing.T) {
 	wireNoopBridge()
 	defer resetBridge()
 
-	end := EmitExecutorSelect(context.Background(), "sess_x", 3, "subagent", "1.000", "kind_match")
+	_, end := EmitExecutorSelect(context.Background(), "sess_x", 3, "subagent", "1.000", "kind_match")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func")
 	}
@@ -153,9 +153,38 @@ func TestD7S5A34T09_EmitExecutorSelect_HappyPath(t *testing.T) {
 func TestD7S5A34T10_EmitExecutorSelect_NilBridgeFailSafe(t *testing.T) {
 	resetBridge()
 
-	end := EmitExecutorSelect(context.Background(), "sess_x", 3, "subagent", "1.000", "kind_match")
+	_, end := EmitExecutorSelect(context.Background(), "sess_x", 3, "subagent", "1.000", "kind_match")
 	if end == nil {
 		t.Fatal("emit must return a non-nil end func even when bridge is nil")
+	}
+	end(nil)
+}
+
+// ─── D7-S6-A50 mups.pipeline ────────────────────────────────────────
+
+func TestD7S6A50T11_EmitMUPSPipeline_HappyPath(t *testing.T) {
+	wireNoopBridge()
+	defer resetBridge()
+
+	ctx, end := EmitMUPSPipeline(context.Background(), "sess_x", "wi_x", "intent_orchestrate")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func")
+	}
+	if ctx == nil {
+		t.Fatal("emit must return a non-nil ctx so the 5 sub-spans can chain")
+	}
+	end(nil)
+}
+
+func TestD7S6A50T12_EmitMUPSPipeline_NilBridgeFailSafe(t *testing.T) {
+	resetBridge()
+
+	ctx, end := EmitMUPSPipeline(context.Background(), "sess_x", "wi_x", "intent_orchestrate")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func even when bridge is nil")
+	}
+	if ctx == nil {
+		t.Fatal("emit must return the input ctx unchanged when bridge is nil")
 	}
 	end(nil)
 }

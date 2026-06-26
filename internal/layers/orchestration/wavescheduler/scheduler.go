@@ -337,7 +337,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 	} else {
 		selectedKind = "none"
 	}
-	endExecSelect := hardening.EmitExecutorSelect(parentCtx, sessionID, candidatesCount, selectedKind, score, "kind_match")
+	_, endExecSelect := hardening.EmitExecutorSelect(parentCtx, sessionID, candidatesCount, selectedKind, score, "kind_match")
 
 	runner, ok := s.runners[node.WorkerType]
 	endExecSelect(nil)

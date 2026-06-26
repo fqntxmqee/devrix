@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
@@ -90,6 +91,16 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		return r.runHumanReviewAwait(ctx, sessionID, item)
 	}
 
+	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the
+	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. Previously
+	// only OrchestratePath emitted this; the default-on ItemPipeline path was
+	// missing the root + 5 sub-spans, so the 5-node tree was visible only on
+	// the legacy route. hardening uses a package-level bridge (SetBridge in
+	// bootstrap/wire_coordinator.go), so this works without an obsBridge field
+	// on ItemPipelineRunner.
+	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
+	defer func() { endMUPS(nil) }()
+
 	started := time.Now()
 	roundNo := 1
 	if item.LastRound != nil {
@@ -134,15 +145,23 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			PersistScope: plan.PersistSession,
 		},
 	}
+	_, endPlan := hardening.EmitTaskGraphSynthesize(ctx, sessionID, len(planInput.Steps), 0, 1, false)
 	pl, err := r.Planner.Plan(planInput)
+	endPlan(err)
 	if err != nil {
 		return nil, fmt.Errorf("item_pipeline: plan: %w", err)
 	}
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseExecute)
 
 	// DM-20260626-009: bypass CommitChannel/ItemToolRunner/work_item_execute;
-	// call WorkItemExecutor directly with the WorkItem's directive.
+	// call WorkItemExecutor directly with the WorkItem's directive. Also
+	// emit the Wave (executor.select) + Execute (channel.route) sub-spans
+	// so Jaeger shows the full 5-node tree on the per-WorkItem path.
+	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
+	endWave(nil)
+	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")
 	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, itemDirective(item))
+	endExecute(execErr)
 	if execErr != nil {
 		// Non-fatal: continue with whatever Content was accumulated so the
 		// round still produces an Artifact + Verdict for downstream Verify.
@@ -163,12 +182,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	exitReason := exitReasonForVerdict(verdict, sessionID)
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseLearn)
 
+	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
+	// as a verify stand-in: the legacy OrchestratePath uses real anomaly
+	// detection; the per-WorkItem path uses deterministic verifyArtifact and
+	// shares the same op name so dashboards see a consistent 5-node tree).
+	_, endVerify := hardening.EmitSystemAnomalyDetect(ctx, sessionID, "n/a", "n/a", "0", verdict.SourceID)
+	endVerify(nil)
+
 	var learningClass types.LearningClass
 	if r.Learner != nil {
 		obsLookups := make([]learn.ObservationLookup, 0, len(obsIDs))
 		for _, id := range obsIDs {
 			obsLookups = append(obsLookups, observationRef(id))
 		}
+		_, endLearn := hardening.EmitMemoryPersist(ctx, sessionID, "item", "round", 0, 0)
 		assets, err := r.Learner.Learn(ctx, learn.LearnRequest{
 			SessionID:    sessionID,
 			Verdict:      verdict,
@@ -176,6 +203,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			Artifact:     art,
 			Observations: obsLookups,
 		})
+		endLearn(err)
 		if err != nil {
 			return nil, fmt.Errorf("item_pipeline: learn: %w", err)
 		}

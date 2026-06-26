@@ -214,7 +214,7 @@ func (r *ChannelRouter) Route(ctx context.Context, p *plan.Plan, req ChannelRequ
 	// records both successful routes and the rare Kind-mismatch / nil-plan paths.
 	// Plan.Strength is float64 in [0,1]; surface as 3-decimal string for the Jaeger UI.
 	score := strconv.FormatFloat(p.Strength, 'f', 3, 64)
-	end := hardening.EmitChannelRoute(ctx, p.SessionID, p.Kind.String(), "", score, "false")
+	_, end := hardening.EmitChannelRoute(ctx, p.SessionID, p.Kind.String(), "", score, "false")
 	if !p.Kind.IsKnown() {
 		err := NewChannelUnsupportedError("<router>", p.Kind.String())
 		end(err)
