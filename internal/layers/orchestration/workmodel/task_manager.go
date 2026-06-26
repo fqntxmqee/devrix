@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -32,6 +33,12 @@ type TaskManager struct {
 	// registry tracks run observation handles (DM-011). Optional; nil
 	// disables run tracking (SpawnForWorkItem becomes a no-op).
 	registry *Registry
+
+	// adaptiveThreshold supplies per-user decompose gates (TD-WT-01).
+	adaptiveThreshold *AdaptiveThreshold
+
+	// parentReevalMu deduplicates concurrent parent re-evaluation (TD-WT-06).
+	parentReevalMu sync.Map
 }
 
 // NewTaskManager creates a new in-memory task manager.
@@ -66,6 +73,28 @@ func (m *TaskManager) SetBus(bus notify.Bus) *TaskManager {
 func (m *TaskManager) SetRegistry(reg *Registry) *TaskManager {
 	m.registry = reg
 	return m
+}
+
+// SetAdaptiveThreshold wires self-evolving decompose thresholds (TD-WT-01).
+func (m *TaskManager) SetAdaptiveThreshold(a *AdaptiveThreshold) *TaskManager {
+	if m != nil {
+		m.adaptiveThreshold = a
+	}
+	return m
+}
+
+// AdaptiveThreshold returns the wired threshold state (may be nil).
+func (m *TaskManager) AdaptiveThreshold() *AdaptiveThreshold {
+	if m == nil {
+		return nil
+	}
+	return m.adaptiveThreshold
+}
+
+func (m *TaskManager) parentReevalLock(sessionID, parentID string) *sync.Mutex {
+	key := sessionID + "|" + parentID
+	v, _ := m.parentReevalMu.LoadOrStore(key, &sync.Mutex{})
+	return v.(*sync.Mutex)
 }
 
 // Registry returns the run registry (nil if not wired). Nil-safe: returns

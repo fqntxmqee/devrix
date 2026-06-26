@@ -3,10 +3,22 @@ package workmodel
 import "errors"
 
 // ReevaluateParentAfterChild updates parent uncertainty and status after a child terminals (AC29, AC43).
+// TD-WT-06: serializes concurrent child terminal updates per parent via TaskManager lock.
 func ReevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 	if tm == nil || childID == "" {
 		return
 	}
+	child, ok := tm.GetWorkItem(sessionID, childID)
+	if !ok || child.ParentID == "" {
+		return
+	}
+	mu := tm.parentReevalLock(sessionID, child.ParentID)
+	mu.Lock()
+	defer mu.Unlock()
+	reevaluateParentAfterChild(sessionID, childID, tm)
+}
+
+func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 	child, ok := tm.GetWorkItem(sessionID, childID)
 	if !ok || child.ParentID == "" {
 		return

@@ -77,6 +77,9 @@ type SessionOrchestrator struct {
 	// before falling back to rule-based decomposition.
 	llmDecomposer decisionplanning.LLMTaskDecomposer
 
+	// itemPipeline runs per-WorkItem MUPS when D7_WORKITEM_PIPELINE=1 (Phase C).
+	itemPipeline *ItemPipelineRunner
+
 	// activeSessions tracks the running orchtypes.ProcessRequest per sessionID so
 	// HandleInterrupt can cancel them. Protected by mu.
 	mu             sync.Mutex
@@ -141,6 +144,12 @@ func WithTurnToolExecutor(e *TurnToolExecutor) OrchestratorOption {
 // JSON, or yields invalid task nodes, the rule-based fallback runs.
 func WithLLMDecomposer(d decisionplanning.LLMTaskDecomposer) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.llmDecomposer = d }
+}
+
+// WithItemPipelineRunner wires per-WorkItem MUPS pipeline (Phase C).
+// Active when workmodel.FeatureWorkItemPipelineEnabled() is true.
+func WithItemPipelineRunner(r *ItemPipelineRunner) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.itemPipeline = r }
 }
 
 // WithTaskManager wires the *workmodel.TaskManager that backs /task CLI
@@ -295,6 +304,9 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 // DefaultDeveloperPrior (Beta(5,3)) and ClassifyWithPrior degenerates
 // to a baseline-equivalent path.
 func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.ProcessRequest) (<-chan *contracts.EngineEvent, error) {
+	if req.UserID == "" {
+		req.UserID = effectiveUserID(ctx, req)
+	}
 	ctx, sessionSpan := o.startSpan(ctx, telemetry.OpD7_S2_Orchestration_Session_Process, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "session_id", Value: req.SessionID},
 		tracer.Attribute{Key: "message.len", Value: fmt.Sprintf("%d", len(req.Message))},
@@ -423,7 +435,9 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 			ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 		}
 	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
-		if o.orchestratePath == nil {
+		if workmodel.FeatureWorkItemPipelineEnabled() && o.itemPipeline != nil {
+			ch, err = o.RunSessionTurnLoop(sessionCtx, req, intent)
+		} else if o.orchestratePath == nil {
 			err = fmt.Errorf("orchestrator: intent %q requires OrchestratePath but it is nil (bootstrap missing wiring)", intent.Kind)
 		} else {
 			ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
@@ -525,7 +539,19 @@ func (o *SessionOrchestrator) callAdvisoryValidator(ctx context.Context, intent 
 // ProcessMessageContract satisfies contracts.IOrchestrationEntry. It is the
 // D1 gateway-facing seam (string args instead of orchtypes.ProcessRequest).
 func (o *SessionOrchestrator) ProcessMessageContract(ctx context.Context, sessionID, message string) (<-chan *contracts.EngineEvent, error) {
-	return o.ProcessMessage(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: message})
+	return o.ProcessMessage(ctx, orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   message,
+		UserID:    effectiveUserID(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: message}),
+	})
+}
+
+// TaskManager returns the wired work-item store (nil if not configured).
+func (o *SessionOrchestrator) TaskManager() *workmodel.TaskManager {
+	if o == nil {
+		return nil
+	}
+	return o.taskManager
 }
 
 // Entry is the adapter that exposes SessionOrchestrator as
@@ -543,7 +569,11 @@ func NewEntry(o *SessionOrchestrator) *Entry {
 
 // ProcessMessage implements contracts.IOrchestrationEntry.
 func (e *Entry) ProcessMessage(ctx context.Context, sessionID, message string) (<-chan *contracts.EngineEvent, error) {
-	return e.SessionOrchestrator.ProcessMessage(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: message})
+	return e.SessionOrchestrator.ProcessMessage(ctx, orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   message,
+		UserID:    effectiveUserID(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: message}),
+	})
 }
 
 // Cancel implements contracts.IOrchestrationEntry. It is the gateway's

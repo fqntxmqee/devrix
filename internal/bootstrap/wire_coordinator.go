@@ -69,6 +69,9 @@ func InitOrchestration(
 	tm := workmodel.NewTaskManagerFromConfig(coordCfg.tasksCfg, obsBridge)
 	// Registry created by bootstrap and DI'd to TaskManager.
 	tm.SetRegistry(workmodel.NewRegistry("~/.devrix/runs"))
+	tm.SetAdaptiveThreshold(&workmodel.AdaptiveThreshold{
+		GlobalDefault: workmodel.DefaultUncertaintyDecomposeThreshold,
+	})
 	todoBackend := &workmodel.TodoWriteBackend{Manager: tm}
 	tools.SetTodoSync(todoBackend.Sync)
 
@@ -136,6 +139,14 @@ func InitOrchestration(
 	}
 	executor := newTurnOrchExecutor(turnOrch)
 
+	itemRunner, pipelineLearner, err := WireItemPipeline(ItemPipelineWireDeps{
+		ToolExec: toolExec,
+		Tasks:    tm,
+	})
+	if err != nil {
+		return fmt.Errorf("d7: wire item pipeline: %w", err)
+	}
+
 	orch := sessionorchestrator.NewSessionOrchestrator(
 		coordinatorCfg,
 		executor,
@@ -145,6 +156,8 @@ func InitOrchestration(
 		sessionorchestrator.WithOrchestratePath(orchPath),
 		sessionorchestrator.WithTurnToolExecutor(toolExec),
 		sessionorchestrator.WithTaskManager(tm),
+		sessionorchestrator.WithItemPipelineRunner(itemRunner),
+		sessionorchestrator.WithLearner(pipelineLearner),
 	)
 
 	entry := sessionorchestrator.NewEntry(orch)
