@@ -115,14 +115,10 @@ func detectDuplicateReplay(buffer, chunk string) bool {
 	return false
 }
 
-// dedupRepeatedText is a thin alias for textutil.DedupRepeatedText kept
-// here so the call sites read like "dedup the streaming buffer". The
-// implementation lives in internal/shared/textutil so the same dedup
-// can be applied at D2 fold time (FoldAssistantOutput) without
-// duplicating the O(n^2) LCP scan.
-func dedupRepeatedText(buffer string, minDupRunes, minGapRunes int) string {
-	return textutil.DedupRepeatedText(buffer, minDupRunes, minGapRunes)
-}
+// DM-20260626-009 follow-up: dedupRepeatedText alias removed. The
+// textutil.DedupRepeatedText it forwarded to is deleted (see
+// internal/shared/textutil), and detectDuplicateReplay at streaming time
+// is the sole surviving dedup layer in this adapter.
 
 type toolCallEntry struct {
 	name   string
@@ -196,14 +192,11 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	stream.mu.Lock()
 	if msg.Content != "" {
 		chunk := textutil.StripPriorOutputSummary(msg.Content)
-		// minimax M2.7 streaming replay dedup (DM-20260621-006): same
-		// double-layer dedup as appendResponseText. The LLM occasionally
-		// re-emits a long prefix of its own thinking, which would render
-		// as the same paragraph repeated 2-3 times on the thinking card.
-		// detectDuplicateReplay drops the replay at the source so the
-		// thinkingBuffer never carries it; dedupRepeatedText is the
-		// post-hoc safety net for duplicates that slipped through (e.g.
-		// the chunk didn't match a clean prefix during streaming).
+		// minimax M2.7 streaming replay dedup (DM-20260621-006). The LLM
+		// occasionally re-emits a long prefix of its own thinking, which
+		// would render as the same paragraph repeated 2-3 times on the
+		// thinking card. detectDuplicateReplay drops the replay at the
+		// source so the thinkingBuffer never carries it.
 		if detectDuplicateReplay(stream.thinkingBuffer.String(), chunk) {
 			existing := stream.thinkingBuffer.String()
 			stream.mu.Unlock()
@@ -221,15 +214,21 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	return a.patchThinkingCard(ctx, stream, msg.SessionID, msg.ChatID)
 }
 
-// patchThinkingCard renders the current thinkingBuffer (after dedup) and
-// sends/patches the thinking card. Used by sendStructuredThinkingCard on
-// every event (with the dedup logic upstream) so a single render path owns
-// the create-or-patch branching.
+// patchThinkingCard renders the current thinkingBuffer (after the
+// streaming-time StripToolCallXML only) and sends/patches the thinking
+// card. Used by sendStructuredThinkingCard on every event (with the
+// dedup logic upstream) so a single render path owns the create-or-patch
+// branching.
+//
+// DM-20260626-009 follow-up: post-hoc dedup via textutil.DedupRepeatedText
+// was removed. The LCP-based dedup false-positives on natural Chinese
+// repetition (e.g. "先看一下代码。先看一下代码的结构。" lost its second
+// occurrence), and detectDuplicateReplay at the streaming-time layer
+// already drops the genuine M2.7 replay pattern at the source. Render
+// the buffer verbatim so legitimate text is never silently truncated.
 func (a *FeishuAdapter) patchThinkingCard(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
 	stream.mu.Lock()
 	text := textutil.StripToolCallXML(stream.thinkingBuffer.String())
-	text = textutil.DedupRepeatedTextIterative(text, 8, 2, 6)
-	text = textutil.DedupAdjacentRepeats(text, 3, 7)
 	text = strings.TrimSpace(text)
 	thinkingMsgID := stream.thinkingMsgID
 	stream.mu.Unlock()
@@ -490,14 +489,11 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	}
 	stream.mu.Lock()
 	cardkitActive := stream.cardkitEnabled && stream.replyCardID != ""
-	// Post-hoc dedup: same reasoning as in finalizeReplyCardStreaming
-	// — the LLM sometimes re-emits text it just streamed, and the
-	// non-cardkit finalize path constructs the footer from the same
-	// textBuffer. Without this, the user sees the report twice on
-	// the final card.
+	// DM-20260626-009 follow-up: post-hoc dedup removed. detectDuplicateReplay
+	// at streaming time already drops the M2.7 replay pattern at the source.
+	// Stripping tool-call XML still runs so the card body never carries
+	// raw <function_calls> blocks (that's an LLM protocol leak, not dedup).
 	responseText = textutil.StripToolCallXML(responseText)
-	responseText = textutil.DedupRepeatedTextIterative(responseText, 8, 2, 6)
-	responseText = textutil.DedupAdjacentRepeats(responseText, 3, 7)
 	stream.mu.Unlock()
 	if cardkitActive {
 		// Pass trimmedSummary so finalizeReplyCardStreaming can strip it
@@ -577,21 +573,13 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	}
 
 	content := stream.textBuffer.String()
-	// Post-hoc dedup: catch any duplicate that slipped past
-	// detectDuplicateReplay during streaming (e.g. the LLM re-emitted
-	// a suffix rather than a prefix, or the overlap didn't clear the
-	// 30-rune minimum). The reply card must show the report only once.
-	//
-	// 2026-06-26 hotfix: iterate. Single-pass dedup only removes one
-	// longest-LCP pair, but minimax M2.7 emits the same short opening
-	// 3-5 times; iterating collapses the leftovers.
+	// DM-20260626-009 follow-up: post-hoc dedup removed. detectDuplicateReplay
+	// at streaming time already drops the M2.7 replay pattern at the source;
+	// the LCP-based dedup that lived here was both fragile (false-positives
+	// on natural Chinese repetition) and redundant with the streaming-time
+	// layer. Stripping tool-call XML + prior-output-summary markers still
+	// runs — those are LLM protocol leaks, not dedup candidates.
 	content = textutil.StripToolCallXML(content)
-	content = textutil.DedupRepeatedTextIterative(content, 8, 2, 6)
-	content = textutil.DedupAdjacentRepeats(content, 3, 7)
-	// Strip D2 context-budget fold markers so the LLM's echo of its own
-	// prior <prior-output-summary> blocks (which it sometimes regurgitates
-	// in long replies, e.g. a deep-review tool loop) does not leak into
-	// the final reply card.
 	content = textutil.StripPriorOutputSummary(content)
 	// DM-20260621-008: the LLM emits the D7 final summary as ordinary
 	// text events, so textBuffer already ends with the same paragraph
@@ -713,47 +701,18 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 		)
 		return nil
 	}
-	// DM-20260625-007: chunk-self dedup. detectDuplicateReplay only
-	// catches "cross-chunk prefix replay" (chunk's prefix is already in
-	// the buffer). When the LLM emits a single chunk that itself
-	// contains the same 60+ rune paragraph twice — e.g. minimax M2.7
-	// streaming artifacts where the model concatenates "A B A B" into
-	// one event — the prefix is new, so detectDuplicateReplay stays
-	// silent and the verbatim duplicate lands in textBuffer. Run
-	// dedupRepeatedText on the chunk before writing so the live
-	// cardkit stream never carries the duplicate.
-	chunk = textutil.DedupRepeatedTextIterative(chunk, 8, 2, 6)
-	chunk = textutil.DedupAdjacentRepeats(chunk, 3, 7)
+	// DM-20260625-007 → DM-20260626-009 follow-up: chunk-self dedup and
+	// buffer-self dedup were removed. detectDuplicateReplay at this same
+	// site already drops the genuine M2.7 cross-chunk prefix replay at
+	// the source, and the LCP-based dedup that lived here was false-
+	// positive prone on natural Chinese repetition. The chunk now flows
+	// into textBuffer verbatim so the user sees legitimate text intact.
 	if strings.TrimSpace(chunk) == "" {
 		stream.mu.Unlock()
 		return nil
 	}
 	stream.textBuffer.WriteString(chunk)
-	// DM-20260625-007: buffer-self dedup. The LLM also "loops back" and
-	// rewrites the same opening across many small consecutive chunks
-	// (sess_1782381569430_3000 19:22:07-19:22:18 pattern: 5-7 chunks
-	// each carrying a different slice of the same opening). Each
-	// individual chunk's prefix is technically new so detectDuplicateReplay
-	// is silent, but the running buffer accumulates 2-3 copies of the
-	// same opening. Collapse them on every write so the live reply
-	// card never shows a verbatim duplicate. The finalize step already
-	// runs dedupRepeatedText as a safety net; this layer just moves the
-	// dedup from "after the user saw it" to "while the LLM is still
-	// talking".
-	//
-	// 2026-06-26 hotfix: use the iterative variant. The single-pass
-	// dedup only removes ONE longest-LCP pair, but minimax M2.7 has
-	// started emitting the same short opening 3-5 times in a row
-	// ("我来帮你review" × 4-5), which leaves 3-4 leftover copies after
-	// the first pass. Iterating collapses them all so the user no
-	// longer sees the same sentence repeated 3+ times on the live card.
-	content := textutil.StripToolCallXML(stream.textBuffer.String())
-	content = textutil.DedupRepeatedTextIterative(content, 8, 2, 6)
-	content = textutil.DedupAdjacentRepeats(content, 3, 7)
-	if content != stream.textBuffer.String() {
-		stream.textBuffer.Reset()
-		stream.textBuffer.WriteString(content)
-	}
+	content := stream.textBuffer.String()
 	stream.mu.Unlock()
 
 	if !a.streamingEnabled {

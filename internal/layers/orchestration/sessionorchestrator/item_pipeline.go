@@ -107,13 +107,21 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		roundNo = item.LastRound.RoundNo + 1
 	}
 
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseObserve)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseObserve))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseObserve)
+		end(nil)
+	}
 
 	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks)
 	if err != nil {
 		return nil, err
 	}
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhasePlan)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhasePlan))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhasePlan)
+		end(nil)
+	}
 
 	qKind := "intent_orchestrate"
 	if report.QuantizedIntent != nil {
@@ -151,7 +159,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if err != nil {
 		return nil, fmt.Errorf("item_pipeline: plan: %w", err)
 	}
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseExecute)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseExecute))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseExecute)
+		end(nil)
+	}
 
 	// DM-20260626-009: bypass CommitChannel/ItemToolRunner/work_item_execute;
 	// call WorkItemExecutor directly with the WorkItem's directive. Also
@@ -173,14 +185,22 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseVerify)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseVerify))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseVerify)
+		end(nil)
+	}
 
 	verdict := verifyArtifact(art)
 	if r.Verify != nil {
 		verdict = r.Verify(art)
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseLearn)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseLearn))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseLearn)
+		end(nil)
+	}
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
 	// as a verify stand-in: the legacy OrchestratePath uses real anomaly
@@ -220,7 +240,13 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	stats := workmodel.ChildOutcomeStats{}
 	if r.Tasks != nil {
-		for _, c := range r.Tasks.Tree().ListChildren(sessionID, item.ID) {
+		var children []*workmodel.WorkItem
+		{
+			end := hardening.EmitWorktreeOp(ctx, sessionID, "list_children", item.ID, "")
+			children = r.Tasks.Tree().ListChildren(sessionID, item.ID)
+			end(nil)
+		}
+		for _, c := range children {
 			if c == nil || c.Kind == workmodel.WorkKindChecklist {
 				continue
 			}
@@ -281,7 +307,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if round.VerdictKind == types.VerdictIndeterminate {
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}
-	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseDecide)
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseDecide))
+		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseDecide)
+		end(nil)
+	}
 
 	phase := workmodel.RoundPhaseIdle
 	switch round.SpawnPolicy {
@@ -292,21 +322,32 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	default:
 		phase = workmodel.RoundPhaseIdle
 	}
-	if err := r.Tasks.Tree().ApplyPipelineRound(sessionID, item.ID, round, phase); err != nil {
-		return nil, err
+	{
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "apply_pipeline_round", item.ID, string(phase))
+		if err := r.Tasks.Tree().ApplyPipelineRound(sessionID, item.ID, round, phase); err != nil {
+			end(err)
+			return nil, err
+		}
+		end(nil)
 	}
 
 	if round.SpawnPolicy == workmodel.SpawnNone {
 		status := workmodel.StatusAfterSpawnNone(verdict.Kind)
 		got, _ := r.Tasks.GetWorkItem(sessionID, item.ID)
 		if got != nil && got.Status == workmodel.TaskStatusPending {
+			end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))
 			_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusInProgress)
+			end(nil)
 		}
 		if status != workmodel.TaskStatusInProgress {
+			end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(status))
 			_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, status)
+			end(nil)
 		}
 	} else if item.Status == workmodel.TaskStatusPending {
+		end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))
 		_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusInProgress)
+		end(nil)
 	}
 
 	item.LastRound = round

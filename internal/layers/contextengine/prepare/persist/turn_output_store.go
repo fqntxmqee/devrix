@@ -20,8 +20,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	"github.com/devrix/devrix/internal/shared/textutil"
 )
 
 // DefaultAssistantHead is the number of leading runes preserved when an
@@ -37,18 +35,12 @@ const DefaultAssistantTail = 200
 // well under the per-message allocation typical LLM providers reserve.
 const DefaultMaxAssistantChars = 8000
 
-// DefaultFoldDedupMinDup is the minimum duplicate length (runes) that
-// DedupRepeatedText looks for inside each fold segment. Tuned to 20
-// to match the D1 streaming-time dedup threshold — short enough to
-// catch the minimax M2.7 21-rune tail-rewrite loop (e.g. "测试覆盖、
-// 规范一致性），适合并行分解执行。" repeated verbatim in the
-// buffer), large enough to avoid false positives on common phrases.
-const DefaultFoldDedupMinDup = 20
-
-// DefaultFoldDedupMinGap is the minimum non-overlapping gap (runes)
-// between the two duplicate positions required for a match. A 2-rune
-// gap matches the streaming-time dedup so both layers stay consistent.
-const DefaultFoldDedupMinGap = 2
+// DefaultFoldDedupMinDup / DefaultFoldDedupMinGap: DM-20260626-009
+// follow-up, fold dedup removed. The LCP-based dedup that consumed these
+// thresholds was false-positive prone on natural Chinese repetition and
+// is no longer applied to fold head/tail. The constants are retained as
+// zero-value no-ops so any future code that imports them still compiles;
+// remove in a follow-up cleanup pass once grep confirms no callers.
 
 // TurnOutputRecord is a persisted oversized assistant output.
 type TurnOutputRecord struct {
@@ -134,16 +126,13 @@ func FoldAssistantOutput(
 
 	head := truncateHead(content, headChars)
 	tail := truncateTail(content, tailChars)
-	// DM-20260625-008: dedup LLM streaming-loop pollution out of the
-	// fold summary before it lands in the next-turn prompt. When the
-	// provider emits the same long phrase twice in a single reply
-	// (minimax M2.7 streaming artifact), without this pass the second
-	// copy gets carried verbatim into <prior-output-summary> content
-	// and biases the next LLM call toward replaying the same loop. Run
-	// dedup on head and tail separately so the fold boundary does not
-	// create a spurious cross-segment match.
-	head = textutil.DedupRepeatedText(head, DefaultFoldDedupMinDup, DefaultFoldDedupMinGap)
-	tail = textutil.DedupRepeatedText(tail, DefaultFoldDedupMinDup, DefaultFoldDedupMinGap)
+	// DM-20260626-009 follow-up: dedup removed from fold. The LCP-based
+	// dedup was false-positive prone on natural Chinese repetition; the
+	// streaming-time detectDuplicateReplay in feishu_progress.go already
+	// drops the genuine M2.7 replay pattern before it lands in the
+	// fold source. If the provider replays during the LLM call we accept
+	// the duplicate in <prior-output-summary> as honest signal rather
+	// than silently truncating legitimate text.
 	mid := utf8.RuneCountInString(content) - headChars - tailChars
 	if mid < 0 {
 		mid = 0

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -144,67 +145,116 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1
 
-		content, toolCalls, finishReason, err := e.streamLLM(ctx, sessionID, systemPrompt, tools, messages)
-		if err != nil {
-			result.StopReason = "llm_error"
-			return result, fmt.Errorf("workitem executor: llm invoke (iter %d): %w", iter+1, err)
-		}
-		result.Content += content
+		stopReason, iterErr, newMessages := e.stepOneIter(ctx, sessionID, systemPrompt, tools, messages, itemID, iter+1, result)
+		// Span per iter (DM-20260626-009 follow-up): a ReAct iter can stall
+		// for many seconds (LLM + tool round); without this span "why did
+		// this WorkItem take 16s?" required reading code instead of
+		// inspecting Jaeger. finishReason comes from the LLM (stop / tool_calls
+		// / length / ...) so the trace shows where each iter ended.
+		// stopReason is the executor's own label (final_answer / tool_error /
+		// ...), surfaced as the iter's exit state.
+		endSpan := hardening.EmitSubTurnIteration(ctx, sessionID, itemID, iter+1, "", stopReason)
+		endSpan(iterErr)
 
-		// No tool calls → final answer.
-		if len(toolCalls) == 0 {
-			if finishReason != "" && finishReason != "stop" {
-				result.StopReason = "llm_finish_" + finishReason
-				return result, fmt.Errorf("workitem executor: llm finish_reason=%s", finishReason)
-			}
-			result.Done = true
-			result.StopReason = "final_answer"
+		switch {
+		case iterErr != nil:
+			return result, iterErr
+		case stopReason == "final_answer" || stopReason == "tool_no_executor" || stopReason == "tool_no_results":
 			return result, nil
 		}
-
-		result.ToolCalls += len(toolCalls)
-
-		// LLM wants tools. Append the assistant message (so the model sees
-		// its own tool_call history on the next iteration) and execute.
-		messages = append(messages, buildWorkItemAssistantToolCallMsg(sessionID, toolCalls, content))
-
-		if e.Tools == nil {
-			// No tool executor wired — degrade gracefully with what we have
-			// so the user isn't left with an empty reply.
-			result.StopReason = "tool_no_executor"
-			return result, nil
-		}
-
-		round, err := e.Tools.ExecuteRound(ctx, ToolRoundRequest{
-			SessionID: sessionID,
-			ToolCalls: toolCalls,
-		})
-		if err != nil {
-			result.StopReason = "tool_error"
-			return result, fmt.Errorf("workitem executor: tool round (iter %d): %w", iter+1, err)
-		}
-		if len(round.Results) == 0 {
-			// Executor returned no results — break with what we have rather
-			// than spin forever on a silent failure.
-			result.StopReason = "tool_no_results"
-			return result, nil
-		}
-
-		// Append tool result messages, paired 1:1 by index with the requested
-		// tool_calls. If the executor returns fewer results than requested
-		// (truncated batch), only append the available pairings.
-		for i := range toolCalls {
-			if i >= len(round.Results) {
-				break
-			}
-			messages = append(messages, buildWorkItemToolResultMsg(sessionID, round.Results[i]))
+		if len(newMessages) > 0 {
+			messages = append(messages, newMessages...)
 		}
 	}
 
 	// Cap reached without a tool-call-free final answer. Return the
 	// accumulated text so the user sees something rather than nothing.
 	result.StopReason = "max_iters"
+	// Emit one last span so the trace shows the cap-hit itself (otherwise
+	// the trace stops at the last successful iter and the cap event is
+	// invisible in Jaeger).
+	hardening.EmitSubTurnIteration(ctx, sessionID, itemID, max+1, "", "max_iters")(nil)
 	return result, nil
+}
+
+// stepOneIter runs one ReAct iteration: stream LLM → optionally execute
+// tool round → return outcome. The three return values are:
+//   - stopReason: labels the iter's terminal state ("llm_error" /
+//     "final_answer" / "llm_finish_<X>" / "tool_no_executor" / "tool_error" /
+//     "tool_no_results" / "ok").
+//   - iterErr: non-nil iff the iter produced a hard error (caller returns).
+//   - newMessages: assistant + tool result messages to feed the next iter;
+//     empty when the iter terminated.
+//
+// stepOneIter is split out from ExecuteWorkItem so the per-iter span can
+// wrap a single function call rather than bookend 6 inline return paths.
+func (e *DefaultWorkItemExecutor) stepOneIter(
+	ctx context.Context,
+	sessionID, systemPrompt string,
+	tools []ToolSchema,
+	messages []types.Message,
+	itemID string,
+	iter int,
+	result *WorkItemResult,
+) (string, error, []types.Message) {
+	content, toolCalls, finishReason, err := e.streamLLM(ctx, sessionID, systemPrompt, tools, messages)
+	if err != nil {
+		result.StopReason = "llm_error"
+		return "llm_error", fmt.Errorf("workitem executor: llm invoke (iter %d): %w", iter, err), nil
+	}
+	result.Content += content
+
+	// No tool calls → final answer.
+	if len(toolCalls) == 0 {
+		if finishReason != "" && finishReason != "stop" {
+			result.StopReason = "llm_finish_" + finishReason
+			return "llm_finish_" + finishReason, fmt.Errorf("workitem executor: llm finish_reason=%s", finishReason), nil
+		}
+		result.Done = true
+		result.StopReason = "final_answer"
+		return "final_answer", nil, nil
+	}
+
+	result.ToolCalls += len(toolCalls)
+
+	// LLM wants tools. Append the assistant message (so the model sees
+	// its own tool_call history on the next iteration) and execute.
+	newMessages := []types.Message{
+		buildWorkItemAssistantToolCallMsg(sessionID, toolCalls, content),
+	}
+
+	if e.Tools == nil {
+		// No tool executor wired — degrade gracefully with what we have
+		// so the user isn't left with an empty reply.
+		result.StopReason = "tool_no_executor"
+		return "tool_no_executor", nil, nil
+	}
+
+	round, err := e.Tools.ExecuteRound(ctx, ToolRoundRequest{
+		SessionID: sessionID,
+		ToolCalls: toolCalls,
+	})
+	if err != nil {
+		result.StopReason = "tool_error"
+		return "tool_error", fmt.Errorf("workitem executor: tool round (iter %d): %w", iter, err), nil
+	}
+	if len(round.Results) == 0 {
+		// Executor returned no results — break with what we have rather
+		// than spin forever on a silent failure.
+		result.StopReason = "tool_no_results"
+		return "tool_no_results", nil, nil
+	}
+
+	// Append tool result messages, paired 1:1 by index with the requested
+	// tool_calls. If the executor returns fewer results than requested
+	// (truncated batch), only append the available pairings.
+	for i := range toolCalls {
+		if i >= len(round.Results) {
+			break
+		}
+		newMessages = append(newMessages, buildWorkItemToolResultMsg(sessionID, round.Results[i]))
+	}
+	return "ok", nil, newMessages
 }
 
 // streamLLM runs one LLMInvokeStream call and assembles content + tool_calls
