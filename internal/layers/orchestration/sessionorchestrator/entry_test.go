@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -17,9 +18,16 @@ import (
 // T: d7.Entry adapter must satisfy the gateway contract.
 //
 // T: D7-D1-T01 — Entry.ProcessMessage routes through the orchestrator.
+// v6.1.0: routes through OrchestratePath (5-node pipeline); exec.RunTurn
+// is no longer called directly. Use the fake scheduler helper to inject
+// deterministic artifacts → text event.
 func TestEntry_ProcessMessage(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch, _ := newOrchestratorWithFakeOrchestratePath(
+		orchtypes.DefaultConfig(),
+		exec,
+		[]wavescheduler.Artifact{{Summary: "hello"}},
+	)
 	entry := NewEntry(orch)
 	ch, err := entry.ProcessMessage(context.Background(), "sess-entry", "hello")
 	if err != nil {
@@ -32,14 +40,11 @@ func TestEntry_ProcessMessage(t *testing.T) {
 	if len(events) < 2 {
 		t.Fatalf("want ≥ 2 events, got %d", len(events))
 	}
-	if events[0].Type != "text" {
-		t.Fatalf("first event should be text, got %q", events[0].Type)
+	if events[0].Type != "plan_formed" {
+		t.Fatalf("first event should be plan_formed, got %q", events[0].Type)
 	}
-	if exec.calls != 1 {
-		t.Fatalf("want 1 D2 call, got %d", exec.calls)
-	}
-	if exec.executedMsgs[0] != "hello" {
-		t.Fatalf("message not forwarded: %q", exec.executedMsgs[0])
+	if events[len(events)-1].Type != "complete" {
+		t.Fatalf("last event should be complete, got %q", events[len(events)-1].Type)
 	}
 }
 
@@ -86,18 +91,25 @@ func TestSessionOrchestrator_ProcessMessageContract(t *testing.T) {
 	exec := &fakeD2{}
 	cfg := orchtypes.DefaultConfig()
 	cfg.FastPathThreshold = 0 // allow all fast-path classifications through
-	orch := NewSessionOrchestrator(cfg, exec)
+	// v6.1.0: ProcessMessageContract routes through OrchestratePath; exec.RunTurn
+	// is no longer called directly. Verify the wave scheduler was started
+	// (the orchestrator's wiring did dispatch the message).
+	orch, sched := newOrchestratorWithFakeOrchestratePath(
+		cfg,
+		exec,
+		[]wavescheduler.Artifact{{Summary: "ping"}},
+	)
 	ch, err := orch.ProcessMessageContract(context.Background(), "sess-pmc", "ping")
 	if err != nil {
 		t.Fatalf("ProcessMessageContract err: %v", err)
 	}
 	for range ch {
 	}
-	if exec.calls != 1 {
-		t.Fatalf("want 1 D2 call, got %d", exec.calls)
+	if sched.starts != 1 {
+		t.Fatalf("want 1 wave start, got %d", sched.starts)
 	}
-	if exec.executedMsgs[0] != "ping" {
-		t.Fatalf("message not forwarded: %q", exec.executedMsgs[0])
+	if exec.calls != 0 {
+		t.Fatalf("exec.RunTurn should not be called in v6.1.0, got %d", exec.calls)
 	}
 }
 
@@ -123,10 +135,18 @@ func TestSessionOrchestrator_AdvisoryValidator_Pass(t *testing.T) {
 
 // T: D6 validator pass=false still lets the request through (advisory).
 // Per R1 Q11, validation is advisory; failure is logged but does not block.
+// v6.1.0: exec.RunTurn is no longer called directly; verify the wave
+// scheduler started instead.
 func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
 	exec := &fakeD2{}
 	v := &fakeAdvisoryValidator{pass: false, reason: "risky"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithValidator(v))
+	cfg := orchtypes.DefaultConfig()
+	orch, sched := newOrchestratorWithFakeOrchestratePath(
+		cfg,
+		exec,
+		[]wavescheduler.Artifact{{Summary: "hi"}},
+		WithValidator(v),
+	)
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-vfail",
 		Message:   "hi",
@@ -136,8 +156,11 @@ func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
 	}
 	for range ch {
 	}
-	if exec.calls != 1 {
-		t.Fatalf("advisory fail must not block D2, got calls=%d", exec.calls)
+	if v.calls != 1 {
+		t.Fatalf("validator should be called once, got %d", v.calls)
+	}
+	if sched.starts != 1 {
+		t.Fatalf("advisory fail must not block wave start, got starts=%d", sched.starts)
 	}
 }
 

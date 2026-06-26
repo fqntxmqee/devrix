@@ -11,6 +11,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
 // newTestMeter builds a fresh MeterProvider + Meter with no labels.
@@ -171,10 +172,15 @@ func TestValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
 }
 
 // T: D7-D6-T06 — nil validator 不调用 metrics。
+// v6.1.0: routing collapsed to OrchestratePath; exec.RunTurn is no longer
+// called directly. Verify wave scheduler started instead.
 func TestOrchestrator_NoValidator_NoMetrics(t *testing.T) {
 	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
-	// Both validator and metrics are nil — should not panic.
+	orch, sched := newOrchestratorWithFakeOrchestratePath(
+		orchtypes.DefaultConfig(),
+		exec,
+		[]wavescheduler.Artifact{{Summary: "hi"}},
+	)
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-nil",
 		Message:   "hi",
@@ -184,8 +190,8 @@ func TestOrchestrator_NoValidator_NoMetrics(t *testing.T) {
 	}
 	for range ch {
 	}
-	if exec.calls != 1 {
-		t.Fatalf("D2 should still run, got calls=%d", exec.calls)
+	if sched.starts != 1 {
+		t.Fatalf("wave scheduler should run, got starts=%d", sched.starts)
 	}
 }
 
