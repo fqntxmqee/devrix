@@ -131,6 +131,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			ID:             "step_" + item.ID,
 			Directive:      itemDirective(item),
 			ToolName:       "work_item_execute",
+			ToolArgs:       map[string]any{"directive": itemDirective(item)},
 			IdempotencyKey: "idem_" + item.ID,
 			EstimatedTokens: 100,
 		}},
