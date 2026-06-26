@@ -2,8 +2,8 @@
 
 **Capability:** d7-orchestration
 **Status:** Active
-**Version:** 2.0.0
-**Last Updated:** 2026-06-26
+**Version:** 2.1.0
+**Last Updated:** 2026-06-26 (inner-spans + dedup-remove, PR #254)
 **Parent:** `d7-domain.md` · `span-registry.md` · `t-registry.md`
 **Complements:** `terminal-state-guide.md` · `../d5-observability/span-registry.md`
 
@@ -54,6 +54,9 @@
 | `D7_Orchestration_System_Anomaly_Detect` ⭐新 P0 | **S4** | （v6.0.0 新增，system.anomaly_detect）|
 | `D7_Orchestration_TaskGraph_Synthesize` ⭐新 P1 | **S5** | （v6.0.0 新增，taskgraph.synthesize）|
 | `D7_Orchestration_Executor_Select` ⭐新 P1 | **S3** | （v6.0.0 新增，executor.select）|
+| `D7_S1_Worktree_Op` ⭐DM-20260626-009 P1 | **S1** | **D7-S1-A52-T11** happy + **T12** nil-bridge fail-safe；ItemPipelineRunner 11 callsite |
+| `D7_S1_SubWorktree_Run` ⭐DM-20260626-009 P2 | **S1** | **D7-S1-A53-T13** happy + **T14** nil-bridge fail-safe；session_turn_loop.RunParallelExplore 1 callsite |
+| `D7_S5_SubTurn_Iteration` ⭐DM-20260626-009 P1 | **S5** | **D7-S5-A54-T15** happy + **T16** nil-bridge fail-safe；WorkItemExecutor ReAct loop per-iter + cap-hit（iter=max+1）|
 
 > **v6.0.0 6 S 精简说明：** 14 S → 6 S 后 span operation 按新 S 重归类。Observe/Plan 归 **S5**（Information Producer + Quantizer），Execute/Learn/AutoClose 归 **S6**（Pipeline Coordinator + Memory Curator），Verify 归 **S4**（Certifier），AutoClose/Resume/EscapeEngine 入口 归 **S2**（Mediator + Error Recovery）。Span operation 名保持稳定（Jaeger 查询不破坏），仅 S 编号变化。5 个新 P0/P1 span（v6.0.0 新增）按 S 归类：channel.route / memory.persist → S6；system.anomaly_detect → S4；taskgraph.synthesize → S5；executor.select → S3。
 
@@ -144,6 +147,35 @@ D7_Orchestration_Session_Process
     └── D7_Orchestration_Resume_Session  {resume.decision=fall_through/force_exited/aborted}
 ```
 
+### 2.6 WorkItem Inner Layer Trace 树（DM-20260626-009 follow-up，2026-06-26）
+
+5-node MUPS 根 span 之外，工作树每次 mutation + WorkItemExecutor ReAct 每次 iteration 在 trace 显形。否则"16s session 慢在哪一步 / 哪一步把 round_phase 改到 X"必须读代码。
+
+```text
+D7_Orchestration_Session_Process  {route=orchestrate}
+└── D7_Orchestration_Execute_Artifact  (MUPS Execute, S6)
+    └── (imSink → ItemPipelineRunner span)
+        ├── D7_S1_Worktree_Op[set_round_phase]   (S1, op="set_round_phase", phase_or_status=observe/plan/execute/verify/learn/decide) ×5
+        ├── D7_S1_Worktree_Op[apply_pipeline_round]  (S1, op="apply_pipeline_round") ×1
+        ├── D7_S1_Worktree_Op[update_status]   (S1, op="update_status") ×3-5
+        ├── D7_S1_Worktree_Op[list_children]   (S1, op="list_children") ×0-1
+        └── (WorkItemExecutor 进入 ReAct 循环)
+            └── D7_S5_SubTurn_Iteration[iter=1..N]  (S5, finish_reason=stop/tool_calls/length, stop_reason=ok/final_answer/llm_error/...) ×N per ReAct loop, N≤MaxIters
+                └── D7_S5_SubTurn_Iteration[iter=max+1, finish_reason=tool_calls, stop_reason=max_iters]  cap-hit 多发 1 span
+
+# session_turn_loop.RunParallelExplore (S2 LoopDepthTracker v2)
+D7_Orchestration_Session_Process
+└── D7_S1_SubWorktree_Run[parent_id, child_id, spawned_by=parallel_explore]  (S1) ×N per parallel_explore batch
+    └── D7_Orchestration_Session_Process (child session)
+```
+
+**finish_reason vs stop_reason 正交说明：**
+
+- `subturn.finish_reason` (LLM 真实) — `stop` / `tool_calls` / `length` / `content_filter` / `function_call` / ...
+- `subturn.stop_reason` (executor 自定义) — `final_answer` / `tool_error` / `tool_no_executor` / `tool_no_results` / `llm_error` / `max_iters` / `ok` / `llm_finish_<X>`
+
+LLM 报告 `finish_reason=tool_calls` 时 executor 通常走 `stop_reason=ok`（继续 loop）或 `stop_reason=tool_no_executor`（首次循环 degrade）。cap-hit `stop_reason=max_iters` 隐含最近一次 finish_reason=`tool_calls`（否则不会循环到 cap），trace 上显式写成 `iter=max+1, finish_reason=tool_calls, stop_reason=max_iters`。
+
 完整跨域树（含 D1 展示侧）见 `span-registry.md` §Trace Tree · `../d5-observability/span-registry.md`。
 
 ---
@@ -189,15 +221,15 @@ D4 Agent / D2 SubQuery / D7 Wave
 
 ## 5. T 层验收矩阵（按 S 摘要）
 
-全表 180 条见 `t-registry.md`（180/180 IMPLEMENTED，2026-06-25 v4.9.0 闭环）。
+全表 180 条见 `t-registry.md`（180/180 IMPLEMENTED，2026-06-25 v4.9.0 闭环）。**DM-20260626-009 follow-up 新增 6 T → 186 条**（PR #253+#254 落地；t-registry v4.7.0）：S1 +4 (A52 T11/T12 + A53 T13/T14) / S5 +2 (A54 T15/T16)。
 
 | S（v6.0.0 6 S） | T 数 | P0 数 | 覆盖重点 |
 |---|------|-------|----------|
-| **S1 WorkModel**（原 S1） | 8 | 3 | WorkItem 持久化、DAG、PlanMode、状态机（v4.3 Task flat-view 全删）|
+| **S1 WorkModel**（原 S1） | 10 | 5 | WorkItem 持久化、DAG、PlanMode、状态机（v4.3 Task flat-view 全删）+ 内层 worktree.op + subworktree.run 4 T（DM-20260626-009）|
 | **S2 SessionOrchestrator**（原 S2 + S12 入口 + S13 入口 + S14 入口） | 18 | 14 | ProcessMessage、FastPath SLA、Interrupt、Turn Leader、Dispatch、AutoClose、Resume、Escape |
 | **S3 WaveScheduler**（原 S3） | 11 | 8 | DAG 并发、Conflict、Context policy、Cancel |
 | **S4 ExecutionFlow + Verify**（原 S4 + S10） | 9 | 7 | Hub 双通道、SpokeBridge、IM progress + Verify 4 态 Verdict + 14 ExitReason |
-| **S5 DecisionPlanning + Observe**（原 S5 + S8） | 14 | 10 | Classify、Synthesize、SelectExecutor、command-first + Observe 4 类 + UncertaintyReport |
+| **S5 DecisionPlanning + Observe**（原 S5 + S8） | 16 | 12 | Classify、Synthesize、SelectExecutor、command-first + Observe 4 类 + UncertaintyReport + 内层 subturn.iteration 2 T（DM-20260626-009）|
 | **S6 MUPS Pipeline**（原 S7 + S9 + S11 + S12 E2E + S13 兜底） | 15 | 15 | Execute/Learn + AutoClose + ObserveLearner 闭环 + Pipeline Coordinator |
 | **Cross-cutting Hardening**（原 S6 拆 2 A） | 2 | 2 | DM-20260622-001 5 fix + CircuitBreaker Monitor（横切硬化）|
 | 契约/迁移 | 6 | 2 | D1 入口、D2 瘦身、D6 advisory |
@@ -260,6 +292,9 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | Flow 到 D1 | D7 Flow_Event_Publish → D1_Signal_* | worker_id 一致 |
 | Interrupt | `/stop` 后 Wave span 终止 | stopped EngineEvent |
 | **MUPS 5 节点** | Session_Process 下 5 个子 span 齐全（Observe_Quantize + Plan_Generate + Execute_Artifact + Verify_Verdict + Learn_Asset）| 缺一个需 P1 告警 |
+| **WorkItem 内层 span** | Execute_Artifact 子树中 Worktree_Op ≥ 1 + (SubTurn_Iteration ≥ 1 或 cap-hit iter=max+1) | 缺内层 span 时 P2 告警（内层未 wired）|
+| **Worktree Op 完整** | Worktree_Op 序列含 set_round_phase(×5) + apply_pipeline_round + update_status + list_children | 缺任意 op 时 P2 告警（trace 路径不完整）|
+| **Sub-Turn finish_reason** | SubTurn_Iteration.finish_reason ∈ {stop, tool_calls, length, content_filter, function_call} | 非空字符串值；空时 P2 告警（LLM 未上报 finish_reason）|
 | **Prior 闭环** | Observe_Request_WithPrior 的 prior.beta_alpha = 上轮 Learn_Asset 的 reputation.beta_alpha | 闭环一致 |
 | **Auto-Close** | Verify_AutoClose.auto_close.rule ∈ {R1, R2, R3, R4} | 4 规则对应 4 场景 |
 | **EscapeEngine** | circuit_level ∈ {L0..L5} | L4/L5 触发 P1 告警 |
@@ -288,6 +323,9 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | S1 Task span | 无显式 OTel op | D5 补 `D7_WorkModel_*` |
 | Orchestrate LLM Decompose | llm.purpose=decompose 无独立 span 文档 | span-registry 补登记 |
 | BackgroundRun | QueryWorkPlan 可见，trace 未标准化 | S1-T07 扩展 integration trace |
+| ~~Worktree Op 内层 span 缺失~~ | ~~ItemPipelineRunner 11 callsite 无显形，调试 worktree mutation 必须读代码~~ | ✅ **DM-20260626-009 P1 已补 D7_S1_Worktree_Op + D7_S1_SubWorktree_Run**（PR #253+#254） |
+| ~~WorkItemExecutor ReAct iter span 缺失~~ | ~~16s session 慢在哪次 iter 无法定位~~ | ✅ **DM-20260626-009 P1 已补 D7_S5_SubTurn_Iteration + cap-hit 多发 1 span**（PR #253+#254，follow-up PR #255 thread LLM finishReason） |
+| **worktree.op 全 op 覆盖** | 当前仅 set_round_phase / apply_pipeline_round / update_status / list_children 4 类；新增 mutator 需补 op 标签 | v2.1.0 后 guard: grep "r.Tasks.Tree().*()" callsite 必须配套 EmitWorktreeOp |
 
 ---
 
@@ -343,3 +381,4 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | **1.1.0** | **2026-06-22** | **DM-20260622-001 D5 Dashboard 过滤规则变更**：metric 名 plural 对齐（`worker_panic` → `worker_panics`，`dispatch_wakeup` → `dispatch_loop_wakeups`），详见 §10；新增 CommandHandler emit backpressure 观测信号 |
 | **1.2.0** | **2026-06-25** | **MUPS v4.3 5 节点管道 + v5 EscapeEngine 可观测性扩展**：(1) §1 Canonical Span ↔ T 表新增 9 ops × S8-S14 绑定（S8 Observe / S8 PR-B1 Plan / S9 Execute / S10 Verify / S11 Learn / S12 跨域 / S13 Auto-Close / S14 EscapeEngine + Resume）；(2) §1 关键 Span 属性新增 7 类（observation/plan/artifact/verdict/asset + 6 prior + 3 resume）；(3) §2 Trace 树新增 2.4 MUPS 5 节点 + 2.5 EscapeEngine；(4) §5 T 层验收矩阵 S1-S5 → S1-S14，66 T → 180 T；(5) §7 生产 Trace 检查清单新增 4 行（MUPS 5 节点 / Prior 闭环 / Auto-Close / EscapeEngine），建议告警新增 4 条 |
 | **2.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：§1 Canonical Span↔T 表 14 S → 6 S 重归类（Observe/Plan 归 S5；Execute/Learn 归 S6；Verify 归 S4；AutoClose/Resume/Escape 入口 归 S2；Observe_Request_WithPrior 归 S2/S5；Verify_AutoClose 归 S2/S4）；新增 5 个 v6.0.0 新 P0/P1 span 绑定（channel.route / memory.persist → S6；system.anomaly_detect → S4；taskgraph.synthesize → S5；executor.select → S3）；§2.4 MUPS Trace 树注释 S 编号重归类；§5 T 层验收矩阵 14 S → 6 S + 1 横切 重写（每个 S 标注原 14 S 归属）。Span operation 名保持稳定（Jaeger 查询不破坏），仅 S 编号变化 |
+| **2.1.0** | **2026-06-26** | **DM-20260626-009 follow-up 内层 observability span + dedup 删除（PR #253+#254 落地，follow-up PR #255 待开）**：(1) §1 Canonical Span↔T 表新增 3 ops × S1+S5 绑定（D7_S1_Worktree_Op → D7-S1-A52-T11/T12；D7_S1_SubWorktree_Run → D7-S1-A53-T13/T14；D7_S5_SubTurn_Iteration → D7-S5-A54-T15/T16）；(2) §2 Trace 树新增 2.6 WorkItem Inner Layer Trace 树（ItemPipelineRunner 11 callsite + WorkItemExecutor ReAct iter + cap-hit + RunParallelExplore 1 callsite，含 finish_reason vs stop_reason 正交说明）；(3) §5 T 层验收矩阵 S1 8→10 + S5 14→16（180→186 T）；(4) §7 生产 Trace 检查清单新增 3 行（WorkItem 内层 span + Worktree Op 完整 + Sub-Turn finish_reason），建议告警覆盖；(5) §8 已知缺口关闭 2 项（Worktree Op 内层 span 缺失 + WorkItemExecutor ReAct iter span 缺失），新增 1 项（worktree.op 全 op 覆盖 guard） |
