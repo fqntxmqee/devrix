@@ -184,3 +184,32 @@ func TestWaveScheduler_DispatchLoopWakeupsMetric(t *testing.T) {
 		t.Errorf("DispatchLoopWakeups = %d, want ≥ 10 (ticker should fire ≥ 10 times in 1.5s)", got)
 	}
 }
+
+// TestWaveScheduler_NoTaskCtxLeakOnNormalCompletion is the regression test
+// for the per-task context.CancelFunc leak. Before the fix, completeTask
+// would skip driving h.cancel on normal completion and only nil it, leaking
+// the context resource and bumping TaskCtxLeaked by 1 per worker. The fix
+// drives cancel via sync.Once on every terminal transition.
+func TestWaveScheduler_NoTaskCtxLeakOnNormalCompletion(t *testing.T) {
+	runners := map[WorkerType]WorkerRunner{
+		WorkerSubAgent: &stubRunner{kind: WorkerSubAgent, delay: 30 * time.Millisecond},
+	}
+	s, _, _ := newTestScheduler(t, map[WorkerType]int{WorkerSubAgent: 1}, runners)
+	graph := NewTaskGraph([]TaskNode{
+		{ID: "ok", WorkerType: WorkerSubAgent, ContextPolicy: ContextFresh, Directive: "ok"},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := s.Start(ctx, "sess-noctx-leak", graph); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if _, err := s.WaitForCompletion(ctx, "sess-noctx-leak"); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+	if got := s.Metrics().TaskCtxLeaked; got != 0 {
+		t.Errorf("TaskCtxLeaked = %d, want 0 (normal completion must drive cancel)", got)
+	}
+	if got := s.Metrics().Completed; got != 1 {
+		t.Errorf("Completed = %d, want 1", got)
+	}
+}

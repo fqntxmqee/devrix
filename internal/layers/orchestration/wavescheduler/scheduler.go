@@ -96,6 +96,7 @@ type workerHandle struct {
 	slotID     SlotID
 	bgID       string
 	cancel     context.CancelFunc
+	cancelOnce sync.Once
 	startedAt  time.Time
 }
 
@@ -530,21 +531,19 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 	s.pool.Release(slotID)
 	state.graph.SetState(taskID, terminal)
 
-	// Update handle.
+	// Update handle. Drive h.cancel on every terminal transition (normal
+	// completion, failure, cancellation) so the per-task context is released.
+	// Without this, context.WithCancel's cancel func leaks — observe by the
+	// "task_ctx_leaked" metric which used to fire on every normal completion.
+	// sync.Once protects against races with CancelTask / cancelWaveLocked
+	// which can also drive cancel from another goroutine.
 	state.mu.Lock()
 	h, hOK := state.handles[taskID]
 	if hOK {
-		// taskCtx leak detection: if task reached normal completion (no error,
-		// exit 0) but cancel is still non-nil, the caller didn't drive the
-		// cancel lifecycle — flag it for observability.
-		if h.cancel != nil && art.ExitCode == 0 && art.Error == "" {
-			s.incMetric("task_ctx_leaked")
-			slog.Warn("wave: taskCtx not cleaned up after normal completion",
-				"session", sessionID, "task", taskID,
-				"worker_id", h.taskID,
-				"metric", "task_ctx_leaked")
+		if h.cancel != nil {
+			h.cancelOnce.Do(h.cancel)
+			h.cancel = nil
 		}
-		h.cancel = nil
 		delete(state.handles, taskID)
 	}
 	state.mu.Unlock()
@@ -627,7 +626,7 @@ func (s *WaveScheduler) CancelWorker(sessionID, taskID string) error {
 	// the cancelled bucket even if Run returns normally.
 	state.graph.SetState(taskID, StateCancelled)
 	if h.cancel != nil {
-		h.cancel()
+		h.cancelOnce.Do(h.cancel)
 	}
 	return nil
 }
@@ -653,7 +652,7 @@ func (s *WaveScheduler) cancelWaveLocked(state *schedulerWaveState) int {
 	count := 0
 	for _, h := range state.handles {
 		if h.cancel != nil {
-			h.cancel()
+			h.cancelOnce.Do(h.cancel)
 			count++
 		}
 	}
