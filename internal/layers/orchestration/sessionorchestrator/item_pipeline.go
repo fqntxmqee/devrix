@@ -111,7 +111,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseObserve)
 
-	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode)
+	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks)
 	if err != nil {
 		return nil, err
 	}
@@ -246,6 +246,10 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		treeCtx.IndeterminateRetries = item.LastRound.IndeterminateRetries
 	}
 	treeCtx.DailyLimitExceeded = workmodel.DecomposeDailyLimitWouldExceed(sessionID, item.Kind, 1)
+
+	parent, _ := r.Tasks.GetWorkItem(sessionID, item.ParentID)
+	bubbleCtx := workmodel.DefaultContextBubbleEvalContext(item, parent, round, r.Tasks, sessionID)
+	workmodel.ApplyContextBubbleDecision(round, nil, bubbleCtx)
 
 	workmodel.EvaluateSpawnPolicy(round, treeCtx)
 	if round.VerdictKind == types.VerdictIndeterminate {

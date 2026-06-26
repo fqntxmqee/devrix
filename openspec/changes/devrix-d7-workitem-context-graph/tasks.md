@@ -21,16 +21,16 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T07 | `WorkItemPipelineRound.ContextBubbleKind` 字段 | TODO |
-| T08 | 父 Observe 读 structured bubble | TODO |
+| T07 | `WorkItemPipelineRound.ContextBubbleKind` 字段 | DONE |
+| T08 | 父 Observe 读 structured bubble | DONE |
 
 ## F3 — R2 自动 upstream + feature flag
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T09 | `InferDependencyContextLinks` 接线 TaskManager | TODO |
-| T10 | `MaterializeContext` stub + WaveNodesFromSubtree 映射 | TODO |
-| T11 | `D7_WORKITEM_CONTEXT_GRAPH=1` 集成测试 | TODO |
+| T09 | `ProjectWaveTaskNode` / `InferDependencyContextLinks` 接线 | DONE |
+| T10 | `WaveNodesFromSubtree` BlockedBy → upstream 映射 | DONE |
+| T11 | `D7_WORKITEM_CONTEXT_GRAPH=1` 集成测试 | DONE |
 
 ## F4 — LLM proposer + Plan 扩展
 

@@ -55,9 +55,10 @@ type WorkItemPipelineRound struct {
 	VerdictConfidence float64         `json:"verdict_confidence,omitempty"`
 	IndeterminateReason string        `json:"indeterminate_reason,omitempty"`
 	IndeterminateRetries int          `json:"indeterminate_retries,omitempty"`
-	SpawnPolicy     SpawnPolicy       `json:"spawn_policy,omitempty"`
-	ChildSpecs      []ChildSpec       `json:"child_specs,omitempty"`
-	SpawnRationale  string            `json:"spawn_rationale,omitempty"`
+	SpawnPolicy       SpawnPolicy       `json:"spawn_policy,omitempty"`
+	ContextBubbleKind ContextBubbleKind `json:"context_bubble_kind,omitempty"`
+	ChildSpecs        []ChildSpec       `json:"child_specs,omitempty"`
+	SpawnRationale    string            `json:"spawn_rationale,omitempty"`
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`
 }

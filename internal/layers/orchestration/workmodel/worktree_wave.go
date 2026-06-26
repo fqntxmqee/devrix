@@ -60,15 +60,7 @@ func (m *TaskManager) WaveNodesFromSubtree(sessionID, batchRootID string) []wave
 		if item.Status != TaskStatusPending {
 			continue
 		}
-		nodes = append(nodes, wavescheduler.TaskNode{
-			ID:            item.ID,
-			Title:         item.Title,
-			Directive:     item.Directive,
-			WorkerType:    wavescheduler.WorkerSubAgent,
-			ContextPolicy: wavescheduler.ContextFresh,
-			DependsOn:     append([]string(nil), item.BlockedBy...),
-			Metadata:      map[string]any{"work_item_id": item.ID},
-		})
+		nodes = append(nodes, ProjectWaveTaskNode(item))
 	}
 	return nodes
 }

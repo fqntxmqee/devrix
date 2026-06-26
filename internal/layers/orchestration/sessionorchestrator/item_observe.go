@@ -39,6 +39,7 @@ func observeWorkItem(
 	classifier decisionplanning.IntentClassifier,
 	learner learn.Learner,
 	trackMode string,
+	tasks *workmodel.TaskManager,
 ) (orchtypes.UncertaintyReport, []string, error) {
 	directive := itemDirective(item)
 	if directive == "" {
@@ -64,6 +65,11 @@ func observeWorkItem(
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
 	}
+	childObs, err := observationsFromChildStructuredBubbles(tasks, sessionID, item)
+	if err != nil {
+		return orchtypes.UncertaintyReport{}, nil, err
+	}
+	obs = append(obs, childObs...)
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
@@ -152,6 +158,43 @@ func observationsFromItem(
 		return nil, err
 	}
 	obs = append(obs, fact)
+	return obs, nil
+}
+
+func observationsFromChildStructuredBubbles(
+	tm *workmodel.TaskManager,
+	sessionID string,
+	parent *workmodel.WorkItem,
+) ([]orchtypes.Observation, error) {
+	if tm == nil || parent == nil {
+		return nil, nil
+	}
+	bubbles := workmodel.CollectStructuredChildBubbles(tm, sessionID, parent.ID)
+	var obs []orchtypes.Observation
+	for _, b := range bubbles {
+		stmt := workmodel.StructuredBubbleStatement(b.ChildID, b.Round)
+		if stmt == "" {
+			continue
+		}
+		strength := 0.9
+		if b.Round.UncertaintyMean > 0 {
+			strength = 1 - b.Round.UncertaintyMean
+			if strength < 0.1 {
+				strength = 0.1
+			}
+		}
+		o, err := orchtypes.NewObservation(
+			orchtypes.ObsFact,
+			orchtypes.CatBusiness,
+			strength,
+			orchtypes.FactPayload{Statement: stmt, Evidence: []string{b.ChildID, b.Round.VerdictID}},
+			"context_structured_bubble",
+		)
+		if err != nil {
+			return nil, err
+		}
+		obs = append(obs, o)
+	}
 	return obs, nil
 }
 
