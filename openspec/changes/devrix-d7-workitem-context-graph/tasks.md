@@ -36,17 +36,17 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T12 | `ItemPlanOutput` ContextLinkSpecs / BubbleSpec | TODO |
-| T13 | Decide 阶段 EvaluateContextLinks/Bubble 顺序 | TODO |
+| T12 | `ItemPlanOutput` ContextLinkSpecs / BubbleSpec | DONE |
+| T13 | Decide 阶段 EvaluateContextLinks/Bubble 顺序 | DONE |
 
 ## F5 — D2 sidechain 分区
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T14 | CreateContextScopeForWorkItem + `wi_<id>` sidechain | TODO |
+| T14 | CreateContextScopeForWorkItem + `wi_<id>` sidechain | DONE |
 
 ## F6 — 运维与验收
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T15 | `/task context show` + ResolveHint + 集成 Gherkin | TODO |
+| T15 | `/task context show` + ResolveHint + 集成 Gherkin | DONE |

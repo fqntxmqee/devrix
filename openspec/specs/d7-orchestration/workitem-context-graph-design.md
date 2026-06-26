@@ -3,7 +3,7 @@
 **文档类型:** 详细架构设计（目标驱动）
 **Domain:** D7 Orchestration（D7-S1 WorkModel + D7-S2 SessionOrchestrator + D7-S3 WaveScheduler + D2 ContextEngine）
 **Status:** Active — F1 契约已落地（Review 通过 2026-06-26）
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Last Updated:** 2026-06-26
 **Parent:** `d7-domain.md` · `workitem-pipeline-unification-design.md` · `pipeline-architecture.md` · `design.md`
 **Related Tech Debt:** `openspec/tech-debt/worktree-v2-deferred.md` (TD-WT-04 跨 Session UI；上下文分区存储待登记)

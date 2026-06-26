@@ -39,8 +39,35 @@ func ResolveHint(sessionID string, tm *TaskManager, focus *WorkItem) string {
 			"Resolve: uncertainty %.2f ≥ %.2f — decompose with task_write mode=decompose (max depth %d).",
 			focus.Uncertainty, threshold, maxDepth))
 	}
+	if ctxHint := ContextResolveHint(sessionID, tm, focus); ctxHint != "" {
+		parts = append(parts, ctxHint)
+	}
 	if len(parts) == 0 {
 		return ""
+	}
+	return strings.Join(parts, " ")
+}
+
+// ContextResolveHint adds ContextGraph audit lines when the feature flag is on (F6).
+func ContextResolveHint(sessionID string, tm *TaskManager, focus *WorkItem) string {
+	if !FeatureWorkItemContextGraphEnabled() || tm == nil || focus == nil {
+		return ""
+	}
+	links := tm.LinksForWorkItem(sessionID, focus.ID)
+	if len(links) == 0 && focus.ContextPolicy == "" && focus.ContextScopeID == "" {
+		return ""
+	}
+	var parts []string
+	if focus.ContextPolicy != "" {
+		parts = append(parts, fmt.Sprintf("Resolve: context policy=%s.", focus.ContextPolicy))
+	}
+	if focus.ContextScopeID != "" {
+		parts = append(parts, fmt.Sprintf("Resolve: context scope=%s (sidechain %s).",
+			focus.ContextScopeID, ContextScopeSidechainKey(focus.ID)))
+	}
+	for _, l := range links {
+		parts = append(parts, fmt.Sprintf("Resolve: context link %s → %s kind=%s by %s.",
+			l.FromWorkItemID, l.ToWorkItemID, l.Kind, l.ProposedBy))
 	}
 	return strings.Join(parts, " ")
 }
