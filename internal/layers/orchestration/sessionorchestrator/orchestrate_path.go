@@ -247,7 +247,7 @@ func summarizeArtifacts(artifacts []wavescheduler.Artifact) string {
 
 func workerEventToEngine(sessionID, taskID string, ev wavescheduler.WorkerEvent) *contracts.EngineEvent {
 	switch ev.Type {
-	case "thinking", "tool_use", "error":
+	case "thinking", "tool_use", "text", "error":
 		return &contracts.EngineEvent{
 			Type:      ev.Type,
 			Content:   ev.Content,

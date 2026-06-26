@@ -154,3 +154,50 @@ func (failingWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wa
 // Ensure the contracts package is referenced (for downstream consumers
 // reading the file).
 var _ = contracts.EngineEvent{}
+
+// T: regression — workerEventToEngine must pass through "text" events so
+// worker output (bash results, LLM text) reaches the Feishu card. Before
+// the fix, only thinking/tool_use/error were mapped; text was silently
+// dropped, leaving the user staring at a stale "started" card.
+func TestWorkerEventToEngine_PassesText(t *testing.T) {
+	cases := []struct {
+		name    string
+		inType  string
+		wantNil bool
+	}{
+		{"text passes through", "text", false},
+		{"thinking passes through", "thinking", false},
+		{"tool_use passes through", "tool_use", false},
+		{"error passes through", "error", false},
+		{"complete filtered", "complete", true},
+		{"cancelled filtered", "cancelled", true},
+		{"unknown filtered", "unknown_type", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ev := workerEventToEngine("sess-x", "task-y",
+				wavescheduler.WorkerEvent{Type: tc.inType, Content: "hello"})
+			if tc.wantNil {
+				if ev != nil {
+					t.Fatalf("type=%q should map to nil, got %+v", tc.inType, ev)
+				}
+				return
+			}
+			if ev == nil {
+				t.Fatalf("type=%q should produce an EngineEvent, got nil", tc.inType)
+			}
+			if ev.Type != tc.inType {
+				t.Errorf("Type=%q, want %q", ev.Type, tc.inType)
+			}
+			if ev.Content != "hello" {
+				t.Errorf("Content=%q, want hello", ev.Content)
+			}
+			if ev.SessionID != "sess-x" {
+				t.Errorf("SessionID=%q, want sess-x", ev.SessionID)
+			}
+			if ev.Metadata["wave_task_id"] != "task-y" {
+				t.Errorf("metadata.wave_task_id=%q, want task-y", ev.Metadata["wave_task_id"])
+			}
+		})
+	}
+}
