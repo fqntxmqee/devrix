@@ -247,12 +247,32 @@ func summarizeArtifacts(artifacts []wavescheduler.Artifact) string {
 
 func workerEventToEngine(sessionID, taskID string, ev wavescheduler.WorkerEvent) *contracts.EngineEvent {
 	switch ev.Type {
-	case "thinking", "tool_use", "text", "error":
+	case "thinking", "text", "error":
 		return &contracts.EngineEvent{
 			Type:      ev.Type,
 			Content:   ev.Content,
 			SessionID: sessionID,
 			Metadata:  map[string]string{"wave_task_id": taskID},
+		}
+	case "tool_use":
+		// D7↔D1 boundary translation: workers emit `tool_use` (Anthropic /
+		// OpenAI streaming vocabulary), but the D1 feishu task-card surface
+		// and SignalRouter only recognise `tool_call`. Without this rename
+		// the event reached handleEngineEvent with Type="tool_use", fell
+		// into SignalRouter.Dispatch's default branch, and was silently
+		// dropped (2026-06-26 hotfix — task card stayed empty during
+		// subagent tool calls).
+		return &contracts.EngineEvent{
+			Type:      "tool_call",
+			Content:   ev.Content,
+			ToolName:  ev.ToolName,
+			ToolInput: ev.ToolInput,
+			SessionID: sessionID,
+			Metadata: map[string]string{
+				"wave_task_id": taskID,
+				"tool_name":    ev.ToolName,
+				"input":        ev.ToolInput,
+			},
 		}
 	default:
 		return nil

@@ -84,7 +84,16 @@ func (r *AgentToolRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunS
 			case "thinking":
 				emit(wavescheduler.WorkerEvent{Type: "thinking", Content: ev.Content, At: time.Now()})
 			case "text", "tool_use":
-				emit(wavescheduler.WorkerEvent{Type: ev.Type, Content: ev.Content, At: time.Now()})
+				we := wavescheduler.WorkerEvent{Type: ev.Type, Content: ev.Content, At: time.Now()}
+				if ev.Type == "tool_use" {
+					// 2026-06-26 hotfix: the runner itself is the tool —
+					// the AgentTool exposes an Execute stream whose
+					// "tool_use" event represents this runner being invoked.
+					// The D1 feishu task card needs a ToolName to render
+					// the entry, so surface the runner kind.
+					we.ToolName = string(r.kind)
+				}
+				emit(we)
 			case "error":
 				emit(wavescheduler.WorkerEvent{Type: "error", Content: ev.Content, At: time.Now()})
 				if firstErr == nil {

@@ -124,7 +124,13 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSp
 			// emit its own "complete" when the loop drains.
 			return
 		}
-		spec.Emit(wavescheduler.WorkerEvent{Type: workerType, Content: ev.Content, At: time.Now()})
+		spec.Emit(wavescheduler.WorkerEvent{
+			Type:      workerType,
+			Content:   ev.Content,
+			ToolName:  ev.ToolName,
+			ToolInput: ev.ToolInput,
+			At:        time.Now(),
+		})
 	}
 
 	params := SubAgentParams{
