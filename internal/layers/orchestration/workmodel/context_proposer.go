@@ -75,9 +75,6 @@ func proposeSiblingShareSummary(a, b *WorkItem, parentRound *WorkItemPipelineRou
 
 // ProposeContextPipelineOutput selects proposer output for the Decide phase.
 func ProposeContextPipelineOutput(sessionID string, item *WorkItem, round *WorkItemPipelineRound, tm *TaskManager, proposer ContextProposer) ItemPipelineContextOutput {
-	if !FeatureWorkItemContextGraphEnabled() {
-		return ItemPipelineContextOutput{}
-	}
 	if proposer == nil {
 		proposer = DefaultContextProposer{}
 	}

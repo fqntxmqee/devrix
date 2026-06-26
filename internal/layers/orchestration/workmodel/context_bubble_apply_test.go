@@ -43,16 +43,14 @@ func TestCollectStructuredChildBubbles(t *testing.T) {
 	}
 }
 
-func TestWaveContextPolicyForItem_FlagOff(t *testing.T) {
-	t.Setenv(FeatureWorkItemContextGraphEnv, "0")
-	item := &WorkItem{BlockedBy: []string{"up"}}
+func TestWaveContextPolicyForItem_NoBlockedByFresh(t *testing.T) {
+	item := &WorkItem{}
 	if got := WaveContextPolicyForItem(item); got != wavescheduler.ContextFresh {
 		t.Fatalf("got %q", got)
 	}
 }
 
 func TestWaveContextPolicyForItem_BlockedByUpstream(t *testing.T) {
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
 	item := &WorkItem{BlockedBy: []string{"up"}}
 	if got := WaveContextPolicyForItem(item); got != wavescheduler.ContextUpstream {
 		t.Fatalf("got %q", got)
@@ -60,7 +58,6 @@ func TestWaveContextPolicyForItem_BlockedByUpstream(t *testing.T) {
 }
 
 func TestProjectWaveTaskNode_UpstreamID(t *testing.T) {
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
 	item := &WorkItem{
 		ID: "dep", Title: "t", Directive: "d", BlockedBy: []string{"blocker"},
 	}

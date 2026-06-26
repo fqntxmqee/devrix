@@ -15,10 +15,7 @@ func ApplyPipelineDecide(
 	parent, _ := tm.GetWorkItem(sessionID, item.ParentID)
 	bubbleCtx := DefaultContextBubbleEvalContext(item, parent, round, tm, sessionID)
 	ApplyContextBubbleDecision(round, props.ContextBubbleSpec, bubbleCtx)
-
-	if FeatureWorkItemContextGraphEnabled() {
-		ApplyAcceptedContextLinks(sessionID, item, props.ContextLinkSpecs, tm)
-	}
+	ApplyAcceptedContextLinks(sessionID, item, props.ContextLinkSpecs, tm)
 
 	EvaluateSpawnPolicy(round, treeCtx)
 }

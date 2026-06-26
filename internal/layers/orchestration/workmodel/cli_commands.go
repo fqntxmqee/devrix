@@ -331,9 +331,6 @@ func (c *CLICommands) review(sessionID string, args []string) string {
 }
 
 func (c *CLICommands) contextShow(sessionID string, args []string) string {
-	if !FeatureWorkItemContextGraphEnabled() {
-		return "ContextGraph is disabled. Set D7_WORKITEM_CONTEXT_GRAPH=1 to enable."
-	}
 	if len(args) < 1 || args[0] != "show" {
 		return "Usage: /task context show [work_item_id]"
 	}

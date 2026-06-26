@@ -93,9 +93,7 @@ func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	}
 }
 
-func TestProcessMessage_WorkItemPipelineFeatureFlag(t *testing.T) {
-	t.Setenv(workmodel.FeatureWorkItemPipelineEnv, "1")
-
+func TestProcessMessage_WorkItemPipelineTurnLoop(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	orch := NewSessionOrchestrator(
 		orchtypes.DefaultConfig(),

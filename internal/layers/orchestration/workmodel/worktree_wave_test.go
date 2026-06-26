@@ -6,8 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
-func TestWaveNodesFromSubtree_UpstreamWhenFlagOn(t *testing.T) {
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
+func TestWaveNodesFromSubtree_UpstreamWhenBlockedBy(t *testing.T) {
 	tm := NewTaskManager()
 	batch, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{
 		Kind: WorkKindPlan, Title: "batch", Policy: ExecPolicyParallelOK,
@@ -39,22 +38,15 @@ func TestWaveNodesFromSubtree_UpstreamWhenFlagOn(t *testing.T) {
 	}
 }
 
-func TestWaveNodesFromSubtree_FreshWhenFlagOff(t *testing.T) {
-	t.Setenv(FeatureWorkItemContextGraphEnv, "0")
+func TestWaveNodesFromSubtree_FreshWithoutBlockedBy(t *testing.T) {
 	tm := NewTaskManager()
 	batch, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{Kind: WorkKindPlan, Title: "batch"})
-	upstream, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{
-		ParentID: batch.ID, Kind: WorkKindImplement, Title: "upstream",
+	_, _ = tm.CreateWorkItem("s1", CreateWorkItemInput{
+		ParentID: batch.ID, Kind: WorkKindImplement, Title: "solo", Directive: "solo",
 	})
-	dependent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{
-		ParentID: batch.ID, Kind: WorkKindImplement, Title: "dependent",
-	})
-	_ = tm.Tree().AddDependency("s1", dependent.ID, upstream.ID)
 
 	nodes := tm.WaveNodesFromSubtree("s1", batch.ID)
-	for _, n := range nodes {
-		if n.ID == dependent.ID && n.ContextPolicy != wavescheduler.ContextFresh {
-			t.Fatalf("flag off: policy=%q want fresh", n.ContextPolicy)
-		}
+	if len(nodes) != 1 || nodes[0].ContextPolicy != wavescheduler.ContextFresh {
+		t.Fatalf("nodes=%+v", nodes)
 	}
 }

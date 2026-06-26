@@ -29,7 +29,6 @@ func TestDefaultContextProposer_ShareSummary(t *testing.T) {
 
 func TestApplyAcceptedContextLinks_Dependency(t *testing.T) {
 	ResetContextGraphState()
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
 	tm := NewTaskManager()
 	up, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "up"})
 	dep, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "dep"})
@@ -44,14 +43,17 @@ func TestApplyAcceptedContextLinks_Dependency(t *testing.T) {
 	if got.ContextPolicy != LinkUpstream {
 		t.Fatalf("policy=%q", got.ContextPolicy)
 	}
-	if got.ContextScopeID == "" || up.ContextScopeID == "" {
-		t.Fatal("expected context scopes on dependency chain")
+	if got.ContextScopeID == "" {
+		t.Fatal("expected context scope on dependent")
+	}
+	upGot, _ := tm.GetWorkItem("s1", up.ID)
+	if upGot.ContextScopeID == "" {
+		t.Fatal("expected context scope on upstream")
 	}
 }
 
 func TestContextResolveHint(t *testing.T) {
 	ResetContextGraphState()
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
 	tm := NewTaskManager()
 	item, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "x"})
 	tm.EnsureContextScope("s1", item)
@@ -63,7 +65,6 @@ func TestContextResolveHint(t *testing.T) {
 
 func TestCLIContextShow(t *testing.T) {
 	ResetContextGraphState()
-	t.Setenv(FeatureWorkItemContextGraphEnv, "1")
 	tm := NewTaskManager()
 	cli := NewCLICommands(tm)
 	item, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{Kind: WorkKindImplement, Title: "wi"})

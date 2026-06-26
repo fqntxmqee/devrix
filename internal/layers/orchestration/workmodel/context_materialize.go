@@ -9,9 +9,6 @@ func WaveContextPolicyForItem(item *WorkItem) wavescheduler.ContextPolicy {
 	if item == nil {
 		return wavescheduler.ContextFresh
 	}
-	if !FeatureWorkItemContextGraphEnabled() {
-		return wavescheduler.ContextFresh
-	}
 	if item.ContextPolicy != "" && item.ContextPolicy.Valid() {
 		return item.ContextPolicy.WaveContextPolicy()
 	}
@@ -69,7 +66,7 @@ func ProjectWaveTaskNode(item *WorkItem) wavescheduler.TaskNode {
 	return node
 }
 
-// InferWorkItemContextPolicy sets ContextPolicy from BlockedBy when graph flag is on.
+// InferWorkItemContextPolicy sets ContextPolicy from BlockedBy.
 func InferWorkItemContextPolicy(item *WorkItem) ContextLinkKind {
 	if item == nil {
 		return LinkFresh
