@@ -435,7 +435,7 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 			ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 		}
 	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
-		if o.itemPipeline != nil {
+		if workmodel.FeatureWorkItemPipelineEnabled() && o.itemPipeline != nil {
 			ch, err = o.RunSessionTurnLoop(sessionCtx, req, intent)
 		} else if o.orchestratePath == nil {
 			err = fmt.Errorf("orchestrator: intent %q requires OrchestratePath but it is nil (bootstrap missing wiring)", intent.Kind)
