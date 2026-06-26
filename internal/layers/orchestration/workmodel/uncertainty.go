@@ -66,6 +66,27 @@ func evidenceScore(count int) float64 {
 	return clamp01(1.0 - 1.0/float64(count+1))
 }
 
+// UnifiedUncertaintyInput feeds the G2 unified uncertainty formula (design §2.3).
+type UnifiedUncertaintyInput struct {
+	WilsonLower       float64
+	ChildStats        ChildOutcomeStats
+	VerdictConfidence float64
+	EvidenceCount     int
+}
+
+// ComputeUnifiedUncertainty merges MUPS reputation and WorkTree structural signals.
+func ComputeUnifiedUncertainty(in UnifiedUncertaintyInput) float64 {
+	historical := historicalUncertainty(in.ChildStats)
+	evidence := evidenceScore(in.EvidenceCount)
+	wilson := clamp01(1 - in.WilsonLower)
+	conf := clamp01(1 - in.VerdictConfidence)
+	u := 0.35*wilson +
+		0.25*historical +
+		0.25*conf +
+		0.15*evidence
+	return clamp01(u)
+}
+
 func clamp01(v float64) float64 {
 	return math.Max(0, math.Min(1, v))
 }

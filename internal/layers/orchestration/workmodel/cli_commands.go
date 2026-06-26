@@ -78,6 +78,9 @@ func (c *CLICommands) Handle(cmd *Command, sessionID string) string {
 	case "verify", "v":
 		return c.verify(cmd.Args)
 
+	case "review":
+		return c.review(sessionID, cmd.Args)
+
 	default:
 		return fmt.Sprintf("Unknown command: %s\nType /task help for usage.", cmd.Name)
 	}
@@ -96,6 +99,7 @@ func (c *CLICommands) Help() string {
   /task dep <task_id> <blocked_by>    - Add dependency
   /task plan <goal>                   - Generate plan for goal
   /task verify [files...]              - Verify changes
+  /task review approve <work_item_id>  - Approve a human-review gate item
 
 Examples:
   /task create "Fix bug" "Fix authentication issue"
@@ -295,6 +299,31 @@ To generate a plan, use /plan command instead:
 
 Use /task create to manually create tasks.
 `, goal, goal)
+}
+
+func (c *CLICommands) review(sessionID string, args []string) string {
+	if len(args) < 2 || args[0] != "approve" {
+		return "Usage: /task review approve <work_item_id>"
+	}
+	itemID := args[1]
+	item, ok := c.manager.GetWorkItem(sessionID, itemID)
+	if !ok {
+		return fmt.Sprintf("Work item not found: %s", itemID)
+	}
+	if !IsHumanReviewItem(item) {
+		return fmt.Sprintf("Work item %s is not a human review gate", itemID)
+	}
+	if item.Status == TaskStatusCompleted {
+		return fmt.Sprintf("Work item %s already approved", itemID)
+	}
+	if err := c.manager.UpdateStatus(sessionID, itemID, TaskStatusInProgress); err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
+	if err := c.manager.UpdateStatus(sessionID, itemID, TaskStatusCompleted); err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
+	ReevaluateParentAfterChild(sessionID, itemID, c.manager)
+	return fmt.Sprintf("✓ Human review approved for %s", itemID)
 }
 
 func (c *CLICommands) verify(args []string) string {

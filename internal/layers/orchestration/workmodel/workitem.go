@@ -39,6 +39,8 @@ type WorkItem struct {
 	Title         string     `json:"title"`
 	Directive     string     `json:"directive,omitempty"`
 	Uncertainty   float64    `json:"uncertainty,omitempty"`
+	RoundPhase    RoundPhase `json:"round_phase,omitempty"`
+	LastRound     *WorkItemPipelineRound `json:"last_round,omitempty"`
 	Policy        ExecPolicy `json:"policy,omitempty"`
 	Owner         string     `json:"owner,omitempty"`
 	BlockedBy     []string   `json:"blocked_by,omitempty"`

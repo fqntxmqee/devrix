@@ -67,6 +67,11 @@ type ProcessRequest struct {
 	// over the per-request hint, see inject track-mode policy in
 	// learner.go:DefaultLearner.Inject).
 	TrackMode string
+
+	// UserID selects per-user AdaptiveThreshold for spawn/decompose gates
+	// (TD-WT-01). When empty, orchestrator resolves from Metadata or ctx
+	// baggage "user.id" (D1 gateway).
+	UserID string
 }
 
 // ProcessResult is the outcome of ProcessMessage.

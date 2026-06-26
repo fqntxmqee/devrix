@@ -21,9 +21,9 @@ import (
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
@@ -46,6 +46,9 @@ type D7StackOptions struct {
 
 	// RoutingMode sets coordinator.routing_mode (default loop_first).
 	RoutingMode string
+
+	// WorkItemPipeline sets D7_WORKITEM_PIPELINE=1 for the test process.
+	WorkItemPipeline bool
 }
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
@@ -65,6 +68,10 @@ type D7TestStack struct {
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
 func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	t.Helper()
+
+	if opt.WorkItemPipeline {
+		t.Setenv(workmodel.FeatureWorkItemPipelineEnv, "1")
+	}
 
 	workDir := t.TempDir()
 	obs, err := observability.New(observability.DefaultConfig())
