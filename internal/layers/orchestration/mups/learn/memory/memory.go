@@ -147,7 +147,7 @@ func (m *SkillMemory) Store(ctx context.Context, a *asset.LearningAsset) error {
 		return asset.ErrAssetClassMismatch
 	}
 	ttlMs := ttlRemainingMs(a)
-	end := hardening.EmitMemoryPersist(ctx, a.SessionID, MemorySkill.String(), a.Class.String(), ttlMs, assetPayloadSize(a))
+	_, end := hardening.EmitMemoryPersist(ctx, a.SessionID, MemorySkill.String(), a.Class.String(), ttlMs, assetPayloadSize(a))
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.store[a.AssetKey] = a

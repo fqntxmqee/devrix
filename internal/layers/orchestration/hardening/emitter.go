@@ -75,8 +75,24 @@ func endSpanWithError(span tracer.Span, err error) {
 
 // --- S6 MUPS Pipeline ---
 
+// EmitMUPSPipeline is the v6.0.0 root span for the 5-node MUPS pipeline
+// (DM-20260626-009 hotfix: previously only OrchestratePath emitted this; the
+// per-WorkItem ItemPipelineRunner path was missing it, so Jaeger showed
+// the 5-node span tree on the legacy route only). Returns the enriched
+// context so callers can chain the 5 sub-spans as children.
+func EmitMUPSPipeline(ctx context.Context, sessionID, workItemID, pipelineIntent string) (context.Context, func(error)) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "pipeline.work_item_id", Value: workItemID},
+		{Key: "pipeline.intent", Value: pipelineIntent},
+		{Key: "pipeline.nodes", Value: "observe,plan,wave,execute,verify,learn"},
+	}
+	c, span := start(ctx, telemetry.OpD7_S6_MUPS_Pipeline, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
+}
+
 // EmitChannelRoute wraps ChannelRouter.Route. v6.0.0 S6-A48 P0.
-func EmitChannelRoute(ctx context.Context, sessionID, planKind, channelKind, score, fallback string) func(error) {
+func EmitChannelRoute(ctx context.Context, sessionID, planKind, channelKind, score, fallback string) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
 		{Key: "channel.kind", Value: channelKind},
@@ -84,12 +100,12 @@ func EmitChannelRoute(ctx context.Context, sessionID, planKind, channelKind, sco
 		{Key: "score", Value: score},
 		{Key: "fallback", Value: fallback},
 	}
-	_, span := start(ctx, telemetry.OpD7_S6_Channel_Route, attrs...)
-	return func(err error) { endSpanWithError(span, err) }
+	c, span := start(ctx, telemetry.OpD7_S6_Channel_Route, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
 }
 
 // EmitMemoryPersist wraps Memory.Persist. v6.0.0 S6-A49 P0.
-func EmitMemoryPersist(ctx context.Context, sessionID, channel, assetKind string, ttlMs int, payloadSize int) func(error) {
+func EmitMemoryPersist(ctx context.Context, sessionID, channel, assetKind string, ttlMs int, payloadSize int) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
 		{Key: "channel", Value: channel},
@@ -97,14 +113,14 @@ func EmitMemoryPersist(ctx context.Context, sessionID, channel, assetKind string
 		{Key: "ttl_ms", Value: intToString(ttlMs)},
 		{Key: "payload_size", Value: intToString(payloadSize)},
 	}
-	_, span := start(ctx, telemetry.OpD7_S6_Memory_Persist, attrs...)
-	return func(err error) { endSpanWithError(span, err) }
+	c, span := start(ctx, telemetry.OpD7_S6_Memory_Persist, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
 }
 
 // --- S5 DecisionPlanning + Observe ---
 
 // EmitTaskGraphSynthesize wraps DecisionPlanning.SynthesizeTaskGraph. v6.0.0 S5-A33 P1.
-func EmitTaskGraphSynthesize(ctx context.Context, sessionID string, nodeCount, edgeCount, dagDepth int, cycleDetected bool) func(error) {
+func EmitTaskGraphSynthesize(ctx context.Context, sessionID string, nodeCount, edgeCount, dagDepth int, cycleDetected bool) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
 		{Key: "taskgraph.node_count", Value: intToString(nodeCount)},
@@ -112,14 +128,14 @@ func EmitTaskGraphSynthesize(ctx context.Context, sessionID string, nodeCount, e
 		{Key: "taskgraph.dag_depth", Value: intToString(dagDepth)},
 		{Key: "taskgraph.cycle_detected", Value: boolToString(cycleDetected)},
 	}
-	_, span := start(ctx, telemetry.OpD7_S5_TaskGraph_Synthesize, attrs...)
-	return func(err error) { endSpanWithError(span, err) }
+	c, span := start(ctx, telemetry.OpD7_S5_TaskGraph_Synthesize, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
 }
 
 // --- S4 ExecutionFlow + Verify ---
 
 // EmitSystemAnomalyDetect wraps verify.DetectSystemAnomaly. v6.0.0 S4-A47 P0.
-func EmitSystemAnomalyDetect(ctx context.Context, sessionID, anomalyKind, severity, threshold, evidenceID string) func(error) {
+func EmitSystemAnomalyDetect(ctx context.Context, sessionID, anomalyKind, severity, threshold, evidenceID string) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
 		{Key: "anomaly.kind", Value: anomalyKind},
@@ -127,14 +143,14 @@ func EmitSystemAnomalyDetect(ctx context.Context, sessionID, anomalyKind, severi
 		{Key: "threshold", Value: threshold},
 		{Key: "evidence_id", Value: evidenceID},
 	}
-	_, span := start(ctx, telemetry.OpD7_S4_System_Anomaly_Detect, attrs...)
-	return func(err error) { endSpanWithError(span, err) }
+	c, span := start(ctx, telemetry.OpD7_S4_System_Anomaly_Detect, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
 }
 
 // --- S3 WaveScheduler ---
 
 // EmitExecutorSelect wraps WaveScheduler.ExecutorSelector.Select. v6.0.0 S5-A34 P1.
-func EmitExecutorSelect(ctx context.Context, sessionID string, candidatesCount int, selectedKind, score, policy string) func(error) {
+func EmitExecutorSelect(ctx context.Context, sessionID string, candidatesCount int, selectedKind, score, policy string) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
 		{Key: "candidates_count", Value: intToString(candidatesCount)},
@@ -142,8 +158,8 @@ func EmitExecutorSelect(ctx context.Context, sessionID string, candidatesCount i
 		{Key: "score", Value: score},
 		{Key: "policy", Value: policy},
 	}
-	_, span := start(ctx, telemetry.OpD7_S3_Executor_Select, attrs...)
-	return func(err error) { endSpanWithError(span, err) }
+	c, span := start(ctx, telemetry.OpD7_S3_Executor_Select, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
 }
 
 func intToString(n int) string {

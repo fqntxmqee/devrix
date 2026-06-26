@@ -139,7 +139,7 @@ func DetectSystemAnomaly(ctx context.Context, sessionID string, report orchtypes
 		EvidenceID: evidenceID,
 	}
 
-	end := hardening.EmitSystemAnomalyDetect(
+	_, end := hardening.EmitSystemAnomalyDetect(
 		ctx,
 		sessionID,
 		string(kind),
