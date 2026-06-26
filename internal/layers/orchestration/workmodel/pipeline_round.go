@@ -39,6 +39,12 @@ const DefaultMaxIndeterminateRetries = 3
 
 // WorkItemPipelineRound is the typed signal bundle for one WorkItem pipeline
 // iteration. Parent spawn decisions MUST read this struct (goal G2).
+//
+// ArtifactSummary carries the execute-phase artifact's Summary text (the
+// LLM response for chat-style work_item_execute tool calls). RunSessionTurnLoop
+// emits it as a "text" EngineEvent so the user sees the answer; without this
+// field the round's ArtifactID would be opaque to the gateway and the LLM
+// response would never reach feishu. Populated by ItemPipelineRunner.Run.
 type WorkItemPipelineRound struct {
 	RoundNo         int               `json:"round_no,omitempty"`
 	WorkItemID      string            `json:"work_item_id,omitempty"`
@@ -47,6 +53,7 @@ type WorkItemPipelineRound struct {
 	PlanID          string            `json:"plan_id,omitempty"`
 	PlanKind        plan.PlanKind     `json:"plan_kind,omitempty"`
 	ArtifactID      string            `json:"artifact_id,omitempty"`
+	ArtifactSummary string            `json:"artifact_summary,omitempty"`
 	VerdictID       string            `json:"verdict_id,omitempty"`
 	VerdictKind     types.VerdictKind `json:"verdict_kind,omitempty"`
 	ExitReason      string            `json:"exit_reason,omitempty"`

@@ -140,8 +140,9 @@ func InitOrchestration(
 	executor := newTurnOrchExecutor(turnOrch)
 
 	itemRunner, pipelineLearner, err := WireItemPipeline(ItemPipelineWireDeps{
-		ToolExec: toolExec,
-		Tasks:    tm,
+		ToolExec:   toolExec,
+		Tasks:      tm,
+		LLMInvoker: llmInvoker,
 	})
 	if err != nil {
 		return fmt.Errorf("d7: wire item pipeline: %w", err)
