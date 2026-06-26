@@ -3,7 +3,6 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -34,9 +33,19 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		defer close(out)
 		sessionID := req.SessionID
 		userID := effectiveUserID(ctx, req)
-		var summaries []string
 
 		awaiter := &workmodel.ResolveAwaiter{Manager: o.taskManager}
+
+		// Seed: ensure a session root WorkItem exists before the focus loop
+		// (Phase C ingress gap fix, 2026-06-26). Without this, a fresh user
+		// message finds an empty work tree, GetPipelineFocus returns nil, and
+		// the loop emits a 50-byte stub. EnsureGoal follows design D5
+		// ("单 session 单根" / "EnsureGoal 现有语义"); a locked (terminal) goal
+		// gets a fresh root while the original children stay attached.
+		if _, seedErr := o.taskManager.EnsureGoal(sessionID, req.Message); seedErr != nil {
+			emitError(ctx, o.sink, out, sessionID, "ensure_goal", seedErr)
+			return
+		}
 
 		for iter := 0; iter < defaultSessionTurnLoopMax; iter++ {
 			if ctx.Err() != nil {
@@ -73,7 +82,6 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			if workmodel.IsHumanReviewItem(focus) && focus.Status == workmodel.TaskStatusPending {
 				msg := fmt.Sprintf("Human review required for work item %s — use /task review approve %s",
 					focus.ID, focus.ID)
-				summaries = append(summaries, msg)
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type:      "human_review",
 					Content:   focus.Directive,
@@ -89,9 +97,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 
 			if stats := runningChildCount(o.taskManager, sessionID, focus.ID); stats > 0 {
-				if msg := awaiter.AwaitRunningChildren(ctx, sessionID); msg != "" {
-					summaries = append(summaries, msg)
-				}
+				_ = awaiter.AwaitRunningChildren(ctx, sessionID)
 				continue
 			}
 
@@ -100,9 +106,6 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				emitError(ctx, o.sink, out, sessionID, "item_pipeline", err)
 				return
 			}
-
-			summaries = append(summaries, fmt.Sprintf("[%s] %s → %s (spawn=%s)",
-				focus.Kind, focus.Title, round.VerdictKind, round.SpawnPolicy))
 
 			emit(ctx, o.sink, out, &contracts.EngineEvent{
 				Type:      "pipeline_round",
@@ -125,10 +128,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 					emitError(ctx, o.sink, out, sessionID, "parallel_explore", err)
 					return
 				}
-				summaries = append(summaries, round.SpawnRationale)
-			case workmodel.SpawnEscalateHuman:
-				summaries = append(summaries, "escalated to human review: "+round.SpawnRationale)
-			case workmodel.SpawnNone:
+			case workmodel.SpawnEscalateHuman, workmodel.SpawnNone:
 				// focus may be terminal; loop picks next item or exits
 			}
 
@@ -137,15 +137,21 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 		}
 
-		summary := strings.Join(summaries, "\n")
-		if summary == "" {
-			summary = "session turn loop: no work items processed"
-		}
+		// 2026-06-26 hotfix: previously the loop emitted a `text` event
+		// carrying the D7 internal pipeline summary ([Goal] title →
+		// VerdictKind (spawn=...)) before the `complete`. The feishu
+		// reply card treats both as user-facing content, so the user saw
+		// the LLM's actual answer plus a D7 metadata line appended. The
+		// LLM streaming path already delivers the real answer; the
+		// pipeline summary is internal and now stays internal.
+		//
+		// The `complete` event is kept (gateway needs it to finalize the
+		// session and LP-1 Auto-Close to run), but Content is empty so
+		// feishu.finalizeStructuredSession does not render a 任务总结 card
+		// from D7 metadata — the LLM's own final paragraph (already on
+		// the reply card via streaming) is the conclusion the user sees.
 		emit(ctx, o.sink, out, &contracts.EngineEvent{
-			Type: "text", Content: summary, SessionID: sessionID,
-		})
-		emit(ctx, o.sink, out, &contracts.EngineEvent{
-			Type: "complete", Content: summary, SessionID: sessionID,
+			Type: "complete", SessionID: sessionID,
 		})
 	}()
 

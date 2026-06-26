@@ -173,7 +173,14 @@ func TestSubAgentRunner_HappyPath(t *testing.T) {
 	defer mu.Unlock()
 	// DM-20260626-002: the "started" thinking placeholder is gone
 	// (real LLM thinking events now stream in via the Emit callback).
-	// Expected sequence: text(result) → complete("done").
+	// 2026-06-26 hotfix: the terminal text(result) emit is also gone —
+	// SubQuery.Run's streaming Emit already pushed the LLM chunks to the
+	// feishu reply card; re-emitting the full result at terminal time
+	// would duplicate the entire response on the user's card when the
+	// early-stage replay dedup in feishu.appendResponseText hasn't
+	// accumulated enough buffer runes. BackgroundRegistry still stores
+	// the result for post-mortem, but the worker channel only sees the
+	// terminal "complete" event.
 	hasText, hasComplete, hasStarted := false, false, false
 	for _, e := range events {
 		if e.Type == "text" && e.Content == "the result" {
@@ -186,8 +193,8 @@ func TestSubAgentRunner_HappyPath(t *testing.T) {
 			hasStarted = true
 		}
 	}
-	if !hasText {
-		t.Fatalf("expected text event with the result, got %+v", events)
+	if hasText {
+		t.Fatalf("terminal text(result) emit removed (2026-06-26 hotfix); got %+v", events)
 	}
 	if !hasComplete {
 		t.Fatalf("expected complete event, got %+v", events)
@@ -319,15 +326,18 @@ func TestSubAgentRunner_StreamsEmitAsWorkerEvents(t *testing.T) {
 	}
 	// Expected mapping:
 	//   thinking  → thinking  (1, streamed)
-	//   text      → text      (2 streamed + 1 final from TerminalResult = 3)
+	//   text      → text      (2 streamed; 2026-06-26 hotfix removed the
+	//                          final TerminalResult re-emit because the
+	//                          streaming path already pushed the LLM
+	//                          chunks to the feishu reply card)
 	//   tool_call → tool_use  (1)
 	//   info      → skipped
 	//   complete  → skipped (the runner emits its own "complete" via TerminalResult)
 	if got["thinking"] != 1 {
 		t.Errorf("thinking count = %d, want 1", got["thinking"])
 	}
-	if got["text"] != 3 {
-		t.Errorf("text count = %d, want 3 (2 streamed chunks + 1 final TerminalResult)", got["text"])
+	if got["text"] != 2 {
+		t.Errorf("text count = %d, want 2 (streamed chunks; 2026-06-26 hotfix dropped final TerminalResult re-emit)", got["text"])
 	}
 	if got["tool_use"] != 1 {
 		t.Errorf("tool_use count = %d, want 1 (tool_call must map to tool_use)", got["tool_use"])
