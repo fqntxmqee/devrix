@@ -42,6 +42,11 @@ type SubQueryParams struct {
 	// to SubTurnRequest so the nested runLoop gets a non-zero
 	// maxContextTokens. 0 = SubTurnRunner uses Cfg.MaxContextTokens.
 	MaxContextTokens int
+	// Emit forwards per-event streams from the nested turn loop back to
+	// the caller (DM-20260626-002). SubTurnRunner calls this for every
+	// non-complete EngineEvent it drains; nil = no streaming (terminal
+	// result still returned via SubQueryResult).
+	Emit contracts.EngineEmitFunc
 }
 
 // SubQueryResult is the outcome of SubQuery.Run.
@@ -113,6 +118,10 @@ func Run(ctx context.Context, deps SubQueryDeps, params SubQueryParams) (*SubQue
 		ChildContext: child,
 		FlowParams:   flowParams,
 		FlowReporter: reporter,
+		// DM-20260626-002 — forward caller-provided Emit so per-event
+		// streams (text/thinking/tool_call) reach the worker channel
+		// instead of being buffered until terminal.
+		Emit: params.Emit,
 		// DM-20260620-001-B (AC6 + AC9) — pass Mode/Depth to SubTurnRunner
 		// so dispatch + recursion limit apply uniformly.
 		Mode:  params.Mode,

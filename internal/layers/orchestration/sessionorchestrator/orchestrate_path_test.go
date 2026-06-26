@@ -155,6 +155,45 @@ func (failingWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wa
 // reading the file).
 var _ = contracts.EngineEvent{}
 
+// T: regression — DM-20260626-002. OrchestratePath.Run must NOT emit a
+// consolidated "text" event after the wave finishes; the worker's text
+// events (streamed through workerEventToEngine) are the only source of
+// user-facing text. Emitting a second text event from summarizeArtifacts
+// produced a 61207 vs 61212 byte duplicate in the feishu card (the
+// extra 5 bytes came from outputParts joining the worker's "result"
+// with the runner's "done" complete-event content).
+func TestOrchestratePath_NoDuplicateTextOnCompletion(t *testing.T) {
+	decomp := decisionplanning.NewTaskDecomposer()
+	sched := &fakeWaveScheduler{artifacts: []wavescheduler.Artifact{{
+		TaskID:    "t1",
+		Summary:   "the result",
+		ExitCode:  0,
+		StartedAt: time.Now().Add(-2 * time.Second),
+		EndedAt:   time.Now(),
+	}}}
+	op := NewOrchestratePath(decomp, sched, nil)
+
+	ch, err := op.Run(context.Background(), orchtypes.ProcessRequest{
+		SessionID: "sess-no-dup",
+		Message:   "do something",
+	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+
+	var textCount int
+	var textContents []string
+	for ev := range ch {
+		if ev.Type == "text" {
+			textCount++
+			textContents = append(textContents, ev.Content)
+		}
+	}
+	if textCount != 0 {
+		t.Fatalf("OrchestratePath must NOT emit text events (the worker streams them); got %d: %v", textCount, textContents)
+	}
+}
+
 // T: regression — workerEventToEngine must pass through "text" events so
 // worker output (bash results, LLM text) reaches the Feishu card. Before
 // the fix, only thinking/tool_use/error were mapped; text was silently

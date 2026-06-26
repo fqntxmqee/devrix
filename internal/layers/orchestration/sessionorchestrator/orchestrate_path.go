@@ -190,18 +190,18 @@ func (op *OrchestratePath) Run(ctx context.Context, req orchtypes.ProcessRequest
 			return
 		}
 
-		// 5) Summarize artifacts and emit terminal events
+		// 5) Emit terminal events. The per-task text/thinking/tool_use
+		// streams were already fanned out by workerEventToEngine during
+		// step 4 (DM-20260626-002) — DO NOT re-emit a consolidated
+		// summary here, that produced duplicate content in the feishu
+		// card (contentLen=61207 followed by 61212 = worker text +
+		// outputParts-joined "result\ndone" + summarizeArtifacts).
 		if len(artifacts) == 0 {
 			emitError(ctx, op.sink, out, req.SessionID, "wave_complete",
 				fmt.Errorf("wave finished with no task output (check worker runners)"))
 			return
 		}
-		summary := summarizeArtifacts(artifacts)
-		emit(ctx, op.sink, out, &contracts.EngineEvent{
-			Type:      "text",
-			Content:   summary,
-			SessionID: req.SessionID,
-		})
+		_ = summarizeArtifacts // retained for cross-package callers / tests
 		emit(ctx, op.sink, out, &contracts.EngineEvent{
 			Type:      "complete",
 			SessionID: req.SessionID,

@@ -123,6 +123,10 @@ func buildSubAgentDeps(gw *capture.CommunicationGateway, engine contracts.IEngin
 				MaxTurns:       maxTurns,
 				ModelTier:      params.ModelTier,
 				ReadOnlyTools:  params.ReadOnlyTools,
+				// DM-20260626-002 — forward streaming Emit so the LLM
+				// loop's per-event streams reach the worker channel
+				// (and feishu card) in real time.
+				Emit: params.Emit,
 			}, reg, executionflow.NewSessionQueue())
 		},
 		Cancel: func(taskID string) bool {
