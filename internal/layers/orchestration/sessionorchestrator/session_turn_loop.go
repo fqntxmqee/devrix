@@ -38,6 +38,17 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 
 		awaiter := &workmodel.ResolveAwaiter{Manager: o.taskManager}
 
+		// Seed: ensure a session root WorkItem exists before the focus loop
+		// (Phase C ingress gap fix, 2026-06-26). Without this, a fresh user
+		// message finds an empty work tree, GetPipelineFocus returns nil, and
+		// the loop emits a 50-byte stub. EnsureGoal follows design D5
+		// ("单 session 单根" / "EnsureGoal 现有语义"); a locked (terminal) goal
+		// gets a fresh root while the original children stay attached.
+		if _, seedErr := o.taskManager.EnsureGoal(sessionID, req.Message); seedErr != nil {
+			emitError(ctx, o.sink, out, sessionID, "ensure_goal", seedErr)
+			return
+		}
+
 		for iter := 0; iter < defaultSessionTurnLoopMax; iter++ {
 			if ctx.Err() != nil {
 				emit(ctx, o.sink, out, &contracts.EngineEvent{

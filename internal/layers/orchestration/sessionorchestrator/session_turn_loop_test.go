@@ -45,6 +45,54 @@ func TestRunSessionTurnLoop_SingleGoal_Completes(t *testing.T) {
 	}
 }
 
+// Regression (2026-06-26): when RunSessionTurnLoop is invoked with a fresh
+// session (no prior WorkItem tree) and the user message as the only input,
+// the loop used to break on GetPipelineFocus=nil and emit a 50-byte stub.
+// RunSessionTurnLoop now seeds an EnsureGoal from req.Message so a single
+// intent_orchestrate request lands on a real WorkItem.
+func TestRunSessionTurnLoop_FreshSession_SeedsGoalFromMessage(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		&recordingExecutor{},
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
+		WithLearner(runner.Learner),
+	)
+
+	sessionID := "sess-turn-loop-fresh"
+	if focus, _ := tm.Tree().GetPipelineFocus(sessionID); focus != nil {
+		t.Fatalf("precondition: expected no focus, got %+v", focus)
+	}
+
+	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   "review d2 domain code",
+	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
+	if err != nil {
+		t.Fatalf("RunSessionTurnLoop: %v", err)
+	}
+	events := drainEvents(ch)
+	if !hasEventType(events, "pipeline_round") {
+		t.Fatalf("expected pipeline_round, got %v", loopEventTypes(events))
+	}
+	if !hasEventType(events, "complete") {
+		t.Fatalf("expected complete, got %v", loopEventTypes(events))
+	}
+	for _, ev := range events {
+		if ev.Type == "text" && ev.Content == "session turn loop: no work items processed" {
+			t.Fatalf("regression: emitted empty-tree stub; events=%v", loopEventTypes(events))
+		}
+	}
+	goal, ok := tm.GetWorkItem(sessionID, mustGoalID(t, tm, sessionID))
+	if !ok || goal == nil {
+		t.Fatalf("expected goal WorkItem to be seeded from req.Message")
+	}
+	if goal.Directive != "review d2 domain code" {
+		t.Fatalf("goal.Directive = %q, want seeded from req.Message", goal.Directive)
+	}
+}
+
 func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	runner.Verify = func(_ *wavescheduler.Artifact) workmodel.Verdict {
