@@ -421,8 +421,13 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			if ev.Content == "" {
 				return
 			}
+			// Only content events (text / tool_use) contribute to the
+			// artifact summary. "complete" carries a control marker
+			// (e.g. "done") that would otherwise taint the joined
+			// summary with a 5-byte suffix (DM-20260626-002 — fixes
+			// 61207 vs 61212 byte duplicate in feishu OnMessage).
 			switch ev.Type {
-			case "text", "complete", "tool_use":
+			case "text", "tool_use":
 				outputMu.Lock()
 				outputParts = append(outputParts, ev.Content)
 				outputMu.Unlock()
