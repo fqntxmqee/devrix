@@ -48,12 +48,13 @@ func routeLabel(intent orchtypes.IntentClassification) string {
 	if intent.Reason == "loop_first_default" {
 		return "turn"
 	}
+	// v6.1.0: IntentFast and IntentOrchestrate both route through
+	// OrchestratePath (5-node MUPS pipeline). Collapse the label so trace
+	// dashboards reflect the single execution surface.
 	switch intent.Kind {
 	case orchtypes.IntentCommand:
 		return "command"
-	case orchtypes.IntentFast:
-		return "fast"
-	case orchtypes.IntentOrchestrate:
+	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
 		return "orchestrate"
 	case orchtypes.IntentSkip:
 		return "skip"

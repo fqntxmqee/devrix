@@ -244,7 +244,8 @@ func TestPlanKindFromIntent(t *testing.T) {
 	}{
 		{orchtypes.IntentSkip, 0},
 		{orchtypes.IntentCommand, plan.CommitmentPlan},
-		{orchtypes.IntentFast, plan.ExplorationPlan},
+		// v6.1.0: IntentFast routes through OrchestratePath → ScenarioPlan
+		{orchtypes.IntentFast, plan.ScenarioPlan},
 		{orchtypes.IntentOrchestrate, plan.ScenarioPlan},
 	}
 	for _, tt := range tests {

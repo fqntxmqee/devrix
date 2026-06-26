@@ -25,14 +25,17 @@ import (
 // D1 RouteInbound (when d7_enabled=true) calls ProcessMessage. The
 // orchestrator:
 //  1. Classifies the intent (decisionplanning.IntentClassifier; default rule-based).
-//  2. Routes to one of 4 real execution paths per the routing matrix:
-//     - orchtypes.IntentSkip        → close channel
-//     - orchtypes.IntentCommand     → CommandHandler (zero LLM, plan/task CLI)
-//     - orchtypes.IntentFast        → FastPath.Run (D2 single-turn LLM↔Tool loop)
-//     - orchtypes.IntentOrchestrate → OrchestratePath (SynthesizeTaskGraph → Wave)
+//  2. Routes per the routing matrix:
+//     - orchtypes.IntentSkip                                  → close channel
+//     - orchtypes.IntentCommand                               → CommandHandler (zero LLM, plan/task CLI)
+//     - orchtypes.IntentFast | orchtypes.IntentOrchestrate    → OrchestratePath (5-node MUPS pipeline: Observe → Plan → Wave → Execute → Verify → Learn)
 //  3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
 //
-// Each orchtypes.IntentKind has its own execution chain (orthogonal paths).
+// v6.1.0 routing collapse: all user instructions except `/`-prefixed D7
+// internal commands and skip-eligible empty messages flow through the
+// 5-node MUPS pipeline. The previous FastPath (D2 single-turn LLM↔Tool
+// loop) is retained in the codebase but no longer reachable from
+// ProcessMessage. Classifier confidence no longer gates routing.
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
@@ -274,14 +277,16 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
 }
 
-// Routing (v1.1.0+ orthogonal dispatch, see
-// devrix-d7-orthogonal-intent-paths):
+// Routing (v6.1.0 collapsed, see commit refactor/d7-route-all-to-5node):
 //   - skip        → return empty channel (inlined, no executor)
 //   - command     → CommandHandler.Handle (D7-internal CLI, zero LLM)
-//   - fast        → FastPath.Run (D2 single-turn LLM↔Tool loop)
-//   - orchestrate → OrchestratePath.Run (SynthesizeTaskGraph → Wave)
+//   - fast|orchestrate → OrchestratePath.Run (5-node MUPS pipeline:
 //
-// Each orchtypes.IntentKind maps to an independent execution chain.
+//	Observe → Plan → Wave → Execute → Verify → Learn)
+//
+// Each orchtypes.IntentKind maps to its own execution chain. v6.1.0
+// collapses IntentFast and IntentOrchestrate onto OrchestratePath so the
+// 5-node pipeline is the single LLM-driven execution surface.
 //
 // Phase 6 PR-F2 (D7-S12-A42-T05): at entry, buildObserveRequest calls
 // Learner.Inject (when wired) to obtain an AdaptivePrior. The prior
@@ -383,16 +388,6 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// and panic are surfaced via the 4-counter + alert hook.
 	o.callAdvisoryValidator(sessionCtx, intent, req.SessionID)
 
-	// D7-S5-A01-T01: FastPath confidence threshold gating (rule_orchestrate only).
-	if !o.cfg.IsLoopFirst() && intent.Kind == orchtypes.IntentFast && intent.Confidence < o.cfg.FastPathThreshold {
-		intent = orchtypes.IntentClassification{
-			Kind:       orchtypes.IntentOrchestrate,
-			Confidence: intent.Confidence,
-			Reason:     fmt.Sprintf("fast confidence %d < threshold %d: %s", intent.Confidence, o.cfg.FastPathThreshold, intent.Reason),
-			Command:    intent.Command,
-		}
-	}
-
 	// PR-V5.5 wiring point 1b: Plan前 (before dispatch).
 	// Evaluate escape decision; may ForceExit.
 	if o.escapeEngine != nil {
@@ -416,16 +411,20 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		close(skipCh)
 		ch = skipCh
 	case orchtypes.IntentCommand:
+		// `/`-prefixed D7-internal commands stay on CommandHandler (zero-LLM,
+		// no 5-node overhead). All other user instructions — regardless of
+		// classifier confidence or previous Fast/Orchestrate classification —
+		// route through OrchestratePath so the 5-node MUPS pipeline (Observe
+		// → Plan → Wave → Execute → Verify → Learn) is the single execution
+		// surface. See ProcessMessage doc comment above.
 		if o.commandHandler == nil {
 			err = fmt.Errorf("orchestrator: orchtypes.IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
 		} else {
 			ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 		}
-	case orchtypes.IntentFast:
-		ch, err = o.fastPath.Run(sessionCtx, req, decisionplanning.TurnSystemPrompt(o.cfg, ""))
-	case orchtypes.IntentOrchestrate:
+	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
 		if o.orchestratePath == nil {
-			err = fmt.Errorf("orchestrator: orchtypes.IntentOrchestrate received but orchestratePath is nil (bootstrap missing wiring)")
+			err = fmt.Errorf("orchestrator: intent %q requires OrchestratePath but it is nil (bootstrap missing wiring)", intent.Kind)
 		} else {
 			ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
 		}

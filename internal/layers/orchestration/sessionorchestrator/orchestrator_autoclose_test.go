@@ -422,18 +422,21 @@ func TestProcessMessage_AutoClose_IntentSkip_NoLearn(t *testing.T) {
 
 // TestProcessMessage_AutoClose_ErrorEvent_VerdictFail verifies that an
 // "error" terminal event produces a VerdictFail via auto-Close.
+// v6.1.0: ProcessMessage routes through OrchestratePath; auto-Close now
+// reads events from OrchestratePath's channel. To inject a deterministic
+// "error" terminal event we test processAutoClose directly with a stub
+// source channel — the wrapper logic itself is unchanged.
 func TestProcessMessage_AutoClose_ErrorEvent_VerdictFail(t *testing.T) {
 	fl := &fakeLearner{}
-	exec := &completingExecutor{eventType: "error", eventContent: "OOM at line 42"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
 
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-ac-err",
-		Message:   "trigger error",
-	})
-	if err != nil {
-		t.Fatalf("ProcessMessage: %v", err)
-	}
+	// Stub source: emits an "error" terminal event then closes.
+	src := make(chan *contracts.EngineEvent, 1)
+	src <- &contracts.EngineEvent{Type: "error", Content: "OOM at line 42"}
+	close(src)
+
+	ch := orch.processAutoClose(src, context.Background(), nil, "sess-ac-err",
+		orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
 	for range ch {
 	}
 
@@ -464,18 +467,18 @@ func TestProcessMessage_AutoClose_ErrorEvent_VerdictFail(t *testing.T) {
 // the interrupt path: a tombstone event produces VerdictIndeterminate with
 // IndeterminateReason="interrupt" (drives PendingAsset routing per Phase 5
 // LP-2 隔离).
+// v6.1.0: test processAutoClose directly with a stub source channel
+// (see ErrorEvent_VerdictFail for rationale).
 func TestProcessMessage_AutoClose_TombstoneEvent_VerdictIndeterminate(t *testing.T) {
 	fl := &fakeLearner{}
-	exec := &completingExecutor{eventType: "tombstone"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
 
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-ac-tomb",
-		Message:   "trigger tombstone",
-	})
-	if err != nil {
-		t.Fatalf("ProcessMessage: %v", err)
-	}
+	src := make(chan *contracts.EngineEvent, 1)
+	src <- &contracts.EngineEvent{Type: "tombstone"}
+	close(src)
+
+	ch := orch.processAutoClose(src, context.Background(), nil, "sess-ac-tomb",
+		orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
 	for range ch {
 	}
 
