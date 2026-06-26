@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -42,6 +43,98 @@ func TestRunSessionTurnLoop_SingleGoal_Completes(t *testing.T) {
 	goal, _ := tm.GetWorkItem(sessionID, mustGoalID(t, tm, sessionID))
 	if goal.Status != workmodel.TaskStatusCompleted {
 		t.Fatalf("goal status = %q, want completed", goal.Status)
+	}
+}
+
+// Regression (2026-06-26): when RunSessionTurnLoop is invoked with a fresh
+// session (no prior WorkItem tree) and the user message as the only input,
+// the loop used to break on GetPipelineFocus=nil and emit a 50-byte stub.
+// RunSessionTurnLoop now seeds an EnsureGoal from req.Message so a single
+// intent_orchestrate request lands on a real WorkItem.
+func TestRunSessionTurnLoop_FreshSession_SeedsGoalFromMessage(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		&recordingExecutor{},
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
+		WithLearner(runner.Learner),
+	)
+
+	sessionID := "sess-turn-loop-fresh"
+	if focus, _ := tm.Tree().GetPipelineFocus(sessionID); focus != nil {
+		t.Fatalf("precondition: expected no focus, got %+v", focus)
+	}
+
+	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   "review d2 domain code",
+	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
+	if err != nil {
+		t.Fatalf("RunSessionTurnLoop: %v", err)
+	}
+	events := drainEvents(ch)
+	if !hasEventType(events, "pipeline_round") {
+		t.Fatalf("expected pipeline_round, got %v", loopEventTypes(events))
+	}
+	if !hasEventType(events, "complete") {
+		t.Fatalf("expected complete, got %v", loopEventTypes(events))
+	}
+	for _, ev := range events {
+		if ev.Type == "text" && ev.Content == "session turn loop: no work items processed" {
+			t.Fatalf("regression: emitted empty-tree stub; events=%v", loopEventTypes(events))
+		}
+	}
+	goal, ok := tm.GetWorkItem(sessionID, mustGoalID(t, tm, sessionID))
+	if !ok || goal == nil {
+		t.Fatalf("expected goal WorkItem to be seeded from req.Message")
+	}
+	if goal.Directive != "review d2 domain code" {
+		t.Fatalf("goal.Directive = %q, want seeded from req.Message", goal.Directive)
+	}
+}
+
+// Regression (2026-06-26): RunSessionTurnLoop used to emit a `text` event
+// carrying the D7 internal pipeline summary ([Goal] title → VerdictKind
+// (spawn=...)) at loop end, which the feishu reply card treated as
+// user-facing content. The LLM's streaming path already delivers the
+// real answer; the D7 metadata must stay internal.
+func TestRunSessionTurnLoop_NoSummaryTextEventAtLoopEnd(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		&recordingExecutor{},
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
+		WithLearner(runner.Learner),
+	)
+
+	sessionID := "sess-no-summary"
+	_, _ = tm.EnsureGoal(sessionID, "draft release notes")
+	_ = tm.Tree().SetUncertainty(sessionID, mustGoalID(t, tm, sessionID), 0.2)
+
+	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   "draft release notes",
+	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
+	if err != nil {
+		t.Fatalf("RunSessionTurnLoop: %v", err)
+	}
+	events := drainEvents(ch)
+	for _, ev := range events {
+		if ev.Type == "text" && strings.Contains(ev.Content, "draft release notes →") {
+			t.Fatalf("regression: pipeline summary leaked as text event: %q", ev.Content)
+		}
+	}
+	// The terminal `complete` event must have empty Content so the
+	// feishu finalize path does not render a 任务总结 card from D7
+	// metadata.
+	last := events[len(events)-1]
+	if last.Type != "complete" {
+		t.Fatalf("last event type = %q, want complete", last.Type)
+	}
+	if last.Content != "" {
+		t.Fatalf("complete event Content = %q, want empty (D7 metadata must not surface to user)", last.Content)
 	}
 }
 

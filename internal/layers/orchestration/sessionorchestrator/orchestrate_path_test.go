@@ -200,17 +200,25 @@ func TestOrchestratePath_NoDuplicateTextOnCompletion(t *testing.T) {
 // dropped, leaving the user staring at a stale "started" card.
 func TestWorkerEventToEngine_PassesText(t *testing.T) {
 	cases := []struct {
-		name    string
-		inType  string
-		wantNil bool
+		name     string
+		inType   string
+		wantType string
+		wantNil  bool
 	}{
-		{"text passes through", "text", false},
-		{"thinking passes through", "thinking", false},
-		{"tool_use passes through", "tool_use", false},
-		{"error passes through", "error", false},
-		{"complete filtered", "complete", true},
-		{"cancelled filtered", "cancelled", true},
-		{"unknown filtered", "unknown_type", true},
+		{"text passes through", "text", "text", false},
+		{"thinking passes through", "thinking", "thinking", false},
+		// 2026-06-26 hotfix: worker "tool_use" must surface as
+		// EngineEvent "tool_call" so the D1 feishu task-card surface
+		// and SignalRouter (which only recognise tool_call/tool_result)
+		// actually render the entry. Otherwise the event reaches
+		// handleEngineEvent with Type="tool_use", falls into the router
+		// default branch, and is silently dropped — task card stays
+		// empty during subagent tool calls.
+		{"tool_use maps to tool_call", "tool_use", "tool_call", false},
+		{"error passes through", "error", "error", false},
+		{"complete filtered", "complete", "", true},
+		{"cancelled filtered", "cancelled", "", true},
+		{"unknown filtered", "unknown_type", "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -225,8 +233,8 @@ func TestWorkerEventToEngine_PassesText(t *testing.T) {
 			if ev == nil {
 				t.Fatalf("type=%q should produce an EngineEvent, got nil", tc.inType)
 			}
-			if ev.Type != tc.inType {
-				t.Errorf("Type=%q, want %q", ev.Type, tc.inType)
+			if ev.Type != tc.wantType {
+				t.Errorf("Type=%q, want %q", ev.Type, tc.wantType)
 			}
 			if ev.Content != "hello" {
 				t.Errorf("Content=%q, want hello", ev.Content)
@@ -238,5 +246,35 @@ func TestWorkerEventToEngine_PassesText(t *testing.T) {
 				t.Errorf("metadata.wave_task_id=%q, want task-y", ev.Metadata["wave_task_id"])
 			}
 		})
+	}
+}
+
+// TestWorkerEventToEngine_ToolUseCarriesToolName (2026-06-26 hotfix): a
+// worker `tool_use` event with ToolName/ToolInput must produce a
+// `tool_call` EngineEvent that surfaces them. Otherwise the D1 feishu
+// task card has no name to render and the user cannot tell which tool
+// ran.
+func TestWorkerEventToEngine_ToolUseCarriesToolName(t *testing.T) {
+	ev := workerEventToEngine("sess-x", "task-y",
+		wavescheduler.WorkerEvent{
+			Type:      "tool_use",
+			Content:   "running ls",
+			ToolName:  "bash",
+			ToolInput: `{"cmd":"ls -la"}`,
+		})
+	if ev == nil {
+		t.Fatal("tool_use must produce an EngineEvent, got nil")
+	}
+	if ev.Type != "tool_call" {
+		t.Errorf("Type=%q, want tool_call", ev.Type)
+	}
+	if ev.ToolName != "bash" {
+		t.Errorf("ToolName=%q, want bash", ev.ToolName)
+	}
+	if ev.ToolInput != `{"cmd":"ls -la"}` {
+		t.Errorf("ToolInput=%q, want %q", ev.ToolInput, `{"cmd":"ls -la"}`)
+	}
+	if ev.Metadata["tool_name"] != "bash" {
+		t.Errorf("metadata.tool_name=%q, want bash", ev.Metadata["tool_name"])
 	}
 }

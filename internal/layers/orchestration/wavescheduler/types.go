@@ -173,7 +173,13 @@ type ResolvedContext struct {
 type WorkerEvent struct {
 	Type    string // "thinking" | "text" | "tool_use" | "error" | "complete" | "cancelled"
 	Content string
-	At      time.Time
+	// ToolName / ToolInput are populated for Type == "tool_use" so the
+	// workerEventToEngine bridge can render a real `tool_call` EngineEvent
+	// (the D1 feishu task card surface and the SignalRouter only recognise
+	// tool_call / tool_result, never the raw worker `tool_use` name).
+	ToolName  string
+	ToolInput string
+	At        time.Time
 }
 
 // WorkerRunner is implemented by SubAgent / AgentTool / Stub runners. It owns
