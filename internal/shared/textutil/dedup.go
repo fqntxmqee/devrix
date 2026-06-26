@@ -105,6 +105,86 @@ func DedupRepeatedTextIterative(buffer string, minDupRunes, minGapRunes, maxPass
 	return buffer
 }
 
+// DedupAdjacentRepeats finds short phrases (3-7 runes) that appear
+// consecutively 2+ times and collapses them to a single occurrence.
+// The companion to DedupRepeatedText which only operates on LCPs
+// ≥ 8 runes: the hasMinUniqueRunes guard rejects short phrases as
+// too unvaried, so echoes like "让我先让我先" or "我来帮你我来帮你"
+// would slip through. The empirical pattern in minimax M2.7 streaming
+// is the LLM starting multiple consecutive sentences with the same
+// 3-5 rune phrase ("让我先", "我来帮你"); this collapses that
+// pattern without affecting longer, more varied repeats.
+//
+// Algorithm: single linear scan. At each position, try the longest
+// phrase length first and look for consecutive exact repeats. If ≥ 2
+// are found, keep one and skip the rest; otherwise advance one rune.
+// O(n * (maxRunes - minRunes)) worst case, fine for buffer sizes up
+// to ~64K runes (a reply card).
+//
+// minRunes < 2 is clamped to 2 (avoid matching single-rune particles
+// like 的/是). maxRunes < minRunes is clamped to minRunes.
+func DedupAdjacentRepeats(buffer string, minRunes, maxRunes int) string {
+	if minRunes < 2 {
+		minRunes = 2
+	}
+	if maxRunes < minRunes {
+		maxRunes = minRunes
+	}
+	runes := []rune(buffer)
+	n := len(runes)
+	if n < minRunes*2 {
+		return buffer
+	}
+	out := make([]rune, 0, n)
+	for i := 0; i < n; {
+		matched := false
+		for L := maxRunes; L >= minRunes; L-- {
+			if i+L > n {
+				continue
+			}
+			run := 1
+			for i+(run+1)*L <= n && equalRuneSlices(runes[i:i+L], runes[i+run*L:i+run*L+L]) {
+				run++
+			}
+			if run >= 2 {
+				// Reject single-rune padding runs (e.g. "补补补补补"
+				// × N) by requiring at least 2 distinct runes in the
+				// candidate phrase. This is intentionally weaker than
+				// DedupRepeatedText's hasMinUniqueRunes(5 + k/30)
+				// because short Chinese phrases legitimately have 2-4
+				// unique runes ("让我先" = 3), and the LLM echo
+				// pattern is exactly these high-information short
+				// phrases — the strict guard would reject them all.
+				if !hasMinUniqueRunes(runes[i:i+L], 2) {
+					continue
+				}
+				out = append(out, runes[i:i+L]...)
+				i += run * L
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+		out = append(out, runes[i])
+		i++
+	}
+	return string(out)
+}
+
+func equalRuneSlices(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // minUniqueRunes returns the minimum number of unique runes that a
 // candidate LCP of length k must contain to be considered a real
 // duplicate. The threshold combines a fixed floor of 5 (so short LCPs
