@@ -48,9 +48,11 @@ type WorkItem struct {
 	RunRef        string     `json:"run_ref,omitempty"`
 	Ephemeral     bool       `json:"ephemeral,omitempty"`
 	Locked        bool       `json:"locked,omitempty"`
-	SourceSession string     `json:"source_session,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	SourceSession  string          `json:"source_session,omitempty"`
+	ContextScopeID string          `json:"context_scope_id,omitempty"`
+	ContextPolicy  ContextLinkKind `json:"context_policy,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 // CreateWorkItemInput holds fields for creating a work item.

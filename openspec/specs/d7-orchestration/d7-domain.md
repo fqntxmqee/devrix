@@ -130,6 +130,8 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 登记 SoT |
 | `span-registry.md` | Span operation 登记 SoT（含 MUPS 5 节点 + 9 sessionSpan attributes） |
 | `layer-delta.md` | V1→V5 演进 Delta（含 MUPS 5 节点管道 IMPLEMENTED 段） |
+| `workitem-pipeline-unification-design.md` | WorkItem × MUPS Pipeline 统一（Turn Loop + SpawnPolicy） |
+| `workitem-context-graph-design.md` | WorkItem × ContextGraph 分层透传（ContextScope + Link/Bubble 规则） |
 | `../../tech-debt/worktree-v2-deferred.md` | WorkTree v2.1+ 技术债务（TD-WT-01..06） |
 | `../architecture/code-layout.md` §4.2 | scenario-slug 物理路径 |
 
