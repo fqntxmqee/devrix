@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-workitem-context-graph`
 **Demand ID:** DM-20260626-020
 **Priority:** P1
-**Status:** S2_Proposal → S3_Design → S4_Implementing
+**Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S7_Archived
 **SoT:** `openspec/specs/d7-orchestration/workitem-context-graph-design.md`
 
 ---
@@ -54,6 +54,27 @@ WorkItem Pipeline 解决了 **spawn 规则化**，但未解决 **上下文分区
 
 ## 6. Success Criteria
 
-- [ ] F1: `go test ./internal/layers/orchestration/workmodel/... -run Context` PASS
-- [ ] F3: BlockedBy 集成测试 MaterializeContext upstream
-- [ ] F6: ResolveHint 展示 link/bubble 审计信息
+- [x] F1: `go test ./internal/layers/orchestration/workmodel/... -run Context` PASS
+- [x] F3: BlockedBy 集成测试 Wave upstream
+- [x] F6: ResolveHint 展示 link/bubble 审计信息
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-26
+**Duration:** 1 day
+**Outcome:** Successfully implemented
+**PR:** #244 → master (`6aec4c6`)
+
+### Specs Updated
+
+- `openspec/specs/d7-orchestration/workitem-context-graph-design.md` v0.3.0
+- `openspec/specs/d7-orchestration/d7-domain.md` v2.5.0
+- `openspec/archive/2026-06-26-devrix-d7-workitem-context-graph/specs/d7-orchestration/spec.md`
+
+### Code (primary)
+
+- `internal/layers/orchestration/workmodel/context_*.go`
+- `internal/layers/orchestration/sessionorchestrator/item_observe.go`
+- `internal/layers/orchestration/sessionorchestrator/item_pipeline.go`
