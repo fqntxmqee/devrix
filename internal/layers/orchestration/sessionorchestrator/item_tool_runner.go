@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/execute"
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
-	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
 )
 
@@ -19,42 +16,37 @@ const workItemExecuteTool = "work_item_execute"
 // ItemToolRunner adapts ToolRoundExecutor to execute.ToolRunner for the
 // per-WorkItem MUPS pipeline (Phase D bootstrap).
 //
-// work_item_execute (synthetic "execute directive" tool) delegates to the
-// D7 LLMInvoker (D7-S2-A07) so a chat-style user instruction actually
-// reaches the LLM. This is the regression hotfix for PR #243 + PR #246:
-// the per-WorkItem pipeline became the default ingress (RunSessionTurnLoop
-// in orchestrator.go:438-439), but ItemToolRunner previously returned a
-// synthetic "work item executed: <directive>" string for work_item_execute,
-// so the LLM was never called and the user saw an instant empty reply
-// (sess_1782464239150_5000 — round completed in 11ms with no LLM call).
-//
-// Other tool names delegate to a.Exec.ExecuteRound (the real
-// D2 ToolRoundExecutor path), preserving the v6.0.0+ surface/perms model.
+// DM-20260626-009: ItemPipelineRunner.Run no longer routes through
+// ItemToolRunner — WorkItemExecutor now drives the per-WorkItem
+// LLM↔Tool ReAct loop directly (see workitem_executor.go). This type is
+// kept as a thin adapter for any legacy ToolRunner consumers that still
+// need execute.ToolRunner compatibility (e.g. ChannelRouter/ChannelExecute
+// wiring in tests). The work_item_execute synthetic tool now fails fast
+// so a misuse cannot silently short-circuit the LLM call again.
 type ItemToolRunner struct {
-	Exec       ToolRoundExecutor
-	LLMInvoker orchtypes.LLMInvoker
+	Exec ToolRoundExecutor
 }
 
 // NewItemToolRunner wraps a production tool executor for ItemPipelineRunner.
-//
-// LLMInvoker is optional: when nil, work_item_execute returns an explicit
-// error instead of a synthetic result so the regression is surfaced instead
-// of silently producing "work item executed: <directive>".
 func NewItemToolRunner(exec ToolRoundExecutor) execute.ToolRunner {
 	return ItemToolRunner{Exec: exec}
-}
-
-// NewItemToolRunnerWithLLM wires the LLMInvoker for the synthetic
-// work_item_execute tool. Bootstrap uses this constructor so the
-// per-WorkItem pipeline can actually reach the LLM (D7-S2-A07).
-func NewItemToolRunnerWithLLM(exec ToolRoundExecutor, llm orchtypes.LLMInvoker) execute.ToolRunner {
-	return ItemToolRunner{Exec: exec, LLMInvoker: llm}
 }
 
 func (a ItemToolRunner) Invoke(ctx context.Context, req execute.ToolRequest) (execute.ToolResult, error) {
 	now := time.Now()
 	if req.ToolName == workItemExecuteTool {
-		return a.invokeWorkItemExecute(ctx, req, now)
+		// DM-20260626-009: ItemPipelineRunner now drives the per-WorkItem
+		// LLM↔Tool loop via WorkItemExecutor (workitem_executor.go). The
+		// work_item_execute synthetic tool path is decommissioned; surface
+		// an explicit error rather than returning a synthetic stub so any
+		// leftover caller is forced to migrate.
+		return execute.ToolResult{
+			ToolName:    req.ToolName,
+			ExitCode:    1,
+			Output:      "",
+			StartedAt:   now,
+			CompletedAt: now,
+		}, fmt.Errorf("item tool runner: work_item_execute path decommissioned (DM-20260626-009); use WorkItemExecutor instead")
 	}
 	if a.Exec == nil {
 		return execute.ToolResult{
@@ -109,80 +101,6 @@ func (a ItemToolRunner) Invoke(ctx context.Context, req execute.ToolRequest) (ex
 		ToolName:    req.ToolName,
 		ExitCode:    exit,
 		Output:      tr.Output,
-		StartedAt:   now,
-		CompletedAt: time.Now(),
-	}, nil
-}
-
-// invokeWorkItemExecute runs the synthetic "execute this directive" tool
-// by calling the LLM via D7-S2-A07 (orchtypes.LLMInvoker). The directive
-// is the user message; the LLM response becomes the ToolResult.Output and
-// flows into the round's ArtifactSummary, which RunSessionTurnLoop emits
-// as a text event so the user sees the actual answer.
-func (a ItemToolRunner) invokeWorkItemExecute(ctx context.Context, req execute.ToolRequest, now time.Time) (execute.ToolResult, error) {
-	directive := ""
-	if req.Args != nil {
-		if v, ok := req.Args["directive"].(string); ok {
-			directive = v
-		}
-	}
-	directive = strings.TrimSpace(directive)
-	if directive == "" {
-		return execute.ToolResult{
-			ToolName:    req.ToolName,
-			ExitCode:    1,
-			StartedAt:   now,
-			CompletedAt: now,
-		}, fmt.Errorf("item tool runner: work_item_execute requires a non-empty directive arg")
-	}
-	if a.LLMInvoker == nil {
-		return execute.ToolResult{
-			ToolName:    req.ToolName,
-			ExitCode:    1,
-			Output:      "",
-			StartedAt:   now,
-			CompletedAt: now,
-		}, fmt.Errorf("item tool runner: work_item_execute requires LLMInvoker (bootstrap wiring missing — see wire_item_pipeline.go)")
-	}
-
-	ch, err := a.LLMInvoker.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
-		SessionID: req.SessionID,
-		Messages: []types.Message{{
-			Role:    types.MessageRoleUser,
-			Content: directive,
-		}},
-	})
-	if err != nil {
-		return execute.ToolResult{
-			ToolName:    req.ToolName,
-			ExitCode:    1,
-			StartedAt:   now,
-			CompletedAt: time.Now(),
-		}, fmt.Errorf("item tool runner: llm invoke: %w", err)
-	}
-
-	var sb strings.Builder
-	for chunk := range ch {
-		if chunk.Content != "" {
-			sb.WriteString(chunk.Content)
-		}
-		if chunk.Thinking != "" {
-			sb.WriteString(chunk.Thinking)
-		}
-		if chunk.FinishReason != "" && chunk.FinishReason != "stop" {
-			return execute.ToolResult{
-				ToolName:    req.ToolName,
-				ExitCode:    1,
-				Output:      sb.String(),
-				StartedAt:   now,
-				CompletedAt: time.Now(),
-			}, fmt.Errorf("item tool runner: llm finish_reason=%s", chunk.FinishReason)
-		}
-	}
-	return execute.ToolResult{
-		ToolName:    req.ToolName,
-		ExitCode:    0,
-		Output:      sb.String(),
 		StartedAt:   now,
 		CompletedAt: time.Now(),
 	}, nil

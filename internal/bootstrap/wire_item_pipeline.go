@@ -12,18 +12,18 @@ import (
 
 // ItemPipelineWireDeps holds production wiring for per-WorkItem MUPS (Phase D).
 //
-// LLMInvoker wires the D7-S2-A07 streaming call used by ItemToolRunner.invokeWorkItemExecute
-// so chat-style directives actually reach the LLM. Without this the
-// per-WorkItem pipeline returns a synthetic "work item executed: <directive>"
-// string and the user sees an instant empty reply (DM-20260626-008 follow-up
-// regression after PR #243 + PR #246 made ItemPipelineRunner the default
-// ingress).
+// DM-20260626-009: per-WorkItem execution moved from the legacy
+// ItemToolRunner+work_item_execute shim to a fresh WorkItemExecutor
+// (see sessionorchestrator.workitem_executor.go). The Executor drives a
+// per-WorkItem ReAct loop (LLM ↔ Tool) and needs LLMInvoker for the LLM
+// side and ContextPreparer for workspace context assembly.
 type ItemPipelineWireDeps struct {
-	ToolExec   sessionorchestrator.ToolRoundExecutor
-	Tasks      *workmodel.TaskManager
-	Classifier decisionplanning.IntentClassifier
-	LLMInvoker orchtypes.LLMInvoker
-	TrackMode  string
+	ToolExec      sessionorchestrator.ToolRoundExecutor
+	Tasks         *workmodel.TaskManager
+	Classifier    decisionplanning.IntentClassifier
+	LLMInvoker    orchtypes.LLMInvoker
+	CtxPreparer   sessionorchestrator.ContextPreparer
+	TrackMode     string
 }
 
 // WireDefaultMUPSLearner constructs the in-process LP-1 learner used by both
@@ -45,12 +45,16 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		return nil, nil, fmt.Errorf("wire item pipeline: ToolRoundExecutor required")
 	}
 	if deps.LLMInvoker == nil {
-		return nil, nil, fmt.Errorf("wire item pipeline: LLMInvoker required (ItemToolRunner needs D7-S2-A07 to call the LLM)")
+		return nil, nil, fmt.Errorf("wire item pipeline: LLMInvoker required (WorkItemExecutor needs D7-S2-A07 to call the LLM)")
+	}
+	if deps.CtxPreparer == nil {
+		return nil, nil, fmt.Errorf("wire item pipeline: ContextPreparer required (WorkItemExecutor needs D2-S15 to assemble SystemPrompt + Tools)")
 	}
 	learner := WireDefaultMUPSLearner()
+	executor := sessionorchestrator.NewWorkItemExecutor(deps.LLMInvoker, deps.CtxPreparer, deps.ToolExec)
 	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
 		Classifier: deps.Classifier,
-		Runner:     sessionorchestrator.NewItemToolRunnerWithLLM(deps.ToolExec, deps.LLMInvoker),
+		Executor:   executor,
 		Learner:    learner,
 		Tasks:      deps.Tasks,
 		TrackMode:  deps.TrackMode,

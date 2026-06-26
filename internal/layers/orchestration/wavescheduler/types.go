@@ -19,12 +19,18 @@ const (
 	WorkerCursor     WorkerType = "cursor"
 	WorkerClaudeCode WorkerType = "claude_code"
 	WorkerSubAgent   WorkerType = "subagent"
+	// WorkerWorkItem tags Artifacts produced by the per-WorkItem
+	// WorkItemExecutor (D7 sessionorchestrator.workitem_executor.go).
+	// Not a runner-pool kind — WorkItemExecutor does not consume slots —
+	// just a tag so downstream Verify/Learn can distinguish the
+	// per-WorkItem ReAct origin from wave-spawned runners.
+	WorkerWorkItem WorkerType = "workitem"
 )
 
 // Valid reports whether the worker type is recognized.
 func (w WorkerType) Valid() bool {
 	switch w {
-	case WorkerCursor, WorkerClaudeCode, WorkerSubAgent:
+	case WorkerCursor, WorkerClaudeCode, WorkerSubAgent, WorkerWorkItem:
 		return true
 	default:
 		return false

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
-	"github.com/devrix/devrix/internal/layers/orchestration/mups/execute"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
@@ -15,25 +14,48 @@ import (
 )
 
 // ItemPipelineRunner executes Observe→Plan→Execute→Verify→Learn→Decide for one WorkItem.
+//
+// DM-20260626-009: the Execute phase now goes through WorkItemExecutor
+// directly (per-WorkItem ReAct loop), bypassing the legacy CommitChannel +
+// ItemToolRunner + work_item_execute shim. Planner is kept for round
+// metadata + Learn lineage; the Plan.Steps are vestigial (Executor reads
+// the directive from WorkItem directly, not from Plan.Steps[0].ToolArgs).
 type ItemPipelineRunner struct {
-	Classifier        decisionplanning.IntentClassifier
-	Planner           plan.Planner
-	Router            *execute.ChannelRouter
-	Learner           learn.Learner
-	Tasks             *workmodel.TaskManager
-	TrackMode         string
-	ContextProposer   workmodel.ContextProposer
+	Classifier      decisionplanning.IntentClassifier
+	Planner         plan.Planner
+	Learner         learn.Learner
+	Tasks           *workmodel.TaskManager
+	TrackMode       string
+	ContextProposer workmodel.ContextProposer
+	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
+	// Replaces the prior Router/Channel/tool-pipeline path.
+	Executor WorkItemExecutor
 	// Verify overrides deterministic artifact verification (tests / future LLM verifier).
 	Verify func(*wavescheduler.Artifact) workmodel.Verdict
 }
 
-// ItemPipelineDeps wires a production-style runner. Nil Planner defaults to DefaultPlanner.
+// ItemPipelineDeps wires a production-style runner. Nil Planner defaults to
+// DefaultPlanner; nil Classifier defaults to RuleClassifier. Executor is
+// required (DM-20260626-009).
+type ItemPipelineDeps struct {
+	Classifier decisionplanning.IntentClassifier
+	Planner    plan.Planner
+	Learner    learn.Learner
+	Tasks      *workmodel.TaskManager
+	TrackMode  string
+	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
+	// Required. nil → NewItemPipelineRunner returns an error.
+	Executor WorkItemExecutor
+}
+
+// NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
+// Executor is required; the Planner/Classifier fall back to defaults.
 func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 	if deps.Tasks == nil {
 		return nil, fmt.Errorf("item_pipeline: TaskManager required")
 	}
-	if deps.Runner == nil {
-		return nil, fmt.Errorf("item_pipeline: ToolRunner required")
+	if deps.Executor == nil {
+		return nil, fmt.Errorf("item_pipeline: WorkItemExecutor required (DM-20260626-009)")
 	}
 	planner := deps.Planner
 	if planner == nil {
@@ -43,50 +65,14 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 	if classifier == nil {
 		classifier = decisionplanning.NewRuleClassifier(nil)
 	}
-	reg := execute.NewChannelRegistry()
-	for _, regFn := range []struct {
-		name string
-		fn   func(execute.ToolRunner) (execute.Channel, error)
-	}{
-		{"commit", func(r execute.ToolRunner) (execute.Channel, error) {
-			return execute.NewCommitChannel(r, execute.CommitChannelConfig{})
-		}},
-		{"protocol", func(r execute.ToolRunner) (execute.Channel, error) {
-			return execute.NewProtocolChannel(r, execute.ProtocolChannelConfig{})
-		}},
-		{"scenario", func(r execute.ToolRunner) (execute.Channel, error) {
-			return execute.NewScenarioChannel(r, execute.ScenarioChannelConfig{})
-		}},
-		{"exploration", func(r execute.ToolRunner) (execute.Channel, error) {
-			return execute.NewExplorationChannel(r, execute.ExplorationChannelConfig{})
-		}},
-	} {
-		ch, err := regFn.fn(deps.Runner)
-		if err != nil {
-			return nil, fmt.Errorf("item_pipeline: %s channel: %w", regFn.name, err)
-		}
-		if err := reg.Register(ch); err != nil {
-			return nil, fmt.Errorf("item_pipeline: register %s: %w", regFn.name, err)
-		}
-	}
 	return &ItemPipelineRunner{
 		Classifier: classifier,
 		Planner:    planner,
-		Router:     execute.NewChannelRouter(reg),
 		Learner:    deps.Learner,
 		Tasks:      deps.Tasks,
 		TrackMode:  deps.TrackMode,
+		Executor:   deps.Executor,
 	}, nil
-}
-
-// ItemPipelineDeps holds dependencies for NewItemPipelineRunner.
-type ItemPipelineDeps struct {
-	Classifier decisionplanning.IntentClassifier
-	Planner    plan.Planner
-	Runner     execute.ToolRunner
-	Learner    learn.Learner
-	Tasks      *workmodel.TaskManager
-	TrackMode  string
 }
 
 // Run executes the full per-WorkItem MUPS pipeline and persists LastRound (Phase B).
@@ -128,11 +114,16 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		QuantizedKind:  qKind,
 		AnomaliesCount: len(report.Anomalies),
 		Steps: []plan.Step{{
-			ID:             "step_" + item.ID,
-			Directive:      itemDirective(item),
-			ToolName:       "work_item_execute",
-			ToolArgs:       map[string]any{"directive": itemDirective(item)},
-			IdempotencyKey: "idem_" + item.ID,
+			ID:        "step_" + item.ID,
+			Directive: itemDirective(item),
+			// ToolName/ToolArgs are vestigial post-DM-20260626-009: the
+			// Execute phase calls WorkItemExecutor directly with the
+			// directive, not through CommitChannel+work_item_execute.
+			// Kept so the Plan still validates (DefaultPlanner requires
+			// ≥1 Step) and so any Plan inspector sees the directive.
+			ToolName:        "workitem_executor_direct",
+			ToolArgs:        map[string]any{"directive": itemDirective(item)},
+			IdempotencyKey:  "idem_" + item.ID,
 			EstimatedTokens: 100,
 		}},
 		FailureCriteria: []plan.FailureCriterion{{Field: "exit_code", Op: "eq", Value: 0}},
@@ -149,15 +140,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseExecute)
 
-	art, err := r.Router.Route(ctx, pl, execute.ChannelRequest{
-		SessionID: sessionID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("item_pipeline: execute: %w", err)
+	// DM-20260626-009: bypass CommitChannel/ItemToolRunner/work_item_execute;
+	// call WorkItemExecutor directly with the WorkItem's directive.
+	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, itemDirective(item))
+	if execErr != nil {
+		// Non-fatal: continue with whatever Content was accumulated so the
+		// round still produces an Artifact + Verdict for downstream Verify.
+		// Empty content is fine — Verify will mark the round as failed and
+		// the parent pipeline decides whether to retry / spawn.
+		if result == nil {
+			return nil, fmt.Errorf("item_pipeline: execute: %w", execErr)
+		}
 	}
-	if art != nil && art.SourcePlanID == "" {
-		art.SourcePlanID = pl.ID
-	}
+	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
+
 	_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseVerify)
 
 	verdict := verifyArtifact(art)
@@ -289,6 +285,80 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	item.RoundPhase = phase
 	item.Uncertainty = uncertaintyMean
 	return round, nil
+}
+
+// buildArtifactFromWorkItemResult converts a WorkItemExecutor result into a
+// wavescheduler.Artifact. Sets SourcePlanID to pl.ID so downstream consumers
+// can correlate Artifact → Plan. WorkerType=WorkerWorkItem distinguishes
+// ReAct-origin artifacts from wave-spawned runner artifacts.
+func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, sessionID string, started time.Time, result *WorkItemResult, execErr error) *wavescheduler.Artifact {
+	ended := time.Now()
+	content := ""
+	stopReason := ""
+	iterations := 0
+	toolCalls := 0
+	exit := 0
+	errMsg := ""
+	if result != nil {
+		content = result.Content
+		stopReason = result.StopReason
+		iterations = result.Iterations
+		toolCalls = result.ToolCalls
+		if !result.Done {
+			exit = 1
+		}
+		if !result.EndedAt.IsZero() {
+			ended = result.EndedAt
+		}
+	}
+	if execErr != nil {
+		exit = 1
+		errMsg = execErr.Error()
+	}
+	art := &wavescheduler.Artifact{
+		TaskID:     item.ID,
+		SessionID:  sessionID,
+		WorkerType: wavescheduler.WorkerWorkItem,
+		// DM-20260626-009 follow-up: WorkerWorkItem artifacts carry the LLM's
+		// full ReAct response — this IS the user's answer, not a brief task
+		// digest. Truncating at 200 chars (the wave-worker summary cap) cut
+		// long reviews short and the feishu reply card showed only the first
+		// 200 chars + ellipsis. Skip truncation here; Learn node truncates
+		// evidence further (asset_builder.go:272 truncates to 64) so the
+		// downstream path is unaffected.
+		Summary:   content,
+		ExitCode:  exit,
+		Error:     errMsg,
+		StartedAt: started,
+		EndedAt:   ended,
+		Duration:  ended.Sub(started),
+		Metadata: map[string]any{
+			"source":      WorkItemSourceLabel,
+			"stop_reason": stopReason,
+			"iterations":  iterations,
+			"tool_calls":  toolCalls,
+		},
+	}
+	if pl != nil {
+		art.SourcePlanID = pl.ID
+	}
+	return art
+}
+
+// truncateForArtifact returns the first n runes of s followed by an
+// ellipsis when truncation occurred. Empty input returns empty.
+func truncateForArtifact(s string, n int) string {
+	if s == "" || n <= 0 {
+		return s
+	}
+	count := 0
+	for i := range s {
+		if count == n {
+			return s[:i] + "…"
+		}
+		count++
+	}
+	return s
 }
 
 type observationRef string
