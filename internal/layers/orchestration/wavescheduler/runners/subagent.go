@@ -180,13 +180,21 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSp
 		case <-ticker.C:
 			if r.deps.IsTerminal(taskID) {
 				if r.deps.TerminalResult != nil {
-					result, errMsg, _ := r.deps.TerminalResult(taskID)
+					_, errMsg, _ := r.deps.TerminalResult(taskID)
 					if errMsg != "" {
 						emit(wavescheduler.WorkerEvent{Type: "error", Content: errMsg, At: time.Now()})
 						return fmt.Errorf("subagent: %s", errMsg)
 					}
-					emit(wavescheduler.WorkerEvent{Type: "text", Content: result, At: time.Now()})
 				}
+				// Streaming text already reached the feishu reply card via
+				// SubQuery.Run's Emit (DM-20260626-002). Re-emitting the
+				// terminal result here would duplicate the entire LLM
+				// response on the user's card when the early-stage replay
+				// dedup in feishu.appendResponseText hasn't accumulated
+				// enough buffer runes to detect the overlap (see 2026-06-26
+				// hotfix). The BackgroundRegistry still stores the full
+				// result for post-mortem / cross-session reuse, but the
+				// worker channel only sees a terminal "complete" event.
 				emit(wavescheduler.WorkerEvent{Type: "complete", Content: "done", At: time.Now()})
 				return nil
 			}
