@@ -398,12 +398,12 @@ Resolve: bubble to parent = summary (LLM proposed, rule CB3 clamped).
 |-------|------|----------|--------------|
 | **F1** | `ContextScope` + `ContextLinkKind` + Sibling taxonomy 单测 | CG1 契约 | — |
 | **F2** | `ContextBubbleEvaluator` CB0–CB6；父 Observe 读 structured bubble | CG4 | — |
-| **F3** | R2 自动 `LinkUpstream`；decompose 兄弟默认隔离 | CG2 | `D7_WORKITEM_CONTEXT_GRAPH=1` |
+| **F3** | R2 自动 `LinkUpstream`；decompose 兄弟默认隔离 | CG2 | 默认开启 |
 | **F4** | Plan `ContextLinkSpec` / `ContextBubbleSpec` + LLM proposer + CL0–CL8 | CG3 | 同上 |
 | **F5** | D2 sidechain 分区 `wi_<id>`；ContextScope 持久化 | CG1 运行时 | 同上 |
 | **F6** | `/task context show`、ResolveHint、集成测试 | 可运维 | 同上 |
 
-**依赖：** Phase F3+ 建议在 `D7_WORKITEM_PIPELINE=1` 启用前提下验收（ingress 已走 `RunSessionTurnLoop`）。
+**依赖：** WorkItem Pipeline ingress 与 ContextGraph 默认开启（`FeatureWorkItemPipelineEnabled` / `FeatureWorkItemContextGraphEnabled` 恒为 true）。
 
 ---
 

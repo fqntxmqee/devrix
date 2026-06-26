@@ -327,7 +327,7 @@ Scenario: Turn Loop 驱动 focus 切换 (G5)
 
 | OQ | 问题 | 建议默认 | 影响目标 |
 |----|------|----------|----------|
-| OQ-1 | Phase C 是否 feature flag `D7_WORKITEM_PIPELINE=1` | **是**（`workmodel.FeatureWorkItemPipelineEnabled`） | G5 回滚 |
+| OQ-1 | Phase C WorkItem Pipeline ingress | **默认开启**（`FeatureWorkItemPipelineEnabled` 恒为 true） | — |
 | OQ-2 | Partial 时 decompose 子节点数量上限 | **min(7, proposer N)**（`CapChildSpecs`） | G1 vs 成本 |
 | OQ-3 | 子 WorkItem Kind 映射 | hypothesis→`explore`, 实施→`implement` | G4 |
 | OQ-4 | Indeterminate 同节点最大重试 | **3**（`DefaultMaxIndeterminateRetries`） | G3 |
@@ -336,9 +336,9 @@ Scenario: Turn Loop 驱动 focus 切换 (G5)
 
 **Phase B 状态（2026-06-26）：** `ItemPipelineRunner.Run` + `ApplyPipelineRound` + sessionorchestrator 单测 IMPLEMENTED.
 
-**Phase C 状态（2026-06-26）：** `RunSessionTurnLoop` + `ApplySpawnPolicy` + `ProcessMessage` feature flag (`D7_WORKITEM_PIPELINE=1`) + 递归 decompose 单测 IMPLEMENTED.
+**Phase C 状态（2026-06-26）：** `RunSessionTurnLoop` + `ApplySpawnPolicy` + `ProcessMessage` WorkItem Pipeline ingress **默认开启** + 递归 decompose 单测 IMPLEMENTED.
 
-**Phase D 状态（2026-06-26）：** Bootstrap `WireItemPipeline` + `ItemToolRunner` 生产接线；TD-WT-01 `AdaptiveThreshold` 接入 `DefaultTreeEvalContext`；TD-WT-05 `SpawnEscalateHuman` → verify 子 WorkItem；TD-WT-06 父节点 re-eval 互斥；`RunParallelExplore` ephemeral 写回 `LastRound.SpawnRationale`。启用：`D7_WORKITEM_PIPELINE=1`。
+**Phase D 状态（2026-06-26）：** Bootstrap `WireItemPipeline` + `ItemToolRunner` 生产接线；TD-WT-01 `AdaptiveThreshold` 接入 `DefaultTreeEvalContext`；TD-WT-05 `SpawnEscalateHuman` → verify 子 WorkItem；TD-WT-06 父节点 re-eval 互斥；`RunParallelExplore` ephemeral 写回 `LastRound.SpawnRationale`。
 
 **Phase E 状态（2026-06-26）：** `ProcessRequest.UserID` + baggage `user.id` 接入 per-user 阈值；`/task review approve` 人机门控闭环；`human_review` 事件 + Turn Loop 暂停；`SessionOrchestrator.TaskManager()` + `D7StackOptions.WorkItemPipeline` 集成测试脚手架。
 

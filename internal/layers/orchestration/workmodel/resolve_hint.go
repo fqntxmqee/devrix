@@ -48,9 +48,9 @@ func ResolveHint(sessionID string, tm *TaskManager, focus *WorkItem) string {
 	return strings.Join(parts, " ")
 }
 
-// ContextResolveHint adds ContextGraph audit lines when the feature flag is on (F6).
+// ContextResolveHint adds ContextGraph audit lines for ResolveHint (F6).
 func ContextResolveHint(sessionID string, tm *TaskManager, focus *WorkItem) string {
-	if !FeatureWorkItemContextGraphEnabled() || tm == nil || focus == nil {
+	if tm == nil || focus == nil {
 		return ""
 	}
 	links := tm.LinksForWorkItem(sessionID, focus.ID)

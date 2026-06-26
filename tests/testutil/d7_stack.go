@@ -47,7 +47,7 @@ type D7StackOptions struct {
 	// RoutingMode sets coordinator.routing_mode (default loop_first).
 	RoutingMode string
 
-	// WorkItemPipeline sets D7_WORKITEM_PIPELINE=1 for the test process.
+	// WorkItemPipeline wires ItemPipelineRunner in the stack (always on by default).
 	WorkItemPipeline bool
 }
 
@@ -68,10 +68,6 @@ type D7TestStack struct {
 // NewD7TestStack wires bootstrap.InitOrchestration with mock LLM and context engine.
 func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	t.Helper()
-
-	if opt.WorkItemPipeline {
-		t.Setenv(workmodel.FeatureWorkItemPipelineEnv, "1")
-	}
 
 	workDir := t.TempDir()
 	obs, err := observability.New(observability.DefaultConfig())

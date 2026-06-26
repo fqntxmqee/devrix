@@ -77,7 +77,7 @@ type SessionOrchestrator struct {
 	// before falling back to rule-based decomposition.
 	llmDecomposer decisionplanning.LLMTaskDecomposer
 
-	// itemPipeline runs per-WorkItem MUPS when D7_WORKITEM_PIPELINE=1 (Phase C).
+	// itemPipeline runs per-WorkItem MUPS (default on).
 	itemPipeline *ItemPipelineRunner
 
 	// activeSessions tracks the running orchtypes.ProcessRequest per sessionID so
@@ -147,7 +147,7 @@ func WithLLMDecomposer(d decisionplanning.LLMTaskDecomposer) OrchestratorOption 
 }
 
 // WithItemPipelineRunner wires per-WorkItem MUPS pipeline (Phase C).
-// Active when workmodel.FeatureWorkItemPipelineEnabled() is true.
+// WithItemPipelineRunner wires per-WorkItem pipeline ingress (default on).
 func WithItemPipelineRunner(r *ItemPipelineRunner) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.itemPipeline = r }
 }
