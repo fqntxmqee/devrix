@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -54,6 +55,10 @@ type SubAgentParams struct {
 	// Model overrides the inherited model.
 	Model     string
 	ModelTier string
+	// Emit forwards per-event streams from the SubQuery loop back to the
+	// worker channel (DM-20260626-002). EngineEvent types are translated
+	// to WorkerEvent types by the runner; nil = no streaming.
+	Emit contracts.EngineEmitFunc
 }
 
 // SubAgentRunner implements wavescheduler.WorkerRunner for SubQuery-backed workers.
@@ -95,6 +100,33 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSp
 		emit = func(wavescheduler.WorkerEvent) {}
 	}
 
+	// Forward every SubQuery loop event to the worker channel so the
+	// OrchestratePath fan-out (workerEventToEngine) and the feishu card
+	// renderer see the LLM stream in real time. The engine emits
+	// "text"/"thinking"/"tool_call"/"error" — we map them to worker
+	// semantics: tool_call → tool_use, others stay as-is.
+	streamEmit := func(ev *contracts.EngineEvent) {
+		if ev == nil || spec.Emit == nil {
+			return
+		}
+		var workerType string
+		switch ev.Type {
+		case "thinking":
+			workerType = "thinking"
+		case "text":
+			workerType = "text"
+		case "tool_call":
+			workerType = "tool_use"
+		case "error":
+			workerType = "error"
+		default:
+			// "complete" / "info" / unknown: skip — the worker will
+			// emit its own "complete" when the loop drains.
+			return
+		}
+		spec.Emit(wavescheduler.WorkerEvent{Type: workerType, Content: ev.Content, At: time.Now()})
+	}
+
 	params := SubAgentParams{
 		SessionID:      spec.SessionID,
 		AgentID:        "wave-" + spec.TaskID,
@@ -105,6 +137,7 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSp
 		PromptMessages: spec.Context.Messages,
 		MaxTurns:       30,
 		ModelTier:      spec.ModelTier,
+		Emit:           streamEmit,
 	}
 
 	taskID, err := r.deps.Start(ctx, params)
@@ -113,7 +146,6 @@ func (r *SubAgentRunner) Run(ctx context.Context, spec wavescheduler.WorkerRunSp
 		return err
 	}
 	spec.BackgroundID = taskID
-	emit(wavescheduler.WorkerEvent{Type: "thinking", Content: "started", At: time.Now()})
 
 	// Bridge ctx.Done() → BackgroundRegistry.Cancel.
 	if r.deps.Cancel != nil {
