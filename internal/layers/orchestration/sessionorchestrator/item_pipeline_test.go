@@ -3,48 +3,53 @@ package sessionorchestrator
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/mups/execute"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-type stubItemToolRunner struct{}
+// stubWorkItemExecutor is the production-shape WorkItemExecutor used by
+// ItemPipelineRunner tests that don't care about executor internals.
+// Always returns a passing result so the round completes successfully.
+type stubWorkItemExecutor struct{}
 
-func (stubItemToolRunner) Invoke(_ context.Context, req execute.ToolRequest) (execute.ToolResult, error) {
-	now := time.Now()
-	return execute.ToolResult{
-		ToolName:    req.ToolName,
-		ExitCode:    0,
-		Output:      "ok",
-		StartedAt:   now,
-		CompletedAt: now.Add(5 * time.Millisecond),
+func (stubWorkItemExecutor) ExecuteWorkItem(_ context.Context, _, _, directive string) (*WorkItemResult, error) {
+	return &WorkItemResult{
+		Content:    "ok: " + directive,
+		Done:       true,
+		Iterations: 1,
+		ToolCalls:  0,
+		StopReason: "final_answer",
 	}, nil
 }
 
-// capturingItemToolRunner records the Args of each Invoke call. Used by the
-// regression test for the work_item_execute ToolArgs propagation bug
-// (DM-20260626-009): ItemPipelineRunner.Run must inject the WorkItem's
-// directive into Step.ToolArgs so ItemToolRunner.invokeWorkItemExecute can
-// read it via req.Args["directive"]. The 2026-06-26 hotfix wired the LLM
-// call but forgot to populate ToolArgs, so the directive arrived empty and
-// every session returned the "requires a non-empty directive arg" error.
-type capturingItemToolRunner struct {
-	calls []execute.ToolRequest
+// capturingWorkItemExecutor records the directive of each ExecuteWorkItem
+// call. Used by the regression test for DM-20260626-009: ItemPipelineRunner
+// must pass the WorkItem's directive straight to the executor (no shim, no
+// ToolArgs JSON, no synthetic tool name).
+type capturingWorkItemExecutor struct {
+	calls []capturedWorkItemCall
 }
 
-func (s *capturingItemToolRunner) Invoke(_ context.Context, req execute.ToolRequest) (execute.ToolResult, error) {
-	s.calls = append(s.calls, req)
-	now := time.Now()
-	return execute.ToolResult{
-		ToolName:    req.ToolName,
-		ExitCode:    0,
-		Output:      "ok",
-		StartedAt:   now,
-		CompletedAt: now.Add(5 * time.Millisecond),
+type capturedWorkItemCall struct {
+	SessionID string
+	ItemID    string
+	Directive string
+}
+
+func (s *capturingWorkItemExecutor) ExecuteWorkItem(_ context.Context, sessionID, itemID, directive string) (*WorkItemResult, error) {
+	s.calls = append(s.calls, capturedWorkItemCall{
+		SessionID: sessionID,
+		ItemID:    itemID,
+		Directive: directive,
+	})
+	return &WorkItemResult{
+		Content:    "ok",
+		Done:       true,
+		Iterations: 1,
+		StopReason: "final_answer",
 	}, nil
 }
 
@@ -57,9 +62,9 @@ func newItemPipelineTestRunner(t *testing.T) (*ItemPipelineRunner, *workmodel.Ta
 	rep := learn.NewInMemoryReputationStore()
 	learner := learn.NewDefaultLearner(skill, feedback, scheduled, rep, learn.NewAssetBuilder())
 	runner, err := NewItemPipelineRunner(ItemPipelineDeps{
-		Runner:  stubItemToolRunner{},
-		Learner: learner,
-		Tasks:   tm,
+		Executor: stubWorkItemExecutor{},
+		Learner:  learner,
+		Tasks:    tm,
 	})
 	if err != nil {
 		t.Fatalf("NewItemPipelineRunner: %v", err)
@@ -163,19 +168,24 @@ func TestRunItemPipeline_LP5_LineageFields(t *testing.T) {
 	}
 }
 
-// TestRunItemPipeline_WorkItemExecuteReceivesDirective is the regression test
-// for DM-20260626-009: ItemPipelineRunner.Run must populate
-// PlanInput.Steps[0].ToolArgs["directive"] with the WorkItem's directive so
-// ItemToolRunner.invokeWorkItemExecute can read it (the LLM call path that
-// replaced the synthetic stub in PR #249). Without ToolArgs the channel
-// propagates an empty map → ItemToolRunner fails with "requires a non-empty
-// directive arg" and the user sees an instant error card with no LLM call.
-func TestRunItemPipeline_WorkItemExecuteReceivesDirective(t *testing.T) {
+// TestRunItemPipeline_WorkItemExecutorReceivesDirective is the regression
+// test for DM-20260626-009: ItemPipelineRunner.Run must pass the WorkItem's
+// directive straight to WorkItemExecutor.ExecuteWorkItem (no CommitChannel
+// shim, no ToolArgs JSON, no synthetic work_item_execute tool name).
+//
+// Pre-DM-20260626-009 (PR #249+#250) the directive flowed via
+// Plan.Step.ToolArgs → CommitChannel → ItemToolRunner → LLM. The 2026-06-26
+// hotfix wired the LLM call but the synthetic-tool plumbing was the wrong
+// shape: a directive is a first-class WorkItem parameter, not a tool
+// argument. ItemPipelineRunner now calls the Executor directly with the
+// directive as a parameter; the capturing executor below asserts the
+// parameter reaches the executor intact.
+func TestRunItemPipeline_WorkItemExecutorReceivesDirective(t *testing.T) {
 	tm := workmodel.NewTaskManager()
-	runner := &capturingItemToolRunner{}
+	exec := &capturingWorkItemExecutor{}
 	r, err := NewItemPipelineRunner(ItemPipelineDeps{
-		Runner: runner,
-		Tasks:  tm,
+		Executor: exec,
+		Tasks:    tm,
 	})
 	if err != nil {
 		t.Fatalf("NewItemPipelineRunner: %v", err)
@@ -193,22 +203,18 @@ func TestRunItemPipeline_WorkItemExecuteReceivesDirective(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if len(runner.calls) == 0 {
-		t.Fatal("ItemToolRunner.Invoke was never called (no pipeline round reached execute)")
+	if len(exec.calls) == 0 {
+		t.Fatal("WorkItemExecutor.ExecuteWorkItem was never called (no pipeline round reached execute)")
 	}
-	var workItemCall *execute.ToolRequest
-	for i := range runner.calls {
-		if runner.calls[i].ToolName == "work_item_execute" {
-			workItemCall = &runner.calls[i]
-			break
-		}
+	got := exec.calls[0]
+	if got.SessionID != sessionID {
+		t.Fatalf("SessionID = %q, want %q", got.SessionID, sessionID)
 	}
-	if workItemCall == nil {
-		t.Fatalf("work_item_execute not invoked; calls = %+v", runner.calls)
+	if got.ItemID != goal.ID {
+		t.Fatalf("ItemID = %q, want %q", got.ItemID, goal.ID)
 	}
-	got, _ := workItemCall.Args["directive"].(string)
-	if got != directive {
-		t.Fatalf("directive arg = %q, want %q (regression: ItemPipelineRunner.Run must inject directive via Step.ToolArgs so ItemToolRunner.invokeWorkItemExecute can read it)",
-			got, directive)
+	if got.Directive != directive {
+		t.Fatalf("Directive = %q, want %q (regression: ItemPipelineRunner.Run must inject the WorkItem's directive straight into WorkItemExecutor.ExecuteWorkItem)",
+			got.Directive, directive)
 	}
 }
