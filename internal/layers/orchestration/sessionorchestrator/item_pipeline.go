@@ -221,8 +221,10 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	artifactID := ""
+	artifactSummary := ""
 	if art != nil {
 		artifactID = art.TaskID
+		artifactSummary = art.Summary
 	}
 	round := &workmodel.WorkItemPipelineRound{
 		RoundNo:           roundNo,
@@ -232,6 +234,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		PlanID:            pl.ID,
 		PlanKind:          pl.Kind,
 		ArtifactID:        artifactID,
+		ArtifactSummary:   artifactSummary,
 		VerdictID:         verdict.SourceID,
 		VerdictKind:       verdict.Kind,
 		ExitReason:        exitReason,
