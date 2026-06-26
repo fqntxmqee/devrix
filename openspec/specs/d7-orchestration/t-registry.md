@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.6.0
-**Last Updated:** 2026-06-26 (bootstrap-slim)
+**Version:** 4.7.0
+**Last Updated:** 2026-06-26 (inner-spans + dedup-remove, PR #254)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -520,6 +520,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.4.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并（DM-20260626-004 / devrix-d7-6s-package-merge 落地）**：D7-S2 SessionOrchestrator 单一博弈角色单一 Go 包封装（pure physical migration + import path replace）。24 .go 文件 git mv + 14 importer 文件 import path replace + 跨包 import cycle 打破（LLMInvoker/LLMInvokeRequest/ToolSchema 上提 `orchtypes/` + sessionorchestrator 用 type alias）。**0 函数签名变化** + 0 行为变化 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` 0 变更验证。22/22 orchestration packages go test -race PASS + go build + go vet 全绿。**4 新 P0 T** IMPLEMENTED：D7-S2-A50-T01 `orchestration/turn/` 24 .go 文件 git mv → `orchestration/sessionorchestrator/`（contracts/doc/orchestrator/orchestrator_test/tracing 5 文件加 turn_ 前缀解决同名冲突）/ D7-S2-A50-T02 24 .go 文件 `package turn` → `package sessionorchestrator` 替换 / D7-S2-A50-T03 14 importer 文件 import path + identifier 全替换（10 bootstrap + 2 decisionplanning + 2 sessionorchestrator）+ 跨包 import cycle 打破（orchtypes 上提）/ D7-S2-A50-T04 `orchestration/turn/` 目录 0 残留验证 + `hardening/` + `escape/circuit_breaker.go` + `sessionorchestrator/autoclose.go` git diff 0 变更。Total 214→218, IMPLEMENTED 214→218, PLANNED 0→0, P0 181→185。详见 `openspec/archive/2026-06-26-devrix-d7-6s-package-merge/acceptance-report.md` (S6 归档阶段)。 |
 | **4.5.0** | **2026-06-26** | **verify-promotion 包归属迁移 PLANNED 预登记（DM-20260626-005 / devrix-d7-6s-verify-promotion）**：Step 5 (v6.0.0 follow-up) — DM-20260626-004 turn/ → sessionorchestrator/ 时为避免单 PR scope 膨胀临时留存的 `sessionorchestrator/{exit_reason.go (72 行) + verdict_to_exit_reason.go (49 行) + verdict_to_exit_reason_test.go (97 行)}` 3 文件 (218 行) 物理 promote 到 `executionflow/verify/`；让 S4 ExecutionFlow + Verify (Costly Signaler + Certifier) 角色的可验证承诺 (14 ExitReason + VerdictToExitReason 4 态映射) 在 spec/code 完全对齐；`sessionorchestrator/turn_orchestrator.go` 11 处 `ExitReason*` → `verify.ExitReason*` 跨包引用替换（state 字段 + 6 常量 + 2 函数参数 + 1 type assertion）+ `turn_orchestrator_test.go` 2 处替换。**0 函数签名变化**（pure physical migration，安全网与 DM-20260626-004 一致）；14 ExitReason 字符串值全不变；6 测试函数测试矩阵全不变；加 4 P0 T 点 PLANNED：D7-S4-A50 T01 3 文件 git mv + git log --follow 100% rename detection / T02 3 文件 package 改名 + 13 处 ExitReason* 全替换 + grep 0 残留 / T03 executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 cycle 0 风险 / T04 go build/vet/test -race 22/22 PASS + LP-1/LP-2/LP-5 兼容 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 变化。Total 218→222, PLANNED 0→4, P0 185 (IMPLEMENTED 持平 218)。收口后 v4.5.0 → v4.6.0。详见 `openspec/changes/devrix-d7-6s-verify-promotion/proposal.md` + `demand.md` + `design.md` + `tasks.md`。 |
 | **4.6.0** | **2026-06-26** | **Bootstrap Wire 拓扑收口 IMPLEMENTED（DM-20260626-007 / devrix-d7-6s-bootstrap-slim 落地）**：v6.0.0 follow-up 序列最终 PR（#6）— `internal/bootstrap/wire_coordinator.go` InitOrchestration 函数体 275 → **140 行**（≤ 200 目标达成）+ 6 S × WireFunc 命名一致（5 Wire* + 1 BuildOrchestratePath） + 3 内嵌 adapter 函数（newContextEngineAdapter 已在 turn_adapter.go 独立 + newTurnOrchExecutor + newGatewayEventPublisher）拆到 `internal/bootstrap/adapters.go` (48 行) + 4 util 函数（boolPtr + intPtr + strPtr + mapBackgroundStatus）拆到 `internal/bootstrap/util.go` (30 行) + 52 行 config 加载抽到 `loadOrchestratorConfigs` 辅助函数 (24 行) + 4 行类型断言抽到 `resolveObsBridge` 辅助函数 (6 行) + 新增 `WireDecisionPlanning` (16 行 S5) + `WireMUPSPipeline` + `MUPSPipelinesDeps` (75 行 S6)。**0 函数签名变化**（pure physical refactor）+ cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 调用方 0 变化 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 baseline stability。**4 PR 联动** (#225 + #226 + #227 + #228) 全部 squash auto-merge (commit c9a1797)。**4 新 P0 T** IMPLEMENTED：D7-S2-A51-T01 6 S × WireFunc 命名一致 + D7-S2-A51-T02 InitOrchestration 主体 ≤ 200 行 + D7-S2-A51-T03 3 内嵌 adapter + 4 util 函数已抽到独立文件 + D7-S2-A51-T04 22/22 orchestration packages go test -race PASS + 0 baseline regression。Total 222 (IMPLEMENTED 218, PLANNED 4→0), P0 185 (P0 持平)。**v6.0.0 follow-up 序列收官**：5/6 S7_Archived + 1/6 S1_Cancelled (observe-merge) + 1/1 S7_Archived (本次) = D7 编排层进入 v6.0.x 维护阶段。详见 `openspec/archive/2026-06-26-devrix-d7-6s-bootstrap-slim/acceptance-report.md` (S6 归档阶段)。 |
+| **4.7.0** | **2026-06-26** | **DM-20260626-009 follow-up 内层 observability span + dedup 删除（PR #253+#254 落地）**：3 层 LCP-based dedup 在 D1 adapter 兜底 minimax M2.7 流式回放 bug，但同时把自然中文复述当成 echo 误杀（错层：D3 gateway bug 不该 D1 adapter 兜底）。D1/D2/textutil 三处 dedup 全删 + 5-node MUPS 根 span 之外 3 内层 span 落地：(1) D7-S1-A52 worktree.op（P1，2 T 点 T11 EmitWorktreeOp happy + T12 nil-bridge fail-safe，6 P0/P1 spans 之一）+ (2) D7-S1-A53 subworktree.run（P2，2 T 点 T13 EmitSubWorktreeRun happy + T14 nil-bridge fail-safe）+ (3) D7-S5-A54 subturn.iteration（P1，2 T 点 T15 EmitSubTurnIteration happy + T16 nil-bridge fail-safe）。`subturn.finish_reason` 取 LLM 真实 finish_reason（stop/tool_calls/length/...）与 executor 自定义的 stop_reason（final_answer/max_iters/tool_error/...）正交；stepOneIter helper 抽离让 span 包单次函数调用而不是 6 inline return path；cap-hit 多发 1 个 `iter=max+1` span 让 "max_iters" 终止态在 Jaeger 显形。**0 函数签名变化**（pure instrumentation）+ 22/22 orchestration packages go test -race PASS + ItemPipelineRunner 11 个 worktree callsite + WorkItemExecutor ReAct iter + session_turn_loop RunParallelExplore 全 wiring。6 P0 T IMPLEMENTED：Total 222→228, IMPLEMENTED 222→228, P0 185→191。详见 `span-registry.md` §4.1.0 + §WorkItem Inner Layer Trace 树。 |
 
 ---
 
@@ -718,3 +719,86 @@ D7-S6  子包清理热身 Sprint (4 遗留小子包物理合并, IMPLEMENTED 子
 **D7 编排层目录结构终态**: 15 → 11 子目录（移除 4 遗留小子包）。
 **0 函数签名变化 + 0 业务逻辑变化** (pure physical migration)。
 归档：`openspec/archive/2026-06-25-devrix-d7-package-cleanup-sprint/`。
+
+---
+
+## D7-S1: Worktree Op 兜底 (DM-20260626-009 follow-up)
+
+> **Change:** `devrix-d7-inner-spans-dedup-remove` (DM-20260626-009) follow-up — 5-node MUPS 根 span 之外，工作树每次 mutation (set_round_phase / apply_pipeline_round / update_status / list_children) 加一层 `D7_Worktree_Op` span，让 ItemPipelineRunner 11 个 callsite 在 Jaeger 显形，否则"哪一步把 round_phase 改到 X"必须读代码。包级 nil-bridge fail-safe (PR #253+#254 已落)。
+
+### D7-S1-A52: EmitWorktreeOp (P1, 6 P0/P1 span 之一)
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S1-A52-T11** | `EmitWorktreeOp(ctx, sessionID, op, itemID, phaseOrStatus)` happy path — start 时建 span + 设 4 attributes (worktree.op / worktree.item_id / worktree.phase_or_status + session_id)，end 时 nil err 不动 span status、non-nil err 标 error 并记录 err.message | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T11_EmitWorktreeOp_HappyPath` |
+| **D7-S1-A52-T12** | `EmitWorktreeOp` nil-bridge fail-safe — bridge==nil 时 start() 直接 return zero span + closure，end() nil-receiver safe 不 panic；保证 hardening 在未接 telemetry 时不影响生产路径 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T12_EmitWorktreeOp_NilBridgeFailSafe` |
+
+### D7-S1-A53: EmitSubWorktreeRun (P2)
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S1-A53-T13** | `EmitSubWorktreeRun(ctx, sessionID, parentID, childID, spawnedBy)` happy path — parent/child 关系在 trace 上显形 + spawnedBy 标记 spawn 路径 (parallel_explore / spawn_decompose)，便于 dashboard filter | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T13_EmitSubWorktreeRun_HappyPath` |
+| **D7-S1-A53-T14** | `EmitSubWorktreeRun` nil-bridge fail-safe — 同 A52-T12 设计 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T14_EmitSubWorktreeRun_NilBridgeFailSafe` |
+
+---
+
+## D7-S5: Decision & Planning 内层 Sub-Turn (DM-20260626-009 follow-up)
+
+> **Change:** `devrix-d7-inner-spans-dedup-remove` (DM-20260626-009) follow-up — WorkItemExecutor ReAct 循环的每次 LLM→tool round iteration 加一层 `D7_SubTurn_Iteration` span，让"16s session 慢在哪一步"在 Jaeger 显形。`subturn.finish_reason` (LLM stop/tool_calls/length/...) 与 `subturn.stop_reason` (executor final_answer/max_iters/tool_error/...) 正交，前者描述 LLM 自身 finish 行为，后者描述 executor 自定义终止态。cap-hit 路径多发 1 个 `iter=max+1` span 让 "max_iters" 终止态在 trace 可见。
+
+### D7-S5-A54: EmitSubTurnIteration (P1)
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S5-A54-T15** | `EmitSubTurnIteration(ctx, sessionID, itemID, iter, finishReason, stopReason)` happy path — iter 1-based + finishReason 来自 LLM (stop/tool_calls/length) + stopReason 来自 executor (final_answer/tool_error/ok/max_iters)；end 时 nil err 不动 status、non-nil err 标 error | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T15_EmitSubTurnIteration_HappyPath` |
+| **D7-S5-A54-T16** | `EmitSubTurnIteration` nil-bridge fail-safe — 同 A52-T12 设计；同时 cap-hit 路径 (iter=max+1, finishReason="tool_calls", stopReason="max_iters") 也走该函数确认零 panic | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T16_EmitSubTurnIteration_NilBridgeFailSafe` |
+
+---
+
+## Scenario D7-S1 + D7-S5 IMPLEMENTED Detail (内层 observability span 子集)
+
+```
+D7-S1  Worktree Op (DM-20260626-009 follow-up, IMPLEMENTED 子集 4 T)
+├── A52  EmitWorktreeOp (P1, worktree.op 内层 span)
+│   ├── T11  EmitWorktreeOp happy path                              [IMPLEMENTED]
+│   └── T12  EmitWorktreeOp nil-bridge fail-safe                   [IMPLEMENTED]
+└── A53  EmitSubWorktreeRun (P2, subworktree.run 内层 span)
+    ├── T13  EmitSubWorktreeRun happy path                          [IMPLEMENTED]
+    └── T14  EmitSubWorktreeRun nil-bridge fail-safe               [IMPLEMENTED]
+
+D7-S5  Sub-Turn Iteration (DM-20260626-009 follow-up, IMPLEMENTED 子集 2 T)
+└── A54  EmitSubTurnIteration (P1, subturn.iteration 内层 span)
+    ├── T15  EmitSubTurnIteration happy path                        [IMPLEMENTED]
+    └── T16  EmitSubTurnIteration nil-bridge fail-safe             [IMPLEMENTED]
+```
+
+**Total (D7-S1+S5 inner-spans 子集)**: 6 IMPLEMENTED P0 T points, 0 PLANNED, 0 PARTIAL.
+
+**WorkItem Inner Layer Trace 树**（DM-20260626-009 follow-up 内层 span 落地后，SessionOrchestrator 5-node → ItemPipelineRunner → Worktree Op → WorkItemExecutor → Sub-Turn 全链路显形）：
+
+```
+session.span (D7_Session_Run, S1-A42 root)
+└── orchestrator.span (D7_Orchestrator_Run, S2-A43)
+    └── mups.observe.span (D7_MUPS_Observe, S8-A15)
+    └── mups.plan.span (D7_MUPS_Plan, S8-A22)
+    └── mups.execute.span (D7_MUPS_Execute, S9-A26)
+        └── item_pipeline.span (D7_Item_Pipeline, S3-A44)
+            ├── worktree.op[set_round_phase] (D7_Worktree_Op, S1-A52) ×11 per WorkItem
+            ├── worktree.op[apply_pipeline_round] (D7_Worktree_Op, S1-A52)
+            ├── worktree.op[update_status] (D7_Worktree_Op, S1-A52)
+            └── workitem.span (D7_Workitem_Execute, S3-A45)
+                └── subturn.iter[N] (D7_SubTurn_Iteration, S5-A54) ×N per ReAct loop, N≤MaxIters
+                    └── subturn.iter[max_iters] (D7_SubTurn_Iteration, S5-A54) cap-hit 多发 1 span
+    └── mups.verify.span (D7_MUPS_Verify, S10-A32)
+    └── mups.learn.span (D7_MUPS_Learn, S12-A41)
+
+session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
+└── subworktree.run[parent→child, spawned_by=parallel_explore] (D7_SubWorktree_Run, S1-A53)
+    └── orchestrator.span (D7_Orchestrator_Run, S2-A43) per child
+```
+
+**0 函数签名变化**（pure instrumentation — EmitXxx 是新加函数 + 工作树 mutation inline 加 emit + ReAct loop 拆 stepOneIter 让 span 包单次函数调用）。22/22 orchestration packages `go test -race` PASS。
+
+**PR 联动**: PR #253 (5-node MUPS 根 span + item_pipeline 11 callsite) + PR #254 (3 dedup 删除 + 3 inner observability span) + follow-up PR (#255 待开, thread LLM finishReason + 4 spec doc 同步)。
+
+归档：`openspec/archive/2026-06-26-devrix-d7-inner-spans-dedup-remove/` (待 S6)。
