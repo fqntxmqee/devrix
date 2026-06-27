@@ -1,0 +1,23 @@
+change_id: devrix-d2-agents-md-project-layout
+demand_id: DM-20260627-002
+status: s7_archived
+priority: P0
+sprint: d2-hotfix-2026-06-27
+domains: [d2-contextengine]
+type: bugfix
+pr_count: 1
+merged_prs: [258]
+merged_at: 2026-06-27
+summary: |
+  Hotfix: .devrix/AGENTS.md 缺 D{N}→path 映射，导致 LLM 收 "review d2领域代码"
+  指令后盲搜 **/d2/**/*.go 返回空就放弃，只回 152 字节 meta-comment。
+
+  根因：devrix 项目的运行时 AGENTS.md (.devrix/AGENTS.md) 没暴露项目结构
+  布局，只有人读 CLAUDE.md 有 D{N}→path 表。LLM 收指令时不知道 d2 =
+  contextengine = internal/layers/contextengine/。
+
+  Fix: 在 .devrix/AGENTS.md 加 "项目结构（D{N} → 路径）" 章节，7 行表 +
+  3 条补充（跨域共享、域归档、不确定先 ls internal/layers/）。
+
+  项目特定修复（不动 workspace_guidance.zh.md 通用模板），避免影响其他
+  devrix 用户。

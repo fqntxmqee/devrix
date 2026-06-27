@@ -1,0 +1,23 @@
+change_id: devrix-d7-itempipeline-emit-hook
+demand_id: DM-20260627-001
+status: s7_archived
+priority: P0
+sprint: d7-hotfix-2026-06-27
+domains: [d7-orchestration]
+type: bugfix
+pr_count: 1
+merged_prs: [257]
+merged_at: 2026-06-27
+summary: |
+  Hotfix: ItemPipelineRunner per-WorkItem ReAct loop path (default-on since
+  DM-20260626-009) had no emit hook, so tool/text events from LLM↔Tool
+  iterations never reached the D1 gateway — Feishu cards showed nothing.
+
+  Root cause: DefaultWorkItemExecutor.Emit field was nil; ItemPipelineRunner
+  didn't propagate runner-level Emit to executor-level; goroutine wrapper in
+  session_turn_loop.go only set SessionID for the session-level emit, not the
+  per-item pipeline emit.
+
+  Fix: 3 files emit chain (DefaultWorkItemExecutor.Emit → ItemPipelineRunner.Emit
+  → propagation via Executor.Emit assignment + goroutine wrapper) + 2 tests +
+  1 coverage registry fix (D5 spans missed when inner ops added).
