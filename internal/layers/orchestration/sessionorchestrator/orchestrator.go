@@ -28,31 +28,25 @@ import (
 //  2. Routes per the routing matrix:
 //     - orchtypes.IntentSkip                                  → close channel
 //     - orchtypes.IntentCommand                               → CommandHandler (zero LLM, plan/task CLI)
-//     - orchtypes.IntentFast | orchtypes.IntentOrchestrate    → OrchestratePath (5-node MUPS pipeline: Observe → Plan → Wave → Execute → Verify → Learn)
+//     - orchtypes.IntentFast | orchtypes.IntentOrchestrate    → RunSessionTurnLoop (WorkTree + per-WorkItem MUPS)
 //  3. Handles interrupts (HandleInterrupt) for /stop and D1 Stop.
 //
-// v6.1.0 routing collapse: all user instructions except `/`-prefixed D7
-// internal commands and skip-eligible empty messages flow through the
-// 5-node MUPS pipeline. The previous FastPath (D2 single-turn LLM↔Tool
-// loop) is retained in the codebase but no longer reachable from
-// ProcessMessage. Classifier confidence no longer gates routing.
+// User instructions (except `/` commands and skip-eligible empty messages)
+// flow through RunSessionTurnLoop → ItemPipelineRunner (Observe→Plan→
+// Execute→Verify→Learn→Decide) backed by WorkTree.
 //
 // See d7-domain.md §Orchestration Routing Matrix.
 type SessionOrchestrator struct {
 	cfg              *orchtypes.Config
-	classifier       decisionplanning.IntentClassifier
-	executor         TurnExecutor
-	fastPath         *FastPath
-	workModel        WorkModel
+	classifier decisionplanning.IntentClassifier
+	workModel  WorkModel
 	validator        AdvisoryValidator
 	sink             EventPublisher
 	validationMetric *ValidationMetrics
 	obsBridge        *observability.Bridge
 
-	// v1.1.0+ orthogonal paths
-	commandHandler  *CommandHandler
-	orchestratePath *OrchestratePath
-	turnToolExec    *TurnToolExecutor
+	commandHandler *CommandHandler
+	turnToolExec   *TurnToolExecutor
 
 	// taskManager is the D7 task store injected at construction (DM-20260617-008 W4).
 	// nil → a fresh in-memory taskmanager is created in NewSessionOrchestrator.
@@ -72,12 +66,7 @@ type SessionOrchestrator struct {
 	// PlanKind-switch policies. See escape.Engine for details.
 	escapeEngine *escape.EscapeEngine
 
-	// llmDecomposer is the D7-S5-A03 LLM-augmented task synthesizer.
-	// When non-nil, the default OrchestratePath's decisionplanning.TaskDecomposer uses it
-	// before falling back to rule-based decomposition.
-	llmDecomposer decisionplanning.LLMTaskDecomposer
-
-	// itemPipeline runs per-WorkItem MUPS (default on).
+	// itemPipeline runs per-WorkItem MUPS (required for user messages).
 	itemPipeline *ItemPipelineRunner
 
 	// activeSessions tracks the running orchtypes.ProcessRequest per sessionID so
@@ -123,31 +112,13 @@ func WithCommandHandler(h *CommandHandler) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.commandHandler = h }
 }
 
-// WithOrchestratePath wires the orchtypes.IntentOrchestrate explicit-orchestration
-// path. v1.1.0+ orthogonal dispatch.
-func WithOrchestratePath(p *OrchestratePath) OrchestratorOption {
-	return func(o *SessionOrchestrator) { o.orchestratePath = p }
-}
-
 // WithTurnToolExecutor wires the loop-first turn tool executor for
-// delegate_wave / enter_plan_mode. SetOrchestratePath updates its path.
+// enter_plan_mode and D2 tool delegation inside WorkItemExecutor.
 func WithTurnToolExecutor(e *TurnToolExecutor) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.turnToolExec = e }
 }
 
-// WithLLMDecomposer wires an LLM-augmented task synthesizer into the
-// default OrchestratePath. When WithOrchestratePath is also used, that
-// path takes precedence and the LLM decomposer is ignored.
-//
-// D7-S5-A03: with this option wired, SynthesizeTaskGraph first asks the
-// LLM to produce a JSON task DAG; if the LLM call fails, returns no
-// JSON, or yields invalid task nodes, the rule-based fallback runs.
-func WithLLMDecomposer(d decisionplanning.LLMTaskDecomposer) OrchestratorOption {
-	return func(o *SessionOrchestrator) { o.llmDecomposer = d }
-}
-
-// WithItemPipelineRunner wires per-WorkItem MUPS pipeline (Phase C).
-// WithItemPipelineRunner wires per-WorkItem pipeline ingress (default on).
+// WithItemPipelineRunner wires per-WorkItem MUPS pipeline (required in production).
 func WithItemPipelineRunner(r *ItemPipelineRunner) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.itemPipeline = r }
 }
@@ -197,56 +168,26 @@ func WithClassifier(c decisionplanning.IntentClassifier) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.classifier = c }
 }
 
-// NewSessionOrchestrator builds the orchestrator with the given
-// query-loop executor and options. The classifier defaults to
-// decisionplanning.NewRuleClassifier(cfg) (rule-only) but can be replaced via
-// WithClassifier (tests, LLM-first v1.1+).
-//
-// v1.1.0+ orthogonal paths: if WithCommandHandler / WithOrchestratePath
-// are not provided, defaults are constructed (CommandHandler bound to
-// workmodel.TaskManager + a fresh PlanMode; OrchestratePath bound
-// to a fresh decisionplanning.TaskDecomposer + fresh WaveScheduler). Tests that want
-// control over the wave scheduler or the plan mode should still wire
-// the options explicitly. Bootstrap does NOT need to wire these in
-// production — defaults are sufficient for d7_enabled=true.
-//
-// Options are applied in order. WithSink and WithValidator must be passed
-// before the orchestrator constructs the FastPath (i.e. via the returned
-// instance), so the FastPath is built lazily on first ProcessMessage.
-// This avoids the bug where WithSink would have been ignored because the
-// FastPath was constructed before the option was applied.
-func NewSessionOrchestrator(cfg *orchtypes.Config, executor TurnExecutor, opts ...OrchestratorOption) *SessionOrchestrator {
+// NewSessionOrchestrator builds the orchestrator with options. The
+// classifier defaults to decisionplanning.NewRuleClassifier(cfg) (rule-only)
+// but can be replaced via WithClassifier (tests, LLM-first v1.1+).
+func NewSessionOrchestrator(cfg *orchtypes.Config, _ TurnExecutor, opts ...OrchestratorOption) *SessionOrchestrator {
 	if cfg == nil {
 		cfg = orchtypes.DefaultConfig()
 	}
 	o := &SessionOrchestrator{
 		cfg:            cfg,
 		classifier:     decisionplanning.NewRuleClassifier(cfg),
-		executor:       executor,
 		activeSessions: make(map[string]context.CancelFunc),
 	}
 	for _, opt := range opts {
 		opt(o)
 	}
-	// Build FastPath now that sink (if any) has been applied.
-	o.fastPath = NewFastPath(cfg, executor, o.sink)
-
-	// v1.1.0+ orthogonal paths: provide lazy defaults so callers (and
-	// tests) can rely on the 4-way switch without explicitly wiring
-	// the new options. Production code may still wire explicitly via
-	// WithCommandHandler / WithOrchestratePath to inject a real
-	// WaveScheduler or a custom PlanMode.
 	if o.taskManager == nil {
 		o.taskManager = workmodel.NewTaskManager()
 	}
 	if o.commandHandler == nil {
 		o.commandHandler = newDefaultCommandHandler(o.workModel, o.sink, o.taskManager)
-	}
-	if o.orchestratePath == nil {
-		o.orchestratePath = newDefaultOrchestratePath(o.sink, o.llmDecomposer)
-	}
-	if o.orchestratePath != nil {
-		o.orchestratePath.SetObsBridge(o.obsBridge)
 	}
 	return o
 }
@@ -286,16 +227,10 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
 }
 
-// Routing (v6.1.0 collapsed, see commit refactor/d7-route-all-to-5node):
+// Routing:
 //   - skip        → return empty channel (inlined, no executor)
 //   - command     → CommandHandler.Handle (D7-internal CLI, zero LLM)
-//   - fast|orchestrate → OrchestratePath.Run (5-node MUPS pipeline:
-//
-//	Observe → Plan → Wave → Execute → Verify → Learn)
-//
-// Each orchtypes.IntentKind maps to its own execution chain. v6.1.0
-// collapses IntentFast and IntentOrchestrate onto OrchestratePath so the
-// 5-node pipeline is the single LLM-driven execution surface.
+//   - fast|orchestrate → RunSessionTurnLoop (WorkTree + per-WorkItem MUPS)
 //
 // Phase 6 PR-F2 (D7-S12-A42-T05): at entry, buildObserveRequest calls
 // Learner.Inject (when wired) to obtain an AdaptivePrior. The prior
@@ -435,12 +370,10 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 			ch, err = o.commandHandler.Handle(sessionCtx, req, intent)
 		}
 	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
-		if o.itemPipeline != nil {
-			ch, err = o.RunSessionTurnLoop(sessionCtx, req, intent)
-		} else if o.orchestratePath == nil {
-			err = fmt.Errorf("orchestrator: intent %q requires OrchestratePath but it is nil (bootstrap missing wiring)", intent.Kind)
+		if o.itemPipeline == nil {
+			err = fmt.Errorf("orchestrator: item pipeline not wired (WithItemPipelineRunner)")
 		} else {
-			ch, err = o.orchestratePath.Run(sessionCtx, req, intent)
+			ch, err = o.RunSessionTurnLoop(sessionCtx, req, intent)
 		}
 	default:
 		err = fmt.Errorf("orchestrator: unknown intent kind %q", intent.Kind)
@@ -532,9 +465,8 @@ func (o *SessionOrchestrator) callAdvisoryValidator(ctx context.Context, intent 
 }
 
 // handleCommand and orchestrate were removed in v1.1.0 (devrix-d7-orthogonal-intent-paths).
-// Their old behavior (FastPath.Run with a system-prompt hint) is replaced
-// by CommandHandler.Handle and OrchestratePath.Run respectively. The two
-// switch cases in ProcessMessage now call those independent paths directly.
+// CommandHandler.Handle and RunSessionTurnLoop replaced the old FastPath /
+// OrchestratePath ingress paths.
 
 // ProcessMessageContract satisfies contracts.IOrchestrationEntry. It is the
 // D1 gateway-facing seam (string args instead of orchtypes.ProcessRequest).
@@ -594,20 +526,7 @@ func (o *SessionOrchestrator) SetInterruptHandler(h *InterruptHandler) {
 	o.interruptHandler = h
 }
 
-// SetOrchestratePath replaces the OrchestratePath. v1.1.0+ orthogonal
-// dispatch: by default NewSessionOrchestrator installs a lazy
-// OrchestratePath bound to a zero-deps WaveScheduler (which is unsafe
-// for production). Production bootstrap and integration tests use this
-// setter to inject a fully-wired or fake scheduler.
-func (o *SessionOrchestrator) SetOrchestratePath(p *OrchestratePath) {
-	o.orchestratePath = p
-	if o.turnToolExec != nil {
-		o.turnToolExec.Orchestrate = p
-	}
-}
-
-// SetCommandHandler replaces the CommandHandler. Same rationale as
-// SetOrchestratePath — primarily a test seam so integration tests can
+// SetCommandHandler replaces the CommandHandler.
 // verify the orthogonal dispatch without depending on the lazy default.
 func (o *SessionOrchestrator) SetCommandHandler(h *CommandHandler) {
 	o.commandHandler = h

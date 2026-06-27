@@ -2,15 +2,12 @@ package sessionorchestrator
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
-	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -36,18 +33,9 @@ func (f *fakeD2) RunTurn(_ context.Context, req QueryRequest) (<-chan *contracts
 	return out, nil
 }
 
-// T: D7-S2-T01 — ProcessMessage returns a streaming channel of EngineEvent.
-// v6.1.0: the channel is produced by OrchestratePath (5-node pipeline).
-// The v6.0 FastPath-only test is replaced by one that asserts the
-// OrchestratePath event sequence (plan_formed → text → complete) plus
-// that the fake scheduler was started exactly once.
-func TestSessionOrchestrator_ProcessMessage_OrchestratePath(t *testing.T) {
-	exec := &fakeD2{}
-	orch, sched := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hello"}},
-	)
+// T: D7-S2-T01 — ProcessMessage returns a streaming channel via RunSessionTurnLoop.
+func TestSessionOrchestrator_ProcessMessage_TurnLoop(t *testing.T) {
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-1",
 		Message:   "hello",
@@ -55,24 +43,12 @@ func TestSessionOrchestrator_ProcessMessage_OrchestratePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	var events []*contracts.EngineEvent
-	for ev := range ch {
-		events = append(events, ev)
+	events := drainEvents(ch)
+	if !hasEventType(events, "complete") {
+		t.Fatalf("last event should be complete, got %v", loopEventTypes(events))
 	}
-	if len(events) < 2 {
-		t.Fatalf("want ≥ 2 events, got %d", len(events))
-	}
-	if events[0].Type != "plan_formed" {
-		t.Fatalf("first event should be plan_formed, got %q", events[0].Type)
-	}
-	if events[len(events)-1].Type != "complete" {
-		t.Fatalf("last event should be complete, got %q", events[len(events)-1].Type)
-	}
-	if sched.starts != 1 {
-		t.Fatalf("want 1 wave start, got %d", sched.starts)
-	}
-	if exec.calls != 0 {
-		t.Fatalf("v6.1.0: exec.RunTurn should not be called, got %d", exec.calls)
+	if !hasEventType(events, "pipeline_round") {
+		t.Fatalf("expected pipeline_round, got %v", loopEventTypes(events))
 	}
 }
 
@@ -135,13 +111,8 @@ func TestSessionOrchestrator_ProcessMessage_Command(t *testing.T) {
 // v6.1.0: replaced by OrchestratePath first-event latency; the v6.0
 // FastPath P99 ≤ 2ms target is retired (5-node pipeline first event
 // is plan_formed, dominated by orchestrator entry overhead).
-func TestSessionOrchestrator_OrchestratePath_FirstEvent_Latency(t *testing.T) {
-	exec := &fakeD2{}
-	orch, _ := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hello"}},
-	)
+func TestSessionOrchestrator_TurnLoop_FirstEvent_Latency(t *testing.T) {
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	const iters = 100
 	var maxDur time.Duration
 	for i := 0; i < iters; i++ {
@@ -168,7 +139,7 @@ func TestSessionOrchestrator_OrchestratePath_FirstEvent_Latency(t *testing.T) {
 	// We allow generous headroom for CI; the v6.0 2ms FastPath target was
 	// retired. 50ms is a safe upper bound for unit tests.
 	if maxDur > 50*time.Millisecond {
-		t.Fatalf("OrchestratePath first-event too slow: %v (allow ≤50ms in test env)", maxDur)
+		t.Fatalf("turn loop first-event too slow: %v (allow ≤50ms in test env)", maxDur)
 	}
 }
 
@@ -186,15 +157,9 @@ func (f *fakeSink) Publish(_ context.Context, ev *contracts.EngineEvent) {
 
 // T: D7-S2-T01 — OrchestratePath does not mirror events to sink (D1
 // consumes channel only). v6.1.0: rename from FastPath_NoSinkMirrorOnStream.
-func TestSessionOrchestrator_OrchestratePath_NoSinkMirrorOnStream(t *testing.T) {
-	exec := &fakeD2{}
+func TestSessionOrchestrator_TurnLoop_NoSinkMirrorOnStream(t *testing.T) {
 	sink := &fakeSink{}
-	orch, _ := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hi"}},
-		WithSink(sink),
-	)
+	orch, _, _ := newOrchestratorWithItemPipeline(t, WithSink(sink))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-sink",
 		Message:   "hi",
@@ -208,80 +173,6 @@ func TestSessionOrchestrator_OrchestratePath_NoSinkMirrorOnStream(t *testing.T) 
 	if len(sink.events) != 0 {
 		t.Fatalf("sink should not receive stream events, got %d", len(sink.events))
 	}
-}
-
-// T: D7-S2-T03 — wave scheduler errors propagate through OrchestratePath.
-// v6.1.0: renamed from FastPath_D2Error; exec.RunTurn is no longer called
-// directly, so an errD2 executor is irrelevant. The error now originates
-// from the wave scheduler and is emitted as an "error" EngineEvent on the
-// channel (OrchestratePath.Run returns nil error; downstream consumers
-// observe the error event).
-func TestSessionOrchestrator_OrchestratePath_SchedulerError(t *testing.T) {
-	exec := &fakeD2{}
-	decomp := decisionplanning.NewTaskDecomposer()
-	sched := &errWaveScheduler{err: errors.New("simulated scheduler error")}
-	op := NewOrchestratePath(decomp, sched, nil)
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithOrchestratePath(op))
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-err",
-		Message:   "hi",
-	})
-	if err != nil {
-		t.Fatalf("ProcessMessage returned err (expected nil; error is on channel): %v", err)
-	}
-	sawError := false
-	for ev := range ch {
-		if ev.Type == "error" {
-			sawError = true
-		}
-	}
-	if !sawError {
-		t.Fatalf("expected error event from scheduler, got none")
-	}
-}
-
-// errWaveScheduler returns an error from Start to simulate a scheduler failure.
-type errWaveScheduler struct {
-	err error
-}
-
-func (e *errWaveScheduler) Start(_ context.Context, _ string, _ *wavescheduler.TaskGraph) error {
-	return e.err
-}
-
-func (e *errWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wavescheduler.Artifact, error) {
-	return nil, e.err
-}
-
-type errD2 struct{}
-
-func (errD2) RunTurn(_ context.Context, _ QueryRequest) (<-chan *contracts.EngineEvent, error) {
-	return nil, errors.New("simulated d2 error")
-}
-
-// fakeWaveScheduler is the minimal WaveSchedulerRunner for testing
-// OrchestratePath. It bypasses the real wave pool and returns a
-// caller-supplied artifact list (typically empty for anti-fabrication
-// tests).
-type fakeWaveScheduler struct {
-	mu        sync.Mutex
-	starts    int
-	waits     int
-	artifacts []wavescheduler.Artifact
-}
-
-func (f *fakeWaveScheduler) Start(_ context.Context, _ string, _ *wavescheduler.TaskGraph) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.starts++
-	return nil
-}
-
-func (f *fakeWaveScheduler) WaitForCompletion(_ context.Context, _ string) ([]wavescheduler.Artifact, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.waits++
-	return f.artifacts, nil
 }
 
 // T: D7-S2-T04 — HandleInterrupt emits "stopped" event and runs cancelers
@@ -343,7 +234,7 @@ func TestInterruptHandler_Handle_SequenceAndEvent(t *testing.T) {
 
 // T: D7-S2-T05 — HandleInterrupt is idempotent (no active orchestration).
 func TestInterruptHandler_Handle_Idempotent(t *testing.T) {
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{})
+	orch := newTestOrch(t)
 	sink := &fakeSink{}
 	called := 0
 	h := NewInterruptHandler(orch, InterruptOptions{
@@ -379,53 +270,9 @@ func TestTaskSpec_Immutability(t *testing.T) {
 	_ = types.Message{Role: "user", Content: "x"}
 }
 
-// T: D7-S2-A01-T02 — v6.1.0 collapsed routing: ALL user instructions
-// flow through OrchestratePath (5-node pipeline), so the wave scheduler
-// IS started. The previous FastPath_NoWaveScheduled invariant no longer
-// holds; replaced by the opposite assertion.
-func TestSessionOrchestrator_OrchestratePath_AlwaysSchedulesWave(t *testing.T) {
-	exec := &fakeD2{}
-	orch, sched := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hello"}},
-	)
-
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-op",
-		Message:   "hello",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	for range ch {
-		// drain
-	}
-	// v6.1.0: every IntentFast / IntentOrchestrate message runs the
-	// 5-node pipeline, so the wave scheduler must be started exactly once.
-	if sched.starts != 1 {
-		t.Fatalf("v6.1.0: wave scheduler must start exactly once, got %d", sched.starts)
-	}
-	if exec.calls != 0 {
-		t.Fatalf("v6.1.0: exec.RunTurn should not be called, got %d", exec.calls)
-	}
-}
-
-// T: D7-S2-A01-T03 — 禁止在 Worker terminal FlowEvent 前伪造 Task 进度。
-// anti-fabrication commitment: D7 不允许在 Worker 发送 terminal FlowEvent 之前
-// 发送任何 synthetic Task progress 信号。
-//
-// v1.1.0+ (orthogonal dispatch): orchtypes.IntentOrchestrate routes through
-// OrchestratePath → SynthesizeTaskGraph → WaveScheduler. The
-// fakeWaveScheduler below emits a clean terminal-only event stream
-// (plan_formed, wave_started, text, complete) — no synthetic progress.
+// T: D7-S2-A01-T03 — no synthetic task progress before terminal events on turn loop path.
 func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
-	exec := &fakeD2{}
-	decomp := decisionplanning.NewTaskDecomposer()
-	sched := &fakeWaveScheduler{artifacts: nil}
-	op := NewOrchestratePath(decomp, sched, nil)
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithOrchestratePath(op))
-
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-anti",
 		Message:   "do something complex",
@@ -439,71 +286,17 @@ func TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress(t *testing.T) {
 	var eventTypes []string
 	for ev := range ch {
 		eventTypes = append(eventTypes, ev.Type)
-		// terminal FlowEvent 类型: complete, stopped, error
 		if ev.Type == "complete" || ev.Type == "stopped" || ev.Type == "error" {
 			sawTerminal = true
 			break
 		}
-		// synthetic progress 类型: task_progress, task_update (非 terminal)
 		if ev.Type == "task_progress" || ev.Type == "task_update" {
 			hasProgressBeforeComplete = true
 		}
 	}
-
-	// 验证：不应该在 terminal 之前看到任何 synthetic progress
 	if hasProgressBeforeComplete && !sawTerminal {
 		t.Fatalf("anti-fabrication violated: synthetic progress before terminal FlowEvent; events=%v", eventTypes)
 	}
-}
-
-// D7-S5-A01-T01: FastPath confidence threshold gating.
-// When the classifier returns orchtypes.IntentFast with confidence below the configured
-// FastPathThreshold, the request is downgraded to orchtypes.IntentOrchestrate.
-
-func TestSessionOrchestrator_FastPathConfidenceBelowThreshold(t *testing.T) {
-	cfg := orchtypes.DefaultConfig()
-	cfg.RoutingMode = orchtypes.RoutingModeRuleOrchestrate
-	cfg.FastPathThreshold = 80 // short message default is 70
-
-	decomp := decisionplanning.NewTaskDecomposer()
-	sched := &fakeWaveScheduler{artifacts: nil}
-	op := NewOrchestratePath(decomp, sched, nil)
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(cfg, exec,
-		WithOrchestratePath(op),
-	)
-
-	// Short message (≤32 chars, single-line) → classifier returns
-	// orchtypes.IntentFast with confidence=70. With threshold=80, this should
-	// be downgraded to orchtypes.IntentOrchestrate.
-	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
-		SessionID: "sess-thresh",
-		Message:   "how do I test this",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var eventTypes []string
-	for ev := range ch {
-		eventTypes = append(eventTypes, ev.Type)
-	}
-
-	// OrchestratePath emits plan_formed → wave_started → text → complete.
-	foundPlan := false
-	for _, typ := range eventTypes {
-		if typ == "plan_formed" {
-			foundPlan = true
-			break
-		}
-	}
-	if !foundPlan {
-		t.Errorf("expected plan_formed from OrchestratePath (downgrade), got events: %v", eventTypes)
-	}
-}
-
-func TestSessionOrchestrator_FastPathConfidenceAboveThreshold_Removed(t *testing.T) {
-	t.Skip("v6.1.0: FastPath routing retired. IntentFast always flows through OrchestratePath regardless of classifier confidence. See TestSessionOrchestrator_ProcessMessage_OrchestratePath for the equivalent coverage.")
 }
 
 type testLLMClassifier struct {

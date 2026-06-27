@@ -14,12 +14,10 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler/runners"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// WaveSchedulerDeps wires the production WaveScheduler for OrchestratePath.
+// WaveSchedulerDeps wires the production WaveScheduler (tests / background workers).
 type WaveSchedulerDeps struct {
 	GW         *capture.CommunicationGateway
 	Engine     contracts.IEngine
@@ -61,22 +59,6 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wavescheduler.WaveScheduler {
 		Observability: deps.ObsBridge,
 	})
 	return sched
-}
-
-// BuildOrchestratePath wires TaskDecomposer + WaveScheduler for IntentOrchestrate.
-func BuildOrchestratePath(
-	sink sessionorchestrator.EventPublisher,
-	llmDecomp decisionplanning.LLMTaskDecomposer,
-	deps WaveSchedulerDeps,
-) *sessionorchestrator.OrchestratePath {
-	decomp := decisionplanning.NewTaskDecomposer()
-	if llmDecomp != nil {
-		decomp.SetLLMDecomposer(llmDecomp)
-	}
-	sched := WireWaveScheduler(deps)
-	op := sessionorchestrator.NewOrchestratePath(decomp, sched, sink)
-	op.SetObsBridge(deps.ObsBridge)
-	return op
 }
 
 func contextEngineFrom(engine contracts.IEngine) *contextengine.ContextEngine {

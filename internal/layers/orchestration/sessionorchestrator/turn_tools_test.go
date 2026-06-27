@@ -1,90 +1,20 @@
 package sessionorchestrator
 
 import (
-	"context"
-	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
-	"sync/atomic"
 	"testing"
-
-	"github.com/devrix/devrix/internal/layers/llmgateway"
-	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
-	"github.com/devrix/devrix/internal/shared/contracts"
 )
-
-type stubToolBase struct {
-	calls atomic.Int32
-}
-
-func (s *stubToolBase) ExecuteRound(_ context.Context, req ToolRoundRequest) (ToolRoundResult, error) {
-	s.calls.Add(1)
-	results := make([]ToolResult, len(req.ToolCalls))
-	for i, tc := range req.ToolCalls {
-		results[i] = ToolResult{ToolCallID: tc.ID, Output: "ok"}
-	}
-	return ToolRoundResult{Results: results}, nil
-}
-
-type fakeWaveForTools struct {
-	starts atomic.Int32
-}
-
-func (f *fakeWaveForTools) Start(_ context.Context, _ string, _ *wavescheduler.TaskGraph) error {
-	f.starts.Add(1)
-	return nil
-}
-
-func (f *fakeWaveForTools) WaitForCompletion(_ context.Context, _ string) ([]wavescheduler.Artifact, error) {
-	return []wavescheduler.Artifact{{TaskID: "t1", Summary: "done", ExitCode: 0}}, nil
-}
-
-// T: D7-S2-L5-02 — delegate_wave tool triggers OrchestratePath without ingress routing.
-func TestTurnToolExecutor_DelegateWave(t *testing.T) {
-	base := &stubToolBase{}
-	fake := &fakeWaveForTools{}
-	op := NewOrchestratePath(decisionplanning.NewTaskDecomposer(), fake, nil)
-	exec := NewTurnToolExecutor(base, op, nil, true)
-
-	var streamed int
-	ctx := WithToolEventStream(context.Background(), func(ev *contracts.EngineEvent) {
-		if ev != nil {
-			streamed++
-		}
-	})
-
-	_, err := exec.ExecuteRound(ctx, ToolRoundRequest{
-		SessionID: "sess-1",
-		ToolCalls: []llmgateway.ToolCall{{
-			ID:    "tc1",
-			Name:  toolDelegateWave,
-			Input: `{"goal":"design auth refactor && add tests"}`,
-		}},
-	})
-	if err != nil {
-		t.Fatalf("ExecuteRound: %v", err)
-	}
-	if fake.starts.Load() != 1 {
-		t.Fatalf("Wave Start calls = %d, want 1", fake.starts.Load())
-	}
-	if streamed == 0 {
-		t.Fatal("expected streamed engine events from delegate_wave")
-	}
-	if exec.DelegateWaveCount.Load() != 1 {
-		t.Fatalf("delegate_wave count = %d", exec.DelegateWaveCount.Load())
-	}
-}
 
 // T: D7-S2-A06-T03 (DM-20260617-004 devrix-d7-tool-ctx-inject)
 // orchestrationToolSchemas (LoopFirst injected tool list) must include the
 // free_fork tool so users saying "用 free_fork 启 N 个 worker" reach a
-// real registered tool. Without this, the LLM hallucinates old tool names
-// (delegate_wave / task_output / task_list_background) under loop_first.
+// real registered tool.
 func TestOrchestrationToolSchemas_ExposesFreeFork(t *testing.T) {
 	schemas := orchestrationToolSchemas()
 	names := make(map[string]bool, len(schemas))
 	for _, s := range schemas {
 		names[s.Name] = true
 	}
-	for _, want := range []string{"delegate_wave", "enter_plan_mode", "free_fork"} {
+	for _, want := range []string{"enter_plan_mode", "free_fork"} {
 		if !names[want] {
 			t.Errorf("orchestrationToolSchemas missing %q; got names=%v", want, names)
 		}

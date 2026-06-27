@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
+	learnasset "github.com/devrix/devrix/internal/layers/orchestration/mups/learn/asset"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
-	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -50,7 +50,7 @@ type lp1Fixture struct {
 
 func newLP1Fixture(t *testing.T, sessionID string) *lp1Fixture {
 	t.Helper()
-	exec := &recordingExecutor{}
+	_ = sessionID
 	classifier := &recordingClassifier{}
 	cfg := orchtypes.DefaultConfig()
 	cfg.CommandWhitelist = []string{"/status", "/help"}
@@ -63,9 +63,27 @@ func newLP1Fixture(t *testing.T, sessionID string) *lp1Fixture {
 	builder := learn.NewAssetBuilder()
 	learner := learn.NewDefaultLearner(skill, feedback, scheduled, rep, builder)
 
+	tm := workmodel.NewTaskManager()
+	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
+		Executor: lp1WorkItemExecutor{},
+		Learner: learn.NewDefaultLearner(
+			learn.NewSkillMemory(),
+			learn.NewFeedbackMemory(),
+			learn.NewScheduledMemory(),
+			learn.NewInMemoryReputationStore(),
+			learn.NewAssetBuilder(),
+		),
+		Tasks: tm,
+	})
+	if err != nil {
+		t.Fatalf("NewItemPipelineRunner: %v", err)
+	}
+
 	orch := sessionorchestrator.NewSessionOrchestrator(
 		cfg,
-		exec,
+		nil,
+		sessionorchestrator.WithTaskManager(tm),
+		sessionorchestrator.WithItemPipelineRunner(runner),
 		sessionorchestrator.WithLearner(learner),
 		sessionorchestrator.WithClassifier(classifier),
 	)
@@ -81,29 +99,15 @@ func newLP1Fixture(t *testing.T, sessionID string) *lp1Fixture {
 	}
 }
 
-// recordingExecutor is a minimal D2 turn executor that echoes the first
-// message content and emits text + complete. Used by LP-1 tests so the
-// ProcessMessage → executor path completes and the channel drains cleanly.
-type recordingExecutor struct {
-	mu     sync.Mutex
-	calls  int
-	turns  []string
-}
+type lp1WorkItemExecutor struct{}
 
-func (r *recordingExecutor) RunTurn(_ context.Context, req sessionorchestrator.QueryRequest) (<-chan *contracts.EngineEvent, error) {
-	r.mu.Lock()
-	r.calls++
-	msg := ""
-	if len(req.Messages) > 0 {
-		msg = req.Messages[0].Content
-	}
-	r.turns = append(r.turns, msg)
-	r.mu.Unlock()
-	out := make(chan *contracts.EngineEvent, 2)
-	out <- &contracts.EngineEvent{Type: "text", Content: "echo: " + msg, SessionID: req.SessionID}
-	out <- &contracts.EngineEvent{Type: "complete", SessionID: req.SessionID}
-	close(out)
-	return out, nil
+func (lp1WorkItemExecutor) ExecuteWorkItem(_ context.Context, _, _, directive string) (*sessionorchestrator.WorkItemResult, error) {
+	return &sessionorchestrator.WorkItemResult{
+		Content:    "echo: " + directive,
+		Done:       true,
+		Iterations: 1,
+		StopReason: "final_answer",
+	}, nil
 }
 
 // recordingClassifier records the prior seen on each ClassifyWithPrior call
@@ -193,9 +197,8 @@ func TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior(t *testing.T) {
 		t.Errorf("round 1: prior.Mean = %.4f, want %.4f", got, wantMean1)
 	}
 
-	// Simulate 3 Learn cycles with VerdictPass. Each Learn updates the
-	// reputation store via BayesianUpdate: prior Alpha++, Beta unchanged.
-	// After 3 passes: prior.Alpha = 0 + 3 = 3 (cold-start baseline 0).
+	// ProcessMessage round 1 also triggers processAutoClose → Learn(VerdictPass)
+	// (+1 Alpha). Three explicit Learn cycles add +3 Alpha → total Alpha=4.
 	verdict := workmodel.Verdict{Kind: types.VerdictPass, SourceID: "v_pass_e2e", Reason: "ok"}
 	planStub := plan.NewPlan("plan_lp1_1", sessionID, plan.CommitmentPlan, []string{"obs_1"},
 		[]plan.Step{{ID: "step_1"}}, 0.8)
@@ -213,9 +216,8 @@ func TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior(t *testing.T) {
 		}
 	}
 
-	// After 3 passes: cold-start ReputationEvidence Alpha=3, Beta=0.
-	// BuildAdaptivePrior with rep.Alpha=3 + rep.Beta=0 + DefaultDeveloper
-	// prior (5,3) → merged Beta = (5+3, 3+0) = (8, 3). Mean = 8/11 ≈ 0.7273.
+	// After auto-close + 3 manual passes: ReputationEvidence Alpha=4, Beta=0.
+	// BuildAdaptivePrior → merged Beta = (5+4, 3+0) = (9, 3). Mean = 9/12 = 0.75.
 	gotRep, err := f.rep.Get(context.Background(), sessionID)
 	if err != nil {
 		t.Fatalf("rep.Get: %v", err)
@@ -223,11 +225,11 @@ func TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior(t *testing.T) {
 	if gotRep == nil {
 		t.Fatal("rep.Get after 3 passes: got nil, want non-nil")
 	}
-	if gotRep.Alpha != 3 || gotRep.Beta != 0 {
-		t.Errorf("rep after 3 passes = Alpha=%d/Beta=%d, want 3/0", gotRep.Alpha, gotRep.Beta)
+	if gotRep.Alpha != 4 || gotRep.Beta != 0 {
+		t.Errorf("rep after auto-close + 3 passes = Alpha=%d/Beta=%d, want 4/0", gotRep.Alpha, gotRep.Beta)
 	}
 
-	// Round 2: ProcessMessage observes prior Beta(8,3).
+	// Round 2: ProcessMessage observes prior Beta(9,3).
 	_ = f.processOnce(t, sessionID, "another msg")
 
 	f.classifier.mu.Lock()
@@ -241,11 +243,11 @@ func TestE2E_LP1_ClosedLoop_LearnPassAccumulatePrior(t *testing.T) {
 	if round2Prior == nil {
 		t.Fatal("round 2: prior should not be nil")
 	}
-	wantAlpha, wantBeta := 8, 3
+	wantAlpha, wantBeta := 9, 3
 	if round2Prior.PriorBeta.Alpha != wantAlpha || round2Prior.PriorBeta.Beta != wantBeta {
 		t.Errorf("round 2: prior.PriorBeta = %+v, want Beta(%d,%d)", round2Prior.PriorBeta, wantAlpha, wantBeta)
 	}
-	wantMean2 := 8.0 / 11.0
+	wantMean2 := 9.0 / 12.0
 	if got := round2Prior.PriorBeta.Mean(); got != wantMean2 {
 		t.Errorf("round 2: prior.Mean = %.4f, want %.4f", got, wantMean2)
 	}
@@ -259,7 +261,8 @@ func TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution(t *testin
 	sessionID := "sess-lp1-parsefail"
 	f := newLP1Fixture(t, sessionID)
 
-	// Round 1 — cold-start prior Beta(5,3).
+	// Round 1 ProcessMessage auto-close deposits VerdictPass (+1 Alpha).
+	// The explicit verifier_parse_failure Learn must not add further α/β.
 	_ = f.processOnce(t, sessionID, "hi")
 
 	// Simulate Verify → Learn with VerdictIndeterminate +
@@ -285,8 +288,8 @@ func TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution(t *testin
 		t.Errorf("Class = %s, want LearningPending", assets[0].Class)
 	}
 
-	// ReputationStore row exists, but Alpha/Beta must be unchanged
-	// (cold-start was Alpha=0/Beta=0). VerifierFailureCount must be 1.
+	// ReputationStore: Alpha=1 from auto-close; parse_failure increments
+	// VerifierFailureCount only (no extra α/β from indeterminate verdict).
 	gotRep, err := f.rep.Get(context.Background(), sessionID)
 	if err != nil {
 		t.Fatalf("rep.Get: %v", err)
@@ -294,8 +297,8 @@ func TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution(t *testin
 	if gotRep == nil {
 		t.Fatal("rep.Get: got nil, want non-nil (row created with defaults)")
 	}
-	if gotRep.Alpha != 0 || gotRep.Beta != 0 {
-		t.Errorf("Alpha/Beta polluted by verifier_parse_failure: Alpha=%d Beta=%d, want 0/0",
+	if gotRep.Alpha != 1 || gotRep.Beta != 0 {
+		t.Errorf("Alpha/Beta after auto-close + verifier_parse_failure: Alpha=%d Beta=%d, want 1/0",
 			gotRep.Alpha, gotRep.Beta)
 	}
 	if gotRep.VerifierFailureCount != 1 {
@@ -305,7 +308,7 @@ func TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution(t *testin
 		t.Errorf("IndeterminateCount = %d, want 0 (parse_failure is separate)", gotRep.IndeterminateCount)
 	}
 
-	// Round 2 — prior must still be Beta(5,3) since α/β did not change.
+	// Round 2 — prior reflects auto-close Alpha=1 → Beta(6,3).
 	_ = f.processOnce(t, sessionID, "hi again")
 
 	f.classifier.mu.Lock()
@@ -315,8 +318,8 @@ func TestE2E_LP1_ClosedLoop_IndeterminateParseFailure_NoAlphaPollution(t *testin
 	if round2Prior == nil {
 		t.Fatal("round 2: prior should not be nil")
 	}
-	if round2Prior.PriorBeta != (learn.BetaPrior{Alpha: 5, Beta: 3}) {
-		t.Errorf("round 2 prior.PriorBeta = %+v, want Beta(5,3) (no α/β pollution from parse failure)",
+	if round2Prior.PriorBeta != (learn.BetaPrior{Alpha: 6, Beta: 3}) {
+		t.Errorf("round 2 prior.PriorBeta = %+v, want Beta(6,3) (auto-close α only; parse failure did not add α/β)",
 			round2Prior.PriorBeta)
 	}
 }
@@ -375,8 +378,8 @@ func TestE2E_LP1_ClosedLoop_PendingAssetScheduledMemory(t *testing.T) {
 	for _, retry := range dueList {
 		if retry.Asset.AssetKey == asset.AssetKey {
 			found = true
-			if retry.MaxRetries != learn.DefaultScheduledMaxRetries {
-				t.Errorf("MaxRetries = %d, want %d", retry.MaxRetries, learn.DefaultScheduledMaxRetries)
+			if retry.MaxRetries != learnasset.DefaultPendingMaxRetries {
+				t.Errorf("MaxRetries = %d, want %d", retry.MaxRetries, learnasset.DefaultPendingMaxRetries)
 			}
 			break
 		}
@@ -472,13 +475,13 @@ func TestE2E_5NodePipeline_End2End(t *testing.T) {
 			priorSeenByClassifier.PriorBeta)
 	}
 
-	// LP-3: ReputationStore updated by VerdictPass → Alpha=1, Beta=0.
+	// LP-3: ReputationStore updated by auto-close + explicit VerdictPass → Alpha=2, Beta=0.
 	gotRep, err := f.rep.Get(context.Background(), sessionID)
 	if err != nil {
 		t.Fatalf("rep.Get: %v", err)
 	}
-	if gotRep == nil || gotRep.Alpha != 1 || gotRep.Beta != 0 {
-		t.Errorf("rep after 1 VerdictPass = %+v, want Alpha=1/Beta=0",
+	if gotRep == nil || gotRep.Alpha != 2 || gotRep.Beta != 0 {
+		t.Errorf("rep after auto-close + 1 VerdictPass = %+v, want Alpha=2/Beta=0",
 			gotRep)
 	}
 

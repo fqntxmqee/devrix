@@ -55,7 +55,7 @@ func routeLabel(intent orchtypes.IntentClassification) string {
 	case orchtypes.IntentCommand:
 		return "command"
 	case orchtypes.IntentFast, orchtypes.IntentOrchestrate:
-		return "orchestrate"
+		return "turn_loop"
 	case orchtypes.IntentSkip:
 		return "skip"
 	default:
@@ -154,8 +154,5 @@ func endSpanWhenChannelClosed(ch <-chan *contracts.EngineEvent, span tracer.Span
 func WithObservability(bridge *observability.Bridge) OrchestratorOption {
 	return func(o *SessionOrchestrator) {
 		o.obsBridge = bridge
-		if o.orchestratePath != nil {
-			o.orchestratePath.SetObsBridge(bridge)
-		}
 	}
 }

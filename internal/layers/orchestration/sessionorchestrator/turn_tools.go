@@ -1,46 +1,36 @@
 package sessionorchestrator
 
 import (
-	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync/atomic"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
-const (
-	toolDelegateWave  = "delegate_wave"
-	toolEnterPlanMode = "enter_plan_mode"
-)
+const toolEnterPlanMode = "enter_plan_mode"
 
 // TurnToolExecutor handles loop-first orchestration tools and delegates all
 // other tool calls to the base executor (D2 tool runner).
 type TurnToolExecutor struct {
-	Base        ToolRoundExecutor
-	Orchestrate *OrchestratePath
-	PlanMode    *workmodel.PlanMode
-	LoopFirst   bool
-	Metrics     *TurnToolMetrics
-
-	DelegateWaveCount atomic.Int64
+	Base      ToolRoundExecutor
+	PlanMode  *workmodel.PlanMode
+	LoopFirst bool
+	Metrics   *TurnToolMetrics
 }
 
 // NewTurnToolExecutor wraps base with orchestration tools when loopFirst is true.
 func NewTurnToolExecutor(
 	base ToolRoundExecutor,
-	op *OrchestratePath,
 	pm *workmodel.PlanMode,
 	loopFirst bool,
 ) *TurnToolExecutor {
 	return &TurnToolExecutor{
-		Base:        base,
-		Orchestrate: op,
-		PlanMode:    pm,
-		LoopFirst:   loopFirst,
+		Base:      base,
+		PlanMode:  pm,
+		LoopFirst: loopFirst,
 	}
 }
 
@@ -62,9 +52,6 @@ func (e *TurnToolExecutor) ExecuteRound(ctx context.Context, req ToolRoundReques
 	results := make([]ToolResult, len(req.ToolCalls))
 	for i, tc := range req.ToolCalls {
 		switch tc.Name {
-		case toolDelegateWave:
-			out, err := e.runDelegateWave(ctx, req.SessionID, tc.Input)
-			results[i] = ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
 		case toolEnterPlanMode:
 			out, err := e.runEnterPlanMode(ctx, req.SessionID, tc.Input)
 			results[i] = ToolResult{ToolCallID: tc.ID, Output: out, Error: errString(err)}
@@ -82,41 +69,6 @@ func (e *TurnToolExecutor) ExecuteRound(ctx context.Context, req ToolRoundReques
 		}
 	}
 	return ToolRoundResult{Results: results}, nil
-}
-
-func (e *TurnToolExecutor) runDelegateWave(ctx context.Context, sessionID, input string) (string, error) {
-	if e.Orchestrate == nil {
-		return "", fmt.Errorf("delegate_wave: orchestrate path not wired")
-	}
-	goal, err := parseGoalInput(input)
-	if err != nil {
-		return "", err
-	}
-	e.DelegateWaveCount.Add(1)
-	if e.Metrics != nil && e.Metrics.DelegateWave != nil {
-		e.Metrics.DelegateWave.Inc()
-	}
-	emit := ToolEventStreamFrom(ctx)
-	ch, err := e.Orchestrate.Run(ctx, orchtypes.ProcessRequest{SessionID: sessionID, Message: goal}, orchtypes.IntentClassification{})
-	if err != nil {
-		return "", err
-	}
-	var summary string
-	for ev := range ch {
-		if ev == nil {
-			continue
-		}
-		if emit != nil {
-			emit(ev)
-		}
-		if ev.Type == "text" && ev.Content != "" {
-			summary = ev.Content
-		}
-	}
-	if summary == "" {
-		summary = "(wave completed with no summary text)"
-	}
-	return summary, nil
 }
 
 func (e *TurnToolExecutor) runEnterPlanMode(ctx context.Context, sessionID, input string) (string, error) {
@@ -188,25 +140,6 @@ func orchestrationToolSchemas() []ToolSchema {
 				"required": []any{"goal"},
 			},
 		},
-		{
-			Name:        toolDelegateWave,
-			Description: "Decompose a multi-step goal into a task graph and execute via parallel workers. Do NOT use for greetings or simple single-turn questions.",
-			Parameters: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"goal": map[string]any{"type": "string", "description": "The multi-step goal to orchestrate"},
-				},
-				"required": []any{"goal"},
-			},
-		},
-		// DM-20260617-004 (devrix-d7-tool-ctx-inject): expose free_fork to LLM
-		// under loop_first so users saying "用 free_fork 启 N 个 worker" reach a
-		// real registered tool. Execution is delegated to the base adapter's
-		// ExecuteRound fallback path (freeforkRunner in D2 ToolRegistry).
-		//
-		// DM-20260620-001-B (AC10) — `mode` field selects sub-agent context
-		// inheritance: brief (default, no parent history), fork (cache-friendly
-		// prefix), full (legacy — full parent history).
 		{
 			Name:        "free_fork",
 			Description: "Batch fork N child agents (1..5) under a parent session. Each child inherits the parent's session id and runs in an isolated worktree. Returns {spawned_count, agent_ids:[...]}.",

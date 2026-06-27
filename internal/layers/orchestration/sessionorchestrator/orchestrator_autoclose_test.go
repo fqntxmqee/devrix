@@ -9,6 +9,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -22,7 +23,7 @@ import (
 // calls Learn; it must delegate directly to endSpanWhenChannelClosed
 // (passthrough). Pin: endSpanWhenChannelClosed behavior is preserved.
 func TestProcessAutoClose_NilLearner_Passthrough(t *testing.T) {
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{})
+	orch := newTestOrch(t)
 	// orch.learner == nil (no WithLearner)
 	if orch.learner != nil {
 		t.Fatal("default orchestrator should have nil learner")
@@ -62,7 +63,7 @@ func TestProcessAutoClose_LearnerError_LoggedNotBlocked(t *testing.T) {
 		learnErr:    errors.New("simulated learn storage failure"),
 	}
 
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	// Single "complete" event so synthesizeVerdict produces a non-nil
 	// Verdict. (If we also emit a "text" event after, the text event
@@ -189,7 +190,7 @@ func TestSynthesizeVerdict_Tombstone_IndeterminateReason(t *testing.T) {
 // or premature close), processAutoClose must NOT call Learn.
 func TestProcessAutoClose_EmptyChannel_NoLearn(t *testing.T) {
 	fl := &fakeLearner{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	src := make(chan *contracts.EngineEvent)
 	close(src) // empty, immediate close
@@ -216,7 +217,7 @@ func TestProcessAutoClose_EmptyChannel_NoLearn(t *testing.T) {
 // to deposit).
 func TestProcessAutoClose_NonTerminalEvent_NoLearn(t *testing.T) {
 	fl := &fakeLearner{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	src := make(chan *contracts.EngineEvent, 1)
 	src <- &contracts.EngineEvent{Type: "text", Content: "thinking..."}
@@ -241,7 +242,7 @@ func TestProcessAutoClose_NonTerminalEvent_NoLearn(t *testing.T) {
 // must NOT be called even if the channel emits events.
 func TestProcessAutoClose_ContextCancel_SkipLearn(t *testing.T) {
 	fl := &fakeLearner{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // pre-cancelled
@@ -283,11 +284,7 @@ func TestProcessMessage_Verify2Learn_AutoClose_PassAlpha(t *testing.T) {
 	// Build a SessionOrchestrator with a recording Learner + a FastPath
 	// executor that emits a "complete" event then closes.
 	fl := &fakeLearner{}
-	exec := &completingExecutor{
-		eventType:    "complete",
-		eventContent: "ok",
-	}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	// Round 1: process a message.
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
@@ -363,8 +360,7 @@ func TestProcessMessage_Verify2Learn_AutoClose_PassAlpha(t *testing.T) {
 // nil-learner path (Phase 6 PR-F2 baseline) is unchanged: ProcessMessage
 // completes successfully and does not panic when no Learner is wired.
 func TestProcessMessage_AutoClose_NilLearner_NoOp(t *testing.T) {
-	exec := &completingExecutor{eventType: "complete"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec) // no WithLearner
+	orch := newTestOrch(t) // no WithLearner
 	if orch.learner != nil {
 		t.Fatal("default orchestrator should have nil learner")
 	}
@@ -396,9 +392,8 @@ func TestProcessMessage_AutoClose_NilLearner_NoOp(t *testing.T) {
 // so ObserveRequest validation passes.
 func TestProcessMessage_AutoClose_IntentSkip_NoLearn(t *testing.T) {
 	fl := &fakeLearner{}
-	exec := &fakeD2{}
 	// alwaysSkipClassifier returns IntentSkip for any non-empty message.
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec,
+	orch := newTestOrch(t,
 		WithLearner(fl),
 		WithClassifier(&alwaysSkipClassifier{}),
 	)
@@ -428,7 +423,7 @@ func TestProcessMessage_AutoClose_IntentSkip_NoLearn(t *testing.T) {
 // source channel — the wrapper logic itself is unchanged.
 func TestProcessMessage_AutoClose_ErrorEvent_VerdictFail(t *testing.T) {
 	fl := &fakeLearner{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	// Stub source: emits an "error" terminal event then closes.
 	src := make(chan *contracts.EngineEvent, 1)
@@ -471,7 +466,7 @@ func TestProcessMessage_AutoClose_ErrorEvent_VerdictFail(t *testing.T) {
 // (see ErrorEvent_VerdictFail for rationale).
 func TestProcessMessage_AutoClose_TombstoneEvent_VerdictIndeterminate(t *testing.T) {
 	fl := &fakeLearner{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), &fakeD2{}, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	src := make(chan *contracts.EngineEvent, 1)
 	src <- &contracts.EngineEvent{Type: "tombstone"}
@@ -516,8 +511,26 @@ func TestAutoClose_FullLP1Loop(t *testing.T) {
 	feedback := newInMemoryFeedbackMemoryForTest()
 	realLearner := learn.NewDefaultLearner(skill, feedback, sched, rep, learn.NewAssetBuilder())
 
-	exec := &completingExecutor{eventType: "complete"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(realLearner))
+	tm := workmodel.NewTaskManager()
+	pipelineLearner := learn.NewDefaultLearner(
+		learn.NewSkillMemory(),
+		learn.NewFeedbackMemory(),
+		learn.NewScheduledMemory(),
+		learn.NewInMemoryReputationStore(),
+		learn.NewAssetBuilder(),
+	)
+	runner, err := NewItemPipelineRunner(ItemPipelineDeps{
+		Executor: stubWorkItemExecutor{},
+		Learner:  pipelineLearner,
+		Tasks:    tm,
+	})
+	if err != nil {
+		t.Fatalf("NewItemPipelineRunner: %v", err)
+	}
+	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), nil,
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
+		WithLearner(realLearner))
 
 	sessionID := "sess-lp1-full"
 	// Round 1

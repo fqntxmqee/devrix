@@ -16,7 +16,11 @@ import (
 func TestIntegration_D7WorkModel_DiskPersistAndReload(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{})
 
-	created, err := stack.TaskManager.Create("sess_wm", "Wire D7 integration tests", "Add P0 vertical slices")
+	created, err := stack.TaskManager.Tree().Create("sess_wm", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "Wire D7 integration tests",
+		Directive: "Add P0 vertical slices",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -33,12 +37,22 @@ func TestIntegration_D7WorkModel_DiskPersistAndReload(t *testing.T) {
 		Mode:     "v2",
 		StoreDir: stack.WorkDir,
 	}, stack.ObsBridge)
-	list := reloaded.List("sess_wm")
-	if len(list) != 1 {
-		t.Fatalf("expected 1 task after reload, got %d", len(list))
+	list := reloaded.Tree().List("sess_wm")
+	if len(list) == 0 {
+		t.Fatalf("expected items after reload, got 0")
 	}
-	if list[0].Subject != "Wire D7 integration tests" {
-		t.Fatalf("unexpected subject: %q", list[0].Subject)
+	var found *workmodel.WorkItem
+	for _, item := range list {
+		if item != nil && item.ID == created.ID {
+			found = item
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected created item after reload, got %d items", len(list))
+	}
+	if found.Title != "Wire D7 integration tests" {
+		t.Fatalf("unexpected title: %q", found.Title)
 	}
 }
 

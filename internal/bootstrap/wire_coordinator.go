@@ -49,7 +49,7 @@ func InitOrchestration(
 		routingMode = orchtypes.RoutingModeRuleOrchestrate
 	}
 	if routingMode == orchtypes.RoutingModeRuleOrchestrate {
-		slog.Info("d7: routing_mode=rule_orchestrate enables FastPath confidence threshold gating to OrchestratePath",
+		slog.Info("d7: routing_mode=rule_orchestrate (legacy config; ingress uses RunSessionTurnLoop)",
 			"change", "devrix-d2-queryloop-dismantle",
 			"dm", "DM-20260618-010",
 		)
@@ -104,21 +104,10 @@ func InitOrchestration(
 		return out
 	})
 
-	llmDecomp := WireDecisionPlanning(llmInvoker, llmStack.DefaultModel)
-
-	orchPath := BuildOrchestratePath(sink, llmDecomp, WaveSchedulerDeps{
-		GW:         gw,
-		Engine:     ctxEngine,
-		AgentTools: agentToolReg,
-		ObsBridge:  obsBridge,
-	})
-	orchPath.SetTaskManager(tm)
-
 	planMode := workmodel.NewPlanMode(newPlanLLMCompleter(llmInvoker, llmStack.DefaultModel), obsBridge)
 
 	toolExec, turnOrch, subTurn := WireMUPSPipeline(MUPSPipelinesDeps{
 		CtxAdapter:       ctxAdapter,
-		OrchPath:         orchPath,
 		LLMInvoker:       llmInvoker,
 		DefaultModel:     llmStack.DefaultModel,
 		LoopFirst:        loopFirst,
@@ -128,16 +117,12 @@ func InitOrchestration(
 		MaxContextTokens: coordCfg.maxContextTokens,
 		FocusHint:        &workmodel.FocusHintProvider{Manager: tm},
 		ResolveAwait:     &workmodel.ResolveAwaiter{Manager: tm},
-		// DM-20260620-001 / AC1: oversized tool results (read_file / grep /
-		// cat / etc.) are persisted to disk and replaced with a preview
-		// marker so they do not blow up the LLM context budget.
-		ToolResultStore: persist.NewToolResultStore(""),
+		ToolResultStore:  persist.NewToolResultStore(""),
 	})
 	setWiredSubTurn(subTurn)
 	if ce := contextEngineFrom(ctxEngine); ce != nil {
 		ce.SetPreparedTurnRunner(sessionorchestrator.NewPreparedTurnAdapter(turnOrch))
 	}
-	executor := newTurnOrchExecutor(turnOrch)
 
 	itemRunner, pipelineLearner, err := WireItemPipeline(ItemPipelineWireDeps{
 		ToolExec:    toolExec,
@@ -151,11 +136,10 @@ func InitOrchestration(
 
 	orch := sessionorchestrator.NewSessionOrchestrator(
 		coordinatorCfg,
-		executor,
+		nil,
 		sessionorchestrator.WithSink(sink),
 		sessionorchestrator.WithObservability(obsBridge),
 		sessionorchestrator.WithWorkModel(wm),
-		sessionorchestrator.WithOrchestratePath(orchPath),
 		sessionorchestrator.WithTurnToolExecutor(toolExec),
 		sessionorchestrator.WithTaskManager(tm),
 		sessionorchestrator.WithItemPipelineRunner(itemRunner),
