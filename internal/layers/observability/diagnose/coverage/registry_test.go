@@ -130,6 +130,12 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		// D7 5 节点 pipeline root span (D7-S6)
 		telemetry.OpD7_S6_MUPS_Pipeline,
 
+		// DM-20260626-009 follow-up inner observability spans
+		// (PR #254 + #255 + #257 inner spans).
+		telemetry.OpD7_S1_Worktree_Op,
+		telemetry.OpD7_S1_SubWorktree_Run,
+		telemetry.OpD7_S5_SubTurn_Iteration,
+
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,
 	}

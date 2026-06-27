@@ -43,5 +43,18 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		// Started in OrchestratePath.Run; async Learn node (memory.persist) is associated
 		// by sessionID rather than trace tree.
 		{Name: "D7_MUPS_Pipeline", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.2.0", Instrumented: true},
+
+		// DM-20260626-009 follow-up inner observability spans (2026-06-26).
+		// The 5-node MUPS spans above cover the top-level pipeline; these
+		// three cover the inner layers that were invisible in Jaeger: the
+		// WorkItem task tree mutations, parallel-explore / child WorkItem
+		// runs, and the per-WorkItem ReAct loop iterations. Without these,
+		// debugging a slow WorkItem meant reading the code instead of
+		// inspecting traces. Names mirror telemetry/names.go (OpD7_S1_* /
+		// OpD7_S5_*) so coverage.IsKnown returns true and tracer.Start no
+		// longer WARNs "unknown operation".
+		{Name: "D7_Worktree_Op", Layer: "orchestration", Component: "worktree", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_SubWorktree_Run", Layer: "orchestration", Component: "worktree", SinceVersion: "2.2.0", Instrumented: true},
+		{Name: "D7_SubTurn_Iteration", Layer: "orchestration", Component: "executor", SinceVersion: "2.2.0", Instrumented: true},
 	}
 }

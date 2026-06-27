@@ -11,6 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -97,6 +98,20 @@ type DefaultWorkItemExecutor struct {
 	MaxIters int
 	// Now is the clock injection point for tests. nil → time.Now.
 	Now func() time.Time
+	// Emit forwards intermediate engine events (text / thinking / tool_call /
+	// tool_result) to the gateway so the user-visible stream mirrors what
+	// OrchestratePath's workerEventToEngine path produces. nil → silent
+	// (legacy / test fixtures). ItemPipelineRunner sets this in
+	// RunSessionTurnLoop so per-WorkItem tool calls land in feishu reply
+	// cards; Wave path already does this via subagent.streamEmit.
+	//
+	// Hotfix (2026-06-27): without this hook, ItemPipelineRunner's ReAct
+	// loop ran 4 tool.bash calls but emitted only the final ArtifactSummary
+	// as a `text` event — feishu cards showed only the LLM's last paragraph
+	// with no tool-call evidence. See sessionorchestrator.workitem_executor.go
+	// history; the regression was introduced when ItemPipelineRunner became
+	// the default execution surface (DM-20260626-009).
+	Emit func(*contracts.EngineEvent)
 }
 
 // Compile-time interface check.
@@ -246,6 +261,34 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 		result.StopReason = "tool_error"
 		return "tool_error", fmt.Errorf("workitem executor: tool round (iter %d): %w", iter, err), nil, finishReason
 	}
+	// Emit a `tool_result` event per result so the feishu card shows the
+	// tool's return value (mirrors OrchestratePath's workerEventToEngine
+	// "tool_call" → result pairing). Append-only — downstream messages
+	// below carry the result content for the next LLM iter, but the
+	// gateway needs the event for live card rendering. Look up tool name
+	// from the originating toolCalls via ToolCallID since ToolResult itself
+	// only carries ID/Output/Error.
+	nameByID := make(map[string]string, len(toolCalls))
+	for _, tc := range toolCalls {
+		nameByID[tc.ID] = tc.Name
+	}
+	for _, r := range round.Results {
+		body := r.Output
+		if r.Error != "" {
+			body = r.Error
+		}
+		name := nameByID[r.ToolCallID]
+		e.emit(ctx, &contracts.EngineEvent{
+			Type:      "tool_result",
+			Content:   body,
+			ToolName:  name,
+			SessionID: sessionID,
+			Metadata: map[string]string{
+				"tool_name":    name,
+				"tool_call_id": r.ToolCallID,
+			},
+		})
+	}
 	if len(round.Results) == 0 {
 		// Executor returned no results — break with what we have rather
 		// than spin forever on a silent failure.
@@ -274,6 +317,11 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 // events for richer observability; for WorkItemExecutor (which has no event
 // stream of its own), folding into Content keeps the user-visible output
 // coherent in one place.
+//
+// Emit hook: each chunk's text / thinking / tool_call stream is forwarded
+// as an EngineEvent so the gateway can render intermediate state on feishu
+// cards (mirrors OrchestratePath's streamEmit → workerEventToEngine path).
+// nil Emit → no-op (legacy / tests).
 func (e *DefaultWorkItemExecutor) streamLLM(
 	ctx context.Context,
 	sessionID, systemPrompt string,
@@ -296,18 +344,56 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	for chunk := range ch {
 		if chunk.Content != "" {
 			content.WriteString(chunk.Content)
+			e.emit(ctx, &contracts.EngineEvent{
+				Type:      "text",
+				Content:   chunk.Content,
+				SessionID: sessionID,
+			})
 		}
 		if chunk.Thinking != "" {
 			content.WriteString(chunk.Thinking)
+			e.emit(ctx, &contracts.EngineEvent{
+				Type:      "thinking",
+				Content:   chunk.Thinking,
+				SessionID: sessionID,
+			})
 		}
 		if len(chunk.ToolCalls) > 0 {
 			toolCalls = chunk.ToolCalls
+			for _, tc := range chunk.ToolCalls {
+				e.emit(ctx, &contracts.EngineEvent{
+					Type:      "tool_call",
+					ToolName:  tc.Name,
+					ToolInput: tc.Input,
+					SessionID: sessionID,
+					Metadata: map[string]string{
+						"tool_name": tc.Name,
+						"input":     tc.Input,
+						"call_id":   tc.ID,
+					},
+				})
+			}
 		}
 		if chunk.FinishReason != "" {
 			finishReason = chunk.FinishReason
 		}
 	}
 	return content.String(), toolCalls, finishReason, nil
+}
+
+// emit forwards an EngineEvent to the configured Emit hook. nil Emit is a
+// no-op so legacy / test fixtures that don't wire a sink keep working.
+// Used for intermediate LLM chunk (text/thinking/tool_call) + tool-result
+// events; matches OrchestratePath's streamEmit pattern in shape but with
+// caller-driven control instead of subagent-driven streaming.
+func (e *DefaultWorkItemExecutor) emit(ctx context.Context, ev *contracts.EngineEvent) {
+	if e == nil || e.Emit == nil || ev == nil {
+		return
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+	e.Emit(ev)
 }
 
 // prepareContext calls ContextPreparer.Prepare to assemble SystemPrompt +
