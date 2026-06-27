@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
@@ -36,6 +37,7 @@ func (a *AsyncAutocompacter) StartAsync(
 	turns [][]types.Message,
 	head, tail int,
 	observer StepObserver,
+	loc i18n.Locale,
 ) {
 	if a == nil || a.summarizer == nil || sessionID == "" {
 		return
@@ -75,7 +77,7 @@ func (a *AsyncAutocompacter) StartAsync(
 		}()
 
 		middle := flattenTurns(turns[head : len(turns)-tail])
-		summary, err := summarizeWithRetry(runCtx, a.summarizer, cfg, middle)
+		summary, err := summarizeWithRetry(runCtx, a.summarizer, cfg, middle, loc)
 		if err != nil {
 			if observer != nil {
 				observer.OnAutocompact(AutocompactMeta{Degraded: true, Model: cfg.Model})
@@ -90,7 +92,7 @@ func (a *AsyncAutocompacter) StartAsync(
 			return
 		}
 
-		observer.OnAutocompactComplete(buildSummaryMessage(summary, len(middle)), sessionID, asyncToken)
+		observer.OnAutocompactComplete(buildSummaryMessage(summary, len(middle), loc), sessionID, asyncToken)
 		observer.OnAutocompact(AutocompactMeta{
 			Degraded: false,
 			Model:    cfg.Model,
@@ -150,10 +152,10 @@ func buildAutocompactPlaceholder(turns [][]types.Message, head, tail int) []type
 	return out
 }
 
-func buildSummaryMessage(summary string, middleCount int) types.Message {
+func buildSummaryMessage(summary string, middleCount int, loc i18n.Locale) types.Message {
 	return types.Message{
 		Role:    types.MessageRoleAssistant,
-		Content: formatSummaryContent(summary),
+		Content: formatSummaryContent(summary, loc),
 		Metadata: map[string]string{
 			"compressed_by":  "autocompact",
 			"original_count": fmt.Sprintf("%d", middleCount),

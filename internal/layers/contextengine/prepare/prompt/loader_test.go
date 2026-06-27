@@ -2,10 +2,12 @@ package prompt
 
 import (
 	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
-func TestLoaderLoadAsSections(t *testing.T) {
-	loader := NewLoader(nil)
+func TestLoaderLoadAsSectionsEnglish(t *testing.T) {
+	loader := NewLoader(nil, i18n.LocaleEN)
 	sections := loader.LoadAsSections("/tmp")
 
 	if len(sections) != 14 {
@@ -17,8 +19,19 @@ func TestLoaderLoadAsSections(t *testing.T) {
 	}
 }
 
+func TestLoaderLoadAsSectionsChineseDefault(t *testing.T) {
+	loader := NewLoader(nil, i18n.DefaultLocale)
+	sections := loader.LoadAsSections("/tmp")
+	if len(sections) != 14 {
+		t.Fatalf("expected 14 sections, got %d", len(sections))
+	}
+	if !contains(sections[0], "软件工程") {
+		t.Fatalf("expected Chinese intro, got: %.80q", sections[0])
+	}
+}
+
 func TestLoaderLoadWithDynamic(t *testing.T) {
-	loader := NewLoader(nil)
+	loader := NewLoader(nil, i18n.LocaleEN)
 
 	dynamic := []string{"# Dynamic Section\nDynamic content here"}
 	sections := loader.LoadWithDynamic("/tmp", dynamic)
@@ -60,7 +73,7 @@ func TestDynamicBoundary(t *testing.T) {
 }
 
 func TestLoaderClearCache(t *testing.T) {
-	loader := NewLoader(nil)
+	loader := NewLoader(nil, i18n.LocaleEN)
 	loader.cache.Set("intro", "mutated")
 	loader.ClearCache()
 	if v, _ := loader.cache.Get("intro"); v == "mutated" {

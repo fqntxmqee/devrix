@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -12,6 +13,7 @@ type toolWorkDirKey struct{}
 type toolSessionIDKey struct{}
 type toolSessionContextKey struct{}
 type toolFilesAutoApprovedKey struct{}
+type toolPromptLocaleKey struct{}
 
 // WithToolWorkDir attaches the session workspace directory to ctx for tool execution.
 func WithToolWorkDir(ctx context.Context, workDir string) context.Context {
@@ -64,6 +66,22 @@ func WithFilesAutoApproved(ctx context.Context, approved bool) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, toolFilesAutoApprovedKey{}, true)
+}
+
+// WithPromptLocale attaches the LLM-facing locale for tool messages/schemas.
+func WithPromptLocale(ctx context.Context, loc i18n.Locale) context.Context {
+	if loc == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, toolPromptLocaleKey{}, loc)
+}
+
+// PromptLocaleFromContext returns the prompt locale for tool execution.
+func PromptLocaleFromContext(ctx context.Context) i18n.Locale {
+	if v, ok := ctx.Value(toolPromptLocaleKey{}).(i18n.Locale); ok && v != "" {
+		return v
+	}
+	return i18n.DefaultLocale
 }
 
 // FilesAutoApprovedFromContext reports YOLO workspace write bypass for plan mode.

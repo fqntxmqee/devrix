@@ -74,6 +74,8 @@ type WorkspacePromptConfig struct {
 	AgentName              string          `yaml:"agent_name"`
 	AdditionalContextFiles []string        `yaml:"additional_context_files"`
 	EmbedCoreTemplate      bool            `yaml:"embed_core_template"`
+	// Language controls LLM-facing system prompts and tool schemas: zh-CN | en-US.
+	Language               string          `yaml:"language"`
 	PromptConfig           *PromptConfig   `yaml:"prompt"`
 }
 
@@ -125,7 +127,20 @@ func DefaultWorkspacePromptConfig() WorkspacePromptConfig {
 		MaxContextTokens:  8000,
 		AgentName:        "Devrix",
 		EmbedCoreTemplate: true,
+		Language:         "zh-CN",
 		PromptConfig:     DefaultPromptConfig(),
+	}
+}
+
+// ApplyUILanguage copies ui.language from user config into the context engine
+// workspace prompt settings when set. devrix.yaml workspace.language overrides
+// user config when explicitly configured.
+func ApplyUILanguage(ctxCfg *ContextEngineConfig, uiLanguage string) {
+	if ctxCfg == nil || uiLanguage == "" {
+		return
+	}
+	if ctxCfg.Workspace.Language == "" {
+		ctxCfg.Workspace.Language = uiLanguage
 	}
 }
 

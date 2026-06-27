@@ -9,16 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
 //go:embed templates/devrix_core.zh.md
-var defaultCoreTemplate string
+var defaultCoreTemplateZH string
+
+//go:embed templates/devrix_core.en.md
+var defaultCoreTemplateEN string
 
 //go:embed templates/workspace_guidance.zh.md
-var defaultGuidanceTemplate string
+var defaultGuidanceTemplateZH string
+
+//go:embed templates/workspace_guidance.en.md
+var defaultGuidanceTemplateEN string
 
 // ProcessRuntimeContext carries per-process runtime metadata (not persisted).
 type ProcessRuntimeContext struct {
@@ -55,31 +62,38 @@ type SystemPromptBuildReport struct {
 // SystemPromptAssembler builds the final system prompt per §十 spec.
 // Supports both legacy mode and new section-based prompt system.
 type SystemPromptAssembler struct {
-	coreTemplate     string
-	guidanceTemplate string
-	cfg              config.WorkspacePromptConfig
-	promptLoader     *Loader
+	coreTemplateZH     string
+	coreTemplateEN     string
+	guidanceTemplateZH string
+	guidanceTemplateEN string
+	cfg                config.WorkspacePromptConfig
+	promptLoader       *Loader
+	locale             i18n.Locale
 }
 
 // NewSystemPromptAssembler creates an assembler from workspace config.
 func NewSystemPromptAssembler(cfg config.WorkspacePromptConfig) *SystemPromptAssembler {
-	core := defaultCoreTemplate
-	guidance := defaultGuidanceTemplate
+	locale := i18n.ParseLanguage(cfg.Language)
 
-	// Create prompt loader for section-based prompts
 	var loader *Loader
 	if cfg.PromptConfig != nil && cfg.PromptConfig.UseSections {
-		loader = NewLoader(nil)
+		loader = NewLoader(nil, locale)
 	}
 
+	coreZH, coreEN := defaultCoreTemplateZH, defaultCoreTemplateEN
+	guidanceZH, guidanceEN := defaultGuidanceTemplateZH, defaultGuidanceTemplateEN
 	if !cfg.EmbedCoreTemplate {
-		core = "你是 Devrix，多智能体开发助手。"
+		fallback := i18n.CoreTemplateFallback(locale)
+		coreZH, coreEN = fallback, fallback
 	}
 	return &SystemPromptAssembler{
-		coreTemplate:     core,
-		guidanceTemplate: guidance,
-		cfg:              cfg,
-		promptLoader:     loader,
+		coreTemplateZH:     coreZH,
+		coreTemplateEN:     coreEN,
+		guidanceTemplateZH: guidanceZH,
+		guidanceTemplateEN: guidanceEN,
+		cfg:                cfg,
+		promptLoader:       loader,
+		locale:             locale,
 	}
 }
 
@@ -95,7 +109,7 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	report.LayerTokens[0] = estimateTokens(layer0)
 	report.SectionCount = sectionCount
 
-	layer2 := strings.TrimSpace(a.guidanceTemplate)
+	layer2 := strings.TrimSpace(a.guidanceTemplate())
 	report.LayerTokens[2] = estimateTokens(layer2)
 
 	blocks, blockReport := a.buildLayer3Blocks(in)
@@ -105,7 +119,7 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	layer3 := ""
 	if layer3HasContent(blocks) {
 		loaded := buildLoadedContext(blocks)
-		layer3Header := "## Workspace Files (Injected)\nThe following <loaded_context> was loaded from workspace.\n\n"
+		layer3Header := i18n.Layer3Header(a.locale)
 		layer3 = layer3Header + loaded
 		report.LayerTokens[3] = estimateTokens(layer3)
 	}
@@ -182,7 +196,7 @@ func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in System
 		if in.Session != nil && in.Session.WorkDir != "" {
 			workDir = in.Session.WorkDir
 		}
-		if gitCtx, ok := resolveGitStatusSection(sessionID, workDir); ok {
+		if gitCtx, ok := resolveGitStatusSection(sessionID, workDir, a.locale); ok {
 			parts = append(parts, gitCtx)
 			names = append(names, "git_status")
 		}
@@ -203,9 +217,9 @@ func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in System
 	return parts, names
 }
 
-func resolveGitStatusSection(sessionID, workDir string) (string, bool) {
+func resolveGitStatusSection(sessionID, workDir string, loc i18n.Locale) (string, bool) {
 	raw := resolveCachedSection(sessionID, "git_status", false, func() string {
-		s, ok := computeGitStatus(workDir)
+		s, ok := computeGitStatus(workDir, loc)
 		if !ok {
 			return ""
 		}
@@ -229,10 +243,7 @@ func (a *SystemPromptAssembler) buildEnvInfo(in SystemPromptBuildInput) string {
 	if workDir == "" && model == "" {
 		return ""
 	}
-	return fmt.Sprintf(`## Environment
-Workspace directory: %s
-Model: %s
-`, workDir, model)
+	return i18n.EnvInfoHeader(a.locale) + "\n" + i18n.EnvInfoBody(a.locale, workDir, model)
 }
 
 func joinNonEmptyParts(parts ...string) string {
@@ -255,7 +266,7 @@ func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (strin
 			return strings.Join(sections, "\n\n"), len(sections)
 		}
 	}
-	return a.coreTemplate, 1
+	return a.coreTemplate(), 1
 }
 
 // BuildLegacy returns the V4 system prompt (agents + longterm appendix).
@@ -294,15 +305,11 @@ func (a *SystemPromptAssembler) buildSessionContext(in SystemPromptBuildInput) s
 	}
 	// S4-Gate H-2 fix: 不在这里 drain — 移到 Build 顶层, 避免被 dynamic_sections
 	// cache 命中导致第二次 build 拿不到新 event.
-	return fmt.Sprintf(`## Session Context
-Agent: %s
-Today's date: %s
-Operating system: %s
-Workspace directory: %s
-Session ID: %s
-Request ID: %s
-Model: %s
-`, agentName, time.Now().Format("Monday Jan 2, 2006"), runtime.GOOS, workDir, sessionID, requestID, model)
+	now := time.Now()
+	return i18n.SessionContextHeader(a.locale) + "\n" + i18n.SessionContextBody(
+		a.locale, agentName, i18n.FormatSessionDate(a.locale, now), runtime.GOOS,
+		workDir, sessionID, requestID, model,
+	)
 }
 
 // drainTaskNotifications (D4-S12-A03 / G3) 在 prepare 阶段把 session 累积的
@@ -372,7 +379,7 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 	report.MemoryTruncated = truncated
 
 	agentsBudget := budget
-	agentsRaw := truncateToTokenBudget(strings.TrimSpace(in.AgentsRaw), agentsBudget)
+	agentsRaw := a.truncateToTokenBudget(strings.TrimSpace(in.AgentsRaw), agentsBudget)
 	if in.OmitAgentsFromSystem {
 		agentsRaw = ""
 	}
@@ -380,7 +387,7 @@ func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (ma
 	if budget < 0 {
 		budget = 0
 	}
-	memoryRaw = truncateToTokenBudget(memoryRaw, budget)
+	memoryRaw = a.truncateToTokenBudget(memoryRaw, budget)
 
 	if agentsRaw != "" {
 		blocks["agents_context"] = agentsRaw
@@ -436,7 +443,7 @@ func estimateTokens(s string) int {
 	return n
 }
 
-func truncateToTokenBudget(text string, maxTokens int) string {
+func (a *SystemPromptAssembler) truncateToTokenBudget(text string, maxTokens int) string {
 	if maxTokens <= 0 {
 		return ""
 	}
@@ -444,19 +451,31 @@ func truncateToTokenBudget(text string, maxTokens int) string {
 	if len(text) <= maxChars {
 		return text
 	}
-	return text[:maxChars] + memoryTruncationNoticeZH
+	return text[:maxChars] + i18n.MemoryTruncationNotice(a.locale)
 }
 
-const memoryTruncationNoticeZH = "\n... (记忆已截断 — 更多内容请依赖 LongTerm recall 或项目文档) ..."
+func (a *SystemPromptAssembler) coreTemplate() string {
+	if a.locale == i18n.LocaleEN {
+		return a.coreTemplateEN
+	}
+	return a.coreTemplateZH
+}
+
+func (a *SystemPromptAssembler) guidanceTemplate() string {
+	if a.locale == i18n.LocaleEN {
+		return a.guidanceTemplateEN
+	}
+	return a.guidanceTemplateZH
+}
 
 func (a *SystemPromptAssembler) templateFingerprint() string {
 	if a == nil {
 		return ""
 	}
 	h := sha256.New()
-	h.Write([]byte(a.coreTemplate))
+	h.Write([]byte(a.coreTemplate()))
 	h.Write([]byte{0})
-	h.Write([]byte(a.guidanceTemplate))
+	h.Write([]byte(a.guidanceTemplate()))
 	h.Write([]byte{0})
 	h.Write([]byte(fmt.Sprintf("%t", a.cfg.EmbedCoreTemplate)))
 	return shortHash(h.Sum(nil))

@@ -1,4 +1,4 @@
-## Workspace Guidance
+## 工作区指引
 
 - 项目规约以 `<agents_context>` 为唯一来源（SoT）。
 - 回答历史决策时优先依赖 `<memory_context>`；不足时使用 LongTerm recall。

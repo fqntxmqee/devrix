@@ -2,11 +2,13 @@ package prompt
 
 import (
 	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
 // TestStaticSectionsContent verifies that static sections contain expected keywords.
 func TestStaticSectionsContent(t *testing.T) {
-	loader := NewLoader(nil)
+	loader := NewLoader(nil, i18n.LocaleEN)
 	sections := loader.LoadAsSections("/tmp")
 
 	expectedKeywords := map[string][]string{
@@ -47,7 +49,7 @@ func TestStaticSectionsContent(t *testing.T) {
 
 // TestContextAssemblerUsesNewLoader verifies assembler uses new loader.
 func TestContextAssemblerUsesNewLoader(t *testing.T) {
-	loader := NewLoader(nil)
+	loader := NewLoader(nil, i18n.LocaleEN)
 
 	// Verify loader provides sections
 	sections := loader.LoadAsSections("/tmp")

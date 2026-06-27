@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/diagnose/tracker"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
@@ -150,10 +151,11 @@ func NewContextEngine(
 	// (replaces freefork.GlobalForker() / SetGlobalForker process-wide
 	// singleton). Caller passes nil when multi-agent free_fork is disabled.
 	surfaces := BuildSurfaces(SurfaceBuildOpts{
-		ToolReg:   toolReg,
-		LSPConfig: nil, // LSP wired via legacy RegisterLSPTool above
-		Tracker:   diagTracker,
-		Forker:    freeforkGlobalFunc(forker),
+		ToolReg:      toolReg,
+		LSPConfig:    nil, // LSP wired via legacy RegisterLSPTool above
+		Tracker:      diagTracker,
+		Forker:       freeforkGlobalFunc(forker),
+		PromptLocale: i18n.ParseLanguage(ctxCfg.Workspace.Language),
 	})
 
 	return contextengine.NewContextEngine(contextengine.EngineDeps{

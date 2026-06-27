@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -37,6 +38,7 @@ type Pipeline struct {
 	asyncCompact       *AsyncAutocompacter
 	sessionID          string
 	skipAssembly       bool
+	locale             i18n.Locale
 }
 
 // NewPipeline creates a compression pipeline with functional options.
@@ -147,7 +149,7 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 	}
 
 	// Step 6: autocompact (before assembly, on message history only)
-	next, stepLabel, _ := runAutocompact(ctx, sessionID, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver, p.asyncCompact)
+	next, stepLabel, _ := runAutocompact(ctx, sessionID, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver, p.asyncCompact, p.locale)
 	current = next
 	report.StepsApplied = append(report.StepsApplied, stepLabel)
 	if stepLabel == stepAutocompact {

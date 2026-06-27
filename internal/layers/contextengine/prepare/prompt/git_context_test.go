@@ -6,11 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
 func TestComputeGitStatus_should_return_false_outside_git(t *testing.T) {
 	dir := t.TempDir()
-	if _, ok := computeGitStatus(dir); ok {
+	if _, ok := computeGitStatus(dir, i18n.LocaleEN); ok {
 		t.Fatal("expected false for non-git directory")
 	}
 }
@@ -24,7 +26,7 @@ func TestComputeGitStatus_should_include_branch_in_repo(t *testing.T) {
 	runGit(t, dir, "add", "README.md")
 	runGit(t, dir, "commit", "-m", "init")
 
-	out, ok := computeGitStatus(dir)
+	out, ok := computeGitStatus(dir, i18n.LocaleEN)
 	if !ok {
 		t.Fatal("expected git status in initialized repo")
 	}

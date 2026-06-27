@@ -41,7 +41,7 @@ func TestSystemPromptAssembler_should_build_xml_blocks(t *testing.T) {
 	if !strings.Contains(prompt, "<memory_context>") {
 		t.Fatal("expected memory_context block")
 	}
-	if !strings.Contains(prompt, "Session ID: sess_1") {
+	if !strings.Contains(prompt, "Session ID: sess_1") && !strings.Contains(prompt, "会话 ID: sess_1") {
 		t.Fatal("expected session context")
 	}
 	if report.TotalTokens <= 0 {
@@ -82,15 +82,17 @@ func TestSystemPromptAssembler_should_insert_dynamic_boundary(t *testing.T) {
 		t.Fatal("expected dynamic boundary marker in prompt")
 	}
 	staticPrefix := prompt[:idx]
-	if !strings.Contains(staticPrefix, "Workspace Guidance") {
+	if !strings.Contains(staticPrefix, "Workspace Guidance") && !strings.Contains(staticPrefix, "工作区指引") {
 		t.Fatal("guidance should appear before boundary")
 	}
 	if !strings.Contains(staticPrefix, "You are an interactive agent") &&
-		!strings.Contains(staticPrefix, "Devrix") {
+		!strings.Contains(staticPrefix, "Devrix") &&
+		!strings.Contains(staticPrefix, "软件工程") {
 		t.Fatal("core static content should appear before boundary")
 	}
 	dynamicSuffix := prompt[idx+len(DynamicBoundary):]
-	if !strings.Contains(dynamicSuffix, "Session Context") {
+	if !strings.Contains(dynamicSuffix, "Session Context") &&
+		!strings.Contains(dynamicSuffix, "会话上下文") {
 		t.Fatal("session context should appear after boundary")
 	}
 	if !strings.Contains(report.DynamicSectionNames[0], "session_context") {
@@ -112,7 +114,7 @@ func TestSystemPromptAssembler_should_disable_boundary_when_config_off(t *testin
 	if strings.Contains(prompt, DynamicBoundary) {
 		t.Fatal("prompt must not contain boundary marker")
 	}
-	if !strings.Contains(prompt, "Session Context") {
+	if !strings.Contains(prompt, "日期:") && !strings.Contains(prompt, "Today's date:") {
 		t.Fatal("session context should remain inline without boundary mode")
 	}
 }
@@ -128,7 +130,7 @@ func TestSystemPromptAssembler_should_use_core_template(t *testing.T) {
 		Session: types.NewSession("sess_1", "cli", "/tmp/proj"),
 		Runtime: ProcessRuntimeContext{SessionID: "sess_1"},
 	})
-	if !strings.Contains(prompt, "Devrix") {
+	if !strings.Contains(prompt, "Devrix") && !strings.Contains(prompt, "软件工程") {
 		t.Fatal("expected embedded core template in system prompt")
 	}
 	if strings.Contains(prompt, "Project agents content") {

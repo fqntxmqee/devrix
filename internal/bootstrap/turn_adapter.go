@@ -9,6 +9,8 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -73,6 +75,13 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 	return a
 }
 
+func (a *contextEngineAdapter) promptLocale() i18n.Locale {
+	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+		return ce.PromptLocale()
+	}
+	return i18n.DefaultLocale
+}
+
 // Prepare implements sessionorchestrator.ContextPreparer.
 // D-e: checks token budget and returns CompressHint when exceeded.
 //
@@ -106,6 +115,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 
 	seen := map[string]bool{}
 	var toolSchemas []sessionorchestrator.ToolSchema
+	loc := a.promptLocale()
 	for _, s := range a.surfaces {
 		for _, sp := range s.Tools(ctx, session.WorkDir, "") {
 			if seen[sp.Name] {
@@ -122,10 +132,11 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 			if a.deferDecider != nil && a.deferDecider.ShouldDefer(ctx, sp) {
 				continue
 			}
-			params := parseToolParams(sp.Parameters)
+			desc, paramsRaw := i18n.LocalizeTool(sp.Name, sp.Description, sp.Parameters, loc)
+			params := parseToolParams(paramsRaw)
 			toolSchemas = append(toolSchemas, sessionorchestrator.ToolSchema{
 				Name:        sp.Name,
-				Description: sp.Description,
+				Description: desc,
 				Parameters:  params,
 			})
 		}
@@ -138,10 +149,11 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 					continue
 				}
 				seen[s.Name] = true
-				params := parseToolParams(s.Parameters)
+				desc, paramsRaw := i18n.LocalizeTool(s.Name, s.Description, s.Parameters, loc)
+				params := parseToolParams(paramsRaw)
 				toolSchemas = append(toolSchemas, sessionorchestrator.ToolSchema{
 					Name:        s.Name,
-					Description: s.Description,
+					Description: desc,
 					Parameters:  params,
 				})
 			}
@@ -276,7 +288,7 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorch
 		return sessionorchestrator.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
 	}
 
-	toolCtx := ctx
+	toolCtx := tools.WithPromptLocale(ctx, a.promptLocale())
 	if req.SessionID != "" {
 		if sc, ok := contracts.SubAgentSessionFromContext(ctx); ok {
 			toolCtx = contextengine.ToolContextWithGate(toolCtx, sc, a.perm)

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
@@ -21,7 +22,7 @@ func TestDiscoverAgents_should_prefer_closer_directory(t *testing.T) {
 	loader := NewLoader(&config.SystemPromptConfig{
 		Sources: []string{"AGENTS.md"},
 		WalkUp:  configBool(true),
-	})
+	}, i18n.DefaultLocale)
 	merged := loader.Load(sub)
 	if !strings.Contains(merged, "root-rule") {
 		t.Fatal("expected ancestor AGENTS.md")
@@ -42,7 +43,7 @@ func TestDiscoverAgents_should_load_devrix_before_agents_in_same_dir(t *testing.
 	loader := NewLoader(&config.SystemPromptConfig{
 		Sources: []string{".devrix/AGENTS.md", "AGENTS.md"},
 		WalkUp:  configBool(false),
-	})
+	}, i18n.DefaultLocale)
 	merged := loader.Load(dir)
 	if !strings.Contains(merged, "generic") || !strings.Contains(merged, "specific") {
 		t.Fatalf("unexpected merge: %q", merged)
@@ -61,7 +62,7 @@ func TestDiscoverAgents_should_load_rules_glob(t *testing.T) {
 	writeAgents(t, rulesDir, "01-style.md", "style-rule")
 	writeAgents(t, dir, ".devrix/AGENTS.md", "agent-rule")
 
-	loader := NewLoader(nil)
+	loader := NewLoader(nil, i18n.DefaultLocale)
 	merged := loader.Load(dir)
 	if !strings.Contains(merged, "style-rule") {
 		t.Fatal("expected rules file content")

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -98,7 +99,7 @@ func (r *todoWriteRunner) Execute(ctx context.Context, workDir, input string) (*
 		}
 		if !hasVerif {
 			verificationNudgeNeeded = true
-			nudgeMessage = "You have completed 3+ tasks without a verification step. Consider running a verification agent or using /verify to validate completeness and quality before concluding."
+			nudgeMessage = i18n.TodoVerificationNudge(PromptLocaleFromContext(ctx))
 		}
 		// Reset counter regardless of whether nudge fires (prevents repeated nudges)
 		sc.VerifState.CompletedSinceLastVerif = 0

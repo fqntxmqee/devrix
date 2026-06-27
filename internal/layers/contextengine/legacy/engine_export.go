@@ -1,6 +1,9 @@
 package legacy
 
-import "github.com/devrix/devrix/internal/shared/contracts"
+import (
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
+	"github.com/devrix/devrix/internal/shared/contracts"
+)
 
 // ToolRegistry returns the engine tool registry.
 func (e *ContextEngine) ToolRegistry() IToolRegistry {
@@ -32,4 +35,12 @@ func (e *ContextEngine) Filters() []contracts.ToolFilter {
 // HasSurfaces reports whether the engine has a non-nil surface list.
 func (e *ContextEngine) HasSurfaces() bool {
 	return e != nil && len(e.surfaces) > 0
+}
+
+// PromptLocale returns the locale used for LLM-facing prompts and tool schemas.
+func (e *ContextEngine) PromptLocale() i18n.Locale {
+	if e == nil || e.cfg == nil {
+		return i18n.DefaultLocale
+	}
+	return i18n.ParseLanguage(e.cfg.Workspace.Language)
 }
