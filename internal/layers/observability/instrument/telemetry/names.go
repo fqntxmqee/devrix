@@ -215,6 +215,18 @@ func LayerAndComponent(operation string) (layer, component string) {
 		// + 1 5-node pipeline root span (D7_MUPS_Pipeline).
 		return LayerOrchestration, "orchestrator"
 
+	case strings.HasPrefix(operation, "D7_Worktree_Op"),
+		strings.HasPrefix(operation, "D7_SubWorktree_Run"):
+		// DM-20260626-009 follow-up inner observability spans (PR #254 + #257).
+		// WorkItem task tree mutations + parallel-explore / child WorkItem
+		// runs → worktree component (D7-S1).
+		return LayerOrchestration, "worktree"
+
+	case strings.HasPrefix(operation, "D7_SubTurn_Iteration"):
+		// DM-20260626-009 follow-up inner observability spans (PR #254 + #257).
+		// Per-WorkItem ReAct loop iterations (D7-S5).
+		return LayerOrchestration, "executor"
+
 	// D6 Evolution
 	case strings.HasPrefix(operation, "D6_Validation_"):
 		return LayerEvolution, "validation"

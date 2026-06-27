@@ -11,6 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -32,6 +33,18 @@ type ItemPipelineRunner struct {
 	Executor WorkItemExecutor
 	// Verify overrides deterministic artifact verification (tests / future LLM verifier).
 	Verify func(*wavescheduler.Artifact) workmodel.Verdict
+	// Emit forwards intermediate engine events from the ReAct loop to the
+	// gateway so feishu cards show live tool_call / tool_result / text
+	// alongside the final ArtifactSummary. nil → no-op (legacy / test
+	// fixtures). RunSessionTurnLoop sets this in its goroutine so the
+	// per-WorkItem path produces the same observable stream as the legacy
+	// OrchestratePath worker fan-out.
+	//
+	// Hotfix (2026-06-27): without this, ItemPipelineRunner ran 4 tool.bash
+	// calls per ReAct loop but the feishu card only saw the final
+	// ArtifactSummary text + complete — tool invocations were invisible.
+	// See devrix-inner-spans-dedup-remove memory note.
+	Emit func(*contracts.EngineEvent)
 }
 
 // ItemPipelineDeps wires a production-style runner. Nil Planner defaults to
@@ -88,6 +101,16 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	if workmodel.IsHumanReviewItem(item) && item.Status == workmodel.TaskStatusPending {
 		return r.runHumanReviewAwait(ctx, sessionID, item)
+	}
+	// Propagate Emit hook to Executor so the ReAct loop's intermediate
+	// events (text / thinking / tool_call / tool_result) flow to the
+	// gateway. nil-safe — legacy / test runners without Emit continue to
+	// work unchanged. Don't overwrite if Executor already has its own Emit
+	// (lets tests inject a stub).
+	if r.Emit != nil {
+		if exec, ok := r.Executor.(*DefaultWorkItemExecutor); ok && exec.Emit == nil {
+			exec.Emit = r.Emit
+		}
 	}
 
 	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the

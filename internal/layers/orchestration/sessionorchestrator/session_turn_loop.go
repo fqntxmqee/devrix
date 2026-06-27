@@ -35,6 +35,23 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		sessionID := req.SessionID
 		userID := effectiveUserID(ctx, req)
 
+		// Emit hook for ItemPipelineRunner / WorkItemExecutor so per-WorkItem
+		// tool calls show up on feishu cards. Mirrors OrchestratePath's
+		// spec.Emit pattern but driven from the gateway out channel rather
+		// than the subagent stream — the executor already runs sequentially
+		// in this goroutine, so each event lands on `out` in arrival order
+		// and the gateway renders it live.
+		emitFn := func(ev *contracts.EngineEvent) {
+			if ev == nil {
+				return
+			}
+			if ev.SessionID == "" {
+				ev.SessionID = sessionID
+			}
+			emit(ctx, o.sink, out, ev)
+		}
+		o.itemPipeline.Emit = emitFn
+
 		awaiter := &workmodel.ResolveAwaiter{Manager: o.taskManager}
 
 		// Seed: ensure a session root WorkItem exists before the focus loop

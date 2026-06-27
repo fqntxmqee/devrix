@@ -36,3 +36,23 @@
 - 顶层包/目录用 L1 领域名（`trade`, `contextengine`）
 - API URL kebab-case 复数：`/api/v1/order-items`
 - 详见 `specs/02-domain-concepts.md`
+
+## 项目结构（D{N} → 路径）
+
+用户提到 `D{N}` 或 `d{N} 域` 时直接定位：
+
+
+| 域  | 中文     | 目录                                   | 备注                |
+| --- | ------ | ------------------------------------ | ----------------- |
+| D1  | 通信层    | `internal/layers/communication/`      | Im/adapter/bridge |
+| D2  | 上下文引擎  | `internal/layers/contextengine/`     | prompt / recall   |
+| D3  | LLM 网关 | `internal/layers/llmgateway/`        | 流式 / tool schema |
+| D4  | 多智能体   | `internal/layers/multiagent/`        | subagent / fork   |
+| D5  | 可观测性   | `internal/layers/observability/`     | span / metric     |
+| D6  | 演化层    | `internal/layers/evolution/`         | guard / learn     |
+| D7  | 编排层    | `internal/layers/orchestration/`     | SessionOrchestrator / MUPS |
+
+
+- 跨域共享：`internal/shared/`（types / config / errors / contracts）
+- 域架构归档：`openspec/specs/d{N}-*/`（spec.md + A/F/T 注册表）
+- 不确定时先 `ls internal/layers/` 再继续，避免盲搜 `**/d2/**`
