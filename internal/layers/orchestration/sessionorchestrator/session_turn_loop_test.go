@@ -126,20 +126,19 @@ func TestRunSessionTurnLoop_NoSummaryTextEventAtLoopEnd(t *testing.T) {
 			t.Fatalf("regression: pipeline summary leaked as text event: %q", ev.Content)
 		}
 	}
-	// The terminal `complete` event must have empty Content so the
-	// feishu finalize path does not render a 任务总结 card from D7
-	// metadata.
 	last := events[len(events)-1]
 	if last.Type != "complete" {
 		t.Fatalf("last event type = %q, want complete", last.Type)
 	}
-	if last.Content != "" {
-		t.Fatalf("complete event Content = %q, want empty (D7 metadata must not surface to user)", last.Content)
+	// DM-20260627-001: complete carries root deliverable (reverses empty-Content hotfix).
+	if last.Content == "" {
+		t.Fatalf("complete event Content empty, want session deliverable summary")
 	}
 }
 
 func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
+	runner.Executor = &rollupContentExecutor{summary: validRollupSummary(), capture: nil}
 	runner.Verify = func(_ *wavescheduler.Artifact) workmodel.Verdict {
 		return workmodel.Verdict{
 			Kind: types.VerdictPartial, SourceID: "v_partial", Confidence: 0.4,

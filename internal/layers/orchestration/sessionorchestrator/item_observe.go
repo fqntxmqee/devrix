@@ -70,6 +70,18 @@ func observeWorkItem(
 		return orchtypes.UncertaintyReport{}, nil, err
 	}
 	obs = append(obs, childObs...)
+	if item.NeedsRollup {
+		summaryObs, err := observationsFromChildSummaryBubbles(tasks, sessionID, item)
+		if err != nil {
+			return orchtypes.UncertaintyReport{}, nil, err
+		}
+		obs = append(obs, summaryObs...)
+		checklistObs, err := observationsFromChecklistChildBubbles(tasks, sessionID, item)
+		if err != nil {
+			return orchtypes.UncertaintyReport{}, nil, err
+		}
+		obs = append(obs, checklistObs...)
+	}
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
@@ -161,6 +173,36 @@ func observationsFromItem(
 	return obs, nil
 }
 
+func observationsFromChildSummaryBubbles(
+	tm *workmodel.TaskManager,
+	sessionID string,
+	parent *workmodel.WorkItem,
+) ([]orchtypes.Observation, error) {
+	if tm == nil || parent == nil {
+		return nil, nil
+	}
+	bubbles := workmodel.CollectSummaryChildBubbles(tm, sessionID, parent.ID)
+	var obs []orchtypes.Observation
+	for _, b := range bubbles {
+		stmt := workmodel.SummaryBubbleStatement(b.ChildID, b.Summary)
+		if stmt == "" {
+			continue
+		}
+		o, err := orchtypes.NewObservation(
+			orchtypes.ObsFact,
+			orchtypes.CatBusiness,
+			0.85,
+			orchtypes.FactPayload{Statement: stmt, Evidence: []string{b.ChildID}},
+			"context_summary_bubble",
+		)
+		if err != nil {
+			return nil, err
+		}
+		obs = append(obs, o)
+	}
+	return obs, nil
+}
+
 func observationsFromChildStructuredBubbles(
 	tm *workmodel.TaskManager,
 	sessionID string,
@@ -189,6 +231,36 @@ func observationsFromChildStructuredBubbles(
 			strength,
 			orchtypes.FactPayload{Statement: stmt, Evidence: []string{b.ChildID, b.Round.VerdictID}},
 			"context_structured_bubble",
+		)
+		if err != nil {
+			return nil, err
+		}
+		obs = append(obs, o)
+	}
+	return obs, nil
+}
+
+func observationsFromChecklistChildBubbles(
+	tm *workmodel.TaskManager,
+	sessionID string,
+	parent *workmodel.WorkItem,
+) ([]orchtypes.Observation, error) {
+	if tm == nil || parent == nil {
+		return nil, nil
+	}
+	bubbles := workmodel.CollectChecklistChildBubbles(tm, sessionID, parent.ID)
+	var obs []orchtypes.Observation
+	for _, b := range bubbles {
+		stmt := workmodel.ChecklistBubbleStatement(b.ChildID, b.Item)
+		if stmt == "" {
+			continue
+		}
+		o, err := orchtypes.NewObservation(
+			orchtypes.ObsFact,
+			orchtypes.CatBusiness,
+			0.75,
+			orchtypes.FactPayload{Statement: stmt, Evidence: []string{b.ChildID}},
+			"context_checklist_bubble",
 		)
 		if err != nil {
 			return nil, err

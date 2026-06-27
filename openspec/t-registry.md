@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 222 | 218 | 4 | 185 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 243 | 239 | 0 | 206 |
 
-**总计**: 544 · IMPLEMENTED 535 · PLANNED 7 · PARTIAL 0 · P0 354
+**总计**: 565 · IMPLEMENTED 556 · PLANNED 7 · PARTIAL 2 · P0 375
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。

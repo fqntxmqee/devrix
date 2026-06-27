@@ -237,6 +237,7 @@
 | **devrix-d7-six-s-simplification** | **`openspec/archive/2026-06-26-devrix-d7-six-s-simplification/`** |
 | **devrix-d7-itempipeline-emit-hook** | **`openspec/archive/2026-06-27-devrix-d7-itempipeline-emit-hook/`**（DM-20260627-001 HOTFIX; ItemPipelineRunner emit hook 补齐; PR #257 merged `8251a18`; 用户飞书验收 "tools有了"） |
 | **devrix-d2-agents-md-project-layout** | **`openspec/archive/2026-06-27-devrix-d2-agents-md-project-layout/`**（DM-20260627-002 HOTFIX; .devrix/AGENTS.md 加 D{N}→path 映射; PR #258 merged `9b660fa`; 等待用户飞书实测验收） |
+| **devrix-d7-workitem-rollup-pipeline** | **`openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`**（DM-20260627-001; Phase 1 Rollup 闭环 — gate/dual bubble/rollup MUPS/deliverable; PARTIAL 验收; best_effort only; 未 commit） |
 
 ## Active Changes (未归档)
 

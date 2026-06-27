@@ -38,6 +38,13 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 	if parent.Status == TaskStatusPending {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress)
 	}
+	if ShouldRollupAfterChildren(parent, RollupGatePolicyFor(parent), stats) {
+		_ = tm.Tree().SetNeedsRollup(sessionID, parent.ID, true)
+		if isTerminalStatus(parent.Status) {
+			_ = tm.Tree().ReopenForRollup(sessionID, parent.ID)
+		}
+		return
+	}
 	if stats.Failed > 0 {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusFailed)
 		return

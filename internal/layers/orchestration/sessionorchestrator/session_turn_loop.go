@@ -94,6 +94,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 			if focus == nil {
+				if _, triggered := workmodel.MaybeRootRollupFallback(sessionID, o.taskManager); triggered {
+					continue
+				}
 				break
 			}
 
@@ -173,25 +176,16 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 
 			if !o.taskManager.Tree().HasOpenWork(sessionID) {
+				if _, triggered := workmodel.MaybeRootRollupFallback(sessionID, o.taskManager); triggered {
+					continue
+				}
 				break
 			}
 		}
 
-		// 2026-06-26 hotfix: previously the loop emitted a `text` event
-		// carrying the D7 internal pipeline summary ([Goal] title →
-		// VerdictKind (spawn=...)) before the `complete`. The feishu
-		// reply card treats both as user-facing content, so the user saw
-		// the LLM's actual answer plus a D7 metadata line appended. The
-		// LLM streaming path already delivers the real answer; the
-		// pipeline summary is internal and now stays internal.
-		//
-		// The `complete` event is kept (gateway needs it to finalize the
-		// session and LP-1 Auto-Close to run), but Content is empty so
-		// feishu.finalizeStructuredSession does not render a 任务总结 card
-		// from D7 metadata — the LLM's own final paragraph (already on
-		// the reply card via streaming) is the conclusion the user sees.
+		deliverable := workmodel.ExtractSessionDeliverable(o.taskManager, sessionID)
 		emit(ctx, o.sink, out, &contracts.EngineEvent{
-			Type: "complete", SessionID: sessionID,
+			Type: "complete", Content: deliverable, SessionID: sessionID,
 		})
 	}()
 
