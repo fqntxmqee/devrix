@@ -1,7 +1,10 @@
 package sessionorchestrator
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
 // T: D7-S2-A06-T03 (DM-20260617-004 devrix-d7-tool-ctx-inject)
@@ -118,5 +121,45 @@ func TestOrchestrationToolSchemas_FreeFork_ModeEnum(t *testing.T) {
 	}
 	if def, _ := mode["default"].(string); def != "brief" {
 		t.Errorf("free_fork schema: mode.default = %q, want \"brief\"", def)
+	}
+}
+
+func TestMergeOrchestrationTools_DedupesAndLocalizes(t *testing.T) {
+	existing := []ToolSchema{{
+		Name:        "enter_plan_mode",
+		Description: "Enter read-only plan mode",
+		Parameters:  map[string]any{"type": "object"},
+	}}
+	merged := mergeOrchestrationTools(existing, i18n.LocaleZH)
+	names := map[string]int{}
+	for _, s := range merged {
+		names[s.Name]++
+	}
+	if names["enter_plan_mode"] != 1 {
+		t.Fatalf("enter_plan_mode count = %d, want 1 (deduped)", names["enter_plan_mode"])
+	}
+	ff, ok := names["free_fork"]
+	if !ok || ff != 1 {
+		t.Fatalf("expected localized free_fork appended once, names=%v", names)
+	}
+	var fork *ToolSchema
+	for i := range merged {
+		if merged[i].Name == "free_fork" {
+			fork = &merged[i]
+			break
+		}
+	}
+	if fork == nil {
+		t.Fatal("free_fork missing")
+	}
+	if !strings.Contains(fork.Description, "子 agent") {
+		t.Errorf("free_fork description not localized: %q", fork.Description)
+	}
+	props, ok := fork.Parameters["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("free_fork parameters: %+v", fork.Parameters)
+	}
+	if _, ok := props["parent_session"]; !ok {
+		t.Errorf("free_fork missing parent_session; props=%v", props)
 	}
 }

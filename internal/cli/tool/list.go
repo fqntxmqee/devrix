@@ -20,6 +20,7 @@ import (
 
 	"github.com/devrix/devrix/internal/bootstrap"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -29,11 +30,12 @@ import (
 // ListCmd holds the inputs needed to render a tool list. Tests populate the
 // fields directly; CLI dispatch (Run) fills them from args.
 type ListCmd struct {
-	Surfaces  []contracts.ToolSurface
-	Filters   []contracts.ToolFilter
-	AgentType string // "" | "main" | "explore" | "plan" | "fix" | "delegate" | "worker" | ...
-	Format    string // "text" (default) | "json"
-	Out       io.Writer
+	Surfaces     []contracts.ToolSurface
+	Filters      []contracts.ToolFilter
+	AgentType    string // "" | "main" | "explore" | "plan" | "fix" | "delegate" | "worker" | ...
+	Format       string // "text" (default) | "json"
+	PromptLocale i18n.Locale
+	Out          io.Writer
 }
 
 // BuildFromConfig constructs the canonical surface + filter list from the
@@ -62,10 +64,11 @@ func BuildFromConfig(ctxCfg *config.ContextEngineConfig, agentType string) ([]co
 	// (LSP disabled → surface.Tools() still returns the lsp schema with
 	// "lsp not enabled" reported at Execute time).
 	surfaces := bootstrap.BuildSurfaces(bootstrap.SurfaceBuildOpts{
-		ToolReg:   reg,
-		LSPConfig: nil,
-		Tracker:   nil,
-		Forker:    nil,
+		ToolReg:      reg,
+		LSPConfig:    nil,
+		Tracker:      nil,
+		Forker:       nil,
+		PromptLocale: i18n.ParseLanguage(ctxCfg.Workspace.Language),
 	})
 	// Filter to agent-specific view if requested.
 	var filters []contracts.ToolFilter
@@ -114,11 +117,12 @@ func runWith(args []string, out io.Writer) error {
 		return err
 	}
 	cmd := &ListCmd{
-		Surfaces:  surfaces,
-		Filters:   filters,
-		AgentType: *agentType,
-		Format:    *format,
-		Out:       out,
+		Surfaces:     surfaces,
+		Filters:      filters,
+		AgentType:    *agentType,
+		Format:       *format,
+		PromptLocale: i18n.ParseLanguage(ctxCfg.Workspace.Language),
+		Out:          out,
 	}
 	return cmd.Run()
 }
@@ -162,7 +166,8 @@ func (c *ListCmd) renderText(surfaces []contracts.ToolSurface) error {
 			if risk == "" {
 				risk = types.RiskLevelLow
 			}
-			if _, err := fmt.Fprintf(c.Out, "  - %-32s %-8s  %s\n", sp.Name, strings.ToUpper(string(risk)), trim(sp.Description, 80)); err != nil {
+			desc := c.localizeToolSpec(sp).Description
+			if _, err := fmt.Fprintf(c.Out, "  - %-32s %-8s  %s\n", sp.Name, strings.ToUpper(string(risk)), trim(desc, 80)); err != nil {
 				return err
 			}
 		}
@@ -195,12 +200,13 @@ func (c *ListCmd) renderJSON(surfaces []contracts.ToolSurface) error {
 			if risk == "" {
 				risk = types.RiskLevelLow
 			}
+			localized := c.localizeToolSpec(sp)
 			rep.Tools++
 			rep.Items = append(rep.Items, jsonTool{
 				Surface: s.Name(),
 				Name:    sp.Name,
 				Risk:    strings.ToUpper(string(risk)),
-				Desc:    sp.Description,
+				Desc:    localized.Description,
 			})
 		}
 	}
@@ -224,4 +230,22 @@ func trim(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+func (c *ListCmd) localizeLocale() i18n.Locale {
+	if c.PromptLocale != "" {
+		return c.PromptLocale
+	}
+	return i18n.DefaultLocale
+}
+
+func (c *ListCmd) localizeToolSpec(sp contracts.ToolSpec) contracts.ToolSpec {
+	loc := c.localizeLocale()
+	desc, params := i18n.LocalizeTool(sp.Name, sp.Description, sp.Parameters, loc)
+	return contracts.ToolSpec{
+		Name:        sp.Name,
+		Description: desc,
+		Parameters:  params,
+		Risk:        sp.Risk,
+	}
 }

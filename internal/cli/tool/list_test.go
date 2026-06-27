@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -44,6 +45,31 @@ func TestListCmd_TextOutput(t *testing.T) {
 	}
 	if !strings.Contains(out, "lsp") {
 		t.Errorf("missing lsp tool in output")
+	}
+}
+
+// T: D2-i18n — default zh-CN locale localizes LLM-facing tool descriptions in CLI output.
+func TestListCmd_LocalizedChineseOutput(t *testing.T) {
+	reg, err := tools.NewBuiltinToolRegistry(nil)
+	if err != nil {
+		t.Fatalf("NewBuiltinToolRegistry: %v", err)
+	}
+	cmd := &ListCmd{
+		Surfaces:     buildTestSurfaces(reg),
+		AgentType:    "main",
+		Format:       "text",
+		PromptLocale: i18n.LocaleZH,
+		Out:          &bytes.Buffer{},
+	}
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	out := cmd.Out.(*bytes.Buffer).String()
+	if strings.Contains(out, "Execute a shell command") {
+		t.Errorf("expected localized bash description, got English in:\n%s", out)
+	}
+	if !strings.Contains(out, "shell 命令") && !strings.Contains(out, "命令") {
+		t.Errorf("expected Chinese bash description in output:\n%s", out)
 	}
 }
 

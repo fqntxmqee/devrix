@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
@@ -112,8 +113,9 @@ func errString(err error) string {
 
 // TurnPrepareWrapper adds orchestration tool schemas when loop-first is active.
 type TurnPrepareWrapper struct {
-	Inner     ContextPreparer
-	LoopFirst bool
+	Inner        ContextPreparer
+	LoopFirst    bool
+	PromptLocale i18n.Locale
 }
 
 func (w *TurnPrepareWrapper) Prepare(ctx context.Context, req PrepareRequest) (PreparedContext, error) {
@@ -122,9 +124,59 @@ func (w *TurnPrepareWrapper) Prepare(ctx context.Context, req PrepareRequest) (P
 		return pc, err
 	}
 	if w.LoopFirst {
-		pc.Tools = append(pc.Tools, orchestrationToolSchemas()...)
+		loc := w.PromptLocale
+		if loc == "" {
+			loc = i18n.DefaultLocale
+		}
+		pc.Tools = mergeOrchestrationTools(pc.Tools, loc)
 	}
 	return pc, nil
+}
+
+// mergeOrchestrationTools appends loop-first orchestration tools missing from
+// the inner Prepare result, applying i18n.LocalizeTool so LLM payloads match
+// the configured prompt locale (default zh-CN).
+func mergeOrchestrationTools(existing []ToolSchema, loc i18n.Locale) []ToolSchema {
+	seen := make(map[string]bool, len(existing))
+	for _, t := range existing {
+		seen[t.Name] = true
+	}
+	out := existing
+	for _, raw := range orchestrationToolSchemas() {
+		if seen[raw.Name] {
+			continue
+		}
+		seen[raw.Name] = true
+		out = append(out, localizeOrchestrationSchema(raw, loc))
+	}
+	return out
+}
+
+func localizeOrchestrationSchema(ts ToolSchema, loc i18n.Locale) ToolSchema {
+	paramStr := ""
+	if len(ts.Parameters) > 0 {
+		if bz, err := json.Marshal(ts.Parameters); err == nil {
+			paramStr = string(bz)
+		}
+	}
+	desc, paramsRaw := i18n.LocalizeTool(ts.Name, ts.Description, paramStr, loc)
+	return ToolSchema{
+		Name:        ts.Name,
+		Description: desc,
+		Parameters:  parseOrchestrationParams(paramsRaw),
+	}
+}
+
+func parseOrchestrationParams(raw string) map[string]any {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 func orchestrationToolSchemas() []ToolSchema {
