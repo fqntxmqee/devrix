@@ -3,6 +3,7 @@ package workmodel
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 )
@@ -102,4 +103,102 @@ func StructuredBubbleStatement(childID string, round *WorkItemPipelineRound) str
 // IsTerminalStatus reports completed/failed/cancelled work items.
 func IsTerminalStatus(s TaskStatus) bool {
 	return isTerminalStatus(s)
+}
+
+// ChildChecklistBubble pairs an ephemeral checklist child for virtual rollup Observe.
+type ChildChecklistBubble struct {
+	ChildID string
+	Item    *WorkItem
+}
+
+// CollectChecklistChildBubbles returns direct ephemeral checklist children (Path B).
+func CollectChecklistChildBubbles(tm *TaskManager, sessionID, parentID string) []ChildChecklistBubble {
+	if tm == nil || parentID == "" {
+		return nil
+	}
+	var out []ChildChecklistBubble
+	for _, child := range tm.Tree().ListChildren(sessionID, parentID) {
+		if child == nil || child.Kind != WorkKindChecklist || !child.Ephemeral {
+			continue
+		}
+		out = append(out, ChildChecklistBubble{ChildID: child.ID, Item: child})
+	}
+	return out
+}
+
+// truncateBubblePreview applies CB3 rune budget with ellipsis when truncated.
+func truncateBubblePreview(s string, maxRunes int) string {
+	if maxRunes <= 0 {
+		maxRunes = DefaultShareSummaryMaxTokens
+	}
+	if s == "" || maxRunes <= 0 {
+		return s
+	}
+	if utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	var b strings.Builder
+	count := 0
+	for _, r := range s {
+		if count >= maxRunes {
+			b.WriteString("…")
+			break
+		}
+		b.WriteRune(r)
+		count++
+	}
+	return b.String()
+}
+
+// ChecklistBubbleStatement formats virtual checklist input for rollup Observe (design §5.8).
+func ChecklistBubbleStatement(childID string, item *WorkItem) string {
+	if item == nil {
+		return ""
+	}
+	directive := strings.TrimSpace(item.Directive)
+	if directive == "" {
+		directive = strings.TrimSpace(item.Title)
+	}
+	directive = truncateBubblePreview(directive, DefaultShareSummaryMaxTokens)
+	return fmt.Sprintf(
+		"checklist_child_bubble: child=%s; status=%s; directive=%q",
+		childID, item.Status, directive,
+	)
+}
+
+// ChildSummaryBubble pairs a terminal child with artifact summary for parent Observe.
+type ChildSummaryBubble struct {
+	ChildID string
+	Summary string
+}
+
+// CollectSummaryChildBubbles returns terminal children's artifact summaries (CB3 input).
+func CollectSummaryChildBubbles(tm *TaskManager, sessionID, parentID string) []ChildSummaryBubble {
+	if tm == nil || parentID == "" {
+		return nil
+	}
+	var out []ChildSummaryBubble
+	for _, child := range tm.Tree().ListChildren(sessionID, parentID) {
+		if child == nil || child.Kind == WorkKindChecklist || child.LastRound == nil {
+			continue
+		}
+		if !IsTerminalStatus(child.Status) {
+			continue
+		}
+		summary := strings.TrimSpace(child.LastRound.ArtifactSummary)
+		if summary == "" {
+			continue
+		}
+		out = append(out, ChildSummaryBubble{ChildID: child.ID, Summary: summary})
+	}
+	return out
+}
+
+// SummaryBubbleStatement formats a child's artifact summary for parent Observe (CB3 truncate).
+func SummaryBubbleStatement(childID string, artifactSummary string) string {
+	summary := truncateBubblePreview(strings.TrimSpace(artifactSummary), DefaultShareSummaryMaxTokens)
+	if summary == "" {
+		return ""
+	}
+	return fmt.Sprintf("summary_child_bubble: child=%s; preview=%q", childID, summary)
 }

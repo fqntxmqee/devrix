@@ -611,6 +611,11 @@ func (t *WorkTree) GetReadyItems(sessionID string) []*WorkItem {
 	var ready []*WorkItem
 	for _, item := range t.items[sessionID] {
 		if item.Status != TaskStatusPending {
+			if item.Status != TaskStatusInProgress || !item.NeedsRollup {
+				continue
+			}
+		}
+		if item.Ephemeral && item.Kind == WorkKindChecklist {
 			continue
 		}
 		if !t.depsSatisfiedLocked(sessionID, item) {
@@ -650,6 +655,9 @@ func (t *WorkTree) GetFocus(sessionID string) (*WorkItem, error) {
 	}
 	sort.SliceStable(ready, func(i, j int) bool {
 		a, b := ready[i], ready[j]
+		if a.NeedsRollup != b.NeedsRollup {
+			return a.NeedsRollup
+		}
 		pa, pb := kindFocusPriority[a.Kind], kindFocusPriority[b.Kind]
 		if pa != pb {
 			return pa < pb
@@ -663,6 +671,44 @@ func (t *WorkTree) GetFocus(sessionID string) (*WorkItem, error) {
 		return a.ID < b.ID
 	})
 	return ready[0], nil
+}
+
+// SetNeedsRollup sets the rollup gate flag (DM-20260627-001).
+func (t *WorkTree) SetNeedsRollup(sessionID, itemID string, v bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	item, ok := t.items[sessionID][itemID]
+	if !ok {
+		return fmt.Errorf("work item not found: %s", itemID)
+	}
+	item.NeedsRollup = v
+	t.touch(item)
+	t.persistLocked(sessionID)
+	return nil
+}
+
+// ReopenForRollup transitions a terminal locked item to pending for rollup R2+ (I3-Rollup).
+func (t *WorkTree) ReopenForRollup(sessionID, itemID string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	item, ok := t.items[sessionID][itemID]
+	if !ok {
+		return fmt.Errorf("work item not found: %s", itemID)
+	}
+	if !item.NeedsRollup {
+		return errWorkItem("reopen for rollup: needs_rollup is false")
+	}
+	if item.Status != TaskStatusFailed && item.Status != TaskStatusCompleted {
+		return errWorkItem("reopen for rollup: item not terminal")
+	}
+	item.Status = TaskStatusPending
+	item.Locked = false
+	item.RoundPhase = RoundPhaseIdle
+	t.touch(item)
+	t.persistLocked(sessionID)
+	return nil
 }
 
 // ClearSession removes all items for a session.

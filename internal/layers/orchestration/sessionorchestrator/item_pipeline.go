@@ -123,6 +123,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
 	defer func() { endMUPS(nil) }()
 
+	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
+		item = got
+	}
+	isRollup := item.NeedsRollup
+	directive := DirectiveForItem(sessionID, item, r.Tasks)
+
 	started := time.Now()
 	roundNo := 1
 	if item.LastRound != nil {
@@ -156,12 +162,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		AnomaliesCount: len(report.Anomalies),
 		Steps: []plan.Step{{
 			ID:        "step_" + item.ID,
-			Directive: itemDirective(item),
+			Directive: directive,
 			// ToolName/ToolArgs are vestigial: Execute calls WorkItemExecutor
 			// directly with the directive. Kept so the Plan validates and
 			// Plan inspectors see the directive.
 			ToolName:        "workitem_executor_direct",
-			ToolArgs:        map[string]any{"directive": itemDirective(item)},
+			ToolArgs:        map[string]any{"directive": directive},
 			IdempotencyKey:  "idem_" + item.ID,
 			EstimatedTokens: 100,
 		}},
@@ -173,11 +179,17 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			PersistScope: plan.PersistSession,
 		},
 	}
+	if isRollup {
+		planInput.FailureCriteria = rollupFailureCriteria()
+	}
 	_, endPlan := hardening.EmitTaskGraphSynthesize(ctx, sessionID, len(planInput.Steps), 0, 1, false)
 	pl, err := r.Planner.Plan(planInput)
 	endPlan(err)
 	if err != nil {
 		return nil, fmt.Errorf("item_pipeline: plan: %w", err)
+	}
+	if isRollup && pl != nil {
+		pl.Kind = plan.CommitmentPlan
 	}
 	{
 		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseExecute))
@@ -190,7 +202,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
 	endWave(nil)
 	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")
-	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, itemDirective(item))
+	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, directive)
 	endExecute(execErr)
 	if execErr != nil {
 		// Non-fatal: continue with whatever Content was accumulated so the
@@ -210,7 +222,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	verdict := verifyArtifact(art)
-	if r.Verify != nil {
+	if isRollup {
+		verdict = verifyRollupArtifact(art)
+	} else if r.Verify != nil {
 		verdict = r.Verify(art)
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
@@ -366,6 +380,10 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))
 		_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusInProgress)
 		end(nil)
+	}
+
+	if isRollup && verdict.Kind == types.VerdictPass {
+		_ = r.Tasks.Tree().SetNeedsRollup(sessionID, item.ID, false)
 	}
 
 	item.LastRound = round

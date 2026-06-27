@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.12.0
+**Version:** 4.13.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-26 (inner-spans + dedup-remove, PR #254)
+**Last Updated:** 2026-06-27 (workitem rollup pipeline, DM-20260627-001 rollup change)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -105,6 +105,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | **D7-S12** | **Observe-Learner 跨域闭环集成 (PR-F1/F2/F3)** | **ObserveRequest struct + NewObserveRequest fail-fast + EffectivePrior DefaultDeveloperPrior 兜底 + IntentQuantizer 4 IntentClass (Fact/Command/Orchestrate/Skip) + Quantize baseline + QuantizeWithPrior (Mean 乘数, clamp [0,100]) + AnomalyDetector + HistoricalDetector.DetectWithPrior (threshold = 0.5 × Mean, Mean 越高阈值越高 = 更信任用户 = 更易放过) + RuleClassifier.ClassifyWithPrior + IntentClassifier 接口扩展 ClassifyWithPrior + ShadowClassifier.ClassifyWithPrior 委托给 rule + SessionOrchestrator.learner 字段 + WithLearner option + buildObserveRequest 3 层 fail-safe (nil learner / Inject error / 正常 → 全部 DefaultDeveloperPrior 兜底) + ProcessMessage 在 classifySpan 之前调用 buildObserveRequest + 4 E2E 集成测试 (Pass Accumulate / G8-1 parse_failure No Pollution / PendingAsset ScheduledMemory / 5-Node Pipeline End2End) + LP-1 闭环 (Learn × 3 Pass → Alpha=3 → Round 2 观察 Beta(8,3)) + LP-2 隔离 (PendingAsset 仅在 ScheduledMemory) + LP-5 反向追溯 (Plan.SourceObservationIDs / Verdict.SourceArtifactID / Asset.SourceSessionIDs)** | **IMPLEMENTED (PR-F1/F2/F3, 6 P0 T)** | `internal/layers/orchestration/orchtypes/{observe_request,intent_quantizer,anomaly_detector}.go` + `internal/layers/orchestration/decisionplanning/{classifier,shadow_classifier}.go` + `internal/layers/orchestration/sessionorchestrator/orchestrator.go` + `tests/integration/d7/learn_observe_closure_test.go` |
 | **D7-S13** | **运行时 5 节点闭环 (PR-7.1/7.2/7.3)** | **SessionOrchestrator.processAutoClose 包装 channel + 异步触发 learner.Learn + 替换 endSpanWhenChannelClosed 调用 + synthesizeVerdict 4 规则 (complete→VerdictPass / error→VerdictFail Reason=Content / tombstone→VerdictIndeterminate IndeterminateReason="interrupt" / 其他 Type→nil) + SourceID `autoclose:{sessionID}:{nanosecond}` + 3 层 fail-safe (nil learner / Learn error / channel cancel → 全部 log + skip 不阻塞 caller) + IntentSkip 路径不调用 processAutoClose + AssetBuilder Auto-Close fallback (sop:autoclose:<SourceID> + ["autoclose-completion"] 合成步骤) + ProcessRequest.TrackMode string 字段 + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast 校验 + 3 sentinel error (ErrProcessRequestSessionIDEmpty / MessageEmpty / InvalidTrackMode) + DefaultLearner.Inject 3-tier 解析 (Reputation 持久状态 > req.TrackMode hint > Developer 兜底 + slog.Warn 未知值) + buildObserveRequest 透传 TrackMode → Operator track → DefaultOperatorPrior Beta(8,1) Mean=0.889 + priorSessionSpanAttrs 纯 helper 函数 + sessionSpan 6 prior attributes (learn.prior.alpha / beta / mean / track_mode / classifier_source / injected_at) + injected_at "phase6_lp1" (真实注入) vs "cold_start_failsafe" (兜底) + Jaeger UI 自然支持 + 30+ 单测/集成测试** | **IMPLEMENTED (PR-7.1/7.2/7.3, 6 P0 T)** | `internal/layers/orchestration/sessionorchestrator/{autoclose,tracing,orchestrator}.go` + `internal/layers/orchestration/learn/{learner,asset_builder}.go` + `internal/layers/orchestration/orchtypes/{process,errors}.go` + 4 NEW test files (`orchestrator_autoclose_test.go` + `orchestrator_trackmode_test.go` + `orchestrator_priorspan_test.go` + `process_test.go`) |
 | **D7-S14** | **MUPS v5 统一逃逸机制 (PR-V5.1/V5.2/V5.3/V5.4/V5.5)** | **LoopDepthTracker v2 (按模式 hash 计数回路深度, MaxDepth=3, depth < MaxDepth → Continue, depth >= MaxDepth → ForceExit) + PlanKindSwitchPolicy 3 档 (Constrained ≤4 / Allowed / Forbidden) + EscapeAction 6 类 (Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / EscapePendingHuman) + ChainedArbitrator LLM/Rule/Human 3 层 (5s + 10s timeout 兜底) + EscapeEngine 整合入口 (3 类深度限制: tracker + LoopBudget + CircuitBreaker) + CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + AuditLog AuditLevel 0/1/2 + 5 节点 EscapeEngine 接线点 (Observe 失败/Plan 失败/Plan 前/Execute 失败/Verify 失败 + 1a 短路不调 1b) + ResumeSession / applyResumeSession T2 续跑机制 (user_choice=A Continue / B ForceExit / C AbortWithAudit) + 13 类失败降级矩阵 (Evaluate panic/error + audit fail-open + LLM timeout + ctx cancel + CB metric timeout + ...)** | **PLANNED** | `internal/layers/orchestration/escape/{loop_depth_tracker,plan_kind_switch_policy,arbitrator,engine,circuit_breaker,audit_log,notifier}.go` |
+| **D7-S15** | **WorkItem Rollup 闭环** | **Parent Rollup Gate (Path A) + Root Fallback (Path B) + Summary/Structured dual bubble Observe + Rollup MUPS R2+ synthesize + Session complete deliverable + ephemeral checklist gate; Phase 1 `RollupGatePolicy=best_effort` only** | **IMPLEMENTED (Phase 1)** | `workmodel/{rollup_gate,resolve,context_bubble_apply}.go` + `sessionorchestrator/{item_observe,item_pipeline,rollup_directive,rollup_verify,session_turn_loop}.go` |
 
 ---
 
@@ -1786,10 +1787,54 @@ Engine 决策合并逻辑 (V5.4):
 
 ---
 
+## Scenario D7-S15: WorkItem Rollup 闭环 (DM-20260627-001)
+
+> **Archived change:** `openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`  
+> **Design SoT:** change package `design.md` §4–§8; **Phase 2** decompose/parallel 登记不编码。
+
+### Requirement: D7-S15-A50 Parent Rollup Gate
+
+When all direct non-checklist children of a decomposed parent reach terminal status, `ReevaluateParentAfterChild` shall set `NeedsRollup=true`, reopen the parent to `pending`, and **not** auto-complete the parent until rollup MUPS finishes.
+
+#### Scenario: best_effort triggers rollup when all children terminal including failures
+
+- **Given** parent `P` with `LastRound.SpawnPolicy=SpawnDecompose` and `RollupGatePolicy=best_effort` (Phase 1 default via `RollupGatePolicyFor`)
+- **When** all implement children reach terminal status (pass or fail)
+- **Then** `ShouldRollupAfterChildren` returns true and `P.NeedsRollup=true`
+
+### Requirement: D7-S15-A51 Summary Bubble Materialize
+
+Rollup Observe shall inject **both** `structured_child_bubble` and `summary_child_bubble` observations per terminal child with artifact summary (CB3 truncate).
+
+### Requirement: D7-S15-A55 RollupGatePolicy
+
+Phase 1 ships **`best_effort` only** (`RollupGatePolicyFor`); `all_pass` logic exists for tests; `min_coverage` deferred to Phase 2.
+
+### Requirement: D7-S15-A60 Parent Rollup Round 2+ MUPS
+
+When `NeedsRollup=true`, ItemPipelineRunner executes CommitmentPlan rollup round with `verifyRollupArtifact` heuristic (len≥500, P0/P1, planning denylist).
+
+### Requirement: D7-S15-A61 Session complete Deliverable
+
+TurnLoop exit shall populate `complete.Content` from root post-rollup `LastRound.ArtifactSummary` via `ExtractSessionDeliverable`.
+
+### Requirement: D7-S15-A53 Ephemeral Checklist Gate
+
+`GetPipelineFocus` skips ephemeral checklist WorkItems; checklist children do not run MUPS.
+
+### Requirement: D7-S15-A54 Root Session Rollup Fallback (Path B)
+
+When root goal Round 1 ends with `SpawnNone` or failed + ephemeral checklist children exist, `MaybeRootRollupFallback` sets `NeedsRollup=true` before session close.
+
+> **本 change 合入 ≠ WorkTree v2 完成** — Phase 2 DecomposeProposer / ParallelExplore / min_coverage / ExpectedReturn text match 独立 PR。
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **4.13.0** | **2026-06-27** | **devrix-d7-workitem-rollup-pipeline (DM-20260627-001) Phase 1 Rollup 闭环**：(1) ADDED Scenario D7-S15 + A50/A51/A53/A54/A55/A60/A61；(2) Parent Rollup Gate + `NeedsRollup` + `ReopenForRollup`；(3) Summary + Structured dual bubble Observe (`observationsFromChildSummaryBubbles`)；(4) Rollup MUPS R2+ + `verifyRollupArtifact`；(5) Root Fallback + session deliverable；(6) Phase 1 `RollupGatePolicy=best_effort` only；(7) t-registry v4.7.0→v4.8.0 (+21 P0 T) |
 | 1.0.0 | 2026-06-10 | ORCH v2 read model spec (DM-20260610-012) |
 | 1.0.0 | 2026-06-13 | D7 domain spec draft (DM-20260613-001, S3 design) |
 | 2.0.0 | 2026-06-14 | 对齐最新代码：实现状态标注、DSAFT 结构、T 层映射、配置同步 |

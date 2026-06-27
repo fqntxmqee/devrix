@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.7.0
-**Last Updated:** 2026-06-26 (inner-spans + dedup-remove, PR #254)
+**Version:** 4.8.0
+**Last Updated:** 2026-06-27 (workitem rollup pipeline, DM-20260627-001)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -802,3 +802,75 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 **PR 联动**: PR #253 (5-node MUPS 根 span + item_pipeline 11 callsite) + PR #254 (3 dedup 删除 + 3 inner observability span) + follow-up PR (#255 待开, thread LLM finishReason + 4 spec doc 同步)。
 
 归档：`openspec/archive/2026-06-26-devrix-d7-inner-spans-dedup-remove/` (待 S6)。
+
+---
+
+## D7-S15: WorkItem Rollup 闭环 (DM-20260627-001)
+
+> **Change:** `devrix-d7-workitem-rollup-pipeline` — Phase 1 P0 闭环；Phase 2 DecomposeProposer / ParallelExplore 登记不编码。  
+> **归档：** `openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`
+
+### D7-S15-A50: Parent Rollup Gate
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A50-T01** | NeedsRollup schema backward compat | IMPLEMENTED | `workmodel/workitem_store_test.go` |
+| **D7-S15-A50-T02** | ReevaluateParent rollup gate | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| **D7-S15-A50-T03** | GetPipelineFocus rollup priority | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+
+### D7-S15-A55: RollupGatePolicy
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A55-T01** | all_pass blocks on child fail | IMPLEMENTED | `workmodel/rollup_gate_test.go::TestShouldRollupAfterChildren_AllPassBlocksOnFail` |
+| **D7-S15-A55-T02** | min_coverage threshold | SKIP (Phase 2) | — |
+| **D7-S15-A55-T03** | best_effort default on all terminal | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+
+### D7-S15-A51: Summary Bubble Materialize
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A51-T01** | CB3 truncate | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` |
+| **D7-S15-A51-T02** | Observe dual bubble (T05) | IMPLEMENTED | `sessionorchestrator/item_observe_test.go::TestObserveWorkItem_RollupDualBubbles` |
+| **D7-S15-A51-T03** | Rollup directive uses summaries | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+
+### D7-S15-A60: Parent Rollup Round 2+ MUPS
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A60-T01** | CommitmentPlan + FailureCriteria | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+| **D7-S15-A60-T02** | Rollup directive lists children | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+| **D7-S15-A60-T03** | Verify Pass clears NeedsRollup | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+
+### D7-S15-A61: Session complete Deliverable
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A61-T01** | complete.Content from root summary | IMPLEMENTED | `workmodel/rollup_gate_test.go` + `sessionorchestrator/session_turn_loop` |
+| **D7-S15-A61-T02** | best-effort child fallback | IMPLEMENTED | `workmodel/rollup_gate.go::ExtractSessionDeliverable` |
+
+### D7-S15-A53: Ephemeral Checklist Gate
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A53-T01** | GetFocus skips ephemeral checklist | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| **D7-S15-A53-T02** | HasOpenWork after rollup | IMPLEMENTED | `workmodel/spawn_apply_test.go` |
+| **D7-S15-A53-T03** | root R1 + checklist focus | IMPLEMENTED | `workmodel/work_tree_test.go` |
+
+### D7-S15-A54: Root Session Rollup Fallback
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A54-T01** | maybeRootRollupFallback | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| **D7-S15-A54-T02** | ChecklistBubbleStatement CB3 | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` |
+| **D7-S15-A54-T03** | Path B checklist Observe | IMPLEMENTED | `sessionorchestrator/item_observe.go` |
+| **D7-S15-A54-T04** | trace replay E2E | PARTIAL (stub IT) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
+
+### D7-S15 Integration
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-IT01** | decompose + rollup E2E | PARTIAL | `sessionorchestrator/item_pipeline_rollup_test.go` (unit-level) |
+| **D7-S15-IT02** | trace replay no checklist MUPS | PARTIAL (stub) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
+
+**Phase 1 Total:** 21 P0 T — 18 IMPLEMENTED · 2 PARTIAL (IT stub) · 1 SKIP (min_coverage Phase 2)

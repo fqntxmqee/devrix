@@ -1,7 +1,9 @@
 package workmodel
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -64,6 +66,53 @@ func TestProjectWaveTaskNode_UpstreamID(t *testing.T) {
 	node := ProjectWaveTaskNode(item)
 	if node.ContextPolicy != wavescheduler.ContextUpstream || node.UpstreamTaskID != "blocker" {
 		t.Fatalf("node=%+v", node)
+	}
+}
+
+func TestCollectChecklistChildBubbles(t *testing.T) {
+	tm := NewTaskManager()
+	parent, _ := tm.EnsureGoal("s1", "review d2")
+	_ = tm.Tree().UpsertChecklist("s1", parent.ID, []ChecklistEntry{
+		{Content: "Review prepare/ pipeline", Status: TaskStatusPending},
+	})
+	bubbles := CollectChecklistChildBubbles(tm, "s1", parent.ID)
+	if len(bubbles) != 1 {
+		t.Fatalf("bubbles=%d, want 1", len(bubbles))
+	}
+}
+
+func TestChecklistBubbleStatement_CB3Truncate(t *testing.T) {
+	long := strings.Repeat("z", 3000)
+	item := &WorkItem{Directive: long, Status: TaskStatusPending}
+	stmt := ChecklistBubbleStatement("cl1", item)
+	if !strings.Contains(stmt, "checklist_child_bubble") {
+		t.Fatalf("stmt=%q", stmt)
+	}
+	// directive preview inside quotes should be ≤2048 runes + ellipsis
+	idx := strings.Index(stmt, "directive=")
+	if idx < 0 {
+		t.Fatalf("missing directive in %q", stmt)
+	}
+	quoted := stmt[idx+len("directive="):]
+	quoted = strings.Trim(quoted, "\"")
+	if utf8.RuneCountInString(quoted) > DefaultShareSummaryMaxTokens+1 {
+		t.Fatalf("directive preview too long: %d runes", utf8.RuneCountInString(quoted))
+	}
+}
+
+func TestSummaryBubbleStatement_CB3Truncate(t *testing.T) {
+	long := strings.Repeat("s", 3000)
+	stmt := SummaryBubbleStatement("c1", long)
+	if stmt == "" {
+		t.Fatal("expected summary bubble statement")
+	}
+	idx := strings.Index(stmt, "preview=")
+	if idx < 0 {
+		t.Fatalf("stmt=%q", stmt)
+	}
+	preview := strings.Trim(stmt[idx+len("preview="):], "\"")
+	if utf8.RuneCountInString(preview) > DefaultShareSummaryMaxTokens+1 {
+		t.Fatalf("preview too long: %d runes", utf8.RuneCountInString(preview))
 	}
 }
 

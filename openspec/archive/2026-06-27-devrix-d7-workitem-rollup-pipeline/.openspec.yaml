@@ -1,0 +1,31 @@
+id: devrix-d7-workitem-rollup-pipeline
+demand_id: DM-20260627-001
+title: "D7 WorkItem rollup 闭环 — 父层 synthesize、向上 bubble materialize、受控 decompose"
+status: s7_archived
+archived: 2026-06-27
+review_r1: review-r1.md
+review_r1_decisions: 2026-06-27
+priority: P0
+created: 2026-06-27
+author: 用户 trace 排查 + WorkTree/MUPS 架构对齐讨论
+
+domains: [D7]
+layers:
+  - D7-S1  # Work Model
+  - D7-S2  # Session Orchestrator
+  - D7-S3  # Wave Scheduler (Phase 2 only)
+
+related_changes:
+  - devrix-d7-workitem-pipeline-unification  # design SoT (G1–G5)
+  - devrix-d7-workitem-context-graph         # bubble/link SoT (CG1–CG5)
+  - devrix-d7-mups-v4-5node-coverage-orchestration  # MUPS span 已落地
+
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d7-orchestration/workitem-pipeline-unification-design.md
+  - openspec/specs/d7-orchestration/workitem-context-graph-design.md
+
+feature_flags:
+  - name: FeatureWorkItemRollupEnabled
+    default: true
+    note: "Phase 1 可与现有 TurnLoop 同开；ParallelExplore Phase 2 单独 flag"
