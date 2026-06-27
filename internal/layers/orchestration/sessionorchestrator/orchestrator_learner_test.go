@@ -53,14 +53,13 @@ func (f *fakeLearner) ScheduledTick(_ context.Context) error {
 
 // T: D7-S12-A42-T04 — WithLearner wires a Learner into SessionOrchestrator.
 func TestSessionOrchestrator_WithLearner_InjectBeforeClassify(t *testing.T) {
-	exec := &fakeD2{}
 	fl := &fakeLearner{
 		prior: learn.BuildAdaptivePrior(nil, learn.TrackModeOperator),
 	}
 	// Operator Beta(8,1) → Mean ≈ 0.889
 	fl.prior.PriorBeta = learn.BetaPrior{Alpha: 8, Beta: 1}
 
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 	if orch.learner == nil {
 		t.Fatal("WithLearner did not wire learner")
 	}
@@ -83,8 +82,7 @@ func TestSessionOrchestrator_WithLearner_InjectBeforeClassify(t *testing.T) {
 
 // T: D7-S12-A42-T05 — Nil learner falls back to DefaultDeveloperPrior (no error).
 func TestSessionOrchestrator_NilLearner_UseDefaultPrior(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec) // no WithLearner
+	orch := newTestOrch(t) // no WithLearner
 	if orch.learner != nil {
 		t.Fatal("default orchestrator should have nil learner")
 	}
@@ -102,11 +100,10 @@ func TestSessionOrchestrator_NilLearner_UseDefaultPrior(t *testing.T) {
 
 // T: D7-S12-A42-T05 — Learner.Inject error falls back to DefaultDeveloperPrior.
 func TestSessionOrchestrator_LearnerInjectError_UseDefaultPrior(t *testing.T) {
-	exec := &fakeD2{}
 	fl := &fakeLearner{
 		injectErr: errors.New("simulated reputation store failure"),
 	}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-inject-fail",
@@ -121,8 +118,7 @@ func TestSessionOrchestrator_LearnerInjectError_UseDefaultPrior(t *testing.T) {
 
 // T: D7-S12-A42-T05 — BuildObserveRequest returns ObserveRequest with prior.
 func TestSessionOrchestrator_BuildObserveRequest_NilLearner_NilPrior(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	req := orchtypes.ProcessRequest{SessionID: "sess-x", Message: "hi"}
 	observeReq, err := orch.buildObserveRequest(context.Background(), req)
 	if err != nil {
@@ -143,11 +139,10 @@ func TestSessionOrchestrator_BuildObserveRequest_NilLearner_NilPrior(t *testing.
 
 // T: D7-S12-A42-T05 — BuildObserveRequest with wired learner calls Inject.
 func TestSessionOrchestrator_BuildObserveRequest_WiredLearner_UsesInjectedPrior(t *testing.T) {
-	exec := &fakeD2{}
 	customPrior := learn.BuildAdaptivePrior(nil, learn.TrackModeOperator)
 	customPrior.PriorBeta = learn.BetaPrior{Alpha: 10, Beta: 2} // Mean = 10/12 = 0.833
 	fl := &fakeLearner{prior: customPrior}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	req := orchtypes.ProcessRequest{SessionID: "sess-y", Message: "hi"}
 	observeReq, err := orch.buildObserveRequest(context.Background(), req)
@@ -164,9 +159,8 @@ func TestSessionOrchestrator_BuildObserveRequest_WiredLearner_UsesInjectedPrior(
 
 // T: D7-S12-A42-T05 — BuildObserveRequest with learner.Inject error → nil prior.
 func TestSessionOrchestrator_BuildObserveRequest_InjectError_NilPrior(t *testing.T) {
-	exec := &fakeD2{}
 	fl := &fakeLearner{injectErr: errors.New("boom")}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	req := orchtypes.ProcessRequest{SessionID: "sess-z", Message: "hi"}
 	observeReq, err := orch.buildObserveRequest(context.Background(), req)
@@ -185,8 +179,7 @@ func TestSessionOrchestrator_BuildObserveRequest_InjectError_NilPrior(t *testing
 
 // T: D7-S12-A42-T05 — BuildObserveRequest fail-fast on empty SessionID.
 func TestSessionOrchestrator_BuildObserveRequest_EmptySessionID(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	req := orchtypes.ProcessRequest{SessionID: "", Message: "hi"}
 	_, err := orch.buildObserveRequest(context.Background(), req)
 	if err == nil {
@@ -196,8 +189,7 @@ func TestSessionOrchestrator_BuildObserveRequest_EmptySessionID(t *testing.T) {
 
 // T: D7-S12-A42-T05 — BuildObserveRequest fail-fast on empty Message.
 func TestSessionOrchestrator_BuildObserveRequest_EmptyMessage(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	req := orchtypes.ProcessRequest{SessionID: "sess-1", Message: ""}
 	_, err := orch.buildObserveRequest(context.Background(), req)
 	if err == nil {
@@ -209,11 +201,10 @@ func TestSessionOrchestrator_BuildObserveRequest_EmptyMessage(t *testing.T) {
 // (verified by injecting a custom prior and checking intent kind/confidence
 // is adjusted).
 func TestSessionOrchestrator_ProcessMessage_UsePriorInClassification(t *testing.T) {
-	exec := &fakeD2{}
 	// prior Beta(8,1) → Mean = 0.889 → confidence multiplier
 	fl := &fakeLearner{}
 	fl.prior = learn.BuildAdaptivePrior(nil, learn.TrackModeOperator) // Beta(8,1) Mean=0.889
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	// "hello" matches the greeting fast pattern → baseline Confidence=95
 	// With prior Mean=0.889: 95 × 0.889 = 84.455 → 84
@@ -275,7 +266,6 @@ func (p *priorRecordingClassifier) ClassifyWithPrior(_ context.Context, _ string
 // call classifier.ClassifyWithPrior — observable via the recorder seeing
 // the injected prior.
 func TestSessionOrchestrator_WithClassifier_PriorThreadedToClassifier(t *testing.T) {
-	exec := &fakeD2{}
 	recorder := &priorRecordingClassifier{}
 
 	// Inject a custom prior (Beta(8,3) → Mean = 0.727) via fakeLearner.
@@ -283,11 +273,7 @@ func TestSessionOrchestrator_WithClassifier_PriorThreadedToClassifier(t *testing
 	fl.prior = learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)
 	fl.prior.PriorBeta = learn.BetaPrior{Alpha: 8, Beta: 3}
 
-	orch := NewSessionOrchestrator(
-		orchtypes.DefaultConfig(), exec,
-		WithLearner(fl),
-		WithClassifier(recorder),
-	)
+	orch := newTestOrch(t, WithLearner(fl), WithClassifier(recorder))
 
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-prior-shadow",

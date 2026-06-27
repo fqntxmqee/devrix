@@ -21,8 +21,7 @@ import (
 func TestProcessMessage_TrackModeOperator_PropagatedToInject(t *testing.T) {
 	fl := &fakeLearner{prior: learn.BuildAdaptivePrior(nil, learn.TrackModeOperator)}
 	fl.prior.PriorBeta = learn.DefaultOperatorPrior
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-op",
@@ -46,8 +45,7 @@ func TestProcessMessage_TrackModeOperator_PropagatedToInject(t *testing.T) {
 // explicit "developer" hint is plumbed.
 func TestProcessMessage_TrackModeDeveloper_PropagatedToInject(t *testing.T) {
 	fl := &fakeLearner{prior: learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)}
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-dev",
@@ -69,8 +67,7 @@ func TestProcessMessage_TrackModeDeveloper_PropagatedToInject(t *testing.T) {
 // as "" to Inject. DefaultLearner.Inject resolves "" to Developer.
 func TestProcessMessage_TrackModeEmpty_PropagatedAsEmpty(t *testing.T) {
 	fl := &fakeLearner{prior: learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)}
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-empty",
@@ -98,8 +95,7 @@ func TestProcessMessage_TrackModeEmpty_PropagatedAsEmpty(t *testing.T) {
 // DefaultLearner.Inject (slog.Warn + Developer fail-safe).
 func TestProcessMessage_TrackModeInvalid_ForwardsToInject(t *testing.T) {
 	fl := &fakeLearner{prior: learn.BuildAdaptivePrior(nil, learn.TrackModeDeveloper)}
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithLearner(fl))
+	orch := newTestOrch(t, WithLearner(fl))
 
 	// Direct struct literal with invalid TrackMode (bypasses NewProcessRequest).
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{

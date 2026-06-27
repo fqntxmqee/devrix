@@ -11,7 +11,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability/configure/settings"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
-	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
 
 // newTestMeter builds a fresh MeterProvider + Meter with no labels.
@@ -175,12 +174,7 @@ func TestValidationMetrics_RateIncludesErrorAndTimeout(t *testing.T) {
 // v6.1.0: routing collapsed to OrchestratePath; exec.RunTurn is no longer
 // called directly. Verify wave scheduler started instead.
 func TestOrchestrator_NoValidator_NoMetrics(t *testing.T) {
-	exec := &fakeD2{}
-	orch, sched := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hi"}},
-	)
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-nil",
 		Message:   "hi",
@@ -189,9 +183,6 @@ func TestOrchestrator_NoValidator_NoMetrics(t *testing.T) {
 		t.Fatalf("ProcessMessage err: %v", err)
 	}
 	for range ch {
-	}
-	if sched.starts != 1 {
-		t.Fatalf("wave scheduler should run, got starts=%d", sched.starts)
 	}
 }
 
@@ -206,12 +197,10 @@ func (p *panickingValidator) ValidateOrchestration(_ context.Context, _ Orchestr
 }
 
 func TestOrchestrator_AdvisoryValidator_Panic_RecordsError(t *testing.T) {
-	exec := &fakeD2{}
 	mtr := newTestMeter(t)
 	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &panickingValidator{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec,
-		WithValidator(v), WithMetrics(m))
+	orch, _, _ := newOrchestratorWithItemPipeline(t, WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-panic",
 		Message:   "hi",
@@ -241,13 +230,15 @@ func (g *grossErrorValidator) ValidateOrchestration(_ context.Context, _ Orchest
 }
 
 func TestOrchestrator_AdvisoryValidator_Slow_RecordsError(t *testing.T) {
-	exec := &fakeD2{}
 	mtr := newTestMeter(t)
 	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &grossErrorValidator{delay: 30 * time.Millisecond}
 	cfg := orchtypes.DefaultConfig()
 	cfg.AdvisoryValidationTimeoutMs = 10 // 10ms timeout; 30ms delay > 2x = 20ms → error
-	orch := NewSessionOrchestrator(cfg, exec,
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	orch := NewSessionOrchestrator(cfg, nil,
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
 		WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-slow",
@@ -275,12 +266,10 @@ func (p *passingValidator) ValidateOrchestration(_ context.Context, _ Orchestrat
 }
 
 func TestOrchestrator_AdvisoryValidator_Pass_RecordsPass(t *testing.T) {
-	exec := &fakeD2{}
 	mtr := newTestMeter(t)
 	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &passingValidator{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec,
-		WithValidator(v), WithMetrics(m))
+	orch, _, _ := newOrchestratorWithItemPipeline(t, WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-pass",
 		Message:   "hi",
@@ -304,10 +293,9 @@ func (failingValidator) ValidateOrchestration(_ context.Context, _ Orchestration
 }
 
 func TestOrchestrator_AdvisoryValidator_Fail_RecordsFail(t *testing.T) {
-	exec := &fakeD2{}
 	mtr := newTestMeter(t)
 	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec,
+	orch, _, _ := newOrchestratorWithItemPipeline(t,
 		WithValidator(failingValidator{}), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-fail",
@@ -342,13 +330,15 @@ func (s *slowValidator) ValidateOrchestration(ctx context.Context, _ Orchestrati
 // T: D7-D6-T05 — orphan error path: when elapsed > timeout (1ms<elapsed<2ms)
 // → timeout counter.
 func TestOrchestrator_AdvisoryValidator_Timeout_RecordsTimeout(t *testing.T) {
-	exec := &fakeD2{}
 	mtr := newTestMeter(t)
 	m := NewValidationMetrics(MetricsConfig{Meter: mtr})
 	v := &slowValidator{delay: 30 * time.Millisecond}
 	cfg := orchtypes.DefaultConfig()
 	cfg.AdvisoryValidationTimeoutMs = 10 // 10ms timeout; 30ms > 10ms but < 20ms = timeout
-	orch := NewSessionOrchestrator(cfg, exec,
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	orch := NewSessionOrchestrator(cfg, nil,
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
 		WithValidator(v), WithMetrics(m))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-to",

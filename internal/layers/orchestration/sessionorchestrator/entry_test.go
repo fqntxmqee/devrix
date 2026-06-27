@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
-	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
-	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -22,36 +20,21 @@ import (
 // is no longer called directly. Use the fake scheduler helper to inject
 // deterministic artifacts → text event.
 func TestEntry_ProcessMessage(t *testing.T) {
-	exec := &fakeD2{}
-	orch, _ := newOrchestratorWithFakeOrchestratePath(
-		orchtypes.DefaultConfig(),
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hello"}},
-	)
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	entry := NewEntry(orch)
 	ch, err := entry.ProcessMessage(context.Background(), "sess-entry", "hello")
 	if err != nil {
 		t.Fatalf("ProcessMessage err: %v", err)
 	}
-	var events []*contracts.EngineEvent
-	for ev := range ch {
-		events = append(events, ev)
-	}
-	if len(events) < 2 {
-		t.Fatalf("want ≥ 2 events, got %d", len(events))
-	}
-	if events[0].Type != "plan_formed" {
-		t.Fatalf("first event should be plan_formed, got %q", events[0].Type)
-	}
-	if events[len(events)-1].Type != "complete" {
-		t.Fatalf("last event should be complete, got %q", events[len(events)-1].Type)
+	events := drainEvents(ch)
+	if !hasEventType(events, "complete") {
+		t.Fatalf("expected complete, got %v", loopEventTypes(events))
 	}
 }
 
 // T: d7.Entry adapter Cancel path uses InterruptHandler.
 func TestEntry_Cancel_WithWiredHandler(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	sink := &fakeSink{}
 	var procCalled int32
 	orch.SetInterruptHandler(NewInterruptHandler(orch, InterruptOptions{
@@ -77,8 +60,7 @@ func TestEntry_Cancel_WithWiredHandler(t *testing.T) {
 // did not wire one. This is the "cancel from gateway before bootstrap"
 // defensive path.
 func TestEntry_Cancel_LazyHandler(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	entry := NewEntry(orch)
 	// No SetInterruptHandler call — Cancel should still work.
 	if err := entry.Cancel(context.Background(), "sess-lazy"); err != nil {
@@ -88,37 +70,22 @@ func TestEntry_Cancel_LazyHandler(t *testing.T) {
 
 // T: orchestrator.ProcessMessageContract (string-args seam).
 func TestSessionOrchestrator_ProcessMessageContract(t *testing.T) {
-	exec := &fakeD2{}
-	cfg := orchtypes.DefaultConfig()
-	cfg.FastPathThreshold = 0 // allow all fast-path classifications through
-	// v6.1.0: ProcessMessageContract routes through OrchestratePath; exec.RunTurn
-	// is no longer called directly. Verify the wave scheduler was started
-	// (the orchestrator's wiring did dispatch the message).
-	orch, sched := newOrchestratorWithFakeOrchestratePath(
-		cfg,
-		exec,
-		[]wavescheduler.Artifact{{Summary: "ping"}},
-	)
+	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	ch, err := orch.ProcessMessageContract(context.Background(), "sess-pmc", "ping")
 	if err != nil {
 		t.Fatalf("ProcessMessageContract err: %v", err)
 	}
-	for range ch {
-	}
-	if sched.starts != 1 {
-		t.Fatalf("want 1 wave start, got %d", sched.starts)
-	}
-	if exec.calls != 0 {
-		t.Fatalf("exec.RunTurn should not be called in v6.1.0, got %d", exec.calls)
+	events := drainEvents(ch)
+	if !hasEventType(events, "complete") {
+		t.Fatalf("expected complete, got %v", loopEventTypes(events))
 	}
 }
 
 // T: D6 validator is invoked when wired, and the result is consumed
 // (timeout → pass per the contract).
 func TestSessionOrchestrator_AdvisoryValidator_Pass(t *testing.T) {
-	exec := &fakeD2{}
 	v := &fakeAdvisoryValidator{pass: true, reason: "ok"}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithValidator(v))
+	orch, _, _ := newOrchestratorWithItemPipeline(t, WithValidator(v))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-v",
 		Message:   "hi",
@@ -138,15 +105,8 @@ func TestSessionOrchestrator_AdvisoryValidator_Pass(t *testing.T) {
 // v6.1.0: exec.RunTurn is no longer called directly; verify the wave
 // scheduler started instead.
 func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
-	exec := &fakeD2{}
 	v := &fakeAdvisoryValidator{pass: false, reason: "risky"}
-	cfg := orchtypes.DefaultConfig()
-	orch, sched := newOrchestratorWithFakeOrchestratePath(
-		cfg,
-		exec,
-		[]wavescheduler.Artifact{{Summary: "hi"}},
-		WithValidator(v),
-	)
+	orch, _, _ := newOrchestratorWithItemPipeline(t, WithValidator(v))
 	ch, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-vfail",
 		Message:   "hi",
@@ -158,9 +118,6 @@ func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
 	}
 	if v.calls != 1 {
 		t.Fatalf("validator should be called once, got %d", v.calls)
-	}
-	if sched.starts != 1 {
-		t.Fatalf("advisory fail must not block wave start, got starts=%d", sched.starts)
 	}
 }
 
@@ -178,9 +135,8 @@ func (f *fakeAdvisoryValidator) ValidateOrchestration(_ context.Context, _ Orche
 // T: WithWorkModel installs a custom WorkModel that the orchestrator
 // stores on the field.
 func TestWithWorkModel_StoresModel(t *testing.T) {
-	exec := &fakeD2{}
 	wm := NewLocalWorkModel(nil)
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec, WithWorkModel(wm))
+	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), nil, WithWorkModel(wm))
 	if orch.workModel == nil {
 		t.Fatalf("WithWorkModel should store the WorkModel")
 	}
@@ -191,8 +147,7 @@ func TestWithWorkModel_StoresModel(t *testing.T) {
 // registered func from outside, but we can confirm that successive
 // register calls replace the prior cancel.
 func TestSessionOrchestrator_RegisterInterrupt_Replace(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	var first, second int32
 	cancel1 := func() { atomic.AddInt32(&first, 1) }
 	cancel2 := func() { atomic.AddInt32(&second, 1) }
@@ -217,8 +172,7 @@ func TestSessionOrchestrator_RegisterInterrupt_Replace(t *testing.T) {
 
 // T: ProcessMessage propagates classifier errors.
 func TestSessionOrchestrator_ClassifyError(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	// Replace classifier with one that errors.
 	orch.classifier = &errClassifier{}
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
@@ -240,31 +194,9 @@ func (errClassifier) ClassifyWithPrior(_ context.Context, _ string, _ *learn.Ada
 	return orchtypes.IntentClassification{}, errors.New("simulated classify failure")
 }
 
-// T: NewFastPath with nil cfg falls back to defaults.
-func TestNewFastPath_NilCfg(t *testing.T) {
-	exec := &fakeD2{}
-	fp := NewFastPath(nil, exec, nil)
-	if fp.cfg == nil {
-		t.Fatalf("cfg should fall back to orchtypes.DefaultConfig")
-	}
-	if fp.cfg.FastPathThreshold != 90 {
-		t.Fatalf("default threshold mismatch: %d", fp.cfg.FastPathThreshold)
-	}
-}
-
-// T: FastPath requires an executor; nil executor returns an error.
-func TestFastPath_NilExecutor(t *testing.T) {
-	fp := NewFastPath(orchtypes.DefaultConfig(), nil, nil)
-	_, err := fp.Run(context.Background(), orchtypes.ProcessRequest{SessionID: "s", Message: "x"}, "")
-	if err == nil {
-		t.Fatalf("nil executor should error")
-	}
-}
-
 // T: ProcessMessage classify-error path returns the wrapped error.
 func TestProcessMessage_UnknownIntent(t *testing.T) {
-	exec := &fakeD2{}
-	orch := NewSessionOrchestrator(orchtypes.DefaultConfig(), exec)
+	orch := newTestOrch(t)
 	orch.classifier = &forcedKindClassifier{kind: "weird"}
 	_, err := orch.ProcessMessage(context.Background(), orchtypes.ProcessRequest{
 		SessionID: "sess-unk",

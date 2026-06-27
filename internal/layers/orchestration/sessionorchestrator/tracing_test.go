@@ -10,12 +10,10 @@ func TestRouteLabel_should_map_intent_kinds(t *testing.T) {
 		intent orchtypes.IntentClassification
 		want   string
 	}{
-		// v6.1.0: IntentFast and IntentOrchestrate both route through
-		// OrchestratePath. The label collapses to "orchestrate".
-		{orchtypes.IntentClassification{Kind: orchtypes.IntentFast}, "orchestrate"},
+		{orchtypes.IntentClassification{Kind: orchtypes.IntentFast}, "turn_loop"},
 		{orchtypes.IntentClassification{Kind: orchtypes.IntentFast, Reason: "loop_first_default"}, "turn"},
 		{orchtypes.IntentClassification{Kind: orchtypes.IntentCommand, Command: "/plan"}, "command"},
-		{orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate}, "orchestrate"},
+		{orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate}, "turn_loop"},
 		{orchtypes.IntentClassification{Kind: orchtypes.IntentSkip}, "skip"},
 	}
 	for _, tc := range cases {

@@ -139,11 +139,7 @@ func TestEscapeWiring_1b_PlanPre_ForceExit(t *testing.T) {
 // TestEscapeWiring_1b_PlanPre_Continue: normal path → no escape error
 func TestEscapeWiring_1b_PlanPre_Continue(t *testing.T) {
 	engine := newFakeEscapeEngine(escape.EscapeContinue, "all_depth_limits_passed")
-	orch := NewSessionOrchestrator(
-		orchtypes.DefaultConfig(),
-		&completingExecutor{eventType: "complete"},
-		WithEscapeEngine(engine),
-	)
+	orch := newTestOrch(t, WithEscapeEngine(engine))
 
 	ch, err := orch.ProcessMessage(context.Background(),
 		orchtypes.ProcessRequest{SessionID: "sess-1b-continue", Message: "hi"})
@@ -174,9 +170,7 @@ func (c *fixedKindClassifier) ClassifyWithPrior(_ context.Context, _ string, _ *
 // path returns an error AND escape engine decides ForceExit,
 // the error is propagated.
 //
-// Mechanism: set orchestratePath=nil so the switch case in
-// ProcessMessage sets err (instead of calling Run). Then escape
-// engine is consulted at wiring point 2.
+// Mechanism: leave itemPipeline nil so ProcessMessage sets err.
 func TestEscapeWiring_2_ExecuteFails_ForceExit(t *testing.T) {
 	engine := newFakeEscapeEngine(escape.EscapeForceExit, "circuit_breaker_L0_AnomalyDetector_open")
 	orch := NewSessionOrchestrator(
@@ -185,8 +179,8 @@ func TestEscapeWiring_2_ExecuteFails_ForceExit(t *testing.T) {
 		WithClassifier(&fixedKindClassifier{kind: orchtypes.IntentOrchestrate}),
 		WithEscapeEngine(engine),
 	)
-	// Force the path-error branch by nil-ing orchestratePath.
-	orch.orchestratePath = nil
+	// Force the path-error branch by leaving itemPipeline unwired.
+	orch.itemPipeline = nil
 
 	_, err := orch.ProcessMessage(context.Background(),
 		orchtypes.ProcessRequest{SessionID: "sess-2", Message: "hi"})
@@ -207,7 +201,7 @@ func TestEscapeWiring_2_ExecuteFails_Continue(t *testing.T) {
 		WithClassifier(&fixedKindClassifier{kind: orchtypes.IntentOrchestrate}),
 		WithEscapeEngine(engine),
 	)
-	orch.orchestratePath = nil
+	orch.itemPipeline = nil
 
 	_, err := orch.ProcessMessage(context.Background(),
 		orchtypes.ProcessRequest{SessionID: "sess-2-continue", Message: "hi"})

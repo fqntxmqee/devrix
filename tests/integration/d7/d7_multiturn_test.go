@@ -47,8 +47,7 @@ func TestIntegration_D7FastPath_MultiTurnToolConversation(t *testing.T) {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
-	// "hi" matches the greeting fast pattern → IntentFast (95% ≥ threshold 90)
-	// → FastPath.Run → TurnOrchestrator multi-turn loop.
+	// "hi" → IntentFast → RunSessionTurnLoop → WorkItemExecutor multi-turn ReAct.
 	routeAndWait(t, stack, session.SessionID, "hi")
 
 	// Verify: exactly 2 LLM calls (tool call + final reply).
@@ -56,24 +55,14 @@ func TestIntegration_D7FastPath_MultiTurnToolConversation(t *testing.T) {
 		t.Fatalf("expected 2 LLM invocations (tool call + final reply), got %d", got)
 	}
 
-	// Verify: outbound messages contain tool_call + tool_result + final text.
-	var sawToolCall, sawToolResult, sawText bool
+	// Item pipeline ingress consolidates tool telemetry into pipeline_round;
+	// D1 outbound carries text + complete. Assert the final answer surfaced.
+	var sawText bool
 	for _, msg := range stack.Handler.OutboundMessages() {
-		if msg.Metadata["event_type"] == "tool_call" {
-			sawToolCall = true
-		}
-		if msg.Metadata["event_type"] == "tool_result" {
-			sawToolResult = true
-		}
 		if strings.Contains(msg.Content, "I've read the file") {
 			sawText = true
+			break
 		}
-	}
-	if !sawToolCall {
-		t.Error("expected tool_call event in outbound")
-	}
-	if !sawToolResult {
-		t.Error("expected tool_result event in outbound")
 	}
 	if !sawText {
 		t.Errorf("expected final text in outbound, got: %+v", stack.Handler.OutboundMessages())

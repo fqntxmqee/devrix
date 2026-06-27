@@ -21,7 +21,6 @@ import (
 	multiagentprovision "github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/executionflow"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -36,13 +35,6 @@ type D7StackOptions struct {
 	ExecutionFlow bool
 	Delegate      bool
 	MultiAgent    bool
-
-	// OverrideOrchestratePath replaces the lazy default OrchestratePath
-	// (which uses a zero-deps WaveScheduler that panics on Start). Tests
-	// that drive the IntentOrchestrate branch must inject a custom path
-	// backed by a fake scheduler (see D7Stack.OrchestratePath entry in
-	// tests/integration/d7/d7_orthogonal_dispatch_test.go).
-	OverrideOrchestratePath *sessionorchestrator.OrchestratePath
 
 	// RoutingMode sets coordinator.routing_mode (default loop_first).
 	RoutingMode string
@@ -207,14 +199,6 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 
 	if err := bootstrap.InitOrchestration(configFile, gw, engine, obsBridge, llmStack, nil); err != nil {
 		t.Fatalf("InitOrchestration: %v", err)
-	}
-
-	if opt.OverrideOrchestratePath != nil {
-		entry, ok := gw.OrchestrationEntry().(*sessionorchestrator.Entry)
-		if !ok {
-			t.Fatalf("OverrideOrchestratePath requires *sessionorchestrator.Entry, got %T", gw.OrchestrationEntry())
-		}
-		entry.SetOrchestratePath(opt.OverrideOrchestratePath)
 	}
 
 	return &D7TestStack{

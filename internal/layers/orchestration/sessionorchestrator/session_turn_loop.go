@@ -125,14 +125,10 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 
-			// 2026-06-26 LLM-not-called hotfix (DM-20260626-008 follow-up):
-			// ItemPipelineRunner.Run → CommitChannel → ItemToolRunner invokes
-			// the LLM (work_item_execute) and the response lands in
-			// round.ArtifactSummary. Without an explicit text event here the
-			// gateway never sees the answer — RunSessionTurnLoop used to emit
-			// only `pipeline_round` (rationale) + `complete` (empty), so the
-			// feishu reply card stayed empty. Emit ArtifactSummary as a text
-			// event so the user-visible content reaches feishu.
+			// WorkItemExecutor (inside ItemPipelineRunner.Run) drives the
+			// per-WorkItem ReAct loop; round.ArtifactSummary carries the
+			// LLM's final answer. Emit it as a text event so the gateway
+			// (feishu reply card) sees user-visible content.
 			if round.ArtifactSummary != "" {
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type:      "text",

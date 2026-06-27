@@ -17,11 +17,15 @@ import (
 func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 	stack := testutil.NewD7TestStack(t, testutil.D7StackOptions{ExecutionFlow: true})
 
-	task, err := stack.TaskManager.Create("sess_hub", "explore module", "")
+	item, err := stack.TaskManager.Tree().Create("sess_hub", workmodel.CreateWorkItemInput{
+		Kind:      workmodel.WorkKindImplement,
+		Title:     "explore module",
+		Directive: "explore module",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if task == nil {
+	if item == nil {
 		t.Fatal("expected task")
 	}
 
@@ -35,14 +39,14 @@ func TestIntegration_D7HubFlow_PublishLinksTaskAndQueue(t *testing.T) {
 		SessionID: "sess_hub",
 		FlowID:    "flow-1",
 		WorkerID:  "worker-1",
-		TaskID:    task.ID,
+		TaskID:    item.ID,
 		Source:    contracts.ExecutionSourceSubQuery,
 		Role:      "explore",
 		Kind:      contracts.FlowStarted,
 		Summary:   "started explore worker",
 	})
 
-	got, ok := stack.TaskManager.Get("sess_hub", task.ID)
+	got, ok := stack.TaskManager.Tree().Get("sess_hub", item.ID)
 	if !ok {
 		t.Fatal("task not found after FlowStarted")
 	}
