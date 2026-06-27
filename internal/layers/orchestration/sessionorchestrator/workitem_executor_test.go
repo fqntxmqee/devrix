@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -256,4 +258,163 @@ type errLLM struct{ err error }
 
 func (e *errLLM) InvokeStream(_ context.Context, _ orchtypes.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
 	return nil, e.err
+}
+
+// TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27 pins the per-WorkItem
+// ReAct loop's intermediate event emission. Without this hook the
+// ItemPipelineRunner default path ran tool.bash calls but feishu cards
+// only saw the final ArtifactSummary (silent regression introduced
+// when ItemPipelineRunner became the default execution surface in
+// DM-20260626-009). The fix: WorkItemExecutor forwards each chunk's
+// text/thinking/tool_call + the post-round tool_result events to a
+// caller-provided Emit hook so RunSessionTurnLoop can land them on
+// the gateway out channel — matching what OrchestratePath's
+// streamEmit/workerEventToEngine already does for the Wave path.
+//
+// Assertions:
+//   - text events fire per non-empty Content chunk (sequence: "let me check" then "answer is 42")
+//   - thinking event fires for non-empty Thinking chunk
+//   - tool_call event fires with ToolName/ToolInput populated
+//   - tool_result event fires after the round with name resolved via
+//     ToolCallID lookup (ToolResult itself carries no Name field)
+//   - nil Emit hook is a no-op (legacy / test safety, separate test)
+//   - emitted events carry SessionID so gateway can route
+func TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27(t *testing.T) {
+	var (
+		mu      sync.Mutex
+		all     []*contracts.EngineEvent // ordered
+	)
+	emit := func(ev *contracts.EngineEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		cp := *ev
+		all = append(all, &cp)
+	}
+
+	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
+		{{
+			Content:   "let me check",
+			Thinking:  "the model is reasoning",
+			ToolCalls: []llmgateway.ToolCall{{ID: "call_1", Name: "read_file", Input: `{"path":"x.go"}`}},
+			FinishReason: "tool_calls",
+		}},
+		{{Content: "answer is 42", FinishReason: "stop"}},
+	}}
+	tools := &scriptedTools{results: []ToolRoundResult{
+		{Results: []ToolResult{{ToolCallID: "call_1", Output: "package x"}}},
+	}}
+	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, tools)
+	exec.Emit = emit
+
+	if _, err := exec.ExecuteWorkItem(context.Background(), "sess_emit", "item_emit", "explain x"); err != nil {
+		t.Fatalf("ExecuteWorkItem: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Expected sequence:
+	//   text("let me check") → thinking("reasoning") → tool_call(read_file) → tool_result(package x) → text("answer is 42")
+	wantSeq := []string{"text", "thinking", "tool_call", "tool_result", "text"}
+	if len(all) != len(wantSeq) {
+		types := []string{}
+		for _, e := range all {
+			types = append(types, e.Type)
+		}
+		t.Fatalf("emit count = %d (types=%v), want %d (want=%v)", len(all), types, len(wantSeq), wantSeq)
+	}
+	for i, w := range wantSeq {
+		if all[i].Type != w {
+			t.Fatalf("emit[%d].Type = %q, want %q", i, all[i].Type, w)
+		}
+	}
+
+	// text event content (first text = "let me check", last text = "answer is 42")
+	textEvents := []*contracts.EngineEvent{}
+	for _, e := range all {
+		if e.Type == "text" {
+			textEvents = append(textEvents, e)
+		}
+	}
+	if len(textEvents) != 2 {
+		t.Fatalf("text events = %d, want 2", len(textEvents))
+	}
+	if textEvents[0].Content != "let me check" || textEvents[1].Content != "answer is 42" {
+		t.Fatalf("text content = %q / %q, want let me check / answer is 42",
+			textEvents[0].Content, textEvents[1].Content)
+	}
+	if textEvents[0].SessionID != "sess_emit" {
+		t.Fatalf("text[0].SessionID = %q, want sess_emit", textEvents[0].SessionID)
+	}
+
+	// thinking event
+	var thinkEv *contracts.EngineEvent
+	for _, e := range all {
+		if e.Type == "thinking" {
+			thinkEv = e
+			break
+		}
+	}
+	if thinkEv == nil || thinkEv.Content != "the model is reasoning" {
+		t.Fatalf("thinking event missing or wrong content: %+v", thinkEv)
+	}
+
+	// tool_call event
+	var tcEv *contracts.EngineEvent
+	for _, e := range all {
+		if e.Type == "tool_call" {
+			tcEv = e
+			break
+		}
+	}
+	if tcEv == nil {
+		t.Fatal("tool_call event missing")
+	}
+	if tcEv.ToolName != "read_file" || tcEv.ToolInput != `{"path":"x.go"}` {
+		t.Fatalf("tool_call ToolName=%q ToolInput=%q", tcEv.ToolName, tcEv.ToolInput)
+	}
+	if tcEv.Metadata["tool_name"] != "read_file" || tcEv.Metadata["call_id"] != "call_1" {
+		t.Fatalf("tool_call metadata = %+v", tcEv.Metadata)
+	}
+
+	// tool_result event: ToolResult has no Name field, so the executor
+	// must look up the originating tool name via ToolCallID.
+	var trEv *contracts.EngineEvent
+	for _, e := range all {
+		if e.Type == "tool_result" {
+			trEv = e
+			break
+		}
+	}
+	if trEv == nil {
+		t.Fatal("tool_result event missing")
+	}
+	if trEv.ToolName != "read_file" {
+		t.Fatalf("tool_result.ToolName = %q, want read_file (resolved via ToolCallID lookup)", trEv.ToolName)
+	}
+	if trEv.Content != "package x" {
+		t.Fatalf("tool_result.Content = %q, want %q", trEv.Content, "package x")
+	}
+	if trEv.Metadata["tool_call_id"] != "call_1" {
+		t.Fatalf("tool_result metadata tool_call_id = %q", trEv.Metadata["tool_call_id"])
+	}
+}
+
+// TestWorkItemExecutor_NilEmit_NoOp ensures the Emit hook is optional
+// (legacy fixtures, fast-path callers, and tests that don't need
+// observability). When Emit is nil, ExecuteWorkItem must still return
+// a valid WorkItemResult.
+func TestWorkItemExecutor_NilEmit_NoOp(t *testing.T) {
+	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
+		{{Content: "ok", FinishReason: "stop"}},
+	}}
+	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
+	// Emit intentionally nil
+	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "noop")
+	if err != nil {
+		t.Fatalf("ExecuteWorkItem with nil Emit: %v", err)
+	}
+	if !res.Done || res.Content != "ok" {
+		t.Fatalf("res = %+v, want Done=true Content=ok", res)
+	}
 }
