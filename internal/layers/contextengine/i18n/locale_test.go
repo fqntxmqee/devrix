@@ -24,6 +24,21 @@ func TestParseLanguage_English(t *testing.T) {
 	}
 }
 
+func TestLocalizeTool_ChineseFreeFork(t *testing.T) {
+	_, params := i18n.LocalizeTool(
+		"free_fork",
+		"Batch fork N child agents",
+		`{"type":"object","required":["parent_session","requests"]}`,
+		i18n.LocaleZH,
+	)
+	if !strings.Contains(params, "parent_session") {
+		t.Fatalf("free_fork zh params missing parent_session: %q", params)
+	}
+	if strings.Contains(params, "count") && strings.Contains(params, "directive") {
+		t.Fatalf("free_fork still uses stale count/directive schema: %q", params)
+	}
+}
+
 func TestLocalizeTool_ChineseBuiltin(t *testing.T) {
 	desc, params := i18n.LocalizeTool(
 		"bash",

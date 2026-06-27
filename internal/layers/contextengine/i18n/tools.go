@@ -62,7 +62,7 @@ var toolCatalogZH = map[string]toolLocaleEntry{
 	},
 	"enter_plan_mode": {
 		description: "进入只读 plan 模式，在实现前探索并起草计划。",
-		parameters:  `{"type":"object","properties":{"plan_file_path":{"type":"string","description":"计划文件路径（可选）"}}}`,
+		parameters:  `{"type":"object","properties":{"goal":{"type":"string","description":"要规划的用户目标"},"plan_file_path":{"type":"string","description":"计划文件路径（可选）"}}}`,
 	},
 	"exit_plan_mode": {
 		description: "退出 plan 模式并请求用户批准开始实现。",
@@ -97,8 +97,16 @@ var toolCatalogZH = map[string]toolLocaleEntry{
 		parameters:  `{"type":"object","properties":{"change_id":{"type":"string","description":"变更 ID（可选）"}}}`,
 	},
 	"free_fork": {
-		description: "批量 fork N 个子 agent（1..5）于父会话下。默认每个子 agent 在隔离 worker 目录沙箱中运行。",
-		parameters:  `{"type":"object","required":["count","directive"],"properties":{"count":{"type":"integer","minimum":1,"maximum":5,"description":"子 agent 数量"},"directive":{"type":"string","description":"给每个子 agent 的指令"}}}`,
+		description: "批量 fork N 个子 agent（1..5）于父会话下。每个子 agent 继承父 session id，默认在隔离 worktree 中运行。返回 {spawned_count, agent_ids:[...]}。",
+		parameters: `{"type":"object","required":["parent_session","requests"],"properties":{
+			"parent_session":{"type":"string","description":"父 session id（调用者 session）"},
+			"requests":{"type":"array","minItems":1,"maxItems":5,"items":{"type":"object","required":["name","prompt"],"properties":{
+				"name":{"type":"string","description":"worker 短名（用于日志）"},
+				"prompt":{"type":"string","description":"给 worker 的自包含指令"},
+				"worktree":{"type":"boolean","description":"是否在隔离 worktree 中运行（默认 true）"},
+				"mode":{"type":"string","enum":["brief","fork","full"],"default":"brief","description":"子 agent 上下文继承模式：brief=无父历史（默认）；fork=兄弟 worker 缓存友好前缀；full=完整父历史（legacy）"}
+			}}}
+		}}`,
 	},
 	"ask_user_question": {
 		description: "向用户提出 1–4 个多选题。问题以 IM 消息发送并带编号选项；用户可回复数字（如「1」）或选项文字，回复在下一 turn 到达。仅在 genuinely 不确定时使用（如歧义需求、工具选择、设计权衡）。 trivial 澄清请直接用文字询问。",

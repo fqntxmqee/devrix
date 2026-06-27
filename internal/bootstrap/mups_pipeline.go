@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
@@ -33,7 +34,11 @@ func WireMUPSPipeline(deps MUPSPipelinesDeps) (*sessionorchestrator.TurnToolExec
 		toolExec.SetTurnToolMetrics(sessionorchestrator.NewTurnToolMetrics(deps.ObsBridge.Meter()))
 	}
 
-	ctxPrep := &sessionorchestrator.TurnPrepareWrapper{Inner: deps.CtxAdapter, LoopFirst: deps.LoopFirst}
+	ctxPrep := &sessionorchestrator.TurnPrepareWrapper{
+		Inner:        deps.CtxAdapter,
+		LoopFirst:    deps.LoopFirst,
+		PromptLocale: i18n.ParseLanguage(deps.PromptLanguage),
+	}
 
 	turnOrch := sessionorchestrator.NewOrchestrator(sessionorchestrator.OrchestratorDeps{
 		LLM:              deps.LLMInvoker,
