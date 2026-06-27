@@ -16,9 +16,8 @@ import (
 
 // ItemPipelineRunner executes Observe→Plan→Execute→Verify→Learn→Decide for one WorkItem.
 //
-// DM-20260626-009: the Execute phase now goes through WorkItemExecutor
-// directly (per-WorkItem ReAct loop), bypassing the legacy CommitChannel +
-// ItemToolRunner + work_item_execute shim. Planner is kept for round
+// DM-20260626-009: the Execute phase goes through WorkItemExecutor
+// directly (per-WorkItem ReAct loop). Planner is kept for round
 // metadata + Learn lineage; the Plan.Steps are vestigial (Executor reads
 // the directive from WorkItem directly, not from Plan.Steps[0].ToolArgs).
 type ItemPipelineRunner struct {
@@ -135,11 +134,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		Steps: []plan.Step{{
 			ID:        "step_" + item.ID,
 			Directive: itemDirective(item),
-			// ToolName/ToolArgs are vestigial post-DM-20260626-009: the
-			// Execute phase calls WorkItemExecutor directly with the
-			// directive, not through CommitChannel+work_item_execute.
-			// Kept so the Plan still validates (DefaultPlanner requires
-			// ≥1 Step) and so any Plan inspector sees the directive.
+			// ToolName/ToolArgs are vestigial: Execute calls WorkItemExecutor
+			// directly with the directive. Kept so the Plan validates and
+			// Plan inspectors see the directive.
 			ToolName:        "workitem_executor_direct",
 			ToolArgs:        map[string]any{"directive": itemDirective(item)},
 			IdempotencyKey:  "idem_" + item.ID,
@@ -165,10 +162,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	// DM-20260626-009: bypass CommitChannel/ItemToolRunner/work_item_execute;
-	// call WorkItemExecutor directly with the WorkItem's directive. Also
-	// emit the Wave (executor.select) + Execute (channel.route) sub-spans
-	// so Jaeger shows the full 5-node tree on the per-WorkItem path.
+	// Execute via WorkItemExecutor (per-WorkItem ReAct loop). Emit Wave +
+	// Execute sub-spans so Jaeger shows the full 5-node tree.
 	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
 	endWave(nil)
 	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")

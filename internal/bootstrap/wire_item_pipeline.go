@@ -12,8 +12,7 @@ import (
 
 // ItemPipelineWireDeps holds production wiring for per-WorkItem MUPS (Phase D).
 //
-// DM-20260626-009: per-WorkItem execution moved from the legacy
-// ItemToolRunner+work_item_execute shim to a fresh WorkItemExecutor
+// DM-20260626-009: per-WorkItem execution uses WorkItemExecutor
 // (see sessionorchestrator.workitem_executor.go). The Executor drives a
 // per-WorkItem ReAct loop (LLM ↔ Tool) and needs LLMInvoker for the LLM
 // side and ContextPreparer for workspace context assembly.
