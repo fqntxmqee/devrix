@@ -121,11 +121,11 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	if streamSpan != nil {
 		g.recordStreamRequest(streamSpan, req)
 	}
-	finishStream := func(err error, usage llmgateway.TokenUsage, usageReceived bool, provider, model string) {
+	finishStream := func(err error, usage llmgateway.TokenUsage, usageReceived bool, provider, model string, capture *streamResponseCapture) {
 		if streamSpan == nil {
 			return
 		}
-		g.recordStreamResponse(streamSpan, err, usage, provider, model)
+		g.recordStreamResponse(streamSpan, err, usage, provider, model, capture)
 		attrs := telemetry.SpanAttrs(telemetry.OpD3_S3_LLM_Stream,
 			tracer.Attribute{Key: "llm.provider", Value: provider},
 			tracer.Attribute{Key: "llm.model", Value: model},
@@ -168,7 +168,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			routeSpan.End()
 		}
 		if err != nil {
-			finishStream(err, llmgateway.TokenUsage{}, false, "", "")
+			finishStream(err, llmgateway.TokenUsage{}, false, "", "", nil)
 			return nil, g.classify(streamCtx, err)
 		}
 		provider, model = p, m
@@ -177,13 +177,13 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 	providerCfg, ok := g.cfg.Providers[provider]
 	if !ok {
 		err := fmt.Errorf("provider config missing: %s", provider)
-		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model, nil)
 		return nil, g.classify(streamCtx, err)
 	}
 
 	count := g.counter.CountWithSystemPrompt(req.SystemPrompt, req.Messages)
 	if err := g.counter.CheckBudget(count, defaultPromptTokenBudget); err != nil {
-		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model, nil)
 		return nil, g.classify(streamCtx, err)
 	}
 
@@ -198,18 +198,18 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			cbSpan.End()
 		}
 		if err != nil {
-			finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
+			finishStream(err, llmgateway.TokenUsage{}, false, provider, model, nil)
 			return nil, g.classify(streamCtx, err)
 		}
 		if !allowed {
-			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, false, provider, model)
+			finishStream(fmt.Errorf("circuit breaker rejected: %s", provider), llmgateway.TokenUsage{}, false, provider, model, nil)
 			return nil, g.classify(streamCtx, fmt.Errorf("circuit breaker rejected: %s", provider))
 		}
 	}
 
 	ad, err := g.reg.Get(provider)
 	if err != nil {
-		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model, nil)
 		return nil, g.classify(streamCtx, err)
 	}
 
@@ -277,7 +277,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			retrySpan.RecordError(err)
 			retrySpan.End()
 		}
-		finishStream(err, llmgateway.TokenUsage{}, false, provider, model)
+		finishStream(err, llmgateway.TokenUsage{}, false, provider, model, nil)
 		return nil, g.classify(streamCtx, err)
 	}
 
@@ -294,6 +294,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 		var streamErr error
 		var usage llmgateway.TokenUsage
 		var usageReceived bool
+		responseCapture := newStreamResponseCapture()
 	streamLoop:
 		for {
 			select {
@@ -315,6 +316,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 					usage = ac.Parsed.Usage
 					usageReceived = true
 				}
+				responseCapture.observe(*ac.Parsed)
 				select {
 				case <-streamCtx.Done():
 					streamErr = streamCtx.Err()
@@ -333,12 +335,12 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			// 流错误通过 finishStream(span RecordError + RecordLLMSpanPayload) 落库，
 			// out channel 正常关闭让 consumer 拿到 io.EOF 风格的语义。
 			classified := g.classify(streamCtx, streamErr)
-			finishStream(classified, usage, usageReceived, provider, model)
+			finishStream(classified, usage, usageReceived, provider, model, responseCapture)
 			return
 		}
 		g.breaker.RecordSuccess(provider)
 		g.recordSuccess(provider, primaryModel, start)
-		finishStream(nil, usage, usageReceived, provider, model)
+		finishStream(nil, usage, usageReceived, provider, model, responseCapture)
 	}()
 
 	return out, nil
@@ -513,21 +515,30 @@ func parseToolParametersJSON(raw string) (any, bool) {
 	return v, true
 }
 
-func (g *Gateway) recordStreamResponse(span tracer.Span, err error, usage llmgateway.TokenUsage, provider, model string) {
-	info := map[string]interface{}{
-		"provider":          provider,
-		"model":             model,
-		"prompt_tokens":     usage.PromptTokens,
-		"completion_tokens": usage.CompletionTokens,
-	}
-	if err != nil {
-		info["error"] = err.Error()
-	}
+func (g *Gateway) recordStreamResponse(span tracer.Span, err error, usage llmgateway.TokenUsage, provider, model string, capture *streamResponseCapture) {
+	info := buildStreamResponseInfo(err, usage, provider, model, capture)
 	bz, _ := json.Marshal(info)
+	extra := []tracer.Attribute{
+		{Key: "llm.provider", Value: provider},
+	}
+	if v, ok := info["content_len"]; ok {
+		extra = append(extra, tracer.Attribute{Key: "llm.response.content_len", Value: v})
+	}
+	if v, ok := info["content_hash"]; ok {
+		extra = append(extra, tracer.Attribute{Key: "llm.response.content_hash", Value: v})
+	}
+	if v, ok := info["content_preview"]; ok {
+		extra = append(extra, tracer.Attribute{Key: "llm.response.content_preview", Value: v})
+	}
+	if incident.LLMLogContentEnabled() {
+		if v, ok := info["content"]; ok {
+			extra = append(extra, tracer.Attribute{Key: "llm.response.content", Value: v})
+		}
+	}
 	incident.RecordLLMSpanPayload(
 		span, "", "response", "llm.response", "llm.response_json", string(bz),
 		0, model,
-		tracer.Attribute{Key: "llm.provider", Value: provider},
+		extra...,
 	)
 }
 
