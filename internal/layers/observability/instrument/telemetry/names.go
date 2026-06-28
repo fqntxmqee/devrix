@@ -55,8 +55,6 @@ const (
 	OpD2_S2_Context_Compression_Run = "D2_Context_Compression_Run"
 	OpD2_S2_Context_Compression_Step = "D2_Context_Compression_Step"
 	OpD2_S2_Context_Longterm_Recall = "D2_Context_Longterm_Recall"
-	OpD2_S2_Context_Longterm_Store = "D2_Context_Longterm_Store"
-	OpD2_S2_Context_Tools_Register = "D2_Context_Tools_Register"
 	OpD2_S2_Context_Tools_List = "D2_Context_Tools_List"
 	OpD2_S2_Context_Tools_Filter_Permission = "D2_Context_Tools_Filter_Permission"
 	OpD2_S2_Context_Tools_Filter_AgentRole = "D2_Context_Tools_Filter_AgentRole"
@@ -70,17 +68,11 @@ const (
 	OpD2_S2_Context_Memory_Snapshot_Save = "D2_Context_Memory_Snapshot_Save"
 	OpD2_S16_Context_Materialize = "D2_Context_Materialize"
 
-	// D2 Context Engine - Harness (D2-S5)
-	OpD2_S5_Context_Harness_Bootstrap_Run = "D2_Context_Harness_Bootstrap_Run"
-	OpD2_S5_Context_Harness_Bootstrap_Stage = "D2_Context_Harness_Bootstrap_Stage"
-	OpD2_S5_Context_Harness_ToolPool = "D2_Context_Harness_ToolPool"
-	OpD2_S5_Context_Harness_Preflight = "D2_Context_Harness_Preflight"
-	OpD2_S5_Context_Harness_Route = "D2_Context_Harness_Route"
+	// D2 Context Engine - Harness (D2-S5, REMOVED v6.5.0; SystemPrompt_Build 在 prepare/adapters/ 复用)
 	OpD2_S5_Context_Harness_SystemPrompt_Build = "D2_Context_Harness_SystemPrompt_Build"
 
 	// D2 Context Engine - Tool Execution (D2-S5)
 	OpD2_S5_Tool_Execute_Single = "D2_Tool_Execute_Single"
-	OpD2_S5_Tool_Execute_Permission = "D2_Tool_Execute_Permission"
 
 	// D2 Context Engine - Task / Plan (D2-S8)
 	OpD2_S8_Task_Plan_Generate = "D2_Task_Plan_Generate"
@@ -88,8 +80,6 @@ const (
 	OpD2_S8_Task_PlanMode_Execute = "D2_Task_PlanMode_Execute"
 	OpD2_S8_Task_PlanMode_Approve = "D2_Task_PlanMode_Approve"
 	OpD2_S8_Task_PlanMode_Reject = "D2_Task_PlanMode_Reject"
-	OpD2_S8_Task_Manager_Create = "D2_Task_Manager_Create"
-	OpD2_S8_Task_Manager_Update = "D2_Task_Manager_Update"
 
 	// D3 LLM Gateway (D3-S3)
 	OpD3_S3_LLM_Stream = "D3_LLM_Stream"
@@ -203,6 +193,8 @@ func LayerAndComponent(operation string) (layer, component string) {
 
 	// D2 Context Engine
 	case strings.HasPrefix(operation, "D2_Context_Harness_"):
+		// 仅 SystemPrompt_Build 仍在 prepare/adapters/assembler_adapter.go
+		// 复用（S5 harness 主体 v6.5.0 已 REMOVED）。
 		return LayerContext, "harness"
 	case strings.HasPrefix(operation, "D2_Context_"):
 		return LayerContext, "context_engine"
@@ -212,8 +204,6 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerContext, "plan_mode"
 	case strings.HasPrefix(operation, "D2_Task_Plan_"):
 		return LayerContext, "plan_agent"
-	case strings.HasPrefix(operation, "D2_Task_Manager_"):
-		return LayerContext, "task_manager"
 
 	// D3 LLM Gateway
 	case strings.HasPrefix(operation, "D3_LLM_Adapter_Stream"):

@@ -21,7 +21,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
-	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -214,7 +213,3 @@ func (e *ContextEngine) transcriptMessages(sc *types.SessionContext, from int) [
 	}
 	return sc.Messages[from:]
 }
-
-// Compile-time sanity check that we don't accidentally drop the telemetry
-// op-name import (kept so the file is grep-able in spec audits).
-var _ = telemetry.OpD2_S2_Context_Memory_Snapshot_Save
