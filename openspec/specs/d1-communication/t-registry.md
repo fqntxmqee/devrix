@@ -1,11 +1,11 @@
 # D1 Communication Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.1.0
+**Version:** 3.1.1
 **Last Updated:** 2026-06-28
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring / 2026-06-20-devrix-context-budget-and-isolation (DM-20260620-001) — AC5 feishu card table-count/size precheck + plain-text fallback (T05-T08) / **devrix-api-error-classification (DM-20260628-001) — IM 适配器 error_code → 差异化文案 (D1-S3-A08-T01 PLANNED)**
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring / 2026-06-20-devrix-context-budget-and-isolation (DM-20260620-001) — AC5 feishu card table-count/size precheck + plain-text fallback (T05-T08) / **devrix-api-error-classification (DM-20260628-001) — IM 适配器 error_code → 差异化文案 (D1-S3-A08-T01 IMPLEMENTED PR #265)**
 
 ---
 
@@ -41,7 +41,7 @@
 | **D1-S5-A07-T06** | **AC5 feishu size precheck: 序列化 JSON 超 28KB 触发 fall back to truncated plain text (Feishu 30KB hard limit 防护)** | **S5-A07 SendCard (extended)** | **`card_precheck_test.go::TestFeishuTableCountPrecheck_SizeOverLimit`, `feishu_test.go::TestSendCard_SizeFallback`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D1-S5-A07-T07** | **AC5 default precheck wired in NewFeishuAdapter: `cardPrecheck = NewFeishuTableCountPrecheck(DefaultCardPrecheckConfig())` (MaxTables=5, MaxChars=28000)** | **S5-A07 NewFeishuAdapter (extended)** | **`feishu_test.go::TestNewFeishuAdapter_DefaultPrecheckWired`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D1-S5-A07-T08** | **AC5 plain-text fallback preserves header + markdown: `cardFallbackText` returns title + content + "[card auto-flattened]" trailer** | **S5-A07 cardFallbackText (new)** | **`feishu_test.go::TestCardFallbackText_{HeaderAndMarkdown,FlattensPipeTable,TrailerMarker}`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
-| **D1-S3-A08-T01** | **feishu / cli IM 适配器基于 `Event.Metadata["error_code"]` 走差异化文案（5 类 code 各自独立文案 + 兜底 Unknown）：RateLimit → "模型繁忙，请稍候重试" / AuthenticationFailed → "API key 失效，请检查 ~/.devrix/config.yaml" / PromptTooLong → "会话过长，已尝试压缩" / MediaSize + ImageSize → "附件过大" / ServerError → "模型服务异常" / Unknown → 现有通用文案** | **D1-S3-A08 EmitError (error_code → 文案映射)** | **`internal/layers/communication/{feishu,cli}_test.go::TestEmitError_{RateLimit,AuthenticationFailed,PromptTooLong,MediaSize,ImageSize,ServerError,Unknown}_MessageMapping` (7 sub-test)** | **PLANNED (DM-20260628-001 S4 实现)** | **P0** |
+| **D1-S3-A08-T01** | **feishu / cli IM 适配器基于 `Event.Metadata["error_code"]` 走差异化文案（5 类 code 各自独立文案 + 兜底 Unknown）：RateLimit → "模型繁忙，请稍候重试" / AuthenticationFailed → "API key 失效，请检查 ~/.devrix/config.yaml" / PromptTooLong → "会话过长，已尝试压缩" / MediaSize + ImageSize → "附件过大" / ServerError → "模型服务异常" / Unknown → 现有通用文案** | **D1-S3-A08 EmitError (error_code → 文案映射)** | **`internal/layers/communication/{feishu,cli}_test.go::TestEmitError_{RateLimit,AuthenticationFailed,PromptTooLong,MediaSize,ImageSize,ServerError,Unknown}_MessageMapping` (7 sub-test)** | **IMPLEMENTED (DM-20260628-001 S5 验收 PR #265，feishu + cli 单测 7 sub-case 全 PASS)** | **P0** |
 
 ---
 
@@ -139,6 +139,8 @@
 |----------|-------|-------------|---------|-----|
 | Legacy T | 44 | 44 | 0 | 19 |
 | Canonical T（新增） | 16 | 16 | 0 | 11 |
-| **合计** | **60** | **60** | **0** | **30** |
+| DM-20260628-001（api-error-classification, +1 P0 T01） | 1 | 1 | 0 | 1 |
+| **合计** | **61** | **61** | **0** | **31** |
 
 > **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) — AC5 feishu precheck 新增 4 项 P0 T 点 T05-T08（16 - 12 = 4）**，全部 IMPLEMENTED。
+> **DM-20260628-001 (devrix-api-error-classification) — AC5 飞书/cli IM 适配器 error_code 差异化文案 +1 P0 T (D1-S3-A08-T01)**，S5 验收 PR #265 IMPLEMENTED。

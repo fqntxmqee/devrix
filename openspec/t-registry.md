@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.7.0
-**Last Updated:** 2026-06-28 (api-error-classification PLANNED, DM-20260628-001)
+**Version:** 5.8.0
+**Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -21,15 +21,15 @@
 
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
-| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 60 | 60 | 0 | 30 |
+| D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 61 | 61 | 0 | 31 |
 | D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 114 | 114 | 0 | 61 |
-| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 35 | 4 | 23 |
+| D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 38 | 1 | 23 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 230 | 228 | 2 | 193 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 230 | 230 | 0 | 193 |
 
-**总计**: 571 · IMPLEMENTED 556 · PLANNED 13 · PARTIAL 2 · P0 377
+**总计**: 572 · IMPLEMENTED 567 · PLANNED 3 · PARTIAL 2 · P0 378
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -65,6 +65,8 @@
 > 2026-06-26 增量（Bootstrap Wire 拓扑收口 PLANNED 预登记）：DM-20260626-007 (devrix-d7-6s-bootstrap-slim) — v6.0.0 域升级 follow-up 序列收官（5/6 S7_Archived + 1/6 S1_Cancelled + 1/1 S7_Archived = #007 bootstrap-slim）：6 S × WireFunc 命名一致（新增 `WireDecisionPlanning` 16 行 S5 + `WireMUPSPipeline` + `MUPSPipelinesDeps` 75 行 S6 包装，6 个 wire 函数对齐）；3rd adapter `contextEngineAdapter` 已在 `turn_adapter.go` 独立，PR-2 抽 `turnOrchExecutor` + `gatewayEventPublisher` 2 内嵌 adapter 到 `adapters.go` (48 行)；PR-1 抽 4 util 函数 (`boolPtr` + `intPtr` + `strPtr` + `mapBackgroundStatus`) 到 `util.go` (30 行)；PR-4 抽 `loadOrchestratorConfigs` (24 行) + `resolveObsBridge` (6 行) 辅助函数分离 config 加载与类型断言；InitOrchestration 函数体 275 → **140 行**（≤ 200 目标达成）+ cmd/devrix + cmd/obs-verify + tests/testutil/d7_stack.go 调用方 0 变化 + hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 baseline stability。加 **4 新 P0 T** PLANNED：D7-S2-A51-T01 6 S × WireFunc 命名一致（`grep -E "^func Wire" internal/bootstrap/*.go` 应列 5 Wire* + 1 BuildOrchestratePath）/ D7-S2-A51-T02 InitOrchestration 主体 ≤ 200 行 + 6 S 组合入口清晰（`wc -l internal/bootstrap/wire_coordinator.go` ≤ 250；函数体 140 行 ≤ 200）/ D7-S2-A51-T03 3 内嵌 adapter + 4 util 函数已抽到独立文件（grep 0 命中 wire_coordinator.go）/ D7-S2-A51-T04 go build/vet/test -race 22/22 PASS + 0 函数签名变化（pure physical refactor, InitOrchestration 外部接口 100% 不变）+ hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go git diff 0 baseline stability。Total 544, PLANNED 7（持平）, P0 354（IMPLEMENTED 535→535 持平, P0 350→354）。D7 t-registry v4.5.0 → v4.6.0。22 包 baseline 持平（DM-20260626-005 PR #222+#223 验证），0 函数签名变化。
 
 > 2026-06-28 增量（DM-20260628-001 devrix-api-error-classification PLANNED）：D3 LLM Gateway API 错误分类与可恢复语义 — `sharederrors.APIErrorCode` 7 类闭集枚举（RateLimit/AuthenticationFailed/ServerError/MediaSize/PromptTooLong/ImageSize/Unknown）+ `NewAPIErrorCodeFromStatus` HTTP status 自动映射 + `sharederrors.IsCode` 包装链识别 + 4 adapter（minimax/deepseek/anthropic/openai）HTTP 错误构造统一走 `NewAPIError(status, msg)` 工厂 + `OrchestratorDeps.FallbackModel string` 字段预留 + `TurnState.Withheld bool` 字段 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]` 受控枚举 + 主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志（fallback_model 未 wire 显式标注）+ prompt_too_long 错误标 `withheld=true` 不 surface + feishu/cli IM 适配器基于 error_code 走差异化文案（5 类 code + 兜底 Unknown）。加 **6 新 P0 T** PLANNED：D3-S1-A01-T04 HTTP status 映射覆盖 8 类 (401/403/408/413/429/529/5xx/4xx-unknown) + D3-S1-A01-T05 IsCode 包装链识别 (WithCode→Unwrap→bare APIError) + D3-S3-A01-T17 4 adapter NewAPIError 工厂统一 + D7-S2-A50-T05 OrchestratorDeps.FallbackModel + TurnState.Withheld + emitError code 注入 + D7-S2-A50-T06 2 次连续触发 fallback 日志 + withheld + SanitizeForUser 回归 + D1-S3-A08-T01 feishu/cli 5 类 code 差异化文案（7 sub-test）。Total 565→571, PLANNED 7→13, P0 375→377（IMPLEMENTED 556 持平）。D3 t-registry v3.2.0 → v3.3.0 (P0 20→23) + D7 t-registry v4.8.0 → v4.9.0 (P0 191→193) + D1 t-registry v3.0.0 → v3.1.0。S4 实现后回填 IMPLEMENTED。Out of Scope：完整 streaming fallback 自动切换（放 P0-2）+ prompt_too_long fold 闭环（放 P0-3）+ per-tool maxResultSizeChars（放 P1-4）。
+
+> 2026-06-28 S5 验收（DM-20260628-001 devrix-api-error-classification, PR #265 squash merged）：6 新 P0 T 全部 PLANNED→IMPLEMENTED。T04 (HTTP status 8 类映射) + T05 (IsCode 包装链) + T17 (4 adapter NewAPIError) 在 D3-S1/S3 测试单测全 PASS；T05+T06 (FallbackModel + emitError code 注入 + 2 次连续 fallback 日志) 在 D7 orchestrator 单测 5 case 全 PASS；T01 (feishu/cli 5 类 code 差异化文案 + 兜底) 在 D1 adapter 单测 7 sub-case 全 PASS。Total 571→572, PLANNED 13→3, P0 377→378（IMPLEMENTED 556→567）。D3 t-registry v3.3.0 → v3.3.1 + D7 t-registry v4.9.0 → v4.9.1 + D1 t-registry v3.1.0 → v3.1.1。Out of Scope P0-2/P0-3/P1-4 不变。
 
 ---
 

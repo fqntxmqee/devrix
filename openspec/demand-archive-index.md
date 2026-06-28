@@ -238,6 +238,7 @@
 | **devrix-d7-itempipeline-emit-hook** | **`openspec/archive/2026-06-27-devrix-d7-itempipeline-emit-hook/`**（DM-20260627-001 HOTFIX; ItemPipelineRunner emit hook 补齐; PR #257 merged `8251a18`; 用户飞书验收 "tools有了"） |
 | **devrix-d2-agents-md-project-layout** | **`openspec/archive/2026-06-27-devrix-d2-agents-md-project-layout/`**（DM-20260627-002 HOTFIX; .devrix/AGENTS.md 加 D{N}→path 映射; PR #258 merged `9b660fa`; 等待用户飞书实测验收） |
 | **devrix-d7-workitem-rollup-pipeline** | **`openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`**（DM-20260627-001; Phase 1 Rollup 闭环 — gate/dual bubble/rollup MUPS/deliverable; PARTIAL 验收; best_effort only; PR #262 merged `d246a9b`; S7_Archived PARTIAL ACCEPTED） |
+| **devrix-api-error-classification** | **`openspec/archive/2026-06-28-devrix-api-error-classification/`**（DM-20260628-001; APIErrorCode 7 类闭集枚举 + HTTP status 映射 + sharederrors.IsCode 包装链识别 + 4 adapter NewAPIError 工厂统一 + OrchestratorDeps.FallbackModel + TurnState.Withheld + emitError code 注入 + 2 次连续 fallback 日志 + feishu/cli 5 类 code 差异化文案; PR #265 squash merged; 6/6 P0 T IMPLEMENTED; P0 AC 5/7 完整 + 2/7 partial（AC3/AC4 follow-up P0-2/P0-3）） |
 
 ## Active Changes (未归档)
 
@@ -246,7 +247,6 @@
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
-| `devrix-api-error-classification` | DM-20260628-001 | **S2_Proposal**（S3 待开） | `openspec/changes/devrix-api-error-classification/` |
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 

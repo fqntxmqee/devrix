@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 4.9.0
-**Last Updated:** 2026-06-28 (api-error-classification PLANNED, DM-20260628-001)
+**Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -428,8 +428,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2-A50-T02 | 24 文件 `package turn` → `package sessionorchestrator` 全替换 | D7-S2-A50 | `grep -l "^package turn$" internal/layers/orchestration/sessionorchestrator/` 应 0 结果 | IMPLEMENTED | P0 |
 | D7-S2-A50-T03 | 14 importer 文件 import path + identifier 全替换 + 跨包 import cycle 打破 | D7-S2-A50 | `grep -rn "orchestration/turn" internal/` 应 0 命中；sessionorchestrator ↔ decisionplanning cycle 经 orchtypes 上提修复 | IMPLEMENTED | P0 |
 | D7-S2-A50-T04 | hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go 0 变更 + 22/22 orchestration packages go test -race PASS | D7-S2-A50 | `git diff --stat hardening/ escape/ sessionorchestrator/autoclose.go` 应空；`go test -race -count=1 ./internal/layers/orchestration/...` 应 22/22 PASS | IMPLEMENTED | P0 |
-| **D7-S2-A50-T05** | **`OrchestratorDeps.FallbackModel string` 字段就位 + `TurnState.Withheld bool` 字段就位 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]`（受控枚举：RateLimit/AuthenticationFailed/ServerError/MediaSize/PromptTooLong/ImageSize/Unknown 7 类）** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/orchestrator_test.go::TestOrchestratorDeps_FallbackModelField + TestTurnState_WithheldField + TestEmitError_MetadataErrorCode` | **PLANNED**（DM-20260628-001 S4 实现） |
-| **D7-S2-A50-T06** | **主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志（fallback_model 未 wire 场景日志显式标注 `fallback_model_set_but_not_yet_wired`）+ prompt_too_long 错误标记 `TurnState.Withheld=true` 不 surface error 事件 + 现有 30+ `SanitizeForUser` 调用点零行为变化回归** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/turn_orchestrator_test.go::TestEmitError_FallbackTriggerCandidate + TestTurnState_Withheld_PromptTooLong_NoSurface + TestSanitizeForUser_NoRegression` | **PLANNED**（DM-20260628-001 S4 实现） |
+| **D7-S2-A50-T05** | **`OrchestratorDeps.FallbackModel string` 字段就位 + `TurnState.Withheld bool` 字段就位 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]`（受控枚举：RateLimit/AuthenticationFailed/ServerError/MediaSize/PromptTooLong/ImageSize/Unknown 7 类）** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/orchestrator_test.go::TestOrchestratorDeps_FallbackModelField + TestTurnState_WithheldField + TestEmitError_MetadataErrorCode` | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，2 case TestEmitErrorWithErr_* PASS） |
+| **D7-S2-A50-T06** | **主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志（fallback_model 未 wire 场景日志显式标注 `fallback_model_set_but_not_yet_wired`）+ prompt_too_long 错误标记 `TurnState.Withheld=true` 不 surface error 事件 + 现有 30+ `SanitizeForUser` 调用点零行为变化回归** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/turn_orchestrator_test.go::TestEmitError_FallbackTriggerCandidate + TestTurnState_Withheld_PromptTooLong_NoSurface + TestSanitizeForUser_NoRegression` | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，3 case TestObserveFallbackTrigger_* PASS + sharederrors 全量回归 55.8% 覆盖） |
 | D7-S4-A50-T01 | sessionorchestrator/{exit_reason,verdict_to_exit_reason,verdict_to_exit_reason_test}.go 3 文件 git mv → executionflow/verify/（218 行） | D7-S4-A50 | `git log --follow` 100% rename detection；`ls sessionorchestrator/ \| grep -E "exit_reason\|verdict_to"` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T02 | 3 文件 `package sessionorchestrator` → `package verify` + sessionorchestrator/turn_orchestrator.go 11 处 `ExitReason*` → `verify.ExitReason*` + turn_orchestrator_test.go 2 处 `ExitReasonNatural` → `verify.ExitReasonNatural` | D7-S4-A50 | `grep -rn "ExitReason[^a-zA-Z]" sessionorchestrator/*.go \| grep -v "verify\."` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T03 | executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 import cycle 0 风险（单向 DAG: sessionorchestrator → verify） | D7-S4-A50 | `go list -deps ./internal/layers/orchestration/executionflow/verify \| grep sessionorchestrator` 0 命中 | PLANNED | P0 |
@@ -445,7 +445,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 222 | 218 | 0 | 4 | 185 |
+| 230 | 228 | 0 | 2 | 193 |
 
 ### 按 Scenario
 
@@ -525,6 +525,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.7.0** | **2026-06-26** | **DM-20260626-009 follow-up 内层 observability span + dedup 删除（PR #253+#254 落地）**：3 层 LCP-based dedup 在 D1 adapter 兜底 minimax M2.7 流式回放 bug，但同时把自然中文复述当成 echo 误杀（错层：D3 gateway bug 不该 D1 adapter 兜底）。D1/D2/textutil 三处 dedup 全删 + 5-node MUPS 根 span 之外 3 内层 span 落地：(1) D7-S1-A52 worktree.op（P1，2 T 点 T11 EmitWorktreeOp happy + T12 nil-bridge fail-safe，6 P0/P1 spans 之一）+ (2) D7-S1-A53 subworktree.run（P2，2 T 点 T13 EmitSubWorktreeRun happy + T14 nil-bridge fail-safe）+ (3) D7-S5-A54 subturn.iteration（P1，2 T 点 T15 EmitSubTurnIteration happy + T16 nil-bridge fail-safe）。`subturn.finish_reason` 取 LLM 真实 finish_reason（stop/tool_calls/length/...）与 executor 自定义的 stop_reason（final_answer/max_iters/tool_error/...）正交；stepOneIter helper 抽离让 span 包单次函数调用而不是 6 inline return path；cap-hit 多发 1 个 `iter=max+1` span 让 "max_iters" 终止态在 Jaeger 显形。**0 函数签名变化**（pure instrumentation）+ 22/22 orchestration packages go test -race PASS + ItemPipelineRunner 11 个 worktree callsite + WorkItemExecutor ReAct iter + session_turn_loop RunParallelExplore 全 wiring。6 P0 T IMPLEMENTED：Total 222→228, IMPLEMENTED 222→228, P0 185→191。详见 `span-registry.md` §4.1.0 + §WorkItem Inner Layer Trace 树。 |
 | **4.8.0** | **2026-06-27** | **DM-20260627-001 devrix-d7-workitem-rollup-pipeline (PR #262) S7_Archived PARTIAL ACCEPTED 收口** + 3 root span ops (D7-S1-A55 gate + D7-S1-A56 dual_bubble + D7-S5-A57 rollup_mups) + ItemPipelineRunner emit hook 配套 span (D7-S1-A58 T17 EmitItemPipelineOp happy + T18 nil-bridge fail-safe); best_effort only 兜底 fail-safe; S7_Archived PARTIAL ACCEPTED 22/22 orchestration packages -race PASS. Total 228, P0 191. |
 | **4.9.0** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) PLANNED**：API 错误分类与可恢复语义 — `OrchestratorDeps.FallbackModel string` 字段就位 + `TurnState.Withheld bool` 字段就位 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]` 受控枚举 + 主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志 + prompt_too_long 错误标 `withheld=true` 不 surface + 现有 30+ `SanitizeForUser` 调用点零行为变化。**+2 P0 T PLANNED**：D7-S2-A50-T05 (字段 + emitError code 注入) + D7-S2-A50-T06 (2 次连续触发 fallback 日志 + withheld + SanitizeForUser 回归)。Total 228→230, IMPLEMENTED 228（持平, 2 新 T 均 PLANNED）, PLANNED 0→2, P0 191→193。S4 实现后回填 IMPLEMENTED。 |
+| **4.9.1** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) S5 验收**：2 P0 T PLANNED→IMPLEMENTED（D7-S2-A50-T05 + T06, PR #265 squash merged, TestEmitErrorWithErr_* 2 case + TestObserveFallbackTrigger_* 3 case 全 PASS）。Total 230（持平）, IMPLEMENTED 228→230, PLANNED 2→0, P0 193。S6 归档 entry 同步。 |
 
 ---
 

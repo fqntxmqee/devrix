@@ -1,7 +1,7 @@
 id: devrix-api-error-classification
 demand_id: DM-20260628-001
 title: "D3 LLM Gateway API 错误分类与可恢复语义 — 529/429/401/PromptTooLong 分桶 + Fallback 兜底"
-status: s4_implementation
+status: s7_archived
 priority: P0
 created: 2026-06-28
 author: clawcode 对比分析 → 借鉴 P0-1（2026-06-28 调研结论）
