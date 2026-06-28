@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -502,7 +503,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 		// with the same paragraph; without the strip, the user sees the
 		// summary twice — once at the tail of the streaming reply card,
 		// once in the standalone 任务总结 card.
-		if err := a.finalizeReplyCardStreaming(ctx, stream, trimmedSummary); err != nil {
+		if err := a.finalizeReplyCardStreaming(ctx, stream, trimmedSummary, sessionID); err != nil {
 			return err
 		}
 	} else if responseMsgID != "" {
@@ -564,7 +565,7 @@ func (a *FeishuAdapter) sendSummaryCard(ctx context.Context, sessionID, chatID, 
 	return nil
 }
 
-func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *feishuSessionStream, summary string) error {
+func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *feishuSessionStream, summary, sessionID string) error {
 	stream.mu.Lock()
 	defer stream.mu.Unlock()
 
@@ -596,9 +597,11 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	}
 
 	stream.cardkitSequence++
+	updateMethod := "stream_final+update_card"
 	if err := a.cardkit.StreamElementContent(ctx, stream.replyCardID, replyTextElementID, content, stream.cardkitSequence); err != nil {
 		if errors.Is(err, ErrFeishuCardRateLimited) {
 			// rate-limited — skip final stream, try updateCard directly
+			updateMethod = "rate_limited+update_card"
 		} else if errors.Is(err, ErrFeishuCardStreamClosed) {
 			// Card's streaming channel was closed by Feishu (idle timeout
 			// or prior finalization) but the card itself still exists.
@@ -608,6 +611,7 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 			// textBuffer content still reaches the user.
 			slog.Warn("feishu: card stream closed at finalize, falling back to UpdateCard",
 				"session", slog.String("cardID", stream.replyCardID))
+			updateMethod = "stream_closed+update_card"
 		} else {
 			return err
 		}
@@ -615,7 +619,27 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 
 	stream.cardkitSequence++
 	finalJSON := BuildStreamingReplyCardJSON(content, false)
-	return a.cardkit.UpdateCard(ctx, stream.replyCardID, finalJSON, stream.cardkitSequence)
+	// DM-20260629-001 PR-6 t-span-coverage (T42): emit the
+	// D7_Feishu_Card_Render span so D7→D1 cross-domain traces show the
+	// final card lifecycle event. lastVerdict / lastExitReason are
+	// empty at this layer (the D7 verdict pipeline is not directly
+	// visible from finalizeReplyCardStreaming); a follow-up change can
+	// plumb the ProcessAutoClose output through
+	// feishuSessionStream.lastVerdict / lastExitReason fields.
+	endCardRender := hardening.EmitFeishuCardRender(
+		ctx,
+		sessionID,
+		"final",
+		updateMethod,
+		"",
+		"",
+	)
+	if err := a.cardkit.UpdateCard(ctx, stream.replyCardID, finalJSON, stream.cardkitSequence); err != nil {
+		endCardRender(err)
+		return err
+	}
+	endCardRender(nil)
+	return nil
 }
 
 func buildTaskProgressCard(stream *feishuSessionStream, completed bool) *kernel.Card {

@@ -156,6 +156,30 @@ const (
 	// D7-S5 SubTurn (subturn.iteration P1)
 	OpD7_S5_SubTurn_Iteration = "D7_SubTurn_Iteration"
 
+	// D7 Orchestration - t-span-coverage 5 ops (DM-20260629-001 PR-6, T35,
+	// 2026-06-29). The 6 S inner spans above cover WorkItem-level mutations;
+	// the five ops below cover the long-running reputation learning, anomaly
+	// triggers, prior injection, resume decision paths, and the cross-domain
+	// IM card render that closes the D7→D1 loop. Together they raise the
+	// T↔Span coverage from ~38% to ≥80%.
+
+	// D7-S2 SessionOrchestrator (resume.decision_path P0, ApplyResumeSession
+	// 3 决策路由 A fall-through / B user_accept→ForceExit / C user_cancel→
+	// AbortWithAudit).
+	OpD7_S2_Resume_Decision_Path = "D7_Resume_Decision_Path"
+	// D7-S5 DecisionPlanning + Observe (adaptive_prior.inject P0, buildObserveRequest
+	// learner.Inject 注入路径, 跨 S5↔S6 数据契约).
+	OpD7_S5_AdaptivePrior_Inject = "D7_AdaptivePrior_Inject"
+	// D7-S4 ExecutionFlow + Verify (anomaly.trigger P0, SystemAnomalyDetector
+	// 阈值触发, 高/中严重度路径).
+	OpD7_S4_Anomaly_Trigger = "D7_Anomaly_Trigger"
+	// D7-S6 MUPS Pipeline (longterm.reputation_update P0, BayesianUpdate 后
+	// 长程信誉落盘, LP-1 闭环 acceptance).
+	OpD7_S6_LongTerm_Reputation_Update = "D7_LongTerm_Reputation_Update"
+	// D7 Orchestration × D1 Communication (feishu.card_render P0, 飞书卡片
+	// finalizeReplyCardStreaming 渲染 span, D7→D1 跨域可观测).
+	OpD7_Feishu_Card_Render = "D7_Feishu_Card_Render"
+
 	// D6 Evolution - Runtime Validation (D6-S4)
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
 )
@@ -227,6 +251,21 @@ func LayerAndComponent(operation string) (layer, component string) {
 		// DM-20260626-009 follow-up inner observability spans (PR #254 + #257).
 		// Per-WorkItem ReAct loop iterations (D7-S5).
 		return LayerOrchestration, "executor"
+
+	case strings.HasPrefix(operation, "D7_Resume_Decision_Path"),
+		strings.HasPrefix(operation, "D7_AdaptivePrior_Inject"),
+		strings.HasPrefix(operation, "D7_Anomaly_Trigger"),
+		strings.HasPrefix(operation, "D7_LongTerm_Reputation_Update"):
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T35). Long-running
+		// reputation learning, anomaly triggers, prior injection and resume
+		// decision paths all live in the orchestrator component.
+		return LayerOrchestration, "orchestrator"
+
+	case strings.HasPrefix(operation, "D7_Feishu_Card_Render"):
+		// DM-20260629-001 PR-6 (T35). Cross-domain D7→D1 finalise: still an
+		// orchestration emit but tagged communication so Jaeger filters
+		// match the D1_S17_Adapter_Feishu_Outbound lineage.
+		return LayerOrchestration, "adapter"
 
 	// D6 Evolution
 	case strings.HasPrefix(operation, "D6_Validation_"):
