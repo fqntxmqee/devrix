@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-layer-subcontext-phase3`  
 **Demand ID:** DM-20260628-002  
 **Parent:** DM-20260627-003 (Phase 1+2 archived)  
-**Status:** S4_Development
+**Status:** S7_Archived
 
 ---
 
@@ -32,3 +32,10 @@
 | T35b | `LLMObservationProposer` (structured signals only, no wi ReAct) | [x] |
 | T35c | ItemPipeline + bootstrap wiring | [x] |
 | T35d | Tests | [x] |
+
+---
+
+## Archive Footer
+
+**Archived:** 2026-06-28  
+**Outcome:** All Phase 3 tasks complete. Layer SubContext Phase 1–3 closed.
