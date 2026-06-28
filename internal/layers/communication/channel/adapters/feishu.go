@@ -17,7 +17,6 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -241,7 +240,7 @@ func (a *FeishuAdapter) OnError(err error, sessionID string) {
 	// TurnInProgressError, render a friendly "⏳ 还在处理中" card instead
 	// of the generic red error card. CLI adapter does NOT have this branch
 	// — it falls through to sharederrors.SanitizeForUser (preserved).
-	var tip sessionorchestrator.TurnInProgressError
+	var tip sharederrors.TurnInProgressError
 	if errors.As(err, &tip) {
 		title := "⏳ 上一条消息还在处理中"
 		body := fmt.Sprintf("devrix 正在处理 session `%s` 的上一条消息（turn %d 自 %s 启动），请稍候片刻再发新消息。",

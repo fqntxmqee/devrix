@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
+
+var _ contracts.TaskCLIHandler = (*CLICommands)(nil)
 
 // CLICommands provides CLI command handlers for task operations.
 type CLICommands struct {
@@ -43,6 +47,15 @@ func ParseCommand(input string) *Command {
 		cmd.Args = parts[2:]
 	}
 	return cmd
+}
+
+// HandleTaskCommand implements contracts.TaskCLIHandler.
+func (c *CLICommands) HandleTaskCommand(rawLine, sessionID string) string {
+	cmd := ParseCommand(rawLine)
+	if cmd == nil {
+		return "Invalid task command\n"
+	}
+	return c.Handle(cmd, sessionID)
 }
 
 // Handle processes a task command and returns the output.
@@ -409,6 +422,8 @@ type PlanCLICommands struct {
 	manager  *TaskManager
 }
 
+var _ contracts.PlanCLIHandler = (*PlanCLICommands)(nil)
+
 // NewPlanCLICommands creates plan CLI commands.
 func NewPlanCLICommands(pm *PlanMode) *PlanCLICommands {
 	return &PlanCLICommands{planMode: pm}
@@ -417,6 +432,11 @@ func NewPlanCLICommands(pm *PlanMode) *PlanCLICommands {
 // SetTaskManager wires task creation on plan approve.
 func (c *PlanCLICommands) SetTaskManager(m *TaskManager) {
 	c.manager = m
+}
+
+// HandlePlanCommand implements contracts.PlanCLIHandler.
+func (c *PlanCLICommands) HandlePlanCommand(args []string, sessionID, workDir string) string {
+	return c.Handle(args, sessionID, workDir, nil)
 }
 
 // Handle processes a /plan command.

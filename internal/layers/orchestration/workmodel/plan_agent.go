@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // PlanAgent generates task plans via LLM.
@@ -97,10 +98,8 @@ func (a *PlanAgent) ValidateToolCall(name string) error {
 	return fmt.Errorf("plan mode: tool %q is not in the read-only whitelist", name)
 }
 
-// LLMCompleter interface for LLM calls.
-type LLMCompleter interface {
-	Complete(ctx context.Context, prompt string) (string, error)
-}
+// LLMCompleter completes prompts for plan-mode flows.
+type LLMCompleter = contracts.PlanLLMCompleter
 
 // NewPlanAgent creates a new PlanAgent.
 func NewPlanAgent(llm LLMCompleter, obsBridge *observability.Bridge) *PlanAgent {

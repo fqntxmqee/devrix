@@ -82,7 +82,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		multiagent.AgentDeps{Engine: engine},
 		config.DefaultMultiAgentConfig(),
 	)
-	gw.SetAgentFactory(factory)
+	testutil.WireGatewaySessionAgents(gw, factory)
 
 	session, err := gw.CreateSession("feishu_chat", dir)
 	if err != nil {

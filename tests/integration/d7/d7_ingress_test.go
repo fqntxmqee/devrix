@@ -30,7 +30,7 @@ func TestIntegration_D7Ingress_WithMultiAgentFactory(t *testing.T) {
 	}
 	stack.Gateway.WaitForProcesses()
 
-	ag := stack.Gateway.SessionAgent(session.SessionID)
+	ag := stack.SessionAgents.SessionAgent(session.SessionID)
 	if ag == nil {
 		t.Fatal("expected session leader after D7 ingress")
 	}

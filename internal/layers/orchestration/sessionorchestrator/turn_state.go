@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
 // TurnState serializes turns per session_id so that turn N+1 cannot enter
@@ -163,25 +165,7 @@ func (ts *TurnState) TurnNo(sessionID string) int {
 // the same session_id has not yet ended. Use errors.As (struct) or
 // errors.Is (with target TurnInProgressError{}) to detect.
 //
-// dm-20260628-003 (D7 multi-turn session state): returned to D1 gateway
-// when a user sends turn N+1 while turn N is still in-flight. Feishu
-// adapter translates this to "⏳ 上一条还在处理中，请稍候".
-type TurnInProgressError struct {
-	SessionID      string
-	SinceStartedAt time.Time
-	TurnNo         int
-}
+// Defined in shared/errors; aliased here for D7 call sites.
+type TurnInProgressError = sharederrors.TurnInProgressError
 
-// Error implements error.
-func (e TurnInProgressError) Error() string {
-	return fmt.Sprintf("session %s turn %d still in progress since %s",
-		e.SessionID, e.TurnNo, e.SinceStartedAt.Format(time.RFC3339Nano))
-}
-
-// Is enables errors.Is(err, TurnInProgressError{}) pattern matching
-// across packages (TurnInProgressError is a value receiver, so pointer
-// comparisons fail without this hook).
-func (e TurnInProgressError) Is(target error) bool {
-	_, ok := target.(TurnInProgressError)
-	return ok
-}
+// Legacy struct definition removed — see shared/errors/turn_in_progress.go.

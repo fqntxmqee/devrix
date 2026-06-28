@@ -74,8 +74,10 @@ A02 PersistUserTurn
 
 A03 DispatchToAgent
   ├─ F02 routeD7          → IOrchestrationEntry.ProcessMessage（主路径）
-  ├─ F03 routeAgent       → AgentFactory 旁路
+  ├─ (bootstrap hook)     → sessionagents.EnsureSessionLeader（DM-20260628-003，非 D1 import）
   └─ F01 routeLegacyD2    → RETIRED（DM-007，禁止 fallback）
+
+> **F03 routeAgent 已迁出 D1**（DM-20260628-003）：原 `gateway/agent_route.go` 逻辑在 `bootstrap/sessionagents.Manager`，经 `SetBeforeDispatch` 注入；**不得**劫持 ProcessMessage。
 
 A04 ResolvePermissionGate
   └─ (Legacy F) RequestPermission · ResolveRequest

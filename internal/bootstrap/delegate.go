@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"log/slog"
 
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
@@ -19,15 +20,14 @@ import (
 )
 
 type gatewayLeaderResolver struct {
-	gw *capture.CommunicationGateway
+	agents *sessionagents.Manager
 }
 
 func (r gatewayLeaderResolver) Leader(sessionID string) (multiagent.Agent, bool) {
-	if r.gw == nil {
+	if r.agents == nil {
 		return nil, false
 	}
-	ag := r.gw.SessionAgent(sessionID)
-	return ag, ag != nil
+	return r.agents.Leader(sessionID)
 }
 
 // WireDelegate wires D4 delegate execution and D7 dispatcher dispatch.
@@ -44,6 +44,7 @@ func WireDelegate(
 	ctxCfg *config.ContextEngineConfig,
 	maCfg *config.MultiAgentConfig,
 	gw *capture.CommunicationGateway,
+	agents *sessionagents.Manager,
 	engine *contextengine.ContextEngine,
 	toolReg contextengine.IToolRegistry,
 	hub contracts.ExecutionFlowHub,
@@ -74,13 +75,13 @@ func WireDelegate(
 		exec,
 		subQuery,
 		hub,
-		gatewayLeaderResolver{gw: gw},
+		gatewayLeaderResolver{agents: agents},
 		tm.Registry(),
 	)
 
 	delegatetools.SetDeps(delegatetools.Deps{
 		Dispatcher: disp,
-		Leader:     gatewayLeaderResolver{gw: gw},
+		Leader:     gatewayLeaderResolver{agents: agents},
 		Tasks:      tm,
 	})
 
