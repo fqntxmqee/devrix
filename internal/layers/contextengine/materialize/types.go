@@ -57,9 +57,11 @@ type InboundSignals struct {
 
 // Request is the D2 Materialize input.
 type Request struct {
-	Partition Partition
-	Policy    Policy
-	Signals   InboundSignals
+	Partition     Partition
+	Policy        Policy
+	Signals       InboundSignals
+	SystemPrompt  string          // optional override (SubTurn / Wave worker)
+	SubTurnParent []types.Message // parent history for SubTurn fork/full modes
 }
 
 // Result is LLM-ready context from D2.

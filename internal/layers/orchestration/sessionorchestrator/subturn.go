@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	derrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -54,8 +55,9 @@ func (c SubTurnConfig) ResolvedMaxDepth() int {
 
 // SubTurnRunner implements contracts.SubTurnExecutor via DefaultOrchestrator.RunTurn.
 type SubTurnRunner struct {
-	Orch TurnOrchestrator
-	Cfg  SubTurnConfig
+	Orch         TurnOrchestrator
+	Cfg          SubTurnConfig
+	Materializer materialize.Materializer // optional D7-S16-A65 unified Materialize path
 }
 
 // NewSubTurnRunner constructs a SubTurnRunner with the given orchestrator
@@ -107,21 +109,23 @@ func (r *SubTurnRunner) RunSubTurn(ctx context.Context, req contracts.SubTurnReq
 		emit = req.FlowReporter.WrapEmit(ctx, req.FlowParams, emit)
 	}
 
-	preloaded, lastUser := r.applyMode(mode, req.Messages)
-
-	// DM-20260620-002 (AC1) — propagate explicit budget. SubTurnRequest
-	// wins when set, otherwise we fall back to Cfg so the nested runLoop
-	// gets a non-zero maxContextTokens (otherwise runTokenAudit /
-	// proactive fold are no-ops).
 	maxCtx := req.MaxContextTokens
 	if maxCtx <= 0 {
 		maxCtx = r.Cfg.MaxContextTokens
 	}
 
+	preloaded, lastUser := r.applyMode(mode, req.Messages)
+	systemPrompt := req.SystemPrompt
+	if sys, pre, usr, ok := r.materializeSubTurnContext(runCtx, req, string(mode), maxCtx); ok {
+		systemPrompt = sys
+		preloaded = pre
+		lastUser = usr
+	}
+
 	ch, err := r.Orch.RunTurn(runCtx, TurnRequest{
 		SessionID:         req.SessionID,
 		UserMessage:       lastUser,
-		SystemPrompt:      req.SystemPrompt,
+		SystemPrompt:      systemPrompt,
 		MaxTurns:          req.MaxTurns,
 		Scope:             scope,
 		PreloadedMessages: preloaded,
