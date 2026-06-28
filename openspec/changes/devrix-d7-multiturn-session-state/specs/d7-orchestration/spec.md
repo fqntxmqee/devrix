@@ -14,9 +14,9 @@
 | 1. `TurnState` struct + BeginTurn/EndTurn/WaitTurn API | `turn_state.go` (NEW) | NEW | 同 session_id turn 串行化门禁 |
 | 2. `TurnInProgressError` 类型 + `errors.Is` 支持 | `turn_state.go` (NEW) | NEW | turn N+1 在 turn N 收尾前到 → 明确错误返回 |
 | 3. `TranscriptReader` struct + ReadRecent/BuildPriorOutputSummary | `transcript_reader.go` (NEW) | NEW | 读最近 N 轮 finalText helper |
-| 4. `OrchestratorDeps.PriorContextRounds int` 字段 | `orchestrator.go` | NEW | 0 关闭注入（默认，向后兼容）；>0 启用 |
-| 5. `OrchestratorDeps.TranscriptDir string` 字段 | `orchestrator.go` | NEW | 默认 `internal/layers/communication/capture/transcript`；空 = 默认 |
-| 6. `SessionOrchestrator.turnState` + `transcriptReader` 字段 | `orchestrator.go` | NEW | deps.PriorContextRounds > 0 时挂载 |
+| 4. `WithPriorContextRounds(n int) OrchestratorOption` functional option | `orchestrator.go` | NEW | 0 关闭注入（默认，向后兼容）；>0 启用 |
+| 5. `WithTranscriptDir(dir string) OrchestratorOption` functional option | `orchestrator.go` | NEW | 默认 `internal/layers/communication/capture/transcript`；空 = 默认 |
+| 6. `SessionOrchestrator.turnState` + `transcriptReader` 字段 | `orchestrator.go` | NEW | `WithPriorContextRounds(n>0)` 时挂载 |
 | 7. `ProcessMessage` 接入 WaitTurn + BeginTurn 门禁 | `orchestrator.go` | MODIFIED | 入口增加 turn 串行化校验 |
 | 8. `ProcessMessage` 在 EnsureGoal 后注入 prior-output-summary | `orchestrator.go` | MODIFIED | directive 自带 prior context |
 | 9. `RunSessionTurnLoop` defer 链加 EndTurn | `session_turn_loop.go` | MODIFIED | goroutine 退出时释放 turn slot |
@@ -55,9 +55,11 @@ type TranscriptReader struct {
     maxRounds int
 }
 
+// ReadRecent 读最近 n 条 kind=complete 的 Body 字段。
+// transcript schema: {t, kind, role, body}; finalText 标记为 kind="complete"
+// (capture/gateway.go:880 appendTranscriptEvent complete 分支)。
+// 文件不存在返回 ([]string{}, nil) 不报错。
 func (r *TranscriptReader) ReadRecent(ctx context.Context, sessionID string, n int) ([]string, error)
-// 读 {sessionID}.jsonl，按 kind=final_text 过滤，取最后 n 条
-// 文件不存在返回 ([]string{}, nil)（不报错）
 
 func (r *TranscriptReader) BuildPriorOutputSummary(texts []string) string
 // 输出: <prior-output-summary>\n  [turn 1] xxx\n  [turn 2] yyy\n</prior-output-summary>
@@ -72,7 +74,7 @@ func (r *TranscriptReader) BuildPriorOutputSummary(texts []string) string
 |------|------|--------|
 | D7-S15-A55-T01 | `TurnState` struct + BeginTurn/EndTurn/WaitTurn + 并发安全（1000 goroutine stress） | PENDING (S4) |
 | D7-S15-A55-T02 | `OrchestratorDeps.PriorContextRounds` + `TranscriptDir` 字段 + `SessionOrchestrator.turnState` 挂载 | PENDING (S4) |
-| D7-S15-A56-T03 | `transcript_reader.go` 读最近 N 轮 finalText helper（filter kind=final_text） | PENDING (S4) |
+| D7-S15-A56-T03 | `transcript_reader.go` 读最近 N 轮 finalText helper（filter kind=complete，Body 字段；复用 capture.transcript.Writer.LoadReader） | PENDING (S4) |
 | D7-S15-A56-T04 | `ProcessMessage` 接入 WaitTurn + BeginTurn 门禁 + `TurnInProgressError` 定义 + prior-output-summary 注入 | PENDING (S4) |
 | D7-S15-A58-T06 | feishu adapter 识别 `TurnInProgressError` + "⏳ 上一条还在处理中" 文案 | PENDING (S4) |
 | D7-S15-A59-T07 | LP-5 e2e 集成测试：sess_e2e_multiturn_v1（断言 complete 时机 + prior context 注入） | PENDING (S4) |

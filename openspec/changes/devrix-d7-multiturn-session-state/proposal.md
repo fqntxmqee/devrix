@@ -75,7 +75,7 @@ D7 SessionOrchestrator.ProcessMessage
 ### 3.3 三层契约
 
 1. **状态层**：`TurnState` struct（in-memory，per-SessionOrchestrator）持有 `sessionID → *turnHandle` map + `sync.RWMutex`；`turnHandle` 包含 `done chan struct{}` + `turnNo int` + `startedAt time.Time`。
-2. **注入层**：`transcript_reader.go` 读 `internal/layers/communication/capture/transcript/{sessionID}.jsonl`，按 `kind=final_text` 过滤，取最近 N 条，按时序拼成 `<prior-output-summary>` 块（复用 D2 `FoldAssistantOutput` 的标签语法）。
+2. **注入层**：`transcript_reader.go` 读 `internal/layers/communication/capture/transcript/{sessionID}.jsonl`，按 `kind=complete` 过滤（capture/gateway.go:880 appendTranscriptEvent 的 complete 分支），取 Body 字段最近 N 条，按时序拼成 `<prior-output-summary>` 块（复用 D2 `FoldAssistantOutput` 的标签语法）。
 3. **时序层**：`session_turn_loop.go` goroutine 在 `defer close(out)` 之前调用 `TurnState.EndTurn(sessionID)`（保证 channel close 先于 EndTurn 信号释放，避免再触发 P3 的并发问题）。`complete` 事件本身在原位 emit（channel close 已隐含 processAutoClose 完成），不需要改 timing。
 
 ### 3.4 关键决策
@@ -113,7 +113,7 @@ D7 SessionOrchestrator.ProcessMessage
 | C. 可配置 + 默认 N=3 | 灵活 | 多一个配置点 |
 
 **选择:** C
-**理由:** 通过 `OrchestratorDeps.PriorContextRounds int` 字段暴露，默认 3（与 devrix PR #149 iter3 的 `prior-output-summary` 剥离场景一致）；N=0 时等于不注入（向后兼容老路径）。本需求 S4 落地 N=3 default，配置化走纯字段预留，不引入配置加载逻辑（避免 scope creep）。
+**理由:** 通过 `WithPriorContextRounds(n int) OrchestratorOption` functional option 暴露（沿用现有 `WithLearner / WithSink` 模式），默认 3（与 devrix PR #149 iter3 的 `prior-output-summary` 剥离场景一致）；n=0 时等于不注入（向后兼容老路径）。本需求 S4 落地 n=3 default，配置化走纯 option 预留，不引入配置加载逻辑（避免 scope creep）。
 
 #### Decision: prior-output-summary 标签注入位置
 
