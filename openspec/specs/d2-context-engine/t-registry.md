@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.9.0
-**Last Updated:** 2026-06-20
+**Version:** 2.10.0
+**Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地：7 surface + 3 filter + turn_adapter dispatch 路径
@@ -436,3 +436,4 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | 2.8.0 | 2026-06-20 | DM-20260620-001 Phase A 归档：D2-S17-A05 T01-T05 (tool result cap) + D2-S17-A06 T01-T03 (assistant fold) + D2-S15-A08 T01-T05 (token audit + proactive fold)。IMPLEMENTED 96→109, P0 56→56 |
 | 2.8.1 | 2026-06-20 | DM-20260620-001-B Phase B 归档：D2-S15-A08 T06-T08 (BuildForkedMessages helpers)。IMPLEMENTED 109→112, P0 56→59 |
 | **2.9.0** | **2026-06-20** | **DM-20260620-002 Phase C 归档**：D2-S15-A08 T09-T10 (SubTurnRequest/SubQueryParams MaxContextTokens 透传)。IMPLEMENTED 112→114, P0 59→61 |
+| **2.10.0** | **2026-06-29** | **DM-20260629-002 PR-4 — registry-sync**: F ID D2-S1..S5 → D2-S15..S18 canonical 重映射 + Historical Appendix tombstone S1/S5/S9/S10/S19/S20; F path 9 修正 (engine_persist.go → kernel/context_engine_commit_window_adapter.go, enforce/background.go → enforce/registry.go, etc.) |

@@ -4,8 +4,8 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S18 (v2.2 final, S19 dismantled, S20 removed)
-**Version:** 8.2.0
-**Last Updated:** 2026-06-19
+**Version:** 8.3.0
+**Last Updated:** 2026-06-29
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
 **Depended By:** D1 (EngineEvent consumer), **D7 (TurnExecutor / PreparedTurnRunner consumer)**
@@ -192,7 +192,8 @@ D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断
 | **S20 LegacyHarnessFallback 移除** | ✅ 所有 harness 代码、类型、测试已删除 |
 | **S19 NestedExecution 拆解** | ✅ fork→prepare/conversation/, subquery+background→enforce/ |
 | **v2.0 根目录瘦身** | ✅ 根 3 生产文件 + `facade/` 编排包（`engine.go` Process glue） |
-| **P5 legacy 退役** | ✅ `facade/` → `legacy/`，`legacy.Process()` 加 `slog.Warn` + D2-STRUCT-T07 layout guard 硬阻断 |
+| **P5 legacy 退役** | ✅ `facade/` → `legacy/` → **kernel/** (DM-20260629-002 PR-1 closed P5 window)；`legacy.Process()` 已删除；D2-STRUCT-T07 layout guard 硬阻断改为 `kernel.ContextEngine.Process()` |
+| **F registry 重映射** | ✅ DM-20260629-002 PR-4 — F ID D2-S1..S5 → canonical D2-S15..S18；S1/S5/S9/S10/S19/S20 移入 Historical Appendix tombstone |
 | **工具注册迁入 enforce/** | ✅ `background_task_tools.go` + `queryloop_tools.go` → `enforce/` |
 
 ---
@@ -202,6 +203,7 @@ D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断
 | Version | Date | Changes |
 |---------|------|---------|
 | 8.2.0 | 2026-06-19 | **v2.2 closure (DM-20260619-007)**: (1) `enforce/toolrunner/` → `enforce/tools/` (package `tools`); (2) `enforce/sandbox/` 物理迁入 enforce/; (3) 删除 `enforce/orchestrator.go` (92 行 stub); (4) `prepare/memory/longterm.go` 拆分 recall.go + persist/memory/store.go; (5) `MemoryEntry` 提升至 shared/types; (6) `facade/` → `legacy/` (Deprecated + slog.Warn + T07 guard) |
+| 8.3.0 | 2026-06-29 | **DM-20260629-002 PR-4 registry-sync**: (1) F-registry D2-S1..S5 → canonical D2-S15..S18 重映射；(2) S1 PEV / S5 Nested / S9 Harness / S10 QueryLoop / S19 NestedExecution / S20 LegacyHarness 统一移入 Historical Appendix；(3) PR-1 legacy/→kernel/ 路径落地反映到实现状态表 |
 | 8.1.0 | 2026-06-19 | **DSAFT Structure 重构**: (1) `engine_*.go` + `prepared_turn_*.go` → `facade/`; (2) 根包仅 `contracts.go` + `aliases.go` + `tool_context.go`; (3) `token/` → `prepare/token/`; (4) `spans.go` → `kernel/spans.go` |
 | 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
 | 7.0.0 | 2026-06-16 | **v2.0 终态**: (1) `background_task_tools.go` + `queryloop_tools.go` → `enforce/`; (2) 根目录合并 `tool_register.go`→`tool_context.go`; (3) `spans.go` 清理 harness span 死引用; (4) 根目录 11 生产文件 `engine.go` 212行 Facade |

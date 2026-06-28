@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.1.0
-**Last Updated:** 2026-06-18
+**Version:** 4.2.0
+**Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d2-domain.md`
 
@@ -118,6 +118,24 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 
 ---
 
+## Historical Appendix
+
+> **DM-20260629-002 (devrix-d2-dsaft-restructuring) PR-4** — consolidated
+> historical S into a single appendix (tombstone cross-references only).
+> No active code references these S/A; see `d2_layout_test.go`
+> (D2-STRUCT-T07 no-new-kernel.ContextEngine.Process callers guard).
+
+| Legacy S | Final status | Last canonical destination |
+|----------|--------------|----------------------------|
+| ~~D2-S1 PrepareContext (PEV)~~ | RETIRED | Plan/Execute/Verify cycle split into S15 + S17 in v2.2 |
+| ~~D2-S5 NestedExecution~~ | DISMANTLED v3.1.0 | fork → S15-A04; subquery+background → S18-A06/A07 |
+| ~~D2-S9 Harness~~ | REMOVED v6.5.0 | `fallback/` deleted; canonical path = D7 SessionOrchestrator |
+| ~~D2-S10 QueryLoop~~ | REMOVED (DM-20260618-010) | `internal/layers/contextengine/query/` deleted (D2-STRUCT-T08 guard) |
+| ~~D2-S19 NestedExecution Fork~~ | DISMANTLED (DM-20260614-009) | split into S15-A04 (Prepare sidecar) + S18-A06 (Execute sidecar) |
+| ~~D2-S20 LegacyHarnessFallback~~ | REMOVED v6.5.0 | `legacy_harness` metric always 0; dashboard field preserved |
+
+---
+
 ## Statistics
 
 | Canonical S | A 数 | 状态 |
@@ -137,3 +155,4 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 | 3.1.0 | 2026-06-16 | S19 拆解、S20 移除 |
 | 4.0.0 | 2026-06-16 | Canonical 全局编号 S15–S18；ExecuteToolRound 归 S18；S19 活动并入 S18；Guides 指针 |
 | **4.1.0** | **2026-06-18** | **S18 v3 — 3-tier CheckPermission (Surface + IPermissionGate + PlanMode); 8 surface (含 ToolSearchSurface); 2-phase ExecuteToolRound; ToolSpec 4 bool + DeferLoading 字段；ToolFilter.ShouldDefer runtime hook；A01/A02/A04/A05 拆解细化** (DM-20260618-001/002/003) |
+| **4.2.0** | **2026-06-29** | **DM-20260629-002 PR-4 — registry-sync: §Historical Appendix 加 S1/S5/S9/S10/S19/S20 tombstone 6 行；Version + Last Updated bump** |
