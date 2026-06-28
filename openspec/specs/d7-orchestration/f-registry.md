@@ -333,6 +333,124 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
+## ValueFlow Semantic 映射（v6.0.0 + v2.5.1 同步）
+
+> **ValueFlow Alias per S**（定义见 `d7-domain.md` §North Star）：
+> - **S1 WorkModel** = Multi-Step Task Coordination
+> - **S2 SessionOrchestrator** = Turn-Based Conversation
+> - **S3 WaveScheduler** = Parallel Worktree Execution
+> - **S4 ExecutionFlow + Verify** = Trustworthy Conclusion Delivery
+> - **S5 DecisionPlanning + Observe** = Intent + Uncertainty Quantization
+> - **S6 MUPS Pipeline** = Learn from Outcome
+> - **Cross-cutting Hardening** = (Discipline Keeper)
+
+| F ID | Name | ValueFlow Semantic（用户动作语义） |
+|------|------|-----------------------------------|
+| **D7-S1-A02-F01** | CreateTask | 用户/系统创建 WorkItem 节点 |
+| D7-S1-A02-F02 | ValidateTaskTransition | 验证状态机转移合法性 |
+| D7-S1-A02-F03 | ComputeBlockedBy | 计算任务依赖阻塞 |
+| D7-S1-A02-F04 | ListReadyTasks | 列出可执行任务 |
+| D7-S1-A02-F05 | PersistToDiskStore | 持久化到磁盘 v2 schema |
+| D7-S1-A02-F06 | LinkTaskToFlow | 关联任务到 FlowEvent |
+| D7-S1-A01-F02 | ValidateGraph | 校验 DAG 合法性 |
+| **D7-S2-A01-F01** | BuildObserveRequest | 构建 Observe 请求（含 prior） |
+| **D7-S2-A01-F02** | FastPathProxy | 快速路径代理（< 2ms P99） |
+| **D7-S2-A01-F03** | OrchestratePath | 编排路径（5 节点管道入口） |
+| **D7-S2-A01-F04** | EmitFlowThrottled | 节流广播 FlowEvent |
+| **D7-S2-A02-F01** | RuleClassifyIntent | 规则意图分类（P99 < 1ms） |
+| **D7-S2-A02-F02** | LLMClassifyIntent | LLM 意图分类（fallback） |
+| **D7-S2-A03-F01** | WaveCancel | 取消运行中的 Wave |
+| **D7-S2-A03-F02** | D4Cancel | 取消 D4 Worker |
+| **D7-S2-A03-F03** | ProcessCancel | 取消 Process 主循环 |
+| **D7-S2-A03-F06** | DeprecatedMarker | 标记 deprecated 函数（迁移期保留） |
+| **D7-S3-A01-F01** | BuildTaskGraph | 构建任务 DAG |
+| **D7-S3-A01-F02** | DispatchTask | 派发单个任务 |
+| **D7-S3-A01-F03** | CollectArtifacts | 收集产物 |
+| **D7-S3-A01-F04** | SlotRelease | 释放 worker 槽位 |
+| **D7-S3-A01-F05** | CancelWorker | 取消 worker |
+| **D7-S3-A02-F01** | BuildContextPolicy | 构建上下文策略 |
+| **D7-S3-A02-F02** | ResolveContext | 解析 worker 上下文 |
+| **D7-S3-A03-F01** | AllowAndRegister | 原子检查冲突 + 注册（防 TOCTOU） |
+| **D7-S3-A03-F02** | GuardConflict | 冲突守卫（已被 F01 原子化） |
+| **D7-S3-A03-F03** | FileScopeIntersect | 文件作用域冲突检查 |
+| **D7-S4-A01-F01** | PublishFlowEventInternal | 内部广播 FlowEvent |
+| **D7-S4-A01-F02** | EnqueueProgress | 入队 worker 进度 |
+| **D7-S4-A01-F04** | ThrottleFlowToolCall | 节流工具调用事件 |
+| **D7-S4-A03-F01** | EmitWorkerProgress | 发射 worker 进度到 IM |
+| **D7-S5-A01-F01** | ClassifyIntent | 分类意图（Command-first） |
+| **D7-S5-A01-F02** | MergeLLMResult | 合并 LLM 分类结果 |
+| **D7-S5-A01-F03** | ShadowClassify | 影子分类（观测用） |
+| **D7-S5-A02-F01** | ValidateTaskGraph | 校验任务图 |
+| **D7-S5-A02-F02** | PlanLLMFallback | Plan 生成的 LLM fallback |
+| **D7-S5-A03-F01** | SelectD2OrD4 | 选 D2 SubQuery 或 D4 Worker |
+| **D7-S5-A04-F01** | BuildPlanResult | 构建 PlanAgent 结果 |
+| **D7-S5-A05-F01** | TailShadowLog | tail shadow 日志 |
+| **D7-S6-A14-F01** | AllowAndRegisterAtomic | 原子化 AllowAndRegister |
+| **D7-S6-A14-F02** | MarkWaveDoneRelease | markWaveDone 释放 state.cancels/handles |
+| **D7-S6-A14-F03** | EmitSelectDefault | emit 加 select-default 防 stall |
+| **D7-S6-A14-F04** | IncMetricPlural | metric 复数命名对齐 |
+| **D7-S8-A15-F01** | ClassifyObsKind | 4 类 Observation 分类 |
+| **D7-S8-A15-F02** | ScoreObsStrength | 评分 Obs 强度 [0,1] |
+| **D7-S8-A15-F03** | DetectAnomaly | 检测异常信号 |
+| **D7-S8-A15-F04** | QuantizeIntent | 量化意图 |
+| **D7-S8-A15-F05** | BuildUncertaintyCoord | 构建 UncertaintyCoord |
+| **D7-S8-A15-F06** | BuildUncertaintyReport | 构建 UncertaintyReport |
+| **D7-S9-A25-F01** | BuildArtifact | 构建 4 类 Artifact |
+| **D7-S9-A25-F02** | ResolveArtifactKind | 解析 ArtifactKind |
+| **D7-S9-A25-F03** | ExtractArtifactEvidence | 提取 Artifact 证据 |
+| **D7-S9-A25-F04** | AssignSideEffectStatus | 派生 SideEffectStatus |
+| **D7-S9-A26-F01** | RouteChannelKind | 路由 4 Channel |
+| **D7-S9-A26-F02** | DispatchCommit | 1-Step 同步派发 |
+| **D7-S9-A26-F03** | DispatchProtocol | 顺序多步派发 |
+| **D7-S9-A26-F04** | DispatchScenario | 5 并行探测派发 |
+| **D7-S9-A26-F05** | DispatchExploration | 3 多 agent 探索派发 |
+| **D7-S10-A32-F01** | ExtractVerdict | 提取 Verdict 4 态 |
+| **D7-S10-A32-F02** | AggregateVerdicts | 聚合多个 Verdict |
+| **D7-S10-A32-F03** | VerifyWithRetry | 验证 + 重试 |
+| **D7-S10-A33-F01** | MapVerdictToExitReason | 映射到 14 ExitReason |
+| **D7-S10-A33-F02** | IsDeterministicReason | 判定 deterministic 原因 |
+| **D7-S10-A34-F01** | ExtractEvidence | 提取 Evidence |
+| **D7-S10-A34-F02** | ValidateEvidenceCompleteness | 验证证据完整性 |
+| **D7-S10-A35-F01** | DetectSystemAnomaly | 检测系统异常 |
+| **D7-S10-A35-F02** | ClassifyAnomalySeverity | 分类异常严重度 |
+| **D7-S11-A36-F01** | BuildAssetContent | 构建 LearningAsset 内容 |
+| **D7-S11-A36-F02** | ClassifyLearningClass | 分类 5 类 LearningClass |
+| **D7-S11-A36-F03** | AssignAssetTTL | 分配 TTL（90/180/365/30 天） |
+| **D7-S11-A37-F01** | BayesianUpdate | Bayesian Beta 更新 |
+| **D7-S11-A37-F02** | StoreReputationEvidence | 存信誉证据 |
+| **D7-S11-A37-F03** | LoadReputationEvidence | 读信誉证据 |
+| **D7-S11-A38-F01** | BuildAdaptivePrior | 构建 AdaptivePrior |
+| **D7-S11-A38-F02** | DefaultDeveloperPrior | 默认 developer Beta(5,3) |
+| **D7-S11-A38-F03** | DefaultOperatorPrior | 默认 operator Beta(8,1) |
+| **D7-S11-A39-F01** | MemoryPersistSkill | 持久化 skill 通道 |
+| **D7-S11-A39-F02** | MemoryPersistFeedback | 持久化 feedback 通道 |
+| **D7-S11-A39-F03** | MemoryPersistScheduled | 持久化 scheduled 通道 |
+| **D7-S11-A40-F01** | RunLearner | 跑学习者主循环 |
+| **D7-S11-A40-F02** | DispatchToMemoryChannel | 派发到对应记忆通道 |
+| **D7-S12-A41-F01** | BuildObserveRequestWithPrior | 构建带 prior 的 ObserveRequest |
+| **D7-S12-A42-F01** | InjectPriorToIntentQuantizer | 注入 prior 到意图量化 |
+| **D7-S12-A42-F02** | FailSafePriorFallback | prior nil → Default → uniform |
+| **D7-S12-A42-F03** | FailSafeObserverFallback | observer nil → 跳过 prior |
+| **D7-S12-A42-F04** | FailSafeChannelCancel | channel 取消时返回空 |
+| **D7-S12-A43-F01** | E2ECloseLP1RoundTrip | E2E LP-1 闭环 round-trip |
+| **D7-S13-A47-F01** | ProcessAutoClose | channel 关闭时自动收口 |
+| **D7-S13-A47-F02** | SynthesizeVerdict | 合成 Verdict（complete/error/tombstone） |
+| **D7-S13-A48-F01** | ResolveTrackMode | 解析 TrackMode 3-tier |
+| **D7-S13-A48-F02** | ShouldAutoClose | 4 规则判定 auto-close |
+| **D7-S13-A49-F01** | EmitSessionSpanPrior | emit 6 prior attributes |
+| **D7-S14-A50-F01** | TriggerEscape | 触发 EscapeEngine |
+| **D7-S14-A50-F02** | ResolveCircuitLevel | 解析 CircuitBreaker 5 层 |
+| **D7-S14-A50-F03** | ApplyCircuitBreaker | 应用 CircuitBreaker |
+| **D7-S14-A50-F04** | LiftEscape | 解除 Escape 状态 |
+| **D7-S14-A51-F01** | ResumeSession3Layer | 3 层 fail-safe resume |
+| **D7-S14-A51-F02** | RouteResumeDecision | 3 决策路由 (A/B/C) |
+| **D7-S14-A51-F03** | ResumeErrorFailsafe | resume error 兜底 |
+| **D7-S14-A52-F01** | EmitSessionSpanResume | emit 3 resume attributes |
+
+> **ValueFlow Semantic 列**（75 F 全覆盖）：用户动作语义视角；与 6 S 博弈角色 + 4.3 MUPS 5 节点管道 三视角互补。
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
