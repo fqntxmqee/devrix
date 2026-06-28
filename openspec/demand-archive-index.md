@@ -242,11 +242,14 @@
 
 ## Active Changes (未归档)
 
-**当前活跃（2026-06-19）**：
+**当前活跃（2026-06-27）**：
 
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
+| `devrix-d7-layer-subcontext` | DM-20260627-003 | **S3_Design**（待 Claude Review） | `openspec/changes/devrix-d7-layer-subcontext/` |
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
+
+**Claude 拉取 Layer SubContext 讨论入口：** `openspec/changes/devrix-d7-layer-subcontext/review-notes.md` → `design.md` §6
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 
