@@ -871,6 +871,19 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S15-A54-T03** | Path B checklist Observe | IMPLEMENTED | `sessionorchestrator/item_observe.go` |
 | **D7-S15-A54-T04** | trace replay E2E | PARTIAL (stub IT) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
 
+### D7-S15-A07: WorkTree Rollup Governance (DM-20260629-001 PR-3-extended)
+
+> **Change:** `devrix-d7-dsaft-restructuring` PR-3-extended (T52 + T53 + T54) — typed RollupReport envelope + 3-call-site migration + deterministic root + 3 governance T points.  
+> **归档：** `openspec/changes/devrix-d7-dsaft-restructuring/` (PR-3-extended)
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D7-S15-A07-T01** | ApplyPipelineDecide 4 步顺序不变式（ContextBubbleDecision → AcceptedContextLinks → SpawnPolicy → ScopeContractSpawnGate） | IMPLEMENTED | `workmodel/context_decide.go::ApplyPipelineDecide` |
+| **D7-S15-A07-T02** | ReevaluateParentAfterChild 3 调用点幂等性（同一 child 多次 terminal 仅触发 1 次 rollup，签名迁移 `(struct{}, error) → (*RollupReport, error)`） | IMPLEMENTED | `workmodel/resolve.go::ReevaluateParentAfterChild` + 3 调用点 (`sessionorchestrator/session_turn_loop.go:194`, `workmodel/run_spawn.go:51`, `workmodel/cli_commands.go:342`) |
+| **D7-S15-A07-T03** | Path A vs Path B rollup trigger 选择矩阵：Path A (eager rollup) — `workmodel/rollup_gate.go::ShouldRollupAfterChildren` — 3 policies × 2 needs_rollup = 6 组合；Path B (root fallback) — `workmodel/rollup_gate.go::MaybeRootRollupFallback` — 2 has_ephemeral × 2 needs_rollup = 4 组合；合计 10 组合覆盖 | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+
+**A07 Total:** 3 P0 T — 3 IMPLEMENTED (DM-20260629-001 PR-3-extended)
+
 ### D7-S15 Integration
 
 | T ID | Description | Status | File |
