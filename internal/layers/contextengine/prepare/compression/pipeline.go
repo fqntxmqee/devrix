@@ -2,13 +2,11 @@ package compression
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -25,6 +23,12 @@ const (
 )
 
 // Pipeline runs the seven-step compression chain.
+//
+// DM-20260629-002 devrix-d2-dsaft-restructuring PR-2: RunForSession split into
+//   - pipeline.go (this file: orchestrator + step loop)
+//   - compression_steps.go (4 step helpers: toolResultBudget, snip, microcompact, collapse, assemble)
+//   - budget.go (token validation: ShouldCompress, checkBudget, minKeepForAutocompact)
+// Previously a 109-LOC god function; now ~85 LOC for the orchestrator alone.
 type Pipeline struct {
 	counter            contracts.ITokenCounter
 	enabled            bool
@@ -61,6 +65,10 @@ func (p *Pipeline) Run(ctx context.Context, msgs []types.Message, systemPrompt s
 }
 
 // RunForSession compresses messages for a specific session (enables async autocompact).
+//
+// DM-20260629-002 PR-2: orchestrator-only after the god-fn split. The 4-step
+// named loop is now applyCompressionSteps, the autocompact+assembly tail is
+// applyAssemblyAndBudget.
 func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []types.Message, systemPrompt string, budget types.TokenBudget) ([]types.Message, types.CompressionReport, error) {
 	report := types.CompressionReport{OriginalTokens: p.counter.CountMessages(msgs)}
 	if !p.enabled {
@@ -96,6 +104,20 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 		}
 	}
 
+	current, report = p.applyCompressionSteps(ctx, current, budget, report)
+
+	current, report, err := p.applyAssemblyAndBudget(ctx, sessionID, current, systemPrompt, budget, report)
+	if err != nil {
+		return nil, report, err
+	}
+	return current, report, nil
+}
+
+// applyCompressionSteps runs the 4 named token-budget steps (tool_result_budget,
+// snip, microcompact, collapse) in order, recording each applied step into the report.
+//
+// DM-20260629-002 PR-2: extracted from RunForSession (was a 51-LOC inline loop).
+func (p *Pipeline) applyCompressionSteps(ctx context.Context, current []types.Message, budget types.TokenBudget, report types.CompressionReport) ([]types.Message, types.CompressionReport) {
 	type namedStep struct {
 		name string
 		fn   func([]types.Message, types.TokenBudget) ([]types.Message, bool)
@@ -111,10 +133,10 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 		{stepSnip, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
 			snipTarget := b.SnipTarget
-				if snipTarget <= 0 {
-					snipTarget = b.CompressionTarget
-				}
-				next := snip(p.counter, m, snipTarget, p.minKeepForAutocompact())
+			if snipTarget <= 0 {
+				snipTarget = b.CompressionTarget
+			}
+			next := snip(p.counter, m, snipTarget, p.minKeepForAutocompact())
 			after := p.counter.CountMessages(next)
 			p.emitStep(ctx, stepSnip, before, after)
 			return next, before != after
@@ -147,8 +169,14 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 		}
 		current = next
 	}
+	return current, report
+}
 
-	// Step 6: autocompact (before assembly, on message history only)
+// applyAssemblyAndBudget runs autocompact (step 6), prepends the system prompt
+// (step 7), and validates the final token budget (step 8 guard).
+//
+// DM-20260629-002 PR-2: extracted from RunForSession (was a 19-LOC tail block).
+func (p *Pipeline) applyAssemblyAndBudget(ctx context.Context, sessionID string, current []types.Message, systemPrompt string, budget types.TokenBudget, report types.CompressionReport) ([]types.Message, types.CompressionReport, error) {
 	next, stepLabel, _ := runAutocompact(ctx, sessionID, current, budget, p.counter, p.autocompactCfg, p.summarizer, p.stepObserver, p.asyncCompact, p.locale)
 	current = next
 	report.StepsApplied = append(report.StepsApplied, stepLabel)
@@ -164,9 +192,8 @@ func (p *Pipeline) RunForSession(ctx context.Context, sessionID string, msgs []t
 	p.emitStep(ctx, stepAssembly, beforeAsm, afterAsm)
 	report.CompressedTokens = afterAsm
 
-	if p.counter.CountMessages(current) > budget.MaxContextTokens-budget.ReservedOutput {
-		report.StepsApplied = append(report.StepsApplied, stepTokenBlock)
-		return nil, report, errors.NewContextExceededError()
+	if err := p.checkBudget(current, budget, &report); err != nil {
+		return nil, report, err
 	}
 	return current, report, nil
 }
@@ -175,128 +202,4 @@ func (p *Pipeline) emitStep(ctx context.Context, step string, before, after int)
 	if p.stepObserver != nil {
 		p.stepObserver.OnStep(ctx, step, before, after)
 	}
-}
-
-func toolResultBudget(counter contracts.ITokenCounter, msgs []types.Message, maxPerResult int) []types.Message {
-	out := make([]types.Message, len(msgs))
-	for i, m := range msgs {
-		out[i] = m
-		if m.Role == types.MessageRoleTool && counter.CountText(m.Content) > maxPerResult {
-			out[i].Content = counter.TruncateToTokens(m.Content, maxPerResult) + "\n...[truncated]"
-		}
-	}
-	return out
-}
-
-func (p *Pipeline) minKeepForAutocompact() int {
-	const defaultMinKeep = 4
-	if !p.autocompactCfg.Enabled {
-		return defaultMinKeep
-	}
-	turns := p.autocompactCfg.PreserveHeadTurns + p.autocompactCfg.PreserveTailTurns + 1
-	if turns < 3 {
-		turns = 3
-	}
-	// Each turn needs at least one user message; keep enough messages for head+middle+tail turns.
-	minKeep := turns * 2
-	if minKeep < defaultMinKeep {
-		return defaultMinKeep
-	}
-	return minKeep
-}
-
-func snip(counter contracts.ITokenCounter, msgs []types.Message, target, minKeep int) []types.Message {
-	if minKeep <= 0 {
-		minKeep = 4
-	}
-	if len(msgs) <= minKeep {
-		return msgs
-	}
-	out := append([]types.Message(nil), msgs...)
-	for counter.CountMessages(out) > target && len(out) > minKeep {
-		out = out[1:]
-	}
-	return out
-}
-
-func assemble(systemPrompt string, msgs []types.Message) []types.Message {
-	if systemPrompt == "" {
-		return msgs
-	}
-	sys := types.Message{
-		ID:      "system_prompt",
-		Role:    types.MessageRoleSystem,
-		Content: systemPrompt,
-	}
-	return append([]types.Message{sys}, msgs...)
-}
-
-// ShouldCompress returns true if compression should run.
-func (p *Pipeline) ShouldCompress(msgs []types.Message, budget types.TokenBudget) bool {
-	if p.maxMessages > 0 && len(msgs) > p.maxMessages {
-		return true
-	}
-	return p.counter.CountMessages(msgs) > budget.CompressionTarget
-}
-
-// CountMessages exposes token counting.
-func (p *Pipeline) CountMessages(msgs []types.Message) int {
-	return p.counter.CountMessages(msgs)
-}
-
-func microcompact(msgs []types.Message, _ types.TokenBudget) ([]types.Message, bool) {
-	if len(msgs) < 2 {
-		return msgs, false
-	}
-	var out []types.Message
-	changed := false
-	for i := 0; i < len(msgs); i++ {
-		if i+1 < len(msgs) && msgs[i].Role == msgs[i+1].Role {
-			merged := msgs[i]
-			merged.Content = msgs[i].Content + "\n---\n" + msgs[i+1].Content
-			for i+2 < len(msgs) && msgs[i+2].Role == merged.Role {
-				i++
-				merged.Content += "\n---\n" + msgs[i].Content
-			}
-			out = append(out, merged)
-			changed = true
-			i++
-			continue
-		}
-		out = append(out, msgs[i])
-	}
-	return out, changed
-}
-
-func collapse(msgs []types.Message, _ types.TokenBudget) ([]types.Message, bool) {
-	const minLen = 20
-	if len(msgs) < 3 {
-		return msgs, false
-	}
-	var out []types.Message
-	changed := false
-	for i := 0; i < len(msgs); i++ {
-		runStart := i
-		for i+1 < len(msgs) && len(msgs[i].Content) < minLen && len(msgs[i+1].Content) < minLen {
-			i++
-		}
-		if i-runStart >= 2 {
-			out = append(out, msgs[runStart])
-			folded := types.Message{
-				ID:        msgs[runStart].ID + "_fold",
-				SessionID: msgs[runStart].SessionID,
-				Role:      msgs[runStart].Role,
-				Content:   fmt.Sprintf("[折叠 %d 条消息]", i-runStart),
-				Timestamp: msgs[i].Timestamp,
-			}
-			out = append(out, folded)
-			out = append(out, msgs[i])
-			changed = true
-			continue
-		}
-		for j := runStart; j <= i; j++ {
-			out = append(out, msgs[j])
-		}
-	}
-	return out, changed
 }
