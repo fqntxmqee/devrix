@@ -1,0 +1,125 @@
+package materialize
+
+import (
+	"strings"
+
+	"github.com/devrix/devrix/internal/shared/types"
+)
+
+// buildWaveSystemPrompt formats the per-wave system prompt, optionally
+// appending the WaveExtraPrompt hint, WaveFileScope list, ModeUpstream
+// signals (line-by-line), WaveUpstreamFiles, and WaveUpstreamError.
+//
+// DM-20260629-002 devrix-d2-dsaft-restructuring PR-3: extracted from
+// materializer.go (was 45 LOC; total Materialize area was 30+34+32 LOC).
+func buildWaveSystemPrompt(req Request) string {
+	var b strings.Builder
+	if base := strings.TrimSpace(req.SystemPrompt); base != "" {
+		b.WriteString(base)
+	}
+	if extra := strings.TrimSpace(req.Signals.WaveExtraPrompt); extra != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(extra)
+	}
+	if len(req.Signals.WaveFileScope) > 0 {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("Allowed file scope:\n- ")
+		b.WriteString(strings.Join(req.Signals.WaveFileScope, "\n- "))
+	}
+	if req.Policy.Mode == ModeUpstream {
+		for _, line := range req.Signals.SignalLines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString(line)
+		}
+		if len(req.Signals.WaveUpstreamFiles) > 0 {
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString("Files changed by upstream:\n- ")
+			b.WriteString(strings.Join(req.Signals.WaveUpstreamFiles, "\n- "))
+		}
+		if errMsg := strings.TrimSpace(req.Signals.WaveUpstreamError); errMsg != "" {
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString("Upstream error (for context): ")
+			b.WriteString(errMsg)
+		}
+	}
+	return b.String()
+}
+
+// buildSystemPrompt formats the per-WorkItem system prompt including
+// directive, scope-in/scope-out lists, expected return, and signal lines,
+// followed by the shared deliveryHintBlock trailer.
+//
+// DM-20260629-002 PR-3: extracted from materializer.go (was 39 LOC).
+func buildSystemPrompt(req Request) string {
+	var b strings.Builder
+	b.WriteString("You are executing one WorkItem in a layered work tree.\n")
+	if req.Signals.Directive != "" {
+		b.WriteString("\nDirective: ")
+		b.WriteString(req.Signals.Directive)
+		b.WriteByte('\n')
+	}
+	if len(req.Signals.ScopeIn) > 0 {
+		b.WriteString("\nScopeIn:\n")
+		for _, p := range req.Signals.ScopeIn {
+			b.WriteString("- ")
+			b.WriteString(p)
+			b.WriteByte('\n')
+		}
+	}
+	if len(req.Signals.ScopeOut) > 0 {
+		b.WriteString("\nScopeOut:\n")
+		for _, p := range req.Signals.ScopeOut {
+			b.WriteString("- ")
+			b.WriteString(p)
+			b.WriteByte('\n')
+		}
+	}
+	if req.Signals.ExpectedReturn != "" {
+		b.WriteString("\nExpectedReturn: ")
+		b.WriteString(req.Signals.ExpectedReturn)
+		b.WriteByte('\n')
+	}
+	for _, line := range req.Signals.SignalLines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		b.WriteString("\n")
+		b.WriteString(line)
+	}
+	b.WriteString(deliveryHintBlock)
+	return b.String()
+}
+
+// buildInitialMessages builds the user-role opening message for the partition.
+// Returns nil when the directive is empty (caller treats nil as "no opening
+// user message, defer to system prompt only").
+//
+// DM-20260629-002 PR-3: extracted from materializer.go (was 9 LOC).
+func buildInitialMessages(req Request) []types.Message {
+	if strings.TrimSpace(req.Signals.Directive) == "" {
+		return nil
+	}
+	return []types.Message{{
+		SessionID: req.Partition.SessionID,
+		Role:      types.MessageRoleUser,
+		Content:   req.Signals.Directive,
+	}}
+}
+
+// deliveryHintBlock is the trailer appended to every system prompt explaining
+// how the WorkItem should report back. Held in materializer.go (not extracted)
+// because it's a single const referenced by buildSystemPrompt and
+// buildWaveSystemPrompt in this file.
