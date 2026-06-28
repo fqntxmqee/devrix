@@ -20,9 +20,12 @@ var ErrDecomposeDailyLimit = fmt.Errorf("daily decompose limit exceeded for kind
 
 // ChildSpec describes one decomposed child work item.
 type ChildSpec struct {
-	Kind      WorkKind
-	Title     string
-	Directive string
+	Kind           WorkKind
+	Title          string
+	Directive      string
+	ScopeIn        []string
+	ScopeOut       []string
+	ExpectedReturn string
 }
 
 // DecomposeChildren creates persistent child work items under parentID.
@@ -43,6 +46,9 @@ func (m *TaskManager) DecomposeChildren(sessionID, parentID string, children []C
 
 	out := make([]*WorkItem, 0, len(children))
 	for _, c := range children {
+		if trimScopeField(c.ExpectedReturn) == "" {
+			return out, fmt.Errorf("child spec expected_return required (DM-20260627-003)")
+		}
 		kind := c.Kind
 		if kind == "" {
 			kind = WorkKindImplement
@@ -57,6 +63,9 @@ func (m *TaskManager) DecomposeChildren(sessionID, parentID string, children []C
 			return out, err
 		}
 		out = append(out, item)
+		dl := DefaultChildDownlink(parent, item, c)
+		m.storeChildDownlink(sessionID, dl)
+		_ = m.EnsureCohortScope(sessionID, parentID)
 	}
 	recordDecompose(sessionID, parent.Kind, len(children))
 	return out, nil

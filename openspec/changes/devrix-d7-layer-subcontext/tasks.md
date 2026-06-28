@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-layer-subcontext`  
 **Demand ID:** DM-20260627-003  
-**Status:** S3_Design — 待 Review / Claude 讨论  
+**Status:** S4_Development — R1 决议已冻结（2026-06-28）  
 **Total Tasks:** Phase 1 = 9 组（P0）；Phase 2 = 3 组（P1）；Phase 3 = 3 组（登记，不编码）
 
 ---
@@ -18,11 +18,11 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T01 | 定义 `ContextPartition`、`MaterializePolicy`、`MaterializeRequest`、`ContextMaterializer` 接口 | D2-S16-A20-T01 | [ ] |
-| T02 | Partition store：`wi:<sid>:<wi_id>.jsonl` append-only；cohort meta sidecar | D2-S16-A21-T01 | [ ] |
-| T03 | `Materialize`：BasePrompt + InjectSignals + LoadPrivateChain + Compress(token_budget) | D2-S16-A20-T02 | [ ] |
-| T04 | `Append(partition, msgs)` — Execute 后写 WorkItemPrivate | D2-S16-A20-T03 | [ ] |
-| T05 | Jaeger span `D2_Context_Materialize`：`wi_id`, `policy`, `message_count`, `token_est` | D2-S16-A20-T04 | [ ] |
+| T01 | 定义 `ContextPartition`、`MaterializePolicy`、`MaterializeRequest`、`ContextMaterializer` 接口 | D2-S16-A20-T01 | [x] |
+| T02 | Partition store：`wi:<sid>:<wi_id>.jsonl` append-only；cohort meta sidecar | D2-S16-A21-T01 | [x] |
+| T03 | `Materialize`：BasePrompt + InjectSignals + LoadPrivateChain + Compress(token_budget) | D2-S16-A20-T02 | [x] |
+| T04 | `Append(partition, msgs)` — Execute 后写 WorkItemPrivate | D2-S16-A20-T03 | [x] |
+| T05 | Jaeger span `D2_Context_Materialize`：`wi_id`, `policy`, `message_count`, `token_est` | D2-S16-A20-T04 | [x] |
 
 **AC:** `go test ./internal/layers/contextengine/... -run Materialize -count=1` PASS
 
@@ -37,10 +37,10 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T06 | `ResolvePartitionForWorkItem(item)` → Session / Cohort / WorkItem | D7-S16-A71-T01 | [ ] |
-| T07 | `prepareContext` 替换：`FeatureLayerSubContextEnabled` → Materialize；否则 legacy Prepare | D7-S16-A70-T01 | [ ] |
-| T08 | Execute 后 `Append(wi:self, turnMsgs)` | D7-S16-A70-T02 | [ ] |
-| T09 | RollupSynth policy：`NeedsRollup` → `MaterializeMode=RollupSynth`（与 #262 directive 对齐） | D7-S16-A70-T03 | [ ] |
+| T06 | `ResolvePartitionForWorkItem(item)` → Session / Cohort / WorkItem | D7-S16-A71-T01 | [x] |
+| T07 | `prepareContext` 替换：`FeatureLayerSubContextEnabled` → Materialize；否则 legacy Prepare | D7-S16-A70-T01 | [x] |
+| T08 | Execute 后 `Append(wi:self, turnMsgs)` | D7-S16-A70-T02 | [x] |
+| T09 | RollupSynth policy：`NeedsRollup` → `MaterializeMode=RollupSynth`（与 #262 directive 对齐） | D7-S16-A70-T03 | [x] |
 
 **AC:** integration test：子 WI materialize message_count ≪ session 主 Turn
 
@@ -55,10 +55,10 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T10 | `ScopeContract` 类型 + Goal `WorkItem` 字段（或 LastRound 扩展，按 OQ-LC-1 决议） | D7-S16-A60-T01 | [ ] |
-| T11 | Goal Plan 模板：产出 `scope_contract` YAML/JSON block | D7-S16-A60-T02 | [ ] |
-| T12 | `open_questions` 非空 → SpawnPolicy 阻断 `SpawnDecompose` | D7-S16-A60-T03 | [ ] |
-| T13 | 极具体指令规则推断 ScopeIn（单文件/单函数 regex） | D7-S16-A60-T04 | [ ] |
+| T10 | `ScopeContract` 类型 + Goal `WorkItem` 字段（或 LastRound 扩展，按 OQ-LC-1 决议） | D7-S16-A60-T01 | [x] |
+| T11 | Goal Plan 模板：产出 `scope_contract` YAML/JSON block | D7-S16-A60-T02 | [x] |
+| T12 | `open_questions` 非空 → SpawnPolicy 阻断 `SpawnDecompose` | D7-S16-A60-T03 | [x] |
+| T13 | 极具体指令规则推断 ScopeIn（单文件/单函数 regex） | D7-S16-A60-T04 | [x] |
 
 **AC:** Goal fixture：`open_questions=["?"]` 时不 spawn children
 
@@ -73,10 +73,10 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T13b | `mapScopeContractToObservations`：R-OBS-1 open_questions → ObsUncertainty | D7-S16-A72-T01 | [ ] |
-| T13c | R-OBS-2 完整 ScopeContract → ObsFact（evidence=Goal ID） | D7-S16-A72-T02 | [ ] |
-| T13d | 单测：Observe report 含 ObsUncertainty 时 SpawnPolicy 不 decompose | D7-S16-A72-T03 | [ ] |
-| T13e | 单测：Execute wi 私有链 mock **不含** Obs* 强制 taxonomy 块 | D7-S16-A72-T04 | [ ] |
+| T13b | `mapScopeContractToObservations`：R-OBS-1 open_questions → ObsUncertainty | D7-S16-A72-T01 | [x] |
+| T13c | R-OBS-2 完整 ScopeContract → ObsFact（evidence=Goal ID） | D7-S16-A72-T02 | [x] |
+| T13d | 单测：Observe report 含 ObsUncertainty 时 SpawnPolicy 不 decompose | D7-S16-A72-T03 | [x] |
+| T13e | 单测：Execute wi 私有链 mock **不含** Obs* 强制 taxonomy 块 | D7-S16-A72-T04 | [x] |
 
 **AC:** `go test ./internal/layers/orchestration/sessionorchestrator/... -run ScopeContractObserve -count=1` PASS
 
@@ -91,9 +91,9 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T14 | `ChildDownlink` struct + Decompose 时写入 sidecar / WorkItem meta | D7-S16-A61-T01 | [ ] |
-| T15 | Materialize Fresh/InheritCohort：inject Directive + ScopeIn/Out + ExpectedReturn | D7-S16-A61-T02 | [ ] |
-| T16 | Goal ScopeContract → 每个 L1 子 WI ChildDownlink.ScopeIn/Out | D7-S16-A61-T03 | [ ] |
+| T14 | `ChildDownlink` struct + Decompose 时写入 sidecar / WorkItem meta | D7-S16-A61-T01 | [x] |
+| T15 | Materialize Fresh/InheritCohort：inject Directive + ScopeIn/Out + ExpectedReturn | D7-S16-A61-T02 | [x] |
+| T16 | Goal ScopeContract → 每个 L1 子 WI ChildDownlink.ScopeIn/Out | D7-S16-A61-T03 | [x] |
 
 **AC:** 子 WI materialize system prompt 含 ScopeIn 路径列表
 
@@ -108,8 +108,8 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T17 | `EnsureCohortScope(sessionID, parentWIID)` — 同 parent 兄弟共享 cohort 元数据 | D7-S16-A62-T01 | [ ] |
-| T18 | CG2′ 文档注释：cohort 共享契约 vs transcript 隔离 | D7-S16-A62-T02 | [ ] |
+| T17 | `EnsureCohortScope(sessionID, parentWIID)` — 同 parent 兄弟共享 cohort 元数据 | D7-S16-A62-T01 | [x] |
+| T18 | CG2′ 文档注释：cohort 共享契约 vs transcript 隔离 | D7-S16-A62-T02 | [x] |
 
 ---
 
@@ -121,8 +121,8 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T19 | `FeatureLayerSubContextEnabled` default false；bootstrap 注入 Materializer | [ ] |
-| T20 | flag=off 回归：与 master Prepare 路径 bit-identical（现有测试绿） | [ ] |
+| T19 | `FeatureLayerSubContextEnabled` default false；bootstrap 注入 Materializer | [x] |
+| T20 | flag=off 回归：与 master Prepare 路径 bit-identical（现有测试绿） | [x] |
 
 ---
 
@@ -135,8 +135,8 @@
 
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
-| T20b | Materialize 模板：软引导 `<conclusion>` / `<open_questions>`；**禁止** Obs* 自报 | D7-S16-A73-T01 | [ ] |
-| T20c | 文档注释 + 单测：LastRound 是 Signal 载体，非 UncertaintyReport SoT | D7-S16-A73-T02 | [ ] |
+| T20b | Materialize 模板：软引导 `<conclusion>` / `<open_questions>`；**禁止** Obs* 自报 | D7-S16-A73-T01 | [x] |
+| T20c | 文档注释 + 单测：LastRound 是 Signal 载体，非 UncertaintyReport SoT | D7-S16-A73-T02 | [x] |
 
 ---
 
@@ -147,12 +147,12 @@
 
 | ID | Description | AC | Status |
 |----|-------------|-----|--------|
-| T21 | 同层 A/B 无 BlockedBy：B payload 不含 A tool result | LC2 | [ ] |
+| T21 | 同层 A/B 无 BlockedBy：B payload 不含 A tool result | LC2 | [x] |
 | T22 | BlockedBy B→A：B 含 structured bubble，不含 A 私有链 | LC2 | [ ] |
-| T23 | depth≥1 SubContext：prompt/budget/tools ≠ session main | LC1 | [ ] |
-| T24 | Jaeger fixture：`D2_Context_Materialize` span 存在 | LC3 | [ ] |
-| T25 | ScopeContract open_questions → ObsUncertainty → 不 spawn | LC4/LC6 | [ ] |
-| T26 | wi private transcript 无 per-iter Obs* 标签 | LC6 | [ ] |
+| T23 | depth≥1 SubContext：prompt/budget/tools ≠ session main | LC1 | [x] |
+| T24 | Jaeger fixture：`D2_Context_Materialize` span 存在 | LC3 | [x] |
+| T25 | ScopeContract open_questions → ObsUncertainty → 不 spawn | LC4/LC6 | [x] |
+| T26 | wi private transcript 无 per-iter Obs* 标签 | LC6 | [x] |
 
 ---
 
@@ -224,12 +224,15 @@ rollup Phase 1 (#262) ✅
 
 ---
 
-## Review 阻塞项（编码前需 Claude 拍板）
+## Review 阻塞项（R1 已冻结 — 见 review-r1.md）
 
-| # | 项 | 默认 |
+| # | 项 | 决议 |
 |---|-----|------|
-| R1 | ScopeContract 持久化位置 | WorkItem 字段 |
-| R2 | Materialize 轻量 path vs 全 PrepareOrchestrator | 轻量 path + 复用 Compress |
-| R3 | CG2 修订是否 bump design doc 0.4.0 | 是 |
-| R4 | Execute 每轮 Obs 标签 | **规范禁止**；见 design §6 |
-| R5 | 软引导块默认模板 | `<conclusion>` / `<open_questions>` 写入 Materialize |
+| R1 | ScopeContract 持久化 | WorkItem 字段 |
+| R2 | Materialize 路径 | 轻量 path |
+| R3 | CG2 版本 | 0.4.0 + ADR-001 |
+| R4 | Execute Obs 标签 | 禁止 |
+| R5 | 软引导模板 | Materialize 默认 |
+| R6 | ExpectedReturn | 非空 |
+| R7 | cohort 预算 | 8KB（T20d） |
+| R8 | flag 迁移 | 30 天 deadline |

@@ -1,7 +1,9 @@
 id: devrix-d7-layer-subcontext
 demand_id: DM-20260627-003
 title: "D7 Layer SubContext — cohort 域 + 结构化信号 + D2 Materialize 闭环"
-status: draft
+status: s4_development
+review_r1: review-r1.md
+review_r1_decisions: 2026-06-28
 priority: P1
 created: 2026-06-27
 author: WorkTree × Context 架构讨论（Cursor + 用户）

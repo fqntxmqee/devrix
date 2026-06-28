@@ -211,13 +211,15 @@ func TestRunItemPipeline_WorkItemExecutorReceivesDirective(t *testing.T) {
 
 	sessionID := "sess-item-pipeline-directive"
 	const directive = "review d2领域代码"
-	goal, err := tm.EnsureGoal(sessionID, directive)
+	item, err := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{
+		Kind: workmodel.WorkKindPlan, Title: directive, Directive: directive,
+	})
 	if err != nil {
-		t.Fatalf("EnsureGoal: %v", err)
+		t.Fatalf("CreateWorkItem: %v", err)
 	}
-	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.1)
+	_ = tm.Tree().SetUncertainty(sessionID, item.ID, 0.1)
 
-	if _, err := r.Run(context.Background(), sessionID, goal, ""); err != nil {
+	if _, err := r.Run(context.Background(), sessionID, item, ""); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -228,8 +230,8 @@ func TestRunItemPipeline_WorkItemExecutorReceivesDirective(t *testing.T) {
 	if got.SessionID != sessionID {
 		t.Fatalf("SessionID = %q, want %q", got.SessionID, sessionID)
 	}
-	if got.ItemID != goal.ID {
-		t.Fatalf("ItemID = %q, want %q", got.ItemID, goal.ID)
+	if got.ItemID != item.ID {
+		t.Fatalf("ItemID = %q, want %q", got.ItemID, item.ID)
 	}
 	if got.Directive != directive {
 		t.Fatalf("Directive = %q, want %q (regression: ItemPipelineRunner.Run must inject the WorkItem's directive straight into WorkItemExecutor.ExecuteWorkItem)",

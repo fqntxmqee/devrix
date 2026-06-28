@@ -3,8 +3,9 @@
 **Change ID:** `devrix-d7-layer-subcontext`  
 **Demand ID:** DM-20260627-003  
 **Status:** Draft  
-**Version:** 0.2.0  
-**Parent:** `workitem-context-graph-design.md` v0.3.0（**本设计修订 CG2**）
+**Version:** 0.3.0  
+**Parent:** `workitem-context-graph-design.md` v0.3.0 → **v0.4.0（CG2′，ADR-001）**  
+**R1:** `review-r1.md`（2026-06-28 冻结）
 
 ---
 
@@ -458,6 +459,13 @@ sequenceDiagram
 | R8 | 存储迁移 | 低 | 中 | 新 partition 增量；旧 session 走 flag=off |
 | R9 | Execute 每轮 Obs 标签 | 中 | 高 | 规范禁止 + Materialize 模板 + 单测 wi 链无 Obs* 块 |
 | R10 | ScopeContract→Obs 映射遗漏 | 中 | 中 | R-OBS-1..7 表 + item_observe 单测 |
+| R11 | ScopeContract pooling | 中 | 高 | Verifier + ScopeConfidence（Phase 2） |
+| R12 | 自然语言软抱怨 | 中 | 中 | fuzzy match（Phase 2） |
+| R13 | ChildDownlink 越界 | 中 | 高 | Verify hook（T13f 登记） |
+| R14 | PeerStatus 串通 | 低 | 中 | 随机化 + 截断（Phase 2） |
+| R15 | cohort 池膨胀 | 中 | 中 | cohort_signal_budget_max 8KB |
+| R16 | flag 永久 off | 中 | 中 | migration deadline 30d |
+| R17 | Scope 漂移 | 中 | 高 | scope_expansion_max_ratio（Phase 2） |
 
 ---
 
@@ -480,9 +488,15 @@ sequenceDiagram
 | OQ-LC-1 | ScopeContract 持久化字段 | `WorkItem` 嵌入 + LastRound 镜像 |
 | OQ-LC-2 | Materialize 是否每 iter 全量 | 首轮全量；后续增量 until budget |
 | OQ-LC-3 | cohort jsonl 是否进 git audit | 仅 session 目录，CLI show |
-| OQ-LC-4 | 与 DecomposeProposer 合并 timeline | Phase 2 统一 ChildDownlink 来源 |
-| OQ-LC-5 | Execute 软引导块是否默认模板 | `<conclusion>` / `<open_questions>` 写入 Materialize hub prompt |
-| OQ-LC-6 | Phase 2 LLM ObservationProposer | 登记 PR-A4；本 change 不编码 |
+| OQ-LC-4 | 与 DecomposeProposer 合并 timeline | Phase 2；Phase 1 ExpectedReturn **非空** |
+| OQ-LC-5 | Execute 软引导块是否默认模板 | **是** — Materialize hub prompt |
+| OQ-LC-6 | Phase 2 LLM ObservationProposer | 独立 change（T35） |
+| OQ-LC-7 | （reserved） | — |
+| OQ-LC-8 | Scope 漂移防御 | Phase 2 — scope_expansion_max_ratio 1.5x |
+| OQ-LC-9 | cohort 信号池预算 | T20d — 8KB default |
+| OQ-LC-10 | flag 迁移 | 验收后 30 天 depth≥2 强制 on |
+
+**R1 决议全文：** `review-r1.md` · **博弈论：** `game-theory-review.md`
 
 ---
 
@@ -491,4 +505,5 @@ sequenceDiagram
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2026-06-27 | 初稿：Layer SubContext、Signal 通道、ScopeContract、D2 API、风险 |
-| 0.2.0 | 2026-06-27 | §6 Observe 四类 × Execute 边界；LC6；ScopeContract→ObsUncertainty 映射 |
+| 0.2.0 | 2026-06-27 | §6 Observe 四类 × Execute 边界；LC6 |
+| 0.3.0 | 2026-06-28 | R1 冻结；R11–R17；OQ-LC-8/9/10；ADR-001 |

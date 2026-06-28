@@ -128,6 +128,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	isRollup := item.NeedsRollup
 	directive := DirectiveForItem(sessionID, item, r.Tasks)
+	if item.Kind == workmodel.WorkKindGoal {
+		directive = DirectiveForGoalPlan(item, directive)
+	}
 
 	started := time.Now()
 	roundNo := 1
@@ -202,7 +205,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
 	endWave(nil)
 	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")
-	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, directive)
+	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{Item: item, Tasks: r.Tasks})
+	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
 	if execErr != nil {
 		// Non-fatal: continue with whatever Content was accumulated so the
@@ -212,6 +216,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		if result == nil {
 			return nil, fmt.Errorf("item_pipeline: execute: %w", execErr)
 		}
+	}
+	if result != nil {
+		ApplyGoalScopeFromExecute(sessionID, item, result.Content, r.Tasks)
 	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 

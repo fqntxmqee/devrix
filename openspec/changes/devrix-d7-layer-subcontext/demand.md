@@ -76,13 +76,16 @@
 
 ## 7. 澄清 Q&A（供 Claude / Review 继续讨论）
 
-| # | 问题 | 当前决议（Draft） |
-|---|------|-------------------|
+| # | 问题 | 当前决议（R1 已冻结 — 2026-06-28） |
+|---|---|------|
 | Q1 | 同层是否共享 ReAct 全文？ | **否（默认）**；仅共享 **ScopeContract cohort 域** + 可选 terminal **PeerStatus** |
 | Q2 | 与 CG2「默认隔离」是否冲突？ | **修订 CG2**：隔离指 **LLM transcript**；cohort **域/契约** 可共享 |
 | Q3 | Materialize 放 D2 还是 D7？ | **D2**（存储+压缩+prompt）；D7 只解析 partition/policy |
 | Q4 | Goal ScopeContract 是否强制 LLM 一轮？ | **结构化产出强制**；极具体指令可 **规则推断** 单文件 scope |
 | Q5 | delegate SubTurn 是否 Phase 1 统一？ | **否** — Phase 3 映射 brief/fork/full → MaterializePolicy |
 | Q6 | sandbox_slug 与 cohort 关系？ | 有 sandbox 的 WI **强制 WorkItemPrivate**，禁止 peer layer 注入 |
-| Q7 | 每轮 LLM 对话是否强制收敛到 Obs 四类？ | **否（Execute 每轮）**；Execute 产出 **结构化 Signal**；**Observe 规则**映射 Obs*；Goal ScopeContract ≈ ObsUncertainty 门控输入 |
-| Q8 | Execute context 能否软引导结构化块？ | **可以**（`<conclusion>` / `<open_questions>`），但 **非 SoT**；Observe/Verify 规则升格 |
+| Q7 | 每轮 LLM 对话是否强制收敛到 Obs 四类？ | **否（Execute 每轮）** — R1 冻结；Observe 规则映射 |
+| Q8 | Execute context 能否软引导结构化块？ | **可以** — `<conclusion>` / `<open_questions>`；非 SoT |
+| Q9 | ScopeContract 存哪？ | **WorkItem 字段** + LastRound 镜像 — R1 冻结 |
+| Q10 | ExpectedReturn 是否可空？ | **否** — 空则阻断 decompose — R1 冻结 |
+| Q11 | flag 何时强制 on？ | Phase 1 验收后 **30 天**，depth≥2 — OQ-LC-10 |

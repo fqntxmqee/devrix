@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-layer-subcontext`  
 **Demand ID:** DM-20260627-003  
 **Priority:** P1  
-**Status:** Draft — 待 Claude / Review 讨论  
+**Status:** S4_Development — R1 决议已冻结（2026-06-28，见 `review-r1.md`）  
 **Parent SoT:** `workitem-context-graph-design.md` · `workitem-pipeline-unification-design.md` · rollup Phase 1（已归档）
 
 ---
