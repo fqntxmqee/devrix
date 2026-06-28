@@ -3,8 +3,8 @@
 **文档类型:** 详细架构设计（目标驱动）
 **Domain:** D7 Orchestration（D7-S1 WorkModel + D7-S2 SessionOrchestrator + D7-S3 WaveScheduler + D2 ContextEngine）
 **Status:** Active — F1–F6 已落地（PR #244, 2026-06-26）
-**Version:** 0.3.0
-**Last Updated:** 2026-06-26
+**Version:** 0.4.0
+**Last Updated:** 2026-06-28
 **Parent:** `d7-domain.md` · `workitem-pipeline-unification-design.md` · `pipeline-architecture.md` · `design.md`
 **Related Tech Debt:** `openspec/tech-debt/worktree-v2-deferred.md` (TD-WT-04 跨 Session UI；上下文分区存储待登记)
 
@@ -19,7 +19,7 @@
 | ID | 根本目标 | 可验证承诺 | 失败即否决 |
 |----|----------|------------|------------|
 | **CG1** | **每层 WorkItem 有对应 ContextScope** | 每个非 Ephemeral WorkItem 创建时绑定 `ContextScopeID`；Execute 前可 Resolve 出 `ResolvedContext` | 全 session 单桶 history，无法按 WI 审计 |
-| **CG2** | **默认隔离，显式链接** | 子/sibling 上下文 **不自动** 合并；任何透传必须产生 `ContextLinkRecord` | 隐式继承 Leader 全量 history |
+| **CG2′** | **Transcript 隔离 + cohort 域共享** | ReAct 全文 **不**跨 sibling 注入；同 parent 共享 **ScopeContract / cohort 元数据**（非 transcript）；透传须 ContextLink 或结构化 Signal | 隐式继承 Leader 全量 history |
 | **CG3** | **LLM 提案，规则裁决** | Plan 阶段可输出 `ContextLinkSpec` / `ContextBubbleSpec`；**链接/Bubble 种类与 budget 门控** 由规则引擎决定 | LLM 一次调用直接打开 full history 透传 |
 | **CG4** | **结构化优先于全文** | 垂直 bubble 默认 `LastRound` + Artifact summary；`full_tail` 需 token budget 且可降级 | 子节点全文无门控灌入父 Observe |
 | **CG5** | **WorkTree 仍是工作语义 SoT** | ContextGraph 不替代 Status/Spawn/BlockedBy；Wave `TaskNode` 仅为 Execute 投影 | Context 边驱动 spawn 或 status 迁移 |

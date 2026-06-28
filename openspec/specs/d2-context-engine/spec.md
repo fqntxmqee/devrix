@@ -3,9 +3,9 @@
 **Capability:** context-engine
 **Change ID:** devrix-context-engine (archived 2026-06-07), devrix-context-engine-v2 (archived 2026-06-07), devrix-context-engine-v3 (archived 2026-06-07), devrix-context-engine-v4 (archived 2026-06-08), devrix-harness-bootstrap (archived 2026-06-10), devrix-queryloop-context (archived 2026-06-10)
 **Layer:** 2
-**Version:** 8.0.0
+**Version:** 8.1.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-19
+**Last Updated:** 2026-06-28
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md` (D2-S15–S20, DM-20260614-009)  
 **D7 Boundary:** `openspec/specs/d2-context-engine/d7-boundary.md`
 
@@ -1590,6 +1590,22 @@ IM 模式 (飞书/钉钉/企微):
   involved)
 - **AND** `BuiltinSurface` is the only surface with this closed-loop
   property; all others cross at least one domain boundary
+
+---
+
+## Scenario D2-S16: WorkItem Context Materialize (DM-20260627-003)
+
+> **Archived change:** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`
+
+### Requirement: D2-S16-A20 ContextMaterializer.Materialize
+
+D2 exposes **ContextMaterializer** (`internal/layers/contextengine/materialize/`) assembling LLM-ready context from partitioned storage: BasePrompt → InjectSignals → LoadPrivateChain → Compress(token_budget). Span `D2_Context_Materialize` emitted on completion.
+
+### Requirement: D2-S16-A21 Partition Store
+
+WorkItem Execute transcript append-only at `~/.devrix/sessions/<sid>/wi/<wi_id>.jsonl`; session main transcript does not receive depth ≥ 1 WorkItem ReAct messages. Cohort partition holds ScopeContract / PeerStatus metadata only.
+
+**D7 boundary:** depth 0 Goal → legacy Prepare; depth ≥ 1 WorkItem → Materialize. D7 must not read session main messages to build WorkItem LLM requests.
 
 ---
 

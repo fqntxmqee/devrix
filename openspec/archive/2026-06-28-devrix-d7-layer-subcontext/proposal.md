@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-layer-subcontext`  
 **Demand ID:** DM-20260627-003  
 **Priority:** P1  
-**Status:** S4_Development — R1 决议已冻结（2026-06-28，见 `review-r1.md`）  
+**Status:** S7_Archived (2026-06-28, PR #269 + #270 merged, Phase 1+2 ACCEPTED; Phase 3 deferred)  
 **Parent SoT:** `workitem-context-graph-design.md` · `workitem-pipeline-unification-design.md` · rollup Phase 1（已归档）
 
 ---
@@ -168,3 +168,12 @@ Plan 规则        →  PlanKind（Commitment / Protocol / Scenario / Exploratio
 4. CG2 修订是否需 major version bump on ContextGraph design doc？  
 5. Execute 软引导块（`<conclusion>` / `<open_questions>`）是否写入 Materialize 默认模板？  
 6. Phase 2 是否在 Observe 节点增加 LLM ObservationProposer（提案 + 规则校验）？
+
+---
+
+## Archive Footer
+
+**Status:** S7_Archived (2026-06-28)  
+**Outcome:** Phase 1+2 ACCEPTED — PR [#269](https://github.com/fqntxmqee/devrix/pull/269), [#270](https://github.com/fqntxmqee/devrix/pull/270) merged.  
+**Phase 3 deferred:** T33 SubTurn policy, T34 Wave ContextResolver, T35 LLM ObservationProposer.  
+**Archive path:** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`

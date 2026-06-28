@@ -124,6 +124,7 @@
 | DM-20260612-011 | Unified Task Registry | devrix-unified-task-registry | 2026-06-18 | — | **S7_Archived (S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.2 T15 也未实施)** |
 | DM-20260612-010 | Wave Git Worktree 隔离 | devrix-wave-worktree-isolation | 2026-06-18 | — | **S7_Archived (S2_Cancelled; 6 天未推进,代码未落地; 依赖项 Wave Scheduler v1.0 也未完成)** |
 | DM-2024-0613-001 | 配置热重载 (DM ID typo: 2024→2026) | feat-config-hot-reload | 2026-06-18 | — | **S7_Archived (PARTIAL → ACCEPTED at S6 cleanup; 归档文件夹已有 ARCHIVE.md 早于本次 cleanup,本次仅删除 changes/ 残留源目录)** |
+| **DM-20260627-003** | **D7 Layer SubContext — WorkItem 子上下文 Materialize + ScopeContract + CG2′ cohort 隔离 (Phase 1+2)** | **devrix-d7-layer-subcontext** | **2026-06-28** | **[#269](https://github.com/fqntxmqee/devrix/pull/269) · [#270](https://github.com/fqntxmqee/devrix/pull/270)** | **S7_Archived (Phase 1+2 ACCEPTED; depth≥1 默认 Materialize 无 feature flag; D2 Materialize + ScopeContract spawn gate + ChildDownlink + Observe R-OBS mapping + Upstream BlockedBy + PeerStatus cohort≥3; Phase 3 T33 SubTurn / T34 Wave / T35 ObservationProposer deferred; `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`)** |
 
 ## Archive Locations
 
@@ -239,17 +240,15 @@
 | **devrix-d2-agents-md-project-layout** | **`openspec/archive/2026-06-27-devrix-d2-agents-md-project-layout/`**（DM-20260627-002 HOTFIX; .devrix/AGENTS.md 加 D{N}→path 映射; PR #258 merged `9b660fa`; 等待用户飞书实测验收） |
 | **devrix-d7-workitem-rollup-pipeline** | **`openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`**（DM-20260627-001; Phase 1 Rollup 闭环 — gate/dual bubble/rollup MUPS/deliverable; PARTIAL 验收; best_effort only; PR #262 merged `d246a9b`; S7_Archived PARTIAL ACCEPTED） |
 | **devrix-api-error-classification** | **`openspec/archive/2026-06-28-devrix-api-error-classification/`**（DM-20260628-001; APIErrorCode 7 类闭集枚举 + HTTP status 映射 + sharederrors.IsCode 包装链识别 + 4 adapter NewAPIError 工厂统一 + OrchestratorDeps.FallbackModel + TurnState.Withheld + emitError code 注入 + 2 次连续 fallback 日志 + feishu/cli 5 类 code 差异化文案; PR #265 squash merged; 6/6 P0 T IMPLEMENTED; P0 AC 5/7 完整 + 2/7 partial（AC3/AC4 follow-up P0-2/P0-3）） |
+| **devrix-d7-layer-subcontext** | **`openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`**（DM-20260627-003; Phase 1+2 Layer SubContext — D2 Materialize + ScopeContract + ChildDownlink + Observe mapping + Upstream BlockedBy + PeerStatus; depth≥1 默认 Materialize 无 feature flag; PR #269 + #270 merged; Phase 3 T33–T35 deferred） |
 
 ## Active Changes (未归档)
 
-**当前活跃（2026-06-27）**：
+**当前活跃（2026-06-28）**：
 
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
-| `devrix-d7-layer-subcontext` | DM-20260627-003 | **S4_Development**（R1 冻结 2026-06-28） | `openspec/changes/devrix-d7-layer-subcontext/` |
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
-
-**Claude 拉取 Layer SubContext 讨论入口：** `openspec/changes/devrix-d7-layer-subcontext/review-notes.md` → `design.md` §6
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 
