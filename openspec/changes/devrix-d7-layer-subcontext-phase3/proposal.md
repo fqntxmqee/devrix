@@ -35,6 +35,11 @@ Wave scheduler context policies delegate to D2 Materializer via `PartitionWave`:
 
 `NewMaterializingContextResolver` replaces raw `ContextResolver` in bootstrap when Materializer is wired. Legacy resolver remains fallback when Materializer is nil.
 
-## Deferred
+## Phase 3-T35 (this PR)
 
-- **T35:** LLM ObservationProposer @ Observe (independent change per R1)
+LLM ObservationProposer @ Observe (G3: LLM propose → rule validate):
+
+- Input: directive + ScopeContract + structured signal lines + prior (**no** wi private ReAct)
+- `ValidateObservationProposals` caps ObsFact strength at 0.85 and requires evidence
+- Wired via `ItemPipelineDeps.ObservationProposer` (`NewLLMObservationProposer` in bootstrap)
+- LLM failures are fail-safe (rules-only Observe continues)

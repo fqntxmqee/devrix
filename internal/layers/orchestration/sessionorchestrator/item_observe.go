@@ -40,6 +40,7 @@ func observeWorkItem(
 	learner learn.Learner,
 	trackMode string,
 	tasks *workmodel.TaskManager,
+	proposer ObservationProposer,
 ) (orchtypes.UncertaintyReport, []string, error) {
 	directive := itemDirective(item)
 	if directive == "" {
@@ -87,6 +88,8 @@ func observeWorkItem(
 		}
 		obs = append(obs, checklistObs...)
 	}
+	proposed, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prior)
+	obs = append(obs, proposed...)
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err

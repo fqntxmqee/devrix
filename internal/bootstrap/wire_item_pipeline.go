@@ -55,11 +55,12 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		executor.Materializer = mat
 	}
 	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
-		Classifier: deps.Classifier,
-		Executor:   executor,
-		Learner:    learner,
-		Tasks:      deps.Tasks,
-		TrackMode:  deps.TrackMode,
+		Classifier:          deps.Classifier,
+		Executor:            executor,
+		Learner:             learner,
+		Tasks:               deps.Tasks,
+		TrackMode:           deps.TrackMode,
+		ObservationProposer: sessionorchestrator.NewLLMObservationProposer(deps.LLMInvoker),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)

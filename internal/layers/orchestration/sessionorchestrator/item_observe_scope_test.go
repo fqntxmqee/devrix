@@ -31,7 +31,7 @@ func TestObserveWorkItem_ScopeContractObserve(t *testing.T) {
 	goal.ScopeContract = &workmodel.ScopeContract{
 		OpenQuestions: []string{"OAuth or JWT?"},
 	}
-	_, obsIDs, err := observeWorkItem(context.Background(), "s1", goal, nil, nil, "", tm)
+	_, obsIDs, err := observeWorkItem(context.Background(), "s1", goal, nil, nil, "", tm, nil)
 	if err != nil {
 		t.Fatalf("observeWorkItem: %v", err)
 	}

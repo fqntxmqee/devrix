@@ -27,7 +27,8 @@ type ItemPipelineRunner struct {
 	Learner         learn.Learner
 	Tasks           *workmodel.TaskManager
 	TrackMode       string
-	ContextProposer workmodel.ContextProposer
+	ContextProposer      workmodel.ContextProposer
+	ObservationProposer  ObservationProposer
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Replaces the prior Router/Channel/tool-pipeline path.
 	Executor WorkItemExecutor
@@ -59,6 +60,8 @@ type ItemPipelineDeps struct {
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Required. nil → NewItemPipelineRunner returns an error.
 	Executor WorkItemExecutor
+	// ObservationProposer optional LLM proposer @ Observe (T35); nil → rules only.
+	ObservationProposer ObservationProposer
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -79,12 +82,13 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		classifier = decisionplanning.NewRuleClassifier(nil)
 	}
 	return &ItemPipelineRunner{
-		Classifier: classifier,
-		Planner:    planner,
-		Learner:    deps.Learner,
-		Tasks:      deps.Tasks,
-		TrackMode:  deps.TrackMode,
-		Executor:   deps.Executor,
+		Classifier:          classifier,
+		Planner:             planner,
+		Learner:             deps.Learner,
+		Tasks:               deps.Tasks,
+		TrackMode:           deps.TrackMode,
+		Executor:            deps.Executor,
+		ObservationProposer: deps.ObservationProposer,
 	}, nil
 }
 
@@ -144,7 +148,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks)
+	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
 		return nil, err
 	}
