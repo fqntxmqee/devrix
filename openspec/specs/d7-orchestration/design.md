@@ -3,10 +3,10 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 4.4.0
+**Version:** 4.5.0
 **Status:** Active
-**Last Updated:** 2026-06-26 (v4.4 bootstrap-slim)
-**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214) + devrix-d7-6s-bootstrap-slim (DM-20260626-007)
+**Last Updated:** 2026-06-29 (v4.5 dsaft-restructuring: god fn split + boundary debt + rollup governance)
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214) + devrix-d7-6s-bootstrap-slim (DM-20260626-007) + devrix-d7-dsaft-restructuring (DM-20260629-001, PR #280-#289)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`

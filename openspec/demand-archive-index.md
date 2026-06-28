@@ -127,6 +127,7 @@
 | **DM-20260627-003** | **D7 Layer SubContext — WorkItem 子上下文 Materialize + ScopeContract + CG2′ cohort 隔离 (Phase 1+2)** | **devrix-d7-layer-subcontext** | **2026-06-28** | **[#269](https://github.com/fqntxmqee/devrix/pull/269) · [#270](https://github.com/fqntxmqee/devrix/pull/270)** | **S7_Archived (Phase 1+2 ACCEPTED; depth≥1 默认 Materialize 无 feature flag; D2 Materialize + ScopeContract spawn gate + ChildDownlink + Observe R-OBS mapping + Upstream BlockedBy + PeerStatus cohort≥3; Phase 3 → DM-20260628-002; `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`)** |
 | **DM-20260628-002** | **D7 Layer SubContext Phase 3 — SubTurn Materialize + Wave merge + LLM ObservationProposer** | **devrix-d7-layer-subcontext-phase3** | **2026-06-28** | **[#273](https://github.com/fqntxmqee/devrix/pull/273) · [#274](https://github.com/fqntxmqee/devrix/pull/274) · [#275](https://github.com/fqntxmqee/devrix/pull/275)** | **S7_Archived (Phase 3 ACCEPTED; SubTurn brief/fork/full→Materialize; Wave ContextResolver merge; LLM ObservationProposer G3 gate; Layer SubContext Phase 1–3 closed; `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`)** |
 | **DM-20260628-003** | **D1 DSAFT 重构 — Trusted Intermediary 边界收敛 + Gateway 拆分 + contracts DTO** | **devrix-d1-dsaft-refactor** | **2026-06-28** | **[#279](https://github.com/fqntxmqee/devrix/pull/279)** | **S7_Archived (Phase 1–4 ACCEPTED; D1-RF-T01..T09; `openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`)** |
+| **DM-20260629-001** | **D7 DSAFT 深度架构重构 — 6 子 Change 联动（dead code + god fn + registry + value flow + span + boundary debt）** | **devrix-d7-dsaft-restructuring** | **2026-06-29** | **[#280](https://github.com/fqntxmqee/devrix/pull/280) · [#281](https://github.com/fqntxmqee/devrix/pull/281) · [#282](https://github.com/fqntxmqee/devrix/pull/282) · [#283](https://github.com/fqntxmqee/devrix/pull/283) · [#284](https://github.com/fqntxmqee/devrix/pull/284) · [#285](https://github.com/fqntxmqee/devrix/pull/285) · [#286](https://github.com/fqntxmqee/devrix/pull/286) · [#287](https://github.com/fqntxmqee/devrix/pull/287) · [#288](https://github.com/fqntxmqee/devrix/pull/288) · [#289](https://github.com/fqntxmqee/devrix/pull/289)** | **S7_Archived (10 PR / 55 T / 15 G 全部 PASS; Span Evidence 覆盖率 94%; 22/22 orchestration packages -race PASS; `openspec/archive/2026-06-29-devrix-d7-dsaft-restructuring/`)** |
 
 ## Archive Locations
 
@@ -245,6 +246,7 @@
 | **devrix-d1-dsaft-refactor** | **`openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`**（DM-20260628-003; D1 Trusted Intermediary DSAFT 重构 — sessionagents 迁出 capture + Gateway 拆分 + contracts 展示 DTO + channel 零 orchestration import + `lint-d1-imports.sh` CI; PR [#279](https://github.com/fqntxmqee/devrix/pull/279); D1-RF-T01..T09 IMPLEMENTED; canonical a/t-registry + layer-delta + spec 回写; S7_Archived ACCEPTED） |
 | **devrix-d7-layer-subcontext** | **`openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`**（DM-20260627-003; Phase 1+2 Layer SubContext — D2 Materialize + ScopeContract + ChildDownlink + Observe mapping + Upstream BlockedBy + PeerStatus; depth≥1 默认 Materialize 无 feature flag; PR #269 + #270 merged; Phase 3 → DM-20260628-002） |
 | **devrix-d7-layer-subcontext-phase3** | **`openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`**（DM-20260628-002; Phase 3 SubTurn→Materialize + Wave ContextResolver merge + LLM ObservationProposer; PR #273–#275 merged; Layer SubContext Phase 1–3 closed） |
+| **devrix-d7-dsaft-restructuring** | **`openspec/archive/2026-06-29-devrix-d7-dsaft-restructuring/`**（DM-20260629-001; D7 深度架构重构 — 6 子 Change 联动: dead-code (~775 LOC) + god function 拆 4 文件 + registry path 6 修正 + ValueFlow Semantic + 5 ops span + 4 acceptance test + Span Evidence 94% 覆盖率 + 3 boundary debt Decision + WorkTree 上行反馈 RollupReport; PR [#280](https://github.com/fqntxmqee/devrix/pull/280)–[#289](https://github.com/fqntxmqee/devrix/pull/289) 10 PR 全部 squash auto-merge; 10 PR / 55 T / 15 G 全部 PASS; 22/22 orchestration packages -race PASS; S7_Archived ACCEPTED; v6.0.x 维护阶段收官, v7.0 演进起点） |
 
 ## Active Changes (未归档)
 
@@ -259,6 +261,10 @@
 **2026-06-28 归档（S7 — D1 DSAFT Refactor）**：
 
 - `devrix-d1-dsaft-refactor` → `openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`（DM-20260628-003 S7_Archived; Phase 1–4 全完成: sessionagents 迁出 capture + Gateway 拆分 + contracts 展示 DTO + `lint-d1-imports.sh` CI; D1-RF-T01..T09 IMPLEMENTED; canonical spec 回写 a/t-registry + layer-delta + spec.md）
+
+**2026-06-29 归档（S7 — D7 DSAFT 深度重构）**：
+
+- `devrix-d7-dsaft-restructuring` → `openspec/archive/2026-06-29-devrix-d7-dsaft-restructuring/`（DM-20260629-001 S7_Archived; 6 子 Change 联动: dead-code ~775 LOC + god fn 拆 4 文件 + 6 registry path 修正 + ValueFlow Semantic + 5 ops span + 4 acceptance test + Span Evidence 94% 覆盖率 + 3 boundary debt Decision + WorkTree 上行反馈 RollupReport; PR #280–#289 10 PR squash auto-merge; 10 PR / 55 T / 15 G 全部 PASS; 22/22 orchestration packages -race PASS; v6.0.x 维护阶段收官, v7.0 演进起点）
 
 _（2026-06-18 历史批次见下方归档记录）_
 
