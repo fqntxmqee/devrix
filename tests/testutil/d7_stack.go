@@ -13,6 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	capturetranscript "github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
@@ -66,7 +67,7 @@ type D7TestStack struct {
 	Gateway       *capture.CommunicationGateway
 	SessionAgents *sessionagents.Manager
 	Handler       *MockEventHandler
-	Engine       *contextengine.ContextEngine
+	Engine       *kernel.ContextEngine
 	LLMStub      llmgateway.IAdapter
 	WorkDir      string
 	TaskManager  *workmodel.TaskManager
@@ -161,9 +162,9 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		toolsReg = MustBuiltinRegistry(t)
 	}
 
-	engine := contextengine.NewContextEngine(MergeEngineDeps(
+	engine := kernel.NewContextEngine(MergeEngineDeps(
 		ContextEngineDepsFromStack(llmStack, ctxCfg),
-		contextengine.EngineDeps{
+		kernel.EngineDeps{
 			Tools:      &enforce.ToolRunner{},
 			ToolsReg:   toolsReg,
 			Permission: enforce.AllowAllPermission{},

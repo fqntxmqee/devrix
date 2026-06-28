@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/observability/configure/runtime"
@@ -31,7 +32,7 @@ func TestContextEngine_QueryLoopEnabled_NoLegacyIncrement(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.TurnRuntime.MaxTurns = 3
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "tool out"},
@@ -62,7 +63,7 @@ func TestContextEngine_100xQueryLoop_LegacyBaselineZero(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	cfg.TurnRuntime.MaxTurns = 2
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "tool out"},

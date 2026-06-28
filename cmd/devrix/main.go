@@ -22,7 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/instance"
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -302,7 +302,7 @@ func main() {
 	// onto the per-agent engine builder so forked workers (D4 ParentID != "")
 	// can run Process() without "PreparedTurnRunner not wired" errors.
 	if engineBuilder != nil {
-		if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+		if ce, ok := contextEngine.(*kernel.ContextEngine); ok {
 			if runner := ce.PreparedTurnRunner(); runner != nil {
 				engineBuilder.WithPreparedTurnRunner(runner)
 			}
@@ -312,7 +312,7 @@ func main() {
 	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, sessionAgents, agentFactory, obs)
 
 	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
-	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+	if ce, ok := contextEngine.(*kernel.ContextEngine); ok {
 		// DM-20260617-008 W4: shared TaskManager (see tm construction above).
 		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, sessionAgents, ce, ce.ToolRegistry(), hub, tm)
 	}

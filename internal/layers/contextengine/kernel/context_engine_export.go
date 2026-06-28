@@ -1,4 +1,4 @@
-package legacy
+package kernel
 
 import (
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"

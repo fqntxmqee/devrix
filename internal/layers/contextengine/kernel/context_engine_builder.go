@@ -1,9 +1,8 @@
-package legacy
+package kernel
 
 import (
 	"log/slog"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/snapshot"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
@@ -26,11 +25,11 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 	observer := deps.Observer
 	if observer == nil {
-		observer = kernel.NoOpObserver{}
+		observer = NoOpObserver{}
 	}
 	compObserver := deps.CompressionObserver
 	if compObserver == nil {
-		compObserver = kernel.NoOpCompressionObserver{}
+		compObserver = NoOpCompressionObserver{}
 	}
 	counter := token.ResolveCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)

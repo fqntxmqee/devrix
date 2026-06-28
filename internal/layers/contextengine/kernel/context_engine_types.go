@@ -1,11 +1,10 @@
-package legacy
+package kernel
 
 import (
 	"sync"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
-	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
@@ -20,11 +19,9 @@ import (
 )
 
 type (
-	IToolRunner          = tools.IToolRunner
-	IToolRegistry        = tools.IToolRegistry
-	IObserver            = kernel.IObserver
-	ICompressionObserver = kernel.ICompressionObserver
-	AgentRoleToolFilter  = enforce.AgentRoleToolFilter
+	IToolRunner         = tools.IToolRunner
+	IToolRegistry       = tools.IToolRegistry
+	AgentRoleToolFilter = enforce.AgentRoleToolFilter
 )
 
 // EngineDeps holds dependencies for ContextEngine.

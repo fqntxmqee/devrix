@@ -9,6 +9,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
@@ -40,7 +41,7 @@ func TestPersistTurn_WritesMessagesToD2Memory(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "ok"},
@@ -93,7 +94,7 @@ func TestPersistTurn_FullRound_ThreeTurns(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "ok"},
@@ -145,7 +146,7 @@ func TestPersistTurn_NilEngine(t *testing.T) {
 	}
 	gw := capture.NewCommunicationGateway(store, nil, nil, nil, nil)
 
-	// pass a stub that is NOT *contextengine.ContextEngine — adapter must no-op.
+	// pass a stub that is NOT *kernel.ContextEngine — adapter must no-op.
 	adapter := newContextEngineAdapter(gw, &stubSessionEngine{}, nil)
 	if err := adapter.PersistTurn(context.Background(), sessionorchestrator.PersistRequest{
 		SessionID: "sess-nil-engine",
@@ -167,7 +168,7 @@ func TestPersistTurn_NoPanic_Sequential(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "ok"},
@@ -216,7 +217,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("real reg: %v", err)
 	}
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              realReg,
@@ -273,7 +274,7 @@ func TestExecuteRound_AttachesSessionContext(t *testing.T) {
 // must still execute the tool (falling back to os.Getwd()).
 
 // T: D7-S2-A06-T03 (DM-20260621-005 devrix-d7-d2-prepare-wire)
-// When the engine is *contextengine.ContextEngine, Prepare must route through
+// When the engine is *kernel.ContextEngine, Prepare must route through
 // ContextEngine.PrepareForTurn → D2 PrepareOrchestrator. The orchestrator
 // runs A04 AssemblePrompt, which produces a non-empty SystemPrompt. Before
 // this wire, Prepare copied sc.Messages directly without invoking the
@@ -287,7 +288,7 @@ func TestPrepareForTurn_RoutesThroughPrepareOrchestrator(t *testing.T) {
 
 	cfg := config.DefaultContextEngineConfig()
 	cfg.Compression.Autocompact.Enabled = false
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "ok"},
@@ -334,7 +335,7 @@ func TestExecuteRound_NoSessionContext_StillExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("real reg: %v", err)
 	}
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              realReg,

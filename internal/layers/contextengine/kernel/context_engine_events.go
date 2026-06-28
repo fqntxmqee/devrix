@@ -1,4 +1,4 @@
-package legacy
+package kernel
 
 import (
 	stderrors "errors"

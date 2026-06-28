@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
@@ -58,7 +59,7 @@ func TestAcceptance_LongTermRecallP0(t *testing.T) {
 		t.Fatalf("NewBuiltinRegistry: %v", err)
 	}
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: turn,
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{},

@@ -11,6 +11,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -43,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		Summarizer: &contextengine.StaticSummarizer{},
 		Tools:      &enforce.ToolRunner{},
 		ToolsReg:   toolsReg,
