@@ -35,6 +35,26 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		sessionID := req.SessionID
 		userID := effectiveUserID(ctx, req)
 
+		// DM-20260628-003 (D7-S15): reserve a turn slot for this session.
+		// WaitTurn at ProcessMessage entry has already verified no prior
+		// turn is in-flight; BeginTurn here claims the slot for THIS
+		// goroutine. defer EndTurn releases it when channel closes.
+		//
+		// nil turnState (legacy path / not wired) → no-op, equivalent to
+		// pre-D7-S15 behavior. This preserves backward compat for
+		// CommandHandler-direct and tests that don't wire TurnState.
+		if o.turnState != nil {
+			if err := o.turnState.BeginTurn(sessionID); err != nil {
+				// Should not happen because WaitTurn ran at ProcessMessage
+				// entry — but defensive: another goroutine may have raced
+				// in via CommandHandler etc. Emit a clear error event so
+				// the gateway can surface "⏳ 上一条还在处理中".
+				emitError(ctx, o.sink, out, sessionID, "begin_turn", err)
+				return
+			}
+			defer o.turnState.EndTurn(sessionID)
+		}
+
 		// Emit hook for ItemPipelineRunner / WorkItemExecutor so per-WorkItem
 		// tool calls show up on feishu cards. Mirrors OrchestratePath's
 		// spec.Emit pattern but driven from the gateway out channel rather
