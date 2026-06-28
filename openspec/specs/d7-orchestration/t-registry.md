@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.11.0
-**Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
+**Version:** 4.12.0
+**Last Updated:** 2026-06-29 (dsaft-restructuring PR-8 Span Evidence 列填充 IMPLEMENTED, DM-20260629-001 T44)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -25,43 +25,43 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v1.1 closure (2026-06-15):** A04/A05 SpokeBridge wired（DM-018）；T 层增补 hubspoke 测试。
 
-| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|-----------|------|----------|-----------|--------|----------|
-| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/executionflow/workplan/service_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/executionflow/imsink/gateway_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 |
-| **D7-S4-T08** | — | **AgentBridge OnWorkerCompleted success/error** | **D7-S4-A04** | **`hubspoke/hubspoke_test.go::TestAgentBridge_OnWorkerCompleted_{success,error}`** | **IMPLEMENTED** | **P0** |
-| **D7-S4-T09** | — | **SubQueryBridge PublishStarted/Completed/Failed** | **D7-S4-A05** | **`hubspoke/hubspoke_test.go::TestSubQueryBridge_Publish{Started,Completed,Failed}`** | **IMPLEMENTED** | **P0** |
+| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|-----------|------|----------|-----------|--------|----------| --- |
+| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/executionflow/workplan/service_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
+| D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
+| D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
+| D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
+| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/executionflow/imsink/gateway_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
+| D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 | Flow_Event_Publish |
+| **D7-S4-T08** | — | **AgentBridge OnWorkerCompleted success/error** | **D7-S4-A04** | **`hubspoke/hubspoke_test.go::TestAgentBridge_OnWorkerCompleted_{success,error}`** | **IMPLEMENTED** | **P0** | Flow_Event_Publish |
+| **D7-S4-T09** | — | **SubQueryBridge PublishStarted/Completed/Failed** | **D7-S4-A05** | **`hubspoke/hubspoke_test.go::TestSubQueryBridge_Publish{Started,Completed,Failed}`** | **IMPLEMENTED** | **P0** | Flow_Event_Publish |
 
 ---
 
 ## D7-S3: Wave Scheduler
 
-| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|-----------|------|----------|-----------|--------|----------|
-| D7-S3-T01 | ORCH-S2-T10 | 6 ready subagent + 1 cursor 峰值并发≤5 | D7-S3-A01 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T02 | ORCH-S2-T15 | 槽位释放后 ready Task 立即派发 | D7-S3-A01-F04 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T03 | ORCH-S2-T17 | Plan DAG 仅 ready 节点被派发 | D7-S3-F03 | `orchestration/wavescheduler/scheduler_test.go`, `taskgraph_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T04 | ORCH-S2-T11 | upstream policy 收到 artifact，无 Leader 全量 | D7-S3-A02-F02 | `orchestration/wavescheduler/context_test.go`, `scheduler_orch_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T05 | ORCH-S2-T12 | fresh policy Messages 仅含 directive | D7-S3-A02-F01 | `orchestration/wavescheduler/context_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T06 | ORCH-S2-T13 | 同 conflict_group Task 不并行 | D7-S3-A03-F01 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T07 | ORCH-S2-T16 | cursor + claude-code 并行 file_scope 不交 | D7-S3-A03-F03 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P1 |
-| D7-S3-T08 | ORCH-S2-T18 | wave 全完成返回全部 artifacts | D7-S3-A01-F03 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P1 |
-| D7-S3-T09 | ORCH-S2-T19 | CancelWorker 槽位释放 status=cancelled | D7-S3-A01-F05 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T10 | ORCH-S2-T20 | CancelAll 5 running 全部 terminal | D7-S3-A01-F05 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 |
-| D7-S3-T11 | ORCH-S2-T21 | CLI Worker cancel 进程终止 | D7-S3-F06 | `orchestration/wavescheduler/runners/agent_tool_orch_test.go`; `multiagent/external/cli_adapter_test.go` | IMPLEMENTED | P1 |
-| **D7-S3-A01-F03-T01** | — | **AllowAndRegister no conflict → registered** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_NoConflict`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-F03-T02** | — | **AllowAndRegister conflict group → blocked** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_ConflictGroup`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-F03-T03** | — | **AllowAndRegister different group → allowed** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_DifferentGroup`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-F03-T04** | — | **AllowAndRegister file scope intersection → blocked** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_FileScope`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-F04-T01** | — | **emit pushes FlowEvent to sink AND channel** | **D7-S3-A01-F04** | **`sessionorchestrator/orchestrate_path.go::emit()`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-F04-T02** | — | **emit tolerates nil sink gracefully** | **D7-S3-A01-F04** | **`sessionorchestrator/orchestrate_path.go::emit()`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-IT01** | — | **Real WaveScheduler dispatch (3-task DAG)** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_RealDispatch`** | **IMPLEMENTED** | **P0** |
-| **D7-S3-A01-IT02** | — | **Empty graph no-op** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_EmptyGraph`** | **IMPLEMENTED** | **P1** |
-| **D7-S3-A01-IT03** | — | **ConflictGuard integration** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_ConflictGuard`** | **IMPLEMENTED** | **P0** |
+| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|-----------|------|----------|-----------|--------|----------| --- |
+| D7-S3-T01 | ORCH-S2-T10 | 6 ready subagent + 1 cursor 峰值并发≤5 | D7-S3-A01 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T02 | ORCH-S2-T15 | 槽位释放后 ready Task 立即派发 | D7-S3-A01-F04 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T03 | ORCH-S2-T17 | Plan DAG 仅 ready 节点被派发 | D7-S3-F03 | `orchestration/wavescheduler/scheduler_test.go`, `taskgraph_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T04 | ORCH-S2-T11 | upstream policy 收到 artifact，无 Leader 全量 | D7-S3-A02-F02 | `orchestration/wavescheduler/context_test.go`, `scheduler_orch_test.go` | IMPLEMENTED | P0 | Wave_Task_Execute |
+| D7-S3-T05 | ORCH-S2-T12 | fresh policy Messages 仅含 directive | D7-S3-A02-F01 | `orchestration/wavescheduler/context_test.go` | IMPLEMENTED | P0 | Wave_Task_Execute |
+| D7-S3-T06 | ORCH-S2-T13 | 同 conflict_group Task 不并行 | D7-S3-A03-F01 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T07 | ORCH-S2-T16 | cursor + claude-code 并行 file_scope 不交 | D7-S3-A03-F03 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P1 | Wave_Schedule |
+| D7-S3-T08 | ORCH-S2-T18 | wave 全完成返回全部 artifacts | D7-S3-A01-F03 | `orchestration/wavescheduler/scheduler_orch_test.go` | IMPLEMENTED | P1 | Wave_Task_Execute |
+| D7-S3-T09 | ORCH-S2-T19 | CancelWorker 槽位释放 status=cancelled | D7-S3-A01-F05 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T10 | ORCH-S2-T20 | CancelAll 5 running 全部 terminal | D7-S3-A01-F05 | `orchestration/wavescheduler/scheduler_test.go` | IMPLEMENTED | P0 | Wave_Schedule |
+| D7-S3-T11 | ORCH-S2-T21 | CLI Worker cancel 进程终止 | D7-S3-F06 | `orchestration/wavescheduler/runners/agent_tool_orch_test.go`; `multiagent/external/cli_adapter_test.go` | IMPLEMENTED | P1 | Wave_Task_Execute |
+| **D7-S3-A01-F03-T01** | — | **AllowAndRegister no conflict → registered** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_NoConflict`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-F03-T02** | — | **AllowAndRegister conflict group → blocked** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_ConflictGroup`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-F03-T03** | — | **AllowAndRegister different group → allowed** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_DifferentGroup`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-F03-T04** | — | **AllowAndRegister file scope intersection → blocked** | **D7-S3-A01-F03** | **`orchestration/wavescheduler/conflict_test.go::TestAllowAndRegister_FileScope`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-F04-T01** | — | **emit pushes FlowEvent to sink AND channel** | **D7-S3-A01-F04** | **`sessionorchestrator/orchestrate_path.go::emit()`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-F04-T02** | — | **emit tolerates nil sink gracefully** | **D7-S3-A01-F04** | **`sessionorchestrator/orchestrate_path.go::emit()`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-IT01** | — | **Real WaveScheduler dispatch (3-task DAG)** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_RealDispatch`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
+| **D7-S3-A01-IT02** | — | **Empty graph no-op** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_EmptyGraph`** | **IMPLEMENTED** | **P1** | Wave_Schedule |
+| **D7-S3-A01-IT03** | — | **ConflictGuard integration** | **D7-S3-A01** | **`tests/integration/d7/d7_wave_real_test.go::TestIntegration_D7WaveScheduler_ConflictGuard`** | **IMPLEMENTED** | **P0** | Wave_Schedule |
 
 ---
 
@@ -69,28 +69,28 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v1.1 closure (2026-06-15):** 写模型迁入 `internal/layers/orchestration/workmodel/`。D7-S1-T01..T05 路径从 `contextengine/tasks/` 更新为 `workmodel/`。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| D7-S1-T01 | Task create 生成唯一 ID | D7-S1-A02-F01 | `workmodel/task_manager_test.go::TestTaskManager_Create` | IMPLEMENTED | P0 |
-| D7-S1-T02 | Task 依赖 blocked_by 正确 | D7-S1-A02-F03 | `workmodel/task_manager_test.go::TestTaskManager_Dependency` | IMPLEMENTED | P0 |
-| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `workmodel/disk_store_test.go::TestTaskManager_disk_persist_and_list_consistent`；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 |
-| D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `workmodel/task_manager_test.go::TestTaskManager_List` | IMPLEMENTED | P1 |
-| D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 |
-| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | `decisionplanning/decomposer_test.go::TestTaskDecomposer_validateGraph` | IMPLEMENTED | P1 |
-| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `sessionorchestrator/entry_test.go`; `contextengine/nested/background_*_test.go` | IMPLEMENTED | P1 |
-| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | `workmodel/task_manager_test.go::TestIsLegalTransition`, `TestTaskManager_UpdateStatus_IllegalTransition`, `TestTaskManager_UpdateStatus_LegalTransitions` | IMPLEMENTED | P2 |
-| **D7-S1-T09** | **WorkTree EnsureGoal 单 session 单根** | **D7-S1-A02** | **`workmodel/work_tree_test.go`** | **IMPLEMENTED** | **P0** |
-| **D7-S1-T10** | **DiskWorkItemStore v2 迁移 + 原子 Save** | **D7-S1-A02-F05** | **`workmodel/work_tree_test.go`; `cross_session_test.go`** | **IMPLEMENTED** | **P0** |
-| **D7-S1-T11** | **GetFocus 确定性 tiebreak** | **D7-S1-A02** | **`workmodel/work_tree_test.go::TestWorkTree_GetFocusTiebreak`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T12** | **RunRef terminal → WorkItem status 同步** | **D7-S1-A02** | **`workmodel/run_spawn_test.go::TestSpawnForWorkItem_SyncTerminal`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T13** | **跨 session FindByItemID** | **D7-S1-A02** | **`workmodel/cross_session_test.go`** | **IMPLEMENTED** | **P2** |
-| **D7-S1-T14** | **DecomposeChildren 深度上限** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestDecomposeChildren_DepthLimit`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T15** | **Decompose 24h 频率上限 (5/kind/session)** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestDecomposeChildren_DailyLimit`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T16** | **ResolveHint 高 uncertainty decompose 引导** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestResolveHint_HighUncertainty`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T17** | **RunTurn blocking await running children** | **D7-S1-A02** | **`workmodel/resolve_await_test.go::TestAwaitRunningChildren_BlocksUntilTerminal`** | **IMPLEMENTED** | **P1** |
-| **D7-S1-T18** | **TaskManager.Create returns `(*Task, error)` instead of silent nil (DM-20260620-003 PR-C H3)** | **D7-S1-A02-F01** | **`workmodel/task_manager_test.go::TestTaskManager_Create`; `cli_commands.go`; `tool_suite.go`** | **IMPLEMENTED** | **P0** |
-| **D7-S1-T19** | **resolveDelegateTaskID returns `(string, error)` so delegate tools surface creation failure** | **D7-S1-A02-F01** | **`delegatetools/delegate_tools.go`; `tests/integration/d7/d7_hub_flow_test.go`** | **IMPLEMENTED** | **P1** |
-| **D7-S3-T12** | **OrchestratePath SyncWaveNodes 挂树** | **D7-S3-A01** | **`sessionorchestrator/orchestrate_path.go`; bootstrap wiring** | **IMPLEMENTED** | **P1** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| D7-S1-T01 | Task create 生成唯一 ID | D7-S1-A02-F01 | `workmodel/task_manager_test.go::TestTaskManager_Create` | IMPLEMENTED | P0 | Worktree_Op |
+| D7-S1-T02 | Task 依赖 blocked_by 正确 | D7-S1-A02-F03 | `workmodel/task_manager_test.go::TestTaskManager_Dependency` | IMPLEMENTED | P0 | Worktree_Op |
+| D7-S1-T03 | DiskStore v2 持久化恢复 | D7-S1-A02-F05 | `workmodel/disk_store_test.go::TestTaskManager_disk_persist_and_list_consistent`；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 | Worktree_Op |
+| D7-S1-T04 | ListReadyTasks 仅返回无阻塞任务 | D7-S1-A02-F04 | `workmodel/task_manager_test.go::TestTaskManager_List` | IMPLEMENTED | P1 | Worktree_Op |
+| D7-S1-T05 | FlowEvent link_tasks 状态联动 | D7-S1-A02-F06 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 | Worktree_Op |
+| D7-S1-T06 | CreateWorkPlan DAG 校验 | D7-S1-A01-F02 | `decisionplanning/decomposer_test.go::TestTaskDecomposer_validateGraph` | IMPLEMENTED | P1 | Worktree_Op |
+| D7-S1-T07 | BackgroundRun 注册与 QueryWorkPlan 可见 | D7-S1 | `sessionorchestrator/entry_test.go`; `contextengine/nested/background_*_test.go` | IMPLEMENTED | P1 | Worktree_Op |
+| D7-S1-T08 | Task 非法状态转换拒绝 | D7-S1-A02-F02 | `workmodel/task_manager_test.go::TestIsLegalTransition`, `TestTaskManager_UpdateStatus_IllegalTransition`, `TestTaskManager_UpdateStatus_LegalTransitions` | IMPLEMENTED | P2 | Worktree_Op |
+| **D7-S1-T09** | **WorkTree EnsureGoal 单 session 单根** | **D7-S1-A02** | **`workmodel/work_tree_test.go`** | **IMPLEMENTED** | **P0** | Worktree_Op |
+| **D7-S1-T10** | **DiskWorkItemStore v2 迁移 + 原子 Save** | **D7-S1-A02-F05** | **`workmodel/work_tree_test.go`; `cross_session_test.go`** | **IMPLEMENTED** | **P0** | Worktree_Op |
+| **D7-S1-T11** | **GetFocus 确定性 tiebreak** | **D7-S1-A02** | **`workmodel/work_tree_test.go::TestWorkTree_GetFocusTiebreak`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T12** | **RunRef terminal → WorkItem status 同步** | **D7-S1-A02** | **`workmodel/run_spawn_test.go::TestSpawnForWorkItem_SyncTerminal`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T13** | **跨 session FindByItemID** | **D7-S1-A02** | **`workmodel/cross_session_test.go`** | **IMPLEMENTED** | **P2** | Worktree_Op |
+| **D7-S1-T14** | **DecomposeChildren 深度上限** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestDecomposeChildren_DepthLimit`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T15** | **Decompose 24h 频率上限 (5/kind/session)** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestDecomposeChildren_DailyLimit`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T16** | **ResolveHint 高 uncertainty decompose 引导** | **D7-S1-A02** | **`workmodel/decompose_test.go::TestResolveHint_HighUncertainty`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T17** | **RunTurn blocking await running children** | **D7-S1-A02** | **`workmodel/resolve_await_test.go::TestAwaitRunningChildren_BlocksUntilTerminal`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S1-T18** | **TaskManager.Create returns `(*Task, error)` instead of silent nil (DM-20260620-003 PR-C H3)** | **D7-S1-A02-F01** | **`workmodel/task_manager_test.go::TestTaskManager_Create`; `cli_commands.go`; `tool_suite.go`** | **IMPLEMENTED** | **P0** | Worktree_Op |
+| **D7-S1-T19** | **resolveDelegateTaskID returns `(string, error)` so delegate tools surface creation failure** | **D7-S1-A02-F01** | **`delegatetools/delegate_tools.go`; `tests/integration/d7/d7_hub_flow_test.go`** | **IMPLEMENTED** | **P1** | Worktree_Op |
+| **D7-S3-T12** | **OrchestratePath SyncWaveNodes 挂树** | **D7-S3-A01** | **`sessionorchestrator/orchestrate_path.go`; bootstrap wiring** | **IMPLEMENTED** | **P1** | — |
 
 ---
 
@@ -98,36 +98,36 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v1.1 closure (2026-06-15):** D7-S5-T04/T05 由 PLANNED 升为 IMPLEMENTED（Phase H/K）。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `workmodel/plan_mode_test.go` 或 `task_manager_test` | IMPLEMENTED | P1 |
-| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `workmodel/plan_agent_whitelist_test.go`（10 ACs）；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 |
-| **D7-S5-T04** | **SynthesizeTaskGraph 产出有效 DAG** | **D7-S5-A02** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-T05** | **SelectExecutor explore→D2 execute→D4** | **D7-S5-A03** | **`decisionplanning/executor_test.go::TestExecutorSelector_SelectExecutor`** | **IMPLEMENTED** | **P1** |
-| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `decisionplanning/{classifier,shadow_classifier}` + `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
-| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `decisionplanning/shadow_classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | `decisionplanning/classifier_test.go::TestRuleClassifier_ExactConfidenceValues`, `TestRuleClassifier_ConfidenceDeterminism`, `TestRuleClassifier_ConfidenceRange`; `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_FastPathConfidence{Below,Above}Threshold` | IMPLEMENTED | P0 |
-| D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 |
-| **D7-S5-A02-T01** | **SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG** | **D7-S5-A02** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A02-T02** | **decomposeGoal 规则版：goal → sub_goal → DAG** | **D7-S5-A02-F01** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_decomposeGoal`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A03-T01** | **MatchExecutorByTaskType：worker_type → D2/D4** | **D7-S5-A03-F01** | **`decisionplanning/executor_test.go::TestExecutorSelector_MatchExecutorByTaskType`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A03-T02** | **CheckExecutorAvailability：executor 状态查询** | **D7-S5-A03-F02** | **`decisionplanning/executor_test.go::TestExecutorSelector_CheckExecutorAvailability`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A03-T03** | **LLM Decomposer 解析 JSON DAG → wavescheduler.TaskNode（含 7 sub-cases）** | **D7-S5-A03-F03** | **`decisionplanning/llm_decomposer_test.go`（happy / bad JSON / enum coercion / unknown deps / extractJSON 6 case / nil LLM / SynthesizeTaskGraph routing）** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A02-F01-T01** | — | **ValidateToolCall: whitelist tool passes** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Allowed`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F01-T02** | — | **ValidateToolCall: forbidden tool rejected** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Forbidden`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F01-T03** | — | **ValidateToolCall: unknown tool rejected** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Unknown`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F01-T04** | — | **ValidateToolCall: nil receiver safe** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_NilReceiver`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F02-T01** | — | **PlanMode.Enter: nil LLM returns ErrLLMNotConfigured** | **D7-S5-A02-F02** | **`workmodel/plan_mode.go::Enter()`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F02-T02** | — | **PlanMode.Enter: valid LLM succeeds** | **D7-S5-A02-F02** | **`workmodel/plan_mode.go::Enter()`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F05-T01** | — | **Config struct: PlanModeApproveGate field removed** | **D7-S5-A02-F05** | **`orchtypes/config.go`, `shared/config/coordinator.go`, `shared/config/loader.go`, `bootstrap/wire_coordinator.go`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-F05-T02** | — | **Default config: no PlanModeApproveGate reference** | **D7-S5-A02-F05** | **`orchtypes/config.go::DefaultConfig()`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-IT01** | — | **LLM Decomposer end-to-end (JSON DAG → WaveScheduler)** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_EndToEnd`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-IT02** | — | **LLM Decomposer fallback on invalid JSON** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A02-IT03** | — | **LLM Decomposer empty task list** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_EmptyTaskList`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A02-IT04** | — | **LLM Decomposer no JSON in response** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_NoJSONInResponse`** | **IMPLEMENTED** | **P1** |
-| **D7-S5-A04-T01** | **turn_adapter.PersistTurn 提交 req.Messages 到 D2 内存（DM-20260617-003 d7-turn-history-persist）** | **D7-S5-A04** | **`internal/bootstrap/turn_adapter_persist_test.go::TestPersistTurn_{WritesMessagesToD2Memory,FullRound,NilEngine,AppendError}`** | **IMPLEMENTED** | **P0** |
-| **D7-S5-A04-T02** | **三轮同 session 连续 PersistTurn → Prepare 返回全历史** | **D7-S5-A04** | **`tests/integration/d7/turn_history_persist_test.go::TestTurnHistory_ThreeTurns`** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| D7-S5-T01 | PlanMode inactive→active 转换 | D7-S1-A04-F01 | `workmodel/plan_mode_test.go` 或 `task_manager_test` | IMPLEMENTED | P1 | Intent_Classify |
+| D7-S5-T02 | PlanAgent 只读模式拒绝写操作；工具白名单不含 write/edit/bash | D7-S5-A04 | `workmodel/plan_agent_whitelist_test.go`（10 ACs）；`tests/integration/d7/d7_workmodel_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| D7-S5-T03 | ClassifyIntent 规则高置信 → simple | D7-S5-A01 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| **D7-S5-T04** | **SynthesizeTaskGraph 产出有效 DAG** | **D7-S5-A02** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** | Intent_Classify |
+| **D7-S5-T05** | **SelectExecutor explore→D2 execute→D4** | **D7-S5-A03** | **`decisionplanning/executor_test.go::TestExecutorSelector_SelectExecutor`** | **IMPLEMENTED** | **P1** | Intent_Classify |
+| D7-S5-T06 | Command-first：`/plan` 不触发 LLM Classify | D7-S5-A01 | `decisionplanning/{classifier,shadow_classifier}` + `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| D7-S5-T07 | Tail-only LLM classify shadow（rule 未命中时异步 LLM，结果只入 metric） | D7-S5-A05 | `decisionplanning/shadow_classifier_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| D7-S5-A01-T01 | 规则分类置信度阈值验证（screening 可重复性） | D7-S5-A01 | `decisionplanning/classifier_test.go::TestRuleClassifier_ExactConfidenceValues`, `TestRuleClassifier_ConfidenceDeterminism`, `TestRuleClassifier_ConfidenceRange`; `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_FastPathConfidence{Below,Above}Threshold` | IMPLEMENTED | P0 | Intent_Classify |
+| D7-S5-A01-T02 | Command-first 优先于 LLM 分类（用户显式策略优先） | D7-S5-A01 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| **D7-S5-A02-T01** | **SynthesizeTaskGraph 吸收 Explore Workers FlowEvent 产出有效 DAG** | **D7-S5-A02** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_SynthesizeTaskGraph`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A02-T02** | **decomposeGoal 规则版：goal → sub_goal → DAG** | **D7-S5-A02-F01** | **`decisionplanning/decomposer_test.go::TestTaskDecomposer_decomposeGoal`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A03-T01** | **MatchExecutorByTaskType：worker_type → D2/D4** | **D7-S5-A03-F01** | **`decisionplanning/executor_test.go::TestExecutorSelector_MatchExecutorByTaskType`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A03-T02** | **CheckExecutorAvailability：executor 状态查询** | **D7-S5-A03-F02** | **`decisionplanning/executor_test.go::TestExecutorSelector_CheckExecutorAvailability`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A03-T03** | **LLM Decomposer 解析 JSON DAG → wavescheduler.TaskNode（含 7 sub-cases）** | **D7-S5-A03-F03** | **`decisionplanning/llm_decomposer_test.go`（happy / bad JSON / enum coercion / unknown deps / extractJSON 6 case / nil LLM / SynthesizeTaskGraph routing）** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A02-F01-T01** | — | **ValidateToolCall: whitelist tool passes** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Allowed`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F01-T02** | — | **ValidateToolCall: forbidden tool rejected** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Forbidden`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F01-T03** | — | **ValidateToolCall: unknown tool rejected** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_Unknown`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F01-T04** | — | **ValidateToolCall: nil receiver safe** | **D7-S5-A02-F01** | **`workmodel/plan_agent_whitelist_test.go::TestValidateToolCall_NilReceiver`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F02-T01** | — | **PlanMode.Enter: nil LLM returns ErrLLMNotConfigured** | **D7-S5-A02-F02** | **`workmodel/plan_mode.go::Enter()`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F02-T02** | — | **PlanMode.Enter: valid LLM succeeds** | **D7-S5-A02-F02** | **`workmodel/plan_mode.go::Enter()`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F05-T01** | — | **Config struct: PlanModeApproveGate field removed** | **D7-S5-A02-F05** | **`orchtypes/config.go`, `shared/config/coordinator.go`, `shared/config/loader.go`, `bootstrap/wire_coordinator.go`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-F05-T02** | — | **Default config: no PlanModeApproveGate reference** | **D7-S5-A02-F05** | **`orchtypes/config.go::DefaultConfig()`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-IT01** | — | **LLM Decomposer end-to-end (JSON DAG → WaveScheduler)** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_EndToEnd`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-IT02** | — | **LLM Decomposer fallback on invalid JSON** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_FallbackOnInvalidJSON`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S5-A02-IT03** | — | **LLM Decomposer empty task list** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_EmptyTaskList`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A02-IT04** | — | **LLM Decomposer no JSON in response** | **D7-S5-A02** | **`tests/integration/d7/d7_llm_decomposer_test.go::TestIntegration_D7LLMDecomposer_NoJSONInResponse`** | **IMPLEMENTED** | **P1** | Plan_Generate |
+| **D7-S5-A04-T01** | **turn_adapter.PersistTurn 提交 req.Messages 到 D2 内存（DM-20260617-003 d7-turn-history-persist）** | **D7-S5-A04** | **`internal/bootstrap/turn_adapter_persist_test.go::TestPersistTurn_{WritesMessagesToD2Memory,FullRound,NilEngine,AppendError}`** | **IMPLEMENTED** | **P0** | SubTurn_Iteration |
+| **D7-S5-A04-T02** | **三轮同 session 连续 PersistTurn → Prepare 返回全历史** | **D7-S5-A04** | **`tests/integration/d7/turn_history_persist_test.go::TestTurnHistory_ThreeTurns`** | **IMPLEMENTED** | **P0** | SubTurn_Iteration |
 
 ---
 
@@ -135,24 +135,24 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v3.8 closure (2026-06-21):** `devrix-d7-error-aggregation-and-metrics` (DM-20260621-010) — 取代 `interrupt.go` 三步 cancel 的「all warn + nil」反模式，引入 `errors.Join` 聚合与原子指标；消除 `_ = Sandbox.Exit(...)` 三处 silent swallow；新增 WaveScheduler 4 字段与 TaskManager / Executor metrics 结构。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **D7-S6-A11-T01** | **HandleInterrupt: 3 步 cancel 全失败 → errors.Join 包含 3 个 wrapped error；errors.Is 命中每个** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_AllStepsFail_JoinsErrors`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A11-T02** | **HandleInterrupt: 1 步失败 → 返回非 nil + 仅含失败 step 的 wrapped error** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_PartialFailure_ReturnsPartialErr`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A11-T03** | **HandleInterrupt: nil Metrics 仍返回 errors.Join（向后兼容）** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_NilMetrics`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A12-T01** | **[OBSOLETE 2026-06-22, see D7-S6-A14-T03 + D4-S6-A12-Txx] Sandbox Exit 失败 metric 由 D4 multiagent/execute 提供，D7 spec 不重复声明** | **D7-S6-A12** | **跨域 reference to D4 executor metrics** | **OBSOLETE** | **P0** |
-| **D7-S6-A12-T02** | **Worker panic → SchedulerMetrics.WorkerPanics +1（spec 名 "worker_panics"，DM-20260622-001 A1 后对齐）** | **D7-S6-A12** | **`wavescheduler/scheduler_metrics_test.go::TestWaveScheduler_WorkerPanicsMetric` + `d7_s6_a14_test.go::TestD7S6A14T02_WorkerPanics_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A12-T03** | **taskCtx leak → SchedulerMetrics.TaskCtxLeaked +1** | **D7-S6-A12** | **`wavescheduler/scheduler_test.go::TestWaveScheduler_TaskCtxLeakMetric`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A12-T04** | **Forker: sandbox Exit 失败 → SandboxExitFailed 计数器 +1 + slog.Warn（13 调用方兼容）** | **D7-S6-A12** | **`multiagent/provision/freefork/forker_test.go::TestFork_SandboxExitFailure_RecordsMetric`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A12-T05** | **dispatchLoop wakeup → SchedulerMetrics.DispatchLoopWakeups +1（spec 名 "dispatch_loop_wakeups"，DM-20260622-001 A1 后对齐）** | **D7-S6-A12** | **`wavescheduler/scheduler_metrics_test.go::TestWaveScheduler_DispatchLoopWakeupsMetric` + `d7_s6_a14_test.go::TestD7S6A14T01_DispatchLoopWakeups_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A12-T06** | **TaskManager.publishCompletion panic → TaskManagerMetrics.PublishCompletionPanics +1 + slog.Error** | **D7-S6-A12** | **`workmodel/task_manager_metrics_test.go::TestTaskManagerMetrics_*`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A13-T07** | **DefaultForker: 多 fork 全失败 → errors.Join 包含每个 fork 的 wrapped error** | **D7-S6-A13** | **`multiagent/provision/freefork/forker_test.go::TestFork_AllFailuresJoined`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T01** | **dispatchLoop wakeup incMetric 名对齐 spec 复数: "dispatch_loop_wakeups"** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T01_DispatchLoopWakeups_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T02** | **Worker panic incMetric 名对齐 spec 复数: "worker_panics"** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T02_WorkerPanics_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T03** | **sandbox_exit_failed 跨域归属：spec 标注 OBSOLETE + cross-ref D4-S6-A12-Txx** | **D7-S6-A14** | **spec.md D7-S6-A12-T01 标注 + t-registry 本表** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T04** | **state.cancels + state.handles 在 markWaveDone 后清空（防长会话无界增长）** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T04_StateCancels_{NilAfterWaveDone,NoLeakAcrossWaves}`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T05** | **dispatchLoop hot path 用 AllowAndRegister 原子调用，关 TOCTOU 窗口** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T05_DispatchLoop_HotPathUsesAllowAndRegister`** | **IMPLEMENTED** | **P0** |
-| **D7-S6-A14-T06** | **CommandHandler emit 用 select-default 防 consumer 阻塞** | **D7-S6-A14** | **`sessionorchestrator/d7_s6_a14_t06_test.go::TestD7S6A14T06_CommandHandler_OutChannelFull_DropsEvent`** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S6-A11-T01** | **HandleInterrupt: 3 步 cancel 全失败 → errors.Join 包含 3 个 wrapped error；errors.Is 命中每个** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_AllStepsFail_JoinsErrors`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A11-T02** | **HandleInterrupt: 1 步失败 → 返回非 nil + 仅含失败 step 的 wrapped error** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_PartialFailure_ReturnsPartialErr`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A11-T03** | **HandleInterrupt: nil Metrics 仍返回 errors.Join（向后兼容）** | **D7-S6-A11** | **`sessionorchestrator/interrupt_test.go::TestHandleInterrupt_NilMetrics`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T01** | **[OBSOLETE 2026-06-22, see D7-S6-A14-T03 + D4-S6-A12-Txx] Sandbox Exit 失败 metric 由 D4 multiagent/execute 提供，D7 spec 不重复声明** | **D7-S6-A12** | **跨域 reference to D4 executor metrics** | **OBSOLETE** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T02** | **Worker panic → SchedulerMetrics.WorkerPanics +1（spec 名 "worker_panics"，DM-20260622-001 A1 后对齐）** | **D7-S6-A12** | **`wavescheduler/scheduler_metrics_test.go::TestWaveScheduler_WorkerPanicsMetric` + `d7_s6_a14_test.go::TestD7S6A14T02_WorkerPanics_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T03** | **taskCtx leak → SchedulerMetrics.TaskCtxLeaked +1** | **D7-S6-A12** | **`wavescheduler/scheduler_test.go::TestWaveScheduler_TaskCtxLeakMetric`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T04** | **Forker: sandbox Exit 失败 → SandboxExitFailed 计数器 +1 + slog.Warn（13 调用方兼容）** | **D7-S6-A12** | **`multiagent/provision/freefork/forker_test.go::TestFork_SandboxExitFailure_RecordsMetric`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T05** | **dispatchLoop wakeup → SchedulerMetrics.DispatchLoopWakeups +1（spec 名 "dispatch_loop_wakeups"，DM-20260622-001 A1 后对齐）** | **D7-S6-A12** | **`wavescheduler/scheduler_metrics_test.go::TestWaveScheduler_DispatchLoopWakeupsMetric` + `d7_s6_a14_test.go::TestD7S6A14T01_DispatchLoopWakeups_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A12-T06** | **TaskManager.publishCompletion panic → TaskManagerMetrics.PublishCompletionPanics +1 + slog.Error** | **D7-S6-A12** | **`workmodel/task_manager_metrics_test.go::TestTaskManagerMetrics_*`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A13-T07** | **DefaultForker: 多 fork 全失败 → errors.Join 包含每个 fork 的 wrapped error** | **D7-S6-A13** | **`multiagent/provision/freefork/forker_test.go::TestFork_AllFailuresJoined`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T01** | **dispatchLoop wakeup incMetric 名对齐 spec 复数: "dispatch_loop_wakeups"** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T01_DispatchLoopWakeups_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T02** | **Worker panic incMetric 名对齐 spec 复数: "worker_panics"** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T02_WorkerPanics_SpecAlignedPlural`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T03** | **sandbox_exit_failed 跨域归属：spec 标注 OBSOLETE + cross-ref D4-S6-A12-Txx** | **D7-S6-A14** | **spec.md D7-S6-A12-T01 标注 + t-registry 本表** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T04** | **state.cancels + state.handles 在 markWaveDone 后清空（防长会话无界增长）** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T04_StateCancels_{NilAfterWaveDone,NoLeakAcrossWaves}`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T05** | **dispatchLoop hot path 用 AllowAndRegister 原子调用，关 TOCTOU 窗口** | **D7-S6-A14** | **`wavescheduler/d7_s6_a14_test.go::TestD7S6A14T05_DispatchLoop_HotPathUsesAllowAndRegister`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
+| **D7-S6-A14-T06** | **CommandHandler emit 用 select-default 防 consumer 阻塞** | **D7-S6-A14** | **`sessionorchestrator/d7_s6_a14_t06_test.go::TestD7S6A14T06_CommandHandler_OutChannelFull_DropsEvent`** | **IMPLEMENTED** | **P0** | Hardening_Metric |
 
 > 配套 P1：WaveScheduler `WorkerPanics` / `TaskCtxLeaked` / `WaveReentryCancelled` / `DispatchLoopWakeups` 4 字段为 `wavescheduler/scheduler_metrics_test.go` 7 单元 + 端到端测试覆盖（panickingRunner / reentry / wakeup ticker）；`TestFork_Metrics_*` 3 场景覆盖 SandboxEnterFailed / FactoryCreateFailed / RollbackTriggered 触发路径。
 
@@ -164,24 +164,24 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ### D7-S9-A25: Execute Artifact Data Contract (PR-C1)
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| **D7-S9-A25-T01** | **ArtifactKind 4 类枚举 + String() snake_case wire format + MarshalJSON/UnmarshalJSON roundtrip + 未知值 fail-fast** | **D7-S9-A25** | **`orchtypes/artifact_kind_test.go::TestArtifactKind_{4Types_String,4Types_ParseRoundTrip,UnknownValue_ParseError,JSON_WireFormat,UnmarshalEmptyString_DefaultsToZero,UnmarshalUnknownString_FailsLoudly}`（6 functions / 9 subtests）** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A25-T02** | **SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）+ IsTerminal/NeedsAttention 派生 + SideEffectDetail 5 字段（IdempotencyKey/SentAt/ConfirmedAt/CompensationLog/CompensationTool）** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_{5States_String,5States_RoundTrip,IsTerminal,NeedsAttention,ReusesUncertaintyCoordType}` + `TestSideEffectDetail_JSON_RoundTrip`（6 functions / 11 subtests）** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A25-T03** | **wavescheduler.Artifact +5 字段（Kind/SourcePlanID/AnomaliesCount/SideEffectStatus/SideEffectDetail）+ omitempty 向后兼容 + zero Kind 不出现在 JSON** | **D7-S9-A25** | **`wavescheduler/artifact_test.go::TestArtifact_{NewFields_PrC1,BackwardCompat_PrC1,KindZeroValue_OmittedFromJSON}`（3 new functions）+ 4 既有 ArtifactStore 测试 0 regression** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A25-T04** | **跨域类型上提 shared/types 打破 import cycle（orchtypes.SideEffectStatus 改为 type alias = types.SideEffectStatus，与 UncertaintyCoord 共享同一定义）+ shared/types → orchtypes 单向依赖无 cycle** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_ReusesUncertaintyCoordType` + `internal/lint/layer` PASS + `go test -race ./internal/...` 19/19 PASS** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A25-T01** | **ArtifactKind 4 类枚举 + String() snake_case wire format + MarshalJSON/UnmarshalJSON roundtrip + 未知值 fail-fast** | **D7-S9-A25** | **`orchtypes/artifact_kind_test.go::TestArtifactKind_{4Types_String,4Types_ParseRoundTrip,UnknownValue_ParseError,JSON_WireFormat,UnmarshalEmptyString_DefaultsToZero,UnmarshalUnknownString_FailsLoudly}`（6 functions / 9 subtests）** | **IMPLEMENTED** | **P0** | Execute_Artifact |
+| **D7-S9-A25-T02** | **SideEffectStatus 5 态（None/Unknown/Inflight/Committed/RolledBack）+ IsTerminal/NeedsAttention 派生 + SideEffectDetail 5 字段（IdempotencyKey/SentAt/ConfirmedAt/CompensationLog/CompensationTool）** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_{5States_String,5States_RoundTrip,IsTerminal,NeedsAttention,ReusesUncertaintyCoordType}` + `TestSideEffectDetail_JSON_RoundTrip`（6 functions / 11 subtests）** | **IMPLEMENTED** | **P0** | Execute_Artifact |
+| **D7-S9-A25-T03** | **wavescheduler.Artifact +5 字段（Kind/SourcePlanID/AnomaliesCount/SideEffectStatus/SideEffectDetail）+ omitempty 向后兼容 + zero Kind 不出现在 JSON** | **D7-S9-A25** | **`wavescheduler/artifact_test.go::TestArtifact_{NewFields_PrC1,BackwardCompat_PrC1,KindZeroValue_OmittedFromJSON}`（3 new functions）+ 4 既有 ArtifactStore 测试 0 regression** | **IMPLEMENTED** | **P0** | Execute_Artifact |
+| **D7-S9-A25-T04** | **跨域类型上提 shared/types 打破 import cycle（orchtypes.SideEffectStatus 改为 type alias = types.SideEffectStatus，与 UncertaintyCoord 共享同一定义）+ shared/types → orchtypes 单向依赖无 cycle** | **D7-S9-A25** | **`orchtypes/side_effect_status_test.go::TestSideEffectStatus_ReusesUncertaintyCoordType` + `internal/lint/layer` PASS + `go test -race ./internal/...` 19/19 PASS** | **IMPLEMENTED** | **P0** | Execute_Artifact |
 
 > 配套 P0 验证：`internal/shared/types/execute.go` 包内独立测试覆盖（`TestArtifactKind_4Types_String` + `TestSideEffectStatus_5States_String` 在新包内 PASS，验证上提后无 cycle）；`go vet ./...` 0 issue；19/19 internal packages `go test -race` 0 race warnings；orchtypes 包覆盖率 72.2%（与 Phase 2 baseline 持平）。
 
 ### D7-S9-A26: Execute 4 Channel + ChannelRouter (PR-C2)
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| **D7-S9-A26-T01** | **Channel interface (Name/Supports/Execute) + ChannelRegistry (PlanKind → Channel 1:1 绑定 + 重复 Register 冲突检测) + ChannelRouter (无状态分发 4 PlanKind → 4 ArtifactKind 1:1 映射) + defensive checks (nil Plan + 未知 Kind)** | **D7-S9-A26** | **`execute/execute_test.go::TestChannelRegistry_Register_4Kinds`, `TestChannelRegistry_Get_NotFound`, `TestChannelRegistry_Register_DuplicateConflict`, `TestChannelRouter_Route_4Kinds`, `TestChannelRouter_Route_NilPlan`, `TestChannelRouter_Route_UnknownPlanKind`** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A26-T02** | **CommitChannel (CommitmentPlan → ArtifactStateChangeCert, 1-Step 同步 + IdempotencyKey 强制 + 超时 SideEffectInflight) + Supports guard + 多步 Plan ErrChannelStepCountMismatch + nil runner constructor ErrChannelToolRunnerNil** | **D7-S9-A26** | **`execute/execute_test.go::TestCommitChannel_CommitmentPlan_OK`, `TestCommitChannel_OtherPlan_NotSupported`, `TestCommitChannel_SingleStep_ProducesStateChangeCert`, `TestCommitChannel_Timeout_InflightSideEffect`, `TestCommitChannel_NilRunner`** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A26-T03** | **ProtocolChannel (ProtocolPlan → ArtifactResponseRecord, 顺序多步 + 失败 reverse-order rollback 含 `__rollback: true` hint 标记) + Supports guard + 空 Steps rejection** | **D7-S9-A26** | **`execute/execute_test.go::TestProtocolChannel_AllStepsSuccess_ResponseRecord`, `TestProtocolChannel_Step2_Failed_RollbackStep1`, `TestProtocolChannel_OtherPlan_NotSupported`, `TestProtocolChannel_EmptySteps`** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A26-T04** | **ScenarioChannel (ScenarioPlan → ArtifactProbeReport, MaxParallel=5 并行探测 + 多数派投票 success > len/2 → pass + 失败多数派触发 ErrChannelStepCountMismatch + SideEffectStatus=None read-only)** | **D7-S9-A26** | **`execute/execute_test.go::TestScenarioChannel_5ParallelProbes`, `TestScenarioChannel_MajorityVote_ProbeReport`, `TestScenarioChannel_MixedResults_TakesMajority`** | **IMPLEMENTED** | **P0** |
-| **D7-S9-A26-T05** | **ExplorationChannel (ExplorationPlan → ArtifactExperimentData, MaxParallel=3 多 agent 并行 + 容忍部分失败 free-fork + 优先级排序 success → duration → EstimatedTokens + PersistScope → SideEffectStatus 派生 transient → None, session/permanent → Committed, unknown → Unknown)** | **D7-S9-A26** | **`execute/execute_test.go::TestExplorationChannel_MultiAgent_Parallel`, `TestExplorationChannel_FreeFork_Optional`, `TestExplorationChannel_PriorityOrder_ExperimentData`, `TestExplorationChannel_PersistScope_Mapping`** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A26-T01** | **Channel interface (Name/Supports/Execute) + ChannelRegistry (PlanKind → Channel 1:1 绑定 + 重复 Register 冲突检测) + ChannelRouter (无状态分发 4 PlanKind → 4 ArtifactKind 1:1 映射) + defensive checks (nil Plan + 未知 Kind)** | **D7-S9-A26** | **`execute/execute_test.go::TestChannelRegistry_Register_4Kinds`, `TestChannelRegistry_Get_NotFound`, `TestChannelRegistry_Register_DuplicateConflict`, `TestChannelRouter_Route_4Kinds`, `TestChannelRouter_Route_NilPlan`, `TestChannelRouter_Route_UnknownPlanKind`** | **IMPLEMENTED** | **P0** | Channel_Route |
+| **D7-S9-A26-T02** | **CommitChannel (CommitmentPlan → ArtifactStateChangeCert, 1-Step 同步 + IdempotencyKey 强制 + 超时 SideEffectInflight) + Supports guard + 多步 Plan ErrChannelStepCountMismatch + nil runner constructor ErrChannelToolRunnerNil** | **D7-S9-A26** | **`execute/execute_test.go::TestCommitChannel_CommitmentPlan_OK`, `TestCommitChannel_OtherPlan_NotSupported`, `TestCommitChannel_SingleStep_ProducesStateChangeCert`, `TestCommitChannel_Timeout_InflightSideEffect`, `TestCommitChannel_NilRunner`** | **IMPLEMENTED** | **P0** | Channel_Route |
+| **D7-S9-A26-T03** | **ProtocolChannel (ProtocolPlan → ArtifactResponseRecord, 顺序多步 + 失败 reverse-order rollback 含 `__rollback: true` hint 标记) + Supports guard + 空 Steps rejection** | **D7-S9-A26** | **`execute/execute_test.go::TestProtocolChannel_AllStepsSuccess_ResponseRecord`, `TestProtocolChannel_Step2_Failed_RollbackStep1`, `TestProtocolChannel_OtherPlan_NotSupported`, `TestProtocolChannel_EmptySteps`** | **IMPLEMENTED** | **P0** | Channel_Route |
+| **D7-S9-A26-T04** | **ScenarioChannel (ScenarioPlan → ArtifactProbeReport, MaxParallel=5 并行探测 + 多数派投票 success > len/2 → pass + 失败多数派触发 ErrChannelStepCountMismatch + SideEffectStatus=None read-only)** | **D7-S9-A26** | **`execute/execute_test.go::TestScenarioChannel_5ParallelProbes`, `TestScenarioChannel_MajorityVote_ProbeReport`, `TestScenarioChannel_MixedResults_TakesMajority`** | **IMPLEMENTED** | **P0** | Channel_Route |
+| **D7-S9-A26-T05** | **ExplorationChannel (ExplorationPlan → ArtifactExperimentData, MaxParallel=3 多 agent 并行 + 容忍部分失败 free-fork + 优先级排序 success → duration → EstimatedTokens + PersistScope → SideEffectStatus 派生 transient → None, session/permanent → Committed, unknown → Unknown)** | **D7-S9-A26** | **`execute/execute_test.go::TestExplorationChannel_MultiAgent_Parallel`, `TestExplorationChannel_FreeFork_Optional`, `TestExplorationChannel_PriorityOrder_ExperimentData`, `TestExplorationChannel_PersistScope_Mapping`** | **IMPLEMENTED** | **P0** | Channel_Route |
 
 > 配套 P0 验证：`execute/execute_test.go` 22 个测试 100% PASS（0 race detector warnings），覆盖率 88.1%；5 SentinelError + 4 helpers (EXEC_CHANNEL_9001..9004) 在 `execute/errors.go` 定义并被测试断言；`go vet ./...` 0 issue；`go build ./...` 0 error；22/22 tests cover T01..T05 P0 边界 + 1-Step 严格性 + IdempotencyKey 强制 + 超时 SideEffectInflight + reverse-order rollback + 多数派投票 + PersistScope 派生。
 
@@ -193,24 +193,24 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ### D7-S8-A15: Observation + UncertaintyReport (PR-A1 + PR-RF)
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| **D7-S8-A15-T01** | **Observation 4 类（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）× 2 Category（CatBusiness/CatSystem）+ sealed Payload interface（4 concrete types: FactPayload/SignalPayload/DeviationPayload/UncertaintyPayload）+ 不可变（WithKind/WithStrength 返回新副本）+ Strength ∈ [0,1] 边界保护（clamp01Float panic on out-of-range）+ DetectedAt 非零 + MarshalJSON wire format 嵌套对象 + JSON roundtrip** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{4Kinds_4Categories,Immutability,Payload_TypeAssertion,Validate_StrengthOutOfRange,Validate_DetectedAtZero,JSON_Roundtrip,WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError,MarshalJSON_WireFormat,Clamp01Float_NaN_Fallback}`（12 functions / 13 subtests）** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A15-T02** | **UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness Observations（不包含 CatSystem 避免系统异常污染整体 Strength）+ CatBusiness 为空时 defaults 0.5（避免 NaN via clamp01Float NaN 兜底）** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{ComputeOverallStrength_BusinessOnly,ComputeOverallStrength_EmptyBusiness_DefaultsHalf,ComputeOverallStrength_IgnoresCatSystem,Overall_NaN_Fallback}`（4 functions）** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A15-T03** | **UncertaintyCoord Phase 2 增量扩展：FromVerifier 工厂方法（verdict/confidence/reason → Coord，含 Source: SourceVerifier）+ IsColdStart + Equal + With* + Phase 1 JSON wire format 向后兼容（FromVerifier=false + SideEffectStatus="" 零值，MarshalJSON 用 omitempty）+ 未知 verdict 失败兜底 + FromVerifier fail-fast (ORCH_COORD_VERDICT_7004 错误码 + sharederrors.WithCode)** | **D7-S8-A15** | **`orchtypes/uncertainty_coord_test.go::TestUncertaintyCoord_{FromVerifier_SetsFromVerifierTrue,FromVerifier_SourceIsVerifier,JSON_Phase1_Compatibility,JSON_Omitempty_NewFields,FromVerifier_UnknownKind}` + 4 既有 baseline test PASS** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A15-T04** | **UncertaintyReport Partition 不变式强制保证（CatBusiness ∪ CatSystem == Observations）+ 违反不变式返回 ErrUncertaintyReportPartitionInvariant + 空 Observations 边界（Partition invariant holds vacuously）+ CatBusiness/CatSystem disjoint 不变式** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{PartitionInvariant_BusinessUnionSystemEqualsObservations,PartitionInvariant_Violation_ReturnsError,PartitionInvariant_EmptyObservations}`（3 functions）** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A15-T05** | **UncertaintyReport FilterByKind 故意遍历全集（不限 Category，跨 CatBusiness/CatSystem 都返回）+ 返回所有指定 Kind 的 Observation + 空输入返回空切片 + ALL kind 返回全集** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{FilterByKind_IncludesCatSystem,FilterByKind_Empty,FilterByKind_AllObservations}`（3 functions）** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A15-T06** | **Observation 不可变（WithKind 返回新副本，原实例未修改）+ Strength ∈ [0,1] panic on out-of-range + validateFact FailureCriteria 包装 fmt.Errorf（"orchtypes: FactPayload.Statement empty: %w", ErrObservationPayloadInvalid）+ UnmarshalJSON graceful degrade（forward-compat 字段缺失不回 error）** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError}`（4 functions）** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S8-A15-T01** | **Observation 4 类（ObsFact/ObsSignal/ObsDeviation/ObsUncertainty）× 2 Category（CatBusiness/CatSystem）+ sealed Payload interface（4 concrete types: FactPayload/SignalPayload/DeviationPayload/UncertaintyPayload）+ 不可变（WithKind/WithStrength 返回新副本）+ Strength ∈ [0,1] 边界保护（clamp01Float panic on out-of-range）+ DetectedAt 非零 + MarshalJSON wire format 嵌套对象 + JSON roundtrip** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{4Kinds_4Categories,Immutability,Payload_TypeAssertion,Validate_StrengthOutOfRange,Validate_DetectedAtZero,JSON_Roundtrip,WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError,MarshalJSON_WireFormat,Clamp01Float_NaN_Fallback}`（12 functions / 13 subtests）** | **IMPLEMENTED** | **P0** | Observe_Quantize |
+| **D7-S8-A15-T02** | **UncertaintyReport ComputeOverallStrength 仅遍历 CatBusiness Observations（不包含 CatSystem 避免系统异常污染整体 Strength）+ CatBusiness 为空时 defaults 0.5（避免 NaN via clamp01Float NaN 兜底）** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{ComputeOverallStrength_BusinessOnly,ComputeOverallStrength_EmptyBusiness_DefaultsHalf,ComputeOverallStrength_IgnoresCatSystem,Overall_NaN_Fallback}`（4 functions）** | **IMPLEMENTED** | **P0** | Observe_Quantize |
+| **D7-S8-A15-T03** | **UncertaintyCoord Phase 2 增量扩展：FromVerifier 工厂方法（verdict/confidence/reason → Coord，含 Source: SourceVerifier）+ IsColdStart + Equal + With* + Phase 1 JSON wire format 向后兼容（FromVerifier=false + SideEffectStatus="" 零值，MarshalJSON 用 omitempty）+ 未知 verdict 失败兜底 + FromVerifier fail-fast (ORCH_COORD_VERDICT_7004 错误码 + sharederrors.WithCode)** | **D7-S8-A15** | **`orchtypes/uncertainty_coord_test.go::TestUncertaintyCoord_{FromVerifier_SetsFromVerifierTrue,FromVerifier_SourceIsVerifier,JSON_Phase1_Compatibility,JSON_Omitempty_NewFields,FromVerifier_UnknownKind}` + 4 既有 baseline test PASS** | **IMPLEMENTED** | **P0** | Observe_Quantize |
+| **D7-S8-A15-T04** | **UncertaintyReport Partition 不变式强制保证（CatBusiness ∪ CatSystem == Observations）+ 违反不变式返回 ErrUncertaintyReportPartitionInvariant + 空 Observations 边界（Partition invariant holds vacuously）+ CatBusiness/CatSystem disjoint 不变式** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{PartitionInvariant_BusinessUnionSystemEqualsObservations,PartitionInvariant_Violation_ReturnsError,PartitionInvariant_EmptyObservations}`（3 functions）** | **IMPLEMENTED** | **P0** | Observe_Quantize |
+| **D7-S8-A15-T05** | **UncertaintyReport FilterByKind 故意遍历全集（不限 Category，跨 CatBusiness/CatSystem 都返回）+ 返回所有指定 Kind 的 Observation + 空输入返回空切片 + ALL kind 返回全集** | **D7-S8-A15** | **`orchtypes/uncertainty_report_test.go::TestUncertaintyReport_{FilterByKind_IncludesCatSystem,FilterByKind_Empty,FilterByKind_AllObservations}`（3 functions）** | **IMPLEMENTED** | **P0** | Observe_Quantize |
+| **D7-S8-A15-T06** | **Observation 不可变（WithKind 返回新副本，原实例未修改）+ Strength ∈ [0,1] panic on out-of-range + validateFact FailureCriteria 包装 fmt.Errorf（"orchtypes: FactPayload.Statement empty: %w", ErrObservationPayloadInvalid）+ UnmarshalJSON graceful degrade（forward-compat 字段缺失不回 error）** | **D7-S8-A15** | **`orchtypes/observation_test.go::TestObservation_{WithKind_Immutability,WithStrength_Panic_OnOutOfRange,WithStrength_NormalRange,ValidateFact_WrappedError}`（4 functions）** | **IMPLEMENTED** | **P0** | Observe_Quantize |
 
 > 配套 P0 验证：`internal/layers/orchestration/orchtypes/` 包内 23 baseline + 6 新增测试函数 + 33 subtests 100% PASS；`go vet ./...` 0 issue；orchtypes 包 `go test -race` 0 race warnings；覆盖率 72.2%（持平 PR-A1 baseline）。Phase 1 调用方零修改（Phase 1 UncertaintyCoord 字段 + JSON wire format 保持）；Phase 2 后续 PR-A2 (IntentQuantizer) / PR-A3 (AnomalyDetector) / PR-A4 (ObserveNode wiring) / PR-B2 (Plan.Validate 细化) / PR-B3 (LLMPlanner) 作为独立 OpenSpec change 推进（D7-S8-A19/A20/A21/A23/A24 模块 PLANNED）；PR-B1 (Plan 4 类 + Planner) 已闭环为 D7-S8-A22。
 
 ### D7-S8-A22: Plan Data Contract + Planner (PR-B1)
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| **D7-S8-A22-T01** | **PlanKind 4 类枚举 (CommitmentPlan/ProtocolPlan/ScenarioPlan/ExplorationPlan) + String() snake_case wire format + MarshalJSON 输出字符串 + UnmarshalJSON 未知值 fail-fast + KindUnset omitempty + ParsePlanKind CLI 反向解析** | **D7-S8-A22** | **`plan/plan_test.go::TestPlanKind_4Types_AreDistinct`, `TestPlanKind_String_SnakeCase`, `TestPlanKind_KindUnset_DefaultsFromEmpty`, `TestPlanKind_MarshalJSON_KnownValues`, `TestPlanKind_MarshalJSON_KindUnset_Omits`, `TestPlanKind_UnmarshalJSON_RoundTrip`, `TestPlanKind_UnmarshalJSON_UnknownFailsFast`, `TestParsePlanKind`** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A22-T02** | **Plan.SourceObservationIDs 必填（空 → ErrPlanSourceObservationIDsRequired + 错误码 PLAN_LINEAGE_8002）+ NewPlan 防御性拷贝（外部 mutation 不影响 Plan 内字段）+ ReverseLookupObservations Phase 4 Verify 反向追溯入口（按 ID 集合求交）+ 重复 ID 不产生重复结果 + 空输入边界（nil/empty）** | **D7-S8-A22** | **`plan/plan_test.go::TestPlan_SourceObservationIDs_Required`, `TestPlan_NewPlan_CopiesObservationIDs`, `TestPlan_SourceObservationIDs_ReverseLookup_Exact`, `TestPlan_SourceObservationIDs_ReverseLookup_DuplicateIDs`, `TestPlan_SourceObservationIDs_ReverseLookup_Empty`** | **IMPLEMENTED** | **P0** |
-| **D7-S8-A22-T03** | **MatchKind 4 规则分类器 (Rule 1: intent_orchestrate OR anomaliesCount≥3 → ExplorationPlan; Rule 2: stepCount==1 → CommitmentPlan; Rule 3: intent_command OR stepCount≤3 → ProtocolPlan; Rule 4: default → ScenarioPlan) + uncertainty-first tie-break + DefaultPlanner.Plan() 完整集成（强度公式 / 校验失败传递 / BlastRadius 透传 / 空 ObservationIDs fast-fail）** | **D7-S8-A22** | **`plan/plan_test.go::TestMatchKind_4Rules`, `TestDefaultPlanner_Plan_EmptyObservationIDs_FailsFast`, `TestDefaultPlanner_Plan_CommitmentFromSingleStep`, `TestDefaultPlanner_Plan_ExplorationFromAnomalies`, `TestDefaultPlanner_Plan_StrengthMatchesFormula`, `TestDefaultPlanner_Plan_ValidationFailurePropagates`, `TestDefaultPlanner_Plan_BlastRadiusPropagated`, `TestStrengthFloor_Unit`** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S8-A22-T01** | **PlanKind 4 类枚举 (CommitmentPlan/ProtocolPlan/ScenarioPlan/ExplorationPlan) + String() snake_case wire format + MarshalJSON 输出字符串 + UnmarshalJSON 未知值 fail-fast + KindUnset omitempty + ParsePlanKind CLI 反向解析** | **D7-S8-A22** | **`plan/plan_test.go::TestPlanKind_4Types_AreDistinct`, `TestPlanKind_String_SnakeCase`, `TestPlanKind_KindUnset_DefaultsFromEmpty`, `TestPlanKind_MarshalJSON_KnownValues`, `TestPlanKind_MarshalJSON_KindUnset_Omits`, `TestPlanKind_UnmarshalJSON_RoundTrip`, `TestPlanKind_UnmarshalJSON_UnknownFailsFast`, `TestParsePlanKind`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S8-A22-T02** | **Plan.SourceObservationIDs 必填（空 → ErrPlanSourceObservationIDsRequired + 错误码 PLAN_LINEAGE_8002）+ NewPlan 防御性拷贝（外部 mutation 不影响 Plan 内字段）+ ReverseLookupObservations Phase 4 Verify 反向追溯入口（按 ID 集合求交）+ 重复 ID 不产生重复结果 + 空输入边界（nil/empty）** | **D7-S8-A22** | **`plan/plan_test.go::TestPlan_SourceObservationIDs_Required`, `TestPlan_NewPlan_CopiesObservationIDs`, `TestPlan_SourceObservationIDs_ReverseLookup_Exact`, `TestPlan_SourceObservationIDs_ReverseLookup_DuplicateIDs`, `TestPlan_SourceObservationIDs_ReverseLookup_Empty`** | **IMPLEMENTED** | **P0** | Plan_Generate |
+| **D7-S8-A22-T03** | **MatchKind 4 规则分类器 (Rule 1: intent_orchestrate OR anomaliesCount≥3 → ExplorationPlan; Rule 2: stepCount==1 → CommitmentPlan; Rule 3: intent_command OR stepCount≤3 → ProtocolPlan; Rule 4: default → ScenarioPlan) + uncertainty-first tie-break + DefaultPlanner.Plan() 完整集成（强度公式 / 校验失败传递 / BlastRadius 透传 / 空 ObservationIDs fast-fail）** | **D7-S8-A22** | **`plan/plan_test.go::TestMatchKind_4Rules`, `TestDefaultPlanner_Plan_EmptyObservationIDs_FailsFast`, `TestDefaultPlanner_Plan_CommitmentFromSingleStep`, `TestDefaultPlanner_Plan_ExplorationFromAnomalies`, `TestDefaultPlanner_Plan_StrengthMatchesFormula`, `TestDefaultPlanner_Plan_ValidationFailurePropagates`, `TestDefaultPlanner_Plan_BlastRadiusPropagated`, `TestStrengthFloor_Unit`** | **IMPLEMENTED** | **P0** | Plan_Generate |
 
 > 配套 P0 验证：`plan/plan_test.go` 30 个测试 100% PASS（0 race detector warnings），覆盖率 93.5%；含 9 SentinelError + 3 helpers (PLAN_KIND_8001 / PLAN_LINEAGE_8002 / PLAN_BLAST_8003) 在 `plan/errors.go` 定义并被测试断言；strengthFloor 公式 `0.7 base − 0.1·anomalies + min(observations·0.02, 0.2)` 单测覆盖（含 IEEE 754 float drift 容忍 `≥ 0.89`）；Plan 不可变 With* (WithKind/WithStrength/WithFailureCriteria/WithBlastRadius/WithAnomaliesCount) 全部以新副本返回；PP-1 强度范围 [0,1] + PP-2 FailureCriteria 非空 + PP-3 BlastRadius 阈值 全部 Validate 强制；C2/W8 MatchKind 签名收紧为 `(*UncertaintyReport)` 已落地。
 
@@ -222,28 +222,28 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v1.1 closure (2026-06-15):** D7-S2-A04 DispatchWorker wired（Phase DM-018）；D7-S2-A06/A07 wired（Phase DM-020）。T 层增补 hubspoke 测试。
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `sessionorchestrator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T03 | OrchestratePath 按路由矩阵（v1.1.0+ 显式调 SynthesizeTaskGraph + WaveScheduler） | D7-S2-A01-F03 | `sessionorchestrator/orchestrate_path_test.go` (5 AC) | IMPLEMENTED | P0 |
-| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 |
-| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go` | IMPLEMENTED | P0 |
-| D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress` | IMPLEMENTED | P0 |
-| D7-S2-A01-T04 | IntentCommand 显式分发到 PlanCLI/CLICommands（v1.1.0+ orthogonal） | D7-S2-A01 | `sessionorchestrator/command_handler_test.go` (3 AC) | IMPLEMENTED | P0 |
-| D7-S2-A01-T05 | IntentOrchestrate 走 SynthesizeTaskGraph + WaveScheduler（v1.1.0+ orthogonal） | D7-S2-A01 | `sessionorchestrator/orchestrate_path_test.go` (5 AC) | IMPLEMENTED | P0 |
-| D7-S2-A01-T06 | IntentFast 保持 FastPath（v1.1.0+ orthogonal, 不回归） | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_ProcessMessage_FastPath` | IMPLEMENTED | P0 |
-| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 |
-| **D7-S2-A04-T01** | **DispatchWorker D4 enabled with leader** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_enabled_withLeader`** | **IMPLEMENTED** | **P0** |
-| **D7-S2-A04-T02** | **DispatchWorker D4 disabled falls back to D2 SubQuery** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_disabled_fallsToD2`** | **IMPLEMENTED** | **P0** |
-| **D7-S2-A04-T03** | **DispatchWorker async mode** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_async`** | **IMPLEMENTED** | **P1** |
-| **D7-S2-A03-F06-T01** | — | **LLMFallbackClassifier Deprecated marker** | **D7-S2-A03-F06** | **`decisionplanning/classifier_fallback.go`** | **IMPLEMENTED** | **P1** |
-| **D7-S2-A03-F06-T02** | — | **ExecutorSelector Deprecated marker** | **D7-S2-A03-F06** | **`decisionplanning/executor.go`** | **IMPLEMENTED** | **P1** |
-| **D7-S2-A06-IT01** | — | **Multi-turn tool conversation (2 LLM rounds)** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MultiTurnToolConversation`** | **IMPLEMENTED** | **P0** |
-| **D7-S2-A06-IT02** | — | **MaxTurns cap enforcement** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MaxTurnsCap`** | **IMPLEMENTED** | **P1** |
-| **D7-S2-A06-IT03** | — | **StopProcess during slow Turn** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_ContextCancellation`** | **IMPLEMENTED** | **P1** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| D7-S2-T01 | ProcessMessage 为 D1 主入口 | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-T02a | FastPath proxy 开销 P99 ≤ 2ms（Classify 后） | D7-S2-A01-F02 | `sessionorchestrator/orchestrator_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-T02b | 规则 ClassifyIntent P99 ≤ 1ms | D7-S2-A02 | `decisionplanning/classifier_test.go` | IMPLEMENTED | P0 | Intent_Classify |
+| D7-S2-T02c | FastPath 端到端 P99 ≤ 2ms（command-first 全栈） | D7-S2-A01-F02 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_fastpath_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-T03 | OrchestratePath 按路由矩阵（v1.1.0+ 显式调 SynthesizeTaskGraph + WaveScheduler） | D7-S2-A01-F03 | `sessionorchestrator/orchestrate_path_test.go` (5 AC) | IMPLEMENTED | P0 | Orchestrate_Run |
+| D7-S2-T04 | HandleInterrupt：Wave→D4→Process→stopped→TaskCancel | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-T05 | HandleInterrupt 幂等 | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-A01-T03 | 禁止在 Worker terminal FlowEvent 前伪造 Task 进度（anti-fabrication commitment） | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_AntiFabrication_NoSyntheticProgress` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-A01-T04 | IntentCommand 显式分发到 PlanCLI/CLICommands（v1.1.0+ orthogonal） | D7-S2-A01 | `sessionorchestrator/command_handler_test.go` (3 AC) | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-A01-T05 | IntentOrchestrate 走 SynthesizeTaskGraph + WaveScheduler（v1.1.0+ orthogonal） | D7-S2-A01 | `sessionorchestrator/orchestrate_path_test.go` (5 AC) | IMPLEMENTED | P0 | Orchestrate_Run |
+| D7-S2-A01-T06 | IntentFast 保持 FastPath（v1.1.0+ orthogonal, 不回归） | D7-S2-A01 | `sessionorchestrator/orchestrator_test.go::TestSessionOrchestrator_ProcessMessage_FastPath` | IMPLEMENTED | P0 | Session_Process |
+| D7-S2-A03-T01 | HandleInterrupt 中断顺序正确（可中断性承诺） | D7-S2-A03 | `sessionorchestrator/orchestrator_test.go`；`tests/integration/d7/d7_interrupt_test.go` | IMPLEMENTED | P0 | Session_Process |
+| **D7-S2-A04-T01** | **DispatchWorker D4 enabled with leader** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_enabled_withLeader`** | **IMPLEMENTED** | **P0** | Session_Process |
+| **D7-S2-A04-T02** | **DispatchWorker D4 disabled falls back to D2 SubQuery** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_disabled_fallsToD2`** | **IMPLEMENTED** | **P0** | Session_Process |
+| **D7-S2-A04-T03** | **DispatchWorker async mode** | **D7-S2-A04** | **`hubspoke/hubspoke_test.go::TestDispatcher_Dispatch_D4_async`** | **IMPLEMENTED** | **P1** | Session_Process |
+| **D7-S2-A03-F06-T01** | — | **LLMFallbackClassifier Deprecated marker** | **D7-S2-A03-F06** | **`decisionplanning/classifier_fallback.go`** | **IMPLEMENTED** | **P1** | Session_Process |
+| **D7-S2-A03-F06-T02** | — | **ExecutorSelector Deprecated marker** | **D7-S2-A03-F06** | **`decisionplanning/executor.go`** | **IMPLEMENTED** | **P1** | Session_Process |
+| **D7-S2-A06-IT01** | — | **Multi-turn tool conversation (2 LLM rounds)** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MultiTurnToolConversation`** | **IMPLEMENTED** | **P0** | Turn_Run |
+| **D7-S2-A06-IT02** | — | **MaxTurns cap enforcement** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MaxTurnsCap`** | **IMPLEMENTED** | **P1** | Turn_Run |
+| **D7-S2-A06-IT03** | — | **StopProcess during slow Turn** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_ContextCancellation`** | **IMPLEMENTED** | **P1** | Turn_Run |
 
 ### Turn Adapter LTL-Lite Hook (DM-20260618-007)
 
@@ -257,11 +257,11 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > D2 t-registry 持有 helper 自身的 T 点（T01-T05/T01-T03/T01-T05）；
 > 本表持有 turn loop 集成 + bootstrap 接线 T 点（T11-T13）。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **D7-S2-A06-T11** | **AC1+AC2 turn loop integration: tool result cap + assistant fold wired into RunTurn** | **D7-S2-A06** | **`orchestration/sessionorchestrator/orchestrator_toolcap_test.go::TestOrchestrator_BuildToolResultMsgWithCap_*`, `TestOrchestrator_BuildAssistantToolCallMsgFolded_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
-| **D7-S2-A06-T12** | **AC4 per-iter audit + proactive fold + span attrs + slog** | **D7-S2-A06** | **`orchestration/sessionorchestrator/orchestrator_toolcap_test.go::TestOrchestrator_RunTokenAudit_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
-| **D7-S2-A06-T13** | **WireD7 bootstrap constructs ToolResultStore** | **D7-S2-A06** | **`bootstrap/wire_coordinator.go::NewOrchestrator(OrchestratorDeps{ToolResultStore: …})`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S2-A06-T11** | **AC1+AC2 turn loop integration: tool result cap + assistant fold wired into RunTurn** | **D7-S2-A06** | **`orchestration/sessionorchestrator/orchestrator_toolcap_test.go::TestOrchestrator_BuildToolResultMsgWithCap_*`, `TestOrchestrator_BuildAssistantToolCallMsgFolded_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** | Turn_Run |
+| **D7-S2-A06-T12** | **AC4 per-iter audit + proactive fold + span attrs + slog** | **D7-S2-A06** | **`orchestration/sessionorchestrator/orchestrator_toolcap_test.go::TestOrchestrator_RunTokenAudit_*`** | **IMPLEMENTED (DM-20260620-001)** | **P0** | Turn_Run |
+| **D7-S2-A06-T13** | **WireD7 bootstrap constructs ToolResultStore** | **D7-S2-A06** | **`bootstrap/wire_coordinator.go::NewOrchestrator(OrchestratorDeps{ToolResultStore: …})`** | **IMPLEMENTED (DM-20260620-001)** | **P0** | Turn_Run |
 
 ### Context Budget Phase B — SubTurn 3-Mode Dispatch (DM-20260620-001-B)
 
@@ -276,12 +276,12 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > D2 t-registry 持有 BuildForkedMessages 自身的 T 点（T06/T07/T08）；
 > 本表持有 SubTurnRunner 派发 + depth + default-mode T 点（T14/T15/T16/T17）。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **D7-S2-A06-T14** | **AC6 brief mode drops parent history: LLM sees only last user message** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_BriefMode_PreloadedMessagesNil`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
-| **D7-S2-A06-T15** | **AC8+AC11a fork mode = BuildForkedMessages (cache-friendly prefix) + full mode = legacy parity** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_ForkMode_DispatchesAsFork`, `TestSubTurnRunner_FullMode_BackwardCompat`, `TestSubTurnRunner_FullMode_EquivalentToLegacy`, `TestSubTurnRunner_FullMode_EmptyParent`; `subturn_fork_test.go::TestSubTurnRunner_ForkSiblingPrefixStable`, `TestSubTurnRunner_ForkPrefix_ContainsPlaceholder`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
-| **D7-S2-A06-T16** | **AC9 depth limit: `Depth >= MaxDepth` rejected before LLM call; `Depth = MaxDepth-1` allowed** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_DepthLimit_{Equals,Exceeds,BoundaryAtMaxMinus1}`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
-| **D7-S2-A06-T17** | **AC6 default mode: empty `req.Mode` → `SubagentConfig.DefaultMode`; `LegacyMode` overrides `DefaultMode`; invalid mode rejected** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_DefaultModeFromConfig`, `TestSubTurnRunner_DefaultModeBrief`, `TestSubTurnRunner_InvalidModeRejected`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S2-A06-T14** | **AC6 brief mode drops parent history: LLM sees only last user message** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_BriefMode_PreloadedMessagesNil`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** | Turn_Run |
+| **D7-S2-A06-T15** | **AC8+AC11a fork mode = BuildForkedMessages (cache-friendly prefix) + full mode = legacy parity** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_ForkMode_DispatchesAsFork`, `TestSubTurnRunner_FullMode_BackwardCompat`, `TestSubTurnRunner_FullMode_EquivalentToLegacy`, `TestSubTurnRunner_FullMode_EmptyParent`; `subturn_fork_test.go::TestSubTurnRunner_ForkSiblingPrefixStable`, `TestSubTurnRunner_ForkPrefix_ContainsPlaceholder`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** | Turn_Run |
+| **D7-S2-A06-T16** | **AC9 depth limit: `Depth >= MaxDepth` rejected before LLM call; `Depth = MaxDepth-1` allowed** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_DepthLimit_{Equals,Exceeds,BoundaryAtMaxMinus1}`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** | Turn_Run |
+| **D7-S2-A06-T17** | **AC6 default mode: empty `req.Mode` → `SubagentConfig.DefaultMode`; `LegacyMode` overrides `DefaultMode`; invalid mode rejected** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn_test.go::TestSubTurnRunner_DefaultModeFromConfig`, `TestSubTurnRunner_DefaultModeBrief`, `TestSubTurnRunner_InvalidModeRejected`** | **IMPLEMENTED (DM-20260620-001-B)** | **P0** | Turn_Run |
 
 ### Context Budget Phase C — Nested Branch Budget Injection (DM-20260620-002)
 
@@ -303,14 +303,14 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > D7 t-registry holds TurnRequest + nested-branch read + integration
 > verification T 点（T18/T19/T20/T21/T22/T23）。
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **D7-S2-A06-T18** | **AC1 `TurnRequest.MaxContextTokens` 字段添加 + 注释（nested 分支可显式注入 budget）** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_contracts.go::TurnRequest.MaxContextTokens`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
-| **D7-S2-A06-T19** | **AC1 `runLoop` nested 分支读取 `req.MaxContextTokens`，fallback `o.maxContextTokens`** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator.go:271-274`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
-| **D7-S2-A06-T20** | **AC1 `SubTurnRunner.Cfg.MaxContextTokens` + `bootstrap/wire_coordinator.go` 注入全局 config** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn.go::SubTurnConfig.MaxContextTokens`, `bootstrap/wire_coordinator.go:179` (NewSubTurnRunner 调用)** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
-| **D7-S2-A06-T21** | **AC1 nested-branch 显式注入路径：80K assistant + 96K system + 32K budget → audit 触发 + fold 80000→1186** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
-| **D7-S2-A06-T22** | **AC1 nested-branch fallback 路径：req=0 → `o.maxContextTokens`（Phase A wiring 32000）audit 仍触发** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
-| **D7-S2-A06-T23** | **AC2 4-parallel deep review 端到端：4 路 `SubQuery.Run` 并行（80K+96K+32K）全部完成，capture adapter 验证 max 消息 1186 chars (folded)** | **D7-S2-A06** | **`tests/integration/d7/d7_nested_budget_test.go::TestIntegration_D7NestedBudget_4ParallelDeepReview`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S2-A06-T18** | **AC1 `TurnRequest.MaxContextTokens` 字段添加 + 注释（nested 分支可显式注入 budget）** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_contracts.go::TurnRequest.MaxContextTokens`** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
+| **D7-S2-A06-T19** | **AC1 `runLoop` nested 分支读取 `req.MaxContextTokens`，fallback `o.maxContextTokens`** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator.go:271-274`** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
+| **D7-S2-A06-T20** | **AC1 `SubTurnRunner.Cfg.MaxContextTokens` + `bootstrap/wire_coordinator.go` 注入全局 config** | **D7-S2-A06** | **`orchestration/sessionorchestrator/subturn.go::SubTurnConfig.MaxContextTokens`, `bootstrap/wire_coordinator.go:179` (NewSubTurnRunner 调用)** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
+| **D7-S2-A06-T21** | **AC1 nested-branch 显式注入路径：80K assistant + 96K system + 32K budget → audit 触发 + fold 80000→1186** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_BudgetInjection_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
+| **D7-S2-A06-T22** | **AC1 nested-branch fallback 路径：req=0 → `o.maxContextTokens`（Phase A wiring 32000）audit 仍触发** | **D7-S2-A06** | **`orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_NestedBranch_FallbackToDeps_PhaseA_AC1_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
+| **D7-S2-A06-T23** | **AC2 4-parallel deep review 端到端：4 路 `SubQuery.Run` 并行（80K+96K+32K）全部完成，capture adapter 验证 max 消息 1186 chars (folded)** | **D7-S2-A06** | **`tests/integration/d7/d7_nested_budget_test.go::TestIntegration_D7NestedBudget_4ParallelDeepReview`** | **IMPLEMENTED (DM-20260620-002)** | **P0** | Turn_Run |
 
 ### Error Handling Tier 1+2 (DM-20260620-003)
 
@@ -340,20 +340,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > `internal/shared/errors/` (no `shared-errors` D-domain — cross-cutting per
 > `openspec/specs/architecture/cross-domain-boundaries.md`).
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **D7-S2-A06-T24** | **AC6 `turn_adapter.ErrInvariantViolation` migrated to `sharederrors.ErrInvariantViolation` (code AGT_INVARIANT_5013); `Prepare` wraps via `NewInvariantViolationError`; legacy alias kept** | **D7-S2-A06** | **`internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` (still match via alias)** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
-| **D7-S2-A06-T25** | **AC2 `subturn.go:collectSubTurnResult` error case: when event has `error_code` metadata, wrap via `derrors.WithCode(code, ...)`; otherwise fall back to `NewSubagentStreamError`** | **D7-S2-A06** | **`internal/shared/errors/subturn.go`; `internal/layers/orchestration/sessionorchestrator/subturn.go`** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
-| **D7-S2-A06-T26** | **AC2 `subturn.go:collectSubTurnResult` channel-closed-without-complete branch returns `NewSubagentStreamClosedError()` (code AGT_STREAM_5014)** | **D7-S2-A06** | **`internal/shared/errors/subturn.go::NewSubagentStreamClosedError`** | **IMPLEMENTED (DM-20260620-003)** | **P1** |
-| **D7-S2-A06-T27** | **AC2/H3 `protect/retry.go:91` nil-sentinel fix: defensive fallback wraps `errors.New("retry loop completed without recording an error: ...")` instead of `nil`** | **D7-S2-A06** | **`internal/layers/llmgateway/protect/retry.go`** | **IMPLEMENTED (DM-20260620-003)** | **P0** |
-| **D7-S2-A02-T18** | **AC1 `orchestrator.emitError` variadic `code ...string` adds `Metadata["error_code"]`; all 5 call sites pass `SanitizeForUser(err)` + `ErrorCode(err)`** | **D7-S2-A02** | **`internal/layers/orchestration/sessionorchestrator/turn_orchestrator.go::emitError` + call sites (256, 292, 371, 428, 581)** | **IMPLEMENTED (DM-20260620-003)** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S2-A06-T24** | **AC6 `turn_adapter.ErrInvariantViolation` migrated to `sharederrors.ErrInvariantViolation` (code AGT_INVARIANT_5013); `Prepare` wraps via `NewInvariantViolationError`; legacy alias kept** | **D7-S2-A06** | **`internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` (still match via alias)** | **IMPLEMENTED (DM-20260620-003)** | **P1** | Turn_Run |
+| **D7-S2-A06-T25** | **AC2 `subturn.go:collectSubTurnResult` error case: when event has `error_code` metadata, wrap via `derrors.WithCode(code, ...)`; otherwise fall back to `NewSubagentStreamError`** | **D7-S2-A06** | **`internal/shared/errors/subturn.go`; `internal/layers/orchestration/sessionorchestrator/subturn.go`** | **IMPLEMENTED (DM-20260620-003)** | **P1** | Turn_Run |
+| **D7-S2-A06-T26** | **AC2 `subturn.go:collectSubTurnResult` channel-closed-without-complete branch returns `NewSubagentStreamClosedError()` (code AGT_STREAM_5014)** | **D7-S2-A06** | **`internal/shared/errors/subturn.go::NewSubagentStreamClosedError`** | **IMPLEMENTED (DM-20260620-003)** | **P1** | Turn_Run |
+| **D7-S2-A06-T27** | **AC2/H3 `protect/retry.go:91` nil-sentinel fix: defensive fallback wraps `errors.New("retry loop completed without recording an error: ...")` instead of `nil`** | **D7-S2-A06** | **`internal/layers/llmgateway/protect/retry.go`** | **IMPLEMENTED (DM-20260620-003)** | **P0** | Turn_Run |
+| **D7-S2-A02-T18** | **AC1 `orchestrator.emitError` variadic `code ...string` adds `Metadata["error_code"]`; all 5 call sites pass `SanitizeForUser(err)` + `ErrorCode(err)`** | **D7-S2-A02** | **`internal/layers/orchestration/sessionorchestrator/turn_orchestrator.go::emitError` + call sites (256, 292, 371, 428, 581)** | **IMPLEMENTED (DM-20260620-003)** | **P0** | Session_Process |
 
-| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
-|------|------|----------|-----------|--------|----------|
-| **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** |
-| **PERMISSION-GATE-1-T02** | CI lint 静态校验 (ci-lint-invariant 扫描 _invariant.go) | tools/ | `tools/ci-lint-invariant/main_test.go` | **IMPLEMENTED** | **P0** |
-| **PERMISSION-GATE-1-T03** | turn_adapter HookRegistry Prepare/BeforeExecute 定向重检 | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_BeforeExecute_*` | **IMPLEMENTED** | **P0** |
-| **D7-S2-A08-T01** | ToolEventStream context 推送 + BackgroundTaskSurface 集成 | turn | `internal/layers/orchestration/sessionorchestrator/tool_stream_test.go` | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **PERMISSION-GATE-1-T01** | LTL-Lite runtime check (ltllite.Check + HookRegistry.Prepare) | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_Prepare_*` | **IMPLEMENTED** | **P0** | — |
+| **PERMISSION-GATE-1-T02** | CI lint 静态校验 (ci-lint-invariant 扫描 _invariant.go) | tools/ | `tools/ci-lint-invariant/main_test.go` | **IMPLEMENTED** | **P0** | — |
+| **PERMISSION-GATE-1-T03** | turn_adapter HookRegistry Prepare/BeforeExecute 定向重检 | turn_adapter | `internal/layers/orchestration/turn_adapter/ltl_hook_test.go::TestHookRegistry_BeforeExecute_*` | **IMPLEMENTED** | **P0** | — |
+| **D7-S2-A08-T01** | ToolEventStream context 推送 + BackgroundTaskSurface 集成 | turn | `internal/layers/orchestration/sessionorchestrator/tool_stream_test.go` | **IMPLEMENTED** | **P0** | Session_Process |
 
 ### Loop-First Routing L5 (DM-20260616-002)
 
@@ -370,27 +370,27 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ## Cross-Domain (D7 契约)
 
-| T ID | 描述 | 归属 | Test 位置 | Status | Priority |
-|------|------|------|-----------|--------|----------|
-| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `tests/integration/d7/d7_entry_test.go`（WireD7 全栈）；`sessionorchestrator/entry_test.go` | IMPLEMENTED | P0 |
-| D7-D4-T01 | D2 enforce 无 delegate hooks | D7-S2 | `internal/lint/layer/d2_thin_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P1 |
-| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/sessionorchestrator/entry_test.go` | IMPLEMENTED | P2 |
-| D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 |
-| D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `tests/integration/d7/d7_entry_test.go::TestIntegration_D7Entry_PlanModeStillUsesD7Path`；`coordinator_matrix_test.go` | IMPLEMENTED | P0 |
-| D7-THIN-T01 | D2 contextengine 无 orchestration import | D2 瘦身 | `internal/lint/layer/d2_thin_test.go` | IMPLEMENTED | P0 |
-| D7-THIN-T02 | ~~loop.go Run ≤200 行~~ | D2 瘦身 | **REMOVED**（`query/loop.go` 已删，DM-20260618-010） | REMOVED | P0 |
+| T ID | 描述 | 归属 | Test 位置 | Status | Priority | Span Evidence |
+|------|------|------|-----------|--------|----------| --- |
+| D7-D1-T01 | D1 调用 D7 而非 D2（d7_enabled） | D7-S2 | `tests/integration/d7/d7_entry_test.go`（WireD7 全栈）；`sessionorchestrator/entry_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-D4-T01 | D2 enforce 无 delegate hooks | D7-S2 | `internal/lint/layer/d2_thin_test.go` | IMPLEMENTED | P0 | — |
+| D7-D6-T01 | D6 校验编排决策（advisory）+ `orchestration.d6.validation.{pass,fail,timeout,error}` metric | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P1 | Validation_Metric |
+| D7-D6-T02 | D6 校验超时 50ms 视为 pass | D7-S5 | `internal/layers/orchestration/sessionorchestrator/entry_test.go` | IMPLEMENTED | P2 | Validation_Metric |
+| D7-D6-T03 | 4 counter 注入 + result.Pass 分流 | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 | Validation_Metric |
+| D7-D6-T04 | timeout_rate > 5% 触发 AlertHook（5min 滑窗） | D7-S5 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 | Validation_Metric |
+| D7-D6-T05 | panic-recovered 计入 error 路径 | D7-S2 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 | Validation_Metric |
+| D7-D6-T06 | nil validator 与 nil metrics 都降级 no-op | D7-S2 | `internal/layers/orchestration/sessionorchestrator/validation_metrics_test.go` | IMPLEMENTED | P0 | — |
+| D7-MIG-T01 | D7-only ingress × plan.enabled 组合回归 | D7-S2 | `tests/integration/d7/d7_entry_test.go::TestIntegration_D7Entry_PlanModeStillUsesD7Path`；`coordinator_matrix_test.go` | IMPLEMENTED | P0 | Session_Process |
+| D7-THIN-T01 | D2 contextengine 无 orchestration import | D2 瘦身 | `internal/lint/layer/d2_thin_test.go` | IMPLEMENTED | P0 | — |
+| D7-THIN-T02 | ~~loop.go Run ≤200 行~~ | D2 瘦身 | **REMOVED**（`query/loop.go` 已删，DM-20260618-010） | REMOVED | P0 | — |
 
 ---
 
 ## D1 集成（IM 渲染）
 
-| T ID | Legacy ID | 描述 | 归属 | Test 位置 | Status | Priority |
-|------|-----------|------|------|-----------|--------|----------|
-| D7-S4-T07 | ORCH-S2-T14 | 每 Task 独立双区块 IM 卡流式 | D1-S8 + D7-S4 | `communication/channel/adapters/feishu_worker_card_test.go` | IMPLEMENTED | P0 |
+| T ID | Legacy ID | 描述 | 归属 | Test 位置 | Status | Priority | Span Evidence |
+|------|-----------|------|------|-----------|--------|----------| --- |
+| D7-S4-T07 | ORCH-S2-T14 | 每 Task 独立双区块 IM 卡流式 | D1-S8 + D7-S4 | `communication/channel/adapters/feishu_worker_card_test.go` | IMPLEMENTED | P0 | Flow_Event_Publish |
 
 ---
 
@@ -398,16 +398,16 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 > **v3.0 closure (2026-06-15):** v2.0-b/c/f 全部闭环。A06-T01..T04 + A07-T01..T02 全部 IMPLEMENTED。
 
-| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
-|------|------|--------|-----------|--------|----------|
-| D7-S2-A06-T01 | FastPath turn D2 then D3 in order | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_SingleTurn_NoTools` | IMPLEMENTED | P0 |
-| D7-S2-A06-T02 | Cancel propagates to D3 stream and D2 tools | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_CancelBetweenTurns`, `TestOrchestrator_RunTurn_CancelBeforeLLM` | IMPLEMENTED | P0 |
-| D7-S2-A06-T03 | Multi-turn tool_use loops under D7 | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_MultiTurn_ToolLoop` | IMPLEMENTED | P0 |
-| D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_{SubQueryScope,SameOrchestratorForMainAndSubQuery}` | IMPLEMENTED | P0 |
-| D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_LLMInvokeError`; `orchestration/sessionorchestrator/llm_test.go::TestGatewayInvoker_InvokeStream_BreakerOpen` | IMPLEMENTED | P0 |
-| D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/sessionorchestrator/llm_test.go::TestGatewayInvoker_InvokeStream_{ContextCanceled,ContextDeadlineExceeded}`, `TestOrchestrator_RunTurn_StreamTimeout_EngineEvent` | IMPLEMENTED | P0 |
-| **D7-S2-A06-T09** | **D7 RunTurn never touches removed D2 QueryLoop** | **D7-S2-A06** | **`orchestration/sessionorchestrator/loop_legacy_test.go::TestOrchestrator_RunTurn_MainPathOnly`** | **IMPLEMENTED** | **P0** |
-| **D7-S2-A06-T10** | **~~D2.QueryLoop legacy counter~~ REMOVED (DM-20260618-010)** | **D7-S2-A06** | **`contextengine/queryloop_removed_test.go::TestD2_NoQueryLoopProductionReferences`** | **IMPLEMENTED** | **P0** |
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| D7-S2-A06-T01 | FastPath turn D2 then D3 in order | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_SingleTurn_NoTools` | IMPLEMENTED | P0 | Turn_Run |
+| D7-S2-A06-T02 | Cancel propagates to D3 stream and D2 tools | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_CancelBetweenTurns`, `TestOrchestrator_RunTurn_CancelBeforeLLM` | IMPLEMENTED | P0 | Turn_Run |
+| D7-S2-A06-T03 | Multi-turn tool_use loops under D7 | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_MultiTurn_ToolLoop` | IMPLEMENTED | P0 | Turn_Iteration |
+| D7-S2-A06-T04 | SubQuery nested turn uses same orchestrator | D7-S2-A06 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_{SubQueryScope,SameOrchestratorForMainAndSubQuery}` | IMPLEMENTED | P0 | Turn_Run |
+| D7-S2-A07-T01 | Breaker open with no fallback returns error | D7-S2-A07 | `orchestration/sessionorchestrator/turn_orchestrator_test.go::TestOrchestrator_RunTurn_LLMInvokeError`; `orchestration/sessionorchestrator/llm_test.go::TestGatewayInvoker_InvokeStream_BreakerOpen` | IMPLEMENTED | P0 | LLM_Invoke |
+| D7-S2-A07-T02 | StreamChat timeout propagates as EngineEvent | D7-S2-A07 | `orchestration/sessionorchestrator/llm_test.go::TestGatewayInvoker_InvokeStream_{ContextCanceled,ContextDeadlineExceeded}`, `TestOrchestrator_RunTurn_StreamTimeout_EngineEvent` | IMPLEMENTED | P0 | LLM_Invoke |
+| **D7-S2-A06-T09** | **D7 RunTurn never touches removed D2 QueryLoop** | **D7-S2-A06** | **`orchestration/sessionorchestrator/loop_legacy_test.go::TestOrchestrator_RunTurn_MainPathOnly`** | **IMPLEMENTED** | **P0** | Turn_Run |
+| **D7-S2-A06-T10** | **~~D2.QueryLoop legacy counter~~ REMOVED (DM-20260618-010)** | **D7-S2-A06** | **`contextengine/queryloop_removed_test.go::TestD2_NoQueryLoopProductionReferences`** | **IMPLEMENTED** | **P0** | Turn_Run |
 
 ### Legacy T 映射（DM-020 — v1.0 Registry，v2.0 实施）
 
@@ -568,24 +568,24 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ### D7-S13-A47: SessionOrchestrator.processAutoClose (Verify→Learn Auto-Close)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S13-A47-T01** | processAutoClose 包装 channel + 异步触发 learner.Learn + 替换 endSpanWhenChannelClosed 调用 | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_autoclose_test.go` (NEW) |
-| **D7-S13-A47-T02** | synthesizeVerdict 规则 (complete→Pass / error→Fail / tombstone→Indeterminate) + 3 层 fail-safe (nil learner / Learn error / channel cancel) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_autoclose_test.go` (NEW) |
-| **D7-S13-A47-T03** | 集成测试 ProcessMessage 完整跑 → Alpha++ + 下一轮 prior 更新 (Round 1 冷启动 Beta(5,3) → Learn VerdictPass → Alpha=1 → Round 2 Beta(6,3) Mean=0.667) + TestAutoClose_FullLP1Loop 端到端 LP-1 闭环 | IMPLEMENTED | `sessionorchestrator/orchestrator_autoclose_test.go` (NEW) |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S13-A47-T01** | processAutoClose 包装 channel + 异步触发 learner.Learn + 替换 endSpanWhenChannelClosed 调用 | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_autoclose_test.go` (NEW) | Verify_AutoClose |
+| **D7-S13-A47-T02** | synthesizeVerdict 规则 (complete→Pass / error→Fail / tombstone→Indeterminate) + 3 层 fail-safe (nil learner / Learn error / channel cancel) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_autoclose_test.go` (NEW) | Verify_AutoClose |
+| **D7-S13-A47-T03** | 集成测试 ProcessMessage 完整跑 → Alpha++ + 下一轮 prior 更新 (Round 1 冷启动 Beta(5,3) → Learn VerdictPass → Alpha=1 → Round 2 Beta(6,3) Mean=0.667) + TestAutoClose_FullLP1Loop 端到端 LP-1 闭环 | IMPLEMENTED | `sessionorchestrator/orchestrator_autoclose_test.go` (NEW) | Verify_AutoClose |
 
 ### D7-S13-A48: ProcessRequest.TrackMode (Operator 角色支持)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S13-A48-T04** | ProcessRequest 新增 TrackMode string 字段 (默认 "" 兜底 developer) + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast 校验 + 3 个 sentinel error | IMPLEMENTED | `orchtypes/process.go` + `orchtypes/process_test.go` (NEW) |
-| **D7-S13-A48-T05** | buildObserveRequest 透传 req.TrackMode → o.learner.Inject(ctx, sessionID, req.TrackMode) → BuildAdaptivePrior (Operator track → DefaultOperatorPrior Beta(8,1) Mean=0.889) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_trackmode_test.go` (NEW) |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S13-A48-T04** | ProcessRequest 新增 TrackMode string 字段 (默认 "" 兜底 developer) + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast 校验 + 3 个 sentinel error | IMPLEMENTED | `orchtypes/process.go` + `orchtypes/process_test.go` (NEW) | Observe_Request_WithPrior |
+| **D7-S13-A48-T05** | buildObserveRequest 透传 req.TrackMode → o.learner.Inject(ctx, sessionID, req.TrackMode) → BuildAdaptivePrior (Operator track → DefaultOperatorPrior Beta(8,1) Mean=0.889) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `orchestrator_trackmode_test.go` (NEW) | Observe_Request_WithPrior |
 
 ### D7-S13-A49: sessionSpan 6 prior attributes (D5 可观测化增强)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S13-A49-T06** | sessionSpan 新增 4 属性 (learn.prior.mean / track_mode / injected_at / learn.classifier_source) + 6 字段全部写入测试 (含 cold_start_failsafe 标记) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `sessionorchestrator/tracing.go` + `orchestrator_priorspan_test.go` (NEW) |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S13-A49-T06** | sessionSpan 新增 4 属性 (learn.prior.mean / track_mode / injected_at / learn.classifier_source) + 6 字段全部写入测试 (含 cold_start_failsafe 标记) | IMPLEMENTED | `sessionorchestrator/orchestrator.go` + `sessionorchestrator/tracing.go` + `orchestrator_priorspan_test.go` (NEW) | Session_Process |
 
 ## Scenario D7-S13 Detail (test points summary)
 
@@ -612,26 +612,26 @@ D7-S13  Phase 7 Verify→Learn Auto-Close + Operator TrackMode + D5 增强
 
 ### D7-S14-A50: LoopDepthTracker v2 + PlanKindSwitchPolicy + ChainedArbitrator + EscapeEngine + CircuitBreaker + AuditLog
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S14-A50-T01** | LoopContext struct (7 字段: 5 hash 输入 + 2 状态) + hashLoopContext SHA-256 + History 按 SessionID 隔离 | IMPLEMENTED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) |
-| **D7-S14-A50-T02** | LoopDepthTracker.ShouldContinue 严格按 `depth >= MaxDepth` 触发 ForceExit (MaxDepth=3, depth=1/2 Continue, depth=3 ForceExit) + Reset 按 SessionID 维度清空 | IMPLEMENTED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) |
-| **D7-S14-A50-T03** | PlanKindSwitchPolicy 3 档 enum + determineSwitchPolicy (Exploration→Constrained ≤4 / Scenario→Allowed / Protocol→Constrained ≤4 / Commitment→Forbidden) + 累计计数 (Commitment 1 次→ForceExit, Constrained 5 次→ForceExit) | IMPLEMENTED | `orchestration/escape/plan_kind_switch_policy.go` (PR-V5.2) |
-| **D7-S14-A50-T04** | EscapeAction 6 类 typed enum (Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / EscapePendingHuman) + EscapeDecision 9 字段 (5 核心 Action/Reason/AuditLevel/Depth/PendingID + 4 审计 ExitReason/SessionID/CreatedAt/SourceDecisionIDs) | IMPLEMENTED | `orchestration/escape/arbitrator.go` (PR-V5.3) |
-| **D7-S14-A50-T05** | LLMArbitrator (5s timeout 兜底 ForceExit + 1 次格式重试 + 非 JSON / 非法 action 拦截 + ctx 取消语义优先 + recover panic) + RuleArbitrator (不可恢复→AbortWithAudit, 可恢复→EscalateToHuman) + HumanArbitrator (10s timeout + 异步化立即返回 EscapePendingHuman + SubmitUserChoice 缓冲 1 + SubmitOverrideCard 防 UI 误导) + ChainedArbitrator (LLM→Rule→Human 链式调用, EscalateTo* 中间态消化绝不返回 caller) | IMPLEMENTED | `orchestration/escape/arbitrator.go` (PR-V5.3) |
-| **D7-S14-A50-T06** | Notifier interface + FeishuCardNotifier (3 按钮 A/B/C + ExpiresAt 10s) + ChainedNotifier (FeishuCard→CLI→Email fallback) + OverrideCardNotifier 可选 interface + PendingResolutionStore interface + InMemoryPendingResolutionStore (TTL=10s 过期清理) + ResumeSession 委托 HumanArbitrator (Save/Load/Delete 闭环) | IMPLEMENTED | `orchestration/escape/notifier.go` + `pending_resolution_store.go` (PR-V5.3) |
-| **D7-S14-A50-T07** | EscapeEngine.Evaluate 整合入口 (3 类深度限制串联: tracker → loopBudget → circuitBreaker, 全部 Continue → EscapeContinue, 任一非 Continue → ChainedArbitrator) + AuditLevel 0/1/2 (记录次数递增) + 13 类失败降级矩阵 (Evaluate panic/error + audit fail-open + LLM timeout + ctx cancel + CB metric timeout + ...) | IMPLEMENTED | `orchestration/escape/engine.go` (PR-V5.4) |
-| **D7-S14-A50-T08** | LoopBudget struct (ConsecutiveFails=3 触发 ForceExit + TotalFails=20 触发 AbortWithAudit, doc 38 §19.2 DenialBudget 概念) + LoopBudget.Evaluate | IMPLEMENTED | `orchestration/escape/loop_budget.go` (PR-V5.4) |
-| **D7-S14-A50-T09** | CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + State machine Open→HalfOpen→Close + 阈值占位推导 (V5.5 集成测试后回填) + CB 拉 metric 200ms timeout 防御 | IMPLEMENTED | `orchestration/escape/circuit_breaker.go` (PR-V5.4) |
-| **D7-S14-A50-T10** | EscapeAuditLog (AuditLevel 0/1/2) + InMemoryEscapeAuditLog (含 SourceDecisionIDs + CreatedAt) + EscapeDecision.ExitReason 14 类 Phase 4 映射 | IMPLEMENTED | `orchestration/escape/audit_log.go` (PR-V5.4) |
-| **D7-S14-A50-T11** | SessionOrchestrator.ProcessMessage 5 节点接线 (Observe 失败 / Plan 失败 1a / Plan 前 1b / Execute 失败 / Verify 失败) + 1a 短路不调 1b (codex R4 修复) + processEscapeDecision 6 类 action 统一处理 (Continue→continue 回路 / PendingHuman→return nil 异步 / ForceExit/Abort→return error / EscalateTo*→兜底 ForceExit) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
-| **D7-S14-A50-T12** | ResumeSession T2 续跑入口 (ProcessMessage 开头检查 → applyResumeSession) + applyResumeSession (user_choice=A→EscapeContinue fall through to 5-node pipeline / B→ForceExit 短路 emit "complete" / C→AbortWithAudit 短路 emit "complete" — audit already recorded at SubmitUserChoice time V5.4, resume is read-only) + 3 层 fail-safe (nil engine / ResumeSession error / TTL expired → 静默 fall through) + 3 sessionSpan attrs (escape.resume.attempted / decision_action / decision_pending_id) + resumeContentForDecision helper (6 类 EscapeAction → 中文 text 消息) | **IMPLEMENTED** | `orchestration/escape/arbitrator.go` (PR-V5.3 ResumeSession one-shot consume) + `sessionorchestrator/escape_wiring.go` (PR-V5.6 applyResumeSession + resumeContentForDecision) + `sessionorchestrator/orchestrator.go` (PR-V5.6 ProcessMessage 入口插入) |
-| **D7-S14-A50-T13** | buildLoopContext 5 hash 字段构造 (SessionID + PlanKind + ObservationKind + FailureCriterion + ArtifactType) + buildLoopContextFromObserve (Observe 失败 case) + 4 IntentKind × 5 节点 12 case 集成测试 (Skip→1 次 Evaluate, Orchestrate→完整 5 节点) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) |
-| **D7-S14-A50-T14** | L4 业务验收 4 测试 (TestL4_v5_Compatible_With_Phase1_7 / TestL4_v5_PerformanceOverhead_Under5Percent / TestL4_FeishuCard_NotBlocked_ByHuman10s + TestL4_LLMSwitchPlanKind_5Times_ForcesExit) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
-| **D7-S14-A50-T15** | L3 端到端 7 测试 (TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit / TestL3_SameMode_4Times_ForcesExit / TestL3_AnomalyDetector_5Nil_OpensL0 / TestL3_Verifier_3Times2s_OpensL2 / TestL3_Human10s_Async_FeishuNotBlocked / TestL3_PlanKindSwitch_Constrained_4Limit / TestL3_CB5Layers_Open_Independently) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) |
-| **D7-S14-A50-T16** | L2 集成 7 测试 (TestIntegration_4DepthLimits / TestIntegration_3LayerArbitration / TestIntegration_5EscapeActions / TestIntegration_PlanKindSwitchLimit / TestIntegration_5NodePipeline_End2End / TestIntegration_5WiringPoints + TestIntegration_4IntentKind_5NodePaths) | IMPLEMENTED | `orchestration/escape/*_integration_test.go` (PR-V5.5) |
-| **D7-S14-A50-T17** | L1 单元 103 测试 (LoopDepthTracker 11 + PlanKindSwitchPolicy 15 + ChainedArbitrator 36 + EscapeEngine + CB 22 + Orchestrator 接线 19) | IMPLEMENTED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) |
-| **D7-S14-A50-T18** | 14 gap 补测 (LoopDepthTracker panic L1-91 / PendingResolutionStore TTL L1-92 / 14 ExitReason 映射 L1-93 / AuditLog 持久化 L1-94/95 / LoopBudget 2 个 L1-96/97 / CB panic L1-98 / ResumeSession + ApplyDecision 5 个 L1-99..103 + 4 IntentKind × 5 节点 L2-07) | IMPLEMENTED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S14-A50-T01** | LoopContext struct (7 字段: 5 hash 输入 + 2 状态) + hashLoopContext SHA-256 + History 按 SessionID 隔离 | IMPLEMENTED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) | Escape_Engine_Run |
+| **D7-S14-A50-T02** | LoopDepthTracker.ShouldContinue 严格按 `depth >= MaxDepth` 触发 ForceExit (MaxDepth=3, depth=1/2 Continue, depth=3 ForceExit) + Reset 按 SessionID 维度清空 | IMPLEMENTED | `orchestration/escape/loop_depth_tracker.go` (PR-V5.1) | Escape_Engine_Run |
+| **D7-S14-A50-T03** | PlanKindSwitchPolicy 3 档 enum + determineSwitchPolicy (Exploration→Constrained ≤4 / Scenario→Allowed / Protocol→Constrained ≤4 / Commitment→Forbidden) + 累计计数 (Commitment 1 次→ForceExit, Constrained 5 次→ForceExit) | IMPLEMENTED | `orchestration/escape/plan_kind_switch_policy.go` (PR-V5.2) | Escape_Engine_Run |
+| **D7-S14-A50-T04** | EscapeAction 6 类 typed enum (Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / EscapePendingHuman) + EscapeDecision 9 字段 (5 核心 Action/Reason/AuditLevel/Depth/PendingID + 4 审计 ExitReason/SessionID/CreatedAt/SourceDecisionIDs) | IMPLEMENTED | `orchestration/escape/arbitrator.go` (PR-V5.3) | Escape_Engine_Run |
+| **D7-S14-A50-T05** | LLMArbitrator (5s timeout 兜底 ForceExit + 1 次格式重试 + 非 JSON / 非法 action 拦截 + ctx 取消语义优先 + recover panic) + RuleArbitrator (不可恢复→AbortWithAudit, 可恢复→EscalateToHuman) + HumanArbitrator (10s timeout + 异步化立即返回 EscapePendingHuman + SubmitUserChoice 缓冲 1 + SubmitOverrideCard 防 UI 误导) + ChainedArbitrator (LLM→Rule→Human 链式调用, EscalateTo* 中间态消化绝不返回 caller) | IMPLEMENTED | `orchestration/escape/arbitrator.go` (PR-V5.3) | Escape_Engine_Run |
+| **D7-S14-A50-T06** | Notifier interface + FeishuCardNotifier (3 按钮 A/B/C + ExpiresAt 10s) + ChainedNotifier (FeishuCard→CLI→Email fallback) + OverrideCardNotifier 可选 interface + PendingResolutionStore interface + InMemoryPendingResolutionStore (TTL=10s 过期清理) + ResumeSession 委托 HumanArbitrator (Save/Load/Delete 闭环) | IMPLEMENTED | `orchestration/escape/notifier.go` + `pending_resolution_store.go` (PR-V5.3) | Escape_Engine_Run |
+| **D7-S14-A50-T07** | EscapeEngine.Evaluate 整合入口 (3 类深度限制串联: tracker → loopBudget → circuitBreaker, 全部 Continue → EscapeContinue, 任一非 Continue → ChainedArbitrator) + AuditLevel 0/1/2 (记录次数递增) + 13 类失败降级矩阵 (Evaluate panic/error + audit fail-open + LLM timeout + ctx cancel + CB metric timeout + ...) | IMPLEMENTED | `orchestration/escape/engine.go` (PR-V5.4) | Escape_Engine_Run |
+| **D7-S14-A50-T08** | LoopBudget struct (ConsecutiveFails=3 触发 ForceExit + TotalFails=20 触发 AbortWithAudit, doc 38 §19.2 DenialBudget 概念) + LoopBudget.Evaluate | IMPLEMENTED | `orchestration/escape/loop_budget.go` (PR-V5.4) | Escape_Engine_Run |
+| **D7-S14-A50-T09** | CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + State machine Open→HalfOpen→Close + 阈值占位推导 (V5.5 集成测试后回填) + CB 拉 metric 200ms timeout 防御 | IMPLEMENTED | `orchestration/escape/circuit_breaker.go` (PR-V5.4) | Escape_Engine_Run |
+| **D7-S14-A50-T10** | EscapeAuditLog (AuditLevel 0/1/2) + InMemoryEscapeAuditLog (含 SourceDecisionIDs + CreatedAt) + EscapeDecision.ExitReason 14 类 Phase 4 映射 | IMPLEMENTED | `orchestration/escape/audit_log.go` (PR-V5.4) | Escape_Engine_Run |
+| **D7-S14-A50-T11** | SessionOrchestrator.ProcessMessage 5 节点接线 (Observe 失败 / Plan 失败 1a / Plan 前 1b / Execute 失败 / Verify 失败) + 1a 短路不调 1b (codex R4 修复) + processEscapeDecision 6 类 action 统一处理 (Continue→continue 回路 / PendingHuman→return nil 异步 / ForceExit/Abort→return error / EscalateTo*→兜底 ForceExit) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T12** | ResumeSession T2 续跑入口 (ProcessMessage 开头检查 → applyResumeSession) + applyResumeSession (user_choice=A→EscapeContinue fall through to 5-node pipeline / B→ForceExit 短路 emit "complete" / C→AbortWithAudit 短路 emit "complete" — audit already recorded at SubmitUserChoice time V5.4, resume is read-only) + 3 层 fail-safe (nil engine / ResumeSession error / TTL expired → 静默 fall through) + 3 sessionSpan attrs (escape.resume.attempted / decision_action / decision_pending_id) + resumeContentForDecision helper (6 类 EscapeAction → 中文 text 消息) | **IMPLEMENTED** | `orchestration/escape/arbitrator.go` (PR-V5.3 ResumeSession one-shot consume) + `sessionorchestrator/escape_wiring.go` (PR-V5.6 applyResumeSession + resumeContentForDecision) + `sessionorchestrator/orchestrator.go` (PR-V5.6 ProcessMessage 入口插入) | Escape_Engine_Run |
+| **D7-S14-A50-T13** | buildLoopContext 5 hash 字段构造 (SessionID + PlanKind + ObservationKind + FailureCriterion + ArtifactType) + buildLoopContextFromObserve (Observe 失败 case) + 4 IntentKind × 5 节点 12 case 集成测试 (Skip→1 次 Evaluate, Orchestrate→完整 5 节点) | IMPLEMENTED | `orchestration/sessionorchestrator/orchestrator.go` (PR-V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T14** | L4 业务验收 4 测试 (TestL4_v5_Compatible_With_Phase1_7 / TestL4_v5_PerformanceOverhead_Under5Percent / TestL4_FeishuCard_NotBlocked_ByHuman10s + TestL4_LLMSwitchPlanKind_5Times_ForcesExit) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T15** | L3 端到端 7 测试 (TestL3_LLM_SwitchesPlanKind_5Times_ForcesExit / TestL3_SameMode_4Times_ForcesExit / TestL3_AnomalyDetector_5Nil_OpensL0 / TestL3_Verifier_3Times2s_OpensL2 / TestL3_Human10s_Async_FeishuNotBlocked / TestL3_PlanKindSwitch_Constrained_4Limit / TestL3_CB5Layers_Open_Independently) | IMPLEMENTED | `orchestration/escape/*_e2e_test.go` (PR-V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T16** | L2 集成 7 测试 (TestIntegration_4DepthLimits / TestIntegration_3LayerArbitration / TestIntegration_5EscapeActions / TestIntegration_PlanKindSwitchLimit / TestIntegration_5NodePipeline_End2End / TestIntegration_5WiringPoints + TestIntegration_4IntentKind_5NodePaths) | IMPLEMENTED | `orchestration/escape/*_integration_test.go` (PR-V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T17** | L1 单元 103 测试 (LoopDepthTracker 11 + PlanKindSwitchPolicy 15 + ChainedArbitrator 36 + EscapeEngine + CB 22 + Orchestrator 接线 19) | IMPLEMENTED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) | Escape_Engine_Run |
+| **D7-S14-A50-T18** | 14 gap 补测 (LoopDepthTracker panic L1-91 / PendingResolutionStore TTL L1-92 / 14 ExitReason 映射 L1-93 / AuditLog 持久化 L1-94/95 / LoopBudget 2 个 L1-96/97 / CB panic L1-98 / ResumeSession + ApplyDecision 5 个 L1-99..103 + 4 IntentKind × 5 节点 L2-07) | IMPLEMENTED | `orchestration/escape/*_test.go` (PR-V5.1..V5.5) | Escape_Engine_Run |
 
 ## Scenario D7-S14 Detail (test points summary)
 
@@ -668,12 +668,12 @@ D7-S14  MUPS v5 统一逃逸机制 (IMPLEMENTED, 5 PR 拆分)
 
 ### D7-S6-A51: mups Package Migration (execute/ + learn/ → mups/)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S6-A51-T01** | `internal/layers/orchestration/mups/execute/` 目录创建，原 `orchestration/execute/` 7 个 .go 文件（channel.go + channel_commit.go + channel_exploration.go + channel_protocol.go + channel_scenario.go + errors.go + execute_test.go）`git mv` 迁移完成，`package execute` 保持不变 | IMPLEMENTED | `internal/layers/orchestration/mups/execute/*.go` |
-| **D7-S6-A51-T02** | `internal/layers/orchestration/mups/learn/` 目录创建，原 `orchestration/learn/` 17 个 .go 文件（含 9 个 _test.go: adaptive_prior + asset_builder + asset_content + learner + learning_asset + memory + reputation_evidence + reputation_store + testhelpers + 9 _test.go 配套）`git mv` 迁移完成，`package learn` 保持不变 | IMPLEMENTED | `internal/layers/orchestration/mups/learn/*.go` |
-| **D7-S6-A51-T03** | 全仓 import path 替换：17 处 `internal/layers/orchestration/learn"` → `internal/layers/orchestration/mups/learn"`（decisionplanning 2 + orchtypes 6 + sessionorchestrator 9）；execute 包 0 外部 import 跳过；`grep -rl "orchestration/execute\""` + `grep -rl "orchestration/learn\""` 双 0 命中 | IMPLEMENTED | 全仓 import path 替换 |
-| **D7-S6-A51-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` 22/22 PASS（与 baseline 持平）+ LP-1/LP-2/LP-5 路径 0 变化 | IMPLEMENTED | 全仓 build/vet/test 验证 |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S6-A51-T01** | `internal/layers/orchestration/mups/execute/` 目录创建，原 `orchestration/execute/` 7 个 .go 文件（channel.go + channel_commit.go + channel_exploration.go + channel_protocol.go + channel_scenario.go + errors.go + execute_test.go）`git mv` 迁移完成，`package execute` 保持不变 | IMPLEMENTED | `internal/layers/orchestration/mups/execute/*.go` | Hardening_Metric |
+| **D7-S6-A51-T02** | `internal/layers/orchestration/mups/learn/` 目录创建，原 `orchestration/learn/` 17 个 .go 文件（含 9 个 _test.go: adaptive_prior + asset_builder + asset_content + learner + learning_asset + memory + reputation_evidence + reputation_store + testhelpers + 9 _test.go 配套）`git mv` 迁移完成，`package learn` 保持不变 | IMPLEMENTED | `internal/layers/orchestration/mups/learn/*.go` | Hardening_Metric |
+| **D7-S6-A51-T03** | 全仓 import path 替换：17 处 `internal/layers/orchestration/learn"` → `internal/layers/orchestration/mups/learn"`（decisionplanning 2 + orchtypes 6 + sessionorchestrator 9）；execute 包 0 外部 import 跳过；`grep -rl "orchestration/execute\""` + `grep -rl "orchestration/learn\""` 双 0 命中 | IMPLEMENTED | 全仓 import path 替换 | Hardening_Metric |
+| **D7-S6-A51-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` 22/22 PASS（与 baseline 持平）+ LP-1/LP-2/LP-5 路径 0 变化 | IMPLEMENTED | 全仓 build/vet/test 验证 | Hardening_Metric |
 
 ---
 
@@ -681,22 +681,22 @@ D7-S14  MUPS v5 统一逃逸机制 (IMPLEMENTED, 5 PR 拆分)
 
 ### D7-S7-A01: hardening/metrics Package Directory Exists
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S7-A01-T01** | `internal/layers/orchestration/hardening/metrics.go` 目录创建，原 `sessionorchestrator/metrics.go` (61 行 InterruptMetrics struct + Snapshot + TotalCancelFailures) `git mv` 迁移完成，`package hardening` 声明（取代 `package sessionorchestrator`）；同包 `metrics_test.go` (4 测试: TestInterruptMetrics_Snapshot_AtomicIncrement / TestInterruptMetrics_NilSafe / TestInterruptMetrics_TotalCancelFailures / TestInterruptMetrics_Snapshot_AllFields) 同步迁 | IMPLEMENTED | `internal/layers/orchestration/hardening/{metrics.go,metrics_test.go,doc.go}` |
-| **D7-S7-A01-T03** | 全仓 import path 替换：`sessionorchestrator/interrupt.go` Metrics 字段类型 `*InterruptMetrics` → `*hardening.InterruptMetrics` (1 处) + `interrupt_test.go` 4 处 `&InterruptMetrics{}` → `&hardening.InterruptMetrics{}`；`grep -rln "sessionorchestrator\.InterruptMetrics"` + `grep -rln "sessionorchestrator/metrics"` 双 0 命中 | IMPLEMENTED | `sessionorchestrator/interrupt.go` + `sessionorchestrator/interrupt_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S7-A01-T01** | `internal/layers/orchestration/hardening/metrics.go` 目录创建，原 `sessionorchestrator/metrics.go` (61 行 InterruptMetrics struct + Snapshot + TotalCancelFailures) `git mv` 迁移完成，`package hardening` 声明（取代 `package sessionorchestrator`）；同包 `metrics_test.go` (4 测试: TestInterruptMetrics_Snapshot_AtomicIncrement / TestInterruptMetrics_NilSafe / TestInterruptMetrics_TotalCancelFailures / TestInterruptMetrics_Snapshot_AllFields) 同步迁 | IMPLEMENTED | `internal/layers/orchestration/hardening/{metrics.go,metrics_test.go,doc.go}` | Execute_Artifact |
+| **D7-S7-A01-T03** | 全仓 import path 替换：`sessionorchestrator/interrupt.go` Metrics 字段类型 `*InterruptMetrics` → `*hardening.InterruptMetrics` (1 处) + `interrupt_test.go` 4 处 `&InterruptMetrics{}` → `&hardening.InterruptMetrics{}`；`grep -rln "sessionorchestrator\.InterruptMetrics"` + `grep -rln "sessionorchestrator/metrics"` 双 0 命中 | IMPLEMENTED | `sessionorchestrator/interrupt.go` + `sessionorchestrator/interrupt_test.go` | Execute_Artifact |
 
 ### D7-S7-A02: hardening/recovery Package Directory Exists
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S7-A02-T02** | `internal/layers/orchestration/hardening/recovery.go` 子集拆分（Decision 2）：原 `turn/recovery.go` (133 行) 拆 4 纯函数 + 1 const → hardening/ (`IsContextLengthError` + `IsOverloadOr5xx` + `NeedsMaxOutputTokenRecovery` + `MaxOutputTokensRecoveryMessage` const)，`package hardening` 声明；receiver methods（`compressMessagesForRecovery` + `invokeStreamWithRecovery`）+ `partialStreamEmit` struct + `emitStreamRecoveryTombstones` + `maxOutputTokenRecoveryAttempts` const 留 `turn/`；同包 `recovery_test.go` 3 纯函数测试（TestIsContextLengthError + TestIsOverloadOr5xx + TestNeedsMaxOutputTokenRecovery）同步迁；`grep -rln "turn\.IsContextLengthError"` + `grep -rln "turn/recovery"` 双 0 命中 | IMPLEMENTED | `internal/layers/orchestration/hardening/{recovery.go,recovery_test.go}` + `turn/recovery.go` (KEEP) + `turn/recovery_test.go` (KEEP 3 orchestrator-coupled tests + `recoveryStubLLM`) |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S7-A02-T02** | `internal/layers/orchestration/hardening/recovery.go` 子集拆分（Decision 2）：原 `turn/recovery.go` (133 行) 拆 4 纯函数 + 1 const → hardening/ (`IsContextLengthError` + `IsOverloadOr5xx` + `NeedsMaxOutputTokenRecovery` + `MaxOutputTokensRecoveryMessage` const)，`package hardening` 声明；receiver methods（`compressMessagesForRecovery` + `invokeStreamWithRecovery`）+ `partialStreamEmit` struct + `emitStreamRecoveryTombstones` + `maxOutputTokenRecoveryAttempts` const 留 `turn/`；同包 `recovery_test.go` 3 纯函数测试（TestIsContextLengthError + TestIsOverloadOr5xx + TestNeedsMaxOutputTokenRecovery）同步迁；`grep -rln "turn\.IsContextLengthError"` + `grep -rln "turn/recovery"` 双 0 命中 | IMPLEMENTED | `internal/layers/orchestration/hardening/{recovery.go,recovery_test.go}` + `turn/recovery.go` (KEEP) + `turn/recovery_test.go` (KEEP 3 orchestrator-coupled tests + `recoveryStubLLM`) | Execute_Artifact |
 
 ### D7-S7-A01 (续): Build, Vet, Test All Green
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S7-A01-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` **23/23 PASS**（原 22 + 新 hardening 1 包，0 race condition）+ LP-1（Bayesian reputation `TestAutoClose_FullLP1Loop`）+ LP-2（`TestIntegration_5NodePipeline_End2End`）100% 兼容 + `escape/circuit_breaker.go` 0 变化（git diff HEAD 空，Decision 1） | IMPLEMENTED | 全仓 build/vet/test 验证 + escape/circuit_breaker.go 保持原状 |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S7-A01-T04** | `go build ./...` 0 错误 + `go vet ./...` 0 警告 + `go test ./internal/layers/orchestration/... -race -count=1` **23/23 PASS**（原 22 + 新 hardening 1 包，0 race condition）+ LP-1（Bayesian reputation `TestAutoClose_FullLP1Loop`）+ LP-2（`TestIntegration_5NodePipeline_End2End`）100% 兼容 + `escape/circuit_breaker.go` 0 变化（git diff HEAD 空，Decision 1） | IMPLEMENTED | 全仓 build/vet/test 验证 + escape/circuit_breaker.go 保持原状 | Execute_Artifact |
 
 ## Scenario D7-S6 PLANNED Detail (mups 包迁移子集)
 
@@ -768,17 +768,17 @@ D7-S6  子包清理热身 Sprint (4 遗留小子包物理合并, IMPLEMENTED 子
 
 ### D7-S1-A52: EmitWorktreeOp (P1, 6 P0/P1 span 之一)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S1-A52-T11** | `EmitWorktreeOp(ctx, sessionID, op, itemID, phaseOrStatus)` happy path — start 时建 span + 设 4 attributes (worktree.op / worktree.item_id / worktree.phase_or_status + session_id)，end 时 nil err 不动 span status、non-nil err 标 error 并记录 err.message | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T11_EmitWorktreeOp_HappyPath` |
-| **D7-S1-A52-T12** | `EmitWorktreeOp` nil-bridge fail-safe — bridge==nil 时 start() 直接 return zero span + closure，end() nil-receiver safe 不 panic；保证 hardening 在未接 telemetry 时不影响生产路径 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T12_EmitWorktreeOp_NilBridgeFailSafe` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S1-A52-T11** | `EmitWorktreeOp(ctx, sessionID, op, itemID, phaseOrStatus)` happy path — start 时建 span + 设 4 attributes (worktree.op / worktree.item_id / worktree.phase_or_status + session_id)，end 时 nil err 不动 span status、non-nil err 标 error 并记录 err.message | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T11_EmitWorktreeOp_HappyPath` | Worktree_Op |
+| **D7-S1-A52-T12** | `EmitWorktreeOp` nil-bridge fail-safe — bridge==nil 时 start() 直接 return zero span + closure，end() nil-receiver safe 不 panic；保证 hardening 在未接 telemetry 时不影响生产路径 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A52T12_EmitWorktreeOp_NilBridgeFailSafe` | Worktree_Op |
 
 ### D7-S1-A53: EmitSubWorktreeRun (P2)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S1-A53-T13** | `EmitSubWorktreeRun(ctx, sessionID, parentID, childID, spawnedBy)` happy path — parent/child 关系在 trace 上显形 + spawnedBy 标记 spawn 路径 (parallel_explore / spawn_decompose)，便于 dashboard filter | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T13_EmitSubWorktreeRun_HappyPath` |
-| **D7-S1-A53-T14** | `EmitSubWorktreeRun` nil-bridge fail-safe — 同 A52-T12 设计 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T14_EmitSubWorktreeRun_NilBridgeFailSafe` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S1-A53-T13** | `EmitSubWorktreeRun(ctx, sessionID, parentID, childID, spawnedBy)` happy path — parent/child 关系在 trace 上显形 + spawnedBy 标记 spawn 路径 (parallel_explore / spawn_decompose)，便于 dashboard filter | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T13_EmitSubWorktreeRun_HappyPath` | SubWorktree_Run |
+| **D7-S1-A53-T14** | `EmitSubWorktreeRun` nil-bridge fail-safe — 同 A52-T12 设计 | IMPLEMENTED | `hardening/emitter_test.go::TestD7S1A53T14_EmitSubWorktreeRun_NilBridgeFailSafe` | SubWorktree_Run |
 
 ---
 
@@ -788,10 +788,10 @@ D7-S6  子包清理热身 Sprint (4 遗留小子包物理合并, IMPLEMENTED 子
 
 ### D7-S5-A54: EmitSubTurnIteration (P1)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S5-A54-T15** | `EmitSubTurnIteration(ctx, sessionID, itemID, iter, finishReason, stopReason)` happy path — iter 1-based + finishReason 来自 LLM (stop/tool_calls/length) + stopReason 来自 executor (final_answer/tool_error/ok/max_iters)；end 时 nil err 不动 status、non-nil err 标 error | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T15_EmitSubTurnIteration_HappyPath` |
-| **D7-S5-A54-T16** | `EmitSubTurnIteration` nil-bridge fail-safe — 同 A52-T12 设计；同时 cap-hit 路径 (iter=max+1, finishReason="tool_calls", stopReason="max_iters") 也走该函数确认零 panic | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T16_EmitSubTurnIteration_NilBridgeFailSafe` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S5-A54-T15** | `EmitSubTurnIteration(ctx, sessionID, itemID, iter, finishReason, stopReason)` happy path — iter 1-based + finishReason 来自 LLM (stop/tool_calls/length) + stopReason 来自 executor (final_answer/tool_error/ok/max_iters)；end 时 nil err 不动 status、non-nil err 标 error | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T15_EmitSubTurnIteration_HappyPath` | SubTurn_Iteration |
+| **D7-S5-A54-T16** | `EmitSubTurnIteration` nil-bridge fail-safe — 同 A52-T12 设计；同时 cap-hit 路径 (iter=max+1, finishReason="tool_calls", stopReason="max_iters") 也走该函数确认零 panic | IMPLEMENTED | `hardening/emitter_test.go::TestD7S5A54T16_EmitSubTurnIteration_NilBridgeFailSafe` | SubTurn_Iteration |
 
 ---
 
@@ -852,79 +852,79 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 ### D7-S15-A50: Parent Rollup Gate
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A50-T01** | NeedsRollup schema backward compat | IMPLEMENTED | `workmodel/workitem_store_test.go` |
-| **D7-S15-A50-T02** | ReevaluateParent rollup gate | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
-| **D7-S15-A50-T03** | GetPipelineFocus rollup priority | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A50-T01** | NeedsRollup schema backward compat | IMPLEMENTED | `workmodel/workitem_store_test.go` | Rollup_Gate |
+| **D7-S15-A50-T02** | ReevaluateParent rollup gate | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Gate |
+| **D7-S15-A50-T03** | GetPipelineFocus rollup priority | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Gate |
 
 ### D7-S15-A55: RollupGatePolicy
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A55-T01** | all_pass blocks on child fail | IMPLEMENTED | `workmodel/rollup_gate_test.go::TestShouldRollupAfterChildren_AllPassBlocksOnFail` |
-| **D7-S15-A55-T02** | min_coverage threshold | SKIP (Phase 2) | — |
-| **D7-S15-A55-T03** | best_effort default on all terminal | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A55-T01** | all_pass blocks on child fail | IMPLEMENTED | `workmodel/rollup_gate_test.go::TestShouldRollupAfterChildren_AllPassBlocksOnFail` | Rollup_Gate |
+| **D7-S15-A55-T02** | min_coverage threshold | SKIP (Phase 2) | — | Rollup_Gate |
+| **D7-S15-A55-T03** | best_effort default on all terminal | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Gate |
 
 ### D7-S15-A51: Summary Bubble Materialize
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A51-T01** | CB3 truncate | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` |
-| **D7-S15-A51-T02** | Observe dual bubble (T05) | IMPLEMENTED | `sessionorchestrator/item_observe_test.go::TestObserveWorkItem_RollupDualBubbles` |
-| **D7-S15-A51-T03** | Rollup directive uses summaries | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A51-T01** | CB3 truncate | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` | Rollup_Bubble |
+| **D7-S15-A51-T02** | Observe dual bubble (T05) | IMPLEMENTED | `sessionorchestrator/item_observe_test.go::TestObserveWorkItem_RollupDualBubbles` | Rollup_Bubble |
+| **D7-S15-A51-T03** | Rollup directive uses summaries | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` | Rollup_Bubble |
 
 ### D7-S15-A60: Parent Rollup Round 2+ MUPS
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A60-T01** | CommitmentPlan + FailureCriteria | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
-| **D7-S15-A60-T02** | Rollup directive lists children | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
-| **D7-S15-A60-T03** | Verify Pass clears NeedsRollup | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A60-T01** | CommitmentPlan + FailureCriteria | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` | Rollup_Round |
+| **D7-S15-A60-T02** | Rollup directive lists children | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` | Rollup_Round |
+| **D7-S15-A60-T03** | Verify Pass clears NeedsRollup | IMPLEMENTED | `sessionorchestrator/item_pipeline_rollup_test.go` | Rollup_Round |
 
 ### D7-S15-A61: Session complete Deliverable
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A61-T01** | complete.Content from root summary | IMPLEMENTED | `workmodel/rollup_gate_test.go` + `sessionorchestrator/session_turn_loop` |
-| **D7-S15-A61-T02** | best-effort child fallback | IMPLEMENTED | `workmodel/rollup_gate.go::ExtractSessionDeliverable` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A61-T01** | complete.Content from root summary | IMPLEMENTED | `workmodel/rollup_gate_test.go` + `sessionorchestrator/session_turn_loop` | Session_Process |
+| **D7-S15-A61-T02** | best-effort child fallback | IMPLEMENTED | `workmodel/rollup_gate.go::ExtractSessionDeliverable` | Session_Process |
 
 ### D7-S15-A53: Ephemeral Checklist Gate
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A53-T01** | GetFocus skips ephemeral checklist | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
-| **D7-S15-A53-T02** | HasOpenWork after rollup | IMPLEMENTED | `workmodel/spawn_apply_test.go` |
-| **D7-S15-A53-T03** | root R1 + checklist focus | IMPLEMENTED | `workmodel/work_tree_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A53-T01** | GetFocus skips ephemeral checklist | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Gate |
+| **D7-S15-A53-T02** | HasOpenWork after rollup | IMPLEMENTED | `workmodel/spawn_apply_test.go` | Rollup_Gate |
+| **D7-S15-A53-T03** | root R1 + checklist focus | IMPLEMENTED | `workmodel/work_tree_test.go` | Rollup_Gate |
 
 ### D7-S15-A54: Root Session Rollup Fallback
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A54-T01** | maybeRootRollupFallback | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
-| **D7-S15-A54-T02** | ChecklistBubbleStatement CB3 | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` |
-| **D7-S15-A54-T03** | Path B checklist Observe | IMPLEMENTED | `sessionorchestrator/item_observe.go` |
-| **D7-S15-A54-T04** | trace replay E2E | PARTIAL (stub IT) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A54-T01** | maybeRootRollupFallback | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Fallback |
+| **D7-S15-A54-T02** | ChecklistBubbleStatement CB3 | IMPLEMENTED | `workmodel/context_bubble_apply_test.go` | Rollup_Fallback |
+| **D7-S15-A54-T03** | Path B checklist Observe | IMPLEMENTED | `sessionorchestrator/item_observe.go` | Rollup_Fallback |
+| **D7-S15-A54-T04** | trace replay E2E | PARTIAL (stub IT) | `tests/integration/d7/d7_rollup_trace_replay_test.go` | Rollup_Fallback |
 
 ### D7-S15-A07: WorkTree Rollup Governance (DM-20260629-001 PR-3-extended)
 
 > **Change:** `devrix-d7-dsaft-restructuring` PR-3-extended (T52 + T53 + T54) — typed RollupReport envelope + 3-call-site migration + deterministic root + 3 governance T points.  
 > **归档：** `openspec/changes/devrix-d7-dsaft-restructuring/` (PR-3-extended)
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-A07-T01** | ApplyPipelineDecide 4 步顺序不变式（ContextBubbleDecision → AcceptedContextLinks → SpawnPolicy → ScopeContractSpawnGate） | IMPLEMENTED | `workmodel/context_decide.go::ApplyPipelineDecide` |
-| **D7-S15-A07-T02** | ReevaluateParentAfterChild 3 调用点幂等性（同一 child 多次 terminal 仅触发 1 次 rollup，签名迁移 `(struct{}, error) → (*RollupReport, error)`） | IMPLEMENTED | `workmodel/resolve.go::ReevaluateParentAfterChild` + 3 调用点 (`sessionorchestrator/session_turn_loop.go:194`, `workmodel/run_spawn.go:51`, `workmodel/cli_commands.go:342`) |
-| **D7-S15-A07-T03** | Path A vs Path B rollup trigger 选择矩阵：Path A (eager rollup) — `workmodel/rollup_gate.go::ShouldRollupAfterChildren` — 3 policies × 2 needs_rollup = 6 组合；Path B (root fallback) — `workmodel/rollup_gate.go::MaybeRootRollupFallback` — 2 has_ephemeral × 2 needs_rollup = 4 组合；合计 10 组合覆盖 | IMPLEMENTED | `workmodel/rollup_gate_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-A07-T01** | ApplyPipelineDecide 4 步顺序不变式（ContextBubbleDecision → AcceptedContextLinks → SpawnPolicy → ScopeContractSpawnGate） | IMPLEMENTED | `workmodel/context_decide.go::ApplyPipelineDecide` | Rollup_Gate |
+| **D7-S15-A07-T02** | ReevaluateParentAfterChild 3 调用点幂等性（同一 child 多次 terminal 仅触发 1 次 rollup，签名迁移 `(struct{}, error) → (*RollupReport, error)`） | IMPLEMENTED | `workmodel/resolve.go::ReevaluateParentAfterChild` + 3 调用点 (`sessionorchestrator/session_turn_loop.go:194`, `workmodel/run_spawn.go:51`, `workmodel/cli_commands.go:342`) | Rollup_Gate |
+| **D7-S15-A07-T03** | Path A vs Path B rollup trigger 选择矩阵：Path A (eager rollup) — `workmodel/rollup_gate.go::ShouldRollupAfterChildren` — 3 policies × 2 needs_rollup = 6 组合；Path B (root fallback) — `workmodel/rollup_gate.go::MaybeRootRollupFallback` — 2 has_ephemeral × 2 needs_rollup = 4 组合；合计 10 组合覆盖 | IMPLEMENTED | `workmodel/rollup_gate_test.go` | Rollup_Gate |
 
 **A07 Total:** 3 P0 T — 3 IMPLEMENTED (DM-20260629-001 PR-3-extended)
 
 ### D7-S15 Integration
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D7-S15-IT01** | decompose + rollup E2E | PARTIAL | `sessionorchestrator/item_pipeline_rollup_test.go` (unit-level) |
-| **D7-S15-IT02** | trace replay no checklist MUPS | PARTIAL (stub) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S15-IT01** | decompose + rollup E2E | PARTIAL | `sessionorchestrator/item_pipeline_rollup_test.go` (unit-level) | — |
+| **D7-S15-IT02** | trace replay no checklist MUPS | PARTIAL (stub) | `tests/integration/d7/d7_rollup_trace_replay_test.go` | — |
 
 **Phase 1 Total:** 21 P0 T — 18 IMPLEMENTED · 2 PARTIAL (IT stub) · 1 SKIP (min_coverage Phase 2)
 
@@ -935,19 +935,19 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 > **Change:** Phase 1+2 `devrix-d7-layer-subcontext` · Phase 3 `devrix-d7-layer-subcontext-phase3`  
 > **归档：** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/` · `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`
 
-| T ID | Description | Status | File |
-|------|-------------|--------|------|
-| **D2-S16-A20-T01..T05** | Materializer + partition store + Jaeger span | IMPLEMENTED | `contextengine/materialize/` |
-| **D7-S16-A60-T01..T04** | ScopeContract + spawn gate + rule infer | IMPLEMENTED | `workmodel/scope_contract*.go`, `item_plan.go` |
-| **D7-S16-A61-T01..T03** | ChildDownlink + Materialize inject | IMPLEMENTED | `workmodel/child_downlink.go` |
-| **D7-S16-A70-T01..T03** | Executor Materialize wiring | IMPLEMENTED | `workitem_executor.go`, `workitem_exec_context.go` |
-| **D7-S16-A72-T01..T04** | Signal→Obs mapping | IMPLEMENTED | `item_observe.go`, `item_observe_scope_test.go` |
-| **D7-S16-A63-T01/T02** | Upstream BlockedBy | IMPLEMENTED | `workitem_exec_context.go`, materialize tests |
-| **D7-S16-A64-T01/T02** | PeerStatus cohort | IMPLEMENTED | `workmodel/cohort_signals.go` |
-| **D7-S16-IT21..IT26** | Materialize integration | IMPLEMENTED | `item_pipeline_materialize_test.go` |
-| **D2-S16-A22-T01..T03** | SubTurn/Wave Materialize paths | IMPLEMENTED | `materialize/subturn.go`, `materialize/wave.go` |
-| **D7-S16-A65-T01..T03** | SubTurn→MaterializePolicy + bootstrap | IMPLEMENTED | `subturn_materialize.go`, `mups_pipeline.go` |
-| **D7-S16-A66-T01..T03** | Wave ContextResolver merge | IMPLEMENTED | `wavescheduler/context_materialize.go`, `wire_wave.go` |
-| **D7-S16-A74-T01..T04** | LLM ObservationProposer + rule gate | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go` |
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D2-S16-A20-T01..T05** | Materializer + partition store + Jaeger span | IMPLEMENTED | `contextengine/materialize/` | — |
+| **D7-S16-A60-T01..T04** | ScopeContract + spawn gate + rule infer | IMPLEMENTED | `workmodel/scope_contract*.go`, `item_plan.go` | SubContext_Scope |
+| **D7-S16-A61-T01..T03** | ChildDownlink + Materialize inject | IMPLEMENTED | `workmodel/child_downlink.go` | SubContext_Downlink |
+| **D7-S16-A70-T01..T03** | Executor Materialize wiring | IMPLEMENTED | `workitem_executor.go`, `workitem_exec_context.go` | SubContext_Executor |
+| **D7-S16-A72-T01..T04** | Signal→Obs mapping | IMPLEMENTED | `item_observe.go`, `item_observe_scope_test.go` | SubContext_Signal |
+| **D7-S16-A63-T01/T02** | Upstream BlockedBy | IMPLEMENTED | `workitem_exec_context.go`, materialize tests | SubContext_Blocked |
+| **D7-S16-A64-T01/T02** | PeerStatus cohort | IMPLEMENTED | `workmodel/cohort_signals.go` | SubContext_Cohort |
+| **D7-S16-IT21..IT26** | Materialize integration | IMPLEMENTED | `item_pipeline_materialize_test.go` | — |
+| **D2-S16-A22-T01..T03** | SubTurn/Wave Materialize paths | IMPLEMENTED | `materialize/subturn.go`, `materialize/wave.go` | — |
+| **D7-S16-A65-T01..T03** | SubTurn→MaterializePolicy + bootstrap | IMPLEMENTED | `subturn_materialize.go`, `mups_pipeline.go` | SubContext_Materialize |
+| **D7-S16-A66-T01..T03** | Wave ContextResolver merge | IMPLEMENTED | `wavescheduler/context_materialize.go`, `wire_wave.go` | SubContext_Materialize |
+| **D7-S16-A74-T01..T04** | LLM ObservationProposer + rule gate | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go` | SubContext_Executor |
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
