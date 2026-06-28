@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-layer-subcontext-phase3`  
 **Demand ID:** DM-20260628-002  
-**Status:** S4_Development  
+**Status:** S7_Archived  
 **Parent:** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/` (DM-20260627-003)
 
 ---
@@ -43,3 +43,12 @@ LLM ObservationProposer @ Observe (G3: LLM propose → rule validate):
 - `ValidateObservationProposals` caps ObsFact strength at 0.85 and requires evidence
 - Wired via `ItemPipelineDeps.ObservationProposer` (`NewLLMObservationProposer` in bootstrap)
 - LLM failures are fail-safe (rules-only Observe continues)
+
+---
+
+## Archive Footer
+
+**Status:** S7_Archived (2026-06-28)  
+**Outcome:** Phase 3 ACCEPTED — PR [#273](https://github.com/fqntxmqee/devrix/pull/273), [#274](https://github.com/fqntxmqee/devrix/pull/274), [#275](https://github.com/fqntxmqee/devrix/pull/275) merged.  
+**Layer SubContext Phase 1–3 closed.**  
+**Archive path:** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`

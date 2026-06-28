@@ -1,0 +1,22 @@
+id: devrix-d7-layer-subcontext-phase3
+demand_id: DM-20260628-002
+title: "D7 Layer SubContext Phase 3 — SubTurn Materialize + Wave merge + ObservationProposer"
+status: s7_archived
+completed: 2026-06-28
+priority: P1
+created: 2026-06-28
+parent_archive: openspec/archive/2026-06-28-devrix-d7-layer-subcontext
+
+domains: [D7, D2]
+layers:
+  - D7-S16-A65  # SubTurn → MaterializePolicy
+  - D7-S16-A66  # Wave ContextResolver merge
+  - D7-S16-A74  # LLM ObservationProposer @ Observe
+  - D2-S16-A22  # SubTurn and Wave Materialize paths
+
+related_changes:
+  - devrix-d7-layer-subcontext  # Phase 1+2 parent (archived)
+
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d2-context-engine/spec.md

@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.10.0
+**Version:** 4.11.0
 **Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -882,10 +882,10 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 ---
 
-## D7-S16: Layer SubContext (DM-20260627-003)
+## D7-S16: Layer SubContext (DM-20260627-003 + DM-20260628-002)
 
-> **Change:** `devrix-d7-layer-subcontext` — Phase 1+2 P0/P1 闭环；Phase 3 SubTurn/Wave/ObservationProposer 登记不编码。  
-> **归档：** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`
+> **Change:** Phase 1+2 `devrix-d7-layer-subcontext` · Phase 3 `devrix-d7-layer-subcontext-phase3`  
+> **归档：** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/` · `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`
 
 | T ID | Description | Status | File |
 |------|-------------|--------|------|
@@ -897,5 +897,9 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S16-A63-T01/T02** | Upstream BlockedBy | IMPLEMENTED | `workitem_exec_context.go`, materialize tests |
 | **D7-S16-A64-T01/T02** | PeerStatus cohort | IMPLEMENTED | `workmodel/cohort_signals.go` |
 | **D7-S16-IT21..IT26** | Materialize integration | IMPLEMENTED | `item_pipeline_materialize_test.go` |
+| **D2-S16-A22-T01..T03** | SubTurn/Wave Materialize paths | IMPLEMENTED | `materialize/subturn.go`, `materialize/wave.go` |
+| **D7-S16-A65-T01..T03** | SubTurn→MaterializePolicy + bootstrap | IMPLEMENTED | `subturn_materialize.go`, `mups_pipeline.go` |
+| **D7-S16-A66-T01..T03** | Wave ContextResolver merge | IMPLEMENTED | `wavescheduler/context_materialize.go`, `wire_wave.go` |
+| **D7-S16-A74-T01..T04** | LLM ObservationProposer + rule gate | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go` |
 
-**Phase 1+2 Total:** 32 task groups — IMPLEMENTED (Phase 3 T33–T35 DEFERRED)
+**Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
