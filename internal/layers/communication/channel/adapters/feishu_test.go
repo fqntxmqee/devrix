@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
+	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
@@ -661,7 +661,7 @@ func TestFeishuAdapter_OnError_TurnInProgress(t *testing.T) {
 	// TurnInProgressError must not panic. The actual card render path
 	// requires a live lark client; here we only exercise the early
 	// return + no-side-effect invariants.
-	tip := sessionorchestrator.TurnInProgressError{
+	tip := sharederrors.TurnInProgressError{
 		SessionID:      "sess_xyz",
 		SinceStartedAt: time.Date(2026, 6, 28, 17, 31, 4, 0, time.UTC),
 		TurnNo:         2,
