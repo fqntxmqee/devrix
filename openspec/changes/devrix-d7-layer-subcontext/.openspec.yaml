@@ -29,10 +29,7 @@ parent_specs:
   - openspec/specs/d2-context-engine/spec.md
   - openspec/specs/d2-context-engine/d7-boundary.md
 
-feature_flags:
-  - name: FeatureLayerSubContextEnabled
-    default: false
-    note: "Phase 1 默认关；WorkItemExecutor 走 Materialize 路径时开启"
+feature_flags: []
 
 discussion:
   - "同层默认不共享 ReAct 全文；cohort 共享 ScopeContract 域"

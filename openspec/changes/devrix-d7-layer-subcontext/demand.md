@@ -59,7 +59,7 @@
 - [ ] **P0** `BlockedBy`：下游 WI Materialize 含上游 **structured bubble**，不含上游 wi 私有全文。
 - [ ] **P0** 子 terminal：父 Observe 仍含 `BubbleStructured`（与 #262 兼容，不回归）。
 - [ ] **P1** `SpawnParallelExplore`：可选 **PeerStatusSignal**（terminal 后 1 行）；默认 **无** live tail 共享。
-- [ ] **P1** `FeatureLayerSubContextEnabled=1` 时集成测试全绿；=0 时行为与现网一致。
+- [ ] **P1** depth≥1 WorkItem 默认走 Materialize；L0 Goal 仍 legacy Prepare（无环境变量开关）。
 - [ ] **P0** Execute ReAct transcript **不含** ObsFact/ObsSignal/ObsDeviation/ObsUncertainty 强制标签块（Obs* 仅出现在 Observe 阶段 UncertaintyReport）。
 - [ ] **P0** Goal `ScopeContract.open_questions` 非空 → Observe 产出 ObsUncertainty（规则映射）→ SpawnPolicy 阻断 decompose。
 - [ ] **P0** 子 WI terminal BubbleStructured → 父 Observe ObsFact（已有 #262 路径，不回归）。

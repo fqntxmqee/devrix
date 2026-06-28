@@ -2,7 +2,6 @@ package sessionorchestrator
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -14,9 +13,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// TestMaterialize_SiblingPrivateChainIsolation verifies LC2: sibling B payload excludes A private chain.
 func TestMaterialize_SiblingPrivateChainIsolation(t *testing.T) {
-	enableLayerSubContext(t)
 	dir := t.TempDir()
 	store, _ := materialize.NewPartitionStore(dir)
 	mat := materialize.NewDefaultMaterializer(store)
@@ -45,13 +42,7 @@ func TestMaterialize_SiblingPrivateChainIsolation(t *testing.T) {
 	}
 }
 
-func enableLayerSubContext(t *testing.T) {
-	t.Helper()
-	t.Setenv("DEVRIX_LAYER_SUBCONTEXT", "1")
-}
-
 func TestMaterialize_ChildDownlinkScopeInPrompt(t *testing.T) {
-	enableLayerSubContext(t)
 	tm := workmodel.NewTaskManager()
 	goal, _ := tm.EnsureGoal("s1", "implement feature")
 	_, err := tm.DecomposeChildren("s1", goal.ID, []workmodel.ChildSpec{{
@@ -75,6 +66,55 @@ func TestMaterialize_ChildDownlinkScopeInPrompt(t *testing.T) {
 	}
 	if !strings.Contains(res.SystemPrompt, "internal/foo.go") {
 		t.Fatalf("system prompt missing ScopeIn: %q", res.SystemPrompt)
+	}
+}
+
+func TestBuildMaterializeRequest_UpstreamBlockedBy(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	blocker, _ := tm.CreateWorkItem("s1", workmodel.CreateWorkItemInput{
+		Kind: workmodel.WorkKindImplement, Title: "upstream", Directive: "do A",
+	})
+	_ = tm.Tree().ApplyPipelineRound("s1", blocker.ID, &workmodel.WorkItemPipelineRound{
+		WorkItemID:      blocker.ID,
+		PlanID:            "plan_a",
+		VerdictID:         "verdict_a",
+		VerdictKind:       types.VerdictPass,
+		ArtifactSummary:   "upstream result text",
+		ContextBubbleKind: workmodel.BubbleStructured,
+	}, workmodel.RoundPhaseIdle)
+	_ = tm.UpdateStatus("s1", blocker.ID, workmodel.TaskStatusCompleted)
+
+	dep, _ := tm.CreateWorkItem("s1", workmodel.CreateWorkItemInput{
+		Kind: workmodel.WorkKindImplement, Title: "downstream", Directive: "do B",
+	})
+	_ = tm.Tree().AddDependency("s1", dep.ID, blocker.ID)
+	dep, _ = tm.GetWorkItem("s1", dep.ID)
+
+	req := BuildMaterializeRequest("s1", dep, tm, "do B", DefaultWorkItemTokenBudget)
+	if req.Policy.Mode != materialize.ModeUpstream {
+		t.Fatalf("mode = %q, want upstream", req.Policy.Mode)
+	}
+	if len(req.Signals.SignalLines) == 0 {
+		t.Fatal("expected upstream signal lines")
+	}
+	payload := strings.Join(req.Signals.SignalLines, " ")
+	if !strings.Contains(payload, "structured_child_bubble") {
+		t.Fatalf("missing structured bubble: %q", payload)
+	}
+	if !strings.Contains(payload, "upstream result text") {
+		t.Fatalf("missing artifact summary: %q", payload)
+	}
+	secret := "BLOCKER_PRIVATE_CHAIN_SECRET"
+	dir := t.TempDir()
+	store, _ := materialize.NewPartitionStore(dir)
+	_ = store.Append("s1", blocker.ID, []types.Message{{Content: secret}})
+	mat := materialize.NewDefaultMaterializer(store)
+	res, err := mat.Materialize(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Materialize: %v", err)
+	}
+	if strings.Contains(res.SystemPrompt, secret) {
+		t.Fatal("upstream private chain must not appear in BlockedBy materialize")
 	}
 }
 
@@ -141,7 +181,6 @@ func TestEmitContextMaterialize_SpanNoPanic(t *testing.T) {
 }
 
 func TestMaterialize_DepthSubContextDiffersFromSessionPrepare(t *testing.T) {
-	enableLayerSubContext(t)
 	dir := t.TempDir()
 	store, _ := materialize.NewPartitionStore(dir)
 	mat := materialize.NewDefaultMaterializer(store)
@@ -163,7 +202,7 @@ func TestMaterialize_DepthSubContextDiffersFromSessionPrepare(t *testing.T) {
 	}
 	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{Item: child, Tasks: tm})
 	if !ShouldMaterializeWorkItem(ctx, "s1", child.ID) {
-		t.Fatal("depth>=1 child should materialize when flag on")
+		t.Fatal("depth>=1 child should materialize by default")
 	}
 	req := BuildMaterializeRequest("s1", child, tm, "do work", DefaultWorkItemTokenBudget)
 	res, err := mat.Materialize(ctx, req)
@@ -190,15 +229,11 @@ func TestMaterialize_NoObsTaxonomyInPrivateChainTemplate(t *testing.T) {
 	}
 }
 
-func TestFeatureFlag_OffUsesLegacyPrepare(t *testing.T) {
-	os.Unsetenv("DEVRIX_LAYER_SUBCONTEXT")
+func TestShouldMaterializeWorkItem_L0GoalUsesLegacyPrepare(t *testing.T) {
 	tm := workmodel.NewTaskManager()
 	goal, _ := tm.EnsureGoal("s1", "g")
-	child, _ := tm.CreateWorkItem("s1", workmodel.CreateWorkItemInput{
-		ParentID: goal.ID, Kind: workmodel.WorkKindImplement, Title: "c", Directive: "d",
-	})
-	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{Item: child, Tasks: tm})
-	if ShouldMaterializeWorkItem(ctx, "s1", child.ID) {
-		t.Fatal("flag off should not materialize depth>=1 child")
+	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{Item: goal, Tasks: tm})
+	if ShouldMaterializeWorkItem(ctx, "s1", goal.ID) {
+		t.Fatal("L0 Goal should use legacy Prepare, not Materialize")
 	}
 }

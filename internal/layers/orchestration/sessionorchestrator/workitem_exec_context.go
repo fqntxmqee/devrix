@@ -2,9 +2,9 @@ package sessionorchestrator
 
 import (
 	"context"
+	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
-	"github.com/devrix/devrix/internal/layers/orchestration/configure"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
@@ -33,8 +33,8 @@ func WorkItemExecContextFrom(ctx context.Context) (WorkItemExecContext, bool) {
 // ResolvePartitionForWorkItem maps a WorkItem to its primary private partition (D7-S16-A71).
 func ResolvePartitionForWorkItem(sessionID string, item *workmodel.WorkItem) materialize.Partition {
 	p := materialize.Partition{
-		SessionID: sessionID,
-		Kind:      materialize.PartitionWorkItem,
+		SessionID:  sessionID,
+		Kind:       materialize.PartitionWorkItem,
 		WorkItemID: item.ID,
 	}
 	if item != nil && item.ParentID != "" {
@@ -44,10 +44,8 @@ func ResolvePartitionForWorkItem(sessionID string, item *workmodel.WorkItem) mat
 }
 
 // ShouldMaterializeWorkItem reports whether Execute should use D2 Materialize instead of legacy Prepare.
+// L0 Goal uses legacy Prepare; depth≥1 and rollup WorkItems always Materialize (DM-20260627-003).
 func ShouldMaterializeWorkItem(ctx context.Context, sessionID, itemID string) bool {
-	if !configure.FeatureLayerSubContextEnabled() {
-		return false
-	}
 	ec, ok := WorkItemExecContextFrom(ctx)
 	if !ok || ec.Item == nil || ec.Tasks == nil {
 		return false
@@ -85,12 +83,38 @@ func BuildMaterializeRequest(sessionID string, item *workmodel.WorkItem, tm *wor
 			signals.ScopeOut = append([]string(nil), dl.ScopeOut...)
 			signals.ExpectedReturn = dl.ExpectedReturn
 		}
+		if len(item.BlockedBy) > 0 {
+			policy.Mode = materialize.ModeUpstream
+			signals.SignalLines = upstreamSignalLines(sessionID, item, tm)
+		}
 	}
 	return materialize.Request{
 		Partition: partition,
 		Policy:    policy,
 		Signals:   signals,
 	}
+}
+
+func upstreamSignalLines(sessionID string, item *workmodel.WorkItem, tm *workmodel.TaskManager) []string {
+	if item == nil || tm == nil {
+		return nil
+	}
+	var lines []string
+	for _, blockerID := range item.BlockedBy {
+		upstream, ok := tm.GetWorkItem(sessionID, blockerID)
+		if !ok || upstream == nil {
+			continue
+		}
+		if upstream.LastRound != nil {
+			if stmt := workmodel.StructuredBubbleStatement(blockerID, upstream.LastRound); stmt != "" {
+				lines = append(lines, stmt)
+			}
+			if s := strings.TrimSpace(upstream.LastRound.ArtifactSummary); s != "" {
+				lines = append(lines, "upstream_artifact_summary: "+workmodel.TruncateArtifactSummary(s, 240))
+			}
+		}
+	}
+	return lines
 }
 
 func toolProfileForItem(item *workmodel.WorkItem) string {

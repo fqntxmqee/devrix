@@ -38,7 +38,7 @@
 | ID | Description | L5 | Status |
 |----|-------------|-----|--------|
 | T06 | `ResolvePartitionForWorkItem(item)` → Session / Cohort / WorkItem | D7-S16-A71-T01 | [x] |
-| T07 | `prepareContext` 替换：`FeatureLayerSubContextEnabled` → Materialize；否则 legacy Prepare | D7-S16-A70-T01 | [x] |
+| T07 | `prepareContext` 替换：depth≥1 默认 Materialize；L0 Goal legacy Prepare | D7-S16-A70-T01 | [x] |
 | T08 | Execute 后 `Append(wi:self, turnMsgs)` | D7-S16-A70-T02 | [x] |
 | T09 | RollupSynth policy：`NeedsRollup` → `MaterializeMode=RollupSynth`（与 #262 directive 对齐） | D7-S16-A70-T03 | [x] |
 
@@ -121,8 +121,8 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T19 | `FeatureLayerSubContextEnabled` default false；bootstrap 注入 Materializer | [x] |
-| T20 | flag=off 回归：与 master Prepare 路径 bit-identical（现有测试绿） | [x] |
+| T19 | bootstrap 注入 Materializer（depth≥1 默认启用，无 feature flag） | [x] |
+| T20 | L0 Goal legacy Prepare 回归测试绿 | [x] |
 
 ---
 
@@ -148,7 +148,7 @@
 | ID | Description | AC | Status |
 |----|-------------|-----|--------|
 | T21 | 同层 A/B 无 BlockedBy：B payload 不含 A tool result | LC2 | [x] |
-| T22 | BlockedBy B→A：B 含 structured bubble，不含 A 私有链 | LC2 | [ ] |
+| T22 | BlockedBy B→A：B 含 structured bubble，不含 A 私有链 | LC2 | [x] |
 | T23 | depth≥1 SubContext：prompt/budget/tools ≠ session main | LC1 | [x] |
 | T24 | Jaeger fixture：`D2_Context_Materialize` span 存在 | LC3 | [x] |
 | T25 | ScopeContract open_questions → ObsUncertainty → 不 spawn | LC4/LC6 | [x] |
@@ -166,8 +166,8 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T27 | `MaterializeMode=Upstream`：仅 inject structured + ArtifactSummary | [ ] |
-| T28 | 单测：upstream 不含 blocker wi 私有 jsonl 全文 | [ ] |
+| T27 | `MaterializeMode=Upstream`：仅 inject structured + ArtifactSummary | [x] |
+| T28 | 单测：upstream 不含 blocker wi 私有 jsonl 全文 | [x] |
 
 ---
 
@@ -194,8 +194,8 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T31 | `/task context show --wi=<id>` 展示 partition + inbound signals | [ ] |
-| T32 | ResolveHint：`cohort domain`, `upstream inject`, `private chain len` | [ ] |
+| T31 | `/task context show --wi=<id>` 展示 partition + inbound signals | [x] |
+| T32 | ResolveHint：`cohort domain`, `upstream inject`, `private chain len` | [x] |
 
 ---
 
