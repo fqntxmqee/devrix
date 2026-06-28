@@ -164,6 +164,11 @@ func TestDeepSeekAdapter_should_fail_without_api_key(t *testing.T) {
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMAuthFailed {
 		t.Errorf("err: %v", err)
 	}
+	// DM-20260628-001 (T4): error must carry APICodeAuthenticationFailed in the
+	// sharederrors chain so orchestrator emitError can populate error_code.
+	if !sharederrors.IsCode(err, sharederrors.APICodeAuthenticationFailed) {
+		t.Errorf("expected APICodeAuthenticationFailed in chain, got: %v", sharederrors.Code(err))
+	}
 }
 
 func TestDeepSeekAdapter_should_map_auth_http_status(t *testing.T) {
@@ -180,6 +185,9 @@ func TestDeepSeekAdapter_should_map_auth_http_status(t *testing.T) {
 	var llmErr *sharederrors.SentinelError
 	if !errors.As(err, &llmErr) || llmErr.Code != sharederrors.CodeLLMAuthFailed {
 		t.Errorf("err: %v", err)
+	}
+	if !sharederrors.IsCode(err, sharederrors.APICodeAuthenticationFailed) {
+		t.Errorf("expected APICodeAuthenticationFailed in chain, got: %v", sharederrors.Code(err))
 	}
 }
 

@@ -246,6 +246,7 @@
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
+| `devrix-api-error-classification` | DM-20260628-001 | **S2_Proposal**（S3 待开） | `openspec/changes/devrix-api-error-classification/` |
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
 
