@@ -210,6 +210,19 @@ func EmitSubWorktreeRun(ctx context.Context, sessionID, parentID, childID, spawn
 // EmitMUPSPipeline Execute phase — Jaeger shows the iter-level latency
 // distribution directly, which is what was missing when "16s session" had
 // no per-iter breakdown.
+// EmitContextMaterialize wraps D2 Materialize for a WorkItem partition (DM-20260627-003).
+func EmitContextMaterialize(ctx context.Context, sessionID, wiID, policy string, messageCount, tokenEst int) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "materialize.wi_id", Value: wiID},
+		{Key: "materialize.policy", Value: policy},
+		{Key: "materialize.message_count", Value: intToString(messageCount)},
+		{Key: "materialize.token_est", Value: intToString(tokenEst)},
+	}
+	_, span := start(ctx, telemetry.OpD2_S16_Context_Materialize, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
 func EmitSubTurnIteration(ctx context.Context, sessionID, itemID string, iter int, finishReason, stopReason string) func(error) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},

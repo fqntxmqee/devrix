@@ -59,7 +59,7 @@
 - [ ] **P0** `BlockedBy`：下游 WI Materialize 含上游 **structured bubble**，不含上游 wi 私有全文。
 - [ ] **P0** 子 terminal：父 Observe 仍含 `BubbleStructured`（与 #262 兼容，不回归）。
 - [ ] **P1** `SpawnParallelExplore`：可选 **PeerStatusSignal**（terminal 后 1 行）；默认 **无** live tail 共享。
-- [ ] **P1** `FeatureLayerSubContextEnabled=1` 时集成测试全绿；=0 时行为与现网一致。
+- [ ] **P1** depth≥1 WorkItem 默认走 Materialize；L0 Goal 仍 legacy Prepare（无环境变量开关）。
 - [ ] **P0** Execute ReAct transcript **不含** ObsFact/ObsSignal/ObsDeviation/ObsUncertainty 强制标签块（Obs* 仅出现在 Observe 阶段 UncertaintyReport）。
 - [ ] **P0** Goal `ScopeContract.open_questions` 非空 → Observe 产出 ObsUncertainty（规则映射）→ SpawnPolicy 阻断 decompose。
 - [ ] **P0** 子 WI terminal BubbleStructured → 父 Observe ObsFact（已有 #262 路径，不回归）。
@@ -76,13 +76,16 @@
 
 ## 7. 澄清 Q&A（供 Claude / Review 继续讨论）
 
-| # | 问题 | 当前决议（Draft） |
-|---|------|-------------------|
+| # | 问题 | 当前决议（R1 已冻结 — 2026-06-28） |
+|---|---|------|
 | Q1 | 同层是否共享 ReAct 全文？ | **否（默认）**；仅共享 **ScopeContract cohort 域** + 可选 terminal **PeerStatus** |
 | Q2 | 与 CG2「默认隔离」是否冲突？ | **修订 CG2**：隔离指 **LLM transcript**；cohort **域/契约** 可共享 |
 | Q3 | Materialize 放 D2 还是 D7？ | **D2**（存储+压缩+prompt）；D7 只解析 partition/policy |
 | Q4 | Goal ScopeContract 是否强制 LLM 一轮？ | **结构化产出强制**；极具体指令可 **规则推断** 单文件 scope |
 | Q5 | delegate SubTurn 是否 Phase 1 统一？ | **否** — Phase 3 映射 brief/fork/full → MaterializePolicy |
 | Q6 | sandbox_slug 与 cohort 关系？ | 有 sandbox 的 WI **强制 WorkItemPrivate**，禁止 peer layer 注入 |
-| Q7 | 每轮 LLM 对话是否强制收敛到 Obs 四类？ | **否（Execute 每轮）**；Execute 产出 **结构化 Signal**；**Observe 规则**映射 Obs*；Goal ScopeContract ≈ ObsUncertainty 门控输入 |
-| Q8 | Execute context 能否软引导结构化块？ | **可以**（`<conclusion>` / `<open_questions>`），但 **非 SoT**；Observe/Verify 规则升格 |
+| Q7 | 每轮 LLM 对话是否强制收敛到 Obs 四类？ | **否（Execute 每轮）** — R1 冻结；Observe 规则映射 |
+| Q8 | Execute context 能否软引导结构化块？ | **可以** — `<conclusion>` / `<open_questions>`；非 SoT |
+| Q9 | ScopeContract 存哪？ | **WorkItem 字段** + LastRound 镜像 — R1 冻结 |
+| Q10 | ExpectedReturn 是否可空？ | **否** — 空则阻断 decompose — R1 冻结 |
+| Q11 | flag 何时强制 on？ | Phase 1 验收后 **30 天**，depth≥2 — OQ-LC-10 |

@@ -65,6 +65,11 @@ func observeWorkItem(
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
 	}
+	scopeObs, err := mapScopeContractToObservations(sessionID, item)
+	if err != nil {
+		return orchtypes.UncertaintyReport{}, nil, err
+	}
+	obs = append(obs, scopeObs...)
 	childObs, err := observationsFromChildStructuredBubbles(tasks, sessionID, item)
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
@@ -170,6 +175,59 @@ func observationsFromItem(
 		return nil, err
 	}
 	obs = append(obs, fact)
+	return obs, nil
+}
+
+// mapScopeContractToObservations applies R-OBS-1/R-OBS-2 rules (DM-20260627-003).
+// LastRound carries Execute signals; Obs* taxonomy is produced only here at Observe.
+func mapScopeContractToObservations(sessionID string, item *workmodel.WorkItem) ([]orchtypes.Observation, error) {
+	if item == nil || item.ScopeContract == nil {
+		return nil, nil
+	}
+	sc := item.ScopeContract
+	var obs []orchtypes.Observation
+	if sc.HasOpenQuestions() {
+		for _, q := range sc.OpenQuestions {
+			q = strings.TrimSpace(q)
+			if q == "" {
+				continue
+			}
+			o, err := orchtypes.NewObservation(
+				orchtypes.ObsUncertainty,
+				orchtypes.CatBusiness,
+				0.9,
+				orchtypes.UncertaintyPayload{
+					Question:     q,
+					Confidence:   0.1,
+					RequiresMore: true,
+				},
+				"scope_contract",
+			)
+			if err != nil {
+				return nil, err
+			}
+			obs = append(obs, o)
+		}
+	}
+	if sc.IsCompleteEnoughForDecompose() {
+		stmt := strings.TrimSpace(sc.GoalStatement)
+		if stmt == "" && len(sc.InScope) > 0 {
+			stmt = "ScopeIn: " + strings.Join(sc.InScope, ", ")
+		}
+		if stmt != "" {
+			o, err := orchtypes.NewObservation(
+				orchtypes.ObsFact,
+				orchtypes.CatBusiness,
+				0.9,
+				orchtypes.FactPayload{Statement: stmt, Evidence: []string{item.ID, sessionID}},
+				"scope_contract",
+			)
+			if err != nil {
+				return nil, err
+			}
+			obs = append(obs, o)
+		}
+	}
 	return obs, nil
 }
 

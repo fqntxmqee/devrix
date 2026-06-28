@@ -4,7 +4,15 @@
 **Demand ID:** DM-20260627-003  
 **Date:** 2026-06-27  
 **Author:** Cursor（基于用户 WorkTree/Context 讨论整理）  
-**Status:** Draft — **请 Claude 逐条回应 §5 开放问题**
+**Status:** Draft — Claude 已回应（2026-06-28，详见 `game-theory-review.md`）
+
+---
+
+## 0. Claude 回应索引（博弈论视角）
+
+完整分析见同目录 **`game-theory-review.md`**。本节同步 §5 OQ-LC-1..7 的 1 行结论与新增 OQ-LC-8/9/10。
+
+**整体评分**：8.0/10，推荐进入 S3-Gate；补充 OQ-LC-8/9/10 后启动 S4。
 
 ---
 
@@ -115,7 +123,7 @@ Plan 规则        →  PlanKind（MatchKind）
 
 ---
 
-## 5. 请 Claude 讨论的开放问题
+## 5. 请 Claude 讨论的开放问题（含 Claude 回应 1 行结论）
 
 ### OQ-LC-1：ScopeContract 持久化
 
@@ -128,6 +136,8 @@ Plan 规则        →  PlanKind（MatchKind）
 **Cursor 默认：** A + LastRound 镜像（审计）
 
 **请 Claude 评估：** 对 DecomposeProposer Phase 2、disk store 版本、CLI show 的影响。
+
+**Claude 回应（2026-06-28）：** **A: WorkItem 字段**（审计/可追溯性 > 写放大成本），拆解后 scope readonly。WorkItem 字段比 LastRound 更可信（commitment cost 更高 = 信号更强），但需控制写放大：Goal 拆解后 scope 转 readonly。
 
 ---
 
@@ -142,6 +152,8 @@ Plan 规则        →  PlanKind（MatchKind）
 
 **请 Claude 评估：** 是否与 D2 边界冲突；i18n/tool catalog 如何复用。
 
+**Claude 回应：** **A: 轻量 path**，L0 Goal 可选全量；明确 Compress 复用边界（避免 PrepareOrchestrator 隐式调用）。轻量 path 让 R-OBS 规则可以单测验证，不被 PrepareOrchestrator 副作用污染。
+
 ---
 
 ### OQ-LC-3：CG2 修订版本策略
@@ -149,6 +161,8 @@ Plan 规则        →  PlanKind（MatchKind）
 **提案：** `workitem-context-graph-design.md` bump **0.3.0 → 0.4.0**，CG2 拆为 Transcript 隔离 + Cohort 域共享。
 
 **请 Claude 评估：** 是否需要 ADR；F3 已 merge 的测试语义是否需 MODIFIED。
+
+**Claude 回应：** **0.4.0 + ADR**（记录为何从"完全隔离"→"transcript 隔离 + cohort 域共享"的博弈论依据：信号博弈 / 承诺装置）。spec_delta §MODIFIED CG2 Scenario 已做 ✅。
 
 ---
 
@@ -158,6 +172,8 @@ rollup Phase 2 计划 LLM DecomposeProposer。ChildDownlink 是否在 Phase 1 �
 
 **Cursor 默认：** Phase 1 规则 + Goal ScopeContract 下行；Phase 2 合并 proposer 输出。
 
+**Claude 回应：** Phase 1 规则模板（OK），但 **ExpectedReturn 字段强制非空**（空值 = 阻断 decompose）。⚠️ 否则 Parent LLM 预期 Phase 2 LLM 兜底，Phase 1 不认真写 ExpectedReturn → 承诺装置失效（cheap talk）。
+
 ---
 
 ### OQ-LC-5：PeerStatus 默认策略
@@ -165,6 +181,8 @@ rollup Phase 2 计划 LLM DecomposeProposer。ChildDownlink 是否在 Phase 1 �
 并行 explore 时 PeerStatus 是否 **opt-in**（spawn flag）还是 cohort 默认 inject terminal status？
 
 **Cursor 默认：** opt-in policy flag，避免噪声。
+
+**Claude 回应：** **opt-in + cohort_size ≥ 3 才暴露**。避免小 cohort 内串通定价 / 从众效应（博弈论 §1.4 Bandwagon Effect）。
 
 ---
 
@@ -176,6 +194,8 @@ rollup Phase 2 计划 LLM DecomposeProposer。ChildDownlink 是否在 Phase 1 �
 
 **请 Claude 确认或提出反例场景。**
 
+**Claude 回应：** **禁止**（✅ 反 Moral Hazard 方向正确）+ 软引导 `<open_questions>` 补底 + **≥1 门槛**（避免敷衍式 1 条占位）。⚠️ 但要警惕 LLM 用自然语言软抱怨代替结构化块 → R-OBS 表预留自然语言 fuzzy match 扩展点。
+
 ---
 
 ### OQ-LC-7：Phase 2 LLM ObservationProposer
@@ -183,6 +203,32 @@ rollup Phase 2 计划 LLM DecomposeProposer。ChildDownlink 是否在 Phase 1 �
 是否在 Observe 节点增加 LLM 提案 Obs*（输入不含 wi 全文）+ 规则校验？
 
 **Cursor 默认：** Phase 2 独立登记（T35），不与 Layer SubContext Phase 1 合并 PR。
+
+**Claude 回应：** **独立 change**，LLM 提案不直接进 ObsFact，必须经规则校验（提案 → 规则裁决的 G3 范式）。LLM 输入明确**不含 wi 全文**（避免 Moral Hazard 复发）。
+
+---
+
+### OQ-LC-8：Scope 漂移防御（Claude 新增）
+
+**风险**：子 WI 通过 Bubble 主动建议扩大 Scope → Parent 下次 Plan 扩大 ScopeIn → scope 逐层漂移（scope creep / 软件熵增）。
+
+**建议**：Goal ScopeContract 加 `scope_expansion_max_ratio`（默认 1.5x），超限后强制 SpawnPolicy = SpawnInline 而非继续 decompose。
+
+---
+
+### OQ-LC-9：cohort 信号池预算（Claude 新增）
+
+**风险**：`cohort:<parent>/signals.jsonl` 是 append-only 无 cap，PeerStatus + ScopeContract cohort meta 在长任务下会膨胀，形成新公共池塘。
+
+**建议**：加 `cohort_signal_budget_max` 配置（默认 8KB），触发后降级 CB3 truncate 而非 fail-fast。降级次数进 metrics。
+
+---
+
+### OQ-LC-10：Feature Flag 路径依赖锁定（Claude 新增）
+
+**风险**：`FeatureLayerSubContextEnabled` 默认 false，但 flag=off 路径不被使用 → 维护成本隐性上升 → flag 永远不开（技术债务博弈）。
+
+**建议**：Phase 1 验收后**强制迁移路径**（如所有 depth≥2 WorkTree 强制 flag=on）+ `flag_migration_deadline` 30 天。
 
 ---
 

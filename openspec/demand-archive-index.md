@@ -246,7 +246,7 @@
 
 | Change ID | Demand ID | 状态 | 路径 |
 |-----------|-----------|------|------|
-| `devrix-d7-layer-subcontext` | DM-20260627-003 | **S3_Design**（待 Claude Review） | `openspec/changes/devrix-d7-layer-subcontext/` |
+| `devrix-d7-layer-subcontext` | DM-20260627-003 | **S4_Development**（R1 冻结 2026-06-28） | `openspec/changes/devrix-d7-layer-subcontext/` |
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
 
 **Claude 拉取 Layer SubContext 讨论入口：** `openspec/changes/devrix-d7-layer-subcontext/review-notes.md` → `design.md` §6

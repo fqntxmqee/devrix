@@ -68,6 +68,7 @@ const (
 	OpD2_S2_Context_Attachments_Collect = "D2_Context_Attachments_Collect"
 	OpD2_S2_Context_Queue_Drain = "D2_Context_Queue_Drain"
 	OpD2_S2_Context_Memory_Snapshot_Save = "D2_Context_Memory_Snapshot_Save"
+	OpD2_S16_Context_Materialize = "D2_Context_Materialize"
 
 	// D2 Context Engine - Harness (D2-S5)
 	OpD2_S5_Context_Harness_Bootstrap_Run = "D2_Context_Harness_Bootstrap_Run"

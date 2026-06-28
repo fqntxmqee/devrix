@@ -10,8 +10,8 @@ func DefaultDecomposeProposer(item *WorkItem, round *WorkItemPipelineRound) []Ch
 	kind := ChildKindForHypothesis(exploratory)
 	base := itemDirectiveForProposer(item)
 	return []ChildSpec{
-		{Kind: kind, Title: "explore path A", Directive: base + " — hypothesis A"},
-		{Kind: kind, Title: "explore path B", Directive: base + " — hypothesis B"},
+		{Kind: kind, Title: "explore path A", Directive: base + " — hypothesis A", ExpectedReturn: "Evidence comparing hypothesis A"},
+		{Kind: kind, Title: "explore path B", Directive: base + " — hypothesis B", ExpectedReturn: "Evidence comparing hypothesis B"},
 	}
 }
 

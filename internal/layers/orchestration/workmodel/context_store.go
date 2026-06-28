@@ -6,7 +6,22 @@ type contextSessionData struct {
 	mu         sync.RWMutex
 	links      []ContextLinkRecord
 	scopesByWI map[string]*ContextScope
+	cohorts    map[string]*CohortScope
+	downlinks  map[string]ChildDownlink // childWorkItemID -> downlink
 }
+
+// CohortScope holds shared metadata for sibling work items under one parent.
+//
+// CG2′ (ADR-001): siblings share cohort domain signals (ScopeContract, PeerStatus)
+// but NOT WorkItemPrivate transcript chains — transcript isolation is per wi:<sid>:<wi_id>.
+type CohortScope struct {
+	SessionID      string
+	ParentWorkItem string
+	ScopeContract  *ScopeContract
+}
+
+// DefaultCohortSignalBudgetMax is the soft cap for cohort signal metadata (OQ-LC-9).
+const DefaultCohortSignalBudgetMax = 8 * 1024
 
 // contextSessions holds per-session ContextGraph state (F4/F5).
 var contextSessions sync.Map // sessionID -> *contextSessionData
@@ -17,6 +32,8 @@ func (m *TaskManager) contextData(sessionID string) *contextSessionData {
 	}
 	v, _ := contextSessions.LoadOrStore(sessionID, &contextSessionData{
 		scopesByWI: make(map[string]*ContextScope),
+		cohorts:    make(map[string]*CohortScope),
+		downlinks:  make(map[string]ChildDownlink),
 	})
 	return v.(*contextSessionData)
 }
@@ -101,4 +118,54 @@ func linkRecordExists(existing []ContextLinkRecord, rec ContextLinkRecord) bool 
 		}
 	}
 	return false
+}
+
+// EnsureCohortScope registers cohort domain for siblings under parentWorkItemID.
+func (m *TaskManager) EnsureCohortScope(sessionID, parentWorkItemID string) *CohortScope {
+	if m == nil || parentWorkItemID == "" {
+		return nil
+	}
+	sd := m.contextData(sessionID)
+	if sd == nil {
+		return nil
+	}
+	key := cohortKey(sessionID, parentWorkItemID)
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+	if c, ok := sd.cohorts[key]; ok {
+		return c
+	}
+	c := &CohortScope{SessionID: sessionID, ParentWorkItem: parentWorkItemID}
+	if parent, ok := m.GetWorkItem(sessionID, parentWorkItemID); ok && parent != nil && parent.ScopeContract != nil {
+		sc := *parent.ScopeContract
+		c.ScopeContract = &sc
+	}
+	sd.cohorts[key] = c
+	return c
+}
+
+func cohortKey(sessionID, parentID string) string {
+	return sessionID + ":" + parentID
+}
+
+func (m *TaskManager) storeChildDownlink(sessionID string, dl ChildDownlink) {
+	sd := m.contextData(sessionID)
+	if sd == nil || dl.ChildWorkItemID == "" {
+		return
+	}
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+	sd.downlinks[dl.ChildWorkItemID] = dl
+}
+
+// ChildDownlinkFor returns the persisted downlink for a child work item.
+func (m *TaskManager) ChildDownlinkFor(sessionID, childWorkItemID string) (ChildDownlink, bool) {
+	sd := m.contextData(sessionID)
+	if sd == nil {
+		return ChildDownlink{}, false
+	}
+	sd.mu.RLock()
+	defer sd.mu.RUnlock()
+	dl, ok := sd.downlinks[childWorkItemID]
+	return dl, ok
 }

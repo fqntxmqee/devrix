@@ -360,6 +360,7 @@ func (c *CLICommands) contextShow(sessionID string, args []string) string {
 	if item.ContextPolicy != "" {
 		fmt.Fprintf(&b, "  policy: %s\n", item.ContextPolicy)
 	}
+	b.WriteString(FormatMaterializeContextShow(sessionID, c.manager, item))
 	links := c.manager.LinksForWorkItem(sessionID, itemID)
 	if len(links) == 0 {
 		b.WriteString("  links: (none)\n")
