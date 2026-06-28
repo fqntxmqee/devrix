@@ -2,7 +2,7 @@
 
 **Change ID:** devrix-api-error-classification
 **Demand ID:** DM-20260628-001
-**Status:** S2_Proposal
+**Status:** S7_Archived (2026-06-28, PR #265 squash merged, S6 archive)
 **Reporter:** clawcode v2.1.88 对比分析（2026-06-28）
 **Priority:** P0
 
