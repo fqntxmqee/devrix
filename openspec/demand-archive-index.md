@@ -126,6 +126,7 @@
 | DM-2024-0613-001 | 配置热重载 (DM ID typo: 2024→2026) | feat-config-hot-reload | 2026-06-18 | — | **S7_Archived (PARTIAL → ACCEPTED at S6 cleanup; 归档文件夹已有 ARCHIVE.md 早于本次 cleanup,本次仅删除 changes/ 残留源目录)** |
 | **DM-20260627-003** | **D7 Layer SubContext — WorkItem 子上下文 Materialize + ScopeContract + CG2′ cohort 隔离 (Phase 1+2)** | **devrix-d7-layer-subcontext** | **2026-06-28** | **[#269](https://github.com/fqntxmqee/devrix/pull/269) · [#270](https://github.com/fqntxmqee/devrix/pull/270)** | **S7_Archived (Phase 1+2 ACCEPTED; depth≥1 默认 Materialize 无 feature flag; D2 Materialize + ScopeContract spawn gate + ChildDownlink + Observe R-OBS mapping + Upstream BlockedBy + PeerStatus cohort≥3; Phase 3 → DM-20260628-002; `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`)** |
 | **DM-20260628-002** | **D7 Layer SubContext Phase 3 — SubTurn Materialize + Wave merge + LLM ObservationProposer** | **devrix-d7-layer-subcontext-phase3** | **2026-06-28** | **[#273](https://github.com/fqntxmqee/devrix/pull/273) · [#274](https://github.com/fqntxmqee/devrix/pull/274) · [#275](https://github.com/fqntxmqee/devrix/pull/275)** | **S7_Archived (Phase 3 ACCEPTED; SubTurn brief/fork/full→Materialize; Wave ContextResolver merge; LLM ObservationProposer G3 gate; Layer SubContext Phase 1–3 closed; `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`)** |
+| **DM-20260628-003** | **D1 DSAFT 重构 — Trusted Intermediary 边界收敛 + Gateway 拆分 + contracts DTO** | **devrix-d1-dsaft-refactor** | **2026-06-28** | **— (TBD PR)** | **S7_Archived (Phase 1–4 ACCEPTED; D1-RF-T01..T09; `openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`)** |
 
 ## Archive Locations
 
@@ -241,6 +242,7 @@
 | **devrix-d2-agents-md-project-layout** | **`openspec/archive/2026-06-27-devrix-d2-agents-md-project-layout/`**（DM-20260627-002 HOTFIX; .devrix/AGENTS.md 加 D{N}→path 映射; PR #258 merged `9b660fa`; 等待用户飞书实测验收） |
 | **devrix-d7-workitem-rollup-pipeline** | **`openspec/archive/2026-06-27-devrix-d7-workitem-rollup-pipeline/`**（DM-20260627-001; Phase 1 Rollup 闭环 — gate/dual bubble/rollup MUPS/deliverable; PARTIAL 验收; best_effort only; PR #262 merged `d246a9b`; S7_Archived PARTIAL ACCEPTED） |
 | **devrix-api-error-classification** | **`openspec/archive/2026-06-28-devrix-api-error-classification/`**（DM-20260628-001; APIErrorCode 7 类闭集枚举 + HTTP status 映射 + sharederrors.IsCode 包装链识别 + 4 adapter NewAPIError 工厂统一 + OrchestratorDeps.FallbackModel + TurnState.Withheld + emitError code 注入 + 2 次连续 fallback 日志 + feishu/cli 5 类 code 差异化文案; PR #265 squash merged; 6/6 P0 T IMPLEMENTED; P0 AC 5/7 完整 + 2/7 partial（AC3/AC4 follow-up P0-2/P0-3）） |
+| **devrix-d1-dsaft-refactor** | **`openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`**（DM-20260628-003; D1 Trusted Intermediary DSAFT 重构 — sessionagents 迁出 capture + Gateway 拆分 + contracts 展示 DTO + channel 零 orchestration import + `lint-d1-imports.sh` CI; D1-RF-T01..T09 IMPLEMENTED; canonical a/t-registry + layer-delta + spec 回写; S7_Archived ACCEPTED） |
 | **devrix-d7-layer-subcontext** | **`openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`**（DM-20260627-003; Phase 1+2 Layer SubContext — D2 Materialize + ScopeContract + ChildDownlink + Observe mapping + Upstream BlockedBy + PeerStatus; depth≥1 默认 Materialize 无 feature flag; PR #269 + #270 merged; Phase 3 → DM-20260628-002） |
 | **devrix-d7-layer-subcontext-phase3** | **`openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/`**（DM-20260628-002; Phase 3 SubTurn→Materialize + Wave ContextResolver merge + LLM ObservationProposer; PR #273–#275 merged; Layer SubContext Phase 1–3 closed） |
 
@@ -253,6 +255,10 @@
 | `devrix-d5-v2-terminal` | DM-20260619-006 | **S3_Design**（S4 未启动） | `openspec/changes/devrix-d5-v2-terminal/` |
 
 **Claude 拉取 D5 讨论入口：** `openspec/changes/devrix-d5-v2-terminal/README.md` → `gaming-analysis.md`
+
+**2026-06-28 归档（S7 — D1 DSAFT Refactor）**：
+
+- `devrix-d1-dsaft-refactor` → `openspec/archive/2026-06-28-devrix-d1-dsaft-refactor/`（DM-20260628-003 S7_Archived; Phase 1–4 全完成: sessionagents 迁出 capture + Gateway 拆分 + contracts 展示 DTO + `lint-d1-imports.sh` CI; D1-RF-T01..T09 IMPLEMENTED; canonical spec 回写 a/t-registry + layer-delta + spec.md）
 
 _（2026-06-18 历史批次见下方归档记录）_
 

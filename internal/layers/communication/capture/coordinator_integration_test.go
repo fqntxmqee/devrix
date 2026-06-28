@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision"
 	"github.com/devrix/devrix/internal/layers/multiagent/run"
@@ -95,7 +96,8 @@ func TestGateway_AgentFactoryWithD7_PrefersD7Path(t *testing.T) {
 	factory := provision.NewAgentFactory(multiagent.AgentDeps{
 		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
 	}, config.DefaultMultiAgentConfig())
-	gw.SetAgentFactory(factory)
+	mgr := sessionagents.NewManager(factory)
+	gw.SetBeforeDispatch(mgr.EnsureSessionLeader)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {
@@ -121,7 +123,7 @@ func TestGateway_AgentFactoryWithD7_PrefersD7Path(t *testing.T) {
 		t.Fatalf("orchestrationEntry.ProcessMessage calls = %d, want 1", processes)
 	}
 
-	ag := gw.SessionAgent(session.SessionID)
+	ag := mgr.SessionAgent(session.SessionID)
 	if ag == nil {
 		t.Fatal("expected session leader to be provisioned")
 	}
@@ -146,13 +148,14 @@ func TestGateway_MissingOrchestrationEntry(t *testing.T) {
 	}
 }
 
-// T: D7-D1-T03 — agent factory cannot bypass D7 when orchestration entry is absent.
+// T: D7-D1-T03 — agent factory hook without D7 entry still fails (no bypass).
 func TestGateway_AgentFactoryWithoutD7_Fails(t *testing.T) {
 	gw := newTestGateway(t)
 	factory := provision.NewAgentFactory(multiagent.AgentDeps{
 		Engine: &run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}},
 	}, config.DefaultMultiAgentConfig())
-	gw.SetAgentFactory(factory)
+	mgr := sessionagents.NewManager(factory)
+	gw.SetBeforeDispatch(mgr.EnsureSessionLeader)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {

@@ -61,7 +61,7 @@
 
 | scenario-slug | 当前路径 | Canonical S |
 |---------------|----------|-------------|
-| `capture` | `gateway/`, `signal/` | S13 |
+| `capture` | `capture/`（原 `gateway/`）, `signal/` | S13 |
 | `thinking` / `taskprogress` / `conclusion` | `present/`（已拆分） | S14–S16 |
 | `channel` | `adapters/`, `connection/`, `instance/`, `ratelimit/`, `renderers/` | S17 |
 | `delivery` | `eventbus/` | S18 |
@@ -85,10 +85,10 @@ User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context E
 
 | Domain | 依赖内容 | 使用位置 |
 |--------|---------|---------|
-| D2 Context Engine | `contracts.IEngine`, tasks (CLICommands, PlanMode) | gateway, adapters/cli |
-| D4 MultiAgent | `IAgentFactory`, `Agent`, `AgentObserver` | gateway/agent_route |
-| D5 Observability | `Observability`, `Bridge`, tracer, telemetry | gateway, adapters |
-| D7 Orchestration | `wave.WorkerType`, `wave.WorkerEvent` | adapters/feishu_worker_card |
+| D2 Context Engine | `contracts.IEngine`（CLI /task 仍经 `contracts.TaskCLIHandler` 注入） | adapters/cli（composition root 接线） |
+| D4 MultiAgent | **禁止** D1 capture import；`bootstrap/sessionagents` 持有 leader 生命周期 | `bootstrap/sessionagents` |
+| D5 Observability | `Observability`, `Bridge`, tracer, telemetry | capture, adapters |
+| D7 Orchestration | **禁止** channel/adapters import；Worker 展示经 `contracts.WorkerStreamEvent` | D7 `wavescheduler/present.go` → D1 adapter |
 | Shared | config, contracts, errors, types | 全子包 |
 
 ## Legacy 路径索引（RETIRED — 仅追溯）

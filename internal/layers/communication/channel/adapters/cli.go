@@ -16,11 +16,11 @@ import (
 	"github.com/devrix/devrix/internal/cli/context_analyze"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/renderers"
-	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/config"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -32,8 +32,8 @@ type CLIAdapter struct {
 	reader       *bufio.Reader
 	writer       io.Writer
 	obsBridge    *observability.Bridge
-	taskCommands *workmodel.CLICommands
-	planMode     *workmodel.PlanMode
+	taskCLI contracts.TaskCLIHandler
+	planCLI contracts.PlanCLIHandler
 
 	mu               sync.RWMutex
 	running          bool
@@ -43,36 +43,20 @@ type CLIAdapter struct {
 }
 
 // NewCLIAdapter creates a new CLIAdapter.
-//
-// DM-20260617-008 W4: tm is the workmodel.TaskManager used for /task CLI
-// commands. Pass nil to disable task commands (was: read from
-// workmodel.GlobalTaskManager process-wide singleton).
 func NewCLIAdapter(
 	gw *capture.CommunicationGateway,
 	cfg *config.CommunicationConfig,
-	tm *workmodel.TaskManager,
+	taskCLI contracts.TaskCLIHandler,
+	planCLI contracts.PlanCLIHandler,
 ) *CLIAdapter {
-	var taskCmds *workmodel.CLICommands
-	if tm != nil {
-		taskCmds = workmodel.NewCLICommands(tm)
-	}
 	return &CLIAdapter{
-		gateway:      gw,
-		renderer:     renderers.NewCLIRenderer(cfg.CLI.ANSI),
-		cfg:          cfg,
-		reader:       bufio.NewReader(os.Stdin),
-		writer:       os.Stdout,
-		taskCommands: taskCmds,
-		planMode:     workmodel.NewPlanMode(nil, nil), // LLM + ObsBridge injected later
-	}
-}
-
-// SetPlanModeLLM sets the LLM for plan mode.
-func (a *CLIAdapter) SetPlanModeLLM(llm workmodel.LLMCompleter) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.planMode != nil {
-		a.planMode = workmodel.NewPlanMode(llm, a.obsBridge)
+		gateway:  gw,
+		renderer: renderers.NewCLIRenderer(cfg.CLI.ANSI),
+		cfg:      cfg,
+		reader:   bufio.NewReader(os.Stdin),
+		writer:   os.Stdout,
+		taskCLI:  taskCLI,
+		planCLI:  planCLI,
 	}
 }
 
@@ -252,17 +236,11 @@ func (a *CLIAdapter) handleTaskCommand(args []string) {
 	a.mu.RUnlock()
 
 	raw := "/task " + strings.Join(args, " ")
-	cmd := workmodel.ParseCommand(raw)
-	if cmd == nil {
-		a.writer.Write([]byte("Invalid task command\n"))
-		return
-	}
-
-	if a.taskCommands == nil {
+	if a.taskCLI == nil {
 		a.writer.Write([]byte("task commands disabled (no TaskManager wired)\n"))
 		return
 	}
-	output := a.taskCommands.Handle(cmd, sessionID)
+	output := a.taskCLI.HandleTaskCommand(raw, sessionID)
 	a.writer.Write([]byte(output + "\n"))
 }
 
@@ -277,8 +255,11 @@ func (a *CLIAdapter) handlePlanCommand(args []string) {
 	}
 	a.mu.RUnlock()
 
-	planCommands := workmodel.NewPlanCLICommands(a.planMode)
-	output := planCommands.Handle(args, sessionID, workDir, nil)
+	if a.planCLI == nil {
+		a.writer.Write([]byte("plan commands disabled\n"))
+		return
+	}
+	output := a.planCLI.HandlePlanCommand(args, sessionID, workDir)
 	a.writer.Write([]byte(output + "\n"))
 }
 

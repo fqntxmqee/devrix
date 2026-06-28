@@ -54,7 +54,7 @@ func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 		t.Fatal("NewContextEngine returned nil")
 	}
 	// WireDelegate owns delegate_* registration on the main engine.
-	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry(), nil, nil)
+	WireDelegate(ctxCfg, maCfg, nil, nil, ce, ce.ToolRegistry(), nil, nil)
 
 	got := collectToolNames(t, ce)
 	names := make([]string, 0, len(got))
@@ -103,7 +103,7 @@ func TestSelectContextEngine_ForwardsMultiAgentConfig(t *testing.T) {
 		t.Fatalf("SelectContextEngine returned %T, want *contextengine.ContextEngine", eng)
 	}
 	// Mirror main.go:WireDelegate.
-	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry(), nil, nil)
+	WireDelegate(ctxCfg, maCfg, nil, nil, ce, ce.ToolRegistry(), nil, nil)
 	got := collectToolNames(t, ce)
 	for _, want := range []string{"free_fork", "query_diagnostics", "delegate_explore"} {
 		if !got[want] {

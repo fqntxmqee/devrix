@@ -85,7 +85,7 @@ func (h *MockEventHandler) WaitForMessages(n int, timeout time.Duration) bool {
 	return h.MessageCount() >= n
 }
 
-// MockContextEngine implements capture.IContextEngine for integration and acceptance tests.
+// MockContextEngine implements contracts.IEngine for integration and acceptance tests.
 type MockContextEngine struct {
 	Events []*capture.EngineEvent
 }

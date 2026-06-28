@@ -34,6 +34,9 @@ jobs:
       - name: Verify module
         run: go mod verify
 
+      - name: D1 import boundary lint (DM-20260628-003)
+        run: chmod +x ./scripts/lint-d1-imports.sh && ./scripts/lint-d1-imports.sh
+
       - name: Build
         run: go build ./...
 

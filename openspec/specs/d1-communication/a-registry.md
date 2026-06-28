@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.1.0  
+**Last Updated:** 2026-06-28 (DM-20260628-003 DSAFT refactor)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
 
@@ -26,7 +26,7 @@ Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力�
 |------|------|------|-------|--------|-------------|
 | D1-S13-A01 | AcceptInboundMessage | USER | raw IM/CLI | InboundMessage | S2-A01 ParseInbound |
 | D1-S13-A02 | PersistUserTurn | SYSTEM | InboundMessage | persisted | S1-A01 ManageSession |
-| D1-S13-A03 | DispatchToAgent | USER | session, content | event_chan | S1-A02 RouteMessage, S1-A04 RouteAgent |
+| D1-S13-A03 | DispatchToAgent | USER | session, content | event_chan | S1-A02 RouteMessage；S1-A04 RouteAgent **→ SUPERSEDED** `bootstrap/sessionagents` |
 | D1-S13-A04 | ResolvePermissionGate | USER | tool, risk | approved | S1-A03 ResolvePermission |
 | D1-S13-A05 | ParseCommand | USER | /new /stop /help | command | S3-A01 ParseCommand |
 
@@ -69,16 +69,19 @@ Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力�
 
 ---
 
-## Legacy Module Index — D1-S1–S12（FROZEN）
+## Legacy Module Index — D1-S1–S12（ARCHIVED — 仅追溯）
+
+> **完整 Legacy 索引与路径映射** 见 `layer-delta.md` §Legacy Archive（DM-20260628-003）。  
+> 新能力 **禁止** 登记 Legacy S1–S12；仅 Canonical S13–S18。
 
 ## D1-S1: Gateway
 
 | A ID | Name | Type | Input | Output | State Change | Code Location |
 |------|------|------|-------|--------|--------------|---------------|
-| D1-S1-A01 | ManageSession | A-BE | session_id, action | session_state | session.created / closed / expired | `gateway/store.go` |
-| D1-S1-A02 | RouteMessage | A-BE | message, session | routing_result, events | session.last_activity | `gateway/gateway.go` |
-| D1-S1-A03 | ResolvePermission | A-BE | permission_request | approved/denied | permission.resolved | `gateway/permission.go` |
-| D1-S1-A04 | RouteAgent | A-BE | agent_factory, session | agent_registered | session.agent_bound | `gateway/agent_route.go` |
+| D1-S1-A01 | ManageSession | A-BE | session_id, action | session_state | session.created / closed / expired | `capture/store.go`, `capture/session.go` |
+| D1-S1-A02 | RouteMessage | A-BE | message, session | routing_result, events | session.last_activity | `capture/ingress.go`, `capture/gateway.go` |
+| D1-S1-A03 | ResolvePermission | A-BE | permission_request | approved/denied | permission.resolved | `capture/permission.go` |
+| D1-S1-A04 | RouteAgent | A-BE | agent_factory, session | agent_registered | session.agent_bound | **SUPERSEDED** → `bootstrap/sessionagents/manager.go`（原 `capture/agent_route.go` 已删除，DM-20260628-003；D1-RF-T02） |
 
 ## D1-S2: Adapters
 
@@ -86,7 +89,7 @@ Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力�
 |------|------|------|-------|--------|--------------|---------------|
 | D1-S2-A01 | ParseInbound | A-BE | raw_message (IM/CLI) | parsed_message | — | `adapters/feishu.go`, `adapters/dingtalk.go`, `adapters/cli.go` |
 | D1-S2-A02 | SendOutbound | A-BE | message, session | delivery_result | — | `adapters/feishu.go`, `adapters/dingtalk_outbound.go`, `adapters/cli.go` |
-| D1-S2-A03 | RenderWorkerCard | A-BE | worker_event, session | card_rendered | card.created / updated | `adapters/feishu_worker_card.go` |
+| D1-S2-A03 | RenderWorkerCard | A-BE | worker_event, session | card_rendered | card.created / updated | `adapters/feishu_worker_card.go`（`contracts.WorkerStreamEvent`，零 D7 import） |
 | D1-S2-A04 | StreamCardContent | A-BE | card_id, content, sequence | stream_result | card.streaming | `adapters/feishu_cardkit.go` |
 | D1-S2-A05 | ResolveOrCreateSession | A-BE | session_key | session | session.cached | `adapters/session_resolve.go` |
 

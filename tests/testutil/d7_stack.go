@@ -8,6 +8,7 @@ import (
 
 	"github.com/devrix/devrix/internal/bootstrap"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
@@ -47,8 +48,9 @@ type D7StackOptions struct {
 type D7TestStack struct {
 	Obs          *observability.Observability
 	ObsBridge    *observability.Bridge
-	Gateway      *capture.CommunicationGateway
-	Handler      *MockEventHandler
+	Gateway       *capture.CommunicationGateway
+	SessionAgents *sessionagents.Manager
+	Handler       *MockEventHandler
 	Engine       *contextengine.ContextEngine
 	LLMStub      llmgateway.IAdapter
 	WorkDir      string
@@ -163,13 +165,14 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig(), nil)
 	gw.SetObservability(obs)
 
+	var sessionAgents *sessionagents.Manager
 	if opt.MultiAgent {
 		maCfg := config.DefaultMultiAgentConfig()
 		factory := multiagentprovision.NewAgentFactory(
 			multiagent.AgentDeps{Engine: engine},
 			maCfg,
 		)
-		gw.SetAgentFactory(factory)
+		sessionAgents = WireGatewaySessionAgents(gw, factory)
 	}
 
 	var flowHub contracts.ExecutionFlowHub
@@ -181,7 +184,7 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		maCfg := config.DefaultMultiAgentConfig()
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, flowHub, tm)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, sessionAgents, engine, toolReg, flowHub, tm)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}
@@ -202,10 +205,11 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	return &D7TestStack{
-		Obs:          obs,
-		ObsBridge:    obsBridge,
-		Gateway:      gw,
-		Handler:      handler,
+		Obs:           obs,
+		ObsBridge:     obsBridge,
+		Gateway:       gw,
+		SessionAgents: sessionAgents,
+		Handler:       handler,
 		Engine:       engine,
 		LLMStub:      stub,
 		WorkDir:      workDir,

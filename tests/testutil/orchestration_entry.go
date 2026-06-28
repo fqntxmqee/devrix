@@ -11,12 +11,12 @@ import (
 // EngineOrchestrationEntry adapts IEngine to IOrchestrationEntry for tests.
 // Simulates D7 dispatch without wiring the full coordinator stack.
 type EngineOrchestrationEntry struct {
-	Engine capture.IContextEngine
+	Engine contracts.IEngine
 }
 
 var _ contracts.IOrchestrationEntry = (*EngineOrchestrationEntry)(nil)
 
-func NewEngineOrchestrationEntry(engine capture.IContextEngine) *EngineOrchestrationEntry {
+func NewEngineOrchestrationEntry(engine contracts.IEngine) *EngineOrchestrationEntry {
 	return &EngineOrchestrationEntry{Engine: engine}
 }
 
@@ -35,7 +35,7 @@ func (e *EngineOrchestrationEntry) Cancel(_ context.Context, _ string) error {
 }
 
 // WireGatewayOrchestration attaches a test engine via the D7 entry seam.
-func WireGatewayOrchestration(gw *capture.CommunicationGateway, engine capture.IContextEngine) {
+func WireGatewayOrchestration(gw *capture.CommunicationGateway, engine contracts.IEngine) {
 	if gw == nil || engine == nil {
 		return
 	}

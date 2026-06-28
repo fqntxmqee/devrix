@@ -160,3 +160,66 @@ func TestL5_D1_ConclusionFeedbackCapture(t *testing.T) {
 		t.Fatalf("feedback should not dispatch engine, got %d messages", handler.MessageCount())
 	}
 }
+
+// T: D1-RF-T06 — S16-A01 text delta → Conclusion 非终态
+func TestL5_D1_SignalJourney_TextDeltaConclusion(t *testing.T) {
+	dir := t.TempDir()
+	store, err := capture.NewFileSessionStore(dir)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+
+	handler := testutil.NewMockEventHandler()
+	engine := &testutil.MockContextEngine{
+		Events: []*capture.EngineEvent{
+			{Type: "text", Content: "partial "},
+			{Type: "text", Content: "answer"},
+			{Type: "complete", SessionID: ""},
+		},
+	}
+
+	gw := capture.NewCommunicationGateway(store, handler, nil, config.DefaultConfig(), nil)
+	testutil.WireGatewayOrchestration(gw, engine)
+	session, err := gw.CreateSession("cli", dir)
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+	for _, ev := range engine.Events {
+		ev.SessionID = session.SessionID
+	}
+
+	if err := gw.RouteInbound(context.Background(), &types.InboundMessage{
+		SessionID: session.SessionID,
+		ChatID:    "cli",
+		MessageID: "turn-text",
+		Content:   "stream text",
+	}); err != nil {
+		t.Fatalf("RouteInbound: %v", err)
+	}
+
+	if !handler.WaitForMessages(3, 3*time.Second) {
+		t.Fatalf("expected 3 outbound messages, got %d", handler.MessageCount())
+	}
+
+	var textCount, completeCount int
+	for _, msg := range handler.OutboundMessages() {
+		if msg.Metadata["signal_kind"] != string(contracts.SignalConclusion) {
+			continue
+		}
+		switch msg.Metadata["event_type"] {
+		case "text":
+			textCount++
+			if msg.Metadata["inbound_turn_id"] != "turn-text" {
+				t.Fatalf("text inbound_turn_id=%q want turn-text", msg.Metadata["inbound_turn_id"])
+			}
+		case "complete":
+			completeCount++
+		}
+	}
+	if textCount != 2 {
+		t.Fatalf("expected 2 text conclusion deltas, got %d", textCount)
+	}
+	if completeCount != 1 {
+		t.Fatalf("expected 1 complete conclusion, got %d", completeCount)
+	}
+}
