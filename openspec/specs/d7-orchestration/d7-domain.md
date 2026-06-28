@@ -31,14 +31,19 @@
 
 ## Out of Scope
 
-| 能力 | 归属 | 备注 |
-|------|------|------|
-| IM ingress / 卡片呈现 | D1 | D7 只消费 `InboundMessage`，产出 `EngineEvent` |
-| Session 上下文 / 工具沙箱 / Persist | D2 | D7 拆面调用 Prepare / ToolRound / Persist |
-| LLM Gateway 实现 / Breaker 执行 | D3 | D7 **拥有调用决策权**（DM-020），经 `InvokeLLM` |
-| Worker 执行体 / Agent 生命周期 | D4 | D7 Dispatch → D4 RunAgent |
-| 结论质量 / 信誉 | D6 | D7 可被 advisory 校验，不阻塞 |
-| 可观测性基础设施 | D5 | D7 发 span，D5 聚合 |
+| 能力 | 归属 | 备注 | Pending Boundary Decision (DM-20260629-001 PR-9) |
+|------|------|------|----------------------------------------------|
+| IM ingress / 卡片呈现 | D1 | D7 只消费 `InboundMessage`，产出 `EngineEvent` | — |
+| Session 上下文 / 工具沙箱 / Persist | D2 | D7 拆面调用 Prepare / ToolRound / Persist | — |
+| LLM Gateway 实现 / Breaker 执行 | D3 | D7 **拥有调用决策权**（DM-020），经 `InvokeLLM` | — |
+| Worker 执行体 / Agent 生命周期 | D4 | D7 Dispatch → D4 RunAgent | — |
+| 结论质量 / 信誉 | D6 | D7 可被 advisory 校验，不阻塞 | — |
+| 可观测性基础设施 | D5 | D7 发 span，D5 聚合 | — |
+| **ReputationEvidence** | **(pending)** | Bayesian reputation 数据结构在 D7 workmodel 内但跨 Learn/Observe 双向 | `boundary-debt:reputation-evidence-v7.0` |
+| **SystemAnomaly** | **(pending)** | 阈值触发逻辑在 D7 hardening/ 但跨 Verify + Observe 双消费 | `boundary-debt:system-anomaly-v7.0` |
+| **AdaptivePrior** | **(pending)** | Bayesian 状态在 D7 workmodel 但跨 Orchestrator + Learner 双读写 | `boundary-debt:adaptive-prior-v7.0` |
+
+> **3 项 Pending Boundary Decision（DM-20260629-001 PR-9 T45）**：v6.0.0 临时放在 D7 域（含 orchtypes/ + workmodel/ 子目录），归属待 v7.0 重新评估。常量定义见 `internal/layers/orchestration/orchtypes/boundary_decision.go`。完整 Decision 表见 `design.md §Cross-Domain Boundary`。
 
 ---
 
