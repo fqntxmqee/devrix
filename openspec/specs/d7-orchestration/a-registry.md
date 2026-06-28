@@ -30,27 +30,6 @@ D7 编排域 A 层活动注册表。
 
 ---
 
-## Legacy 双轨方案（v1.0+）
-
-> 根据 `devrix-d7-sa-refine` (DM-20260614-008) §7 设计决策：
-> - **Legacy** — 旧编号冻结追溯，路径：`internal/layers/orchestration/sessionorchestrator/`（旧包结构）
-> - **Canonical** — 新编号按用户价值流，路径：`internal/layers/orchestration/`（新包结构）
-
-### 追溯规则
-
-```
-Legacy ID（如 D7-S2-A01-LEGACY）→ 新 Canonical（D7-S2-A01）
-Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
-```
-
-### 禁止约束
-
-- **禁止** 在 Legacy 语义上新增 T
-- **禁止** 在 Legacy 路径下开发新功能
-- **强制** 新功能走 Canonical S
-
----
-
 ## D7-S1: Work Model ✅ IMPLEMENTED（v4.3 post-cleanup）
 
 > **WorkItem** 写模型位于 `internal/layers/orchestration/workmodel/{work_tree,workitem,workitem_store,task_manager}.go` + `sessionorchestrator/workmodel.go`。v4.3 post-cleanup（PR #214）已删 `workmodel/task_store.go`（Task flat-view）+ `workitem.go` 内 conversion helpers + `taskStoreAdapter`，**WorkItem 是唯一 canonical 模型**, TaskManager 只是 `Tree()` facade。PlanMode 在 `workmodel/{plan_mode,plan_agent}.go`, PlanAgent 仅服务于 `/plan` CLI 命令入口。
@@ -520,6 +499,73 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 | 代码同址 | S7 = S2 自身；S13 = S2 内部文件；S12 散落在 S2 内 | S7/S12/S13 全部并入 S2；Engine 物理独立但入口归 S2 |
 | 跨切不该独立成 S | S6 Hardening 是观测基础设施 | Hardening 改为 cross-cutting（不占 S 位）|
 | 粒度过细 | S5 决策 + S8 Observe Quantize 都属"信息生产+量化" | S5 + S8 合并为 S5（Information Producer + Quantizer）|
+
+---
+
+## ValueFlow Semantic 映射（v6.0.0 + v2.5.1 同步）
+
+> **ValueFlow Alias per S**（定义见 `d7-domain.md` §North Star）：
+> - **S1 WorkModel** = Multi-Step Task Coordination
+> - **S2 SessionOrchestrator** = Turn-Based Conversation
+> - **S3 WaveScheduler** = Parallel Worktree Execution
+> - **S4 ExecutionFlow + Verify** = Trustworthy Conclusion Delivery
+> - **S5 DecisionPlanning + Observe** = Intent + Uncertainty Quantization
+> - **S6 MUPS Pipeline** = Learn from Outcome
+> - **Cross-cutting Hardening** = (Discipline Keeper)
+
+| A ID | Name | ValueFlow Semantic（用户动作语义） |
+|------|------|-----------------------------------|
+| S1-A01 | CreateWorkPlan | 用户给出目标 → 拆解为多步任务 DAG |
+| S1-A02 | ManageWorkItem | 用户/系统增删改查 WorkItem 节点 |
+| S1-A03 | QueryWorkPlan | 用户/系统查询当前任务计划状态 |
+| S1-A04 | ExecutePlanAgent | 用户/系统执行规划好的多步任务 |
+| S2-A01 | ProcessMessage | 用户发送消息 → 进入 D7 编排对话 |
+| S2-A02 | HandleInterrupt | 用户/系统中断当前编排流程 |
+| S2-A03 | CommandHandler | 用户发 slash 命令（/plan, /worktree, /help, /stop） |
+| S2-A04 | DispatchWorker | D7 派发任务给 D4 Worker |
+| S2-A05 | RunTurnLoop | 多轮 LLM 对话主循环 |
+| S2-A06 | InvokeLLM | 调用 LLM 生成回复 |
+| S2-A07 | AutoClose + Resume + Escape + PriorBuild | 会话自动收口 + 用户恢复会话 + 紧急逃生 + 先验注入 |
+| S3-A01 | ScheduleWave | 调度一波并行 Worker 任务 |
+| S3-A02 | ResolveWorkerContext | 为 Worker 解析执行上下文 |
+| S3-A03 | GuardConflict | 防止并行任务冲突（file scope / group） |
+| S3-A04 | HardenScheduler | 调度器并发硬化（atomic + state bound） |
+| S4-A01 | PublishFlowEvent | 广播执行进度事件给用户 |
+| S4-A02 | SnapshotWorkPlan | 快照当前任务计划 |
+| S4-A03 | NotifyGateway | 通知 IM 网关推送卡片 |
+| S4-A04 | BridgeAgentSpoke | D4 Agent 进度接入执行流 |
+| S4-A05 | BridgeSubQuerySpoke | D2 SubQuery 结果接入执行流 |
+| S4-A06 | VerifyVerdict | 验证产物是否满足完成标准 |
+| S4-A07 | VerdictToExitReason | 把验证结果映射为退出原因 |
+| S4-A08 | AggregateVerdicts | 聚合多个验证结果 |
+| S4-A09 | DetectSystemAnomaly | 检测系统异常信号 |
+| S5-A01 | ClassifyIntent | 分类用户意图（Command/Fast/Orchestrate/Skip） |
+| S5-A02 | SynthesizeTaskGraph | 合成可执行任务图 |
+| S5-A03 | SelectExecutor | 选 D2/D4 执行器 |
+| S5-A04 | EvaluateIntent | 评估意图（带上下文） |
+| S5-A05 | TailShadowClassify | 影子分类（异步观测） |
+| S5-A06 | ObserveQuantize | 把消息+历史量化为 4 类观察 |
+| S5-A07 | PlanGenerate | 生成 4 类执行计划 |
+| S5-A08 | PriorLoad | 加载历史信誉先验 |
+| S6-A01 | ExecuteArtifact | 按计划执行产出 4 类产物 |
+| S6-A02 | RouteChannel | 选 4 通道（sync/async/probe/explore） |
+| S6-A03 | ChannelDispatch | 通道路由派发 |
+| S6-A04 | ToolCall | 调用工具 |
+| S6-A05 | RetryPolicy | 工具调用重试策略 |
+| S6-A06 | BuildLearningAsset | 构建 5 类学习资产 |
+| S6-A07 | UpdateReputationEvidence | 更新 Bayesian 信誉证据 |
+| S6-A08 | BuildAdaptivePrior | 构建自适应先验 |
+| S6-A09 | MemoryPersist | 持久化到 3 通道记忆（skill/feedback/scheduled） |
+| S6-A10 | RunLearner | 跑学习者主循环 |
+| S6-A11 | FeedbackPersist | 持久化反馈通道 |
+| S6-A12 | ScheduledPersist | 持久化计划通道 |
+| S6-A13 | CrossSessionLearning | 跨 session 学习 |
+| S6-A14 | ObserveLearnerLoop | 观察-学习闭环 LP-1 |
+| S6-A15 | AutoClose | 终态自动收口 |
+| Hardening-A01 | HardenMetricsAndConcurrency | metric 命名对齐 + 并发硬化 |
+| Hardening-A02 | HardenCircuitBreakerMonitor | CircuitBreaker 监控硬化 |
+
+> **ValueFlow Semantic 列**（49 A 全覆盖）：用户动作语义视角；与 6 S 博弈角色 + 4.3 MUPS 5 节点管道 三视角互补。`legacy_harness` 域内 0 A。
 
 ---
 

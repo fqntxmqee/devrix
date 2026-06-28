@@ -27,11 +27,11 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|-----------|------|----------|-----------|--------|----------|
-| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/executionflow/workplan/service_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/executionflow/imsink/gateway_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 |
 | **D7-S4-T08** | — | **AgentBridge OnWorkerCompleted success/error** | **D7-S4-A04** | **`hubspoke/hubspoke_test.go::TestAgentBridge_OnWorkerCompleted_{success,error}`** | **IMPLEMENTED** | **P0** |
 | **D7-S4-T09** | — | **SubQueryBridge PublishStarted/Completed/Failed** | **D7-S4-A05** | **`hubspoke/hubspoke_test.go::TestSubQueryBridge_Publish{Started,Completed,Failed}`** | **IMPLEMENTED** | **P0** |
@@ -456,13 +456,48 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S3 | 20 | 20 | 0 | 0 |
 | D7-S4 | 13 | 9 | 0 | 4 |
 | D7-S5 | 28 | 28 | 0 | 0 |
-| **D7-S6** | **7** | **7** | **0** | **0** |
-| **D7-S8** | **9** | **9** | **0** | **0** |
-| **D7-S9** | **9** | **9** | **0** | **0** |
-| **D7-S10** | **8** | **8** | **0** | **0** |
-| **D7-S11** | **13** | **13** | **0** | **0** |
-| **D7-S14** | **18** | **18** | **0** | **0** |
+| D7-S6 (Error Agg) | 7 | 7 | 0 | 0 |
+| **D7-S7** (Cross-cutting Hardening) | **4** | **4** | **0** | **0** |
+| D7-S8 | 9 | 9 | 0 | 0 |
+| D7-S9 | 9 | 9 | 0 | 0 |
+| D7-S10 | 8 | 8 | 0 | 0 |
+| D7-S11 | 13 | 13 | 0 | 0 |
+| **D7-S12** (Observe-Learner 跨域闭环) | **6** | **6** | **0** | **0** |
+| **D7-S13** (Verify→Learn Auto-Close) | **6** | **6** | **0** | **0** |
+| D7-S14 | 18 | 18 | 0 | 0 |
+| **D7-S15** (WorkItem Rollup) | **21** | **18** | **2** | **0** |
+| **D7-S16** (Layer SubContext) | **18** | **18** | **0** | **0** |
 | 契约/迁移 | 8 | 8 | 0 | 0 |
+
+---
+
+## ValueFlow Semantic + Span Evidence 覆盖率（v6.0.0 + v2.5.1 同步）
+
+> **ValueFlow Semantic 列**（230 T 全覆盖，按 S 分组给出语义聚合）：
+> - **S1 (8 T)**: Multi-Step Task Coordination — Task 创建/依赖/状态机 + WorkTree 持久化 + 跨 session
+> - **S2 (36 T)**: Turn-Based Conversation — ProcessMessage 入口 + 4 IntentKind 路径 + Turn 主循环 + 5 模式 SubTurn + 错误处理 + LLM 调用 + 上下文预算 + 跨域契约
+> - **S3 (20 T)**: Parallel Worktree Execution — Wave 调度 + 5-slot WorkerPool + 冲突守卫 + AllowAndRegister 原子化
+> - **S4 (13 T)**: Trustworthy Conclusion Delivery — Hub 双通道 + SpokeBridge + IMSink + 4 态 Verdict + 14 ExitReason + 聚合 + SystemAnomaly
+> - **S5 (28 T)**: Intent + Uncertainty Quantization — ClassifyIntent + Planner + MatchKind + Observation 4 类 + UncertaintyReport + UncertaintyCoord + AnomalyDetector + IntentQuantizer + WithPrior
+> - **S6 (7+9+9+8+13 = 46 T + Hardening 4)**: Learn from Outcome + Discipline Keeper — 4 Channel + Router + Artifact 4 类 + SideEffect 5 态 + LearningAsset 5 类 + Bayesian + 3 通道记忆 + 6 metric
+> - **S7-S16** (62 T): 见各 Scenario Detail 段
+> - **契约/迁移** (8 T): D1/D2/D4/D6 跨域 + d2_thin + d7-only ingress
+
+> **Span Evidence 列**（覆盖率 **~38%** = 87/230 T 有对应 span ops）：
+> - 26 ops 覆盖的核心 T 点（87/230 = ~38%）：S2 turn 链路 + S3 wave 调度 + S4 flow + S5 observe/plan + S6 execute/learn 5 节点 + 3 inner span
+> - **缺口 T 点 (~62%)**：单元/集成测试 (200+ T) 不直接 emit span（通过 capture adapter 间接覆盖）；详见 `observability-guide.md` §"T-Without-Span Tracker" 缺口清单
+> - **目标**：80% 覆盖率（PR-6/PR-7 增量）
+
+> **缺口 T-Without-Span Tracker**（`observability-guide.md` §X 同步）：
+> - **S1 unit** (5/8 = 63% 缺)：T01-T08 task_manager/disk_store 单元 → 无 span ops
+> - **S2 unit** (12/36 = 33% 缺)：T02a/b/c FastPath P99 + T05 idempotency + A06-T01..T04 Turn Leader + A07-T01/T02 LLM invoke + L5-04/06 loop_first → 间接通过 `D7_Orchestration_Turn_Run` 覆盖
+> - **S3 unit** (6/20 = 30% 缺)：T01-T11 wavescheduler 单元 → 间接通过 `D7_Orchestration_Wave_Schedule` 覆盖
+> - **S4 unit** (4/13 = 31% 缺)：T06 throttle + 契约类 → 间接通过 `D7_Orchestration_Flow_Event_Publish` 覆盖
+> - **S5 unit** (15/28 = 54% 缺)：T01-T05 + S8-A15 + S8-A22 unit → 间接通过 `D7_Orchestration_Intent_Classify` + `D7_Orchestration_Plan_Generate` 覆盖
+> - **S6 unit** (10/46 = 22% 缺)：channel/side_effect/reputation unit → 间接通过 `D7_Orchestration_Channel_Route` 覆盖
+> - **契约/迁移** (8/8 = 100% 缺)：跨域契约测试无对应 span
+
+**结论**：80% 覆盖率目标需要 PR-6（5 ops span）+ PR-7（4 acceptance test）+ PR-8（Span Evidence 列填充）三段增量；当前 38% 作为 v2.5.1 baseline。
 
 > **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。
 >

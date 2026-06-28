@@ -17,15 +17,15 @@
 
 **作为 Orchestration Mediator / Turn Leader / 5 节点管道 Owner，决定做什么、按什么顺序、谁来做，并把执行进度信号化送达 D1；同时通过 Observe → Plan → Execute → Verify → Learn 5 节点管道闭环交付可信结论——不拥有 Session 上下文与 Agent 生命周期。**
 
-| 可验证承诺 | Canonical S | 博弈角色 |
-|-----------|-------------|----------|
-| WorkItem 事实与状态机单一权威 + UncertaintyCoord/ReputationEvidence/AdaptivePrior 状态归属 | **D7-S1 WorkModel**（State Authority） | State Authority |
-| 用户消息统一入口 + Turn 主循环 + LLM 调用权 + RunTurn resolve/decompose/await + ResumeSession 3 决策路由 + AutoClose 4 规则 + EscapeEngine 调度 | **D7-S2 SessionOrchestrator**（Mediator + Turn Leader + Error Recovery） | Mediator + Turn Leader + Error Recovery |
-| 多 Worker 并行 DAG，冲突与上下文隔离 | **D7-S3 WaveScheduler** | Mechanism Designer |
-| FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + 14 ExitReason + SystemAnomaly 检测 | **D7-S4 ExecutionFlow + Verify** | Costly Signaler + Certifier |
-| ClassifyIntent (Command-first) + UncertaintyReport + IntentQuantize + AnomalyDetector + 4 IntentKind | **D7-S5 DecisionPlanning + Observe** | Information Producer + Quantizer |
-| 4 Channel + ChannelRouter + C2/W8 1:1 映射 + 4 LearningClass + 3 通道记忆 + ReputationEvidence Bayesian | **D7-S6 MUPS Pipeline** | Pipeline Coordinator + Memory Curator |
-| metric 命名 spec/code 对齐 + 并发硬化 + CircuitBreaker 监控 + ErrorRecoveryPolicy | **Cross-cutting: Hardening**（非 S） | Discipline Keeper |
+| 可验证承诺 | Canonical S | 博弈角色 | ValueFlow Alias（用户感知） |
+|-----------|-------------|----------|------------------------------|
+| WorkItem 事实与状态机单一权威 + UncertaintyCoord/ReputationEvidence/AdaptivePrior 状态归属 | **D7-S1 WorkModel**（State Authority） | State Authority | Multi-Step Task Coordination |
+| 用户消息统一入口 + Turn 主循环 + LLM 调用权 + RunTurn resolve/decompose/await + ResumeSession 3 决策路由 + AutoClose 4 规则 + EscapeEngine 调度 | **D7-S2 SessionOrchestrator**（Mediator + Turn Leader + Error Recovery） | Mediator + Turn Leader + Error Recovery | Turn-Based Conversation |
+| 多 Worker 并行 DAG，冲突与上下文隔离 | **D7-S3 WaveScheduler** | Mechanism Designer | Parallel Worktree Execution |
+| FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + 14 ExitReason + SystemAnomaly 检测 | **D7-S4 ExecutionFlow + Verify** | Costly Signaler + Certifier | Trustworthy Conclusion Delivery |
+| ClassifyIntent (Command-first) + UncertaintyReport + IntentQuantize + AnomalyDetector + 4 IntentKind | **D7-S5 DecisionPlanning + Observe** | Information Producer + Quantizer | Intent + Uncertainty Quantization |
+| 4 Channel + ChannelRouter + C2/W8 1:1 映射 + 4 LearningClass + 3 通道记忆 + ReputationEvidence Bayesian | **D7-S6 MUPS Pipeline** | Pipeline Coordinator + Memory Curator | Learn from Outcome |
+| metric 命名 spec/code 对齐 + 并发硬化 + CircuitBreaker 监控 + ErrorRecoveryPolicy | **Cross-cutting: Hardening**（非 S） | Discipline Keeper | (Discipline Keeper) |
 
 ---
 
@@ -61,16 +61,16 @@
 |------|----------|----------|--------|
 | **Hardening** | **Discipline Keeper** | `orchestration/hardening/`（含 metrics.go + recovery.go subset；`circuit_breaker.go` 留 `escape/`，见 Decision 1） | **✅ IMPLEMENTED** |
 
-### 登记规模（Canonical，v6.0.0）
+### 登记规模（Canonical，v6.0.0 + v2.5.1 同步）
 
 | 层 | 数量 | SoT 文件 |
 |----|------|----------|
 | A | **49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）| `a-registry.md` |
-| F | **68**（Legacy 41 + Canonical 27） | `f-registry.md` |
-| T | **180**（v4.9.0 2026-06-25 闭环，6 S 重归类不删测试点） | `t-registry.md` |
-| Span | **23 ops**（18 旧 + **5 新 P0/P1**）+ 9 sessionSpan attributes | `span-registry.md` |
+| F | **68**（deprecated 2 + canonical 66） | `f-registry.md` |
+| T | **230**（v4.9.1 2026-06-28 闭环，6 S 重归类不删测试点，devrix-api-error-classification 2 新 T PLANNED→IMPLEMENTED） | `t-registry.md` |
+| Span | **26 ops**（18 旧 + 5 新 P0/P1 + 3 内层 observability span）+ 9 sessionSpan attributes | `span-registry.md` |
 
-> **6 S 精简说明（v6.0.0）：** 14 S → 6 S + 1 横切的合并依据见 `dsaft-architecture.md` §14 S 冗余分析。MUPS 5 节点管道（Observe/Plan/Execute/Verify/Learn）+ v5 EscapeEngine 完整保留；A/F 重映射，T 180 重归类不删；Span 18→23（5 个新 P0/P1）。
+> **6 S 精简说明（v6.0.0）：** 14 S → 6 S + 1 横切的合并依据见 `dsaft-architecture.md` §14 S 冗余分析。MUPS 5 节点管道（Observe/Plan/Execute/Verify/Learn）+ v5 EscapeEngine 完整保留；A/F 重映射，T 180 → 230（v2.5.1 + devrix-api-error-classification 等增量 50 T）；Span 18 → 26（5 个新 P0/P1 + 3 个内层 span）。
 
 ### MUPS 5 节点管道（v6.0.0，挂在 S5/S6 下）
 
