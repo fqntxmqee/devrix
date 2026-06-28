@@ -59,10 +59,12 @@ func WireDelegate(
 		if hub != nil {
 			fr = bridge.NewFlowReporter(hub)
 		}
-		subQuery = delegatetools.BuildSubQueryRunner(enforce.SubQueryDeps{
-			SubTurn:      st,
-			FlowReporter: fr,
-		})
+		subQuery = &delegatetools.SubQueryRunner{
+			LoopDeps: enforce.SubQueryDeps{
+				SubTurn:      st,
+				FlowReporter: fr,
+			},
+		}
 	}
 	var sb *sandbox.Manager
 	if ctxCfg.Sandbox.Enabled {

@@ -83,32 +83,16 @@ func TestRuleClassifier_Classify_FastPath(t *testing.T) {
 }
 
 // T: D7-S5-T03 (negative) — complex message falls through to orchestrate (legacy mode).
-func TestRuleClassifier_Classify_Orchestrate(t *testing.T) {
-	c := NewRuleClassifier(orchtypes.RuleOrchestrateConfig())
-	got, err := c.Classify(context.Background(),
-		"investigate the auth module latency and propose a refactor plan with milestones")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Kind != orchtypes.IntentOrchestrate {
-		t.Fatalf("want orchtypes.IntentOrchestrate, got %q (reason=%s)", got.Kind, got.Reason)
-	}
-}
+//
+// v2.6.0 (DM-20260629-001): RoutingModeRuleOrchestrate retired; all non-command
+// non-pattern-matched messages now route to IntentFast (loop_first) per D7-S2
+// rule order. This test removed; superseded by TestRuleClassifier_Classify_LoopFirstDefault.
 
 // T: D7-S5-T03 — short single-token messages default to fast with 70 confidence (legacy).
-func TestRuleClassifier_Classify_ShortDefaultsFast(t *testing.T) {
-	c := NewRuleClassifier(orchtypes.RuleOrchestrateConfig())
-	got, err := c.Classify(context.Background(), "what time is it")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Kind != orchtypes.IntentFast {
-		t.Fatalf("want orchtypes.IntentFast, got %q", got.Kind)
-	}
-	if got.Confidence != 70 {
-		t.Fatalf("want 70 confidence for short default, got %d", got.Confidence)
-	}
-}
+//
+// v2.6.0 (DM-20260629-001): conf-70 short-default branch is no longer reachable
+// — the loop_first check (Confidence=100) precedes it. This test removed; covered
+// transitively by TestRuleClassifier_ExactConfidenceValues loop_first cases.
 
 // T: D7-S5-T06 (negative) — CommandFirst=false 时 /plan 不再匹配 orchtypes.IntentCommand。
 // 断言不限定具体回退 Kind，避免规则微调时回归脆弱。
@@ -131,7 +115,7 @@ func TestRuleClassifier_Classify_CommandFirst_Disabled(t *testing.T) {
 // guarantees screening repeatability (determinism).
 
 func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
-	c := NewRuleClassifier(orchtypes.RuleOrchestrateConfig())
+	c := NewRuleClassifier(orchtypes.DefaultConfig())
 	tests := []struct {
 		name       string
 		input      string
@@ -152,9 +136,12 @@ func TestRuleClassifier_ExactConfidenceValues(t *testing.T) {
 		{"fast greeting zh", "你好", orchtypes.IntentFast, 95},
 		{"fast thanks", "thanks!", orchtypes.IntentFast, 95},
 		{"fast goodbye", "bye", orchtypes.IntentFast, 95},
-		{"fast short default", "what time is it", orchtypes.IntentFast, 70},
-		{"orchestrate complex", "investigate the auth module latency and propose a refactor", orchtypes.IntentOrchestrate, 60},
-		{"orchestrate multiline", "line one\nline two", orchtypes.IntentOrchestrate, 60},
+		// v2.6.0 (DM-20260629-001): loop_first check precedes short-default branch,
+		// so "what time is it" now returns IntentFast conf 100 (was conf 70).
+		{"loop_first short default", "what time is it", orchtypes.IntentFast, 100},
+		// v2.6.0: rule_orchestrate retired; complex messages now route to IntentFast (loop_first).
+		{"loop_first complex", "investigate the auth module latency and propose a refactor", orchtypes.IntentFast, 100},
+		{"loop_first multiline", "line one\nline two", orchtypes.IntentFast, 100},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -211,7 +198,7 @@ func TestRuleClassifier_ConfidenceDeterminism(t *testing.T) {
 }
 
 func TestRuleClassifier_ConfidenceRange(t *testing.T) {
-	c := NewRuleClassifier(orchtypes.RuleOrchestrateConfig())
+	c := NewRuleClassifier(orchtypes.DefaultConfig())
 	// All possible classification paths must produce confidence in [0, 100].
 	inputs := []string{
 		"",               // skip
