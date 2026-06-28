@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-layer-subcontext`  
 **Demand ID:** DM-20260627-003  
-**Status:** S4_Development — R1 决议已冻结（2026-06-28）  
+**Status:** S7_Archived — Phase 1+2 完成（2026-06-28）；Phase 3 登记不编码  
 **Total Tasks:** Phase 1 = 9 组（P0）；Phase 2 = 3 组（P1）；Phase 3 = 3 组（登记，不编码）
 
 ---

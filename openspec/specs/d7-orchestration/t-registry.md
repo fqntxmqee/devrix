@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.9.0
+**Version:** 4.10.0
 **Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -879,3 +879,23 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S15-IT02** | trace replay no checklist MUPS | PARTIAL (stub) | `tests/integration/d7/d7_rollup_trace_replay_test.go` |
 
 **Phase 1 Total:** 21 P0 T — 18 IMPLEMENTED · 2 PARTIAL (IT stub) · 1 SKIP (min_coverage Phase 2)
+
+---
+
+## D7-S16: Layer SubContext (DM-20260627-003)
+
+> **Change:** `devrix-d7-layer-subcontext` — Phase 1+2 P0/P1 闭环；Phase 3 SubTurn/Wave/ObservationProposer 登记不编码。  
+> **归档：** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/`
+
+| T ID | Description | Status | File |
+|------|-------------|--------|------|
+| **D2-S16-A20-T01..T05** | Materializer + partition store + Jaeger span | IMPLEMENTED | `contextengine/materialize/` |
+| **D7-S16-A60-T01..T04** | ScopeContract + spawn gate + rule infer | IMPLEMENTED | `workmodel/scope_contract*.go`, `item_plan.go` |
+| **D7-S16-A61-T01..T03** | ChildDownlink + Materialize inject | IMPLEMENTED | `workmodel/child_downlink.go` |
+| **D7-S16-A70-T01..T03** | Executor Materialize wiring | IMPLEMENTED | `workitem_executor.go`, `workitem_exec_context.go` |
+| **D7-S16-A72-T01..T04** | Signal→Obs mapping | IMPLEMENTED | `item_observe.go`, `item_observe_scope_test.go` |
+| **D7-S16-A63-T01/T02** | Upstream BlockedBy | IMPLEMENTED | `workitem_exec_context.go`, materialize tests |
+| **D7-S16-A64-T01/T02** | PeerStatus cohort | IMPLEMENTED | `workmodel/cohort_signals.go` |
+| **D7-S16-IT21..IT26** | Materialize integration | IMPLEMENTED | `item_pipeline_materialize_test.go` |
+
+**Phase 1+2 Total:** 32 task groups — IMPLEMENTED (Phase 3 T33–T35 DEFERRED)
