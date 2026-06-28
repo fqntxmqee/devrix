@@ -906,28 +906,19 @@ func resolveFinalText(finalText, thinkingTail string, exitReason verify.ExitReas
 // emitError emits a user-facing error event. The content MUST be pre-sanitized
 // via sharederrors.SanitizeForUser — callers should NOT pass raw err.Error().
 //
-// DM-20260620-003 (AC2 + H1 + H4): variadic code parameter optionally carries
-// the sentinel code (e.g. "LLM_AUTH_1004") so D1 IM adapters can render
-// error-type-aware messages via event.Metadata["error_code"]. Existing call
-// sites that pass only 3 args continue to work unchanged.
+// DM-20260620-003 (AC2 + H1 + H4): variadic code parameter is retained for
+// backward compat with out-of-tree callers (the legacy explicit-code path
+// was retired in v2.6.0 — DM-20260629-001 — and all in-tree call sites
+// pass only 3 args).
 //
-// DM-20260628-001 (FR-15): when no explicit code is passed, the closed-set
-// APIErrorCode is extracted from sharederrors.Code(err) so D1 IM adapters
-// receive a controlled enum value (rate_limit / authentication_failed / …).
+// DM-20260628-001 (FR-15): the closed-set APIErrorCode is extracted from
+// sharederrors.Code(err) so D1 IM adapters receive a controlled enum value
+// (rate_limit / authentication_failed / …). When callers pre-sanitize via
+// sharederrors.SanitizeForUser, the original err is gone — fall back to
+// "unknown" rather than guessing.
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string, code ...string) {
-	var metadata map[string]string
-	switch {
-	case len(code) > 0 && code[0] != "":
-		// Legacy explicit-code path (DM-20260620-003 backward compat).
-		metadata = map[string]string{"error_code": code[0]}
-	default:
-		// DM-20260628-001: default to controlled-enum extraction.
-		// Caller may have a *llmgateway.APIError or a sharederrors-wrapped
-		// error chain; sharederrors.Code walks both via APICodeProvider.
-		// When callers pre-sanitize via sharederrors.SanitizeForUser, the
-		// original err is gone — fall back to "unknown" rather than guessing.
-		metadata = map[string]string{"error_code": "unknown"}
-	}
+	_ = code // legacy variadic retained for out-of-tree backward compat (v2.6.0)
+	metadata := map[string]string{"error_code": "unknown"}
 	out <- &contracts.EngineEvent{
 		Type:      "error",
 		Content:   content,

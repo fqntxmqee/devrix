@@ -16,7 +16,6 @@ package escape
 import (
 	"context"
 	"log/slog"
-	"time"
 )
 
 // DepthChecker is the interface EscapeEngine uses to consult the
@@ -170,6 +169,3 @@ func (e *EscapeEngine) LoopDepthTracker() *LoopDepthTracker {
 func (e *EscapeEngine) CircuitBreakerSet() *CircuitBreakerSet {
 	return e.cbSet
 }
-
-// nowFunc alias for tests to override. Re-exported here for clarity.
-var _ = time.Now // suppress unused import in non-test builds

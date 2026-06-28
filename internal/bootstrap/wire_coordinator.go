@@ -42,24 +42,15 @@ func InitOrchestration(
 
 	slog.Info("d7: initializing SessionOrchestrator",
 		"routing_mode", coordCfg.coordCfg.RoutingMode,
-		"fast_path_threshold", coordCfg.coordCfg.FastPathThreshold,
 		"command_first", coordCfg.coordCfg.CommandFirst,
 	)
 
-	routingMode := orchtypes.RoutingModeLoopFirst
-	if coordCfg.coordCfg.RoutingMode == "rule_orchestrate" {
-		routingMode = orchtypes.RoutingModeRuleOrchestrate
-	}
-	if routingMode == orchtypes.RoutingModeRuleOrchestrate {
-		slog.Info("d7: routing_mode=rule_orchestrate (legacy config; ingress uses RunSessionTurnLoop)",
-			"change", "devrix-d2-queryloop-dismantle",
-			"dm", "DM-20260618-010",
-		)
-	}
+	// v2.6.0 (DM-20260629-001): RoutingModeRuleOrchestrate retired; legacy
+	// "rule_orchestrate" YAML values are normalized to RoutingModeLoopFirst
+	// (orchtypes.normalizeRoutingMode in config.go).
 	coordinatorFileCfg := orchtypes.FileConfig{
 		Enabled:            boolPtr(coordCfg.coordCfg.Enabled),
-		RoutingMode:        strPtr(string(routingMode)),
-		FastPathThreshold:  intPtr(coordCfg.coordCfg.FastPathThreshold),
+		RoutingMode:        strPtr(coordCfg.coordCfg.RoutingMode),
 		CommandFirst:       boolPtr(coordCfg.coordCfg.CommandFirst),
 		PriorContextRounds: intPtr(coordCfg.coordCfg.PriorContextRounds),
 	}
