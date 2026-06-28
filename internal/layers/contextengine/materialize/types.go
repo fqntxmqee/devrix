@@ -14,6 +14,7 @@ const (
 	PartitionCohort  PartitionKind = "cohort"
 	PartitionWorkItem PartitionKind = "workitem"
 	PartitionAgent   PartitionKind = "agent"
+	PartitionWave    PartitionKind = "wave"
 )
 
 // Mode selects materialize composition policy.
@@ -34,6 +35,7 @@ type Partition struct {
 	ParentWorkItemID string
 	WorkItemID       string
 	AgentID          string
+	ParentSessionID  string // wave resume sidechain session
 }
 
 // Policy controls token budget and tool profile.
@@ -53,6 +55,11 @@ type InboundSignals struct {
 	ExpectedReturn  string
 	ChildDownlink   bool
 	SignalLines     []string
+	// Wave worker fields (D7-S16 T34).
+	WaveExtraPrompt   string
+	WaveFileScope     []string
+	WaveUpstreamFiles []string
+	WaveUpstreamError string
 }
 
 // Request is the D2 Materialize input.

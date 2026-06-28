@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -19,6 +20,7 @@ type ContextResolverDeps struct {
 	Artifacts        *ArtifactStore
 	Sidechain        SidechainLoader
 	BaseSystemPrompt string
+	Materializer     materialize.Materializer // optional D7-S16 T34 unified path
 	// LeaderMessages is the read-only Leader history passed in for fallback
 	// only; fresh / upstream / resume should never include it directly.
 	LeaderMessages []types.Message

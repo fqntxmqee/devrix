@@ -34,6 +34,9 @@ func (m *DefaultMaterializer) Materialize(_ context.Context, req Request) (Resul
 	if req.Partition.Kind == PartitionAgent {
 		return m.materializeSubTurn(req)
 	}
+	if req.Partition.Kind == PartitionWave {
+		return m.materializeWave(req)
+	}
 	sys := buildSystemPrompt(req)
 	msgs := buildInitialMessages(req)
 	if m != nil && m.Store != nil && req.Partition.WorkItemID != "" {
@@ -96,6 +99,85 @@ func (m *DefaultMaterializer) materializeSubTurn(req Request) (Result, error) {
 		MessageCount: len(msgs),
 		TokenEst:     tokEst,
 	}, nil
+}
+
+func (m *DefaultMaterializer) materializeWave(req Request) (Result, error) {
+	sys := buildWaveSystemPrompt(req)
+	msgs := []types.Message{{
+		SessionID: req.Partition.SessionID,
+		Role:      types.MessageRoleUser,
+		Content:   req.Signals.Directive,
+	}}
+	if req.Policy.Mode == ModeResume {
+		sid := req.Partition.ParentSessionID
+		if sid == "" {
+			sid = req.Partition.SessionID
+		}
+		if m != nil && m.Store != nil && req.Partition.AgentID != "" {
+			loaded, err := m.Store.LoadAgent(sid, req.Partition.AgentID)
+			if err != nil {
+				return Result{}, err
+			}
+			if len(loaded) > 0 {
+				msgs = append(append([]types.Message(nil), loaded...), msgs...)
+			}
+		}
+	}
+	msgs = compressMessages(msgs, req.Policy.TokenBudget)
+	counter := token.NewCounter()
+	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
+	return Result{
+		SystemPrompt: sys,
+		Messages:     msgs,
+		MessageCount: len(msgs),
+		TokenEst:     tokEst,
+	}, nil
+}
+
+func buildWaveSystemPrompt(req Request) string {
+	var b strings.Builder
+	if base := strings.TrimSpace(req.SystemPrompt); base != "" {
+		b.WriteString(base)
+	}
+	if extra := strings.TrimSpace(req.Signals.WaveExtraPrompt); extra != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(extra)
+	}
+	if len(req.Signals.WaveFileScope) > 0 {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("Allowed file scope:\n- ")
+		b.WriteString(strings.Join(req.Signals.WaveFileScope, "\n- "))
+	}
+	if req.Policy.Mode == ModeUpstream {
+		for _, line := range req.Signals.SignalLines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString(line)
+		}
+		if len(req.Signals.WaveUpstreamFiles) > 0 {
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString("Files changed by upstream:\n- ")
+			b.WriteString(strings.Join(req.Signals.WaveUpstreamFiles, "\n- "))
+		}
+		if errMsg := strings.TrimSpace(req.Signals.WaveUpstreamError); errMsg != "" {
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString("Upstream error (for context): ")
+			b.WriteString(errMsg)
+		}
+	}
+	return b.String()
 }
 
 func buildSystemPrompt(req Request) string {

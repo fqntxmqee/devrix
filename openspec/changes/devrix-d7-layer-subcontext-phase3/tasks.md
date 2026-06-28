@@ -16,11 +16,13 @@
 | T33c | `SubTurnRunner.Materializer` optional wiring + bootstrap | [x] |
 | T33d | Unit + integration tests | [x] |
 
-## Phase 3-T34 — Wave ContextResolver merge (P1, deferred)
+## Phase 3-T34 — Wave ContextResolver merge (P1)
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T34 | Merge `wavescheduler.ContextResolver` into Materializer | [ ] |
+| T34a | Wave fresh/upstream/resume → Materialize `PartitionWave` | [x] |
+| T34b | `NewMaterializingContextResolver` + bootstrap wire | [x] |
+| T34c | Tests | [x] |
 
 ## Phase 3-T35 — LLM ObservationProposer (P1, deferred)
 
