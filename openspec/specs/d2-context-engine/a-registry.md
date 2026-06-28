@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 4.2.0
+**Version:** 4.3.0
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d2-domain.md`
@@ -23,6 +23,8 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 ### D2-S15: PrepareExecutionContext ✅
 
 > North Star: Turn 前上下文合法、在预算内
+>
+> **ValueFlow Alias (用户感知):** `D2_Context_Loading_Compression`
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
@@ -45,6 +47,8 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 ### D2-S17: PersistSessionState ✅
 
 > North Star: Turn 后状态 durable + deferred complete
+>
+> **ValueFlow Alias (用户感知):** `D2_Session_State_Persistence`
 
 | A ID | Name | Type | Input | Output | Code Location |
 |------|------|------|-------|--------|---------------|
@@ -56,6 +60,8 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 ### D2-S18: EnforceExecutionPolicy ✅
 
 > North Star: 权限 / 沙箱 / 工具面先于执行；SubQuery/Background 执行体
+>
+> **ValueFlow Alias (用户感知):** `D2_Tool_Permission_Sandbox`
 >
 > **v3 增量 (DM-20260618-001/002/003):**
 > - D2-S18-A01 拆分为 **Surface.CheckPermission** (per-tool hook, surface 内置) +
@@ -156,3 +162,4 @@ D2 上下文引擎域 A 层注册表。**Canonical 全局编号 D2-S15–S18**�
 | 4.0.0 | 2026-06-16 | Canonical 全局编号 S15–S18；ExecuteToolRound 归 S18；S19 活动并入 S18；Guides 指针 |
 | **4.1.0** | **2026-06-18** | **S18 v3 — 3-tier CheckPermission (Surface + IPermissionGate + PlanMode); 8 surface (含 ToolSearchSurface); 2-phase ExecuteToolRound; ToolSpec 4 bool + DeferLoading 字段；ToolFilter.ShouldDefer runtime hook；A01/A02/A04/A05 拆解细化** (DM-20260618-001/002/003) |
 | **4.2.0** | **2026-06-29** | **DM-20260629-002 PR-4 — registry-sync: §Historical Appendix 加 S1/S5/S9/S10/S19/S20 tombstone 6 行；Version + Last Updated bump** |
+| **4.3.0** | **2026-06-29** | **DM-20260629-002 PR-5 — value-flow-rename: S15/S17/S18 §section header 增 ValueFlow Alias（D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox）；与 d2-domain.md §North Star ValueFlow Alias 列对齐** |

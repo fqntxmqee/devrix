@@ -1,7 +1,7 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.10.0
+**Version:** 2.11.0
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
@@ -21,6 +21,12 @@
 ## Canonical T 映射（DM-20260614-009）
 
 v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登记。
+
+> **ValueFlow Alias (用户感知, DM-20260629-002 PR-5):**
+> - D2-S15 (PrepareExecutionContext) → `D2_Context_Loading_Compression`
+> - D2-S17 (PersistSessionState) → `D2_Session_State_Persistence`
+> - D2-S18 (EnforceExecutionPolicy) → `D2_Tool_Permission_Sandbox`
+> - D2-S16 (RunQueryLoop) → (归 D7 ValueFlow, REMOVED DM-20260618-010)
 
 | Canonical T ID | Legacy T ID | Canonical S | 描述 | Status |
 |----------------|-------------|-------------|------|--------|
@@ -437,3 +443,4 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | 2.8.1 | 2026-06-20 | DM-20260620-001-B Phase B 归档：D2-S15-A08 T06-T08 (BuildForkedMessages helpers)。IMPLEMENTED 109→112, P0 56→59 |
 | **2.9.0** | **2026-06-20** | **DM-20260620-002 Phase C 归档**：D2-S15-A08 T09-T10 (SubTurnRequest/SubQueryParams MaxContextTokens 透传)。IMPLEMENTED 112→114, P0 59→61 |
 | **2.10.0** | **2026-06-29** | **DM-20260629-002 PR-4 — registry-sync**: F ID D2-S1..S5 → D2-S15..S18 canonical 重映射 + Historical Appendix tombstone S1/S5/S9/S10/S19/S20; F path 9 修正 (engine_persist.go → kernel/context_engine_commit_window_adapter.go, enforce/background.go → enforce/registry.go, etc.) |
+| **2.11.0** | **2026-06-29** | **DM-20260629-002 PR-5 — value-flow-rename**: §Canonical T 映射 加 ValueFlow Alias block（S15/S17/S18 D2_* Alias + S16 归 D7）；与 d2-domain.md / a-registry / f-registry §North Star 对齐 |

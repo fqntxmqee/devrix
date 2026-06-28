@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d2-context-engine/a-registry.md`
@@ -24,6 +24,8 @@ D2 F 层注册表 v3.2。F 点按 Canonical S15–S18 重新索引（与 `a-regi
 ---
 
 ## D2-S15 PrepareExecutionContext
+
+> **ValueFlow Alias (用户感知):** `D2_Context_Loading_Compression`
 
 ### D2-S15-A01 LoadSession
 
@@ -89,6 +91,8 @@ D2 F 层注册表 v3.2。F 点按 Canonical S15–S18 重新索引（与 `a-regi
 
 ## D2-S17 PersistSessionState
 
+> **ValueFlow Alias (用户感知):** `D2_Session_State_Persistence`
+
 ### D2-S17-A01 SaveSnapshot
 
 | F ID | Name | Input | Output | Code Location |
@@ -119,6 +123,8 @@ D2 F 层注册表 v3.2。F 点按 Canonical S15–S18 重新索引（与 `a-regi
 ---
 
 ## D2-S18 EnforceExecutionPolicy
+
+> **ValueFlow Alias (用户感知):** `D2_Tool_Permission_Sandbox`
 
 ### D2-S18-A01 CheckPermission
 
@@ -242,3 +248,12 @@ compatibility with dashboards.
 | S18 EnforceExecutionPolicy | 12 |
 | **Total active** | **30** |
 | Historical (S1+S5+S9+S10+S19+S20) | 17 (tombstone only) |
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 3.1.0 | 2026-06-29 | **DM-20260629-002 PR-4 — registry-sync**: 47 F → 38 F re-key (D2-S1..S5 → canonical D2-S15..S18) + 9 F path correction + §Historical Appendix with S1/S5/S9/S10/S19/S20 tombstones |
+| **3.3.0** | **2026-06-29** | **DM-20260629-002 PR-5 — value-flow-rename**: S15/S17/S18 §section header 增 ValueFlow Alias（D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox）；与 d2-domain.md §North Star + a-registry §Canonical S 对齐 |
