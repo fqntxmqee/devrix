@@ -24,8 +24,11 @@
 | T34b | `NewMaterializingContextResolver` + bootstrap wire | [x] |
 | T34c | Tests | [x] |
 
-## Phase 3-T35 — LLM ObservationProposer (P1, deferred)
+## Phase 3-T35 — LLM ObservationProposer (P1)
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T35 | Observe LLM proposer + rule validation (D7-S8 PR-A4) | [ ] |
+| T35a | `ObservationProposer` interface + `ValidateObservationProposals` rule gate | [x] |
+| T35b | `LLMObservationProposer` (structured signals only, no wi ReAct) | [x] |
+| T35c | ItemPipeline + bootstrap wiring | [x] |
+| T35d | Tests | [x] |
