@@ -1,0 +1,62 @@
+id: devrix-api-error-classification
+demand_id: DM-20260628-001
+title: "D3 LLM Gateway API 错误分类与可恢复语义 — 529/429/401/PromptTooLong 分桶 + Fallback 兜底"
+status: s4_implementation
+priority: P0
+created: 2026-06-28
+author: clawcode 对比分析 → 借鉴 P0-1（2026-06-28 调研结论）
+
+# DSAFT 层归属
+domains: [D3, D7, D1]
+primary_domain: D3
+layer_types:
+  D3: public        # LLM 网关 — 公共
+  D7: core          # 编排层 — 核心
+  D1: core          # 通信层 — 核心
+
+# 涉及场景（粗粒度预登记，S2 阶段细化）
+dsaft_scenarios:
+  - D3-S1   # RouteModel — 错误码枚举与 HTTP status 映射落地处
+  - D3-S3   # ProtectCall — 4 个 adapter 错误构造统一走 NewAPIError
+  - D7-S2   # SessionOrchestrator — emitError 路径 + FallbackModel 字段 + withheld 状态
+  - D1-S3   # Communication — IM 适配器 error_code → 文案映射
+
+# 涉及活动（S2 阶段细化）
+dsaft_activities:
+  - D3-S1-A01   # ResolveModelRoute — 错误分类核心
+  - D3-S3-A01   # ShieldAndRetry — 4 adapter 错误构造
+  - D7-S2-A50   # SessionOrchestrator RunTurnLoop — emitError + FallbackModel + withheld
+  - D1-S3-A08   # IM 适配器 EmitError — error_code → 差异化文案
+
+# T 层测试点（预登记 PLANNED，6 个新 P0 T）
+t_points:
+  - D3-S1-A01-T04   # NewAPIErrorCodeFromStatus HTTP status → APIErrorCode 映射覆盖 401/403/408/413/429/529/5xx
+  - D3-S1-A01-T05   # sharederrors.IsCode 正确识别包装链
+  - D3-S3-A01-T17   # 4 adapter 错误构造统一走 NewAPIError
+  - D7-S2-A50-T05   # OrchestratorDeps.FallbackModel + withheld 字段 + emitError 用 sharederrors.Code
+  - D7-S2-A50-T06   # 2 次连续 RateLimit/ServerError 触发 fallback_trigger_candidate 日志 + prompt_too_long 标 withheld
+  - D1-S3-A08-T01   # feishu/cli IM 适配器差异化文案（5 类 code + 兜底 Unknown）
+
+# 关联变更
+related_changes:
+  - devrix-d7-llm-intent-only-and-feishu-verdict-hotfix   # 2026-06-27 hotfix，先行暴露 error_code 字段
+  - devrix-d3-sa-refine                                    # v1.0 D3 价值流化
+  - devrix-d3-sa-refine-v1.1                               # v1.1 韧性可见性 + 适配扩展
+  - devrix-d7-mups-v5-escape-engine                        # CircuitBreaker 五层，提供 fallback 触发的兜底
+  - devrix-error-handling-tier1-tier2                      # DM-20260620-003 SentinelError + sharederrors.WithCode 基础设施
+
+# 后续 follow-up 候选（不作为本次范围）
+followup_candidates:
+  - id: P0-2 streaming-fallback-model-switch
+    note: "自动切到 fallbackModel — 需先有本需求的错误分类基础"
+  - id: P0-3 withhold-then-recover
+    note: "PromptTooLong 先压住尝试 compress 再 surface — 需先有本需求的 apiError 字段"
+  - id: P1-4 per-tool-maxResultSizeChars
+  - id: P1-5 additionalWorkingDirectories
+  - id: P1-6 sandbox-isolation
+
+# 已归档对照（参考实现，不复用代码）
+reference:
+  - clawcode/src/services/api/errors.ts:1163-1182   # categorizeRetryableAPIError
+  - clawcode/src/query.ts:799-825                  # isWithheldMaxOutputTokens
+  - clawcode/src/query.ts:894-953                  # FallbackTriggeredError 路径

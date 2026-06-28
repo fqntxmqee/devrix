@@ -2,27 +2,28 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
-**Last Updated:** 2026-06-20
+**Version:** 3.3.0
+**Last Updated:** 2026-06-28
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / **devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16)**
+**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16) / **devrix-api-error-classification (DM-20260628-001) — APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus 工厂 + 4 adapter NewAPIError 统一 + IsCode 包装链识别 (D3-S1-A01-T04 + D3-S1-A01-T05 + D3-S3-A01-T17 PLANNED)**
 **Companion Docs:** `a-registry.md` · `f-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---
 
-## 0. 变更摘要（v3.0.0 → v3.1.0 → v3.1.1 → v3.2.0）
+## 0. 变更摘要（v3.0.0 → v3.1.0 → v3.1.1 → v3.2.0 → v3.3.0）
 
-| 维度 | v3.0.0 | v3.1.0（spec 设计） | v3.1.1（S5 验收后） | **v3.2.0（DM-20260620-003）** |
-|------|--------|--------|--------|--------|
-| T 总数 | 26 | 35 | 35 | **36**（+1 D3-S3-A01-T16） |
-| T 编号规则 | 新 S/A 顺序 + `<!-- Mechanism: -->` | 继承 v3.0.0 + v1.1 新 T 标注 `<!-- v1.1 Fx -->` | 继承 v3.1.0 | 继承 v3.1.1 + 新 T 标注 `<!-- v3.2.0 -->` |
-| Legacy 兼容 | §Legacy Archive 26 条 100% 覆盖 | 继承 100%（v1.1 不增不删旧 T） | 继承 100% | 继承 100%（v3.2.0 增新 T 不删旧） |
-| IMPLEMENTED T | 25 | 26 | 34 | **35**（+1 T16） |
-| PLANNED T | 1 | 9 | 1 | 1（仅 T08 持久化仍 PLANNED） |
-| v1.1 新 T 编号 | — | D3-S1-A01-T03 / D3-S2-A01-T06 / D3-S3-A01-T13~T15 / D3-S5-A01-T03 / D3-S6-A01-T02 / D3-X-A02-T01 | 继承 | 继承 + D3-S3-A01-T16 |
+| 维度 | v3.0.0 | v3.1.0（spec 设计） | v3.1.1（S5 验收后） | v3.2.0（DM-20260620-003） | **v3.3.0（DM-20260628-001）** |
+|------|--------|--------|--------|--------|--------|
+| T 总数 | 26 | 35 | 35 | 36（+1 D3-S3-A01-T16） | **39**（+3 T04/T05/T17 PLANNED） |
+| T 编号规则 | 新 S/A 顺序 + `<!-- Mechanism: -->` | 继承 v3.0.0 + v1.1 新 T 标注 `<!-- v1.1 Fx -->` | 继承 v3.1.0 | 继承 v3.1.1 + 新 T 标注 `<!-- v3.2.0 -->` | 继承 v3.2.0 + 新 T 标注 `<!-- v3.3.0 -->` |
+| Legacy 兼容 | §Legacy Archive 26 条 100% 覆盖 | 继承 100%（v1.1 不增不删旧 T） | 继承 100% | 继承 100%（v3.2.0 增新 T 不删旧） | 继承 100%（v3.3.0 增新 T 不删旧） |
+| IMPLEMENTED T | 25 | 26 | 34 | 35（+1 T16） | **35**（持平，3 新 T 均 PLANNED） |
+| PLANNED T | 1 | 9 | 1 | 1（仅 T08 持久化仍 PLANNED） | **4**（+3 新 T） |
+| v1.1 新 T 编号 | — | D3-S1-A01-T03 / D3-S2-A01-T06 / D3-S3-A01-T13~T15 / D3-S5-A01-T03 / D3-S6-A01-T02 / D3-X-A02-T01 | 继承 | 继承 + D3-S3-A01-T16 | 继承 + D3-S1-A01-T04/T05 + D3-S3-A01-T17 |
 
 > **v1.1 T 编号连续性**：v1.1 新增 T 紧接 v3.0.0 末尾 T 编号；不重启 S 编号池；不破坏 `§Legacy Archive` 100% 覆盖。
 > **v3.2.0**：仅 +1 T (D3-S3-A01-T16 retry nil-sentinel)；不破坏 PLANNED/IMPLEMENTED 比例；不破坏 Legacy Archive 100%。
+> **v3.3.0 (DM-20260628-001 PLANNED)**：+3 T（D3-S1-A01-T04 NewAPIErrorCodeFromStatus HTTP status 映射 + D3-S1-A01-T05 IsCode 包装链识别 + D3-S3-A01-T17 4 adapter NewAPIError 统一构造）；不删旧 T；不破坏 Legacy Archive 100%；PLANNED 1→4；S4 实现后回填 IMPLEMENTED。
 
 ---
 
@@ -53,12 +54,14 @@
 | D3-S1-A01-T01 | 多 Provider 并发调用（MatchRouting 路径） | P1 | F01 MatchRouting | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
 | D3-S1-A01-T02 | 未知 Provider/Model 报错（ResolveDefault F02a+F02b 联动） | P1 | F02a ResolveTierAlias + F02b ResolveDefault | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
 | **D3-S1-A01-T03** | **Tier 解析正确性 ≥ 99%（D6 probe #1）** `<!-- v1.1 F6 -->` | **P1** | F01 + F02a（routing 暴露调用次数 + 错误率） | `internal/layers/llmgateway/route/router_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T20 配套） |
+| **D3-S1-A01-T04** | **`NewAPIErrorCodeFromStatus` HTTP status → APIErrorCode 映射覆盖 401/403/408/413/429/529/5xx/4xx-unknown 8 类** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting（错误分类） | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | **PLANNED**（DM-20260628-001 S4 实现） |
+| **D3-S1-A01-T05** | **`sharederrors.IsCode(err, code)` 正确识别包装链（WithCode → Unwrap → bare APIError）** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | **PLANNED**（DM-20260628-001 S4 实现） |
 
 **F 覆盖**：
 
 ```
 D3-S1-A01 ResolveModelRoute
-  ├─ F01 MatchRouting         → T01 (P1) 验证 routing 矩阵
+  ├─ F01 MatchRouting         → T01 (P1) + T04 (P0 v3.3.0) + T05 (P0 v3.3.0) 验证 routing 矩阵 + HTTP status 映射 + 包装链识别
   ├─ F02a ResolveTierAlias    → T02 (P1) 验证 tier alias 透传
   └─ F02b ResolveDefault      → T02 (P1) 验证 default 回填
   + T03 (v1.1) → D6 probe #1 配合：routing 正确性 ≥ 99%
@@ -118,16 +121,17 @@ D3-S2-A01 StreamChatCompletion
 | **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/protect/events_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
 | **D3-S3-A01-T15** | **D6 probe #2 Breaker 异常切换告警** `<!-- v1.1 F7 -->` | **P1** | F07 + F08（D6 探针统计 `llm_breaker_transitions_total`） | Probe | `tests/integration/d6_breaker_probe_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T21 配套） |
 | **D3-S3-A01-T16** | **Retry loop nil-sentinel 防御：`retry.go:91` 在所有 attempt 返回 nil 时包真实 `errors.New("retry loop completed without recording an error")`（DM-20260620-003 PR-A L4 / PR-C H3）** `<!-- v3.2.0 -->` | **P0** | F05 StreamWithFallback（defensive fallback path） | Retry | `internal/layers/llmgateway/protect/retry.go:91` | **IMPLEMENTED**（DM-20260620-003） |
+| **D3-S3-A01-T17** | **4 adapter（minimax/deepseek/anthropic/openai）HTTP 错误构造点全部走 `NewAPIError(status, msg)` 工厂，CI guard 检测 `errors.New(fmt.Sprintf(...))` 字符串拼接模式** `<!-- v3.3.0 -->` | **P0** | F02 RecordOutcome + F05 StreamWithFallback | `internal/layers/llmgateway/stream/adapter/{minimax,deepseek,anthropic,openai}_test.go`（v3.3.0 增） | **PLANNED**（DM-20260628-001 S4 实现） |
 
 **F 覆盖**：
 
 ```
 D3-S3-A01 ShieldAndRetry
   ├─ F01 AllowCircuit                → T01-T04, T06  (Breaker 状态机)
-  ├─ F02 RecordOutcome               → T01-T04, T05  (成功/失败记录)
+  ├─ F02 RecordOutcome               → T01-T04, T05, T17 (P0 v3.3.0 错误构造统一)
   ├─ F03 ManageCircuitState          → T01-T04, T06, T08  (状态机切换)
   ├─ F04 ComputeBackoff              → T09, T10  (退避计算)
-  ├─ F05 StreamWithFallback          → T05, T07, T09, T11, T12  (重试 + fallback)
+  ├─ F05 StreamWithFallback          → T05, T07, T09, T11, T12, T17 (P0 v3.3.0 4 adapter 统一)
   ├─ F06 ShouldRecordBreakerFailure  → T05  (Cancel/Deadline 不触发 CB)
   ├─ F07 EmitBreakerStateMetric      → T13 (v1.1 P0) 状态切换 emit llm_breaker_state
   ├─ F08 OnStateTransitionEmit       → T13 (v1.1 P0) 状态机钩子
@@ -234,16 +238,16 @@ D3-S3-A01 ShieldAndRetry
 
 ## 10. Statistics
 
-| 维度 | v3.0.0 | v3.1.0 | v3.2.0 |
-|------|--------|--------|--------|
-| Total T | 26 | **35**（+9 v1.1） | **36**（+1 DM-20260620-003 T16） |
-| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） | **35**（T16 IMPLEMENTED） |
-| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） | 1（不变） |
-| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） | **20**（+1 DM-20260620-003 T16） |
-| P1 | 13 | **15**（+2 v1.1：F3/F7） | 15（不变） |
-| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） | 1（不变） |
-| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） | 26 / 26 (100%)（v3.2.0 不破坏追溯） |
-| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） | 9 / 9（继承） |
+| 维度 | v3.0.0 | v3.1.0 | v3.2.0 | **v3.3.0** |
+|------|--------|--------|--------|--------|
+| Total T | 26 | **35**（+9 v1.1） | 36（+1 DM-20260620-003 T16） | **39**（+3 DM-20260628-001 T04/T05/T17 PLANNED） |
+| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） | 35（T16 IMPLEMENTED） | **35**（持平，3 新 T 均 PLANNED） |
+| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） | 1（不变） | **4**（+3 新 T） |
+| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） | 20（+1 DM-20260620-003 T16） | **23**（+3 v3.3.0 P0） |
+| P1 | 13 | **15**（+2 v1.1：F3/F7） | 15（不变） | 15（不变） |
+| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） | 1（不变） | 1（不变） |
+| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） | 26 / 26 (100%)（v3.2.0 不破坏追溯） | 26 / 26 (100%)（v3.3.0 不破坏追溯） |
+| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） | 9 / 9（继承） | 9 / 9（继承） |
 
 ---
 
@@ -268,3 +272,4 @@ D3-S3-A01 ShieldAndRetry
 | 3.1.0 | 2026-06-14 | 5+1 S × 1 A × 35 T（v1.1 净增 9）；新增 T03 (D3-S1 F6 probe) + T06 (D3-S2 F5 Protocol) + T13/T14/T15 (D3-S3 F1/F2/F3 + F7) + T03 (D3-S5 F8 latency) + T02 (D3-S6 F9 flag) + T01 (D3-X-A02 F4 fail-fast)；§Legacy Archive 26/26 (100%) 继承；8 v1.1 新 T 标注 `<!-- v1.1 Fx -->` |
 | **3.1.1** | 2026-06-14 | **v1.1 S5 验收后**：9 v1.1 T PLANNED→IMPLEMENTED；IMPLEMENTED 25 → 34，PLANNED 9 → 1（仅 T08 持久化）；§0/§1/§10 统计与详细条目对齐 |
 | **3.2.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D3-S3-A01-T16 retry nil-sentinel defensive wrap (PR-A L4 / PR-C H3)。Total 35→36, IMPLEMENTED 34→35, P0 19→20 |
+| **3.3.0** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) PLANNED**: APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus HTTP status → APIErrorCode 工厂 + sharederrors.IsCode 包装链识别 + 4 adapter 错误构造统一走 NewAPIError。**+3 P0 T PLANNED**：D3-S1-A01-T04 HTTP status 映射覆盖 8 类 (401/403/408/413/429/529/5xx/4xx-unknown) + D3-S1-A01-T05 IsCode 正确识别 WithCode→Unwrap→bare APIError 包装链 + D3-S3-A01-T17 4 adapter 错误构造统一走 NewAPIError 工厂。Total 36→39, IMPLEMENTED 35（持平，3 新 T 均 PLANNED）, PLANNED 1→4, P0 20→23。S4 实现后回填 IMPLEMENTED，§0/§1/§4/§10 统计对齐。 |

@@ -818,11 +818,234 @@
 
 ---
 
-## 13. Archive
+## 13b. Archive (Legacy)
 
 - `openspec/archive/2026-06-07-devrix-llm-gateway/` — V1
 - `openspec/archive/2026-06-08-devrix-llm-gateway-v2/` — V2
-- `openspec/changes/devrix-d3-sa-refine/` — V3 (S/A 重切，**current**)
+- `openspec/changes/devrix-d3-sa-refine/` — V3 (S/A 重切)
+- `openspec/changes/devrix-d3-sa-refine-v1.1/` — V3.1 (韧性可见性)
+
+---
+
+## 14. ADDED Requirements (V4 API 错误分类与可恢复语义 — DM-20260628-001)
+
+> **V4 落地**：本节 8 个 FR（FR-10 ~ FR-17）由 `devrix-api-error-classification`（DM-20260628-001）实施；F 编号对应 `f-registry.md` 新 F；T 编号对应 `t-registry.md v3.3.0` 新增 3 个 P0 T（D3-S1-A01-T04 / D3-S1-A01-T05 / D3-S3-A01-T17）+ 跨域 3 个 T（D7-S2-A50-T05 / D7-S2-A50-T06 / D1-S3-A08-T01）。
+>
+> **设计原则**：与 clawcode v2.1.88 `categorizeRetryableAPIError`（`src/services/api/errors.ts:1163-1182`）1:1 对齐；受控枚举由 Go `const ( ... )` 编译期强约束。
+
+### Requirement FR-10: APIErrorCode Closed-Set Enumeration（AC1 / AC6）
+
+- **Priority**: P0
+- **S**: D3-S1 RouteModel（**新 F10 NewAPIErrorCodeFromStatus**）
+- **T**: `D3-S1-A01-T04`, `D3-S1-A01-T05`
+- **跨域依赖**: sharederrors 包扩展（DM-20260620-003 SentinelError 复用）
+
+#### Scenario: 7 类枚举值与 HTTP status 映射
+
+- **Given** `sharederrors.APIErrorCode` 闭集类型定义就位
+- **When** 调用 `NewAPIErrorCodeFromStatus(status)` 对 401/403/408/413/429/529/5xx/4xx-unknown 7 类 status
+- **Then** 返回值依次为 `APICodeAuthenticationFailed` / `APICodeAuthenticationFailed` / `APICodePromptTooLong` / `APICodePromptTooLong` / `APICodeRateLimit` / `APICodeServerError` / `APICodeServerError` / `APICodeUnknown`
+- **And** `APICodeUnknown` 是零值（JSON 友好）
+
+#### Scenario: String() 反向解析正确性
+
+- **Given** 任意 `APIErrorCode` 值
+- **When** 调用 `String()` 与 `ParseAPIErrorCode(s)`
+- **Then** 7 类枚举 round-trip 一致（rate_limit / authentication_failed / server_error / media_size / prompt_too_long / image_size / unknown）
+- **And** 非法字符串输入 `ParseAPIErrorCode` 返回 `APICodeUnknown`
+
+#### Scenario: Code/IsCode 包装链识别
+
+- **Given** `WithAPIErrorCode(APICodeRateLimit, "...", innerErr)` 包装的错误链
+- **When** 调用 `Code(err)` / `IsCode(err, APICodeRateLimit)`
+- **Then** `Code` 返回 `APICodeRateLimit`
+- **And** `IsCode` 返回 `true`
+- **And** `IsCode(err, APICodeServerError)` 返回 `false`
+- **And** 非包装错误（bare `errors.New("...")`）`Code` 返回 `APICodeUnknown`
+
+### Requirement FR-11: llmgateway.APIError 结构扩展（AC2）
+
+- **Priority**: P0
+- **S**: D3-S3 ProtectCall（**新 F11 NewAPIError**）
+- **T**: `D3-S3-A01-T17`
+
+#### Scenario: APIError 自动按 status 填 Code
+
+- **Given** 调用 `llmgateway.NewAPIError(429, "Too Many Requests")`
+- **When** 构造完成
+- **Then** `err.Code == APICodeRateLimit`（自动映射）
+- **And** `err.Status == 429` / `err.Message == "Too Many Requests"` 保留
+
+#### Scenario: Error/Unwrap 接口实现
+
+- **Given** `*llmgateway.APIError` 实例
+- **When** 调用 `Error()` 与 `Unwrap()`
+- **Then** `Error()` 返回非空字符串（`Message` 非空时用 Message，否则用 Cause）
+- **And** `Unwrap()` 返回 `Cause` 字段；`Cause == nil` 时返回 `nil`
+
+### Requirement FR-12: 4 Adapter 错误构造统一走 NewAPIError（AC2）
+
+- **Priority**: P0
+- **S**: D3-S3 ProtectCall
+- **T**: `D3-S3-A01-T17`
+- **修改范围**: minimax / deepseek / anthropic / openai 4 adapter HTTP 错误构造点
+
+#### Scenario: 4 adapter HTTP 5xx 路径
+
+- **Given** 4 adapter 中任意一个接到 HTTP 5xx 响应
+- **When** adapter 构造错误
+- **Then** 走 `llmgateway.NewAPIError(status, msg)` + `sharederrors.WithAPIErrorCode(...)` 链路
+- **And** 不再使用 `fmt.Errorf("provider %s status %d: %s", ...)` 字符串拼接
+
+#### Scenario: 4 adapter HTTP 401/403 路径
+
+- **Given** 任意 adapter 接到 HTTP 401/403 响应
+- **When** adapter 构造错误
+- **Then** 走 `sharederrors.NewLLMAuthFailedError(apiErr)` 保留（向后兼容）
+- **And** `apiErr` 内部用 `NewAPIError(status, msg)` 构造（确保 `errors.Is(err, APICodeAuthenticationFailed)` 成立）
+
+### Requirement FR-13: OrchestratorDeps.FallbackModel 字段预留（AC3 partial）
+
+- **Priority**: P0
+- **S**: D7-S2 SessionOrchestrator RunTurnLoop
+- **T**: `D7-S2-A50-T05`
+- **范围声明**: 仅字段预留 + 日志埋点；完整切换循环放 P0-2 `devrix-streaming-fallback` follow-up
+
+#### Scenario: FallbackModel 字段就位 + 字段未填行为
+
+- **Given** `OrchestratorDeps{FallbackModel: ""}` 构造 orchestrator
+- **When** session 启动
+- **Then** orchestrator 字段就位（不 panic）
+- **And** 当主模型返回 2 次连续 RateLimit/ServerError 时，打日志 `fallback_trigger_candidate`
+- **And** 当 `FallbackModel == ""` 时，**额外**打日志 `fallback_model_set_but_not_yet_wired`
+
+#### Scenario: FallbackModel 字段已填行为
+
+- **Given** `OrchestratorDeps{FallbackModel: "claude-haiku-4"}` 构造 orchestrator
+- **When** 主模型 2 次连续 529
+- **Then** 仍打 `fallback_trigger_candidate` 日志
+- **And** **不**打 `fallback_model_set_but_not_yet_wired`
+- **And** 当前 turn 仍用主模型（完整切换逻辑在 P0-2）
+
+### Requirement FR-14: prompt_too_long Withhold-then-Recover（AC4 partial）
+
+- **Priority**: P0
+- **S**: D7-S2 SessionOrchestrator RunTurnLoop
+- **T**: `D7-S2-A50-T06`
+
+#### Scenario: Withheld 状态标记 + 不立即 emit error
+
+- **Given** `TurnState.Withheld == false` 起始
+- **When** adapter 返回 `*llmgateway.APIError{Code: APICodePromptTooLong}` 或 `APICodeMediaSize`
+- **Then** `state.Withheld = true`
+- **And** **不**调用 `emitError`（session 继续推进）
+- **And** Turn N+1 进入 prepareContext 阶段触发 `FoldAssistantOutput`（DM-20260620-001 已有）
+
+#### Scenario: Withheld 状态恢复路径
+
+- **Given** `state.Withheld == true`
+- **When** D2 FoldAssistantOutput 成功（compress ratio > 阈值）
+- **Then** `state.Withheld = false`
+- **And** session 正常推进
+
+#### Scenario: Withheld 状态 fold 失败路径
+
+- **Given** `state.Withheld == true`
+- **When** D2 FoldAssistantOutput 失败
+- **Then** 调用 `emitError` 且 `Metadata["error_code"] == "prompt_too_long"`
+- **And** 用户 IM 端看到差异化文案 "📦 会话过长，已尝试压缩"
+
+### Requirement FR-15: emitError 路径填 error_code Metadata（AC7）
+
+- **Priority**: P0
+- **S**: D7-S2 SessionOrchestrator RunTurnLoop
+- **T**: `D7-S2-A50-T05`
+
+#### Scenario: emitError 受控枚举语义
+
+- **Given** orchestrator emitError helper 改造完成
+- **When** 调用 `emitError(ctx, sink, out, sessionID, label, err)`
+- **Then** `Event.Metadata["error_code"]` 取值必为 7 类闭集枚举之一的 `String()` 值
+- **And** 不再接受任意字符串（无 WithCode 包装的 err 返回 `"unknown"`）
+
+#### Scenario: 向后兼容（无包装 err 路径）
+
+- **Given** err 是 `errors.New("plain error")`（无 sharederrors 包装）
+- **When** 调用 emitError
+- **Then** `Event.Metadata["error_code"] == "unknown"`
+- **And** `Event.Content` 仍走 `SanitizeForUser(err)`（现有行为不变）
+
+### Requirement FR-16: D1 IM 适配器差异化文案（AC5）
+
+- **Priority**: P1
+- **S**: D1-S3 Communication EmitError
+- **T**: `D1-S3-A08-T01`
+- **修改范围**: feishu.go / cli.go / cli renderer
+
+#### Scenario: feishu 适配器 5 类 code 独立文案
+
+- **Given** feishu adapter 收到 `Event.Type == "error"` 且 `Metadata["error_code"]` 非空
+- **When** 渲染飞书卡片
+- **Then** `RateLimit` → "⚠️ 模型繁忙，请稍候重试"
+- **And** `AuthenticationFailed` → "🔑 API key 失效，请检查 ~/.devrix/config.yaml"
+- **And** `PromptTooLong` → "📦 会话过长，已尝试压缩"
+- **And** `MediaSize` / `ImageSize` → "📎 文件/图片过大，请缩小后重试"
+- **And** `ServerError` → "🔧 服务暂时不可用，请稍候重试"
+
+#### Scenario: feishu 兜底文案（Unknown / 缺失 error_code）
+
+- **Given** feishu 收到 error 事件但 `Metadata["error_code"]` 缺失或为非法值
+- **When** 渲染飞书卡片
+- **Then** 使用现有统一文案（即 `Event.Content`）
+- **And** 不报错（向后兼容）
+
+#### Scenario: cli 适配器差异化文案
+
+- **Given** CLI adapter 渲染错误
+- **When** 调用 `RenderError(err)` 且错误来自 emitError 路径
+- **Then** 按 `Event.Metadata["error_code"]` 走差异化文案（与 feishu 同样的 5 类映射）
+- **And** 缺 error_code 时回退到 `err.Error()`
+
+### Requirement FR-17: SanitizeForUser 向后兼容（AC6）
+
+- **Priority**: P0
+- **S**: CROSS 跨域
+- **T**: `D3-S1-A01-T04` (回归测试覆盖)
+
+#### Scenario: 现有 SanitizeForUser 调用点零行为变化
+
+- **Given** 现有 30+ `sharederrors.SanitizeForUser(err)` 调用点
+- **When** 实施本需求后跑 `go test ./...`
+- **Then** 0 regression
+- **And** `sharederrors.WithCode(code, msg, err)` string API 仍可用（不删除）
+- **And** `sharederrors.SentinelError.Code` 字段仍为 string 类型（不破坏 ABI）
+
+### Requirement FR-18: 端到端集成测试（AC8）
+
+- **Priority**: P0
+- **S**: D3-S2 StreamChat + D7-S2 SessionOrchestrator E2E
+- **T**: `D3-S3-A01-T17` (E2E variant)
+- **范围声明**: 当前 mock 主模型连续返回 529 验证 emitError 路径；真实 fallback 切换放 P0-2 follow-up
+
+#### Scenario: E2E 主模型 3 次 529
+
+- **Given** 测试 fixture 注入 mock 主模型（连续返回 3 次 529）
+- **And** session 启动后用户发送一条消息
+- **When** orchestrator 处理该 turn
+- **Then** 3 次 LLM call 均返回 `*llmgateway.APIError{Code: APICodeServerError}`
+- **And** 第 2 次返回后日志含 `fallback_trigger_candidate`
+- **And** `Event.Metadata["error_code"] == "server_error"` 在最后 emit error 时
+- **And** 测试断言飞书卡片最终显示 "🔧 服务暂时不可用"（mock feishu 适配器）
+
+---
+
+## 15. Archive
+
+- `openspec/archive/2026-06-07-devrix-llm-gateway/` — V1
+- `openspec/archive/2026-06-08-devrix-llm-gateway-v2/` — V2
+- `openspec/changes/devrix-d3-sa-refine/` — V3 (S/A 重切)
+- `openspec/changes/devrix-d3-sa-refine-v1.1/` — V3.1 (韧性可见性 + 评测探针)
+- `openspec/changes/devrix-api-error-classification/` — V4 (API 错误分类 — DM-20260628-001, **current**)
 
 ---
 
@@ -833,3 +1056,5 @@
 | 2.1.0 | 2026-06-14 | 7 S 技术角色词版（V2 Reliability 增补） |
 | 3.0.0 | 2026-06-14 | 5+1 S 价值流化：RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway；North Star 5 承诺显式声明；R2 灰区声明（§11）；R3 fail-fast（P0 #8）；Breaker+Retry 合并 ProtectCall；T ID 重排 + Legacy Archive 100% alias 追溯 |
 | 3.1.0 | 2026-06-14 | 韧性可见性 + 评测探针 + 适配扩展（v1.1 子 change 落地）：6 F 域内新增（F07/F08/F09/F04/F04/F05）+ 1 F CROSS 段（F02 FailFastOnObsNil）；9 T 新增（6 P0 + 3 P1）；§13 V3.1 Requirements 9 个 FR（FR-1 ~ FR-9）；D1-A / D2-B / D3-A / D4-B / D5-A / D6-A / D7-A R1 决议固化；3 新 metric + 1 新 span event + 3 新 event；`IAdapter.Protocol() string` BREAKING 接口扩展（3 处实现同步修） |
+| 3.2.0 | 2026-06-16 | DM-20260616-003 diagnostic-tools-parity + DM-20260617-002 diagnostic-tools-wiring（T 增量） |
+| 4.0.0 | 2026-06-28 | API 错误分类与可恢复语义（DM-20260628-001）：§14 V4 Requirements 9 个 FR（FR-10 ~ FR-18）；新增 `sharederrors.APIErrorCode` 7 类闭集枚举 + `NewAPIErrorCodeFromStatus` 工厂 + `Code`/`IsCode`/`WithAPIErrorCode` 包装链 API；`llmgateway.APIError.Code` 新字段 + `NewAPIError(status, msg)` 工厂；4 adapter HTTP 错误构造统一走 NewAPIError；`OrchestratorDeps.FallbackModel` 字段预留 + `TurnState.Withheld` in-memory 状态 + emitError 路径填 `Event.Metadata["error_code"]`；D1 feishu/cli IM 适配器 5 类 code 差异化文案；3 新 P0 T（D3-S1-A01-T04 / D3-S1-A01-T05 / D3-S3-A01-T17）+ 2 跨域 P0 T（D7-S2-A50-T05 / D7-S2-A50-T06 / D1-S3-A08-T01）；SanitizeForUser 30+ 调用点零回归 |

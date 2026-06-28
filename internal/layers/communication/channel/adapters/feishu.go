@@ -152,9 +152,11 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 			a.clearSessionStream(msg.SessionID)
 			return
 		}
+		// DM-20260628-001 (FR-16): error_code-driven differentiated copy.
+		body := errorCopyByCode(errorCodeFromMetadata(msg.Metadata), content)
 		card := NewCard().
 			Title("错误", "red").
-			Markdown(content).
+			Markdown(body).
 			Build()
 		if err := a.sendCardToSession(ctx, msg.SessionID, msg.ChatID, card); err != nil {
 			slog.Error("feishu: failed to send error card", "error", err)

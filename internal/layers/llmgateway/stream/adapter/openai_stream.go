@@ -46,7 +46,11 @@ func (c *OpenAIStreamClient) WithHTTPClient(client *http.Client) *OpenAIStreamCl
 func (c *OpenAIStreamClient) Stream(ctx context.Context, req *llmgateway.Request) (<-chan *llmgateway.AdapterChunk, error) {
 	apiKey, ok := configure.APIKey(c.cfg)
 	if !ok {
-		return nil, sharederrors.NewLLMAuthFailedError(sharederrors.ErrLLMAuthFailed)
+		// DM-20260628-001 (T4): wrap with APIError so sharederrors.Code()
+		// surfaces APICodeAuthenticationFailed via the APICodeProvider interface.
+		apiErr := llmgateway.NewAPIErrorWithCause(http.StatusUnauthorized,
+			"missing api key", sharederrors.ErrLLMAuthFailed)
+		return nil, sharederrors.NewLLMAuthFailedError(apiErr)
 	}
 
 	body, err := buildOpenAIChatRequest(req)
@@ -78,13 +82,26 @@ func (c *OpenAIStreamClient) Stream(ctx context.Context, req *llmgateway.Request
 	}
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		_ = resp.Body.Close()
-		return nil, sharederrors.NewLLMAuthFailedError(fmt.Errorf("status %d", resp.StatusCode))
+		// DM-20260628-001 (T4): route 401/403 through NewAPIError so the
+		// sharederrors.Code() chain surfaces APICodeAuthenticationFailed.
+		apiErr := llmgateway.NewAPIErrorWithCause(resp.StatusCode,
+			fmt.Sprintf("status %d", resp.StatusCode), sharederrors.ErrLLMAuthFailed)
+		return nil, sharederrors.NewLLMAuthFailedError(apiErr)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
-		apiErr := fmt.Errorf("provider %s status %d: %s", c.provider, resp.StatusCode, string(bodyBytes))
-		slog.Warn("llm: provider HTTP error", "provider", c.provider, "status", resp.StatusCode, "body", string(bodyBytes))
+		// DM-20260628-001 (T4): replace string-concat provider error with
+		// NewAPIError; the APIError is the inner cause so its APICode() flows
+		// up through the sentinel Error() chain.
+		apiErr := llmgateway.NewAPIErrorWithCause(resp.StatusCode,
+			fmt.Sprintf("provider %s status %d: %s", c.provider, resp.StatusCode, string(bodyBytes)),
+			fmt.Errorf("body: %s", string(bodyBytes)))
+		slog.Warn("llm: provider HTTP error",
+			"provider", c.provider,
+			"status", resp.StatusCode,
+			"code", apiErr.Code.String(),
+			"body", string(bodyBytes))
 		return nil, sharederrors.NewProviderUnavailableError(apiErr)
 	}
 

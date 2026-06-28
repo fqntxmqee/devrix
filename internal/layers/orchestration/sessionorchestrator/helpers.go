@@ -26,10 +26,14 @@ func emit(ctx context.Context, sink EventPublisher, out chan<- *contracts.Engine
 }
 
 func emitError(ctx context.Context, sink EventPublisher, out chan<- *contracts.EngineEvent, sessionID, label string, err error) {
+	// DM-20260628-001 (FR-15): error_code metadata carries the closed-set
+	// APIErrorCode (AC7). Falls back to "unknown" for bare errors.
+	apiCode := sharederrors.Code(err).String()
 	emit(ctx, sink, out, &contracts.EngineEvent{
 		Type:      "error",
 		Content:   fmt.Sprintf("%s: %s", label, sharederrors.SanitizeForUser(err)),
 		SessionID: sessionID,
+		Metadata:  map[string]string{"error_code": apiCode},
 	})
 }
 

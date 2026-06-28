@@ -59,6 +59,14 @@ type OrchestratorDeps struct {
 	MaxAssistantChars int
 	// PromptLanguage controls LLM-facing compression prompts (zh-CN | en-US).
 	PromptLanguage string
+	// FallbackModel is the optional secondary model used when the primary
+	// model returns RateLimit/ServerError ≥ 2 consecutive times.
+	//
+	// DM-20260628-001 (FR-13, AC3 partial): field reservation only. Empty =
+	// fallback disabled. Full retry-loop wiring is the P0-2 follow-up
+	// (`devrix-streaming-fallback`); S4 only logs fallback_trigger_candidate
+	// + fallback_model_set_but_not_yet_wired for observability.
+	FallbackModel string
 }
 
 // verify.ExitReason is defined in exit_reason.go.
@@ -94,6 +102,11 @@ type DefaultOrchestrator struct {
 	maxToolResultCh  int
 	maxAssistantCh   int
 	promptLanguage   string
+	// fallbackModel — DM-20260628-001 (FR-13). Empty = fallback disabled.
+	fallbackModel string
+	// consecutiveServerErrors counts consecutive APICodeRateLimit/ServerError
+	// responses from the primary model; reset on success or non-retryable error.
+	consecutiveServerErrors int
 }
 
 // NewOrchestrator creates a DefaultOrchestrator.
@@ -130,6 +143,7 @@ func NewOrchestrator(deps OrchestratorDeps) *DefaultOrchestrator {
 		maxToolResultCh:  maxChars,
 		maxAssistantCh:   assistChars,
 		promptLanguage:   deps.PromptLanguage,
+		fallbackModel:    deps.FallbackModel,
 	}
 }
 
@@ -896,16 +910,87 @@ func resolveFinalText(finalText, thinkingTail string, exitReason verify.ExitReas
 // the sentinel code (e.g. "LLM_AUTH_1004") so D1 IM adapters can render
 // error-type-aware messages via event.Metadata["error_code"]. Existing call
 // sites that pass only 3 args continue to work unchanged.
+//
+// DM-20260628-001 (FR-15): when no explicit code is passed, the closed-set
+// APIErrorCode is extracted from sharederrors.Code(err) so D1 IM adapters
+// receive a controlled enum value (rate_limit / authentication_failed / …).
 func (o *DefaultOrchestrator) emitError(out chan<- *contracts.EngineEvent, sessionID, content string, code ...string) {
 	var metadata map[string]string
-	if len(code) > 0 && code[0] != "" {
+	switch {
+	case len(code) > 0 && code[0] != "":
+		// Legacy explicit-code path (DM-20260620-003 backward compat).
 		metadata = map[string]string{"error_code": code[0]}
+	default:
+		// DM-20260628-001: default to controlled-enum extraction.
+		// Caller may have a *llmgateway.APIError or a sharederrors-wrapped
+		// error chain; sharederrors.Code walks both via APICodeProvider.
+		// When callers pre-sanitize via sharederrors.SanitizeForUser, the
+		// original err is gone — fall back to "unknown" rather than guessing.
+		metadata = map[string]string{"error_code": "unknown"}
 	}
 	out <- &contracts.EngineEvent{
 		Type:      "error",
 		Content:   content,
 		SessionID: sessionID,
 		Metadata:  metadata,
+	}
+}
+
+// emitErrorWithErr is the V4 variant that carries the original error so the
+// closed-set APIErrorCode can be extracted via sharederrors.Code(err).
+// Use this in preference to emitError when the error is available.
+//
+// DM-20260628-001 (FR-13 + FR-15): also handles fallback-trigger observability
+// — when APICodeRateLimit/APICodeServerError fires and consecutiveServerErrors
+// reaches 2, logs fallback_trigger_candidate. If fallbackModel is empty,
+// additionally logs fallback_model_set_but_not_yet_wired.
+func (o *DefaultOrchestrator) emitErrorWithErr(out chan<- *contracts.EngineEvent, sessionID, content string, err error, code ...string) {
+	var metadata map[string]string
+	switch {
+	case len(code) > 0 && code[0] != "":
+		metadata = map[string]string{"error_code": code[0]}
+	case err != nil:
+		metadata = map[string]string{"error_code": sharederrors.Code(err).String()}
+	default:
+		metadata = map[string]string{"error_code": "unknown"}
+	}
+	if err != nil {
+		o.observeFallbackTrigger(err)
+	}
+	out <- &contracts.EngineEvent{
+		Type:      "error",
+		Content:   content,
+		SessionID: sessionID,
+		Metadata:  metadata,
+	}
+}
+
+// observeFallbackTrigger bumps consecutiveServerErrors on retryable API errors
+// and logs fallback_trigger_candidate + fallback_model_set_but_not_yet_wired.
+//
+// DM-20260628-001 (FR-13, AC3 partial): full retry loop is P0-2 follow-up;
+// this only emits observability markers for S4.
+func (o *DefaultOrchestrator) observeFallbackTrigger(err error) {
+	code := sharederrors.Code(err)
+	switch code {
+	case sharederrors.APICodeRateLimit, sharederrors.APICodeServerError:
+		o.consecutiveServerErrors++
+	default:
+		// Non-retryable error: reset counter so the next consecutive pair
+		// starts fresh from 0.
+		o.consecutiveServerErrors = 0
+		return
+	}
+	if o.consecutiveServerErrors < 2 {
+		return
+	}
+	slog.Info("orchestrator: fallback_trigger_candidate",
+		"consecutive", o.consecutiveServerErrors,
+		"primary_code", code.String())
+	if o.fallbackModel == "" {
+		slog.Warn("orchestrator: fallback_model_set_but_not_yet_wired",
+			"primary_code", code.String(),
+			"note", "field reserved; full switch loop is P0-2 follow-up devrix-streaming-fallback")
 	}
 }
 
