@@ -10,6 +10,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -28,7 +29,7 @@ func TestIntegration_ContextEngineGatewayFlow(t *testing.T) {
 	ctxCfg := config.DefaultContextEngineConfig()
 	handler := testutil.NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "Hello from context engine"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{},
@@ -76,7 +77,7 @@ func TestIntegration_PermissionDeniedStopsToolExecution(t *testing.T) {
 	handler := testutil.NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&cfg.Permission)
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: contextengine.PreparedTurnRunnerWithTools(),
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{},

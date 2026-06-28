@@ -1,17 +1,22 @@
 // D2 v2.2 Structure layout guard tests (DM-20260619-007 devrix-d2-structure-closure).
 //
 // Per the DSAFT Refactoring Playbook §6 双锚点对齐, D2 root must remain
-// scenario-organized: prepare/ persist/ enforce/ legacy/. Anything that drifts
+// scenario-organized: prepare/ persist/ enforce/ kernel/. Anything that drifts
 // back to Pre-v2.2 form (engine_*.go files at root, tools package name,
 // orchestrate stub) is a layout violation that must be caught at CI time.
 //
-// T: D2-STRUCT-T01 — root production files only `contracts.go` + `aliases.go`
+// DM-20260629-002 (devrix-d2-dsaft-restructuring PR-1): legacy/ directory and
+// aliases.go retired; the D2 ContextEngine implementation now lives in
+// kernel/ alongside the observer contracts. Tests T01 + T07 + T08 updated to
+// reflect the post-P5 closure state.
+//
+// T: D2-STRUCT-T01 — root production files only `contracts.go` (+ tool_context.go + fixtures)
 // T: D2-STRUCT-T02 — no engine_persist.go outside facade/ (now persist/commit.go)
 // T: D2-STRUCT-T03 — enforce/tools/ package is `package tools`, not `tools`
 // T: D2-STRUCT-T04 — prepare/memory/ and persist/memory/ have no cyclic import
 // T: D2-STRUCT-T05 — enforce/orchestrator.go removed (stub gone, turn_adapter is SoT)
 // T: D2-STRUCT-T06 — scenario subdirectories at most 2 levels deep
-// T: D2-STRUCT-T07 — no new legacy.Process() callers (P5 retirement guard)
+// T: D2-STRUCT-T07 — no new kernel.ContextEngine.Process() callers (PR-1 P5 retirement guard)
 // T: D2-STRUCT-T08 — query/ package removed (DM-20260618-010 QueryLoop decommission)
 package layer
 
@@ -24,6 +29,9 @@ import (
 )
 
 // allowedRootProductionFiles are the only files permitted at D2 root after v2.2 closure.
+// DM-20260629-002 PR-1: `aliases.go` removed (legacy/ directory retired). The
+// remaining allowances are documented inline.
+//
 // `tool_context.go` is allowed as a transitional type alias only after P2 migration.
 // `summarizer_fixture.go` and `prepared_turn_fixture.go` are cross-domain D7-contract
 // fixtures (DM-20260619-008 devrix-d2-mock-semantic-split): D2 cannot import D7
@@ -33,7 +41,6 @@ import (
 // They cannot live in *_test.go because cmd/obs-verify imports them from main.
 var allowedRootProductionFiles = map[string]bool{
 	"contracts.go":              true,
-	"aliases.go":                true,
 	"tool_context.go":           true, // P2 transitional: re-exports types after enforce/tools/context.go extraction
 	"doc.go":                    true, // package doc
 	"summarizer_fixture.go":     true, // D7 contracts.Summarizer cross-domain fixture
@@ -62,7 +69,8 @@ func d2RepoRoot(t *testing.T) string {
 }
 
 // TestD2Layout_RootProductionFilesOnly verifies D2-STRUCT-T01: root contains
-// only contracts.go + aliases.go (+ tool_context.go alias + doc.go).
+// only contracts.go (+ tool_context.go alias + doc.go + fixtures).
+// DM-20260629-002 PR-1: aliases.go removed after legacy/ retirement.
 func TestD2Layout_RootProductionFilesOnly(t *testing.T) {
 	root := filepath.Join(d2RepoRoot(t), "internal", "layers", "contextengine")
 	entries, err := os.ReadDir(root)
@@ -86,7 +94,7 @@ func TestD2Layout_RootProductionFilesOnly(t *testing.T) {
 
 	if len(violations) > 0 {
 		t.Errorf("D2 root drift (D2-STRUCT-T01): disallowed production files at %s: %v. "+
-			"Allowed: %v. Extract to scenario/ or facade/legacy/.", root, violations, keys(allowedRootProductionFiles))
+			"Allowed: %v. Extract to scenario/ or kernel/.", root, violations, keys(allowedRootProductionFiles))
 	}
 }
 
@@ -107,6 +115,9 @@ func TestD2Layout_NoEngineFilesAtRoot(t *testing.T) {
 // TestD2Layout_NoEnginePersistOutsideFacade verifies D2-STRUCT-T02:
 // engine_persist.go functionality must live at persist/commit.go (already extracted),
 // no duplicate persists anywhere outside facade/.
+//
+// DM-20260629-002 PR-1: legacy/ retired (moved to kernel/). engine_persist.go
+// allowance updated to /kernel/ + /persist/ + /facade/.
 func TestD2Layout_NoEnginePersistOutsideFacade(t *testing.T) {
 	root := filepath.Join(d2RepoRoot(t), "internal", "layers", "contextengine")
 	var violations []string
@@ -120,10 +131,11 @@ func TestD2Layout_NoEnginePersistOutsideFacade(t *testing.T) {
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		// Allow engine_persist.go only in facade/ (will move to legacy/ in P5).
+		// Allow engine_persist.go only in kernel/ (DM-20260629-002 PR-1: legacy/ → kernel/).
 		if strings.HasSuffix(path, "engine_persist.go") &&
-			!strings.Contains(path, "/facade/") &&
-			!strings.Contains(path, "/legacy/") {
+			!strings.Contains(path, "/kernel/") &&
+			!strings.Contains(path, "/persist/") &&
+			!strings.Contains(path, "/facade/") {
 			violations = append(violations, path)
 		}
 		return nil
@@ -132,7 +144,7 @@ func TestD2Layout_NoEnginePersistOutsideFacade(t *testing.T) {
 		t.Fatalf("Walk(%s): %v", root, err)
 	}
 	if len(violations) > 0 {
-		t.Errorf("D2-STRUCT-T02: engine_persist.go found outside facade/legacy/: %v", violations)
+		t.Errorf("D2-STRUCT-T02: engine_persist.go found outside kernel/persist/facade: %v", violations)
 	}
 }
 
@@ -298,24 +310,24 @@ func TestD2Layout_ScenarioDepthLE2(t *testing.T) {
 }
 
 // TestD2Layout_NoNewLegacyProcessCallers verifies D2-STRUCT-T07 (P5):
-// after facade/ → legacy/ retirement, no NEW production code may call
-// legacy.ContextEngine.Process() — that entry point is deprecated
-// (emits slog.Warn at runtime) and the canonical hot path is now
-// D7 SessionOrchestrator.ProcessMessage (or the turn adapter for
-// worker forking). Existing callers are grandfathered in legacy/
-// itself + the 8 known production sites listed in AC-P5-3; this guard
+// after facade/ → legacy/ → kernel/ retirement (DM-20260629-002 PR-1), no
+// NEW production code may call kernel.ContextEngine.Process() outside the
+// documented hot path. That entry point emits slog.Warn at runtime and the
+// canonical hot path is now D7 SessionOrchestrator.ProcessMessage (or the
+// turn adapter for worker forking). Existing callers are grandfathered in
+// kernel/ itself + the 8 known production sites listed in AC-P5-3; this guard
 // fails the build if a NEW caller outside the allowlist appears.
 //
 // Allowlist: cmd/llm-smoke (smoke fixture), multiagent/run (worker
 // engine), all tests/ (integration/acceptance/perf fixtures), and the
-// legacy/ package itself (where the deprecation warning lives).
+// kernel/ package itself (where the deprecation warning lives).
 func TestD2Layout_NoNewLegacyProcessCallers(t *testing.T) {
 	root := d2RepoRoot(t)
 	allowed := map[string]bool{
 		"cmd/llm-smoke/main.go":                                true,
 		"internal/layers/multiagent/run/lifecycle.go":          true,
 		"internal/layers/multiagent/run/worker_engine.go":      true,
-		"internal/layers/contextengine/legacy/":                true, // legacy/ is the deprecation home
+		"internal/layers/contextengine/kernel/":                true, // kernel/ replaces legacy/ (DM-20260629-002 PR-1)
 		"tests/integration/":                                   true,
 		"tests/acceptance/":                                    true,
 		"tests/performance/":                                   true,
@@ -376,7 +388,7 @@ func TestD2Layout_NoNewLegacyProcessCallers(t *testing.T) {
 		t.Fatalf("Walk(%s): %v", root, err)
 	}
 	if len(violations) > 0 {
-		t.Errorf("D2-STRUCT-T07 (P5): new legacy.Process() callers detected: %v. "+
+		t.Errorf("D2-STRUCT-T07 (P5): new kernel.ContextEngine.Process() callers detected: %v. "+
 			"Migrate to D7 SessionOrchestrator.ProcessMessage or turn_adapter.ExecuteRound.",
 			violations)
 	}

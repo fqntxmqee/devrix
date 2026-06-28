@@ -8,6 +8,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -252,7 +253,7 @@ func (b *ContextEngineBuilder) buildWithGate(perm contracts.IPermissionGate) con
 		PromptLocale: i18n.ParseLanguage(b.ctxCfg.Workspace.Language),
 	})
 
-	ce := contextengine.NewContextEngine(contextengine.EngineDeps{
+	ce := kernel.NewContextEngine(kernel.EngineDeps{
 		TokenCounter:        b.stack.TokenCounter,
 		Tools:               tools,
 		ToolsReg:            toolReg,

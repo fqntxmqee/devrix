@@ -6,6 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/sandbox"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
@@ -45,7 +46,7 @@ func WireDelegate(
 	maCfg *config.MultiAgentConfig,
 	gw *capture.CommunicationGateway,
 	agents *sessionagents.Manager,
-	engine *contextengine.ContextEngine,
+	engine *kernel.ContextEngine,
 	toolReg contextengine.IToolRegistry,
 	hub contracts.ExecutionFlowHub,
 	tm *workmodel.TaskManager,

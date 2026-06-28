@@ -13,6 +13,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
@@ -138,9 +139,9 @@ func TestIntegration_SessionContextAccumulation(t *testing.T) {
 	// --- D2: Context Engine ---
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = false
-	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
+	engine := kernel.NewContextEngine(testutil.MergeEngineDeps(
 		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
-		contextengine.EngineDeps{
+		kernel.EngineDeps{
 			PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{
 				Response: "Echo: round response",
 			},

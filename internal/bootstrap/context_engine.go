@@ -8,6 +8,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -47,7 +48,7 @@ func NewContextEngine(
 	obsBridge *observability.Bridge,
 	agentToolReg *external.Registry,
 	forker freefork.Forker,
-) *contextengine.ContextEngine {
+) *kernel.ContextEngine {
 	longTermRecaller, longTermStore := WireContextV3(ctxCfg)
 	// TaskManager constructed locally and DI'd to RegisterTaskTools +
 	// NewSessionOrchestrator via WithTaskManager option.
@@ -158,7 +159,7 @@ func NewContextEngine(
 		PromptLocale: i18n.ParseLanguage(ctxCfg.Workspace.Language),
 	})
 
-	return contextengine.NewContextEngine(contextengine.EngineDeps{
+	return kernel.NewContextEngine(kernel.EngineDeps{
 		// LLM deliberately omitted — production must go through DM-020 拆面.
 		TokenCounter:        stack.TokenCounter,
 		Tools:               tools,
@@ -183,6 +184,6 @@ func NewContextEngine(
 // Compile-time assertion that the adapters implement the D2拆面 contracts.
 var (
 	_ contracts.Summarizer      = (*sessionorchestrator.CompressionSummarizer)(nil)
-	_ contracts.IEngine         = (*contextengine.ContextEngine)(nil)
+	_ contracts.IEngine         = (*kernel.ContextEngine)(nil)
 	_ contracts.IPermissionGate = (*capture.PermissionGateAdapter)(nil)
 )

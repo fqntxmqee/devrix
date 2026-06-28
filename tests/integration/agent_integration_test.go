@@ -11,6 +11,7 @@ import (
 	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -73,7 +74,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &bashOncePreparedTurn{},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{},

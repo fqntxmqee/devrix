@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -64,11 +64,11 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wavescheduler.WaveScheduler {
 	return sched
 }
 
-func contextEngineFrom(engine contracts.IEngine) *contextengine.ContextEngine {
+func contextEngineFrom(engine contracts.IEngine) *kernel.ContextEngine {
 	if engine == nil {
 		return nil
 	}
-	ce, _ := engine.(*contextengine.ContextEngine)
+	ce, _ := engine.(*kernel.ContextEngine)
 	return ce
 }
 
@@ -140,7 +140,7 @@ func buildSubAgentDeps(gw *capture.CommunicationGateway, engine contracts.IEngin
 }
 
 func resolveParentSessionContext(
-	ce *contextengine.ContextEngine,
+	ce *kernel.ContextEngine,
 	gw *capture.CommunicationGateway,
 	sessionID string,
 ) (*types.SessionContext, error) {

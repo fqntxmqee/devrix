@@ -15,6 +15,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -359,7 +360,7 @@ func TestExecuteRound_RealEngine_DenyAllBlocksAll(t *testing.T) {
 		t.Fatalf("real reg: %v", err)
 	}
 	registryBuiltin := mustBuiltinRegistryForAdapter(t)
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              realReg,

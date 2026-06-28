@@ -6,7 +6,7 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
 	"github.com/devrix/devrix/internal/layers/multiagent/provision/freefork"
 	"github.com/devrix/devrix/internal/layers/observability"
@@ -51,7 +51,7 @@ func SelectContextEngine(
 // ContextEngineKind returns a short label for logs.
 func ContextEngineKind(engine contracts.IEngine) string {
 	switch engine.(type) {
-	case *contextengine.ContextEngine:
+	case *kernel.ContextEngine:
 		return "context"
 	default:
 		return "unknown"
