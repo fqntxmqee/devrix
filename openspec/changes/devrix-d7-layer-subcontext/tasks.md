@@ -179,8 +179,8 @@
 
 | ID | Description | Status |
 |----|-------------|--------|
-| T29 | terminal 后写 `PeerStatusSignal` 至 cohort signals.jsonl | [ ] |
-| T30 | Materialize optional inject（policy flag，默认 OFF） | [ ] |
+| T29 | terminal 后写 `PeerStatusSignal` 至 cohort signals.jsonl | [x] |
+| T30 | Materialize optional inject（policy flag，默认 OFF） | [x] |
 
 **Note:** `RunParallelExplore` 实装依赖 rollup Phase 2 Wave；本组可与 Wave PR 联动。
 

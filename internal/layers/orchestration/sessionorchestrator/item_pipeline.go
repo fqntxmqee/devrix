@@ -396,6 +396,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	item.LastRound = round
 	item.RoundPhase = phase
 	item.Uncertainty = uncertaintyMean
+	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil && workmodel.IsTerminalStatus(got.Status) {
+		r.Tasks.RecordPeerStatusOnTerminal(sessionID, got)
+	}
 	return round, nil
 }
 

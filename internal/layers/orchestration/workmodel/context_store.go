@@ -8,6 +8,7 @@ type contextSessionData struct {
 	scopesByWI map[string]*ContextScope
 	cohorts    map[string]*CohortScope
 	downlinks  map[string]ChildDownlink // childWorkItemID -> downlink
+	peerStatus map[string][]PeerStatusSignal // cohortKey -> signals
 }
 
 // CohortScope holds shared metadata for sibling work items under one parent.
@@ -34,6 +35,7 @@ func (m *TaskManager) contextData(sessionID string) *contextSessionData {
 		scopesByWI: make(map[string]*ContextScope),
 		cohorts:    make(map[string]*CohortScope),
 		downlinks:  make(map[string]ChildDownlink),
+		peerStatus: make(map[string][]PeerStatusSignal),
 	})
 	return v.(*contextSessionData)
 }

@@ -87,6 +87,11 @@ func BuildMaterializeRequest(sessionID string, item *workmodel.WorkItem, tm *wor
 			policy.Mode = materialize.ModeUpstream
 			signals.SignalLines = upstreamSignalLines(sessionID, item, tm)
 		}
+		if item.ParentID != "" {
+			if peers := tm.PeerStatusSignalsForCohort(sessionID, item.ParentID); len(peers) > 0 {
+				signals.SignalLines = append(signals.SignalLines, workmodel.PeerStatusLines(peers)...)
+			}
+		}
 	}
 	return materialize.Request{
 		Partition: partition,
