@@ -1,0 +1,40 @@
+id: devrix-d7-layer-subcontext
+demand_id: DM-20260627-003
+title: "D7 Layer SubContext — cohort 域 + 结构化信号 + D2 Materialize 闭环"
+status: draft
+priority: P1
+created: 2026-06-27
+author: WorkTree × Context 架构讨论（Cursor + 用户）
+
+domains: [D7, D2]
+layers:
+  - D7-S1   # Work Model — ScopeContract, ChildDownlink, cohort partition
+  - D7-S2   # Session Orchestrator — WorkItemExecutor Materialize 接线
+  - D7-S8   # Observe — Signal→Observation 规则映射（Obs* 边界）
+  - D7-S16  # Layer SubContext scenario（spec_delta ADDED requirements）
+  - D2-S16  # WorkItem Context Materialize（spec_delta ADDED requirements）
+  - D2-S15  # PrepareExecutionContext — 复用 Compress / locale / tools
+
+related_changes:
+  - devrix-d7-workitem-context-graph      # CG1–CG5 契约（本 change 修订 CG2 默认语义）
+  - devrix-d7-workitem-rollup-pipeline    # Phase 1 rollup + bubble Observe（已归档）
+  - devrix-d7-workitem-pipeline-unification
+
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d7-orchestration/workitem-context-graph-design.md
+  - openspec/specs/d7-orchestration/workitem-pipeline-unification-design.md
+  - openspec/specs/d2-context-engine/spec.md
+  - openspec/specs/d2-context-engine/d7-boundary.md
+
+feature_flags:
+  - name: FeatureLayerSubContextEnabled
+    default: false
+    note: "Phase 1 默认关；WorkItemExecutor 走 Materialize 路径时开启"
+
+discussion:
+  - "同层默认不共享 ReAct 全文；cohort 共享 ScopeContract 域"
+  - "SubContext = 下层 fork + 父 bubble/ChildDownlink，非 session 单桶"
+  - "Goal 首轮必须 ScopeContract（结构化范围收敛）"
+  - "Execute 产 Signal；Observe 规则映射 Obs*；禁止 Execute 每轮 Obs  taxonomy 自报"
+  - "ScopeContract.open_questions → R-OBS-1 ObsUncertainty → 阻断 decompose"
