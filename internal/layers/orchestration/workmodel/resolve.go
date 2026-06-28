@@ -3,29 +3,39 @@ package workmodel
 import "errors"
 
 // ReevaluateParentAfterChild updates parent uncertainty and status after a child terminals (AC29, AC43).
+// Returns the *RollupReport aggregated from the child's last round so callers
+// that need the typed envelope can read it; existing callers that ignore the
+// return value remain unaffected.
+//
+// DM-20260629-001 / PR-3-extended / T53: signature migrated from `func()`
+// to `func() *RollupReport`. Backward-compatible: 3 call sites in
+// session_turn_loop.go / run_spawn.go / cli_commands.go already
+// discard the return value; the typed envelope is available for future
+// callers that want the aggregated rollup signal.
+//
 // TD-WT-06: serializes concurrent child terminal updates per parent via TaskManager lock.
-func ReevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
+func ReevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *RollupReport {
 	if tm == nil || childID == "" {
-		return
+		return nil
 	}
 	child, ok := tm.GetWorkItem(sessionID, childID)
 	if !ok || child.ParentID == "" {
-		return
+		return nil
 	}
 	mu := tm.parentReevalLock(sessionID, child.ParentID)
 	mu.Lock()
 	defer mu.Unlock()
-	reevaluateParentAfterChild(sessionID, childID, tm)
+	return reevaluateParentAfterChild(sessionID, childID, tm)
 }
 
-func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
+func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *RollupReport {
 	child, ok := tm.GetWorkItem(sessionID, childID)
 	if !ok || child.ParentID == "" {
-		return
+		return nil
 	}
 	parent, ok := tm.GetWorkItem(sessionID, child.ParentID)
 	if !ok {
-		return
+		return nil
 	}
 
 	stats := childOutcomeStats(tm, sessionID, parent.ID)
@@ -33,7 +43,7 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 	_ = tm.Tree().SetUncertainty(sessionID, parent.ID, u)
 
 	if stats.Running > 0 {
-		return
+		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if parent.Status == TaskStatusPending {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress)
@@ -43,15 +53,16 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) {
 		if isTerminalStatus(parent.Status) {
 			_ = tm.Tree().ReopenForRollup(sessionID, parent.ID)
 		}
-		return
+		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if stats.Failed > 0 {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusFailed)
-		return
+		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if stats.Total > 0 && stats.Completed == stats.Total {
 		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusCompleted)
 	}
+	return NewRollupReportFromRound(childID, child.LastRound)
 }
 
 func childOutcomeStats(tm *TaskManager, sessionID, parentID string) ChildOutcomeStats {

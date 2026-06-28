@@ -64,7 +64,13 @@ func CollectStructuredChildBubbles(tm *TaskManager, sessionID, parentID string) 
 		if !IsTerminalStatus(child.Status) {
 			continue
 		}
-		kind := child.LastRound.ContextBubbleKind
+		// DM-20260629-001 / T53: read BubbleKind via typed RollupReport
+		// envelope instead of scattered child.LastRound.* access.
+		report := NewRollupReportFromRound(child.ID, child.LastRound)
+		if report == nil {
+			continue
+		}
+		kind := report.BubbleKind
 		if kind == BubbleNone {
 			continue
 		}
@@ -185,7 +191,13 @@ func CollectSummaryChildBubbles(tm *TaskManager, sessionID, parentID string) []C
 		if !IsTerminalStatus(child.Status) {
 			continue
 		}
-		summary := strings.TrimSpace(child.LastRound.ArtifactSummary)
+		// DM-20260629-001 / T53: read ArtifactSummary via typed
+		// RollupReport envelope instead of scattered child.LastRound.* access.
+		report := NewRollupReportFromRound(child.ID, child.LastRound)
+		if report == nil {
+			continue
+		}
+		summary := strings.TrimSpace(report.ArtifactSummary)
 		if summary == "" {
 			continue
 		}

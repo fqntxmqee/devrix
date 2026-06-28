@@ -1,6 +1,9 @@
 package workmodel
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // NeedsRollup marks a WorkItem that must run a synthesize (rollup) MUPS round
 // after direct children reach terminal (Path A) or root fallback (Path B).
@@ -30,10 +33,13 @@ func ShouldRollupAfterChildren(parent *WorkItem, policy RollupGatePolicy, stats 
 	if stats.Running > 0 || stats.Total == 0 {
 		return false
 	}
-	if parent.LastRound == nil {
+	// DM-20260629-001 / T53: read SpawnPolicy via typed RollupReport
+	// envelope instead of scattered parent.LastRound.* access.
+	report := NewRollupReportFromRound(parent.ID, parent.LastRound)
+	if report == nil {
 		return false
 	}
-	switch parent.LastRound.SpawnPolicy {
+	switch report.SpawnPolicy {
 	case SpawnDecompose, SpawnAwait:
 	default:
 		return false
@@ -120,19 +126,40 @@ func MaybeRootRollupFallback(sessionID string, tm *TaskManager) (*WorkItem, bool
 }
 
 func sessionRootGoal(tm *TaskManager, sessionID string) *WorkItem {
-	for _, item := range tm.Tree().List(sessionID) {
+	items := tm.Tree().List(sessionID)
+	roots := make([]*WorkItem, 0, len(items))
+	for _, item := range items {
 		if item != nil && item.Kind == WorkKindGoal && item.ParentID == "" {
-			return item
+			roots = append(roots, item)
 		}
 	}
-	return nil
+	if len(roots) == 0 {
+		return nil
+	}
+	// DM-20260629-001 / T54: deterministic order. Multiple goal roots can
+	// exist during multi-goal sessions (rare, but the tree API does not
+	// forbid it). Sort by item.ID and return the lexicographically smallest
+	// so callers (SessionRootGoal, ExtractSessionDeliverable,
+	// MaybeRootRollupFallback) observe a stable choice across restarts.
+	// Without this, the choice depends on map iteration order in
+	// TaskManager.Tree().List(sessionID) which can change between runs.
+	sort.SliceStable(roots, func(i, j int) bool {
+		return roots[i].ID < roots[j].ID
+	})
+	return roots[0]
 }
 
 func rootRollupFallbackEligible(root *WorkItem) bool {
-	if root == nil || root.LastRound == nil {
+	if root == nil {
 		return false
 	}
-	switch root.LastRound.SpawnPolicy {
+	// DM-20260629-001 / T53: read SpawnPolicy via typed RollupReport
+	// envelope instead of scattered root.LastRound.* access.
+	report := NewRollupReportFromRound(root.ID, root.LastRound)
+	if report == nil {
+		return false
+	}
+	switch report.SpawnPolicy {
 	case SpawnNone:
 		return true
 	default:
@@ -148,10 +175,16 @@ func SessionRootGoal(tm *TaskManager, sessionID string) *WorkItem {
 // ExtractSessionDeliverable returns the best post-rollup summary for complete.Content.
 func ExtractSessionDeliverable(tm *TaskManager, sessionID string) string {
 	root := sessionRootGoal(tm, sessionID)
-	if root == nil || root.LastRound == nil {
+	if root == nil {
 		return ""
 	}
-	if s := strings.TrimSpace(root.LastRound.ArtifactSummary); s != "" {
+	// DM-20260629-001 / T53: read ArtifactSummary via typed RollupReport
+	// envelope instead of scattered root.LastRound.* access.
+	report := NewRollupReportFromRound(root.ID, root.LastRound)
+	if report == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(report.ArtifactSummary); s != "" {
 		return s
 	}
 	return bestEffortChildSummaries(tm, sessionID, root.ID)
