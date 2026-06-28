@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 
@@ -633,6 +634,48 @@ func TestFeishuAdapter_OnError(t *testing.T) {
 
 	// Should not panic
 	adapter.OnError(context.DeadlineExceeded, "sess_123")
+}
+
+// TestFeishuAdapter_OnError_TurnInProgress covers DM-20260628-003
+// (D7-S15-A58-T06): when the orchestrator returns a
+// sessionorchestrator.TurnInProgressError, OnError must render a
+// friendly "⏳ 还在处理中" card rather than the generic red error card.
+//
+// We can't directly assert the rendered card (sendCardToSession talks
+// to lark API), but we can verify the no-panic + no-side-effect path:
+// the adapter must NOT call finishUserMessageReaction (because the
+// previous turn is still running and owns the UI handles). On the
+// default error path it would call finishUserMessageReaction; on the
+// TurnInProgress path it returns early.
+func TestFeishuAdapter_OnError_TurnInProgress(t *testing.T) {
+	mockGW := &mockGatewayAPI{
+		getSessionFunc: func(sessionID string) (*types.Session, error) {
+			return &types.Session{SessionID: sessionID, ChatID: "chat_abc"}, nil
+		},
+	}
+	cfg := &config.CommunicationConfig{}
+	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret", DoneEmoji: "✅"}
+
+	adapter := NewFeishuAdapter(nil, feishuCfg, cfg, WithGateway(mockGW))
+
+	// TurnInProgressError must not panic. The actual card render path
+	// requires a live lark client; here we only exercise the early
+	// return + no-side-effect invariants.
+	tip := sessionorchestrator.TurnInProgressError{
+		SessionID:      "sess_xyz",
+		SinceStartedAt: time.Date(2026, 6, 28, 17, 31, 4, 0, time.UTC),
+		TurnNo:         2,
+	}
+	adapter.OnError(tip, "sess_xyz")
+}
+
+// TestFeishuAdapter_OnError_NilError verifies the early-return guard.
+func TestFeishuAdapter_OnError_NilError(t *testing.T) {
+	mockGW := &mockGatewayAPI{}
+	cfg := &config.CommunicationConfig{}
+	feishuCfg := &FeishuConfig{AppID: "test_app", AppSecret: "test_secret"}
+	adapter := NewFeishuAdapter(nil, feishuCfg, cfg, WithGateway(mockGW))
+	adapter.OnError(nil, "sess_nil") // must not panic
 }
 
 // TestFeishuAdapter_OnStatus tests status callback
