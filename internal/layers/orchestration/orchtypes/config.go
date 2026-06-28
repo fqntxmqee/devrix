@@ -27,6 +27,10 @@ type Config struct {
 	// ShadowLLMTimeoutMs is the LLM call timeout for the shadow in
 	// milliseconds. Default 500. Only used when ShadowLLMClassify=true.
 	ShadowLLMTimeoutMs int
+	// PriorContextRounds (DM-20260628-003, D7-S15): see
+	// shared/config.CoordinatorConfig for semantics. 0 (default)
+	// disables TurnState + transcript injection.
+	PriorContextRounds int
 }
 
 // DefaultConfig returns the v1.0 default. This is what D1 routes against
@@ -66,6 +70,7 @@ type FileConfig struct {
 	CommandWhitelist            []string `yaml:"command_whitelist"`
 	ShadowLLMClassify           *bool    `yaml:"shadow_llm_classify"`
 	ShadowLLMTimeoutMs          *int     `yaml:"shadow_llm_timeout_ms"`
+	PriorContextRounds          *int     `yaml:"prior_context_rounds"`
 }
 
 // BuildConfig merges file over default. nil fields in file keep default.
@@ -100,6 +105,9 @@ func BuildConfig(file *FileConfig) *Config {
 	}
 	if file.ShadowLLMTimeoutMs != nil {
 		cfg.ShadowLLMTimeoutMs = *file.ShadowLLMTimeoutMs
+	}
+	if file.PriorContextRounds != nil {
+		cfg.PriorContextRounds = *file.PriorContextRounds
 	}
 	return cfg
 }
