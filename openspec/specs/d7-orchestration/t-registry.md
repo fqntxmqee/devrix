@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.12.0
-**Last Updated:** 2026-06-29 (dsaft-restructuring PR-8 Span Evidence 列填充 IMPLEMENTED, DM-20260629-001 T44)
+**Version:** 4.13.0
+**Last Updated:** 2026-06-29 (dsaft-restructuring S7_Archived: PR-9 boundary decision 3 治理常量 + 248 T 行 / 94% Span Evidence coverage, DM-20260629-001)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`

@@ -1,0 +1,105 @@
+id: devrix-d7-dsaft-restructuring
+demand_id: DM-20260629-001
+title: "D7 DSAFT 深度架构重构 — 6 子 Change 联动（dead code + god fn + registry + value flow + span + boundary debt）"
+status: s7_archived
+priority: P0
+created: 2026-06-29
+archived: 2026-06-29
+author: D7 域整体 DSAFT Review（2026-06-28 会话）+ 双 Agent 验证（2026-06-29）
+
+domains: [D7]
+
+# T 点
+t_points:
+  - D7-S1-A52-T11
+  - D7-S1-A52-T12
+  - D7-S1-A53-T13
+  - D7-S1-A53-T14
+  - D7-S5-A54-T15
+  - D7-S5-A54-T16
+  - D7-S15-A50-T01
+  - D7-S15-A50-T02
+  - D7-S15-A50-T03
+  - D7-S15-A50-T04
+  - D7-S15-A55-T01
+  - D7-S15-A55-T02
+  - D7-S15-A55-T03
+  - D7-S15-A51-T01
+  - D7-S15-A51-T02
+  - D7-S15-A60-T01
+  - D7-S15-A60-T02
+  - D7-S15-A61-T01
+  - D7-S15-A61-T02
+  - D7-S15-A53-T01
+  - D7-S15-A53-T02
+  - D7-S15-A54-T01
+  - D7-S15-A54-T02
+  - D7-S15-A07-T01
+  - D7-S15-A07-T02
+
+layers:
+  - D7-S1  # WorkModel — RollupReport struct + 3 T 点
+  - D7-S2  # SessionOrchestrator — turn_orchestrator 拆 4 文件
+  - D7-S4  # ExecutionFlow + Verify — path 修正
+  - D7-S5  # DecisionPlanning + Observe — value flow alias
+  - D7-S6  # MUPS Pipeline — value flow alias
+  - D7-S15 # WorkItem Rollup — 上行反馈治理
+
+pr_count: 9
+pr_list:
+  - id: 280
+    title: "refactor(d7): dead-code cleanup — retire v1.0/v2.0 leftover (~775 LOC)"
+    sub_change: "#0"
+  - id: 281
+    title: "refactor(d7): split RunTurn loop into turn_loop.go (T15)"
+    sub_change: "#1"
+  - id: 282
+    title: "refactor(d7): split LLM invoke + tool round into turn_invoke.go (PR-3a, T16)"
+    sub_change: "#1"
+  - id: 283
+    title: "refactor(d7): typed RollupReport envelope + deterministic root + 3 governance T (PR-3-extended, T52-T55)"
+    sub_change: "#1-extended"
+  - id: 284
+    title: "docs(d7): registry sync — 6 F paths + t-registry Statistics + 6 S pipeline-arch v1.2.0"
+    sub_change: "#2"
+  - id: 285
+    title: "docs(d7): ValueFlow Semantic 列 + 用户感知层"
+    sub_change: "#3"
+  - id: 286
+    title: "feat(d7): 5 ops span coverage + 5 emit points"
+    sub_change: "#4-batch-1"
+  - id: 287
+    title: "feat(d7): 4 acceptance tests LP-1/LP-2/LP-5/ResumeSession"
+    sub_change: "#4-batch-2"
+  - id: 288
+    title: "docs(d7): t-registry Span Evidence 列填充 + observability-guide T-Without-Span Tracker"
+    sub_change: "#4-batch-3"
+  - id: 289
+    title: "feat(d7): 3 boundary debt Decision + governance constants"
+    sub_change: "#5"
+
+related_changes:
+  - devrix-d7-six-s-simplification        # DM-20260626-001 v6.0.0 base
+  - devrix-d7-mups-v4-5node-coverage-orchestration  # DM-20260625-019 5-node Span
+  - devrix-d7-workitem-rollup-pipeline    # DM-20260627-001 父层 bubble
+
+parent_specs:
+  - openspec/specs/d7-orchestration/d7-domain.md
+  - openspec/specs/d7-orchestration/design.md
+  - openspec/specs/d7-orchestration/{a,f,t,span}-registry.md
+  - openspec/specs/d7-orchestration/pipeline-architecture.md
+  - openspec/specs/d7-orchestration/observability-guide.md
+  - docs/methodology/dsaft-methodology.md v4.0.0
+  - docs/methodology/dsaft-refactoring-playbook.md v1.0.0
+
+# Spec 版本同步
+spec_sync:
+  source_version: "d7-domain.md v2.5.1"
+  target_version: "d7-domain.md v2.6.0"
+  sync_date: "2026-06-29"
+  sync_changes:
+    - "§Out of Scope: 3 boundary debt Decision 标注"
+    - "§Cross-cutting Hardening: Hardening 物理位置记录"
+    - "§DSAFT 资产: 186 T → 230 T 规模更新"
+    - "§登记规模: Span 18 → 26 (5 个新 P0/P1)"
+    - "§修订记录: 2.6.0 row"
