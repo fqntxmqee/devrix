@@ -31,6 +31,9 @@ func (m *DefaultMaterializer) Materialize(_ context.Context, req Request) (Resul
 	if req.Partition.SessionID == "" {
 		return Result{}, fmt.Errorf("materialize: session id required")
 	}
+	if req.Partition.Kind == PartitionAgent {
+		return m.materializeSubTurn(req)
+	}
 	sys := buildSystemPrompt(req)
 	msgs := buildInitialMessages(req)
 	if m != nil && m.Store != nil && req.Partition.WorkItemID != "" {
@@ -58,6 +61,41 @@ func (m *DefaultMaterializer) Append(_ context.Context, partition Partition, msg
 		return nil
 	}
 	return m.Store.Append(partition.SessionID, partition.WorkItemID, msgs)
+}
+
+func (m *DefaultMaterializer) materializeSubTurn(req Request) (Result, error) {
+	mode := SubTurnBrief
+	switch req.Policy.Mode {
+	case ModeFork:
+		mode = SubTurnFork
+	case ModeResume:
+		mode = SubTurnFull
+	}
+	preloaded, lastUser := ComposeSubTurnMessages(mode, req.SubTurnParent)
+	msgs := append([]types.Message(nil), preloaded...)
+	if strings.TrimSpace(lastUser.Content) != "" {
+		msgs = append(msgs, lastUser)
+	}
+	if m != nil && m.Store != nil && req.Partition.AgentID != "" && req.Policy.Mode == ModeResume {
+		priv, err := m.Store.LoadAgent(req.Partition.SessionID, req.Partition.AgentID)
+		if err != nil {
+			return Result{}, err
+		}
+		if len(priv) > 0 {
+			msgs = append(priv, msgs...)
+		}
+	}
+	msgs = compressMessages(msgs, req.Policy.TokenBudget)
+	sys := strings.TrimSpace(req.SystemPrompt)
+	counter := token.NewCounter()
+	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
+	return Result{
+		SystemPrompt: sys,
+		Messages:     msgs,
+		Tools:        toolsForProfile(req.Policy.ToolProfile),
+		MessageCount: len(msgs),
+		TokenEst:     tokEst,
+	}, nil
 }
 
 func buildSystemPrompt(req Request) string {

@@ -2,15 +2,12 @@ package bootstrap
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
-	"github.com/devrix/devrix/internal/shared/textutil"
 )
 
 // ItemPipelineWireDeps holds production wiring for per-WorkItem MUPS (Phase D).
@@ -54,8 +51,8 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 	}
 	learner := WireDefaultMUPSLearner()
 	executor := sessionorchestrator.NewWorkItemExecutor(deps.LLMInvoker, deps.CtxPreparer, deps.ToolExec)
-	if store, err := materialize.NewPartitionStore(defaultTranscriptBaseDir()); err == nil {
-		executor.Materializer = materialize.NewDefaultMaterializer(store)
+	if mat := newDefaultMaterializer(); mat != nil {
+		executor.Materializer = mat
 	}
 	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
 		Classifier: deps.Classifier,
@@ -68,11 +65,4 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)
 	}
 	return runner, learner, nil
-}
-
-func defaultTranscriptBaseDir() string {
-	if v := os.Getenv("DEVRIX_TRANSCRIPT_DIR"); v != "" {
-		return textutil.ExpandPath(v)
-	}
-	return textutil.ExpandPath("~/.devrix/sessions")
 }

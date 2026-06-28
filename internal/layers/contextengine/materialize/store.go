@@ -34,6 +34,10 @@ func (s *PartitionStore) wiPath(sessionID, workItemID string) string {
 	return filepath.Join(s.baseDir, sessionID, "wi", workItemID+".jsonl")
 }
 
+func (s *PartitionStore) agentPath(sessionID, agentID string) string {
+	return filepath.Join(s.baseDir, sessionID, "subagents", agentID+".jsonl")
+}
+
 // Append appends messages to a work item private chain.
 func (s *PartitionStore) Append(sessionID, workItemID string, msgs []types.Message) error {
 	if s == nil || sessionID == "" || workItemID == "" || len(msgs) == 0 {
@@ -68,6 +72,36 @@ func (s *PartitionStore) Load(sessionID, workItemID string) ([]types.Message, er
 		return nil, nil
 	}
 	target := s.wiPath(sessionID, workItemID)
+	f, err := os.Open(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+	var out []types.Message
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var msg types.Message
+		if err := json.Unmarshal(line, &msg); err != nil {
+			continue
+		}
+		out = append(out, msg)
+	}
+	return out, scanner.Err()
+}
+
+// LoadAgent reads persisted sub-agent sidechain messages.
+func (s *PartitionStore) LoadAgent(sessionID, agentID string) ([]types.Message, error) {
+	if s == nil || sessionID == "" || agentID == "" {
+		return nil, nil
+	}
+	target := s.agentPath(sessionID, agentID)
 	f, err := os.Open(target)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -63,5 +63,8 @@ func WireMUPSPipeline(deps MUPSPipelinesDeps) (*sessionorchestrator.TurnToolExec
 		MaxDepth:         deps.SubagentCfg.MaxDepth,
 		MaxContextTokens: deps.MaxContextTokens,
 	})
+	if mat := newDefaultMaterializer(); mat != nil {
+		subTurn.Materializer = mat
+	}
 	return toolExec, turnOrch, subTurn
 }
