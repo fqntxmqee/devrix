@@ -505,7 +505,7 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_UpdateCardFallbackOnStreamClos
 	stream.textBuffer.WriteString("third: writing report")
 	stream.mu.Unlock()
 
-	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "conclusion summary"); err != nil {
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "conclusion summary", sessionID); err != nil {
 		t.Fatalf("finalizeReplyCardStreaming: %v", err)
 	}
 
@@ -899,7 +899,7 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_PreservesDuplicateText(t *test
 	stream.textBuffer.WriteString("\n\n最终结论：4 路并行都成功完成。")
 	stream.mu.Unlock()
 
-	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, ""); err != nil {
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "", sessionID); err != nil {
 		t.Fatalf("finalizeReplyCardStreaming: %v", err)
 	}
 

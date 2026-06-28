@@ -235,6 +235,130 @@ func EmitSubTurnIteration(ctx context.Context, sessionID, itemID string, iter in
 	return func(err error) { endSpanWithError(span, err) }
 }
 
+// --- DM-20260629-001 PR-6 t-span-coverage 5 emit helpers (T38-T42) ---
+
+// EmitResumeDecisionPath wraps the 3 决策路径 in applyResumeSession
+// (T38, A fall-through / B user_accept→ForceExit / C user_cancel→
+// AbortWithAudit). The span is emitted whenever a decision is reached so
+// dashboards can filter traces by route independently of sessionSpan.
+func EmitResumeDecisionPath(ctx context.Context, sessionID, userChoice, decision string, auditLevel, depth int) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "resume.user_choice", Value: userChoice},
+		{Key: "resume.decision", Value: decision},
+		{Key: "resume.audit_level", Value: intToString(auditLevel)},
+		{Key: "resume.depth", Value: intToString(depth)},
+	}
+	_, span := start(ctx, telemetry.OpD7_S2_Resume_Decision_Path, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitAdaptivePriorInject wraps learner.Inject in buildObserveRequest (T41).
+// priorKind labels the inject target (Observe / Plan); alpha/beta are the
+// Beta prior parameters being injected (clamp [0.001, 1000] upstream so
+// downstream Jaeger filters get a stable numeric range).
+func EmitAdaptivePriorInject(ctx context.Context, sessionID, priorKind string, alpha, beta float64) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "prior.adaptive_kind", Value: priorKind},
+		{Key: "prior.beta_alpha", Value: floatToString(alpha)},
+		{Key: "prior.beta_beta", Value: floatToString(beta)},
+	}
+	_, span := start(ctx, telemetry.OpD7_S5_AdaptivePrior_Inject, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitAnomalyTrigger wraps SystemAnomalyDetector.Trigger (T40).
+// kind (CatSystem) and severity (High/Medium/Low) come from the anomaly
+// envelope; threshold is the value that tripped the detector; evidenceID
+// lets downstream traces correlate back to the Verdict.SourceID that
+// produced the anomaly.
+func EmitAnomalyTrigger(ctx context.Context, sessionID, kind, severity, threshold, evidenceID string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "anomaly.kind", Value: kind},
+		{Key: "anomaly.severity", Value: severity},
+		{Key: "anomaly.threshold", Value: threshold},
+		{Key: "anomaly.evidence_id", Value: evidenceID},
+	}
+	_, span := start(ctx, telemetry.OpD7_S4_Anomaly_Trigger, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitLongTermReputationUpdate wraps BayesianUpdate in
+// mups/learn/reputation/store.go (T39). Both prior and posterior Beta
+// parameters are recorded so the trace shows the actual update delta;
+// wilson95 lower/upper provide the 95% Wilson score confidence interval.
+// trackMode (developer/operator) is propagated so dashboards can
+// separate operator vs developer reputation streams.
+func EmitLongTermReputationUpdate(
+	ctx context.Context,
+	sessionID string,
+	priorAlpha, priorBeta, posteriorAlpha, posteriorBeta float64,
+	wilsonLower, wilsonUpper float64,
+	verifierFailureCount int,
+	trackMode string,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "reputation.prior_alpha", Value: floatToString(priorAlpha)},
+		{Key: "reputation.prior_beta", Value: floatToString(priorBeta)},
+		{Key: "reputation.posterior_alpha", Value: floatToString(posteriorAlpha)},
+		{Key: "reputation.posterior_beta", Value: floatToString(posteriorBeta)},
+		{Key: "reputation.wilson_lower", Value: floatToString(wilsonLower)},
+		{Key: "reputation.wilson_upper", Value: floatToString(wilsonUpper)},
+		{Key: "reputation.verifier_failure_count", Value: intToString(verifierFailureCount)},
+		{Key: "reputation.track_mode", Value: trackMode},
+	}
+	_, span := start(ctx, telemetry.OpD7_S6_LongTerm_Reputation_Update, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitFeishuCardRender wraps finalizeReplyCardStreaming in
+// communication/feishu/progress.go (T42). cardType (initial / update /
+// final) and updateMethod (add / update / patch) describe the IM card
+// lifecycle; lastVerdict + lastExitReason (from ProcessAutoClose) let
+// dashboards correlate the rendered card with the orchestration verdict
+// that produced the conclusion text shown in the card.
+func EmitFeishuCardRender(
+	ctx context.Context,
+	sessionID, cardType, updateMethod, lastVerdict, lastExitReason string,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "feishu.card_type", Value: cardType},
+		{Key: "feishu.update_method", Value: updateMethod},
+		{Key: "d7.last_verdict", Value: lastVerdict},
+		{Key: "d7.last_exit_reason", Value: lastExitReason},
+	}
+	_, span := start(ctx, telemetry.OpD7_Feishu_Card_Render, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+func floatToString(f float64) string {
+	// 4-decimal precision keeps Beta parameters in a stable numeric
+	// range for Jaeger filter ranges without losing meaningful digits.
+	if f == 0 {
+		return "0"
+	}
+	neg := f < 0
+	if neg {
+		f = -f
+	}
+	intPart := int64(f)
+	frac := f - float64(intPart)
+	fracPart := int64(frac*10000 + 0.5)
+	if fracPart >= 10000 {
+		intPart++
+		fracPart -= 10000
+	}
+	s := intToString(int(intPart)) + "." + intToString(int(fracPart))
+	if neg {
+		s = "-" + s
+	}
+	return s
+}
+
 func intToString(n int) string {
 	if n == 0 {
 		return "0"

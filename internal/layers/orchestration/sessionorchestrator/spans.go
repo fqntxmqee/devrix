@@ -56,5 +56,24 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D7_Worktree_Op", Layer: "orchestration", Component: "worktree", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D7_SubWorktree_Run", Layer: "orchestration", Component: "worktree", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D7_SubTurn_Iteration", Layer: "orchestration", Component: "executor", SinceVersion: "2.2.0", Instrumented: true},
+
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T36, 2026-06-29).
+		// Layer/component mirror telemetry.LayerAndComponent so coverage.IsKnown
+		// returns true. Together with the 5-node MUPS spans above + 3 inner
+		// spans, these raise the T↔Span coverage from ~38% baseline to ≥80%
+		// (per observability-guide §"T-Without-Span Tracker").
+
+		// D7-S2 SessionOrchestrator — ApplyResumeSession 3 决策路由
+		// (A fall-through / B user_accept→ForceExit / C user_cancel→AbortWithAudit).
+		{Name: "D7_Resume_Decision_Path", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.6.0", Instrumented: true},
+		// D7-S5 DecisionPlanning + Observe — learner.Inject 跨 S5↔S6 数据契约.
+		{Name: "D7_AdaptivePrior_Inject", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.6.0", Instrumented: true},
+		// D7-S4 ExecutionFlow + Verify — SystemAnomalyDetector 阈值触发.
+		{Name: "D7_Anomaly_Trigger", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.6.0", Instrumented: true},
+		// D7-S6 MUPS Pipeline — BayesianUpdate 后长程信誉落盘（LP-1 acceptance）.
+		{Name: "D7_LongTerm_Reputation_Update", Layer: "orchestration", Component: "orchestrator", SinceVersion: "2.6.0", Instrumented: true},
+		// D7 Orchestration × D1 Communication — finalizeReplyCardStreaming
+		// 飞书卡片渲染（D7→D1 跨域可观测）.
+		{Name: "D7_Feishu_Card_Render", Layer: "orchestration", Component: "adapter", SinceVersion: "2.6.0", Instrumented: true},
 	}
 }

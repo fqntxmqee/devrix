@@ -148,6 +148,21 @@ func DetectSystemAnomaly(ctx context.Context, sessionID string, report orchtypes
 		evidenceID,
 	)
 	end(nil)
+
+	// DM-20260629-001 PR-6 t-span-coverage (T40): when the detector
+	// actually trips (triggered=true), emit a second D7_Anomaly_Trigger
+	// span so dashboards can filter alerts by fired-only detections.
+	if triggered {
+		endTrigger := hardening.EmitAnomalyTrigger(
+			ctx,
+			sessionID,
+			string(kind),
+			string(severity),
+			strconv.Itoa(total),
+			evidenceID,
+		)
+		endTrigger(nil)
+	}
 	return res
 }
 

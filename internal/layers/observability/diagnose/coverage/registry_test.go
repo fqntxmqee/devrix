@@ -136,6 +136,16 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD7_S1_SubWorktree_Run,
 		telemetry.OpD7_S5_SubTurn_Iteration,
 
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T37). Adding new ops
+		// to the expected list is the coverage gate that fails CI when a new
+		// D7 T point ships without its Span. Coverage threshold bumped to
+		// ≥80% (see observability-guide §"T-Without-Span Tracker").
+		telemetry.OpD7_S2_Resume_Decision_Path,
+		telemetry.OpD7_S5_AdaptivePrior_Inject,
+		telemetry.OpD7_S4_Anomaly_Trigger,
+		telemetry.OpD7_S6_LongTerm_Reputation_Update,
+		telemetry.OpD7_Feishu_Card_Render,
+
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,
 	}

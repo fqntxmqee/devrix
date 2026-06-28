@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -280,6 +281,26 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 				"session_id", req.SessionID, "track_mode", req.TrackMode, "err", err)
 		} else {
 			prior = injected
+			// DM-20260629-001 PR-6 t-span-coverage (T41): emit the
+			// D7_AdaptivePrior_Inject span so LP-1 closure traces show the
+			// actual Beta(alpha, beta) being injected at the Observe
+			// boundary. The span fires only on the success path
+			// (cold-start Bootstrap / Reputation fallback path emits no
+			// span — they fall back to DefaultDeveloperPrior and the
+			// caller already sees the warning slog).
+			trackMode := req.TrackMode
+			if trackMode == "" {
+				trackMode = string(learn.TrackModeDeveloper)
+			}
+			endInject := hardening.EmitAdaptivePriorInject(
+				ctx,
+				req.SessionID,
+				"Observe",
+				float64(prior.PriorBeta.Alpha),
+				float64(prior.PriorBeta.Beta),
+			)
+			endInject(nil)
+			_ = trackMode // reserved for follow-up prior.source_track_mode attr
 		}
 	}
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
