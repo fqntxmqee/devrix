@@ -105,10 +105,19 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// Propagate Emit hook to Executor so the ReAct loop's intermediate
 	// events (text / thinking / tool_call / tool_result) flow to the
 	// gateway. nil-safe — legacy / test runners without Emit continue to
-	// work unchanged. Don't overwrite if Executor already has its own Emit
-	// (lets tests inject a stub).
+	// work unchanged.
+	//
+	// Hotfix 2026-06-28 (DM-20260628-002): overwrite (not "set if nil") so
+	// each Run() invocation picks up the freshest r.Emit. Production
+	// RunSessionTurnLoop assigns a new emitFn per turn that captures the
+	// current turn's `out` channel — without this overwrite, a multi-turn
+	// session's later Run() inherits the earlier turn's executor.Emit, and
+	// once that turn's `out` is closed via defer close(out), the LLM
+	// stream's chunk emit panics with "send on closed channel". Tests that
+	// inject an Emit stub continue to work because they leave r.Emit nil
+	// and instead set exec.Emit directly on the executor.
 	if r.Emit != nil {
-		if exec, ok := r.Executor.(*DefaultWorkItemExecutor); ok && exec.Emit == nil {
+		if exec, ok := r.Executor.(*DefaultWorkItemExecutor); ok {
 			exec.Emit = r.Emit
 		}
 	}
