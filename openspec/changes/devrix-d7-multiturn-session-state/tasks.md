@@ -27,29 +27,30 @@
 ### T2: transcript_reader.go 读最近 N 轮 finalText [D7-S15-A56-T03]
 
 - **范围**: `internal/layers/orchestration/sessionorchestrator/transcript_reader.go` + `transcript_reader_test.go`
-- **F**: 新 F13 `ReadRecentFinalTexts`
+- **F**: 新 F13 `TranscriptReader.ReadRecent` + `BuildPriorOutputSummary`
 - **预估**: 100 行实现 + 100 行单测
 - **依赖**: 无（独立 helper）
 
 **步骤：**
 - [ ] 定义 `TranscriptReader struct { dir string; maxRounds int }`
-- [ ] 实现 `NewTranscriptReader(dir string, maxRounds int) *TranscriptReader`：dir 默认 `internal/layers/communication/capture/transcript`
-- [ ] 实现 `ReadRecent(ctx, sessionID, n int) ([]string, error)`：读 `{sessionID}.jsonl`，按行 json.Unmarshal，filter `kind=="final_text"`，取最后 n 条按时间倒序
+- [ ] 实现 `NewTranscriptReader(dir string) *TranscriptReader`：dir 默认 `internal/layers/communication/capture/transcript`
+- [ ] 实现 `ReadRecent(ctx, sessionID, n int) ([]string, error)`：复用 `internal/layers/communication/capture/transcript.Writer.LoadReader()`（避免重复 fs/json 解析逻辑），filter `kind=="complete"`，取 Body 字段，按时间序取最后 n 条
 - [ ] 实现 `BuildPriorOutputSummary(texts []string) string`：拼成 `<prior-output-summary>\n  [turn 1] xxx\n  [turn 2] yyy\n</prior-output-summary>` 格式（参考 D2 `FoldAssistantOutput` 标签语法）
-- [ ] 单测 5 case：空文件、单 final_text、多 final_text 取最近 n、超 n 截断、文件不存在返回空 slice 不报错
+- [ ] 单测 5 case：空文件、单 complete、多 complete 取最近 n、超 n 截断、文件不存在返回空 slice 不报错
 
-### T3: SessionOrchestrator 加 TurnState + PriorContextRounds 字段 [D7-S15-A55-T02]
+### T3: SessionOrchestrator 加 WithPriorContextRounds / WithTranscriptDir functional options [D7-S15-A55-T02]
 
-- **范围**: `internal/layers/orchestration/sessionorchestrator/orchestrator.go` `SessionOrchestrator` struct + `OrchestratorDeps`
-- **F**: 新字段 turnState + PriorContextRounds
+- **范围**: `internal/layers/orchestration/sessionorchestrator/orchestrator.go` `SessionOrchestrator` struct + functional options
+- **F**: 新增 3 个 OrchestratorOption（functional options 模式，与 `WithLearner / WithSink` 一致）
 - **预估**: 30 行
 - **依赖**: T1, T2
 
 **步骤：**
-- [ ] `OrchestratorDeps` 增加 `PriorContextRounds int` 字段（默认 0，向后兼容）
-- [ ] `OrchestratorDeps` 增加 `TranscriptDir string` 字段（默认空，使用 reader 默认值）
-- [ ] `NewSessionOrchestrator(deps)` 在 deps.PriorContextRounds > 0 时构造 `TurnState` 并挂到 `SessionOrchestrator.turnState`
-- [ ] 单测 2 case：默认 0 不构造 turnState；>0 时构造
+- [ ] `WithPriorContextRounds(n int) OrchestratorOption` functional option：n>0 时构造 `TurnState` 并挂 `transcriptReader`
+- [ ] `WithTranscriptDir(dir string) OrchestratorOption` functional option：覆盖默认 transcript 目录
+- [ ] `WithTurnState(ts *TurnState) OrchestratorOption` functional option：测试用，注入预构建 TurnState
+- [ ] `SessionOrchestrator.turnState` + `transcriptReader` 私有字段
+- [ ] 单测 2 case：默认（无 option）不构造 turnState；WithPriorContextRounds(3) 时构造
 
 ### T4: ProcessMessage 接入 WaitTurn + prior-output-summary 注入 [D7-S15-A56-T04]
 
@@ -123,8 +124,8 @@
 | T ID | 描述 | Status |
 |------|------|--------|
 | D7-S15-A55-T01 | `TurnState` struct 定义 + BeginTurn/EndTurn/WaitTurn API + 并发安全（1000 goroutine stress） | PENDING |
-| D7-S15-A55-T02 | `OrchestratorDeps.PriorContextRounds` + `TranscriptDir` 字段 + `SessionOrchestrator.turnState` 挂载 | PENDING |
-| D7-S15-A56-T03 | `transcript_reader.go` 读最近 N 轮 finalText helper（filter kind=final_text，取最后 n 条） | PENDING |
+| D7-S15-A55-T02 | `WithPriorContextRounds` + `WithTranscriptDir` + `WithTurnState` functional options + `SessionOrchestrator.turnState`/`transcriptReader` 字段挂载 | PENDING |
+| D7-S15-A56-T03 | `transcript_reader.go` 读最近 N 轮 finalText helper（filter kind=complete 事件 Body 字段；复用 transcript.Writer.LoadReader） | PENDING |
 | D7-S15-A56-T04 | `ProcessMessage` 接入 WaitTurn + prior-output-summary 注入 + `TurnInProgressError` 定义 + RunSessionTurnLoop defer EndTurn | PENDING |
 | D7-S15-A57-T05 | `session_turn_loop.go` complete 事件 emit 时机隐含修正（processAutoClose 已在 channel close 路径，无须显式改动） | N/A (无需新增 T，已隐含) |
 | D7-S15-A58-T06 | feishu adapter 识别 `TurnInProgressError` + "上一条还在处理中" 文案 | PENDING |

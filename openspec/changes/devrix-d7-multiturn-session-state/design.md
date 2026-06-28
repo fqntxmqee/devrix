@@ -27,7 +27,7 @@
 [状态层]                              [注入层]                              [时序层]
 TurnState (in-memory)                TranscriptReader                     WaitTurn(ctx)
   sessionID → turnHandle               transcript/{sessID}.jsonl            select done / ctx.Done
-  sync.RWMutex                         kind=final_text filter
+  sync.RWMutex                         kind=complete filter (capture/gateway.go:880)
   BeginTurn / EndTurn / WaitTurn       ReadRecent(n) → BuildPriorSummary   EndTurn on defer
 ```
 
@@ -107,37 +107,46 @@ func (e TurnInProgressError) Is(target error) bool {
 
 ```go
 // sessionorchestrator/transcript_reader.go
+//
+// Reuses internal/layers/communication/capture/transcript.Writer.LoadReader()
+// which already handles file-not-exist, sanitized sessionID, and jsonl scanning.
+// No duplicate parsing logic.
+
 type TranscriptReader struct {
-    dir       string
+    dir       string  // 默认 internal/layers/communication/capture/transcript
     maxRounds int
 }
 
+func NewTranscriptReader(dir string) *TranscriptReader {
+    if dir == "" {
+        dir = defaultTranscriptDir()
+    }
+    return &TranscriptReader{dir: dir, maxRounds: 16}
+}
+
+// ReadRecent 读最近 n 条 kind=complete 的 Body 字段。
+// transcript schema: {t, kind, role, body}; finalText 标记为 kind="complete"
+// (参见 capture/gateway.go:880 appendTranscriptEvent 的 complete 分支)。
+// 文件不存在返回 ([]string{}, nil) 不报错。
 func (r *TranscriptReader) ReadRecent(ctx context.Context, sessionID string, n int) ([]string, error) {
     if n <= 0 || r == nil || sessionID == "" {
         return nil, nil
     }
-    path := filepath.Join(r.dir, sessionID+".jsonl")
-    f, err := os.Open(path)
-    if err != nil {
-        if os.IsNotExist(err) {
-            return nil, nil
-        }
-        return nil, err
+    if ctx.Err() != nil {
+        return nil, ctx.Err()
     }
-    defer f.Close()
-
+    w, err := transcript.NewWriter(r.dir)
+    if err != nil {
+        return nil, fmt.Errorf("transcript reader: new writer: %w", err)
+    }
+    events, err := w.LoadReader(sessionID)
+    if err != nil {
+        return nil, fmt.Errorf("transcript reader: load: %w", err)
+    }
     var finals []string
-    scanner := bufio.NewScanner(f)
-    for scanner.Scan() {
-        var entry struct {
-            Kind    string `json:"kind"`
-            Content string `json:"content"`
-        }
-        if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-            continue
-        }
-        if entry.Kind == "final_text" {
-            finals = append(finals, entry.Content)
+    for _, ev := range events {
+        if ev.Kind == "complete" && ev.Body != "" {
+            finals = append(finals, ev.Body)
         }
     }
     if len(finals) > n {
@@ -259,7 +268,7 @@ T5: RunSessionTurnLoop → EnsureGoal("sess_x", "review foo") + transcript 注�
 T6: for iter 循环 → Run("review foo") → LLM ReAct → 拆 2 个 spawn decompose 子任务
 T7: for iter 循环 → Run(decompose child A) + Run(decompose child B) → 两个 finalText
 T8: HasOpenWork → false → break → emit complete("foo review done")
-T9: defer close(out) → defer EndTurn → processAutoClose → transcript jsonl 写入 final_text
+T9: defer close(out) → defer EndTurn → processAutoClose → transcript jsonl 写入 kind=complete 事件
 T10: feishu 卡片显示 ✅ Done + foo review 内容
 
 T11: 用户发送 turn 2 "再 review bar"
@@ -267,11 +276,11 @@ T12: feishu → D7 ProcessMessage("sess_x", "再 review bar")
 T13: ProcessMessage → turnState.WaitTurn（turn 1 已 EndTurn，立即通过）
 T14: ProcessMessage → turnState.BeginTurn("sess_x") ✅
 T15: ProcessMessage → RunSessionTurnLoop → EnsureGoal + transcript 注入：
-       ReadRecent(n=3) → [turn1 final_text] → BuildPriorOutputSummary
+       ReadRecent(n=3) → [turn1 complete Body] → BuildPriorOutputSummary
        → EnsureGoal("sess_x", "<prior-output-summary>...</prior-output-summary>\n\n再 review bar")
 T16: for iter 循环 → Run → LLM 看到 prior summary → 输出 "bar review done, 与 foo 不同"
 T17: emit complete
-T18: transcript 写入 turn 2 final_text
+T18: transcript 写入 turn 2 complete 事件
 ```
 
 ## 5. 接口契约
@@ -295,22 +304,34 @@ func (r *TranscriptReader) ReadRecent(ctx context.Context, sessionID string, n i
 func (r *TranscriptReader) BuildPriorOutputSummary(texts []string) string
 ```
 
-### 5.3 OrchestratorDeps 增量
+### 5.3 OrchestratorOption 增量（functional-options 模式）
+
+> 现有 `NewSessionOrchestrator(cfg, _, opts ...OrchestratorOption)` 走 functional options 模式（`WithSink / WithValidator / WithLearner / WithItemPipelineRunner / ...`），**不**用 `OrchestratorDeps` struct。本需求沿用相同模式：
 
 ```go
 // sessionorchestrator/orchestrator.go
-type OrchestratorDeps struct {
-    // ... 现有字段 ...
-    
-    // PriorContextRounds controls how many recent turns' finalText are injected
-    // into the new turn's directive as <prior-output-summary>. 0 disables injection
-    // (default, backward compatible). >0 enables injection.
-    PriorContextRounds int
-    
-    // TranscriptDir overrides the default transcript directory
-    // (internal/layers/communication/capture/transcript). Empty = default.
-    TranscriptDir string
-}
+
+// WithPriorContextRounds enables prior-output-summary injection.
+// n <= 0 (default) → injection disabled, TurnState not wired.
+// n > 0 → construct TurnState + TranscriptReader, inject last n turns.
+func WithPriorContextRounds(n int) OrchestratorOption
+
+// WithTranscriptDir overrides the default transcript directory.
+// Empty string → default internal/layers/communication/capture/transcript.
+func WithTranscriptDir(dir string) OrchestratorOption
+
+// WithTurnState injects a pre-built TurnState (used by tests to share state
+// across orchestrator instances; production calls the convenience options).
+func WithTurnState(ts *TurnState) OrchestratorOption
+```
+
+使用示例：
+```go
+orch := sessionorchestrator.NewSessionOrchestrator(cfg, nil,
+    sessionorchestrator.WithItemPipelineRunner(p),
+    sessionorchestrator.WithPriorContextRounds(3),
+    sessionorchestrator.WithTranscriptDir("/custom/transcript/path"),
+)
 ```
 
 ### 5.4 TurnInProgressError
@@ -365,7 +386,7 @@ func (e TurnInProgressError) Is(target error) bool
 
 | 旧路径 | 新行为 | 影响 |
 |--------|--------|------|
-| `OrchestratorDeps.PriorContextRounds = 0` (默认) | TurnState 不构造 + transcript_reader 不读 + EnsureGoal 不注入 | 完全等价现状 |
+| `WithPriorContextRounds(0)` (默认, 不传 option) | TurnState 不构造 + transcript_reader 不读 + EnsureGoal 不注入 | 完全等价现状 |
 | 单 turn session（turn N=1） | WaitTurn 立即通过 + transcript 首次读为空 → 不注入 | 完全等价现状 |
 | feishu 适配器收到 TurnInProgressError | 显示"⏳ 上一条还在处理中" | 新增友好提示（breaking for cli？CLI 不识别此错误，回退到原文案） |
 | CLI 适配器收到 TurnInProgressError | errors.Is 不识别，走通用 error 处理 | 保持兼容 |
