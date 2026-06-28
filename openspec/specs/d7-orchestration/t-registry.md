@@ -27,11 +27,11 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority |
 |------|-----------|------|----------|-----------|--------|----------|
-| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/workplan/service_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T01 | ORCH-S2-T01 | WorkPlan.Snapshot 含 ExecutionFlow + 状态 | D7-S4-A02 | `orchestration/executionflow/workplan/service_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T02 | — | Hub 双通道：WorkPlan + SessionQueue + IM | D7-S4-A01 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T03 | D4-S10-T04 | FlowStarted 触发 delegate-progress 入队 | D7-S4-A01-F02 | `orchestration/executionflow/hub/hub_test.go`；`tests/integration/d7/d7_hub_flow_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T04 | D4-S10-T07 | Snapshot 含 Task 投影（link_tasks） | D7-S1-A03-F02 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P0 |
-| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/imsink/gateway_test.go` | IMPLEMENTED | P0 |
+| D7-S4-T05 | D4-S10-T05 | IMSink 发射 worker_progress 事件 | D7-S4-A03-F01 | `orchestration/executionflow/imsink/gateway_test.go` | IMPLEMENTED | P0 |
 | D7-S4-T06 | — | FlowToolCall 节流（throttle_ms） | D7-S4-A01-F04 | `orchestration/executionflow/hub/hub_test.go` | IMPLEMENTED | P1 |
 | **D7-S4-T08** | — | **AgentBridge OnWorkerCompleted success/error** | **D7-S4-A04** | **`hubspoke/hubspoke_test.go::TestAgentBridge_OnWorkerCompleted_{success,error}`** | **IMPLEMENTED** | **P0** |
 | **D7-S4-T09** | — | **SubQueryBridge PublishStarted/Completed/Failed** | **D7-S4-A05** | **`hubspoke/hubspoke_test.go::TestSubQueryBridge_Publish{Started,Completed,Failed}`** | **IMPLEMENTED** | **P0** |
@@ -456,12 +456,17 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S3 | 20 | 20 | 0 | 0 |
 | D7-S4 | 13 | 9 | 0 | 4 |
 | D7-S5 | 28 | 28 | 0 | 0 |
-| **D7-S6** | **7** | **7** | **0** | **0** |
-| **D7-S8** | **9** | **9** | **0** | **0** |
-| **D7-S9** | **9** | **9** | **0** | **0** |
-| **D7-S10** | **8** | **8** | **0** | **0** |
-| **D7-S11** | **13** | **13** | **0** | **0** |
-| **D7-S14** | **18** | **18** | **0** | **0** |
+| D7-S6 (Error Agg) | 7 | 7 | 0 | 0 |
+| **D7-S7** (Cross-cutting Hardening) | **4** | **4** | **0** | **0** |
+| D7-S8 | 9 | 9 | 0 | 0 |
+| D7-S9 | 9 | 9 | 0 | 0 |
+| D7-S10 | 8 | 8 | 0 | 0 |
+| D7-S11 | 13 | 13 | 0 | 0 |
+| **D7-S12** (Observe-Learner 跨域闭环) | **6** | **6** | **0** | **0** |
+| **D7-S13** (Verify→Learn Auto-Close) | **6** | **6** | **0** | **0** |
+| D7-S14 | 18 | 18 | 0 | 0 |
+| **D7-S15** (WorkItem Rollup) | **21** | **18** | **2** | **0** |
+| **D7-S16** (Layer SubContext) | **18** | **18** | **0** | **0** |
 | 契约/迁移 | 8 | 8 | 0 | 0 |
 
 > **v3.0 closure (2026-06-15):** v1.2 + v2.0-b/c/f 全部闭环。D7-S1-T08 (state machine), D7-S5-A01-T01 (confidence threshold), D7-S2-A06-T01..T04 (turn leader), D7-S2-A07-T01..T02 (LLM invoker) 全部 IMPLEMENTED。IMPLEMENTED 58→66，PLANNED 9→0。全部 T 点闭环。

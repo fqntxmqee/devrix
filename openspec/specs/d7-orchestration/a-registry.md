@@ -30,27 +30,6 @@ D7 编排域 A 层活动注册表。
 
 ---
 
-## Legacy 双轨方案（v1.0+）
-
-> 根据 `devrix-d7-sa-refine` (DM-20260614-008) §7 设计决策：
-> - **Legacy** — 旧编号冻结追溯，路径：`internal/layers/orchestration/sessionorchestrator/`（旧包结构）
-> - **Canonical** — 新编号按用户价值流，路径：`internal/layers/orchestration/`（新包结构）
-
-### 追溯规则
-
-```
-Legacy ID（如 D7-S2-A01-LEGACY）→ 新 Canonical（D7-S2-A01）
-Legacy T（如 D7-S2-T01-LEGACY）→ 新 T 映射
-```
-
-### 禁止约束
-
-- **禁止** 在 Legacy 语义上新增 T
-- **禁止** 在 Legacy 路径下开发新功能
-- **强制** 新功能走 Canonical S
-
----
-
 ## D7-S1: Work Model ✅ IMPLEMENTED（v4.3 post-cleanup）
 
 > **WorkItem** 写模型位于 `internal/layers/orchestration/workmodel/{work_tree,workitem,workitem_store,task_manager}.go` + `sessionorchestrator/workmodel.go`。v4.3 post-cleanup（PR #214）已删 `workmodel/task_store.go`（Task flat-view）+ `workitem.go` 内 conversion helpers + `taskStoreAdapter`，**WorkItem 是唯一 canonical 模型**, TaskManager 只是 `Tree()` facade。PlanMode 在 `workmodel/{plan_mode,plan_agent}.go`, PlanAgent 仅服务于 `/plan` CLI 命令入口。

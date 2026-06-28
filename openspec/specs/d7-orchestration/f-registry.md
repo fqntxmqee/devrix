@@ -8,9 +8,9 @@
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 **Domain SoT:** `d7-domain.md`
 
-> **MUPS v4.3 5 节点管道（2026-06-25 落地）：** Canonical F 层扩展至 S1-S14 全部节点的 F 功能点登记，共 **68 + 7** 个 F 点全部 IMPLEMENTED（Legacy 41 + Canonical 27）。具体 F 层见 §8-§14（Observe/Execute/Verify/Learn/跨域集成/Verify Auto-Close/EscapeEngine）。
+> **MUPS v4.3 5 节点管道（2026-06-25 落地）：** Canonical F 层扩展至 S1-S14 全部节点的 F 功能点登记，共 **75** 个 F 点全部 IMPLEMENTED（deprecated 2 + canonical 73）。具体 F 层见 §8-§14（Observe/Execute/Verify/Learn/跨域集成/Verify Auto-Close/EscapeEngine）。
 >
-> **v6.0.0 6 S 精简（DM-20260626-001）：** 14 S → 6 S + 1 横切后 F 层按新 S 重归类，**F 总数 75 → 68**（Legacy 41 + Canonical 27；S 编号变化不增减 F 点）。具体 A/F 重映射见 `a-registry.md §v6.0.0 6 S 精简映射`。
+> **v6.0.0 6 S 精简（DM-20260626-001）：** 14 S → 6 S + 1 横切后 F 层按新 S 重归类。具体 A/F 重映射见 `a-registry.md §v6.0.0 6 S 精简映射`。
 
 ---
 
@@ -26,12 +26,12 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S1-A02-F01 | CreateTask | F-BE | subject, description | Task | ✅ | `contextengine/tasks/task_manager.go` |
-| D7-S1-A02-F02 | UpdateTaskStatus | F-BE | task_id, status | Task | ✅ | `contextengine/tasks/task_manager.go` |
-| D7-S1-A02-F03 | AddDependency | F-BE | task_id, blocked_by | — | ✅ | `contextengine/tasks/task_manager.go` |
-| D7-S1-A02-F04 | ListReadyTasks | F-BE | session_id | []Task | ✅ | `contextengine/tasks/task_manager.go` |
-| D7-S1-A02-F05 | PersistToDisk | F-BE | session_id | — | ✅ | `contextengine/tasks/disk_store.go` |
-| D7-S1-A02-F06 | SetOwner | F-BE | task_id, worker_id | — | ✅ | `contextengine/tasks/task_manager.go` |
+| D7-S1-A02-F01 | CreateTask | F-BE | subject, description | Task | ✅ | `workmodel/task_manager.go` |
+| D7-S1-A02-F02 | UpdateTaskStatus | F-BE | task_id, status | Task | ✅ | `workmodel/task_manager.go` |
+| D7-S1-A02-F03 | AddDependency | F-BE | task_id, blocked_by | — | ✅ | `workmodel/task_manager.go` |
+| D7-S1-A02-F04 | ListReadyTasks | F-BE | session_id | []Task | ✅ | `workmodel/task_manager.go` |
+| D7-S1-A02-F05 | PersistToDisk | F-BE | session_id | — | ✅ | `workmodel/workitem_store.go` |
+| D7-S1-A02-F06 | SetOwner | F-BE | task_id, worker_id | — | ✅ | `workmodel/task_manager.go` |
 
 ## D7-S1-A01 CreateWorkPlan ✅
 
@@ -66,10 +66,10 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/orchestrator.go` ProcessMessage switch |
+| D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/turn_orchestrator.go` ProcessMessage switch |
 | D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `sessionorchestrator/fastpath.go` Run |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/orchestrator.go` orchestrate (delegates to D2/turn) |
-| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/orchestrator.go` + `EventPublisher` |
+| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/turn_orchestrator.go` orchestrate (delegates to D2/turn) |
+| D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/turn_orchestrator.go` + `EventPublisher` |
 | D7-S2-A01-F05 | HandleInterrupt | F-BE | session_id, reason | — | ✅ | `sessionorchestrator/interrupt.go` |
 
 ## D7-S2-A02 EvaluateIntent ✅
@@ -140,13 +140,13 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ## D7-S5-A01 ClassifyIntent ✅
 
-> **v1.1 closure:** LLM-first 路径通过 `decisionplanning/classifier_fallback.go` 实现；rule+LLM merge 在 `Classify` 调用链中。
+> **v1.1 closure:** LLM-first 路径合并入 `decisionplanning/classifier.go`；rule+LLM merge 在 `ClassifyWithPrior` 调用链中（DM-20260624-001 Phase 6 PR-F1 收口）。
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `decisionplanning/classifier.go` RuleClassifier.Classify |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `decisionplanning/classifier_fallback.go` LLMClassifier.Classify |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `decisionplanning/classifier.go` + `classifier_fallback.go` Merge |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `decisionplanning/classifier.go` RuleClassifier.ClassifyWithPrior (LLM-first 路径合并) |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `decisionplanning/classifier.go` ClassifyWithPrior merge chain |
 
 ## D7-S5-A02 SynthesizeTaskGraph ✅
 
@@ -329,7 +329,7 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | Activities with F | Total F Points | Implemented | Planned |
 |-------------------|----------------|-------------|---------|
-| **22 + 7 Canonical（6 S 精简, v6.0.0 DM-20260626-001）** | **68 + 7 Canonical** | **68 + 7** | **0** |
+| **deprecated 2 + canonical 73 = 75（6 S 精简, v6.0.0 DM-20260626-001）** | **75** | **75** | **0** |
 
 ---
 
