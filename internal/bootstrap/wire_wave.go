@@ -53,7 +53,10 @@ func WireWaveScheduler(deps WaveSchedulerDeps) *wavescheduler.WaveScheduler {
 	sched := wavescheduler.NewWaveScheduler(wavescheduler.SchedulerDeps{
 		Pool:          pool,
 		Guard:         wavescheduler.NewConflictGuard(),
-		Resolver:      wavescheduler.NewContextResolver(wavescheduler.ContextResolverDeps{Artifacts: artifacts}),
+		Resolver: wavescheduler.NewMaterializingContextResolver(wavescheduler.ContextResolverDeps{
+			Artifacts:    artifacts,
+			Materializer: newDefaultMaterializer(),
+		}),
 		Artifacts:     artifacts,
 		Runners:       runnerMap,
 		Observability: deps.ObsBridge,

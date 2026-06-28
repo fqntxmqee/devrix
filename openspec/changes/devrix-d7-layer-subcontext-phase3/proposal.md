@@ -23,7 +23,18 @@ Map context-budget SubTurn modes to Materialize policy:
 
 `SubTurnRunner` uses `Materializer` when wired (bootstrap); legacy `applyMode` remains fallback.
 
+## Phase 3-T34 (this PR)
+
+Wave scheduler context policies delegate to D2 Materializer via `PartitionWave`:
+
+| Wave policy | Materialize mode |
+|-------------|------------------|
+| fresh | fresh |
+| resume | resume (+ agent sidechain) |
+| upstream | upstream (+ artifact summary in system prompt) |
+
+`NewMaterializingContextResolver` replaces raw `ContextResolver` in bootstrap when Materializer is wired. Legacy resolver remains fallback when Materializer is nil.
+
 ## Deferred
 
-- **T34:** Wave ContextResolver → Materializer (rollup Phase 2 Wave dependency)
 - **T35:** LLM ObservationProposer @ Observe (independent change per R1)

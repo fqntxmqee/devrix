@@ -66,6 +66,34 @@ func (s *PartitionStore) Append(sessionID, workItemID string, msgs []types.Messa
 	return nil
 }
 
+// AppendAgent appends messages to a sub-agent sidechain partition.
+func (s *PartitionStore) AppendAgent(sessionID, agentID string, msgs []types.Message) error {
+	if s == nil || sessionID == "" || agentID == "" || len(msgs) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	target := s.agentPath(sessionID, agentID)
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(target, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for _, msg := range msgs {
+		data, err := json.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		if _, err := f.Write(append(data, '\n')); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Load reads all messages from a work item private chain.
 func (s *PartitionStore) Load(sessionID, workItemID string) ([]types.Message, error) {
 	if s == nil || sessionID == "" || workItemID == "" {
