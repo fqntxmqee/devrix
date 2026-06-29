@@ -2,8 +2,10 @@
 
 **Change ID:** devrix-d3-dsaft-restructuring
 **Demand ID:** DM-20260629-003
-**Status:** S2_Proposal
+**Priority:** P0
+**Status:** S7_Archived
 **Created:** 2026-06-29
+**Archived:** 2026-06-29
 **Template:** `devrix-d2-dsaft-restructuring` proposal.md (DM-20260629-002 S7_Archived)
 
 ---

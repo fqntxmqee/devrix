@@ -1,0 +1,113 @@
+id: devrix-d3-dsaft-restructuring
+demand_id: DM-20260629-003
+title: "D3 DSAFT 深度架构重构 — 6 子 Change 联动 (dead code + god fn + registry + value flow + span + boundary debt)"
+status: s7_archived
+priority: P0
+created: 2026-06-29
+archived: 2026-06-29
+author: D3 域整体 DSAFT Review（2026-06-29 会话）+ 对齐 D7 DM-20260629-001 + D2 DM-20260629-002 模板
+
+domains: [D3]
+
+# T 点 (本 DM 范围内实施的 T)
+t_points:
+  # PR-2 #1 god-fn-split pt1 (T09-T13)
+  - D3-S2-A01-T01
+  - D3-S2-A01-T02
+  - D3-S2-A01-T03
+  - D3-S2-A01-T04
+  - D3-S2-A01-T05
+  # PR-3 #1 god-fn-split pt2 (T14-T18)
+  - D3-S6-A01-T01
+  - D3-S6-A01-T02
+  - D3-S3-A01-T07
+  - D3-EC-T01
+  - D3-EC-T02
+  # PR-4 #2 registry-sync (T19-T24)
+  - D3-S4-A01-T01
+  - D3-S4-A01-T02
+  - D3-S4-A01-T03
+  - D3-S5-A01-T01
+  - D3-S5-A01-T02
+  - D3-S5-A01-T03
+  # PR-5 #3 value-flow-rename (T25-T28) — metadata only
+  # PR-6 #4 span-coverage (T29-T33)
+  - D3-S3-A01-T13
+  - D3-S3-A01-T14
+  - D3-S3-A01-T15
+  - D3-S2-A01-T06
+  - D3-S3-A01-T16
+  # PR-7 #5 boundary-decision (T34-T37)
+  - D3-S1-A01-T04
+  - D3-S1-A01-T05
+  - D3-S3-A01-T17
+
+layers:
+  - D3-S1   # RouteModel (D3_Model_Routing)
+  - D3-S2   # StreamChat (D3_Stream_Chat_Completion)
+  - D3-S3   # ProtectCall (D3_Circuit_Breaker_And_Retry)
+  - D3-S4   # BudgetTokens (D3_Token_Budget_Control)
+  - D3-S5   # GuardContent (D3_Content_Safety_Filter)
+  - D3-S6   # ConfigureGateway (D3_Gateway_Configuration)
+  - D3-X    # CROSS (Bridge + Bootstrap)
+
+pr_count: 8
+pr_list:
+  - id: 299
+    title: "docs(d3): dead code & unused export audit"
+    sub_change: "#0"
+  - id: 300
+    title: "refactor(d3): split god fn Gateway.Stream() 235→3 files"
+    sub_change: "#1-pt1"
+  - id: 301
+    title: "refactor(d3): split configure + errorclass god fns 4 files"
+    sub_change: "#1-pt2"
+  - id: 302
+    title: "docs(d3): sync F code paths to v2.0 directories (token/→budget/ safety/→guard/ config/→configure/)"
+    sub_change: "#2"
+  - id: 303
+    title: "docs(d3): ValueFlow Alias rename (5 + 1 = 6 alias with D3_ prefix)"
+    sub_change: "#3"
+  - id: 304
+    title: "docs(d3): Span Evidence 覆盖率 30/30=100%, runtime span 名与 telemetry 对齐"
+    sub_change: "#4"
+  - id: 305
+    title: "docs(d3): boundary debt 4 常量登记 + d3-domain v1.6.0"
+    sub_change: "#5"
+  - id: 306
+    title: "chore(d3): S7_Archive 收口 — 6 artifacts copy + verify-archive 12/12 PASS"
+    sub_change: "S7"
+
+related_changes:
+  - devrix-d7-dsaft-restructuring    # DM-20260629-001 6 子 Change 模板
+  - devrix-d2-dsaft-restructuring    # DM-20260629-002 6 子 Change 模板 (S7_Archived)
+  - devrix-d3-sa-refine              # R1+R2+R3 早期 refine
+  - devrix-d3-sa-refine-v1.1         # 9 新 T 增; v1.1 PLANNED→IMPLEMENTED
+  - devrix-api-error-classification  # DM-20260628-001 v3.3.0 3 T 落地
+  - devrix-llm-gateway-user-override-v2.x  # DM-20260619-006 4 层优先级
+  - devrix-error-handling-tier1-tier2     # DM-20260620-003 retry nil-sentinel
+
+parent_specs:
+  - openspec/specs/d3-llm-gateway/d3-domain.md
+  - openspec/specs/d3-llm-gateway/design.md
+  - openspec/specs/d3-llm-gateway/{a,f,t,span}-registry.md
+  - openspec/specs/d3-llm-gateway/observability-guide.md
+  - openspec/specs/d3-llm-gateway/d7-boundary.md
+  - openspec/specs/d3-llm-gateway/layer-delta.md
+  - openspec/specs/architecture/cross-domain-boundaries.md
+  - docs/methodology/dsaft-methodology.md v4.0.0
+  - docs/methodology/dsaft-refactoring-playbook.md v1.0.0
+
+# Spec 版本同步
+spec_sync:
+  source_version: "d3-domain.md v1.0.0 + t-registry v3.3.1 + a-registry v3.0.0 + f-registry v3.1.0 + span-registry v3.1.0"
+  target_version: "d3-domain.md v1.6.0 + t-registry v3.4.0 + a-registry v3.1.0 + f-registry v3.2.0 + span-registry v3.2.0"
+  sync_date: "2026-06-29"
+  sync_changes:
+    - "§North Star: ValueFlow Alias 列填充 (D3_Model_Routing / D3_Stream_Chat_Completion / D3_Circuit_Breaker_And_Retry / D3_Token_Budget_Control / D3_Content_Safety_Filter / D3_Gateway_Configuration)"
+    - "§Boundary Debt Decisions: 新增章节, 4 boundary-debt ID (D2D3ImportBan / S5vsS18 / BudgetSpanInjection / FailFastOnObsNil) 全部 RESOLVED"
+    - "§DSAFT 资产: 41 T (35 DSAFT + 3 D3-EC 错误分类) 维持 + 4 boundary debt 常量 + orchtypes 治理包"
+    - "§登记规模: F 路径 token/→budget/ + safety/→guard/ + config/→configure/ 物理对齐"
+    - "t-registry v3.4.0: 全 41 T 行加 Span Evidence 列, 30 mapped + 11 explicit — = 100% 覆盖率 (raw 73.2%)"
+    - "span-registry v3.2.0: runtime span 名 llm.* → D3_LLM_* (与 telemetry/names.go OpD3_S3_LLM_* 对齐) + §9 T-Without-Span Tracker"
+    - "§修订记录: v1.5.0 + v1.6.0 row"
