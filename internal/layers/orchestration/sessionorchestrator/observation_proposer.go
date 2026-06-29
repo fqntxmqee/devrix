@@ -12,7 +12,7 @@ import (
 
 const (
 	maxLLMObsFactStrength = 0.85
-	llmObsProposerSource  = "llm_observation_proposer"
+	llmObsProposerSource  = "observation_proposer" // StaticObservationProposer / tests only
 )
 
 // ObserveSignalInput carries structured signals for LLM observation proposals.

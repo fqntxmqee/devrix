@@ -6,12 +6,22 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-const llmObservationSystemPrompt = `You propose structured observations for an orchestration Observe node.
+const (
+	observationTaskAppendixZH = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。每个元素：
+{"kind":"obs_fact|obs_signal|obs_uncertainty|obs_deviation","strength":0.0-1.0,"statement":"...","question":"...","evidence":["wi_id"]}
+
+规则：
+- 只能使用下方提供的 directive 与结构化 signal；不要编造工具输出。
+- 范围不清时优先 obs_uncertainty；obs_fact 仅在有强依据时使用。
+- 最多 3 条提案；空数组 [] 合法。`
+
+	observationTaskAppendixEN = `You propose structured observations for an orchestration Observe node.
 Return ONLY a JSON array (no markdown). Each element:
 {"kind":"obs_fact|obs_signal|obs_uncertainty|obs_deviation","strength":0.0-1.0,"statement":"...","question":"...","evidence":["wi_id"]}
 
@@ -19,28 +29,53 @@ Rules:
 - Use ONLY the provided directive and structured signals; do not invent tool outputs.
 - Prefer obs_uncertainty when scope is unclear; obs_fact only when strongly supported.
 - Maximum 3 proposals. Empty array [] is valid.`
+)
 
-// LLMObservationProposer calls D3 via LLMInvoker to propose Obs* candidates (T35).
+// LLMObservationProposer calls D2 ContextPreparer then D3 LLMInvoker (DM-20260630-001).
+// User payload carries structured Observe signals only — no WorkItem private ReAct transcript.
 type LLMObservationProposer struct {
-	LLM orchtypes.LLMInvoker
+	LLM    orchtypes.LLMInvoker
+	Ctx    ContextPreparer
+	Locale i18n.Locale
 }
 
-// NewLLMObservationProposer constructs an LLM-backed proposer.
-func NewLLMObservationProposer(llm orchtypes.LLMInvoker) *LLMObservationProposer {
-	if llm == nil {
+// NewLLMObservationProposer constructs a D2→D3 observation proposer.
+func NewLLMObservationProposer(llm orchtypes.LLMInvoker, ctx ContextPreparer, loc i18n.Locale) *LLMObservationProposer {
+	if llm == nil || ctx == nil {
 		return nil
 	}
-	return &LLMObservationProposer{LLM: llm}
+	if loc == "" {
+		loc = i18n.DefaultLocale
+	}
+	return &LLMObservationProposer{LLM: llm, Ctx: ctx, Locale: loc}
 }
 
 func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in ObserveSignalInput) ([]ObservationProposal, error) {
-	if p == nil || p.LLM == nil {
+	if p == nil || p.LLM == nil || p.Ctx == nil {
 		return nil, nil
+	}
+	prepared, err := p.Ctx.Prepare(ctx, PrepareRequest{
+		SessionID: in.SessionID,
+		Message: types.Message{
+			SessionID: in.SessionID,
+			Role:      types.MessageRoleUser,
+			Content:   in.Directive,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("observe proposer: d2 prepare: %w", err)
+	}
+	systemPrompt := strings.TrimSpace(prepared.SystemPrompt)
+	if appendix := observationTaskAppendix(p.Locale); appendix != "" {
+		if systemPrompt != "" {
+			systemPrompt += "\n\n"
+		}
+		systemPrompt += appendix
 	}
 	user := buildLLMObservationUserPrompt(in)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,
-		SystemPrompt: llmObservationSystemPrompt,
+		SystemPrompt: systemPrompt,
 		Messages: []types.Message{{
 			SessionID: in.SessionID,
 			Role:      types.MessageRoleUser,
@@ -52,6 +87,13 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 	}
 	raw := collectLLMText(ch)
 	return parseObservationProposalsJSON(raw)
+}
+
+func observationTaskAppendix(loc i18n.Locale) string {
+	if loc == i18n.LocaleEN {
+		return observationTaskAppendixEN
+	}
+	return observationTaskAppendixZH
 }
 
 func buildLLMObservationUserPrompt(in ObserveSignalInput) string {

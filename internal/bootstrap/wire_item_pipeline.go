@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -20,9 +21,10 @@ type ItemPipelineWireDeps struct {
 	ToolExec      sessionorchestrator.ToolRoundExecutor
 	Tasks         *workmodel.TaskManager
 	Classifier    decisionplanning.IntentClassifier
-	LLMInvoker    orchtypes.LLMInvoker
-	CtxPreparer   sessionorchestrator.ContextPreparer
-	TrackMode     string
+	LLMInvoker     orchtypes.LLMInvoker
+	CtxPreparer    sessionorchestrator.ContextPreparer
+	PromptLanguage string
+	TrackMode      string
 }
 
 // WireDefaultMUPSLearner constructs the in-process LP-1 learner used by both
@@ -55,12 +57,16 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		executor.Materializer = mat
 	}
 	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
-		Classifier:          deps.Classifier,
-		Executor:            executor,
-		Learner:             learner,
-		Tasks:               deps.Tasks,
-		TrackMode:           deps.TrackMode,
-		ObservationProposer: sessionorchestrator.NewLLMObservationProposer(deps.LLMInvoker),
+		Classifier: deps.Classifier,
+		Executor:   executor,
+		Learner:    learner,
+		Tasks:      deps.Tasks,
+		TrackMode:  deps.TrackMode,
+		ObservationProposer: sessionorchestrator.NewLLMObservationProposer(
+			deps.LLMInvoker,
+			deps.CtxPreparer,
+			i18n.ParseLanguage(deps.PromptLanguage),
+		),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)

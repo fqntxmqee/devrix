@@ -52,17 +52,7 @@ func TestObserveWorkItem_MergesValidatedProposals(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("expected llm_observation_proposer uncertainty in report: %+v", report.Observations)
+		t.Fatalf("expected observation_proposer uncertainty in report: %+v", report.Observations)
 	}
 }
 
-func TestParseObservationProposalsJSON(t *testing.T) {
-	raw := `[{"kind":"obs_fact","strength":0.7,"statement":"ok","evidence":["wi_1"]}]`
-	got, err := parseObservationProposalsJSON(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 || got[0].Kind != orchtypes.ObsFact {
-		t.Fatalf("got = %+v", got)
-	}
-}

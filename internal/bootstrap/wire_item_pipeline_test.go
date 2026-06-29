@@ -48,6 +48,12 @@ func TestWireItemPipeline(t *testing.T) {
 	if runner == nil || learner == nil {
 		t.Fatal("expected runner and learner")
 	}
+	if runner.ObservationProposer == nil {
+		t.Fatal("DM-20260630-001: expected LLMObservationProposer wired in production")
+	}
+	if _, ok := runner.ObservationProposer.(*sessionorchestrator.LLMObservationProposer); !ok {
+		t.Fatalf("ObservationProposer type = %T", runner.ObservationProposer)
+	}
 }
 
 func TestWireItemPipeline_RequiresLLMInvoker(t *testing.T) {
