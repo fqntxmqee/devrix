@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Last Updated:** 2026-06-30
 **Change ID:** devrix-d4-dsaft-restructuring
 **Demand ID:** DM-20260629-004
@@ -20,8 +20,12 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 ## Canonical F 层（SoT）— D4-S11–S16
 
 > F 编号与 Canonical A 1:1 或按机制拆分；Hub-Spoke 编排 F 迁 D7（Out of Scope）。
+>
+> **ValueFlow Alias (用户感知)**（DM-20260629-004 PR-5 value-flow-rename）：每个 S 段 header 加 `> **ValueFlow Alias (用户感知):** D4_*` 行；与 a-registry.md / d4-domain.md 同步。
 
 ### D4-S11 ProvisionAgent
+
+> **ValueFlow Alias (用户感知):** `D4_Provision_Agent`
 
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
@@ -35,6 +39,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 
 ### D4-S12 RunAgentLoop
 
+> **ValueFlow Alias (用户感知):** `D4_Run_Agent_Loop`
+
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
 | D4-S12-A01-F01 | ExecuteRun | F-BE | ctx | *AgentResult | S2-F01 | `run/lifecycle.go` (Run / runLoop) |
@@ -45,6 +51,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 | D4-S12-A02-F02 | ResolveDecision | F-BE | tool_name, granted | — | S2-F06 | `run/perm_gate.go` (resolve) |
 
 ### D4-S13 IsolateAndMerge
+
+> **ValueFlow Alias (用户感知):** `D4_Isolate_Merge`
 
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
@@ -60,6 +68,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 
 ### D4-S14 ExecuteWorker
 
+> **ValueFlow Alias (用户感知):** `D4_Execute_Worker`
+
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
 | D4-S14-A01-F01 | ExecuteWorkerSync | F-BE | leader, spec | *DelegateResult | S10-F01 | `execute/worker.go` (WorkerExecutor.Execute) |
@@ -68,6 +78,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 > **迁 D7（Out of Scope）：** `DelegateOrFallback` → D7-S2-A04-F01；`EmitAgentEvent` / `EngineEventSink` → D7-S4-A04/A05。
 
 ### D4-S15 InvokeExternalAgent
+
+> **ValueFlow Alias (用户感知):** `D4_External_Agent_Tool`
 
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
@@ -79,6 +91,8 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 | D4-S15-A03-F01 | ParseStreamJSONLine | F-BE | stdout_line | StreamParseResult | S6-F06 | `external/stream_json.go` (ParseStreamJSONLine) |
 
 ### D4-S16 ConfigureAgents
+
+> **ValueFlow Alias (用户感知):** `D4_Configure_Agents`
 
 | F ID | Name | Type | Input | Output | Legacy 映射 | Code Location |
 |------|------|------|-------|--------|-------------|---------------|
@@ -118,7 +132,7 @@ D4 多智能体域 F 层功能点注册表。Canonical S11–S16 为 SoT；Legac
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 3.1.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：22 个 F 路径全替换到 v2.0d；D4-S1~S10 详细表下沉 archive |
+| 3.2.0 | 2026-06-30 | DM-20260629-004 PR-5 #3 value-flow-rename：§S→A→F 索引每个 S header 加 `> **ValueFlow Alias (用户感知):**` 行（5 S + 1 横切 = 6 alias：`D4_Provision_Agent` / `D4_Run_Agent_Loop` / `D4_Isolate_Merge` / `D4_Execute_Worker` / `D4_External_Agent_Tool` / `D4_Configure_Agents`）；与 d4-domain.md §North Star + a-registry.md §ValueFlow Alias 总览对齐 |
 | 3.0.0 | 2026-06-14 | Canonical S11–S16 F 表 + Legacy 冻结；Hub-Spoke F 标 Out of Scope（DM-20260614-018） |
 | 2.0.0 | 2026-06-14 | Fixed D4-S3-A01-F02 (BuildForkedMessages→ForkSessionView), added D4-S2-A02/A03, D4-S5, D4-S6-A01/A02/A03, D4-S7, D4-S8, D4-S9 F points; added WaitAgent, DelegateOrFallback; 16 activities, 37 F points |
 | 1.0.0 | 2026-06-13 | Initial F registry (6 activities, 14 F points) |

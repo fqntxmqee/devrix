@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Last Updated:** 2026-06-30
 **Change ID:** devrix-d4-dsaft-restructuring
 **Demand ID:** DM-20260629-004
@@ -15,6 +15,21 @@
 ---
 
 ## Canonical A 层（SoT）— D4-S11–S16
+
+### ValueFlow Alias 总览
+
+> **用户感知命名（DM-20260629-004 PR-5 value-flow-rename）：** 5 S + 1 横切 = 6 alias，与 d4-domain.md §North Star ValueFlow Alias 列对齐。
+
+| S ID | Scenario | ValueFlow Alias (用户感知) |
+|------|----------|---------------------------|
+| D4-S11 | ProvisionAgent | `D4_Provision_Agent` |
+| D4-S12 | RunAgentLoop | `D4_Run_Agent_Loop` |
+| D4-S13 | IsolateAndMerge | `D4_Isolate_Merge` |
+| D4-S14 | ExecuteWorker | `D4_Execute_Worker` |
+| D4-S15 | InvokeExternalAgent | `D4_External_Agent_Tool` |
+| D4-S16 | ConfigureAgents | `D4_Configure_Agents`（横切） |
+
+---
 
 | A ID | Name | Canonical S | Legacy 映射 | Code（v2.0） |
 |------|------|-------------|-------------|-------------|
@@ -51,6 +66,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.3.0 | 2026-06-30 | DM-20260629-004 PR-5 #3 value-flow-rename：§Canonical A 层前新增 §ValueFlow Alias 总览表（5 S + 1 横切 = 6 alias：`D4_Provision_Agent` / `D4_Run_Agent_Loop` / `D4_Isolate_Merge` / `D4_Execute_Worker` / `D4_External_Agent_Tool` / `D4_Configure_Agents`） |
 | 3.2.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：12 个 F 路径全替换到 v2.0d；D4-S1~S10 详细表下沉 archive |
 | 3.1.0 | 2026-06-16 | Canonical S11–S16 表 + Legacy 冻结（DM-20260614-018） |
 

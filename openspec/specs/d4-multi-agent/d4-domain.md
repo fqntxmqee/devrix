@@ -15,14 +15,14 @@
 
 **在 D7 给定 Worker 派发参数后，可靠地供给 Agent 实例、执行隔离的子任务循环、合并结果——作为 Delegation Execution Follower，不承担 Hub-Spoke 编排与 Flow 发布。**
 
-| 可验证承诺 | Canonical S |
-|-----------|-------------|
-| 按配额创建 Agent/Worker，注入协作模式 | D4-S11 ProvisionAgent |
-| Agent 主循环可取消；CRITICAL 工具等权限 | D4-S12 RunAgentLoop |
-| Fork/Worker 执行不污染父 Session | D4-S13 IsolateAndMerge |
-| 给定 WorkerSpec 后 fork→run→join | D4-S14 ExecuteWorker |
-| CLI/Cursor 外部 Agent Tool Session 隔离 | D4-S15 InvokeExternalAgent |
-| multi_agent 配置加载与校验 | D4-S16 ConfigureAgents |
+| 可验证承诺 | Canonical S | ValueFlow Alias (用户感知) |
+|-----------|-------------|---------------------------|
+| 按配额创建 Agent/Worker，注入协作模式 | D4-S11 ProvisionAgent | `D4_Provision_Agent` |
+| Agent 主循环可取消；CRITICAL 工具等权限 | D4-S12 RunAgentLoop | `D4_Run_Agent_Loop` |
+| Fork/Worker 执行不污染父 Session | D4-S13 IsolateAndMerge | `D4_Isolate_Merge` |
+| 给定 WorkerSpec 后 fork→run→join | D4-S14 ExecuteWorker | `D4_Execute_Worker` |
+| CLI/Cursor 外部 Agent Tool Session 隔离 | D4-S15 InvokeExternalAgent | `D4_External_Agent_Tool` |
+| multi_agent 配置加载与校验 | D4-S16 ConfigureAgents | `D4_Configure_Agents` |
 
 ---
 
@@ -46,14 +46,14 @@
 
 ### Canonical 价值流（SoT）— D4-S11–S16
 
-| S ID | Scenario | Responsibility | Status |
-|------|----------|----------------|--------|
-| D4-S11 | ProvisionAgent | 创建、配额、协作模式 prompt、Builtin 注册 | REGISTRY |
-| D4-S12 | RunAgentLoop | 生命周期、PermissionGate、状态机 | REGISTRY |
-| D4-S13 | IsolateAndMerge | Fork/Join、SessionView COW、WorkerEngine overlay | REGISTRY |
-| D4-S14 | ExecuteWorker | Worker fork→run→join（D7 派发） | REGISTRY |
-| D4-S15 | InvokeExternalAgent | CLI/Cursor Agent Tool | REGISTRY |
-| D4-S16 | ConfigureAgents | multi_agent 配置（横切） | REGISTRY |
+| S ID | Scenario | Responsibility | ValueFlow Alias (用户感知) | Status |
+|------|----------|----------------|---------------------------|--------|
+| D4-S11 | ProvisionAgent | 创建、配额、协作模式 prompt、Builtin 注册 | `D4_Provision_Agent` | REGISTRY |
+| D4-S12 | RunAgentLoop | 生命周期、PermissionGate、状态机 | `D4_Run_Agent_Loop` | REGISTRY |
+| D4-S13 | IsolateAndMerge | Fork/Join、SessionView COW、WorkerEngine overlay | `D4_Isolate_Merge` | REGISTRY |
+| D4-S14 | ExecuteWorker | Worker fork→run→join（D7 派发） | `D4_Execute_Worker` | REGISTRY |
+| D4-S15 | InvokeExternalAgent | CLI/Cursor Agent Tool | `D4_External_Agent_Tool` | REGISTRY |
+| D4-S16 | ConfigureAgents | multi_agent 配置（横切） | `D4_Configure_Agents` | REGISTRY |
 
 ### Legacy Module Index（冻结追溯）— D4-S1–S10
 
@@ -121,5 +121,6 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.1.0 | 2026-06-30 | DM-20260629-004 PR-5 #3 value-flow-rename：§North Star + §Canonical 价值流加 ValueFlow Alias 列（5 S + 1 横切 = 6 alias：`D4_Provision_Agent` / `D4_Run_Agent_Loop` / `D4_Isolate_Merge` / `D4_Execute_Worker` / `D4_External_Agent_Tool` / `D4_Configure_Agents`） |
 | 2.0.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：物理路径表对齐 code；version bump 1.0→2.0 |
 | 1.0.0 | 2026-06-14 | 初版：S11–S16 + Hub-Spoke Out of Scope + Legacy 双轨（DM-20260614-018） |
