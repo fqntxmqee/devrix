@@ -1,4 +1,12 @@
-package multiagent
+// Package orchtypes is the governance root for D4 multiagent cross-cutting
+// constants: runtime span operations (coverage hook), engine event names, and
+// boundary debt decisions. New constants MUST be added here instead of being
+// scattered as string literals across the codebase; this keeps the D4 cross-
+// domain emit/receive contract auditable from a single import path.
+//
+// DM-20260629-004: package promoted from multiagent/spans.go (DM-20260628
+// PR-D1) and extended with events.go + boundary_decision.go governance.
+package orchtypes
 
 import "github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"
 
