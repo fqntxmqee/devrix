@@ -1,7 +1,9 @@
 change_id: devrix-d7-taskcontract-unification-pr-b
 demand_id: DM-20260629-008
 title: D7 TaskContract 统一 PR-B — Pessimistic Commit + Rule-based Fallback (L3 防御运行时层)
-status: S4_Implementation
+status: s7_archived
+archived: 2026-06-29
+archived_path: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-b/
 created: 2026-06-29
 parent_design: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/
 parent_pr_a: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-a/

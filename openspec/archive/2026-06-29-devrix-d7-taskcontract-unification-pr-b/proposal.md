@@ -3,7 +3,7 @@
 **Change ID:** devrix-d7-taskcontract-unification-pr-b
 **Demand ID:** DM-20260629-008
 **Parent Demand:** DM-20260629-006 (DESIGN ONLY) + DM-20260629-007 PR-A (S7_Archived)
-**Status:** S2_Proposal
+**Status:** s7_archived
 **Priority:** P0
 **Reporter:** 2026-06-29 启动 v7.0 演进第二阶段
 **DSAFT Domain:** D7 Orchestration (核心域)
