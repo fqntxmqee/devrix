@@ -3,11 +3,11 @@
 **Domain ID:** D4
 **Slug:** `multiagent`
 **Type:** Core Domain
-**Status:** Active — Canonical S11–S16 (v1.0 registry, DM-20260614-018)
+**Status:** Active — Canonical S11–S16 (v2.0 registry, DM-20260629-004 PR-4)
 **Depends On:** D2 (`IEngine`), D1 (`PermissionManager`), D5 (tracer emit)
 **Depended By:** D7 (`WorkerExecutor` consumer)
 **Cross-Domain SoT:** `d7-boundary.md`
-**Change:** `openspec/changes/devrix-d4-sa-refine/`
+**Change:** `openspec/changes/devrix-d4-dsaft-restructuring/`
 
 ---
 
@@ -89,15 +89,15 @@
 
 ## 物理路径（v2.0 目标）
 
-| Canonical S | scenario-slug | v1.0 当前 | v2.0 目标 |
-|-------------|---------------|----------|-----------|
-| S11 | `provision` | `factory/`, `collaboration/`, `builtin/` | `multiagent/provision/` |
-| S12 | `run` | `agent/`（lifecycle, perm） | `multiagent/run/` |
-| S13 | `isolate` | `forkjoin`, `sessionview/` | `multiagent/isolate/` |
-| S14 | `execute` | `delegate/service.go` | `multiagent/execute/` |
-| S15 | `external` | `tool/` | `multiagent/external/` |
-| S16 | `configure` | `shared/config/multiagent.go` | `multiagent/configure/` |
-| kernel | `kernel` | `contracts.go`, `observer/` | `multiagent/kernel/` |
+| Canonical S | scenario-slug | v2.0 实际 |
+|-------------|---------------|----------|
+| S11 | `provision` | `multiagent/provision/`（factory.go, freefork/，含 WorkerEngine inline） |
+| S12 | `run` | `multiagent/run/`（lifecycle.go, agent.go, state.go, perm_gate.go, forkjoin.go） |
+| S13 | `isolate` | `multiagent/isolate/`（sessionview.go） |
+| S14 | `execute` | `multiagent/execute/`（worker.go, metrics.go, contracts.go） |
+| S15 | `external` | `multiagent/external/`（registry.go, stream_json.go, cli_session.go + cli_execute.go, cursor_session.go + cursor_execute.go） |
+| S16 | `configure` | `multiagent/configure/`（configure.go） |
+| kernel | `kernel` | `multiagent/kernel/`（contracts.go, noop.go） |
 
 ---
 
@@ -121,4 +121,5 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：物理路径表对齐 code；version bump 1.0→2.0 |
 | 1.0.0 | 2026-06-14 | 初版：S11–S16 + Hub-Spoke Out of Scope + Legacy 双轨（DM-20260614-018） |
