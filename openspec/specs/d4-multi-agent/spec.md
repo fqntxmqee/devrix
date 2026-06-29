@@ -1,11 +1,11 @@
 # D4 Multi-Agent Layer Specification
 
 **Capability:** multi-agent
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Status:** Canonical — source of truth (S11–S16 价值流)
-**Last Updated:** 2026-06-14
-**Change ID:** devrix-d4-sa-refine
-**Demand ID:** DM-20260614-018
+**Last Updated:** 2026-06-30
+**Change ID:** devrix-d4-dsaft-restructuring
+**Demand ID:** DM-20260629-004
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d4-domain.md`
 **D7 Boundary:** `d7-boundary.md`
@@ -82,17 +82,17 @@ D4 独立面：
 
 ---
 
-## Package Map（v1.0 当前 / v2.0 目标）
+## Package Map（v2.0 实际，对齐 d4-domain.md）
 
-| v1.0 路径 | Canonical S | v2.0 slug |
-|----------|-------------|-----------|
-| `factory/`, `collaboration/`, `builtin/` | S11 | `provision/` |
-| `agent/` (lifecycle, perm) | S12 | `run/` |
-| `forkjoin`, `sessionview/`, `worker_engine` | S13 | `isolate/` |
-| `delegate/service.go` | S14 | `execute/` |
-| `tool/` | S15 | `external/` |
-| `shared/config/multiagent.go` | S16 | `configure/` |
-| `contracts.go`, `observer/` | kernel | `kernel/` |
+| v2.0 路径 | Canonical S |
+|----------|-------------|
+| `multiagent/provision/`, `multiagent/collaboration/`, `orchestration/delegatetools/builtin_agents.go` | S11 |
+| `multiagent/run/`, `multiagent/collaboration/` | S12 (主要 run) |
+| `multiagent/isolate/` (sessionview), `multiagent/run/forkjoin.go` (forkjoin in run/) | S13 |
+| `multiagent/execute/` | S14 |
+| `multiagent/external/` | S15 |
+| `multiagent/configure/`, `shared/config/multiagent.go` | S16 |
+| `multiagent/kernel/`, `multiagent/orchtypes/` | kernel |
 
 ---
 
