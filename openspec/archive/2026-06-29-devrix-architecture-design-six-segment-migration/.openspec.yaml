@@ -1,0 +1,34 @@
+change_id: devrix-architecture-design-six-segment-migration
+priority: P1
+demand_id: DM-20260629-007
+status: s7_archived
+domains: [project]
+dsaft_scenarios:
+  - PROJECT-S1  # NEW: architecture-design.md 规范升级场景
+dsaft_activities:
+  - PROJECT-S1-A01  # §1.2 强制语义改造
+  - PROJECT-S1-A02  # §1.3 范围裁剪改造
+  - PROJECT-S1-A03  # §4 design.md 模板重写
+  - PROJECT-S1-A04  # §8 S3 checklist 加校验
+t_points:
+  - PROJECT-S1-A01-T01  # §1.2 "必须遵循" 验证
+  - PROJECT-S1-A02-T01  # §1.3 范围裁剪验证
+  - PROJECT-S1-A03-T01  # §4 六段式模板验证
+  - PROJECT-S1-A04-T01  # §8 checklist 验证
+  - PROJECT-S1-REFERENCE-T01  # reference Change（devrix-d7-taskcontract-unification）合规验证
+version_scope:
+  v1.0: architecture-design.md 规范升级（一次性原子操作）
+  v1.1: 维护期：跟踪未来 Change 是否严格遵循六段式
+metrics_definitions:
+  - name: architecture_design_six_segment_compliance_rate
+    type: gauge
+    labels: [change_id, lifecycle_stage]
+    description: Change design.md 按六段式合规率（合规 = ①-⑥ 6 段齐全 + 每段 ≥ 3 行实质内容）
+span_naming: []
+status_notes:
+  - 2026-06-29 S1 demand.md 创建（DM-20260629-007）
+  - 2026-06-29 S2 proposal.md + .openspec.yaml 创建（6 Decision 已落）
+  - 2026-06-29 architecture-design.md §1.2/§1.3/§4/§8 已修改（200 → 251 行）
+  - 2026-06-29 memory 记录已写入
+  - 备注：本 Change 无 PR（规范一次性原子修改，直接归档）
+  - 备注：本 Change 是规范升级后第一个走"无 PR + 直接归档"路径的 Change

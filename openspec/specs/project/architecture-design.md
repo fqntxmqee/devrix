@@ -31,23 +31,27 @@ S3 设计文档必须包含：
 - **活动定义**：对外暴露哪些 A（A-BE 或 A-FE），输入/输出/状态变更
 - **功能点编排**：每个 A 由哪些 F 协作完成
 
-### 1.2 六段式框架
+### 1.2 六段式框架（强制）
 
-复杂架构文档应参照 `../../docs/methodology/detail-design-framework.md` 六段式：
-1. 架构目标 — 业务与技术目标、约束
-2. 架构原则 — 设计原则、命名规范
-3. 业务流程 — 核心用例、异常补偿
-4. 领域模型 — 聚合根、限界上下文
-5. 核心链路 — 端到端路径与时序
-6. 接口/API 设计 — 契约、幂等、版本
+**所有 design.md 必须遵循** `../../docs/methodology/detail-design-framework.md` 六段式，章节标题与符号必须与 detail-design-framework.md 一致：
 
-### 1.3 轻量变更
+1. **① 架构目标** — 业务目标（解决哪些痛点）+ 技术目标（量化指标：QPS/RT/Coverage/P99）+ 约束条件（SemVer / 合规 / 灰度）
+2. **② 架构原则** — 设计原则（10 条以内）+ 命名规范（ID/Type/Error/Span 模板）+ 代码风格（函数 < 50 行 / 文件 < 800 行）
+3. **③ 业务流程** — 核心用例时序图 + 异常补偿（Fallback 路径表）+ 分支处理决策树
+4. **④ 领域模型** — 聚合根（4 个以内）+ 限界上下文（包边界图）+ 领域事件（Span/Metric 列表）+ 跨域消费模型
+5. **⑤ 核心链路图** — 端到端路径 + 时序标注（SLA/P99）+ 单点风险与缓解
+6. **⑥ 接口/API 设计** — 风格（Pure types / Builder / With*）+ 契约（错误码三元组 + TraceID）+ 幂等 + 版本演进
 
-非架构级变更可跳过六段式，但 design.md 必须包含：
-- 问题根因
-- 方案描述
-- 关键代码片段或接口变更
-- 回归风险评估
+附录可自由组织（File Manifest / Rollback Plan / 回归风险 / S3 Checklist / 下一步），不属于六段式主体。
+
+### 1.3 范围与详细度裁剪
+
+六段式是结构骨架，**各段详细度可按 Change 规模裁剪**，但**章节不可省略**：
+- **小型 Change**（< 5 AC / < 1 PR）：每段 1-3 行概要 + 关键示例
+- **中型 Change**（5-15 AC / 1-3 PR）：每段 5-20 行 + 时序图 / 表格
+- **大型 Change**（> 15 AC / 多 PR 跨域）：每段 20+ 行 + 完整时序图 + 决策树 + 风险表
+
+**禁止**用 §1 Root Cause Analysis / §2 Solution Design / §3 Key Interfaces 等旧式 7 段模板替代六段式（2026-06-29 规范升级，已归档 Change 不追溯）。
 
 ---
 
@@ -92,19 +96,63 @@ span_naming: []
 
 ---
 
-## 4. design.md 模板
+## 4. design.md 模板（六段式 — 与 detail-design-framework.md 一致）
 
 ```markdown
 # Design: <标题>
 
-## 1. Root Cause Analysis
-## 2. Solution Design
-## 3. Key Interfaces / Types
-## 4. Data Flow
-## 5. File Manifest（新增/修改/删除文件清单）
-## 6. Regression Risk Assessment
-## 7. Rollback Plan
+**Change ID:** <change-id>
+**Demand ID:** DM-YYYYMMDD-NNN
+**Status:** S3_Design
+**Parent Proposal:** `proposal.md`
+**Template:** `docs/methodology/detail-design-framework.md`（六段式）
+**Created:** YYYY-MM-DD
+
+---
+
+## ① 架构目标
+- 业务目标（解决哪些痛点，列出对应 AC）
+- 技术目标（量化指标：P99 / Coverage / QPS 等）
+- 约束条件（SemVer / 合规 / 灰度 / Pure types / 错误码闭合）
+
+## ② 架构原则
+- 设计原则（10 条以内，每条对应落地方式 + AC）
+- 命名规范（DSAFT ID / Type / Error Code / Span Op / Metric 模板）
+- 代码风格（函数 < 50 行 / 文件 < 800 行 / 异常不过模块边界）
+
+## ③ 业务流程
+- 核心用例时序图（Downlink + Uplink 端到端）
+- 异常补偿（Fallback 路径表 + 触发条件 + 幂等保障）
+- 分支处理决策树（资源耗尽 / 异常码 / 重试退避）
+
+## ④ 领域模型
+- 聚合根（4 个以内，标注职责 + 不可变性）
+- 限界上下文（包边界图 + 白名单）
+- 领域事件（Span / Metric 列表）
+- 跨域消费模型（D2/D4/D6 boundary contract）
+
+## ⑤ 核心链路图
+- 端到端路径（每跳节点 + SLA 承诺 + P99 上限）
+- 时序标注（识别瓶颈节点）
+- 单点风险与缓解（每个单点对应 AC）
+
+## ⑥ 接口 / API 设计
+- 风格（Pure types / Builder / With* 不可变）
+- 契约（错误码三元组 Code + Message + Remediation + TraceID 全链路）
+- 幂等保障表
+- 版本演进路径（v1.0 / v1.1 / v2.0）
+
+---
+
+## 附录（自由组织，不属于六段式主体）
+- 附录 A：File Manifest（新增 / 修改 / 删除文件清单）
+- 附录 B：Rollback Plan（多层回滚机制 + 触发条件）
+- 附录 C：回归风险评估（baseline 对比 + 高风险改动点 + 测试策略）
+- 附录 D：S3 检查清单自检
+- 附录 E：下一步
 ```
+
+**附录可按需裁剪**（小型 Change 可合并 A+C 至一附录），但**主体六段不可省略、不可改名**。
 
 ---
 
@@ -193,10 +241,11 @@ S2 完成前：
 - [ ] T 层测试点在 T 层注册表预登记（PLANNED）— 根索引 `openspec/t-registry.md`，域明细 `openspec/specs/d{N}-*/t-registry.md`
 
 S3 完成前：
-- [ ] `design.md` 包含根因、方案、文件清单、回归风险
+- [ ] **六段式完整性**：`design.md` 主体包含 ①架构目标 / ②架构原则 / ③业务流程 / ④领域模型 / ⑤核心链路图 / ⑥接口/API 设计 六段（章节标题与符号与 detail-design-framework.md 完全一致，**不可改名、不可省略**）
+- [ ] **六段式非空**：每段至少有 3 行实质内容（小型 Change 可放宽至 1-2 行概要，但禁止 "TBD" / "TODO" / 空标题）
 - [ ] `dsaft_activities` 已标注涉及的活动 ID
-- [ ] `design.md` 明确每个 A 的 F 编排关系（A↔F）
+- [ ] `design.md` 明确每个 A 的 F 编排关系（A↔F，可在 ④领域模型或附录）
 - [ ] `specs/*/spec.md` 包含所有 Gherkin Scenario
 - [ ] 每个 Requirement 有对应的 T 层注释
-- [ ] 重大决策已记录（Decision 节）
+- [ ] 重大决策已记录（Decision 节，通常在 proposal.md §3.4）
 - [ ] Draft PR 已创建
