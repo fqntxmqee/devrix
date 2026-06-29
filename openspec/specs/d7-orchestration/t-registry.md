@@ -951,3 +951,29 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S16-A74-T01..T04** | LLM ObservationProposer + rule gate | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go` | SubContext_Executor |
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
+
+---
+
+## D7-S16 ~ S19: TaskContract 统一 (DM-20260629-006) — DESIGN ONLY
+
+> **Change:** `devrix-d7-taskcontract-unification` (DM-20260629-006)  
+> **归档：** `openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/`（S6_Archived, **DESIGN ONLY** — implementation deferred to v7.0 sprint）  
+> **v7.0 演进起点：** D7 缺契约不缺机制 → P0=TaskReport 五元素（缺 Dissent/Blockage/Resource）+ P1=TaskSpec 四元组（Plan/Channel/WorkItem 分散）4-Layer × 3-Phase  
+> **触发规范升级：** `devrix-architecture-design-six-segment-migration` (DM-20260629-007, PR #321 merged) — 本 Change 是规范升级后**第一个**按新六段式 design.md 落地的 Change（reference）
+
+### 4-Layer × 3-Phase 设计（DESIGN ONLY，0 IMPLEMENTED）
+
+| Layer | Scenario | 主题 | AC 数 | T 点（DESIGN） | PR |
+|-------|----------|------|-------|----------------|-----|
+| L1 接口层 | **D7-S16** (TaskContract 接口) | TaskSpec struct + TaskReport struct + 3 处创建点统一迁移 | AC1, AC2 | 2 T (A01-T01 + A02-T01) | PR-A |
+| L2 字段语义层 | **D7-S17** (TaskContract 字段语义) | Dissent + Blockage + Resource 字段填充 | AC3, AC4, AC5 | 3 T (A01-T01 + A02-T01 + A03-T01) | PR-A |
+| L3 防御运行时层 | **D7-S18** (TaskContract 防御运行时) | Pessimistic Commit + Hard Evidence + CoW VersionChain + Rule-based Fallback + Similarity Check | AC6, AC7, AC8, AC11, AC12, AC13, AC14, AC15 | 5 T (A01-T01 + A02-T01 + A03-T01 + A04-T01 + A05-T01) | PR-B + PR-C |
+| L4 治理横切层 | **D7-S19** (TaskContract 治理横切) | spec sync + Coverage + Perf + Security + Cross-Domain Boundary + Feature Flag + Error Code + convergence span + AdaptiveThreshold + Layout guard | AC9, AC10, AC16, AC17, AC18, AC19, AC20, AC21, AC22, AC23 | 11 T (A01-T01 + A02-T01 + A03-T01 + A04-T01 + A05-T01 + A06-T01 + A07-T01 + A08-T01 + A09-T01 + A10-T01 + A11-T01 + LP-T01 + RACE-T01) | PR-A + PR-B + PR-C |
+
+> ⚠ **T 编号冲突提示：** 现有 D7-S16 = "Layer SubContext" (DM-20260627-003 + DM-20260628-002)；新 D7-S16 = "TaskContract 接口层" (本 Change DESIGN ONLY)。v7.0 sprint 实施时**必须重新分配 scenario 编号**（建议：本 Change 的 S16-S19 改名为 S20-S23 或 S17-S20 + 现有 S16 改名为 SubContext-Layer 保留）。
+
+**Phase Total (DESIGN):** 23 AC + 25 T (21 形式化 + 4 LP/RACE) + 27 Scenarios | **IMPLEMENTED:** 0 / **DESIGN:** 25/25 | **0 PR / 0 commit / 0 test**
+
+**实施计划（v7.0 sprint）：** PR-A (1 周, 6 AC) + PR-B (2 周, 8 AC) + PR-C (1.5 周, 9 AC) = **3 PR / 4.5 周 / 23 AC**。
+
+**归档位置：** `openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/`（demand.md / proposal.md / design.md 648 行 / tasks.md / specs/d7-orchestration/spec.md / acceptance-report.md / .openspec.yaml）

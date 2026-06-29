@@ -1,0 +1,120 @@
+change_id: devrix-d7-taskcontract-unification
+priority: P0
+demand_id: DM-20260629-006
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S16  # NEW: TaskContract 接口层（L1）
+  - D7-S17  # NEW: TaskContract 字段语义层（L2）
+  - D7-S18  # NEW: TaskContract 防御运行时层（L3）
+  - D7-S19  # NEW: TaskContract 治理横切层（L4）
+dsaft_activities:
+  # L1 接口层
+  - D7-S16-A01  # Define TaskSpec struct + builder
+  - D7-S16-A02  # Define TaskReport struct + builder
+  # L2 字段语义层
+  - D7-S17-A01  # Dissent 字段填充 + Learn 节点沉淀
+  - D7-S17-A02  # Blockage 字段填充 + 重规划驱动
+  - D7-S17-A03  # Resource 字段填充（从 ContextBudget 抽取）
+  # L3 防御运行时层
+  - D7-S18-A01  # Pessimistic Commit + MVPArtifact
+  - D7-S18-A02  # Hard Evidence 防共谋
+  - D7-S18-A03  # CoW VersionChain
+  - D7-S18-A04  # Rule-based Fallback 候选规则
+  - D7-S18-A05  # Similarity Check 防递归塌陷
+  # L4 治理横切层
+  - D7-S19-A01  # Migration Plan + type alias lifecycle
+  - D7-S19-A02  # Spec 文档同步（d7-domain.md v7.0）
+  - D7-S19-A03  # Test Coverage ≥ 80%
+  - D7-S19-A04  # Performance Budget P99 < 1ms
+  - D7-S19-A05  # Security Classification
+  - D7-S19-A06  # Cross-Domain Boundary checks
+  - D7-S19-A07  # Feature Flag 灰度
+  - D7-S19-A08  # Error Code 闭合（ORCH_* SentinelError）
+  - D7-S19-A09  # convergence.feasible_space_width span
+  - D7-S19-A10  # AdaptiveThreshold 接入 RunTurn（解 TD-WT-01）
+  - D7-S19-A11  # Layout guard interfaces 包
+t_points:
+  # PR-A T 层（6 AC → 6+ T）
+  - D7-S16-A01-T01  # TaskSpec struct 单测
+  - D7-S16-A02-T01  # TaskReport struct 单测
+  - D7-S17-A01-T01  # Dissent 字段填充逻辑测试
+  - D7-S17-A02-T01  # Blockage 字段填充逻辑测试
+  - D7-S17-A03-T01  # Resource 字段填充逻辑测试
+  - D7-S19-A02-T01  # spec 文档同步验证（CI gate）
+  # PR-B T 层（8 AC → 8+ T）
+  - D7-S18-A01-T01  # Pessimistic Commit 触发测试
+  - D7-S18-A02-T01  # Hard Evidence 拒绝测试
+  - D7-S19-A01-T01  # Migration Plan type alias 生命周期测试
+  - D7-S19-A06-T01  # Cross-Domain boundary_test 套件
+  - D7-S19-A07-T01  # Feature Flag 灰度测试
+  - D7-S19-A08-T01  # Error Code 闭合测试
+  - D7-S19-LP-T01   # LP-1/LP-2/LP-5 回归测试（AC10）
+  - D7-S19-RACE-T01 # race test 全包验证（AC9）
+  # PR-C T 层（9 AC → 9+ T）
+  - D7-S18-A03-T01  # CoW VersionChain 测试
+  - D7-S18-A04-T01  # Rule-based Fallback 候选规则测试
+  - D7-S18-A05-T01  # Similarity Check 拦截测试
+  - D7-S19-A09-T01  # convergence span 测试
+  - D7-S19-A10-T01  # AdaptiveThreshold RunTurn 接线测试（解 TD-WT-01）
+  - D7-S19-A11-T01  # Layout guard 合规测试
+  - D7-S19-A03-T01  # Coverage ≥ 80% 测试
+  - D7-S19-A04-T01  # Performance Budget benchstat 测试
+  - D7-S19-A05-T01  # Security Classification 测试
+version_scope:
+  v1.0: devrix-d7-taskcontract-unification 主体落地（PR-A + PR-B + PR-C）
+  v1.1: v7.0.x 维护期补 Reference Adapter + Operator Runbook（已声明 Out of Scope）
+  v2.0: v8.0 interfaces/v2 子包演进（预留 Semver 路径）
+metrics_definitions:
+  - name: interfaces_task_spec_coverage
+    type: gauge
+    labels: [call_site]
+    description: TaskSpec 覆盖率（3 处创建点：plan.New / channel.New / workitem.New）
+  - name: taskreport_dissent_recorded_count
+    type: counter
+    labels: [verdict_kind, session_id_hash]
+    description: TaskReport.Dissent 字段填充次数（触发条件 = VERDICT=INDETERMINATE 或 fallback_used=true）
+  - name: pessimistic_commit_trigger_count
+    type: counter
+    labels: [trigger_reason, session_id_hash]
+    description: Pessimistic Commit 触发次数（trigger_reason = escape_force_exit | budget_exhausted）
+  - name: pessimistic_commit_mvp_artifact_size
+    type: histogram
+    labels: [artifact_kind]
+    description: MVPArtifact 大小分布（KB）
+  - name: worktree_versionchain_length
+    type: gauge
+    labels: [workitem_id_hash]
+    description: WorkItem.VersionChain 平均长度（target ≤ 10 / session）
+  - name: similarity_check_intercept_count
+    type: counter
+    labels: [intercept_reason]
+    description: Similarity Check 拦截次数（intercept_reason = parent_child_similarity_high）
+  - name: hard_evidence_reject_count
+    type: counter
+    labels: [verifier_kind, missing_evidence]
+    description: Hard Evidence 拒绝次数（missing_evidence = no_test | no_log | no_artifact_hash）
+  - name: cross_domain_boundary_test_count
+    type: gauge
+    labels: [domain_pair]
+    description: 跨域 boundary_test.go 套件大小（domain_pair = D2-D7 | D4-D7 | D6-D7）
+span_naming:
+  - taskreport.dissent_recorded
+  - taskreport.blockage_recorded
+  - taskreport.resource_recorded
+  - pessimistic.commit.emit
+  - worktree.versionchain.append
+  - worktree.versionchain.gc
+  - similarity.check.intercept
+  - hard.evidence.reject
+  - convergence.feasible_space_width
+  - interfaces.task_spec.created
+  - interfaces.task_report.created
+status_notes:
+  - 2026-06-29 S1 demand.md 创建（DM-20260629-006）
+  - 2026-06-29 S2 proposal.md + .openspec.yaml 创建
+  - 2026-06-29 S3 design.md 重写为六段式（按 detail-design-framework.md）
+  - 2026-06-29 S3 specs/d7-orchestration/spec.md + tasks.md 写完（27 Scenarios / 24 T 点）
+  - 2026-06-29 architecture-design.md §1.2/§1.3/§4/§8 规范升级（六段式强制）
+  - 备注：本 Change 不在 tasks.md 中放工时估算（遵循 architecture-design.md §5）
+  - 备注：本 Change 是规范升级后**第一个**按六段式 design.md 落地的 Change
