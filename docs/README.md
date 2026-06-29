@@ -21,7 +21,7 @@ Devrix 文档分为 **稳定态文档（docs/）** 和 **演进态架构归档�
 | 文档 | 说明 |
 |------|------|
 | [config.md](./config.md) | 配置项说明与热重载 |
-| [development-workflow.md](./development-workflow.md) | OpenSpec S1–S7 + GitHub Flow |
+| [development-workflow.md](./development-workflow.md) | OpenSpec S1–S6 + GitHub Flow（辅助；SoT 见 `openspec/specs/project/master.md`） |
 
 ### 架构入口（可读版，权威来源见 openspec/specs/）
 

@@ -3,7 +3,7 @@
 **版本:** 1.1.0
 **状态:** Active
 **最后更新:** 2026-06-19
-**所属阶段:** S4 实现 → S6 交付
+**所属阶段:** S4 实现 → S6-交付
 **关联规范:** `master.md` · `review-code.md` · `archiving.md`
 **适用对象:** 人类开发者 · **Cursor Agent** · **Claude Code** · 其他 IDE Agent
 
@@ -62,10 +62,10 @@ Devrix 当前为 **单人维护**（solo maintainer）。GitHub **不允许 PR �
 
 ## 3. 分支命名
 
-采用 **GitHub Flow**（见 `master.md` §3.1）：
+采用 **GitHub Flow**（见 `master.md` §3.1）。**本仓库生产分支为 `master`**（通用教程中的 `main` 与此同义）：
 
 ```
-main / master          # 生产分支（本仓库为 master）
+master                    # 生产分支
 ├── feat/<change-id>   # 功能 / 需求变更
 ├── fix/<change-id>    # 缺陷修复
 ├── docs/<topic>       # 仅文档（如 docs/domain-terminal-guides）
@@ -274,3 +274,4 @@ EOF
 |------|------|------|
 | 1.0.0 | 2026-06-16 | 初版：单人团队 PR + CI + Auto-merge；固化 master 分支保护与 Agent 清单 |
 | 1.1.0 | 2026-06-19 | CI 精简（DM-20260619-005）：删除 `integration / e2e / acceptance` 与 `layer-lint (strict gate)` required check；仅保留 `unit tests` 作为 PR smoke check；`layer-lint` 降为 warn-only |
+| 1.2.0 | 2026-06-26 | §3.1 明确 `main`/`master` 同指本仓库生产分支 |

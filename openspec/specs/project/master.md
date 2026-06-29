@@ -1,8 +1,8 @@
 # Devrix 项目研发规范
 
-**版本:** 1.2.0
+**版本:** 1.3.0
 **状态:** Active
-**最后更新:** 2026-06-16
+**最后更新:** 2026-06-26
 
 ---
 
@@ -25,7 +25,7 @@
 | 架构设计规范 | `architecture-design.md` | .openspec.yaml、proposal/design/spec 模板与设计原则 |
 | 设计 Review 规范 | `review-design.md` | S3 门禁：设计审查清单与通过标准 |
 | 编码规范 | `coding.md` | Go 编码规则（引全局规则 + 项目补充） |
-| 测试规范 | `testing.md` | 测试金字塔、T 层追溯、覆盖率要求（引 testing-framework/spec.md） |
+| 测试规范 | `testing.md` | 测试金字塔、T 层追溯、覆盖率、**acceptance-report 模板** |
 | 代码 Review 规范 | `review-code.md` | S4 门禁：代码审查清单与通过标准 |
 | 归档规范 | `archiving.md` | S6 归档检查清单与操作流程 |
 | **Git / PR 工作流** | **`git-workflow.md`** | **分支保护、PR、CI、Auto-merge、Agent push 清单（单人团队）** |
@@ -37,13 +37,23 @@
 
 ### 2.1 六阶段总览
 
+流程阶段为 **S1–S6 六阶段**；S3-Gate / S4-Gate 为阶段内门禁，不单独编号。
+
 ```
-S1 需求 → S2 提案 → S3 设计 → S4 实现 → S5 验收 → S6 归档
-  │          │          │          │          │          │
-Issue    分支       Draft PR   逐 commit    test-all    merge
-         .yaml      design.md   实现代码    验收报告     archive
-         proposal   specs/      tasks.md
+S1 需求 → S2 提案 → S3 设计 → S3-Gate → S4 实现 → S4-Gate → S5 验收 → S6 交付 → S6 归档
+  │          │          │         │          │         │          │          │          │
+demand   .yaml +    design.md  Review   代码+测试   Review   acceptance  PR merge   archive/
+         proposal   specs/     通过     tasks.md    通过     report      master     域文档同步
 ```
+
+**S6 两子步（顺序固定，同属阶段 S6，不可颠倒）：**
+
+| 子步 | 名称 | 规范 | 产出 |
+|------|------|------|------|
+| S6-交付 | Merge | `git-workflow.md` | PR squash 合入 `master` |
+| S6-归档 | Archive | `archiving.md` | `openspec/archive/` + 索引/域文档同步 |
+
+**元数据状态 `s7_archived`：** `.openspec.yaml` 的终端状态枚举沿用 `s7_` 前缀（历史命名）；**不是**第八个流程阶段。流程仍以 S6 归档结束；归档完成后将 `status` 设为 `s7_archived`。
 
 ### 2.2 阶段→规范路由表
 
@@ -57,9 +67,9 @@ Agent 或开发者进入任一阶段时，**必须**加载对应的子规范。�
 | **S3-Gate** | **Reviewer** | **`review-design.md`** | **Review 结论** | **设计审查通过** |
 | S4 实现 | 开发者 | `coding.md`、`testing.md` | 代码 + 测试 + `tasks.md` | `go vet` + `test-unit` 通过 |
 | **S4-Gate** | **Reviewer** | **`review-code.md`** | **Review 结论** | **代码审查通过** |
-| S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 T 层 100% PASS、覆盖率 ≥ 80% |
-| **S6 交付** | **维护者 / Agent** | **`git-workflow.md`** | **PR 合入 `master`** | **CI 全绿 + Auto-merge（单人：0 approval）** |
-| S6 归档 | 维护者 | `archiving.md` | `archive/` 目录 + 域文档同步（如需要） | 归档检查清单 + 域文档同步评估通过 |
+| S5 验收 | QA | `testing.md` | `acceptance-report.md` | P0 T 层 100% PASS、覆盖率 ≥ 80%、**verdict: ACCEPTED**；PR CI 仅 `unit tests` smoke，S5 须跑 `./scripts/test-all.sh` |
+| **S6-交付** | **维护者 / Agent** | **`git-workflow.md`** | **PR 合入 `master`** | **CI 全绿 + Auto-merge（单人：0 approval）** |
+| **S6-归档** | 维护者 | `archiving.md` | `archive/` 目录 + 域文档同步（如需要） | 归档检查清单 + 域文档同步评估通过；`.openspec.yaml` → `s7_archived` |
 
 ### 2.3 如何使用
 
@@ -76,19 +86,19 @@ Agent 或开发者进入任一阶段时，**必须**加载对应的子规范。�
 
 ### 3.1 分支策略
 
-采用 **GitHub Flow**。`main` 始终保持可部署。
+采用 **GitHub Flow**。本仓库生产分支为 **`master`**（GitHub 默认分支名；部分文档或通用教程中的 `main` 均指同一分支）。
 
 ```
-main
-  └── feat/<change-id>     # 功能分支
+master
+  └── feat/<change-id>     # 功能分支（change-id 含 devrix- 前缀，如 feat/devrix-tool-security）
   └── fix/<change-id>      # 修复分支
 ```
 
 规则：
 - 一个 Change 一个分支
-- 分支从 `main` 拉出，合并回 `main`
+- 分支从 `origin/master` 拉出，合并回 `master`
 - 合并前 CI 必须通过
-- 禁止 force push 到 `main`
+- 禁止 force push 到 `master`
 
 ### 3.2 提交信息格式
 

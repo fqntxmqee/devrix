@@ -5,10 +5,10 @@
 ## 研发流程
 
 ```
-S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-Gate(Review) → S5 验收 → S6 归档
+S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-Gate(Review) → S5 验收 → S6-交付(Merge) → S6-归档(Archive)
 ```
 
-**所有开发活动遵循 OpenSpec 规范。** 规范权威来源：`openspec/specs/project/master.md`
+**六阶段 + 两门禁 + S6 两子步。** 规范权威来源：`openspec/specs/project/master.md`
 
 ## 阶段→规范路由（关键）
 
@@ -18,14 +18,14 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 | 阶段          | 加载规范                                         | 门禁                      |
 | ----------- | -------------------------------------------- | ----------------------- |
 | S1 需求       | `requirements.md`                            | DM ID 合法                |
-| S2 提案       | `requirements.md` + `architecture-design.md` | 文件完整性                   |
+| S2 提案       | `requirements.md` + `dsaft-methodology.md` + `architecture-design.md` | 文件完整性                   |
 | S3 设计       | `architecture-design.md`                     | —                       |
-| **S3-Gate** | `**review-design.md`**                       | 设计审查通过                  |
+| **S3-Gate** | `review-design.md`                           | 设计审查通过                  |
 | S4 实现       | `coding.md` + `testing.md`                   | go vet + test-unit      |
-| **S4-Gate** | `**review-code.md`**                         | 代码审查通过                  |
+| **S4-Gate** | `review-code.md`                             | 代码审查通过                  |
 | S5 验收       | `testing.md`                                 | P0 T 层 100% + 覆盖率 ≥ 80% |
-| **S6 交付**   | **`git-workflow.md`**                        | PR 合入 master（CI + Auto-merge） |
-| S6 归档       | `archiving.md`                               | 归档检查清单                  |
+| **S6-交付**   | `git-workflow.md`                            | PR 合入 master（CI + Auto-merge） |
+| **S6-归档**   | `archiving.md`                               | 归档检查清单 + `s7_archived` |
 
 
 所有子规范路径：`openspec/specs/project/<规范名>`
@@ -37,6 +37,6 @@ S1 需求 → S2 提案 → S3 设计 → S3-Gate(Review) → S4 实现 → S4-G
 - **不可变性**: 创建新对象，禁止原地修改
 - **文件规模**: 函数 < 50 行，文件 < 800 行
 - **Git**: GitHub Flow，`feat/<change-id>` 分支，squash merge + auto-merge；**流程 SoT：`openspec/specs/project/git-workflow.md`**
-- **T 层测试点**: 编号 `D{X}-S{X}-T{NN}`（DSAFT 标准），注册在 `openspec/t-registry.md`
+- **T 层测试点**: 编号 `D{X}-S{X}-A{XX}-T{XX}` 或 `D{X}-S{X}-A{XX}-F{XX}-T{XX}`（DSAFT 标准），注册在 `openspec/t-registry.md`
 - **Change 目录**: `openspec/changes/<change-id>/`，归档到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`
 

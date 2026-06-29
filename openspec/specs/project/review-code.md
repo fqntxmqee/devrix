@@ -127,7 +127,7 @@ Review 完成时确认：
 **S4-Gate 不跳过**，签收方式改为：
 
 1. **Agent 或作者** 按 §2 全表自检，结果写入 PR 描述的「S4-Gate 自检」章节
-2. **CI** 三项 required checks 全绿（`git-workflow.md` §4）
+2. **CI** 1 项 required check 全绿：`unit tests`（`git-workflow.md` §4）
 3. **Auto-merge** 开启后由 GitHub 自动 squash 合入
 
 禁止：因无 Reviewer 而直接 push `master` 或绕过 CI。

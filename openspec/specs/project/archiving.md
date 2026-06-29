@@ -1,9 +1,9 @@
 # 归档规范
 
-**版本:** 1.1.0
+**版本:** 1.2.0
 **状态:** Active
-**所属阶段:** S6
-**前置阶段:** S5 验收通过、PR 已合并到 main
+**所属阶段:** S6-归档（S6 的第二子步；S6-交付见 `git-workflow.md`）
+**前置阶段:** S5 验收通过、S6-交付完成（PR 已 squash 合入 `master`）
 
 ---
 
@@ -11,9 +11,9 @@
 
 S6 归档在以下条件**全部满足**后执行：
 
-- [ ] PR 已合并到 `main` 分支
-- [ ] S5 验收报告状态为 PASS
-- [ ] 所有 P0 T 层测试 100% PASS
+- [ ] PR 已合并到 `master` 分支（S6-交付完成）
+- [ ] S5 验收报告 **`verdict: ACCEPTED`**（或文档化 **`PARTIAL`**，defer 已在 proposal Out of Scope 声明）
+- [ ] 所有 P0 T 层测试 100% **PASS**（报告矩阵中）
 - [ ] T 层注册表对应条目已更新为 IMPLEMENTED（根索引 `openspec/t-registry.md` + 域注册表 `openspec/specs/d{N}-*/t-registry.md`）
 
 ---
@@ -30,7 +30,7 @@ S6 归档在以下条件**全部满足**后执行：
 - [ ] `design.md` 存在
 - [ ] `tasks.md` 存在
 - [ ] `specs/*/spec.md` 存在
-- [ ] `acceptance-report.md` 存在且结论为 ACCEPTED
+- [ ] `acceptance-report.md` 存在且 frontmatter **`verdict`** 为 `ACCEPTED` 或文档化 `PARTIAL`
 
 ### 2.2 状态一致性
 
@@ -143,7 +143,7 @@ git pull origin feat/<change-id> 2>/dev/null || true
 
 # 2. 确认前置条件
 # - PR 已合并到 master（场景 A）或即将通过当前 PR 合并（场景 B）
-# - acceptance-report.md 已创建且结论为 ACCEPTED
+# - acceptance-report.md 已创建且 verdict 为 ACCEPTED（或文档化 PARTIAL）
 # - .openspec.yaml status 已更新为 s7_archived
 
 # 3. 移动 change 到 archive
@@ -177,7 +177,7 @@ gh pr create --title "archive: <change-id> S6 归档" \
     --body "## Summary
 - 归档 change: <change-id>
 - Demand ID: <demand-id>
-- S5 验收: ACCEPTED
+- S5 验收: ACCEPTED（verdict 字段）
 - 代码 PR: #<number> (场景 A) / 当前 PR (场景 B)
 
 ## 归档内容
@@ -257,3 +257,4 @@ S6 归档完成后，**必须**清理对应分支：
 |---------|------|---------|
 | 1.0.0 | 2026-06-07 | 初始归档规范 |
 | 1.1.0 | 2026-06-16 | 新增 §3.0 分支策略（场景 A/B）+ §7 分支清理；禁止在 master 直推归档、禁止混入其他功能分支 |
+| 1.2.0 | 2026-06-26 | 统一 verdict（ACCEPTED/PARTIAL）与测试行 PASS 的用词；与 testing.md v1.1.0 对齐 |
