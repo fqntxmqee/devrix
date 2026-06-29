@@ -10,8 +10,8 @@ func TestLoaderLoadAsSectionsEnglish(t *testing.T) {
 	loader := NewLoader(nil, i18n.LocaleEN)
 	sections := loader.LoadAsSections("/tmp")
 
-	if len(sections) != 14 {
-		t.Errorf("expected 14 sections, got %d", len(sections))
+	if len(sections) != 11 {
+		t.Errorf("expected 11 sections, got %d", len(sections))
 	}
 
 	if len(sections) > 0 && !contains(sections[0], "You are an interactive agent") {
@@ -22,8 +22,8 @@ func TestLoaderLoadAsSectionsEnglish(t *testing.T) {
 func TestLoaderLoadAsSectionsChineseDefault(t *testing.T) {
 	loader := NewLoader(nil, i18n.DefaultLocale)
 	sections := loader.LoadAsSections("/tmp")
-	if len(sections) != 14 {
-		t.Fatalf("expected 14 sections, got %d", len(sections))
+	if len(sections) != 11 {
+		t.Fatalf("expected 11 sections, got %d", len(sections))
 	}
 	if !contains(sections[0], "软件工程") {
 		t.Fatalf("expected Chinese intro, got: %.80q", sections[0])
@@ -36,8 +36,8 @@ func TestLoaderLoadWithDynamic(t *testing.T) {
 	dynamic := []string{"# Dynamic Section\nDynamic content here"}
 	sections := loader.LoadWithDynamic("/tmp", dynamic)
 
-	if len(sections) != 16 {
-		t.Errorf("expected 16 sections, got %d", len(sections))
+	if len(sections) != 13 {
+		t.Errorf("expected 13 sections, got %d", len(sections))
 	}
 
 	found := false

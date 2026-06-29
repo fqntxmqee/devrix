@@ -15,8 +15,7 @@ func FormatGitStatus(loc Locale, branch, status, logLines string, statusTruncate
 	}
 	var b strings.Builder
 	if loc == LocaleEN {
-		b.WriteString("This is the git status at the start of the conversation. ")
-		b.WriteString("Note that this status is a snapshot in time, and will not update during the conversation.\n\n")
+		b.WriteString("Git snapshot (not updated during the conversation):\n\n")
 		if branch != "" {
 			fmt.Fprintf(&b, "Current branch: %s\n\n", branch)
 		}
@@ -29,7 +28,7 @@ func FormatGitStatus(loc Locale, branch, status, logLines string, statusTruncate
 			fmt.Fprintf(&b, "Recent commits:\n%s", logLines)
 		}
 	} else {
-		b.WriteString("以下是对话开始时的 git 状态快照，对话过程中不会自动更新。\n\n")
+		b.WriteString("Git 快照（对话中不自动更新）：\n\n")
 		if branch != "" {
 			fmt.Fprintf(&b, "当前分支: %s\n\n", branch)
 		}
