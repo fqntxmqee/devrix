@@ -1,7 +1,7 @@
 # D7 Orchestration Span 注册表
 
 **Domain:** D7 Orchestration
-**Version:** 4.1.0
+**Version:** 4.2.0
 **Status:** Active (2026-06-26)
 **Domain SoT:** `d7-domain.md`
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
@@ -9,6 +9,8 @@
 > **Trace 树 / Span↔T / P0 Runbook：** 见 `observability-guide.md` §1–§7（本文仅登记 operation 名，不展开流程）。
 >
 > **v6.0.0 6 S 精简 + 5 个新 Span 落地（2026-06-26）：** 14 S → 6 S Span 重归类 + 5 个新 P0/P1 Span（channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select），共 23 ops + 9 sessionSpan attributes。详见 §Operations 与 §SessionSpan Attributes。
+>
+> **v4.2.0 路径同步（2026-06-26，DM-20260629-001 PR-4）：** 6 S 精简后 Component 列与 6 S + 1 横切实际包路径 1:1 对齐：S1=`workmodel` / S2=`sessionorchestrator`（含 `session` 别名）/ S3=`wavescheduler` / S4=`executionflow` + `verify` / S5=`decisionplanning` + `observe` / S6=`mups` / Cross-cutting=`hardening` + `escape` 别名（V5 EscapeEngine 物理独立）。无新增/删除 operation。
 >
 > **v4.1.0 DM-20260626-009 follow-up（2026-06-26）：** 新增 3 个内层 observability span（`D7_Worktree_Op` P1 + `D7_SubWorktree_Run` P2 + `D7_SubTurn_Iteration` P1），ops 总数 23 → 26；新增 §WorkItem Inner Layer Trace 树。详见 §Operations 与 §WorkItem Inner Layer Trace 树。
 

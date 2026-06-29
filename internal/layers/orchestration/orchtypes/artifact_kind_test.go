@@ -9,10 +9,10 @@ import (
 
 func TestArtifactKind_4Types_String(t *testing.T) {
 	cases := map[ArtifactKind]string{
-		ArtifactStateChangeCert: "state_change_cert",
-		ArtifactResponseRecord:  "response_record",
-		ArtifactProbeReport:     "probe_report",
-		ArtifactExperimentData:  "experiment_data",
+		types.ArtifactStateChangeCert: "state_change_cert",
+		types.ArtifactResponseRecord:  "response_record",
+		types.ArtifactProbeReport:     "probe_report",
+		types.ArtifactExperimentData:  "experiment_data",
 	}
 	for k, want := range cases {
 		if got := k.String(); got != want {
@@ -26,10 +26,10 @@ func TestArtifactKind_4Types_String(t *testing.T) {
 
 func TestArtifactKind_4Types_ParseRoundTrip(t *testing.T) {
 	kinds := []ArtifactKind{
-		ArtifactStateChangeCert,
-		ArtifactResponseRecord,
-		ArtifactProbeReport,
-		ArtifactExperimentData,
+		types.ArtifactStateChangeCert,
+		types.ArtifactResponseRecord,
+		types.ArtifactProbeReport,
+		types.ArtifactExperimentData,
 	}
 	for _, k := range kinds {
 		t.Run(k.String(), func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestArtifactKind_UnknownValue_ParseError(t *testing.T) {
 func TestArtifactKind_JSON_WireFormat(t *testing.T) {
 	// JSON wire format must be a string (snake_case), not the underlying uint8.
 	// D5 dashboards key on the string form; a number would break filtering.
-	k := ArtifactProbeReport
+	k := types.ArtifactProbeReport
 	data, err := json.Marshal(k)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
@@ -71,19 +71,19 @@ func TestArtifactKind_JSON_WireFormat(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if got != ArtifactProbeReport {
-		t.Errorf("Unmarshal = %d, want %d", got, ArtifactProbeReport)
+	if got != types.ArtifactProbeReport {
+		t.Errorf("Unmarshal = %d, want %d", got, types.ArtifactProbeReport)
 	}
 }
 
 func TestArtifactKind_UnmarshalEmptyString_DefaultsToZero(t *testing.T) {
 	// Backward compat: a v2 Artifact with no Kind field deserializes to
-	// ArtifactStateChangeCert (zero value) rather than failing.
+	// types.ArtifactStateChangeCert (zero value) rather than failing.
 	var k ArtifactKind
 	if err := json.Unmarshal([]byte(`""`), &k); err != nil {
 		t.Fatalf("Unmarshal empty: %v", err)
 	}
-	if k != ArtifactStateChangeCert {
+	if k != types.ArtifactStateChangeCert {
 		t.Errorf("empty string should default to zero value, got %d", k)
 	}
 }

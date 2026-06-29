@@ -3,10 +3,10 @@
 **文档类型:** 详细架构设计（遵循 `docs/methodology/detail-design-framework.md`）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 4.4.0
+**Version:** 4.5.0
 **Status:** Active
-**Last Updated:** 2026-06-26 (v4.4 bootstrap-slim)
-**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214) + devrix-d7-6s-bootstrap-slim (DM-20260626-007)
+**Last Updated:** 2026-06-29 (v4.5 dsaft-restructuring: god fn split + boundary debt + rollup governance)
+**Change ID:** devrix-d7-v2-structure (DM-20260619-005) + devrix-d7-metrics-and-concurrency-hardening (DM-20260622-001) + devrix-d7-dead-files-cleanup (DM-20260625-013..016, PR #214) + devrix-d7-6s-bootstrap-slim (DM-20260626-007) + devrix-d7-dsaft-restructuring (DM-20260629-001, PR #280-#289)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`
 **需求澄清:** `openspec/changes/devrix-d7-orchestration-domain/demand.md`
 **契约 SoT:** `internal/shared/contracts/execution_flow.go`
@@ -729,14 +729,36 @@ D5 dashboard 可直接通过这 9 个 sessionSpan 字段过滤，无需进入子
 
 ---
 
+## ⑧.5 Cross-Domain Boundary Decision Table（DM-20260629-001 PR-9 T46）
+
+> 3 项越界能力临时放在 D7 域（含 orchtypes/ + workmodel/ 子目录），归属存在争议。每项分配 `boundary-debt:{name}-v{major}.{minor}` 常量以便 v7.0 重新评估时精准迁移。常量定义见 `internal/layers/orchestration/orchtypes/boundary_decision.go`，单元测试 4 项 PASS（`boundary_decision_test.go`）。
+
+| Boundary Debt ID | 能力 | 当前归属 D | 跨域性质 | 当前状态 | 推荐归属 | Future re-evaluate 触发条件 |
+|------------------|------|------------|----------|----------|----------|----------------------------|
+| `boundary-debt:reputation-evidence-v7.0` | **ReputationEvidence** | D7 / workmodel | Bayesian reputation 数据结构跨 Learn (D7-S11) → Observe (D7-S5) 双向消费 | v6.0.0 临时归属 D7 | shared/types (跨域公共) | v7.0 Phase 8 reputation migration: 若 ≥ 2 个非 D7 域（D2 / D6）开始读写 ReputationEvidence 时迁移 |
+| `boundary-debt:system-anomaly-v7.0` | **SystemAnomaly** | D7 / hardening | 阈值触发逻辑跨 Verify (D7-S4) + Observe (D7-S5) 双消费；阈值参数跨 session | v6.0.0 临时归属 D7 hardening/ | hardening/ 横切包（已存在） | v7.0 Phase 9 hardening v2: 若 hardening/ 拆出独立 `crosscut/` 子包时，连同 SystemAnomaly 一起 promote |
+| `boundary-debt:adaptive-prior-v7.0` | **AdaptivePrior** | D7 / workmodel | Bayesian 状态跨 SessionOrchestrator (D7-S2) + Learner (D7-S11) 双读写；Beta(α,β) 状态含冷启动兜底 | v6.0.0 临时归属 D7 workmodel/ | D2 contextengine (持久化 + 共享) | v7.0 Phase 10 context v3: 若 D2 引入 `PriorStore` 接口（持久化 + 跨 session 共享）时迁移 AdaptivePrior 归属 |
+
+**Decision 表读取规则：**
+- **当前归属 D**：能力定义所在的物理包（orchtypes/ + workmodel/ + hardening/）
+- **跨域性质**：被哪些 D7-S 子系统消费 / 写入
+- **当前状态**：临时归属（v6.0.0 临时方案）
+- **推荐归属**：v7.0 重新评估时的目标位置
+- **Future re-evaluate 触发条件**：必须满足的客观条件（不能主观判断）
+
+**关联文档：** `d7-domain.md §Out of Scope`（能力层声明） · `orchtypes/boundary_decision.go`（常量 SoT） · `orchtypes/boundary_decision_test.go`（4 测试覆盖）。
+
+---
+
 ## ⑨ 关联文档
 
 - `d7-domain.md`：MUPS 5 节点管道 SoT + 6 S + 1 横切（v6.0.0，14 S 已精简）
-- `spec.md` / `t-registry.md`：180 T 层绑定
+- `spec.md` / `t-registry.md`：248 T 层绑定 + Span Evidence 94% 覆盖（v4.12.0）
 - `a-registry.md` / `f-registry.md`：49 A + 68 F 登记（v6.0.0 6 S 精简：56 → 49 / 75 → 68）
 - `span-registry.md`：MUPS 5 节点 + 9 sessionSpan attributes + 5 新 P0/P1 ops（v6.0.0）
 - `terminal-state-guide.md`：14 ExitReason + Auto-Close 4 规则 + ResumeSession 3 决策路由 + §3 6 S 精简
-- `observability-guide.md`：5 节点 Trace 树 + P0 Runbook + Span↔T 6 S 归类
+- `observability-guide.md`：5 节点 Trace 树 + P0 Runbook + Span↔T 6 S 归类 + §8.1 T-Without-Span Tracker
+- `boundary_decision.go`：3 项 boundary-debt 常量 SoT（DM-20260629-001 PR-9）
 - `task-planning-design.md`：MUPS Plan 节点专项设计（Phase 2 PR-B1）
 - `pipeline-architecture.md`：端到端调用链路总图
 
@@ -816,3 +838,4 @@ PR-4 落地后，InitOrchestration 函数体 **140 行**（从原始 275 行下�
 | **4.2.0** | **2026-06-26** | **turn/ → sessionorchestrator/ 整包物理合并（DM-20260626-004）**：§② 包结构 S2 节描述从"S2 主目录 + turn/ 子包"改为"S2 单一博弈角色单一 Go 包"；§⑨ 关联文档指针同步更新（orchestration/turn/ → orchestration/sessionorchestrator/）；A/F 表中所有 turn/ 路径 → sessionorchestrator/ + turn_ 前缀（5 重命名文件）；§Cross-cutting Hardening 关系图更新（hardening/ ↔ sessionorchestrator/ 单一入口）；D7-S2-A50 4 新 P0 T（int_path_replace / test_cycle_break / 0_signatures / 0_residual_pkg）IMPLEMENTED → 域 t-registry v4.4.0 |
 | **4.3.0** | **2026-06-26** | **verify-promotion 包归属迁移（DM-20260626-005）**：§② 包结构 S4 节描述从"S4 ExecutionFlow + Verify（Costly Signaler + Certifier）= FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + 14 ExitReason + SystemAnomaly 检测"改为 "S4 ExecutionFlow + Verify = FlowEvent 聚合 + 4 态 Verdict + VerifyWithRetry + **executionflow/verify/{exit_reason.go + verdict_to_exit_reason.go} 14 ExitReason + VerdictToExitReason 4 态映射** + SystemAnomaly 检测"；§⑤ Verify 章节 `VerdictToExitReason` 实现位置 `sessionorchestrator/verdict_to_exit_reason.go::VerdictToExitReason` → `executionflow/verify/verdict_to_exit_reason.go::VerdictToExitReason`（pure physical migration, 0 函数签名变化）；§⑨ 关联文档指针同步更新（orchestration/sessionorchestrator/exit_reason.go → orchestration/executionflow/verify/exit_reason.go + orchestration/sessionorchestrator/verdict_to_exit_reason.go → orchestration/executionflow/verify/verdict_to_exit_reason.go）；D7-S4-A50 4 新 P0 T（3 files git mv / package rename + 13 处 replace / 0 cycle / 22-22 PASS）PLANNED → 域 t-registry v4.5.0 |
 | **4.4.0** | **2026-06-26** | **Bootstrap Wire 拓扑收口（DM-20260626-007 / devrix-d7-6s-bootstrap-slim）**：新增 §⑩ Bootstrap Wire 拓扑章节，详细描述 (1) **6 S × WireFunc 函数清单**：5 个 `Wire*` 函数（`WireTurnInvoker` S2 / `WireWaveScheduler` S3 / `WireExecutionFlow` S4 / `WireDecisionPlanning` S5 NEW / `WireMUPSPipeline` S6 NEW）+ 1 个 `BuildOrchestratePath` S3 helper；(2) **InitOrchestration 主体 ≤ 200 行**（PR-4 落地后 140 行，-49%）；(3) **辅助函数清单**：`loadOrchestratorConfigs` (24 行) + `resolveObsBridge` (6 行) + 4 个 util 函数在 `util.go` (30 行)；(4) **Adapter 拓扑**：3 个 adapter 分散在 2 文件（`turn_adapter.go` 502 行已独立 + `adapters.go` 48 行 NEW）；(5) **PR 落地序列**：4 PR (#225 util + #226 adapters + #227 S5+S6 wire + #228 config+obsBridge+docs)；D7-S2-A51 4 新 P0 T IMPLEMENTED → 域 t-registry v4.6.0 |
+| **4.5.0** | **2026-06-29** | **dsaft-restructuring PR-9 Cross-Domain Boundary Decision（DM-20260629-001 T46）**：新增 §⑧.5 Cross-Domain Boundary Decision 表，3 项 boundary debt 完整登记（ReputationEvidence → shared/types / SystemAnomaly → hardening/ 横切包 / AdaptivePrior → D2 contextengine）+ Future re-evaluate 触发条件；§⑨ 关联文档新增 `orchtypes/boundary_decision.go` + `t-registry.md v4.12.0` + `observability-guide.md v2.2.0` 链接；d7-domain.md §Out of Scope 同步新增 Pending Boundary Decision 列 |

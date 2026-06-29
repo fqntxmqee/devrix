@@ -27,7 +27,8 @@ type ItemPipelineRunner struct {
 	Learner         learn.Learner
 	Tasks           *workmodel.TaskManager
 	TrackMode       string
-	ContextProposer workmodel.ContextProposer
+	ContextProposer      workmodel.ContextProposer
+	ObservationProposer  ObservationProposer
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Replaces the prior Router/Channel/tool-pipeline path.
 	Executor WorkItemExecutor
@@ -59,6 +60,8 @@ type ItemPipelineDeps struct {
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Required. nil → NewItemPipelineRunner returns an error.
 	Executor WorkItemExecutor
+	// ObservationProposer optional LLM proposer @ Observe (T35); nil → rules only.
+	ObservationProposer ObservationProposer
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -79,12 +82,13 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		classifier = decisionplanning.NewRuleClassifier(nil)
 	}
 	return &ItemPipelineRunner{
-		Classifier: classifier,
-		Planner:    planner,
-		Learner:    deps.Learner,
-		Tasks:      deps.Tasks,
-		TrackMode:  deps.TrackMode,
-		Executor:   deps.Executor,
+		Classifier:          classifier,
+		Planner:             planner,
+		Learner:             deps.Learner,
+		Tasks:               deps.Tasks,
+		TrackMode:           deps.TrackMode,
+		Executor:            deps.Executor,
+		ObservationProposer: deps.ObservationProposer,
 	}, nil
 }
 
@@ -137,6 +141,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	isRollup := item.NeedsRollup
 	directive := DirectiveForItem(sessionID, item, r.Tasks)
+	if item.Kind == workmodel.WorkKindGoal {
+		directive = DirectiveForGoalPlan(item, directive)
+	}
 
 	started := time.Now()
 	roundNo := 1
@@ -150,7 +157,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks)
+	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +218,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
 	endWave(nil)
 	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")
-	result, execErr := r.Executor.ExecuteWorkItem(ctx, sessionID, item.ID, directive)
+	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{Item: item, Tasks: r.Tasks})
+	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
 	if execErr != nil {
 		// Non-fatal: continue with whatever Content was accumulated so the
@@ -221,6 +229,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		if result == nil {
 			return nil, fmt.Errorf("item_pipeline: execute: %w", execErr)
 		}
+	}
+	if result != nil {
+		ApplyGoalScopeFromExecute(sessionID, item, result.Content, r.Tasks)
 	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
@@ -398,6 +409,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	item.LastRound = round
 	item.RoundPhase = phase
 	item.Uncertainty = uncertaintyMean
+	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil && workmodel.IsTerminalStatus(got.Status) {
+		r.Tasks.RecordPeerStatusOnTerminal(sessionID, got)
+	}
 	return round, nil
 }
 

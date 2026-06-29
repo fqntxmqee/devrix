@@ -3,8 +3,10 @@ package bootstrap
 import (
 	"log/slog"
 
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/sandbox"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
@@ -19,15 +21,14 @@ import (
 )
 
 type gatewayLeaderResolver struct {
-	gw *capture.CommunicationGateway
+	agents *sessionagents.Manager
 }
 
 func (r gatewayLeaderResolver) Leader(sessionID string) (multiagent.Agent, bool) {
-	if r.gw == nil {
+	if r.agents == nil {
 		return nil, false
 	}
-	ag := r.gw.SessionAgent(sessionID)
-	return ag, ag != nil
+	return r.agents.Leader(sessionID)
 }
 
 // WireDelegate wires D4 delegate execution and D7 dispatcher dispatch.
@@ -44,7 +45,8 @@ func WireDelegate(
 	ctxCfg *config.ContextEngineConfig,
 	maCfg *config.MultiAgentConfig,
 	gw *capture.CommunicationGateway,
-	engine *contextengine.ContextEngine,
+	agents *sessionagents.Manager,
+	engine *kernel.ContextEngine,
 	toolReg contextengine.IToolRegistry,
 	hub contracts.ExecutionFlowHub,
 	tm *workmodel.TaskManager,
@@ -58,10 +60,12 @@ func WireDelegate(
 		if hub != nil {
 			fr = bridge.NewFlowReporter(hub)
 		}
-		subQuery = delegatetools.BuildSubQueryRunner(enforce.SubQueryDeps{
-			SubTurn:      st,
-			FlowReporter: fr,
-		})
+		subQuery = &delegatetools.SubQueryRunner{
+			LoopDeps: enforce.SubQueryDeps{
+				SubTurn:      st,
+				FlowReporter: fr,
+			},
+		}
 	}
 	var sb *sandbox.Manager
 	if ctxCfg.Sandbox.Enabled {
@@ -74,13 +78,13 @@ func WireDelegate(
 		exec,
 		subQuery,
 		hub,
-		gatewayLeaderResolver{gw: gw},
+		gatewayLeaderResolver{agents: agents},
 		tm.Registry(),
 	)
 
 	delegatetools.SetDeps(delegatetools.Deps{
 		Dispatcher: disp,
-		Leader:     gatewayLeaderResolver{gw: gw},
+		Leader:     gatewayLeaderResolver{agents: agents},
 		Tasks:      tm,
 	})
 

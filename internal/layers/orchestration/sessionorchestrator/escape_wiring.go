@@ -17,6 +17,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -190,6 +191,23 @@ func (o *SessionOrchestrator) applyResumeSession(
 			tracer.Attribute{Key: "escape.resume.decision_pending_id", Value: decision.PendingID},
 		)
 	}
+
+	// DM-20260629-001 PR-6 t-span-coverage (T38): emit a dedicated
+	// D7_Resume_Decision_Path span around the 3 决策路径 so that
+	// traces/dashboards can filter by route independently of sessionSpan.
+	// The 3 paths are: A user_continue fall through / B user_accept→
+	// ForceExit (terminal emit "complete") / C user_cancel→AbortWithAudit
+	// (terminal emit "complete"). A is the no-span path (no decision to
+	// observe); B/C emit one span each with attributes below.
+	endResumeSpan := hardening.EmitResumeDecisionPath(
+		context.Background(),
+		req.SessionID,
+		decision.Reason,
+		decision.Action.String(),
+		decision.AuditLevel,
+		decision.Depth,
+	)
+	defer endResumeSpan(nil)
 
 	// user_continue → fall through to full 5-node pipeline.
 	if decision.Action == escape.EscapeContinue {

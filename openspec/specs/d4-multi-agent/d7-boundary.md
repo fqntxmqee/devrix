@@ -2,8 +2,8 @@
 
 **Capability:** d4-d7-boundary
 **Status:** Active
-**Version:** 1.0.0
-**Last Updated:** 2026-06-14
+**Version:** 1.2.0
+**Last Updated:** 2026-06-30
 **Change ID:** devrix-d4-sa-refine
 **Demand ID:** DM-20260614-018
 **Parent (D4):** `openspec/specs/d4-multi-agent/d4-domain.md`
@@ -28,8 +28,8 @@
 | 组件 | v1.0 代码位置 | Canonical 归属 | v2.0 目标 |
 |------|--------------|---------------|----------|
 | delegate_* 工具 | D7 `delegatetools/` | D7-S2 | 保持 |
-| Spoke 派发 / fallback | D4 `delegate/service.go` | **D7-S2** | `hubspoke/dispatch.go` |
-| Agent FlowBridge | D4 `delegate/bridge.go` | **D7-S4** | `hubspoke/agent_bridge.go` |
+| Spoke 派发 / fallback | D4 `execute/worker.go` (原 `delegate/service.go`) | **D7-S2** | `hubspoke/dispatch.go` |
+| Agent FlowBridge | D4 `execute/` (原 `delegate/bridge.go`，已删) | **D7-S4** | `hubspoke/agent_bridge.go` |
 | SubQuery Flow 发布 | D2 `nested/flow_report.go` | **D7-S4** | `hubspoke/subquery_bridge.go` |
 | WorkPlan | D7 `workplan/` | D7-S4 | 保持 |
 | sessionqueue drain | D7 `executionflow/` (formerly `sessionqueue/`) | D7-S4 | DM-20260625-018 PR-3b |
@@ -51,7 +51,7 @@ D1.Gateway.RouteInbound
             └── [optional] D4-S12 RunAgentLoop（Leader Agent 本体）
 ```
 
-**代码锚点（v1.0）：** `internal/layers/orchestration/delegatetools/delegate_tools.go` → `multiagent/delegate/service.go`
+**代码锚点（v2.0 实际）：** `internal/layers/orchestration/delegatetools/delegate_tools.go` → `multiagent/execute/worker.go`（v1.0 旧 → `multiagent/delegate/service.go` 已迁 D7）
 
 ---
 
@@ -131,15 +131,15 @@ D1.Gateway.RouteInbound
 
 ---
 
-## 8. 跨域迁移表（v2.0，并入 DM-20260614-018）
+## 8. 跨域迁移表（v2.0，DM-20260614-018 + DM-20260629-004 PR-4）
 
-| # | 路径 | 行为 | 目标 | Slice |
-|---|------|------|------|-------|
-| 1 | `multiagent/delegate/bridge.go` | Agent→FlowEvent | D7 `hubspoke/agent_bridge.go` | b |
-| 2 | `delegate/service.go` Dispatch 逻辑 | Spoke 选择 | D7 `hubspoke/dispatch.go` | b |
-| 3 | `delegate/service.go` 执行逻辑 | fork/run/join | D4 `execute/worker.go` | b |
-| 4 | `nested/flow_report.go` | SubQuery Publish | D7 `hubspoke/subquery_bridge.go` | c |
-| 5 | `SubQueryParams.FlowHub` | 直连 Hub | 删除；D7 包装 | c |
+| # | 路径 | 行为 | 目标 | Slice | Status |
+|---|------|------|------|-------|--------|
+| 1 | `multiagent/execute/` (原 `delegate/bridge.go`，已删) | Agent→FlowEvent | D7 `hubspoke/agent_bridge.go` | b | RESOLVED (迁 D7) |
+| 2 | `multiagent/execute/worker.go` (原 `delegate/service.go`) Dispatch 逻辑 | Spoke 选择 | D7 `hubspoke/dispatch.go` | b | RESOLVED (迁 D7) |
+| 3 | `multiagent/execute/worker.go` 执行逻辑 | fork/run/join | D4 `execute/worker.go` | b | RESOLVED (D4 owns) |
+| 4 | `nested/flow_report.go` | SubQuery Publish | D7 `hubspoke/subquery_bridge.go` | c | RESOLVED |
+| 5 | `SubQueryParams.FlowHub` | 直连 Hub | 删除；D7 包装 | c | RESOLVED |
 
 ---
 
@@ -177,5 +177,6 @@ D1.Gateway.RouteInbound
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-06-14 | 初版：Hub-Spoke 全归 D7 + D4 Follower 契约 + v2.0 迁移表 |
+| 1.2.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：5 条跨域迁移路径对齐 v2.0 + Status 列 |
 | 1.1.0 | 2026-06-15 | 双边共识落盘：影子编排风险表（§9）+ Follower 对称性声明（§10）+ 反僭越契约交叉引用 |
+| 1.0.0 | 2026-06-14 | 初版：Hub-Spoke 全归 D7 + D4 Follower 契约 + v2.0 迁移表 |

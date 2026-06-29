@@ -3,6 +3,8 @@ package bootstrap
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
@@ -40,25 +42,17 @@ func InitOrchestration(
 
 	slog.Info("d7: initializing SessionOrchestrator",
 		"routing_mode", coordCfg.coordCfg.RoutingMode,
-		"fast_path_threshold", coordCfg.coordCfg.FastPathThreshold,
 		"command_first", coordCfg.coordCfg.CommandFirst,
 	)
 
-	routingMode := orchtypes.RoutingModeLoopFirst
-	if coordCfg.coordCfg.RoutingMode == "rule_orchestrate" {
-		routingMode = orchtypes.RoutingModeRuleOrchestrate
-	}
-	if routingMode == orchtypes.RoutingModeRuleOrchestrate {
-		slog.Info("d7: routing_mode=rule_orchestrate (legacy config; ingress uses RunSessionTurnLoop)",
-			"change", "devrix-d2-queryloop-dismantle",
-			"dm", "DM-20260618-010",
-		)
-	}
+	// v2.6.0 (DM-20260629-001): RoutingModeRuleOrchestrate retired; legacy
+	// "rule_orchestrate" YAML values are normalized to RoutingModeLoopFirst
+	// (orchtypes.normalizeRoutingMode in config.go).
 	coordinatorFileCfg := orchtypes.FileConfig{
-		Enabled:           boolPtr(coordCfg.coordCfg.Enabled),
-		RoutingMode:       strPtr(string(routingMode)),
-		FastPathThreshold: intPtr(coordCfg.coordCfg.FastPathThreshold),
-		CommandFirst:      boolPtr(coordCfg.coordCfg.CommandFirst),
+		Enabled:            boolPtr(coordCfg.coordCfg.Enabled),
+		RoutingMode:        strPtr(coordCfg.coordCfg.RoutingMode),
+		CommandFirst:       boolPtr(coordCfg.coordCfg.CommandFirst),
+		PriorContextRounds: intPtr(coordCfg.coordCfg.PriorContextRounds),
 	}
 	coordinatorCfg := orchtypes.BuildConfig(&coordinatorFileCfg)
 
@@ -138,9 +132,7 @@ func InitOrchestration(
 		return fmt.Errorf("d7: wire item pipeline: %w", err)
 	}
 
-	orch := sessionorchestrator.NewSessionOrchestrator(
-		coordinatorCfg,
-		nil,
+	orchOpts := []sessionorchestrator.OrchestratorOption{
 		sessionorchestrator.WithSink(sink),
 		sessionorchestrator.WithObservability(obsBridge),
 		sessionorchestrator.WithWorkModel(wm),
@@ -148,7 +140,27 @@ func InitOrchestration(
 		sessionorchestrator.WithTaskManager(tm),
 		sessionorchestrator.WithItemPipelineRunner(itemRunner),
 		sessionorchestrator.WithLearner(pipelineLearner),
-	)
+	}
+	// DM-20260628-003 (D7-S15): wire turn-state + transcript reader when
+	// the deployment sets d7.prior_context_rounds > 0. The transcript
+	// dir is resolved from coordCfg.tasksCfg.Diagnostics (matching the
+	// writer's resolution in NewTranscriptWriter) so the reader and
+	// writer point at the same jsonl files. WithPriorContextRounds
+	// builds a fresh TurnState + TranscriptReader; WithTranscriptDir
+	// overrides the default reader dir (applied AFTER
+	// WithPriorContextRounds in this slice so it wins).
+	if coordinatorCfg.PriorContextRounds > 0 {
+		orchOpts = append(orchOpts,
+			sessionorchestrator.WithPriorContextRounds(coordinatorCfg.PriorContextRounds),
+		)
+		transcriptDir := resolveTranscriptDir(coordCfg.transcriptDir)
+		if transcriptDir != "" {
+			orchOpts = append(orchOpts,
+				sessionorchestrator.WithTranscriptDir(transcriptDir),
+			)
+		}
+	}
+	orch := sessionorchestrator.NewSessionOrchestrator(coordinatorCfg, nil, orchOpts...)
 
 	entry := sessionorchestrator.NewEntry(orch)
 	gw.SetOrchestrationEntry(entry)
@@ -177,6 +189,10 @@ type orchestratorConfigs struct {
 	subagentCfg      config.SubagentConfig
 	maxContextTokens int
 	promptLanguage   string
+	// transcriptDir (DM-20260628-003, D7-S15) is the resolved
+	// context_engine.diagnostics.transcript_dir from configFile. Empty
+	// when not configured — caller falls back to env / ~/.devrix.
+	transcriptDir string
 }
 
 // loadOrchestratorConfigs loads the 4 orchestrator configs from configFile.
@@ -200,6 +216,7 @@ func loadOrchestratorConfigs(configFile string) *orchestratorConfigs {
 		if fileCfg.ContextEngine.MaxContextTokens > 0 {
 			cfg.maxContextTokens = fileCfg.ContextEngine.MaxContextTokens
 		}
+		cfg.transcriptDir = fileCfg.ContextEngine.Diagnostics.TranscriptDir
 	}
 	if _, _, _, ctxFileCfg, err := config.LoadConfig(configFile); err == nil && ctxFileCfg != nil {
 		cfg.tasksCfg = ctxFileCfg.Tasks
@@ -216,4 +233,28 @@ func resolveObsBridge(arg interface{}) *observability.Bridge {
 		return b
 	}
 	return nil
+}
+
+// resolveTranscriptDir (DM-20260628-003, D7-S15) mirrors the resolution
+// in NewTranscriptWriter so the orchestrator's TranscriptReader points
+// at the same dir the gateway's writer uses. Order:
+//  1. fileCfg.ContextEngine.Diagnostics.TranscriptDir (already loaded
+//     into coordCfg.transcriptDir by loadOrchestratorConfigs)
+//  2. $DEVRIX_TRANSCRIPT_DIR
+//  3. ~/.devrix/transcripts (or "" if home lookup fails)
+//
+// Returns "" when no source resolves — caller should treat that as
+// "use default" and not pass WithTranscriptDir (so TranscriptReader
+// falls back to its own default in sync with the writer).
+func resolveTranscriptDir(fileTranscriptDir string) string {
+	tdir := fileTranscriptDir
+	if tdir == "" {
+		tdir = os.Getenv("DEVRIX_TRANSCRIPT_DIR")
+	}
+	if tdir == "" {
+		if home, herr := os.UserHomeDir(); herr == nil {
+			tdir = filepath.Join(home, ".devrix", "transcripts")
+		}
+	}
+	return tdir
 }

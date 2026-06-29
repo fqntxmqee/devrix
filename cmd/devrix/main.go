@@ -12,6 +12,7 @@ import (
 	clidebug "github.com/devrix/devrix/internal/cli/debug"
 	evalcli "github.com/devrix/devrix/internal/cli/eval"
 	"github.com/devrix/devrix/internal/bootstrap"
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	contextanalyze "github.com/devrix/devrix/internal/cli/context_analyze"
 	doctorcli "github.com/devrix/devrix/internal/cli/doctor"
 	toolcli "github.com/devrix/devrix/internal/cli/tool"
@@ -21,7 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/communication/channel/instance"
 	"github.com/devrix/devrix/internal/layers/communication/channel/metrics"
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	asksurface "github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/evolution/guard"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -270,6 +271,7 @@ func main() {
 	// Replaces workmodel.GlobalTaskManager process-wide singleton.
 	tm := workmodel.NewTaskManagerFromConfig(ctxCfg.Tasks, obsBridge)
 
+	var sessionAgents *sessionagents.Manager
 	if multiAgentCfg.Enabled && agentFactory != nil {
 		// DM-20260617-008 W5: now that the main engine exists, wire it into
 		// the factory's deps.Engine so root session agents share the
@@ -278,7 +280,12 @@ func main() {
 			factoryImpl.SetSharedEngine(contextEngine)
 		}
 		engineBuilder.WithContext(ctx)
-		gw.SetAgentFactory(agentFactory)
+		sessionAgents = sessionagents.NewManager(agentFactory)
+		sessionAgents.SetPermissionRouter(gw)
+		sessionAgents.SetActiveProcessChecker(gw)
+		sessionAgents.SetOrphanEngineEventSink(gw.DeliverOrphanEngineEvent)
+		gw.SetBeforeDispatch(sessionAgents.EnsureSessionLeader)
+		bootstrap.WireSessionAgents(sessionAgents)
 		slog.Info("multi-agent layer enabled",
 			"max_children", multiAgentCfg.MaxChildren,
 			"max_total_agents", multiAgentCfg.MaxTotalAgents,
@@ -295,19 +302,19 @@ func main() {
 	// onto the per-agent engine builder so forked workers (D4 ParentID != "")
 	// can run Process() without "PreparedTurnRunner not wired" errors.
 	if engineBuilder != nil {
-		if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+		if ce, ok := contextEngine.(*kernel.ContextEngine); ok {
 			if runner := ce.PreparedTurnRunner(); runner != nil {
 				engineBuilder.WithPreparedTurnRunner(runner)
 			}
 		}
 	}
 
-	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, gw, agentFactory, obs)
+	initOrchestration(configFile, multiAgentCfg.Enabled, llmStack.RawGateway, sessionAgents, agentFactory, obs)
 
 	hub, _ := bootstrap.WireExecutionFlow(ctxCfg, gw, obsBridge, tm)
-	if ce, ok := contextEngine.(*contextengine.ContextEngine); ok {
+	if ce, ok := contextEngine.(*kernel.ContextEngine); ok {
 		// DM-20260617-008 W4: shared TaskManager (see tm construction above).
-		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, ce, ce.ToolRegistry(), hub, tm)
+		bootstrap.WireDelegate(ctxCfg, multiAgentCfg, gw, sessionAgents, ce, ce.ToolRegistry(), hub, tm)
 	}
 
 	gw.StartCleanupRoutine(ctx, 30*time.Second)
@@ -367,7 +374,7 @@ func main() {
 
 	if runCLI {
 		// DM-20260617-008 W4: shared TaskManager (constructed above).
-		cli := adapters.NewCLIAdapter(gw, commCfg, tm)
+		cli := adapters.NewCLIAdapter(gw, commCfg, workmodel.NewCLICommands(tm), workmodel.NewPlanCLICommands(workmodel.NewPlanMode(nil, obsBridge)))
 		if err := cli.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("cli exited with error", "error", err)
 			os.Exit(1)
@@ -398,11 +405,11 @@ func initOrchestration(
 	configFile string,
 	multiAgentEnabled bool,
 	rawGateway llmgateway.IGateway,
-	gw *capture.CommunicationGateway,
+	sessionAgents *sessionagents.Manager,
 	agentFactory multiagent.IAgentFactory,
 	obs *observability.Observability,
 ) {
-	if !multiAgentEnabled || rawGateway == nil {
+	if !multiAgentEnabled || rawGateway == nil || sessionAgents == nil {
 		return
 	}
 
@@ -417,10 +424,10 @@ func initOrchestration(
 	}
 
 	runtimeJudge := guard.NewRuntimeJudge(rawGateway, orchCfg)
-	executor := guard.NewInterventionExecutor(gw, agentFactory)
+	executor := guard.NewInterventionExecutor(sessionAgents, agentFactory)
 	guardValidator := guard.NewRuntimeGuardValidator(orchCfg, runtimeJudge, executor)
 	guardValidator.SetObservability(obs)
-	gw.SetAgentObserverFactory(func(ctx context.Context, session *types.Session) guard.AgentObserver {
+	sessionAgents.SetObserverFactory(func(ctx context.Context, session *types.Session) guard.AgentObserver {
 		return guard.NewGuardObserver(guardValidator, ctx, session)
 	})
 	slog.Info("guard validator enabled",

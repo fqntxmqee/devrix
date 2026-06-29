@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/registry"
 	"github.com/devrix/devrix/internal/layers/multiagent"
@@ -72,7 +74,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	reg := &criticalBashRegistry{BuiltinRegistry: mustBuiltinRegistry(t)}
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &bashOncePreparedTurn{},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{},
@@ -86,7 +88,7 @@ func TestIntegration_GatewayResolveAgentPermission(t *testing.T) {
 		multiagent.AgentDeps{Engine: engine},
 		config.DefaultMultiAgentConfig(),
 	)
-	gw.SetAgentFactory(factory)
+	testutil.WireGatewaySessionAgents(gw, factory)
 
 	session, err := gw.CreateSession("cli", t.TempDir())
 	if err != nil {
@@ -147,13 +149,14 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	gw.RegisterSessionAgent(session.SessionID, ag)
+	mgr := sessionagents.NewManager(nil)
+	mgr.RegisterSessionAgent(session.SessionID, ag)
 
 	impl, ok := ag.(*run.Impl)
 	if !ok {
 		t.Fatal("expected *run.Impl")
 	}
-	impl.SetAgentObserver(&gatewayBridgeObserver{gw: gw, session: session})
+	impl.SetAgentObserver(&gatewayBridgeObserver{mgr: mgr, gw: gw, session: session})
 
 	done := make(chan bool, 1)
 	go func() {
@@ -169,7 +172,7 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 		t.Fatal("expected permission bridge to call handler")
 	}
 
-	gw.ResolveAgentPermission(session.SessionID, "bash", true)
+	mgr.ResolveAgentPermission(session.SessionID, "bash", true)
 	select {
 	case granted := <-done:
 		if !granted {
@@ -181,6 +184,7 @@ func TestIntegration_AgentPermissionGateGatewayBridge(t *testing.T) {
 }
 
 type gatewayBridgeObserver struct {
+	mgr     *sessionagents.Manager
 	gw      *capture.CommunicationGateway
 	session *types.Session
 }
@@ -192,7 +196,7 @@ func (o *gatewayBridgeObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
 	tool, _ := ev.Metadata["tool"].(string)
 	req := types.NewPermissionRequest("req-test", o.session.SessionID, tool, types.RiskLevelCritical, time.Minute)
 	approved, _ := o.gw.RoutePermission(req)
-	o.gw.ResolveAgentPermission(o.session.SessionID, tool, approved)
+	o.mgr.ResolveAgentPermission(o.session.SessionID, tool, approved)
 }
 
 func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {

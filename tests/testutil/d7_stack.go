@@ -2,14 +2,18 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/devrix/devrix/internal/bootstrap"
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
+	"github.com/devrix/devrix/internal/bootstrap/sessionagents"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
+	capturetranscript "github.com/devrix/devrix/internal/layers/communication/capture/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
@@ -41,15 +45,29 @@ type D7StackOptions struct {
 
 	// WorkItemPipeline wires ItemPipelineRunner in the stack (always on by default).
 	WorkItemPipeline bool
+
+	// TranscriptDir (DM-20260628-003, D7-S15) enables transcript writing
+	// for the gateway; when non-empty, a transcript.Writer is constructed
+	// and passed to NewCommunicationGateway. Default "" = nil writer =
+	// no transcript jsonl. Pair with PriorContextRounds to verify the
+	// turn-N+1 directive is enriched with turn-N finalText.
+	TranscriptDir string
+
+	// PriorContextRounds (DM-20260628-003, D7-S15) is written into the
+	// d7-test-config.yaml as d7.prior_context_rounds. >0 also forces
+	// the bootstrap to wire TurnState + TranscriptReader. Default 0
+	// (disabled, pre-D7-S15 behavior).
+	PriorContextRounds int
 }
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
 type D7TestStack struct {
 	Obs          *observability.Observability
 	ObsBridge    *observability.Bridge
-	Gateway      *capture.CommunicationGateway
-	Handler      *MockEventHandler
-	Engine       *contextengine.ContextEngine
+	Gateway       *capture.CommunicationGateway
+	SessionAgents *sessionagents.Manager
+	Handler       *MockEventHandler
+	Engine       *kernel.ContextEngine
 	LLMStub      llmgateway.IAdapter
 	WorkDir      string
 	TaskManager  *workmodel.TaskManager
@@ -144,9 +162,9 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		toolsReg = MustBuiltinRegistry(t)
 	}
 
-	engine := contextengine.NewContextEngine(MergeEngineDeps(
+	engine := kernel.NewContextEngine(MergeEngineDeps(
 		ContextEngineDepsFromStack(llmStack, ctxCfg),
-		contextengine.EngineDeps{
+		kernel.EngineDeps{
 			Tools:      &enforce.ToolRunner{},
 			ToolsReg:   toolsReg,
 			Permission: enforce.AllowAllPermission{},
@@ -160,16 +178,28 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 	handler := NewMockEventHandler()
 	permMgr := capture.NewPermissionManager(&config.DefaultConfig().Permission)
-	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig(), nil)
+	var transcriptWriter *capturetranscript.Writer
+	if opt.TranscriptDir != "" {
+		if err := os.MkdirAll(opt.TranscriptDir, 0o755); err != nil {
+			t.Fatalf("transcript dir: %v", err)
+		}
+		tw, terr := capturetranscript.NewWriter(opt.TranscriptDir)
+		if terr != nil {
+			t.Fatalf("transcript writer: %v", terr)
+		}
+		transcriptWriter = tw
+	}
+	gw := capture.NewCommunicationGateway(store, handler, permMgr, config.DefaultConfig(), transcriptWriter)
 	gw.SetObservability(obs)
 
+	var sessionAgents *sessionagents.Manager
 	if opt.MultiAgent {
 		maCfg := config.DefaultMultiAgentConfig()
 		factory := multiagentprovision.NewAgentFactory(
 			multiagent.AgentDeps{Engine: engine},
 			maCfg,
 		)
-		gw.SetAgentFactory(factory)
+		sessionAgents = WireGatewaySessionAgents(gw, factory)
 	}
 
 	var flowHub contracts.ExecutionFlowHub
@@ -181,16 +211,31 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 		maCfg := config.DefaultMultiAgentConfig()
 		maCfg.Delegate.Enabled = true
 		if toolReg, ok := toolsReg.(*contextengine.ToolRegistry); ok {
-			bootstrap.WireDelegate(ctxCfg, maCfg, gw, engine, toolReg, flowHub, tm)
+			bootstrap.WireDelegate(ctxCfg, maCfg, gw, sessionAgents, engine, toolReg, flowHub, tm)
 		} else {
 			t.Fatal("delegate wiring requires *contextengine.ToolRegistry")
 		}
 	}
 
 	configFile := ""
-	if opt.RoutingMode != "" {
+	if opt.RoutingMode != "" || opt.PriorContextRounds > 0 {
 		cfgPath := filepath.Join(workDir, "d7-test-config.yaml")
-		yaml := "d7:\n  enabled: true\n  routing_mode: " + opt.RoutingMode + "\n"
+		yaml := "d7:\n  enabled: true\n"
+		if opt.RoutingMode != "" {
+			yaml += "  routing_mode: " + opt.RoutingMode + "\n"
+		}
+		if opt.PriorContextRounds > 0 {
+			yaml += fmt.Sprintf("  prior_context_rounds: %d\n", opt.PriorContextRounds)
+		}
+		// DM-20260628-003 (D7-S15): when TranscriptDir is set, propagate
+		// it into the file so bootstrap's resolveTranscriptDir reads the
+		// same dir the gateway writer writes to. Without this the
+		// orchestrator's TranscriptReader would fall back to the default
+		// ~/.devrix/transcripts and the LP-5 enrichment would silently
+		// no-op.
+		if opt.TranscriptDir != "" {
+			yaml += "context_engine:\n  diagnostics:\n    transcript_dir: " + opt.TranscriptDir + "\n"
+		}
 		if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 			t.Fatalf("write test config: %v", err)
 		}
@@ -202,10 +247,11 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	}
 
 	return &D7TestStack{
-		Obs:          obs,
-		ObsBridge:    obsBridge,
-		Gateway:      gw,
-		Handler:      handler,
+		Obs:           obs,
+		ObsBridge:     obsBridge,
+		Gateway:       gw,
+		SessionAgents: sessionAgents,
+		Handler:       handler,
 		Engine:       engine,
 		LLMStub:      stub,
 		WorkDir:      workDir,

@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -26,6 +28,9 @@ import (
 // MaxTurns safety net) because WorkItemExecutor has no natural turn count
 // signal — a single user message either resolves or it doesn't.
 const DefaultWorkItemMaxIters = 5
+
+// DefaultWorkItemTokenBudget is the default Materialize token budget for WorkItem execute.
+const DefaultWorkItemTokenBudget = 8000
 
 // WorkItemSourceLabel is the SourcePlanID prefix used when ItemPipelineRunner
 // bypasses the Planner and feeds the directive straight into WorkItemExecutor.
@@ -93,6 +98,10 @@ type DefaultWorkItemExecutor struct {
 	LLM     orchtypes.LLMInvoker
 	Context ContextPreparer
 	Tools   ToolRoundExecutor
+	// Materializer is the D2 Materialize adapter (DM-20260627-003). nil → legacy Prepare only.
+	Materializer materialize.Materializer
+	// TokenBudget caps Materialize private chain size. 0 → DefaultWorkItemTokenBudget.
+	TokenBudget int
 
 	// MaxIters caps the ReAct loop. 0 → DefaultWorkItemMaxIters.
 	MaxIters int
@@ -137,24 +146,25 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	if directive == "" {
 		return nil, fmt.Errorf("workitem executor: directive required")
 	}
-	_ = itemID // currently unused; reserved for per-item override of Context.
+	_ = itemID // reserved for span attrs; Materialize partition comes from ctx.
 
 	result := &WorkItemResult{StartedAt: e.now(), StopReason: "started"}
 	defer func() { result.EndedAt = e.now() }()
 
-	systemPrompt, tools, prepErr := e.prepareContext(ctx, sessionID, directive)
+	systemPrompt, tools, messages, prepErr := e.prepareContext(ctx, sessionID, itemID, directive)
 	if prepErr != nil {
 		// Non-fatal: log and continue with empty context. Better to give the
 		// user a degraded answer than to fail outright on a Prepare hiccup.
 		slog.Warn("workitem executor: prepare context (degraded)",
 			"session_id", sessionID, "error", prepErr)
 	}
-
-	messages := []types.Message{{
-		SessionID: sessionID,
-		Role:      types.MessageRoleUser,
-		Content:   directive,
-	}}
+	if len(messages) == 0 {
+		messages = []types.Message{{
+			SessionID: sessionID,
+			Role:      types.MessageRoleUser,
+			Content:   directive,
+		}}
+	}
 
 	max := e.maxIters()
 	for iter := 0; iter < max; iter++ {
@@ -173,8 +183,10 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 
 		switch {
 		case iterErr != nil:
+			e.appendPrivateChain(ctx, sessionID, itemID, messages)
 			return result, iterErr
 		case stopReason == "final_answer" || stopReason == "tool_no_executor" || stopReason == "tool_no_results":
+			e.appendPrivateChain(ctx, sessionID, itemID, messages)
 			return result, nil
 		}
 		if len(newMessages) > 0 {
@@ -185,13 +197,8 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	// Cap reached without a tool-call-free final answer. Return the
 	// accumulated text so the user sees something rather than nothing.
 	result.StopReason = "max_iters"
-	// Emit one last span so the trace shows the cap-hit itself (otherwise
-	// the trace stops at the last successful iter and the cap event is
-	// invisible in Jaeger). finishReason stays empty for the cap-hit
-	// span: the LLM kept returning tool_calls (we'd have looped
-	// otherwise), so the most-recent finishReason is "tool_calls" — which
-	// is implicit in the stop_reason="max_iters" / iter=max+1 pair.
 	hardening.EmitSubTurnIteration(ctx, sessionID, itemID, max+1, "tool_calls", "max_iters")(nil)
+	e.appendPrivateChain(ctx, sessionID, itemID, messages)
 	return result, nil
 }
 
@@ -396,12 +403,37 @@ func (e *DefaultWorkItemExecutor) emit(ctx context.Context, ev *contracts.Engine
 	e.Emit(ev)
 }
 
-// prepareContext calls ContextPreparer.Prepare to assemble SystemPrompt +
-// Tools. Returns empty defaults when ContextPreparer is nil (legacy bare
-// call preservation so test fixtures that don't wire Context keep working).
-func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, directive string) (string, []ToolSchema, error) {
+// prepareContext calls ContextPreparer.Prepare or D2 Materialize to assemble
+// SystemPrompt + Tools + initial messages. Returns empty defaults when both
+// paths are unavailable (legacy bare call preservation).
+func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, itemID, directive string) (string, []ToolSchema, []types.Message, error) {
+	if ShouldMaterializeWorkItem(ctx, sessionID, itemID) && e.Materializer != nil {
+		ec, _ := WorkItemExecContextFrom(ctx)
+		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget())
+		end := hardening.EmitContextMaterialize(ctx, sessionID, itemID, string(req.Policy.Mode), 0, 0)
+		mat, err := e.Materializer.Materialize(ctx, req)
+		end(err)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		tools := toolSchemasFromDescriptors(mat.Tools)
+		if len(tools) == 0 && e.Context != nil {
+			prepared, prepErr := e.Context.Prepare(ctx, PrepareRequest{
+				SessionID: sessionID,
+				Message: types.Message{
+					SessionID: sessionID,
+					Role:      types.MessageRoleUser,
+					Content:   directive,
+				},
+			})
+			if prepErr == nil {
+				tools = prepared.Tools
+			}
+		}
+		return mat.SystemPrompt, tools, mat.Messages, nil
+	}
 	if e.Context == nil {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 	prepared, err := e.Context.Prepare(ctx, PrepareRequest{
 		SessionID: sessionID,
@@ -412,9 +444,44 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 		},
 	})
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	return prepared.SystemPrompt, prepared.Tools, nil
+	msgs := []types.Message{{
+		SessionID: sessionID,
+		Role:      types.MessageRoleUser,
+		Content:   directive,
+	}}
+	return prepared.SystemPrompt, prepared.Tools, msgs, nil
+}
+
+func (e *DefaultWorkItemExecutor) appendPrivateChain(ctx context.Context, sessionID, itemID string, msgs []types.Message) {
+	if e == nil || e.Materializer == nil || !ShouldMaterializeWorkItem(ctx, sessionID, itemID) {
+		return
+	}
+	partition := ResolvePartitionForWorkItem(sessionID, &workmodel.WorkItem{ID: itemID})
+	_ = e.Materializer.Append(ctx, partition, msgs)
+}
+
+func (e *DefaultWorkItemExecutor) tokenBudget() int {
+	if e != nil && e.TokenBudget > 0 {
+		return e.TokenBudget
+	}
+	return DefaultWorkItemTokenBudget
+}
+
+func toolSchemasFromDescriptors(desc []materialize.ToolDescriptor) []ToolSchema {
+	if len(desc) == 0 {
+		return nil
+	}
+	out := make([]ToolSchema, 0, len(desc))
+	for _, d := range desc {
+		out = append(out, ToolSchema{
+			Name:        d.Name,
+			Description: d.Description,
+			Parameters:  d.Schema,
+		})
+	}
+	return out
 }
 
 func (e *DefaultWorkItemExecutor) maxIters() int {

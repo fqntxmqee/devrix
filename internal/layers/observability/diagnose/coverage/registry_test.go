@@ -61,8 +61,6 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S2_Context_Compression_Run,
 		telemetry.OpD2_S2_Context_Compression_Step,
 		telemetry.OpD2_S2_Context_Longterm_Recall,
-		telemetry.OpD2_S2_Context_Longterm_Store,
-		telemetry.OpD2_S2_Context_Tools_Register,
 		telemetry.OpD2_S2_Context_Tools_List,
 		telemetry.OpD2_S2_Context_Tools_Filter_Permission,
 		telemetry.OpD2_S2_Context_Tools_Filter_AgentRole,
@@ -77,7 +75,6 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 
 		// D2 Context Engine - Tool Execution (D2-S5)
 		telemetry.OpD2_S5_Tool_Execute_Single,
-		telemetry.OpD2_S5_Tool_Execute_Permission,
 		telemetry.OpD2_S5_Context_Harness_SystemPrompt_Build,
 
 		// D2 Context Engine - Task / Plan (D2-S8)
@@ -86,8 +83,6 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S8_Task_PlanMode_Execute,
 		telemetry.OpD2_S8_Task_PlanMode_Approve,
 		telemetry.OpD2_S8_Task_PlanMode_Reject,
-		telemetry.OpD2_S8_Task_Manager_Create,
-		telemetry.OpD2_S8_Task_Manager_Update,
 
 		// D3 LLM Gateway (D3-S3)
 		telemetry.OpD3_S3_LLM_Stream,
@@ -135,6 +130,16 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD7_S1_Worktree_Op,
 		telemetry.OpD7_S1_SubWorktree_Run,
 		telemetry.OpD7_S5_SubTurn_Iteration,
+
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T37). Adding new ops
+		// to the expected list is the coverage gate that fails CI when a new
+		// D7 T point ships without its Span. Coverage threshold bumped to
+		// ≥80% (see observability-guide §"T-Without-Span Tracker").
+		telemetry.OpD7_S2_Resume_Decision_Path,
+		telemetry.OpD7_S5_AdaptivePrior_Inject,
+		telemetry.OpD7_S4_Anomaly_Trigger,
+		telemetry.OpD7_S6_LongTerm_Reputation_Update,
+		telemetry.OpD7_Feishu_Card_Render,
 
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,

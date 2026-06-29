@@ -221,26 +221,27 @@ func (f *forcedKindClassifier) ClassifyWithPrior(_ context.Context, _ string, _ 
 func TestBuildConfig_NilFile(t *testing.T) {
 	cfg := orchtypes.BuildConfig(nil)
 	def := orchtypes.DefaultConfig()
-	if cfg.Enabled != def.Enabled || cfg.FastPathThreshold != def.FastPathThreshold {
+	if cfg.Enabled != def.Enabled || cfg.RoutingMode != def.RoutingMode {
 		t.Fatalf("nil file should yield defaults")
 	}
 }
 
 // T: orchtypes.BuildConfig with overrides merges file onto defaults.
 func TestBuildConfig_Overrides(t *testing.T) {
-	yes, threshold := true, 75
+	yes := true
+	mode := orchtypes.RoutingModeLoopFirst
 	whitelist := []string{"/x", "/y"}
 	file := &orchtypes.FileConfig{
-		Enabled:           &yes,
-		FastPathThreshold: &threshold,
-		CommandWhitelist:  whitelist,
+		Enabled:          &yes,
+		RoutingMode:      (*string)(&mode),
+		CommandWhitelist: whitelist,
 	}
 	cfg := orchtypes.BuildConfig(file)
 	if !cfg.Enabled {
 		t.Fatalf("Enabled override not applied")
 	}
-	if cfg.FastPathThreshold != 75 {
-		t.Fatalf("threshold override = %d, want 75", cfg.FastPathThreshold)
+	if cfg.RoutingMode != orchtypes.RoutingModeLoopFirst {
+		t.Fatalf("routing mode override = %s, want %s", cfg.RoutingMode, orchtypes.RoutingModeLoopFirst)
 	}
 	if len(cfg.CommandWhitelist) != 2 || cfg.CommandWhitelist[0] != "/x" {
 		t.Fatalf("whitelist not applied: %v", cfg.CommandWhitelist)

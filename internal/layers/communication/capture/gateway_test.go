@@ -56,7 +56,7 @@ func (h *mockEventHandler) OnStatus(sessionID string, state types.SessionState) 
 	h.statuses[sessionID] = state
 }
 
-// mockContextEngine implements IContextEngine for testing
+// mockContextEngine implements contracts.IEngine for testing
 type mockContextEngine struct {
 	events []*EngineEvent
 }

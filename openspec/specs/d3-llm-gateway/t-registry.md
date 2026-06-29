@@ -2,10 +2,10 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.3.0
-**Last Updated:** 2026-06-28
+**Version:** 3.5.0
+**Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
-**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16) / **devrix-api-error-classification (DM-20260628-001) — APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus 工厂 + 4 adapter NewAPIError 统一 + IsCode 包装链识别 (D3-S1-A01-T04 + D3-S1-A01-T05 + D3-S3-A01-T17 PLANNED)**
+**Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16) / devrix-api-error-classification (DM-20260628-001) — APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus 工厂 + 4 adapter NewAPIError 统一 + IsCode 包装链识别 (D3-S1-A01-T04 + D3-S1-A01-T05 + D3-S3-A01-T17 IMPLEMENTED) / **devrix-d3-dsaft-restructuring (DM-20260629-003) — 6 子 Change 联动: PR-1 #0 dead code 审计 / PR-2 #1 god-fn pt1 (Stream 235→3) / PR-3 #1 god-fn pt2 (configure + errorclass 拆 4) / PR-4 #2 registry-sync (9 F path 修正) / PR-5 #3 value-flow-rename (6 D3_* Alias) / PR-6 #4 span-coverage (全 41 T 加 Span Evidence 列 + 11 显式 `—` + 覆盖率 30/30 = 100%) / PR-7 #5 boundary-decision (4 boundary debt 全部 RESOLVED)**
 **Companion Docs:** `a-registry.md` · `f-registry.md` · `span-registry.md` · `spec.md` · `design.md`
 
 ---
@@ -25,6 +25,10 @@
 > **v3.2.0**：仅 +1 T (D3-S3-A01-T16 retry nil-sentinel)；不破坏 PLANNED/IMPLEMENTED 比例；不破坏 Legacy Archive 100%。
 > **v3.3.0 (DM-20260628-001 PLANNED)**：+3 T（D3-S1-A01-T04 NewAPIErrorCodeFromStatus HTTP status 映射 + D3-S1-A01-T05 IsCode 包装链识别 + D3-S3-A01-T17 4 adapter NewAPIError 统一构造）；不删旧 T；不破坏 Legacy Archive 100%；PLANNED 1→4。
 > **v3.3.1 (DM-20260628-001 S5 验收)**：3 P0 T PLANNED→IMPLEMENTED；IMPLEMENTED 35→38；PLANNED 4→1（仅 T08 持久化）；§0/§1/§4 统计对齐。
+> 
+> **v3.4.0 (DM-20260629-003 PR-6 #4 span-coverage)**：全 41 T 行新增 **Span Evidence 列**（runtime span 名与 telemetry/names.go `OpD3_S3_LLM_*` 常量值对齐 — `D3_LLM_Stream` / `D3_LLM_Provider_Route` / `D3_LLM_CircuitBreaker` / `D3_LLM_Retry` / `D3_LLM_Adapter_Stream`）。其中 **30 T 直接映射** 到 5 个 active span op / 1 span event (`safety.check.duration_ms`) / 3 EngineEvent (`flow.breaker.*`); **11 T 显式标 `—`**（注入模式 6 + 启动期 3 + 编译期 2 — 详见 `span-registry.md §9 T-Without-Span Tracker`）。**Span Evidence 覆盖率 = 30/30 = 100%**（排除显式 `—` 后所有 T 都有 span 引用；raw 30/41 ≈ 73.2% informational only）。`scripts/d3-span-coverage.sh` 守门 ≥ 80% PASS。
+> 
+> **v3.5.0 (DM-20260629-003 S7_Archive ACCEPTED + PR-5 value-flow-rename)**：T 编号无变化；§1 T 总览 S 段名称旁加 ValueFlow Alias 列；§2~§8 各 S header 加 `> **ValueFlow Alias (用户感知):**` 行（5 S + 1 横切 = 6 alias，与 a/f-registry.md 同步）；T 编排逻辑 0 改动；修订记录 v3.5.0 row。
 
 ---
 
@@ -47,16 +51,18 @@
 
 ## 2. D3-S1 RouteModel — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Model_Routing`
+
 **A**: `D3-S1-A01 ResolveModelRoute`
 **承诺 C1**：用户给出 model 名（含 tier alias），D3 必须返回正确 provider + 实际 model。
 
-| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-S1-A01-T01 | 多 Provider 并发调用（MatchRouting 路径） | P1 | F01 MatchRouting | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
-| D3-S1-A01-T02 | 未知 Provider/Model 报错（ResolveDefault F02a+F02b 联动） | P1 | F02a ResolveTierAlias + F02b ResolveDefault | `internal/layers/llmgateway/route/router_test.go` | IMPLEMENTED |
-| **D3-S1-A01-T03** | **Tier 解析正确性 ≥ 99%（D6 probe #1）** `<!-- v1.1 F6 -->` | **P1** | F01 + F02a（routing 暴露调用次数 + 错误率） | `internal/layers/llmgateway/route/router_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T20 配套） |
-| **D3-S1-A01-T04** | **`NewAPIErrorCodeFromStatus` HTTP status → APIErrorCode 映射覆盖 401/403/408/413/429/529/5xx/4xx-unknown 8 类** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting（错误分类） | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265） |
-| **D3-S1-A01-T05** | **`sharederrors.IsCode(err, code)` 正确识别包装链（WithCode → Unwrap → bare APIError）** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265） |
+| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-S1-A01-T01 | 多 Provider 并发调用（MatchRouting 路径） | P1 | F01 MatchRouting | `internal/layers/llmgateway/route/router_test.go` | `D3_LLM_Provider_Route` | IMPLEMENTED |
+| D3-S1-A01-T02 | 未知 Provider/Model 报错（ResolveDefault F02a+F02b 联动） | P1 | F02a ResolveTierAlias + F02b ResolveDefault | `internal/layers/llmgateway/route/router_test.go` | `D3_LLM_Provider_Route` | IMPLEMENTED |
+| **D3-S1-A01-T03** | **Tier 解析正确性 ≥ 99%（D6 probe #1）** `<!-- v1.1 F6 -->` | **P1** | F01 + F02a（routing 暴露调用次数 + 错误率） | `internal/layers/llmgateway/route/router_test.go`（v1.1 增） | `D3_LLM_Provider_Route` | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T20 配套） |
+| **D3-S1-A01-T04** | **`NewAPIErrorCodeFromStatus` HTTP status → APIErrorCode 映射覆盖 401/403/408/413/429/529/5xx/4xx-unknown 8 类** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting（错误分类） | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | `—`（错误映射内部，无独立 span） | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265） |
+| **D3-S1-A01-T05** | **`sharederrors.IsCode(err, code)` 正确识别包装链（WithCode → Unwrap → bare APIError）** `<!-- v3.3.0 -->` | **P0** | F01 MatchRouting | `internal/shared/errors/api_code_test.go`（v3.3.0 增） | `—`（包装链识别内部） | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265） |
 
 **F 覆盖**：
 
@@ -74,17 +80,19 @@ D3-S1-A01 ResolveModelRoute
 
 ## 3. D3-S2 StreamChat — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Stream_Chat_Completion`
+
 **A**: `D3-S2-A01 StreamChatCompletion`
 **承诺 C2**：用户发起流式聊天，D3 必须返回符合 OpenAI SSE 协议的 chunk 流。
 
-| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-S2-A01-T01 | DeepSeek 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/deepseek_test.go` | IMPLEMENTED |
-| D3-S2-A01-T02 | MiniMax 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/minimax_test.go` | IMPLEMENTED |
-| D3-S2-A01-T03 | SSE parse error handling | P1 | F02 ParseSSE | `internal/layers/llmgateway/stream/adapter/sse_parser_test.go` | IMPLEMENTED |
-| D3-S2-A01-T04 | OpenAI request body construction | P1 | F03 BuildOpenAIRequest | `internal/layers/llmgateway/stream/adapter/openai_request_test.go` | IMPLEMENTED |
-| D3-S2-A01-T05 | LLM 调用可观测事件 (spans + metrics) | P1 | F01 + F02（跨 A 验证 emit） | `tests/integration/llm_observer_test.go` | IMPLEMENTED |
-| **D3-S2-A01-T06** | **`IAdapter.Protocol() string` 接口扩展 + 3 实现** `<!-- v1.1 F5 -->` | **P0** | F04 AdapterProtocolMethod | `internal/layers/llmgateway/stream/adapter/iadapter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 接口，DeepSeek + MiniMax + Mock 全部实施） |
+| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-S2-A01-T01 | DeepSeek 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/deepseek_test.go` | `D3_LLM_Stream` + `D3_LLM_Adapter_Stream` | IMPLEMENTED |
+| D3-S2-A01-T02 | MiniMax 适配器流式响应 | P0 | F01 OpenAIStreamClientStream | `internal/layers/llmgateway/stream/adapter/minimax_test.go` | `D3_LLM_Stream` + `D3_LLM_Adapter_Stream` | IMPLEMENTED |
+| D3-S2-A01-T03 | SSE parse error handling | P1 | F02 ParseSSE | `internal/layers/llmgateway/stream/adapter/sse_parser_test.go` | `D3_LLM_Stream` (顶层) | IMPLEMENTED |
+| D3-S2-A01-T04 | OpenAI request body construction | P1 | F03 BuildOpenAIRequest | `internal/layers/llmgateway/stream/adapter/openai_request_test.go` | `D3_LLM_Adapter_Stream` (F03 构造层) | IMPLEMENTED |
+| D3-S2-A01-T05 | LLM 调用可观测事件 (spans + metrics) | P1 | F01 + F02（跨 A 验证 emit） | `tests/integration/llm_observer_test.go` | `D3_LLM_Stream` (跨 A 验证) | IMPLEMENTED |
+| **D3-S2-A01-T06** | **`IAdapter.Protocol() string` 接口扩展 + 3 实现** `<!-- v1.1 F5 -->` | **P0** | F04 AdapterProtocolMethod | `internal/layers/llmgateway/stream/adapter/iadapter_test.go`（v1.1 增） | `—`（接口扩展，编译期阻断，无 runtime span） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 接口，DeepSeek + MiniMax + Mock 全部实施） |
 
 **F 覆盖**：
 
@@ -101,28 +109,30 @@ D3-S2-A01 StreamChatCompletion
 
 ## 4. D3-S3 ProtectCall — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Circuit_Breaker_And_Retry`
+
 **A**: `D3-S3-A01 ShieldAndRetry`
 **承诺 C3**：Provider 故障（5xx / 网络错误 / 限流），D3 必须不阻塞用户。
 
-| T ID | 描述 | 优先级 | F 编排 | Mechanism | Test 位置 | Status |
-|-------|------|--------|--------|-----------|-----------|--------|
-| D3-S3-A01-T01 | Circuit breaker 正常关闭 (Closed) | P0 | F01 AllowCircuit + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T02 | Circuit breaker 触发开启 (Open) | P0 | F01 + F02 RecordOutcome + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T03 | Circuit breaker 半开→关闭 (HalfOpen→Closed) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T04 | Circuit breaker 半开→开启 (HalfOpen→Open) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | IMPLEMENTED |
-| D3-S3-A01-T05 | Retry 与 CB 联动（Cancel/Deadline 不触发 CB） | P0 | F01 + F05 StreamWithFallback + F06 ShouldRecordBreakerFailure | Cross | `internal/layers/llmgateway/stream/gateway_test.go` | IMPLEMENTED |
-| D3-S3-A01-T06 | Half-Open 并发探测限制 | P0 | F01 + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/stream/gateway_test.go` | IMPLEMENTED |
-| D3-S3-A01-T07 | LLM 429 rate limit handling | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_real_api_test.go` | IMPLEMENTED |
-| D3-S3-A01-T08 | 熔断器状态持久化（重启后 Closed 状态恢复） | P2 | F03 + 持久化层（v1.1 候选） | Breaker | — | PLANNED |
-| D3-S3-A01-T09 | 重试策略执行（Full Jitter 退避） | P0 | F04 ComputeBackoff + F05 | Retry | `internal/layers/llmgateway/protect/retry_test.go` | IMPLEMENTED |
-| D3-S3-A01-T10 | Full Jitter 随机化验证 | P1 | F04 ComputeBackoff | Retry | `internal/layers/llmgateway/protect/retry_jitter_test.go` | IMPLEMENTED |
-| D3-S3-A01-T11 | DeepSeek Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
-| D3-S3-A01-T12 | MiniMax Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | IMPLEMENTED |
-| **D3-S3-A01-T13** | **Breaker 状态切换 emit `llm_breaker_state{provider,state}`** `<!-- v1.1 F1 + F2 -->` | **P0** | F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit | Metric | `internal/layers/llmgateway/protect/circuit_breaker_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，2 provider × 3 state = 6 series） |
-| **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/protect/events_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
-| **D3-S3-A01-T15** | **D6 probe #2 Breaker 异常切换告警** `<!-- v1.1 F7 -->` | **P1** | F07 + F08（D6 探针统计 `llm_breaker_transitions_total`） | Probe | `tests/integration/d6_breaker_probe_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T21 配套） |
-| **D3-S3-A01-T16** | **Retry loop nil-sentinel 防御：`retry.go:91` 在所有 attempt 返回 nil 时包真实 `errors.New("retry loop completed without recording an error")`（DM-20260620-003 PR-A L4 / PR-C H3）** `<!-- v3.2.0 -->` | **P0** | F05 StreamWithFallback（defensive fallback path） | Retry | `internal/layers/llmgateway/protect/retry.go:91` | **IMPLEMENTED**（DM-20260620-003） |
-| **D3-S3-A01-T17** | **4 adapter（minimax/deepseek/anthropic/openai）HTTP 错误构造点全部走 `NewAPIError(status, msg)` 工厂，CI guard 检测 `errors.New(fmt.Sprintf(...))` 字符串拼接模式** `<!-- v3.3.0 -->` | **P0** | F02 RecordOutcome + F05 StreamWithFallback | `internal/layers/llmgateway/stream/adapter/{minimax,deepseek,anthropic,openai}_test.go`（v3.3.0 增） | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，4 adapter 统一走 NewAPIError+APICode） |
+| T ID | 描述 | 优先级 | F 编排 | Mechanism | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|-----------|---------------|--------|
+| D3-S3-A01-T01 | Circuit breaker 正常关闭 (Closed) | P0 | F01 AllowCircuit + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | `D3_LLM_CircuitBreaker` (state=closed) | IMPLEMENTED |
+| D3-S3-A01-T02 | Circuit breaker 触发开启 (Open) | P0 | F01 + F02 RecordOutcome + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | `D3_LLM_CircuitBreaker` (state=open) | IMPLEMENTED |
+| D3-S3-A01-T03 | Circuit breaker 半开→关闭 (HalfOpen→Closed) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | `D3_LLM_CircuitBreaker` (transition half_open→closed) | IMPLEMENTED |
+| D3-S3-A01-T04 | Circuit breaker 半开→开启 (HalfOpen→Open) | P0 | F01 + F02 + F03 | Breaker | `internal/layers/llmgateway/protect/circuit_breaker_test.go` | `D3_LLM_CircuitBreaker` (transition half_open→open) | IMPLEMENTED |
+| D3-S3-A01-T05 | Retry 与 CB 联动（Cancel/Deadline 不触发 CB） | P0 | F01 + F05 StreamWithFallback + F06 ShouldRecordBreakerFailure | Cross | `internal/layers/llmgateway/stream/gateway_test.go` | `D3_LLM_CircuitBreaker` + `D3_LLM_Retry` | IMPLEMENTED |
+| D3-S3-A01-T06 | Half-Open 并发探测限制 | P0 | F01 + F03 ManageCircuitState | Breaker | `internal/layers/llmgateway/stream/gateway_test.go` | `D3_LLM_CircuitBreaker` (state=half_open) | IMPLEMENTED |
+| D3-S3-A01-T07 | LLM 429 rate limit handling | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_real_api_test.go` | `D3_LLM_Retry` (outcome=success/retry) | IMPLEMENTED |
+| D3-S3-A01-T08 | 熔断器状态持久化（重启后 Closed 状态恢复） | P2 | F03 + 持久化层（v1.1 候选） | Breaker | — | `D3_LLM_CircuitBreaker` (持久化路径，PLANNED) | PLANNED |
+| D3-S3-A01-T09 | 重试策略执行（Full Jitter 退避） | P0 | F04 ComputeBackoff + F05 | Retry | `internal/layers/llmgateway/protect/retry_test.go` | `D3_LLM_Retry` (attempt=N) | IMPLEMENTED |
+| D3-S3-A01-T10 | Full Jitter 随机化验证 | P1 | F04 ComputeBackoff | Retry | `internal/layers/llmgateway/protect/retry_jitter_test.go` | `D3_LLM_Retry` (attempt 退避分布) | IMPLEMENTED |
+| D3-S3-A01-T11 | DeepSeek Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | `D3_LLM_Retry` (outcome=success) | IMPLEMENTED |
+| D3-S3-A01-T12 | MiniMax Fallback 模型切换 | P1 | F05 StreamWithFallback | Retry | `tests/integration/llm_fallback_test.go` | `D3_LLM_Retry` (outcome=success) | IMPLEMENTED |
+| **D3-S3-A01-T13** | **Breaker 状态切换 emit `llm_breaker_state{provider,state}`** `<!-- v1.1 F1 + F2 -->` | **P0** | F07 EmitBreakerStateMetric + F08 OnStateTransitionEmit | Metric | `internal/layers/llmgateway/protect/circuit_breaker_test.go`（v1.1 增） | `D3_LLM_CircuitBreaker` + metric `llm_breaker_state{provider,state}` | **IMPLEMENTED**（v1.1 S5 验收通过，2 provider × 3 state = 6 series） |
+| **D3-S3-A01-T14** | **Breaker 状态切换 emit `flow.breaker.opened` / `closed` / `halfopened` EngineEvent** `<!-- v1.1 F3 -->` | **P1** | F09 ReuseEngineEvent | Event | `internal/layers/llmgateway/protect/events_test.go`（v1.1 增） | `D3_LLM_CircuitBreaker` + event `flow.breaker.*` | **IMPLEMENTED**（v1.1 S5 验收通过，3 事件分开，fakePublisher 验证） |
+| **D3-S3-A01-T15** | **D6 probe #2 Breaker 异常切换告警** `<!-- v1.1 F7 -->` | **P1** | F07 + F08（D6 探针统计 `llm_breaker_transitions_total`） | Probe | `tests/integration/d6_breaker_probe_test.go`（v1.1 增） | `D3_LLM_CircuitBreaker` + metric `llm_breaker_transitions_total` | **IMPLEMENTED**（v1.1 S5 验收通过，D6-S3-A01-T21 配套） |
+| **D3-S3-A01-T16** | **Retry loop nil-sentinel 防御：`retry.go:91` 在所有 attempt 返回 nil 时包真实 `errors.New("retry loop completed without recording an error")`（DM-20260620-003 PR-A L4 / PR-C H3）** `<!-- v3.2.0 -->` | **P0** | F05 StreamWithFallback（defensive fallback path） | Retry | `internal/layers/llmgateway/protect/retry.go:91` | `D3_LLM_Retry` (outcome=cancelled/exhausted) | **IMPLEMENTED**（DM-20260620-003） |
+| **D3-S3-A01-T17** | **4 adapter（minimax/deepseek/anthropic/openai）HTTP 错误构造点全部走 `NewAPIError(status, msg)` 工厂，CI guard 检测 `errors.New(fmt.Sprintf(...))` 字符串拼接模式** `<!-- v3.3.0 -->` | **P0** | F02 RecordOutcome + F05 StreamWithFallback | `internal/layers/llmgateway/stream/adapter/{minimax,deepseek,anthropic,openai}_test.go`（v3.3.0 增） | `D3_LLM_Retry` (outcome=exhausted/circuit_open 错误码标签) | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，4 adapter 统一走 NewAPIError+APICode） |
 
 **F 覆盖**：
 
@@ -147,27 +157,31 @@ D3-S3-A01 ShieldAndRetry
 
 ## 5. D3-S4 BudgetTokens — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Token_Budget_Control`
+
 **A**: `D3-S4-A01 CountAndCheckLLMTokens`
 **承诺 C4**：Token 超预算，D3 必须截断或报错，不超额调用。
 
-| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-S4-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
-| D3-S4-A01-T02 | Token 预算检查 (CheckBudget) | P0 | F03 CheckBudget | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
-| D3-S4-A01-T03 | Token counter 中文准确性 (CJK) | P1 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | IMPLEMENTED |
+| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-S4-A01-T01 | Token 计数准确性 (cl100k_base) | P0 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | `—`（注入模式，详见 span-registry §9 T-Without-Span Tracker） | IMPLEMENTED |
+| D3-S4-A01-T02 | Token 预算检查 (CheckBudget) | P0 | F03 CheckBudget | `internal/layers/llmgateway/budget/counter_test.go` | `—`（注入模式，v1.1 候选 span event `budget.check.exceeded`） | IMPLEMENTED |
+| D3-S4-A01-T03 | Token counter 中文准确性 (CJK) | P1 | F01 CountText | `internal/layers/llmgateway/budget/counter_test.go` | `—`（注入模式） | IMPLEMENTED |
 
 ---
 
 ## 6. D3-S5 GuardContent — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Content_Safety_Filter`
+
 **A**: `D3-S5-A01 FilterAndMatchContent`
 **承诺 C5**：用户 prompt 命中危险模式，D3 必须拒绝（critical）或告警（warning）。
 
-| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-S5-A01-T01 | Safety filter critical 拒绝 (malware/exploit) | P0 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | IMPLEMENTED |
-| D3-S5-A01-T02 | Safety filter warning 匹配 (injection/credential) | P1 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | IMPLEMENTED |
-| **D3-S5-A01-T03** | **Safety filter span event `safety.check.duration_ms` + D6 probe #4 P99 < 1ms** `<!-- v1.1 F8 -->` | **P0** | F04 EmitSafetyLatencyEvent | `internal/layers/llmgateway/guard/filter_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，LatencySink 接口 + WithLatencySink，D6-S3-A01-T22 配套） |
+| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-S5-A01-T01 | Safety filter critical 拒绝 (malware/exploit) | P0 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | `—`（注入 `D3_LLM_Stream` span event `safety.check.duration_ms` 内嵌 attribute `safety.decision=reject`） | IMPLEMENTED |
+| D3-S5-A01-T02 | Safety filter warning 匹配 (injection/credential) | P1 | F01 CheckContent | `internal/layers/llmgateway/guard/filter_test.go` | `—`（注入同上，attribute `safety.decision=warn`） | IMPLEMENTED |
+| **D3-S5-A01-T03** | **Safety filter span event `safety.check.duration_ms` + D6 probe #4 P99 < 1ms** `<!-- v1.1 F8 -->` | **P0** | F04 EmitSafetyLatencyEvent | `internal/layers/llmgateway/guard/filter_test.go`（v1.1 增） | `D3_LLM_Stream` + span event `safety.check.duration_ms` | **IMPLEMENTED**（v1.1 S5 验收通过，LatencySink 接口 + WithLatencySink，D6-S3-A01-T22 配套） |
 
 > **跨域灰区声明**（R2 命题 E / P0 #5）：D3-S5 与 D2-S18 PermissionMode 灰区 — 当 prompt 内容与 tool execution 存在交叉时，**D3 优先拒**（前置过滤），D2 兜底；详见 `openspec/specs/architecture/cross-domain-boundaries.md` §D3-S5。
 
@@ -175,13 +189,15 @@ D3-S3-A01 ShieldAndRetry
 
 ## 7. D3-S6 ConfigureGateway — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Gateway_Configuration`
+
 **A**: `D3-S6-A01 LoadAndValidateLLMConfig`
 **承诺**：无（横切支撑）。
 
-| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-S6-A01-T01 | Provider 配置加载与验证 | P0 | F01 LoadConfig + F03 ValidateProviders | `internal/layers/llmgateway/configure/loader_test.go` | IMPLEMENTED |
-| **D3-S6-A01-T02** | **3 feature flag schema + 默认值；OFF 时 v1.0 行为保持** `<!-- v1.1 F9 -->` | **P0** | F05 FeatureFlagDefaults | `internal/layers/llmgateway/configure/loader_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，resilience+latency ON / warn OFF 默认；8 组合单测） |
+| T ID | 描述 | 优先级 | F 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-S6-A01-T01 | Provider 配置加载与验证 | P0 | F01 LoadConfig + F03 ValidateProviders | `internal/layers/llmgateway/configure/loader_test.go` | `—`（启动期 trace `config.load.duration_ms`，不进入请求 tree） | IMPLEMENTED |
+| **D3-S6-A01-T02** | **3 feature flag schema + 默认值；OFF 时 v1.0 行为保持** `<!-- v1.1 F9 -->` | **P0** | F05 FeatureFlagDefaults | `internal/layers/llmgateway/configure/loader_test.go`（v1.1 增） | `—`（启动期 trace span event `config.feature_flags`） | **IMPLEMENTED**（v1.1 S5 验收通过，resilience+latency ON / warn OFF 默认；8 组合单测） |
 
 ---
 
@@ -189,13 +205,13 @@ D3-S3-A01 ShieldAndRetry
 
 > **R1 D2 决议**：Bridge / Bootstrap 归属跨域锚点 `internal/bridges/llm/`，T 编号前缀 `D3-X-`（X = Cross）。
 
-| T ID | 描述 | 优先级 | A 编排 | Test 位置 | Status |
-|-------|------|--------|--------|-----------|--------|
-| D3-X-A01-T01 | Bridge 适配 Gateway → ILLMGateway | P1 | D3-X-A01 AdaptToContextEngine | `internal/bridges/llm/bridge_test.go` | IMPLEMENTED |
-| **D3-X-A02-T01** | **`WireContextLLM` obs nil fail-fast** `<!-- v1.1 F4 -->` | **P0** | D3-X-A02 WireLLMStack F02 FailFastOnObsNil | `internal/bridges/llm/wire_test.go`（v1.1 增） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 签名 `WireContextLLM(...) (ContextLLMStack, error)`，ErrObservabilityRequired sentinel） |
-| D3-EC-T01 | ErrorClassifier LlmError.Code 优先匹配 | P0 | S4 ProtectCall 21 类错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
-| D3-EC-T02 | ErrorClassifier HTTP status fallback (401→Auth, 429→RateLimit, 5xx→Upstream) | P0 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
-| D3-EC-T03 | ErrorClassifier ctx propagation (`InjectClassification` / `FromContext`) | P1 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | IMPLEMENTED |
+| T ID | 描述 | 优先级 | A 编排 | Test 位置 | Span Evidence | Status |
+|-------|------|--------|--------|-----------|---------------|--------|
+| D3-X-A01-T01 | Bridge 适配 Gateway → ILLMGateway | P1 | D3-X-A01 AdaptToContextEngine | `internal/bridges/llm/bridge_test.go` | `D3_LLM_Stream` (Bridge 复用根 span) | IMPLEMENTED |
+| **D3-X-A02-T01** | **`WireContextLLM` obs nil fail-fast** `<!-- v1.1 F4 -->` | **P0** | D3-X-A02 WireLLMStack F02 FailFastOnObsNil | `internal/bridges/llm/wire_test.go`（v1.1 增） | `—`（启动 fail-fast，无 runtime span） | **IMPLEMENTED**（v1.1 S5 验收通过，BREAKING 签名 `WireContextLLM(...) (ContextLLMStack, error)`，ErrObservabilityRequired sentinel） |
+| D3-EC-T01 | ErrorClassifier LlmError.Code 优先匹配 | P0 | S4 ProtectCall 21 类错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | `D3_LLM_Retry` (outcome=exhausted 错误码标签) | IMPLEMENTED |
+| D3-EC-T02 | ErrorClassifier HTTP status fallback (401→Auth, 429→RateLimit, 5xx→Upstream) | P0 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | `D3_LLM_Retry` (outcome=exhausted 错误码标签) | IMPLEMENTED |
+| D3-EC-T03 | ErrorClassifier ctx propagation (`InjectClassification` / `FromContext`) | P1 | S4 ProtectCall 错误分类 | `internal/layers/llmgateway/protect/errorclass/classifier_test.go` | `D3_LLM_Retry` (outcome 错误码标签) | IMPLEMENTED |
 
 ---
 
@@ -239,16 +255,17 @@ D3-S3-A01 ShieldAndRetry
 
 ## 10. Statistics
 
-| 维度 | v3.0.0 | v3.1.0 | v3.2.0 | **v3.3.0** |
-|------|--------|--------|--------|--------|
-| Total T | 26 | **35**（+9 v1.1） | 36（+1 DM-20260620-003 T16） | **39**（+3 DM-20260628-001 T04/T05/T17 PLANNED） |
-| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） | 35（T16 IMPLEMENTED） | **35**（持平，3 新 T 均 PLANNED） |
-| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） | 1（不变） | **4**（+3 新 T） |
-| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） | 20（+1 DM-20260620-003 T16） | **23**（+3 v3.3.0 P0） |
-| P1 | 13 | **15**（+2 v1.1：F3/F7） | 15（不变） | 15（不变） |
-| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） | 1（不变） | 1（不变） |
-| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） | 26 / 26 (100%)（v3.2.0 不破坏追溯） | 26 / 26 (100%)（v3.3.0 不破坏追溯） |
-| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） | 9 / 9（继承） | 9 / 9（继承） |
+| 维度 | v3.0.0 | v3.1.0 | v3.2.0 | v3.3.0 | **v3.4.0** |
+|------|--------|--------|--------|--------|--------|
+| Total T | 26 | **35**（+9 v1.1） | 36（+1 DM-20260620-003 T16） | 39（+3 DM-20260628-001 T04/T05/T17 PLANNED） | **41**（含 38 DSAFT T + 3 D3-EC 错误分类 T，DM-20260629-003 增 Span Evidence 列） |
+| IMPLEMENTED | 25 | **34**（25 v1.0 保留 + 9 v1.1 全部实施） | 35（T16 IMPLEMENTED） | 38（v3.3.1 S5 验收 3 T PLANNED→IMPLEMENTED） | **38**（持平） |
+| PLANNED | 1 | **1**（仅 T08 持久化仍 PLANNED） | 1（不变） | 1（仅 T08 持久化） | **1**（不变） |
+| P0 | 12 | **19**（+7 v1.1：F1/F2/F4/F5/F8/F9 + 1 F6） | 20（+1 DM-20260620-003 T16） | 23（+3 v3.3.0 P0） | **23**（不变） |
+| P1 | 13 | **15**（+2 v1.1：F3/F7） | 15（不变） | 15（不变） | 15（不变） |
+| P2 (PLANNED) | 1 | 1（不变；T08 持久化仍 PLANNED） | 1（不变） | 1（不变） | 1（不变） |
+| Span Evidence 列 | — | — | — | — | **30 mapped + 11 explicit `—` = 30/30 = 100%**（排除显式 `—` 后所有 T 都有 span 引用） |
+| Legacy Archive 覆盖 | 26 / 26 (100%) | **26 / 26 (100%)**（v1.1 不破坏追溯） | 26 / 26 (100%)（v3.2.0 不破坏追溯） | 26 / 26 (100%)（v3.3.0 不破坏追溯） | 26 / 26 (100%)（v3.4.0 不破坏追溯） |
+| v1.1 新 T PLANNED → IMPLEMENTED | — | 9 / 9（v1.1 S5 验收通过） | 9 / 9（继承） | 9 / 9（继承） | 9 / 9（继承） |
 
 ---
 
@@ -275,3 +292,5 @@ D3-S3-A01 ShieldAndRetry
 | **3.2.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D3-S3-A01-T16 retry nil-sentinel defensive wrap (PR-A L4 / PR-C H3)。Total 35→36, IMPLEMENTED 34→35, P0 19→20 |
 | **3.3.0** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) PLANNED**: APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus HTTP status → APIErrorCode 工厂 + sharederrors.IsCode 包装链识别 + 4 adapter 错误构造统一走 NewAPIError。**+3 P0 T PLANNED**：D3-S1-A01-T04 HTTP status 映射覆盖 8 类 (401/403/408/413/429/529/5xx/4xx-unknown) + D3-S1-A01-T05 IsCode 正确识别 WithCode→Unwrap→bare APIError 包装链 + D3-S3-A01-T17 4 adapter 错误构造统一走 NewAPIError 工厂。Total 36→39, IMPLEMENTED 35（持平，3 新 T 均 PLANNED）, PLANNED 1→4, P0 20→23。S4 实现后回填 IMPLEMENTED，§0/§1/§4/§10 统计对齐。 |
 | **3.3.1** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) S5 验收**：3 P0 T PLANNED→IMPLEMENTED（D3-S1-A01-T04 + T05 + D3-S3-A01-T17，PR #265 squash merged）。Total 39（持平）, IMPLEMENTED 35→38, PLANNED 4→1（仅 T08 持久化仍 PLANNED）, P0 23。§0/§1/§4 统计对齐。 |
+| **3.4.0** | **2026-06-29** | **devrix-d3-dsaft-restructuring (DM-20260629-003) PR-6 (#4 span-coverage)**：全 41 T 行新增 **Span Evidence 列**，runtime span 名与 `telemetry/names.go` `OpD3_S3_LLM_*` 常量值对齐（`D3_LLM_Stream` / `D3_LLM_Provider_Route` / `D3_LLM_CircuitBreaker` / `D3_LLM_Retry` / `D3_LLM_Adapter_Stream`）。**30 T 直接映射** + **11 T 显式标 `—`**（注入模式 6 / 启动期 3 / 编译期 2 — 详见 `span-registry.md §9 T-Without-Span Tracker`）。**Span Evidence 覆盖率 = 30/30 = 100%**（排除显式 `—` 后所有 T 都有 span 引用；raw 30/41 ≈ 73.2% informational only）。`scripts/d3-span-coverage.sh` 守门 ≥ 80% PASS。 |
+| **3.5.0** | **2026-06-29** | **devrix-d3-dsaft-restructuring (DM-20260629-003) PR-5 #3 value-flow-rename + S7_Archive ACCEPTED**：T 编号无变化；§1 T 总览 S 段名称旁加 ValueFlow Alias 列（5 S + 1 横切 = 6 alias，与 a/f-registry.md / d3-domain.md §North Star 同步）；§2~§8 各 S header 加 `> **ValueFlow Alias (用户感知):**` 行；PR-1..PR-8 全部 squash auto-merge；8 PR / 40 T / 14 G 全部 PASS；10/10 D3 packages -race PASS；d3-domain v1.0.0 → v1.6.0；`openspec/archive/2026-06-29-devrix-d3-dsaft-restructuring/` |

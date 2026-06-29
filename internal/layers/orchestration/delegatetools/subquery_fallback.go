@@ -1,3 +1,10 @@
+// Package delegatetools provides D4 delegate canonical tools + D2 fallback runners.
+//
+// v2.6.0 (DM-20260629-001):
+//   - BuildSubQueryRunner() removed; bootstrap callers now construct
+//     &SubQueryRunner{LoopDeps: deps} directly.
+//   - Doc drift rewrites for AC6/AC10 references retired (those AC IDs
+//     were from v1.0 spec, retired in v6.0.0).
 package delegatetools
 
 import (
@@ -6,7 +13,6 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/contracts"
-	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/prompts/agent"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -68,9 +74,4 @@ func (f *SubQueryRunner) RunSubQuery(
 		return "", nil
 	}
 	return res.Result.AssistantText, nil
-}
-
-// BuildSubQueryRunner creates a SubQueryRunner from turn-runtime deps.
-func BuildSubQueryRunner(deps enforce.SubQueryDeps) sessionorchestrator.SubQueryRunner {
-	return &SubQueryRunner{LoopDeps: deps}
 }

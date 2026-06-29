@@ -49,6 +49,7 @@ type WorkItem struct {
 	Ephemeral     bool       `json:"ephemeral,omitempty"`
 	Locked        bool       `json:"locked,omitempty"`
 	NeedsRollup   bool       `json:"needs_rollup,omitempty"`
+	ScopeContract *ScopeContract `json:"scope_contract,omitempty"`
 	SourceSession  string          `json:"source_session,omitempty"`
 	ContextScopeID string          `json:"context_scope_id,omitempty"`
 	ContextPolicy  ContextLinkKind `json:"context_policy,omitempty"`

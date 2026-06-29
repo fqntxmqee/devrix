@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.13.0
+**Version:** 4.15.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-27 (workitem rollup pipeline, DM-20260627-001 rollup change)
+**Last Updated:** 2026-06-28 (layer subcontext phase 3, DM-20260628-002)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -1830,10 +1830,65 @@ When root goal Round 1 ends with `SpawnNone` or failed + ephemeral checklist chi
 
 ---
 
+## Scenario D7-S16: Layer SubContext (DM-20260627-003 + DM-20260628-002)
+
+> **Archived changes:** `openspec/archive/2026-06-28-devrix-d7-layer-subcontext/` (Phase 1+2) · `openspec/archive/2026-06-28-devrix-d7-layer-subcontext-phase3/` (Phase 3)  
+> **Design SoT:** CG2′ in `workitem-context-graph-design.md` v0.4.0
+
+### Requirement: D7-S16-A60 ScopeContract — Goal 范围收敛
+
+Goal WorkItem Plan/Execute shall produce a parseable **ScopeContract** (`goal_statement`, `in_scope`, `out_of_scope`, `open_questions`, …). Non-empty `open_questions` blocks `SpawnDecompose` (rule gate + R-OBS-1 ObsUncertainty).
+
+### Requirement: D7-S16-A61 ChildDownlink
+
+Decompose persists **ChildDownlink** with mandatory non-empty `ExpectedReturn`; Materialize injects Directive + ScopeIn/Out for depth ≥ 1 children.
+
+### Requirement: D7-S16-A62 LayerCohort Partition
+
+Siblings under one parent share **cohort domain** (ScopeContract meta) via `EnsureCohortScope`; WorkItemPrivate transcript remains per `wi:<sid>:<wi_id>`.
+
+### Requirement: D7-S16-A63 UpstreamSignal (BlockedBy)
+
+Materialize mode **Upstream** injects structured bubble + truncated artifact summary only; blocker private jsonl shall not appear in dependent payload.
+
+### Requirement: D7-S16-A64 PeerStatusSignal
+
+When cohort size ≥ 3, terminal siblings may record **PeerStatusSignal**; Materialize may inject `peer_status` lines (no live ReAct tail sharing).
+
+### Requirement: D7-S16-A70 WorkItemExecutor Materialize 接线
+
+WorkItems at **depth ≥ 1** shall obtain LLM context via D2 `ContextMaterializer.Materialize` (default on, no env flag). L0 Goal continues legacy `ContextPreparer.Prepare`. Jaeger span `D2_Context_Materialize` records `wi_id`, `policy`, `message_count`.
+
+### Requirement: D7-S16-A72 Signal→Observation 边界
+
+Execute ReAct transcript shall **not** require per-iteration ObsFact/ObsSignal/ObsDeviation/ObsUncertainty self-labels; Observe rules map ScopeContract / bubbles to Obs* (R-OBS-1..7).
+
+### Requirement: D7-S16-A73 Execute Structured Delivery Template
+
+Materialize may soft-guide `<conclusion>` / `<open_questions>`; LastRound is Signal carrier, not UncertaintyReport SoT.
+
+### Requirement: D7-S16-A65 SubTurn → MaterializePolicy (DM-20260628-002)
+
+`PolicyFromSubTurnMode` maps SubTurn `brief`/`fork`/`full` to Materialize `fresh`/`fork`/`resume`. When `SubTurnRunner.Materializer` is wired, delegate sub-agents assemble context via D2 Materialize (`PartitionAgent`); nil Materializer falls back to legacy `applyMode`.
+
+### Requirement: D7-S16-A66 Wave ContextResolver → Materializer (DM-20260628-002)
+
+Wave worker policies `fresh`/`resume`/`upstream` delegate to D2 Materialize via `PartitionWave`. `NewMaterializingContextResolver` is the bootstrap default when Materializer is available; legacy `ContextResolver` remains when Materializer is nil.
+
+### Requirement: D7-S16-A74 LLM ObservationProposer @ Observe (DM-20260628-002)
+
+Optional `ObservationProposer` may propose Obs* from structured signals (directive, ScopeContract, inbound signal lines, prior) **without** WorkItem private ReAct transcript. `ValidateObservationProposals` rule-gates proposals (ObsFact strength ≤ 0.85, mandatory evidence); LLM failures are fail-safe (rules-only Observe continues).
+
+> **Layer SubContext Phase 1–3 闭环** — WorkTree v2 其他项见 `tech-debt/worktree-v2-deferred.md`。
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **4.15.0** | **2026-06-28** | **devrix-d7-layer-subcontext-phase3 (DM-20260628-002) Phase 3 闭环**：(1) ADDED D7-S16-A65 SubTurn→MaterializePolicy；(2) ADDED D7-S16-A66 Wave ContextResolver→Materializer；(3) ADDED D7-S16-A74 LLM ObservationProposer @ Observe（G3 提案+规则校验）；PR #273–#275 |
+| **4.14.0** | **2026-06-28** | **devrix-d7-layer-subcontext (DM-20260627-003) Phase 1+2 Layer SubContext**：(1) ADDED Scenario D7-S16 + A60/A61/A62/A63/A64/A70/A72/A73；(2) D2 Materialize + WorkItemPrivate partition；(3) ScopeContract + spawn gate + Observe R-OBS mapping；(4) ChildDownlink + cohort CG2′；(5) Upstream BlockedBy + PeerStatus；(6) depth≥1 默认 Materialize（无 feature flag）；(7) `/task context show` + ResolveHint 扩展；(8) Phase 3 T33–T35 登记 |
 | **4.13.0** | **2026-06-27** | **devrix-d7-workitem-rollup-pipeline (DM-20260627-001) Phase 1 Rollup 闭环**：(1) ADDED Scenario D7-S15 + A50/A51/A53/A54/A55/A60/A61；(2) Parent Rollup Gate + `NeedsRollup` + `ReopenForRollup`；(3) Summary + Structured dual bubble Observe (`observationsFromChildSummaryBubbles`)；(4) Rollup MUPS R2+ + `verifyRollupArtifact`；(5) Root Fallback + session deliverable；(6) Phase 1 `RollupGatePolicy=best_effort` only；(7) t-registry v4.7.0→v4.8.0 (+21 P0 T) |
 | 1.0.0 | 2026-06-10 | ORCH v2 read model spec (DM-20260610-012) |
 | 1.0.0 | 2026-06-13 | D7 domain spec draft (DM-20260613-001, S3 design) |

@@ -3,13 +3,14 @@ package testutil
 import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // ContextEngineDepsFromStack builds EngineDeps with D7 turn adapters (production-like).
-func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.ContextEngineConfig) contextengine.EngineDeps {
+func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.ContextEngineConfig) kernel.EngineDeps {
 	if ctxCfg == nil {
 		ctxCfg = config.DefaultContextEngineConfig()
 	}
@@ -19,7 +20,7 @@ func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.
 		DefaultTier:  stack.DefaultModel,
 		Timeout:      ctxCfg.Compression.Autocompact.Timeout,
 	})
-	return contextengine.EngineDeps{
+	return kernel.EngineDeps{
 		Summarizer:   summarizer,
 		TokenCounter: stack.TokenCounter,
 		TierResolver: stack.TierResolver,
@@ -29,7 +30,7 @@ func ContextEngineDepsFromStack(stack llmbridge.ContextLLMStack, ctxCfg *config.
 }
 
 // MergeEngineDeps overlays non-zero fields from patch onto base.
-func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDeps) contextengine.EngineDeps {
+func MergeEngineDeps(base kernel.EngineDeps, patch kernel.EngineDeps) kernel.EngineDeps {
 	if patch.Summarizer != nil {
 		base.Summarizer = patch.Summarizer
 	}
@@ -76,7 +77,7 @@ func MergeEngineDeps(base contextengine.EngineDeps, patch contextengine.EngineDe
 }
 
 // EnsureLLMDeps panics if Summarizer or PreparedTurnRunner are missing.
-func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
+func EnsureLLMDeps(deps kernel.EngineDeps) kernel.EngineDeps {
 	if deps.Summarizer == nil {
 		panic("test EngineDeps missing Summarizer")
 	}
@@ -87,11 +88,11 @@ func EnsureLLMDeps(deps contextengine.EngineDeps) contextengine.EngineDeps {
 }
 
 // EngineDepsWithPreparedTurn returns minimal EngineDeps with a static prepared-turn runner.
-func EngineDepsWithPreparedTurn(runner contracts.PreparedTurnRunner) contextengine.EngineDeps {
+func EngineDepsWithPreparedTurn(runner contracts.PreparedTurnRunner) kernel.EngineDeps {
 	if runner == nil {
 		runner = &contextengine.StaticPreparedTurnRunner{}
 	}
-	return contextengine.EngineDeps{
+	return kernel.EngineDeps{
 		PreparedTurnRunner: runner,
 		Summarizer:         &contextengine.StaticSummarizer{},
 	}

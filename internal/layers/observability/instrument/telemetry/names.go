@@ -55,8 +55,6 @@ const (
 	OpD2_S2_Context_Compression_Run = "D2_Context_Compression_Run"
 	OpD2_S2_Context_Compression_Step = "D2_Context_Compression_Step"
 	OpD2_S2_Context_Longterm_Recall = "D2_Context_Longterm_Recall"
-	OpD2_S2_Context_Longterm_Store = "D2_Context_Longterm_Store"
-	OpD2_S2_Context_Tools_Register = "D2_Context_Tools_Register"
 	OpD2_S2_Context_Tools_List = "D2_Context_Tools_List"
 	OpD2_S2_Context_Tools_Filter_Permission = "D2_Context_Tools_Filter_Permission"
 	OpD2_S2_Context_Tools_Filter_AgentRole = "D2_Context_Tools_Filter_AgentRole"
@@ -68,18 +66,13 @@ const (
 	OpD2_S2_Context_Attachments_Collect = "D2_Context_Attachments_Collect"
 	OpD2_S2_Context_Queue_Drain = "D2_Context_Queue_Drain"
 	OpD2_S2_Context_Memory_Snapshot_Save = "D2_Context_Memory_Snapshot_Save"
+	OpD2_S16_Context_Materialize = "D2_Context_Materialize"
 
-	// D2 Context Engine - Harness (D2-S5)
-	OpD2_S5_Context_Harness_Bootstrap_Run = "D2_Context_Harness_Bootstrap_Run"
-	OpD2_S5_Context_Harness_Bootstrap_Stage = "D2_Context_Harness_Bootstrap_Stage"
-	OpD2_S5_Context_Harness_ToolPool = "D2_Context_Harness_ToolPool"
-	OpD2_S5_Context_Harness_Preflight = "D2_Context_Harness_Preflight"
-	OpD2_S5_Context_Harness_Route = "D2_Context_Harness_Route"
+	// D2 Context Engine - Harness (D2-S5, REMOVED v6.5.0; SystemPrompt_Build 在 prepare/adapters/ 复用)
 	OpD2_S5_Context_Harness_SystemPrompt_Build = "D2_Context_Harness_SystemPrompt_Build"
 
 	// D2 Context Engine - Tool Execution (D2-S5)
 	OpD2_S5_Tool_Execute_Single = "D2_Tool_Execute_Single"
-	OpD2_S5_Tool_Execute_Permission = "D2_Tool_Execute_Permission"
 
 	// D2 Context Engine - Task / Plan (D2-S8)
 	OpD2_S8_Task_Plan_Generate = "D2_Task_Plan_Generate"
@@ -87,8 +80,6 @@ const (
 	OpD2_S8_Task_PlanMode_Execute = "D2_Task_PlanMode_Execute"
 	OpD2_S8_Task_PlanMode_Approve = "D2_Task_PlanMode_Approve"
 	OpD2_S8_Task_PlanMode_Reject = "D2_Task_PlanMode_Reject"
-	OpD2_S8_Task_Manager_Create = "D2_Task_Manager_Create"
-	OpD2_S8_Task_Manager_Update = "D2_Task_Manager_Update"
 
 	// D3 LLM Gateway (D3-S3)
 	OpD3_S3_LLM_Stream = "D3_LLM_Stream"
@@ -155,6 +146,30 @@ const (
 	// D7-S5 SubTurn (subturn.iteration P1)
 	OpD7_S5_SubTurn_Iteration = "D7_SubTurn_Iteration"
 
+	// D7 Orchestration - t-span-coverage 5 ops (DM-20260629-001 PR-6, T35,
+	// 2026-06-29). The 6 S inner spans above cover WorkItem-level mutations;
+	// the five ops below cover the long-running reputation learning, anomaly
+	// triggers, prior injection, resume decision paths, and the cross-domain
+	// IM card render that closes the D7→D1 loop. Together they raise the
+	// T↔Span coverage from ~38% to ≥80%.
+
+	// D7-S2 SessionOrchestrator (resume.decision_path P0, ApplyResumeSession
+	// 3 决策路由 A fall-through / B user_accept→ForceExit / C user_cancel→
+	// AbortWithAudit).
+	OpD7_S2_Resume_Decision_Path = "D7_Resume_Decision_Path"
+	// D7-S5 DecisionPlanning + Observe (adaptive_prior.inject P0, buildObserveRequest
+	// learner.Inject 注入路径, 跨 S5↔S6 数据契约).
+	OpD7_S5_AdaptivePrior_Inject = "D7_AdaptivePrior_Inject"
+	// D7-S4 ExecutionFlow + Verify (anomaly.trigger P0, SystemAnomalyDetector
+	// 阈值触发, 高/中严重度路径).
+	OpD7_S4_Anomaly_Trigger = "D7_Anomaly_Trigger"
+	// D7-S6 MUPS Pipeline (longterm.reputation_update P0, BayesianUpdate 后
+	// 长程信誉落盘, LP-1 闭环 acceptance).
+	OpD7_S6_LongTerm_Reputation_Update = "D7_LongTerm_Reputation_Update"
+	// D7 Orchestration × D1 Communication (feishu.card_render P0, 飞书卡片
+	// finalizeReplyCardStreaming 渲染 span, D7→D1 跨域可观测).
+	OpD7_Feishu_Card_Render = "D7_Feishu_Card_Render"
+
 	// D6 Evolution - Runtime Validation (D6-S4)
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
 )
@@ -178,6 +193,8 @@ func LayerAndComponent(operation string) (layer, component string) {
 
 	// D2 Context Engine
 	case strings.HasPrefix(operation, "D2_Context_Harness_"):
+		// 仅 SystemPrompt_Build 仍在 prepare/adapters/assembler_adapter.go
+		// 复用（S5 harness 主体 v6.5.0 已 REMOVED）。
 		return LayerContext, "harness"
 	case strings.HasPrefix(operation, "D2_Context_"):
 		return LayerContext, "context_engine"
@@ -187,8 +204,6 @@ func LayerAndComponent(operation string) (layer, component string) {
 		return LayerContext, "plan_mode"
 	case strings.HasPrefix(operation, "D2_Task_Plan_"):
 		return LayerContext, "plan_agent"
-	case strings.HasPrefix(operation, "D2_Task_Manager_"):
-		return LayerContext, "task_manager"
 
 	// D3 LLM Gateway
 	case strings.HasPrefix(operation, "D3_LLM_Adapter_Stream"):
@@ -226,6 +241,21 @@ func LayerAndComponent(operation string) (layer, component string) {
 		// DM-20260626-009 follow-up inner observability spans (PR #254 + #257).
 		// Per-WorkItem ReAct loop iterations (D7-S5).
 		return LayerOrchestration, "executor"
+
+	case strings.HasPrefix(operation, "D7_Resume_Decision_Path"),
+		strings.HasPrefix(operation, "D7_AdaptivePrior_Inject"),
+		strings.HasPrefix(operation, "D7_Anomaly_Trigger"),
+		strings.HasPrefix(operation, "D7_LongTerm_Reputation_Update"):
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T35). Long-running
+		// reputation learning, anomaly triggers, prior injection and resume
+		// decision paths all live in the orchestrator component.
+		return LayerOrchestration, "orchestrator"
+
+	case strings.HasPrefix(operation, "D7_Feishu_Card_Render"):
+		// DM-20260629-001 PR-6 (T35). Cross-domain D7→D1 finalise: still an
+		// orchestration emit but tagged communication so Jaeger filters
+		// match the D1_S17_Adapter_Feishu_Outbound lineage.
+		return LayerOrchestration, "adapter"
 
 	// D6 Evolution
 	case strings.HasPrefix(operation, "D6_Validation_"):

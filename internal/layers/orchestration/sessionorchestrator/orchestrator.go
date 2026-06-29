@@ -16,6 +16,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -51,6 +52,23 @@ type SessionOrchestrator struct {
 	// taskManager is the D7 task store injected at construction (DM-20260617-008 W4).
 	// nil → a fresh in-memory taskmanager is created in NewSessionOrchestrator.
 	taskManager *workmodel.TaskManager
+
+	// turnState (DM-20260628-003, D7-S15) serializes turns per session_id
+	// so a second ProcessMessage call for the same session waits for the
+	// first one's RunSessionTurnLoop goroutine to drain `out`. nil →
+	// disabled (legacy/test path; equivalent to pre-D7-S15 behavior).
+	turnState *TurnState
+
+	// transcriptReader (DM-20260628-003, D7-S15) reads the recent
+	// complete-event Bodies from a session's transcript jsonl so the
+	// next turn's directive can be enriched with <prior-output-summary>.
+	// nil → no injection.
+	transcriptReader *TranscriptReader
+
+	// priorContextRounds (DM-20260628-003, D7-S15) controls how many
+	// recent turns' finalText to inject. 0 disables injection (default,
+	// backward compatible). >0 reads transcript + builds summary block.
+	priorContextRounds int
 
 	// learner is the Phase 6 PR-F2 (D7-S12-A42-T04) LP-1 closed-loop
 	// component. When non-nil, ProcessMessage calls learner.Inject at
@@ -157,6 +175,47 @@ func WithEscapeEngine(e *escape.EscapeEngine) OrchestratorOption {
 	return func(o *SessionOrchestrator) { o.escapeEngine = e }
 }
 
+// WithTurnState injects a pre-built TurnState (typically used by tests
+// that want to share state across orchestrator instances, or by
+// bootstrap to share state across orchestrator rebuilds on config
+// reload). Production code should prefer WithPriorContextRounds which
+// constructs an isolated TurnState automatically.
+func WithTurnState(ts *TurnState) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.turnState = ts }
+}
+
+// WithTranscriptDir overrides the default transcript directory used by
+// the embedded TranscriptReader. Empty string → default
+// ~/.devrix/transcripts (matching bootstrap.NewTranscriptWriter).
+// No-op unless WithPriorContextRounds(n>0) is also applied.
+func WithTranscriptDir(dir string) OrchestratorOption {
+	return func(o *SessionOrchestrator) { o.transcriptReader = NewTranscriptReader(dir) }
+}
+
+// WithPriorContextRounds enables prior-output-summary injection into
+// each turn's directive.
+//
+// n <= 0 (default) → injection disabled; turnState and transcriptReader
+// are NOT constructed. Equivalent to pre-D7-S15 behavior.
+//
+// n > 0 → construct a fresh TurnState + TranscriptReader on this
+// orchestrator. Subsequent calls to WithTurnState or WithTranscriptDir
+// can override the freshly built instances (applied later wins because
+// functional options run in caller order).
+func WithPriorContextRounds(n int) OrchestratorOption {
+	return func(o *SessionOrchestrator) {
+		o.priorContextRounds = n
+		if n > 0 {
+			if o.turnState == nil {
+				o.turnState = NewTurnState()
+			}
+			if o.transcriptReader == nil {
+				o.transcriptReader = NewTranscriptReader("")
+			}
+		}
+	}
+}
+
 // WithClassifier replaces the default decisionplanning.RuleClassifier. The default is
 // decisionplanning.NewRuleClassifier(cfg) (rule-only). Tests use this to inject stubs;
 // v1.1+ may inject a LLM-first classifier that satisfies
@@ -222,6 +281,26 @@ func (o *SessionOrchestrator) buildObserveRequest(ctx context.Context, req orcht
 				"session_id", req.SessionID, "track_mode", req.TrackMode, "err", err)
 		} else {
 			prior = injected
+			// DM-20260629-001 PR-6 t-span-coverage (T41): emit the
+			// D7_AdaptivePrior_Inject span so LP-1 closure traces show the
+			// actual Beta(alpha, beta) being injected at the Observe
+			// boundary. The span fires only on the success path
+			// (cold-start Bootstrap / Reputation fallback path emits no
+			// span — they fall back to DefaultDeveloperPrior and the
+			// caller already sees the warning slog).
+			trackMode := req.TrackMode
+			if trackMode == "" {
+				trackMode = string(learn.TrackModeDeveloper)
+			}
+			endInject := hardening.EmitAdaptivePriorInject(
+				ctx,
+				req.SessionID,
+				"Observe",
+				float64(prior.PriorBeta.Alpha),
+				float64(prior.PriorBeta.Beta),
+			)
+			endInject(nil)
+			_ = trackMode // reserved for follow-up prior.source_track_mode attr
 		}
 	}
 	return orchtypes.NewObserveRequest(req.SessionID, req.Message, prior)
@@ -251,6 +330,21 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// that ctx after End() would attach Turn/Wave spans to the ended classify
 	// span instead of Session_Process (registry: Turn is sibling of Classify).
 	sessionCtx := ctx
+
+	// DM-20260628-003 (D7-S15): wait for any in-flight turn on this session
+	// to fully drain its out channel. This is the architectural fix for the
+	// 2026-06-28 17:31 panic (sess_1782638991113_5000) where two goroutines
+	// for the same session_id raced on executor.Emit. PR #271 added the
+	// defensive recover + per-Run overwrite; this WaitTurn gate ensures the
+	// race cannot happen in the first place.
+	//
+	// nil turnState (legacy/test path) → no wait, equivalent to v6.0.0.
+	if o.turnState != nil {
+		if err := o.turnState.WaitTurn(sessionCtx, req.SessionID); err != nil {
+			endSpanWithError(sessionSpan, err)
+			return nil, fmt.Errorf("orchestrator: wait turn: %w", err)
+		}
+	}
 
 	// Phase 6 PR-F2 LP-1: build observe request with AdaptivePrior injection
 	// BEFORE classification. Failures from learner.Inject are logged but do
@@ -328,6 +422,21 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 
 	if o.taskManager != nil && req.SessionID != "" && strings.TrimSpace(req.Message) != "" && intent.Kind != orchtypes.IntentSkip {
 		_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, req.Message)
+		// DM-20260628-003 (D7-S15): enrich directive with prior-output-summary
+		// so turn N+1's LLM sees turn N's finalText. Read failures are
+		// non-fatal — a missing transcript just means fresh session / no
+		// history; we fall through with req.Message as-is.
+		if o.priorContextRounds > 0 && o.transcriptReader != nil {
+			texts, rerr := o.transcriptReader.ReadRecent(sessionCtx, req.SessionID, o.priorContextRounds)
+			if rerr != nil {
+				slog.Warn("orchestrator: transcript reader failed, skipping prior context injection",
+					"session_id", req.SessionID, "err", rerr)
+			} else if len(texts) > 0 {
+				summary := o.transcriptReader.BuildPriorOutputSummary(texts)
+				enriched := summary + "\n\n" + req.Message
+				_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, enriched)
+			}
+		}
 	}
 
 	// Advisory validation; outcome is observed (per R2 §5 P1 #6) but

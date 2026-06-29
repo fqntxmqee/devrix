@@ -256,23 +256,50 @@ Added: CardkitClient for streaming, WorkerCardRenderer for orchestration, struct
 | CLI Adapter | ANSI rendering | + task/plan commands | `adapters/cli.go` |
 | Feishu Adapter | Webhook only | + WebSocket + CardKit streaming + Worker cards | `adapters/feishu.go` |
 | DingTalk Adapter | — | Webhook + Card renderer | `adapters/dingtalk.go` |
-| Session Store | File-based (JSON) | + atomic write + ResolveByChatID + CleanupRoutine | `gateway/store.go` |
+| Session Store | File-based (JSON) | + atomic write + ResolveByChatID + CleanupRoutine | `capture/store.go`, `capture/session.go` |
 | Session idle timeout | 30min (configurable) | unchanged | `config.CommunicationConfig.Session` |
 | Command Handler | /new, /stop, /help | + /task, /plan | CLI + Feishu |
-| Permission System | Basic YOLO | + CRITICAL never auto-approve + timeout metrics + signal-based resolution | `gateway/permission.go` |
+| Permission System | Basic YOLO | + CRITICAL never auto-approve + timeout metrics + signal-based resolution | `capture/permission.go` |
 | EventBus | — | BackpressureEventBus (Drain/Compact/Reconnect) + Critical guarantee | `eventbus/bus.go` |
 | CardKit Streaming | — | Element-level streaming + throttle + fallback to Patch | `adapters/feishu_cardkit.go` |
-| Worker Cards | — | Per-worker independent cards + double-block streaming | `adapters/feishu_worker_card.go` |
-| Agent Routing | — | Gateway-to-L4 bridge + permission bridging | `gateway/agent_route.go` |
+| Worker Cards | — | Per-worker independent cards + double-block streaming | `adapters/feishu_worker_card.go`（`contracts` DTO，DM-20260628-003） |
+| Agent Routing | — | **SUPERSEDED** → bootstrap sessionagents beforeDispatch | `bootstrap/sessionagents/manager.go`（原 `capture/agent_route.go` 已删） |
 | Connection Manager | — | Heartbeat + exponential backoff reconnect | `connection/manager.go` |
 | Rate Limiter | — | Token bucket + HTTP middleware | `ratelimit/limiter.go` |
 | Instance Registry | — | In-memory Register/Unregister/HealthCheck | `instance/registry.go` |
 | Milestone DAG | Basic CRUD | + cycle detection + topological sort + task flow orchestration | `milestone/` |
 | Metrics | Legacy Counter/Gauge | DEPRECATED → D5 observability.Bridge | `metrics/collector.go` |
 
+### DSAFT Refactor（DM-20260628-003 — devrix-d1-dsaft-refactor）
+
+| 变更 | 前 | 后 |
+|------|----|----|
+| D4 leader 供给 | `capture/agent_route.go` | `bootstrap/sessionagents` + `SetBeforeDispatch` |
+| Gateway 物理文件 | 单文件 `gateway.go` | `ingress/session/outbound/dispatch/gateway` facade |
+| capture import 边界 | 曾 import `multiagent` | 零 `multiagent` / `orchestration/*`（`lint-d1-imports.sh` CI） |
+| Worker 卡 DTO | `wavescheduler.WorkerEvent` | `contracts.WorkerStreamEvent` |
+| CLI /task | `workmodel` 直 import | `contracts.TaskCLIHandler`（composition root 注入） |
+| IContextEngine alias | `capture.IContextEngine` | 删除；用 `contracts.IEngine` |
+
+## Legacy Archive（D1-S1–S12 — 仅追溯）
+
+> 活动全表见 `a-registry.md` §Legacy Module Index。Canonical 映射见 `t-registry.md` §Legacy T。
+
+| Legacy S | 终态 Canonical | 备注 |
+|----------|----------------|------|
+| S1 Gateway | S13 + bootstrap hook | S1-A04 RouteAgent **SUPERSEDED** → D1-RF-T02 |
+| S2 Adapters | S17 | S2-A03 Worker 卡 → contracts DTO |
+| S9 EventBus | S18 | 路径 `delivery/eventbus/` |
+
 ## REMOVED
 
-(None — deprecated metrics package retained for reference, not removed)
+| 组件 | 原因 | 替代 |
+|------|------|------|
+| `capture/agent_route.go` | D4 生命周期不属于 D1 | `bootstrap/sessionagents/manager.go` |
+| `capture.IContextEngine` | 跨层契约应直用 contracts | `contracts.IEngine` |
+| `capture/event_dispatcher.go` | Gateway 拆分 | `capture/dispatch.go` |
+
+（deprecated metrics package 仍保留参考，未物理删除）
 
 ---
 

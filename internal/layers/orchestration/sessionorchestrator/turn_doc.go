@@ -1,17 +1,26 @@
-// Package turn implements the D7 Turn Leader — the canonical LLM↔Tool turn loop
-// owned by the Orchestration Domain (D7-S2-A06 RunTurnLoop, D7-S2-A07 InvokeLLM).
+// Package sessionorchestrator hosts the D7 v6.0 6-Scenario orchestration surface
+// after the DM-20260626-001 14→6 simplification. The package boundary bundles
+// what used to be a separate turn/ subpackage (merged by DM-20260626-004) and
+// remains the single source of truth for turn execution.
 //
-// DM-020 (D7 Turn 编排上移): TurnOrchestrator replaces the legacy D2-S16 turn loop
-// as the single source of truth for turn execution. D7 directly calls D3 for LLM
-// inference; D2 provides ContextPreparer, ToolRoundExecutor, and SessionPersister
-// as pure execution primitives (Context Follower).
+// v6.0 6S + 1 cross-cutting layout (D7-S1..S6 + D7-S0 meta):
 //
-// v2.0 Slice plan:
+//	S1 (Intent)        — orchestrator intent classification + sub-intent dispatch
+//	S2 (Session)       — per-session state, multi-turn context, resume/force-exit
+//	S3 (Decide)        — decide-next-action with WorkTree downward propagation
+//	S4 (Verify)        — promote to executionflow/verify, drives ExitReason
+//	S5 (Plan / Wave)   — wave / task planning + scheduling
+//	S6 (Tool)          — D4 delegate canonical tools + D2 fallback runner
+//	S0 (Meta, cross)   — DSAFT governance, registry sync, value-flow rename,
+//	                      span coverage, archive
 //
-//	a: skeleton + interfaces (this package)
-//	b: bootstrap WireContextLLM → D7
-//	c: FastPath calls TurnOrchestrator
-//	d: D2 removes ILLMGateway + import lint
-//	e: Autocompact D7→D3
-//	f: Legacy adapter + all T green
+// Current state (v2.6.0, DM-20260629-001):
+//   - TurnOrchestrator is the only turn-loop owner (replaces legacy D2-S16).
+//   - D7 calls D3 directly for LLM inference; D2 is a Context Follower via
+//     ContextPreparer, ToolRoundExecutor, SessionPersister primitives.
+//   - ingress routes via ProcessMessage with loop_first only (rule_orchestrate
+//     retired in v6.0.0, FastPath retired in PR #239).
+//   - WorkTree governance: typed RollupReport struct, deterministic
+//     sessionRootGoal, 5 ReevaluateParentAfterChild call sites are all
+//     migrated (see design.md §2.4).
 package sessionorchestrator

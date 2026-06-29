@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.0
-**Last Updated:** 2026-06-14
+**Version:** 3.3.0
+**Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `a-registry.md` · `t-registry.md`
 **Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议固化；6 F 新增/调整）
@@ -32,13 +32,17 @@
 
 ## 1. S → A → F 索引
 
+> **ValueFlow Alias (用户感知)**：每个 S 段 header 加 `> **ValueFlow Alias:** D3_*` 行；与 a-registry.md / d3-domain.md 同步。
+
 ```
+> **ValueFlow Alias (用户感知):** D3_Model_Routing
 D3-S1 RouteModel
   └─ D3-S1-A01 ResolveModelRoute
        ├─ F01 MatchRouting
        ├─ F02a ResolveTierAlias       <!-- Tier -->
        └─ F02b ResolveDefault         <!-- Default -->
 
+> **ValueFlow Alias (用户感知):** D3_Stream_Chat_Completion
 D3-S2 StreamChat
   └─ D3-S2-A01 StreamChatCompletion
        ├─ F01 OpenAIStreamClientStream
@@ -46,6 +50,7 @@ D3-S2 StreamChat
        ├─ F03 BuildOpenAIRequest
        └─ F04 AdapterProtocolMethod       <!-- v1.1 F5: BREAKING 接口扩展 -->
 
+> **ValueFlow Alias (用户感知):** D3_Circuit_Breaker_And_Retry
 D3-S3 ProtectCall
   └─ D3-S3-A01 ShieldAndRetry
        ├─ F01 AllowCircuit                <!-- Breaker -->
@@ -58,6 +63,7 @@ D3-S3 ProtectCall
        ├─ F08 OnStateTransitionEmit       <!-- v1.1 F2: Breaker 钩子 -->
        └─ F09 ReuseEngineEvent            <!-- v1.1 F3: D3→D7 复用 -->
 
+> **ValueFlow Alias (用户感知):** D3_Token_Budget_Control
 D3-S4 BudgetTokens
   └─ D3-S4-A01 CountAndCheckLLMTokens
        ├─ F01 CountText
@@ -66,6 +72,7 @@ D3-S4 BudgetTokens
        ├─ F04 TruncateToTokens
        └─ F05 LoadBPE
 
+> **ValueFlow Alias (用户感知):** D3_Content_Safety_Filter
 D3-S5 GuardContent
   └─ D3-S5-A01 FilterAndMatchContent
        ├─ F01 CheckContent
@@ -73,6 +80,7 @@ D3-S5 GuardContent
        ├─ F03 MatchPattern
        └─ F04 EmitSafetyLatencyEvent      <!-- v1.1 F8: D3→D6 probe #4 -->
 
+> **ValueFlow Alias (用户感知):** D3_Gateway_Configuration
 D3-S6 ConfigureGateway
   └─ D3-S6-A01 LoadAndValidateLLMConfig
        ├─ F01 LoadConfig
@@ -196,11 +204,11 @@ CROSS (D3 → D2 Bridge)
 
 | F ID | Name | Type | Input | Output | Mechanism | Code Location | Legacy Alias |
 |------|------|------|-------|--------|-----------|---------------|--------------|
-| D3-S4-A01-F01 | CountText | F-BE | text | token_count | — | `token/counter.go` (`Counter.CountText`) | 旧 D3-S5-A01-F01 CountText |
-| D3-S4-A01-F02 | CountMessages | F-BE | []Message, systemPrompt | total_tokens | — | `token/counter.go` (`Counter.CountMessages`, `CountWithSystemPrompt`) | 旧 D3-S5-A01-F02 CountMessages |
-| D3-S4-A01-F03 | CheckBudget | F-BE | count, budget | error/nil | — | `token/counter.go` (`Counter.CheckBudget`) | 旧 D3-S5-A01-F03 CheckBudget |
-| D3-S4-A01-F04 | TruncateToTokens | F-BE | text, maxTokens | truncated_text | — | `token/counter.go` (`Counter.TruncateToTokens`) | 旧 D3-S5-A01-F04 TruncateToTokens |
-| D3-S4-A01-F05 | LoadBPE | F-BE | — | tiktoken.Encoding | — | `token/bpe_loader.go` (`ensureEmbeddedBPELoader`, `embeddedBpeLoader`) | 旧 D3-S5-A01-F05 LoadBPE |
+| D3-S4-A01-F01 | CountText | F-BE | text | token_count | — | `budget/counter.go` (`Counter.CountText`) | 旧 D3-S5-A01-F01 CountText |
+| D3-S4-A01-F02 | CountMessages | F-BE | []Message, systemPrompt | total_tokens | — | `budget/counter.go` (`Counter.CountMessages`, `CountWithSystemPrompt`) | 旧 D3-S5-A01-F02 CountMessages |
+| D3-S4-A01-F03 | CheckBudget | F-BE | count, budget | error/nil | — | `budget/counter.go` (`Counter.CheckBudget`) | 旧 D3-S5-A01-F03 CheckBudget |
+| D3-S4-A01-F04 | TruncateToTokens | F-BE | text, maxTokens | truncated_text | — | `budget/counter.go` (`Counter.TruncateToTokens`) | 旧 D3-S5-A01-F04 TruncateToTokens |
+| D3-S4-A01-F05 | LoadBPE | F-BE | — | tiktoken.Encoding | — | `budget/bpe_loader.go` (`ensureEmbeddedBPELoader`, `embeddedBpeLoader`) | 旧 D3-S5-A01-F05 LoadBPE |
 
 > **跨域观察**（R3 NQ-6 / P2 #20）：D2-S4 Token vs D3-S4 BudgetTokens 合并评估是 v1.1 路线图项；当前 F 边界不重叠（D2-S4 关注 context window 内 token 统计；D3-S4 关注预算 + 截断）。
 
@@ -210,10 +218,10 @@ CROSS (D3 → D2 Bridge)
 
 | F ID | Name | Type | Input | Output | Mechanism | Code Location | Legacy Alias |
 |------|------|------|-------|--------|-----------|---------------|--------------|
-| D3-S5-A01-F01 | CheckContent | F-BE | ctx, system_prompt, []messages | *safety.Result | — | `safety/filter.go` (`Filter.Check`) | 旧 D3-S7-A01-F01 CheckContent |
-| D3-S5-A01-F02 | LoadPatterns | F-BE | — | []Pattern | — | `safety/patterns.go` (`defaultPatterns`) | 旧 D3-S7-A01-F02 LoadPatterns |
-| D3-S5-A01-F03 | MatchPattern | F-BE | text, pattern | bool | — | `safety/filter.go` (`strings.Contains`, case-insensitive) | 旧 D3-S7-A01-F03 MatchPattern |
-| **D3-S5-A01-F04** | **EmitSafetyLatencyEvent** | F-BE | duration_ms | — | Span event | `safety/filter.go` (F01 调用后计时写入 span event `safety.check.duration_ms`) | — (v1.1 F8 增) |
+| D3-S5-A01-F01 | CheckContent | F-BE | ctx, system_prompt, []messages | *safety.Result | — | `guard/filter.go` (`Filter.Check`) | 旧 D3-S7-A01-F01 CheckContent |
+| D3-S5-A01-F02 | LoadPatterns | F-BE | — | []Pattern | — | `guard/patterns.go` (`defaultPatterns`) | 旧 D3-S7-A01-F02 LoadPatterns |
+| D3-S5-A01-F03 | MatchPattern | F-BE | text, pattern | bool | — | `guard/filter.go` (`strings.Contains`, case-insensitive) | 旧 D3-S7-A01-F03 MatchPattern |
+| **D3-S5-A01-F04** | **EmitSafetyLatencyEvent** | F-BE | duration_ms | — | Span event | `guard/filter.go` (F01 调用后计时写入 span event `safety.check.duration_ms`) | — (v1.1 F8 增) |
 
 **F04 EmitSafetyLatencyEvent 实施说明**（R3 P1 #16 + D5-A 决议）：
 
@@ -236,11 +244,11 @@ CROSS (D3 → D2 Bridge)
 
 | F ID | Name | Type | Input | Output | Mechanism | Code Location | Legacy Alias |
 |------|------|------|-------|--------|-----------|---------------|--------------|
-| D3-S6-A01-F01 | LoadConfig | F-BE | config_file | LLMGatewayConfig | — | `config/loader.go` (`Loader.Load`, `LoadFromFileConfig`) | 旧 D3-S6-A01-F01 LoadConfig |
-| D3-S6-A01-F02 | BuildConfig | F-BE | LLMGatewayFileConfig | LLMGatewayConfig | — | `shared/config/llmgateway.go` (`BuildLLMGatewayConfig`, `DefaultLLMGatewayConfig`) | 旧 D3-S6-A01-F02 BuildConfig |
-| D3-S6-A01-F03 | ValidateProviders | F-BE | LLMGatewayConfig | error/nil | — | `config/loader.go` (`validate`) | 旧 D3-S6-A01-F03 ValidateProviders |
-| D3-S6-A01-F04 | LoadAPIKey | F-BE | LLMProviderRuntimeConfig | api_key, ok | — | `config/loader.go` (`APIKey`) | 旧 D3-S6-A01-F04 LoadAPIKey |
-| **D3-S6-A01-F05** | **FeatureFlagDefaults** | F-BE | — | feature flag schema | — | `shared/config/llmgateway.go` + `wire.go` (3 flag schema + 默认值 + 读取) | — (v1.1 F9 增) |
+| D3-S6-A01-F01 | LoadConfig | F-BE | config_file | LLMGatewayConfig | — | `configure/loader.go` (`Loader.Load`, `LoadFromFileConfig`) | 旧 D3-S6-A01-F01 LoadConfig |
+| D3-S6-A01-F02 | BuildConfig | F-BE | LLMGatewayFileConfig | LLMGatewayConfig | — | `configure/shared_config.go` (`BuildLLMGatewayConfig`, `DefaultLLMGatewayConfig`) | 旧 D3-S6-A01-F02 BuildConfig |
+| D3-S6-A01-F03 | ValidateProviders | F-BE | LLMGatewayConfig | error/nil | — | `configure/loader.go` (`validate`) | 旧 D3-S6-A01-F03 ValidateProviders |
+| D3-S6-A01-F04 | LoadAPIKey | F-BE | LLMProviderRuntimeConfig | api_key, ok | — | `configure/loader.go` (`APIKey`) | 旧 D3-S6-A01-F04 LoadAPIKey |
+| **D3-S6-A01-F05** | **FeatureFlagDefaults** | F-BE | — | feature flag schema | — | `configure/shared_config.go` + `wire.go` (3 flag schema + 默认值 + 读取) | — (v1.1 F9 增) |
 
 **F05 FeatureFlagDefaults 实施说明**（D4-B 决议）：
 
@@ -320,3 +328,5 @@ CROSS (D3 → D2 Bridge)
 | 2.1.0 | 2026-06-14 | 7 S × 1 A × 22 F |
 | 3.0.0 | 2026-06-14 | 5+1 S × 1 A × 24 F（域内）+ CROSS 2 A × 2 F；F02 拆 F02a/F02b（+1）；ProtectCall 合并 Breaker+Retry 引入 F06 ShouldRecordBreakerFailure（+1）；Bridge / Bootstrap 移至 CROSS 段 |
 | 3.1.0 | 2026-06-14 | 5+1 S × 1 A × 30 F（域内）+ CROSS 3 F（净增 6 域内 + 1 CROSS = 7 F）；D3-S3 增 F07/F08/F09（emit metric / state hook / engine event）；D3-S2 增 F04 AdapterProtocolMethod（BREAKING 接口扩展）；D3-S5 增 F04 EmitSafetyLatencyEvent；D3-S6 增 F05 FeatureFlagDefaults；D3-X-A02 增 F02 FailFastOnObsNil（R3 P0 #8 实施） |
+| 3.2.0 | 2026-06-29 | DM-20260629-003 PR-4 (#2 registry-sync) F 路径同步：`token/` → `budget/` (D3-S4-A01 F01~F05, 5 F)；`safety/` → `guard/` (D3-S5-A01 F01~F04, 4 F 含 F04 EmitSafetyLatencyEvent)；`config/` + `shared/config/` → `configure/` (D3-S6-A01 F01~F05, 5 F)；0 漂移 |
+| 3.3.0 | 2026-06-29 | DM-20260629-003 PR-5 (#3 value-flow-rename) §S→A→F 索引每个 S header 加 `> **ValueFlow Alias (用户感知):**` 行（5 S + 1 横切 = 6 alias：`D3_Model_Routing` / `D3_Stream_Chat_Completion` / `D3_Circuit_Breaker_And_Retry` / `D3_Token_Budget_Control` / `D3_Content_Safety_Filter` / `D3_Gateway_Configuration`）；与 d3-domain.md §North Star 对齐 |

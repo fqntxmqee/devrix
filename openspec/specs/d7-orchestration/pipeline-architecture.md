@@ -3,14 +3,26 @@
 **文档类型:** 运行时序 + 调用链路（pipeline architecture & call-chain reference）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** Active
-**Last Updated:** 2026-06-25 (post-cleanup PR #214)
+**Last Updated:** 2026-06-26 (6 S 博弈角色对齐 v6.0.0)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`（DSAFT 规范 SoT）
 **领域 SoT:** `openspec/specs/d7-orchestration/d7-domain.md`（North Star / Out of Scope）
 **详细设计:** `openspec/specs/d7-orchestration/design.md`（六段式架构设计）
 **理想态蓝图:** `openspec/specs/d7-orchestration/call-chain-v4.3.md`（端到端 ASCII 全图 + 不变量验证清单）
 
+> **v1.2.0 更新（2026-06-26，6 S 博弈角色对齐 v6.0.0）**：
+> - **6 S 精简**：14 S → **6 S + 1 横切**（DM-20260626-001 / devrix-d7-six-s-simplification PR #215）。
+> - **D7-S1 WorkModel**：D7-S1 (WorkModel) + D7-S14 (EscapeEngine 入口) + D7-S12 (Observe-Learner 闭环) + D7-S13 (AutoClose) 归并 S2 (State Authority→Mediator+Turn Leader+Error Recovery)
+> - **D7-S2 SessionOrchestrator**：含 Mediator + Turn Leader + Error Recovery 三角色；D7-S5 (DecisionPlanning) + D7-S8 (Observe) 归 S5 (Information Producer + Quantizer)
+> - **D7-S3 WaveScheduler**：不变（Mechanism Designer）
+> - **D7-S4 ExecutionFlow + Verify**：D7-S4 + D7-S10 (Verify) 归 S4 (Costly Signaler + Certifier)
+> - **D7-S5 DecisionPlanning + Observe**：D7-S5 + D7-S8 归 S5
+> - **D7-S6 MUPS Pipeline**：D7-S9 (Execute) + D7-S11 (Learn) 归 S6 (Pipeline Coordinator + Memory Curator)
+> - **Cross-cutting Hardening**：D7-S6 (Error Agg & Metrics) + D7-S7 (Hardening 横切) 改为横切，**不占 S 位**
+> - **MUPS 5 节点管道挂载**：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2
+> - **A 数量**：56 → **49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）
+>
 > **v1.1.0 更新（2026-06-25，PR #214 squash-merged）**：
 > - **D7-S1 重命名**：Task/Plan 数据模型 → **WorkItem** 数据模型（canonical 单一来源）
 > - **§6.3 代码路径**与 `internal/layers/orchestration/` 物理结构 1:1 对齐
@@ -112,29 +124,42 @@ Observe → Plan → Execute → Verify → Learn
 
 ## §2 S 场景关系图
 
-D7 域共 **13 个 S 场景**（S1-S6 + S8-S13，S7 留空 N/A），按"5 节点管道主干 + 横切关注点"分层。
+D7 域共 **6 个 Canonical S + 1 横切（v6.0.0 博弈角色对齐精简）**。MUPS 5 节点管道（Observe/Plan/Execute/Verify/Learn）按角色挂载到 6 S；v5 EscapeEngine 入口归 S2；AutoClose + Resume + Cross-cutting Hardening 独立成段。
 
-### 2.1 13 个 S 场景清单
+### 2.1 6 Canonical S + 1 横切清单（v6.0.0）
 
-| S 场景 | 名称 | 职责 | 状态 | 节点归属 |
+| S 场景 | 名称 | 职责 | 状态 | 博弈角色 |
 |--------|------|------|------|----------|
-| D7-S1 | Work Model | **WorkItem** 数据模型 + WorkTree 持久化 + PlanMode 状态机 | IMPLEMENTED (v1.0+post-cleanup v1.1) | 基础 |
-| D7-S2 | Session Orchestrator | ProcessMessage 入口 + Turn 主循环 + 4 IntentKind 正交分发 | IMPLEMENTED (v1.0) | 基础 |
-| D7-S3 | Wave Scheduler | TaskGraph DAG + 5-slot WorkerPool + ConflictGuard + ContextPolicy | IMPLEMENTED (v1.1) | 基础 |
-| D7-S4 | Execution Flow | Hub 双通道（WorkPlan + SessionQueue + IM）+ SpokeBridge | IMPLEMENTED (v1.0+v1.1 closure) | 基础 |
-| D7-S5 | Decision & Planning | 4 PlanKind + Planner + MatchKind 4 规则 + Plan.Validate PP-1/2/3 | IMPLEMENTED (Phase 2 PR-B1) | **管道主干（Plan）** |
-| D7-S6 | Error Aggregation & Metrics | `errors.Join` 聚合 + InterruptMetrics + sandbox cleanup observability + 6 metric 字段 | IMPLEMENTED (DM-20260621-010 + DM-20260622-001) | 横切 |
-| **D7-S8** | Observation | 4 类 ObsKind × 2 Category + UncertaintyReport + UncertaintyCoord + 3 Observer 子模块 | IMPLEMENTED (Phase 2 PR-A1 + PR-RF) | **管道主干（Observe）** |
-| **D7-S9** | Execute | Artifact 4 类 + SideEffect 5 态 + Channel 4 个 + ChannelRouter | IMPLEMENTED (Phase 3 PR-C1 + PR-C2) | **管道主干（Execute）** |
-| **D7-S10** | Verify | VerdictKind 4 态 + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + 14 ExitReason | IMPLEMENTED (Phase 4) | **管道主干（Verify）** |
-| **D7-S11** | Learn | 5 类 LearningAsset + BayesianUpdate + Wilson 95% CI + AdaptivePrior + Memory 3 通道 + Learner | IMPLEMENTED (Phase 5 PR-E1..E5) | **管道主干（Learn）** |
-| **D7-S12** | Observe-Learner Wiring | `buildObserveRequest` 3 层 fail-safe + `IntentClassifier.ClassifyWithPrior` + 4 E2E 集成测试 | IMPLEMENTED (Phase 6 PR-F1/F2/F3) | **闭环（LP-1 wiring）** |
-| **D7-S13** | Auto-Close | `processAutoClose` + `synthesizeVerdict` + `TrackMode` 3-tier 解析 + sessionSpan 6 prior attributes | IMPLEMENTED (Phase 7 PR-7.1/7.2/7.3) | **闭环（Runtime LP-1）** |
+| **D7-S1** | **WorkModel** | **WorkItem 事实与状态机**单一权威 + UncertaintyCoord/ReputationEvidence/AdaptivePrior 状态归属 | **IMPLEMENTED (v1.0+post-cleanup v1.1)** | **State Authority** |
+| **D7-S2** | **SessionOrchestrator** | ProcessMessage 入口 + Turn 主循环 + LLM 调用权 + RunTurn resolve/decompose/await + ResumeSession 3 决策路由 + AutoClose 4 规则 + EscapeEngine 调度 | **IMPLEMENTED (v1.0)** | **Mediator + Turn Leader + Error Recovery** |
+| **D7-S3** | **WaveScheduler** | TaskGraph DAG + 5-slot WorkerPool + ConflictGuard + ContextPolicy | **IMPLEMENTED (v1.1)** | **Mechanism Designer** |
+| **D7-S4** | **ExecutionFlow + Verify** | Hub 双通道（WorkPlan + SessionQueue + IM）+ SpokeBridge + VerdictKind 4 态 + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + 14 ExitReason | **IMPLEMENTED (v1.0+v1.1+Phase 4)** | **Costly Signaler + Certifier** |
+| **D7-S5** | **DecisionPlanning + Observe** | 4 PlanKind + Planner + MatchKind 4 规则 + Plan.Validate PP-1/2/3 + Observation 4 类 + UncertaintyReport + UncertaintyCoord + 3 Observer 子模块 | **IMPLEMENTED (Phase 2 PR-A1+PR-B1+PR-RF)** | **Information Producer + Quantizer** |
+| **D7-S6** | **MUPS Pipeline** | 4 Channel + ChannelRouter + 4 ArtifactKind + 5 LearningClass + 3 通道记忆 + ReputationEvidence Bayesian | **IMPLEMENTED (Phase 3 PR-C1/PR-C2 + Phase 5 PR-E1..E5)** | **Pipeline Coordinator + Memory Curator** |
+| **Cross-cutting** | **Hardening** | `errors.Join` 聚合 + InterruptMetrics + sandbox cleanup observability + 6 metric 字段 + CircuitBreaker 监控 + ErrorRecoveryPolicy | **IMPLEMENTED (DM-20260621-010 + DM-20260622-001 + DM-20260626-003)** | **Discipline Keeper**（非 S） |
 
-### 2.2 S 场景关系图
+### 2.2 历史对照（v1.1 13 S → v1.2 6 S + 1 横切）
+
+| v1.1 S | v1.2 归并 | 说明 |
+|--------|----------|------|
+| D7-S1 Work Model | S1 WorkModel | State Authority |
+| D7-S2 Session Orchestrator | S2 SessionOrchestrator | 吸收 D7-S12/S13/S14 入口 |
+| D7-S3 Wave Scheduler | S3 WaveScheduler | Mechanism Designer |
+| D7-S4 Execution Flow | S4 ExecutionFlow + Verify | 吸收 D7-S10 Verify 角色 |
+| D7-S5 Decision & Planning | S5 DecisionPlanning + Observe | 吸收 D7-S8 Observe 角色 |
+| D7-S6 Error Agg & Metrics | Cross-cutting Hardening | 横切，**不占 S 位** |
+| D7-S8 Observation | S5 DecisionPlanning + Observe | 已并入 S5 |
+| D7-S9 Execute | S6 MUPS Pipeline | Pipeline Coordinator |
+| D7-S10 Verify | S4 ExecutionFlow + Verify | 已并入 S4 |
+| D7-S11 Learn | S6 MUPS Pipeline | Memory Curator |
+| D7-S12 Observe-Learner Wiring | S2 SessionOrchestrator | 入口归 S2 |
+| D7-S13 Auto-Close | S2 SessionOrchestrator | 入口归 S2 |
+| D7-S14 (v5) EscapeEngine | S2 SessionOrchestrator | 入口归 S2（Engine 物理独立） |
+
+### 2.3 S 场景关系图（v6.0.0 6 S + 1 横切）
 
 ```
-                              D7-S2 SessionOrchestrator (入口 / Turn Leader)
+                              D7-S2 SessionOrchestrator (入口 / Turn Leader / Error Recovery)
                                            │
         ┌───────────────┬──────────────────┼──────────────────┬─────────────────┐
         ↓               ↓                  ↓                  ↓                 ↓
@@ -143,34 +168,37 @@ D7 域共 **13 个 S 场景**（S1-S6 + S8-S13，S7 留空 N/A），按"5 节点
    Fast/Orches)                          Request 优先)
                                            │
   ┌────────────────────────────────────────┼─────────────────────────────────────────┐
-  │            MUPS 5 节点管道 (IntentOrchestrate 路径)                                │
+  │            MUPS 5 节点管道 (IntentOrchestrate 路径, v6.0.0 挂载到 6 S)             │
   │                                                                                   │
-  │   D7-S8 Observe ─→ D7-S5 Plan ─→ D7-S9 Execute ─→ D7-S10 Verify ─→ D7-S11 Learn │
-  │       ↑                                                                       │
-  │       │   D7-S12 Observe-Learner Wiring (buildObserveRequest 3 层 fail-safe)   │
-  │       └───────────────── LP-1 闭环 (AdaptivePrior 注入) ────────────────────────┘
+  │   D7-S5 Observe ─→ D7-S5 Plan ─→ D7-S6 Execute ─→ D7-S4 Verify ─→ D7-S6 Learn  │
+  │       ↑            (Info Prod)      (Pipe Coord)    (Certifier)     (Memory)     │
+  │       │                                                                       │
+  │       │   S2 闭环 wiring (buildObserveRequest 3 层 fail-safe)                   │
+  │       └─────────── LP-1 闭环 (AdaptivePrior 注入) ──────────────────────────────┘
   │                                  ↑
-  │                       D7-S13 Auto-Close (processAutoClose + synthesizeVerdict)
+  │                       S2 Auto-Close (processAutoClose + synthesizeVerdict)
   │                         channel 关闭时异步触发 Learn
+  │                                  ↑
+  │                       S2 v5 EscapeEngine (5 层 CircuitBreaker L0..L5)
+  │                       S2 ResumeSession (3 决策路由: fall through / ForceExit / AbortWithAudit)
   │
-  ├── 基础：D7-S1 WorkModel (**WorkItem 持久化** + 状态机)
-  ├── 执行：D7-S3 WaveScheduler (DAG + WorkerPool + ConflictGuard) ─→ 喂给 D7-S9
-  ├── 事件：D7-S4 ExecutionFlow (Hub 双通道 + SpokeBridge) ─→ IM 广播
-  └── 横切：D7-S6 Error Aggregation & Metrics (errors.Join + 6 metric)
+  ├── 基础：D7-S1 WorkModel (**WorkItem 持久化** + 状态机) ── State Authority
+  ├── 执行：D7-S3 WaveScheduler (DAG + WorkerPool + ConflictGuard) ─→ 喂给 S6
+  ├── 事件：D7-S4 ExecutionFlow (Hub 双通道 + SpokeBridge) ─→ IM 广播 + S4 Verify
+  └── 横切：Cross-cutting Hardening (errors.Join + 6 metric + CircuitBreaker monitor)
 ```
 
-### 2.3 关键关系要点
+### 2.4 关键关系要点（v6.0.0）
 
 1. **D7-S2 是唯一入口** — 4 IntentKind 决定走哪条路径：
    - `IntentSkip` → close channel（不触发 Auto-Close）
    - `IntentCommand` → CommandHandler（/plan, /worktree, /help, /stop）
    - `IntentFast` → FastPath → D3 (LLM) + D2 (Prepare/ToolRound/Persist)
    - `IntentOrchestrate` → OrchestratePath → **5 节点管道**
-2. **D7-S8 / S5 / S9 / S10 / S11 是 5 节点管道主干**，按 LP-5 反向追溯链串联
-3. **D7-S12 是 S11→S8 的回写线**（LP-1 闭环 wiring）
-4. **D7-S13 是 S10→S11 的自动触发器**（channel 关闭时 runtime LP-1）
-5. **D7-S1/S3/S4 是 v2.0 已有基础设施**，MUPS 期间未改，被新节点复用
-6. **D7-S6 横切所有 S 场景**（错误聚合 + metric）
+2. **5 节点管道挂载 6 S（v6.0.0）**：Observe+Plan 归 S5、Execute+Learn 归 S6、Verify 归 S4；按 LP-5 反向追溯链串联
+3. **S2 是闭环 + 错误恢复单点**：含 buildObserveRequest（wiring）+ AutoClose（runtime）+ EscapeEngine + ResumeSession
+4. **D7-S1/S3/S4 是 v2.0 已有基础设施**，MUPS 期间未改，被新节点复用
+5. **Cross-cutting Hardening 横切所有 S 场景**（错误聚合 + metric + CB 监控），不占 S 位
 
 ---
 

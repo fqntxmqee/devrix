@@ -1,0 +1,130 @@
+id: devrix-d2-dsaft-restructuring
+demand_id: DM-20260629-002
+title: "D2 DSAFT 深度架构重构 — 6 子 Change 联动 (legacy + god fn + registry + value flow + span + boundary debt)"
+status: s7_archived
+priority: P0
+created: 2026-06-29
+archived: 2026-06-29
+author: D2 域整体 DSAFT Review（2026-06-29 会话）+ 对齐 D7 DM-20260629-001 模板
+
+domains: [D2]
+
+# T 点
+t_points:
+  # PR-1 #0 legacy-cleanup (T01-T15)
+  - D2-S15-A01-T01
+  - D2-S15-A01-T02
+  - D2-S15-A01-T03
+  - D2-S15-A01-T04
+  - D2-S17-A01-T01
+  - D2-S17-A01-T02
+  - D2-S18-A01-T01
+  - D2-S18-A01-T02
+  - D2-S18-A01-T03
+  - D2-S18-A01-T04
+  - D2-S18-A01-T05
+  # PR-2 #1 god-fn pt1 (T16-T20)
+  - D2-S15-A02-T01
+  - D2-S15-A02-T02
+  - D2-S15-A02-T03
+  - D2-S15-A02-T04
+  - D2-S15-A02-T05
+  # PR-3 #1 god-fn pt2 (T21-T25)
+  - D2-S16-A01-T01
+  - D2-S18-A04-T01
+  - D2-S18-A04-T02
+  - D2-S18-A04-T03
+  - D2-S18-A04-T04
+  # PR-4 #2 registry-sync (T26-T35)
+  - D2-S15-A03-T01
+  - D2-S15-A03-T02
+  - D2-S17-A02-T01
+  - D2-S17-A02-T02
+  - D2-S18-A02-T01
+  - D2-S18-A02-T02
+  - D2-S18-A02-T03
+  - D2-S18-A02-T04
+  - D2-S18-A02-T05
+  - D2-S18-A02-T06
+  # PR-5 #3 value-flow-rename (T36-T39)
+  - D2-S15-A04-T01
+  - D2-S17-A03-T01
+  - D2-S18-A03-T01
+  - D2-S18-A03-T02
+  # PR-6 #4 span-coverage pt1 (T40-T43)
+  - D2-S15-A05-T01
+  - D2-S15-A05-T02
+  - D2-S15-A05-T03
+  - D2-S15-A05-T04
+  # PR-7 #4 span-coverage pt2 (T44)
+  - D2-S15-A06-T01
+  # PR-8 #5 boundary-decision (T45-T47)
+  - D2-S18-A05-T01
+  - D2-S18-A05-T02
+  - D2-S18-A05-T03
+
+layers:
+  - D2-S15  # PrepareExecutionContext (D2_Context_Loading_Compression)
+  - D2-S17  # PersistSessionState (D2_Session_State_Persistence)
+  - D2-S18  # EnforceExecutionPolicy (D2_Tool_Permission_Sandbox)
+  - D2-S2   # Compression (legacy → S15)
+  - D2-S9   # Harness (REMOVED v6.5.0)
+  - D2-S10  # QueryLoop (REMOVED DM-20260618-010)
+  - D2-S19  # NestedExecution (DISMANTLED v6.4.0)
+  - D2-S20  # LegacyHarnessFallback (REMOVED v6.5.0)
+
+pr_count: 8
+pr_list:
+  - id: 290
+    title: "refactor(d2): delete 11 legacy/ + aliases.go (~1298 LOC)"
+    sub_change: "#0"
+  - id: 291
+    title: "refactor(d2): split god fns pipeline.RunForSession + assembler.Build"
+    sub_change: "#1-pt1"
+  - id: 292
+    title: "refactor(d2): split god fns materializer/analyzer/background"
+    sub_change: "#1-pt2"
+  - id: 293
+    title: "docs(d2): registry-sync + value-flow-rename S15/S17/S18 D2_* Alias"
+    sub_change: "#2+#3"
+  - id: 294
+    title: "refactor(d2): split god fns materializer/analyzer/background (PR-3)"
+    sub_change: "#1-pt2-resubmit"
+  - id: 295
+    title: "chore(d2+obs): delete 10 truly dead D2 span ops + Span Evidence Coverage 88%"
+    sub_change: "#4-pt1+pt2"
+  - id: 296
+    title: "docs(d2): boundary-decision 治理常量 + DM-018 slice-c 归档"
+    sub_change: "#5"
+  - id: 297
+    title: "docs(d2): v8.5.0 → v9.0.0 S7_Archived 收口"
+    sub_change: "S7"
+
+related_changes:
+  - devrix-d7-dsaft-restructuring    # DM-20260629-001 6 子 Change 模板
+  - devrix-d2-structure-closure      # DM-20260619-007 v8.2.0 v2.2 结构终态
+  - devrix-d1-dsaft-refactor         # DM-20260628-003 Trusted Intermediary
+  - devrix-d2-queryloop-legacy-decommission  # DM-20260618-010 S10 REMOVED
+
+parent_specs:
+  - openspec/specs/d2-context-engine/d2-domain.md
+  - openspec/specs/d2-context-engine/design.md
+  - openspec/specs/d2-context-engine/{a,f,t,span}-registry.md
+  - openspec/specs/d2-context-engine/observability-guide.md
+  - openspec/specs/d2-context-engine/d7-boundary.md
+  - openspec/specs/d2-context-engine/layer-delta.md
+  - docs/methodology/dsaft-methodology.md v4.0.0
+  - docs/methodology/dsaft-refactoring-playbook.md v1.0.0
+
+# Spec 版本同步
+spec_sync:
+  source_version: "d2-domain.md v8.5.0"
+  target_version: "d2-domain.md v9.0.0"
+  sync_date: "2026-06-29"
+  sync_changes:
+    - "§Out of Scope: 2 boundary debt Decision 标注 (DM-018 RESOLVED + 跨域 fixture 待定)"
+    - "§Boundary Debt Decisions: 新增章节, 2 boundary-debt ID"
+    - "§North Star: ValueFlow Alias 列填充 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox)"
+    - "§DSAFT 资产: 232 T → 232 T (D2 v9.0.0 净增 0, 治理颗粒度提升)"
+    - "§登记规模: D2 span ops 30 → 20 (10 dead 删)"
+    - "§修订记录: v9.0.0 row"

@@ -1,3 +1,11 @@
+// Package multiagent — self-registers D4 MultiAgent span operations with the
+// observability coverage registry on init(). The 6 D4_S4_* runtime operations
+// are defined in telemetry/names.go; this file only mirrors them into the
+// coverage registry so the doctor CLI can audit instrumentation.
+//
+// DM-20260629-004 PR-1 #0: kept at multiagent root (matching D3 llmgateway/
+// spans.go pattern); orchtypes/ subpackage handles events + boundary_decision
+// governance constants (see multiagent/orchtypes/).
 package multiagent
 
 import "github.com/devrix/devrix/internal/layers/observability/diagnose/coverage"

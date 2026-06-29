@@ -1,0 +1,30 @@
+id: devrix-d1-dsaft-refactor
+demand_id: DM-20260628-003
+title: "D1 DSAFT 重构 — 四条流出站 + D7-only 边界收敛"
+status: s7_archived
+priority: P1
+created: 2026-06-28
+author: D1 架构讨论（用户 + Cursor）
+
+domains: [D1, D7]
+layers:
+  - D1-S13  # CaptureUserIntent — 入站/命令
+  - D1-S14  # PresentThinking
+  - D1-S15  # PresentTaskProgress
+  - D1-S16  # DeliverConclusion
+  - D1-S17  # ConnectChannel（Feishu/CLI/DingTalk 保留）
+  - D1-S18  # GuaranteeDelivery
+
+decisions:
+  dingtalk: retain
+  multi_instance_registry: retain
+  agent_provision: migrate_to_bootstrap
+
+related_changes:
+  - devrix-d1-d7-only-ingress  # archived — D1→D7 mandatory dispatch
+  - devrix-d1-sa-refine         # archived — S13–S18 canonical
+
+parent_specs:
+  - openspec/specs/d1-communication/d1-domain.md
+  - openspec/specs/d1-communication/terminal-state-guide.md
+  - docs/methodology/dsaft-refactoring-playbook.md

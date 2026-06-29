@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -232,6 +233,27 @@ func (a *FeishuAdapter) OnError(err error, sessionID string) {
 		}
 	}
 	if chatID == "" {
+		return
+	}
+
+	// DM-20260628-003 (D7-S15): when the orchestrator returns a
+	// TurnInProgressError, render a friendly "⏳ 还在处理中" card instead
+	// of the generic red error card. CLI adapter does NOT have this branch
+	// — it falls through to sharederrors.SanitizeForUser (preserved).
+	var tip sharederrors.TurnInProgressError
+	if errors.As(err, &tip) {
+		title := "⏳ 上一条消息还在处理中"
+		body := fmt.Sprintf("devrix 正在处理 session `%s` 的上一条消息（turn %d 自 %s 启动），请稍候片刻再发新消息。",
+			tip.SessionID, tip.TurnNo, tip.SinceStartedAt.Format("15:04:05"))
+		card := NewCard().
+			Title(title, "blue").
+			Markdown(body).
+			Build()
+		if sendErr := a.sendCardToSession(ctx, sessionID, chatID, card); sendErr != nil {
+			slog.Error("feishu: failed to send turn-in-progress card", "sessionID", sessionID, "error", sendErr)
+		}
+		// No done-emoji / reply-context cleanup — the previous turn is still
+		// running and owns those UI handles.
 		return
 	}
 

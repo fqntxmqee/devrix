@@ -9,6 +9,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -59,7 +60,7 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 		gw: gw, engine: engine, counter: counter,
 		deferDecider: contracts.NeverDefer{},
 	}
-	if ce, ok := engine.(*contextengine.ContextEngine); ok {
+	if ce, ok := engine.(*kernel.ContextEngine); ok {
 		a.tools = ce.ToolRunner()
 		a.toolsReg = ce.ToolRegistry()
 		a.perm = ce.PermissionGate()
@@ -76,7 +77,7 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 }
 
 func (a *contextEngineAdapter) promptLocale() i18n.Locale {
-	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+	if ce, ok := a.engine.(*kernel.ContextEngine); ok {
 		return ce.PromptLocale()
 	}
 	return i18n.DefaultLocale
@@ -167,9 +168,9 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 	// D2 prepare orchestrator wire (DM-20260621-005): route through
 	// PrepareForTurn so D2 A01-A04 spans + Compressor pipeline run.
 	// Fall back to legacy direct sc.Messages read only when the engine
-	// is not the production *contextengine.ContextEngine (test mocks
+	// is not the production *kernel.ContextEngine (test mocks
 	// use other IEngine implementations).
-	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+	if ce, ok := a.engine.(*kernel.ContextEngine); ok {
 		prepared, err := ce.PrepareForTurn(ctx, session, req.Message.Content)
 		if err != nil {
 			return sessionorchestrator.PreparedContext{}, fmt.Errorf("turn adapter: PrepareForTurn: %w", err)
@@ -216,7 +217,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 	return result, nil
 }
 
-// sessionContextProvider is implemented by *contextengine.ContextEngine.
+// sessionContextProvider is implemented by *kernel.ContextEngine.
 type sessionContextProvider interface {
 	SessionContext(sessionID string) (*types.SessionContext, bool)
 }
@@ -505,7 +506,7 @@ func (a *contextEngineAdapter) findSurface(toolName string) (contracts.ToolSurfa
 // stub that discarded req.Messages, causing multi-turn conversation context
 // loss under the loop_first routing mode.
 func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req sessionorchestrator.PersistRequest) error {
-	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+	if ce, ok := a.engine.(*kernel.ContextEngine); ok {
 		if err := ce.AppendAndTrimMessages(req.SessionID, req.Messages); err != nil {
 			return fmt.Errorf("turn adapter: persist: %w", err)
 		}

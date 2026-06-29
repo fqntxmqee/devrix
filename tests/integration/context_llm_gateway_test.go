@@ -7,6 +7,7 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	llmtoken "github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/shared/config"
 )
@@ -21,7 +22,7 @@ func TestIntegration_ContextEngineUsesGatewayTokenCounterWhenWired(t *testing.T)
 		t.Skip("tiktoken not available:", err)
 	}
 
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{},
 		Summarizer:     &contextengine.StaticSummarizer{},
 		TokenCounter: counter,

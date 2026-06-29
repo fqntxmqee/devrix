@@ -13,7 +13,7 @@ func TestDecomposeChildren_DepthLimit(t *testing.T) {
 	goal, _ := tm.EnsureGoal("s1", "g")
 	l1, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "l1", Directive: "l1"})
 	l2, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: l1.ID, Kind: WorkKindImplement, Title: "l2", Directive: "l2"})
-	_, err := tm.DecomposeChildren("s1", l2.ID, []ChildSpec{{Title: "too deep", Directive: "x"}})
+	_, err := tm.DecomposeChildren("s1", l2.ID, []ChildSpec{{Title: "too deep", Directive: "x", ExpectedReturn: "deliver x"}})
 	if err != ErrDecomposeDepthExceeded {
 		t.Fatalf("err = %v, want depth exceeded", err)
 	}
@@ -25,9 +25,9 @@ func TestDecomposeChildren_DailyLimit(t *testing.T) {
 	goal, _ := tm.EnsureGoal("s1", "g")
 	parent, _ := tm.CreateWorkItem("s1", CreateWorkItemInput{ParentID: goal.ID, Kind: WorkKindPlan, Title: "p", Directive: "p"})
 	for i := 0; i < 5; i++ {
-		_, _ = tm.DecomposeChildren("s1", parent.ID, []ChildSpec{{Title: "c", Directive: "d"}})
+		_, _ = tm.DecomposeChildren("s1", parent.ID, []ChildSpec{{Title: "c", Directive: "d", ExpectedReturn: "deliver d"}})
 	}
-	_, err := tm.DecomposeChildren("s1", parent.ID, []ChildSpec{{Title: "one more", Directive: "d"}})
+	_, err := tm.DecomposeChildren("s1", parent.ID, []ChildSpec{{Title: "one more", Directive: "d", ExpectedReturn: "deliver d"}})
 	if err != ErrDecomposeDailyLimit {
 		t.Fatalf("err = %v, want daily limit", err)
 	}

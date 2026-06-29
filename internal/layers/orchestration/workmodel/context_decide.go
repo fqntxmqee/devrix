@@ -18,6 +18,7 @@ func ApplyPipelineDecide(
 	ApplyAcceptedContextLinks(sessionID, item, props.ContextLinkSpecs, tm)
 
 	EvaluateSpawnPolicy(round, treeCtx)
+	ApplyScopeContractSpawnGate(item, round)
 }
 
 // ApplyAcceptedContextLinks evaluates CL0–CL8 proposals and mandatory R2 edges.

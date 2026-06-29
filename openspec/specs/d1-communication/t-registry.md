@@ -1,11 +1,11 @@
 # D1 Communication Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.1.1
+**Version:** 3.2.0
 **Last Updated:** 2026-06-28
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260616-003 (devrix-diagnostic-tools-parity) — Transcript S19 / DM-20260617-002 (devrix-diagnostic-tools-wiring) — Transcript bootstrap wiring / 2026-06-20-devrix-context-budget-and-isolation (DM-20260620-001) — AC5 feishu card table-count/size precheck + plain-text fallback (T05-T08) / **devrix-api-error-classification (DM-20260628-001) — IM 适配器 error_code → 差异化文案 (D1-S3-A08-T01 IMPLEMENTED PR #265)**
+**Change:** DM-20260614-006 — 切法 A 双轨 / … / **DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI**
 
 ---
 
@@ -42,6 +42,15 @@
 | **D1-S5-A07-T07** | **AC5 default precheck wired in NewFeishuAdapter: `cardPrecheck = NewFeishuTableCountPrecheck(DefaultCardPrecheckConfig())` (MaxTables=5, MaxChars=28000)** | **S5-A07 NewFeishuAdapter (extended)** | **`feishu_test.go::TestNewFeishuAdapter_DefaultPrecheckWired`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D1-S5-A07-T08** | **AC5 plain-text fallback preserves header + markdown: `cardFallbackText` returns title + content + "[card auto-flattened]" trailer** | **S5-A07 cardFallbackText (new)** | **`feishu_test.go::TestCardFallbackText_{HeaderAndMarkdown,FlattensPipeTable,TrailerMarker}`** | **IMPLEMENTED (DM-20260620-001)** | **P0** |
 | **D1-S3-A08-T01** | **feishu / cli IM 适配器基于 `Event.Metadata["error_code"]` 走差异化文案（5 类 code 各自独立文案 + 兜底 Unknown）：RateLimit → "模型繁忙，请稍候重试" / AuthenticationFailed → "API key 失效，请检查 ~/.devrix/config.yaml" / PromptTooLong → "会话过长，已尝试压缩" / MediaSize + ImageSize → "附件过大" / ServerError → "模型服务异常" / Unknown → 现有通用文案** | **D1-S3-A08 EmitError (error_code → 文案映射)** | **`internal/layers/communication/{feishu,cli}_test.go::TestEmitError_{RateLimit,AuthenticationFailed,PromptTooLong,MediaSize,ImageSize,ServerError,Unknown}_MessageMapping` (7 sub-test)** | **IMPLEMENTED (DM-20260628-001 S5 验收 PR #265，feishu + cli 单测 7 sub-case 全 PASS)** | **P0** |
+| **D1-RF-T01** | **D1 capture 生产代码禁止 import multiagent / orchestration/** | **S13 边界 (DM-20260628-003)** | **`capture/import_boundary_test.go`** | **IMPLEMENTED** | **P0** |
+| **D1-RF-T02** | **beforeDispatch + D7：leader Created 且 ProcessMessage 仅 1 次** | **S13-A03 + bootstrap hook** | **`coordinator_integration_test.go`, `tests/acceptance/p0/d1_dsaft_refactor_test.go`** | **IMPLEMENTED** | **P0** |
+| **D1-RF-T03** | **permission_required → RoutePermission → ResolveAgentPermission** | **S13-A04 + sessionagents** | **`bootstrap/sessionagents/manager_test.go`** | **IMPLEMENTED** | **P0** |
+| **D1-RF-T04** | **无 active turn 时 orphan EngineEvent 到达 DeliverOrphanEngineEvent** | **bootstrap sessionagents sink** | **`bootstrap/sessionagents/manager_test.go`** | **IMPLEMENTED** | **P1** |
+| **D1-RF-T05** | **orchestrationEntry nil 时 RouteInbound 失败（hook 不 bypass）** | **S13-A03** | **`capture/coordinator_integration_test.go`** | **IMPLEMENTED** | **P0** |
+| **D1-RF-T06** | **text delta → Conclusion 非终态（独立 signal journey）** | **S16-A01 EmitSummaryChunk** | **`tests/acceptance/p0/d1_signal_journey_test.go::TestL5_D1_SignalJourney_TextDeltaConclusion`** | **IMPLEMENTED** | **P1** |
+| **D1-RF-T07** | **milestone_progress → Task presenter 单测** | **S15-A01 EmitToolProgress** | **`capture/signal_router_test.go::TestSignalRouter_Dispatch_MilestoneProgress`** | **IMPLEMENTED** | **P1** |
+| **D1-RF-T08** | **Gateway 拆分后 ingress/outbound 包级测试锚点不变** | **S13 + S14–S16** | **`capture/gateway_test.go`, `capture/coordinator_*_test.go`** | **IMPLEMENTED** | **P1** |
+| **D1-RF-T09** | **channel/adapters 生产代码禁止 import orchestration/** | **S17 边界** | **`channel/adapters/import_boundary_test.go`** | **IMPLEMENTED** | **P0** |
 
 ---
 
@@ -59,7 +68,7 @@
 | D1-S1-A02-T01 | Inbound/Outbound 消息路由全链路 | Gateway | S13-A03 + S14/S15/S16 | `internal/layers/communication/capture/gateway_test.go` | IMPLEMENTED | P0 |
 | D1-S1-A03-T01 | YOLO 模式 CRITICAL 风险永不自动审批 | Permission | S13-A04 ResolvePermissionGate | `internal/layers/communication/capture/permission_test.go` | IMPLEMENTED | P0 |
 | D1-S1-A03-T02 | Permission Request/Resolve/ListPending 生命周期 | Permission | S13-A04 ResolvePermissionGate | `internal/layers/communication/capture/permission_test.go` | IMPLEMENTED | P1 |
-| D1-S1-A04-T01 | AgentFactory 注入后路由走 Agent 路径 | Agent | S13-A03-F03 routeAgent | `internal/layers/communication/capture/gateway_test.go` | IMPLEMENTED | P1 |
+| D1-S1-A04-T01 | AgentFactory 注入后路由走 Agent 路径 | Agent | S13-A03-F03 routeAgent | `internal/layers/communication/capture/gateway_test.go` | **SUPERSEDED** → D1-RF-T02 (`d1_dsaft_refactor_test.go`, `sessionagents`) | P1 |
 
 ### D1-S5: Milestone Module
 

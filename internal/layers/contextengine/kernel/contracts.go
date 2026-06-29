@@ -62,3 +62,17 @@ type EngineEvent = contracts.EngineEvent
 //
 // DSAFT: D2-S1-A01 (Config)
 type ContextEngineConfig = config.ContextEngineConfig
+
+// --- ContextEngine (formerly legacy.ContextEngine) ---
+//
+// DM-20260629-002 (devrix-d2-dsaft-restructuring): legacy/ package retired
+// (P5 deprecation window closed). The D2 ContextEngine implementation
+// moved to internal/layers/contextengine/kernel/ alongside the observer
+// contracts. Tests and bootstrap now import it via the kernel package
+// directly rather than via the legacy package.
+
+// ContextEngine re-exports the D2 domain entry point (S15→S17 glue via D7 PreparedTurn).
+//
+// DSAFT: D2-S15-A01 (LoadSession) / D2-S17-A01 (PersistSessionState)
+// (Already declared in context_engine_types.go — no alias needed; this
+// header documents the DM-20260629-002 legacy→kernel migration.)

@@ -54,7 +54,6 @@ func newLP1Fixture(t *testing.T, sessionID string) *lp1Fixture {
 	classifier := &recordingClassifier{}
 	cfg := orchtypes.DefaultConfig()
 	cfg.CommandWhitelist = []string{"/status", "/help"}
-	cfg.FastPathThreshold = 0 // allow all fast paths through for test predictability
 
 	skill := learn.NewSkillMemory()
 	feedback := learn.NewFeedbackMemory()

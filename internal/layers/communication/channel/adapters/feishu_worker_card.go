@@ -9,24 +9,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // ErrWorkerCardClosed indicates the renderer has been closed and no further
 // events should be processed.
 var ErrWorkerCardClosed = errors.New("worker_card: renderer closed")
 
+// WorkerCardOptions configures card creation (presentation DTO).
+type WorkerCardOptions = contracts.WorkerCardOpts
+
 // WorkerCardRenderer renders a per-worker double-block (thinking + output)
 // Feishu card. One session gets N independent cards, one per Wave worker.
-//
-// Lifecycle (design §7.2):
-//   - On worker start: CreateCard → record CardMsgID
-//   - On thinking event: StreamElementContent(element=thinking, sequence++)
-//   - On text/tool_use event: StreamElementContent(element=output, sequence++)
-//   - On complete/failed/cancelled: UpdateCard with footer reflecting status
-//
-// This renderer is intentionally separate from the Leader reply card so 5
-// workers can stream in parallel without sequence contention.
 type WorkerCardRenderer struct {
 	cardkit  CardkitSurface
 	mu       sync.Mutex
@@ -48,7 +42,7 @@ type WorkerCardSession struct {
 	SessionID   string
 	TaskID      string
 	WorkerID    string
-	WorkerType  wavescheduler.WorkerType
+	WorkerKind  contracts.WorkerKind
 	CardID      string
 	Title       string
 	thinkingSeq int
@@ -59,15 +53,6 @@ type WorkerCardSession struct {
 	mu          sync.Mutex
 	created     bool
 	createdAt   time.Time
-}
-
-// WorkerCardOptions configures card creation.
-type WorkerCardOptions struct {
-	SessionID  string
-	TaskID     string
-	WorkerID   string
-	WorkerType wavescheduler.WorkerType
-	Title      string
 }
 
 // NewWorkerCardRenderer returns a renderer.
@@ -110,7 +95,7 @@ func (r *WorkerCardRenderer) GetSession(opts WorkerCardOptions) *WorkerCardSessi
 			SessionID:  opts.SessionID,
 			TaskID:     opts.TaskID,
 			WorkerID:   opts.WorkerID,
-			WorkerType: opts.WorkerType,
+			WorkerKind: opts.WorkerKind,
 			Title:      opts.Title,
 			createdAt:  time.Now(),
 		}
@@ -119,9 +104,8 @@ func (r *WorkerCardRenderer) GetSession(opts WorkerCardOptions) *WorkerCardSessi
 	return s
 }
 
-// EmitWorkerEvent drives the card from a wavescheduler.WorkerEvent. It is idempotent
-// for the same event and safe to call concurrently.
-func (r *WorkerCardRenderer) EmitWorkerEvent(ctx context.Context, opts WorkerCardOptions, ev wavescheduler.WorkerEvent) error {
+// EmitWorkerEvent drives the card from a presentation WorkerStreamEvent.
+func (r *WorkerCardRenderer) EmitWorkerEvent(ctx context.Context, opts WorkerCardOptions, ev contracts.WorkerStreamEvent) error {
 	if r == nil {
 		return errWaveNil
 	}
@@ -167,9 +151,7 @@ func (r *WorkerCardRenderer) EmitWorkerEvent(ctx context.Context, opts WorkerCar
 		}
 	case "error", "complete", "cancelled":
 		sess.status = ev.Type
-		// Update the card with a final footer.
 		if !sess.created {
-			// No card was ever created — nothing to finalize.
 			return nil
 		}
 		cardJSON := buildWorkerCardJSON(sess)
@@ -218,16 +200,15 @@ func (r *WorkerCardRenderer) ActiveSessions() int {
 	return len(r.sessions)
 }
 
-// buildWorkerCardJSON produces the Feishu card JSON for a worker card.
 func buildWorkerCardJSON(sess *WorkerCardSession) string {
 	status := sess.status
 	if status == "" {
 		status = "running"
 	}
-	emoji := workerEmoji(sess.WorkerType)
+	emoji := workerEmoji(sess.WorkerKind)
 	title := sess.Title
 	if title == "" {
-		title = string(sess.WorkerType) + " / " + sess.TaskID
+		title = string(sess.WorkerKind) + " / " + sess.TaskID
 	}
 	thinking := sess.thinkingBuf.String()
 	if thinking == "" {
@@ -290,13 +271,13 @@ func buildWorkerCardJSON(sess *WorkerCardSession) string {
 	return string(b)
 }
 
-func workerEmoji(wt wavescheduler.WorkerType) string {
-	switch wt {
-	case wavescheduler.WorkerCursor:
+func workerEmoji(kind contracts.WorkerKind) string {
+	switch kind {
+	case contracts.WorkerKindCursor:
 		return "🖱️"
-	case wavescheduler.WorkerClaudeCode:
+	case contracts.WorkerKindClaudeCode:
 		return "🛠️"
-	case wavescheduler.WorkerSubAgent:
+	case contracts.WorkerKindSubAgent:
 		return "🤖"
 	default:
 		return "⚙️"

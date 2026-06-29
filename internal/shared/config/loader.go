@@ -120,6 +120,10 @@ type CoordinatorFileConfig struct {
 	LLMFallback                 *bool    `yaml:"llm_fallback"`
 	AdvisoryValidationTimeoutMs *int     `yaml:"d6_validation_timeout_ms"`
 	CommandWhitelist            []string `yaml:"command_whitelist"`
+	// PriorContextRounds (DM-20260628-003, D7-S15): see
+	// config.CoordinatorConfig for semantics. Pointer so we can
+	// distinguish "absent in yaml" (keep default 0) from "explicitly 0".
+	PriorContextRounds *int `yaml:"prior_context_rounds"`
 }
 
 // LoadConfigFile loads configuration from a YAML file

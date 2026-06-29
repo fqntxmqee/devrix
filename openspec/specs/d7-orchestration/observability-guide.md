@@ -2,8 +2,8 @@
 
 **Capability:** d7-orchestration
 **Status:** Active
-**Version:** 2.1.0
-**Last Updated:** 2026-06-26 (inner-spans + dedup-remove, PR #254)
+**Version:** 2.2.0
+**Last Updated:** 2026-06-29 (dsaft-restructuring PR-8 Span Evidence 列填充 + T-Without-Span Tracker IMPLEMENTED, DM-20260629-001 T44)
 **Parent:** `d7-domain.md` · `span-registry.md` · `t-registry.md`
 **Complements:** `terminal-state-guide.md` · `../d5-observability/span-registry.md`
 
@@ -327,6 +327,41 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | ~~WorkItemExecutor ReAct iter span 缺失~~ | ~~16s session 慢在哪次 iter 无法定位~~ | ✅ **DM-20260626-009 P1 已补 D7_S5_SubTurn_Iteration + cap-hit 多发 1 span**（PR #253+#254，follow-up PR #255 thread LLM finishReason） |
 | **worktree.op 全 op 覆盖** | 当前仅 set_round_phase / apply_pipeline_round / update_status / list_children 4 类；新增 mutator 需补 op 标签 | v2.1.0 后 guard: grep "r.Tasks.Tree().*()" callsite 必须配套 EmitWorktreeOp |
 
+## 8.1 T-Without-Span Tracker（DM-20260629-001 T44）
+
+t-registry v4.12.0 新增 **Span Evidence** 列填充 248 T 行；覆盖率 **94%（235/248）**。剩余 13 个未映射 T 主要分布：
+
+| T ID | 所属 A/F | 描述 | 未映射原因 | 建议 follow-up |
+|------|----------|------|----------|----------------|
+| D7-S2-A01-F02-T01 | D7-S2-A01 | subagent 入参 type | 内部 helper 无独立 span | Session_Process 顶层已覆盖 |
+| D7-S2-A01-F02-T02 | D7-S2-A01 | subagent 路径限制 | 内部 helper 无独立 span | Session_Process 顶层已覆盖 |
+| D7-S2-A01-F03-T01 | D7-S2-A01 | file_scope 限制 | 内部 helper 无独立 span | Session_Process 顶层已覆盖 |
+| D7-S2-A01-F03-T02 | D7-S2-A01 | workspace 限制 | 内部 helper 无独立 span | Session_Process 顶层已覆盖 |
+| D7-S2-A02-T18 | D7-S2-A02 | emitError sanitize + code | 错误处理内部路径 | 跨 Error Aggregation span 已覆盖 |
+| D7-S5-A02-F05-T01 | D7-S5-A02 | Config struct 字段移除 | 编译期 check | 不需 runtime span |
+| D7-S5-A02-F05-T02 | D7-S5-A02 | Default config ref | 编译期 check | 不需 runtime span |
+| D7-S5-A03-F03-T01 | D7-S5-A03 | LLM Decomposer sub-cases | 测试用例集 | Plan_Generate 顶层覆盖 |
+| D7-S5-A04-T01..T02 | D7-S5-A04 | turn_adapter.PersistTurn | 内部 IO | SubTurn_Iteration 父 span 覆盖 |
+| D7-S7-A01/A02 | D7-S7 | 子路由 + 5-step | Execute_Artifact 子模块 | 顶层覆盖 |
+| D7-S6-A12-T01 (OBSOLETE) | D7-S6-A12 | 跨域归属 D4 | 已 OBSOLETE | 不需 span |
+
+**跟踪策略：**
+- **94% ≥ 80% 阈值** — 目标达成（DM-20260629-001 T44 AC 满足）
+- 13 个未映射 T 均为内部 helper / 编译期 check / 子用例，**不阻塞可观测性验收**
+- v7.0 后如发现新缺口，新增 T 必须配套 span operation 名；guard 见 §8.2
+
+### 8.2 Span Evidence Coverage Guard（v7.0 follow-up）
+
+CI guard: `openspec/specs/d7-orchestration/t-registry.md` 每新增 T 行必须有 Span Evidence 列值；若为 `—` 则需 PR 描述说明豁免理由（编译期 check / 内部 helper / OBSOLETE）。覆盖率 < 80% 时 CI fail。
+
+```bash
+# CI snippet (proposed)
+SPAN_OK=$(awk -F'\\|' '/^\\| .*\\| — \\|$/' t-registry.md | wc -l)
+SPAN_TOTAL=$(grep -cE '^\\| (\\*\\*)?D7-' t-registry.md)
+COVERAGE=$((100 * (SPAN_TOTAL - SPAN_OK) / SPAN_TOTAL))
+[ "$COVERAGE" -ge 80 ] || { echo "Span coverage $COVERAGE% < 80%"; exit 1; }
+```
+
 ---
 
 ## 10. D5 Dashboard 过滤规则变更（DM-20260622-001）
@@ -382,3 +417,4 @@ go test ./tests/integration/d7/ -run Interrupt -v
 | **1.2.0** | **2026-06-25** | **MUPS v4.3 5 节点管道 + v5 EscapeEngine 可观测性扩展**：(1) §1 Canonical Span ↔ T 表新增 9 ops × S8-S14 绑定（S8 Observe / S8 PR-B1 Plan / S9 Execute / S10 Verify / S11 Learn / S12 跨域 / S13 Auto-Close / S14 EscapeEngine + Resume）；(2) §1 关键 Span 属性新增 7 类（observation/plan/artifact/verdict/asset + 6 prior + 3 resume）；(3) §2 Trace 树新增 2.4 MUPS 5 节点 + 2.5 EscapeEngine；(4) §5 T 层验收矩阵 S1-S5 → S1-S14，66 T → 180 T；(5) §7 生产 Trace 检查清单新增 4 行（MUPS 5 节点 / Prior 闭环 / Auto-Close / EscapeEngine），建议告警新增 4 条 |
 | **2.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：§1 Canonical Span↔T 表 14 S → 6 S 重归类（Observe/Plan 归 S5；Execute/Learn 归 S6；Verify 归 S4；AutoClose/Resume/Escape 入口 归 S2；Observe_Request_WithPrior 归 S2/S5；Verify_AutoClose 归 S2/S4）；新增 5 个 v6.0.0 新 P0/P1 span 绑定（channel.route / memory.persist → S6；system.anomaly_detect → S4；taskgraph.synthesize → S5；executor.select → S3）；§2.4 MUPS Trace 树注释 S 编号重归类；§5 T 层验收矩阵 14 S → 6 S + 1 横切 重写（每个 S 标注原 14 S 归属）。Span operation 名保持稳定（Jaeger 查询不破坏），仅 S 编号变化 |
 | **2.1.0** | **2026-06-26** | **DM-20260626-009 follow-up 内层 observability span + dedup 删除（PR #253+#254 落地，follow-up PR #255 待开）**：(1) §1 Canonical Span↔T 表新增 3 ops × S1+S5 绑定（D7_S1_Worktree_Op → D7-S1-A52-T11/T12；D7_S1_SubWorktree_Run → D7-S1-A53-T13/T14；D7_S5_SubTurn_Iteration → D7-S5-A54-T15/T16）；(2) §2 Trace 树新增 2.6 WorkItem Inner Layer Trace 树（ItemPipelineRunner 11 callsite + WorkItemExecutor ReAct iter + cap-hit + RunParallelExplore 1 callsite，含 finish_reason vs stop_reason 正交说明）；(3) §5 T 层验收矩阵 S1 8→10 + S5 14→16（180→186 T）；(4) §7 生产 Trace 检查清单新增 3 行（WorkItem 内层 span + Worktree Op 完整 + Sub-Turn finish_reason），建议告警覆盖；(5) §8 已知缺口关闭 2 项（Worktree Op 内层 span 缺失 + WorkItemExecutor ReAct iter span 缺失），新增 1 项（worktree.op 全 op 覆盖 guard） |
+| **2.2.0** | **2026-06-29** | **dsaft-restructuring PR-8 Span Evidence 列填充（DM-20260629-001 T44）**：t-registry v4.12.0 新增 Span Evidence 列填充 248 T 行；覆盖率 **94%**（235/248 映射到 canonical span operation）；剩余 13 个未映射 T（内部 helper / 编译期 check / 子用例 / OBSOLETE）追踪在新增 §8.1 T-Without-Span Tracker；§8.2 Span Evidence Coverage Guard 提出 v7.0 follow-up CI 验收脚本 |

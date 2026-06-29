@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -22,7 +23,7 @@ func TestMemory_ConcurrentSessionsBoundedGrowth(t *testing.T) {
 	runtime.ReadMemStats(&before)
 
 	cfg := config.DefaultContextEngineConfig()
-	engine := contextengine.NewContextEngine(contextengine.EngineDeps{
+	engine := kernel.NewContextEngine(kernel.EngineDeps{
 		PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "ok"},
 		Summarizer:         &contextengine.StaticSummarizer{},
 		Tools:              &enforce.ToolRunner{Output: "ok"},

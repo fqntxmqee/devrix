@@ -23,13 +23,13 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
-	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/shared/config"
 )
 
 // collectToolNames flattens the engine's surface list into a name set.
-func collectToolNames(t *testing.T, ce *contextengine.ContextEngine) map[string]bool {
+func collectToolNames(t *testing.T, ce *kernel.ContextEngine) map[string]bool {
 	t.Helper()
 	got := map[string]bool{}
 	for _, s := range ce.Surfaces() {
@@ -54,7 +54,7 @@ func TestMainEngine_RegistersDiagnosticToolSurface(t *testing.T) {
 		t.Fatal("NewContextEngine returned nil")
 	}
 	// WireDelegate owns delegate_* registration on the main engine.
-	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry(), nil, nil)
+	WireDelegate(ctxCfg, maCfg, nil, nil, ce, ce.ToolRegistry(), nil, nil)
 
 	got := collectToolNames(t, ce)
 	names := make([]string, 0, len(got))
@@ -98,12 +98,12 @@ func TestSelectContextEngine_ForwardsMultiAgentConfig(t *testing.T) {
 	if eng == nil {
 		t.Fatal("SelectContextEngine returned nil")
 	}
-	ce, ok := eng.(*contextengine.ContextEngine)
+	ce, ok := eng.(*kernel.ContextEngine)
 	if !ok {
-		t.Fatalf("SelectContextEngine returned %T, want *contextengine.ContextEngine", eng)
+		t.Fatalf("SelectContextEngine returned %T, want *kernel.ContextEngine", eng)
 	}
 	// Mirror main.go:WireDelegate.
-	WireDelegate(ctxCfg, maCfg, nil, ce, ce.ToolRegistry(), nil, nil)
+	WireDelegate(ctxCfg, maCfg, nil, nil, ce, ce.ToolRegistry(), nil, nil)
 	got := collectToolNames(t, ce)
 	for _, want := range []string{"free_fork", "query_diagnostics", "delegate_explore"} {
 		if !got[want] {

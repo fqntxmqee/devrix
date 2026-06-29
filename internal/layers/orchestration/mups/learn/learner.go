@@ -28,6 +28,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/memory"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/prior"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/reputation"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -268,6 +269,21 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 			}
 		}
 		next := l.BayesianUpdater(priorEv, req.Verdict)
+
+		// DM-20260629-001 PR-6 t-span-coverage (T39): emit a dedicated
+		// D7_LongTerm_Reputation_Update span around the BayesianUpdate so
+		// LP-1 acceptance traces show both the prior and posterior Beta
+		// parameters side-by-side (LP-1 closure evidence).
+		endRep := hardening.EmitLongTermReputationUpdate(
+			ctx,
+			req.SessionID,
+			float64(priorEv.Alpha), float64(priorEv.Beta),
+			float64(next.Alpha), float64(next.Beta),
+			next.ConfidenceLow, next.ConfidenceHigh,
+			next.VerifierFailureCount,
+			string(priorEv.TrackMode),
+		)
+		endRep(nil)
 		if err := l.Reputation.Update(ctx, next); err != nil {
 			return nil, fmt.Errorf("learn: ReputationStore.Update: %w", err)
 		}

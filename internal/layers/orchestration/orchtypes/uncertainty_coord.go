@@ -176,8 +176,3 @@ func (u UncertaintyCoord) Equal(other UncertaintyCoord) bool {
 		u.FromVerifier == other.FromVerifier &&
 		u.SideEffectStatus == other.SideEffectStatus
 }
-
-// ErrInvalidVerdictKind is kept as a deprecated alias for backward
-// compatibility. Use ErrUncertaintyCoordInvalidVerdictKind (declared in
-// errors.go) which is the canonical sentinel.
-var ErrInvalidVerdictKind = ErrUncertaintyCoordInvalidVerdictKind

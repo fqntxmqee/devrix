@@ -11,6 +11,7 @@ import (
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
+	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/llmgateway/budget"
 	"github.com/devrix/devrix/internal/layers/llmgateway/configure"
@@ -59,9 +60,9 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 
 	ctxCfg := config.DefaultContextEngineConfig()
 	ctxCfg.LongTerm.Enabled = false
-	engine := contextengine.NewContextEngine(testutil.MergeEngineDeps(
+	engine := kernel.NewContextEngine(testutil.MergeEngineDeps(
 		testutil.ContextEngineDepsFromStack(llmStack, ctxCfg),
-		contextengine.EngineDeps{
+		kernel.EngineDeps{
 			PreparedTurnRunner: &contextengine.StaticPreparedTurnRunner{Response: "Echo: agent route"},
 			Tools:              &enforce.ToolRunner{},
 			ToolsReg:           mustBuiltinRegistry(t),
@@ -82,7 +83,7 @@ func TestIntegration_AgentRouteSessionContextAccumulation(t *testing.T) {
 		multiagent.AgentDeps{Engine: engine},
 		config.DefaultMultiAgentConfig(),
 	)
-	gw.SetAgentFactory(factory)
+	testutil.WireGatewaySessionAgents(gw, factory)
 
 	session, err := gw.CreateSession("feishu_chat", dir)
 	if err != nil {

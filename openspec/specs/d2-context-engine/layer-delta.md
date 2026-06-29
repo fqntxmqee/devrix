@@ -1,9 +1,22 @@
 # Delta: Domain D2 (CTX)
 
-**Change ID:** devrix-foundation → devrix-queryloop-context (archived) → devrix-d2-queryloop-dismantle (archived) → **devrix-d2-structure-closure** (v8.0.0 → **v8.2.0**)
-**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v8.2.0)
-**Status:** v8.2.0 merged — D2 v2.2 structure closure (DM-20260619-007)
-**Affects:** D7 turn runtime, compression pipeline, layered memory, conversation repair, main transcript, **enforce/tools/ rename (P3-T2)**, **memory split (P4)**, **legacy retirement (P5)**
+**Change ID:** devrix-foundation → devrix-queryloop-context (archived) → devrix-d2-queryloop-dismantle (archived) → **devrix-d2-structure-closure** (v8.0.0 → **v8.2.0**) → **devrix-d2-dsaft-restructuring** (v8.2.0 → v8.3.0)
+**Canonical spec:** `openspec/specs/d2-context-engine/spec.md` (v8.3.0)
+**Status:** v8.3.0 — D2 v2.2 structure closure + DSAFT restructuring (DM-20260629-002 PR-1..PR-5)
+**Affects:** D7 turn runtime, compression pipeline, layered memory, conversation repair, main transcript, **enforce/tools/ rename (P3-T2)**, **memory split (P4)**, **legacy retirement (P5)**, **god fn split (PR-2/PR-3)**, **registry sync (PR-4)**, **value flow rename (PR-5)**
+
+---
+
+## Canonical S → ValueFlow Alias (DM-20260629-002 PR-5)
+
+| Canonical S | ValueFlow Alias (用户感知) |
+|-------------|------------------------------|
+| D2-S15 PrepareExecutionContext | `D2_Context_Loading_Compression` |
+| D2-S16 RunQueryLoop | (REMOVED DM-20260618-010 → 归 D7 ValueFlow) |
+| D2-S17 PersistSessionState | `D2_Session_State_Persistence` |
+| D2-S18 EnforceExecutionPolicy | `D2_Tool_Permission_Sandbox` |
+
+> 与 `d2-domain.md` §North Star + `a-registry.md` §Canonical S + `f-registry.md` §D2-S15/S17/S18 + `t-registry.md` §Canonical T 映射 一致。
 
 ---
 

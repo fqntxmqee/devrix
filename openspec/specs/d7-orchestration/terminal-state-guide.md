@@ -183,11 +183,21 @@ S4-A04/A05 SpokeBridge → S4-A01 PublishFlowEvent
 | **IntentFast** | FastPath → RunTurnLoop | ✅ InvokeLLM | ✅ 拆面 | ❌ | S2 |
 | **IntentOrchestrate** | OrchestratePath | 可选（拆解） | ✅ Worker | ✅ Delegate | S5→S3→S4 |
 
+**用户感知层（ValueFlow Semantics，PR-5 T34 同步）**
+
+| IntentKind | 用户动作 | 用户感知 | IM 卡片呈现 | 完成标志 |
+|------------|---------|---------|-----------|---------|
+| **IntentSkip** | 发送/输入"无意义"消息（空、纯表情、长度 < 3 字符） | 静默忽略 | 无卡片 | channel close |
+| **IntentCommand** | 发送 `/plan` `/task` `/stop` 等 slash 命令 | 命令即执行 | 命令结果行（单行） | 命令返回 |
+| **IntentFast** | 普通对话、问答、简单工具调用 | 流畅对话流式输出 | 流式文本卡片 | 终态 Verdict (Pass) |
+| **IntentOrchestrate** | 复杂多步任务、并行执行、跨域协作 | 任务规划 + 多 worker 并行进度 | 双区块 IM 卡片（per-Task + 总进度） | 终态 Verdict + ExitReason |
+
 **硬约束：**
 
 - command-first：`/plan` `/task` `/stop` **先于** ClassifyIntent，不触发 LLM 分类（D7-S5-T06）
 - S2 **不得**串行替代 S3 做并行 DAG
 - D4 / D2 **禁止**直 Publish FlowEvent（须经 S4-A04/A05）
+- **用户感知与代码路径 1:1**：4 IntentKind ↔ 4 用户感知 ↔ 4 IM 卡片形态
 
 ---
 

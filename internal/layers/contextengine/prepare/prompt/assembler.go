@@ -48,19 +48,29 @@ type SystemPromptBuildInput struct {
 
 // SystemPromptBuildReport describes assembly observability metadata.
 type SystemPromptBuildReport struct {
-	TotalTokens        int
-	LayerTokens        [4]int
-	MemoryTruncated    bool
-	BlocksIncluded     []string
-	TemplateHash       string
-	AgentsMDHash       string
-	SectionCount       int
-	HasDynamicBoundary bool
+	TotalTokens         int
+	LayerTokens         [4]int
+	MemoryTruncated     bool
+	BlocksIncluded      []string
+	TemplateHash        string
+	AgentsMDHash        string
+	SectionCount        int
+	HasDynamicBoundary  bool
 	DynamicSectionNames []string
 }
 
 // SystemPromptAssembler builds the final system prompt per §十 spec.
 // Supports both legacy mode and new section-based prompt system.
+//
+// DM-20260629-002 devrix-d2-dsaft-restructuring PR-2: Build (was 55 LOC)
+// split into:
+//   - assembler.go (this file: orchestrator + report + NewSystemPromptAssembler)
+//   - layers.go (buildCoreLayer, buildLayer3Blocks, buildLoadedContext,
+//     buildXMLContext, truncateToTokenBudget)
+//   - dynamic_sections.go (in pkg prompt: buildDynamicSections, wantsDynamicSection,
+//     resolveGitStatusSection, buildEnvInfo, coreTemplate, guidanceTemplate)
+//
+// The orchestrator Build is now ~55 LOC of flow control only.
 type SystemPromptAssembler struct {
 	coreTemplateZH     string
 	coreTemplateEN     string
@@ -99,6 +109,9 @@ func NewSystemPromptAssembler(cfg config.WorkspacePromptConfig) *SystemPromptAss
 
 // Build assembles the four-layer system prompt (ClawCode-aligned: core always
 // in system; AGENTS.md via agents_context only when not omitted for prepend).
+//
+// DM-20260629-002 PR-2: orchestrator-only after the god-fn split. Each layer's
+// body lives in layers.go; dynamic-boundary logic in dynamic_sections.go.
 func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, SystemPromptBuildReport) {
 	report := SystemPromptBuildReport{
 		TemplateHash: a.templateFingerprint(),
@@ -129,10 +142,10 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 		sessionID = in.Session.SessionID
 	}
 
-	// S4-Gate H-2 fix: drainTaskNotifications 必须每次 Build 都调, 因为它是消费性
-	// 语义 (bus.Drain 一次性清空 pending). 如果放进 buildSessionContext, 而
-	// buildSessionContext 会被 dynamic_sections 的 cache 命中, 第二次 build
-	// 就拿不到新 event 了. 这里作为 top-level "live" section 拼接, 不进 cache.
+	// S4-Gate H-2 fix: drainTaskNotifications must be called on every Build,
+	// because the underlying bus.Drain is one-shot. Putting it in
+	// buildSessionContext would mean dynamic_sections cache hits skip the
+	// drain. So we drain here at the top, then splice.
 	taskNotif := drainTaskNotifications(sessionID)
 
 	if a.enableDynamicBoundary() {
@@ -155,120 +168,6 @@ func (a *SystemPromptAssembler) Build(in SystemPromptBuildInput) (string, System
 	return out, report
 }
 
-func (a *SystemPromptAssembler) enableDynamicBoundary() bool {
-	return a.cfg.PromptConfig != nil && a.cfg.PromptConfig.EnableDynamicBoundary
-}
-
-func (a *SystemPromptAssembler) wantsDynamicSection(name string) bool {
-	if a.cfg.PromptConfig == nil {
-		return false
-	}
-	for _, n := range a.cfg.PromptConfig.DynamicSections {
-		if n == name {
-			return true
-		}
-	}
-	return false
-}
-
-func (a *SystemPromptAssembler) buildDynamicSections(sessionID string, in SystemPromptBuildInput, layer3, taskNotif string) ([]string, []string) {
-	var parts []string
-	var names []string
-
-	sessionCtx := resolveCachedSection(sessionID, "session_context", false, func() string {
-		return a.buildSessionContext(in)
-	})
-	if strings.TrimSpace(sessionCtx) != "" {
-		parts = append(parts, sessionCtx)
-		names = append(names, "session_context")
-	}
-
-	// S4-Gate H-2 fix: task_notifications 是 live section, 不进 cache,
-	// 每次 Build 都会拿到 bus 里的最新完成事件. taskNotif 由 Build 顶层
-	// drain 后传入, 这里只负责拼接 / 跳过空段.
-	if strings.TrimSpace(taskNotif) != "" {
-		parts = append(parts, taskNotif)
-		names = append(names, "task_notifications")
-	}
-
-	if a.wantsDynamicSection("git_status") {
-		workDir := in.WorkDir
-		if in.Session != nil && in.Session.WorkDir != "" {
-			workDir = in.Session.WorkDir
-		}
-		if gitCtx, ok := resolveGitStatusSection(sessionID, workDir, a.locale); ok {
-			parts = append(parts, gitCtx)
-			names = append(names, "git_status")
-		}
-	}
-
-	if a.wantsDynamicSection("env_info") {
-		if env := a.buildEnvInfo(in); env != "" {
-			parts = append(parts, env)
-			names = append(names, "env_info")
-		}
-	}
-
-	if strings.TrimSpace(layer3) != "" {
-		parts = append(parts, layer3)
-		names = append(names, "loaded_context")
-	}
-
-	return parts, names
-}
-
-func resolveGitStatusSection(sessionID, workDir string, loc i18n.Locale) (string, bool) {
-	raw := resolveCachedSection(sessionID, "git_status", false, func() string {
-		s, ok := computeGitStatus(workDir, loc)
-		if !ok {
-			return ""
-		}
-		return s
-	})
-	if strings.TrimSpace(raw) == "" {
-		return "", false
-	}
-	return raw, true
-}
-
-func (a *SystemPromptAssembler) buildEnvInfo(in SystemPromptBuildInput) string {
-	workDir := in.WorkDir
-	model := ""
-	if in.Session != nil {
-		if in.Session.WorkDir != "" {
-			workDir = in.Session.WorkDir
-		}
-		model = in.Session.Model
-	}
-	if workDir == "" && model == "" {
-		return ""
-	}
-	return i18n.EnvInfoHeader(a.locale) + "\n" + i18n.EnvInfoBody(a.locale, workDir, model)
-}
-
-func joinNonEmptyParts(parts ...string) string {
-	nonEmpty := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if strings.TrimSpace(p) != "" {
-			nonEmpty = append(nonEmpty, p)
-		}
-	}
-	return strings.Join(nonEmpty, "\n\n")
-}
-
-// buildCoreLayer builds layer 0 from embedded sections or template.
-// Workspace AGENTS.md is not Layer 0 (ClawCode: CLAUDE.md → user prepend / Layer 3).
-func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (string, int) {
-	if a.promptLoader != nil && a.cfg.PromptConfig != nil {
-		names := a.cfg.PromptConfig.GetStaticSections()
-		sections := a.promptLoader.LoadStaticSections(names)
-		if len(sections) > 0 {
-			return strings.Join(sections, "\n\n"), len(sections)
-		}
-	}
-	return a.coreTemplate(), 1
-}
-
 // BuildLegacy returns the V4 system prompt (agents + longterm appendix).
 func (a *SystemPromptAssembler) BuildLegacy(agentsRaw string, memoryAppendix string) string {
 	out := strings.TrimSpace(agentsRaw)
@@ -282,6 +181,11 @@ func (a *SystemPromptAssembler) BuildLegacy(agentsRaw string, memoryAppendix str
 	return out
 }
 
+// buildSessionContext formats the per-session runtime context block (agent
+// name, date, OS, workdir, session id, request id, model).
+//
+// DM-20260629-002 PR-2: kept here because the H-2 fix comment is more
+// discoverable when paired with the drainTaskNotifications comment.
 func (a *SystemPromptAssembler) buildSessionContext(in SystemPromptBuildInput) string {
 	agentName := a.cfg.AgentName
 	if agentName == "" {
@@ -303,8 +207,7 @@ func (a *SystemPromptAssembler) buildSessionContext(in SystemPromptBuildInput) s
 		}
 		model = in.Session.Model
 	}
-	// S4-Gate H-2 fix: 不在这里 drain — 移到 Build 顶层, 避免被 dynamic_sections
-	// cache 命中导致第二次 build 拿不到新 event.
+	// S4-Gate H-2 fix: drain moved to Build top-level — here we only format.
 	now := time.Now()
 	return i18n.SessionContextHeader(a.locale) + "\n" + i18n.SessionContextBody(
 		a.locale, agentName, i18n.FormatSessionDate(a.locale, now), runtime.GOOS,
@@ -357,84 +260,25 @@ func SetTaskNotifDrainerForTest(f TaskNotifDrainerFunc) TaskNotifDrainerFunc {
 	return prev
 }
 
-type layer3BlockReport struct {
-	MemoryTruncated bool
-	BlocksIncluded  []string
-}
-
-func (a *SystemPromptAssembler) buildLayer3Blocks(in SystemPromptBuildInput) (map[string]string, layer3BlockReport) {
-	report := layer3BlockReport{}
-	blocks := make(map[string]string)
-
-	budget := a.cfg.MaxContextTokens
-	if budget <= 0 {
-		budget = 8000
-	}
-
-	memoryBudget := in.RecallMaxTokens
-	if memoryBudget <= 0 {
-		memoryBudget = 2000
-	}
-	memoryRaw, truncated := memory.FormatMemoryContext(in.MemoryEntries, memoryBudget)
-	report.MemoryTruncated = truncated
-
-	agentsBudget := budget
-	agentsRaw := a.truncateToTokenBudget(strings.TrimSpace(in.AgentsRaw), agentsBudget)
-	if in.OmitAgentsFromSystem {
-		agentsRaw = ""
-	}
-	budget -= estimateTokens(agentsRaw)
-	if budget < 0 {
-		budget = 0
-	}
-	memoryRaw = a.truncateToTokenBudget(memoryRaw, budget)
-
-	if agentsRaw != "" {
-		blocks["agents_context"] = agentsRaw
-	}
-	if memoryRaw != "" {
-		blocks["memory_context"] = memoryRaw
-	}
-
-	for tag := range blocks {
-		report.BlocksIncluded = append(report.BlocksIncluded, tag)
-	}
-	return blocks, report
-}
-
-func layer3HasContent(blocks map[string]string) bool {
-	for _, v := range blocks {
-		if strings.TrimSpace(v) != "" {
-			return true
+// joinNonEmptyParts concatenates non-empty parts with double newlines.
+//
+// DM-20260629-002 PR-2: kept in assembler.go because both static and dynamic
+// paths in Build need it (and it's 9 LOC).
+func joinNonEmptyParts(parts ...string) string {
+	nonEmpty := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if strings.TrimSpace(p) != "" {
+			nonEmpty = append(nonEmpty, p)
 		}
 	}
-	return false
+	return strings.Join(nonEmpty, "\n\n")
 }
 
-func buildLoadedContext(blocks map[string]string) string {
-	order := []string{
-		"agents_context", "memory_context",
-	}
-	var b strings.Builder
-	b.WriteString("<loaded_context>\n")
-	for _, tag := range order {
-		content, ok := blocks[tag]
-		if !ok {
-			continue
-		}
-		b.WriteString(buildXMLContext(tag, content))
-	}
-	b.WriteString("</loaded_context>\n")
-	return b.String()
-}
-
-func buildXMLContext(tag, content string) string {
-	if strings.TrimSpace(content) == "" {
-		return fmt.Sprintf("<%s></%s>\n", tag, tag)
-	}
-	return fmt.Sprintf("<%s>\n%s\n</%s>\n", tag, strings.TrimSpace(content), tag)
-}
-
+// estimateTokens uses a 4-chars-per-token heuristic for the system prompt
+// layer accounting.
+//
+// DM-20260629-002 PR-2: kept in assembler.go because both Build and
+// buildLayer3Blocks use it.
 func estimateTokens(s string) int {
 	n := len(s) / 4
 	if n <= 0 && s != "" {
@@ -443,31 +287,10 @@ func estimateTokens(s string) int {
 	return n
 }
 
-func (a *SystemPromptAssembler) truncateToTokenBudget(text string, maxTokens int) string {
-	if maxTokens <= 0 {
-		return ""
-	}
-	maxChars := maxTokens * 4
-	if len(text) <= maxChars {
-		return text
-	}
-	return text[:maxChars] + i18n.MemoryTruncationNotice(a.locale)
-}
-
-func (a *SystemPromptAssembler) coreTemplate() string {
-	if a.locale == i18n.LocaleEN {
-		return a.coreTemplateEN
-	}
-	return a.coreTemplateZH
-}
-
-func (a *SystemPromptAssembler) guidanceTemplate() string {
-	if a.locale == i18n.LocaleEN {
-		return a.guidanceTemplateEN
-	}
-	return a.guidanceTemplateZH
-}
-
+// templateFingerprint hashes the active templates + embed flag so report
+// consumers can detect prompt-version drift.
+//
+// DM-20260629-002 PR-2: kept in assembler.go (Build calls it inline).
 func (a *SystemPromptAssembler) templateFingerprint() string {
 	if a == nil {
 		return ""
@@ -481,6 +304,9 @@ func (a *SystemPromptAssembler) templateFingerprint() string {
 	return shortHash(h.Sum(nil))
 }
 
+// contentHash hashes non-blank content (used for AGENTS.md provenance).
+//
+// DM-20260629-002 PR-2: kept in assembler.go.
 func contentHash(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return ""
@@ -489,6 +315,9 @@ func contentHash(s string) string {
 	return shortHash(h[:])
 }
 
+// shortHash returns the first 12 hex chars of a digest (compact form).
+//
+// DM-20260629-002 PR-2: kept in assembler.go.
 func shortHash(sum []byte) string {
 	return hex.EncodeToString(sum)[:12]
 }
