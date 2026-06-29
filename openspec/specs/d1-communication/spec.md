@@ -2,10 +2,10 @@
 
 **Capability:** communication
 **Status:** Active
-**Version:** 6.0.0
+**Version:** 6.1.0
 **Last Updated:** 2026-06-30
 **Domain SoT:** `d1-domain.md`
-**Change:** devrix-d1-sa-refine (DM-20260614-006) — 切法 A / devrix-d1-dsaft-refactor (DM-20260628-003) — Gateway 拆分 + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) — PR-1 orchtypes + PR-2/3 god-doc-split + PR-4 Span Evidence + PR-5 ValueFlow Alias + PR-6 gherkin-restructuring (18 → 90 Scenario)**
+**Change:** devrix-d1-sa-refine (DM-20260614-006) — 切法 A / devrix-d1-dsaft-refactor (DM-20260628-003) — Gateway 拆分 + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) — PR-1 orchtypes + PR-2/3 god-doc-split + PR-4 Span Evidence + PR-5 ValueFlow Alias + PR-6 gherkin-restructuring (18 → 90 Scenario) + PR-7 boundary-decision (d7-boundary.md NEW, v6.1.0)**
 
 ---
 
@@ -62,6 +62,8 @@
 | D5 Observability | `Observability`, `Bridge`, tracer, telemetry | capture, adapters |
 | D7 Orchestration | **禁止** channel/adapters import；Worker 展示经 `contracts.WorkerStreamEvent` | D7 `wavescheduler/present.go` → D1 adapter |
 | Shared | config, contracts, errors, types | 全子包 |
+
+> **跨域边界详细规范：** `d7-boundary.md`（DM-20260629-005 PR-7 #5 boundary-decision）。包含调用链 SoT、职责矩阵、契约接口、依赖规则、跨域迁移表、影子编排风险、Follower 对称性声明与 Boundary Debt Decisions 治理常量。
 
 ## Key Design Patterns
 
@@ -573,3 +575,4 @@
 |---------|------|---------|
 | 5.0.0 | 2026-06-30 | **DM-20260629-005 PR-2 god-doc-split pt1**：176 → 90 行（拆出 `architecture/d1-flow-architecture.md`） |
 | 6.0.0 | 2026-06-30 | **DM-20260629-005 PR-6 #4 gherkin-restructuring**：§Requirements 18 缩写 bullet → **90 `#### Scenario:` 块**（分布：happy 30 / sad 24 / boundary 18 / concurrent 9 / timeout 9）+ v5.0.0 → v6.0.0 + §Change line 累计 PR-1~PR-6 |
+| 6.1.0 | 2026-06-30 | **DM-20260629-005 PR-7 #5 boundary-decision**：§Cross-Domain Dependencies 补充 `d7-boundary.md` 链接（Boundary Debt Decisions + 影子编排风险 + 治理常量）+ v6.0.0 → v6.1.0 |

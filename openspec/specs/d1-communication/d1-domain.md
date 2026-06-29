@@ -4,13 +4,13 @@
 **Slug:** `communication`
 **Type:** Core Domain
 **Status:** Active — Canonical S13–S18 (v1.0 registry, DM-20260614-006)
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Last Updated:** 2026-06-30
 **Depends On:** D5 (Observability), D7 (`IOrchestrationEntry` — ingress 后唯一编排入口)
 **Depended By:** D7 (EngineEvent 消费方展示), D6 (feedback 钩子消费)
 **Hard Ban:** D1→D2 直连 `IEngine.Process`（DM-007，`routeLegacyD2` RETIRED）
 **Cross-Domain SoT:** `../architecture/cross-domain-boundaries.md` §2.5
-**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-4 #2 registry-sync — T 56 → 74 全量加 Span Evidence 列 + d1-span-coverage.sh CI 守门 (v1.1.0)**
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-4 #2 registry-sync + PR-5 #3 value-flow-rename + PR-6 #4 gherkin-restructuring + PR-7 #5 boundary-decision (d7-boundary.md NEW, v1.2.0)**
 
 ---
 
@@ -39,6 +39,20 @@
 | Worker 派发 / FlowEvent 写侧 | D7-S4 | `GatewaySink` 只读展示 |
 | 结论质量 / 信誉计算 | D6 | D1 仅 feedback 钩子 + 客观锚点 |
 | Task/Plan 写模型 | D7-S1 | milestone 展示数据来自 D7 |
+
+## Boundary Debt Decisions
+
+> **治理常量：** `internal/layers/communication/orchtypes/boundary_decision.go`  
+> **单测：** `internal/layers/communication/orchtypes/boundary_decision_test.go`（3 单测 PASS）  
+> **详细规范：** `d7-boundary.md`（DM-20260629-005 PR-7 #5 boundary-decision）
+
+| Boundary Decision ID | 描述 | Status |
+|----------------------|------|--------|
+| `boundary-debt:d1-to-d7-orchestration-entry-v1.0` | D1 capture → D7 `IOrchestrationEntry.ProcessMessage` 唯一入口契约 | **RESOLVED** |
+| `boundary-debt:d1-to-d4-permission-gate-v1.0` | D1 → D4 `sessionagents/manager.ResolveAgentPermission`（CRITICAL 永不 YOLO） | **RESOLVED** |
+| `boundary-debt:d1-forbidden-orchestration-import-v2.0` | D1 capture 生产代码禁止 import `multiagent` / `orchestration/*` | **RESOLVED** |
+
+**重新评估触发：** D1 域升级 v3.0+ 或 D7 编排 v7.0+ 跨域契约变化时，需重新审计本节与 `d7-boundary.md` §2。
 
 ---
 
@@ -82,6 +96,7 @@ Legacy D1-S1–S12 已退役（DM-20260614-006 Phase 3）。
 | `a-registry.md` / `f-registry.md` / `t-registry.md` | A/F/T 登记 SoT |
 | `span-registry.md` | Span operation 登记 SoT |
 | `layer-delta.md` | V1→V2 演进 Delta |
+| `d7-boundary.md` | D1 ↔ D7 跨域边界规范 + Boundary Debt Decisions |
 | `../architecture/d1-flow-architecture.md` | 价值流流图 + Package Map + Legacy 包结构 + 跨域接线 |
 | `../../scripts/d1-span-coverage.sh` | Span Evidence 覆盖率守门（PR-4 落地，≥80% effective PASS） |
 | `openspec/archive/2026-06-30-devrix-d1-ac-restructuring/legacy-s1-s12.md` | Historical S1–S12 frozen index（PR-4 #2 沉 archive） |
@@ -94,3 +109,4 @@ Legacy D1-S1–S12 已退役（DM-20260614-006 Phase 3）。
 |---------|------|---------|
 | 1.0.0 | 2026-06-16 | 初版：North Star、Out of Scope、文档索引；对齐 D2/D4 `*-domain.md` 模式 |
 | 1.1.0 | 2026-06-30 | **DM-20260629-005 PR-4 #2 registry-sync**：T 56 → 74 + 全量 Span Evidence 列（覆盖率 100% effective）+ `scripts/d1-span-coverage.sh` CI 守门 + Historical S1–S12 沉 `openspec/archive/2026-06-30-devrix-d1-ac-restructuring/legacy-s1-s12.md` + §Change line |
+| 1.2.0 | 2026-06-30 | **DM-20260629-005 PR-5 #3 + PR-6 #4 + PR-7 #5**：6 D1_* ValueFlow Alias 加入 §North Star + spec.md v5.0.0 → v6.0.0（18 缩写 bullet → 90 `#### Scenario:` 块）+ `d7-boundary.md` NEW（Boundary Debt Decisions 3 row + 调用链 SoT + 职责矩阵 + 影子编排风险 + 治理常量）+ §Boundary Debt Decisions 章节 + §Change line |
