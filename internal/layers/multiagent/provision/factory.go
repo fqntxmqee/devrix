@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
-	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	"github.com/devrix/devrix/internal/layers/multiagent/collaboration"
 	"github.com/devrix/devrix/internal/layers/multiagent/isolate"
+	"github.com/devrix/devrix/internal/layers/multiagent/run"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	sharedconfig "github.com/devrix/devrix/internal/shared/config"
@@ -16,6 +16,42 @@ import (
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// workerEngine wraps an IEngine and injects D4 worker session context per Process.
+// Pure delegating wrapper; inlined here from run/worker_engine.go (DM-20260629-004
+// PR-1 #0 legacy-cleanup) because the helper had only one production caller
+// (this factory) and one test caller (worker_engine_test.go).
+type workerEngine struct {
+	inner        contracts.IEngine
+	agentID      string
+	workerRole   string
+	systemPrompt string
+	modelTier    string
+}
+
+func newWorkerEngine(inner contracts.IEngine, cfg multiagent.AgentConfig, agentID string) contracts.IEngine {
+	if inner == nil || cfg.ParentID == "" {
+		return inner
+	}
+	return &workerEngine{
+		inner:        inner,
+		agentID:      agentID,
+		workerRole:   cfg.WorkerRole,
+		systemPrompt: cfg.SystemPrompt,
+		modelTier:    cfg.ModelTier,
+	}
+}
+
+func (w *workerEngine) Process(ctx context.Context, session *types.Session, message string) <-chan *contracts.EngineEvent {
+	ov := contracts.ProcessOverlay{
+		AgentID:      w.agentID,
+		IsWorker:     true,
+		WorkerRole:   w.workerRole,
+		SystemPrompt: w.systemPrompt,
+		ModelTier:    w.modelTier,
+	}
+	return w.inner.Process(contracts.WithProcessOverlay(ctx, ov), session, message)
+}
 
 // EngineBuilder constructs a per-agent IEngine with the agent permission gate.
 type EngineBuilder interface {
@@ -109,14 +145,14 @@ func (f *AgentFactory) Create(
 	case cfg.ParentID != "" && f.builder != nil:
 		// Forked workers need an isolated engine with the agent permission gate.
 		inner := f.builder.Build(impl.PermissionGate())
-		impl.SetEngine(run.NewWorkerEngine(inner, resolved, impl.ID()))
+		impl.SetEngine(newWorkerEngine(inner, resolved, impl.ID()))
 	case f.deps.Engine != nil:
 		// Root session agents share the gateway context engine so conversation
 		// history accumulates across inbound messages in the same session.
 		impl.SetEngine(f.deps.Engine)
 	case f.builder != nil:
 		inner := f.builder.Build(impl.PermissionGate())
-		impl.SetEngine(run.NewWorkerEngine(inner, resolved, impl.ID()))
+		impl.SetEngine(newWorkerEngine(inner, resolved, impl.ID()))
 	default:
 		impl.SetEngine(&run.StubEngine{Events: []*contracts.EngineEvent{{Type: "complete"}}})
 	}
