@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -40,7 +41,7 @@ func (g *agentPermissionGate) Request(
 	g.mu.Unlock()
 
 	_ = g.agent.setState(multiagent.AgentStateWaitingPermission)
-	g.agent.emit("permission_required", map[string]any{"tool": toolName})
+	g.agent.emit(orchtypes.EventPermissionRequired, map[string]any{"tool": toolName})
 
 	timeout := g.agent.cfg.PermissionTimeout
 	if timeout <= 0 {

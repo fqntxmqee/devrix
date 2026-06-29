@@ -9,6 +9,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/communication/kernel"
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -175,7 +176,7 @@ type managerAgentObserver struct {
 }
 
 func (o *managerAgentObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
-	if ev.EventType != "permission_required" {
+	if ev.EventType != orchtypes.EventPermissionRequired {
 		return
 	}
 	tool, _ := ev.Metadata["tool"].(string)

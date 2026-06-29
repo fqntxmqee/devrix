@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -31,7 +32,7 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	if err := a.setState(multiagent.AgentStateRunning); err != nil {
 		return nil, err
 	}
-	a.emit("agent.started", nil)
+	a.emit(orchtypes.EventAgentStarted, nil)
 
 	ctx, runSpan := a.startSpan(ctx, telemetry.OpD4_S4_Agent_Run, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "agent.id", Value: a.id},
@@ -53,7 +54,7 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	duration := time.Since(start)
 
 	if err != nil {
-		a.emit("agent.error", map[string]any{"error": err})
+		a.emit(orchtypes.EventAgentError, map[string]any{"error": err})
 		if runSpan != nil {
 			runSpan.RecordError(err)
 			runSpan.SetAttributes(tracer.Attribute{Key: "agent.duration_ms", Value: fmt.Sprintf("%d", duration.Milliseconds())})
@@ -69,7 +70,7 @@ func (a *Impl) Run(ctx context.Context) (*multiagent.AgentResult, error) {
 	}
 	result.Messages = append(a.GetMessages(), result.Messages...)
 	result.Duration = duration
-	a.emit("agent.terminated", nil)
+	a.emit(orchtypes.EventAgentTerminated, nil)
 	if runSpan != nil {
 		runSpan.SetAttributes(tracer.Attribute{Key: "agent.duration_ms", Value: fmt.Sprintf("%d", duration.Milliseconds())})
 		runSpan.SetStatus(tracer.StatusCodeOk, "")
@@ -83,7 +84,7 @@ func (a *Impl) runLoop(ctx context.Context) (*multiagent.AgentResult, error) {
 	if err := a.setState(multiagent.AgentStateIterating); err != nil {
 		return nil, err
 	}
-	a.emit("agent.iterating", nil)
+	a.emit(orchtypes.EventAgentIterating, nil)
 
 	input := a.cfg.InitialInput
 	if input == "" {
@@ -205,7 +206,7 @@ func (a *Impl) Terminate(ctx context.Context) error {
 	}
 	a.mu.Unlock()
 	a.terminateChildren(ctx)
-	a.emit("agent.terminated", map[string]any{"forced": true})
+	a.emit(orchtypes.EventAgentTerminated, map[string]any{"forced": true})
 	a.finishResult(&multiagent.AgentResult{
 		ExitCode: 130,
 		Error:    sharederrors.NewAgentContextCancelledError(a.id),
