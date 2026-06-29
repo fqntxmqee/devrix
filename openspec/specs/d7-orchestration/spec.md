@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.17.0
+**Version:** 4.18.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-29 (taskcontract-unification-pr-b DM-20260629-008: 新增 2 ADDED Requirement (D7-S18-A11 PessimisticCommitGuard.Evaluate + D7-S18-A12 Rule-based Fallback) + 11 Gherkin Scenario; L3 防御运行时层 PessimisticCommitGuard interface + 5 类触发 + 4 候选规则 Rule-based Fallback; interfaces 包 +3 NEW (contracts.go + fallback_policy.go + convergence_budget.go) + escape/fallback.go (DefaultPessimisticCommitGuard); Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled 0 行为变更; 6/7 P0 T IMPLEMENTED T05 Span/Metric 完整 wire PLANNED 留 PR-C)
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-c DM-20260629-009: v7.0 TaskContract PR-C 收尾: interfaces 包 +3 NEW (version_chain.go CoW + similarity_check.go Jaccard + hard_evidence.go kind-specific) + workmodel 包 +2 NEW (version_chain.go registry + 24h GC worker, similarity.go CheckSimilarityForSession + MostSimilarSessionID) + hardening 包 +3 S18 span ops (Hard_Evidence_Reject / Worktree_VersionChain_Append / Similarity_Check_Intercept) + TaskContractMetrics 3 new counter (HardEvidenceRejects / VersionChainAppends / SimilarityCheckInterceptions) + WorkTree.VersionChainRegistry lazy field + 2 gate 文件 (executionflow/verify/hard_evidence_gate.go + decisionplanning/similarity_gate.go) Function-var indirection default disabled 0 行为变更 + 1 feature flag helpers (bootstrap/prc_feature_flag_wire.go: D7_HARD_EVIDENCE_ENABLED + D7_SIMILARITY_CHECK_ENABLED, default disabled) + 3 ORCH_* SentinelError 7120-7122 (CoW chain broken / similarity intercept / hard evidence missing) + Hash 算法升级 PR-B FNV-1a 16-char → PR-C SHA-256 64-char hex; taskcontract-unification-pr-b DM-20260629-008: 新增 2 ADDED Requirement (D7-S18-A11 PessimisticCommitGuard.Evaluate + D7-S18-A12 Rule-based Fallback) + 11 Gherkin Scenario; L3 防御运行时层 PessimisticCommitGuard interface + 5 类触发 + 4 候选规则 Rule-based Fallback; interfaces 包 +3 NEW (contracts.go + fallback_policy.go + convergence_budget.go) + escape/fallback.go (DefaultPessimisticCommitGuard); Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled 0 行为变更; 6/7 P0 T IMPLEMENTED T05 Span/Metric 完整 wire PLANNED 留 PR-C)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -1585,6 +1585,67 @@ This Change synchronizes the new L1/L2 contract surfaces across **6 spec files**
 - WHEN `len(FallbackPolicyRuleNames())` is checked
 - THEN it equals 4 (no more, no less)
 - AND the set is: `{"most_tests_passed", "compiled_clean", "min_cost", "min_uncertainty"}`
+
+### Requirement: D7-S18-A13 CoW VersionChain (L4 不变性)
+
+`VersionChain` MUST provide SHA-256-hashed Copy-on-Write semantics: `Append` and `RollbackTo` and `GC` return new shallow-copied instances, never mutating existing entries. `Append` MUST compute `Hash = SHA-256(parent_hash + content)`, and `RollbackTo` MUST reject `EmptyHash` (Code 7120). `GC` MUST preserve `Head` regardless of age and MUST reject non-positive TTL. The head 24h protection invariant (`Head 永远不被 GC`) holds regardless of clock skew within ±1h.
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/version_chain.go` + `internal/layers/orchestration/workmodel/version_chain.go`  
+**Gherkin Coverage:** `version_chain_test.go` covers Append / RollbackTo / GC head-preservation / Concurrent / DefensiveCopy / 64-char hex SHA-256 lock-down
+
+#### Scenario: Append produces chained hashes
+
+- WHEN a chain has entries `[h1, h2, h3]`
+- AND a new entry is appended with content C and parent `h3`
+- THEN the new entry's hash `h4 = SHA-256(h3 + C)`
+- AND `h4 != h1`, `h4 != h2`, `h4 != h3`
+
+#### Scenario: Head survives GC older than TTL
+
+- WHEN chain has 2 entries, head was appended `now - 48h`
+- AND `GC(24h)` is called
+- THEN `deleted == 0`
+- AND `Head()` still equals the original hash
+
+### Requirement: D7-S18-A14 Similarity Check (L3 token-level gate)
+
+`CheckSimilarity` MUST compute Jaccard similarity between current text and the last N entries of the chain (`LookbackN=5` default). The Intercept/Warn/None bands MUST be `[0.85+, 0.70..0.85), [0, 0.70)`. `Warn` does NOT block; only `Similar=true` (above InterceptThreshold) triggers the intercept path. 0.7-0.85 boundary sets `Warn=true` but does NOT set `Similar=true` (IV-6: 边界不阻塞).
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/similarity_check.go` + `internal/layers/orchestration/decisionplanning/similarity_gate.go`  
+**Gherkin Coverage:** `similarity_check_test.go` covers Jaccard edge cases (both-empty, one-empty, identical, disjoint, partial-overlap) + 0.85 boundary + 0.70 boundary + LookbackN cap
+
+#### Scenario: 0.85 boundary triggers Intercept
+
+- WHEN `current` has Jaccard 0.90 against any of the last 5 chain entries
+- THEN `result.Similar == true`
+- AND `result.Score ≈ 0.90`
+
+#### Scenario: 0.70 boundary only warns
+
+- WHEN `current` has Jaccard 0.75
+- THEN `result.Warn == true`
+- AND `result.Similar == false`
+
+### Requirement: D7-S18-A15 Hard Evidence kind-specific (L3 verifier gate)
+
+`HardEvidence` MUST verify the minimum kind-specific evidence for a `VerdictPass`: `kind="code"` requires `TestResult.CoveragePct >= 1` OR `LogExcerpt != ""` OR `ArtifactHash != ""`; `kind="chat"` requires `CoherenceScore >= 0.5` OR `EntityHash != ""`. Chat MUST NOT be subjected to test/log/artifact checks (IV-5: kind-specific 严格分离).
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/hard_evidence.go` + `internal/layers/orchestration/executionflow/verify/hard_evidence_gate.go`  
+**Gherkin Coverage:** `hard_evidence_test.go` covers kind-specific Verified() + With* builder immutability + ExtractHardEvidenceFromEvidence string parsing + Error code ORCH_HARD_EVIDENCE_MISSING_7122
+
+#### Scenario: Chat with code-only evidence still rejects
+
+- WHEN HardEvidence is built with `kind="chat"` and only `LogExcerpt` + `ArtifactHash` set
+- THEN `Verified() == false` (chat is not subjected to test/log/artifact checks)
+- AND calling `GateVerdictPass(...)` (with `D7_HARD_EVIDENCE_ENABLED=true`) returns `(false, ORCH_HARD_EVIDENCE_MISSING_7122)`
+
+#### Scenario: Feature Flag disabled → 0 行为变更
+
+- WHEN `D7_HARD_EVIDENCE_ENABLED` is unset (default)
+- THEN `GateVerdictPass(...)` always returns `(true, nil)` — verifier behavior unchanged
 
 ---
 

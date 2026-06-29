@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.15.0
-**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: D7-S20/21 新场景 + 11 P0 T 点 9 IMPLEMENTED + 2 文档同步, T 230→239, P0 195→204; T 编号重映射避开 D7-S16 Layer SubContext 占用)
+**Version:** 4.16.0
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-c DM-20260629-009: 13 P0 T 点 13 IMPLEMENTED, T 239→252, P0 204→217; AC13 CoW VersionChain 5 T (Append/Rollback/GC/Head-Protect/Race) + AC14 Similarity Check 4 T (Jaccard edge cases/Boundary 0.85/Boundary 0.70/LookbackN) + AC15 Hard Evidence 4 T (kind-specific Verified/With-immutable/ExtractFromString/Error-7122); taskcontract-unification-pr-a DM-20260629-007: D7-S20/21 新场景 + 11 P0 T 点 9 IMPLEMENTED + 2 文档同步, T 230→239, P0 195→204; T 编号重映射避开 D7-S16 Layer SubContext 占用)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`

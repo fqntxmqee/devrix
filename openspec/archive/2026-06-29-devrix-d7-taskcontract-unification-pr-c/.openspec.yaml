@@ -1,0 +1,309 @@
+change_id: devrix-d7-taskcontract-unification-pr-c
+demand_id: DM-20260629-009
+title: D7 v7.0 TaskContract 统一 PR-C — CoW VersionChain + Similarity Check + Hard Evidence (L3 防御运行时层)
+status: S3_Design
+created: 2026-06-29
+parent_design: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/
+parent_pr_a: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-a/
+parent_pr_b: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-b/
+phase: PR-C
+priority: P0
+dsaft_domain: D7 Orchestration
+dsaft_layers: [L3, L4]
+
+# DSAFT 维度登记
+dsaft_scenarios:
+  - id: D7-S18
+    name: Pessimistic Commit + Rule-based Fallback + CoW VersionChain + Similarity Check + Hard Evidence
+    role: L3 防御运行时层
+    parent_activities: 5  # PR-A:0 + PR-B:2 + PR-C:3
+
+# Activity 登记 (PR-C scope 3 A)
+dsaft_activities:
+  - id: D7-S18-A13
+    name: CoW VersionChain (Hash + Append/RollbackTo/GC)
+    scenario: D7-S18
+    layer: L3
+    functions: 4
+    test_points: 5
+    status: PLANNED
+  - id: D7-S18-A14
+    name: Similarity Check (token-level Jaccard + boundary)
+    scenario: D7-S18
+    layer: L3
+    functions: 3
+    test_points: 5
+    status: PLANNED
+  - id: D7-S18-A15
+    name: Hard Evidence (kind-specific Verifier reject)
+    scenario: D7-S18
+    layer: L3
+    functions: 2
+    test_points: 4
+    status: PLANNED
+
+# Function 登记 (PR-C scope 9 F)
+dsaft_functions:
+  - id: D7-S18-A13-F01
+    name: VersionChain.Append (SHA-256 hash)
+    activity: D7-S18-A13
+  - id: D7-S18-A13-F02
+    name: VersionChain.RollbackTo (O(1) hash index)
+    activity: D7-S18-A13
+  - id: D7-S18-A13-F03
+    name: VersionChain.GC (24h cycle, head 守护)
+    activity: D7-S18-A13
+  - id: D7-S18-A13-F04
+    name: workmodel.WorkItemVersionChain (additive 嵌入)
+    activity: D7-S18-A13
+  - id: D7-S18-A14-F01
+    name: SimilarityCheck.Check (Jaccard + boundary)
+    activity: D7-S18-A14
+  - id: D7-S18-A14-F02
+    name: workmodel.DecomposeSimilarityChecker
+    activity: D7-S18-A14
+  - id: D7-S18-A14-F03
+    name: decisionplanning.Decomposer.Synthesize (入口 wire)
+    activity: D7-S18-A14
+  - id: D7-S18-A15-F01
+    name: HardEvidence.Verified (kind-specific)
+    activity: D7-S18-A15
+  - id: D7-S18-A15-F02
+    name: executionflow.verify.Verifier.Verify (reject 空证)
+    activity: D7-S18-A15
+
+# Test 登记 (PR-C scope 13 T 点)
+dsaft_tests:
+  # AC13 CoW VersionChain (5 T)
+  - id: D7-S18-A13-T01
+    name: VersionChain.Append SHA-256 hash 稳定
+    activity: D7-S18-A13
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A13-T02
+    name: CoW 不可变 + 24h GC head 守护
+    activity: D7-S18-A13
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A13-T03
+    name: workmodel CoW impl + 24h GC worker
+    activity: D7-S18-A13
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A13-T04
+    name: interfaces/version_chain_test.go (5 tests)
+    activity: D7-S18-A13
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A13-T05
+    name: workmodel/version_chain_test.go (5 tests + race)
+    activity: D7-S18-A13
+    priority: P0
+    status: PLANNED
+  # AC14 Similarity Check (5 T)
+  - id: D7-S18-A14-T01
+    name: SimilarityCheck + Jaccard 算法
+    activity: D7-S18-A14
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A14-T02
+    name: 相似度 > 0.85 强制 Abort
+    activity: D7-S18-A14
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A14-T03
+    name: 0.70-0.85 边界 slog.Warn
+    activity: D7-S18-A14
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A14-T04
+    name: interfaces/similarity_check_test.go (4 tests)
+    activity: D7-S18-A14
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A14-T05
+    name: workmodel/similarity_test.go (4 tests)
+    activity: D7-S18-A14
+    priority: P0
+    status: PLANNED
+  # AC15 Hard Evidence (3 T)
+  - id: D7-S18-A15-T01
+    name: HardEvidence + kind-specific 配置
+    activity: D7-S18-A15
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A15-T02
+    name: Verifier reject 空证 PASS
+    activity: D7-S18-A15
+    priority: P0
+    status: PLANNED
+  - id: D7-S18-A15-T03
+    name: interfaces/hard_evidence_test.go (4 tests)
+    activity: D7-S18-A15
+    priority: P0
+    status: PLANNED
+
+# 验收标准 (PR-C scope 6 AC)
+acceptance_criteria:
+  - id: AC13
+    name: CoW VersionChain 不可变追加 + 24h GC
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A13-T01, D7-S18-A13-T02, D7-S18-A13-T03, D7-S18-A13-T04, D7-S18-A13-T05]
+  - id: AC14
+    name: Similarity Check > 0.85 拦截
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A14-T01, D7-S18-A14-T02, D7-S18-A14-T03, D7-S18-A14-T04, D7-S18-A14-T05]
+  - id: AC15
+    name: Hard Evidence kind-specific 强制 reject
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A15-T01, D7-S18-A15-T02, D7-S18-A15-T03]
+  - id: AC6
+    name: convergence.feasible_space_width span (Observe 节点聚合)
+    priority: P0
+    layer: L4
+    test_refs: [D7-S19-A01-T01]
+  - id: AC18
+    name: Coverage ≥ 80% (4 目标包)
+    priority: P0
+    layer: L4
+    test_refs: []
+  - id: AC22
+    name: Feature Flag env-gated 默认 disabled (D7_HARD_EVIDENCE_ENABLED + D7_SIMILARITY_CHECK_ENABLED)
+    priority: P0
+    layer: L4
+    test_refs: []
+  # PR-B T05 收口 (PR-C 落地)
+  - id: PR-B-T05-Wire
+    name: PR-B T05 Span/Metric 完整 wire 收口 (OTel + 5 metrics)
+    priority: P0
+    layer: L4
+    test_refs: []
+
+# Span emit 登记 (PR-C scope 3 new span + PR-B T05 收口 1 span)
+spans:
+  - op: d7.s18.hard.evidence.reject
+    trigger: Verifier 拒绝空证 PASS
+    ac_ref: AC15
+  - op: d7.s18.worktree.versionchain.append
+    trigger: VersionChain.Append
+    ac_ref: AC13
+  - op: d7.s18.similarity.check.intercept
+    trigger: 相似度 > 0.85 拦截
+    ac_ref: AC14
+  - op: d7.s18.pessimistic.commit.emit
+    trigger: PR-B T05 收口 (OTel 完整)
+    ac_ref: PR-B-T05-Wire
+
+# Metrics 登记 (PR-C scope 8 metric: PR-B T05 5 + PR-C 3)
+metrics:
+  # PR-B T05 收口 (5 metrics)
+  - name: pessimistic_commit_trigger_count
+    unit: count
+    ac_ref: PR-B-T05-Wire
+  - name: fallback_rule_select_total
+    unit: count
+    labels: [most_tests_passed, compiled_clean, min_cost, min_uncertainty]
+    ac_ref: PR-B-T05-Wire
+  - name: mvp_artifact_generated_total
+    unit: count
+    ac_ref: PR-B-T05-Wire
+  - name: pessimistic_commit_latency_us
+    unit: microseconds
+    ac_ref: PR-B-T05-Wire
+  - name: fallback_rule_apply_total
+    unit: count
+    ac_ref: PR-B-T05-Wire
+  # PR-C 新增 (3 metrics)
+  - name: hard_evidence_reject_count
+    unit: count
+    labels: [code, chat, unknown]
+    ac_ref: AC15
+  - name: similarity_check_intercept_count
+    unit: count
+    labels: [high, mid]
+    ac_ref: AC14
+  - name: versionchain_append_total
+    unit: count
+    ac_ref: AC13
+
+# Error Code 登记 (PR-C scope 3 error)
+error_codes:
+  - code: ORCH_COW_VERSION_CHAIN_BROKEN
+    message: CoW VersionChain broken: hash not found or GC'd
+    remediation: trigger VersionChain.GC with longer TTL or rollback to head
+    ac_ref: AC13
+  - code: ORCH_SIMILARITY_INTERCEPTED
+    message: similarity check intercepted: Jaccard > 0.85
+    remediation: refine directive to <0.70 similarity or split into distinct sub-tasks
+    ac_ref: AC14
+  - code: ORCH_HARD_EVIDENCE_MISSING
+    message: hard evidence missing for Pass verdict
+    remediation: provide at least one: test, log, artifact_hash (code) or entity_hash, coherence_score (chat)
+    ac_ref: AC15
+
+# 变更范围
+scope:
+  new_files:
+    - internal/layers/orchestration/interfaces/version_chain.go
+    - internal/layers/orchestration/interfaces/similarity_check.go
+    - internal/layers/orchestration/interfaces/hard_evidence.go
+    - internal/layers/orchestration/workmodel/version_chain.go
+    - internal/layers/orchestration/workmodel/similarity.go
+    - internal/layers/orchestration/interfaces/version_chain_test.go
+    - internal/layers/orchestration/interfaces/similarity_check_test.go
+    - internal/layers/orchestration/interfaces/hard_evidence_test.go
+    - internal/layers/orchestration/workmodel/version_chain_test.go
+    - internal/layers/orchestration/workmodel/similarity_test.go
+  modified_files:
+    - internal/layers/orchestration/interfaces/errors.go (+3 ORCH_* 7120-7122)
+    - internal/layers/orchestration/executionflow/verify/verifier.go (Hard Evidence reject)
+    - internal/layers/orchestration/decisionplanning/decomposer.go (Similarity Check 入口)
+    - internal/layers/orchestration/workmodel/work_tree.go (VersionChain 嵌入)
+    - internal/bootstrap/wire.go (Feature Flag 注入 2 helper)  # NOTE: 实际路径是 internal/bootstrap/，不是 d7-bootstrap/
+    - internal/layers/orchestration/hardening/emitter.go (T05 完整 OTel + 3 新 span)
+    - internal/layers/orchestration/hardening/metrics.go (T05 5 metrics + 3 新 metric)
+    - openspec/specs/d7-orchestration/spec.md (3 ADDED Requirements + 15 Scenarios)
+    - openspec/specs/d7-orchestration/d7-domain.md (§8 L3 row + §9 13 文件清单 + IV-6/7/8)
+    - openspec/specs/d7-orchestration/a-registry.md (3 A entries)
+    - openspec/specs/d7-orchestration/f-registry.md (9 F entries)
+    - openspec/specs/d7-orchestration/span-registry.md (3 new span ops)
+    - openspec/specs/d7-orchestration/t-registry.md (13 P0 T entries)
+
+# 不变更
+unchanged:
+  - PR-A TaskSpec/TaskReport 现有结构 (向后兼容 PR-A 11 F)
+  - PR-B PessimisticCommitGuard + FallbackPolicy + ConvergenceBudget (向后兼容 PR-B 5 F)
+  - 5 层 CB L2-L5 行为
+  - LP-1/LP-2/LP-5 集成测试 (Feature Flag 默认 disabled)
+
+# 预估
+estimate:
+  lines_added: 1290
+  lines_removed: 0
+  ac_count: 6
+  test_points: 13
+  activities: 3
+  functions: 9
+  duration_estimate: 5_days
+
+# 4-Layer × 3-Phase 闭环 (PR-C 后)
+closure:
+  l1_interface_layer: PR-A (TaskSpec/TaskReport)
+  l2_field_semantic_layer: PR-A (Dissent/Blockage/Resource)
+  l3_defensive_runtime_layer:
+    pr_b: Pessimistic Commit + Rule-based Fallback
+    pr_c: CoW VersionChain + Similarity Check + Hard Evidence
+  l4_governance_layer:
+    pr_a: spec 同步 + race test + LP regression + Migration + Boundary + FeatureFlag + ErrorCode
+    pr_b: Coverage + Layout guard + 灰度
+    pr_c: T05 wire + convergence span + 灰度 1%→100%
+  ac_coverage:
+    pr_a: 6
+    pr_b: 8
+    pr_c: 6
+    total: 20
+    planned: 3  # AC7/19/20 留 follow-up
+    percentage: 87

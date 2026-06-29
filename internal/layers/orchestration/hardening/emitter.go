@@ -387,3 +387,54 @@ func boolToString(b bool) string {
 	}
 	return "false"
 }
+
+// --- DM-20260629-009 PR-C: 3 inner-layer spans (AC13/14/15) ---
+//
+// The 3 PR-C spans cover the new CoW VersionChain (AC13), Similarity Check
+// gate (AC14), and Hard Evidence gate (AC15). All three follow the same
+// package-level bridge pattern (no-op when bridge nil) so calls are safe
+// even when the corresponding feature flag is off.
+
+// EmitHardEvidenceReject wraps verify.GateVerdictPass when the gate rejects
+// a Pass verdict. kind labels the rejected verdict (code/chat/unknown);
+// minimumField identifies which kind-specific minimum failed (coverage /
+// log_excerpt / artifact_hash / coherence / entity_hash) so dashboards
+// can stratify by reason.
+func EmitHardEvidenceReject(ctx context.Context, sessionID, verdictID, kind, minimumField string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "verdict.id", Value: verdictID},
+		{Key: "evidence.kind", Value: kind},
+		{Key: "evidence.minimum_failed", Value: minimumField},
+	}
+	_, span := start(ctx, telemetry.OpD7_S18_Hard_Evidence_Reject, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitWorktreeVersionChainAppend wraps workmodel.VersionChainRegistry.Append
+// (AC13). reason (commit / rollback / replan / init) and hash let the trace
+// reconstruct the chain without re-reading the registry.
+func EmitWorktreeVersionChainAppend(ctx context.Context, sessionID, reason, hash string, contentBytes int) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "versionchain.reason", Value: reason},
+		{Key: "versionchain.hash", Value: hash},
+		{Key: "versionchain.content_bytes", Value: intToString(contentBytes)},
+	}
+	_, span := start(ctx, telemetry.OpD7_S18_Worktree_VersionChain_Append, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitSimilarityCheckIntercept wraps decisionplanning.CheckDecomposeSimilarity
+// when Jaccard > InterceptThreshold (AC14). bucket (intercept / warn / pass)
+// plus score and matched hash give enough to reproduce the decision.
+func EmitSimilarityCheckIntercept(ctx context.Context, sessionID, bucket string, score float64, matchedHash string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "similarity.bucket", Value: bucket},
+		{Key: "similarity.score", Value: floatToString(score)},
+		{Key: "similarity.matched_hash", Value: matchedHash},
+	}
+	_, span := start(ctx, telemetry.OpD7_S18_Similarity_Check_Intercept, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}

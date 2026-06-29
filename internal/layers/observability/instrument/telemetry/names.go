@@ -172,6 +172,15 @@ const (
 
 	// D6 Evolution - Runtime Validation (D6-S4)
 	OpD6_S4_Validation_Decision = "D6_Validation_Decision"
+
+	// --- DM-20260629-009 PR-C: TaskContract S18 spans ---
+	// PR-C introduces 3 inner-layer Span ops for AC13/14/15 (CoW
+	// VersionChain, Similarity Check, Hard Evidence). Names use the
+	// D7_ prefix and live alongside the existing S1-S6 spans; the S18
+	// sub-name encodes the change-id so dashboards can filter.
+	OpD7_S18_Hard_Evidence_Reject         = "D7_Hard_Evidence_Reject"
+	OpD7_S18_Worktree_VersionChain_Append = "D7_Worktree_VersionChain_Append"
+	OpD7_S18_Similarity_Check_Intercept   = "D7_Similarity_Check_Intercept"
 )
 
 // SpanAttrs returns the extra attributes only. Layer/component are intentionally

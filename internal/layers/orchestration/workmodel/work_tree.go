@@ -20,6 +20,11 @@ type WorkTree struct {
 	items             map[string]map[string]*WorkItem // sessionID -> itemID -> WorkItem
 	store             WorkItemStore
 	maxDecomposeDepth int
+
+	// versionChainReg is the optional CoW VersionChain registry (PR-C IV-2/3).
+	// Lazy-initialized by EnsureVersionChainRegistry. Nil when never wired;
+	// callers must guard with EnsureVersionChainRegistry.
+	versionChainReg *VersionChainRegistry
 }
 
 // NewWorkTree creates an in-memory work tree.
@@ -28,6 +33,20 @@ func NewWorkTree() *WorkTree {
 		items:             make(map[string]map[string]*WorkItem),
 		maxDecomposeDepth: DefaultMaxDecomposeDepth,
 	}
+}
+
+// EnsureVersionChainRegistry returns the worktree's VersionChainRegistry,
+// creating one on first access (PR-C AC13: CoW VersionChain embedded).
+//
+// This is a lazily-initialised additive helper. Pre-PR-C callers that never
+// touched the field are unaffected.
+func (t *WorkTree) EnsureVersionChainRegistry() *VersionChainRegistry {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.versionChainReg == nil {
+		t.versionChainReg = NewVersionChainRegistry()
+	}
+	return t.versionChainReg
 }
 
 // SetStore wires optional disk persistence.
