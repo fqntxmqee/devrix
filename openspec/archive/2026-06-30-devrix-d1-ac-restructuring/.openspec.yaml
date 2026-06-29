@@ -1,0 +1,118 @@
+id: devrix-d1-ac-restructuring
+demand_id: DM-20260629-005
+title: "D1 Communication AC 深度架构重构 — 8 子 Change 联动 (orchtypes-bootstrap + god-doc-split + registry-sync + value-flow-rename + gherkin-restructuring + boundary-decision + S7_Archive)"
+status: s7_archived
+priority: P0
+created: 2026-06-29
+archived: 2026-06-30
+author: D1 域整体 AC Deep Review (2026-06-29 AC Design Review — D1 outlier 5.5/10) + 对齐 D7 DM-20260629-001 + D2 DM-20260629-002 + D3 DM-20260629-003 + D4 DM-20260629-004 6 子 Change 模板
+
+domains: [D1]
+
+# T 点（本 DM 范围内实施的 T 点）
+t_points:
+  # PR-1 #0 orchtypes-bootstrap (T01-T03)
+  - D1-S13-A02-T01
+  - D1-S13-A03-T01
+  - D1-S13-A04-T01
+  # PR-2 #1 god-doc-split pt1 (T04-T07)
+  # (metadata only — spec.md 176 → 90 + d1-flow-architecture.md 拆出 80-100 行)
+  # PR-3 #1 god-doc-split pt2 (T08-T11)
+  # (metadata only — observability-guide.md 230 → 100 + t-registry §T-Without-Span Tracker 迁入)
+  # PR-4 #2 registry-sync (T12-T16)
+  - D1-S13-A03-T01
+  - D1-S13-A03-T02
+  - D1-S13-A04-T01
+  - D1-S14-A01-F01-T01
+  - D1-S15-A01-F01-T01
+  - D1-S15-A02-F01-T01
+  - D1-S16-A02-T01
+  - D1-S16-A02-T02
+  - D1-S17-A01-T01
+  - D1-S18-A01-F02-T01
+  - D1-S18-A01-F03-T01
+  - D1-S19-A01-T01
+  - D1-S19-A01-T02
+  - D1-S19-A01-T03
+  - D1-S19-A01-T04
+  - D1-S5-A07-T05
+  - D1-S5-A07-T06
+  - D1-S5-A07-T07
+  - D1-S5-A07-T08
+  - D1-S3-A08-T01
+  # PR-5 #3 value-flow-rename (T17-T20) — 6 D1_* Alias
+  # (metadata only — d1-domain §North Star + a/f-registry §ValueFlow Alias + layer-delta)
+  # PR-6 #4 gherkin-restructuring (T21-T26) — spec.md 24 bullet → 90 Scenario
+  # (metadata only — spec.md §Requirements 6 节 S13-S18 全面展开)
+  # PR-7 #5 boundary-decision (T27-T30) — 3 boundary debt 决策
+  - D1-S13-A03-T01  # orchestration entry 唯一入口
+  - D1-S13-A04-T01  # permission gate 跨域约束
+  - D1-RF-T01       # forbidden orchestration import
+  # PR-8 S7_Archive (T31-T34) — 6 artifacts copy + verify-archive 12/12 PASS
+  # (本 PR)
+
+layers:
+  - D1-S13   # CaptureUserIntent (D1_Capture_User_Intent)
+  - D1-S14   # PresentThinking (D1_Present_Thinking)
+  - D1-S15   # PresentTaskProgress (D1_Present_Task_Progress)
+  - D1-S16   # DeliverConclusion (D1_Deliver_Conclusion)
+  - D1-S17   # ConnectChannel (D1_Connect_Channel)
+  - D1-S18   # GuaranteeDelivery (D1_Guarantee_Delivery)
+  - D1-S19   # Transcript (Legacy, PersistTranscript/ListSessions/SanitizeFilename/ConcurrentAppend)
+  - orchtypes  # NEW 治理包 (PR-1) — boundary_decision.go 3 const + 3 单元测试
+
+pr_count: 8
+pr_list:
+  - id: 318
+    title: "feat(d1): orchtypes/ + god-doc-split pt1+pt2 (DM-20260629-005 PR-1+PR-2+PR-3)"
+    sub_change: "#0+PT1+PT2"
+  - id: 319
+    title: "feat(d1): registry-sync + value-flow-rename (DM-20260629-005 PR-4+PR-5)"
+    sub_change: "#2+#3"
+  - id: <pending>
+    title: "feat(d1): gherkin-restructuring + boundary-decision + S7_Archive (DM-20260629-005 PR-6+PR-7+PR-8)"
+    sub_change: "#4+#5+S7"
+
+related_changes:
+  - devrix-d7-dsaft-restructuring    # DM-20260629-001 6 子 Change 模板 (S7_Archived)
+  - devrix-d2-dsaft-restructuring    # DM-20260629-002 6 子 Change 模板 (S7_Archived)
+  - devrix-d3-dsaft-restructuring    # DM-20260629-003 6 子 Change 模板 (S7_Archived)
+  - devrix-d4-dsaft-restructuring    # DM-20260629-004 6 子 Change 模板 (S7_Archived)
+  - devrix-d1-dsaft-refactor         # DM-20260628-003 D1 DSAFT Refactor 前期 (S7_Archived)
+  - devrix-d1-sa-refine              # DM-20260614-006 切法 A 双轨 (Historical S 沉 archive)
+  - devrix-api-error-classification  # DM-20260628-001 APIErrorCode 7 类 (S7_Archived)
+  - devrix-context-budget-and-isolation  # DM-20260620-001 feishu precheck 4 P0 T (S7_Archived Phase A)
+  - devrix-ac-design-review-2026-06-29   # D1 outlier 5.5/10 立 Change
+
+parent_specs:
+  - openspec/specs/d1-communication/d1-domain.md
+  - openspec/specs/d1-communication/spec.md
+  - openspec/specs/d1-communication/{a,f,t,span}-registry.md
+  - openspec/specs/d1-communication/d7-boundary.md
+  - openspec/specs/d1-communication/layer-delta.md
+  - openspec/specs/d1-communication/observability-guide.md
+  - openspec/specs/d1-communication/terminal-state-guide.md
+  - openspec/specs/architecture/d1-flow-architecture.md  # NEW 拆出 (PR-2)
+  - openspec/archive/2026-06-30-devrix-d1-ac-restructuring/legacy-s1-s12.md  # Historical S1-S12 frozen
+  - openspec/specs/architecture/cross-domain-boundaries.md
+  - docs/methodology/dsaft-methodology.md v4.0.0
+  - docs/methodology/dsaft-refactoring-playbook.md v1.0.0
+
+# Spec 版本同步
+spec_sync:
+  source_version: "d1-domain.md v1.0.0 + spec.md v4.1.1 + t-registry v3.2.0 + a-registry v3.1.0 + f-registry v3.0.0 + layer-delta v2.1.0"
+  target_version: "d1-domain.md v1.2.0 + spec.md v6.1.0 + t-registry v3.5.0 + a-registry v3.2.0 + f-registry v3.1.0 + layer-delta v2.2.0 + d7-boundary.md v1.0.0 (NEW)"
+  sync_date: "2026-06-30"
+  sync_changes:
+    - "d1-domain §North Star: 6 ValueFlow Alias 列填充 (D1_Capture_User_Intent / D1_Present_Thinking / D1_Present_Task_Progress / D1_Deliver_Conclusion / D1_Connect_Channel / D1_Guarantee_Delivery)"
+    - "d1-domain §Boundary Debt Decisions: 新增章节, 3 boundary-debt ID (D1ToD7OrchestrationEntry / D1ToD4PermissionGate / D1ForbiddenOrchestrationImport) 全部 RESOLVED"
+    - "d1-domain §DSAFT 资产: T 56 → 74 (新增 S19 Transcript 4 + S5-A07 feishu precheck 4 + S3-A08 error_code 1 + RF-T01..T09 9 + Legacy 真实归档 26→44)"
+    - "spec.md §Requirements: 24 缩写 bullet → 90 `#### Scenario:` Gherkin 块（happy 30 / sad 24 / boundary 18 / concurrent 9 / timeout 9）"
+    - "spec.md §Cross-Domain Dependencies: 补充 `d7-boundary.md` 链接"
+    - "spec.md god-doc-split: 176 → 90 行 + 拆出 `architecture/d1-flow-architecture.md` (80-100 行 NEW)"
+    - "t-registry v3.5.0: 74 T 行 Span Evidence 列稳定 (raw 18/74=24.3% / effective 18/(74-22)=34.6% informational); §T-Without-Span Tracker 表格化 (5 类别: 注入模式 / 启动期 / 编译期 / 路由边界 / 退役 span)"
+    - "a/f-registry §ValueFlow Alias: 6 D1_* Alias 加入 §Canonical S 章节"
+    - "layer-delta v2.2.0: §Legacy Archive 后加 §ValueFlow Alias 表"
+    - "d7-boundary.md NEW (v1.0.0): 11 sections — 关系摘要 + Boundary Debt Decisions 3 row + 调用链 SoT + 职责矩阵 + 契约接口 + 依赖规则 + Canonical S 对照 + 跨域迁移表 (5 RESOLVED) + 影子编排风险 (5 paths) + Follower 对称性声明 + 治理常量"
+    - "orchtypes 治理包 (PR-1): boundary_decision.go 3 const + boundary_decision_test.go 3 单测 (Exist + VersionFormat + Unique)"
+    - "scripts/d1-span-coverage.sh CI guard (PR-4) ≥80% effective PASS"

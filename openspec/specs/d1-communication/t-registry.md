@@ -1,11 +1,11 @@
 # D1 Communication Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.4.0
+**Version:** 3.5.0
 **Last Updated:** 2026-06-30
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-3 god-doc-split pt2 — §T-Without-Span Tracker 迁入 (v3.3.0) / PR-4 #2 registry-sync — 全 74 T 行加 Span Evidence 列 + §Statistics Span Evidence Coverage (v3.4.0)**
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-3 god-doc-split pt2 — §T-Without-Span Tracker 迁入 (v3.3.0) / PR-4 #2 registry-sync — 全 74 T 行加 Span Evidence 列 + §Statistics Span Evidence Coverage (v3.4.0) / PR-5 #3 value-flow-rename — a/f/t-registry §ValueFlow Alias (D1_Capture_User_Intent 等 6 alias 同步, v3.5.0) / PR-6 #4 gherkin-restructuring — spec.md 24 缩写 bullet → 90 `#### Scenario:` (v3.5.0 informational) / PR-7 #5 boundary-decision — d7-boundary.md NEW (v3.5.0 informational) / PR-8 S7_Archive ACCEPTED — 6 artifacts + verify-archive 12/12 + S7_Archive (v3.5.0 final)**
 
 ---
 
@@ -188,3 +188,13 @@
 | D1-S3-A08-T01 | 编译期 | error_code 文案映射在 `EmitError` 时查表（`APIErrorCode` 7 类闭集），不单独 span，属性挂载 `d1.signal.conclusion` |
 | D1-RF-T02..T09 | 路由/边界 | routeD7 / permission / boundary check 由 `d1.dispatch.route` / `d1.capture.persist` span 内嵌属性覆盖，不单独 span |
 | Legacy T（34 条：D1-S1/S5-Milestone/S3-Commands/S8/S2/S9/S10/S6） | 退役 span | Legacy span 已退役，登记至 `span-registry.md` §Legacy 索引；当前 `d1.*` span op 在 v2.0 实现层覆盖同语义 |
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 3.5.0 | 2026-06-30 | **DM-20260629-005 S7_Archive ACCEPTED** (PR-1 orchtypes-bootstrap + PR-2 god-doc-split pt1 + PR-3 god-doc-split pt2 + PR-4 registry-sync + PR-5 value-flow-rename + PR-6 gherkin-restructuring + PR-7 boundary-decision + PR-8 S7_Archive): (1) §Change line 累计 PR-1~PR-8 + 跨 PR-5/PR-6/PR-7 v3.5.0 informational; (2) 74 T 行 Span Evidence 列稳定 (raw 18/74=24.3% / effective 18/(74-22)=34.6% — Tracker 表格化)；(3) 与 d1-domain v1.2.0 / spec.md v6.1.0 / layer-delta v2.2.0 / a/f-registry v3.2.0/v3.1.0 / d7-boundary.md v1.0.0 同步；(4) `openspec/archive/2026-06-30-devrix-d1-ac-restructuring/` S7_Archived |
+| 3.4.0 | 2026-06-30 | **DM-20260629-005 PR-4 #2 registry-sync**: 全 74 T 行加 Span Evidence 列（18 mapped + 22 explicit `—` + 34 legacy `—`）+ §Statistics Span Evidence Coverage 子节（gated 守门）+ `scripts/d1-span-coverage.sh` CI guard ≥80% PASS + Historical S (D1-S1~S12) 44 T 行归 Legacy 章节 + 沉 `openspec/archive/2026-06-30-devrix-d1-ac-restructuring/legacy-s1-s12.md` |
+| 3.3.0 | 2026-06-30 | **DM-20260629-005 PR-3 god-doc-split pt2**: §T-Without-Span Tracker 从 observability-guide.md §7 迁入（34 + 22 = 56 条原因分类）|
