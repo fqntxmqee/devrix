@@ -1,7 +1,7 @@
 # D4 Multi-Agent Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.3.0
+**Version:** 3.4.0
 **Last Updated:** 2026-06-30
 **Change ID:** devrix-d4-sa-refine / devrix-diagnostic-tools-parity (DM-20260616-003) — Free Fork + Task Notify / devrix-diagnostic-tools-wiring (DM-20260617-002) — Free Fork DI + Notify consume / devrix-tools-terminal-architecture (DM-20260618-007) — FreeFork W8-W10 + BackgroundTaskSurface W13 (D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01) / devrix-context-budget-phase-b (DM-20260620-001-B) — SubAgent mode field on delegate/free_fork tools (D4-S14-A07-T01/T02)
 **Parent:** `openspec/specs/architecture/layering.md`
@@ -10,16 +10,16 @@
 
 ## Canonical 索引（S11–S16）
 
-| Canonical S | Legacy S 来源 | T 数量 |
-|-------------|--------------|--------|
-| D4-S11 ProvisionAgent | S1, S4 | 7 |
-| D4-S12 RunAgentLoop | S2 | 4 |
-| D4-S13 IsolateAndMerge | S3, S9 | 8 |
-| D4-S14 ExecuteWorker | S10（执行面） | 10 |
-| D4-S15 InvokeExternalAgent | S6 | 14 |
-| D4-S16 ConfigureAgents | config | 0（v1.1 补） |
-| D4-S0 Cross | — | 4 |
-| **D7-S2/S4**（Hub-Spoke） | S10（编排面） | 5 |
+| Canonical S | ValueFlow Alias (用户感知) | Legacy S 来源 | T 数量 |
+|-------------|---------------------------|--------------|--------|
+| D4-S11 ProvisionAgent | `D4_Provision_Agent` | S1, S4 | 7 |
+| D4-S12 RunAgentLoop | `D4_Run_Agent_Loop` | S2 | 4 |
+| D4-S13 IsolateAndMerge | `D4_Isolate_Merge` | S3, S9 | 8 |
+| D4-S14 ExecuteWorker | `D4_Execute_Worker` | S10（执行面） | 10 |
+| D4-S15 InvokeExternalAgent | `D4_External_Agent_Tool` | S6 | 14 |
+| D4-S16 ConfigureAgents | `D4_Configure_Agents`（横切） | config | 0（v1.1 补） |
+| D4-S0 Cross | （横切） | — | 4 |
+| **D7-S2/S4**（Hub-Spoke） | （归 D7 ValueFlow） | S10（编排面） | 5 |
 
 > v1.0：**不修改**测试 `// T:` 注释；下表保留 Legacy ID，§Legacy Archive 供追溯。
 
@@ -183,6 +183,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.4.0 | 2026-06-30 | DM-20260629-004 PR-5 #3 value-flow-rename：§Canonical 索引加 ValueFlow Alias 列（5 S + 1 横切 + 1 Cross + 1 Hub-Spoke 共 8 行）；T 编号无变化；§1~§9 表头保持 Legacy ID（// T: 注释不修改）；修订记录 v3.4.0 row |
 | 3.3.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：13 个测试路径对齐 v2.0（tool/→external/, delegate/→execute/, agent/worker_engine→provision/factory） |
 | 3.2.0 | 2026-06-20 | devrix-context-budget-phase-b (DM-20260620-001-B) — `mode` field on delegate/free_fork schemas (D4-S14-A07-T01/T02); total 38→40, P0 19→21 |
 | 3.1.0 | 2026-06-18 | FreeFork W8-W10 + BackgroundTaskSurface W13 + TaskNotify 闭环（D4-S11-A02-T01~T04 + S13-A02-T01 + S12-A03-T01） |

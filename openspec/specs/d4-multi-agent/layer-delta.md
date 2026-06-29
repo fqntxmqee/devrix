@@ -5,6 +5,19 @@
 
 ---
 
+## Canonical S → ValueFlow Alias (DM-20260629-004 PR-5)
+
+| Canonical S | ValueFlow Alias (用户感知) |
+|-------------|---------------------------|
+| D4-S11 ProvisionAgent | `D4_Provision_Agent` |
+| D4-S12 RunAgentLoop | `D4_Run_Agent_Loop` |
+| D4-S13 IsolateAndMerge | `D4_Isolate_Merge` |
+| D4-S14 ExecuteWorker | `D4_Execute_Worker` |
+| D4-S15 InvokeExternalAgent | `D4_External_Agent_Tool` |
+| D4-S16 ConfigureAgents | `D4_Configure_Agents`（横切） |
+
+---
+
 ## Current State Summary
 
 D4 多智能体域已从 V1 基础版本（Agent 状态机 + Fork/Join + Collaboration）演进为完整的 V2 实现能力，新增 Hub-Spoke 委托编排、Agent Tool 子系统、SessionView COW 隔离、WorkerEngine sidechain、Builtin Agents 和可观测性指标。以下记录所有变更：
