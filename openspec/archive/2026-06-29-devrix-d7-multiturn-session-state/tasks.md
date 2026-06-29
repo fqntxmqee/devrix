@@ -1,8 +1,8 @@
 # Tasks: devrix-d7-multiturn-session-state
 
 **Change ID:** devrix-d7-multiturn-session-state
-**Demand ID:** DM-20260628-003
-**Status:** S2_Design
+**Demand ID:** DM-20260628-004
+**Status:** S6_Archived (2026-06-29, PARTIAL — RC-3 hotfix done via PR #271, RC-1/2/4 deferred to v1.1)
 **Created:** 2026-06-28
 
 ---

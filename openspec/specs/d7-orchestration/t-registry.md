@@ -977,3 +977,74 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 **实施计划（v7.0 sprint）：** PR-A (1 周, 6 AC) + PR-B (2 周, 8 AC) + PR-C (1.5 周, 9 AC) = **3 PR / 4.5 周 / 23 AC**。
 
 **归档位置：** `openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/`（demand.md / proposal.md / design.md 648 行 / tasks.md / specs/d7-orchestration/spec.md / acceptance-report.md / .openspec.yaml）
+
+---
+
+## D7-S2-A14~A17: Multi-Turn Session Serialization (DM-20260628-004, PARTIAL)
+
+> **Change:** `devrix-d7-multiturn-session-state` (DM-20260628-004) — D7 多轮 session 串行化与 complete 时机修正  
+> **归档：** `openspec/archive/2026-06-29-devrix-d7-multiturn-session-state/`（S6_Archived **PARTIAL** — RC-3 panic hotfix done via PR #271, RC-1/2/4 设计 4 层契约已就位 deferred to v1.1）  
+> **DM ID 重新分配：** 原 DM-20260628-003 → DM-20260628-004（与 D1 DSAFT Refactor DM-20260628-003 冲突）
+
+### D7-S2-A16: turn 串行化 + panic recovery (PR #271 — IMPLEMENTED)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S2-A16-T01** | emit recover middleware（避免 send-on-closed-channel panic）| **IMPLEMENTED** | `sessionorchestrator/item_pipeline_emit.go` (PR #271 commit 52eeefb3) | Emit |
+| **D7-S2-A16-T02** | exec.Emit overwrite per Run（避免 stale emit hook 串扰）| **IMPLEMENTED** | `sessionorchestrator/item_pipeline_emit.go` (PR #271 commit 52eeefb3) | Emit |
+
+### D7-S2-A14: WaitForTurnCompletion + TurnState (DESIGN DEFERRED v1.1)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S2-A14-T01** | `WaitForTurnCompletion` API（turn N 收尾前 turn N+1 阻塞）| **DESIGN** (v1.1) | design.md §2.1 (TurnState) | — |
+| **D7-S2-A14-T02** | TurnState in-memory + sync.RWMutex（per-SessionOrchestrator）| **DESIGN** (v1.1) | design.md §2.1 (TurnState) | — |
+
+### D7-S2-A15: TranscriptReader + turn 上下文注入 (DESIGN DEFERRED v1.1)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S2-A15-T01** | TranscriptReader for fold-output（filter kind=complete, Body 字段, capture/gateway.go:880）| **DESIGN** (v1.1) | design.md §2.1 (TranscriptReader) | — |
+| **D7-S2-A15-T02** | turn directive auto-injection（<prior-output-summary> 标签注入 WorkItem.Directive）| **DESIGN** (v1.1) | design.md §2.1 (TranscriptReader) | — |
+
+### D7-S2-A17: feishu adapter TurnInProgressError (DESIGN DEFERRED v1.1)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S2-A17-T01** | feishu adapter 识别 `TurnInProgressError` + "⏳ 上一条还在处理中" 文案 | **DESIGN** (v1.1) | design.md §2.3 (feishu adapter) | — |
+
+**A14~A17 Total:** 7 P0 T — 2 IMPLEMENTED (PR #271) + 5 DESIGN (v1.1) | **0 panic** (production smoke sess_1782638991113_5000 post-#271 PASS)
+
+**验收结论（PARTIAL）：** RC-3 panic hotfix done via PR #271；RC-1/2/4 设计 4 层契约（TurnState + TranscriptReader + WaitTurn + feishu adapter）已就位待 v1.1 实施；22/22 orchestration packages -race PASS。
+
+---
+
+## D7-S8/S9/S12-A30+: MUPS 5-node Span 全覆盖 + 目录结构治理 (DM-20260625-019, FULL)
+
+> **Change:** `devrix-d7-mups-v4-5node-coverage-orchestration` (DM-20260625-019) — D7 MUPS 5-node Span 全覆盖 + mups/{execute,learn} 目录结构治理  
+> **归档：** `openspec/archive/2026-06-29-devrix-d7-mups-v4-5node-coverage-orchestration/`（S7_Archived **FULL** — 6 T 100% DONE, PR #235+#236 squash merged 2026-06-26）  
+> **v6.0.x 维护阶段：** Span 注册 + root span + 物理迁移 + 0 函数签名变化
+
+### D7-S8-A30/A31: 5-node Span 注册 + D7_MUPS_Pipeline 根 Span (PR #235)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S8-A30-T01** | 5 节点 Span (TaskGraph/Executor/Channel/Memory/Anomaly) 注册到 coverage registry | **IMPLEMENTED** | `observability/diagnose/coverage/registry_test.go` + `orchestration/sessionorchestrator/spans.go` (PR #235) | Coverage_Registry |
+| **D7-S8-A31-T01** | D7_MUPS_Pipeline 根 Span + 5 节点子 Span (taskgraph.synthesize / executor.select / channel.route / memory.persist / system.anomaly_detect) 端到端串联（Jaeger mupsSpan.parent == orchSpan.SpanContext）| **IMPLEMENTED** | `orchestration/sessionorchestrator/orchestrate_path.go` + `observability/instrument/telemetry/names.go` (PR #235) | MUPS_RootSpan |
+
+### D7-S9-A30: mups/execute/ channel_ 前缀清理 (PR #236)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S9-A30-T01** | mups/execute/ 5 个 channel_ 前缀清理（目录浏览无 channel_ 噪音）| **IMPLEMENTED** | `orchestration/mups/execute/*` (PR #236) | — |
+
+### D7-S12-A30: mups/learn/ 4 subpackage 拆分 (PR #236)
+
+| T ID | 描述 | Status | File | Span Evidence |
+|------|------|--------|------| --- |
+| **D7-S12-A30-T01** | mups/learn/ 拆 4 subpackage: asset/ + memory/ + reputation/ + prior/ | **IMPLEMENTED** | `orchestration/mups/learn/{asset,memory,reputation,prior}/` (PR #236) | — |
+| **D7-S12-A30-T02** | import cycle 打破（DefaultPendingMaxRetries 上提 asset/）| **IMPLEMENTED** | `orchestration/mups/learn/asset/` (PR #236) | — |
+
+**A30+ Total:** 5 P0 T (在 S8/S9/S12 三个 Scenario 跨域) — 5 IMPLEMENTED (PR #235+#236) | **0 函数签名变化** (pure physical migration) | **23 orchestration packages -race PASS 0 FAIL**
+
+**验收结论（FULL）：** Span 注册 + root span + 目录结构治理一次到位；d2-domain v8.5.0 → v9.0.0；spec v4.9.0→v4.10.0；D7 v6.0.x 维护阶段收尾。

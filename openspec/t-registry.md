@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.8.0
-**Last Updated:** 2026-06-28 (api-error-classification IMPLEMENTED, DM-20260628-001)
+**Version:** 5.9.0
+**Last Updated:** 2026-06-29 (mups-5node-coverage-orchestration FULL + multiturn-session-state PARTIAL — DM-20260625-019 + DM-20260628-004)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -29,7 +29,7 @@
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
 | D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 230 | 230 | 0 | 193 |
 
-**总计**: 572 · IMPLEMENTED 567 · PLANNED 3 · PARTIAL 2 · P0 378
+**总计**: 579 · IMPLEMENTED 574 · PLANNED 3 · PARTIAL 2 · P0 385
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -67,6 +67,12 @@
 > 2026-06-28 增量（DM-20260628-001 devrix-api-error-classification PLANNED）：D3 LLM Gateway API 错误分类与可恢复语义 — `sharederrors.APIErrorCode` 7 类闭集枚举（RateLimit/AuthenticationFailed/ServerError/MediaSize/PromptTooLong/ImageSize/Unknown）+ `NewAPIErrorCodeFromStatus` HTTP status 自动映射 + `sharederrors.IsCode` 包装链识别 + 4 adapter（minimax/deepseek/anthropic/openai）HTTP 错误构造统一走 `NewAPIError(status, msg)` 工厂 + `OrchestratorDeps.FallbackModel string` 字段预留 + `TurnState.Withheld bool` 字段 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]` 受控枚举 + 主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志（fallback_model 未 wire 显式标注）+ prompt_too_long 错误标 `withheld=true` 不 surface + feishu/cli IM 适配器基于 error_code 走差异化文案（5 类 code + 兜底 Unknown）。加 **6 新 P0 T** PLANNED：D3-S1-A01-T04 HTTP status 映射覆盖 8 类 (401/403/408/413/429/529/5xx/4xx-unknown) + D3-S1-A01-T05 IsCode 包装链识别 (WithCode→Unwrap→bare APIError) + D3-S3-A01-T17 4 adapter NewAPIError 工厂统一 + D7-S2-A50-T05 OrchestratorDeps.FallbackModel + TurnState.Withheld + emitError code 注入 + D7-S2-A50-T06 2 次连续触发 fallback 日志 + withheld + SanitizeForUser 回归 + D1-S3-A08-T01 feishu/cli 5 类 code 差异化文案（7 sub-test）。Total 565→571, PLANNED 7→13, P0 375→377（IMPLEMENTED 556 持平）。D3 t-registry v3.2.0 → v3.3.0 (P0 20→23) + D7 t-registry v4.8.0 → v4.9.0 (P0 191→193) + D1 t-registry v3.0.0 → v3.1.0。S4 实现后回填 IMPLEMENTED。Out of Scope：完整 streaming fallback 自动切换（放 P0-2）+ prompt_too_long fold 闭环（放 P0-3）+ per-tool maxResultSizeChars（放 P1-4）。
 
 > 2026-06-28 S5 验收（DM-20260628-001 devrix-api-error-classification, PR #265 squash merged）：6 新 P0 T 全部 PLANNED→IMPLEMENTED。T04 (HTTP status 8 类映射) + T05 (IsCode 包装链) + T17 (4 adapter NewAPIError) 在 D3-S1/S3 测试单测全 PASS；T05+T06 (FallbackModel + emitError code 注入 + 2 次连续 fallback 日志) 在 D7 orchestrator 单测 5 case 全 PASS；T01 (feishu/cli 5 类 code 差异化文案 + 兜底) 在 D1 adapter 单测 7 sub-case 全 PASS。Total 571→572, PLANNED 13→3, P0 377→378（IMPLEMENTED 556→567）。D3 t-registry v3.3.0 → v3.3.1 + D7 t-registry v4.9.0 → v4.9.1 + D1 t-registry v3.1.0 → v3.1.1。Out of Scope P0-2/P0-3/P1-4 不变。
+
+> 2026-06-29 S7 归档（DM-20260625-019 devrix-d7-mups-v4-5node-coverage-orchestration, FULL — PR #235+#236 squash merged 2026-06-26）：D7 MUPS 5-node Span 全覆盖 + mups/{execute,learn} 目录结构治理。加 **5 IMPLEMENTED P0 T**：D7-S8-A30-T01 (5 节点 Span 注册 coverage registry) + D7-S8-A31-T01 (D7_MUPS_Pipeline 根 Span 端到端串联) + D7-S9-A30-T01 (mups/execute/ channel_ 前缀清理 5 文件) + D7-S12-A30-T01 (mups/learn/ 拆 4 subpackage) + D7-S12-A30-T02 (import cycle 打破 DefaultPendingMaxRetries 上提 asset/)。0 函数签名变化 (pure physical migration) + 23 orchestration packages -race PASS 0 FAIL。Total 572→577, P0 378→383（IMPLEMENTED 567→572）。D7 t-registry v4.9.1 → v4.10.0。详见 `openspec/archive/2026-06-29-devrix-d7-mups-v4-5node-coverage-orchestration/acceptance-report.md` §2 T 层验证。
+
+> 2026-06-29 S6 归档（DM-20260628-004 devrix-d7-multiturn-session-state, **PARTIAL** — PR #271 squash merged 2026-06-28）：D7 多轮 session 串行化与 complete 时机修正 — RC-3 panic hotfix done via PR #271。加 **2 IMPLEMENTED P0 T**：D7-S2-A16-T01 (emit recover middleware) + D7-S2-A16-T02 (exec.Emit overwrite per Run) — **避免 send-on-closed-channel panic + stale emit hook 串扰**。生产环境 smoke test sess_1782638991113_5000 二轮消息不 panic 验证 PASS。**5 DESIGN T points DEFERRED to v1.1**：D7-S2-A14-T01 WaitForTurnCompletion + D7-S2-A14-T02 TurnState in-memory + D7-S2-A15-T01 TranscriptReader + D7-S2-A15-T02 turn directive auto-injection + D7-S2-A17-T01 feishu TurnInProgressError（设计 4 层契约已就位：TurnState + TranscriptReader + WaitTurn + feishu adapter）。22/22 orchestration packages -race PASS 0 FAIL。Total 577→579, P0 383→385（IMPLEMENTED 572→574, PARTIAL 持平 0, DESIGN +5 待 v1.1）。D7 t-registry v4.10.0 → v4.11.0。详见 `openspec/archive/2026-06-29-devrix-d7-multiturn-session-state/acceptance-report.md` §2 T 层验证。**DM ID 重新分配：** 原 DM-20260628-003 → DM-20260628-004（与 D1 DSAFT Refactor DM-20260628-003 冲突）。
+
+> 2026-06-29 S6 归档（DM-20260626-006 devrix-d7-6s-observe-merge-cancel, **S1_Cancelled**）：D7 6s observe-merge-cancel — observe/orchtypes/ → decisionplanning/ 物理合并 S1_Cancelled: observe/orchtypes/ 目录从未存在, 原 follow-up #5' scope 基于错误假设, 实际 v6.0.0 域升级后子包已全部归位 sessionorchestrator/ + decisionplanning/ + mups/{observe,plan,execute,learn}/ + hardening/。仅 demand.md 在 archive/（CANCELLED precedent: no .openspec.yaml + no acceptance-report.md + no specs/）。0 T 点（无 S2/S3 design phase），不影响 t-registry 计数。
 
 ---
 
