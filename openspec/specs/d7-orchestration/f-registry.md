@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active · **6 S 精简 (v6.0.0 DM-20260626-001)**
-**Version:** 5.0.0
-**Last Updated:** 2026-06-26
+**Version:** 5.1.0
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: 新增 11 个 F: D7-S20/F01-F06 + D7-S21/F01-F03 + D7-S22/F01-F02 PR-A 通讯契约)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 **Domain SoT:** `d7-domain.md`
@@ -325,11 +325,56 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
+## D7-S20-A01 TaskSpec 下行契约 F 层 ✅ (PR-A, DM-20260629-007)
+
+> **物理位置：** `orchestration/interfaces/task_spec.go`。pure types 原则（0 import D7 子包）。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S20-A01-F01** | **NewTaskSpec** | **F-BE** | **session_id, plan, channel, work_item, trace_id** | **TaskSpec** | **✅** | **`orchestration/interfaces/task_spec.go::NewTaskSpec`（fail-fast session_id + TraceID format `ts_<8 hex>`）** |
+| **D7-S20-A01-F02** | **ValidateTaskSpec** | **F-BE** | **TaskSpec** | **error** | **✅** | **`orchestration/interfaces/task_spec.go::Validate`**（happy path + empty session_id + channel unknown + trace_id 格式校验）|
+| **D7-S20-A01-F03** | **WithTaskSpecFields** | **F-BE** | **TaskSpec, Plan/Channel/WorkItem** | **TaskSpec (immutable)** | **✅** | **`orchestration/interfaces/task_spec.go::WithPlan + WithChannel + WithWorkItem`（3 不可变 builder，浅拷贝 `c := *s` 返回新副本）**|
+
+## D7-S20-A02 TaskReport 上行契约 F 层 ✅ (PR-A, DM-20260629-007)
+
+> **物理位置：** `orchestration/interfaces/task_report.go`。pure types 原则。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S20-A02-F01** | **NewTaskReport** | **F-BE** | **session_id, channel, verdict, trace_id** | **TaskReport** | **✅** | **`orchestration/interfaces/task_report.go::NewTaskSpec`（fail-fast session_id + trace_id 格式）** |
+| **D7-S20-A02-F02** | **ValidateTaskReport** | **F-BE** | **TaskReport** | **error** | **✅** | **`orchestration/interfaces/task_report.go::Validate`** |
+| **D7-S20-A02-F03** | **WithTaskReportFields** | **F-BE** | **TaskReport, Verdict/Resource/Blockage** | **TaskReport (immutable)** | **✅** | **`orchestration/interfaces/task_report.go::WithVerdict + WithResource + WithBlockage`（3 不可变 builder）** |
+| **D7-S20-A02-F04** | **AppendDissent** | **F-BE** | **TaskReport, Dissent** | **TaskReport (immutable)** | **✅** | **`orchestration/interfaces/task_report.go::AppendDissent`（top-3 截断 + summary hash 懒计算）**|
+
+## D7-S21-A01/A02/A03 字段语义 F 层 ✅ (PR-A, DM-20260629-007)
+
+> **物理位置：** `orchestration/interfaces/task_report.go` + `task_spec.go` + 内部 helpers。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S21-A01-F01** | **HashDissentSummary** | **F-BE** | **summary string** | **hash 8 hex prefix** | **✅** | **`orchestration/interfaces/task_report.go::hashSummary`（fnv64a → fmt.Sprintf("%08x", h)[:8]）** |
+| **D7-S21-A01-F02** | **TopNTuncateDissent** | **F-BE** | **[]Dissent, n int** | **[]Dissent (≤ n)** | **✅** | **`orchestration/interfaces/task_report.go::AppendDissent` 内嵌（默认 n=3，silent truncate 不警告）** |
+| **D7-S21-A02-F01** | **ClassifyBlockageKind** | **F-BE** | **failure error + Plan context** | **BlockageKind (permission/resource/contract)** | **✅** | **`orchestration/interfaces/task_spec.go::WithBlockage` 内嵌分类器（403/IAM deny → permission；OOM/disk/quota → resource；其他 → contract）** |
+| **D7-S21-A03-F01** | **ExtractResource** | **F-BE** | **ExecutionResult + 上下文 (token accounting + Start/End time + ReAct iter count)** | **Resource (token/time/step)** | **✅** | **`orchestration/interfaces/task_report.go::WithResource` 内嵌抽取器（直接读 execution metadata）** |
+
+## D7-S22 TaskContract PR-B 通讯契约预留位 ✅ (DESIGN ONLY, DM-20260629-006)
+
+> **物理位置：** `orchestration/interfaces/contracts.go`（PLANNED，留给 PR-B Pessimistic Commit / PR-C CoW VersionChain）
+>
+> **PR-A 不实现**，仅登记 F 层接口签名作为契约锚点；PR-B + PR-C 在不破坏 `interfaces` 包 pure types 原则下扩展。
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S22-F01** | **PessimisticCommitGuard** | **F-BE** | **TaskSpec + TaskReport (diff)** | **ok/blocked** | **⬜ PLANNED (PR-B)** | **`orchestration/interfaces/contracts.go::PessimisticCommitGuard`（防 false success commit，先 mark pessimistic state 再 verify）** |
+| **D7-S22-F02** | **CoWVersionChain** | **F-BE** | **TaskSpec vN** | **TaskSpec vN+1 (with prev_version_id)** | **⬜ PLANNED (PR-C)** | **`orchestration/interfaces/contracts.go::CoWVersionChain`（每次 spec 变 → 生成新 version_id，引用前驱用于反向追溯）** |
+
+---
+
 ## Statistics
 
 | Activities with F | Total F Points | Implemented | Planned |
 |-------------------|----------------|-------------|---------|
-| **deprecated 2 + canonical 73 = 75（6 S 精简, v6.0.0 DM-20260626-001）** | **75** | **75** | **0** |
+| **deprecated 2 + canonical 73 + v7.0 TaskContract 11 = 86**（v6.0.0 6 S 精简 + v7.0 PR-A 增量, DM-20260629-007） | **86** | **84** (canonical 73 + TaskContract 11 - 2 PLANNED S22) | **2 (D7-S22 PR-B/C)** |
 
 ---
 
@@ -462,3 +507,4 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | **3.2.0** | **2026-06-22** | **DM-20260622-001 D7 Metrics & Concurrency Hardening**：新增 D7-S6-A14 横切 F 层 4 项（AllowAndRegisterAtomic + MarkWaveDoneRelease + EmitSelectDefault + IncMetricPlural）；D7-S3-A03-F01/F02 legacy 标记 deprecated（hot path 已切 AllowAndRegisterAtomic）。统计 48+7/48+7/0 |
 | **4.0.0** | **2026-06-25** | **MUPS v4.3 5 节点管道 + v5 EscapeEngine F 层补全（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）**：新增 7 段共 27 F 点。D7-S8-A15 6 F（ClassifyObsKind + ScoreObsStrength + DetectAnomaly + QuantizeIntent + BuildUncertaintyCoord + BuildUncertaintyReport）；D7-S9-A25/A26 8 F（BuildArtifact + ResolveArtifactKind + ExtractEvidence + RouteChannelKind + 4 Dispatch）；D7-S10-A32..A35 9 F（ExtractVerdict + AggregateVerdicts + VerifyWithRetry + MapVerdictToExitReason + IsDeterministicReason + ExtractEvidence + ValidateEvidenceCompleteness + DetectSystemAnomaly + ClassifyAnomalySeverity）；D7-S11-A36..A40 14 F（BuildAssetContent + ClassifyLearningClass + AssignAssetTTL + BayesianUpdate + Store/LoadReputationEvidence + BuildAdaptivePrior + DefaultDeveloper/OperatorPrior + 3 MemoryPersist + RunLearner + DispatchToMemoryChannel）；D7-S12-A41..A43 6 F（BuildObserveRequestWithPrior + InjectPriorToIntentQuantizer + 3 Layer fail-safe + E2ECloseLP1RoundTrip）；D7-S13-A47..A49 5 F（ProcessAutoClose + SynthesizeVerdict + ResolveTrackMode + ShouldAutoClose + EmitSessionSpanPrior）；D7-S14-A50..A52 9 F（TriggerEscape + ResolveCircuitLevel + ApplyCircuitBreaker + LiftEscape + 3 Layer resume + RouteResumeDecision + EmitSessionSpanResume）。统计 68+7/68+7/0 |
 | **5.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；F 层按新 S 重归类（F 总数 75 → 68，Legacy 41 + Canonical 27；S 编号变化不增减 F 点）；新增 Status 标注 `6 S 精简 (v6.0.0 DM-20260626-001)`；Statistics 表 Activities with F 加注 v6.0.0。具体 A/F 重映射见 `a-registry.md §v6.0.0 6 S 精简映射`。 |
+| **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 11 个 F**（D7-S20-A01/F01-F03 TaskSpec 下行契约 + D7-S20-A02/F01-F04 TaskReport 上行契约 + D7-S21-A01/F01-F02 Dissent + D7-S21-A02-F01 Blockage 分类 + D7-S21-A03-F01 Resource 抽取）；(2) **新增 D7-S22 TaskContract PR-B 通讯契约预留位**（2 F PLANNED：PessimisticCommitGuard + CoWVersionChain，PR-A 仅登记接口签名不实现）；(3) F 总数 75 → **84 IMPLEMENTED + 2 PLANNED = 86**；(4) 全部 F 物理位置 `orchestration/interfaces/`（pure types 原则 0 import D7 子包）；(5) Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report（**老路径完全不变**，仅可选追加指针） |

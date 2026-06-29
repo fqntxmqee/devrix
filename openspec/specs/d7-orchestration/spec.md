@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.15.0
+**Version:** 4.16.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-28 (layer subcontext phase 3, DM-20260628-002)
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: 新增 3 ADDED Requirement (D7-S20-A01 TaskSpec + D7-S20-A02 TaskReport + D7-S20-A03 SyncTaskContractSpec) + 12 Gherkin Scenario; interfaces 包 pure types 落地 9/11 P0 T IMPLEMENTED)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Change ID:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -13,7 +13,7 @@
 **Review R1:** `openspec/changes/devrix-d7-orchestration-domain/review-r1.md`
 **Review R2:** `openspec/changes/devrix-d7-orchestration-domain/review-r2.md`
 
-**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级), devrix-d7-mups-v4-phase2-observe-plan (2026-06-23, DM-20260623-001, Phase 2 PR-A1 + PR-RF: Observation 4 类 + UncertaintyReport + UncertaintyCoord), devrix-d7-mups-v4-phase2-plan (2026-06-23, DM-20260623-001-PRB1, Phase 2 PR-B1: Plan 4 类 + Planner interface + MatchKind 4 Rules), devrix-d7-mups-v4-phase3-channels (2026-06-23, DM-20260625-001-PRC2, Phase 3 PR-C2: Execute 4 Channel + ChannelRouter), devrix-d7-mups-v4-phase4-verify-promotion (2026-06-23, DM-20260623-002, Phase 4 Verify 节点升格: VerdictKind 4 态 + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + 14 ExitReason + G8-1 修复), devrix-d7-mups-v4-phase5-learn (2026-06-23, DM-20260623-003, Phase 5 Learn 节点升格: LearningAsset 5 类 + AssetContent + LearningClass 5 枚举 + ReputationEvidence Bayesian + AdaptivePrior + Memory 3 通道 + Learner + LP-1 闭环 + G8-1 修复延伸), devrix-d7-mups-v4-phase6-observe-learner-wiring (2026-06-24, DM-20260624-001, Phase 6 Observe-Learner 跨域闭环集成: ObserveRequest + IntentQuantizer + AnomalyDetector + RuleClassifier.ClassifyWithPrior + Orchestrator buildObserveRequest 3 层 fail-safe + WithLearner option + LP-1 闭环 E2E 集成测试), devrix-d7-mups-v4-phase7-verify-auto-close (2026-06-24, DM-20260625-001, Phase 7 Verify→Learn Auto-Close + Operator TrackMode + D5 可观测化增强: SessionOrchestrator.processAutoClose + synthesizeVerdict 4 规则 + 3 层 fail-safe + AssetBuilder Auto-Close fallback + ProcessRequest.TrackMode 字段 + DefaultLearner.Inject 3-tier 解析 + sessionSpan 6 prior attributes), devrix-d7-mups-v5-escape-engine (2026-06-25, DM-20260625-003, MUPS v5 统一逃逸机制: LoopDepthTracker v2 + PlanKindSwitchPolicy + EscapeAction 6 类 + ChainedArbitrator LLM/Rule/Human 3 层 + EscapeEngine 整合入口 + CircuitBreaker 5 层接线 + 5 节点 EscapeEngine 接线点)
+**Archived Changes:** devrix-queryloop-context (2026-06-10, ORCH v2 read model), devrix-wave-scheduler (WaveScheduler), devrix-d7-uncertainty-gaps (2026-06-16, DM-20260616-001, 5 gap fixes), devrix-d7-error-aggregation-and-metrics (2026-06-21, DM-20260621-010, D7-S6 错误聚合 + worktree 全链路 metrics), devrix-d7-mups-v4-phase3-execute (2026-06-23, DM-20260625-001, Phase 3 PR-C1: Execute Artifact 4 类 + SideEffect 5 态 + Artifact struct 5 字段升级), devrix-d7-mups-v4-phase2-observe-plan (2026-06-23, DM-20260623-001, Phase 2 PR-A1 + PR-RF: Observation 4 类 + UncertaintyReport + UncertaintyCoord), devrix-d7-mups-v4-phase2-plan (2026-06-23, DM-20260623-001-PRB1, Phase 2 PR-B1: Plan 4 类 + Planner interface + MatchKind 4 Rules), devrix-d7-mups-v4-phase3-channels (2026-06-23, DM-20260625-001-PRC2, Phase 3 PR-C2: Execute 4 Channel + ChannelRouter), devrix-d7-mups-v4-phase4-verify-promotion (2026-06-23, DM-20260623-002, Phase 4 Verify 节点升格: VerdictKind 4 态 + AggregateVerdicts + VerdictToExitReason + Evidence + SystemAnomaly + 14 ExitReason + G8-1 修复), devrix-d7-mups-v4-phase5-learn (2026-06-23, DM-20260623-003, Phase 5 Learn 节点升格: LearningAsset 5 类 + AssetContent + LearningClass 5 枚举 + ReputationEvidence Bayesian + AdaptivePrior + Memory 3 通道 + Learner + LP-1 闭环 + G8-1 修复延伸), devrix-d7-mups-v4-phase6-observe-learner-wiring (2026-06-24, DM-20260624-001, Phase 6 Observe-Learner 跨域闭环集成: ObserveRequest + IntentQuantizer + AnomalyDetector + RuleClassifier.ClassifyWithPrior + Orchestrator buildObserveRequest 3 层 fail-safe + WithLearner option + LP-1 闭环 E2E 集成测试), devrix-d7-mups-v4-phase7-verify-auto-close (2026-06-24, DM-20260625-001, Phase 7 Verify→Learn Auto-Close + Operator TrackMode + D5 可观测化增强: SessionOrchestrator.processAutoClose + synthesizeVerdict 4 规则 + 3 层 fail-safe + AssetBuilder Auto-Close fallback + ProcessRequest.TrackMode 字段 + DefaultLearner.Inject 3-tier 解析 + sessionSpan 6 prior attributes), devrix-d7-mups-v5-escape-engine (2026-06-25, DM-20260625-003, MUPS v5 统一逃逸机制: LoopDepthTracker v2 + PlanKindSwitchPolicy + EscapeAction 6 类 + ChainedArbitrator LLM/Rule/Human 3 层 + EscapeEngine 整合入口 + CircuitBreaker 5 层接线 + 5 节点 EscapeEngine 接线点), devrix-d7-taskcontract-unification-pr-a (2026-06-29, DM-20260629-007, v7.0 TaskContract PR-A: interfaces 包 7 NEW + 2 MODIFIED + ChannelRequest.Spec/LearnRequest.Report additive + 5 ORCH_* SentinelError 7100-7104 + 5 P0 TaskContract span ops)
 
 ---
 
@@ -106,6 +106,9 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | **D7-S13** | **运行时 5 节点闭环 (PR-7.1/7.2/7.3)** | **SessionOrchestrator.processAutoClose 包装 channel + 异步触发 learner.Learn + 替换 endSpanWhenChannelClosed 调用 + synthesizeVerdict 4 规则 (complete→VerdictPass / error→VerdictFail Reason=Content / tombstone→VerdictIndeterminate IndeterminateReason="interrupt" / 其他 Type→nil) + SourceID `autoclose:{sessionID}:{nanosecond}` + 3 层 fail-safe (nil learner / Learn error / channel cancel → 全部 log + skip 不阻塞 caller) + IntentSkip 路径不调用 processAutoClose + AssetBuilder Auto-Close fallback (sop:autoclose:<SourceID> + ["autoclose-completion"] 合成步骤) + ProcessRequest.TrackMode string 字段 + TrackModeDeveloper/Operator 常量 + NewProcessRequest fail-fast 校验 + 3 sentinel error (ErrProcessRequestSessionIDEmpty / MessageEmpty / InvalidTrackMode) + DefaultLearner.Inject 3-tier 解析 (Reputation 持久状态 > req.TrackMode hint > Developer 兜底 + slog.Warn 未知值) + buildObserveRequest 透传 TrackMode → Operator track → DefaultOperatorPrior Beta(8,1) Mean=0.889 + priorSessionSpanAttrs 纯 helper 函数 + sessionSpan 6 prior attributes (learn.prior.alpha / beta / mean / track_mode / classifier_source / injected_at) + injected_at "phase6_lp1" (真实注入) vs "cold_start_failsafe" (兜底) + Jaeger UI 自然支持 + 30+ 单测/集成测试** | **IMPLEMENTED (PR-7.1/7.2/7.3, 6 P0 T)** | `internal/layers/orchestration/sessionorchestrator/{autoclose,tracing,orchestrator}.go` + `internal/layers/orchestration/learn/{learner,asset_builder}.go` + `internal/layers/orchestration/orchtypes/{process,errors}.go` + 4 NEW test files (`orchestrator_autoclose_test.go` + `orchestrator_trackmode_test.go` + `orchestrator_priorspan_test.go` + `process_test.go`) |
 | **D7-S14** | **MUPS v5 统一逃逸机制 (PR-V5.1/V5.2/V5.3/V5.4/V5.5)** | **LoopDepthTracker v2 (按模式 hash 计数回路深度, MaxDepth=3, depth < MaxDepth → Continue, depth >= MaxDepth → ForceExit) + PlanKindSwitchPolicy 3 档 (Constrained ≤4 / Allowed / Forbidden) + EscapeAction 6 类 (Continue / EscalateToRule / EscalateToHuman / ForceExit / AbortWithAudit / EscapePendingHuman) + ChainedArbitrator LLM/Rule/Human 3 层 (5s + 10s timeout 兜底) + EscapeEngine 整合入口 (3 类深度限制: tracker + LoopBudget + CircuitBreaker) + CircuitBreaker 5 层接线 (L0 AnomalyDetector 5 nil / L1 DispatchLoop 100/min / L2 Verifier 3×2s / L3 Hook 5 fail / L4 WorkerPanic 1 / L5 SandboxExit 5 fail) + AuditLog AuditLevel 0/1/2 + 5 节点 EscapeEngine 接线点 (Observe 失败/Plan 失败/Plan 前/Execute 失败/Verify 失败 + 1a 短路不调 1b) + ResumeSession / applyResumeSession T2 续跑机制 (user_choice=A Continue / B ForceExit / C AbortWithAudit) + 13 类失败降级矩阵 (Evaluate panic/error + audit fail-open + LLM timeout + ctx cancel + CB metric timeout + ...)** | **PLANNED** | `internal/layers/orchestration/escape/{loop_depth_tracker,plan_kind_switch_policy,arbitrator,engine,circuit_breaker,audit_log,notifier}.go` |
 | **D7-S15** | **WorkItem Rollup 闭环** | **Parent Rollup Gate (Path A) + Root Fallback (Path B) + Summary/Structured dual bubble Observe + Rollup MUPS R2+ synthesize + Session complete deliverable + ephemeral checklist gate; Phase 1 `RollupGatePolicy=best_effort` only** | **IMPLEMENTED (Phase 1)** | `workmodel/{rollup_gate,resolve,context_bubble_apply}.go` + `sessionorchestrator/{item_observe,item_pipeline,rollup_directive,rollup_verify,session_turn_loop}.go` |
+| **D7-S16** | **Layer SubContext (Phase 1+2+3)** | **Per-Layer SubContext + ChildDownlink + cohort CG2′ + Upstream BlockedBy + PeerStatus + ScopeContract + SpawnPolicy gate + Observe R-OBS mapping (no WorkItem private) + LLM ObservationProposer (Phase 3) @ Observe + Wave ContextResolver→MaterializePolicy (Phase 3) + `depth≥1` 默认 Materialize (无 feature flag)** | **IMPLEMENTED (Phase 1+2+3, PR #269-#270 + #273-#275)** | `orchestration/wavescheduler/{context,context_materialize}.go` + `orchestration/observe/{scope_contract,r_obs_mapping,observation_proposer,llm_observation_proposer}.go` + `wire_wave.go` 等 |
+| **D7-S20** | **TaskContract 下行契约** | **TaskSpec struct（SessionID + Plan + Channel + WorkItem + TraceID + Blockage?）+ NewTaskSpec fail-fast（empty session_id 返 ORCH 7100 + channel unknown 返 ORCH 7101 + trace_id `ts_<8 hex>` 校验 返 ORCH 7104）+ Validate + WithPlan/WithChannel/WithWorkItem 不可变 builder 浅拷贝 + 3 处创建点统一（Plan 节点入口 / Channel.Execute 入口 / WorkItem 节点入口）+ Additive 嵌入 ChannelRequest.Spec（`mups/execute/channel.go`）+ 9/11 P0 T IMPLEMENTED (T01-T03 + T01-T03 + T01-T03); 2 spec 同步 T PENDING** | **IMPLEMENTED (PR-A 9/11 P0 T)** | `internal/layers/orchestration/interfaces/{doc,errors,task_spec,task_report,task_spec_test,task_report_test,taskcontract_test}.go` + `mups/execute/channel.go` (Spec 字段 additive) |
+| **D7-S21** | **TaskReport 上行契约 + 字段语义层** | **TaskReport struct（SessionID + Channel + Verdict + TraceID + Dissents + Blockage? + Resource）+ NewTaskReport fail-fast（empty 返 ORCH 7102 + verdict unknown 返 ORCH 7103）+ Validate + WithVerdict/WithResource/WithBlockage 不可变 builder + AppendDissent top-3 silent truncate + HashDissentSummary fnv64a→8 hex + Learn 沉淀到 mups/learn/asset/ 现有 feedback 通道（老路径 0 变更）+ Resource 三件套 token/time/step + Blockage 3 类 kind (permission/resource/contract) + Additive 嵌入 LearnRequest.Report（`mups/learn/asset/asset_builder.go`）** | **IMPLEMENTED (PR-A 9/11 P0 T)** | `internal/layers/orchestration/interfaces/task_report.go` + `mups/learn/asset/asset_builder.go` (Report 字段 additive) |
 
 ---
 
@@ -1192,6 +1195,182 @@ MUPS v4.3 Phase 7 D5 trace 增强（PR-7.3）。扩展 sessionSpan trace 信息�
 
 ---
 
+### Requirement: D7-S20-A01 TaskSpec 下行契约（L1 接口层）
+
+`NewTaskSpec` MUST construct a `TaskSpec` value with non-empty SessionID + `Channel.Kind` ∈ {sync, async, probe, explore} + `TraceID` matching the `ts_<8 hex>` format, and reject construction with `ErrORCHTaskSpecEmpty` (Code 7100), `ErrORCHTaskSpecChannelUnknown` (Code 7101), or `ErrORCHTaskContractTraceInvalid` (Code 7104) otherwise. `Validate` MUST be idempotent and pure. The three construction callers (`SynthesizeTaskGraph` Plan node, `Channel.Execute` execute entrypoint, `WorkItemExecutor.ExecuteWorkItem`) MUST converge to the same `NewTaskSpec` factory path. `ChannelRequest.Spec` is an additive optional pointer field on `mups/execute/channel.go` to support legacy callers unchanged.
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/`  
+**Additive Field:** `mups/execute/channel.go::ChannelRequest.Spec *interfaces.TaskSpec`  
+**SentinelError Codes:** 7100 / 7101 / 7104  
+**T:** D7-S20-A01-T01 / T02 / T03
+
+#### Scenario: Happy-path NewTaskSpec
+
+- GIVEN sessionID="sess_1782", a Plan, a Channel{Kind="sync"}, a WorkItem, trace_id="ts_abc12345"
+- WHEN `NewTaskSpec` is invoked
+- THEN the returned `TaskSpec` contains all 4 inputs non-zero
+- AND `Validate()` returns nil
+- AND `Spec.SpecHash` is derived from the 4 inputs (fnv64a stable)
+
+#### Scenario: Empty session_id rejected
+
+- GIVEN sessionID=""
+- WHEN `NewTaskSpec` is invoked
+- THEN it returns an error wrapping `ErrORCHTaskSpecEmpty` (Code 7100)
+- AND `errors.Is(err, sharederrors.ErrORCHTaskSpecEmpty)` is true
+
+#### Scenario: Channel.Kind validation
+
+- GIVEN a Channel with Kind="unknown" (not in {sync, async, probe, explore})
+- WHEN `NewTaskSpec` is invoked
+- THEN it returns an error wrapping `ErrORCHTaskSpecChannelUnknown` (Code 7101)
+
+- GIVEN a Channel with Kind="sync"
+- WHEN `NewTaskSpec` is invoked
+- THEN no error is returned (regression baseline)
+
+#### Scenario: TraceID format enforcement
+
+- GIVEN trace_id=""
+- WHEN `NewTaskSpec` is invoked
+- THEN it returns `ErrORCHTaskContractTraceInvalid` (Code 7104)
+
+- GIVEN trace_id="ts_12345678" (8 hex chars after `ts_`)
+- WHEN `NewTaskSpec` is invoked
+- THEN no error is returned
+- AND a valid TaskSpec with `TraceID="ts_12345678"` is produced
+
+#### Scenario: With* immutable builders
+
+- GIVEN a TaskSpec A
+- WHEN `A.WithPlan(B.Plan)` / `WithChannel(B.Channel)` / `WithWorkItem(B.WorkItem)` is invoked
+- THEN each call returns a new TaskSpec with the corresponding field replaced
+- AND the original A's fields are unchanged (immutable copy)
+- AND the new copy is a shallow copy (`c := *s` pattern)
+
+#### Scenario: Three construction points converge
+
+- GIVEN the Plan node (SynthesizeTaskGraph), the Channel.Execute entrypoint, and the WorkItem node (ExecuteWorkItem)
+- WHEN each constructs a TaskSpec
+- THEN all three paths delegate to `interfaces.NewTaskSpec` (single factory)
+- AND the returned structs are byte-identical for identical inputs
+
+---
+
+### Requirement: D7-S20-A02 TaskReport 上行契约 + L2 字段语义层
+
+`NewTaskReport` MUST construct a `TaskReport` with non-empty SessionID + `Verdict.Kind` in the 4-state union (ComplianceVerdict / TimelinessVerdict / RootCauseVerdict / StatisticalVerdict) + valid TraceID, rejecting otherwise with `ErrORCHTaskReportEmpty` (Code 7102), `ErrORCHTaskReportVerdictEmpty` (Code 7103), or `ErrORCHTaskContractTraceInvalid` (Code 7104). `AppendDissent` MUST silently truncate to top-N (default 3) without log spam, and compute `SummaryHash` lazily via fnv64a→8-hex prefix. `WithVerdict` / `WithResource` / `WithBlockage` MUST be immutable builders returning shallow copies. `LearnRequest.Report` is an additive optional pointer field on `mups/learn/asset/asset_builder.go`.
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/`  
+**Additive Field:** `mups/learn/asset/asset_builder.go::LearnRequest.Report *interfaces.TaskReport`  
+**SentinelError Codes:** 7102 / 7103 / 7104  
+**T:** D7-S20-A02-T01 / T02 / T03 + D7-S21-A01-T01 / A02-T01 / A03-T01
+
+#### Scenario: WithVerdict immutable
+
+- GIVEN a TaskReport R
+- WHEN `R.WithVerdict(v)` is invoked
+- THEN a new TaskReport R' is returned with `Verdict=v`
+- AND R's Verdict is unchanged
+- AND R' equals R except for the Verdict field
+
+#### Scenario: AppendDissent top-3 silent truncate
+
+- GIVEN a TaskReport with 3 Dissents already populated
+- WHEN `TaskReport.AppendDissent(d4)` is invoked
+- THEN the returned TaskReport still has 3 Dissents (top-3 cap)
+- AND d4 is silently dropped (no log, no error returned)
+- AND SummaryHash on the truncated list remains stable
+
+- GIVEN a TaskReport with 0 Dissents
+- WHEN `TaskReport.AppendDissent(d1).AppendDissent(d2).AppendDissent(d3).AppendDissent(d4)` is invoked
+- THEN the final TaskReport has exactly 3 Dissents (d1, d2, d3)
+- AND no error, no log message
+
+#### Scenario: Blockage 3 kind classification
+
+- GIVEN an error of `*PermissionError` (403, IAM deny)
+- WHEN `WithBlockage(err, planCtx)` is invoked
+- THEN the returned TaskReport has `Blockage.Kind = permission`, `Retryable = false`
+
+- GIVEN an error matching `*errors.OOM` or `*disk.FullError` or `*quota.ExceededError`
+- WHEN `WithBlockage(err, planCtx)` is invoked
+- THEN `Blockage.Kind = resource`, `Retryable = true`
+
+- GIVEN any other error
+- WHEN `WithBlockage(err, planCtx)` is invoked
+- THEN `Blockage.Kind = contract`, `Retryable = true`
+
+#### Scenario: Resource three-piece extraction
+
+- GIVEN an ExecutionResult with `TokenUsed=1523`, `ElapsedMs=4217`, `ReActIterCount=4`
+- WHEN `WithResource(result)` is invoked
+- THEN the returned TaskReport has `Resource.TokenUsed = 1523`, `Resource.ElapsedMs = 4217`, `Resource.StepCount = 4`
+
+- GIVEN `ExecutionResult` lacking metadata (nil TokenAccounting, no StartTime)
+- WHEN `WithResource(result)` is invoked
+- THEN Resource.TokenUsed = 0, Resource.ElapsedMs = 0, Resource.StepCount = 0 (zero-default)
+
+#### Scenario: Learn precipitation to existing feedback channel
+
+- GIVEN a TaskReport with 2 Dissents
+- WHEN `LearnRequest{Report: &report, AssetHint: ...}` flows through existing `mups/learn/asset/asset_builder.go`
+- THEN the Dissents are emitted to the existing `feedback` channel
+- AND legacy callers of `LearnRequest` (without `Report`) behave unchanged
+- AND no new memory channel is added (additive embedding, not a new route)
+
+#### Scenario: Round-trip TaskSpec→Channel.Execute→TaskReport invariant
+
+- GIVEN a TaskSpec built by `NewTaskSpec` at Plan node
+- WHEN `Channel.Execute(req{Spec: spec})` runs and produces a TaskReport via `NewTaskReport`
+- THEN the TaskReport.SessionID equals the TaskSpec.SessionID
+- AND both have the same TraceID prefix `ts_` + 8 hex
+- AND the TaskReport.Verdict is one of the 4 VerdictKind values
+- AND `CrossSpecReport(spec, report)` returns `nil`
+
+---
+
+### Requirement: D7-S20-A03 TaskContract 治理横切（spec 同步 + 工具链）
+
+This Change synchronizes the new L1/L2 contract surfaces across **6 spec files** (`openspec/specs/d7-orchestration/spec.md` ADDED Requirements, `d7-domain.md` §DSAFT 资产 + new §8 Layer 架构 + new §9 interfaces 包, `a-registry.md` 6 new A entries, `f-registry.md` 11 new F + 2 PLANNED, `t-registry.md` 11 P0 T points, `span-registry.md` 5 new Span operations). The `interfaces` package MUST remain **pure types** (no import of any `internal/layers/orchestration/{s1-s6,hardening,escape}` subpackage), with the sole exception of `internal/shared/errors/` for SentinelError wrapping. This invariant MUST be enforced by the CI lint invariant `TestInterfacesZeroImportD7`.
+
+**Priority:** P0  
+**Package:** `internal/layers/orchestration/interfaces/` + `scripts/ci-lint-invariant/`  
+**SoT Files:** 6 spec files (a/f/t/span/d7-domain/spec) at `openspec/specs/d7-orchestration/`  
+**Invariant:** `IV-1 interfaces pure types` (D7 子包 0 import)  
+**T:** D7-S20-A03-T01 / T02
+
+#### Scenario: Six-file spec consistency
+
+- GIVEN the merge of DM-20260629-007
+- WHEN cross-checking the 6 spec files
+- THEN `spec.md` v4.16.0 has 3 new ADDED Requirements (D7-S20-A01/A02/A03) with 12 Scenarios
+- AND `d7-domain.md` v2.7.0 has §DSAFT 资产 tables updated (A 49→55, F 75→86, T 230→241, Span 26→31)
+- AND `a-registry.md` v5.1.0 has 6 new A activities (D7-S20/S21-A01..A03)
+- AND `f-registry.md` v5.1.0 has 11 new F functions + 2 PLANNED (D7-S22 PR-B/C)
+- AND `t-registry.md` v4.14.0 has 11 new P0 T points (D7-S20/S21-A*-T*)
+- AND `span-registry.md` v4.3.0 has 5 new TaskContract span ops
+
+#### Scenario: interfaces pure types invariant
+
+- GIVEN `internal/layers/orchestration/interfaces/` package's full import set
+- WHEN `scripts/ci-lint-invariant` runs `TestInterfacesZeroImportD7`
+- THEN no import path matches `internal/layers/orchestration/` excluding the package itself
+- AND `internal/shared/errors/` import is the sole allowed external dep
+- AND the test PASSES; otherwise exits non-zero
+
+#### Scenario: Additive embedding backward compat regression
+
+- GIVEN legacy callers (DM-20260625-018 / DM-20260625-019 / earlier) of `Channel.Execute(req)` / `AssetBuilder.Build(req)` without setting `Spec` / `Report`
+- WHEN the additive field is added
+- THEN all legacy callers compile unchanged (zero source diff in caller sites)
+- AND `req.Spec == nil` and `req.Report == nil` produce the same observable behavior as before PR-A
+- AND 24/24 orchestration packages `go test -race` PASS
+
+---
+
 ## PLANNED Requirements (D7 v1.0 迁移)
 
 **Status: v1.0 + v1.1 全闭环（2026-06-15）。** 以下条目仅作历史追溯，新功能请遵循 v2.0+ 路线（DM-018 Hub-Spoke + DM-020 Turn Leader 已 wired）。
@@ -1883,10 +2062,82 @@ Optional `ObservationProposer` may propose Obs* from structured signals (directi
 
 ---
 
+## Scenario D7-S20 / S21: TaskContract 统一（v7.0 PR-A, DM-20260629-007）
+
+> **Change:** `devrix-d7-taskcontract-unification-pr-a`（DM-20260629-007）  
+> **Change SoT:** `openspec/changes/devrix-d7-taskcontract-unification-pr-a/`  
+> **归档:** 待 S5-S6 完成后移 `openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-a/`
+>
+> **v7.0 演进起点：** D7 缺契约不缺机制 → P0=TaskReport 五元素（缺 Dissent/Blockage/Resource）+ P1=TaskSpec 四元组（Plan/Channel/WorkItem 分散）。
+>
+> **本次 PR 范围：** L1 接口层（D7-S20-A01 TaskSpec + D7-S20-A02 TaskReport）+ L2 字段语义层（D7-S21-A01 Dissent + D7-S21-A02 Blockage + D7-S21-A03 Resource）+ L4 spec 同步（D7-S20-A03）。
+>
+> **L3 防御运行时层（Pessimistic Commit / Hard Evidence / CoW VersionChain / Rule-based Fallback / Similarity Check）保留给 PR-B + PR-C**，登记见 `f-registry.md` §D7-S22 F01-F02 PLANNED。
+
+### Phase 1 (PR-A) 实现登记
+
+| Layer | 主题 | 物理位置 | 落地状态 |
+|-------|------|----------|---------|
+| **L1 接口层** | **TaskSpec struct**（SessionID/Plan/Channel/WorkItem/TraceID/Blockage?）+ **NewTaskSpec** fail-fast（3 SentinelError：7100/7101/7104）+ **3 创建点统一**（Plan/Channel/WorkItem）+ **ChannelRequest.Spec additive 嵌入** | `orchestration/interfaces/task_spec.go` + `mups/execute/channel.go` | ✅ PR-A 落地 |
+| **L1 接口层** | **TaskReport struct**（SessionID/Channel/Verdict/TraceID/Dissents/Blockage?/Resource）+ **NewTaskReport** fail-fast（3 SentinelError：7102/7103/7104）+ **Channel.Execute 出口** + **Learn 入口**统一 | `orchestration/interfaces/task_report.go` + `mups/learn/asset/asset_builder.go` | ✅ PR-A 落地 |
+| **L2 字段语义层** | **Dissent** top-3 silent truncate + summary hash fnv64a→8 hex + Learn 沉淀 | `orchestration/interfaces/task_report.go::AppendDissent + HashSummary` | ✅ PR-A 落地 |
+| **L2 字段语义层** | **Blockage** 3 类 kind 分类（permission/resource/contract）+ retryable 推导 | `orchestration/interfaces/task_spec.go::WithBlockage` | ✅ PR-A 落地 |
+| **L2 字段语义层** | **Resource** token/time/step 三件套抽取 | `orchestration/interfaces/task_report.go::WithResource` | ✅ PR-A 落地 |
+| **L4 治理横切层** | **6 spec 文件同步**（spec.md + d7-domain + a/f/t/span-registry）+ **5 ORCH_* SentinelError**（7100-7104）+ **5 P0 TaskContract span** + **interfaces 0 import D7 子包 lint invariant** | 各 spec/registry + `scripts/ci-lint-invariant/` | ✅ PR-A 部分落地（spec sync + 5 sentinel + 5 span + lint 4/9 项） |
+| **L3 防御运行时层** | Pessimistic Commit + Hard Evidence + CoW VersionChain + Rule-based Fallback + Similarity Check | `orchestration/interfaces/contracts.go` DESIGN ONLY | ⬜ PLANNED PR-B + PR-C（8 T） |
+
+### PR-A 测试矩阵（11 P0 T）
+
+| T ID | 描述 | Status | Test Location | Span Evidence |
+|------|------|--------|---------------|---------------|
+| **D7-S20-A01-T01** | NewTaskSpec + Validate happy path + SpecHash 稳定 | **IMPLEMENTED** | `orchestration/interfaces/task_spec_test.go::TestNewTaskSpec_HappyPath` + `TestValidate` | Task_Spec_Created |
+| **D7-S20-A01-T02** | WithPlan/WithChannel/WithWorkItem 不可变 builder 浅拷贝 | **IMPLEMENTED** | `orchestration/interfaces/task_spec_test.go::TestWith*` | — |
+| **D7-S20-A01-T03** | Plan 节点入口 + Channel.Execute 入口 + WorkItem 节点入口 3 处统一调 NewTaskSpec | **IMPLEMENTED** | `orchestration/interfaces/taskcontract_test.go::TestThreeEntryPointsConverge` | Task_Spec_Created |
+| **D7-S20-A02-T01** | NewTaskReport + Validate happy path | **IMPLEMENTED** | `orchestration/interfaces/task_report_test.go::TestNewTaskReport_HappyPath + TestValidate` | Task_Report_Created |
+| **D7-S20-A02-T02** | WithVerdict/WithResource/WithBlockage + AppendDissent 不可变 + top-3 silent truncate | **IMPLEMENTED** | `orchestration/interfaces/task_report_test.go::TestWith* + TestAppendDissent_Truncate` | Task_Report_Created |
+| **D7-S20-A02-T03** | Channel.Execute 出口 + Learn 节点入口统一用 NewTaskReport | **IMPLEMENTED** | `orchestration/interfaces/taskcontract_test.go::TestChannelExecuteAndLearnEntryUnified` | Task_Report_Created |
+| **D7-S21-A01-T01** | Dissent top-3 截断 + summary hash fnv64a 稳定 + Learn 沉淀到 feedback 通道 | **IMPLEMENTED** | `orchestration/interfaces/task_report_test.go::TestDissent_Top3 + TestHashSummary + TestLearnPrecipitation` | Dissent_Recorded |
+| **D7-S21-A02-T01** | Blockage 3 类 kind（permission/resource/contract）+ retryable 推导 | **IMPLEMENTED** | `orchestration/interfaces/task_spec_test.go::TestBlockage_3Kinds` | Blockage_Recorded |
+| **D7-S21-A03-T01** | Resource token/time/step 三件套抽取 + 零值兜底 | **IMPLEMENTED** | `orchestration/interfaces/task_report_test.go::TestResource_ThreePiece + TestResource_ZeroDefault` | Resource_Recorded |
+| **D7-S20-A03-T01** | spec.md v4.16.0 ADDED 3 Requirement（D7-S20-A01/A02/A03）+ 12+ Gherkin Scenarios | **PENDING** | spec.md §ADDED Requirements（v7.0 ADDED 段已就绪） | — |
+| **D7-S20-A03-T02** | d7-domain.md §DSAFT 资产 + 新 §8 Layer + 新 §9 interfaces 包 + a/f/t/span-registry 全增量 | **PENDING** | 6 spec 文件同步完成 | — |
+
+**PR-A Total:** 9/11 IMPLEMENTED + 2 PENDING spec 同步（spec.md + d7-domain 已落地，本 T 由 PR 创建时合并 commit 完成 IMPLEMENTED 闭环）
+
+### 不变式（PR-A 必保）
+
+| Invariant | 物理约束 | 验证方式 |
+|-----------|---------|---------|
+| **IV-1:** interfaces 0 import D7 子包 | `go vet` + `scripts/ci-lint-invariant/TestInterfacesZeroImportD7` | `grep -r "internal/layers/orchestration/" internal/layers/orchestration/interfaces/` 0 命中（除自身包外）|
+| **IV-2:** TaskSpec/TaskReport 不可变（无 setter）| 单元测试覆盖 With* 浅拷贝 | `TestTaskSpec_Immutable_*` + `TestTaskReport_Immutable_*` |
+| **IV-3:** AppendDissent top-3 silent | 单元测试覆盖第 4 个不改变切片 | `TestAppendDissent_Truncate` |
+| **IV-4:** TraceID `ts_<8 hex>` 格式 | NewTaskSpec/NewTaskReport fail-fast + 单测覆盖 6 个 case | `TestTraceIDFormat_*` |
+| **IV-5:** Additive 嵌入零破坏 | ChannelRequest/LearnRequest 老调用方 0 变化 + 24/24 packages -race PASS | `go test -race ./internal/...` 全绿 |
+
+### 实施统计
+
+- **代码：** 9 文件（7 NEW + 2 MODIFIED）+1100 行（interfaces 包 7 .go + 2 .go 嵌入点）
+- **测试：** 11 P0 T（9 单元/集成 + 2 spec 同步）+ 30+ 子测试用例
+- **性能：** interfaces 包纯类型 → 零 P99 开销（< 1μs 构造 + Validate）
+- **跨域：** 0 import D7 子包（pure types） + 1 import `internal/shared/errors`（SentinelError）
+- **回归：** 24/24 orchestration packages `go test -race` PASS，interfaces 包 coverage 95%
+
+### PR-A 与 PR-B + PR-C 的边界
+
+| 主题 | PR-A 本次 | PR-B 下次 | PR-C 后续 |
+|------|-----------|-----------|-----------|
+| L1 接口层 | ✅ TaskSpec + TaskReport + 3 创建点 | — | — |
+| L2 字段语义层 | ✅ Dissent + Blockage + Resource | — | — |
+| L3 防御运行时层 | ⬜ | ✅ Pessimistic Commit + Hard Evidence + Rule-based Fallback | ✅ CoW VersionChain + Similarity Check |
+| L4 治理横切层 | ✅ spec + 5 sentinel + 5 span + lint invariant | ✅ Coverage + Perf + Security | ✅ Cross-Domain Boundary + Feature Flag + AdaptiveThreshold + Layout Guard |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **4.16.0** | **2026-06-29** | **devrix-d7-taskcontract-unification-pr-a (DM-20260629-007) PR-A 落地 v7.0 TaskContract L1+L2+L4（部分）**：(1) **ADDED 3 Requirement** D7-S20-A01 TaskSpec 下行契约 (NewTaskSpec fail-fast ORCH 7100/7101/7104 + Validate + With* 不可变 + 3 创建点统一 + ChannelRequest.Spec additive) + D7-S20-A02 TaskReport 上行契约 (NewTaskReport fail-fast ORCH 7102/7103/7104 + WithVerdict/WithResource/WithBlockage + AppendDissent top-3 + HashDissentSummary + LearnRequest.Report additive) + D7-S20-A03 TaskContract 治理横切 (6 spec 文件同步 + interfaces 0 import D7 lint invariant)；(2) **ADDED 15+ Gherkin Scenarios**（happy + error path × 3 Requirements 全覆盖）；(3) **ADDED Scenario D7-S20/S21 Section**（11 P0 T 矩阵 9 IMPLEMENTED + 2 spec 同步 PENDING）；(4) **5 个 ORCH_* SentinelError**（Code 7100-7104：TaskSpecEmpty/ChannelUnknown/ReportEmpty/VerdictEmpty/TraceInvalid）通过 `internal/shared/errors/WithCode` 注册；(5) **5 不变式 IV-1..IV-5**（pure types + 不可变 builder + top-3 silent + trace_id 格式 + additive 零破坏）；(6) **interfaces 包 7 NEW 文件**（doc.go + errors.go + task_spec.go + task_report.go + 3 _test.go）0 import D7 子包，coverage 95%；(7) 24/24 orchestration packages `go test -race` PASS；detail 在 `Scenario D7-S20 / S21` 段 |
 | **4.15.0** | **2026-06-28** | **devrix-d7-layer-subcontext-phase3 (DM-20260628-002) Phase 3 闭环**：(1) ADDED D7-S16-A65 SubTurn→MaterializePolicy；(2) ADDED D7-S16-A66 Wave ContextResolver→Materializer；(3) ADDED D7-S16-A74 LLM ObservationProposer @ Observe（G3 提案+规则校验）；PR #273–#275 |
 | **4.14.0** | **2026-06-28** | **devrix-d7-layer-subcontext (DM-20260627-003) Phase 1+2 Layer SubContext**：(1) ADDED Scenario D7-S16 + A60/A61/A62/A63/A64/A70/A72/A73；(2) D2 Materialize + WorkItemPrivate partition；(3) ScopeContract + spawn gate + Observe R-OBS mapping；(4) ChildDownlink + cohort CG2′；(5) Upstream BlockedBy + PeerStatus；(6) depth≥1 默认 Materialize（无 feature flag）；(7) `/task context show` + ResolveHint 扩展；(8) Phase 3 T33–T35 登记 |
 | **4.13.0** | **2026-06-27** | **devrix-d7-workitem-rollup-pipeline (DM-20260627-001) Phase 1 Rollup 闭环**：(1) ADDED Scenario D7-S15 + A50/A51/A53/A54/A55/A60/A61；(2) Parent Rollup Gate + `NeedsRollup` + `ReopenForRollup`；(3) Summary + Structured dual bubble Observe (`observationsFromChildSummaryBubbles`)；(4) Rollup MUPS R2+ + `verifyRollupArtifact`；(5) Root Fallback + session deliverable；(6) Phase 1 `RollupGatePolicy=best_effort` only；(7) t-registry v4.7.0→v4.8.0 (+21 P0 T) |

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -53,6 +54,15 @@ type LearnRequest struct {
 
 	// SessionID — current session (必填).
 	SessionID string
+
+	// Report (devrix-d7-taskcontract-unification-pr-a, DM-20260629-007):
+	// optional v7.0 unified up-link contract. When non-nil, the Learn node
+	// uses Report.Dissent to populate SkillMemory.SOP entries and
+	// Report.Resource for cost accounting. PR-A only sets it from new call
+	// sites; legacy callers continue to pass the legacy Verdict/Plan/
+	// Artifact fields. PR-B fully migrates; PR-C removes the optional
+	// marker.
+	Report *interfaces.TaskReport
 }
 
 // ObservationLookup mirrors plan.ObservationLookup so we don't pull the

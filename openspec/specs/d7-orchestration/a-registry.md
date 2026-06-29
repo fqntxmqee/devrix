@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.0.0
-**Last Updated:** 2026-06-26
+**Version:** 5.1.0
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: 新增 6 个 A: D7-S20-A01/A02/A03 + D7-S21-A01/A02/A03; v6.0 维护阶段再增量)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 
@@ -370,7 +370,7 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 
 | Scenarios | Activities | Implemented | Partial | Planned |
 |-----------|------------|-------------|---------|---------|
-| **6 Canonical (S1–S6) + 1 横切 (Hardening)** | **49** | **49** | **0** | **0** |
+| **6 Canonical (S1–S6) + 1 横切 (Hardening) + v7.0 TaskContract (S20/S21)** | **55**（49 + 6） | **55** | **0** | **0** |
 | + Legacy 追溯段（已并入 Canonical） | +0 | — | — | — |
 
 > **v1.0 + v1.1 closure (2026-06-15):** All S-layer activities are now IMPLEMENTED. v2.0-c/f slices (A06/A07 T 层) are still PLANNED at the T level (no test fixtures in `turn/orchestrator_test.go`); the A 层 activities themselves are wired and active in `bootstrap/wire_coordinator.go`.
@@ -502,6 +502,100 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 
 ---
 
+## D7-S20 / S21: TaskContract 统一（v7.0 PR-A, DM-20260629-007）✅ IMPLEMENTED（9/11 T 点）
+
+> North Star: **TaskSpec（下行契约） + TaskReport（上行契约）** 是 D7 跨节点（Plan / Execute / Verify / Learn）通讯的**统一结构化载体**——v7.0 PR-A 用纯类型包 `interfaces` 替代散落的 wire 数据。
+>
+> 博弈角色: Contract Owner（跨节点契约锚点 + 不可变 + 字段语义）
+>
+> **设计：** 4-Layer × 3-Phase 框架（本 Change 仅完成 L1 接口层 + L2 字段语义层 + L4 spec 同步；L3 防御运行时层 留给 PR-B + PR-C）。
+>
+> **物理包：** `internal/layers/orchestration/interfaces/`（7 NEW: doc.go + errors.go + task_spec.go + task_report.go + task_spec_test.go + task_report_test.go + taskcontract_test.go）。**pure types 原则：0 import D7 任何子包**，仅依赖 `internal/shared/errors/`（SentinelError）。
+>
+> **Additive 嵌入：** `ChannelRequest.Spec` + `LearnRequest.Report` 是不破坏老路径的可选指针，老代码可继续工作。
+
+### D7-S20-A01 TaskSpec 下行契约
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S20-A01** | **BuildTaskSpec** | **A-BE** | **session_id, plan, channel, work_item** | **TaskSpec** | **task_spec.created** | **✅** | **`orchestration/interfaces/task_spec.go::NewTaskSpec` + `task_spec.go::Validate`（3 创建点统一：Plan 节点入口 / Channel.Execute 入口 / WorkItem 节点入口）** |
+
+### D7-S20-A02 TaskReport 上行契约
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S20-A02** | **BuildTaskReport** | **A-BE** | **session_id, channel, verdict, trace_id** | **TaskReport** | **task_report.created** | **✅** | **`orchestration/interfaces/task_report.go::NewTaskReport` + `task_report.go::With*` (WithVerdict/WithDissent/WithBlockage/WithResource 不可变 builder)** |
+
+### D7-S20-A03 TaskContract 治理横切（PR-A spec 同步）
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S20-A03** | **SyncTaskContractSpec** | **A-BE** | **interfaces API** | **spec.md + d7-domain + a/f/t/span-registry 增量** | **—** | **✅** | **`openspec/specs/d7-orchestration/spec.md` v7.0 ADDED 3 Requirement + 12 Gherkin Scenarios** |
+
+### D7-S21-A01 Dissent 沉淀
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S21-A01** | **RecordDissent** | **A-BE** | **TaskReport + Dissent 候选** | **TaskReport (AppendDissent immutable)** | **dissent.recorded** | **✅** | **`orchestration/interfaces/task_report.go::AppendDissent`（top-3 截断 + summary hash + Learn 沉淀到 feedback 通道）** |
+
+### D7-S21-A02 Blockage 分类
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S21-A02** | **ClassifyBlockage** | **A-BE** | **TaskSpec + 失败原因** | **TaskSpec (WithBlockage immutable)** | **blockage.recorded** | **✅** | **`orchestration/interfaces/task_spec.go::WithBlockage`（3 类 kind: permission/resource/contract）** |
+
+### D7-S21-A03 Resource 抽取
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S21-A03** | **ExtractResource** | **A-BE** | **ExecutionResult + 上下文** | **TaskReport (WithResource immutable)** | **resource.recorded** | **✅** | **`orchestration/interfaces/task_report.go::WithResource`（token / elapsed_ms / step_count 三件套）** |
+
+### TaskContract Dissent 治理
+
+- **Top-N silent truncation：** `AppendDissent(d Dissent)` 若已有 ≥ 3 Dissent 则 silently 不追加（避免日志/反馈通道被淹没）。
+- **Summary hash：** Dissent.Summary 计算 `fnv64a(Summary string)` 8 hex 前缀，`Learn` 节点去重。
+- **Learn 沉淀：** Dissent 通过 `LearnRequest.Report.Dissents` 走 `mups/learn/asset/` 现有 feedback 通道（**老路径完全不变**，仅可选追加）。
+
+### TaskContract Blockage 分类（3 类 kind）
+
+| Kind | 含义 | retryable | example |
+|------|------|-----------|---------|
+| `permission` | 权限不足（403 / IAM deny） | false | WorkItem.Directive 越权 |
+| `resource` | 资源耗尽（OOM / disk full / quota） | true | sandbox OOM killed |
+| `contract` | 契约违例（不满足 Plan.FailureCriteria） | true | Artifact evidence 缺失 |
+
+### TaskContract Resource 三件套
+
+| 字段 | 类型 | 取值范围 | 用途 |
+|------|------|---------|------|
+| `TokenUsed` | int | ≥ 0 | LLM token 消耗（嵌入 ReputationStore Bayesian 更新） |
+| `ElapsedMs` | int64 | ≥ 0 | wall-clock 时延（嵌入 5 节点管道 P99 监控） |
+| `StepCount` | int | ≥ 0 | ReAct iter 次数（嵌入 `D7_SubTurn_Iteration` span） |
+
+### ORCH_* SentinelError（PR-A 5 个，7100-7104 范围）
+
+| 常量 | Code | 触发 | 含义 |
+|------|------|------|------|
+| `ErrORCHTaskSpecEmpty` | 7100 | `NewTaskSpec("", ...)` | session_id 为空 |
+| `ErrORCHTaskSpecChannelUnknown` | 7101 | `Channel.Kind == "" 或未知` | channel kind 不在 sync/async/probe/explore 4 选 1 |
+| `ErrORCHTaskReportEmpty` | 7102 | `NewTaskReport("", ...)` | session_id 为空 |
+| `ErrORCHTaskReportVerdictEmpty` | 7103 | `Verdict == "" 或未知` | verdict kind 不在 4 VerdictKind |
+| `ErrORCHTaskContractTraceInvalid` | 7104 | `TraceID == "" 或格式 ≠ ts_<8 hex>` | trace_id 格式校验 |
+
+---
+
+### v7.0 PR-A 实现统计
+
+| 阶段 | IMPLEMENTED | PARTIAL | PLANNED |
+|------|-------------|---------|---------|
+| L1 接口层（TaskSpec struct + TaskReport struct + 3 创建点） | **3/3 T** | 0 | 0 |
+| L2 字段语义层（Dissent + Blockage + Resource） | **3/3 T** | 0 | 0 |
+| L3 防御运行时层（Pessimistic Commit + Hard Evidence + CoW + Rule-based Fallback + Similarity Check） | 0/0 T（本 PR 不涵盖） | — | 留给 PR-B + PR-C |
+| L4 治理横切层（spec sync + Coverage + Perf + Security + Cross-Domain Boundary + Error Code + Convergence Span + AdaptiveThreshold + Layout Guard） | **2/9 T**（spec + 各 registry 同步） | 0 | 7 T 留给 PR-B + PR-C |
+| **PR-A Total** | **9/11 P0 T** | **0** | **2（spec 同步）** |
+
+---
+
 ## ValueFlow Semantic 映射（v6.0.0 + v2.5.1 同步）
 
 > **ValueFlow Alias per S**（定义见 `d7-domain.md` §North Star）：
@@ -584,3 +678,4 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 | 3.8.0 | 2026-06-22 | DM-20260622-001 D7 Metrics & Concurrency Hardening：新增 Canonical S6 横切层（D7-S6-A14 HardenMetricsAndConcurrency），承载 5 P0/P1 fix；Legacy S3-A04 HardenScheduler；Legacy S2-A04 CommandHandler（emit 硬化）。统计 25+20/25+20/0/0 |
 | 4.0.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 落地（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）：Canonical S 扩展至 S1-S14（14 个 S 层）。新增 7 段 + 31 A 活动。统计 56+20/56+20/0/0 |
 | **5.0.0** | **2026-06-26** | **6 S 博弈角色对齐精简**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；(2) A 活动 **56 → 49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）；(3) **新增 §v6.0.0 6 S 精简映射**（14 S → 6 S 完整映射表 + 6 S 完整 A 清单 49 A + 14 S 冗余合并依据 4 类）；(4) 7 Legacy A 全部并入 Canonical（不再保留独立 Legacy 段）；(5) MUPS 5 节点挂载：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2 |
+| **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 D7-S20/S21 TaskContract 段**（6 A：D7-S20-A01 BuildTaskSpec + D7-S20-A02 BuildTaskReport + D7-S20-A03 SyncTaskContractSpec + D7-S21-A01 RecordDissent + D7-S21-A02 ClassifyBlockage + D7-S21-A03 ExtractResource），物理包 `orchestration/interfaces/` 7 NEW 文件；(2) **新增 5 个 ORCH_* SentinelError**（7100-7104：TaskSpecEmpty / TaskSpecChannelUnknown / TaskReportEmpty / TaskReportVerdictEmpty / TaskContractTraceInvalid）；(3) A 活动 **49 → 55**（6 v7.0 A 增量）；(4) 4-Layer × 3-Phase 设计框架落地：本 PR 完成 L1 接口层 + L2 字段语义层 + L4 spec 同步 9/11 P0 T IMPLEMENTED（L3 防御运行时层留给 PR-B + PR-C）；(5) Dissent top-3 截断 + summary hash + Learn 沉淀；Blockage 3 类 kind（permission/resource/contract）；Resource token/time/step 三件套；Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report；(6) **0 函数签名变化**（pure types 原则，interfaces 0 import D7 任何子包） |
