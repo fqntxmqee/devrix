@@ -1,9 +1,9 @@
 # D7 Orchestration Span 注册表
 
 **Domain:** D7 Orchestration
-**Version:** 4.3.0
+**Version:** 4.4.0
 **Status:** Active (2026-06-29)
-**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: 新增 5 个 P0/P1 TaskContract Span: task_spec.created / task_report.created / dissent_recorded / blockage_recorded / resource_recorded)
+**Last Updated:** 2026-06-29 (taskcontract-unification-pr-c DM-20260629-009: 新增 3 个 S18 P0 Span: Hard_Evidence_Reject (verify) + Worktree_VersionChain_Append (workmodel) + Similarity_Check_Intercept (decisionplanning), ops 总数 26 → 29; v4.3.0 PR-A taskcontract-unification-pr-a DM-20260629-007: 新增 5 个 P0/P1 TaskContract Span: task_spec.created / task_report.created / dissent_recorded / blockage_recorded / resource_recorded)
 **Domain SoT:** `d7-domain.md`
 **Canonical Source:** `internal/layers/observability/instrument/telemetry/names.go` · `internal/layers/observability/diagnose/coverage/registry.go`
 

@@ -60,3 +60,68 @@ func (m *InterruptMetrics) TotalCancelFailures() int64 {
 	}
 	return m.WaveCancelFailed.Load() + m.D4CancelFailed.Load() + m.ProcessCancelFailed.Load()
 }
+
+// --- DM-20260629-009 PR-C: 3 new metric counters (AC13/14/15) ---
+//
+// All 3 counters are atomic.Int64 with the same threading contract as
+// InterruptMetrics. Snapshot helpers expose JSON-friendly views for the
+// Prometheus scrape exporter.
+
+// TaskContractMetrics counts PR-C gate activity. Disabled-by-default
+// feature flags mean counters stay at 0 until the flags flip on (so PR-C
+// ships with 0 behavior change).
+type TaskContractMetrics struct {
+	HardEvidenceRejects          atomic.Int64 // verifier rejected Pass (insufficient evidence)
+	VersionChainAppends          atomic.Int64 // workmodel.VersionChainRegistry.Append calls
+	SimilarityCheckInterceptions atomic.Int64 // similarity Jaccard > InterceptThreshold
+}
+
+// Snapshot returns a point-in-time view; safe under concurrent use.
+func (m *TaskContractMetrics) Snapshot() TaskContractMetricsSnapshot {
+	if m == nil {
+		return TaskContractMetricsSnapshot{}
+	}
+	return TaskContractMetricsSnapshot{
+		HardEvidenceRejects:          m.HardEvidenceRejects.Load(),
+		VersionChainAppends:          m.VersionChainAppends.Load(),
+		SimilarityCheckInterceptions: m.SimilarityCheckInterceptions.Load(),
+	}
+}
+
+// TaskContractMetricsSnapshot is the JSON-friendly view of TaskContractMetrics.
+// Schema-stable: field names are part of the D5 observability contract.
+type TaskContractMetricsSnapshot struct {
+	HardEvidenceRejects          int64 `json:"hard_evidence_rejects"`
+	VersionChainAppends          int64 `json:"versionchain_appends"`
+	SimilarityCheckInterceptions int64 `json:"similarity_interceptions"`
+}
+
+// TaskContract returns the package-level TaskContractMetrics singleton.
+// Counters increment via RecordHardEvidenceReject / RecordVersionChainAppend /
+// RecordSimilarityCheckIntercept. nil-safe on every method.
+var TaskContract = &TaskContractMetrics{}
+
+// RecordHardEvidenceReject bumps the HardEvidenceRejects counter. PR-C AC15.
+func RecordHardEvidenceReject() {
+	if TaskContract == nil {
+		return
+	}
+	TaskContract.HardEvidenceRejects.Add(1)
+}
+
+// RecordVersionChainAppend bumps the VersionChainAppends counter. PR-C AC13.
+func RecordVersionChainAppend() {
+	if TaskContract == nil {
+		return
+	}
+	TaskContract.VersionChainAppends.Add(1)
+}
+
+// RecordSimilarityCheckIntercept bumps the SimilarityCheckInterceptions
+// counter. PR-C AC14.
+func RecordSimilarityCheckIntercept() {
+	if TaskContract == nil {
+		return
+	}
+	TaskContract.SimilarityCheckInterceptions.Add(1)
+}
