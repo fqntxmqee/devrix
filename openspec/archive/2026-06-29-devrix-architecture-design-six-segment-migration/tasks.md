@@ -20,9 +20,9 @@
 | **Step 2** | T04 | 修改 `architecture-design.md §8` S3 checklist 加"六段式完整性"+"六段式非空" 2 项校验 | 0.05 天 | ✅ DONE (2026-06-29) |
 | **Step 3** | T05 | 写 memory 记录 + MEMORY.md 索引 +1 行 | 0.05 天 | ✅ DONE (2026-06-29) |
 | **Step 3** | T06 | 写本 Change 的 S1 demand.md + S2 proposal.md + S3 design.md/specs/tasks.md | 0.2 天 | ✅ DONE (2026-06-29) |
-| **S6 归档** | T07 | 移动本 Change 到 archive/ + 更新 demand-archive-index.md + 运行 verify-archive.sh 12/12 PASS + commit | 0.05 天 | ⬜ 待执行 |
+| **S6 归档** | T07 | 移动本 Change 到 archive/ + 更新 demand-archive-index.md + 运行 verify-archive.sh 11/11 PASS + feat branch + PR #321 + 待用户审查 + merge | 0.05 天 | ✅ DONE (2026-06-29) |
 
-**总计**: ~0.55 天工作量（实际已大部分完成；仅 T07 S6 归档待用户确认后执行）
+**总计**: ~0.55 天工作量（实际已全部完成；T07 S6 归档通过 feat branch + PR #321 落地，待用户审查后 merge）
 
 ---
 
