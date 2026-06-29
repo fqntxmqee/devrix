@@ -1,0 +1,33 @@
+change_id: devrix-d7-mups-v4-5node-coverage-orchestration
+priority: P0
+demand_id: DM-20260625-019
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S8  # Observe Node (5-node Span 注册)
+  - D7-S9  # Execute Node (channel_ 前缀清理)
+  - D7-S12  # Learn Node (4 subpackage 拆分)
+dsaft_activities:
+  - D7-S8-A30  # 5 节点 Span 注册到 coverage registry
+  - D7-S8-A31  # D7_MUPS_Pipeline 根 Span
+  - D7-S9-A30  # execute/ 5 个 channel_ 前缀清理
+  - D7-S12-A30  # learn/ 4 subpackage 拆分
+  - D7-S12-A31  # learn/asset/ 边界
+  - D7-S12-A32  # learn/memory/ 边界
+  - D7-S12-A33  # learn/reputation/ 边界
+  - D7-S12-A34  # learn/prior/ 边界
+t_points:
+  - D7-S8-A30-T01  # 5 节点 SpanMeta 注册 (PR #235)
+  - D7-S8-A31-T01  # D7_MUPS_Pipeline 根 Span (PR #235)
+  - D7-S9-A30-T01  # execute/ channel_ 前缀清理 (PR #236)
+  - D7-S12-A30-T01  # learn/ 4 subpackage 物理迁移 (PR #236)
+  - D7-S12-A30-T02  # import cycle 打破 (PR #236, DefaultPendingMaxRetries 上提 asset/)
+  - D7-S12-A30-T03  # 23 packages -race PASS (PR #236)
+version_scope:
+  v1.0: 5-node Span 全覆盖 + 目录结构治理（PR #235 + #236）
+  v1.1: 基于 4 subpackage 边界添加新能力（无短期计划）
+status_notes:
+  - 2026-06-25 user feedback: "5节点Span是没有生效吗？另外5节点的目录非常混乱"
+  - 2026-06-26 PR #235 + #236 merged
+  - 2026-06-29 S6 归档（FULL — 6 T all DONE）
+  - design.md 4-section template（per architecture-design.md §1.3 自然过渡，不回填六段式）

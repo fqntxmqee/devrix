@@ -5,7 +5,7 @@
 **Priority:** P0
 **Sprint:** d7-v6 follow-up
 **PR Count:** 2
-**Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S7_Archived
+**Status:** S7_Archived (2026-06-29, FULL — PR #235+#236 merged)
 **SoT:** 用户反馈 "D7领域的5节点Span是没有生效吗？请修复。另外5节点的目录非常混乱。"
 
 ---

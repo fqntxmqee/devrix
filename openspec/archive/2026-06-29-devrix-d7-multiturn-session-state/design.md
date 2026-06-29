@@ -1,7 +1,7 @@
 # Design: D7 多轮 session 串行化与 complete 时机修正
 
 **Change ID:** devrix-d7-multiturn-session-state
-**Demand ID:** DM-20260628-003
+**Demand ID:** DM-20260628-004
 **Status:** S3_Design
 **Primary Domain:** D7 (orchestration, core)
 **Secondary Domains:** D1 (communication, core)

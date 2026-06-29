@@ -1,7 +1,7 @@
-# D1 Communication Spec Delta — feishu TurnInProgressError 友好文案 (DM-20260628-003)
+# D1 Communication Spec Delta — feishu TurnInProgressError 友好文案 (DM-20260628-004)
 
 **Change ID:** devrix-d7-multiturn-session-state
-**Demand ID:** DM-20260628-003
+**Demand ID:** DM-20260628-004
 **Delta Type:** ADDED (v3.5.0 → v3.6.0)
 **SOT:** `internal/layers/communication/feishu/feishu.go`
 
@@ -73,5 +73,5 @@ if err != nil {
 ## 7. 关联变更
 
 - **DM-20260628-002 (PR #271)**：panic hotfix
-- **DM-20260628-003**：本 change，定义 `TurnInProgressError` 类型，D1 在本 delta 中识别
+- **DM-20260628-004**：本 change，定义 `TurnInProgressError` 类型，D1 在本 delta 中识别
 - **DM-20260628-001**：API 错误分类，已暴露 `error_code` 字段供 IM 端差异化消费

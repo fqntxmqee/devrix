@@ -1,8 +1,8 @@
 ---
-demand-id: DM-20260628-003
+demand-id: DM-20260628-004
 title: D7 多轮 session 串行化与 complete 时机修正 — WaitForTurnCompletion + turn 上下文自动注入
 priority: P0
-status: S1_Proposal
+status: S6_Archived (2026-06-29, PARTIAL — RC-3 hotfix done via PR #271, RC-1/2/4 deferred to v1.1)
 dsaft_domain: orchestration
 created: 2026-06-28
 reporter: 2026-06-28 17:31:04 sess_1782638991113_5000 panic hotfix（PR #271）现场跟踪 — multi-turn session 体验缺陷

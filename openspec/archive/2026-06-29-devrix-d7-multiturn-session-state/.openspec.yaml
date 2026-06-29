@@ -1,0 +1,27 @@
+change_id: devrix-d7-multiturn-session-state
+priority: P0
+demand_id: DM-20260628-004
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S2  # Session Orchestrator (multi-turn session lifecycle)
+dsaft_activities:
+  - D7-S2-A14  # WaitForTurnCompletion + TurnState
+  - D7-S2-A15  # TranscriptReader + turn 上下文注入
+  - D7-S2-A16  # turn 串行化 + panic recovery
+  - D7-S2-A17  # feishu adapter TurnInProgressError
+t_points:
+  - D7-S2-A16-T01  # emit recover middleware (PR #271)
+  - D7-S2-A16-T02  # exec.Emit overwrite per Run (PR #271)
+  - D7-S2-A14-T01  # WaitForTurnCompletion (DEFERRED v1.1)
+  - D7-S2-A14-T02  # TurnState in-memory + sync.RWMutex (DEFERRED v1.1)
+  - D7-S2-A15-T01  # TranscriptReader for fold-output (DEFERRED v1.1)
+  - D7-S2-A15-T02  # turn directive auto-injection (DEFERRED v1.1)
+  - D7-S2-A17-T01  # feishu TurnInProgressError (DEFERRED v1.1)
+version_scope:
+  v1.0: D7 多轮 session 串行化与 complete 时机修正（PR #271 panic hotfix + RC-3 部分）
+  v1.1: RC-1 (complete 提前) + RC-2 (turn 上下文) + RC-4 (feishu error) 全部完成
+status_notes:
+  - 2026-06-28 17:31 sess_1782638991113_5000 panic hotfix（PR #271）
+  - 2026-06-29 S6 归档（PARTIAL — RC-3 done, RC-1/2/4 deferred to v1.1）
+  - design.md 7-section 旧模板（per architecture-design.md §1.3 自然过渡，不回填六段式）

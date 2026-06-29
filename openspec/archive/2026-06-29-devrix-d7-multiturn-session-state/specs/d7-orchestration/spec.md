@@ -1,7 +1,7 @@
-# D7 Orchestration Spec Delta — TurnState 串行化 + prior-output-summary 注入 (DM-20260628-003)
+# D7 Orchestration Spec Delta — TurnState 串行化 + prior-output-summary 注入 (DM-20260628-004)
 
 **Change ID:** devrix-d7-multiturn-session-state
-**Demand ID:** DM-20260628-003
+**Demand ID:** DM-20260628-004
 **Delta Type:** ADDED (v4.13.0 → v4.14.0)
 **SOT:** `internal/layers/orchestration/sessionorchestrator/{turn_state,transcript_reader,orchestrator,session_turn_loop}.go`
 
