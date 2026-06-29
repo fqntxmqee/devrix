@@ -5,6 +5,7 @@
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
+**Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
 **Change:** devrix-tool-surface-contract (DM-20260617-007) — W1-W9 阶段 1 落地：7 surface + 3 filter + turn_adapter dispatch 路径
 **Change:** devrix-tool-surface-phase2-full (DM-20260617-008) — W1-W5 阶段 2 落地：5 剩余 global singleton 全删
 **Change:** devrix-tool-spec-enrichment (DM-20260618-001) — v2: ToolSpec 4 bool + InterruptBehavior (5th method) + BuildSurfaces sort + parallel dispatch (T22-T25)
