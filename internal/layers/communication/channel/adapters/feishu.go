@@ -136,8 +136,9 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 		}
 
 	case "complete":
-		if err := a.finalizeStructuredSession(ctx, msg.SessionID, msg.ChatID, content); err != nil {
-			slog.Error("feishu: failed to finalize structured session", "error", err)
+		exitReason := msg.Metadata[metadataKeyExitReason]
+		if err := a.finalizeStructuredSession(ctx, msg.SessionID, msg.ChatID, content, exitReason); err != nil {
+			slog.Error("feishu: failed to finalize structured session", "error", err, "exit_reason", exitReason)
 		}
 
 		if a.doneEmoji != "" {

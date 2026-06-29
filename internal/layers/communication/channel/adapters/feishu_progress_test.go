@@ -108,7 +108,7 @@ func TestBuildTaskProgressCard_ProgressBarAndSummaries(t *testing.T) {
 		taskName:    "排查 OK 确认图标",
 		summaries:   []string{"代码逻辑正确", "需排查运行时日志"},
 	}
-	card := buildTaskProgressCard(stream, false)
+	card := buildTaskProgressCard(stream, false, "")
 	body := cardBodyMarkdown(card)
 	if !strings.Contains(body, "50%") || !strings.Contains(body, "█") {
 		t.Fatalf("progress bar missing: %q", body)
@@ -120,10 +120,108 @@ func TestBuildTaskProgressCard_ProgressBarAndSummaries(t *testing.T) {
 		t.Fatalf("summaries missing: %q", body)
 	}
 
-	done := buildTaskProgressCard(stream, true)
+	done := buildTaskProgressCard(stream, true, "")
 	doneBody := cardBodyMarkdown(done)
 	if !strings.Contains(doneBody, "已完成") || !strings.Contains(doneBody, "100%") {
 		t.Fatalf("completed state missing: %q", doneBody)
+	}
+}
+
+// TestBuildTaskProgressCard_FailedExitReason covers the hotfix
+// 2026-06-27 (sess_1782541795374_7000) path: when the orchestrator
+// surfaces a failed exit_reason (verifier_fail / verifier_abstain /
+// system_anomaly / intent_only_aborted), the progress card renders
+// red "任务失败" with the reason, not the misleading green
+// "任务完成" / "✅ 已完成".
+func TestBuildTaskProgressCard_FailedExitReason(t *testing.T) {
+	cases := []struct {
+		name       string
+		exitReason string
+		wantTitle  string
+		wantMarker string
+	}{
+		{"verifier_fail", "verifier_fail", "任务失败", "❌ **失败（verifier_fail）**"},
+		{"verifier_abstain", "verifier_abstain", "任务失败", "❌ **失败（verifier_abstain）**"},
+		{"system_anomaly", "system_anomaly", "任务失败", "❌ **失败（system_anomaly）**"},
+		{"intent_only_aborted", "intent_only_aborted", "任务失败", "❌ **失败（intent_only_aborted）**"},
+		{"natural (sanity)", "natural", "任务完成", "✅ **已完成**"},
+		{"empty (sanity)", "", "任务完成", "✅ **已完成**"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			stream := &feishuSessionStream{
+				progressPct: 100,
+				taskName:    "review d2 kernel",
+			}
+			card := buildTaskProgressCard(stream, true, tc.exitReason)
+			title := ""
+			if card.Header != nil {
+				title = card.Header.Title
+			}
+			if title != tc.wantTitle {
+				t.Errorf("title = %q, want %q", title, tc.wantTitle)
+			}
+			body := cardBodyMarkdown(card)
+			if !strings.Contains(body, tc.wantMarker) {
+				t.Errorf("body missing marker %q in:\n%s", tc.wantMarker, body)
+			}
+		})
+	}
+}
+
+// TestIsFailedExitReason covers the failedExitReasons membership test
+// used by the hotfix 2026-06-27 (sess_1782541795374_7000) display
+// path. Mirrors the verify.ExitReason taxonomy in
+// orchestration/executionflow/verify/exit_reason.go.
+func TestIsFailedExitReason(t *testing.T) {
+	cases := []struct {
+		reason string
+		want   bool
+	}{
+		{"verifier_fail", true},
+		{"verifier_abstain", true},
+		{"system_anomaly", true},
+		{"intent_only_aborted", true},
+		{"natural", false},
+		{"max_turns", false},
+		{"repeated_tool", false},
+		{"aborted_user", false},
+		{"", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.reason, func(t *testing.T) {
+			if got := isFailedExitReason(tc.reason); got != tc.want {
+				t.Errorf("isFailedExitReason(%q) = %v, want %v", tc.reason, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestBuildCompletionFooter covers the non-cardkit hotfix footer
+// branch: failed tasks render "❌ 任务失败（<reason>）_" instead of
+// the misleading "✅ 任务已完成".
+func TestBuildCompletionFooter(t *testing.T) {
+	cases := []struct {
+		name       string
+		stripped   string
+		failed     bool
+		exitReason string
+		want       string
+	}{
+		{"success with body", "report body", false, "natural", "report body\n\n---\n_✅ 任务已完成_"},
+		{"success empty body", "", false, "natural", "_✅ 任务已完成_"},
+		{"verifier_fail with body", "report body", true, "verifier_fail", "report body\n\n---\n_❌ 任务失败（verifier_fail）_"},
+		{"verifier_fail empty body", "", true, "verifier_fail", "_❌ 任务失败（verifier_fail）_"},
+		{"intent_only_aborted with body", "让我先...", true, "intent_only_aborted", "让我先...\n\n---\n_❌ 任务失败（intent_only_aborted）_"},
+		{"failed but no reason (defensive)", "x", true, "", "x\n\n---\n_❌ 任务失败_"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := buildCompletionFooter(tc.stripped, tc.failed, tc.exitReason)
+			if got != tc.want {
+				t.Errorf("buildCompletionFooter = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -505,7 +603,7 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_UpdateCardFallbackOnStreamClos
 	stream.textBuffer.WriteString("third: writing report")
 	stream.mu.Unlock()
 
-	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "conclusion summary", sessionID); err != nil {
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "conclusion summary", sessionID, ""); err != nil {
 		t.Fatalf("finalizeReplyCardStreaming: %v", err)
 	}
 
@@ -899,7 +997,7 @@ func TestFeishuAdapter_FinalizeReplyCardStreaming_PreservesDuplicateText(t *test
 	stream.textBuffer.WriteString("\n\n最终结论：4 路并行都成功完成。")
 	stream.mu.Unlock()
 
-	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "", sessionID); err != nil {
+	if err := adapter.finalizeReplyCardStreaming(context.Background(), stream, "", sessionID, ""); err != nil {
 		t.Fatalf("finalizeReplyCardStreaming: %v", err)
 	}
 
@@ -1265,7 +1363,7 @@ func TestFeishuAdapter_FinalizeStructuredSession_TaskCardDoesNotIncludeSummary(t
 	// Invoke finalizeStructuredSession directly. clearSessionStream
 	// (the production OnMessage step) is NOT called here, so the
 	// stream stays alive for inspection after.
-	if err := adapter.finalizeStructuredSession(context.Background(), "sess_no_dup", "feishu_oc_1", summary); err != nil {
+	if err := adapter.finalizeStructuredSession(context.Background(), "sess_no_dup", "feishu_oc_1", summary, ""); err != nil {
 		t.Fatalf("finalizeStructuredSession: %v", err)
 	}
 
@@ -1307,7 +1405,7 @@ func TestFeishuAdapter_FinalizeStructuredSession_TaskCardDoesNotIncludeSummary(t
 	// produces the exact body that was patched onto the progress card.
 	// Pin it so the user-visible card cannot regress to carry the D7
 	// summary.
-	card := buildTaskProgressCard(post, true)
+	card := buildTaskProgressCard(post, true, "")
 	cardBody := BuildCardJSON(card)
 	if strings.Contains(cardBody, summary) {
 		t.Errorf("rendered progress card body contains D7 final summary — DM-20260621-008 regression.\nbody=%s", cardBody)
