@@ -18,14 +18,14 @@
 
 **向所有消费者提供可独立验证的 LLM 横向能力：路由、流式调用、韧性保护、预算控制、内容守卫——由 D7 拥有调用决策权，D3 仅执行 Gateway 契约。**
 
-| 可验证承诺 | Canonical S |
-|-----------|-------------|
-| C1 模型路由（tier alias → provider + model） | D3-S1 RouteModel |
-| C2 流式 SSE chunk 流 | D3-S2 StreamChat |
-| C3 Provider 故障不阻塞用户 | D3-S3 ProtectCall |
-| C4 Token 超预算截断/报错 | D3-S4 BudgetTokens |
-| C5 危险 prompt 拒绝/告警 | D3-S5 GuardContent |
-| 配置加载与启动 fail-fast | D3-S6 ConfigureGateway |
+| 可验证承诺 | Canonical S | ValueFlow Alias (用户感知) |
+|-----------|-------------|----------------------------|
+| C1 模型路由（tier alias → provider + model） | D3-S1 RouteModel | `D3_Model_Routing` |
+| C2 流式 SSE chunk 流 | D3-S2 StreamChat | `D3_Stream_Chat_Completion` |
+| C3 Provider 故障不阻塞用户 | D3-S3 ProtectCall | `D3_Circuit_Breaker_And_Retry` |
+| C4 Token 超预算截断/报错 | D3-S4 BudgetTokens | `D3_Token_Budget_Control` |
+| C5 危险 prompt 拒绝/告警 | D3-S5 GuardContent | `D3_Content_Safety_Filter` |
+| 配置加载与启动 fail-fast | D3-S6 ConfigureGateway | `D3_Gateway_Configuration` |
 
 ---
 
@@ -46,14 +46,14 @@
 
 ### Canonical 价值流 — D3-S1–S6
 
-| S ID | Scenario | 承诺 | Status |
-|------|----------|------|--------|
-| D3-S1 | RouteModel | C1 | IMPLEMENTED |
-| D3-S2 | StreamChat | C2 | IMPLEMENTED |
-| D3-S3 | ProtectCall | C3 | IMPLEMENTED |
-| D3-S4 | BudgetTokens | C4 | IMPLEMENTED |
-| D3-S5 | GuardContent | C5 | IMPLEMENTED |
-| D3-S6 | ConfigureGateway | 横切 | IMPLEMENTED |
+| S ID | Scenario | 承诺 | ValueFlow Alias | Status |
+|------|----------|------|-----------------|--------|
+| D3-S1 | RouteModel | C1 | `D3_Model_Routing` | IMPLEMENTED |
+| D3-S2 | StreamChat | C2 | `D3_Stream_Chat_Completion` | IMPLEMENTED |
+| D3-S3 | ProtectCall | C3 | `D3_Circuit_Breaker_And_Retry` | IMPLEMENTED |
+| D3-S4 | BudgetTokens | C4 | `D3_Token_Budget_Control` | IMPLEMENTED |
+| D3-S5 | GuardContent | C5 | `D3_Content_Safety_Filter` | IMPLEMENTED |
+| D3-S6 | ConfigureGateway | 横切 | `D3_Gateway_Configuration` | IMPLEMENTED |
 
 ### 登记规模（Canonical）
 
@@ -123,4 +123,3 @@
 |---------|------|---------|
 | 1.0.0 | 2026-06-16 | 初版：薄领域 SoT；厚规格保留 `spec.md`；对齐 D1/D7 `*-domain.md` 模式 |
 | 1.5.0 | 2026-06-29 | devrix-d3-dsaft-restructuring (DM-20260629-003) PR-5 #3 value-flow-rename — §North Star + §Canonical 价值流加 ValueFlow Alias 列（5 + 1 横切 = 6 alias） |
-| 1.6.0 | 2026-06-29 | devrix-d3-dsaft-restructuring (DM-20260629-003) PR-7 #5 boundary-decision — §Boundary Debt Decisions 段，4 boundary debt 常量登记（`BoundaryD2D3ImportBan` / `BoundaryD3S5VsD2S18Grayzone` / `BoundaryD3S4BudgetSpanInjection` / `BoundaryD3S6FailFastOnObsNil`），全部 RESOLVED；`internal/layers/llmgateway/orchtypes/boundary_decision.go` + test (3 单测) PASS |

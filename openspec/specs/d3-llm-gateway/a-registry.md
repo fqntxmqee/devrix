@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.1.0
+**Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d3-sa-refine（R1+Q1-Q7 决议 + R2 命题 A/OQ-4 决议 + R3 命题 A~D 自裁决）
 **Domain SoT:** `d3-domain.md`
@@ -31,14 +31,14 @@
 
 > S = 价值流承诺（playbook 原则 1「S 是可被独立验证的承诺」）；scenario-slug 全部语义化、无技术角色词、Go 合法目录名（`code-layout.md §2`）。
 
-| S ID | S Name | scenario-slug | 承诺（North Star 5 承诺映射） | 北极星承诺归属 |
-|------|--------|---------------|------------------------------|----------------|
-| **D3-S1** | **RouteModel** | `route/` | C1：用户给出 model 名（含 tier alias），D3 必须返回正确 provider + 实际 model | C1 模型路由 |
-| **D3-S2** | **StreamChat** | `stream/` | C2：用户发起流式聊天，D3 必须返回符合 OpenAI SSE 协议的 chunk 流 | C2 流式调用 |
-| **D3-S3** | **ProtectCall** | `protect/` | C3：Provider 故障（5xx / 网络错误 / 限流），D3 必须不阻塞用户（Breaker + Retry + Fallback） | C3 韧性保护 |
-| **D3-S4** | **BudgetTokens** | `budget/` | C4：Token 超预算，D3 必须截断或报错，不超额调用 | C4 预算控制 |
-| **D3-S5** | **GuardContent** | `guard/` | C5：用户 prompt 命中危险模式，D3 必须拒绝（critical）或告警（warning） | C5 内容守卫 |
-| **D3-S6** | **ConfigureGateway** | `configure/` | （横切支撑）配置加载与验证；不挂承诺 | 横切 |
+| S ID | S Name | scenario-slug | 承诺（North Star 5 承诺映射） | 北极星承诺归属 | ValueFlow Alias (用户感知) |
+|------|--------|---------------|------------------------------|----------------|----------------------------|
+| **D3-S1** | **RouteModel** | `route/` | C1：用户给出 model 名（含 tier alias），D3 必须返回正确 provider + 实际 model | C1 模型路由 | `D3_Model_Routing` |
+| **D3-S2** | **StreamChat** | `stream/` | C2：用户发起流式聊天，D3 必须返回符合 OpenAI SSE 协议的 chunk 流 | C2 流式调用 | `D3_Stream_Chat_Completion` |
+| **D3-S3** | **ProtectCall** | `protect/` | C3：Provider 故障（5xx / 网络错误 / 限流），D3 必须不阻塞用户（Breaker + Retry + Fallback） | C3 韧性保护 | `D3_Circuit_Breaker_And_Retry` |
+| **D3-S4** | **BudgetTokens** | `budget/` | C4：Token 超预算，D3 必须截断或报错，不超额调用 | C4 预算控制 | `D3_Token_Budget_Control` |
+| **D3-S5** | **GuardContent** | `guard/` | C5：用户 prompt 命中危险模式，D3 必须拒绝（critical）或告警（warning） | C5 内容守卫 | `D3_Content_Safety_Filter` |
+| **D3-S6** | **ConfigureGateway** | `configure/` | （横切支撑）配置加载与验证；不挂承诺 | 横切 | `D3_Gateway_Configuration` |
 
 **S 与承诺 1:1 对应**（R1 D1 决议）：5 承诺 → 5 S；Config 横切 → +1 S。
 
@@ -244,3 +244,4 @@ D3-S6-A01 LoadAndValidateLLMConfig
 |------|------|------|
 | 2.1.0 | 2026-06-14 | 7 S 技术角色词版本（D3-S1~S7） |
 | 3.0.0 | 2026-06-14 | 5+1 S 价值流化：RouteModel/StreamChat/ProtectCall/BudgetTokens/GuardContent/ConfigureGateway；F02 拆 F02a/F02b；Bridge / Bootstrap 移至 CROSS 段；T ID 末尾加 `<!-- Mechanism: -->` 注释（R2 命题 A 衍生） |
+| 3.1.0 | 2026-06-29 | DM-20260629-003 PR-5 (#3 value-flow-rename) §S 切法总览加 ValueFlow Alias 列（5 S + 1 横切 = 6 alias：`D3_Model_Routing` / `D3_Stream_Chat_Completion` / `D3_Circuit_Breaker_And_Retry` / `D3_Token_Budget_Control` / `D3_Content_Safety_Filter` / `D3_Gateway_Configuration`） |
