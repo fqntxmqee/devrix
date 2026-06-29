@@ -4,7 +4,7 @@
 **Slug:** `contextengine`
 **Type:** Core Domain
 **Status:** Active — Canonical S15–S18 (v2.2 final, S19 dismantled, S20 removed)
-**Version:** 8.5.0
+**Version:** 9.0.0
 **Last Updated:** 2026-06-29
 **Depends On:** ~~D3 (ILLMGateway)~~ → **D7 消费（DM-020）**, D5 (Observability), **D7 (invocation only — Leader)**
 **Hard Ban:** D2→D3 import 禁止（DM-020 v1.0 Registry，v2.0-d CI 硬阻断）
@@ -220,6 +220,7 @@ D2 **不** import `orchestration` 包。**D2→D3 import 禁止**（CI 硬阻断
 | 8.3.0 | 2026-06-29 | **DM-20260629-002 PR-4 registry-sync**: (1) F-registry D2-S1..S5 → canonical D2-S15..S18 重映射；(2) S1 PEV / S5 Nested / S9 Harness / S10 QueryLoop / S19 NestedExecution / S20 LegacyHarness 统一移入 Historical Appendix；(3) PR-1 legacy/→kernel/ 路径落地反映到实现状态表 |
 | 8.4.0 | 2026-06-29 | **DM-20260629-002 PR-5 value-flow-rename**: (1) §North Star 加 ValueFlow Alias 列（S15 D2_Context_Loading_Compression / S17 D2_Session_State_Persistence / S18 D2_Tool_Permission_Sandbox）；(2) 与 a/f/t-registry + layer-delta.md §Canonical S 一致 |
 | 8.5.0 | 2026-06-29 | **DM-20260629-002 PR-8 boundary-decision**: (1) §Out of Scope 表 `FlowEvent/WorkPlan` 行补 DM-018 slice-c RESOLVED 备注 + 跨域 fixture 待定行；(2) §Boundary Debt Decisions 新增章节，2 个 boundary-debt ID；(3) 治理常量 in `internal/layers/contextengine/orchtypes/boundary_decision.go` + 4 单元测试 |
+| 9.0.0 | 2026-06-29 | **DM-20260629-002 S7_Archived 收口**: (1) v8.2.0 → v9.0.0 大版本对齐 D7 v2.6.0；(2) 8 PR / 6 sub-change / 44 T 全部 IMPLEMENTED；(3) Span Evidence 覆盖率 88%（12/14 canonical T 映射到 4 active ops）；(4) 死代码 0（PR-1 legacy/ 全删 ~1298 LOC）；(5) god fn 拆 5 文件（pipeline/assembler/materializer/analyzer/background）；(6) 治理常量 + 4 单元测试 PASS |
 | 8.1.0 | 2026-06-19 | **DSAFT Structure 重构**: (1) `engine_*.go` + `prepared_turn_*.go` → `facade/`; (2) 根包仅 `contracts.go` + `aliases.go` + `tool_context.go`; (3) `token/` → `prepare/token/`; (4) `spans.go` → `kernel/spans.go` |
 | 6.1.0 | 2026-06-15 | DM-020 拆面闭合状态同步：实现状态表 3 项 ⬜ PLANNED → ✅ IMPLEMENTED（D2-S16 Legacy Freeze / D2→D3 import lint / S18 ExecuteToolRound 拆面），引用 commit 41aec47 与 `TestD2_D3Ban` 实测通过 |
 | 7.0.0 | 2026-06-16 | **v2.0 终态**: (1) `background_task_tools.go` + `queryloop_tools.go` → `enforce/`; (2) 根目录合并 `tool_register.go`→`tool_context.go`; (3) `spans.go` 清理 harness span 死引用; (4) 根目录 11 生产文件 `engine.go` 212行 Facade |
