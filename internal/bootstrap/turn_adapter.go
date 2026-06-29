@@ -244,7 +244,7 @@ func parseToolParams(raw string) map[string]any {
 }
 
 func (a *contextEngineAdapter) userContextPrepend(ctx context.Context, sc *types.SessionContext) map[string]string {
-	if ce, ok := a.engine.(*contextengine.ContextEngine); ok {
+	if ce, ok := a.engine.(*kernel.ContextEngine); ok {
 		return ce.UserContextForPrepend(ctx, sc)
 	}
 	return nil
