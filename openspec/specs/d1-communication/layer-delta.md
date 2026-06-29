@@ -1,7 +1,10 @@
 # Delta: Domain D1 (COMM)
 
 **Change ID:** devrix-foundation → current
+**Version:** 2.2.0
+**Last Updated:** 2026-06-30 (DM-20260629-005 PR-5 value-flow-rename)
 **Affects:** communication layer, session management, all adapters, event bus, milestone, renderers
+**Change:** devrix-foundation → current / **devrix-d1-ac-restructuring (DM-20260629-005) PR-5 #3 value-flow-rename — 6 D1_* ValueFlow Alias 加入 §Legacy Archive 后子节 (v2.2.0)**
 
 ---
 
@@ -290,6 +293,19 @@ Added: CardkitClient for streaming, WorkerCardRenderer for orchestration, struct
 | S1 Gateway | S13 + bootstrap hook | S1-A04 RouteAgent **SUPERSEDED** → D1-RF-T02 |
 | S2 Adapters | S17 | S2-A03 Worker 卡 → contracts DTO |
 | S9 EventBus | S18 | 路径 `delivery/eventbus/` |
+
+### ValueFlow Alias 表（DM-20260629-005 PR-5 #3 value-flow-rename）
+
+> 与 `d1-domain.md` §North Star / `a-registry.md` §ValueFlow Alias / `f-registry.md` §ValueFlow Alias 同步。
+
+| Canonical S | ValueFlow Alias | 跨域 span/signal contract |
+|-------------|-----------------|--------------------------|
+| D1-S13 | `D1_Capture_User_Intent` | D1 → D7 `ProcessMessage` |
+| D1-S14 | `D1_Present_Thinking` | D7 → D1 thinking 信号 |
+| D1-S15 | `D1_Present_Task_Progress` | D7/D4 → D1 task/worker 信号 |
+| D1-S16 | `D1_Deliver_Conclusion` | D7 → D1 conclusion + PublishCritical 必达 |
+| D1-S17 | `D1_Connect_Channel` | 横切多 IM 接入与编解码 |
+| D1-S18 | `D1_Guarantee_Delivery` | EventBus Critical 路径 |
 
 ## REMOVED
 
