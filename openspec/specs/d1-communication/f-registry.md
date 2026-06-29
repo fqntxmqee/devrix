@@ -2,11 +2,12 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.0.0
-**Last Updated:** 2026-06-14
+**Version:** 3.1.0
+**Last Updated:** 2026-06-30 (DM-20260629-005 PR-5 value-flow-rename)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d1-communication/a-registry.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
+**Change:** DM-20260614-006 — 切法 A 双轨 / **devrix-d1-ac-restructuring (DM-20260629-005) PR-5 #3 value-flow-rename — ValueFlow Alias 表 +6 (D1_Capture_User_Intent 等) 与 a-registry §ValueFlow Alias 同步 (v3.1.0)**
 
 ---
 
@@ -19,6 +20,21 @@ D1 通信域 F 层功能点注册表。**Canonical SoT：S13–S18 下 F**（见
 ---
 
 ## Canonical — S13–S18 F 点
+
+### ValueFlow Alias (DM-20260629-005 PR-5 #3 value-flow-rename)
+
+> 与 `a-registry.md` §ValueFlow Alias 同步 — F 层是 A 层的功能点分解，价值流别名对每个 S 唯一。详见 a-registry.md 同节。
+
+| Canonical S | ValueFlow Alias | 关键 F 点 | 跨域对接 |
+|-------------|-----------------|-----------|----------|
+| D1-S13 | `D1_Capture_User_Intent` | routeD7 / ensureSessionLeader / resolvePermission | 入站 → D7 ProcessMessage |
+| D1-S14 | `D1_Present_Thinking` | EmitThinkingDelta + Encode Thinking | 出站 → IM adapter |
+| D1-S15 | `D1_Present_Task_Progress` | EmitToolProgress / EmitWorkerProgress + Encode Task | 出站 → IM adapter |
+| D1-S16 | `D1_Deliver_Conclusion` | EmitSummaryChunk / FinalizeReply + Encode Conclusion | 出站 + PublishCritical 必达 |
+| D1-S17 | `D1_Connect_Channel` | ParseFeishu/CLI/DingTalk + Encode + CheckRateLimit | 横切多 IM |
+| D1-S18 | `D1_Guarantee_Delivery` | Publish / PublishCritical / Drain / Compact / Reconnect | 横切 EventBus |
+
+---
 
 ### D1-S13-A03 DispatchToAgent
 

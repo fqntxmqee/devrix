@@ -2,10 +2,11 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.1.0  
-**Last Updated:** 2026-06-28 (DM-20260628-003 DSAFT refactor)
+**Version:** 3.2.0  
+**Last Updated:** 2026-06-30 (DM-20260629-005 PR-5 value-flow-rename)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-5 #3 value-flow-rename — 6 D1_* ValueFlow Alias 加入 a-registry (v3.2.0)**
 
 ---
 
@@ -19,6 +20,20 @@ Legacy D1-S1–S12 活动表保留于下文，供代码位置追溯；新能力�
 ---
 
 ## Canonical — D1-S13–S18（价值流）
+
+### ValueFlow Alias (DM-20260629-005 PR-5 #3 value-flow-rename)
+
+> 价值流别名与跨域 span / signal contract 对齐，避免与 D7 alias 命名冲突。  
+> 使用约定：`D1_<Verb>_<Object>`（snake_case 大写），与代码 const / span op / observability tag 同形。
+
+| Canonical S | Name | ValueFlow Alias | 跨域对接 |
+|-------------|------|-----------------|----------|
+| D1-S13 | CaptureUserIntent | `D1_Capture_User_Intent` | 入站 → D7 `ProcessMessage` (DM-20260629-005 boundary decision 1) |
+| D1-S14 | PresentThinking | `D1_Present_Thinking` | 出站 → IM adapter thinking 区 |
+| D1-S15 | PresentTaskProgress | `D1_Present_Task_Progress` | 出站 → IM adapter tools/worker 区 |
+| D1-S16 | DeliverConclusion | `D1_Deliver_Conclusion` | 出站 → IM adapter conclusion + PublishCritical 必达 |
+| D1-S17 | ConnectChannel | `D1_Connect_Channel` | 横切 — 多 IM adapter + 编解码 |
+| D1-S18 | GuaranteeDelivery | `D1_Guarantee_Delivery` | 横切 — EventBus Critical 路径 |
 
 ### D1-S13: CaptureUserIntent
 

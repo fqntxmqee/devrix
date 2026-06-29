@@ -18,14 +18,14 @@
 
 **作为 Trusted Intermediary，可靠地完成用户指令入站、三类出站信号呈现与弱网必达——不拥有编排、推理与执行。**
 
-| 可验证承诺 | Canonical S |
-|-----------|-------------|
-| 指令不丢、可追、可续聊 | D1-S13 CaptureUserIntent |
-| 思考过程可见（信号① Costly） | D1-S14 PresentThinking |
-| 任务/工具/Worker 进度可见（信号②） | D1-S15 PresentTaskProgress |
-| 结论/错误必达用户（信号③ Costly） | D1-S16 DeliverConclusion |
-| 多 IM 平台结构一致 | D1-S17 ConnectChannel |
-| 背压/弱网下 Critical 不丢 | D1-S18 GuaranteeDelivery |
+| 可验证承诺 | Canonical S | ValueFlow Alias (PR-5) |
+|-----------|-------------|---------------------|
+| 指令不丢、可追、可续聊 | D1-S13 CaptureUserIntent | `D1_Capture_User_Intent` |
+| 思考过程可见（信号① Costly） | D1-S14 PresentThinking | `D1_Present_Thinking` |
+| 任务/工具/Worker 进度可见（信号②） | D1-S15 PresentTaskProgress | `D1_Present_Task_Progress` |
+| 结论/错误必达用户（信号③ Costly） | D1-S16 DeliverConclusion | `D1_Deliver_Conclusion` |
+| 多 IM 平台结构一致 | D1-S17 ConnectChannel | `D1_Connect_Channel` |
+| 背压/弱网下 Critical 不丢 | D1-S18 GuaranteeDelivery | `D1_Guarantee_Delivery` |
 
 ---
 
