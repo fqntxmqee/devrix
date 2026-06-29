@@ -19,6 +19,27 @@ import (
 
 const progressStyleStructured = "structured"
 
+// metadataKeyExitReason is the metadata key set by D7 orchestrator on
+// the final `complete` EngineEvent. The Feishu adapter reads it to
+// decide whether to render a "✅ 任务完成" green card (natural finish
+// or any non-fail reason) or a "❌ 任务失败 (verifier_fail)" red card
+// (verifier_fail / verifier_abstain / system_anomaly / intent_only_
+// aborted). Mirrors `metadataKeyExitReason` in
+// orchestration/sessionorchestrator/turn_orchestrator.go.
+const metadataKeyExitReason = "exit_reason"
+
+// failedExitReasons lists the exit reasons that should be rendered as
+// a red "任务失败" card on the user's chat. Hotfix 2026-06-27
+// (sess_1782541795374_7000): without this branching the adapter
+// showed "✅ 任务已完成" for verifier_fail cases, hiding the actual
+// failure status from the user.
+var failedExitReasons = map[string]struct{}{
+	"verifier_fail":    {},
+	"verifier_abstain": {},
+	"system_anomaly":   {},
+	"intent_only_aborted": {},
+}
+
 // dedupReplayMinBufferRunes / dedupReplayMinChunkRunes / dedupReplayMinOverlapRunes
 // bound the LLM-stream-replay dedup. When the LLM re-emits a previously
 // streamed prefix from scratch (a minimax M2.7 streaming artifact: the
@@ -413,7 +434,7 @@ func (a *FeishuAdapter) appendTaskProgress(ctx context.Context, msg *types.Outbo
 		}
 	}
 	stream.mu.Unlock()
-	return a.upsertTaskProgressCard(ctx, msg.SessionID, msg.ChatID, false)
+	return a.upsertTaskProgressCard(ctx, msg.SessionID, msg.ChatID, false, "")
 }
 
 func formatWorkerProgressSummary(msg *types.OutboundMessage) string {
@@ -440,13 +461,13 @@ func formatWorkerProgressSummary(msg *types.OutboundMessage) string {
 	}
 }
 
-func (a *FeishuAdapter) upsertTaskProgressCard(ctx context.Context, sessionID, chatID string, completed bool) error {
+func (a *FeishuAdapter) upsertTaskProgressCard(ctx context.Context, sessionID, chatID string, completed bool, exitReason string) error {
 	stream := a.sessionStream(sessionID)
 	stream.mu.Lock()
 	if completed && stream.progressPct < 100 {
 		stream.progressPct = 100
 	}
-	card := buildTaskProgressCard(stream, completed)
+	card := buildTaskProgressCard(stream, completed, exitReason)
 	stream.mu.Unlock()
 
 	cardJSON := BuildCardJSON(card)
@@ -464,13 +485,14 @@ func (a *FeishuAdapter) upsertTaskProgressCard(ctx context.Context, sessionID, c
 	return a.patchMessage(ctx, stream.progressMsgID, cardJSON)
 }
 
-func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID, chatID, summary string) error {
+func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID, chatID, summary, exitReason string) error {
 	stream := a.sessionStream(sessionID)
 	stream.mu.Lock()
 	hasTaskCard := stream.progressMsgID != "" || stream.taskName != "" || stream.progressPct > 0
 	responseMsgID := stream.responseMsgID
 	responseText := stream.textBuffer.String()
 	trimmedSummary := strings.TrimSpace(summary)
+	taskFailed := isFailedExitReason(exitReason)
 	// DM-20260621-008: do NOT append trimmedSummary to stream.summaries.
 	// stream.summaries is rendered on the "任务进度" / "任务完成" progress
 	// card (buildTaskProgressCard), and that card already coexists with
@@ -484,7 +506,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	stream.mu.Unlock()
 
 	if hasTaskCard {
-		if err := a.upsertTaskProgressCard(ctx, sessionID, chatID, true); err != nil {
+		if err := a.upsertTaskProgressCard(ctx, sessionID, chatID, !taskFailed, exitReason); err != nil {
 			return err
 		}
 	}
@@ -503,7 +525,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 		// with the same paragraph; without the strip, the user sees the
 		// summary twice — once at the tail of the streaming reply card,
 		// once in the standalone 任务总结 card.
-		if err := a.finalizeReplyCardStreaming(ctx, stream, trimmedSummary, sessionID); err != nil {
+		if err := a.finalizeReplyCardStreaming(ctx, stream, trimmedSummary, sessionID, exitReason); err != nil {
 			return err
 		}
 	} else if responseMsgID != "" {
@@ -520,13 +542,14 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 		// call while the LLM was still looping), the response card is
 		// still patched with a minimal "✅ 任务已完成" footer so the user
 		// never sees a dangling partial card with no closure.
+		//
+		// Hotfix 2026-06-27: when exitReason is in failedExitReasons
+		// (verifier_fail / verifier_abstain / system_anomaly /
+		// intent_only_aborted) the footer reads "❌ 任务失败" + the
+		// reason, so the user sees the actual outcome rather than a
+		// misleading "✅ 任务已完成".
 		stripped := stripTrailingSummary(responseText, trimmedSummary)
-		var footer string
-		if strings.TrimSpace(stripped) != "" {
-			footer = stripped + "\n\n---\n_✅ 任务已完成_"
-		} else {
-			footer = "_✅ 任务已完成_"
-		}
+		footer := buildCompletionFooter(stripped, taskFailed, exitReason)
 		card := NewCard().
 			Markdown(footer).
 			Build()
@@ -538,6 +561,37 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 		return a.sendSummaryCard(ctx, sessionID, chatID, trimmedSummary)
 	}
 	return nil
+}
+
+// isFailedExitReason reports whether the given exit_reason should be
+// rendered as a red "❌ 任务失败" card on the user's chat. Hotfix
+// 2026-06-27 (sess_1782541795374_7000).
+func isFailedExitReason(reason string) bool {
+	_, ok := failedExitReasons[reason]
+	return ok
+}
+
+// buildCompletionFooter renders the trailing footer line on the
+// non-cardkit path's reply card. Hotfix 2026-06-27: when the task
+// failed (verifier_fail / verifier_abstain / system_anomaly /
+// intent_only_aborted) the footer reads "❌ 任务失败" plus the exit
+// reason, so the user sees the actual outcome rather than a
+// misleading "✅ 任务已完成".
+func buildCompletionFooter(stripped string, taskFailed bool, exitReason string) string {
+	var marker string
+	if taskFailed {
+		if exitReason != "" {
+			marker = fmt.Sprintf("_❌ 任务失败（%s）_", exitReason)
+		} else {
+			marker = "_❌ 任务失败_"
+		}
+	} else {
+		marker = "_✅ 任务已完成_"
+	}
+	if strings.TrimSpace(stripped) != "" {
+		return stripped + "\n\n---\n" + marker
+	}
+	return marker
 }
 
 // sendSummaryCard delivers the D7 final summary as a standalone "任务总结"
@@ -565,7 +619,7 @@ func (a *FeishuAdapter) sendSummaryCard(ctx context.Context, sessionID, chatID, 
 	return nil
 }
 
-func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *feishuSessionStream, summary, sessionID string) error {
+func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *feishuSessionStream, summary, sessionID, exitReason string) error {
 	stream.mu.Lock()
 	defer stream.mu.Unlock()
 
@@ -593,7 +647,20 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 		// Minimal completion marker on the streaming card so the user
 		// sees the task finished even when the D7 orchestrator did not
 		// produce a final summary.
-		content += "\n\n---\n_✅ 任务已完成_"
+		//
+		// Hotfix 2026-06-27: when the task failed, surface "❌ 任务
+		// 失败" + the exit reason rather than the misleading green
+		// "✅ 任务已完成" marker. Mirrors buildCompletionFooter on the
+		// non-cardkit path.
+		if isFailedExitReason(exitReason) {
+			if exitReason != "" {
+				content += "\n\n---\n_❌ 任务失败（" + exitReason + "）_"
+			} else {
+				content += "\n\n---\n_❌ 任务失败_"
+			}
+		} else {
+			content += "\n\n---\n_✅ 任务已完成_"
+		}
 	}
 
 	stream.cardkitSequence++
@@ -642,10 +709,14 @@ func (a *FeishuAdapter) finalizeReplyCardStreaming(ctx context.Context, stream *
 	return nil
 }
 
-func buildTaskProgressCard(stream *feishuSessionStream, completed bool) *kernel.Card {
+func buildTaskProgressCard(stream *feishuSessionStream, completed bool, exitReason string) *kernel.Card {
+	taskFailed := isFailedExitReason(exitReason)
 	color := "purple"
 	title := "任务进度"
-	if completed {
+	if taskFailed {
+		color = "red"
+		title = "任务失败"
+	} else if completed {
 		color = "green"
 		title = "任务完成"
 	}
@@ -667,7 +738,16 @@ func buildTaskProgressCard(stream *feishuSessionStream, completed bool) *kernel.
 			builder = builder.Markdown("- " + summary)
 		}
 	}
-	if completed {
+	if taskFailed {
+		// Hotfix 2026-06-27 (sess_1782541795374_7000): render a red
+		// "❌ 失败" marker + exit reason so the user sees the actual
+		// outcome rather than the misleading green "✅ 已完成".
+		if exitReason != "" {
+			builder = builder.Markdown(fmt.Sprintf("❌ **失败（%s）**", exitReason))
+		} else {
+			builder = builder.Markdown("❌ **失败**")
+		}
+	} else if completed {
 		builder = builder.Markdown("✅ **已完成**")
 	} else if pct == 0 && stream.taskName == "" && len(stream.summaries) == 0 {
 		builder = builder.Markdown("_等待任务更新…_")
