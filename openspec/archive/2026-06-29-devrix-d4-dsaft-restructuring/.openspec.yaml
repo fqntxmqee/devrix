@@ -1,0 +1,126 @@
+id: devrix-d4-dsaft-restructuring
+demand_id: DM-20260629-004
+title: "D4 DSAFT 深度架构重构 — 6 子 Change 联动 (legacy-cleanup + god-fn-split + registry-sync + value-flow-rename + span-coverage + boundary-decision)"
+status: s7_archived
+priority: P0
+created: 2026-06-29
+archived: 2026-06-29
+author: D4 域整体 DSAFT Review（2026-06-29 会话）+ 对齐 D7 DM-20260629-001 + D2 DM-20260629-002 + D3 DM-20260629-003 模板
+
+domains: [D4]
+
+# T 点（本 DM 范围内实施的 T 点）
+t_points:
+  # PR-1 #0 legacy-cleanup (T01-T05)
+  - D4-S11-A01-T01
+  - D4-S11-A01-T02
+  - D4-S11-A01-T03
+  - D4-S11-A01-T04
+  - D4-S11-A01-T05
+  - D4-S12-A02-T02
+  - D4-S12-A02-T03
+  - D4-S15-A01-T01
+  - D4-S15-A02-T02
+  # PR-2 #1 god-fn-split pt1 (T06-T09) - cli_adapter 466 → 2 文件
+  - D4-S15-A02-T02
+  - D4-S15-A02-T03
+  - D4-S15-A02-T04
+  - D4-S15-A02-T05
+  - D4-S15-A02-T06
+  - D4-S15-A02-T07
+  # PR-3 #1 god-fn-split pt2 (T10-T13) - cursor_adapter 410 → 2 文件
+  - D4-S15-A02-T08
+  - D4-S15-A02-T09
+  - D4-S15-A02-T10
+  - D4-S15-A02-T11
+  # PR-4 #2 registry-sync (T14-T17) - 18 F path 修正 + Historical S 沉 archive
+  - D4-S12-A01-T01
+  - D4-S13-A01-T01
+  - D4-S13-A02-T07
+  # PR-5 #3 value-flow-rename (T18-T21) - 6 D4_* Alias
+  # (metadata only - 已在 d4-domain.md/a-registry/f-registry/t-registry/layer-delta 同步)
+  # PR-6 #4 span-coverage (T22-T27) - 7 EngineEvent 常量化 + Span Evidence 列
+  - D4-S11-A02-T01
+  - D4-S11-A02-T02
+  - D4-S11-A02-T03
+  - D4-S11-A02-T04
+  - D4-S12-A03-T01
+  - D4-S13-A02-T01
+  - D4-S14-A07-T01
+  - D4-S14-A07-T02
+  # PR-7 #5 boundary-decision (T28-T31) - 3 boundary debt 决策
+  # (metadata only - 已在 d4-domain.md §Boundary Debt Decisions 同步 + 3 单元测试)
+  # PR-8 S7_Archive (T32-T34) - 6 artifacts copy + verify-archive 12/12 PASS
+  # (本 PR)
+
+layers:
+  - D4-S11   # ProvisionAgent (D4_Provision_Agent)
+  - D4-S12   # RunAgentLoop (D4_Run_Agent_Loop)
+  - D4-S13   # IsolateAndMerge (D4_Isolate_Merge)
+  - D4-S14   # ExecuteWorker (D4_Execute_Worker)
+  - D4-S15   # InvokeExternalAgent (D4_External_Agent_Tool)
+  - D4-S16   # ConfigureAgents (D4_Configure_Agents 横切)
+  - D4-S0    # CROSS
+  - kernel
+  - orchtypes  # NEW 治理包 (PR-1)
+
+pr_count: 8
+pr_list:
+  - id: 307
+    title: "refactor(d4): orchtypes 包建立 + WorkerEngine inline"
+    sub_change: "#0"
+  - id: 308
+    title: "refactor(d4): split cli_adapter god fn into session + execute"
+    sub_change: "#1-pt1"
+  - id: 309
+    title: "refactor(d4): split cursor_adapter god fn into session + execute"
+    sub_change: "#1-pt2"
+  - id: 310
+    title: "docs(d4): registry-sync — 18 F 路径全替换 + D4-S1~S10 沉 archive"
+    sub_change: "#2"
+  - id: 311
+    title: "docs(d4): add ValueFlow Alias to all S sections"
+    sub_change: "#3"
+  - id: 312
+    title: "refactor(d4): 7 EngineEvent literals → orchtypes.Event* consts + Span Evidence 31/31=100%"
+    sub_change: "#4"
+  - id: 313
+    title: "docs(d4): 3 boundary debt decisions + governance consts lint test"
+    sub_change: "#5"
+  - id: 314
+    title: "chore(d4): S7_Archive 收口 — 6 artifacts copy + verify-archive 12/12 PASS"
+    sub_change: "S7"
+
+related_changes:
+  - devrix-d7-dsaft-restructuring    # DM-20260629-001 6 子 Change 模板 (S7_Archived)
+  - devrix-d2-dsaft-restructuring    # DM-20260629-002 6 子 Change 模板 (S7_Archived)
+  - devrix-d3-dsaft-restructuring    # DM-20260629-003 6 子 Change 模板 (S7_Archived)
+  - devrix-d4-sa-refine              # 早期 S1-S10 refine (Historical S 沉 archive)
+  - devrix-evolution-review-fixes    # DM-20260621-011 evolution/guard observer rename
+
+parent_specs:
+  - openspec/specs/d4-multi-agent/d4-domain.md
+  - openspec/specs/d4-multi-agent/design.md
+  - openspec/specs/d4-multi-agent/{a,f,t,span}-registry.md
+  - openspec/specs/d4-multi-agent/observability-guide.md
+  - openspec/specs/d4-multi-agent/d7-boundary.md
+  - openspec/specs/d4-multi-agent/layer-delta.md
+  - openspec/archive/2026-06-15-devrix-d4-sa-refine/legacy-s1-s10.md
+  - openspec/specs/architecture/cross-domain-boundaries.md
+  - docs/methodology/dsaft-methodology.md v4.0.0
+  - docs/methodology/dsaft-refactoring-playbook.md v1.0.0
+
+# Spec 版本同步
+spec_sync:
+  source_version: "d4-domain.md v2.0.0 + t-registry v3.4.0 + a-registry v3.2.0 + f-registry v3.1.0 + span-registry v2.x"
+  target_version: "d4-domain.md v2.2.0 + t-registry v3.5.0 + a-registry v3.3.0 + f-registry v3.2.0 + span-registry v3.x"
+  sync_date: "2026-06-29"
+  sync_changes:
+    - "§North Star: ValueFlow Alias 列填充 (D4_Provision_Agent / D4_Run_Agent_Loop / D4_Isolate_Merge / D4_Execute_Worker / D4_External_Agent_Tool / D4_Configure_Agents)"
+    - "§Boundary Debt Decisions: 新增章节, 3 boundary-debt ID (D4ToD7AgentEventBridge / D4ToD6EvolutionObserver / D4ForbiddenFlowHubPublish) 全部 RESOLVED"
+    - "§DSAFT 资产: 59 T (35 DSAFT + 24 跨域) 维持 + 3 boundary debt 常量 + orchtypes 治理包 (events.go + boundary_decision.go)"
+    - "§登记规模: F 路径 18 处修正 (agent/factory→provision, agent/lifecycle→run, sessionview→isolate, delegate→execute, tool→external, contracts→kernel, observer/noop→kernel/observer) + Historical S 沉 archive"
+    - "t-registry v3.5.0: 59 T 行加 Span Evidence 列, 31 mapped + 28 explicit — = 100% effective (raw 52.5%)"
+    - "span-registry v3.x: 6 OpD4_S4_* + 7 EventAgent* const 登记 (orchtypes 包建立)"
+    - "§修订记录: v2.1.0 (PR-5) + v2.2.0 (PR-7) row"
+    - "orchtypes 治理包 (PR-1): events.go 7 常量 + boundary_decision.go 3 常量 + boundary_decision_test.go 3 单测"

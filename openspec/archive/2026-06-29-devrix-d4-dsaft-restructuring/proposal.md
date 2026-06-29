@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d4-dsaft-restructuring`
 **Demand ID:** DM-20260629-004
-**Status:** S2_Proposal
+**Status:** S7_Archived
 **Title:** D4 多智能体域 DSAFT 深度架构重构 — 6 子 Change 联动 (legacy + god-fn + registry + value-flow + span + boundary)
 **Template:** `devrix-d3-dsaft-restructuring` proposal.md (DM-20260629-003 S7_Archived)
 
