@@ -12,79 +12,61 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 )
 
-// CursorConfig holds configuration for a Cursor Agent tool.
-type CursorConfig struct {
-	Name         string
-	DisplayName  string
-	Description  string
-	Capabilities []string
-	Role         string // LLM role description for tool decision
-	Command      string   // CLI binary name, default "cursor"
-	Args         []string // optional extra args (for testing with bash etc.)
-	Model        string
-	Mode         string // "force" | "plan" | "ask" | "default"
-	WorkDir      string
-	Timeout      time.Duration
-}
-
-// CursorAgentTool implements AgentTool for Cursor Agent CLI using
-// one-shot processes with --resume for multi-turn conversations.
-type CursorAgentTool struct {
-	cfg     CursorConfig
-	info    Info
-	chatIDs map[string]string // sessionID → cursor chatID for --resume
-	mu      sync.RWMutex
-}
-
-// NewCursorAgentTool creates a Cursor Agent tool.
-func NewCursorAgentTool(cfg CursorConfig) *CursorAgentTool {
-	if cfg.Command == "" {
-		cfg.Command = "cursor"
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 5 * time.Minute
-	}
-	info := Info{
-		Name:         cfg.Name,
-		DisplayName:  cfg.DisplayName,
-		Description:  cfg.Description,
-		Capabilities: cfg.Capabilities,
-		Role:         cfg.Role,
-	}
-	return &CursorAgentTool{
-		cfg:     cfg,
-		info:    info,
-		chatIDs: make(map[string]string),
-	}
-}
-
-// Info returns the tool's identity metadata.
-func (t *CursorAgentTool) Info() Info { return t.info }
-
-// ExecutionTimeout returns the configured per-call timeout for this agent tool.
-func (t *CursorAgentTool) ExecutionTimeout() time.Duration {
-	return t.cfg.Timeout
-}
-
-// Execute sends a task to Cursor Agent and streams events until complete.
-// Each call spawns a one-shot process; multi-turn uses --resume <chatID>.
-func (t *CursorAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
-	workDir := t.cfg.WorkDir
-	if req.WorkDir != "" {
-		workDir = req.WorkDir
+// validateCursorWorkDir resolves req.WorkDir / cfg.WorkDir / ".", verifies it
+// exists and is a directory, then returns the cleaned absolute path.
+func validateCursorWorkDir(reqWorkDir, cfgWorkDir string) (string, error) {
+	workDir := cfgWorkDir
+	if reqWorkDir != "" {
+		workDir = reqWorkDir
 	}
 	if workDir == "" {
 		workDir = "."
 	}
 	workDir = filepath.Clean(workDir)
-	if info, err := os.Stat(workDir); err != nil {
-		return nil, fmt.Errorf("cursor: invalid workspace %q: %w", workDir, err)
-	} else if !info.IsDir() {
-		return nil, fmt.Errorf("cursor: workspace is not a directory: %q", workDir)
+	info, err := os.Stat(workDir)
+	if err != nil {
+		return "", fmt.Errorf("cursor: invalid workspace %q: %w", workDir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("cursor: workspace is not a directory: %q", workDir)
+	}
+	return workDir, nil
+}
+
+// buildCursorArgs assembles the CLI argv for a cursor agent invocation,
+// honouring cfg.Args override, --mode flags, --resume chatID, --model, workspace + task.
+// Callers run a one-shot process per call.
+func buildCursorArgs(t *CursorAgentTool, workDir string, task string, chatID string) []string {
+	if len(t.cfg.Args) > 0 {
+		return t.cfg.Args
+	}
+	args := []string{"agent", "--print", "--output-format", "stream-json", "--trust"}
+	switch t.cfg.Mode {
+	case "force":
+		args = append(args, "--force")
+	case "plan":
+		args = append(args, "--mode", "plan")
+	case "ask":
+		args = append(args, "--mode", "ask")
+	}
+	if chatID != "" {
+		args = append(args, "--resume", chatID)
+	}
+	if t.cfg.Model != "" {
+		args = append(args, "--model", t.cfg.Model)
+	}
+	args = append(args, "--workspace", workDir, "--", task)
+	return args
+}
+
+// Execute sends a task to Cursor Agent and streams events until complete.
+// Each call spawns a one-shot process; multi-turn uses --resume <chatID>.
+func (t *CursorAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
+	workDir, err := validateCursorWorkDir(req.WorkDir, t.cfg.WorkDir)
+	if err != nil {
+		return nil, err
 	}
 
 	// Note: we do NOT wrap ctx with a timeout here because
@@ -92,36 +74,7 @@ func (t *CursorAgentTool) Execute(ctx context.Context, sessionID string, req Req
 	// timeout fires via deferred cancel(). Callers are responsible for
 	// passing a context with the desired deadline.
 
-	// Build args
-	var args []string
-	if len(t.cfg.Args) > 0 {
-		// Custom args for testing or non-standard setups
-		args = t.cfg.Args
-	} else {
-		// Standard cursor agent args
-		args = []string{"agent", "--print", "--output-format", "stream-json", "--trust"}
-		switch t.cfg.Mode {
-		case "force":
-			args = append(args, "--force")
-		case "plan":
-			args = append(args, "--mode", "plan")
-		case "ask":
-			args = append(args, "--mode", "ask")
-		}
-
-		// Resume previous chat if available
-		t.mu.RLock()
-		chatID := t.chatIDs[sessionID]
-		t.mu.RUnlock()
-		if chatID != "" {
-			args = append(args, "--resume", chatID)
-		}
-
-		if t.cfg.Model != "" {
-			args = append(args, "--model", t.cfg.Model)
-		}
-		args = append(args, "--workspace", workDir, "--", req.Task)
-	}
+	args := buildCursorArgs(t, workDir, req.Task, t.lookupChatID(sessionID))
 
 	cmd := exec.CommandContext(ctx, t.cfg.Command, args...)
 	cmd.Dir = workDir
@@ -199,9 +152,7 @@ func (t *CursorAgentTool) readLoop(ctx context.Context, cmd *exec.Cmd, stdout io
 
 func (t *CursorAgentTool) handleSystem(raw map[string]any, sessionID string) {
 	if sid, ok := raw["session_id"].(string); ok && sid != "" {
-		t.mu.Lock()
-		t.chatIDs[sessionID] = sid
-		t.mu.Unlock()
+		t.storeChatID(sessionID, sid)
 		slog.Debug("cursor: session started", "chat_id", sid)
 	}
 }
@@ -388,23 +339,4 @@ func (t *CursorAgentTool) handleResult(raw map[string]any, ch chan<- Event, ctx 
 	case <-ctx.Done():
 	}
 	return true // stream finished
-}
-
-// Stop cleans up all tracked sessions.
-func (t *CursorAgentTool) Stop() {
-	t.mu.Lock()
-	t.chatIDs = make(map[string]string)
-	t.mu.Unlock()
-}
-
-// CloseSession forgets the cursor chatID for the given session.
-func (t *CursorAgentTool) CloseSession(sessionID string) {
-	t.mu.Lock()
-	delete(t.chatIDs, sessionID)
-	t.mu.Unlock()
-}
-
-// CleanupBySessionID removes all sessions for the given D1 Session ID.
-func (t *CursorAgentTool) CleanupBySessionID(sessionID string) {
-	t.CloseSession(sessionID)
 }
