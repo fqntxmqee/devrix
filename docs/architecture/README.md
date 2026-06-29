@@ -45,7 +45,7 @@
 | 文档 | 说明 |
 |------|------|
 | [../config.md](../config.md) | 配置项与热重载 |
-| [../development-workflow.md](../development-workflow.md) | OpenSpec S1–S7 + GitHub Flow |
+| [../development-workflow.md](../development-workflow.md) | OpenSpec S1–S6 + GitHub Flow（辅助） |
 
 ---
 

@@ -1,9 +1,9 @@
 # Devrix 研发流程规范
 
-> **规范权威来源：** `openspec/specs/project/master.md` — 本文件为辅助阅读，冲突时以 master.md 为准。
+> **规范权威来源：** `openspec/specs/project/master.md` — 本文件为辅助阅读，冲突时以 `openspec/specs/project/` 为准。
 
-**版本:** 1.0.0
-**最后更新:** 2026-06-08
+**版本:** 1.1.0（与 master.md v1.3.0 对齐）
+**最后更新:** 2026-06-26
 
 ---
 
@@ -17,34 +17,35 @@ Devrix 研发流程由两条主线交织而成：
 | 代码协作 | GitHub Flow | `gh` CLI |
 
 ```
-S1 Demand ──> S2 Proposal ──> S3 Design ──> S4 Tasks ──> S5 Acceptance ──> S6 Archive
-     │              │              │             │              │                │
-     └── gh issue   └── branch     └── PR draft  └── commits   └── PR merge     └── archive
+S1 需求 → S2 提案 → S3 设计 → S3-Gate → S4 实现 → S4-Gate → S5 验收 → S6-交付 → S6-归档
+     │         │          │         │          │         │          │           │          │
+  demand   branch+    design+    Review    commits+   Review   acceptance  PR merge   archive/
+           proposal   specs/     通过      tasks.md    通过      report      master
 ```
 
 ---
 
 ## 二、分支策略
 
-采用 **GitHub Flow**（单一主干 + 短期功能分支）：
+采用 **GitHub Flow**（单一主干 + 短期功能分支）。**本仓库生产分支为 `master`**：
 
 ```
-main
-  └── feat/<change-id>          # 功能分支
+master
+  └── feat/<change-id>          # 功能分支（change-id 含 devrix- 前缀）
   └── fix/<change-id>           # 修复分支
   └── docs/<description>        # 文档分支
 ```
 
 **规则：**
-- `main` 始终保持可部署状态
+- `master` 始终保持可部署状态
 - 一个 Change 一个分支，分支名与 Change ID 对应
-- 分支从 `main` 拉出，合并回 `main`
+- 分支从 `origin/master` 拉出，合并回 `master`
 - 合并前必须通过 CI 门禁
 
 ```bash
 # 创建功能分支
-git checkout main
-git pull origin main
+git checkout master
+git pull origin master
 git checkout -b feat/devrix-tool-security
 
 # 推送并设置 upstream
@@ -103,17 +104,20 @@ openspec/changes/<change-id>/
   └── proposal.md             # 提案：背景、方案、任务估算、风险
 ```
 
-**`.openspec.yaml` 模板：**
+**`.openspec.yaml` 模板：**（完整字段见 `openspec/specs/project/architecture-design.md` §2）
 
 ```yaml
-change_id: <change-id>
+change_id: devrix-{module-name}
 priority: P0 | P1 | P2
 demand_id: DM-YYYYMMDD-NNN
-parent_change: <parent-change-id>  # 可选
-layers: [D1, D2, ...]
-t_points: [{T}-XXX-NN, ...]
-estimated_hours: <hours>
+status: s2_design
+domains: [D1, D2, ...]
+dsaft_scenarios: [D{X}-S{X}, ...]
+dsaft_activities: [D{X}-S{X}-A{XX}, ...]
+t_points: [D{X}-S{X}-A{XX}-T{XX}, ...]
 ```
+
+> **禁止**在 proposal/design 中写工时估算；估算仅可在 `tasks.md` 作参考值。
 
 **操作流程：**
 
@@ -160,9 +164,9 @@ openspec/changes/<change-id>/
 
 **操作流程：**
 
-1. 编写 `design.md`（参考现有变更的格式）
+1. 编写 `design.md`（**六段式**，见 `docs/methodology/detail-design-framework.md`）
 2. 编写 `specs/<module>/spec.md`（Gherkin 场景）
-3. 如需详细架构文档，按 `docs/detail design framework.md` 六段式编写 `docs/<module>-design.md`
+3. S3-Gate：按 `openspec/specs/project/review-design.md` 审查；结论写入 design.md 附录 D
 
 **GitHub 操作：**
 
@@ -299,32 +303,32 @@ gh pr ready
 **产出文件：**
 ```
 openspec/changes/<change-id>/
-  └── acceptance-report.md    # 验收报告（由脚本生成）
+  └── acceptance-report.md    # 验收报告（模板见 testing.md §8）
 ```
 
 **操作流程：**
 
-1. 运行全量测试
-2. 生成验收报告
-3. 更新 `openspec/t-registry.md` 对应测试点状态为 `IMPLEMENTED`
+1. 运行全量测试（S5 必须；PR CI 仅 unit smoke）
+2. 编写或生成验收报告（frontmatter **`verdict: ACCEPTED`**）
+3. 更新 T 层注册表状态为 `IMPLEMENTED`
 
 ```bash
-# 全量测试
+# 全量测试（S5 门禁）
 ./scripts/test-all.sh
 
-# 生成验收报告
+# 可选：生成报告骨架
 ./scripts/gen-acceptance-report.sh --change <change-id>
 
-# 检查覆盖率
+# 检查覆盖率（目标 ≥ 80%）
 go test ./internal/... -coverprofile=coverage.out
 go tool cover -func=coverage.out | grep total
 ```
 
 **验收通过标准：**
-- P0 T 层测试 100% PASS
+- P0 T 层测试 100% **PASS**（矩阵行）
+- 报告 **`verdict: ACCEPTED`**
 - 覆盖率 ≥ 80%
 - 无 race condition（`-race` 通过）
-- 回归测试 100% PASS
 
 **提交验收：**
 
@@ -342,37 +346,40 @@ git push
 
 ---
 
-### S6: Archive（归档）
+### S6: 交付与归档
 
-**目的：** 变更完成后归档到 `openspec/archive/`
+**S6 分两子步（顺序固定）：**
 
-**操作流程：**
+| 子步 | 操作 | 规范 |
+|------|------|------|
+| **S6-交付** | PR squash 合入 `master` | `git-workflow.md` |
+| **S6-归档** | 移入 `openspec/archive/` + 索引/域文档 | `archiving.md` |
 
-1. PR 合并到 `main` 后
-2. 将 `openspec/changes/<change-id>/` 移动到 `openspec/archive/<YYYY-MM-DD>-<change-id>/`
-3. 更新 `demand-archive-index.md`（添加 PR 链接和归档路径）
+**S6-归档操作流程：**
+
+1. S6-交付完成（代码 PR 已合入 `master`）
+2. 在功能分支或 `feat/archive-<change-id>` 上执行归档（**禁止**直推 `master`）
+3. 运行 `./scripts/verify-archive.sh --changes <change-id>`
+4. 更新 `demand-archive-index.md`；`.openspec.yaml` → `s7_archived`
+
+详见 `openspec/specs/project/archiving.md` §3（场景 A/B）。
 
 ```bash
-# 合并后，在 main 分支上归档
-git checkout main
-git pull origin main
+git checkout master && git pull origin master
+git checkout -b feat/archive-<change-id>   # 或继续在 feat/<change-id>
 
-# 移动归档
-mkdir -p openspec/archive/2026-06-08-<change-id>
-cp -r openspec/changes/<change-id>/* openspec/archive/2026-06-08-<change-id>/
+./scripts/verify-archive.sh --changes <change-id>
+
+ARCHIVE_DIR="openspec/archive/$(date +%Y-%m-%d)-<change-id>"
+mkdir -p "$ARCHIVE_DIR"
+cp -r openspec/changes/<change-id>/* "$ARCHIVE_DIR/"
 git rm -r openspec/changes/<change-id>/
-git add openspec/archive/2026-06-08-<change-id>/
+git add "$ARCHIVE_DIR" openspec/demand-archive-index.md
 
-# 更新归档索引
-git add openspec/demand-archive-index.md
-
-git commit -m "$(cat <<'EOF'
-archive: <change-id> 归档
-
-PR: #<number>
-EOF
-)"
-git push
+git commit -m "archive: <change-id> S6 归档"
+git push -u origin HEAD
+gh pr create --base master --title "archive: <change-id> S6 归档"
+gh pr merge --auto --squash
 ```
 
 ---
@@ -425,14 +432,14 @@ gh pr status
 # 3. S4 完成后标记就绪
 gh pr ready
 
-# 4. 请求 Review
-gh pr review --request @reviewer
+# 4. 请求 Review（单人团队：S4-Gate 自检 + CI，见 git-workflow.md §8）
+# gh pr review --approve   # 仅在有第二 Reviewer 时使用
 
-# 5. 查看 CI 状态
+# 5. 查看 CI 状态（required: unit tests）
 gh pr checks
 
-# 6. 合并（S5 验收通过后）
-gh pr merge --squash --delete-branch
+# 6. S5 验收通过后合入（推荐 auto-merge）
+gh pr merge --auto --squash --delete-branch
 
 # 7. 查看已合并 PR
 gh pr list --state merged --limit 10
@@ -442,75 +449,42 @@ gh pr list --state merged --limit 10
 
 ## 五、Code Review 流程
 
+> 单人团队：**S4-Gate 自检**（`review-code.md`）+ CI 全绿，无需他人 Approve。详见 `git-workflow.md` §8。
+
 ### Review 触发条件
 
-- 所有 PR 合并前必须至少一人 Review
-- 安全相关变更必须 security-reviewer 参与
-
-### Review 命令
-
-```bash
-# 查看 PR diff
-gh pr diff
-
-# 查看 PR 评论
-gh pr view --comments
-
-# 提交 Review
-gh pr review --approve    # 通过
-gh pr review --request-changes --body "需要修复: ..."   # 请求修改
-gh pr review --comment --body "建议: ..."               # 仅评论
-
-# 列出 Review 意见
-gh pr view --json reviews
-```
+- S4 完成、PR 从 Draft 转 Ready
+- 安全相关变更须完成 `review-code.md` 全表自检
 
 ### Review Checklist
 
 - [ ] OpenSpec 文档完整（proposal / design / specs / tasks）
-- [ ] T 层测试点已在 `t-registry.md` 登记
-- [ ] 代码符合 `CLAUDE.md` 编码风格（不可变、小函数、错误处理）
-- [ ] 无硬编码密钥/凭证
-- [ ] 覆盖率 ≥ 80%
-- [ ] CI 全绿
+- [ ] T 层测试点已在注册表登记
+- [ ] PR 描述含 S4-Gate 自检章节
+- [ ] `./scripts/test-unit.sh` + `go vet` 通过
+- [ ] 覆盖率 ≥ 80%（S5 目标；PR CI 基线 20%）
 
 ---
 
 ## 六、CI/CD 门禁
 
-CI 流水线定义于 `.github/workflows/ci.yml`：
+> **PR 合并 required check：仅 `unit tests`。** 合入前本地建议跑 `test-all.sh`（S5）。详见 `git-workflow.md` §4。
+
+CI 流水线：`.github/workflows/ci.yml`
 
 ```
-git push ──> unit tests ──> gate (integration/e2e/acceptance) ──> coverage
-                              (需 unit 通过)                    (需 gate 通过)
+git push ──> unit tests (required on PR)
+          └── layer-lint (warn-only，不阻断 merge)
 ```
 
 ### 本地预检
 
-提交前必须通过本地门禁：
-
 ```bash
-# 等同于 CI unit 阶段
 go mod verify
 go build ./...
 go vet ./...
-./scripts/test-unit.sh
-
-# 集成测试
-./scripts/test-integration.sh
-```
-
-### PR 状态检查
-
-```bash
-# 查看 CI 运行状态
-gh pr checks
-
-# 查看特定 job 日志
-gh run view --job <job-id>
-
-# 重新运行失败的 CI
-gh run rerun <run-id>
+./scripts/test-unit.sh          # PR 门禁
+./scripts/test-all.sh           # S5 全量（合入前建议）
 ```
 
 ---
@@ -596,25 +570,16 @@ gh pr ready  # 所有任务完成后
 
 # S5: 验收
 ./scripts/test-all.sh
-./scripts/gen-acceptance-report.sh --change devrix-tool-security
+# 编写 acceptance-report.md（verdict: ACCEPTED，见 testing.md §8）
 git commit -m "acceptance: devrix-tool-security 验收通过"
 git push
 
-# PR 合并
-gh pr merge --squash --delete-branch
+# S6-交付: PR 合入
+gh pr merge --auto --squash --delete-branch
 
-# S6: 归档
-git checkout main && git pull
-mkdir -p openspec/archive/2026-06-08-devrix-tool-security
-cp -r openspec/changes/devrix-tool-security/* openspec/archive/2026-06-08-devrix-tool-security/
-git rm -r openspec/changes/devrix-tool-security/
-git add openspec/archive/
-git add openspec/demand-archive-index.md
-
-# 域文档同步（如变更影响域架构）
-# 更新 openspec/specs/d{N}-*/ 下的 spec.md / design.md / 注册表
-git add openspec/specs/d{N}-*/
-
-git commit -m "archive: devrix-tool-security 归档"
-git push
+# S6-归档（独立 PR，见 archiving.md）
+git checkout master && git pull origin master
+git checkout -b feat/archive-devrix-tool-security
+./scripts/verify-archive.sh --changes devrix-tool-security
+# ... 归档步骤见 § S6 ...
 ```

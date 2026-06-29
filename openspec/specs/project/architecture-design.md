@@ -61,7 +61,10 @@ S3 设计文档必须包含：
 change_id: devrix-{module-name}
 priority: P0 | P1 | P2
 demand_id: DM-YYYYMMDD-NNN
-status: s2_design | s3_design | s4_implementation | s5_acceptance | s7_archived
+# 流程阶段 S1–S6；下列为 .openspec.yaml 元数据状态（小写 snake_case）
+# s7_archived = 归档完成终端态（对应 S6-归档，不是第八流程阶段）
+# s1_cancelled / s0_abandoned = 取消或放弃（见 archiving.md §5）
+status: s2_design | s3_design | s4_implementation | s5_acceptance | s7_archived | s1_cancelled
 domains: [D1, D2, ...]
 dsaft_scenarios: [D{X}-S{X}, ...]        # 涉及的场景 ID
 dsaft_activities: [D{X}-S{X}-A{XX}, ...]  # 涉及的活动 ID
@@ -73,6 +76,19 @@ version_scope:
 metrics_definitions: []
 span_naming: []
 ```
+
+### 2.1 status 枚举（元数据，非流程阶段编号）
+
+| 值 | 含义 | 对应流程 |
+|----|------|----------|
+| `s2_design` | 提案阶段 | S2 |
+| `s3_design` | 设计阶段 | S3 |
+| `s4_implementation` | 实现阶段 | S4 |
+| `s5_acceptance` | 验收阶段 | S5 |
+| `s7_archived` | 已归档（终端态） | S6-归档完成 |
+| `s1_cancelled` | 已取消 | 见 `archiving.md` §5 |
+
+`proposal.md` / `design.md` 头部 **Status** 使用可读形式（如 `S3_Design`、`Archived`），须与 `.openspec.yaml` 的 `status` 语义一致。
 
 ---
 
@@ -148,7 +164,7 @@ span_naming: []
 - 附录 A：File Manifest（新增 / 修改 / 删除文件清单）
 - 附录 B：Rollback Plan（多层回滚机制 + 触发条件）
 - 附录 C：回归风险评估（baseline 对比 + 高风险改动点 + 测试策略）
-- 附录 D：S3 检查清单自检
+- 附录 D：S3 检查清单自检 + **S3-Gate Review 结论**（Approved / Changes Requested；架构级变更须含 Grill Review 要点）
 - 附录 E：下一步
 ```
 
@@ -247,5 +263,6 @@ S3 完成前：
 - [ ] `design.md` 明确每个 A 的 F 编排关系（A↔F，可在 ④领域模型或附录）
 - [ ] `specs/*/spec.md` 包含所有 Gherkin Scenario
 - [ ] 每个 Requirement 有对应的 T 层注释
-- [ ] 重大决策已记录（Decision 节，通常在 proposal.md §3.4）
+- [ ] 重大决策已记录（Decision 节，通常在 proposal.md §3 或 design.md）
+- [ ] **S3-Gate Review 结论**已写入 design.md 附录 D（Approved / Changes Requested；架构级变更含 Grill Review 要点）
 - [ ] Draft PR 已创建

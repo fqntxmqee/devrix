@@ -33,7 +33,7 @@ devrix-{module-name}
 
 - 全小写，连字符分隔
 - 与 `openspec/changes/<change-id>/` 目录名一致
-- 与 `feat/<change-id>` 分支名一致
+- 与 `feat/<change-id>` 或 `fix/<change-id>` 分支名一致（完整 change-id，含 `devrix-` 前缀）
 
 ---
 
@@ -47,7 +47,7 @@ demand-id: DM-YYYYMMDD-NNN
 title: <一句话描述>
 priority: P0 | P1 | P2
 status: S1_Proposal
-dsaft_domain: architecture | communication | context-engine | llm-gateway | multi-agent | observability
+dsaft_domain: architecture | communication | context-engine | llm-gateway | multi-agent | observability | evolution | orchestration
 created: YYYY-MM-DD
 ---
 

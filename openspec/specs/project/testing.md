@@ -1,8 +1,9 @@
 # 测试规范
 
-**版本:** 1.0.0
+**版本:** 1.1.0
 **状态:** Active
 **所属阶段:** S4、S5
+**最后更新:** 2026-06-26
 **引用规范:** `openspec/specs/testing-framework/spec.md`、`openspec/specs/testing-quality/spec.md`
 
 ---
@@ -73,6 +74,20 @@ func TestAgent_Run_NormalFlow(t *testing.T) { ... }
 | P1 | 必须执行，失败记例外 |
 | P2 | 尽力执行 |
 
+### 3.4 结论用词（避免与归档门禁混淆）
+
+| 层级 | 字段 | 合法值 | 说明 |
+|------|------|--------|------|
+| **单测 / AC / T 行** | 状态列 | `PASS` · `FAIL` · `SKIP` · `DESIGN` | 具体检查项或测试用例结果 |
+| **验收报告终态** | frontmatter `verdict` | `ACCEPTED` · `PARTIAL` · `REJECTED` | Change 级 S5 结论 |
+
+规则：
+- S5 完成且可进入 S6-交付：`verdict: ACCEPTED`，且所有 P0 T / AC 为 **PASS**（或已在 `proposal.md` Out of Scope 中声明 defer 并标 `DESIGN`）。
+- 热修/分阶段交付：`verdict: PARTIAL` 须写明 defer 项与 follow-up Change；S6-归档前须在报告中说明 PARTIAL 依据。
+- `REJECTED`：回到 S4 修复，不得归档。
+
+`archiving.md` 归档门禁检查的是报告 **verdict**（`ACCEPTED` 或文档化的 `PARTIAL`），不是单行测试的 `PASS`。
+
 ---
 
 ## 4. 覆盖率
@@ -140,8 +155,78 @@ S4 提测前：
 - [ ] 测试文件无 `t.Skip`（除非有注释说明原因）
 
 S5 验收前：
-- [ ] `./scripts/test-all.sh` 通过
+- [ ] `./scripts/test-all.sh` 通过（**全量**；PR CI 仅跑 `unit tests` smoke，不等同 S5）
 - [ ] 覆盖率 >= 80%
-- [ ] `acceptance-report.md` 已生成，状态 PASS
+- [ ] `acceptance-report.md` 已生成，frontmatter **`verdict: ACCEPTED`**（或文档化 `PARTIAL`）
 - [ ] `t-registry.md` 对应条目更新为 IMPLEMENTED（根索引 + 域注册表）
 - [ ] P0 T 层测试 100% PASS（阻断交付）
+
+---
+
+## 8. acceptance-report.md 模板
+
+S5 产出，路径：`openspec/changes/<change-id>/acceptance-report.md`。
+
+可手工编写，或用 `./scripts/gen-acceptance-report.sh --change <change-id>` 生成骨架后补全。
+
+```markdown
+---
+demand-id: DM-YYYYMMDD-NNN
+change-id: devrix-{module-name}
+title: <Change 标题> — 验收报告
+executor: <执行人 / Agent>
+environment: local | staging | production
+date: YYYY-MM-DD
+verdict: ACCEPTED | PARTIAL | REJECTED
+---
+
+# 验收报告：<标题>
+
+## 1. 执行摘要
+
+| 项目 | 值 |
+|------|---|
+| Demand ID | DM-YYYYMMDD-NNN |
+| Change ID | devrix-{module-name} |
+| PR | #NNN |
+| 总体结论 | **ACCEPTED**（或 PARTIAL / REJECTED） |
+
+### 验证命令与结果
+
+| Check | Command | Result |
+|-------|---------|--------|
+| 单元测试 | `./scripts/test-unit.sh` | PASS / FAIL |
+| 全量测试 | `./scripts/test-all.sh` | PASS / FAIL |
+| 覆盖率 | `go test ./internal/... -coverprofile=...` | XX% |
+| 域分段（如适用） | `./scripts/test-domain.sh d{N}` | PASS / FAIL |
+
+## 2. T 层验收矩阵
+
+| T ID | 描述 | 优先级 | 状态 | 证据 |
+|------|------|--------|------|------|
+| D{X}-S{X}-A{XX}-T{XX} | ... | P0 | PASS | 测试文件:行 / PR commit |
+
+**P0 T 通过率:** N/N = 100%
+
+## 3. AC 验收对照
+
+| AC | 描述 | 优先级 | 状态 | 证据 |
+|----|------|--------|------|------|
+| AC1 | ... | P0 | PASS | ... |
+
+## 4. 领域文档同步
+
+| 路径 | 是否更新 | 说明 |
+|------|----------|------|
+| `openspec/specs/d{N}-*/spec.md` | 是/否 | ... |
+| `openspec/specs/d{N}-*/t-registry.md` | 是/否 | PLANNED → IMPLEMENTED |
+
+## 5. 边界与遗留（PARTIAL 时必填）
+
+- defer 项、follow-up Change ID、风险说明
+```
+
+**verdict 判定：**
+- **ACCEPTED** — P0 T 100% PASS，P0 AC 满足，`test-all.sh` 绿，覆盖率 ≥ 80%
+- **PARTIAL** — 范围已在 proposal Out of Scope 声明的 defer；须列 follow-up
+- **REJECTED** — 未达 P0 门禁，需回 S4

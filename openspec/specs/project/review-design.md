@@ -104,5 +104,5 @@ Review 完成时确认：
 - [ ] 所有 P0 验收标准有对应 Scenario
 - [ ] Happy path 和 sad path 均有 Scenario
 - [ ] 回归风险已评估
-- [ ] Grill Review 结论已记录在 design.md 顶部
+- [ ] S3-Gate Review 结论已记录在 design.md **附录 D**
 - [ ] Review 结论明确（Approved / Changes Requested）

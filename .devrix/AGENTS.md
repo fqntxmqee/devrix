@@ -7,23 +7,23 @@
 
 ## 工程约束
 
-- 遵循 OpenSpec S1–S7 交付管线；新功能需有 `openspec/changes/{slug}/demand.md`
-- 使用 DSAFT 六域架构；生产路径为 QueryLoop（`harness.enabled: false` 默认）
-- Commit 使用 Conventional Commits；单 PR 变更控制在 400 行以内
+- 遵循 OpenSpec **S1–S6 六阶段**（S3-Gate / S4-Gate 为阶段内门禁；**S6 含交付合入 + 文档归档** 两子步；终端元数据状态 `s7_archived` 不是第八阶段）
+- 新功能 Change 目录：`openspec/changes/<change-id>/`（`change-id` 格式 `devrix-{module-name}`）；轻量变更可免 `demand.md`
+- 使用 DSAFT 七域架构（D1–D7）；生产路径为 QueryLoop（`harness.enabled: false` 默认）
+- Commit 使用 Conventional Commits；单 PR 变更控制在 400 行以内（超出需在 PR 说明理由）
 - **Git / PR / CI / Auto-merge**：`openspec/specs/project/git-workflow.md`（push、开 PR、盯 CI、合入前必读）
-- Java 17+ / Spring Boot 3.x；TypeScript strict，禁止 `any`
+- **Go 项目**：`internal/` 下 Go 源码；编码规范见 `openspec/specs/project/coding.md`
 
 ## 测试
 
-- 测试命名：`should_行为_when_条件`
+- 测试命名：`should_行为_when_条件`（或 table-driven `TestXxx_场景`）
 - 标注 `// T: D*-S*-A*-T*` 关联测试点
-- P0 测试点至少 1 个集成或 E2E 测试
+- P0 测试点至少 1 个可执行验收路径（单元/集成/E2E 按 T 层定义）
 
 ## 领域术语
 
-- 顶层包/目录用 L1 领域名（`trade`, `contextengine`）
-- API URL kebab-case 复数：`/api/v1/order-items`
-- 详见 `specs/02-domain-concepts.md`
+- 顶层包/目录用 L1 领域名（`communication`, `contextengine`, `orchestration` 等）
+- 域概念与边界：`openspec/specs/d{N}-*/design.md` 与 `openspec/specs/architecture/layering.md`
 
 ## 项目结构（D{N} → 路径）
 
