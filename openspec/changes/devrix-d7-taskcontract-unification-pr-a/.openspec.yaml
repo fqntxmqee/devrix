@@ -1,0 +1,301 @@
+change_id: devrix-d7-taskcontract-unification-pr-a
+demand_id: DM-20260629-007
+title: D7 TaskContract 统一 PR-A — interfaces 包 + TaskSpec/TaskReport 双契约
+status: S1_Demand
+created: 2026-06-29
+parent_design: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/
+phase: PR-A
+priority: P0
+dsaft_domain: D7 Orchestration
+dsaft_layers: [L1, L2, L4]
+
+# DSAFT 维度登记
+dsaft_scenarios:
+  - id: D7-S20
+    name: TaskContract 接口层
+    role: L1 接口层 (Pure types)
+    parent_activities: 2
+  - id: D7-S21
+    name: TaskContract 字段语义层
+    role: L2 字段语义层 (5+2 字段填充)
+    parent_activities: 3
+  - id: D7-S23
+    name: TaskContract 治理层 (PR-A scope)
+    role: L4 治理横切层 (AC17 spec 同步)
+    parent_activities: 1
+
+# Activity 登记 (PR-A scope 6 A)
+dsaft_activities:
+  - id: D7-S20-A01
+    name: TaskSpec struct + builder + Validate
+    scenario: D7-S20
+    layer: L1
+    functions: 3
+    test_points: 3
+    status: PLANNED
+  - id: D7-S20-A02
+    name: TaskReport struct + 5 子类型 + builder
+    scenario: D7-S20
+    layer: L1
+    functions: 3
+    test_points: 3
+    status: PLANNED
+  - id: D7-S20-A03
+    name: TaskContract spec 文档同步
+    scenario: D7-S23
+    layer: L4
+    functions: 2
+    test_points: 2
+    status: PLANNED
+  - id: D7-S21-A01
+    name: Dissent 字段填充 + 沉淀
+    scenario: D7-S21
+    layer: L2
+    functions: 1
+    test_points: 1
+    status: PLANNED
+  - id: D7-S21-A02
+    name: Blockage 字段填充
+    scenario: D7-S21
+    layer: L2
+    functions: 1
+    test_points: 1
+    status: PLANNED
+  - id: D7-S21-A03
+    name: Resource 字段填充
+    scenario: D7-S21
+    layer: L2
+    functions: 1
+    test_points: 1
+    status: PLANNED
+
+# Function 登记 (PR-A scope 11 F)
+dsaft_functions:
+  - id: D7-S20-A01-F01
+    name: NewTaskSpec
+    activity: D7-S20-A01
+  - id: D7-S20-A01-F02
+    name: TaskSpec.With* 不可变 builder
+    activity: D7-S20-A01
+  - id: D7-S20-A01-F03
+    name: TaskSpec.Validate
+    activity: D7-S20-A01
+  - id: D7-S20-A02-F01
+    name: NewTaskReport
+    activity: D7-S20-A02
+  - id: D7-S20-A02-F02
+    name: TaskReport.With* 不可变 builder
+    activity: D7-S20-A02
+  - id: D7-S20-A02-F03
+    name: TaskReport.AppendDissent
+    activity: D7-S20-A02
+  - id: D7-S20-A03-F01
+    name: spec.md delta 写入
+    activity: D7-S20-A03
+  - id: D7-S20-A03-F02
+    name: d7-domain.md §8 Layer 章节新增
+    activity: D7-S20-A03
+  - id: D7-S21-A01-F01
+    name: ExplorationChannel 全量结果 → Dissent 填充
+    activity: D7-S21-A01
+  - id: D7-S21-A02-F01
+    name: Verifier 拒绝原因 → Blockage 填充
+    activity: D7-S21-A02
+  - id: D7-S21-A03-F01
+    name: ContextBudget metric 抽取 → Resource 填充
+    activity: D7-S21-A03
+
+# Test 登记 (PR-A scope 7 T 点)
+dsaft_tests:
+  - id: D7-S20-A01-T01
+    name: NewTaskSpec + Validate happy path
+    activity: D7-S20-A01
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A01-T02
+    name: TaskSpec.With* 不可变 builder (浅拷贝验证)
+    activity: D7-S20-A01
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A01-T03
+    name: TaskSpec 3 处创建点统一迁移 (Plan / Channel / WorkItem)
+    activity: D7-S20-A01
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A02-T01
+    name: NewTaskReport + Validate happy path
+    activity: D7-S20-A02
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A02-T02
+    name: TaskReport.With* 不可变 builder + AppendDissent
+    activity: D7-S20-A02
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A02-T03
+    name: TaskReport Channel.Execute 出口 + Learn 节点入口统一
+    activity: D7-S20-A02
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A03-T01
+    name: spec.md v7.0 ADDED Requirement (TaskSpec + TaskReport)
+    activity: D7-S20-A03
+    priority: P0
+    status: PLANNED
+  - id: D7-S20-A03-T02
+    name: d7-domain.md §8 + a/f/t/span-registry 增量登记
+    activity: D7-S20-A03
+    priority: P0
+    status: PLANNED
+  - id: D7-S21-A01-T01
+    name: Dissent 字段 top-3 截断 + summary hash + Learn 沉淀
+    activity: D7-S21-A01
+    priority: P0
+    status: PLANNED
+  - id: D7-S21-A02-T01
+    name: Blockage 字段 3 类 kind 分类 (missing/required_external/infeasible)
+    activity: D7-S21-A02
+    priority: P0
+    status: PLANNED
+  - id: D7-S21-A03-T01
+    name: Resource 字段 token/time/step 抽取 + 单位一致性
+    activity: D7-S21-A03
+    priority: P0
+    status: PLANNED
+
+# 验收标准（PR-A scope 6 AC）
+acceptance_criteria:
+  - id: AC1
+    name: TaskSpec struct + 3 处创建点统一
+    priority: P0
+    layer: L1
+    test_refs: [D7-S20-A01-T01, D7-S20-A01-T02, D7-S20-A01-T03]
+  - id: AC2
+    name: TaskReport struct + Channel.Execute 出口 + Learn 节点入口
+    priority: P0
+    layer: L1
+    test_refs: [D7-S20-A02-T01, D7-S20-A02-T02, D7-S20-A02-T03]
+  - id: AC3
+    name: Dissent 字段 + Learn 节点沉淀
+    priority: P0
+    layer: L2
+    test_refs: [D7-S21-A01-T01]
+  - id: AC4
+    name: Blockage 字段结构化分类
+    priority: P0
+    layer: L2
+    test_refs: [D7-S21-A02-T01]
+  - id: AC5
+    name: Resource 字段 per-Plan 度量抽取
+    priority: P0
+    layer: L2
+    test_refs: [D7-S21-A03-T01]
+  - id: AC17
+    name: Spec 文档同步
+    priority: P0
+    layer: L4
+    test_refs: [D7-S20-A03-T01, D7-S20-A03-T02]
+
+# Span emit 登记 (PR-A scope 5 span)
+spans:
+  - op: d7.s20.interfaces.task_spec.created
+    trigger: NewTaskSpec()
+    ac_ref: AC1
+  - op: d7.s20.interfaces.task_report.created
+    trigger: NewTaskReport()
+    ac_ref: AC2
+  - op: d7.s21.taskreport.dissent_recorded
+    trigger: AppendDissent()
+    ac_ref: AC3
+  - op: d7.s21.taskreport.blockage_recorded
+    trigger: WithBlockage()
+    ac_ref: AC4
+  - op: d7.s21.taskreport.resource_recorded
+    trigger: WithResource()
+    ac_ref: AC5
+
+# Metrics 登记 (PR-A scope 4 metric)
+metrics:
+  - name: task_spec_constructed_total
+    unit: count
+    ac_ref: AC1
+  - name: task_report_constructed_total
+    unit: count
+    ac_ref: AC2
+  - name: dissent_entry_count
+    unit: count
+    ac_ref: AC3
+  - name: taskcontract_construct_latency_us
+    unit: microseconds
+    ac_ref: AC19
+
+# Error Code 登记 (PR-A 范围 5 基础 error)
+error_codes:
+  - code: ORCH_TASK_SPEC_GOAL_EMPTY
+    message: TaskSpec.Goal cannot be empty
+    remediation: set non-empty Goal string
+    ac_ref: AC1
+  - code: ORCH_TASK_SPEC_TRACE_ID_EMPTY
+    message: TaskSpec.TraceID cannot be empty after auto-generate
+    remediation: NewTaskSpec() auto-generates ts_<uuid8>
+    ac_ref: AC1
+  - code: ORCH_TASK_REPORT_TRACE_ID_EMPTY
+    message: TaskReport.TraceID cannot be empty
+    remediation: NewTaskReport() auto-generates or inherit from spec
+    ac_ref: AC2
+  - code: ORCH_DISSENT_REJECTION
+    message: Dissent entry rejected: Reason empty
+    remediation: append entry with non-empty Reason
+    ac_ref: AC3
+  - code: ORCH_RESOURCE_INVALID
+    message: Resource field invalid: tokens/time/step < 0
+    remediation: producer must validate positive values
+    ac_ref: AC5
+
+# 变更范围
+scope:
+  new_files:
+    - internal/layers/orchestration/interfaces/doc.go
+    - internal/layers/orchestration/interfaces/task_spec.go
+    - internal/layers/orchestration/interfaces/task_report.go
+    - internal/layers/orchestration/interfaces/errors.go
+    - internal/layers/orchestration/interfaces/task_spec_test.go
+    - internal/layers/orchestration/interfaces/task_report_test.go
+    - internal/layers/orchestration/interfaces/taskcontract_test.go
+  modified_files:
+    - mups/execute/channel.go
+    - mups/execute/exploration.go
+    - mups/execute/commit.go
+    - mups/execute/scenario.go
+    - mups/execute/protocol.go
+    - mups/learn/learner.go
+    - workmodel/workitem.go
+    - workmodel/child_downlink.go
+    - decisionplanning/decomposer.go
+    - decisionplanning/filter.go
+    - sessionorchestrator/orchestrator.go
+    - sessionorchestrator/turn_orchestrator.go
+    - wavescheduler/scheduler.go
+    - openspec/specs/d7-orchestration/spec.md
+    - openspec/specs/d7-orchestration/d7-domain.md
+    - openspec/specs/d7-orchestration/a-registry.md
+    - openspec/specs/d7-orchestration/f-registry.md
+    - openspec/specs/d7-orchestration/t-registry.md
+    - openspec/specs/d7-orchestration/span-registry.md
+
+# 不变更
+unchanged:
+  - UncertaintyCoord + Verdict 现有结构（向后兼容）
+  - 4 PlanKind → 4 Channel 路由
+  - 5 层 CircuitBreaker 阈值
+  - LP-1/LP-2/LP-5 集成测试
+
+# 预估
+estimate:
+  lines_added: 800
+  lines_removed: 50
+  ac_count: 6
+  test_points: 11
+  activities: 6
+  functions: 11
+  duration_estimate: 1_week
