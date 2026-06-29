@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -109,7 +110,7 @@ type DefaultWorkItemExecutor struct {
 	Now func() time.Time
 	// Emit forwards intermediate engine events (text / thinking / tool_call /
 	// tool_result) to the gateway so the user-visible stream mirrors what
-	// OrchestratePath's workerEventToEngine path produces. nil → silent
+	// gateway feishu cards. nil → silent
 	// (legacy / test fixtures). ItemPipelineRunner sets this in
 	// RunSessionTurnLoop so per-WorkItem tool calls land in feishu reply
 	// cards; Wave path already does this via subagent.streamEmit.
@@ -121,6 +122,9 @@ type DefaultWorkItemExecutor struct {
 	// history; the regression was introduced when ItemPipelineRunner became
 	// the default execution surface (DM-20260626-009).
 	Emit func(*contracts.EngineEvent)
+	// userContextPrepend is set per ExecuteWorkItem from ContextPreparer
+	// (API-boundary AGENTS.md when user_context.mode=prepend|both).
+	userContextPrepend map[string]string
 }
 
 // Compile-time interface check.
@@ -152,6 +156,7 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	defer func() { result.EndedAt = e.now() }()
 
 	systemPrompt, tools, messages, prepErr := e.prepareContext(ctx, sessionID, itemID, directive)
+	baseMessageCount := len(messages)
 	if prepErr != nil {
 		// Non-fatal: log and continue with empty context. Better to give the
 		// user a degraded answer than to fail outright on a Prepare hiccup.
@@ -167,6 +172,13 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	}
 
 	max := e.maxIters()
+	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.Item != nil {
+		if ec.Item.NeedsRollup {
+			max = 2
+		} else if ec.Tasks != nil && ec.Tasks.Tree().Depth(sessionID, ec.Item.ID) >= 1 {
+			max = 3
+		}
+	}
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1
 
@@ -183,10 +195,10 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 
 		switch {
 		case iterErr != nil:
-			e.appendPrivateChain(ctx, sessionID, itemID, messages)
+			e.appendPrivateChainDelta(ctx, sessionID, itemID, messages[baseMessageCount:])
 			return result, iterErr
 		case stopReason == "final_answer" || stopReason == "tool_no_executor" || stopReason == "tool_no_results":
-			e.appendPrivateChain(ctx, sessionID, itemID, messages)
+			e.appendPrivateChainDelta(ctx, sessionID, itemID, messages[baseMessageCount:])
 			return result, nil
 		}
 		if len(newMessages) > 0 {
@@ -198,7 +210,7 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	// accumulated text so the user sees something rather than nothing.
 	result.StopReason = "max_iters"
 	hardening.EmitSubTurnIteration(ctx, sessionID, itemID, max+1, "tool_calls", "max_iters")(nil)
-	e.appendPrivateChain(ctx, sessionID, itemID, messages)
+	e.appendPrivateChainDelta(ctx, sessionID, itemID, messages[baseMessageCount:])
 	return result, nil
 }
 
@@ -228,6 +240,7 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 	result *WorkItemResult,
 ) (string, error, []types.Message, string) {
 	content, toolCalls, finishReason, err := e.streamLLM(ctx, sessionID, systemPrompt, tools, messages)
+	toolCalls = dedupeToolCalls(toolCalls)
 	if err != nil {
 		result.StopReason = "llm_error"
 		return "llm_error", fmt.Errorf("workitem executor: llm invoke (iter %d): %w", iter, err), nil, ""
@@ -269,8 +282,7 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 		return "tool_error", fmt.Errorf("workitem executor: tool round (iter %d): %w", iter, err), nil, finishReason
 	}
 	// Emit a `tool_result` event per result so the feishu card shows the
-	// tool's return value (mirrors OrchestratePath's workerEventToEngine
-	// "tool_call" → result pairing). Append-only — downstream messages
+	// tool's return value ("tool_call" → result pairing). Append-only — downstream messages
 	// below carry the result content for the next LLM iter, but the
 	// gateway needs the event for live card rendering. Look up tool name
 	// from the originating toolCalls via ToolCallID since ToolResult itself
@@ -303,14 +315,20 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 		return "tool_no_results", nil, nil, finishReason
 	}
 
-	// Append tool result messages, paired 1:1 by index with the requested
-	// tool_calls. If the executor returns fewer results than requested
-	// (truncated batch), only append the available pairings.
-	for i := range toolCalls {
-		if i >= len(round.Results) {
-			break
+	// Append tool result messages, one per declared tool_call (by ID).
+	resultByID := make(map[string]ToolResult, len(round.Results))
+	for _, r := range round.Results {
+		if id := strings.TrimSpace(r.ToolCallID); id != "" {
+			resultByID[id] = r
 		}
-		newMessages = append(newMessages, buildWorkItemToolResultMsg(sessionID, round.Results[i]))
+	}
+	for _, tc := range toolCalls {
+		id := strings.TrimSpace(tc.ID)
+		r, ok := resultByID[id]
+		if !ok {
+			r = ToolResult{ToolCallID: id, Error: "tool execution did not return a result"}
+		}
+		newMessages = append(newMessages, buildWorkItemToolResultMsg(sessionID, r))
 	}
 	return "ok", nil, newMessages, finishReason
 }
@@ -326,8 +344,7 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 // coherent in one place.
 //
 // Emit hook: each chunk's text / thinking / tool_call stream is forwarded
-// as an EngineEvent so the gateway can render intermediate state on feishu
-// cards (mirrors OrchestratePath's streamEmit → workerEventToEngine path).
+// as an EngineEvent so the gateway can render intermediate state on feishu cards.
 // nil Emit → no-op (legacy / tests).
 func (e *DefaultWorkItemExecutor) streamLLM(
 	ctx context.Context,
@@ -335,10 +352,11 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	tools []ToolSchema,
 	messages []types.Message,
 ) (string, []llmgateway.ToolCall, string, error) {
+	apiMessages := messagesForLLMInvoke(messages, e.userContextPrepend)
 	ch, err := e.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    sessionID,
 		SystemPrompt: systemPrompt,
-		Messages:     messages,
+		Messages:     apiMessages,
 		Tools:        tools,
 	})
 	if err != nil {
@@ -367,23 +385,24 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 		}
 		if len(chunk.ToolCalls) > 0 {
 			toolCalls = chunk.ToolCalls
-			for _, tc := range chunk.ToolCalls {
-				e.emit(ctx, &contracts.EngineEvent{
-					Type:      "tool_call",
-					ToolName:  tc.Name,
-					ToolInput: tc.Input,
-					SessionID: sessionID,
-					Metadata: map[string]string{
-						"tool_name": tc.Name,
-						"input":     tc.Input,
-						"call_id":   tc.ID,
-					},
-				})
-			}
 		}
 		if chunk.FinishReason != "" {
 			finishReason = chunk.FinishReason
 		}
+	}
+	toolCalls = dedupeToolCalls(toolCalls)
+	for _, tc := range toolCalls {
+		e.emit(ctx, &contracts.EngineEvent{
+			Type:      "tool_call",
+			ToolName:  tc.Name,
+			ToolInput: tc.Input,
+			SessionID: sessionID,
+			Metadata: map[string]string{
+				"tool_name": tc.Name,
+				"input":     tc.Input,
+				"call_id":   tc.ID,
+			},
+		})
 	}
 	return content.String(), toolCalls, finishReason, nil
 }
@@ -391,8 +410,7 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 // emit forwards an EngineEvent to the configured Emit hook. nil Emit is a
 // no-op so legacy / test fixtures that don't wire a sink keep working.
 // Used for intermediate LLM chunk (text/thinking/tool_call) + tool-result
-// events; matches OrchestratePath's streamEmit pattern in shape but with
-// caller-driven control instead of subagent-driven streaming.
+// events; caller-driven control instead of subagent-driven streaming.
 func (e *DefaultWorkItemExecutor) emit(ctx context.Context, ev *contracts.EngineEvent) {
 	if e == nil || e.Emit == nil || ev == nil {
 		return
@@ -416,8 +434,8 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 		if err != nil {
 			return "", nil, nil, err
 		}
-		tools := toolSchemasFromDescriptors(mat.Tools)
-		if len(tools) == 0 && e.Context != nil {
+		tools := filterPipelineTools(toolSchemasFromDescriptors(mat.Tools))
+		if e.Context != nil {
 			prepared, prepErr := e.Context.Prepare(ctx, PrepareRequest{
 				SessionID: sessionID,
 				Message: types.Message{
@@ -427,7 +445,11 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 				},
 			})
 			if prepErr == nil {
-				tools = prepared.Tools
+				e.userContextPrepend = prepared.UserContextPrepend
+				rollupSynth := ec.Item != nil && ec.Item.NeedsRollup
+				if len(tools) == 0 && !rollupSynth {
+					tools = filterPipelineTools(prepared.Tools)
+				}
 			}
 		}
 		return mat.SystemPrompt, tools, mat.Messages, nil
@@ -446,16 +468,21 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 	if err != nil {
 		return "", nil, nil, err
 	}
+	e.userContextPrepend = prepared.UserContextPrepend
 	msgs := []types.Message{{
 		SessionID: sessionID,
 		Role:      types.MessageRoleUser,
 		Content:   directive,
 	}}
-	return prepared.SystemPrompt, prepared.Tools, msgs, nil
+	return prepared.SystemPrompt, filterPipelineTools(prepared.Tools), msgs, nil
 }
 
-func (e *DefaultWorkItemExecutor) appendPrivateChain(ctx context.Context, sessionID, itemID string, msgs []types.Message) {
-	if e == nil || e.Materializer == nil || !ShouldMaterializeWorkItem(ctx, sessionID, itemID) {
+func (e *DefaultWorkItemExecutor) appendPrivateChainDelta(ctx context.Context, sessionID, itemID string, msgs []types.Message) {
+	if e == nil || e.Materializer == nil || !ShouldMaterializeWorkItem(ctx, sessionID, itemID) || len(msgs) == 0 {
+		return
+	}
+	msgs = conversation.RepairToolMessageChain(msgs)
+	if len(msgs) == 0 {
 		return
 	}
 	partition := ResolvePartitionForWorkItem(sessionID, &workmodel.WorkItem{ID: itemID})

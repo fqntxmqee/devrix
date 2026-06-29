@@ -3,9 +3,9 @@
 **文档类型:** 运行时序 + 调用链路（pipeline architecture & call-chain reference）
 **Domain:** D7 Orchestration
 **DSAFT Type:** 核心域
-**Version:** 1.2.0
+**Version:** 1.2.1
 **Status:** Active
-**Last Updated:** 2026-06-26 (6 S 博弈角色对齐 v6.0.0)
+**Last Updated:** 2026-06-26 (主链路 RunSessionTurnLoop + WorkTree + MUPS 对齐 v2.6.0)
 **架构入口:** `openspec/specs/d7-orchestration/spec.md`（DSAFT 规范 SoT）
 **领域 SoT:** `openspec/specs/d7-orchestration/d7-domain.md`（North Star / Out of Scope）
 **详细设计:** `openspec/specs/d7-orchestration/design.md`（六段式架构设计）
@@ -65,7 +65,7 @@ Observe → Plan → Execute → Verify → Learn
 1. **§1 5 节点管道总览**（架构图 + 4 类对应表 + 3 项不变式）
 2. **§2 S 场景关系图**（13 个 S 场景 + 横向 / 闭环）
 3. **§3 调用链路 — 全局入口 D1→D7 路径**（ProcessMessage 入口 + 4 IntentKind 分流）
-4. **§4 调用链路 — OrchestratePath 6 步时序**（MUPS 5 节点管道运行时序）
+4. **§4 调用链路 — RunSessionTurnLoop + ItemPipelineRunner 时序**（MUPS 5 节点管道运行时序）
 5. **§5 调用链路 — 5 节点管道闭环可视化**（LP-1/LP-2/LP-5 闭环）
 6. **§6 Cross-references**
 
@@ -193,8 +193,7 @@ D7 域共 **6 个 Canonical S + 1 横切（v6.0.0 博弈角色对齐精简）**�
 1. **D7-S2 是唯一入口** — 4 IntentKind 决定走哪条路径：
    - `IntentSkip` → close channel（不触发 Auto-Close）
    - `IntentCommand` → CommandHandler（/plan, /worktree, /help, /stop）
-   - `IntentFast` → FastPath → D3 (LLM) + D2 (Prepare/ToolRound/Persist)
-   - `IntentOrchestrate` → OrchestratePath → **5 节点管道**
+   - `IntentFast` | `IntentOrchestrate` → **RunSessionTurnLoop**（WorkTree + 逐 WorkItem MUPS）
 2. **5 节点管道挂载 6 S（v6.0.0）**：Observe+Plan 归 S5、Execute+Learn 归 S6、Verify 归 S4；按 LP-5 反向追溯链串联
 3. **S2 是闭环 + 错误恢复单点**：含 buildObserveRequest（wiring）+ AutoClose（runtime）+ EscapeEngine + ResumeSession
 4. **D7-S1/S3/S4 是 v2.0 已有基础设施**，MUPS 期间未改，被新节点复用
@@ -250,22 +249,57 @@ D7-S2 SessionOrchestrator.ProcessMessage(ctx, req)
           │                     ├─ /worktree → CLICommands → TaskManager.Tree() (D7-S1)
           │                     └─ /help, /stop → explicit handlers
           │
-          ├─ IntentFast       → FastPath.Run
-          │                     └─ TurnOrchestrator → D3 (LLM Gateway)
-          │                                       → D2 (Prepare / ToolRound / Persist)
-          │
-          └─ IntentOrchestrate → OrchestratePath.Run  ← MUPS 5 节点管道主入口
+          ├─ IntentFast       ─┐
+          │                     ├─ RunSessionTurnLoop  ← 主链路（WorkTree + MUPS）
+          └─ IntentOrchestrate ─┘
                                 │
                                 ↓
-                            §4 6 步时序
+                            §4 RunSessionTurnLoop 时序
 ```
+
+> **v2.6.0 主链路（DM-20260629-001）**：`FastPath` / `OrchestratePath` 已退役。
+> `IntentFast` 与 `IntentOrchestrate` 仅为分类标签，二者均走
+> `RunSessionTurnLoop` → `GetPipelineFocus` → `ItemPipelineRunner.Run`（MUPS）。
+> `DefaultOrchestrator.RunTurn` 仅用于 sub-agent / PreparedTurn，不是飞书用户消息主路径。
 
 ---
 
-## §4 调用链路 — OrchestratePath 6 步时序
+## §4 调用链路 — RunSessionTurnLoop + ItemPipelineRunner 时序
 
 ```
-OrchestratePath.Run(ctx, req, report)
+RunSessionTurnLoop(ctx, req, intent)
+    │  ← bootstrap: WithItemPipelineRunner + WithTaskManager
+    │
+    ├─[0] EnsureGoal(sessionID, directive)     ← WorkTree 种子（ProcessMessage 已做则跳过）
+    │
+    └─ loop (max 16 rounds):
+          GetPipelineFocus(sessionID)           ← WorkTree 选焦点 WorkItem
+          │
+          ItemPipelineRunner.Run(ctx, sessionID, focus, userID)  ← MUPS 主入口
+            │
+            ├─[A] Observe 阶段 (D7-S8)
+            │     buildObserveRequest / UncertaintyReport
+            │
+            ├─[B] Plan 阶段 (D7-S5)
+            │     Planner.Plan(ctx, report) → Plan{Kind, Steps, FailureCriteria, ...}
+            │
+            ├─[C] Execute 阶段 (D7-S9)
+            │     WorkItemExecutor.ExecuteWorkItem (per-WorkItem ReAct)
+            │       → D3 LLM stream + D2 Prepare/ToolRound/Persist
+            │
+            ├─[D] Verify 阶段 (D7-S10)
+            │     artifact → Verdict (Pass/Fail/Indeterminate)
+            │
+            └─[E] Learn 阶段 (D7-S11)
+                  Learner.Learn → ReputationStore (LP-1)
+            │
+            Decide spawn/rollup → WorkTree 状态迁移 → 下一 focus 或 break
+```
+
+> 下列为 **ItemPipelineRunner.Run 内部** 各阶段细节（原 §4 OrchestratePath 6 步时序，语义不变，入口已迁移）：
+
+```
+ItemPipelineRunner.Run(ctx, sessionID, item, userID)   [legacy alias: OrchestratePath.Run — 已删]
     │
     ├─[A] Observe 阶段 (D7-S8)  [Phase 2 PR-A1]
     │     UncertaintyReport ─→ 喂给 Planner

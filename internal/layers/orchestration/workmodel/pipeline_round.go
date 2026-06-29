@@ -75,6 +75,9 @@ type TreeEvalContext struct {
 	Depth                   int
 	MaxDepth                int
 	RunningChildren         int
+	ChildTotal              int
+	CanDecompose            bool
+	RollupRound             bool
 	DailyLimitExceeded      bool
 	Threshold               float64
 	UserID                  string
@@ -99,6 +102,11 @@ func DefaultTreeEvalContext(sessionID, workItemID, userID string, tm *TaskManage
 	}
 	stats := childOutcomeStats(tm, sessionID, workItemID)
 	ctx.RunningChildren = stats.Running
+	ctx.ChildTotal = stats.Total
+	if item, ok := tm.GetWorkItem(sessionID, workItemID); ok && item != nil {
+		ctx.CanDecompose = CanDecompose(item.Kind)
+		ctx.RollupRound = item.NeedsRollup
+	}
 	return ctx
 }
 

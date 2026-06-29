@@ -38,8 +38,7 @@ type ItemPipelineRunner struct {
 	// gateway so feishu cards show live tool_call / tool_result / text
 	// alongside the final ArtifactSummary. nil → no-op (legacy / test
 	// fixtures). RunSessionTurnLoop sets this in its goroutine so the
-	// per-WorkItem path produces the same observable stream as the legacy
-	// OrchestratePath worker fan-out.
+	// per-WorkItem path produces the same observable stream on feishu cards.
 	//
 	// Hotfix (2026-06-27): without this, ItemPipelineRunner ran 4 tool.bash
 	// calls per ReAct loop but the feishu card only saw the final
@@ -127,12 +126,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the
-	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. Previously
-	// only OrchestratePath emitted this; the default-on ItemPipeline path was
-	// missing the root + 5 sub-spans, so the 5-node tree was visible only on
-	// the legacy route. hardening uses a package-level bridge (SetBridge in
-	// bootstrap/wire_coordinator.go), so this works without an obsBridge field
-	// on ItemPipelineRunner.
+	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. hardening
+	// uses a package-level bridge (SetBridge in bootstrap/wire_coordinator.go),
+	// so this works without an obsBridge field on ItemPipelineRunner.
 	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
 	defer func() { endMUPS(nil) }()
 
@@ -167,10 +163,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	qKind := "intent_orchestrate"
-	if report.QuantizedIntent != nil {
-		qKind = quantizedKindFromIntent(report.QuantizedIntent.Kind)
-	}
+	qKind := planQuantizedKind(item, report)
 	planInput := plan.PlanInput{
 		SessionID:      sessionID,
 		ObservationIDs: obsIDs,
@@ -233,6 +226,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if result != nil {
 		ApplyGoalScopeFromExecute(sessionID, item, result.Content, r.Tasks)
 	}
+	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
+		item = got
+	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
 	{
@@ -241,7 +237,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	verdict := verifyArtifact(art)
+	verdict := verifyArtifactForWorkItem(art, item, pl)
 	if isRollup {
 		verdict = verifyRollupArtifact(art)
 	} else if r.Verify != nil {
@@ -385,6 +381,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	if round.SpawnPolicy == workmodel.SpawnNone {
 		status := workmodel.StatusAfterSpawnNone(verdict.Kind)
+		if isRollup && verdict.Kind != types.VerdictPass {
+			status = workmodel.TaskStatusInProgress
+		}
 		got, _ := r.Tasks.GetWorkItem(sessionID, item.ID)
 		if got != nil && got.Status == workmodel.TaskStatusPending {
 			end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))

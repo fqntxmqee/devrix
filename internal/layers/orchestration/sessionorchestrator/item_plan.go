@@ -3,6 +3,7 @@ package sessionorchestrator
 import (
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
@@ -19,6 +20,28 @@ func DirectiveForGoalPlan(item *workmodel.WorkItem, baseDirective string) string
 		return baseDirective
 	}
 	return baseDirective + workmodel.GoalScopeContractPlanHint
+}
+
+// planQuantizedKind selects the Planner MatchKind input for a WorkItem.
+// loop_first ingress classifies most messages as IntentFast, which would
+// collapse to CommitmentPlan (single step) and skip exploration spawn
+// rules (R6 decompose). Goal WorkItems are multi-phase by design — force
+// intent_orchestrate unless this round is rollup synthesis.
+func planQuantizedKind(item *workmodel.WorkItem, report orchtypes.UncertaintyReport) string {
+	if item == nil {
+		return "intent_orchestrate"
+	}
+	if item.NeedsRollup {
+		return "intent_command"
+	}
+	switch item.Kind {
+	case workmodel.WorkKindGoal, workmodel.WorkKindExplore, workmodel.WorkKindPlan:
+		return "intent_orchestrate"
+	}
+	if report.QuantizedIntent != nil {
+		return quantizedKindFromIntent(report.QuantizedIntent.Kind)
+	}
+	return "intent_orchestrate"
 }
 
 // ApplyGoalScopeFromExecute parses Execute output and persists ScopeContract on Goal items.

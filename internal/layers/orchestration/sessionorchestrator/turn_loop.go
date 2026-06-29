@@ -67,6 +67,8 @@ type runLoopState struct {
 	consecutiveErrorFP    string
 	consecutiveErrorCount int
 	budgetTracker         *budgetTracker
+	// userContextPrepend applied at LLM invoke only (not persisted).
+	userContextPrepend map[string]string
 }
 
 // RunTurn executes the full prepare→llm→tools→persist loop (D7-S2-A06).

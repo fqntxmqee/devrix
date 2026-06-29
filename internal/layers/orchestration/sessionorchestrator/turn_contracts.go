@@ -62,6 +62,8 @@ type PreparedContext struct {
 	CompressHint     *CompressHint
 	Model            string
 	MaxContextTokens int
+	// UserContextPrepend is applied at LLM invoke only (user_context.mode=prepend|both).
+	UserContextPrepend map[string]string
 }
 
 // ToolRoundRequest is the input to D2-S18 ExecuteToolRound.

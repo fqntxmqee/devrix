@@ -126,6 +126,9 @@ func toolProfileForItem(item *workmodel.WorkItem) string {
 	if item == nil {
 		return "implement"
 	}
+	if item.NeedsRollup {
+		return "rollup_synth"
+	}
 	switch item.Policy {
 	case workmodel.ExecPolicyReadonly:
 		return "readonly"

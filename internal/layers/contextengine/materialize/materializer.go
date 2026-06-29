@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -44,9 +45,11 @@ func (m *DefaultMaterializer) Materialize(_ context.Context, req Request) (Resul
 		if err != nil {
 			return Result{}, err
 		}
-		msgs = append(msgs, priv...)
+		msgs = mergeInitialWithPrivateChain(msgs, priv)
 	}
+	msgs = conversation.RepairToolMessageChain(msgs)
 	msgs = compressMessages(msgs, req.Policy.TokenBudget)
+	msgs = conversation.RepairToolMessageChain(msgs)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
 	return Result{
@@ -88,7 +91,9 @@ func (m *DefaultMaterializer) materializeSubTurn(req Request) (Result, error) {
 			msgs = append(priv, msgs...)
 		}
 	}
+	msgs = conversation.RepairToolMessageChain(msgs)
 	msgs = compressMessages(msgs, req.Policy.TokenBudget)
+	msgs = conversation.RepairToolMessageChain(msgs)
 	sys := strings.TrimSpace(req.SystemPrompt)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
@@ -123,7 +128,9 @@ func (m *DefaultMaterializer) materializeWave(req Request) (Result, error) {
 			}
 		}
 	}
+	msgs = conversation.RepairToolMessageChain(msgs)
 	msgs = compressMessages(msgs, req.Policy.TokenBudget)
+	msgs = conversation.RepairToolMessageChain(msgs)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
 	return Result{
@@ -133,3 +140,4 @@ func (m *DefaultMaterializer) materializeWave(req Request) (Result, error) {
 		TokenEst:     tokEst,
 	}, nil
 }
+

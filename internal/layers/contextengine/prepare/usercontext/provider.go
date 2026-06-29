@@ -90,3 +90,15 @@ func OmitClaudeMd(ctx map[string]string) map[string]string {
 	}
 	return out
 }
+
+// MessagesWithUserContext prepends runtime user context at the LLM API boundary.
+// Per D2 spec, prepend content is not persisted in snapshot Messages.
+func MessagesWithUserContext(msgs []types.Message, uc map[string]string) []types.Message {
+	if len(uc) == 0 {
+		return msgs
+	}
+	if conversation.HasMetaUserContext(msgs) {
+		return msgs
+	}
+	return PrependForAPI(msgs, uc)
+}

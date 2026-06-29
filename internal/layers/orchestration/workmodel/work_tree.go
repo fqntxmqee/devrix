@@ -163,6 +163,7 @@ func (t *WorkTree) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
 		title = title[:80] + "..."
 	}
 	item := NewWorkItem(WorkKindGoal, title, directive)
+	item.Uncertainty = DefaultUncertaintyDecomposeThreshold
 	t.items[sessionID][item.ID] = item
 	t.persistLocked(sessionID)
 	return item, nil

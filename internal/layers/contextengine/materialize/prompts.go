@@ -119,6 +119,28 @@ func buildInitialMessages(req Request) []types.Message {
 	}}
 }
 
+// mergeInitialWithPrivateChain joins the fresh user directive with persisted
+// private-chain turns without duplicating the opening user message when a
+// prior ExecuteWorkItem round already persisted it.
+func mergeInitialWithPrivateChain(initial, priv []types.Message) []types.Message {
+	if len(priv) == 0 {
+		return initial
+	}
+	if len(initial) == 1 &&
+		initial[0].Role == types.MessageRoleUser &&
+		priv[0].Role == types.MessageRoleUser &&
+		initial[0].Content == priv[0].Content {
+		out := make([]types.Message, 0, len(priv))
+		out = append(out, initial[0])
+		out = append(out, priv[1:]...)
+		return out
+	}
+	out := make([]types.Message, 0, len(initial)+len(priv))
+	out = append(out, initial...)
+	out = append(out, priv...)
+	return out
+}
+
 // deliveryHintBlock is the trailer appended to every system prompt explaining
 // how the WorkItem should report back. Held in materializer.go (not extracted)
 // because it's a single const referenced by buildSystemPrompt and

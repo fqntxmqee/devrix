@@ -46,6 +46,8 @@ func compressMessages(msgs []types.Message, budget int) []types.Message {
 // DM-20260629-002 PR-3: extracted from materializer.go (was 13 LOC).
 func toolsForProfile(profile string) []ToolDescriptor {
 	switch profile {
+	case "rollup_synth":
+		return []ToolDescriptor{} // synthesis-only: no tools
 	case "implement", "":
 		return nil // executor uses full tool set from ContextPreparer fallback merge
 	case "readonly":

@@ -78,6 +78,41 @@ func TestSpawnPolicyEvaluator_R5_PartialHighUncertainty(t *testing.T) {
 	}
 }
 
+func TestSpawnPolicyEvaluator_R5_PartialAtThreshold(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ProtocolPlan, 0.6)
+	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnDecompose {
+		t.Fatalf("R5 at threshold: got %q, want decompose", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R5_ExplorationPartialLowUncertainty_Decomposable(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.2)
+	ctx := baseCtx()
+	ctx.CanDecompose = true
+	ctx.ChildTotal = 0
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnDecompose {
+		t.Fatalf("R5 exploration partial decomposable: got %q, want decompose", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R5_ExploreLeafPartialInlines(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.2)
+	ctx := baseCtx()
+	ctx.CanDecompose = false
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnInline {
+		t.Fatalf("R5 explore leaf partial: got %q, want inline", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R5_RollupPartialInlines(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnInline {
+		t.Fatalf("rollup partial: got %q, want inline", got)
+	}
+}
+
 func TestSpawnPolicyEvaluator_R5_PartialLowUncertainty(t *testing.T) {
 	round := baseRound(types.VerdictPartial, plan.ProtocolPlan, 0.5)
 	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnNone {
@@ -94,8 +129,20 @@ func TestSpawnPolicyEvaluator_R6_ScenarioFail(t *testing.T) {
 
 func TestSpawnPolicyEvaluator_R6_ExplorationFail(t *testing.T) {
 	round := baseRound(types.VerdictFail, plan.ExplorationPlan, 0.8)
-	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnDecompose {
-		t.Fatalf("R6 exploration: got %q, want decompose", got)
+	ctx := baseCtx()
+	ctx.CanDecompose = true
+	ctx.ChildTotal = 0
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnDecompose {
+		t.Fatalf("R6 exploration decomposable: got %q, want decompose", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R6_ExploreLeafFailInlines(t *testing.T) {
+	round := baseRound(types.VerdictFail, plan.ExplorationPlan, 0.8)
+	ctx := baseCtx()
+	ctx.CanDecompose = false
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnInline {
+		t.Fatalf("R6 explore leaf fail: got %q, want inline", got)
 	}
 }
 
@@ -115,12 +162,33 @@ func TestSpawnPolicyEvaluator_R7_IndeterminateRetry(t *testing.T) {
 	}
 }
 
-func TestSpawnPolicyEvaluator_R7_IndeterminateExhausted(t *testing.T) {
+func TestSpawnPolicyEvaluator_R7_IndeterminateExhausted_ExploratoryDecomposes(t *testing.T) {
 	round := baseRound(types.VerdictIndeterminate, plan.ExplorationPlan, 0.5)
+	ctx := baseCtx()
+	ctx.CanDecompose = true
+	ctx.ChildTotal = 0
+	ctx.IndeterminateRetries = 3
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnDecompose {
+		t.Fatalf("R7 exhausted exploratory: got %q, want decompose", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R7_ExploreLeafIndeterminateExhaustedEscalates(t *testing.T) {
+	round := baseRound(types.VerdictIndeterminate, plan.ExplorationPlan, 0.5)
+	ctx := baseCtx()
+	ctx.CanDecompose = false
+	ctx.IndeterminateRetries = 3
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
+		t.Fatalf("R7 explore leaf exhausted: got %q, want escalate_human", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R7_IndeterminateExhausted_CommitmentEscalatesHuman(t *testing.T) {
+	round := baseRound(types.VerdictIndeterminate, plan.CommitmentPlan, 0.5)
 	ctx := baseCtx()
 	ctx.IndeterminateRetries = 3
 	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
-		t.Fatalf("R7 exhausted: got %q, want escalate_human", got)
+		t.Fatalf("R7 exhausted commitment: got %q, want escalate_human", got)
 	}
 }
 
@@ -139,7 +207,10 @@ func TestSpawnPolicyEvaluator_NilRound(t *testing.T) {
 
 func TestEvaluateSpawnPolicy_SetsRationale(t *testing.T) {
 	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.9)
-	EvaluateSpawnPolicy(round, baseCtx())
+	ctx := baseCtx()
+	ctx.CanDecompose = true
+	ctx.ChildTotal = 0
+	EvaluateSpawnPolicy(round, ctx)
 	if round.SpawnPolicy != SpawnDecompose {
 		t.Fatalf("policy = %q, want decompose", round.SpawnPolicy)
 	}
