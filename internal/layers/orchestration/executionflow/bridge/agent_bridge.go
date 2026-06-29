@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -140,17 +141,17 @@ func (b *AgentBridge) EngineEventSink() func(*contracts.EngineEvent) {
 
 func mapAgentEventKind(eventType string) contracts.FlowEventKind {
 	switch eventType {
-	case "agent.forked":
+	case orchtypes.EventAgentForked:
 		return contracts.FlowForked
-	case "agent.started":
+	case orchtypes.EventAgentStarted:
 		return contracts.FlowStarted
-	case "agent.iterating":
+	case orchtypes.EventAgentIterating:
 		return contracts.FlowIterating
-	case "agent.terminated":
+	case orchtypes.EventAgentTerminated:
 		return contracts.FlowCompleted
-	case "agent.error":
+	case orchtypes.EventAgentError:
 		return contracts.FlowFailed
-	case "agent.joined":
+	case orchtypes.EventAgentJoined:
 		return contracts.FlowJoined
 	default:
 		if strings.Contains(eventType, "permission") {

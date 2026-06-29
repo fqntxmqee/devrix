@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/multiagent"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/shared/types"
 	"github.com/google/uuid"
 )
@@ -50,7 +51,7 @@ func (o *GuardObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
 	var rec *DecisionRecord
 
 	switch ev.EventType {
-	case "permission_required":
+	case orchtypes.EventPermissionRequired:
 		toolName, _ := ev.Metadata["tool"].(string)
 		if toolName == "" {
 			return
@@ -67,7 +68,7 @@ func (o *GuardObserver) EmitAgentEvent(ev multiagent.AgentEvent) {
 			SessionState:  o.session.State,
 		}
 
-	case "agent.forked":
+	case orchtypes.EventAgentForked:
 		childID, _ := ev.Metadata["child_id"].(string)
 		if childID == "" {
 			return

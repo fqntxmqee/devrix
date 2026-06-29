@@ -6,6 +6,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/multiagent"
 	"github.com/devrix/devrix/internal/layers/multiagent/observability"
 	"github.com/devrix/devrix/internal/layers/multiagent/isolate"
+	"github.com/devrix/devrix/internal/layers/multiagent/orchtypes"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
@@ -61,7 +62,7 @@ func (a *Impl) Fork(ctx context.Context, cfg multiagent.AgentConfig) (multiagent
 		impl.AttachSessionView(childView)
 	}
 	a.addChild(child)
-	a.emit("agent.forked", map[string]any{"child_id": child.ID()})
+	a.emit(orchtypes.EventAgentForked, map[string]any{"child_id": child.ID()})
 	if forkSpan != nil {
 		forkSpan.SetAttributes(tracer.Attribute{Key: "child.id", Value: child.ID()})
 		forkSpan.SetStatus(tracer.StatusCodeOk, "")
@@ -111,7 +112,7 @@ func (a *Impl) Join(ctx context.Context, child multiagent.Agent) error {
 	}
 	a.appendMessages(a.dedupToolCallMessages(msgs)...)
 	a.removeChild(child.ID())
-	a.emit("agent.joined", map[string]any{"child_id": child.ID()})
+	a.emit(orchtypes.EventAgentJoined, map[string]any{"child_id": child.ID()})
 	if joinSpan != nil {
 		joinSpan.SetStatus(tracer.StatusCodeOk, "")
 		joinSpan.End()
