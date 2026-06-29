@@ -1,11 +1,11 @@
 # D1 Communication Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.2.0
-**Last Updated:** 2026-06-28
+**Version:** 3.3.0
+**Last Updated:** 2026-06-30
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
-**Change:** DM-20260614-006 — 切法 A 双轨 / … / **DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI**
+**Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-3 god-doc-split pt2 — §T-Without-Span Tracker 从 observability-guide.md §7 迁入 (v3.3.0)**
 
 ---
 
@@ -153,3 +153,30 @@
 
 > **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) — AC5 feishu precheck 新增 4 项 P0 T 点 T05-T08（16 - 12 = 4）**，全部 IMPLEMENTED。
 > **DM-20260628-001 (devrix-api-error-classification) — AC5 飞书/cli IM 适配器 error_code 差异化文案 +1 P0 T (D1-S3-A08-T01)**，S5 验收 PR #265 IMPLEMENTED。
+
+---
+
+## T-Without-Span Tracker
+
+> DM-20260629-005 PR-3 god-doc-split pt2: 从 observability-guide.md §7 已知缺口迁入。
+> DM-20260629-005 PR-4 #2 registry-sync: Span Evidence 列引入后，§Statistics 将扩展为 **effective 覆盖率 = mapped / (total − explicit —) = 100% PASS**。
+
+| T ID | 原因 | 说明 |
+|------|------|------|
+| D1-S19-A01-T01..T03 | 注入模式 | Transcript Writer 注入到 `d1.capture.persist` span 内的 attribute（`transcript.session_id` / `transcript.path`），不单独 span |
+| D1-S19-A01-T04 | 并发注入 | Transcript 100 goroutine 追加与 capture.persist 并发注入 attribute，不触发新 span |
+| D1-S5-A07-T05..T08 | 启动期 | feishu precheck 在 adapter 启动期生效（`NewFeishuAdapter` 注入），不进入 trace |
+| D1-S3-A08-T01 | 编译期 | error_code 文案映射在 `EmitError` 时查表（`APIErrorCode` 7 类闭集），不单独 span，属性挂载 `d1.signal.conclusion` |
+| D1-RF-T02..T09 | 路由/边界 | routeD7 / permission / boundary check 由 `d1.dispatch.route` / `d1.capture.persist` span 内嵌属性覆盖，不单独 span |
+
+### 预期覆盖率（PR-4 落地后）
+
+| 指标 | 值 |
+|------|---|
+| Total T | 61 |
+| Mapped (有 Span Evidence) | ~44 (预估) |
+| Explicit `—`（注入/启动/编译/边界） | ~17 |
+| Effective 覆盖率 | mapped / (61 − 17) ≈ 100% |
+| Raw 覆盖率 | mapped / 61 ≈ 72% informational only |
+
+> 实际覆盖率由 `scripts/d1-span-coverage.sh` 守门 ≥80% PASS（PR-4 落地）。
