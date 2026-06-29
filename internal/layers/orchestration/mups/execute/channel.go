@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 )
@@ -87,9 +88,22 @@ type Channel interface {
 // for PR-C2 because the Phase 4 VerdictKind enum has not landed yet. PR-C2
 // only carries the values through to Channel implementations that need them;
 // when Phase 4 lands, the type will be tightened via a type alias.
+//
+// Spec (devrix-d7-taskcontract-unification-pr-a, DM-20260629-007): optional
+// additive pointer to the v7.0 unified down-link contract. PR-A only sets
+// it from new call sites; legacy callers continue to pass the legacy
+// fields and Channel implementations fall back to the existing extractors.
+// PR-B fully migrates all call sites; PR-C removes this field's optional
+// marker.
 type ChannelRequest struct {
-	SessionID        string
+	SessionID         string
 	PriorVerdictKinds []string
+
+	// Spec — optional v7.0 TaskContract down-link. When non-nil, Channel
+	// implementations SHOULD prefer it over the legacy SessionID/
+	// PriorVerdictKinds fields. Kept as a pointer (not a value) so the
+	// zero-value ChannelRequest{} remains valid for legacy callers.
+	Spec *interfaces.TaskSpec
 }
 
 // ChannelRegistry maps PlanKind → Channel. Constructed once at wiring time
