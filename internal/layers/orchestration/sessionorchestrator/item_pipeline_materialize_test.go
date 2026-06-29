@@ -118,7 +118,7 @@ func TestBuildMaterializeRequest_UpstreamBlockedBy(t *testing.T) {
 	}
 }
 
-func TestRunItemPipeline_ScopeContractOpenQuestionsBlocksDecompose(t *testing.T) {
+func TestRunItemPipeline_ScopeContractOpenQuestionsAllowsDecompose(t *testing.T) {
 	tm := workmodel.NewTaskManager()
 	block := `<scope_contract>{"goal_statement":"compare caches","in_scope":["cache"],"open_questions":["Redis or Memcached?"]}</scope_contract>`
 	exec := &contentWorkItemExecutor{content: block}
@@ -131,7 +131,7 @@ func TestRunItemPipeline_ScopeContractOpenQuestionsBlocksDecompose(t *testing.T)
 			Kind: types.VerdictPartial, SourceID: "v", Confidence: 0.4, Reason: "explore",
 		}
 	}
-	sessionID := "sess-scope-block"
+	sessionID := "sess-scope-decompose"
 	goal, _ := tm.EnsureGoal(sessionID, "compare cache strategies")
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.9)
 
@@ -139,11 +139,8 @@ func TestRunItemPipeline_ScopeContractOpenQuestionsBlocksDecompose(t *testing.T)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if round.SpawnPolicy == workmodel.SpawnDecompose {
-		t.Fatalf("SpawnPolicy = decompose, want blocked by open_questions (got %+v)", round)
-	}
-	if round.SpawnPolicy != workmodel.SpawnInline {
-		t.Fatalf("SpawnPolicy = %q, want inline", round.SpawnPolicy)
+	if round.SpawnPolicy != workmodel.SpawnDecompose {
+		t.Fatalf("SpawnPolicy = %q, want decompose for open_questions exploration (got %+v)", round.SpawnPolicy, round)
 	}
 	got, _ := tm.GetWorkItem(sessionID, goal.ID)
 	if got.ScopeContract == nil || !got.ScopeContract.HasOpenQuestions() {

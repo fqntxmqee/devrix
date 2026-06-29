@@ -175,6 +175,7 @@ func (o *DefaultOrchestrator) prepareContext(ctx context.Context, req TurnReques
 		nested:               nested,
 		exitReason:           verify.ExitReasonNatural,
 		recentToolSignatures: make([]string, 0, repeatedToolLookback),
+		userContextPrepend:   prepared.UserContextPrepend,
 	}, nil
 }
 
@@ -236,10 +237,11 @@ func (o *DefaultOrchestrator) runLLMStream(
 
 streamRecoveryLoop:
 	for {
+		apiMessages := messagesForLLMInvoke(st.messages, st.userContextPrepend)
 		chunkCh, invokeErr := o.invokeStreamWithRecovery(turnCtx, req, LLMInvokeRequest{
 			SessionID:    req.SessionID,
 			SystemPrompt: st.systemPrompt,
-			Messages:     st.messages,
+			Messages:     apiMessages,
 			Tools:        st.tools,
 		})
 		if invokeErr != nil {

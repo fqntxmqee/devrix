@@ -16,9 +16,8 @@ import (
 // T: d7.Entry adapter must satisfy the gateway contract.
 //
 // T: D7-D1-T01 — Entry.ProcessMessage routes through the orchestrator.
-// v6.1.0: routes through OrchestratePath (5-node pipeline); exec.RunTurn
-// is no longer called directly. Use the fake scheduler helper to inject
-// deterministic artifacts → text event.
+// v6.1.0+: routes through RunSessionTurnLoop + ItemPipelineRunner (MUPS);
+// legacy TurnExecutor.RunTurn is not invoked for user messages.
 func TestEntry_ProcessMessage(t *testing.T) {
 	orch, _, _ := newOrchestratorWithItemPipeline(t)
 	entry := NewEntry(orch)
@@ -102,8 +101,7 @@ func TestSessionOrchestrator_AdvisoryValidator_Pass(t *testing.T) {
 
 // T: D6 validator pass=false still lets the request through (advisory).
 // Per R1 Q11, validation is advisory; failure is logged but does not block.
-// v6.1.0: exec.RunTurn is no longer called directly; verify the wave
-// scheduler started instead.
+// v6.1.0+: legacy TurnExecutor.RunTurn is not invoked; MUPS pipeline runs instead.
 func TestSessionOrchestrator_AdvisoryValidator_AdvisoryFail(t *testing.T) {
 	v := &fakeAdvisoryValidator{pass: false, reason: "risky"}
 	orch, _, _ := newOrchestratorWithItemPipeline(t, WithValidator(v))

@@ -470,9 +470,9 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 		// `/`-prefixed D7-internal commands stay on CommandHandler (zero-LLM,
 		// no 5-node overhead). All other user instructions — regardless of
 		// classifier confidence or previous Fast/Orchestrate classification —
-		// route through OrchestratePath so the 5-node MUPS pipeline (Observe
-		// → Plan → Wave → Execute → Verify → Learn) is the single execution
-		// surface. See ProcessMessage doc comment above.
+		// All other user instructions route through RunSessionTurnLoop
+		// (WorkTree focus loop + per-WorkItem MUPS: Observe → Plan →
+		// Execute → Verify → Learn). See ProcessMessage doc comment above.
 		if o.commandHandler == nil {
 			err = fmt.Errorf("orchestrator: orchtypes.IntentCommand received but commandHandler is nil (bootstrap missing wiring)")
 		} else {

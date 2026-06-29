@@ -1,30 +1,5 @@
 package workmodel
 
-// DefaultDecomposeProposer fills ChildSpecs when the rule engine selects
-// SpawnDecompose but no LLM proposer ran yet (Phase C baseline, OQ-3).
-func DefaultDecomposeProposer(item *WorkItem, round *WorkItemPipelineRound) []ChildSpec {
-	if item == nil || round == nil {
-		return nil
-	}
-	exploratory := IsExploratoryPlanKind(round.PlanKind)
-	kind := ChildKindForHypothesis(exploratory)
-	base := itemDirectiveForProposer(item)
-	return []ChildSpec{
-		{Kind: kind, Title: "explore path A", Directive: base + " — hypothesis A", ExpectedReturn: "Evidence comparing hypothesis A"},
-		{Kind: kind, Title: "explore path B", Directive: base + " — hypothesis B", ExpectedReturn: "Evidence comparing hypothesis B"},
-	}
-}
-
-func itemDirectiveForProposer(item *WorkItem) string {
-	if item == nil {
-		return ""
-	}
-	if d := item.Directive; d != "" {
-		return d
-	}
-	return item.Title
-}
-
 // PrepareDecomposeSpecs ensures round carries capped child specs and passes I4.
 func PrepareDecomposeSpecs(item *WorkItem, round *WorkItemPipelineRound) error {
 	if round == nil {
@@ -44,6 +19,11 @@ func ApplySpawnPolicy(sessionID string, item *WorkItem, round *WorkItemPipelineR
 	}
 	switch round.SpawnPolicy {
 	case SpawnDecompose:
+		if item != nil && !CanDecompose(item.Kind) {
+			round.SpawnPolicy = SpawnInline
+			round.SpawnRationale = "spawn guard: kind " + string(item.Kind) + " cannot decompose → inline retry"
+			return nil
+		}
 		if err := PrepareDecomposeSpecs(item, round); err != nil {
 			return err
 		}
@@ -114,6 +94,9 @@ func (t *WorkTree) HasOpenWork(sessionID string) bool {
 	for _, item := range t.List(sessionID) {
 		if item == nil || item.Ephemeral {
 			continue
+		}
+		if item.Kind == WorkKindGoal && item.NeedsRollup && item.ParentID == "" {
+			return true
 		}
 		if !isTerminalStatus(item.Status) {
 			return true

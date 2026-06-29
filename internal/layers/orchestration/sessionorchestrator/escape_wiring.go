@@ -45,7 +45,7 @@ func (o *SessionOrchestrator) buildEscapeLoopContext(sessionID string, kind esca
 //
 // IntentSkip → 0 (no plan)
 // IntentCommand → plan.CommitmentPlan
-// IntentFast | IntentOrchestrate → plan.ScenarioPlan (v6.1.0: both flow through OrchestratePath)
+// IntentFast | IntentOrchestrate → plan.ScenarioPlan (both flow through RunSessionTurnLoop + MUPS)
 func planKindFromIntent(kind orchtypes.IntentKind) escape.PlanKind {
 	switch kind {
 	case orchtypes.IntentCommand:

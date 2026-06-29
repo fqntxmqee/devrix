@@ -37,6 +37,9 @@ jobs:
       - name: D1 import boundary lint (DM-20260628-003)
         run: chmod +x ./scripts/lint-d1-imports.sh && ./scripts/lint-d1-imports.sh
 
+      - name: D7 main-path architecture lint (TurnLoop + WorkTree + MUPS)
+        run: chmod +x ./scripts/lint-d7-main-path.sh && ./scripts/lint-d7-main-path.sh
+
       - name: Build
         run: go build ./...
 

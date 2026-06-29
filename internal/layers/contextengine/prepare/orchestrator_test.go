@@ -2,11 +2,13 @@ package prepare_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/prompt"
+	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -318,5 +320,43 @@ func TestPrepareOrchestrator_Prepare_forwards_ctx_to_prompt_assembler(t *testing
 	}
 	if v, _ := assembler.gotCtx.Value(ctxKey{}).(string); v != "marker" {
 		t.Fatalf("ctx value lost: got %q, want %q", v, "marker")
+	}
+}
+
+type capturingPromptAssembler struct {
+	lastIn prompt.SystemPromptBuildInput
+}
+
+func (s *capturingPromptAssembler) Build(_ context.Context, in prompt.SystemPromptBuildInput) (string, prompt.SystemPromptBuildReport) {
+	s.lastIn = in
+	a := prompt.NewSystemPromptAssembler(config.DefaultWorkspacePromptConfig())
+	return a.Build(in)
+}
+
+func TestPrepareOrchestrator_Prepare_passesAgentsRawToAssembler(t *testing.T) {
+	sc := &types.SessionContext{SessionID: "s1", WorkDir: "/tmp/ws", Messages: []types.Message{}}
+	cap := &capturingPromptAssembler{}
+	orch := prepare.NewPrepareOrchestrator(prepare.PrepareDeps{
+		SessionLoader:   &stubSessionLoader{sc: sc},
+		PromptAssembler: cap,
+	})
+	agents := "D2 → internal/layers/contextengine/"
+	out, err := orch.Prepare(context.Background(), prepare.PrepareInput{
+		Session:         &types.Session{SessionID: "s1"},
+		Message:         "review d2",
+		AgentsRaw:       agents,
+		UserContextMode: "system",
+	}, nil)
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if cap.lastIn.AgentsRaw != agents {
+		t.Fatalf("AgentsRaw = %q, want %q", cap.lastIn.AgentsRaw, agents)
+	}
+	if cap.lastIn.OmitAgentsFromSystem {
+		t.Fatal("expected agents in system for mode=system")
+	}
+	if !strings.Contains(out.SystemPrompt, "contextengine") {
+		t.Fatalf("system prompt missing agents: %q", out.SystemPrompt)
 	}
 }

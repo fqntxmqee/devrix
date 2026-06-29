@@ -63,3 +63,54 @@ func TestDefaultMaterializer_Materialize(t *testing.T) {
 		t.Fatalf("messages = %d, want 1", len(res.Messages))
 	}
 }
+
+func TestDefaultMaterializer_Materialize_repairs_orphan_tool_results_after_compress(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := NewPartitionStore(dir)
+	calls := `[{"id":"call_a","type":"function","function":{"name":"read_file","arguments":"{}"}},{"id":"call_b","type":"function","function":{"name":"grep","arguments":"{}"}}]`
+	priv := []types.Message{
+		{SessionID: "s1", Role: types.MessageRoleAssistant, Metadata: map[string]string{"tool_calls": calls}},
+		{SessionID: "s1", Role: types.MessageRoleTool, Content: "a", Metadata: map[string]string{"tool_call_id": "call_a"}},
+		{SessionID: "s1", Role: types.MessageRoleTool, Content: "orphan", Metadata: map[string]string{"tool_call_id": "call_stale"}},
+	}
+	if err := store.Append("s1", "wi1", priv); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	m := NewDefaultMaterializer(store)
+	res, err := m.Materialize(context.Background(), Request{
+		Partition: Partition{SessionID: "s1", Kind: PartitionWorkItem, WorkItemID: "wi1"},
+		Policy:    Policy{Mode: ModeFresh, TokenBudget: 100000},
+		Signals:   InboundSignals{Directive: "work"},
+	})
+	if err != nil {
+		t.Fatalf("Materialize: %v", err)
+	}
+	toolCount := 0
+	for _, msg := range res.Messages {
+		if msg.Role == types.MessageRoleTool {
+			toolCount++
+			if msg.Metadata["tool_call_id"] == "call_stale" {
+				t.Fatal("orphan tool result should be repaired out")
+			}
+		}
+	}
+	if toolCount != 0 {
+		t.Fatalf("tool messages = %d, want 0 (incomplete multi-call round stripped)", toolCount)
+	}
+}
+
+func TestMergeInitialWithPrivateChain_skips_duplicate_opening_user(t *testing.T) {
+	directive := "do work"
+	initial := []types.Message{{Role: types.MessageRoleUser, Content: directive}}
+	priv := []types.Message{
+		{Role: types.MessageRoleUser, Content: directive},
+		{Role: types.MessageRoleAssistant, Content: "ok"},
+	}
+	got := mergeInitialWithPrivateChain(initial, priv)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].Role != types.MessageRoleUser || got[1].Role != types.MessageRoleAssistant {
+		t.Fatalf("got %+v", got)
+	}
+}

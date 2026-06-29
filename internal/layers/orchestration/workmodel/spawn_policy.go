@@ -49,25 +49,51 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		return SpawnNone
 
 	case types.VerdictPartial:
-		// R5
-		if round.UncertaintyMean > ctx.Threshold {
+		// R5 — rollup synthesis retries inline until verifyRollup passes.
+		if ctx.RollupRound {
+			return SpawnInline
+		}
+		// Exploratory partial on decomposable parents (Goal/Plan/Implement)
+		// triggers the first split; leaf explore items retry inline.
+		if IsExploratoryPlanKind(round.PlanKind) {
+			if ctx.CanDecompose && ctx.ChildTotal == 0 {
+				return SpawnDecompose
+			}
+			return SpawnInline
+		}
+		if round.UncertaintyMean >= ctx.Threshold {
 			return SpawnDecompose
 		}
 		return SpawnNone
 
 	case types.VerdictFail:
+		if ctx.RollupRound {
+			return SpawnInline
+		}
 		// R6
 		if round.PlanKind == plan.ScenarioPlan {
 			return SpawnParallelExplore
 		}
+		// Leaf explore items cannot decompose; retry inline instead.
 		if round.PlanKind == plan.ExplorationPlan {
-			return SpawnDecompose
+			if ctx.CanDecompose && ctx.ChildTotal == 0 {
+				return SpawnDecompose
+			}
+			return SpawnInline
 		}
 		return SpawnNone
 
 	case types.VerdictIndeterminate:
-		// R7
+		if ctx.RollupRound {
+			return SpawnInline
+		}
+		// R7 — exploratory plans decompose when verifier abstains (uncertainty path),
+		// instead of blocking on human gate.
 		if ctx.IndeterminateRetries >= ctx.MaxIndeterminateRetries {
+			if (IsExploratoryPlanKind(round.PlanKind) || round.UncertaintyMean >= ctx.Threshold) &&
+				ctx.CanDecompose && ctx.ChildTotal == 0 {
+				return SpawnDecompose
+			}
 			return SpawnEscalateHuman
 		}
 		return SpawnInline
@@ -103,6 +129,10 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		}
 		return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
 	case SpawnDecompose:
+		if round.VerdictKind == types.VerdictIndeterminate {
+			return fmt.Sprintf("R7: indeterminate retries exhausted → decompose (plan=%d uncertainty=%.2f)",
+				round.PlanKind, round.UncertaintyMean)
+		}
 		return fmt.Sprintf("R5/R6: verdict=%s uncertainty=%.2f threshold=%.2f plan=%d",
 			round.VerdictKind, round.UncertaintyMean, ctx.Threshold, round.PlanKind)
 	case SpawnParallelExplore:

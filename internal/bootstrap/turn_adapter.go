@@ -183,6 +183,7 @@ func (a *contextEngineAdapter) Prepare(ctx context.Context, req sessionorchestra
 					result.Model = prepared.SessionContext.Model
 				}
 				result.MaxContextTokens = prepared.SessionContext.TokenBudget.MaxContextTokens
+				result.UserContextPrepend = a.userContextPrepend(ctx, prepared.SessionContext)
 			}
 		}
 	} else if prov, ok := a.engine.(sessionContextProvider); ok {
@@ -240,6 +241,13 @@ func parseToolParams(raw string) map[string]any {
 		return map[string]any{"raw": raw}
 	}
 	return m
+}
+
+func (a *contextEngineAdapter) userContextPrepend(ctx context.Context, sc *types.SessionContext) map[string]string {
+	if ce, ok := a.engine.(*kernel.ContextEngine); ok {
+		return ce.UserContextForPrepend(ctx, sc)
+	}
+	return nil
 }
 
 // ExecuteRound implements sessionorchestrator.ToolRoundExecutor.

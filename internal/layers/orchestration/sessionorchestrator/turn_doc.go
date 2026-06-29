@@ -18,8 +18,11 @@
 //   - TurnOrchestrator is the only turn-loop owner (replaces legacy D2-S16).
 //   - D7 calls D3 directly for LLM inference; D2 is a Context Follower via
 //     ContextPreparer, ToolRoundExecutor, SessionPersister primitives.
-//   - ingress routes via ProcessMessage with loop_first only (rule_orchestrate
-//     retired in v6.0.0, FastPath retired in PR #239).
+//   - ingress: ProcessMessage → RunSessionTurnLoop (WorkTree focus loop)
+//     → ItemPipelineRunner per WorkItem (Observe→Plan→Execute→Verify→Learn).
+//     loop_first only (rule_orchestrate retired v6.0.0; FastPath retired PR #239).
+//   - RunTurn (DefaultOrchestrator) is sub-agent / PreparedTurn only, not
+//     the Feishu user-message main path.
 //   - WorkTree governance: typed RollupReport struct, deterministic
 //     sessionRootGoal, 5 ReevaluateParentAfterChild call sites are all
 //     migrated (see design.md §2.4).

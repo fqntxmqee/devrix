@@ -139,12 +139,6 @@ func TestRunSessionTurnLoop_NoSummaryTextEventAtLoopEnd(t *testing.T) {
 func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	runner.Executor = &rollupContentExecutor{summary: validRollupSummary(), capture: nil}
-	runner.Verify = func(_ *wavescheduler.Artifact) workmodel.Verdict {
-		return workmodel.Verdict{
-			Kind: types.VerdictPartial, SourceID: "v_partial", Confidence: 0.4,
-			Reason: "explore more",
-		}
-	}
 
 	orch := NewSessionOrchestrator(
 		orchtypes.DefaultConfig(),
@@ -157,6 +151,20 @@ func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	sessionID := "sess-recursive"
 	goal, _ := tm.EnsureGoal(sessionID, "compare cache strategies")
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.9)
+	goalID := goal.ID
+
+	runner.Verify = func(art *wavescheduler.Artifact) workmodel.Verdict {
+		// Partial on root triggers decompose; children must pass to reach rollup.
+		if art != nil && art.TaskID != goalID {
+			return workmodel.Verdict{
+				Kind: types.VerdictPass, SourceID: art.TaskID, Confidence: 0.9,
+			}
+		}
+		return workmodel.Verdict{
+			Kind: types.VerdictPartial, SourceID: "v_partial", Confidence: 0.4,
+			Reason: "explore more",
+		}
+	}
 
 	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
 		SessionID: sessionID,

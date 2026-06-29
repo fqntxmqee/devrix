@@ -15,6 +15,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/attachments"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/usercontext"
 	obsruntime "github.com/devrix/devrix/internal/layers/observability/configure/runtime"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -56,12 +57,35 @@ func (e *ContextEngine) PrepareForTurn(ctx context.Context, session *types.Sessi
 	if ov, ok := contracts.ProcessOverlayFromContext(ctx); ok && ov.IsWorker {
 		workerLocal = true
 	}
+	mode := e.cfg.UserContext.Mode
+	if mode == "" {
+		mode = "prepend"
+	}
+	agentsRaw := e.prompt.Load(session.WorkDir)
 	return e.prepareOrchestrator.Prepare(ctx, prepare.PrepareInput{
 		Session:         session,
 		Message:         message,
 		WorkerLocal:     workerLocal,
 		CompressPerTurn: e.cfg.TurnRuntime.CompressPerTurn,
+		AgentsRaw:       agentsRaw,
+		UserContextMode: mode,
 	}, e.startSpan)
+}
+
+// UserContextForPrepend returns the API-boundary prepend map for D7 LLM calls.
+// Nil when user_context.mode=system (agents live in system prompt only).
+func (e *ContextEngine) UserContextForPrepend(ctx context.Context, sc *types.SessionContext) map[string]string {
+	if sc == nil {
+		return nil
+	}
+	mode := e.cfg.UserContext.Mode
+	if mode == "" {
+		mode = "prepend"
+	}
+	if mode != "prepend" && mode != "both" {
+		return nil
+	}
+	return usercontext.NewProvider(e.prompt, e.cfg.UserContext).Get(ctx, sc)
 }
 
 // AppendAndTrimMessages writes a batch of messages into the session context's
@@ -196,11 +220,17 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	// workerLocal is resolved earlier (above the Process span) so the span
 	// attribute reflects the same value used for snapshot persistence.
+	mode := e.cfg.UserContext.Mode
+	if mode == "" {
+		mode = "prepend"
+	}
 	output, err := e.prepareOrchestrator.Prepare(ctx, prepare.PrepareInput{
 		Session:         session,
 		Message:         message,
 		WorkerLocal:     workerLocal,
 		CompressPerTurn: e.cfg.TurnRuntime.CompressPerTurn,
+		AgentsRaw:       agentsRaw,
+		UserContextMode: mode,
 	}, e.startSpan)
 	if err != nil {
 		emit(mapProcessError(session.SessionID, err))

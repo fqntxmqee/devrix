@@ -56,11 +56,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		}
 
 		// Emit hook for ItemPipelineRunner / WorkItemExecutor so per-WorkItem
-		// tool calls show up on feishu cards. Mirrors OrchestratePath's
-		// spec.Emit pattern but driven from the gateway out channel rather
-		// than the subagent stream — the executor already runs sequentially
-		// in this goroutine, so each event lands on `out` in arrival order
-		// and the gateway renders it live.
+		// tool calls show up on feishu cards. Events are forwarded from this
+		// goroutine's `out` channel in arrival order so the gateway renders
+		// them live on feishu cards.
 		emitFn := func(ev *contracts.EngineEvent) {
 			if ev == nil {
 				return

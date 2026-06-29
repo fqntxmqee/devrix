@@ -61,7 +61,11 @@ type PrepareInput struct {
 	Model           string
 	Message         string
 	WorkerLocal     bool
-	CompressPerTurn bool   // when false, skip per-turn compression entirely
+	CompressPerTurn bool // when false, skip per-turn compression entirely
+	// AgentsRaw is merged .devrix/AGENTS.md (+ rules) for system prompt assembly.
+	AgentsRaw string
+	// UserContextMode is devrix.yaml user_context.mode (prepend|system|both).
+	UserContextMode string
 }
 
 // PrepareOutput carries the outputs from a prepare orchestration run.
@@ -173,6 +177,10 @@ func (o *PrepareOrchestrator) Prepare(ctx context.Context, input PrepareInput, p
 // toSystemPromptBuildInput converts prepare state into the prompt.Assembler input.
 // Centralized to avoid drift between orchestrator and facade paths.
 func (in *PrepareInput) toSystemPromptBuildInput(sc *types.SessionContext, entries []memory.MemoryEntry) prompt.SystemPromptBuildInput {
+	mode := in.UserContextMode
+	if mode == "" {
+		mode = "prepend"
+	}
 	return prompt.SystemPromptBuildInput{
 		WorkDir: sc.WorkDir,
 		Session: in.Session,
@@ -181,7 +189,9 @@ func (in *PrepareInput) toSystemPromptBuildInput(sc *types.SessionContext, entri
 			RequestID: in.Session.RequestID,
 			UserID:    in.Session.UserID,
 		},
-		MemoryEntries: entries,
+		MemoryEntries:        entries,
+		AgentsRaw:            in.AgentsRaw,
+		OmitAgentsFromSystem: mode == "prepend",
 	}
 }
 

@@ -14,7 +14,7 @@ func TestScopeContract_HasOpenQuestions(t *testing.T) {
 	}
 }
 
-func TestApplyScopeContractSpawnGate_BlocksDecompose(t *testing.T) {
+func TestApplyScopeContractSpawnGate_AllowsDecompose(t *testing.T) {
 	item := &WorkItem{Kind: WorkKindGoal, ScopeContract: &ScopeContract{OpenQuestions: []string{"?"}}}
 	round := &WorkItemPipelineRound{
 		PlanKind:    plan.ExplorationPlan,
@@ -22,8 +22,8 @@ func TestApplyScopeContractSpawnGate_BlocksDecompose(t *testing.T) {
 		SpawnPolicy: SpawnDecompose,
 	}
 	ApplyScopeContractSpawnGate(item, round)
-	if round.SpawnPolicy != SpawnInline {
-		t.Fatalf("got %q, want inline", round.SpawnPolicy)
+	if round.SpawnPolicy != SpawnDecompose {
+		t.Fatalf("got %q, want decompose (open questions are exploration hypotheses)", round.SpawnPolicy)
 	}
 }
 
