@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.4.0
+**Version:** 3.5.0
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d3-sa-refine（R1+R2+R3）+ devrix-d3-sa-refine-v1.1（D1-D7 R1 决议；9 新 T 增；S5 验收后 v1.1 PLANNED→IMPLEMENTED）+ devrix-diagnostic-tools-parity (DM-20260616-003) — Error Classifier / devrix-diagnostic-tools-wiring (DM-20260617-002) — A6 ErrorClassify wiring / devrix-error-handling-tier1-tier2 (DM-20260620-003) — retry nil-sentinel defensive wrap (D3-S3-A01-T16) / devrix-api-error-classification (DM-20260628-001) — APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus 工厂 + 4 adapter NewAPIError 统一 + IsCode 包装链识别 (D3-S1-A01-T04 + D3-S1-A01-T05 + D3-S3-A01-T17 IMPLEMENTED) / **devrix-d3-dsaft-restructuring (DM-20260629-003) — 6 子 Change 联动: PR-1 #0 dead code 审计 / PR-2 #1 god-fn pt1 (Stream 235→3) / PR-3 #1 god-fn pt2 (configure + errorclass 拆 4) / PR-4 #2 registry-sync (9 F path 修正) / PR-5 #3 value-flow-rename (6 D3_* Alias) / PR-6 #4 span-coverage (全 41 T 加 Span Evidence 列 + 11 显式 `—` + 覆盖率 30/30 = 100%) / PR-7 #5 boundary-decision (4 boundary debt 全部 RESOLVED)**
@@ -27,6 +27,8 @@
 > **v3.3.1 (DM-20260628-001 S5 验收)**：3 P0 T PLANNED→IMPLEMENTED；IMPLEMENTED 35→38；PLANNED 4→1（仅 T08 持久化）；§0/§1/§4 统计对齐。
 > 
 > **v3.4.0 (DM-20260629-003 PR-6 #4 span-coverage)**：全 41 T 行新增 **Span Evidence 列**（runtime span 名与 telemetry/names.go `OpD3_S3_LLM_*` 常量值对齐 — `D3_LLM_Stream` / `D3_LLM_Provider_Route` / `D3_LLM_CircuitBreaker` / `D3_LLM_Retry` / `D3_LLM_Adapter_Stream`）。其中 **30 T 直接映射** 到 5 个 active span op / 1 span event (`safety.check.duration_ms`) / 3 EngineEvent (`flow.breaker.*`); **11 T 显式标 `—`**（注入模式 6 + 启动期 3 + 编译期 2 — 详见 `span-registry.md §9 T-Without-Span Tracker`）。**Span Evidence 覆盖率 = 30/30 = 100%**（排除显式 `—` 后所有 T 都有 span 引用；raw 30/41 ≈ 73.2% informational only）。`scripts/d3-span-coverage.sh` 守门 ≥ 80% PASS。
+> 
+> **v3.5.0 (DM-20260629-003 S7_Archive ACCEPTED + PR-5 value-flow-rename)**：T 编号无变化；§1 T 总览 S 段名称旁加 ValueFlow Alias 列；§2~§8 各 S header 加 `> **ValueFlow Alias (用户感知):**` 行（5 S + 1 横切 = 6 alias，与 a/f-registry.md 同步）；T 编排逻辑 0 改动；修订记录 v3.5.0 row。
 
 ---
 
@@ -48,6 +50,8 @@
 ---
 
 ## 2. D3-S1 RouteModel — 测试点
+
+> **ValueFlow Alias (用户感知):** `D3_Model_Routing`
 
 **A**: `D3-S1-A01 ResolveModelRoute`
 **承诺 C1**：用户给出 model 名（含 tier alias），D3 必须返回正确 provider + 实际 model。
@@ -76,6 +80,8 @@ D3-S1-A01 ResolveModelRoute
 
 ## 3. D3-S2 StreamChat — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Stream_Chat_Completion`
+
 **A**: `D3-S2-A01 StreamChatCompletion`
 **承诺 C2**：用户发起流式聊天，D3 必须返回符合 OpenAI SSE 协议的 chunk 流。
 
@@ -102,6 +108,8 @@ D3-S2-A01 StreamChatCompletion
 ---
 
 ## 4. D3-S3 ProtectCall — 测试点
+
+> **ValueFlow Alias (用户感知):** `D3_Circuit_Breaker_And_Retry`
 
 **A**: `D3-S3-A01 ShieldAndRetry`
 **承诺 C3**：Provider 故障（5xx / 网络错误 / 限流），D3 必须不阻塞用户。
@@ -149,6 +157,8 @@ D3-S3-A01 ShieldAndRetry
 
 ## 5. D3-S4 BudgetTokens — 测试点
 
+> **ValueFlow Alias (用户感知):** `D3_Token_Budget_Control`
+
 **A**: `D3-S4-A01 CountAndCheckLLMTokens`
 **承诺 C4**：Token 超预算，D3 必须截断或报错，不超额调用。
 
@@ -161,6 +171,8 @@ D3-S3-A01 ShieldAndRetry
 ---
 
 ## 6. D3-S5 GuardContent — 测试点
+
+> **ValueFlow Alias (用户感知):** `D3_Content_Safety_Filter`
 
 **A**: `D3-S5-A01 FilterAndMatchContent`
 **承诺 C5**：用户 prompt 命中危险模式，D3 必须拒绝（critical）或告警（warning）。
@@ -176,6 +188,8 @@ D3-S3-A01 ShieldAndRetry
 ---
 
 ## 7. D3-S6 ConfigureGateway — 测试点
+
+> **ValueFlow Alias (用户感知):** `D3_Gateway_Configuration`
 
 **A**: `D3-S6-A01 LoadAndValidateLLMConfig`
 **承诺**：无（横切支撑）。
@@ -279,4 +293,4 @@ D3-S3-A01 ShieldAndRetry
 | **3.3.0** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) PLANNED**: APIErrorCode 7 类枚举 + NewAPIErrorCodeFromStatus HTTP status → APIErrorCode 工厂 + sharederrors.IsCode 包装链识别 + 4 adapter 错误构造统一走 NewAPIError。**+3 P0 T PLANNED**：D3-S1-A01-T04 HTTP status 映射覆盖 8 类 (401/403/408/413/429/529/5xx/4xx-unknown) + D3-S1-A01-T05 IsCode 正确识别 WithCode→Unwrap→bare APIError 包装链 + D3-S3-A01-T17 4 adapter 错误构造统一走 NewAPIError 工厂。Total 36→39, IMPLEMENTED 35（持平，3 新 T 均 PLANNED）, PLANNED 1→4, P0 20→23。S4 实现后回填 IMPLEMENTED，§0/§1/§4/§10 统计对齐。 |
 | **3.3.1** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) S5 验收**：3 P0 T PLANNED→IMPLEMENTED（D3-S1-A01-T04 + T05 + D3-S3-A01-T17，PR #265 squash merged）。Total 39（持平）, IMPLEMENTED 35→38, PLANNED 4→1（仅 T08 持久化仍 PLANNED）, P0 23。§0/§1/§4 统计对齐。 |
 | **3.4.0** | **2026-06-29** | **devrix-d3-dsaft-restructuring (DM-20260629-003) PR-6 (#4 span-coverage)**：全 41 T 行新增 **Span Evidence 列**，runtime span 名与 `telemetry/names.go` `OpD3_S3_LLM_*` 常量值对齐（`D3_LLM_Stream` / `D3_LLM_Provider_Route` / `D3_LLM_CircuitBreaker` / `D3_LLM_Retry` / `D3_LLM_Adapter_Stream`）。**30 T 直接映射** + **11 T 显式标 `—`**（注入模式 6 / 启动期 3 / 编译期 2 — 详见 `span-registry.md §9 T-Without-Span Tracker`）。**Span Evidence 覆盖率 = 30/30 = 100%**（排除显式 `—` 后所有 T 都有 span 引用；raw 30/41 ≈ 73.2% informational only）。`scripts/d3-span-coverage.sh` 守门 ≥ 80% PASS。 |
-| **3.5.0** | **2026-06-29** | **devrix-d3-dsaft-restructuring (DM-20260629-003) S7_Archive ACCEPTED (PR-1..PR-8 全部 squash auto-merge)**：PR-1 #0 dead code 审计 (T01-T08) + PR-2 #1 god-fn pt1 (Stream 235→3 T09-T13) + PR-3 #1 god-fn pt2 (configure + errorclass 拆 4 T14-T18) + PR-4 #2 registry-sync (9 F path 修正 T19-T24) + PR-5 #3 value-flow-rename (6 D3_* Alias T25-T28) + PR-6 #4 span-coverage (T29-T33 + 11 显式 —) + PR-7 #5 boundary-decision (4 boundary debt 常量登记 + `orchtypes/boundary_decision.go` 3 单元测试 T34-T37) + PR-8 S7_Archive (T38-T40 + verify-archive 12/12)。**8 PR / 40 T / 14 G 全部 PASS**；10/10 D3 packages -race PASS；d3-domain v1.0.0 → v1.6.0；`openspec/archive/2026-06-29-devrix-d3-dsaft-restructuring/`。 |
+| **3.5.0** | **2026-06-29** | **devrix-d3-dsaft-restructuring (DM-20260629-003) PR-5 #3 value-flow-rename + S7_Archive ACCEPTED**：T 编号无变化；§1 T 总览 S 段名称旁加 ValueFlow Alias 列（5 S + 1 横切 = 6 alias，与 a/f-registry.md / d3-domain.md §North Star 同步）；§2~§8 各 S header 加 `> **ValueFlow Alias (用户感知):**` 行；PR-1..PR-8 全部 squash auto-merge；8 PR / 40 T / 14 G 全部 PASS；10/10 D3 packages -race PASS；d3-domain v1.0.0 → v1.6.0；`openspec/archive/2026-06-29-devrix-d3-dsaft-restructuring/` |

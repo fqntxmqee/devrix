@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Last Updated:** 2026-06-29
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `a-registry.md` · `t-registry.md`
@@ -32,13 +32,17 @@
 
 ## 1. S → A → F 索引
 
+> **ValueFlow Alias (用户感知)**：每个 S 段 header 加 `> **ValueFlow Alias:** D3_*` 行；与 a-registry.md / d3-domain.md 同步。
+
 ```
+> **ValueFlow Alias (用户感知):** D3_Model_Routing
 D3-S1 RouteModel
   └─ D3-S1-A01 ResolveModelRoute
        ├─ F01 MatchRouting
        ├─ F02a ResolveTierAlias       <!-- Tier -->
        └─ F02b ResolveDefault         <!-- Default -->
 
+> **ValueFlow Alias (用户感知):** D3_Stream_Chat_Completion
 D3-S2 StreamChat
   └─ D3-S2-A01 StreamChatCompletion
        ├─ F01 OpenAIStreamClientStream
@@ -46,6 +50,7 @@ D3-S2 StreamChat
        ├─ F03 BuildOpenAIRequest
        └─ F04 AdapterProtocolMethod       <!-- v1.1 F5: BREAKING 接口扩展 -->
 
+> **ValueFlow Alias (用户感知):** D3_Circuit_Breaker_And_Retry
 D3-S3 ProtectCall
   └─ D3-S3-A01 ShieldAndRetry
        ├─ F01 AllowCircuit                <!-- Breaker -->
@@ -58,6 +63,7 @@ D3-S3 ProtectCall
        ├─ F08 OnStateTransitionEmit       <!-- v1.1 F2: Breaker 钩子 -->
        └─ F09 ReuseEngineEvent            <!-- v1.1 F3: D3→D7 复用 -->
 
+> **ValueFlow Alias (用户感知):** D3_Token_Budget_Control
 D3-S4 BudgetTokens
   └─ D3-S4-A01 CountAndCheckLLMTokens
        ├─ F01 CountText
@@ -66,6 +72,7 @@ D3-S4 BudgetTokens
        ├─ F04 TruncateToTokens
        └─ F05 LoadBPE
 
+> **ValueFlow Alias (用户感知):** D3_Content_Safety_Filter
 D3-S5 GuardContent
   └─ D3-S5-A01 FilterAndMatchContent
        ├─ F01 CheckContent
@@ -73,6 +80,7 @@ D3-S5 GuardContent
        ├─ F03 MatchPattern
        └─ F04 EmitSafetyLatencyEvent      <!-- v1.1 F8: D3→D6 probe #4 -->
 
+> **ValueFlow Alias (用户感知):** D3_Gateway_Configuration
 D3-S6 ConfigureGateway
   └─ D3-S6-A01 LoadAndValidateLLMConfig
        ├─ F01 LoadConfig
@@ -321,3 +329,4 @@ CROSS (D3 → D2 Bridge)
 | 3.0.0 | 2026-06-14 | 5+1 S × 1 A × 24 F（域内）+ CROSS 2 A × 2 F；F02 拆 F02a/F02b（+1）；ProtectCall 合并 Breaker+Retry 引入 F06 ShouldRecordBreakerFailure（+1）；Bridge / Bootstrap 移至 CROSS 段 |
 | 3.1.0 | 2026-06-14 | 5+1 S × 1 A × 30 F（域内）+ CROSS 3 F（净增 6 域内 + 1 CROSS = 7 F）；D3-S3 增 F07/F08/F09（emit metric / state hook / engine event）；D3-S2 增 F04 AdapterProtocolMethod（BREAKING 接口扩展）；D3-S5 增 F04 EmitSafetyLatencyEvent；D3-S6 增 F05 FeatureFlagDefaults；D3-X-A02 增 F02 FailFastOnObsNil（R3 P0 #8 实施） |
 | 3.2.0 | 2026-06-29 | DM-20260629-003 PR-4 (#2 registry-sync) F 路径同步：`token/` → `budget/` (D3-S4-A01 F01~F05, 5 F)；`safety/` → `guard/` (D3-S5-A01 F01~F04, 4 F 含 F04 EmitSafetyLatencyEvent)；`config/` + `shared/config/` → `configure/` (D3-S6-A01 F01~F05, 5 F)；0 漂移 |
+| 3.3.0 | 2026-06-29 | DM-20260629-003 PR-5 (#3 value-flow-rename) §S→A→F 索引每个 S header 加 `> **ValueFlow Alias (用户感知):**` 行（5 S + 1 横切 = 6 alias：`D3_Model_Routing` / `D3_Stream_Chat_Completion` / `D3_Circuit_Breaker_And_Retry` / `D3_Token_Budget_Control` / `D3_Content_Safety_Filter` / `D3_Gateway_Configuration`）；与 d3-domain.md §North Star 对齐 |
