@@ -198,8 +198,14 @@ func allPlanKinds() []plan.PlanKind {
 // for lookup and to Channel.Execute for execution. The StrategyDecider
 // (PR-C3) will be inserted between Router.Get and Channel.Execute in
 // a later PR.
+//
+// PR-B (DM-20260629-008) additive: pessimisticGuard is an optional
+// PessimisticCommitGuard. When non-nil, Route consults it after a Channel
+// returns and may attach a Pessimistic Commit MVPArtifact to the report.
+// nil = no-op, preserves 6.0.x behavior.
 type ChannelRouter struct {
-	registry *ChannelRegistry
+	registry         *ChannelRegistry
+	pessimisticGuard interfaces.PessimisticCommitGuard
 }
 
 // NewChannelRouter constructs a router backed by the given registry. The
@@ -207,6 +213,12 @@ type ChannelRouter struct {
 // passing it in.
 func NewChannelRouter(reg *ChannelRegistry) *ChannelRouter {
 	return &ChannelRouter{registry: reg}
+}
+
+// SetPessimisticGuard wires the PessimisticCommitGuard into the router.
+// PR-B additive: nil (default) preserves 6.0.x behavior. Idempotent.
+func (r *ChannelRouter) SetPessimisticGuard(g interfaces.PessimisticCommitGuard) {
+	r.pessimisticGuard = g
 }
 
 // Route looks up the Channel for Plan.Kind and invokes Execute. The
@@ -243,4 +255,49 @@ func (r *ChannelRouter) Route(ctx context.Context, p *plan.Plan, req ChannelRequ
 	// success path: close span (err may still be non-nil from ch.Execute)
 	end(err)
 	return art, err
+}
+
+// ApplyPessimisticCommit consults the (optional) PessimisticCommitGuard
+// against the supplied report. It is exposed as a separate method so
+// Channel implementations can call it from their own exit points without
+// depending on the router. When no guard is wired, the report is
+// returned unchanged. This method is the PR-B-injected exit hook.
+//
+// The spec argument may be nil (e.g. legacy callers); the guard treats
+// nil spec as "use default ConvergenceBudget".
+func (r *ChannelRouter) ApplyPessimisticCommit(
+	spec *interfaces.TaskSpec,
+	report *interfaces.TaskReport,
+) (*interfaces.TaskReport, error) {
+	if r == nil || r.pessimisticGuard == nil {
+		return report, nil
+	}
+	budget := interfaces.NewConvergenceBudget(interfaces.FallbackPessimistic)
+	if spec != nil {
+		budget = spec.ConvergenceBudget
+	}
+	ok, blockedReason, err := r.pessimisticGuard.Evaluate(spec, report, budget)
+	if err != nil || ok {
+		return report, nil
+	}
+	policy, _ := r.pessimisticGuard.ResolveFallback(report)
+	mvp := r.pessimisticGuard.BuildMVPArtifact(report, blockedReason)
+	updated := report.WithFallbackUsed(true).WithMVPArtifact(&mvp)
+	switch policy {
+	case interfaces.FallbackPessimistic:
+		updated = updated.WithResult(interfaces.Result{
+			Kind:       interfaces.ResultKindIndeterminate,
+			Confidence: report.Result.Confidence,
+			Message:    "pessimistic commit: " + blockedReason,
+			At:         report.Result.At,
+		})
+	case interfaces.FallbackAbort:
+		updated = updated.WithResult(interfaces.Result{
+			Kind:       interfaces.ResultKindFailed,
+			Confidence: 0.0,
+			Message:    "fallback abort: " + blockedReason,
+			At:         report.Result.At,
+		})
+	}
+	return updated, nil
 }

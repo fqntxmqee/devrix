@@ -325,6 +325,29 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
+## D7-S18: Pessimistic Commit + Rule-based Fallback F 层 ✅ (PR-B, DM-20260629-008)
+
+> **L3 防御运行时层:** PR-B 落地 PessimisticCommitGuard interface + 5 类触发条件 (resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort) + 3 FallbackPolicy 路径 (Pessimistic / RuleBased / Abort) + 4 候选规则 (most_tests_passed / compiled_clean / min_cost / min_uncertainty, default min_uncertainty). Feature Flag `D7_PESSIMISTIC_COMMIT_ENABLED` 默认 disabled, 0 行为变更.
+
+### D7-S18-A11 Pessimistic Commit
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S18-A11-F01** | **EvaluatePessimistic** | **F-BE** | **spec, report, budget** | **(ok bool, blockedReason string, err error)** | **✅** | **`orchestration/interfaces/contracts.go::PessimisticCommitGuard.Evaluate` + `orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.Evaluate`** (5 类触发检测) |
+| **D7-S18-A11-F02** | **ResolveFallback** | **F-BE** | **report** | **(policy FallbackPolicy, ruleName string)** | **✅** | **`orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.ResolveFallback`** (3 路径: Pessimistic/RuleBased/Abort, Blockage.Source=policy_override 解析) |
+| **D7-S18-A11-F03** | **BuildMVPArtifact** | **F-BE** | **report, blockedReason** | **MVPArtifact** | **✅** | **`orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.BuildMVPArtifact`** (Output/RiskWarnings/Trigger/ChainHash FNV-1a) |
+| **D7-S18-A11-F04** | **NotifyPessimisticHook** | **F-BE** | **engine, spec, report** | **(*TaskReport, error)** | **✅** | **`orchestration/escape/engine.go::EscapeEngine.NotifyPessimistic`** (5 层 fail-safe: nil guard / nil report / Evaluate error → fall-open / blocked → MVPArtifact 注入) |
+| **D7-S18-A11-F05** | **CheckResourceExhausted** | **F-BE** | **used, budget, reserve** | **bool** | **✅** | **`orchestration/interfaces/convergence_budget.go::RemainingBelowReserve`** (资源耗尽触发检测, reserve 默认 10% budget) |
+
+### D7-S18-A12 Rule-based Fallback
+
+| F ID | Name | Type | Input | Output | Status | Code Location |
+|------|------|------|-------|--------|--------|---------------|
+| **D7-S18-A12-F01** | **ParseFallbackRuleName** | **F-BE** | **string** | **(name, recognized)** | **✅** | **`orchestration/interfaces/fallback_policy.go::ParseFallbackRuleName`** (空 → 默认 / 4 候选 round-trip / 未知 → 默认 + recognized=false) |
+| **D7-S18-A12-F02** | **ValidateFallbackPolicy** | **F-BE** | **FallbackPolicy** | **bool** | **✅** | **`orchestration/interfaces/fallback_policy.go::FallbackPolicy.Valid + ValidNonLegacy`** (3 态 / 2 non-legacy) |
+
+---
+
 ## D7-S20-A01 TaskSpec 下行契约 F 层 ✅ (PR-A, DM-20260629-007)
 
 > **物理位置：** `orchestration/interfaces/task_spec.go`。pure types 原则（0 import D7 子包）。
@@ -508,3 +531,4 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | **4.0.0** | **2026-06-25** | **MUPS v4.3 5 节点管道 + v5 EscapeEngine F 层补全（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）**：新增 7 段共 27 F 点。D7-S8-A15 6 F（ClassifyObsKind + ScoreObsStrength + DetectAnomaly + QuantizeIntent + BuildUncertaintyCoord + BuildUncertaintyReport）；D7-S9-A25/A26 8 F（BuildArtifact + ResolveArtifactKind + ExtractEvidence + RouteChannelKind + 4 Dispatch）；D7-S10-A32..A35 9 F（ExtractVerdict + AggregateVerdicts + VerifyWithRetry + MapVerdictToExitReason + IsDeterministicReason + ExtractEvidence + ValidateEvidenceCompleteness + DetectSystemAnomaly + ClassifyAnomalySeverity）；D7-S11-A36..A40 14 F（BuildAssetContent + ClassifyLearningClass + AssignAssetTTL + BayesianUpdate + Store/LoadReputationEvidence + BuildAdaptivePrior + DefaultDeveloper/OperatorPrior + 3 MemoryPersist + RunLearner + DispatchToMemoryChannel）；D7-S12-A41..A43 6 F（BuildObserveRequestWithPrior + InjectPriorToIntentQuantizer + 3 Layer fail-safe + E2ECloseLP1RoundTrip）；D7-S13-A47..A49 5 F（ProcessAutoClose + SynthesizeVerdict + ResolveTrackMode + ShouldAutoClose + EmitSessionSpanPrior）；D7-S14-A50..A52 9 F（TriggerEscape + ResolveCircuitLevel + ApplyCircuitBreaker + LiftEscape + 3 Layer resume + RouteResumeDecision + EmitSessionSpanResume）。统计 68+7/68+7/0 |
 | **5.0.0** | **2026-06-26** | **6 S 精简（DM-20260626-001）**：14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；F 层按新 S 重归类（F 总数 75 → 68，Legacy 41 + Canonical 27；S 编号变化不增减 F 点）；新增 Status 标注 `6 S 精简 (v6.0.0 DM-20260626-001)`；Statistics 表 Activities with F 加注 v6.0.0。具体 A/F 重映射见 `a-registry.md §v6.0.0 6 S 精简映射`。 |
 | **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 11 个 F**（D7-S20-A01/F01-F03 TaskSpec 下行契约 + D7-S20-A02/F01-F04 TaskReport 上行契约 + D7-S21-A01/F01-F02 Dissent + D7-S21-A02-F01 Blockage 分类 + D7-S21-A03-F01 Resource 抽取）；(2) **新增 D7-S22 TaskContract PR-B 通讯契约预留位**（2 F PLANNED：PessimisticCommitGuard + CoWVersionChain，PR-A 仅登记接口签名不实现）；(3) F 总数 75 → **84 IMPLEMENTED + 2 PLANNED = 86**；(4) 全部 F 物理位置 `orchestration/interfaces/`（pure types 原则 0 import D7 子包）；(5) Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report（**老路径完全不变**，仅可选追加指针） |
+| **5.2.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B（DM-20260629-008）L3 防御运行时层**：(1) **新增 D7-S18 段**（7 F IMPLEMENTED：D7-S18-A11/F01-F05 Pessimistic Commit 五件套 + D7-S18-A12/F01-F02 Rule-based Fallback 双件）；(2) F 总数 86 → **93 IMPLEMENTED**（+7 PR-B, PR-A D7-S22 PessimisticCommitGuard 预留位已实现并归入 D7-S18-A11）；(3) 物理位置 `orchestration/interfaces/{contracts,fallback_policy,convergence_budget}.go` + `orchestration/escape/fallback.go` + `orchestration/escape/engine.go::NotifyPessimistic` + `orchestration/mups/execute/channel.go::ChannelRouter.SetPessimisticGuard/ApplyPessimisticCommit` + `internal/bootstrap/pessimistic_guard_wire.go`；(4) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更**（所有方法 nil/disabled 守门 no-op） |

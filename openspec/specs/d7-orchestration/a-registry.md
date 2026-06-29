@@ -502,6 +502,48 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 
 ---
 
+## D7-S18: Pessimistic Commit + Rule-based Fallback（v7.0 PR-B, DM-20260629-008）✅ IMPLEMENTED（6/7 T 点）
+
+> North Star: 资源耗尽 / 5 层 CB L1 触发 / 连续 3 轮 INDETERMINATE / Verifier 空证 PASS / 人工 abort 5 类触发条件下，**Pessimistic Commit** 给出 MVPArtifact (best-effort 输出 + 风险警告) 替代完全无产出的失败。**Rule-based Fallback** 在 VERDICT 连续 INDETERMINATE 时按 4 候选规则打分选最优。Feature Flag `D7_PESSIMISTIC_COMMIT_ENABLED` 默认 disabled, PR-B 0 行为变更.
+>
+> 博弈角色: Defensive Runtime Keeper (L3 防御运行时层, 4-Layer × 3-Phase 框架的 L3)
+>
+> **物理包:**
+> - `internal/layers/orchestration/interfaces/{contracts.go,fallback_policy.go,convergence_budget.go}` (3 NEW, pure types)
+> - `internal/layers/orchestration/escape/fallback.go` (NEW, PessimisticCommitGuard 默认实现, ~310 LOC)
+> - `internal/layers/orchestration/escape/engine.go` (+NotifyPessimistic + SetPessimisticGuard)
+> - `internal/layers/orchestration/mups/execute/channel.go` (+ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit)
+> - `internal/bootstrap/pessimistic_guard_wire.go` (NEW, env helper + factory)
+>
+> **5 类触发条件 (PR-B design.md §3.2):**
+> 1. 资源耗尽 (tokens_remaining ≤ reserve) → Pessimistic
+> 2. EscapeForceExit / CB L1+ → Pessimistic
+> 3. ≥ 3 轮 INDETERMINATE → Rule-based
+> 4. Verifier "空证 PASS" → Pessimistic
+> 5. 人工 abort (IM 通道关闭) → Abort (向后兼容)
+>
+> **4 ORCH_* SentinelError 码 (7110-7113):**
+> - `ORCH_PESSIMISTIC_TRIGGERED_7110` — pessimistic commit triggered
+> - `ORCH_PESSIMISTIC_MVP_EMPTY_7111` — mvp artifact output is empty
+> - `ORCH_FALLBACK_RULE_INVALID_7112` — fallback rule not recognized
+> - `ORCH_FALLBACK_ABORT_TIMEOUT_7113` — fallback abort timeout
+>
+> **0 行为变更承诺:** Feature Flag 默认 disabled, 全部 PessimisticCommitGuard 方法都是 nil/disabled 守门 no-op. PR-A 已 S7_Archived 的 11/11 T 点完全兼容.
+
+### D7-S18-A11 Pessimistic Commit（5 类触发 + MVPArtifact）
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S18-A11** | **EvaluatePessimistic** | **A-BE** | **spec, report, budget** | **(ok, blockedReason, err)** | **report.{FallbackUsed, MVPArtifact}** | **✅** | **`orchestration/interfaces/contracts.go::PessimisticCommitGuard.Evaluate` + `orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.Evaluate`** (5 类触发: resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort) |
+
+### D7-S18-A12 Rule-based Fallback（4 候选规则）
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| **D7-S18-A12** | **ResolveRuleFallback** | **F-BE** | **report** | **(policy, ruleName)** | **—** | **✅** | **`orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.ResolveFallback` + `orchestration/interfaces/fallback_policy.go::ParseFallbackRuleName`** (4 候选: most_tests_passed / compiled_clean / min_cost / min_uncertainty, default min_uncertainty) |
+
+---
+
 ## D7-S20 / S21: TaskContract 统一（v7.0 PR-A, DM-20260629-007）✅ IMPLEMENTED（9/11 T 点）
 
 > North Star: **TaskSpec（下行契约） + TaskReport（上行契约）** 是 D7 跨节点（Plan / Execute / Verify / Learn）通讯的**统一结构化载体**——v7.0 PR-A 用纯类型包 `interfaces` 替代散落的 wire 数据。
@@ -679,3 +721,4 @@ Observe(S8) ── UncertaintyReport ──▶ Plan(S8-PR-B1) ── Plan ──
 | 4.0.0 | 2026-06-25 | MUPS v4.3 5 节点管道 + v5 EscapeEngine 落地（DM-20260623-001/002/003 + DM-20260624-001 + DM-20260625-001/003/004）：Canonical S 扩展至 S1-S14（14 个 S 层）。新增 7 段 + 31 A 活动。统计 56+20/56+20/0/0 |
 | **5.0.0** | **2026-06-26** | **6 S 博弈角色对齐精简**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；(2) A 活动 **56 → 49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）；(3) **新增 §v6.0.0 6 S 精简映射**（14 S → 6 S 完整映射表 + 6 S 完整 A 清单 49 A + 14 S 冗余合并依据 4 类）；(4) 7 Legacy A 全部并入 Canonical（不再保留独立 Legacy 段）；(5) MUPS 5 节点挂载：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2 |
 | **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 D7-S20/S21 TaskContract 段**（6 A：D7-S20-A01 BuildTaskSpec + D7-S20-A02 BuildTaskReport + D7-S20-A03 SyncTaskContractSpec + D7-S21-A01 RecordDissent + D7-S21-A02 ClassifyBlockage + D7-S21-A03 ExtractResource），物理包 `orchestration/interfaces/` 7 NEW 文件；(2) **新增 5 个 ORCH_* SentinelError**（7100-7104：TaskSpecEmpty / TaskSpecChannelUnknown / TaskReportEmpty / TaskReportVerdictEmpty / TaskContractTraceInvalid）；(3) A 活动 **49 → 55**（6 v7.0 A 增量）；(4) 4-Layer × 3-Phase 设计框架落地：本 PR 完成 L1 接口层 + L2 字段语义层 + L4 spec 同步 9/11 P0 T IMPLEMENTED（L3 防御运行时层留给 PR-B + PR-C）；(5) Dissent top-3 截断 + summary hash + Learn 沉淀；Blockage 3 类 kind（permission/resource/contract）；Resource token/time/step 三件套；Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report；(6) **0 函数签名变化**（pure types 原则，interfaces 0 import D7 任何子包） |
+| **5.2.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B（DM-20260629-008）L3 防御运行时层**：(1) **新增 D7-S18 Pessimistic Commit + Rule-based Fallback 段**（2 A：D7-S18-A11 EvaluatePessimistic + D7-S18-A12 ResolveRuleFallback），A 活动 55 → 57；(2) **新增 3 NEW interfaces/ 文件**（contracts.go PessimisticCommitGuard interface + 4 ORCH_* 错误码 7110-7113 + fallback_policy.go FallbackPolicyRuleNames + ParseFallbackRuleName + convergence_budget.go NewConvergenceBudget + With* + Validate + RemainingBelowReserve + ToFields），物理包 `orchestration/interfaces/` 共 10 文件；(3) **新增 escape/fallback.go**（~310 LOC，DefaultPessimisticCommitGuard 5 类触发 + 3 FallbackPolicy 路径 + buildChainHash FNV-1a 非加密 digest）；(4) **escape/engine.go +NotifyPessimistic + SetPessimisticGuard/PessimisticGuard + 4 unit tests**；(5) **mups/execute/channel.go +ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit**；(6) **bootstrap/pessimistic_guard_wire.go NEW**（PessimisticCommitEnabled + PessimisticRuleStrategy + NewPessimisticCommitGuardFromEnv + 7 env tests）；(7) **circuit_breaker_test.go +3 L1 Pessimistic 联动测试**（L1 trips StateOpen + 60s 持久窗口 + L1-only reason 含 "l1" 路由 hint）；(8) **6/7 T 点 IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C，本 PR 仅 slog.Info 占位）；(9) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更** |

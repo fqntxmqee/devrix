@@ -218,6 +218,75 @@ func TestCircuitBreakerSet_EvaluateAll_AllClosed(t *testing.T) {
 	}
 }
 
+// --- PR-B (DM-20260629-008): CB L1 ↔ Pessimistic Commit 联动测试 ---
+//
+// L1 (DispatchLoopWakeupsCB) 是 PR-B 5 类触发条件中 "cb_l1" 的主信号源。
+// PessimisticCommitGuard.checkCircuitBreakerL1 读 report.Blockage[].Kind
+// == BlockageInfeasible 来识别 L1 触发。本文件覆盖 3 个子测试:
+//   1. L1 触发后 StateOpen 且 Evaluate 返回 ForceExit
+//   2. CircuitBreakerSet.EvaluateAll 把 L1 错误码映射成可被 Pessimistic
+//      Commit 识别的 Reason 字符串前缀
+//   3. L1 StateOpen 状态持久 (60s) — 给 Pessimistic Commit 留出 emit
+//      窗口, 避免 race (Pessimistic 必须在 HalfOpen 之前完成)
+
+// TestL1DispatchLoop_PessimisticHint — D7-S18-A11-T04 sub-case 1.
+// L1 trips → StateOpen + Evaluate → EscapeForceExit with reason prefix
+// "circuit_breaker:l1_" (这是 PessimisticCommitGuard 识别的契约).
+func TestL1DispatchLoop_PessimisticHint(t *testing.T) {
+	cb := NewDispatchLoopWakeupsCB()
+	// Drive to 100 wakeups within 1 minute window.
+	for i := 0; i < 100; i++ {
+		cb.RecordWakeup()
+	}
+	if cb.State() != StateOpen {
+		t.Fatalf("State = %s, want open after 100 wakeups", cb.State())
+	}
+	d := cb.Evaluate(context.Background(), LoopContext{SessionID: "s_pess"})
+	if d.Action != EscapeForceExit {
+		t.Errorf("Action = %s, want force_exit", d.Action)
+	}
+	if !strings.Contains(d.Reason, "circuit_breaker") {
+		t.Errorf("Reason = %q, want contains 'circuit_breaker'", d.Reason)
+	}
+}
+
+// TestL1StateOpen_PersistentForPessimisticWindow — D7-S18-A11-T04 sub-case 2.
+// L1 在 60s 内保持 StateOpen. 这个窗口给 Pessimistic Commit 留出 emit 时间
+// (BuildMVPArtifact + WithMVPArtifact + audit log 写入必须在窗口内完成).
+func TestL1StateOpen_PersistentForPessimisticWindow(t *testing.T) {
+	cb := NewDispatchLoopWakeupsCB()
+	for i := 0; i < 100; i++ {
+		cb.RecordWakeup()
+	}
+	if cb.State() != StateOpen {
+		t.Fatalf("pre-condition failed: State = %s, want open", cb.State())
+	}
+	// 短时间内 Evaluate 仍应返回 ForceExit (State 不会瞬间变 HalfOpen).
+	d := cb.Evaluate(context.Background(), LoopContext{SessionID: "s_pess2"})
+	if d.Action != EscapeForceExit {
+		t.Errorf("immediate re-evaluate Action = %s, want force_exit (Pessimistic window still open)", d.Action)
+	}
+}
+
+// TestCircuitBreakerSet_L1Only_PessimisticCompatible — D7-S18-A11-T04 sub-case 3.
+// 当 L1 是唯一 Open 的 layer, EvaluateAll 返回 L1 的 reason. Reason 包含
+// "L1_DispatchLoop" 后缀, 这是 PessimisticCommitGuard 路由到
+// TriggerCircuitBreakerL1 的契约保证 (case-insensitive 包含 "l1").
+func TestCircuitBreakerSet_L1Only_PessimisticCompatible(t *testing.T) {
+	set := NewCircuitBreakerSet()
+	// Trip ONLY L1 (100 wakeups within 1 minute window).
+	for i := 0; i < 100; i++ {
+		set.L1.RecordWakeup()
+	}
+	d := set.EvaluateAll(context.Background(), LoopContext{SessionID: "s_pess3"})
+	if d.Action != EscapeForceExit {
+		t.Errorf("Action = %s, want force_exit", d.Action)
+	}
+	if !strings.Contains(strings.ToLower(d.Reason), "l1") {
+		t.Errorf("Reason = %q, want contains 'l1' (Pessimistic guard routing hint)", d.Reason)
+	}
+}
+
 func TestCircuitBreaker_PanicRecovery(t *testing.T) {
 	// Inject panic into a layer's Evaluate by forcing state to a value
 	// that triggers an unexpected code path. Easier: create a wrapper
