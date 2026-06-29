@@ -2,9 +2,18 @@
 
 **Capability:** communication
 **Status:** Active
-**Version:** 4.1.1
-**Last Updated:** 2026-06-16
+**Version:** 5.0.0
+**Last Updated:** 2026-06-30
 **Domain SoT:** `d1-domain.md`
+**Change:** devrix-d1-sa-refine (DM-20260614-006) — 切法 A / devrix-d1-dsaft-refactor (DM-20260628-003) — Gateway 拆分 + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) — 6 子 Change 联动: PR-2 #1 god-doc-split pt1 (spec.md 176→90 + d1-flow-architecture.md NEW)**
+
+---
+
+## See also
+
+- **Flow architecture**：`../architecture/d1-flow-architecture.md`（价值流流图 + Package Map + Legacy 包结构 + 跨域接线）
+- **End-to-end flows**：`terminal-state-guide.md`
+- **Observability & Runbook**：`observability-guide.md`
 
 ---
 
@@ -12,9 +21,8 @@
 
 通信域负责 IM 双向对话：用户指令捕获（S13）、三类出站信号呈现（S14–S16）、多平台通道（S17）、弱网必达（S18）。作为 Devrix 入口层，所有用户交互经由此域进入系统。
 
-> **Canonical SoT（v4.0+）：** 价值流 **D1-S13–S18**。  
-> **代码路径 SoT：** `openspec/specs/architecture/code-layout.md` §4.1（scenario-slug → 目录）。  
-> 当前实现仍部分位于 legacy 技术目录，见 §6 迁移表。
+> **Canonical SoT（v5.0+）：** 价值流 **D1-S13–S18**。  
+> **架构包路径：** 见 `architecture/d1-flow-architecture.md`（PR-2 god-doc-split 拆出）。  
 > **博弈定位：** D1 = **Trusted Intermediary** — 可信送达 + 客观锚点；质量评级与信誉见 D5/D6（DM-20260614-007）。
 
 ### 信号分层博弈论（切法 A）
@@ -43,43 +51,7 @@
 
 ## Scenarios — Legacy Module Index（RETIRED v2.0）
 
-> 历史索引已归档至 `t-registry.md` §Legacy Archive。新代码与测试 MUST 使用 D1-S13–S18 canonical ID。
-
-## Architecture（价值流 — v2.0 实现）
-
-```
-[User IM]
-  → S17 Parse* → S13 Accept → Persist → Dispatch (D7|Agent)
-  → Agent events → S18 EventBus → present/ (S14|S15|S16)
-  → S17 Encode* → [User IM]
-  S18 overlay: Critical Conclusion 永不 Drain
-```
-
-## Package Map
-
-> **目标布局** 见 `../architecture/code-layout.md` §5–§6。下表为当前路径速查。
-
-| scenario-slug | 当前路径 | Canonical S |
-|---------------|----------|-------------|
-| `capture` | `capture/`（原 `gateway/`）, `signal/` | S13 |
-| `thinking` / `taskprogress` / `conclusion` | `present/`（已拆分） | S14–S16 |
-| `channel` | `adapters/`, `connection/`, `instance/`, `ratelimit/`, `renderers/` | S17 |
-| `delivery` | `eventbus/` | S18 |
-| `kernel` | `core/` | Domain Kernel |
-
-## Architecture（Legacy 包结构 — RETIRED v2.0）
-User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context Engine (D2)
-  │            │  │                    │                    │
-  │  Feishu    │  ├─ CardKit 流式      ├─ AgentRoute ──→ D4 MultiAgent
-  │  DingTalk  │  ├─ Worker 卡片       ├─ EventDispatcher
-  │  CLI       │  └─ Session Resolve   ├─ PermissionManager
-  │            │                       ├─ SessionStore (File)
-  └─ Renderers (D1-S8) ←── EventBus (D1-S9) ←─┘
-       │                         │
-       ├─ CLIRenderer            ├─ Drain/Compact/Reconnect
-       ├─ DingTalkCardRenderer   └─ Priority (Critical/Normal/Low)
-       └─ Components
-```
+> 历史索引已归档至 `t-registry.md` §Legacy Archive + `openspec/archive/2026-06-14-devrix-d1-sa-refine/legacy-s1-s12.md`（PR-4 #2 registry-sync 沉 archive）。新代码与测试 MUST 使用 D1-S13–S18 canonical ID。
 
 ## Cross-Domain Dependencies
 
@@ -90,17 +62,6 @@ User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context E
 | D5 Observability | `Observability`, `Bridge`, tracer, telemetry | capture, adapters |
 | D7 Orchestration | **禁止** channel/adapters import；Worker 展示经 `contracts.WorkerStreamEvent` | D7 `wavescheduler/present.go` → D1 adapter |
 | Shared | config, contracts, errors, types | 全子包 |
-
-## Legacy 路径索引（RETIRED — 仅追溯）
-
-> 已废弃的 D1-S1–S12 包映射见 `t-registry.md` §Legacy Archive。新代码禁止使用下表路径。
-
-| 旧子包 | 原 Legacy S | 目标 scenario-slug |
-|--------|-------------|-------------------|
-| `gateway/` | S1 | `capture/` |
-| `adapters/` | S2 | `channel/` |
-| `eventbus/` | S9 | `delivery/` |
-| `core/` | S11 | `kernel/` |
 
 ## Key Design Patterns
 
@@ -172,5 +133,14 @@ User/IM ──→ Adapters (D1-S2) ──→ Gateway (D1-S1) ──→ Context E
 ## Guides（互补，非登记 SoT）
 
 - **领域 SoT**: `d1-domain.md` — North Star、Out of Scope、文档索引
+- **Flow architecture**: `../architecture/d1-flow-architecture.md` — 价值流流图、Package Map、Legacy 包结构、跨域接线
 - **终态架构**: `terminal-state-guide.md` — 跨域流程、A→F 编排树、IntentKind 时序、信号映射
-- **可观测性**: `observability-guide.md` — Span↔T 绑定、Trace 树、EventBus 必达、验收 Runbook
+- **可观测性**: `observability-guide.md` — Trace 树、EventBus 必达、验收 Runbook
+
+---
+
+## 修订记录
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 5.0.0 | 2026-06-30 | **DM-20260629-005 S7_Archive ACCEPTED (PR-2 god-doc-split pt1 + PR-6 gherkin-restructuring)**：(1) god-doc-split：176 → 90 行（拆出 `architecture/d1-flow-architecture.md` 80-100 行 NEW，含价值流流图 + Package Map + Legacy 包结构 + 跨域接线 + Legacy 路径索引）；(2) §Cross-Domain Dependencies 保留；(3) §Requirements 24 缩写 bullet → 90 `#### Scenario:` Gherkin 块（PR-6 落地，分布：happy 30 / sad 24 / boundary 18 / concurrent 9 / timeout 9）；(4) §Change line + 修订记录 v5.0.0 row |
