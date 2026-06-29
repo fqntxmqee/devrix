@@ -87,6 +87,22 @@
 
 ---
 
+## Boundary Debt Decisions
+
+> DM-20260629-004 PR-7 #5 boundary-decision — 3 项 D4 跨域边界债务审计。所有 3 项均 **RESOLVED**（PR-6 常量化后 emit 模式稳定 + 消费者路由可验证）。治理常量见 `internal/layers/multiagent/orchtypes/boundary_decision.go`，与 D2/D3/D7 `boundary-debt:` 命名空间一致。
+
+| ID | Debt | Status | Resolution | Governance Constant | 重新评估触发 |
+|----|------|--------|------------|---------------------|--------------|
+| `boundary-debt:d4-to-d7-agent-event-bridge-v1.0` | D4 emit `agent.{started,error,terminated,iterating,forked,joined}` 6 字面量 → D7 FlowEvent（订阅侧） | **RESOLVED** | PR-6 #4 span-coverage：6 字面量常量化 `orchtypes.EventAgent*`，消费者 `agent_bridge.go` const switch | `orchtypes.BoundaryD4ToD7AgentEventBridge` | v4.0+ 新增 AgentEvent 类型（如 `agent.paused`）需重审 |
+| `boundary-debt:d4-to-d6-evolution-observer-v1.0` | D4 emit `agent.{forked,joined}` + `permission_required` → D6 evolution/guard/observer（fail-fast + reputation） | **RESOLVED** | PR-6 #4 span-coverage：3 字面量常量化 `orchtypes.EventAgentForked/Joined/EventPermissionRequired`，消费者 `observer.go` const switch | `orchtypes.BoundaryD4ToD6EvolutionObserver` | D6 增加 fail-fast 维度（如 `agent.quota_exceeded`）需重审 |
+| `boundary-debt:d4-forbidden-flow-hub-publish-v2.0` | D4 跨域 emit 必须走 const switch，**禁止** `flow.Hub.Publish`（D7 v2.0-b 后 lint 强制） | **RESOLVED** | PR-6 #4 span-coverage：跨域 emit 收敛到 `orchtypes.EventAgent*`；`scripts/d4-span-coverage.sh` 守门；layout guard `internal/lint/layer/` 维持 `D4 forbidden flow.Hub.Publish` | `orchtypes.BoundaryD4ForbiddenFlowHubPublish` | D4 需直接发 FlowEvent 时必须先升级 spec |
+
+**格式约定**：`^boundary-debt:[a-z0-9\-]+-v\d+\.\d+$`（与 D2/D3/D7 命名空间一致；版本记录**决议时间**而非债务发生时）。
+**唯一性**：3 项决策字符串全局唯一（`orchtypes.AllBoundaryDecisions()` 在 `boundary_decision_test.go` 中守门）。
+**重新评估触发**：每次 devrix-d4-* Change 启动 S3-Gate 时，须先 `grep -r 'boundary-debt:' openspec/specs/d4-multi-agent/` 检查是否有命中上述 ID；如命中且新需求冲突，回退到 OPEN 状态并补 plan。
+
+---
+
 ## 物理路径（v2.0 目标）
 
 | Canonical S | scenario-slug | v2.0 实际 |
@@ -121,6 +137,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.2.0 | 2026-06-30 | DM-20260629-004 PR-7 #5 boundary-decision：新增 §Boundary Debt Decisions 章节（3 项 RESOLVED）+ 治理常量 `orchtypes.BoundaryD4*` 引用 + 格式/唯一性 lint 守门 |
 | 2.1.0 | 2026-06-30 | DM-20260629-004 PR-5 #3 value-flow-rename：§North Star + §Canonical 价值流加 ValueFlow Alias 列（5 S + 1 横切 = 6 alias：`D4_Provision_Agent` / `D4_Run_Agent_Loop` / `D4_Isolate_Merge` / `D4_Execute_Worker` / `D4_External_Agent_Tool` / `D4_Configure_Agents`） |
 | 2.0.0 | 2026-06-30 | DM-20260629-004 PR-4 #2 registry-sync：物理路径表对齐 code；version bump 1.0→2.0 |
 | 1.0.0 | 2026-06-14 | 初版：S11–S16 + Hub-Spoke Out of Scope + Legacy 双轨（DM-20260614-018） |
