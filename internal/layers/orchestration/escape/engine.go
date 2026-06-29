@@ -1,4 +1,4 @@
-// EscapeEngine (DM-20260625-003, PR-V5.4)
+// EscapeEngine (DM-20260625-003, PR-V5.4 + DM-20260629-008 PR-B additive)
 //
 // 关键设计 (doc 38 §21.1, design.md §5.3.2):
 //   - 整合 3 类深度限制: LoopDepthTracker + LoopBudget + CircuitBreaker
@@ -11,11 +11,19 @@
 //   2. 决策合并: 任一非空 → ChainedArbitrator.Arbitrate
 //   3. 全部空 → EscapeContinue (正常回路)
 //   4. auditLog.Record 终态 (无论是否仲裁)
+//
+// PR-B additive (DM-20260629-008, devrix-d7-taskcontract-unification-pr-b):
+//   - pessimisticGuard 字段: PessimisticCommitGuard 可选注入 (nil = no-op)
+//   - NotifyPessimistic(report): guard 评估 + 决策, 把 Pessimistic Commit
+//     行为 attach 到 report (FallbackUsed + MVPArtifact + 必要 Blockage).
+//     仅在 guard != nil 且 Enabled=true 时生效, 默认 0 行为变更.
 package escape
 
 import (
 	"context"
 	"log/slog"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 )
 
 // DepthChecker is the interface EscapeEngine uses to consult the
@@ -33,12 +41,14 @@ type DepthChecker interface {
 //   - cbSet:   CircuitBreakerSet 5 层 (V5.4)
 //   - audit:   EscapeAuditLog (终态记录)
 //   - resume:  HumanArbitrator.ResumeSession 代理入口 (T2 续跑)
+//   - pessimisticGuard: PessimisticCommitGuard (PR-B, optional — nil = no-op)
 type EscapeEngine struct {
-	tracker DepthChecker
-	chain   *ChainedArbitrator
-	cbSet   *CircuitBreakerSet
-	audit   *EscapeAuditLog
-	resume  *HumanArbitrator
+	tracker          DepthChecker
+	chain            *ChainedArbitrator
+	cbSet            *CircuitBreakerSet
+	audit            *EscapeAuditLog
+	resume           *HumanArbitrator
+	pessimisticGuard interfaces.PessimisticCommitGuard
 }
 
 // NewEscapeEngine constructs the engine with all components.
@@ -168,4 +178,105 @@ func (e *EscapeEngine) LoopDepthTracker() *LoopDepthTracker {
 // CircuitBreakerSet returns the CB set (for tests / metrics push).
 func (e *EscapeEngine) CircuitBreakerSet() *CircuitBreakerSet {
 	return e.cbSet
+}
+
+// SetPessimisticGuard wires the PessimisticCommitGuard into the engine.
+// PR-B additive: passing nil reverts to the no-op behavior. The bootstrap
+// (internal/bootstrap/wire_coordinator.go) consults
+// D7_PESSIMISTIC_COMMIT_ENABLED at startup and calls this once. The setter
+// is idempotent — later calls overwrite earlier ones.
+func (e *EscapeEngine) SetPessimisticGuard(g interfaces.PessimisticCommitGuard) {
+	e.pessimisticGuard = g
+}
+
+// PessimisticGuard returns the currently-wired guard (for tests / metrics
+// push). Returns nil when no guard has been wired (default 6.0.x path).
+func (e *EscapeEngine) PessimisticGuard() interfaces.PessimisticCommitGuard {
+	return e.pessimisticGuard
+}
+
+// NotifyPessimistic is the PR-B entry point called by Channel.Execute
+// exits (and any consumer that has a TaskReport in hand). The method is
+// safe to call with a nil guard (no-op) and a nil report (no-op). When
+// the guard decides to fall back, the report is updated in place:
+//
+//   - report.FallbackUsed = true
+//   - report.Result.Kind forced to ResultKindIndeterminate (Pessimistic path)
+//     or kept as Pass (RuleBased path overrides) or set to ResultKindFailed
+//     (Abort path)
+//   - report.MVPArtifact populated via BuildMVPArtifact
+//
+// Returns the (possibly mutated) report. The original receiver is not
+// guaranteed to be the same pointer (PessimisticCommitGuard implementations
+// are allowed to return a new report via TaskReport.WithMVPArtifact), so
+// callers must use the returned pointer.
+//
+// Feature Flag interaction: when the guard is disabled (the default), this
+// is a pure pass-through that returns the input report unchanged.
+func (e *EscapeEngine) NotifyPessimistic(
+	spec *interfaces.TaskSpec,
+	report *interfaces.TaskReport,
+) (*interfaces.TaskReport, error) {
+	if e == nil || e.pessimisticGuard == nil {
+		return report, nil
+	}
+	if report == nil {
+		return report, nil
+	}
+
+	budget := interfaces.NewConvergenceBudget(interfaces.FallbackPessimistic)
+	if spec != nil {
+		budget = spec.ConvergenceBudget
+	}
+
+	ok, blockedReason, err := e.pessimisticGuard.Evaluate(spec, report, budget)
+	if err != nil {
+		slog.Warn("pessimistic_guard_evaluate_error",
+			"trace_id", report.TraceID,
+			"err", err.Error(),
+		)
+		return report, nil // fail-open: do not break the pipeline
+	}
+	if ok {
+		return report, nil
+	}
+
+	policy, ruleName := e.pessimisticGuard.ResolveFallback(report)
+	_ = ruleName // currently only used for telemetry; PR-C exposes via env
+	_ = policy
+
+	mvp := e.pessimisticGuard.BuildMVPArtifact(report, blockedReason)
+	updated := report.
+		WithFallbackUsed(true).
+		WithMVPArtifact(&mvp)
+
+	// Force Result.Kind based on the policy.
+	switch policy {
+	case interfaces.FallbackPessimistic:
+		updated = updated.WithResult(interfaces.Result{
+			Kind:       interfaces.ResultKindIndeterminate,
+			Confidence: report.Result.Confidence,
+			Message:    "pessimistic commit: " + blockedReason,
+			At:         report.Result.At,
+		})
+	case interfaces.FallbackRuleBased:
+		// PR-B keeps the existing Result.Kind (caller's verdict is honored
+		// because the rule-based path is the "best candidate wins" semantic).
+		// No-op here; PR-C will overwrite with the chosen candidate's verdict.
+	case interfaces.FallbackAbort:
+		updated = updated.WithResult(interfaces.Result{
+			Kind:       interfaces.ResultKindFailed,
+			Confidence: 0.0,
+			Message:    "fallback abort: " + blockedReason,
+			At:         report.Result.At,
+		})
+	}
+
+	slog.Info("pessimistic_commit_emit",
+		"trace_id", report.TraceID,
+		"reason", blockedReason,
+		"policy", policy.String(),
+		"fallback_used", true,
+	)
+	return updated, nil
 }

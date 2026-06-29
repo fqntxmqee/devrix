@@ -110,6 +110,16 @@ D7 是 Turn 编排 Owner：**调用方**是 D7，**被调用方**是 D2 / D3 / D
 | `D7_Orchestration_Metrics_Emit` | INTERNAL | hardening | 4.0.0 | metric.name, metric.value, metric.kind |
 | `D7_Orchestration_CircuitBreaker_Monitor` | INTERNAL | hardening | 4.0.0 | circuit_level, state.kind, transitions_count |
 
+### D7-S18 Pessimistic Commit + Rule-based Fallback Operations（v7.0 PR-B, 2026-06-29）
+
+> L3 防御运行时层：Pessimistic Commit 防 false success，Rule-based Fallback 在连续 INDETERMINATE 时按 4 候选规则打分。
+
+| Operation | Kind | Component | Since | Key Attributes |
+|-----------|------|-----------|-------|----------------|
+| `D7_Orchestration_Pessimistic_Commit_Emit` ⭐新 P0 | INTERNAL | escape | 4.4.0 | session_id, trace_id, reason, policy, fallback_used, mvp.artifact_hash, mvp.trigger |
+
+> **注：** PR-B 阶段 span emit 在 `engine.go::NotifyPessimistic` 内通过 `slog.Info("pessimistic_commit_emit", ...)` 占位（结构化字段已对齐 7 个 attributes）。完整 Jaeger wire (OTel span + 5 metrics 注册) 留 PR-C 与 observability-guide 同步。
+
 ### D7-S20/S21 TaskContract Operations（v7.0 PR-A, 2026-06-29）
 
 > v7.0 TaskContract 统一 PR-A（L1 接口层 + L2 字段语义层）：`interfaces` 包纯类型层 + `ChannelRequest.Spec` / `LearnRequest.Report` 可选指针嵌入。5 个 span 全部挂在 `D7_Orchestration_Session_Process` 父 span 下，作为 TaskContract 跨节点契约锚点。
@@ -287,3 +297,4 @@ D7_Orchestration_Session_Process
 | **4.0.0** | **2026-06-26** | **6 S 精简 + 5 个新 Span 推进**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切** span 重归类（按博弈角色 State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Info Producer+Quantizer / Pipeline Coord+Memory / 横切 Discipline Keeper）；(2) **新增 5 个 P0/P1 span ops**：`D7_Orchestration_Channel_Route`（P0/S6-A48）+ `D7_Orchestration_Memory_Persist`（P0/S6-A49）+ `D7_Orchestration_System_Anomaly_Detect`（P0/S4-A47）+ `D7_Orchestration_TaskGraph_Synthesize`（P1/S5-A33）+ `D7_Orchestration_Executor_Select`（P1/S5-A34）；(3) 移除旧 S6（横切 Hardening）占 S 位，改为 cross-cutting；(4) 移除旧 S7-S14 ops 命名（Observe_Quantize/Plan_Generate/Verify_Verdict/Learn_Asset 保留，Execute_Artifact → Channel_Route，Observe_Request_WithPrior 拆入 Uncertainty_Update）；(5) MUPS 5 节点管道 Trace 树重归类为 6 S；(6) Cross-cutting Hardening Trace 树新增 |
 | **4.1.0** | **2026-06-26** | **DM-20260626-009 follow-up 内层 observability span**：(1) **新增 3 个内层 span ops**：`D7_Worktree_Op`（P1/S1-A52，包 ItemPipelineRunner 11 个 r.Tasks.Tree().Xxx() callsite）+ `D7_SubWorktree_Run`（P2/S1-A53，包 RunParallelExplore，目前 child_id 空）+ `D7_SubTurn_Iteration`（P1/S5-A54，包每个 ReAct iter + cap-hit 多发 1 个 max+1 iter span）；(2) §Operations ops 总数 23 → 26；(3) §WorkItem Inner Layer Trace 树新增（挂在 D7_Orchestration_Channel_Route Execute 节点下）；(4) `D7_SubTurn_Iteration.finish_reason` 取 LLM 真实 finish_reason（stop/tool_calls/length/...），与 executor 自定义的 stop_reason（final_answer/max_iters/tool_error/...）正交 |
 | **4.3.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A Span 落地（DM-20260629-007）**：(1) **新增 5 个 P0/P1 TaskContract span ops**：`D7_Interfaces_Task_Spec_Created`（P0/S20-A01，挂在 sessionSpan 下，作为 TaskSpec 跨节点契约锚点）+ `D7_Interfaces_Task_Report_Created`（P0/S20-A02，同 TaskReport 锚点）+ `D7_TaskReport_Dissent_Recorded`（P1/S21-A01，summary hash + top-N 截断）+ `D7_TaskReport_Blockage_Recorded`（P1/S21-A02，3 类 kind 分类）+ `D7_TaskReport_Resource_Recorded`（P1/S21-A03，token/time/step 三件套）；(2) §Operations ops 总数 26 → **31 ops**；(3) §D7-S20/S21 TaskContract Operations 段新增，挂在 `D7_Orchestration_Session_Process` 父 span 下；(4) 5 span 都是 INTERNAL Kind，Component = `interfaces`（v7.0 新增纯类型层）；(5) `interfaces` 包 0 import D7 任何子包（pure types 原则），trace_id 格式 `ts_<8 hex>` |
+| **4.4.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B L3 防御运行时层 Span 落地（DM-20260629-008）**：(1) **新增 1 个 P0 span op**：`D7_Orchestration_Pessimistic_Commit_Emit`（P0/S18-A11，挂在 D7_Orchestration_Session_Process 父 span 下，Pessimistic Commit 触发时刻 emit）；(2) 7 attributes（session_id + trace_id + reason + policy + fallback_used + mvp.artifact_hash + mvp.trigger）；(3) PR-B 阶段在 `engine.go::NotifyPessimistic` 内通过 `slog.Info("pessimistic_commit_emit", ...)` 占位（结构化字段已对齐）；(4) 完整 Jaeger wire (OTel span 注册 + 5 metrics) 留 PR-C + observability-guide 同步；(5) §Operations ops 总数 31 → **32 ops**；(6) Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更 |

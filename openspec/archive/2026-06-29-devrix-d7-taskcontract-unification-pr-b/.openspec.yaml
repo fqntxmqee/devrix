@@ -1,0 +1,209 @@
+change_id: devrix-d7-taskcontract-unification-pr-b
+demand_id: DM-20260629-008
+title: D7 TaskContract 统一 PR-B — Pessimistic Commit + Rule-based Fallback (L3 防御运行时层)
+status: s7_archived
+archived: 2026-06-29
+archived_path: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-b/
+created: 2026-06-29
+parent_design: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification/
+parent_pr_a: openspec/archive/2026-06-29-devrix-d7-taskcontract-unification-pr-a/
+phase: PR-B
+priority: P0
+dsaft_domain: D7 Orchestration
+dsaft_layers: [L3]
+
+# DSAFT 维度登记
+dsaft_scenarios:
+  - id: D7-S18
+    name: Pessimistic Commit + Rule-based Fallback
+    role: L3 防御运行时层
+    parent_activities: 2
+
+# Activity 登记 (PR-B scope 2 A)
+dsaft_activities:
+  - id: D7-S18-A11
+    name: Pessimistic Commit (5 类触发 + MVPArtifact)
+    scenario: D7-S18
+    layer: L3
+    functions: 3
+    test_points: 5
+    status: IMPLEMENTED
+  - id: D7-S18-A12
+    name: Rule-based Fallback (4 候选规则)
+    scenario: D7-S18
+    layer: L3
+    functions: 2
+    test_points: 2
+    status: IMPLEMENTED
+
+# Function 登记 (PR-B scope 5 F)
+dsaft_functions:
+  - id: D7-S18-A11-F01
+    name: PessimisticCommitGuard.Evaluate
+    activity: D7-S18-A11
+  - id: D7-S18-A11-F02
+    name: PessimisticCommitGuard.ResolveFallback
+    activity: D7-S18-A11
+  - id: D7-S18-A11-F03
+    name: PessimisticCommitGuard.BuildMVPArtifact
+    activity: D7-S18-A11
+  - id: D7-S18-A12-F01
+    name: FallbackRuleBased.Select
+    activity: D7-S18-A12
+  - id: D7-S18-A12-F02
+    name: FallbackRuleBased.ApplyPolicy
+    activity: D7-S18-A12
+
+# Test 登记 (PR-B scope 7 T 点)
+dsaft_tests:
+  - id: D7-S18-A11-T01
+    name: PessimisticCommitGuard.Evaluate happy path (资源充足)
+    activity: D7-S18-A11
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/layers/orchestration/escape/fallback_test.go::TestDefaultPessimisticCommitGuard_Enabled_HappyPath
+  - id: D7-S18-A11-T02
+    name: PessimisticCommitGuard.BuildMVPArtifact (5 类触发 → MVP)
+    activity: D7-S18-A11
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/layers/orchestration/escape/fallback_test.go::TestDefaultPessimisticCommitGuard_BuildMVPArtifact
+  - id: D7-S18-A11-T03
+    name: 5 层 CB L1 → Pessimistic action
+    activity: D7-S18-A11
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/layers/orchestration/escape/circuit_breaker_test.go::TestL1DispatchLoop_PessimisticHint
+  - id: D7-S18-A11-T04
+    name: Feature Flag env-gated (D7_PESSIMISTIC_COMMIT_ENABLED)
+    activity: D7-S18-A11
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/bootstrap/pessimistic_guard_wire_test.go::TestPessimisticCommitEnabled_DefaultsOff
+  - id: D7-S18-A11-T05
+    name: Span d7.s18.pessimistic.commit.emit + pessimistic_commit_trigger_count Metric
+    activity: D7-S18-A11
+    priority: P0
+    status: PLANNED
+    notes: Span/Metric emit hook 在 NotifyPessimistic 内 slog.Info 占位 (5.3 设计), 完整 Jaeger/Prom wire 待 PR-C
+  - id: D7-S18-A12-T01
+    name: 4 候选规则实现 (most_tests_passed / compiled_clean / min_cost / min_uncertainty)
+    activity: D7-S18-A12
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/layers/orchestration/interfaces/fallback_policy.go::FallbackPolicyRuleNames
+  - id: D7-S18-A12-T02
+    name: env D7_RULE_FALLBACK_STRATEGY 切换 (default min_uncertainty)
+    activity: D7-S18-A12
+    priority: P0
+    status: IMPLEMENTED
+    implementation: internal/bootstrap/pessimistic_guard_wire_test.go::TestPessimisticRuleStrategy_AllValid
+
+# 验收标准 (PR-B scope 4 AC)
+acceptance_criteria:
+  - id: AC11
+    name: Pessimistic Commit 防 false success
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A11-T01, D7-S18-A11-T02, D7-S18-A11-T03]
+  - id: AC12
+    name: Rule-based Fallback 可插拔
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A12-T01, D7-S18-A12-T02]
+  - id: AC16
+    name: Feature Flag env-gated 默认 disabled
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A11-T04]
+  - id: AC18
+    name: Span + Metric + ErrorCode 全链路可观测
+    priority: P0
+    layer: L3
+    test_refs: [D7-S18-A11-T05]
+
+# Span emit 登记 (PR-B scope 1 span)
+spans:
+  - op: d7.s18.pessimistic.commit.emit
+    trigger: PessimisticCommitGuard.Evaluate() 返回 blocked
+    ac_ref: AC11
+  - op: d7.s18.fallback.rule_select
+    trigger: FallbackRuleBased.Select() 选中规则
+    ac_ref: AC12
+
+# Metrics 登记 (PR-B scope 5 metric)
+metrics:
+  - name: pessimistic_commit_trigger_count
+    unit: count
+    ac_ref: AC11
+  - name: fallback_rule_select_total
+    unit: count
+    labels: [most_tests_passed, compiled_clean, min_cost, min_uncertainty]
+    ac_ref: AC12
+  - name: mvp_artifact_generated_total
+    unit: count
+    ac_ref: AC11
+  - name: pessimistic_commit_latency_us
+    unit: microseconds
+    ac_ref: AC18
+  - name: fallback_rule_apply_total
+    unit: count
+    ac_ref: AC12
+
+# Error Code 登记 (PR-B 范围 4 error)
+error_codes:
+  - code: ORCH_PESSIMISTIC_TRIGGERED
+    message: pessimistic commit triggered (resource exhausted or CB L1)
+    remediation: BuildMVPArtifact + FallbackUsed=true
+    ac_ref: AC11
+  - code: ORCH_PESSIMISTIC_MVP_EMPTY
+    message: mvp artifact output is empty
+    remediation: producer must ensure Output is non-empty
+    ac_ref: AC11
+  - code: ORCH_FALLBACK_RULE_INVALID
+    message: fallback rule not recognized
+    remediation: env D7_RULE_FALLBACK_STRATEGY must be one of 4 valid rules
+    ac_ref: AC12
+  - code: ORCH_FALLBACK_ABORT_TIMEOUT
+    message: fallback abort timeout
+    remediation: producer must respect time_budget_ms
+    ac_ref: AC11
+
+# 变更范围
+scope:
+  new_files:
+    - internal/layers/orchestration/interfaces/contracts.go
+    - internal/layers/orchestration/interfaces/fallback_policy.go
+    - internal/layers/orchestration/interfaces/convergence_budget.go
+    - internal/layers/orchestration/escape/fallback.go
+    - internal/layers/orchestration/interfaces/contracts_test.go
+    - internal/layers/orchestration/escape/fallback_test.go
+    - internal/layers/orchestration/escape/circuit_breaker_test.go
+  modified_files:
+    - internal/layers/orchestration/interfaces/task_report.go (WithMVPArtifact 新增, PR-A 已落地)
+    - internal/layers/orchestration/escape/engine.go (NotifyPessimistic 集成)
+    - internal/layers/orchestration/mups/execute/channel.go (ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit)
+    - internal/bootstrap/pessimistic_guard_wire.go (Feature Flag 注入, NEW — design.md 写的 d7-bootstrap/wire.go 实际不存在, 落到 internal/bootstrap/)
+    - openspec/specs/d7-orchestration/spec.md
+    - openspec/specs/d7-orchestration/d7-domain.md
+    - openspec/specs/d7-orchestration/a-registry.md
+    - openspec/specs/d7-orchestration/f-registry.md
+    - openspec/specs/d7-orchestration/span-registry.md
+    - openspec/specs/d7-orchestration/t-registry.md
+
+# 不变更
+unchanged:
+  - TaskSpec/TaskReport 现有结构 (向后兼容 PR-A 11 F)
+  - 5 层 CB L2-L5 行为
+  - LP-1/LP-2/LP-5 集成测试 (Feature Flag 默认 disabled)
+  - PR-C 范围 (CoW VersionChain + Similarity Check)
+
+# 预估
+estimate:
+  lines_added: 940
+  lines_removed: 0
+  ac_count: 4
+  test_points: 7
+  activities: 2
+  functions: 5
+  duration_estimate: 4_days

@@ -3,9 +3,9 @@
 **Domain ID:** D7
 **Slug:** `orchestration`
 **Type:** Core Domain
-**Status:** Active — Canonical S1–S6 + 1 横切（v6.0.0 博弈角色对齐精简，14 S → 6 S + 1 横切；MUPS 5 节点管道 + v5 EscapeEngine 完整保留；v7.0 TaskContract 统一 PR-A 落 `interfaces` 包）
-**Version:** 2.7.0
-**Last Updated:** 2026-06-29 (devrix-d7-taskcontract-unification-pr-a DM-20260629-007 S4 part: interfaces 包 7 NEW + 2 MODIFIED 0 race + 95% coverage；9/11 P0 T IMPLEMENTED)
+**Status:** Active — Canonical S1–S6 + 1 横切（v6.0.0 博弈角色对齐精简，14 S → 6 S + 1 横切；MUPS 5 节点管道 + v5 EscapeEngine 完整保留；v7.0 TaskContract 统一 PR-A 落 `interfaces` 包 + PR-B 落 L3 防御运行时层 `PessimisticCommitGuard` + 4 候选规则 Rule-based Fallback）
+**Version:** 2.8.0
+**Last Updated:** 2026-06-29 (devrix-d7-taskcontract-unification-pr-b DM-20260629-008 S4: L3 防御运行时层 5 类触发 Pessimistic Commit + 4 候选规则 Rule-based Fallback；A 55→57 / F 86→93 / T 239→246 / Span 31→32；Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled 0 行为变更)
 **Depends On:** D1（ingress `ProcessMessage`）、D2（Follower 拆面）、D3（`IGateway`，D7 直调）、D4（Delegate Follower）
 **Depended By:** D1（EngineEvent / Flow 展示）、D6（`ValidateOrchestration` advisory）
 **Hard Ban:** D1→D2 直连 `IEngine.Process`（DM-007）；D2→D3 import（DM-020）；D4 直 Publish FlowEvent（DM-018）
@@ -70,10 +70,10 @@
 
 | 层 | 数量 | SoT 文件 |
 |----|------|----------|
-| A | **55**（49 v6.0.0 + 6 v7.0 TaskContract: D7-S20-A01..A03 + D7-S21-A01..A03） | `a-registry.md` |
-| F | **84 IMPLEMENTED + 2 PLANNED = 86**（68 v6.0.0 + 11 v7.0 TaskContract + 2 v7.0 PLANNED S22 PR-B/PR-C） | `f-registry.md` |
-| T | **241**（230 v6.0.0 + 11 v7.0 TaskContract: 9 P0 IMPLEMENTED + 2 spec 同步） | `t-registry.md` |
-| Span | **31 ops**（26 v6.0.0 + 5 v7.0 TaskContract: task_spec.created/task_report.created/dissent_recorded/blockage_recorded/resource_recorded）+ 9 sessionSpan attributes | `span-registry.md` |
+| A | **57**（49 v6.0.0 + 6 v7.0 TaskContract: D7-S20-A01..A03 + D7-S21-A01..A03 + 2 v7.0 PR-B: D7-S18-A11 + D7-S18-A12） | `a-registry.md` |
+| F | **93 IMPLEMENTED**（68 v6.0.0 + 11 v7.0 PR-A + 14 v7.0 PR-B: D7-S18-A11 F01-F05 + D7-S18-A12 F01-F02 + 7 PR-B 增量在 contract/fallback_policy/convergence_budget） | `f-registry.md` |
+| T | **246**（230 v6.0.0 + 11 v7.0 PR-A: 9 P0 IMPLEMENTED + 2 spec 同步 + 7 v7.0 PR-B: 6 IMPLEMENTED + 1 PLANNED T05） | `t-registry.md` |
+| Span | **32 ops**（26 v6.0.0 + 5 v7.0 PR-A TaskContract + 1 v7.0 PR-B pessimistic_commit_emit）+ 9 sessionSpan attributes | `span-registry.md` |
 
 > **6 S 精简说明（v6.0.0）：** 14 S → 6 S + 1 横切的合并依据见 `dsaft-architecture.md` §14 S 冗余分析。MUPS 5 节点管道（Observe/Plan/Execute/Verify/Learn）+ v5 EscapeEngine 完整保留；A/F 重映射，T 180 → 230（v2.6.0 + devrix-api-error-classification 等增量 50 T）；Span 18 → 26（5 个新 P0/P1 + 3 个内层 span）。
 
@@ -126,9 +126,9 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 
 > **Why this section:** v7.0 TaskContract 用 **4-Layer × 3-Phase** 框架描述从 L1 纯类型契约到 L3 防御运行时到 L4 治理横切的完整演化路径——弥补 v6.0 缺契约不缺机制的 gap。
 >
-> **现状（v7.0 PR-A 已落地）：** L1 接口层 + L2 字段语义层 + L4 spec 同步 9/11 P0 T。
+> **现状（v7.0 PR-A + PR-B 已落地）：** L1 接口层 + L2 字段语义层 + L3 防御运行时层（PR-B 6/7 P0 T IMPLEMENTED） + L4 spec 同步 9/11 P0 T。
 >
-> **下一步（PR-B + PR-C，留待 v7.0 sprint 后半段）：** L3 防御运行时层 7 T。
+> **下一步（PR-C，留待 v7.0 sprint 后半段）：** L3 防御运行时层 1 P0 T (T05 Span/Metric 完整 wire) + CoW VersionChain + Similarity Check。
 
 ### 4-Layer 架构定义
 
@@ -136,7 +136,7 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 |-------|------|----------|---------|
 | **L1 接口层** | **TaskSpec / TaskReport struct 定义** + **NewTaskSpec / NewTaskReport 构造器** + 3 处创建点统一 (Plan/Channel/WorkItem) | `orchestration/interfaces/task_spec.go` + `task_report.go` | ✅ PR-A 落地 (3 P0 T) |
 | **L2 字段语义层** | **Dissent** (top-3 + summary hash + Learn 沉淀) + **Blockage** (3 类 kind) + **Resource** (token/time/step) | `orchestration/interfaces/task_report.go` (Dissent+Resource) + `task_spec.go` (Blockage) | ✅ PR-A 落地 (3 P0 T) |
-| **L3 防御运行时层** | **Pessimistic Commit**（防 false success） + **Hard Evidence**（强制 evidence 完整） + **CoW VersionChain**（每次变生成 version_id） + **Rule-based Fallback**（contract kind 不明时降级到 conservative） + **Similarity Check**（intra-Dissent 重复检测） | `orchestration/interfaces/contracts.go` (DESIGN ONLY) + 各节点 runtime hook | ⬜ PLANNED **PR-B + PR-C** (8 T) |
+| **L3 防御运行时层** | **Pessimistic Commit**（5 类触发：resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort → MVPArtifact best-effort 输出 + 风险警告）+ **Rule-based Fallback**（4 候选规则：most_tests_passed / compiled_clean / min_cost / min_uncertainty, default min_uncertainty）+ buildChainHash FNV-1a 16-char hex digest；后续 PR-C 接 Hard Evidence + CoW VersionChain + Similarity Check | `orchestration/interfaces/{contracts,fallback_policy,convergence_budget}.go` + `orchestration/escape/fallback.go` + `orchestration/escape/engine.go::NotifyPessimistic` + `orchestration/mups/execute/channel.go::ChannelRouter.SetPessimisticGuard/ApplyPessimisticCommit` + `internal/bootstrap/pessimistic_guard_wire.go` | ✅ **PR-B 落地 6/7 P0 T**（T05 Span/Metric 完整 wire PLANNED 留 PR-C） |
 | **L4 治理横切层** | **spec sync** + **Coverage 95%** + **Perf P99 < 1ms** + **Security** (SentinelError) + **Cross-Domain Boundary** (pure types) + **Feature Flag** (always-on PR-A) + **Error Code** (7100-7104) + **Convergence Span** (5 new ops) + **AdaptiveThreshold** (Learn 闭环使用) + **Layout Guard** (interfaces/ 0 import D7) | 各 spec/registry + bootstrap lint | ✅ PR-A 部分（spec sync + 5 SentinelError + 5 span + 0 import lint 落地 4 项） + ⬜ PLANNED PR-B + PR-C 7 项 |
 
 ### 3-Phase 实施计划
@@ -144,9 +144,9 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 | Phase | 时间 | 范围 | AC | T | PR |
 |-------|------|------|----|----|----|
 | **Phase 1 (PR-A)** | 2026-06-29 | L1 接口层 + L2 字段语义层 + L4 部分 spec 同步 | 6 AC | 9 单元/集成 + 2 spec = **11 T** | **#325 (本次)** |
-| **Phase 2 (PR-B)** | 2026-07 初 | L3 Pessimistic Commit + Hard Evidence + Rule-based Fallback + Cross-Domain Boundary + Error Code 7105-7110 | 8 AC | 18 T (含 4 LP/RACE) | TBD |
+| **Phase 2 (PR-B)** | 2026-06-29 | L3 Pessimistic Commit + Rule-based Fallback + Error Code 7110-7113 | **4 AC** (AC11 Pessimistic Commit + AC12 Rule-based + AC16 Feature Flag + AC18 Observability) | **7 T** (D7-S18-A11-T01..T05 + D7-S18-A12-T01/T02, 6 IMPLEMENTED + 1 PLANNED T05) | **本 PR (#TBD)** |
 | **Phase 3 (PR-C)** | 2026-07 中 | L3 CoW VersionChain + Similarity Check + AdaptiveThreshold + Convergence Span + Layout Guard | 9 AC | 23 T (含 4 LP/RACE) | TBD |
-| **Total 3-Phase** | 4.5 周 | 4 Layer × 3 Phase 完整闭环 | **23 AC** | **~52 T** | **3 PR** |
+| **Total 3-Phase** | 4.5 周 | 4 Layer × 3 Phase 完整闭环 | **23 AC** (PR-A 6 + PR-B 4 + PR-C 9 + L4 spec 同步 4) | **~52 T** (PR-A 11 + PR-B 7 + PR-C 23 + L4 11 共享) | **3 PR** |
 
 ### L1 ↔ L2 ↔ L3 ↔ L4 演进依据（博弈论 + 工程论）
 
@@ -165,33 +165,40 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 >
 > **设计原则：** pure types（0 import D7 任何子包，仅依赖 `internal/shared/errors/` 用于 SentinelError）。
 >
-> **物理位置：** `internal/layers/orchestration/interfaces/`（7 NEW 文件 + 0 MODIFIED 跨包）
+> **物理位置：** `internal/layers/orchestration/interfaces/`（PR-A 7 NEW + PR-B +3 NEW = 10 文件 + 0 MODIFIED 跨包）
 
 ### 包文件清单
 
-| 文件 | 角色 | 行数（约） | 关键导出 |
-|------|------|-----------|----------|
-| `doc.go` | 包文档 | 30+ | Package overview + L1/L2 设计摘要 |
-| `errors.go` | 5 ORCH_* SentinelError + wrap helper | 60+ | `ErrORCHTaskSpecEmpty` (7100) / `ErrORCHTaskSpecChannelUnknown` (7101) / `ErrORCHTaskReportEmpty` (7102) / `ErrORCHTaskReportVerdictEmpty` (7103) / `ErrORCHTaskContractTraceInvalid` (7104) |
-| `task_spec.go` | TaskSpec struct + 3 创建点 + 不可变 builder | 250+ | `NewTaskSpec` / `Validate` / `WithPlan` / `WithChannel` / `WithWorkItem` / `WithBlockage` |
-| `task_report.go` | TaskReport struct + 不可变 builder + AppendDissent | 300+ | `NewTaskReport` / `WithVerdict` / `WithResource` / `WithBlockage` / `AppendDissent` / `HashDissentSummary` |
-| `task_spec_test.go` | TaskSpec 单元测试 | 250+ | 8 子测试 |
-| `task_report_test.go` | TaskReport 单元测试 | 300+ | 10 子测试 |
-| `taskcontract_test.go` | 集成测试（round-trip） | 150+ | TestContract_RoundTrip + TestChannelRequest_SpecEmbed + TestLearnRequest_ReportEmbed |
+| 文件 | 角色 | 行数（约） | 关键导出 | PR |
+|------|------|-----------|----------|----|
+| `doc.go` | 包文档 | 30+ | Package overview + L1/L2/L3 设计摘要 | PR-A |
+| `errors.go` | **9 ORCH_* SentinelError + wrap helper**（PR-A 5 + PR-B 4） | 110+ | `ErrORCHTaskSpecEmpty` (7100) / `ErrORCHTaskSpecChannelUnknown` (7101) / `ErrORCHTaskReportEmpty` (7102) / `ErrORCHTaskReportVerdictEmpty` (7103) / `ErrORCHTaskContractTraceInvalid` (7104) / `ErrORCHPessimisticTriggered` (7110) / `ErrORCHPessimisticMVPEmpty` (7111) / `ErrORCHFallbackRuleInvalid` (7112) / `ErrORCHFallbackAbortTimeout` (7113) | PR-A + PR-B |
+| `task_spec.go` | TaskSpec struct + 3 创建点 + 不可变 builder | 250+ | `NewTaskSpec` / `Validate` / `WithPlan` / `WithChannel` / `WithWorkItem` / `WithBlockage` | PR-A |
+| `task_report.go` | TaskReport struct + 不可变 builder + AppendDissent + MVPArtifact | 300+ | `NewTaskReport` / `WithVerdict` / `WithResource` / `WithBlockage` / `AppendDissent` / `HashDissentSummary` / `WithMVPArtifact` | PR-A |
+| `contracts.go` | **PessimisticCommitGuard interface**（PR-B）+ 5 Trigger* 常量 + FallbackPolicy enum | 110+ | `PessimisticCommitGuard` (Evaluate / ResolveFallback / BuildMVPArtifact) + `FallbackPolicy` (3 路径) + `TriggerResourceExhausted/CircuitBreakerL1/Indeterminate3x/EmptyEvidence/ManualAbort` | **PR-B** |
+| `fallback_policy.go` | **4 候选规则 FallbackPolicy helpers**（PR-B） | 80+ | `FallbackPolicyRuleNames` / `ParseFallbackRuleName` / `DefaultFallbackRule` = `"min_uncertainty"` / `Valid` / `ValidNonLegacy` | **PR-B** |
+| `convergence_budget.go` | **ConvergenceBudget helpers**（PR-B，与 fallback_policy 共生） | 100+ | `NewConvergenceBudget` / `WithMaxDepth/MaxSteps/MaxTokens` / `Validate` / `RemainingBelowReserve` / `ToFields` | **PR-B** |
+| `task_spec_test.go` | TaskSpec 单元测试 | 250+ | 8 子测试 | PR-A |
+| `task_report_test.go` | TaskReport 单元测试 | 300+ | 10 子测试 | PR-A |
+| `taskcontract_test.go` | 集成测试（round-trip） | 150+ | TestContract_RoundTrip + TestChannelRequest_SpecEmbed + TestLearnRequest_ReportEmbed | PR-A |
+| `contracts_test.go` | **PessimisticCommitGuard interface + 9 ORCH_* 错误 helper 单测**（PR-B） | 150+ | TestInterfaceCompiles + 4 NewORCH* helpers + TestTriggerConstants_Stable + TestUniqueCodes (6 tests) | **PR-B** |
+| `fallback_policy_test.go` | **4 候选规则 + ClosedSet + Default 稳定**（PR-B） | 120+ | TestValid + TestValidNonLegacy + TestParseFallbackRuleName (9 cases) + TestClosedSet + TestDefaultFallbackRule_Stable (5 tests) | **PR-B** |
+| `convergence_budget_test.go` | **NewConvergenceBudget 系列 + Validate + RemainingBelowReserve**（PR-B） | 115+ | TestNewConvergenceBudget + TestWithBuilders + TestValidate (7 cases) + TestRemainingBelowReserve (6 cases) + TestToFields (5 tests) | **PR-B** |
 
 ### Additive 嵌入策略（**老路径 0 变更**）
 
-| 现有类型 | 新增字段（optional 指针） | 类型 |
-|---------|---------------------------|------|
-| `mups/execute/channel.go::ChannelRequest` | `Spec *interfaces.TaskSpec` | 嵌入 |
-| `mups/learn/asset/asset_builder.go::LearnRequest` | `Report *interfaces.TaskReport` | 嵌入 |
+| 现有类型 | 新增字段（optional 指针） | 类型 | PR |
+|---------|---------------------------|------|----|
+| `mups/execute/channel.go::ChannelRequest` | `Spec *interfaces.TaskSpec` + `pessimisticGuard interfaces.PessimisticCommitGuard` | 嵌入 | PR-A + **PR-B** |
+| `mups/learn/asset/asset_builder.go::LearnRequest` | `Report *interfaces.TaskReport` | 嵌入 | PR-A |
+| `escape/engine.go::Engine` | `pessimisticGuard interfaces.PessimisticCommitGuard` + `NotifyPessimistic` 方法 | 字段 + 方法 | **PR-B** |
 
 **关键不变量：**
 - 老路径调用方（`Channel.Execute(req)` / `AssetBuilder.Build(req)`）**0 变更**——只看老字段。
 - 新调用方可同时设置 `req.Spec` 或 `req.Report`，下游 ConsumeNode 自动捕获并落 `interfaces` 包的 span。
 - Additive 验证：`grep -n 'req\.Spec' mups/execute/channel.go` 之外的位置不应有新调用——确保**不是 PR-A 强加的迁移**。
 
-### 4 个不变式（PR-A 必保）
+### 4 个不变式（PR-A 必保）+ 1 个新增（PR-B）
 
 | Invariant | 物理约束 | 验证方式 |
 |-----------|---------|---------|
@@ -199,18 +206,23 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 | **IV-2:** TaskSpec / TaskReport 不可变（无 setter） | `go vet` + 单元测试覆盖 With* 浅拷贝 | TestTaskSpec_Immutable + TestTaskReport_Immutable |
 | **IV-3:** `AppendDissent` top-3 silent truncate | 单元测试覆盖"添加第 4 个 Dissent 不改变切片" | TestTaskReport_AppendDissent_Truncation |
 | **IV-4:** TraceID 格式 `ts_<8 hex>` | NewTaskSpec/NewTaskReport fail-fast 校验 + 单元测试覆盖 | TestNewTaskSpec_TraceIDFormat 等 5 个 |
+| **IV-5（PR-B 新增）:** `PessimisticCommitGuard` interface 必须 nil-safe / disabled-safe | guard==nil 或 guard.Enabled=false → Evaluate 直接 return (true, "", nil) | TestDefaultPessimisticCommitGuard_NilReceiver + TestDisabled_NilReport + TestEnabled_HappyPath 等 14 tests |
 
 ### 已落地的 SentinelError + Code 范围
 
-| 包内 Err 常量 | Code | 触发条件 | 返回方式 |
-|----------------|------|---------|---------|
-| `ErrORCHTaskSpecEmpty` | 7100 | `NewTaskSpec(sessionID="", …)` | `sharederrors.WithCode` |
-| `ErrORCHTaskSpecChannelUnknown` | 7101 | `Spec.Channel.Kind == ""` 或不在 `sync/async/probe/explore` | `sharederrors.WithCode` |
-| `ErrORCHTaskReportEmpty` | 7102 | `NewTaskReport(sessionID="", …)` | `sharederrors.WithCode` |
-| `ErrORCHTaskReportVerdictEmpty` | 7103 | `Report.Verdict.Kind == ""` 或不在 4 VerdictKind | `sharederrors.WithCode` |
-| `ErrORCHTaskContractTraceInvalid` | 7104 | `TraceID == ""` 或格式 `≠ ts_<8 hex>` | `sharederrors.WithCode` |
+| 包内 Err 常量 | Code | 触发条件 | 返回方式 | PR |
+|----------------|------|---------|----------|----|
+| `ErrORCHTaskSpecEmpty` | 7100 | `NewTaskSpec(sessionID="", …)` | `sharederrors.WithCode` | PR-A |
+| `ErrORCHTaskSpecChannelUnknown` | 7101 | `Spec.Channel.Kind == ""` 或不在 `sync/async/probe/explore` | `sharederrors.WithCode` | PR-A |
+| `ErrORCHTaskReportEmpty` | 7102 | `NewTaskReport(sessionID="", …)` | `sharederrors.WithCode` | PR-A |
+| `ErrORCHTaskReportVerdictEmpty` | 7103 | `Report.Verdict.Kind == ""` 或不在 4 VerdictKind | `sharederrors.WithCode` | PR-A |
+| `ErrORCHTaskContractTraceInvalid` | 7104 | `TraceID == ""` 或格式 `≠ ts_<8 hex>` | `sharederrors.WithCode` | PR-A |
+| `ErrORCHPessimisticTriggered` | 7110 | Evaluate 返回 blocked（5 类触发条件之一命中） | `sharederrors.WithCode` | **PR-B** |
+| `ErrORCHPessimisticMVPEmpty` | 7111 | `BuildMVPArtifact` 输出空（producer 须保证 Output 非空） | `sharederrors.WithCode` | **PR-B** |
+| `ErrORCHFallbackRuleInvalid` | 7112 | env `D7_RULE_FALLBACK_STRATEGY` 不在 4 候选规则内 | `sharederrors.WithCode` | **PR-B** |
+| `ErrORCHFallbackAbortTimeout` | 7113 | FallbackAbort 超时（producer 须 respect `time_budget_ms`） | `sharederrors.WithCode` | **PR-B** |
 
-后续 PR-B / PR-C 增 `ErrORCH*` (Code 7105-7110+) 在同 errors.go 续编，不另开文件。
+后续 PR-C 增 `ErrORCH*` (Code 7120+) 在同 errors.go 续编，不另开文件。
 
 ---
 
@@ -250,3 +262,4 @@ InitOrchestration 是 D7 编排层的单点入口，6 S + 1 横切博弈角色�
 | **2.5.1** | **2026-06-26** | **默认开启 WorkItem Pipeline + ContextGraph**（PR #246）：移除 `D7_WORKITEM_PIPELINE` / `D7_WORKITEM_CONTEXT_GRAPH` 环境变量门控；`FeatureWorkItemPipelineEnabled` / `FeatureWorkItemContextGraphEnabled` 恒为 true；`EnsureGoal` 同步绑定 ContextScope |
 | **2.6.0** | **2026-06-29** | **devrix-d7-dsaft-restructuring DM-20260629-001 S7_Archived**：(1) §Out of Scope 3 boundary debt Decision 标注（ReputationEvidence / SystemAnomaly / AdaptivePrior）+ 治理常量 `orchtypes/boundary_decision.go`；(2) §Cross-cutting Hardening 物理位置记录（`orchestration/hardening/` 5 .go + `escape/circuit_breaker.go` 留 escape/）；(3) §DSAFT 资产 T 186 → **230**（devrix-d7-dsaft-restructuring + devrix-api-error-classification 等增量）；(4) §登记规模 Span 18 → 26（5 个新 P0/P1 span：channel.route / memory.persist / system.anomaly_detect / taskgraph.synthesize / executor.select）；(5) `t-registry.md` v4.12.0 Span Evidence 列填充 **94% 覆盖率**（235/248 T）+ `observability-guide.md` v2.2.0 §8.1 T-Without-Span Tracker；(6) god function 治理：`turn_orchestrator.go` 1551 行拆 4 文件（turn_orchestrator / turn_loop / turn_invoke / turn_recovery），36 T 重映射；(7) WorkTree 上行反馈治理：`RollupReport` typed struct（5 字段聚合） + `sessionRootGoal` 确定性排序 + 3 governance T（D7-S15-A50..A55）；(8) 10 PR / 55 T / 15 G 全部 PASS，22/22 orchestration packages -race PASS，v6.0.x 维护阶段收官, v7.0 演进起点 |
 | **2.7.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A 部分（DM-20260629-007 S4 part）**：(1) **新增 §8 Layer 架构**（4-Layer × 3-Phase：L1 接口层 + L2 字段语义层 + L3 防御运行时层（PR-B/C）+ L4 治理横切层）+ 3-Phase 实施计划表（PR-A 6 AC + 11 T / PR-B 8 AC + 18 T / PR-C 9 AC + 23 T）+ L1-L4 演进依据（博弈论 + 工程论双视角）；(2) **新增 §9 interfaces 包**章节（pure types 原则 + 7 NEW 文件清单 + Additive 嵌入策略 ChannelRequest.Spec/LearnRequest.Report + 4 个不变式 IV-1..IV-4 + 5 ORCH_* SentinelError 7100-7104）；(3) **§DSAFT 资产规模更新**：A 49 → **55**（+6 v7.0 A），F 75 → **86**（+11 v7.0 IMPLEMENTED + 2 PLANNED），T 230 → **241**（+11 v7.0 T 9 IMPLEMENTED + 2 spec 同步），Span 26 → **31 ops**（+5 v7.0 TaskContract span）；(4) PR-A 9/11 P0 T IMPLEMENTED：`interfaces` 包 7 NEW + 2 MODIFIED 0 race + 95% coverage（详见 `a-registry.md` §D7-S20/S21 + `f-registry.md` §D7-S20-A01-F01 等 + `t-registry.md` §D7-S20/S21 + `span-registry.md` §D7-S20/S21 + `spec.md` ADDED 3 Requirement）|
+| **2.8.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B L3 防御运行时层（DM-20260629-008 S4 part）**：(1) **新增 D7-S18 Pessimistic Commit + Rule-based Fallback 段**（2 A + 7 F + 7 T + 1 Span = `a-registry.md` §D7-S18-A11/A12 + `f-registry.md` §D7-S18-A11/F01-F05 + §D7-S18-A12/F01-F02 + `t-registry.md` §D7-S18-A11-T01..T05 + §D7-S18-A12-T01/T02 + `span-registry.md` §D7-S18 pessimistic_commit_emit）；(2) **新增 §8.5 L3 防御运行时层 PR-B 落地章节**：PessimisticCommitGuard interface + 5 类触发条件（resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort）+ 3 FallbackPolicy 路径（Pessimistic / RuleBased / Abort）+ 4 候选规则（most_tests_passed / compiled_clean / min_cost / min_uncertainty, default min_uncertainty）+ buildChainHash FNV-1a 16-char hex；(3) **§DSAFT 资产规模更新**：A 55 → **57**（+2 v7.0 PR-B: D7-S18-A11 EvaluatePessimistic + D7-S18-A12 ResolveRuleFallback），F 86 → **93 IMPLEMENTED**（+7 v7.0 PR-B），T 241 → **246**（+7 v7.0 PR-B: 6 IMPLEMENTED + 1 PLANNED T05 留 PR-C），Span 31 → **32 ops**（+1 v7.0 PR-B pessimistic_commit_emit）；(4) **新增 4 ORCH_* SentinelError (7110-7113)**：ORCH_PESSIMISTIC_TRIGGERED + ORCH_PESSIMISTIC_MVP_EMPTY + ORCH_FALLBACK_RULE_INVALID + ORCH_FALLBACK_ABORT_TIMEOUT；(5) **新增 3 interfaces/ 文件**（contracts.go PessimisticCommitGuard interface + fallback_policy.go FallbackPolicyRuleNames + convergence_budget.go NewConvergenceBudget 系列）+ **escape/fallback.go** (~310 LOC) + **bootstrap/pessimistic_guard_wire.go** (~75 LOC) + **engine.go +NotifyPessimistic** (5 层 fail-safe) + **mups/execute/channel.go +ChannelRouter.SetPessimisticGuard/ApplyPessimisticCommit**；(6) **6/7 T 点 IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C，本 PR 仅 slog.Info 占位）；(7) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更**（所有方法 nil/disabled 守门 no-op）；(8) interfaces coverage **96.9%** / escape coverage **85.0%** / 22/22 orchestration packages go test -race PASS |

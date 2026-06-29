@@ -1,7 +1,7 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.14.0
+**Version:** 4.15.0
 **Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: D7-S20/21 新场景 + 11 P0 T 点 9 IMPLEMENTED + 2 文档同步, T 230→239, P0 195→204; T 编号重映射避开 D7-S16 Layer SubContext 占用)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -561,6 +561,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.8.0** | **2026-06-27** | **DM-20260627-001 devrix-d7-workitem-rollup-pipeline (PR #262) S7_Archived PARTIAL ACCEPTED 收口** + 3 root span ops (D7-S1-A55 gate + D7-S1-A56 dual_bubble + D7-S5-A57 rollup_mups) + ItemPipelineRunner emit hook 配套 span (D7-S1-A58 T17 EmitItemPipelineOp happy + T18 nil-bridge fail-safe); best_effort only 兜底 fail-safe; S7_Archived PARTIAL ACCEPTED 22/22 orchestration packages -race PASS. Total 228, P0 191. |
 | **4.9.0** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) PLANNED**：API 错误分类与可恢复语义 — `OrchestratorDeps.FallbackModel string` 字段就位 + `TurnState.Withheld bool` 字段就位 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]` 受控枚举 + 主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志 + prompt_too_long 错误标 `withheld=true` 不 surface + 现有 30+ `SanitizeForUser` 调用点零行为变化。**+2 P0 T PLANNED**：D7-S2-A50-T05 (字段 + emitError code 注入) + D7-S2-A50-T06 (2 次连续触发 fallback 日志 + withheld + SanitizeForUser 回归)。Total 228→230, IMPLEMENTED 228（持平, 2 新 T 均 PLANNED）, PLANNED 0→2, P0 191→193。S4 实现后回填 IMPLEMENTED。 |
 | **4.9.1** | **2026-06-28** | **devrix-api-error-classification (DM-20260628-001) S5 验收**：2 P0 T PLANNED→IMPLEMENTED（D7-S2-A50-T05 + T06, PR #265 squash merged, TestEmitErrorWithErr_* 2 case + TestObserveFallbackTrigger_* 3 case 全 PASS）。Total 230（持平）, IMPLEMENTED 228→230, PLANNED 2→0, P0 193。S6 归档 entry 同步。 |
+| **4.14.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A T 点 落地（DM-20260629-007）**：D7-S20/21 新场景 + 11 P0 T 点 9 IMPLEMENTED + 2 文档同步, T 230→239, P0 195→204; T 编号重映射避开 D7-S16 Layer SubContext 占用 |
+| **4.15.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B L3 防御运行时层 T 点 落地（DM-20260629-008）**：(1) **新增 D7-S18 段 7 P0 T**（D7-S18-A11-T01 happy path + T02 5 类触发 BuildMVPArtifact + T03 CB L1 → Pessimistic + T04 Feature Flag env-gated + T05 Span/Metric 完整 wire PLANNED + T06 NotifyPessimistic 5 层 fail-safe + D7-S18-A12-T01 4 候选规则 + T02 ResolveFallback 3 路径）；(2) 6/7 IMPLEMENTED + 1 PLANNED（T05 留 PR-C）；(3) **0 函数签名变化**（pure additive, 全部用 interfaces.MVPArtifact + EscapeEngine.SetPessimisticGuard + ChannelRouter.SetPessimisticGuard）；(4) 3 orchestration packages -race PASS 0 FAIL（interfaces / escape / mups/execute）；(5) interfaces coverage **96.9%** / escape coverage **85.0%** / race-clean；(6) **4 ORCH_* SentinelError (7110-7113)** 新增（ORCH_PESSIMISTIC_TRIGGERED_7110 + ORCH_PESSIMISTIC_MVP_EMPTY_7111 + ORCH_FALLBACK_RULE_INVALID_7112 + ORCH_FALLBACK_ABORT_TIMEOUT_7113）；(7) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更**；(8) Total 239（持平，新增 7 T, 移除 0）, P0 204→211 |
 
 ---
 
@@ -1046,6 +1048,32 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S12-A30-T02** | import cycle 打破（DefaultPendingMaxRetries 上提 asset/）| **IMPLEMENTED** | `orchestration/mups/learn/asset/` (PR #236) | — |
 
 **A30+ Total:** 5 P0 T (在 S8/S9/S12 三个 Scenario 跨域) — 5 IMPLEMENTED (PR #235+#236) | **0 函数签名变化** (pure physical migration) | **23 orchestration packages -race PASS 0 FAIL**
+
+---
+
+## D7-S18: Pessimistic Commit + Rule-based Fallback PR-B (DM-20260629-008)
+
+> **Change:** `devrix-d7-taskcontract-unification-pr-b` (DM-20260629-008) — v7.0 TaskContract 统一 PR-B (L3 防御运行时层)。**6/7 P0 T IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C）。Feature Flag `D7_PESSIMISTIC_COMMIT_ENABLED` 默认 disabled, 0 行为变更.
+
+### D7-S18-A11: Pessimistic Commit (5 类触发 + MVPArtifact)
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------|---------------|
+| **D7-S18-A11-T01** | **PessimisticCommitGuard.Evaluate happy path (5 类触发全不命中 → ok=true) + Disabled/Nil 守门 (Feature Flag off / nil receiver / nil report 全 no-op)** | **D7-S18-A11** | **`escape/fallback_test.go::TestDefaultPessimisticCommitGuard_Enabled_HappyPath + TestDefaultPessimisticCommitGuard_Disabled + TestDefaultPessimisticCommitGuard_NilReceiver`** | **IMPLEMENTED** | **P0** | Pessimistic_Commit_Emit |
+| **D7-S18-A11-T02** | **BuildMVPArtifact 5 类触发 (resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort) 全部命中 + ChainHash FNV-1a 稳定 + traceback 256 截断 + nil report 防御** | **D7-S18-A11** | **`escape/fallback_test.go::TestDefaultPessimisticCommitGuard_Enabled_ResourceExhausted/CircuitBreakerL1/Indeterminate3x/EmptyEvidence/ManualAbort + TestDefaultPessimisticCommitGuard_BuildMVPArtifact + TestDefaultPessimisticCommitGuard_BuildMVPArtifact_Traceback + TestDefaultPessimisticCommitGuard_BuildMVPArtifact_NilReport + TestBuildChainHash_Stable`** | **IMPLEMENTED** | **P0** | Pessimistic_Commit_Emit |
+| **D7-S18-A11-T03** | **5 层 CB L1 → Pessimistic action (L1 trips StateOpen + Evaluate 返回 ForceExit + 60s 持久窗口 + reason 含 "l1" Pessimistic guard 路由 hint)** | **D7-S18-A11** | **`escape/circuit_breaker_test.go::TestL1DispatchLoop_PessimisticHint + TestL1StateOpen_PersistentForPessimisticWindow + TestCircuitBreakerSet_L1Only_PessimisticCompatible`** | **IMPLEMENTED** | **P0** | Pessimistic_Commit_Emit |
+| **D7-S18-A11-T04** | **Feature Flag env-gated (D7_PESSIMISTIC_COMMIT_ENABLED unset/0/false/no/off 全 disabled; 1/true/yes/on 全 enabled; 边界) + D7_RULE_FALLBACK_STRATEGY 4 候选 round-trip + unknown 兜底** | **D7-S18-A11** | **`bootstrap/pessimistic_guard_wire_test.go::TestPessimisticCommitEnabled_DefaultsOff/Truthy/Falsy + TestPessimisticRuleStrategy_Default/AllValid/InvalidFallsBack + TestNewPessimisticCommitGuardFromEnv_OffByDefault/EnabledWithCustomRule`** | **IMPLEMENTED** | **P0** | — |
+| **D7-S18-A11-T05** | **Span d7.s18.pessimistic.commit.emit + pessimistic_commit_trigger_count Metric (结构化字段对齐 7 attributes; PR-B 阶段 slog.Info 占位, 完整 Jaeger/Prom wire 留 PR-C)** | **D7-S18-A11** | **`escape/engine.go::NotifyPessimistic` slog.Info("pessimistic_commit_emit", trace_id/reason/policy/fallback_used)** | **PLANNED** | **P0** | Pessimistic_Commit_Emit |
+| **D7-S18-A11-T06** | **engine.NotifyPessimistic 5 层 fail-safe (nil guard / nil report / Evaluate error fall-open / blocked → MVPArtifact 注入 / Result.Kind 强制) + ChannelRouter.ApplyPessimisticCommit no-op 守门** | **D7-S18-A11** | **`escape/engine_test.go::TestEscapeEngine_NotifyPessimistic_NilGuard/DisabledGuard/Enabled_TriggersCommit/NilReport`** | **IMPLEMENTED** | **P0** | Pessimistic_Commit_Emit |
+
+### D7-S18-A12: Rule-based Fallback (4 候选规则)
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------|---------------|
+| **D7-S18-A12-T01** | **4 候选规则 (most_tests_passed / compiled_clean / min_cost / min_uncertainty) 闭集合 + DefaultFallbackRule=min_uncertainty + Valid/ValidNonLegacy 双判 + ParseFallbackRuleName (空→默认, 未知→默认+recognized=false)** | **D7-S18-A12** | **`interfaces/fallback_policy_test.go::TestFallbackPolicy_Valid/ValidNonLegacy + TestParseFallbackRuleName (9 cases) + TestFallbackPolicyRuleNames_ClosedSet + TestDefaultFallbackRule_Stable`** | **IMPLEMENTED** | **P0** | — |
+| **D7-S18-A12-T02** | **ResolveFallback 3 路径 (Pessimistic/RuleBased/Abort) + policy_override Blockage.Source 解析 + RuleName 默认 min_uncertainty + env D7_RULE_FALLBACK_STRATEGY 切换** | **D7-S18-A12** | **`escape/fallback_test.go::TestDefaultPessimisticCommitGuard_ResolveFallback_Default/PolicyOverride`** | **IMPLEMENTED** | **P0** | Pessimistic_Commit_Emit |
+
+**D7-S18 Total:** 7 P0 T (2 A × 7 T) — **6 IMPLEMENTED + 1 PLANNED (T05 Span/Metric 完整 wire 留 PR-C)** | **0 函数签名变化** (pure additive 嵌入, 全部用 interfaces.MVPArtifact + EscapeEngine.SetPessimisticGuard) | **3 orchestration packages -race PASS 0 FAIL** (interfaces / escape / mups/execute) | **interfaces coverage 96.9% / escape 85.0%** | **race-clean** | **4 ORCH_* SentinelError (7110-7113)**
 
 ---
 

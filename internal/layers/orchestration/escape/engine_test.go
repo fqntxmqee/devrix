@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 )
 
@@ -267,3 +268,99 @@ func TestEscapeEngine_4DepthLimits_Coordination(t *testing.T) {
 // --- helper to silence unused warning ----------------------------------------
 
 var _ = errors.New
+
+// --- PR-B (DM-20260629-008): NotifyPessimistic tests ------------------------
+
+// TestEscapeEngine_NotifyPessimistic_NilGuard — nil guard = no-op pass-through.
+func TestEscapeEngine_NotifyPessimistic_NilGuard(t *testing.T) {
+	tracker, _ := NewLoopDepthTracker(DefaultMaxDepth)
+	chain := NewChainedArbitrator(nil, nil, nil)
+	engine := NewEscapeEngine(tracker, chain, NewCircuitBreakerSet(), nil, nil)
+	// No SetPessimisticGuard call.
+	report, _ := interfaces.NewTaskReport("ts_np_nil")
+	updated, err := engine.NotifyPessimistic(nil, report)
+	if err != nil {
+		t.Fatalf("NotifyPessimistic: %v", err)
+	}
+	if updated != report {
+		t.Errorf("nil-guard must return same report pointer")
+	}
+	if updated.FallbackUsed {
+		t.Error("FallbackUsed should be false (guard not wired)")
+	}
+}
+
+// TestEscapeEngine_NotifyPessimistic_DisabledGuard — wired but
+// Feature Flag off = no-op pass-through.
+func TestEscapeEngine_NotifyPessimistic_DisabledGuard(t *testing.T) {
+	tracker, _ := NewLoopDepthTracker(DefaultMaxDepth)
+	chain := NewChainedArbitrator(nil, nil, nil)
+	engine := NewEscapeEngine(tracker, chain, NewCircuitBreakerSet(), nil, nil)
+	guard := NewDefaultPessimisticCommitGuard() // Enabled = false
+	engine.SetPessimisticGuard(guard)
+
+	report, _ := interfaces.NewTaskReport("ts_np_off")
+	updated, err := engine.NotifyPessimistic(nil, report)
+	if err != nil {
+		t.Fatalf("NotifyPessimistic: %v", err)
+	}
+	if updated.FallbackUsed {
+		t.Error("FallbackUsed should be false (guard disabled)")
+	}
+	if updated.MVPArtifact != nil {
+		t.Error("MVPArtifact should be nil (guard disabled)")
+	}
+}
+
+// TestEscapeEngine_NotifyPessimistic_Enabled_TriggersCommit — guard
+// enabled + resource exhausted → Pessimistic Commit fires, MVPArtifact
+// populated, Result.Kind forced to Indeterminate.
+func TestEscapeEngine_NotifyPessimistic_Enabled_TriggersCommit(t *testing.T) {
+	tracker, _ := NewLoopDepthTracker(DefaultMaxDepth)
+	chain := NewChainedArbitrator(nil, nil, nil)
+	engine := NewEscapeEngine(tracker, chain, NewCircuitBreakerSet(), nil, nil)
+	guard := NewDefaultPessimisticCommitGuard()
+	guard.Enabled = true
+	engine.SetPessimisticGuard(guard)
+
+	report, _ := interfaces.NewTaskReport("ts_np_on")
+	report, _ = report.WithResource(interfaces.Resource{
+		TokensUsed:   990,
+		TokensBudget: 1000, // only 10 left, < 10% reserve (100) → exhausted
+	})
+	updated, err := engine.NotifyPessimistic(nil, report)
+	if err != nil {
+		t.Fatalf("NotifyPessimistic: %v", err)
+	}
+	if !updated.FallbackUsed {
+		t.Error("FallbackUsed should be true after trigger")
+	}
+	if updated.MVPArtifact == nil {
+		t.Fatal("MVPArtifact should be populated")
+	}
+	if updated.MVPArtifact.Trigger != interfaces.TriggerResourceExhausted {
+		t.Errorf("Trigger = %q, want %q", updated.MVPArtifact.Trigger, interfaces.TriggerResourceExhausted)
+	}
+	if updated.Result.Kind != interfaces.ResultKindIndeterminate {
+		t.Errorf("Result.Kind = %v, want ResultKindIndeterminate", updated.Result.Kind)
+	}
+}
+
+// TestEscapeEngine_NotifyPessimistic_NilReport — defensive: nil report
+// is a no-op, no panic.
+func TestEscapeEngine_NotifyPessimistic_NilReport(t *testing.T) {
+	tracker, _ := NewLoopDepthTracker(DefaultMaxDepth)
+	chain := NewChainedArbitrator(nil, nil, nil)
+	engine := NewEscapeEngine(tracker, chain, NewCircuitBreakerSet(), nil, nil)
+	guard := NewDefaultPessimisticCommitGuard()
+	guard.Enabled = true
+	engine.SetPessimisticGuard(guard)
+
+	updated, err := engine.NotifyPessimistic(nil, nil)
+	if err != nil {
+		t.Fatalf("NotifyPessimistic(nil): %v", err)
+	}
+	if updated != nil {
+		t.Error("nil report should stay nil")
+	}
+}
