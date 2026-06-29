@@ -3,7 +3,6 @@ package external
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -102,128 +101,6 @@ func (s *CLISession) isAlive() bool {
 	}
 	// ProcessState is only populated after Wait(); use signal 0 to probe liveness.
 	return s.cmd.Process.Signal(syscall.Signal(0)) == nil
-}
-
-// Execute sends a task to the agent tool and streams events until complete.
-func (t *CLIAgentTool) Execute(ctx context.Context, sessionID string, req Request) (<-chan Event, error) {
-	sess, err := t.ensureSession(ctx, sessionID, req.WorkDir)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
-	}
-
-	// Build stdin message (stream-json protocol)
-	msg := map[string]any{
-		"type": "user",
-		"message": map[string]string{
-			"role":    "user",
-			"content": req.Task,
-		},
-	}
-	data, _ := json.Marshal(msg)
-
-	var writeErr error
-	for attempt := 0; attempt < 2; attempt++ {
-		writeErr = func() error {
-			sess.mu.Lock()
-			defer sess.mu.Unlock()
-			if _, err := fmt.Fprintln(sess.stdin, string(data)); err != nil {
-				return err
-			}
-			sess.lastUsedAt = time.Now()
-			return nil
-		}()
-		if writeErr == nil {
-			break
-		}
-		// Stale session (e.g. prior ctx cancel closed stdin, or --print subprocess exited).
-		t.dropSession(sessionID)
-		sess, err = t.ensureSession(ctx, sessionID, req.WorkDir)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", t.cfg.Name, err)
-		}
-	}
-	if writeErr != nil {
-		return nil, fmt.Errorf("%s: write stdin: %w", t.cfg.Name, writeErr)
-	}
-
-	ch := make(chan Event)
-	go func() {
-		defer close(ch)
-
-		t.mu.RLock()
-		scanSess := t.sessions[sessionID]
-		t.mu.RUnlock()
-		if scanSess == nil {
-			ch <- Event{Type: "error", Content: "session terminated"}
-			return
-		}
-
-		scanSess.mu.Lock()
-		scanner := scanSess.stdout
-		scanSess.mu.Unlock()
-		if scanner == nil {
-			ch <- Event{Type: "error", Content: "session terminated"}
-			return
-		}
-
-		// Close stdin on context cancellation to unblock the scanner.
-		go func() {
-			<-ctx.Done()
-			scanSess.mu.Lock()
-			defer scanSess.mu.Unlock()
-			if scanSess.stdin != nil {
-				_ = scanSess.stdin.Close()
-			}
-		}()
-
-		normalDone := false
-		defer func() {
-			// Aborted turns leave a broken pipe; drop so the next call starts fresh.
-			if !normalDone {
-				t.dropSession(sessionID)
-			}
-		}()
-
-		for scanner.Scan() {
-			if ctx.Err() != nil {
-				return
-			}
-
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" {
-				continue
-			}
-
-			parsed := ParseStreamJSONLine(line)
-			for _, evt := range parsed.Events {
-				if evt.Type == "thinking" || evt.Type == "text" || evt.Type == "tool_use" {
-					slog.Debug("agent tool stream event",
-						"tool", t.cfg.Name,
-						"session", sessionID,
-						"type", evt.Type,
-						"len", len(evt.Content),
-					)
-				}
-				select {
-				case ch <- evt:
-				case <-ctx.Done():
-					return
-				}
-			}
-			if parsed.Done {
-				normalDone = true
-				if t.cfg.OneShot || !scanSess.isAlive() {
-					t.dropSession(sessionID)
-				}
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			ch <- Event{Type: "error", Content: fmt.Sprintf("stdout error: %v", err)}
-		}
-	}()
-
-	return ch, nil
 }
 
 // ensureSession returns an existing session or creates a new one.
