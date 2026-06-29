@@ -8,13 +8,21 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 )
 
-// buildCoreLayer builds layer 0 from embedded sections or template.
+// buildCoreLayer builds layer 0 from embedded core template or legacy sections.
+// When EmbedCoreTemplate is true (default), devrix_core.{zh,en}.md is the single
+// SoT for universal agent behavior — prompt_sections are not concatenated on top.
 // Workspace AGENTS.md is not Layer 0 (ClawCode: CLAUDE.md → user prepend / Layer 3).
 //
 // DM-20260629-002 devrix-d2-dsaft-restructuring PR-2: extracted from assembler.go
 // Build into layers.go so the orchestrator only owns flow control.
+// DM-20260629-003 cherry-pick 978156f2 Fix B: add EmbedCoreTemplate short-circuit
+// so the default path uses the embedded core and never concatenates legacy
+// prompt_sections (which have been deduped to remove glob/grep/edit_file).
 func (a *SystemPromptAssembler) buildCoreLayer(in SystemPromptBuildInput) (string, int) {
-	if a.promptLoader != nil && a.cfg.PromptConfig != nil {
+	if a.cfg.EmbedCoreTemplate {
+		return a.coreTemplate(), 1
+	}
+	if a.promptLoader != nil && a.cfg.PromptConfig != nil && a.cfg.PromptConfig.UseSections {
 		names := a.cfg.PromptConfig.GetStaticSections()
 		sections := a.promptLoader.LoadStaticSections(names)
 		if len(sections) > 0 {

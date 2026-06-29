@@ -87,7 +87,7 @@ func (l *Loader) LoadAsSections(workDir string) []string {
 		"intro", "system", "doing_tasks", "actions",
 		"using_tools", "output_efficiency", "tone_and_style",
 		"safety_guidelines", "knowledge_boundaries",
-		"todo_write", "delegate_strategy", "glob", "grep", "edit_file",
+		"todo_write", "delegate_strategy",
 	})
 }
 

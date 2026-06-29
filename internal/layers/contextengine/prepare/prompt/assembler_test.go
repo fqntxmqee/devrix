@@ -154,3 +154,23 @@ func TestSystemPromptAssembler_should_embed_agents_when_system_mode(t *testing.T
 		t.Fatal("expected agents in system prompt when not omitted")
 	}
 }
+
+// embed_core_template=true must use devrix_core.md, not legacy prompt_sections.
+func TestSystemPromptAssembler_should_prefer_embedded_core_over_sections(t *testing.T) {
+	cfg := config.DefaultWorkspacePromptConfig()
+	if !cfg.EmbedCoreTemplate {
+		t.Fatal("test expects EmbedCoreTemplate default true")
+	}
+	assembler := NewSystemPromptAssembler(cfg)
+	prompt, report := assembler.Build(SystemPromptBuildInput{})
+	if report.SectionCount != 1 {
+		t.Fatalf("embedded core should be one layer, got SectionCount=%d", report.SectionCount)
+	}
+	if !strings.Contains(prompt, "复杂任务") && !strings.Contains(prompt, "Complex Tasks") {
+		t.Fatal("expected embedded core template content")
+	}
+	// Legacy section-only phrase from prompt_sections intro (not in devrix_core).
+	if strings.Contains(prompt, "绝不要生成或猜测 URL") {
+		t.Fatal("legacy prompt_sections should not be concatenated when embed_core_template=true")
+	}
+}

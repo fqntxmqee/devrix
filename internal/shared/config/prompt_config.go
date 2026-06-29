@@ -1,6 +1,8 @@
 package config
 
-// defaultStaticPromptSections lists all static system prompt sections in load order.
+// defaultStaticPromptSections lists legacy section names when embed_core_template
+// is false. Per-tool sections (glob/grep/edit_file) are omitted — tool schemas
+// already describe them. Core behavior lives in devrix_core.{zh,en}.md.
 var defaultStaticPromptSections = []string{
 	"intro",
 	"system",
@@ -13,9 +15,6 @@ var defaultStaticPromptSections = []string{
 	"knowledge_boundaries",
 	"todo_write",
 	"delegate_strategy",
-	"glob",
-	"grep",
-	"edit_file",
 }
 
 // PromptConfig holds prompt-related configuration.
