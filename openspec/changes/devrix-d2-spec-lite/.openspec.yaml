@@ -1,0 +1,17 @@
+change_id: devrix-d2-spec-lite
+priority: P1
+demand_id: DM-20260630-004
+status: s2_design
+domains: [D2]
+dsaft_scenarios:
+  - D2-S15
+  - D2-S17
+  - D2-S18
+  - D2-S20
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: d2-context-engine spec.md 精简设计契约（≤ 200 行）+ CHANGELOG.md（≤ 300 行）
+  v1.1: 视需求扩展至其他域（d1/d3/d4/d5/d6）
+metrics_definitions: []
+span_naming: []
