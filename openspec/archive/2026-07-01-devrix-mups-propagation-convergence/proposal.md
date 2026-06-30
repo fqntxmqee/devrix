@@ -2,6 +2,7 @@
 
 - **Demand ID:** DM-20260701-001
 - **Change ID:** devrix-mups-propagation-convergence
+- **Status:** Archived (s7_archived 2026-07-01)
 
 ## 1. 目标
 

@@ -13,6 +13,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-07-01 | devrix-mups-propagation-convergence | A88 UncertaintyReconcile + A89 RollupTerminationGuard + A90 RollupOutcomeAggregation + A91 AcceptanceCriteriaVisibility + A92 DivergenceBudgetVisibility + A93 SchemaMonotonicNarrowing + A94 ScopeSubdivisionContract + A95 ChildUncertaintyBubble（MUPS 收敛 + Rollup 终止 + 发散范围/验收标准对 LLM 可见） | IMPLEMENTED | [archive](../../archive/2026-07-01-devrix-mups-propagation-convergence/) |
 | 2026-06-30 | devrix-mups-deliverable-convergence | A76 StrategicPlanProposer + A32 DeliverableVerifier + Session Deliverable Gate + 战术硬编码清理 | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-mups-deliverable-convergence/) |
 | 2026-06-30 | devrix-d7-observe-unified-llm-path | S16-A75 Observe LLM D2→D3 (SUPERSEDED A74) | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-d7-observe-unified-llm-path/) |
 | 2026-06-29 | devrix-d7-taskcontract-unification-pr-c | S18 CoW VersionChain + Similarity + Hard Evidence | IMPLEMENTED | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-c/) |

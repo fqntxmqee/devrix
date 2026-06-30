@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.9.0
-**Last Updated:** 2026-06-29 (mups-5node-coverage-orchestration FULL + multiturn-session-state PARTIAL — DM-20260625-019 + DM-20260628-004)
+**Version:** 5.10.0
+**Last Updated:** 2026-07-01 (devrix-mups-propagation-convergence — DM-20260701-001 — D7 +21 T points IMPLEMENTED 230→251)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,7 +27,7 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 230 | 230 | 0 | 193 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 251 | 251 | 0 | 207 |
 
 **总计**: 579 · IMPLEMENTED 574 · PLANNED 3 · PARTIAL 2 · P0 385
 
