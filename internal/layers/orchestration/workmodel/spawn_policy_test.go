@@ -137,6 +137,78 @@ func TestSpawnPolicyEvaluator_R6_ExplorationFail(t *testing.T) {
 	}
 }
 
+// T: D7-S15-A89-T01 (DM-20260701-001 RH-MUPS-03 SpawnPolicyEvaluator rollup guard)
+//
+// Rollup partial verdict at retry < limit → still SpawnInline.
+func TestSpawnPolicyEvaluator_RollupPartial_BelowLimitInlines(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	ctx.RollupRetries = 1
+	ctx.MaxRollupRetries = DefaultMaxRollupRetries
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnInline {
+		t.Fatalf("rollup partial retry 1/3: got %q, want inline", got)
+	}
+}
+
+// T: D7-S15-A89-T02 (DM-20260701-001 RH-MUPS-03 SpawnPolicyEvaluator rollup guard)
+//
+// Rollup partial verdict at retry == limit → SpawnEscalateHuman (was SpawnInline).
+func TestSpawnPolicyEvaluator_RollupPartial_AtLimitEscalates(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	ctx.RollupRetries = DefaultMaxRollupRetries
+	ctx.MaxRollupRetries = DefaultMaxRollupRetries
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
+		t.Fatalf("rollup partial retry %d/%d: got %q, want escalate_human",
+			ctx.RollupRetries, ctx.MaxRollupRetries, got)
+	}
+}
+
+// T: D7-S15-A89-T03 (DM-20260701-001 RH-MUPS-03 SpawnPolicyEvaluator rollup guard)
+//
+// Rollup fail verdict at retry == limit → SpawnEscalateHuman (was SpawnInline).
+func TestSpawnPolicyEvaluator_RollupFail_AtLimitEscalates(t *testing.T) {
+	round := baseRound(types.VerdictFail, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	ctx.RollupRetries = DefaultMaxRollupRetries
+	ctx.MaxRollupRetries = DefaultMaxRollupRetries
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
+		t.Fatalf("rollup fail retry %d/%d: got %q, want escalate_human",
+			ctx.RollupRetries, ctx.MaxRollupRetries, got)
+	}
+}
+
+// T: D7-S15-A89-T04 (DM-20260701-001 RH-MUPS-03 SpawnPolicyEvaluator rollup guard)
+//
+// Rollup indeterminate at retry == limit → SpawnEscalateHuman.
+func TestSpawnPolicyEvaluator_RollupIndeterminate_AtLimitEscalates(t *testing.T) {
+	round := baseRound(types.VerdictIndeterminate, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	ctx.RollupRetries = DefaultMaxRollupRetries
+	ctx.MaxRollupRetries = DefaultMaxRollupRetries
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
+		t.Fatalf("rollup indeterminate retry %d/%d: got %q, want escalate_human",
+			ctx.RollupRetries, ctx.MaxRollupRetries, got)
+	}
+}
+
+// T: D7-S15-A89-T05 (DM-20260701-001 RH-MUPS-03 SpawnPolicyEvaluator rollup guard)
+//
+// Rollup pass verdict → SpawnNone regardless of retry count (success resets).
+func TestSpawnPolicyEvaluator_RollupPass_AlwaysNone(t *testing.T) {
+	round := baseRound(types.VerdictPass, plan.CommitmentPlan, 0.2)
+	ctx := baseCtx()
+	ctx.RollupRound = true
+	ctx.RollupRetries = 5 // any prior retry count
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnNone {
+		t.Fatalf("rollup pass: got %q, want none", got)
+	}
+}
+
 func TestSpawnPolicyEvaluator_R6_ExploreLeafFailInlines(t *testing.T) {
 	round := baseRound(types.VerdictFail, plan.ExplorationPlan, 0.8)
 	ctx := baseCtx()

@@ -275,11 +275,22 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if strategic != nil && strategic.ReactItersHint > 0 {
 		maxItersOverride = strategic.ReactItersHint
 	}
+	// RH-MUPS-10 (DM-20260701-001): when this is a retry of a non-Pass
+	// round (the spawn policy above decided SpawnInline rather than
+	// SpawnNone/Decompose), the producer must see WHY the previous
+	// attempt failed so it can self-correct. We only surface a non-empty
+	// reason when the prior round's verdict is Fail/Partial AND we are
+	// not the first round; a Pass round carries no reason to learn from.
+	priorReason := ""
+	if item.LastRound != nil && item.LastRound.VerdictKind != types.VerdictPass {
+		priorReason = strings.TrimSpace(item.LastRound.ExitReason)
+	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
 		Item:              item,
 		Tasks:             r.Tasks,
 		MaxItersOverride:  maxItersOverride,
 		DeliverableSchema: deliverableSchema,
+		PriorVerifyReason: priorReason,
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
@@ -306,10 +317,34 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
+	// RH-MUPS-04 (DM-20260701-001): compute child-outcome stats BEFORE the
+	// verify step so rollup verify can refuse to mark the parent Completed
+	// when Failed==Total. Without this, a rollup that synthesizes a
+	// well-formed summary from all-failed children would still Pass and the
+	// parent would be marked Completed — the all-failure case gets washed
+	// into apparent success.
+	rollupChildStats := workmodel.ChildOutcomeStats{}
+	if isRollup && r.Tasks != nil {
+		for _, c := range r.Tasks.Tree().ListChildren(sessionID, item.ID) {
+			if c == nil || c.Kind == workmodel.WorkKindChecklist {
+				continue
+			}
+			rollupChildStats.Total++
+			switch c.Status {
+			case workmodel.TaskStatusCompleted:
+				rollupChildStats.Completed++
+			case workmodel.TaskStatusFailed, workmodel.TaskStatusCancelled:
+				rollupChildStats.Failed++
+			case workmodel.TaskStatusInProgress, workmodel.TaskStatusPending:
+				rollupChildStats.Running++
+			}
+		}
+	}
+
 	var verdict workmodel.Verdict
 	var deliverableResult DeliverableVerifyResult
 	if isRollup {
-		verdict = verifyRollupArtifact(art)
+		verdict = verifyRollupArtifact(art, rollupChildStats)
 		deliverableResult = DeliverableVerifyResult{Status: workmodel.DeliverableStatusNotApplicable}
 	} else if r.Verify != nil {
 		verdict = r.Verify(art)
@@ -391,9 +426,18 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		VerdictConfidence: verdict.Confidence,
 		EvidenceCount:     len(obsIDs),
 	})
-	if item.Uncertainty > uncertaintyMean {
-		uncertaintyMean = item.Uncertainty
-	}
+	// RH-MUPS-01/02 (DM-20260701-001): route through ReconcileUncertainty so
+	// convergence (all children terminal) is numerically visible. The prior
+	// naked max ratchet (`item.Uncertainty > uncertaintyMean ? item.Uncertainty : uncertaintyMean`)
+	// made the value monotonically non-decreasing across the WorkItem
+	// lifetime — even after rollup succeeded, item.Uncertainty stayed pinned
+	// at its historical peak. Downstream readers (uncertainty thresholds,
+	// llmClaim feedback) then overestimated remaining uncertainty and could
+	// trigger spurious decomposition / escalation. ReconcileUncertainty
+	// drops prevStored once children are terminal; while children run, a
+	// damped max protects against single-round optimism. See
+	// workmodel/uncertainty_reconcile.go.
+	uncertaintyMean = workmodel.ReconcileUncertainty(item.Uncertainty, uncertaintyMean, stats)
 
 	artifactID := ""
 	artifactSummary := ""
@@ -419,6 +463,17 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		DeliverableSchema: deliverableSchema,
 		StartedAt:         started,
 		CompletedAt:       time.Now(),
+	}
+	// RH-MUPS-03 (DM-20260701-001): increment RollupRetries on non-Pass
+	// rollup rounds so SpawnPolicyEvaluator can escalate after the
+	// configured ceiling. Pass resets the counter so a later successful
+	// rollup immediately stops the retry clock.
+	if isRollup {
+		if verdict.Kind == types.VerdictPass {
+			round.RollupRetries = 0
+		} else if item.LastRound != nil {
+			round.RollupRetries = item.LastRound.RollupRetries + 1
+		}
 	}
 	if !isRollup {
 		round.DeliverableStatus = deliverableResult.Status

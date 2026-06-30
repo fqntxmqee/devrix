@@ -19,6 +19,13 @@ type WorkItemExecContext struct {
 	MaxItersOverride int
 	// DeliverableSchema selects Verify deliverable gate for this round.
 	DeliverableSchema workmodel.DeliverableSchema
+	// PriorVerifyReason carries the previous round's verify verdict reason
+	// (RH-MUPS-10 / D7-S9-A91, DM-20260701-001). When the executor is being
+	// invoked for a retry (SpawnInline after a non-Pass verdict), the
+	// LLM producer must see WHY the prior round failed so it can self-
+	// correct instead of re-producing the same artifact. Empty when this
+	// is the first round or the prior round passed.
+	PriorVerifyReason string
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.

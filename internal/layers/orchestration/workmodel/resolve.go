@@ -39,7 +39,16 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *Rol
 	}
 
 	stats := childOutcomeStats(tm, sessionID, parent.ID)
-	u := ComputeUncertainty(parent, stats, parent.Uncertainty, 0)
+	// RH-MUPS-02 (DM-20260701-001): route through ReconcileUncertainty
+	// instead of ComputeUncertainty so both write paths (item_pipeline.go
+	// after a round + this reevaluate path after a child terminals) share
+	// a single semantic entry point. The prior split — ComputeUncertainty
+	// here (replace semantics, may drop on all-pass) vs naked-max ratchet
+	// in item_pipeline.go (never drop) — created a write race whose
+	// outcome depended on call order. With ReconcileUncertainty both paths
+	// apply the same convergence contract; the persisted value no longer
+	// ratchets up regardless of which path fires last.
+	u := ReconcileUncertainty(parent.Uncertainty, parent.Uncertainty, stats)
 	_ = tm.Tree().SetUncertainty(sessionID, parent.ID, u)
 
 	if stats.Running > 0 {
