@@ -1,0 +1,32 @@
+change_id: devrix-mups-deliverable-convergence
+demand_id: DM-20260630-012
+title: MUPS 交付收敛 — LLM 战略提案 + Deliverable Gate
+priority: P0
+status: s5_accepted
+domains: [D7, D1]
+related:
+  - DM-20260630-011  # session-conclusion-completeness (Turn 路径 LastTextQualityGate)
+  - DM-20260630-001  # observe-unified-llm-path (G3 Observe 范式)
+  - DM-20260627-001  # workitem-rollup-pipeline
+  - DM-20260628-002  # layer-subcontext-phase3 (ChildDownlink ExpectedReturn)
+supersedes_partial: []
+dsaft_scenarios:
+  - D7-S2   # Session Orchestrator / ItemPipeline
+  - D7-S5   # Decision & Planning
+  - D7-S15  # WorkItem Rollup
+  - D7-S16  # Layer SubContext / Decompose
+dsaft_activities:
+  - D7-S2-A73   # RunSessionTurnLoop complete deliverable (extend)
+  - D7-S5-A22   # Plan / StrategicPlanProposer (NEW)
+  - D7-S9-A32   # Verify deliverable schema gate (NEW)
+  - D7-S15-A41  # Rollup synthesis deliverable (extend)
+  - D7-S16-A76  # LLM StrategicPlanProposer @ Plan (NEW)
+t_points:
+  - D7-S5-A22-T01   # StrategicPlanProposer interface + JSON schema
+  - D7-S5-A22-T02   # Plan gate validates scope/budget/decompose limits
+  - D7-S9-A32-T01   # DeliverableVerifier review schema (file:line + P0/P1)
+  - D7-S9-A32-T02   # Partial+max_iters / missing deliverable → not Completed
+  - D7-S2-A73-T03   # Session complete prefers ExtractSessionDeliverable
+  - D7-S2-A73-T04   # Item pipeline complete + LastTextQualityGate
+  - D7-S15-A41-T02  # Rollup input StructuredDeliverable from children
+  - D7-S16-A76-T01  # Bootstrap wire StrategicPlanProposer (LLM + rule fallback)

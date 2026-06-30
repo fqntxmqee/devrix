@@ -152,10 +152,15 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	}
 	_ = itemID // reserved for span attrs; Materialize partition comes from ctx.
 
+	llmDirective := directive
+	if ec, ok := WorkItemExecContextFrom(ctx); ok {
+		llmDirective = AppendDeliverableExecuteHint(directive, ec.DeliverableSchema)
+	}
+
 	result := &WorkItemResult{StartedAt: e.now(), StopReason: "started"}
 	defer func() { result.EndedAt = e.now() }()
 
-	systemPrompt, tools, messages, prepErr := e.prepareContext(ctx, sessionID, itemID, directive)
+	systemPrompt, tools, messages, prepErr := e.prepareContext(ctx, sessionID, itemID, llmDirective)
 	baseMessageCount := len(messages)
 	if prepErr != nil {
 		// Non-fatal: log and continue with empty context. Better to give the
@@ -167,13 +172,15 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		messages = []types.Message{{
 			SessionID: sessionID,
 			Role:      types.MessageRoleUser,
-			Content:   directive,
+			Content:   llmDirective,
 		}}
 	}
 
 	max := e.maxIters()
 	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.Item != nil {
-		if ec.Item.NeedsRollup {
+		if ec.MaxItersOverride > 0 {
+			max = ec.MaxItersOverride
+		} else if ec.Item.NeedsRollup {
 			max = 2
 		} else if ec.Tasks != nil && ec.Tasks.Tree().Depth(sessionID, ec.Item.ID) >= 1 {
 			max = 3
@@ -478,12 +485,34 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 		return "", nil, nil, err
 	}
 	e.userContextPrepend = prepared.UserContextPrepend
+	systemPrompt := appendWorkItemFormatHints(prepared.SystemPrompt, ctx, sessionID, itemID)
 	msgs := []types.Message{{
 		SessionID: sessionID,
 		Role:      types.MessageRoleUser,
 		Content:   directive,
 	}}
-	return prepared.SystemPrompt, filterPipelineTools(prepared.Tools), msgs, nil
+	return systemPrompt, filterPipelineTools(prepared.Tools), msgs, nil
+}
+
+func appendWorkItemFormatHints(systemPrompt string, ctx context.Context, sessionID, itemID string) string {
+	ec, ok := WorkItemExecContextFrom(ctx)
+	if !ok || ec.Item == nil || ec.Item.Kind != workmodel.WorkKindGoal {
+		return systemPrompt
+	}
+	depth := 0
+	if ec.Tasks != nil {
+		depth = ec.Tasks.Tree().Depth(sessionID, itemID)
+	}
+	if depth > 0 {
+		return systemPrompt
+	}
+	if strings.Contains(systemPrompt, "<scope_contract>") {
+		return systemPrompt
+	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		systemPrompt += "\n"
+	}
+	return systemPrompt + materialize.WorkItemOutputFormatHints
 }
 
 func (e *DefaultWorkItemExecutor) appendPrivateChainDelta(ctx context.Context, sessionID, itemID string, msgs []types.Message) {

@@ -1,17 +1,26 @@
 package workmodel
 
-import "strings"
+import (
+	"fmt"
+	"path"
+	"strings"
+)
 
 // DefaultDecomposeProposer fills ChildSpecs when SpawnDecompose fires and no
-// LLM proposer ran. Splits by ScopeContract paths or concrete review slices —
-// never abstract "hypothesis A/B" labels that confuse downstream executors.
+// LLM proposer ran. Structural fallback only: split by ScopeIn paths or pass
+// through the parent directive — never inject natural-language tactics (see
+// workspace coding rule: orchestration tactical hardcoding).
 func DefaultDecomposeProposer(item *WorkItem, round *WorkItemPipelineRound) []ChildSpec {
 	if item == nil || round == nil {
 		return nil
 	}
 	exploratory := IsExploratoryPlanKind(round.PlanKind)
 	kind := ChildKindForHypothesis(exploratory)
-	base := itemDirectiveForProposer(item)
+	base := strings.TrimSpace(itemDirectiveForProposer(item))
+	if base == "" {
+		return nil
+	}
+	expected := DefaultChildExpectedReturn(item, base)
 
 	var scopePaths []string
 	if item.ScopeContract != nil {
@@ -24,45 +33,54 @@ func DefaultDecomposeProposer(item *WorkItem, round *WorkItemPipelineRound) []Ch
 	if len(filePaths) >= 2 {
 		mid := len(filePaths) / 2
 		return []ChildSpec{
-			scopeSliceChildSpec(kind, base, "in-scope slice A", filePaths[:mid]),
-			scopeSliceChildSpec(kind, base, "in-scope slice B", filePaths[mid:]),
+			scopeSliceChildSpec(kind, base, filePaths[:mid], expected),
+			scopeSliceChildSpec(kind, base, filePaths[mid:], expected),
 		}
 	}
-
-	return []ChildSpec{
-		{
-			Kind:  kind,
-			Title: "contracts and API surface",
-			Directive: scopedDecomposeDirective(base,
-				"聚焦契约、类型定义与跨包接口。只 read_file/grep in-scope 路径，禁止探索无关目录。输出 P0/P1 清单，每条含 file:line。"),
-			ExpectedReturn: "P0/P1 findings for contracts and types with file:line citations",
-		},
-		{
-			Kind:  kind,
-			Title: "implementation and observability",
-			Directive: scopedDecomposeDirective(base,
-				"聚焦实现逻辑、span/observability 与测试覆盖。只 read_file/grep in-scope 路径，禁止探索无关目录。输出 P0/P1 清单，每条含 file:line。"),
-			ExpectedReturn: "P0/P1 findings for implementation and tests with file:line citations",
-		},
+	if len(filePaths) == 1 {
+		return []ChildSpec{{
+			Kind:           kind,
+			Title:          scopeSliceTitle(filePaths[0]),
+			Directive:      base,
+			ScopeIn:        append([]string(nil), filePaths...),
+			ExpectedReturn: expected,
+		}}
 	}
+	return []ChildSpec{{
+		Kind:           kind,
+		Title:          passThroughChildTitle(base),
+		Directive:      base,
+		ExpectedReturn: expected,
+	}}
 }
 
-func scopeSliceChildSpec(kind WorkKind, base, title string, paths []string) ChildSpec {
+func scopeSliceChildSpec(kind WorkKind, base string, paths []string, expected string) ChildSpec {
 	return ChildSpec{
 		Kind:           kind,
-		Title:          title,
-		Directive:      scopedDecomposeDirective(base, "只审查以下路径："+strings.Join(paths, ", ")+"。禁止探索 scope 外目录。输出 P0/P1 清单，每条含 file:line。"),
+		Title:          scopeSliceTitle(paths[0]),
+		Directive:      base,
 		ScopeIn:        append([]string(nil), paths...),
-		ExpectedReturn: "P0/P1 findings for assigned paths with file:line citations",
+		ExpectedReturn: expected,
 	}
 }
 
-func scopedDecomposeDirective(base, focus string) string {
-	base = strings.TrimSpace(base)
-	if base == "" {
-		return focus
+func scopeSliceTitle(firstPath string) string {
+	firstPath = strings.TrimSpace(firstPath)
+	if firstPath == "" {
+		return "scope_slice"
 	}
-	return base + "\n\n" + focus
+	return "scope:" + path.Base(firstPath)
+}
+
+func passThroughChildTitle(base string) string {
+	line := strings.Split(strings.TrimSpace(base), "\n")[0]
+	if len([]rune(line)) > 48 {
+		line = string([]rune(line)[:48])
+	}
+	if line == "" {
+		return "work_slice"
+	}
+	return fmt.Sprintf("slice:%s", line)
 }
 
 func filterDecomposeFilePaths(paths []string) []string {

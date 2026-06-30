@@ -10,12 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-const deliveryHintBlock = `
-## Work item delivery (system)
-- If you form a verifiable conclusion, end with <conclusion>...</conclusion>.
-- If still uncertain, list <open_questions>...</open_questions> (one question per line).
-- Do not label observations as ObsFact/ObsSignal/ObsDeviation/ObsUncertainty; the Observe phase classifies signals.
-`
+const deliveryHintBlock = WorkItemOutputFormatHints
 
 // DefaultMaterializer implements the light Materialize path (OQ-LC-2).
 type DefaultMaterializer struct {

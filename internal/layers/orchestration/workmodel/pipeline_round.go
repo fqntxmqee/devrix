@@ -66,6 +66,9 @@ type WorkItemPipelineRound struct {
 	ContextBubbleKind ContextBubbleKind `json:"context_bubble_kind,omitempty"`
 	ChildSpecs        []ChildSpec       `json:"child_specs,omitempty"`
 	SpawnRationale    string            `json:"spawn_rationale,omitempty"`
+	DeliverableSchema DeliverableSchema `json:"deliverable_schema,omitempty"`
+	DeliverableStatus DeliverableStatus `json:"deliverable_status,omitempty"`
+	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`
 }

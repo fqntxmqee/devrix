@@ -54,6 +54,12 @@ func TestWireItemPipeline(t *testing.T) {
 	if _, ok := runner.ObservationProposer.(*sessionorchestrator.LLMObservationProposer); !ok {
 		t.Fatalf("ObservationProposer type = %T", runner.ObservationProposer)
 	}
+	if runner.StrategicPlanProposer == nil {
+		t.Fatal("DM-20260630-012: expected LLMStrategicPlanProposer wired in production")
+	}
+	if _, ok := runner.StrategicPlanProposer.(*sessionorchestrator.LLMStrategicPlanProposer); !ok {
+		t.Fatalf("StrategicPlanProposer type = %T", runner.StrategicPlanProposer)
+	}
 }
 
 func TestWireItemPipeline_RequiresLLMInvoker(t *testing.T) {

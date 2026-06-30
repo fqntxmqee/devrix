@@ -103,6 +103,15 @@ func StructuredBubbleStatement(childID string, round *WorkItemPipelineRound) str
 	if len(round.ObservationIDs) > 0 {
 		parts = append(parts, fmt.Sprintf("observations=%s", strings.Join(round.ObservationIDs, ",")))
 	}
+	if round.StructuredDeliverable != nil && len(round.StructuredDeliverable.Findings) > 0 {
+		parts = append(parts, fmt.Sprintf("findings_count=%d", len(round.StructuredDeliverable.Findings)))
+		f := round.StructuredDeliverable.Findings[0]
+		if f.File != "" {
+			parts = append(parts, fmt.Sprintf("finding_sample=%s:%d %s", f.File, f.Line, f.Severity))
+		}
+	} else if round.DeliverableStatus == DeliverableStatusIncomplete {
+		parts = append(parts, "deliverable=incomplete")
+	}
 	return "structured_child_bubble: " + strings.Join(parts, "; ")
 }
 

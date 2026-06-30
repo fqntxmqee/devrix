@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
@@ -14,6 +15,10 @@ type workItemExecCtxKey struct{}
 type WorkItemExecContext struct {
 	Item  *workmodel.WorkItem
 	Tasks *workmodel.TaskManager
+	// MaxItersOverride when >0 caps the ReAct loop for this execute (DM-20260630-012).
+	MaxItersOverride int
+	// DeliverableSchema selects Verify deliverable gate for this round.
+	DeliverableSchema workmodel.DeliverableSchema
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.
@@ -90,6 +95,20 @@ func BuildMaterializeRequest(sessionID string, item *workmodel.WorkItem, tm *wor
 		if item.ParentID != "" {
 			if peers := tm.PeerStatusSignalsForCohort(sessionID, item.ParentID); len(peers) > 0 {
 				signals.SignalLines = append(signals.SignalLines, workmodel.PeerStatusLines(peers)...)
+			}
+		}
+	}
+	if item != nil && item.NeedsRollup && tm != nil {
+		for _, c := range tm.Tree().ListChildren(sessionID, item.ID) {
+			if c == nil || c.LastRound == nil || c.LastRound.StructuredDeliverable == nil {
+				continue
+			}
+			for _, f := range c.LastRound.StructuredDeliverable.Findings {
+				line := fmt.Sprintf("child_finding: %s %s:%d", f.Severity, f.File, f.Line)
+				if msg := strings.TrimSpace(f.Message); msg != "" {
+					line += " " + workmodel.TruncateArtifactSummary(msg, 120)
+				}
+				signals.SignalLines = append(signals.SignalLines, line)
 			}
 		}
 	}

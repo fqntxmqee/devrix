@@ -1,0 +1,53 @@
+---
+description: Devrix D7 编排层 — 禁止战术硬编码（与 workspace 03-conventions Go 规约一致）
+globs:
+  - devrix/internal/layers/orchestration/**/*.go
+  - devrix/internal/layers/contextengine/materialize/**/*.go
+alwaysApply: false
+---
+
+# D7 编排层 Prompt / Fallback 规约
+
+本规则是 workspace `03-conventions.mdc` §Go 规约中 **D7 禁止战术硬编码** 在 devrix 仓库的落地说明。
+
+## 分层职责
+
+| 层 | 职责 |
+|----|------|
+| **LLM Proposer**（Observe/Plan Strategic） | 提案 execution_mode、child_specs、scope |
+| **Go invariant** | 深度上限、spawn 规则、DeliverableVerifier、StatusAfterSpawnNone |
+| **Structural fallback** | 无 LLM 时：路径切分 / 单 child 透传，**不改写** parent directive |
+| **D2 format hints** | `materialize.WorkItemOutputFormatHints` — 仅 I/O tag 说明 |
+
+## 禁止模式（垃圾代码）
+
+```go
+// BAD — 代码替 LLM 定 review 战术
+Directive: base + "\n\n聚焦契约…只 read_file…P0/P1 清单…"
+
+// BAD — 固定业务切片
+Title: "contracts and API surface"
+ExpectedReturn: "P0/P1 findings with file:line citations"
+
+// BAD — 中文 rollup 模板
+"请输出最终交付物：1. Executive Summary 2. P0/P1/P2…"
+```
+
+## 推荐模式
+
+```go
+// GOOD — 结构 fallback
+ChildSpec{Directive: base, ScopeIn: paths, ExpectedReturn: DefaultChildExpectedReturn(item, base)}
+
+// GOOD — rollup 只传数据
+"ParentGoal: …\nChildOutcomes: …\nExpectedReturn: <deliverable_schema>…"
+
+// GOOD — Execute 只加机器 tag
+AppendDeliverableExecuteHint(directive, schema) // → <deliverable_schema>p0_p1_file_line</deliverable_schema>
+```
+
+## 回归测试
+
+- `workmodel/decompose_proposer_test.go::TestDefaultDecomposeProposer_NoTacticalHardcoding` 扫描源文件禁词
+- 变更 `*Directive*` / `*Proposer*` / `decompose_proposer.go` 时必须跑：
+  `go test ./internal/layers/orchestration/workmodel/... ./internal/layers/orchestration/sessionorchestrator/... -count=1`

@@ -67,6 +67,11 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 			deps.CtxPreparer,
 			i18n.ParseLanguage(deps.PromptLanguage),
 		),
+		StrategicPlanProposer: sessionorchestrator.NewLLMStrategicPlanProposer(
+			deps.LLMInvoker,
+			deps.CtxPreparer,
+			i18n.ParseLanguage(deps.PromptLanguage),
+		),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)
