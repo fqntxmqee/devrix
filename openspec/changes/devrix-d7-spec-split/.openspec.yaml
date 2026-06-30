@@ -1,0 +1,29 @@
+change_id: devrix-d7-spec-split
+priority: P1
+demand_id: DM-20260630-002
+status: s2_design
+domains: [D7]
+dsaft_scenarios:
+  - D7-S1
+  - D7-S3
+  - D7-S4
+  - D7-S5
+  - D7-S8
+  - D7-S9
+  - D7-S11
+  - D7-S12
+  - D7-S13
+  - D7-S14
+  - D7-S15
+  - D7-S16
+  - D7-S18
+  - D7-S20
+  - D7-S21
+  - D7-S22
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: 拆分 d7-orchestration/spec.md 至 ≤ 800 行
+  v1.1: 按需扩展至其他超大域文档（d2/d3/d4）
+metrics_definitions: []
+span_naming: []

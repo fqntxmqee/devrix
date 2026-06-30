@@ -1,6 +1,6 @@
 # 架构设计规范
 
-**版本:** 1.1.0
+**版本:** 1.2.0
 **状态:** Active
 **所属阶段:** S2、S3
 **关联规范:** `requirements.md`、`review-design.md`、`../../docs/methodology/dsaft-methodology.md`
@@ -226,6 +226,41 @@ proposal.md、design.md **不得**包含工时估算。理由：
 
 - **T 归属 A**（4 段）：`D{X}-S{X}-A{XX}-T{XX}` — 契约/E2E 级验证
 - **T 归属 F**（5 段）：`D{X}-S{X}-A{XX}-F{XX}-T{XX}` — 单元/集成级验证
+
+### 6.4 文档规模约束（强制）
+
+所有 `openspec/specs/` 下的域文档必须遵循以下规模上限。**超过上限的 PR 在 S3-Gate / S4-Gate 一律阻断**，须先拆分再合入。
+
+| 文档 | 软上限（推荐） | 硬上限（强制） | 超限处理 |
+|------|---------------|---------------|----------|
+| `spec.md`（Gherkin 域规） | 600 行 | **800 行** | 按 S 拆分：`spec-s{XX}.md` + 主 `spec.md` 仅含索引 |
+| `design.md`（六段式） | 500 行 | **800 行** | 按 ④领域模型 / ⑤核心链路图 子拆分：引用 `design-{subsection}.md` |
+| `t-registry.md` | 400 行 | **500 行** | 按 A 拆分：`t-registry-a{XX}.md` + 主表 |
+| `a-registry.md` / `f-registry.md` | 400 行 | **600 行** | 按 D 跨域切分到子注册表 |
+| `layer-delta.md` / `d{N}-domain.md` | 300 行 | **500 行** | 按主题拆分为 `*-{topic}.md` |
+| 项目级规范（`specs/project/*.md`） | 200 行 | **300 行** | 拆分为多个子规范文件 |
+
+**拆分原则：**
+
+1. **主文档 = 索引 + 跨章节内容**（≤ 200 行）
+2. **子文档 = 单一主题**（按 S / A / 子领域切分）
+3. **引用方式**：`详见 [spec-s08.md](spec-s08.md)`（相对路径，不引外部 URL）
+4. **拆分不破坏 DSAFT ID 体系**（Requirement / Scenario / T 编号全局唯一，跨文件仍可追溯）
+5. **归档时域文档同步**（见 `archiving.md` §2.4）按子文档粒度逐个评估
+
+**反模式（禁止）：**
+
+- ❌ 单 `spec.md` 累积所有 S 的 Requirement/Scenario（d7-orchestration 已 2622 行）
+- ❌ 拆分后主文档不维护索引，沦为"挂载页"
+- ❌ 跨文件复制 Requirement 文本（必须引用，复制导致双源不一致）
+- ❌ 用"附录"无限追加大章节（应改为独立子文档）
+
+**S3-Gate 检查项**：
+
+- [ ] `specs/d{N}-*/spec.md` ≤ 800 行（硬上限）
+- [ ] `specs/d{N}-*/design.md` ≤ 800 行（硬上限）
+- [ ] `specs/d{N}-*/t-registry.md` ≤ 500 行（硬上限）
+- [ ] 主文档含有效索引链接到子文档
 
 ---
 
