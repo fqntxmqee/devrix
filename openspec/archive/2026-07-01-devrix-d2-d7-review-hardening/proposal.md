@@ -2,8 +2,9 @@
 
 **Change ID:** `devrix-d2-d7-review-hardening`  
 **Demand ID:** DM-20260630-013  
-**Status:** Draft (S3)  
-**Created:** 2026-06-30
+**Status:** Archived (S7) — PR #361 (P1-A + P1-B) + PR #362 (P2)  
+**Created:** 2026-06-30  
+**Archived:** 2026-07-01
 
 ---
 

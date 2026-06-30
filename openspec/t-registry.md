@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.10.0
-**Last Updated:** 2026-07-01 (devrix-mups-propagation-convergence — DM-20260701-001 — D7 +21 T points IMPLEMENTED 230→251)
+**Version:** 5.11.0
+**Last Updated:** 2026-07-01 (devrix-d2-d7-review-hardening — DM-20260630-013 — D2+D7 +30 T points IMPLEMENTED all P0: D2 114→129 + D7 251→266)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -22,14 +22,14 @@
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 61 | 61 | 0 | 31 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 114 | 114 | 0 | 61 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 129 | 129 | 0 | 76 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 38 | 1 | 23 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 251 | 251 | 0 | 207 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 266 | 266 | 0 | 222 |
 
-**总计**: 579 · IMPLEMENTED 574 · PLANNED 3 · PARTIAL 2 · P0 385
+**总计**: 609 · IMPLEMENTED 604 · PLANNED 3 · PARTIAL 2 · P0 415
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -73,6 +73,8 @@
 > 2026-06-29 S6 归档（DM-20260628-004 devrix-d7-multiturn-session-state, **PARTIAL** — PR #271 squash merged 2026-06-28）：D7 多轮 session 串行化与 complete 时机修正 — RC-3 panic hotfix done via PR #271。加 **2 IMPLEMENTED P0 T**：D7-S2-A16-T01 (emit recover middleware) + D7-S2-A16-T02 (exec.Emit overwrite per Run) — **避免 send-on-closed-channel panic + stale emit hook 串扰**。生产环境 smoke test sess_1782638991113_5000 二轮消息不 panic 验证 PASS。**5 DESIGN T points DEFERRED to v1.1**：D7-S2-A14-T01 WaitForTurnCompletion + D7-S2-A14-T02 TurnState in-memory + D7-S2-A15-T01 TranscriptReader + D7-S2-A15-T02 turn directive auto-injection + D7-S2-A17-T01 feishu TurnInProgressError（设计 4 层契约已就位：TurnState + TranscriptReader + WaitTurn + feishu adapter）。22/22 orchestration packages -race PASS 0 FAIL。Total 577→579, P0 383→385（IMPLEMENTED 572→574, PARTIAL 持平 0, DESIGN +5 待 v1.1）。D7 t-registry v4.10.0 → v4.11.0。详见 `openspec/archive/2026-06-29-devrix-d7-multiturn-session-state/acceptance-report.md` §2 T 层验证。**DM ID 重新分配：** 原 DM-20260628-003 → DM-20260628-004（与 D1 DSAFT Refactor DM-20260628-003 冲突）。
 
 > 2026-06-29 S6 归档（DM-20260626-006 devrix-d7-6s-observe-merge-cancel, **S1_Cancelled**）：D7 6s observe-merge-cancel — observe/orchtypes/ → decisionplanning/ 物理合并 S1_Cancelled: observe/orchtypes/ 目录从未存在, 原 follow-up #5' scope 基于错误假设, 实际 v6.0.0 域升级后子包已全部归位 sessionorchestrator/ + decisionplanning/ + mups/{observe,plan,execute,learn}/ + hardening/。仅 demand.md 在 archive/（CANCELLED precedent: no .openspec.yaml + no acceptance-report.md + no specs/）。0 T 点（无 S2/S3 design phase），不影响 t-registry 计数。
+
+> 2026-07-01 增量（DM-20260630-013 devrix-d2-d7-review-hardening, 4 phase 一次性收口 — D2 + D7 review hardening P0/P1/P2）：**D2 加 15 项 P0 T** 全 IMPLEMENTED: D2-S15-A80-T01/T02 AutocompactWriteback (autocompact → writeback 2 case) + D2-S15-A81-T01 CompressedView mu 保护 + D2-S15-A82-T01 async_compact session-scoped ctx + D2-S15-A83-T01 microcompact 跳 tool msg + D2-S17-A80-T01 materialize/store.go JSONL strict 模式 + D2-S18-A80-T01/T02 PlanModeWriteParity (PlanMode 写操作判断一致) + D2-S18-A81-T01/T02 SymlinkContainment (符号链接路径收敛 + 容器边界检查) + D2-S18-A82-T01/T02 5 fail-closed (nil bashAST→Deny + sandbox disabled→Deny + bashAST parse→Deny + unknown threshold strictest + bash audit redaction) + D2-S18-A83-T01/T02 + D2-S18-A84-T01 + D2-S18-A85-T01 (fail-closed 3 surface: parse + threshold + audit)。**D7 加 15 项 P0 T** 全 IMPLEMENTED: D7-S1-A80-T01 work_tree.SetStore mu 保护 + D7-S2-A80-T01/T02 PerInvocationEmit (ItemPipelineRunOpts + ExecuteOpts.Emit 字段参数化) + D7-S2-A81-T01 orchestrator.EnsureGoal slog.Warn + D7-S2-A82-T01 turn_loop.AwaitRunningChildren err purge + D7-S2-A83-T01 turn_loop 4 错误 slog.Warn + D7-S2-A84-T01 item_pipeline SetRoundPhase warn span + D7-S2-A85-T01 turn_state.EndTurn purge handle + D7-S3-A84-T01/T02 WorkerPool OnReleaseOnce (单 hook 注册 API 禁无界 append + scheduler 删重复 OnRelease) + D7-S9-A33-T01 mups/execute ErrChannelCtxCancelled + D7-S14-A48-T01 escape Arbitrator Timer + ctx cancel (200 cycles no-leak) + D7-S14-A49-T01 arbitrator 战术 prompt i18n 化 + D7-S15-A42-T01 resolve 4 _ = → warn + D7-S16-A77-T01 child_downlink DefaultChildExpectedReturn schema tag + D7-S16-A78-T01 strategic_plan_proposer i18n 化。24/24 orchestration + 22/22 contextengine packages `go test -race -count=1` PASS。Total 579→609 (+30 T), P0 385→415 (+30 P0, 全部新 T 为 P0), IMPLEMENTED 574→604 (+30), PLANNED 持平 3, PARTIAL 持平 2。D2 t-registry v2.12.0 → v2.13.0 (P0 61→76, IMPLEMENTED 114→129) + D7 t-registry v4.18.0 → v4.19.0 (P0 207→222, IMPLEMENTED 251→266)。详见 `openspec/archive/2026-07-01-devrix-d2-d7-review-hardening/acceptance-report.md` §2 T 层验证。
 
 ---
 

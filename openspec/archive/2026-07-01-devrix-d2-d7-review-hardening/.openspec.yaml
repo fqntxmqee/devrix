@@ -2,7 +2,9 @@ change_id: devrix-d2-d7-review-hardening
 demand_id: DM-20260630-013
 title: D2+D7 代码审查硬化 — 安全 / 并发 / 压缩闭环 / 错误可观测
 priority: P0
-status: s2_clarified
+status: s7_archived
+archived_at: 2026-07-01
+pr: 362
 domains: [D2, D7]
 related:
   - DM-20260630-012  # mups-deliverable-convergence (战术硬编码 partial cleanup)
@@ -21,4 +23,12 @@ dsaft_scenarios:
   - D2-S15  # PrepareExecutionContext / compression
   - D2-S17  # PersistSessionState / materialize
   - D2-S18  # EnforceExecutionPolicy / tools
-t_points_planned: 24
+t_points_planned: 30
+t_points_implemented: 30
+findings_total: 24
+findings_critical: 5
+findings_warning: 11
+findings_info: 8
+prs:
+  - 361  # P1-A (4 T) + P1-B (10 T) — squash merged 2026-07-01
+  - 362  # P2 (5 T) — squash merged 2026-07-01
