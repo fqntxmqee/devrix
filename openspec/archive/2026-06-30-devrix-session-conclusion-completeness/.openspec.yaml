@@ -2,16 +2,94 @@ change_id: devrix-session-conclusion-completeness
 priority: P0
 demand_id: DM-20260630-011
 status: s7_archived
+pr_number: "350"
+archived: 2026-06-30
+author: devrix session sess_1782814140202_7000 prod review d2-kernel 指令复盘
+
 domains: [D1, D2, D7]
+
+# T 点
+t_points:
+  # D1 — Communication Layer (conclusion package)
+  - D1-S16-A72-T01   # LastTextQualityGate: too_short fallback to event.Content
+  - D1-S16-A72-T02   # inconclusive (planning marker) fallback to event.Content
+  - D1-S16-A72-T03   # valid summary preserves on Content (no fallback)
+  - D1-S16-A72-T04   # empty summary + empty Content falls back to stats
+  - D1-S16-A72-T05   # EmitEmitCompleteFallback span emission when fallback triggers
+  # D2 — Context Engine (workitem executor)
+  - D2-S16-A73-T01   # Regular materialize emits span with actual MessageCount/TokenEst
+  - D2-S16-A74-T01   # Empty yield (0/0) emits EmitMaterializeEmptyYield span
+  - D2-S16-A74-T02   # Non-empty yield does NOT emit EmptyYield
+  # D7 — Orchestration
+  - D7-S2-A73-T01    # LastTextQualityGate 4-way classification
+  - D7-S2-A73-T02    # Case-insensitive marker detection
+  - D7-S2-A74-T01    # Orchestrator EmitMeta: summary_quality propagation
+  - D7-S2-A75-T01    # Rule classifier produces source="rule"
+  - D7-S2-A75-T02    # Default fallback when intent.Source is unset
+  - D7-S5-A43-T01    # BuildAdaptivePriorWithReport cold-start = baseline
+  - D7-S5-A43-T02    # 2 high-strength signals shift Beta prior down by 2
+  - D7-S5-A43-T03    # Extreme penalty floors Alpha at 1
+  - D7-S12-A41-T04   # UncertaintyReport.Partition falls back ObsUncertainty to Anomalies
+  - D7-S13-A47-T04   # Verify DetectTaskIncomplete detector
+  - D7-S13-A47-T05   # Verify DetectEmptyConclusion detector
+
 dsaft_scenarios:
   - D1-S16
   - D2-S16
   - D7-S2
-  - D7-S4
+  - D7-S5
   - D7-S12
   - D7-S13
-dsaft_activities: []
-t_points: []
-version_scope: {}
-metrics_definitions: []
-span_naming: []
+
+dsaft_activities:
+  - D1-S16-A72
+  - D2-S16-A73
+  - D2-S16-A74
+  - D7-S2-A73
+  - D7-S2-A74
+  - D7-S2-A75
+  - D7-S5-A43
+
+version_scope:
+  d1-domain:
+    spec: v1.0.0 → v1.1.0
+    spec_delta_path: d1-communication/spec.md
+  d2-domain:
+    spec: v9.0.0 → v9.0.1
+    spec_delta_path: d2-context-engine/spec.md
+  d7-domain:
+    spec: v2.8.0 → v2.9.0
+    spec_delta_path: d7-orchestration/spec.md
+
+metrics_definitions:
+  - name: devrix_emit_complete_fallback_total
+    type: counter
+    attributes: [session_id, summary_quality, fallback_source]
+    description: EmitComplete fallback trigger (too_short/inconclusive/empty)
+  - name: devrix_materialize_empty_yield_total
+    type: counter
+    attributes: [session_id, workitem_id]
+    description: D2 Materialize span with 0 message/0 token count (silent failure proxy)
+
+span_naming:
+  - op: D1_Communication_EmitComplete_Fallback
+    layer: D1
+    module: d1.conclusion
+    description: EmitComplete fallback span (summary_quality-aware content override)
+  - op: D2_Context_Materialize_EmptyYield
+    layer: D2
+    module: d2.workitem_executor
+    description: D2 Materialize 0/0 yield diagnostic span
+  - op: D7_Orchestration_LastText_Quality_Gate
+    layer: D7
+    module: d7.sessionorchestrator
+    description: LastTextQualityGate 4-way classification span
+
+related_changes:
+  - devrix-d7-observe-unified-llm-path       # DM-20260630-001 LLM 通路收口 (predecessor)
+  - devrix-d7-multiturn-session-state        # DM-20260628-004 RC-3 panic hotfix (precondition)
+  - devrix-think-tag-conclusion-pr102        # PR #102 D3 splitter + D7 resolveFinalText (precondition)
+  - devrix-final-text-accumulation-pr137     # PR #137 cross-turn finalText accumulation (precondition)
+  - devrix-feishu-updatecard-fallback-pr138  # PR #138 feishu stream closed fallback (precondition)
+  - devrix-llm-stream-replay-dedup-pr139     # PR #139 streaming replay dedup (precondition)
+  - devrix-emitemptyconclusion-bug-pr149     # PR #149 EmitComplete Content/stats separation (precondition)
