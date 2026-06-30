@@ -1,0 +1,18 @@
+change_id: devrix-d6-spec-lite
+priority: P1
+demand_id: DM-20260630-009
+status: s2_design
+domains: [D6]
+dsaft_scenarios:
+  - D6-S3
+  - D6-S4
+  - D6-S5
+  - D6-S11
+  - D6-S12
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: d6-evolution spec.md 精简设计契约（≤ 200 行）+ CHANGELOG.md（≤ 300 行）
+  v1.1: devrix-verify-spec-links (Backlog 收官)
+metrics_definitions: []
+span_naming: []
