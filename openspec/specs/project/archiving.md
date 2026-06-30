@@ -1,6 +1,6 @@
 # 归档规范
 
-**版本:** 1.3.0
+**版本:** 1.4.0
 **状态:** Active
 **所属阶段:** S6-归档（S6 的第二子步；S6-交付见 `git-workflow.md`）
 **前置阶段:** S5 验收通过、S6-交付完成（PR 已 squash 合入 `master`）
@@ -43,9 +43,16 @@ S6 归档在以下条件**全部满足**后执行：
 - [ ] `openspec/demand-archive-index.md` 将新增记录
 - [ ] 域架构文档已评估是否需要同步更新（见 §2.4）
 
-### 2.4 域文档同步
+### 2.4 域文档同步（精简模式 — Lite-Mode）
 
 归档前，**必须评估**本次变更是否影响 `openspec/specs/d{N}-*/` 下的域架构文档。判断标准：
+
+**核心原则（lite-mode）：**
+
+- **spec.md = 当前符合代码的设计契约**（只放 Overview / DSAFT / 关键设计 / 链路口 / 1-2 关键 Scenario 范式，≤ 200 行）
+- **CHANGELOG.md = 时间线列表**（每个 change 一行 + 一句话摘要 + 链接到 archive/，≤ 300 行）
+- **archive/<change>/specs/ = 过程需求详细文本**（完整 Requirement / Scenario 集合随 change 归档）
+- **Scenario 详细文本不合并到 spec.md**——只 CHANGELOG.md 追加一行引用即可
 
 **需要同步的情况：**
 
@@ -55,7 +62,7 @@ S6 归档在以下条件**全部满足**后执行：
 | 新增/修改 F（功能点） | `f-registry.md` | 新增功能点条目或修改代码位置 |
 | 新增 T 层测试点 | `t-registry.md`（或按 A 拆分的子注册表） | 状态从 PLANNED → IMPLEMENTED |
 | 架构设计变更 | `design.md`（或子文档） | 领域模型、接口、业务流程变更 |
-| 新增/修改 Gherkin 规格 | `spec.md` + 按 S 拆分的 `spec-s{XX}.md` | **按 S 分片合并**（禁止单点累积，详见 §2.5） |
+| 架构级 spec.md 变更 | `spec.md`（修订契约段）+ `CHANGELOG.md`（追加 1 行） | 仅在架构级变更时修订 spec.md；过程需求留在 archive/ |
 | 跨域影响 | 所有受影响域的上述文档 | 每个域独立评估 |
 
 **不需要同步的情况：**
@@ -66,6 +73,7 @@ S6 归档在以下条件**全部满足**后执行：
 | 纯重构（无行为变更） | 不改变架构契约 |
 | 配置调整 | 不改变架构文档 |
 | 测试补充（已有 T 层预登记） | 仅更新 t-registry 状态 |
+| 过程需求迭代（仅 Scenario 增删） | 详细文本留在 `archive/<change>/specs/`，CHANGELOG.md 追加 1 行 |
 
 **同步操作：**
 
@@ -74,29 +82,25 @@ S6 归档在以下条件**全部满足**后执行：
 # 查看 .openspec.yaml 中的 domains 字段
 cat openspec/changes/<change-id>/.openspec.yaml | grep domains
 
-# 2. 对于每个受影响域，检查是否需要更新
-# - spec.md: 按 S 分片合并 changes/<id>/specs/ 下的 Gherkin Scenario（见 §2.5）
+# 2. 对于每个受影响域，检查是否需要更新（精简模式）
+# - spec.md: 仅在架构级变更时修订契约段（Overview / DSAFT / 关键设计 / 链路口）
+# - CHANGELOG.md: 追加 1 行（Date / Change ID / 一句话摘要 / 归档链接）
 # - design.md: 更新领域模型/接口/流程图
 # - a-registry.md: 新增/修改活动条目
 # - f-registry.md: 新增/修改功能点条目
 # - t-registry.md: 更新测试点状态
-
-# 2.5 spec.md 按 S 分片合并规则（强制）
-# 禁止将所有 S 的 Scenario 累积到单 spec.md 文件。
-# 拆分策略（详见 architecture-design.md §6.4）：
-#   - 目标域 spec.md 当前 ≤ 800 行 → 直接在主 spec.md 追加（ADDED/MODIFIED/REMOVED）
-#   - 目标域 spec.md 当前 > 800 行 → 按 S 拆分：
-#       1. 评估本次新增 Scenario 归属哪些 S
-#       2. 对每个 S 创建/更新 spec-s{XX}.md（XX = S 编号）
-#       3. 在主 spec.md 顶部"## Scenario Index"段追加索引条目：
-#          - [D7-S3 Wave Scheduler 详细](spec-s03.md)
-#       4. 主 spec.md 主体不再展开该 S 的 Requirement/Scenario
-#   - 单 S 自身 Scenario 数 > 30 或行数 > 400 → 进一步按 A 拆分 spec-s{XX}-a{YY}.md
-# 拆分后必须保持 DSAFT ID 全局唯一，跨文件用 T 层注释追溯。
+# - archive/<change>/specs/: 过程需求详细文本（完整 Gherkin Scenario 集合）
 
 # 3. 在归档 commit 中包含域文档更新
 git add openspec/specs/d{N}-*/
 ```
+
+**精简模式反模式（禁止）：**
+
+- ❌ 把过程需求 Gherkin Scenario 合并到 spec.md（累积超过 200 行）
+- ❌ 创建 `spec-s{XX}.md` / `spec-cross-cutting.md` 等子文件（lite-mode 不需要）
+- ❌ 在 CHANGELOG.md 复制 Requirement 文本（只列 change-id 链接 + 一句话摘要）
+- ❌ 在 spec.md 中保留 IMPLEMENTED 标记的旧 Requirement
 
 ---
 

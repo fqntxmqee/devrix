@@ -1,0 +1,14 @@
+change_id: devrix-spec-lite-mode
+priority: P1
+demand_id: DM-20260630-003
+status: s2_design
+replaces: devrix-d7-spec-split (DM-20260630-002, s1_cancelled)
+domains: [D7]
+dsaft_scenarios: []
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: specs 域文档 = 精简设计契约 + 轻量 changelog（替代 #332 的"按 S 分片"硬要求）
+  v1.1: 视需求扩展至其他域（d2/d3/d4/d5/d6）
+metrics_definitions: []
+span_naming: []
