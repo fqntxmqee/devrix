@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 4.17.0
-**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: D7-S16-A74 SUPERSEDED + A75-T01..T04 IMPLEMENTED — Observe 统一 LLM 入口 @ Execute)
+**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: D7-S16-A74 SUPERSEDED + A75-T01..T04 IMPLEMENTED — Observe LLM D2→D3)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`

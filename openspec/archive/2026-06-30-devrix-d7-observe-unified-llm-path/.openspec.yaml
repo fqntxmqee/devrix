@@ -1,0 +1,19 @@
+change_id: devrix-d7-observe-unified-llm-path
+demand_id: DM-20260630-001
+title: D7 Observe 统一 LLM 入口 — Observe D2→D3
+priority: P1
+status: s7_archived
+domains: [D7]
+supersedes:
+  - DM-20260628-002  # D7-S16-A74 LLM ObservationProposer @ Observe (T35 bare D3)
+dsaft_scenarios:
+  - D7-S16  # Layer SubContext
+dsaft_activities:
+  - D7-S16-A72  # Observe R-OBS rules (retained)
+  - D7-S16-A75  # Observe LLM via D2 then D3 (NEW)
+t_points:
+  - D7-S16-A75-T01  # WireItemPipeline wires LLMObservationProposer
+  - D7-S16-A75-T02  # Observe D2 Prepare before D3
+  - D7-S16-A75-T03  # zh-CN appendix + ValidateObservationProposals
+  - D7-S16-A75-T04  # spec + t-registry sync
+pr: 330

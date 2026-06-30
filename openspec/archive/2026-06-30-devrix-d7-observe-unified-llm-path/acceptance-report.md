@@ -61,6 +61,6 @@ Observe 阶段如需调 D3，必须先经 D2 `ContextPreparer.Prepare` 获取 i1
 
 ## 5. 归档待办（S7）
 
-- [ ] PR 合入 main
-- [ ] 移包至 `openspec/archive/2026-06-30-devrix-d7-observe-unified-llm-path/`
-- [ ] 更新 `openspec/demand-archive-index.md`
+- [x] PR #330 合入 main
+- [x] 移包至 `openspec/archive/2026-06-30-devrix-d7-observe-unified-llm-path/`
+- [x] 更新 `openspec/demand-archive-index.md`

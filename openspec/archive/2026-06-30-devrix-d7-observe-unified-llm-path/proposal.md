@@ -63,3 +63,21 @@ Jaeger 首条消息先看到 Observe 的英文 D3 调用，用户误以为系统
 |------|------------|
 | Observe + Execute 双 D2 调用 | 语义分离：Obs 提案 vs ReAct；可接受 |
 | LLM 失败 | fail-safe rules-only Observe |
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-30  
+**PR:** [#330](https://github.com/fqntxmqee/devrix/pull/330) (squash auto-merge)  
+**Outcome:** Successfully implemented
+
+### Files Modified
+- `internal/layers/orchestration/sessionorchestrator/llm_observation_proposer.go` (REWRITE D2→D3)
+- `internal/layers/orchestration/sessionorchestrator/llm_observation_proposer_test.go` (NEW)
+- `internal/bootstrap/wire_item_pipeline.go`, `wire_coordinator.go`
+- `openspec/specs/d7-orchestration/spec.md` v4.19.0
+- `openspec/specs/d7-orchestration/t-registry.md` v4.17.0
+
+### Archive Location
+- `openspec/archive/2026-06-30-devrix-d7-observe-unified-llm-path/`
