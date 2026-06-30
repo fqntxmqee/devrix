@@ -46,7 +46,7 @@ func TestItemPipelineRunner_EmitsFiveNodeSpan_NoPanic(t *testing.T) {
 	// EmitChannelRoute (Execute) → verifyArtifact → EmitSystemAnomalyDetect
 	// (Verify) → EmitMemoryPersist (Learn). Each emit's end func must be
 	// called and must not panic when the bridge is no-op.
-	if _, err := runner.Run(context.Background(), sessionID, goal, ""); err != nil {
+	if _, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 }
@@ -70,7 +70,7 @@ func TestItemPipelineRunner_EmitsFiveNodeSpan_NilBridgeFailSafe(t *testing.T) {
 	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
 	_ = workmodel.TaskStatusPending // keep import live if compiler prunes
 
-	if _, err := runner.Run(context.Background(), sessionID, goal, ""); err != nil {
+	if _, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 }

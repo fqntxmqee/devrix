@@ -112,6 +112,19 @@ func (p *WorkerPool) OnRelease(hook func(SlotID)) {
 	p.hooks = append(p.hooks, hook)
 }
 
+// HookCount returns the number of registered OnRelease hooks. Used by tests
+// to verify the OnReleaseOnce invariant (D7-S3-A84): exactly one hook must
+// be registered per scheduler lifetime, regardless of how many waves Start
+// spawns.
+func (p *WorkerPool) HookCount() int {
+	if p == nil {
+		return 0
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.hooks)
+}
+
 // Close marks the pool as closed; subsequent Release calls become no-ops on
 // unknown ids. Existing slots continue to function. For test teardown.
 func (p *WorkerPool) Close() {

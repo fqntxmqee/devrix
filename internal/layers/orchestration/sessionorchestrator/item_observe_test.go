@@ -97,7 +97,7 @@ func TestRunItemPipeline_ChildBubbleOnRound(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	sessionID := "sess-bubble-kind"
 	goal, _ := tm.EnsureGoal(sessionID, "goal")
-	round, err := runner.Run(context.Background(), sessionID, goal, "")
+	round, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

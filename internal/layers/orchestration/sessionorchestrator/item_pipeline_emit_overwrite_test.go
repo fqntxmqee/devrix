@@ -44,7 +44,7 @@ func TestItemPipelineRunner_OverwritesExecutorEmit_PerRun(t *testing.T) {
 
 	// Turn 1: install emitFn_1 then Run().
 	runner.Emit = emitFn1
-	if _, err := runner.Run(context.Background(), sessionID, goal1, ""); err != nil {
+	if _, err := runner.Run(context.Background(), sessionID, goal1, "", ItemPipelineRunOpts{}); err != nil {
 		t.Fatalf("Run turn 1: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestItemPipelineRunner_OverwritesExecutorEmit_PerRun(t *testing.T) {
 	goal2, _ = tm.GetWorkItem(sessionID, goal2.ID)
 
 	runner.Emit = emitFn2
-	if _, err := runner.Run(context.Background(), sessionID, goal2, ""); err != nil {
+	if _, err := runner.Run(context.Background(), sessionID, goal2, "", ItemPipelineRunOpts{}); err != nil {
 		t.Fatalf("Run turn 2: %v", err)
 	}
 

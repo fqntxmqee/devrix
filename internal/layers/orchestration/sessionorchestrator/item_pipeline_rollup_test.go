@@ -103,7 +103,7 @@ func TestRunItemPipeline_RollupRound(t *testing.T) {
 	runner.Executor = capture
 	runner.Executor = &rollupContentExecutor{summary: validRollupSummary(), capture: capture}
 
-	round, err := runner.Run(context.Background(), sessionID, parent, "")
+	round, err := runner.Run(context.Background(), sessionID, parent, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

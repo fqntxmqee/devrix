@@ -40,7 +40,7 @@ func TestItemPipeline_GoalPartialAtThresholdSpawnsDecompose(t *testing.T) {
 		t.Fatalf("seed uncertainty = %v, want %v", goal.Uncertainty, workmodel.DefaultUncertaintyDecomposeThreshold)
 	}
 
-	round, err := runner.Run(context.Background(), "s1", goal, "")
+	round, err := runner.Run(context.Background(), "s1", goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestItemPipeline_GoalMaxItersSpawnsDecompose(t *testing.T) {
 		t.Fatalf("EnsureGoal: %v", err)
 	}
 
-	round, err := runner.Run(context.Background(), "s1", goal, "")
+	round, err := runner.Run(context.Background(), "s1", goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
