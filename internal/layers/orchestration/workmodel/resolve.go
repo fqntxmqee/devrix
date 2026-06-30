@@ -1,6 +1,9 @@
 package workmodel
 
-import "errors"
+import (
+	"errors"
+	"log/slog"
+)
 
 // ReevaluateParentAfterChild updates parent uncertainty and status after a child terminals (AC29, AC43).
 // Returns the *RollupReport aggregated from the child's last round so callers
@@ -49,27 +52,45 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *Rol
 	// apply the same convergence contract; the persisted value no longer
 	// ratchets up regardless of which path fires last.
 	u := ReconcileUncertainty(parent.Uncertainty, parent.Uncertainty, stats)
-	_ = tm.Tree().SetUncertainty(sessionID, parent.ID, u)
+	if err := tm.Tree().SetUncertainty(sessionID, parent.ID, u); err != nil {
+		slog.Warn("resolve: SetUncertainty failed; parent rollup convergence may stall",
+			"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+	}
 
 	if stats.Running > 0 {
 		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if parent.Status == TaskStatusPending {
-		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress)
+		if err := tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress); err != nil {
+			slog.Warn("resolve: UpdateStatus(in_progress) failed; parent may stay pending",
+				"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+		}
 	}
 	if ShouldRollupAfterChildren(parent, RollupGatePolicyFor(parent), stats) {
-		_ = tm.Tree().SetNeedsRollup(sessionID, parent.ID, true)
+		if err := tm.Tree().SetNeedsRollup(sessionID, parent.ID, true); err != nil {
+			slog.Warn("resolve: SetNeedsRollup failed; rollup gate may not trigger",
+				"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+		}
 		if isTerminalStatus(parent.Status) {
-			_ = tm.Tree().ReopenForRollup(sessionID, parent.ID)
+			if err := tm.Tree().ReopenForRollup(sessionID, parent.ID); err != nil {
+				slog.Warn("resolve: ReopenForRollup failed; parent may stay terminal",
+					"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+			}
 		}
 		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if stats.Failed > 0 {
-		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusFailed)
+		if err := tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusFailed); err != nil {
+			slog.Warn("resolve: UpdateStatus(failed) failed; parent may not reflect child failure",
+				"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+		}
 		return NewRollupReportFromRound(childID, child.LastRound)
 	}
 	if stats.Total > 0 && stats.Completed == stats.Total {
-		_ = tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusCompleted)
+		if err := tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusCompleted); err != nil {
+			slog.Warn("resolve: UpdateStatus(completed) failed; parent may stay open",
+				"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)
+		}
 	}
 	return NewRollupReportFromRound(childID, child.LastRound)
 }

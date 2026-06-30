@@ -114,6 +114,21 @@ func (c *ScenarioChannel) Execute(ctx context.Context, p *plan.Plan, req Channel
 	}
 	wg.Wait()
 
+	// RH-D7-09 (DM-20260630-013 T-P1-A3-8.2): if the outer ctx was cancelled
+	// mid-run, surface it BEFORE the majority-vote result. Without this
+	// check the channel would return a misleading "majority failed" / StepCount
+	// mismatch when the real cause was upstream cancellation (e.g. turn
+	// abort, session ctx cancel). The probes themselves can't observe outer
+	// cancellation if the runner doesn't propagate ctx to them.
+	if err := ctx.Err(); err != nil {
+		art.EndedAt = time.Now()
+		art.Duration = art.EndedAt.Sub(art.StartedAt)
+		art.ExitCode = 1
+		art.SideEffectStatus = types.SideEffectUnknown
+		art.Error = fmt.Sprintf("scenario_channel: ctx cancelled (%v)", err)
+		return art, NewChannelCtxCancelledError(c.Name(), err)
+	}
+
 	art.EndedAt = time.Now()
 	art.Duration = art.EndedAt.Sub(art.StartedAt)
 

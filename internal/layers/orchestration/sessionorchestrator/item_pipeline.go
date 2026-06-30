@@ -3,6 +3,7 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -179,21 +180,13 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		roundNo = item.LastRound.RoundNo + 1
 	}
 
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseObserve))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseObserve)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
 
 	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
 		return nil, err
 	}
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhasePlan))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhasePlan)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
 
 	var strategic *StrategicPlanProposal
 	if r.StrategicPlanProposer != nil && !isRollup {
@@ -277,11 +270,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if isRollup && pl != nil {
 		pl.Kind = plan.CommitmentPlan
 	}
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseExecute))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseExecute)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
 
 	// Execute via WorkItemExecutor (per-WorkItem ReAct loop). Emit Wave +
 	// Execute sub-spans so Jaeger shows the full 5-node tree.
@@ -328,11 +317,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseVerify))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseVerify)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseVerify)
 
 	// RH-MUPS-04 (DM-20260701-001): compute child-outcome stats BEFORE the
 	// verify step so rollup verify can refuse to mark the parent Completed
@@ -372,11 +357,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		deliverableResult = out.Deliverable
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseLearn))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseLearn)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
 	// as a verify stand-in: the legacy OrchestratePath uses real anomaly
@@ -516,11 +497,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if round.VerdictKind == types.VerdictIndeterminate {
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}
-	{
-		end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", item.ID, string(workmodel.RoundPhaseDecide))
-		_ = r.Tasks.Tree().SetRoundPhase(sessionID, item.ID, workmodel.RoundPhaseDecide)
-		end(nil)
-	}
+	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseDecide)
 
 	phase := workmodel.RoundPhaseIdle
 	switch round.SpawnPolicy {
@@ -640,6 +617,30 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 		art.SourcePlanID = pl.ID
 	}
 	return art
+}
+
+// setRoundPhaseWithLog wraps r.Tasks.Tree().SetRoundPhase with the standard
+// RH-D7-05 (DM-20260630-013) observability pattern: emit a WorktreeOp span
+// that opens on entry and closes with the SetRoundPhase result, and surface
+// any error via slog.Warn (the worktree's eventual consistency model means
+// the next round's GetPipelineFocus will recover, so we don't fail the
+// pipeline — but operators need to know it happened). The previous code
+// silently dropped the error via `_, _ =`, hiding WorkTree lock contention
+// and replay-skew bugs from Jaeger.
+func (r *ItemPipelineRunner) setRoundPhaseWithLog(
+	ctx context.Context,
+	sessionID, itemID string,
+	phase workmodel.RoundPhase,
+) {
+	end := hardening.EmitWorktreeOp(ctx, sessionID, "set_round_phase", itemID, string(phase))
+	if err := r.Tasks.Tree().SetRoundPhase(sessionID, itemID, phase); err != nil {
+		slog.Warn("item_pipeline: SetRoundPhase failed; worktree will self-heal on next round",
+			"session_id", sessionID, "work_item_id", itemID,
+			"phase", string(phase), "err", err)
+		end(err)
+		return
+	}
+	end(nil)
 }
 
 // truncateForArtifact returns the first n runes of s followed by an

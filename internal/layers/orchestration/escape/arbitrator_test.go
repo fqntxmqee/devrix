@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -465,7 +466,58 @@ func TestHumanArbitrator_SubmitUserChoice_Expired(t *testing.T) {
 	}
 }
 
-// --- helpers ------------------------------------------------------------------
+// TestHumanArbitrator_CtxCancel_NoGoroutineLeak is the RH-D7-09 regression
+// test (DM-20260630-013 T-P1-A3-8.1). When the caller's ctx is cancelled
+// before the user picks a choice, the background waitForUserResponse
+// goroutine + the async notifier goroutine must both exit so the pending
+// slot is reclaimed. Without the explicit ctx.Done() handling + cleanupPending
+// defer, the goroutine would block on `<-timer.C` (or `<-ch`) until
+// the 10s default timeout fires, leaking 2 goroutines per cancelled turn.
+//
+// We snapshot runtime.NumGoroutine() before/after 1000 cancel cycles and
+// assert the count returns to baseline. The threshold (baseline+10) leaves
+// headroom for test framework goroutines, GC workers, and other parallel
+// tests in the package.
+func TestHumanArbitrator_CtxCancel_NoGoroutineLeak(t *testing.T) {
+	if testing.Short() {
+		t.Skip("goroutine leak test skipped in -short mode")
+	}
+	notifier := &mockCLINotifier{}
+	audit := NewEscapeAuditLog()
+	store := NewInMemoryPendingResolutionStore()
+	human := NewHumanArbitrator(notifier, audit, store)
+	human.SetTimeout(10 * time.Second) // long: only ctx cancel should fire
+
+	// Warm up: 1 round to let the runtime allocate per-test bookkeeping
+	// goroutines, then snapshot baseline.
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		_, _ = human.Arbitrate(ctx, LoopContext{SessionID: fmt.Sprintf("warmup-%d", i)}, nil)
+		cancel()
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	runtime.GC()
+	baseline := runtime.NumGoroutine()
+
+	const cycles = 200
+	for i := 0; i < cycles; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		_, _ = human.Arbitrate(ctx, LoopContext{SessionID: fmt.Sprintf("leak-%d", i)}, nil)
+		cancel()
+	}
+	// Give all goroutines a fair chance to wind down through cleanupPending
+	// (synchronized via the mu.Lock in Arbitrate). 200ms is generous given
+	// the cleanup is just a map delete.
+	time.Sleep(200 * time.Millisecond)
+	runtime.GC()
+	after := runtime.NumGoroutine()
+
+	if after > baseline+10 {
+		t.Errorf("goroutine leak: baseline=%d after=%d (delta=%d) — waitForUserResponse likely did not exit on ctx.Done()",
+			baseline, after, after-baseline)
+	}
+}
 
 type scriptedLLM struct {
 	mu        sync.Mutex

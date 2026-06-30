@@ -41,7 +41,15 @@ func DefaultChildDownlink(parent *WorkItem, child *WorkItem, spec ChildSpec) Chi
 		ContextPolicy:    LinkFresh,
 	}
 	if dl.ExpectedReturn == "" && spec.Directive != "" {
-		dl.ExpectedReturn = "Deliverable aligned with directive: " + spec.Directive
+		// RH-D7-08 (DM-20260630-013 T-P1-4): the prior plain-string fallback
+		// ("Deliverable aligned with directive: ...") carried no schema tag,
+		// so the child executor / verifier saw a prose instruction and the
+		// deterministic verify step would fall back to the structural default.
+		// Now we route through DefaultChildExpectedReturn so the fallback
+		// emits a <deliverable_schema> tag (or same_as_parent_directive) that
+		// ParseDeliverableSchemaTag can recognize, giving the child a
+		// verifiable acceptance bar instead of a wish.
+		dl.ExpectedReturn = DefaultChildExpectedReturn(child, spec.Directive)
 	}
 	return dl
 }

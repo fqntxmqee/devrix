@@ -91,20 +91,30 @@ func (ts *TurnState) nextTurnNoLocked(sessionID string) int {
 	return 1
 }
 
-// EndTurn closes the handle's done channel. Idempotent — repeated calls are
-// safe (sync.Once guarantees close(done) happens exactly once per handle).
+// EndTurn closes the handle's done channel and purges the map entry.
+// Idempotent — repeated calls are safe (sync.Once guarantees close(done)
+// happens exactly once per handle, and the second delete is a no-op).
 // No-op if no handle exists for sessionID.
+//
+// RH-D7-07 (DM-20260630-013): previously the handle was retained in the
+// map after close, which meant long-running devrix processes accumulated
+// one map entry per completed session — unbounded growth across the
+// devrix lifetime. After purge, WaitTurn called for a session that has
+// already ended returns nil immediately (per the no-handle branch), which
+// matches the documented semantics ("WaitTurn late-arrival returns nil
+// when no handle exists").
 func (ts *TurnState) EndTurn(sessionID string) {
 	if ts == nil || sessionID == "" {
 		return
 	}
-	ts.mu.RLock()
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 	h, ok := ts.handles[sessionID]
-	ts.mu.RUnlock()
 	if !ok {
 		return
 	}
 	h.closeOnce.Do(func() { close(h.done) })
+	delete(ts.handles, sessionID)
 }
 
 // WaitTurn blocks until the current turn for sessionID ends (EndTurn

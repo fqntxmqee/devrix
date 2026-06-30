@@ -546,6 +546,47 @@ func TestScenarioChannel_MixedResults_TakesMajority(t *testing.T) {
 	}
 }
 
+// TestScenarioChannel_CtxCancel_SurfacesCtxError is the RH-D7-09
+// regression test (DM-20260630-013 T-P1-A3-8.2). When the outer ctx is
+// cancelled mid-run, the channel must return a NewChannelCtxCancelledError
+// — NOT the misleading ErrChannelStepCountMismatch that the majority-vote
+// failure path would otherwise produce. Without the early check, callers
+// downstream (StrategyDecider) couldn't distinguish a turn-abort cancel
+// from a real probe majority failure.
+func TestScenarioChannel_CtxCancel_SurfacesCtxError(t *testing.T) {
+	runner := newFakeRunner()
+	// Probe handlers return ok quickly (fakeRunner doesn't propagate ctx
+	// to handlers); the channel observes ctx.Err() after wg.Wait().
+	for i := 0; i < 5; i++ {
+		tool := fmt.Sprintf("ok_%d", i)
+		runner.OnInvoke(tool, func(req ToolRequest) (ToolResult, error) {
+			return okResult(tool), nil
+		})
+	}
+	ch, _ := NewScenarioChannel(runner, ScenarioChannelConfig{Timeout: 5 * time.Second})
+	steps := make([]plan.Step, 5)
+	for i := range steps {
+		steps[i] = validStep(fmt.Sprintf("s%d", i+1), fmt.Sprintf("ok_%d", i), fmt.Sprintf("i%d", i))
+	}
+	p := validPlan(plan.ScenarioPlan, "sess_cancel", steps...)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel BEFORE Execute — wg.Wait returns immediately, ctx.Err() != nil
+	art, err := ch.Execute(ctx, p, ChannelRequest{SessionID: "sess_cancel"})
+	if err == nil {
+		t.Fatal("expected ctx-cancelled error, got nil")
+	}
+	if !errors.Is(err, ErrChannelCtxCancelled) {
+		t.Errorf("err = %v, want errors.Is(ErrChannelCtxCancelled)", err)
+	}
+	if art == nil {
+		t.Fatal("art nil on ctx cancel")
+	}
+	if art.SideEffectStatus != types.SideEffectUnknown {
+		t.Errorf("SideEffectStatus = %v, want SideEffectUnknown on ctx cancel", art.SideEffectStatus)
+	}
+}
+
 // -----------------------------------------------------------------------------
 // D7-S9-A26-T05: ExplorationChannel
 // -----------------------------------------------------------------------------
