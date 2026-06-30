@@ -1,7 +1,8 @@
 change_id: devrix-d5-spec-lite
 priority: P1
 demand_id: DM-20260630-008
-status: s2_design
+status: s7_archived
+pr_number: "344"
 domains: [D5]
 dsaft_scenarios:
   - D5-S21
