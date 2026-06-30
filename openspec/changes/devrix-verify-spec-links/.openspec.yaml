@@ -1,0 +1,12 @@
+change_id: devrix-verify-spec-links
+priority: P2
+demand_id: DM-20260630-010
+status: s2_design
+domains: [project]
+dsaft_scenarios: []
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: scripts/verify-spec-links.sh NEW CI 工具
+metrics_definitions: []
+span_naming: []
