@@ -1,7 +1,12 @@
 change_id: devrix-d2-spec-lite
 priority: P1
 demand_id: DM-20260630-004
-status: s2_design
+status: s7_archived
+archived: 2026-06-30
+pr_number: "336"
+verdict: ACCEPTED
+ac_pass: 12
+ac_pending: 0
 domains: [D2]
 dsaft_scenarios:
   - D2-S15
