@@ -201,12 +201,23 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		if report.QuantizedIntent != nil {
 			intentKind = string(report.QuantizedIntent.Kind)
 		}
+		// RH-MUPS-07 (DM-20260701-001 T-P1-2): build the divergence budget
+		// snapshot + carry the parent's in-scope paths so the LLM proposer
+		// sees the same numbers the cap function will use. Without this
+		// the proposer would propose 7 children on a 3-remaining budget
+		// and CapChildSpecs would silently truncate to 3.
+		var parentScopeIn []string
+		if item.ScopeContract != nil {
+			parentScopeIn = append([]string(nil), item.ScopeContract.InScope...)
+		}
 		prop, propErr := r.StrategicPlanProposer.ProposeStrategicPlan(ctx, StrategicPlanInput{
 			SessionID:      sessionID,
 			WorkItemID:     item.ID,
 			Directive:      directive,
 			ObservationIDs: obsIDs,
 			ReportSummary:  uncertaintyReportSummary(len(report.Anomalies), intentKind),
+			Budget:         workmodel.StrategicPlanBudget(sessionID, item, r.Tasks),
+			ParentScopeIn:  parentScopeIn,
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
@@ -216,8 +227,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	expectedReturn := workmodel.ExpectedReturnForItem(r.Tasks, sessionID, item)
 	deliverableSchema := workmodel.InferDeliverableSchema(item, directive, expectedReturn)
+	// RH-MUPS-11 (DM-20260701-001 T-P1-5): the strategic proposer may
+	// NARROW but never WIDEN. A previous run could "downgrade" a
+	// p0_p1_file_line directive to not_applicable and skip verify,
+	// silently passing short reviews. NarrowestSchema returns the
+	// most-constrained of the two: inferred schema wins unless the
+	// LLM added a stricter one.
 	if strategic != nil && strategic.DeliverableSchema != "" {
-		deliverableSchema = strategic.DeliverableSchema
+		deliverableSchema = workmodel.NarrowestSchema(deliverableSchema, strategic.DeliverableSchema)
 	}
 
 	qKind := planQuantizedKind(item, report)

@@ -40,6 +40,15 @@ type StrategicPlanInput struct {
 	Directive      string
 	ObservationIDs []string
 	ReportSummary  string
+	// Budget (RH-MUPS-07, T-P1-2): spawn-side limits the proposer must
+	// see so it can self-bound its proposal. Built by
+	// workmodel.StrategicPlanBudget.
+	Budget workmodel.DivergenceBudget
+	// ParentScopeIn (RH-MUPS-07, T-P1-2): the parent's in-scope paths,
+	// copied from item.ScopeContract.InScope. The proposer should not
+	// propose child scopes that are disjoint from this list (and the
+	// post-validate gate enforces a real-subset invariant; see T-P2-2).
+	ParentScopeIn []string
 }
 
 type rawStrategicChildSpec struct {
@@ -128,7 +137,19 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 		return nil, err
 	}
 	raw := collectLLMText(ch)
-	return parseStrategicPlanJSON(raw, in.Directive)
+	prop, err := parseStrategicPlanJSON(raw, in.Directive)
+	if err != nil {
+		return nil, err
+	}
+	// RH-MUPS-07 (DM-20260701-001 T-P1-3): reject over-budget proposals
+	// with a structured StrategicPlanReject so the next round's prompt
+	// can pre-emptively size the proposal. Without this, CapChildSpecs
+	// would silently truncate the LLM output and the next round would
+	// re-propose the same too-large set forever.
+	if budgetErr := applyBudgetCap(prop, in.Budget); budgetErr != nil {
+		return nil, budgetErr
+	}
+	return prop, nil
 }
 
 func strategicPlanAppendix(loc i18n.Locale) string {
@@ -147,6 +168,25 @@ func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
 	}
 	if s := strings.TrimSpace(in.ReportSummary); s != "" {
 		fmt.Fprintf(&b, "observation_summary: %s\n", s)
+	}
+	// RH-MUPS-07 (DM-20260701-001 T-P1-2): inject the divergence budget so
+	// the LLM can self-bound its proposal. Field order is fixed: depth,
+	// max_depth, remaining_children, remaining_daily, max_iters, then
+	// parent_scope_in. The Plan prompt snapshot test asserts this exact
+	// order; reordering breaks T-P1-4.
+	if in.Budget.MaxChildren > 0 {
+		fmt.Fprintf(&b, "depth: %d\n", in.Budget.Depth)
+		fmt.Fprintf(&b, "max_depth: %d\n", in.Budget.MaxDepth)
+		fmt.Fprintf(&b, "existing_children: %d\n", in.Budget.ExistingChildren)
+		fmt.Fprintf(&b, "remaining_children: %d\n", in.Budget.RemainingChildren())
+		fmt.Fprintf(&b, "max_children: %d\n", in.Budget.MaxChildren)
+		fmt.Fprintf(&b, "decompose_used_today: %d\n", in.Budget.DecomposeUsedToday)
+		fmt.Fprintf(&b, "remaining_daily: %d\n", in.Budget.RemainingDaily())
+		fmt.Fprintf(&b, "max_daily: %d\n", in.Budget.MaxDaily)
+		fmt.Fprintf(&b, "max_iters: %d\n", in.Budget.MaxIters)
+	}
+	if len(in.ParentScopeIn) > 0 {
+		fmt.Fprintf(&b, "parent_scope_in: %s\n", strings.Join(in.ParentScopeIn, ","))
 	}
 	return b.String()
 }
@@ -246,6 +286,67 @@ func validateStrategicPlan(p *StrategicPlanProposal) error {
 	}
 	if p.ExecutionMode == "single" && len(p.ChildSpecs) > 0 {
 		p.ChildSpecs = nil
+	}
+	return nil
+}
+
+// StrategicPlanReject is the structured over-budget rejection for
+// RH-MUPS-07 (T-P1-3). The runner (item_pipeline.go) inspects this
+// type to record the rejection in the round's SpawnRationale so the
+// next round's LLM prompt can self-correct.
+//
+// Without this, the prior `CapChildSpecs` truncated silently — the LLM
+// saw a 4-child proposal produce a 1-child CapChildSpecs output and
+// had no idea why. With this, the rejection carries a Reason (one of
+// the BudgetField* constants) + MaxAllowed so the next prompt can
+// pre-emptively size its proposal.
+type StrategicPlanReject struct {
+	Reason     string // one of BudgetField*
+	MaxAllowed int
+	Requested  int
+	Field      string // "children" or "daily" — for the runner's logging
+}
+
+// Error implements error.
+func (e *StrategicPlanReject) Error() string {
+	return fmt.Sprintf("strategic plan: over budget (%s): requested=%d max=%d",
+		e.Reason, e.Requested, e.MaxAllowed)
+}
+
+// Strategic plan budget rejection reasons (RH-MUPS-07).
+const (
+	BudgetFieldChildren = "children"
+	BudgetFieldDaily    = "daily"
+)
+
+// applyBudgetCap implements T-P1-3: when the LLM proposes more children
+// than the budget allows, return a structured StrategicPlanReject so
+// the runner can surface the rejection to the next round. Replaces the
+// silent truncation in CapChildSpecs (kept in spawn_apply.go as a
+// last-resort safety net, never the primary path).
+func applyBudgetCap(prop *StrategicPlanProposal, budget workmodel.DivergenceBudget) error {
+	if prop == nil || prop.ExecutionMode != "decompose" {
+		return nil
+	}
+	n := len(prop.ChildSpecs)
+	if n == 0 {
+		return nil
+	}
+	if remaining := budget.RemainingChildren(); n > remaining {
+		return &StrategicPlanReject{
+			Reason:     BudgetFieldChildren,
+			MaxAllowed: budget.MaxChildren,
+			Requested:  n,
+			Field:      BudgetFieldChildren,
+		}
+	}
+	if remaining := budget.RemainingDaily(); n > remaining {
+		return &StrategicPlanReject{
+			Reason:     BudgetFieldDaily,
+			MaxAllowed: budget.MaxDaily,
+			Requested:  n,
+			Field:      BudgetFieldDaily,
+		}
 	}
 	return nil
 }

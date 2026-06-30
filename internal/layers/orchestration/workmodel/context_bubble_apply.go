@@ -223,3 +223,74 @@ func SummaryBubbleStatement(childID string, artifactSummary string) string {
 	}
 	return fmt.Sprintf("summary_child_bubble: child=%s; preview=%q", childID, summary)
 }
+
+// ChildUncertaintyBubble is the upward-bubble entry for a high-
+// uncertainty child (RH-MUPS-06, DM-20260701-001 T-P2-3). When a
+// child WorkItem completes with UncertaintyMean above the configured
+// threshold, the parent Observe phase should see an explicit
+// "this child is uncertain, do something about it" signal — not just
+// the rolled-up mean. The parent's Planner / Learn can then act on
+// the bubble (escalate, decompose further, or surface a question to
+// the user).
+type ChildUncertaintyBubble struct {
+	ChildID     string
+	Uncertainty float64
+	VerdictKind string
+	Reason      string
+}
+
+// ChildUncertaintyBubbleThreshold is the cutoff above which a child's
+// terminal round emits a ChildUncertaintyBubble. Tuned to
+// DefaultUncertaintyDecomposeThreshold (0.6) so the bubble fires for
+// the same condition that would have triggered decompose had the
+// child been a parent. Forward-compat: per-item override can live on
+// the round if needed.
+const ChildUncertaintyBubbleThreshold = DefaultUncertaintyDecomposeThreshold
+
+// CollectChildUncertaintyBubbles walks the children and emits one
+// bubble per child whose terminal round ended with UncertaintyMean ≥
+// ChildUncertaintyBubbleThreshold. Empty when no child qualifies.
+// Pure function over (tm, sessionID, parentID); safe to call inside
+// the rollup / Observe phase.
+func CollectChildUncertaintyBubbles(tm *TaskManager, sessionID, parentID string) []ChildUncertaintyBubble {
+	if tm == nil || parentID == "" {
+		return nil
+	}
+	var out []ChildUncertaintyBubble
+	for _, child := range tm.Tree().ListChildren(sessionID, parentID) {
+		if child == nil || child.Kind == WorkKindChecklist || child.LastRound == nil {
+			continue
+		}
+		if !IsTerminalStatus(child.Status) {
+			continue
+		}
+		u := child.LastRound.UncertaintyMean
+		if u < ChildUncertaintyBubbleThreshold {
+			continue
+		}
+		out = append(out, ChildUncertaintyBubble{
+			ChildID:     child.ID,
+			Uncertainty: u,
+			VerdictKind: child.LastRound.VerdictKind.String(),
+			Reason:      child.LastRound.ExitReason,
+		})
+	}
+	return out
+}
+
+// ChildUncertaintyBubbleStatement renders one bubble as a
+// machine-parseable string for the parent's Observe SignalLines.
+// Format mirrors StructuredBubbleStatement so downstream consumers
+// can apply a single parser.
+func ChildUncertaintyBubbleStatement(b ChildUncertaintyBubble) string {
+	parts := []string{
+		fmt.Sprintf("child=%s", b.ChildID),
+		fmt.Sprintf("uncertainty=%.3f", b.Uncertainty),
+		fmt.Sprintf("threshold=%.3f", ChildUncertaintyBubbleThreshold),
+		fmt.Sprintf("verdict=%s", b.VerdictKind),
+	}
+	if reason := strings.TrimSpace(b.Reason); reason != "" {
+		parts = append(parts, fmt.Sprintf("reason=%q", reason))
+	}
+	return "child_uncertainty_bubble: " + strings.Join(parts, "; ")
+}

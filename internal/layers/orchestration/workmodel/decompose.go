@@ -141,10 +141,29 @@ func checkDailyDecomposeLimit(sessionID string, kind WorkKind, add int) error {
 	if !b.since.IsZero() && time.Since(b.since) > 24*time.Hour {
 		b = decomposeBucket{since: time.Now()}
 	}
-	if b.count+add > 5 {
+	if b.count+add > DefaultMaxDecomposePerDay {
 		return ErrDecomposeDailyLimit
 	}
 	return nil
+}
+
+// decomposeCountFor returns the live 24h rolling count for a (session,
+// kind) pair, and whether the entry exists. Used by StrategicPlanBudget
+// to surface remaining_daily in the Plan user prompt (RH-MUPS-07). Locked
+// against the package-internal decomposeMu; resets naturally on >24h
+// via the same path as checkDailyDecomposeLimit.
+func decomposeCountFor(sessionID string, kind WorkKind) (int, bool) {
+	decomposeMu.Lock()
+	defer decomposeMu.Unlock()
+	key := sessionKindKey(sessionID, kind)
+	b, ok := decomposeCounts[key]
+	if !ok {
+		return 0, false
+	}
+	if !b.since.IsZero() && time.Since(b.since) > 24*time.Hour {
+		return 0, false
+	}
+	return b.count, true
 }
 
 // ResetDecomposeLimits clears rate-limit state (tests).
