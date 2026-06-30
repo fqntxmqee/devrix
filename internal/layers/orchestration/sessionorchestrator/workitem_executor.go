@@ -428,9 +428,18 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 	if ShouldMaterializeWorkItem(ctx, sessionID, itemID) && e.Materializer != nil {
 		ec, _ := WorkItemExecContextFrom(ctx)
 		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget())
-		end := hardening.EmitContextMaterialize(ctx, sessionID, itemID, string(req.Policy.Mode), 0, 0)
 		mat, err := e.Materializer.Materialize(ctx, req)
+		// DM-20260630-011 AC3: emit the materialize span AFTER the call so
+		// message_count / token_est reflect actual mat values (start-time
+		// 0/0 would be misleading). When the materializer returned 0/0,
+		// also emit a sibling empty-yield span so dashboards can filter by
+		// the empty-yield condition independently.
+		end := hardening.EmitContextMaterialize(ctx, sessionID, itemID, string(req.Policy.Mode), mat.MessageCount, mat.TokenEst)
 		end(err)
+		if mat.MessageCount == 0 && mat.TokenEst == 0 {
+			endEmpty := hardening.EmitMaterializeEmptyYield(ctx, sessionID, itemID, string(req.Policy.Mode))
+			endEmpty(nil)
+		}
 		if err != nil {
 			return "", nil, nil, err
 		}

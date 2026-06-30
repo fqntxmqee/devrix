@@ -42,6 +42,12 @@ const (
 	OpD1_S14_Signal_ChainIntegrity = "D1_Signal_ChainIntegrity"
 	OpD1_S15_Signal_TaskWorkProof = "D1_Signal_TaskWorkProof"
 	OpD1_S16_UserFeedback_ConclusionRejected = "D1_UserFeedback_ConclusionRejected"
+	// D1 S16 emit.complete.fallback (P0, DM-20260630-011 devrix-session-conclusion-completeness).
+	// Emitted when conclusion.EmitComplete falls back from `summary` to
+	// event.Content or stats because the LLM last-turn text was too_short /
+	// inconclusive per LastTextQualityGate. Surfaces the silent fallback
+	// chain in Jaeger so dashboards can alert on abnormal fallback rate.
+	OpD1_S16_EmitComplete_Fallback = "D1_EmitComplete_Fallback"
 
 	// D1 Communication - Adapter (D1-S17)
 	OpD1_S17_Adapter_Message_Receive = "D1_Adapter_Message_Receive"
@@ -67,6 +73,12 @@ const (
 	OpD2_S2_Context_Queue_Drain = "D2_Context_Queue_Drain"
 	OpD2_S2_Context_Memory_Snapshot_Save = "D2_Context_Memory_Snapshot_Save"
 	OpD2_S16_Context_Materialize = "D2_Context_Materialize"
+	// D2 S16 context.materialize.empty_yield (P1, DM-20260630-011).
+	// Emitted when Materializer returns 0 messages AND 0 token estimate for
+	// a WorkItem partition. Sibling to OpD2_S16_Context_Materialize so
+	// Jaeger shows the empty-yield condition separately from the regular
+	// materialize span (which records the start-time 0/0 attrs).
+	OpD2_S16_Context_Materialize_EmptyYield = "D2_Context_Materialize_EmptyYield"
 
 	// D2 Context Engine - Harness (D2-S5, REMOVED v6.5.0; SystemPrompt_Build 在 prepare/adapters/ 复用)
 	OpD2_S5_Context_Harness_SystemPrompt_Build = "D2_Context_Harness_SystemPrompt_Build"
@@ -157,6 +169,12 @@ const (
 	// 3 决策路由 A fall-through / B user_accept→ForceExit / C user_cancel→
 	// AbortWithAudit).
 	OpD7_S2_Resume_Decision_Path = "D7_Resume_Decision_Path"
+	// D7 S2 lasttext.quality_gate (P0, DM-20260630-011).
+	// Emitted at SessionOrchestrator.finalizeLoop after resolveFinalText.
+	// Captures the structural quality classification of the LLM's
+	// last-turn text (which becomes the IM "任务总结" card content).
+	// kind ∈ {valid, thin, too_short, inconclusive}.
+	OpD7_S2_LastText_Quality_Gate = "D7_LastText_Quality_Gate"
 	// D7-S5 DecisionPlanning + Observe (adaptive_prior.inject P0, buildObserveRequest
 	// learner.Inject 注入路径, 跨 S5↔S6 数据契约).
 	OpD7_S5_AdaptivePrior_Inject = "D7_AdaptivePrior_Inject"

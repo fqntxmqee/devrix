@@ -63,7 +63,16 @@ func routeLabel(intent orchtypes.IntentClassification) string {
 	}
 }
 
-func intentClassifyAttrs(intent orchtypes.IntentClassification, source string) []tracer.Attribute {
+// intentClassifyAttrs reads the classifier source from intent.Source
+// (DM-20260630-011). The legacy `source` parameter was retired in
+// favour of the typed ClassifierSource on IntentClassification so
+// dashboards / D6 Evolution can distinguish rule / llm / hybrid paths
+// without a parallel hardcoded string.
+func intentClassifyAttrs(intent orchtypes.IntentClassification) []tracer.Attribute {
+	source := string(intent.Source)
+	if source == "" {
+		source = string(orchtypes.SourceRule)
+	}
 	attrs := []tracer.Attribute{
 		{Key: "orchestration.intent.kind", Value: string(intent.Kind)},
 		{Key: "orchestration.intent.confidence", Value: fmt.Sprintf("%d", intent.Confidence)},

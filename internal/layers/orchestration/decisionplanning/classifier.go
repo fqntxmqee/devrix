@@ -154,11 +154,16 @@ func (c *RuleClassifier) Classify(_ context.Context, message string) (orchtypes.
 //
 // Immutable: prior is not mutated. The returned IntentClassification is a
 // new value (Reason is updated to include the prior mean for observability).
+//
+// DM-20260630-011: result.Source is set to SourceRule so the
+// sessionSpan.learn.classifier_source attribute reflects the actual
+// classifier path (orchestrator.go:392).
 func (c *RuleClassifier) ClassifyWithPrior(ctx context.Context, message string, prior *learn.AdaptivePrior) (orchtypes.IntentClassification, error) {
 	result, err := c.Classify(ctx, message)
 	if err != nil {
 		return result, err
 	}
+	result.Source = orchtypes.SourceRule
 	if prior == nil {
 		return result, nil
 	}
@@ -175,5 +180,25 @@ func (c *RuleClassifier) ClassifyWithPrior(ctx context.Context, message string, 
 	}
 	result.Confidence = adjusted
 	result.Reason = fmt.Sprintf("%s [prior.Mean=%.3f]", result.Reason, mean)
+	return result, nil
+}
+
+// ClassifyWithReport is the DM-20260630-011 overload of ClassifyWithPrior.
+// It accepts an UncertaintyReport so future LLM-driven classifiers can
+// consume observation-driven uncertainty signals. The RuleClassifier
+// implementation currently ignores the report (rule-only path) but still
+// annotates Source=SourceRule for downstream observability.
+//
+// Backward compat: the IntentClassifier interface in this package does
+// NOT declare ClassifyWithReport — it is an optional overload. New
+// callers (DM-20260630-011) can type-assert or use this RuleClassifier
+// directly; the old ClassifyWithPrior signature remains the canonical
+// entry point so existing orchestrator callers are unaffected.
+func (c *RuleClassifier) ClassifyWithReport(ctx context.Context, message string, prior *learn.AdaptivePrior, _ *orchtypes.UncertaintyReport) (orchtypes.IntentClassification, error) {
+	result, err := c.ClassifyWithPrior(ctx, message, prior)
+	if err != nil {
+		return result, err
+	}
+	result.Source = orchtypes.SourceRule
 	return result, nil
 }

@@ -211,6 +211,13 @@ func EmitSubWorktreeRun(ctx context.Context, sessionID, parentID, childID, spawn
 // distribution directly, which is what was missing when "16s session" had
 // no per-iter breakdown.
 // EmitContextMaterialize wraps D2 Materialize for a WorkItem partition (DM-20260627-003).
+//
+// DM-20260630-011 (devrix-session-conclusion-completeness) — messageCount/tokenEst
+// are emitted at span start (may be 0 pre-Materialize), then OVERWRITTEN
+// at end-of-span with the actual mat.Messages/mat.TokenEstimate values
+// via the returned end func. The end func accepts an optional override
+// closure so callers can back-fill real numbers without losing the original
+// start-time attributes (for OTel span protocol compatibility).
 func EmitContextMaterialize(ctx context.Context, sessionID, wiID, policy string, messageCount, tokenEst int) func(error) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
@@ -220,6 +227,63 @@ func EmitContextMaterialize(ctx context.Context, sessionID, wiID, policy string,
 		{Key: "materialize.token_est", Value: intToString(tokenEst)},
 	}
 	_, span := start(ctx, telemetry.OpD2_S16_Context_Materialize, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitMaterializeEmptyYield — DM-20260630-011 AC3. Emitted when the
+// D2 Materializer returns 0 messages AND 0 token estimate. Indicates
+// the WorkItem partition materialized with no content; downstream
+// Execute should still proceed but the user-facing summary may not
+// reflect real findings.
+//
+// Emitted as a sibling to EmitContextMaterialize so Jaeger shows the
+// empty-yield condition without confusing it with the regular materialize span.
+func EmitMaterializeEmptyYield(ctx context.Context, sessionID, wiID, policy string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "materialize.wi_id", Value: wiID},
+		{Key: "materialize.policy", Value: policy},
+		{Key: "materialize.kind", Value: "empty_yield"},
+	}
+	_, span := start(ctx, telemetry.OpD2_S16_Context_Materialize_EmptyYield, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitLastTextQualityGate — DM-20260630-011 AC1. Emitted at D7
+// finalizeLoop phase. Captures the structural quality classification of
+// the LLM's last-turn text (which becomes the IM "任务总结" card
+// content). kind ∈ {valid, thin, too_short, inconclusive}; length is
+// rune count of the original text; exit_reason is the terminal exit
+// reason (natural / max_turns / etc.) for downstream correlation.
+func EmitLastTextQualityGate(ctx context.Context, sessionID, kind string, length int, exitReason string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "summary.kind", Value: kind},
+		{Key: "summary.length", Value: intToString(length)},
+		{Key: "summary.exit_reason", Value: exitReason},
+	}
+	_, span := start(ctx, telemetry.OpD7_S2_LastText_Quality_Gate, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitEmitCompleteFallback — DM-20260630-011 AC2. Emitted when
+// conclusion.EmitComplete falls back from `summary` to `event.Content`
+// or to `stats` because the summary was empty/blank or marked
+// inconclusive by D7's LastTextQualityGate. Surfaces the fallback
+// chain so dashboards can alert on "abnormal fallback rate".
+//
+// fallback.source ∈ {event.Content, stats, event.Content_redacted};
+// content_length is the rune count of the eventual OutboundMessage.Content;
+// summary_quality ∈ {valid, thin, too_short, inconclusive} (mirrors
+// LastTextQualityGate kind) for easy Jaeger correlation.
+func EmitEmitCompleteFallback(ctx context.Context, sessionID, fallbackSource, summaryQuality string, contentLength int) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "fallback.source", Value: fallbackSource},
+		{Key: "fallback.content_length", Value: intToString(contentLength)},
+		{Key: "summary_quality", Value: summaryQuality},
+	}
+	_, span := start(ctx, telemetry.OpD1_S16_EmitComplete_Fallback, attrs...)
 	return func(err error) { endSpanWithError(span, err) }
 }
 
