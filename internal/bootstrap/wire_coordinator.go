@@ -8,6 +8,7 @@ import (
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
+	"github.com/devrix/devrix/internal/layers/communication/conclusion"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/persist"
 	"github.com/devrix/devrix/internal/layers/multiagent/external"
@@ -177,6 +178,14 @@ func InitOrchestration(
 	// taskgraph.synthesize / executor.select) emit even though their call sites
 	// live in sub-packages that don't hold a SessionOrchestrator reference.
 	hardening.SetBridge(obsBridge)
+
+	// DM-20260630-011 (devrix-session-conclusion-completeness): wire the
+	// D1 conclusion package-level tracer so EmitComplete can emit the
+	// D1_EmitComplete_Fallback span. Same package-level pattern as hardening
+	// to avoid threading an obsBridge through every Emitter interface.
+	if obsBridge != nil {
+		conclusion.SetBridge(obsBridge.Tracer())
+	}
 
 	return nil
 }
