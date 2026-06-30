@@ -38,5 +38,5 @@
 - [x] 代码变更完成
 - [x] 单测 PASS
 - [x] SoT spec 已写入 `openspec/specs/`
-- [ ] S6 PR 合入 main
-- [ ] S7 归档
+- [x] S6 PR 合入 main ([#330](https://github.com/fqntxmqee/devrix/pull/330))
+- [x] S7 归档 → `openspec/archive/2026-06-30-devrix-d7-observe-unified-llm-path/`
