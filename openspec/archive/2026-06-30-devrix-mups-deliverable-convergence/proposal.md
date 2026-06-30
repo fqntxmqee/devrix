@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-mups-deliverable-convergence`  
 **Demand ID:** DM-20260630-012  
-**Status:** Draft (S3)  
+**Status:** S7_Archived  
 **Created:** 2026-06-30
 
 ---
@@ -156,3 +156,23 @@ StructuredDeliverable *DeliverablePayload // parsed findings JSON or nil
 | **P0** | DeliverableVerifier + Session complete gate + Item LastTextQualityGate | 用户不见过渡句 |
 | **P1** | StrategicPlanProposer + StructuredDeliverable bubble | LLM 决定 single vs decompose |
 | **P2** | LLM Spawn/Decide 提案（登记 backlog，本 change 不编码） | — |
+
+---
+
+## Archive Information
+
+**Archived:** 2026-06-30
+**Duration:** 1 day
+**Outcome:** Successfully implemented (P0 + P1; P2 backlog deferred)
+**PR:** [#353](https://github.com/fqntxmqee/devrix/pull/353) squash merged `3288ddb0`
+
+### Specs Updated
+- `openspec/specs/d7-orchestration/spec.md` — v4.20.0 lite-mode 契约 + 范式 2 交付收敛
+- `openspec/specs/d7-orchestration/t-registry.md` — 8 T points (D7-S5/S9/S15/S16/S2)
+- `openspec/specs/d7-orchestration/CHANGELOG.md` — timeline entry
+
+### Key Files
+- `sessionorchestrator/{deliverable_verify,strategic_plan_proposer,session_complete,session_turn_loop}.go`
+- `workmodel/{pipeline_apply,deliverable,expected_return,context_bubble_apply}.go`
+- `bootstrap/wire_item_pipeline.go`
+- `.cursor/rules/orchestration-no-tactical-hardcoding.mdc`

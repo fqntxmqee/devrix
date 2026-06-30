@@ -13,6 +13,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-06-30 | devrix-mups-deliverable-convergence | A76 StrategicPlanProposer + A32 DeliverableVerifier + Session Deliverable Gate + 战术硬编码清理 | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-mups-deliverable-convergence/) |
 | 2026-06-30 | devrix-d7-observe-unified-llm-path | S16-A75 Observe LLM D2→D3 (SUPERSEDED A74) | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-d7-observe-unified-llm-path/) |
 | 2026-06-29 | devrix-d7-taskcontract-unification-pr-c | S18 CoW VersionChain + Similarity + Hard Evidence | IMPLEMENTED | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-c/) |
 | 2026-06-29 | devrix-d7-taskcontract-unification-pr-b | S18-A11/A12 Pessimistic + Rule-based (L3) | IMPLEMENTED | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-b/) |
