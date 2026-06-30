@@ -59,7 +59,7 @@ type ItemPipelineDeps struct {
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Required. nil → NewItemPipelineRunner returns an error.
 	Executor WorkItemExecutor
-	// ObservationProposer optional LLM proposer @ Observe (T35); nil → rules only.
+	// ObservationProposer optional @ Observe; production uses D2 Prepare → D3 (DM-20260630-001).
 	ObservationProposer ObservationProposer
 }
 

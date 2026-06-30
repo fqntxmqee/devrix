@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.16.0
-**Last Updated:** 2026-06-29 (taskcontract-unification-pr-c DM-20260629-009: 13 P0 T 点 13 IMPLEMENTED, T 239→252, P0 204→217; AC13 CoW VersionChain 5 T (Append/Rollback/GC/Head-Protect/Race) + AC14 Similarity Check 4 T (Jaccard edge cases/Boundary 0.85/Boundary 0.70/LookbackN) + AC15 Hard Evidence 4 T (kind-specific Verified/With-immutable/ExtractFromString/Error-7122); taskcontract-unification-pr-a DM-20260629-007: D7-S20/21 新场景 + 11 P0 T 点 9 IMPLEMENTED + 2 文档同步, T 230→239, P0 195→204; T 编号重映射避开 D7-S16 Layer SubContext 占用)
+**Version:** 4.17.0
+**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: D7-S16-A74 SUPERSEDED + A75-T01..T04 IMPLEMENTED — Observe 统一 LLM 入口 @ Execute)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -950,7 +950,11 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D2-S16-A22-T01..T03** | SubTurn/Wave Materialize paths | IMPLEMENTED | `materialize/subturn.go`, `materialize/wave.go` | — |
 | **D7-S16-A65-T01..T03** | SubTurn→MaterializePolicy + bootstrap | IMPLEMENTED | `subturn_materialize.go`, `mups_pipeline.go` | SubContext_Materialize |
 | **D7-S16-A66-T01..T03** | Wave ContextResolver merge | IMPLEMENTED | `wavescheduler/context_materialize.go`, `wire_wave.go` | SubContext_Materialize |
-| **D7-S16-A74-T01..T04** | LLM ObservationProposer + rule gate | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go` | SubContext_Executor |
+| **D7-S16-A74-T01..T04** | ~~LLM ObservationProposer + rule gate~~ | **SUPERSEDED** (DM-20260630-001) | — | — |
+| **D7-S16-A75-T01** | WireItemPipeline wires LLMObservationProposer | **IMPLEMENTED** | `bootstrap/wire_item_pipeline.go` | SubContext_Executor |
+| **D7-S16-A75-T02** | Observe D2 Prepare before D3 (no bare D3) | **IMPLEMENTED** | `llm_observation_proposer.go`, `llm_observation_proposer_test.go` | SubContext_Executor |
+| **D7-S16-A75-T03** | zh-CN observation appendix + ValidateObservationProposals | **IMPLEMENTED** | `llm_observation_proposer.go`, `observation_proposer_test.go` | SubContext_Signal |
+| **D7-S16-A75-T04** | spec.md v4.19.0 + t-registry A75 sync | **IMPLEMENTED** | `openspec/specs/d7-orchestration/` | — |
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 

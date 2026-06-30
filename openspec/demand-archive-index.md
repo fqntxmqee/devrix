@@ -140,6 +140,7 @@
 | **DM-20260625-019** | **D7 MUPS 5-node Span 全覆盖 + mups/{execute,learn} 目录结构治理 (v6.0.x 维护阶段) — Span 注册 + root span + 物理迁移** | **devrix-d7-mups-v4-5node-coverage-orchestration** | **2026-06-29** | **[#235](https://github.com/fqntxmqee/devrix/pull/235) · [#236](https://github.com/fqntxmqee/devrix/pull/236)** | **S7_Archived (FULL — 6 T 100% DONE: D7-S8-A30-T01 (5-node Span 注册) + D7-S8-A31-T01 (D7_MUPS_Pipeline 根 Span) + D7-S9-A30-T01 (mups/execute/ channel_ 前缀清理 5 文件) + D7-S12-A30-T01/T02 (mups/learn/ 拆 4 subpackage) + 5 active D3 span ops 保持 runtime 字面量; 0 函数签名变化 (pure physical migration); 23 orchestration packages -race PASS 0 FAIL; d2-domain v8.5.0 → v9.0.0; design.md 6 主段 + 5 附录; `openspec/archive/2026-06-29-devrix-d7-mups-v4-5node-coverage-orchestration/`)** |
 | **DM-20260628-004** | **D7 多轮 session 串行化与 complete 时机修正 — TurnState + TranscriptReader + feishu TurnInProgressError (PARTIAL — RC-3 hotfix done via PR #271, RC-1/2/4 deferred v1.1)** | **devrix-d7-multiturn-session-state** | **2026-06-29** | **[#271](https://github.com/fqntxmqee/devrix/pull/271)** | **S6_Archived (PARTIAL — 2/7 P0 T IMPLEMENTED: D7-S2-A16-T01 (emit recover middleware, PR #271 commit 52eeefb3) + D7-S2-A16-T02 (exec.Emit overwrite per Run, PR #271 commit 52eeefb3); 5/7 T DEFERRED to v1.1: D7-S2-A14-T01 WaitForTurnCompletion + D7-S2-A14-T02 TurnState in-memory + D7-S2-A15-T01 TranscriptReader + D7-S2-A15-T02 turn directive auto-injection + D7-S2-A17-T01 feishu TurnInProgressError (设计 4 层契约已就位); RC-3 panic hotfix 已治本 (PR #271 + production smoke sess_1782638991113_5000 二轮消息不 panic); RC-1 complete 提前 + RC-2 turn 上下文 + RC-4 feishu 错误路径 留 v1.1 实施; DM ID 重新分配: 原 DM-20260628-003 → DM-20260628-004 (与 D1 DSAFT Refactor DM-20260628-003 冲突); `openspec/archive/2026-06-29-devrix-d7-multiturn-session-state/`)** |
 | **DM-20260626-006** | **D7 6s observe-merge-cancel — observe/orchtypes/ → decisionplanning/ 物理合并 (原 follow-up #5') — S1_Cancelled (scope 基于错误假设)** | **devrix-d7-6s-observe-merge-cancel** | **2026-06-29** | **—** | **S6_Archived (S1_Cancelled — observe/orchtypes/ 目录从未存在; 原 follow-up #5' scope 基于错误假设, 实际 v6.0.0 域升级后子包已全部归位 sessionorchestrator/ + decisionplanning/ + mups/{observe,plan,execute,learn}/ + hardening/; 仅 demand.md 在 archive/ (CANCELLED precedent, no .openspec.yaml + no acceptance-report.md + no specs/); `openspec/archive/2026-06-29-devrix-d7-6s-observe-merge-cancel/`)** |
+| **DM-20260630-001** | **D7 Observe 统一 LLM 入口 — 退役 A74 独立 D3 路径，对齐 Clawcode QueryLoop** | **devrix-d7-observe-unified-llm-path** | **—** | **—** | **S5_Accepted (代码 + SoT spec v4.19.0 已同步; 待 S6 PR 合入 + S7 归档; 部分 supersede DM-20260628-002 T35; `openspec/changes/devrix-d7-observe-unified-llm-path/`)** |
 
 ## Archive Locations
 
@@ -274,7 +275,7 @@
 
 **当前活跃（2026-06-29）**：
 
-- ✅ **无** — `openspec/changes/` 目录已清空（2026-06-29 PR #323 batch S6 归档 3 个 remaining active changes）
+- **Active:** `openspec/changes/devrix-d7-observe-unified-llm-path/`（DM-20260630-001, S5 ACCEPTED, 待 S6 PR）
 - 所有 development work 走 DM-YYYYMMDD-NNN 编号 → `openspec/archive/<YYYY-MM-DD>-<change-id>/` 归档
 
 **历史活跃归档：**

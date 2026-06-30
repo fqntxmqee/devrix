@@ -123,10 +123,11 @@ func InitOrchestration(
 	}
 
 	itemRunner, pipelineLearner, err := WireItemPipeline(ItemPipelineWireDeps{
-		ToolExec:    toolExec,
-		Tasks:       tm,
-		LLMInvoker:  llmInvoker,
-		CtxPreparer: ctxAdapter,
+		ToolExec:         toolExec,
+		Tasks:            tm,
+		LLMInvoker:       llmInvoker,
+		CtxPreparer:      ctxAdapter,
+		PromptLanguage:   coordCfg.promptLanguage,
 	})
 	if err != nil {
 		return fmt.Errorf("d7: wire item pipeline: %w", err)
