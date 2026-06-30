@@ -14,19 +14,6 @@
 
 ---
 
-## Recent Changes
-
-| Date | Change ID | 摘要 | 归档 |
-|------|-----------|------|------|
-| 2026-06-30 | devrix-d7-observe-unified-llm-path | S16-A75 Observe LLM D2→D3 (4 Req/4 T) | [archive](../../archive/2026-06-30-devrix-d7-observe-unified-llm-path/) |
-| 2026-06-29 | devrix-d7-taskcontract-unification-pr-c | S18 CoW VersionChain + Similarity + Hard Evidence | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-c/) |
-| 2026-06-29 | devrix-d7-taskcontract-unification-pr-b | S18-A11/A12 Pessimistic + Rule-based (L3) | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-b/) |
-| 2026-06-29 | devrix-d7-taskcontract-unification-pr-a | S20/S21 TaskSpec + TaskReport 契约 | [archive](../../archive/2026-06-29-devrix-d7-taskcontract-unification-pr-a/) |
-
-> 完整时间线见 [CHANGELOG.md](CHANGELOG.md)。
-
----
-
 ## Overview
 
 D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
@@ -43,15 +30,15 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 6. **CoW VersionChain 不变性**：所有 Task/Plan/Artifact 走 Copy-on-Write 版本链，避免 in-place mutation
 7. **Trace 树全程贯穿**：每跳节点产生 child span；6 prior attributes（α/β/mean/track_mode/classifier_source/injected_at）由 sessionSpan 统一注入
 
-### S 层博弈角色定义（切法 A — 按用户价值流）
+### S 层职责
 
-| S 层 | 博弈角色 | North Star |
-|------|---------|------------|
-| D7-S2 | **Screening Mechanism** + **Turn Leader (Stackelberg)** | 用户消息统一入口 + Turn 主循环 |
-| D7-S3 | **Mechanism Designer** | 多任务并行执行 + 冲突避免 |
-| D7-S4 | **Costly Signaler** | 执行进度透明 + WorkPlan 可追溯 |
-| D7-S5 | **Information Producer** | 把用户 goal 转化为可执行的任务结构 |
-| D7-S1 | **State Authority**（非博弈角色） | **WorkItem** 持久化与状态机 |
+| S 层 | 名称 | 职责 | 上下游 |
+|------|------|------|--------|
+| D7-S1 | Work Model | WorkItem CRUD、依赖 DAG、磁盘持久化、PlanMode 状态机 | 写：被 S2/S3 写；读：被 S4 读 |
+| D7-S2 | Session Orchestrator | 用户消息主入口、Turn 主循环、Intent 四链分发 | 调用 S1/S3/S4/S5；发布 D7-S4 事件 |
+| D7-S3 | Wave Scheduler | TaskGraph DAG 调度、WorkerPool、ConflictGuard、ContextPolicy | 写 S1 状态；读 S2 directive |
+| D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 广播 | 读 S2/S3 events；写 D1 progress |
+| D7-S5 | Decision & Planning | 意图分类、任务拆解、执行器选择、PlanKind 4 类 | 读 D2/D3 信号；驱动 S3 |
 
 ---
 
@@ -183,13 +170,3 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 4. **跨域消费**：D2 Prepare (V10/V11) → D3 LLM Gateway → D4 Delegate.Service → D5 Span Evidence
 5. **Escape 链**：Observe/Plan/Execute/Verify 任一节点失败 → EscapeEngine.Evaluate → ChainedArbitrator (LLM/Rule/Human) → Action 6 类
 6. **LP-1 闭环链**：Learn × 3 Pass → Alpha=3 → Round 2 Observe 用 Beta(8,3) 注入（PriorSessionAttrs 6 字段）
-
----
-
-## 附录：总览
-
-- **当前活跃 Requirement 数**：0（已合入代码，需求态转为代码态）
-- **当前活跃 Scenario 数**：0 完整文本（仅 2 个范式示例）
-- **历史 Scenario 详细文本**：174 个，分布在 `archive/<change>/specs/` 各 change 目录（详见 CHANGELOG.md）
-- **当前 spec 版本**：v4.19.0
-- **下一次架构级变更触发**：MUPS v5 5 节点 EscapeEngine 完整接线（PR-V5.7+，T181-T200）
