@@ -20,7 +20,7 @@ import (
 // DM-20260621-010 PR-B: 4 new counters added — WorkerPanics (recover hits),
 // TaskCtxLeaked (cancel still non-nil after normal completion),
 // WaveReentryCancelled (Start invoked while a wave is active),
-// DispatchLoopWakeups (ticker + wakeupCh total wakeup events).
+// DispatchLoopWakeups (ticker + s.wakeupCh total wakeup events).
 type SchedulerMetrics struct {
 	Started         int
 	Completed       int
@@ -67,6 +67,13 @@ type WaveScheduler struct {
 	mu    sync.Mutex
 	waves map[string]*schedulerWaveState
 
+	// wakeupCh is the SCHEDULER-level slot-release signal bus (RH-D7-02).
+	// All dispatchLoops across all sessions share this single channel;
+	// the OnRelease hook registered at NewWaveScheduler time writes here.
+	// Per-wave wakeup state was removed because every Start() previously
+	// appended its own hook, growing the hook slice without bound.
+	wakeupCh chan struct{}
+
 	// metricsMu guards the metrics counters.
 	metricsMu sync.Mutex
 	metrics   SchedulerMetrics
@@ -84,10 +91,10 @@ type schedulerWaveState struct {
 	cancels []context.CancelFunc // aggregated for CancelAll
 	scheduleSpan tracer.Span
 
-	// wakeup is closed when the wave should be torn down (cancel / done).
-	// The dispatch loop uses a separate trigger channel for slot-release
-	// re-dispatch signals.
-	wakeupCh chan struct{}
+	// doneCh is closed when all tasks reach terminal state. wakeup is
+	// scheduler-level (see s.wakeupCh in WaveScheduler) — every dispatch
+	// loop shares one wakeup channel that the single OnRelease hook
+	// registered at NewWaveScheduler time signals into.
 }
 
 type workerHandle struct {
@@ -116,7 +123,7 @@ func NewWaveScheduler(deps SchedulerDeps) *WaveScheduler {
 	if runners == nil {
 		runners = make(map[WorkerType]WorkerRunner)
 	}
-	return &WaveScheduler{
+	s := &WaveScheduler{
 		pool:      deps.Pool,
 		guard:     deps.Guard,
 		resolver:  deps.Resolver,
@@ -124,7 +131,24 @@ func NewWaveScheduler(deps SchedulerDeps) *WaveScheduler {
 		runners:   runners,
 		obsBridge: deps.Observability,
 		waves:     make(map[string]*schedulerWaveState),
+		wakeupCh:  make(chan struct{}, 256),
 	}
+	// RH-D7-02 (DM-20260630-013): register the wakeup hook on the pool
+	// exactly once at scheduler construction. Before this fix, every
+	// Start() appended a no-op hook AND every dispatchLoop added its own
+	// wakeup hook — after N waves the pool would fan-out N goroutines per
+	// release, writing to defunct wave channels. The scheduler now owns
+	// a single wakeup channel shared across all dispatchLoops, and the
+	// pool hook targets it directly.
+	if s.pool != nil {
+		s.pool.OnRelease(func(_ SlotID) {
+			select {
+			case s.wakeupCh <- struct{}{}:
+			default:
+			}
+		})
+	}
+	return s
 }
 
 // SetObsBridge wires the D5 observability bridge for wave spans.
@@ -226,7 +250,6 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		graph:        graph,
 		handles:      make(map[string]*workerHandle),
 		doneCh:       make(chan struct{}),
-		wakeupCh:     make(chan struct{}, 64),
 		scheduleSpan: scheduleSpan,
 	}
 	s.waves[sessionID] = state
@@ -239,12 +262,11 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		s.incMetric("wave_reentry_cancelled")
 	}
 
-	// Register release hooks on the pool so we wake up the dispatch loop.
-	if s.pool != nil {
-		s.pool.OnRelease(func(_ SlotID) {
-			// No-op signal — Start's main loop wakes via select on doneCh.
-		})
-	}
+	// RH-D7-02 (DM-20260630-013): the pool's OnRelease hook is registered
+	// ONCE at scheduler construction (see NewWaveScheduler). DO NOT append
+	// here — every Start() running this would silently grow the hook slice
+	// and after N waves, every Release would fan out to N defunct wave
+	// wakeup channels. See spec D7-S3-A84.
 
 	// Spawn the dispatch loop. waveCtx carries Wave_Schedule until markWaveDone.
 	go s.dispatchLoop(waveCtx, sessionID, state)
@@ -255,15 +277,11 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 
-	// Hook slot-release notifications into the wakeup channel.
-	if s.pool != nil {
-		s.pool.OnRelease(func(_ SlotID) {
-			select {
-			case state.wakeupCh <- struct{}{}:
-			default:
-			}
-		})
-	}
+	// RH-D7-02 (DM-20260630-013): the pool's OnRelease hook was registered
+	// ONCE at scheduler construction (NewWaveScheduler) and targets the
+	// scheduler-level s.wakeupCh. dispatchLoop MUST NOT append its own hook
+	// here — the prior behaviour caused the hook slice to grow without bound
+	// across waves (see spec D7-S3-A84).
 
 	for {
 		// Check global done.
@@ -306,7 +324,7 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 			s.cancelWaveLocked(state)
 			s.markWaveDone(state)
 			return
-		case <-state.wakeupCh:
+		case <-s.wakeupCh:
 			// A slot was released OR a task completed — re-check ready tasks.
 			s.incMetric("dispatch_loop_wakeups")
 		case <-ticker.C:
@@ -555,7 +573,7 @@ func (s *WaveScheduler) completeTask(sessionID string, state *schedulerWaveState
 
 	// Wake the dispatch loop.
 	select {
-	case state.wakeupCh <- struct{}{}:
+	case s.wakeupCh <- struct{}{}:
 	default:
 	}
 }
