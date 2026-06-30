@@ -26,6 +26,14 @@ func SetBridge(t *tracer.Tracer) {
 	d1ObsBridge = t
 }
 
+// TaskIncompleteMessage is rendered on the IM "任务总结" card when D7
+// flagged BOTH summary AND final Content as bad (transitional / planning
+// text leaked to the user — e.g. sess_1782826968112_7000 emitted "Now let
+// me look at the cross-package contracts…" as its 82-char "conclusion").
+// The message is intentionally short and bilingual-friendly so it works
+// across IM adapters without needing per-locale wiring.
+const TaskIncompleteMessage = "（任务未能完成，AI 未产生有效结论。请重新发起。）"
+
 // EmitText maps S16-A01 EmitSummaryChunk → OutboundMessage.
 func EmitText(session *types.Session, event *contracts.EngineEvent, sig contracts.IMOutboundSignal, hasSig bool, emit kernel.Emitter) {
 	if session == nil || event == nil || emit == nil {
@@ -71,6 +79,15 @@ func EmitText(session *types.Session, event *contracts.EngineEvent, sig contract
 // blank or summary_quality ∈ {too_short, inconclusive}), emit the
 // hardening EmitEmitCompleteFallback span so dashboards can alert on
 // abnormal fallback rate.
+//
+// DM-20260630-011 follow-up: when summary_quality AND final_quality are
+// BOTH bad (LLM ended mid-tool-call with transitional text — see
+// sess_1782826968112_7000), the original fallback chain forwards the
+// transitional phrase to Feishu, leaving the user with a meaningless
+// fragment instead of an answer. Detect this case and replace the
+// fallback Content with a clear "task incomplete" message so the user
+// knows to retry, and surface task_incomplete on the metadata so D6
+// Evolution / dashboards can alert on the pattern.
 func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig contracts.IMOutboundSignal, hasSig bool, emit kernel.Emitter) {
 	if session == nil || event == nil || emit == nil {
 		return
@@ -80,10 +97,12 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 	model := kernel.MetaField(event.Metadata, "model")
 	ctxPct := kernel.MetaField(event.Metadata, "ctx_pct")
 	summaryQuality := kernel.MetaField(event.Metadata, "summary_quality")
+	finalQuality := kernel.MetaField(event.Metadata, "final_quality")
 	stats := BuildCompletionSummary(duration, usage, model, ctxPct)
 	summary := strings.TrimSpace(kernel.MetaField(event.Metadata, "summary"))
 	content := summary
 	fallbackSource := ""
+	taskIncomplete := false
 	// DM-20260630-011 AC1+AC2: when D7 marked summary as too_short /
 	// inconclusive (LastTextQualityGate), treat the summary as empty
 	// for IM card rendering purposes. The original summary is still
@@ -95,6 +114,23 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 		content = strings.TrimSpace(event.Content)
 		if content != "" && fallbackSource == "" {
 			fallbackSource = "event.Content"
+		}
+	}
+	// DM-20260630-011 follow-up: when BOTH summary and Content classify
+	// as bad (transitional text leaked to the user), replace with a
+	// clear "task incomplete" message. We classify Content using the
+	// final_quality signal D7 propagated; that's cheaper than re-running
+	// the structural classifier here and avoids re-importing
+	// orchestration/ into D1 (forbidden by scripts/lint-d1-imports.sh).
+	if summaryQuality == "too_short" || summaryQuality == "inconclusive" {
+		if finalQuality == "too_short" || finalQuality == "inconclusive" {
+			content = TaskIncompleteMessage
+			taskIncomplete = true
+			if fallbackSource == "" {
+				fallbackSource = "task_incomplete"
+			} else {
+				fallbackSource = fallbackSource + "+task_incomplete"
+			}
 		}
 	}
 	if content == "" {
@@ -113,6 +149,12 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 	}, kernel.SigOrEmpty(hasSig, sig))
 	if summary != "" {
 		meta["summary"] = summary
+	}
+	if taskIncomplete {
+		meta["task_incomplete"] = "true"
+	}
+	if finalQuality != "" {
+		meta["final_quality"] = finalQuality
 	}
 	outbound := &types.OutboundMessage{
 		MessageID:  kernel.NewMessageID(),

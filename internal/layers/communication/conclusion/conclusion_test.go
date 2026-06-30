@@ -244,3 +244,74 @@ func TestEmitComplete_SummaryQualityValid_PreservesSummary(t *testing.T) {
 		t.Fatalf("summary_quality must propagate unchanged: got %q, want valid", msg.Metadata["summary_quality"])
 	}
 }
+
+// TestEmitComplete_BothSummaryAndFinalBad_EmitsTaskIncomplete pins the
+// DM-20260630-011 follow-up regression fix for sess_1782826968112_7000:
+// when D7 classified BOTH the summary AND the fallback Content as bad
+// (LLM ended mid-tool-call with transitional text like "Now let me look
+// at..."), EmitComplete MUST replace the fallback Content with a clear
+// "task incomplete" message rather than forwarding the transitional
+// phrase to the user. The task_incomplete=true metadata flag is also
+// surfaced so dashboards can alert on the pattern.
+func TestEmitComplete_BothSummaryAndFinalBad_EmitsTaskIncomplete(t *testing.T) {
+	sess := &types.Session{SessionID: "sess_test", ChatID: "chat_test"}
+	const transitionalSummary = "ok" // 2 chars — too_short
+	const transitionalFinal = "Now let me look at the cross-package contracts referenced from the kernel package." // 82 chars — too_short
+	ev := &contracts.EngineEvent{
+		Type:      "complete",
+		Content:   transitionalFinal,
+		SessionID: "sess_test",
+		Metadata: map[string]string{
+			"summary":         transitionalSummary,
+			"summary_quality": "too_short",
+			"final_quality":   "too_short",
+		},
+	}
+	em := &recordingEmitter{}
+
+	EmitComplete(sess, ev, contracts.IMOutboundSignal{}, false, em)
+
+	msg := em.messages[0]
+	if msg.Content != TaskIncompleteMessage {
+		t.Fatalf("both-bad case must emit task-incomplete message; got %q, want %q", msg.Content, TaskIncompleteMessage)
+	}
+	if msg.Metadata["task_incomplete"] != "true" {
+		t.Fatalf("metadata[task_incomplete] = %q, want \"true\"", msg.Metadata["task_incomplete"])
+	}
+	// Original summary is still preserved for observability / CLI / transcript.
+	if msg.Metadata["summary"] != transitionalSummary {
+		t.Fatalf("metadata[summary] must preserve original: got %q, want %q", msg.Metadata["summary"], transitionalSummary)
+	}
+}
+
+// TestEmitComplete_OnlySummaryBad_FallsBackToContent pins the original
+// behavior preserved for the case where the summary is bad but the
+// final Content IS a real review. This is the common path when D7's
+// brief extraction mangles a long response — fallback to the full
+// transcript is correct.
+func TestEmitComplete_OnlySummaryBad_FallsBackToContent(t *testing.T) {
+	sess := &types.Session{SessionID: "sess_test", ChatID: "chat_test"}
+	const shortSummary = "ok"
+	const realContent = "代码审查完成，整体结构清晰，无阻塞问题。建议关注 xxx 模块。"
+	ev := &contracts.EngineEvent{
+		Type:      "complete",
+		Content:   realContent,
+		SessionID: "sess_test",
+		Metadata: map[string]string{
+			"summary":         shortSummary,
+			"summary_quality": "too_short",
+			"final_quality":   "valid",
+		},
+	}
+	em := &recordingEmitter{}
+
+	EmitComplete(sess, ev, contracts.IMOutboundSignal{}, false, em)
+
+	msg := em.messages[0]
+	if msg.Content != realContent {
+		t.Fatalf("only-summary-bad must fall back to event.Content; got %q, want %q", msg.Content, realContent)
+	}
+	if _, ok := msg.Metadata["task_incomplete"]; ok {
+		t.Fatalf("task_incomplete must NOT be set when fallback Content is valid; got %q", msg.Metadata["task_incomplete"])
+	}
+}

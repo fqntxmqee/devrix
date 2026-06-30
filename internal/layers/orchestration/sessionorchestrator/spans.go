@@ -75,5 +75,12 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		// D7 Orchestration × D1 Communication — finalizeReplyCardStreaming
 		// 飞书卡片渲染（D7→D1 跨域可观测）.
 		{Name: "D7_Feishu_Card_Render", Layer: "orchestration", Component: "adapter", SinceVersion: "2.6.0", Instrumented: true},
+
+		// D7-S2 lasttext.quality_gate (P0, DM-20260630-011 devrix-session-conclusion-completeness).
+		// Emitted at SessionOrchestrator.finalizeLoop after resolveFinalText.
+		// Captures the structural quality classification of the LLM's
+		// last-turn text (which becomes the IM "任务总结" card content).
+		// kind ∈ {valid, thin, too_short, inconclusive}.
+		{Name: "D7_LastText_Quality_Gate", Layer: "orchestration", Component: "orchestrator", SinceVersion: "3.2.0", Instrumented: true},
 	}
 }

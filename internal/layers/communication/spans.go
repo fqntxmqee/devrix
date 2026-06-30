@@ -33,6 +33,12 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D1_Signal_ChainIntegrity", Layer: "communication", Component: "gateway", SinceVersion: "3.1.0", Instrumented: true},
 		{Name: "D1_Signal_TaskWorkProof", Layer: "communication", Component: "gateway", SinceVersion: "3.1.0", Instrumented: true},
 		{Name: "D1_UserFeedback_ConclusionRejected", Layer: "communication", Component: "gateway", SinceVersion: "3.1.0", Instrumented: true},
+		// D1-S16 emit.complete.fallback (P0, DM-20260630-011 devrix-session-conclusion-completeness).
+		// Emitted when conclusion.EmitComplete falls back from `summary` to
+		// event.Content or stats because the LLM last-turn text was too_short /
+		// inconclusive per LastTextQualityGate. Surfaces the silent fallback
+		// chain in Jaeger so dashboards can alert on abnormal fallback rate.
+		{Name: "D1_EmitComplete_Fallback", Layer: "communication", Component: "gateway", SinceVersion: "3.2.0", Instrumented: true},
 
 		// D1 Communication - Adapter (D1-S17)
 		{Name: "D1_Adapter_Message_Receive", Layer: "communication", Component: "adapter", SinceVersion: "1.3.0", Instrumented: true},

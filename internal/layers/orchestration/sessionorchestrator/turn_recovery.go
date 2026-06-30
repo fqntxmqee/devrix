@@ -63,6 +63,14 @@ func (o *DefaultOrchestrator) finalizeLoop(
 	// summary_quality to D1 IM adapters. Emit always (even on valid kind)
 	// so dashboards can filter by "interesting" via != valid.
 	summaryQuality := EmitLastTextQuality(ctx, req.SessionID, resolvedSummary, string(st.exitReason))
+	// DM-20260630-011 follow-up: also classify resolvedFinal (the fallback
+	// Content that D1 EmitComplete uses when summary_quality is too_short /
+	// inconclusive). When the LLM ends mid-tool-call with a transitional
+	// phrase like "Now let me look at..." (sess_1782826968112_7000 — 82 chars),
+	// BOTH summary and final classify as too_short, so the fallback chain
+	// would forward the junk to Feishu. Emitting final_quality lets D1 detect
+	// this and emit a clear "task incomplete" message instead.
+	finalQuality := ClassifyLastTextQuality(resolvedFinal)
 	if err := st.persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  st.messages,
@@ -78,7 +86,7 @@ func (o *DefaultOrchestrator) finalizeLoop(
 	}
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, st.totalUsage, st.lastPromptTokens, st.model, st.maxContextTokens,
-		resolvedFinal, resolvedSummary, summaryQuality.Kind, st.exitReason)
+		resolvedFinal, resolvedSummary, summaryQuality.Kind, finalQuality.Kind, st.exitReason)
 }
 
 // resolveFinalText promotes the most recent accumulated thinking into
@@ -211,6 +219,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	finalText string,
 	summary string,
 	summaryQuality SummaryQualityKind,
+	finalQuality SummaryQualityKind,
 	exitReason verify.ExitReason,
 ) {
 	if model == "" {
@@ -245,6 +254,11 @@ func (o *DefaultOrchestrator) emitComplete(
 	// emitted (even when valid) so dashboards / D6 Evolution have a stable
 	// Jaeger filter dimension across sessions.
 	meta["summary_quality"] = string(summaryQuality)
+	// DM-20260630-011 follow-up: surface final_quality so D1 EmitComplete can
+	// detect when both summary AND fallback Content are bad (LLM ended
+	// mid-tool-call with transitional text), and emit a clear "task
+	// incomplete" message instead of forwarding the junk text.
+	meta["final_quality"] = string(finalQuality)
 	// Surface the last LLM-generated text on the complete event so IM adapters
 	// (Feishu cardkit streaming finalize, CLI plain stdout) can render the
 	// conclusion even when no interleaved text chunks were emitted (e.g. LLM
