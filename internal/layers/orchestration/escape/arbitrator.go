@@ -2,20 +2,20 @@
 //
 // 关键设计 (doc 38 §21.3.4, design.md §5.3):
 //
-//   3 层链式调度 (LLM → Rule → Human):
-//   - LLMArbitrator  (5s timeout, 1 次 retry, panic recover, ctx.Done() 优先)
-//   - RuleArbitrator (规则检查, hasUnrecoverableFailure)
-//   - HumanArbitrator (异步注册 + 立即返回 EscapePendingHuman)
+//	3 层链式调度 (LLM → Rule → Human):
+//	- LLMArbitrator  (5s timeout, 1 次 retry, panic recover, ctx.Done() 优先)
+//	- RuleArbitrator (规则检查, hasUnrecoverableFailure)
+//	- HumanArbitrator (异步注册 + 立即返回 EscapePendingHuman)
 //
-//   ChainedArbitrator.Arbitrate 关键不变式:
-//   1. 返回值 Action ∈ {EscapeContinue, EscapePendingHuman, EscapeForceExit, EscapeAbortWithAudit}
-//   2. EscalateToRule / EscalateToHuman 中间态绝不返回给 caller
-//   3. 任何一层 panic / error → 降级到下一层（不阻塞主链路）
+//	ChainedArbitrator.Arbitrate 关键不变式:
+//	1. 返回值 Action ∈ {EscapeContinue, EscapePendingHuman, EscapeForceExit, EscapeAbortWithAudit}
+//	2. EscalateToRule / EscalateToHuman 中间态绝不返回给 caller
+//	3. 任何一层 panic / error → 降级到下一层（不阻塞主链路）
 //
-//   HumanArbitrator 异步化（采纳 Phase 7 Auto-Close 模式）:
-//   - Arbitrate 立即返回 EscapePendingHuman（ProcessMessage 同步返回）
-//   - 后台 goroutine 等待 user 响应 / 10s timeout / ctx.Done()
-//   - ResumeSession 由 EscapeEngine.ResumeSession 委托调用
+//	HumanArbitrator 异步化（采纳 Phase 7 Auto-Close 模式）:
+//	- Arbitrate 立即返回 EscapePendingHuman（ProcessMessage 同步返回）
+//	- 后台 goroutine 等待 user 响应 / 10s timeout / ctx.Done()
+//	- ResumeSession 由 EscapeEngine.ResumeSession 委托调用
 package escape
 
 import (
@@ -25,6 +25,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 )
 
 // LLMClient is the minimal interface LLMArbitrator needs for a one-shot
@@ -203,6 +205,9 @@ type LLMArbitrator struct {
 	timeout   time.Duration
 	promptFn  func(loopCtx LoopContext, decisions []EscapeDecision) string
 	parseFn   func(resp string) (action string, reason string, err error)
+	// loc is the i18n locale for tactical prompts (RH-D2-CC-05,
+	// DM-20260630-013 T-P2-11.1). Empty → i18n.DefaultLocale at use.
+	loc i18n.Locale
 }
 
 // NewLLMArbitrator constructs an LLMArbitrator with default 5s timeout.
@@ -334,8 +339,16 @@ func (a *LLMArbitrator) parseWithRetry(
 	if parseErr == nil {
 		return action, reason, nil
 	}
-	// 1 retry with format hint.
-	retryPrompt := prompt + "\n\n必须返回 JSON: {\"action\":\"Continue|Exit\",\"reason\":\"...\"}"
+	// 1 retry with format hint. RH-D2-CC-05 (DM-20260630-013 T-P2-11.1):
+	// the tactical JSON-schema hint was previously a hard-coded Chinese
+	// literal; now it goes through the i18n layer so an English session
+	// sees an English hint. The default locale (zh-CN) preserves the
+	// pre-existing behavior.
+	loc := a.loc
+	if loc == "" {
+		loc = i18n.DefaultLocale
+	}
+	retryPrompt := prompt + i18n.EscapeArbitratorJSONSchemaHint(loc)
 	retryResp, retryErr := a.invokeGenerateBounded(llmCtx, retryPrompt)
 	if retryErr != nil {
 		return "", "", retryErr
