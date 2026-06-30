@@ -1,7 +1,8 @@
 change_id: devrix-verify-spec-links
 priority: P2
 demand_id: DM-20260630-010
-status: s2_design
+status: s7_archived
+pr_number: "348"
 domains: [project]
 dsaft_scenarios: []
 dsaft_activities: []
