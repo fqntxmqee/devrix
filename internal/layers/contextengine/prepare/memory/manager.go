@@ -193,6 +193,57 @@ func (m *Manager) SetCompressedView(sc *types.SessionContext, view []types.Messa
 	sc.UpdatedAt = time.Now()
 }
 
+// ReplaceAutocompactPlaceholder swaps the first pending autocompact
+// placeholder in sc.Messages with summary, returning true when a
+// placeholder was found and replaced. A pending placeholder is a message
+// with metadata["compressed_by"]=="autocompact" && metadata["status"]=="pending".
+//
+// This is the RH-D2-03 / RH-D2-04 (DM-20260630-013) closure hook: async
+// autocompact summarization produces a real summary; this method makes
+// it visible to the next Prepare call by replacing the placeholder rather
+// than leaving "[compressing ...]" stuck in history.
+//
+// Concurrency: holds messagesMu so concurrent Prepare / AppendAndTrimMessages
+// callers either see the placeholder or the summary, never a torn state.
+func (m *Manager) ReplaceAutocompactPlaceholder(sc *types.SessionContext, summary types.Message) bool {
+	if sc == nil {
+		return false
+	}
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	for i := range sc.Messages {
+		md := sc.Messages[i].Metadata
+		if md == nil {
+			continue
+		}
+		if md["compressed_by"] == "autocompact" && md["status"] == "pending" {
+			merged := sc.Messages[i].Metadata
+			if summary.Metadata == nil {
+				summary.Metadata = make(map[string]string, len(merged)+1)
+			}
+			for k, v := range merged {
+				if _, set := summary.Metadata[k]; !set {
+					summary.Metadata[k] = v
+				}
+			}
+			summary.Metadata["status"] = "complete"
+			if summary.ID == "" {
+				summary.ID = sc.Messages[i].ID
+			}
+			if summary.SessionID == "" {
+				summary.SessionID = sc.Messages[i].SessionID
+			}
+			if summary.Timestamp.IsZero() {
+				summary.Timestamp = sc.Messages[i].Timestamp
+			}
+			sc.Messages[i] = summary
+			sc.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveLastUserMessage removes the last user message from sc.Messages.
 // Used on stop to discard the unanswered user message.
 func (m *Manager) RemoveLastUserMessage(sc *types.SessionContext) {
