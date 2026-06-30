@@ -1,0 +1,19 @@
+change_id: devrix-d4-spec-lite
+priority: P1
+demand_id: DM-20260630-007
+status: s2_design
+domains: [D4]
+dsaft_scenarios:
+  - D4-S11
+  - D4-S12
+  - D4-S13
+  - D4-S14
+  - D4-S15
+  - D4-S16
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: d4-multi-agent spec.md 精简设计契约（≤ 200 行）+ CHANGELOG.md（≤ 300 行）
+  v1.1: 视需求扩展至其他域（d5/d6）
+metrics_definitions: []
+span_naming: []
