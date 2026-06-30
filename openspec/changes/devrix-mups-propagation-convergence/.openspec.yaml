@@ -1,0 +1,31 @@
+change_id: devrix-mups-propagation-convergence
+demand_id: DM-20260701-001
+title: MUPS+WorkTree 传播闭环修复 — 不确定性收敛 / Rollup 终止 / 发散范围与验收标准对生产者可见
+priority: P0
+status: s2_clarified
+domains: [D7]
+related:
+  - DM-20260630-013  # d2-d7-review-hardening（工程实现层：silent swallow / 并发 / 安全）
+  - DM-20260630-012  # mups-deliverable-convergence（StatusAfterSpawnNone + StrategicPlanProposer + DeliverableVerifier）
+  - DM-20260629-001  # RollupReport typed envelope（向上反馈收口）
+  - DM-20260627-003  # ChildDownlink + ExpectedReturn 下行契约
+  - DM-20260627-001  # Parent Rollup Gate / Path A/B
+source: design-review 2026-07-01 (D7 MUPS+WorkTree 上下传播 / 向上反馈 / 不确定性发散收敛 逻辑审查)
+review_scope: >
+  聚焦 MUPS 算法语义层（非工程实现层，与 DM-20260630-013 不重叠）：
+  向下传播链（Goal→decompose→ChildSpec/Directive/ScopeContract）、
+  向上反馈链（child deliverable→Bubble→parent Observe→Rollup）、
+  不确定性发散（SpawnPolicyEvaluator R0–R8）与收敛（Rollup Gate + Verify）、
+  以及 MUPS 5 节点与 LLM 交互时"期望发散范围"与"收敛验收标准"的可见性。
+dsaft_scenarios:
+  - D7-S1   # Work Model / Uncertainty 字段
+  - D7-S5   # Decision & Planning / StrategicPlanProposer 发散提案
+  - D7-S8   # Observation + UncertaintyReport
+  - D7-S9   # Execute Artifact / DeliverableVerifier 验收
+  - D7-S15  # WorkItem Rollup 收敛
+  - D7-S16  # Layer SubContext / Decompose / ChildDownlink
+findings_total: 12
+findings_critical: 4
+findings_warning: 5
+findings_info: 3
+t_points_planned: 18
