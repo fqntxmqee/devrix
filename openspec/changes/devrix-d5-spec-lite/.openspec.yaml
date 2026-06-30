@@ -1,0 +1,18 @@
+change_id: devrix-d5-spec-lite
+priority: P1
+demand_id: DM-20260630-008
+status: s2_design
+domains: [D5]
+dsaft_scenarios:
+  - D5-S21
+  - D5-S22
+  - D5-S23
+  - D5-S24
+  - D5-S0
+dsaft_activities: []
+t_points: []
+version_scope:
+  v1.0: d5-observability spec.md 精简设计契约（≤ 200 行）+ CHANGELOG.md（≤ 300 行）
+  v1.1: 视需求扩展至其他域（d6）
+metrics_definitions: []
+span_naming: []
