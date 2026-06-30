@@ -1,6 +1,6 @@
 # 归档规范
 
-**版本:** 1.2.0
+**版本:** 1.3.0
 **状态:** Active
 **所属阶段:** S6-归档（S6 的第二子步；S6-交付见 `git-workflow.md`）
 **前置阶段:** S5 验收通过、S6-交付完成（PR 已 squash 合入 `master`）
@@ -51,11 +51,11 @@ S6 归档在以下条件**全部满足**后执行：
 
 | 变更类型 | 需更新的域文档 | 说明 |
 |---------|---------------|------|
-| 新增/修改 A（活动） | `a-registry.md` | 新增活动条目或修改活动描述 |
+| 新增/修改 A（活动） | `a-registry.md`（或按 A 拆分的子注册表） | 新增活动条目或修改活动描述 |
 | 新增/修改 F（功能点） | `f-registry.md` | 新增功能点条目或修改代码位置 |
-| 新增 T 层测试点 | `t-registry.md` | 状态从 PLANNED → IMPLEMENTED |
-| 架构设计变更 | `design.md` | 领域模型、接口、业务流程变更 |
-| 新增/修改 Gherkin 规格 | `spec.md` | 将 changes 下的 Scenario 合并到域 spec.md |
+| 新增 T 层测试点 | `t-registry.md`（或按 A 拆分的子注册表） | 状态从 PLANNED → IMPLEMENTED |
+| 架构设计变更 | `design.md`（或子文档） | 领域模型、接口、业务流程变更 |
+| 新增/修改 Gherkin 规格 | `spec.md` + 按 S 拆分的 `spec-s{XX}.md` | **按 S 分片合并**（禁止单点累积，详见 §2.5） |
 | 跨域影响 | 所有受影响域的上述文档 | 每个域独立评估 |
 
 **不需要同步的情况：**
@@ -75,11 +75,24 @@ S6 归档在以下条件**全部满足**后执行：
 cat openspec/changes/<change-id>/.openspec.yaml | grep domains
 
 # 2. 对于每个受影响域，检查是否需要更新
-# - spec.md: 合并 changes/<id>/specs/ 下的 Gherkin Scenario
+# - spec.md: 按 S 分片合并 changes/<id>/specs/ 下的 Gherkin Scenario（见 §2.5）
 # - design.md: 更新领域模型/接口/流程图
 # - a-registry.md: 新增/修改活动条目
 # - f-registry.md: 新增/修改功能点条目
 # - t-registry.md: 更新测试点状态
+
+# 2.5 spec.md 按 S 分片合并规则（强制）
+# 禁止将所有 S 的 Scenario 累积到单 spec.md 文件。
+# 拆分策略（详见 architecture-design.md §6.4）：
+#   - 目标域 spec.md 当前 ≤ 800 行 → 直接在主 spec.md 追加（ADDED/MODIFIED/REMOVED）
+#   - 目标域 spec.md 当前 > 800 行 → 按 S 拆分：
+#       1. 评估本次新增 Scenario 归属哪些 S
+#       2. 对每个 S 创建/更新 spec-s{XX}.md（XX = S 编号）
+#       3. 在主 spec.md 顶部"## Scenario Index"段追加索引条目：
+#          - [D7-S3 Wave Scheduler 详细](spec-s03.md)
+#       4. 主 spec.md 主体不再展开该 S 的 Requirement/Scenario
+#   - 单 S 自身 Scenario 数 > 30 或行数 > 400 → 进一步按 A 拆分 spec-s{XX}-a{YY}.md
+# 拆分后必须保持 DSAFT ID 全局唯一，跨文件用 T 层注释追溯。
 
 # 3. 在归档 commit 中包含域文档更新
 git add openspec/specs/d{N}-*/
@@ -258,3 +271,4 @@ S6 归档完成后，**必须**清理对应分支：
 | 1.0.0 | 2026-06-07 | 初始归档规范 |
 | 1.1.0 | 2026-06-16 | 新增 §3.0 分支策略（场景 A/B）+ §7 分支清理；禁止在 master 直推归档、禁止混入其他功能分支 |
 | 1.2.0 | 2026-06-26 | 统一 verdict（ACCEPTED/PARTIAL）与测试行 PASS 的用词；与 testing.md v1.1.0 对齐 |
+| 1.3.0 | 2026-06-30 | §2.4 域文档同步表细化"按 S 分片合并"+新增 §2.5 spec.md 按 S 分片合并强制规则（对应 architecture-design.md §6.4） |
