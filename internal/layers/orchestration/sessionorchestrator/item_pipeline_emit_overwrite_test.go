@@ -7,8 +7,8 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// TestItemPipelineRunner_OverwritesExecutorEmit_PerRun verifies the
-// architectural fix for DM-20260628-002 (multi-turn closed-channel panic).
+// TestItemPipelineRunner_DoesNotPersistExecutorEmit_PerRun verifies the
+// per-invocation emit fix for DM-20260630-013.
 //
 // Without the fix, r.Run() only set exec.Emit when it was nil. The first
 // turn set exec.Emit to emitFn_1 (capturing out_1); subsequent turns
@@ -17,14 +17,10 @@ import (
 // defer close(out), any LLM stream chunk on a later turn caused
 // `send on closed channel` panic.
 //
-// The fix unconditionally writes r.Emit to exec.Emit so each Run() picks
-// up the freshest emitFn (which captures the current turn's `out`).
-//
-// The test directly drives two consecutive Run() calls with two distinct
-// r.Emit closures (and two distinct WorkItems — the first becomes locked
-// after Run completes) and asserts exec.Emit is the SECOND closure after
-// the second Run().
-func TestItemPipelineRunner_OverwritesExecutorEmit_PerRun(t *testing.T) {
+// The secure fix must NOT write per-run state onto the shared
+// DefaultWorkItemExecutor at all; the emit closure travels in
+// WorkItemExecContext for the single ExecuteWorkItem invocation.
+func TestItemPipelineRunner_DoesNotPersistExecutorEmit_PerRun(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	exec := NewWorkItemExecutor(&scriptedLLM{}, nil, nil)
 	runner.Executor = exec
@@ -48,15 +44,8 @@ func TestItemPipelineRunner_OverwritesExecutorEmit_PerRun(t *testing.T) {
 		t.Fatalf("Run turn 1: %v", err)
 	}
 
-	// After turn 1, exec.Emit must point at the emitFn1 closure. Invoke
-	// through exec.Emit directly to verify identity (we cannot compare
-	// function pointers reliably across closures, so we count calls).
-	exec.Emit(&contracts.EngineEvent{Type: "synthetic-1"})
-	if emitFn1Calls != 1 {
-		t.Fatalf("turn 1: exec.Emit not pointing at emitFn1 (emitFn1Calls=%d)", emitFn1Calls)
-	}
-	if emitFn2Calls != 0 {
-		t.Fatalf("turn 1: exec.Emit unexpectedly invoked emitFn2 (emitFn2Calls=%d)", emitFn2Calls)
+	if exec.Emit != nil {
+		t.Fatal("turn 1: exec.Emit must not retain per-run emit closure")
 	}
 
 	// Turn 2: a fresh goal so Run() doesn't bail on a locked historical
@@ -73,12 +62,10 @@ func TestItemPipelineRunner_OverwritesExecutorEmit_PerRun(t *testing.T) {
 		t.Fatalf("Run turn 2: %v", err)
 	}
 
-	// After turn 2, exec.Emit must point at the emitFn2 closure.
-	exec.Emit(&contracts.EngineEvent{Type: "synthetic-2"})
-	if emitFn2Calls != 1 {
-		t.Fatalf("turn 2: exec.Emit NOT overwritten to emitFn2 (emitFn2Calls=%d) — architectural fix missing", emitFn2Calls)
+	if exec.Emit != nil {
+		t.Fatal("turn 2: exec.Emit must not retain per-run emit closure")
 	}
-	if emitFn1Calls != 1 {
-		t.Fatalf("turn 2: exec.Emit unexpectedly points at emitFn1 (emitFn1Calls=%d, want %d)", emitFn1Calls, 1)
+	if emitFn1Calls != 0 || emitFn2Calls != 0 {
+		t.Fatalf("synthetic emit closures should not be retained on executor: fn1=%d fn2=%d", emitFn1Calls, emitFn2Calls)
 	}
 }

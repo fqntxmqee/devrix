@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/observability"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/google/uuid"
 )
 
@@ -54,12 +54,12 @@ type WorkerEventHandler func(sessionID, taskID string, ev WorkerEvent)
 //
 // DSAFT: ORCH-S3-A01 (ScheduleWave)
 type WaveScheduler struct {
-	pool      *WorkerPool
-	guard     *ConflictGuard
-	resolver  ContextResolverIface
-	artifacts *ArtifactStore
-	runners   map[WorkerType]WorkerRunner
-	obsBridge *observability.Bridge
+	pool          *WorkerPool
+	guard         *ConflictGuard
+	resolver      ContextResolverIface
+	artifacts     *ArtifactStore
+	runners       map[WorkerType]WorkerRunner
+	obsBridge     *observability.Bridge
 	onWorkerEvent WorkerEventHandler
 
 	// Per-wave runtime state. A wave is uniquely identified by sessionID —
@@ -84,11 +84,12 @@ type schedulerWaveState struct {
 	graph     *TaskGraph
 
 	// Per-task runtime handles: cancel func + slotID + backgroundID.
-	mu      sync.Mutex
-	handles map[string]*workerHandle
-	doneCh  chan struct{} // closed when all tasks reach terminal state
-	done    bool
-	cancels []context.CancelFunc // aggregated for CancelAll
+	mu           sync.Mutex
+	handles      map[string]*workerHandle
+	doneCh       chan struct{} // closed when all tasks reach terminal state
+	done         bool
+	cancels      []context.CancelFunc // aggregated for CancelAll
+	cancel       context.CancelFunc   // cancels the wave-level dispatch loop
 	scheduleSpan tracer.Span
 
 	// doneCh is closed when all tasks reach terminal state. wakeup is
@@ -243,6 +244,7 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		tracer.Attribute{Key: "wave.reentry", Value: boolStr(hasExisting)},
 		tracer.Attribute{Key: "context.caller", Value: "d7"},
 	)
+	waveCtx, waveCancel := context.WithCancel(waveCtx)
 
 	s.mu.Lock()
 	state := &schedulerWaveState{
@@ -250,6 +252,7 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 		graph:        graph,
 		handles:      make(map[string]*workerHandle),
 		doneCh:       make(chan struct{}),
+		cancel:       waveCancel,
 		scheduleSpan: scheduleSpan,
 	}
 	s.waves[sessionID] = state
@@ -258,6 +261,9 @@ func (s *WaveScheduler) Start(ctx context.Context, sessionID string, graph *Task
 	// Reentry: cancel prior wave first.
 	if hasExisting {
 		slog.Info("wave: reentry — cancelling prior wave", "session", sessionID)
+		if existing.cancel != nil {
+			existing.cancel()
+		}
 		s.cancelWaveLocked(existing)
 		s.incMetric("wave_reentry_cancelled")
 	}
@@ -284,6 +290,10 @@ func (s *WaveScheduler) dispatchLoop(ctx context.Context, sessionID string, stat
 	// across waves (see spec D7-S3-A84).
 
 	for {
+		if !s.isCurrentWave(sessionID, state) {
+			s.markWaveDone(state)
+			return
+		}
 		// Check global done.
 		if state.graph.AllTerminal() {
 			s.markWaveDone(state)
@@ -699,7 +709,19 @@ func (s *WaveScheduler) WaitForCompletion(ctx context.Context, sessionID string)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	return s.artifacts.List(), nil
+	arts := s.artifacts.ListForSession(sessionID)
+	s.mu.Lock()
+	if s.waves[sessionID] == state {
+		delete(s.waves, sessionID)
+	}
+	s.mu.Unlock()
+	return arts, nil
+}
+
+func (s *WaveScheduler) isCurrentWave(sessionID string, state *schedulerWaveState) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waves[sessionID] == state
 }
 
 // PeakRunning exposes the high-water mark of concurrent workers seen since

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -171,6 +172,10 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 		command = NormalizeWorkspacePaths(workDir, command)
 	}
 
+	if denied := EnforcePlanModeBash(ctx); denied != nil {
+		return denied, nil
+	}
+
 	if cfg.policy != nil {
 		if err := cfg.policy.Validate(command); err != nil {
 			return &ToolResult{Error: err.Error()}, nil
@@ -178,7 +183,7 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 	}
 
 	if cfg.auditEnabled {
-		slog.Info("tool.bash.audit", "command", command, "work_dir", workDir)
+		slog.Info("tool.bash.audit", "command", redactCommandForAudit(command), "work_dir", workDir)
 	}
 
 	timeout := cfg.timeout
@@ -276,41 +281,51 @@ func resolveWorkspacePath(workDir, relPath string) (string, error) {
 
 	if workDir != "" {
 		rel, err := filepath.Rel(workDir, target)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return "", fmt.Errorf("path escapes workspace: %s", relPath)
 		}
 		// RH-D2-02 (DM-20260630-013): symlink containment. A symlink inside
 		// the workspace pointing outside it would otherwise let a malicious
 		// or stale link escape. Reject when the resolved realpath falls
 		// outside the (also-resolved) workDir.
-		if escaped, evalErr := pathEscapesViaSymlink(workDir, target); evalErr == nil && escaped {
+		if escaped, evalErr := pathEscapesViaSymlink(workDir, target); evalErr != nil {
+			return "", fmt.Errorf("path containment check failed: %w", evalErr)
+		} else if escaped {
 			return "", fmt.Errorf("path escapes workspace via symlink: %s", relPath)
 		}
 	}
 	return target, nil
 }
 
-// pathEscapesViaSymlink returns true when target's realpath falls outside
-// workDir's realpath. Missing files are not treated as escapes (they would
-// have failed at the os.* call anyway); only existing symlinks whose chain
-// resolves outside the workspace are flagged. Errors from EvalSymlinks on
-// the target itself are surfaced to the caller via evalErr so it can decide
-// whether to fall back to the original containment check.
+// pathEscapesViaSymlink returns true when target's resolved realpath falls
+// outside workDir's realpath. For paths that do not exist yet, it resolves the
+// closest existing ancestor first; this blocks writes like
+// "workspace/link_to_outside/new.txt", where the final file is missing but an
+// intermediate symlink directory escapes the workspace.
 func pathEscapesViaSymlink(workDir, target string) (bool, error) {
 	realWork, err := filepath.EvalSymlinks(workDir)
 	if err != nil {
 		return false, err
 	}
-	realTarget, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		// ENOENT etc.: do not flag as escape; let caller surface the original error.
-		return false, err
+	existing := target
+	for {
+		realTarget, err := filepath.EvalSymlinks(existing)
+		if err == nil {
+			rel, relErr := filepath.Rel(realWork, realTarget)
+			if relErr != nil {
+				return true, nil
+			}
+			return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)), nil
+		}
+		if !os.IsNotExist(err) {
+			return false, err
+		}
+		parent := filepath.Dir(existing)
+		if parent == existing {
+			return false, err
+		}
+		existing = parent
 	}
-	rel, err := filepath.Rel(realWork, realTarget)
-	if err != nil {
-		return true, nil
-	}
-	return strings.HasPrefix(rel, ".."), nil
 }
 
 func formatCommandOutput(stdout, stderr string, maxBytes int) string {
@@ -332,6 +347,22 @@ func truncateToolOutput(s string, maxBytes int) string {
 		return s
 	}
 	return s[:maxBytes] + "\n...(output truncated)"
+}
+
+func redactCommandForAudit(command string) string {
+	redacted := command
+	patterns := []string{
+		`(?i)(authorization:\s*bearer\s+)[^\s"'\\]+`,
+		`(?i)(api[_-]?key\s*=\s*)[^\s"'\\]+`,
+		`(?i)(token\s*=\s*)[^\s"'\\]+`,
+		`(?i)(password\s*=\s*)[^\s"'\\]+`,
+		`(?i)(cookie:\s*)[^\n]+`,
+	}
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		redacted = re.ReplaceAllString(redacted, `${1}<redacted>`)
+	}
+	return redacted
 }
 
 // bashWrongToolHint detects when the model invoked bash with another tool's JSON args.

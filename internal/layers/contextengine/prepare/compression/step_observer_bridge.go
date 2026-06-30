@@ -33,3 +33,10 @@ func (o *pipelineStepObserver) OnAutocompactComplete(summaryMsg types.Message, s
 	}
 	o.sink.EmitAutocompactComplete(sessionID, summaryMsg, asyncToken)
 }
+
+func (o *pipelineStepObserver) OnAutocompactFailed(sessionID string, restored []types.Message, asyncToken string) {
+	if sessionID == "" {
+		sessionID = o.sessionID
+	}
+	o.sink.EmitAutocompactFailed(sessionID, restored, asyncToken)
+}

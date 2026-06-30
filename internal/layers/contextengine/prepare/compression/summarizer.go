@@ -18,6 +18,7 @@ type StepObserver interface {
 	OnStep(ctx context.Context, step string, before, after int)
 	OnAutocompact(meta AutocompactMeta)
 	OnAutocompactComplete(summaryMsg types.Message, sessionID, asyncToken string)
+	OnAutocompactFailed(sessionID string, restored []types.Message, asyncToken string)
 }
 
 // AutocompactMeta describes an autocompact event.

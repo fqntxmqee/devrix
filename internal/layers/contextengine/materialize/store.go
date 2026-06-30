@@ -143,7 +143,10 @@ func (s *PartitionStore) Load(sessionID, workItemID string) ([]types.Message, er
 	var out []types.Message
 	var badLines int
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	lineNo := 0
 	for scanner.Scan() {
+		lineNo++
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
@@ -158,14 +161,14 @@ func (s *PartitionStore) Load(sessionID, workItemID string) ([]types.Message, er
 				// silently dropping messages. Operators see the line
 				// number + first 80 bytes of the bad line in the
 				// returned error for triage.
-				return nil, fmt.Errorf("materialize: bad jsonl line %d: %w (line=%q)", badLines, err, truncateForLog(line, 80))
+				return nil, fmt.Errorf("materialize: bad jsonl line %d: %w (line=%q)", lineNo, err, truncateForLog(line, 80))
 			}
 			// Lenient mode: log + skip. The slog.Warn gives operators
 			// a Jaeger signal for "we silently dropped N messages from
 			// this chain" without breaking the load.
 			slog.Warn("materialize: bad jsonl line; skipping (lenient mode)",
 				"session_id", sessionID, "work_item_id", workItemID,
-				"line_no", badLines, "err", err)
+				"line_no", lineNo, "err", err)
 			continue
 		}
 		out = append(out, msg)
@@ -201,7 +204,10 @@ func (s *PartitionStore) LoadAgent(sessionID, agentID string) ([]types.Message, 
 	var out []types.Message
 	var badLines int
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	lineNo := 0
 	for scanner.Scan() {
+		lineNo++
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
@@ -210,11 +216,11 @@ func (s *PartitionStore) LoadAgent(sessionID, agentID string) ([]types.Message, 
 		if err := json.Unmarshal(line, &msg); err != nil {
 			badLines++
 			if s.strict {
-				return nil, fmt.Errorf("materialize: bad agent jsonl line %d: %w (line=%q)", badLines, err, truncateForLog(line, 80))
+				return nil, fmt.Errorf("materialize: bad agent jsonl line %d: %w (line=%q)", lineNo, err, truncateForLog(line, 80))
 			}
 			slog.Warn("materialize: bad agent jsonl line; skipping (lenient mode)",
 				"session_id", sessionID, "agent_id", agentID,
-				"line_no", badLines, "err", err)
+				"line_no", lineNo, "err", err)
 			continue
 		}
 		out = append(out, msg)

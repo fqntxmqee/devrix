@@ -12,6 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
+	"github.com/google/uuid"
 )
 
 type summaryOutput struct {
@@ -54,8 +55,9 @@ func runAutocompact(
 	}
 
 	if async != nil && sessionID != "" {
-		out := buildAutocompactPlaceholder(turns, head, tail)
-		async.StartAsync(sessionID, cfg, turns, head, tail, observer, loc)
+		asyncToken := uuid.NewString()
+		out := buildAutocompactPlaceholder(turns, head, tail, asyncToken)
+		async.StartAsync(sessionID, asyncToken, cfg, turns, head, tail, observer, loc)
 		return out, stepAutocompact, nil
 	}
 

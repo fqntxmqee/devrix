@@ -43,6 +43,9 @@ func (m *TaskManager) DecomposeChildren(sessionID, parentID string, children []C
 	if err := m.checkDecomposeLimits(sessionID, parentID, parent.Kind, len(children)); err != nil {
 		return nil, err
 	}
+	if err := validateChildSpecsAgainstParentScope(parent, children); err != nil {
+		return nil, err
+	}
 
 	out := make([]*WorkItem, 0, len(children))
 	for _, c := range children {
@@ -69,6 +72,30 @@ func (m *TaskManager) DecomposeChildren(sessionID, parentID string, children []C
 	}
 	recordDecompose(sessionID, parent.Kind, len(children))
 	return out, nil
+}
+
+func validateChildSpecsAgainstParentScope(parent *WorkItem, children []ChildSpec) error {
+	if parent == nil || parent.ScopeContract == nil || len(children) == 0 {
+		return nil
+	}
+	tmp := make([]*WorkItem, 0, len(children))
+	for i, c := range children {
+		tmp = append(tmp, &WorkItem{
+			ID:    fmt.Sprintf("child_spec_%d", i),
+			Title: c.Title,
+			ScopeContract: &ScopeContract{
+				InScope: append([]string(nil), c.ScopeIn...),
+			},
+		})
+	}
+	res := ValidateChildScopes(parent, tmp)
+	if res.OK {
+		return nil
+	}
+	if len(res.Violations) == 0 {
+		return fmt.Errorf("child scope validation failed")
+	}
+	return fmt.Errorf("child scope validation failed: %s", res.Violations[0].Message)
 }
 
 // CanDecompose reports whether a kind supports child decomposition.

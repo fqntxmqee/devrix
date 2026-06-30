@@ -371,7 +371,7 @@ func (e *ContextEngine) runProcess(ctx context.Context, session *types.Session, 
 
 	working := memory.NewWorkingMemory()
 	var pendingComplete *contracts.EngineEvent
-	messages := sc.CompressedView
+	messages := e.memory.CompressedView(sc)
 	if len(messages) > 0 && messages[0].Role == types.MessageRoleSystem {
 		messages = messages[1:]
 	}

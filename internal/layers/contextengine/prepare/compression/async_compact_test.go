@@ -41,6 +41,7 @@ type asyncObserver struct {
 	mu        sync.Mutex
 	complete  int
 	degraded  int
+	failed    int
 	lastToken string
 }
 
@@ -56,6 +57,12 @@ func (o *asyncObserver) OnAutocompactComplete(_ types.Message, _, asyncToken str
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.complete++
+	o.lastToken = asyncToken
+}
+func (o *asyncObserver) OnAutocompactFailed(_ string, _ []types.Message, asyncToken string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.failed++
 	o.lastToken = asyncToken
 }
 

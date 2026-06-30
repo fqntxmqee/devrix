@@ -86,21 +86,12 @@ func TestD7S6A14T04_StateCancels_NilAfterWaveDone(t *testing.T) {
 		t.Fatalf("Wait: %v", err)
 	}
 
-	// Wave completed → state.cancels/handles must be released to avoid
-	// unbounded growth across wave re-entries in long-lived sessions.
+	// Wave completed → state must be removed to avoid unbounded growth across
+	// long-lived scheduler sessions.
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	state, ok := s.waves["sess-a14-t04"]
-	if !ok {
-		t.Fatal("wave state not retained after completion")
-	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if n := len(state.cancels); n != 0 {
-		t.Errorf("state.cancels len = %d after wave done, want 0 (leak)", n)
-	}
-	if n := len(state.handles); n != 0 {
-		t.Errorf("state.handles len = %d after wave done, want 0", n)
+	if _, ok := s.waves["sess-a14-t04"]; ok {
+		t.Fatal("wave state retained after completion")
 	}
 }
 
@@ -126,17 +117,8 @@ func TestD7S6A14T04_StateCancels_NoLeakAcrossWaves(t *testing.T) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	state, ok := s.waves["sess-a14-t04-loop"]
-	if !ok {
-		t.Fatal("wave state not retained after loop completion")
-	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if n := len(state.cancels); n != 0 {
-		t.Errorf("state.cancels len = %d after 5 waves, want 0", n)
-	}
-	if n := len(state.handles); n != 0 {
-		t.Errorf("state.handles len = %d after 5 waves, want 0", n)
+	if _, ok := s.waves["sess-a14-t04-loop"]; ok {
+		t.Fatal("wave state retained after loop completion")
 	}
 }
 
@@ -173,7 +155,7 @@ func TestD7S6A14T05_HotPathUsesAllowAndRegister(t *testing.T) {
 	pool := NewWorkerPool(map[WorkerType]int{WorkerSubAgent: 5})
 	spy := &a14SpyGuard{}
 	resolver := NewContextResolver(ContextResolverDeps{
-		Artifacts:       NewArtifactStore(),
+		Artifacts:        NewArtifactStore(),
 		BaseSystemPrompt: "test",
 	})
 	runners := map[WorkerType]WorkerRunner{

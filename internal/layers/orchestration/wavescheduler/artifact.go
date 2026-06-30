@@ -87,6 +87,21 @@ func (s *ArtifactStore) List() []Artifact {
 	return out
 }
 
+// ListForSession returns a snapshot of artifacts for one session only.
+func (s *ArtifactStore) ListForSession(sessionID string) []Artifact {
+	if s == nil || sessionID == "" {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	m := s.bySess[sessionID]
+	out := make([]Artifact, 0, len(m))
+	for _, a := range m {
+		out = append(out, a)
+	}
+	return out
+}
+
 // putSessionLocked inserts an artifact into the per-session map. Caller holds
 // the write lock.
 func (s *ArtifactStore) putSessionLocked(sessionID string, art Artifact) {

@@ -50,6 +50,12 @@ func (o *tracingStepObserver) OnAutocompactComplete(summaryMsg types.Message, se
 	}
 }
 
+func (o *tracingStepObserver) OnAutocompactFailed(sessionID string, restored []types.Message, asyncToken string) {
+	if o.inner != nil {
+		o.inner.OnAutocompactFailed(sessionID, restored, asyncToken)
+	}
+}
+
 func (o *tracingStepObserver) startSpan(ctx context.Context, operation string, kind tracer.SpanKind, attrs ...tracer.Attribute) (context.Context, tracer.Span) {
 	if o.obsBridge == nil || o.obsBridge.Tracer() == nil {
 		return ctx, nil
