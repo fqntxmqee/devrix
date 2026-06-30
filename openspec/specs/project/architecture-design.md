@@ -1,6 +1,6 @@
 # 架构设计规范
 
-**版本:** 1.2.0
+**版本:** 1.3.0
 **状态:** Active
 **所属阶段:** S2、S3
 **关联规范:** `requirements.md`、`review-design.md`、`../../docs/methodology/dsaft-methodology.md`
@@ -227,40 +227,49 @@ proposal.md、design.md **不得**包含工时估算。理由：
 - **T 归属 A**（4 段）：`D{X}-S{X}-A{XX}-T{XX}` — 契约/E2E 级验证
 - **T 归属 F**（5 段）：`D{X}-S{X}-A{XX}-F{XX}-T{XX}` — 单元/集成级验证
 
-### 6.4 文档规模约束（强制）
+### 6.4 文档规模约束（精简模式 — Lite-Mode）
 
-所有 `openspec/specs/` 下的域文档必须遵循以下规模上限。**超过上限的 PR 在 S3-Gate / S4-Gate 一律阻断**，须先拆分再合入。
+**核心原则**：specs 域文档 = **精简设计契约**（最新符合代码）+ **轻量 changelog**（时间线）。**过程需求迭代**（完整 Gherkin Scenario 历史）**不进入 specs/**，留在 `archive/<change-id>/specs/`。
+
+```
+openspec/specs/<domain>/
+  spec.md         ≤ 200 行   当前符合代码的设计契约（Overview / DSAFT / 关键设计 / 链路口 / 1-2 关键 Scenario 范式）
+  CHANGELOG.md    ≤ 300 行   时间线列表（每个 change 一行 + 一句话摘要 + 链接到 archive/）
+  <其他子文档>    见下表     a-registry.md / t-registry.md / f-registry.md / design.md 等
+```
 
 | 文档 | 软上限（推荐） | 硬上限（强制） | 超限处理 |
 |------|---------------|---------------|----------|
-| `spec.md`（Gherkin 域规） | 600 行 | **800 行** | 按 S 拆分：`spec-s{XX}.md` + 主 `spec.md` 仅含索引 |
+| `spec.md`（精简设计契约） | 150 行 | **200 行** | 删除累积的 Requirement/Scenario 详细文本，移到 archive/；spec.md 只保留 Overview / DSAFT / 关键设计 / 链路口 / 1-2 关键 Scenario 范式 |
+| `CHANGELOG.md`（时间线） | 200 行 | **300 行** | 保留最近 30 天；超期条目精简为一行摘要 + 归档链接 |
 | `design.md`（六段式） | 500 行 | **800 行** | 按 ④领域模型 / ⑤核心链路图 子拆分：引用 `design-{subsection}.md` |
 | `t-registry.md` | 400 行 | **500 行** | 按 A 拆分：`t-registry-a{XX}.md` + 主表 |
 | `a-registry.md` / `f-registry.md` | 400 行 | **600 行** | 按 D 跨域切分到子注册表 |
 | `layer-delta.md` / `d{N}-domain.md` | 300 行 | **500 行** | 按主题拆分为 `*-{topic}.md` |
 | 项目级规范（`specs/project/*.md`） | 200 行 | **300 行** | 拆分为多个子规范文件 |
 
-**拆分原则：**
+**精简模式原则：**
 
-1. **主文档 = 索引 + 跨章节内容**（≤ 200 行）
-2. **子文档 = 单一主题**（按 S / A / 子领域切分）
-3. **引用方式**：`详见 [spec-s08.md](spec-s08.md)`（相对路径，不引外部 URL）
-4. **拆分不破坏 DSAFT ID 体系**（Requirement / Scenario / T 编号全局唯一，跨文件仍可追溯）
-5. **归档时域文档同步**（见 `archiving.md` §2.4）按子文档粒度逐个评估
+1. **spec.md = 当前符合代码的设计契约**——只放 Overview / DSAFT 结构 / 核心设计原则 / 关键链路口 / 1-2 关键 Scenario 范式
+2. **CHANGELOG.md = 时间线摘要**——每个 change 一行（Date / Change ID / 一句话摘要 / 归档链接）
+3. **archive/<change>/specs/ = 过程需求详细文本**——完整 Requirement / Scenario 集合随 change 归档
+4. **检索路径**：读 spec.md（看当前设计）→ 跳 CHANGELOG.md（看时间线）→ 跳 archive/<change>/specs/（看历史）
+5. **写入路径**：change 实现 → 修订 spec.md（如有架构级变更）→ 归档时在 CHANGELOG.md 追加一行
 
 **反模式（禁止）：**
 
-- ❌ 单 `spec.md` 累积所有 S 的 Requirement/Scenario（d7-orchestration 已 2622 行）
-- ❌ 拆分后主文档不维护索引，沦为"挂载页"
-- ❌ 跨文件复制 Requirement 文本（必须引用，复制导致双源不一致）
-- ❌ 用"附录"无限追加大章节（应改为独立子文档）
+- ❌ spec.md 累积所有 Requirement/Scenario（d7-orchestration 已 2622 行，是反模式典型）
+- ❌ 创建 `spec-s{XX}.md` / `spec-{topic}.md` 等子文件（lite-mode 不需要，specs 不接收 Scenario）
+- ❌ 跨文件复制 Requirement 文本到 CHANGELOG.md
+- ❌ 在 spec.md 中保留 IMPLEMENTED 标记的旧 Requirement（已合入代码，需求态转为代码态，spec.md 只放当前契约）
 
 **S3-Gate 检查项**：
 
-- [ ] `specs/d{N}-*/spec.md` ≤ 800 行（硬上限）
+- [ ] `specs/d{N}-*/spec.md` ≤ 200 行（硬上限）
+- [ ] `specs/d{N}-*/CHANGELOG.md` ≤ 300 行（硬上限，不存在则视为"无变更记录"，无需创建）
 - [ ] `specs/d{N}-*/design.md` ≤ 800 行（硬上限）
 - [ ] `specs/d{N}-*/t-registry.md` ≤ 500 行（硬上限）
-- [ ] 主文档含有效索引链接到子文档
+- [ ] `specs/d{N}-*/` 不含 `spec-s{XX}.md` / `spec-cross-cutting.md` 等子文件（lite-mode 模式）
 
 ---
 
