@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 3.5.0
-**Last Updated:** 2026-06-30
+**Last Updated:** 2026-06-30 (devrix-session-conclusion-completeness DM-20260630-011: D1-S16-A72-T01..T05 IMPLEMENTED — summary_quality 4-class fallback to event.Content + EmitEmitCompleteFallback span)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d1-communication/d1-domain.md`
 **Change:** DM-20260614-006 — 切法 A 双轨 / DM-20260628-003 (devrix-d1-dsaft-refactor) — DSAFT 边界 + Gateway 拆分 + contracts DTO + lint-d1-imports CI / **devrix-d1-ac-restructuring (DM-20260629-005) PR-3 god-doc-split pt2 — §T-Without-Span Tracker 迁入 (v3.3.0) / PR-4 #2 registry-sync — 全 74 T 行加 Span Evidence 列 + §Statistics Span Evidence Coverage (v3.4.0) / PR-5 #3 value-flow-rename — a/f/t-registry §ValueFlow Alias (D1_Capture_User_Intent 等 6 alias 同步, v3.5.0) / PR-6 #4 gherkin-restructuring — spec.md 24 缩写 bullet → 90 `#### Scenario:` (v3.5.0 informational) / PR-7 #5 boundary-decision — d7-boundary.md NEW (v3.5.0 informational) / PR-8 S7_Archive ACCEPTED — 6 artifacts + verify-archive 12/12 + S7_Archive (v3.5.0 final)**

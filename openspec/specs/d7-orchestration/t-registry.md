@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 4.17.0
-**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: D7-S16-A74 SUPERSEDED + A75-T01..T04 IMPLEMENTED — Observe LLM D2→D3)
+**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: D7-S16-A74 SUPERSEDED + A75-T01..T04 IMPLEMENTED — Observe LLM D2→D3) / **devrix-session-conclusion-completeness DM-20260630-011: D7-S2-A73-T01/T02 + D7-S2-A74-T01 + D7-S2-A75-T01/T02 + D7-S5-A43-T01/T02/T03 + D7-S12-A41-T04 + D7-S13-A47-T04/T05 IMPLEMENTED — LastTextQualityGate 4-class + Orchestrator EmitMeta summary_quality propagation + typed ClassifierSource enum (eliminate hardcoded "rule") + BuildAdaptivePriorWithReport penalty formula + UncertaintyReport.Partition ObsUncertainty fallback + Verify DetectTaskIncomplete + DetectEmptyConclusion detectors**
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
