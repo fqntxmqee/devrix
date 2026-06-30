@@ -279,8 +279,38 @@ func resolveWorkspacePath(workDir, relPath string) (string, error) {
 		if err != nil || strings.HasPrefix(rel, "..") {
 			return "", fmt.Errorf("path escapes workspace: %s", relPath)
 		}
+		// RH-D2-02 (DM-20260630-013): symlink containment. A symlink inside
+		// the workspace pointing outside it would otherwise let a malicious
+		// or stale link escape. Reject when the resolved realpath falls
+		// outside the (also-resolved) workDir.
+		if escaped, evalErr := pathEscapesViaSymlink(workDir, target); evalErr == nil && escaped {
+			return "", fmt.Errorf("path escapes workspace via symlink: %s", relPath)
+		}
 	}
 	return target, nil
+}
+
+// pathEscapesViaSymlink returns true when target's realpath falls outside
+// workDir's realpath. Missing files are not treated as escapes (they would
+// have failed at the os.* call anyway); only existing symlinks whose chain
+// resolves outside the workspace are flagged. Errors from EvalSymlinks on
+// the target itself are surfaced to the caller via evalErr so it can decide
+// whether to fall back to the original containment check.
+func pathEscapesViaSymlink(workDir, target string) (bool, error) {
+	realWork, err := filepath.EvalSymlinks(workDir)
+	if err != nil {
+		return false, err
+	}
+	realTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		// ENOENT etc.: do not flag as escape; let caller surface the original error.
+		return false, err
+	}
+	rel, err := filepath.Rel(realWork, realTarget)
+	if err != nil {
+		return true, nil
+	}
+	return strings.HasPrefix(rel, ".."), nil
 }
 
 func formatCommandOutput(stdout, stderr string, maxBytes int) string {

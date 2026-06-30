@@ -51,6 +51,13 @@ func (r *editFileRunner) Execute(ctx context.Context, workDir, input string) (*T
 		return &ToolResult{Error: fmt.Sprintf("edit_file: %s", err)}, nil
 	}
 
+	// RH-D2-01 (DM-20260630-013): edit_file must enforce the same plan-mode
+	// write gate as write_file. Without this parity, plan mode could rewrite
+	// non-plan files via targeted edits.
+	if denied := EnforcePlanModeWrite(ctx, target); denied != nil {
+		return denied, nil
+	}
+
 	// Read file
 	data, err := os.ReadFile(target)
 	if err != nil {

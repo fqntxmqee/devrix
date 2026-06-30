@@ -27,10 +27,6 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	if observer == nil {
 		observer = NoOpObserver{}
 	}
-	compObserver := deps.CompressionObserver
-	if compObserver == nil {
-		compObserver = NoOpCompressionObserver{}
-	}
 	counter := token.ResolveCounter(cfg, deps.TokenCounter)
 	store := snapshot.NewStore(&cfg.Snapshot)
 	summarizer := deps.Summarizer
@@ -57,6 +53,15 @@ func NewContextEngine(deps EngineDeps) *ContextEngine {
 	}
 
 	memMgr := memory.NewManager(cfg, store, deps.LongTermRecaller, deps.LongTermStore)
+
+	compObserver := deps.CompressionObserver
+	if compObserver == nil {
+		// RH-D2-03 (DM-20260630-013): default to the production writeback
+		// sink so async autocompact summaries actually replace their
+		// placeholders. The previous NoOp default dropped the summary,
+		// leaving the [compressing ...] placeholder stuck in history.
+		compObserver = NewSessionAutocompactSink(memMgr)
+	}
 	assembler := prompt.NewSystemPromptAssembler(cfg.Workspace)
 
 	return &ContextEngine{
