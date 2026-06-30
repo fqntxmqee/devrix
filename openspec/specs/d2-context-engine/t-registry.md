@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.12.0
-**Last Updated:** 2026-06-30 (devrix-session-conclusion-completeness DM-20260630-011: D2-S16-A73-T01 + A74-T01/T02 IMPLEMENTED — ContextMaterialize span post-call back-fill + EmitMaterializeEmptyYield diagnostic)
+**Version:** 2.13.0
+**Last Updated:** 2026-07-01 (devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 114→129, P0 61→76 — D2 安全硬化 (S18-A80/A81 PlanModeWriteParity + SymlinkContainment) + D2 AutocompactWriteback (S15-A80) + D2 fail-closed (S18-A82/A83/A84/A85 5 surface) + D2 压缩并发 (S15-A81/A82/A83 CompressedView mu + session ctx + microcompact 跳 tool msg) + D2 JSONL 卫生 (S17-A80 strict 模式))
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -16,6 +16,7 @@
 **Change:** 2026-06-20-devrix-context-budget-and-isolation (devrix-context-budget-and-isolation / DM-20260620-001) — Phase A: AC1 tool result size cap (D2-S17-A05 T01-T05) + AC2 assistant fold (D2-S17-A06 T01-T03) + AC4+AC13 per-iter token audit + proactive fold (D2-S15-A08 T01-T05); TruncateToTokens dead-code upgraded to required.
 **Change:** 2026-06-20-devrix-context-budget-and-isolation-phase-b (devrix-context-budget-and-isolation / DM-20260620-001-B) — Phase B: AC11a fork prefix byte-level stability via `BuildForkedMessages` (D2-S15-A08 T06-T08); IMPLEMENTED 109→112, P0 56→59.
 **Change:** 2026-06-20-devrix-context-budget-phase-c-nested (devrix-context-budget-phase-c-nested / DM-20260620-002) — Phase C: nested-branch budget injection via `SubTurnRequest.MaxContextTokens` → `TurnRequest.MaxContextTokens` (D2-S15-A08 T09-T10); IMPLEMENTED 112→114, P0 59→61.
+**Change:** 2026-07-01-devrix-d2-d7-review-hardening (devrix-d2-d7-review-hardening / DM-20260630-013) — D2 安全 + 卫生 + 压缩硬化 5 phase 一次性收口：P0-A1 PlanModeWriteParity (edit_tool.EnforcePlanModeWrite + workspace.ResolveWorkspacePath) (D2-S18-A80-T01/T02) + P0-A2 SymlinkContainment (tool_runner.resolveWorkspacePath EvalSymlinks + realpath ⊆ workDir) (D2-S18-A81-T01/T02) + P0-A3 AutocompactWriteback (sessionAutocompactSink token 替换 placeholder + Degraded 路径保留 middle 或 sync fallback) (D2-S15-A80-T01/T02) + P1-B1 5 fail-closed surface (nil bashAST→Deny / sandbox disabled warn / bashAST parse→Deny / unknown threshold strictest / RedactBashAudit 凭证 redaction) (D2-S18-A82-T01/T02 + A83-T01 + A84-T01 + A85-T01) + P1-B2 compression 3 concurrency fix (memory/manager.SetCompressedView 加 messagesMu + async_compact session-scoped ctx + microcompact 跳 tool msg) (D2-S15-A81-T01 + A82-T01 + A83-T01) + P2-2 JSONL 卫生 (materialize/store.go strict 模式 + LoadAgent 镜像 + truncateForLog) (D2-S17-A80-T01); IMPLEMENTED 114→129, P0 61→76; 24/24 orchestration + contextengine packages go test -race -count=1 PASS; `openspec/archive/2026-07-01-devrix-d2-d7-review-hardening/`.
 
 ---
 
@@ -401,7 +402,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 
 | Total | IMPLEMENTED | PARTIAL | P0 |
 |-------|-------------|---------|-----|
-| 114 | 114 | 0 | 61 |
+| 129 | 129 | 0 | 76 |
 
 > TOOL-SURFACE-1 阶段 1（W1-W9）新增 11 项 P0/P1 测试点（73 - 62 = 11）。
 > TOOL-SURFACE-1 阶段 2（DM-20260617-008 W1-W5）新增 7 项 P0 测试点 T15-T21（80 - 73 = 7），全部 IMPLEMENTED。
@@ -413,6 +414,7 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 > **DM-20260620-001 (devrix-context-budget-and-isolation, Phase A) 新增 13 项 P0 T 点 (109 - 96 = 13)**
 > **DM-20260620-001-B (devrix-context-budget-and-isolation, Phase B) 新增 3 项 P0 T 点 (112 - 109 = 3)：D2-S15-A08-T06/T07/T08 BuildForkedMessages helper 边界**
 > **DM-20260620-002 (devrix-context-budget-phase-c-nested, Phase C) 新增 2 项 P0 T 点 (114 - 112 = 2)：D2-S15-A08-T09/T10 SubTurnRequest / SubQueryParams 透传 MaxContextTokens**
+> **DM-20260630-013 (devrix-d2-d7-review-hardening) 新增 15 项 P0 T 点 (129 - 114 = 15)：D2-S15-A80-T01/T02 AutocompactWriteback + D2-S15-A81/A82/A83-T01 compression 并发 3 fix + D2-S17-A80-T01 JSONL strict + D2-S18-A80-T01/T02 PlanModeWriteParity + D2-S18-A81-T01/T02 SymlinkContainment + D2-S18-A82-T01/T02 5 fail-closed (nil bashAST+sandbox) + D2-S18-A83/A84/A85-T01 fail-closed 3 surface (bashAST parse + unknown threshold + audit)**
 > 全部 IMPLEMENTED。
 
 ---

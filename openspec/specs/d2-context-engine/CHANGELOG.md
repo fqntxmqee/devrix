@@ -15,6 +15,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-07-01 | devrix-d2-d7-review-hardening | D2 安全硬化 (P0-A PlanModeWriteParity + SymlinkContainment + AutocompactWriteback) + D2 fail-closed (P1-B1 5 surface: nil bashAST→Deny / sandbox disabled warn / bashAST parse→Deny / unknown threshold strictest / bash audit redaction) + D2 压缩并发 (P1-B2 memory/manager CompressedView mu 保护 + async_compact session-scoped ctx + microcompact 跳过 tool msg) + D2 JSONL 卫生 (P2 materialize/store.go strict 模式 + LoadAgent 镜像 + truncateForLog); 15 T IMPLEMENTED (D2-S15-A80/A81/A82/A83 + D2-S17-A80 + D2-S18-A80/A81/A82/A83/A84/A85) | IMPLEMENTED | [archive](../../archive/2026-07-01-devrix-d2-d7-review-hardening/) |
 | 2026-06-30 | devrix-d2-spec-lite | d2 spec.md 1622→152 lite-mode (12 AC) | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-d2-spec-lite/) |
 | 2026-06-29 | devrix-d2-dsaft-restructuring | v8.2→v9.0 8 PR / 44 T / 14 G 全 PASS（legacy + god fn + registry + value flow + span + boundary debt） | IMPLEMENTED | [archive](../../archive/2026-06-29-devrix-d2-dsaft-restructuring/) |
 | 2026-06-28 | devrix-d7-layer-subcontext-phase3 | Wave ContextResolver → Materialize Policy 接线 | IMPLEMENTED | [archive](../../archive/2026-06-28-devrix-d7-layer-subcontext-phase3/) |
