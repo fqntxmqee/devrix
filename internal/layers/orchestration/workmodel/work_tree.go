@@ -50,8 +50,24 @@ func (t *WorkTree) EnsureVersionChainRegistry() *VersionChainRegistry {
 }
 
 // SetStore wires optional disk persistence.
-func (t *WorkTree) SetStore(store WorkItemStore) {
+//
+// RH-D2-CC-04 (DM-20260630-013 T-P2-11.3): SetStore previously wrote
+// t.store without holding t.mu, which is a data race if called
+// concurrently with any other method (the rest of the file locks
+// before reading/writing). The contract is still "bootstrap-only":
+// SetStore is expected to fire once at startup before any session
+// exists, and concurrent callers will block briefly on the write
+// lock rather than tearing the store pointer.
+//
+// Returns the previously-installed store (nil if none) for symmetry
+// with the original assignment; the caller can use it to flush
+// pending writes before swap.
+func (t *WorkTree) SetStore(store WorkItemStore) WorkItemStore {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	prev := t.store
 	t.store = store
+	return prev
 }
 
 func (t *WorkTree) ensureSessionLocked(sessionID string) {

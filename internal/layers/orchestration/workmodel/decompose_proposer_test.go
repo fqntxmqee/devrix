@@ -2,6 +2,7 @@ package workmodel
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,24 +10,75 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// Regression: decompose fallback must stay structural — no tactical NL in Go source.
-func TestDefaultDecomposeProposer_NoTacticalHardcoding(t *testing.T) {
-	raw, err := os.ReadFile("decompose_proposer.go")
+// noTacticalHardcodingSources lists every Go source file in the
+// orchestration layer that authors fallback proposers / directive
+// builders. RH-D7-13 (DM-20260630-013 T-P2-11.4) extends the original
+// decompose-only scan to all of these so a tactical hardcoding slipping
+// into a sibling proposer still trips CI. The .cursor rule
+// `orchestration-no-tactical-hardcoding.mdc` covers the same surface
+// conceptually; this test is the executable regression.
+//
+// Paths are relative to the repo root. The repo-root-relative form
+// keeps the test stable across `go test ./...` runs from any cwd
+// because Go tests run with cwd == the package directory; we resolve
+// from cwd upward looking for go.mod.
+func noTacticalHardcodingSources(t *testing.T) []string {
+	t.Helper()
+	root, err := findRepoRoot()
 	if err != nil {
-		t.Fatalf("read source: %v", err)
+		t.Fatalf("find repo root: %v", err)
 	}
-	src := string(raw)
-	for _, forbidden := range []string{
-		"聚焦",
-		"只 read_file",
-		"禁止探索",
-		"P0/P1 清单",
-		"contracts and API surface",
-		"implementation and observability",
-		"hypothesis",
-	} {
-		if strings.Contains(src, forbidden) {
-			t.Fatalf("decompose_proposer.go contains forbidden tactical string %q", forbidden)
+	return []string{
+		filepath.Join(root, "internal/layers/orchestration/workmodel/decompose_proposer.go"),
+		filepath.Join(root, "internal/layers/orchestration/workmodel/context_proposer.go"),
+		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/observation_proposer.go"),
+		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/llm_observation_proposer.go"),
+		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/rollup_directive.go"),
+		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/strategic_plan_proposer.go"),
+	}
+}
+
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for i := 0; i < 16; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", os.ErrNotExist
+}
+
+// Regression: orchestrator fallback paths must stay structural — no
+// tactical NL sneaks into Go source. Original test scanned only
+// decompose_proposer.go; RH-D7-13 (T-P2-11.4) extends to every
+// proposer/directive file in workmodel/ + sessionorchestrator/.
+func TestDefaultDecomposeProposer_NoTacticalHardcoding(t *testing.T) {
+	for _, path := range noTacticalHardcodingSources(t) {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		src := string(raw)
+		for _, forbidden := range []string{
+			"聚焦",
+			"只 read_file",
+			"禁止探索",
+			"P0/P1 清单",
+			"contracts and API surface",
+			"implementation and observability",
+			"hypothesis",
+		} {
+			if strings.Contains(src, forbidden) {
+				t.Fatalf("%s contains forbidden tactical string %q", path, forbidden)
+			}
 		}
 	}
 }

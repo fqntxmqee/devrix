@@ -12,27 +12,6 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-const (
-	strategicPlanAppendixZH = `你是编排 Plan 节点的战略提案助手。仅返回 JSON 对象（不要 markdown）：
-{"execution_mode":"single|decompose|parallel_probe","scope_in":["path/"],"child_specs":[],"deliverable_schema":"p0_p1_file_line|not_applicable","react_iters_hint":5,"rationale":"..."}
-
-规则：
-- 只能使用下方 directive 与 Obs 摘要；不要编造未提供的文件列表。
-- 范围清晰且可一次完成时优先 execution_mode=single。
-- decompose 时 child_specs 每项含 title、directive_suffix、expected_return；最多 2 项。
-- react_iters_hint 范围 1-5。`
-
-	strategicPlanAppendixEN = `You propose strategic execution plans for an orchestration Plan node.
-Return ONLY a JSON object (no markdown):
-{"execution_mode":"single|decompose|parallel_probe","scope_in":["path/"],"child_specs":[],"deliverable_schema":"p0_p1_file_line|not_applicable","react_iters_hint":5,"rationale":"..."}
-
-Rules:
-- Use ONLY the directive and observation summary below; do not invent files.
-- Prefer execution_mode=single when scope is clear and small enough for one pass.
-- For decompose, each child_specs entry needs title, directive_suffix, expected_return; max 2.
-- react_iters_hint between 1 and 5.`
-)
-
 // StrategicPlanInput carries Plan-phase context for LLM strategic proposals.
 type StrategicPlanInput struct {
 	SessionID      string
@@ -52,19 +31,19 @@ type StrategicPlanInput struct {
 }
 
 type rawStrategicChildSpec struct {
-	Title          string `json:"title"`
-	DirectiveSuffix string `json:"directive_suffix"`
-	ExpectedReturn string `json:"expected_return"`
-	ScopeIn        []string `json:"scope_in"`
+	Title           string   `json:"title"`
+	DirectiveSuffix string   `json:"directive_suffix"`
+	ExpectedReturn  string   `json:"expected_return"`
+	ScopeIn         []string `json:"scope_in"`
 }
 
 type rawStrategicPlan struct {
-	ExecutionMode    string                  `json:"execution_mode"`
-	ScopeIn          []string                `json:"scope_in"`
-	ChildSpecs       []rawStrategicChildSpec `json:"child_specs"`
-	DeliverableSchema string                 `json:"deliverable_schema"`
-	ReactItersHint   int                     `json:"react_iters_hint"`
-	Rationale        string                  `json:"rationale"`
+	ExecutionMode     string                  `json:"execution_mode"`
+	ScopeIn           []string                `json:"scope_in"`
+	ChildSpecs        []rawStrategicChildSpec `json:"child_specs"`
+	DeliverableSchema string                  `json:"deliverable_schema"`
+	ReactItersHint    int                     `json:"react_iters_hint"`
+	Rationale         string                  `json:"rationale"`
 }
 
 // StrategicPlanProposal is a validated LLM strategic plan (DM-20260630-012).
@@ -117,7 +96,7 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 		return nil, fmt.Errorf("strategic plan proposer: d2 prepare: %w", err)
 	}
 	systemPrompt := strings.TrimSpace(prepared.SystemPrompt)
-	if appendix := strategicPlanAppendix(p.Locale); appendix != "" {
+	if appendix := i18n.StrategicPlanAppendix(p.Locale); appendix != "" {
 		if systemPrompt != "" {
 			systemPrompt += "\n\n"
 		}
@@ -150,13 +129,6 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 		return nil, budgetErr
 	}
 	return prop, nil
-}
-
-func strategicPlanAppendix(loc i18n.Locale) string {
-	if loc == i18n.LocaleEN {
-		return strategicPlanAppendixEN
-	}
-	return strategicPlanAppendixZH
 }
 
 func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
@@ -206,9 +178,9 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 		return nil, fmt.Errorf("strategic plan: parse json: %w", err)
 	}
 	prop := &StrategicPlanProposal{
-		ExecutionMode: strings.ToLower(strings.TrimSpace(row.ExecutionMode)),
-		ScopeIn:       append([]string(nil), row.ScopeIn...),
-		Rationale:     strings.TrimSpace(row.Rationale),
+		ExecutionMode:  strings.ToLower(strings.TrimSpace(row.ExecutionMode)),
+		ScopeIn:        append([]string(nil), row.ScopeIn...),
+		Rationale:      strings.TrimSpace(row.Rationale),
 		ReactItersHint: clampReactIters(row.ReactItersHint),
 	}
 	prop.DeliverableSchema = mapDeliverableSchema(row.DeliverableSchema, baseDirective)
