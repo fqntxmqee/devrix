@@ -63,11 +63,28 @@ func buildRollupDirective(sessionID string, parent *workmodel.WorkItem, tm *work
 	if body == "" {
 		body = "(no child summaries available)"
 	}
+	// RH-MUPS-06 (DM-20260701-001 T-P2-3): surface any high-uncertainty
+	// child as a separate "UncertainChildren" section so the rollup
+	// synthesizer cannot accidentally drop the signal. Without this
+	// the parent's only view of the child's high uncertainty was the
+	// aggregated mean, and a single high-u child gets washed by
+	// confident siblings.
+	uncertainLines := []string{}
+	if tm != nil && sessionID != "" {
+		for _, ub := range workmodel.CollectChildUncertaintyBubbles(tm, sessionID, parent.ID) {
+			uncertainLines = append(uncertainLines, workmodel.ChildUncertaintyBubbleStatement(ub))
+		}
+	}
 	expected := workmodel.DefaultChildExpectedReturn(parent, itemDirective(parent))
 	var b strings.Builder
 	fmt.Fprintf(&b, "ParentGoal: %s\n", title)
 	fmt.Fprintf(&b, "ChildOutcomes: %d\n", len(childLines))
 	b.WriteString(body)
+	if len(uncertainLines) > 0 {
+		b.WriteByte('\n')
+		fmt.Fprintf(&b, "UncertainChildren: %d\n", len(uncertainLines))
+		b.WriteString(strings.Join(uncertainLines, "\n"))
+	}
 	if len(failedChildLines) > 0 {
 		b.WriteByte('\n')
 		fmt.Fprintf(&b, "FailedSubset: %d\n", len(failedChildLines))

@@ -13,6 +13,23 @@ type ChildDownlink struct {
 }
 
 // DefaultChildDownlink builds a downlink from parent scope and child spec.
+//
+// RH-MUPS-05/09 (DM-20260701-001 T-P2-1): the prior version silently
+// inherited the parent's full ScopeContract whenever spec.ScopeIn was
+// empty. That made a focused child review (e.g. "review only the
+// materialize/ subdir") accidentally end up doing the entire parent
+// review when the LLM forgot to set the spec scope. The post-validate
+// step (ValidateChildScopes, T-P2-2) now enforces proper-subset; this
+// function trusts the spec as the authoritative source.
+//
+// New contract:
+//   - If spec.ScopeIn is set → use it as-is.
+//   - If spec.ScopeIn is empty AND parent has NO ScopeContract →
+//     leave ScopeIn empty (parent is unbounded, child inherits via
+//     Materialize ModeUpstream / ModeInheritCohort).
+//   - If spec.ScopeIn is empty AND parent has a ScopeContract →
+//     leave ScopeIn empty (caller / ValidateChildScopes surfaces this).
+//     The previous silent inheritance was the bug.
 func DefaultChildDownlink(parent *WorkItem, child *WorkItem, spec ChildSpec) ChildDownlink {
 	dl := ChildDownlink{
 		ParentWorkItemID: parent.ID,
@@ -22,14 +39,6 @@ func DefaultChildDownlink(parent *WorkItem, child *WorkItem, spec ChildSpec) Chi
 		ScopeOut:         append([]string(nil), spec.ScopeOut...),
 		ExpectedReturn:   spec.ExpectedReturn,
 		ContextPolicy:    LinkFresh,
-	}
-	if parent != nil && parent.ScopeContract != nil {
-		if len(dl.ScopeIn) == 0 {
-			dl.ScopeIn = append([]string(nil), parent.ScopeContract.InScope...)
-		}
-		if len(dl.ScopeOut) == 0 {
-			dl.ScopeOut = append([]string(nil), parent.ScopeContract.OutOfScope...)
-		}
 	}
 	if dl.ExpectedReturn == "" && spec.Directive != "" {
 		dl.ExpectedReturn = "Deliverable aligned with directive: " + spec.Directive

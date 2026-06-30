@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -12,12 +13,12 @@ import (
 
 const rollupMinSummaryRunes = 500
 
-var rollupPlanningDenylist = []string{
-	"parallel explore",
-	"我将要",
-	"我将",
-	"todo_write",
-}
+// rollupPlanningDenylist is the tactical-hardcoding fix from
+// devrix-mups-deliverable-convergence (RH-MUPS-12, DM-20260701-001
+// T-P1-6). The list now lives in i18n so non-Go surfaces (translator
+// tools, future config) can read the same source. We compute it once
+// at package init and read-only afterwards.
+var rollupPlanningDenylist = i18n.RollupPlanningDenylist()
 
 // verifyRollupArtifact applies R1-V1-C production heuristic for rollup deliverables.
 //
