@@ -67,19 +67,19 @@
 - [x] 6.1 `wire_item_pipeline.go` wire `NewLLMStrategicPlanProposer`
 - [x] 6.2 `wire_item_pipeline_test.go` 断言 wired
 - [x] 6.3 更新 `openspec/specs/d7-orchestration/t-registry.md`
-- [ ] 6.4 change delta spec 合并指引（S6 合入 main 前）
+- [x] 6.4 change delta spec 合并指引（S6 合入 main）
 
 **T:** D7-S16-A76-T01
 
 ### T-P1-4 集成测试
 
 - [x] 7.1 `tests/integration/d7/d7_deliverable_convergence_test.go`
-- [ ] 7.2 场景：review kernel — CI stub LLM 环境手工/集成跑通
+- [ ] 7.2 场景：review kernel — CI stub LLM 环境手工/集成跑通（deferred: staging Jaeger）
 
 **P1 Quality Gate:**
 
 - [x] 关联 T 测试点全部 IMPLEMENTED
-- [ ] Jaeger 手工验收树（design §4）一次通过
+- [ ] Jaeger 手工验收树（design §4）一次通过（deferred: next staging deploy）
 
 ---
 
@@ -95,5 +95,5 @@
 
 - [x] demand.md AC 全部勾选（实现侧）
 - [x] acceptance-report.md 填写
-- [ ] `openspec/specs/d7-orchestration/` delta 合入 SoT（S6 门禁）
-- [ ] demand-archive-index 条目（S7）
+- [x] `openspec/specs/d7-orchestration/` delta 合入 SoT（S6 门禁）
+- [x] demand-archive-index 条目（S7）

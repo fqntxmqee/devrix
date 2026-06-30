@@ -44,8 +44,9 @@ Integration (requires `-tags='integration d7'`): `d7_deliverable_convergence_tes
 ## 领域文档同步清单
 
 - [x] `openspec/specs/d7-orchestration/t-registry.md` — D7-S9-A32, D7-S5-A22, D7-S15-A41, D7-S16-A76, D7-S2-A73-T03/T04
-- [ ] `openspec/specs/d7-orchestration/spec.md` — merge change delta at S6 (pre-merge gate)
-- [ ] `openspec/demand-archive-index.md` — S7 archive entry
+- [x] `openspec/specs/d7-orchestration/spec.md` — v4.20.0 lite-mode 契约 + 范式 2 交付收敛（S6 合入）
+- [x] `openspec/specs/d7-orchestration/CHANGELOG.md` — 时间线条目
+- [x] `openspec/demand-archive-index.md` — S7 archive entry
 
 ## Notes
 

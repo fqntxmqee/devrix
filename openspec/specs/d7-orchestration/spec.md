@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.19.0
+**Version:** 4.20.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-30 (devrix-d7-observe-unified-llm-path DM-20260630-001: SUPERSEDED A74 裸 D3; ADDED A75 Observe LLM via D2 Prepare → 本地化 Obs 附录 → D3)
+**Last Updated:** 2026-06-30 (devrix-mups-deliverable-convergence DM-20260630-012: ADDED A76 StrategicPlanProposer + A32 DeliverableVerifier + Session Deliverable Gate; MODIFIED StatusAfterSpawnNone + DefaultPlanner single override)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Parent Change:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -56,7 +56,7 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | F | F1-F999 | 功能点编排 | 见 `f-registry.md` |
 | T | T1-T200 | 测试点（T01-T180 IMPLEMENTED，T181-T200 PLANNED） | 见 `t-registry.md` |
 
-**当前计数（v4.19.0）**：D=1, S=6, A=22, F=120, T=180（IMPLEMENTED）。Canonical 5 节点 = Observe-A15 / Plan-A22 / Execute-A25/A26 / Verify-A32 / Learn-A36-A40。
+**当前计数（v4.20.0）**：D=1, S=6, A=22, F=120, T=188（IMPLEMENTED）。Canonical 5 节点 = Observe-A15 / Plan-A22 / Execute-A25/A26 / Verify-A32 / Learn-A36-A40。
 
 ---
 
@@ -65,19 +65,19 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | ID | Scenario | Responsibility | Status | 代码位置 |
 |----|----------|----------------|--------|----------|
 | D7-S1 | Work Model | **WorkItem** CRUD、依赖 DAG、磁盘持久化（schema v2）、PlanMode 状态机 | **IMPLEMENTED** | `workmodel/work_tree.go` + `workitem.go` + `sessionorchestrator/workmodel.go` |
-| D7-S2 | Session Orchestrator | ProcessMessage、FastPath、HandleInterrupt、TurnLoop、InvokeLLM、Dispatch | **IMPLEMENTED** | `sessionorchestrator/` |
+| D7-S2 | Session Orchestrator | ProcessMessage、FastPath、TurnLoop、Session Deliverable Gate（ExtractSessionDeliverable + LastTextQualityGate） | **IMPLEMENTED** | `sessionorchestrator/` |
 | D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard | **IMPLEMENTED** | `wavescheduler/` |
 | D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | **IMPLEMENTED** | `executionflow/` |
-| D7-S5 | Decision & Planning | PlanAgent 只读探索（/plan CLI）、规则+LLM 分类、PlanKind 4 类 + DefaultPlanner | **IMPLEMENTED** | `plan/` + `decisionplanning/` |
+| D7-S5 | Decision & Planning | PlanAgent、规则+LLM 分类、PlanKind 4 类 + DefaultPlanner + **StrategicPlanProposer (A76)** | **IMPLEMENTED** | `plan/` + `decisionplanning/` + `sessionorchestrator/strategic_plan_proposer.go` |
 | D7-S6 | Error Aggregation & Metrics | errors.Join 聚合 + InterruptMetrics + 4 新 WaveScheduler metrics 字段 | **IMPLEMENTED** | `sessionorchestrator/{interrupt,metrics}.go` + `wavescheduler/scheduler.go` |
 | D7-S8 | Observation + UncertaintyReport | Observation 4 类 + UncertaintyReport Partition + UncertaintyCoord | **IMPLEMENTED** | `orchtypes/{observation,uncertainty_report,uncertainty_coord}.go` |
-| D7-S9 | Execute Artifact | ArtifactKind 4 类 + SideEffectStatus 5 态 | **IMPLEMENTED** | `shared/types/execute.go` + `wavescheduler/types.go` |
+| D7-S9 | Execute Artifact | ArtifactKind 4 类 + SideEffectStatus 5 态 + **DeliverableVerifier (A32)** schema gate | **IMPLEMENTED** | `shared/types/execute.go` + `sessionorchestrator/deliverable_verify.go` |
 | D7-S11 | Learn Node | LearningAsset 5 类 + ReputationEvidence + Bayesian + 3 通道 Memory + Learner | **IMPLEMENTED** | `learn/` + `shared/types/learning.go` |
 | D7-S12 | Observe-Learner 闭环 | ObserveRequest + IntentQuantizer + AnomalyDetector + buildObserveRequest 3 层 fail-safe | **IMPLEMENTED** | `orchtypes/{observe_request,intent_quantizer,anomaly_detector}.go` |
 | D7-S13 | 5 节点运行时闭环 | processAutoClose + synthesizeVerdict 4 规则 + TrackMode + 6 prior attributes | **IMPLEMENTED** | `sessionorchestrator/{autoclose,tracing,orchestrator}.go` |
 | D7-S14 | MUPS v5 逃逸 | LoopDepthTracker v2 + EscapeEngine 5 节点 + CircuitBreaker 5 层 + ResumeSession | **IMPLEMENTED** | `escape/` |
-| D7-S15 | WorkItem Rollup | Parent Rollup Gate + Root Fallback + Summary/Structured dual bubble | **IMPLEMENTED (Phase 1)** | `workmodel/rollup_gate.go` + `sessionorchestrator/rollup_*` |
-| D7-S16 | Layer SubContext | Per-Layer SubContext + ChildDownlink + Observe LLM D2→D3 (A75) | **IMPLEMENTED (Phase 1+2+3 + A75)** | `wavescheduler/context*.go` + `sessionorchestrator/llm_observation_proposer.go` |
+| D7-S15 | WorkItem Rollup | Parent Rollup Gate + StructuredDeliverable upward bubble + rollup findings merge | **IMPLEMENTED** | `workmodel/rollup_gate.go` + `context_bubble_apply.go` + `sessionorchestrator/rollup_*` |
+| D7-S16 | Layer SubContext | Per-Layer SubContext + ChildDownlink + Observe LLM (A75) + StrategicPlanProposer (A76) | **IMPLEMENTED** | `wavescheduler/context*.go` + `sessionorchestrator/{llm_observation_proposer,strategic_plan_proposer}.go` |
 | D7-S18 | Pessimistic + Fallback | PessimisticCommitGuard 5 类触发 + 4 候选规则 + CoW VersionChain | **IMPLEMENTED (PR-A/B/C)** | `interfaces/contracts.go` + `escape/fallback.go` + `mups/execute/channel.go` |
 | D7-S20 | TaskSpec 下行 | TaskSpec 5 字段 + NewTaskSpec fail-fast + 3 处创建点统一 | **IMPLEMENTED (PR-A 9/11 P0 T)** | `interfaces/task_spec.go` |
 | D7-S21 | TaskReport 上行 | TaskReport 7 字段 + Dissent/Blockage/Resource 语义层 + Learn 沉淀 | **IMPLEMENTED (PR-A 9/11 P0 T)** | `interfaces/task_report.go` + `mups/learn/asset/asset_builder.go` |
@@ -150,7 +150,23 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 - THEN peak running ≤ 5 (cursor=1, claude_code=1, subagent=3)
 - AND slot release triggers immediate re-dispatch (D2 continuous loop)
 
-### 范式 2：Pessimistic Commit L3 防御
+### 范式 2：MUPS 交付收敛（Deliverable Gate + LLM 战略提案）
+
+#### Scenario: Session complete prefers rollup deliverable
+
+- GIVEN Goal rollup `ArtifactSummary` contains P0/P1 review with file:line citations
+- AND the last processed child WorkItem summary is an exploration transition phrase
+- WHEN `RunSessionTurnLoop` terminates
+- THEN `complete.Content` SHALL be the rollup deliverable (via `ExtractSessionDeliverable`)
+- AND NOT the child's transition text
+
+#### Scenario: Partial without deliverable stays open
+
+- GIVEN `VerdictPartial` AND `DeliverableStatus=incomplete` (e.g. `stop_reason=max_iters` without file:line)
+- WHEN `ApplyPipelineRound` + `StatusAfterSpawnNone`
+- THEN `TaskStatus` SHALL remain `InProgress` (not `Completed`)
+
+### 范式 3：Pessimistic Commit L3 防御
 
 #### Scenario: 资源耗尽触发 Pessimistic
 
@@ -165,7 +181,7 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 ## 关键链路口
 
 1. **主入口链**：D1 RouteInbound → D7-S2 ProcessMessage → ClassifyIntent → switch intent → 4 链分发
-2. **5 节点管道链**：Observe (S8/S12) → Plan (S5/S22) → Execute (S9/S25/S26) → Verify (S10/A32-A35) → Learn (S11/S36-S40)
+2. **5 节点管道链**：Observe (S8/S12/A75) → Plan (S5/A22/A76 StrategicPlan) → Execute (S9/S25/S26) → Verify (S9/A32 DeliverableVerifier + S10) → Learn (S11/S36-S40)
 3. **D7-D1 反馈链**：D7-S4 Hub.Publish → WorkPlan.Apply → SessionQueue → imsink.GatewaySink (飞书卡片)
 4. **跨域消费**：D2 Prepare (V10/V11) → D3 LLM Gateway → D4 Delegate.Service → D5 Span Evidence
 5. **Escape 链**：Observe/Plan/Execute/Verify 任一节点失败 → EscapeEngine.Evaluate → ChainedArbitrator (LLM/Rule/Human) → Action 6 类
