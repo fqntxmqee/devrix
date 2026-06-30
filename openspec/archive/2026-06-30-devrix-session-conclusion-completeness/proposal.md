@@ -18,6 +18,37 @@
 
 完整排查过程：`/Users/fukai/brain/02知识沉淀/永久笔记/项目/devrix-sess_1782814140202_7000-排查分析.md`
 
+### 1.1 Follow-up Hotfix (2026-06-30 22:38, c155e2da)
+
+用户重测 sess_1782826968112_7000 同样指令 → 飞书卡片仍展示 82 字符 transitional 短语
+"Now let me look at the cross-package contracts referenced from the kernel package."
+
+**根因升级**：上一次修复（B + D）的 `summary_quality` 路径能识别 summary 是 transitional，
+但 D1 fallback 链回退到 `event.Content` 时，`event.Content` 本身也是同一段 LLM 中途截断的
+过渡文本（LLM 在 tool_call 序列中间被打断，stream 最后的 text 是 "Now let me..."）。fallback
+span 正确发出（D1_EmitComplete_Fallback span 触发并被 WARN 标 unknown operation），
+但用户看到的还是 82 chars 的垃圾。
+
+**Hotfix 改动**（无新增 AC，无架构变化，仅在原 DM-20260630-011 scope 内修复 fallback 链）：
+
+1. **D7 turn_recovery.go emitComplete** 新增 `finalQuality` 入参（`ClassifyLastTextQuality(resolvedFinal)`），
+   把 fallback Content 的质量信号写到 `meta["final_quality"]`。
+2. **D1 conclusion.EmitComplete** 当 `summary_quality ∈ {too_short, inconclusive}` AND
+   `final_quality ∈ {too_short, inconclusive}` → 用 `TaskIncompleteMessage`
+   （"（任务未能完成，AI 未产生有效结论。请重新发起。）"）替代 fallback Content；
+   metadata 打 `task_incomplete=true` 给 dashboard 告警。
+3. **三处遗漏的 span 注册**（comm/contextengine/orchestration 三域 spans.go）补齐，
+   移除 `observability: unknown operation` WARN noise。
+4. `LayerAndComponent` 增加 `D7_LastText_Quality_Gate` 路由 → orchestration/orchestrator。
+5. `registry_test.go` expected list 同步 +3 ops，coverage 87 → 90。
+
+**测试**：2 个新 P0 regression 测试 + 5 个既有测试 1:1 保持 PASS，22 orchestration + 23
+communication packages `-race` PASS，`lint-d1-imports.sh` PASS（D1↔orchestration boundary
+守住），`coverage.AllOperations()` 测试 PASS。
+
+未走完整 S1-S6（hotfix 路径，per `feedback-devrix-bugfix-skip-openspec.md` 用户明确偏好的
+bug-fix 流程），用户飞书验收后再决定是否后续补 archive delta。
+
 ## 2. Problem Statement
 
 ### 2.1 当前失败链路（4 类独立 silent failure 联动）
