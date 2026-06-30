@@ -58,6 +58,11 @@ func (o *DefaultOrchestrator) finalizeLoop(
 	// We apply the same MaxTurns notice as resolvedFinal so the brief and
 	// full paths agree on loop-bound signalling.
 	resolvedSummary := resolveFinalText(st.lastTurnText, st.lastThinkingTail.String(), st.exitReason, req.MaxTurns)
+	// DM-20260630-011 (devrix-session-conclusion-completeness) AC1:
+	// classify the resolved summary BEFORE emit so D7 propagates
+	// summary_quality to D1 IM adapters. Emit always (even on valid kind)
+	// so dashboards can filter by "interesting" via != valid.
+	summaryQuality := EmitLastTextQuality(ctx, req.SessionID, resolvedSummary, string(st.exitReason))
 	if err := st.persister.PersistTurn(ctx, PersistRequest{
 		SessionID: req.SessionID,
 		Messages:  st.messages,
@@ -73,7 +78,7 @@ func (o *DefaultOrchestrator) finalizeLoop(
 	}
 	endSpan(persistSpan)
 	o.emitComplete(out, req.SessionID, start, st.totalUsage, st.lastPromptTokens, st.model, st.maxContextTokens,
-		resolvedFinal, resolvedSummary, st.exitReason)
+		resolvedFinal, resolvedSummary, summaryQuality.Kind, st.exitReason)
 }
 
 // resolveFinalText promotes the most recent accumulated thinking into
@@ -189,6 +194,10 @@ func (o *DefaultOrchestrator) observeFallbackTrigger(err error) {
 // surfaced on meta["summary"] for IM "任务总结" cards; finalText is the
 // full multi-turn transcript on Content.
 //
+// summaryQuality (DM-20260630-011) drives meta["summary_quality"] so D1
+// IM adapters can render explicit "任务结论不完整" UI when the LLM last
+// text was too_short / inconclusive, instead of showing the raw artifact.
+//
 // usageTokenTotal helper (defined in turn_invoke.go) is reused across the
 // package.
 func (o *DefaultOrchestrator) emitComplete(
@@ -201,6 +210,7 @@ func (o *DefaultOrchestrator) emitComplete(
 	maxContextTokens int,
 	finalText string,
 	summary string,
+	summaryQuality SummaryQualityKind,
 	exitReason verify.ExitReason,
 ) {
 	if model == "" {
@@ -229,6 +239,12 @@ func (o *DefaultOrchestrator) emitComplete(
 	if summary != "" {
 		meta["summary"] = summary
 	}
+	// DM-20260630-011 AC1: surface summary_quality so D1 EmitComplete can
+	// decide whether to fall back to Content / stats (when too_short /
+	// inconclusive) or just keep the summary (when valid / thin). Always
+	// emitted (even when valid) so dashboards / D6 Evolution have a stable
+	// Jaeger filter dimension across sessions.
+	meta["summary_quality"] = string(summaryQuality)
 	// Surface the last LLM-generated text on the complete event so IM adapters
 	// (Feishu cardkit streaming finalize, CLI plain stdout) can render the
 	// conclusion even when no interleaved text chunks were emitted (e.g. LLM

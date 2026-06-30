@@ -71,11 +71,29 @@ func NewUncertaintyReport(sessionID string, observations []Observation) (Uncerta
 	return r, nil
 }
 
+// obsUncertaintyAnomalyThreshold — DM-20260630-011.
+//
+// ObsUncertainty observations with strength ≥ this threshold (and
+// Category=CatSystem) are surfaced as anomalies so downstream
+// DetectTaskIncomplete / DetectEmptyConclusion detectors can fire.
+// Set to 0.7 (not a magic threshold; corresponds to the LLM classifier
+// confidence band documented in design.md §① AC4).
+const obsUncertaintyAnomalyThreshold = 0.7
+
 // Partition splits Observations into BusinessObservations and
 // SystemObservations based on Category. It also extracts Anomalies
-// (CatSystem + ObsDeviation) into a separate slice. Returns an error if
-// the partition invariant is violated (defensive — should never fire
-// with well-formed inputs).
+// (CatSystem + ObsDeviation, OR CatSystem + ObsUncertainty with strength
+// ≥ obsUncertaintyAnomalyThreshold) into a separate slice. Returns an
+// error if the partition invariant is violated (defensive — should never
+// fire with well-formed inputs).
+//
+// DM-20260630-011 (devrix-session-conclusion-completeness) — ObsUncertainty
+// 兜底: prior implementation only surfaced ObsDeviation as anomalies.
+// LLM-driven uncertainty signals (e.g. "task may not be a real review"
+// or "no concrete findings produced") were silently dropped, blocking
+// the DetectTaskIncomplete detector (executionflow/verify/anomaly.go).
+// The 0.7 strength threshold matches the rule-based detector at the
+// same layer so downstream consumers see a consistent noise floor.
 func (r *UncertaintyReport) Partition() error {
 	r.BusinessObservations = r.BusinessObservations[:0]
 	r.SystemObservations = r.SystemObservations[:0]
@@ -85,6 +103,12 @@ func (r *UncertaintyReport) Partition() error {
 		case CatSystem:
 			r.SystemObservations = append(r.SystemObservations, o)
 			if o.Kind == ObsDeviation {
+				r.Anomalies = append(r.Anomalies, o)
+			} else if o.Kind == ObsUncertainty && o.Strength >= obsUncertaintyAnomalyThreshold {
+				// DM-20260630-011 AC4: surface high-strength system
+				// uncertainty signals as anomalies. Defensive guard
+				// prevents non-CatSystem obs from entering via the
+				// wrong branch (shouldn't happen given the case label).
 				r.Anomalies = append(r.Anomalies, o)
 			}
 		case CatBusiness:

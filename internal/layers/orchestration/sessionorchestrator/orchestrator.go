@@ -385,16 +385,23 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	// Classify. When prior is nil or zero-mean, ClassifyWithPrior
 	// degenerates to the baseline Classify behavior.
 	intent, err = o.classifier.ClassifyWithPrior(ctx, req.Message, prior)
-	// Phase 7 PR-7.3 (D7-S13-A49-T06): mirror classifier_source onto the
-	// sessionSpan for D5 observability. Rule classifier is the only source.
+	// DM-20260630-011 AC5: classifier_source is read from intent.Source
+	// (typed ClassifierSource enum) instead of the prior hardcoded
+	// "rule" value. Rule classifier is currently the only registered
+	// path, but SourceLLM / SourceHybrid are reserved for the v6.1
+	// LLM classifier promotion so observability distinguishes paths.
+	classifierSource := string(intent.Source)
+	if classifierSource == "" {
+		classifierSource = string(orchtypes.SourceRule)
+	}
 	if sessionSpan != nil {
 		sessionSpan.SetAttributes(
-			tracer.Attribute{Key: "learn.classifier_source", Value: "rule"},
+			tracer.Attribute{Key: "learn.classifier_source", Value: classifierSource},
 		)
 	}
 	if classifySpan != nil {
 		classifySpan.SetAttributes(telemetry.SpanAttrs(telemetry.OpD7_S2_Orchestration_Intent_Classify,
-			intentClassifyAttrs(intent, "rule")...)...)
+			intentClassifyAttrs(intent)...)...)
 		if err != nil {
 			classifySpan.RecordError(err)
 			classifySpan.SetStatus(tracer.StatusCodeError, err.Error())

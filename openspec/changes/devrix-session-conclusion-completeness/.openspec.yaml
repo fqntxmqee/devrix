@@ -1,0 +1,17 @@
+change_id: devrix-session-conclusion-completeness
+priority: P0
+demand_id: DM-20260630-011
+status: s1_proposal
+domains: [D1, D2, D7]
+dsaft_scenarios:
+  - D1-S16
+  - D2-S16
+  - D7-S2
+  - D7-S4
+  - D7-S12
+  - D7-S13
+dsaft_activities: []
+t_points: []
+version_scope: {}
+metrics_definitions: []
+span_naming: []

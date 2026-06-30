@@ -48,6 +48,21 @@ const (
 	// AnomalyKindVerifierAbstainLoop — reserved for v6.1 verifier
 	// abstention-loop detectors.
 	AnomalyKindVerifierAbstain AnomalyKind = "verifier_abstain_loop"
+
+	// AnomalyKindTaskIncomplete — DM-20260630-011.
+	// Triggers when the LLM Observe node emitted ≥ 2 high-strength
+	// (≥ 0.7) ObsUncertainty observations under CatSystem, indicating
+	// the agent is uncertain whether the task has been completed
+	// correctly. Detector: DetectTaskIncomplete (anomaly_kind_incomplete.go).
+	AnomalyKindTaskIncomplete AnomalyKind = "task_incomplete"
+
+	// AnomalyKindEmptyConclusion — DM-20260630-011.
+	// Triggers when the LLM's last-turn text contains template/repeat
+	// markers (scope_contract, directive_template, task_recap, planning),
+	// indicating a planning/recap artifact was produced instead of real
+	// review findings. Detector: DetectEmptyConclusion
+	// (anomaly_kind_incomplete.go).
+	AnomalyKindEmptyConclusion AnomalyKind = "empty_conclusion"
 )
 
 // Severity bands the anomaly detection by how concentrated the
