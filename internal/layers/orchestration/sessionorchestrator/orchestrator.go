@@ -428,7 +428,15 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 	}
 
 	if o.taskManager != nil && req.SessionID != "" && strings.TrimSpace(req.Message) != "" && intent.Kind != orchtypes.IntentSkip {
-		_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, req.Message)
+		// RH-D7-03 (DM-20260630-013): EnsureGoal error must not be silently swallowed.
+		// A non-fatal seed failure means the worktree lacks a root goal for this turn —
+		// downstream decompose/rollup will operate on stale or empty state.
+		// Surface via structured warn so the failure is observable in Jaeger / logs
+		// without aborting the turn (the message still flows through to the LLM).
+		if _, gerr := o.taskManager.Tree().EnsureGoal(req.SessionID, req.Message); gerr != nil {
+			slog.Warn("orchestrator: EnsureGoal seed failed; worktree may lack root goal for this turn",
+				"session_id", req.SessionID, "err", gerr)
+		}
 		// DM-20260628-003 (D7-S15): enrich directive with prior-output-summary
 		// so turn N+1's LLM sees turn N's finalText. Read failures are
 		// non-fatal — a missing transcript just means fresh session / no
@@ -441,7 +449,10 @@ func (o *SessionOrchestrator) ProcessMessage(ctx context.Context, req orchtypes.
 			} else if len(texts) > 0 {
 				summary := o.transcriptReader.BuildPriorOutputSummary(texts)
 				enriched := summary + "\n\n" + req.Message
-				_, _ = o.taskManager.Tree().EnsureGoal(req.SessionID, enriched)
+				if _, gerr := o.taskManager.Tree().EnsureGoal(req.SessionID, enriched); gerr != nil {
+					slog.Warn("orchestrator: EnsureGoal enriched seed failed; turn will use raw message",
+						"session_id", req.SessionID, "err", gerr)
+				}
 			}
 		}
 	}

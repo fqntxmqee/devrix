@@ -3,6 +3,7 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -187,7 +188,16 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 
 			if stats := runningChildCount(o.taskManager, sessionID, focus.ID); stats > 0 {
-				_ = awaiter.AwaitRunningChildren(ctx, sessionID)
+				// RH-D7-04 (DM-20260630-013): AwaitRunningChildren returns a
+				// summary string of the just-completed children. Previously
+				// dropped via `_`, which made the await-into-continue
+				// path invisible to both the user and the trace. Surface
+				// the summary via slog (and the resolve event) so the loop
+				// restart is observable in Jaeger.
+				if summary := awaiter.AwaitRunningChildren(ctx, sessionID); summary != "" {
+					slog.Info("session_turn_loop: running children resolved before next focus",
+						"session_id", sessionID, "work_item_id", focus.ID, "summary_len", len(summary))
+				}
 				continue
 			}
 

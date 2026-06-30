@@ -80,7 +80,8 @@ func TestTurnState_BeginTurn_DoubleBlocks_ReturnsInProgress(t *testing.T) {
 }
 
 // TestTurnState_BeginTurn_AfterEnd_AdvancesTurnNo verifies that after
-// EndTurn, BeginTurn succeeds and TurnNo advances to 2.
+// EndTurn, BeginTurn succeeds and TurnNo returns to 1 (handle is purged
+// post-End per RH-D7-07 DM-20260630-013 to bound map growth).
 func TestTurnState_BeginTurn_AfterEnd_AdvancesTurnNo(t *testing.T) {
 	ts := NewTurnState()
 	if err := ts.BeginTurn("sess_adv"); err != nil {
@@ -91,10 +92,37 @@ func TestTurnState_BeginTurn_AfterEnd_AdvancesTurnNo(t *testing.T) {
 	if err := ts.BeginTurn("sess_adv"); err != nil {
 		t.Fatalf("BeginTurn #2 (after End): %v", err)
 	}
-	if got := ts.TurnNo("sess_adv"); got != 2 {
-		t.Errorf("TurnNo after BeginTurn #2 = %d, want 2", got)
+	// RH-D7-07: EndTurn purges the handle, so the next BeginTurn starts a
+	// fresh counter at 1 (no prev handle to advance from). This is the
+	// trade-off for bounding long-lived map growth — turn identity is
+	// tracked at the session layer (TranscriptReader / log scope) rather
+	// than by an in-process counter that survives End.
+	if got := ts.TurnNo("sess_adv"); got != 1 {
+		t.Errorf("TurnNo after BeginTurn #2 = %d, want 1 (handle purged on End)", got)
 	}
 	ts.EndTurn("sess_adv")
+}
+
+// TestTurnState_EndTurn_PurgesHandle_MapBounded is the regression test
+// for the unbounded-growth bug (RH-D7-07 DM-20260630-013). With the
+// pre-fix code, 1000 BeginTurn/EndTurn cycles for distinct sessions
+// would leave 1000 stale entries in handles. Post-fix, the map stays
+// empty after each End.
+func TestTurnState_EndTurn_PurgesHandle_MapBounded(t *testing.T) {
+	ts := NewTurnState()
+	for i := 0; i < 1000; i++ {
+		sid := "sess_purge_" + strings.Repeat("x", 0) + string(rune('a'+i%26)) + string(rune('A'+(i/26)%26))
+		if err := ts.BeginTurn(sid); err != nil {
+			t.Fatalf("BeginTurn #%d: %v", i, err)
+		}
+		ts.EndTurn(sid)
+	}
+	ts.mu.RLock()
+	n := len(ts.handles)
+	ts.mu.RUnlock()
+	if n != 0 {
+		t.Errorf("handles map size after 1000 Begin/End cycles = %d, want 0 (unbounded growth regression)", n)
+	}
 }
 
 // TestTurnState_BeginTurn_AfterEnd_StaleSlotReplaced verifies the cleanup
