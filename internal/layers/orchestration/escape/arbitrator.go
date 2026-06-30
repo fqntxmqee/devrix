@@ -591,9 +591,19 @@ func (a *HumanArbitrator) waitForUserResponse(ctx context.Context, pendingID str
 			CreatedAt:  nowFunc(),
 		}
 		// Overwrite the user-facing card (UI consistency, design §5.3.3).
+		// RH-D7-09 (DM-20260630-013 T-P1-5): the prior `_ =` swallowed
+		// SubmitOverrideCard errors, so a feishu api failure on the
+		// disconnect path left the user staring at the original "需要您
+		// 决策" card with no visible signal that the session was force-
+		// exited. Now we slog.Warn so the failure is visible in Jaeger
+		// and the orchestrator can decide whether to retry on the next
+		// wave.
 		if a.notifier != nil {
 			if override, ok := a.notifier.(OverrideCardNotifier); ok {
-				_ = override.SubmitOverrideCard(context.Background(), pendingID, "已强制退出（客户端断开）", nil)
+				if oerr := override.SubmitOverrideCard(context.Background(), pendingID, "已强制退出（客户端断开）", nil); oerr != nil {
+					slog.Warn("arbitrator: ctx_cancelled override card update failed; user may see stale card",
+						"session_id", loopCtx.SessionID, "pending_id", pendingID, "err", oerr)
+				}
 			}
 		}
 	}

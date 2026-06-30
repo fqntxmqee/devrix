@@ -146,6 +146,19 @@ func (c *ExplorationChannel) Execute(ctx context.Context, p *plan.Plan, req Chan
 		results = append(results, r)
 	}
 
+	// RH-D7-09 (DM-20260630-013 T-P1-A3-8.2): same ctx-cancel check as
+	// scenario.go. Without it, an upstream cancel (turn abort) would
+	// surface as a noisy "all N explorations failed" when the real cause
+	// is just that the parent session decided to bail.
+	if err := ctx.Err(); err != nil {
+		art.EndedAt = time.Now()
+		art.Duration = art.EndedAt.Sub(art.StartedAt)
+		art.ExitCode = 1
+		art.SideEffectStatus = types.SideEffectUnknown
+		art.Error = fmt.Sprintf("exploration_channel: ctx cancelled (%v)", err)
+		return art, NewChannelCtxCancelledError(c.Name(), err)
+	}
+
 	art.EndedAt = time.Now()
 	art.Duration = art.EndedAt.Sub(art.StartedAt)
 

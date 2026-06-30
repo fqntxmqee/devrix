@@ -65,6 +65,16 @@ var (
 	// inflight side effects to StrategyAskNow (PR-C3) without confusing
 	// them with malformed-Plan errors.
 	ErrChannelToolCallTimedOut = errors.New("execute: tool call timed out")
+
+	// ErrChannelCtxCancelled: the channel's outer ctx was cancelled while
+	// the channel was running. Distinct from ErrChannelToolCallTimedOut
+	// (channel-internal deadline) so callers can route upstream cancellation
+	// (e.g. turn cancel / parent abort) differently from inner timeouts.
+	// RH-D7-09 (DM-20260630-013 T-P1-A3-8.2): previously scenario +
+	// exploration would wait for every probe to finish even after the
+	// outer ctx was cancelled, hiding the cancellation behind a misleading
+	// "majority failed" result.
+	ErrChannelCtxCancelled = errors.New("execute: ctx cancelled during channel run")
 )
 
 // -----------------------------------------------------------------------------
@@ -128,5 +138,17 @@ func NewChannelToolCallTimedOutError(channelName, toolName string) *sharederrors
 		"EXEC_CHANNEL_9006",
 		fmt.Sprintf("execute: channel=%s tool=%s call timed out (side-effect status uncertain)", channelName, toolName),
 		fmt.Errorf("%w: channel=%s tool=%s", ErrChannelToolCallTimedOut, channelName, toolName),
+	)
+}
+
+// NewChannelCtxCancelledError returns a SentinelError when the channel's
+// outer ctx was cancelled mid-run. Callers can route this to
+// StrategyCancel (turn abort) rather than StrategyAskNow (inflight
+// side-effect query). ctxErr is the underlying context error.
+func NewChannelCtxCancelledError(channelName string, ctxErr error) *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"EXEC_CHANNEL_9007",
+		fmt.Sprintf("execute: channel=%s ctx cancelled mid-run: %v", channelName, ctxErr),
+		fmt.Errorf("%w: channel=%s: %w", ErrChannelCtxCancelled, channelName, ctxErr),
 	)
 }
