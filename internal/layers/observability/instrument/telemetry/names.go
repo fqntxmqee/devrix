@@ -272,10 +272,13 @@ func LayerAndComponent(operation string) (layer, component string) {
 	case strings.HasPrefix(operation, "D7_Resume_Decision_Path"),
 		strings.HasPrefix(operation, "D7_AdaptivePrior_Inject"),
 		strings.HasPrefix(operation, "D7_Anomaly_Trigger"),
-		strings.HasPrefix(operation, "D7_LongTerm_Reputation_Update"):
-		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T35). Long-running
-		// reputation learning, anomaly triggers, prior injection and resume
-		// decision paths all live in the orchestrator component.
+		strings.HasPrefix(operation, "D7_LongTerm_Reputation_Update"),
+		strings.HasPrefix(operation, "D7_LastText_Quality_Gate"):
+		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T35) +
+		// DM-20260630-011 lasttext.quality_gate. Long-running reputation
+		// learning, anomaly triggers, prior injection, resume decision
+		// paths and last-text structural quality all live in the
+		// orchestrator component (D7-S2 finalizeLoop).
 		return LayerOrchestration, "orchestrator"
 
 	case strings.HasPrefix(operation, "D7_Feishu_Card_Render"):

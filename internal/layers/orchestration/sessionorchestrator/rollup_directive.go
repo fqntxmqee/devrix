@@ -42,15 +42,21 @@ func buildRollupDirective(sessionID string, parent *workmodel.WorkItem, tm *work
 			childLines = append(childLines, formatRollupChildLine(b.ChildID, checklistVerdict(b.Item), directive))
 		}
 	}
-	n := len(childLines)
 	body := strings.Join(childLines, "\n")
 	if body == "" {
-		body = "(no child summaries available — synthesize from parent goal and observations)"
+		body = "(no child summaries available)"
 	}
-	return fmt.Sprintf(
-		"你是父 WorkItem「%s」的汇总者。以下 %d 个子任务已结束。\n\n【子任务摘要】\n%s\n\n请输出最终交付物：\n1. Executive Summary\n2. P0 / P1 / P2 问题清单（每条含：位置、现象、建议）\n3. 未覆盖范围与建议下一步\n\n不要输出规划过程或「我将要 parallel explore」类 meta 文本。",
-		title, n, body,
-	)
+	expected := workmodel.DefaultChildExpectedReturn(parent, itemDirective(parent))
+	var b strings.Builder
+	fmt.Fprintf(&b, "ParentGoal: %s\n", title)
+	fmt.Fprintf(&b, "ChildOutcomes: %d\n", len(childLines))
+	b.WriteString(body)
+	if expected != "" {
+		b.WriteByte('\n')
+		b.WriteString("ExpectedReturn: ")
+		b.WriteString(expected)
+	}
+	return b.String()
 }
 
 func formatRollupChildLine(childID string, verdict types.VerdictKind, text string) string {

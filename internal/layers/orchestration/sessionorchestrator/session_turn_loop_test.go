@@ -179,7 +179,7 @@ func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	}
 
 	children := tm.Tree().ListChildren(sessionID, goal.ID)
-	if len(children) < 2 {
+	if len(children) < 1 {
 		t.Fatalf("expected decomposed children, got %d", len(children))
 	}
 	for _, c := range children {

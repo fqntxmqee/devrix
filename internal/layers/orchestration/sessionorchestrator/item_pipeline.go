@@ -3,6 +3,7 @@ package sessionorchestrator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
@@ -29,6 +30,7 @@ type ItemPipelineRunner struct {
 	TrackMode       string
 	ContextProposer      workmodel.ContextProposer
 	ObservationProposer  ObservationProposer
+	StrategicPlanProposer StrategicPlanProposer
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Replaces the prior Router/Channel/tool-pipeline path.
 	Executor WorkItemExecutor
@@ -61,6 +63,7 @@ type ItemPipelineDeps struct {
 	Executor WorkItemExecutor
 	// ObservationProposer optional @ Observe; production uses D2 Prepare → D3 (DM-20260630-001).
 	ObservationProposer ObservationProposer
+	StrategicPlanProposer StrategicPlanProposer
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -81,13 +84,14 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		classifier = decisionplanning.NewRuleClassifier(nil)
 	}
 	return &ItemPipelineRunner{
-		Classifier:          classifier,
-		Planner:             planner,
-		Learner:             deps.Learner,
-		Tasks:               deps.Tasks,
-		TrackMode:           deps.TrackMode,
-		Executor:            deps.Executor,
-		ObservationProposer: deps.ObservationProposer,
+		Classifier:            classifier,
+		Planner:               planner,
+		Learner:               deps.Learner,
+		Tasks:                 deps.Tasks,
+		TrackMode:             deps.TrackMode,
+		Executor:              deps.Executor,
+		ObservationProposer:   deps.ObservationProposer,
+		StrategicPlanProposer: deps.StrategicPlanProposer,
 	}, nil
 }
 
@@ -163,7 +167,35 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
+	var strategic *StrategicPlanProposal
+	if r.StrategicPlanProposer != nil && !isRollup {
+		intentKind := ""
+		if report.QuantizedIntent != nil {
+			intentKind = string(report.QuantizedIntent.Kind)
+		}
+		prop, propErr := r.StrategicPlanProposer.ProposeStrategicPlan(ctx, StrategicPlanInput{
+			SessionID:      sessionID,
+			WorkItemID:     item.ID,
+			Directive:      directive,
+			ObservationIDs: obsIDs,
+			ReportSummary:  uncertaintyReportSummary(len(report.Anomalies), intentKind),
+		})
+		if propErr == nil && prop != nil {
+			strategic = prop
+			applyStrategicScope(sessionID, item, prop, r.Tasks)
+		}
+	}
+
+	expectedReturn := workmodel.ExpectedReturnForItem(r.Tasks, sessionID, item)
+	deliverableSchema := workmodel.InferDeliverableSchema(item, directive, expectedReturn)
+	if strategic != nil && strategic.DeliverableSchema != "" {
+		deliverableSchema = strategic.DeliverableSchema
+	}
+
 	qKind := planQuantizedKind(item, report)
+	if strategic != nil && strings.TrimSpace(strategic.QuantizedKind) != "" {
+		qKind = strategic.QuantizedKind
+	}
 	planInput := plan.PlanInput{
 		SessionID:      sessionID,
 		ObservationIDs: obsIDs,
@@ -211,7 +243,16 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	_, endWave := hardening.EmitExecutorSelect(ctx, sessionID, 1, "workitem", "0", "item_pipeline")
 	endWave(nil)
 	_, endExecute := hardening.EmitChannelRoute(ctx, sessionID, "item", "workitem", "0", "")
-	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{Item: item, Tasks: r.Tasks})
+	maxItersOverride := 0
+	if strategic != nil && strategic.ReactItersHint > 0 {
+		maxItersOverride = strategic.ReactItersHint
+	}
+	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
+		Item:              item,
+		Tasks:             r.Tasks,
+		MaxItersOverride:  maxItersOverride,
+		DeliverableSchema: deliverableSchema,
+	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
 	if execErr != nil {
@@ -237,11 +278,18 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end(nil)
 	}
 
-	verdict := verifyArtifactForWorkItem(art, item, pl)
+	var verdict workmodel.Verdict
+	var deliverableResult DeliverableVerifyResult
 	if isRollup {
 		verdict = verifyRollupArtifact(art)
+		deliverableResult = DeliverableVerifyResult{Status: workmodel.DeliverableStatusNotApplicable}
 	} else if r.Verify != nil {
 		verdict = r.Verify(art)
+		deliverableResult = VerifyDeliverable(deliverableSchema, art)
+	} else {
+		out := verifyArtifactForWorkItemWithSchema(art, item, pl, deliverableSchema)
+		verdict = out.Verdict
+		deliverableResult = out.Deliverable
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
 	{
@@ -340,8 +388,21 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		LearningClass:     learningClass,
 		UncertaintyMean:   uncertaintyMean,
 		VerdictConfidence: verdict.Confidence,
+		DeliverableSchema: deliverableSchema,
 		StartedAt:         started,
 		CompletedAt:       time.Now(),
+	}
+	if !isRollup {
+		round.DeliverableStatus = deliverableResult.Status
+		round.StructuredDeliverable = deliverableResult.Payload
+	}
+	if strategic != nil {
+		if s := strings.TrimSpace(strategic.Rationale); s != "" {
+			round.SpawnRationale = s
+		}
+		if len(strategic.ChildSpecs) > 0 {
+			round.ChildSpecs = append([]workmodel.ChildSpec(nil), strategic.ChildSpecs...)
+		}
 	}
 
 	treeCtx := workmodel.DefaultTreeEvalContext(sessionID, item.ID, userID, r.Tasks)
@@ -380,7 +441,16 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	if round.SpawnPolicy == workmodel.SpawnNone {
-		status := workmodel.StatusAfterSpawnNone(verdict.Kind)
+		schemaForStatus := deliverableSchema
+		deliverableStatus := deliverableResult.Status
+		if r.Verify != nil && !isRollup {
+			schemaForStatus = workmodel.DeliverableSchemaNotApplicable
+		}
+		if isRollup {
+			schemaForStatus = workmodel.DeliverableSchemaNotApplicable
+			deliverableStatus = workmodel.DeliverableStatusNotApplicable
+		}
+		status := workmodel.StatusAfterSpawnNone(verdict.Kind, schemaForStatus, deliverableStatus)
 		if isRollup && verdict.Kind != types.VerdictPass {
 			status = workmodel.TaskStatusInProgress
 		}

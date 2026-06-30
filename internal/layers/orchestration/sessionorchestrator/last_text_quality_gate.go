@@ -75,6 +75,14 @@ var lastTextQualityMarkers = []string{
 	"<directive_template>",
 	"<task_recap>",
 	"<planning>",
+	"let me continue",
+	"let me read",
+	"let me explore",
+	"i'll examine",
+	"i will examine",
+	"继续探索",
+	"继续查看",
+	"继续阅读",
 }
 
 // LastTextQualityResult is the output of ClassifyLastTextQuality. The

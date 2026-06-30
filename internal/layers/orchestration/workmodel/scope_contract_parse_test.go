@@ -1,7 +1,6 @@
 package workmodel
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -52,11 +51,5 @@ func TestSetScopeContract_Persists(t *testing.T) {
 	got, _ := tm.GetWorkItem("s1", goal.ID)
 	if got.ScopeContract == nil || got.ScopeContract.GoalStatement != "g" {
 		t.Fatalf("scope not persisted: %+v", got.ScopeContract)
-	}
-}
-
-func TestGoalScopeContractPlanHint_Present(t *testing.T) {
-	if !strings.Contains(GoalScopeContractPlanHint, "<scope_contract>") {
-		t.Fatal("plan hint must include scope_contract block")
 	}
 }

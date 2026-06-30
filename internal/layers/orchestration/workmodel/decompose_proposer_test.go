@@ -1,12 +1,35 @@
 package workmodel
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/shared/types"
 )
+
+// Regression: decompose fallback must stay structural — no tactical NL in Go source.
+func TestDefaultDecomposeProposer_NoTacticalHardcoding(t *testing.T) {
+	raw, err := os.ReadFile("decompose_proposer.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	src := string(raw)
+	for _, forbidden := range []string{
+		"聚焦",
+		"只 read_file",
+		"禁止探索",
+		"P0/P1 清单",
+		"contracts and API surface",
+		"implementation and observability",
+		"hypothesis",
+	} {
+		if strings.Contains(src, forbidden) {
+			t.Fatalf("decompose_proposer.go contains forbidden tactical string %q", forbidden)
+		}
+	}
+}
 
 func TestDefaultDecomposeProposer_NoHypothesisLabels(t *testing.T) {
 	item := &WorkItem{
@@ -15,16 +38,17 @@ func TestDefaultDecomposeProposer_NoHypothesisLabels(t *testing.T) {
 	}
 	round := &WorkItemPipelineRound{PlanKind: plan.ExplorationPlan}
 	specs := DefaultDecomposeProposer(item, round)
-	if len(specs) < 2 {
-		t.Fatalf("specs = %d, want >= 2", len(specs))
+	if len(specs) != 1 {
+		t.Fatalf("specs = %d, want 1 pass-through without scope paths", len(specs))
 	}
-	for _, s := range specs {
-		if strings.Contains(strings.ToLower(s.Directive), "hypothesis") {
-			t.Fatalf("directive must not use hypothesis labels: %q", s.Directive)
-		}
-		if s.ExpectedReturn == "" {
-			t.Fatal("expected_return required")
-		}
+	if specs[0].Directive != item.Directive {
+		t.Fatalf("directive = %q, want pass-through %q", specs[0].Directive, item.Directive)
+	}
+	if specs[0].ExpectedReturn == "" {
+		t.Fatal("expected_return required")
+	}
+	if !strings.Contains(specs[0].ExpectedReturn, "deliverable_schema") {
+		t.Fatalf("expected machine schema tag, got %q", specs[0].ExpectedReturn)
 	}
 }
 
@@ -45,8 +69,13 @@ func TestDefaultDecomposeProposer_SplitsScopePaths(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("specs = %d, want 2 scope slices", len(specs))
 	}
-	if len(specs[0].ScopeIn) == 0 {
-		t.Fatal("expected scope_in on child spec")
+	for _, s := range specs {
+		if len(s.ScopeIn) == 0 {
+			t.Fatal("expected scope_in on child spec")
+		}
+		if s.Directive != item.Directive {
+			t.Fatalf("directive mutated tactically: %q", s.Directive)
+		}
 	}
 }
 

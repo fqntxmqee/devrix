@@ -29,6 +29,13 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D2_Context_Queue_Drain", Layer: "context", Component: "context_engine", SinceVersion: "2.2.0", Instrumented: true},
 		{Name: "D2_Context_Memory_Snapshot_Save", Layer: "context", Component: "context_engine", SinceVersion: "2.0.0", Instrumented: true},
 
+		// D2-S16 context.materialize.empty_yield (P1, DM-20260630-011).
+		// Emitted when Materializer returns 0 messages AND 0 token estimate for
+		// a WorkItem partition. Sibling to D2_Context_Materialize so Jaeger
+		// shows the empty-yield condition separately from the regular
+		// materialize span (which records the start-time 0/0 attrs).
+		{Name: "D2_Context_Materialize_EmptyYield", Layer: "context", Component: "context_engine", SinceVersion: "3.2.0", Instrumented: true},
+
 		// D2 Context Engine - Tool Execution (D2-S5)
 		{Name: "D2_Tool_Execute_Single", Layer: "context", Component: "tool_runner", SinceVersion: "2.1.0", Instrumented: true},
 		{Name: "D2_Context_Harness_SystemPrompt_Build", Layer: "context", Component: "harness", SinceVersion: "2.2.0", Instrumented: true},

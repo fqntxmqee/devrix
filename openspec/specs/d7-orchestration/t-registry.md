@@ -1131,3 +1131,23 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 **D7-S20/S21 Total:** 11 P0 T (9 单元/集成 + 2 spec 文档) — **9/11 IMPLEMENTED** (T01-T09 代码 100% PASS, T10+T11 spec 同步本表 + 5 spec 文件完成) | **0 函数签名变化** (pure additive 嵌入) | **24/24 orchestration packages -race PASS 0 FAIL** | **interfaces 包 coverage 95%** | **race-clean** | **5 ORCH_* SentinelError (7100-7104)**
 
 **验收结论（FULL）：** Span 注册 + root span + 目录结构治理一次到位；d2-domain v8.5.0 → v9.0.0；spec v4.9.0→v4.10.0；D7 v6.0.x 维护阶段收尾。
+
+---
+
+## D7-S5/S9/S15/S16: MUPS Deliverable Convergence (DM-20260630-012)
+
+> **Change:** `devrix-mups-deliverable-convergence` — DeliverableVerifier + LLM StrategicPlanProposer + Session complete gate.
+
+| T ID | 描述 | Test 位置 | Status | Priority |
+|------|------|-----------|--------|----------|
+| **D7-S9-A32-T01** | VerifyDeliverable p0_p1_file_line | `sessionorchestrator/deliverable_verify_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S9-A32-T02** | StatusAfterSpawnNone incomplete → InProgress | `workmodel/pipeline_apply_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S5-A22-T01** | LLMStrategicPlanProposer parse/validate | `sessionorchestrator/strategic_plan_proposer_test.go` | **IMPLEMENTED** | P1 |
+| **D7-S5-A22-T02** | ItemPipeline + bootstrap wire proposer | `bootstrap/wire_item_pipeline_test.go` | **IMPLEMENTED** | P1 |
+| **D7-S15-A41-T02** | StructuredDeliverable bubble + rollup signals | `workmodel/context_bubble_apply.go` | **IMPLEMENTED** | P1 |
+| **D7-S16-A76-T01** | Wire NewLLMStrategicPlanProposer | `bootstrap/wire_item_pipeline_test.go` | **IMPLEMENTED** | P1 |
+| **D7-S2-A73-T03** | Session complete rollup + quality meta | `sessionorchestrator/session_complete_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A73-T04** | Transition markers + TaskIncompleteMessage | `sessionorchestrator/session_complete_test.go` | **IMPLEMENTED** | P0 |
+
+Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `integration && d7`).
+

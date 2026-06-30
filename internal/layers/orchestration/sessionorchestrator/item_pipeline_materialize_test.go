@@ -148,20 +148,21 @@ func TestRunItemPipeline_ScopeContractOpenQuestionsAllowsDecompose(t *testing.T)
 	}
 }
 
-func TestRunItemPipeline_GoalPlanIncludesScopeTemplate(t *testing.T) {
+func TestRunItemPipeline_GoalPlan_DirectiveUnmodified(t *testing.T) {
 	tm := workmodel.NewTaskManager()
 	exec := &capturingWorkItemExecutor{}
 	runner, err := NewItemPipelineRunner(ItemPipelineDeps{Executor: exec, Tasks: tm})
 	if err != nil {
 		t.Fatalf("NewItemPipelineRunner: %v", err)
 	}
-	goal, _ := tm.EnsureGoal("s1", "explore architecture")
+	const base = "explore architecture"
+	goal, _ := tm.EnsureGoal("s1", base)
 	_, _ = runner.Run(context.Background(), "s1", goal, "")
 	if len(exec.calls) == 0 {
 		t.Fatal("no execute call")
 	}
-	if !strings.Contains(exec.calls[0].Directive, "<scope_contract>") {
-		t.Fatalf("Goal first round directive missing scope template: %q", exec.calls[0].Directive)
+	if exec.calls[0].Directive != base {
+		t.Fatalf("Goal directive must not be mutated with tactical appendix: %q", exec.calls[0].Directive)
 	}
 }
 

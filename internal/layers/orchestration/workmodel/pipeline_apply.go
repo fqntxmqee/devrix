@@ -36,7 +36,20 @@ func (t *WorkTree) SetRoundPhase(sessionID, itemID string, phase RoundPhase) err
 }
 
 // StatusAfterSpawnNone maps a terminal VerdictKind to TaskStatus when spawn is none.
-func StatusAfterSpawnNone(kind types.VerdictKind) TaskStatus {
+// When schema is applicable, Partial/Pass without a complete deliverable stays InProgress
+// so inline retry or rollup can converge (DM-20260630-012).
+func StatusAfterSpawnNone(kind types.VerdictKind, schema DeliverableSchema, deliverable DeliverableStatus) TaskStatus {
+	if schema != DeliverableSchemaNotApplicable && schema != "" &&
+		deliverable != DeliverableStatusNotApplicable {
+		if deliverable != DeliverableStatusComplete {
+			switch kind {
+			case types.VerdictFail:
+				return TaskStatusFailed
+			default:
+				return TaskStatusInProgress
+			}
+		}
+	}
 	switch kind {
 	case types.VerdictPass, types.VerdictPartial:
 		return TaskStatusCompleted

@@ -85,16 +85,32 @@ func verifyArtifact(art *wavescheduler.Artifact) workmodel.Verdict {
 // verifyArtifactForWorkItem applies pipeline-aware checks so autonomous rounds
 // do not Pass on user-gate or scope-only output (which would block decompose).
 func verifyArtifactForWorkItem(art *wavescheduler.Artifact, item *workmodel.WorkItem, pl *plan.Plan) workmodel.Verdict {
+	return verifyArtifactForWorkItemWithSchema(art, item, pl, workmodel.DeliverableSchemaNotApplicable).Verdict
+}
+
+// WorkItemVerifyOutcome bundles verdict with deliverable verification (DM-20260630-012).
+type WorkItemVerifyOutcome struct {
+	Verdict           workmodel.Verdict
+	Deliverable       DeliverableVerifyResult
+	DeliverableSchema workmodel.DeliverableSchema
+}
+
+func verifyArtifactForWorkItemWithSchema(
+	art *wavescheduler.Artifact,
+	item *workmodel.WorkItem,
+	pl *plan.Plan,
+	schema workmodel.DeliverableSchema,
+) WorkItemVerifyOutcome {
 	v := verifyArtifact(art)
 	if art == nil {
-		return v
+		return WorkItemVerifyOutcome{Verdict: v, DeliverableSchema: schema}
 	}
 	id := art.TaskID
 	if id == "" {
 		id = "artifact_unknown"
 	}
 	if artifactAwaitingUserGate(art) {
-		return workmodel.Verdict{
+		v = workmodel.Verdict{
 			Kind:       types.VerdictPartial,
 			Reason:     "interactive user gate not allowed in pipeline execute",
 			SourceID:   id,
@@ -103,7 +119,7 @@ func verifyArtifactForWorkItem(art *wavescheduler.Artifact, item *workmodel.Work
 	}
 	if item != nil && workmodel.CanDecompose(item.Kind) && pl != nil && pl.Kind == plan.ExplorationPlan {
 		if isScopeOnlyDeliverable(art, item) {
-			return workmodel.Verdict{
+			v = workmodel.Verdict{
 				Kind:       types.VerdictPartial,
 				Reason:     "scope contract emitted without deliverable; decompose required",
 				SourceID:   id,
@@ -111,7 +127,31 @@ func verifyArtifactForWorkItem(art *wavescheduler.Artifact, item *workmodel.Work
 			}
 		}
 	}
-	return v
+	deliverable := VerifyDeliverable(schema, art)
+	if schema != workmodel.DeliverableSchemaNotApplicable && schema != "" {
+		if deliverable.Status == workmodel.DeliverableStatusIncomplete {
+			if v.Kind == types.VerdictPass {
+				v = workmodel.Verdict{
+					Kind:       types.VerdictPartial,
+					Reason:     deliverableReason(deliverable),
+					SourceID:   id,
+					Confidence: 0.65,
+				}
+			}
+		}
+	}
+	return WorkItemVerifyOutcome{
+		Verdict:           v,
+		Deliverable:       deliverable,
+		DeliverableSchema: schema,
+	}
+}
+
+func deliverableReason(r DeliverableVerifyResult) string {
+	if r.Reason != "" {
+		return r.Reason
+	}
+	return "deliverable schema not satisfied"
 }
 
 func artifactAwaitingUserGate(art *wavescheduler.Artifact) bool {

@@ -220,15 +220,8 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 		}
 
-		// Prefer the current turn's per-round summary over the session-root
-		// deliverable (see comment on lastArtifactSummary above).
-		completeContent := lastArtifactSummary
-		if completeContent == "" {
-			completeContent = workmodel.ExtractSessionDeliverable(o.taskManager, sessionID)
-		}
-		emit(ctx, o.sink, out, &contracts.EngineEvent{
-			Type: "complete", Content: completeContent, SessionID: sessionID,
-		})
+		// Prefer rollup deliverable + quality gate (DM-20260630-012).
+		emit(ctx, o.sink, out, buildSessionCompleteEvent(ctx, sessionID, o.taskManager, lastArtifactSummary))
 	}()
 
 	return out, nil

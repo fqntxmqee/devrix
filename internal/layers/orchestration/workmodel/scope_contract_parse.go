@@ -8,15 +8,6 @@ import (
 
 var scopeContractBlockRE = regexp.MustCompile(`(?s)<scope_contract>(.*?)</scope_contract>`)
 
-// GoalScopeContractPlanHint is appended to Goal directives at Plan (D7-S16-A60-T02).
-const GoalScopeContractPlanHint = `
-
-Before decomposition, emit a scope contract block:
-<scope_contract>
-{"goal_statement":"...","in_scope":["..."],"out_of_scope":["..."],"assumptions":[],"open_questions":[],"success_criteria":["..."]}
-</scope_contract>
-Resolve ambiguity in assumptions[] (not open_questions[]). Pipeline execute must NOT call ask_user_question — unresolved scope becomes child work via decomposition after this round.`
-
 // ParseScopeContractBlock extracts JSON ScopeContract from Execute output.
 func ParseScopeContractBlock(content string) (*ScopeContract, bool) {
 	m := scopeContractBlockRE.FindStringSubmatch(content)
@@ -46,7 +37,6 @@ func ResolveGoalScopeContract(item *WorkItem, directive, executeContent string) 
 		return &ScopeContract{
 			GoalStatement: strings.TrimSpace(directive),
 			InScope:       paths,
-			SuccessCriteria: []string{"Changes limited to inferred paths"},
 		}
 	}
 	if qs := parseOpenQuestionsBlock(executeContent); len(qs) > 0 {

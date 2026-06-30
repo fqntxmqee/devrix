@@ -81,7 +81,10 @@ func TestItemPipeline_GoalMaxItersSpawnsDecompose(t *testing.T) {
 		t.Fatalf("ApplySpawnPolicy: %v", err)
 	}
 	children := tm.Tree().ListChildren("s1", goal.ID)
-	if len(children) < 2 {
-		t.Fatalf("children = %d, want >= 2 after decompose", len(children))
+	if len(children) < 1 {
+		t.Fatalf("children = %d, want >= 1 after decompose", len(children))
+	}
+	if children[0].Directive != goal.Directive {
+		t.Fatalf("child directive should pass through parent: %q", children[0].Directive)
 	}
 }

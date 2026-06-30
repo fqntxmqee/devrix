@@ -48,6 +48,8 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD1_S14_Signal_ChainIntegrity,
 		telemetry.OpD1_S15_Signal_TaskWorkProof,
 		telemetry.OpD1_S16_UserFeedback_ConclusionRejected,
+		// D1-S16 emit.complete.fallback (DM-20260630-011).
+		telemetry.OpD1_S16_EmitComplete_Fallback,
 
 		// D1 Communication - Adapter (D1-S17)
 		telemetry.OpD1_S17_Adapter_Message_Receive,
@@ -72,6 +74,8 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD2_S2_Context_Attachments_Collect,
 		telemetry.OpD2_S2_Context_Queue_Drain,
 		telemetry.OpD2_S2_Context_Memory_Snapshot_Save,
+		// D2-S16 context.materialize.empty_yield (DM-20260630-011).
+		telemetry.OpD2_S16_Context_Materialize_EmptyYield,
 
 		// D2 Context Engine - Tool Execution (D2-S5)
 		telemetry.OpD2_S5_Tool_Execute_Single,
@@ -140,6 +144,8 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 		telemetry.OpD7_S4_Anomaly_Trigger,
 		telemetry.OpD7_S6_LongTerm_Reputation_Update,
 		telemetry.OpD7_Feishu_Card_Render,
+		// D7-S2 lasttext.quality_gate (DM-20260630-011).
+		telemetry.OpD7_S2_LastText_Quality_Gate,
 
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,

@@ -1,25 +1,18 @@
 package sessionorchestrator
 
 import (
-	"strings"
-
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
-// DirectiveForGoalPlan returns the Execute directive for Goal WorkItems, including
-// the scope contract template on the first pipeline round (D7-S16-A60-T02).
+// DirectiveForGoalPlan returns the Execute directive for Goal WorkItems unchanged.
+// Scope/deliverable output shapes live in D2 Materialize format hints — not injected
+// as tactical prose on the user directive (DM-20260630-012 hygiene).
 func DirectiveForGoalPlan(item *workmodel.WorkItem, baseDirective string) string {
 	if item == nil || item.Kind != workmodel.WorkKindGoal {
 		return baseDirective
 	}
-	if item.LastRound != nil {
-		return baseDirective
-	}
-	if strings.Contains(baseDirective, "<scope_contract>") {
-		return baseDirective
-	}
-	return baseDirective + workmodel.GoalScopeContractPlanHint
+	return baseDirective
 }
 
 // planQuantizedKind selects the Planner MatchKind input for a WorkItem.
