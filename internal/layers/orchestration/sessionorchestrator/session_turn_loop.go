@@ -136,6 +136,36 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				if _, triggered := workmodel.MaybeRootRollupFallback(sessionID, o.taskManager); triggered {
 					continue
 				}
+				// RH-MUPS-03 (DM-20260701-001): before exiting silently,
+				// surface any rollup parent that exhausted retries as a
+				// human_review event. Without this, the session loop would
+				// break with the rollup parent still InProgress and the user
+				// sees no signal at all.
+				if item, reason := findExhaustedRollupParent(sessionID, o.taskManager); item != nil {
+					msg := fmt.Sprintf("Rollup verification failed after retry limit: %s — human review required for work item %s", reason, item.ID)
+					emit(ctx, o.sink, out, &contracts.EngineEvent{
+						Type:      "human_review",
+						Content:   item.Directive,
+						SessionID: sessionID,
+					})
+					emit(ctx, o.sink, out, &contracts.EngineEvent{
+						Type:      "error",
+						Content:   msg,
+						SessionID: sessionID,
+						Metadata:  map[string]string{"work_item_id": item.ID, "reason": "rollup_retries_exhausted"},
+					})
+					emit(ctx, o.sink, out, &contracts.EngineEvent{
+						Type:      "text",
+						Content:   msg,
+						SessionID: sessionID,
+					})
+					emit(ctx, o.sink, out, &contracts.EngineEvent{
+						Type:      "complete",
+						Content:   msg,
+						SessionID: sessionID,
+					})
+					return
+				}
 				break
 			}
 
@@ -244,4 +274,41 @@ func runningChildCount(tm *workmodel.TaskManager, sessionID, parentID string) in
 		}
 	}
 	return n
+}
+
+// findExhaustedRollupParent returns the first rollup WorkItem in the session
+// whose LastRound.RollupRetries reached DefaultMaxRollupRetries and whose
+// status is still non-terminal. The session loop calls this immediately
+// before exiting with focus==nil so unresolved rollups surface as a
+// human_review event instead of disappearing silently (RH-MUPS-03).
+//
+// Returns (item, reason) — reason is the prior round's verdict reason when
+// available, else a default "rollup retries exhausted". The session loop
+// surfaces reason verbatim in the emitted error event so users can see why
+// the rollup could not converge.
+func findExhaustedRollupParent(sessionID string, tm *workmodel.TaskManager) (*workmodel.WorkItem, string) {
+	if tm == nil {
+		return nil, ""
+	}
+	items := tm.Tree().List(sessionID)
+	for _, item := range items {
+		if item == nil || !item.NeedsRollup {
+			continue
+		}
+		if workmodel.IsTerminalStatus(item.Status) {
+			continue
+		}
+		if item.LastRound == nil {
+			continue
+		}
+		if item.LastRound.RollupRetries < workmodel.DefaultMaxRollupRetries {
+			continue
+		}
+		reason := "rollup retries exhausted"
+		if r := item.LastRound.VerdictKind; r != 0 {
+			reason = fmt.Sprintf("rollup retries exhausted (last verdict=%s)", r)
+		}
+		return item, reason
+	}
+	return nil, ""
 }

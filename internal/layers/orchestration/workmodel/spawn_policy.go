@@ -29,6 +29,9 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 	if ctx.MaxIndeterminateRetries <= 0 {
 		ctx.MaxIndeterminateRetries = DefaultMaxIndeterminateRetries
 	}
+	if ctx.MaxRollupRetries <= 0 {
+		ctx.MaxRollupRetries = DefaultMaxRollupRetries
+	}
 
 	// R0
 	if ctx.RunningChildren > 0 {
@@ -50,7 +53,13 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 
 	case types.VerdictPartial:
 		// R5 — rollup synthesis retries inline until verifyRollup passes.
+		// RH-MUPS-03 (DM-20260701-001): after MaxRollupRetries consecutive
+		// non-Pass rollup rounds escalate to human review rather than
+		// silently looping until the session loop max=16 backstops us.
 		if ctx.RollupRound {
+			if ctx.RollupRetries >= ctx.MaxRollupRetries {
+				return SpawnEscalateHuman
+			}
 			return SpawnInline
 		}
 		// Exploratory partial on decomposable parents (Goal/Plan/Implement)
@@ -67,7 +76,11 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		return SpawnNone
 
 	case types.VerdictFail:
+		// RH-MUPS-03 (DM-20260701-001): same termination guard as R5.
 		if ctx.RollupRound {
+			if ctx.RollupRetries >= ctx.MaxRollupRetries {
+				return SpawnEscalateHuman
+			}
 			return SpawnInline
 		}
 		// R6
@@ -84,7 +97,11 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		return SpawnNone
 
 	case types.VerdictIndeterminate:
+		// RH-MUPS-03 (DM-20260701-001): same termination guard as R5/R6.
 		if ctx.RollupRound {
+			if ctx.RollupRetries >= ctx.MaxRollupRetries {
+				return SpawnEscalateHuman
+			}
 			return SpawnInline
 		}
 		// R7 — exploratory plans decompose when verifier abstains (uncertainty path),
@@ -122,10 +139,16 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		if ctx.Depth >= ctx.MaxDepth {
 			return fmt.Sprintf("R1: depth %d >= max %d", ctx.Depth, ctx.MaxDepth)
 		}
+		if ctx.RollupRound {
+			return fmt.Sprintf("R5/R6/R7-rollup: retry %d/%d", ctx.RollupRetries, ctx.MaxRollupRetries)
+		}
 		return fmt.Sprintf("R7: indeterminate retry %d/%d", ctx.IndeterminateRetries, ctx.MaxIndeterminateRetries)
 	case SpawnEscalateHuman:
 		if ctx.DailyLimitExceeded {
 			return "R2: daily decompose limit exceeded"
+		}
+		if ctx.RollupRound {
+			return fmt.Sprintf("rollup retries exhausted (%d/%d)", ctx.RollupRetries, ctx.MaxRollupRetries)
 		}
 		return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
 	case SpawnDecompose:

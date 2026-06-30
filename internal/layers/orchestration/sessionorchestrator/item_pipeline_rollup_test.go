@@ -27,7 +27,7 @@ func TestVerifyRollupArtifact_Pass(t *testing.T) {
 		Summary:  validRollupSummary(),
 		ExitCode: 0,
 	}
-	v := verifyRollupArtifact(art)
+	v := verifyRollupArtifact(art, workmodel.ChildOutcomeStats{Total: 3, Completed: 3})
 	if v.Kind != types.VerdictPass {
 		t.Fatalf("kind=%v reason=%s", v.Kind, v.Reason)
 	}
@@ -39,7 +39,7 @@ func TestVerifyRollupArtifact_TooShort(t *testing.T) {
 		Summary:  "P0: short P1: short",
 		ExitCode: 0,
 	}
-	v := verifyRollupArtifact(art)
+	v := verifyRollupArtifact(art, workmodel.ChildOutcomeStats{Total: 3, Completed: 3})
 	if v.Kind != types.VerdictFail {
 		t.Fatalf("kind=%v, want fail", v.Kind)
 	}
@@ -51,9 +51,82 @@ func TestVerifyRollupArtifact_PlanningDenylist(t *testing.T) {
 		Summary:  validRollupSummary() + "\n我将要 parallel explore",
 		ExitCode: 0,
 	}
-	v := verifyRollupArtifact(art)
+	v := verifyRollupArtifact(art, workmodel.ChildOutcomeStats{Total: 3, Completed: 3})
 	if v.Kind != types.VerdictFail {
 		t.Fatalf("kind=%v, want fail for planning meta", v.Kind)
+	}
+}
+
+// T: D7-S15-A90-T01 (DM-20260701-001 RH-MUPS-04 RollupOutcomeAggregation)
+//
+// All children failed → rollup MUST refuse Pass even if the synthesized
+// summary is well-formed. Without this guard, the failure is washed into
+// apparent success and the parent gets marked Completed.
+func TestVerifyRollupArtifact_AllChildrenFailed_RefusesPass(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_parent",
+		Summary:  validRollupSummary(),
+		ExitCode: 0,
+	}
+	stats := workmodel.ChildOutcomeStats{Total: 3, Failed: 3}
+	v := verifyRollupArtifact(art, stats)
+	if v.Kind != types.VerdictFail {
+		t.Fatalf("all-failed rollup: kind=%v reason=%s, want fail", v.Kind, v.Reason)
+	}
+	if !strings.Contains(v.Reason, "3") {
+		t.Errorf("reason should mention failed count, got %q", v.Reason)
+	}
+}
+
+// T: D7-S15-A90-T02 (DM-20260701-001 RH-MUPS-04 RollupOutcomeAggregation)
+//
+// Some failed + some still running → Partial (premature rollup).
+func TestVerifyRollupArtifact_FailedAndRunning_Partial(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_parent",
+		Summary:  validRollupSummary(),
+		ExitCode: 0,
+	}
+	stats := workmodel.ChildOutcomeStats{Total: 4, Completed: 1, Failed: 2, Running: 1}
+	v := verifyRollupArtifact(art, stats)
+	if v.Kind != types.VerdictPartial {
+		t.Fatalf("failed+running: kind=%v reason=%s, want partial", v.Kind, v.Reason)
+	}
+}
+
+// T: D7-S15-A90-T03 (DM-20260701-001 RH-MUPS-04 RollupOutcomeAggregation)
+//
+// Some failed + some completed (no running) → still Pass. The failure
+// info is in the artifact summary; we don't refuse Pass here because at
+// least some children succeeded and the rollup synthesizes a partial-
+// success picture. (The aggregate-gate refusal is for all-failed only.)
+func TestVerifyRollupArtifact_MixedFailure_Passes(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_parent",
+		Summary:  validRollupSummary(),
+		ExitCode: 0,
+	}
+	stats := workmodel.ChildOutcomeStats{Total: 4, Completed: 2, Failed: 2}
+	v := verifyRollupArtifact(art, stats)
+	if v.Kind != types.VerdictPass {
+		t.Fatalf("mixed failure: kind=%v reason=%s, want pass", v.Kind, v.Reason)
+	}
+}
+
+// T: D7-S15-A90-T04 (DM-20260701-001 RH-MUPS-04 RollupOutcomeAggregation)
+//
+// Zero children (empty stats) → behaviour matches legacy: rollup verify
+// runs on summary shape alone. Tests the "rollup with no children" path
+// used by the root-rollup fallback.
+func TestVerifyRollupArtifact_NoChildren_LegacyShapeCheck(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_parent",
+		Summary:  validRollupSummary(),
+		ExitCode: 0,
+	}
+	v := verifyRollupArtifact(art, workmodel.ChildOutcomeStats{})
+	if v.Kind != types.VerdictPass {
+		t.Fatalf("no-children rollup: kind=%v reason=%s, want pass (legacy shape check)", v.Kind, v.Reason)
 	}
 }
 

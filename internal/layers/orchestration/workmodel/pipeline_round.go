@@ -37,6 +37,18 @@ const (
 // DefaultMaxIndeterminateRetries matches MVE MaxRetries (OQ-4).
 const DefaultMaxIndeterminateRetries = 3
 
+// DefaultMaxRollupRetries caps how many consecutive non-Pass rollup rounds
+// a WorkItem may run before SpawnPolicyEvaluator forces a SpawnEscalateHuman.
+//
+// RH-MUPS-03 (DM-20260701-001): before this constant the rollup branch in
+// SpawnPolicyEvaluator returned SpawnInline unconditionally on any non-Pass
+// verdict. After MaxRollupRetries failed inline rounds the session loop's
+// own max=16 became the only termination backstop, and it would exit
+// silently with the parent still InProgress — the loop's "no more focus"
+// break hid the unresolved rollup. With this constant the rollup path has
+// a real termination guarantee: escalate to human review.
+const DefaultMaxRollupRetries = 3
+
 // WorkItemPipelineRound is the typed signal bundle for one WorkItem pipeline
 // iteration. Parent spawn decisions MUST read this struct (goal G2).
 //
@@ -62,6 +74,11 @@ type WorkItemPipelineRound struct {
 	VerdictConfidence float64         `json:"verdict_confidence,omitempty"`
 	IndeterminateReason string        `json:"indeterminate_reason,omitempty"`
 	IndeterminateRetries int          `json:"indeterminate_retries,omitempty"`
+	// RollupRetries counts consecutive non-Pass rollup rounds on this
+	// WorkItem. SpawnPolicyEvaluator reads the previous round's counter via
+	// TreeEvalContext.RollupRetries and forces SpawnEscalateHuman once the
+	// count reaches MaxRollupRetries. RH-MUPS-03 (DM-20260701-001).
+	RollupRetries       int             `json:"rollup_retries,omitempty"`
 	SpawnPolicy       SpawnPolicy       `json:"spawn_policy,omitempty"`
 	ContextBubbleKind ContextBubbleKind `json:"context_bubble_kind,omitempty"`
 	ChildSpecs        []ChildSpec       `json:"child_specs,omitempty"`
@@ -86,6 +103,11 @@ type TreeEvalContext struct {
 	UserID                  string
 	IndeterminateRetries    int
 	MaxIndeterminateRetries int
+	// RollupRetries mirrors item.LastRound.RollupRetries so the policy
+	// evaluator can compare against MaxRollupRetries without touching the
+	// WorkItem. Zero when the item has no prior round. RH-MUPS-03.
+	RollupRetries    int
+	MaxRollupRetries int
 }
 
 // DefaultTreeEvalContext returns evaluator defaults aligned with WorkTree limits.
@@ -94,6 +116,7 @@ func DefaultTreeEvalContext(sessionID, workItemID, userID string, tm *TaskManage
 		MaxDepth:                DefaultMaxDecomposeDepth,
 		Threshold:               EffectiveDecomposeThreshold(tm, userID),
 		MaxIndeterminateRetries: DefaultMaxIndeterminateRetries,
+		MaxRollupRetries:        DefaultMaxRollupRetries,
 		UserID:                  userID,
 	}
 	if tm == nil || workItemID == "" {
@@ -109,6 +132,9 @@ func DefaultTreeEvalContext(sessionID, workItemID, userID string, tm *TaskManage
 	if item, ok := tm.GetWorkItem(sessionID, workItemID); ok && item != nil {
 		ctx.CanDecompose = CanDecompose(item.Kind)
 		ctx.RollupRound = item.NeedsRollup
+		if item.LastRound != nil {
+			ctx.RollupRetries = item.LastRound.RollupRetries
+		}
 	}
 	return ctx
 }

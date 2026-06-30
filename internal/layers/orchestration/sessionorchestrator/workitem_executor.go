@@ -155,6 +155,19 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	llmDirective := directive
 	if ec, ok := WorkItemExecContextFrom(ctx); ok {
 		llmDirective = AppendDeliverableExecuteHint(directive, ec.DeliverableSchema)
+		// RH-MUPS-10 (DM-20260701-001): on a retry of a non-Pass round, the
+		// producer must see WHY the prior attempt failed so it can self-
+		// correct. We prepend a "PriorVerifyReason" section to the LLM
+		// directive (separate from the schema-tag acceptance bar) — empty
+		// when no prior failure, so the message is unchanged for first-pass
+		// items. The D7 orchestrator already routes the retry through
+		// SpawnInline so we only land here when the policy decided another
+		// attempt is worthwhile.
+		if ec.PriorVerifyReason != "" {
+			llmDirective = strings.TrimSpace(llmDirective) +
+				"\n\nPriorVerifyReason: " + ec.PriorVerifyReason +
+				"\n(Adjust your approach to address the above; the previous attempt failed verification for this reason.)"
+		}
 	}
 
 	result := &WorkItemResult{StartedAt: e.now(), StopReason: "started"}

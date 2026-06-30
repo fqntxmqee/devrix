@@ -44,3 +44,30 @@ func ParseDeliverableSchemaTag(s string) DeliverableSchema {
 		return DeliverableSchemaNotApplicable
 	}
 }
+
+// AcceptanceCriteriaFor returns a human-readable description of what the
+// LLM producer must produce to satisfy the deliverable schema.
+//
+// RH-MUPS-10 (DM-20260701-001): before this function, the producer-side
+// execute prompt only carried a machine tag like `<deliverable_schema>
+// p0_p1_file_line</deliverable_schema>`. The actual acceptance bar —
+// "≥500 runes / include P0/P1 severity / cite file:line / no planning
+// meta" — lived in the deterministic verify regex and was invisible to
+// the LLM until it failed. The producer couldn't self-correct because
+// it didn't know what verify would check for.
+//
+// Now the criteria are appended to the execute hint as readable text.
+// Returns empty string when the schema is empty or not_applicable —
+// callers should skip the section in that case.
+func AcceptanceCriteriaFor(schema DeliverableSchema) string {
+	switch schema {
+	case DeliverableSchemaP0P1FileLine:
+		return "Acceptance: include at least one file:line citation (e.g. `path/to/file.go:42`); tag findings with severity P0 or P1; avoid planning meta phrases like `let me continue` / `我将要` / `parallel explore`; produce a substantive summary (≥500 runes for rollup)."
+	case "":
+		return ""
+	default:
+		// Unknown schemas (forward-compatibility): return empty rather than
+		// fabricate criteria. The producer can still see the schema tag.
+		return ""
+	}
+}
