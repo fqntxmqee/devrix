@@ -68,7 +68,10 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			}
 			emit(ctx, o.sink, out, ev)
 		}
-		o.itemPipeline.Emit = emitFn
+		// RH-D7-01 (DM-20260630-013): emitFn is now passed per-invocation
+		// via ItemPipelineRunOpts instead of being installed on the shared
+		// runner struct. Concurrent sessions each carry their own closure,
+		// eliminating cross-session event leakage.
 
 		awaiter := &workmodel.ResolveAwaiter{Manager: o.taskManager}
 
@@ -158,7 +161,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				continue
 			}
 
-			round, err := o.itemPipeline.Run(ctx, sessionID, focus, userID)
+			round, err := o.itemPipeline.Run(ctx, sessionID, focus, userID, ItemPipelineRunOpts{Emit: emitFn})
 			if err != nil {
 				emitError(ctx, o.sink, out, sessionID, "item_pipeline", err)
 				return

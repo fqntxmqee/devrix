@@ -36,17 +36,44 @@ type ItemPipelineRunner struct {
 	Executor WorkItemExecutor
 	// Verify overrides deterministic artifact verification (tests / future LLM verifier).
 	Verify func(*wavescheduler.Artifact) workmodel.Verdict
+	// Emit is the deprecated single-emit field. Use ItemPipelineRunOpts.Emit
+	// on Run() / RunParallelExplore() so concurrent sessions each carry
+	// their own emit closure instead of racing on a shared struct field.
+	//
+	// Deprecated (DM-20260630-013, RH-D7-01): retained for one release so
+	// external callers and tests that pre-date PerInvocationEmit continue
+	// to compile. New code MUST use the opts-based path. Setting this
+	// field while two sessions run concurrently is the root cause of
+	// cross-session event leakage (RH-D7-01).
+	Emit func(*contracts.EngineEvent)
+}
+
+// ItemPipelineRunOpts carries per-invocation state that must NOT live on
+// the shared ItemPipelineRunner struct (RH-D7-01, DM-20260630-013).
+//
+// Per-invocation scoping matters because a single ItemPipelineRunner is
+// typically shared across many sessions (singleton bootstrap). Putting
+// Emit on the struct produced cross-session event leakage when two
+// sessions ran concurrently — RunSessionTurnLoop for session A would
+// install emitFn_A on the shared runner, then session B's loop would
+// install emitFn_B, and session A's later ReAct events would flow to
+// session B's sink. ItemPipelineRunOpts breaks that aliasing by making
+// the closure an argument of Run() rather than a field of the runner.
+type ItemPipelineRunOpts struct {
 	// Emit forwards intermediate engine events from the ReAct loop to the
 	// gateway so feishu cards show live tool_call / tool_result / text
-	// alongside the final ArtifactSummary. nil → no-op (legacy / test
-	// fixtures). RunSessionTurnLoop sets this in its goroutine so the
-	// per-WorkItem path produces the same observable stream on feishu cards.
-	//
-	// Hotfix (2026-06-27): without this, ItemPipelineRunner ran 4 tool.bash
-	// calls per ReAct loop but the feishu card only saw the final
-	// ArtifactSummary text + complete — tool invocations were invisible.
-	// See devrix-inner-spans-dedup-remove memory note.
+	// alongside the final ArtifactSummary. nil → no-op.
 	Emit func(*contracts.EngineEvent)
+}
+
+// Resolve returns opts, falling back to the runner's deprecated Emit
+// field for callers that have not migrated yet. Removed in a follow-up
+// release once all callers are migrated.
+func (r *ItemPipelineRunner) Resolve(opts ItemPipelineRunOpts) ItemPipelineRunOpts {
+	if opts.Emit == nil && r != nil && r.Emit != nil {
+		opts.Emit = r.Emit
+	}
+	return opts
 }
 
 // ItemPipelineDeps wires a production-style runner. Nil Planner defaults to
@@ -96,7 +123,11 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 }
 
 // Run executes the full per-WorkItem MUPS pipeline and persists LastRound (Phase B).
-func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *workmodel.WorkItem, userID string) (*workmodel.WorkItemPipelineRound, error) {
+//
+// Per-invocation Emit is carried in opts (RH-D7-01, DM-20260630-013). The
+// shared runner's Emit field is retained only as a transitional fallback
+// for callers that have not migrated yet.
+func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *workmodel.WorkItem, userID string, opts ItemPipelineRunOpts) (*workmodel.WorkItemPipelineRound, error) {
 	if r == nil {
 		return nil, fmt.Errorf("item_pipeline: runner nil")
 	}
@@ -106,6 +137,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if sessionID == "" {
 		return nil, fmt.Errorf("item_pipeline: sessionID required")
 	}
+	opts = r.Resolve(opts)
 	if workmodel.IsHumanReviewItem(item) && item.Status == workmodel.TaskStatusPending {
 		return r.runHumanReviewAwait(ctx, sessionID, item)
 	}
@@ -114,18 +146,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// gateway. nil-safe — legacy / test runners without Emit continue to
 	// work unchanged.
 	//
-	// Hotfix 2026-06-28 (DM-20260628-002): overwrite (not "set if nil") so
-	// each Run() invocation picks up the freshest r.Emit. Production
-	// RunSessionTurnLoop assigns a new emitFn per turn that captures the
-	// current turn's `out` channel — without this overwrite, a multi-turn
-	// session's later Run() inherits the earlier turn's executor.Emit, and
-	// once that turn's `out` is closed via defer close(out), the LLM
-	// stream's chunk emit panics with "send on closed channel". Tests that
-	// inject an Emit stub continue to work because they leave r.Emit nil
-	// and instead set exec.Emit directly on the executor.
-	if r.Emit != nil {
+	// RH-D7-01 (DM-20260630-013): emit is sourced from per-invocation opts
+	// rather than the shared runner field. The runner field is consulted
+	// only as a transitional fallback by Resolve() above. This is the
+	// architectural fix that prevents cross-session event leakage when two
+	// sessions share one runner.
+	if opts.Emit != nil {
 		if exec, ok := r.Executor.(*DefaultWorkItemExecutor); ok {
-			exec.Emit = r.Emit
+			exec.Emit = opts.Emit
 		}
 	}
 

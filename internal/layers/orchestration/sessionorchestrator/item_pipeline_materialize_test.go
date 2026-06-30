@@ -135,7 +135,7 @@ func TestRunItemPipeline_ScopeContractOpenQuestionsAllowsDecompose(t *testing.T)
 	goal, _ := tm.EnsureGoal(sessionID, "compare cache strategies")
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.9)
 
-	round, err := runner.Run(context.Background(), sessionID, goal, "")
+	round, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestRunItemPipeline_GoalPlan_DirectiveUnmodified(t *testing.T) {
 	}
 	const base = "explore architecture"
 	goal, _ := tm.EnsureGoal("s1", base)
-	_, _ = runner.Run(context.Background(), "s1", goal, "")
+	_, _ = runner.Run(context.Background(), "s1", goal, "", ItemPipelineRunOpts{})
 	if len(exec.calls) == 0 {
 		t.Fatal("no execute call")
 	}

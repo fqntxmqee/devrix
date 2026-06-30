@@ -100,7 +100,7 @@ func TestRunItemPipeline_SingleWorkItem_Completed(t *testing.T) {
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.2)
 	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
 
-	round, err := runner.Run(context.Background(), sessionID, goal, "")
+	round, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestRunItemPipeline_PartialHighUncertainty_SpawnDecompose(t *testing.T) {
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.85)
 	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
 
-	round, err := runner.Run(context.Background(), sessionID, goal, "")
+	round, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestRunItemPipeline_LP5_LineageFields(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	sessionID := "sess-lp5"
 	goal, _ := tm.EnsureGoal(sessionID, "verify login flow")
-	round, err := runner.Run(context.Background(), sessionID, goal, "")
+	round, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestRunItemPipeline_WorkItemExecutorReceivesDirective(t *testing.T) {
 	}
 	_ = tm.Tree().SetUncertainty(sessionID, item.ID, 0.1)
 
-	if _, err := r.Run(context.Background(), sessionID, item, ""); err != nil {
+	if _, err := r.Run(context.Background(), sessionID, item, "", ItemPipelineRunOpts{}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -270,7 +270,7 @@ func TestRunItemPipeline_LongLLMResponseSurvivesArtifact(t *testing.T) {
 	}
 	_ = tm.Tree().SetUncertainty(sessionID, goal.ID, 0.1)
 
-	round, err := r.Run(context.Background(), sessionID, goal, "")
+	round, err := r.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
