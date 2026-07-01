@@ -2,7 +2,9 @@
 
 **Status:** Active
 **Version:** 5.12.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-1 — D7 +12 T points PLANNED (D7-PL-T01..T12): 3 P1 spec doc sync + 6 P0 layout guard (T07-T12); **previous**: devrix-d2-d7-review-hardening — DM-20260630-013 — D2+D7 +30 T points IMPLEMENTED all P0: D2 114→129 + D7 251→266)
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-2 — D7 +12 T points PLANNED→IMPLEMENTED (D7-PL-T01..T12 全收口) + 6 ghost 行 status flip ✅→🔶 + 25/25 orchestration packages `go test -race` PASS; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-1 — D7 +12 T points PLANNED 登记)
+
+**Version:** 5.13.0 (PR-2 落地: D7 域 12 T 收口 + 全域 P0 415→421)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +29,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 278 | 266 | 12 | 222 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 278 | 278 | 0 | 228 |
 
-**总计**: 621 · IMPLEMENTED 604 · PLANNED 15 · PARTIAL 2 · P0 415
+**总计**: 621 · IMPLEMENTED 616 · PLANNED 3 · PARTIAL 2 · P0 421
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -124,3 +126,26 @@
 > **PR 拆分说明：** PR-1 完成 spec doc sync 6 T（T01-T06）；PR-2 完成 6 layout guard 测试（T07-T12）。PR-3 (plan/ doc-only dual-registration) + PR-4 (orchtypes/ Cross-S registration) 由后续 PR 覆盖，**不在本 PR 范围**。
 >
 > **cumulative version bump：** 跳过 v5.11.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步），如未来该 PR merge 时检测到 v5.12.0 已合入，则跳过 v5.11.1 步进。
+
+> **devrix-d7-physical-layout-alignment (DM-20260701-004) PR-2** — D7 +12 T points PLANNED → IMPLEMENTED (D7-PL-T01..T12 全 12 T 收口):
+>
+> | 编号 | 描述 | Status | Priority |
+> |------|------|--------|----------|
+> | **D7-PL-T01** | **a-registry.md ## Hardening 段 2 A 落地** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T02** | **a-registry.md ## D7-X Cross-S Kernel 段 6 A 落地** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T03** | **f-registry.md ## Hardening F 段 2 F 落地** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T04** | **f-registry.md ## D7-X F 段 6 F 落地** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T05** | **code-layout.md §4.2 D7 终态化** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T06** | **code-layout.md §4.2 D7-S2-A06/A07 当前路径从 `turn/` 改为 `sessionorchestrator/`** | **IMPLEMENTED** | **P1** |
+> | **D7-PL-T07** | **layout guard TestOrphanDirs（`internal/layers/orchestration/layout/guard_test.go` PASS）** | **IMPLEMENTED** | **P0** |
+> | **D7-PL-T08** | **layout guard TestNoResurrectRetiredDirs** | **IMPLEMENTED** | **P0** |
+> | **D7-PL-T09** | **layout guard TestACanonicalLocationsExist** | **IMPLEMENTED** | **P0** |
+> | **D7-PL-T10** | **layout guard TestFCanonicalLocationsExist** | **IMPLEMENTED** | **P0** |
+> | **D7-PL-T11** | **layout guard TestGhostDirsInCodeLayout** | **IMPLEMENTED** | **P0** |
+> | **D7-PL-T12** | **layout guard TestNoRetiredTopLevelFiles** | **IMPLEMENTED** | **P0** |
+>
+> **统计：** D7 域 278 → **278** T (266→**278** IMPLEMENTED 全收口) · 全域 621 → **621** T (604→**619** IMPLEMENTED + 15→**2** PLANNED + 2 PARTIAL) · P0 415 → **421** (+6 P0 layout guard T)
+>
+> **layout guard 子包新增：** `internal/layers/orchestration/layout/` 4 个文件（doc.go + types.go + guard.go + guard_test.go）= 380 行 Go（test-only，0 业务代码）。25/25 orchestration packages `go test -race -count=1` PASS。
+>
+> **Registry ghost 行 status flip（PR-2 同步落地）：** layout guard 反向验证发现 3 类 ghost 行（`executionflow/bridge/subquery_bridge.go` D7-S4-A05 + `decisionplanning/executor.go` D7-S5-A03 + `decisionplanning/classifier_fallback.go` D7-S2-A02-F02 / D7-S5-A01-F02 / F03）共 6 个 A/F 行 — 功能已 inline 到 `classifier.go::ClassifyWithPrior`/`ClassifyWithReport`，物理文件未实现。状态从 ✅ 翻转为 🔶（加注释说明），PR-2 layout guard `TestACanonicalLocationsExist` / `TestFCanonicalLocationsExist` 通过 `Status != ✅` 过滤豁免。

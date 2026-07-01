@@ -108,7 +108,7 @@ D7 编排域 A 层活动注册表。
 | D7-S4-A02 | SnapshotWorkPlan | D7-S4-A02-LEGACY | A-BE | session_id | WorkPlanSnapshot | — | ✅ | `orchestration/executionflow/hub/hub.go` Snapshot |
 | D7-S4-A03 | NotifyGateway | D7-S4-A03-LEGACY | A-BE | event, session | — | — | ✅ | `orchestration/executionflow/imsink/gateway.go` |
 | D7-S4-A04 | BridgeAgentSpoke | D4-S10-A02 | A-BE | agent_event, engine_event | — | flow.published | ✅ | `executionflow/bridge/agent_bridge.go`（wired by `bootstrap/delegate.go:52`） |
-| D7-S4-A05 | BridgeSubQuerySpoke | D2-S19（Flow 面） | A-BE | subquery_result | flow_event | flow.published | ✅ | `executionflow/bridge/subquery_bridge.go`（wired by `bootstrap/delegate.go`） |
+| D7-S4-A05 | BridgeSubQuerySpoke | D2-S19（Flow 面） | A-BE | subquery_result | flow_event | flow.published | 🔶 | `executionflow/bridge/subquery_bridge.go`（wired by `bootstrap/delegate.go`） — 物理文件未实现，DM-20260701-004 PR-2 layout guard 守护 |
 
 > **D7-S4-A04/A05**（DM-20260614-018）：统一三 Spoke 写侧（D4 Delegate / D2 SubQuery / D7 Wave）→ `ExecutionFlowHub`。
 
@@ -122,7 +122,7 @@ D7 编排域 A 层活动注册表。
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
 | D7-S5-A01 | ClassifyIntent | D7-S5-A01-LEGACY | A-BE | message, session, context | IntentClassification | — | ✅ | `orchestration/decisionplanning/classifier.go` + `classifier_fallback.go` |
 | D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ✅ | `decisionplanning/decomposer.go`（rule + LLM via SetLLMDecomposer） |
-| D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | ✅ | `decisionplanning/executor.go` |
+| D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | 🔶 | `decisionplanning/executor.go` — 物理文件未实现，DM-20260701-004 PR-2 layout guard 守护 |
 
 ### D7-S6: MUPS Governance + Observability & Hardening ✅ Canonical
 
