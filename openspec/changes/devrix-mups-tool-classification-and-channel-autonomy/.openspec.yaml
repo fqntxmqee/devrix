@@ -1,0 +1,161 @@
+change_id: devrix-mups-tool-classification-and-channel-autonomy
+demand_id: DM-20260701-007
+title: MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 — LLM 自我循环治本
+priority: P0
+status: s3_design  # S3-Gate 设计已并入双 review 共识 + codex 复审 PASS (v1.3.1 critical_count: 0)
+  # PR #374 已开启 auto-merge → master (S3-Gate 交付完成)
+  # 下一步: S4 实现 PR-A → PR-D 4 联动 (33 T 点), 全合入后再做 S6 归档
+  # 留 s3_design 状态: archive 仅在 S6 (S4-S5 全部 P0 T IMPLEMENTED + acceptance-report.md ACCEPTED) 触发
+created_at: 2026-07-01
+domains: [D2, D5, D7]
+source: 2026-07-01 6 轮对话合成 (Sess 1782885908460_4000 + R1-R6) + 博弈论双 review (Codex + Composer)
+       - R1: PR #373 仅修 D1 表现层红卡, root cause 在 tool metadata 缺 control plane
+       - R2: M1-M5 机制 (MaxToolIter / PromptPressure / Verify contract / reason 透传 / truncate 透明)
+       - R3: MUPS 4 类正交从节点下沉到 tool metadata
+       - R4: Clawcode TS 35 字段参照, 元数据是 control plane 不是 label
+       - R5: devrix 4 大机制现状 (Schema 9 字段 / Surface 8 / Filter 4 / BashAST 4 层)
+       - R6: 理想态合成 — 7 原则 + 6 特征 + 4 Phase
+       - R7: 博弈论双 review 共识 (H7-H12, P0-AC-8..10, P1-AC-1..8)
+related:
+  - DM-20260701-005  # D7 Verify synthesize enforce (上游 — 治本缺失的现状 PR)
+  - DM-20260701-006  # D2 tool_result budget profile (上游 — task kind 路由)
+  - DM-20260630-012  # D7 deliverable convergence (上游 — task_incomplete 标识修)
+  - DM-20260629-001  # D7 DSAFT restructuring (前置 — Span Evidence 100%)
+  - DM-20260617-008  # Tool Surface Phase 2 full (前置 — 12→0 global loop)
+  - DM-20260617-007  # D7 Tool Surface Contract S1-S3 (前置 — 7 surface + 3 filter)
+  - DM-20260625-019  # D7 5-node coverage (前置 — MUPS Phase 3 PR-C1 跨域类型)
+  - DM-20260626-005  # D7 6S Verify promotion (前置 — executionflow/verify/ 物理 promote)
+  - DM-20260618-001  # Tool Spec v2 + CheckPermission + DeferLoading (前置 — 现有 9 字段基线)
+dsaft_scenarios:
+  - D2-S15  # PrepareExecutionContext (ToolSpec lookup + TruncateWithMarker + Filter v2 + 19 工具默认 metadata)
+  - D5-S25  # Observability LTL-Lite (L4-L6 终止不变量, 新 S)
+  - D7-S2   # SessionOrchestrator (session_complete meta 透传 + Learn FeedbackMemory 接入)
+  - D7-S5   # IntentClassifier (task_kind 推 — 复用 DM-20260618 Phase 5, H9 cross-consistency)
+  - D7-S9   # Execute 节点 (4 PlanKind Channel rename + 4 ToolChannel 路由)
+  - D7-S10  # Verify 节点 (VerifyContract 4 元组 + burden of proof by class)
+dsaft_activities:
+  - D2-S15-A02  # ToolSpec v3 schema + 19 工具 orthogonal_flags 重标 + TruncateWithMarker + Filter v2 + silent default CI gate (8 Phase A: T06..T12, T14 + 1 Phase C: T13 + 5 Phase D: T02..T05, T15 = 14 T-points)
+  - D5-S25-A01  # LTL-Lite L4 Bounded invariant (cross-check L0-L3)
+  - D5-S25-A02  # LTL-Lite L5 Quotient invariant
+  - D5-S25-A03  # LTL-Lite L6 Synthesize invariant
+  - D7-S2-A50   # session_complete.go meta 透传 (T07) + Learn FeedbackMemory 接入 (T08)
+  - D7-S9-A26   # PlanChannel rename (T06 — Phase B-pre P0 门禁)
+  - D7-S9-A50   # ToolChannel Router (per EmissionClass, T01..T06)
+  - D7-S10-A50  # VerifyContract 4 元组 (T01..T04)
+t_points: 33
+  # Phase A (8 T): D2-S15-A02-T06..T12 + T14 (silent default CI gate)
+  # Phase B-pre (1 T): D7-S9-A26-T06 (Channel → PlanChannel rename, P0 门禁)
+  # Phase B (12 T): D7-S9-A50-T01..T06 (4 ToolChannel) + D5-S25-A01..A03-T01 (LTL-Lite L4-L6) + D7-S9-A50-T07..T12 (ToolChannel tests + shadow mode)
+  # Phase C (7 T): D7-S10-A50-T01..T04 (VerifyContract + burden of proof) + D7-S2-A50-T07 (meta 透传) + D7-S2-A50-T08 (Learn FeedbackMemory) + D2-S15-A02-T13 (TruncateMarker)
+  # Phase D (5 T): D2-S15-A02-T02..T05 (Filter v2 3 维) + D2-S15-A02-T15 (H9 cross-consistency 单测, 跳 T06..T14 因已被占)
+  # 见 tasks.md 各 T 点 DSAFT 编号 + d2/d5/d7 t-registry 注册
+v0_backlog:
+  symptom:
+    - "review d2 领域 kernel 目录下代码": LLM 反复 read_file (9 次) + 0 synthesize review
+    - 当前 devrix ToolSpec v2 仅 9 字段 (Name/Description/Parameters/Risk + ReadOnly/Destructive/OpenWorld/ConcurrencySafe/DeferLoading)
+    - 9 字段是 init-time 1 次查表的 declaration, 不是 runtime 必查的 control plane
+    - D2 ToolResultBudget=8K 单阈值截断, 截断无 marker 透明告知 LLM
+    - Execute 节点 mups/execute/ 现有 4 PlanKind Channel (DM-20260625-001-PRC2), 但无 per-tool EmissionClass 终止约束
+    - D7 Verify 节点只判现有 deliverable, 无 input contract 强校验
+    - verify_exit_reason 在 session_complete.go 局部变量丢失
+  hypothesis:
+    - 4 类正交分解 (Fact/Action/Probe/Experiment) 必须从 MUPS 节点级下沉到 tool metadata 级
+    - 每个 tool 自带 emission_class + convergence_contract + iteration_bound + source_uncertainty
+    - Execute 节点按 emission_class 路由 4 Channel, 每个 channel 挂 LTL-Lite L4-L6 termination invariant
+    - ProbeToolChannel 的 Bounded(n) + PromptPressure 是 LLM 自我循环的根治
+    - Verify input contract 4 元组强校验 deliverable mandatory + 按 EmissionClass 分配 burden of proof
+    - verdict.Reason 透传 meta 全链路到 D1 feishu 渲染 + Learn FeedbackMemory 最小接入
+  propose_options:
+    - A (DO): ToolSpec v3 (+6 字段) + Execute 4 ToolChannel + VerifyContract + Reason 透传 + Filter v2 (3 维) — 双 review 共识
+    - B (partial): 仅 Execute 4 ToolChannel + VerifyContract, ToolSpec v3 拆 2 步 — 维持 mixed strategy
+    - C (rejected): 仅治标 Fix Verify synthesize enforce (DM-005), 不下沉 tool metadata
+  risk:
+    - ToolSpec v3 是 breaking change, 19 工具全部需要重标 (mitigation: 现有 9 字段保持不变, 新增 6 字段有 default)
+    - Execute 4 Channel 是 behavior change, 可能影响现有 22 zsh rules + 19 工具 routing (mitigation: H11 shadow mode 1 周 + 强制 only @would_reject FP<5%)
+    - LTL-Lite L4-L6 是新概念, 缺成熟 fixture (mitigation: 用 read_file + edit_file 作 MVP fixture + H8 L0-L3 cross-check)
+    - emission_class cheap talk 风险 (mitigation: H10 Learn drift 最小接入 + Phase E 完整 audit)
+    - PlanChannel vs ToolChannel focal point 冲突 (mitigation: H12 PR-B 前 rename + type alias 1-release)
+    - PR-A 缺 EmissionClass 时 silent default Action+OpenEnded 会维持 pooling (mitigation: H12 silent default CI gate fail-build)
+  out_of_scope:
+    - 历史 T/A/F 路径重编号 (跨 30+ 历史 change)
+    - WaveScheduler / D4 delegate / D2 context engine 行为变更 (各自领域)
+    - 跨 D1/D2/D3/D4 物理布局
+    - 新建外部依赖
+    - 现有 Clawcode TS Tool 接口的 goalong (我们是 Go 实现, TS 不适用)
+    - 5 Surface × LTL-Lite 已有 L0-L3 安全不变量 **改造** (本 change 仅 cross-check, 不改造 — OOS-5)
+    - R4 strict 默认值全量迁移 (PR-A 用 R3 默认, R4 留 Phase E — OOS-6)
+    - Filter v2 workspace 维 (双 review 共识 defer — OOS-10, P1-AC-8)
+    - 完整 drift audit + 半自动 emission_class 分类器 (Phase E — OOS-11)
+version_scope:
+  v0.1: S1 需求 + 6 轮对话 synthesis 引用
+  v1.0: S2 提案 + design.md 详化 4 Phase + 23 T 点
+  v1.1: S3 设计 + tool_surface.go 扩展 + mups/execute/toolchannel/ + executionflow/verify/verify_contract.go
+  v1.2: S3 Re-Review 6 Critical 修复 — T 编号重映射 (D2-S1/D2-S2/D5-S3 retired → D2-S15-A02/D5-S25/D7-S9-A50), 25 T 点
+  v1.3: S3 博弈论双 review 共识并入 (H7-H12 + P0-AC-8..10 + P1-AC-1..8 + 33 T 点 + Equilibrium Concept + Learn 最小接入 + shadow mode + workspace defer) — codex review 1st round NEEDS-FIX
+  v1.3.1: S3-Gate Re-Review patch — T-ID 冲突修复 (Phase D D2-S15-A02-T06 → T15) + design.md §2.8 L0-L3 vs L4-L6 cross-check (H8) + §2.9 禁止 Silent Default (H12) + P0-AC-8 归 demand.md Q2 focal point; codex review 2nd round PASS (critical_count: 0)
+  v2.0: Phase A ToolSpec v3 schema 落地 (含 19 工具默认 metadata + silent default CI gate)
+  v2.1: Phase B-pre PlanChannel rename (P0 门禁) + Phase B Execute 4 ToolChannel 落地 (含 shadow mode)
+  v2.2: Phase C VerifyContract + Reason 透传 + Learn FeedbackMemory
+  v2.3: Phase D Filter v2 + Task Kind 路由 (3 维)
+  v3.0: 4 Phase all S7_Archived, 33/33 T IMPLEMENTED, verify-archive.sh 13/13 PASS
+
+# 设计原则锚定 (从 6 轮对话合成)
+design_principles:
+  P1: "元数据是 control plane, 不是声明标签"
+  P2: "每个 tool 是 self-bounded actor, 节点是协同编排器"
+  P3: "LLM 的自我循环必须由工具层 iteration_bound 强收敛"
+  P4: "Verify 节点有 input contract, deliverable mandatory + burden of proof by class"
+  P5: "Verdict 全链路透传到 D1 + Learn FeedbackMemory, 禁止中途丢失"
+  P6: "截断必须对 LLM 透明, 禁止欺骗 LLM"
+  P7: "4 类正交分解必须从节点级下沉到 tool 级"
+
+# 博弈论双 review 共识 (Codex + Composer, 2026-07-01)
+game_theory_consensus:
+  H1: "emission_class + 4 control plane 字段 = 类型揭示 (cheap talk 风险, H10 解)"
+  H2: "4 ToolChannel 按 emission_class 路由 = 菜单设计 (OnResult 行为重分类, H9 解)"
+  H3: "L4-L6 termination invariant = 可执行承诺 (与 L0-L3 cross-check, H8 解)"
+  H4: "Bounded(n) hard reject + PromptPressure = SPE 均衡 (单 session) + reputation (跨 session, H7 解)"
+  H5: "VerifyContract 4 元组 + 按 EmissionClass 举证 = 多维契约补全"
+  H6: "verdict.Reason 透传 D1 + Learn FeedbackMemory 最小接入 = 分布式 Bayesian 链起点"
+  H7: "目标均衡双声明: 单 session SPE + 跨 session reputation equilibrium"
+  H8: "LTL-Lite L4-L6 与 L0-L3 安全 invariant cross-check (≥3 条)"
+  H9: "PlanKind × EmissionClass 交叉一致性 + OnResult 行为重分类 (call_count>3 → 升级 Probe)"
+  H10: "emission_class cheap talk 审计: Phase C 最小 (verify_exit_reason) + Phase E 完整 drift"
+  H11: "Phase B shadow mode: would_reject log-only, FP<5% 再硬切"
+  H12: "PR-A 禁止 silent metadata default: 缺 EmissionClass CI fail, read_file/grep/glob 显式 Probe+Bounded(15)"
+
+# OpenSpec 文件清单
+open_spec_files:
+  proposal: proposal.md (35KB)
+  design: design.md (42KB, v1.3.1 — 含 §2.4..§2.9: Equilibrium + Learn 边界 + cross-consistency + shadow mode + L0-L3 cross-check + 禁止 Silent Default)
+  tasks: tasks.md (28KB, 33 T 点 v1.3)
+  demand: demand.md (17KB, v1.1 — 含 H7-H12 + P0-AC-8..10 + P1-AC-1..8)
+  game_theory_codex: game-theory-review.md (14KB, v1 — Codex)
+  game_theory_composer: game-theory-review-composer.md (13KB, v1 — Composer/Cursor)
+  spec_deltas:
+    - specs/tool-spec-v3.md (Phase A: 15 字段 schema)
+    - specs/execute-channels.md (Phase B: 4 ToolChannel 路由 + LTL-Lite L4-L6)
+    - specs/verify-contract.md (Phase C: VerifyContract + Reason 透传 + burden of proof)
+
+# S3-Gate 验收 (待 codex review)
+s3_gate_acceptance:
+  P0_AC:
+    - P0-AC-1: ProbeToolChannel Bounded(15) hard stop @iter 16 (review)
+    - P0-AC-2: review/edit/test 3 task_kind 100% 触发
+    - P0-AC-3: TruncateMarker 必附加
+    - P0-AC-4: VerifyContract 4 元组 + 举证规则
+    - P0-AC-5: verdict.Reason 透传 D1
+    - P0-AC-6: 19 工具 metadata 显式标注 (grep gate)
+    - P0-AC-7: ToolSpec v3 0 break 现有 9 字段 (position literal = 0)
+    - P0-AC-8: PlanChannel rename (PR-B 前 P0 门禁, demand.md Q2 focal point 共识)
+    - P0-AC-9: read_file/grep/glob 显式 Probe+Bounded(15) (H12)
+    - P0-AC-10: 禁止 silent metadata default (CI fail, H12)
+  P1_AC:
+    - P1-AC-1: design.md §2.4 含 Equilibrium Concept
+    - P1-AC-2: execute-channels.md L4-L6 vs L0-L3 ≥3 条 cross-check
+    - P1-AC-3: VerifyContract burden of proof 单测
+    - P1-AC-4: verify_exit_reason 写入 Learn FeedbackMemory
+    - P1-AC-5: Phase B shadow mode (FP<5%)
+    - P1-AC-6: PromptPressure 软警告 baseline
+    - P1-AC-7: PlanKind × task_kind 交叉一致性单测
+    - P1-AC-8: Filter v2 不含 workspace 维 (defer)
