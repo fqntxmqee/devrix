@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.23.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-2: D7-PL-T07..T12 6 P0 layout guard 测试 PLANNED→IMPLEMENTED + 6 ghost 行（subquery_bridge.go / executor.go / classifier_fallback.go 3 处共 6 A/F 行）status ✅→🔶; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1 → v4.22.0 (T01..T12 PLANNED 登记); **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 → v4.21.0 (+6 D7-HC T points for historical doc split, S3 boundary, registry guards); **earlier**: devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222)
+**Version:** 4.24.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED（a-registry.md S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 两行；新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明 段；S5 段加 cross-reference；code-layout.md §4.2 D7-S5 sub 行 "Plan agent"→"Plan Generation" + doc-only 双登记 wording 收敛；0 业务代码变更）; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-2 → v4.23.0 (D7-PL-T07..T12 6 P0 layout guard 测试 IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1 → v4.22.0 (T01..T12 PLANNED 登记); **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 → v4.21.0; **earlier**: devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -1255,8 +1255,9 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 | **D7-PL-T10** | **PR-2 layout guard TestFCanonicalLocationsExist：同 T09，对 f-registry 中登记的所有 F Code Location 反向验证** | **—** | **`internal/layers/orchestration/layout/guard_test.go::TestFCanonicalLocationsExist`** | **IMPLEMENTED** | **P0** | — |
 | **D7-PL-T11** | **PR-2 layout guard TestGhostDirsInCodeLayout：枚举 code-layout.md §4.2 中提到的所有 scenario-slug，断言对应物理目录存在；幽灵行（spec 提了但物理没有）报告为 Violation（AC5 反向验证）** | **—** | **`internal/layers/orchestration/layout/guard_test.go::TestGhostDirsInCodeLayout`** | **IMPLEMENTED** | **P0** | — |
 | **D7-PL-T12** | **PR-2 layout guard TestNoRetiredTopLevelFiles：黑名单 retired 顶层文件（coordinator.go / hubspoke.go / turn.go / milestone.go 在 orchestration/ 根），任意一个存在则报告 Violation（防 resurrection 文件级）** | **—** | **`internal/layers/orchestration/layout/guard_test.go::TestNoRetiredTopLevelFiles`** | **IMPLEMENTED** | **P0** | — |
+| **D7-PL-T13** | **PR-3 `plan/` 归属 S5 doc-only dual registration 在 code-layout + a-registry 双登记（spec.md Requirement "`plan/` MUST be registered under D7-S5 Decision & Planning"）**：a-registry.md S6 段新增 D7-S6-A03 PlanValidate（Code Location `decisionplanning/plan_mode.go::Validate`）+ D7-S6-A04 PlanGenerate（Code Location `plan/planner.go::DefaultPlanner.Generate`），物理路径在 S5 路径符合 spec.md §S5 carve-out Note；code-layout.md §4.2 D7-S5 sub 行 "Plan agent" → "Plan Generation" 命名收敛，保留 doc-only dual-registration 注释（含 word "doc-only 双登记" 与 a-registry 内部一致）；0 函数签名 / 0 物理路径变化 | **D7-S6-A03/A04** | **`openspec/specs/d7-orchestration/a-registry.md` S6 段 + ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + `openspec/specs/architecture/code-layout.md` §4.2 D7-S5 sub 行** | **IMPLEMENTED** | **P1** | — |
 
-**D7-PL Total:** 12 T (6 P1 spec doc sync + 6 P0 layout guard) — **12/12 IMPLEMENTED**（PR-1 落 6 P1 spec doc sync；PR-2 落 6 P0 layout guard 测试 + 6 ghost 行 🔶 翻转）。**cumulative version bump**：跳过 v4.19.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步）。
+**D7-PL Total:** 13 T (6 P1 spec doc sync + 6 P0 layout guard + 1 P1 plan/ dual registration) — **13/13 IMPLEMENTED**（PR-1 落 6 P1 spec doc sync；PR-2 落 6 P0 layout guard 测试 + 6 ghost 行 🔶 翻转；PR-3 落 1 P1 plan/ dual registration + CHANGELOG.md 清理 PR-1 遗留 `<<<<<<<` conflict marker）。**cumulative version bump**：跳过 v4.19.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步）。
 
-**D7 全域统计：** 266 IMPLEMENTED + **12 IMPLEMENTED (D7-PL)** = **278 T 全 IMPLEMENTED** · **P0 228**（222 原 + 6 新 P0 layout guard T）。
+**D7 全域统计：** 266 IMPLEMENTED + **13 IMPLEMENTED (D7-PL)** = **279 T 全 IMPLEMENTED** · **P0 228**（222 原 + 6 新 P0 layout guard T）。
 
