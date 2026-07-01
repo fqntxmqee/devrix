@@ -202,6 +202,30 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | 🔶 | `orchestration/decisionplanning/classifier_fallback.go` LLMClassifier.Classify — 物理文件未实现（功能已 inline 到 `classifier.go::ClassifyWithPrior`），DM-20260701-004 PR-2 layout guard 守护 |
 | D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | 🔶 | `orchestration/decisionplanning/classifier_fallback.go` Merge — 物理文件未实现（功能已 inline 到 `classifier.go::ClassifyWithReport`），DM-20260701-004 PR-2 layout guard 守护 |
 
+### D7-S1 Canonical F 层
+
+> **S1 WorkModel F 层**：A01..A06 共 6 个 Activity → 详细 F 表见 §## D7-S1-A01 CreateWorkPlan ✅ / ## D7-S1-A02 ManageTask ✅ / ## D7-S1-A03 QueryWorkPlan ✅ / ## D7-S1-A04/A05 PlanMode ✅（合并段）/ ## D7-S1-A06 ExecutePlanAgent ✅（在 a-registry §D7-S1 附加活动 段登记）。S1 是 State Authority（非博弈角色），F 层集中在 workmodel/ 子包（work_tree + task_manager + plan_mode + plan_agent）。
+
+### D7-S3 Canonical F 层
+
+> **S3 WaveScheduler F 层**：A01 ScheduleWave / A02 ResolveWorkerContext / A03 GuardConflict + S3 基础设施共 4 段。详细 F 表见 §## D7-S3-A01..A03 + §## D7-S3 基础设施 ✅。S3 是 Mechanism Designer，F 层集中在 wavescheduler/ 子包（scheduler + context + conflict + runners）。
+
+### D7-S4 Canonical F 层
+
+> **S4 ExecutionFlow F 层**：A01 PublishFlowEvent / A03 NotifyGateway 共 2 个详细 F 表 + ExecutionFlow 完整子包（hub + bridge + workplan + imsink）。A02 SnapshotWorkPlan / A04 BridgeAgentSpoke / A05 BridgeSubQuerySpoke 在 a-registry §D7-S4 段登记，F 层细节跨包分布于 executionflow/{hub,bridge,imsink}/。S4 是 Costly Signaler，F 层集中在 executionflow/ 子包。
+
+### D7-S6 Canonical F 层
+
+> **S6 MUPS Governance F 层**：A01..A15 共 15 个 Activity + Hardening-A01/A02 横切层。当前详细 F 表集中在 §## D7-S6-A14 HardenMetricsAndConcurrency ✅（A14 横切层 + 5 P0/P1 fix 一揽子）。其余 S6 A 的 F 层跨包分布于：
+> - A01 ObserveObservation → `orchtypes/observation.go`（Cross-S kernel）
+> - A02 ObserveUncertainty → `orchtypes/uncertainty_*.go`（Cross-S kernel）
+> - A03/A04 PlanValidate/PlanGenerate → `decisionplanning/plan_mode.go` + `plan/planner.go`（S5 sub-registration carve-out，详见 design §④ + a-registry §D7-S5 plan/ ↔ decisionplanning/ 双登记说明）
+> - A05..A08 Channel* → `mups/execute/{channel,commit,protocol,scenario,exploration}.go`
+> - A09/A10 Verify* → `executionflow/verify/{verdict_to_exit_reason,exit_reason,anomaly}.go` + 跨包 wiring 到 `orchtypes/system_anomaly_wiring.go`
+> - A11 Interrupt → `sessionorchestrator/interrupt.go`（S2 spillover）
+> - A12/A13 SandboxCleanup/ForkAndResume → `escape/{audit_log,fallback,pending_resolution,loop_depth_tracker}.go`
+> - A15 CrossSContract → `interfaces/{task_spec,task_report,contracts}.go`（Cross-S）
+
 ---
 
 ## D7-S6-A14 HardenMetricsAndConcurrency ✅ (DM-20260622-001)
