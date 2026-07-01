@@ -31,3 +31,18 @@ func EnforcePlanModeWrite(ctx context.Context, targetPath string) *ToolResult {
 	}
 	return nil
 }
+
+// EnforcePlanModeBash blocks arbitrary shell execution while plan mode is
+// active. Unlike write_file/edit_file, bash can hide writes behind redirects,
+// subprocesses, or interpreter snippets; without a complete write-target
+// extractor it must fail closed unless the session explicitly enables YOLO
+// workspace writes.
+func EnforcePlanModeBash(ctx context.Context) *ToolResult {
+	sc := ToolSessionContextFromContext(ctx)
+	if sc == nil || !sc.PermissionMode.IsPlanMode() || FilesAutoApprovedFromContext(ctx) {
+		return nil
+	}
+	return &ToolResult{
+		Error: fmt.Sprintf("plan mode: bash denied. %s", permission.PlanModeWriteHint()),
+	}
+}

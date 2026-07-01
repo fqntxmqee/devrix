@@ -95,7 +95,7 @@ func (s *sessionAutocompactSink) EmitAutocompactComplete(sessionID string, summa
 		return
 	}
 
-	replaced := s.memory.ReplaceAutocompactPlaceholder(sc, summary)
+	replaced := s.memory.ReplaceAutocompactPlaceholder(sc, summary, asyncToken)
 	if !replaced {
 		slog.Warn("contextengine.autocompact.writeback.no_placeholder",
 			"session_id", sessionID, "async_token", asyncToken)
@@ -108,4 +108,23 @@ func (s *sessionAutocompactSink) EmitAutocompactComplete(sessionID string, summa
 	slog.Info("contextengine.autocompact.writeback.ok",
 		"session_id", sessionID, "async_token", asyncToken,
 		"summary_bytes", len(summary.Content))
+}
+
+func (s *sessionAutocompactSink) EmitAutocompactFailed(sessionID string, restored []types.Message, asyncToken string) {
+	if s == nil || s.memory == nil || sessionID == "" {
+		return
+	}
+	sc, ok := s.memory.Get(sessionID)
+	if !ok || sc == nil {
+		slog.Warn("contextengine.autocompact.restore.no_session",
+			"session_id", sessionID, "async_token", asyncToken)
+		return
+	}
+	if !s.memory.RestoreAutocompactPlaceholder(sc, restored, asyncToken) {
+		slog.Warn("contextengine.autocompact.restore.no_placeholder",
+			"session_id", sessionID, "async_token", asyncToken)
+		return
+	}
+	slog.Info("contextengine.autocompact.restore.ok",
+		"session_id", sessionID, "async_token", asyncToken, "restored_messages", len(restored))
 }

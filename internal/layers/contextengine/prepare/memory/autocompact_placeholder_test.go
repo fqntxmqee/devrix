@@ -28,6 +28,7 @@ func TestReplaceAutocompactPlaceholder_replacesFirstPending(t *testing.T) {
 				Metadata: map[string]string{
 					"compressed_by": "autocompact",
 					"status":        "pending",
+					"async_token":   "tok-1",
 				},
 			},
 			{Role: types.MessageRoleUser, Content: "tail-1"},
@@ -41,10 +42,11 @@ func TestReplaceAutocompactPlaceholder_replacesFirstPending(t *testing.T) {
 		Metadata: map[string]string{
 			"compressed_by": "autocompact",
 			"status":        "complete",
+			"async_token":   "tok-1",
 		},
 	}
 
-	if replaced := mgr.ReplaceAutocompactPlaceholder(sc, summary); !replaced {
+	if replaced := mgr.ReplaceAutocompactPlaceholder(sc, summary, "tok-1"); !replaced {
 		t.Fatal("expected placeholder to be replaced")
 	}
 
@@ -84,7 +86,7 @@ func TestReplaceAutocompactPlaceholder_noPlaceholder(t *testing.T) {
 	replaced := mgr.ReplaceAutocompactPlaceholder(sc, types.Message{
 		Role:    types.MessageRoleAssistant,
 		Content: "summary",
-	})
+	}, "tok-1")
 	if replaced {
 		t.Fatal("expected no replacement when no pending placeholder exists")
 	}
@@ -100,7 +102,31 @@ func TestReplaceAutocompactPlaceholder_noPlaceholder(t *testing.T) {
 func TestReplaceAutocompactPlaceholder_nilSession(t *testing.T) {
 	cfg := config.DefaultContextEngineConfig()
 	mgr := NewManager(cfg, nil, nil, nil)
-	if replaced := mgr.ReplaceAutocompactPlaceholder(nil, types.Message{}); replaced {
+	if replaced := mgr.ReplaceAutocompactPlaceholder(nil, types.Message{}, "tok-1"); replaced {
 		t.Fatal("expected false for nil session")
+	}
+}
+
+func TestRestoreAutocompactPlaceholder_restoresMatchingToken(t *testing.T) {
+	cfg := config.DefaultContextEngineConfig()
+	mgr := NewManager(cfg, nil, nil, nil)
+	sc := &types.SessionContext{
+		SessionID: "sess_restore",
+		Messages: []types.Message{
+			{Role: types.MessageRoleUser, Content: "head"},
+			{Role: types.MessageRoleAssistant, Content: "[compressing]", Metadata: map[string]string{
+				"compressed_by": "autocompact",
+				"status":        "pending",
+				"async_token":   "tok-restore",
+			}},
+			{Role: types.MessageRoleUser, Content: "tail"},
+		},
+	}
+	restored := []types.Message{{Role: types.MessageRoleAssistant, Content: "middle"}}
+	if !mgr.RestoreAutocompactPlaceholder(sc, restored, "tok-restore") {
+		t.Fatal("expected restore to replace placeholder")
+	}
+	if got := sc.Messages[1].Content; got != "middle" {
+		t.Fatalf("restored content = %q, want middle", got)
 	}
 }

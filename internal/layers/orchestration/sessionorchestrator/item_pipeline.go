@@ -24,13 +24,13 @@ import (
 // metadata + Learn lineage; the Plan.Steps are vestigial (Executor reads
 // the directive from WorkItem directly, not from Plan.Steps[0].ToolArgs).
 type ItemPipelineRunner struct {
-	Classifier      decisionplanning.IntentClassifier
-	Planner         plan.Planner
-	Learner         learn.Learner
-	Tasks           *workmodel.TaskManager
-	TrackMode       string
-	ContextProposer      workmodel.ContextProposer
-	ObservationProposer  ObservationProposer
+	Classifier            decisionplanning.IntentClassifier
+	Planner               plan.Planner
+	Learner               learn.Learner
+	Tasks                 *workmodel.TaskManager
+	TrackMode             string
+	ContextProposer       workmodel.ContextProposer
+	ObservationProposer   ObservationProposer
 	StrategicPlanProposer StrategicPlanProposer
 	// Executor runs the per-WorkItem ReAct loop (DM-20260626-009).
 	// Replaces the prior Router/Channel/tool-pipeline path.
@@ -90,7 +90,7 @@ type ItemPipelineDeps struct {
 	// Required. nil → NewItemPipelineRunner returns an error.
 	Executor WorkItemExecutor
 	// ObservationProposer optional @ Observe; production uses D2 Prepare → D3 (DM-20260630-001).
-	ObservationProposer ObservationProposer
+	ObservationProposer   ObservationProposer
 	StrategicPlanProposer StrategicPlanProposer
 }
 
@@ -142,22 +142,6 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if workmodel.IsHumanReviewItem(item) && item.Status == workmodel.TaskStatusPending {
 		return r.runHumanReviewAwait(ctx, sessionID, item)
 	}
-	// Propagate Emit hook to Executor so the ReAct loop's intermediate
-	// events (text / thinking / tool_call / tool_result) flow to the
-	// gateway. nil-safe — legacy / test runners without Emit continue to
-	// work unchanged.
-	//
-	// RH-D7-01 (DM-20260630-013): emit is sourced from per-invocation opts
-	// rather than the shared runner field. The runner field is consulted
-	// only as a transitional fallback by Resolve() above. This is the
-	// architectural fix that prevents cross-session event leakage when two
-	// sessions share one runner.
-	if opts.Emit != nil {
-		if exec, ok := r.Executor.(*DefaultWorkItemExecutor); ok {
-			exec.Emit = opts.Emit
-		}
-	}
-
 	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the
 	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. hardening
 	// uses a package-level bridge (SetBridge in bootstrap/wire_coordinator.go),
@@ -297,6 +281,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		MaxItersOverride:  maxItersOverride,
 		DeliverableSchema: deliverableSchema,
 		PriorVerifyReason: priorReason,
+		Emit:              opts.Emit,
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)

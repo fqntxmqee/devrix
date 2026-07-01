@@ -7,6 +7,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 type workItemExecCtxKey struct{}
@@ -26,6 +27,10 @@ type WorkItemExecContext struct {
 	// correct instead of re-producing the same artifact. Empty when this
 	// is the first round or the prior round passed.
 	PriorVerifyReason string
+	// Emit is scoped to this ExecuteWorkItem invocation. It must never live on
+	// the shared DefaultWorkItemExecutor because the executor is singleton-ish
+	// in production wiring and can serve multiple sessions concurrently.
+	Emit func(*contracts.EngineEvent)
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.

@@ -281,8 +281,8 @@ func (e *errLLM) InvokeStream(_ context.Context, _ orchtypes.LLMInvokeRequest) (
 //   - emitted events carry SessionID so gateway can route
 func TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27(t *testing.T) {
 	var (
-		mu      sync.Mutex
-		all     []*contracts.EngineEvent // ordered
+		mu  sync.Mutex
+		all []*contracts.EngineEvent // ordered
 	)
 	emit := func(ev *contracts.EngineEvent) {
 		mu.Lock()
@@ -293,9 +293,9 @@ func TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27(t *testing.T) {
 
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{
-			Content:   "let me check",
-			Thinking:  "the model is reasoning",
-			ToolCalls: []llmgateway.ToolCall{{ID: "call_1", Name: "read_file", Input: `{"path":"x.go"}`}},
+			Content:      "let me check",
+			Thinking:     "the model is reasoning",
+			ToolCalls:    []llmgateway.ToolCall{{ID: "call_1", Name: "read_file", Input: `{"path":"x.go"}`}},
 			FinishReason: "tool_calls",
 		}},
 		{{Content: "answer is 42", FinishReason: "stop"}},
@@ -304,9 +304,9 @@ func TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27(t *testing.T) {
 		{Results: []ToolResult{{ToolCallID: "call_1", Output: "package x"}}},
 	}}
 	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, tools)
-	exec.Emit = emit
 
-	if _, err := exec.ExecuteWorkItem(context.Background(), "sess_emit", "item_emit", "explain x"); err != nil {
+	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{Emit: emit})
+	if _, err := exec.ExecuteWorkItem(ctx, "sess_emit", "item_emit", "explain x"); err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
 

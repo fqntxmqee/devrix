@@ -33,6 +33,7 @@ func NewAsyncAutocompacter(summarizer Summarizer) *AsyncAutocompacter {
 // StartAsync schedules background summarization; duplicate triggers cancel prior work.
 func (a *AsyncAutocompacter) StartAsync(
 	sessionID string,
+	asyncToken string,
 	cfg config.AutocompactConfig,
 	turns [][]types.Message,
 	head, tail int,
@@ -43,7 +44,9 @@ func (a *AsyncAutocompacter) StartAsync(
 		return
 	}
 
-	asyncToken := uuid.NewString()
+	if asyncToken == "" {
+		asyncToken = uuid.NewString()
+	}
 
 	a.mu.Lock()
 	if _, ok := a.pending[sessionID]; !ok {
@@ -80,6 +83,12 @@ func (a *AsyncAutocompacter) StartAsync(
 		summary, err := summarizeWithRetry(runCtx, a.summarizer, cfg, middle, loc)
 		if err != nil {
 			if observer != nil {
+				a.mu.Lock()
+				isLatest := a.latest[sessionID] == asyncToken
+				a.mu.Unlock()
+				if isLatest {
+					observer.OnAutocompactFailed(sessionID, middle, asyncToken)
+				}
 				observer.OnAutocompact(AutocompactMeta{Degraded: true, Model: cfg.Model})
 			}
 			return
@@ -92,7 +101,7 @@ func (a *AsyncAutocompacter) StartAsync(
 			return
 		}
 
-		observer.OnAutocompactComplete(buildSummaryMessage(summary, len(middle), loc), sessionID, asyncToken)
+		observer.OnAutocompactComplete(buildSummaryMessage(summary, len(middle), asyncToken, loc), sessionID, asyncToken)
 		observer.OnAutocompact(AutocompactMeta{
 			Degraded: false,
 			Model:    cfg.Model,
@@ -127,7 +136,7 @@ func (a *AsyncAutocompacter) Shutdown(timeout time.Duration) error {
 	}
 }
 
-func buildAutocompactPlaceholder(turns [][]types.Message, head, tail int) []types.Message {
+func buildAutocompactPlaceholder(turns [][]types.Message, head, tail int, asyncToken string) []types.Message {
 	if head <= 0 {
 		head = 2
 	}
@@ -144,6 +153,7 @@ func buildAutocompactPlaceholder(turns [][]types.Message, head, tail int) []type
 		Metadata: map[string]string{
 			"compressed_by": "autocompact",
 			"status":        "pending",
+			"async_token":   asyncToken,
 		},
 	})
 	for i := len(turns) - tail; i < len(turns); i++ {
@@ -152,7 +162,7 @@ func buildAutocompactPlaceholder(turns [][]types.Message, head, tail int) []type
 	return out
 }
 
-func buildSummaryMessage(summary string, middleCount int, loc i18n.Locale) types.Message {
+func buildSummaryMessage(summary string, middleCount int, asyncToken string, loc i18n.Locale) types.Message {
 	return types.Message{
 		Role:    types.MessageRoleAssistant,
 		Content: formatSummaryContent(summary, loc),
@@ -160,6 +170,7 @@ func buildSummaryMessage(summary string, middleCount int, loc i18n.Locale) types
 			"compressed_by":  "autocompact",
 			"original_count": fmt.Sprintf("%d", middleCount),
 			"status":         "complete",
+			"async_token":    asyncToken,
 		},
 	}
 }

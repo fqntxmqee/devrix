@@ -173,7 +173,7 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	result := &WorkItemResult{StartedAt: e.now(), StopReason: "started"}
 	defer func() { result.EndedAt = e.now() }()
 
-	systemPrompt, tools, messages, prepErr := e.prepareContext(ctx, sessionID, itemID, llmDirective)
+	systemPrompt, tools, messages, userContextPrepend, prepErr := e.prepareContext(ctx, sessionID, itemID, llmDirective)
 	baseMessageCount := len(messages)
 	if prepErr != nil {
 		// Non-fatal: log and continue with empty context. Better to give the
@@ -202,7 +202,8 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1
 
-		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, tools, messages, itemID, iter+1, result)
+		emit := emitFromExecContext(ctx)
+		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, tools, messages, userContextPrepend, emit, itemID, iter+1, result)
 		// Span per iter (DM-20260626-009 follow-up): a ReAct iter can stall
 		// for many seconds (LLM + tool round); without this span "why did
 		// this WorkItem take 16s?" required reading code instead of
@@ -255,11 +256,13 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 	sessionID, systemPrompt string,
 	tools []ToolSchema,
 	messages []types.Message,
+	userContextPrepend map[string]string,
+	emit func(*contracts.EngineEvent),
 	itemID string,
 	iter int,
 	result *WorkItemResult,
 ) (string, error, []types.Message, string) {
-	content, toolCalls, finishReason, err := e.streamLLM(ctx, sessionID, systemPrompt, tools, messages)
+	content, toolCalls, finishReason, err := e.streamLLM(ctx, sessionID, systemPrompt, tools, messages, userContextPrepend, emit)
 	toolCalls = dedupeToolCalls(toolCalls)
 	if err != nil {
 		result.StopReason = "llm_error"
@@ -317,7 +320,7 @@ func (e *DefaultWorkItemExecutor) stepOneIter(
 			body = r.Error
 		}
 		name := nameByID[r.ToolCallID]
-		e.emit(ctx, &contracts.EngineEvent{
+		emitEvent(ctx, emit, &contracts.EngineEvent{
 			Type:      "tool_result",
 			Content:   body,
 			ToolName:  name,
@@ -371,8 +374,10 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	sessionID, systemPrompt string,
 	tools []ToolSchema,
 	messages []types.Message,
+	userContextPrepend map[string]string,
+	emit func(*contracts.EngineEvent),
 ) (string, []llmgateway.ToolCall, string, error) {
-	apiMessages := messagesForLLMInvoke(messages, e.userContextPrepend)
+	apiMessages := messagesForLLMInvoke(messages, userContextPrepend)
 	ch, err := e.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    sessionID,
 		SystemPrompt: systemPrompt,
@@ -389,7 +394,7 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	for chunk := range ch {
 		if chunk.Content != "" {
 			content.WriteString(chunk.Content)
-			e.emit(ctx, &contracts.EngineEvent{
+			emitEvent(ctx, emit, &contracts.EngineEvent{
 				Type:      "text",
 				Content:   chunk.Content,
 				SessionID: sessionID,
@@ -397,7 +402,7 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 		}
 		if chunk.Thinking != "" {
 			content.WriteString(chunk.Thinking)
-			e.emit(ctx, &contracts.EngineEvent{
+			emitEvent(ctx, emit, &contracts.EngineEvent{
 				Type:      "thinking",
 				Content:   chunk.Thinking,
 				SessionID: sessionID,
@@ -412,7 +417,7 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	}
 	toolCalls = dedupeToolCalls(toolCalls)
 	for _, tc := range toolCalls {
-		e.emit(ctx, &contracts.EngineEvent{
+		emitEvent(ctx, emit, &contracts.EngineEvent{
 			Type:      "tool_call",
 			ToolName:  tc.Name,
 			ToolInput: tc.Input,
@@ -431,20 +436,27 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 // no-op so legacy / test fixtures that don't wire a sink keep working.
 // Used for intermediate LLM chunk (text/thinking/tool_call) + tool-result
 // events; caller-driven control instead of subagent-driven streaming.
-func (e *DefaultWorkItemExecutor) emit(ctx context.Context, ev *contracts.EngineEvent) {
-	if e == nil || e.Emit == nil || ev == nil {
+func emitEvent(ctx context.Context, emit func(*contracts.EngineEvent), ev *contracts.EngineEvent) {
+	if emit == nil || ev == nil {
 		return
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return
 	}
-	e.Emit(ev)
+	emit(ev)
+}
+
+func emitFromExecContext(ctx context.Context) func(*contracts.EngineEvent) {
+	if ec, ok := WorkItemExecContextFrom(ctx); ok {
+		return ec.Emit
+	}
+	return nil
 }
 
 // prepareContext calls ContextPreparer.Prepare or D2 Materialize to assemble
 // SystemPrompt + Tools + initial messages. Returns empty defaults when both
 // paths are unavailable (legacy bare call preservation).
-func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, itemID, directive string) (string, []ToolSchema, []types.Message, error) {
+func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, itemID, directive string) (string, []ToolSchema, []types.Message, map[string]string, error) {
 	if ShouldMaterializeWorkItem(ctx, sessionID, itemID) && e.Materializer != nil {
 		ec, _ := WorkItemExecContextFrom(ctx)
 		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget())
@@ -461,9 +473,10 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 			endEmpty(nil)
 		}
 		if err != nil {
-			return "", nil, nil, err
+			return "", nil, nil, nil, err
 		}
 		tools := filterPipelineTools(toolSchemasFromDescriptors(mat.Tools))
+		var userContextPrepend map[string]string
 		if e.Context != nil {
 			prepared, prepErr := e.Context.Prepare(ctx, PrepareRequest{
 				SessionID: sessionID,
@@ -474,17 +487,17 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 				},
 			})
 			if prepErr == nil {
-				e.userContextPrepend = prepared.UserContextPrepend
+				userContextPrepend = prepared.UserContextPrepend
 				rollupSynth := ec.Item != nil && ec.Item.NeedsRollup
 				if len(tools) == 0 && !rollupSynth {
 					tools = filterPipelineTools(prepared.Tools)
 				}
 			}
 		}
-		return mat.SystemPrompt, tools, mat.Messages, nil
+		return mat.SystemPrompt, tools, mat.Messages, userContextPrepend, nil
 	}
 	if e.Context == nil {
-		return "", nil, nil, nil
+		return "", nil, nil, nil, nil
 	}
 	prepared, err := e.Context.Prepare(ctx, PrepareRequest{
 		SessionID: sessionID,
@@ -495,16 +508,15 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 		},
 	})
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, err
 	}
-	e.userContextPrepend = prepared.UserContextPrepend
 	systemPrompt := appendWorkItemFormatHints(prepared.SystemPrompt, ctx, sessionID, itemID)
 	msgs := []types.Message{{
 		SessionID: sessionID,
 		Role:      types.MessageRoleUser,
 		Content:   directive,
 	}}
-	return systemPrompt, filterPipelineTools(prepared.Tools), msgs, nil
+	return systemPrompt, filterPipelineTools(prepared.Tools), msgs, prepared.UserContextPrepend, nil
 }
 
 func appendWorkItemFormatHints(systemPrompt string, ctx context.Context, sessionID, itemID string) string {

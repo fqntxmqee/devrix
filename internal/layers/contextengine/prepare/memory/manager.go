@@ -189,8 +189,19 @@ func (m *Manager) AppendFullMessage(sc *types.SessionContext, msg types.Message)
 
 // SetCompressedView updates the LLM-facing view.
 func (m *Manager) SetCompressedView(sc *types.SessionContext, view []types.Message) {
-	sc.CompressedView = view
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	sc.CompressedView = append([]types.Message(nil), view...)
 	sc.UpdatedAt = time.Now()
+}
+
+func (m *Manager) CompressedView(sc *types.SessionContext) []types.Message {
+	if sc == nil {
+		return nil
+	}
+	m.messagesMu.RLock()
+	defer m.messagesMu.RUnlock()
+	return append([]types.Message(nil), sc.CompressedView...)
 }
 
 // ReplaceAutocompactPlaceholder swaps the first pending autocompact
@@ -205,7 +216,7 @@ func (m *Manager) SetCompressedView(sc *types.SessionContext, view []types.Messa
 //
 // Concurrency: holds messagesMu so concurrent Prepare / AppendAndTrimMessages
 // callers either see the placeholder or the summary, never a torn state.
-func (m *Manager) ReplaceAutocompactPlaceholder(sc *types.SessionContext, summary types.Message) bool {
+func (m *Manager) ReplaceAutocompactPlaceholder(sc *types.SessionContext, summary types.Message, asyncToken string) bool {
 	if sc == nil {
 		return false
 	}
@@ -216,7 +227,7 @@ func (m *Manager) ReplaceAutocompactPlaceholder(sc *types.SessionContext, summar
 		if md == nil {
 			continue
 		}
-		if md["compressed_by"] == "autocompact" && md["status"] == "pending" {
+		if md["compressed_by"] == "autocompact" && md["status"] == "pending" && md["async_token"] == asyncToken {
 			merged := sc.Messages[i].Metadata
 			if summary.Metadata == nil {
 				summary.Metadata = make(map[string]string, len(merged)+1)
@@ -237,6 +248,35 @@ func (m *Manager) ReplaceAutocompactPlaceholder(sc *types.SessionContext, summar
 				summary.Timestamp = sc.Messages[i].Timestamp
 			}
 			sc.Messages[i] = summary
+			sc.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
+// RestoreAutocompactPlaceholder replaces the pending placeholder for
+// asyncToken with the original middle messages when async summarization fails.
+// This avoids leaving a permanent "[compressing ...]" message in the active
+// context and preserves the conversation content.
+func (m *Manager) RestoreAutocompactPlaceholder(sc *types.SessionContext, restored []types.Message, asyncToken string) bool {
+	if sc == nil {
+		return false
+	}
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+	for i := range sc.Messages {
+		md := sc.Messages[i].Metadata
+		if md == nil {
+			continue
+		}
+		if md["compressed_by"] == "autocompact" && md["status"] == "pending" && md["async_token"] == asyncToken {
+			replacement := append([]types.Message(nil), restored...)
+			next := make([]types.Message, 0, len(sc.Messages)-1+len(replacement))
+			next = append(next, sc.Messages[:i]...)
+			next = append(next, replacement...)
+			next = append(next, sc.Messages[i+1:]...)
+			sc.Messages = next
 			sc.UpdatedAt = time.Now()
 			return true
 		}

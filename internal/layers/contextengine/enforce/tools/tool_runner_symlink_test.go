@@ -1,9 +1,13 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // T: D2-S18-A81-T01 (DM-20260630-013 RH-D2-02)
@@ -65,5 +69,50 @@ func TestResolveWorkspacePath_plainPath(t *testing.T) {
 	want := filepath.Join(workDir, "file.md")
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+// T: D2-S18-A81-T04 (DM-20260630-013 symlink directory regression)
+//
+// A symlink directory pointing outside the workspace must not allow creation of
+// a new missing child below that symlink. EvalSymlinks(target) alone misses this
+// because the final target does not exist yet.
+func TestResolveWorkspacePath_rejectsNewFileUnderExternalSymlinkDir(t *testing.T) {
+	workDir := t.TempDir()
+	outsideDir := t.TempDir()
+	linkPath := filepath.Join(workDir, "outside")
+	if err := os.Symlink(outsideDir, linkPath); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := resolveWorkspacePath(workDir, "outside/new.txt"); err == nil {
+		t.Fatal("expected symlink directory escape to be rejected for missing child")
+	}
+}
+
+// T: D2-S18-A80-T03 (DM-20260630-013 plan-mode bash fail-closed)
+func TestRunBash_planModeDenied(t *testing.T) {
+	workDir := t.TempDir()
+	sc := &types.SessionContext{
+		PermissionMode: types.PermissionPlan,
+		PlanFilePath:   filepath.Join(workDir, "plan.md"),
+	}
+	ctx := WithToolSessionContext(WithToolWorkDir(context.Background(), workDir), sc)
+	got, err := runBash(ctx, workDir, `printf x > other.md`, newToolExecConfig(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || !strings.Contains(got.Error, "plan mode: bash denied") {
+		t.Fatalf("expected plan-mode bash denial, got %#v", got)
+	}
+}
+
+func TestRedactCommandForAudit(t *testing.T) {
+	command := `curl -H "Authorization: Bearer secret-token" 'https://x.test?api_key=abc' PASSWORD=hunter2`
+	got := redactCommandForAudit(command)
+	for _, secret := range []string{"secret-token", "api_key=abc", "hunter2"} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("redacted command still contains %q: %s", secret, got)
+		}
 	}
 }
