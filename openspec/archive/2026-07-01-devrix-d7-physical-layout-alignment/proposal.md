@@ -2,9 +2,13 @@
 
 **Change ID:** `devrix-d7-physical-layout-alignment`
 **Demand ID:** DM-20260701-004
-**Status:** S2_Proposal
+**Status:** S7_Archived (ACCEPTED 2026-07-01)
 **Created:** 2026-07-01
+**Archived:** 2026-07-01
 **Parent Demand:** `demand.md`
+**Verdict:** ACCEPTED
+**Archive PR:** #371
+**Implementation PRs:** #366 · #367 · #368 · #369 · #370
 
 ---
 
