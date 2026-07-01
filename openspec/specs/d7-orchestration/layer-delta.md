@@ -273,7 +273,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `ObserveQuantize` MUST 把用户消息 + 历史 + 上下文结构化为 4 类 Observation，产出 UncertaintyReport。
 
-**Package:** `internal/layers/orchestration/observe/`
+**Package:** `internal/layers/orchestration/orchtypes/`（Observe 节点已合并入 Cross-S kernel；详见 `observation.go` + `uncertainty_report.go` + `uncertainty_coord.go`，DM-20260626-002 物理迁移）
 **DSAFT:** D7-S8-A15 ObserveQuantize
 
 #### Scenario: ObsFact 不降级
@@ -294,7 +294,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `ExecuteArtifact` MUST 按 Plan 调度执行，产出 4 类 Artifact（StateChangeCert / ResponseRecord / ProbeReport / ExperimentData）。
 
-**Package:** `internal/layers/orchestration/execute/` + `shared/types/`（PR-C1 跨域类型上提）
+**Package:** `internal/layers/orchestration/mups/execute/` + `shared/types/`（PR-C1 跨域类型上提；execute 包已物理迁入 mups/，DM-20260626-002 包迁移）
 **DSAFT:** D7-S9-A25 ExecuteArtifact, D7-S9-A26 RouteChannel
 
 #### Scenario: C2/W8 1:1 映射
@@ -315,7 +315,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `VerifyVerdict` MUST 验证 Artifact 是否满足 Plan.FailureCriteria，产出 4 态 Verdict + 14 ExitReason。
 
-**Package:** `internal/layers/orchestration/verify/`
+**Package:** `internal/layers/orchestration/executionflow/verify/`（verify 包已 promote 到 executionflow/verify/，DM-20260626-005 Verify Promotion）
 **DSAFT:** D7-S10-A32..A35
 
 #### Scenario: 14 ExitReason 映射
@@ -339,7 +339,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `RunLearner` MUST 把 Verdict + 追溯链沉淀为 LearningAsset + ReputationEvidence，下轮 Observe 注入 AdaptivePrior。
 
-**Package:** `internal/layers/orchestration/learn/`
+**Package:** `internal/layers/orchestration/mups/learn/`（learn 包已物理迁入 mups/learn/，DM-20260626-002 包迁移；含 asset/ + memory/ + prior/ + reputation/ 4 子包）
 **DSAFT:** D7-S11-A36..A40
 
 #### Scenario: Bayesian Beta 更新
@@ -353,7 +353,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `buildObserveRequest` MUST 从 ReputationStore 加载历史 ReputationEvidence，3 层 fail-safe 注入 AdaptivePrior 到 ObserveRequest。
 
-**Package:** `internal/layers/sessionorchestrator/observe_request.go` + `internal/layers/orchestration/observe/observe_node.go`
+**Package:** `internal/layers/sessionorchestrator/observe_request.go` + `internal/layers/orchestration/orchtypes/{observe_request,uncertainty_report,uncertainty_coord}.go`（observe_node.go 已合并入 orchtypes/，DM-20260626-002 物理迁移）
 **DSAFT:** D7-S12-A41..A43
 
 #### Scenario: 3 层 fail-safe（LP-1 闭环 E2E）
@@ -367,7 +367,7 @@ Three task representations (PlanTask, WaveTaskNode, BackgroundRun) MUST remain s
 
 `processAutoClose` MUST 在 ProcessRequest 终态但 Verifier 未触发时，自动 synthesizeVerdict + Auto-Close。
 
-**Package:** `internal/layers/orchestration/verify/auto_close.go`
+**Package:** `internal/layers/orchestration/sessionorchestrator/autoclose.go`（auto_close.go 已物理合并入 sessionorchestrator/，DM-20260629-001 D7 DSAFT Restructuring）
 **DSAFT:** D7-S13-A47..A49
 
 #### Scenario: Auto-Close R1 idle_timeout

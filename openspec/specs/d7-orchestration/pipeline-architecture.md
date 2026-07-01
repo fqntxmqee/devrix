@@ -632,11 +632,11 @@ ProcessRequest
 |------|---------|
 | D7-S8 Observe | `internal/layers/orchestration/orchtypes/{observation,uncertainty_report,uncertainty_coord,observe_request,intent_quantizer,anomaly_detector,system_anomaly_wiring}.go` |
 | D7-S5 Plan | `internal/layers/orchestration/plan/{plan,plan_struct,planner,blast_radius,errors}.go` + `internal/layers/orchestration/workmodel/{plan_agent,plan_mode}.go`（PlanAgent 仅 /plan 命令入口） |
-| D7-S9 Execute | `internal/layers/orchestration/execute/{channel,channel_commit,channel_protocol,channel_scenario,channel_exploration,errors}.go` + `internal/shared/types/execute.go` + `internal/layers/orchestration/orchtypes/artifact_kind_alias.go` |
+| D7-S9 Execute | `internal/layers/orchestration/mups/execute/{channel,channel_commit,channel_protocol,channel_scenario,channel_exploration,errors}.go` + `internal/shared/types/execute.go` + `internal/layers/orchestration/orchtypes/artifact_kind_alias.go` |
 | D7-S10 Verify | `internal/shared/types/verdict.go` + `internal/layers/orchestration/workmodel/{aggregate_verdicts,verify_with_retry,evidence,evidence_extractor,system_anomaly}.go` + `internal/layers/orchestration/sessionorchestrator/verdict_to_exit_reason.go` |
-| D7-S11 Learn | `internal/layers/orchestration/learn/{learning_asset,asset_content,asset_builder,reputation_evidence,adaptive_prior,memory,reputation_store,learner}.go` + `internal/shared/types/learning.go` |
+| D7-S11 Learn | `internal/layers/orchestration/mups/learn/{learning_asset,asset_content,asset_builder,reputation_evidence,adaptive_prior,memory,reputation_store,learner}.go` + `internal/shared/types/learning.go` |
 | D7-S12 wiring | `internal/layers/orchestration/sessionorchestrator/orchestrator.go::buildObserveRequest` + `internal/layers/orchestration/orchtypes/{observe_request,errors}.go` |
-| D7-S13 Auto-Close | `internal/layers/orchestration/sessionorchestrator/{autoclose,tracing,orchestrator}.go` + `internal/layers/orchestration/learn/{learner,asset_builder}.go` + `internal/layers/orchestration/orchtypes/process.go` |
+| D7-S13 Auto-Close | `internal/layers/orchestration/sessionorchestrator/{autoclose,tracing,orchestrator}.go` + `internal/layers/orchestration/mups/learn/{learner,asset_builder}.go` + `internal/layers/orchestration/orchtypes/process.go` |
 | Turn Loop | `internal/layers/orchestration/sessionorchestrator/{orchestrator,exit_reason,verdict_to_exit_reason,recovery,subturn,tool_stream,compression_summarizer,llm,focus_hint,tracing,contracts}.go` |
 | WorkTree | `internal/layers/orchestration/workmodel/{work_tree,workitem,workitem_store,task_manager,task_manager_metrics,run_spawn,plan_agent,plan_mode,tool_suite,cli_commands}.go` |
 | Escape | `internal/layers/orchestration/escape/` + `internal/layers/orchestration/sessionorchestrator/escape_wiring.go` |
