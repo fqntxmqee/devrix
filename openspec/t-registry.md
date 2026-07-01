@@ -1,8 +1,8 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.11.0
-**Last Updated:** 2026-07-01 (devrix-d2-d7-review-hardening — DM-20260630-013 — D2+D7 +30 T points IMPLEMENTED all P0: D2 114→129 + D7 251→266)
+**Version:** 5.12.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-1 — D7 +12 T points PLANNED (D7-PL-T01..T12): 3 P1 spec doc sync + 6 P0 layout guard (T07-T12); **previous**: devrix-d2-d7-review-hardening — DM-20260630-013 — D2+D7 +30 T points IMPLEMENTED all P0: D2 114→129 + D7 251→266)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -27,9 +27,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 266 | 266 | 0 | 222 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 278 | 266 | 12 | 222 |
 
-**总计**: 609 · IMPLEMENTED 604 · PLANNED 3 · PARTIAL 2 · P0 415
+**总计**: 621 · IMPLEMENTED 604 · PLANNED 15 · PARTIAL 2 · P0 415
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -97,3 +97,30 @@
 | D6-S3-T02 | D6-S3-A02-T02 | JudgeResult 活动 |
 | CROSS-T03 | CROSS-A02-T03 | CheckContracts 活动 |
 | D4-S12-T01 | D2-S12-A01-T01 | 修正域编号（D4→D2） |
+
+---
+
+## 2026-07-01 增量
+
+> **devrix-d7-physical-layout-alignment (DM-20260701-004) PR-1** — D7 +12 T points PLANNED:
+>
+> | 编号 | 描述 | Status | Priority |
+> |------|------|--------|----------|
+> | **D7-PL-T01** | **a-registry.md ## Hardening 段 2 A 落地** | **PLANNED** | **P1** |
+> | **D7-PL-T02** | **a-registry.md ## D7-X Cross-S Kernel 段 6 A 落地** | **PLANNED** | **P1** |
+> | **D7-PL-T03** | **f-registry.md ## Hardening F 段 2 F 落地** | **PLANNED** | **P1** |
+> | **D7-PL-T04** | **f-registry.md ## D7-X F 段 6 F 落地** | **PLANNED** | **P1** |
+> | **D7-PL-T05** | **code-layout.md §4.2 D7 终态化（去 ghost shim + 登记 4 新增归属）** | **PLANNED** | **P1** |
+> | **D7-PL-T06** | **code-layout.md §4.2 D7-S2-A06/A07 当前路径从 `turn/` 改为 `sessionorchestrator/`** | **PLANNED** | **P1** |
+> | **D7-PL-T07** | **PR-2 layout guard TestOrphanDirs（孤儿目录检测）** | **PLANNED** | **P0** |
+> | **D7-PL-T08** | **PR-2 layout guard TestNoResurrectRetiredDirs（防 retired 目录复活）** | **PLANNED** | **P0** |
+> | **D7-PL-T09** | **PR-2 layout guard TestACanonicalLocationsExist（A Code Location 反向验证）** | **PLANNED** | **P0** |
+> | **D7-PL-T10** | **PR-2 layout guard TestFCanonicalLocationsExist（F Code Location 反向验证）** | **PLANNED** | **P0** |
+> | **D7-PL-T11** | **PR-2 layout guard TestGhostDirsInCodeLayout（幽灵行检测）** | **PLANNED** | **P0** |
+> | **D7-PL-T12** | **PR-2 layout guard TestNoRetiredTopLevelFiles（防 retired 顶层文件复活）** | **PLANNED** | **P0** |
+>
+> **统计：** D7 域 266 → **278** T (266 IMPLEMENTED + 12 PLANNED) · 全域 609 → **621** T (604 IMPLEMENTED + 15 PLANNED + 2 PARTIAL) · P0 415 不变（PR-1 是 doc-only 纯 markdown，0 Go 业务代码）
+>
+> **PR 拆分说明：** PR-1 完成 spec doc sync 6 T（T01-T06）；PR-2 完成 6 layout guard 测试（T07-T12）。PR-3 (plan/ doc-only dual-registration) + PR-4 (orchtypes/ Cross-S registration) 由后续 PR 覆盖，**不在本 PR 范围**。
+>
+> **cumulative version bump：** 跳过 v5.11.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步），如未来该 PR merge 时检测到 v5.12.0 已合入，则跳过 v5.11.1 步进。

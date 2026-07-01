@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.12.0
-**Last Updated:** 2026-06-19
+**Version:** 1.13.0
+**Last Updated:** 2026-07-01
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -97,21 +97,34 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D7-S6         | MUPS Governance         | `mupsgov`             | `orchestration/sessionorchestrator/` + `orchestration/mups/` + `orchestration/escape/` + `orchestration/interfaces/` | ✅ governance overlay (DM-20260701-002; no forced directory migration) |
 | —             | Hub-Spoke dispatch (S2) | —                     | `sessionorchestrator/dispatch.go`    | ✅ DM-20260619-005（自 `hubspoke/`） |
 | —             | Hub-Spoke bridge (S4)   | `bridge`              | `executionflow/bridge/`              | ✅ DM-20260619-005（自 `hubspoke/`） |
-| —             | Legacy shim             | `coordinator`         | `orchestration/coordinator/`         | 🔶 1-release aliases only           |
-| —             | Legacy shim             | `hubspoke`            | `orchestration/hubspoke/`            | 🔶 1-release aliases only           |
 | —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
 | —             | Session command queue F | `executionflow`       | `orchestration/executionflow/`       | ✅ DM-013 + DM-20260625-018 PR-3b（物理合并到 executionflow 父级）|
-| —             | Milestone DAG           | `milestone`           | `orchestration/milestone/`           | ✅ 已迁入                              |
-| **D7-S2-A06** | **RunTurnLoop**         | `turn`                | `orchestration/turn/orchestrator.go` | ✅ DM-020                           |
-| **D7-S2-A07** | **InvokeLLM**           | `turn`                | `orchestration/turn/llm.go`          | ✅ DM-020                           |
+| D7-S5 sub     | Plan agent              | `plan`                | `orchestration/plan/`                | ✅ DM-20260625-019 PR-2（物理独立成包，S5 sub-registration carve-out；doc-only dual-registration：物理在 `decisionplanning/` 路径下，但 a/f-registry 同时登记 `plan/` 与 `decisionplanning/`，**0 shim / 0 alias / 0 git mv**）|
+| —             | Cross-S Kernel          | `orchtypes`           | `orchestration/orchtypes/`           | ✅ DM-20260701-004 PR-1（共享类型 / 哨兵 / 边界决策 / 先验 / 异常检测 / LLM 调用契约 6 A + 6 F；**no Go shim, no re-export, 直接 import**）|
+| —             | Cross-cutting Hardening | `hardening`           | `orchestration/hardening/`           | ✅ DM-20260701-004 PR-1（emitter 集中点 namespace，**不是 owner**；ConflictGuard 实际 owner 是 `wavescheduler/`）|
+| —             | TaskContract contracts  | `interfaces`          | `orchestration/interfaces/`          | ✅ DM-20260629-007 (v7.0 PR-A) + DM-20260629-008 (v7.0 PR-B)；pure types 包，0 import D7 任何子包 |
+| **D7-S2-A06** | **RunTurnLoop**         | `sessionorchestrator` | `sessionorchestrator/turn_orchestrator.go` | ✅ DM-020 v2.3（`turn/` 子包已物理合并入 `sessionorchestrator/`，见 DM-20260626-004 6S Package Merge） |
+| **D7-S2-A07** | **InvokeLLM**           | `sessionorchestrator` | `sessionorchestrator/llm.go`         | ✅ DM-020 v2.3（同上）|
 
-> **DM-020 bootstrap 注释（v1.0 Registry / v2.0-b 实施）：** `bootstrap/main.go` 目标接线：
+> **DM-020 bootstrap 注释（v1.0 Registry / v2.3 实施）：** `bootstrap/main.go` 目标接线：
 > 
 > ```text
 > WireContextLLM(obs) → TurnOrchestrator deps  # 迁出 context_engine，D7 持有 ILLMGateway
 > WireContextEngine() → ContextPreparer only   # 无 LLM 字段
 > WireCoordinator(turnOrch, ctxPrep, ...)      # D7 持有 Turn Leader + Hub-Spoke
 > ```
+> 
+> **v6.0.0 6 S 终态（DM-20260626-001 + 后续 package cleanup sprint）：**
+> - **`turn/` 子包已物理合并入 `sessionorchestrator/`**（DM-20260626-004 6S Package Merge），故 D7-S2-A06/A07 当前路径表 1 行（统一归属 `sessionorchestrator/turn_orchestrator.go` + `llm.go`）
+> - **`hubspoke/` 已退役**（DM-20260625-018 Package Cleanup Sprint），dispatch.go / agent_bridge.go / subquery_bridge.go 物理迁入 `sessionorchestrator/` + `executionflow/bridge/`
+> - **`milestone/` 已退役**（早期 v2.x 迁入 `executionflow/workplan/`）
+> - **`coordinator/` 已退役**（v1.1 closure 同步后完全删除）
+> 
+> **v6.0.0+ 新增归属（DM-20260701-004 PR-1 登记）：**
+> - **`plan/`（S5 sub-registration）**：物理独立子包，但 a/f-registry 双登记（同时归属 `decisionplanning/` 路径下的代码），是 **doc-only dual-registration**，**0 物理 shim**
+> - **`orchtypes/`（Cross-S Kernel）**：物理即 kernel，**no Go shim, no re-export, 直接 import**，S1-S6 任意 A 可直接 import
+> - **`hardening/`（Cross-cutting Discipline Keeper）**：emitter 集中点 namespace，**ConflictGuard 实际 owner 是 `wavescheduler/`**（物理位置与 hardener 命名解耦）
+> - **`interfaces/`（TaskContract contracts）**：pure types 包，0 import D7 任何子包
 
 ### 4.3 D2 Context Engine
 
@@ -353,3 +366,4 @@ internal/layers/communication/
 | **1.10.0** | **2026-06-15** | **DM-20260615-004 D7 Intent 路径正交化文档同步**：layering.md v4.4.0 D7 目录树新增 `coordinator/command_handler.go`（IntentCommand 零 LLM 分发）+ `coordinator/orchestrate_path.go`（IntentOrchestrate 显式调 SynthesizeTaskGraph + WaveScheduler）；两文件位于 `internal/layers/orchestration/coordinator/` 包内，PR #35 引入；§3 目录决策树 §6 D1 终态示例同步不需更新（D7 目录树属于 layering.md 职责） |
 | **1.11.0** | **2026-06-16** | **D1 领域文档同步**：§7 OpenSpec 对应表增加 `d1-domain.md` 领域 SoT 与 `terminal-state-guide` / `observability-guide` 指南路径 |
 | **1.12.0** | **2026-06-19** | **D5 v2.1 Terminal（DM-20260619-006）**：§4.6 D5 物理路径表更新为 v2.1 TERMINAL；diagnose 子目录补全 doctor/tracker/faultinject；instrument 子目录补全 debugfilter；genai_tokens.go → instrument/metrics/ + llm_log.go → diagnose/incident/；Bridge 删除路线标注 |
+| **1.13.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-1 §4.2 D7 终态化**：**(1) 移除 retired ghost shim 行**（`coordinator/` 🔶 row 删除 — DM-20260625-018 已全删；`hubspoke/` 🔶 row 删除 — DM-20260626-004 6S Package Merge 已迁入 sessionorchestrator/ + executionflow/bridge/；`turn/` 行 D7-S2-A06/A07 当前路径改为 `sessionorchestrator/turn_orchestrator.go` + `llm.go`（子包已合并）；`milestone/` row 删除 — 早期 v2.x 已迁入 `executionflow/workplan/`）；**(2) 登记 4 个新增归属**：`plan/`（S5 sub-registration carve-out，doc-only dual-registration 同时归属 `decisionplanning/`，**0 shim / 0 alias / 0 git mv**）+ `orchtypes/`（Cross-S Kernel，**no Go shim, no re-export, 直接 import**）+ `hardening/`（Cross-cutting Discipline Keeper namespace，**ConflictGuard 实际 owner 是 wavescheduler/**）+ `interfaces/`（TaskContract contracts pure types 包）；**(3) D7-S2-A06/A07 当前路径表 1 行**（统一归属 `sessionorchestrator/`，原 `turn/` 子包已物理合并）；**(4) cumulative version bump**：跳过 v1.12.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 code-layout 同步） |

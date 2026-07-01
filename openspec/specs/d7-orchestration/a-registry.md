@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.3.0
-**Last Updated:** 2026-07-01 (devrix-d7-historical-s-cleanup DM-20260701-003: S7+ 大段正文迁出至 historical-s-mapping.md; current registry 仅保留 S1-S6)
+**Version:** 5.4.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-1: 新增 ## Hardening 段 + ## D7-X Cross-S Kernel（orchtypes/）段 + 加固 a-registry 与代码分布一致性; **previous**: devrix-d7-historical-s-cleanup DM-20260701-003 S7+ 大段正文迁出至 historical-s-mapping.md → v5.3.0; **earlier**: devrix-d7-taskcontract-unification-pr-b DM-20260629-008 S18 Pessimistic Commit + Rule-based Fallback 段)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 
@@ -207,6 +207,44 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 
 ---
 
+## Hardening ✅ Canonical（横切 Discipline Keeper — 物理 location 补登，DM-20260701-004 PR-1）
+
+> **物理 location 锚点：** `internal/layers/orchestration/hardening/`（emitter 集中点 namespace，**不是 owner**）
+> **承载职责：** metric 命名 / 并发原子化 / state bound / emitter hardening 等专项 fix（DM-20260622-001 已落地的 5 P0/P1 fix）。
+> **与 §v6.0.0 6 S 精简映射 - Cross-cutting Hardening 段 关系：** 本段补充物理路径锚点 + 实装 A；§v6.0.0 段保留 14 S → 6 S 重映射视角。两者互补，不重复。
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| Hardening-A01 | MetricsEmit | A-BE | metric_name, attributes | MetricSpan | metric.recorded | ✅ | `orchestration/hardening/emitter.go`（20+ Emit* span helper 跨节点） |
+| Hardening-A02 | ConcurrencyGuard | A-BE | candidate, conflict_scope | allowed/blocked | — | ✅ | `orchestration/wavescheduler/conflict.go` + `orchestration/wavescheduler/scheduler.go`（ConflictGuard AllowAndRegister 原子调用,**owner: wavescheduler/**，`hardening/` 仅是 namespace） |
+
+> **横切 Discipline Keeper**：横切 S2/S3/S6；ConflictGuard 实际 owner 是 `wavescheduler/`，物理位置与 hardener 命名解耦。`hardening/` 仅是 namespace（emitter 集中点），不是 owner；并发原子化的实施 owner 是 `wavescheduler/scheduler.go::dispatchOne`。后续 v1.1 评估：在 hardening/ 增加 re-export 透明层。
+
+---
+
+## D7-X: Cross-S Kernel（orchtypes/）✅ Canonical — DM-20260701-004 PR-1 新增
+
+> **物理 location 锚点：** `internal/layers/orchestration/orchtypes/`（共享类型 / 哨兵 / 边界决策 / 先验 / 异常检测 / 配置 / LLM 调用契约）
+> **承载职责：** 跨 S1-S6 共享 primitives，被 S5 (intent) + S6 (types) + S1-S6 各层直接 import。
+> **no Go shim, no re-export, 直接 import**：orchtypes/ 是物理 kernel 包，不通过 alias 暴露。
+
+| A ID | Name | Type | Input | Output | State Change | Status | Code Location |
+|------|------|------|-------|--------|--------------|--------|---------------|
+| D7-X-A01 | DefineCrossSPrimitives | A-BE | schema | SharedType | type.registered | ✅ | `orchtypes/`（根包 — Observation / UncertaintyReport / UncertaintyCoord / Verdict / LearningAsset / ReputationEvidence / AdaptivePrior / PlanKind / ChannelKind / ArtifactKind / SideEffectStatus / ExitReason 等核心类型） |
+| D7-X-A02 | DefineSentinelErrors | A-BE | error_code, scope | SentinelError | error.registered | ✅ | `orchtypes/errors.go`（ORCH_* 7100-7113 + ErrORCHTaskSpecEmpty/TaskSpecChannelUnknown/TaskReportEmpty/TaskReportVerdictEmpty/TaskContractTraceInvalid + ErrORCHPessimisticTriggered/EmptyMVP/FallbackRuleInvalid/FallbackAbortTimeout + ErrChannelCtxCancelled 等） |
+| D7-X-A03 | BoundaryDecision | A-BE | boundary_request | BoundaryDecision | boundary.recorded | ✅ | `orchtypes/boundary_decision.go`（SchemaMonotonicNarrowing + BoundaryReason + BoundaryAction enum） |
+| D7-X-A04 | AdaptivePriorInject | A-BE | session_id, track_mode | AdaptivePrior | prior.injected | ✅ | `orchtypes/adaptive_prior_overload.go`（WithPrior 变体 + DefaultDeveloperPrior Beta(5,3) + DefaultOperatorPrior Beta(8,1) + BuildAdaptivePrior Bayesian 合并公式 + EffectivePrior 兜底） |
+| D7-X-A05 | SystemAnomalyDetect | A-BE | observation, history | SystemAnomaly | anomaly.detected | ✅ | `orchtypes/system_anomaly_wiring.go`（跨包 wiring 到 executionflow/verify，SystemAnomaly + AnomalyReport + HistoricalDetector baseline + DetectWithPrior threshold = 0.5 × Mean） |
+| D7-X-A06 | LLMInvokerContract | A-BE | LLMRequest | LLMResponse | llm.invoked | ✅ | `orchtypes/llm_invoker.go`（IGateway 接口 + LLMInvokeRequest/Chunk/Response 不可变 + D2→D3 拆面契约） |
+
+> **Cross-S Kernel 设计原则：**
+> - **物理即 kernel**：`orchtypes/` 是真实物理包（不是 alias 也不是 shim）
+> - **0 reverse import**：orchtypes/ 不 import D7 任何子包（仅依赖 shared/errors + shared/types）
+> - **S-level 透明**：S1-S6 任意 A 可直接 import orchtypes/，无需中间层
+> - **演进路径**：后续 v1.1 评估 — 把 D7-X-A01 子类型按 S 维度再分文件（observation.go / uncertainty.go / verdict.go ...）但保持单包
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -224,3 +262,4 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 | **5.0.0** | **2026-06-26** | **6 S 博弈角色对齐精简**（DM-20260626-001）：(1) 14 S → **6 S + 1 横切**（State Authority / Mediator+Turn Leader+Error Recovery / Mechanism Designer / Costly Signaler+Certifier / Information Producer+Quantizer / Pipeline Coordinator+Memory Curator / 横切 Discipline Keeper）；(2) A 活动 **56 → 49**（S1:4 · S2:7 · S3:4 · S4:9 · S5:8 · S6:15 + Hardening:2）；(3) **新增 §v6.0.0 6 S 精简映射**（14 S → 6 S 完整映射表 + 6 S 完整 A 清单 49 A + 14 S 冗余合并依据 4 类）；(4) 7 Legacy A 全部并入 Canonical（不再保留独立 Legacy 段）；(5) MUPS 5 节点挂载：Observe+Plan 归 S5，Execute+Learn 归 S6，Verify 归 S4，AutoClose+Resume+Escape入口 归 S2 |
 | **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 D7-S20/S21 TaskContract 段**（6 A：D7-S20-A01 BuildTaskSpec + D7-S20-A02 BuildTaskReport + D7-S20-A03 SyncTaskContractSpec + D7-S21-A01 RecordDissent + D7-S21-A02 ClassifyBlockage + D7-S21-A03 ExtractResource），物理包 `orchestration/interfaces/` 7 NEW 文件；(2) **新增 5 个 ORCH_* SentinelError**（7100-7104：TaskSpecEmpty / TaskSpecChannelUnknown / TaskReportEmpty / TaskReportVerdictEmpty / TaskContractTraceInvalid）；(3) A 活动 **49 → 55**（6 v7.0 A 增量）；(4) 4-Layer × 3-Phase 设计框架落地：本 PR 完成 L1 接口层 + L2 字段语义层 + L4 spec 同步 9/11 P0 T IMPLEMENTED（L3 防御运行时层留给 PR-B + PR-C）；(5) Dissent top-3 截断 + summary hash + Learn 沉淀；Blockage 3 类 kind（permission/resource/contract）；Resource token/time/step 三件套；Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report；(6) **0 函数签名变化**（pure types 原则，interfaces 0 import D7 任何子包） |
 | **5.2.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B（DM-20260629-008）L3 防御运行时层**：(1) **新增 D7-S18 Pessimistic Commit + Rule-based Fallback 段**（2 A：D7-S18-A11 EvaluatePessimistic + D7-S18-A12 ResolveRuleFallback），A 活动 55 → 57；(2) **新增 3 NEW interfaces/ 文件**（contracts.go PessimisticCommitGuard interface + 4 ORCH_* 错误码 7110-7113 + fallback_policy.go FallbackPolicyRuleNames + ParseFallbackRuleName + convergence_budget.go NewConvergenceBudget + With* + Validate + RemainingBelowReserve + ToFields），物理包 `orchestration/interfaces/` 共 10 文件；(3) **新增 escape/fallback.go**（~310 LOC，DefaultPessimisticCommitGuard 5 类触发 + 3 FallbackPolicy 路径 + buildChainHash FNV-1a 非加密 digest）；(4) **escape/engine.go +NotifyPessimistic + SetPessimisticGuard/PessimisticGuard + 4 unit tests**；(5) **mups/execute/channel.go +ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit**；(6) **bootstrap/pessimistic_guard_wire.go NEW**（PessimisticCommitEnabled + PessimisticRuleStrategy + NewPessimisticCommitGuardFromEnv + 7 env tests）；(7) **circuit_breaker_test.go +3 L1 Pessimistic 联动测试**（L1 trips StateOpen + 60s 持久窗口 + L1-only reason 含 "l1" 路由 hint）；(8) **6/7 T 点 IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C，本 PR 仅 slog.Info 占位）；(9) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更** |
+| **5.4.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-1**：**(1) 新增 ## Hardening 段**（2 A：Hardening-A01 MetricsEmit + Hardening-A02 ConcurrencyGuard），物理 location 锚点 `orchestration/hardening/`（namespace）+ `orchestration/wavescheduler/`（owner）双归属；**(2) 新增 ## D7-X Cross-S Kernel（orchtypes/）段**（6 A：D7-X-A01 DefineCrossSPrimitives + D7-X-A02 DefineSentinelErrors + D7-X-A03 BoundaryDecision + D7-X-A04 AdaptivePriorInject + D7-X-A05 SystemAnomalyDetect + D7-X-A06 LLMInvokerContract），**物理即 kernel，0 shim / 0 alias / 0 reverse import**；**(3) 与 §v6.0.0 6 S 精简映射 - Cross-cutting Hardening 段互补**（本段补物理路径锚点，§v6.0.0 段保留 14 S → 6 S 重映射视角）；**(4) 0 函数签名变化**（purely additive — 仅追加 ## Hardening + ## D7-X 两段，§v6.0.0 段与 S1-S6 现有 Canonical 段不动）；**(5) cumulative version bump**：跳过 v5.3.0（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S1-S6 canonical 收敛 + S7+ → historical-s-mapping.md 物理拆分），如未来该 PR merge 时检测到 v5.4.0 已合入，则跳过 v5.3.0 步进 |
