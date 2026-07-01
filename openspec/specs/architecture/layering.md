@@ -257,15 +257,16 @@ D1-S1–S12 已于 DM-20260614-006 Phase 3 退役。历史 T ID 追溯见 `opens
 
 ### D7 Orchestration Domain
 
-> **2026-06-13**: 升格自 ORCH v2 读模型包。D7 作为编排域，是**横向协调层**，编排 D2+D4 跨域执行；**D1 仍拥有 ingress**，D7 不替代 D1 Gateway。
+> **2026-07-01**: DM-20260701-002 将 D7 current canonical S 固定为 S1-S6。历史 MUPS 节点 S7-S14 与 TaskContract S20/S21 不再作为 current S，仅在 D7 registry historical/contract mapping 中追溯。
 
 | Module ID | Scenario | Responsibility | Status | 来源 |
 |-----------|----------|----------------|--------|------|
 | D7-S1 | Work Model | Task/Plan 数据模型单一权威来源，生命周期管理 | DESIGN | D2 tasks/ + 新增 |
-| D7-S2 | Session Orchestrator | 用户消息主入口，快速路径 + 编排路径路由 | DESIGN | D2 engine.go 入口上移 |
+| D7-S2 | Session Orchestrator | 用户消息主入口，TurnLoop + session-level coordination | DESIGN | D2 engine.go 入口上移 |
 | D7-S3 | Wave Scheduler | DAG 调度、WorkerPool、ConflictGuard、ContextPolicy | DESIGN | ORCH-S3 升格 |
 | D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 进度广播 | DESIGN | ORCH-S1/S2 升格 |
 | D7-S5 | Decision & Planning | 意图分类（规则+LLM）、任务拆解、执行器选择 | DESIGN | 新增 |
+| D7-S6 | MUPS Governance | Execute / Verify / Learn / Escape / convergence governance | DESIGN | MUPS 5 节点治理归口 |
 
 Spec: `openspec/specs/d7-orchestration/d7-domain.md` · Guides: `terminal-state-guide.md` · `observability-guide.md` (D7)
 

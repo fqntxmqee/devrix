@@ -51,7 +51,7 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *Rol
 	// outcome depended on call order. With ReconcileUncertainty both paths
 	// apply the same convergence contract; the persisted value no longer
 	// ratchets up regardless of which path fires last.
-	u := ReconcileUncertainty(parent.Uncertainty, parent.Uncertainty, stats)
+	u := ReconcileUncertaintyFromChildStats(parent.Uncertainty, stats)
 	if err := tm.Tree().SetUncertainty(sessionID, parent.ID, u); err != nil {
 		slog.Warn("resolve: SetUncertainty failed; parent rollup convergence may stall",
 			"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)

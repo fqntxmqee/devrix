@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.20.0
+**Version:** 4.22.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-06-30 (devrix-mups-deliverable-convergence DM-20260630-012: ADDED A76 StrategicPlanProposer + A32 DeliverableVerifier + Session Deliverable Gate; MODIFIED StatusAfterSpawnNone + DefaultPlanner single override)
+**Last Updated:** 2026-07-01 (devrix-d7-historical-s-cleanup DM-20260701-003: S3 定位澄清 + S7+ 正文迁出 historical-s-mapping.md)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Parent Change:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -18,13 +18,13 @@
 
 D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么样了"**。作为 **横向协调层** 编排 D2（LLM↔Tool 执行原语）与 D4（Agent 委托原语），并向 D1 发布进度事件（D1 仍拥有 ingress）。
 
-**现行实现路径（v4.3 post-cleanup）**：v2.0 Structure（DM-20260619-005）+ devrix-d7-dead-files-cleanup 合流后物理路径与 S 层 1:1 对齐：S2 `sessionorchestrator/`、S3 `wavescheduler/`、S4 `executionflow/{hub,workplan,imsink,bridge}/`、S5 `plan/` + `decisionplanning/`。D1 主入口 `sessionorchestrator.Entry.ProcessMessage`（`bootstrap/wire_coordinator.go::WireD7`）。Intent 四链正交分发不变（CommandHandler / FastPath / OrchestratePath / Skip）。详见 `pipeline-architecture.md` §6.3 + §7。
+**现行实现路径（v4.21 canonical）**：D7 current S 层固定为 S1-S6：S1 `workmodel/`、S2 `sessionorchestrator/`、S3 `wavescheduler/`、S4 `executionflow/{hub,workplan,imsink,bridge}/`、S5 `plan/` + `decisionplanning/`、S6 `sessionorchestrator/item_pipeline.go` + `mups/` + `escape/` + `interfaces/`。D1 主入口 `sessionorchestrator.Entry.ProcessMessage`（`bootstrap/wire_coordinator.go::WireD7`）。用户消息主链路为 `RunSessionTurnLoop → ItemPipelineRunner → WorkTree`；retired `FastPath` / `OrchestratePath` 仅作历史追溯。
 
 ### 核心设计原则
 
 1. **不可变 + 纯函数优先**：值对象（TaskSpec/TaskReport/Verdict）通过 `With*` 返回新副本；Engine 节点间通过 Channel 单向通信
 2. **5 节点管道**：Observe → Plan → Execute → Verify → Learn 顺序执行 + LP-1/2/5 闭环（Learn → Observe / Learn → Skill / Plan → Verdict 反查）
-3. **意图四链正交分发**：CommandHandler / FastPath / OrchestratePath / Skip 各走各的执行链，不复用
+3. **入口收敛**：CommandHandler / Skip 是显式控制链；普通用户消息统一进入 `RunSessionTurnLoop → ItemPipelineRunner`；retired FastPath/OrchestratePath 不再作为 current 架构链路
 4. **Auto-Close 异步触发**：Verify 完成后异步触发 Learn，不阻塞 channel close（3 层 fail-safe：nil learner / Learn error / channel cancel）
 5. **Pessimistic Commit L3 防御**：5 类触发（resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort）+ Rule-based Fallback 4 候选规则
 6. **CoW VersionChain 不变性**：所有 Task/Plan/Artifact 走 Copy-on-Write 版本链，避免 in-place mutation
@@ -36,9 +36,10 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 |------|------|------|--------|
 | D7-S1 | Work Model | WorkItem CRUD、依赖 DAG、磁盘持久化、PlanMode 状态机 | 写：被 S2/S3 写；读：被 S4 读 |
 | D7-S2 | Session Orchestrator | 用户消息主入口、Turn 主循环、Intent 四链分发 | 调用 S1/S3/S4/S5；发布 D7-S4 事件 |
-| D7-S3 | Wave Scheduler | TaskGraph DAG 调度、WorkerPool、ConflictGuard、ContextPolicy | 写 S1 状态；读 S2 directive |
+| D7-S3 | Wave Scheduler | TaskGraph DAG 调度、WorkerPool、ConflictGuard、ContextPolicy；**仅** explicit wave / background / delegate 触发，**不是**普通用户消息主链路 | 写 S1 状态；由 Plan/delegate 显式调用 |
 | D7-S4 | Execution Flow | FlowEvent 聚合、WorkPlan 快照、IM 广播 | 读 S2/S3 events；写 D1 progress |
 | D7-S5 | Decision & Planning | 意图分类、任务拆解、执行器选择、PlanKind 4 类 | 读 D2/D3 信号；驱动 S3 |
+| D7-S6 | MUPS Governance | Execute / Verify / Learn / Escape / convergence governance | 读 S1/S5；写 S1 round/verdict/learning state |
 
 ---
 
@@ -52,11 +53,12 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 | S | D7-S3 | Wave Scheduler | `wavescheduler/` |
 | S | D7-S4 | Execution Flow | `executionflow/{hub,workplan,imsink,bridge}/` |
 | S | D7-S5 | Decision & Planning | `plan/` + `decisionplanning/` |
+| S | D7-S6 | MUPS Governance | `sessionorchestrator/` + `mups/` + `escape/` + `interfaces/` |
 | A | A1-A99 | 22 个核心活动 | 见 `a-registry.md` |
 | F | F1-F999 | 功能点编排 | 见 `f-registry.md` |
 | T | T1-T200 | 测试点（T01-T180 IMPLEMENTED，T181-T200 PLANNED） | 见 `t-registry.md` |
 
-**当前计数（v4.20.0）**：D=1, S=6, A=22, F=120, T=188（IMPLEMENTED）。Canonical 5 节点 = Observe-A15 / Plan-A22 / Execute-A25/A26 / Verify-A32 / Learn-A36-A40。
+**当前计数（v4.21.0）**：D=1, S=6 (canonical), A=22 current + historical mapped, F=120+, T=188+（IMPLEMENTED）。Canonical 5 节点 = S5 Observe/Plan + S6 Execute/Verify/Learn，不再作为独立 S 层扩张。
 
 ---
 
@@ -66,21 +68,30 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 |----|----------|----------------|--------|----------|
 | D7-S1 | Work Model | **WorkItem** CRUD、依赖 DAG、磁盘持久化（schema v2）、PlanMode 状态机 | **IMPLEMENTED** | `workmodel/work_tree.go` + `workitem.go` + `sessionorchestrator/workmodel.go` |
 | D7-S2 | Session Orchestrator | ProcessMessage、FastPath、TurnLoop、Session Deliverable Gate（ExtractSessionDeliverable + LastTextQualityGate） | **IMPLEMENTED** | `sessionorchestrator/` |
-| D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard | **IMPLEMENTED** | `wavescheduler/` |
+| D7-S3 | Wave Scheduler | TaskGraph DAG、5-slot 池、ContextPolicy、ConflictGuard；**explicit wave/background 调度**，非 ItemPipeline 主链路 | **IMPLEMENTED** | `wavescheduler/` |
 | D7-S4 | Execution Flow | Hub 双通道发布、WorkPlan 读模型、IM worker_progress、SpokeBridge | **IMPLEMENTED** | `executionflow/` |
 | D7-S5 | Decision & Planning | PlanAgent、规则+LLM 分类、PlanKind 4 类 + DefaultPlanner + **StrategicPlanProposer (A76)** | **IMPLEMENTED** | `plan/` + `decisionplanning/` + `sessionorchestrator/strategic_plan_proposer.go` |
-| D7-S6 | Error Aggregation & Metrics | errors.Join 聚合 + InterruptMetrics + 4 新 WaveScheduler metrics 字段 | **IMPLEMENTED** | `sessionorchestrator/{interrupt,metrics}.go` + `wavescheduler/scheduler.go` |
-| D7-S8 | Observation + UncertaintyReport | Observation 4 类 + UncertaintyReport Partition + UncertaintyCoord | **IMPLEMENTED** | `orchtypes/{observation,uncertainty_report,uncertainty_coord}.go` |
-| D7-S9 | Execute Artifact | ArtifactKind 4 类 + SideEffectStatus 5 态 + **DeliverableVerifier (A32)** schema gate | **IMPLEMENTED** | `shared/types/execute.go` + `sessionorchestrator/deliverable_verify.go` |
-| D7-S11 | Learn Node | LearningAsset 5 类 + ReputationEvidence + Bayesian + 3 通道 Memory + Learner | **IMPLEMENTED** | `learn/` + `shared/types/learning.go` |
-| D7-S12 | Observe-Learner 闭环 | ObserveRequest + IntentQuantizer + AnomalyDetector + buildObserveRequest 3 层 fail-safe | **IMPLEMENTED** | `orchtypes/{observe_request,intent_quantizer,anomaly_detector}.go` |
-| D7-S13 | 5 节点运行时闭环 | processAutoClose + synthesizeVerdict 4 规则 + TrackMode + 6 prior attributes | **IMPLEMENTED** | `sessionorchestrator/{autoclose,tracing,orchestrator}.go` |
-| D7-S14 | MUPS v5 逃逸 | LoopDepthTracker v2 + EscapeEngine 5 节点 + CircuitBreaker 5 层 + ResumeSession | **IMPLEMENTED** | `escape/` |
-| D7-S15 | WorkItem Rollup | Parent Rollup Gate + StructuredDeliverable upward bubble + rollup findings merge | **IMPLEMENTED** | `workmodel/rollup_gate.go` + `context_bubble_apply.go` + `sessionorchestrator/rollup_*` |
-| D7-S16 | Layer SubContext | Per-Layer SubContext + ChildDownlink + Observe LLM (A75) + StrategicPlanProposer (A76) | **IMPLEMENTED** | `wavescheduler/context*.go` + `sessionorchestrator/{llm_observation_proposer,strategic_plan_proposer}.go` |
-| D7-S18 | Pessimistic + Fallback | PessimisticCommitGuard 5 类触发 + 4 候选规则 + CoW VersionChain | **IMPLEMENTED (PR-A/B/C)** | `interfaces/contracts.go` + `escape/fallback.go` + `mups/execute/channel.go` |
-| D7-S20 | TaskSpec 下行 | TaskSpec 5 字段 + NewTaskSpec fail-fast + 3 处创建点统一 | **IMPLEMENTED (PR-A 9/11 P0 T)** | `interfaces/task_spec.go` |
-| D7-S21 | TaskReport 上行 | TaskReport 7 字段 + Dissent/Blockage/Resource 语义层 + Learn 沉淀 | **IMPLEMENTED (PR-A 9/11 P0 T)** | `interfaces/task_report.go` + `mups/learn/asset/asset_builder.go` |
+| D7-S6 | MUPS Governance | Execute / Verify / Learn / Escape / Pessimistic / convergence governance；承载 D7-S6 横切 hardening | **IMPLEMENTED** | `sessionorchestrator/item_pipeline.go` + `workitem_executor.go` + `deliverable_verify.go` + `mups/` + `escape/` + `interfaces/` |
+
+### Historical / Contract Mapping（非 current S）
+
+> 完整 A/F 正文与 v6.0.0 14→6 重映射见 **`historical-s-mapping.md`**。下表为 current 追溯索引。
+
+| Historical ID | Current Target | Meaning |
+|---------------|----------------|---------|
+| D7-S7 | D7-S6-A01 | MUPS 5 节点管道入口 |
+| D7-S8 | D7-S5-A06 | Observe + UncertaintyReport |
+| D7-S9 | D7-S6-A02 | Execute Artifact / WorkItemExecutor |
+| D7-S10 | D7-S6-A03 | Verify Verdict / Deliverable Gate |
+| D7-S11 | D7-S6-A04 | Learn Node / Reputation / Memory |
+| D7-S12 | D7-S6-A05 | Observe-Learner 闭环 |
+| D7-S13 | D7-S2-A07 + D7-S6-A03 | AutoClose / session completion |
+| D7-S14 | D7-S6-A06 | MUPS v5 EscapeEngine |
+| D7-S15 | D7-S1-A07 | WorkItem Rollup |
+| D7-S16 | D7-S1-A08 + D7-S5-A07 | Layer SubContext / ScopeContract / StrategicPlanProposer |
+| D7-S18 | D7-S6-A07 | Pessimistic + Fallback |
+| D7-S20 | Contract → D7-S1/D7-S6 | TaskSpec 下行契约 |
+| D7-S21 | Contract → D7-S1/D7-S6 | TaskReport 上行契约 |
 
 ---
 
@@ -90,28 +101,25 @@ D7 编排域回答 **"做什么、按什么顺序做、谁来做、做得怎么�
 
 ```
 D1 Gateway.RouteInbound
-    └── D7-S2 SessionOrchestrator.ProcessMessage    ← v1.0 主入口（wired by wire_coordinator.go::WireD7）
+    └── D7-S2 SessionOrchestrator.ProcessMessage    ← 主入口（wired by wire_coordinator.go::WireD7）
             ├── D7-S2-A02 ClassifyIntent (rule + LLM fallback)
-            ├── switch intent.Kind (v1.1.0+ orthogonal dispatch):
+            ├── switch intent.Kind:
             │     ├─ IntentSkip        → close channel
             │     ├─ IntentCommand     → CommandHandler.Handle
-            │     ├─ IntentFast        → FastPath.Run → TurnOrchestrator → D3 (LLM) + D2 (tools/persist)
-            │     └─ IntentOrchestrate → OrchestratePath.Run
-            │                            ├─ TaskDecomposer.SynthesizeTaskGraph (D7-S5-A02)
-            │                            ├─ WaveScheduler.Start (D7-S3-A01)
-            │                            └─ WaveScheduler.WaitForCompletion (D7-S3)
+            │     └─ IntentFast / IntentOrchestrate / default
+            │           → RunSessionTurnLoop → ItemPipelineRunner (D7-S6 MUPS Governance)
+            │                 ├─ Observe / Plan (D7-S5)
+            │                 ├─ Execute / Verify / Learn (D7-S6)
+            │                 └─ WorkTree rollup (D7-S1)
             ├── D7-S2-A06 RunTurnLoop → D7-S2-A07 InvokeLLM → D3 (LLM Gateway)
             │                            → D2 (ContextPreparer / ToolRoundExecutor / SessionPersister)
-            ├── D7-S2-A04 DispatchWorker → hubspoke.Dispatcher → D4 Worker / D2 SubQuery
+            ├── D7-S2-A04 DispatchWorker → sessionorchestrator/dispatch.go → D4 Worker / D2 SubQuery
             └── flow.GlobalHub.Publish    ← D7-S4 读模型入口
                     ├── workplan.Service.Apply
                     ├── queue.SessionQueue (delegate-progress)
                     └── imsink.GatewaySink (worker_progress)
 
-D4 Delegate.Service
-    └── FlowBridge → flow.GlobalHub.Publish
-
-WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
+WaveScheduler (独立 explicit 路径 — D7-S3；由 delegate_tools / Plan / background job 触发，不经 ProcessMessage 主链路)
     ├── TaskGraph.ReadyNodes
     ├── WorkerPool.Acquire (cursor=1, claude_code=1, subagent=3)
     ├── ConflictGuard.Allow
@@ -180,9 +188,10 @@ WaveScheduler (独立调用路径，由 delegate_tools / Plan 触发)
 
 ## 关键链路口
 
-1. **主入口链**：D1 RouteInbound → D7-S2 ProcessMessage → ClassifyIntent → switch intent → 4 链分发
-2. **5 节点管道链**：Observe (S8/S12/A75) → Plan (S5/A22/A76 StrategicPlan) → Execute (S9/S25/S26) → Verify (S9/A32 DeliverableVerifier + S10) → Learn (S11/S36-S40)
-3. **D7-D1 反馈链**：D7-S4 Hub.Publish → WorkPlan.Apply → SessionQueue → imsink.GatewaySink (飞书卡片)
-4. **跨域消费**：D2 Prepare (V10/V11) → D3 LLM Gateway → D4 Delegate.Service → D5 Span Evidence
-5. **Escape 链**：Observe/Plan/Execute/Verify 任一节点失败 → EscapeEngine.Evaluate → ChainedArbitrator (LLM/Rule/Human) → Action 6 类
-6. **LP-1 闭环链**：Learn × 3 Pass → Alpha=3 → Round 2 Observe 用 Beta(8,3) 注入（PriorSessionAttrs 6 字段）
+1. **主入口链**：D1 RouteInbound → D7-S2 ProcessMessage → ClassifyIntent → Command / TurnLoop → ItemPipelineRunner
+2. **5 节点管道链**：Observe/Plan (S5) → Execute/Verify/Learn (S6) → WorkTree rollup (S1)
+3. **Wave 调度链（S3，独立）**：delegate_tools / Plan / background → WaveScheduler.Start → WorkerPool → ArtifactStore
+4. **D7-D1 反馈链**：D7-S4 Hub.Publish → WorkPlan.Apply → SessionQueue → imsink.GatewaySink (飞书卡片)
+5. **跨域消费**：D2 Prepare (V10/V11) → D3 LLM Gateway → D4 Delegate.Service → D5 Span Evidence
+6. **Escape 链**：Observe/Plan/Execute/Verify 任一节点失败 → EscapeEngine.Evaluate → ChainedArbitrator (LLM/Rule/Human) → Action 6 类
+7. **LP-1 闭环链**：Learn × 3 Pass → Alpha=3 → Round 2 Observe 用 Beta(8,3) 注入（PriorSessionAttrs 6 字段）

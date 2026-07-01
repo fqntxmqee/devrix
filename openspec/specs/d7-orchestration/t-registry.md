@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.19.0
-**Last Updated:** 2026-07-01 (devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222 — D7 并发 (S2-A80 PerInvocationEmit + S3-A84 OnReleaseOnce) + D7 错误可观测 (S2-A81/A82/A83/A85 4 静默吞咽→slog.Warn + S2-A84 SetRoundPhase span + S15-A42 resolve warn + S16-A77 DefaultChildExpectedReturn schema tag) + D7 escape ctx cancel (S14-A48 200 cycles no-leak + S9-A33 ErrChannelCtxCancelled) + D7 规约清理 (S14-A49 + S16-A78 i18n 化 + S1-A80 SetStore mu 保护 + decompose_proposer_test 扫描 1→6 文件))
+**Version:** 4.21.0
+**Last Updated:** 2026-07-01 (devrix-d7-historical-s-cleanup DM-20260701-003: +6 D7-HC T points for historical doc split, S3 boundary, registry guards)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -18,6 +18,32 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 > **按 S 分组摘要 / P0 Runbook / Trace 树：** 见 `observability-guide.md` §5–§7（本文保留全表登记）。
 
 **状态：** IMPLEMENTED · PARTIAL · PLANNED
+
+---
+
+## D7-SN: S Layer Normalization (DM-20260701-002)
+
+| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|-----------|------|----------|-----------|--------|----------| --- |
+| **D7-SN-T01** | — | OpenSpec change 包完整：demand/proposal/design/tasks/delta spec | D7-S6-A14 | `openspec/changes/devrix-d7-s-layer-normalization/` | IMPLEMENTED | P0 | Spec_Review |
+| **D7-SN-T02** | — | current canonical S 仅 S1-S6，S7+ 不作为 current S | D7-S6-A14 | `internal/layers/orchestration/sessionorchestrator/d7_architecture_guard_test.go` | IMPLEMENTED | P0 | Spec_Review |
+| **D7-SN-T03** | — | A/F registry current path 指向现行 runtime，历史路径仅作 mapping | D7-S6-A14 | `internal/layers/orchestration/sessionorchestrator/d7_architecture_guard_test.go` | IMPLEMENTED | P1 | Spec_Review |
+| **D7-SN-T04** | — | retired FastPath/OrchestratePath 文件不得回归 | D7-S2-A01 | `internal/layers/orchestration/sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P1 | Session_Process |
+| **D7-SN-T05** | — | StrategicPlanReject 写入 round rationale 并回灌下一轮 prompt | D7-S5-A07 | `internal/layers/orchestration/sessionorchestrator/strategic_plan_reject_feedback_test.go` | IMPLEMENTED | P1 | TaskGraph_Synthesize |
+| **D7-SN-T06** | — | parent reevaluate uncertainty 使用 child-stats signal，全 pass 收敛下降 | D7-S1-A07 | `internal/layers/orchestration/workmodel/uncertainty_reconcile_test.go` | IMPLEMENTED | P1 | Worktree_Op |
+
+---
+
+## D7-HC: Historical S Cleanup (DM-20260701-003)
+
+| T ID | Legacy ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|-----------|------|----------|-----------|--------|----------| --- |
+| **D7-HC-T01** | — | OpenSpec change 包完整：demand/proposal/design/tasks/delta spec | D7-S6-A14 | `openspec/changes/devrix-d7-historical-s-cleanup/` | IMPLEMENTED | P0 | Spec_Review |
+| **D7-HC-T02** | — | `historical-s-mapping.md` 存在且 spec 引用 | D7-S6-A14 | `sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P0 | Spec_Review |
+| **D7-HC-T03** | — | a-registry 不含 S7+ 大段 Historical heading | D7-S6-A14 | `sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P0 | Spec_Review |
+| **D7-HC-T04** | — | f-registry 不含 S8+ F heading 与 fastpath 路径 | D7-S6-A14 | `sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P1 | Spec_Review |
+| **D7-HC-T05** | — | spec.md 明确 S3 为 explicit wave/background，非主链路 | D7-S3-A01 | `sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P1 | Spec_Review |
+| **D7-HC-T06** | — | Architecture 图不再展示 FastPath/OrchestratePath 为 current 路径 | D7-S2-A01 | `sessionorchestrator/main_path_arch_test.go` | IMPLEMENTED | P1 | Spec_Review |
 
 ---
 

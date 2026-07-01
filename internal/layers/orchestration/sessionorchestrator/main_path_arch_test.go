@@ -127,6 +127,92 @@ func TestD7MainPath_RetiredIngressFilesAbsent(t *testing.T) {
 	}
 }
 
+// T: D7-SN-T02 / D7-SN-T03 / D7-HC-T02 / D7-HC-T03 (DM-20260701-002 / DM-20260701-003)
+//
+// D7 current canonical S must stay normalized to S1-S6. Historical MUPS
+// nodes (former S7-S14) and TaskContract IDs (former S20/S21) may remain
+// in mapping sections or historical-s-mapping.md, but must not be reintroduced
+// as current canonical scenario rows or registry headings.
+func TestD7MainPath_CanonicalSLayerNormalized(t *testing.T) {
+	root := findModuleRoot(t)
+	specPath := filepath.Join(root, "openspec/specs/d7-orchestration/spec.md")
+	specData, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec.md: %v", err)
+	}
+	spec := string(specData)
+	for _, needle := range []string{
+		"| D7-S6 | MUPS Governance |",
+		"### Historical / Contract Mapping",
+		"historical-s-mapping.md",
+	} {
+		if !strings.Contains(spec, needle) {
+			t.Fatalf("spec.md missing normalized S-layer marker %q", needle)
+		}
+	}
+	for _, retiredCurrent := range []string{
+		"| D7-S8 | Observation + UncertaintyReport |",
+		"| D7-S20 | TaskSpec 下行 |",
+		"| D7-S21 | TaskReport 上行 |",
+	} {
+		if strings.Contains(spec, retiredCurrent) {
+			t.Fatalf("spec.md reintroduced former S as current scenario: %q", retiredCurrent)
+		}
+	}
+	if !strings.Contains(spec, "explicit wave") {
+		t.Fatalf("spec.md missing S3 explicit wave/background positioning")
+	}
+	for _, retiredArch := range []string{
+		"FastPath.Run",
+		"OrchestratePath.Run",
+	} {
+		if strings.Contains(spec, retiredArch) {
+			t.Fatalf("spec.md Architecture still shows retired ingress: %q", retiredArch)
+		}
+	}
+
+	registryPath := filepath.Join(root, "openspec/specs/d7-orchestration/a-registry.md")
+	registryData, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatalf("read a-registry.md: %v", err)
+	}
+	registry := string(registryData)
+	for _, retiredHeading := range []string{
+		"### D7-S7: MUPS 5 节点管道入口",
+		"### D7-S8: Observe 节点 ✅ Canonical",
+		"### Historical: D7-S7",
+		"## D7-S20 / S21: TaskContract 统一",
+	} {
+		if strings.Contains(registry, retiredHeading) {
+			t.Fatalf("a-registry.md reintroduced retired current heading: %q", retiredHeading)
+		}
+	}
+	if !strings.Contains(registry, "historical-s-mapping.md") {
+		t.Fatalf("a-registry.md missing pointer to historical-s-mapping.md")
+	}
+
+	fRegistryPath := filepath.Join(root, "openspec/specs/d7-orchestration/f-registry.md")
+	fRegistryData, err := os.ReadFile(fRegistryPath)
+	if err != nil {
+		t.Fatalf("read f-registry.md: %v", err)
+	}
+	fRegistry := string(fRegistryData)
+	for _, retiredFHeading := range []string{
+		"## D7-S8-A15 ObserveQuantize",
+		"## D7-S14-A50..A52 EscapeEngine",
+		"fastpath.go",
+	} {
+		if strings.Contains(fRegistry, retiredFHeading) {
+			t.Fatalf("f-registry.md reintroduced retired F heading or path: %q", retiredFHeading)
+		}
+	}
+
+	histPath := filepath.Join(root, "openspec/specs/d7-orchestration/historical-s-mapping.md")
+	if _, err := os.Stat(histPath); err != nil {
+		t.Fatalf("historical-s-mapping.md missing: %v", err)
+	}
+}
+
 // Bootstrap must wire ItemPipelineRunner so ProcessMessage can reach MUPS.
 func TestD7MainPath_BootstrapWiresItemPipeline(t *testing.T) {
 	root := findModuleRoot(t)

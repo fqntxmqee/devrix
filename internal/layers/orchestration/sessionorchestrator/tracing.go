@@ -48,9 +48,9 @@ func routeLabel(intent orchtypes.IntentClassification) string {
 	if intent.Reason == "loop_first_default" {
 		return "turn"
 	}
-	// v6.1.0: IntentFast and IntentOrchestrate both route through
-	// OrchestratePath (5-node MUPS pipeline). Collapse the label so trace
-	// dashboards reflect the single execution surface.
+	// v6.1.0+: IntentFast and IntentOrchestrate are classifier labels only;
+	// both route through RunSessionTurnLoop / ItemPipelineRunner. Collapse
+	// the label so trace dashboards reflect the single execution surface.
 	switch intent.Kind {
 	case orchtypes.IntentCommand:
 		return "command"

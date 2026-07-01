@@ -1,0 +1,22 @@
+change_id: devrix-d7-s-layer-normalization
+demand_id: DM-20260701-002
+title: D7 S 层归一化 — DSAFT canonical S1-S6 与 WorkTree+MUPS 关系收敛
+priority: P0
+status: s7_archived
+created_at: 2026-07-01
+archived_at: 2026-07-01
+domains: [D7]
+source: architecture-review 2026-07-01 (D7 WorkTree+MUPS + DSAFT S/A layer review)
+dsaft_scenarios:
+  - D7-S1   # Work Model
+  - D7-S2   # Session Orchestrator
+  - D7-S3   # Wave Scheduler
+  - D7-S4   # Execution Flow
+  - D7-S5   # Decision & Planning
+  - D7-S6   # MUPS Governance / Hardening
+related:
+  - DM-20260701-001  # MUPS propagation / convergence semantics
+  - DM-20260630-013  # D2+D7 review hardening
+  - DM-20260626-001  # D7 six-S simplification
+t_points_planned: 6
+t_points_implemented: 6

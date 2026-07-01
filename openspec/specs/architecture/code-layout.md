@@ -94,6 +94,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | D7-S3         | Wave Scheduler          | `wavescheduler`       | `orchestration/wavescheduler/`       | ✅ DM-20260619-005                  |
 | D7-S4         | Execution Flow          | `executionflow`       | `orchestration/executionflow/`       | ✅ DM-20260619-005                  |
 | D7-S5         | Decision & Planning     | `decisionplanning`    | `orchestration/decisionplanning/`    | ✅ DM-20260619-005                  |
+| D7-S6         | MUPS Governance         | `mupsgov`             | `orchestration/sessionorchestrator/` + `orchestration/mups/` + `orchestration/escape/` + `orchestration/interfaces/` | ✅ governance overlay (DM-20260701-002; no forced directory migration) |
 | —             | Hub-Spoke dispatch (S2) | —                     | `sessionorchestrator/dispatch.go`    | ✅ DM-20260619-005（自 `hubspoke/`） |
 | —             | Hub-Spoke bridge (S4)   | `bridge`              | `executionflow/bridge/`              | ✅ DM-20260619-005（自 `hubspoke/`） |
 | —             | Legacy shim             | `coordinator`         | `orchestration/coordinator/`         | 🔶 1-release aliases only           |

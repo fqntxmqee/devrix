@@ -59,8 +59,8 @@ func TestReconcileUncertainty_AllChildrenTerminal_ConvergenceVisibility(t *testi
 			// damped: 0.5*0.6 + 0.5*historical. historicalUncertainty: stats.Total>0,
 			// stats.Running>0 → 0.3 + (0/4)*0.4 = 0.3. damped = 0.5*0.6 + 0.5*0.3 = 0.45
 			// roundSignal=0.05 → max(0.05, 0.45) = 0.45
-			wantAbove:  ptrF(0.3),
-			wantBelow:  ptrF(0.6),
+			wantAbove: ptrF(0.3),
+			wantBelow: ptrF(0.6),
 		},
 		{
 			name:       "no_children_at_all_returns_blend",
@@ -68,8 +68,8 @@ func TestReconcileUncertainty_AllChildrenTerminal_ConvergenceVisibility(t *testi
 			round:      0.4,
 			stats:      ChildOutcomeStats{}, // Total==0 → falls through to in-flight branch
 			// damped: 0.5*0.5 + 0.5*historical=0.5 → 0.5; round=0.4 → max(0.4, 0.5)=0.5
-			wantAbove:  ptrF(0.3),
-			wantBelow:  ptrF(0.7),
+			wantAbove: ptrF(0.3),
+			wantBelow: ptrF(0.7),
 		},
 	}
 
@@ -124,6 +124,15 @@ func TestReconcileUncertainty_WriterEquivalence(t *testing.T) {
 	v2 := ReconcileUncertainty(v1, 0.1, stats)
 	if math.Abs(v1-v2) > 1e-12 {
 		t.Errorf("writer-equivalence violated: writer1=%.4f writer2=%.4f", v1, v2)
+	}
+}
+
+// T: D7-SN-T06 (DM-20260701-002)
+func TestReconcileUncertaintyFromChildStats_AllPassDropsStoredParent(t *testing.T) {
+	stats := ChildOutcomeStats{Total: 4, Completed: 4, Failed: 0, Running: 0}
+	got := ReconcileUncertaintyFromChildStats(0.95, stats)
+	if got > 0.05 {
+		t.Fatalf("got %.4f, want near-zero all-pass convergence", got)
 	}
 }
 
