@@ -1,10 +1,10 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.12.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-2 — D7 +12 T points PLANNED→IMPLEMENTED (D7-PL-T01..T12 全收口) + 6 ghost 行 status flip ✅→🔶 + 25/25 orchestration packages `go test -race` PASS; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-1 — D7 +12 T points PLANNED 登记)
+**Version:** 5.13.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-3 — D7 +1 T point PLANNED→IMPLEMENTED (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED) + a-registry v5.4.0→v5.5.0 (S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate + 新增 ## D7-S5 双登记说明段 + S5 段 cross-reference) + code-layout v1.13.0→v1.14.0 (§4.2 D7-S5 sub 行 "Plan agent"→"Plan Generation" + doc-only 双登记 wording 收敛) + CHANGELOG.md 清理 PR-1 遗留 `<<<<<<<` conflict marker + 0 业务代码变更; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-2 — D7 +12 T points IMPLEMENTED)
 
-**Version:** 5.13.0 (PR-2 落地: D7 域 12 T 收口 + 全域 P0 415→421)
+**Version:** 5.13.0 (PR-3 落地: D7 域 13 T 收口 [12 → 13] + D7 t-registry v4.23.0 → v4.24.0)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -29,9 +29,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 278 | 278 | 0 | 228 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 279 | 279 | 0 | 228 |
 
-**总计**: 621 · IMPLEMENTED 616 · PLANNED 3 · PARTIAL 2 · P0 421
+**总计**: 622 · IMPLEMENTED 620 · PLANNED 3 · PARTIAL 2 · P0 421
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -149,3 +149,15 @@
 > **layout guard 子包新增：** `internal/layers/orchestration/layout/` 4 个文件（doc.go + types.go + guard.go + guard_test.go）= 380 行 Go（test-only，0 业务代码）。25/25 orchestration packages `go test -race -count=1` PASS。
 >
 > **Registry ghost 行 status flip（PR-2 同步落地）：** layout guard 反向验证发现 3 类 ghost 行（`executionflow/bridge/subquery_bridge.go` D7-S4-A05 + `decisionplanning/executor.go` D7-S5-A03 + `decisionplanning/classifier_fallback.go` D7-S2-A02-F02 / D7-S5-A01-F02 / F03）共 6 个 A/F 行 — 功能已 inline 到 `classifier.go::ClassifyWithPrior`/`ClassifyWithReport`，物理文件未实现。状态从 ✅ 翻转为 🔶（加注释说明），PR-2 layout guard `TestACanonicalLocationsExist` / `TestFCanonicalLocationsExist` 通过 `Status != ✅` 过滤豁免。
+>
+> ---
+>
+> **devrix-d7-physical-layout-alignment (DM-20260701-004) PR-3** — D7 +1 T point PLANNED → IMPLEMENTED (D7-PL-T13 `plan/` S5 doc-only dual registration) + a-registry v5.4.0→v5.5.0 + code-layout v1.13.0→v1.14.0 + CHANGELOG.md cleanup:
+>
+> | 编号 | 描述 | Status | Priority |
+> |------|------|--------|----------|
+> | **D7-PL-T13** | **`plan/` 归属 S5 doc-only dual registration 在 code-layout + a-registry 双登记**：a-registry.md S6 段新增 D7-S6-A03 PlanValidate（`decisionplanning/plan_mode.go::Validate`）+ D7-S6-A04 PlanGenerate（`plan/planner.go::DefaultPlanner.Generate`）+ 新增 ## D7-S5 `plan/` ↔ `decisionplanning/` 双登记说明 段 + S5 段 cross-reference；code-layout.md §4.2 D7-S5 sub 行 "Plan agent"→"Plan Generation" 命名收敛；0 函数签名 / 0 物理路径变化（purely additive doc-only registration） | **IMPLEMENTED** | **P1** |
+>
+> **CHANGELOG.md cleanup（顺带 fix）：** PR-1 rebase 时遗留的孤儿 conflict marker `<<<<<<< HEAD`（无 `=======` / `>>>>>>>` 关闭）已清理。物理文件未受冲突影响（master 上 PR-2 merge 时也带此 marker），Markdown 渲染不影响。
+>
+> **统计：** D7 域 278 → **279** T (278→**279** IMPLEMENTED + 0 PLANNED) · 全域 621 → **622** T (619→**620** IMPLEMENTED + 2 PLANNED + 2 PARTIAL) · P0 421 不变（T13 为 P1）

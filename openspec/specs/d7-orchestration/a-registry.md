@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.4.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-1: 新增 ## Hardening 段 + ## D7-X Cross-S Kernel（orchtypes/）段 + 加固 a-registry 与代码分布一致性; **previous**: devrix-d7-historical-s-cleanup DM-20260701-003 S7+ 大段正文迁出至 historical-s-mapping.md → v5.3.0; **earlier**: devrix-d7-taskcontract-unification-pr-b DM-20260629-008 S18 Pessimistic Commit + Rule-based Fallback 段)
+**Version:** 5.5.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行 + 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + S5 段加 cross-reference; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1: 新增 ## Hardening 段 + ## D7-X Cross-S Kernel（orchtypes/）段 + 加固 a-registry 与代码分布一致性 → v5.4.0; **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 S7+ 大段正文迁出至 historical-s-mapping.md → v5.3.0)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 
@@ -124,6 +124,8 @@ D7 编排域 A 层活动注册表。
 | D7-S5-A02 | SynthesizeTaskGraph | D7-S5-A02-LEGACY | A-BE | goal, constraints, explore_events | []TaskNode | plan.formulated | ✅ | `decisionplanning/decomposer.go`（rule + LLM via SetLLMDecomposer） |
 | D7-S5-A03 | SelectExecutor | — | A-BE | TaskNode, agent_pool | executor_id (D2/D4) | — | 🔶 | `decisionplanning/executor.go` — 物理文件未实现，DM-20260701-004 PR-2 layout guard 守护 |
 
+> **D7-S5 双登记提示**：D7-S5 主路径为 `decisionplanning/`，但 `plan/` 是 **S5 sub-registration carve-out**（doc-only dual registration），详见下方 `## D7-S5 plan/ ↔ decisionplanning/ 双登记说明` 段。`D7-S6-A04 PlanGenerate` 物理路径在 `plan/planner.go`，但属于 S6 治理 Activity（见 S6 表）。
+
 ### D7-S6: MUPS Governance + Observability & Hardening ✅ Canonical
 
 > North Star: MUPS Execute / Verify / Learn / Escape / convergence governance 与 D7 编排层 hardening 统一归口；S6 是 governance overlay，不要求新增单独 scenario 目录。
@@ -132,7 +134,23 @@ D7 编排域 A 层活动注册表。
 
 | A ID | Name | Legacy ID | Type | Input | Output | State Change | Status | Code Location |
 |------|------|-----------|------|-------|--------|--------------|--------|---------------|
+| **D7-S6-A03** | **PlanValidate** | **D7-S6-A03-LEGACY** | **A-BE** | **Plan, ConstraintSet** | **[]PlanValidationError** | **plan.validated** | **✅** | **`decisionplanning/plan_mode.go::Validate`**（S6 治理 Activity，物理路径在 S5 `decisionplanning/`，符合 spec.md §S5 carve-out Note） |
+| **D7-S6-A04** | **PlanGenerate** | **D7-S6-A04-LEGACY** | **A-BE** | **goal, observation, rules** | **Plan** | **plan.generated** | **✅** | **`plan/planner.go::DefaultPlanner.Generate`**（S6 治理 Activity，物理路径在 S5 `plan/`，符合 spec.md §S5 carve-out Note + design §④ S5 sub-registration carve-out，doc-only 双登记：`plan/` ↔ `decisionplanning/` 共存，**0 shim / 0 alias / 0 git mv**）|
 | **D7-S6-A14** | **HardenMetricsAndConcurrency** | **—** | **A-BE** | **—** | **—** | **—** | **✅** | **5 fix 一揽子（DM-20260622-001）：(A1) `dispatch_loop_wakeups`/`worker_panics` 复数化与 switch case 双修；(A2) `dispatch_loop_wakeups`/`worker_panics` 命名口径 spec/code 一致；(A3) `markWaveDone` 释放 `state.cancels`/`state.handles` 至 nil/空 map 防跨 wave 累积；(A4) `dispatchOne` 改原子 `AllowAndRegister` 关 TOCTOU 窗口；(A5) `CommandHandler.emit` 改 `select-default` + `slog.Warn` 防 consumer 阻塞；(A6) `sandbox_exit_failed` 跨域归属澄清（D4 实际拥有，D7 spec 标 OBSOLETE）** |
+
+---
+
+## D7-S5 `plan/` ↔ `decisionplanning/` 双登记说明（DM-20260701-004 PR-3）
+
+> **决策记录（design §④ Q1 选 B：doc-only）**：`plan/` 与 `decisionplanning/` 物理共存，**避免 43 importer 改动**。
+> 
+> **Doc-only dual-registration 定义（design §④ S5 sub-registration carve-out）**：
+> - `plan/`（物理独立子包，5 prod + 1 test 共 6 .go 文件）：`plan.go` / `plan_struct.go` / `planner.go` / `blast_radius.go` / `errors.go` + `plan_test.go`
+> - `decisionplanning/`（S5 主路径，8 prod + 8 test 共 16 .go 文件）：`classifier.go` / `classifier_fallback.go` / `decomposer.go` / `llm_decomposer.go` / `plan_mode.go` / `similarity_gate.go` / `filter.go` / `filter_adapter.go` + 8 对应 `_test.go`
+> - 两个包各自承担不同职责，但都属于 S5 Decision & Planning 范畴
+> - **0 物理 shim / 0 alias / 0 git mv** — 仅在 a/f-registry 双登记索引
+> - a-registry: `D7-S5-A02 SynthesizeTaskGraph`（decisionplanning/）+ `D7-S6-A04 PlanGenerate`（plan/）双登记路径
+> - code-layout.md §4.2 line 102：`D7-S5 sub | Plan Generation | plan | orchestration/plan/ | ✅ doc-only 双登记`
 
 ---
 
@@ -263,3 +281,4 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 | **5.1.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-A（DM-20260629-007）**：**(1) 新增 D7-S20/S21 TaskContract 段**（6 A：D7-S20-A01 BuildTaskSpec + D7-S20-A02 BuildTaskReport + D7-S20-A03 SyncTaskContractSpec + D7-S21-A01 RecordDissent + D7-S21-A02 ClassifyBlockage + D7-S21-A03 ExtractResource），物理包 `orchestration/interfaces/` 7 NEW 文件；(2) **新增 5 个 ORCH_* SentinelError**（7100-7104：TaskSpecEmpty / TaskSpecChannelUnknown / TaskReportEmpty / TaskReportVerdictEmpty / TaskContractTraceInvalid）；(3) A 活动 **49 → 55**（6 v7.0 A 增量）；(4) 4-Layer × 3-Phase 设计框架落地：本 PR 完成 L1 接口层 + L2 字段语义层 + L4 spec 同步 9/11 P0 T IMPLEMENTED（L3 防御运行时层留给 PR-B + PR-C）；(5) Dissent top-3 截断 + summary hash + Learn 沉淀；Blockage 3 类 kind（permission/resource/contract）；Resource token/time/step 三件套；Additive 嵌入 ChannelRequest.Spec + LearnRequest.Report；(6) **0 函数签名变化**（pure types 原则，interfaces 0 import D7 任何子包） |
 | **5.2.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B（DM-20260629-008）L3 防御运行时层**：(1) **新增 D7-S18 Pessimistic Commit + Rule-based Fallback 段**（2 A：D7-S18-A11 EvaluatePessimistic + D7-S18-A12 ResolveRuleFallback），A 活动 55 → 57；(2) **新增 3 NEW interfaces/ 文件**（contracts.go PessimisticCommitGuard interface + 4 ORCH_* 错误码 7110-7113 + fallback_policy.go FallbackPolicyRuleNames + ParseFallbackRuleName + convergence_budget.go NewConvergenceBudget + With* + Validate + RemainingBelowReserve + ToFields），物理包 `orchestration/interfaces/` 共 10 文件；(3) **新增 escape/fallback.go**（~310 LOC，DefaultPessimisticCommitGuard 5 类触发 + 3 FallbackPolicy 路径 + buildChainHash FNV-1a 非加密 digest）；(4) **escape/engine.go +NotifyPessimistic + SetPessimisticGuard/PessimisticGuard + 4 unit tests**；(5) **mups/execute/channel.go +ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit**；(6) **bootstrap/pessimistic_guard_wire.go NEW**（PessimisticCommitEnabled + PessimisticRuleStrategy + NewPessimisticCommitGuardFromEnv + 7 env tests）；(7) **circuit_breaker_test.go +3 L1 Pessimistic 联动测试**（L1 trips StateOpen + 60s 持久窗口 + L1-only reason 含 "l1" 路由 hint）；(8) **6/7 T 点 IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C，本 PR 仅 slog.Info 占位）；(9) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更** |
 | **5.4.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-1**：**(1) 新增 ## Hardening 段**（2 A：Hardening-A01 MetricsEmit + Hardening-A02 ConcurrencyGuard），物理 location 锚点 `orchestration/hardening/`（namespace）+ `orchestration/wavescheduler/`（owner）双归属；**(2) 新增 ## D7-X Cross-S Kernel（orchtypes/）段**（6 A：D7-X-A01 DefineCrossSPrimitives + D7-X-A02 DefineSentinelErrors + D7-X-A03 BoundaryDecision + D7-X-A04 AdaptivePriorInject + D7-X-A05 SystemAnomalyDetect + D7-X-A06 LLMInvokerContract），**物理即 kernel，0 shim / 0 alias / 0 reverse import**；**(3) 与 §v6.0.0 6 S 精简映射 - Cross-cutting Hardening 段互补**（本段补物理路径锚点，§v6.0.0 段保留 14 S → 6 S 重映射视角）；**(4) 0 函数签名变化**（purely additive — 仅追加 ## Hardening + ## D7-X 两段，§v6.0.0 段与 S1-S6 现有 Canonical 段不动）；**(5) cumulative version bump**：跳过 v5.3.0（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S1-S6 canonical 收敛 + S7+ → historical-s-mapping.md 物理拆分），如未来该 PR merge 时检测到 v5.4.0 已合入，则跳过 v5.3.0 步进 |
+| **5.5.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-3**: **(1) D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行**：A03 Code Location `decisionplanning/plan_mode.go::Validate`，A04 Code Location `plan/planner.go::DefaultPlanner.Generate`（S6 治理 Activity 物理路径在 S5，符合 spec.md §S5 carve-out Note 与 design §④ S5 sub-registration carve-out）；**(2) 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明 段**：plan/（5 prod + 1 test 共 6 .go）+ decisionplanning/（8 prod + 8 test 共 16 .go）职责分工 + 0 shim / 0 alias / 0 git mv doc-only dual-registration；**(3) D7-S5 段加 cross-reference 提示**：指向下方双登记说明段 + D7-S6-A04 的物理路径；**(4) 0 函数签名变化 / 0 物理路径变化**（purely additive — 仅 a-registry 内部新增 2 行 + 1 cross-reference 段 + 1 双登记说明段）；**(5) T 层覆盖 D7-PL-T07**（plan/ 归属 S5 在 code-layout + a-registry 双登记）。 |

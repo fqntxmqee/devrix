@@ -2,8 +2,8 @@
 
 **Capability:** architecture-code-layout  
 **Status:** Active  
-**Version:** 1.13.0
-**Last Updated:** 2026-07-01
+**Version:** 1.14.0
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: §4.2 D7 S5 sub 行 "Plan agent" → "Plan Generation" 命名收敛 + doc-only 双登记 wording 收敛（与 a-registry D7-S6-A03/A04 加 cross-reference 对齐）)
 **Parent:** `openspec/specs/architecture/layering.md`
 
 ---
@@ -99,7 +99,7 @@ L4 功能点 (F) →  …/{scenario-slug}/*.go  （或 activity 子目录）
 | —             | Hub-Spoke bridge (S4)   | `bridge`              | `executionflow/bridge/`              | ✅ DM-20260619-005（自 `hubspoke/`） |
 | —             | Delegate routing F      | `delegatetools`       | `orchestration/delegatetools/`       | ✅ DM-011                           |
 | —             | Session command queue F | `executionflow`       | `orchestration/executionflow/`       | ✅ DM-013 + DM-20260625-018 PR-3b（物理合并到 executionflow 父级）|
-| D7-S5 sub     | Plan agent              | `plan`                | `orchestration/plan/`                | ✅ DM-20260625-019 PR-2（物理独立成包，S5 sub-registration carve-out；doc-only dual-registration：物理在 `decisionplanning/` 路径下，但 a/f-registry 同时登记 `plan/` 与 `decisionplanning/`，**0 shim / 0 alias / 0 git mv**）|
+| D7-S5 sub     | Plan Generation         | `plan`                | `orchestration/plan/`                | ✅ DM-20260625-019 PR-2（物理独立成包，S5 sub-registration carve-out；doc-only 双登记（与 decisionplanning/ 并列 S5）：物理在 `decisionplanning/` 路径下，但 a/f-registry 同时登记 `plan/` 与 `decisionplanning/`，**0 shim / 0 alias / 0 git mv**；DM-20260701-004 PR-3 收敛命名 "Plan agent"→"Plan Generation" + doc-only 双登记 wording）|
 | —             | Cross-S Kernel          | `orchtypes`           | `orchestration/orchtypes/`           | ✅ DM-20260701-004 PR-1（共享类型 / 哨兵 / 边界决策 / 先验 / 异常检测 / LLM 调用契约 6 A + 6 F；**no Go shim, no re-export, 直接 import**）|
 | —             | Cross-cutting Hardening | `hardening`           | `orchestration/hardening/`           | ✅ DM-20260701-004 PR-1（emitter 集中点 namespace，**不是 owner**；ConflictGuard 实际 owner 是 `wavescheduler/`）|
 | —             | TaskContract contracts  | `interfaces`          | `orchestration/interfaces/`          | ✅ DM-20260629-007 (v7.0 PR-A) + DM-20260629-008 (v7.0 PR-B)；pure types 包，0 import D7 任何子包 |
@@ -367,3 +367,4 @@ internal/layers/communication/
 | **1.11.0** | **2026-06-16** | **D1 领域文档同步**：§7 OpenSpec 对应表增加 `d1-domain.md` 领域 SoT 与 `terminal-state-guide` / `observability-guide` 指南路径 |
 | **1.12.0** | **2026-06-19** | **D5 v2.1 Terminal（DM-20260619-006）**：§4.6 D5 物理路径表更新为 v2.1 TERMINAL；diagnose 子目录补全 doctor/tracker/faultinject；instrument 子目录补全 debugfilter；genai_tokens.go → instrument/metrics/ + llm_log.go → diagnose/incident/；Bridge 删除路线标注 |
 | **1.13.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-1 §4.2 D7 终态化**：**(1) 移除 retired ghost shim 行**（`coordinator/` 🔶 row 删除 — DM-20260625-018 已全删；`hubspoke/` 🔶 row 删除 — DM-20260626-004 6S Package Merge 已迁入 sessionorchestrator/ + executionflow/bridge/；`turn/` 行 D7-S2-A06/A07 当前路径改为 `sessionorchestrator/turn_orchestrator.go` + `llm.go`（子包已合并）；`milestone/` row 删除 — 早期 v2.x 已迁入 `executionflow/workplan/`）；**(2) 登记 4 个新增归属**：`plan/`（S5 sub-registration carve-out，doc-only dual-registration 同时归属 `decisionplanning/`，**0 shim / 0 alias / 0 git mv**）+ `orchtypes/`（Cross-S Kernel，**no Go shim, no re-export, 直接 import**）+ `hardening/`（Cross-cutting Discipline Keeper namespace，**ConflictGuard 实际 owner 是 wavescheduler/**）+ `interfaces/`（TaskContract contracts pure types 包）；**(3) D7-S2-A06/A07 当前路径表 1 行**（统一归属 `sessionorchestrator/`，原 `turn/` 子包已物理合并）；**(4) cumulative version bump**：跳过 v1.12.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 code-layout 同步） |
+| **1.14.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-3 §4.2 D7 doc-only 双登记 wording 收敛**：§4.2 D7 `D7-S5 sub` 行 "Plan agent" → **"Plan Generation"** 命名收敛（与 spec.md §S5 carve-out wording 对齐 + D7-S6-A04 PlanGenerate PlanKind/DefaultPlanner 的代码定位一致）；保留 PR-1 引入的 `plan/` doc-only dual-registration 注释，与 a-registry.md `D7-S6-A03/A04` cross-reference + `## D7-S5 plan/ ↔ decisionplanning/ 双登记说明` 段构成三处一致 doc-only 登记；**0 函数签名变化 / 0 物理路径变化**（purely 命名 + wording 收敛）。 |
