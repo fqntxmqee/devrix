@@ -2,6 +2,7 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260701-004 | D7 物理布局对齐 — A 层补全 + S1-S6 代码路径收敛 | devrix-d7-physical-layout-alignment | 2026-07-01 | [#366](https://github.com/fqntxmqee/devrix/pull/366) · [#367](https://github.com/fqntxmqee/devrix/pull/367) · [#368](https://github.com/fqntxmqee/devrix/pull/368) · [#369](https://github.com/fqntxmqee/devrix/pull/369) · [#370](https://github.com/fqntxmqee/devrix/pull/370) | ACCEPTED |
 | DM-20260701-003 | D7 Historical S Cleanup — S7+ 正文迁出与 S3 定位澄清 | devrix-d7-historical-s-cleanup | 2026-07-01 | — | ACCEPTED |
 | DM-20260701-002 | D7 S 层归一化 — DSAFT canonical S1-S6 与 WorkTree+MUPS 关系收敛 | devrix-d7-s-layer-normalization | 2026-07-01 | — | ACCEPTED |
 | DM-20260607-001 | Devrix 可观察层 | devrix-observability | 2026-06-07 | — | PASS |
