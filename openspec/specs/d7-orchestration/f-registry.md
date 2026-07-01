@@ -2,13 +2,13 @@
 
 **Capability:** architecture-layering
 **Status:** Active · **6 S 精简 (v6.0.0 DM-20260626-001)**
-**Version:** 5.1.0
-**Last Updated:** 2026-06-29 (taskcontract-unification-pr-a DM-20260629-007: 新增 11 个 F: D7-S20/F01-F06 + D7-S21/F01-F03 + D7-S22/F01-F02 PR-A 通讯契约)
+**Version:** 5.3.0
+**Last Updated:** 2026-07-01 (devrix-d7-historical-s-cleanup DM-20260701-003: S7+ F 段迁出至 historical-s-mapping.md; current F registry 仅保留 S1-S6 + Current Path Correction)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Depends On:** `openspec/specs/d7-orchestration/a-registry.md`
 **Domain SoT:** `d7-domain.md`
 
-> **MUPS v4.3 5 节点管道（2026-06-25 落地）：** Canonical F 层扩展至 S1-S14 全部节点的 F 功能点登记，共 **75** 个 F 点全部 IMPLEMENTED（deprecated 2 + canonical 73）。具体 F 层见 §8-§14（Observe/Execute/Verify/Learn/跨域集成/Verify Auto-Close/EscapeEngine）。
+> **MUPS v4.3 5 节点管道（2026-06-25 落地）：** 历史 F 层曾扩展至 S1-S14 全部节点。DM-20260701-002 后，current canonical S 固定为 S1-S6：Observe/Plan 归 S5，Execute/Verify/Learn/Escape/Convergence 归 S6；S7-S14 仅作 historical mapping。
 >
 > **v6.0.0 6 S 精简（DM-20260626-001）：** 14 S → 6 S + 1 横切后 F 层按新 S 重归类。具体 A/F 重映射见 `a-registry.md §v6.0.0 6 S 精简映射`。
 
@@ -19,6 +19,18 @@
 D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(planned)` 表示目标 D7 包尚未创建。
 
 **状态图例：** ✅ · 🔶 · ⬜
+
+### Current Path Correction（DM-20260701-002）
+
+| Historical Function Area | Current Canonical Target | Current Runtime Path |
+|--------------------------|--------------------------|----------------------|
+| Observe / UncertaintyReport | D7-S5 Decision & Planning | `sessionorchestrator/item_observe.go` + `orchtypes/` |
+| StrategicPlanProposer | D7-S5 Decision & Planning | `sessionorchestrator/strategic_plan_proposer.go` |
+| Execute WorkItem | D7-S6 MUPS Governance | `sessionorchestrator/workitem_executor.go` |
+| Verify / Deliverable Gate | D7-S6 MUPS Governance | `sessionorchestrator/deliverable_verify.go` + `item_pipeline.go` |
+| Learn | D7-S6 MUPS Governance | `mups/learn/` |
+| Rollup / Context Bubble | D7-S1 Work Model + D7-S6 Governance | `workmodel/rollup_gate.go` + `workmodel/context_bubble_apply.go` + `sessionorchestrator/rollup_*` |
+| TaskSpec / TaskReport | Contract → D7-S1/D7-S6 | `interfaces/task_spec.go` + `interfaces/task_report.go` |
 
 ---
 
@@ -67,8 +79,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/turn_orchestrator.go` ProcessMessage switch |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `sessionorchestrator/fastpath.go` Run |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/turn_orchestrator.go` orchestrate (delegates to D2/turn) |
+| D7-S2-A01-F02 | RunItemPipeline | F-BE | message, session | events | ✅ | `sessionorchestrator/item_pipeline.go` Run |
+| D7-S2-A01-F03 | RunSessionTurnLoop | F-BE | message, session | WorkItem rounds | ✅ | `sessionorchestrator/session_turn_loop.go` |
 | D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/turn_orchestrator.go` + `EventPublisher` |
 | D7-S2-A01-F05 | HandleInterrupt | F-BE | session_id, reason | — | ✅ | `sessionorchestrator/interrupt.go` |
 
@@ -178,8 +190,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S2-A01-F01 | RouteByIntent | F-BE | IntentClassification | routing_decision | ✅ | `sessionorchestrator/orchestrator.go` ProcessMessage switch |
-| D7-S2-A01-F02 | ExecuteFastPath | F-BE | message, session | events | ✅ | `sessionorchestrator/fastpath.go` Run |
-| D7-S2-A01-F03 | EnterOrchestration | F-BE | message, session | Plan | ✅ | `sessionorchestrator/orchestrator.go` orchestrate |
+| D7-S2-A01-F02 | RunItemPipeline | F-BE | message, session | events | ✅ | `sessionorchestrator/item_pipeline.go` Run |
+| D7-S2-A01-F03 | RunSessionTurnLoop | F-BE | message, session | WorkItem rounds | ✅ | `sessionorchestrator/session_turn_loop.go` |
 | D7-S2-A01-F04 | EmitSessionEvents | F-BE | event | — | ✅ | `sessionorchestrator/orchestrator.go` + `EventPublisher` |
 
 ### D7-S5 Canonical F 层
@@ -205,193 +217,9 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 ---
 
-## D7-S8-A15 ObserveQuantize ✅ (Phase 2 PR-A1 + PR-RF, DM-20260623-001)
+## Historical / Contract F Detail
 
-> Observe 节点 F 层登记：4 类 Observation 量化 + UncertaintyReport 产出 + UncertaintyCoord 不确定性度量。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S8-A15-F01** | **ClassifyObsKind** | **F-BE** | **raw signal** | **ObsKind (fact/anomaly/signal/user)** | **✅** | **`orchestration/observe/observation.go::ClassifyObsKind`** |
-| **D7-S8-A15-F02** | **ScoreObsStrength** | **F-BE** | **observation + evidence** | **strength (★-★★★★)** | **✅** | **`orchestration/observe/observation.go::ScoreStrength`** |
-| **D7-S8-A15-F03** | **DetectAnomaly** | **F-BE** | **[]observation** | **[]Anomaly** | **✅** | **`orchestration/observe/anomaly.go::Detect`**（PR-A1）|
-| **D7-S8-A15-F04** | **QuantizeIntent** | **F-BE** | **[]observation + anomalies** | **IntentPayload** | **✅** | **`orchestration/observe/intent_quantizer.go::Quantize`**（PR-A1 + WithPrior 变体 Phase 6）|
-| **D7-S8-A15-F05** | **BuildUncertaintyCoord** | **F-BE** | **[]observation** | **UncertaintyCoord** | **✅** | **`orchestration/observe/uncertainty_coord.go::Build`**（PR-A1）|
-| **D7-S8-A15-F06** | **BuildUncertaintyReport** | **F-BE** | **observations, coord, anomalies, intent** | **UncertaintyReport** | **✅** | **`orchestration/observe/uncertainty_report.go::Build`**（PR-A1）|
-
----
-
-## D7-S9-A25/A26 Execute ✅ (Phase 3 PR-C1 + PR-C2, DM-20260625-001)
-
-> Execute 节点 F 层登记：4 类 Artifact 数据契约 + 4 Channel 路由 + C2/W8 1:1 映射。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S9-A25-F01** | **BuildArtifact** | **F-BE** | **Plan, ExecutionResult** | **Artifact (4 子类多态)** | **✅** | **`orchestration/execute/artifact.go::Build`**（PR-C1，跨域类型上提 `shared/types.Artifact`）|
-| **D7-S9-A25-F02** | **ResolveArtifactKind** | **F-BE** | **Plan.Step.Kind** | **ArtifactKind (state_change/response/probe/experiment)** | **✅** | **`orchestration/execute/artifact.go::ResolveKind`** |
-| **D7-S9-A25-F03** | **ExtractEvidence** | **F-BE** | **ExecutionResult** | **Evidence (与 Plan.FailureCriteria 对齐)** | **✅** | **`orchestration/execute/evidence.go::Extract`** |
-| **D7-S9-A26-F01** | **RouteChannelKind** | **F-BE** | **Plan.Step** | **ChannelKind (sync/async/probe/explore)** | **✅** | **`orchestration/execute/channel_router.go::RouteChannel`**（PR-C2）|
-| **D7-S9-A26-F02** | **DispatchSync** | **F-BE** | **Plan.Step** | **ExecutionResult (synchronous)** | **✅** | **`orchestration/execute/channel_sync.go::Dispatch`** |
-| **D7-S9-A26-F03** | **DispatchAsync** | **F-BE** | **Plan.Step** | **<-chan ExecutionResult** | **✅** | **`orchestration/execute/channel_async.go::Dispatch`**（3 retry + queue）|
-| **D7-S9-A26-F04** | **DispatchProbe** | **F-BE** | **Plan.Step** | **ExecutionResult (probe)** | **✅** | **`orchestration/execute/channel_probe.go::Dispatch`**（2 retry + backoff）|
-| **D7-S9-A26-F05** | **DispatchExplore** | **F-BE** | **Plan.Step** | **ExecutionResult (explore)** | **✅** | **`orchestration/execute/channel_explore.go::Dispatch`**（1 retry best-effort）|
-
----
-
-## D7-S10-A32..A35 Verify ✅ (Phase 4, DM-20260623-002)
-
-> Verify 节点 F 层登记：4 态 Verdict + 14 ExitReason + Evidence + SystemAnomaly。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S10-A32-F01** | **ExtractVerdict** | **F-BE** | **Artifact + Plan** | **VerdictKind (compliance/timeliness/root_cause/statistical)** | **✅** | **`orchestration/verify/verifier.go::extractVerdict`** |
-| **D7-S10-A32-F02** | **AggregateVerdicts** | **F-BE** | **[]Verdict** | **Verdict (聚合)** | **✅** | **`orchestration/verify/verdict.go::AggregateVerdicts`** |
-| **D7-S10-A32-F03** | **VerifyWithRetry** | **F-BE** | **Artifact + Plan** | **Verdict (3 次重试兜底)** | **✅** | **`orchestration/verify/verifier.go::VerifyWithRetry`** |
-| **D7-S10-A33-F01** | **MapVerdictToExitReason** | **F-BE** | **Verdict + Plan.ObservationStrength** | **ExitReason (14 态)** | **✅** | **`orchestration/verify/exit_reason.go::MapToExitReason`** |
-| **D7-S10-A33-F02** | **IsDeterministicReason** | **F-BE** | **ExitReason** | **bool (8 deterministic vs 6 verify-driven)** | **✅** | **`orchestration/verify/exit_reason.go::IsDeterministic`** |
-| **D7-S10-A34-F01** | **ExtractEvidence** | **F-BE** | **Artifact + Verdict** | **Evidence (含 SourceObservationIDs 追溯链)** | **✅** | **`orchestration/verify/evidence.go::ExtractEvidence`** |
-| **D7-S10-A34-F02** | **ValidateEvidenceCompleteness** | **F-BE** | **Evidence + Plan.FailureCriteria** | **bool** | **✅** | **`orchestration/verify/evidence.go::ValidateCompleteness`** |
-| **D7-S10-A35-F01** | **DetectSystemAnomaly** | **F-BE** | **session history** | **SystemAnomaly?** | **✅** | **`orchestration/verify/system_anomaly.go::Detect`** |
-| **D7-S10-A35-F02** | **ClassifyAnomalySeverity** | **F-BE** | **SystemAnomaly** | **Severity (warn/error/critical)** | **✅** | **`orchestration/verify/system_anomaly.go::ClassifySeverity`** |
-
----
-
-## D7-S11-A36..A40 Learn ✅ (Phase 5, DM-20260623-003)
-
-> Learn 节点 F 层登记：4 类 LearningAsset + ReputationEvidence Bayesian 更新 + AdaptivePrior + Memory 3 通道。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S11-A36-F01** | **BuildAssetContent** | **F-BE** | **Verdict + Plan + Observation (追溯链)** | **AssetContent** | **✅** | **`orchestration/learn/asset_builder.go::BuildContent`** |
-| **D7-S11-A36-F02** | **ClassifyLearningClass** | **F-BE** | **Verdict.Kind** | **LearningClass (SOP/Protocol/Knowledge/Conclusion)** | **✅** | **`orchestration/learn/asset_builder.go::ClassifyClass`** |
-| **D7-S11-A36-F03** | **AssignAssetTTL** | **F-BE** | **LearningClass** | **TTL (90d/180d/365d/30d)** | **✅** | **`orchestration/learn/asset_builder.go::AssignTTL`** |
-| **D7-S11-A37-F01** | **BayesianUpdate** | **F-BE** | **prior Beta(α,β) + Verdict.Kind** | **posterior Beta(α',β')** | **✅** | **`orchestration/learn/reputation_store.go::BayesianUpdate`**（PR-v4.5 合并原 bayesian_update.go）|
-| **D7-S11-A37-F02** | **StoreReputationEvidence** | **F-BE** | **SessionID + Verdict + Evidence** | **ReputationEvidence** | **✅** | **`orchestration/learn/reputation_store.go::Store`** |
-| **D7-S11-A37-F03** | **LoadReputationHistory** | **F-BE** | **SessionID** | **[]ReputationEvidence** | **✅** | **`orchestration/learn/reputation_store.go::LoadHistory`** |
-| **D7-S11-A38-F01** | **BuildAdaptivePrior** | **F-BE** | **[]ReputationEvidence** | **AdaptivePrior** | **✅** | **`orchestration/learn/adaptive_prior.go::Build`** |
-| **D7-S11-A38-F02** | **DefaultDeveloperPrior** | **F-BE** | **—** | **AdaptivePrior Beta(5,3)** | **✅** | **`orchestration/learn/adaptive_prior.go::DefaultDeveloperPrior`** |
-| **D7-S11-A38-F03** | **DefaultOperatorPrior** | **F-BE** | **—** | **AdaptivePrior Beta(8,1)** | **✅** | **`orchestration/learn/adaptive_prior.go::DefaultOperatorPrior`** |
-| **D7-S11-A39-F01** | **PersistToSkillChannel** | **F-BE** | **LearningAsset** | **—** | **✅** | **`orchestration/learn/memory.go::PersistSkill`** |
-| **D7-S11-A39-F02** | **PersistToFeedbackChannel** | **F-BE** | **LearningAsset** | **—** | **✅** | **`orchestration/learn/memory.go::PersistFeedback`** |
-| **D7-S11-A39-F03** | **PersistToScheduledChannel** | **F-BE** | **LearningAsset** | **—** | **✅** | **`orchestration/learn/memory.go::PersistScheduled`** |
-| **D7-S11-A40-F01** | **RunLearner** | **F-BE** | **Verdict + 追溯链** | **[]LearningAsset + ReputationEvidence** | **✅** | **`orchestration/learn/learner.go::Learn`** |
-| **D7-S11-A40-F02** | **DispatchToMemoryChannel** | **F-BE** | **LearningAsset** | **ChannelKind (skill/feedback/scheduled)** | **✅** | **`orchestration/learn/learner.go::DispatchChannel`** |
-
----
-
-## D7-S12-A41..A43 Observe-Learner 跨域闭环 ✅ (Phase 6, DM-20260624-001)
-
-> Observe-Learner 跨域闭环 F 层登记：WithPrior 变体 + 3 层 fail-safe + E2E round-trip。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S12-A41-F01** | **BuildObserveRequestWithPrior** | **F-BE** | **SessionID + UserMessage + AdaptivePrior** | **ObserveRequest (含 prior)** | **✅** | **`orchestration/observe/observe_node.go::ObserveRequestWithPrior`**（Phase 6 WithPrior 变体）|
-| **D7-S12-A41-F02** | **InjectPriorToIntentQuantizer** | **F-BE** | **ObserveRequest** | **IntentPayload (prior-weighted)** | **✅** | **`orchestration/observe/intent_quantizer.go::QuantizeWithPrior`** |
-| **D7-S12-A42-F01** | **ResolvePriorLayer1** | **F-BE** | **SessionID** | **AdaptivePrior (历史)** | **✅** | **`orchestration/sessionorchestrator/observe_request.go::resolvePrior` — Layer 1: 从 ReputationStore Load** |
-| **D7-S12-A42-F02** | **ResolvePriorLayer2** | **F-BE** | **AdaptivePrior?** | **AdaptivePrior** | **✅** | **`orchestration/sessionorchestrator/observe_request.go::resolvePrior` — Layer 2: nil → DefaultDeveloperPrior Beta(5,3)** |
-| **D7-S12-A42-F03** | **ResolvePriorLayer3** | **F-BE** | **AdaptivePrior?** | **AdaptivePrior** | **✅** | **`orchestration/sessionorchestrator/observe_request.go::resolvePrior` — Layer 3: 仍 nil → Beta(1,1) uniform** |
-| **D7-S12-A43-F01** | **E2ECloseLP1RoundTrip** | **F-BE** | **session_id (跨多轮)** | **ReputationEvidence round-trip** | **✅** | **`tests/integration/d7/e2e_lp1_closure_test.go`**（Phase 6 E2E）|
-
----
-
-## D7-S13-A47..A49 Verify Auto-Close ✅ (Phase 7, DM-20260625-001)
-
-> Verify 自动闭环 F 层登记：processAutoClose + TrackMode + sessionSpan 6 prior attributes。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S13-A47-F01** | **ProcessAutoClose** | **F-BE** | **ProcessRequest + session state** | **Verdict + ExitReason** | **✅** | **`orchestration/verify/auto_close.go::ProcessAutoClose`**（3 层 fail-safe）|
-| **D7-S13-A47-F02** | **SynthesizeVerdict** | **F-BE** | **session state + Plan** | **Verdict (default compliance)** | **✅** | **`orchestration/verify/auto_close.go::SynthesizeVerdict`** |
-| **D7-S13-A48-F01** | **ResolveTrackMode** | **F-BE** | **session state** | **TrackMode (full/partial/track-only)** | **✅** | **`orchestration/verify/track_mode.go::ResolveTrackMode`** |
-| **D7-S13-A48-F02** | **ShouldAutoClose** | **F-BE** | **session state + last activity** | **bool** | **✅** | **`orchestration/verify/auto_close.go::ShouldAutoClose`**（4 条触发规则）|
-| **D7-S13-A49-F01** | **EmitSessionSpanPrior** | **F-BE** | **session + prior** | **sessionSpan (6 prior attributes)** | **✅** | **`orchestration/sessionorchestrator/session_span.go::EmitPrior`**（prior.adaptive_kind / beta_alpha / beta_beta / evidence_count / cycle_count / last_update）|
-
----
-
-## D7-S14-A50..A52 EscapeEngine + ResumeSession ✅ (Phase v5, DM-20260625-003 + DM-20260625-004)
-
-> EscapeEngine + ResumeSession F 层登记：5 层 CircuitBreaker + 3 决策路由 + sessionSpan 3 resume attributes。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S14-A50-F01** | **TriggerEscape** | **F-BE** | **session_id + signal** | **EscapeTrigger** | **✅** | **`orchestration/escape/engine.go::Trigger`** |
-| **D7-S14-A50-F02** | **ResolveCircuitLevel** | **F-BE** | **signal + history** | **CircuitLevel (L0..L5)** | **✅** | **`orchestration/escape/circuit_breaker.go::ResolveLevel`** |
-| **D7-S14-A50-F03** | **ApplyCircuitBreaker** | **F-BE** | **CircuitLevel + plan** | **plan (modified)** | **✅** | **`orchestration/escape/circuit_breaker.go::Apply`** |
-| **D7-S14-A50-F04** | **LiftEscape** | **F-BE** | **session_id** | **—** | **✅** | **`orchestration/escape/engine.go::Lift`** |
-| **D7-S14-A51-F01** | **ApplyResumeSessionLayer1** | **F-BE** | **session_id + user_choice** | **ResumeDecision** | **✅** | **`orchestration/sessionorchestrator/resume.go::applyResumeSession` Layer 1** |
-| **D7-S14-A51-F02** | **ApplyResumeSessionLayer2** | **F-BE** | **session_id + prior state** | **ResumeDecision** | **✅** | **`orchestration/sessionorchestrator/resume.go::applyResumeSession` Layer 2 (fall through 兜底)** |
-| **D7-S14-A51-F03** | **ApplyResumeSessionLayer3** | **F-BE** | **session_id** | **AbortDecision (with audit)** | **✅** | **`orchestration/sessionorchestrator/resume.go::applyResumeSession` Layer 3 (AbortWithAudit)** |
-| **D7-S14-A51-F04** | **RouteResumeDecision** | **F-BE** | **user_choice** | **DecisionKind (A fall through / B user_accept→ForceExit / C user_cancel→Abort)** | **✅** | **`orchestration/sessionorchestrator/resume.go::routeResumeDecision`** |
-| **D7-S14-A52-F01** | **EmitSessionSpanResume** | **F-BE** | **session + decision** | **sessionSpan (3 resume attributes)** | **✅** | **`orchestration/sessionorchestrator/session_span.go::EmitResume`**（resume.decision / circuit_level / user_choice）|
-
----
-
-## D7-S18: Pessimistic Commit + Rule-based Fallback F 层 ✅ (PR-B, DM-20260629-008)
-
-> **L3 防御运行时层:** PR-B 落地 PessimisticCommitGuard interface + 5 类触发条件 (resource_exhausted / cb_l1 / indeterminate_3x / empty_evidence / manual_abort) + 3 FallbackPolicy 路径 (Pessimistic / RuleBased / Abort) + 4 候选规则 (most_tests_passed / compiled_clean / min_cost / min_uncertainty, default min_uncertainty). Feature Flag `D7_PESSIMISTIC_COMMIT_ENABLED` 默认 disabled, 0 行为变更.
-
-### D7-S18-A11 Pessimistic Commit
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S18-A11-F01** | **EvaluatePessimistic** | **F-BE** | **spec, report, budget** | **(ok bool, blockedReason string, err error)** | **✅** | **`orchestration/interfaces/contracts.go::PessimisticCommitGuard.Evaluate` + `orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.Evaluate`** (5 类触发检测) |
-| **D7-S18-A11-F02** | **ResolveFallback** | **F-BE** | **report** | **(policy FallbackPolicy, ruleName string)** | **✅** | **`orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.ResolveFallback`** (3 路径: Pessimistic/RuleBased/Abort, Blockage.Source=policy_override 解析) |
-| **D7-S18-A11-F03** | **BuildMVPArtifact** | **F-BE** | **report, blockedReason** | **MVPArtifact** | **✅** | **`orchestration/escape/fallback.go::DefaultPessimisticCommitGuard.BuildMVPArtifact`** (Output/RiskWarnings/Trigger/ChainHash FNV-1a) |
-| **D7-S18-A11-F04** | **NotifyPessimisticHook** | **F-BE** | **engine, spec, report** | **(*TaskReport, error)** | **✅** | **`orchestration/escape/engine.go::EscapeEngine.NotifyPessimistic`** (5 层 fail-safe: nil guard / nil report / Evaluate error → fall-open / blocked → MVPArtifact 注入) |
-| **D7-S18-A11-F05** | **CheckResourceExhausted** | **F-BE** | **used, budget, reserve** | **bool** | **✅** | **`orchestration/interfaces/convergence_budget.go::RemainingBelowReserve`** (资源耗尽触发检测, reserve 默认 10% budget) |
-
-### D7-S18-A12 Rule-based Fallback
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S18-A12-F01** | **ParseFallbackRuleName** | **F-BE** | **string** | **(name, recognized)** | **✅** | **`orchestration/interfaces/fallback_policy.go::ParseFallbackRuleName`** (空 → 默认 / 4 候选 round-trip / 未知 → 默认 + recognized=false) |
-| **D7-S18-A12-F02** | **ValidateFallbackPolicy** | **F-BE** | **FallbackPolicy** | **bool** | **✅** | **`orchestration/interfaces/fallback_policy.go::FallbackPolicy.Valid + ValidNonLegacy`** (3 态 / 2 non-legacy) |
-
----
-
-## D7-S20-A01 TaskSpec 下行契约 F 层 ✅ (PR-A, DM-20260629-007)
-
-> **物理位置：** `orchestration/interfaces/task_spec.go`。pure types 原则（0 import D7 子包）。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S20-A01-F01** | **NewTaskSpec** | **F-BE** | **session_id, plan, channel, work_item, trace_id** | **TaskSpec** | **✅** | **`orchestration/interfaces/task_spec.go::NewTaskSpec`（fail-fast session_id + TraceID format `ts_<8 hex>`）** |
-| **D7-S20-A01-F02** | **ValidateTaskSpec** | **F-BE** | **TaskSpec** | **error** | **✅** | **`orchestration/interfaces/task_spec.go::Validate`**（happy path + empty session_id + channel unknown + trace_id 格式校验）|
-| **D7-S20-A01-F03** | **WithTaskSpecFields** | **F-BE** | **TaskSpec, Plan/Channel/WorkItem** | **TaskSpec (immutable)** | **✅** | **`orchestration/interfaces/task_spec.go::WithPlan + WithChannel + WithWorkItem`（3 不可变 builder，浅拷贝 `c := *s` 返回新副本）**|
-
-## D7-S20-A02 TaskReport 上行契约 F 层 ✅ (PR-A, DM-20260629-007)
-
-> **物理位置：** `orchestration/interfaces/task_report.go`。pure types 原则。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S20-A02-F01** | **NewTaskReport** | **F-BE** | **session_id, channel, verdict, trace_id** | **TaskReport** | **✅** | **`orchestration/interfaces/task_report.go::NewTaskSpec`（fail-fast session_id + trace_id 格式）** |
-| **D7-S20-A02-F02** | **ValidateTaskReport** | **F-BE** | **TaskReport** | **error** | **✅** | **`orchestration/interfaces/task_report.go::Validate`** |
-| **D7-S20-A02-F03** | **WithTaskReportFields** | **F-BE** | **TaskReport, Verdict/Resource/Blockage** | **TaskReport (immutable)** | **✅** | **`orchestration/interfaces/task_report.go::WithVerdict + WithResource + WithBlockage`（3 不可变 builder）** |
-| **D7-S20-A02-F04** | **AppendDissent** | **F-BE** | **TaskReport, Dissent** | **TaskReport (immutable)** | **✅** | **`orchestration/interfaces/task_report.go::AppendDissent`（top-3 截断 + summary hash 懒计算）**|
-
-## D7-S21-A01/A02/A03 字段语义 F 层 ✅ (PR-A, DM-20260629-007)
-
-> **物理位置：** `orchestration/interfaces/task_report.go` + `task_spec.go` + 内部 helpers。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S21-A01-F01** | **HashDissentSummary** | **F-BE** | **summary string** | **hash 8 hex prefix** | **✅** | **`orchestration/interfaces/task_report.go::hashSummary`（fnv64a → fmt.Sprintf("%08x", h)[:8]）** |
-| **D7-S21-A01-F02** | **TopNTuncateDissent** | **F-BE** | **[]Dissent, n int** | **[]Dissent (≤ n)** | **✅** | **`orchestration/interfaces/task_report.go::AppendDissent` 内嵌（默认 n=3，silent truncate 不警告）** |
-| **D7-S21-A02-F01** | **ClassifyBlockageKind** | **F-BE** | **failure error + Plan context** | **BlockageKind (permission/resource/contract)** | **✅** | **`orchestration/interfaces/task_spec.go::WithBlockage` 内嵌分类器（403/IAM deny → permission；OOM/disk/quota → resource；其他 → contract）** |
-| **D7-S21-A03-F01** | **ExtractResource** | **F-BE** | **ExecutionResult + 上下文 (token accounting + Start/End time + ReAct iter count)** | **Resource (token/time/step)** | **✅** | **`orchestration/interfaces/task_report.go::WithResource` 内嵌抽取器（直接读 execution metadata）** |
-
-## D7-S22 TaskContract PR-B 通讯契约预留位 ✅ (DESIGN ONLY, DM-20260629-006)
-
-> **物理位置：** `orchestration/interfaces/contracts.go`（PLANNED，留给 PR-B Pessimistic Commit / PR-C CoW VersionChain）
->
-> **PR-A 不实现**，仅登记 F 层接口签名作为契约锚点；PR-B + PR-C 在不破坏 `interfaces` 包 pure types 原则下扩展。
-
-| F ID | Name | Type | Input | Output | Status | Code Location |
-|------|------|------|-------|--------|--------|---------------|
-| **D7-S22-F01** | **PessimisticCommitGuard** | **F-BE** | **TaskSpec + TaskReport (diff)** | **ok/blocked** | **⬜ PLANNED (PR-B)** | **`orchestration/interfaces/contracts.go::PessimisticCommitGuard`（防 false success commit，先 mark pessimistic state 再 verify）** |
-| **D7-S22-F02** | **CoWVersionChain** | **F-BE** | **TaskSpec vN** | **TaskSpec vN+1 (with prev_version_id)** | **⬜ PLANNED (PR-C)** | **`orchestration/interfaces/contracts.go::CoWVersionChain`（每次 spec 变 → 生成新 version_id，引用前驱用于反向追溯）** |
-
----
+Former D7-S8–S14 / S18 / S20–S22 F registrations moved to **`historical-s-mapping.md`**. T IDs retain historical A/F prefixes; do not reintroduce as current F headings here.
 
 ## Statistics
 

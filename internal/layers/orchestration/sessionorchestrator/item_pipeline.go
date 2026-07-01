@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -173,6 +174,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
 
 	var strategic *StrategicPlanProposal
+	strategicRejectRationale := ""
 	if r.StrategicPlanProposer != nil && !isRollup {
 		intentKind := ""
 		if report.QuantizedIntent != nil {
@@ -199,6 +201,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		if propErr == nil && prop != nil {
 			strategic = prop
 			applyStrategicScope(sessionID, item, prop, r.Tasks)
+		} else if propErr != nil {
+			var reject *StrategicPlanReject
+			if errors.As(propErr, &reject) {
+				strategicRejectRationale = formatStrategicPlanReject(reject)
+			}
 		}
 	}
 
@@ -274,6 +281,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	priorReason := ""
 	if item.LastRound != nil && item.LastRound.VerdictKind != types.VerdictPass {
 		priorReason = strings.TrimSpace(item.LastRound.ExitReason)
+		if s := strings.TrimSpace(item.LastRound.SpawnRationale); s != "" {
+			if priorReason != "" {
+				priorReason += "\n"
+			}
+			priorReason += s
+		}
 	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
 		Item:              item,
@@ -345,9 +358,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
-	// as a verify stand-in: the legacy OrchestratePath uses real anomaly
-	// detection; the per-WorkItem path uses deterministic verifyArtifact and
-	// shares the same op name so dashboards see a consistent 5-node tree).
+	// as a verify stand-in). The current per-WorkItem path uses deterministic
+	// verifyArtifact and shares the same op name so dashboards see a consistent
+	// 5-node tree.
 	_, endVerify := hardening.EmitSystemAnomalyDetect(ctx, sessionID, "n/a", "n/a", "0", verdict.SourceID)
 	endVerify(nil)
 
@@ -469,6 +482,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		if len(strategic.ChildSpecs) > 0 {
 			round.ChildSpecs = append([]workmodel.ChildSpec(nil), strategic.ChildSpecs...)
 		}
+	} else if strategicRejectRationale != "" {
+		round.SpawnRationale = strategicRejectRationale
 	}
 
 	treeCtx := workmodel.DefaultTreeEvalContext(sessionID, item.ID, userID, r.Tasks)
@@ -479,6 +494,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	ctxOut := workmodel.ProposeContextPipelineOutput(sessionID, item, round, r.Tasks, r.ContextProposer)
 	workmodel.ApplyPipelineDecide(sessionID, item, round, ctxOut, treeCtx, r.Tasks)
+	if strategicRejectRationale != "" {
+		if round.SpawnRationale != "" {
+			round.SpawnRationale += "\n"
+		}
+		round.SpawnRationale += strategicRejectRationale
+	}
 	if round.VerdictKind == types.VerdictIndeterminate {
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}
@@ -626,6 +647,21 @@ func (r *ItemPipelineRunner) setRoundPhaseWithLog(
 		return
 	}
 	end(nil)
+}
+
+func formatStrategicPlanReject(reject *StrategicPlanReject) string {
+	if reject == nil {
+		return ""
+	}
+	field := strings.TrimSpace(reject.Field)
+	if field == "" {
+		field = strings.TrimSpace(reject.Reason)
+	}
+	if field == "" {
+		field = "budget"
+	}
+	return fmt.Sprintf("strategic_plan_rejected: field=%s requested=%d max_allowed=%d reason=%s",
+		field, reject.Requested, reject.MaxAllowed, reject.Reason)
 }
 
 // truncateForArtifact returns the first n runes of s followed by an

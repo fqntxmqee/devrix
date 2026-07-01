@@ -71,6 +71,32 @@ func (c *contentWorkItemExecutor) ExecuteWorkItem(_ context.Context, _, _, _ str
 	}, nil
 }
 
+type execContextCapturingExecutor struct {
+	priorReasons []string
+}
+
+func (e *execContextCapturingExecutor) ExecuteWorkItem(ctx context.Context, _, _, _ string) (*WorkItemResult, error) {
+	ec, _ := WorkItemExecContextFrom(ctx)
+	e.priorReasons = append(e.priorReasons, ec.PriorVerifyReason)
+	return &WorkItemResult{
+		Content:    "ok",
+		Done:       true,
+		Iterations: 1,
+		StopReason: "final_answer",
+	}, nil
+}
+
+type rejectingStrategicPlanProposer struct{}
+
+func (rejectingStrategicPlanProposer) ProposeStrategicPlan(context.Context, StrategicPlanInput) (*StrategicPlanProposal, error) {
+	return nil, &StrategicPlanReject{
+		Reason:     BudgetFieldChildren,
+		Field:      BudgetFieldChildren,
+		Requested:  5,
+		MaxAllowed: 2,
+	}
+}
+
 func newItemPipelineTestRunner(t *testing.T) (*ItemPipelineRunner, *workmodel.TaskManager, *learn.InMemoryReputationStore) {
 	t.Helper()
 	tm := workmodel.NewTaskManager()
@@ -88,6 +114,47 @@ func newItemPipelineTestRunner(t *testing.T) (*ItemPipelineRunner, *workmodel.Ta
 		t.Fatalf("NewItemPipelineRunner: %v", err)
 	}
 	return runner, tm, rep
+}
+
+// T: D7-SN-T05 (DM-20260701-002)
+func TestRunItemPipeline_StrategicPlanRejectFeedsNextPrompt(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	exec := &execContextCapturingExecutor{}
+	runner.Executor = exec
+	runner.StrategicPlanProposer = rejectingStrategicPlanProposer{}
+	runner.Verify = func(_ *wavescheduler.Artifact) workmodel.Verdict {
+		return workmodel.Verdict{
+			Kind:       types.VerdictFail,
+			Reason:     "first pass failed",
+			SourceID:   "v_fail",
+			Confidence: 0.4,
+		}
+	}
+
+	sessionID := "sess-strategic-reject-feedback"
+	goal, err := tm.EnsureGoal(sessionID, "review D7 architecture")
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+
+	first, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if !strings.Contains(first.SpawnRationale, "strategic_plan_rejected") {
+		t.Fatalf("first round SpawnRationale = %q, want strategic rejection", first.SpawnRationale)
+	}
+
+	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
+	if _, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{}); err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if len(exec.priorReasons) < 2 {
+		t.Fatalf("ExecuteWorkItem calls = %d, want at least 2", len(exec.priorReasons))
+	}
+	if got := exec.priorReasons[1]; !strings.Contains(got, "strategic_plan_rejected") {
+		t.Fatalf("second prior reason = %q, want strategic rejection feedback", got)
+	}
 }
 
 func TestRunItemPipeline_SingleWorkItem_Completed(t *testing.T) {

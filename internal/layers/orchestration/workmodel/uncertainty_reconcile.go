@@ -48,3 +48,12 @@ func ReconcileUncertainty(prevStored, roundSignal float64, stats ChildOutcomeSta
 	damped := 0.5*clamp01(prevStored) + 0.5*hist
 	return clamp01(math.Max(clamp01(roundSignal), damped))
 }
+
+// ReconcileUncertaintyFromChildStats is the parent-rollup writer used by
+// ReevaluateParentAfterChild. Unlike the full pipeline writer, it has no fresh
+// MUPS round signal, so the child outcome distribution itself becomes the
+// current signal. Passing prevStored as both previous and current input would
+// recreate a hidden ratchet and make all-pass child convergence less visible.
+func ReconcileUncertaintyFromChildStats(prevStored float64, stats ChildOutcomeStats) float64 {
+	return ReconcileUncertainty(prevStored, historicalUncertainty(stats), stats)
+}

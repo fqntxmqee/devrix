@@ -1,0 +1,20 @@
+change_id: devrix-d7-historical-s-cleanup
+demand_id: DM-20260701-003
+title: D7 Historical S Cleanup — S7+ 正文迁出与 S3 定位澄清
+priority: P1
+status: s7_archived
+created_at: 2026-07-01
+archived_at: 2026-07-01
+domains: [D7]
+source: architecture-review follow-up (DM-20260701-002)
+related:
+  - DM-20260701-002  # D7 S layer normalization
+dsaft_scenarios:
+  - D7-S1
+  - D7-S2
+  - D7-S3
+  - D7-S4
+  - D7-S5
+  - D7-S6
+t_points_planned: 6
+t_points_implemented: 6

@@ -2,6 +2,8 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260701-003 | D7 Historical S Cleanup — S7+ 正文迁出与 S3 定位澄清 | devrix-d7-historical-s-cleanup | 2026-07-01 | — | ACCEPTED |
+| DM-20260701-002 | D7 S 层归一化 — DSAFT canonical S1-S6 与 WorkTree+MUPS 关系收敛 | devrix-d7-s-layer-normalization | 2026-07-01 | — | ACCEPTED |
 | DM-20260607-001 | Devrix 可观察层 | devrix-observability | 2026-06-07 | — | PASS |
 | DM-20260607-008 | 测试框架规范与目录拆分 | devrix-test-framework | 2026-06-07 | — | ACCEPTED |
 | DM-20260607-009 | Communication Layer V2 可靠性增强 | devrix-v2 | 2026-06-07 | — | ACCEPTED |
