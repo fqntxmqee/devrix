@@ -89,7 +89,7 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S2-A02-F01 | ClassifyByRules | F-BE | message | rules_hint + confidence | ✅ | `decisionplanning/classifier.go` RuleClassifier.Classify |
-| D7-S2-A02-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `decisionplanning/classifier_fallback.go`（合并 LLM-first 路径） |
+| D7-S2-A02-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | 🔶 | `decisionplanning/classifier_fallback.go`（合并 LLM-first 路径） — 物理文件未实现（功能已 inline 到 `classifier.go::ClassifyWithPrior`），DM-20260701-004 PR-2 layout guard 守护 |
 
 ## D7-S2-A03 HandleInterrupt 🔶
 
@@ -176,8 +176,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
-| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | ✅ | `decisionplanning/executor.go` SelectExecutor |
-| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | ✅ | `decisionplanning/executor.go` CheckAvailability |
+| D7-S5-A03-F01 | MatchExecutorByTaskType | F-BE | task_type | executor_id | 🔶 | `decisionplanning/executor.go` SelectExecutor — 物理文件未实现，DM-20260701-004 PR-2 layout guard 守护 |
+| D7-S5-A03-F02 | CheckExecutorAvailability | F-BE | executor_id | available/busy | 🔶 | `decisionplanning/executor.go` CheckAvailability — 物理文件未实现，DM-20260701-004 PR-2 layout guard 守护 |
 
 ---
 
@@ -199,8 +199,8 @@ D7 编排域 F 层功能点注册表。代码位置标注**现行路径**；`(pl
 | F ID | Name | Type | Input | Output | Status | Code Location |
 |------|------|------|-------|--------|--------|---------------|
 | D7-S5-A01-F01 | ClassifyByRules | F-BE | message | rules_hint | ✅ | `orchestration/decisionplanning/classifier.go` RuleClassifier.Classify |
-| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | ✅ | `orchestration/decisionplanning/classifier_fallback.go` LLMClassifier.Classify |
-| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | ✅ | `orchestration/decisionplanning/classifier_fallback.go` Merge |
+| D7-S5-A01-F02 | ClassifyByLLM | F-BE | message, rules_hint | llm_classification | 🔶 | `orchestration/decisionplanning/classifier_fallback.go` LLMClassifier.Classify — 物理文件未实现（功能已 inline 到 `classifier.go::ClassifyWithPrior`），DM-20260701-004 PR-2 layout guard 守护 |
+| D7-S5-A01-F03 | MergeClassifications | F-BE | rules, llm | final_decision | 🔶 | `orchestration/decisionplanning/classifier_fallback.go` Merge — 物理文件未实现（功能已 inline 到 `classifier.go::ClassifyWithReport`），DM-20260701-004 PR-2 layout guard 守护 |
 
 ---
 
