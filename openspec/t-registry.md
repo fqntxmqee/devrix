@@ -2,9 +2,9 @@
 
 **Status:** Active
 **Version:** 5.13.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-3 — D7 +1 T point PLANNED→IMPLEMENTED (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED) + a-registry v5.4.0→v5.5.0 (S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate + 新增 ## D7-S5 双登记说明段 + S5 段 cross-reference) + code-layout v1.13.0→v1.14.0 (§4.2 D7-S5 sub 行 "Plan agent"→"Plan Generation" + doc-only 双登记 wording 收敛) + CHANGELOG.md 清理 PR-1 遗留 `<<<<<<<` conflict marker + 0 业务代码变更; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-2 — D7 +12 T points IMPLEMENTED)
+**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-4 — D7 +1 T point PLANNED→IMPLEMENTED (D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾 IMPLEMENTED) + orchtypes/doc.go package 注释升级 + d7-domain.md §North Star 加 1 行 Cross-S Kernel + f-registry v5.4.0→v5.5.0 (PR-4 修订记录行) + d7-domain.md v2.8.0→v2.9.0 (PR-4 Revision History 行) + 0 业务代码变更; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-3 — D7 +1 T point (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED))
 
-**Version:** 5.13.0 (PR-3 落地: D7 域 13 T 收口 [12 → 13] + D7 t-registry v4.23.0 → v4.24.0)
+**Version:** 5.13.0 (PR-4 落地: D7 域 14 T 收口 [13 → 14] + D7 t-registry v4.24.0 → v4.25.0)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -29,9 +29,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 279 | 279 | 0 | 228 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 280 | 280 | 0 | 228 |
 
-**总计**: 622 · IMPLEMENTED 620 · PLANNED 3 · PARTIAL 2 · P0 421
+**总计**: 623 · IMPLEMENTED 621 · PLANNED 3 · PARTIAL 2 · P0 421
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -123,7 +123,7 @@
 >
 > **统计：** D7 域 266 → **278** T (266 IMPLEMENTED + 12 PLANNED) · 全域 609 → **621** T (604 IMPLEMENTED + 15 PLANNED + 2 PARTIAL) · P0 415 不变（PR-1 是 doc-only 纯 markdown，0 Go 业务代码）
 >
-> **PR 拆分说明：** PR-1 完成 spec doc sync 6 T（T01-T06）；PR-2 完成 6 layout guard 测试（T07-T12）。PR-3 (plan/ doc-only dual-registration) + PR-4 (orchtypes/ Cross-S registration) 由后续 PR 覆盖，**不在本 PR 范围**。
+> **PR 拆分说明：** PR-1 完成 spec doc sync 6 T（T01-T06）；PR-2 完成 6 layout guard 测试（T07-T12）。**PR-3 (plan/ S5 doc-only dual-registration)** 由 PR-3 覆盖（T13）+ **PR-4 (orchtypes/ Cross-S registration 收尾)** 由 PR-4 覆盖（T14）— 见下两段增量。
 >
 > **cumulative version bump：** 跳过 v5.11.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步），如未来该 PR merge 时检测到 v5.12.0 已合入，则跳过 v5.11.1 步进。
 
@@ -161,3 +161,15 @@
 > **CHANGELOG.md cleanup（顺带 fix）：** PR-1 rebase 时遗留的孤儿 conflict marker `<<<<<<< HEAD`（无 `=======` / `>>>>>>>` 关闭）已清理。物理文件未受冲突影响（master 上 PR-2 merge 时也带此 marker），Markdown 渲染不影响。
 >
 > **统计：** D7 域 278 → **279** T (278→**279** IMPLEMENTED + 0 PLANNED) · 全域 621 → **622** T (619→**620** IMPLEMENTED + 2 PLANNED + 2 PARTIAL) · P0 421 不变（T13 为 P1）
+>
+> ---
+>
+> **devrix-d7-physical-layout-alignment (DM-20260701-004) PR-4** — D7 +1 T point PLANNED → IMPLEMENTED (D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾) + f-registry v5.4.0→v5.5.0 + d7-domain.md v2.8.0→v2.9.0 + orchtypes/doc.go package 注释升级:
+>
+> | 编号 | 描述 | Status | Priority |
+> |------|------|--------|----------|
+> | **D7-PL-T14** | **`orchtypes/` Cross-S kernel registration 收尾**（spec.md Requirement "`orchtypes/` MUST be registered as D7 Cross-S Kernel"）：orchtypes/doc.go package 注释升级为 "Package orchtypes is the cross-S governance kernel of D7 (types, sentinels, intent/observation primitives)."；d7-domain.md §North Star 新增 Cross-S Kernel (orchtypes/) 1 行（types / sentinels / intent primitives / Bayesian / Verdict / Observation / UncertaintyCoord / PlanKind / ChannelKind / ArtifactKind / 14 ExitReason — single source of truth for D7 contract）；PR-1 已落地 a-registry 6 A + f-registry 6 F + code-layout 1 行 + spec.md 3 Requirement，本 PR 收尾 doc.go + d7-domain.md + Revision History 全 5 处语义对齐 | **IMPLEMENTED** | **P1** |
+>
+> **PR-1 收口追溯：** PR-1 实际已完成 5 处中的 4 处（a-registry ## D7-X Cross-S Kernel 段 + f-registry ## D7-X Cross-S Kernel F 段 + code-layout §4.2 Cross-S Kernel 行 + spec.md 3 Requirement Scenario），本 PR-4 收尾最后 1 处 d7-domain.md §North Star + doc.go package 注释，使 4 处（a-registry + f-registry + code-layout + d7-domain.md）共 5 处完全语义对齐。
+>
+> **统计：** D7 域 279 → **280** T (279→**280** IMPLEMENTED + 0 PLANNED) · 全域 622 → **623** T (620→**621** IMPLEMENTED + 2 PLANNED + 2 PARTIAL) · P0 421 不变（T14 为 P1）
