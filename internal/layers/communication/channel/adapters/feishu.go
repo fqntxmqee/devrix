@@ -137,8 +137,14 @@ func (a *FeishuAdapter) OnMessage(msg *types.OutboundMessage) {
 
 	case "complete":
 		exitReason := msg.Metadata[metadataKeyExitReason]
-		if err := a.finalizeStructuredSession(ctx, msg.SessionID, msg.ChatID, content, exitReason); err != nil {
-			slog.Error("feishu: failed to finalize structured session", "error", err, "exit_reason", exitReason)
+		// Hotfix 2026-07-01 (sess_1782885908460_4000): propagate the
+		// task_incomplete signal from D1 EmitComplete (conclusion.go) so
+		// the summary card title, reply-card footer, and progress card
+		// all render "❌ 任务未完成" instead of the misleading green
+		// "✅ 任务已完成" + blue "任务总结" combination.
+		taskIncomplete := msg.Metadata["task_incomplete"] == "true"
+		if err := a.finalizeStructuredSession(ctx, msg.SessionID, msg.ChatID, content, exitReason, taskIncomplete); err != nil {
+			slog.Error("feishu: failed to finalize structured session", "error", err, "exit_reason", exitReason, "task_incomplete", taskIncomplete)
 		}
 
 		if a.doneEmoji != "" {
