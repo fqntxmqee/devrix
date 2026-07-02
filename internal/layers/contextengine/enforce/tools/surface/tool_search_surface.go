@@ -64,8 +64,8 @@ func (s *ToolSearchSurface) Name() string { return ToolSearchSurfaceName }
 // for the `tool_search` tool. DeferLoading is forced false so callers
 // can't accidentally filter it out.
 func (s *ToolSearchSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
-	return []contracts.ToolSpec{
-		{
+		spec := contracts.ToolSpec{
+
 			Name:        ToolSearchSurfaceName,
 			Description: "Search the deferred tool catalog. Pass a query (substring or glob like 'delegate_*') and an optional category prefix. Returns up to 5 matching tool schemas that you can then call directly.",
 			Parameters: `{
@@ -81,8 +81,10 @@ func (s *ToolSearchSurface) Tools(_ context.Context, _, _ string) []contracts.To
 			OpenWorld:       false,
 			ConcurrencySafe: true,
 			DeferLoading:    false, // forced: this tool must always be in-pack
-		},
-	}
+		
+}
+	ApplyV3Metadata(&spec, "tool_search")
+	return []contracts.ToolSpec{spec}
 }
 
 // RiskLevel implements contracts.ToolSurface.

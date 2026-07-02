@@ -3,6 +3,7 @@ package contracts_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -119,5 +120,100 @@ func TestToolSurface_ExecuteError(t *testing.T) {
 	}
 	if err != context.DeadlineExceeded {
 		t.Errorf("Execute err = %v, want DeadlineExceeded", err)
+	}
+}
+
+// T: D2-S15-A02-T12 — ToolSpec v3 has the 6 control plane fields and
+// reasonable zero-value defaults. Position-struct-literal compatibility
+// gate: the v3 fields are appended to the struct so existing named-field
+// literals (the only style in the codebase) remain source-compatible.
+func TestToolSpec_V3Fields_Exist(t *testing.T) {
+	spec := contracts.ToolSpec{Name: "x"}
+	// Type checks via assignment (the Go compiler enforces existence).
+	var ec contracts.EmissionClass = spec.EmissionClass
+	var cc contracts.ConvergenceContract = spec.ConvergenceContract
+	var ib contracts.IterationBound = spec.IterationBound
+	var su contracts.SourceUncertainty = spec.SourceUncertainty
+	var max int = spec.MaxResultSizeChars
+	var marker string = spec.TruncateMarkerText
+	_ = ec
+	_ = cc
+	_ = ib
+	_ = su
+	_ = max
+	_ = marker
+}
+
+// T: D2-S15-A02-T12 — Zero-value defaults per R3 cycle 0:
+//   EmissionClass       = EC_Action (0)
+//   ConvergenceContract = CC_None (0)
+//   IterationBound      = IB_OpenEnded (0)
+//   SourceUncertainty   = SK_Deterministic (0) + Value 0
+//   MaxResultSizeChars  = 0 (no cap)
+//   TruncateMarkerText  = "" (caller MUST set DefaultTruncateMarkerText)
+func TestToolSpec_V3ZeroDefaults(t *testing.T) {
+	spec := contracts.ToolSpec{Name: "x"}
+	if spec.EmissionClass != contracts.EC_Action {
+		t.Errorf("zero EmissionClass = %v, want EC_Action (0)", spec.EmissionClass)
+	}
+	if spec.ConvergenceContract.Kind != contracts.CC_None {
+		t.Errorf("zero ConvergenceContract.Kind = %v, want CC_None (0)", spec.ConvergenceContract.Kind)
+	}
+	if spec.IterationBound.Kind != contracts.IB_OpenEnded {
+		t.Errorf("zero IterationBound.Kind = %v, want IB_OpenEnded (0)", spec.IterationBound.Kind)
+	}
+	if spec.SourceUncertainty.Source != contracts.SK_Deterministic {
+		t.Errorf("zero SourceUncertainty.Source = %v, want SK_Deterministic (0)", spec.SourceUncertainty.Source)
+	}
+	if spec.MaxResultSizeChars != 0 {
+		t.Errorf("zero MaxResultSizeChars = %d, want 0", spec.MaxResultSizeChars)
+	}
+	if spec.TruncateMarkerText != "" {
+		t.Errorf("zero TruncateMarkerText = %q, want empty", spec.TruncateMarkerText)
+	}
+}
+
+// T: D2-S15-A02-T12 — EmissionClass String() returns the symbolic name
+// used in logs / metrics / JSON tags.
+func TestEmissionClass_String(t *testing.T) {
+	cases := map[contracts.EmissionClass]string{
+		contracts.EC_Action:     "Action",
+		contracts.EC_Fact:       "Fact",
+		contracts.EC_Probe:      "Probe",
+		contracts.EC_Experiment: "Experiment",
+	}
+	for c, want := range cases {
+		if got := c.String(); got != want {
+			t.Errorf("%d.String() = %q, want %q", c, got, want)
+		}
+	}
+	if got := contracts.EmissionClass(99).String(); got != "Unknown" {
+		t.Errorf("99.String() = %q, want Unknown", got)
+	}
+}
+
+// T: D2-S15-A02-T12 — SourceKind / ConvergenceKind / IterationBoundKind
+// all have a String() that returns the symbolic name.
+func TestV3Kind_Strings(t *testing.T) {
+	if got := contracts.CC_StateChangeRequired.String(); got != "StateChangeRequired" {
+		t.Errorf("CC_StateChangeRequired.String() = %q", got)
+	}
+	if got := contracts.IB_Bounded.String(); got != "Bounded" {
+		t.Errorf("IB_Bounded.String() = %q", got)
+	}
+	if got := contracts.SK_LLM.String(); got != "LLM" {
+		t.Errorf("SK_LLM.String() = %q", got)
+	}
+}
+
+// T: D2-S15-A02-T12 — DefaultTruncateMarkerText is the marker template
+// with %d placeholders for (chars kept, total chars).
+func TestDefaultTruncateMarkerText(t *testing.T) {
+	got := contracts.DefaultTruncateMarkerText
+	if !strings.Contains(got, "complete=false") {
+		t.Errorf("DefaultTruncateMarkerText missing complete=false: %q", got)
+	}
+	if !strings.Contains(got, "%d") {
+		t.Errorf("DefaultTruncateMarkerText missing %%d placeholders: %q", got)
 	}
 }

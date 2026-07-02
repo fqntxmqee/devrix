@@ -221,3 +221,81 @@ func TestBuiltinSurface_OrthogonalFlags_PerTool(t *testing.T) {
 		}
 	}
 }
+
+// T: D2-S15-A02-T08 — DefaultV3MetadataFor returns the 6 control plane
+// fields per the 19-tool truth table. Each registered tool MUST have an
+// explicit entry; the gate (T14) fails the build if any registered surface
+// returns a spec whose v3 fields are the zero defaults.
+func TestDefaultV3MetadataFor_AllRegisteredTools(t *testing.T) {
+	cases := []struct {
+		tool  string
+		wantEC contracts.EmissionClass
+		wantCC contracts.ConvergenceKind
+		wantIB contracts.IterationBoundKind
+		wantSK contracts.SourceKind
+	}{
+		// 6 builtin
+		{"read_file", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"write_file", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
+		{"edit_file", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
+		{"bash", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
+		{"grep", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"glob", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		// 5 LSP (4 Fact + 1 Probe)
+		{"lsp_go_to_definition", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
+		{"lsp_find_references", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
+		{"lsp_incoming_calls", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
+		{"lsp_hover", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
+		{"lsp_workspace_symbol", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_LLM},
+		// standalone
+		{"query_diagnostics", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
+		{"verify_plan_execution", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"ask_user_question", contracts.EC_Action, contracts.CC_None, contracts.IB_Bounded, contracts.SK_User},
+		{"tool_search", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_LLM},
+		{"free_fork", contracts.EC_Experiment, contracts.CC_QuotientThreshold, contracts.IB_Quotient, contracts.SK_User},
+		// pattern-based (delegate_*, task_*)
+		{"delegate_explore", contracts.EC_Probe, contracts.CC_EvidenceRequired, contracts.IB_Bounded, contracts.SK_LLM},
+		{"delegate_status", contracts.EC_Probe, contracts.CC_EvidenceRequired, contracts.IB_Bounded, contracts.SK_LLM},
+		{"task_output", contracts.EC_Action, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"task_stop", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
+	}
+	for _, c := range cases {
+		t.Run(c.tool, func(t *testing.T) {
+			ec, cc, ib, su, max, marker := surface.DefaultV3MetadataFor(c.tool)
+			if ec != c.wantEC {
+				t.Errorf("EC = %v, want %v", ec, c.wantEC)
+			}
+			if cc.Kind != c.wantCC {
+				t.Errorf("CC.Kind = %v, want %v", cc.Kind, c.wantCC)
+			}
+			if ib.Kind != c.wantIB {
+				t.Errorf("IB.Kind = %v, want %v", ib.Kind, c.wantIB)
+			}
+			if su.Source != c.wantSK {
+				t.Errorf("SU.Source = %v, want %v", su.Source, c.wantSK)
+			}
+			if max == 0 {
+				t.Errorf("MaxResultSizeChars = 0 (every registered tool must have a non-zero cap)")
+			}
+			if marker == "" {
+				t.Errorf("TruncateMarkerText = empty (every registered tool must have a non-empty marker)")
+			}
+		})
+	}
+}
+
+// T: D2-S15-A02-T08 — ApplyV3Metadata fills the 6 fields on a *ToolSpec
+// (the in-place variant the surface files use).
+func TestApplyV3Metadata(t *testing.T) {
+	spec := &contracts.ToolSpec{Name: "read_file"}
+	surface.ApplyV3Metadata(spec, "read_file")
+	if spec.EmissionClass != contracts.EC_Probe {
+		t.Errorf("after ApplyV3Metadata(read_file): EC = %v, want Probe", spec.EmissionClass)
+	}
+	if spec.IterationBound.Kind != contracts.IB_Bounded || spec.IterationBound.MaxN != 15 {
+		t.Errorf("after ApplyV3Metadata(read_file): IB = %+v, want Bounded(15)", spec.IterationBound)
+	}
+	if spec.MaxResultSizeChars != 8192 {
+		t.Errorf("after ApplyV3Metadata(read_file): MaxResultSizeChars = %d, want 8192", spec.MaxResultSizeChars)
+	}
+}
