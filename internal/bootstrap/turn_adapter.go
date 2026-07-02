@@ -345,6 +345,19 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorch
 	exec := func(cctx context.Context, call llmgateway.ToolCall) sessionorchestrator.ToolResult {
 		return a.executeOne(cctx, req.SessionID, call)
 	}
+
+	// TODO(gaming-debate-round3, D7-S10-A50-T23 stub): 升 P1 时接入
+	// AutoModeClassifier.ClassifyToolUse 在 partition 之前. 当前 PR-D+E
+	// 阶段 ChannelRouter 占位代码: interface 已就位
+	// (decisionplanning.AutoModeClassifier, P2 stub panic), 但 ChannelRouter
+	// 当前不实例化任何实现.
+	//
+	// 触发 metric: verify_contract.deny_rate 7d 滑动 > 5%
+	// 触发 change: devrix-d2-tool-input-aware-concurrency-and-classifier-pr-d-followup
+	//
+	// 接入位置: 在 BuildSurfaceLookup 之后, ExecuteBatches 之前. call site
+	// 必须 recover() stub panic 并降级为 DecisionAllow + emit metric,
+	// 不可让 panic 突破 ChannelRouter 边界 (P7 异常不过模块边界).
 	partitionResults := ExecuteBatches(toolCtx, pending, surfaces, exec, 0)
 	for k, r := range partitionResults {
 		results[pendingOrigIdx[k]] = r
