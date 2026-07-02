@@ -25,7 +25,8 @@ func (s *VerifySurface) Name() string { return "verify" }
 // Tools implements contracts.ToolSurface.
 func (s *VerifySurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("verify_plan_execution")
-	return []contracts.ToolSpec{{
+		spec := contracts.ToolSpec{
+
 		Name:            "verify_plan_execution",
 		Description:     "Verify that all done items in the change's tasks.md have their evidence files present and (for _test.go) contain a func TestXxx(). Returns a Report JSON with verified/unverified/skipped counts.",
 		Parameters:      `{"change_id": "<change-id>", "repo_root": "<optional abs path>"}`,
@@ -34,7 +35,10 @@ func (s *VerifySurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 		Destructive:     dest,
 		OpenWorld:       openW,
 		ConcurrencySafe: concSafe,
-	}}
+	
+}
+	ApplyV3Metadata(&spec, "verify_plan_execution")
+	return []contracts.ToolSpec{spec}
 }
 
 // InterruptBehavior implements contracts.ToolSurface.

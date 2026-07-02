@@ -39,7 +39,8 @@ func (s *TrackerSurface) Name() string { return "tracker" }
 // discoverable (otherwise the LLM would silently lose the schema).
 func (s *TrackerSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("query_diagnostics")
-	return []contracts.ToolSpec{{
+		spec := contracts.ToolSpec{
+
 		Name:            "query_diagnostics",
 		Description:     "Query the recent file-diagnostic buffer maintained by the periodic linter tick. Returns up to `limit` (default 50) diagnostics with file/line/severity/source/message. Optional `file` and `severity` filters narrow the result.",
 		Parameters:      `{"limit": 50, "file": "<optional>", "severity": "<error|warning|info>"}`,
@@ -48,7 +49,10 @@ func (s *TrackerSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 		Destructive:     dest,
 		OpenWorld:       openW,
 		ConcurrencySafe: concSafe,
-	}}
+	
+}
+	ApplyV3Metadata(&spec, "query_diagnostics")
+	return []contracts.ToolSpec{spec}
 }
 
 // InterruptBehavior implements contracts.ToolSurface.

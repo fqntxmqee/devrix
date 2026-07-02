@@ -69,7 +69,8 @@ func (s *AskUserQuestionSurface) Name() string { return "ask_user_question" }
 // Tools implements contracts.ToolSurface.
 func (s *AskUserQuestionSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("ask_user_question")
-	return []contracts.ToolSpec{{
+		spec := contracts.ToolSpec{
+
 		Name:            "ask_user_question",
 		Description:     "Ask the user one to four multiple-choice questions. The question is delivered as a formatted IM message with numbered options; the user can reply with a number (e.g. '1') or with the option label. Their reply arrives on the next turn. Use this when the LLM is genuinely uncertain (e.g. ambiguous user request, tool choice, design trade-off). Do NOT use it for trivial clarifications — just ask in plain text.",
 		Parameters: `{
@@ -110,7 +111,10 @@ func (s *AskUserQuestionSurface) Tools(_ context.Context, _, _ string) []contrac
 		Destructive:     dest,
 		OpenWorld:       openW,
 		ConcurrencySafe: concSafe,
-	}}
+	
+}
+	ApplyV3Metadata(&spec, "ask_user_question")
+	return []contracts.ToolSpec{spec}
 }
 
 // InterruptBehavior implements contracts.ToolSurface. Long-run — the

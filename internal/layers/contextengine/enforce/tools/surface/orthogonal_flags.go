@@ -154,3 +154,191 @@ type allowAllChecker struct{}
 func (allowAllChecker) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }
+
+// --- ToolSpec v3 control plane metadata (D2-S15-A02-T08) -----------------
+//
+// DefaultV3MetadataFor returns the 6 control plane fields for the named
+// tool. DSAFT: D2-S15-A02-T08 (19 tools explicit default metadata — the
+// 治本 narrative MUST NOT defer to a Phase E migration).
+//
+// The returned tuple is the per-tool truth table for the 6 v3 fields.
+// T14 (surface_metadata_gate_test.go) enforces that every registered
+// surface's Tools() returns specs whose v3 fields are non-default
+// (i.e., DefaultV3MetadataFor has been applied with the correct name).
+//
+// Naming convention:
+//   read_file / grep / glob   → Probe + Bounded(15)  (H12 consensus:
+//                              "re-read in self-loop recovery" is Probe)
+//   write_file/edit_file/bash → Action + StateChangeRequired
+//   lsp_*                     → Fact for read-only methods, Probe for
+//                              workspace_symbol / code_action
+//   free_fork                 → Experiment + Quotient(0.8)
+//   delegate_*                → Probe + EvidenceRequired(min=1) + Bounded(3)
+//   task_*                    → Action + Bounded(n) per tool
+func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.ConvergenceContract, contracts.IterationBound, contracts.SourceUncertainty, int, string) {
+	const (
+		maxCharsDefault = 8192
+		maxCharsSmall   = 4096
+		maxCharsTiny    = 2048
+	)
+	marker := contracts.DefaultTruncateMarkerText
+
+	switch toolName {
+	case "read_file":
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsDefault, marker
+	case "write_file":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 8},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsDefault, marker
+	case "edit_file":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 8},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsDefault, marker
+	case "bash":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 10},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsDefault, marker
+	case "grep":
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsDefault, marker
+	case "glob":
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsDefault, marker
+	case "query_diagnostics":
+		return contracts.EC_Fact,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsDefault, marker
+	case "verify_plan_execution":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsDefault, marker
+	case "ask_user_question":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 2},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsSmall, marker
+	case "tool_search":
+		return contracts.EC_Fact,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
+			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
+			maxCharsSmall, marker
+	case "lsp_go_to_definition", "lsp_find_references", "lsp_incoming_calls", "lsp_hover":
+		return contracts.EC_Fact,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	case "lsp_workspace_symbol":
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 5},
+			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
+			maxCharsSmall, marker
+	case "lsp_code_action":
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
+			maxCharsSmall, marker
+	case "free_fork":
+		return contracts.EC_Experiment,
+			contracts.ConvergenceContract{Kind: contracts.CC_QuotientThreshold, Threshold: 0.8},
+			contracts.IterationBound{Kind: contracts.IB_Quotient, Quotient: 0.8},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsSmall, marker
+	case "task_output":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 5},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	case "task_stop":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 1},
+			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
+			maxCharsTiny, marker
+	case "task_list_background":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	case "task_output_background":
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	}
+
+	// Pattern-based fallbacks (delegate_*, task_*, lsp_*).
+	if hasPrefix(toolName, "delegate_") {
+		return contracts.EC_Probe,
+			contracts.ConvergenceContract{Kind: contracts.CC_EvidenceRequired, MinEvidence: 1},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
+			maxCharsSmall, marker
+	}
+	if hasPrefix(toolName, "task_") {
+		return contracts.EC_Action,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	}
+	if hasPrefix(toolName, "lsp_") {
+		return contracts.EC_Fact,
+			contracts.ConvergenceContract{Kind: contracts.CC_None},
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
+			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
+			maxCharsSmall, marker
+	}
+
+	// Unknown tool name — T14 gate will fail the build. Returning the
+	// zero defaults lets a fresh ToolSpec compile cleanly; the gate
+	// prevents any registered surface from hitting this path.
+	return contracts.EC_Action,
+		contracts.ConvergenceContract{Kind: contracts.CC_None},
+		contracts.IterationBound{Kind: contracts.IB_OpenEnded},
+		contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 0.0},
+		0, ""
+}
+
+// ApplyV3Metadata fills the 6 ToolSpec v3 control plane fields on the
+// given spec from DefaultV3MetadataFor. Surface implementations call
+// this once per tool after constructing the v2 9-field spec.
+//
+// DSAFT: D2-S15-A02-T08 (truth table) + T09/T10/T11 (surface call sites)
+// + T14 (gate test forbids any registered spec from skipping this call).
+func ApplyV3Metadata(spec *contracts.ToolSpec, toolName string) {
+	ec, cc, ib, su, max, marker := DefaultV3MetadataFor(toolName)
+	spec.EmissionClass = ec
+	spec.ConvergenceContract = cc
+	spec.IterationBound = ib
+	spec.SourceUncertainty = su
+	spec.MaxResultSizeChars = max
+	spec.TruncateMarkerText = marker
+}

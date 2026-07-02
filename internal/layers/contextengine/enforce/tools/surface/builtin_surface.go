@@ -65,7 +65,8 @@ func (s *BuiltinSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 	out := make([]contracts.ToolSpec, 0, len(schemas))
 	for _, sc := range schemas {
 		rOnly, dest, openW, concSafe := OrthogonalFlagFor(sc.Name)
-		out = append(out, contracts.ToolSpec{
+				spec := contracts.ToolSpec{
+
 			Name:            sc.Name,
 			Description:     sc.Description,
 			Parameters:      sc.Parameters,
@@ -75,7 +76,10 @@ func (s *BuiltinSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 			OpenWorld:       openW,
 			ConcurrencySafe: concSafe,
 			DeferLoading:    ShouldDeferByDefault(sc.Name),
-		})
+		
+}
+		ApplyV3Metadata(&spec, sc.Name)
+		out = append(out, spec)
 	}
 	return out
 }
