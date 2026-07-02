@@ -43,13 +43,13 @@
       // Default impl returns ToolSpec.ConcurrencySafe (v2 static bool)
       // for back-compat. Tools that need per-input logic override.
       // Fail-safe: NEVER panic; on parse failure, return false.
-      IsConcurrencySafe(input []byte) bool
+      IsConcurrencySafe(input json.RawMessage) bool
 
       // T16: per-tool auto-mode classifier projection.
       // Returns compact, security-relevant string (e.g. "ls -la" for Bash).
       // Returns '' to skip this tool in classifier transcript.
       // Fail-safe: on parse failure, return raw input + emit metric.
-      ToAutoClassifierInput(input []byte) string
+      ToAutoClassifierInput(input json.RawMessage) string
   }
   ```
 - **仿:** clawcode `src/Tool.ts:402,556` interface + `src/Tool.ts:759,767` TOOL_DEFAULTS (`(_input?: unknown) => false` / `(_input?: unknown) => ''`)

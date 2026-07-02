@@ -21,7 +21,7 @@
 > - **D5**: `IsConcurrencySafe(input)` 参数类型 = **`json.RawMessage`** (跟 CheckPermission 对齐, 类型内聚 > 扩展性)
 > - **D6**: partition batch 边界 = **连续 safe 合并** (clawcode 实战验证, 三方一致)
 > - **D7**: AutoModeClassifier 返回类型 = **`ClassifierResult`** (devrix Naming Policy, 三方一致)
-> - **D8**: GrowthBook 注入方式 = **M1 复用 PERSIST 模式** + **M2/M3 未来独立 struct** (Cursor+Codex 一致指出 M1 是 persist concern, Claude 让步)
+> - **D8**: GrowthBook 注入方式 = **M1 复用 PERSIST 模式** + **M2/M3 未来独立 struct** (Cursor+Codex 一致指出 M1 是 persist concern, Claude 让步)。**M2/M3 定义**: M2 = per-tool concurrency threshold GB override (本 change 不实现, 后续 D8 v1.2 起); M3 = AutoModeClassifier canary GB override (本 change 不实现, OOS-NEW-2 ensemble 启用时)
 >
 > 完整辩论: `gaming-debate-{round1,round2-codex,round2-cursor,round3-convergence}-*.md` (S2) + `gaming-debate-design-{round1,round2-codex,round2-cursor,round3-convergence}-*.md` (Design)
 
@@ -73,7 +73,7 @@
 | P3 | **devrix 文化 = hotfix 模式** | PR-D+E 合并 (vs 拆 6 PR), 实现+测试同 PR | D4 收敛 |
 | P4 | **Production-Safety 默认关** | GrowthBook registry 默认全关, single test `AllFlagsOff_NoBehaviorChange` | AC11 |
 | P5 | **不可变值对象 + With\*** | ToolSpec / ClassifierResult / ThresholdOverride 不可变, 通过 WithOptions 配置 | ②⑥ |
-| P6 | **聚合根 ≤ 4 个** | ToolSpec + Surface 元数据 + ThresholdOverride + SideQuery context | ④ |
+| P6 | **聚合根 ≤ 4 个** | ToolSpec + ThresholdOverride + ClassifierResult + SurfaceLookup | ④ |
 | P7 | **异常不过模块边界** | BashASTPolicy 错误 → IPermissionGate Decision 而非 error return; AutoMode 不达 → 默认 allow | AC4, AC7 |
 | P8 | **SentinelError 模式** | 新增 `ErrAutoModeClassifierPanic` / `ErrPartitionEmpty` 等 | ⑥ |
 | P9 | **跨域 D2↔D7 boundary 守恒** | D7→D2 ToolSurface 调用走 contract package, 不引入 D7→D2 直引 | ④ |
@@ -90,7 +90,7 @@
 | **Error Code** | `Err<Action><Subject>` (SentinelError 模式) | ErrPartitionEmpty |
 | **Span Op** | `d2.<action>` / `d7.<node>.<action>` | d2.partition_tool_calls, d7.execute.classify |
 | **Metric** | `<domain>.<subject>.<verb>` | auto_mode.malformed_tool_input, auto_mode.deny |
-| **GB Flag** | `devrix_<scope>_<verb>` | devrix_bash_readonly_threshold_bytes |
+| **GB Flag** | `devrix_<scope>_<noun>` (output-truncation 类, 跟 concurrency 解耦) | devrix_bash_max_result_size_chars |
 
 ### 2.3 代码风格
 
@@ -311,12 +311,12 @@ LLM emits tool call(s)
 │                                                                  │
 │   ExecuteBatches (3 batch 串行, batch 内并发)                      │
 │   ┌──────────────────────────────────────────────────────────┐   │
-│   │ Batch 1 (safe): errgroup, 9 并发阈值, P99 < 50ms          │   │
-│   │ Batch 2 (unsafe): 串行, P99 < 200ms (ls)                  │   │
-│   │ Batch 3 (unsafe): 串行, P99 < 100ms (edit 1 file)         │   │
+│   │ Batch 1 (safe): errgroup 并发, P99 < 50ms (2 read_file I/O 并发, 远低于 100ms 串行) │
+│   │ Batch 2 (unsafe): 串行, P99 < 50ms (ls 命令本身快速)       │   │
+│   │ Batch 3 (unsafe): 串行, P99 < 50ms (单文件写)              │   │
 │   │ Batch 4 (safe): errgroup, P99 < 50ms                      │   │
 │   │ ────────────────────────────────────────                   │   │
-│   │ 总 P99 < 400ms (vs 串行 50ms × 6 = 300ms 不可控)          │   │
+│   │ 总 P99 < 200ms (vs 串行 6×50ms = 300ms, 并发节省 ~100ms)  │   │
 │   └──────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
      │
@@ -346,13 +346,13 @@ Results → sessionorchestrator.ToolRoundResult → LLM next turn
 |------|-----|------|-------|------|
 | Phase 1 CheckPermission | < 5ms | 1% | ✗ | (tool_surface.go:158 已优化) |
 | partitionToolCalls | < 1ms | <1% | ✗ | pure memory |
-| **Batch 1 (errgroup 2 read)** | < 50ms | **80%** | ✓ | 已是并发上限, 9 并发阈值无需更高 |
-| Batch 2 (bash 串行) | < 200ms | 5% | ✗ | ls 命令天然快 |
-| Batch 3 (edit 串行) | < 100ms | 3% | ✗ | 单文件写 |
-| Batch 4 (errgroup 2 read) | < 50ms | 8% | ✗ | 同 Batch 1 |
-| **Phase 2 total** | **< 400ms** | **100%** | | |
+| **Batch 1 (errgroup 2 read)** | < 50ms | **25%** | ✓ | errgroup 内 read_file 受限于 I/O 而非 partition 决策 |
+| Batch 2 (bash 串行) | < 50ms | 25% | ✗ | ls 命令天然快 (与并发无关) |
+| Batch 3 (edit 串行) | < 50ms | 25% | ✗ | 单文件写天然快 |
+| Batch 4 (errgroup 2 read) | < 50ms | **25%** | ✓ | 同 Batch 1 |
+| **Phase 2 total** | **< 200ms** | **100%** | | vs 串行 6×50ms = 300ms |
 
-**瓶颈识别**: 50 read_file 场景下, errgroup 内 read_file 受限于 I/O 而非 partition 决策。partition 本身不是瓶颈。
+**瓶颈识别**: 50 read_file 场景 (AC10 验收基准) 下, errgroup 内 read_file 受限于 I/O 而非 partition 决策。partition 本身不是瓶颈。AC10 场景目标为 e2e < 串行 / 3 (50 文件串行 5s → 并发 ≤ 1.7s)。本 §5.1 示例仅 4 个 read_file, 不能直接套 AC10, 仅作 partition 行为演示。
 
 ### 5.3 单点风险与缓解
 
@@ -542,7 +542,7 @@ Results → sessionorchestrator.ToolRoundResult → LLM next turn
 | **D5** | `IsConcurrencySafe` 参数类型 | **`json.RawMessage`** (跟 CheckPermission 对齐) | Claude+Cursor 让步: YAGNI 适用 mcp_* 扩展, 类型内聚 > 推测性扩展性 |
 | **D6** | partition batch 边界规则 | **连续 safe 合并** (clawcode 实战验证) | 三方一致, 无让步 |
 | **D7** | AutoModeClassifier 接口命名 | **`ClassifierResult`** (devrix Naming Policy) | 三方一致, 修 design.md 草稿 YoloResult 疏忽 |
-| **D8** | GrowthBook override 注入方式 | **M1 复用 PERSIST 模式** + **M2/M3 未来独立 struct** | Claude 让步: M1 是 persist concern (`MaxResultSizeChars`), 不是 concurrency; Cursor+Codex 指出 `growthbook_override_test.go:33-38` 已预演 `bash: 50*1024` |
+| **D8** | GrowthBook override 注入方式 | **M1 复用 PERSIST 模式** + **M2/M3 未来独立 struct** | Claude 让步: M1 是 persist concern (`MaxResultSizeChars`), 不是 concurrency; Cursor+Codex 指出 `growthbook_override_test.go:33-38` 已预演 `bash: 50*1024`。**M2/M3 定义**: M2 = per-tool concurrency threshold GB override (后续 change, 不在本 change 范围); M3 = AutoModeClassifier canary GB override (OOS-NEW-2 ensemble 启用时, 不在本 change 范围) |
 
 ---
 

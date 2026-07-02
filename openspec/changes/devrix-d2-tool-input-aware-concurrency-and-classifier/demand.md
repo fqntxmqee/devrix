@@ -124,8 +124,8 @@ devrix 现状: 缺 `Tool.toAutoClassifierInput(input)` + auto-mode classifier �
 
 | ID | 标准 | 优先级 | 验证 |
 |----|------|--------|------|
-| AC1 | `ToolSurface` 加 `IsConcurrencySafe(input []byte) bool` 方法, 19 工具全部默认实现 (per-input 决策) | P0 | 19 工具 surface_test PASS |
-| AC2 | `ToolSurface` 加 `ToAutoClassifierInput(input []byte) string` 方法, 19 工具全部默认实现 | P0 | 19 工具 surface_test PASS |
+| AC1 | `ToolSurface` 加 `IsConcurrencySafe(input json.RawMessage) bool` 方法, 19 工具全部默认实现 (per-input 决策; 参数类型跟 CheckPermission 对齐, 详见 design.md D5) | P0 | 19 工具 surface_test PASS |
+| AC2 | `ToolSurface` 加 `ToAutoClassifierInput(input json.RawMessage) string` 方法, 19 工具全部默认实现 | P0 | 19 工具 surface_test PASS |
 | AC3 | `ChannelRouter.ExecuteRound` (`turn_adapter.go:277`) 改造为 `partitionToolCalls`-style: 把 `IsConcurrencySafe=true` 的连续 tool_call 放进同 batch, batch 内并发, batch 间串行 | P0 | 50 文件 e2e: 50 read_file 拆成 ~10 batch, 总延迟 < 串行 / 5 |
 | AC4 | **[R3→P2 stub]** `AutoModeClassifier` interface 契约 (`internal/layers/orchestration/decisionplanning/auto_classifier.go`): 定义 `Classify(ctx, transcript) (Result, error)` + panic-on-unimplemented stub (T22', 不接真 SideQuery) | P2 | `classifier_stub_test`: 契约存在 + stub panic 信息明确 (含 "P2 interface, not implemented") |
 | AC5 | **[R3→P2 stub]** `auto_mode.malformed_tool_input` metric stub 编译存在 (不实际触发, 等 P1 classifier 实施后激活) | P2 | 编译验证 |
