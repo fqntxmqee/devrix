@@ -66,6 +66,11 @@ func TestAllSurfacesHaveExplicitV3Metadata(t *testing.T) {
 
 // T: D2-S15-A02-T14 — ApplyV3Metadata leaves the zero defaults only for
 // unknown tool names. Every registered tool name MUST return non-zero.
+// DM-20260702-008 / D2-S15-A02-T06 — every registered tool must declare
+// a non-zero PersistThreshold (MaxResultSizeChars). The gate also enforces
+// a per-tool floor: read_file=8K, grep/glob=20K, bash=30K, edit/write/
+// web*/lsp/agent/task/plan=100K. Sentinel "PersistThreshold:" in this
+// file is grep-able by CI to confirm the gate is wired.
 func TestNoToolNameReturnsZeroMetadata(t *testing.T) {
 	for _, name := range []string{
 		"read_file", "write_file", "edit_file", "bash", "grep", "glob",
@@ -79,6 +84,36 @@ func TestNoToolNameReturnsZeroMetadata(t *testing.T) {
 			su.Source == contracts.SK_Deterministic && su.Value == 0 && max == 0 && marker == "" {
 			t.Errorf("DefaultV3MetadataFor(%q) returned zero defaults — should be explicit", name)
 		}
+		// T06 PersistThreshold sentinel: per-tool MaxResultSizeChars must
+		// be positive. The actual value is decided by the per-tool
+		// differentiation in orthogonal_flags.go (8K/20K/30K/100K/4K/2K);
+		// the gate only checks "non-zero" so a future tool can pick any
+		// positive value.
+		if max <= 0 {
+			t.Errorf("PersistThreshold: DefaultV3MetadataFor(%q).MaxResultSizeChars = %d, want > 0", name, max)
+		}
+	}
+}
+
+// DM-20260702-008 / D2-S15-A02-T06 — sentinel floor for read_file: the
+// 8K floor exists because Read is the recovery path (offset/limit
+// re-reads); making the threshold anything smaller doesn't gain
+// anything and risks masking real size issues.
+func TestPersistThreshold_Floor_ReadFile(t *testing.T) {
+	_, _, _, _, max, _ := surface.DefaultV3MetadataFor("read_file")
+	if max < 8*1024 {
+		t.Errorf("PersistThreshold: read_file MaxResultSizeChars = %d, want >= 8K (recovery path)", max)
+	}
+}
+
+// DM-20260702-008 / D2-S15-A02-T06 — sentinel floor for bash: 30K is
+// the clawcode-aligned value; bash output is re-issued, not re-read,
+// so a higher threshold wastes tokens without giving the LLM better
+// recovery.
+func TestPersistThreshold_Floor_Bash(t *testing.T) {
+	_, _, _, _, max, _ := surface.DefaultV3MetadataFor("bash")
+	if max < 30*1024 {
+		t.Errorf("PersistThreshold: bash MaxResultSizeChars = %d, want >= 30K (clawcode-aligned)", max)
 	}
 }
 

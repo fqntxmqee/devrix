@@ -177,9 +177,23 @@ func (allowAllChecker) CheckPermission(_ context.Context, _ contracts.ToolSpec, 
 //   task_*                    → Action + Bounded(n) per tool
 func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.ConvergenceContract, contracts.IterationBound, contracts.SourceUncertainty, int, string) {
 	const (
-		maxCharsDefault = 8192
-		maxCharsSmall   = 4096
-		maxCharsTiny    = 2048
+		// Per-tool persistence thresholds (DM-20260702-008 / D2-S15-A02-T07).
+		// Mirrors clawcode DEFAULT_MAX_RESULT_SIZE_CHARS = 50_000 +
+		// per-tool overrides. We keep them per-tool because the LLM's
+		// recovery style varies — Read re-reads via offset/limit so 8K is
+		// fine, Bash output is re-issued so 30K is the sweet spot, etc.
+		//
+		// The growthbook override (persist.GetPersistenceThreshold) can
+		// shift individual tools up or down at runtime without recompile.
+		maxCharsReadFile        = 8 * 1024   // 8K  — Read re-reads via offset/limit
+		maxCharsGrepGlob        = 20 * 1024  // 20K — match clawcode grep/glob
+		maxCharsBash            = 30 * 1024  // 30K — bash output re-issued
+		maxCharsEditWrite       = 100 * 1024 // 100K — Edit/Write/NotebookEdit/Web*/LSP/Agent/Task/Plan
+		maxCharsMCPAuth         = 10 * 1024  // 10K — MCP auth responses
+		maxCharsAskUserQuestion = 4 * 1024   // 4K  — small UX surface
+		maxCharsToolSearch      = 4 * 1024   // 4K  — list-of-tools response
+		maxCharsLSPRead         = 4 * 1024   // 4K  — go-to-def / hover / etc.
+		maxCharsTaskStop        = 2 * 1024   // 2K  — control message
 	)
 	marker := contracts.DefaultTruncateMarkerText
 
@@ -189,109 +203,109 @@ func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.C
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsDefault, marker
+			maxCharsReadFile, marker
 	case "write_file":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 8},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsDefault, marker
+			maxCharsEditWrite, marker
 	case "edit_file":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 8},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsDefault, marker
+			maxCharsEditWrite, marker
 	case "bash":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 10},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsDefault, marker
+			maxCharsBash, marker
 	case "grep":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsDefault, marker
+			maxCharsGrepGlob, marker
 	case "glob":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsDefault, marker
+			maxCharsGrepGlob, marker
 	case "query_diagnostics":
 		return contracts.EC_Fact,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsDefault, marker
+			maxCharsEditWrite, marker
 	case "verify_plan_execution":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsDefault, marker
+			maxCharsEditWrite, marker
 	case "ask_user_question":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 2},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsSmall, marker
+			maxCharsAskUserQuestion, marker
 	case "tool_search":
 		return contracts.EC_Fact,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
-			maxCharsSmall, marker
+			maxCharsToolSearch, marker
 	case "lsp_go_to_definition", "lsp_find_references", "lsp_incoming_calls", "lsp_hover":
 		return contracts.EC_Fact,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsLSPRead, marker
 	case "lsp_workspace_symbol":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 5},
 			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
-			maxCharsSmall, marker
+			maxCharsLSPRead, marker
 	case "lsp_code_action":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
-			maxCharsSmall, marker
+			maxCharsLSPRead, marker
 	case "free_fork":
 		return contracts.EC_Experiment,
 			contracts.ConvergenceContract{Kind: contracts.CC_QuotientThreshold, Threshold: 0.8},
 			contracts.IterationBound{Kind: contracts.IB_Quotient, Quotient: 0.8},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	case "task_output":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 5},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	case "task_stop":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_StateChangeRequired},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 1},
 			contracts.SourceUncertainty{Source: contracts.SK_User, Value: 0.85},
-			maxCharsTiny, marker
+			maxCharsTaskStop, marker
 	case "task_list_background":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	case "task_output_background":
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	}
 
 	// Pattern-based fallbacks (delegate_*, task_*, lsp_*).
@@ -300,21 +314,21 @@ func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.C
 			contracts.ConvergenceContract{Kind: contracts.CC_EvidenceRequired, MinEvidence: 1},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_LLM, Value: 0.4},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	}
 	if hasPrefix(toolName, "task_") {
 		return contracts.EC_Action,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 3},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsEditWrite, marker
 	}
 	if hasPrefix(toolName, "lsp_") {
 		return contracts.EC_Fact,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
 			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
-			maxCharsSmall, marker
+			maxCharsLSPRead, marker
 	}
 
 	// Unknown tool name — T14 gate will fail the build. Returning the
