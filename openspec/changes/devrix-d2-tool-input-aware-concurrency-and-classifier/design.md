@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d2-tool-input-aware-concurrency-and-classifier`
 **Demand ID:** DM-20260702-009
-**Status:** S3_Design (待 S3-Gate review + 博弈论 Round 3 收敛)
+**Status:** S3_Gate_PendingReview (S3 文档齐备, 4 维度自审见附录 D.4, 待 reviewer verdict)
 **Parent Proposal:** `proposal.md`
 **Template:** `docs/methodology/detail-design-framework.md` (六段式)
 **Created:** 2026-07-02
@@ -544,12 +544,84 @@ Results → sessionorchestrator.ToolRoundResult → LLM next turn
 | **D7** | AutoModeClassifier 接口命名 | **`ClassifierResult`** (devrix Naming Policy) | 三方一致, 修 design.md 草稿 YoloResult 疏忽 |
 | **D8** | GrowthBook override 注入方式 | **M1 复用 PERSIST 模式** + **M2/M3 未来独立 struct** | Claude 让步: M1 是 persist concern (`MaxResultSizeChars`), 不是 concurrency; Cursor+Codex 指出 `growthbook_override_test.go:33-38` 已预演 `bash: 50*1024`。**M2/M3 定义**: M2 = per-tool concurrency threshold GB override (后续 change, 不在本 change 范围); M3 = AutoModeClassifier canary GB override (OOS-NEW-2 ensemble 启用时, 不在本 change 范围) |
 
+### D.4 S3-Gate Review 记录 (per `review-design.md` §2-5)
+
+> **自审方**: Claude (作为设计作者, devrix solo 模式下自审 + reviewer 复核并行)
+> **自审时间**: 2026-07-02 (commit `8fe73ca7`)
+> **Reviewer verdict**: _待 user 确认 (Approved / Approved with Suggestions / Changes Requested)_
+
+#### 2.1 架构决策审查
+
+| 检查项 | 自评 | 证据 |
+|--------|------|------|
+| 层归属正确 | ✅ | D2 surface (D2-owned), D7 decisionplanning (D7-owned), D5 growthbook (D5-owned); §4.2 包边界图单向 |
+| 接口方向正确 | ✅ | D7→D2 contract, D2 不 import D7 (P9 boundary 守恒) |
+| 不重复造轮子 | ✅ | 仿 clawcode 1:1 (BashTool / Tool / partitionToolCalls), 适配 devrix D2/D7 |
+| 跨层依赖最小 | ✅ | D7→D2 走 `internal/shared/contracts/`, 不引入直引 |
+| 设计决策有记录 | ✅ | 附录 D.2/D.3 决策表完整 (D1-D8 共 8 决策点) |
+
+#### 2.2 需求完整性审查
+
+| 检查项 | 自评 | 证据 |
+|--------|------|------|
+| 需求可追溯 | ✅ | demand.md (13 AC) → proposal.md (12 AC, R3) → design.md (21 AC, R3+S3 复核增补) |
+| 验收标准覆盖 | ✅ | 21 AC, P0 14 全有 T + Scenario; T16-T21 P0 (6) + T22'-T24' P2 (3) + T25'-T28 P0 (4) = 13 T |
+| Out of Scope 明确 | ✅ | proposal.md OOS 段 + tasks.md OOS-NEW-1~12 (含 -11/-12 Codex 提议, Claude 定 OOS) |
+| DM ID 无冲突 | ✅ | DM-20260702-009, 与 `demand-archive-index.md` 交叉 (S6 归档时 check) |
+
+#### 2.3 规格质量审查
+
+| 检查项 | 自评 | 证据 |
+|--------|------|------|
+| Gherkin Scenario 完整 | ⚠️ | design.md 不含 Gherkin 详情, 由 S4 spec.md 产出 (DM-20260630-003 lite-mode 推广) |
+| Happy path 覆盖 | ✅ | AC10 (50 文件 e2e < 串行/3), AC3 (partition + batch) |
+| Sad path 覆盖 | ✅ | AC17 (read 部分失败), AC19 (panic 隔离), AC6 (fail-safe), AC12 (Bash abort), AC13 (fallback discard) |
+| 并发场景覆盖 | ✅ | AC15-AC21 全是并发不变量 (S3 阶段博弈论增补 7 条) |
+| 错误路径覆盖 | ✅ | AC6 (fail-safe), AC12 (synthetic cancel), AC14 (cache invalidation), AC4 (panic-on-unimplemented) |
+| T 层映射完整 | ✅ | tasks.md T16-T28 + T22'-T25' + 域 t-registry 索引 |
+
+#### 2.4 风险审查
+
+| 检查项 | 自评 | 证据 |
+|--------|------|------|
+| 回归风险已评估 | ✅ | 附录 C.1 baseline 对比 (7 行) + C.2 高风险改动点 (3 项) + C.3 测试策略 (8 类) |
+| 回滚方案可行 | ✅ | 附录 B 多层回滚 L1-L4 (PR revert / GB flag / interface 兼容 / stub 隔离) |
+| 性能影响已评估 | ✅ | P99 指标 (Phase 1 < 5ms, partition < 1ms, Phase 2 < 200ms) + AC10 e2e 目标 |
+
+#### §5 Checklist 自审
+
+- [x] 层归属和接口方向正确
+- [x] 不重复现有能力
+- [x] demand → proposal → design → specs 追溯链完整
+- [x] 所有 P0 验收标准有对应 Scenario
+- [x] Happy path 和 sad path 均有 Scenario
+- [x] 回归风险已评估
+- [x] S3-Gate Review 结论已记录在 design.md 附录 D (本节)
+- [ ] **Review 结论明确 (Approved / Changes Requested)**: _待 reviewer 确认_
+
+#### 已修复的 S3 阶段 logic gap (commit `54d741a0`)
+
+- B1: GB flag 重命名 (`devrix_bash_max_result_size_chars`) + 模板说明
+- B2: §5.1 timing 数据合理化 (4 batch × 50ms = 200ms vs 串行 6×50ms = 300ms)
+- H1: M2/M3 双处定义 (per-tool concurrency threshold + AutoMode classifier canary)
+- H2: json.RawMessage 同步 (demand.md AC1/AC2 + tasks.md T17 interface)
+- H3: P6 聚合根列表同步 §4.1 (ToolSpec + ThresholdOverride + ClassifierResult + SurfaceLookup)
+
+#### S3-Gate Reviewer Notes (待 reviewer 填写)
+
+- [ ] 4 维度自审是否符合实际? 有无漏审维度?
+- [ ] 5 处 logic gap 修复是否真正消除歧义? (B1 三处一致, B2 数字合理, H1/H2/H3 同步)
+- [ ] 21 AC + 13 T 范围是否过宽? (P0 14 + P1 4 + P2 3)
+- [ ] 5 PR 收口 (PR-A / B / C / D+E / F) 排序合理?
+- [ ] 三方共识缺 cursor 票是否构成硬阻塞? (用户于 2026-07-02 决议"先不考虑 cursor", 风险由用户承担)
+
 ---
 
 ## 附录 E: 下一步
 
 1. ~~三方博弈论 Round 1 强论证稿~~ (已完成: `gaming-debate-design-round1-claude.md`)
-2. ~~codex + cursor 读 Round 1 写 Round 2 回应~~ (已完成: codex + cursor 双方答辩)
+2. ~~codex + cursor 读 Round 1 写 Round 2 回应~~ (已完成: codex + cursor 双方答辩, cursor 后端宕机用户决议"先不考虑 cursor")
 3. ~~基于 Round 2 写 Round 3 收敛, 更新 design.md (本文件)~~ (已完成: `gaming-debate-design-round3-convergence.md` + design.md 修正)
-4. **S3-Gate review** (Approved / Changes Requested)
+4. **S3-Gate review** (4 维度自审见附录 D.4, 待 reviewer verdict; 推荐 Approved, 进 S4)
+5. **进入 S4 实现** (PR-A 路线优先, 5 PR 合并 D+E)
 5. **进入 S4 实现** (PR-A 路线优先, 5 PR 合并 D+E)
