@@ -126,7 +126,7 @@ partitionToolCalls(calls, surfaces)  ◄── NEW (T18)
    │    input := parseInput(call.Input)
    │    safe := surface.IsConcurrencySafe(input)  ◄── NEW per-input
    │      bash(ls)  → isReadOnlyBashCommand("ls") → true
-   │      read_file(A) → <8K → true
+   │      read_file(A) → true (read-only, 跟 v2 一致, 无 size-based 决策)
    │      edit_file(X) → 同 target 路径 false
    │
    │  Partition logic (clawcode toolOrchestration.ts:84-118):
@@ -299,7 +299,7 @@ LLM emits tool call(s)
 │   partitionToolCalls (NEW T18)                                   │
 │   ┌──────────────────────────────────────────────────────────┐   │
 │   │ P99 < 1ms (pure memory, no I/O)                           │   │
-│   │ 4 read_file → IsConcurrencySafe(input) = true (<8K)      │   │
+│   │ 4 read_file → IsConcurrencySafe(input) = true (read-only)  │   │
 │   │ bash(ls) → isReadOnlyBashCommand("ls") = true             │   │
 │   │ edit_file(X) → false (写并发会乱序)                        │   │
 │   │ → 3 batches:                                              │   │
@@ -324,7 +324,8 @@ LLM emits tool call(s)
 ┌──────────────────────────────────────────────────────────────────┐
 │ D2 enforce/tools/surface/builtin/*  (19 surface)                 │
 │   BuiltinSurface.bash → BashRunner (T26 sibling abort wiring)    │
-│   BuiltinSurface.read_file → file.ReadFile (8K truncate)         │
+│   BuiltinSurface.read_file → file.ReadFile (MaxResultSizeChars   │
+│     截断, 跟并发决策无关 — 见 orthogonal_flags.go:363)            │
 │   BuiltinSurface.edit_file → file.EditFile                       │
 └──────────────────────────────────────────────────────────────────┘
      │

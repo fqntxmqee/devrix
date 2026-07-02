@@ -66,7 +66,7 @@
   | 工具 | override? | IsConcurrencySafe(input) | ToAutoClassifierInput(input) |
   |------|-----------|--------------------------|------------------------------|
   | **bash** | ✅ override | per-input: `isReadOnlyBashCommand(command)` → true/false | command (e.g. "ls -la") |
-  | **read_file** | ✅ override | per-input: `<8K → true`, ≥8K → false (大文件 8K 截断, 串行不浪费 slot) | "" (无安全相关性, 跳过) |
+  | **read_file** | ✅ override | 永远 true (read-only, 天然并发安全, 无 size-based 决策 — 跟 v2 `orthogonal_flags.go:22` 一致) | "" (无安全相关性, 跳过) |
   | **write_file** | ✅ override | 永远 false (写并发会乱序) | "path: content (first 200 chars)" |
   | **edit_file** | ✅ override | per-input: 同 target 路径互斥 → false | "path: old → new (first 200 chars)" |
   | grep | ❌ default | true (read-only) | "" |
