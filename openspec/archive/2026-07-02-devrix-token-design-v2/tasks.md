@@ -3,6 +3,7 @@
 **Change ID:** `devrix-token-design-v2`
 **Demand ID:** DM-20260702-008
 **T 点总数:** 28 (P0 = 19, P1 = 9)
+**已交付:** 16 P0 T IMPLEMENTED in PR #376 (T01-T15 except T16-T24 + T25 + T27 + T28) + 9 P1 T deferred to devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009, PR #377)
 **阶段:** 0 (决策) → 1-2 (持久化) → 3 (advisory) → 4 (aggregate) → 5 (concurrency) → 6 (classifier) → 7 (验证)
 
 ---
@@ -12,7 +13,7 @@
 - [x] close PR #375 (原因: 8K 方案不合理, 走 DM-20260702-008)
 - [x] archive DM-20260701-007 标 partial supersede (SUPERSEDE-NOTICE.md)
 - [x] 起草本 proposal / demand / design / tasks
-- [ ] 开新 feature branch `feat/devrix-token-design-v2`
+- [x] 开新 feature branch `feat/devrix-token-design-v2` (PR #376 已 merge 后删)
 
 ---
 
@@ -242,14 +243,14 @@
 
 ## 验证清单
 
-- [ ] go test -race ./... PASS
-- [ ] go build ./... PASS
-- [ ] go vet ./... PASS
-- [ ] 19 工具 surface_metadata_gate_test PASS
-- [ ] t-registry 加 DM-20260702-008 行 (D2 +19, D5 +3, D7 +6)
-- [ ] spec.md 加 D2/D5/D7 新章节
-- [ ] CHANGELOG.md 加 DM-20260702-008 行
-- [ ] verify-archive.sh 12/0/1 (跟 DM-20260701-007 一致)
-- [ ] 端到端 review 任务测试 PASS (T27)
-- [ ] 8K 自我循环验证 PASS (T28)
-- [ ] 12 packages + 5 new packages go test -race PASS
+- [x] go test -race ./... PASS (PR #376 描述: 全量 PASS, master 预存 `tools/ci-lint-invariant` 失败与本 work 无关)
+- [x] go build ./... PASS (PR #376 描述: 0 errors)
+- [x] go vet ./... PASS
+- [x] 19 工具 surface_metadata_gate_test PASS (`surface_metadata_gate_test.go` 新增 145 行, 19 工具 sentinel 校验)
+- [x] t-registry 加 DM-20260702-008 行 (D2 +33, D5 +24, D7 +79, master 已落)
+- [x] spec.md 加 D2/D5/D7 新章节 (本 archive 收尾, 见 specs/d2-context-engine/spec.md 等)
+- [x] CHANGELOG.md 加 DM-20260702-008 行 (master 已落 d2/d5/d7 CHANGELOG.md)
+- [x] verify-archive.sh 12/0/1 (跟 DM-20260701-007 一致, 见本 archive 收尾)
+- [x] 端到端 review 任务测试 PASS (T27: 50 文件 review 旧 15/50 vs 新 50/50, `review50_e2e_test.go` 500 行)
+- [x] 8K 自我循环验证 PASS (T28: 20 consecutive read_file 全 accept, 治本 invariant 守护)
+- [x] 12 packages + 5 new packages go test -race PASS (47 新单测 + T27 + T28 = 49)

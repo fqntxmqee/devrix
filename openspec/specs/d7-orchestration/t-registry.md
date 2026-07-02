@@ -664,7 +664,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Version | Date | Changes |
 |---------|------|---------|
-| **4.26.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T) -- **15 新 T 全部 P0 IMPLEMENTED**. Total 266->281, P0 222->237. S10 新 S section (0->4 A + 12 T 含 8 既有 A32/A33/A34/A35). PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). |
+| **4.26.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T) -- **15 新 T 全部 P0 IMPLEMENTED**. Total 266->281, P0 222->237. S10 新 S section (0->4 A + 12 T 含 8 既有 A32/A33/A34/A35). PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). [retroactive S6 archive 2026-07-02 — DM-20260702-008 devrix-token-design-v2 PR #376 (ProbeToolChannel.Accept 永真 T09 + read_file offset/limit T10 + Default OpenEnded T11 + task_kind 推 advisory T12 共用此版本条目, 详见 `openspec/archive/2026-07-02-devrix-token-design-v2/acceptance-report.md`] |
 | **4.27.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D7-S10-A50-T22 AutoModeClassifier P2 interface stub + D7-S10-A50-T23 ChannelRouter TODO 占位 + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测) + D7-S9-A50-T26 Bash sibling abort (per-batch controller) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring — **5 新 T 全部 IMPLEMENTED (3 P0 + 2 P1)**. Total 281→286, P0 237→240. 2 tech-debt 关闭 (TD-STE-02 + TD-STE-03). 5 PR (PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |
 | 1.0.0 | 2026-06-13 | 初始（仅 ORCH-S2-T* 遗留 ID） |
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
@@ -1351,3 +1351,5 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 
 **D7 全域统计：** 281 IMPLEMENTED + **14 IMPLEMENTED (D7-PL)** = **295 T 全 IMPLEMENTED** · **P0 243**（237 原 + 6 新 P0 layout guard T）。
 
+
+**S1_Cancelled (DM-20260630-002 devrix-d7-spec-split):** 0 T (S1 阶段取消, replaced by devrix-spec-lite-mode DM-20260630-003, 详见 `openspec/archive/2026-06-30-devrix-d7-spec-split/acceptance-report.md`)

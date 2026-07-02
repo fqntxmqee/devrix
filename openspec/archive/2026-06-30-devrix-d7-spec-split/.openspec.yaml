@@ -1,8 +1,12 @@
 change_id: devrix-d7-spec-split
 priority: P1
 demand_id: DM-20260630-002
-status: s1_cancelled
+status: s7_archived
 cancelled_at: 2026-06-30
+cancelled_in_s: S1
+archived_at: 2026-07-02
+verdict: CANCELLED
+verdict_summary: "S1 阶段取消, replaced by devrix-spec-lite-mode (DM-20260630-003, S7_Archived 2026-06-30) — 方向本质相反, 按 S 分片(扩容) vs 压成精华(瘦身)"
 cancelled_reason: |
   按"按 S 分片"思路推进 d7 spec.md 实际拆分时，发现方向偏离用户原始意图：
   用户希望 specs/ 域文档 = 精简设计契约（最新符合代码），过程需求迭代走 archive/，

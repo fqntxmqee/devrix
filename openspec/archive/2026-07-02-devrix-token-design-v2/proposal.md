@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-token-design-v2`
 **Demand ID:** DM-20260702-008
-**Status:** S2_Clarified (复盘 DM-20260701-007 后提案, 待 S3-Gate review)
+**Status:** S7_Archived (PR #376 squash merge 2026-07-02T08:50:17Z, 16 P0 T IMPLEMENTED + T27 e2e 50/50 + T28 回归, 9 P1 T deferred to devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009, PR #377))
 **Created:** 2026-07-02
 **Parent Demand:** `demand.md`
 **Supersedes:** devrix-mups-tool-classification-and-channel-autonomy (partial: 5 T 点, 详见 archive/2026-07-02-.../SUPERSEDE-NOTICE.md)
