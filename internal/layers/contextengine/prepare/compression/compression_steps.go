@@ -6,20 +6,129 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-// toolResultBudget truncates tool-result messages whose content exceeds maxPerResult
-// tokens. Returns a fresh slice (does not mutate the input).
+// toolResultBudget persists oversized tool-result messages to disk and
+// replaces their in-band content with a <persisted-output> XML reference
+// pointing at the saved file. Returns a fresh slice (does not mutate
+// the input).
 //
-// DM-20260629-002 devrix-d2-dsaft-restructuring PR-2: extracted from pipeline.go
-// RunForSession (was 109 LOC god function).
-func toolResultBudget(counter tokenCounter, msgs []types.Message, maxPerResult int) []types.Message {
+// DM-20260702-008 devrix-token-design-v2 / D2-S15-A02-T02: replaces the
+// 8K TruncateToTokens self-loop with on-disk persistence mirroring
+// clawcode's processPreMappedToolResultBlock. The LLM can recover the
+// full payload by Reading the saved file via offset/limit (T10).
+//
+// Fall-back contract: if PersistToFile returns an error, the function
+// falls back to TruncateWithMarker so the task is NEVER abandoned by
+// the budget pass — same fail-closed semantics as the previous design.
+func toolResultBudget(
+	counter tokenCounter,
+	msgs []types.Message,
+	maxPerResult int,
+	projectDir string,
+	sessionID string,
+) []types.Message {
+	const charsPerToken = 4 // tiktoken approximation, matches clawcode
+	maxChars := maxPerResult * charsPerToken
 	out := make([]types.Message, len(msgs))
 	for i, m := range msgs {
 		out[i] = m
-		if m.Role == types.MessageRoleTool && counter.CountText(m.Content) > maxPerResult {
-			out[i].Content = counter.TruncateToTokens(m.Content, maxPerResult) + "\n...[truncated]"
+		if m.Role != types.MessageRoleTool {
+			continue
 		}
+		// Token-count gate mirrors the prior design so we don't
+		// pay I/O for already-small results.
+		if counter.CountText(m.Content) <= maxPerResult {
+			continue
+		}
+		out[i].Content = persistOrTruncate(
+			m.Content, m.ID, maxChars, projectDir, sessionID, maxPerResult,
+		)
 	}
 	return out
+}
+
+// persistOrTruncate runs PersistToFile and, on success, wraps the preview
+// in <persisted-output> XML. On any error it falls back to
+// TruncateWithMarker so the budget pass never drops content entirely.
+//
+// DSAFT: D2-S15-A02-T02 (fall-back to TruncateWithMarker keeps the
+// 8K-self-loop fix signal visible even when persistence I/O fails).
+func persistOrTruncate(
+	content, toolUseID string,
+	maxChars int,
+	projectDir, sessionID string,
+	maxTokensForMarker int,
+) string {
+	// Pull toolUseID from message metadata if not set on the ID field.
+	effectiveID := toolUseID
+	if effectiveID == "" {
+		// devrix messages may carry the tool_use_id in Metadata; this
+		// keeps the persist path working even when the upstream
+		// adapter hasn't yet plumbed a dedicated field.
+		if v, ok := lookupToolUseID(content); ok {
+			effectiveID = v
+		}
+	}
+	res, err := PersistToFile(content, effectiveID, maxChars, projectDir, sessionID)
+	if err == nil {
+		if res.FilePath == "" {
+			// Under threshold or image block — return as-is.
+			return res.Preview
+		}
+		return BuildPersistedMessage(res)
+	}
+	// Fall back to TruncateWithMarker so the LLM still sees the
+	// complete=false signal (preserves the 8K self-loop治本 contract
+	// when the disk write fails — e.g. read-only FS, ENOSPC).
+	marker := "[TRUNCATED at %d/%d chars, complete=false, REREAD may help]"
+	truncated, _ := TruncateWithMarker(content, maxTokensForMarker, marker)
+	return truncated
+}
+
+// lookupToolUseID is a defensive helper: some devrix adapters stash the
+// tool_use_id at the top of the content as "tool_use_id: <id>\n".
+// We only treat it as authoritative when it's a single short token
+// (alphanumeric + dashes) — anything else is treated as untrusted
+// content and we let PersistToFile derive a path from the message ID.
+func lookupToolUseID(content string) (string, bool) {
+	const prefix = "tool_use_id: "
+	if len(content) < len(prefix) {
+		return "", false
+	}
+	if content[:len(prefix)] != prefix {
+		return "", false
+	}
+	rest := content[len(prefix):]
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if c == '\n' {
+			id := rest[:i]
+			if isSafeToolID(id) {
+				return id, true
+			}
+			return "", false
+		}
+		if !isSafeToolIDChar(c) {
+			return "", false
+		}
+	}
+	return "", false
+}
+
+func isSafeToolIDChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') || c == '-' || c == '_'
+}
+
+func isSafeToolID(s string) bool {
+	if s == "" || len(s) > 128 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if !isSafeToolIDChar(s[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // snip drops the oldest messages (FIFO) until total tokens ≤ target or only

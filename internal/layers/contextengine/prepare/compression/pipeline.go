@@ -41,6 +41,7 @@ type Pipeline struct {
 	stepObserver       StepObserver
 	asyncCompact       *AsyncAutocompacter
 	sessionID          string
+	projectDir         string // DM-20260702-008: T01 PersistToFile root
 	skipAssembly       bool
 	locale             i18n.Locale
 }
@@ -125,7 +126,7 @@ func (p *Pipeline) applyCompressionSteps(ctx context.Context, current []types.Me
 	steps := []namedStep{
 		{stepToolResultBudget, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
-			next := toolResultBudget(p.counter, m, b.ToolResultBudget)
+			next := toolResultBudget(p.counter, m, b.ToolResultBudget, p.projectDir, p.sessionID)
 			after := p.counter.CountMessages(next)
 			p.emitStep(ctx, stepToolResultBudget, before, after)
 			return next, before != after

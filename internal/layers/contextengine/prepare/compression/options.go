@@ -61,6 +61,21 @@ func WithSessionID(sessionID string) Option {
 	}
 }
 
+// WithProjectDir sets the on-disk root for persisted tool results.
+//
+// DM-20260702-008 / D2-S15-A02-T01: required by PersistToFile so oversized
+// tool results can be written to <projectDir>/<sessionID>/tool-results/<id>.txt
+// and replaced in-band with a <persisted-output> XML preview reference.
+// Default empty → fallback to t.TempDir() at construction time.
+func WithProjectDir(dir string) Option {
+	return func(p *Pipeline) {
+		if dir != "" {
+			p.projectDir = dir
+		}
+	}
+}
+
+
 // WithMicrocompactConfig sets microcompact (stale tool result clearing) settings.
 func WithMicrocompactConfig(cfg config.MicrocompactConfig) Option {
 	return func(p *Pipeline) {
