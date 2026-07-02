@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.26.0
-**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 15 T IMPLEMENTED 266->281, P0 222->237 -- D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T); S10 Verify Node 新 S section 由 0 增至 4 A + 12 T (含 8 既有 A32/A33/A34/A35); 之前 devrix-d7-physical-layout-alignment DM-20260701-004 PR-4: D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾 IMPLEMENTED（orchtypes/doc.go package 注释升级 + d7-domain.md §North Star 新增 Cross-S Kernel 行，PR-1 已落地 a-registry 6 A + f-registry 6 F + code-layout 1 行的 doc-only 收尾）; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3 → v4.24.0 (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-2 → v4.23.0 (D7-PL-T07..T12 6 P0 layout guard 测试 IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1 → v4.22.0 (T01..T12 PLANNED 登记); **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 → v4.21.0; **earlier**: devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222)
+**Version:** 4.27.0
+**Last Updated:** 2026-07-02 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 5 T IMPLEMENTED 281→286, P0 237→240 -- D7-S10-A50-T22 AutoModeClassifier P2 interface stub (0 行实现, panic 信息合规) + D7-S10-A50-T23 ChannelRouter TODO 占位 (不破坏 partition 行为) + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测) + D7-S9-A50-T26 Bash sibling abort (per-batch controller + watched call 失败时取消 siblings) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring; 2 tech-debt 关闭 TD-STE-02 + TD-STE-03)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -301,6 +301,22 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S10-A50-T04** | **BurdenOfProofForClass by EmissionClass (P1-AC-3): Fact=text 自证; Action=state change evidence; Probe=source_quality; Experiment=reproducibility** | **D7-S10-A50** | **`verify_contract.go::BurdenOfProofForClass` + `verify_contract_test.go::TestBurdenOfProofForClass + TestBurdenOfProof_Probe_LowCC`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Verify_Contract |
 
 > 配套 P0 验证: `executionflow/verify/verify_contract_test.go` 13 tests 100% PASS (含 8 CC 子用例 + 4 task_kind + 2 zero-value + burden of proof); coverage verify 53.7%; 0 race warnings. D1 EmitComplete/feishu 透传 12 communication package tests 0 regression.
+
+> **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) — Phase 5-6+ 落地.**
+> 5 PR 联动 (PR-D+E AutoModeClassifier stub + PR-F sibling abort + discard):
+>
+> - **PR-D+E Phase 5 (3 T)**: D7-S10-A50-T22 AutoModeClassifier P2 interface stub (0 行实现, panic 信息合规) + D7-S10-A50-T23 ChannelRouter TODO 占位 (不破坏 partition 行为) + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测)
+> - **PR-F Phase 6+ (2 T)**: D7-S9-A50-T26 Bash sibling abort (per-batch controller + watched call 失败时取消 siblings) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring
+>
+> AC 满足: 5/5 PASS (P0 3 + P1 2) — T22/T23/T24 + T26/T27. 2 tech-debt 关闭 (TD-STE-02 + TD-STE-03).
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D7-S10-A50-T22** | **PR-D+E AutoModeClassifier P2 interface stub: `ClassifyToolUse(ctx, transcript) (YoloResult, error)`; YoloResult{Decision, Reason, Source}; 当前 0 行实现, panic("P2 interface, not implemented; see gaming-debate-round3-convergence.md"); 触发升 P1 实施的条件: verify_contract.deny_rate > 5% (任意 7 天窗口)** | **D7-S10-A50 AutoClassifier Stub** | **`internal/layers/orchestration/decisionplanning/auto_classifier.go` + `auto_classifier_test.go::TestAutoModeClassifier_InterfaceExists + TestAutoModeClassifier_StubPanic`** | **IMPLEMENTED (DM-20260702-009)** | **P2** | Verify_Contract |
+| **D7-S10-A50-T23** | **PR-D+E ChannelRouter TODO 注释 + 占位 metric stub (不破坏现有 partition 行为): `internal/bootstrap/turn_adapter.go::ExecuteRound` partitionToolCalls 之后 batch 跑之前预留 `ClassifyToolUse` 调用点, 当前直接走 default allow** | **D7-S10-A50 ChannelRouter Placeholder** | **`internal/bootstrap/turn_adapter.go` + `turn_adapter_partition_test.go::TestPartition_NoClassifierNoRegression + TestChannelRouter_PlaceholderCallsite`** | **IMPLEMENTED (DM-20260702-009)** | **P2** | Verify_Contract |
+| **D7-S10-A50-T24** | **PR-D+E Classifier interface stub 单测 (4 单测) + e2e: TestAutoModeClassifier_InterfaceExists (compile) + TestAutoModeClassifier_StubPanic (panic 信息合规) + TestPartition_NoClassifierNoRegression (ChannelRouter 占位不破坏 partition) + TestChannelRouter_PlaceholderCallsite (TODO 注释 + metric 占位存在)** | **D7-S10-A50 Classifier Stub Tests** | **`internal/layers/orchestration/decisionplanning/auto_classifier_test.go` (4 tests) + `turn_adapter_partition_test.go`** | **IMPLEMENTED (DM-20260702-009)** | **P0** | Verify_Contract |
+| **D7-S9-A50-T26** | **PR-F Bash sibling abort: BashSiblingAbortController per-batch controller (sync.Mutex + sync.Once wrapped cancel) + Register(callID, toolName) (ctx, cancel, ok) + AbortSiblings(callID, reason) bool + isSiblingAbortWatched(name) 仅 bash; executeOneBatch parallel branch wired; watched call 失败时取消其它 watched siblings** | **D7-S9-A50 SiblingAbort** | **`internal/layers/contextengine/enforce/tools/bash/sibling_abort.go` (10 unit tests) + `internal/bootstrap/partition_sibling_abort_test.go` (3 integration tests); `executeOneBatch` parallel branch wired** | **IMPLEMENTED (DM-20260702-009)** | **P1** | Channel_Route |
+| **D7-S9-A50-T27** | **PR-F StreamingToolExecutor.Discard() + fallback 路径 wiring: StreamingToolExecutor per-LLM-iteration buffer (Buffer/Buffered/BufferedCount/IsDiscarded/DiscardReason/Discard); ErrStreamingFallbackSentinel = "streaming_fallback"; DiscardOnFallback wiring helper (atomic.Int64 counter + idempotent); FormatStreamingFallbackError(reason)** | **D7-S9-A50 Discard** | **`internal/bootstrap/streaming_executor.go` (10 tests) + `internal/bootstrap/discard_on_fallback.go` (8 tests) + `streaming_executor_test.go` + `discard_on_fallback_test.go`** | **IMPLEMENTED (DM-20260702-009)** | **P1** | Channel_Route |
 
 ---
 
@@ -649,6 +665,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | Version | Date | Changes |
 |---------|------|---------|
 | **4.26.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T) -- **15 新 T 全部 P0 IMPLEMENTED**. Total 266->281, P0 222->237. S10 新 S section (0->4 A + 12 T 含 8 既有 A32/A33/A34/A35). PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). |
+| **4.27.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D7-S10-A50-T22 AutoModeClassifier P2 interface stub + D7-S10-A50-T23 ChannelRouter TODO 占位 + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测) + D7-S9-A50-T26 Bash sibling abort (per-batch controller) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring — **5 新 T 全部 IMPLEMENTED (3 P0 + 2 P1)**. Total 281→286, P0 237→240. 2 tech-debt 关闭 (TD-STE-02 + TD-STE-03). 5 PR (PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |
 | 1.0.0 | 2026-06-13 | 初始（仅 ORCH-S2-T* 遗留 ID） |
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
 | 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
