@@ -48,3 +48,5 @@ v0_backlog:
   out_of_scope:
     - D1 表现层 task_incomplete 渲染 (PR #373 已修)
     - D2 tool_result budget 调优 (另立 DM-20260701-006)
+archived_at: 2026-07-02
+replaced_by: devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)

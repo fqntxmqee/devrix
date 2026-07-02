@@ -2,7 +2,8 @@
 
 **Change ID:** `devrix-mups-tool-classification-and-channel-autonomy`
 **Demand ID:** DM-20260701-007
-**Status:** S2_Clarified → S3_Design（博弈论双 review 共识已并入 demand/proposal/design/tasks）
+**Status:** S7_Archived (S5 ACCEPTED 2026-07-02, S6 归档完成, PR-B/C/D 待开 PR 合入 master)
+**Prior Status:** S2_Clarified → S3_Design → S4_Implementing → S5_Accepted（博弈论双 review 共识已并入 demand/proposal/design/tasks）
 **Created:** 2026-07-01
 **Parent Demand:** `demand.md`
 **Game Theory Reviews:** `game-theory-review.md` · `game-theory-review-composer.md`
