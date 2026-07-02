@@ -1,15 +1,18 @@
 change_id: devrix-d2-tool-input-aware-concurrency-and-classifier
 demand_id: DM-20260702-009
-title: D2 Tool Input-Aware Concurrency + Auto-Mode Security Classifier + Tech-Debt Closure — per-input IsConcurrencySafe + toAutoClassifierInput + LLM SideQuery + GrowthBook + Bash sibling abort + discard + inputsEquivalent (clawcode 真实设计 + 4 项遗留讨论落地)
+title: D2 Tool Input-Aware Concurrency + Auto-Mode Security Classifier + Tech-Debt Closure — per-input IsConcurrencySafe (4 工具 override + 15 default) + toAutoClassifierInput + AutoModeClassifier P2 interface + GrowthBook P0 部分保留 1 flag + Bash sibling abort + discard + inputsEquivalent (clawcode 真实设计 + 4 项遗留讨论落地, 博弈论 Round 3 收敛)
 priority: P1
-status: s1_proposal
+status: s2_proposal
 created_at: 2026-07-02
+updated_at: 2026-07-02  # 博弈论 Round 3 收敛
 domains: [D2, D3, D5, D7]
 source: |
   2026-07-02 复盘 DM-20260702-008 P1 延期 + DM-20260701-007 借鉴关系 10 项 +
   openspec/tech-debt/streaming-tool-executor-v2.md (TD-STE-01~06) +
   clawcode Tool interface 35 字段 (doc 53) + 复盘清单 6 项审计,
-  把 13 T 点 (T16-T28) 走完, 关闭 4 项 tech-debt (TD-STE-01/02/03/06), 落地 6 项遗留讨论.
+  走完 12 T 点 (T16-T21 P0 = 6, T22'-T23' P2 interface stubs = 2, T25'-T28 P0 = 4),
+  关闭 4 项 tech-debt (TD-STE-01/02/03/06), 落地 6 项遗留讨论.
+  博弈论 Round 3 收敛结果: 分层混合 (4 override + 15 default) + P2 interface only (auto-mode) + P0 部分保留 1 GB flag (bash 30K→50K) + 5 PR (D+E 合并).
 related:
   - DM-20260702-008  # Token Design 2.0 (P0 已合并, P1 延期给本 change)
   - DM-20260701-007  # MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 (上游)

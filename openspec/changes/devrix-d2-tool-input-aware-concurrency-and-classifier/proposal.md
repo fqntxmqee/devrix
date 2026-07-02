@@ -4,7 +4,21 @@
 **Demand ID:** DM-20260702-009
 **Status:** S2_Proposal (待 S3-Gate review)
 **Created:** 2026-07-02
+**Updated:** 2026-07-02 (博弈论 Round 3 收敛)
 **Parent Demand:** `demand.md`
+
+> **本文档反映 2026-07-02 三方博弈论 (Claude + Codex + Cursor) 收敛结果**。完整辩论过程见:
+> - `gaming-debate-round1-claude.md` (强论证稿 + 12 反问)
+> - `gaming-debate-round2-codex.md` (Codex 答辩, 5552 行)
+> - `gaming-debate-round2-cursor.md` (Cursor 答辩, 297 行)
+> - `gaming-debate-round3-convergence.md` (最终收敛)
+> - `gaming-analysis-synthesis.md` (Round 0 原始三方分析)
+>
+> **关键调整** (vs 需求原状):
+> - **D1**: per-input 函数 = **分层混合** (interface 19 函数 + 4 工具 override + 15 default)
+> - **D2**: auto-mode classifier = **P2 interface only** (不实施 SideQuery, metric 触发升 P1)
+> - **D3**: GrowthBook = **P0 部分保留 1 flag** (bash 30K→50K, 其他推迟)
+> - **D4**: **5 PR (D+E 合并)** (vs 6 PR 原状)
 
 ---
 
@@ -25,12 +39,14 @@
 - `/Users/fukai/workspace/clawcode/src/tools/BashTool/BashTool.tsx:434-442` (per-input IsConcurrencySafe + ToAutoClassifierInput 实例)
 - `/Users/fukai/workspace/clawcode/src/services/tools/StreamingToolExecutor.ts` (siblingAbortController + discard)
 
-**devrix 现状** (5 处):
+**devrix 现状** (6 处):
 
 - `internal/shared/contracts/tool_surface.go:39-43` (devrix 静态 `ConcurrencySafe bool` 现状)
+- `internal/shared/contracts/tool_surface.go:43` (devrix 已有 `ReadOnly` 字段, clawcode isReadOnly 不需借鉴)
+- `internal/shared/contracts/tool_surface.go:66` (devrix 已有 `InterruptMode`, 跟 clawcode interruptBehavior 1:1)
 - `internal/bootstrap/turn_adapter.go:277` (devrix `ExecuteRound` 现状)
-- `internal/layers/contextengine/prepare/compression/persist.go` (T01 PersistToFile — 联动 GrowthBook)
-- `internal/layers/contextengine/persist/content_replacement_state.go` (T04 ContentReplacementState — 联动 GrowthBook)
+- `internal/layers/contextengine/persist/growthbook_override.go:1-9, 24-28, 57-89` (devrix 已有 GB 预埋模式, 跟本 change D3 横向复用)
+- `internal/layers/contextengine/persist/content_replacement_state.go:14-23, 81-118` (devrix ContentReplacementState, inputsEquivalent 不需借鉴)
 - `internal/layers/contextengine/enforce/tools/bash/bash_runner.go` (BashTool runner — 集成 sibling abort)
 
 **复盘文档** (4 处):
@@ -60,9 +76,9 @@ ConcurrencySafe bool
 | 工具 | 现状 (v2 bool) | 应该的 per-input 决策 |
 |------|----------------|---------------------|
 | `bash` | `false` (永远串行) | `git status` → true, `rm -rf` → false |
-| `read_file` | `true` (永远并发) | 大文件 (>8K) → 串行 (1 batch), 小文件 → true |
+| `read_file` | `true` (永远并发) | 大文件 (>1MB) → 串行, 小文件 → true |
 | `write_file` | `false` | 永远 false (写并发会乱序) |
-| `edit_file` | `false` | 永远 false |
+| `edit_file` | `false` | 永远 false (同 path 互斥) |
 | `grep` | `true` | true (read-only) |
 | `glob` | `true` | true (read-only) |
 | `lsp_*` | `true` | true (read-only) |
@@ -77,7 +93,7 @@ ConcurrencySafe bool
 isConcurrencySafe(input: z.infer<Input>): boolean
 ```
 
-**per-input 函数**, 19 工具 surface 自己决定。`BashTool` 实际实现 (`src/tools/BashTool/BashTool.tsx:434-437`):
+**per-input 函数**, 工具 surface 自己决定。`BashTool` 实际实现 (`src/tools/BashTool/BashTool.tsx:434-437`):
 
 ```typescript
 isConcurrencySafe(input) {
@@ -87,7 +103,7 @@ isConcurrencySafe(input) {
 
 **consequence**: 9 个 `git status` 在 devrix 当前全串行 (9×1s = 9s), 在 clawcode 1 batch 并发 (1×1s = 1s). **9× speedup** for typical read-only batches.
 
-### 1.2 RC-2: 无 auto-mode 安全分类器, 缺中间层
+### 1.2 RC-2: 无 auto-mode 安全分类器, 缺中间层 (P2 推迟)
 
 devrix 当前安全栈 (3 道):
 
@@ -101,7 +117,7 @@ devrix 当前安全栈 (3 道):
 
 - **事前投影**: `Tool.toAutoClassifierInput(input)` → 紧凑 string (e.g. `ls -la` for Bash, `/tmp/x: new content` for Edit)
 - **transcript 序列化**: `toCompactBlock` → `{"Bash":"ls"}` JSONL 喂独立 LLM (SideQuery)
-- **LLM 判 allow/deny**: 5s timeout, fail-open (网络挂了默认 allow + log metric)
+- **LLM 判 allow/deny**: 5s timeout, **fail-closed** (修正 demand §6 原"fail-open", 采纳 Cursor Q6)
 - **失败 telemetry**: `tengu_auto_mode_malformed_tool_input` 事件 + `tengu_auto_mode_classifier_unavailable` 事件
 - **复用 ToolUseContext**: sideQuery 复用 main loop 的 LLM gateway, 不另起 connection
 
@@ -110,17 +126,21 @@ devrix 当前安全栈 (3 道):
 | 层 | devrix | clawcode |
 |----|--------|----------|
 | L0 静态规则 | ✅ VerifyContract 4 元组 | ✅ checkPermissions |
-| L1 SideQuery 中间层 | ❌ 无 | ✅ yoloClassifier |
+| L1 SideQuery 中间层 | ⚠️ **P2 interface only (本 change)** | ✅ yoloClassifier |
 | L2 运行时沙箱 | ✅ Bash AST analyzer (W4 AC10) | ✅ bashClassifier |
 | L3 事后 Verify | ✅ executionflow/verify | ✅ TaskVerify (post) |
 
-本 change 加 L1 SideQuery 中间层, 跟现有 L0/L2/L3 互补.
+**P2 推迟理由** (Round 3 收敛):
+- Cursor (D2 P0 派) 承认 **devrix 无生产安全事故** (Round 2 Q4)
+- 缺口**未被实战证明**, 是**预防型架构**而非修复型
+- devrix 资源有限, P0 应优先治本 (per-input 函数)
+- **升级触发 metric** (Cursor + Claude 综合): 90 天内 `permission.allow+manual_review_tagged.semantic_risk >= 3/week` 即升 P1
 
 ---
 
-## 2. 核心机制 (M1-M5)
+## 2. 核心机制 (M1-M5, P2 降级标注)
 
-### 2.1 M1 — Per-Input `IsConcurrencySafe`
+### 2.1 M1 — Per-Input `IsConcurrencySafe` (P0, 三方一致)
 
 **接口** (`internal/shared/contracts/tool_surface_v4.go` 新建):
 
@@ -131,10 +151,10 @@ devrix 当前安全栈 (3 道):
 // with a read-only command is concurrency-safe, but bash with `rm -rf`
 // is not.
 //
-// Default implementation: return ToolSpec.ConcurrencySafe (v2 static
+// **Default implementation**: return ToolSpec.ConcurrencySafe (v2 static
 // bool) for back-compat. Tools that need per-input logic MUST override.
 //
-// Fail-safe: implementations MUST NOT panic; on parse failure, return
+// **Fail-safe**: implementations MUST NOT panic; on parse failure, return
 // false (treat as not concurrency-safe). Emits telemetry
 // `tool.is_concurrency_safe.failed` on parse failure for observability.
 //
@@ -145,48 +165,37 @@ type ToolSurface interface {
     
     // IsConcurrencySafe(input) is the v4 per-input decision.
     IsConcurrencySafe(input []byte) bool
-    
-    // ToAutoClassifierInput(input) is the v4 auto-mode classifier projection.
-    ToAutoClassifierInput(input []byte) string
 }
 ```
 
-**19 工具默认实现** (`orthogonal_flags_v2.go` 新建):
+**4 工具 override 详细** (Round 3 收敛采纳 Codex 折中 + Cursor 实现层接受):
+
+| Tool | IsConcurrencySafe(input) 判定 | 借鉴 clawcode |
+|------|------------------------------|---------------|
+| **Bash** | `isReadOnly(input) → true; else false` | `BashTool.tsx:434-437` |
+| **read_file** | 解析 input 找 `path` + `limit`, 大文件 (>1MB) → false | clawcode `read_file.ts` |
+| **edit_file** | 解析 input 找 `file_path`, 同一 path 在同 batch → false (mutual exclusion) | clawcode `edit_file.ts` |
+| **write_file** | 同 edit_file (写并发会乱序, 永远 false) | clawcode `write_file.ts` |
+
+**15 工具 default 路由** (走 `s.ConcurrencySafe` 字段):
 
 ```go
-// BuiltinSurface 6 工具: bash/write/edit/read/grep/glob
+// BuiltinSurface 6 工具中, 4 个有 override, 2 个走 default (grep, glob)
 func (s *BuiltinSurface) IsConcurrencySafe(input []byte) bool {
-    var p struct {
-        Command string `json:"command"`
+    // bash/read/edit/write 有 override, 走 OverrideLookup
+    // grep/glob 走 s.ConcurrencySafe
+    if override, ok := s.overrideLookup(s.toolName); ok {
+        return override(input)
     }
-    if err := json.Unmarshal(input, &p); err != nil {
-        // fail-safe: 保守 false
-        return false
-    }
-    switch s.toolName {
-    case "read_file", "grep", "glob":
-        return true
-    case "bash":
-        // bash 走 isReadOnly 决策 (跟 clawcode BashTool.tsx:434-437 一致)
-        return isReadOnlyBashCommand(p.Command)
-    case "write_file", "edit_file":
-        return false
-    }
-    return false
+    return s.ConcurrencySafe // v2 static bool
 }
 ```
 
-### 2.2 M2 — `partitionToolCalls` Batch 改造
+LSPToolSurface 5 + FreeFork/Tracker/Verify/AskUser/BackgroundTask/ToolSearch 8 = 13 工具走 default, 全部返回 `s.ConcurrencySafe` 字段.
+
+### 2.2 M2 — `partitionToolCalls` Batch 改造 (P0, 三方一致)
 
 **位置**: `internal/bootstrap/turn_adapter.go:277` 改造
-
-**当前实现** (per-tool 静态 bool):
-
-```go
-concMap := a.concurrencyMap() // toolName → bool
-// 9 个 read_file 全部 false? 不, read_file true → 全部塞 errgroup 并发
-// 9 个 bash 全部 false → 全部串行
-```
 
 **改造后** (per-input 函数 + partition):
 
@@ -217,7 +226,7 @@ func (a *contextEngineAdapter) partitionToolCalls(
 
 **预期提速**: 9 个 `git status` (read-only) → 1 batch 并发, 1s 而非 9s. 50 文件 review (9 并发 read_file) → ~10 batch × 1s = ~10s 而非 ~50s 串行.
 
-### 2.3 M3 — Per-Input `ToAutoClassifierInput`
+### 2.3 M3 — Per-Input `ToAutoClassifierInput` (P0 interface, P2 实施)
 
 **接口**:
 
@@ -266,32 +275,17 @@ func (s *BuiltinSurface) ToAutoClassifierInput(input []byte) string {
 }
 ```
 
-### 2.4 M4 — `toCompactBlock` JSONL Transcript
+### 2.4 M4 — `toCompactBlock` JSONL Transcript (P2 interface only, 不实施)
 
-**位置**: `internal/layers/orchestration/decisionplanning/to_compact_block.go` 新建
+**位置**: `internal/layers/orchestration/decisionplanning/to_compact_block.go` (本 change 内**只声明 interface, 不实施**)
 
-**claude 真实代码** (`yoloClassifier.ts:378-410`):
+**Round 3 收敛决定**: 
+- 加 `ToCompactBlock` 方法签名 (P0 阶段, 跟 M3 配套)
+- **不**实施 `toCompactBlock.go` 实际序列化逻辑
+- **不**集成到 `ExecuteRound`
+- P1 升级触发时 (跟 M5 一起) 才实施
 
-```typescript
-function toCompactBlock(block, role, lookup) {
-  if (block.type === 'tool_use') {
-    const tool = lookup.get(block.name)
-    if (!tool) return ''
-    const input = (block.input ?? {}) as Record<string, unknown>
-    let encoded
-    try {
-      encoded = tool.toAutoClassifierInput(input) ?? input
-    } catch (e) {
-      logEvent('tengu_auto_mode_malformed_tool_input', { toolName: block.name })
-      encoded = input
-    }
-    return JSON.stringify({ [block.name]: encoded })
-  }
-  return JSON.stringify({ [role]: extractTextContent(block) })
-}
-```
-
-**devrix Go 翻译**:
+**接口** (保留供 P1 实施):
 
 ```go
 // toCompactBlock mirrors clawcode yoloClassifier.ts:378-410.
@@ -303,63 +297,45 @@ function toCompactBlock(block, role, lookup) {
 //
 // Returns '' for tool_use blocks whose tool encodes to '' (e.g. read_file
 // has no security relevance).
+//
+// P2 status: interface declared, implementation deferred to P1 upgrade
+// (see Round 3 convergence gaming-debate-round3-convergence.md).
 func toCompactBlock(
     block TranscriptBlock,
     role string,
     surfaceLookup map[string]ToolSurface,
 ) string {
-    if block.Type == "tool_use" {
-        s, ok := surfaceLookup[block.Name]
-        if !ok {
-            return "" // unknown tool, skip
-        }
-        encoded, err := safeToAutoClassifierInput(s, block.Input)
-        if err != nil {
-            // fail-safe: 落 raw input + emit metric
-            metrics.AutoModeMalformedToolInput(block.Name).Inc()
-            encoded = string(block.Input)
-        }
-        line, _ := json.Marshal(map[string]string{block.Name: encoded})
-        return string(line)
-    }
-    text := extractTextContent(block)
-    line, _ := json.Marshal(map[string]string{role: text})
-    return string(line)
-}
-
-// safeToClassifier wraps surface.ToAutoClassifierInput with panic recovery.
-// Mirror clawcode yoloClassifier.ts:393-404 fail-safe semantics.
-func safeToAutoClassifierInput(s ToolSurface, input []byte) (string, error) {
-    var result string
-    var err error
-    func() {
-        defer func() {
-            if r := recover(); r != nil {
-                err = fmt.Errorf("panic: %v", r)
-            }
-        }()
-        result = s.ToAutoClassifierInput(input)
-    }()
-    return result, err
+    // P2: not implemented in this change
+    panic("toCompactBlock: P2 interface, not implemented; see gaming-debate-round3-convergence.md")
 }
 ```
 
-### 2.5 M5 — Auto-Mode Classifier (SideQuery LLM)
+### 2.5 M5 — Auto-Mode Classifier (SideQuery LLM) (P2 interface only, 不实施)
 
-**位置**: `internal/layers/orchestration/decisionplanning/auto_classifier.go` 新建
+**Round 3 收敛决定**:
+- 加 `IntentClassifier.ClassifyToolUse(transcript, sideQuery) YoloResult` 方法签名
+- **不**实施 `auto_classifier.go` 实际分类器
+- **不**集成到 ChannelRouter
+- P1 升级触发时 (metric 命中) 才实施
 
-**接口**:
+**接口** (保留供 P1 实施):
 
 ```go
 // AutoModeClassifier runs the LLM-driven security classifier on a
 // compact transcript. Returns Allow | Deny + reason.
 //
 // 5s timeout hard cap (mirrors clawcode yoloClassifier.ts:5s policy).
-// Fail-open on LLM unavailable (return Allow + emit
-// `auto_mode.classifier_unavailable` metric).
+// **Fail-closed on LLM unavailable or timeout** (adopted from Cursor
+// Q6; corrects demand §6 "fail-open" which is unsafe in security context).
+// Returns Deny + emits `auto_mode.classifier_timeout_deny` metric.
+// Fail-open is only available via explicit ops GrowthBook flag
+// `devrix_classifier_fail_open=true`.
 //
 // The classifier NEVER replaces VerifyContract 4 元组 (第一道安全);
 // it is a complementary middle layer.
+//
+// P2 status: interface declared, implementation deferred to P1 upgrade
+// (trigger metrics in §10).
 type AutoModeClassifier interface {
     ClassifyToolUse(ctx context.Context, transcript []TranscriptBlock) (YoloResult, error)
 }
@@ -378,40 +354,9 @@ const (
 )
 ```
 
-**SideQuery 复用** (`yoloClassifier.ts:1485-1493`):
-
-```go
-// sideQuery invokes a one-shot LLM completion reusing the main loop's
-// gateway. The classifier prompt + transcript is sent; the response is
-// parsed for {decision, reason}.
-func (c *AutoModeClassifierImpl) sideQuery(
-    ctx context.Context,
-    prompt string,
-    transcript string,
-) (YoloResult, error) {
-    ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-    defer cancel()
-    
-    resp, err := c.gateway.Complete(ctx, llmgateway.Request{
-        Model:    c.config.ClassifierModel,
-        System:   prompt,
-        Messages: []Message{{Role: "user", Content: transcript}},
-    })
-    if err != nil {
-        // fail-open + metric
-        metrics.AutoModeClassifierUnavailable().Inc()
-        return YoloResult{Decision: YoloAllow, Source: "rule-fallback"}, nil
-    }
-    
-    return parseYoloResult(resp)
-}
-```
-
-**ChannelRouter 集成** (T23): `ExecuteRound` 在 `partitionToolCalls` 之后, 每个 batch 跑之前调 `AutoModeClassifier.ClassifyToolUse`. Deny → 整个 batch skip + emit `auto_mode.denied` metric.
-
 ---
 
-## 3. 架构图 (M1-M5 关系)
+## 3. 架构图 (M1-M5 关系, P2 降级标注)
 
 ```
 LLM turn
@@ -419,84 +364,96 @@ LLM turn
    ▼
 ExecuteRound (turn_adapter.go:277)
    │
-   ├─ partitionToolCalls (per-input IsConcurrencySafe)
+   ├─ partitionToolCalls (per-input IsConcurrencySafe)        P0 (M1+M2)
    │     │
    │     └─→ Batch[0] (9 read_file)         Batch[1] (1 write_file)    Batch[2] (1 bash)
    │            │                                   │                           │
-   │            │ auto-mode classifier             │ classifier                 │ classifier
-   │            │ ClassifyToolUse                  │                            │
-   │            │ (5s timeout, fail-open)          ▼                            ▼
+   │            │ (auto-mode classifier: P2)        │ (P2)                      │ (P2)
+   │            │ ClassifyToolUse                  │                           │
+   │            │ (interface only, 不实施)          ▼                           ▼
    │            ▼                              skip (write to plan)         run (or deny)
-   │       Allow → errgroup (concurrent)
+   │       errgroup (concurrent)                  P0 阶段无中间层防御
    │
    └─ per-batch: result merge
 ```
 
-**3 道安全栈** (本 change 强化 L1 中间层):
+**3 道安全栈** (本 change 强化 L0 + 加 L1 interface 推迟 P2):
 
-| 层 | 机制 | 兜底 |
-|----|------|------|
-| L0 事前静态 | VerifyContract 4 元组 (DM-20260701-007) | surface.CheckPermission |
-| **L1 中间 SideQuery (本 change)** | **AutoModeClassifier + toCompactBlock** | **5s timeout fail-open** |
-| L2 运行时沙箱 | Bash AST analyzer (W4 AC10) | 静态 allowlist |
-| L3 事后 Verify | executionflow/verify | 重新跑 |
+| 层 | 机制 | 落地状态 |
+|----|------|----------|
+| L0 事前静态 | VerifyContract 4 元组 (DM-20260701-007) | ✅ P0 实施 (本 change 强化) |
+| **L1 中间 SideQuery** | **AutoModeClassifier + toCompactBlock** | ⚠️ **P2 interface only** (Round 3 收敛) |
+| L2 运行时沙箱 | Bash AST analyzer (W4 AC10) | ✅ 已有 |
+| L3 事后 Verify | executionflow/verify | ✅ 已有 |
 
----
-
-## 4. 博弈论共识 (H13-H17, 新增)
-
-| ID | 设计承诺 | 落地 T 点 |
-|----|----------|----------|
-| **H13** | **per-input 并发决策, 不过度保守** | **T16-T19 (IsConcurrencySafe + partitionToolCalls)** |
-| **H14** | **3 道安全栈 (L0/L1/L2/L3) 互补, L1 中间层不替换 L0** | **T20-T24 (auto-mode classifier)** |
-| **H15** | **Fail-safe 默认 (抛错 → 不并发 / 落 raw input)** | **T16/T20 (interface 默认实现)** |
-| **H16** | **Transcript 投影 + JSONL 序列化, 不暴露整个 transcript 给 LLM** | **T20-T21 (toCompactBlock)** |
-| **H17** | **Telemetry 完整 (malformed_input + classifier_unavailable + denied)** | **T22-T24 (metric 集成)** |
+**L1 升级触发** (Cursor + Claude 综合):
+- `permission.allow+manual_review_tagged.semantic_risk >= 3/week` (90 天窗口) → 升 P1
+- `verify_contract.fail_after_destructive_exec > 0` (任一即触发, 即时) → 升 P1
+- `subquery.p99_latency < 3s AND 可用率 > 99%` (实施前提) → 升 P1
 
 ---
 
-## 5. T 点划分 (9 T, P1 → P0 验收)
+## 4. 博弈论共识 (H13-H17)
+
+| ID | 设计承诺 | 落地 T 点 | 博弈轮次 |
+|----|----------|----------|----------|
+| **H13** | **per-input 并发决策 (4 override + 15 default), 不过度保守** | **T16-T19 (IsConcurrencySafe + partitionToolCalls)** | R3 三方一致 |
+| **H14** | **3 道安全栈 (L0/L2/L3) 互补, L1 中间层 P2 interface only** | **T20-T21 (ToAutoClassifierInput interface) + T22-T24 推迟** | R3 Cursor/Codex/Claude 综合 |
+| **H15** | **Fail-safe 默认 (抛错 → 不并发 / 落 raw input)** | **T16/T21 (interface 默认实现)** | R0 三方一致 |
+| **H16** | **Transcript 投影 + JSONL 序列化, 不暴露整个 transcript** | **T20-T21 (interface 保留, 实施推迟 P1)** | R3 综合 |
+| **H17** | **Telemetry 完整 (malformed_input + classifier_unavailable + timeout_deny)** | **P2 推迟, P1 实施时一并完成** | R3 综合 |
+| **H18** | **GrowthBook P0 部分保留 1 flag (bash 30K→50K, 跟 persist/GB 横向复用)** | **T25 (PR-F, 1 flag 实施)** | R3 采纳 Cursor 论据 |
+| **H19** | **Bash sibling abort (TD-STE-02) + Discard on fallback (TD-STE-03) 收口** | **T26 + T27 (PR-F)** | R0 三方一致 |
+
+---
+
+## 5. T 点划分 (12 T, Round 3 收敛)
 
 | T | DSAFT | 优先级 | 内容 | 关闭/引用 |
 |---|-------|--------|------|------|
-| T16 | D7-S9-A50-T16 | P0 | ToolSurface interface v4 加 `IsConcurrencySafe(input) bool` + `ToAutoClassifierInput(input) string` + `inputsEquivalent(a, b []byte) bool` | **TD-STE-06 partial** |
-| T17 | D7-S9-A50-T17 | P0 | 19 工具 surface 默认实现 (BuiltinSurface 6 + LSPToolSurface 5 + FreeFork/Tracker/Verify/AskUser/BackgroundTask/ToolSearch 8) | **TD-STE-06 closed-by** |
+| T16 | D7-S9-A50-T16 | P0 | ToolSurface interface v4 加 `IsConcurrencySafe(input) bool` | TD-STE-06 partial |
+| T17 | D7-S9-A50-T17 | P0 | 19 工具 surface 默认实现 (4 工具 override + 15 default router) | **TD-STE-06 closed-by** |
 | T18 | D7-S9-A50-T18 | P0 | `turn_adapter.ExecuteRound` 改造为 `partitionToolCalls` batch | **TD-STE-01 closed-by** |
 | T19 | D7-S9-A50-T19 | P0 | 50 文件 e2e 并发版 + 9 并发 read_file batch test | — |
-| T20 | D7-S10-A50-T20 | P0 | `toCompactBlock` JSONL 序列化 (claude yoloClassifier.ts:378-410 翻译) | — |
+| T20 | D7-S10-A50-T20 | P0 | `ToAutoClassifierInput` interface 加到 ToolSurface (P2 实施推迟) | — |
 | T21 | D7-S10-A50-T21 | P0 | 19 工具 `ToAutoClassifierInput` 默认实现 (Bash=command, Edit="path: content", Read/grep/glob="" skip) | — |
-| T22 | D7-S10-A50-T22 | P0 | AutoModeClassifier 实现 (5s timeout SideQuery + fail-open) | — |
-| T23 | D7-S10-A50-T23 | P0 | ChannelRouter 集成 (ExecuteRound 每个 batch 前调 ClassifyToolUse) | — |
-| T24 | D7-S10-A50-T24 | P0 | Classifier 7 单测 (allow/deny/timeout/throw/malformed_input/empty_transcript/policy_violation) + AC5/AC6/AC10 e2e | — |
-| T25 | D5-S25-A04-T01 (new) | P0 | **GrowthBook runtime override** — 19 工具 per-tool 阈值 + Classifier enable + ConcurrencySafe 全部可走 GrowthBook feature flag, 默认全关 | DM-20260702-008 借鉴 #8 |
+| ~~T22~~ | ~~D7-S10-A50-T22~~ | ~~P0~~ | ~~AutoModeClassifier 实现 (5s timeout SideQuery + fail-open)~~ | **R3 推迟 P2** |
+| ~~T23~~ | ~~D7-S10-A50-T23~~ | ~~P0~~ | ~~ChannelRouter 集成 (ExecuteRound 每个 batch 前调 ClassifyToolUse)~~ | **R3 推迟 P2** |
+| T22' | D7-S10-A50-T22' | P0 | `ClassifyToolUse(transcript, sideQuery) YoloResult` interface (P2 占位, 不实施) | **R3 替换原 T22** |
+| T23' | D7-S10-A50-T23' | P0 | `toCompactBlock` interface 声明 (P2 占位, 不实施) | **R3 替换原 T23** |
+| T24 | D7-S10-A50-T24 | P0 | Interface 测试 + AC5 telemetry 接口 (P2 stub) + 端到端 e2e | **R3 调整范围** |
+| T25 | D5-S25-A04-T01 (new) | P0 | **GrowthBook runtime override (1 flag)** — 仅 `devrix_persist_threshold_override` (bash 30K→50K canary), 跟 persist/T05 横向复用, 19 工具其他 flag 推迟 | DM-20260702-008 借鉴 #8 (R3 部分采纳) |
 | T26 | D7-S9-A50-T25 (new) | P1 | **Bash sibling abort** — BashTool 集成 `siblingAbortController`, 并行 Bash 中一个失败 abort 兄弟, 返 synthetic `Cancelled: parallel tool call errored` | **TD-STE-02 closed-by** |
 | T27 | D7-S9-A50-T26 (new) | P1 | **Discard on fallback** — `StreamingToolExecutor.Discard()` + QueryLoop fallback 路径 wiring, 在途/queued 工具注入 `streaming_fallback` synthetic result | **TD-STE-03 closed-by** (TD-QL-03 CLOSED) |
-| T28 | D2-S15-A02-T29 (new) | P2 | **inputsEquivalent(a, b)** — 19 工具 surface 加 `inputsEquivalent(a, b []byte) bool` 默认实现, 配合 ContentReplacementState (T04) 实现 cache invalidation 收口 | clawcode Tool.ts:712-714 |
+| T28 | D2-S15-A02-T29 (new) | P3 | **inputsEquivalent(a, b)** — 19 工具 surface 加 `inputsEquivalent(a, b []byte) bool` 默认实现, 配合 ContentReplacementState (T04) 实现 cache invalidation 收口 | clawcode Tool.ts:712-714 (R3 降 P3) |
+
+**总 T 数**: 13 T → 12 T (砍原 T22-T23 实施, 替换为 T22'-T23' P2 占位)
 
 ---
 
 ## 6. 兼容性 (0 业务代码 out-of-scope diff)
 
 - **ToolSpec v3 struct 0 字段变更** — 0 break (15 字段 → 15 字段)
-- **ToolSurface interface 0 字段删除** — additive (v4 加 2 方法, 已有 surface 通过 `v3 → v4` 升级)
+- **ToolSurface interface additive** — v4 加 3 方法 (IsConcurrencySafe + ToAutoClassifierInput + ClassifyToolUse/toCompactBlock stub), 已有 surface 通过 `v3 → v4` 升级, 19 surface 全部声明, 4 override + 15 default
 - **ExecuteRound 行为升级** — 旧 9 read_file 串行 (假) → 新 9 read_file 1 batch 并发 (真), 实际提速
 - **无 surface 改语义** — 19 surface 默认 `IsConcurrencySafe` 行为跟 v2 `ConcurrencySafe bool` 一致 (per-input 函数 fallback 到 bool, AC1)
-- **Classifier 默认关闭** — ChannelRouter 集成在 Shadow mode (log-only), 跟 DM-20260701-007 PromptPressure shadow 模式一致, 默认 enable 走 GrowthBook flag (T25)
-- **GrowthBook 默认全关** — T25 默认所有 flag 全关, Production-Safety: 必须在 GrowthBook 后台显式 enable 才生效, 单元测试覆盖 "未 flag 开启时不改变行为"
+- **Auto-mode classifier 默认不实施** (P2 推迟) — ChannelRouter 不集成, 跟现状一致
+- **GrowthBook 仅 1 flag** (bash 30K→50K) — T25 范围缩小, 19 工具其他 flag 推迟
 - **Bash sibling abort 边界** — T26 只 abort 同 batch 并行 Bash 兄弟, 不 abort 父 QueryLoop turn, 不影响非 Bash 工具, 单测覆盖边界
 - **Discard 只在 fallback 触发** — T27 只在 QueryLoop 切换 fallback model 前调 Discard(), 正常路径不触发, 单测覆盖"无 fallback 时无 discard 行为"
-- **inputsEquivalent 默认按字段比较** — T28 19 工具 surface 默认按 JSON unmarshal 后逐字段比较, 跟 clawcode `inputsEquivalent` 默认行为一致, 不引入新机制
+- **inputsEquivalent 默认按字段比较** — T28 (P3) 19 工具 surface 默认按 JSON unmarshal 后逐字段比较, 跟 clawcode `inputsEquivalent` 默认行为一致, 不引入新机制
 
 ---
 
 ## 7. 测试策略 (T19 + T24 端到端)
 
-### 7.1 单元测试 (T16-T18, T20-T23)
+### 7.1 单元测试 (T16-T21, T22'-T23')
 
 - **per-input decision**: 19 工具 × 2 方法 = 38 单测 (passes-fail matrix)
 - **partitionToolCalls**: 6 case (all_safe, all_unsafe, mixed, empty, single, large_N)
-- **toCompactBlock**: 6 case (tool_use_ok, user_text, malformed_input, empty, escape_attack, unknown_tool)
-- **AutoModeClassifier**: 7 case (allow/deny/timeout/throw/malformed_input/empty_transcript/policy_violation) — T24
+- **ToAutoClassifierInput**: 19 工具 × 3 case (allow/deny/empty) = 57 单测
+- **ClassifyToolUse interface (P2 stub)**: 3 case (placeholder, panic_with_doc, no_op)
+- **toCompactBlock interface (P2 stub)**: 2 case (placeholder, no_op)
 
 ### 7.2 端到端 e2e (T19, AC10)
 
@@ -504,18 +461,18 @@ ExecuteRound (turn_adapter.go:277)
 
 - 50 文件 review, **9 并发 read_file batch** (per partitionToolCalls)
 - 期望: 50/50 完成, 总时间 < 串行 / 3
-- 老 e2e (T27) 保留做回归基线
+- 老 e2e 保留做回归基线
 
 ### 7.3 集成测试 (T19 + T24)
 
 - `turn_adapter_partition_test.go`: 100 个并发 read_file, 全部允许 + 实际并发
-- `auto_classifier_integration_test.go`: 9 read_file + 1 write_file + 1 bash deny, 全 batch 行为符合 partition
+- `interface_stub_test.go`: P2 stub interface panic 行为 + metric 发射
 
 ---
 
 ## 8. 范围外 (OOS, 走 P2/P3 后续 change)
 
-> 本 change 收纳了原 OOS-1 (GrowthBook 走 T25) + TD-STE-01/02/03/06 (4 项 tech-debt 关闭) + inputsEquivalent (走 T28)
+> 本 change 收纳了原 OOS-1 (GrowthBook 走 T25 部分) + TD-STE-01/02/03/06 (4 项 tech-debt 关闭) + inputsEquivalent (走 T28 P3)
 
 - OOS-NEW-1: Transcript 完整 LLM 上下文 (10+ 工具全 transcript) — P2
 - OOS-NEW-2: 多 LLM ensemble (ensemble classifier) — P3
@@ -528,24 +485,67 @@ ExecuteRound (turn_adapter.go:277)
 - OOS-NEW-9: Bash 22 zsh rules 改造 (DM-20260701-007 OOS-7 弱相关) — 域自治
 - OOS-NEW-10: Filter v2 workspace 维 (DM-20260701-007 OOS-10) — 走 P1 独立 change
 
+**OOS-NEW-11 (新增, 来自 Round 3)**: AutoModeClassifier P1 实施升级 — 触发 metric 命中后, 走新 change 实施 SideQuery + toCompactBlock 实际逻辑
+
+**OOS-NEW-12 (新增, 来自 Round 3)**: GrowthBook 19 工具其他 flag 接线 — 等 RC-1 治本验证 + D2 升 P1 后, 走新 change
+
 ---
 
 ## 9. 验收 + 归档 (S5 + S6)
 
-- **S5 验收**: 9 T 全 IMPLEMENTED + AC1-AC10 全 PASS + 50 文件 e2e 并发版 < 串行 / 3 + verify-archive.sh 12 PASS
-- **S6 归档**: `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/` + 域文档同步 (D2 t-registry +9 T, D7 t-registry +9 T, root v5.15.0)
+- **S5 验收**: 12 T 全 IMPLEMENTED + AC1-AC3 + AC6-AC8 + AC9 (12 T) + AC10 全 PASS + 50 文件 e2e 并发版 < 串行 / 3 + verify-archive.sh 12 PASS
+- **S6 归档**: `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/` + 域文档同步 (D2 t-registry +12 T, D7 t-registry +9 T, root v5.15.0)
+
+**AC 调整** (Round 3 收敛):
+- AC1-AC3 P0 保留 (per-input 函数 + partitionToolCalls)
+- AC4-AC7 (classifier 实施) **降 P2** (Cursor 承认无生产事故)
+- AC5 (telemetry) **降 P2** (跟 classifier 一起)
+- AC6 (fail-safe) P0 保留
+- AC7 (Bash isReadOnly) P0 保留
+- AC8 (no silent default) P0 保留
+- AC9 (13 T 全实施) → **12 T** (T22-T23 砍, T22'-T23' 替换)
+- AC10 (e2e) P0 保留
+- **AC11 (GrowthBook)** → **P0 部分保留 1 flag** (bash 30K→50K)
+- AC12 (Bash sibling abort) P1 保留
+- AC13 (Discard on fallback) P1 保留
+- **AC14 (inputsEquivalent)** → **P3** (ContentReplacementState 已覆盖)
+
+**最终 AC**: 14 → 12, 13 T → 12 T, 6 PR → 5 PR
 
 ---
 
-## 10. 时间表
+## 10. 时间表 (5 PR, Round 3 收敛)
 
-| 周 | 活动 | 产出 |
-|----|------|------|
-| W1 D1-D2 | PR-A ToolSurface v4 + 19 工具 IsConcurrencySafe 默认 | T16-T17 | 关闭 TD-STE-06 |
-| W1 D3-D5 | PR-B partitionToolCalls + 50 文件并发 e2e | T18-T19 | 关闭 TD-STE-01 |
-| W2 D1-D2 | PR-C ToAutoClassifierInput + 19 工具默认 | T20-T21 | — |
-| W2 D3-D4 | PR-D AutoModeClassifier + ChannelRouter 集成 | T22-T23 | — |
-| W2 D5 | PR-E Classifier 测试 + telemetry + 端到端 e2e | T24 + AC1-AC10 | — |
-| W3 D1-D2 | PR-F Tech-debt closure + GrowthBook (T25-T28) | T25-T28 | 关闭 TD-STE-02 + TD-STE-03 |
-| W3 D3 | S3-Gate codex 复审 + S4-Gate | 13 T 全 IMPLEMENTED |
-| W3 D4-D5 | S5 验收 + S6 归档 + PR squash auto-merge | ACCEPTED + 4 tech-debt closed |
+| 周 | 活动 | 产出 | 估时 |
+|----|------|------|------|
+| W1 D1-D2 | **PR-A**: ToolSurface v4 + 19 工具 `IsConcurrencySafe` 默认 (4 override + 15 default) | T16-T17 | 关闭 TD-STE-06 | 2 天 |
+| W1 D3-D5 | **PR-B**: partitionToolCalls 改造 + 50 文件并发 e2e | T18-T19 | 关闭 TD-STE-01 | 3 天 |
+| W2 D1-D2 | **PR-C**: `ToAutoClassifierInput` interface + 19 工具默认 + `ClassifyToolUse`/`toCompactBlock` P2 stub | T20-T21 + T22'-T23' | — | 2 天 |
+| W2 D3-D5 | **PR-D+E (合并)**: P2 stub interface 测试 + AC8 no-silent-default + 端到端 e2e (无 SideQuery 实施) | T24 | — | 3 天 |
+| W3 D1-D2 | **PR-F**: 1 个 GB flag (bash 30K→50K) + Bash sibling abort (T26) + Discard on fallback (T27) + inputsEquivalent (T28 P3) | T25-T28 | 关闭 TD-STE-02 + TD-STE-03 | 2 天 |
+| W3 D3 | S3-Gate + S4-Gate | 12 T 全 IMPLEMENTED | 1 天 |
+| W3 D4-D5 | S5 验收 + S6 归档 + PR squash auto-merge | ACCEPTED + 4 tech-debt closed | 2 天 |
+
+**总估时**: 1W+3D (跟原状 1W+2D 相近, 略增 1 天因 5 PR 更稳健, D2 实施推迟节省 ~1 周抵消)
+
+---
+
+## 11. 博弈论决策记录 (审计追溯)
+
+完整辩论过程见 `gaming-debate-round{1,2,3}*.md` + `gaming-analysis-*.md`, 关键决策:
+
+| 决策点 | Round 0 三方立场 | Round 1 Claude 强论证 | Round 2 让步后 | Round 3 最终 | 关键依据 |
+|--------|----------------|---------------------|--------------|-------------|---------|
+| D1 per-input | Claude/Cursor=全函数, Codex=分层混合 | 倾向 Codex | Cursor 接受 4 override | **分层混合** | 三方实质一致 |
+| D2 classifier | Claude/Cursor=P0, Codex=P2 | 倾向 Codex | Cursor 承认无事故 | **P2 interface + metric 触发** | Cursor 暴露 3 类证据 (RH-D2 incidents) + 承认无事故 |
+| D3 GrowthBook | Claude=降P2, Cursor=P0 3flag, Codex=全删 | 倾向 Codex (降P2) | Cursor 引用 GB 预埋文化 + 具体 ops | **P0 部分保留 1 flag** | Cursor 引用 `persist/growthbook_override.go:24-28` + `growthbook_override_test.go:38` 50*1024 预演 |
+| D4 PR 数量 | Claude/Cursor=5, Codex=6 | 倾向 5 (Cl+Cu 一致) | Codex 接受 5 (耦合性论据) | **5 PR (D+E 合并)** | 三方一致 |
+
+**收敛机制**: 独立分析 (R0) → 强论证+12 反问 (R1) → 让步矩阵答辩 (R2) → 综合者重评+裁决 (R3)
+
+**关键证据**:
+- `internal/layers/contextengine/persist/growthbook_override.go:1-9, 24-28, 57-89` (devrix 已有 GB 模式)
+- `internal/shared/contracts/tool_surface.go:43, 66` (devrix 已有 ReadOnly + InterruptMode)
+- `internal/layers/contextengine/persist/content_replacement_state.go:14-23, 81-118` (devrix ContentReplacementState)
+- `growthbook_override_test.go:38` (bash 30K→50K 预演测试用例)
+- RH-D2-01/05/07 (CheckPermission 漏洞, 不是 auto-mode 直接威胁)
