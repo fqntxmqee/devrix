@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/bash"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools/surface"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
@@ -247,9 +248,14 @@ func ExecuteBatches(
 
 // executeOneBatch runs a single batch and writes results into the
 // provided results slice at the batch's Indices. If the batch is
-// concurrency-safe, all calls run via errgroup; if not, they run
-// sequentially (one at a time). Both paths recover from panics and
-// write to the result slice at the correct index.
+// concurrency-safe, all calls run via errgroup with a per-batch
+// BashSiblingAbortController (so a failing watched tool can cancel
+// other watched siblings); if not, they run sequentially (one at a
+// time). Both paths recover from panics and write to the result slice
+// at the correct index.
+//
+// DSAFT: D7-S9-A50-T26 (DM-20260702-009 PR-F) — Bash sibling abort
+// controller wired into the parallel batch executor.
 func executeOneBatch(
 	ctx context.Context,
 	b Batch,
@@ -259,12 +265,17 @@ func executeOneBatch(
 ) {
 	if !b.IsConcurrencySafe {
 		// Sequential — one call at a time, panic-recover each.
+		// No controller needed: there are no concurrent siblings to abort.
 		for j, c := range b.Calls {
 			results[b.Indices[j]] = safeExecuteOne(ctx, exec, c)
 		}
 		return
 	}
-	// Parallel — errgroup with optional limit.
+	// Parallel — per-batch sibling-abort controller.
+	// Sized at len(b.Calls) so any sub-batch cannot exhaust the registry.
+	controller := bash.NewBashSiblingAbortController(ctx, len(b.Calls))
+	defer controller.Close()
+
 	var g errgroup.Group
 	if concurrencyLimit > 0 {
 		g.SetLimit(concurrencyLimit)
@@ -273,7 +284,7 @@ func executeOneBatch(
 	for j, c := range b.Calls {
 		j, c := j, c
 		g.Go(func() error {
-			r := safeExecuteOne(ctx, exec, c)
+			r := executeOneWithSiblingAbort(ctx, controller, exec, c)
 			mu.Lock()
 			results[b.Indices[j]] = r
 			mu.Unlock()
@@ -281,6 +292,54 @@ func executeOneBatch(
 		})
 	}
 	_ = g.Wait()
+}
+
+// executeOneWithSiblingAbort runs a single call within a parallel
+// batch, optionally registering it with the per-batch controller. Only
+// watched tools (currently bash) participate in the sibling-abort
+// protocol — non-watched tools just run with the parent ctx.
+//
+// AC12 invariant: when a watched call returns a result with Error set,
+// AbortSiblings cancels the OTHER watched siblings' ctx. Those siblings
+// then see ctx.Done() on their next ctx check and return a synthetic
+// cancel result via their ExecuteFunc.
+func executeOneWithSiblingAbort(
+	parentCtx context.Context,
+	controller *bash.BashSiblingAbortController,
+	exec ExecuteFunc,
+	call llmgateway.ToolCall,
+) sessionorchestrator.ToolResult {
+	if !isSiblingAbortWatched(call.Name) {
+		return safeExecuteOne(parentCtx, exec, call)
+	}
+	siblingCtx, cancel, ok := controller.Register(call.ID, call.Name)
+	if !ok {
+		// Controller closed / aborted / full — fall through with parent ctx.
+		return safeExecuteOne(parentCtx, exec, call)
+	}
+	defer cancel()
+	defer controller.Unregister(call.ID)
+
+	result := safeExecuteOne(siblingCtx, exec, call)
+	if result.Error != "" {
+		// Watched call failed — cancel other watched siblings. Idempotent
+		// (returns false on subsequent calls), so multi-failure races are safe.
+		controller.AbortSiblings(call.ID, result.Error)
+	}
+	return result
+}
+
+// isSiblingAbortWatched returns true for tools that participate in the
+// per-batch sibling-abort protocol. Currently only bash; future
+// watchers (mcp_* with side-effects, etc.) can be added without
+// touching the controller wiring.
+//
+// Rationale: read_file / grep / glob are read-only and idempotent — no
+// need to abort them on bash failure. write_file / edit_file are
+// sequential (ConcurrencySafe=false), so they never enter the parallel
+// branch where the controller lives.
+func isSiblingAbortWatched(name string) bool {
+	return name == "bash"
 }
 
 // safeExecuteOne wraps exec with a panic recovery. The recover returns
