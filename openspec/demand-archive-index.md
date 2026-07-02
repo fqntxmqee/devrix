@@ -2,6 +2,8 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260702-009 | D2 Tool Input-Aware Concurrency + Auto-Mode Security Classifier — per-input IsConcurrencySafe + toAutoClassifierInput + LLM SideQuery (clawcode 真实设计落地) | devrix-d2-tool-input-aware-concurrency-and-classifier | 2026-07-02 | — | S1_Proposal (T16-T24 9 T 全 P0, 走 5 PR 收口; proposal.md / demand.md / tasks.md 已就位, 等 S3-Gate codex 复审) |
+| DM-20260702-008 | Token Design 2.0 — clawcode-style persistence + advisory iteration bound (LLM 自我循环治本) | devrix-token-design-v2 | 2026-07-02 | [#376](https://github.com/fqntxmqee/devrix/pull/376) | ACCEPTED (16 P0 T + T27 e2e + T28 回归, 50 文件 review 15/50→50/50) |
 | DM-20260701-007 | MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 — LLM 自我循环治本 | devrix-mups-tool-classification-and-channel-autonomy | 2026-07-02 | [#374](https://github.com/fqntxmqee/devrix/pull/374) (PR-A S3 设计) + PR-B/C/D 合并中 | ACCEPTED |
 | DM-20260701-004 | D7 物理布局对齐 — A 层补全 + S1-S6 代码路径收敛 | devrix-d7-physical-layout-alignment | 2026-07-01 | [#366](https://github.com/fqntxmqee/devrix/pull/366) · [#367](https://github.com/fqntxmqee/devrix/pull/367) · [#368](https://github.com/fqntxmqee/devrix/pull/368) · [#369](https://github.com/fqntxmqee/devrix/pull/369) · [#370](https://github.com/fqntxmqee/devrix/pull/370) | ACCEPTED |
 | DM-20260701-003 | D7 Historical S Cleanup — S7+ 正文迁出与 S3 定位澄清 | devrix-d7-historical-s-cleanup | 2026-07-01 | — | ACCEPTED |
