@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d2-tool-input-aware-concurrency-and-classifier`
 **Demand ID:** DM-20260702-009
 **博弈论 Round 3 收敛:** 2026-07-02 (Claude + Codex + Cursor 三方共识)
-**T 点总数:** 12 (T16-T21 P0 = 6, T22'-T23' P2 interface stubs = 2, T25'-T28 P0 = 4)
+**T 点总数:** 13 (T16-T21 P0 = 6, T22'-T24' P2 interface stubs + 单测 = 3, T25'-T28 P0 = 4)
 **AC 总数:** 21 (AC1-AC3/AC6-AC10 P0 + AC11 P0 缩减版 + AC12-AC13 P1 + AC4/AC5/AC14 P2 + **AC15-AC19 P0 并发不变量** + AC20-AC21 P1) — S3 设计阶段博弈论 AC 复核增补 (Claude+Codex 两方, cursor 后端宕机待补审)
 **PR 收口:** **5** (PR-A / PR-B / PR-C / **PR-D+E 合并** / PR-F)
 **tech-debt closed:** 4 (TD-STE-01/02/03/06, 引用见各 T 点)
@@ -295,7 +295,7 @@
 - [ ] `go build ./...` 0 errors
 - [ ] `go test -count=1 ./internal/layers/...` 全量 PASS
 - [ ] `go test -race -count=1 ./...` 全量 PASS (master 预存失败 tools/ci-lint-invariant 除外)
-- [ ] 12 T 全 IMPLEMENTED + 21 AC 全 PASS (P0 14 + P1 4 + P2 3)
+- [ ] 13 T 全 IMPLEMENTED + 21 AC 全 PASS (P0 14 + P1 4 + P2 3)
 - [ ] 50 文件 e2e 并发版 < 串行 / 3 (AC10)
 - [ ] `partition_invariants_test` 全 PASS (AC15 完整性 / AC16 交错 / AC17 read部分失败 / AC19 panic 隔离 / AC20 限流 / AC21 goleak)
 - [ ] read_file IsConcurrencySafe 大/小 input 均 true (AC18: 8K 回归锁)
