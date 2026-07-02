@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
@@ -292,6 +290,13 @@ func (a *contextEngineAdapter) userContextPrepend(ctx context.Context, sc *types
 //	  through this path).
 //	Phase 2: parallel / sequential dispatch of the remaining
 //	  Allow tools, identical to DM-001 F06.
+//
+// DM-20260702-009 PR-B (T18): Phase 2 now uses partitionToolCalls
+// (per-input IsConcurrencySafe) instead of the v1 static-bool
+// concurrencyMap. The dispatcher groups consecutive safe calls into a
+// single batch (clawcode toolOrchestration.ts:84-118) and runs each
+// batch concurrently via errgroup; batches run serially to preserve
+// cross-batch causal order.
 func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorchestrator.ToolRoundRequest) (sessionorchestrator.ToolRoundResult, error) {
 	if a.tools == nil && len(a.surfaces) == 0 {
 		return sessionorchestrator.ToolRoundResult{}, fmt.Errorf("turn adapter: tool runner not available")
@@ -308,7 +313,6 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorch
 		}
 	}
 
-	concSafe := a.concurrencyMap()
 	results := make([]sessionorchestrator.ToolResult, len(req.ToolCalls))
 
 	// Phase 1: CheckPermission pre-dispatch (DM-002 F07).
@@ -318,29 +322,32 @@ func (a *contextEngineAdapter) ExecuteRound(ctx context.Context, req sessionorch
 		}
 	}
 
-	// Phase 2: execute the surviving calls in parallel / sequential.
-	var parallelIdx []int
+	// Phase 2: partition the surviving calls by per-input concurrency
+	// and dispatch each batch.
+	//
+	// T18: per-input IsConcurrencySafe — see partitionToolCalls. Calls
+	// already denied in Phase 1 are filtered out before partitioning so
+	// their indices are reserved in `results` and not re-written.
+	var pending []llmgateway.ToolCall
+	var pendingOrigIdx []int
 	for i, tc := range req.ToolCalls {
 		if results[i].Error != "" {
 			continue // already denied in Phase 1
 		}
-		if concSafe[tc.Name] {
-			parallelIdx = append(parallelIdx, i)
-			continue
-		}
-		results[i] = a.executeOne(toolCtx, req.SessionID, tc)
+		pending = append(pending, tc)
+		pendingOrigIdx = append(pendingOrigIdx, i)
+	}
+	if len(pending) == 0 {
+		return sessionorchestrator.ToolRoundResult{Results: results}, nil
 	}
 
-	if len(parallelIdx) > 0 {
-		var g errgroup.Group
-		for _, idx := range parallelIdx {
-			idx, tc := idx, req.ToolCalls[idx]
-			g.Go(func() error {
-				results[idx] = a.executeOne(toolCtx, req.SessionID, tc)
-				return nil
-			})
-		}
-		_ = g.Wait()
+	surfaces := BuildSurfaceLookup(a.surfaces)
+	exec := func(cctx context.Context, call llmgateway.ToolCall) sessionorchestrator.ToolResult {
+		return a.executeOne(cctx, req.SessionID, call)
+	}
+	partitionResults := ExecuteBatches(toolCtx, pending, surfaces, exec, 0)
+	for k, r := range partitionResults {
+		results[pendingOrigIdx[k]] = r
 	}
 
 	return sessionorchestrator.ToolRoundResult{Results: results}, nil
