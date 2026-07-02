@@ -46,3 +46,5 @@ v0_backlog:
   out_of_scope:
     - 3-mode brief/fork/full (DM-20260620-001 已上线)
     - MaxSubagentDepth=3 (DM-20260620-001-B 已上线)
+archived_at: 2026-07-02
+replaced_by: devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)

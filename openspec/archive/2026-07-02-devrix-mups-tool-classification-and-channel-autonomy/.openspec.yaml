@@ -2,12 +2,12 @@ change_id: devrix-mups-tool-classification-and-channel-autonomy
 demand_id: DM-20260701-007
 title: MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 — LLM 自我循环治本
 priority: P0
-status: s5_acceptance  # S5 验收 ACCEPTED (acceptance-report.md verdict: ACCEPTED, 33/33 T IMPLEMENTED)
-  # PR-A (commit 74fba9c5) 已合入 master #374 (S3-Gate 交付)
-  # PR-B/C/D (12+7+5+1=25 T + 8 T 配套 = 33 T) 实现完成, 待开 PR 合入 master
-  # S6-归档: 4 PR 全部 squash merge 后触发 (archiving.md §2.1 文件完整性 + §2.3 索引更新)
-  # 状态 s5_acceptance: 表示 P0 T 100% PASS + P0/P1 AC 全部满足 + acceptance-report.md 已生成
-  # 下一步 (S6): PR squash merge → master → 归档到 openspec/archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/
+# S5 验收 ACCEPTED (acceptance-report.md verdict: ACCEPTED, 33/33 T IMPLEMENTED)
+# PR-A (commit 74fba9c5) 已合入 master #374 (S3-Gate 交付)
+# PR-B/C/D (12+7+5+1=25 T + 8 T 配套 = 33 T) 实现完成, 全部 squash merge
+# S6-归档: 归档到 openspec/archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/
+# 状态 s7_archived: S6 归档完成, 进入 S7 维护阶段
+status: s7_archived
 created_at: 2026-07-01
 domains: [D2, D5, D7]
 source: 2026-07-01 6 轮对话合成 (Sess 1782885908460_4000 + R1-R6) + 博弈论双 review (Codex + Composer)
@@ -166,3 +166,5 @@ s3_gate_acceptance:
     - P1-AC-6: PromptPressure 软警告 baseline
     - P1-AC-7: PlanKind × task_kind 交叉一致性单测
     - P1-AC-8: Filter v2 不含 workspace 维 (defer)
+archived_at: 2026-07-02
+archive_path: openspec/archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/
