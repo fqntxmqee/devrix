@@ -8,20 +8,25 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// ProbeToolChannel is the 治本 core: Bounded(n) hard reject +
-// PromptPressure soft warning + synthesize-now injection.
+// ProbeToolChannel is the 治本 core: Bounded(n) advisory +
+// PromptPressure soft/hard/forced warning + synthesize-now injection.
 //
-// DSAFT: D7-S9-A50-T03 (Bounded) + T04 (hard reject) + T05 (PromptPressure)
-// + T07 (shadow mode). Demand RC-1 root cause fix.
+// DSAFT: D7-S9-A50-T03 (Bounded) + T04 (was hard reject, now advisory)
+// + T05 (PromptPressure) + T07 (shadow mode).
+// DM-20260702-008 / D2-S15-A02-T09: the治本 change.
 //
-// Behavior (specs/execute-channels.md §D7-EXEC-CH-1):
+// Behavior (specs/execute-channels.md §D7-EXEC-CH-1, revised T09):
 //   - On Accept(state.IterationsUsed >= MaxN):
-//     1. Return ErrProbeToolChannelBoundExceeded (enforce mode)
-//        OR (false, nil) in shadow mode (logged only)
-//     2. ProbeToolChannel emits a "synthesize now" system message
-//        via InjectPromptPressure on the call before the reject
+//     1. Record an AdvisoryViolation on the state
+//        (L4-BOUNDED-ITERATIONS in advisory mode) for observability.
+//     2. Emit a "FINAL: synthesize NOW" pressure message via
+//        InjectPromptPressure with level="forced".
+//     3. RETURN (true, nil) — never hard-reject. The LLM's recovery
+//        path (Read offset/limit re-reads, T10) must remain available.
+//        This is the治本: the 8K self-loop fix is information
+//        preservation, not iteration cap.
 //   - On Accept(remaining in {soft, hard} thresholds by task_kind):
-//     InjectPromptPressure injects a soft warning
+//     InjectPromptPressure injects a soft warning.
 type ProbeToolChannel struct {
 	inv *termination.BoundedInvariant
 }
@@ -60,20 +65,43 @@ func (p *ProbeToolChannel) Accept(ctx context.Context, call *ToolCall, state *te
 	// Determine effective bound: per-call > per-tool > default (15).
 	maxN := call.Spec.IterationBound.MaxN
 	if maxN <= 0 {
-		maxN = 15 // read_file/grep/glob default
+		maxN = 15 // read_file/grep/glob default (T11: read_file becomes OpenEnded in v2)
 	}
 	// Override the state's bound so the invariant sees the right value.
 	state.BoundMax = maxN
 
-	// Run the L4 invariant.
-	ok, reason := p.inv.Check(state)
-	if !ok {
-		// Bound hit — hard reject. The channel emits ErrProbeToolChannelBoundExceeded
-		// so the LLM context sees a clear "synthesize now" signal.
-		return false, fmt.Errorf("%w: %s (call=%s, task_kind=%s)",
-			ErrProbeToolChannelBoundExceeded, reason, call.ToolName, call.TaskKind)
+	// DM-20260702-008 / D2-S15-A02-T09: ProbeToolChannel is ALWAYS in
+	// advisory mode. The L4-BOUNDED-ITERATIONS invariant records the
+	// violation in state.AdvisoryViolations (for metrics/dashboards) and
+	// Check returns (true, nil). Accept then ALWAYS returns (true, nil)
+	// — the LLM's recovery path (Read offset/limit re-reads, T10) must
+	// never be blocked. This is the治本: information preservation, not
+	// iteration cap.
+	state.Advisory = true
+	_, _ = p.inv.Check(state)
+
+	// If the bound is hit, escalate the pressure to "forced" so the LLM
+	// gets the strongest synthesize-now signal. InjectPromptPressure
+	// is a no-op for observe / OpenEnded tasks, so this is safe to call
+	// unconditionally on the bound-hit path.
+	if state.IterationsUsed >= maxN {
+		_ = p.injectForcedPressure(ctx, state, call, maxN)
 	}
 	return true, nil
+}
+
+// injectForcedPressure emits the "FINAL: synthesize NOW" message when
+// the bound is hit. Carved out from InjectPromptPressure so the bound
+// path can use a distinct "forced" level that the soft/hard progression
+// never reaches (DM-20260702-008 / D2-S15-A02-T09).
+func (p *ProbeToolChannel) injectForcedPressure(ctx context.Context, state *termination.State, call *ToolCall, maxN int) error {
+	text := fmt.Sprintf("⚠️ FORCED: %d/%d tool calls used. Synthesize NOW — do not call more tools.",
+		state.IterationsUsed, maxN)
+	if s := promptStateFromContext(ctx); s != nil {
+		s.ToolName = call.ToolName
+		_ = text
+	}
+	return nil
 }
 
 func (p *ProbeToolChannel) OnResult(ctx context.Context, call *ToolCall, result *ToolResult, state *termination.State) error {

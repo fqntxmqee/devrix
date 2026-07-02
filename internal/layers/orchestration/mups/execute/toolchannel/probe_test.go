@@ -4,7 +4,6 @@ package toolchannel
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -21,8 +20,19 @@ func makeState(iter, bound int) *termination.State {
 	}
 }
 
-// D7-S9-A50-T03 + T04: ProbeToolChannel Bounded(15) hard stops at iter 16.
-func TestProbeToolChannel_Bounded15_HardStopsAt16(t *testing.T) {
+// DM-20260702-008 / D2-S15-A02-T09: the治本 change. ProbeToolChannel
+// Bounded(15) no longer hard-stops at iter 16. Instead:
+//   - Accept ALWAYS returns (true, nil) — the LLM's recovery path
+//     (Read offset/limit re-reads) is never blocked.
+//   - state.Advisory = true is set on every Accept call.
+//   - The L4-BOUNDED-ITERATIONS invariant records the violation in
+//     state.AdvisoryViolations for observability (dashboards / metrics)
+//     but does NOT drive a hard reject.
+//   - On bound hit, injectForcedPressure emits a "FINAL: synthesize
+//     NOW" message so the LLM gets a strong synthesize signal.
+//
+// The old ErrProbeToolChannelBoundExceeded contract is retired.
+func TestProbeToolChannel_Bounded15_AdvisoryAtBound(t *testing.T) {
 	ch := NewProbeToolChannelWithBound(15)
 	call := &ToolCall{
 		SessionID: "sess-1",
@@ -36,19 +46,31 @@ func TestProbeToolChannel_Bounded15_HardStopsAt16(t *testing.T) {
 	state := makeState(15, 15) // iter=15, bound=15
 
 	ok, err := ch.Accept(context.Background(), call, state)
-	if ok {
-		t.Errorf("iter=15 should be at bound and fire hard reject")
+	if !ok {
+		t.Errorf("Accept must ALWAYS return ok=true in T09 advisory mode, got false (err=%v)", err)
 	}
-	if err == nil {
-		t.Errorf("expected ErrProbeToolChannelBoundExceeded, got nil")
+	if err != nil {
+		t.Errorf("Accept must return nil error in T09 advisory mode, got %v", err)
 	}
-	if !errors.Is(err, ErrProbeToolChannelBoundExceeded) {
-		t.Errorf("expected ErrProbeToolChannelBoundExceeded, got %v", err)
+	if !state.Advisory {
+		t.Errorf("Accept must set state.Advisory=true on every call")
 	}
-	if !strings.Contains(err.Error(), "read_file") {
-		t.Errorf("error should mention call tool name: %v", err)
+	if len(state.AdvisoryViolations) == 0 {
+		t.Errorf("bound-hit must record an AdvisoryViolation, got 0")
+	} else {
+		v := state.AdvisoryViolations[0]
+		if v.Invariant != "L4-BOUNDED-ITERATIONS" {
+			t.Errorf("advisory violation invariant = %q, want L4-BOUNDED-ITERATIONS", v.Invariant)
+		}
+		if v.IterationsUsed != 15 || v.BoundMax != 15 {
+			t.Errorf("advisory violation context: iter=%d bound=%d, want 15/15", v.IterationsUsed, v.BoundMax)
+		}
 	}
 }
+
+// DM-20260702-008: the unused `errors` and `strings` imports are still
+// used by other tests in this file (PromptPressure / shadow mode). Keep
+// them; only the hard-reject test changed.
 
 // D7-S9-A50-T03: ProbeToolChannel accepts iter < bound.
 func TestProbeToolChannel_AcceptsUnderBound(t *testing.T) {
@@ -178,15 +200,20 @@ func TestRouter_ShadowMode_LogsWouldReject(t *testing.T) {
 	state.IterationsUsed = 15
 	state.BoundMax = 15
 
+	// DM-20260702-008 / D2-S15-A02-T09: shadow mode now also accepts
+	// (T09 advisory). The "would reject" counter is retired; the bound
+	// hit is recorded as an AdvisoryViolation on the state. We keep the
+	// field for backward compat but the test now asserts the new
+	// advisory semantics.
 	accepted, _, err := r.Route(context.Background(), call)
-	if accepted {
-		t.Errorf("shadow mode: iter=15 should not be accepted")
+	if !accepted {
+		t.Errorf("advisory mode: iter=15 should be accepted, got rejected")
 	}
 	if err != nil {
-		t.Errorf("shadow mode: err should be nil (log only), got %v", err)
+		t.Errorf("advisory mode: err should be nil, got %v", err)
 	}
-	if r.WouldRejectCount() != 1 {
-		t.Errorf("WouldRejectCount should be 1, got %d", r.WouldRejectCount())
+	if len(state.AdvisoryViolations) == 0 {
+		t.Errorf("advisory mode: bound hit should record AdvisoryViolation")
 	}
 }
 
@@ -207,15 +234,18 @@ func TestRouter_EnforceMode_ReturnsError(t *testing.T) {
 	state.IterationsUsed = 15
 	state.BoundMax = 15
 
+	// DM-20260702-008 / D2-S15-A02-T09: in advisory mode the router
+	// still accepts the call (LLM recovery path must not be blocked).
+	// The bound hit is recorded as an AdvisoryViolation on the state.
 	accepted, _, err := r.Route(context.Background(), call)
-	if accepted {
-		t.Errorf("enforce mode: iter=15 should not be accepted")
+	if !accepted {
+		t.Errorf("advisory mode: iter=15 should be accepted (LLM recovery), got rejected")
 	}
-	if err == nil {
-		t.Errorf("enforce mode: err should not be nil")
+	if err != nil {
+		t.Errorf("advisory mode: err should be nil, got %v", err)
 	}
-	if !errors.Is(err, ErrProbeToolChannelBoundExceeded) {
-		t.Errorf("expected ErrProbeToolChannelBoundExceeded, got %v", err)
+	if len(state.AdvisoryViolations) == 0 {
+		t.Errorf("advisory mode: bound hit should record AdvisoryViolation, got 0")
 	}
 }
 
@@ -271,18 +301,23 @@ func TestProbeToolChannel_DoesNotBypassPermissionGuards(t *testing.T) {
 		TaskKind: "review",
 	}
 
-	// At iter=15, Accept should fire regardless of permission state.
-	// The channel does NOT consult permission state.
+	// DM-20260702-008 / D2-S15-A02-T09: in advisory mode, Accept at
+	// iter=15 always returns (true, nil). The bound hit is recorded
+	// as an AdvisoryViolation. Permission guards are still checked by
+	// the ChannelRouter BEFORE Accept (H8 / P1-AC-2 cross-check) — that
+	// cross-check is unaffected by the advisory change because the
+	// channel signature still does not take a permission parameter.
 	state := makeState(15, 15)
 	ok, err := ch.Accept(context.Background(), call, state)
-	if ok {
-		t.Errorf("Accept should fire at iter=15")
+	if !ok {
+		t.Errorf("Accept must return ok=true in advisory mode, got false")
 	}
-	if err == nil {
-		t.Errorf("Accept should return ErrProbeToolChannelBoundExceeded")
+	if err != nil {
+		t.Errorf("Accept must return nil error in advisory mode, got %v", err)
 	}
-	// Permission guards are checked by the ChannelRouter BEFORE Accept.
-	// This is the H8 / P1-AC-2 cross-check invariant.
+	if len(state.AdvisoryViolations) == 0 {
+		t.Errorf("advisory mode: bound hit should record AdvisoryViolation")
+	}
 }
 
 // D7-S9-A50-T01: ToolChannel interface — 4 channels implement it.

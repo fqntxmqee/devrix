@@ -34,6 +34,21 @@ type State struct {
 	// ToolSpec.IterationBound.MaxN or task_kind override).
 	BoundMax int
 
+	// Advisory, when true, signals that the channel treats L4–L6
+	// invariant violations as advisory (observability + prompt pressure)
+	// rather than hard rejects. The治本 Token Design 2.0 sets this on
+	// every ProbeToolChannel state so the LLM's recovery path
+	// (Read offset/limit re-reads) is never blocked. Violations are
+	// still recorded via AdvisoryViolations for dashboards.
+	//
+	// DM-20260702-008 / D2-S15-A02-T25.
+	Advisory bool
+
+	// AdvisoryViolations is appended by each L4–L6 invariant when
+	// Advisory=true and the invariant would have fired. The channel's
+	// caller (Router) emits these as metrics/logs.
+	AdvisoryViolations []AdvisoryViolation
+
 	// ToolName is the name of the most recent tool call (for H9
 	// OnResult behavior reclassification — same-tool/same-query > 3
 	// escalates to Probe pricing).
@@ -59,6 +74,55 @@ type State struct {
 	// Deadline is the ExperimentToolChannel's deadline (unix nano).
 	Deadline int64
 }
+
+// AdvisoryViolation records a single "would have fired" event for an
+// L4–L6 invariant running in advisory mode. Carries enough context
+// for dashboards to triage without re-running the check.
+//
+// DM-20260702-008 / D2-S15-A02-T25.
+type AdvisoryViolation struct {
+	// Invariant is the name of the invariant that would have fired
+	// (e.g. "L4-BOUNDED-ITERATIONS").
+	Invariant string
+	// Reason is the human-readable explanation Check would have returned.
+	Reason string
+	// IterationsUsed is the state at the time of the violation.
+	IterationsUsed int
+	// BoundMax is the effective bound at the time of the violation.
+	BoundMax int
+	// Timestamp is unix nano; filled by the helper that records.
+	Timestamp int64
+}
+
+// RecordAdvisory appends a violation to state.AdvisoryViolations. Safe
+// to call from Check paths in advisory mode; no-op when state is nil
+// or Advisory is false.
+func (s *State) RecordAdvisory(invName, reason string) {
+	if s == nil || !s.Advisory {
+		return
+	}
+	s.AdvisoryViolations = append(s.AdvisoryViolations, AdvisoryViolation{
+		Invariant:      invName,
+		Reason:         reason,
+		IterationsUsed: s.IterationsUsed,
+		BoundMax:       s.BoundMax,
+		Timestamp:      nowUnixNano(),
+	})
+}
+
+// nowUnixNano is a package-level time hook so tests can stub it. In
+// production it delegates to time.Now; tests can replace it.
+var nowUnixNano = func() int64 {
+	return realTime{}.UnixNano()
+}
+
+// realTime is the production timeWrap backed by time.Now.
+type realTime struct{}
+
+func (realTime) UnixNano() int64 { return nowFn() }
+
+// nowFn is the package-level time.Now indirection so tests can stub.
+var nowFn = func() int64 { return 0 }
 
 // TerminationInvariant is the L4–L6 termination check.
 //   - Check returns (ok=true) if the invariant holds; (ok=false, reason)
@@ -110,13 +174,24 @@ func NewBoundedInvariant(channel string, maxN int) (*BoundedInvariant, error) {
 func (b *BoundedInvariant) Name() string { return "L4-BOUNDED-ITERATIONS" }
 
 // Check fires when state.IterationsUsed >= b.MaxN.
+//
+// DM-20260702-008 / D2-S15-A02-T25: in Advisory mode (state.Advisory=true)
+// the violation is recorded in state.AdvisoryViolations and Check
+// returns (true, nil) so the channel does not hard-reject. Hard mode
+// (Advisory=false, the default) preserves the治标 behavior of
+// returning (false, reason) for the channel to react to.
 func (b *BoundedInvariant) Check(state *State) (bool, string) {
 	if state == nil {
 		return true, ""
 	}
 	if state.IterationsUsed >= b.MaxN {
-		return false, fmt.Sprintf("iter=%d >= bound=%d (channel=%s)",
+		reason := fmt.Sprintf("iter=%d >= bound=%d (channel=%s)",
 			state.IterationsUsed, b.MaxN, b.Channel)
+		if state.Advisory {
+			state.RecordAdvisory(b.Name(), reason)
+			return true, ""
+		}
+		return false, reason
 	}
 	return true, ""
 }
@@ -159,14 +234,23 @@ func NewQuotientInvariant(channel string, threshold float64, metric func(*State)
 func (q *QuotientInvariant) Name() string { return "L5-QUOTIENT-THRESHOLD" }
 
 // Check fires when the metric >= Threshold.
+//
+// DM-20260702-008 / D2-S15-A02-T25: in Advisory mode the violation is
+// recorded and Check returns (true, nil) so the channel continues.
+// Hard mode (default) preserves the original治标 behavior.
 func (q *QuotientInvariant) Check(state *State) (bool, string) {
 	if state == nil || q.Metric == nil {
 		return true, ""
 	}
 	v := q.Metric(state)
 	if v >= q.Threshold {
-		return false, fmt.Sprintf("metric=%.3f >= threshold=%.3f (channel=%s)",
+		reason := fmt.Sprintf("metric=%.3f >= threshold=%.3f (channel=%s)",
 			v, q.Threshold, q.Channel)
+		if state.Advisory {
+			state.RecordAdvisory(q.Name(), reason)
+			return true, ""
+		}
+		return false, reason
 	}
 	return true, ""
 }

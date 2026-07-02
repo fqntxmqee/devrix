@@ -235,12 +235,12 @@ func TestDefaultV3MetadataFor_AllRegisteredTools(t *testing.T) {
 		wantSK contracts.SourceKind
 	}{
 		// 6 builtin
-		{"read_file", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"read_file", contracts.EC_Probe, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},  // T11
 		{"write_file", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
 		{"edit_file", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
 		{"bash", contracts.EC_Action, contracts.CC_StateChangeRequired, contracts.IB_Bounded, contracts.SK_User},
-		{"grep", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
-		{"glob", contracts.EC_Probe, contracts.CC_None, contracts.IB_Bounded, contracts.SK_Deterministic},
+		{"grep", contracts.EC_Probe, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},  // T11
+		{"glob", contracts.EC_Probe, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},  // T11
 		// 5 LSP (4 Fact + 1 Probe)
 		{"lsp_go_to_definition", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
 		{"lsp_find_references", contracts.EC_Fact, contracts.CC_None, contracts.IB_OpenEnded, contracts.SK_Deterministic},
@@ -292,8 +292,11 @@ func TestApplyV3Metadata(t *testing.T) {
 	if spec.EmissionClass != contracts.EC_Probe {
 		t.Errorf("after ApplyV3Metadata(read_file): EC = %v, want Probe", spec.EmissionClass)
 	}
-	if spec.IterationBound.Kind != contracts.IB_Bounded || spec.IterationBound.MaxN != 15 {
-		t.Errorf("after ApplyV3Metadata(read_file): IB = %+v, want Bounded(15)", spec.IterationBound)
+	// DM-20260702-008 / D2-S15-A02-T11: read_file is now OpenEnded
+	// (the recovery path; bound lives in MaxN for dashboards but the
+	// channel never hard-rejects in T09 advisory mode).
+	if spec.IterationBound.Kind != contracts.IB_OpenEnded {
+		t.Errorf("after ApplyV3Metadata(read_file): IB = %+v, want OpenEnded (T11)", spec.IterationBound)
 	}
 	if spec.MaxResultSizeChars != 8192 {
 		t.Errorf("after ApplyV3Metadata(read_file): MaxResultSizeChars = %d, want 8192", spec.MaxResultSizeChars)

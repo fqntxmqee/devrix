@@ -2,6 +2,7 @@ package tools
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -50,4 +51,24 @@ func firstNonEmpty(fields map[string]string, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// ToolInputIntDefault parses an integer field from a tool argument
+// string (JSON or plain). Returns def when the field is missing,
+// empty, or unparseable. Mirrors ToolInputString for ints.
+//
+// DM-20260702-008 / D2-S15-A02-T10: used by read_file offset/limit
+// defaults (Offset=0, Limit=8192). The plain-string fallback is fine
+// because ParseToolInput coerces JSON ints to their string repr.
+func ToolInputIntDefault(input, field string, def int) int {
+	fields := ParseToolInput(input)
+	v, ok := fields[field]
+	if !ok || strings.TrimSpace(v) == "" {
+		return def
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return def
+	}
+	return n
 }

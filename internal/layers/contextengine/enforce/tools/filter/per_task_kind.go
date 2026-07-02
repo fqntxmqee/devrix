@@ -4,20 +4,24 @@ import (
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// PerTaskKindFilter tightens IterationBound based on the inferred
-// task_kind. The 5 task kinds and their bound overrides:
+// PerTaskKindFilter applies ADVISORY task_kind hints based on the
+// inferred task_kind. The 5 task kinds and their hint overrides:
 //
-//	review   → Bounded(15)   (LLM may need to read many files; but Bounded)
-//	edit     → Bounded(10)   (tighter; user wants changes)
-//	test     → Bounded(12)   (test runs have stable shape)
+//	review   → Bounded(15)   hint  (LLM may need to read many files)
+//	edit     → Bounded(10)   hint  (tighter; user wants changes)
+//	test     → Bounded(12)   hint  (test runs have stable shape)
 //	observe  → OpenEnded     (no convergence pressure)
-//	refactor → Bounded(8)    (tightest; refactor scope is bounded)
+//	refactor → Bounded(8)    hint  (tightest; refactor scope is bounded)
 //
-// H9 / P1-AC-7 cross-consistency (TestPerTaskKindFilterCrossConsistency):
-// when task_kind=review, Probe tools MUST NOT be downgraded to
-// OpenEnded. The filter enforces this.
+// DM-20260702-008 / D2-S15-A02-T12: hints are advisory only. The
+// filter no longer forces Bounded(15) on Probe tools for review —
+// the治本 change in T09 means the channel never hard-rejects anyway,
+// so the cross-consistency rule from H9 / P1-AC-7 is relaxed: Probe
+// tools keep their declared bound (OpenEnded for read_file/grep/glob
+// in T11), and the task_kind hint is exposed via the spec for
+// dashboards / pressure thresholds, not for rejection.
 //
-// DSAFT: D2-S15-A02-T03 (4 task_kind mapping) + T15 (cross-consistency).
+// DSAFT: D2-S15-A02-T03 (4 task_kind mapping) + T12 (advisory hints).
 type PerTaskKindFilter struct {
 	// TaskKind is the inferred user task kind.
 	TaskKind string
@@ -28,16 +32,18 @@ func NewPerTaskKindFilter(taskKind string) *PerTaskKindFilter {
 	return &PerTaskKindFilter{TaskKind: taskKind}
 }
 
-// TaskKindBound returns the canonical IterationBound for a task kind.
-// Used by Apply to rewrite each spec's IterationBound.
+// TaskKindBound returns the ADVISORY IterationBound hint for a task kind.
+// In T12 these are hints only — ProbeToolChannel.Accept never hard-rejects
+// regardless of the bound. The hints are exposed via Apply for dashboards
+// and pressure thresholds.
 //
-// Per-task-kind defaults (D2-S15-A02-T03):
+// Per-task-kind hints (D2-S15-A02-T03 → T12 advisory):
 //
-//	review:   Bounded(15)
-//	edit:     Bounded(10)
-//	test:     Bounded(12)
+//	review:   Bounded(15)   hint
+//	edit:     Bounded(10)   hint
+//	test:     Bounded(12)   hint
 //	observe:  OpenEnded
-//	refactor: Bounded(8)
+//	refactor: Bounded(8)    hint
 //	"":       OpenEnded (no override; use tool default)
 func TaskKindBound(taskKind string) contracts.IterationBound {
 	switch taskKind {
@@ -71,20 +77,18 @@ func (f *PerTaskKindFilter) Apply(specs []contracts.ToolSpec) []contracts.ToolSp
 	for i, s := range specs {
 		out[i] = s
 
-		// Cross-consistency rule (P1-AC-7): review + Probe → must be Bounded.
-		// Only applies to Probe-class tools. For other classes, the
-		// tool's existing bound is preserved.
-		if f.TaskKind == "review" && s.EmissionClass == contracts.EC_Probe {
-			// Force Bounded(15) regardless of the canonical bound.
-			out[i].IterationBound = contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15}
-			continue
-		}
+		// T12 (DM-20260702-008): the old cross-consistency rule
+		// (review + Probe → force Bounded(15), P1-AC-7) is RELAXED.
+		// ProbeToolChannel never hard-rejects (T09), so the rule's
+		// purpose (prevent an OpenEnded Probe from escaping the bound)
+		// is moot. We preserve the spec's declared bound; the
+		// task_kind hint is exposed via TaskKindHint(s.Name) for
+		// dashboards and pressure thresholds, not for spec mutation.
 
-		// For other (Fact/Action/Experiment) tools, apply the task_kind
-		// bound only if the spec already has a real Bounded bound.
-		// OpenEnded tools (read-once Fact queries like query_diagnostics,
-		// lsp_goto_definition) are NOT affected by the task_kind filter
-		// — their OpenEnded contract is preserved.
+		// For tools that DO have a Bounded bound (Bash, Write, etc.),
+		// still tighten it if the task_kind hint is tighter. OpenEnded
+		// tools (read_file, grep, glob after T11; query_diagnostics;
+		// lsp_*) keep their OpenEnded contract — the hint is advisory.
 		if s.IterationBound.Kind != contracts.IB_Bounded {
 			continue
 		}
@@ -94,6 +98,17 @@ func (f *PerTaskKindFilter) Apply(specs []contracts.ToolSpec) []contracts.ToolSp
 		}
 	}
 	return out
+}
+
+// TaskKindHint returns the advisory bound for a tool name, exposed
+// for dashboards / pressure thresholds (T12). Returns (zero, false)
+// when the tool has no task_kind-specific hint.
+func TaskKindHint(toolName string) (contracts.IterationBound, bool) {
+	switch toolName {
+	case "read_file", "grep", "glob":
+		return TaskKindBound("review"), true
+	}
+	return contracts.IterationBound{}, false
 }
 
 // isTighter returns true if boundA is tighter (more restrictive) than boundB.

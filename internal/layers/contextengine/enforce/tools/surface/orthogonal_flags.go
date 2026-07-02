@@ -201,7 +201,12 @@ func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.C
 	case "read_file":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
-			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			// DM-20260702-008 / D2-S15-A02-T11: read_file is the recovery
+			// path (offset/limit re-reads, T10). OpenEnded is correct
+			// because the LLM uses Read to recover from oversized
+			// results, NOT to discover content. The bound is preserved
+			// as MaxN for dashboards but the channel no longer hard-rejects.
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
 			maxCharsReadFile, marker
 	case "write_file":
@@ -225,13 +230,15 @@ func DefaultV3MetadataFor(toolName string) (contracts.EmissionClass, contracts.C
 	case "grep":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
-			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			// T11: OpenEnded — see read_file above.
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
 			maxCharsGrepGlob, marker
 	case "glob":
 		return contracts.EC_Probe,
 			contracts.ConvergenceContract{Kind: contracts.CC_None},
-			contracts.IterationBound{Kind: contracts.IB_Bounded, MaxN: 15},
+			// T11: OpenEnded — see read_file above.
+			contracts.IterationBound{Kind: contracts.IB_OpenEnded},
 			contracts.SourceUncertainty{Source: contracts.SK_Deterministic, Value: 1.0},
 			maxCharsGrepGlob, marker
 	case "query_diagnostics":

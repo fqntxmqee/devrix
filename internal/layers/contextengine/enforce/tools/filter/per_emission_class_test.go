@@ -101,13 +101,14 @@ func TestPerTaskKindFilterCrossConsistency(t *testing.T) {
 	}
 	out := filter.Apply(specs)
 
-	// read_file: must end up Bounded(15) (NOT OpenEnded)
+	// DM-20260702-008 / D2-S15-A02-T12: cross-consistency rule RELAXED.
+	// read_file is now OpenEnded by default (T11) and the task_kind
+	// filter no longer forces it to Bounded(15). The治本 change in T09
+	// means the channel never hard-rejects anyway, so the rule's
+	// purpose (prevent Probe from escaping the bound) is moot.
 	readFile := out[0]
-	if readFile.IterationBound.Kind != contracts.IB_Bounded {
-		t.Errorf("read_file should be Bounded (cross-consistency), got %v", readFile.IterationBound)
-	}
-	if readFile.IterationBound.MaxN != 15 {
-		t.Errorf("read_file should be Bounded(15), got %v", readFile.IterationBound)
+	if readFile.IterationBound.Kind != contracts.IB_OpenEnded {
+		t.Errorf("read_file should stay OpenEnded (T12 advisory), got %v", readFile.IterationBound)
 	}
 
 	// query_diagnostics: Fact class, observe-task bound would be OpenEnded
