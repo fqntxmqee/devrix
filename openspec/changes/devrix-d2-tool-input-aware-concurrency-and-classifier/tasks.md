@@ -4,7 +4,7 @@
 **Demand ID:** DM-20260702-009
 **博弈论 Round 3 收敛:** 2026-07-02 (Claude + Codex + Cursor 三方共识)
 **T 点总数:** 12 (T16-T21 P0 = 6, T22'-T23' P2 interface stubs = 2, T25'-T28 P0 = 4)
-**AC 总数:** 12 (AC1-AC10 P0 + AC11 P0 缩减版 + AC12-AC14 P1)
+**AC 总数:** 21 (AC1-AC3/AC6-AC10 P0 + AC11 P0 缩减版 + AC12-AC13 P1 + AC4/AC5/AC14 P2 + **AC15-AC19 P0 并发不变量** + AC20-AC21 P1) — S3 设计阶段博弈论 AC 复核增补 (Claude+Codex 两方, cursor 后端宕机待补审)
 **PR 收口:** **5** (PR-A / PR-B / PR-C / **PR-D+E 合并** / PR-F)
 **tech-debt closed:** 4 (TD-STE-01/02/03/06, 引用见各 T 点)
 **阶段:** 0 (决策) → 1-2 (interface + per-tool 默认) → 3 (partition + e2e) → 4 (投影 + 序列化) → 5 (classifier P2 interface stub) → 6 (验证 + GrowthBook 1 flag) → 6+ (sibling abort / discard / inputsEquivalent)
@@ -86,7 +86,7 @@
   | web_search | ❌ default | false (per-host rate-limit) | "query" |
   | mcp_* | ❌ default | false (保守, 未知 mcp 协议) | "server.tool: input (first 200 chars)" |
 
-- **AC:** 19 surface 加默认实现, `surface_metadata_gate_test.go` 加 1 case (AC8: 0 silent default)
+- **AC:** 19 surface 加默认实现, `surface_metadata_gate_test.go` 加 1 case (AC8: 0 silent default); `read_file` surface_test 断言大/小 input 均 `IsConcurrencySafe=true` (AC18: 8K anti-pattern 回归锁)
 - **tech-debt 引用:** **TD-STE-06 closed-by** (per-tool `IsConcurrencySafe` 走 surface 元数据, 跟 clawcode `Tool` interface 一致)
 
 ---
@@ -124,6 +124,7 @@
   ```
 - **ExecuteRound 改造:** 替换单层 errgroup 为两层 (batch 间串行 + batch 内并发)
 - **AC:** 50 read_file 拆成 ~10 batch, 总时间 < 串行 / 3 (AC3)
+- **并发不变量测试 (S3 AC 复核增补):** 新建 `partition_invariants_test.go` 覆盖 AC15 (完整性 N:N+保序+id 1:1) / AC16 (交错保序) / AC17 (read-only 部分失败) / AC19 (panic 隔离) / AC20 (并发上限 errgroup.SetLimit) / AC21 (ctx 取消 goleak) — 折进 T18, 不新增 T 编号
 - **tech-debt 引用:** **TD-STE-01 closed-by** (混合批次: safe × N 并行 + unsafe 独占, 替换 v1 整批 all-or-nothing)
 
 ### T19 — 50 文件 e2e 并发版
@@ -294,7 +295,10 @@
 - [ ] `go build ./...` 0 errors
 - [ ] `go test -count=1 ./internal/layers/...` 全量 PASS
 - [ ] `go test -race -count=1 ./...` 全量 PASS (master 预存失败 tools/ci-lint-invariant 除外)
-- [ ] 12 T 全 IMPLEMENTED + 12 AC 全 PASS
+- [ ] 12 T 全 IMPLEMENTED + 21 AC 全 PASS (P0 14 + P1 4 + P2 3)
+- [ ] 50 文件 e2e 并发版 < 串行 / 3 (AC10)
+- [ ] `partition_invariants_test` 全 PASS (AC15 完整性 / AC16 交错 / AC17 read部分失败 / AC19 panic 隔离 / AC20 限流 / AC21 goleak)
+- [ ] read_file IsConcurrencySafe 大/小 input 均 true (AC18: 8K 回归锁)
 - [ ] 50 文件 e2e 并发版 < 串行 / 3 (AC10)
 - [ ] AutoModeClassifier interface stub panic 信息合规
 - [ ] ChannelRouter 占位代码不破坏 partition 行为
@@ -315,6 +319,8 @@
 - OOS-NEW-8: synthetic error 统一 (TD-STE-05) — P2
 - OOS-NEW-9: Bash 22 zsh rules 改造 (DM-20260701-007 OOS-7 弱相关) — 域自治
 - OOS-NEW-10: Filter v2 workspace 维 (DM-20260701-007 OOS-10) — 走 P1 独立 change
+- OOS-NEW-11: metric emit 幂等 (同一 error 多次 emit 去重) — P1, Codex Round 1 B2, cursor 恢复后可翻案纳入 AC
+- OOS-NEW-12: GrowthBook flag 运行时热切换一致性 (partition 途中 flag 变更防御) — P1, Codex Round 1 B3, "理论上不该发生" 边际收益低
 
 > **OOS 编号变更说明:** 原 OOS-1~7 中 OOS-1 (GrowthBook) 部分走 T25' 已吸收, 重新编号 OOS-NEW-1~10.
 
@@ -324,12 +330,12 @@
 
 | PR | commit | 内容 | T 数 | AC | tech-debt closed |
 |----|--------|------|------|----|------------------|
-| **PR-A** | (TBD) | T16-T17 ToolSurface v4 + 19 工具 IsConcurrencySafe 默认 (4 override + 15 default) | 2 | AC1-AC2 | TD-STE-06 |
-| **PR-B** | (TBD) | T18-T19 partitionToolCalls + 50 文件 e2e 并发版 | 2 | AC3 + AC10 | TD-STE-01 |
+| **PR-A** | (TBD) | T16-T17 ToolSurface v4 + 19 工具 IsConcurrencySafe 默认 (4 override + 15 default) | 2 | AC1-AC2 + **AC18** | TD-STE-06 |
+| **PR-B** | (TBD) | T18-T19 partitionToolCalls + `partition_invariants_test` + 50 文件 e2e 并发版 | 2 | AC3 + AC10 + **AC15-AC17 + AC19-AC21** | TD-STE-01 |
 | **PR-C** | (TBD) | T20-T21 toCompactBlock + 19 工具 ToAutoClassifierInput 默认 | 2 | AC4-AC6 | — |
 | **PR-D+E** | (TBD) | T22'-T23' AutoModeClassifier P2 interface stub + T24' 单测 + T25' GrowthBook bash threshold flag | 4 | AC7-AC11 | — |
 | **PR-F** | (TBD) | T26 Bash sibling abort + T27 Discard on fallback + T28 inputsEquivalent | 3 | AC12-AC14 | TD-STE-02 + TD-STE-03 |
-| **合计** | | | **13 T** | **12 AC** | **4 tech-debt** |
+| **合计** | | | **13 T** | **21 AC** | **4 tech-debt** |
 
 > **排期 (1W+3D, 总工期 8 天):**
 > - W1 D1-D5: PR-A → PR-B → PR-C 顺序合入 (interface + per-input 决策 + 投影)

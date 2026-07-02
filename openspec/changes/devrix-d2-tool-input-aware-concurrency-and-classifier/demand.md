@@ -127,17 +127,24 @@ devrix 现状: 缺 `Tool.toAutoClassifierInput(input)` + auto-mode classifier �
 | AC1 | `ToolSurface` 加 `IsConcurrencySafe(input []byte) bool` 方法, 19 工具全部默认实现 (per-input 决策) | P0 | 19 工具 surface_test PASS |
 | AC2 | `ToolSurface` 加 `ToAutoClassifierInput(input []byte) string` 方法, 19 工具全部默认实现 | P0 | 19 工具 surface_test PASS |
 | AC3 | `ChannelRouter.ExecuteRound` (`turn_adapter.go:277`) 改造为 `partitionToolCalls`-style: 把 `IsConcurrencySafe=true` 的连续 tool_call 放进同 batch, batch 内并发, batch 间串行 | P0 | 50 文件 e2e: 50 read_file 拆成 ~10 batch, 总延迟 < 串行 / 5 |
-| AC4 | Auto-mode classifier (`internal/layers/orchestration/decisionplanning/auto_classifier.go` 新建): 接收 `toCompactBlock` JSONL transcript, 调 SideQuery (5s timeout), 返 `allow` / `deny` + reason | P0 | 7 单测 (allow/deny/timeout/throw/malformed_input/empty_transcript/policy_violation) |
-| AC5 | `tengu_auto_mode_malformed_tool_input` 对等 telemetry 事件 (devrix 用 `auto_mode.malformed_tool_input` metric) | P0 | metric_test PASS |
+| AC4 | **[R3→P2 stub]** `AutoModeClassifier` interface 契约 (`internal/layers/orchestration/decisionplanning/auto_classifier.go`): 定义 `Classify(ctx, transcript) (Result, error)` + panic-on-unimplemented stub (T22', 不接真 SideQuery) | P2 | `classifier_stub_test`: 契约存在 + stub panic 信息明确 (含 "P2 interface, not implemented") |
+| AC5 | **[R3→P2 stub]** `auto_mode.malformed_tool_input` metric stub 编译存在 (不实际触发, 等 P1 classifier 实施后激活) | P2 | 编译验证 |
 | AC6 | Fail-safe: `IsConcurrencySafe` 抛错时保守 false (不并发); `ToAutoClassifierInput` 抛错时落 raw input + emit metric | P0 | 2 单测 |
 | AC7 | Bash 工具: `isReadOnly(input) → IsConcurrencySafe(input) = true` (镜像 clawcode `BashTool.tsx:434-437`) | P0 | bash_runner_test |
 | AC8 | 19 工具 default ToAutoClassifierInput 走 registered surface 而非 hardcoded fallback (避免 silent default) | P0 | surface_metadata_gate_test 加 1 case |
-| AC9 | 13 T 点 (T16-T28) 全 IMPLEMENTED, 走 D2-S15-A02 + D7-S9-A50 + D7-S10-A50 + D7-S11-A50 t-registry | P0 | t-registry + tasks.md |
+| AC9 | 12 T 点 (R3 收敛: T16-T21 + T22'-T23' + T24'-T25' + T26-T28) 全 IMPLEMENTED, 走 D2-S15-A02 + D7-S9-A50 + D7-S10-A50 + D7-S11-A50 t-registry | P0 | t-registry + tasks.md |
 | AC10 | 端到端 e2e: 50 文件 review + 9 并发 read_file batch, 任务完成时间 < 串行 / 3 | P0 | review50_e2e_test.go 加并发版本 |
 | AC11 | **GrowthBook override** — 19 工具 per-tool 阈值 + Classifier enable + ConcurrencySafe 全部可走 GrowthBook feature flag 运行时调, 默认全关 | P0 | growthbook_override_test + 19 工具 default + Production-Safety |
 | AC12 | **Bash sibling abort** — 并行 Bash 中一个失败, 兄弟 Bash 通过 `siblingAbortController` abort + 返 synthetic `Cancelled: parallel tool call errored` tool_result | P1 | bash_sibling_abort_test (mock 双 Bash, 第一个 error → 第二个 cancelled) |
 | AC13 | **Discard on fallback** — QueryLoop fallback model 切换前调 `StreamingToolExecutor.Discard()`, 在途/queued 工具注入 `streaming_fallback` synthetic result | P1 | discard_test (fallback 路径无 orphan tool_use) — 依赖 TD-QL-03 已 CLOSED |
 | AC14 | **inputsEquivalent(a, b)** — 19 工具 surface 加 `inputsEquivalent(a, b []byte) bool` 默认实现, 配合 ContentReplacementState (T04) 实现 cache invalidation 收口 | P2 | inputs_equivalent_test (19 工具 × 3 case = 57 单测) |
+| AC15 | **partition 结果完整性** — M 个 tool_call 输入 → 恰好 M 个 tool_result 输出, 每个 result 的 `tool_use_id` 与原始 call 一一对应 (无 drop/dup), 且重组后顺序与原始索引一致 (batch 内乱序完成不影响输出顺序) | P0 | `partition_invariants_test`: batch 内 3 call 逆序返回 → 重组后顺序 + id + 计数正确 |
+| AC16 | **交错保序拆分** — `[safe, unsafe, safe, safe]` 序列 → `[safe][unsafe][safe,safe]` 3 batch, 不跨 unsafe 合并两个 safe 组, 保持原序 | P0 | `partition_invariants_test` (交错序列 case) |
+| AC17 | **read-only batch 部分失败** — read batch 中 1 个失败, 其余照常完成 + 全部 result 返回 (不 abort 兄弟, 区别于 AC12 bash abort 语义) | P0 | `partition_invariants_test` (read-only 部分失败 case) |
+| AC18 | **read_file size 无关** — `read_file.IsConcurrencySafe` 忽略 input size, 恒 true (锁 8K anti-pattern 回归) | P0 | `read_file` surface_test: 大/小 input 均 true |
+| AC19 | **panic 隔离** — partition batch 内单个 tool goroutine panic, 经 L4 fail-safe wrapper (design.md:468) 转 error tool_result, 不污染兄弟 goroutine / 不崩 ExecuteRound | P0 | `partition_invariants_test` (panic 隔离 case) |
+| AC20 | **并发上限 enforcement** — batch 内并发受 `maxConcurrency` 上限约束 (errgroup.SetLimit / semaphore), 50 全 safe 不 spawn 50 goroutine | P1 | `partition_invariants_test`: 50 safe call, 峰值活跃 goroutine ≤ 上限 |
+| AC21 | **ctx 取消清理** — turn ctx 中途 cancel, 在途 batch goroutine 全部退出无泄漏 | P1 | `partition_invariants_test` (goleak + -race) |
 
 ---
 

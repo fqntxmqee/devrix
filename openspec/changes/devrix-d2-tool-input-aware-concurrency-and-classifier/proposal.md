@@ -493,12 +493,12 @@ ExecuteRound (turn_adapter.go:277)
 
 ## 9. 验收 + 归档 (S5 + S6)
 
-- **S5 验收**: 12 T 全 IMPLEMENTED + AC1-AC3 + AC6-AC8 + AC9 (12 T) + AC10 全 PASS + 50 文件 e2e 并发版 < 串行 / 3 + verify-archive.sh 12 PASS
+- **S5 验收**: 12 T 全 IMPLEMENTED + AC1-AC3 + AC6-AC11 + **AC15-AC21 (并发不变量)** 全 PASS + 50 文件 e2e 并发版 < 串行 / 3 + `partition_invariants_test` PASS + verify-archive.sh 12 PASS (P2 stub AC4/AC5/AC14 走契约守护测试)
 - **S6 归档**: `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/` + 域文档同步 (D2 t-registry +12 T, D7 t-registry +9 T, root v5.15.0)
 
 **AC 调整** (Round 3 收敛):
 - AC1-AC3 P0 保留 (per-input 函数 + partitionToolCalls)
-- AC4-AC7 (classifier 实施) **降 P2** (Cursor 承认无生产事故)
+- AC4 (classifier 实施) **降 P2** (Cursor 承认无生产事故, 保留契约守护测试)
 - AC5 (telemetry) **降 P2** (跟 classifier 一起)
 - AC6 (fail-safe) P0 保留
 - AC7 (Bash isReadOnly) P0 保留
@@ -508,9 +508,19 @@ ExecuteRound (turn_adapter.go:277)
 - **AC11 (GrowthBook)** → **P0 部分保留 1 flag** (bash 30K→50K)
 - AC12 (Bash sibling abort) P1 保留
 - AC13 (Discard on fallback) P1 保留
-- **AC14 (inputsEquivalent)** → **P3** (ContentReplacementState 已覆盖)
+- **AC14 (inputsEquivalent)** → **P2** (ContentReplacementState 已覆盖)
 
-**最终 AC**: 14 → 12, 13 T → 12 T, 6 PR → 5 PR
+**S3 设计阶段 AC 复核增补** (Claude+Codex 两方共识, cursor 后端宕机待补审):
+- **AC15** partition 结果完整性 (N:N + 保序 + tool_use_id 1:1) — P0
+- **AC16** 交错 safe/unsafe 保序拆分 — P0
+- **AC17** read-only batch 部分失败不 abort 兄弟 — P0
+- **AC18** read_file IsConcurrencySafe 忽略 size 恒 true (8K 回归锁) — P0
+- **AC19** panic 隔离 (单 tool goroutine panic 不污染 batch) — P0
+- **AC20** 并发上限 enforcement (errgroup.SetLimit) — P1
+- **AC21** ctx 取消 goroutine 清理无泄漏 (goleak) — P1
+- 均折进 T18 (`partition_invariants_test.go`) + T17 (AC18), 不新增 T 编号; B2/B3 → OOS-NEW-11/12
+
+**最终 AC**: 14 → **21** (7 新增并发不变量: 5 P0 + 2 P1), 13 T → 12 T, 6 PR → 5 PR
 
 ---
 
