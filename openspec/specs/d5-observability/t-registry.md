@@ -1,8 +1,8 @@
 # D5 Observability Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.4.0
-**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 3 T IMPLEMENTED 42→45, P0 27→30 — D5-S25-A01-T01 BoundedInvariant + D5-S25-A02-T01 QuotientInvariant + D5-S25-A03-T01 SynthesizeInvariant (LTL-Lite L4–L6 termination invariants for PR-B 4 ToolChannel); S25 新 S 由 0 增至 3 A + 3 T)
+**Version:** 3.5.0
+**Last Updated:** 2026-07-02 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 1 T IMPLEMENTED 45→46, P0 30→31 — D5-S25-A04-T01 GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS))
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) + devrix-diagnostic-tools-wiring (DM-20260617-002) + devrix-tools-terminal-architecture (DM-20260618-007) + **devrix-d5-v2-terminal (DM-20260619-006 / v2.1 Terminal；增 canonical_a 列；canonical_s 校正 A08→S21、A06→S0；canonical_a 校正 Doctor T→A10；3 PLANNED 闭合)** 
 
@@ -55,8 +55,9 @@
 | D5-S25-A01-T01 | L4 BoundedInvariant: Check(state) 在 iter ≥ MaxN 时返 (false, "Bounded exceeded iter N/MaxN, inject synthesize-now"); NewBoundedInvariant(MaxN) fail-fast 校验 > 0; Name() 返 "L4-Bounded" | S25 | A01 | P0 | `internal/layers/observability/instrument/ltl/invariants/termination/bounded_test.go::TestBoundedInvariant_{FiresAtBound, RejectsZeroMax, Name, DoesNotBypassPermissionGuards}` (4 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
 | D5-S25-A02-T01 | L5 QuotientInvariant: Check(state) 在 metric(state) < Threshold 时返 (false, "Quotient below threshold X/Y, inject synthesize-now"); NewQuotientInvariant(Threshold, Metric) 校验 0 ≤ T ≤ 1; Name() 返 "L5-Quotient" | S25 | A02 | P0 | `quotient_test.go::TestQuotientInvariant_{FiresAtThreshold, BelowThreshold, CustomMetric}` (3 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
 | D5-S25-A03-T01 | L6 SynthesizeInvariant: Check(state) 在 len(text) < MinChars 时返 (false, "Synthesize too short X < MinChars, inject synthesize-now"); NewSynthesizeInvariant(MinChars) fail-fast; Name() 返 "L6-Synthesize" | S25 | A03 | P0 | `synthesize_test.go::TestSynthesizeInvariant_{NeverFiresFromCheck, BelowMinChars, ExactlyMinChars}` (3 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
+| D5-S25-A04-T01 | GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS): `Override.BashReadOnlyThresholdBytes(defaultBytes int) int`; default 30000 → override 50000; seedFeatureFlags 空 map 时返 default (0 行为变化); 运行时变更通过 GrowthBook SDK 推送不需重启; 2 deferred flags (bash readonly canary 5%→50% / classifier 5% canary) 推迟等 P1 实施时再立 | S25 | A04 | P0 | `internal/layers/observability/instrument/growthbook/registry.go::NewGrowthBookOverride + concurrency_override.go::BashReadOnlyThresholdBytes + growthbook_override_test.go (Production-Safety 单测)` | **IMPLEMENTED (DM-20260702-009)** | — |
 
-**D5-S25 (DM-20260701-007) Total: 3 T 全部 P0 IMPLEMENTED**。3 invariant 共 10 unit tests, 0 race warnings; coverage 70.2% (新包); 配套 cross-check 测试 `TestBoundedInvariant_DoesNotBypassPermissionGuards` 验证 L4 不得 override L0–L3 readonly/permission guards.
+**D5-S25 (DM-20260701-007) Total: 4 T 全部 P0 IMPLEMENTED**（3 T 既有 + 1 T 新增 A04-T01）。3 invariant 共 10 unit tests, 0 race warnings; coverage 70.2% (新包); 配套 cross-check 测试 `TestBoundedInvariant_DoesNotBypassPermissionGuards` 验证 L4 不得 override L0–L3 readonly/permission guards。
 
 ## D5-S22: Export（遥测导出）
 
@@ -150,3 +151,5 @@ D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, 
 | 3.1.0 | 2026-06-17 | devrix-queryloop-legacy-decommission (DM-20260617-001)：(1) D5-S24-A02-T04 legacy counter 已注册；(2) D5-S24-A02-T05 一次警告 sync.Once。IMPLEMENTED 38→40 |
 | **3.2.0** | **2026-06-19** | **v2.1 Terminal（代码锚点）**：增 canonical_a 列（全量填充）；canonical_s 校正 A08→S21 (DebugFilter)、A06→S0 (SessionBridge)；canonical_a 校正 Doctor T→A10、DebugFilter T→A14、SessionBridge T→A03；3 PLANNED 全部闭合 → 41/41 IMPLEMENTED；Statistics 更新 IMPLEMENTED 40→41 |
 | **3.3.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D5-S23-A06-T03 Observability.Shutdown errors.Join typed chain (PR-C M3)。IMPLEMENTED 41→42, P0 26→27 |
+| **3.4.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)**: D5-S25-A01-T01 BoundedInvariant + D5-S25-A02-T01 QuotientInvariant + D5-S25-A03-T01 SynthesizeInvariant (LTL-Lite L4–L6 termination invariants for PR-B 4 ToolChannel). Total 42→45, P0 27→30. S25 新 S section (0→3 A + 3 T) |
+| **3.5.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D5-S25-A04-T01 GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS). Total 45→46, P0 30→31. PR-D+E `57469504` 全部合入. 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED) |

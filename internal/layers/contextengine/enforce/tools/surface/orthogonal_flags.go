@@ -70,6 +70,8 @@ func OrthogonalFlagFor(toolName string) (readOnly, destructive, openWorld, concu
 		return true, false, true, false
 	case "verify_plan_execution":
 		return true, false, false, false
+	case "tool_search":
+		return true, false, false, true
 	}
 	// delegate_*, task_output, etc. follow a "spawn-agents" / "read-result"
 	// rule below.

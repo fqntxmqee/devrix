@@ -79,6 +79,18 @@ func (s *FreeForkSurface) CheckPermission(ctx context.Context, spec contracts.To
 	return s.permGate.CheckPermission(ctx, spec)
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. free_fork is a
+// multi-agent spawn — NEVER concurrency safe (DSAFT: D2-S15-A02-T17).
+func (s *FreeForkSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return false
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *FreeForkSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return DefaultToAutoClassifierInputFor("free_fork", input)
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *FreeForkSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "free_fork" {

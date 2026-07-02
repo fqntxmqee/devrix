@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.14.0
-**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 19 T IMPLEMENTED 129→148, P0 76→93 — D2 安全硬化 (S18-A80/A81 PlanModeWriteParity + SymlinkContainment) + D2 AutocompactWriteback (S15-A80) + D2 fail-closed (S18-A82/A83/A84/A85 5 surface) + D2 压缩并发 (S15-A81/A82/A83 CompressedView mu + session ctx + microcompact 跳 tool msg) + D2 JSONL 卫生 (S17-A80 strict 模式))
+**Version:** 2.15.0
+**Last Updated:** 2026-07-02 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 7 T IMPLEMENTED 148→155, P0 93→99 — D2-S15-A02-T16 ToolSurface v4 interface + D2-S15-A02-T17 19 工具 IsConcurrencySafe + ToAutoClassifierInput default helpers + D2-S15-A02-T18 partitionToolCalls 改造 + D2-S15-A02-T19 50 文件 e2e 并发版 + D2-S15-A02-T20 toCompactBlock JSONL 序列化 + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认 + D2-S15-A02-T28 inputsEquivalent 19 工具默认实现; 4 tech-debt 关闭 TD-STE-01/02/03/06)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -244,7 +244,27 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 | **D2-S15-A02-T05** | **PR-D D2 PrepareOrchestrator task_kind 推 (复用 DM-20260618 Phase 5 IntentClassifier 90%+ 验证集)** | **S15-A02 TaskKind Inference** | **internal/layers/contextengine/prepare/orchestrator.go (modified to call IntentClassifier from task_kind) + existing 18 integration tests PASS** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
 | **D2-S15-A02-T15** | **PR-D TestPerTaskKindFilterCrossConsistency: review 时 read/grep/glob (Probe) 不得 OpenEnded; Bounded(15) 收紧 (H9/P1-AC-7)** | **S15-A02 CrossConsistency** | **internal/layers/contextengine/enforce/tools/filter/per_emission_class_test.go (TestPerTaskKindFilterCrossConsistency)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
 
-**D2-S15-A02 (DM-20260701-007) Total: 19 T 全部 P0 IMPLEMENTED**（含 1 T01 既有 RepairToolChain 复用 + 14 新 A02 slot (T02..T15)）。Filter v2 不含 workspace 维（双 review 共识 defer — P1-AC-8, OOS-10）。
+> **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) — Phase 1-6 落地.**
+> 5 PR 联动 (PR-A ToolSurface v4 + PR-B partitionToolCalls + PR-C toCompactBlock + PR-D+E AutoModeClassifier stub + GB + PR-F inputsEquivalent + sibling abort + discard):
+>
+> - **PR-A Phase 1-2 (2 T)**: D2-S15-A02-T16 ToolSurface v4 interface (IsConcurrencySafe + ToAutoClassifierInput) + D2-S15-A02-T17 19 工具 default helpers (4 override + 15 default); surface_metadata_gate_test 0 silent default
+> - **PR-B Phase 3 (2 T)**: D2-S15-A02-T18 partitionToolCalls 改造 + partition_invariants_test (AC15-AC17+AC19-AC21) + D2-S15-A02-T19 50 文件 e2e 并发版 (< 串行 / 3)
+> - **PR-C Phase 4 (2 T)**: D2-S15-A02-T20 toCompactBlock JSONL 序列化 (6 case PASS) + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认
+> - **PR-F Phase 6+ (1 T)**: D2-S15-A02-T28 inputsEquivalent(a, b) 19 工具默认 + ContentReplacementState 联动 (57 单测)
+>
+> AC 满足: 21/21 PASS (P0 14 + P1 4 + P2 3) + AC15-AC21 并发不变量全 PASS. 4 tech-debt 关闭 (TD-STE-01/02/03/06).
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D2-S15-A02-T16** | **PR-A ToolSurface v4 interface extension: IsConcurrencySafe(input json.RawMessage) bool + ToAutoClassifierInput(input json.RawMessage) string — 0 break existing 9 v2 + 6 v3 methods** | **S15-A02 ToolSurface v4** | **internal/shared/contracts/tool_surface_v4.go + go vet ./shared/contracts/... clean** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T17** | **PR-A 19 工具 IsConcurrencySafe + ToAutoClassifierInput default helpers (4 override: bash/read_file/write_file/edit_file + 15 default: grep/glob/lsp_*/free_fork/tracker/verify_*/ask_user_question/background_task/tool_search/web_fetch/web_search/mcp_*); surface_metadata_gate_test 0 silent default** | **S15-A02 19 工具 Default** | **internal/layers/contextengine/enforce/tools/surface/orthogonal_flags_v2.go + surface_metadata_gate_test.go** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T18** | **PR-B partitionToolCalls 改造 (clawcode toolOrchestration.ts:84-118 mirror) + partition_invariants_test (AC15-AC17 + AC19-AC21 7 invariant tests)** | **S15-A02 partitionToolCalls** | **internal/bootstrap/partition_tool_calls.go + partition_invariants_test.go + partition_sibling_abort_test.go** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T19** | **PR-B 50 文件 e2e 并发版: review50_e2e_concurrent_test.go; total wall time < serial / 3 (AC10)** | **S15-A02 50 文件 e2e** | **internal/layers/contextengine/prepare/compression/review50_e2e_concurrent_test.go** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T20** | **PR-C toCompactBlock JSONL 序列化 (text / role / surface_lookup) — 6 case (tool_use_ok, user_text, malformed_input, empty, escape_attack, unknown_tool) PASS; fail-safe wrapper panic recovery + AutoModeMalformedToolInput metric** | **S15-A02 toCompactBlock** | **internal/layers/orchestration/decisionplanning/to_compact_block.go + to_compact_block_test.go (6 cases)** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T21** | **PR-C 19 工具 ToAutoClassifierInput 默认实现 + 0 panic; 与 T17 同步落地 (fail-safe: parse failure → raw input + emit metric)** | **S15-A02 19 ToAutoClassifierInput** | **internal/layers/contextengine/enforce/tools/surface/orthogonal_flags_v2.go (synchronized with T17)** | **IMPLEMENTED (DM-20260702-009)** | **P0** |
+| **D2-S15-A02-T28** | **PR-F inputsEquivalent(a, b) 19 工具默认实现 + ContentReplacementState 联动 (57 单测: 19 工具 × 3 case: 相同 / 字段顺序不同 / 完全不同)** | **S15-A02 inputsEquivalent** | **internal/layers/contextengine/enforce/tools/surface/inputs_equivalent.go + inputs_equivalent_test.go (57 tests) + persist/content_replacement_state.go (bridge)** | **IMPLEMENTED (DM-20260702-009)** | **P2** |
+
+**D2-S15-A02 (DM-20260702-009) Total: 7 新 T 全部 IMPLEMENTED** (T16-T21 P0 = 6, T28 P2 = 1)。
 
 ## D2-S11: Harness Unification
 
@@ -536,3 +556,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.11.0** | **2026-06-29** | **DM-20260629-002 PR-5 — value-flow-rename**: §Canonical T 映射 加 ValueFlow Alias block（S15/S17/S18 D2_* Alias + S16 归 D7）；与 d2-domain.md / a-registry / f-registry §North Star 对齐 |
 | **2.12.0** | **2026-06-29** | **DM-20260629-002 PR-7 — span-coverage**: (1) §Canonical T 映射 加 Span Evidence 列（12/14 mapped = 86%）；(2) §Span Evidence Coverage 新增章节 + Active D2 Spans (23) 列表 + T-Without-Span Tracker（2 排除：compile-time invariant + CI layout guard）；(3) Coverage Gate ≥80% CI 守门草案 |
 | **2.14.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D2-S15-A02-T06..T12 + T14 ToolSpec v3 + 19 工具默认 metadata + silent default gate (Phase A 8 T) + D2-S15-A02-T02..T05 Filter v2 三维 (Phase D 4 T) + D2-S15-A02-T13 TruncateWithMarker (Phase C) + D2-S15-A02-T15 cross-consistency (Phase D) — **19 新 T 全部 P0 IMPLEMENTED**. Total 129→148, P0 76→93. PR-A commit 74fba9c5 已合入 master #374; PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). |
+| **2.15.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D2-S15-A02-T16 ToolSurface v4 interface (IsConcurrencySafe + ToAutoClassifierInput) + D2-S15-A02-T17 19 工具 default helpers (4 override + 15 default) + D2-S15-A02-T18 partitionToolCalls 改造 (AC15-AC17+AC19-AC21 7 invariant tests) + D2-S15-A02-T19 50 文件 e2e 并发版 + D2-S15-A02-T20 toCompactBlock JSONL 序列化 + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认 + D2-S15-A02-T28 inputsEquivalent 19 工具默认 — **7 新 T 全部 IMPLEMENTED (6 P0 + 1 P2)**. Total 148→155, P0 93→99. 5 PR (PR-A `3257e0bb` + PR-B `8e61bb13` + PR-C `dd8736e7` + PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 4 tech-debt 关闭 (TD-STE-01/02/03/06). 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |

@@ -134,6 +134,18 @@ func (s *ToolSearchSurface) CheckPermission(_ context.Context, _ contracts.ToolS
 	return contracts.DecisionAllow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. tool_search is
+// a pure read-only discovery — concurrency safe (DSAFT: D2-S15-A02-T17).
+func (s *ToolSearchSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return true
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *ToolSearchSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return DefaultToAutoClassifierInputFor(ToolSearchSurfaceName, input)
+}
+
 // search returns up to 5 deferred tools matching (query, category).
 // Algorithm order: exact > glob > substring (case-insensitive).
 func (s *ToolSearchSurface) search(query, category string) []ToolSearchResult {

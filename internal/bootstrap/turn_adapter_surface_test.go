@@ -63,6 +63,10 @@ func (s *stubSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _
 	}
 	return contracts.DecisionAllow
 }
+func (s *stubSurface) IsConcurrencySafe(_ json.RawMessage) bool { return false }
+func (s *stubSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
+}
 
 func (s *stubSurface) Execute(_ context.Context, name, input, _ string) (*contracts.ToolResult, error) {
 	if atomic.AddInt32(s.hits, 1); s.failGo {

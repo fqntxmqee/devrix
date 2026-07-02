@@ -158,4 +158,66 @@ type ToolSurface interface {
 	// Performance budget: < 5ms p99 (BashASTPolicy is the hot path).
 	// DSAFT: TOOL-SURFACE-1-A01-F07 (DM-20260618-002).
 	CheckPermission(ctx context.Context, spec ToolSpec, input json.RawMessage) Decision
+
+	// --- v4: per-input concurrency decision + auto-classifier projection ---
+	//
+	// DSAFT: D2-S15-A02-T16 (DM-20260702-009 devrix-d2-tool-input-aware-concurrency-and-classifier).
+	//
+	// v3 was static-bool: ToolSpec.ConcurrencySafe is decided at BuildSurfaces
+	// time and applies to every call of that tool (治标 — `bash` was always
+	// sequential even for `ls`; `read_file` was always parallel even on the
+	// same path). v4 upgrades both decisions to per-input so that partitionToolCalls
+	// (T18) can build safe/unsafe batches that respect actual data dependencies.
+	//
+	// D5 decision: json.RawMessage (跟 CheckPermission 对齐) — type cohesion
+	// over YAGNI extension. D7 decision: ClassifierResult naming (P2 stub).
+	//
+	// 4 surfaces override (BuiltinSurface handles bash + read_file + write_file
+	// + edit_file with real per-input logic). 15 surfaces fall back to the v2
+	// static bool via orthogonal_flags_v2.go's default helpers.
+
+	// IsConcurrencySafe returns whether this specific input can be
+	// executed concurrently with other IsConcurrencySafe=true calls of
+	// the same tool without mutual interference.
+	//
+	// Semantics:
+	//   - true  → safe to batch with other true calls; partitionToolCalls
+	//             groups these into the same errgroup.
+	//   - false → must run sequentially (own batch).
+	//
+	// Fail-safe: returns false on parse failure, NEVER panics. On parse
+	// error the surface SHOULD emit metric auto_mode.malformed_tool_input
+	// (P2 stub metric; production metric activates when classifier goes P1).
+	//
+	// Per-tool semantics:
+	//   - bash       → isReadOnlyBashCommand (BashASTPolicy extended)
+	//   - read_file  → 恒 true (read-only op, AC18 8K 回归锁 removed in 6a6b9add)
+	//   - write_file → 恒 false (write op, must serialize)
+	//   - edit_file  → per-input target path check (same path → false,
+	//                  different paths → true)
+	//   - 15 default → v2 static ToolSpec.ConcurrencySafe
+	IsConcurrencySafe(input json.RawMessage) bool
+
+	// ToAutoClassifierInput projects a tool call into the compact string
+	// the auto-mode classifier (D7 P2 stub — AutoModeClassifier.Classify)
+	// consumes in its transcript. Returns "" to skip the call.
+	//
+	// Examples: bash("ls -la") → "ls -la"; read_file("foo.go") → "foo.go";
+	// ask_user_question → "" (skip; not security-relevant).
+	//
+	// Fail-safe: on parse failure, return raw input + emit metric
+	// auto_mode.malformed_tool_input. NEVER panics.
+	ToAutoClassifierInput(input json.RawMessage) string
 }
+
+// ToolSurfaceV4 is a type alias for the v4-extended ToolSurface interface.
+// The v4 extension adds IsConcurrencySafe + ToAutoClassifierInput directly
+// to the v3 ToolSurface (no separate interface — Go interfaces can't be
+// split across files). This alias exists for documentation / type-assertion
+// readability at partitionToolCalls (T18) call sites: callers can write
+// `var v4 contracts.ToolSurfaceV4 = surface` instead of commenting "this
+// surface must implement v4 methods". The assertion is always true because
+// ToolSurface == ToolSurfaceV4 after this change.
+//
+// DSAFT: D2-S15-A02-T16 (DM-20260702-009).
+type ToolSurfaceV4 = ToolSurface

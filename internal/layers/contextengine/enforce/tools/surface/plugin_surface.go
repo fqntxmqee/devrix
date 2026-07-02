@@ -105,6 +105,36 @@ func (s *PluginSurface) RiskLevel(name string) types.RiskLevel {
 	return types.RiskLevelLow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4.
+//
+// DSAFT: D2-S15-A02-T17. PluginSurface is dynamic — runners are passed
+// in at composition time and the v4 signature has no tool-name argument.
+// We can't dispatch by input shape (delegate_*/task_* inputs differ per
+// runner and the surface doesn't own a name->input map). The
+// conservative default is `false` (sequential):
+//
+//   - delegate_* tools are never concurrency-safe (v2 truth table) —
+//     false is correct.
+//   - task_output IS concurrency-safe in theory (v2 truth table = true)
+//     but treating it as sequential is safe; T18 partitionToolCalls
+//     may later add a runner-level hook for finer dispatch.
+//
+// Surfacing the conservative default matches the v4 contract's
+// "conservative on ambiguity" guidance and lets the call site assume
+// the lower-concurrency option when in doubt.
+func (s *PluginSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return false
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript. The dynamic
+// tool catalog means we can't apply a per-tool projection here; T18
+// partitionToolCalls will provide explicit tool name and the per-tool
+// helper if the auto-mode classifier needs richer input.
+func (s *PluginSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
+}
+
 // Execute implements contracts.ToolSurface. Dispatches by tool name to
 // the matching runner. Returns a ToolResult error envelope on unknown name
 // or nil runner set — never a Go error — to match the contract used by

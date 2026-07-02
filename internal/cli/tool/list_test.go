@@ -175,6 +175,10 @@ func (s *staticSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 func (s *staticSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }
+func (s *staticSurface) IsConcurrencySafe(_ json.RawMessage) bool { return false }
+func (s *staticSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
+}
 
 // buildTestSurfaces constructs a small canonical list for testing. Mirrors
 // the production BuildSurfaces output (BuiltinSurface + LSPToolSurface +
