@@ -42,6 +42,10 @@ func (s *stubSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _
 	}
 	return contracts.DecisionAllow
 }
+func (s *stubSurface) IsConcurrencySafe(_ json.RawMessage) bool { return false }
+func (s *stubSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
+}
 func (s *stubSurface) Execute(_ context.Context, _, _, _ string) (*contracts.ToolResult, error) {
 	if s.execErr != nil {
 		return nil, s.execErr

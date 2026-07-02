@@ -137,6 +137,19 @@ func (s *AskUserQuestionSurface) CheckPermission(_ context.Context, _ contracts.
 	return contracts.DecisionAllow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. ask_user_question
+// is interactive (blocks on user input) — NEVER concurrency safe
+// (DSAFT: D2-S15-A02-T17).
+func (s *AskUserQuestionSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return false
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *AskUserQuestionSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return DefaultToAutoClassifierInputFor("ask_user_question", input)
+}
+
 // QuestionOption mirrors a single multiple-choice option.
 type QuestionOption struct {
 	Label       string `json:"label"`

@@ -52,6 +52,19 @@ func (s *VerifySurface) CheckPermission(_ context.Context, _ contracts.ToolSpec,
 	return contracts.DecisionAllow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. verify_plan_execution
+// is read-only but NOT concurrency safe (v2 static bool = false) — verification
+// state can race between parallel calls (DSAFT: D2-S15-A02-T17).
+func (s *VerifySurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return false
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *VerifySurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return DefaultToAutoClassifierInputFor("verify_plan_execution", input)
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *VerifySurface) RiskLevel(name string) types.RiskLevel {
 	if name == "verify_plan_execution" {

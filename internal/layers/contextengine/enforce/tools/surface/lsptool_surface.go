@@ -136,6 +136,23 @@ func (s *LSPToolSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec
 	return contracts.DecisionAllow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. LSP servers
+// (gopls / tsserver / etc.) typically serialize on per-file basis; the
+// v2 static bool for all lsp_* is ConcurrencySafe=false. Falls through
+// to the default helper for consistency with the v2 truth table.
+//
+// DSAFT: D2-S15-A02-T17.
+func (s *LSPToolSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return false
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *LSPToolSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	// lsp_* 6 tools all share the default projection (P2 stub).
+	return DefaultToAutoClassifierInputFor("lsp", input)
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *LSPToolSurface) RiskLevel(name string) types.RiskLevel {
 	if _, ok := lspMethodOpMap[name]; ok {

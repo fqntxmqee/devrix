@@ -227,6 +227,23 @@ func (f *filteredSurface) CheckPermission(ctx context.Context, spec ToolSpec, in
 	return f.parent.CheckPermission(ctx, spec, input)
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. Delegates to
+// the parent surface — the filter only changes the visible set, not the
+// per-input concurrency decision. T18 partitionToolCalls will compute
+// the partition by walking the visible specs and asking the parent
+// (which is the source of truth for the v4 logic).
+func (f *filteredSurface) IsConcurrencySafe(input json.RawMessage) bool {
+	return f.parent.IsConcurrencySafe(input)
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. Delegates
+// to the parent surface — the per-tool projection lives in the
+// surface's own implementation (BuiltinSurface for bash/read/write/edit,
+// default helpers for the 15 default surfaces).
+func (f *filteredSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return f.parent.ToAutoClassifierInput(input)
+}
+
 // ctxForLog extracts a session/agent hint from ctx for error messages.
 // Returns "" if no usable value is found; this is intentionally cheap
 // and best-effort.

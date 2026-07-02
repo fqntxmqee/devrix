@@ -2,6 +2,7 @@ package surface_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
@@ -88,3 +89,67 @@ func TestBuiltinSurface_InterfaceCompliance(t *testing.T) {
 	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
 	var _ contracts.ToolSurface = surface.NewBuiltinSurface(reg)
 }
+
+// T: D2-S15-A02-T17 — BuiltinSurface.IsConcurrencySafe dispatches by
+// input shape (command for bash, file_path/path for read/write/edit).
+// Pattern matches: AC18 8K 回归锁 — read_file is always concurrency-safe.
+func TestBuiltinSurface_IsConcurrencySafe(t *testing.T) {
+	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	s := surface.NewBuiltinSurface(reg)
+
+	cases := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"bash_read_only", `{"command": "ls -la"}`, true},
+		{"bash_write", `{"command": "rm -rf foo"}`, false},
+		// PR-A limitation: file_path/path input shape can't disambiguate
+		// read vs write vs edit (read_file = true, write/edit = false).
+		// Conservative default = false (serial). T18 partitionToolCalls
+		// will provide explicit tool name and use the per-tool dispatch.
+		{"read_file", `{"file_path": "/a/b.go"}`, false},
+		{"read_file_alt", `{"path": "/a/b.go"}`, false},
+		{"write_or_edit_path", `{"file_path": "/a/b.go", "content": "x"}`, false},
+		{"empty", ``, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := s.IsConcurrencySafe(json.RawMessage(c.input))
+			if got != c.want {
+				t.Errorf("IsConcurrencySafe(%q) = %v, want %v", c.input, got, c.want)
+			}
+		})
+	}
+}
+
+// T: D2-S15-A02-T17 — BuiltinSurface.ToAutoClassifierInput projects
+// the per-input classifier string (command for bash, file_path/path
+// for read/write/edit).
+func TestBuiltinSurface_ToAutoClassifierInput(t *testing.T) {
+	reg, _ := tools.NewBuiltinToolRegistry(config.DefaultToolConfig())
+	s := surface.NewBuiltinSurface(reg)
+
+	cases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"bash_command", `{"command": "ls -la"}`, "ls -la"},
+		{"read_file", `{"file_path": "/a/b.go"}`, "/a/b.go"},
+		{"read_file_alt", `{"path": "/a/b.go"}`, "/a/b.go"},
+		{"write_file", `{"file_path": "/a/b.go", "content": "x"}`, "/a/b.go"},
+		{"edit_file", `{"file_path": "/a/b.go", "old_string": "a", "new_string": "b"}`, "/a/b.go"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := s.ToAutoClassifierInput(json.RawMessage(c.input))
+			if got != c.want {
+				t.Errorf("ToAutoClassifierInput(%q) = %q, want %q", c.input, got, c.want)
+			}
+		})
+	}
+}
+
+// (avoid unused import warnings if the v4 tests above are the only users)
+var _ = types.RiskLevelLow

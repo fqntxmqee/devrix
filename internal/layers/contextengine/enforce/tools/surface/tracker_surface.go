@@ -66,6 +66,18 @@ func (s *TrackerSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec
 	return contracts.DecisionAllow
 }
 
+// IsConcurrencySafe implements contracts.ToolSurface v4. query_diagnostics
+// is read-only, so always returns true (DSAFT: D2-S15-A02-T17).
+func (s *TrackerSurface) IsConcurrencySafe(_ json.RawMessage) bool {
+	return true
+}
+
+// ToAutoClassifierInput implements contracts.ToolSurface v4. P2 stub
+// default — returns "" to skip in classifier transcript.
+func (s *TrackerSurface) ToAutoClassifierInput(input json.RawMessage) string {
+	return DefaultToAutoClassifierInputFor("query_diagnostics", input)
+}
+
 // RiskLevel implements contracts.ToolSurface.
 func (s *TrackerSurface) RiskLevel(name string) types.RiskLevel {
 	if name == "query_diagnostics" {

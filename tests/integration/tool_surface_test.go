@@ -150,6 +150,10 @@ func (s *markerSurface) InterruptBehavior(_ string) contracts.InterruptMode {
 func (s *markerSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
 }
+func (s *markerSurface) IsConcurrencySafe(_ json.RawMessage) bool { return false }
+func (s *markerSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
+}
 
 type stubIntegratedSurface struct {
 	name     string
@@ -174,6 +178,10 @@ func (s *stubIntegratedSurface) InterruptBehavior(_ string) contracts.InterruptM
 }
 func (s *stubIntegratedSurface) CheckPermission(_ context.Context, _ contracts.ToolSpec, _ json.RawMessage) contracts.Decision {
 	return contracts.DecisionAllow
+}
+func (s *stubIntegratedSurface) IsConcurrencySafe(_ json.RawMessage) bool { return false }
+func (s *stubIntegratedSurface) ToAutoClassifierInput(_ json.RawMessage) string {
+	return ""
 }
 
 // Importing the alias as toolpolicyfilter so the `toolpolicy` import below
