@@ -1,0 +1,50 @@
+# CANCELLED 2026-07-02 — 被 devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) 治本覆盖
+# 本 change 仅留 .openspec.yaml 留作溯源，4 字段文件不再维护
+change_id: devrix-d7-verify-synthesize-enforce
+demand_id: DM-20260701-005
+title: D7 Verify 节点 "synthesize or fail" enforce — LLM 反复 explore 而不产出 deliverable 时主动干预
+priority: P2
+status: s1_cancelled
+created_at: 2026-07-01
+domains: [D7, D2]
+source: Hotfix 2026-07-01 (PR #373) 处理 D1 表现层 task_incomplete propagate
+       后, 治本 LLM 反复 "Let me read more files in parallel" 而不出 review
+       的根因 (sess_1782885908460_4000 触发 9 read_file + 0 deliverable)
+related:
+  - DM-20260701-004  # D7 physical layout alignment (含 5 节点管道背景)
+  - DM-20260630-012  # D7 deliverable convergence (前置, 修了 task_incomplete 标识)
+  - DM-20260627-001  # D7 LLM Intent-Only + Feishu Verdict hotfix (前置, 修 intent-only)
+dsaft_scenarios:
+  - D7-S9  # Execute 节点
+  - D7-S10 # Verify 节点
+  - D7-S11 # Observe 节点
+dsaft_activities:
+  - D7-S10-A32  # VerdictKind 4 态
+  - D7-S10-A35  # AggregateVerdicts
+  - D7-S9-A26   # Execute 4 Channel
+t_points: []
+cancelled_at: 2026-07-02
+cancelled_reason: |
+  治标方案 (D7 Verify "synthesize or fail" rule + D2 重读信号 + D7 explore-only loop detector)
+  已被 devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) 治本方案
+  完全覆盖：ProbeToolChannel Bounded(n) hard reject + PromptPressure + VerifyContract 4 元组
+  + reason 透传 + Filter v2 三维。
+replaced_by: devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)
+v0_backlog:
+  symptom:
+    - LLM 反复 emit "Let me read more files in parallel" / "Now let me explore each file" / "Let me start by exploring..." 作为最后 text 事件
+    - 9 tool_call(read_file) + 0 synthesize review → D7 deliverable-convergence 标 task_incomplete=true 但仅终止
+  hypothesis:
+    - D7 Verify 节点只对已生成的 deliverable 做 verdict 评判, 没有"max tool calls reached → force synthesize" 机制
+    - D7 escape engine L0..L5 救 intent-only / circuit break, 但没救"explore-more 半成品"
+  propose_options:
+    - A: 加 D7 Verify 节点 "synthesize or fail" rule (max tool_calls N → 强制进入 synthesize phase, 失败则 verbatim return 已读 content)
+    - B: D2 上下文层加重读信号 (read_file 累计 context > X% → LLM prompt injection 提示 "synthesize now")
+    - C: D7 Execute 节点加 "explore-only loop detector" (连续 K 次 tool_call 同一类型 → 强切 synthesize mode)
+  risk:
+    - A 可能误判 (LLM 真的需要 read 大量文件才能 review)
+    - B 增加 prompt token cost
+    - C 阈值难定 (K=5? K=10?)
+  out_of_scope:
+    - D1 表现层 task_incomplete 渲染 (PR #373 已修)
+    - D2 tool_result budget 调优 (另立 DM-20260701-006)

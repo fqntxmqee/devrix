@@ -13,7 +13,7 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// Channel interface + supporting types (PR-C2 surface)
+// PlanChannel interface + supporting types (PR-C2 surface)
 // -----------------------------------------------------------------------------
 
 // ToolResult is the minimal projection a Channel needs from a ToolRunner.
@@ -66,7 +66,7 @@ type ToolRequest struct {
 // plus a non-nil error if anything failed. Partial completion is reported
 // via the Artifact.SideEffectStatus field (SideEffectInflight /
 // SideEffectRolledBack).
-type Channel interface {
+type PlanChannel interface {
 	// Name returns a short stable identifier (e.g. "commit", "protocol").
 	// Used in error messages and metrics labels.
 	Name() string
@@ -301,3 +301,9 @@ func (r *ChannelRouter) ApplyPessimisticCommit(
 	}
 	return updated, nil
 }
+
+
+// Type alias kept for 1 release (PR-B-pre P0-AC-8 gate).
+// External callers may continue to use `Channel`; both names refer
+// to the same interface. Remove in PR-B + 1.
+type Channel = PlanChannel

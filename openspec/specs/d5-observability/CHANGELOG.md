@@ -15,6 +15,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-07-02 | devrix-mups-tool-classification-and-channel-autonomy | D5-S25 Termination (LTL-Lite L4-L6 invariants: BoundedInvariant + QuotientInvariant + SynthesizeInvariant) 配套 4 ToolChannel; 3 T IMPLEMENTED | IMPLEMENTED | [archive](../../archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/) |
 | 2026-06-30 | devrix-d5-spec-lite | d5 spec.md 376→150 lite-mode (12 AC) | IMPLEMENTED | [archive](../../archive/2026-06-30-devrix-d5-spec-lite/) |
 | 2026-06-19 | devrix-d5-v2-terminal | d5 v3.0.0 收口（DM-20260618-013）：v2.1 Terminal S21-S24+S0 冻结 + D7 Turn 主路径 canonical + query.loop 全部下沉 RETIRED + legacy_harness DEPRECATED | IMPLEMENTED | [archive](../../archive/2026-06-19-devrix-d5-v2-terminal/) |
 | 2026-06-18 | devrix-queryloop-spans-v1.1 | QueryLoop span 族最后清理（DM-20260618-010）：query.loop.* span RETIRED + orchestration.turn.* 主路径 + Coverage 重新对齐 | IMPLEMENTED | [archive](../../archive/2026-06-18-devrix-queryloop-spans-v1.1/) |

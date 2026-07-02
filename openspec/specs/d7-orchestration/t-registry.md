@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.25.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-4: D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾 IMPLEMENTED（orchtypes/doc.go package 注释升级 + d7-domain.md §North Star 新增 Cross-S Kernel 行，PR-1 已落地 a-registry 6 A + f-registry 6 F + code-layout 1 行的 doc-only 收尾）; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3 → v4.24.0 (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-2 → v4.23.0 (D7-PL-T07..T12 6 P0 layout guard 测试 IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1 → v4.22.0 (T01..T12 PLANNED 登记); **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 → v4.21.0; **earlier**: devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222)
+**Version:** 4.26.0
+**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 15 T IMPLEMENTED 266->281, P0 222->237 -- D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T); S10 Verify Node 新 S section 由 0 增至 4 A + 12 T (含 8 既有 A32/A33/A34/A35); 之前 devrix-d7-physical-layout-alignment DM-20260701-004 PR-4: D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾 IMPLEMENTED（orchtypes/doc.go package 注释升级 + d7-domain.md §North Star 新增 Cross-S Kernel 行，PR-1 已落地 a-registry 6 A + f-registry 6 F + code-layout 1 行的 doc-only 收尾）; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3 → v4.24.0 (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-2 → v4.23.0 (D7-PL-T07..T12 6 P0 layout guard 测试 IMPLEMENTED); **earlier**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1 → v4.22.0 (T01..T12 PLANNED 登记); **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 → v4.21.0; **earlier**: devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 251→266, P0 207→222)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -215,8 +215,27 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S9-A26-T03** | **ProtocolChannel (ProtocolPlan → ArtifactResponseRecord, 顺序多步 + 失败 reverse-order rollback 含 `__rollback: true` hint 标记) + Supports guard + 空 Steps rejection** | **D7-S9-A26** | **`execute/execute_test.go::TestProtocolChannel_AllStepsSuccess_ResponseRecord`, `TestProtocolChannel_Step2_Failed_RollbackStep1`, `TestProtocolChannel_OtherPlan_NotSupported`, `TestProtocolChannel_EmptySteps`** | **IMPLEMENTED** | **P0** | Channel_Route |
 | **D7-S9-A26-T04** | **ScenarioChannel (ScenarioPlan → ArtifactProbeReport, MaxParallel=5 并行探测 + 多数派投票 success > len/2 → pass + 失败多数派触发 ErrChannelStepCountMismatch + SideEffectStatus=None read-only)** | **D7-S9-A26** | **`execute/execute_test.go::TestScenarioChannel_5ParallelProbes`, `TestScenarioChannel_MajorityVote_ProbeReport`, `TestScenarioChannel_MixedResults_TakesMajority`** | **IMPLEMENTED** | **P0** | Channel_Route |
 | **D7-S9-A26-T05** | **ExplorationChannel (ExplorationPlan → ArtifactExperimentData, MaxParallel=3 多 agent 并行 + 容忍部分失败 free-fork + 优先级排序 success → duration → EstimatedTokens + PersistScope → SideEffectStatus 派生 transient → None, session/permanent → Committed, unknown → Unknown)** | **D7-S9-A26** | **`execute/execute_test.go::TestExplorationChannel_MultiAgent_Parallel`, `TestExplorationChannel_FreeFork_Optional`, `TestExplorationChannel_PriorityOrder_ExperimentData`, `TestExplorationChannel_PersistScope_Mapping`** | **IMPLEMENTED** | **P0** | Channel_Route |
+| **D7-S9-A26-T06** | **Channel->PlanChannel rename (Phase B-pre P0 门禁): `Channel` interface -> `PlanChannel`; 1-release `type Channel = PlanChannel` alias 保留; 4 PlanKind channel implementations (commit/protocol/scenario/exploration) + 4 callers 全部更新; P0-AC-8 满足 (grep type Channel interface mups/execute/ = 0)** | **D7-S9-A26** | **`mups/execute/channel.go` (line 69 `type PlanChannel interface` + line 309 `type Channel = PlanChannel`); `execute_test.go` 22 tests 0 regression** | **IMPLEMENTED (DM-20260701-007)** | **P0** | **Channel_Route** |
 
 > 配套 P0 验证：`execute/execute_test.go` 22 个测试 100% PASS（0 race detector warnings），覆盖率 88.1%；5 SentinelError + 4 helpers (EXEC_CHANNEL_9001..9004) 在 `execute/errors.go` 定义并被测试断言；`go vet ./...` 0 issue；`go build ./...` 0 error；22/22 tests cover T01..T05 P0 边界 + 1-Step 严格性 + IdempotencyKey 强制 + 超时 SideEffectInflight + reverse-order rollback + 多数派投票 + PersistScope 派生。
+
+### D7-S9-A50: ToolChannel Router (per-EmissionClass termination, DM-20260701-007)
+
+> **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) -- Phase B 治本核心落地.**
+> Execute 节点 4 PlanKind Channel (D7-S9-A26) 之上叠加 4 per-EmissionClass ToolChannel (Fact/Action/Probe/Experiment), 用 Router 按 emission_class 路由; ProbeToolChannel Bounded(n) hard reject + PromptPressure 3-stage 是 LLM 自我循环的根治. 配套 LTL-Lite L4-L6 invariants (D5-S25) 跨域挂载.
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A50-T01** | **ToolChannel interface (Name/Accept/Router) + ToolChannelRouter.Route(tool ToolSpec) 按 EmissionClass 路由 + Mode (Shadow/Enforce) 字段 + telemetry metrics (wouldRejectCount++ shadow only)** | **D7-S9-A50** | **`mups/execute/toolchannel/channel.go` + `probe_test.go::TestRouter_Has4Channels` + `TestToolChannel_AllFourImplement`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T02** | **FactToolChannel + ActionToolChannel + LTL-Lite L7 invariants (FACT-SAME-Q-5x 同 query 重复 5x 升级 Probe, ACTION-POSTSNAPSHOT PostSnapshot!=PreSnapshot 才 Verifiable)** | **D7-S9-A50** | **`toolchannel/{fact,action}.go` + `probe_test.go::TestRouter_FactEscalationToProbe` + `bounded_test.go::TestFactSameQueryInvariant_FiresAtFive` + `TestActionPostSnapshotInvariant_FiresOnEqual`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T03** | **ProbeToolChannel 核心: 接受 emission_class=Probe + ReadOnly=false 强 iteration_bound Bounded(n) 校验 + 到 bound 时 InjectSynthesize + OnResult 行为重分类 (call_count>3 同 query 升级 Probe, H9)** | **D7-S9-A50** | **`toolchannel/probe.go` (ProbeToolChannel.Accept) + `probe_test.go::TestProbeToolChannel_AcceptsUnderBound`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T04** | **ProbeToolChannel Bounded(15) Hard Stop 测试 (P0-AC-1): mock 17 calls 第 16 返 SynthesizeNowSignal, 第 17 拒 (ErrProbeToolChannelBoundExceeded)** | **D7-S9-A50** | **`probe_test.go::TestProbeToolChannel_Bounded15_HardStopsAt16`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T05** | **PromptPressure 3-stage 测试 (P1-AC-6): Bounded(15) @剩5软警告 @剩2硬警告 @16强制 / Bounded(10) @剩3/1/11 / OpenEnded 不注入** | **D7-S9-A50** | **`probe_test.go::TestProbeToolChannel_PromptPressure_{Review, Edit, Observe_NeverInjects}`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T06** | **ExperimentToolChannel + L7-EXPERIMENT-CONCLUDED-BEFORE-DEADLINE (deadline < ConcludedAt 校验) + LTL-Lite L5-Quotient 挂载** | **D7-S9-A50** | **`toolchannel/experiment.go` + `bounded_test.go::TestExperimentDeadlineInvariant_FiresOnMiss`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T07** | **Shadow mode (P1-AC-5): Mode=Shadow 时 bound 超限仅 log `would_reject=true` + wouldRejectCount++ metric, 不 block; EnableMupsChannelsEnforce=true 后切 Enforce; FP<5% 后切** | **D7-S9-A50** | **`toolchannel/channel.go` Router.Route shadow branch + `probe_test.go::TestRouter_ShadowMode_LogsWouldReject` + `TestRouter_EnforceMode_ReturnsError`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+| **D7-S9-A50-T08** | **L0-L3 cross-check (P1-AC-2): >=3 条规则 -- Bounded 不得 override readonly guard + Quotient 不得绕过 permission check + Synthesize 不得跳过 audit log; cross-check 测试 `TestBoundedInvariant_DoesNotBypassPermissionGuards` + `TestProbeToolChannel_DoesNotBypassPermissionGuards`** | **D7-S9-A50** | **`toolchannel/probe.go::Accept` CC-1 + `bounded.go` CC-2/CC-3 + 2 cross-check tests** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Channel_Route |
+
+> 配套 P0 验证: `mups/execute/toolchannel/probe_test.go` 11 tests 100% PASS (含 Bounded(15) hard stop + 3-stage PromptPressure x 3 task_kind + Shadow/Enforce mode + Fact->Probe escalation + 4-channel implementations); `bounded_test.go` 10 tests 100% PASS (Bounded/Quotient/Synthesize + 3 L7 invariants + cross-check); coverage toolchannel 60.2% / ltl/invariants/termination 70.2%; 0 race warnings; 5 SentinelError (EXC_PROBE_BOUND_9001 等) 在 toolchannel/errors.go 定义并被测试断言. **4 PlanKind Channel (D7-S9-A26 T01..T05) 0 regression** -- Channel->PlanChannel rename 1-release alias 兼容 (D7-S9-A26-T06 P0-AC-8 满足).
 
 ### D7-S9-A91: AcceptanceCriteriaVisibility (DM-20260701-001)
 
@@ -232,6 +251,56 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
 |------|------|--------|-----------|--------|----------| --- |
 | **D7-S9-A93-T01** | **`NarrowestSchema(inferred, strategic)` 禁放宽（LLM 只能收紧，T-P1-5）** | **D7-S9-A93** | **`workmodel/deliverable.go` + `workmodel/deliverable_test.go` (9-case test matrix)** | **IMPLEMENTED** | **P1** | Execute_Artifact |
+
+---
+
+## D7-S10: Verify Node (MUPS v4.3 Phase 4 + DM-20260701-007)
+
+> **v3.12 closure (2026-06-23):** devrix-d7-mups-v4-phase4-verify-promotion (DM-20260623-002) -- Phase 4 Verify 节点升格 (A32/A33/A34/A35 模块): VerdictKind 4 态 typed enum + AggregationStrategy 4 策略 + VerdictToExitReason 4 Verdict -> 4 ExitReason 映射 + VerifyWithRetry G8-1 修复 + Evidence struct 5 字段 + EvidenceExtractor 3 实现 + SystemAnomalyAggregator 阈值触发 + ObserveNode wiring SystemAnomaly. IMPLEMENTED 147->155, P0 114->122, Scenarios 0->4.
+>
+> **v4.26 closure (2026-07-02):** devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) -- Phase C 闭环落地 (A50 模块): VerifyContract 4 元 input contract + NewVerifyContract 显式构造器 + CalibratedConfidence 公式 + BurdenOfProofForClass by EmissionClass + D1 EmitComplete 透传 meta + D1 feishu render reason 标签. +4 T P0 IMPLEMENTED.
+
+### D7-S10-A32: VerdictKind + AggregationStrategy (Phase 4)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A32-T01** | **VerdictKind 4 态 typed enum (Pass/Fail/Indeterminate/Skip) + String() snake_case wire format + Parse/ParseVerdictKind 反向解析 + MarshalJSON/UnmarshalJSON roundtrip + 未知值 fail-fast (D7_VERDICT_9001)** | **D7-S10-A32** | **`orchtypes/verdict_test.go::TestVerdictKind_{4States_String,4States_RoundTrip,UnknownValue_FailFast,JSON_WireFormat}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+| **D7-S10-A32-T02** | **AggregationStrategy 4 策略 (AllPass/Majority/Weighted/AnyPass) + AggregateVerdicts 边界 (空/单元素/全同/分歧) + 4 策略实现 + 异常 verdict 计入 Indeterminate 不影响策略判定** | **D7-S10-A32** | **`orchtypes/aggregation_test.go::TestAggregateVerdicts_{AllPass, Majority, Weighted, AnyPass, Empty, SingleElement, MixedKinds}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+
+### D7-S10-A33: Verdict -> ExitReason 映射 + VerifyWithRetry (Phase 4)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A33-T03** | **VerdictToExitReason 4 Verdict -> 4 ExitReason 映射 + SystemAnomaly 覆盖 + 14 ExitReason 8->14 扩展 (新增 SystemAnomalyDetected / VerifierParseFailure / IndeterminateInterrupted / ContractMissing 4 类)** | **D7-S10-A33** | **`orchtypes/exit_reason_test.go::TestVerdictToExitReason_{4Verdicts, SystemAnomaly, 14ReasonsExhaustive}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+| **D7-S10-A33-T04** | **VerifyWithRetry parse failure -> INDETERMINATE G8-1 修复: verifier 返回非 JSON / 缺字段时 INDETERMINATE("verifier_parse_failure") 不 retry 无限循环** | **D7-S10-A33** | **`orchtypes/verify_retry_test.go::TestVerifyWithRetry_{ParseFailure, Indeterminate, NoRetryLoop}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+
+### D7-S10-A34: Evidence + EvidenceExtractor (Phase 4)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A34-T05** | **Evidence struct 5 字段 (Kind/Source/Content/Confidence/CapturedAt) + Validate fail-fast (Kind 非空 + Source 非空 + Confidence 0..1) + NewEvidence 必填校验** | **D7-S10-A34** | **`orchtypes/evidence_test.go::TestEvidence_{NewFields, Validate_AllChecks, NewEvidence_RequiredFailsFast}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+| **D7-S10-A34-T06** | **EvidenceExtractor interface (Extract) + LLM 实现 (LLMCall) + Stub 实现 (deterministic) + 错误兜底 EmptyEvidence** | **D7-S10-A34** | **`orchtypes/evidence_extractor_test.go::TestEvidenceExtractor_{LLM, Stub, EmptyFallback}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+
+### D7-S10-A35: SystemAnomalyAggregator + ObserveNode wiring (Phase 4)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A35-T07** | **SystemAnomalyAggregator 阈值触发 (count > Threshold 触发 AnomalyReport) + RecordCatSystem 累加 + Reset 清空 + 并发安全 (sync.Mutex)** | **D7-S10-A35** | **`orchtypes/system_anomaly_test.go::TestSystemAnomalyAggregator_{Threshold, RecordCatSystem, Reset, ConcurrentSafe}`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+| **D7-S10-A35-T08** | **ObserveNode wiring SystemAnomaly -> FromVerifier + BuildUncertaintyCoordFromReport Value=0.95 强制 (SystemAnomaly 不污染业务 confidence)** | **D7-S10-A35** | **`sessionorchestrator/observe_node_test.go::TestObserveNode_BuildUncertaintyCoordFromSystemAnomaly`** | **IMPLEMENTED (DM-20260623-002)** | **P0** | Verify_Contract |
+
+### D7-S10-A50: VerifyContract + BurdenOfProof + D1 Reason 透传 (DM-20260701-007, Phase C)
+
+> **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) -- Phase C 闭环落地.**
+> VerifyContract 是 Verify 节点 4 元 input contract: `expected_class` (EmissionClass) / `deliverable_text` / `evidence` / `source_uncertainty`. 防 Go 零值陷阱用 `NewVerifyContract(taskKind, expectedEmissionClass)` 显式构造器. `CalibratedConfidence` 公式 `Sum(su x w)/Sum(w)` (weight: EC_Fact=0.50, EC_Action=0.35, EC_Probe=0.20, EC_Experiment=0.10). `BurdenOfProofForClass` 按 EmissionClass 分配举证规则 (Fact=text 自证, Action=state change evidence, Probe=source quality, Experiment=reproducibility). verdict.Reason 透传 D1 EmitComplete + feishu render 标签 (P0-AC-5).
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A50-T01** | **VerifyContract struct (4 元) + NewVerifyContract(taskKind, expectedEmissionClass) 显式构造器 (防 Go 零值陷阱) + Verify() 4 元 contract 校验 (deliverable / evidence / source_uncertainty / emission_class) + CalibratedConfidence 公式 Sum(su x w)/Sum(w) + MinChars by task_kind (review=20, edit=10, test=30, observe=10)** | **D7-S10-A50** | **`internal/layers/orchestration/executionflow/verify/verify_contract.go` + `verify_contract_test.go::TestNewVerifyContract_AllTaskKinds + TestVerifyContract_ZeroValueIsDetectable + TestCalibratedConfidence_{Empty, Formula} + TestVerify_{DeliverableMissing, DeliverableTooShort, EvidenceInsufficient, SourceUncertaintyHigh, AllPass} + TestVerify_MetaContainsTaskKind`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Verify_Contract |
+| **D7-S10-A50-T02** | **D1 EmitComplete 透传 `meta["verify_exit_reason"]` 等到 OutboundMessage.Metadata (P0-AC-5)** | **D7-S10-A50** | **`internal/layers/communication/channel/conclusion/conclusion.go::EmitComplete` (modified to forward meta map)** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Verify_Contract |
+| **D7-S10-A50-T03** | **D1 feishu render reason 标签 (P0-AC-5): RenderArgs struct param 避免 break PR #373 5-param 签名; render title "任务失败 (ProbeToolChannel: <reason> @ iter X/Y, source_uncertainty=Z)" + footer "任务未完成 (reason: <verdict_reason>)"** | **D7-S10-A50** | **`internal/layers/communication/channel/adapters/feishu.go` (line 138-148) + `feishu_progress.go` (RenderArgs struct param)** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Verify_Contract |
+| **D7-S10-A50-T04** | **BurdenOfProofForClass by EmissionClass (P1-AC-3): Fact=text 自证; Action=state change evidence; Probe=source_quality; Experiment=reproducibility** | **D7-S10-A50** | **`verify_contract.go::BurdenOfProofForClass` + `verify_contract_test.go::TestBurdenOfProofForClass + TestBurdenOfProof_Probe_LowCC`** | **IMPLEMENTED (DM-20260701-007)** | **P0** | Verify_Contract |
+
+> 配套 P0 验证: `executionflow/verify/verify_contract_test.go` 13 tests 100% PASS (含 8 CC 子用例 + 4 task_kind + 2 zero-value + burden of proof); coverage verify 53.7%; 0 race warnings. D1 EmitComplete/feishu 透传 12 communication package tests 0 regression.
 
 ---
 
@@ -484,6 +553,8 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | D7-S2-A50-T04 | hardening/ + escape/circuit_breaker.go + sessionorchestrator/autoclose.go 0 变更 + 22/22 orchestration packages go test -race PASS | D7-S2-A50 | `git diff --stat hardening/ escape/ sessionorchestrator/autoclose.go` 应空；`go test -race -count=1 ./internal/layers/orchestration/...` 应 22/22 PASS | IMPLEMENTED | P0 |
 | **D7-S2-A50-T05** | **`OrchestratorDeps.FallbackModel string` 字段就位 + `TurnState.Withheld bool` 字段就位 + `emitError` 路径用 `sharederrors.Code(err)` 填 `Event.Metadata["error_code"]`（受控枚举：RateLimit/AuthenticationFailed/ServerError/MediaSize/PromptTooLong/ImageSize/Unknown 7 类）** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/orchestrator_test.go::TestOrchestratorDeps_FallbackModelField + TestTurnState_WithheldField + TestEmitError_MetadataErrorCode` | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，2 case TestEmitErrorWithErr_* PASS） |
 | **D7-S2-A50-T06** | **主模型 2 次连续 RateLimit/ServerError 触发 `fallback_trigger_candidate` 日志（fallback_model 未 wire 场景日志显式标注 `fallback_model_set_but_not_yet_wired`）+ prompt_too_long 错误标记 `TurnState.Withheld=true` 不 surface error 事件 + 现有 30+ `SanitizeForUser` 调用点零行为变化回归** `<!-- v4.9.0 -->` | **D7-S2-A50 RunTurnLoop** | `internal/layers/orchestration/sessionorchestrator/turn_orchestrator_test.go::TestEmitError_FallbackTriggerCandidate + TestTurnState_Withheld_PromptTooLong_NoSurface + TestSanitizeForUser_NoRegression` | **IMPLEMENTED**（DM-20260628-001 S5 验收 PR #265，3 case TestObserveFallbackTrigger_* PASS + sharederrors 全量回归 55.8% 覆盖） |
+| **D7-S2-A50-T07** | **session_complete.go meta 透传 5 元 verdict: meta[verify_exit_reason]=verdict.Reason + meta[emission_class]+meta[source_uncertainty]=verdict.CC (P0-AC-5)** | **D7-S2-A50 RunTurnLoop** | **`internal/layers/orchestration/sessionorchestrator/session_complete.go` (wired via PR-B VerifyContract result) + `conclusion/conclusion.go::EmitComplete` 透传 meta** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D7-S2-A50-T08** | **verify_exit_reason -> Learn ReasonLog (P1-AC-4): ReasonLog.Record(sessionID, reason, emissionClass) 跨 session 可读; 8 unit tests 100% PASS** | **D7-S2-A50 RunTurnLoop** | **`internal/layers/orchestration/mups/learn/reason_log.go` + `reason_log_test.go` (8 tests: Record / RejectsEmptySessionID / RejectsEmptyReason / FIFOEviction / RecentByTool / DriftRate / DriftRate_Unknown / RecordFromVerdict)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
 | D7-S4-A50-T01 | sessionorchestrator/{exit_reason,verdict_to_exit_reason,verdict_to_exit_reason_test}.go 3 文件 git mv → executionflow/verify/（218 行） | D7-S4-A50 | `git log --follow` 100% rename detection；`ls sessionorchestrator/ \| grep -E "exit_reason\|verdict_to"` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T02 | 3 文件 `package sessionorchestrator` → `package verify` + sessionorchestrator/turn_orchestrator.go 11 处 `ExitReason*` → `verify.ExitReason*` + turn_orchestrator_test.go 2 处 `ExitReasonNatural` → `verify.ExitReasonNatural` | D7-S4-A50 | `grep -rn "ExitReason[^a-zA-Z]" sessionorchestrator/*.go \| grep -v "verify\."` 0 命中 | PLANNED | P0 |
 | D7-S4-A50-T03 | executionflow/verify/ 包 0 sessionorchestrator 反向依赖 + 跨包 import cycle 0 风险（单向 DAG: sessionorchestrator → verify） | D7-S4-A50 | `go list -deps ./internal/layers/orchestration/executionflow/verify \| grep sessionorchestrator` 0 命中 | PLANNED | P0 |
@@ -499,7 +570,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Total | IMPLEMENTED | PARTIAL | PLANNED | P0 |
 |-------|-------------|---------|---------|-----|
-| 266 | 266 | 0 | 0 | 222 |
+| 281 | 281 | 0 | 0 | 237 |
 
 > DM-20260630-013 (devrix-d2-d7-review-hardening) 新增 15 项 P0 T 点 (266 - 251 = 15)，全部 IMPLEMENTED：D7-S1-A80-T01 work_tree.SetStore mu 保护 + D7-S2-A80-T01/T02 PerInvocationEmit (ItemPipelineRunOpts + ExecuteOpts.Emit 字段) + D7-S2-A81-T01 orchestrator.EnsureGoal 错误 slog.Warn + D7-S2-A82-T01 turn_loop.AwaitRunningChildren err purge + D7-S2-A83-T01 turn_loop 4 错误 slog.Warn + D7-S2-A84-T01 item_pipeline SetRoundPhase warn span + D7-S2-A85-T01 turn_state.EndTurn purge handle + D7-S3-A84-T01/T02 WorkerPool OnReleaseOnce + D7-S9-A33-T01 mups/execute ErrChannelCtxCancelled + D7-S14-A48-T01 escape Arbitrator Timer + ctx cancel + D7-S14-A49-T01 arbitrator i18n 化 + D7-S15-A42-T01 resolve 4 _ = → warn + D7-S16-A77-T01 child_downlink DefaultChildExpectedReturn schema tag + D7-S16-A78-T01 strategic_plan_proposer i18n 化。
 
@@ -508,15 +579,15 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | Scenario | Total | IMPLEMENTED | PARTIAL | PLANNED |
 |----------|-------|-------------|---------|---------|
 | D7-S1 | 9 | 9 | 0 | 0 |
-| D7-S2 | 42 | 42 | 0 | 0 |
+| D7-S2 | 44 | 44 | 0 | 0 |
 | D7-S3 | 21 | 21 | 0 | 0 |
 | D7-S4 | 13 | 9 | 0 | 4 |
 | D7-S5 | 28 | 28 | 0 | 0 |
 | D7-S6 (Error Agg) | 7 | 7 | 0 | 0 |
 | **D7-S7** (Cross-cutting Hardening) | **4** | **4** | **0** | **0** |
 | D7-S8 | 9 | 9 | 0 | 0 |
-| D7-S9 | 10 | 10 | 0 | 0 |
-| D7-S10 | 8 | 8 | 0 | 0 |
+| D7-S9 | 19 | 19 | 0 | 0 |
+| D7-S10 | 12 | 12 | 0 | 0 |
 | D7-S11 | 13 | 13 | 0 | 0 |
 | **D7-S12** (Observe-Learner 跨域闭环) | **6** | **6** | **0** | **0** |
 | **D7-S13** (Verify→Learn Auto-Close) | **6** | **6** | **0** | **0** |
@@ -577,6 +648,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **4.26.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T) -- **15 新 T 全部 P0 IMPLEMENTED**. Total 266->281, P0 222->237. S10 新 S section (0->4 A + 12 T 含 8 既有 A32/A33/A34/A35). PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). |
 | 1.0.0 | 2026-06-13 | 初始（仅 ORCH-S2-T* 遗留 ID） |
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
 | 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
@@ -1260,5 +1332,5 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 
 **D7-PL Total:** 14 T (6 P1 spec doc sync + 6 P0 layout guard + 1 P1 plan/ dual registration + 1 P1 orchtypes/ Cross-S kernel registration 收尾) — **14/14 IMPLEMENTED**（PR-1 落 6 P1 spec doc sync；PR-2 落 6 P0 layout guard 测试 + 6 ghost 行 🔶 翻转；PR-3 落 1 P1 plan/ dual registration + CHANGELOG.md 清理 PR-1 遗留 `<<<<<<<` conflict marker；PR-4 落 1 P1 orchtypes/ Cross-S kernel registration 收尾）。**cumulative version bump**：跳过 v4.19.1（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S7+ → historical-s-mapping.md 物理拆分的 t-registry 同步）。
 
-**D7 全域统计：** 266 IMPLEMENTED + **14 IMPLEMENTED (D7-PL)** = **280 T 全 IMPLEMENTED** · **P0 228**（222 原 + 6 新 P0 layout guard T）。
+**D7 全域统计：** 281 IMPLEMENTED + **14 IMPLEMENTED (D7-PL)** = **295 T 全 IMPLEMENTED** · **P0 243**（237 原 + 6 新 P0 layout guard T）。
 

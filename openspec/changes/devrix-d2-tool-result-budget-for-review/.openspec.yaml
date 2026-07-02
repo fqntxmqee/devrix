@@ -1,0 +1,48 @@
+# CANCELLED 2026-07-02 — 被 devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) 治本覆盖
+# 本 change 仅留 .openspec.yaml 留作溯源，4 字段文件不再维护
+change_id: devrix-d2-tool-result-budget-for-review
+demand_id: DM-20260701-006
+title: D2 tool_result budget 阈值对 review 类任务放宽
+priority: P2
+status: s1_cancelled
+created_at: 2026-07-01
+domains: [D2]
+source: sess_1782885908460_4000 触发 read_file 拿到 9 文件累计 50K tokens,
+       触发 contextengine.persistTurn::TruncateToTokens (cfg.ToolResultBudget 默认 8K)
+       截断 tool_result, LLM 看不到完整内容 → 反复 "read more"
+       导致 LLM 自我循环不出 review
+related:
+  - DM-20260701-005  # D7 Verify synthesize enforce (上游)
+  - DM-20260620-001  # Context Budget Phase A+B (前置, 3-mode brief/fork/full 已上线)
+dsaft_scenarios:
+  - D2-S1 # ExecuteQuery
+dsaft_activities:
+  - D2-S1-A01 # ContextEngine 核心
+  - D2-S15-A02 # PrepareOrchestrator
+t_points: []
+cancelled_at: 2026-07-02
+cancelled_reason: |
+  治标方案 (按 task_kind 加 ToolResultBudgetProfile + IntentClassifier 路由)
+  已被 devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) 治本方案
+  完全覆盖：ToolSpec v3 (MaxResultSizeChars per tool) + ProbeToolChannel Bounded(n) + TruncateWithMarker
+  + Filter v2 PerTaskKindFilter 一并解决 task_kind 路由 + 截断透明 + 自我循环根治。
+replaced_by: devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)
+v0_backlog:
+  symptom:
+    - "review d2 领域 kernel 目录下代码" 类任务需要看多个文件, 单文件 5-25K tokens
+    - D2 默认 cfg.ToolResultBudget=8K tokens, 截断到 8K 后 LLM 看不到完整内容
+    - LLM 反复 read_file 同一文件试图绕过截断 → tool loop 累积
+  hypothesis:
+    - D2 ToolResultBudget 是单一全局阈值, 没有按 task kind (review/edit/test) 区分
+    - review 类任务需要 full content, edit 类任务可以 brief 摘要, test 类任务需要 test 上下文
+  propose_options:
+    - A: 按 task kind 加 ToolResultBudgetProfile (review=64K, edit=8K, test=16K) + IntentClassifier 路由
+    - B: 加 ToolResultBudget 动态阈值 (已读 context 比例 < 50% 时放宽, > 70% 时收紧)
+    - C: 给 read_file tool 加 --full / --brief / --head=N 标志, LLM 显式选择
+  risk:
+    - A 需要 IntentClassifier 准确度 (D7 Phase 5 验证集 < 90% 不可靠)
+    - B 阈值抖动影响 LLM 体验
+    - C 改变 tool 表面 (要重走 tool-surface-contract Change)
+  out_of_scope:
+    - 3-mode brief/fork/full (DM-20260620-001 已上线)
+    - MaxSubagentDepth=3 (DM-20260620-001-B 已上线)
