@@ -1,0 +1,30 @@
+change_id: devrix-token-design-v2
+demand_id: DM-20260702-008
+title: Token Design 2.0 — clawcode-style persistence + advisory iteration bound
+priority: P0
+status: s2_clarified
+created_at: 2026-07-02
+domains: [D2, D5, D7]
+source: 2026-07-02 复盘 DM-20260701-007 + clawcode 源码深读
+       - 复盘发现 8K token truncate + Bounded(15) hard reject 是治标不治本
+       - clawcode 设计哲学 (persistence + 引用 + LLM 自治 offset/limit) 更优
+       - 保留 devrix 创新 (EmissionClass / task_kind 推 / VerifyContract / MUPS / Learn)
+related:
+  - DM-20260701-007  # MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 (上游)
+  - DM-20260701-005  # D7 Verify synthesize enforce (上游)
+  - DM-20260701-006  # D2 tool_result budget profile (上游)
+  - DM-20260630-012  # D7 deliverable convergence (上游)
+supersedes:
+  - devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007, partial: 5 T 点)
+dsaft_scenarios:
+  - D2-S15  # PrepareExecutionContext (PersistToFile + ContentReplacementState + per-message aggregate + 19 工具 per-tool 阈值)
+  - D5-S25  # Observability LTL-Lite (L4-L6 advisory)
+  - D7-S9   # Execute 节点 (4 PlanKind Channel + 4 ToolChannel 路由, Probe 改 advisory)
+  - D7-S10  # Verify 节点 (VerifyContract 4 元组, 保留)
+dsaft_activities:
+  - D2-S15-A02  # PersistToFile + 集成 + image 跳过 + ContentReplacementState + growthbook override + surface gate + 19 工具 per-tool 阈值 + tests + per-message aggregate + 集成 + tests
+  - D5-S25-A01/A02/A03  # LTL-Lite L4-L6 改 advisory
+  - D7-S9-A50  # ProbeToolChannel.Accept 改 advisory + Read offset/limit + default OpenEnded + task_kind 推 advisory + IsConcurrencySafe + 19 工具 surface 声明 + ChannelRouter 集成 + tests
+  - D7-S10-A50  # ToAutoClassifierInput + 19 工具 surface 声明 + classifier + ChannelRouter 集成 + tests
+  - 端到端验证  # go test + review 任务 e2e + 8K 自我循环验证
+t_points: 28
