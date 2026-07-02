@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
+	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/memory"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
@@ -179,7 +180,18 @@ func (e *ContextEngine) appendToolHistoryAndAssistant(sc *types.SessionContext, 
 			resultContent := conversation.FormatToolResultContent(tc.ToolName, tc.Output, tc.Error)
 			if e.cfg.ToolResultBudget > 0 && e.counter != nil {
 				if e.counter.CountText(resultContent) > e.cfg.ToolResultBudget {
-					resultContent = e.counter.TruncateToTokens(resultContent, e.cfg.ToolResultBudget) + "\n...[truncated for persist]"
+					// T13 (DM-20260701-007 Phase C): TruncateWithMarker makes the
+					// truncation visible to the LLM (Akerlof 1970 signal separation).
+					// The default marker includes "complete=false" so the LLM can
+					// detect the truncation and either REREAD or refile the search.
+					// Per-tool MaxResultSizeChars wiring is part of T13's full
+					// integration; here we use the contracts default.
+					truncated, _ := compression.TruncateWithMarker(
+						resultContent,
+						e.cfg.ToolResultBudget*4, // ToolResultBudget is in tokens; ×4 ≈ chars
+						contracts.DefaultTruncateMarkerText,
+					)
+					resultContent = truncated
 				}
 			}
 			resultMsg := types.Message{

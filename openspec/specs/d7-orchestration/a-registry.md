@@ -263,6 +263,24 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 
 ---
 
+
+## D7-S9-A50: ToolChannel 路由 (per-EmissionClass termination)
+
+**承诺 C6：** 为 Execute 节点 4 ToolChannel 提供 per-EmissionClass termination 路由 + LTL-Lite L4–L6 invariant 挂载，根治 LLM 自我循环（demand RC-1）。
+
+| A ID | Name | Type | Input | Output | State Change | Code Location | Legacy |
+|------|------|------|-------|--------|--------------|---------------|--------|
+| **D7-S9-A50-T01** | **ToolChannel interface** | **A-BE** | **—** | **ToolChannel** | **—** | **`orchestration/mups/execute/toolchannel/channel.go`** (ToolChannel interface) | **—** |
+| **D7-S9-A50-T02** | **ToolChannelRouter** | **A-BE** | **Mode, 4 channels** | **Router** | **per-session state** | **`orchestration/mups/execute/toolchannel/channel.go`** (Router) | **—** |
+| **D7-S9-A50-T03** | **ProbeToolChannel Bounded(n)** | **A-BE** | **ToolCall, State** | **(ok, err)** | **state.IterationsUsed++** | **`orchestration/mups/execute/toolchannel/probe.go`** (ProbeToolChannel.Accept) | **—** |
+| **D7-S9-A50-T04** | **ProbeToolChannel hard reject** | **A-BE** | **iter>=bound** | **ErrProbeToolChannelBoundExceeded** | **—** | **`orchestration/mups/execute/toolchannel/probe.go`** (Accept) | **—** |
+| **D7-S9-A50-T05** | **PromptPressure 3-stage** | **A-BE** | **state, task_kind** | **— (warning emitted)** | **—** | **`orchestration/mups/execute/toolchannel/probe.go`** (InjectPromptPressure) | **—** |
+| **D7-S9-A50-T06** | **Fact/Action/Experiment Channels** | **A-BE** | **ToolCall, State** | **ChannelOutcome** | **—** | **`orchestration/mups/execute/toolchannel/{fact,action,experiment}.go`** | **—** |
+| **D7-S9-A50-T07** | **Shadow mode** | **A-BE** | **Mode=Shadow** | **(false, nil)** | **wouldRejectCount++** | **`orchestration/mups/execute/toolchannel/channel.go`** (Router.Route) | **—** |
+| **D7-S9-A50-T08** | **L0-L3 cross-check** | **A-BE** | **3 CC rules** | **—** | **—** | **`orchestration/mups/execute/toolchannel/probe.go`** (Accept CC-1) | **—** |
+
+> **Code 锚点**: 本 change `devrix-mups-tool-classification-and-channel-autonomy` (DM-20260701-007) Phase B 落地。
+
 ## Revision History
 
 | Version | Date | Changes |

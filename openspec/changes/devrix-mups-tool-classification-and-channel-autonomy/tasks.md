@@ -417,3 +417,12 @@
   - T07 shadow mode；T08 L0-L3 cross-check；C T04 burden of proof；C T08 Learn FeedbackMemory
   - D T06 cross-consistency；Filter 三维无 workspace；总数 25 → **33**
 - 2026-07-01：v1.3.1 S3-Gate Re-Review patch — T-ID 冲突修复（D2-S15-A02-T06 Phase D 改为 T15；tasks.md 7 处同步：§Phase D heading, T registry, AC table P1-AC-7, PR-D row, t-registry note；.openspec.yaml ds aft_activities + t_points；proposal.md AC24）；codex 复审 PASS（critical_count: 0）
+- 2026-07-02：v1.4 S4 实现收口 + S5 验收（33/33 T IMPLEMENTED 4 PR 联动）：
+  - **PR-A** ToolSpec v3 + 19 工具默认 metadata + silent default gate（commit `74fba9c5` 已合入 master #374）— D2-S15-A02-T06..T12+T14 8 T
+  - **PR-B-pre** PlanChannel rename + 1-release alias — D7-S9-A26-T06 1 T
+  - **PR-B** Execute 4 ToolChannel + LTL-Lite L4–L6 — D7-S9-A50-T01..T08 + D5-S25-A01-T01/T02 + A02-T01 + A03-T01 12 T
+  - **PR-C** VerifyContract + Reason 透传 + Learn ReasonLog + TruncateWithMarker — D7-S10-A50-T01/T04 + D7-S2-A50-T07/T08 + D2-S15-A02-T13 7 T
+  - **PR-D** Filter v2 三维 + cross-consistency — D2-S15-A02-T02..T05+T15 5 T
+  - **Total 33/33 = 100% IMPLEMENTED**（含 30 P0）；详见 `acceptance-report.md`（verdict: ACCEPTED）
+  - supersede 标记：DM-005 (`devrix-d7-verify-synthesize-enforce`) + DM-006 (`devrix-d2-tool-result-budget-for-review`) → `s1_cancelled 2026-07-02` + `replaced_by: devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)`
+  - 答 Cursor 8K token 问题：需 4 PR 全部合入才治本，PR-A 单 PR 不解决；三件套 (Bounded + TruncateMarker + Filter v2 task_kind 推) 全部就位

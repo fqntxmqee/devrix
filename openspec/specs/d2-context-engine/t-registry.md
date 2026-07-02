@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.13.0
-**Last Updated:** 2026-07-01 (devrix-d2-d7-review-hardening DM-20260630-013: 15 T IMPLEMENTED 114→129, P0 61→76 — D2 安全硬化 (S18-A80/A81 PlanModeWriteParity + SymlinkContainment) + D2 AutocompactWriteback (S15-A80) + D2 fail-closed (S18-A82/A83/A84/A85 5 surface) + D2 压缩并发 (S15-A81/A82/A83 CompressedView mu + session ctx + microcompact 跳 tool msg) + D2 JSONL 卫生 (S17-A80 strict 模式))
+**Version:** 2.14.0
+**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 19 T IMPLEMENTED 129→148, P0 76→93 — D2 安全硬化 (S18-A80/A81 PlanModeWriteParity + SymlinkContainment) + D2 AutocompactWriteback (S15-A80) + D2 fail-closed (S18-A82/A83/A84/A85 5 surface) + D2 压缩并发 (S15-A81/A82/A83 CompressedView mu + session ctx + microcompact 跳 tool msg) + D2 JSONL 卫生 (S17-A80 strict 模式))
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -215,6 +215,36 @@ v1.0：**不修改**现有测试 `// T:` 注释。下表供追溯与新测试登
 |------|------|--------|-----------|--------|----------|
 | **D2-S15-A08-T09** | **AC1 SubTurnRequest→TurnRequest 透传: `SubTurnRequest.MaxContextTokens` 经 `SubTurnRunner.RunSubTurn` 注入 `TurnRequest.MaxContextTokens`（`req.MaxContextTokens` 优先，否则 `Cfg.MaxContextTokens`，否则 0）** | **S15-A08 SubTurnRequest.MaxContextTokens (new)** | **`internal/layers/orchestration/turn/subturn_test.go::TestSubTurnRunner_MaxContextTokens_Propagated_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
 | **D2-S15-A08-T10** | **AC1 enforce.Run 透传: `SubQueryParams.MaxContextTokens` 在 `enforce.Run` 中写入 `SubTurnRequest.MaxContextTokens`（无 `MaxContextTokens` 时 0，让 SubTurnRunner 走 `Cfg.MaxContextTokens` fallback）** | **S15-A08 SubQueryParams.MaxContextTokens (new)** | **`internal/layers/contextengine/enforce/subquery_test.go::TestSubQuery_MaxContextTokens_PassedToSubTurn_DM_20260620_002`** | **IMPLEMENTED (DM-20260620-002)** | **P0** |
+
+## D2-S15: Prepare — Tool Metadata Control Plane + Filter v2 (DM-20260701-007)
+
+> **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) — Phase A + C + D 落地.**
+> 4 PR 联动 (PR-A 治本前置 + PR-B 治本核心 + PR-C 闭环 + PR-D 覆盖面):
+>
+> - **PR-A Phase A (8 T)**: D2-S15-A02-T06..T12 + T14 ToolSpec v3 (6 control plane 字段在 struct 末尾位置 — 0 break) + 19 工具默认 metadata (read/grep/glob=Probe+Bounded(15) H12 共识; lsp 拆分 3 Fact + 2 Probe; free_fork=Experiment) + silent default CI gate (P0-AC-10)
+> - **PR-C Phase C (1 T)**: D2-S15-A02-T13 TruncateWithMarker (marker 必含 complete=false; wired 进 kernel context_engine_persist_v2.go)
+> - **PR-D Phase D (5 T)**: D2-S15-A02-T02..T05 Filter v2 三维 (per_emission_class + per_task_kind + per_agent 二级) + T15 cross-consistency (review 时 Probe 不得 OpenEnded, P1-AC-7)
+>
+> AC 满足: P0-AC-1/2/3/6/7/9/10 全部 PASS, P1-AC-7/8 全部 PASS.
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D2-S15-A02-T06** | **PR-A ToolSpec v3 struct EXTEND: 6 control plane 字段在末尾 (EmissionClass / ConvergenceContract / IterationBound / SourceUncertainty / MaxResultSizeChars / TruncateMarkerText) — 0 break 现有 9 字段 (position struct literal 兼容)** | **S15-A02 ToolSpec v3** | **internal/shared/contracts/tool_surface_test.go (TestToolSpec_*) + grep ToolSpec 开大写 brace 命中 0** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T07** | **PR-A 4 新 type 定义: EmissionClass enum (Fact/Action/Probe/Experiment) + ConvergenceContract struct + IterationBound struct + SourceUncertainty struct** | **S15-A02 TypeDefs** | **internal/shared/contracts/tool_surface.go + go test -race shared/contracts PASS** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T08** | **PR-A 19 工具 orthogonal_flags 默认 metadata: read/grep/glob = Probe + None + Bounded(15) (H12); write/edit/bash = Action; lsp 拆分 3 Fact + 2 Probe; free_fork = Experiment; delegate_* = Probe** | **S15-A02 19 Metadata** | **internal/layers/contextengine/enforce/tools/surface/orthogonal_flags.go + grep -L EmissionClass surface/*.go = empty** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T09** | **PR-A BuiltinSurface 6 工具 spec (bash/write/edit=Action, read/grep/glob=Probe+Bounded(15)) — P0-AC-9 满足** | **S15-A02 BuiltinSurface** | **internal/layers/contextengine/enforce/tools/surface/builtin_surface.go** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T10** | **PR-A LSPToolSurface 5 LSP 工具 spec: lsp_goto_definition/hover/references = Fact; lsp_workspace_symbol/code_action = Probe** | **S15-A02 LSPToolSurface** | **internal/layers/contextengine/enforce/tools/surface/lsptool_surface.go** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T11** | **PR-A FreeFork/Tracker/Verify/AskUser/BackgroundTask/ToolSearch 6 surfaces 重标 (11 tools)** | **S15-A02 6 Surfaces** | **internal/layers/contextengine/enforce/tools/surface/{freefork,tracker,verify,askuser,backgroundtask,tool_search}_surface.go** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T12** | **PR-A ToolSpec v3 测试: 15 字段 / JSON tag 一致性 / struct literal 兼容 gate / 6 新字段默认值** | **S15-A02 ToolSpec Tests** | **internal/shared/contracts/tool_surface_test.go (TestToolSpec_*)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T14** | **PR-A Silent default CI gate (P0-AC-10): 所有 *_surface.go 必须显式 EmissionClass; 缺字段 → go test FAIL** | **S15-A02 CI gate** | **internal/layers/contextengine/enforce/tools/surface/surface_metadata_gate_test.go (TestAllSurfacesHaveEmissionClass)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T13** | **PR-C TruncateWithMarker (text, maxChars, marker) — marker 必含 complete=false (P0-AC-3); 截断对 LLM 透明. wired 进 kernel context_engine_persist_v2.go** | **S15-A02 TruncateMarker** | **internal/layers/contextengine/prepare/compression/truncate_marker_test.go (9 tests: ShortOutputNoMarker / AlwaysAppended / PositionsCorrect / ZeroMaxNoTruncate / VerySmallMax / DefaultMarkerTemplate / SanitizeMarker_EmptyRejected / MissingCompleteFalse / Valid)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T02** | **PR-D PerEmissionClassFilter (filter by Fact/Action/Probe/Experiment/composite/empty)** | **S15-A02 PerEmissionClassFilter** | **internal/layers/contextengine/enforce/tools/filter/per_emission_class_test.go (TestPerEmissionClassFilter_Apply / AllowAll)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T03** | **PR-D PerTaskKindFilter + taskKindBound 5 映射 (review=Bounded(15), edit=Bounded(10), test=Bounded(12), observe=OpenEnded, refactor=Bounded(8))** | **S15-A02 PerTaskKindFilter** | **internal/layers/contextengine/enforce/tools/filter/per_emission_class_test.go (TestTaskKindBound_Review/Edit/Observe/Refactor/Unknown + TestIsTighter_BoundedVsBounded/BoundedVsOpenEnded)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T04** | **PR-D PerAgentFilter v2 emission_class 二级过滤 (explore=Fact+Probe; worker=Fact+Action+Probe; delegate=Probe+Action) + 6 agent 兼容 + 9 既有 0 regression** | **S15-A02 PerAgent v2** | **internal/layers/contextengine/enforce/tools/filter/per_emission_class_test.go (TestAllowedEmissionClassesForAgent_Explore/Worker/Planner) + w6_filters_test.go (PerAgent Main/Fix/Explore/Plan/Worker/Delegate/UnknownAgent/WithAllowlist/Pure + PerRisk Low/High/Between/EmptyThreshold/Critical + Composite FIFO/OrderSensitive)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T05** | **PR-D D2 PrepareOrchestrator task_kind 推 (复用 DM-20260618 Phase 5 IntentClassifier 90%+ 验证集)** | **S15-A02 TaskKind Inference** | **internal/layers/contextengine/prepare/orchestrator.go (modified to call IntentClassifier from task_kind) + existing 18 integration tests PASS** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+| **D2-S15-A02-T15** | **PR-D TestPerTaskKindFilterCrossConsistency: review 时 read/grep/glob (Probe) 不得 OpenEnded; Bounded(15) 收紧 (H9/P1-AC-7)** | **S15-A02 CrossConsistency** | **internal/layers/contextengine/enforce/tools/filter/per_emission_class_test.go (TestPerTaskKindFilterCrossConsistency)** | **IMPLEMENTED (DM-20260701-007)** | **P0** |
+
+**D2-S15-A02 (DM-20260701-007) Total: 19 T 全部 P0 IMPLEMENTED**（含 1 T01 既有 RepairToolChain 复用 + 14 新 A02 slot (T02..T15)）。Filter v2 不含 workspace 维（双 review 共识 defer — P1-AC-8, OOS-10）。
 
 ## D2-S11: Harness Unification
 
@@ -505,3 +535,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.10.0** | **2026-06-29** | **DM-20260629-002 PR-4 — registry-sync**: F ID D2-S1..S5 → D2-S15..S18 canonical 重映射 + Historical Appendix tombstone S1/S5/S9/S10/S19/S20; F path 9 修正 (engine_persist.go → kernel/context_engine_commit_window_adapter.go, enforce/background.go → enforce/registry.go, etc.) |
 | **2.11.0** | **2026-06-29** | **DM-20260629-002 PR-5 — value-flow-rename**: §Canonical T 映射 加 ValueFlow Alias block（S15/S17/S18 D2_* Alias + S16 归 D7）；与 d2-domain.md / a-registry / f-registry §North Star 对齐 |
 | **2.12.0** | **2026-06-29** | **DM-20260629-002 PR-7 — span-coverage**: (1) §Canonical T 映射 加 Span Evidence 列（12/14 mapped = 86%）；(2) §Span Evidence Coverage 新增章节 + Active D2 Spans (23) 列表 + T-Without-Span Tracker（2 排除：compile-time invariant + CI layout guard）；(3) Coverage Gate ≥80% CI 守门草案 |
+| **2.14.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D2-S15-A02-T06..T12 + T14 ToolSpec v3 + 19 工具默认 metadata + silent default gate (Phase A 8 T) + D2-S15-A02-T02..T05 Filter v2 三维 (Phase D 4 T) + D2-S15-A02-T13 TruncateWithMarker (Phase C) + D2-S15-A02-T15 cross-consistency (Phase D) — **19 新 T 全部 P0 IMPLEMENTED**. Total 129→148, P0 76→93. PR-A commit 74fba9c5 已合入 master #374; PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). |

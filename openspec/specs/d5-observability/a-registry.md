@@ -102,11 +102,33 @@ D5 可观测性域 A 层活动注册表（Canonical v4.0）。S 层为 4+1 价�
 
 ---
 
+
+## D5-S25: Termination Invariants (LTL-Lite L4–L6 + L7 umbrella)
+
+**承诺 C5：** 为 Execute 节点 4 ToolChannel 提供 LTL-Lite L4–L6 termination 不变量 + L7 子类（Fact/Action/Experiment deadline），支持 Bounded(n) hard reject + Quotient(metric) + Synthesize(min_chars) 三层收敛。
+
+| A ID | Name | Type | Input | Output | State Change | Code Location | Legacy |
+|------|------|------|-------|--------|--------------|---------------|--------|
+| **D5-S25-A01** | **BoundedInvariant** | **A-BE** | **state, MaxN** | **(ok, reason)** | **—** | **`observability/instrument/ltl/invariants/termination/bounded.go`** (BoundedInvariant.Check) | **—** |
+| **D5-S25-A02** | **QuotientInvariant** | **A-BE** | **state, Threshold, Metric** | **(ok, reason)** | **—** | **`observability/instrument/ltl/invariants/termination/bounded.go`** (QuotientInvariant.Check) | **—** |
+| **D5-S25-A03** | **SynthesizeInvariant** | **A-BE** | **state, MinChars** | **(ok, reason)** | **—** | **`observability/instrument/ltl/invariants/termination/bounded.go`** (SynthesizeInvariant.Check) | **—** |
+
+**L7 umbrella**（FactSameQuery / ActionPostSnapshot / ExperimentDeadline）在 `bounded.go` 同文件实现，作为 termination 4-元 umbrella 类不另开 A ID（避免 L4/L5/L6 占用后无 slot 编号）。
+
+| L 编号 | 大类 | 具体 invariant | 适用 Channel |
+|--------|------|----------------|--------------|
+| L4 | Bounded | `L4-BOUNDED-ITERATIONS` | ProbeToolChannel (Bounded(n)) |
+| L5 | Quotient | `L5-QUOTIENT-THRESHOLD` | ExperimentToolChannel (Quotient 0.8) |
+| L6 | Synthesize | `L6-SYNTHESIZE-MIN-CHARS` | ProbeToolChannel (synthesize 阶段) |
+| L7 | Umbrella | `L7-FACT-SAME-Q-5x` / `L7-ACTION-POSTSNAPSHOT` / `L7-EXPERIMENT-CONCLUDED-BEFORE-DEADLINE` | Fact / Action / Experiment |
+
+> **Code 锚点**: 本 change `devrix-mups-tool-classification-and-channel-autonomy` (DM-20260701-007) Phase B 落地。
+
 ## Statistics
 
 | Scenarios | Activities | IMPLEMENTED |
 |-----------|------------|-------------|
-| 5 (S21–S24 + S0) | 32 | 32 |
+| 6 (S21–S25 + S0) | 35 | 35 |
 
 ## Revision History
 
