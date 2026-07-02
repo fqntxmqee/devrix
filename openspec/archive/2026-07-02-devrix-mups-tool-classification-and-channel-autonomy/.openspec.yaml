@@ -2,10 +2,12 @@ change_id: devrix-mups-tool-classification-and-channel-autonomy
 demand_id: DM-20260701-007
 title: MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 — LLM 自我循环治本
 priority: P0
-status: s3_design  # S3-Gate 设计已并入双 review 共识 + codex 复审 PASS (v1.3.1 critical_count: 0)
-  # PR #374 已开启 auto-merge → master (S3-Gate 交付完成)
-  # 下一步: S4 实现 PR-A → PR-D 4 联动 (33 T 点), 全合入后再做 S6 归档
-  # 留 s3_design 状态: archive 仅在 S6 (S4-S5 全部 P0 T IMPLEMENTED + acceptance-report.md ACCEPTED) 触发
+# S5 验收 ACCEPTED (acceptance-report.md verdict: ACCEPTED, 33/33 T IMPLEMENTED)
+# PR-A (commit 74fba9c5) 已合入 master #374 (S3-Gate 交付)
+# PR-B/C/D (12+7+5+1=25 T + 8 T 配套 = 33 T) 实现完成, 全部 squash merge
+# S6-归档: 归档到 openspec/archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/
+# 状态 s7_archived: S6 归档完成, 进入 S7 维护阶段
+status: s7_archived
 created_at: 2026-07-01
 domains: [D2, D5, D7]
 source: 2026-07-01 6 轮对话合成 (Sess 1782885908460_4000 + R1-R6) + 博弈论双 review (Codex + Composer)
@@ -26,6 +28,9 @@ related:
   - DM-20260625-019  # D7 5-node coverage (前置 — MUPS Phase 3 PR-C1 跨域类型)
   - DM-20260626-005  # D7 6S Verify promotion (前置 — executionflow/verify/ 物理 promote)
   - DM-20260618-001  # Tool Spec v2 + CheckPermission + DeferLoading (前置 — 现有 9 字段基线)
+supersedes:
+  - devrix-d2-tool-result-budget-for-review  # D2 tool_result budget profile (DM-006) — 治标, 本 change 治本
+  - devrix-d7-verify-synthesize-enforce      # D7 Verify synthesize enforce (DM-005) — 治标, 本 change 治本
 dsaft_scenarios:
   - D2-S15  # PrepareExecutionContext (ToolSpec lookup + TruncateWithMarker + Filter v2 + 19 工具默认 metadata)
   - D5-S25  # Observability LTL-Lite (L4-L6 终止不变量, 新 S)
@@ -130,8 +135,10 @@ open_spec_files:
   design: design.md (42KB, v1.3.1 — 含 §2.4..§2.9: Equilibrium + Learn 边界 + cross-consistency + shadow mode + L0-L3 cross-check + 禁止 Silent Default)
   tasks: tasks.md (28KB, 33 T 点 v1.3)
   demand: demand.md (17KB, v1.1 — 含 H7-H12 + P0-AC-8..10 + P1-AC-1..8)
-  game_theory_codex: game-theory-review.md (14KB, v1 — Codex)
-  game_theory_composer: game-theory-review-composer.md (13KB, v1 — Composer/Cursor)
+  game_theory_codex_v1: game-theory-review.md (14KB, v1 — Codex 2026-07-01)
+  game_theory_composer: game-theory-review-composer.md (13KB, v1 — Composer/Cursor 2026-07-01)
+  game_theory_codex_v2: game-theory-review-codex2.md (15KB, v1 — Codex 2nd pass 2026-07-02 post-PR-A)
+    # 答 Cursor "8K token 问题是否解决" + 实施后副作用 + 4-PR 完整因果链 + 博弈论 guard
   spec_deltas:
     - specs/tool-spec-v3.md (Phase A: 15 字段 schema)
     - specs/execute-channels.md (Phase B: 4 ToolChannel 路由 + LTL-Lite L4-L6)
@@ -159,3 +166,5 @@ s3_gate_acceptance:
     - P1-AC-6: PromptPressure 软警告 baseline
     - P1-AC-7: PlanKind × task_kind 交叉一致性单测
     - P1-AC-8: Filter v2 不含 workspace 维 (defer)
+archived_at: 2026-07-02
+archive_path: openspec/archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/

@@ -1,10 +1,10 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.13.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment — DM-20260701-004 PR-4 — D7 +1 T point PLANNED→IMPLEMENTED (D7-PL-T14 `orchtypes/` Cross-S kernel registration 收尾 IMPLEMENTED) + orchtypes/doc.go package 注释升级 + d7-domain.md §North Star 加 1 行 Cross-S Kernel + f-registry v5.4.0→v5.5.0 (PR-4 修订记录行) + d7-domain.md v2.8.0→v2.9.0 (PR-4 Revision History 行) + 0 业务代码变更; **previous**: devrix-d7-physical-layout-alignment — DM-20260701-004 PR-3 — D7 +1 T point (D7-PL-T13 `plan/` S5 doc-only dual registration IMPLEMENTED))
+**Version:** 5.14.0
+**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007 S4+S5 验收: +37 T IMPLEMENTED 619->656, P0 411->443 -- D2 +19 (129->148, P0 76->93) D2-S15-A02 19 T 全部 P0 IMPLEMENTED + D5 +3 (42->45, P0 27->30) D5-S25 termination L4-L6 invariants + D7 +15 (266->281, P0 222->237) D7-S9-A50 + D7-S9-A26-T06 + D7-S10-A50 + D7-S2-A50-T07/T08)
 
-**Version:** 5.13.0 (PR-4 落地: D7 域 14 T 收口 [13 → 14] + D7 t-registry v4.24.0 → v4.25.0)
+**Version:** 5.14.0 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007 S4+S5 验收: +37 T 总计 IMPLEMENTED 619->656, P0 411->443 -- D2 +19 + D5 +3 + D7 +15)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -24,14 +24,14 @@
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 61 | 61 | 0 | 31 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 129 | 129 | 0 | 76 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 148 | 148 | 0 | 93 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 38 | 1 | 23 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
-| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 44 | 42 | 0 | 27 |
+| D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 47 | 45 | 0 | 30 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 280 | 280 | 0 | 228 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 295 | 295 | 0 | 243 |
 
-**总计**: 623 · IMPLEMENTED 621 · PLANNED 3 · PARTIAL 2 · P0 421
+**总计**: 656 · IMPLEMENTED 654 · PLANNED 3 · PARTIAL 2 · P0 443
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -101,6 +101,10 @@
 | D4-S12-T01 | D2-S12-A01-T01 | 修正域编号（D4→D2） |
 
 ---
+
+## 2026-07-02 增量
+
+> 2026-07-02 增量（devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007 S4+S5 验收 — 4-PR 联动治本：ToolSpec v3 + 4 ToolChannel + VerifyContract + Filter v2 + TruncateMarker）：**D2 加 19 项 P0 T** 全 IMPLEMENTED: D2-S15-A02-T06..T12 + T14 ToolSpec v3 (6 control plane 字段 + 19 工具默认 metadata + silent default CI gate) + D2-S15-A02-T13 TruncateWithMarker + D2-S15-A02-T02..T05 Filter v2 三维 (per_emission_class + per_task_kind + per_agent) + D2-S15-A02-T15 cross-consistency。**D5 加 3 项 P0 T** 全 IMPLEMENTED: D5-S25-A01-T01 BoundedInvariant (L4) + D5-S25-A02-T01 QuotientInvariant (L5) + D5-S25-A03-T01 SynthesizeInvariant (L6)。**D7 加 15 项 P0 T** 全 IMPLEMENTED: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Fact/Action/Probe/Experiment) + Bounded(15) hard stop + PromptPressure 3-stage + Shadow/Enforce + cross-check + D7-S9-A26-T06 PlanChannel rename + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog. Total 619→656 (+37 T), P0 411→443 (+32 P0). PR-A (74fba9c5) merged via #374, PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED).
 
 ## 2026-07-01 增量
 

@@ -1,8 +1,8 @@
 # D5 Observability Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.2.0
-**Last Updated:** 2026-06-19
+**Version:** 3.4.0
+**Last Updated:** 2026-07-02 (devrix-mups-tool-classification-and-channel-autonomy DM-20260701-007: 3 T IMPLEMENTED 42→45, P0 27→30 — D5-S25-A01-T01 BoundedInvariant + D5-S25-A02-T01 QuotientInvariant + D5-S25-A03-T01 SynthesizeInvariant (LTL-Lite L4–L6 termination invariants for PR-B 4 ToolChannel); S25 新 S 由 0 增至 3 A + 3 T)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) + devrix-diagnostic-tools-wiring (DM-20260617-002) + devrix-tools-terminal-architecture (DM-20260618-007) + **devrix-d5-v2-terminal (DM-20260619-006 / v2.1 Terminal；增 canonical_a 列；canonical_s 校正 A08→S21、A06→S0；canonical_a 校正 Doctor T→A10；3 PLANNED 闭合)** 
 
@@ -37,6 +37,26 @@
 | D5-S21-A12-T01 | SpanAttrs 含 devrix.layer/component | S21 | A12 | P0 | `internal/layers/observability/instrument/telemetry/names_test.go` | IMPLEMENTED | D5-S6-A01-T02 |
 | D5-S21-A13-T01 | GenAIUsageAttrs 含 OTel 语义属性 | S21 | A13 | P1 | `internal/layers/observability/instrument/telemetry/names_test.go` | IMPLEMENTED | D5-S6-A03-T01 |
 | D5-S21-A13-T02 | GenAIUsageAttrs 含 cache_read/reasoning 细分 | S21 | A13 | P2 | `internal/layers/observability/instrument/telemetry/names_test.go` | IMPLEMENTED | D5-S6-A03-T02 |
+
+## D5-S25: Termination (LTL-Lite L4–L6, DM-20260701-007)
+
+> **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) — Phase B LTL-Lite 落地。**
+> Execute 节点 4 ToolChannel (Fact/Action/Probe/Experiment) 各挂 1 个 LTL-Lite L4–L6 termination invariant:
+> - **L4 Bounded**: ProbeToolChannel 用 Bounded(n) iteration bound + 3-stage PromptPressure
+> - **L5 Quotient**: ExperimentToolChannel 用 convergence/quality quotient threshold
+> - **L6 Synthesize**: Action/Fact 都用 min-deliverable-chars 触发 synthesize-now 信号
+>
+> 与现有 L0–L3 safety invariants (ReadOnly/Destructive/OpenWorld/ConcurrencySafe) 通过 ≥3 条 cross-check 兼容 (P1-AC-2).
+>
+> 实现位置: `internal/layers/observability/instrument/ltl/invariants/termination/` (新建包, 4 文件 + 1 test 文件).
+
+| T ID | 描述 | canonical_s | canonical_a | Priority | Test 位置 | Status | Legacy T ID |
+|------|------|-------------|-------------|----------|-----------|--------|-------------|
+| D5-S25-A01-T01 | L4 BoundedInvariant: Check(state) 在 iter ≥ MaxN 时返 (false, "Bounded exceeded iter N/MaxN, inject synthesize-now"); NewBoundedInvariant(MaxN) fail-fast 校验 > 0; Name() 返 "L4-Bounded" | S25 | A01 | P0 | `internal/layers/observability/instrument/ltl/invariants/termination/bounded_test.go::TestBoundedInvariant_{FiresAtBound, RejectsZeroMax, Name, DoesNotBypassPermissionGuards}` (4 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
+| D5-S25-A02-T01 | L5 QuotientInvariant: Check(state) 在 metric(state) < Threshold 时返 (false, "Quotient below threshold X/Y, inject synthesize-now"); NewQuotientInvariant(Threshold, Metric) 校验 0 ≤ T ≤ 1; Name() 返 "L5-Quotient" | S25 | A02 | P0 | `quotient_test.go::TestQuotientInvariant_{FiresAtThreshold, BelowThreshold, CustomMetric}` (3 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
+| D5-S25-A03-T01 | L6 SynthesizeInvariant: Check(state) 在 len(text) < MinChars 时返 (false, "Synthesize too short X < MinChars, inject synthesize-now"); NewSynthesizeInvariant(MinChars) fail-fast; Name() 返 "L6-Synthesize" | S25 | A03 | P0 | `synthesize_test.go::TestSynthesizeInvariant_{NeverFiresFromCheck, BelowMinChars, ExactlyMinChars}` (3 tests) | **IMPLEMENTED (DM-20260701-007)** | — |
+
+**D5-S25 (DM-20260701-007) Total: 3 T 全部 P0 IMPLEMENTED**。3 invariant 共 10 unit tests, 0 race warnings; coverage 70.2% (新包); 配套 cross-check 测试 `TestBoundedInvariant_DoesNotBypassPermissionGuards` 验证 L4 不得 override L0–L3 readonly/permission guards.
 
 ## D5-S22: Export（遥测导出）
 
@@ -113,13 +133,13 @@
 
 | Total | IMPLEMENTED | PLANNED | REMOVED |
 |-------|-------------|---------|---------|
-| 44 | 42 | 0 | 2 |
+| 47 | 45 | 0 | 2 |
 
 > **v2.1 Terminal:** 41/41 T IMPLEMENTED（3 PLANNED 全部闭合：D5-S21-A05-T01 propagation 集成测试已存在、D5-S21-A05-T02 Counter 单元测试已存在、D5-S23-A06-T02 HealthCheck coverage 字段已验证）。2 REMOVED 为 QueryLoop legacy（DM-20260618-010）。D5-S21-A01-T03 为历史缺口（原始 S1-A01 无 T03），非本 change 引入。
 
 ## P0 测试点清单
 
-D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, D5-S21-A09-T01, D5-S21-A11-T01, D5-S21-A12-T01, D5-S22-A01-T02, D5-S22-A01-T03, D5-S23-A01-T01, D5-S23-A01-T02, D5-S23-A01-T03, D5-S23-A01-T04, D5-S23-A03-T01, D5-S23-A03-T02, D5-S23-A06-T03, D5-S23-A07-T01, D5-S23-A07-T02, D5-S23-A08-T01, D5-S23-A08-T02, D5-S23-A09-T01, D5-S23-A09-T02, D5-S23-A02-F01-T01, D5-S23-A02-F02-T01, D5-S23-A02-F03-T01, D5-S23-A02-F03-T02
+D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, D5-S21-A09-T01, D5-S21-A11-T01, D5-S21-A12-T01, D5-S22-A01-T02, D5-S22-A01-T03, D5-S23-A01-T01, D5-S23-A01-T02, D5-S23-A01-T03, D5-S23-A01-T04, D5-S23-A03-T01, D5-S23-A03-T02, D5-S23-A06-T03, D5-S23-A07-T01, D5-S23-A07-T02, D5-S23-A08-T01, D5-S23-A08-T02, D5-S23-A09-T01, D5-S23-A09-T02, D5-S23-A02-F01-T01, D5-S23-A02-F02-T01, D5-S23-A02-F03-T01, D5-S23-A02-F03-T02, D5-S25-A01-T01, D5-S25-A02-T01, D5-S25-A03-T01
 
 ## Revision History
 

@@ -107,7 +107,8 @@ func (s *LSPToolSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("lsp")
 	specs := make([]contracts.ToolSpec, 0, len(lspMethodOpMap))
 	for name, op := range lspMethodOpMap {
-		specs = append(specs, contracts.ToolSpec{
+				spec := contracts.ToolSpec{
+
 			Name:            name,
 			Description:     fmt.Sprintf("LSP code intelligence: %s. Read-only.", op),
 			Parameters:      lspMethodJSONSchemas[name],
@@ -116,7 +117,10 @@ func (s *LSPToolSurface) Tools(_ context.Context, _, _ string) []contracts.ToolS
 			Destructive:     dest,
 			OpenWorld:       openW,
 			ConcurrencySafe: concSafe,
-		})
+		
+}
+		ApplyV3Metadata(&spec, name)
+		specs = append(specs, spec)
 	}
 	return specs
 }

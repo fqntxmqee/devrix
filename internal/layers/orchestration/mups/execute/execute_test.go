@@ -96,7 +96,7 @@ func okResult(tool string) ToolResult {
 }
 
 // -----------------------------------------------------------------------------
-// D7-S9-A26-T01: Channel interface + ChannelRegistry
+// D7-S9-A26-T01: PlanChannel interface + ChannelRegistry
 // -----------------------------------------------------------------------------
 
 // TestChannelRegistry_Register_4Kinds covers the canonical 1:1 binding

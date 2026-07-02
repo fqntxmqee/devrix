@@ -20,6 +20,8 @@ const (
 	stepAssembly         = "system_prompt_assembly"
 	stepAutocompact      = "autocompact"
 	stepTokenBlock       = "token_block"
+	// DM-20260702-008 / D2-S15-A02-T14: per-message aggregate 200K cap
+	stepPerMessageBudget = "per_message_budget"
 )
 
 // Pipeline runs the seven-step compression chain.
@@ -41,6 +43,11 @@ type Pipeline struct {
 	stepObserver       StepObserver
 	asyncCompact       *AsyncAutocompacter
 	sessionID          string
+	projectDir         string // DM-20260702-008: T01 PersistToFile root
+	// DM-20260702-008 / D2-S15-A02-T14: per-message budget state.
+	// Thread-local ContentReplacementState for the aggregate 200K cap.
+	// Per-conversation, set once and reused across turns.
+	perMessageBudget  *PerMessageBudget
 	skipAssembly       bool
 	locale             i18n.Locale
 }
@@ -125,9 +132,22 @@ func (p *Pipeline) applyCompressionSteps(ctx context.Context, current []types.Me
 	steps := []namedStep{
 		{stepToolResultBudget, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
 			before := p.counter.CountMessages(m)
-			next := toolResultBudget(p.counter, m, b.ToolResultBudget)
+			next := toolResultBudget(p.counter, m, b.ToolResultBudget, p.projectDir, p.sessionID)
 			after := p.counter.CountMessages(next)
 			p.emitStep(ctx, stepToolResultBudget, before, after)
+			return next, before != after
+		}},
+		// DM-20260702-008 / D2-S15-A02-T14: per-message aggregate 200K cap.
+		// Runs AFTER stepToolResultBudget so individual results are
+		// already bounded; this step catches the SUM-of-N case.
+		{stepPerMessageBudget, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
+			if p.perMessageBudget == nil {
+				return m, false
+			}
+			before := p.counter.CountMessages(m)
+			next := applyPerMessageBudget(p.perMessageBudget, m)
+			after := p.counter.CountMessages(next)
+			p.emitStep(ctx, stepPerMessageBudget, before, after)
 			return next, before != after
 		}},
 		{stepSnip, func(m []types.Message, b types.TokenBudget) ([]types.Message, bool) {
@@ -202,4 +222,42 @@ func (p *Pipeline) emitStep(ctx context.Context, step string, before, after int)
 	if p.stepObserver != nil {
 		p.stepObserver.OnStep(ctx, step, before, after)
 	}
+}
+
+// applyPerMessageBudget walks all user messages and runs the budget
+// step on each. Returns a new slice (does not mutate input). When a
+// message's tool_result aggregate exceeds the threshold, the largest
+// fresh results are persisted to disk and replaced with
+// <persisted-output> previews.
+//
+// DM-20260702-008 / D2-S15-A02-T14: simple per-message sweep; the more
+// sophisticated "collectCandidatesByMessage + selectFreshToReplace"
+// pattern from clawcode is implemented inside PerMessageBudget.Enforce
+// for callers that need it. The pipeline-level step here is the
+// simpler "run Enforce on every tool message" form which is correct
+// for our single-threaded sync pipeline.
+func applyPerMessageBudget(budget *PerMessageBudget, msgs []types.Message) []types.Message {
+	out := make([]types.Message, len(msgs))
+	for i, m := range msgs {
+		out[i] = m
+		if m.Role != types.MessageRoleTool {
+			continue
+		}
+		// Only enforce when content actually exceeds threshold; the
+		// per-message check is cheap and avoids unnecessary work.
+		threshold := budget.Threshold
+		if threshold <= 0 {
+			threshold = MaxToolResultsPerMessageChars
+		}
+		if len(m.Content) <= threshold {
+			continue
+		}
+		// Use the message ID as the toolUseID surrogate. Per-message
+		// budget decisions are per-message (not per-result), and the
+		// ContentReplacementState freezes the decision at the
+		// message granularity. For finer per-result decisions, callers
+		// use PerMessageBudget.Enforce directly with the actual result ID.
+		out[i].Content = budget.Enforce(m.ID, m.Content)
+	}
+	return out
 }

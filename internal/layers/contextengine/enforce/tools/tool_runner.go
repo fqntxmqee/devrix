@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"io"
 	"bytes"
 	"context"
 	"fmt"
@@ -107,10 +108,15 @@ func newReadFileRunner(cfg *toolExecConfig) *readFileRunner {
 func (r *readFileRunner) Name() string { return "read_file" }
 
 func (r *readFileRunner) Schema() ToolSchema {
+	// DM-20260702-008 / D2-S15-A02-T10: read_file supports offset/limit
+	// so the LLM can recover from a truncated/persisted result
+	// (PersistToFile from T01). Default Offset=0, Limit=8192 — matches
+	// read_file's MaxResultSizeChars from T07. The LLM can re-call
+	// with Offset=N*Limit to fetch subsequent 8K-byte chunks.
 	return ToolSchema{
 		Name:        "read_file",
-		Description: "Read a file from the workspace. Args: {\"path\":\"relative/or/abs/path\"}",
-		Parameters:  `{"type":"object","required":["path"],"properties":{"path":{"type":"string"},"file_path":{"type":"string"}}}`,
+		Description: "Read a file from the workspace. Args: {\"path\":\"...\",\"offset\":0,\"limit\":8192}. Default offset=0, limit=8192 (bytes).",
+		Parameters:  `{"type":"object","required":["path"],"properties":{"path":{"type":"string"},"file_path":{"type":"string"},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"default":8192}}}`,
 	}
 }
 
@@ -227,6 +233,13 @@ func runBash(ctx context.Context, workDir, input string, cfg *toolExecConfig) (*
 	return &ToolResult{Output: out}, nil
 }
 
+// DM-20260702-008 / D2-S15-A02-T10: read_file supports offset/limit
+// (bytes) for the治本 recovery path. Defaults: Offset=0, Limit=8192
+// (matches the read_file MaxResultSizeChars from T07). The LLM can
+// re-read with Offset=N*Limit to fetch subsequent chunks. This is
+// what makes the PersistToFile reference (T01) actionable: the LLM
+// sees the <persisted-output> XML from T01 and re-reads with offset=8192
+// to fetch the next 8K, repeatedly until done.
 func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {
 	path := ToolInputString(input, "path", "file", "file_path")
 	if path == "" {
@@ -237,11 +250,48 @@ func runReadFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error
 		return &ToolResult{Error: err.Error()}, nil
 	}
 
-	data, err := os.ReadFile(target)
+	offset := ToolInputIntDefault(input, "offset", 0)
+	limit := ToolInputIntDefault(input, "limit", 8192)
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 8192
+	}
+
+	data, err := readFileRange(target, offset, limit)
 	if err != nil {
 		return &ToolResult{Error: err.Error()}, nil
 	}
 	return &ToolResult{Output: truncateToolOutput(string(data), cfg.maxOutput())}, nil
+}
+
+// readFileRange reads [offset, offset+limit) bytes from path. Returns
+// the requested slice; if offset >= file size, returns empty []byte
+// (NOT an error — the LLM gets a stable "end of file" signal and can
+// stop re-reading).
+func readFileRange(path string, offset, limit int) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if offset >= int(info.Size()) {
+		return []byte{}, nil
+	}
+	if _, err := f.Seek(int64(offset), 0); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, limit)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return nil, err
+	}
+	return buf[:n], nil
 }
 
 func runWriteFile(workDir, input string, cfg *toolExecConfig) (*ToolResult, error) {

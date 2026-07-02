@@ -4,7 +4,7 @@
 **Demand ID:** DM-20260701-007
 **Stage:** S2_Clarified（博弈论双 review 共识已并入）
 **Created:** 2026-07-01
-**Game Theory Reviews:** [game-theory-review.md](./game-theory-review.md)（Codex）· [game-theory-review-composer.md](./game-theory-review-composer.md)（Composer）
+**Game Theory Reviews:** [game-theory-review.md](./game-theory-review.md)（Codex v1, 2026-07-01）· [game-theory-review-composer.md](./game-theory-review-composer.md)（Composer v1, 2026-07-01）· [game-theory-review-codex2.md](./game-theory-review-codex2.md)（Codex v2 / 2nd pass, 2026-07-02 post-PR-A — 答 Cursor "8K token 问题是否解决"）
 **Parent Demands:**
 
 - DM-20260701-005 (D7 Verify synthesize enforce — 治标)

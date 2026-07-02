@@ -41,7 +41,8 @@ func (s *FreeForkSurface) Name() string { return "free_fork" }
 // Tools implements contracts.ToolSurface.
 func (s *FreeForkSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSpec {
 	rOnly, dest, openW, concSafe := OrthogonalFlagFor("free_fork")
-	return []contracts.ToolSpec{{
+		spec := contracts.ToolSpec{
+
 		Name:            "free_fork",
 		Description:     "Batch fork N child agents (1..5) under a parent session. Each child runs in an isolated worker directory sandbox by default.",
 		Parameters:      `{"parent_session": "<id>", "requests": [{"name": "...", "prompt": "...", "sandbox": true, "mode": "brief|fork|full (default: brief)"}]}`,
@@ -50,7 +51,10 @@ func (s *FreeForkSurface) Tools(_ context.Context, _, _ string) []contracts.Tool
 		Destructive:     dest,
 		OpenWorld:       openW,
 		ConcurrencySafe: concSafe,
-	}}
+	
+}
+	ApplyV3Metadata(&spec, "free_fork")
+	return []contracts.ToolSpec{spec}
 }
 
 // InterruptBehavior implements contracts.ToolSurface. free_fork is the only

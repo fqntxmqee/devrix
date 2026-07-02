@@ -4,7 +4,7 @@
 // based on Plan.Kind, and produces an Artifact (Phase 3 PR-C1 output) for
 // downstream Verify consumption.
 //
-// Channel interface contract:
+// PlanChannel interface contract:
 //   - Each Channel knows which PlanKind(s) it Supports().
 //   - ChannelRegistry maps PlanKind → Channel; ChannelRouter dispatches.
 //   - Channels use a pluggable ToolRunner so tests can inject fakes without

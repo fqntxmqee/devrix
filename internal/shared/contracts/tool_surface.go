@@ -50,6 +50,15 @@ type ToolSpec struct {
 	//
 	// DSAFT: TOOL-SURFACE-1-A01-F08 (DM-20260618-003 devrix-surface-lazy-loading).
 	DeferLoading bool
+
+	// --- ToolSpec v3 (D2-S15-A02-T06): 6 control plane fields ---
+	// DSAFT: D2-S15-A02-T06 — control plane; runtime-bound; defaults in tool_surface_v3.go.
+	EmissionClass       EmissionClass       `json:"emission_class"`
+	ConvergenceContract ConvergenceContract `json:"convergence_contract"`
+	IterationBound      IterationBound      `json:"iteration_bound"`
+	SourceUncertainty   SourceUncertainty   `json:"source_uncertainty"`
+	MaxResultSizeChars  int                 `json:"max_result_size_chars"`
+	TruncateMarkerText  string              `json:"truncate_marker_text"`
 }
 
 // ToolResult is the return type of ToolSurface.Execute.

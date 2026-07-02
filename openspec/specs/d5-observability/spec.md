@@ -43,6 +43,7 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 | D5-S22 | Export | Console/OTLP/Memory SpanExporter | **REGISTRY** |
 | D5-S23 | Diagnose | Coverage 对账、Incident 导出、Doctor 环境检查、Tracker 代码变更追踪、FaultInject(test) | **REGISTRY** |
 | D5-S24 | Configure | 配置加载/校验、Runtime path 指标 | **REGISTRY** |
+| **D5-S25** | **Termination** | **LTL-Lite L4–L6 termination invariants (Bounded/Quotient/Synthesize) + L7 umbrella (FactSameQuery/ActionPostSnapshot/ExperimentDeadline) — 配合 D7-S9-A50 ToolChannel 路由** | **REGISTRY** |
 | D5-S0 | Facade | Init/Shutdown/Bridge/SessionGauge；观测失败不阻断业务（横切） | **REGISTRY** |
 
 ---
@@ -56,12 +57,14 @@ D5 可观测性域提供 Tracing、Metrics、结构化 Logging、Bridge 集成�
 | S | D5-S22 | Export | `export/` (Console + OTLP + Memory + Null) |
 | S | D5-S23 | Diagnose | `diagnose/{coverage,incident,doctor,tracker,faultinject}/` |
 | S | D5-S24 | Configure | `configure/{settings,runtime}/` |
+| S | **D5-S25** | **Termination** | **`observability/instrument/ltl/invariants/termination/`** |
 | S | D5-S0 | Facade | `observability.go` + `bridge.go` + `health.go` |
 | A | A1-A30 | 30 Activities (v4.0) | `a-registry.md` |
 | F | F1-F45 | 45 Function Points (v3.0) | `f-registry.md` |
 | T | T1-T41 | 41 Test Points (v3.2) | `t-registry.md` |
 
-**当前计数（v3.1.0）**：D=1, S=5 (canonical: S21-S24 + S0), A=30, F=45, T=41, Operation=56。
+**当前计数（v3.2.0）**：D=1, S=6 (canonical: S21-S25 + S0), A=33 (含 S25 +3 A), F=45, T=44 (含 S25 +3 T), Operation=56。
+> **v3.2.0 changelog**: +D5-S25 (Termination LTL-Lite L4–L6) + 3 A (Bounded/Quotient/Synthesize) + 3 T. 配套 change: `devrix-mups-tool-classification-and-channel-autonomy` (DM-20260701-007) Phase B.
 
 ---
 

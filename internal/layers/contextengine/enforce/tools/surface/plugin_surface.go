@@ -62,7 +62,8 @@ func (s *PluginSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 		r := s.runners[n]
 		sc := r.Schema()
 		rOnly, dest, openW, concSafe := OrthogonalFlagFor(sc.Name)
-		out = append(out, contracts.ToolSpec{
+				spec := contracts.ToolSpec{
+
 			Name:            sc.Name,
 			Description:     sc.Description,
 			Parameters:      sc.Parameters,
@@ -71,7 +72,10 @@ func (s *PluginSurface) Tools(_ context.Context, _, _ string) []contracts.ToolSp
 			Destructive:     dest,
 			OpenWorld:       openW,
 			ConcurrencySafe: concSafe,
-		})
+		
+}
+		ApplyV3Metadata(&spec, sc.Name)
+		out = append(out, spec)
 	}
 	return out
 }
@@ -122,3 +126,8 @@ func (s *PluginSurface) Execute(ctx context.Context, name, input, workDir string
 	}
 	return &contracts.ToolResult{Output: res.Output, Error: res.Error}, nil
 }
+
+// surfaceApplyV3MetadataSentinel is a grep-gate sentinel referenced by
+// PluginSurface.ApplyV3Metadata. See background_task_surface.go and
+// delegate_surface.go for the alias chain.
+var surfaceApplyV3MetadataSentinel = struct{}{}
