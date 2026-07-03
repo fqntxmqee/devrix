@@ -262,6 +262,30 @@ func ContractDimensionPromptDoc() string {
 	return string(b)
 }
 
+const maxStrategicContractMinRunes = 500
+
+const (
+	deliverableFormatOpen  = "<deliverable_format>"
+	deliverableFormatClose = "</deliverable_format>"
+)
+
+// ClampDeliverableContract caps LLM-proposed min_runes to a sane verify bound.
+func ClampDeliverableContract(c DeliverableContract) DeliverableContract {
+	c = c.Normalized()
+	if c.MinRunes > maxStrategicContractMinRunes {
+		c.MinRunes = maxStrategicContractMinRunes
+	}
+	return c
+}
+
+// DeliverableFinalAnswerHint is the machine tag for Execute final-turn output shape.
+func DeliverableFinalAnswerHint(c DeliverableContract) string {
+	if c.Normalized().Structure == DeliverableStructureFindingsJSON {
+		return deliverableFormatOpen + "findings_json_only" + deliverableFormatClose
+	}
+	return ""
+}
+
 // DefaultTestDeliverableContract is the standard review contract for tests.
 func DefaultTestDeliverableContract() DeliverableContract {
 	return DeliverableContract{

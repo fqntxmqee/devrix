@@ -46,7 +46,7 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 	}
 	// R1 — max depth with continuation: bounded inline, then escalate.
 	if ctx.Depth >= ctx.MaxDepth {
-		if ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth {
+		if deliverableInlineWouldExhaust(ctx) {
 			return SpawnEscalateHuman
 		}
 		return SpawnInline
@@ -61,7 +61,7 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		// CC-1 / §8.1: Pass with applicable schema MUST NOT SpawnNone while
 		// deliverable is still owed — inline (or R1 budget) instead.
 		if deliverableContinuationRequired(round) {
-			if IsDeliverableInlineBudgetExhaustedFromCtx(ctx) {
+			if deliverableInlineWouldExhaust(ctx) {
 				return SpawnEscalateHuman
 			}
 			return SpawnInline
@@ -91,7 +91,7 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 			return SpawnDecompose
 		}
 		if deliverableContinuationRequired(round) {
-			if IsDeliverableInlineBudgetExhaustedFromCtx(ctx) {
+			if deliverableInlineWouldExhaust(ctx) {
 				return SpawnEscalateHuman
 			}
 			return SpawnInline
@@ -244,4 +244,14 @@ func applicableDeliverableSchema(round *WorkItemPipelineRound) bool {
 
 func IsDeliverableInlineBudgetExhaustedFromCtx(ctx TreeEvalContext) bool {
 	return ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth
+}
+
+// deliverableInlineWouldExhaust reports whether the next inline retry would
+// hit the CC-1.2 budget (TouchInlineRetry runs after EvaluateSpawnPolicy).
+func deliverableInlineWouldExhaust(ctx TreeEvalContext) bool {
+	max := ctx.MaxInlineRetriesAtMaxDepth
+	if max <= 0 {
+		max = DefaultMaxInlineRetriesAtMaxDepth
+	}
+	return ctx.InlineRetriesAtMaxDepth+1 >= max
 }

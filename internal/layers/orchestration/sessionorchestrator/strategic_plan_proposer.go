@@ -201,7 +201,7 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 
 func mapDeliverableContract(raw workmodel.DeliverableContract, schemaField, directive string) workmodel.DeliverableContract {
 	if raw.ContractApplicable() {
-		return raw.Normalized()
+		return workmodel.ClampDeliverableContract(raw)
 	}
 	if schema, ok := workmodel.LookupRegisteredDeliverableSchema(schemaField); ok {
 		return workmodel.ExpandLegacySchemaToContract(schema)
@@ -298,6 +298,7 @@ func (e *StrategicPlanReject) Error() string {
 const (
 	BudgetFieldChildren = "children"
 	BudgetFieldDaily    = "daily"
+	BudgetFieldScope    = "scope"
 )
 
 // applyBudgetCap implements T-P1-3: when the LLM proposes more children
