@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-const defaultSessionTurnLoopMax = 16
-
 // RunSessionTurnLoop drives GetPipelineFocus → RunItemPipeline → spawn/await
-// until the session work set is closed or limits hit (Phase C, G5).
+// until the session work set is closed or anomaly/escape/spawn signals say
+// stop (Phase C, G5). RH-D7-05: no fixed iteration budget — termination is
+// driven by HasOpenWork, SpawnEscalateHuman, EscapeEngine, and verify
+// anomaly detectors (empty_conclusion / deliverable stagnation).
 func (o *SessionOrchestrator) RunSessionTurnLoop(
 	ctx context.Context,
 	req orchtypes.ProcessRequest,
@@ -104,8 +106,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		// when the loop never ran a pipeline round (direct caller / no
 		// focus / skip path).
 		var lastArtifactSummary string
+		var lastRound *workmodel.WorkItemPipelineRound
 
-		for iter := 0; iter < defaultSessionTurnLoopMax; iter++ {
+		for {
 			if ctx.Err() != nil {
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type: "error", Content: ctx.Err().Error(), SessionID: sessionID,
@@ -113,10 +116,11 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 
+			var escDecision escape.EscapeDecision
 			if o.escapeEngine != nil {
-				loopCtx := o.buildEscapeLoopContext(sessionID, 0, "")
-				decision := o.escapeEngine.Evaluate(ctx, loopCtx)
-				if term, augErr := o.processEscapeDecision(decision, nil); term {
+				loopCtx := buildEscapeLoopContextFromRound(sessionID, lastRound)
+				escDecision = o.escapeEngine.Evaluate(ctx, loopCtx)
+				if term, augErr := o.processEscapeDecision(escDecision, nil); term {
 					msg := "escape_force_exit"
 					if augErr != nil {
 						msg = augErr.Error()
@@ -134,6 +138,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 			if focus == nil {
+				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
+					continue
+				}
 				if _, triggered := workmodel.MaybeRootRollupFallback(sessionID, o.taskManager); triggered {
 					continue
 				}
@@ -206,6 +213,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				emitError(ctx, o.sink, out, sessionID, "item_pipeline", err)
 				return
 			}
+			lastRound = round
 
 			// WorkItemExecutor (inside ItemPipelineRunner.Run) drives the
 			// per-WorkItem ReAct loop; round.ArtifactSummary carries the
@@ -255,13 +263,48 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				// focus may be terminal; loop picks next item or exits
 			}
 
+			exit := evaluateSessionLoopExitAfterRound(ctx, sessionID, o.taskManager, round, escDecision)
+			switch exit.Kind {
+			case SessionLoopExitEscalate:
+				msg := exit.Reason
+				if msg == "" {
+					msg = "human review required"
+				}
+				emit(ctx, o.sink, out, &contracts.EngineEvent{
+					Type: "human_review", Content: focus.Directive, SessionID: sessionID,
+				})
+				emit(ctx, o.sink, out, &contracts.EngineEvent{
+					Type: "text", Content: msg, SessionID: sessionID,
+				})
+				emit(ctx, o.sink, out, &contracts.EngineEvent{
+					Type: "complete", Content: msg, SessionID: sessionID,
+				})
+				return
+			case SessionLoopExitAnomaly:
+				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
+					continue
+				}
+				goto sessionLoopDone
+			}
+
 			if !o.taskManager.Tree().HasOpenWork(sessionID) {
+				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
+					continue
+				}
 				if _, triggered := workmodel.MaybeRootRollupFallback(sessionID, o.taskManager); triggered {
 					continue
 				}
-				break
+				goto sessionLoopDone
+			}
+
+			if sessionNoForwardProgress(sessionID, o.taskManager) {
+				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
+					continue
+				}
+				goto sessionLoopDone
 			}
 		}
+	sessionLoopDone:
 
 		// Prefer rollup deliverable + quality gate (DM-20260630-012).
 		emit(ctx, o.sink, out, buildSessionCompleteEvent(ctx, sessionID, o.taskManager, lastArtifactSummary))
