@@ -1,6 +1,7 @@
 # Design: D7 收敛契约 — 向下传播 & 向上反馈决策树
 
 **Change ID:** `d7-convergence-contract`  
+**Demand ID:** DM-20260703-001  
 **Status:** Draft  
 **Audience:** D7 编排 / Review / 集成测试  
 **代码锚点:** `workmodel/spawn_policy.go`, `rollup_gate.go`, `resolve.go`, `sessionorchestrator/item_pipeline.go`, `item_observe.go`
@@ -440,6 +441,7 @@ flowchart TD
 | DefaultMaxIndeterminateRetries | 3 | R7 | 是 |
 | DefaultMaxRollupRetries | 3 | rollup inline | 是 |
 | MaxInlineRetriesAtMaxDepth | 3 🆕 | R1 inline | 是 |
+| InlineRetriesAtMaxDepth (counter) | 0..3 | 挂在 **WorkItem** 字段；SpawnInline@maxDepth increment；terminal/escalate/decompose 清零；ReopenForRollup 不 reset | WorkItem |
 | RollupGatePolicy | best_effort | rollup 门禁 | WorkItem/Session |
 | DefaultShareSummaryMaxTokens | 2048 | bubble 截断 | 否（Phase 1） |
 | kindFocusPriority | Verify>Implement>… | focus 选择 | 否 |
@@ -451,6 +453,16 @@ flowchart TD
 - **父文档：** `openspec/specs/d7-orchestration/pipeline-architecture.md` §4 RunSessionTurnLoop
 - **本 change 归档后：** 在 pipeline-architecture 增加 §4.x Convergence Contract 引用本 design
 - **Delta spec：** `specs/d7-orchestration_convergence_delta.md`
+
+---
+
+## §8.1 Verify ↔ SpawnPolicy 边界（2026-07-03 澄清）
+
+当 WorkItem 绑定 applicable `DeliverableSchema` 时：
+
+- Verify **MUST NOT** 在 `DeliverableStatus != complete` 时 emit `VerdictPass`（producer 不应获得「已通过」信号却欠 deliverable）。
+- R0.5 **MUST** 在 R1 之前：`!DeliverableContinuationRequired → SpawnNone`，使 complete leaf 在任何 depth 可 terminal。
+- `GetPipelineFocus` **MUST** focus：`InProgress + DeliverableContinuationRequired + SpawnPolicy ∈ {inline, none}`，避免 SpawnNone+InProgress 停滞后 session loop 假退出。
 
 ---
 

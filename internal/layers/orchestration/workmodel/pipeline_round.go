@@ -49,6 +49,14 @@ const DefaultMaxIndeterminateRetries = 3
 // a real termination guarantee: escalate to human review.
 const DefaultMaxRollupRetries = 3
 
+// DefaultMaxInlineRetriesAtMaxDepth caps consecutive inline retries on a leaf
+// at max decompose depth before SpawnEscalateHuman (DM-20260703-001 CC-1.2).
+const DefaultMaxInlineRetriesAtMaxDepth = 3
+
+// TerminalReasonInlineRetriesExhaustedAtMaxDepth is recorded when max-depth
+// inline budget is exhausted (L5-D7-CC-02).
+const TerminalReasonInlineRetriesExhaustedAtMaxDepth = "inline_retries_exhausted_at_max_depth"
+
 // WorkItemPipelineRound is the typed signal bundle for one WorkItem pipeline
 // iteration. Parent spawn decisions MUST read this struct (goal G2).
 //
@@ -84,6 +92,7 @@ type WorkItemPipelineRound struct {
 	ChildSpecs        []ChildSpec       `json:"child_specs,omitempty"`
 	SpawnRationale    string            `json:"spawn_rationale,omitempty"`
 	DeliverableSchema DeliverableSchema `json:"deliverable_schema,omitempty"`
+	DeliverableContract DeliverableContract `json:"deliverable_contract,omitempty"`
 	DeliverableStatus DeliverableStatus `json:"deliverable_status,omitempty"`
 	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`
 	StartedAt       time.Time         `json:"started_at,omitempty"`
@@ -108,6 +117,9 @@ type TreeEvalContext struct {
 	// WorkItem. Zero when the item has no prior round. RH-MUPS-03.
 	RollupRetries    int
 	MaxRollupRetries int
+	// InlineRetriesAtMaxDepth mirrors WorkItem.InlineRetriesAtMaxDepth for R1.
+	InlineRetriesAtMaxDepth    int
+	MaxInlineRetriesAtMaxDepth int
 }
 
 // DefaultTreeEvalContext returns evaluator defaults aligned with WorkTree limits.
@@ -116,8 +128,9 @@ func DefaultTreeEvalContext(sessionID, workItemID, userID string, tm *TaskManage
 		MaxDepth:                DefaultMaxDecomposeDepth,
 		Threshold:               EffectiveDecomposeThreshold(tm, userID),
 		MaxIndeterminateRetries: DefaultMaxIndeterminateRetries,
-		MaxRollupRetries:        DefaultMaxRollupRetries,
-		UserID:                  userID,
+		MaxRollupRetries:           DefaultMaxRollupRetries,
+		MaxInlineRetriesAtMaxDepth:   DefaultMaxInlineRetriesAtMaxDepth,
+		UserID:                     userID,
 	}
 	if tm == nil || workItemID == "" {
 		return ctx
@@ -135,6 +148,10 @@ func DefaultTreeEvalContext(sessionID, workItemID, userID string, tm *TaskManage
 		if item.LastRound != nil {
 			ctx.RollupRetries = item.LastRound.RollupRetries
 		}
+		ctx.InlineRetriesAtMaxDepth = item.InlineRetriesAtMaxDepth
+	}
+	if ctx.MaxInlineRetriesAtMaxDepth <= 0 {
+		ctx.MaxInlineRetriesAtMaxDepth = DefaultMaxInlineRetriesAtMaxDepth
 	}
 	return ctx
 }

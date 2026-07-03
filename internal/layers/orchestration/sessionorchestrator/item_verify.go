@@ -90,9 +90,10 @@ func verifyArtifactForWorkItem(art *wavescheduler.Artifact, item *workmodel.Work
 
 // WorkItemVerifyOutcome bundles verdict with deliverable verification (DM-20260630-012).
 type WorkItemVerifyOutcome struct {
-	Verdict           workmodel.Verdict
-	Deliverable       DeliverableVerifyResult
-	DeliverableSchema workmodel.DeliverableSchema
+	Verdict             workmodel.Verdict
+	Deliverable         DeliverableVerifyResult
+	DeliverableContract workmodel.DeliverableContract
+	DeliverableSchema   workmodel.DeliverableSchema
 }
 
 func verifyArtifactForWorkItemWithSchema(
@@ -101,9 +102,22 @@ func verifyArtifactForWorkItemWithSchema(
 	pl *plan.Plan,
 	schema workmodel.DeliverableSchema,
 ) WorkItemVerifyOutcome {
+	return verifyArtifactForWorkItemWithContract(art, item, pl, workmodel.ExpandLegacySchemaToContract(schema))
+}
+
+func verifyArtifactForWorkItemWithContract(
+	art *wavescheduler.Artifact,
+	item *workmodel.WorkItem,
+	pl *plan.Plan,
+	contract workmodel.DeliverableContract,
+) WorkItemVerifyOutcome {
 	v := verifyArtifact(art)
+	schema := workmodel.DeliverableSchemaNotApplicable
+	if contract.ContractApplicable() {
+		schema = workmodel.DeliverableSchema("legacy_contract")
+	}
 	if art == nil {
-		return WorkItemVerifyOutcome{Verdict: v, DeliverableSchema: schema}
+		return WorkItemVerifyOutcome{Verdict: v, DeliverableContract: contract, DeliverableSchema: schema}
 	}
 	id := art.TaskID
 	if id == "" {
@@ -127,8 +141,8 @@ func verifyArtifactForWorkItemWithSchema(
 			}
 		}
 	}
-	deliverable := VerifyDeliverable(schema, art)
-	if schema != workmodel.DeliverableSchemaNotApplicable && schema != "" {
+	deliverable := VerifyDeliverableContract(contract, art)
+	if contract.ContractApplicable() {
 		if deliverable.Status == workmodel.DeliverableStatusIncomplete {
 			if v.Kind == types.VerdictPass {
 				v = workmodel.Verdict{
@@ -141,9 +155,10 @@ func verifyArtifactForWorkItemWithSchema(
 		}
 	}
 	return WorkItemVerifyOutcome{
-		Verdict:           v,
-		Deliverable:       deliverable,
-		DeliverableSchema: schema,
+		Verdict:             v,
+		Deliverable:         deliverable,
+		DeliverableContract: contract,
+		DeliverableSchema:   schema,
 	}
 }
 

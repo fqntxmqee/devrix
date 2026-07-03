@@ -44,6 +44,8 @@ func buildSessionCompleteEvent(
 	if isBothSummaryAndFinalBad(summaryQuality.Kind, finalQuality.Kind) {
 		content = taskIncompleteUserMessage
 		meta["task_incomplete"] = "true"
+	} else if hasOpenIncompleteDeliverable(tm, sessionID) {
+		meta["task_incomplete"] = "true"
 	}
 	return &contracts.EngineEvent{
 		Type:      "complete",
@@ -58,4 +60,19 @@ func isBothSummaryAndFinalBad(summaryQ, finalQ SummaryQualityKind) bool {
 		return k == SummaryQualityTooShort || k == SummaryQualityInconclusive
 	}
 	return bad(summaryQ) && bad(finalQ)
+}
+
+func hasOpenIncompleteDeliverable(tm *workmodel.TaskManager, sessionID string) bool {
+	if tm == nil {
+		return false
+	}
+	for _, item := range tm.Tree().List(sessionID) {
+		if item == nil || item.Ephemeral || workmodel.IsTerminalStatus(item.Status) {
+			continue
+		}
+		if item.LastRound != nil && workmodel.DeliverableContinuationRequired(item.LastRound) {
+			return true
+		}
+	}
+	return false
 }

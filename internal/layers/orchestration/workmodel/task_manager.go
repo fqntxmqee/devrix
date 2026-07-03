@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +40,10 @@ type TaskManager struct {
 
 	// parentReevalMu deduplicates concurrent parent re-evaluation (TD-WT-06).
 	parentReevalMu sync.Map
+
+	// sessionWorkDirs optional repo roots for decompose scope validation (CC-2).
+	sessionWorkDirs map[string]string
+	sessionWorkDirMu sync.RWMutex
 }
 
 // NewTaskManager creates a new in-memory task manager.
@@ -237,4 +242,30 @@ func truncateSubject(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// SetSessionWorkDir registers the repo root used for decompose scope validation.
+func (m *TaskManager) SetSessionWorkDir(sessionID, workDir string) {
+	if m == nil || sessionID == "" {
+		return
+	}
+	m.sessionWorkDirMu.Lock()
+	defer m.sessionWorkDirMu.Unlock()
+	if m.sessionWorkDirs == nil {
+		m.sessionWorkDirs = make(map[string]string)
+	}
+	m.sessionWorkDirs[sessionID] = strings.TrimSpace(workDir)
+}
+
+// SessionWorkDir returns the registered repo root for scope validation.
+func (m *TaskManager) SessionWorkDir(sessionID string) string {
+	if m == nil {
+		return ""
+	}
+	m.sessionWorkDirMu.RLock()
+	defer m.sessionWorkDirMu.RUnlock()
+	if m.sessionWorkDirs == nil {
+		return ""
+	}
+	return m.sessionWorkDirs[sessionID]
 }

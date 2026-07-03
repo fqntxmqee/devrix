@@ -157,6 +157,75 @@ func TestRunItemPipeline_StrategicPlanRejectFeedsNextPrompt(t *testing.T) {
 	}
 }
 
+func directiveWithDeliverableSchema(directive string) string {
+	return directive + "\n" + workmodel.DeliverableContractTag(workmodel.DefaultTestDeliverableContract())
+}
+
+func TestRunItemPipeline_IncompleteDeliverable_InlineRetry(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	exec := &multiRoundReviewExecutor{}
+	runner.Executor = exec
+
+	sessionID := "sess-pipeline-retry"
+	goal, _ := tm.EnsureGoal(sessionID, directiveWithDeliverableSchema("review d2 domain kernel directory code"))
+	ph, _ := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{
+		ParentID: goal.ID, Kind: workmodel.WorkKindImplement, Title: "done",
+	})
+	_ = tm.Tree().UpdateStatus(sessionID, ph.ID, workmodel.TaskStatusInProgress)
+	_ = tm.Tree().UpdateStatus(sessionID, ph.ID, workmodel.TaskStatusCompleted)
+
+	round1, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if round1.SpawnPolicy != workmodel.SpawnInline {
+		t.Fatalf("first SpawnPolicy = %q, want inline (got rationale %q)", round1.SpawnPolicy, round1.SpawnRationale)
+	}
+	if exec.calls != 1 {
+		t.Fatalf("calls after first = %d, want 1", exec.calls)
+	}
+
+	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
+	round2, err := runner.Run(context.Background(), sessionID, goal, "", ItemPipelineRunOpts{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if exec.calls != 2 {
+		t.Fatalf("calls after second = %d, want 2", exec.calls)
+	}
+	if round2.SpawnPolicy != workmodel.SpawnNone {
+		t.Fatalf("second SpawnPolicy = %q, want none", round2.SpawnPolicy)
+	}
+	got, _ := tm.GetWorkItem(sessionID, goal.ID)
+	if got.Status != workmodel.TaskStatusCompleted {
+		t.Fatalf("status = %q, want completed", got.Status)
+	}
+}
+
+type multiRoundReviewExecutor struct {
+	calls int
+}
+
+func (e *multiRoundReviewExecutor) ExecuteWorkItem(_ context.Context, _, _, _ string) (*WorkItemResult, error) {
+	e.calls++
+	if e.calls == 1 {
+		return &WorkItemResult{
+			Content:    "I'll review the D2 kernel directory.\nLet me locate internal/layers/contextengine/kernel/ first.",
+			Done:       true,
+			Iterations: 1,
+			ToolCalls:  0,
+			StopReason: "final_answer",
+		}, nil
+	}
+	return &WorkItemResult{
+		Content:    "P0: nil deref in internal/layers/contextengine/kernel/foo.go:42 — missing guard\nExecutive summary: one P0 issue.",
+		Done:       true,
+		Iterations: 1,
+		ToolCalls:  3,
+		StopReason: "final_answer",
+	}, nil
+}
+
 func TestRunItemPipeline_SingleWorkItem_Completed(t *testing.T) {
 	runner, tm, rep := newItemPipelineTestRunner(t)
 	sessionID := "sess-item-pipeline"

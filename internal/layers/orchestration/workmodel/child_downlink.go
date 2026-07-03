@@ -49,7 +49,7 @@ func DefaultChildDownlink(parent *WorkItem, child *WorkItem, spec ChildSpec) Chi
 		// emits a <deliverable_schema> tag (or same_as_parent_directive) that
 		// ParseDeliverableSchemaTag can recognize, giving the child a
 		// verifiable acceptance bar instead of a wish.
-		dl.ExpectedReturn = DefaultChildExpectedReturn(child, spec.Directive)
+		dl.ExpectedReturn = DefaultChildExpectedReturn(parent, spec.Directive)
 	}
 	return dl
 }

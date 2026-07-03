@@ -2,14 +2,29 @@ package sessionorchestrator
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
+func TestStrategicPlanAppendix_UsesContractDimensions(t *testing.T) {
+	dims := workmodel.ContractDimensionPromptDoc()
+	for _, loc := range []i18n.Locale{i18n.LocaleEN, i18n.LocaleZH} {
+		got := i18n.StrategicPlanAppendix(loc, dims)
+		if !strings.Contains(got, "deliverable_contract") {
+			t.Fatalf("appendix for %q missing deliverable_contract:\n%s", loc, got)
+		}
+		if !strings.Contains(got, dims) {
+			t.Fatalf("appendix for %q missing dimension doc:\n%s", loc, got)
+		}
+	}
+}
+
 func TestParseStrategicPlanJSON_should_accept_single_mode(t *testing.T) {
-	raw := `{"execution_mode":"single","scope_in":["internal/foo/"],"child_specs":[],"deliverable_schema":"p0_p1_file_line","react_iters_hint":3,"rationale":"one pass"}`
+	raw := `{"execution_mode":"single","scope_in":["internal/foo/"],"child_specs":[],"deliverable_contract":{"citation":"file_line","severity":"p0_p1","reject":["planning_meta"]},"react_iters_hint":3,"rationale":"one pass"}`
 	prop, err := parseStrategicPlanJSON(raw, "review internal/foo/")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -26,7 +41,7 @@ func TestParseStrategicPlanJSON_should_accept_single_mode(t *testing.T) {
 }
 
 func TestParseStrategicPlanJSON_should_map_decompose_child_specs(t *testing.T) {
-	raw := `{"execution_mode":"decompose","child_specs":[{"title":"slice A","directive_suffix":"focus A","expected_return":"P0 list"}],"deliverable_schema":"p0_p1_file_line","react_iters_hint":2}`
+	raw := fmt.Sprintf(`{"execution_mode":"decompose","child_specs":[{"title":"slice A","directive_suffix":"focus A","expected_return":"P0 list"}],"deliverable_schema":"%s","react_iters_hint":2}`, workmodel.FirstRegisteredDeliverableSchema())
 	prop, err := parseStrategicPlanJSON(raw, "review kernel")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -46,10 +61,11 @@ func TestValidateStrategicPlan_should_reject_decompose_without_children(t *testi
 	}
 }
 
-func TestAppendDeliverableExecuteHint_should_add_schema_tag_for_review_schema(t *testing.T) {
-	got := AppendDeliverableExecuteHint("review code", workmodel.DeliverableSchemaP0P1FileLine)
-	if !strings.Contains(got, "<deliverable_schema>p0_p1_file_line</deliverable_schema>") {
-		t.Fatalf("missing schema tag: %q", got)
+func TestAppendDeliverableExecuteHint_should_add_contract_tag_for_review_schema(t *testing.T) {
+	got := AppendDeliverableExecuteHint("review code", workmodel.FirstRegisteredDeliverableSchema())
+	tag := workmodel.DeliverableContractTag(workmodel.DefaultTestDeliverableContract())
+	if !strings.Contains(got, tag) {
+		t.Fatalf("missing contract tag: %q", got)
 	}
 }
 

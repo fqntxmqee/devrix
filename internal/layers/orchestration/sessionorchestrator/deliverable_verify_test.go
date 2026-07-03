@@ -13,7 +13,7 @@ func TestVerifyDeliverable_should_complete_when_p0_file_line(t *testing.T) {
 		Summary:  "P0: nil deref in internal/foo/bar.go:42",
 		Metadata: map[string]any{"stop_reason": "final_answer"},
 	}
-	got := VerifyDeliverable(workmodel.DeliverableSchemaP0P1FileLine, art)
+	got := VerifyDeliverable(workmodel.FirstRegisteredDeliverableSchema(), art)
 	if got.Status != workmodel.DeliverableStatusComplete {
 		t.Fatalf("status = %q, want complete", got.Status)
 	}
@@ -27,7 +27,7 @@ func TestVerifyDeliverable_should_incomplete_when_max_iters_without_citation(t *
 		Summary:  "Let me continue exploring the kernel package.",
 		Metadata: map[string]any{"stop_reason": "max_iters"},
 	}
-	got := VerifyDeliverable(workmodel.DeliverableSchemaP0P1FileLine, art)
+	got := VerifyDeliverable(workmodel.FirstRegisteredDeliverableSchema(), art)
 	if got.Status != workmodel.DeliverableStatusIncomplete {
 		t.Fatalf("status = %q, want incomplete", got.Status)
 	}
@@ -41,7 +41,7 @@ func TestVerifyDeliverable_should_incomplete_when_exploration_transition(t *test
 		Summary:  "继续探索 internal/layers/contextengine/kernel/",
 		Metadata: map[string]any{"stop_reason": "final_answer"},
 	}
-	got := VerifyDeliverable(workmodel.DeliverableSchemaP0P1FileLine, art)
+	got := VerifyDeliverable(workmodel.FirstRegisteredDeliverableSchema(), art)
 	if got.Status != workmodel.DeliverableStatusIncomplete {
 		t.Fatalf("status = %q, want incomplete", got.Status)
 	}
@@ -62,7 +62,7 @@ func TestVerifyArtifactForWorkItemWithSchema_should_downgrade_pass_when_incomple
 		ExitCode: 0,
 		Metadata: map[string]any{"stop_reason": "max_iters"},
 	}
-	out := verifyArtifactForWorkItemWithSchema(art, item, nil, workmodel.DeliverableSchemaP0P1FileLine)
+	out := verifyArtifactForWorkItemWithSchema(art, item, nil, workmodel.FirstRegisteredDeliverableSchema())
 	if out.Verdict.Kind != types.VerdictPartial {
 		t.Fatalf("verdict = %q, want partial", out.Verdict.Kind)
 	}

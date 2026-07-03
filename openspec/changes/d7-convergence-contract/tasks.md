@@ -1,62 +1,124 @@
 # Implementation Tasks: D7 收敛契约
 
-**Change ID:** `d7-convergence-contract`
+**Change ID:** `d7-convergence-contract`  
+**Demand ID:** DM-20260703-001  
+**Status:** S4 In Progress
 
 ---
 
-## Phase 1: Round Terminalization（收敛闭环）
+## T 点注册表（本 change 新增，归档时写入 `t-registry.md`）
 
-- [ ] 1.1 `SpawnPolicyEvaluator`：R0.5 `!deliverableContinuationRequired → SpawnNone`（在 R1 之前）
-- [ ] 1.2 `WorkItemPipelineRound` + `TreeEvalContext`：增加 `InlineRetriesAtMaxDepth` / `MaxInlineRetriesAtMaxDepth`（默认 3）
-- [ ] 1.3 新 `terminalize.go`：`ApplyRoundTerminalization` 统一 Status 更新（替代仅 SpawnNone 分支）
-- [ ] 1.4 `GetPipelineFocus`：跳过 `SpawnInline` 且 `!DeliverableContinuationRequired` 的 WI（双保险）
-- [ ] 1.5 测试 T1、T2、T3（见 design.md §6）
+| T ID | L5 | Phase | 描述 | 优先级 |
+|------|-----|-------|------|--------|
+| D7-S5-A93-T01 | L5-D7-CC-01 | 1 | R0.5：`!DeliverableContinuationRequired → SpawnNone` 在 R1 之前 | P0 |
+| D7-S5-A93-T02 | L5-D7-CC-02 | 1 | `InlineRetriesAtMaxDepth` 字段 + max-depth inline increment/escalate | P0 |
+| D7-S5-A93-T03 | L5-D7-CC-01 | 1 | `spawn_policy_test`：complete@maxDepth→None；incomplete→inline→escalate | P0 |
+| D7-S2-A86-T01 | L5-D7-CC-01 | 1 | `ApplyRoundTerminalization` 统一 SpawnNone status 更新 | P0 |
+| D7-S2-A86-T02 | L5-D7-CC-07 | 1 | `GetPipelineFocus`：`pipelineItemNeedsContinuation`（Inline **或** SpawnNone+InProgress+continuation） | P0 |
+| D7-S2-A86-T03 | L5-D7-CC-07 | 1 | `TestRunSessionTurnLoop_RetriesWhenDeliverableIncomplete` stub 多轮 | P0 |
+| D7-S5-A94-T01 | L5-D7-CC-05 | 2 | `ScopeValidator`：repo 存在 + ⊆parent + blocklist | P1 |
+| D7-S5-A94-T02 | L5-D7-CC-05 | 2 | 挂接 `PrepareDecomposeSpecs`；全 reject → DefaultDecomposeProposer | P1 |
+| D7-S5-A93-T04 | L5-D7-CC-04 | 2 | `shouldDecomposeForDeliverable` 扩展至 registered schema | P1 |
+| D7-S15-A43-T01 | L5-D7-CC-03 | 3 | `MaybeSiblingBestEffortRollup` @ `ReevaluateParentAfterChild` Running>0 分支 | P0 |
+| D7-S15-A43-T02 | L5-D7-CC-04 | 3 | `MaybeDecomposeParentRollup` → `MaybeParentRollup`（任意 decompose 父） | P1 |
+| D7-S15-A43-T03 | L5-D7-CC-03/04 | 3 | 集成 T3、T4、T6 | P0/P1 |
+| D7-S2-A87-T01 | L5-D7-CC-03 | 4 | 统一 `EvaluateSessionExit`；`sessionNoForwardProgress` → recursive subtree stuck | P0 |
+| D7-S2-A87-T02 | L5-D7-CC-03 | 4 | 可选 `MaxMUPSRounds` 软上限（默认 disabled） | P2 |
+| D7-S2-A73-T05 | L5-D7-CC-07 | 4 | `buildSessionCompleteEvent`：open incomplete deliverable → `task_incomplete` 安全网 | P0 |
+
+---
+
+## Phase 1: Round Terminalization（收敛闭环）— P0
+
+> **目标：** 修复 RH-D7-CC-01/02；leaf complete 可 terminal；incomplete 有界 inline。
+
+- [x] **1.1** `SpawnPolicyEvaluator` R0.5 — `@T(D7-S5-A93-T01)` `@L5(L5-D7-CC-01)`
+  - 在 R0 之后、R1 之前：`if applicableDeliverableSchema && !DeliverableContinuationRequired { return SpawnNone }`
+  - Verify invariant 文档化：applicable schema 下 Pass 时 deliverable MUST be complete（否则 Inline）
+
+- [x] **1.2** `WorkItem.InlineRetriesAtMaxDepth` + `TreeEvalContext.MaxInlineRetriesAtMaxDepth`（默认 3）— `@T(D7-S5-A93-T02)` `@L5(L5-D7-CC-02)`
+  - 字段持久化在 WorkItem；SpawnInline+continuation increment（任意 depth）；terminal/escalate/decompose 清零
+  - R1 分支 + Pass/Partial deliverable path：`InlineRetries < Max → Inline`；否则 `EscalateHuman`
+
+- [x] **1.3** 新 `workmodel/terminalize.go`：`ApplyRoundTerminalization` — `@T(D7-S2-A86-T01)`
+  - 从 `item_pipeline.go` SpawnNone 分支抽取；统一调用 `StatusAfterSpawnNone`
+
+- [x] **1.4** `GetPipelineFocus` 续跑扩展 — `@T(D7-S2-A86-T02)` `@L5(L5-D7-CC-07)`
+  - `pipelineItemNeedsContinuation`：`SpawnInline + DeliverableContinuationRequired`（Pass→Inline 路径；SpawnNone+InProgress 不再 refocus）
+
+- [x] **1.5** 测试矩阵 T1、T2、T3（stub）— `@T(D7-S5-A93-T03)` `@T(D7-S2-A86-T03)`
+  - **T1/T2** `spawn_policy_test` ✅
+  - **T3** `session_turn_loop_test` RetryWhenDeliverableIncomplete + FreshSession ✅；4 层 stub 待补
 
 **Quality Gate:**
-- [ ] `go test ./internal/layers/orchestration/workmodel/... ./internal/layers/orchestration/sessionorchestrator/...`
+- [x] `go test -race ./internal/layers/orchestration/workmodel/... ./internal/layers/orchestration/sessionorchestrator/...`
 
 ---
 
-## Phase 2: Downward Scope Validation
+## Phase 2: Downward Scope Validation — P1
 
-- [ ] 2.1 新 `scope_validator.go`：repo 存在性 + parent scope 单调收窄 + blocklist
-- [ ] 2.2 挂接 `PrepareDecomposeSpecs` / strategic plan 落地前
-- [ ] 2.3 扩展 `shouldDecomposeForDeliverable` 至 general registered schema（非仅 p0_p1）
-- [ ] 2.4 测试 T5
+> **目标：** 修复 RH-D7-CC-05；防 LLM 幻觉路径 spawn 并行兄弟。
+
+- [x] **2.1** 新 `workmodel/scope_validator.go` — `@T(D7-S5-A94-T01)` `@L5(L5-D7-CC-05)`
+
+- [x] **2.2** 挂接 `PrepareDecomposeSpecs` / strategic plan 落地前 — `@T(D7-S5-A94-T02)`
+
+- [x] **2.3** `shouldDecomposeForDeliverable` 扩展 registered schema — `@T(D7-S5-A93-T04)` `@L5(L5-D7-CC-04)`
+
+- [x] **2.4** 测试 T5 — `@T(D7-S5-A94-T01)`
 
 **Quality Gate:**
-- [ ] decompose 提案全 reject 时 fallback DefaultDecomposeProposer
+- [x] decompose 提案全 reject 时 fallback 保证 ≥1 child
 
 ---
 
-## Phase 3: Upward Feedback Enhancement
+## Phase 3: Upward Feedback Enhancement — P0/P1
 
-- [ ] 3.1 `MaybeSiblingBestEffortRollup`：1 complete + 1 stuck → fail stuck + parent NeedsRollup
-- [ ] 3.2 `MaybeDecomposeParentRollup` → `MaybeParentRollup`（所有 decompose 父节点）
-- [ ] 3.3 可选 `MergeChildDeliverables`（rollup verify 前结构化合并）
-- [ ] 3.4 `RollupGatePolicyFor` 读 Session/WorkItem 配置（默认 best_effort）
-- [ ] 3.5 测试 T4、T6、T7
+> **目标：** 修复 RH-D7-CC-03/04；全层 rollup + 并行兄弟 best-effort。
+
+- [x] **3.1** `MaybeSiblingBestEffortRollup` — `@T(D7-S15-A43-T01)` `@L5(L5-D7-CC-03)`
+
+- [x] **3.2** `MaybeDecomposeParentRollup` → `MaybeParentRollup` — `@T(D7-S15-A43-T02)` `@L5(L5-D7-CC-04)`
+
+- [ ] **3.3** 可选 `MergeChildDeliverables`（rollup verify 前结构化合并）— P2，可 defer
+
+- [ ] **3.4** `RollupGatePolicyFor` 读 Session/WorkItem 配置（默认 best_effort）— P2
+
+- [ ] **3.5** 测试 T4、T6、T7a — `@T(D7-S15-A43-T03)`
+  - **T4** 4 层 decompose chain — 待补
+  - **T6** rollup fail×3 → human_review — 回归已有 rollup 测试
+  - **T7a** stub 多轮 complete — 部分覆盖（DecomposeRecursive + Retry）
 
 **Quality Gate:**
 - [ ] rollup 后 root `ExtractSessionDeliverable` 非空
 
 ---
 
-## Phase 4: Session Exit & Docs
+## Phase 4: Session Exit & Docs — P0/P2
 
-- [ ] 4.1 统一 `EvaluateSessionExit`；重构 `sessionNoForwardProgress` 为 subtree stuck
-- [ ] 4.2 可选 Session `MaxMUPSRounds` 软上限
-- [ ] 4.3 更新 `openspec/specs/d7-orchestration/pipeline-architecture.md` 引用本 change
-- [ ] 4.4 `/openspec-archive` 前 acceptance-report
+- [x] **4.1** `sessionNoForwardProgress` → recursive subtree stuck + inline budget — `@T(D7-S2-A87-T01)` `@L5(L5-D7-CC-03)`
+  - `EvaluateSessionExit` 统一入口 — 待补（P2）
+
+- [ ] **4.2** 可选 Session `MaxMUPSRounds` 软上限（env-gated，默认 0=disabled）— `@T(D7-S2-A87-T02)` P2
+
+- [x] **4.3** `buildSessionCompleteEvent` open incomplete deliverable 安全网 — `@T(D7-S2-A73-T05)` `@L5(L5-D7-CC-07)`
+
+- [x] **4.4** 更新 `openspec/specs/d7-orchestration/pipeline-architecture.md` §4.1 Convergence Contract 引用
+
+- [ ] **4.5** staging 手工 T7b：飞书 `review d2 领域 kernel目录下代码` — `@L5(L5-D7-CC-07)` P1
+
+- [ ] **4.6** `/openspec-archive` 前 `acceptance-report.md`
 
 **Quality Gate:**
-- [ ] 真实飞书指令 `review d2 领域 kernel目录下代码` 回归
+- [ ] T1–T7a CI 全绿；T7b staging 记录于 acceptance-report
 
 ---
 
 ## Completion Checklist
 
+- [x] Phase 1 P0 完成并可独立合入
 - [ ] All phases complete
-- [ ] T1–T7 集成测试绿
+- [ ] T1–T7a 集成测试绿（核心 CI 已绿；T4/T7a stub 待补）
 - [ ] design.md 决策树与代码一致
+- [ ] `t-registry.md` 登记 D7-S5-A93/A94、D7-S2-A86/A87、D7-S15-A43
 - [ ] Ready for `/openspec-apply d7-convergence-contract`

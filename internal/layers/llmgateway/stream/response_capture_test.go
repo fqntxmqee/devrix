@@ -37,6 +37,27 @@ func TestBuildStreamResponseInfo_LogContentOn(t *testing.T) {
 	}
 }
 
+func TestStreamResponseCapture_DedupesStreamingToolCallFrames(t *testing.T) {
+	cap := newStreamResponseCapture()
+	call := llmgateway.ToolCall{ID: "call_019f284a", Name: "bash", Input: `{"command":"ls -la internal/layers/orchestration/plan/"}`}
+	// Mimic SSE parser emitting the same merged call on each delta frame.
+	cap.observe(llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{call}})
+	cap.observe(llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{call}})
+	cap.observe(llmgateway.Chunk{ToolCalls: []llmgateway.ToolCall{call}, FinishReason: "tool_calls"})
+
+	info := buildStreamResponseInfo(nil, llmgateway.TokenUsage{}, "minimax", "MiniMax-M3", cap)
+	if info["tool_calls_count"] != 1 {
+		t.Fatalf("tool_calls_count = %v, want 1", info["tool_calls_count"])
+	}
+	tools, ok := info["tool_calls"].([]map[string]interface{})
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tool_calls = %#v, want single entry", info["tool_calls"])
+	}
+	if tools[0]["id"] != "call_019f284a" {
+		t.Fatalf("tool call id = %v", tools[0]["id"])
+	}
+}
+
 func TestBuildStreamResponseInfo_LogContentOff(t *testing.T) {
 	incident.ConfigureLLMLogging(incident.LLMLogSettings{LogContent: false})
 

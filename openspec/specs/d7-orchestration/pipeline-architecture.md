@@ -296,6 +296,20 @@ RunSessionTurnLoop(ctx, req, intent)
             Decide spawn/rollup → WorkTree 状态迁移 → 下一 focus 或 break
 ```
 
+### 4.1 Convergence Contract（DM-20260703-001）
+
+Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC-1～CC-5** 不变式；完整决策树见 `openspec/changes/d7-convergence-contract/design.md` §CC-1。
+
+| 契约 | 代码锚点 | 要点 |
+|------|----------|------|
+| **CC-1.1** Round terminalization | `workmodel/spawn_policy.go` R0.5 | applicable schema 且 deliverable complete → `SpawnNone`；Pass 不得与 incomplete deliverable 配对 |
+| **CC-1.2** Inline budget | `workmodel/inline_retry.go`, `terminalize.go` | `InlineRetriesAtMaxDepth`（默认 3）；rollup 轮次 deliverable 标 `not_applicable` |
+| **CC-1.3** Rollup gate | `workmodel/rollup_gate.go` | `MaybeParentRollup` / `MaybeSiblingBestEffortRollup` |
+| **CC-1.4** Child bubble | `item_observe.go` | terminal structured child → parent Observe |
+| **CC-1.5** Session complete | `session_complete.go` | `ExtractSessionDeliverable` → `BestEffortSessionSummary` → `task_incomplete` 安全网 |
+
+Focus 续跑：`GetPipelineFocus` 仅 refocus `SpawnInline + DeliverableContinuationRequired`（Pass→Inline 路径，不再 refocus `SpawnNone+InProgress`）。
+
 > 下列为 **ItemPipelineRunner.Run 内部** 各阶段细节（原 §4 OrchestratePath 6 步时序，语义不变，入口已迁移）：
 
 ```

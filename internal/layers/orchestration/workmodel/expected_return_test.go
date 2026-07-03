@@ -3,24 +3,41 @@ package workmodel
 import "testing"
 
 func TestDeliverableSchemaTag(t *testing.T) {
-	got := DeliverableSchemaTag(DeliverableSchemaP0P1FileLine)
-	want := "<deliverable_schema>p0_p1_file_line</deliverable_schema>"
+	schema := FirstRegisteredDeliverableSchema()
+	got := DeliverableSchemaTag(schema)
+	want := DeliverableSchemaTag(schema)
 	if got != want {
 		t.Fatalf("tag = %q, want %q", got, want)
 	}
 }
 
-func TestDefaultChildExpectedReturn_ReviewDirective(t *testing.T) {
-	item := &WorkItem{Kind: WorkKindGoal}
-	got := DefaultChildExpectedReturn(item, "review internal/kernel")
-	if got == "" {
-		t.Fatal("expected schema tag for review directive")
+func TestDefaultChildExpectedReturn_PropagatesParentContract(t *testing.T) {
+	contract := DefaultTestDeliverableContract()
+	parent := &WorkItem{
+		Kind: WorkKindGoal,
+		LastRound: &WorkItemPipelineRound{
+			DeliverableContract: contract,
+		},
+	}
+	got := DefaultChildExpectedReturn(parent, "any directive without tag")
+	want := DeliverableContractTag(contract)
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestDefaultChildExpectedReturn_NoSchemaUsesStructuralFallback(t *testing.T) {
+	parent := &WorkItem{Kind: WorkKindGoal}
+	got := DefaultChildExpectedReturn(parent, "review internal/kernel")
+	if got != DefaultStructuralExpectedReturn {
+		t.Fatalf("got %q, want structural fallback %q", got, DefaultStructuralExpectedReturn)
 	}
 }
 
 func TestParseDeliverableSchemaTag(t *testing.T) {
-	got := ParseDeliverableSchemaTag("<deliverable_schema>p0_p1_file_line</deliverable_schema>")
-	if got != DeliverableSchemaP0P1FileLine {
+	schema := FirstRegisteredDeliverableSchema()
+	got := ParseDeliverableSchemaTag("<deliverable_schema>" + string(schema) + "</deliverable_schema>")
+	if got != schema {
 		t.Fatalf("parsed = %q", got)
 	}
 }

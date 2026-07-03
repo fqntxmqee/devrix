@@ -30,6 +30,7 @@ func noTacticalHardcodingSources(t *testing.T) []string {
 	}
 	return []string{
 		filepath.Join(root, "internal/layers/orchestration/workmodel/decompose_proposer.go"),
+		filepath.Join(root, "internal/layers/orchestration/workmodel/deliverable.go"),
 		filepath.Join(root, "internal/layers/orchestration/workmodel/context_proposer.go"),
 		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/observation_proposer.go"),
 		filepath.Join(root, "internal/layers/orchestration/sessionorchestrator/llm_observation_proposer.go"),
@@ -75,6 +76,7 @@ func TestDefaultDecomposeProposer_NoTacticalHardcoding(t *testing.T) {
 			"contracts and API surface",
 			"implementation and observability",
 			"hypothesis",
+			"reviewHints",
 		} {
 			if strings.Contains(src, forbidden) {
 				t.Fatalf("%s contains forbidden tactical string %q", path, forbidden)
@@ -87,6 +89,9 @@ func TestDefaultDecomposeProposer_NoHypothesisLabels(t *testing.T) {
 	item := &WorkItem{
 		Kind:      WorkKindGoal,
 		Directive: "review d2 kernel code",
+		LastRound: &WorkItemPipelineRound{
+			DeliverableContract: DefaultTestDeliverableContract(),
+		},
 	}
 	round := &WorkItemPipelineRound{PlanKind: plan.ExplorationPlan}
 	specs := DefaultDecomposeProposer(item, round)
@@ -99,8 +104,8 @@ func TestDefaultDecomposeProposer_NoHypothesisLabels(t *testing.T) {
 	if specs[0].ExpectedReturn == "" {
 		t.Fatal("expected_return required")
 	}
-	if !strings.Contains(specs[0].ExpectedReturn, "deliverable_schema") {
-		t.Fatalf("expected machine schema tag, got %q", specs[0].ExpectedReturn)
+	if !strings.Contains(specs[0].ExpectedReturn, "deliverable_contract") {
+		t.Fatalf("expected machine contract tag, got %q", specs[0].ExpectedReturn)
 	}
 }
 

@@ -38,7 +38,47 @@ func TestSpawnPolicyEvaluator_R0_RunningChildren(t *testing.T) {
 	}
 }
 
-func TestSpawnPolicyEvaluator_R1_MaxDepth(t *testing.T) {
+func TestSpawnPolicyEvaluator_R1_MaxDepth_IncompleteDeliverable(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.9)
+	round.DeliverableSchema = FirstRegisteredDeliverableSchema()
+	round.DeliverableStatus = DeliverableStatusIncomplete
+	ctx := baseCtx()
+	ctx.Depth = 3
+	ctx.MaxDepth = 3
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnInline {
+		t.Fatalf("R1 incomplete: got %q, want inline", got)
+	}
+}
+
+// T: D7-S5-A93-T01 (DM-20260703-001 CC-1.1 R0.5)
+func TestSpawnPolicyEvaluator_R05_DeliverableCompleteAtMaxDepth(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.9)
+	round.DeliverableSchema = FirstRegisteredDeliverableSchema()
+	round.DeliverableStatus = DeliverableStatusComplete
+	ctx := baseCtx()
+	ctx.Depth = 3
+	ctx.MaxDepth = 3
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnNone {
+		t.Fatalf("R0.5: got %q, want none", got)
+	}
+}
+
+// T: D7-S5-A93-T02 (DM-20260703-001 CC-1.2)
+func TestSpawnPolicyEvaluator_R1_InlineRetriesExhaustedEscalates(t *testing.T) {
+	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.9)
+	round.DeliverableSchema = FirstRegisteredDeliverableSchema()
+	round.DeliverableStatus = DeliverableStatusIncomplete
+	ctx := baseCtx()
+	ctx.Depth = 3
+	ctx.MaxDepth = 3
+	ctx.InlineRetriesAtMaxDepth = DefaultMaxInlineRetriesAtMaxDepth
+	ctx.MaxInlineRetriesAtMaxDepth = DefaultMaxInlineRetriesAtMaxDepth
+	if got := SpawnPolicyEvaluator(round, ctx); got != SpawnEscalateHuman {
+		t.Fatalf("R1 exhausted: got %q, want escalate_human", got)
+	}
+}
+
+func TestSpawnPolicyEvaluator_R1_MaxDepth_NoDeliverableSchema(t *testing.T) {
 	round := baseRound(types.VerdictPartial, plan.ExplorationPlan, 0.9)
 	ctx := baseCtx()
 	ctx.Depth = 3

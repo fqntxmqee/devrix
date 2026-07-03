@@ -8,6 +8,6 @@ const WorkItemOutputFormatHints = `
 - Verifiable conclusion: <conclusion>...</conclusion>
 - Residual uncertainty: <open_questions>one question per line</open_questions>
 - Scope boundary (optional JSON): <scope_contract>{"goal_statement":"","in_scope":[],"out_of_scope":[],"assumptions":[],"open_questions":[],"success_criteria":[]}</scope_contract>
-- Deliverable schema (when ExpectedReturn requests it): <deliverable_schema>p0_p1_file_line</deliverable_schema>
+- Deliverable schema (only when ExpectedReturn or directive already names one): <deliverable_schema>{registered_schema}</deliverable_schema>
 - Do not label observations as ObsFact/ObsSignal/ObsDeviation/ObsUncertainty; Observe classifies signals.
 `

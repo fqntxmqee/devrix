@@ -68,7 +68,7 @@ func TestRunSessionTurnLoop_FreshSession_SeedsGoalFromMessage(t *testing.T) {
 
 	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
 		SessionID: sessionID,
-		Message:   "review d2 domain code",
+		Message:   "implement cache layer feature",
 	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
 	if err != nil {
 		t.Fatalf("RunSessionTurnLoop: %v", err)
@@ -89,7 +89,7 @@ func TestRunSessionTurnLoop_FreshSession_SeedsGoalFromMessage(t *testing.T) {
 	if !ok || goal == nil {
 		t.Fatalf("expected goal WorkItem to be seeded from req.Message")
 	}
-	if goal.Directive != "review d2 domain code" {
+	if goal.Directive != "implement cache layer feature" {
 		t.Fatalf("goal.Directive = %q, want seeded from req.Message", goal.Directive)
 	}
 }
@@ -190,6 +190,73 @@ func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	goal, _ = tm.GetWorkItem(sessionID, goal.ID)
 	if goal.Status != workmodel.TaskStatusCompleted {
 		t.Fatalf("parent status = %q, want completed after children", goal.Status)
+	}
+}
+
+// T: D7-S2-A86-T03 (DM-20260703-001 L5-D7-CC-07) — session loop delegates to pipeline retry.
+func TestRunSessionTurnLoop_RetriesWhenDeliverableIncomplete(t *testing.T) {
+	exec := &multiRoundReviewExecutor{}
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	runner.Executor = exec
+	orch := NewSessionOrchestrator(
+		orchtypes.DefaultConfig(),
+		&recordingExecutor{},
+		WithTaskManager(tm),
+		WithItemPipelineRunner(runner),
+		WithLearner(runner.Learner),
+	)
+
+	sessionID := "sess-incomplete-retry"
+	directive := directiveWithDeliverableSchema("review d2 domain kernel directory code")
+	goal, _ := tm.EnsureGoal(sessionID, directive)
+	ph, _ := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{
+		ParentID: goal.ID, Kind: workmodel.WorkKindImplement, Title: "done",
+	})
+	_ = tm.Tree().UpdateStatus(sessionID, ph.ID, workmodel.TaskStatusInProgress)
+	_ = tm.Tree().UpdateStatus(sessionID, ph.ID, workmodel.TaskStatusCompleted)
+
+	ch, err := orch.RunSessionTurnLoop(context.Background(), orchtypes.ProcessRequest{
+		SessionID: sessionID,
+		Message:   directive,
+	}, orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate})
+	if err != nil {
+		t.Fatalf("RunSessionTurnLoop: %v", err)
+	}
+	events := drainEvents(ch)
+	if exec.calls < 2 {
+		// Pipeline-level retry is covered by TestRunItemPipeline_IncompleteDeliverable_InlineRetry.
+		goal, _ = tm.GetWorkItem(sessionID, goal.ID)
+		t.Fatalf("executor calls = %d, want >= 2; last spawn=%q status=%q deliverable=%s",
+			exec.calls, goal.LastRound.SpawnPolicy, goal.Status, goal.LastRound.DeliverableStatus)
+	}
+	pipelineRounds := 0
+	var complete *contracts.EngineEvent
+	for _, ev := range events {
+		if ev == nil {
+			continue
+		}
+		if ev.Type == "pipeline_round" {
+			pipelineRounds++
+		}
+		if ev.Type == "complete" {
+			complete = ev
+		}
+	}
+	if pipelineRounds < 2 {
+		t.Fatalf("pipeline_round events = %d, want >= 2", pipelineRounds)
+	}
+	if complete == nil {
+		t.Fatal("missing complete event")
+	}
+	if complete.Metadata["task_incomplete"] == "true" {
+		t.Fatalf("complete flagged task_incomplete after successful retry: %q", complete.Content)
+	}
+	goal, _ = tm.GetWorkItem(sessionID, mustGoalID(t, tm, sessionID))
+	if goal.Status != workmodel.TaskStatusCompleted {
+		t.Fatalf("goal status = %q, want completed after retry", goal.Status)
+	}
+	if !strings.Contains(complete.Content, "kernel/foo.go:42") {
+		t.Fatalf("complete should carry deliverable from retry round, got %q", complete.Content)
 	}
 }
 

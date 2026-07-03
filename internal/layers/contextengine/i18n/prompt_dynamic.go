@@ -1,6 +1,9 @@
 package i18n
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // DynamicBoundaryMarker separates static and dynamic system prompt sections.
 const DynamicBoundaryMarker = "<!-- DYNAMIC_CONTENT_BOUNDARY -->"
@@ -68,18 +71,19 @@ func EscapeArbitratorJSONSchemaHint(loc Locale) string {
 }
 
 // StrategicPlanAppendix is the system-prompt appendix injected after
-// the D2-prepared system prompt for the strategic plan proposer
-// (sessionorchestrator.LLMStrategicPlanProposer). RH-D7-13
-// (DM-20260630-013 T-P2-11.2) lifts these strings from package-level
-// `strategicPlanAppendixZH/EN` constants into the i18n package so
-// future locale expansion does not require editing orchestration
-// code. The schema (execution_mode/scope_in/child_specs/...) is
-// kept verbatim to preserve prompt-snapshot test parity.
-func StrategicPlanAppendix(loc Locale) string {
+// the D2-prepared system prompt for the strategic plan proposer.
+// contractDimensionDoc is workmodel.ContractDimensionPromptDoc() at call site.
+func StrategicPlanAppendix(loc Locale, contractDimensionDoc string) string {
+	dims := strings.TrimSpace(contractDimensionDoc)
+	if dims == "" {
+		dims = `{"citation":["none","file_line"],"severity":["none","p0_p1"],"reject":["planning_meta"]}`
+	}
+	contractExample := `{"citation":"file_line","severity":"p0_p1","reject":["planning_meta"],"min_runes":0}`
 	if loc == LocaleEN {
 		return "You propose strategic execution plans for an orchestration Plan node.\n" +
 			"Return ONLY a JSON object (no markdown):\n" +
-			"{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_schema\":\"p0_p1_file_line|not_applicable\",\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n" +
+			fmt.Sprintf("{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_contract\":%s,\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n", contractExample) +
+			fmt.Sprintf("deliverable_contract dimensions (compose from categories only): %s\n\n", dims) +
 			"Rules:\n" +
 			"- Use ONLY the directive and observation summary below; do not invent files.\n" +
 			"- Prefer execution_mode=single when scope is clear and small enough for one pass.\n" +
@@ -87,7 +91,8 @@ func StrategicPlanAppendix(loc Locale) string {
 			"- react_iters_hint between 1 and 5."
 	}
 	return "你是编排 Plan 节点的战略提案助手。仅返回 JSON 对象（不要 markdown）：\n" +
-		"{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_schema\":\"p0_p1_file_line|not_applicable\",\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n" +
+		fmt.Sprintf("{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_contract\":%s,\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n", contractExample) +
+		fmt.Sprintf("deliverable_contract 维度（仅从类别组合）: %s\n\n", dims) +
 		"规则：\n" +
 		"- 只能使用下方 directive 与 Obs 摘要；不要编造未提供的文件列表。\n" +
 		"- 范围清晰且可一次完成时优先 execution_mode=single。\n" +

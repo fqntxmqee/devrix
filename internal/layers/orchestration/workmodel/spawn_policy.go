@@ -32,13 +32,23 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 	if ctx.MaxRollupRetries <= 0 {
 		ctx.MaxRollupRetries = DefaultMaxRollupRetries
 	}
+	if ctx.MaxInlineRetriesAtMaxDepth <= 0 {
+		ctx.MaxInlineRetriesAtMaxDepth = DefaultMaxInlineRetriesAtMaxDepth
+	}
 
 	// R0
 	if ctx.RunningChildren > 0 {
 		return SpawnAwait
 	}
-	// R1
+	// R0.5 — CC-1.1: applicable deliverable satisfied → terminal before R1.
+	if applicableDeliverableSchema(round) && !deliverableContinuationRequired(round) {
+		return SpawnNone
+	}
+	// R1 — max depth with continuation: bounded inline, then escalate.
 	if ctx.Depth >= ctx.MaxDepth {
+		if ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth {
+			return SpawnEscalateHuman
+		}
 		return SpawnInline
 	}
 	// R2
@@ -46,16 +56,16 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		return SpawnEscalateHuman
 	}
 
-	// RH-MUPS-12 / RH-D7-05: review deliverable still incomplete on a
-	// decomposable parent with no children yet → split by scope instead of
-	// burning inline retries on the root Goal.
-	if shouldDecomposeForDeliverable(round, ctx) {
-		return SpawnDecompose
-	}
-
 	switch round.VerdictKind {
 	case types.VerdictPass:
-		// R3 / R4 — converged success for commitment and exploratory plans.
+		// CC-1 / §8.1: Pass with applicable schema MUST NOT SpawnNone while
+		// deliverable is still owed — inline (or R1 budget) instead.
+		if deliverableContinuationRequired(round) {
+			if IsDeliverableInlineBudgetExhaustedFromCtx(ctx) {
+				return SpawnEscalateHuman
+			}
+			return SpawnInline
+		}
 		return SpawnNone
 
 	case types.VerdictPartial:
@@ -81,6 +91,9 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 			return SpawnDecompose
 		}
 		if deliverableContinuationRequired(round) {
+			if IsDeliverableInlineBudgetExhaustedFromCtx(ctx) {
+				return SpawnEscalateHuman
+			}
 			return SpawnInline
 		}
 		return SpawnNone
@@ -147,6 +160,11 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		return fmt.Sprintf("R0: %d running children", ctx.RunningChildren)
 	case SpawnInline:
 		if deliverableContinuationRequired(round) {
+			if ctx.Depth >= ctx.MaxDepth {
+				return fmt.Sprintf("R1: max depth inline retry %d/%d (schema=%s status=%s)",
+					ctx.InlineRetriesAtMaxDepth+1, ctx.MaxInlineRetriesAtMaxDepth,
+					round.DeliverableSchema, round.DeliverableStatus)
+			}
 			return fmt.Sprintf("deliverable incomplete (schema=%s status=%s): inline retry",
 				round.DeliverableSchema, round.DeliverableStatus)
 		}
@@ -161,15 +179,16 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		if ctx.DailyLimitExceeded {
 			return "R2: daily decompose limit exceeded"
 		}
+		if ctx.Depth >= ctx.MaxDepth && deliverableContinuationRequired(round) &&
+			ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth {
+			return fmt.Sprintf("R1: inline retries exhausted at max depth (%d/%d)",
+				ctx.InlineRetriesAtMaxDepth, ctx.MaxInlineRetriesAtMaxDepth)
+		}
 		if ctx.RollupRound {
 			return fmt.Sprintf("rollup retries exhausted (%d/%d)", ctx.RollupRetries, ctx.MaxRollupRetries)
 		}
 		return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
 	case SpawnDecompose:
-		if deliverableContinuationRequired(round) {
-			return fmt.Sprintf("deliverable incomplete (schema=%s status=%s) → decompose",
-				round.DeliverableSchema, round.DeliverableStatus)
-		}
 		if round.VerdictKind == types.VerdictIndeterminate {
 			return fmt.Sprintf("R7: indeterminate retries exhausted → decompose (plan=%d uncertainty=%.2f)",
 				round.PlanKind, round.UncertaintyMean)
@@ -179,20 +198,14 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 	case SpawnParallelExplore:
 		return fmt.Sprintf("R6: scenario fail plan=%d → parallel probe", round.PlanKind)
 	case SpawnNone:
+		if applicableDeliverableSchema(round) && !deliverableContinuationRequired(round) {
+			return fmt.Sprintf("R0.5: deliverable complete (schema=%s) → terminal",
+				round.DeliverableSchema)
+		}
 		return fmt.Sprintf("R3/R4/R8: verdict=%s plan=%d converged or terminal fail", round.VerdictKind, round.PlanKind)
 	default:
 		return ""
 	}
-}
-
-func shouldDecomposeForDeliverable(round *WorkItemPipelineRound, ctx TreeEvalContext) bool {
-	if !deliverableContinuationRequired(round) {
-		return false
-	}
-	if ctx.RollupRound || !ctx.CanDecompose || ctx.ChildTotal > 0 {
-		return false
-	}
-	return round.DeliverableSchema == DeliverableSchemaP0P1FileLine
 }
 
 // DeliverableContinuationRequired reports whether a round still owes a
@@ -209,8 +222,7 @@ func deliverableContinuationRequired(round *WorkItemPipelineRound) bool {
 	if round == nil {
 		return false
 	}
-	schema := round.DeliverableSchema
-	if schema == "" || schema == DeliverableSchemaNotApplicable {
+	if !round.DeliverableContract.ContractApplicable() && !IsRegisteredDeliverableSchema(round.DeliverableSchema) {
 		return false
 	}
 	status := round.DeliverableStatus
@@ -218,4 +230,18 @@ func deliverableContinuationRequired(round *WorkItemPipelineRound) bool {
 		return false
 	}
 	return status != DeliverableStatusComplete
+}
+
+func applicableDeliverableSchema(round *WorkItemPipelineRound) bool {
+	if round == nil {
+		return false
+	}
+	if round.DeliverableContract.ContractApplicable() {
+		return true
+	}
+	return IsRegisteredDeliverableSchema(round.DeliverableSchema)
+}
+
+func IsDeliverableInlineBudgetExhaustedFromCtx(ctx TreeEvalContext) bool {
+	return ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth
 }

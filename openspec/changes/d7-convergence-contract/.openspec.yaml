@@ -5,6 +5,7 @@ created: 2026-07-03
 domains:
   - d7-orchestration
 artifacts:
+  - demand.md
   - proposal.md
   - design.md
   - tasks.md

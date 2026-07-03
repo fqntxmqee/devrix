@@ -60,6 +60,24 @@ func TestBuildSessionCompleteEvent_should_emit_task_incomplete_when_both_bad(t *
 	}
 }
 
+func TestBuildSessionCompleteEvent_should_emit_task_incomplete_when_open_incomplete_deliverable(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	sessionID := "sess-open-incomplete"
+	goal, _ := tm.EnsureGoal(sessionID, "review kernel")
+	_ = tm.Tree().UpdateStatus(sessionID, goal.ID, workmodel.TaskStatusInProgress)
+	_ = tm.Tree().ApplyPipelineRound(sessionID, goal.ID, &workmodel.WorkItemPipelineRound{
+		SpawnPolicy:       workmodel.SpawnInline,
+		DeliverableSchema: workmodel.FirstRegisteredDeliverableSchema(),
+		DeliverableStatus: workmodel.DeliverableStatusIncomplete,
+		ArtifactSummary:   "P0: issue in internal/foo.go:1",
+	}, workmodel.RoundPhaseIdle)
+
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "P0: issue in internal/foo.go:1")
+	if ev.Metadata["task_incomplete"] != "true" {
+		t.Fatalf("expected task_incomplete when open WI owes deliverable, meta=%v", ev.Metadata)
+	}
+}
+
 func TestRunSessionTurnLoop_CompletePrefersRollupDeliverable(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
 	runner.Executor = &rollupContentExecutor{summary: validRollupSummary(), capture: nil}

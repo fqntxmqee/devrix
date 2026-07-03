@@ -43,7 +43,7 @@ ChildSpec{Directive: base, ScopeIn: paths, ExpectedReturn: DefaultChildExpectedR
 "ParentGoal: …\nChildOutcomes: …\nExpectedReturn: <deliverable_schema>…"
 
 // GOOD — Execute 只加机器 tag
-AppendDeliverableExecuteHint(directive, schema) // → <deliverable_schema>p0_p1_file_line</deliverable_schema>
+AppendDeliverableExecuteHint(directive, schema) // → workmodel.DeliverableSchemaTag(schema)
 ```
 
 ## 回归测试

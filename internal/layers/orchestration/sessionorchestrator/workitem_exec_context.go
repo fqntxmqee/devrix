@@ -18,7 +18,9 @@ type WorkItemExecContext struct {
 	Tasks *workmodel.TaskManager
 	// MaxItersOverride when >0 caps the ReAct loop for this execute (DM-20260630-012).
 	MaxItersOverride int
-	// DeliverableSchema selects Verify deliverable gate for this round.
+	// DeliverableContract selects Verify deliverable gate for this round.
+	DeliverableContract workmodel.DeliverableContract
+	// DeliverableSchema is deprecated; kept for legacy round serialization.
 	DeliverableSchema workmodel.DeliverableSchema
 	// PriorVerifyReason carries the previous round's verify verdict reason
 	// (RH-MUPS-10 / D7-S9-A91, DM-20260701-001). When the executor is being

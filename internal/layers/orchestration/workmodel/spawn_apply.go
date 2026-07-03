@@ -1,12 +1,21 @@
 package workmodel
 
 // PrepareDecomposeSpecs ensures round carries capped child specs and passes I4.
-func PrepareDecomposeSpecs(item *WorkItem, round *WorkItemPipelineRound) error {
+func PrepareDecomposeSpecs(sessionID string, item *WorkItem, round *WorkItemPipelineRound, tm *TaskManager) error {
 	if round == nil {
 		return errSpawnRoundRequired
 	}
 	if len(round.ChildSpecs) == 0 {
 		round.ChildSpecs = DefaultDecomposeProposer(item, round)
+	}
+	workDir := ""
+	if tm != nil {
+		workDir = tm.SessionWorkDir(sessionID)
+	}
+	round.ChildSpecs = FilterValidatedChildSpecs(item, round.ChildSpecs, workDir)
+	if len(round.ChildSpecs) == 0 {
+		round.ChildSpecs = DefaultDecomposeProposer(item, round)
+		round.ChildSpecs = FilterValidatedChildSpecs(item, round.ChildSpecs, workDir)
 	}
 	round.ChildSpecs = CapChildSpecs(round.ChildSpecs)
 	return ValidateSpawnDecompose(round)
@@ -24,13 +33,20 @@ func ApplySpawnPolicy(sessionID string, item *WorkItem, round *WorkItemPipelineR
 			round.SpawnRationale = "spawn guard: kind " + string(item.Kind) + " cannot decompose → inline retry"
 			return nil
 		}
-		if err := PrepareDecomposeSpecs(item, round); err != nil {
+		if err := PrepareDecomposeSpecs(sessionID, item, round, tm); err != nil {
 			return err
 		}
 		_, err := tm.DecomposeChildren(sessionID, item.ID, round.ChildSpecs)
+		if err == nil {
+			_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
+		}
 		return err
 	case SpawnEscalateHuman:
-		return createHumanReviewWorkItem(sessionID, item, round, tm)
+		if err := createHumanReviewWorkItem(sessionID, item, round, tm); err != nil {
+			return err
+		}
+		_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
+		return nil
 	default:
 		return nil
 	}
@@ -59,8 +75,21 @@ func createHumanReviewWorkItem(sessionID string, item *WorkItem, round *WorkItem
 	return nil
 }
 
+// pipelineItemNeedsContinuation reports whether the session loop should schedule
+// another MUPS round on this WorkItem (DM-20260703-001 CC-1 / D7-S2-A86-T02).
+func pipelineItemNeedsContinuation(item *WorkItem) bool {
+	if item == nil || item.LastRound == nil || item.Status != TaskStatusInProgress {
+		return false
+	}
+	if item.LastRound.SpawnPolicy == SpawnInline {
+		return DeliverableContinuationRequired(item.LastRound)
+	}
+	return false
+}
+
 // GetPipelineFocus selects the next WorkItem for RunSessionTurnLoop (Phase C).
-// Pending ready items win; otherwise in_progress items awaiting SpawnInline retry.
+// Pending ready items win; otherwise in_progress items needing inline retry
+// or deliverable continuation after SpawnNone stagnation.
 func (t *WorkTree) GetPipelineFocus(sessionID string) (*WorkItem, error) {
 	if t == nil {
 		return nil, nil
@@ -75,8 +104,7 @@ func (t *WorkTree) GetPipelineFocus(sessionID string) (*WorkItem, error) {
 		if item == nil || item.Ephemeral || isTerminalStatus(item.Status) {
 			continue
 		}
-		if item.Status == TaskStatusInProgress && item.LastRound != nil &&
-			item.LastRound.SpawnPolicy == SpawnInline {
+		if pipelineItemNeedsContinuation(item) {
 			return item, nil
 		}
 	}

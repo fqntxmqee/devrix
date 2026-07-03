@@ -215,3 +215,50 @@ func TestNewRollupReportFromRound(t *testing.T) {
 		t.Fatal("GeneratedAt must be set")
 	}
 }
+
+func TestMaybeParentRollup_IntermediateImplementParent(t *testing.T) {
+	tm := NewTaskManager()
+	goal, _ := tm.EnsureGoal("s1", "review")
+	child, err := tm.CreateWorkItem("s1", CreateWorkItemInput{
+		ParentID: goal.ID, Kind: WorkKindImplement, Title: "slice",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf, err := tm.CreateWorkItem("s1", CreateWorkItemInput{
+		ParentID: child.ID, Kind: WorkKindImplement, Title: "leaf",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = tm.Tree().ApplyPipelineRound("s1", child.ID, &WorkItemPipelineRound{
+		SpawnPolicy: SpawnDecompose,
+		VerdictKind: types.VerdictPartial,
+	}, RoundPhaseAwaitChild)
+	_ = tm.Tree().UpdateStatus("s1", child.ID, TaskStatusInProgress)
+	_ = tm.Tree().UpdateStatus("s1", leaf.ID, TaskStatusInProgress)
+	_ = tm.Tree().UpdateStatus("s1", leaf.ID, TaskStatusCompleted)
+	_ = tm.Tree().ApplyPipelineRound("s1", leaf.ID, &WorkItemPipelineRound{
+		DeliverableSchema: FirstRegisteredDeliverableSchema(),
+		DeliverableStatus: DeliverableStatusComplete,
+		VerdictKind:       types.VerdictPass,
+	}, RoundPhaseIdle)
+
+	// Normal path: child terminal rollup via reevaluate.
+	ReevaluateParentAfterChild("s1", leaf.ID, tm)
+	childGot, _ := tm.GetWorkItem("s1", child.ID)
+	if childGot == nil || !childGot.NeedsRollup {
+		got, ok := MaybeParentRollup("s1", tm)
+		if !ok || got == nil || got.ID != child.ID {
+			t.Fatalf("NeedsRollup=false and MaybeParentRollup = %v/%v, want implement parent %s",
+				got, ok, child.ID)
+		}
+		if !got.NeedsRollup {
+			t.Fatal("expected NeedsRollup on implement parent")
+		}
+		return
+	}
+	if childGot.ID != child.ID {
+		t.Fatalf("NeedsRollup set on wrong item %s", childGot.ID)
+	}
+}
