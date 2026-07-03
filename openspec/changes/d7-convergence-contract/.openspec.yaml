@@ -1,0 +1,11 @@
+change_id: d7-convergence-contract
+title: D7 任务树收敛契约
+status: draft
+created: 2026-07-03
+domains:
+  - d7-orchestration
+artifacts:
+  - proposal.md
+  - design.md
+  - tasks.md
+  - specs/d7-orchestration_convergence_delta.md
