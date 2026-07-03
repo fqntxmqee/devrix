@@ -46,6 +46,13 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		return SpawnEscalateHuman
 	}
 
+	// RH-MUPS-12 / RH-D7-05: review deliverable still incomplete on a
+	// decomposable parent with no children yet → split by scope instead of
+	// burning inline retries on the root Goal.
+	if shouldDecomposeForDeliverable(round, ctx) {
+		return SpawnDecompose
+	}
+
 	switch round.VerdictKind {
 	case types.VerdictPass:
 		// R3 / R4 — converged success for commitment and exploratory plans.
@@ -72,6 +79,9 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		}
 		if round.UncertaintyMean >= ctx.Threshold {
 			return SpawnDecompose
+		}
+		if deliverableContinuationRequired(round) {
+			return SpawnInline
 		}
 		return SpawnNone
 
@@ -136,6 +146,10 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 	case SpawnAwait:
 		return fmt.Sprintf("R0: %d running children", ctx.RunningChildren)
 	case SpawnInline:
+		if deliverableContinuationRequired(round) {
+			return fmt.Sprintf("deliverable incomplete (schema=%s status=%s): inline retry",
+				round.DeliverableSchema, round.DeliverableStatus)
+		}
 		if ctx.Depth >= ctx.MaxDepth {
 			return fmt.Sprintf("R1: depth %d >= max %d", ctx.Depth, ctx.MaxDepth)
 		}
@@ -152,6 +166,10 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		}
 		return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
 	case SpawnDecompose:
+		if deliverableContinuationRequired(round) {
+			return fmt.Sprintf("deliverable incomplete (schema=%s status=%s) → decompose",
+				round.DeliverableSchema, round.DeliverableStatus)
+		}
 		if round.VerdictKind == types.VerdictIndeterminate {
 			return fmt.Sprintf("R7: indeterminate retries exhausted → decompose (plan=%d uncertainty=%.2f)",
 				round.PlanKind, round.UncertaintyMean)
@@ -165,4 +183,39 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 	default:
 		return ""
 	}
+}
+
+func shouldDecomposeForDeliverable(round *WorkItemPipelineRound, ctx TreeEvalContext) bool {
+	if !deliverableContinuationRequired(round) {
+		return false
+	}
+	if ctx.RollupRound || !ctx.CanDecompose || ctx.ChildTotal > 0 {
+		return false
+	}
+	return round.DeliverableSchema == DeliverableSchemaP0P1FileLine
+}
+
+// DeliverableContinuationRequired reports whether a round still owes a
+// registered deliverable schema (RH-MUPS-12). Exported for session loop
+// stagnation checks in sessionorchestrator.
+func DeliverableContinuationRequired(round *WorkItemPipelineRound) bool {
+	return deliverableContinuationRequired(round)
+}
+
+// deliverableContinuationRequired reports whether SpawnNone would leave an
+// applicable deliverable schema unsatisfied — the WorkItem must inline-retry
+// (or decompose) instead of stopping. RH-MUPS-12 (2026-07-03).
+func deliverableContinuationRequired(round *WorkItemPipelineRound) bool {
+	if round == nil {
+		return false
+	}
+	schema := round.DeliverableSchema
+	if schema == "" || schema == DeliverableSchemaNotApplicable {
+		return false
+	}
+	status := round.DeliverableStatus
+	if status == DeliverableStatusNotApplicable {
+		return false
+	}
+	return status != DeliverableStatusComplete
 }

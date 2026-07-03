@@ -337,6 +337,15 @@ func applyStrategicScope(sessionID string, item *workmodel.WorkItem, prop *Strat
 	if prop == nil || item == nil || tm == nil || len(prop.ScopeIn) == 0 {
 		return
 	}
+	// RH-D7-05: decomposed child items carry authoritative scope via
+	// ChildDownlink at decompose time. Strategic plan LLM output must not
+	// overwrite persisted ScopeContract with hallucinated paths (e.g.
+	// internal/layers/d2/kernel/ instead of contextengine/kernel/).
+	if item.Kind != workmodel.WorkKindGoal {
+		if dl, ok := tm.ChildDownlinkFor(sessionID, item.ID); ok && len(dl.ScopeIn) > 0 {
+			return
+		}
+	}
 	sc := item.ScopeContract
 	if sc == nil {
 		sc = &workmodel.ScopeContract{}

@@ -167,7 +167,76 @@ func rootRollupFallbackEligible(root *WorkItem) bool {
 	}
 }
 
-// SessionRootGoal returns the session root goal WorkItem if any.
+// MaybeDecomposeParentRollup triggers rollup on a decomposed parent when all
+// direct non-checklist children are terminal but the parent has not yet
+// synthesized (Path A extension, RH-D7-05). Prevents session loop exit with
+// an await_child parent and no rollup deliverable.
+func MaybeDecomposeParentRollup(sessionID string, tm *TaskManager) (*WorkItem, bool) {
+	if tm == nil {
+		return nil, false
+	}
+	for _, item := range tm.Tree().List(sessionID) {
+		if item == nil || item.Kind != WorkKindGoal || item.ParentID != "" {
+			continue
+		}
+		if item.NeedsRollup {
+			continue
+		}
+		stats := childOutcomeStatsForParent(tm, sessionID, item.ID)
+		if stats.Total == 0 || stats.Running > 0 {
+			continue
+		}
+		if !parentHadDecomposeSpawn(item) {
+			continue
+		}
+		if err := tm.Tree().SetNeedsRollup(sessionID, item.ID, true); err != nil {
+			continue
+		}
+		if isTerminalStatus(item.Status) {
+			if err := tm.Tree().ReopenForRollup(sessionID, item.ID); err != nil {
+				continue
+			}
+		}
+		got, ok := tm.GetWorkItem(sessionID, item.ID)
+		if !ok {
+			return nil, false
+		}
+		return got, true
+	}
+	return nil, false
+}
+
+func parentHadDecomposeSpawn(parent *WorkItem) bool {
+	if parent == nil || parent.LastRound == nil {
+		return false
+	}
+	switch parent.LastRound.SpawnPolicy {
+	case SpawnDecompose, SpawnAwait:
+		return true
+	default:
+		return false
+	}
+}
+
+func childOutcomeStatsForParent(tm *TaskManager, sessionID, parentID string) ChildOutcomeStats {
+	var stats ChildOutcomeStats
+	for _, c := range tm.Tree().ListChildren(sessionID, parentID) {
+		if c == nil || c.Kind == WorkKindChecklist || c.Ephemeral {
+			continue
+		}
+		stats.Total++
+		switch c.Status {
+		case TaskStatusCompleted:
+			stats.Completed++
+		case TaskStatusFailed, TaskStatusCancelled:
+			stats.Failed++
+		case TaskStatusInProgress, TaskStatusPending:
+			stats.Running++
+		}
+	}
+	return stats
+}
+
 func SessionRootGoal(tm *TaskManager, sessionID string) *WorkItem {
 	return sessionRootGoal(tm, sessionID)
 }
@@ -186,6 +255,16 @@ func ExtractSessionDeliverable(tm *TaskManager, sessionID string) string {
 	}
 	if s := strings.TrimSpace(report.ArtifactSummary); s != "" {
 		return s
+	}
+	return bestEffortChildSummaries(tm, sessionID, root.ID)
+}
+
+// BestEffortSessionSummary aggregates child artifact summaries when the root
+// goal has no rollup deliverable yet (RH-D7-05).
+func BestEffortSessionSummary(tm *TaskManager, sessionID string) string {
+	root := sessionRootGoal(tm, sessionID)
+	if root == nil {
+		return ""
 	}
 	return bestEffortChildSummaries(tm, sessionID, root.ID)
 }

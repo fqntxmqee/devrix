@@ -25,6 +25,9 @@ func buildSessionCompleteEvent(
 	if content == "" {
 		content = strings.TrimSpace(lastArtifactSummary)
 	}
+	if content == "" {
+		content = strings.TrimSpace(workmodel.BestEffortSessionSummary(tm, sessionID))
+	}
 	summary := content
 	summaryQuality := EmitLastTextQuality(ctx, sessionID, summary, "")
 	finalQuality := ClassifyLastTextQuality(content)
