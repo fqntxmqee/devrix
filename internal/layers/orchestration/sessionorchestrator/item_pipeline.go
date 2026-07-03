@@ -200,7 +200,18 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
-			applyStrategicScope(sessionID, item, prop, r.Tasks)
+			workDir := r.Tasks.SessionWorkDir(sessionID)
+			scopeIn, scopeAccepted, scopeReason := workmodel.PrepareStrategicScopeIn(directive, prop.ScopeIn, workDir)
+			prop.ScopeIn = scopeIn
+			if scopeReason != "" && !scopeAccepted {
+				if strategicRejectRationale != "" {
+					strategicRejectRationale += "\n"
+				}
+				strategicRejectRationale += "scope: " + scopeReason
+			}
+			if len(prop.ScopeIn) > 0 {
+				applyStrategicScope(sessionID, item, prop, r.Tasks)
+			}
 		} else if propErr != nil {
 			var reject *StrategicPlanReject
 			if errors.As(propErr, &reject) {
@@ -225,6 +236,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if strategic != nil && strategic.DeliverableSchema != "" {
 		deliverableSchema = workmodel.NarrowestSchema(deliverableSchema, strategic.DeliverableSchema)
 	}
+	deliverableContract = workmodel.ClampDeliverableContract(deliverableContract)
 
 	qKind := planQuantizedKind(item, report)
 	if strategic != nil && strings.TrimSpace(strategic.QuantizedKind) != "" {

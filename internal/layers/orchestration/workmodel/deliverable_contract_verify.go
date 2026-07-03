@@ -45,6 +45,24 @@ func VerifyDeliverableContract(contract DeliverableContract, summary, stopReason
 		}
 	}
 
+	if c.Structure == DeliverableStructureFindingsJSON {
+		if payload == nil || len(payload.Findings) == 0 {
+			return deliverableVerifyResult{
+				Status:  DeliverableStatusIncomplete,
+				Payload: payload,
+				Reason:  "findings_json_required",
+			}
+		}
+		if contractFindingsComplete(c, payload) {
+			return deliverableVerifyResult{Status: DeliverableStatusComplete, Payload: payload}
+		}
+		return deliverableVerifyResult{
+			Status:  DeliverableStatusIncomplete,
+			Payload: payload,
+			Reason:  "findings_json_incomplete",
+		}
+	}
+
 	hasCitation := c.Citation != DeliverableCitationFileLine || fileLineCitationRE.MatchString(summary)
 	hasSeverity := c.Severity != DeliverableSeverityP0P1 || p0p1SeverityRE.MatchString(summary)
 
@@ -176,5 +194,26 @@ func AcceptanceCriteriaForContract(c DeliverableContract) string {
 	for _, r := range n.Reject {
 		parts = append(parts, "reject="+string(r))
 	}
+	if n.Structure == DeliverableStructureFindingsJSON {
+		parts = append(parts, "structure=findings_json")
+	}
 	return "Acceptance: " + strings.Join(parts, "; ")
+}
+
+func contractFindingsComplete(c DeliverableContract, payload *DeliverablePayload) bool {
+	if payload == nil || len(payload.Findings) == 0 {
+		return false
+	}
+	for _, f := range payload.Findings {
+		if c.Citation == DeliverableCitationFileLine && strings.TrimSpace(f.File) == "" {
+			return false
+		}
+		if c.Severity == DeliverableSeverityP0P1 {
+			sev := strings.ToUpper(strings.TrimSpace(f.Severity))
+			if sev != "P0" && sev != "P1" {
+				return false
+			}
+		}
+	}
+	return true
 }

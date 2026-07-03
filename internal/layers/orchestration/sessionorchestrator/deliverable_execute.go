@@ -17,11 +17,16 @@ func AppendDeliverableContractExecuteHint(directive string, contract workmodel.D
 		return directive
 	}
 	crit := workmodel.AcceptanceCriteriaForContract(contract)
+	finalHint := workmodel.DeliverableFinalAnswerHint(contract)
 	var hint strings.Builder
 	hint.WriteString(tag)
 	if crit != "" {
 		hint.WriteString("\n")
 		hint.WriteString(crit)
+	}
+	if finalHint != "" {
+		hint.WriteString("\n")
+		hint.WriteString(finalHint)
 	}
 	return strings.TrimSpace(directive) + "\n\n" + hint.String()
 }

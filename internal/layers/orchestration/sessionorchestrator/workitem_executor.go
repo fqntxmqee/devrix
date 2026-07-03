@@ -200,6 +200,18 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1
 
+		if iter == max-1 {
+			if ec, ok := WorkItemExecContextFrom(ctx); ok {
+				if hint := workmodel.DeliverableFinalAnswerHint(ec.DeliverableContract); hint != "" {
+					messages = append(messages, types.Message{
+						SessionID: sessionID,
+						Role:      types.MessageRoleUser,
+						Content:   hint,
+					})
+				}
+			}
+		}
+
 		emit := emitFromExecContext(ctx)
 		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, tools, messages, userContextPrepend, emit, itemID, iter+1, result)
 		// Span per iter (DM-20260626-009 follow-up): a ReAct iter can stall

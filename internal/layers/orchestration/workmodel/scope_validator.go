@@ -62,6 +62,55 @@ func ValidateChildSpecScope(parent *WorkItem, spec ChildSpec, workDir string) (b
 	return true, ""
 }
 
+// PrepareStrategicScopeIn validates Strategic Plan scope_in for Goal/single paths
+// (CC-2 extension, L5-D7-CC-05). Returns corrected scope paths, whether the
+// proposal was accepted as-is, and a machine reason when fallback applied.
+func PrepareStrategicScopeIn(directive string, proposed []string, workDir string) (scopeOut []string, accepted bool, reason string) {
+	valid, invalid := filterExistingScopePaths(proposed, workDir)
+	candidates := DirectiveScopeCandidates(directive)
+
+	if len(valid) > 0 && len(candidates) > 0 && !scopeIntersectsCandidates(valid, candidates) {
+		if fallback := filterExistingScopeCandidates(candidates, workDir); len(fallback) > 0 {
+			return fallback, false, "scope_disjoint_from_directive:" + strings.Join(valid, ",")
+		}
+	}
+
+	if len(valid) > 0 {
+		return valid, true, ""
+	}
+
+	if len(invalid) > 0 && len(candidates) > 0 {
+		if fallback := filterExistingScopeCandidates(candidates, workDir); len(fallback) > 0 {
+			return fallback, false, "scope_invalid_fallback:" + strings.Join(invalid, ",")
+		}
+	}
+
+	if len(valid) > 0 {
+		return valid, true, ""
+	}
+	if len(candidates) > 0 {
+		if fallback := filterExistingScopeCandidates(candidates, workDir); len(fallback) > 0 {
+			return fallback, false, "scope_empty_fallback"
+		}
+	}
+	return nil, false, "scope_no_valid_paths"
+}
+
+func filterExistingScopeCandidates(candidates []string, workDir string) []string {
+	var out []string
+	for _, c := range candidates {
+		c = strings.TrimSpace(c)
+		if c == "" || blockedScopePath(c) {
+			continue
+		}
+		if workDir != "" && !scopePathExists(workDir, c) {
+			continue
+		}
+		out = append(out, normalizeScopePrefix(c))
+	}
+	return out
+}
+
 func blockedScopePath(path string) bool {
 	norm := filepath.ToSlash(strings.TrimSpace(path))
 	if strings.Contains(norm, "../") {
