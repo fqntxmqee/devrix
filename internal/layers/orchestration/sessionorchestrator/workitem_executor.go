@@ -154,7 +154,11 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 
 	llmDirective := directive
 	if ec, ok := WorkItemExecContextFrom(ctx); ok {
-		llmDirective = AppendDeliverableExecuteHint(directive, ec.DeliverableSchema)
+		if ec.DeliverableContract.ContractApplicable() {
+			llmDirective = AppendDeliverableContractExecuteHint(directive, ec.DeliverableContract)
+		} else {
+			llmDirective = AppendDeliverableExecuteHint(directive, ec.DeliverableSchema)
+		}
 		// RH-MUPS-10 (DM-20260701-001): on a retry of a non-Pass round, the
 		// producer must see WHY the prior attempt failed so it can self-
 		// correct. We prepend a "PriorVerifyReason" section to the LLM
@@ -190,14 +194,8 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	}
 
 	max := e.maxIters()
-	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.Item != nil {
-		if ec.MaxItersOverride > 0 {
-			max = ec.MaxItersOverride
-		} else if ec.Item.NeedsRollup {
-			max = 2
-		} else if ec.Tasks != nil && ec.Tasks.Tree().Depth(sessionID, ec.Item.ID) >= 1 {
-			max = 3
-		}
+	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.MaxItersOverride > 0 {
+		max = ec.MaxItersOverride
 	}
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1

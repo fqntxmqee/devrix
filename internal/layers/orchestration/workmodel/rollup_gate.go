@@ -167,43 +167,103 @@ func rootRollupFallbackEligible(root *WorkItem) bool {
 	}
 }
 
-// MaybeDecomposeParentRollup triggers rollup on a decomposed parent when all
-// direct non-checklist children are terminal but the parent has not yet
-// synthesized (Path A extension, RH-D7-05). Prevents session loop exit with
-// an await_child parent and no rollup deliverable.
-func MaybeDecomposeParentRollup(sessionID string, tm *TaskManager) (*WorkItem, bool) {
+// MaybeParentRollup triggers rollup on any decompose/await parent whose direct
+// non-checklist children are all terminal but synthesis has not run (CC-3).
+func MaybeParentRollup(sessionID string, tm *TaskManager) (*WorkItem, bool) {
 	if tm == nil {
 		return nil, false
 	}
+	var best *WorkItem
+	bestDepth := -1
 	for _, item := range tm.Tree().List(sessionID) {
-		if item == nil || item.Kind != WorkKindGoal || item.ParentID != "" {
+		if item == nil || item.Ephemeral || item.NeedsRollup {
 			continue
 		}
-		if item.NeedsRollup {
+		if !parentHadDecomposeSpawn(item) {
 			continue
 		}
 		stats := childOutcomeStatsForParent(tm, sessionID, item.ID)
 		if stats.Total == 0 || stats.Running > 0 {
 			continue
 		}
-		if !parentHadDecomposeSpawn(item) {
-			continue
+		depth := tm.Tree().Depth(sessionID, item.ID)
+		if depth > bestDepth {
+			best = item
+			bestDepth = depth
 		}
-		if err := tm.Tree().SetNeedsRollup(sessionID, item.ID, true); err != nil {
-			continue
-		}
-		if isTerminalStatus(item.Status) {
-			if err := tm.Tree().ReopenForRollup(sessionID, item.ID); err != nil {
-				continue
-			}
-		}
-		got, ok := tm.GetWorkItem(sessionID, item.ID)
-		if !ok {
+	}
+	if best == nil {
+		return nil, false
+	}
+	if err := tm.Tree().SetNeedsRollup(sessionID, best.ID, true); err != nil {
+		return nil, false
+	}
+	if isTerminalStatus(best.Status) {
+		if err := tm.Tree().ReopenForRollup(sessionID, best.ID); err != nil {
 			return nil, false
 		}
-		return got, true
 	}
-	return nil, false
+	got, ok := tm.GetWorkItem(sessionID, best.ID)
+	if !ok {
+		return nil, false
+	}
+	return got, true
+}
+
+// MaybeDecomposeParentRollup is retained for callers; delegates to MaybeParentRollup.
+func MaybeDecomposeParentRollup(sessionID string, tm *TaskManager) (*WorkItem, bool) {
+	return MaybeParentRollup(sessionID, tm)
+}
+
+// MaybeSiblingBestEffortRollup fails stuck max-depth siblings and opens rollup
+// when at least one sibling completed with a satisfactory deliverable (CC-3).
+func MaybeSiblingBestEffortRollup(sessionID, parentID string, tm *TaskManager) bool {
+	if tm == nil || parentID == "" {
+		return false
+	}
+	parent, ok := tm.GetWorkItem(sessionID, parentID)
+	if !ok || parent == nil || parent.NeedsRollup {
+		return false
+	}
+	if !parentHadDecomposeSpawn(parent) {
+		return false
+	}
+	maxDepth := tm.Tree().MaxDecomposeDepth()
+	if maxDepth <= 0 {
+		maxDepth = DefaultMaxDecomposeDepth
+	}
+	hasCompleteSibling := false
+	var stuckIDs []string
+	for _, c := range tm.Tree().ListChildren(sessionID, parentID) {
+		if c == nil || c.Ephemeral || c.Kind == WorkKindChecklist {
+			continue
+		}
+		if c.Status == TaskStatusCompleted && c.LastRound != nil &&
+			!DeliverableContinuationRequired(c.LastRound) {
+			hasCompleteSibling = true
+		}
+		if IsInlineRetryExhaustedAtMaxDepth(c, maxDepth) &&
+			(c.Status == TaskStatusInProgress || c.Status == TaskStatusPending) {
+			stuckIDs = append(stuckIDs, c.ID)
+		}
+	}
+	if !hasCompleteSibling || len(stuckIDs) == 0 {
+		return false
+	}
+	for _, id := range stuckIDs {
+		if c, ok := tm.GetWorkItem(sessionID, id); ok && c != nil && c.LastRound != nil {
+			c.LastRound.ExitReason = TerminalReasonInlineRetriesExhaustedAtMaxDepth
+			_ = tm.Tree().ApplyPipelineRound(sessionID, id, c.LastRound, c.RoundPhase)
+		}
+		_ = tm.Tree().UpdateStatus(sessionID, id, TaskStatusFailed)
+	}
+	if err := tm.Tree().SetNeedsRollup(sessionID, parentID, true); err != nil {
+		return false
+	}
+	if isTerminalStatus(parent.Status) {
+		_ = tm.Tree().ReopenForRollup(sessionID, parentID)
+	}
+	return true
 }
 
 func parentHadDecomposeSpawn(parent *WorkItem) bool {

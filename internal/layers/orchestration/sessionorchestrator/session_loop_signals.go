@@ -9,6 +9,41 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
+// deliverableIncompleteEscapeCriterion returns the escape failure hash when
+// a round still owes a deliverable on an inline/none stagnation path. Decompose
+// / await / parallel explore are forward-progress spawns and must not share
+// the same hash (DM-20260703-001 / review session false ForceExit).
+func deliverableIncompleteEscapeCriterion(round *workmodel.WorkItemPipelineRound) string {
+	if round == nil {
+		return ""
+	}
+	if round.DeliverableStatus != workmodel.DeliverableStatusIncomplete {
+		return ""
+	}
+	key := deliverableEscapeKey(round)
+	if key == "" {
+		return ""
+	}
+	switch round.SpawnPolicy {
+	case workmodel.SpawnDecompose, workmodel.SpawnAwait, workmodel.SpawnParallelExplore:
+		return ""
+	}
+	return "deliverable_incomplete:" + key
+}
+
+func deliverableEscapeKey(round *workmodel.WorkItemPipelineRound) string {
+	if round == nil {
+		return ""
+	}
+	if round.DeliverableContract.ContractApplicable() {
+		return round.DeliverableContract.CacheKey()
+	}
+	if round.DeliverableSchema != "" && round.DeliverableSchema != workmodel.DeliverableSchemaNotApplicable {
+		return string(round.DeliverableSchema)
+	}
+	return ""
+}
+
 // SessionLoopExitKind classifies why the session turn loop stopped.
 type SessionLoopExitKind string
 
@@ -43,13 +78,11 @@ func buildEscapeLoopContextFromRound(sessionID string, round *workmodel.WorkItem
 	failure := ""
 	if round != nil {
 		kind = escape.PlanKind(round.PlanKind)
-		if round.DeliverableStatus == workmodel.DeliverableStatusIncomplete &&
-			round.DeliverableSchema != "" &&
-			round.DeliverableSchema != workmodel.DeliverableSchemaNotApplicable {
+		if fc := deliverableIncompleteEscapeCriterion(round); fc != "" {
 			// Stable mode hash for repeated inline retries on the same
 			// deliverable contract — lets LoopDepthTracker force-exit
 			// without a fixed session iteration budget.
-			failure = "deliverable_incomplete:" + string(round.DeliverableSchema)
+			failure = fc
 		} else {
 			failure = strings.TrimSpace(round.ExitReason)
 			if failure == "" {
@@ -133,7 +166,8 @@ func deliverableStagnation(round *workmodel.WorkItemPipelineRound, tm *workmodel
 	if round == nil || tm == nil {
 		return false
 	}
-	if round.DeliverableSchema == "" || round.DeliverableSchema == workmodel.DeliverableSchemaNotApplicable {
+	if !round.DeliverableContract.ContractApplicable() &&
+		(round.DeliverableSchema == "" || round.DeliverableSchema == workmodel.DeliverableSchemaNotApplicable) {
 		return false
 	}
 	if round.DeliverableStatus == workmodel.DeliverableStatusComplete ||
@@ -157,27 +191,8 @@ func deliverableStagnation(round *workmodel.WorkItemPipelineRound, tm *workmodel
 	return true
 }
 
-var explorationPlanningMarkers = []string{
-	"let me continue",
-	"let me read",
-	"let me explore",
-	"i'll examine",
-	"i will examine",
-	"let me first locate",
-	"let me start by",
-}
-
 func isExplorationPlanningText(summary string) bool {
-	lower := strings.ToLower(strings.TrimSpace(summary))
-	if lower == "" {
-		return false
-	}
-	for _, m := range explorationPlanningMarkers {
-		if strings.Contains(lower, m) {
-			return true
-		}
-	}
-	return false
+	return workmodel.DetectPlanningMeta(summary)
 }
 
 // sessionNoForwardProgress reports whether every non-terminal WorkItem is
@@ -196,7 +211,7 @@ func sessionNoForwardProgress(sessionID string, tm *workmodel.TaskManager) bool 
 		}
 		sawOpen = true
 		if item.RoundPhase == workmodel.RoundPhaseAwaitChild {
-			if childrenDeliverableInlineStuck(tm, sessionID, item.ID) {
+			if subtreeDeliverableInlineStuck(tm, sessionID, item.ID) {
 				continue
 			}
 			return false
@@ -209,6 +224,50 @@ func sessionNoForwardProgress(sessionID string, tm *workmodel.TaskManager) bool 
 			return false
 		case workmodel.SpawnInline, workmodel.SpawnNone:
 			if !workmodel.DeliverableContinuationRequired(item.LastRound) {
+				return false
+			}
+			if item.LastRound.SpawnPolicy == workmodel.SpawnInline {
+				if workmodel.IsDeliverableInlineBudgetExhausted(item) {
+					continue
+				}
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return sawOpen
+}
+
+// subtreeDeliverableInlineStuck walks descendants: all open leaves owe deliverable
+// continuation via inline/none with no decompose/await forward path (CC-4).
+func subtreeDeliverableInlineStuck(tm *workmodel.TaskManager, sessionID, parentID string) bool {
+	if tm == nil {
+		return false
+	}
+	sawOpen := false
+	for _, c := range tm.Tree().ListChildren(sessionID, parentID) {
+		if c == nil || c.Ephemeral || c.Kind == workmodel.WorkKindChecklist {
+			continue
+		}
+		if workmodel.IsTerminalStatus(c.Status) {
+			continue
+		}
+		sawOpen = true
+		if c.RoundPhase == workmodel.RoundPhaseAwaitChild {
+			if !subtreeDeliverableInlineStuck(tm, sessionID, c.ID) {
+				return false
+			}
+			continue
+		}
+		if c.LastRound == nil {
+			return false
+		}
+		switch c.LastRound.SpawnPolicy {
+		case workmodel.SpawnDecompose, workmodel.SpawnAwait, workmodel.SpawnParallelExplore, workmodel.SpawnEscalateHuman:
+			return false
+		case workmodel.SpawnInline, workmodel.SpawnNone:
+			if !workmodel.DeliverableContinuationRequired(c.LastRound) {
 				return false
 			}
 		default:

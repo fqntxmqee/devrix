@@ -2,9 +2,11 @@ package sessionorchestrator
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
+	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -37,7 +39,7 @@ func TestEvaluateSessionLoopExitAfterRound_PlanningTextAnomaly(t *testing.T) {
 		WorkItemID:        goal.ID,
 		VerdictKind:       types.VerdictPartial,
 		SpawnPolicy:       workmodel.SpawnInline,
-		DeliverableSchema: workmodel.DeliverableSchemaP0P1FileLine,
+		DeliverableSchema: workmodel.FirstRegisteredDeliverableSchema(),
 		DeliverableStatus: workmodel.DeliverableStatusIncomplete,
 		ArtifactSummary:   "Let me continue reading the file.",
 	}
@@ -50,6 +52,36 @@ func TestEvaluateSessionLoopExitAfterRound_PlanningTextAnomaly(t *testing.T) {
 	got = evaluateSessionLoopExitAfterRound(context.Background(), "s1", tm, round, escape.EscapeDecision{})
 	if got.Kind != SessionLoopExitAnomaly {
 		t.Fatalf("stagnation should exit with anomaly, got kind=%q reason=%q", got.Kind, got.Reason)
+	}
+}
+
+func TestBuildEscapeLoopContextFromRound_DecomposeSkipsDeliverableHash(t *testing.T) {
+	round := &workmodel.WorkItemPipelineRound{
+		SpawnPolicy:       workmodel.SpawnDecompose,
+		DeliverableSchema: workmodel.FirstRegisteredDeliverableSchema(),
+		DeliverableStatus: workmodel.DeliverableStatusIncomplete,
+		PlanKind:          plan.CommitmentPlan,
+		ExitReason:        "partial_verified",
+	}
+	ctx := buildEscapeLoopContextFromRound("s1", round)
+	if strings.Contains(ctx.FailureCriterion, "deliverable_incomplete") {
+		t.Fatalf("decompose forward progress must not use deliverable_incomplete hash, got %q", ctx.FailureCriterion)
+	}
+	if ctx.FailureCriterion != "partial_verified" {
+		t.Fatalf("failure = %q, want exit_reason", ctx.FailureCriterion)
+	}
+}
+
+func TestDeliverableIncompleteEscapeCriterion_InlineUsesHash(t *testing.T) {
+	contract := workmodel.DefaultTestDeliverableContract()
+	round := &workmodel.WorkItemPipelineRound{
+		SpawnPolicy:         workmodel.SpawnInline,
+		DeliverableContract: contract,
+		DeliverableStatus:   workmodel.DeliverableStatusIncomplete,
+	}
+	got := deliverableIncompleteEscapeCriterion(round)
+	if got != "deliverable_incomplete:"+contract.CacheKey() {
+		t.Fatalf("got %q", got)
 	}
 }
 

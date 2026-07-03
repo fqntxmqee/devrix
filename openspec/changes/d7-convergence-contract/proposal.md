@@ -1,9 +1,11 @@
 # Proposal: D7 任务树收敛契约（向下传播 + 向上反馈）
 
 **Change ID:** `d7-convergence-contract`  
+**Demand ID:** DM-20260703-001  
 **Created:** 2026-07-03  
 **Status:** Draft  
-**Related:** PR #379 (`fix/d7-session-loop-anomaly-exit`), 会话 `sess_1783064119386_3000` 复盘
+**Related:** PR #379 (`fix/d7-session-loop-anomaly-exit`), 会话 `sess_1783064119386_3000` 复盘  
+**Demand:** [`demand.md`](demand.md)
 
 ---
 

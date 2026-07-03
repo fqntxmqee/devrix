@@ -3,6 +3,7 @@ package stream
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
@@ -32,8 +33,11 @@ func (c *streamResponseCapture) observe(chunk llmgateway.Chunk) {
 	if chunk.Thinking != "" {
 		c.thinking.WriteString(chunk.Thinking)
 	}
+	// SSE parser re-emits the full merged tool-call list on every delta
+	// frame. Keep the latest batch (same as WorkItemExecutor.streamLLM)
+	// so Jaeger llm.response_json does not duplicate identical call IDs.
 	if len(chunk.ToolCalls) > 0 {
-		c.toolCalls = append(c.toolCalls, chunk.ToolCalls...)
+		c.toolCalls = chunk.ToolCalls
 	}
 	if chunk.FinishReason != "" {
 		c.finishReason = chunk.FinishReason
@@ -93,12 +97,35 @@ func buildStreamResponseInfo(
 	if cap.finishReason != "" {
 		info["finish_reason"] = cap.finishReason
 	}
-	if len(cap.toolCalls) > 0 {
-		info["tool_calls_count"] = len(cap.toolCalls)
-		tools := summarizeToolCallsForTrace(cap.toolCalls, full)
-		info["tool_calls"] = tools
+	toolCalls := dedupeToolCallsForTrace(cap.toolCalls)
+	if len(toolCalls) > 0 {
+		info["tool_calls_count"] = len(toolCalls)
+		info["tool_calls"] = summarizeToolCallsForTrace(toolCalls, full)
 	}
 	return info
+}
+
+func dedupeToolCallsForTrace(calls []llmgateway.ToolCall) []llmgateway.ToolCall {
+	if len(calls) <= 1 {
+		return calls
+	}
+	seen := make(map[string]struct{}, len(calls))
+	out := make([]llmgateway.ToolCall, 0, len(calls))
+	for i, tc := range calls {
+		id := strings.TrimSpace(tc.ID)
+		if id == "" {
+			id = fmt.Sprintf("call_%d", i)
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		if strings.TrimSpace(tc.ID) == "" {
+			tc.ID = id
+		}
+		out = append(out, tc)
+	}
+	return out
 }
 
 func summarizeToolCallsForTrace(calls []llmgateway.ToolCall, full bool) []map[string]interface{} {

@@ -210,13 +210,18 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	expectedReturn := workmodel.ExpectedReturnForItem(r.Tasks, sessionID, item)
+	deliverableContract := workmodel.InferDeliverableContract(item, directive, expectedReturn)
+	if strategic != nil {
+		if strategic.DeliverableContract.ContractApplicable() {
+			deliverableContract = workmodel.NarrowestContract(deliverableContract, strategic.DeliverableContract)
+		} else if strategic.DeliverableSchema != "" {
+			deliverableContract = workmodel.NarrowestContract(
+				deliverableContract,
+				workmodel.ExpandLegacySchemaToContract(strategic.DeliverableSchema),
+			)
+		}
+	}
 	deliverableSchema := workmodel.InferDeliverableSchema(item, directive, expectedReturn)
-	// RH-MUPS-11 (DM-20260701-001 T-P1-5): the strategic proposer may
-	// NARROW but never WIDEN. A previous run could "downgrade" a
-	// p0_p1_file_line directive to not_applicable and skip verify,
-	// silently passing short reviews. NarrowestSchema returns the
-	// most-constrained of the two: inferred schema wins unless the
-	// LLM added a stricter one.
 	if strategic != nil && strategic.DeliverableSchema != "" {
 		deliverableSchema = workmodel.NarrowestSchema(deliverableSchema, strategic.DeliverableSchema)
 	}
@@ -289,12 +294,13 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		}
 	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
-		Item:              item,
-		Tasks:             r.Tasks,
-		MaxItersOverride:  maxItersOverride,
-		DeliverableSchema: deliverableSchema,
-		PriorVerifyReason: priorReason,
-		Emit:              opts.Emit,
+		Item:                item,
+		Tasks:               r.Tasks,
+		MaxItersOverride:    maxItersOverride,
+		DeliverableContract: deliverableContract,
+		DeliverableSchema:   deliverableSchema,
+		PriorVerifyReason:   priorReason,
+		Emit:                opts.Emit,
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
@@ -348,9 +354,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		deliverableResult = DeliverableVerifyResult{Status: workmodel.DeliverableStatusNotApplicable}
 	} else if r.Verify != nil {
 		verdict = r.Verify(art)
-		deliverableResult = VerifyDeliverable(deliverableSchema, art)
+		deliverableResult = VerifyDeliverableContract(deliverableContract, art)
 	} else {
-		out := verifyArtifactForWorkItemWithSchema(art, item, pl, deliverableSchema)
+		out := verifyArtifactForWorkItemWithContract(art, item, pl, deliverableContract)
 		verdict = out.Verdict
 		deliverableResult = out.Deliverable
 	}
@@ -456,7 +462,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		LearningClass:     learningClass,
 		UncertaintyMean:   uncertaintyMean,
 		VerdictConfidence: verdict.Confidence,
-		DeliverableSchema: deliverableSchema,
+		DeliverableSchema:   deliverableSchema,
+		DeliverableContract: deliverableContract,
 		StartedAt:         started,
 		CompletedAt:       time.Now(),
 	}
@@ -470,8 +477,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		} else if item.LastRound != nil {
 			round.RollupRetries = item.LastRound.RollupRetries + 1
 		}
-	}
-	if !isRollup {
+		// Rollup synthesis is not a deliverable-schema round; avoid CC-1 inline
+		// retry on Pass when the parent directive still matches review schema.
+		round.DeliverableSchema = workmodel.DeliverableSchemaNotApplicable
+		round.DeliverableContract = workmodel.DeliverableContract{}
+		round.DeliverableStatus = workmodel.DeliverableStatusNotApplicable
+	} else {
 		round.DeliverableStatus = deliverableResult.Status
 		round.StructuredDeliverable = deliverableResult.Payload
 	}
@@ -503,6 +514,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if round.VerdictKind == types.VerdictIndeterminate {
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}
+	workmodel.TouchInlineRetryAtMaxDepth(r.Tasks.Tree(), sessionID, item, round, treeCtx)
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseDecide)
 
 	phase := workmodel.RoundPhaseIdle
@@ -524,29 +536,15 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 
 	if round.SpawnPolicy == workmodel.SpawnNone {
-		schemaForStatus := deliverableSchema
-		deliverableStatus := deliverableResult.Status
-		if r.Verify != nil && !isRollup {
-			schemaForStatus = workmodel.DeliverableSchemaNotApplicable
+		opts := workmodel.SpawnNoneTerminalOpts{
+			IsRollup:                  isRollup,
+			StripDeliverableForStatus: r.Verify != nil && !isRollup,
 		}
-		if isRollup {
-			schemaForStatus = workmodel.DeliverableSchemaNotApplicable
-			deliverableStatus = workmodel.DeliverableStatusNotApplicable
-		}
-		status := workmodel.StatusAfterSpawnNone(verdict.Kind, schemaForStatus, deliverableStatus)
-		if isRollup && verdict.Kind != types.VerdictPass {
-			status = workmodel.TaskStatusInProgress
-		}
-		got, _ := r.Tasks.GetWorkItem(sessionID, item.ID)
-		if got != nil && got.Status == workmodel.TaskStatusPending {
-			end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))
-			_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusInProgress)
-			end(nil)
-		}
-		if status != workmodel.TaskStatusInProgress {
-			end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(status))
-			_ = r.Tasks.Tree().UpdateStatus(sessionID, item.ID, status)
-			end(nil)
+		if err := workmodel.ApplyRoundTerminalization(
+			r.Tasks.Tree(), sessionID, item.ID,
+			verdict.Kind, deliverableSchema, deliverableResult.Status, opts,
+		); err != nil {
+			return nil, err
 		}
 	} else if item.Status == workmodel.TaskStatusPending {
 		end := hardening.EmitWorktreeOp(ctx, sessionID, "update_status", item.ID, string(workmodel.TaskStatusInProgress))

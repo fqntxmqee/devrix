@@ -35,7 +35,11 @@ func TestGetPipelineFocus_InlineRetry(t *testing.T) {
 	tm := NewTaskManager()
 	goal, _ := tm.EnsureGoal("s1", "g")
 	_ = tm.Tree().UpdateStatus("s1", goal.ID, TaskStatusInProgress)
-	goal.LastRound = &WorkItemPipelineRound{SpawnPolicy: SpawnInline}
+	goal.LastRound = &WorkItemPipelineRound{
+		SpawnPolicy:       SpawnInline,
+		DeliverableSchema: FirstRegisteredDeliverableSchema(),
+		DeliverableStatus: DeliverableStatusIncomplete,
+	}
 	tm.Tree().ApplyPipelineRound("s1", goal.ID, goal.LastRound, RoundPhaseIdle)
 
 	focus, err := tm.Tree().GetPipelineFocus("s1")
@@ -44,6 +48,26 @@ func TestGetPipelineFocus_InlineRetry(t *testing.T) {
 	}
 	if focus == nil || focus.ID != goal.ID {
 		t.Fatalf("focus = %v, want goal %s", focus, goal.ID)
+	}
+}
+
+func TestGetPipelineFocus_SpawnNoneDeliverableContinuation(t *testing.T) {
+	tm := NewTaskManager()
+	goal, _ := tm.EnsureGoal("s1", "review kernel")
+	_ = tm.Tree().UpdateStatus("s1", goal.ID, TaskStatusInProgress)
+	goal.LastRound = &WorkItemPipelineRound{
+		SpawnPolicy:       SpawnNone,
+		DeliverableSchema: FirstRegisteredDeliverableSchema(),
+		DeliverableStatus: DeliverableStatusIncomplete,
+	}
+	tm.Tree().ApplyPipelineRound("s1", goal.ID, goal.LastRound, RoundPhaseIdle)
+
+	focus, err := tm.Tree().GetPipelineFocus("s1")
+	if err != nil {
+		t.Fatalf("GetPipelineFocus: %v", err)
+	}
+	if focus != nil {
+		t.Fatalf("focus = %v, want nil for spawn none without inline path", focus)
 	}
 }
 

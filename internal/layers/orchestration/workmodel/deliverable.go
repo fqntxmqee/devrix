@@ -4,13 +4,10 @@ import (
 	"strings"
 )
 
-// DeliverableSchema names the expected Execute output shape for Verify.
+// DeliverableSchema names legacy deliverable markers; prefer DeliverableContract.
 type DeliverableSchema string
 
-const (
-	DeliverableSchemaNotApplicable   DeliverableSchema = "not_applicable"
-	DeliverableSchemaP0P1FileLine    DeliverableSchema = "p0_p1_file_line"
-)
+const DeliverableSchemaNotApplicable DeliverableSchema = "not_applicable"
 
 // DeliverableStatus is the outcome of schema verification (DM-20260630-012).
 type DeliverableStatus string
@@ -36,24 +33,29 @@ type DeliverablePayload struct {
 	Raw      string               `json:"raw,omitempty"`
 }
 
-// InferDeliverableSchema selects a verify schema from directive and child downlink.
-func InferDeliverableSchema(item *WorkItem, directive string, expectedReturn string) DeliverableSchema {
-	if item != nil && item.NeedsRollup {
-		return DeliverableSchemaP0P1FileLine
+// InferDeliverableSchema resolves legacy schema tag; prefer InferDeliverableContract.
+func InferDeliverableSchema(_ *WorkItem, directive string, expectedReturn string) DeliverableSchema {
+	if schema := ParseDeliverableSchemaTag(expectedReturn); schema != DeliverableSchemaNotApplicable {
+		return schema
 	}
-	text := strings.ToLower(strings.TrimSpace(directive + " " + expectedReturn))
-	if text == "" {
-		return DeliverableSchemaNotApplicable
+	if schema := ParseDeliverableSchemaTag(directive); schema != DeliverableSchemaNotApplicable {
+		return schema
 	}
-	reviewHints := []string{
-		"p0/p1", "p0", "p1", "file:line", "review", "code review", "审查", "评审",
+	if c := ParseDeliverableContractTag(expectedReturn); c.ContractApplicable() {
+		return schemaForContract(c)
 	}
-	for _, h := range reviewHints {
-		if strings.Contains(text, h) {
-			return DeliverableSchemaP0P1FileLine
-		}
+	if c := ParseDeliverableContractTag(directive); c.ContractApplicable() {
+		return schemaForContract(c)
 	}
 	return DeliverableSchemaNotApplicable
+}
+
+func schemaForContract(c DeliverableContract) DeliverableSchema {
+	legacy := ExpandLegacySchemaToContract(FirstRegisteredDeliverableSchema())
+	if c.Normalized().CacheKey() == legacy.CacheKey() {
+		return FirstRegisteredDeliverableSchema()
+	}
+	return DeliverableSchema("legacy_contract")
 }
 
 // ExpectedReturnForItem reads child downlink expected_return when present.
@@ -67,52 +69,42 @@ func ExpectedReturnForItem(tm *TaskManager, sessionID string, item *WorkItem) st
 	return ""
 }
 
-// SchemaNarrowness rank orders the deliverable schemas by how much
-// shape they impose on the producer. Higher = more constrained. The
-// strategic proposer may NARROW a schema (inferred=p0_p1_file_line,
-// strategic=not_applicable is rejected; inferred=not_applicable,
-// strategic=p0_p1_file_line is accepted because there is nothing to
-// narrow). Monotonic-narrowing is the schema analog of "monotonic
-// uncertainty convergence" in C1.
-//
-// RH-MUPS-11 (DM-20260701-001, T-P1-5): without this contract the
-// strategic proposer could "downgrade" a p0_p1_file_line directive
-// into not_applicable, skipping verify and silently passing short
-// reviews. The narrowest-non-empty rule preserves the inferred
-// shape when the proposer disagrees.
-//
-// Future schemas append here so the order is canonical.
-var schemaNarrowness = map[DeliverableSchema]int{
-	DeliverableSchemaNotApplicable: 0,
-	DeliverableSchemaP0P1FileLine:  10,
+// NarrowestSchema narrows deliverable contracts via legacy schema wrapper.
+func NarrowestSchema(inferred, strategic DeliverableSchema) DeliverableSchema {
+	if inferred == "" && strategic == "" {
+		return ""
+	}
+	inC := ExpandLegacySchemaToContract(inferred)
+	stC := ExpandLegacySchemaToContract(strategic)
+	if !inC.ContractApplicable() && !stC.ContractApplicable() {
+		if inferred == "" || inferred == DeliverableSchemaNotApplicable {
+			if strategic == "" || strategic == DeliverableSchemaNotApplicable {
+				return DeliverableSchemaNotApplicable
+			}
+		}
+	}
+	out := NarrowestContract(inC, stC)
+	if !out.ContractApplicable() {
+		return DeliverableSchemaNotApplicable
+	}
+	if inferred != "" && inferred != DeliverableSchemaNotApplicable {
+		return inferred
+	}
+	if strategic != "" && strategic != DeliverableSchemaNotApplicable {
+		return strategic
+	}
+	return schemaForContract(out)
 }
 
-// NarrowestSchema returns the most-constrained schema of the two.
-// Empty / NotApplicable as a strategic override is rejected when the
-// inference picked something more specific — the LLM cannot widen.
-// Empty / NotApplicable as the inference is freely overridable.
-//
-// Cases (inferred, strategic) → result:
-//   (NA, *)     → strategic  // inference says "no shape"; LLM may add one
-//   (X, NA)     → X          // inference says X; LLM cannot drop
-//   (X, X)      → X
-//   (X, Y!=X)   → X          // unrelated: keep the more specific inference
-func NarrowestSchema(inferred, strategic DeliverableSchema) DeliverableSchema {
-	if strategic == "" {
-		return inferred
+// IsRegisteredDeliverableSchema reports whether a deliverable gate applies.
+func IsRegisteredDeliverableSchema(s DeliverableSchema) bool {
+	if s == "" || s == DeliverableSchemaNotApplicable {
+		return false
 	}
-	if inferred == "" || inferred == DeliverableSchemaNotApplicable {
-		return strategic
-	}
-	// Both non-empty: keep the higher-narrowness one. Equal narrowness
-	// → prefer inferred (the deterministic baseline).
-	in, sok := schemaNarrowness[inferred]
-	st, stok := schemaNarrowness[strategic]
-	if !sok || !stok {
-		return inferred
-	}
-	if st > in {
-		return strategic
-	}
-	return inferred
+	return ExpandLegacySchemaToContract(s).ContractApplicable()
+}
+
+// IsApplicableDeliverableContract reports whether round owes deliverable verification.
+func IsApplicableDeliverableContract(c DeliverableContract) bool {
+	return c.ContractApplicable()
 }

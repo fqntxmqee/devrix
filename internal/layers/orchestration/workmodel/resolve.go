@@ -58,7 +58,12 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *Rol
 	}
 
 	if stats.Running > 0 {
-		return NewRollupReportFromRound(childID, child.LastRound)
+		if MaybeSiblingBestEffortRollup(sessionID, parent.ID, tm) {
+			stats = childOutcomeStats(tm, sessionID, parent.ID)
+		}
+		if stats.Running > 0 {
+			return NewRollupReportFromRound(childID, child.LastRound)
+		}
 	}
 	if parent.Status == TaskStatusPending {
 		if err := tm.Tree().UpdateStatus(sessionID, parent.ID, TaskStatusInProgress); err != nil {

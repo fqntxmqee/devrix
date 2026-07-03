@@ -38,23 +38,25 @@ type rawStrategicChildSpec struct {
 }
 
 type rawStrategicPlan struct {
-	ExecutionMode     string                  `json:"execution_mode"`
-	ScopeIn           []string                `json:"scope_in"`
-	ChildSpecs        []rawStrategicChildSpec `json:"child_specs"`
-	DeliverableSchema string                  `json:"deliverable_schema"`
-	ReactItersHint    int                     `json:"react_iters_hint"`
-	Rationale         string                  `json:"rationale"`
+	ExecutionMode       string                  `json:"execution_mode"`
+	ScopeIn             []string                `json:"scope_in"`
+	ChildSpecs          []rawStrategicChildSpec `json:"child_specs"`
+	DeliverableContract workmodel.DeliverableContract `json:"deliverable_contract"`
+	DeliverableSchema   string                  `json:"deliverable_schema"`
+	ReactItersHint      int                     `json:"react_iters_hint"`
+	Rationale           string                  `json:"rationale"`
 }
 
 // StrategicPlanProposal is a validated LLM strategic plan (DM-20260630-012).
 type StrategicPlanProposal struct {
-	ExecutionMode     string
-	ScopeIn           []string
-	ChildSpecs        []workmodel.ChildSpec
-	DeliverableSchema workmodel.DeliverableSchema
-	ReactItersHint    int
-	QuantizedKind     string
-	Rationale         string
+	ExecutionMode       string
+	ScopeIn             []string
+	ChildSpecs          []workmodel.ChildSpec
+	DeliverableContract workmodel.DeliverableContract
+	DeliverableSchema   workmodel.DeliverableSchema
+	ReactItersHint      int
+	QuantizedKind       string
+	Rationale           string
 }
 
 // StrategicPlanProposer calls D2 Prepare then D3 for Plan strategy (G3).
@@ -96,7 +98,7 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 		return nil, fmt.Errorf("strategic plan proposer: d2 prepare: %w", err)
 	}
 	systemPrompt := strings.TrimSpace(prepared.SystemPrompt)
-	if appendix := i18n.StrategicPlanAppendix(p.Locale); appendix != "" {
+	if appendix := i18n.StrategicPlanAppendix(p.Locale, workmodel.ContractDimensionPromptDoc()); appendix != "" {
 		if systemPrompt != "" {
 			systemPrompt += "\n\n"
 		}
@@ -183,7 +185,12 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 		Rationale:      strings.TrimSpace(row.Rationale),
 		ReactItersHint: clampReactIters(row.ReactItersHint),
 	}
-	prop.DeliverableSchema = mapDeliverableSchema(row.DeliverableSchema, baseDirective)
+	prop.DeliverableContract = mapDeliverableContract(row.DeliverableContract, row.DeliverableSchema, baseDirective)
+	if prop.DeliverableContract.ContractApplicable() {
+		prop.DeliverableSchema = workmodel.FirstRegisteredDeliverableSchema()
+	} else {
+		prop.DeliverableSchema = workmodel.DeliverableSchemaNotApplicable
+	}
 	prop.QuantizedKind = mapExecutionModeToQuantizedKind(prop.ExecutionMode)
 	prop.ChildSpecs = mapRawChildSpecs(baseDirective, row.ChildSpecs, prop.ExecutionMode)
 	if err := validateStrategicPlan(prop); err != nil {
@@ -192,15 +199,17 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 	return prop, nil
 }
 
-func mapDeliverableSchema(s, directive string) workmodel.DeliverableSchema {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case string(workmodel.DeliverableSchemaP0P1FileLine):
-		return workmodel.DeliverableSchemaP0P1FileLine
-	case string(workmodel.DeliverableSchemaNotApplicable):
-		return workmodel.DeliverableSchemaNotApplicable
-	default:
-		return workmodel.InferDeliverableSchema(nil, directive, "")
+func mapDeliverableContract(raw workmodel.DeliverableContract, schemaField, directive string) workmodel.DeliverableContract {
+	if raw.ContractApplicable() {
+		return raw.Normalized()
 	}
+	if schema, ok := workmodel.LookupRegisteredDeliverableSchema(schemaField); ok {
+		return workmodel.ExpandLegacySchemaToContract(schema)
+	}
+	if tag := workmodel.ParseDeliverableSchemaTag(directive); tag != workmodel.DeliverableSchemaNotApplicable {
+		return workmodel.ExpandLegacySchemaToContract(tag)
+	}
+	return workmodel.DeliverableContract{}
 }
 
 func mapExecutionModeToQuantizedKind(mode string) string {

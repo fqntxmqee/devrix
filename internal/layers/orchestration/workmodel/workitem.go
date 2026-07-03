@@ -49,6 +49,9 @@ type WorkItem struct {
 	Ephemeral     bool       `json:"ephemeral,omitempty"`
 	Locked        bool       `json:"locked,omitempty"`
 	NeedsRollup   bool       `json:"needs_rollup,omitempty"`
+	// InlineRetriesAtMaxDepth counts consecutive SpawnInline rounds while at
+	// max decompose depth with an unsatisfied deliverable (DM-20260703-001 CC-1.2).
+	InlineRetriesAtMaxDepth int `json:"inline_retries_at_max_depth,omitempty"`
 	ScopeContract *ScopeContract `json:"scope_contract,omitempty"`
 	SourceSession  string          `json:"source_session,omitempty"`
 	ContextScopeID string          `json:"context_scope_id,omitempty"`
