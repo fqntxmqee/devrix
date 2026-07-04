@@ -3,7 +3,7 @@ demand-id: DM-20260705-001
 title: "MUPS 六节点动态提示词 — Observe/Plan/Execute 标签语义与使用场景说明"
 source: 产品/架构评审（prompttags v2 后续）
 priority: P1
-status: OPEN
+status: PLANNING
 l1-domain: shared, orchestration
 created: 2026-07-05
 related:
@@ -132,6 +132,7 @@ parent_demands:
 
 ## 9. 后续（S3 再展开）
 
-- `proposal.md` — Capabilities: TagSemanticsRegistry, PhaseSemanticAppendix, UserFrameFieldDoc
-- `design.md` — 数据面/控制面 prompt 分区、六节点 I/O 矩阵、与 Verify 维度映射
-- `tasks.md` — 映射 L4/L5/T 点
+- [x] `proposal.md` — Capabilities: TagSemanticsRegistry, PhaseSemanticAppendix, UserFrameFieldDoc
+- [x] `design.md` — 数据面/控制面 prompt 分区、六节点 I/O 矩阵、与 Verify 维度映射
+- [x] `tasks.md` — 映射 L4/L5/T 点
+- [ ] S4 开发 — 见 `tasks.md` Phase P0/P1

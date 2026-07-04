@@ -1,0 +1,26 @@
+change_id: mups-prompt-tag-semantics
+priority: P1
+demand_id: DM-20260705-001
+status: s3_planning
+domains: [shared, D2, D7]
+dsaft_scenarios:
+  - D2-S15   # MaterializeForMUPS / phase prompts
+  - D7-S5    # Observe / Plan LLM proposers
+  - D7-S6    # Execute WorkItem ReAct
+dsaft_activities:
+  - D2-S15-A97  # Phase semantic appendix assembly
+  - shared-A97  # TagSemanticsRegistry
+t_points: []  # registered in tasks.md → t-registry at S4
+version_scope:
+  v1.0: P0 Observe/Plan/Execute semantic appendix + user frame field docs
+  v1.1: P1 golden tests + zh/en parity
+  v2.0: P2 defer — parse reject feedback loops (DM-005)
+created: 2026-07-05
+author: DM-20260705-001 S3 planning
+title: "MUPS 六节点 LLM 提示词 — 标签语义与使用场景说明"
+related_changes:
+  - mups-prompttags
+  - mups-prompttags-v2-io-registry
+parent_specs:
+  - openspec/specs/shared/prompttags.md
+  - openspec/specs/d7-orchestration/spec.md
