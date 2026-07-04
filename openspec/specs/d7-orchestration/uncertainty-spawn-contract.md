@@ -4,7 +4,7 @@
 **Demand ID:** DM-20260704-001  
 **Change ID:** `d7-uncertainty-spawn-decouple`  
 **Affects:** SpawnPolicy, RollupGate, StrategicPlan, Observe signals, Session complete  
-**Design SoT:** `openspec/changes/d7-uncertainty-spawn-decouple/design.md` (归档后见 `openspec/archive/`)  
+**Design SoT:** `openspec/archive/2026-07-04-d7-uncertainty-spawn-decouple/design.md`  
 **Depends on:** CC-1～CC-5 (`pipeline-architecture.md` §4.1)
 
 ---

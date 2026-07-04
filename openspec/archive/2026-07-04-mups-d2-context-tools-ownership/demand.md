@@ -1,6 +1,6 @@
 # Demand: MUPS 上下文与工具决策归 D2 统一负责
 
-- **Demand ID:** DM-20260704-001
+- **Demand ID:** DM-20260704-002
 - **Change ID:** mups-d2-context-tools-ownership
 - **Priority:** P0
 - **Domain:** D2 Context Engine + D7 Orchestration（跨域边界）

@@ -384,17 +384,33 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S2-A06-IT02** | — | **MaxTurns cap enforcement** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_MaxTurnsCap`** | **IMPLEMENTED** | **P1** | Turn_Run |
 | **D7-S2-A06-IT03** | — | **StopProcess during slow Turn** | **D7-S2-A06** | **`tests/integration/d7/d7_multiturn_test.go::TestIntegration_D7FastPath_ContextCancellation`** | **IMPLEMENTED** | **P1** | Turn_Run |
 
-### MUPS D2 Context Ownership (DM-20260704-001)
+### MUPS D2 Context Ownership (DM-20260704-002)
 
-> **mups-d2-context-tools-ownership** — D7 迁移至 `MaterializeForMUPS`；移除 D7 侧 tool filter / phase appendix。
+> **Archive:** `openspec/archive/2026-07-04-mups-d2-context-tools-ownership/`
 
 | T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
 |------|------|--------|-----------|--------|----------|
-| **D7-S2-A90-T01** | LLMObservationProposer 无 appendix 常量，改调 D2 MaterializeForMUPS | D7-S2-A90 | `llm_observation_proposer_test.go::TestLLMObservationProposer_UsesMUPS` | **IMPLEMENTED** | P0 |
-| **D7-S2-A90-T02** | LLMStrategicPlanProposer 无 D7 appendix 拼接 | D7-S2-A90 | `strategic_plan_proposer_test.go` | **IMPLEMENTED** | P0 |
-| **D7-S2-A90-T03** | WorkItemExecutor.prepareContext 仅 MaterializeForMUPS | D7-S2-A90 | `workitem_executor_test.go`, `item_pipeline_materialize_test.go` | **IMPLEMENTED** | P0 |
-| **D7-S2-A91-T01** | d7_no_tool_filter_test CI — sessionorchestrator 不 import enforce/tools/filter | D7-S2-A91 | `internal/lint/layer/d7_no_tool_filter_test.go` | **IMPLEMENTED** | P0 |
-| **D7-S2-A91-T02** | grep gate: 无 toolsForProfile / filterPipelineTools 死代码 | D7-S2-A91 | `internal/lint/layer/d7_no_tool_filter_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A90-T01** | LLMObservationProposer → MaterializeForMUPS | D7-S2-A90 | `llm_observation_proposer_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A90-T02** | LLMStrategicPlanProposer → MaterializeForMUPS | D7-S2-A90 | `strategic_plan_proposer_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A90-T03** | WorkItemExecutor.prepareContext → MaterializeForMUPS | D7-S2-A90 | `workitem_executor_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A91-T01** | d7_no_tool_filter_test boundary lint | D7-S2-A91 | `internal/lint/layer/d7_no_tool_filter_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A91-T02** | 无 toolsForProfile / filterPipelineTools 死代码 | D7-S2-A91 | `d7_no_tool_filter_test.go` | **IMPLEMENTED** | P0 |
+
+### D7 Convergence Contract (DM-20260703-001)
+
+> **Archive:** `openspec/archive/2026-07-03-d7-convergence-contract/`
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D7-S5-A93-T01** | R0.5 deliverable complete → SpawnNone | D7-S5-A93 | `workmodel/spawn_policy_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S5-A93-T02** | InlineRetriesAtMaxDepth budget | D7-S5-A93 | `workmodel/spawn_policy_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S5-A93-T03** | spawn_policy complete@maxDepth scenarios | D7-S5-A93 | `workmodel/spawn_policy_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S2-A86-T01** | ApplyRoundTerminalization | D7-S2-A86 | `sessionorchestrator/` | **IMPLEMENTED** | P0 |
+| **D7-S2-A86-T02** | GetPipelineFocus continuation | D7-S2-A86 | `session_turn_loop_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S15-A43-T01** | MaybeSiblingBestEffortRollup | D7-S15-A43 | `workmodel/rollup_gate_test.go` | **IMPLEMENTED** | P0 |
+| **D7-S15-A43-T02** | MaybeParentRollup | D7-S15-A43 | `workmodel/rollup_gate_test.go` | **IMPLEMENTED** | P1 |
+| **D7-S2-A87-T01** | sessionNoForwardProgress recursive stuck | D7-S2-A87 | `session_turn_loop` | **IMPLEMENTED** | P0 |
+| **D7-S2-A73-T05** | buildSessionCompleteEvent task_incomplete 安全网 | D7-S2-A73 | `session_complete_test.go` | **IMPLEMENTED** | P0 |
 
 ### Turn Adapter LTL-Lite Hook (DM-20260618-007)
 
