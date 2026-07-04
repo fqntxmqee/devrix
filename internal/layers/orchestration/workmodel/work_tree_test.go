@@ -243,3 +243,39 @@ func TestEnsureGoal_LockedGoalGetsFreshRoot(t *testing.T) {
 		t.Fatalf("expected 2 roots, got %d", len(roots))
 	}
 }
+
+func TestWorkTree_SemanticIDAssignAndBackfill(t *testing.T) {
+	tree := NewWorkTree()
+	goal, err := tree.EnsureGoal("s1", "root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if goal.SemanticID != "wi_d0_s0_goal" {
+		t.Fatalf("goal semantic_id = %q", goal.SemanticID)
+	}
+	childA, err := tree.Create("s1", CreateWorkItemInput{
+		ParentID: goal.ID, Kind: WorkKindImplement, Title: "A",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	childB, err := tree.Create("s1", CreateWorkItemInput{
+		ParentID: goal.ID, Kind: WorkKindImplement, Title: "B",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if childA.SemanticID != "wi_d1_s0_impl" {
+		t.Fatalf("childA semantic_id = %q", childA.SemanticID)
+	}
+	if childB.SemanticID != "wi_d1_s1_impl" {
+		t.Fatalf("childB semantic_id = %q", childB.SemanticID)
+	}
+
+	// Legacy backfill must not count self as an extra sibling.
+	childA.SemanticID = ""
+	tree.EnsureSemanticID("s1", childA)
+	if got, ok := tree.Get("s1", childA.ID); !ok || got.SemanticID != "wi_d1_s0_impl" {
+		t.Fatalf("backfill childA = %q", got.SemanticID)
+	}
+}

@@ -67,6 +67,10 @@ const TerminalReasonInlineRetriesExhaustedAtMaxDepth = "inline_retries_exhausted
 // ItemPipelineRunner.Run.
 type WorkItemPipelineRound struct {
 	RoundNo         int               `json:"round_no,omitempty"`
+	// Trigger labels why this MUPS round ran (initial|inline|rollup|…).
+	Trigger         string            `json:"trigger,omitempty"`
+	// LoopTick is the RunSessionTurnLoop for{} iteration when this round started.
+	LoopTick        int               `json:"loop_tick,omitempty"`
 	WorkItemID      string            `json:"work_item_id,omitempty"`
 	SessionID       string            `json:"session_id,omitempty"`
 	ObservationIDs  []string          `json:"observation_ids,omitempty"`

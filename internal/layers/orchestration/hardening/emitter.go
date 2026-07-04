@@ -25,7 +25,18 @@ import (
 var (
 	bridgeMu sync.RWMutex
 	bridge   *observability.Bridge
+
+	locatorAttrsMu sync.RWMutex
+	locatorAttrs   func(context.Context) []tracer.Attribute
 )
+
+// SetLocatorAttrsProvider wires semantic locator span attrs from ctx.
+// Called from bootstrap to avoid hardening → workmodel import cycle.
+func SetLocatorAttrsProvider(fn func(context.Context) []tracer.Attribute) {
+	locatorAttrsMu.Lock()
+	defer locatorAttrsMu.Unlock()
+	locatorAttrs = fn
+}
 
 // SetBridge wires the observability bridge for v6.0.0 5 new Span ops.
 // Idempotent; safe to call multiple times. Called from
@@ -73,6 +84,18 @@ func endSpanWithError(span tracer.Span, err error) {
 	span.End()
 }
 
+// locatorAttrsFromCtx appends Jaeger breadcrumb attrs when a LocatorFrame
+// provider is wired (D7 semantic locator).
+func locatorAttrsFromCtx(ctx context.Context) []tracer.Attribute {
+	locatorAttrsMu.RLock()
+	fn := locatorAttrs
+	locatorAttrsMu.RUnlock()
+	if fn == nil {
+		return nil
+	}
+	return fn(ctx)
+}
+
 // --- S6 MUPS Pipeline ---
 
 // EmitMUPSPipeline is the v6.0.0 root span for the 5-node MUPS pipeline
@@ -87,6 +110,7 @@ func EmitMUPSPipeline(ctx context.Context, sessionID, workItemID, pipelineIntent
 		{Key: "pipeline.intent", Value: pipelineIntent},
 		{Key: "pipeline.nodes", Value: "observe,plan,wave,execute,verify,learn"},
 	}
+	attrs = append(attrs, locatorAttrsFromCtx(ctx)...)
 	c, span := start(ctx, telemetry.OpD7_S6_MUPS_Pipeline, attrs...)
 	return c, func(err error) { endSpanWithError(span, err) }
 }
@@ -182,6 +206,7 @@ func EmitWorktreeOp(ctx context.Context, sessionID, op, itemID, phaseOrStatus st
 		{Key: "worktree.item_id", Value: itemID},
 		{Key: "worktree.phase_or_status", Value: phaseOrStatus},
 	}
+	attrs = append(attrs, locatorAttrsFromCtx(ctx)...)
 	_, span := start(ctx, telemetry.OpD7_S1_Worktree_Op, attrs...)
 	return func(err error) { endSpanWithError(span, err) }
 }
@@ -295,6 +320,7 @@ func EmitSubTurnIteration(ctx context.Context, sessionID, itemID string, iter in
 		{Key: "subturn.finish_reason", Value: finishReason},
 		{Key: "subturn.stop_reason", Value: stopReason},
 	}
+	attrs = append(attrs, locatorAttrsFromCtx(ctx)...)
 	_, span := start(ctx, telemetry.OpD7_S5_SubTurn_Iteration, attrs...)
 	return func(err error) { endSpanWithError(span, err) }
 }

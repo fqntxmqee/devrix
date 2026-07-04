@@ -66,6 +66,10 @@ type ItemPipelineRunOpts struct {
 	// gateway so feishu cards show live tool_call / tool_result / text
 	// alongside the final ArtifactSummary. nil → no-op.
 	Emit func(*contracts.EngineEvent)
+	// TurnNo is the session turn counter from TurnState (0 when unwired).
+	TurnNo int
+	// LoopTick is the 1-based RunSessionTurnLoop for{} iteration index.
+	LoopTick int
 }
 
 // Resolve returns opts, falling back to the runner's deprecated Emit
@@ -143,17 +147,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if workmodel.IsHumanReviewItem(item) && item.Status == workmodel.TaskStatusPending {
 		return r.runHumanReviewAwait(ctx, sessionID, item)
 	}
-	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the
-	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. hardening
-	// uses a package-level bridge (SetBridge in bootstrap/wire_coordinator.go),
-	// so this works without an obsBridge field on ItemPipelineRunner.
-	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
-	defer func() { endMUPS(nil) }()
-
 	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
 		item = got
 	}
 	isRollup := item.NeedsRollup
+	r.Tasks.Tree().EnsureSemanticID(sessionID, item)
+	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
+		item = got
+	}
 	directive := DirectiveForItem(sessionID, item, r.Tasks)
 	if item.Kind == workmodel.WorkKindGoal {
 		directive = DirectiveForGoalPlan(item, directive)
@@ -164,14 +165,35 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if item.LastRound != nil {
 		roundNo = item.LastRound.RoundNo + 1
 	}
+	trigger := workmodel.InferMUPSTrigger(item, isRollup)
+	frame := workmodel.LocatorFrame{
+		SessionID:    sessionID,
+		TurnNo:       opts.TurnNo,
+		LoopTick:     opts.LoopTick,
+		WorkItemID:   item.ID,
+		SemanticID:   item.SemanticID,
+		Depth:        r.Tasks.Tree().Depth(sessionID, item.ID),
+		SiblingIndex: r.Tasks.Tree().SiblingIndex(sessionID, item.ID),
+		RoundNo:      roundNo,
+		Trigger:      trigger,
+	}
+	ctx = workmodel.WithLocatorFrame(ctx, frame)
+	// DM-20260626-009 hotfix: emit the v6.0.0 5-node MUPS root span so the
+	// per-WorkItem ItemPipelineRunner path is observable in Jaeger. hardening
+	// uses a package-level bridge (SetBridge in bootstrap/wire_coordinator.go),
+	// so this works without an obsBridge field on ItemPipelineRunner.
+	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
+	defer func() { endMUPS(nil) }()
 
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseObserve))
 
 	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
 		return nil, err
 	}
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhasePlan))
 
 	var strategic *StrategicPlanProposal
 	strategicRejectRationale := ""
@@ -279,6 +301,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		pl.Kind = plan.CommitmentPlan
 	}
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseExecute))
 
 	// Execute via WorkItemExecutor (per-WorkItem ReAct loop). Emit Wave +
 	// Execute sub-spans so Jaeger shows the full 5-node tree.
@@ -334,6 +357,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseVerify)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseVerify))
 
 	// RH-MUPS-04 (DM-20260701-001): compute child-outcome stats BEFORE the
 	// verify step so rollup verify can refuse to mark the parent Completed
@@ -374,6 +398,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseLearn))
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
 	// as a verify stand-in). The current per-WorkItem path uses deterministic
@@ -461,6 +486,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	round := &workmodel.WorkItemPipelineRound{
 		RoundNo:           roundNo,
+		Trigger:           trigger,
+		LoopTick:          opts.LoopTick,
 		WorkItemID:        item.ID,
 		SessionID:         sessionID,
 		ObservationIDs:    obsIDs,
@@ -528,6 +555,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	workmodel.TouchInlineRetryAtMaxDepth(r.Tasks.Tree(), sessionID, item, round, treeCtx)
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseDecide)
+	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseDecide))
 
 	phase := workmodel.RoundPhaseIdle
 	switch round.SpawnPolicy {

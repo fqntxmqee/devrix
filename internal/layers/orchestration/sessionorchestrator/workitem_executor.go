@@ -199,6 +199,8 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 	}
 	for iter := 0; iter < max; iter++ {
 		result.Iterations = iter + 1
+		ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseExecute))
+		ctx = workmodel.WithLocatorIter(ctx, iter+1)
 
 		if iter == max-1 {
 			if ec, ok := WorkItemExecContextFrom(ctx); ok {
