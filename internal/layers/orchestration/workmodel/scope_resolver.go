@@ -20,6 +20,11 @@ var registeredScenarioScopes = []scenarioScopeEntry{
 		ScenarioSlug: "plan",
 		PathPrefix:   "internal/layers/orchestration/plan/",
 	},
+	{
+		DomainTokens: []string{"d2", "contextengine", "context engine"},
+		ScenarioSlug: "kernel",
+		PathPrefix:   "internal/layers/contextengine/kernel/",
+	},
 }
 
 var explicitInternalPathRE = regexp.MustCompile(`internal/layers/[\w./-]+`)
@@ -72,6 +77,10 @@ func scenarioMentionedInDirective(lower string, e scenarioScopeEntry) bool {
 		return true
 	}
 	if slug == "plan" && strings.Contains(lower, "plan") && strings.Contains(lower, "目录") {
+		return true
+	}
+	if slug == "kernel" && strings.Contains(lower, "kernel") &&
+		(strings.Contains(lower, "目录") || strings.Contains(lower, "directory")) {
 		return true
 	}
 	return strings.Contains(lower, "/"+slug)

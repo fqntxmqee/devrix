@@ -214,6 +214,7 @@ func (a *FeishuAdapter) sendStructuredThinkingCard(ctx context.Context, msg *typ
 	stream.mu.Lock()
 	if msg.Content != "" {
 		chunk := textutil.StripPriorOutputSummary(msg.Content)
+		chunk = textutil.StripMiniMaxStreamMarkers(chunk)
 		// minimax M2.7 streaming replay dedup (DM-20260621-006). The LLM
 		// occasionally re-emits a long prefix of its own thinking, which
 		// would render as the same paragraph repeated 2-3 times on the

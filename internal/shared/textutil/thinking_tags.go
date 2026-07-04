@@ -243,7 +243,7 @@ func StripPriorOutputSummary(text string) string {
 // embedded <prior-output-summary> markers when the LLM quotes its own
 // prior reasoning, so we strip thinking first.
 func StripAssistantInternalMarkers(text string) string {
-	return StripPriorOutputSummary(StripThinkingTags(text))
+	return StripMiniMaxStreamMarkers(StripPriorOutputSummary(StripThinkingTags(text)))
 }
 
 func partialTagSuffix(raw, tag string) int {

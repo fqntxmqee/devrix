@@ -21,6 +21,7 @@ const (
 // DeliverableFinding is one structured review finding for upward bubble / rollup.
 type DeliverableFinding struct {
 	Severity string `json:"severity"`
+	Title    string `json:"title,omitempty"`
 	File     string `json:"file,omitempty"`
 	Line     int    `json:"line,omitempty"`
 	Message  string `json:"message,omitempty"`

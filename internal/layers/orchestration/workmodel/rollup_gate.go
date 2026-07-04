@@ -307,6 +307,13 @@ func ExtractSessionDeliverable(tm *TaskManager, sessionID string) string {
 	if root == nil {
 		return ""
 	}
+	if root.LastRound != nil && root.LastRound.DeliverableStatus == DeliverableStatusComplete {
+		if root.LastRound.StructuredDeliverable != nil {
+			if formatted := FormatDeliverablePayloadForIM(root.LastRound.StructuredDeliverable); formatted != "" {
+				return formatted
+			}
+		}
+	}
 	// DM-20260629-001 / T53: read ArtifactSummary via typed RollupReport
 	// envelope instead of scattered root.LastRound.* access.
 	report := NewRollupReportFromRound(root.ID, root.LastRound)

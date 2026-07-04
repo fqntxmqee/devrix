@@ -77,10 +77,10 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 		if thinking != "" {
 			// Provider-native reasoning field (DeepSeek-R1 reasoning_content,
 			// Anthropic thinking). Trust the protocol: content is clean.
-			chunk.Thinking += thinking
+			chunk.Thinking += textutil.StripMiniMaxStreamMarkers(thinking)
 			hasDelta = true
 			if delta.Content != "" {
-				chunk.Content += delta.Content
+				chunk.Content += textutil.StripMiniMaxStreamMarkers(delta.Content)
 				hasDelta = true
 			}
 		} else if delta.Content != "" {
@@ -91,7 +91,7 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 			// <think> / </think> boundary still separate correctly.
 			thinkDelta, contentDelta := a.thinkSplitter.Push(delta.Content)
 			if thinkDelta != "" {
-				chunk.Thinking += thinkDelta
+				chunk.Thinking += textutil.StripMiniMaxStreamMarkers(thinkDelta)
 				hasDelta = true
 			}
 			if contentDelta != "" {
@@ -101,7 +101,7 @@ func (a *streamAccumulator) apply(event openAIStreamEvent) *llmgateway.Chunk {
 				// The discarded fold summary is intentionally not surfaced.
 				_, visibleDelta := a.priorSummarySplitter.Push(contentDelta)
 				if visibleDelta != "" {
-					chunk.Content += visibleDelta
+					chunk.Content += textutil.StripMiniMaxStreamMarkers(visibleDelta)
 					hasDelta = true
 				}
 			}
