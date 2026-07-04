@@ -43,6 +43,9 @@ func TestMaterializeForMUPS_Observe(t *testing.T) {
 	if !strings.Contains(got.SystemPrompt, "obs_fact") {
 		t.Fatalf("system = %q", got.SystemPrompt)
 	}
+	if idxObs := strings.Index(got.SystemPrompt, "obs_fact"); idxObs < 0 || strings.Index(got.SystemPrompt, "base prompt") < idxObs {
+		t.Fatalf("observe appendix must precede static base: %q", got.SystemPrompt)
+	}
 	appendix := got.PhaseAppendix
 	if appendix != "" && strings.Count(got.SystemPrompt, appendix) != 1 {
 		t.Fatalf("observation appendix duplicated in SystemPrompt: count=%d", strings.Count(got.SystemPrompt, appendix))
@@ -139,10 +142,15 @@ func TestMaterializeForMUPS_ExecuteImplement(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(got.SystemPrompt, "CORE_UNCERTAINTY_PRINCIPLES") {
-		t.Fatalf("execute must prepend devrix_core via PrepareBase: %q", got.SystemPrompt)
+		t.Fatalf("execute must include devrix_core via PrepareBase: %q", got.SystemPrompt)
 	}
 	if !strings.Contains(got.SystemPrompt, "你正在分层工作树") {
 		t.Fatalf("execute must include WI body: %q", got.SystemPrompt)
+	}
+	idxCore := strings.Index(got.SystemPrompt, "CORE_UNCERTAINTY_PRINCIPLES")
+	idxWI := strings.Index(got.SystemPrompt, "你正在分层工作树")
+	if idxWI < 0 || idxCore < idxWI {
+		t.Fatalf("execute dynamic layers must precede static core: %q", got.SystemPrompt)
 	}
 	// Output hints appear once via AssembleMUPSSystemPrompt outputHints, not duplicated in WI body.
 	if strings.Count(got.SystemPrompt, "WorkItem 输出块") != 1 {

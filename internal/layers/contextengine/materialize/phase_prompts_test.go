@@ -37,11 +37,18 @@ func TestBuildExecuteOutputHints_DeliverableSchema(t *testing.T) {
 }
 
 func TestAssembleMUPSSystemPrompt_Layers(t *testing.T) {
-	got := AssembleMUPSSystemPrompt("base", "hints", "appendix")
-	for _, want := range []string{"base", "hints", "appendix"} {
+	got := AssembleMUPSSystemPrompt("base", "hints", "wibody", "appendix")
+	for _, want := range []string{"base", "hints", "wibody", "appendix"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("assembled = %q, missing %q", got, want)
 		}
+	}
+	idxHints := strings.Index(got, "hints")
+	idxBody := strings.Index(got, "wibody")
+	idxAppendix := strings.Index(got, "appendix")
+	idxBase := strings.Index(got, "base")
+	if !(idxHints < idxBody && idxBody < idxAppendix && idxAppendix < idxBase) {
+		t.Fatalf("dynamic-before-static order violated: %q", got)
 	}
 }
 

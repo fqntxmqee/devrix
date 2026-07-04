@@ -45,17 +45,15 @@ func BuildExecuteOutputHints(loc i18n.Locale, wi *contracts.MUPSWorkItemSnapshot
 	return hints
 }
 
-// AssembleMUPSSystemPrompt combines base system prompt, output hints, and phase appendix.
-func AssembleMUPSSystemPrompt(base, outputHints, phaseAppendix string) string {
+// AssembleMUPSSystemPrompt builds the final MUPS system prompt with node-specific
+// dynamic sections before the static PrepareBase system prompt (devrix_core).
+// Order: outputHints → workItemBody → phaseAppendix → staticBase.
+func AssembleMUPSSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix string) string {
 	var parts []string
-	if s := strings.TrimSpace(base); s != "" {
-		parts = append(parts, s)
-	}
-	if s := strings.TrimSpace(outputHints); s != "" {
-		parts = append(parts, s)
-	}
-	if s := strings.TrimSpace(phaseAppendix); s != "" {
-		parts = append(parts, s)
+	for _, s := range []string{outputHints, workItemBody, phaseAppendix, staticBase} {
+		if t := strings.TrimSpace(s); t != "" {
+			parts = append(parts, t)
+		}
 	}
 	return strings.Join(parts, "\n\n")
 }

@@ -60,6 +60,7 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 	}
 
 	var baseSystem string
+	var wiBody string
 	var messages []types.Message
 	var tokenBudget int
 	var userContextPrepend map[string]string
@@ -116,13 +117,13 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 		if err != nil {
 			return contracts.MUPSPreparedContext{}, err
 		}
-		wiBody := buildWorkItemSystemBody(matReq)
-		baseSystem = AssembleMUPSSystemPrompt(coreBase, wiBody, "")
+		wiBody = buildWorkItemSystemBody(matReq)
+		baseSystem = coreBase
 		messages = mat.Messages
 		tokenBudget = matReq.Policy.TokenBudget
 	}
 
-	systemPrompt := AssembleMUPSSystemPrompt(baseSystem, outputHints, phaseAppendix)
+	systemPrompt := AssembleMUPSSystemPrompt(baseSystem, outputHints, wiBody, phaseAppendix)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(messages) + counter.CountText(systemPrompt)
 
