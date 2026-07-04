@@ -456,3 +456,14 @@ func TestWorkItemExecutor_NilEmit_NoOp(t *testing.T) {
 		t.Fatalf("res = %+v, want Done=true Content=ok", res)
 	}
 }
+
+func TestFilterEphemeralExecuteMessages_dropsSynthesisHint(t *testing.T) {
+	msgs := []types.Message{
+		{Role: types.MessageRoleAssistant, Content: "ok"},
+		{Role: types.MessageRoleUser, Content: "<deliverable_format>findings_json_only</deliverable_format>\nFinal iteration: tools are disabled."},
+	}
+	got := filterEphemeralExecuteMessages(msgs)
+	if len(got) != 1 || got[0].Role != types.MessageRoleAssistant {
+		t.Fatalf("got %v", got)
+	}
+}

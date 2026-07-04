@@ -13,8 +13,8 @@ var DeliverableFindingFieldAliases = map[string][]string{
 	"severity":       {"severity", "level", "priority"},
 	"title":          {"title", "issue", "name", "summary"},
 	"message":        {"message", "description", "detail", "details"},
-	"file":           {"file", "path", "filepath", "file_path"},
-	"line":           {"line", "lineno", "line_no", "line_number"},
+	"file":           {"file", "path", "filepath", "file_path", "location"},
+	"line":           {"line", "lineno", "line_no", "line_number", "line_range"},
 	"evidence":       {"evidence", "proof", "citation_text"},
 	"impact":         {"impact", "risk", "effect"},
 	"recommendation": {"recommendation", "fix", "suggestion", "action"},
@@ -137,6 +137,10 @@ func applyFindingField(f *DeliverableFinding, canonical string, raw json.RawMess
 	case "line":
 		if n, ok := parseFlexibleInt(raw); ok {
 			f.Line = n
+		} else if strings.Contains(s, "-") {
+			if n, err := strconv.Atoi(strings.TrimSpace(strings.Split(s, "-")[0])); err == nil && n > 0 {
+				f.Line = n
+			}
 		}
 	}
 }

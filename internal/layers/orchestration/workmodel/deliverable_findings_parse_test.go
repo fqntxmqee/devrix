@@ -32,6 +32,37 @@ func TestShouldSuppressFindingsArtifactStream(t *testing.T) {
 	}
 }
 
+func TestParseFindingsJSONPayload_locationFieldAlias(t *testing.T) {
+	summary := `{"findings":[{"id":"F-01","severity":"high","location":"planner.go:NewPlanID","title":"non-deterministic hash","detail":"map iteration order"}]}`
+	p, ok := parseFindingsJSONPayload(summary)
+	if !ok || p == nil || len(p.Findings) != 1 {
+		t.Fatalf("parse failed: ok=%v payload=%v", ok, p)
+	}
+	f := p.Findings[0]
+	if f.File != "planner.go" || f.Severity != "P0" {
+		t.Fatalf("finding = %+v", f)
+	}
+}
+
+func TestSalvageDeliverablePayload_corruptMixedSummary(t *testing.T) {
+	contract := DeliverableContract{
+		Citation:  DeliverableCitationFileLine,
+		Severity:  DeliverableSeverityP0P1,
+		Structure: DeliverableStructureFindingsJSON,
+	}
+	summary := "Let me read files.\n```json\n{\"module\":\"x\",\"findings\":[{\"id\":\"F-01\",\"severity\":\"high\",\"location\":\"planner.go:NewPlanID\",\"title\":\"hash bug\",\"detail\":\"sort before hash\"}]}\n```"
+	payload := SalvageDeliverablePayload(summary, contract)
+	if !FindingsPayloadPresentable(payload) {
+		t.Fatalf("expected salvage, got %+v", payload)
+	}
+	got := VerifyDeliverableContract(contract, summary, "max_iters")
+	if got.Status != DeliverableStatusComplete && got.Reason != "findings_json_incomplete" {
+		if got.Status == DeliverableStatusIncomplete && got.Reason == "findings_json_required" {
+			t.Fatalf("verify should salvage findings, got reason=%q", got.Reason)
+		}
+	}
+}
+
 func TestVerifyDeliverableContract_rejects_regex_fallback_for_findings_json(t *testing.T) {
 	c := DeliverableContract{
 		Citation:  DeliverableCitationFileLine,

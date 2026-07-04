@@ -22,7 +22,7 @@ func TestPolicyFromWaveContext(t *testing.T) {
 }
 
 func TestMaterializeWave_Fresh(t *testing.T) {
-	m := NewDefaultMaterializer(nil)
+	m := NewDefaultMaterializer(nil, "")
 	res, err := m.Materialize(t.Context(), Request{
 		Partition: Partition{SessionID: "s1", Kind: PartitionWave},
 		Policy:    PolicyFromWaveContext(WavePolicyFresh),

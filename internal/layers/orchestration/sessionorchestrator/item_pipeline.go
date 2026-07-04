@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -151,6 +152,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		item = got
 	}
 	isRollup := item.NeedsRollup
+	isDeliverableSynth := isRollup && workmodel.IsDeliverableFormatRollupSynth(r.Tasks, sessionID, item)
+	isParentRollup := isRollup && workmodel.IsParentRollupSynth(r.Tasks, sessionID, item)
 	r.Tasks.Tree().EnsureSemanticID(sessionID, item)
 	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
 		item = got
@@ -289,7 +292,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			PersistScope: plan.PersistSession,
 		},
 	}
-	if isRollup {
+	if isParentRollup {
 		planInput.FailureCriteria = rollupFailureCriteria()
 	}
 	_, endPlan := hardening.EmitTaskGraphSynthesize(ctx, sessionID, len(planInput.Steps), 0, 1, false)
@@ -298,7 +301,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if err != nil {
 		return nil, fmt.Errorf("item_pipeline: plan: %w", err)
 	}
-	if isRollup && pl != nil {
+	if isParentRollup && pl != nil {
 		pl.Kind = plan.CommitmentPlan
 	}
 	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
@@ -313,10 +316,26 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if strategic != nil && strategic.ReactItersHint > 0 {
 		maxItersOverride = strategic.ReactItersHint
 	}
-	maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
+	if isDeliverableSynth {
+		maxItersOverride = 1
+	} else {
+		maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
+	}
 	// RH-MUPS-10 (DM-20260701-001): surface deliverable failure + scope anchor on
 	// inline retry; omit spawn rationale / artifact prose (scope drift).
-	priorReason := PriorDeliverableRetryHint(item, deliverableContract)
+	execDeliverableContract := deliverableContract
+	if isParentRollup {
+		execDeliverableContract = workmodel.RollupDeliverableContract()
+	} else if isDeliverableSynth && item.LastRound != nil {
+		prior := item.LastRound.DeliverableContract
+		if !prior.ContractApplicable() {
+			prior = workmodel.ExpandLegacySchemaToContract(item.LastRound.DeliverableSchema)
+		}
+		if prior.ContractApplicable() {
+			execDeliverableContract = workmodel.NarrowestContract(deliverableContract, prior)
+		}
+	}
+	priorReason := PriorDeliverableRetryHint(item, execDeliverableContract)
 	if extra := machineSpawnFeedback(item); extra != "" {
 		if priorReason != "" {
 			priorReason += "\n"
@@ -327,7 +346,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		Item:                item,
 		Tasks:               r.Tasks,
 		MaxItersOverride:    maxItersOverride,
-		DeliverableContract: deliverableContract,
+		DeliverableContract: execDeliverableContract,
 		DeliverableSchema:   deliverableSchema,
 		PriorVerifyReason:   priorReason,
 		Emit:                opts.Emit,
@@ -361,7 +380,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// parent would be marked Completed — the all-failure case gets washed
 	// into apparent success.
 	rollupChildStats := workmodel.ChildOutcomeStats{}
-	if isRollup && r.Tasks != nil {
+	if isParentRollup && r.Tasks != nil {
 		for _, c := range r.Tasks.Tree().ListChildren(sessionID, item.ID) {
 			if c == nil || c.Kind == workmodel.WorkKindChecklist {
 				continue
@@ -380,14 +399,18 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	var verdict workmodel.Verdict
 	var deliverableResult DeliverableVerifyResult
-	if isRollup {
+	verifyContract := deliverableContract
+	if isDeliverableSynth {
+		verifyContract = execDeliverableContract
+	}
+	if isParentRollup {
 		verdict = verifyRollupArtifact(art, rollupChildStats)
 		deliverableResult = DeliverableVerifyResult{Status: workmodel.DeliverableStatusNotApplicable}
 	} else if r.Verify != nil {
 		verdict = r.Verify(art)
-		deliverableResult = VerifyDeliverableContract(deliverableContract, art)
+		deliverableResult = VerifyDeliverableContract(verifyContract, art)
 	} else {
-		out := verifyArtifactForWorkItemWithContract(art, item, pl, deliverableContract)
+		out := verifyArtifactForWorkItemWithContract(art, item, pl, verifyContract)
 		verdict = out.Verdict
 		deliverableResult = out.Deliverable
 	}
@@ -506,14 +529,13 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// rollup rounds so SpawnPolicyEvaluator can escalate after the
 	// configured ceiling. Pass resets the counter so a later successful
 	// rollup immediately stops the retry clock.
-	if isRollup {
+	if isParentRollup {
 		if verdict.Kind == types.VerdictPass {
 			round.RollupRetries = 0
 		} else if item.LastRound != nil {
 			round.RollupRetries = item.LastRound.RollupRetries + 1
 		}
-		// Rollup synthesis is not a deliverable-schema round; avoid CC-1 inline
-		// retry on Pass when the parent directive still matches review schema.
+		// Parent rollup synthesis is not a deliverable-schema round.
 		round.DeliverableSchema = workmodel.DeliverableSchemaNotApplicable
 		round.DeliverableContract = workmodel.DeliverableContract{}
 		round.DeliverableStatus = workmodel.DeliverableStatusNotApplicable
@@ -582,8 +604,8 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	if round.SpawnPolicy == workmodel.SpawnNone {
 		opts := workmodel.SpawnNoneTerminalOpts{
-			IsRollup:                  isRollup,
-			StripDeliverableForStatus: r.Verify != nil && !isRollup,
+			IsRollup:                  isParentRollup,
+			StripDeliverableForStatus: r.Verify != nil && !isParentRollup,
 		}
 		if err := workmodel.ApplyRoundTerminalization(
 			r.Tasks.Tree(), sessionID, item.ID,
@@ -623,7 +645,7 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 	exit := 0
 	errMsg := ""
 	if result != nil {
-		content = result.Content
+		content = textutil.StripMiniMaxStreamMarkers(result.Content)
 		stopReason = result.StopReason
 		iterations = result.Iterations
 		toolCalls = result.ToolCalls

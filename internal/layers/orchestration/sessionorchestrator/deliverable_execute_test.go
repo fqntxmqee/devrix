@@ -7,6 +7,16 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
 
+func TestRollupSynthesisTurnExecuteHint_nonEmpty(t *testing.T) {
+	got := RollupSynthesisTurnExecuteHint()
+	if got == "" {
+		t.Fatal("expected non-empty rollup synthesis hint")
+	}
+	if !strings.Contains(got, "tools are disabled") {
+		t.Fatalf("hint=%q want tools disabled guidance", got)
+	}
+}
+
 func TestPriorDeliverableRetryHint_ScopeAndReason(t *testing.T) {
 	contract := workmodel.DeliverableContract{
 		Citation:  workmodel.DeliverableCitationFileLine,

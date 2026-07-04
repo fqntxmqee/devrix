@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/token"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -15,11 +15,19 @@ const deliveryHintBlock = WorkItemOutputFormatHints
 // DefaultMaterializer implements the light Materialize path (OQ-LC-2).
 type DefaultMaterializer struct {
 	Store *PartitionStore
+	// ProjectDir is the persist root for oversized tool results
+	// (<projectDir>/<sessionID>/tool-results/). Defaults to Store.BaseDir().
+	ProjectDir string
+	perMsgStates sync.Map // sessionID → *persist.ContentReplacementState
 }
 
 // NewDefaultMaterializer constructs a materializer with partition store.
-func NewDefaultMaterializer(store *PartitionStore) *DefaultMaterializer {
-	return &DefaultMaterializer{Store: store}
+func NewDefaultMaterializer(store *PartitionStore, projectDir string) *DefaultMaterializer {
+	m := &DefaultMaterializer{Store: store, ProjectDir: projectDir}
+	if m.ProjectDir == "" && store != nil {
+		m.ProjectDir = store.BaseDir()
+	}
+	return m
 }
 
 // Materialize composes system prompt, messages, and readonly tool profile.
@@ -42,9 +50,7 @@ func (m *DefaultMaterializer) Materialize(_ context.Context, req Request) (Resul
 		}
 		msgs = mergeInitialWithPrivateChain(msgs, priv)
 	}
-	msgs = conversation.RepairToolMessageChain(msgs)
-	msgs = compressMessages(msgs, req.Policy.TokenBudget)
-	msgs = conversation.RepairToolMessageChain(msgs)
+	msgs = m.shrinkPrivateChain(req.Partition.SessionID, msgs, req.Policy.TokenBudget)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
 	return Result{
@@ -86,9 +92,7 @@ func (m *DefaultMaterializer) materializeSubTurn(req Request) (Result, error) {
 			msgs = append(priv, msgs...)
 		}
 	}
-	msgs = conversation.RepairToolMessageChain(msgs)
-	msgs = compressMessages(msgs, req.Policy.TokenBudget)
-	msgs = conversation.RepairToolMessageChain(msgs)
+	msgs = m.shrinkPrivateChain(req.Partition.SessionID, msgs, req.Policy.TokenBudget)
 	sys := strings.TrimSpace(req.SystemPrompt)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
@@ -123,9 +127,7 @@ func (m *DefaultMaterializer) materializeWave(req Request) (Result, error) {
 			}
 		}
 	}
-	msgs = conversation.RepairToolMessageChain(msgs)
-	msgs = compressMessages(msgs, req.Policy.TokenBudget)
-	msgs = conversation.RepairToolMessageChain(msgs)
+	msgs = m.shrinkPrivateChain(req.Partition.SessionID, msgs, req.Policy.TokenBudget)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(msgs) + counter.CountText(sys)
 	return Result{

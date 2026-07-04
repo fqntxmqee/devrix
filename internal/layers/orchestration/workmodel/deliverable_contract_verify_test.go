@@ -35,6 +35,23 @@ func TestVerifyDeliverableContract_planningOutsideValidFindingsJSON(t *testing.T
 	}
 }
 
+func TestVerifyDeliverableContract_salvageCorruptFindingsWithPlanningProse(t *testing.T) {
+	c := DeliverableContract{
+		Citation:  DeliverableCitationFileLine,
+		Severity:  DeliverableSeverityP0P1,
+		Structure: DeliverableStructureFindingsJSON,
+		Reject:    []DeliverableReject{DeliverableRejectPlanningMeta},
+	}
+	summary := "The user wants me to review plan code.\n```json\n{\n  \"review_target\": \"plan/\",\n  \"notCorrupt\": true,\n  \"findings\": [\n    {\"id\":\"F-001\",\"severity\":\"high\",\"file\":\"plan.go\",\"line_range\":\"107-114\",\"description\":\"MarshalJSON mismatch\",\"recommendation\":\"fix doc\"},\n    {\"id\":\"F-002\",\"severity\":\"medium\",\"file\":\"plan_struct.go\",\"line_range\":\"117-127\",\"description\":\"NaN strength\",\"recommendation\":\"guard NaN\"}\n  ]\n}\n```"
+	got := VerifyDeliverableContract(c, summary, "final_answer")
+	if got.Status != DeliverableStatusComplete {
+		t.Fatalf("status=%q reason=%q, want complete via salvage", got.Status, got.Reason)
+	}
+	if got.Payload == nil || len(got.Payload.Findings) < 2 {
+		t.Fatalf("expected salvaged findings, got %+v", got.Payload)
+	}
+}
+
 func TestDeliverableInlineWouldExhaust(t *testing.T) {
 	ctx := TreeEvalContext{InlineRetriesAtMaxDepth: 2, MaxInlineRetriesAtMaxDepth: 3}
 	if !deliverableInlineWouldExhaust(ctx) {

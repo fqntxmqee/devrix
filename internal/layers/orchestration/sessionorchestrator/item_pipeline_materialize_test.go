@@ -16,7 +16,7 @@ import (
 func TestMaterialize_SiblingPrivateChainIsolation(t *testing.T) {
 	dir := t.TempDir()
 	store, _ := materialize.NewPartitionStore(dir)
-	mat := materialize.NewDefaultMaterializer(store)
+	mat := materialize.NewDefaultMaterializer(store, dir)
 
 	secret := "SECRET_SIBLING_A_TOOL_OUTPUT_XYZ"
 	_ = store.Append("s1", "wi_a", []types.Message{{
@@ -59,7 +59,7 @@ func TestMaterialize_ChildDownlinkScopeInPrompt(t *testing.T) {
 	child := children[0]
 
 	req := BuildMaterializeRequest("s1", child, tm, "child work", DefaultWorkItemTokenBudget)
-	mat := materialize.NewDefaultMaterializer(nil)
+	mat := materialize.NewDefaultMaterializer(nil, "")
 	res, err := mat.Materialize(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
@@ -108,7 +108,7 @@ func TestBuildMaterializeRequest_UpstreamBlockedBy(t *testing.T) {
 	dir := t.TempDir()
 	store, _ := materialize.NewPartitionStore(dir)
 	_ = store.Append("s1", blocker.ID, []types.Message{{Content: secret}})
-	mat := materialize.NewDefaultMaterializer(store)
+	mat := materialize.NewDefaultMaterializer(store, dir)
 	res, err := mat.Materialize(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
@@ -181,7 +181,7 @@ func TestEmitContextMaterialize_SpanNoPanic(t *testing.T) {
 func TestMaterialize_DepthSubContextDiffersFromSessionPrepare(t *testing.T) {
 	dir := t.TempDir()
 	store, _ := materialize.NewPartitionStore(dir)
-	mat := materialize.NewDefaultMaterializer(store)
+	mat := materialize.NewDefaultMaterializer(store, dir)
 	tm := workmodel.NewTaskManager()
 	goal, _ := tm.EnsureGoal("s1", "g")
 	_, err := tm.DecomposeChildren("s1", goal.ID, []workmodel.ChildSpec{{
@@ -213,7 +213,7 @@ func TestMaterialize_DepthSubContextDiffersFromSessionPrepare(t *testing.T) {
 }
 
 func TestMaterialize_NoObsTaxonomyInPrivateChainTemplate(t *testing.T) {
-	mat := materialize.NewDefaultMaterializer(nil)
+	mat := materialize.NewDefaultMaterializer(nil, "")
 	res, err := mat.Materialize(context.Background(), materialize.Request{
 		Partition: materialize.Partition{SessionID: "s1", WorkItemID: "wi1"},
 		Policy:    materialize.Policy{TokenBudget: 1000},

@@ -37,6 +37,14 @@ func NewPartitionStore(baseDir string) (*PartitionStore, error) {
 	return &PartitionStore{baseDir: dir}, nil
 }
 
+// BaseDir returns the expanded sessions root used for partition jsonl paths.
+func (s *PartitionStore) BaseDir() string {
+	if s == nil {
+		return ""
+	}
+	return s.baseDir
+}
+
 // NewPartitionStoreStrict is like NewPartitionStore but enables strict
 // JSONL parse mode. The first unparseable line causes LoadWorkItem /
 // LoadAgent to return an error instead of silently skipping. Use this

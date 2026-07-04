@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
@@ -145,6 +146,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 			if focus == nil {
+				if workmodel.MaybePromotePendingSingleChildRollups(sessionID, o.taskManager) {
+					continue
+				}
 				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
 					continue
 				}
@@ -230,13 +234,23 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			// per-WorkItem ReAct loop; round.ArtifactSummary carries the
 			// LLM's final answer. Emit it as a text event so the gateway
 			// (feishu reply card) sees user-visible content.
-			if round.ArtifactSummary != "" && !workmodel.ShouldSuppressFindingsArtifactStream(round) {
-				lastArtifactSummary = round.ArtifactSummary
-				emit(ctx, o.sink, out, &contracts.EngineEvent{
-					Type:      "text",
-					Content:   round.ArtifactSummary,
-					SessionID: sessionID,
-				})
+			if round.ArtifactSummary != "" {
+				content := round.ArtifactSummary
+				if workmodel.ShouldSuppressFindingsArtifactStream(round) {
+					if formatted := workmodel.SalvageDeliverableFromRound(round); formatted != "" {
+						content = formatted
+					} else {
+						content = ""
+					}
+				}
+				if content != "" {
+					lastArtifactSummary = content
+					emit(ctx, o.sink, out, &contracts.EngineEvent{
+						Type:      "text",
+						Content:   content,
+						SessionID: sessionID,
+					})
+				}
 			}
 
 			emit(ctx, o.sink, out, &contracts.EngineEvent{
@@ -252,6 +266,15 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 
 			if focus.ParentID != "" {
 				workmodel.ReevaluateParentAfterChild(sessionID, focus.ID, o.taskManager)
+				if parent, ok := o.taskManager.GetWorkItem(sessionID, focus.ParentID); ok && parent != nil &&
+					parent.LastRound != nil && parent.LastRound.ExitReason == workmodel.ExitReasonChildPromoted {
+					if content := strings.TrimSpace(parent.LastRound.ArtifactSummary); content != "" {
+						lastArtifactSummary = content
+						emit(ctx, o.sink, out, &contracts.EngineEvent{
+							Type: "text", Content: content, SessionID: sessionID,
+						})
+					}
+				}
 			}
 
 			switch round.SpawnPolicy {

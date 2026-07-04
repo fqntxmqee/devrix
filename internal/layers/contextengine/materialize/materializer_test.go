@@ -40,7 +40,7 @@ func TestPartitionStore_AppendLoad(t *testing.T) {
 func TestDefaultMaterializer_Materialize(t *testing.T) {
 	dir := t.TempDir()
 	store, _ := NewPartitionStore(dir)
-	m := NewDefaultMaterializer(store)
+	m := NewDefaultMaterializer(store, dir)
 	res, err := m.Materialize(context.Background(), Request{
 		Partition: Partition{SessionID: "s1", Kind: PartitionWorkItem, WorkItemID: "wi1"},
 		Policy:    Policy{Mode: ModeFresh, TokenBudget: 1000},
@@ -76,7 +76,7 @@ func TestDefaultMaterializer_Materialize_repairs_orphan_tool_results_after_compr
 	if err := store.Append("s1", "wi1", priv); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
-	m := NewDefaultMaterializer(store)
+	m := NewDefaultMaterializer(store, dir)
 	res, err := m.Materialize(context.Background(), Request{
 		Partition: Partition{SessionID: "s1", Kind: PartitionWorkItem, WorkItemID: "wi1"},
 		Policy:    Policy{Mode: ModeFresh, TokenBudget: 100000},
