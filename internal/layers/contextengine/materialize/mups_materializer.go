@@ -56,7 +56,7 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 	phaseAppendix := BuildPhaseAppendix(req.Phase, loc, req.WorkItem, toolProfile, contractDocForRequest(req, m.Deps.ContractDoc))
 	outputHints := ""
 	if req.Phase == contracts.MUPSPhaseExecute {
-		outputHints = BuildExecuteOutputHints(req.WorkItem)
+		outputHints = BuildExecuteOutputHints(loc, req.WorkItem)
 	}
 
 	var baseSystem string
@@ -75,7 +75,7 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 			sessionID = req.Turn.SessionID
 		}
 		if m.Deps.PrepareBase != nil && sessionID != "" && userContent != "" {
-			prompt, prepend, err := m.Deps.PrepareBase(ctx, sessionID, userContent)
+			prompt, prepend, err := m.prepareBaseForMUPS(ctx, sessionID, userContent, req.Phase)
 			if err != nil {
 				return contracts.MUPSPreparedContext{}, fmt.Errorf("mups prepare base: %w", err)
 			}
@@ -98,11 +98,26 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 		if m.Deps.PartitionMat == nil {
 			return contracts.MUPSPreparedContext{}, fmt.Errorf("mups materialize: partition materializer required")
 		}
+		userContent := strings.TrimSpace(matReq.Signals.Directive)
+		sessionID := matReq.Partition.SessionID
+		if req.Turn != nil && sessionID == "" {
+			sessionID = req.Turn.SessionID
+		}
+		var coreBase string
+		if m.Deps.PrepareBase != nil && sessionID != "" && userContent != "" {
+			prompt, prepend, err := m.prepareBaseForMUPS(ctx, sessionID, userContent, req.Phase)
+			if err != nil {
+				return contracts.MUPSPreparedContext{}, fmt.Errorf("mups prepare base: %w", err)
+			}
+			coreBase = prompt
+			userContextPrepend = prepend
+		}
 		mat, err := m.Deps.PartitionMat.Materialize(ctx, matReq)
 		if err != nil {
 			return contracts.MUPSPreparedContext{}, err
 		}
-		baseSystem = mat.SystemPrompt
+		wiBody := buildWorkItemSystemBody(matReq)
+		baseSystem = AssembleMUPSSystemPrompt(coreBase, wiBody, "")
 		messages = mat.Messages
 		tokenBudget = matReq.Policy.TokenBudget
 	}
@@ -251,6 +266,26 @@ func toContractTools(tools []ToolDescriptor) []contracts.MUPSToolDescriptor {
 		}
 	}
 	return out
+}
+
+func (m *MUPSMaterializer) prepareBaseForMUPS(ctx context.Context, sessionID, userContent string, phase contracts.MUPSPhase) (string, map[string]string, error) {
+	switch phase {
+	case contracts.MUPSPhaseObserve, contracts.MUPSPhasePlan, contracts.MUPSPhaseExecute:
+		if prompt, prepend, ok := contracts.TryMUPSPrepareBase(ctx, sessionID, userContent); ok {
+			return prompt, prepend, nil
+		}
+	}
+	if m.Deps.PrepareBase == nil {
+		return "", nil, nil
+	}
+	prompt, prepend, err := m.Deps.PrepareBase(ctx, sessionID, userContent)
+	if err != nil {
+		return "", nil, err
+	}
+	if phase == contracts.MUPSPhaseObserve || phase == contracts.MUPSPhasePlan {
+		contracts.StoreMUPSPrepareBase(ctx, sessionID, userContent, prompt, prepend)
+	}
+	return prompt, prepend, nil
 }
 
 // ToSessionToolSchemas converts MUPS tool descriptors to D7 ToolSchema slice.

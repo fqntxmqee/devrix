@@ -115,6 +115,19 @@ func EmitMUPSPipeline(ctx context.Context, sessionID, workItemID, pipelineIntent
 	return c, func(err error) { endSpanWithError(span, err) }
 }
 
+// EmitMUPSPhase wraps one MUPS node (observe/plan/execute/verify/learn/decide).
+// Returns enriched ctx so D2/D3 children inherit the phase locator breadcrumb.
+func EmitMUPSPhase(ctx context.Context, sessionID, workItemID, phase string) (context.Context, func(error)) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "pipeline.work_item_id", Value: workItemID},
+		{Key: "pipeline.phase", Value: phase},
+	}
+	attrs = append(attrs, locatorAttrsFromCtx(ctx)...)
+	c, span := start(ctx, telemetry.OpD7_S6_MUPS_Phase, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
+}
+
 // EmitChannelRoute wraps ChannelRouter.Route. v6.0.0 S6-A48 P0.
 func EmitChannelRoute(ctx context.Context, sessionID, planKind, channelKind, score, fallback string) (context.Context, func(error)) {
 	attrs := []tracer.Attribute{

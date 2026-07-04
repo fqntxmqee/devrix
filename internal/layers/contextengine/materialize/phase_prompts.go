@@ -26,8 +26,8 @@ func BuildPhaseAppendix(phase contracts.MUPSPhase, loc i18n.Locale, wi *contract
 }
 
 // BuildExecuteOutputHints assembles deliverable_schema and scope_contract tags.
-func BuildExecuteOutputHints(wi *contracts.MUPSWorkItemSnapshot) string {
-	hints := WorkItemOutputFormatHints
+func BuildExecuteOutputHints(loc i18n.Locale, wi *contracts.MUPSWorkItemSnapshot) string {
+	hints := i18n.WorkItemExecuteOutputHints(loc)
 	if wi == nil {
 		return hints
 	}

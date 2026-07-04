@@ -195,6 +195,20 @@ func TestD7S6A50T12_EmitMUPSPipeline_NilBridgeFailSafe(t *testing.T) {
 	end(nil)
 }
 
+func TestEmitMUPSPhase_HappyPath(t *testing.T) {
+	wireNoopBridge()
+	defer resetBridge()
+
+	ctx, end := EmitMUPSPhase(context.Background(), "sess_x", "wi_x", "observe")
+	if end == nil {
+		t.Fatal("emit must return a non-nil end func")
+	}
+	if ctx == nil {
+		t.Fatal("emit must return enriched ctx")
+	}
+	end(nil)
+}
+
 // ─── D7-S1-A52 worktree.op (DM-20260626-009 follow-up inner spans) ──
 
 // TestD7S1A52T11_EmitWorktreeOp_HappyPath verifies EmitWorktreeOp returns

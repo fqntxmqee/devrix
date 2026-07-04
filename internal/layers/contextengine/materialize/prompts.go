@@ -3,6 +3,7 @@ package materialize
 import (
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -13,6 +14,9 @@ import (
 // DM-20260629-002 devrix-d2-dsaft-restructuring PR-3: extracted from
 // materializer.go (was 45 LOC; total Materialize area was 30+34+32 LOC).
 func buildWaveSystemPrompt(req Request) string {
+	loc := i18n.ParseLanguage(req.Policy.Locale)
+	labels := i18n.WavePromptLabelsFor(loc)
+
 	var b strings.Builder
 	if base := strings.TrimSpace(req.SystemPrompt); base != "" {
 		b.WriteString(base)
@@ -27,7 +31,8 @@ func buildWaveSystemPrompt(req Request) string {
 		if b.Len() > 0 {
 			b.WriteString("\n\n")
 		}
-		b.WriteString("Allowed file scope:\n- ")
+		b.WriteString(labels.AllowedFileScope)
+		b.WriteString("\n- ")
 		b.WriteString(strings.Join(req.Signals.WaveFileScope, "\n- "))
 	}
 	if req.Policy.Mode == ModeUpstream {
@@ -44,35 +49,42 @@ func buildWaveSystemPrompt(req Request) string {
 			if b.Len() > 0 {
 				b.WriteString("\n\n")
 			}
-			b.WriteString("Files changed by upstream:\n- ")
+			b.WriteString(labels.FilesChangedUpstream)
+			b.WriteString("\n- ")
 			b.WriteString(strings.Join(req.Signals.WaveUpstreamFiles, "\n- "))
 		}
 		if errMsg := strings.TrimSpace(req.Signals.WaveUpstreamError); errMsg != "" {
 			if b.Len() > 0 {
 				b.WriteString("\n\n")
 			}
-			b.WriteString("Upstream error (for context): ")
+			b.WriteString(labels.UpstreamErrorPrefix)
 			b.WriteString(errMsg)
 		}
 	}
 	return b.String()
 }
 
-// buildSystemPrompt formats the per-WorkItem system prompt including
-// directive, scope-in/scope-out lists, expected return, and signal lines,
-// followed by the shared deliveryHintBlock trailer.
-//
-// DM-20260629-002 PR-3: extracted from materializer.go (was 39 LOC).
-func buildSystemPrompt(req Request) string {
+// buildWorkItemSystemBody formats the WorkItem context block (intro, directive,
+// scopes, signals) without output format hints. MUPS Execute prepends devrix_core
+// via PrepareBase and appends hints separately to avoid duplication.
+func buildWorkItemSystemBody(req Request) string {
+	loc := i18n.ParseLanguage(req.Policy.Locale)
+	labels := i18n.WorkItemExecuteFieldLabels
+
 	var b strings.Builder
-	b.WriteString("You are executing one WorkItem in a layered work tree.\n")
+	b.WriteString(i18n.WorkItemExecuteIntro(loc))
+	b.WriteByte('\n')
 	if req.Signals.Directive != "" {
-		b.WriteString("\nDirective: ")
+		b.WriteString("\n")
+		b.WriteString(labels.Directive)
+		b.WriteString(": ")
 		b.WriteString(req.Signals.Directive)
 		b.WriteByte('\n')
 	}
 	if len(req.Signals.ScopeIn) > 0 {
-		b.WriteString("\nScopeIn:\n")
+		b.WriteString("\n")
+		b.WriteString(labels.ScopeIn)
+		b.WriteString(":\n")
 		for _, p := range req.Signals.ScopeIn {
 			b.WriteString("- ")
 			b.WriteString(p)
@@ -80,7 +92,9 @@ func buildSystemPrompt(req Request) string {
 		}
 	}
 	if len(req.Signals.ScopeOut) > 0 {
-		b.WriteString("\nScopeOut:\n")
+		b.WriteString("\n")
+		b.WriteString(labels.ScopeOut)
+		b.WriteString(":\n")
 		for _, p := range req.Signals.ScopeOut {
 			b.WriteString("- ")
 			b.WriteString(p)
@@ -88,7 +102,9 @@ func buildSystemPrompt(req Request) string {
 		}
 	}
 	if req.Signals.ExpectedReturn != "" {
-		b.WriteString("\nExpectedReturn: ")
+		b.WriteString("\n")
+		b.WriteString(labels.ExpectedReturn)
+		b.WriteString(": ")
 		b.WriteString(req.Signals.ExpectedReturn)
 		b.WriteByte('\n')
 	}
@@ -99,8 +115,25 @@ func buildSystemPrompt(req Request) string {
 		b.WriteString("\n")
 		b.WriteString(line)
 	}
-	b.WriteString(deliveryHintBlock)
 	return b.String()
+}
+
+// buildSystemPrompt formats the per-WorkItem system prompt including
+// directive, scope-in/scope-out lists, expected return, and signal lines,
+// followed by locale-aware output format hints.
+//
+// DM-20260629-002 PR-3: extracted from materializer.go (was 39 LOC).
+func buildSystemPrompt(req Request) string {
+	loc := i18n.ParseLanguage(req.Policy.Locale)
+	body := buildWorkItemSystemBody(req)
+	if body == "" {
+		return workItemOutputHints(loc)
+	}
+	return body + workItemOutputHints(loc)
+}
+
+func workItemOutputHints(loc i18n.Locale) string {
+	return i18n.WorkItemExecuteOutputHints(loc)
 }
 
 // buildInitialMessages builds the user-role opening message for the partition.
@@ -140,8 +173,3 @@ func mergeInitialWithPrivateChain(initial, priv []types.Message) []types.Message
 	out = append(out, priv...)
 	return out
 }
-
-// deliveryHintBlock is the trailer appended to every system prompt explaining
-// how the WorkItem should report back. Held in materializer.go (not extracted)
-// because it's a single const referenced by buildSystemPrompt and
-// buildWaveSystemPrompt in this file.

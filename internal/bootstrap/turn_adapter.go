@@ -608,7 +608,7 @@ func (a *contextEngineAdapter) MaterializeForMUPS(ctx context.Context, req contr
 	if !ok {
 		return contracts.MUPSPreparedContext{}, fmt.Errorf("turn adapter: MaterializeForMUPS requires *kernel.ContextEngine")
 	}
-	if req.Phase == contracts.MUPSPhasePlan && req.Policy.Locale == "" {
+	if req.Policy.Locale == "" {
 		req.Policy.Locale = string(a.promptLocale())
 	}
 	return ce.MaterializeForMUPS(ctx, req)

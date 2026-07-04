@@ -30,7 +30,7 @@ func TestBuildExecuteOutputHints_DeliverableSchema(t *testing.T) {
 	wi := &contracts.MUPSWorkItemSnapshot{
 		DeliverableSchema: "findings_json",
 	}
-	got := BuildExecuteOutputHints(wi)
+	got := BuildExecuteOutputHints(i18n.LocaleEN, wi)
 	if !strings.Contains(got, "<deliverable_schema>findings_json</deliverable_schema>") {
 		t.Fatalf("hints = %q", got)
 	}

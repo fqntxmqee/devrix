@@ -43,6 +43,10 @@ func TestMaterializeForMUPS_Observe(t *testing.T) {
 	if !strings.Contains(got.SystemPrompt, "obs_fact") {
 		t.Fatalf("system = %q", got.SystemPrompt)
 	}
+	appendix := got.PhaseAppendix
+	if appendix != "" && strings.Count(got.SystemPrompt, appendix) != 1 {
+		t.Fatalf("observation appendix duplicated in SystemPrompt: count=%d", strings.Count(got.SystemPrompt, appendix))
+	}
 }
 
 // T: D2-S15-A90-T02 — plan → empty tools + strategic plan appendix.
@@ -69,11 +73,52 @@ func TestMaterializeForMUPS_Plan(t *testing.T) {
 	if !strings.Contains(got.SystemPrompt, "execution_mode") {
 		t.Fatalf("system = %q", got.SystemPrompt)
 	}
+	appendix := got.PhaseAppendix
+	if appendix != "" && strings.Count(got.SystemPrompt, appendix) != 1 {
+		t.Fatalf("plan appendix duplicated in SystemPrompt: count=%d", strings.Count(got.SystemPrompt, appendix))
+	}
+}
+
+func TestMaterializeForMUPS_PlanReusesPrepareBaseCache(t *testing.T) {
+	calls := 0
+	prepare := func(_ context.Context, _, _ string) (string, map[string]string, error) {
+		calls++
+		return "shared-core", nil, nil
+	}
+	mat := NewMUPSMaterializer(MUPSMaterializerDeps{
+		PrepareBase: prepare,
+		ContractDoc: `{"citation":["file_line"]}`,
+		FilterDeps:  FilterPipelineDeps{Locale: i18n.LocaleEN},
+	})
+	ctx := contracts.WithMUPSPrepareCache(context.Background())
+	observeReq := contracts.MUPSContextRequest{
+		Phase:       contracts.MUPSPhaseObserve,
+		Turn:        &contracts.MUPSTurnContext{SessionID: "s1"},
+		UserMessage: "same directive",
+	}
+	if _, err := mat.MaterializeForMUPS(ctx, observeReq); err != nil {
+		t.Fatal(err)
+	}
+	planReq := contracts.MUPSContextRequest{
+		Phase:       contracts.MUPSPhasePlan,
+		Turn:        &contracts.MUPSTurnContext{SessionID: "s1"},
+		UserMessage: "same directive",
+		Policy:      contracts.MUPSContextPolicy{Locale: "en"},
+	}
+	if _, err := mat.MaterializeForMUPS(ctx, planReq); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("PrepareBase calls = %d, want 1 (Plan should reuse Observe cache)", calls)
+	}
 }
 
 // T: D2-S15-A90-T03 — execute implement includes read_file and edit_file.
 func TestMaterializeForMUPS_ExecuteImplement(t *testing.T) {
 	mat := NewMUPSMaterializer(MUPSMaterializerDeps{
+		PrepareBase: func(ctx context.Context, sessionID, userMessage string) (string, map[string]string, error) {
+			return "CORE_UNCERTAINTY_PRINCIPLES", nil, nil
+		},
 		PartitionMat: NewDefaultMaterializer(nil, ""),
 		FilterDeps: FilterPipelineDeps{
 			Surfaces: []contracts.ToolSurface{&stubFilterSurface{}},
@@ -92,6 +137,16 @@ func TestMaterializeForMUPS_ExecuteImplement(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(got.SystemPrompt, "CORE_UNCERTAINTY_PRINCIPLES") {
+		t.Fatalf("execute must prepend devrix_core via PrepareBase: %q", got.SystemPrompt)
+	}
+	if !strings.Contains(got.SystemPrompt, "你正在分层工作树") {
+		t.Fatalf("execute must include WI body: %q", got.SystemPrompt)
+	}
+	// Output hints appear once via AssembleMUPSSystemPrompt outputHints, not duplicated in WI body.
+	if strings.Count(got.SystemPrompt, "WorkItem 输出块") != 1 {
+		t.Fatalf("output hints duplicated in execute prompt: %q", got.SystemPrompt)
 	}
 	names := toolNames(got.Tools)
 	if !containsAll(names, "read_file", "edit_file") {

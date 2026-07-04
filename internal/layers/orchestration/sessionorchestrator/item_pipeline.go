@@ -187,16 +187,17 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// so this works without an obsBridge field on ItemPipelineRunner.
 	ctx, endMUPS := hardening.EmitMUPSPipeline(ctx, sessionID, item.ID, "item_pipeline")
 	defer func() { endMUPS(nil) }()
+	ctx = contracts.WithMUPSPrepareCache(ctx)
 
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseObserve))
-
+	ctx, endObservePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
 	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
+		endObservePhase(err)
 		return nil, err
 	}
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhasePlan))
+	endObservePhase(nil)
+
+	ctx, endPlanPhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
 
 	var strategic *StrategicPlanProposal
 	strategicRejectRationale := ""
@@ -299,13 +300,15 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	pl, err := r.Planner.Plan(planInput)
 	endPlan(err)
 	if err != nil {
+		endPlanPhase(err)
 		return nil, fmt.Errorf("item_pipeline: plan: %w", err)
 	}
 	if isParentRollup && pl != nil {
 		pl.Kind = plan.CommitmentPlan
 	}
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseExecute))
+	endPlanPhase(nil)
+
+	ctx, endExecutePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
 
 	// Execute via WorkItemExecutor (per-WorkItem ReAct loop). Emit Wave +
 	// Execute sub-spans so Jaeger shows the full 5-node tree.
@@ -353,6 +356,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
+	endExecutePhase(execErr)
 	if execErr != nil {
 		// Non-fatal: continue with whatever Content was accumulated so the
 		// round still produces an Artifact + Verdict for downstream Verify.
@@ -370,8 +374,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	art := buildArtifactFromWorkItemResult(pl, item, sessionID, started, result, execErr)
 
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseVerify)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseVerify))
+	ctx, endVerifyPhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseVerify)
 
 	// RH-MUPS-04 (DM-20260701-001): compute child-outcome stats BEFORE the
 	// verify step so rollup verify can refuse to mark the parent Completed
@@ -415,8 +418,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		deliverableResult = out.Deliverable
 	}
 	exitReason := exitReasonForVerdict(verdict, sessionID)
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseLearn))
+	endVerifyPhase(nil)
+
+	ctx, endLearnPhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
 	// as a verify stand-in). The current per-WorkItem path uses deterministic
@@ -441,6 +445,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		})
 		endLearn(err)
 		if err != nil {
+			endLearnPhase(err)
 			return nil, fmt.Errorf("item_pipeline: learn: %w", err)
 		}
 		if len(assets) > 0 && assets[0] != nil {
@@ -581,8 +586,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		round.IndeterminateRetries = treeCtx.IndeterminateRetries + 1
 	}
 	workmodel.TouchInlineRetryAtMaxDepth(r.Tasks.Tree(), sessionID, item, round, treeCtx)
-	r.setRoundPhaseWithLog(ctx, sessionID, item.ID, workmodel.RoundPhaseDecide)
-	ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseDecide))
+	endLearnPhase(nil)
+
+	ctx, endDecidePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseDecide)
 
 	phase := workmodel.RoundPhaseIdle
 	switch round.SpawnPolicy {
@@ -597,6 +603,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		end := hardening.EmitWorktreeOp(ctx, sessionID, "apply_pipeline_round", item.ID, string(phase))
 		if err := r.Tasks.Tree().ApplyPipelineRound(sessionID, item.ID, round, phase); err != nil {
 			end(err)
+			endDecidePhase(err)
 			return nil, err
 		}
 		end(nil)
@@ -611,6 +618,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			r.Tasks.Tree(), sessionID, item.ID,
 			verdict.Kind, deliverableSchema, deliverableResult.Status, opts,
 		); err != nil {
+			endDecidePhase(err)
 			return nil, err
 		}
 	} else if item.Status == workmodel.TaskStatusPending {
@@ -629,6 +637,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil && workmodel.IsTerminalStatus(got.Status) {
 		r.Tasks.RecordPeerStatusOnTerminal(sessionID, got)
 	}
+	endDecidePhase(nil)
 	return round, nil
 }
 
@@ -712,6 +721,20 @@ func (r *ItemPipelineRunner) setRoundPhaseWithLog(
 		return
 	}
 	end(nil)
+}
+
+// enterMUPSPhase sets the locator phase, opens a D7_MUPS_Phase span (parent for
+// D2/D3 work), then persists the round phase on the worktree. Locator must be
+// updated before EmitWorktreeOp so Jaeger breadcrumbs match the active node.
+func (r *ItemPipelineRunner) enterMUPSPhase(
+	ctx context.Context,
+	sessionID, itemID string,
+	phase workmodel.RoundPhase,
+) (context.Context, func(error)) {
+	ctx = workmodel.WithLocatorPhase(ctx, string(phase))
+	ctx, endPhase := hardening.EmitMUPSPhase(ctx, sessionID, itemID, string(phase))
+	r.setRoundPhaseWithLog(ctx, sessionID, itemID, phase)
+	return ctx, endPhase
 }
 
 func formatStrategicPlanReject(reject *StrategicPlanReject) string {

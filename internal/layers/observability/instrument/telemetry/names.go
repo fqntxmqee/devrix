@@ -142,6 +142,8 @@ const (
 	// Learn (memory.persist, async via sessionCtx). Started in OrchestratePath.Run after
 	// the outer Orchestrate_Run span; the 4 sync nodes inherit it as parent via ctx.
 	OpD7_S6_MUPS_Pipeline = "D7_MUPS_Pipeline"
+	// D7-S6 MUPS per-node phase span (Observe/Plan/Execute/Verify/Learn/Decide).
+	OpD7_S6_MUPS_Phase = "D7_MUPS_Phase"
 
 	// D7 Orchestration - inner observability spans (DM-20260626-009 follow-up,
 	// 2026-06-26). The 5-node MUPS spans cover top-level pipeline nodes; the
@@ -252,7 +254,8 @@ func LayerAndComponent(operation string) (layer, component string) {
 		strings.HasPrefix(operation, "D7_TaskGraph_Synthesize"),
 		strings.HasPrefix(operation, "D7_Channel_Route"),
 		strings.HasPrefix(operation, "D7_Memory_Persist"),
-		strings.HasPrefix(operation, "D7_MUPS_Pipeline"):
+		strings.HasPrefix(operation, "D7_MUPS_Pipeline"),
+		strings.HasPrefix(operation, "D7_MUPS_Phase"):
 		// v6.0.0 6 S 精简新增 5 ops (channel.kind / memory / system / taskgraph / executor)
 		// + 1 5-node pipeline root span (D7_MUPS_Pipeline).
 		return LayerOrchestration, "orchestrator"

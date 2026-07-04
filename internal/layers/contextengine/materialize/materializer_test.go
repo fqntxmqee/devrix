@@ -56,7 +56,8 @@ func TestDefaultMaterializer_Materialize(t *testing.T) {
 	if !strings.Contains(res.SystemPrompt, "internal/foo.go") {
 		t.Fatalf("system prompt missing scope: %q", res.SystemPrompt)
 	}
-	if !strings.Contains(res.SystemPrompt, "Do not label observations as Obs") {
+	if !strings.Contains(res.SystemPrompt, "Do not label observations as Obs") &&
+		!strings.Contains(res.SystemPrompt, "不要自行标注 ObsFact") {
 		t.Fatal("system prompt must forbid Execute-side Obs* self-labeling")
 	}
 	if len(res.Messages) != 1 {

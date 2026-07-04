@@ -166,7 +166,7 @@ func TestSystemPromptAssembler_should_prefer_embedded_core_over_sections(t *test
 	if report.SectionCount != 1 {
 		t.Fatalf("embedded core should be one layer, got SectionCount=%d", report.SectionCount)
 	}
-	if !strings.Contains(prompt, "复杂任务") && !strings.Contains(prompt, "Complex Tasks") {
+	if !strings.Contains(prompt, "不确定性处理原则") && !strings.Contains(prompt, "Uncertainty handling principles") {
 		t.Fatal("expected embedded core template content")
 	}
 	// Legacy section-only phrase from prompt_sections intro (not in devrix_core).

@@ -10,8 +10,6 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
-const deliveryHintBlock = WorkItemOutputFormatHints
-
 // DefaultMaterializer implements the light Materialize path (OQ-LC-2).
 type DefaultMaterializer struct {
 	Store *PartitionStore
