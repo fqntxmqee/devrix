@@ -319,6 +319,14 @@ Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC
 | **CC-U5** Observe verify 信号 | `item_observe.go` | 结构化 ObsSignal；证据足时 damp deliverable_incomplete 强度 |
 | **CC-U6** spawnRationale 标签 | `spawn_policy.go` | CC-1.2 inline 与 R7 indeterminate 区分 |
 
+**延伸阅读（MUPS 数据对象与时序）：**
+
+| 文档 | 内容 |
+|------|------|
+| [`mups-spawn-data-objects.md`](mups-spawn-data-objects.md) | 发散/收敛契约 × 五节点数据对象与上下链路 |
+| [`mups-spawn-sequence-goal-decompose-rollup.md`](mups-spawn-sequence-goal-decompose-rollup.md) | 标准时序：Goal decompose → rollup → session |
+| [`mups-spawn-sequence-sess-1783138563281-variant.md`](mups-spawn-sequence-sess-1783138563281-variant.md) | 真实会话变体：单 leaf 格式失败 AS-IS vs CC-U TO-BE |
+
 Focus 续跑：`GetPipelineFocus` 仅 refocus `SpawnInline + DeliverableContinuationRequired`（Pass→Inline 路径，不再 refocus `SpawnNone+InProgress`）。
 
 > 下列为 **ItemPipelineRunner.Run 内部** 各阶段细节（原 §4 OrchestratePath 6 步时序，语义不变，入口已迁移）：
