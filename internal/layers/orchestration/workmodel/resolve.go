@@ -72,6 +72,9 @@ func reevaluateParentAfterChild(sessionID, childID string, tm *TaskManager) *Rol
 		}
 	}
 	if ShouldRollupAfterChildren(parent, RollupGatePolicyFor(parent), stats) {
+		if TryPromoteSingleChildDeliverable(sessionID, tm, parent) {
+			return NewRollupReportFromRound(childID, child.LastRound)
+		}
 		if err := tm.Tree().SetNeedsRollup(sessionID, parent.ID, true); err != nil {
 			slog.Warn("resolve: SetNeedsRollup failed; rollup gate may not trigger",
 				"session_id", sessionID, "parent_id", parent.ID, "child_id", childID, "err", err)

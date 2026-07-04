@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/escape"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
@@ -145,6 +146,9 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				return
 			}
 			if focus == nil {
+				if workmodel.MaybePromotePendingSingleChildRollups(sessionID, o.taskManager) {
+					continue
+				}
 				if _, triggered := workmodel.MaybeDecomposeParentRollup(sessionID, o.taskManager); triggered {
 					continue
 				}
@@ -262,6 +266,15 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 
 			if focus.ParentID != "" {
 				workmodel.ReevaluateParentAfterChild(sessionID, focus.ID, o.taskManager)
+				if parent, ok := o.taskManager.GetWorkItem(sessionID, focus.ParentID); ok && parent != nil &&
+					parent.LastRound != nil && parent.LastRound.ExitReason == workmodel.ExitReasonChildPromoted {
+					if content := strings.TrimSpace(parent.LastRound.ArtifactSummary); content != "" {
+						lastArtifactSummary = content
+						emit(ctx, o.sink, out, &contracts.EngineEvent{
+							Type: "text", Content: content, SessionID: sessionID,
+						})
+					}
+				}
 			}
 
 			switch round.SpawnPolicy {
