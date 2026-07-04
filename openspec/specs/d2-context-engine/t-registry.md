@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.18.0
-**Last Updated:** 2026-07-04 (mups-prompttags-v2-io-registry DM-20260704-005: D2-S15-A96 +2 T IMPLEMENTED 176→178, P0 118→120)
+**Version:** 2.20.0
+**Last Updated:** 2026-07-05 (mups-prompt-tag-semantics DM-20260705-001: D2-S15-A97 +4 T IMPLEMENTED 178→182, P0 120→124)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -584,6 +584,15 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **D2-S15-A96-T01** | `MUPSIOCatalog` 覆盖 envelope/linefield/lineframe/wholebody 四类 profile | S15-A96 | `internal/shared/prompttags/registry_test.go::TestMUPSIOCatalog_CoversAllProfiles` | **IMPLEMENTED** | P0 |
 | **D2-S15-A96-T02** | `LineFrameRegistry` + `LookupLineFrame` 注册 Observe/Plan user frames | S15-A96 | `internal/shared/prompttags/registry_test.go::TestLookupLineFrame_ObserveAndPlan` | **IMPLEMENTED** | P0 |
 
+## D2-S15-A97: MUPS tag semantics layer（DM-20260705-001）
+
+| T ID | 描述 | Activity | 证据 | 状态 | 优先级 |
+|------|------|----------|------|------|--------|
+| **D2-S15-A97-T01** | Observe appendix 含 obs_* kind when-use 语义段 | S15-A97 | `i18n/format_hints_mups_test.go::TestObservationTaskAppendix_IncludesObserveKindSemantics` | **IMPLEMENTED** | P0 |
+| **D2-S15-A97-T02** | Plan appendix 含 execution_mode 决策树 + uncertainty gate | S15-A97 | `i18n/format_hints_mups_test.go::TestStrategicPlanAppendix_IncludesExecutionModeSemantics` | **IMPLEMENTED** | P0 |
+| **D2-S15-A97-T03** | Execute hints 含 Required/Optional 语义矩阵 | S15-A97 | `i18n/format_hints_mups_test.go::TestWorkItemExecuteOutputHints_IncludesRequiredOptionalMatrix` | **IMPLEMENTED** | P0 |
+| **D2-S15-A97-T04** | zh/en Observe/Plan/Execute appendix golden hash 稳定 | S15-A97 | `i18n/prompttags_semantics_golden_test.go::TestMUPSSemanticAppendix_GoldenHash` | **IMPLEMENTED** | P0 |
+
 ---
 
 ## Revision History
@@ -603,3 +612,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.17.0** | **2026-07-04** | **devrix-runtime-feedback-closure (DM-20260704-003) S5 验收**: D2-S15-A82-T01/T02/T03 i18n 中文硬规则（zh intro 含硬规则 + en 对称不含 + golden test 5 case）— **3 新 T 全部 P0 IMPLEMENTED**. Total 169→172, P0 111→114. 详见 `openspec/changes/devrix-runtime-feedback-closure/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.18.0** | **2026-07-04** | **mups-prompttags (DM-20260704-004) S5 验收**: D2-S15-A93-T01..T04 DocBlock + ExecuteOutputTagDoc + i18n 集成 + envelope golden — **4 新 T 全部 P0 IMPLEMENTED**. Total 172→176, P0 114→118. 详见 `openspec/changes/mups-prompttags/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.19.0** | **2026-07-04** | **mups-prompttags-v2-io-registry (DM-20260704-005) S4**: D2-S15-A96-T01..T02 MUPSIOCatalog + LineFrameRegistry — **2 新 T 全部 P0 IMPLEMENTED**. Total 176→178, P0 118→120. |
+| **2.20.0** | **2026-07-05** | **mups-prompt-tag-semantics (DM-20260705-001) S4**: D2-S15-A97-T01..T04 TagSemanticsRegistry + PhaseSemanticAppendix + golden hash — **4 新 T 全部 P0 IMPLEMENTED**. Total 178→182, P0 120→124. |

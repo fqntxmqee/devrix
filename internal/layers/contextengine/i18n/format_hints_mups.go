@@ -1,37 +1,37 @@
 package i18n
 
-import "github.com/devrix/devrix/internal/shared/prompttags"
+import (
+	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/prompttags"
+)
 
 // ObservationTaskAppendix returns the Observe-node JSON schema appendix (DM-20260704-001).
-// Migrated from sessionorchestrator/llm_observation_proposer.go.
+// Semantic bullets precede DocBlock schema (DM-20260705-001).
 func ObservationTaskAppendix(loc Locale) string {
 	schema := prompttags.DocBlockObserveSchema()
+	semantic := RenderSemanticAppendix(contracts.MUPSPhaseObserve, loc)
 	if loc == LocaleEN {
-		return observationTaskAppendixENPrefix + schema + observationTaskAppendixENSuffix
+		return observationTaskAppendixENIntro + "\n" + semantic + "\nEach element:\n" + schema + observationTaskAppendixENSuffix
 	}
-	return observationTaskAppendixZHPrefix + schema + observationTaskAppendixZHSuffix
+	return observationTaskAppendixZHIntro + "\n" + semantic + "\n每个元素：\n" + schema + observationTaskAppendixZHSuffix
 }
 
-const observationTaskAppendixZHPrefix = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。每个元素：
-`
+const observationTaskAppendixZHIntro = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。`
 
 const observationTaskAppendixZHSuffix = `
 
 规则：
 - 只能使用下方提供的 directive 与结构化 signal；不要编造工具输出。
-- 范围不清时优先 obs_uncertainty；obs_fact 仅在有强依据时使用。
-- 最多 3 条提案；空数组 [] 合法。`
+- 空数组 [] 合法。`
 
-const observationTaskAppendixENPrefix = `You propose structured observations for an orchestration Observe node.
-Return ONLY a JSON array (no markdown). Each element:
-`
+const observationTaskAppendixENIntro = `You propose structured observations for an orchestration Observe node.
+Return ONLY a JSON array (no markdown).`
 
 const observationTaskAppendixENSuffix = `
 
 Rules:
 - Use ONLY the provided directive and structured signals; do not invent tool outputs.
-- Prefer obs_uncertainty when scope is unclear; obs_fact only when strongly supported.
-- Maximum 3 proposals. Empty array [] is valid.`
+- Empty array [] is valid.`
 
 // RollupSynthAppendix returns synthesis instructions for parent rollup WorkItems.
 func RollupSynthAppendix(loc Locale) string {

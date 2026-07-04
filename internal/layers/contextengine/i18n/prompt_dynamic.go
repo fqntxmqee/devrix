@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
@@ -82,23 +83,22 @@ func StrategicPlanAppendix(loc Locale, contractDimensionDoc string) string {
 	}
 	contractExample := `{"citation":"file_line","severity":"p0_p1","reject":["planning_meta"],"min_runes":0}`
 	schemaLine := prompttags.DocBlockPlanSchema(contractExample)
+	semantic := RenderSemanticAppendix(contracts.MUPSPhasePlan, loc)
 	if loc == LocaleEN {
 		return "You propose strategic execution plans for an orchestration Plan node.\n" +
 			"Return ONLY a JSON object (no markdown):\n" +
+			semantic + "\n" +
 			schemaLine + "\n\n" +
 			fmt.Sprintf("deliverable_contract dimensions (compose from categories only): %s\n\n", dims) +
 			"Rules:\n" +
 			"- Use ONLY the directive and observation summary below; do not invent files.\n" +
-			"- Prefer execution_mode=single when scope is clear and small enough for one pass.\n" +
-			"- For decompose, each child_specs entry needs title, directive_suffix, expected_return; max 2.\n" +
 			"- react_iters_hint between 1 and 5."
 	}
 	return "你是编排 Plan 节点的战略提案助手。仅返回 JSON 对象（不要 markdown）：\n" +
+		semantic + "\n" +
 		schemaLine + "\n\n" +
 		fmt.Sprintf("deliverable_contract 维度（仅从类别组合）: %s\n\n", dims) +
 		"规则：\n" +
 		"- 只能使用下方 directive 与 Obs 摘要；不要编造未提供的文件列表。\n" +
-		"- 范围清晰且可一次完成时优先 execution_mode=single。\n" +
-		"- decompose 时 child_specs 每项含 title、directive_suffix、expected_return；最多 2 项。\n" +
 		"- react_iters_hint 范围 1-5。"
 }

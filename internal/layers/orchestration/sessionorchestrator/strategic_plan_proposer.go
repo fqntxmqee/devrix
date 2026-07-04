@@ -96,7 +96,7 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 		return nil, fmt.Errorf("strategic plan proposer: d2 materialize: %w", err)
 	}
 	systemPrompt := mergeMUPSPreparedSystem(prepared)
-	user := buildStrategicPlanUserPrompt(in)
+	user := buildStrategicPlanUserPrompt(in, p.Locale)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,
 		SystemPrompt: systemPrompt,
@@ -128,7 +128,7 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 	return prop, nil
 }
 
-func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
+func buildStrategicPlanUserPrompt(in StrategicPlanInput, loc i18n.Locale) string {
 	fields := map[prompttags.TagName]any{
 		prompttags.TagWorkItemID: in.WorkItemID,
 		prompttags.TagDirective:  in.Directive,
@@ -160,7 +160,12 @@ func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
 	if in.UncertaintyMean > 0 {
 		fields[prompttags.TagUncertaintyMean] = in.UncertaintyMean
 	}
-	return prompttags.BuildLineFrame(prompttags.PlanUserFrame, fields)
+	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FramePlanUser, prompttags.PlanUserFrame, fields)
+	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FramePlanUser, loc, fields)
+	if guide == "" {
+		return frame
+	}
+	return guide + "\n\n" + frame
 }
 
 func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, error) {

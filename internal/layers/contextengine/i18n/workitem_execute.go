@@ -3,6 +3,7 @@ package i18n
 import (
 	"strings"
 
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
@@ -35,10 +36,11 @@ func WorkItemExecuteIntro(loc Locale) string {
 // Locale prose + prompttags.ExecuteOutputTagDoc machine syntax (P2 DocBlock).
 func WorkItemExecuteOutputHints(loc Locale) string {
 	tagDoc := prompttags.ExecuteOutputTagDoc()
+	semantic := RenderSemanticAppendix(contracts.MUPSPhaseExecute, loc)
 	if loc == LocaleEN {
-		return workItemOutputFormatHeaderEN + "\n" + tagDoc + workItemOutputFormatFooterEN
+		return workItemOutputFormatHeaderEN + "\n" + semantic + "\n" + tagDoc + workItemOutputFormatFooterEN
 	}
-	return workItemOutputFormatHeaderZH + "\n" + tagDoc + workItemOutputFormatFooterZH
+	return workItemOutputFormatHeaderZH + "\n" + semantic + "\n" + tagDoc + workItemOutputFormatFooterZH
 }
 
 const workItemOutputFormatHeaderEN = `

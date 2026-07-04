@@ -73,18 +73,28 @@ var PlanUserFrame = FrameSpec{
 // BuildLineFrame serializes fields into newline-separated key: value lines per spec order.
 // Omitted map entries are skipped. Repeated-line tags emit one line per slice element.
 func BuildLineFrame(spec FrameSpec, fields map[TagName]any) string {
+	return buildLineFrame(spec, FrameName(""), fields, false)
+}
+
+// BuildAnnotatedLineFrame prefixes each emitted line with [data] or [control] per FrameFieldPlane.
+func BuildAnnotatedLineFrame(frame FrameName, spec FrameSpec, fields map[TagName]any) string {
+	return buildLineFrame(spec, frame, fields, true)
+}
+
+func buildLineFrame(spec FrameSpec, frame FrameName, fields map[TagName]any, annotate bool) string {
 	var b strings.Builder
 	for _, name := range spec.Fields {
 		v, ok := fields[name]
 		if !ok {
 			continue
 		}
-		writeLineField(&b, name, v)
+		writeLineField(&b, frame, name, v, annotate)
 	}
 	return b.String()
 }
 
-func writeLineField(b *strings.Builder, name TagName, v any) {
+func writeLineField(b *strings.Builder, frame FrameName, name TagName, v any, annotate bool) {
+	prefix := linePrefix(frame, name, annotate)
 	switch name {
 	case TagScopeOpenQuestion, TagSignal:
 		lines, ok := v.([]string)
@@ -95,34 +105,41 @@ func writeLineField(b *strings.Builder, name TagName, v any) {
 			if name == TagScopeOpenQuestion && strings.TrimSpace(line) == "" {
 				continue
 			}
-			fmt.Fprintf(b, "%s: %s\n", name, line)
+			fmt.Fprintf(b, "%s%s: %s\n", prefix, name, line)
 		}
 	case TagObservationIDs, TagParentScopeIn, TagPriorObservationIDs:
 		lines, ok := v.([]string)
 		if !ok || len(lines) == 0 {
 			return
 		}
-		fmt.Fprintf(b, "%s: %s\n", name, strings.Join(lines, ","))
+		fmt.Fprintf(b, "%s%s: %s\n", prefix, name, strings.Join(lines, ","))
 	case TagPriorMean:
 		f, ok := v.(float64)
 		if !ok || f <= 0 {
 			return
 		}
-		fmt.Fprintf(b, "%s: %.3f\n", name, f)
+		fmt.Fprintf(b, "%s%s: %.3f\n", prefix, name, f)
 	case TagUncertaintyMean:
 		f, ok := v.(float64)
 		if !ok || f <= 0 {
 			return
 		}
-		fmt.Fprintf(b, "%s: %.3f\n", name, f)
+		fmt.Fprintf(b, "%s%s: %.3f\n", prefix, name, f)
 	default:
 		switch val := v.(type) {
 		case string:
-			fmt.Fprintf(b, "%s: %s\n", name, val)
+			fmt.Fprintf(b, "%s%s: %s\n", prefix, name, val)
 		case int:
-			fmt.Fprintf(b, "%s: %d\n", name, val)
+			fmt.Fprintf(b, "%s%s: %d\n", prefix, name, val)
 		case int64:
-			fmt.Fprintf(b, "%s: %d\n", name, val)
+			fmt.Fprintf(b, "%s%s: %d\n", prefix, name, val)
 		}
 	}
+}
+
+func linePrefix(frame FrameName, name TagName, annotate bool) string {
+	if !annotate || frame == "" {
+		return ""
+	}
+	return fmt.Sprintf("[%s] ", FrameFieldPlane(frame, name))
 }
