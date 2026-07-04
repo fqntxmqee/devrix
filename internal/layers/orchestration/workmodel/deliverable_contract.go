@@ -264,6 +264,10 @@ func ContractDimensionPromptDoc() string {
 
 const maxStrategicContractMinRunes = 500
 
+// DefaultFindingsJSONExecuteIters is the minimum ReAct budget for review tasks
+// that must explore files then emit structured findings_json (DM-20260703-001).
+const DefaultFindingsJSONExecuteIters = 5
+
 const (
 	deliverableFormatOpen  = "<deliverable_format>"
 	deliverableFormatClose = "</deliverable_format>"
@@ -284,6 +288,26 @@ func DeliverableFinalAnswerHint(c DeliverableContract) string {
 		return deliverableFormatOpen + "findings_json_only" + deliverableFormatClose
 	}
 	return ""
+}
+
+// EffectiveExecuteMaxIters merges strategic react_iters_hint with contract floors.
+// hint<=0 falls back to defaultMax (WorkItem executor default).
+func EffectiveExecuteMaxIters(hint, defaultMax int, contract DeliverableContract) int {
+	max := hint
+	if max <= 0 {
+		max = defaultMax
+	}
+	if contract.Normalized().Structure == DeliverableStructureFindingsJSON {
+		if DefaultFindingsJSONExecuteIters > max {
+			max = DefaultFindingsJSONExecuteIters
+		}
+	}
+	return max
+}
+
+// RequiresSynthesisTurn reports contracts that need a tool-free final iteration.
+func RequiresSynthesisTurn(c DeliverableContract) bool {
+	return DeliverableFinalAnswerHint(c) != ""
 }
 
 // DefaultTestDeliverableContract is the standard review contract for tests.

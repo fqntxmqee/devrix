@@ -202,20 +202,38 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		ctx = workmodel.WithLocatorPhase(ctx, string(workmodel.RoundPhaseExecute))
 		ctx = workmodel.WithLocatorIter(ctx, iter+1)
 
-		if iter == max-1 {
-			if ec, ok := WorkItemExecContextFrom(ctx); ok {
+		iterTools := tools
+		if ec, ok := WorkItemExecContextFrom(ctx); ok && iter == max-1 {
+			if workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
+				iterTools = nil
+				var synth strings.Builder
 				if hint := workmodel.DeliverableFinalAnswerHint(ec.DeliverableContract); hint != "" {
+					synth.WriteString(hint)
+				}
+				if extra := SynthesisTurnExecuteHint(ec.DeliverableContract); extra != "" {
+					if synth.Len() > 0 {
+						synth.WriteString("\n")
+					}
+					synth.WriteString(extra)
+				}
+				if synth.Len() > 0 {
 					messages = append(messages, types.Message{
 						SessionID: sessionID,
 						Role:      types.MessageRoleUser,
-						Content:   hint,
+						Content:   synth.String(),
 					})
 				}
+			} else if hint := workmodel.DeliverableFinalAnswerHint(ec.DeliverableContract); hint != "" {
+				messages = append(messages, types.Message{
+					SessionID: sessionID,
+					Role:      types.MessageRoleUser,
+					Content:   hint,
+				})
 			}
 		}
 
 		emit := emitFromExecContext(ctx)
-		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, tools, messages, userContextPrepend, emit, itemID, iter+1, result)
+		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, iterTools, messages, userContextPrepend, emit, itemID, iter+1, result)
 		// Span per iter (DM-20260626-009 follow-up): a ReAct iter can stall
 		// for many seconds (LLM + tool round); without this span "why did
 		// this WorkItem take 16s?" required reading code instead of

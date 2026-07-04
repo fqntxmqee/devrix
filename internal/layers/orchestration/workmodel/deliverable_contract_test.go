@@ -39,6 +39,17 @@ func TestNarrowestContract(t *testing.T) {
 	}
 }
 
+func TestEffectiveExecuteMaxIters(t *testing.T) {
+	jsonContract := DeliverableContract{Structure: DeliverableStructureFindingsJSON}
+	if got := EffectiveExecuteMaxIters(3, 5, jsonContract); got != DefaultFindingsJSONExecuteIters {
+		t.Fatalf("findings_json floor = %d, want %d", got, DefaultFindingsJSONExecuteIters)
+	}
+	free := DeliverableContract{Structure: DeliverableStructureFreeText}
+	if got := EffectiveExecuteMaxIters(3, 5, free); got != 3 {
+		t.Fatalf("free text = %d, want 3", got)
+	}
+}
+
 func TestNoStrayDeliverableSchemaLiterals(t *testing.T) {
 	root, err := findRepoRootForContractTest()
 	if err != nil {

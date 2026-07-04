@@ -15,7 +15,9 @@ const (
 	MUPSTriggerRefocus = "refocus"
 )
 
-// LocatorFrame is the cross-layer breadcrumb for Session → Turn → Loop → WI → MUPS.
+// LocatorFrame is the cross-layer breadcrumb for Session → Turn → WI → Loop → MUPS.
+// LoopTick is scoped to a WorkItem revisit (RunSessionTurnLoop for{} index when
+// that item was focused), not a session-global partition above the worktree.
 type LocatorFrame struct {
 	SessionID    string
 	TurnNo       int
@@ -104,7 +106,7 @@ func (r *WorkItemPipelineRound) MUPSRoundDisplay() string {
 
 // BuildLocator assembles the URL-style locator string.
 //
-// Example: sess_x/turn-1/loop-3/wi_d0_s0_goal/mups-r2+inline/execute/iter-2
+// Example: sess_x/turn-1/wi_d0_s0_goal/loop-2/mups-r2+inline/execute/iter-2
 func BuildLocator(f LocatorFrame) string {
 	parts := make([]string, 0, 8)
 	if sid := strings.TrimSpace(f.SessionID); sid != "" {
@@ -113,15 +115,15 @@ func BuildLocator(f LocatorFrame) string {
 	if f.TurnNo > 0 {
 		parts = append(parts, fmt.Sprintf("turn-%d", f.TurnNo))
 	}
-	if f.LoopTick > 0 {
-		parts = append(parts, fmt.Sprintf("loop-%d", f.LoopTick))
-	}
 	sem := strings.TrimSpace(f.SemanticID)
 	if sem == "" && f.WorkItemID != "" {
 		sem = f.WorkItemID
 	}
 	if sem != "" {
 		parts = append(parts, sem)
+	}
+	if f.LoopTick > 0 {
+		parts = append(parts, fmt.Sprintf("loop-%d", f.LoopTick))
 	}
 	if f.RoundNo > 0 {
 		label := FormatMUPSRoundLabel(f.RoundNo)

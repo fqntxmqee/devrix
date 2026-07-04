@@ -10,6 +10,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -74,6 +75,43 @@ type stubCtxPreparer struct {
 
 func (s stubCtxPreparer) Prepare(_ context.Context, _ PrepareRequest) (PreparedContext, error) {
 	return PreparedContext{SystemPrompt: s.system, Tools: s.tools}, nil
+}
+
+func TestWorkItemExecutor_FindingsJSONFinalIterDisablesTools(t *testing.T) {
+	contract := workmodel.DeliverableContract{
+		Structure: workmodel.DeliverableStructureFindingsJSON,
+		Citation:  workmodel.DeliverableCitationFileLine,
+		Severity:  workmodel.DeliverableSeverityP0P1,
+	}
+	toolChunks := []llmgateway.Chunk{{
+		Content:      "tool",
+		ToolCalls:    []llmgateway.ToolCall{{ID: "c", Name: "read_file", Input: "{}"}},
+		FinishReason: "tool_calls",
+	}}
+	finalChunks := []llmgateway.Chunk{{Content: `{"findings":[]}`, FinishReason: "stop"}}
+	llm := &scriptedLLM{script: [][]llmgateway.Chunk{toolChunks, toolChunks, toolChunks, toolChunks, finalChunks}}
+	toolsExec := &scriptedTools{results: []ToolRoundResult{
+		{Results: []ToolResult{{ToolCallID: "c", Output: "ok"}}},
+	}}
+	prep := stubCtxPreparer{tools: []ToolSchema{{Name: "read_file"}}}
+	exec := NewWorkItemExecutor(llm, prep, toolsExec)
+	exec.MaxIters = 5
+	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{
+		DeliverableContract: contract,
+	})
+	res, err := exec.ExecuteWorkItem(ctx, "s1", "i1", "review plan code")
+	if err != nil {
+		t.Fatalf("ExecuteWorkItem: %v", err)
+	}
+	if !res.Done {
+		t.Fatalf("Done=false StopReason=%q", res.StopReason)
+	}
+	if len(llm.tools) != 5 {
+		t.Fatalf("expected 5 LLM calls, got %d", len(llm.tools))
+	}
+	if len(llm.tools[4]) != 0 {
+		t.Fatalf("final iter must disable tools, got %d tools", len(llm.tools[4]))
+	}
 }
 
 func TestWorkItemExecutor_FinalAnswerNoTools(t *testing.T) {
