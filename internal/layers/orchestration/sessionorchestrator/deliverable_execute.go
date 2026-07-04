@@ -40,6 +40,15 @@ func SynthesisTurnExecuteHint(contract workmodel.DeliverableContract) string {
 		"Respond with ONLY the findings_json deliverable; do not explore new paths or OpenSpec docs."
 }
 
+// RollupSynthesisTurnExecuteHint instructs the model on rollup synthesis rounds
+// (ModeRollupSynth / NeedsRollup) where tools are disabled but the model may
+// still emit phantom tool-call XML on the text channel.
+func RollupSynthesisTurnExecuteHint() string {
+	return "Rollup synthesis: tools are disabled. Write a prose summary (≥500 runes) " +
+		"with P0 and P1 findings citing file:line from evidence already gathered. " +
+		"Do not emit tool_call XML, invoke tags, or start new reads."
+}
+
 // PriorDeliverableRetryHint builds machine retry context for inline rounds.
 // Omits spawn rationale and full artifact prose to avoid scope drift (DM-20260703-001).
 func PriorDeliverableRetryHint(item *workmodel.WorkItem, contract workmodel.DeliverableContract) string {

@@ -12,6 +12,16 @@ func TestStripMiniMaxStreamMarkers_should_remove_delimiter_tokens(t *testing.T) 
 	}
 }
 
+func TestStripMiniMaxStreamMarkers_should_remove_bracket_variant(t *testing.T) {
+	t.Parallel()
+	raw := "]<]minimax[>[<tool_call>\n]<]minimax[>[<invoke name=\"read_file\">]"
+	got := StripMiniMaxStreamMarkers(raw)
+	want := "<tool_call>\n<invoke name=\"read_file\">]"
+	if got != want {
+		t.Fatalf("StripMiniMaxStreamMarkers() = %q, want %q", got, want)
+	}
+}
+
 func TestStripMiniMaxStreamMarkers_should_preserve_plain_text(t *testing.T) {
 	t.Parallel()
 	raw := "plain visible answer"

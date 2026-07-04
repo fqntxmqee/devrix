@@ -57,6 +57,18 @@ func TestVerifyRollupArtifact_PlanningDenylist(t *testing.T) {
 	}
 }
 
+func TestVerifyRollupArtifact_PhantomToolCallMarkup(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_898d132d",
+		Summary:  "]<]minimax[>[<tool_call>\n]<]minimax[>[<invoke name=\"read_file\">]",
+		ExitCode: 0,
+	}
+	v := verifyRollupArtifact(art, workmodel.ChildOutcomeStats{Total: 1, Completed: 1})
+	if v.Kind != types.VerdictFail {
+		t.Fatalf("kind=%v, want fail for phantom tool markup", v.Kind)
+	}
+}
+
 // T: D7-S15-A90-T01 (DM-20260701-001 RH-MUPS-04 RollupOutcomeAggregation)
 //
 // All children failed → rollup MUST refuse Pass even if the synthesized

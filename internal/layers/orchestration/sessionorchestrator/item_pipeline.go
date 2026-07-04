@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -316,7 +317,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
 	// RH-MUPS-10 (DM-20260701-001): surface deliverable failure + scope anchor on
 	// inline retry; omit spawn rationale / artifact prose (scope drift).
-	priorReason := PriorDeliverableRetryHint(item, deliverableContract)
+	execDeliverableContract := deliverableContract
+	if isRollup {
+		execDeliverableContract = workmodel.RollupDeliverableContract()
+	}
+	priorReason := PriorDeliverableRetryHint(item, execDeliverableContract)
 	if extra := machineSpawnFeedback(item); extra != "" {
 		if priorReason != "" {
 			priorReason += "\n"
@@ -327,7 +332,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		Item:                item,
 		Tasks:               r.Tasks,
 		MaxItersOverride:    maxItersOverride,
-		DeliverableContract: deliverableContract,
+		DeliverableContract: execDeliverableContract,
 		DeliverableSchema:   deliverableSchema,
 		PriorVerifyReason:   priorReason,
 		Emit:                opts.Emit,
@@ -623,7 +628,7 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 	exit := 0
 	errMsg := ""
 	if result != nil {
-		content = result.Content
+		content = textutil.StripMiniMaxStreamMarkers(result.Content)
 		stopReason = result.StopReason
 		iterations = result.Iterations
 		toolCalls = result.ToolCalls

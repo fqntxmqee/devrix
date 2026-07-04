@@ -205,7 +205,14 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		iterTools := tools
 		iterCtx := ctx
 		if ec, ok := WorkItemExecContextFrom(ctx); ok && iter == max-1 {
-			if workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
+			if ec.Item != nil && ec.Item.NeedsRollup {
+				iterTools = nil
+				messages = append(messages, types.Message{
+					SessionID: sessionID,
+					Role:      types.MessageRoleUser,
+					Content:   RollupSynthesisTurnExecuteHint(),
+				})
+			} else if workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
 				iterTools = nil
 				iterCtx = WithSuppressExecuteTextEmit(ctx)
 				var synth strings.Builder

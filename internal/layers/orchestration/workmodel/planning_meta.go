@@ -12,6 +12,9 @@ var structuralPlanningMetaMarkers = []string{
 	"<task_recap>",
 	"<planning>",
 	"<open_questions>",
+	// MiniMax phantom tool markup leaked into synthesis text when tools are disabled.
+	"<tool_call>",
+	"<invoke",
 }
 
 // DetectPlanningMeta reports whether summary matches the planning_meta reject category.
