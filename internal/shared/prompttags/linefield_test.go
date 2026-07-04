@@ -40,6 +40,24 @@ func TestBuildLineFrame_ObserveUserFrame_Minimal(t *testing.T) {
 	}
 }
 
+// T: D7-S16-A96-T03 (DM-20260704-005) Observe frame incremental fields when prior obs present.
+func TestBuildLineFrame_ObserveUserFrame_Incremental(t *testing.T) {
+	got := BuildLineFrame(ObserveUserFrame, map[TagName]any{
+		TagWorkItemID:          "wi_1",
+		TagDirective:           "review",
+		TagPriorObservationIDs: []string{"obs_a", "obs_b"},
+		TagIncrementalOnly:     "true",
+	})
+	want := "" +
+		"work_item_id: wi_1\n" +
+		"directive: review\n" +
+		"prior_observation_ids: obs_a,obs_b\n" +
+		"incremental_only: true\n"
+	if got != want {
+		t.Fatalf("incremental frame mismatch:\ngot:\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func TestBuildLineFrame_PlanUserFrame_Golden(t *testing.T) {
 	got := BuildLineFrame(PlanUserFrame, map[TagName]any{
 		TagWorkItemID:        "wi_42",

@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
@@ -28,6 +29,47 @@ func TestValidateObservationProposals_CapsObsFactStrength(t *testing.T) {
 	}
 	if obs[0].Source != llmObsProposerSource {
 		t.Fatalf("source = %q", obs[0].Source)
+	}
+}
+
+// T: D7-S16-A96-T01 (DM-20260704-005) ValidateObservationProposals caps at 3 valid proposals.
+func TestValidateObservationProposals_CapsAtThree(t *testing.T) {
+	proposals := make([]ObservationProposal, 5)
+	for i := range proposals {
+		proposals[i] = ObservationProposal{
+			Kind:      orchtypes.ObsUncertainty,
+			Category:  orchtypes.CatBusiness,
+			Strength:  0.5,
+			Question:  fmt.Sprintf("question %d", i+1),
+			Evidence:  []string{"goal_1"},
+		}
+	}
+	obs, err := ValidateObservationProposals(proposals, "s1", "goal_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != maxObservationProposals {
+		t.Fatalf("obs = %d, want %d", len(obs), maxObservationProposals)
+	}
+}
+
+func TestValidateObservationProposals_SkipsInvalidBeforeCap(t *testing.T) {
+	proposals := []ObservationProposal{
+		{Kind: orchtypes.ObsFact, Category: orchtypes.CatBusiness, Strength: 0.5, Statement: ""}, // invalid
+		{Kind: orchtypes.ObsUncertainty, Category: orchtypes.CatBusiness, Strength: 0.5, Question: "q1", Evidence: []string{"goal_1"}},
+		{Kind: orchtypes.ObsUncertainty, Category: orchtypes.CatBusiness, Strength: 0.5, Question: "q2", Evidence: []string{"goal_1"}},
+		{Kind: orchtypes.ObsUncertainty, Category: orchtypes.CatBusiness, Strength: 0.5, Question: "q3", Evidence: []string{"goal_1"}},
+		{Kind: orchtypes.ObsUncertainty, Category: orchtypes.CatBusiness, Strength: 0.5, Question: "q4", Evidence: []string{"goal_1"}},
+	}
+	obs, err := ValidateObservationProposals(proposals, "s1", "goal_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 3 {
+		t.Fatalf("obs = %d, want 3 (invalid skipped, then cap)", len(obs))
+	}
+	if p, ok := obs[0].Payload.(orchtypes.UncertaintyPayload); !ok || p.Question != "q1" {
+		t.Fatalf("first valid = %+v", obs[0])
 	}
 }
 

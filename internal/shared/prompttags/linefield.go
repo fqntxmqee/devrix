@@ -24,8 +24,10 @@ const (
 	TagRemainingDaily     TagName = "remaining_daily"
 	TagMaxDaily           TagName = "max_daily"
 	TagMaxIters           TagName = "max_iters"
-	TagParentScopeIn      TagName = "parent_scope_in"
-	TagUncertaintyMean    TagName = "uncertainty_mean"
+	TagParentScopeIn         TagName = "parent_scope_in"
+	TagUncertaintyMean       TagName = "uncertainty_mean"
+	TagPriorObservationIDs   TagName = "prior_observation_ids"
+	TagIncrementalOnly       TagName = "incremental_only"
 )
 
 // FrameSpec defines fixed-order key: value lines for a MUPS user prompt frame.
@@ -42,6 +44,8 @@ var ObserveUserFrame = FrameSpec{
 		TagScopeGoal,
 		TagScopeOpenQuestion,
 		TagSignal,
+		TagPriorObservationIDs,
+		TagIncrementalOnly,
 	},
 }
 
@@ -93,7 +97,7 @@ func writeLineField(b *strings.Builder, name TagName, v any) {
 			}
 			fmt.Fprintf(b, "%s: %s\n", name, line)
 		}
-	case TagObservationIDs, TagParentScopeIn:
+	case TagObservationIDs, TagParentScopeIn, TagPriorObservationIDs:
 		lines, ok := v.([]string)
 		if !ok || len(lines) == 0 {
 			return

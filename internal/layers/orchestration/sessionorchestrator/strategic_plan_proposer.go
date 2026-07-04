@@ -157,6 +157,9 @@ func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
 	if len(in.ParentScopeIn) > 0 {
 		fields[prompttags.TagParentScopeIn] = in.ParentScopeIn
 	}
+	if in.UncertaintyMean > 0 {
+		fields[prompttags.TagUncertaintyMean] = in.UncertaintyMean
+	}
 	return prompttags.BuildLineFrame(prompttags.PlanUserFrame, fields)
 }
 

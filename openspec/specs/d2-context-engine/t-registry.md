@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 2.18.0
-**Last Updated:** 2026-07-04 (mups-prompttags DM-20260704-004: D2-S15-A93 +4 T IMPLEMENTED 172→176, P0 114→118)
+**Last Updated:** 2026-07-04 (mups-prompttags-v2-io-registry DM-20260704-005: D2-S15-A96 +2 T IMPLEMENTED 176→178, P0 118→120)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -577,6 +577,13 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **D2-S15-A93-T03** | Observe/Plan appendix 注入 `DocBlockObserveSchema` / `DocBlockPlanSchema` | S15-A93 | `materialize/phase_prompts_test.go::TestPhaseAppendix_ZhEnParity` | **IMPLEMENTED** | P0 |
 | **D2-S15-A93-T04** | `Wrap`→`ExtractOne` round-trip golden 覆盖 envelope tags | S15-A93 | `internal/shared/prompttags/envelope_test.go` | **IMPLEMENTED** | P0 |
 
+## D2-S15-A96: MUPS IO registry v2（DM-20260704-005）
+
+| T ID | 描述 | Activity | 证据 | 状态 | 优先级 |
+|------|------|----------|------|------|--------|
+| **D2-S15-A96-T01** | `MUPSIOCatalog` 覆盖 envelope/linefield/lineframe/wholebody 四类 profile | S15-A96 | `internal/shared/prompttags/registry_test.go::TestMUPSIOCatalog_CoversAllProfiles` | **IMPLEMENTED** | P0 |
+| **D2-S15-A96-T02** | `LineFrameRegistry` + `LookupLineFrame` 注册 Observe/Plan user frames | S15-A96 | `internal/shared/prompttags/registry_test.go::TestLookupLineFrame_ObserveAndPlan` | **IMPLEMENTED** | P0 |
+
 ---
 
 ## Revision History
@@ -595,3 +602,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.16.0** | **2026-07-04** | **mups-d2-context-tools-ownership (DM-20260704-001) S5 验收**: D2-S15-A90-T01..T06 MaterializeForMUPS + D2-S15-A91-T01..T04 filter pipeline + D2-S15-A92-T01..T02 phase prompts + D2-S18-A90-T01..T02 toolround — **14 新 T IMPLEMENTED (12 P0 + 2 P1)**. Total 155→169, P0 99→111. 详见 `openspec/changes/mups-d2-context-tools-ownership/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.17.0** | **2026-07-04** | **devrix-runtime-feedback-closure (DM-20260704-003) S5 验收**: D2-S15-A82-T01/T02/T03 i18n 中文硬规则（zh intro 含硬规则 + en 对称不含 + golden test 5 case）— **3 新 T 全部 P0 IMPLEMENTED**. Total 169→172, P0 111→114. 详见 `openspec/changes/devrix-runtime-feedback-closure/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.18.0** | **2026-07-04** | **mups-prompttags (DM-20260704-004) S5 验收**: D2-S15-A93-T01..T04 DocBlock + ExecuteOutputTagDoc + i18n 集成 + envelope golden — **4 新 T 全部 P0 IMPLEMENTED**. Total 172→176, P0 114→118. 详见 `openspec/changes/mups-prompttags/acceptance-report.md` (verdict: ACCEPTED). |
+| **2.19.0** | **2026-07-04** | **mups-prompttags-v2-io-registry (DM-20260704-005) S4**: D2-S15-A96-T01..T02 MUPSIOCatalog + LineFrameRegistry — **2 新 T 全部 P0 IMPLEMENTED**. Total 176→178, P0 118→120. |
