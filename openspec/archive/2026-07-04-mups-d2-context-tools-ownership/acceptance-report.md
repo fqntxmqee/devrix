@@ -1,5 +1,5 @@
 ---
-demand-id: DM-20260704-001
+demand-id: DM-20260704-002
 title: MUPS 上下文与工具决策归 D2 — 验收报告
 executor: Agent S4-Gate
 environment: local dev (go test -race)
@@ -13,7 +13,7 @@ verdict: ACCEPTED
 
 | 项目 | 值 |
 |------|---|
-| 需求 ID | DM-20260704-001 |
+| 需求 ID | DM-20260704-002 |
 | Change ID | mups-d2-context-tools-ownership |
 | 执行人 | Agent S4-Gate |
 | 测试环境 | local dev |

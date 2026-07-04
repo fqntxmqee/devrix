@@ -298,7 +298,7 @@ RunSessionTurnLoop(ctx, req, intent)
 
 ### 4.1 Convergence Contract（DM-20260703-001）
 
-Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC-1～CC-5** 不变式；完整决策树见 `openspec/changes/d7-convergence-contract/design.md` §CC-1。
+Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC-1～CC-5** 不变式；完整决策树见 `openspec/archive/2026-07-03-d7-convergence-contract/design.md` §CC-1。
 
 | 契约 | 代码锚点 | 要点 |
 |------|----------|------|
@@ -308,7 +308,7 @@ Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC
 | **CC-1.4** Child bubble | `item_observe.go` | terminal structured child → parent Observe |
 | **CC-1.5** Session complete | `session_complete.go` | `ExtractSessionDeliverable` → `BestEffortSessionSummary` → `task_incomplete` 安全网 |
 
-**Uncertainty Spawn Contract（CC-U1～U6，DM-20260704-001）：** 完整契约见 [`uncertainty-spawn-contract.md`](uncertainty-spawn-contract.md)；设计决策见 `openspec/changes/d7-uncertainty-spawn-decouple/design.md` §CC-U。
+**Uncertainty Spawn Contract（CC-U1～U6，DM-20260704-001）：** 完整契约见 [`uncertainty-spawn-contract.md`](uncertainty-spawn-contract.md)；设计决策见 `openspec/archive/2026-07-04-d7-uncertainty-spawn-decouple/design.md` §CC-U。
 
 | 契约 | 代码锚点 | 要点 |
 |------|----------|------|

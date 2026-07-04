@@ -2,6 +2,9 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260704-002 | MUPS 上下文与工具决策归 D2 — MaterializeForMUPS + 7 步 filter pipeline + D7 迁移 | mups-d2-context-tools-ownership | 2026-07-04 | [#390](https://github.com/fqntxmqee/devrix/pull/390) | ACCEPTED (19 T, L5-D2-MUPS-01..05 P0 PASS) |
+| DM-20260704-001 | D7 MUPS 不确定性驱动 Spawn — Deliverable 与拓扑解耦 (CC-U1～U6) | d7-uncertainty-spawn-decouple | 2026-07-04 | [#387](https://github.com/fqntxmqee/devrix/pull/387) | ACCEPTED (P0/P1 自动化 PASS; staging T-ACC-2/3 defer) |
+| DM-20260703-001 | D7 任务树收敛契约 — CC-1～CC-5 向下传播 + 向上反馈 | d7-convergence-contract | 2026-07-04 | [#381](https://github.com/fqntxmqee/devrix/pull/381) + #382–386 | ACCEPTED (P0 PASS; staging T7b + P2 defer) |
 | DM-20260702-009 | D2 Tool Input-Aware Concurrency + Auto-Mode Security Classifier — per-input IsConcurrencySafe + toAutoClassifierInput + Bash sibling abort + StreamingToolExecutor.Discard (clawcode 真实设计落地) | devrix-d2-tool-input-aware-concurrency-and-classifier | 2026-07-02 | PR-A `3257e0bb` + PR-B `8e61bb13` + PR-C `dd8736e7` + PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954` | ACCEPTED (13/13 T IMPLEMENTED, 21/21 AC PASS, 4 tech-debt closed TD-STE-01/02/03/06) |
 | DM-20260702-008 | Token Design 2.0 — clawcode-style persistence + advisory iteration bound (LLM 自我循环治本) | devrix-token-design-v2 | 2026-07-02 | [#376](https://github.com/fqntxmqee/devrix/pull/376) | ACCEPTED (16 P0 T + T27 e2e + T28 回归, 50 文件 review 15/50→50/50) |
 | DM-20260701-007 | MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 — LLM 自我循环治本 | devrix-mups-tool-classification-and-channel-autonomy | 2026-07-02 | [#374](https://github.com/fqntxmqee/devrix/pull/374) (PR-A S3 设计) + PR-B/C/D 合并中 | ACCEPTED |
