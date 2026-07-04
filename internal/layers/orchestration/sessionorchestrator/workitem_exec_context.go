@@ -105,7 +105,7 @@ func BuildMaterializeRequest(sessionID string, item *workmodel.WorkItem, tm *wor
 		Depth:       depth,
 	}
 	signals := materialize.InboundSignals{Directive: directive}
-	if item != nil && item.NeedsRollup {
+	if item != nil && item.NeedsRollup && (tm == nil || !workmodel.IsDeliverableFormatRollupSynth(tm, sessionID, item)) {
 		policy.Mode = materialize.ModeRollupSynth
 	}
 	if tm != nil {

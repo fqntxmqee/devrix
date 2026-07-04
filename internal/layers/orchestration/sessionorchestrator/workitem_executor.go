@@ -585,12 +585,37 @@ func (e *DefaultWorkItemExecutor) appendPrivateChainDelta(ctx context.Context, s
 	if e == nil || e.Materializer == nil || !ShouldMaterializeWorkItem(ctx, sessionID, itemID) || len(msgs) == 0 {
 		return
 	}
+	msgs = filterEphemeralExecuteMessages(msgs)
 	msgs = conversation.RepairToolMessageChain(msgs)
 	if len(msgs) == 0 {
 		return
 	}
 	partition := ResolvePartitionForWorkItem(sessionID, &workmodel.WorkItem{ID: itemID})
 	_ = e.Materializer.Append(ctx, partition, msgs)
+}
+
+// filterEphemeralExecuteMessages drops one-shot synthesis hints from the
+// persisted private chain. They belong only on the in-flight LLM request;
+// persisting them breaks merge/compress on the next NeedsRollup round.
+func filterEphemeralExecuteMessages(msgs []types.Message) []types.Message {
+	out := make([]types.Message, 0, len(msgs))
+	for _, m := range msgs {
+		if m.Role == types.MessageRoleUser && isEphemeralExecuteHint(m.Content) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func isEphemeralExecuteHint(content string) bool {
+	c := strings.TrimSpace(content)
+	if c == "" {
+		return false
+	}
+	return strings.Contains(c, "<deliverable_format>") ||
+		strings.Contains(c, "Final iteration: tools are disabled") ||
+		strings.Contains(c, "Rollup synthesis: tools are disabled")
 }
 
 func (e *DefaultWorkItemExecutor) tokenBudget() int {
