@@ -10,6 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/prompttags"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -128,35 +129,35 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 }
 
 func buildStrategicPlanUserPrompt(in StrategicPlanInput) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "work_item_id: %s\n", in.WorkItemID)
-	fmt.Fprintf(&b, "directive: %s\n", in.Directive)
+	fields := map[prompttags.TagName]any{
+		prompttags.TagWorkItemID: in.WorkItemID,
+		prompttags.TagDirective:  in.Directive,
+	}
 	if len(in.ObservationIDs) > 0 {
-		fmt.Fprintf(&b, "observation_ids: %s\n", strings.Join(in.ObservationIDs, ","))
+		fields[prompttags.TagObservationIDs] = in.ObservationIDs
 	}
 	if s := strings.TrimSpace(in.ReportSummary); s != "" {
-		fmt.Fprintf(&b, "observation_summary: %s\n", s)
+		fields[prompttags.TagObservationSummary] = s
 	}
 	// RH-MUPS-07 (DM-20260701-001 T-P1-2): inject the divergence budget so
-	// the LLM can self-bound its proposal. Field order is fixed: depth,
-	// max_depth, remaining_children, remaining_daily, max_iters, then
-	// parent_scope_in. The Plan prompt snapshot test asserts this exact
-	// order; reordering breaks T-P1-4.
+	// the LLM can self-bound its proposal. Field order is fixed in
+	// prompttags.PlanUserFrame; reordering breaks T-P1-4.
 	if in.Budget.MaxChildren > 0 {
-		fmt.Fprintf(&b, "depth: %d\n", in.Budget.Depth)
-		fmt.Fprintf(&b, "max_depth: %d\n", in.Budget.MaxDepth)
-		fmt.Fprintf(&b, "existing_children: %d\n", in.Budget.ExistingChildren)
-		fmt.Fprintf(&b, "remaining_children: %d\n", in.Budget.RemainingChildren())
-		fmt.Fprintf(&b, "max_children: %d\n", in.Budget.MaxChildren)
-		fmt.Fprintf(&b, "decompose_used_today: %d\n", in.Budget.DecomposeUsedToday)
-		fmt.Fprintf(&b, "remaining_daily: %d\n", in.Budget.RemainingDaily())
-		fmt.Fprintf(&b, "max_daily: %d\n", in.Budget.MaxDaily)
-		fmt.Fprintf(&b, "max_iters: %d\n", in.Budget.MaxIters)
+		budget := in.Budget
+		fields[prompttags.TagDepth] = budget.Depth
+		fields[prompttags.TagMaxDepth] = budget.MaxDepth
+		fields[prompttags.TagExistingChildren] = budget.ExistingChildren
+		fields[prompttags.TagRemainingChildren] = budget.RemainingChildren()
+		fields[prompttags.TagMaxChildren] = budget.MaxChildren
+		fields[prompttags.TagDecomposeUsedToday] = budget.DecomposeUsedToday
+		fields[prompttags.TagRemainingDaily] = budget.RemainingDaily()
+		fields[prompttags.TagMaxDaily] = budget.MaxDaily
+		fields[prompttags.TagMaxIters] = budget.MaxIters
 	}
 	if len(in.ParentScopeIn) > 0 {
-		fmt.Fprintf(&b, "parent_scope_in: %s\n", strings.Join(in.ParentScopeIn, ","))
+		fields[prompttags.TagParentScopeIn] = in.ParentScopeIn
 	}
-	return b.String()
+	return prompttags.BuildLineFrame(prompttags.PlanUserFrame, fields)
 }
 
 func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, error) {
@@ -164,14 +165,17 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 	if raw == "" {
 		return nil, fmt.Errorf("strategic plan: empty response")
 	}
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start >= 0 && end > start {
-		raw = raw[start : end+1]
-	}
-	var row rawStrategicPlan
-	if err := json.Unmarshal([]byte(raw), &row); err != nil {
-		return nil, fmt.Errorf("strategic plan: parse json: %w", err)
+	row, ok := prompttags.ParseWholeBody[rawStrategicPlan](raw)
+	if !ok {
+		start := strings.Index(raw, "{")
+		end := strings.LastIndex(raw, "}")
+		candidate := raw
+		if start >= 0 && end > start {
+			candidate = raw[start : end+1]
+		}
+		if err := json.Unmarshal([]byte(candidate), &row); err != nil {
+			return nil, fmt.Errorf("strategic plan: parse json: %w", err)
+		}
 	}
 	prop := &StrategicPlanProposal{
 		ExecutionMode:  strings.ToLower(strings.TrimSpace(row.ExecutionMode)),

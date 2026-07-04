@@ -1,25 +1,15 @@
 package workmodel
 
 import (
-	"encoding/json"
-	"regexp"
 	"strings"
-)
 
-var scopeContractBlockRE = regexp.MustCompile(`(?s)<scope_contract>(.*?)</scope_contract>`)
+	"github.com/devrix/devrix/internal/shared/prompttags"
+)
 
 // ParseScopeContractBlock extracts JSON ScopeContract from Execute output.
 func ParseScopeContractBlock(content string) (*ScopeContract, bool) {
-	m := scopeContractBlockRE.FindStringSubmatch(content)
-	if len(m) < 2 {
-		return nil, false
-	}
-	raw := strings.TrimSpace(m[1])
-	if raw == "" {
-		return nil, false
-	}
-	var sc ScopeContract
-	if err := json.Unmarshal([]byte(raw), &sc); err != nil {
+	sc, ok := prompttags.ExtractOne[ScopeContract](prompttags.TagScopeContract, content)
+	if !ok {
 		return nil, false
 	}
 	return &sc, true
@@ -48,21 +38,12 @@ func ResolveGoalScopeContract(item *WorkItem, directive, executeContent string) 
 	return nil
 }
 
-var openQuestionsBlockRE = regexp.MustCompile(`(?s)<open_questions>(.*?)</open_questions>`)
-
 func parseOpenQuestionsBlock(content string) []string {
-	m := openQuestionsBlockRE.FindStringSubmatch(content)
-	if len(m) < 2 {
+	lines, ok := prompttags.ExtractOne[[]string](prompttags.TagOpenQuestions, content)
+	if !ok {
 		return nil
 	}
-	var out []string
-	for _, line := range strings.Split(m[1], "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			out = append(out, line)
-		}
-	}
-	return out
+	return lines
 }
 
 // SetScopeContract persists ScopeContract on a WorkItem.

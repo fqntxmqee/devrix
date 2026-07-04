@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 // Deliverable dimension enums — exhaustive category sets (DM-20260703-001).
@@ -45,11 +47,6 @@ type DeliverableContract struct {
 	MinRunes  int                  `json:"min_runes,omitempty"`
 	Reject    []DeliverableReject  `json:"reject,omitempty"`
 }
-
-const (
-	deliverableContractOpen  = "<deliverable_contract>"
-	deliverableContractClose = "</deliverable_contract>"
-)
 
 // ContractApplicable reports whether verify/execute gates apply.
 func (c DeliverableContract) ContractApplicable() bool {
@@ -104,27 +101,13 @@ func DeliverableContractTag(c DeliverableContract) string {
 	if !c.ContractApplicable() {
 		return ""
 	}
-	b, err := json.Marshal(c.Normalized())
-	if err != nil {
-		return ""
-	}
-	return deliverableContractOpen + string(b) + deliverableContractClose
+	return prompttags.Wrap(prompttags.TagDeliverableContract, c.Normalized())
 }
 
 // ParseDeliverableContractTag reads <deliverable_contract>{json}</deliverable_contract>.
 func ParseDeliverableContractTag(s string) DeliverableContract {
-	s = strings.TrimSpace(s)
-	start := strings.Index(s, deliverableContractOpen)
-	if start < 0 {
-		return DeliverableContract{}
-	}
-	end := strings.Index(s[start:], deliverableContractClose)
-	if end < 0 {
-		return DeliverableContract{}
-	}
-	raw := strings.TrimSpace(s[start+len(deliverableContractOpen) : start+end])
-	var c DeliverableContract
-	if err := json.Unmarshal([]byte(raw), &c); err != nil {
+	c, ok := prompttags.ExtractOne[DeliverableContract](prompttags.TagDeliverableContract, s)
+	if !ok {
 		return DeliverableContract{}
 	}
 	return c.Normalized()

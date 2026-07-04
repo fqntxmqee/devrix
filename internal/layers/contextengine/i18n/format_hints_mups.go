@@ -1,25 +1,32 @@
 package i18n
 
+import "github.com/devrix/devrix/internal/shared/prompttags"
+
 // ObservationTaskAppendix returns the Observe-node JSON schema appendix (DM-20260704-001).
 // Migrated from sessionorchestrator/llm_observation_proposer.go.
 func ObservationTaskAppendix(loc Locale) string {
+	schema := prompttags.DocBlockObserveSchema()
 	if loc == LocaleEN {
-		return observationTaskAppendixEN
+		return observationTaskAppendixENPrefix + schema + observationTaskAppendixENSuffix
 	}
-	return observationTaskAppendixZH
+	return observationTaskAppendixZHPrefix + schema + observationTaskAppendixZHSuffix
 }
 
-const observationTaskAppendixZH = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。每个元素：
-{"kind":"obs_fact|obs_signal|obs_uncertainty|obs_deviation","strength":0.0-1.0,"statement":"...","question":"...","evidence":["wi_id"]}
+const observationTaskAppendixZHPrefix = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。每个元素：
+`
+
+const observationTaskAppendixZHSuffix = `
 
 规则：
 - 只能使用下方提供的 directive 与结构化 signal；不要编造工具输出。
 - 范围不清时优先 obs_uncertainty；obs_fact 仅在有强依据时使用。
 - 最多 3 条提案；空数组 [] 合法。`
 
-const observationTaskAppendixEN = `You propose structured observations for an orchestration Observe node.
+const observationTaskAppendixENPrefix = `You propose structured observations for an orchestration Observe node.
 Return ONLY a JSON array (no markdown). Each element:
-{"kind":"obs_fact|obs_signal|obs_uncertainty|obs_deviation","strength":0.0-1.0,"statement":"...","question":"...","evidence":["wi_id"]}
+`
+
+const observationTaskAppendixENSuffix = `
 
 Rules:
 - Use ONLY the provided directive and structured signals; do not invent tool outputs.

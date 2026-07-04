@@ -222,7 +222,8 @@ func TestMaterialize_NoObsTaxonomyInPrivateChainTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
-	if !strings.Contains(res.SystemPrompt, "Do not label observations as Obs") {
+	// Locale-aware footer (default zh-CN); Obs taxonomy names are English in both locales.
+	if !strings.Contains(res.SystemPrompt, "ObsFact/ObsSignal") {
 		t.Fatal("must forbid Execute-side Obs taxonomy")
 	}
 }

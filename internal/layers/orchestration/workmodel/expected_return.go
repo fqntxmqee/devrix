@@ -2,6 +2,8 @@ package workmodel
 
 import (
 	"strings"
+
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 // DefaultStructuralExpectedReturn is the fallback when no deliverable contract applies.
@@ -35,23 +37,15 @@ func DeliverableSchemaTag(schema DeliverableSchema) string {
 	if c.ContractApplicable() {
 		return DeliverableContractTag(c)
 	}
-	return "<deliverable_schema>" + string(schema) + "</deliverable_schema>"
+	return prompttags.Wrap(prompttags.TagDeliverableSchema, string(schema))
 }
 
 // ParseDeliverableSchemaTag reads legacy schema tag; maps known names to contract dimensions.
 func ParseDeliverableSchemaTag(s string) DeliverableSchema {
-	s = strings.TrimSpace(s)
-	const open = "<deliverable_schema>"
-	const close = "</deliverable_schema>"
-	start := strings.Index(s, open)
-	if start < 0 {
+	raw, ok := prompttags.ExtractOne[string](prompttags.TagDeliverableSchema, s)
+	if !ok {
 		return DeliverableSchemaNotApplicable
 	}
-	end := strings.Index(s[start:], close)
-	if end < 0 {
-		return DeliverableSchemaNotApplicable
-	}
-	raw := strings.TrimSpace(s[start+len(open) : start+end])
 	if raw == string(DeliverableSchemaNotApplicable) {
 		return DeliverableSchemaNotApplicable
 	}

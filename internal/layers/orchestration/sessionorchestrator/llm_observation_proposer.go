@@ -10,6 +10,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/prompttags"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -59,26 +60,31 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 }
 
 func buildLLMObservationUserPrompt(in ObserveSignalInput) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "work_item_id: %s\n", in.WorkItemID)
-	fmt.Fprintf(&b, "directive: %s\n", in.Directive)
+	fields := map[prompttags.TagName]any{
+		prompttags.TagWorkItemID: in.WorkItemID,
+		prompttags.TagDirective:  in.Directive,
+	}
 	if in.PriorMean > 0 {
-		fmt.Fprintf(&b, "prior_mean: %.3f\n", in.PriorMean)
+		fields[prompttags.TagPriorMean] = in.PriorMean
 	}
 	if in.ScopeContract != nil {
 		if s := strings.TrimSpace(in.ScopeContract.GoalStatement); s != "" {
-			fmt.Fprintf(&b, "scope_goal: %s\n", s)
+			fields[prompttags.TagScopeGoal] = s
 		}
+		var questions []string
 		for _, q := range in.ScopeContract.OpenQuestions {
 			if strings.TrimSpace(q) != "" {
-				fmt.Fprintf(&b, "scope_open_question: %s\n", q)
+				questions = append(questions, q)
 			}
 		}
+		if len(questions) > 0 {
+			fields[prompttags.TagScopeOpenQuestion] = questions
+		}
 	}
-	for _, line := range in.InboundSignalLines {
-		fmt.Fprintf(&b, "signal: %s\n", line)
+	if len(in.InboundSignalLines) > 0 {
+		fields[prompttags.TagSignal] = in.InboundSignalLines
 	}
-	return b.String()
+	return prompttags.BuildLineFrame(prompttags.ObserveUserFrame, fields)
 }
 
 func collectLLMText(ch <-chan llmgateway.Chunk) string {
@@ -104,15 +110,23 @@ func parseObservationProposalsJSON(raw string) ([]ObservationProposal, error) {
 	if raw == "" || raw == "[]" {
 		return nil, nil
 	}
-	start := strings.Index(raw, "[")
-	end := strings.LastIndex(raw, "]")
-	if start >= 0 && end > start {
-		raw = raw[start : end+1]
+	if rows, ok := prompttags.ParseWholeBody[[]rawObsProposal](raw); ok {
+		return mapRawObsProposals(rows), nil
 	}
 	var rows []rawObsProposal
-	if err := json.Unmarshal([]byte(raw), &rows); err != nil {
+	start := strings.Index(raw, "[")
+	end := strings.LastIndex(raw, "]")
+	candidate := raw
+	if start >= 0 && end > start {
+		candidate = raw[start : end+1]
+	}
+	if err := json.Unmarshal([]byte(candidate), &rows); err != nil {
 		return nil, fmt.Errorf("parse observation proposals: %w", err)
 	}
+	return mapRawObsProposals(rows), nil
+}
+
+func mapRawObsProposals(rows []rawObsProposal) []ObservationProposal {
 	out := make([]ObservationProposal, 0, len(rows))
 	for _, r := range rows {
 		kind, ok := mapRawObsKind(r.Kind)
@@ -128,7 +142,7 @@ func parseObservationProposalsJSON(raw string) ([]ObservationProposal, error) {
 			Evidence:  append([]string(nil), r.Evidence...),
 		})
 	}
-	return out, nil
+	return out
 }
 
 func mapRawObsKind(s string) (orchtypes.ObservationKind, bool) {

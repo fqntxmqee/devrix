@@ -32,12 +32,12 @@ type MUPSContextPolicy struct {
 
 // MUPSScopeContract carries scope boundary fields for execute output hints.
 type MUPSScopeContract struct {
-	GoalStatement  string
-	InScope        []string
-	OutOfScope     []string
-	Assumptions    []string
-	OpenQuestions  []string
-	SuccessCriteria []string
+	GoalStatement   string   `json:"goal_statement,omitempty"`
+	InScope         []string `json:"in_scope,omitempty"`
+	OutOfScope      []string `json:"out_of_scope,omitempty"`
+	Assumptions     []string `json:"assumptions,omitempty"`
+	OpenQuestions   []string `json:"open_questions,omitempty"`
+	SuccessCriteria []string `json:"success_criteria,omitempty"`
 }
 
 // MUPSWorkItemSnapshot carries WorkItem fields needed for MUPS materialize.
