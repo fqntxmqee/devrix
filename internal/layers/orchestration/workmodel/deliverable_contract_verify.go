@@ -29,7 +29,16 @@ func VerifyDeliverableContract(contract DeliverableContract, summary, stopReason
 	payload := parseDeliverablePayload(c, summary)
 
 	for _, r := range c.Reject {
-		if r == DeliverableRejectPlanningMeta && DetectPlanningMeta(summary) {
+		if r != DeliverableRejectPlanningMeta {
+			continue
+		}
+		planningScope := summary
+		if c.Structure == DeliverableStructureFindingsJSON {
+			if raw := extractDeliverableJSONObject(summary); raw != nil {
+				planningScope = string(raw)
+			}
+		}
+		if DetectPlanningMeta(planningScope) {
 			return deliverableVerifyResult{
 				Status:  DeliverableStatusIncomplete,
 				Payload: payload,

@@ -1325,6 +1325,22 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 
 ---
 
+## D7-U: Uncertainty-Driven Spawn (DM-20260704-001)
+
+> **Change:** `d7-uncertainty-spawn-decouple` — CC-U1～U6 decouple deliverable gate from spawn continuation; evidence progress + U drive rollup synth.
+
+| T ID | L5 | 描述 | Test 位置 | Status | Priority |
+|------|-----|------|-----------|--------|----------|
+| **D7-U-T01** | L5-D7-U-01 | Partial + 高证据 + U 低 → RollupSynth 非 inline 耗尽 | `workmodel/evidence_progress_test.go::TestSpawnPolicyEvaluator_CCU1_inlineNotEscalateWithEvidence` + `spawn_apply_rollup_test.go::TestApplySpawnPolicy_RollupSynthSetsNeedsRollup` | **IMPLEMENTED** | P0 |
+| **D7-U-T02** | L5-D7-U-02 | U 高时 strategic `single` 被拒绝 | `sessionorchestrator/strategic_plan_proposer_test.go::TestApplySingleModeUncertaintyGate_rejectsHighU` | **IMPLEMENTED** | P0 |
+| **D7-U-T03** | L5-D7-U-03 | spawnRationale 区分 CC-1.2 vs R7 | `workmodel/evidence_progress_test.go::TestSpawnRationale_CC12_notR7` | **IMPLEMENTED** | P1 |
+| **D7-U-T04** | L5-D7-U-04 | Session complete salvage via ExtractSessionDeliverable | `workmodel/deliverable_format_test.go::TestExtractSessionDeliverable_SalvageFromWorkItemArtifact` | **IMPLEMENTED** | P1 |
+| **D7-U-T05** | L5-D7-U-05 | Deliverable alias registry + fence extract + verify JSON-body-only + U damp | `deliverable_findings_parse_test.go` + `deliverable_contract_verify_test.go` + `uncertainty_unified_test.go::TestComputeUnifiedUncertainty_formatFailureWithEvidenceDamps` | **IMPLEMENTED** | P1 |
+
+**D7-U Total:** 5 T (2 P0 + 3 P1) — **5/5 IMPLEMENTED**
+
+---
+
 ## D7-PL: Physical Layout Alignment (DM-20260701-004) — PLANNED
 
 > **Change:** `devrix-d7-physical-layout-alignment` PR-1 (纯 markdown, 0 Go 业务代码): a/f-registry 补全 + code-layout §4.2 终态化 + t-registry 12 T 注册 (layout guard 由 PR-2 覆盖)。PR-2/3/4 后续分别覆盖 layout guard 测试 + plan/ doc-only 双登记 + orchtypes/ Cross-S 登记。

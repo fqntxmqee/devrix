@@ -20,6 +20,21 @@ func TestVerifyDeliverableContract_FindingsJSONRequired(t *testing.T) {
 	}
 }
 
+func TestVerifyDeliverableContract_planningOutsideValidFindingsJSON(t *testing.T) {
+	// L5-D7-U-05: planning_meta reject applies to extracted JSON body only
+	c := DeliverableContract{
+		Citation:  DeliverableCitationFileLine,
+		Severity:  DeliverableSeverityP0P1,
+		Structure: DeliverableStructureFindingsJSON,
+		Reject:    []DeliverableReject{DeliverableRejectPlanningMeta},
+	}
+	summary := "Let me first summarize what I found.\n```json\n{\"findings\":[{\"severity\":\"P0\",\"title\":\"nil deref\",\"file\":\"internal/foo.go\",\"line\":42,\"evidence\":\"missing check\"}]}\n```"
+	got := VerifyDeliverableContract(c, summary, "final_answer")
+	if got.Status != DeliverableStatusComplete {
+		t.Fatalf("status=%q reason=%q, want complete", got.Status, got.Reason)
+	}
+}
+
 func TestDeliverableInlineWouldExhaust(t *testing.T) {
 	ctx := TreeEvalContext{InlineRetriesAtMaxDepth: 2, MaxInlineRetriesAtMaxDepth: 3}
 	if !deliverableInlineWouldExhaust(ctx) {

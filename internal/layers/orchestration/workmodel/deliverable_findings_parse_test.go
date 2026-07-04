@@ -44,3 +44,30 @@ func TestVerifyDeliverableContract_rejects_regex_fallback_for_findings_json(t *t
 		t.Fatalf("status=%q reason=%q", got.Status, got.Reason)
 	}
 }
+
+func TestParseFindingsJSONPayload_issueFieldAlias(t *testing.T) {
+	// L5-D7-U-05: alias registry maps issue → Title
+	summary := `{"findings":[{"severity":"P1","issue":"race on map","file":"internal/foo.go","line":42,"evidence":"unsynchronized write"}]}`
+	p, ok := parseFindingsJSONPayload(summary)
+	if !ok || p == nil || len(p.Findings) != 1 {
+		t.Fatalf("parse failed: ok=%v payload=%v", ok, p)
+	}
+	if p.Findings[0].Title != "race on map" {
+		t.Fatalf("Title = %q, want race on map", p.Findings[0].Title)
+	}
+}
+
+func TestExtractDeliverableJSONObject_proseBeforeJSONFence(t *testing.T) {
+	// L5-D7-U-05: structural fence extraction skips prose before first `{`
+	summary := "The user wants me to finish the review.\n\n```json\nHere is the summary:\n{\"findings\":[{\"severity\":\"P1\",\"title\":\"nil deref\",\"file\":\"internal/foo.go\",\"line\":1,\"evidence\":\"missing check\"}]}\n```"
+	if raw := extractDeliverableJSONObject(summary); raw == nil {
+		t.Fatal("expected extracted JSON object")
+	}
+	p, ok := parseFindingsJSONPayload(summary)
+	if !ok || p == nil || len(p.Findings) != 1 {
+		t.Fatalf("parse failed: ok=%v payload=%v", ok, p)
+	}
+	if p.Findings[0].Title != "nil deref" {
+		t.Fatalf("finding = %+v", p.Findings[0])
+	}
+}

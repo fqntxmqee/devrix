@@ -80,3 +80,52 @@ func TestExtractSessionDeliverable_PrefersStructuredFindings(t *testing.T) {
 		t.Fatalf("expected finding title in report: %q", got)
 	}
 }
+
+func TestExtractSessionDeliverable_SalvageFromWorkItemArtifact(t *testing.T) {
+	// L5-D7-U-05: CC-U2 session exit salvage before raw artifact fallback
+	tm := NewTaskManager()
+	sessionID := "sess-salvage"
+	goal, err := tm.EnsureGoal(sessionID, "review kernel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := tm.CreateWorkItem(sessionID, CreateWorkItemInput{
+		ParentID:  goal.ID,
+		Kind:      WorkKindImplement,
+		Title:     "review slice",
+		Directive: "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract := DeliverableContract{
+		Citation:  DeliverableCitationFileLine,
+		Severity:  DeliverableSeverityP0P1,
+		Structure: DeliverableStructureFindingsJSON,
+	}
+	jsonSummary := "Let me summarize findings.\n```json\n{\"findings\":[{\"severity\":\"P1\",\"issue\":\"dead code\",\"file\":\"internal/foo.go\",\"line\":10,\"evidence\":\"unused func\"}]}\n```"
+	childRound := &WorkItemPipelineRound{
+		WorkItemID:          child.ID,
+		DeliverableContract: contract,
+		DeliverableStatus:   DeliverableStatusIncomplete,
+		ArtifactSummary:     jsonSummary,
+	}
+	if err := tm.Tree().ApplyPipelineRound(sessionID, child.ID, childRound, RoundPhaseIdle); err != nil {
+		t.Fatal(err)
+	}
+	rootRound := &WorkItemPipelineRound{
+		WorkItemID:        goal.ID,
+		DeliverableStatus: DeliverableStatusIncomplete,
+		ArtifactSummary:   "I'll wrap up the review...",
+	}
+	if err := tm.Tree().ApplyPipelineRound(sessionID, goal.ID, rootRound, RoundPhaseIdle); err != nil {
+		t.Fatal(err)
+	}
+	got := ExtractSessionDeliverable(tm, sessionID)
+	if !strings.Contains(got, "dead code") {
+		t.Fatalf("expected salvaged finding, got: %q", got)
+	}
+	if strings.Contains(got, "wrap up the review") {
+		t.Fatalf("expected salvage over root planning prose, got: %q", got)
+	}
+}

@@ -48,6 +48,13 @@ func ApplySpawnPolicy(sessionID string, item *WorkItem, round *WorkItemPipelineR
 		_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
 		return nil
 	default:
+		if round.RollupSynthRequested && item != nil {
+			_ = tm.Tree().SetNeedsRollup(sessionID, item.ID, true)
+			_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
+			if item.Status == TaskStatusCompleted || item.Status == TaskStatusFailed {
+				_ = tm.Tree().ReopenForRollup(sessionID, item.ID)
+			}
+		}
 		return nil
 	}
 }

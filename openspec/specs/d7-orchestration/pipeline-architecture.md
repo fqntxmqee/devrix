@@ -308,6 +308,17 @@ Round 终止、向下 scope 校验、向上 rollup 与 session 退出遵循 **CC
 | **CC-1.4** Child bubble | `item_observe.go` | terminal structured child → parent Observe |
 | **CC-1.5** Session complete | `session_complete.go` | `ExtractSessionDeliverable` → `BestEffortSessionSummary` → `task_incomplete` 安全网 |
 
+**Uncertainty Spawn Contract（CC-U1～U6，DM-20260704-001）：** 完整契约见 [`uncertainty-spawn-contract.md`](uncertainty-spawn-contract.md)；设计决策见 `openspec/changes/d7-uncertainty-spawn-decouple/design.md` §CC-U。
+
+| 契约 | 代码锚点 | 要点 |
+|------|----------|------|
+| **CC-U1** Evidence-primary spawn | `workmodel/spawn_policy.go`, `evidence_progress.go` | Partial + deliverable incomplete 时，证据足 + U 低 → RollupSynth，非 deliverable 单独 inline 耗尽 |
+| **CC-U2** Deliverable 呈现层 | `deliverable_contract_verify.go`, `rollup_gate.go` | Verify 管提取/呈现；session complete salvage 优先于 `task_incomplete` |
+| **CC-U3** Rollup synth 收敛 | `spawn_apply.go`, `rollup_synth.go` | `RollupSynthRequested` → `NeedsRollup` + `ModeRollupSynth` |
+| **CC-U4** Strategic single U gate | `strategic_plan_proposer.go` | `U >= SingleModeThreshold` → structured reject |
+| **CC-U5** Observe verify 信号 | `item_observe.go` | 结构化 ObsSignal；证据足时 damp deliverable_incomplete 强度 |
+| **CC-U6** spawnRationale 标签 | `spawn_policy.go` | CC-1.2 inline 与 R7 indeterminate 区分 |
+
 Focus 续跑：`GetPipelineFocus` 仅 refocus `SpawnInline + DeliverableContinuationRequired`（Pass→Inline 路径，不再 refocus `SpawnNone+InProgress`）。
 
 > 下列为 **ItemPipelineRunner.Run 内部** 各阶段细节（原 §4 OrchestratePath 6 步时序，语义不变，入口已迁移）：

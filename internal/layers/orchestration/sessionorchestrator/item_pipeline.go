@@ -212,13 +212,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			parentScopeIn = append([]string(nil), item.ScopeContract.InScope...)
 		}
 		prop, propErr := r.StrategicPlanProposer.ProposeStrategicPlan(ctx, StrategicPlanInput{
-			SessionID:      sessionID,
-			WorkItemID:     item.ID,
-			Directive:      directive,
-			ObservationIDs: obsIDs,
-			ReportSummary:  uncertaintyReportSummary(len(report.Anomalies), intentKind),
-			Budget:         workmodel.StrategicPlanBudget(sessionID, item, r.Tasks),
-			ParentScopeIn:  parentScopeIn,
+			SessionID:       sessionID,
+			WorkItemID:      item.ID,
+			Directive:       directive,
+			ObservationIDs:  obsIDs,
+			ReportSummary:   uncertaintyReportSummary(len(report.Anomalies), intentKind),
+			Budget:          workmodel.StrategicPlanBudget(sessionID, item, r.Tasks),
+			ParentScopeIn:   parentScopeIn,
+			UncertaintyMean: item.Uncertainty,
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
@@ -454,10 +455,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		}
 	}
 	uncertaintyMean := workmodel.ComputeUnifiedUncertainty(workmodel.UnifiedUncertaintyInput{
-		WilsonLower:       wilsonLower,
-		ChildStats:        stats,
-		VerdictConfidence: verdict.Confidence,
-		EvidenceCount:     len(obsIDs),
+		WilsonLower:               wilsonLower,
+		ChildStats:                stats,
+		VerdictConfidence:         verdict.Confidence,
+		EvidenceCount:             len(obsIDs),
+		FormatFailureWithEvidence: formatFailureWithEvidence(stats, deliverableResult.Status, art, item),
 	})
 	// RH-MUPS-01/02 (DM-20260701-001): route through ReconcileUncertainty so
 	// convergence (all children terminal) is numerically visible. The prior
@@ -518,6 +520,15 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	} else {
 		round.DeliverableStatus = deliverableResult.Status
 		round.StructuredDeliverable = deliverableResult.Payload
+		round.DeliverableReason = deliverableResult.Reason
+	}
+	if art != nil {
+		if tc, ok := art.Metadata["tool_calls"].(int); ok {
+			round.ExecuteToolCalls = tc
+		}
+	}
+	if item.ScopeContract != nil && len(item.ScopeContract.InScope) > 0 {
+		round.ScopeInPresent = true
 	}
 	if strategic != nil {
 		if s := strings.TrimSpace(strategic.Rationale); s != "" {
@@ -715,3 +726,27 @@ func truncateForArtifact(s string, n int) string {
 type observationRef string
 
 func (o observationRef) GetID() string { return string(o) }
+
+func formatFailureWithEvidence(
+	stats workmodel.ChildOutcomeStats,
+	deliverableStatus workmodel.DeliverableStatus,
+	art *wavescheduler.Artifact,
+	item *workmodel.WorkItem,
+) bool {
+	if deliverableStatus != workmodel.DeliverableStatusIncomplete {
+		return false
+	}
+	toolCalls := 0
+	if art != nil {
+		if tc, ok := art.Metadata["tool_calls"].(int); ok {
+			toolCalls = tc
+		}
+	}
+	hasScope := item != nil && item.ScopeContract != nil && len(item.ScopeContract.InScope) > 0
+	progress := workmodel.EvidenceProgress(workmodel.EvidenceInput{
+		ToolCalls:  toolCalls,
+		HasScopeIn: hasScope,
+		ChildStats: stats,
+	})
+	return progress >= workmodel.EvidenceSufficientThreshold
+}

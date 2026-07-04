@@ -12,8 +12,7 @@ const maxFindingFieldRunes = 800
 
 var (
 	findingsJSONMarkerRE = regexp.MustCompile(`(?i)"(?:findings|files_reviewed|scope)"\s*:`)
-	findingsJSONFenceExtractRE = regexp.MustCompile("(?is)```json\\s*(\\{.*?)```")
-	planningProseMarkers       = []string{
+	planningProseMarkers = []string{
 		"the user wants me to",
 		"let me start by",
 		"let me first",
@@ -67,14 +66,8 @@ func parseFindingsJSONPayload(summary string) (*DeliverablePayload, bool) {
 	if rawJSON == nil {
 		return nil, false
 	}
-	var wrapper struct {
-		Findings []DeliverableFinding `json:"findings"`
-	}
-	if err := json.Unmarshal(rawJSON, &wrapper); err != nil || len(wrapper.Findings) == 0 {
-		return nil, false
-	}
-	findings := normalizeDeliverableFindings(wrapper.Findings)
-	if len(findings) == 0 {
+	findings, ok := decodeFindingsFromJSONObject(rawJSON, FindingParseStrict)
+	if !ok {
 		return nil, false
 	}
 	return &DeliverablePayload{
@@ -85,26 +78,57 @@ func parseFindingsJSONPayload(summary string) (*DeliverablePayload, bool) {
 
 func extractDeliverableJSONObject(summary string) []byte {
 	summary = strings.TrimSpace(summary)
-	if m := findingsJSONFenceExtractRE.FindStringSubmatch(summary); len(m) == 2 {
-		return []byte(strings.TrimSpace(m[1]))
-	}
-	start := strings.Index(summary, "{")
-	end := strings.LastIndex(summary, "}")
-	if start < 0 || end <= start {
+	if summary == "" {
 		return nil
 	}
-	candidate := summary[start : end+1]
-	if !findingsJSONMarkerRE.MatchString(candidate) {
+	if body := extractJSONObjectFromMarkdownFence(summary); body != nil {
+		return body
+	}
+	return extractJSONObjectWithFindingsMarker(summary)
+}
+
+func extractJSONObjectFromMarkdownFence(summary string) []byte {
+	lower := strings.ToLower(summary)
+	const fence = "```json"
+	start := strings.Index(lower, fence)
+	if start < 0 {
 		return nil
 	}
-	return []byte(candidate)
+	rest := summary[start+len(fence):]
+	if idx := strings.Index(rest, "{"); idx >= 0 {
+		rest = rest[idx:]
+	}
+	return extractJSONObjectWithFindingsMarker(rest)
+}
+
+func extractJSONObjectWithFindingsMarker(summary string) []byte {
+	summary = strings.TrimSpace(summary)
+	for i := 0; i < len(summary); i++ {
+		if summary[i] != '{' {
+			continue
+		}
+		end := strings.LastIndex(summary[i:], "}")
+		if end < 0 {
+			continue
+		}
+		end += i
+		candidate := summary[i : end+1]
+		if !findingsJSONMarkerRE.MatchString(candidate) {
+			continue
+		}
+		if !json.Valid([]byte(candidate)) {
+			continue
+		}
+		return []byte(candidate)
+	}
+	return nil
 }
 
 func normalizeDeliverableFindings(in []DeliverableFinding) []DeliverableFinding {
 	out := make([]DeliverableFinding, 0, len(in))
 	for _, f := range in {
 		f = normalizeDeliverableFinding(f)
-		if !findingQualityOK(f) {
+		if !findingQualityOK(f, FindingParseStrict) {
 			continue
 		}
 		out = append(out, f)
@@ -136,10 +160,12 @@ func normalizeDeliverableFinding(f DeliverableFinding) DeliverableFinding {
 	return f
 }
 
-func findingQualityOK(f DeliverableFinding) bool {
+func findingQualityOK(f DeliverableFinding, mode FindingParseMode) bool {
 	for _, s := range []string{f.Title, f.Message, f.Evidence, f.Impact, f.Recommendation} {
-		if DetectPlanningMeta(s) || containsPlanningProse(strings.ToLower(s)) {
-			return false
+		if mode == FindingParseStrict {
+			if DetectPlanningMeta(s) || containsPlanningProse(strings.ToLower(s)) {
+				return false
+			}
 		}
 		if utf8.RuneCountInString(s) > maxFindingFieldRunes {
 			return false

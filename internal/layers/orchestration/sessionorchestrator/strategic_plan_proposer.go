@@ -28,6 +28,8 @@ type StrategicPlanInput struct {
 	// propose child scopes that are disjoint from this list (and the
 	// post-validate gate enforces a real-subset invariant; see T-P2-2).
 	ParentScopeIn []string
+	// UncertaintyMean is the WorkItem's stored uncertainty at plan time (CC-U4).
+	UncertaintyMean float64
 }
 
 type rawStrategicChildSpec struct {
@@ -129,6 +131,9 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 	// re-propose the same too-large set forever.
 	if budgetErr := applyBudgetCap(prop, in.Budget); budgetErr != nil {
 		return nil, budgetErr
+	}
+	if gateErr := applySingleModeUncertaintyGate(prop, in); gateErr != nil {
+		return nil, gateErr
 	}
 	return prop, nil
 }
@@ -294,11 +299,12 @@ func (e *StrategicPlanReject) Error() string {
 		e.Reason, e.Requested, e.MaxAllowed)
 }
 
-// Strategic plan budget rejection reasons (RH-MUPS-07).
+// BudgetFieldScope rejects scope proposals outside parent bounds.
 const (
 	BudgetFieldChildren = "children"
 	BudgetFieldDaily    = "daily"
-	BudgetFieldScope    = "scope"
+	BudgetFieldScope       = "scope"
+	BudgetFieldUncertainty = "uncertainty"
 )
 
 // applyBudgetCap implements T-P1-3: when the LLM proposes more children
@@ -331,6 +337,21 @@ func applyBudgetCap(prop *StrategicPlanProposal, budget workmodel.DivergenceBudg
 		}
 	}
 	return nil
+}
+
+func applySingleModeUncertaintyGate(prop *StrategicPlanProposal, in StrategicPlanInput) error {
+	if prop == nil || prop.ExecutionMode != "single" {
+		return nil
+	}
+	if in.UncertaintyMean < workmodel.SingleModeUncertaintyThreshold {
+		return nil
+	}
+	return &StrategicPlanReject{
+		Reason:     BudgetFieldUncertainty,
+		MaxAllowed: int(workmodel.SingleModeUncertaintyThreshold * 100),
+		Requested:  int(in.UncertaintyMean * 100),
+		Field:      BudgetFieldUncertainty,
+	}
 }
 
 func clampReactIters(n int) int {

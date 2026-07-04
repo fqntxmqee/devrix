@@ -23,3 +23,35 @@ func TestComputeUnifiedUncertainty(t *testing.T) {
 		t.Fatalf("high-risk uncertainty %v should exceed baseline %v", high, u)
 	}
 }
+
+// T: L5-D7-U-01 — CC-U5 format failure with sufficient evidence must not inflate U like exploration need.
+func TestComputeUnifiedUncertainty_formatFailureWithEvidenceDamps(t *testing.T) {
+	base := UnifiedUncertaintyInput{
+		WilsonLower:       0.2,
+		ChildStats:        ChildOutcomeStats{Total: 4, Failed: 1},
+		VerdictConfidence: 0.4,
+		EvidenceCount:     2,
+	}
+	plain := ComputeUnifiedUncertainty(base)
+	damped := ComputeUnifiedUncertainty(UnifiedUncertaintyInput{
+		WilsonLower:               base.WilsonLower,
+		ChildStats:                base.ChildStats,
+		VerdictConfidence:         base.VerdictConfidence,
+		EvidenceCount:             base.EvidenceCount,
+		FormatFailureWithEvidence: true,
+	})
+	if damped >= plain {
+		t.Fatalf("damped=%v should be below plain=%v when format failed with evidence", damped, plain)
+	}
+}
+
+func TestDeliverableIncompleteObsStrength_convergenceDamps(t *testing.T) {
+	low := DeliverableIncompleteObsStrength(&WorkItemPipelineRound{ExecuteToolCalls: 0})
+	high := DeliverableIncompleteObsStrength(&WorkItemPipelineRound{
+		ExecuteToolCalls: 3,
+		ScopeInPresent:   true,
+	})
+	if high >= low {
+		t.Fatalf("convergence strength=%v should be below default=%v", high, low)
+	}
+}

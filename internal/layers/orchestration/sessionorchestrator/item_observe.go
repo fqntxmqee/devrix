@@ -90,6 +90,7 @@ func observeWorkItem(
 	}
 	proposed, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prior)
 	obs = append(obs, proposed...)
+	obs = append(obs, observeDeliverableSignals(item)...)
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
 	if err != nil {
 		return orchtypes.UncertaintyReport{}, nil, err
@@ -113,6 +114,51 @@ func observeWorkItem(
 		ids = append(ids, o.ID)
 	}
 	return report, ids, nil
+}
+
+// observeDeliverableSignals emits CC-U5 structured verify signals from LastRound (no LLM).
+func observeDeliverableSignals(item *workmodel.WorkItem) []orchtypes.Observation {
+	if item == nil || item.LastRound == nil {
+		return nil
+	}
+	lr := item.LastRound
+	if lr.DeliverableStatus != workmodel.DeliverableStatusIncomplete {
+		return nil
+	}
+	var out []orchtypes.Observation
+	if o, err := orchtypes.NewObservation(
+		orchtypes.ObsSignal,
+		orchtypes.CatBusiness,
+		workmodel.DeliverableIncompleteObsStrength(lr),
+		orchtypes.SignalPayload{Name: "deliverable_incomplete", Value: 1, Threshold: 0.5},
+		"verify_signal",
+	); err == nil {
+		out = append(out, o)
+	}
+	if lr.ExecuteToolCalls > 0 {
+		if o, err := orchtypes.NewObservation(
+			orchtypes.ObsSignal,
+			orchtypes.CatBusiness,
+			0.6,
+			orchtypes.SignalPayload{Name: "evidence_tool_calls", Value: float64(lr.ExecuteToolCalls), Threshold: 2},
+			"verify_signal",
+		); err == nil {
+			out = append(out, o)
+		}
+	}
+	reason := strings.TrimSpace(lr.DeliverableReason)
+	if reason != "" {
+		if o, err := orchtypes.NewObservation(
+			orchtypes.ObsFact,
+			orchtypes.CatBusiness,
+			0.75,
+			orchtypes.FactPayload{Statement: "deliverable_reason: " + reason, Evidence: []string{item.ID}},
+			"verify_signal",
+		); err == nil {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 func observationsFromItem(

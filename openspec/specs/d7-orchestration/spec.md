@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.22.0
+**Version:** 4.23.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-07-01 (devrix-d7-historical-s-cleanup DM-20260701-003: S3 定位澄清 + S7+ 正文迁出 historical-s-mapping.md)
+**Last Updated:** 2026-07-04 (d7-uncertainty-spawn-decouple DM-20260704-001: CC-U1～U6 uncertainty-driven spawn)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Parent Change:** devrix-d7-orchestration-domain (DM-20260613-001)
@@ -173,6 +173,30 @@ WaveScheduler (独立 explicit 路径 — D7-S3；由 delegate_tools / Plan / ba
 - GIVEN `VerdictPartial` AND `DeliverableStatus=incomplete` (e.g. `stop_reason=max_iters` without file:line)
 - WHEN `ApplyPipelineRound` + `StatusAfterSpawnNone`
 - THEN `TaskStatus` SHALL remain `InProgress` (not `Completed`)
+
+### 范式 4：不确定性驱动 Spawn（CC-U，DM-20260704-001）
+
+完整 Scenario 见 [`uncertainty-spawn-contract.md`](uncertainty-spawn-contract.md)；运行时序见 [`pipeline-architecture.md`](pipeline-architecture.md) §4.1 CC-U 表。
+
+#### Scenario: Format failure after exploration → rollup synth not inline exhaust
+
+- GIVEN depth-0 Goal with `tool_calls >= 2`, `ScopeIn` present, `UncertaintyMean < 0.50`
+- AND `DeliverableStatus == incomplete` (format reason only)
+- WHEN `SpawnPolicyEvaluator` runs
+- THEN MUST trigger rollup synthesis (`RollupSynthRequested` / `NeedsRollup`) before CC-1.2 inline budget exhaust
+- AND MUST NOT `escalate_human` solely for deliverable format
+
+#### Scenario: High U rejects strategic single
+
+- GIVEN `UncertaintyMean >= SingleModeThreshold` (0.45)
+- WHEN Strategic Plan returns `execution_mode=single`
+- THEN proposal MUST be rejected with structured `StrategicPlanReject` (field=uncertainty)
+
+#### Scenario: Session complete salvage before task_incomplete
+
+- GIVEN terminal round with salvageable findings in artifact (alias fields e.g. `issue` → Title)
+- WHEN `ExtractSessionDeliverable` runs at session complete
+- THEN MUST return formatted best-effort text before `task_incomplete` fallback
 
 ### 范式 3：Pessimistic Commit L3 防御
 
