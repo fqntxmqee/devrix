@@ -76,3 +76,10 @@ func hasOpenIncompleteDeliverable(tm *workmodel.TaskManager, sessionID string) b
 	}
 	return false
 }
+
+func buildUserFacingEscalationSummary(tm *workmodel.TaskManager, sessionID string) string {
+	if s := strings.TrimSpace(workmodel.ExtractSessionDeliverable(tm, sessionID)); s != "" {
+		return s + "\n\n---\n（Review 未完全通过验证，请核对上述结论或重新发起。）"
+	}
+	return taskIncompleteUserMessage
+}

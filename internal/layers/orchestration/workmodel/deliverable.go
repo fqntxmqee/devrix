@@ -20,11 +20,16 @@ const (
 
 // DeliverableFinding is one structured review finding for upward bubble / rollup.
 type DeliverableFinding struct {
-	Severity string `json:"severity"`
-	Title    string `json:"title,omitempty"`
-	File     string `json:"file,omitempty"`
-	Line     int    `json:"line,omitempty"`
-	Message  string `json:"message,omitempty"`
+	ID             string `json:"id,omitempty"`
+	Severity       string `json:"severity"`
+	Title          string `json:"title,omitempty"`
+	File           string `json:"file,omitempty"`
+	Line           int    `json:"line,omitempty"`
+	Message        string `json:"message,omitempty"`
+	Evidence       string `json:"evidence,omitempty"`
+	Impact         string `json:"impact,omitempty"`
+	Recommendation string `json:"recommendation,omitempty"`
+	Citation       string `json:"citation,omitempty"`
 }
 
 // DeliverablePayload is the parsed deliverable attached to a pipeline round.

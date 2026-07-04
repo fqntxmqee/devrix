@@ -230,7 +230,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			// per-WorkItem ReAct loop; round.ArtifactSummary carries the
 			// LLM's final answer. Emit it as a text event so the gateway
 			// (feishu reply card) sees user-visible content.
-			if round.ArtifactSummary != "" {
+			if round.ArtifactSummary != "" && !workmodel.ShouldSuppressFindingsArtifactStream(round) {
 				lastArtifactSummary = round.ArtifactSummary
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type:      "text",
@@ -277,18 +277,15 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 			exit := evaluateSessionLoopExitAfterRound(ctx, sessionID, o.taskManager, round, escDecision)
 			switch exit.Kind {
 			case SessionLoopExitEscalate:
-				msg := exit.Reason
-				if msg == "" {
-					msg = "human review required"
-				}
+				userMsg := buildUserFacingEscalationSummary(o.taskManager, sessionID)
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type: "human_review", Content: focus.Directive, SessionID: sessionID,
 				})
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
-					Type: "text", Content: msg, SessionID: sessionID,
+					Type: "text", Content: userMsg, SessionID: sessionID,
 				})
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
-					Type: "complete", Content: msg, SessionID: sessionID,
+					Type: "complete", Content: userMsg, SessionID: sessionID,
 				})
 				return
 			case SessionLoopExitAnomaly:
