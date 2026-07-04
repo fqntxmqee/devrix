@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	maxLLMObsFactStrength = 0.85
-	llmObsProposerSource  = "observation_proposer" // StaticObservationProposer / tests only
+	maxLLMObsFactStrength    = 0.85
+	maxObservationProposals  = 3 // matches i18n ObservationTaskAppendix "Maximum 3 proposals"
+	llmObsProposerSource     = "observation_proposer" // StaticObservationProposer / tests only
 )
 
 // ObserveSignalInput carries structured signals for LLM observation proposals.
@@ -22,8 +23,9 @@ type ObserveSignalInput struct {
 	WorkItemID         string
 	Directive          string
 	ScopeContract      *workmodel.ScopeContract
-	InboundSignalLines []string
-	PriorMean          float64
+	InboundSignalLines    []string
+	PriorMean             float64
+	PriorObservationIDs   []string
 }
 
 // ObservationProposal is a raw LLM proposal before rule validation (G3: propose → rule).
@@ -69,6 +71,9 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 				"artifact_summary: "+workmodel.TruncateArtifactSummary(s, 240))
 		}
 	}
+	if item != nil && item.LastRound != nil && len(item.LastRound.ObservationIDs) > 0 {
+		in.PriorObservationIDs = append([]string(nil), item.LastRound.ObservationIDs...)
+	}
 	if tm != nil && item != nil {
 		if dl, ok := tm.ChildDownlinkFor(sessionID, item.ID); ok {
 			if len(dl.ScopeIn) > 0 {
@@ -93,6 +98,9 @@ func ValidateObservationProposals(proposals []ObservationProposal, sessionID, wo
 			continue
 		}
 		out = append(out, o)
+		if len(out) >= maxObservationProposals {
+			break
+		}
 	}
 	return out, nil
 }

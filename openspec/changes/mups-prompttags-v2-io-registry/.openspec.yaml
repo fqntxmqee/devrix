@@ -1,0 +1,28 @@
+change_id: mups-prompttags-v2-io-registry
+priority: P0
+demand_id: DM-20260704-005
+status: s4_implementation
+domains: [shared, D2, D7]
+dsaft_scenarios:
+  - D2-S15   # MaterializeForMUPS / phase prompts
+  - D7-S16   # Observe/Plan LLM proposers
+dsaft_activities:
+  - D2-S15-A96  # MUPS IO registry v2 catalog
+  - D7-S16-A96  # Observe cap + Plan uncertainty_mean + incremental frame
+t_points:
+  - D2-S15-A96-T01
+  - D2-S15-A96-T02
+  - D7-S16-A96-T01
+  - D7-S16-A96-T02
+  - D7-S16-A96-T03
+version_scope:
+  v2.0: P0 unified IO registry + Observe max-3 enforce
+  v2.1: P1 uncertainty_mean Plan prompt + incremental Observe frame
+created: 2026-07-04
+author: mups-prompttags-v2-io-registry implementation
+title: "MUPS prompttags v2 — unified IO registry + Observe cap + convergence invariants"
+related_changes:
+  - mups-prompttags
+parent_specs:
+  - openspec/specs/shared/prompttags.md
+  - openspec/specs/d7-orchestration/spec.md

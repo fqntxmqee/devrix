@@ -135,6 +135,28 @@ func TestBuildStrategicPlanUserPrompt_EmptyBudgetOmits(t *testing.T) {
 	}
 }
 
+// T: D7-S16-A96-T02 (DM-20260704-005) Plan user prompt injects uncertainty_mean when wired.
+func TestBuildStrategicPlanUserPrompt_InjectsUncertaintyMean(t *testing.T) {
+	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
+		WorkItemID:      "wi_1",
+		Directive:       "plan next",
+		UncertaintyMean: 0.62,
+	})
+	if !strings.Contains(got, "uncertainty_mean: 0.620") {
+		t.Fatalf("missing uncertainty_mean, got:\n%s", got)
+	}
+}
+
+func TestBuildStrategicPlanUserPrompt_OmitsZeroUncertaintyMean(t *testing.T) {
+	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
+		WorkItemID: "wi_1",
+		Directive:  "plan next",
+	})
+	if strings.Contains(got, "uncertainty_mean:") {
+		t.Fatalf("zero uncertainty must be omitted, got:\n%s", got)
+	}
+}
+
 // T: D7-S5-A92-T01..T03 (DM-20260701-001 T-P1-1, T-P1-3 budget constants + structured reject)
 //
 // DivergenceBudget.RemainingChildren / RemainingDaily clamp at 0 when

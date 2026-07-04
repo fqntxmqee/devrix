@@ -19,8 +19,24 @@ type EncodingProfile string
 const (
 	EncodingEnvelope  EncodingProfile = "envelope"  // <tag>...</tag>
 	EncodingLineField EncodingProfile = "linefield" // newline-separated lines inside envelope
+	EncodingLineFrame EncodingProfile = "lineframe" // bare key: value user prompt frames
 	EncodingWholeBody EncodingProfile = "wholebody" // bare JSON/array with optional fence strip
 )
+
+// FrameName identifies a registered MUPS user prompt frame.
+type FrameName string
+
+const (
+	FrameObserveUser FrameName = "observe_user"
+	FramePlanUser    FrameName = "plan_user"
+)
+
+// IOShapeEntry documents one MUPS LLM I/O shape (parseability invariant: one profile each).
+type IOShapeEntry struct {
+	Name    string
+	Profile EncodingProfile
+	Phases  []contracts.MUPSPhase
+}
 
 // TagSpec describes one registered tag.
 type TagSpec struct {
@@ -28,11 +44,45 @@ type TagSpec struct {
 	Profile EncodingProfile
 }
 
+// LineFrameRegistry maps frame names to fixed-order user prompt field specs.
+var LineFrameRegistry = map[FrameName]FrameSpec{
+	FrameObserveUser: ObserveUserFrame,
+	FramePlanUser:    PlanUserFrame,
+}
+
+// WholeBodyRegistry documents whole-body LLM response shapes per MUPS phase.
+var WholeBodyRegistry = map[contracts.MUPSPhase]IOShapeEntry{
+	contracts.MUPSPhaseObserve: {Name: "observe_proposals", Profile: EncodingWholeBody, Phases: []contracts.MUPSPhase{contracts.MUPSPhaseObserve}},
+	contracts.MUPSPhasePlan:    {Name: "strategic_plan", Profile: EncodingWholeBody, Phases: []contracts.MUPSPhase{contracts.MUPSPhasePlan}},
+}
+
+// MUPSIOCatalog is the flat index of all MUPS I/O shapes (envelope + lineframe + wholebody).
+var MUPSIOCatalog = buildMUPSIOCatalog()
+
+func buildMUPSIOCatalog() []IOShapeEntry {
+	var out []IOShapeEntry
+	for name, spec := range MUPSRegistry {
+		out = append(out, IOShapeEntry{
+			Name:    string(name),
+			Profile: spec.Profile,
+			Phases:  tagPhases[name],
+		})
+	}
+	for name := range LineFrameRegistry {
+		switch name {
+		case FrameObserveUser:
+			out = append(out, IOShapeEntry{Name: string(name), Profile: EncodingLineFrame, Phases: []contracts.MUPSPhase{contracts.MUPSPhaseObserve}})
+		case FramePlanUser:
+			out = append(out, IOShapeEntry{Name: string(name), Profile: EncodingLineFrame, Phases: []contracts.MUPSPhase{contracts.MUPSPhasePlan}})
+		}
+	}
+	for _, entry := range WholeBodyRegistry {
+		out = append(out, entry)
+	}
+	return out
+}
+
 // MUPSRegistry holds envelope tags used across MUPS materialize and orchestration.
-//
-// Whole-body response shapes (EncodingWholeBody, not envelope tags):
-//   - Observe: JSON array of observation proposals — see DocBlockObserveSchema
-//   - Plan:    JSON object strategic plan — see DocBlockPlanSchema
 var MUPSRegistry = map[TagName]TagSpec{
 	TagScopeContract:       {Name: TagScopeContract, Profile: EncodingEnvelope},
 	TagDeliverableContract: {Name: TagDeliverableContract, Profile: EncodingEnvelope},
@@ -71,5 +121,11 @@ func TagAppliesToPhase(name TagName, phase string) bool {
 // Lookup returns the TagSpec for name when registered.
 func Lookup(name TagName) (TagSpec, bool) {
 	spec, ok := MUPSRegistry[name]
+	return spec, ok
+}
+
+// LookupLineFrame returns the FrameSpec for a registered user prompt frame.
+func LookupLineFrame(name FrameName) (FrameSpec, bool) {
+	spec, ok := LineFrameRegistry[name]
 	return spec, ok
 }

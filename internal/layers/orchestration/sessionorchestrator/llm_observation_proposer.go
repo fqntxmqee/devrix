@@ -84,6 +84,10 @@ func buildLLMObservationUserPrompt(in ObserveSignalInput) string {
 	if len(in.InboundSignalLines) > 0 {
 		fields[prompttags.TagSignal] = in.InboundSignalLines
 	}
+	if len(in.PriorObservationIDs) > 0 {
+		fields[prompttags.TagPriorObservationIDs] = in.PriorObservationIDs
+		fields[prompttags.TagIncrementalOnly] = "true"
+	}
 	return prompttags.BuildLineFrame(prompttags.ObserveUserFrame, fields)
 }
 

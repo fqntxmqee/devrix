@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 4.29.0
-**Last Updated:** 2026-07-04 (mups-prompttags DM-20260704-004: D7-S16-A95 +4 T IMPLEMENTED 288→292, P0 245→249)
+**Last Updated:** 2026-07-04 (mups-prompttags-v2-io-registry DM-20260704-005: D7-S16-A96 +3 T IMPLEMENTED 292→295, P0 249→252)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -1169,6 +1169,16 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 **A94 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260701-001)
 **A95 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260704-004)
+
+### D7-S16-A96: MUPS IO convergence gates（DM-20260704-005）
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S16-A96-T01** | `ValidateObservationProposals` 保留前 3 个有效提案（与 i18n max 3 一致） | IMPLEMENTED | `sessionorchestrator/observation_proposer.go`, `observation_proposer_test.go` | SubContext_Signal |
+| **D7-S16-A96-T02** | `buildStrategicPlanUserPrompt` 在 `UncertaintyMean > 0` 时注入 `uncertainty_mean` | IMPLEMENTED | `sessionorchestrator/strategic_plan_proposer.go`, `strategic_plan_proposer_test.go` | SubContext_Executor |
+| **D7-S16-A96-T03** | Observe user frame `prior_observation_ids` + `incremental_only`（LastRound 有 obs 时） | IMPLEMENTED | `observation_proposer.go`, `llm_observation_proposer.go`, `linefield_test.go` | SubContext_Signal |
+
+**A96 Total:** 3 P0 T — 3 IMPLEMENTED (DM-20260704-005)
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 
