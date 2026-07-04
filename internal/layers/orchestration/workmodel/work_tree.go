@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -199,6 +200,7 @@ func (t *WorkTree) EnsureGoal(sessionID, directive string) (*WorkItem, error) {
 	}
 	item := NewWorkItem(WorkKindGoal, title, directive)
 	item.Uncertainty = DefaultUncertaintyDecomposeThreshold
+	t.assignSemanticIDLocked(sessionID, item)
 	t.items[sessionID][item.ID] = item
 	t.persistLocked(sessionID)
 	return item, nil
@@ -233,6 +235,7 @@ func (t *WorkTree) Create(sessionID string, in CreateWorkItemInput) (*WorkItem, 
 		item.Policy = ExecPolicySync
 	}
 
+	t.assignSemanticIDLocked(sessionID, item)
 	t.items[sessionID][item.ID] = item
 	t.persistLocked(sessionID)
 	return item, nil
@@ -364,6 +367,113 @@ func (t *WorkTree) depthLocked(sessionID, itemID string) int {
 		return 0
 	}
 	return len(ancestors) - 1
+}
+
+// EnsureSemanticID backfills semantic_id for legacy persisted items.
+func (t *WorkTree) EnsureSemanticID(sessionID string, item *WorkItem) {
+	if t == nil || item == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	t.ensureSemanticIDLocked(sessionID, item)
+	if stored, ok := t.items[sessionID][item.ID]; ok && stored != nil {
+		item.SemanticID = stored.SemanticID
+	}
+}
+
+func (t *WorkTree) assignSemanticIDLocked(sessionID string, item *WorkItem) {
+	if item == nil {
+		return
+	}
+	if strings.TrimSpace(item.SemanticID) != "" {
+		return
+	}
+	depth := 0
+	if item.ParentID != "" {
+		depth = t.depthLocked(sessionID, item.ParentID) + 1
+	}
+	sibling := t.nextSiblingIndexLocked(sessionID, item.ParentID)
+	item.SemanticID = BuildSemanticID(depth, sibling, item.Kind)
+}
+
+func (t *WorkTree) ensureSemanticIDLocked(sessionID string, item *WorkItem) {
+	if item == nil || strings.TrimSpace(item.SemanticID) != "" {
+		return
+	}
+	depth := 0
+	if item.ParentID != "" {
+		depth = t.depthLocked(sessionID, item.ParentID) + 1
+	}
+	// Item is already in the map — count peer index among siblings, not
+	// nextSiblingIndexLocked (which would include self and skew the index).
+	sibling := t.siblingIndexAmongPeersLocked(sessionID, item)
+	item.SemanticID = BuildSemanticID(depth, sibling, item.Kind)
+	t.touch(item)
+}
+
+func (t *WorkTree) nextSiblingIndexLocked(sessionID, parentID string) int {
+	n := 0
+	for _, it := range t.items[sessionID] {
+		if it == nil || it.Ephemeral {
+			continue
+		}
+		if it.Kind == WorkKindChecklist && it.Ephemeral {
+			continue
+		}
+		if it.ParentID == parentID {
+			n++
+		}
+	}
+	return n
+}
+
+// SiblingIndex returns the 0-based peer index among non-ephemeral siblings.
+func (t *WorkTree) SiblingIndex(sessionID, itemID string) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ensureSessionLocked(sessionID)
+	item, ok := t.items[sessionID][itemID]
+	if !ok || item == nil {
+		return 0
+	}
+	return t.siblingIndexAmongPeersLocked(sessionID, item)
+}
+
+func (t *WorkTree) siblingIndexAmongPeersLocked(sessionID string, item *WorkItem) int {
+	if item == nil {
+		return 0
+	}
+	peers := t.peersLocked(sessionID, item.ParentID)
+	for i, p := range peers {
+		if p != nil && p.ID == item.ID {
+			return i
+		}
+	}
+	return 0
+}
+
+func (t *WorkTree) peersLocked(sessionID, parentID string) []*WorkItem {
+	var peers []*WorkItem
+	for _, it := range t.items[sessionID] {
+		if it == nil || it.Ephemeral {
+			continue
+		}
+		if it.Kind == WorkKindChecklist && it.Ephemeral {
+			continue
+		}
+		if it.ParentID == parentID {
+			peers = append(peers, it)
+		}
+	}
+	sort.Slice(peers, func(i, j int) bool {
+		if peers[i].CreatedAt.Equal(peers[j].CreatedAt) {
+			return peers[i].ID < peers[j].ID
+		}
+		return peers[i].CreatedAt.Before(peers[j].CreatedAt)
+	})
+	return peers
 }
 
 // UpsertChecklist replaces ephemeral checklist children under parent.

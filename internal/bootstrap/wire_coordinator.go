@@ -1,10 +1,12 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	llmbridge "github.com/devrix/devrix/internal/bridges/llm"
 	"github.com/devrix/devrix/internal/layers/communication/capture"
@@ -20,6 +22,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 // InitOrchestration initializes the SessionOrchestrator and wires it into the capture.
@@ -62,6 +65,18 @@ func InitOrchestration(
 	// TaskManager constructed locally and DI'd to NewLocalWorkModel +
 	// NewSessionOrchestrator via WithTaskManager.
 	tm := workmodel.NewTaskManagerFromConfig(coordCfg.tasksCfg, obsBridge)
+	prevBeforeDispatch := gw.BeforeDispatch()
+	gw.SetBeforeDispatch(func(ctx context.Context, session *types.Session) error {
+		if session != nil {
+			if wd := strings.TrimSpace(session.WorkDir); wd != "" {
+				tm.SetSessionWorkDir(session.SessionID, wd)
+			}
+		}
+		if prevBeforeDispatch != nil {
+			return prevBeforeDispatch(ctx, session)
+		}
+		return nil
+	})
 	// Registry created by bootstrap and DI'd to TaskManager.
 	tm.SetRegistry(workmodel.NewRegistry("~/.devrix/runs"))
 	tm.SetAdaptiveThreshold(&workmodel.AdaptiveThreshold{
@@ -178,6 +193,7 @@ func InitOrchestration(
 	// taskgraph.synthesize / executor.select) emit even though their call sites
 	// live in sub-packages that don't hold a SessionOrchestrator reference.
 	hardening.SetBridge(obsBridge)
+	hardening.SetLocatorAttrsProvider(workmodel.LocatorSpanAttrsFromContext)
 
 	// DM-20260630-011 (devrix-session-conclusion-completeness): wire the
 	// D1 conclusion package-level tracer so EmitComplete can emit the

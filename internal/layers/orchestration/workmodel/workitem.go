@@ -49,6 +49,8 @@ type WorkItem struct {
 	Ephemeral     bool       `json:"ephemeral,omitempty"`
 	Locked        bool       `json:"locked,omitempty"`
 	NeedsRollup   bool       `json:"needs_rollup,omitempty"`
+	// SemanticID is the human-readable worktree path (wi_d{s}_s{i}_{kind}).
+	SemanticID string `json:"semantic_id,omitempty"`
 	// InlineRetriesAtMaxDepth counts consecutive SpawnInline rounds while at
 	// max decompose depth with an unsatisfied deliverable (DM-20260703-001 CC-1.2).
 	InlineRetriesAtMaxDepth int `json:"inline_retries_at_max_depth,omitempty"`

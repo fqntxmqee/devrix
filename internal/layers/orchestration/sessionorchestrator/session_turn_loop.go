@@ -108,7 +108,14 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		var lastArtifactSummary string
 		var lastRound *workmodel.WorkItemPipelineRound
 
+		turnNo := 0
+		if o.turnState != nil {
+			turnNo = o.turnState.TurnNo(sessionID)
+		}
+		loopTick := 0
+
 		for {
+			loopTick++
 			if ctx.Err() != nil {
 				emit(ctx, o.sink, out, &contracts.EngineEvent{
 					Type: "error", Content: ctx.Err().Error(), SessionID: sessionID,
@@ -208,7 +215,11 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				continue
 			}
 
-			round, err := o.itemPipeline.Run(ctx, sessionID, focus, userID, ItemPipelineRunOpts{Emit: emitFn})
+			round, err := o.itemPipeline.Run(ctx, sessionID, focus, userID, ItemPipelineRunOpts{
+				Emit:     emitFn,
+				TurnNo:   turnNo,
+				LoopTick: loopTick,
+			})
 			if err != nil {
 				emitError(ctx, o.sink, out, sessionID, "item_pipeline", err)
 				return

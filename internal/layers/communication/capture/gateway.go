@@ -88,6 +88,14 @@ func (g *CommunicationGateway) SetBeforeDispatch(fn func(ctx context.Context, se
 	g.beforeDispatch = fn
 }
 
+// BeforeDispatch returns the currently wired pre-dispatch hook, or nil.
+func (g *CommunicationGateway) BeforeDispatch() func(ctx context.Context, session *types.Session) error {
+	if g == nil {
+		return nil
+	}
+	return g.beforeDispatch
+}
+
 // HasActiveProcess reports whether a session has an in-flight D7 dispatch goroutine.
 func (g *CommunicationGateway) HasActiveProcess(sessionID string) bool {
 	if g == nil {
