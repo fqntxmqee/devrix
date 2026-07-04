@@ -85,9 +85,8 @@ func TestSystemPromptAssembler_should_insert_dynamic_boundary(t *testing.T) {
 	if !strings.Contains(staticPrefix, "Workspace Guidance") && !strings.Contains(staticPrefix, "工作区指引") {
 		t.Fatal("guidance should appear before boundary")
 	}
-	if !strings.Contains(staticPrefix, "You are an interactive agent") &&
-		!strings.Contains(staticPrefix, "Devrix") &&
-		!strings.Contains(staticPrefix, "软件工程") {
+	if !strings.Contains(staticPrefix, "Uncertainty handling principles") &&
+		!strings.Contains(staticPrefix, "不确定性处理原则") {
 		t.Fatal("core static content should appear before boundary")
 	}
 	dynamicSuffix := prompt[idx+len(DynamicBoundary):]
