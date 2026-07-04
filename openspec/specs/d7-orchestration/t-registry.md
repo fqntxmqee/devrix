@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.28.0
-**Last Updated:** 2026-07-04 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 5 T IMPLEMENTED 281→286, P0 237→240 -- D7-S10-A50-T22 AutoModeClassifier P2 interface stub (0 行实现, panic 信息合规) + D7-S10-A50-T23 ChannelRouter TODO 占位 (不破坏 partition 行为) + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测) + D7-S9-A50-T26 Bash sibling abort (per-batch controller + watched call 失败时取消 siblings) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring; 2 tech-debt 关闭 TD-STE-02 + TD-STE-03)
+**Version:** 4.29.0
+**Last Updated:** 2026-07-04 (mups-prompttags DM-20260704-004: D7-S16-A95 +4 T IMPLEMENTED 288→292, P0 245→249)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -1136,6 +1136,7 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D2-S16-A20-T01..T05** | Materializer + partition store + Jaeger span | IMPLEMENTED | `contextengine/materialize/` | — |
 | **D7-S16-A60-T01..T04** | ScopeContract + spawn gate + rule infer | IMPLEMENTED | `workmodel/scope_contract*.go`, `item_plan.go` | SubContext_Scope |
 | **D7-S16-A61-T01..T03** | ChildDownlink + Materialize inject | IMPLEMENTED | `workmodel/child_downlink.go` | SubContext_Downlink |
+| **D7-S16-A95-T01..T04** | MUPS prompttags ParseWholeBody + linefield | IMPLEMENTED | `sessionorchestrator/*_proposer.go`, `prompttags/`, `workmodel/deliverable_findings_parse.go` | SubContext_Signal |
 | **D7-S16-A70-T01..T03** | Executor Materialize wiring | IMPLEMENTED | `workitem_executor.go`, `workitem_exec_context.go` | SubContext_Executor |
 | **D7-S16-A72-T01..T04** | Signal→Obs mapping | IMPLEMENTED | `item_observe.go`, `item_observe_scope_test.go` | SubContext_Signal |
 | **D7-S16-A63-T01/T02** | Upstream BlockedBy | IMPLEMENTED | `workitem_exec_context.go`, materialize tests | SubContext_Blocked |
@@ -1157,7 +1158,17 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S16-A94-T01** | `DefaultChildDownlink` 移除"无脑继承父全量 scope"（bounded parent + empty spec = empty child scope，T-P2-1） | IMPLEMENTED | `workmodel/child_downlink.go` | SubContext_Scope |
 | **D7-S16-A94-T02** | `ValidateChildScopes(parent, children)` 真子集 + 覆盖校验 + prompt 指引（5-case test matrix，T-P2-2） | IMPLEMENTED | `workmodel/scope_validate.go` (NEW) + `scope_validate_test.go` (NEW) | SubContext_Scope |
 
+### D7-S16-A95: MUPS prompttags ParseWholeBody（DM-20260704-004）
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S16-A95-T01** | `parseObservationProposalsJSON` 使用 `ParseWholeBody[[]rawObsProposal]`；空/`[]` → nil | IMPLEMENTED | `sessionorchestrator/llm_observation_proposer.go` | SubContext_Signal |
+| **D7-S16-A95-T02** | `parseStrategicPlanJSON` 使用 `ParseWholeBody[rawStrategicPlan]`；保留 validation | IMPLEMENTED | `sessionorchestrator/strategic_plan_proposer.go` | SubContext_Executor |
+| **D7-S16-A95-T03** | `tryParseWholeBodyFindingsObject` fast path；corrupt summary 仍走 marker 逻辑 | IMPLEMENTED | `workmodel/deliverable_findings_parse.go` | SubContext_Executor |
+| **D7-S16-A95-T04** | `BuildLineFrame` Observe/Plan user prompt golden | IMPLEMENTED | `prompttags/linefield_test.go` | SubContext_Signal |
+
 **A94 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260701-001)
+**A95 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260704-004)
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 

@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.16.0
-**Last Updated:** 2026-07-04 (mups-d2-context-tools-ownership DM-20260704-001: D2-S15-A90..A92 + D2-S18-A90 14 T IMPLEMENTED 155→169, P0 99→111)
+**Version:** 2.18.0
+**Last Updated:** 2026-07-04 (mups-prompttags DM-20260704-004: D2-S15-A93 +4 T IMPLEMENTED 172→176, P0 114→118)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -568,6 +568,15 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **D2-S15-A82-T02** | prompt_sections_en.go 不含中文硬规则（防英文污染对称测试） | S15-A82 | `internal/layers/contextengine/i18n/prompt_sections_en_test.go::TestPromptSectionsEN_IntroHasNoChineseHardRule + TestPromptSectionsEN_ToneHasNoChineseMandate` | **IMPLEMENTED** (DM-20260704-003) | P0 |
 | **D2-S15-A82-T03** | i18n golden test：zh/en prompt bytes 稳定（5 case + cross-locale 差异） | S15-A82 | `internal/layers/contextengine/i18n/prompt_sections_{zh,en}_test.go` | **IMPLEMENTED** (DM-20260704-003) | P0 |
 
+## D2-S15-A93: MUPS prompttags DocBlock（DM-20260704-004）
+
+| T ID | 描述 | Activity | 证据 | 状态 | 优先级 |
+|------|------|----------|------|------|--------|
+| **D2-S15-A93-T01** | `ExecuteOutputTagDoc` 含 scope_contract/deliverable_schema/open_questions 等机器 tag 语法 | S15-A93 | `internal/shared/prompttags/docblock_test.go::TestExecuteOutputTagDoc_ContainsEnvelopeTags` | **IMPLEMENTED** | P0 |
+| **D2-S15-A93-T02** | `WorkItemExecuteOutputHints` 组合 locale 散文 + DocBlock tag 语法 | S15-A93 | `i18n/workitem_execute_test.go::TestWorkItemExecuteOutputHints_EN_IncludesScopeContract` | **IMPLEMENTED** | P0 |
+| **D2-S15-A93-T03** | Observe/Plan appendix 注入 `DocBlockObserveSchema` / `DocBlockPlanSchema` | S15-A93 | `materialize/phase_prompts_test.go::TestPhaseAppendix_ZhEnParity` | **IMPLEMENTED** | P0 |
+| **D2-S15-A93-T04** | `Wrap`→`ExtractOne` round-trip golden 覆盖 envelope tags | S15-A93 | `internal/shared/prompttags/envelope_test.go` | **IMPLEMENTED** | P0 |
+
 ---
 
 ## Revision History
@@ -585,3 +594,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.15.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D2-S15-A02-T16 ToolSurface v4 interface (IsConcurrencySafe + ToAutoClassifierInput) + D2-S15-A02-T17 19 工具 default helpers (4 override + 15 default) + D2-S15-A02-T18 partitionToolCalls 改造 (AC15-AC17+AC19-AC21 7 invariant tests) + D2-S15-A02-T19 50 文件 e2e 并发版 + D2-S15-A02-T20 toCompactBlock JSONL 序列化 + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认 + D2-S15-A02-T28 inputsEquivalent 19 工具默认 — **7 新 T 全部 IMPLEMENTED (6 P0 + 1 P2)**. Total 148→155, P0 93→99. 5 PR (PR-A `3257e0bb` + PR-B `8e61bb13` + PR-C `dd8736e7` + PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 4 tech-debt 关闭 (TD-STE-01/02/03/06). 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.16.0** | **2026-07-04** | **mups-d2-context-tools-ownership (DM-20260704-001) S5 验收**: D2-S15-A90-T01..T06 MaterializeForMUPS + D2-S15-A91-T01..T04 filter pipeline + D2-S15-A92-T01..T02 phase prompts + D2-S18-A90-T01..T02 toolround — **14 新 T IMPLEMENTED (12 P0 + 2 P1)**. Total 155→169, P0 99→111. 详见 `openspec/changes/mups-d2-context-tools-ownership/acceptance-report.md` (verdict: ACCEPTED). |
 | **2.17.0** | **2026-07-04** | **devrix-runtime-feedback-closure (DM-20260704-003) S5 验收**: D2-S15-A82-T01/T02/T03 i18n 中文硬规则（zh intro 含硬规则 + en 对称不含 + golden test 5 case）— **3 新 T 全部 P0 IMPLEMENTED**. Total 169→172, P0 111→114. 详见 `openspec/changes/devrix-runtime-feedback-closure/acceptance-report.md` (verdict: ACCEPTED). |
+| **2.18.0** | **2026-07-04** | **mups-prompttags (DM-20260704-004) S5 验收**: D2-S15-A93-T01..T04 DocBlock + ExecuteOutputTagDoc + i18n 集成 + envelope golden — **4 新 T 全部 P0 IMPLEMENTED**. Total 172→176, P0 114→118. 详见 `openspec/changes/mups-prompttags/acceptance-report.md` (verdict: ACCEPTED). |

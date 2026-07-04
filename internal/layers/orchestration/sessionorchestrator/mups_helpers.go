@@ -1,7 +1,6 @@
 package sessionorchestrator
 
 import (
-	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -134,7 +133,7 @@ func taskKindForWorkItem(item *workmodel.WorkItem) string {
 }
 
 func mergeMUPSPreparedSystem(prepared contracts.MUPSPreparedContext) string {
-	return materialize.AssembleMUPSSystemPrompt(prepared.SystemPrompt, prepared.OutputHints, prepared.PhaseAppendix)
+	return prepared.SystemPrompt
 }
 
 func mupsMessagesWithDirective(sessionID, directive string, prepared contracts.MUPSPreparedContext) []types.Message {

@@ -1,0 +1,26 @@
+change_id: mups-prompttags
+priority: P0
+demand_id: DM-20260704-004
+status: s4_implementation
+domains: [shared, D2, D7]
+dsaft_scenarios:
+  - D2-S15   # MaterializeForMUPS / phase prompts
+  - D7-S2    # WorkItem deliverable / scope contract
+dsaft_activities:
+  - D2-S15-A92  # Execute output hints
+  - D7-S2-A50   # WorkItem contract parse
+t_points: []
+version_scope:
+  v1.0: P0 envelope tag registry + call-site migration
+  v1.1: Observe/Plan user prompt builders
+  v1.2: i18n appendix DocBlock
+  v1.3: wholebody adoption in deliverable parse
+created: 2026-07-04
+author: mups-prompttags P0 implementation
+title: "MUPS prompttags framework — TagSpec registry + envelope Wrap/ExtractOne"
+related_changes:
+  - devrix-runtime-feedback-closure
+  - mups-d2-context-tools-ownership
+parent_specs:
+  - openspec/specs/d2-context-engine/spec.md
+  - openspec/specs/d7-orchestration/spec.md

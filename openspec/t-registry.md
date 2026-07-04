@@ -1,10 +1,10 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.15.0
-**Last Updated:** 2026-07-04 (devrix-runtime-feedback-closure DM-20260704-003 S4+S5 验收: +37 T IMPLEMENTED 619->656, P0 411->443 -- D2 +19 (129->148, P0 76->93) D2-S15-A02 19 T 全部 P0 IMPLEMENTED + D5 +3 (42->45, P0 27->30) D5-S25 termination L4-L6 invariants + D7 +15 (266->281, P0 222->237) D7-S9-A50 + D7-S9-A26-T06 + D7-S10-A50 + D7-S2-A50-T07/T08)
+**Version:** 5.16.0
+**Last Updated:** 2026-07-04 (mups-prompttags DM-20260704-004 S5: +8 T D2 +4 D7 +4 IMPLEMENTED 668→676, P0 473→481)
 
-**Version:** 5.15.0 (devrix-runtime-feedback-closure DM-20260704-003 S4+S5 验收: +37 T 总计 IMPLEMENTED 619->656, P0 411->443 -- D2 +19 + D5 +3 + D7 +15)
+**Version:** 5.16.0 (mups-prompttags DM-20260704-004 S5: +8 T 总计 IMPLEMENTED 668→676, P0 473→481 — D2 +4 + D7 +4)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -24,14 +24,14 @@
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 61 | 61 | 0 | 31 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 172 | 172 | 0 | 114 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 176 | 176 | 0 | 118 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 38 | 1 | 23 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 48 | 47 | 0 | 33 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 288 | 288 | 0 | 245 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 292 | 292 | 0 | 249 |
 
-**总计**: 672 · IMPLEMENTED 668 · PLANNED 3 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 473
+**总计**: 680 · IMPLEMENTED 676 · PLANNED 3 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 481
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。

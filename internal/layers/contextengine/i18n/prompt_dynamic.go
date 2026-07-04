@@ -3,6 +3,8 @@ package i18n
 import (
 	"fmt"
 	"strings"
+
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 // DynamicBoundaryMarker separates static and dynamic system prompt sections.
@@ -79,10 +81,11 @@ func StrategicPlanAppendix(loc Locale, contractDimensionDoc string) string {
 		dims = `{"citation":["none","file_line"],"severity":["none","p0_p1"],"reject":["planning_meta"]}`
 	}
 	contractExample := `{"citation":"file_line","severity":"p0_p1","reject":["planning_meta"],"min_runes":0}`
+	schemaLine := prompttags.DocBlockPlanSchema(contractExample)
 	if loc == LocaleEN {
 		return "You propose strategic execution plans for an orchestration Plan node.\n" +
 			"Return ONLY a JSON object (no markdown):\n" +
-			fmt.Sprintf("{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_contract\":%s,\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n", contractExample) +
+			schemaLine + "\n\n" +
 			fmt.Sprintf("deliverable_contract dimensions (compose from categories only): %s\n\n", dims) +
 			"Rules:\n" +
 			"- Use ONLY the directive and observation summary below; do not invent files.\n" +
@@ -91,7 +94,7 @@ func StrategicPlanAppendix(loc Locale, contractDimensionDoc string) string {
 			"- react_iters_hint between 1 and 5."
 	}
 	return "你是编排 Plan 节点的战略提案助手。仅返回 JSON 对象（不要 markdown）：\n" +
-		fmt.Sprintf("{\"execution_mode\":\"single|decompose|parallel_probe\",\"scope_in\":[\"path/\"],\"child_specs\":[],\"deliverable_contract\":%s,\"react_iters_hint\":5,\"rationale\":\"...\"}\n\n", contractExample) +
+		schemaLine + "\n\n" +
 		fmt.Sprintf("deliverable_contract 维度（仅从类别组合）: %s\n\n", dims) +
 		"规则：\n" +
 		"- 只能使用下方 directive 与 Obs 摘要；不要编造未提供的文件列表。\n" +

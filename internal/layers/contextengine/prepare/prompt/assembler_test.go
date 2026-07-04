@@ -85,9 +85,8 @@ func TestSystemPromptAssembler_should_insert_dynamic_boundary(t *testing.T) {
 	if !strings.Contains(staticPrefix, "Workspace Guidance") && !strings.Contains(staticPrefix, "工作区指引") {
 		t.Fatal("guidance should appear before boundary")
 	}
-	if !strings.Contains(staticPrefix, "You are an interactive agent") &&
-		!strings.Contains(staticPrefix, "Devrix") &&
-		!strings.Contains(staticPrefix, "软件工程") {
+	if !strings.Contains(staticPrefix, "Uncertainty handling principles") &&
+		!strings.Contains(staticPrefix, "不确定性处理原则") {
 		t.Fatal("core static content should appear before boundary")
 	}
 	dynamicSuffix := prompt[idx+len(DynamicBoundary):]
@@ -166,7 +165,7 @@ func TestSystemPromptAssembler_should_prefer_embedded_core_over_sections(t *test
 	if report.SectionCount != 1 {
 		t.Fatalf("embedded core should be one layer, got SectionCount=%d", report.SectionCount)
 	}
-	if !strings.Contains(prompt, "复杂任务") && !strings.Contains(prompt, "Complex Tasks") {
+	if !strings.Contains(prompt, "不确定性处理原则") && !strings.Contains(prompt, "Uncertainty handling principles") {
 		t.Fatal("expected embedded core template content")
 	}
 	// Legacy section-only phrase from prompt_sections intro (not in devrix_core).

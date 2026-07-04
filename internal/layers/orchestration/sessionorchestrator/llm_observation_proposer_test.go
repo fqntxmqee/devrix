@@ -60,6 +60,10 @@ func TestLLMObservationProposer_CallsD2BeforeD3(t *testing.T) {
 	if !strings.Contains(llm.lastSystem, "Observe 节点") {
 		t.Fatalf("system prompt missing zh observation appendix: %q", llm.lastSystem)
 	}
+	appendix := i18n.ObservationTaskAppendix(i18n.LocaleZH)
+	if strings.Count(llm.lastSystem, appendix) != 1 {
+		t.Fatalf("observation appendix duplicated: count=%d", strings.Count(llm.lastSystem, appendix))
+	}
 	if len(got) != 1 || got[0].Kind != orchtypes.ObsUncertainty {
 		t.Fatalf("got = %+v", got)
 	}

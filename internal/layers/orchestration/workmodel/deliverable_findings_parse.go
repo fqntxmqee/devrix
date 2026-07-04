@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 const maxFindingFieldRunes = 800
@@ -82,6 +84,10 @@ func extractDeliverableJSONObject(summary string) []byte {
 	if summary == "" {
 		return nil
 	}
+	// ParseWholeBody fast path: bare or fenced JSON object with findings markers.
+	if body := tryParseWholeBodyFindingsObject(summary); body != nil {
+		return body
+	}
 	if body := extractJSONObjectFromMarkdownFence(summary); body != nil {
 		return body
 	}
@@ -89,6 +95,23 @@ func extractDeliverableJSONObject(summary string) []byte {
 		return body
 	}
 	return extractFindingsJSONArrayFromCorruptSummary(summary)
+}
+
+// tryParseWholeBodyFindingsObject uses prompttags.ParseWholeBody when summary is a
+// clean JSON object. Specialized marker/brace scanning below handles partial/corrupt text.
+func tryParseWholeBodyFindingsObject(summary string) []byte {
+	if !strings.HasPrefix(summary, "{") && !strings.Contains(strings.ToLower(summary), "```json") {
+		return nil
+	}
+	obj, ok := prompttags.ParseWholeBody[map[string]json.RawMessage](summary)
+	if !ok {
+		return nil
+	}
+	b, err := json.Marshal(obj)
+	if err != nil || !json.Valid(b) || !findingsJSONMarkerRE.MatchString(string(b)) {
+		return nil
+	}
+	return b
 }
 
 func extractJSONObjectFromMarkdownFence(summary string) []byte {

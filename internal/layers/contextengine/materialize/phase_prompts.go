@@ -1,11 +1,11 @@
 package materialize
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 // BuildPhaseAppendix returns the MUPS phase-specific system prompt appendix.
@@ -26,71 +26,34 @@ func BuildPhaseAppendix(phase contracts.MUPSPhase, loc i18n.Locale, wi *contract
 }
 
 // BuildExecuteOutputHints assembles deliverable_schema and scope_contract tags.
-func BuildExecuteOutputHints(wi *contracts.MUPSWorkItemSnapshot) string {
-	hints := WorkItemOutputFormatHints
+func BuildExecuteOutputHints(loc i18n.Locale, wi *contracts.MUPSWorkItemSnapshot) string {
+	hints := i18n.WorkItemExecuteOutputHints(loc)
 	if wi == nil {
 		return hints
 	}
-	if schema := strings.TrimSpace(wi.DeliverableSchema); schema != "" {
-		hints += fmt.Sprintf("\n<deliverable_schema>%s</deliverable_schema>", schema)
+	if tag := prompttags.Wrap(prompttags.TagDeliverableSchema, wi.DeliverableSchema); tag != "" {
+		hints += "\n" + tag
 	}
 	if wi.ScopeContract != nil {
-		hints += scopeContractBlock(wi.ScopeContract)
+		if tag := prompttags.Wrap(prompttags.TagScopeContract, *wi.ScopeContract); tag != "" {
+			hints += "\n" + tag
+		}
 	}
-	if wi.PriorVerifyReason != "" {
-		hints += fmt.Sprintf("\n<prior_verify_reason>%s</prior_verify_reason>", wi.PriorVerifyReason)
+	if tag := prompttags.Wrap(prompttags.TagPriorVerifyReason, wi.PriorVerifyReason); tag != "" {
+		hints += "\n" + tag
 	}
 	return hints
 }
 
-func scopeContractBlock(sc *contracts.MUPSScopeContract) string {
-	if sc == nil {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("\n<scope_contract>{")
-	first := true
-	writeField := func(key, val string) {
-		if strings.TrimSpace(val) == "" {
-			return
-		}
-		if !first {
-			b.WriteByte(',')
-		}
-		first = false
-		fmt.Fprintf(&b, `%q:%q`, key, val)
-	}
-	writeField("goal_statement", sc.GoalStatement)
-	if len(sc.InScope) > 0 {
-		if !first {
-			b.WriteByte(',')
-		}
-		first = false
-		b.WriteString(`"in_scope":[`)
-		for i, p := range sc.InScope {
-			if i > 0 {
-				b.WriteByte(',')
-			}
-			fmt.Fprintf(&b, `%q`, p)
-		}
-		b.WriteByte(']')
-	}
-	writeField("out_of_scope", strings.Join(sc.OutOfScope, ","))
-	b.WriteString("}</scope_contract>")
-	return b.String()
-}
-
-// AssembleMUPSSystemPrompt combines base system prompt, output hints, and phase appendix.
-func AssembleMUPSSystemPrompt(base, outputHints, phaseAppendix string) string {
+// AssembleMUPSSystemPrompt builds the final MUPS system prompt with node-specific
+// dynamic sections before the static PrepareBase system prompt (devrix_core).
+// Order: outputHints → workItemBody → phaseAppendix → staticBase.
+func AssembleMUPSSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix string) string {
 	var parts []string
-	if s := strings.TrimSpace(base); s != "" {
-		parts = append(parts, s)
-	}
-	if s := strings.TrimSpace(outputHints); s != "" {
-		parts = append(parts, s)
-	}
-	if s := strings.TrimSpace(phaseAppendix); s != "" {
-		parts = append(parts, s)
+	for _, s := range []string{outputHints, workItemBody, phaseAppendix, staticBase} {
+		if t := strings.TrimSpace(s); t != "" {
+			parts = append(parts, t)
+		}
 	}
 	return strings.Join(parts, "\n\n")
 }

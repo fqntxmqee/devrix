@@ -44,6 +44,29 @@ func TestMaterializeWave_Fresh(t *testing.T) {
 	}
 }
 
+func TestMaterializeWave_ZHLocaleLabels(t *testing.T) {
+	m := NewDefaultMaterializer(nil, "")
+	pol := PolicyFromWaveContext(WavePolicyFresh)
+	pol.Locale = "zh-CN"
+	res, err := m.Materialize(t.Context(), Request{
+		Partition: Partition{SessionID: "s1", Kind: PartitionWave},
+		Policy:    pol,
+		Signals: InboundSignals{
+			Directive:     "do X",
+			WaveFileScope: []string{"src/a.go"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contains(res.SystemPrompt, "Allowed file scope") {
+		t.Fatalf("ZH wave prompt must not use EN scope label: %q", res.SystemPrompt)
+	}
+	if !contains(res.SystemPrompt, "允许的文件范围") {
+		t.Fatalf("ZH wave prompt missing scope label: %q", res.SystemPrompt)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(sub) == 0 || (len(s) >= len(sub) && (func() bool {
 		for i := 0; i+len(sub) <= len(s); i++ {
