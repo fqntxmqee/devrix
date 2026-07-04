@@ -2,6 +2,7 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260705-001 | MUPS 标签语义层 — Observe/Plan/Execute 动态提示词语义 appendix | mups-prompt-tag-semantics | 2026-07-05 | [#397](https://github.com/fqntxmqee/devrix/pull/397) | ACCEPTED (6 T D2-S15-A97 + D7-S5-A97; L5-MUPS-TAG-01..05 PASS; P2 reject-loop defer) |
 | DM-20260704-005 | MUPS prompttags v2 — 统一 IO 注册表 + Observe max-3 + 收敛 invariant | mups-prompttags-v2-io-registry | 2026-07-04 | [#394](https://github.com/fqntxmqee/devrix/pull/394) | ACCEPTED (5 T D2-S15-A96 + D7-S16-A96; P2 reject-loop defer) |
 | DM-20260704-004 | MUPS prompttags 框架 — registry/envelope/wholebody/DocBlock + D2/D7 迁移 | mups-prompttags | 2026-07-04 | [#393](https://github.com/fqntxmqee/devrix/pull/393) | ACCEPTED (P0–P3; 8 T D2-S15-A93 + D7-S16-A95) |
 | DM-20260704-003 | Runtime 反馈链路闭环 — i18n ZH 硬规则 + parent-span 连续性 + tool timeout | devrix-runtime-feedback-closure | 2026-07-04 | [#392](https://github.com/fqntxmqee/devrix/pull/392) | ACCEPTED (7 P0 L5; PR #392 merged; S7 archived with follow-up commits) |

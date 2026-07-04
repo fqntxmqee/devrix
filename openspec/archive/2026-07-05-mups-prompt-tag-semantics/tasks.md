@@ -2,7 +2,7 @@
 
 **Change ID:** `mups-prompt-tag-semantics`  
 **Demand ID:** DM-20260705-001  
-**Status:** S4_Complete  
+**Status:** S7_Archived  
 **Design:** [`design.md`](design.md)
 
 ---
