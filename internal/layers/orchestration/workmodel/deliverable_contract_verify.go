@@ -39,6 +39,10 @@ func VerifyDeliverableContract(contract DeliverableContract, summary, stopReason
 			}
 		}
 		if DetectPlanningMeta(planningScope) {
+			if salvaged := SalvageDeliverablePayload(summary, c); FindingsPayloadPresentable(salvaged) {
+				payload = salvaged
+				break
+			}
 			return deliverableVerifyResult{
 				Status:  DeliverableStatusIncomplete,
 				Payload: payload,

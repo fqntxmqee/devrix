@@ -12,6 +12,7 @@ const maxFindingFieldRunes = 800
 
 var (
 	findingsJSONMarkerRE = regexp.MustCompile(`(?i)"(?:findings|files_reviewed|scope)"\s*:`)
+	lineRangeRE          = regexp.MustCompile(`(?i)(?:line_range|lines?)\s*[:=]?\s*"?(\d+)`)
 	planningProseMarkers = []string{
 		"the user wants me to",
 		"let me start by",
@@ -84,7 +85,10 @@ func extractDeliverableJSONObject(summary string) []byte {
 	if body := extractJSONObjectFromMarkdownFence(summary); body != nil {
 		return body
 	}
-	return extractJSONObjectWithFindingsMarker(summary)
+	if body := extractJSONObjectWithFindingsMarker(summary); body != nil {
+		return body
+	}
+	return extractFindingsJSONArrayFromCorruptSummary(summary)
 }
 
 func extractJSONObjectFromMarkdownFence(summary string) []byte {
@@ -124,6 +128,95 @@ func extractJSONObjectWithFindingsMarker(summary string) []byte {
 	return nil
 }
 
+func extractFindingsJSONArrayFromCorruptSummary(summary string) []byte {
+	idx := strings.Index(strings.ToLower(summary), `"findings"`)
+	if idx < 0 {
+		return nil
+	}
+	rest := summary[idx:]
+	arrStart := strings.Index(rest, "[")
+	if arrStart < 0 {
+		return nil
+	}
+	rest = rest[arrStart+1:]
+	var items []json.RawMessage
+	for len(rest) > 0 {
+		rest = strings.TrimLeft(rest, " \t\r\n,")
+		if len(rest) == 0 || rest[0] == ']' {
+			break
+		}
+		if rest[0] != '{' {
+			break
+		}
+		end := matchingJSONObjectEnd(rest)
+		if end < 0 {
+			break
+		}
+		candidate := rest[:end+1]
+		if json.Valid([]byte(candidate)) {
+			items = append(items, json.RawMessage(candidate))
+		}
+		rest = rest[end+1:]
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	wrapper := struct {
+		Findings []json.RawMessage `json:"findings"`
+	}{Findings: items}
+	out, err := json.Marshal(wrapper)
+	if err != nil {
+		return nil
+	}
+	return out
+}
+
+func matchingJSONObjectEnd(s string) int {
+	depth := 0
+	inString := false
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func normalizeFindingSeverity(sev string) string {
+	switch strings.ToLower(strings.TrimSpace(sev)) {
+	case "critical", "high", "p0":
+		return "P0"
+	case "medium", "moderate", "low", "minor", "p1", "p2":
+		return "P1"
+	default:
+		return strings.ToUpper(strings.TrimSpace(sev))
+	}
+}
+
 func normalizeDeliverableFindings(in []DeliverableFinding) []DeliverableFinding {
 	out := make([]DeliverableFinding, 0, len(in))
 	for _, f := range in {
@@ -137,7 +230,7 @@ func normalizeDeliverableFindings(in []DeliverableFinding) []DeliverableFinding 
 }
 
 func normalizeDeliverableFinding(f DeliverableFinding) DeliverableFinding {
-	f.Severity = strings.ToUpper(strings.TrimSpace(f.Severity))
+	f.Severity = normalizeFindingSeverity(f.Severity)
 	f.Title = strings.TrimSpace(f.Title)
 	f.Message = strings.TrimSpace(f.Message)
 	f.Evidence = strings.TrimSpace(f.Evidence)
@@ -147,6 +240,21 @@ func normalizeDeliverableFinding(f DeliverableFinding) DeliverableFinding {
 	if f.Line <= 0 {
 		if n, err := strconv.Atoi(strings.TrimSpace(f.Citation)); err == nil && n > 0 {
 			f.Line = n
+		}
+	}
+	if f.Line <= 0 && strings.Contains(f.Citation, "-") {
+		if n, err := strconv.Atoi(strings.TrimSpace(strings.Split(f.Citation, "-")[0])); err == nil && n > 0 {
+			f.Line = n
+		}
+	}
+	if f.Line <= 0 {
+		for _, field := range []string{f.Evidence, f.Message, f.Title} {
+			if m := lineRangeRE.FindStringSubmatch(field); len(m) > 1 {
+				if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+					f.Line = n
+					break
+				}
+			}
 		}
 	}
 	if f.File == "" {

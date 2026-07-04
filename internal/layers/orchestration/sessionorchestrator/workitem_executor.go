@@ -205,7 +205,7 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		iterTools := tools
 		iterCtx := ctx
 		if ec, ok := WorkItemExecContextFrom(ctx); ok && iter == max-1 {
-			if ec.Item != nil && ec.Item.NeedsRollup {
+			if ec.Item != nil && ec.Item.NeedsRollup && !workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
 				iterTools = nil
 				messages = append(messages, types.Message{
 					SessionID: sessionID,
