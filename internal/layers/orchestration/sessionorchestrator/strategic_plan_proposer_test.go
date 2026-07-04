@@ -20,6 +20,20 @@ func TestStrategicPlanAppendix_UsesContractDimensions(t *testing.T) {
 		if !strings.Contains(got, dims) {
 			t.Fatalf("appendix for %q missing dimension doc:\n%s", loc, got)
 		}
+		if !strings.Contains(got, "uncertainty_mean") {
+			t.Fatalf("appendix for %q missing execution_mode semantics:\n%s", loc, got)
+		}
+	}
+}
+
+// T: D7-S5-A97-T02 — Plan proposer user prompt includes control/data frame guide.
+func TestBuildStrategicPlanUserPrompt_IncludesFrameGuide(t *testing.T) {
+	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
+		WorkItemID: "wi_1",
+		Directive:  "plan",
+	}, i18n.LocaleZH)
+	if !strings.Contains(got, "[control]") || !strings.Contains(got, "[data]") {
+		t.Fatalf("missing plane guide/prefixes:\n%s", got)
 	}
 }
 
@@ -96,20 +110,20 @@ func TestBuildStrategicPlanUserPrompt_AllBudgetFields(t *testing.T) {
 		},
 		ParentScopeIn: []string{"internal/layers/contextengine/", "internal/layers/orchestration/"},
 	}
-	got := buildStrategicPlanUserPrompt(in)
+	got := buildStrategicPlanUserPrompt(in, i18n.LocaleZH)
 	for _, want := range []string{
-		"work_item_id: wi_42",
-		"directive: review d2 code",
-		"depth: 1",
-		"max_depth: 3",
-		"existing_children: 2",
-		"remaining_children: 5",
-		"max_children: 7",
-		"decompose_used_today: 1",
-		"remaining_daily: 4",
-		"max_daily: 5",
-		"max_iters: 5",
-		"parent_scope_in: internal/layers/contextengine/,internal/layers/orchestration/",
+		"[control] work_item_id: wi_42",
+		"[data] directive: review d2 code",
+		"[control] depth: 1",
+		"[control] max_depth: 3",
+		"[control] existing_children: 2",
+		"[control] remaining_children: 5",
+		"[control] max_children: 7",
+		"[control] decompose_used_today: 1",
+		"[control] remaining_daily: 4",
+		"[control] max_daily: 5",
+		"[control] max_iters: 5",
+		"[control] parent_scope_in: internal/layers/contextengine/,internal/layers/orchestration/",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Plan user prompt missing %q, got:\n%s", want, got)
@@ -127,7 +141,7 @@ func TestBuildStrategicPlanUserPrompt_EmptyBudgetOmits(t *testing.T) {
 	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
 		WorkItemID: "wi_x",
 		Directive:  "do x",
-	})
+	}, i18n.LocaleZH)
 	for _, banned := range []string{"depth:", "max_depth:", "remaining_children:", "max_iters:", "parent_scope_in:"} {
 		if strings.Contains(got, banned) {
 			t.Errorf("empty-budget prompt must not contain %q, got:\n%s", banned, got)
@@ -141,8 +155,8 @@ func TestBuildStrategicPlanUserPrompt_InjectsUncertaintyMean(t *testing.T) {
 		WorkItemID:      "wi_1",
 		Directive:       "plan next",
 		UncertaintyMean: 0.62,
-	})
-	if !strings.Contains(got, "uncertainty_mean: 0.620") {
+	}, i18n.LocaleZH)
+	if !strings.Contains(got, "[control] uncertainty_mean: 0.620") {
 		t.Fatalf("missing uncertainty_mean, got:\n%s", got)
 	}
 }
@@ -151,7 +165,7 @@ func TestBuildStrategicPlanUserPrompt_OmitsZeroUncertaintyMean(t *testing.T) {
 	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
 		WorkItemID: "wi_1",
 		Directive:  "plan next",
-	})
+	}, i18n.LocaleZH)
 	if strings.Contains(got, "uncertainty_mean:") {
 		t.Fatalf("zero uncertainty must be omitted, got:\n%s", got)
 	}

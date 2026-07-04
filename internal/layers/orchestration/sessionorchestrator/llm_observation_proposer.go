@@ -42,7 +42,7 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 		return nil, fmt.Errorf("observe proposer: d2 materialize: %w", err)
 	}
 	systemPrompt := mergeMUPSPreparedSystem(prepared)
-	user := buildLLMObservationUserPrompt(in)
+	user := buildLLMObservationUserPrompt(in, p.Locale)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,
 		SystemPrompt: systemPrompt,
@@ -59,7 +59,7 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 	return parseObservationProposalsJSON(raw)
 }
 
-func buildLLMObservationUserPrompt(in ObserveSignalInput) string {
+func buildLLMObservationUserPrompt(in ObserveSignalInput, loc i18n.Locale) string {
 	fields := map[prompttags.TagName]any{
 		prompttags.TagWorkItemID: in.WorkItemID,
 		prompttags.TagDirective:  in.Directive,
@@ -88,7 +88,12 @@ func buildLLMObservationUserPrompt(in ObserveSignalInput) string {
 		fields[prompttags.TagPriorObservationIDs] = in.PriorObservationIDs
 		fields[prompttags.TagIncrementalOnly] = "true"
 	}
-	return prompttags.BuildLineFrame(prompttags.ObserveUserFrame, fields)
+	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FrameObserveUser, prompttags.ObserveUserFrame, fields)
+	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, fields)
+	if guide == "" {
+		return frame
+	}
+	return guide + "\n\n" + frame
 }
 
 func collectLLMText(ch <-chan llmgateway.Chunk) string {

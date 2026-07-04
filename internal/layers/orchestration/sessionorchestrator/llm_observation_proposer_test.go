@@ -69,6 +69,23 @@ func TestLLMObservationProposer_CallsD2BeforeD3(t *testing.T) {
 	}
 }
 
+// T: D7-S5-A97-T01 — prepared Observe system prompt includes semantic appendix markers.
+func TestLLMObservationProposer_SystemIncludesSemanticMarkers(t *testing.T) {
+	mups := &stubObsMUPS{system: "你是 Devrix 助手。"}
+	llm := &stubObsLLM{raw: "[]"}
+	proposer := NewLLMObservationProposer(llm, mups, i18n.LocaleZH)
+	if _, err := proposer.ProposeObservations(context.Background(), ObserveSignalInput{
+		SessionID: "s1", WorkItemID: "wi_1", Directive: "hi",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{"obs_uncertainty", "语义：", "范围/目标不清"} {
+		if !strings.Contains(llm.lastSystem, marker) {
+			t.Fatalf("system missing semantic marker %q: %q", marker, llm.lastSystem)
+		}
+	}
+}
+
 func TestLLMObservationProposer_EnglishAppendix(t *testing.T) {
 	mups := &stubObsMUPS{system: "You are Devrix."}
 	llm := &stubObsLLM{raw: "[]"}

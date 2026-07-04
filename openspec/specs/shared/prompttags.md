@@ -117,6 +117,18 @@ Rationale: node-specific dynamic content precedes static base so the model sees 
 3. **Observe max 3** — `ValidateObservationProposals` keeps first 3 valid proposals (matches prompt)
 4. **Plan budget** — `applyBudgetCap` / `applySingleModeUncertaintyGate` (unchanged)
 5. **Reject feedback loops** — P2 defer (structured reject into next-round prompt)
+6. **Semantics-enforce alignment** — prompt claims with `Enforced: true` in `TagSemanticsRegistry` must match Go gates (`ValidateObservationProposals`, `applySingleModeUncertaintyGate`, `applyBudgetCap`, `VerifyDeliverableContract`)
+
+### v3: Tag semantics layer (DM-20260705-001)
+
+**Path:** `internal/shared/prompttags/semantics.go` + `internal/layers/contextengine/i18n/prompttags_semantics_{zh,en}.go`
+
+- `SemanticsForPhase` — locale-neutral registry (`FieldSemantic`, `PhaseSemantics`)
+- `RenderSemanticAppendix(phase, locale)` — i18n bullet appendix inserted **before** `DocBlock*` in Observe/Plan/Execute prompts
+- `RenderFrameFieldGuideForFields` — compact `[control]`/`[data]` guide for Observe/Plan user frames
+- `BuildAnnotatedLineFrame` — prefixes lineframe keys with plane markers
+
+See `openspec/changes/mups-prompt-tag-semantics/specs/shared/prompttags-semantics.md` for normative kind/mode semantics.
 
 ### v2 call-site changes
 

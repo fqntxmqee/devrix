@@ -1180,6 +1180,15 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 **A96 Total:** 3 P0 T — 3 IMPLEMENTED (DM-20260704-005)
 
+### D7-S5-A97: MUPS tag semantics proposer consumption（DM-20260705-001）
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S5-A97-T01** | LLMObservationProposer prepared system 含 obs_* 语义 marker | IMPLEMENTED | `sessionorchestrator/llm_observation_proposer_test.go::TestLLMObservationProposer_SystemIncludesSemanticMarkers` | SubContext_Signal |
+| **D7-S5-A97-T02** | Plan user prompt 含 control/data frame guide + annotated lines | IMPLEMENTED | `sessionorchestrator/strategic_plan_proposer_test.go::TestBuildStrategicPlanUserPrompt_IncludesFrameGuide` | Plan_Generate |
+
+**A97 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260705-001)
+
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 
 ---

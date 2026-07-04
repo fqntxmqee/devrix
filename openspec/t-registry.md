@@ -1,10 +1,10 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.17.0
-**Last Updated:** 2026-07-04 (mups-prompttags-v2-io-registry DM-20260704-005: +5 T D2 +2 D7 +3 IMPLEMENTED 676→681, P0 481→486)
+**Version:** 5.18.0
+**Last Updated:** 2026-07-05 (mups-prompt-tag-semantics DM-20260705-001: +4 D2 +2 D7 T IMPLEMENTED 685→691, P0 486→490)
 
-**Version:** 5.17.0 (mups-prompttags-v2-io-registry DM-20260704-005 S4: +5 T 总计 IMPLEMENTED 676→681, P0 481→486 — D2 +2 + D7 +3)
+**Version:** 5.18.0 (mups-prompt-tag-semantics DM-20260705-001 S4: +6 T 总计 IMPLEMENTED 685→691, P0 486→490 — D2 +4 + D7 +2)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---
@@ -24,14 +24,14 @@
 | 域 | 路径 | Total | IMPLEMENTED | PLANNED | P0 |
 |----|------|-------|-------------|---------|-----|
 | D1 Communication | `openspec/specs/d1-communication/t-registry.md` | 61 | 61 | 0 | 31 |
-| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 178 | 178 | 0 | 120 |
+| D2 Context Engine | `openspec/specs/d2-context-engine/t-registry.md` | 182 | 182 | 0 | 124 |
 | D3 LLM Gateway | `openspec/specs/d3-llm-gateway/t-registry.md` | 39 | 38 | 1 | 23 |
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 48 | 47 | 0 | 33 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 295 | 295 | 0 | 252 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 297 | 297 | 0 | 254 |
 
-**总计**: 685 · IMPLEMENTED 681 · PLANNED 3 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 486
+**总计**: 691 · IMPLEMENTED 687 · PLANNED 3 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 490
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
