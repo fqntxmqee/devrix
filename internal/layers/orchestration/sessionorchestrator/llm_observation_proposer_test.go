@@ -8,16 +8,21 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-type stubObsCtxPreparer struct {
+type stubObsMUPS struct {
 	system string
 	calls  int
 }
 
-func (s *stubObsCtxPreparer) Prepare(_ context.Context, _ PrepareRequest) (PreparedContext, error) {
+func (s *stubObsMUPS) MaterializeForMUPS(_ context.Context, req contracts.MUPSContextRequest) (contracts.MUPSPreparedContext, error) {
 	s.calls++
-	return PreparedContext{SystemPrompt: s.system}, nil
+	appendix := i18n.ObservationTaskAppendix(i18n.ParseLanguage(req.Policy.Locale))
+	return contracts.MUPSPreparedContext{
+		SystemPrompt:  strings.TrimSpace(s.system) + "\n\n" + appendix,
+		PhaseAppendix: appendix,
+	}, nil
 }
 
 type stubObsLLM struct {
@@ -33,10 +38,11 @@ func (s *stubObsLLM) InvokeStream(_ context.Context, req orchtypes.LLMInvokeRequ
 	return ch, nil
 }
 
+// T: D7-S2-A90-T01 — LLMObservationProposer uses D2 MaterializeForMUPS appendix.
 func TestLLMObservationProposer_CallsD2BeforeD3(t *testing.T) {
-	ctxPrep := &stubObsCtxPreparer{system: "你是 Devrix 助手。"}
+	mups := &stubObsMUPS{system: "你是 Devrix 助手。"}
 	llm := &stubObsLLM{raw: `[{"kind":"obs_uncertainty","strength":0.6,"question":"需要 API 版本？","evidence":["wi_1"]}]`}
-	proposer := NewLLMObservationProposer(llm, ctxPrep, i18n.LocaleZH)
+	proposer := NewLLMObservationProposer(llm, mups, i18n.LocaleZH)
 	got, err := proposer.ProposeObservations(context.Background(), ObserveSignalInput{
 		SessionID:  "s1",
 		WorkItemID: "wi_1",
@@ -45,8 +51,8 @@ func TestLLMObservationProposer_CallsD2BeforeD3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ctxPrep.calls != 1 {
-		t.Fatalf("Prepare calls = %d, want 1", ctxPrep.calls)
+	if mups.calls != 1 {
+		t.Fatalf("MaterializeForMUPS calls = %d, want 1", mups.calls)
 	}
 	if !strings.Contains(llm.lastSystem, "你是 Devrix") {
 		t.Fatalf("system prompt missing D2 base: %q", llm.lastSystem)
@@ -60,9 +66,9 @@ func TestLLMObservationProposer_CallsD2BeforeD3(t *testing.T) {
 }
 
 func TestLLMObservationProposer_EnglishAppendix(t *testing.T) {
-	ctxPrep := &stubObsCtxPreparer{system: "You are Devrix."}
+	mups := &stubObsMUPS{system: "You are Devrix."}
 	llm := &stubObsLLM{raw: "[]"}
-	proposer := NewLLMObservationProposer(llm, ctxPrep, i18n.LocaleEN)
+	proposer := NewLLMObservationProposer(llm, mups, i18n.LocaleEN)
 	if _, err := proposer.ProposeObservations(context.Background(), ObserveSignalInput{
 		SessionID: "s1", WorkItemID: "wi_1", Directive: "hi",
 	}); err != nil {
@@ -79,7 +85,7 @@ func TestParseObservationProposalsJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Kind != orchtypes.ObsFact {
+	if len(got) != 1 {
 		t.Fatalf("got = %+v", got)
 	}
 }

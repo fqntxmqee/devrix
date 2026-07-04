@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -61,7 +62,7 @@ type StrategicPlanProposal struct {
 	Rationale           string
 }
 
-// StrategicPlanProposer calls D2 Prepare then D3 for Plan strategy (G3).
+// StrategicPlanProposer calls D2 MaterializeForMUPS then D3 for Plan strategy (DM-20260704-001).
 type StrategicPlanProposer interface {
 	ProposeStrategicPlan(ctx context.Context, in StrategicPlanInput) (*StrategicPlanProposal, error)
 }
@@ -69,43 +70,31 @@ type StrategicPlanProposer interface {
 // LLMStrategicPlanProposer implements StrategicPlanProposer via D2→D3.
 type LLMStrategicPlanProposer struct {
 	LLM    orchtypes.LLMInvoker
-	Ctx    ContextPreparer
+	MUPS   contracts.IMUPSContextMaterializer
 	Locale i18n.Locale
 }
 
 // NewLLMStrategicPlanProposer constructs a D2→D3 strategic plan proposer.
-func NewLLMStrategicPlanProposer(llm orchtypes.LLMInvoker, ctx ContextPreparer, loc i18n.Locale) *LLMStrategicPlanProposer {
-	if llm == nil || ctx == nil {
+func NewLLMStrategicPlanProposer(llm orchtypes.LLMInvoker, mups contracts.IMUPSContextMaterializer, loc i18n.Locale) *LLMStrategicPlanProposer {
+	if llm == nil || mups == nil {
 		return nil
 	}
 	if loc == "" {
 		loc = i18n.DefaultLocale
 	}
-	return &LLMStrategicPlanProposer{LLM: llm, Ctx: ctx, Locale: loc}
+	return &LLMStrategicPlanProposer{LLM: llm, MUPS: mups, Locale: loc}
 }
 
 func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in StrategicPlanInput) (*StrategicPlanProposal, error) {
-	if p == nil || p.LLM == nil || p.Ctx == nil {
+	if p == nil || p.LLM == nil || p.MUPS == nil {
 		return nil, nil
 	}
-	prepared, err := p.Ctx.Prepare(ctx, PrepareRequest{
-		SessionID: in.SessionID,
-		Message: types.Message{
-			SessionID: in.SessionID,
-			Role:      types.MessageRoleUser,
-			Content:   in.Directive,
-		},
-	})
+	req := buildPlanMUPSRequest(in, string(p.Locale))
+	prepared, err := p.MUPS.MaterializeForMUPS(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("strategic plan proposer: d2 prepare: %w", err)
+		return nil, fmt.Errorf("strategic plan proposer: d2 materialize: %w", err)
 	}
-	systemPrompt := strings.TrimSpace(prepared.SystemPrompt)
-	if appendix := i18n.StrategicPlanAppendix(p.Locale, workmodel.ContractDimensionPromptDoc()); appendix != "" {
-		if systemPrompt != "" {
-			systemPrompt += "\n\n"
-		}
-		systemPrompt += appendix
-	}
+	systemPrompt := mergeMUPSPreparedSystem(prepared)
 	user := buildStrategicPlanUserPrompt(in)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,

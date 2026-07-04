@@ -107,7 +107,7 @@ type WorkItemResult struct {
 //
 // D7→D2/D3 boundary respect:
 //
-//	D7→D2: ContextPreparer.Prepare, ToolRoundExecutor.ExecuteRound
+//	D7→D2: MaterializeForMUPS, ToolRoundExecutor.ExecuteRound
 //	D7→D3: LLMInvoker.InvokeStream
 //
 // D7 owns the LLM call authority (D7-S2-A07). D2→D3 is BANNED (DM-020).
@@ -115,9 +115,9 @@ type WorkItemResult struct {
 // DM-20260626-009 follow-up.
 type DefaultWorkItemExecutor struct {
 	LLM     orchtypes.LLMInvoker
-	Context ContextPreparer
+	MUPS    contracts.IMUPSContextMaterializer
 	Tools   ToolRoundExecutor
-	// Materializer is the D2 Materialize adapter (DM-20260627-003). nil → legacy Prepare only.
+	// Materializer persists private-chain deltas (DM-20260627-003).
 	Materializer materialize.Materializer
 	// TokenBudget caps Materialize private chain size. 0 → DefaultWorkItemTokenBudget.
 	TokenBudget int
@@ -148,11 +148,10 @@ type DefaultWorkItemExecutor struct {
 // Compile-time interface check.
 var _ WorkItemExecutor = (*DefaultWorkItemExecutor)(nil)
 
-// NewWorkItemExecutor constructs a production executor. LLM is required;
-// Context and Tools are optional (nil Context degrades to a bare LLM call
-// matching PR #249's degraded behaviour; nil Tools skips tool execution).
-func NewWorkItemExecutor(llm orchtypes.LLMInvoker, ctx ContextPreparer, tools ToolRoundExecutor) *DefaultWorkItemExecutor {
-	return &DefaultWorkItemExecutor{LLM: llm, Context: ctx, Tools: tools}
+// NewWorkItemExecutor constructs a production executor. LLM and MUPS are required;
+// Tools are optional (nil Tools skips tool execution).
+func NewWorkItemExecutor(llm orchtypes.LLMInvoker, mups contracts.IMUPSContextMaterializer, tools ToolRoundExecutor) *DefaultWorkItemExecutor {
+	return &DefaultWorkItemExecutor{LLM: llm, MUPS: mups, Tools: tools}
 }
 
 // ExecuteWorkItem runs the per-WorkItem ReAct loop. See WorkItemExecutor
@@ -514,92 +513,45 @@ func emitFromExecContext(ctx context.Context) func(*contracts.EngineEvent) {
 	return nil
 }
 
-// prepareContext calls ContextPreparer.Prepare or D2 Materialize to assemble
-// SystemPrompt + Tools + initial messages. Returns empty defaults when both
-// paths are unavailable (legacy bare call preservation).
+// prepareContext calls D2 MaterializeForMUPS to assemble SystemPrompt + Tools + messages.
 func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, itemID, directive string) (string, []ToolSchema, []types.Message, map[string]string, error) {
-	if ShouldMaterializeWorkItem(ctx, sessionID, itemID) && e.Materializer != nil {
-		ec, _ := WorkItemExecContextFrom(ctx)
-		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget(ctx, sessionID))
-		mat, err := e.Materializer.Materialize(ctx, req)
-		// DM-20260630-011 AC3: emit the materialize span AFTER the call so
-		// message_count / token_est reflect actual mat values (start-time
-		// 0/0 would be misleading). When the materializer returned 0/0,
-		// also emit a sibling empty-yield span so dashboards can filter by
-		// the empty-yield condition independently.
-		end := hardening.EmitContextMaterialize(ctx, sessionID, itemID, string(req.Policy.Mode), mat.MessageCount, mat.TokenEst)
-		end(err)
-		if mat.MessageCount == 0 && mat.TokenEst == 0 {
-			endEmpty := hardening.EmitMaterializeEmptyYield(ctx, sessionID, itemID, string(req.Policy.Mode))
-			endEmpty(nil)
-		}
-		if err != nil {
-			return "", nil, nil, nil, err
-		}
-		tools := filterPipelineTools(toolSchemasFromDescriptors(mat.Tools))
-		var userContextPrepend map[string]string
-		if e.Context != nil {
-			prepared, prepErr := e.Context.Prepare(ctx, PrepareRequest{
-				SessionID: sessionID,
-				Message: types.Message{
-					SessionID: sessionID,
-					Role:      types.MessageRoleUser,
-					Content:   directive,
-				},
-			})
-			if prepErr == nil {
-				userContextPrepend = prepared.UserContextPrepend
-				rollupSynth := ec.Item != nil && ec.Tasks != nil &&
-					workmodel.IsParentRollupSynth(ec.Tasks, sessionID, ec.Item)
-				if len(tools) == 0 && !rollupSynth {
-					tools = filterPipelineTools(prepared.Tools)
-				}
-			}
-		}
-		return mat.SystemPrompt, tools, mat.Messages, userContextPrepend, nil
+	if e.MUPS == nil {
+		return "", nil, nil, nil, fmt.Errorf("workitem executor: MUPS materializer required")
 	}
-	if e.Context == nil {
-		return "", nil, nil, nil, nil
-	}
-	prepared, err := e.Context.Prepare(ctx, PrepareRequest{
-		SessionID: sessionID,
-		Message: types.Message{
-			SessionID: sessionID,
-			Role:      types.MessageRoleUser,
-			Content:   directive,
-		},
-	})
-	if err != nil {
-		return "", nil, nil, nil, err
-	}
-	systemPrompt := appendWorkItemFormatHints(prepared.SystemPrompt, ctx, sessionID, itemID)
-	msgs := []types.Message{{
-		SessionID: sessionID,
-		Role:      types.MessageRoleUser,
-		Content:   directive,
-	}}
-	return systemPrompt, filterPipelineTools(prepared.Tools), msgs, prepared.UserContextPrepend, nil
-}
-
-func appendWorkItemFormatHints(systemPrompt string, ctx context.Context, sessionID, itemID string) string {
 	ec, ok := WorkItemExecContextFrom(ctx)
-	if !ok || ec.Item == nil || ec.Item.Kind != workmodel.WorkKindGoal {
-		return systemPrompt
+	if !ok || ec.Item == nil {
+		return "", nil, nil, nil, fmt.Errorf("workitem executor: exec context required")
 	}
 	depth := 0
 	if ec.Tasks != nil {
 		depth = ec.Tasks.Tree().Depth(sessionID, itemID)
 	}
-	if depth > 0 {
-		return systemPrompt
+	mupsReq := buildExecuteMUPSRequest(workItemExecContextBundle{
+		SessionID:         sessionID,
+		Item:              ec.Item,
+		Tasks:             ec.Tasks,
+		TokenBudget:       e.tokenBudget(ctx, sessionID),
+		Depth:             depth,
+		PriorVerifyReason: ec.PriorVerifyReason,
+	})
+	mupsReq.UserMessage = directive
+	prepared, err := e.MUPS.MaterializeForMUPS(ctx, mupsReq)
+	mode := "fresh"
+	if mupsReq.ToolProfile == "rollup_synth" {
+		mode = "rollup_synth"
 	}
-	if strings.Contains(systemPrompt, "<scope_contract>") {
-		return systemPrompt
+	end := hardening.EmitContextMaterialize(ctx, sessionID, itemID, mode, prepared.MessageCount, prepared.TokenEst)
+	end(err)
+	if prepared.MessageCount == 0 && prepared.TokenEst == 0 {
+		endEmpty := hardening.EmitMaterializeEmptyYield(ctx, sessionID, itemID, mode)
+		endEmpty(nil)
 	}
-	if strings.TrimSpace(systemPrompt) != "" {
-		systemPrompt += "\n"
+	if err != nil {
+		return "", nil, nil, nil, err
 	}
-	return systemPrompt + materialize.WorkItemOutputFormatHints
+	systemPrompt := mergeMUPSPreparedSystem(prepared)
+	msgs := mupsMessagesWithDirective(sessionID, directive, prepared)
+	return systemPrompt, mupsToolSchemasFromPrepared(prepared.Tools), msgs, prepared.UserContextPrepend, nil
 }
 
 func (e *DefaultWorkItemExecutor) appendPrivateChainDelta(ctx context.Context, sessionID, itemID string, msgs []types.Message) {

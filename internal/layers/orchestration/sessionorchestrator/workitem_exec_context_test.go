@@ -14,8 +14,7 @@ func TestWorkItemExecutor_AppendsAcceptanceCriteria(t *testing.T) {
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{Content: "ack", FinishReason: "stop"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	exec.Materializer = nil
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
 
 	contract := workmodel.DefaultTestDeliverableContract()
 	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{
@@ -49,8 +48,7 @@ func TestWorkItemExecutor_AppendsPriorVerifyReasonOnRetry(t *testing.T) {
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{Content: "ack", FinishReason: "stop"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	exec.Materializer = nil
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
 
 	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{
 		Item:                &workmodel.WorkItem{ID: "wi_x", Kind: workmodel.WorkKindImplement},
@@ -74,8 +72,7 @@ func TestWorkItemExecutor_NoPriorReasonSectionWhenFirstPass(t *testing.T) {
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{Content: "ack", FinishReason: "stop"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	exec.Materializer = nil
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
 
 	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{
 		Item:  &workmodel.WorkItem{ID: "wi_x", Kind: workmodel.WorkKindImplement},

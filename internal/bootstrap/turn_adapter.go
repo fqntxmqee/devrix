@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine"
 	"github.com/devrix/devrix/internal/layers/contextengine/kernel"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
@@ -62,6 +63,11 @@ func newContextEngineAdapter(gw *capture.CommunicationGateway, engine contracts.
 		a.tools = ce.ToolRunner()
 		a.toolsReg = ce.ToolRegistry()
 		a.perm = ce.PermissionGate()
+		if mat := newDefaultMaterializer(); mat != nil {
+			if dm, ok := mat.(*materialize.DefaultMaterializer); ok {
+				ce.SetPartitionMaterializer(dm)
+			}
+		}
 		// TOOL-SURFACE-1 (W9): engine may have a non-nil surface list
 		// (built by bootstrap.BuildSurfaces in W8). When present, the
 		// surface dispatch path is the primary one; the legacy tools
@@ -540,4 +546,16 @@ func (a *contextEngineAdapter) PersistTurn(ctx context.Context, req sessionorche
 		}
 	}
 	return nil
+}
+
+// MaterializeForMUPS implements contracts.IMUPSContextMaterializer (DM-20260704-001).
+func (a *contextEngineAdapter) MaterializeForMUPS(ctx context.Context, req contracts.MUPSContextRequest) (contracts.MUPSPreparedContext, error) {
+	ce, ok := a.engine.(*kernel.ContextEngine)
+	if !ok {
+		return contracts.MUPSPreparedContext{}, fmt.Errorf("turn adapter: MaterializeForMUPS requires *kernel.ContextEngine")
+	}
+	if req.Phase == contracts.MUPSPhasePlan && req.Policy.Locale == "" {
+		req.Policy.Locale = string(a.promptLocale())
+	}
+	return ce.MaterializeForMUPS(ctx, req)
 }

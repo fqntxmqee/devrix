@@ -40,12 +40,16 @@ type Partition struct {
 
 // Policy controls token budget and tool profile.
 type Policy struct {
-	Mode        Mode
-	TokenBudget int
-	ToolProfile string
-	Locale      string
-	Depth       int
+	Mode         Mode
+	TokenBudget  int
+	ToolProfile  string
+	Locale       string
+	AgentProfile string
+	Depth        int
 }
+
+// MaterializePolicy is the MUPS-facing alias for Policy (DM-20260704-001).
+type MaterializePolicy = Policy
 
 // InboundSignals are D7 signals injected at materialize time (not full transcripts).
 type InboundSignals struct {

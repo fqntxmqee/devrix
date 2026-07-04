@@ -68,13 +68,16 @@ type PreparedContext struct {
 
 // ToolRoundRequest is the input to D2-S18 ExecuteToolRound.
 type ToolRoundRequest struct {
-	SessionID string
-	ToolCalls []llmgateway.ToolCall
+	SessionID       string
+	ToolCalls       []llmgateway.ToolCall
+	TaskKind        string
+	RemainingBudget int
 }
 
 // ToolRoundResult is the output of D2-S18 ExecuteToolRound.
 type ToolRoundResult struct {
-	Results []ToolResult
+	Results           []ToolResult
+	PressureMessages  []types.Message
 }
 
 // ToolResult is a single tool execution outcome.

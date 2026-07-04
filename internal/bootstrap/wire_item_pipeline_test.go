@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/contracts"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -32,6 +33,10 @@ type stubItemPipelineCtxPreparer struct{}
 
 func (stubItemPipelineCtxPreparer) Prepare(_ context.Context, _ sessionorchestrator.PrepareRequest) (sessionorchestrator.PreparedContext, error) {
 	return sessionorchestrator.PreparedContext{}, nil
+}
+
+func (stubItemPipelineCtxPreparer) MaterializeForMUPS(_ context.Context, _ contracts.MUPSContextRequest) (contracts.MUPSPreparedContext, error) {
+	return contracts.MUPSPreparedContext{}, nil
 }
 
 func TestWireItemPipeline(t *testing.T) {
