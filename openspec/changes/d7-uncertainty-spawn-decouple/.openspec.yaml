@@ -1,0 +1,14 @@
+change_id: d7-uncertainty-spawn-decouple
+title: D7 MUPS 不确定性驱动 Spawn（Deliverable 解耦）
+status: draft
+created: 2026-07-04
+domains:
+  - d7-orchestration
+artifacts:
+  - demand.md
+  - proposal.md
+  - design.md
+  - tasks.md
+  - specs/d7-orchestration_uncertainty_spawn_delta.md
+depends_on:
+  - d7-convergence-contract

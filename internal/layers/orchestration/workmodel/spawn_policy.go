@@ -44,8 +44,11 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 	if applicableDeliverableSchema(round) && !deliverableContinuationRequired(round) {
 		return SpawnNone
 	}
-	// R1 — max depth with continuation: bounded inline, then escalate.
+	// R1 — max depth with continuation: bounded inline, then escalate (CC-U1 may prefer rollup).
 	if ctx.Depth >= ctx.MaxDepth {
+		if deliverableContinuationRequired(round) {
+			return spawnForDeliverableContinuation(round, ctx)
+		}
 		if deliverableInlineWouldExhaust(ctx) {
 			return SpawnEscalateHuman
 		}
@@ -61,10 +64,7 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 		// CC-1 / §8.1: Pass with applicable schema MUST NOT SpawnNone while
 		// deliverable is still owed — inline (or R1 budget) instead.
 		if deliverableContinuationRequired(round) {
-			if deliverableInlineWouldExhaust(ctx) {
-				return SpawnEscalateHuman
-			}
-			return SpawnInline
+			return spawnForDeliverableContinuation(round, ctx)
 		}
 		return SpawnNone
 
@@ -91,10 +91,7 @@ func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) Spa
 			return SpawnDecompose
 		}
 		if deliverableContinuationRequired(round) {
-			if deliverableInlineWouldExhaust(ctx) {
-				return SpawnEscalateHuman
-			}
-			return SpawnInline
+			return spawnForDeliverableContinuation(round, ctx)
 		}
 		return SpawnNone
 
@@ -151,6 +148,7 @@ func EvaluateSpawnPolicy(round *WorkItemPipelineRound, ctx TreeEvalContext) {
 	}
 	policy := SpawnPolicyEvaluator(round, ctx)
 	round.SpawnPolicy = policy
+	round.RollupSynthRequested = policy == SpawnInline && RollupSynthEligible(round, ctx)
 	round.SpawnRationale = spawnRationale(policy, round, ctx)
 }
 
@@ -159,6 +157,9 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 	case SpawnAwait:
 		return fmt.Sprintf("R0: %d running children", ctx.RunningChildren)
 	case SpawnInline:
+		if round.RollupSynthRequested {
+			return "CC-U3: rollup synth (evidence sufficient, format deliverable incomplete)"
+		}
 		if deliverableContinuationRequired(round) {
 			if ctx.Depth >= ctx.MaxDepth {
 				return fmt.Sprintf("R1: max depth inline retry %d/%d (schema=%s status=%s)",
@@ -179,6 +180,12 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		if ctx.DailyLimitExceeded {
 			return "R2: daily decompose limit exceeded"
 		}
+		if deliverableContinuationRequired(round) &&
+			ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth &&
+			!RollupSynthEligible(round, ctx) {
+			return fmt.Sprintf("CC-1.2: deliverable inline retries exhausted (%d/%d)",
+				ctx.InlineRetriesAtMaxDepth, ctx.MaxInlineRetriesAtMaxDepth)
+		}
 		if ctx.Depth >= ctx.MaxDepth && deliverableContinuationRequired(round) &&
 			ctx.InlineRetriesAtMaxDepth >= ctx.MaxInlineRetriesAtMaxDepth {
 			return fmt.Sprintf("R1: inline retries exhausted at max depth (%d/%d)",
@@ -187,7 +194,11 @@ func spawnRationale(policy SpawnPolicy, round *WorkItemPipelineRound, ctx TreeEv
 		if ctx.RollupRound {
 			return fmt.Sprintf("rollup retries exhausted (%d/%d)", ctx.RollupRetries, ctx.MaxRollupRetries)
 		}
-		return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
+		if round.VerdictKind == types.VerdictIndeterminate {
+			return fmt.Sprintf("R7: indeterminate retries exhausted (%d)", ctx.MaxIndeterminateRetries)
+		}
+		return fmt.Sprintf("CC-1.2: deliverable inline retries exhausted (%d/%d)",
+			ctx.InlineRetriesAtMaxDepth, ctx.MaxInlineRetriesAtMaxDepth)
 	case SpawnDecompose:
 		if round.VerdictKind == types.VerdictIndeterminate {
 			return fmt.Sprintf("R7: indeterminate retries exhausted → decompose (plan=%d uncertainty=%.2f)",

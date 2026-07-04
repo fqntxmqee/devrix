@@ -312,6 +312,10 @@ func ExtractSessionDeliverable(tm *TaskManager, sessionID string) string {
 			return formatted
 		}
 	}
+	// CC-U2: best-effort salvage from session work items before raw artifact text.
+	if salvaged := SalvageSessionDeliverable(tm, sessionID); salvaged != "" {
+		return salvaged
+	}
 	// DM-20260629-001 / T53: read ArtifactSummary via typed RollupReport
 	// envelope instead of scattered root.LastRound.* access.
 	report := NewRollupReportFromRound(root.ID, root.LastRound)

@@ -72,6 +72,9 @@ type UnifiedUncertaintyInput struct {
 	ChildStats        ChildOutcomeStats
 	VerdictConfidence float64
 	EvidenceCount     int
+	// FormatFailureWithEvidence: deliverable incomplete while EvidenceProgress >= threshold.
+	// Damps confidence inflation so format errors are not misread as exploration need (CC-U5).
+	FormatFailureWithEvidence bool
 }
 
 // ComputeUnifiedUncertainty merges MUPS reputation and WorkTree structural signals.
@@ -80,6 +83,9 @@ func ComputeUnifiedUncertainty(in UnifiedUncertaintyInput) float64 {
 	evidence := evidenceScore(in.EvidenceCount)
 	wilson := clamp01(1 - in.WilsonLower)
 	conf := clamp01(1 - in.VerdictConfidence)
+	if in.FormatFailureWithEvidence {
+		conf *= ConvergenceFormatFailureConfFactor
+	}
 	u := 0.35*wilson +
 		0.25*historical +
 		0.25*conf +

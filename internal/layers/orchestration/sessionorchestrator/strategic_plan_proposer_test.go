@@ -281,3 +281,39 @@ func TestApplyBudgetCap_SkipsNonDecompose(t *testing.T) {
 	}
 }
 
+// T: L5-D7-U-02 / T-P1-4 — CC-U4 strategic single mode uncertainty gate
+func TestApplySingleModeUncertaintyGate_rejectsHighU(t *testing.T) {
+	prop := &StrategicPlanProposal{ExecutionMode: "single"}
+	in := StrategicPlanInput{UncertaintyMean: 0.55}
+	err := applySingleModeUncertaintyGate(prop, in)
+	if err == nil {
+		t.Fatal("expected reject when U >= SingleModeThreshold")
+	}
+	var reject *StrategicPlanReject
+	if !errors.As(err, &reject) {
+		t.Fatalf("want *StrategicPlanReject, got %T: %v", err, err)
+	}
+	if reject.Reason != BudgetFieldUncertainty {
+		t.Fatalf("Reason=%q want %q", reject.Reason, BudgetFieldUncertainty)
+	}
+}
+
+func TestApplySingleModeUncertaintyGate_acceptsLowU(t *testing.T) {
+	prop := &StrategicPlanProposal{ExecutionMode: "single"}
+	in := StrategicPlanInput{UncertaintyMean: workmodel.SingleModeUncertaintyThreshold - 0.05}
+	if err := applySingleModeUncertaintyGate(prop, in); err != nil {
+		t.Fatalf("low U single must pass: %v", err)
+	}
+}
+
+func TestApplySingleModeUncertaintyGate_skipsNonSingle(t *testing.T) {
+	prop := &StrategicPlanProposal{
+		ExecutionMode: "decompose",
+		ChildSpecs:    []workmodel.ChildSpec{{Title: "a"}},
+	}
+	in := StrategicPlanInput{UncertaintyMean: 0.9}
+	if err := applySingleModeUncertaintyGate(prop, in); err != nil {
+		t.Fatalf("decompose must skip U gate: %v", err)
+	}
+}
+

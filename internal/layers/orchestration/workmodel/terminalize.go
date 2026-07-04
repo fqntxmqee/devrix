@@ -74,6 +74,9 @@ func TouchInlineRetryAtMaxDepth(t *WorkTree, sessionID string, item *WorkItem, r
 	if round.SpawnPolicy != SpawnInline || !deliverableContinuationRequired(round) {
 		return
 	}
+	if round.RollupSynthRequested {
+		return
+	}
 	_ = t.IncrementInlineRetriesAtMaxDepth(sessionID, item.ID)
 }
 

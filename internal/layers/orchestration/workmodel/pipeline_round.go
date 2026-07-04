@@ -98,6 +98,13 @@ type WorkItemPipelineRound struct {
 	DeliverableSchema DeliverableSchema `json:"deliverable_schema,omitempty"`
 	DeliverableContract DeliverableContract `json:"deliverable_contract,omitempty"`
 	DeliverableStatus DeliverableStatus `json:"deliverable_status,omitempty"`
+	DeliverableReason string            `json:"deliverable_reason,omitempty"`
+	// ExecuteToolCalls from artifact metadata (CC-U1 evidence progress).
+	ExecuteToolCalls int `json:"execute_tool_calls,omitempty"`
+	// ScopeInPresent mirrors ScopeContract.InScope non-empty at round end.
+	ScopeInPresent bool `json:"scope_in_present,omitempty"`
+	// RollupSynthRequested set by EvaluateSpawnPolicy when CC-U3 rollup synth applies.
+	RollupSynthRequested bool `json:"rollup_synth_requested,omitempty"`
 	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`
