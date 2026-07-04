@@ -1,0 +1,49 @@
+change_id: devrix-runtime-feedback-closure
+priority: P0
+demand_id: DM-20260704-003
+status: s2_design
+domains: [D2, D5, D7]
+dsaft_scenarios:
+  - D2-S15   # PrepareExecutionContext
+  - D2-S18   # EnforceExecutionPolicy
+  - D5-S2    # observability tracer
+  - D7-S2    # RunTurnLoop / SessionOrchestrator
+dsaft_activities:
+  - D2-S15-A02  # MaterializeForTurn / Locale gating
+  - D2-S15-A82  # i18n prompt assembler
+  - D2-S18-A02  # FilterTools + ShouldDefer
+  - D5-S2-A01   # Tracer.Start + Span emission
+  - D7-S2-A50   # RunTurnLoop / executeOne
+t_points:
+  - D2-S15-A82-T01
+  - D2-S15-A82-T02
+  - D2-S15-A82-T03
+  - D5-S2-A01-T01
+  - D5-S2-A01-T02
+  - D5-S2-A01-T03
+  - D7-S2-A50-T09
+  - D7-S2-A50-T10
+version_scope:
+  v1.0: 3 个修复一次性收口
+  v1.1: per-tool timeout override (后置)
+metrics_definitions: []
+span_naming:
+  - span.orphan=true           # 新增属性，仅在 fallback 路径
+  - tool.timeout.exceeded      # tool timeout 触发时 emit
+created: 2026-07-04
+author: handoff 总结 (3 个问题) → S1-S6 立项
+title: "Runtime 反馈链路闭环 — i18n 中文硬规则、tracing parent-span 连续性、tool 调用可超时"
+related_changes:
+  - devrix-mups-d2-context-tools-ownership  # DM-20260704-002, 同 D2 域刚归档
+  - devrix-d2-d7-review-hardening          # DM-20260630-013, D2/D7 hardening 收口
+  - devrix-d7-convergence-contract         # DM-20260703-001, CC-1~CC-5
+  - devrix-observability-baggage           # D5 W3C Baggage 业务上下文传播
+parent_specs:
+  - openspec/specs/d2-context-engine/spec.md
+  - openspec/specs/d5-observability/spec.md
+  - openspec/specs/d7-orchestration/spec.md
+feature_flags:
+  - name: ToolTimeoutSeconds
+    default: 60
+    env: DEVRIX_TOOL_TIMEOUT_SECONDS
+    note: "v1.0 统一 60s；v1.1 per-tool override"

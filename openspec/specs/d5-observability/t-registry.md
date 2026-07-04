@@ -1,8 +1,8 @@
 # D5 Observability Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 3.5.0
-**Last Updated:** 2026-07-02 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 1 T IMPLEMENTED 45→46, P0 30→31 — D5-S25-A04-T01 GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS))
+**Version:** 3.6.0
+**Last Updated:** 2026-07-04 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 1 T IMPLEMENTED 45→46, P0 30→31 — D5-S25-A04-T01 GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS))
 **Parent:** `openspec/specs/architecture/layering.md`
 **Change:** devrix-d5-sa-refine（DM-20260615-001 / v1.0 Canonical 重排；增 canonical_s 列 + Legacy 双轨）+ devrix-diagnostic-tools-parity (DM-20260616-003) + devrix-diagnostic-tools-wiring (DM-20260617-002) + devrix-tools-terminal-architecture (DM-20260618-007) + **devrix-d5-v2-terminal (DM-20260619-006 / v2.1 Terminal；增 canonical_a 列；canonical_s 校正 A08→S21、A06→S0；canonical_a 校正 Doctor T→A10；3 PLANNED 闭合)** 
 
@@ -17,6 +17,9 @@
 | D5-S21-A01-T01 | Shutdown 刷写所有 pending spans | S21 | A01 | P0 | `internal/layers/observability/instrument/tracer/tracer_test.go` | IMPLEMENTED | D5-S1-A01-T01 |
 | D5-S21-A01-T02 | ConsoleExporter 可直接作为 SpanExporter | S21 | A01 | P2 | `internal/layers/observability/export/console_test.go` | IMPLEMENTED | D5-S1-A01-T02 |
 | D5-S21-A01-T04 | TraceID/SpanID 生成符合 W3C 格式 | S21 | A01 | P1 | `internal/layers/observability/instrument/tracer/tracer_test.go` | IMPLEMENTED | D5-S1-A01-T04 |
+| D5-S21-A01-T05 | tracingStepObserver OnStep 透传 ctx（DM-20260704-003 L5-D5-RFC-01）| S21 | A01 | P0 | `internal/layers/observability/instrument/tracer/tracer_test.go::TestTracer_Start_InheritsParentFromContext` + `TestTracer_Start_ThreeLevelChain` | IMPLEMENTED | D5-S2-A01-T01 (RFC 重新分配) |
+| D5-S21-A01-T06 | parent_span_id 100% 命中 (3 case 验证 trace fork / 3-level chain) | S21 | A01 | P0 | `internal/layers/observability/instrument/tracer/tracer_test.go` (2 case) | IMPLEMENTED | D5-S2-A01-T02 (RFC 重新分配) |
+| D5-S21-A01-T07 | tracer.Start fallback 路径 emit span.orphan=true (P1) | S21 | A01 | P1 | (DEFERRED v1.1 — tracer fallback 是合法 root span，非 orphan) | DEFERRED v1.1 | D5-S2-A01-T03 (RFC 重新分配) |
 | D5-S21-A03-T01 | Baggage set/get/list 与 header 往返 | S21 | A03 | P2 | `internal/layers/observability/instrument/tracer/baggage_test.go` | IMPLEMENTED | D5-S1-A03-T01 |
 | D5-S21-A03-T02 | Propagator inject/extract traceparent | S21 | A03 | P1 | `internal/layers/observability/instrument/tracer/propagation_test.go` | IMPLEMENTED | D5-S1-A03-T02 |
 | D5-S21-A03-T03 | CLI 子进程环境含 TRACEPARENT + BAGGAGE | S21 | A03 | P2 | `internal/layers/observability/instrument/tracer/propagation_env_test.go` | IMPLEMENTED | D5-S1-A03-T03 |
@@ -153,3 +156,4 @@ D5-S21-A01-T01, D5-S21-A05-T03, D5-S21-A05-T04, D5-S21-A05-T05, D5-S21-A08-T02, 
 | **3.3.0** | **2026-06-20** | **devrix-error-handling-tier1-tier2 (DM-20260620-003)**: D5-S23-A06-T03 Observability.Shutdown errors.Join typed chain (PR-C M3)。IMPLEMENTED 41→42, P0 26→27 |
 | **3.4.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007)**: D5-S25-A01-T01 BoundedInvariant + D5-S25-A02-T01 QuotientInvariant + D5-S25-A03-T01 SynthesizeInvariant (LTL-Lite L4–L6 termination invariants for PR-B 4 ToolChannel). Total 42→45, P0 27→30. S25 新 S section (0→3 A + 3 T) [retroactive S6 archive 2026-07-02 — DM-20260702-008 devrix-token-design-v2 PR #376 (LTL-Lite Bounded advisory T25) 共用此版本条目, 详见 `openspec/archive/2026-07-02-devrix-token-design-v2/acceptance-report.md`] |
 | **3.5.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D5-S25-A04-T01 GrowthBook override 1 flag (bash 30K→50K, Production-Safety 单测 PASS). Total 45→46, P0 30→31. PR-D+E `57469504` 全部合入. 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED) |
+| **3.6.0** | **2026-07-04** | **devrix-runtime-feedback-closure (DM-20260704-003) S5 验收**: D5-S21-A01-T05/T06 tracing ctx 透传 + parent_span continuity (DM-20260704-003) — **2 新 T IMPLEMENTED + 1 P1 DEFERRED v1.1**. Total 46→48, P0 31→33. 详见 `openspec/changes/devrix-runtime-feedback-closure/acceptance-report.md` (verdict: ACCEPTED). |

@@ -25,7 +25,7 @@ func NewTracingStepObserver(sessionID string, obsBridge *observability.Bridge, s
 }
 
 func (o *tracingStepObserver) OnStep(ctx context.Context, step string, before, after int) {
-	_, span := o.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Step+"."+step, tracer.SpanKindInternal,
+	ctx, span := o.startSpan(ctx, telemetry.OpD2_S2_Context_Compression_Step+"."+step, tracer.SpanKindInternal,
 		tracer.Attribute{Key: "compression.step", Value: step},
 		tracer.Attribute{Key: "compression.tokens_before", Value: fmt.Sprintf("%d", before)},
 		tracer.Attribute{Key: "compression.tokens_after", Value: fmt.Sprintf("%d", after)},
