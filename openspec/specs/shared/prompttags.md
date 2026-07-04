@@ -1,7 +1,7 @@
 # shared/prompttags
 
-**Demand:** DM-20260704-004  
-**Change ID:** `mups-prompttags` (archived 2026-07-04)
+**Demand:** DM-20260704-004, DM-20260704-005  
+**Change ID:** `mups-prompttags` (archived 2026-07-04), `mups-prompttags-v2-io-registry` (archived 2026-07-04)
 
 ---
 
@@ -78,3 +78,47 @@ Central registry and generic API for MUPS machine-readable prompt tags.
 4. **staticBase** — PrepareBase / devrix_core static system prompt
 
 Rationale: node-specific dynamic content precedes static base so the model sees task context before global rules.
+
+---
+
+## v2: Unified IO catalog (DM-20260704-005)
+
+**Path:** `internal/shared/prompttags/registry.go` (extended)
+
+### EncodingProfile
+
+| Profile | Format | Role |
+|---------|--------|------|
+| `envelope` | `<tag>payload</tag>` | Execute input/output machine contracts |
+| `linefield` | lines inside envelope | `open_questions` payload |
+| `lineframe` | bare `key: value` lines | Observe/Plan user prompt frames |
+| `wholebody` | bare JSON / fenced JSON | Observe/Plan LLM output |
+
+### Registries
+
+| Registry | Contents |
+|----------|----------|
+| `MUPSRegistry` | Envelope tags (unchanged API) |
+| `LineFrameRegistry` | `observe_user` → `ObserveUserFrame`, `plan_user` → `PlanUserFrame` |
+| `WholeBodyRegistry` | Observe proposals array, Plan strategic plan object |
+| `MUPSIOCatalog` | Flat index of all I/O shapes (parseability invariant) |
+
+### Line frames (user input)
+
+| Frame | Fields (fixed order) |
+|-------|---------------------|
+| `ObserveUserFrame` | work_item_id, directive, prior_mean, scope_goal, scope_open_question, signal, prior_observation_ids, incremental_only |
+| `PlanUserFrame` | work_item_id, directive, observation_ids, observation_summary, depth, max_depth, existing_children, remaining_children, max_children, decompose_used_today, remaining_daily, max_daily, max_iters, parent_scope_in, uncertainty_mean |
+
+### Convergence invariants
+
+1. **Parseability** — each LLM output shape has exactly one profile in `MUPSIOCatalog`
+2. **Monotonic scope** — Observe → Plan → Execute scope tightening (see `scope_validate.go`)
+3. **Observe max 3** — `ValidateObservationProposals` keeps first 3 valid proposals (matches prompt)
+4. **Plan budget** — `applyBudgetCap` / `applySingleModeUncertaintyGate` (unchanged)
+5. **Reject feedback loops** — P2 defer (structured reject into next-round prompt)
+
+### v2 call-site changes
+
+- Observe user frame: when `LastRound.ObservationIDs` present → `prior_observation_ids` + `incremental_only: true`
+- Plan user prompt: emits `uncertainty_mean` when `StrategicPlanInput.UncertaintyMean > 0`
