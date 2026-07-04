@@ -2,7 +2,7 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
-| DM-20260704-004 | MUPS prompttags 框架 — registry/envelope/wholebody/DocBlock + D2/D7 迁移 | mups-prompttags | 2026-07-04 | TBD | ACCEPTED (P0–P3; 8 T D2-S15-A93 + D7-S16-A95) |
+| DM-20260704-004 | MUPS prompttags 框架 — registry/envelope/wholebody/DocBlock + D2/D7 迁移 | mups-prompttags | 2026-07-04 | [#393](https://github.com/fqntxmqee/devrix/pull/393) | ACCEPTED (P0–P3; 8 T D2-S15-A93 + D7-S16-A95) |
 | DM-20260704-003 | Runtime 反馈链路闭环 — i18n ZH 硬规则 + parent-span 连续性 + tool timeout | devrix-runtime-feedback-closure | 2026-07-04 | [#392](https://github.com/fqntxmqee/devrix/pull/392) | ACCEPTED (7 P0 L5; PR #392 merged; S7 archived with follow-up commits) |
 | DM-20260704-002 | MUPS 上下文与工具决策归 D2 — MaterializeForMUPS + 7 步 filter pipeline + D7 迁移 | mups-d2-context-tools-ownership | 2026-07-04 | [#390](https://github.com/fqntxmqee/devrix/pull/390) | ACCEPTED (19 T, L5-D2-MUPS-01..05 P0 PASS) |
 | DM-20260704-001 | D7 MUPS 不确定性驱动 Spawn — Deliverable 与拓扑解耦 (CC-U1～U6) | d7-uncertainty-spawn-decouple | 2026-07-04 | [#387](https://github.com/fqntxmqee/devrix/pull/387) | ACCEPTED (P0/P1 自动化 PASS; staging T-ACC-2/3 defer) |
