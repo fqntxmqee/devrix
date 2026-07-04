@@ -312,21 +312,15 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if strategic != nil && strategic.ReactItersHint > 0 {
 		maxItersOverride = strategic.ReactItersHint
 	}
-	// RH-MUPS-10 (DM-20260701-001): when this is a retry of a non-Pass
-	// round (the spawn policy above decided SpawnInline rather than
-	// SpawnNone/Decompose), the producer must see WHY the previous
-	// attempt failed so it can self-correct. We only surface a non-empty
-	// reason when the prior round's verdict is Fail/Partial AND we are
-	// not the first round; a Pass round carries no reason to learn from.
-	priorReason := ""
-	if item.LastRound != nil && item.LastRound.VerdictKind != types.VerdictPass {
-		priorReason = strings.TrimSpace(item.LastRound.ExitReason)
-		if s := strings.TrimSpace(item.LastRound.SpawnRationale); s != "" {
-			if priorReason != "" {
-				priorReason += "\n"
-			}
-			priorReason += s
+	maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
+	// RH-MUPS-10 (DM-20260701-001): surface deliverable failure + scope anchor on
+	// inline retry; omit spawn rationale / artifact prose (scope drift).
+	priorReason := PriorDeliverableRetryHint(item, deliverableContract)
+	if extra := machineSpawnFeedback(item); extra != "" {
+		if priorReason != "" {
+			priorReason += "\n"
 		}
+		priorReason += extra
 	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
 		Item:                item,

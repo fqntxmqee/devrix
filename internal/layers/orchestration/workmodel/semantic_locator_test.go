@@ -44,7 +44,7 @@ func TestBuildLocator_fullPath(t *testing.T) {
 		Phase:      "execute",
 		Iter:       2,
 	})
-	want := "sess_x/turn-1/loop-3/wi_d0_s0_goal/mups-r2+inline/execute/iter-2"
+	want := "sess_x/turn-1/wi_d0_s0_goal/loop-3/mups-r2+inline/execute/iter-2"
 	if loc != want {
 		t.Fatalf("BuildLocator = %q, want %q", loc, want)
 	}
