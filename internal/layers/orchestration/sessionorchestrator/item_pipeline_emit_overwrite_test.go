@@ -22,7 +22,7 @@ import (
 // WorkItemExecContext for the single ExecuteWorkItem invocation.
 func TestItemPipelineRunner_DoesNotPersistExecutorEmit_PerRun(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
-	exec := NewWorkItemExecutor(&scriptedLLM{}, nil, nil)
+	exec := NewWorkItemExecutor(&scriptedLLM{}, stubExecMUPS{}, nil)
 	runner.Executor = exec
 
 	sessionID := "sess-emit-overwrite"

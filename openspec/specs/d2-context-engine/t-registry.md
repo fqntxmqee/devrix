@@ -1,8 +1,8 @@
 # D2 Context Engine Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 2.15.0
-**Last Updated:** 2026-07-02 (devrix-d2-tool-input-aware-concurrency-and-classifier DM-20260702-009: 7 T IMPLEMENTED 148→155, P0 93→99 — D2-S15-A02-T16 ToolSurface v4 interface + D2-S15-A02-T17 19 工具 IsConcurrencySafe + ToAutoClassifierInput default helpers + D2-S15-A02-T18 partitionToolCalls 改造 + D2-S15-A02-T19 50 文件 e2e 并发版 + D2-S15-A02-T20 toCompactBlock JSONL 序列化 + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认 + D2-S15-A02-T28 inputsEquivalent 19 工具默认实现; 4 tech-debt 关闭 TD-STE-01/02/03/06)
+**Version:** 2.16.0
+**Last Updated:** 2026-07-04 (mups-d2-context-tools-ownership DM-20260704-001: D2-S15-A90..A92 + D2-S18-A90 14 T IMPLEMENTED 155→169, P0 99→111)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `openspec/specs/d2-context-engine/d2-domain.md`
 **Change:** devrix-d2-dsaft-restructuring (DM-20260629-002) S7_Archived 2026-06-29: 8 PR / 44 T / 14 G 全部 PASS; Span Evidence 覆盖率 88% (12/14 canonical T 映射); legacy/ 全删 ~1298 LOC; god fn 拆 5 文件 (pipeline/assembler/materializer/analyzer/background); ValueFlow Alias 3 (D2_Context_Loading_Compression / D2_Session_State_Persistence / D2_Tool_Permission_Sandbox); 2 boundary debt Decision (DM-018 slice-c RESOLVED + cross-domain-fixtures 待定); d2-domain v8.5.0 → v9.0.0; `openspec/archive/2026-06-29-devrix-d2-dsaft-restructuring/`
@@ -544,6 +544,29 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 
 ---
 
+## D2-S15-A90: MUPS MaterializeForMUPS（DM-20260704-001）
+
+> **mups-d2-context-tools-ownership** — D2 统一负责 MUPS LLM 节点 context + tools 决策。
+
+| T ID | 描述 | S 映射 | Test 位置 | Status | Priority |
+|------|------|--------|-----------|--------|----------|
+| **D2-S15-A90-T01** | MaterializeForMUPS(observe) → Tools 空 + obs schema appendix | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_Observe` | **IMPLEMENTED** | P0 |
+| **D2-S15-A90-T02** | MaterializeForMUPS(plan) → Tools 空 + strategic plan appendix | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_Plan` | **IMPLEMENTED** | P0 |
+| **D2-S15-A90-T03** | MaterializeForMUPS(execute, implement) → 完整工具集 | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_ExecuteImplement` | **IMPLEMENTED** | P0 |
+| **D2-S15-A90-T04** | MaterializeForMUPS(execute, readonly) → 无 write/bash | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_ExecuteReadonly` | **IMPLEMENTED** | P0 |
+| **D2-S15-A90-T05** | MaterializeForMUPS(execute, rollup_synth) → Tools 空 | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_ExecuteRollupSynth` | **IMPLEMENTED** | P0 |
+| **D2-S15-A90-T06** | verify/learn/decide → ErrPhaseNotMaterializable | S15-A90 | `materialize/mups_materializer_test.go::TestMaterializeForMUPS_NonMaterializablePhases` | **IMPLEMENTED** | P0 |
+| **D2-S15-A91-T01** | Filter Step 4: explore agent → Fact+Probe only | S15-A91 | `materialize/filter_pipeline_test.go::TestFilterPipeline_ExploreAgent` | **IMPLEMENTED** | P0 |
+| **D2-S15-A91-T02** | Filter Step 5: review task_kind → Bounded hint | S15-A91 | `materialize/filter_pipeline_test.go::TestFilterPipeline_ReviewTaskKind_BoundedHint` | **IMPLEMENTED** | P0 |
+| **D2-S15-A91-T03** | Filter Step 6: readonly profile + MUPS blocked tools | S15-A91 | `materialize/filter_pipeline_test.go::TestFilterPipeline_ReadonlyProfile` | **IMPLEMENTED** | P0 |
+| **D2-S15-A91-T04** | Pipeline order invariant test | S15-A91 | `materialize/filter_pipeline_test.go::TestFilterPipeline_OrderInvariant` | **IMPLEMENTED** | P0 |
+| **D2-S15-A92-T01** | Phase appendix zh/en parity | S15-A92 | `materialize/phase_prompts_test.go` | **IMPLEMENTED** | P0 |
+| **D2-S15-A92-T02** | Execute OutputHints 含 deliverable_schema | S15-A92 | `materialize/phase_prompts_test.go::TestBuildExecuteOutputHints` | **IMPLEMENTED** | P0 |
+| **D2-S18-A90-T01** | Probe iter≥bound → pressure injection | S18-A90 | `enforce/toolround/channel_router_test.go` | **IMPLEMENTED** | P1 |
+| **D2-S18-A90-T02** | ToolRound Router 4-channel dispatch | S18-A90 | `enforce/toolround/channel_router_test.go` | **IMPLEMENTED** | P1 |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -557,3 +580,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.12.0** | **2026-06-29** | **DM-20260629-002 PR-7 — span-coverage**: (1) §Canonical T 映射 加 Span Evidence 列（12/14 mapped = 86%）；(2) §Span Evidence Coverage 新增章节 + Active D2 Spans (23) 列表 + T-Without-Span Tracker（2 排除：compile-time invariant + CI layout guard）；(3) Coverage Gate ≥80% CI 守门草案 |
 | **2.14.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D2-S15-A02-T06..T12 + T14 ToolSpec v3 + 19 工具默认 metadata + silent default gate (Phase A 8 T) + D2-S15-A02-T02..T05 Filter v2 三维 (Phase D 4 T) + D2-S15-A02-T13 TruncateWithMarker (Phase C) + D2-S15-A02-T15 cross-consistency (Phase D) — **19 新 T 全部 P0 IMPLEMENTED**. Total 129→148, P0 76→93. PR-A commit 74fba9c5 已合入 master #374; PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). [retroactive S6 archive 2026-07-02 — DM-20260702-008 devrix-token-design-v2 PR #376 (16 P0 T) 共用此版本条目, 详见 `openspec/archive/2026-07-02-devrix-token-design-v2/acceptance-report.md`] |
 | **2.15.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D2-S15-A02-T16 ToolSurface v4 interface (IsConcurrencySafe + ToAutoClassifierInput) + D2-S15-A02-T17 19 工具 default helpers (4 override + 15 default) + D2-S15-A02-T18 partitionToolCalls 改造 (AC15-AC17+AC19-AC21 7 invariant tests) + D2-S15-A02-T19 50 文件 e2e 并发版 + D2-S15-A02-T20 toCompactBlock JSONL 序列化 + D2-S15-A02-T21 19 工具 ToAutoClassifierInput 默认 + D2-S15-A02-T28 inputsEquivalent 19 工具默认 — **7 新 T 全部 IMPLEMENTED (6 P0 + 1 P2)**. Total 148→155, P0 93→99. 5 PR (PR-A `3257e0bb` + PR-B `8e61bb13` + PR-C `dd8736e7` + PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 4 tech-debt 关闭 (TD-STE-01/02/03/06). 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |
+| **2.16.0** | **2026-07-04** | **mups-d2-context-tools-ownership (DM-20260704-001) S5 验收**: D2-S15-A90-T01..T06 MaterializeForMUPS + D2-S15-A91-T01..T04 filter pipeline + D2-S15-A92-T01..T02 phase prompts + D2-S18-A90-T01..T02 toolround — **14 新 T IMPLEMENTED (12 P0 + 2 P1)**. Total 155→169, P0 99→111. 详见 `openspec/changes/mups-d2-context-tools-ownership/acceptance-report.md` (verdict: ACCEPTED). |

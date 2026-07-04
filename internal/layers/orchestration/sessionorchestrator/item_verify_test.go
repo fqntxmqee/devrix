@@ -71,20 +71,3 @@ func TestVerifyArtifactForWorkItem_ScopeOnlyIsPartial(t *testing.T) {
 		t.Fatalf("verdict = %v, want partial for scope-only", v.Kind)
 	}
 }
-
-func TestFilterPipelineTools_RemovesAskUser(t *testing.T) {
-	in := []ToolSchema{
-		{Name: "read_file"},
-		{Name: "ask_user_question"},
-		{Name: "grep"},
-	}
-	out := filterPipelineTools(in)
-	if len(out) != 2 {
-		t.Fatalf("len = %d, want 2", len(out))
-	}
-	for _, tool := range out {
-		if tool.Name == "ask_user_question" {
-			t.Fatal("ask_user_question should be filtered")
-		}
-	}
-}

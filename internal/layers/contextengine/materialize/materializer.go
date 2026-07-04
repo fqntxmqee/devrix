@@ -56,7 +56,7 @@ func (m *DefaultMaterializer) Materialize(_ context.Context, req Request) (Resul
 	return Result{
 		SystemPrompt: sys,
 		Messages:     msgs,
-		Tools:        toolsForProfile(req.Policy.ToolProfile),
+		Tools:        nil,
 		MessageCount: len(msgs),
 		TokenEst:     tokEst,
 	}, nil
@@ -99,7 +99,7 @@ func (m *DefaultMaterializer) materializeSubTurn(req Request) (Result, error) {
 	return Result{
 		SystemPrompt: sys,
 		Messages:     msgs,
-		Tools:        toolsForProfile(req.Policy.ToolProfile),
+		Tools:        nil,
 		MessageCount: len(msgs),
 		TokenEst:     tokEst,
 	}, nil

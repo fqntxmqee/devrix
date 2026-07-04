@@ -96,24 +96,3 @@ func truncateMessagesToBudget(msgs []types.Message, budget int, counter *token.C
 	last.Content = counter.TruncateToTokens(last.Content, budget)
 	return []types.Message{last}
 }
-
-// toolsForProfile returns the readonly ToolDescriptor set when the WorkItem's
-// ToolProfile is "readonly"; otherwise nil (executor uses the full tool set
-// from the ContextPreparer fallback merge).
-//
-// DM-20260629-002 PR-3: extracted from materializer.go (was 13 LOC).
-func toolsForProfile(profile string) []ToolDescriptor {
-	switch profile {
-	case "rollup_synth":
-		return []ToolDescriptor{} // synthesis-only: no tools
-	case "implement", "":
-		return nil // executor uses full tool set from ContextPreparer fallback merge
-	case "readonly":
-		return []ToolDescriptor{
-			{Name: "read_file", Description: "Read file contents"},
-			{Name: "grep", Description: "Search codebase"},
-		}
-	default:
-		return nil
-	}
-}

@@ -3,8 +3,8 @@
 **Capability:** d2-d7-boundary  
 **Status:** Active  
 **Version:** 2.1.0  
-**Last Updated:** 2026-06-25  
-**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）+ devrix-d2-queryloop-dismantle（DM-20260618-010）+ devrix-d7-mups-v4-phase3-execute（DM-20260625-001，PR-C1 跨域类型上提 shared/types）  
+**Last Updated:** 2026-07-04  
+**Change ID:** devrix-d2-sa-refine（DM-009）+ devrix-d7-turn-orchestration（DM-020）+ devrix-d2-queryloop-dismantle（DM-20260618-010）+ devrix-d7-mups-v4-phase3-execute（DM-20260625-001，PR-C1 跨域类型上提 shared/types）+ **mups-d2-context-tools-ownership（DM-20260704-001）**  
 **Demand ID:** DM-20260614-009 / DM-20260614-020 / DM-20260618-010 / DM-20260625-001  
 **Parent (D2):** `openspec/specs/d2-context-engine/d2-domain.md`  
 **Parent (D7):** `openspec/specs/d7-orchestration/d7-domain.md`
@@ -258,3 +258,69 @@ MUPS Learn 节点（D7-S11）通过 `Memory.Persist` 3 通道（skill / feedback
 | shared/types/Artifact import | **所有域允许**（PR-C1 跨域共享类型） |
 
 详见 `openspec/specs/d7-orchestration/d7-domain.md` §MUPS 5 节点管道 与 `design.md` §⑦ 跨域类型上提。
+
+---
+
+## 10. MUPS 上下文与工具决策 — D2 统一负责（DM-20260704-001）
+
+> **Change:** `mups-d2-context-tools-ownership` — D2 拥有 MUPS LLM 节点的 context + tools 决策；D7 只传 phase 参数并调 D3。
+
+### 10.1 职责 reaffirmation
+
+| 能力 | D7 (Leader) | D2 (Follower) |
+|------|-------------|---------------|
+| MUPS 节点顺序 / WorkItem 状态机 | ✅ | ❌ |
+| InvokeLLM → D3 | ✅ | ❌（禁止 D2→D3） |
+| `MaterializeForMUPS` 调用 | 发起（传 `MUPSContextRequest`） | 实现（返回 `MUPSPreparedContext`） |
+| System prompt 组装（MUPS 节点） | ❌ | ✅（PromptAssembler + phase registry） |
+| Tool filter pipeline（7 步） | ❌ | ✅（含 Filter v2） |
+| ExecuteToolRound + ToolChannel | 传 TaskKind + budget | ✅（`enforce/toolround/`） |
+| PlanChannel（per-PlanKind 策略） | ✅ | ❌ |
+| Verify / Learn / Decide | ✅ Go-only | ❌ 不调用 Materialize |
+
+### 10.2 契约接口
+
+```go
+// shared/contracts/mups_context.go
+type IMUPSContextMaterializer interface {
+    MaterializeForMUPS(ctx context.Context, req MUPSContextRequest) (MUPSPreparedContext, error)
+}
+```
+
+**挂载：** `bootstrap/turn_adapter.go` → `contextEngineAdapter`；D7 `sessionorchestrator` 通过 `MUPS` 字段注入。
+
+### 10.3 D7 → D2 调用矩阵
+
+| MUPS 节点 | D2 调用 | LLM | Tools |
+|-----------|---------|-----|-------|
+| Observe (LLM) | `MaterializeForMUPS(phase=observe)` | D7→D3 | 空 |
+| Plan (LLM) | `MaterializeForMUPS(phase=plan)` | D7→D3 | 空 |
+| Execute | `MaterializeForMUPS(phase=execute)` 每轮 | D7→D3 | 已过滤 |
+| Verify / Learn / Decide | **不调用** | — | — |
+
+### 10.4 Tool Filter Pipeline（D2 专属，有序）
+
+```text
+ListTools → Permission → AgentRole → PerEmissionClass → PerTaskKind → ToolProfile → i18n descriptors
+```
+
+实现：`internal/layers/contextengine/materialize/filter_pipeline.go`
+
+### 10.5 边界硬约束（新增）
+
+| 约束 | 含义 |
+|------|------|
+| D7 **MUST NOT** import `contextengine/enforce/tools/filter` | CI: `d7_no_tool_filter_test.go` |
+| D7 **MUST NOT** 硬编码 tool name 列表用于 MUPS 过滤 | 同上 |
+| D7 **MUST NOT** 在 proposer/executor 组装 phase appendix | Observe/Plan appendix 在 D2 `phase_prompts.go` |
+| D2 **MUST NOT** import D7 orchestration 包 | 现有 `d2_thin_test.go` |
+| D2 **MUST NOT** 调用 D3 | DM-020 不变 |
+
+### 10.6 相关文档
+
+| 文档 | 用途 |
+|------|------|
+| `openspec/changes/mups-d2-context-tools-ownership/design.md` | 完整架构设计 |
+| `openspec/changes/mups-d2-context-tools-ownership/acceptance-report.md` | S5 验收报告 |
+| `openspec/specs/d2-context-engine/t-registry.md` §D2-S15-A90 | D2 T 点 |
+| `openspec/specs/d7-orchestration/t-registry.md` §D7-S2-A90 | D7 T 点 |

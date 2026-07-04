@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
 // ItemPipelineWireDeps holds production wiring for per-WorkItem MUPS (Phase D).
@@ -52,7 +53,11 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		return nil, nil, fmt.Errorf("wire item pipeline: ContextPreparer required (WorkItemExecutor needs D2-S15 to assemble SystemPrompt + Tools)")
 	}
 	learner := WireDefaultMUPSLearner()
-	executor := sessionorchestrator.NewWorkItemExecutor(deps.LLMInvoker, deps.CtxPreparer, deps.ToolExec)
+	mups, ok := deps.CtxPreparer.(contracts.IMUPSContextMaterializer)
+	if !ok {
+		return nil, nil, fmt.Errorf("wire item pipeline: ContextPreparer must implement IMUPSContextMaterializer")
+	}
+	executor := sessionorchestrator.NewWorkItemExecutor(deps.LLMInvoker, mups, deps.ToolExec)
 	if mat := newDefaultMaterializer(); mat != nil {
 		executor.Materializer = mat
 	}
@@ -64,12 +69,12 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		TrackMode:  deps.TrackMode,
 		ObservationProposer: sessionorchestrator.NewLLMObservationProposer(
 			deps.LLMInvoker,
-			deps.CtxPreparer,
+			mups,
 			i18n.ParseLanguage(deps.PromptLanguage),
 		),
 		StrategicPlanProposer: sessionorchestrator.NewLLMStrategicPlanProposer(
 			deps.LLMInvoker,
-			deps.CtxPreparer,
+			mups,
 			i18n.ParseLanguage(deps.PromptLanguage),
 		),
 	})

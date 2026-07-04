@@ -67,7 +67,36 @@ func (s *scriptedTools) ExecuteRound(_ context.Context, _ ToolRoundRequest) (Too
 	return ToolRoundResult{Results: []ToolResult{{Output: "ok"}}}, nil
 }
 
-// stubCtxPreparer returns canned SystemPrompt + Tools.
+// stubExecMUPS implements MaterializeForMUPS for executor tests.
+type stubExecMUPS struct {
+	system string
+	tools  []contracts.MUPSToolDescriptor
+}
+
+func (s stubExecMUPS) MaterializeForMUPS(_ context.Context, req contracts.MUPSContextRequest) (contracts.MUPSPreparedContext, error) {
+	var msgs []types.Message
+	if req.UserMessage != "" && req.Turn != nil {
+		msgs = []types.Message{{
+			SessionID: req.Turn.SessionID,
+			Role:      types.MessageRoleUser,
+			Content:   req.UserMessage,
+		}}
+	}
+	return contracts.MUPSPreparedContext{
+		SystemPrompt: s.system,
+		Messages:     msgs,
+		Tools:        s.tools,
+	}, nil
+}
+
+func workItemExecTestCtx(sessionID string) (context.Context, string) {
+	tm := workmodel.NewTaskManager()
+	goal, _ := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{Kind: workmodel.WorkKindGoal, Title: "g", Directive: "d"})
+	child, _ := tm.CreateWorkItem(sessionID, workmodel.CreateWorkItemInput{ParentID: goal.ID, Kind: workmodel.WorkKindExplore, Title: "c", Directive: "d"})
+	return WithWorkItemExecContext(context.Background(), WorkItemExecContext{Item: child, Tasks: tm}), child.ID
+}
+
+// stubCtxPreparer returns canned SystemPrompt + Tools (legacy Prepare tests).
 type stubCtxPreparer struct {
 	system string
 	tools  []ToolSchema
@@ -93,13 +122,14 @@ func TestWorkItemExecutor_FindingsJSONFinalIterDisablesTools(t *testing.T) {
 	toolsExec := &scriptedTools{results: []ToolRoundResult{
 		{Results: []ToolResult{{ToolCallID: "c", Output: "ok"}}},
 	}}
-	prep := stubCtxPreparer{tools: []ToolSchema{{Name: "read_file"}}}
+	prep := stubExecMUPS{tools: []contracts.MUPSToolDescriptor{{Name: "read_file"}}}
 	exec := NewWorkItemExecutor(llm, prep, toolsExec)
 	exec.MaxIters = 5
-	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{
-		DeliverableContract: contract,
-	})
-	res, err := exec.ExecuteWorkItem(ctx, "s1", "i1", "review plan code")
+	ctx, itemID := workItemExecTestCtx("s1")
+	ec, _ := WorkItemExecContextFrom(ctx)
+	ec.DeliverableContract = contract
+	ctx = WithWorkItemExecContext(ctx, ec)
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "review plan code")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
@@ -118,8 +148,9 @@ func TestWorkItemExecutor_FinalAnswerNoTools(t *testing.T) {
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{Content: "hello ", FinishReason: "stop"}, {Content: "world", FinishReason: "stop"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{system: "sys"}, nil)
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "review d2领域代码")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{system: "sys"}, nil)
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "review d2领域代码")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
@@ -166,8 +197,9 @@ func TestWorkItemExecutor_ToolLoop(t *testing.T) {
 	tools := &scriptedTools{results: []ToolRoundResult{
 		{Results: []ToolResult{{ToolCallID: "call_1", Output: "package x"}}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, tools)
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "explain x")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, tools)
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "explain x")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
@@ -221,9 +253,10 @@ func TestWorkItemExecutor_MaxItersCap(t *testing.T) {
 	tools := &scriptedTools{results: []ToolRoundResult{
 		{Results: []ToolResult{{ToolCallID: "c", Output: "ok"}}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, tools)
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, tools)
 	exec.MaxIters = 3
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "loop forever")
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "loop forever")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
@@ -247,8 +280,9 @@ func TestWorkItemExecutor_NoTools_Wired_Degrades(t *testing.T) {
 			{ID: "c", Name: "noop", Input: "{}"},
 		}, FinishReason: "tool_calls"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "x")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "x")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
@@ -261,8 +295,9 @@ func TestWorkItemExecutor_NoTools_Wired_Degrades(t *testing.T) {
 }
 
 func TestWorkItemExecutor_RequiresLLM(t *testing.T) {
-	exec := &DefaultWorkItemExecutor{Context: stubCtxPreparer{}, Tools: &scriptedTools{}}
-	_, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "x")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := &DefaultWorkItemExecutor{MUPS: stubExecMUPS{}, Tools: &scriptedTools{}}
+	_, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "x")
 	if err == nil {
 		t.Fatal("expected error when LLMInvoker is nil")
 	}
@@ -270,8 +305,9 @@ func TestWorkItemExecutor_RequiresLLM(t *testing.T) {
 
 func TestWorkItemExecutor_RequiresDirective(t *testing.T) {
 	llm := &scriptedLLM{}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	_, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "   ")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
+	_, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "   ")
 	if err == nil {
 		t.Fatal("expected error when directive is blank")
 	}
@@ -282,8 +318,9 @@ func TestWorkItemExecutor_RequiresDirective(t *testing.T) {
 
 func TestWorkItemExecutor_LLMError(t *testing.T) {
 	llm := &errLLM{err: errors.New("upstream broken")}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "x")
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "x")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -341,10 +378,13 @@ func TestWorkItemExecutor_EmitHook_Hotfix_2026_06_27(t *testing.T) {
 	tools := &scriptedTools{results: []ToolRoundResult{
 		{Results: []ToolResult{{ToolCallID: "call_1", Output: "package x"}}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, tools)
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, tools)
 
-	ctx := WithWorkItemExecContext(context.Background(), WorkItemExecContext{Emit: emit})
-	if _, err := exec.ExecuteWorkItem(ctx, "sess_emit", "item_emit", "explain x"); err != nil {
+	ctx, itemID := workItemExecTestCtx("sess_emit")
+	ec, _ := WorkItemExecContextFrom(ctx)
+	ec.Emit = emit
+	ctx = WithWorkItemExecContext(ctx, ec)
+	if _, err := exec.ExecuteWorkItem(ctx, "sess_emit", itemID, "explain x"); err != nil {
 		t.Fatalf("ExecuteWorkItem: %v", err)
 	}
 
@@ -446,9 +486,10 @@ func TestWorkItemExecutor_NilEmit_NoOp(t *testing.T) {
 	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
 		{{Content: "ok", FinishReason: "stop"}},
 	}}
-	exec := NewWorkItemExecutor(llm, stubCtxPreparer{}, nil)
+	ctx, itemID := workItemExecTestCtx("s1")
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
 	// Emit intentionally nil
-	res, err := exec.ExecuteWorkItem(context.Background(), "s1", "i1", "noop")
+	res, err := exec.ExecuteWorkItem(ctx, "s1", itemID, "noop")
 	if err != nil {
 		t.Fatalf("ExecuteWorkItem with nil Emit: %v", err)
 	}

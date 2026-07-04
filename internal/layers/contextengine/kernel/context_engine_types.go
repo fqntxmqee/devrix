@@ -5,6 +5,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce"
 	"github.com/devrix/devrix/internal/layers/contextengine/enforce/tools"
+	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/persist/transcript"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare"
@@ -95,6 +96,8 @@ type ContextEngine struct {
 	// use; non-nil enables the surface dispatch path in W9.
 	surfaces []contracts.ToolSurface
 	filters  []contracts.ToolFilter
+
+	partitionMaterializer *materialize.DefaultMaterializer
 
 	compressionStates sync.Map // sessionID → *persist.ContentReplacementState
 
