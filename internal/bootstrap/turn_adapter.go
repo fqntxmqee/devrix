@@ -3,7 +3,12 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture"
 	"github.com/devrix/devrix/internal/layers/contextengine"
@@ -27,6 +32,29 @@ import (
 // 128K LLM context, leaving room for system prompt, tools, response, and
 // tool results.
 const compressThreshold = 32000
+
+// DM-20260704-003: tool-level timeout defense. Default 60s, overridable via
+// DEVRIX_TOOL_TIMEOUT_SECONDS env. P0 fail-closed: tool hang → Turn unblock
+// within ~toolTimeout + small slack. Per-tool override is v1.1 follow-up.
+const defaultToolTimeoutSeconds = 60
+
+const envToolTimeoutSeconds = "DEVRIX_TOOL_TIMEOUT_SECONDS"
+
+func loadToolTimeoutSeconds() time.Duration {
+	raw := os.Getenv(envToolTimeoutSeconds)
+	if raw == "" {
+		return defaultToolTimeoutSeconds * time.Second
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return defaultToolTimeoutSeconds * time.Second
+	}
+	return time.Duration(n) * time.Second
+}
+
+// errToolTimeout is returned by executeOne when the inner tool call exceeds
+// the configured deadline. Adapters map it to a fail-closed ToolResult.
+var errToolTimeout = errors.New("tool execution timeout")
 
 // contextEngineAdapter implements sessionorchestrator.ContextPreparer, sessionorchestrator.ToolRoundExecutor,
 // and sessionorchestrator.SessionPersister by delegating to the context engine internals.
@@ -444,19 +472,42 @@ func (a *contextEngineAdapter) findSpec(ctx context.Context, name string) (*cont
 // executeOne runs the full gate → surface → fallback chain for a single
 // tool call. Shared by both the sequential and parallel dispatch paths.
 func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID string, tc llmgateway.ToolCall) sessionorchestrator.ToolResult {
+	// DM-20260704-003: tool-level timeout defense. A single hung tool must
+	// not block the entire Turn loop. env DEVRIX_TOOL_TIMEOUT_SECONDS overrides
+	// the 60s default. The new ctx shadows toolCtx for the inner calls; we
+	// still observe caller's cancellation.
+	timeout := loadToolTimeoutSeconds()
+	callCtx, cancel := context.WithTimeout(toolCtx, timeout)
+	defer cancel()
+	start := time.Now()
+	defer func() {
+		if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+			slog.Warn("tool execution timeout",
+				"tool", tc.Name,
+				"session_id", sessionID,
+				"tool_call_id", tc.ID,
+				"timeout_seconds", int(timeout/time.Second),
+				"elapsed_seconds", int(time.Since(start).Seconds()),
+			)
+		}
+	}()
+
 	// DM-20260617-006: gate via IPermissionGate (suggestion 3) and
 	// propagate risk into the D2 ToolCall (suggestion 4 partial). When
 	// a.perm is nil we leave the gate open — adapter is shared with
 	// tests/mocks that don't wire permission state.
 	risk := a.riskForTool(tc.Name)
-	if a.perm != nil && !a.perm.Request(toolCtx, sessionID, tc.Name, tc.Input, risk) {
+	if a.perm != nil && !a.perm.Request(callCtx, sessionID, tc.Name, tc.Input, risk) {
 		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: "permission denied"}
 	}
 	// TOOL-SURFACE-1 (W9): prefer surface dispatch when available.
 	if surf, ok := a.findSurface(tc.Name); ok {
-		res, err := surf.Execute(toolCtx, tc.Name, tc.Input, "")
+		res, err := surf.Execute(callCtx, tc.Name, tc.Input, "")
 		if err != nil {
 			return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
+		}
+		if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+			return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: errToolTimeout.Error()}
 		}
 		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Output: res.Output, Error: res.Error}
 	}
@@ -467,13 +518,16 @@ func (a *contextEngineAdapter) executeOne(toolCtx context.Context, sessionID str
 			Error:      fmt.Sprintf("turn adapter: no surface or runner for tool %q", tc.Name),
 		}
 	}
-	result, err := a.tools.Execute(toolCtx, contextengine.ToolCall{
+	result, err := a.tools.Execute(callCtx, contextengine.ToolCall{
 		ID:        tc.ID,
 		Name:      tc.Name,
 		Input:     tc.Input,
 		RiskLevel: risk,
 	})
 	if err != nil {
+		if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+			return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: errToolTimeout.Error()}
+		}
 		return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Error: err.Error()}
 	}
 	return sessionorchestrator.ToolResult{ToolCallID: tc.ID, Output: result.Output, Error: result.Error}
