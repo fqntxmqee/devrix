@@ -168,6 +168,7 @@ type feishuSessionStream struct {
 	cardkitSequence    int
 	lastStreamPutAt    time.Time
 	lastStreamPutRunes int
+	findingsJSONPlaceholderShown bool
 }
 
 // normalizeProgressStyle always returns structured; legacy card/compact modes were removed.
@@ -529,7 +530,7 @@ func (a *FeishuAdapter) finalizeStructuredSession(ctx context.Context, sessionID
 	// at streaming time already drops the M2.7 replay pattern at the source.
 	// Stripping tool-call XML still runs so the card body never carries
 	// raw <function_calls> blocks (that's an LLM protocol leak, not dedup).
-	responseText = textutil.StripToolCallXML(responseText)
+	responseText = textutil.StripFindingsJSONBlocks(textutil.StripToolCallXML(responseText))
 	stream.mu.Unlock()
 	if cardkitActive {
 		// Pass trimmedSummary so finalizeReplyCardStreaming can strip it
@@ -827,6 +828,12 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	if strings.TrimSpace(chunk) == "" {
 		return nil
 	}
+	if textutil.LooksLikeFindingsJSONStream(chunk) {
+		stream := a.sessionStream(sessionID)
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		return a.patchFindingsJSONPlaceholderLocked(ctx, stream, sessionID, chatID)
+	}
 
 	stream := a.sessionStream(sessionID)
 	stream.mu.Lock()
@@ -874,6 +881,29 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	useCardkit := stream.cardkitEnabled && stream.replyCardID != ""
 	stream.mu.Unlock()
 	if useCardkit {
+		return a.streamReplyElement(ctx, stream, content, false)
+	}
+	return a.patchResponseCard(ctx, sessionID, chatID, stream, content)
+}
+
+func (a *FeishuAdapter) patchFindingsJSONPlaceholderLocked(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
+	if stream.findingsJSONPlaceholderShown {
+		return nil
+	}
+	stream.findingsJSONPlaceholderShown = true
+	if stream.textBuffer.Len() > 0 && !strings.HasSuffix(stream.textBuffer.String(), "\n") {
+		stream.textBuffer.WriteString("\n")
+	}
+	stream.textBuffer.WriteString("⏳ 正在整理 review 结论…")
+	content := stream.textBuffer.String()
+	if !a.streamingEnabled {
+		return a.patchResponseCard(ctx, sessionID, chatID, stream, content)
+	}
+	started := stream.responseMsgID != "" || stream.cardkitEnabled
+	if !started {
+		return a.startStreamingReplyCard(ctx, sessionID, chatID, stream, content)
+	}
+	if stream.cardkitEnabled && stream.replyCardID != "" {
 		return a.streamReplyElement(ctx, stream, content, false)
 	}
 	return a.patchResponseCard(ctx, sessionID, chatID, stream, content)

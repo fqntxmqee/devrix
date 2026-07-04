@@ -120,6 +120,17 @@ func parseDeliverablePayload(contract DeliverableContract, summary string) *Deli
 	if summary == "" {
 		return nil
 	}
+	c := contract.Normalized()
+	if c.Structure == DeliverableStructureFindingsJSON {
+		if p, ok := parseFindingsJSONPayload(summary); ok {
+			p.Schema = DeliverableSchema(contract.CacheKey())
+			return p
+		}
+		return &DeliverablePayload{
+			Schema: DeliverableSchema(contract.CacheKey()),
+			Raw:    summary,
+		}
+	}
 	start := strings.Index(summary, "{")
 	end := strings.LastIndex(summary, "}")
 	if start >= 0 && end > start {
@@ -204,7 +215,12 @@ func contractFindingsComplete(c DeliverableContract, payload *DeliverablePayload
 	if payload == nil || len(payload.Findings) == 0 {
 		return false
 	}
-	for _, f := range payload.Findings {
+	normalized := normalizeDeliverableFindings(payload.Findings)
+	if len(normalized) == 0 {
+		return false
+	}
+	payload.Findings = normalized
+	for _, f := range normalized {
 		if c.Citation == DeliverableCitationFileLine && strings.TrimSpace(f.File) == "" {
 			return false
 		}

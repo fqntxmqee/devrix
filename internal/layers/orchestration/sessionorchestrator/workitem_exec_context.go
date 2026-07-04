@@ -11,6 +11,22 @@ import (
 )
 
 type workItemExecCtxKey struct{}
+type suppressExecuteTextEmitKey struct{}
+
+// WithSuppressExecuteTextEmit hides LLM text chunks from IM streaming (e.g.
+// findings_json synthesis turn) while still accumulating artifact content.
+func WithSuppressExecuteTextEmit(ctx context.Context) context.Context {
+	return context.WithValue(ctx, suppressExecuteTextEmitKey{}, true)
+}
+
+// SuppressExecuteTextEmit reports whether Execute should omit text EngineEvents.
+func SuppressExecuteTextEmit(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, _ := ctx.Value(suppressExecuteTextEmitKey{}).(bool)
+	return v
+}
 
 // WorkItemExecContext carries the active WorkItem for Materialize during Execute.
 type WorkItemExecContext struct {

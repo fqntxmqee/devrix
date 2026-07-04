@@ -13,7 +13,7 @@ func TestVerifyDeliverableContract_FindingsJSONRequired(t *testing.T) {
 	if got.Status != DeliverableStatusIncomplete || got.Reason != "planning_meta" {
 		t.Fatalf("status=%q reason=%q, want planning_meta", got.Status, got.Reason)
 	}
-	jsonSummary := `{"findings":[{"severity":"P0","file":"internal/foo.go","line":42,"message":"nil deref"}]}`
+	jsonSummary := `{"findings":[{"severity":"P0","file":"internal/foo.go","line":42,"title":"nil deref"}]}`
 	got = VerifyDeliverableContract(c, jsonSummary, "final_answer")
 	if got.Status != DeliverableStatusComplete {
 		t.Fatalf("status=%q reason=%q", got.Status, got.Reason)

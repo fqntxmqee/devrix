@@ -38,14 +38,14 @@ func TestPrepareStrategicScopeIn_D2KernelFallback(t *testing.T) {
 func TestFormatDeliverablePayloadForIM(t *testing.T) {
 	got := FormatDeliverablePayloadForIM(&DeliverablePayload{
 		Findings: []DeliverableFinding{
-			{Severity: "p0", Title: "race in wire", File: "internal/foo.go", Line: 42},
+			{Severity: "p0", Title: "race in wire", File: "internal/foo.go", Line: 42, Evidence: "unsynchronized write", Impact: "data race", Recommendation: "add mutex"},
 			{Severity: "P1", Title: "missing ctx", File: "internal/bar.go", Line: 10},
 		},
 	})
 	if got == "" {
 		t.Fatal("expected non-empty report")
 	}
-	for _, part := range []string{"**P0:** 1", "**P1:** 1", "race in wire", "internal/foo.go:42", "missing ctx"} {
+	for _, part := range []string{"**P0:** 1", "**P1:** 1", "race in wire", "internal/foo.go:42", "missing ctx", "证据:", "影响:", "建议:"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("report missing %q:\n%s", part, got)
 		}
@@ -61,7 +61,7 @@ func TestExtractSessionDeliverable_PrefersStructuredFindings(t *testing.T) {
 	}
 	round := &WorkItemPipelineRound{
 		WorkItemID:        goal.ID,
-		DeliverableStatus: DeliverableStatusComplete,
+		DeliverableStatus: DeliverableStatusIncomplete,
 		ArtifactSummary:   "I'll explore the kernel directory first...",
 		StructuredDeliverable: &DeliverablePayload{
 			Findings: []DeliverableFinding{

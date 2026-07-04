@@ -203,9 +203,11 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		ctx = workmodel.WithLocatorIter(ctx, iter+1)
 
 		iterTools := tools
+		iterCtx := ctx
 		if ec, ok := WorkItemExecContextFrom(ctx); ok && iter == max-1 {
 			if workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
 				iterTools = nil
+				iterCtx = WithSuppressExecuteTextEmit(ctx)
 				var synth strings.Builder
 				if hint := workmodel.DeliverableFinalAnswerHint(ec.DeliverableContract); hint != "" {
 					synth.WriteString(hint)
@@ -233,7 +235,7 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		}
 
 		emit := emitFromExecContext(ctx)
-		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(ctx, sessionID, systemPrompt, iterTools, messages, userContextPrepend, emit, itemID, iter+1, result)
+		stopReason, iterErr, newMessages, finishReason := e.stepOneIter(iterCtx, sessionID, systemPrompt, iterTools, messages, userContextPrepend, emit, itemID, iter+1, result)
 		// Span per iter (DM-20260626-009 follow-up): a ReAct iter can stall
 		// for many seconds (LLM + tool round); without this span "why did
 		// this WorkItem take 16s?" required reading code instead of
@@ -424,11 +426,13 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	for chunk := range ch {
 		if chunk.Content != "" {
 			content.WriteString(chunk.Content)
-			emitEvent(ctx, emit, &contracts.EngineEvent{
-				Type:      "text",
-				Content:   chunk.Content,
-				SessionID: sessionID,
-			})
+			if !SuppressExecuteTextEmit(ctx) {
+				emitEvent(ctx, emit, &contracts.EngineEvent{
+					Type:      "text",
+					Content:   chunk.Content,
+					SessionID: sessionID,
+				})
+			}
 		}
 		if chunk.Thinking != "" {
 			content.WriteString(chunk.Thinking)
