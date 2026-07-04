@@ -66,19 +66,17 @@ go test ./internal/layers/orchestration/sessionorchestrator/...   FAIL (1 test)
 
 | 文档 | 动作 | 状态 |
 |------|------|------|
-| `openspec/changes/mups-prompttags/specs/shared/prompttags.md` | P2/P3 delta 更新 | DONE |
+| `openspec/specs/shared/prompttags.md` | 正式域 spec 合入 + MUPS prompt order | DONE |
 | `openspec/specs/d2-context-engine/t-registry.md` | +4 T (D2-S15-A93) | DONE |
 | `openspec/specs/d7-orchestration/t-registry.md` | +4 T (D7-S16-A95) | DONE |
 | `openspec/t-registry.md` | 索引计数更新 | DONE |
-| `openspec/specs/` 正式域 spec 合入 | 验收后合入 main 前 | PENDING（S6 交付门禁） |
 
 ## 6. 结论
 
-P0–P3 全部完成；prompttags 包提供 registry、envelope、wholebody、linefield、DocBlock API；D2 i18n 与 D7 proposer/findings 已接入。**Verdict: ACCEPTED**（排除 1 个 pre-existing sessionorchestrator 测试失败）。
+P0–P3 全部完成；prompttags 包提供 registry、envelope、wholebody、linefield、DocBlock API；D2 i18n 与 D7 proposer/findings 已接入；`TestMaterialize_NoObsTaxonomyInPrivateChainTemplate` 已修复（locale-aware 断言）。**Verdict: ACCEPTED**
 
 ## 7. Deferred
 
 | 项 | 原因 |
 |----|------|
-| `TestMaterialize_NoObsTaxonomyInPrivateChainTemplate` 修复 | pre-existing；需单独 change 调整 Execute hints footer 或测试断言 |
-| `openspec/specs/shared/prompttags.md` 正式域 spec | S6 合入 main 前写入 |
+| （无） | — |

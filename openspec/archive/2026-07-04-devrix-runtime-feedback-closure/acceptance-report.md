@@ -148,14 +148,17 @@ GOTMPDIR=/private/tmp GOCACHE=/private/tmp/go-cache-rfc \
 5. D7 S15 PARTIAL rollup E2E / trace replay stub（D7-S15-IT01/IT02，独立 follow-up）
 6. D5-S21-A01-T07 (P1) orphan marker — 评估后认为非 orphan，defer 到 v1.1 进一步评估
 
-## 9. S6-交付 待办
+## 9. 领域文档同步（S5 → S6 门禁）
 
-- [ ] 拉分支 `feat/devrix-runtime-feedback-closure` (从 `origin/master`)
-- [ ] 4 个生产文件修改 + 4 个测试文件新增 → 1 commit (Conventional Commits)
-- [ ] PR title: `devrix-runtime-feedback-closure: i18n ZH 硬规则 + tracing parent-span 连续性 + tool-level timeout`
-- [ ] PR body 引用 demand.md + proposal.md + design.md + tasks.md
-- [ ] CI 全绿 + auto-merge
-- [ ] S6-归档：`openspec/archive/2026-07-04-devrix-runtime-feedback-closure/`
-- [ ] 更新 `openspec/demand-archive-index.md` 追加 DM-20260704-003
-- [ ] 更新 `openspec/t-registry.md` + 3 个域 t-registry.md
-- [ ] 域文档 CHANGELOG.md 各追加一行
+| 文件路径 | 变更摘要 | 已更新 |
+|----------|----------|--------|
+| `openspec/specs/d2-context-engine/runtime-feedback-closure.md` | D2 i18n ZH 硬规则 + golden test | ✅ |
+| `openspec/specs/d5-observability/parent-span-continuity.md` | tracingStepObserver ctx 透传 | ✅ |
+| `openspec/specs/d7-orchestration/tool-call-timeout.md` | executeOne WithTimeout 60s | ✅ |
+| `openspec/t-registry.md` + 域 t-registry | D2-S15-A82 + D5-S21-A01 + D7-S2-A50 T 点 | ✅ |
+
+## 10. S7 归档
+
+- 归档路径：`openspec/archive/2026-07-04-devrix-runtime-feedback-closure/`
+- PR：#392（已合并 master）
+- 索引：`openspec/demand-archive-index.md` DM-20260704-003
