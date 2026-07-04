@@ -51,8 +51,15 @@ func TestWorkItemExecuteOutputHints_IncludesRequiredOptionalMatrix(t *testing.T)
 		if !strings.Contains(got, "findings_json") {
 			t.Fatalf("loc %q missing findings_json semantics: %q", loc, got)
 		}
-		if !strings.Contains(got, "Required") && !strings.Contains(got, "Optional") {
-			t.Fatalf("loc %q missing Required/Optional markers: %q", loc, got)
+		if loc == LocaleZH {
+			if !strings.Contains(got, "必填") || !strings.Contains(got, "可选") {
+				t.Fatalf("zh missing 必填/可选 markers: %q", got)
+			}
+			if strings.Contains(got, "Required when contract applicable") {
+				t.Fatalf("zh must not use English execute semantics: %q", got)
+			}
+		} else if !strings.Contains(got, "Required") && !strings.Contains(got, "Optional") {
+			t.Fatalf("en missing Required/Optional markers: %q", got)
 		}
 	}
 }
