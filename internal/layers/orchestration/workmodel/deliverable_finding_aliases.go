@@ -13,7 +13,7 @@ var DeliverableFindingFieldAliases = map[string][]string{
 	"severity":       {"severity", "level", "priority"},
 	"title":          {"title", "issue", "name", "summary"},
 	"message":        {"message", "description", "detail", "details"},
-	"file":           {"file", "path", "filepath", "file_path"},
+	"file":           {"file", "path", "filepath", "file_path", "location"},
 	"line":           {"line", "lineno", "line_no", "line_number", "line_range"},
 	"evidence":       {"evidence", "proof", "citation_text"},
 	"impact":         {"impact", "risk", "effect"},

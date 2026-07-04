@@ -96,6 +96,8 @@ type ContextEngine struct {
 	surfaces []contracts.ToolSurface
 	filters  []contracts.ToolFilter
 
+	compressionStates sync.Map // sessionID → *persist.ContentReplacementState
+
 	metricsOnce      sync.Once
 	compressionRatio metrics.Histogram
 }

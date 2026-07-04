@@ -101,11 +101,11 @@ func BuildMaterializeRequest(sessionID string, item *workmodel.WorkItem, tm *wor
 	policy := materialize.Policy{
 		Mode:        materialize.ModeFresh,
 		TokenBudget: tokenBudget,
-		ToolProfile: toolProfileForItem(item),
+		ToolProfile: toolProfileForItemWithTasks(sessionID, item, tm),
 		Depth:       depth,
 	}
 	signals := materialize.InboundSignals{Directive: directive}
-	if item != nil && item.NeedsRollup && (tm == nil || !workmodel.IsDeliverableFormatRollupSynth(tm, sessionID, item)) {
+	if item != nil && tm != nil && workmodel.IsParentRollupSynth(tm, sessionID, item) {
 		policy.Mode = materialize.ModeRollupSynth
 	}
 	if tm != nil {
@@ -172,10 +172,14 @@ func upstreamSignalLines(sessionID string, item *workmodel.WorkItem, tm *workmod
 }
 
 func toolProfileForItem(item *workmodel.WorkItem) string {
+	return toolProfileForItemWithTasks("", item, nil)
+}
+
+func toolProfileForItemWithTasks(sessionID string, item *workmodel.WorkItem, tm *workmodel.TaskManager) string {
 	if item == nil {
 		return "implement"
 	}
-	if item.NeedsRollup {
+	if item.NeedsRollup && (tm == nil || workmodel.IsParentRollupSynth(tm, sessionID, item)) {
 		return "rollup_synth"
 	}
 	switch item.Policy {

@@ -30,8 +30,26 @@ import (
 // signal — a single user message either resolves or it doesn't.
 const DefaultWorkItemMaxIters = 5
 
-// DefaultWorkItemTokenBudget is the default Materialize token budget for WorkItem execute.
+// DefaultWorkItemTokenBudget is the legacy fallback Materialize token budget.
 const DefaultWorkItemTokenBudget = 8000
+
+const (
+	workItemTokenBudgetReadonly   = 32_000
+	workItemTokenBudgetRollupSynth = 16_000
+	workItemTokenBudgetImplement  = 24_000
+)
+
+// TokenBudgetForToolProfile returns the Materialize token budget for a tool profile.
+func TokenBudgetForToolProfile(profile string) int {
+	switch profile {
+	case "rollup_synth":
+		return workItemTokenBudgetRollupSynth
+	case "readonly":
+		return workItemTokenBudgetReadonly
+	default:
+		return workItemTokenBudgetImplement
+	}
+}
 
 // WorkItemSourceLabel is the SourcePlanID prefix used when ItemPipelineRunner
 // bypasses the Planner and feeds the directive straight into WorkItemExecutor.
@@ -205,7 +223,9 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		iterTools := tools
 		iterCtx := ctx
 		if ec, ok := WorkItemExecContextFrom(ctx); ok && iter == max-1 {
-			if ec.Item != nil && ec.Item.NeedsRollup && !workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
+			if ec.Item != nil && ec.Tasks != nil &&
+				workmodel.IsParentRollupSynth(ec.Tasks, sessionID, ec.Item) &&
+				!workmodel.RequiresSynthesisTurn(ec.DeliverableContract) {
 				iterTools = nil
 				messages = append(messages, types.Message{
 					SessionID: sessionID,
@@ -433,7 +453,7 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 	for chunk := range ch {
 		if chunk.Content != "" {
 			content.WriteString(chunk.Content)
-			if !SuppressExecuteTextEmit(ctx) {
+			if !SuppressExecuteTextEmit(ctx) && !shouldSuppressPlanningTextEmit(ctx, chunk.Content) {
 				emitEvent(ctx, emit, &contracts.EngineEvent{
 					Type:      "text",
 					Content:   chunk.Content,
@@ -500,7 +520,7 @@ func emitFromExecContext(ctx context.Context) func(*contracts.EngineEvent) {
 func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID, itemID, directive string) (string, []ToolSchema, []types.Message, map[string]string, error) {
 	if ShouldMaterializeWorkItem(ctx, sessionID, itemID) && e.Materializer != nil {
 		ec, _ := WorkItemExecContextFrom(ctx)
-		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget())
+		req := BuildMaterializeRequest(sessionID, ec.Item, ec.Tasks, directive, e.tokenBudget(ctx, sessionID))
 		mat, err := e.Materializer.Materialize(ctx, req)
 		// DM-20260630-011 AC3: emit the materialize span AFTER the call so
 		// message_count / token_est reflect actual mat values (start-time
@@ -529,7 +549,8 @@ func (e *DefaultWorkItemExecutor) prepareContext(ctx context.Context, sessionID,
 			})
 			if prepErr == nil {
 				userContextPrepend = prepared.UserContextPrepend
-				rollupSynth := ec.Item != nil && ec.Item.NeedsRollup
+				rollupSynth := ec.Item != nil && ec.Tasks != nil &&
+					workmodel.IsParentRollupSynth(ec.Tasks, sessionID, ec.Item)
 				if len(tools) == 0 && !rollupSynth {
 					tools = filterPipelineTools(prepared.Tools)
 				}
@@ -608,6 +629,17 @@ func filterEphemeralExecuteMessages(msgs []types.Message) []types.Message {
 	return out
 }
 
+func shouldSuppressPlanningTextEmit(ctx context.Context, chunk string) bool {
+	ec, ok := WorkItemExecContextFrom(ctx)
+	if !ok || ec.Item == nil || ec.Tasks == nil {
+		return false
+	}
+	if ec.Item.Kind == workmodel.WorkKindGoal {
+		return false
+	}
+	return workmodel.DetectPlanningMeta(chunk)
+}
+
 func isEphemeralExecuteHint(content string) bool {
 	c := strings.TrimSpace(content)
 	if c == "" {
@@ -618,11 +650,15 @@ func isEphemeralExecuteHint(content string) bool {
 		strings.Contains(c, "Rollup synthesis: tools are disabled")
 }
 
-func (e *DefaultWorkItemExecutor) tokenBudget() int {
+func (e *DefaultWorkItemExecutor) tokenBudget(ctx context.Context, sessionID string) int {
 	if e != nil && e.TokenBudget > 0 {
 		return e.TokenBudget
 	}
-	return DefaultWorkItemTokenBudget
+	profile := "implement"
+	if ec, ok := WorkItemExecContextFrom(ctx); ok {
+		profile = toolProfileForItemWithTasks(sessionID, ec.Item, ec.Tasks)
+	}
+	return TokenBudgetForToolProfile(profile)
 }
 
 func toolSchemasFromDescriptors(desc []materialize.ToolDescriptor) []ToolSchema {

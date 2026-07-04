@@ -60,10 +60,14 @@ func VerifyDeliverableContract(contract DeliverableContract, summary, stopReason
 
 	if c.Structure == DeliverableStructureFindingsJSON {
 		if payload == nil || len(payload.Findings) == 0 {
-			return deliverableVerifyResult{
-				Status:  DeliverableStatusIncomplete,
-				Payload: payload,
-				Reason:  "findings_json_required",
+			if salvaged := SalvageDeliverablePayload(summary, c); FindingsPayloadPresentable(salvaged) {
+				payload = salvaged
+			} else {
+				return deliverableVerifyResult{
+					Status:  DeliverableStatusIncomplete,
+					Payload: payload,
+					Reason:  "findings_json_required",
+				}
 			}
 		}
 		if contractFindingsComplete(c, payload) {

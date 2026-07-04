@@ -153,7 +153,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	isRollup := item.NeedsRollup
 	isDeliverableSynth := isRollup && workmodel.IsDeliverableFormatRollupSynth(r.Tasks, sessionID, item)
-	isParentRollup := isRollup && !isDeliverableSynth
+	isParentRollup := isRollup && workmodel.IsParentRollupSynth(r.Tasks, sessionID, item)
 	r.Tasks.Tree().EnsureSemanticID(sessionID, item)
 	if got, ok := r.Tasks.GetWorkItem(sessionID, item.ID); ok && got != nil {
 		item = got
@@ -316,7 +316,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	if strategic != nil && strategic.ReactItersHint > 0 {
 		maxItersOverride = strategic.ReactItersHint
 	}
-	maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
+	if isDeliverableSynth {
+		maxItersOverride = 1
+	} else {
+		maxItersOverride = workmodel.EffectiveExecuteMaxIters(maxItersOverride, DefaultWorkItemMaxIters, deliverableContract)
+	}
 	// RH-MUPS-10 (DM-20260701-001): surface deliverable failure + scope anchor on
 	// inline retry; omit spawn rationale / artifact prose (scope drift).
 	execDeliverableContract := deliverableContract

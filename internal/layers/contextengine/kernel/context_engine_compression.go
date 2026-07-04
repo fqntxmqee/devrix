@@ -4,10 +4,13 @@ import (
 	"context"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
+	"github.com/devrix/devrix/internal/layers/contextengine/persist"
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/compression"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/metrics"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/telemetry"
 	"github.com/devrix/devrix/internal/layers/observability/instrument/tracer"
+	"github.com/devrix/devrix/internal/shared/config"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -29,11 +32,48 @@ func (e *ContextEngine) compressionPipeline(sessionID string) *compression.Pipel
 			compression.WithStepObserver(compression.NewTracingStepObserver(sessionID, e.obsBridge, e.compObserver)),
 			compression.WithSessionID(sessionID),
 		)
+		if base := e.sessionsBaseDir(); base != "" {
+			opts = append(opts, compression.WithProjectDir(base))
+			state := e.compressionState(sessionID)
+			opts = append(opts, compression.WithPerMessageBudget(&compression.PerMessageBudget{
+				ProjectDir: base,
+				SessionID:  sessionID,
+				State:      state,
+			}))
+		}
 	}
 	if e.asyncCompact != nil {
 		opts = append(opts, compression.WithAsyncAutocompacter(e.asyncCompact))
 	}
 	return compression.NewPipeline(opts...)
+}
+
+func (e *ContextEngine) sessionsBaseDir() string {
+	if e == nil || e.cfg == nil {
+		return ""
+	}
+	base := e.cfg.MainTranscript.BaseDir
+	if base == "" {
+		base = config.DefaultMainTranscriptConfig().BaseDir
+	}
+	return textutil.ExpandPath(base)
+}
+
+func (e *ContextEngine) compressionState(sessionID string) *persist.ContentReplacementState {
+	if e == nil || sessionID == "" {
+		return persist.NewContentReplacementState()
+	}
+	if v, ok := e.compressionStates.Load(sessionID); ok {
+		if s, ok := v.(*persist.ContentReplacementState); ok && s != nil {
+			return s
+		}
+	}
+	s := persist.NewContentReplacementState()
+	actual, _ := e.compressionStates.LoadOrStore(sessionID, s)
+	if st, ok := actual.(*persist.ContentReplacementState); ok && st != nil {
+		return st
+	}
+	return s
 }
 
 func (e *ContextEngine) initMetrics() {

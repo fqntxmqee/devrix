@@ -48,7 +48,7 @@ func TestMaterializeSubTurn_FullParity(t *testing.T) {
 		{Role: types.MessageRoleAssistant, Content: "a1"},
 		{Role: types.MessageRoleUser, Content: "u2"},
 	}
-	m := NewDefaultMaterializer(nil)
+	m := NewDefaultMaterializer(nil, "")
 	res, err := m.Materialize(t.Context(), Request{
 		Partition: Partition{SessionID: "s1", Kind: PartitionAgent, AgentID: "agent1"},
 		Policy:    PolicyFromSubTurnMode(SubTurnFull, 0),

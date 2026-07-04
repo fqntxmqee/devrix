@@ -260,6 +260,16 @@ func normalizeDeliverableFinding(f DeliverableFinding) DeliverableFinding {
 	if f.File == "" {
 		if m := fileLineCitationRE.FindString(f.Evidence); m != "" {
 			f.File, f.Line = splitFileLineCitation(m)
+		} else if cit := strings.TrimSpace(f.Citation); cit != "" {
+			f.File, f.Line = splitFileLineCitation(cit)
+		}
+	}
+	if f.File != "" && f.Line <= 0 {
+		if file, line := splitFileLineCitation(f.File); file != "" {
+			f.File = file
+			if line > 0 {
+				f.Line = line
+			}
 		}
 	}
 	if f.Title == "" {

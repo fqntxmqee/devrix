@@ -11,7 +11,7 @@ import (
 
 func TestSubTurnRunner_MaterializePath_Brief(t *testing.T) {
 	llm, runner := buildSubTurnFixture(t)
-	runner.Materializer = materialize.NewDefaultMaterializer(nil)
+	runner.Materializer = materialize.NewDefaultMaterializer(nil, "")
 
 	_, err := runner.RunSubTurn(context.Background(), contracts.SubTurnRequest{
 		SessionID: "s1",

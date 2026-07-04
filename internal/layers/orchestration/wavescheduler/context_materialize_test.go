@@ -10,7 +10,7 @@ func TestMaterializingContextResolver_FreshParity(t *testing.T) {
 	store := NewArtifactStore()
 	r := NewMaterializingContextResolver(ContextResolverDeps{
 		Artifacts:        store,
-		Materializer:     materialize.NewDefaultMaterializer(nil),
+		Materializer:     materialize.NewDefaultMaterializer(nil, ""),
 		BaseSystemPrompt: "base",
 	})
 
@@ -39,7 +39,7 @@ func TestMaterializingContextResolver_Upstream(t *testing.T) {
 	})
 	r := NewMaterializingContextResolver(ContextResolverDeps{
 		Artifacts:        artifacts,
-		Materializer:     materialize.NewDefaultMaterializer(nil),
+		Materializer:     materialize.NewDefaultMaterializer(nil, ""),
 		BaseSystemPrompt: "base",
 	})
 	got, err := r.Resolve(TaskNode{

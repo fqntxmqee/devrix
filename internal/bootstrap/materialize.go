@@ -8,11 +8,12 @@ import (
 )
 
 func newDefaultMaterializer() materialize.Materializer {
-	store, err := materialize.NewPartitionStore(defaultTranscriptBaseDir())
+	base := defaultTranscriptBaseDir()
+	store, err := materialize.NewPartitionStore(base)
 	if err != nil {
 		return nil
 	}
-	return materialize.NewDefaultMaterializer(store)
+	return materialize.NewDefaultMaterializer(store, base)
 }
 
 func defaultTranscriptBaseDir() string {

@@ -1,5 +1,28 @@
 package workmodel
 
+// HasNonEphemeralChildren reports whether item has rollup-relevant children.
+func HasNonEphemeralChildren(tm *TaskManager, sessionID, itemID string) bool {
+	if tm == nil || itemID == "" {
+		return false
+	}
+	for _, c := range tm.Tree().ListChildren(sessionID, itemID) {
+		if c == nil || c.Ephemeral || c.Kind == WorkKindChecklist {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// IsParentRollupSynth reports parent rollup: synthesize terminal child outcomes.
+// Leaf WorkItems with NeedsRollup but no children use deliverable synth instead.
+func IsParentRollupSynth(tm *TaskManager, sessionID string, item *WorkItem) bool {
+	if item == nil || !item.NeedsRollup || IsDeliverableFormatRollupSynth(tm, sessionID, item) {
+		return false
+	}
+	return HasNonEphemeralChildren(tm, sessionID, item.ID)
+}
+
 // IsDeliverableFormatRollupSynth reports CC-U3 leaf re-synthesis: NeedsRollup is set
 // to reform an incomplete findings deliverable, not to synthesize child outcomes.
 func IsDeliverableFormatRollupSynth(tm *TaskManager, sessionID string, item *WorkItem) bool {
