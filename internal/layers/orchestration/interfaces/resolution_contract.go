@@ -403,6 +403,20 @@ func NewResolutionReport(sessionID, workItemID string, roundNo int, strategies [
 			})
 			continue
 		}
+		// Check order matches ResolutionClaim.IsResolved() so the report
+		// build is the single source of truth for "is this obs resolved".
+		// A Claim with empty Answer + high Confidence + evidence would
+		// otherwise count as resolved here while IsResolved() returns
+		// false — that drift was caught in S4 Phase 2 review.
+		if c.Answer == "" {
+			unresolved = append(unresolved, UnresolvedObs{
+				ObsID:          s.ObsID,
+				Strength:       extractObsStrength(s.ObsID),
+				Reason:         ResolutionReasonNoClaim,
+				HasSubWorktree: s.HasSubWorktree(),
+			})
+			continue
+		}
 		if c.Confidence < ResolutionConfidenceMin {
 			unresolved = append(unresolved, UnresolvedObs{
 				ObsID:          s.ObsID,

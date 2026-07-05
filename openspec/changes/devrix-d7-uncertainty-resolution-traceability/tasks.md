@@ -14,10 +14,10 @@
 
 | T ID | 描述 | L5 测试点 | 状态 |
 |------|------|----------|------|
-| D7-S16-A103-T01 | 新增 `orchtypes/resolution.go`：5 类型 (ResolutionStrategy/SubWorktreeSpec/ResolutionClaim/ResolutionReport/UnresolvedObs) | — | PLANNED |
-| D7-S16-A104-T01 | Plan artifact schema 扩展 `ResolutionStrategy[]` + `sub_worktree` 可选字段 | L5-D7-RT-01 | PLANNED |
-| D7-S16-A104-T02 | Plan LLM 引导词 append（fieldMap guide 方式） | L5-D7-RT-01 | PLANNED |
-| D7-S16-A104-T03 | `StrategicPlanProposal` 解析 `sub_worktree` 字段；保留 `child_specs[]` 兼容路径 | L5-D7-RT-14 | PLANNED |
+| D7-S16-A103-T01 | 新增 `interfaces/resolution_contract.go`：5 类型 (ResolutionStrategy/SubWorktreeSpec/ResolutionClaim/ResolutionReport/UnresolvedObs) | — | IMPLEMENTED |
+| D7-S16-A104-T01 | Plan artifact schema 扩展 `ResolutionStrategy[]` + `sub_worktree` 可选字段 | L5-D7-RT-01 | IMPLEMENTED |
+| D7-S16-A104-T02 | Plan LLM 引导词 append（fieldMap guide 方式） | L5-D7-RT-01 | IMPLEMENTED |
+| D7-S16-A104-T03 | `StrategicPlanProposal` 解析 `sub_worktree` 字段；保留 `child_specs[]` 兼容路径 | L5-D7-RT-14 | IMPLEMENTED |
 | D7-S16-A105-T01 | Execute artifact schema 扩展 `ResolutionClaim[]` | L5-D7-RT-02 | PLANNED |
 | D7-S16-A105-T02 | Execute LLM 引导词 append（tool call 完成后引导 claim） | L5-D7-RT-02 | PLANNED |
 
@@ -25,9 +25,9 @@
 
 | T ID | 描述 | L5 测试点 | 状态 |
 |------|------|----------|------|
-| D7-S16-A106-T01 | `verifyResolutionCoverage()` 函数 + 4 状态决策表 | L5-D7-RT-03, L5-D7-RT-05, L5-D7-RT-06 | PLANNED |
-| D7-S16-A106-T02 | Verify 在 deliverable-verify 之前调用 `verifyResolutionCoverage()` | L5-D7-RT-03 | PLANNED |
-| D7-S16-A106-T03 | `WorkItemPipelineRound.ResolutionReport` 字段 | — | PLANNED |
+| D7-S16-A106-T01 | `verifyResolutionCoverage()` 函数 + 4 状态决策表 | L5-D7-RT-03, L5-D7-RT-05, L5-D7-RT-06 | IMPLEMENTED |
+| D7-S16-A106-T02 | Verify 在 deliverable-verify 之前调用 `verifyResolutionCoverage()` | L5-D7-RT-03 | IMPLEMENTED |
+| D7-S16-A106-T03 | `WorkItemPipelineRound.ResolutionReport` 字段 | — | IMPLEMENTED |
 
 ### Phase 3: Decide binding（治本断链 B）
 

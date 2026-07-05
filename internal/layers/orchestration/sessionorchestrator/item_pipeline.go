@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
+	"github.com/devrix/devrix/internal/layers/orchestration/executionflow/verify"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
@@ -541,6 +543,21 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		StartedAt:         started,
 		CompletedAt:       time.Now(),
 	}
+	// DM-20260704-006 S4 Phase 2 wiring: compute the Verify → Decide
+	// ResolutionCoverage report from the Plan's ResolutionStrategies and
+	// the Execute artifact's ResolutionClaims. The Execute-side emission
+	// is Phase 1.5 (D7-S16-A105-T01/T02); until that lands the claims
+	// slice is empty and the report degrades to "no_resolution_claim"
+	// for every ObsID — by design, the safety-net gate in
+	// ComputeResolutionCoverage returns nil when Plan has no
+	// ResolutionStrategies (legacy LLM rounds).
+	if pl != nil && len(pl.ResolutionStrategies) > 0 {
+		claims := extractResolutionClaimsFromArtifact(art, obsIDs)
+		round.ResolutionClaims = claims
+		round.ResolutionReport = verify.ComputeResolutionCoverage(
+			pl.ResolutionStrategies, claims, sessionID, item.ID, roundNo,
+		)
+	}
 	if observeParseReject != "" {
 		round.ObserveParseReject = observeParseReject
 	}
@@ -714,6 +731,29 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 		art.SourcePlanID = pl.ID
 	}
 	return art
+}
+
+// extractResolutionClaimsFromArtifact reads per-ObsID ResolutionClaim[]
+// out of the Execute artifact.
+//
+// DM-20260704-006 S4 Phase 2: the Execute artifact schema extension that
+// surfaces ResolutionClaim[] lands in D7-S16-A105-T01 (Phase 1.5 follow-up
+// PR). Until then the function returns nil so callers see a degenerate
+// report (every strategy → no_resolution_claim) — which is the canonical
+// "Plan declared strategies but Execute did not answer" state we want
+// Jaeger to surface during the rollout. Phase 1.5 swaps the body for a
+// real extraction path; the signature is stable so call sites do not move.
+//
+// obsIDs is the round's observation IDs (from Observe) included for
+// Phase 1.5 use as a fallback ObsID resolution hint.
+func extractResolutionClaimsFromArtifact(art *wavescheduler.Artifact, obsIDs []string) []interfaces.ResolutionClaim {
+	// Phase 1.5 placeholder: real extraction reads art.Metadata["resolution_claims"]
+	// (JSON-encoded) when the artifact schema ships. Until then return
+	// nil so the report degrades to "no_resolution_claim" for every
+	// strategy. The safety-net behavior is intentional, not a bug.
+	_ = art
+	_ = obsIDs
+	return nil
 }
 
 // setRoundPhaseWithLog wraps r.Tasks.Tree().SetRoundPhase with the standard
