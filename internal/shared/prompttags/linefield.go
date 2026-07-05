@@ -30,6 +30,13 @@ const (
 	TagIncrementalOnly       TagName = "incremental_only"
 	TagPriorParseReject      TagName = "prior_parse_reject"
 
+	// DM-20260705-010 (devrix-d7-mups-frame-delta-closure) Phase 2 T9:
+	// Observe→Plan frame delta inject. prior_artifact_summary carries the
+	// ≤80-char human summary (built by BuildObservePriorDelta); known_gaps
+	// is the machine-readable gap ID array bridging Observe→Plan.
+	TagPriorArtifactSummary  TagName = "prior_artifact_summary"
+	TagKnownGaps             TagName = "known_gaps"
+
 	// ResolutionContract (DM-20260704-006) — Plan user frame fields
 	// emitted by strategic_plan_proposer when the LLM follows the new
 	// RC-1 contract. Both are tagged `data` plane (the LLM fills them,
@@ -44,6 +51,10 @@ type FrameSpec struct {
 }
 
 // ObserveUserFrame is the field order for Observe-phase user prompts.
+//
+// v1.1 (DM-20260705-010 Phase 2 T8/T9): 9 → 11 字段契约.
+// append-only 新增 TagPriorArtifactSummary + TagKnownGaps (Observe→Plan frame
+// delta inject). 既存 9 字段顺序 0 修改;新字段顺序接续 TagIncrementalOnly 之后。
 var ObserveUserFrame = FrameSpec{
 	Fields: []TagName{
 		TagWorkItemID,
@@ -55,6 +66,8 @@ var ObserveUserFrame = FrameSpec{
 		TagSignal,
 		TagPriorObservationIDs,
 		TagIncrementalOnly,
+		TagPriorArtifactSummary,
+		TagKnownGaps,
 	},
 }
 
@@ -125,6 +138,17 @@ func writeLineField(b *strings.Builder, frame FrameName, name TagName, v any, an
 			return
 		}
 		fmt.Fprintf(b, "%s%s: %s\n", prefix, name, strings.Join(lines, ","))
+	// DM-20260705-010 Phase 2: known_gaps emits one line per gap ID so the
+	// closed-classifier Observe LLM sees a copy-paste-friendly list (matches
+	// TagResolutionStrategies/TagResolutionClaims pattern, not comma-joined).
+	case TagKnownGaps:
+		lines, ok := v.([]string)
+		if !ok || len(lines) == 0 {
+			return
+		}
+		for _, line := range lines {
+			fmt.Fprintf(b, "%s%s: %s\n", prefix, name, line)
+		}
 	// DM-20260704-006 (RC-1 + RC-2): one line per ResolutionStrategy /
 	// ResolutionClaim JSON entry so the LLM sees a copy-paste-friendly list
 	// instead of a single comma-joined line that breaks on embedded braces.

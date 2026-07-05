@@ -73,15 +73,18 @@ var executeSemantics = PhaseSemantics{
 
 var frameFieldPlanes = map[FrameName]map[TagName]PromptPlane{
 	FrameObserveUser: {
-		TagWorkItemID:          PlaneControl,
-		TagDirective:           PlaneData,
-		TagPriorParseReject:    PlaneControl,
-		TagPriorMean:           PlaneControl,
-		TagScopeGoal:           PlaneData,
-		TagScopeOpenQuestion:  PlaneData,
-		TagSignal:             PlaneData,
-		TagPriorObservationIDs: PlaneControl,
-		TagIncrementalOnly:    PlaneControl,
+		TagWorkItemID:           PlaneControl,
+		TagDirective:            PlaneData,
+		TagPriorParseReject:     PlaneControl,
+		TagPriorMean:            PlaneControl,
+		TagScopeGoal:            PlaneData,
+		TagScopeOpenQuestion:    PlaneData,
+		TagSignal:               PlaneData,
+		TagPriorObservationIDs:  PlaneControl,
+		TagIncrementalOnly:     PlaneControl,
+		// DM-20260705-010 Phase 2 T8: append-only 2 字段.
+		TagPriorArtifactSummary: PlaneData,
+		TagKnownGaps:            PlaneData,
 	},
 	FramePlanUser: {
 		TagWorkItemID:         PlaneControl,

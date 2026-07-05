@@ -58,7 +58,7 @@ func TestObserveWorkItem_ParseRejectFeedsNextObserveFrame(t *testing.T) {
 		ObserveParseReject: prompttags.NewObserveParseReject(prompttags.RejectParseFail, "bad json", "{").CompactJSON(),
 	}
 	proposer := StaticObservationProposer{}
-	in := buildObserveSignalInput("s1", goal, tm)
+	in := buildObserveSignalInput("s1", goal, tm, nil)
 	if in.PriorParseReject == "" {
 		t.Fatal("PriorParseReject not loaded from LastRound")
 	}

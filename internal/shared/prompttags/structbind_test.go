@@ -108,13 +108,15 @@ func TestMustRegisterFrame_ObserveSignalInputRegistered(t *testing.T) {
 	if !ok {
 		t.Fatal("FrameObserveUser missing from LineFrameRegistry")
 	}
-	// 9 fields per ObserveUserFrame definition in linefield.go.
-	if len(spec.Fields) != 9 {
-		t.Fatalf("FrameObserveUser has %d fields, want 9: %v", len(spec.Fields), spec.Fields)
+	// DM-20260705-010 Phase 2 T8: 9 → 11 字段契约 (append-only 加
+	// prior_artifact_summary + known_gaps, 既存 9 字段顺序不变).
+	if len(spec.Fields) != 11 {
+		t.Fatalf("FrameObserveUser has %d fields, want 11 (DM-20260705-010 v1.1): %v", len(spec.Fields), spec.Fields)
 	}
 	expected := []TagName{
 		TagWorkItemID, TagDirective, TagPriorParseReject, TagPriorMean,
 		TagScopeGoal, TagScopeOpenQuestion, TagSignal, TagPriorObservationIDs, TagIncrementalOnly,
+		TagPriorArtifactSummary, TagKnownGaps,
 	}
 	for i, want := range expected {
 		if spec.Fields[i] != want {

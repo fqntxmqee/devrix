@@ -38,6 +38,10 @@ var semanticGlossaryEN = map[prompttags.SemanticCondition]string{
 	prompttags.CondPriorObservationIDs:      "Prior-round observation IDs (control, incremental context)",
 	prompttags.CondObservationSummary:       "Observation summary (data)",
 	prompttags.CondUncertaintyMeanControl:   "Uncertainty mean (control); single forbidden when ≥0.45",
+
+	// DM-20260705-010 Phase 2 T9: Observe→Plan frame delta inject.
+	prompttags.CondPriorArtifactSummary:     "Prior-round artifact summary (data); ≤80 chars; carries prior Execute convergence context",
+	prompttags.CondKnownGaps:                "Known unresolved gap IDs (data); machine-readable JSON array; bridges Observe→Plan",
 	prompttags.CondRemainingChildrenBudget:  "Remaining child budget (control)",
 	prompttags.CondObservationIDs:           "Prior-round observation IDs (data, incremental context)",
 	prompttags.CondDepthControl:             "Current work item depth (control)",
