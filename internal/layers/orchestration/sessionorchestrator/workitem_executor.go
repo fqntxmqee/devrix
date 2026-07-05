@@ -12,6 +12,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/contextengine/prepare/conversation"
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -77,9 +78,10 @@ type WorkItemExecutor interface {
 // WorkItemResult is the executor's output, ready for Verify/Learn to
 // consume and for Artifact construction.
 type WorkItemResult struct {
-	// Content is the LLM's accumulated text across all iterations. When
-	// Done=true this is the final answer; when Done=false (cap hit) this
-	// is whatever the LLM produced before the loop terminated.
+	// Content is the LLM's accumulated text across all iterations, with the
+	// <resolution_claims> block stripped (DM-20260704-006 S4 Phase 1.5).
+	// When Done=true this is the final answer; when Done=false (cap hit)
+	// this is whatever the LLM produced before the loop terminated.
 	Content string
 	// Done is true iff the LLM returned a tool-call-free final answer.
 	Done bool
@@ -94,6 +96,15 @@ type WorkItemResult struct {
 	// duration accounting.
 	StartedAt time.Time
 	EndedAt   time.Time
+	// ResolutionClaims holds the per-ObsID claims the LLM emitted via
+	// the <resolution_claims> JSON block (RC-1 contract, DM-20260704-006).
+	// Verified against the Plan's ResolutionStrategies by the Verify layer
+	// to compute the round's CoverageRatio + UnresolvedObs[]. nil/empty
+	// when the Plan did not file ResolutionStrategies for this round
+	// (legacy verdict-based path) or when the LLM did not participate
+	// in RC-1 — both cases surface as NoClaim UnresolvedObs for the
+	// affected ObsIDs.
+	ResolutionClaims []interfaces.ResolutionClaim
 }
 
 // DefaultWorkItemExecutor is the production WorkItemExecutor. It drives one
@@ -189,10 +200,26 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 				"\n\nPriorVerifyReason: " + ec.PriorVerifyReason +
 				"\n(Adjust your approach to address the above; the previous attempt failed verification for this reason.)"
 		}
+		// DM-20260704-006 S4 Phase 1.5: append the RC-1 claim guide when
+		// the Plan declared per-ObsID ResolutionStrategies. Empty here →
+		// legacy verdict-based path; ItemPipelineRunner's
+		// extractResolutionClaimsFromArtifact already no-ops when no
+		// strategies were filed, so the ParseResolutionClaims call below
+		// is also a no-op for that case.
+		if len(ec.ResolutionStrategies) > 0 {
+			llmDirective = AppendResolutionClaimHint(llmDirective, ec.ResolutionStrategies)
+		}
 	}
 
 	result := &WorkItemResult{StartedAt: e.now(), StopReason: "started"}
 	defer func() { result.EndedAt = e.now() }()
+	// DM-20260704-006 S4 Phase 1.5: harvest <resolution_claims> from the
+	// accumulated LLM content on every return path (success, tool_error,
+	// max_iters). Doing it here (post-loop) instead of at each return site
+	// guarantees every exit passes through the extractor — the typed claims
+	// live on the WorkItemResult, the cleaned prose (block stripped) lands
+	// on result.Content for downstream Artifact + IM renderers.
+	defer harvestResolutionClaims(result)
 
 	systemPrompt, tools, messages, userContextPrepend, prepErr := e.prepareContext(ctx, sessionID, itemID, llmDirective)
 	baseMessageCount := len(messages)
@@ -701,5 +728,28 @@ func buildWorkItemToolResultMsg(sessionID string, r ToolResult) types.Message {
 		Role:      types.MessageRoleTool,
 		Content:   content,
 		Metadata:  map[string]string{"tool_call_id": r.ToolCallID},
+	}
+}
+
+// harvestResolutionClaims extracts the RC-1 claims block from the LLM's
+// accumulated content and updates result.ResolutionClaims + cleans
+// result.Content. Wired via defer in ExecuteWorkItem so every exit path
+// (success / tool_error / max_iters / llm_error) sees the same parse.
+//
+// DM-20260704-006 S4 Phase 1.5 (D7-S16-A105-T01): the structured claim
+// block is the only signal Phase 3's SpawnDecomposeForUnresolved hook
+// reads. Without this, every strategy → "no_resolution_claim" → Decide
+// stays on the legacy verdict-based path. The function is a no-op when
+// result.Content has no <resolution_claims> markers (legacy LLM rounds).
+func harvestResolutionClaims(result *WorkItemResult) {
+	if result == nil || result.Content == "" {
+		return
+	}
+	claims, cleaned := ParseResolutionClaims(result.Content)
+	if len(claims) > 0 {
+		result.ResolutionClaims = claims
+	}
+	if cleaned != "" {
+		result.Content = cleaned
 	}
 }

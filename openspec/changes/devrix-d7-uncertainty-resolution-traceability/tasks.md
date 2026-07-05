@@ -18,8 +18,8 @@
 | D7-S16-A104-T01 | Plan artifact schema 扩展 `ResolutionStrategy[]` + `sub_worktree` 可选字段 | L5-D7-RT-01 | IMPLEMENTED |
 | D7-S16-A104-T02 | Plan LLM 引导词 append（fieldMap guide 方式） | L5-D7-RT-01 | IMPLEMENTED |
 | D7-S16-A104-T03 | `StrategicPlanProposal` 解析 `sub_worktree` 字段；保留 `child_specs[]` 兼容路径 | L5-D7-RT-14 | IMPLEMENTED |
-| D7-S16-A105-T01 | Execute artifact schema 扩展 `ResolutionClaim[]` | L5-D7-RT-02 | PLANNED |
-| D7-S16-A105-T02 | Execute LLM 引导词 append（tool call 完成后引导 claim） | L5-D7-RT-02 | PLANNED |
+| D7-S16-A105-T01 | Execute artifact schema 扩展 `ResolutionClaim[]` | L5-D7-RT-02 | IMPLEMENTED |
+| D7-S16-A105-T02 | Execute LLM 引导词 append（tool call 完成后引导 claim） | L5-D7-RT-02 | IMPLEMENTED |
 
 ### Phase 2: Verify ResolutionCoverage
 

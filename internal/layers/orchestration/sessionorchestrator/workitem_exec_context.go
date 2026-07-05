@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -57,6 +58,13 @@ type WorkItemExecContext struct {
 	// enforced by WithWorkItemExecContext; consumers can rely on a non-nil
 	// Strategy (default = protocolStrategy for unknown PlanKinds).
 	Strategy workmodel.Strategy
+	// ResolutionStrategies carries the Plan-side RC-1 contract (DM-20260704-006
+	// S4 Phase 1.5). The executor appends the per-ObsID claim guide to the
+	// LLM directive when this slice is non-empty so Execute can emit a
+	// structured <resolution_claims> JSON block instead of free-form prose.
+	// nil/empty → legacy verdict-based path; the ItemPipelineRunner no-ops
+	// on extractResolutionClaimsFromArtifact.
+	ResolutionStrategies []interfaces.ResolutionStrategy
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.
