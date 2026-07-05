@@ -2,6 +2,7 @@
 
 **Change ID:** `mups-node-prompt-dedup`  
 **Demand:** DM-20260705-004
+**Status:** S7_Archived (2026-07-05)
 
 ## Capabilities
 

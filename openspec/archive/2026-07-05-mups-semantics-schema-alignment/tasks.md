@@ -2,7 +2,8 @@
 
 **Change ID:** `mups-semantics-schema-alignment`  
 **Demand ID:** DM-20260705-003  
-**Status:** S4_Development
+**Status:** S7_Archived (2026-07-05)
+**Archive:** `openspec/archive/2026-07-05-mups-semantics-schema-alignment/`
 
 ---
 

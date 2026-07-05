@@ -1,8 +1,11 @@
 schema: openspec
 change-id: mups-semantics-schema-alignment
 demand-id: DM-20260705-003
-status: development
+status: s7_archived
+archived_at: 2026-07-05
+archive_path: openspec/archive/2026-07-05-mups-semantics-schema-alignment/
 title: "MUPS semantics schema alignment — Structured SemanticBlock vs i18n prose"
+domains: [shared, D2, D7]
 parent_demands:
   - DM-20260705-001
   - DM-20260705-002
