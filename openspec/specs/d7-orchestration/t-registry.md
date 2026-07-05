@@ -1189,6 +1189,15 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 **A97 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260705-001)
 
+### D7-S5-A98: MUPS parse reject capture + round persistence（DM-20260705-002）
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S5-A98-T01** | StrategicPlanReject → round.PlanParseReject → next Plan user frame | IMPLEMENTED | `parse_reject_feedback_test.go::TestRunItemPipeline_StrategicPlanRejectFeedsPlanUserFrame` | Plan_Generate |
+| **D7-S5-A98-T02** | Observe parse fail → round.ObserveParseReject → next Observe user frame | IMPLEMENTED | `parse_reject_feedback_test.go::TestObserveWorkItem_ParseRejectFeedsNextObserveFrame` | SubContext_Signal |
+
+**A98 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260705-002)
+
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 
 ---

@@ -1,7 +1,7 @@
 # shared/prompttags
 
-**Demand:** DM-20260704-004, DM-20260704-005  
-**Change ID:** `mups-prompttags` (archived 2026-07-04), `mups-prompttags-v2-io-registry` (archived 2026-07-04)
+**Demand:** DM-20260704-004, DM-20260704-005, DM-20260705-001, DM-20260705-002  
+**Change ID:** `mups-prompttags` (archived 2026-07-04), `mups-prompttags-v2-io-registry` (archived 2026-07-04), `mups-prompt-tag-semantics` (archived 2026-07-05), `mups-parse-reject-feedback` (archived 2026-07-05)
 
 ---
 
@@ -107,8 +107,8 @@ Rationale: node-specific dynamic content precedes static base so the model sees 
 
 | Frame | Fields (fixed order) |
 |-------|---------------------|
-| `ObserveUserFrame` | work_item_id, directive, prior_mean, scope_goal, scope_open_question, signal, prior_observation_ids, incremental_only |
-| `PlanUserFrame` | work_item_id, directive, observation_ids, observation_summary, depth, max_depth, existing_children, remaining_children, max_children, decompose_used_today, remaining_daily, max_daily, max_iters, parent_scope_in, uncertainty_mean |
+| `ObserveUserFrame` | work_item_id, directive, **prior_parse_reject**, prior_mean, scope_goal, scope_open_question, signal, prior_observation_ids, incremental_only |
+| `PlanUserFrame` | work_item_id, directive, **prior_parse_reject**, observation_ids, observation_summary, depth, max_depth, existing_children, remaining_children, max_children, decompose_used_today, remaining_daily, max_daily, max_iters, parent_scope_in, uncertainty_mean |
 
 ### Convergence invariants
 
@@ -116,7 +116,7 @@ Rationale: node-specific dynamic content precedes static base so the model sees 
 2. **Monotonic scope** — Observe → Plan → Execute scope tightening (see `scope_validate.go`)
 3. **Observe max 3** — `ValidateObservationProposals` keeps first 3 valid proposals (matches prompt)
 4. **Plan budget** — `applyBudgetCap` / `applySingleModeUncertaintyGate` (unchanged)
-5. **Reject feedback loops** — P2 defer (structured reject into next-round prompt)
+5. **Parse-reject round-trip** — Observe/Plan reject records on round N appear in matching phase `prior_parse_reject` user frame on round N+1 (`WorkItemPipelineRound.ObserveParseReject` / `PlanParseReject`)
 6. **Semantics-enforce alignment** — prompt claims with `Enforced: true` in `TagSemanticsRegistry` must match Go gates (`ValidateObservationProposals`, `applySingleModeUncertaintyGate`, `applyBudgetCap`, `VerifyDeliverableContract`)
 
 ### v3: Tag semantics layer (DM-20260705-001)
@@ -128,7 +128,17 @@ Rationale: node-specific dynamic content precedes static base so the model sees 
 - `RenderFrameFieldGuideForFields` — compact `[control]`/`[data]` guide for Observe/Plan user frames
 - `BuildAnnotatedLineFrame` — prefixes lineframe keys with plane markers
 
-See `openspec/changes/mups-prompt-tag-semantics/specs/shared/prompttags-semantics.md` for normative kind/mode semantics.
+See `openspec/archive/2026-07-05-mups-prompt-tag-semantics/specs/shared/prompttags-semantics.md` for normative kind/mode semantics.
+
+### v4: Parse reject cross-round feedback (DM-20260705-002)
+
+**Path:** `internal/shared/prompttags/parse_reject.go` + D7 `item_pipeline.go` + D2 lineframe inject
+
+- `ParseRejectRecord` — compact JSON (`phase`, `code`, `field`, `message`, `requested`, `max_allowed`, `snippet`)
+- `TagPriorParseReject` — control-plane lineframe field (after `directive`) on Observe/Plan user frames
+- Round persistence: `ObserveParseReject` / `PlanParseReject` on `WorkItemPipelineRound`
+- Codes: `parse_fail`, `budget_cap`, `uncertainty_gate`, `scope_gate`, `validate_empty`
+- Execute retry unchanged (`PriorVerifyReason` / `machineSpawnFeedback`); no same-round LLM parse retry
 
 ### v2 call-site changes
 

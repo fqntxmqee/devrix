@@ -21,7 +21,7 @@
 | Task | L4/L5 | Status |
 |------|-------|--------|
 | T9 Golden hash update (if appendix changes) | L5-MUPS-REJ-04 | [x] N/A (user frame only) |
-| T10 t-registry D7-S5-A98 / D2-S15-A98 | — | [ ] S4 post |
+| T10 t-registry D7-S5-A98 / D2-S15-A98 | — | [x] |
 
 ## Verification
 
