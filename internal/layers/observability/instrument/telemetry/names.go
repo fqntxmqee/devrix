@@ -32,6 +32,12 @@ const (
 	OpD1_S13_Capture_Permission_Check = "D1_Capture_Permission_Check"
 	OpD1_S13_Capture_Agent_Create = "D1_Capture_Agent_Create"
 	OpD1_S13_Capture_EngineEvent_Handle = "D1_Capture_EngineEvent_Handle"
+	// D1-S13 capture transcript append (P0). Wraps the transcript file I/O
+	// inside handleEngineEvent so disk write latency is visible in Jaeger.
+	OpD1_S13_Capture_Transcript_Append = "D1_Capture_Transcript_Append"
+	// D1-S13 capture dispatch (P0). Wraps the presenter.Dispatch / DispatchError
+	// call (Feishu HTTP round-trips) inside handleEngineEvent.
+	OpD1_S13_Capture_Dispatch = "D1_Capture_Dispatch"
 
 	// D1 Communication - Signal (D1-S14~S16)
 	OpD1_S13_Capture_Persist = "D1_Capture_Persist"
@@ -99,6 +105,10 @@ const (
 	OpD3_S3_LLM_CircuitBreaker = "D3_LLM_CircuitBreaker"
 	OpD3_S3_LLM_Retry = "D3_LLM_Retry"
 	OpD3_S3_LLM_Adapter_Stream = "D3_LLM_Adapter_Stream"
+	// D3-S3 LLM stream consume (P0). Covers the SSE chunk consumption
+	// phase between Adapter_Stream (HTTP connect) and Retry span end,
+	// eliminating the ~94% "ghost time" gap visible in Jaeger traces.
+	OpD3_S3_LLM_Stream_Consume = "D3_LLM_Stream_Consume"
 
 	// D4 MultiAgent (D4-S4)
 	OpD4_S4_Agent_Run = "D4_Agent_Run"

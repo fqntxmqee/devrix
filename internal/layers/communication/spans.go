@@ -23,6 +23,8 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D1_Capture_Permission_Check", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "D1_Capture_Agent_Create", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "D1_Capture_EngineEvent_Handle", Layer: "communication", Component: "gateway", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "D1_Capture_Transcript_Append", Layer: "communication", Component: "gateway", SinceVersion: "3.3.0", Instrumented: true},
+		{Name: "D1_Capture_Dispatch", Layer: "communication", Component: "gateway", SinceVersion: "3.3.0", Instrumented: true},
 
 		// D1 Communication - Signal (D1-S14~S16)
 		{Name: "D1_Capture_Persist", Layer: "communication", Component: "gateway", SinceVersion: "3.1.0", Instrumented: true},

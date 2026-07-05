@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -190,7 +191,21 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 	}
 
 	if w := g.writer; w != nil {
+		var transcriptSpan tracer.Span
+		if g.obsBridge != nil && g.obsBridge.Tracer() != nil {
+			_, transcriptSpan = g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Transcript_Append,
+				tracer.WithSpanKind(tracer.SpanKindInternal),
+				tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Transcript_Append,
+					tracer.Attribute{Key: "session.id", Value: session.SessionID},
+					tracer.Attribute{Key: "event.type", Value: event.Type},
+				)...),
+			)
+		}
 		g.appendTranscriptEvent(w, session.SessionID, event)
+		if transcriptSpan != nil {
+			transcriptSpan.SetStatus(tracer.StatusCodeOk, "")
+			transcriptSpan.End()
+		}
 	}
 
 	if g.metricOutboundMsgs != nil {
@@ -215,9 +230,38 @@ func (g *CommunicationGateway) handleEngineEvent(ctx context.Context, session *t
 			)
 			suppress = true
 		}
+		var dispatchSpan tracer.Span
+		if g.obsBridge != nil && g.obsBridge.Tracer() != nil {
+			_, dispatchSpan = g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Dispatch,
+				tracer.WithSpanKind(tracer.SpanKindClient),
+				tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Dispatch,
+					tracer.Attribute{Key: "session.id", Value: session.SessionID},
+					tracer.Attribute{Key: "event.type", Value: event.Type},
+					tracer.Attribute{Key: "dispatch.suppressed", Value: fmt.Sprintf("%t", suppress)},
+				)...),
+			)
+		}
 		g.presenter.DispatchError(in, emit, suppress)
+		if dispatchSpan != nil {
+			dispatchSpan.SetStatus(tracer.StatusCodeOk, "")
+			dispatchSpan.End()
+		}
 	default:
+		var dispatchSpan tracer.Span
+		if g.obsBridge != nil && g.obsBridge.Tracer() != nil {
+			_, dispatchSpan = g.obsBridge.Tracer().Start(ctx, telemetry.OpD1_S13_Capture_Dispatch,
+				tracer.WithSpanKind(tracer.SpanKindClient),
+				tracer.WithSpanAttributes(telemetry.SpanAttrs(telemetry.OpD1_S13_Capture_Dispatch,
+					tracer.Attribute{Key: "session.id", Value: session.SessionID},
+					tracer.Attribute{Key: "event.type", Value: event.Type},
+				)...),
+			)
+		}
 		g.presenter.Dispatch(in, emit)
+		if dispatchSpan != nil {
+			dispatchSpan.SetStatus(tracer.StatusCodeOk, "")
+			dispatchSpan.End()
+		}
 	}
 }
 

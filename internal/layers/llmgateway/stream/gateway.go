@@ -222,9 +222,18 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 			defer envelope.span.End()
 		}
 
+		// Open a child span covering the SSE chunk consumption phase.
+		// Without this, the gap between Adapter_Stream end (HTTP connect)
+		// and Retry end (all chunks consumed) appears as untraced "ghost time".
+		_, consumeSpan := g.startSpan(envelope.ctx, telemetry.OpD3_S3_LLM_Stream_Consume, tracer.SpanKindInternal,
+			tracer.Attribute{Key: "llm.provider", Value: provider},
+			tracer.Attribute{Key: "llm.model", Value: model},
+		)
+
 		var streamErr error
 		var usage llmgateway.TokenUsage
 		var usageReceived bool
+		var chunksConsumed int
 		responseCapture := newStreamResponseCapture()
 	streamLoop:
 		for {
@@ -243,6 +252,7 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				if ac.Parsed == nil {
 					continue
 				}
+				chunksConsumed++
 				if ac.Parsed.Usage.PromptTokens > 0 || ac.Parsed.Usage.CompletionTokens > 0 {
 					usage = ac.Parsed.Usage
 					usageReceived = true
@@ -255,6 +265,19 @@ func (g *Gateway) Stream(ctx context.Context, req *llmgateway.Request) (<-chan l
 				case out <- *ac.Parsed:
 				}
 			}
+		}
+
+		if consumeSpan != nil {
+			consumeSpan.SetAttributes(
+				tracer.Attribute{Key: "llm.chunks_consumed", Value: fmt.Sprintf("%d", chunksConsumed)},
+			)
+			if streamErr != nil {
+				consumeSpan.RecordError(streamErr)
+				consumeSpan.SetStatus(tracer.StatusCodeError, streamErr.Error())
+			} else {
+				consumeSpan.SetStatus(tracer.StatusCodeOk, "")
+			}
+			consumeSpan.End()
 		}
 
 		if streamErr != nil {
