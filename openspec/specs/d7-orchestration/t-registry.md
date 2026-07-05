@@ -252,6 +252,30 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 |------|------|--------|-----------|--------|----------| --- |
 | **D7-S9-A93-T01** | **`NarrowestSchema(inferred, strategic)` 禁放宽（LLM 只能收紧，T-P1-5）** | **D7-S9-A93** | **`workmodel/deliverable.go` + `workmodel/deliverable_test.go` (9-case test matrix)** | **IMPLEMENTED** | **P1** | Execute_Artifact |
 
+### D7-S9-A112: Execute system_prompt Plan frame delta 注入 (DM-20260705-010) — Change: `devrix-d7-mups-frame-delta-closure` (S2_Proposal, PLANNED)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A112-T01** | `interfaces.FrameDelta` struct 5 字段 (PriorArtifactSummary + KnownGaps + ExecutionMode + ChildSpecs []ChildSpecRef + DeliverableContract)，全部 machine-readable JSON 形态（无 prose） | **D7-S9-A112** | `execute_plan_frame_inject_test.go::TestFrameDelta_StructShape` | **PLANNED** | **P0** | Execute_PlanFrameDelta |
+| **D7-S9-A112-T02** | `StrategicPlanFrame` append 5 字段（DM-20260705-004 M2 16 字段契约 0 修改，append-only），驱动 `PlanOutput.FrameDelta` 可序列化 | **D7-S9-A112** | `execute_plan_frame_inject_test.go::TestStrategicPlanFrame_AppendOnlyFrameDelta` | **PLANNED** | **P0** | Execute_PlanFrameDelta |
+| **D7-S9-A112-T03** | `InjectPlanFrameDelta(ctx, plan, baselinePrompt)` 双轨输出：摘要 ≤ 80 字符（人读）+ schema hash（机读），注入总增量 ≤ 200 字符 | **D7-S9-A112** | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_BudgetUnder200Chars` | **PLANNED** | **P0** | Execute_PlanFrameDelta |
+| **D7-S9-A112-T04** | `item_pipeline.go` Plan→Execute 边调用 `InjectPlanFrameDelta`（走 `WorkItemExecContext.Strategy` 旁路，不进 PlanKind 决策表，DM-20260705-008 M3 兼容） | **D7-S9-A112** | `execute_plan_frame_inject_test.go::TestPlanToExecute_Wiring_StrategyBypass` | **PLANNED** | **P0** | Execute_PlanFrameDelta |
+| **D7-S9-A112-T05** | trace 重放验证：Execute system_prompt 增量 ≤ 200 字符 + 含 `plan_frame_delta_schema_hash` span tag（DM-20260705-010 AC5 + AC3） | **D7-S9-A112** | `e2e_frame_delta_test.go::TestE2E_ExecutePlanFrameDelta_SpanTagVisible` | **PLANNED** | **P0** | Execute_PlanFrameDelta |
+
+**A112 Total:** 5 P0 T — 0 IMPLEMENTED + 5 PLANNED (DM-20260705-010 S2_Proposal, 待 S4 实现)
+
+### D7-S9-A113: Execute convergence_metric deterministic compute + Jaeger emit (DM-20260705-010) — Change: `devrix-d7-mups-frame-delta-closure` (S2_Proposal, PLANNED)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A113-T01** | `ConvergenceMetric` struct (UncertaintyReductionRate float64 + ObservedGapsClosedCount int + FrameDeltaConsumed bool) + `ComputeConvergenceMetric(subTurns)` 纯 deterministic 计算（工具结果 diff + claim 数 + obs_uncertainty 残量，0 LLM） | **D7-S9-A113** | `convergence_metric_test.go::TestConvergenceMetric_DeterministicNoLLMCall` | **PLANNED** | **P0** | Convergence_Metric_Emit |
+| **D7-S9-A113-T02** | `item_pipeline.go` 每个 sub-turn 结束 emit `convergence_metric` span（含 `uncertainty_reduction_rate` + `observed_gaps_closed_count` + `frame_delta_consumed` 3 attributes） | **D7-S9-A113** | `convergence_metric_test.go::TestSubTurn_ConvergenceSpanEmitted` | **PLANNED** | **P0** | Convergence_Metric_Emit |
+| **D7-S9-A113-T03** | 0 LLM 调用验证：mock LLM 后 ComputeConvergenceMetric 调用次数为 0（确定性 + 不引入 LLM 延迟） | **D7-S9-A113** | `convergence_metric_test.go::TestConvergenceMetric_ZeroLLMInvocations` | **PLANNED** | **P0** | Convergence_Metric_Emit |
+| **D7-S9-A113-T04** | span field stable wire format（JSON 序列化 + round-trip 一致），便于 Jaeger tag 解析 | **D7-S9-A113** | `convergence_metric_test.go::TestConvergenceMetric_SpanFieldsStable` | **PLANNED** | **P0** | Convergence_Metric_Emit |
+| **D7-S9-A113-T05** | trace 重放验证 (sess_1783255992426_6000 wi_d0_s0_goal)：Execute 5 个 sub-turn 全有 convergence_metric span + 末轮 `uncertainty_reduction_rate ≥ 0.5`（DM-20260705-010 AC4 + AC7） | **D7-S9-A113** | `e2e_frame_delta_test.go::TestE2E_ConvergenceMetric_AllSubTurnsEmitted` | **PLANNED** | **P0** | Convergence_Metric_Emit |
+
+**A113 Total:** 5 P0 T — 0 IMPLEMENTED + 5 PLANNED (DM-20260705-010 S2_Proposal, 待 S4 实现)
+
 ---
 
 ## D7-S10: Verify Node (MUPS v4.3 Phase 4 + DM-20260701-007)
@@ -1278,6 +1302,20 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S5-A100-T08** | 现有 Plan E2E 0 行为变化（`item_plan_test.go` + `strategic_plan_proposer_test.go` + `parse_reject_feedback_test.go`） | IMPLEMENTED | `internal/layers/orchestration/sessionorchestrator/*_test.go` | Plan_Generate |
 
 **A100 Total:** 8 P0 T — 8 IMPLEMENTED (DM-20260705-004 M2)
+
+
+### D7-S5-A111: MUPS Observe→Plan frame delta 闭环节流 (DM-20260705-010) — Change: `devrix-d7-mups-frame-delta-closure` (S2_Proposal, PLANNED)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S5-A111-T01** | `BuildObservePriorDelta(prevExecCtx)` 首轮返回零值 `FrameDelta{}`（无 prior 时 known_gaps + prior_artifact_summary 均空） | **D7-S5-A111** | `observe_frame_delta_test.go::TestBuildObservePriorDelta_FirstRoundZeroValue` | **PLANNED** | **P0** | Observe_PriorDelta |
+| **D7-S5-A111-T02** | `BuildObservePriorDelta` 非首轮从上一轮 `WorkItemExecContext.ConvergenceMetric` 提取 `prior_artifact_summary`（≤ 80 字符摘要）+ `known_gaps`（未收敛 obs_uncertainty 列表） | **D7-S5-A111** | `observe_frame_delta_test.go::TestBuildObservePriorDelta_NonFirstRoundFromConvergenceMetric` | **PLANNED** | **P0** | Observe_PriorDelta |
+| **D7-S5-A111-T03** | `ObservationFrame` append 2 字段 `PriorArtifactSummary` + `KnownGaps` (obs_fact kind)，9 字段契约 0 修改 (DM-20260705-003 M1 frame 兼容) | **D7-S5-A111** | `observe_frame_delta_test.go::TestObservationFrame_AppendOnly2Fields_NoContractBreak` | **PLANNED** | **P0** | Observe_PriorDelta |
+| **D7-S5-A111-T04** | `FrameObserveUser` spec 扩展 + i18n `obs.input.prior_artifact_summary` / `obs.input.known_gaps` 翻译 (en + zh 完整) | **D7-S5-A111** | `observe_frame_delta_test.go::TestFrameObserveUserSpec_I18nComplete` | **PLANNED** | **P0** | Observe_PriorDelta |
+| **D7-S5-A111-T05** | 封闭式分类器定位兼容 (DM-20260705-009)：prior_artifact_summary + known_gaps 走 `obs_fact` kind，封闭式 JSON 数组不破坏 | **D7-S5-A111** | `observe_frame_delta_test.go::TestClosedClassifierPriorDelta_NotBreakingClosedFormat` | **PLANNED** | **P0** | Observe_PriorDelta |
+| **D7-S5-A111-T06** | trace 重放验证 (sess_1783255992426_6000 wi_d0_s0_goal): Observe→Plan LLM user prompt 含 `prior_artifact_summary` + `known_gaps` span tag (Jaeger mupsSpan.parent == orchSpan.SpanContext) | **D7-S5-A111** | `e2e_frame_delta_test.go::TestE2E_ObservePriorDelta_SpanTagVisible` | **PLANNED** | **P0** | Observe_PriorDelta |
+
+**A111 Total:** 6 P0 T — 0 IMPLEMENTED + 6 PLANNED (DM-20260705-010 S2_Proposal, 待 S4 实现)
 
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)

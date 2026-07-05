@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Version:** 5.19.0
-**Last Updated:** 2026-07-05 (mups-parse-reject-feedback DM-20260705-002: +2 D2 +2 D7 T IMPLEMENTED 691→695, P0 490→494)
+**Last Updated:** 2026-07-05 (mups-frame-delta-closure DM-20260705-010 S2: +6 +5 +5 = +16 D7 T PLANNED 691→707, P0 490→506, D7 v-registry 297→313)
 
 **Version:** 5.19.0 (mups-parse-reject-feedback DM-20260705-002 S4: +4 T 总计 IMPLEMENTED 691→695, P0 490→494 — D2 +2 + D7 +2)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
@@ -29,9 +29,9 @@
 | D4 Multi-Agent | `openspec/specs/d4-multi-agent/t-registry.md` | 40 | 40 | 0 | 21 |
 | D5 Observability | `openspec/specs/d5-observability/t-registry.md` | 48 | 47 | 0 | 33 |
 | D6 Evolution | `openspec/specs/d6-evolution/t-registry.md` | 24 | 22 | 2 | 6 |
-| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 297 | 297 | 0 | 254 |
+| D7 Orchestration | `openspec/specs/d7-orchestration/t-registry.md` | 313 | 297 | 16 | 270 |
 
-**总计**: 691 · IMPLEMENTED 687 · PLANNED 3 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 490
+**总计**: 707 · IMPLEMENTED 687 · PLANNED 19 · DEFERRED-v1.1 1 · PARTIAL 0 · P0 506
 
 > 2026-06-20 增量：DM-20260620-003 (devrix-error-handling-tier1-tier2) — 8 个 P0 T 点（D7-S1-T18 + D7-S2-A02-T18 + D7-S2-A06-T24/T25/T26/T27 + D5-S23-A06-T03 + D3-S3-A01-T16）— 全 IMPLEMENTED。
 > 详见 `docs/error-handling.md` §1-9 (SentinelError 类型统一 + SanitizeForUser + 子 agent stream 哨兵 + retry nil-sentinel)。
@@ -77,6 +77,8 @@
 > 2026-06-29 S6 归档（DM-20260626-006 devrix-d7-6s-observe-merge-cancel, **S1_Cancelled**）：D7 6s observe-merge-cancel — observe/orchtypes/ → decisionplanning/ 物理合并 S1_Cancelled: observe/orchtypes/ 目录从未存在, 原 follow-up #5' scope 基于错误假设, 实际 v6.0.0 域升级后子包已全部归位 sessionorchestrator/ + decisionplanning/ + mups/{observe,plan,execute,learn}/ + hardening/。仅 demand.md 在 archive/（CANCELLED precedent: no .openspec.yaml + no acceptance-report.md + no specs/）。0 T 点（无 S2/S3 design phase），不影响 t-registry 计数。
 
 > 2026-07-01 增量（DM-20260630-013 devrix-d2-d7-review-hardening, 4 phase 一次性收口 — D2 + D7 review hardening P0/P1/P2）：**D2 加 15 项 P0 T** 全 IMPLEMENTED: D2-S15-A80-T01/T02 AutocompactWriteback (autocompact → writeback 2 case) + D2-S15-A81-T01 CompressedView mu 保护 + D2-S15-A82-T01 async_compact session-scoped ctx + D2-S15-A83-T01 microcompact 跳 tool msg + D2-S17-A80-T01 materialize/store.go JSONL strict 模式 + D2-S18-A80-T01/T02 PlanModeWriteParity (PlanMode 写操作判断一致) + D2-S18-A81-T01/T02 SymlinkContainment (符号链接路径收敛 + 容器边界检查) + D2-S18-A82-T01/T02 5 fail-closed (nil bashAST→Deny + sandbox disabled→Deny + bashAST parse→Deny + unknown threshold strictest + bash audit redaction) + D2-S18-A83-T01/T02 + D2-S18-A84-T01 + D2-S18-A85-T01 (fail-closed 3 surface: parse + threshold + audit)。**D7 加 15 项 P0 T** 全 IMPLEMENTED: D7-S1-A80-T01 work_tree.SetStore mu 保护 + D7-S2-A80-T01/T02 PerInvocationEmit (ItemPipelineRunOpts + ExecuteOpts.Emit 字段参数化) + D7-S2-A81-T01 orchestrator.EnsureGoal slog.Warn + D7-S2-A82-T01 turn_loop.AwaitRunningChildren err purge + D7-S2-A83-T01 turn_loop 4 错误 slog.Warn + D7-S2-A84-T01 item_pipeline SetRoundPhase warn span + D7-S2-A85-T01 turn_state.EndTurn purge handle + D7-S3-A84-T01/T02 WorkerPool OnReleaseOnce (单 hook 注册 API 禁无界 append + scheduler 删重复 OnRelease) + D7-S9-A33-T01 mups/execute ErrChannelCtxCancelled + D7-S14-A48-T01 escape Arbitrator Timer + ctx cancel (200 cycles no-leak) + D7-S14-A49-T01 arbitrator 战术 prompt i18n 化 + D7-S15-A42-T01 resolve 4 _ = → warn + D7-S16-A77-T01 child_downlink DefaultChildExpectedReturn schema tag + D7-S16-A78-T01 strategic_plan_proposer i18n 化。24/24 orchestration + 22/22 contextengine packages `go test -race -count=1` PASS。Total 579→609 (+30 T), P0 385→415 (+30 P0, 全部新 T 为 P0), IMPLEMENTED 574→604 (+30), PLANNED 持平 3, PARTIAL 持平 2。D2 t-registry v2.12.0 → v2.13.0 (P0 61→76, IMPLEMENTED 114→129) + D7 t-registry v4.18.0 → v4.19.0 (P0 207→222, IMPLEMENTED 251→266)。详见 `openspec/archive/2026-07-01-devrix-d2-d7-review-hardening/acceptance-report.md` §2 T 层验证。
+
+> 2026-07-05 增量（DM-20260705-010 devrix-d7-mups-frame-delta-closure S2_Proposal PLANNED — Observe→Plan→Execute LLM I/O 协议显式收敛）：D7 MUPS 5 节点管道 (Observe→Plan→Execute→Verify→Learn) LLM 帧 delta 闭环 — 根据 Jaeger trace `38144cebcf8dda7a123827d96a731bc5` 实测，5 节点之间 LLM I/O 协议呈"5 个独立 LLM 调用拼成的序列"而非"逐步收敛的 Markov 过程"。3 个根因: (1) Observe 输入太薄（仅含 directive 69 字符）; (2) Plan→Execute 信号丢失（execution_mode/child_specs/deliverable_contract 未注入 Execute system_prompt）; (3) 缺失 delta 回写（Execute 5 sub-turn prompt tokens 3487→7229 全靠累积 tool_result，无结构化 delta）。**3 候选方案 A/B/C，推荐 C：B + convergence_metric 回写**。加 **16 新 P0 T** PLANNED，分 3 活动: (1) **D7-S5-A111** Observe→Plan frame delta 闭环节流 (6 T): BuildObservePriorDelta 首轮零值 / 非首轮从 ConvergenceMetric 提取 prior_artifact_summary (≤80 字符) + known_gaps / ObservationFrame append-only 2 字段 / FrameObserveUser i18n 完整 / 封闭式分类器 (DM-20260705-009) 兼容 / trace 重放验证 span tag; (2) **D7-S9-A112** Execute system_prompt Plan frame delta 注入 (5 T): interfaces.FrameDelta 5 字段 / StrategicPlanFrame append-only 5 字段 (M2 契约 0 修改) / InjectPlanFrameDelta 双轨 (摘要 ≤80 + schema hash, 增量 ≤200 字符) / item_pipeline 注入点 (走 WorkItemExecContext.Strategy 旁路, 不进 PlanKind 决策表) / trace 重放验证; (3) **D7-S9-A113** Execute convergence_metric deterministic compute + Jaeger emit (5 T): ConvergenceMetric 3 字段 (UncertaintyReductionRate + ObservedGapsClosedCount + FrameDeltaConsumed) + ComputeConvergenceMetric 纯 deterministic (0 LLM) / item_pipeline 每 sub-turn emit convergence_metric span / 0 LLM 调用验证 mock LLM 计数为 0 / span field stable wire format / trace 重放验证 5 sub-turn 全有 span + 末轮 uncertainty_reduction_rate ≥ 0.5。Total 691→707 (+16 T 全 PLANNED), P0 490→506 (+16 P0), IMPLEMENTED 持平 687, PLANNED 3→19。D7 t-registry v4.19.0 → v4.20.0。S4 实现后回填 IMPLEMENTED。Out of Scope: Verify/Learn/Decide 节点改造 (已是 deterministic, 0 LLM) + M1-M5 LLM frame 契约修改 (append-only) + ResolutionContract (DM-20260704-006) 数据契约 + Strategy (DM-20260705-008) 决策表。
 
 ---
 
