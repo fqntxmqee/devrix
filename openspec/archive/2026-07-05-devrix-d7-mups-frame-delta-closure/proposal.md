@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-mups-frame-delta-closure`
 **Demand ID:** DM-20260705-010
 **Created:** 2026-07-05
-**Status:** S1_Proposal
+**Status:** S7_Archived (Phase 1-3 code shipped via PR #434 + docs sync via PR #435; Phase 4 T15/T16/T17/T19 follow-up tracked in tasks.md + acceptance-report §6 + mups-frame-delta-spec.md Phase 4 段)
 **Demand:** [`demand.md`](demand.md)
 **OpenSpec YAML:** [`.openspec.yaml`](.openspec.yaml)
 
