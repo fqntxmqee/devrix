@@ -26,12 +26,16 @@ func TestStrategicPlanFrame_RegisteredAtInit(t *testing.T) {
 	if !ok {
 		t.Fatal("FramePlanUser missing from LineFrameRegistry")
 	}
-	if len(spec.Fields) != 16 {
-		t.Fatalf("FramePlanUser has %d fields, want 16: %v", len(spec.Fields), spec.Fields)
+	if len(spec.Fields) != 18 {
+		t.Fatalf("FramePlanUser has %d fields, want 18: %v", len(spec.Fields), spec.Fields)
 	}
 	expected := []prompttags.TagName{
 		prompttags.TagWorkItemID, prompttags.TagDirective, prompttags.TagPriorParseReject,
 		prompttags.TagObservationIDs, prompttags.TagObservationSummary,
+		// DM-20260704-006 (RC-1 + RC-2) — Plan frame carries the new
+		// resolution_strategies / resolution_claims fields for cross-round
+		// feedback (between observation_summary and the budget block).
+		prompttags.TagResolutionStrategies, prompttags.TagResolutionClaims,
 		prompttags.TagDepth, prompttags.TagMaxDepth,
 		prompttags.TagExistingChildren, prompttags.TagRemainingChildren, prompttags.TagMaxChildren,
 		prompttags.TagDecomposeUsedToday, prompttags.TagRemainingDaily, prompttags.TagMaxDaily,

@@ -49,6 +49,10 @@ var semanticGlossaryEN = map[prompttags.SemanticCondition]string{
 	prompttags.CondMaxDailyControl:          "Daily decompose limit (control)",
 	prompttags.CondMaxItersControl:          "Per-WorkItem ReAct iteration cap (control)",
 	prompttags.CondParentScopeInControl:     "Parent scope in-paths (control, subset constraint)",
+
+	// ResolutionContract (DM-20260704-006, RC-1) — Plan user frame fields.
+	prompttags.CondResolutionStrategies: "resolution_strategies (data): one per ObsUncertainty, binding obs_id + planned_tool + success_criterion; attach sub_worktree when sibling investigation is required",
+	prompttags.CondResolutionClaims:     "resolution_claims (data, cross-round feedback): previous round's Execute-emitted per-obs_id answers + confidence + evidence",
 }
 
 // semanticNodeRoleEN maps node-role keys to one-line en-US descriptions.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
@@ -25,6 +26,13 @@ type Plan struct {
 	BlastRadius           BlastRadius        `json:"blast_radius"`
 	SourceObservationIDs  []string           `json:"source_observation_ids"`
 	AnomaliesCount        int                `json:"anomalies_count,omitempty"`
+	// ResolutionStrategies (DM-20260704-006) — the per-ObsID resolution
+	// contract that closes break-chain A (Obs→Resolution). Optional; when
+	// non-empty, the LLM Verifier cross-checks ResolutionClaim[] from
+	// Execute against these strategies to compute CoverageRatio. Any
+	// strategy whose SubWorktree is non-nil triggers SpawnDecompose via
+	// RC-4a (break-chain B closure).
+	ResolutionStrategies []interfaces.ResolutionStrategy `json:"resolution_strategies,omitempty"`
 	CreatedAt             time.Time          `json:"created_at"`
 	// FailureCriteriaOpWhitelist and ObservableFailureCriterionFields are
 	// package-level; Validate() reads them.
@@ -67,6 +75,14 @@ func (p Plan) WithBlastRadius(br BlastRadius) Plan {
 // can correlate observation anomalies with verification outcomes).
 func (p Plan) WithAnomaliesCount(n int) Plan {
 	p.AnomaliesCount = n
+	return p
+}
+
+// WithResolutionStrategies returns a copy with the new ResolutionStrategies
+// slice (DM-20260704-006). The slice is copied so callers can mutate the
+// input without affecting the receiver (immutable value-object pattern).
+func (p Plan) WithResolutionStrategies(strategies []interfaces.ResolutionStrategy) Plan {
+	p.ResolutionStrategies = append([]interfaces.ResolutionStrategy(nil), strategies...)
 	return p
 }
 

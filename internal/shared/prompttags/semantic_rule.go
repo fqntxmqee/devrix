@@ -122,6 +122,12 @@ var planInputSemantics = map[TagName]SemanticRule{
 	TagParentScopeIn:       {WhenUse: CondParentScopeInControl},
 	TagUncertaintyMean:     {WhenUse: CondUncertaintyMeanControl, Enforced: true, Gate: "applySingleModeUncertaintyGate"},
 	TagWorkItemID:          {WhenUse: CondWorkItemIdentifier, Enforced: true, Gate: "work_item_id"},
+	// ResolutionContract (DM-20260704-006, RC-1 + RC-2) — Plan emits
+	// resolution_strategies (per ObsID resolution plan); previous round's
+	// resolution_claims (from Execute) is included for in-context feedback
+	// so the LLM can refine strategies across rounds.
+	TagResolutionStrategies: {WhenUse: CondResolutionStrategies, Enforced: true, Gate: "strategic_plan_proposer"},
+	TagResolutionClaims:     {WhenUse: CondResolutionClaims, Enforced: true, Gate: "strategic_plan_proposer"},
 }
 
 func inputRuleWhenKey(frame FrameName, name TagName) SemanticCondition {

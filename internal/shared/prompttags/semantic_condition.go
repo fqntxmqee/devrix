@@ -58,4 +58,13 @@ const (
 	CondMaxDailyControl          SemanticCondition = "max_daily_control"
 	CondMaxItersControl          SemanticCondition = "max_iters_control"
 	CondParentScopeInControl     SemanticCondition = "parent_scope_in_control"
+
+	// ResolutionContract (DM-20260704-006) — Plan user frame fields.
+	// CondResolutionStrategies: when ObsUncertainty exists, emit one
+	// resolution_strategy per ObsID with planned_tool + success_criterion;
+	// attach sub_worktree when a sibling WorkItem is required.
+	CondResolutionStrategies SemanticCondition = "resolution_strategies"
+	// CondResolutionClaims: cross-round feedback; Execute-emitted
+	// claims from the previous round so the LLM can refine strategies.
+	CondResolutionClaims SemanticCondition = "resolution_claims"
 )
