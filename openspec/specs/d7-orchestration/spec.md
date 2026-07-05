@@ -3,9 +3,9 @@
 **Capability:** d7-orchestration
 **Domain:** D7
 **DSAFT Type:** 核心域 (Core Domain)
-**Version:** 4.24.0
+**Version:** 4.25.0
 **Status:** Canonical — source of truth
-**Last Updated:** 2026-07-05 (d7-spawn-decision-algebra DM-20260705-006: M5 MUPS Spawn 决策代数化 — spawn_decision_algebra.go kernel + 3 子决策 checkBudget/checkRollupGuard/checkVerdictDirection + normalizeCtx helper; SpawnPolicyEvaluator 50+→8 行; rollup retry exhausted guard 单一权威位置; 0 行为变化; 7 T D7-S15-A102-T01..T07 IMPLEMENTED; L5-MUPS-SDA-01..07 全 PASS; 22 现有测试 0 修改 + 27 byte-equivalent 组合字节级 PASS; 下个 change mups-cleanup-legacy 删除 _legacy_test.go)
+**Last Updated:** 2026-07-05 (mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
 **Domain SoT:** `d7-domain.md`
 **Layering Spec:** `openspec/specs/architecture/layering.md`
 **Parent Change:** devrix-d7-orchestration-domain (DM-20260613-001)

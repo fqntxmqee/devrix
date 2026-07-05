@@ -2,7 +2,7 @@
 
 **Change ID:** mups-cleanup-legacy
 **Demand ID:** DM-20260705-007
-**Status:** S3_Design
+**Status:** Archived (s7_archived)
 
 ## 1. Background
 

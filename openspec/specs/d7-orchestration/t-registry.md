@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.31.0
-**Last Updated:** 2026-07-05 (d7-spawn-decision-algebra DM-20260705-006: D7-S15-A102 +7 T IMPLEMENTED 304→311, P0 260→266)
+**Version:** 4.32.0
+**Last Updated:** 2026-07-05 (mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`

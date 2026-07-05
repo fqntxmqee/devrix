@@ -1,7 +1,7 @@
 change_id: mups-cleanup-legacy
 priority: P2
 demand_id: DM-20260705-007
-status: s3_design
+status: s7_archived
 domains: [D7]
 dsaft_scenarios: [D7-S10, D7-S15]
 dsaft_activities: [D7-S10-A101, D7-S15-A102]
