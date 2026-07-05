@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -14,133 +13,23 @@ var (
 	errSpawnRoundIncomplete    = errors.New("pipeline round missing required LP-5 fields")
 )
 
-// SpawnPolicyEvaluator applies rules R0–R8 (design §4). LLM MUST NOT set
-// SpawnPolicy directly; only this function may assign it (goal G3).
+// SpawnPolicyEvaluator applies the 3-sub-decision algebra
+// (checkBudget → checkRollupGuard → checkVerdictDirection) decomposed in
+// spawn_decision_algebra.go. LLM MUST NOT set SpawnPolicy directly; only
+// this function may assign it (goal G3).
 func SpawnPolicyEvaluator(round *WorkItemPipelineRound, ctx TreeEvalContext) SpawnPolicy {
 	if round == nil {
 		return SpawnNone
 	}
-	if ctx.MaxDepth <= 0 {
-		ctx.MaxDepth = DefaultMaxDecomposeDepth
+	ctx = normalizeCtx(ctx)
+	if policy, fired := checkBudget(round, ctx); fired {
+		return policy
 	}
-	if ctx.Threshold <= 0 {
-		ctx.Threshold = DefaultUncertaintyDecomposeThreshold
+	if policy, fired := checkRollupGuard(round, ctx); fired {
+		return policy
 	}
-	if ctx.MaxIndeterminateRetries <= 0 {
-		ctx.MaxIndeterminateRetries = DefaultMaxIndeterminateRetries
-	}
-	if ctx.MaxRollupRetries <= 0 {
-		ctx.MaxRollupRetries = DefaultMaxRollupRetries
-	}
-	if ctx.MaxInlineRetriesAtMaxDepth <= 0 {
-		ctx.MaxInlineRetriesAtMaxDepth = DefaultMaxInlineRetriesAtMaxDepth
-	}
-
-	// R0
-	if ctx.RunningChildren > 0 {
-		return SpawnAwait
-	}
-	// R0.5 — CC-1.1: applicable deliverable satisfied → terminal before R1.
-	if applicableDeliverableSchema(round) && !deliverableContinuationRequired(round) {
-		return SpawnNone
-	}
-	// R1 — max depth with continuation: bounded inline, then escalate (CC-U1 may prefer rollup).
-	if ctx.Depth >= ctx.MaxDepth {
-		if deliverableContinuationRequired(round) {
-			return spawnForDeliverableContinuation(round, ctx)
-		}
-		if deliverableInlineWouldExhaust(ctx) {
-			return SpawnEscalateHuman
-		}
-		return SpawnInline
-	}
-	// R2
-	if ctx.DailyLimitExceeded {
-		return SpawnEscalateHuman
-	}
-
-	switch round.VerdictKind {
-	case types.VerdictPass:
-		// CC-1 / §8.1: Pass with applicable schema MUST NOT SpawnNone while
-		// deliverable is still owed — inline (or R1 budget) instead.
-		if deliverableContinuationRequired(round) {
-			return spawnForDeliverableContinuation(round, ctx)
-		}
-		return SpawnNone
-
-	case types.VerdictPartial:
-		// R5 — rollup synthesis retries inline until verifyRollup passes.
-		// RH-MUPS-03 (DM-20260701-001): after MaxRollupRetries consecutive
-		// non-Pass rollup rounds escalate to human review rather than
-		// silently looping until the session loop max=16 backstops us.
-		if ctx.RollupRound {
-			if ctx.RollupRetries >= ctx.MaxRollupRetries {
-				return SpawnEscalateHuman
-			}
-			return SpawnInline
-		}
-		// Exploratory partial on decomposable parents (Goal/Plan/Implement)
-		// triggers the first split; leaf explore items retry inline.
-		if IsExploratoryPlanKind(round.PlanKind) {
-			if ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
-			}
-			return SpawnInline
-		}
-		if round.UncertaintyMean >= ctx.Threshold {
-			return SpawnDecompose
-		}
-		if deliverableContinuationRequired(round) {
-			return spawnForDeliverableContinuation(round, ctx)
-		}
-		return SpawnNone
-
-	case types.VerdictFail:
-		// RH-MUPS-03 (DM-20260701-001): same termination guard as R5.
-		if ctx.RollupRound {
-			if ctx.RollupRetries >= ctx.MaxRollupRetries {
-				return SpawnEscalateHuman
-			}
-			return SpawnInline
-		}
-		// R6
-		if round.PlanKind == plan.ScenarioPlan {
-			return SpawnParallelExplore
-		}
-		// Leaf explore items cannot decompose; retry inline instead.
-		if round.PlanKind == plan.ExplorationPlan {
-			if ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
-			}
-			return SpawnInline
-		}
-		return SpawnNone
-
-	case types.VerdictIndeterminate:
-		// RH-MUPS-03 (DM-20260701-001): same termination guard as R5/R6.
-		if ctx.RollupRound {
-			if ctx.RollupRetries >= ctx.MaxRollupRetries {
-				return SpawnEscalateHuman
-			}
-			return SpawnInline
-		}
-		// R7 — exploratory plans decompose when verifier abstains (uncertainty path),
-		// instead of blocking on human gate.
-		if ctx.IndeterminateRetries >= ctx.MaxIndeterminateRetries {
-			if (IsExploratoryPlanKind(round.PlanKind) || round.UncertaintyMean >= ctx.Threshold) &&
-				ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
-			}
-			return SpawnEscalateHuman
-		}
-		return SpawnInline
-
-	default:
-		// R8
-		return SpawnNone
-	}
+	return checkVerdictDirection(round, ctx)
 }
-
 // EvaluateSpawnPolicy fills round.SpawnPolicy and SpawnRationale in place.
 func EvaluateSpawnPolicy(round *WorkItemPipelineRound, ctx TreeEvalContext) {
 	if round == nil {
