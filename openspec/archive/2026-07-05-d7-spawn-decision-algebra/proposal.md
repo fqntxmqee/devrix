@@ -2,7 +2,7 @@
 
 **Change ID:** `d7-spawn-decision-algebra`  
 **Demand:** DM-20260705-006
-**Status:** S3_Design
+**Status:** Archived (s7_archived)
 
 ## Why
 
