@@ -130,6 +130,12 @@ const (
 	OpD7_S3_Executor_Select = "D7_Executor_Select"
 	// D7-S4 ExecutionFlow + Verify (system.anomaly_detect P0)
 	OpD7_S4_System_Anomaly_Detect = "D7_System_Anomaly_Detect"
+	// D7-S4 ExecutionFlow + Verify (mups.resolution_coverage P0)
+	// Phase 5 of devrix-d7-uncertainty-resolution-traceability — emits
+	// the Verify→Decide handoff metrics so dashboards can track
+	// CoverageRatio + unresolved_count per round without re-parsing
+	// artifact JSON.
+	OpD7_S4_Resolution_Coverage = "D7_Resolution_Coverage"
 	// D7-S5 DecisionPlanning + Observe (taskgraph.synthesize P1)
 	OpD7_S5_TaskGraph_Synthesize = "D7_TaskGraph_Synthesize"
 	// D7-S6 MUPS Pipeline (channel.route P0)

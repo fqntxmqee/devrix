@@ -2,9 +2,12 @@ package sessionorchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
@@ -476,5 +479,94 @@ func TestRunItemPipeline_LongLLMResponseSurvivesArtifact(t *testing.T) {
 	if round.ArtifactSummary != longContent {
 		t.Fatalf("ArtifactSummary truncated: len=%d, want=%d (regression: WorkerWorkItem artifact must hold the full LLM response)",
 			len(round.ArtifactSummary), len(longContent))
+	}
+}
+
+// TestBuildArtifactFromWorkItemResult_StampsResolutionClaims verifies the
+// Phase 1.5 contract: WorkItemResult.ResolutionClaims lands on
+// art.Metadata["resolution_claims"] as JSON-encoded
+// []interfaces.ResolutionClaim so extractResolutionClaimsFromArtifact
+// can reverse the encoding on the Verify side.
+//
+// DM-20260704-006 S4 Phase 1.5 (D7-S16-A105-T01).
+func TestBuildArtifactFromWorkItemResult_StampsResolutionClaims(t *testing.T) {
+	item := &workmodel.WorkItem{ID: "wi_test"}
+	started := time.Now()
+	result := &WorkItemResult{
+		Content:         "<resolution_claims>[{\"obs_id\":\"obs-1\",\"answer\":\"a\",\"confidence\":0.9,\"supporting_evidence\":\"e\"}]</resolution_claims> tail",
+		Done:            true,
+		StopReason:      "final_answer",
+		ResolutionClaims: []interfaces.ResolutionClaim{{ObsID: "obs-1", Answer: "a", Confidence: 0.9, SupportingEvidence: "e"}},
+	}
+	art := buildArtifactFromWorkItemResult(nil, item, "sess_test", started, result, nil)
+	if art == nil || art.Metadata == nil {
+		t.Fatalf("artifact or metadata nil")
+	}
+	raw, ok := art.Metadata["resolution_claims"]
+	if !ok {
+		t.Fatalf("resolution_claims key missing from Metadata")
+	}
+	text, ok := raw.(string)
+	if !ok {
+		t.Fatalf("resolution_claims is %T, want string", raw)
+	}
+	var claims []interfaces.ResolutionClaim
+	if err := json.Unmarshal([]byte(text), &claims); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(claims) != 1 || claims[0].ObsID != "obs-1" {
+		t.Errorf("claims = %+v, want one obs-1", claims)
+	}
+}
+
+// TestExtractResolutionClaimsFromArtifact_RoundTrip exercises the inverse:
+// extractResolutionClaimsFromArtifact decodes the JSON encoded by
+// buildArtifactFromWorkItemResult back into typed claims. The round-trip
+// is the safety-net's binary condition: when the artifact carries
+// claims, Verify sees them; when it doesn't, Verify returns nil and
+// every strategy degrades to "no_resolution_claim".
+func TestExtractResolutionClaimsFromArtifact_RoundTrip(t *testing.T) {
+	claims := []interfaces.ResolutionClaim{
+		{ObsID: "obs-1", Answer: "a1", Confidence: 0.9, SupportingEvidence: "e1"},
+		{ObsID: "obs-2", Answer: "a2", Confidence: 0.5, SupportingEvidence: "e2"},
+	}
+	raw, _ := json.Marshal(claims)
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_rt",
+		Metadata: map[string]any{"resolution_claims": string(raw)},
+	}
+	got := extractResolutionClaimsFromArtifact(art, []string{"obs-1", "obs-2"})
+	if len(got) != 2 {
+		t.Fatalf("got %d claims, want 2", len(got))
+	}
+	if got[0].ObsID != "obs-1" || got[1].ObsID != "obs-2" {
+		t.Errorf("obs_id ordering mismatch: %+v", got)
+	}
+}
+
+// TestExtractResolutionClaimsFromArtifact_NoArtifact verifies the safety
+// net: nil artifact → nil claims. This is what Phase 1's verifier used
+// before Phase 1.5 — the placeholder returned nil so Decide stays on
+// the legacy verdict-based path.
+func TestExtractResolutionClaimsFromArtifact_NoArtifact(t *testing.T) {
+	if got := extractResolutionClaimsFromArtifact(nil, nil); got != nil {
+		t.Errorf("nil artifact should yield nil claims, got %+v", got)
+	}
+	if got := extractResolutionClaimsFromArtifact(&wavescheduler.Artifact{}, nil); got != nil {
+		t.Errorf("absent metadata key should yield nil claims, got %+v", got)
+	}
+}
+
+// TestExtractResolutionClaimsFromArtifact_MalformedPayload verifies that
+// bad JSON degrades to nil (not panic). The slog.Warn inside the
+// function is exercised but we don't assert on its output here.
+func TestExtractResolutionClaimsFromArtifact_MalformedPayload(t *testing.T) {
+	art := &wavescheduler.Artifact{
+		TaskID:   "wi_bad",
+		Metadata: map[string]any{"resolution_claims": "{not valid json}"},
+	}
+	got := extractResolutionClaimsFromArtifact(art, nil)
+	if got != nil {
+		t.Errorf("malformed JSON should degrade to nil, got %+v", got)
 	}
 }

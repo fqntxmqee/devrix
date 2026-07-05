@@ -2,6 +2,7 @@ package sessionorchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -359,13 +360,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		priorReason += extra
 	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
-		Item:                item,
-		Tasks:               r.Tasks,
-		MaxItersOverride:    maxItersOverride,
-		DeliverableContract: execDeliverableContract,
-		DeliverableSchema:   deliverableSchema,
-		PriorVerifyReason:   priorReason,
-		Emit:                opts.Emit,
+		Item:                 item,
+		Tasks:                r.Tasks,
+		MaxItersOverride:     maxItersOverride,
+		DeliverableContract:  execDeliverableContract,
+		DeliverableSchema:    deliverableSchema,
+		PriorVerifyReason:    priorReason,
+		Emit:                 opts.Emit,
+		ResolutionStrategies: pl.ResolutionStrategies,
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
@@ -557,6 +559,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		round.ResolutionReport = verify.ComputeResolutionCoverage(
 			pl.ResolutionStrategies, claims, sessionID, item.ID, roundNo,
 		)
+		// DM-20260704-006 Phase 5: emit the Verify→Decide handoff span
+		// with CoverageRatio + unresolved_count metrics. Skipped when
+		// the report is nil (legacy LLM rounds or empty strategies —
+		// see verify.ComputeResolutionCoverage safety-net gate).
+		if round.ResolutionReport != nil {
+			_, endResCov := hardening.EmitResolutionCoverage(
+				ctx, sessionID, item.ID, roundNo,
+				round.ResolutionReport.TotalStrategies,
+				round.ResolutionReport.TotalClaims,
+				len(round.ResolutionReport.UnresolvedObs),
+				round.ResolutionReport.CoverageRatio,
+			)
+			endResCov(nil)
+		}
 	}
 	if observeParseReject != "" {
 		round.ObserveParseReject = observeParseReject
@@ -727,6 +743,15 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 			"tool_calls":  toolCalls,
 		},
 	}
+	if result != nil && len(result.ResolutionClaims) > 0 {
+		raw, err := json.Marshal(result.ResolutionClaims)
+		if err == nil {
+			art.Metadata["resolution_claims"] = string(raw)
+		} else {
+			slog.Warn("item_pipeline: marshal resolution_claims failed; degrade to no_claim",
+				"session_id", sessionID, "work_item_id", item.ID, "err", err)
+		}
+	}
 	if pl != nil {
 		art.SourcePlanID = pl.ID
 	}
@@ -736,24 +761,42 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 // extractResolutionClaimsFromArtifact reads per-ObsID ResolutionClaim[]
 // out of the Execute artifact.
 //
-// DM-20260704-006 S4 Phase 2: the Execute artifact schema extension that
-// surfaces ResolutionClaim[] lands in D7-S16-A105-T01 (Phase 1.5 follow-up
-// PR). Until then the function returns nil so callers see a degenerate
-// report (every strategy → no_resolution_claim) — which is the canonical
-// "Plan declared strategies but Execute did not answer" state we want
-// Jaeger to surface during the rollout. Phase 1.5 swaps the body for a
-// real extraction path; the signature is stable so call sites do not move.
+// DM-20260704-006 S4 Phase 1.5 (D7-S16-A105-T01): buildArtifactFromWorkItemResult
+// stores the typed claims under Metadata["resolution_claims"] (JSON-encoded).
+// This function reverses that and is the only path that decodes claims into
+// the WorkItemPipelineRound so Verify doesn't have to re-parse prose.
 //
-// obsIDs is the round's observation IDs (from Observe) included for
-// Phase 1.5 use as a fallback ObsID resolution hint.
+// obsIDs is the round's observation IDs from Observe. Retained on the
+// signature for stability — Phase 1.5 doesn't consume it but future
+// changes may want to cross-check claim ObsIDs against the round's
+// allowed ObsID set.
+//
+// Failure modes:
+//
+//   - nil artifact or absent metadata key → return nil; Verify reads
+//     "no_resolution_claim" for every strategy (Phase 1.5 safety net).
+//   - malformed JSON → log + return nil (same degradation path).
+//   - empty array → empty slice (no claims, all strategies unresolved).
 func extractResolutionClaimsFromArtifact(art *wavescheduler.Artifact, obsIDs []string) []interfaces.ResolutionClaim {
-	// Phase 1.5 placeholder: real extraction reads art.Metadata["resolution_claims"]
-	// (JSON-encoded) when the artifact schema ships. Until then return
-	// nil so the report degrades to "no_resolution_claim" for every
-	// strategy. The safety-net behavior is intentional, not a bug.
-	_ = art
 	_ = obsIDs
-	return nil
+	if art == nil || art.Metadata == nil {
+		return nil
+	}
+	raw, ok := art.Metadata["resolution_claims"]
+	if !ok {
+		return nil
+	}
+	text, ok := raw.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return nil
+	}
+	var claims []interfaces.ResolutionClaim
+	if err := json.Unmarshal([]byte(text), &claims); err != nil {
+		slog.Warn("item_pipeline: malformed resolution_claims JSON; degrade to no_claim",
+			"err", err, "payload_preview", truncateForArtifact(text, 80))
+		return nil
+	}
+	return claims
 }
 
 // setRoundPhaseWithLog wraps r.Tasks.Tree().SetRoundPhase with the standard
