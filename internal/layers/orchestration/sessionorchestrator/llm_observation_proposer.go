@@ -59,40 +59,13 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 	return parseObservationProposalsJSON(raw)
 }
 
+// buildLLMObservationUserPrompt serializes ObserveSignalInput to the Observe user prompt
+// via reflection-based BuildLineFrameFromStruct (DM-20260705-003 go-struct-driven).
+// Schema is the sole responsibility of ObserveSignalInput's pt struct tags; this
+// function only chooses guide header + frame body.
 func buildLLMObservationUserPrompt(in ObserveSignalInput, loc i18n.Locale) string {
-	fields := map[prompttags.TagName]any{
-		prompttags.TagWorkItemID: in.WorkItemID,
-		prompttags.TagDirective:  in.Directive,
-	}
-	if in.PriorMean > 0 {
-		fields[prompttags.TagPriorMean] = in.PriorMean
-	}
-	if in.ScopeContract != nil {
-		if s := strings.TrimSpace(in.ScopeContract.GoalStatement); s != "" {
-			fields[prompttags.TagScopeGoal] = s
-		}
-		var questions []string
-		for _, q := range in.ScopeContract.OpenQuestions {
-			if strings.TrimSpace(q) != "" {
-				questions = append(questions, q)
-			}
-		}
-		if len(questions) > 0 {
-			fields[prompttags.TagScopeOpenQuestion] = questions
-		}
-	}
-	if len(in.InboundSignalLines) > 0 {
-		fields[prompttags.TagSignal] = in.InboundSignalLines
-	}
-	if len(in.PriorObservationIDs) > 0 {
-		fields[prompttags.TagPriorObservationIDs] = in.PriorObservationIDs
-		fields[prompttags.TagIncrementalOnly] = "true"
-	}
-	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
-		fields[prompttags.TagPriorParseReject] = s
-	}
-	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FrameObserveUser, prompttags.ObserveUserFrame, fields)
-	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, fields)
+	frame := prompttags.BuildLineFrameFromStruct(prompttags.FrameObserveUser, &in)
+	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, nil)
 	if guide == "" {
 		return frame
 	}

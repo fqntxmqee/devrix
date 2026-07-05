@@ -13,6 +13,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-07-05 | mups-go-struct-driven | MUPS Go-struct-driven I/O contract — M1 kernel + Observe 迁移（struct=SoT + pt 反射注册 + 5 项 init panic 校验 + i18n 同步；0 行为变化；14 T IMPLEMENTED D7-S5-A99-T01..T09 + shared-A99-T01..T05；L5-MUPS-GSD-01..06 全 PASS；反射开销 384.7 ns/op） | IMPLEMENTED | [changes](../../changes/mups-go-struct-driven/) |
 | 2026-07-04 | d7-uncertainty-spawn-decouple | CC-U1～U6 + MUPS spawn 数据对象/时序文档（`mups-spawn-*.md`） | IMPLEMENTED | [changes](../../changes/d7-uncertainty-spawn-decouple/) |
 | 2026-07-01 | devrix-d7-s-layer-normalization | D7 current canonical S 固定为 S1-S6；S7-S14 迁 historical mapping，S20/S21 迁 TaskContract contract mapping；补 StrategicPlanReject feedback 与 child-stats uncertainty reconcile | IMPLEMENTED | [archive](../../archive/2026-07-01-devrix-d7-s-layer-normalization/) |
 | 2026-07-02 | devrix-mups-tool-classification-and-channel-autonomy | MUPS 5 节点 × Tool 元数据 Control Plane + ToolChannel 自治 (D7-S9-A50 ToolChannel Router + 4 channels + Bounded(15) hard stop + PromptPressure 3-stage + Shadow/Enforce + cross-check) + VerifyContract 4 元 + BurdenOfProof + D1 Reason 透传 + PlanChannel rename; 15 T IMPLEMENTED (D7-S9-A50-T01..T08 + D7-S9-A26-T06 + D7-S10-A50-T01..T04 + D7-S2-A50-T07/T08) | IMPLEMENTED | [archive](../../archive/2026-07-02-devrix-mups-tool-classification-and-channel-autonomy/) |
