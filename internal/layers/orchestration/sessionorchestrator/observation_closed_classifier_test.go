@@ -88,7 +88,7 @@ func TestObservePipeline_OpenDirectiveNoSignal_ClassifierPrompt(t *testing.T) {
 	}
 
 	// (1) user frame preserves the directive verbatim (M1 contract).
-	if !strings.Contains(llm.lastUser, "[data] directive: review d7 领域 plan目录下代码") {
+	if !strings.Contains(llm.lastUser, "directive: review d7 领域 plan目录下代码") {
 		t.Errorf("user frame should preserve directive verbatim:\n%s", llm.lastUser)
 	}
 

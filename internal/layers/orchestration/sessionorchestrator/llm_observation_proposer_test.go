@@ -79,7 +79,7 @@ func TestLLMObservationProposer_SystemIncludesSemanticMarkers(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	for _, marker := range []string{"obs_uncertainty", "语义：", "范围/目标不清"} {
+	for _, marker := range []string{"obs_uncertainty", "语义规则（机器可读）", "范围/目标不清"} {
 		if !strings.Contains(llm.lastSystem, marker) {
 			t.Fatalf("system missing semantic marker %q: %q", marker, llm.lastSystem)
 		}

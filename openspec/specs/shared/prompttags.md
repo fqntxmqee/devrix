@@ -125,8 +125,9 @@ Rationale: node-specific dynamic content precedes static base so the model sees 
 
 - `SemanticsForPhase` — locale-neutral registry (`FieldSemantic`, `PhaseSemantics`)
 - `RenderSemanticAppendix(phase, locale)` — i18n bullet appendix inserted **before** `DocBlock*` in Observe/Plan/Execute prompts
-- `RenderFrameFieldGuideForFields` — compact `[control]`/`[data]` guide for Observe/Plan user frames
-- `BuildAnnotatedLineFrame` — prefixes lineframe keys with plane markers
+- `RenderFrameFieldGuideForFields` — compact field guide for Observe/Plan user frames (present fields only)
+- `BuildLineFrameFromStruct` — plain `key: value` lines (no plane prefix; DM-20260705-004)
+- `BuildAnnotatedLineFrame` — optional plane prefix (internal/tests only)
 
 See `openspec/archive/2026-07-05-mups-prompt-tag-semantics/specs/shared/prompttags-semantics.md` for normative kind/mode semantics.
 
@@ -144,3 +145,28 @@ See `openspec/archive/2026-07-05-mups-prompt-tag-semantics/specs/shared/promptta
 
 - Observe user frame: when `LastRound.ObservationIDs` present → `prior_observation_ids` + `incremental_only: true`
 - Plan user prompt: emits `uncertainty_mean` when `StrategicPlanInput.UncertaintyMean > 0`
+
+---
+
+## MUPS 三节点 LLM 协议参考（2026-07-05）
+
+**Path:** `openspec/specs/shared/mups-node-llm-protocols.md`
+
+Normative reference for Observe / Plan / Execute:
+
+- Input protocol (lineframe fields, user message structure)
+- Output protocol (wholebody JSON vs envelope tags)
+- System dynamic prompt assembly (`AssembleMUPSSystemPrompt` order per phase)
+- Cross-round `ParseRejectRecord` feedback
+- §8 optimization review (known gaps OPT-01..OPT-09)
+
+Cross-links: D2 `MaterializeForMUPS` — `openspec/specs/d2-context-engine/d7-boundary.md` § MaterializeForMUPS table.
+
+### v5: Prompt dedup (DM-20260705-004)
+
+**Change ID:** `mups-node-prompt-dedup`
+
+- Observe LLM user frame: classifier-visible fields only (`observeLLMFieldMap`); no `work_item_id` / `prior_mean` / `incremental_only`
+- Lineframe: no `[control]`/`[data]` line prefixes; field guide lists present fields only
+- Observe/Plan appendix: no duplicate `observe.node_role` / `plan.node_role` in `RenderSemanticAppendix`
+- Execute: `AssembleMUPSExecuteSystemPrompt` order = workItemBody → outputHints → staticBase; ZH `任务指令` label
