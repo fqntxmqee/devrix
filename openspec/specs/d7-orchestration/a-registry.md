@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.7.0
+**Version:** 5.8.0
 **Last Updated:** 2026-07-05 (mups-verify-table-driven DM-20260705-005: D7-S10-A101 verify_decision_table kernel + 3 verify 函数走表驱动化活动登记 → v5.6.0; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行 + 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + S5 段加 cross-reference → v5.5.0)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
