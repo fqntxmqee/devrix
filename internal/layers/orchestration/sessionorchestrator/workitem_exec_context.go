@@ -65,6 +65,13 @@ type WorkItemExecContext struct {
 	// nil/empty → legacy verdict-based path; the ItemPipelineRunner no-ops
 	// on extractResolutionClaimsFromArtifact.
 	ResolutionStrategies []interfaces.ResolutionStrategy
+	// PlanFrameDelta carries the Plan→Execute typed delta (DM-20260705-010
+	// devrix-d7-mups-frame-delta-closure, Phase 1 T4). Set by the orchestrator
+	// AFTER Plan yields a StrategicPlanProposal and BEFORE Execute's system
+	// prompt is materialized (subturn_materialize.go). nil → legacy path,
+	// InjectPlanFrameDelta no-ops (returns baseline unchanged + emits
+	// prior_delta_empty span).
+	PlanFrameDelta *interfaces.FrameDelta
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.

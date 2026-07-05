@@ -566,3 +566,89 @@ func EmitSimilarityCheckIntercept(ctx context.Context, sessionID, bucket string,
 	_, span := start(ctx, telemetry.OpD7_S18_Similarity_Check_Intercept, attrs...)
 	return func(err error) { endSpanWithError(span, err) }
 }
+
+// --- DM-20260705-010 (devrix-d7-mups-frame-delta-closure) S4 Phase 1 spans ---
+//
+// AC5/AC8/AC9 need 3 observability points that turn the MUPS I/O
+// protocol into an explicit convergence process. All three follow the
+// established hardening.emit pattern (nil-bridge safe, deferred end via
+// returned func(error) closure).
+//
+// Injection status (PlanFrameDeltaInject*) is a stable enum mirrored to
+// the telemetry attribute `injection_status`. Dashboards can filter
+// regressions via `injection_status=budget_exceeded_fallback_baseline`
+// or `injection_status=prior_delta_empty`.
+
+// PlanFrameDeltaInjectOK = normal injection: summary fits, schema_hash
+// present, baseline + injection emitted.
+const PlanFrameDeltaInjectOK = "ok"
+
+// PlanFrameDeltaInjectBudgetExceeded = injection would exceed MaxPlanFrameDeltaInjectChars
+// (200-char absolute budget) — caller must fall back to baseline + warn.
+const PlanFrameDeltaInjectBudgetExceeded = "budget_exceeded_fallback_baseline"
+
+// PlanFrameDeltaInjectEmpty = zero-value FrameDelta or empty schema_hash
+// — no-op injection (returns baseline unchanged).
+const PlanFrameDeltaInjectEmpty = "prior_delta_empty"
+
+// EmitPlanFrameDeltaInject wraps InjectPlanFrameDelta in the item_pipeline
+// Plan→Execute injection point. AC5: the dashboard receives one span per
+// round, tagged with the schema_hash + injection_chars + injection_status
+// triple so budget-exceeded regressions surface immediately.
+//
+// status must be one of PlanFrameDeltaInjectOK / PlanFrameDeltaInjectBudgetExceeded /
+// PlanFrameDeltaInjectEmpty. Empty schemaHash is recorded as "(empty)" for
+// stable Jaeger filter ranges when status=PlanFrameDeltaInjectEmpty.
+func EmitPlanFrameDeltaInject(ctx context.Context, sessionID, schemaHash string, injectionChars int, status string) func(error) {
+	if schemaHash == "" {
+		schemaHash = "(empty)"
+	}
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "plan_frame_delta_schema_hash", Value: schemaHash},
+		{Key: "plan_frame_delta_injection_chars", Value: intToString(injectionChars)},
+		{Key: "injection_status", Value: status},
+	}
+	_, span := start(ctx, telemetry.OpD7_S9_Execute_PlanFrameDelta_Inject, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitObservePriorDelta wraps BuildObservePriorDelta in buildObserveRequest.
+// AC5 Observe→Plan counterpart: the dashboard sees one span per round,
+// tagged with prior_artifact_summary length + known_gaps count + span
+// tag complete flag (the PriorDelta struct fields of buildObserveRequest).
+//
+// knownGapsCount and summaryLength are recorded as integers for stable
+// Jaeger range filters. spanTagComplete mirrors workmodel.ObservePriorDelta.SpanTagComplete
+// (round-bound metadata marker that downstream Decide consumes).
+func EmitObservePriorDelta(ctx context.Context, sessionID, priorArtifactSummary string, knownGapsCount int, spanTagComplete bool) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "prior_artifact_summary_length", Value: intToString(len(priorArtifactSummary))},
+		{Key: "known_gaps_count", Value: intToString(knownGapsCount)},
+		{Key: "span_tag_complete", Value: boolToString(spanTagComplete)},
+	}
+	_, span := start(ctx, telemetry.OpD7_S5_Observe_PriorDelta_Inject, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitConvergenceMetric wraps ConvergenceMetricRecord deterministic compute
+// after Verify yields a Verdict. AC8: Phase 3 cross-round convergence
+// tracking — coverage_ratio is a float in [0,1], gaps_closed_count is the
+// integer delta from previous round, frame_delta_consumed is the bool flag
+// indicating whether the round's FrameDelta payload was actually consumed
+// (false when the budget guard fell back to baseline).
+//
+// rate / gapsClosed are recorded as string types for Jaeger
+// compatibility (floatToString 4-decimal precision matches the existing
+// reputation.Beta parameter pattern).
+func EmitConvergenceMetric(ctx context.Context, sessionID string, rate float64, gapsClosed int, frameDeltaConsumed bool) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "convergence.coverage_ratio", Value: floatToString(rate)},
+		{Key: "convergence.gaps_closed_count", Value: intToString(gapsClosed)},
+		{Key: "convergence.frame_delta_consumed", Value: boolToString(frameDeltaConsumed)},
+	}
+	_, span := start(ctx, telemetry.OpD7_S9_Execute_ConvergenceMetric_Emit, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}

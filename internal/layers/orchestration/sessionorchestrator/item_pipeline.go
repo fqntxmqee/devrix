@@ -368,6 +368,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		PriorVerifyReason:    priorReason,
 		Emit:                 opts.Emit,
 		ResolutionStrategies: pl.ResolutionStrategies,
+		// DM-20260705-010 (devrix-d7-mups-frame-delta-closure) Phase 1 T4:
+		// bind the typed Plan→Execute FrameDelta into WorkItemExecContext so
+		// Execute's system_prompt materialization (subturn_materialize.go) can
+		// inject it via InjectPlanFrameDelta. nil/empty FrameDelta → legacy
+		// baseline path (InjectPlanFrameDelta no-ops + emit prior_delta_empty).
+		PlanFrameDelta: buildPlanFrameDeltaForExecCtx(strategic),
 	})
 	result, execErr := r.Executor.ExecuteWorkItem(execCtx, sessionID, item.ID, directive)
 	endExecute(execErr)
