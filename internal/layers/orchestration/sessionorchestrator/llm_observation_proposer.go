@@ -88,6 +88,9 @@ func buildLLMObservationUserPrompt(in ObserveSignalInput, loc i18n.Locale) strin
 		fields[prompttags.TagPriorObservationIDs] = in.PriorObservationIDs
 		fields[prompttags.TagIncrementalOnly] = "true"
 	}
+	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
+		fields[prompttags.TagPriorParseReject] = s
+	}
 	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FrameObserveUser, prompttags.ObserveUserFrame, fields)
 	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, fields)
 	if guide == "" {

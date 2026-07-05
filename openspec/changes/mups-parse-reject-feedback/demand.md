@@ -3,7 +3,7 @@ demand-id: DM-20260705-002
 title: "MUPS parse/budget reject — 结构化反馈注入下一轮 user frame"
 source: DM-005 P2 defer + DM-20260705-001 归档 tasks P2
 priority: P1
-status: CLARIFIED
+status: S4_COMPLETE
 l1-domain: shared, orchestration
 created: 2026-07-05
 related:
@@ -93,6 +93,6 @@ parent_demands:
 ## 7. 规划状态
 
 - [x] S1 `demand.md`
-- [ ] S3 `proposal.md` / `design.md` / `tasks.md` / delta spec
-- [ ] S4 开发
+- [x] S3 `proposal.md` / `design.md` / `tasks.md` / delta spec
+- [x] S4 开发
 - [ ] S5–S7 验收 / 交付 / 归档

@@ -105,6 +105,10 @@ type WorkItemPipelineRound struct {
 	ScopeInPresent bool `json:"scope_in_present,omitempty"`
 	// RollupSynthRequested set by EvaluateSpawnPolicy when CC-U3 rollup synth applies.
 	RollupSynthRequested bool `json:"rollup_synth_requested,omitempty"`
+	// ObserveParseReject carries compact JSON for the next Observe user frame (DM-20260705-002).
+	ObserveParseReject string `json:"observe_parse_reject,omitempty"`
+	// PlanParseReject carries compact JSON for the next Plan user frame (DM-20260705-002).
+	PlanParseReject string `json:"plan_parse_reject,omitempty"`
 	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`
