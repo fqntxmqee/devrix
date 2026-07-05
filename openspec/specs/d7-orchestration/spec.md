@@ -219,3 +219,4 @@ WaveScheduler (独立 explicit 路径 — D7-S3；由 delegate_tools / Plan / ba
 5. **跨域消费**：D2 Prepare (V10/V11) → D3 LLM Gateway → D4 Delegate.Service → D5 Span Evidence
 6. **Escape 链**：Observe/Plan/Execute/Verify 任一节点失败 → EscapeEngine.Evaluate → ChainedArbitrator (LLM/Rule/Human) → Action 6 类
 7. **LP-1 闭环链**：Learn × 3 Pass → Alpha=3 → Round 2 Observe 用 Beta(8,3) 注入（PriorSessionAttrs 6 字段）
+8. **Frame Delta 闭环节流链（PLANNED — DM-20260705-010 S3）**：Observe→Plan→Execute LLM I/O 帧 delta 显式协议 — `interfaces.FrameDelta` 5 字段（PriorArtifactSummary + KnownGaps + ExecutionMode + ChildSpecs + DeliverableContract）+ Execute `ConvergenceMetric` 3 字段（UncertaintyReductionRate + ObservedGapsClosedCount + FrameDeltaConsumed，deterministic 0 LLM）。append-only 注入，M1/M2 frame 契约 0 修改。详见 [`mups-frame-delta-spec.md`](mups-frame-delta-spec.md) + [change design](../../changes/devrix-d7-mups-frame-delta-closure/design.md)
