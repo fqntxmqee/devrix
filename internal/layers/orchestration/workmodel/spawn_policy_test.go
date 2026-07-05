@@ -104,10 +104,14 @@ func TestSpawnPolicyEvaluator_R3_CommitmentPass(t *testing.T) {
 	}
 }
 
+// T: D7-SX-AXX-TXX (DM-20260705-008 M3 行为增量)
+// ExplorationPlan + VerdictPass: M3 changes default SpawnNone → SpawnDecompose
+// (exploration strategy.SpawnOverride for Pass verdict returns SpawnDecompose
+// to keep parallel experiments running through the success path).
 func TestSpawnPolicyEvaluator_R4_ExplorationPass(t *testing.T) {
 	round := baseRound(types.VerdictPass, plan.ExplorationPlan, 0.2)
-	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnNone {
-		t.Fatalf("R4: got %q, want none", got)
+	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnDecompose {
+		t.Fatalf("R4: got %q, want decompose (M3 行为增量)", got)
 	}
 }
 
@@ -160,10 +164,15 @@ func TestSpawnPolicyEvaluator_R5_PartialLowUncertainty(t *testing.T) {
 	}
 }
 
+// T: D7-SX-AXX-TXX (DM-20260705-008 M3 行为增量)
+// ScenarioPlan + VerdictFail: M3 changes default SpawnParallelExplore → SpawnNone
+// (scenario strategy.SpawnOverride for Fail verdict returns SpawnNone because
+// read-only probes don't retry on Fail; matches Phase 3 PR-C2 ScenarioChannel
+// "parallel probe + majority vote" one-shot semantics).
 func TestSpawnPolicyEvaluator_R6_ScenarioFail(t *testing.T) {
 	round := baseRound(types.VerdictFail, plan.ScenarioPlan, 0.8)
-	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnParallelExplore {
-		t.Fatalf("R6 scenario: got %q, want parallel_explore", got)
+	if got := SpawnPolicyEvaluator(round, baseCtx()); got != SpawnNone {
+		t.Fatalf("R6 scenario: got %q, want none (M3 行为增量)", got)
 	}
 }
 

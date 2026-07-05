@@ -12,8 +12,11 @@ import (
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
+// T: D7-SX-AXX-TXX (DM-20260705-008 M3) — uses commitmentOnlyPlanner
+// to isolate from M3 行为增量. See item_pipeline_test.go for rationale.
 func TestRunSessionTurnLoop_SingleGoal_Completes(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
+	runner.Planner = commitmentOnlyPlanner{} // isolate from M3 行为增量
 	orch := NewSessionOrchestrator(
 		orchtypes.DefaultConfig(),
 		&recordingExecutor{},
@@ -136,8 +139,16 @@ func TestRunSessionTurnLoop_NoSummaryTextEventAtLoopEnd(t *testing.T) {
 	}
 }
 
+// T: D7-SX-AXX-TXX (DM-20260705-008 M3) — uses decomposeAwarePlanner
+// to isolate from M3 行为增量. M3 changes:
+//   - CommitmentPlan + VerdictPartial → SpawnNone (terminal, no decompose on high U)
+//   - ExplorationPlan + VerdictPass   → SpawnDecompose (no complete on pass)
+// For this test, the parent must be decomposable (Partial + high U) and the
+// children must be completable (Pass). Use ExplorationPlan for the first
+// call (parent) and CommitmentPlan for subsequent calls (children).
 func TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren(t *testing.T) {
 	runner, tm, _ := newItemPipelineTestRunner(t)
+	runner.Planner = &decomposeAwarePlanner{} // context-aware: explore→commit
 	runner.Executor = &rollupContentExecutor{summary: validRollupSummary(), capture: nil}
 
 	orch := NewSessionOrchestrator(

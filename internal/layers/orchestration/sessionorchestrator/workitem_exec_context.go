@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/materialize"
+	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -49,10 +50,23 @@ type WorkItemExecContext struct {
 	// the shared DefaultWorkItemExecutor because the executor is singleton-ish
 	// in production wiring and can serve multiple sessions concurrently.
 	Emit func(*contracts.EngineEvent)
+	// Strategy is the per-PlanKind behavior abstraction (M3, DM-20260705-008).
+	// WorkItemExecContext consumers call ec.Strategy.SpawnOverride to gate
+	// per-PlanKind verdict→spawn overrides (commitment terminal, scenario
+	// read-only, exploration parallel-pipeline continuation). nil-guard is
+	// enforced by WithWorkItemExecContext; consumers can rely on a non-nil
+	// Strategy (default = protocolStrategy for unknown PlanKinds).
+	Strategy workmodel.Strategy
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.
+// M3 (DM-20260705-008): nil-guards ec.Strategy by binding protocolStrategy
+// (the safe default for unknown PlanKinds) so downstream consumers can rely
+// on a non-nil Strategy without a per-call guard.
 func WithWorkItemExecContext(ctx context.Context, ec WorkItemExecContext) context.Context {
+	if ec.Strategy == nil {
+		ec.Strategy = workmodel.LookupStrategy(plan.KindUnset)
+	}
 	return context.WithValue(ctx, workItemExecCtxKey{}, ec)
 }
 
