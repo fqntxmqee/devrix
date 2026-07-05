@@ -184,6 +184,31 @@ func EmitSystemAnomalyDetect(ctx context.Context, sessionID, anomalyKind, severi
 	return c, func(err error) { endSpanWithError(span, err) }
 }
 
+// EmitResolutionCoverage (DM-20260704-006 Phase 5) emits the
+// Verify→Decide handoff span with the CoverageRatio + unresolved
+// count metrics. The ItemPipelineRunner calls this once per round
+// when the round carries a non-nil ResolutionReport.
+//
+// total_strategies / total_claims / unresolved_count are integer-typed
+// for Grafana panel compatibility; coverage_ratio is float64.
+// session_id + work_item_id round_no disambiguate the trace tree.
+//
+// D7-S4 P0 (Phase 5). 0-behavior-change on legacy rounds (the
+// runner checks round.ResolutionReport != nil before calling).
+func EmitResolutionCoverage(ctx context.Context, sessionID, workItemID string, roundNo, totalStrategies, totalClaims, unresolvedLen int, coverageRatio float64) (context.Context, func(error)) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "work_item_id", Value: workItemID},
+		{Key: "round_no", Value: intToString(roundNo)},
+		{Key: "total_strategies", Value: intToString(totalStrategies)},
+		{Key: "total_claims", Value: intToString(totalClaims)},
+		{Key: "unresolved_count", Value: intToString(unresolvedLen)},
+		{Key: "coverage_ratio", Value: floatToString(coverageRatio)},
+	}
+	c, span := start(ctx, telemetry.OpD7_S4_Resolution_Coverage, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
+}
+
 // --- S3 WaveScheduler ---
 
 // EmitExecutorSelect wraps WaveScheduler.ExecutorSelector.Select. v6.0.0 S5-A34 P1.

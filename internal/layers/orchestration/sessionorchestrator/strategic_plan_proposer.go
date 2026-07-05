@@ -316,7 +316,14 @@ type rawResolutionStrategy struct {
 type rawStrategicPlan struct {
 	ExecutionMode       string                    `json:"execution_mode"`
 	ScopeIn             []string                  `json:"scope_in"`
-	ChildSpecs          []rawStrategicChildSpec   `json:"child_specs"`
+	// ChildSpecs (DM-20260704-006 Phase 5) — DEPRECATED. The
+	// ResolutionStrategies[] below is the new Obs-bound contract
+	// (RC-1) that lets Decide force SpawnDecompose / SpawnUserGate
+	// without relying on narrative intent. Plans that emit both
+	// still work today (Phase 4+), but new LLM prompts should emit
+	// only resolution_strategies[]. Removal is planned for the next
+	// major version (DM-20260704-006 S5).
+	ChildSpecs          []rawStrategicChildSpec   `json:"child_specs,omitempty"`
 	ResolutionStrategies []rawResolutionStrategy  `json:"resolution_strategies"`
 	DeliverableContract workmodel.DeliverableContract `json:"deliverable_contract"`
 	DeliverableSchema   string                    `json:"deliverable_schema"`
@@ -328,6 +335,12 @@ type rawStrategicPlan struct {
 type StrategicPlanProposal struct {
 	ExecutionMode       string
 	ScopeIn             []string
+	// ChildSpecs (DM-20260704-006 Phase 5) — DEPRECATED, kept for
+	// Decide-compat with the legacy `execution_mode: "decompose"`
+	// path. New code MUST consume ResolutionStrategies[] instead and
+	// rely on the Round's ChildSpecs (built by Decide from
+	// SubWorktree specs in the ResolutionReport). Removal planned
+	// for the next major version.
 	ChildSpecs          []workmodel.ChildSpec
 	// ResolutionStrategies (DM-20260704-006 RC-1) — the new Obs→Resolution
 	// contract. When the LLM emits these (preferred path), the strategic

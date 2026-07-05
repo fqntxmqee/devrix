@@ -559,6 +559,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		round.ResolutionReport = verify.ComputeResolutionCoverage(
 			pl.ResolutionStrategies, claims, sessionID, item.ID, roundNo,
 		)
+		// DM-20260704-006 Phase 5: emit the Verify→Decide handoff span
+		// with CoverageRatio + unresolved_count metrics. Skipped when
+		// the report is nil (legacy LLM rounds or empty strategies —
+		// see verify.ComputeResolutionCoverage safety-net gate).
+		if round.ResolutionReport != nil {
+			_, endResCov := hardening.EmitResolutionCoverage(
+				ctx, sessionID, item.ID, roundNo,
+				round.ResolutionReport.TotalStrategies,
+				round.ResolutionReport.TotalClaims,
+				len(round.ResolutionReport.UnresolvedObs),
+				round.ResolutionReport.CoverageRatio,
+			)
+			endResCov(nil)
+		}
 	}
 	if observeParseReject != "" {
 		round.ObserveParseReject = observeParseReject
