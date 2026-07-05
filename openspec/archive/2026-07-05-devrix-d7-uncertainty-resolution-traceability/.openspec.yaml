@@ -1,7 +1,7 @@
 change_id: devrix-d7-uncertainty-resolution-traceability
 priority: P0
 demand_id: DM-20260704-006
-status: s3_design
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Decision & Planning
