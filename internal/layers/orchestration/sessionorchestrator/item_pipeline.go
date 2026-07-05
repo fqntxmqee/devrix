@@ -580,6 +580,23 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			endResCov(nil)
 		}
 	}
+	// DM-20260705-010 (devrix-d7-mups-frame-delta-closure) Phase 3 T13:
+	// deterministic per-round ConvergenceMetric (工具结果 diff + claim 数 +
+	// obs_uncertainty 残量), 0 LLM. Emitted as a Jaeger span so the next
+	// round's Observe can read the closed-gap counts (Markov 链闭环). The
+	// FrameDeltaConsumed flag records whether this round's Execute prompt
+	// actually carried the injected Plan frame delta (not baseline fallback).
+	frameDeltaConsumed := false
+	if pfd := buildPlanFrameDeltaForExecCtx(strategic); pfd != nil && !pfd.IsZero() {
+		frameDeltaConsumed = true
+	}
+	convMetric := ComputeConvergenceMetric([]SubTurnRecord{
+		BuildRoundSubTurnRecord(obsIDs, round.ResolutionClaims, round.ResolutionReport, frameDeltaConsumed),
+	}, nil)
+	endConv := hardening.EmitConvergenceMetric(ctx, sessionID,
+		convMetric.UncertaintyReductionRate, convMetric.ObservedGapsClosedCount,
+		convMetric.FrameDeltaConsumed)
+	endConv(nil)
 	if observeParseReject != "" {
 		round.ObserveParseReject = observeParseReject
 	}

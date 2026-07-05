@@ -22,9 +22,9 @@
 | T10 `observe_frame_delta_test.go`: 6 子测试（首轮零值 / 非首轮含上一轮收敛度量 / Plan scope_in 映射 known_gaps / 封闭式 JSON 不破坏 / 9 字段契约 0 修改 / i18n 键完整） | D7-S5-A111-T01..T06 | [ ] |
 | T11 L5-MUPS-FD-2: trace 重放 Observe→Plan 链路 LLM user prompt 含 `prior_artifact_summary` + `known_gaps` span tag | AC1 + AC2 + AC5 | [ ] |
 | **Phase 3 — convergence_metric deterministic 回写** | | | |
-| T12 `sessionorchestrator/convergence_metric.go` (new): `ConvergenceMetric` struct + `ComputeConvergenceMetric(subTurns []SubTurnRecord) ConvergenceMetric` 纯 deterministic（工具结果 diff + claim 数 + obs_uncertainty 残量） | AC4 | [ ] |
-| T13 `item_pipeline.go`: 每个 sub-turn 结束 emit `convergence_metric` span（含 `uncertainty_reduction_rate` + `observed_gaps_closed_count` + `frame_delta_consumed`） | AC4 | [ ] |
-| T14 `convergence_metric_test.go`: 5 子测试（首轮 0 / 工具 diff 计算 / claim 累加 / Jaeger span 完整 / 0 LLM 调用验证） | D7-S9-A113-T01..T05 | [ ] |
+| T12 `sessionorchestrator/convergence_metric.go` (new): `ConvergenceMetric` struct + `ComputeConvergenceMetric(subTurns []SubTurnRecord) ConvergenceMetric` 纯 deterministic（工具结果 diff + claim 数 + obs_uncertainty 残量） | AC4 | [x] |
+| T13 `item_pipeline.go`: 每个 sub-turn 结束 emit `convergence_metric` span（含 `uncertainty_reduction_rate` + `observed_gaps_closed_count` + `frame_delta_consumed`） | AC4 | [x] |
+| T14 `convergence_metric_test.go`: 5 子测试（首轮 0 / 工具 diff 计算 / claim 累加 / Jaeger span 完整 / 0 LLM 调用验证） | D7-S9-A113-T01..T05 | [x] |
 | T15 L5-MUPS-FD-3: trace 重放 Execute 5 个 sub-turn 全有 convergence_metric span + 末轮 uncertainty_reduction_rate ≥ 0.5 | AC4 + AC7 | [ ] |
 | **Phase 4 — 端到端收敛验证** | | | |
 | T16 `e2e_frame_delta_test.go`: 端到端 trace 重放 — sess_1783255992426_6000 wi_d0_s0_goal 重跑 → Observe→Plan→Execute LLM frame delta span tag 全可见 + AC5 通过 | AC5 | [ ] |
