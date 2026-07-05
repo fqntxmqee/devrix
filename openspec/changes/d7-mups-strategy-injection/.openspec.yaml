@@ -1,0 +1,20 @@
+change_id: d7-mups-strategy-injection
+priority: P0
+demand_id: DM-20260705-008
+status: s5_accepted
+domains: [D7]
+dsaft_scenarios: [D7-S9, D7-S15, D7-S22]
+dsaft_activities: [D7-S9-A50, D7-S15-A89, D7-S22-A101]
+t_points: []
+version_scope:
+  v1.0: |
+    d7-mups-strategy-injection: Strategy 抽象注入 WorkItemExecContext (M3 5 节点重构总图行为增量最后一步).
+    - workmodel/strategy.go NEW: Strategy interface 3-4 method (RouteChannel / SpawnOverride / ShouldDecompose / IsReadOnly)
+    - workmodel/strategy_commitment.go / strategy_protocol.go / strategy_scenario.go / strategy_exploration.go NEW: 4 PlanKind Strategy 实现
+    - workmodel/strategy_default.go NEW: DefaultStrategy registry + LookupStrategy helper
+    - sessionorchestrator/workitem_exec_context.go MODIFIED: 新增 `Strategy workmodel.Strategy` 字段 (interface, 可空); nil -> DefaultStrategy 兜底
+    - workmodel/spawn_decision_algebra.go MODIFIED: checkVerdictDirection 5 case 末尾 1 行 strategy.SpawnOverride(round.PlanKind) 覆盖默认 SpawnPolicy
+    - 4 PlanKind x 5 verdict = 20 组合新增单测 + Default 兜底 = 24 测试; 现有 22+18 spawn policy 测试 0 修改 PASS
+    - mups-5node-refactor-roadmap.md 5 节点重构总图最终落地文档 P1 创建
+metrics_definitions: []
+span_naming: []

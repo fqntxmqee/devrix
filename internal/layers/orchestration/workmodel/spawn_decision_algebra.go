@@ -106,45 +106,56 @@ func checkRollupGuard(round *WorkItemPipelineRound, ctx TreeEvalContext) (SpawnP
 // checkVerdictDirection applies R3..R8 by verdict kind. Rollup retry
 // exhausted guard is hoisted to checkRollupGuard so this switch only
 // handles the post-rollup verdict-direction routing.
+//
+// M3 (DM-20260705-008): after the 5-case default returns, consult
+// LookupStrategy(round.PlanKind).SpawnOverride. The Strategy MAY override
+// the default for 4 known PlanKind × verdict combinations (commitment
+// terminal fail/partial, scenario read-only fail, exploration parallel
+// pass). For all other 16 of 20 combinations the Strategy returns
+// (SpawnNone, false) and the 5-case default is the final answer — this
+// is the M3 0-behavior-change guarantee for the unaffected cases.
 func checkVerdictDirection(round *WorkItemPipelineRound, ctx TreeEvalContext) SpawnPolicy {
+	var policy SpawnPolicy
 	switch round.VerdictKind {
 	case types.VerdictPass:
 		// CC-1 / §8.1: Pass with applicable schema MUST NOT SpawnNone while
 		// deliverable is still owed — inline (or R1 budget) instead.
 		if deliverableContinuationRequired(round) {
-			return spawnForDeliverableContinuation(round, ctx)
+			policy = spawnForDeliverableContinuation(round, ctx)
+		} else {
+			policy = SpawnNone
 		}
-		return SpawnNone
 
 	case types.VerdictPartial:
 		// Exploratory partial on decomposable parents (Goal/Plan/Implement)
 		// triggers the first split; leaf explore items retry inline.
 		if IsExploratoryPlanKind(round.PlanKind) {
 			if ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
+				policy = SpawnDecompose
+			} else {
+				policy = SpawnInline
 			}
-			return SpawnInline
+		} else if round.UncertaintyMean >= ctx.Threshold {
+			policy = SpawnDecompose
+		} else if deliverableContinuationRequired(round) {
+			policy = spawnForDeliverableContinuation(round, ctx)
+		} else {
+			policy = SpawnNone
 		}
-		if round.UncertaintyMean >= ctx.Threshold {
-			return SpawnDecompose
-		}
-		if deliverableContinuationRequired(round) {
-			return spawnForDeliverableContinuation(round, ctx)
-		}
-		return SpawnNone
 
 	case types.VerdictFail:
 		if round.PlanKind == plan.ScenarioPlan {
-			return SpawnParallelExplore
-		}
-		// Leaf explore items cannot decompose; retry inline instead.
-		if round.PlanKind == plan.ExplorationPlan {
+			policy = SpawnParallelExplore
+		} else if round.PlanKind == plan.ExplorationPlan {
+			// Leaf explore items cannot decompose; retry inline instead.
 			if ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
+				policy = SpawnDecompose
+			} else {
+				policy = SpawnInline
 			}
-			return SpawnInline
+		} else {
+			policy = SpawnNone
 		}
-		return SpawnNone
 
 	case types.VerdictIndeterminate:
 		// R7 — exploratory plans decompose when verifier abstains (uncertainty path),
@@ -152,14 +163,26 @@ func checkVerdictDirection(round *WorkItemPipelineRound, ctx TreeEvalContext) Sp
 		if ctx.IndeterminateRetries >= ctx.MaxIndeterminateRetries {
 			if (IsExploratoryPlanKind(round.PlanKind) || round.UncertaintyMean >= ctx.Threshold) &&
 				ctx.CanDecompose && ctx.ChildTotal == 0 {
-				return SpawnDecompose
+				policy = SpawnDecompose
+			} else {
+				policy = SpawnEscalateHuman
 			}
-			return SpawnEscalateHuman
+		} else {
+			policy = SpawnInline
 		}
-		return SpawnInline
 
 	default:
 		// R8
-		return SpawnNone
+		policy = SpawnNone
 	}
+	// M3 override hook: per-PlanKind Strategy may supersede the 5-case
+	// default. The Strategy receives the full round so it can inspect
+	// DeliverableSchema/DeliverableStatus (CC-1.4 deliverable continuation
+	// must take precedence over commitment terminal override). 4 known
+	// overrides; protocolStrategy (safe default) and unknown PlanKinds
+	// return ok=false → no override (0-behavior-change for 16/20 cases).
+	if p, ok := LookupStrategy(round.PlanKind).SpawnOverride(round); ok {
+		return p
+	}
+	return policy
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/types"
@@ -95,6 +96,63 @@ func (rejectingStrategicPlanProposer) ProposeStrategicPlan(context.Context, Stra
 		Requested:  5,
 		MaxAllowed: 2,
 	}
+}
+
+// commitmentOnlyPlanner is a stub Planner that always returns CommitmentPlan.
+// Used by integration tests that need a deterministic plan kind (so the
+// M3 行为增量 for ExplorationPlan+VerdictPass does not fire). The M3
+// (DM-20260705-008) override for ExplorationPlan+Pass changes
+// SpawnNone→SpawnDecompose; tests that need SpawnNone (e.g. "goal
+// completes on Pass") must use CommitmentPlan, not Goal (Goal becomes
+// ExplorationPlan via intent_orchestrate in planQuantizedKind).
+type commitmentOnlyPlanner struct{}
+
+func (commitmentOnlyPlanner) Plan(in plan.PlanInput) (*plan.Plan, error) {
+	steps := in.Steps
+	if steps == nil {
+		steps = []plan.Step{}
+	}
+	pl := plan.NewPlan(
+		plan.NewPlanID(in.SessionID, in.ObservationIDs),
+		in.SessionID,
+		plan.CommitmentPlan, // force commitment for deterministic test
+		in.ObservationIDs,
+		steps,
+		1.0,
+	).WithFailureCriteria(in.FailureCriteria).WithBlastRadius(in.BlastRadius)
+	return &pl, nil
+}
+
+// decomposeAwarePlanner returns ExplorationPlan on the first call (parent)
+// and CommitmentPlan on subsequent calls (children). Used by
+// TestRunSessionTurnLoop_DecomposeRecursive_CompletesChildren to satisfy
+// M3 (DM-20260705-008) constraints: parent must be decomposable
+// (ExplorationPlan + Partial + high U → SpawnDecompose), children must
+// be completable (CommitmentPlan + Pass → SpawnNone terminal, no
+// Exploration+Pass→SpawnDecompose override).
+type decomposeAwarePlanner struct {
+	callCount int
+}
+
+func (d *decomposeAwarePlanner) Plan(in plan.PlanInput) (*plan.Plan, error) {
+	d.callCount++
+	kind := plan.CommitmentPlan
+	if d.callCount == 1 {
+		kind = plan.ExplorationPlan // first call: parent (decomposable)
+	}
+	steps := in.Steps
+	if steps == nil {
+		steps = []plan.Step{}
+	}
+	pl := plan.NewPlan(
+		plan.NewPlanID(in.SessionID, in.ObservationIDs),
+		in.SessionID,
+		kind,
+		in.ObservationIDs,
+		steps,
+		1.0,
+	).WithFailureCriteria(in.FailureCriteria).WithBlastRadius(in.BlastRadius)
+	return &pl, nil
 }
 
 func newItemPipelineTestRunner(t *testing.T) (*ItemPipelineRunner, *workmodel.TaskManager, *learn.InMemoryReputationStore) {
@@ -226,8 +284,13 @@ func (e *multiRoundReviewExecutor) ExecuteWorkItem(_ context.Context, _, _, _ st
 	}, nil
 }
 
+// T: D7-SX-AXX-TXX (DM-20260705-008 M3) — uses commitmentOnlyPlanner
+// to isolate from M3 行为增量 (ExplorationPlan+Pass→SpawnDecompose).
+// Goal→intent_orchestrate→ExplorationPlan would trigger the M3 override;
+// CommitmentPlan does not, so Pass returns SpawnNone (terminal).
 func TestRunItemPipeline_SingleWorkItem_Completed(t *testing.T) {
 	runner, tm, rep := newItemPipelineTestRunner(t)
+	runner.Planner = commitmentOnlyPlanner{} // isolate from M3 行为增量
 	sessionID := "sess-item-pipeline"
 	goal, err := tm.EnsureGoal(sessionID, "implement cache layer")
 	if err != nil {
