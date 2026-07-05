@@ -1,7 +1,7 @@
 change_id: devrix-d7-mups-frame-delta-closure
 priority: P0
 demand_id: DM-20260705-010
-status: S1_Proposal
+status: S2_Proposal
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Decision & Planning (Observe frame delta)
@@ -10,9 +10,26 @@ dsaft_activities:
   - D7-S5-A111  # Observe frame delta fields (prior_artifact_summary + known_gaps)
   - D7-S9-A112  # Execute system_prompt Plan frame delta injection
   - D7-S9-A113  # Execute convergence_metric deterministic compute + Jaeger emit
-t_points: []  # S2 阶段登记
+t_points:
+  - D7-S5-A111-T01  # BuildObservePriorDelta 首轮零值
+  - D7-S5-A111-T02  # 非首轮从 ConvergenceMetric 提取 prior_artifact_summary + known_gaps
+  - D7-S5-A111-T03  # ObservationFrame append-only 2 字段
+  - D7-S5-A111-T04  # FrameObserveUser i18n 完整
+  - D7-S5-A111-T05  # 封闭式分类器 (DM-20260705-009) 兼容
+  - D7-S5-A111-T06  # trace 重放验证 span tag
+  - D7-S9-A112-T01  # interfaces.FrameDelta 5 字段
+  - D7-S9-A112-T02  # StrategicPlanFrame append-only 5 字段 (M2 契约 0 修改)
+  - D7-S9-A112-T03  # InjectPlanFrameDelta 双轨 (摘要 ≤80 + schema hash, 增量 ≤200 字符)
+  - D7-S9-A112-T04  # item_pipeline 注入点 (走 Strategy 旁路, 不进 PlanKind 决策表)
+  - D7-S9-A112-T05  # trace 重放验证
+  - D7-S9-A113-T01  # ConvergenceMetric 3 字段 + ComputeConvergenceMetric 纯 deterministic
+  - D7-S9-A113-T02  # item_pipeline 每 sub-turn emit convergence_metric span
+  - D7-S9-A113-T03  # 0 LLM 调用验证
+  - D7-S9-A113-T04  # span field stable wire format
+  - D7-S9-A113-T05  # trace 重放验证 5 sub-turn 全有 span
 version_scope:
-  v1.0: "S1 Proposal: 5 节点 frame delta 闭环候选方案 C, 待 S2-S3 拆分 T 点 + S3-Gate 三方共识"
+  v1.0: "S2 Proposal: 3 Phase × 16 P0 T PLANNED, 待 S3 design + S3-Gate 三方共识 review"
+  v1.1: "S3-S6 待落地: design.md + 三方共识 + 4 Phase 实现 (Phase 1 Plan→Execute / Phase 2 Observe→Plan / Phase 3 convergence / Phase 4 E2E)"
 created: 2026-07-05
 author: devrix-d7-mups-frame-delta-closure proposal
 title: "D7 MUPS 5 节点 frame delta 闭环 — Observe→Plan→Execute LLM I/O 协议显式收敛"
