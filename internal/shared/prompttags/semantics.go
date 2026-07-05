@@ -69,8 +69,11 @@ var observeSemantics = PhaseSemantics{
 		{Name: string(TagPriorParseReject), Plane: PlaneControl, WhenUse: "observe.input.prior_parse_reject.when_use", Enforced: true},
 		{Name: string(TagSignal), Plane: PlaneData, WhenUse: "observe.input.signal.when_use"},
 		{Name: string(TagPriorMean), Plane: PlaneControl, WhenUse: "observe.input.prior_mean.when_use"},
+		{Name: string(TagScopeGoal), Plane: PlaneData, WhenUse: "observe.input.scope_goal.when_use"},
 		{Name: string(TagScopeOpenQuestion), Plane: PlaneData, WhenUse: "observe.input.scope_open_question.when_use"},
 		{Name: string(TagIncrementalOnly), Plane: PlaneControl, WhenUse: "observe.input.incremental_only.when_use", Enforced: true},
+		{Name: string(TagWorkItemID), Plane: PlaneControl, WhenUse: "observe.input.work_item_id.when_use"},
+		{Name: string(TagPriorObservationIDs), Plane: PlaneControl, WhenUse: "observe.input.prior_observation_ids.when_use"},
 	},
 }
 

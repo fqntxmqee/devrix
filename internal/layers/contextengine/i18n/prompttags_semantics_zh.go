@@ -23,6 +23,9 @@ var prompttagsSemanticsZH = map[string]string{
 	"observe.input.prior_mean.when_use":      "先验均值（control，非业务内容）",
 	"observe.input.scope_open_question.when_use": "scope 开放问题（data）",
 	"observe.input.incremental_only.when_use":    "增量轮次标记（control）",
+	"observe.input.scope_goal.when_use":       "scope 目标陈述（data）",
+	"observe.input.work_item_id.when_use":     "WorkItem ID（control，仅标识）",
+	"observe.input.prior_observation_ids.when_use": "上一轮 Obs ID（control，增量上下文）",
 
 	"plan.node_role": "六节点管道第 2 步 Plan：提案 execution_mode 与 deliverable_contract。",
 	"plan.output.execution_mode.when_use": "若 uncertainty_mean≥0.45 或 remaining_children>1 需拆子项 → decompose；否则 scope 已清晰 → single；需并行探针 → parallel_probe（uncertainty≥0.45 禁 single，Go 强制）",

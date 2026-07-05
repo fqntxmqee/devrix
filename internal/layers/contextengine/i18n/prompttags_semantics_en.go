@@ -23,6 +23,9 @@ var prompttagsSemanticsEN = map[string]string{
 	"observe.input.prior_mean.when_use":      "Prior mean (control, not business content)",
 	"observe.input.scope_open_question.when_use": "Scope open questions (data)",
 	"observe.input.incremental_only.when_use":    "Incremental round marker (control)",
+	"observe.input.scope_goal.when_use":       "Scope goal statement (data)",
+	"observe.input.work_item_id.when_use":     "WorkItem ID (control, identifier only)",
+	"observe.input.prior_observation_ids.when_use": "Prior-round observation IDs (control, incremental context)",
 
 	"plan.node_role": "Six-node pipeline step 2 Plan: propose execution_mode and deliverable_contract.",
 	"plan.output.execution_mode.when_use": "IF uncertainty_mean≥0.45 OR remaining_children>1 needed → decompose; ELIF scope clear → single; ELIF parallel probes → parallel_probe (single blocked when U≥0.45, Go enforced)",
