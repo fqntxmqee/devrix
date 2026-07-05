@@ -602,6 +602,20 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 
 ---
 
+## D2-S15-A99: Observe 节点封闭式分类器定位强化 (DM-20260705-009) — Change: `d7-observe-closed-classifier-prompt`
+
+> **背景:** MUPS M1 go-struct-driven (DM-20260705-003) 落地后, Observe 节点 user frame 9 字段契约 + i18n guide header + 4 alias 解析全部稳定; 但 system_prompt 缺"封闭式分类器"定位声明, LLM 在面对开放式 directive (如 "review 代码") 且无 signal 时, 不知"我是分类器"还是"我是分析器", 导致返 markdown / 空数组 / 错 kind。本 change 强化 system_prompt 措辞, 引导 LLM 在 signal 不足时优先 obs_uncertainty.
+
+| T ID | 描述 | Activity | 证据 | 状态 | 优先级 |
+|------|------|----------|------|------|--------|
+| **D2-S15-A99-T01** | `ObservationTaskAppendix(LocaleZH)` 包含封闭式分类器角色 + 输入/输出契约 + 4 项负面约束 (不执行工具/不评估任务/不分析任务/不返 markdown) | S15-A99 | `i18n/format_hints_mups_observer_test.go::TestObservationTaskAppendix_ClosedClassifier_ZH` | **IMPLEMENTED** | P0 |
+| **D2-S15-A99-T02** | `ObservationTaskAppendix(LocaleZH)` 包含"signal 不足 / directive 模糊 / 任务需工具时 → 优先 obs_uncertainty (返回 question) 而非空数组"引导 | S15-A99 | `i18n/format_hints_mups_observer_test.go::TestObservationTaskAppendix_PreferUncertaintyWhenSignalsInsufficient_ZH` | **IMPLEMENTED** | P0 |
+| **D2-S15-A99-T03** | `ObservationTaskAppendix(LocaleEN)` 同步 T01+T02 英文版 (closed-set classifier / prefer obs_uncertainty) | S15-A99 | `i18n/format_hints_mups_observer_test.go::TestObservationTaskAppendix_ClosedClassifierAndUncertainty_EN` | **IMPLEMENTED** | P0 |
+| **D2-S15-A99-T04** | `observe.node_role` i18n 语义键与 intro role 声明保持同步 (无 stale 描述) | S15-A99 | `i18n/format_hints_mups_observer_test.go::TestObserveNodeRoleSyncedWithClosedClassifierIntro` | **IMPLEMENTED** | P1 |
+| **D2-S15-A99-T05** | zh/en Observe appendix golden hash 锁定 (DM-20260705-009 改写后 expect new hash, 防后续漂移) | S15-A99 | `i18n/prompttags_semantics_golden_test.go::TestMUPSSemanticAppendix_GoldenHash` (want 已更新) | **IMPLEMENTED** | P0 |
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -621,3 +635,4 @@ harness-legacy (1 op): SystemPrompt_Build (assembler_adapter.go 复用)
 | **2.19.0** | **2026-07-04** | **mups-prompttags-v2-io-registry (DM-20260704-005) S4**: D2-S15-A96-T01..T02 MUPSIOCatalog + LineFrameRegistry — **2 新 T 全部 P0 IMPLEMENTED**. Total 176→178, P0 118→120. |
 | **2.20.0** | **2026-07-05** | **mups-prompt-tag-semantics (DM-20260705-001) S4**: D2-S15-A97-T01..T04 TagSemanticsRegistry + PhaseSemanticAppendix + golden hash — **4 新 T 全部 P0 IMPLEMENTED**. Total 178→182, P0 120→124. |
 | **2.21.0** | **2026-07-05** | **mups-parse-reject-feedback (DM-20260705-002) S4**: D2-S15-A98-T01..T02 prior_parse_reject lineframe inject — **2 新 T 全部 P0 IMPLEMENTED**. Total 182→184, P0 124→126. |
+| **2.22.0** | **2026-07-05** | **d7-observe-closed-classifier-prompt (DM-20260705-009) S5 验收**: D2-S15-A99-T01..T05 封闭式分类器定位 + signal 不足 obs_uncertainty 引导 + 双语同步 + golden hash 改写 — **5 新 T 全部 P0/P1 IMPLEMENTED (4 P0 + 1 P1)**. Total 184→189, P0 126→130. 0 行为变化 (M1 9 字段契约/i18n guide header/4 alias 解析/prior_parse_reject 反馈链路 0 修改). 详见 `openspec/changes/d7-observe-closed-classifier-prompt/acceptance-report.md` (verdict: ACCEPTED). |

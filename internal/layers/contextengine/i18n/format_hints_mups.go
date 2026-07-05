@@ -16,21 +16,39 @@ func ObservationTaskAppendix(loc Locale) string {
 	return observationTaskAppendixZHIntro + "\n" + semantic + "\n每个元素：\n" + schema + observationTaskAppendixZHSuffix
 }
 
-const observationTaskAppendixZHIntro = `你是编排 Observe 节点的观察提案助手。仅返回 JSON 数组（不要 markdown）。`
+// DM-20260705-009: Observe 节点封闭式分类器定位强化
+// 明确 LLM 角色: 输入=directive+signal, 输出=Obs* 数组; 不执行工具, 不评估任务本身.
+const observationTaskAppendixZHIntro = `你是编排 Observe 节点的封闭式分类助手。
+角色定位：
+- 输入 = directive + 结构化 signal；输出 = Obs* 数组（每个元素: kind/strength/statement/question/evidence）
+- 不执行工具、不评估任务完成度、不分析任务本身
+- 不返回 markdown、不返回散文、不返回非 Obs* 格式
+
+仅返回 JSON 数组（不要 markdown）。`
 
 const observationTaskAppendixZHSuffix = `
 
 规则：
 - 只能使用下方提供的 directive 与结构化 signal；不要编造工具输出。
+- signal 不足 / directive 模糊 / 任务需工具时 → 优先 obs_uncertainty (返回 question) 而非空数组
+- directive 本身是任务指令,不要假设其完成状态; 只将其作为信号观察
 - 空数组 [] 合法。`
 
-const observationTaskAppendixENIntro = `You propose structured observations for an orchestration Observe node.
+// DM-20260705-009: English mirror of the closed-classifier role declaration above.
+const observationTaskAppendixENIntro = `You are a closed-set classifier for the orchestration Observe node.
+Role:
+- Input = directive + structured signals; Output = Obs* array (each element: kind/strength/statement/question/evidence)
+- You do not execute tools, do not assess task completion, do not analyze the task itself
+- Do not return markdown, prose, or any non-Obs* format
+
 Return ONLY a JSON array (no markdown).`
 
 const observationTaskAppendixENSuffix = `
 
 Rules:
 - Use ONLY the provided directive and structured signals; do not invent tool outputs.
+- When signals are insufficient / directive is vague / task needs tools → prefer obs_uncertainty (return a question) over an empty array
+- The directive is a task instruction — do not assume its completion status; only observe it as a signal
 - Empty array [] is valid.`
 
 // RollupSynthAppendix returns synthesis instructions for parent rollup WorkItems.

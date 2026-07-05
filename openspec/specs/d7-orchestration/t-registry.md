@@ -1257,6 +1257,9 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S5-A99-T07** | 现有 `observation_proposer_test.go` 5 测试 0 行为变化 PASS | IMPLEMENTED | `observation_proposer_test.go` | SubContext_Signal |
 | **D7-S5-A99-T08** | 现有 `item_observe_test.go` E2E 0 行为变化 PASS | IMPLEMENTED | `item_observe_test.go` | SubContext_Signal |
 | **D7-S5-A99-T09** | 现有 `parse_reject_feedback_test.go` E2E 0 行为变化 PASS（DM-20260705-002 链路保留） | IMPLEMENTED | `parse_reject_feedback_test.go` | SubContext_Signal |
+| **D7-S5-A99-T10** | **DM-20260705-009**: 集成测试覆盖"开放式 directive (review) + 无 signal" 场景, system_prompt 包含封闭式分类器 marker + signal 不足 → obs_uncertainty 引导 | IMPLEMENTED | `observation_closed_classifier_test.go::TestObservePipeline_OpenDirectiveNoSignal_ClassifierPrompt` | SubContext_Signal |
+| **D7-S5-A99-T11** | **DM-20260705-009**: `parseObservationProposalsJSON` 4 alias (obs_fact/fact, obs_signal/signal, obs_deviation/deviation, obs_uncertainty/uncertainty) 仍工作, 0 行为变化 | IMPLEMENTED | `observation_closed_classifier_test.go::TestParseObservationProposalsJSON_AllAliasesAfterClassifierRefactor` (8 子测试) | SubContext_Signal |
+| **D7-S5-A99-T12** | **DM-20260705-009**: 集成测试 — LLM 遵循封闭式分类器引导返回 obs_uncertainty proposal 后, ValidateObservationProposals 通过 + 写入 UncertaintyReport | IMPLEMENTED | `observation_closed_classifier_test.go::TestObservePipeline_ClassifierPromptUnlocksUncertaintyProposal` | SubContext_Signal |
 
 **A99 Total:** 9 P0 T — 9 IMPLEMENTED (DM-20260705-003 M1)
 
