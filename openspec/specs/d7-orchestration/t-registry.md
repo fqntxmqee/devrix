@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.29.0
-**Last Updated:** 2026-07-04 (mups-prompttags-v2-io-registry DM-20260704-005: D7-S16-A96 +3 T IMPLEMENTED 292→295, P0 249→252)
+**Version:** 4.30.0
+**Last Updated:** 2026-07-05 (mups-verify-table-driven DM-20260705-005: D7-S10-A101 +7 T IMPLEMENTED 297→304, P0 254→260)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -317,6 +317,25 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **D7-S10-A50-T24** | **PR-D+E Classifier interface stub 单测 (4 单测) + e2e: TestAutoModeClassifier_InterfaceExists (compile) + TestAutoModeClassifier_StubPanic (panic 信息合规) + TestPartition_NoClassifierNoRegression (ChannelRouter 占位不破坏 partition) + TestChannelRouter_PlaceholderCallsite (TODO 注释 + metric 占位存在)** | **D7-S10-A50 Classifier Stub Tests** | **`internal/layers/orchestration/decisionplanning/auto_classifier_test.go` (4 tests) + `turn_adapter_partition_test.go`** | **IMPLEMENTED (DM-20260702-009)** | **P0** | Verify_Contract |
 | **D7-S9-A50-T26** | **PR-F Bash sibling abort: BashSiblingAbortController per-batch controller (sync.Mutex + sync.Once wrapped cancel) + Register(callID, toolName) (ctx, cancel, ok) + AbortSiblings(callID, reason) bool + isSiblingAbortWatched(name) 仅 bash; executeOneBatch parallel branch wired; watched call 失败时取消其它 watched siblings** | **D7-S9-A50 SiblingAbort** | **`internal/layers/contextengine/enforce/tools/bash/sibling_abort.go` (10 unit tests) + `internal/bootstrap/partition_sibling_abort_test.go` (3 integration tests); `executeOneBatch` parallel branch wired** | **IMPLEMENTED (DM-20260702-009)** | **P1** | Channel_Route |
 | **D7-S9-A50-T27** | **PR-F StreamingToolExecutor.Discard() + fallback 路径 wiring: StreamingToolExecutor per-LLM-iteration buffer (Buffer/Buffered/BufferedCount/IsDiscarded/DiscardReason/Discard); ErrStreamingFallbackSentinel = "streaming_fallback"; DiscardOnFallback wiring helper (atomic.Int64 counter + idempotent); FormatStreamingFallbackError(reason)** | **D7-S9-A50 Discard** | **`internal/bootstrap/streaming_executor.go` (10 tests) + `internal/bootstrap/discard_on_fallback.go` (8 tests) + `streaming_executor_test.go` + `discard_on_fallback_test.go`** | **IMPLEMENTED (DM-20260702-009)** | **P1** | Channel_Route |
+
+---
+
+### D7-S10-A101: verify_decision_table kernel + 3 verify 函数表驱动化 (M4, DM-20260705-005)
+
+> **mups-verify-table-driven (DM-20260705-005) — MUPS 5 节点重构总图 M4 落地.**
+> 12 trigger 命名函数 (5 artifact + 3 workItem overlay + 3 rollup + 1 rollup catch-all) + 2 包级决策表 var (artifactDecisionTable 5 trigger + rollupDecisionTable 4 trigger) + applyDecisionTable 顺序遍历. 3 verify 函数体替换为"建 ctx + applyDecisionTable"+ overlay detector 链: verifyArtifact 49→9 行, verifyArtifactForWorkItemWithContract 54→35 行, verifyRollupArtifact 47→9 行. **0 行为变化承诺**: 17 现有测试 0 修改 PASS + 3 byte-equivalent 测试 (build tag legacy_verify) 17 组合字节级 PASS.
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S10-A101-T01** | **12 detector 命名函数 (`detectNilArtifact` / `detectMaxItersPartial` / `detectExecuteFail` / `detectSideEffectRolledBack` / `detectSideEffectUncertain` / `detectUserGate` / `detectScopeOnlyDeliverable` / `detectDeliverableIncomplete` / `detectRollupAllFailed` / `detectRollupMixedFailedRunning` / `detectRollupContractSatisfied` / `rollup-default-fail` catch-all) + 单元测试 fire true/false 1-2 case each** | **D7-S10-A101** | **`sessionorchestrator/verify_decision_table_test.go::TestDetect{NilArtifact,MaxItersPartial,ExecuteFail,SideEffectRolledBack,SideEffectUncertain,UserGate,ScopeOnlyDeliverable,DeliverableIncomplete,RollupAllFailed,RollupMixedFailedRunning,RollupContractSatisfied}`** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T02** | **`applyDecisionTable` 顺序遍历 VerifyDecisionTable + 第一个 fired trigger 返回 buildVerdictFromTemplate(Template, art, ctx).WithSourceID(ctx.id) + 都不 fire → defaultVerdict(ctx) (Pass 0.9) + SourceID 仅在 ctx.id != "" 时注入 (nil artifact 旧行为保留)** | **D7-S10-A101** | **`sessionorchestrator/verify_decision_table_test.go::TestApplyDecisionTable_{FirstFiredReturns,NilArtifact,MaxItersBeatsExecuteFail,SourceIDFromContext}`** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T03** | **`verifyArtifact` 7 组合字节级等价旧实现: nil / max_iters+tool / max_iters+no_tool / exit=1+error / SideEffectRolledBack / SideEffectInflight / Pass-default. `verdictEqual` 比较 Kind/Confidence/Reason/SourceID/IndeterminateReason 5 字段.** | **D7-S10-A101** | **`sessionorchestrator/verify_legacy_test.go::TestVerifyArtifactRefactor_ByteEquivalent_OldVsNew` (build tag `legacy_verify`)** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T04** | **`verifyArtifactForWorkItemWithContract` 4 overlay 组合字节级等价旧实现: user-gate / scope-only / deliverable-incomplete-pass-downgrade / deliverable-incomplete-fail-no-downgrade. 3 overlay detector 顺序调 (`detectUserGate` → `detectScopeOnlyDeliverable` → `detectDeliverableIncomplete`)** | **D7-S10-A101** | **`sessionorchestrator/verify_legacy_test.go::TestVerifyArtifactForWorkItemWithContractRefactor_ByteEquivalent_OldVsNew` (build tag `legacy_verify`)** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T05** | **`verifyRollupArtifact` 6 rollup 组合字节级等价旧实现: pass / too-short / planning-denylist / all-failed / failed+running / mixed-failure-passes. rollup-default-fail catch-all trigger 兜底 Fail(0.85) "rollup deliverable contract not satisfied".** | **D7-S10-A101** | **`sessionorchestrator/verify_legacy_test.go::TestVerifyRollupArtifactRefactor_ByteEquivalent_OldVsNew` (build tag `legacy_verify`)** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T06** | **现有 17 测试 0 修改 PASS (13 verify + 4 deliverable_verify): `item_verify_test.go` 4 + `deliverable_verify_test.go` 5 + `item_pipeline_rollup_test.go` 8 (含 all-children-failed + failed+running + mixed-failure-passes + no-children-legacy-shape-check)** | **D7-S10-A101** | **`sessionorchestrator/{item_verify,deliverable_verify,item_pipeline_rollup}_test.go` 0 修改** | **IMPLEMENTED (DM-20260705-005)** | **P0** | Verify_Contract |
+| **D7-S10-A101-T07** | **detector 顺序锁定测试: 5 artifact detector 按预期顺序触发, max-iters-partial 短路 execute-fail, final verdict = Partial(0.55) 而非 Fail(0.9). trigger 顺序是隐性契约, 显式声明在 `artifactDecisionTable` / `rollupDecisionTable` 数组定义里.** | **D7-S10-A101** | **`sessionorchestrator/verify_decision_table_test.go::TestVerifyArtifact_DetectorOrder`** | **IMPLEMENTED (DM-20260705-005)** | **P1** | Verify_Contract |
+
+> 配套 P0 验证: `verify_decision_table.go` 339 行 (kernel 12 detector + 2 decision table + applyDecisionTable + helpers + comments); `item_verify.go` 202→153 行; `rollup_verify.go` 47→17 行. 28 新测试 + 3 byte-equivalent 测试 (17 组合) + 1 顺序锁定测试全 PASS. 决策表 trigger 数: artifactDecisionTable 5 + rollupDecisionTable 4 (含 1 catch-all) = 9 explicit. 0 行为变化. Decision_table 是包级 `var` 常量, init() 0 增量, 热路径零反射 (函数指针调用 < 1μs). 下个 change (`mups-cleanup-legacy`) 删除 `_legacy_test.go`.
 
 ---
 

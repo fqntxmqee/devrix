@@ -13,6 +13,7 @@
 
 | Date | Change ID | 摘要 | 状态 | 归档 |
 |------|-----------|------|------|------|
+| 2026-07-05 | mups-verify-table-driven | MUPS Verify 节点决策表化 — M4 落地（verify_decision_table.go kernel + 12 detector 命名函数 + 2 包级决策表 var + applyDecisionTable 顺序遍历；verifyArtifact 49→9 行 + verifyArtifactForWorkItemWithContract 54→35 行 + verifyRollupArtifact 47→9 行；0 行为变化；7 T D7-S10-A101-T01..T07 IMPLEMENTED；L5-MUPS-VTD-01..07 全 PASS；17 现有测试 0 修改 + 3 byte-equivalent 测试 17 组合字节级 PASS；下个 change mups-cleanup-legacy 删除 _legacy_test.go） | IMPLEMENTED | [archive](../../archive/2026-07-05-mups-verify-table-driven/) |
 | 2026-07-05 | mups-go-struct-driven | MUPS Go-struct-driven I/O contract — M1 kernel + Observe 迁移（struct=SoT + pt 反射注册 + 5 项 init panic 校验 + i18n 同步；0 行为变化；14 T IMPLEMENTED D7-S5-A99-T01..T09 + shared-A99-T01..T05；L5-MUPS-GSD-01..06 全 PASS；反射开销 384.7 ns/op） | IMPLEMENTED | [archive](../../archive/2026-07-05-mups-go-struct-driven/) |
 | 2026-07-05 | mups-plan-structbind | MUPS Go-struct-driven I/O contract — M2 Plan 节点独立化（StrategicPlanFrame 16 字段 + pt tag + buildStrategicPlanFrame 嵌套 Budget 平铺；buildStrategicPlanUserPrompt 38 行 → 5 行反射调用；kernel 5 行 *int pointer deref 扩展；i18n 补 11 条 plan.input.*.when_use；0 行为变化；6 T D7-S5-A100-T01..T06 IMPLEMENTED；L5-MUPS-GSD-11..15 全 PASS；复用 M1 kernel 零业务代码增量） | IMPLEMENTED | [archive](../../archive/2026-07-05-mups-plan-structbind/) |
 | 2026-07-04 | d7-uncertainty-spawn-decouple | CC-U1～U6 + MUPS spawn 数据对象/时序文档（`mups-spawn-*.md`） | IMPLEMENTED | [changes](../../changes/d7-uncertainty-spawn-decouple/) |

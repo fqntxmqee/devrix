@@ -2,7 +2,7 @@
 
 **Change ID:** `mups-verify-table-driven`  
 **Demand:** DM-20260705-005
-**Status:** S3_Design
+**Status:** Archived (s7_archived)
 
 ## Why
 
