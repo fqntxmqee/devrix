@@ -2,7 +2,7 @@
 
 **Change ID:** `mups-plan-structbind`  
 **Demand:** DM-20260705-004
-**Status:** S2_Design
+**Status:** Archived (s7_archived)
 
 ## Why
 

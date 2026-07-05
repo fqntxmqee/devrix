@@ -2,6 +2,8 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260705-003 | MUPS Go-struct-driven I/O contract — Observe M1 + 5 节点重构总图 | mups-go-struct-driven | 2026-07-05 | [#403](https://github.com/fqntxmqee/devrix/pull/403) | ACCEPTED (14 T D7-S5-A99 + shared-A99; L5-MUPS-GSD-01..06 PASS; 0 行为变化; 反射 384.7 ns/op) |
+| DM-20260705-004 | MUPS Go-struct-driven I/O contract — M2 Plan 节点独立化 + 复用 M1 kernel | mups-plan-structbind | 2026-07-05 | [#405](https://github.com/fqntxmqee/devrix/pull/405) | ACCEPTED (6 T D7-S5-A100; L5-MUPS-GSD-11..15 PASS; 0 行为变化; 复用 M1 kernel + 5 行 *int pointer deref 扩展) |
 | DM-20260705-002 | MUPS parse/budget reject — 结构化反馈注入下一轮 user frame | mups-parse-reject-feedback | 2026-07-05 | [#401](https://github.com/fqntxmqee/devrix/pull/401) | ACCEPTED (4 T D2-S15-A98 + D7-S5-A98; L5-MUPS-REJ-01..04 PASS; closes DM-005 P2 defer) |
 | DM-20260705-001 | MUPS 标签语义层 — Observe/Plan/Execute 动态提示词语义 appendix | mups-prompt-tag-semantics | 2026-07-05 | [#397](https://github.com/fqntxmqee/devrix/pull/397) | ACCEPTED (6 T D2-S15-A97 + D7-S5-A97; L5-MUPS-TAG-01..05 PASS; P2 reject-loop defer) |
 | DM-20260704-005 | MUPS prompttags v2 — 统一 IO 注册表 + Observe max-3 + 收敛 invariant | mups-prompttags-v2-io-registry | 2026-07-04 | [#394](https://github.com/fqntxmqee/devrix/pull/394) | ACCEPTED (5 T D2-S15-A96 + D7-S16-A96; P2 reject-loop defer) |
