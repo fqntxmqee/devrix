@@ -3,7 +3,8 @@
 **Change ID:** `mups-semantics-schema-alignment`  
 **Demand ID:** DM-20260705-003  
 **Created:** 2026-07-05  
-**Status:** S4_Development  
+**Updated:** 2026-07-05 (→ S7_Archived)
+**Status:** S7_Archived
 **Demand:** [`demand.md`](demand.md)
 
 ---

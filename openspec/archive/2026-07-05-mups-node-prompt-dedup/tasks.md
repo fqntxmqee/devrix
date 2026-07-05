@@ -1,5 +1,9 @@
 # Tasks: mups-node-prompt-dedup
 
+**Status:** S7_Archived (2026-07-05)
+**Demand:** DM-20260705-004
+**Archive:** `openspec/archive/2026-07-05-mups-node-prompt-dedup/`
+
 | Task | L5 | Status |
 |------|-----|--------|
 | Remove lineframe `[control]`/`[data]` prefixes (BuildLineFrameFromStruct) | L5-MUPS-PROMPT-03 | done |

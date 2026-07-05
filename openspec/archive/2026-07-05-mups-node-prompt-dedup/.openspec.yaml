@@ -1,0 +1,6 @@
+schema: openspec-change-v1
+change: mups-node-prompt-dedup
+demand: DM-20260705-004
+status: s7_archived
+archived_at: 2026-07-05
+archive_path: openspec/archive/2026-07-05-mups-node-prompt-dedup/
