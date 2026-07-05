@@ -2,8 +2,8 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.5.0
-**Last Updated:** 2026-07-01 (devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行 + 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + S5 段加 cross-reference; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-1: 新增 ## Hardening 段 + ## D7-X Cross-S Kernel（orchtypes/）段 + 加固 a-registry 与代码分布一致性 → v5.4.0; **earlier**: devrix-d7-historical-s-cleanup DM-20260701-003 S7+ 大段正文迁出至 historical-s-mapping.md → v5.3.0)
+**Version:** 5.6.0
+**Last Updated:** 2026-07-05 (mups-verify-table-driven DM-20260705-005: D7-S10-A101 verify_decision_table kernel + 3 verify 函数走表驱动化活动登记 → v5.6.0; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行 + 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + S5 段加 cross-reference → v5.5.0)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 
@@ -300,3 +300,27 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 | **5.2.0** | **2026-06-29** | **v7.0 TaskContract 统一 PR-B（DM-20260629-008）L3 防御运行时层**：(1) **新增 D7-S18 Pessimistic Commit + Rule-based Fallback 段**（2 A：D7-S18-A11 EvaluatePessimistic + D7-S18-A12 ResolveRuleFallback），A 活动 55 → 57；(2) **新增 3 NEW interfaces/ 文件**（contracts.go PessimisticCommitGuard interface + 4 ORCH_* 错误码 7110-7113 + fallback_policy.go FallbackPolicyRuleNames + ParseFallbackRuleName + convergence_budget.go NewConvergenceBudget + With* + Validate + RemainingBelowReserve + ToFields），物理包 `orchestration/interfaces/` 共 10 文件；(3) **新增 escape/fallback.go**（~310 LOC，DefaultPessimisticCommitGuard 5 类触发 + 3 FallbackPolicy 路径 + buildChainHash FNV-1a 非加密 digest）；(4) **escape/engine.go +NotifyPessimistic + SetPessimisticGuard/PessimisticGuard + 4 unit tests**；(5) **mups/execute/channel.go +ChannelRouter.SetPessimisticGuard + ApplyPessimisticCommit**；(6) **bootstrap/pessimistic_guard_wire.go NEW**（PessimisticCommitEnabled + PessimisticRuleStrategy + NewPessimisticCommitGuardFromEnv + 7 env tests）；(7) **circuit_breaker_test.go +3 L1 Pessimistic 联动测试**（L1 trips StateOpen + 60s 持久窗口 + L1-only reason 含 "l1" 路由 hint）；(8) **6/7 T 点 IMPLEMENTED**（T05 Span/Metric 完整 wire 留 PR-C，本 PR 仅 slog.Info 占位）；(9) **Feature Flag D7_PESSIMISTIC_COMMIT_ENABLED 默认 disabled, 0 行为变更** |
 | **5.4.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-1**：**(1) 新增 ## Hardening 段**（2 A：Hardening-A01 MetricsEmit + Hardening-A02 ConcurrencyGuard），物理 location 锚点 `orchestration/hardening/`（namespace）+ `orchestration/wavescheduler/`（owner）双归属；**(2) 新增 ## D7-X Cross-S Kernel（orchtypes/）段**（6 A：D7-X-A01 DefineCrossSPrimitives + D7-X-A02 DefineSentinelErrors + D7-X-A03 BoundaryDecision + D7-X-A04 AdaptivePriorInject + D7-X-A05 SystemAnomalyDetect + D7-X-A06 LLMInvokerContract），**物理即 kernel，0 shim / 0 alias / 0 reverse import**；**(3) 与 §v6.0.0 6 S 精简映射 - Cross-cutting Hardening 段互补**（本段补物理路径锚点，§v6.0.0 段保留 14 S → 6 S 重映射视角）；**(4) 0 函数签名变化**（purely additive — 仅追加 ## Hardening + ## D7-X 两段，§v6.0.0 段与 S1-S6 现有 Canonical 段不动）；**(5) cumulative version bump**：跳过 v5.3.0（该位预留给 devrix-d7-s-layer-normalization DM-20260701-002/003 — S1-S6 canonical 收敛 + S7+ → historical-s-mapping.md 物理拆分），如未来该 PR merge 时检测到 v5.4.0 已合入，则跳过 v5.3.0 步进 |
 | **5.5.0** | **2026-07-01** | **D7 Physical Layout Alignment（DM-20260701-004）PR-3**: **(1) D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行**：A03 Code Location `decisionplanning/plan_mode.go::Validate`，A04 Code Location `plan/planner.go::DefaultPlanner.Generate`（S6 治理 Activity 物理路径在 S5，符合 spec.md §S5 carve-out Note 与 design §④ S5 sub-registration carve-out）；**(2) 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明 段**：plan/（5 prod + 1 test 共 6 .go）+ decisionplanning/（8 prod + 8 test 共 16 .go）职责分工 + 0 shim / 0 alias / 0 git mv doc-only dual-registration；**(3) D7-S5 段加 cross-reference 提示**：指向下方双登记说明段 + D7-S6-A04 的物理路径；**(4) 0 函数签名变化 / 0 物理路径变化**（purely additive — 仅 a-registry 内部新增 2 行 + 1 cross-reference 段 + 1 双登记说明段）；**(5) T 层覆盖 D7-PL-T07**（plan/ 归属 S5 在 code-layout + a-registry 双登记）。 |
+
+
+---
+
+## D7-S10-A101: verify_decision_table kernel (M4, DM-20260705-005)
+
+> **mups-verify-table-driven (DM-20260705-005) — MUPS 5 节点重构总图 M4 落地.**
+
+**A 定位 (3 个 A)**: 决策表 kernel (verify_decision_table.go) + 3 verify 函数活动化
+
+| A ID | 名称 | 角色 | Code Location | Notes |
+|------|------|------|---------------|-------|
+| **D7-S10-A101-F01** | **`verifyContext` 不可变结构体 (art/item/pl/contract/stats/id 6 字段)** | **A-BE** | **`sessionorchestrator/verify_decision_table.go:30-40`** (verifyContext struct) | detector 只读 ctx; 不可变 value type 保证并发安全 |
+| **D7-S10-A101-F02** | **`VerdictTemplate` / `VerdictTrigger` / `VerifyDecisionTable` 3 struct + `applyDecisionTable` 顺序遍历** | **A-BE** | **`sessionorchestrator/verify_decision_table.go:42-110`** (3 struct + applyDecisionTable + buildVerdictFromTemplate + defaultVerdict) | 第一个 fired trigger 返回; 都不 fire → defaultVerdict (Pass 0.9); SourceID 仅在 ctx.id != "" 时注入 |
+| **D7-S10-A101-F03** | **12 detector 命名函数 (5 artifact + 3 workItem overlay + 3 rollup + 1 rollup catch-all)** | **A-BE** | **`sessionorchestrator/verify_decision_table.go:130-300`** (detectXxx functions) | 命名清晰; 单一职责; 单元测试覆盖 fire true/false |
+| **D7-S10-A101-F04** | **2 包级决策表 var (`artifactDecisionTable` 5 trigger + `rollupDecisionTable` 4 trigger)** | **A-BE** | **`sessionorchestrator/verify_decision_table.go:310-440`** (artifactDecisionTable + rollupDecisionTable) | 顺序显式声明; trigger 顺序是隐性契约 |
+| **D7-S10-A101-F05** | **3 verify 函数走表驱动 (`verifyArtifact` / `verifyArtifactForWorkItemWithContract` / `verifyRollupArtifact`)** | **A-BE** | **`sessionorchestrator/{item_verify.go:30-110, rollup_verify.go:10-17}`** (3 verify 重构) | 49→9 行 + 54→35 行 + 47→9 行 = -95 行; 0 行为变化 (17 现有测试 0 修改 + 3 byte-equivalent 测试 17 组合 PASS) |
+| **D7-S10-A101-F06** | **`_legacy_test.go` 旧实现保留 (build tag `legacy_verify`)** | **A-BE** | **`sessionorchestrator/verify_legacy_test.go`** (verifyArtifactLegacy + verifyArtifactForWorkItemWithContractLegacy + verifyRollupArtifactLegacy + verdictEqual + 3 byte-equivalent 测试) | 仅在 `-tags legacy_verify` 时编译; 下个 change (`mups-cleanup-legacy`) 删除 |
+
+**A-门禁**:
+- `internal/layers/orchestration/sessionorchestrator/verify_decision_table.go` 339 行 (含 12 detector + 2 decision table + applyDecisionTable + helpers + comments)
+- 28 新测试 + 3 byte-equivalent 测试 (legacy_verify build tag) 全 PASS
+- 17 现有测试 (item_verify + deliverable_verify + item_pipeline_rollup) 0 修改 PASS
+- 0 行为变化; 决策表 trigger 顺序显式声明 (5 artifact + 4 rollup = 9 explicit)

@@ -2,6 +2,8 @@
 
 | Demand ID | Title | Change ID | Archived | PR | Verdict |
 |-----------|-------|-----------|----------|-----|---------|
+| DM-20260705-005 | MUPS Verify 节点决策表化 — 4 VerdictKind × 12 trigger 表驱动重构 | mups-verify-table-driven | 2026-07-05 | [#407](https://github.com/fqntxmqee/devrix/pull/407) | ACCEPTED (7 T D7-S10-A101; L5-MUPS-VTD-01..07 PASS; 0 行为变化; 12 detector 命名 + 2 决策表 + 17 现有测试 0 修改 + 3 byte-equivalent 测试 17 组合 PASS) |
+| DM-20260705-005 | MUPS Verify 节点决策表化 — 4 VerdictKind × 12 trigger 表驱动重构 | mups-verify-table-driven | 2026-07-05 | [#407](https://github.com/fqntxmqee/devrix/pull/407) | ACCEPTED (7 T D7-S10-A101; L5-MUPS-VTD-01..07 PASS; 0 行为变化; 12 detector 命名 + 2 决策表 + 17 现有测试 0 修改 + 3 byte-equivalent 测试 17 组合 PASS) |
 | DM-20260705-003 | MUPS Go-struct-driven I/O contract — Observe M1 + 5 节点重构总图 | mups-go-struct-driven | 2026-07-05 | [#403](https://github.com/fqntxmqee/devrix/pull/403) | ACCEPTED (14 T D7-S5-A99 + shared-A99; L5-MUPS-GSD-01..06 PASS; 0 行为变化; 反射 384.7 ns/op) |
 | DM-20260705-004 | MUPS Go-struct-driven I/O contract — M2 Plan 节点独立化 + 复用 M1 kernel | mups-plan-structbind | 2026-07-05 | [#405](https://github.com/fqntxmqee/devrix/pull/405) | ACCEPTED (6 T D7-S5-A100; L5-MUPS-GSD-11..15 PASS; 0 行为变化; 复用 M1 kernel + 5 行 *int pointer deref 扩展) |
 | DM-20260705-002 | MUPS parse/budget reject — 结构化反馈注入下一轮 user frame | mups-parse-reject-feedback | 2026-07-05 | [#401](https://github.com/fqntxmqee/devrix/pull/401) | ACCEPTED (4 T D2-S15-A98 + D7-S5-A98; L5-MUPS-REJ-01..04 PASS; closes DM-005 P2 defer) |
