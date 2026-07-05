@@ -103,23 +103,32 @@ func checkResolutionReport(round *WorkItemPipelineRound, ctx TreeEvalContext) (S
 // irrelevant to the decompose decision because the verifier will
 // process them in subsequent rounds.
 //
-// SubWorktree field on UnresolvedObs is not currently stored (Phase 2
-// only carried HasSubWorktree=true flag); we re-derive the directive
-// suffix from the ObsID + Reason so the child WorkItem knows what to
-// resolve. A future Phase-5 wiring can extend UnresolvedObs to carry
-// the full SubWorktreeSpec pointer; until then this is the deterministic
-// fallback that lets the child execute a meaningful directive.
-//
-// ExpectedReturn is intentionally empty — Phase 4's DecomposeFromSubWorktree
-// wiring (D7-S15-A109-T01) will populate it from the originating
-// SubWorktreeSpec.ExpectedReturn. Today's implementation yields a
-// placeholder directive so the LLM child knows the ObsID it owns.
+// Phase 4 (D7-S15-A109-T01): when the UnresolvedObs carries the
+// originating SubWorktreeSpec (added in interfaces/resolution_contract.go),
+// we lift its Title + DirectiveSuffix + ExpectedReturn + ScopeIn so the
+// child WorkItem starts with the same directive shape as the Plan's
+// child_specs[] carrier (legacy Phase 2 fallback). When the spec is nil
+// (Phase 1/2/3 rounds still in flight, or a malformed upstream payload)
+// we degrade to a deterministic ObsID-based placeholder so the child
+// LLM still has a meaningful directive to work from.
 func buildChildSpecsFromSubWorktrees(unresolved []interfaces.UnresolvedObs) []ChildSpec {
 	out := make([]ChildSpec, 0, len(unresolved))
 	for _, uo := range unresolved {
 		if !uo.HasSubWorktree {
 			continue
 		}
+		if uo.SubWorktree != nil && uo.SubWorktree.Title != "" {
+			out = append(out, ChildSpec{
+				Kind:           WorkKindImplement,
+				Title:          uo.SubWorktree.Title,
+				Directive:      composeSubWorktreeDirective(uo),
+				ScopeIn:        append([]string(nil), uo.SubWorktree.ScopeIn...),
+				ExpectedReturn: uo.SubWorktree.ExpectedReturn,
+			})
+			continue
+		}
+		// Fallback: ObsID-based placeholder directive. Phase 1/2/3
+		// reports without the SubWorktree field set fall here.
 		out = append(out, ChildSpec{
 			Kind:      WorkKindImplement,
 			Title:     "Resolve unresolved ObsID " + uo.ObsID,
@@ -129,6 +138,21 @@ func buildChildSpecsFromSubWorktrees(unresolved []interfaces.UnresolvedObs) []Ch
 		})
 	}
 	return out
+}
+
+// composeSubWorktreeDirective builds the child WorkItem's directive by
+// appending the SubWorktreeSpec.DirectiveSuffix (when present) to a
+// context line that anchors the directive to the originating ObsID +
+// Reason + Strength. Mirrors the Phase 2 PR-A1 PR-RF directive-suffix
+// pattern so legacy `child_specs[]` callers see the same shape.
+func composeSubWorktreeDirective(uo interfaces.UnresolvedObs) string {
+	header := "Resolve unresolved ObsID " + uo.ObsID +
+		" (verify_reason=" + string(uo.Reason) +
+		", strength=" + formatFloat(uo.Strength) + ")"
+	if uo.SubWorktree == nil || uo.SubWorktree.DirectiveSuffix == "" {
+		return header
+	}
+	return header + "\n\n" + uo.SubWorktree.DirectiveSuffix
 }
 
 // formatFloat renders f with up to 3 decimals; used only by the
