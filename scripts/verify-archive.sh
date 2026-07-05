@@ -120,12 +120,12 @@ else
     fail "tasks.md 不存在"
 fi
 
-# specs/*/spec.md
-SPEC_FILES=$(find "$TARGET_DIR/specs" -name "spec.md" -type f 2>/dev/null)
+# specs/*/*.md (per archiving.md section 2.4 lite-mode: spec.md = architecture contract OR specs/<domain>/<feature>.md = process requirement)
+SPEC_FILES=$(find "$TARGET_DIR/specs" -name "*.md" -type f 2>/dev/null)
 if [ -n "$SPEC_FILES" ]; then
-    pass "specs/*/spec.md 存在 ($(echo "$SPEC_FILES" | wc -l | tr -d ' ') 个)"
+    pass "specs/*/*.md 存在 ($(echo "$SPEC_FILES" | wc -l | tr -d ' ') 个)"
 else
-    fail "specs/*/spec.md 不存在"
+    fail "specs/*/*.md 不存在（spec.md 或 specs/<domain>/<feature>.md）"
 fi
 
 # acceptance-report.md

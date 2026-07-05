@@ -1,0 +1,16 @@
+schema: openspec
+change-id: mups-plan-structbind
+demand-id: DM-20260705-004
+status: s7_archived
+title: "MUPS Go-struct-driven I/O contract — M2 Plan 节点独立化 + 复用 M1 kernel"
+author: DM-20260705-004 S3 planning
+parent_demands:
+  - DM-20260705-003  # M1 kernel (depends on)
+domains: [shared/prompttags, d7-orchestration]
+capabilities:
+  - shared/prompttags
+  - d7-orchestration
+  - d2-context-engine
+  - d3-llm-gateway
+scope: foundation
+labels: [mups, refactor, prompttags, plan, m2]

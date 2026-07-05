@@ -1170,7 +1170,7 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 **A94 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260701-001)
 **A95 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260704-004)
 
-### shared-A99: MUPS go-struct binding kernel (DM-20260705-003 M1)
+### shared-A99: MUPS go-struct binding kernel (DM-20260705-003 M1) — Change: `mups-go-struct-driven` (M1 kernel)
 
 | T ID | Description | Status | File | Span Evidence |
 |------|-------------|--------|------| --- |
@@ -1210,7 +1210,7 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 **A98 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260705-002)
 
-### D7-S5-A99: MUPS go-struct-driven I/O contract (DM-20260705-003 M1)
+### D7-S5-A99: MUPS go-struct-driven I/O contract (DM-20260705-003 M1) — Change: `mups-go-struct-driven` (Observe 节点迁移)
 
 | T ID | Description | Status | File | Span Evidence |
 |------|-------------|--------|------| --- |
@@ -1225,6 +1225,23 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S5-A99-T09** | 现有 `parse_reject_feedback_test.go` E2E 0 行为变化 PASS（DM-20260705-002 链路保留） | IMPLEMENTED | `parse_reject_feedback_test.go` | SubContext_Signal |
 
 **A99 Total:** 9 P0 T — 9 IMPLEMENTED (DM-20260705-003 M1)
+
+
+### D7-S5-A100: MUPS Plan 节点 go-struct 化 (DM-20260705-004 M2) — Change: `mups-plan-structbind`
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S5-A100-T01** | `MustRegisterFrame[StrategicPlanFrame]()` init 成功 + 16 字段顺序对齐 `PlanUserFrame` | IMPLEMENTED | `plan_structbind_test.go::TestStrategicPlanFrame_RegisteredAtInit` | Plan_Generate |
+| **D7-S5-A100-T02** | `BuildLineFrameFromStruct` 字节等价 `buildStrategicPlanUserPrompt` 旧 38 行手工 map | IMPLEMENTED | `plan_structbind_test.go::TestBuildStrategicPlanUserPrompt_FullInput` | Plan_Generate |
+| **D7-S5-A100-T03** | `buildStrategicPlanFrame` 平铺 `Budget` 9 字段（含 `*int` nil=absent）与现状手工展开一致 | IMPLEMENTED | `plan_structbind_test.go::TestBuildStrategicPlanFrame_FlattensBudget` | Plan_Generate |
+| **D7-S5-A100-T04** | Budget=0 时 9 Budget 字段全跳过（`Budget.MaxChildren > 0` 守卫保留） | IMPLEMENTED | `plan_structbind_test.go::TestBuildStrategicPlanUserPrompt_ZeroBudget` | Plan_Generate |
+| **D7-S5-A100-T05** | init() 4 项 panic 校验 (pt 缺 / plane 错 / i18n 缺 / 字段数 == FrameSpec) | IMPLEMENTED | `prompttags/structbind_test.go::TestMustRegisterFrame_*` (M1 kernel 兼容 M2) | Spec_Review |
+| **D7-S5-A100-T06** | golden snapshot 12 行精确 byte-equal（含 `[control]` / `[data]` prefix + `%.3f` 格式） | IMPLEMENTED | `plan_structbind_test.go::TestBuildStrategicPlanUserPrompt_GoldenEN` | Plan_Generate |
+| **D7-S5-A100-T07** | `planFrameToMap` 反射辅助：omit_empty / omit_zero 行为与 kernel 一致 | IMPLEMENTED | `plan_structbind_test.go::TestPlanFrameToMap_OmitsEmptyAndZero` | Plan_Generate |
+| **D7-S5-A100-T08** | 现有 Plan E2E 0 行为变化（`item_plan_test.go` + `strategic_plan_proposer_test.go` + `parse_reject_feedback_test.go`） | IMPLEMENTED | `internal/layers/orchestration/sessionorchestrator/*_test.go` | Plan_Generate |
+
+**A100 Total:** 8 P0 T — 8 IMPLEMENTED (DM-20260705-004 M2)
+
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 
