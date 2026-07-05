@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.33.0
-**Last Updated:** 2026-07-05 (d7-mups-strategy-injection DM-20260705-008: M3 Strategy 抽象注入 WorkItemExecContext — Strategy interface (workmodel 4 method) + 4 PlanKind 实现 (commitment/protocol/scenario/exploration) + DefaultStrategy registry + 19 NEW 测试 (14 strategy + 5 algebra integration 4×5 cases) + 2 UPDATED (R4/R6 M3 行为增量对齐); 4 PlanKind × 5 VerdictKind = 20 组合中 4 行为增量; 5 节点重构总图最后一步收口; PR #413 MERGED; **previous**: mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
+**Version:** 4.33.1
+**Last Updated:** 2026-07-05 (devrix-d7-uncertainty-resolution-traceability DM-20260704-006 S3_Design 预登记: 19 T points (11 P0 + 8 P1) all PLANNED — 5 类型 orchtypes/resolution.go + Plan/Execute schema + Verify decision table + Decide binding (SpawnDecomposeForUnresolved + SpawnUserGate + SpawnInline) + DecomposeFromSubWorktree + budget gate; design.md 6 段式 + spec delta 6 Requirement (RC-1..RC-6) + .openspec.yaml 完整; S3-Gate 待 Review; **previous**: d7-mups-strategy-injection DM-20260705-008: M3 Strategy 抽象注入 WorkItemExecContext — Strategy interface (workmodel 4 method) + 4 PlanKind 实现 (commitment/protocol/scenario/exploration) + DefaultStrategy registry + 19 NEW 测试 (14 strategy + 5 algebra integration 4×5 cases) + 2 UPDATED (R4/R6 M3 行为增量对齐); 4 PlanKind × 5 VerdictKind = 20 组合中 4 行为增量; 5 节点重构总图最后一步收口; PR #413 MERGED; **previous**: mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
@@ -1519,5 +1519,37 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 
 **D7 全域统计：** 281 IMPLEMENTED + **14 IMPLEMENTED (D7-PL)** = **295 T 全 IMPLEMENTED** · **P0 243**（237 原 + 6 新 P0 layout guard T）。
 
+
+## D7-RT: Obs→Execution 统一契约 (ResolutionContract + DecideBinding) (DM-20260704-006) — PLANNED
+
+> **Change:** `devrix-d7-uncertainty-resolution-traceability` — 治本 MUPS 双断链 (A: Obs→Resolution, B: Plan→Decide): 5 类型 (orchtypes/resolution.go: ResolutionStrategy/SubWorktreeSpec/ResolutionClaim/ResolutionReport/UnresolvedObs) + Plan artifact schema 扩展 `ResolutionStrategy[]` + Execute artifact schema 扩展 `ResolutionClaim[]` + Verify `verifyResolutionCoverage()` + Decide 新增 `SpawnDecomposeForUnresolved` + `SpawnUserGate` 分支 + `DecomposeFromSubWorktree` 入口 + budget gate; safety net 保留旧 `execution_mode + child_specs[]` + `detectUserGate` 文本正则; design.md 6 段式 + spec delta 6 Requirement (RC-1..RC-6) + 19 T points 预登记 (11 P0 + 8 P1). 详见 `openspec/changes/devrix-d7-uncertainty-resolution-traceability/`.
+
+| T ID | 描述 | 归属 A/F | Test 位置 | Status | Priority | Span Evidence |
+|------|------|----------|-----------|--------|----------| --- |
+| **D7-S16-A103-T01** | `orchtypes/resolution.go` 5 类型 (ResolutionStrategy/SubWorktreeSpec/ResolutionClaim/ResolutionReport/UnresolvedObs) + 4 验证方法 (NewResolutionStrategy/WithSubWorktree/NewResolutionReport/Validate) | D7-S16-A103 | `internal/layers/orchestration/orchtypes/resolution_test.go` | **PLANNED** | **P0** | — |
+| **D7-S16-A104-T01** | Plan artifact schema 扩展 `ResolutionStrategy[]` + `sub_worktree` 可选字段 + JSON unmarshal 路径 | D7-S16-A104 | `mups/plan/plan_test.go::TestPlanArtifact_IncludesResolutionStrategies` | **PLANNED** | **P0** | `D7_Mups_Resolution_Strategy` (Plan Span) |
+| **D7-S16-A104-T02** | Plan LLM 引导词 append（fieldMap guide 方式，走 i18n.ResolutionStrategyGuide 而非 prose 块） | D7-S16-A104 | `i18n/format_hints_mups_test.go::TestResolutionStrategyGuide_ZH` + `TestResolutionStrategyGuide_EN` | **PLANNED** | **P0** | — |
+| **D7-S16-A104-T03** | `StrategicPlanProposer` 解析 `sub_worktree` 字段；保留 `child_specs[]` 兼容路径（标 deprecated） | D7-S16-A104 | `sessionorchestrator/strategic_plan_proposer_test.go::TestStrategicPlanProposer_ParsesSubWorktree` + `TestLegacyChildSpecsCompat_DeprecationWarning` | **PLANNED** | **P0** | — |
+| **D7-S16-A105-T01** | Execute artifact schema 扩展 `ResolutionClaim[]` + JSON unmarshal 路径 | D7-S16-A105 | `mups/execute/channel_test.go::TestChannelExecute_EmitsResolutionClaims` | **PLANNED** | **P0** | `D7_Mups_Resolution_Claim` (Execute Span) |
+| **D7-S16-A105-T02** | Execute LLM 引导词 append（tool call 完成后引导 claim，fieldMap guide 方式） | D7-S16-A105 | `i18n/format_hints_mups_test.go::TestResolutionClaimGuide_ZH` + `TestResolutionClaimGuide_EN` | **PLANNED** | **P0** | — |
+| **D7-S16-A105-T03** | Execute LLM 不填 `ResolutionClaim[]` 路径覆盖 (CoverageRatio=0 fallback) | D7-S16-A105 | `mups/execute/channel_test.go::TestChannelExecute_NoClaimEmitted` | **PLANNED** | **P1** | — |
+| **D7-S16-A105-T04** | safety net: Plan 缺 strategy 时退化 detectUserGate + warning log | D7-S16-A105 | `sessionorchestrator/verify_decision_table_test.go::TestDetectUserGate_SafetyNet` | **PLANNED** | **P1** | — |
+| **D7-S16-A105-T05** | safety net: 旧 `execution_mode + child_specs[]` 退化路径 (legacy R0-R8 logic 保留) | D7-S16-A105 | `workmodel/spawn_policy_test.go::TestLegacyExecutionModeFallback` | **PLANNED** | **P0** | — |
+| **D7-S16-A106-T01** | `verifyResolutionCoverage()` 纯函数 + 4 状态决策表 (CoverageRatio=1.0 + all confident → Pass / ∈ [0.5, 1.0) → Partial / < 0.5 → Fail or Partial / = 0 → Fail or Partial + "no resolution claims") | D7-S16-A106 | `mups/verify/verify_test.go::TestVerifyResolutionCoverage_FourStates` (17 组合 byte-equivalent) | **PLANNED** | **P0** | `D7_Mups_Resolution_Coverage` (Verify Span) |
+| **D7-S16-A106-T02** | Verify 在 deliverable-verify 之前调用 `verifyResolutionCoverage()` + 输出 ResolutionReport 到 round | D7-S16-A106 | `mups/verify/verify_test.go::TestVerify_PipelineOrder` | **PLANNED** | **P0** | — |
+| **D7-S16-A106-T03** | `WorkItemPipelineRound.ResolutionReport` 字段 + round 状态注入 | D7-S16-A106 | `workmodel/pipeline_round_test.go::TestRound_ResolutionReportField` | **PLANNED** | **P0** | — |
+| **D7-S5-A108-T01** | `SpawnDecomposeForUnresolved` 分支 + HasSubWorktree 触发逻辑 (治本断链 B P0) | D7-S5-A108 | `workmodel/spawn_policy_test.go::TestDecideFromResolutionReport_SpawnDecompose_SubWorktree` (4 触发条件) | **PLANNED** | **P0** | `D7_Spawn_From_Resolution` (Decide Span) |
+| **D7-S5-A108-T02** | `SpawnUserGate` 分支 + 触发条件 (全 HasSubWorktree=false + MaxUnresolvedStrength ≥ 0.85) | D7-S5-A108 | `workmodel/spawn_policy_test.go::TestDecideFromResolutionReport_SpawnUserGate` (4 触发条件) | **PLANNED** | **P0** | — |
+| **D7-S5-A108-T03** | `SpawnInline` 兜底分支 (RC-4c 沿用现有 R0-R8 逻辑) | D7-S5-A108 | `workmodel/spawn_policy_test.go::TestDecideFromResolutionReport_SpawnInline` | **PLANNED** | **P1** | — |
+| **D7-S5-A108-T04** | tool_filter whitelist = `[ask_user_question]` 注入 (SpawnUserGate 路径) | D7-S5-A108 | `workmodel/spawn_policy_test.go::TestSpawnUserGate_ToolFilterWhitelist` | **PLANNED** | **P0** | — |
+| **D7-S15-A109-T01** | `DecomposeFromSubWorktree` 入口 (替代 `DecomposeChildren` 处理 sub_worktree 路径) | D7-S15-A109 | `workmodel/decompose_test.go::TestDecomposeFromSubWorktree` (3 sub_worktree → 3 child WI 验证 directive = parent + suffix) | **PLANNED** | **P0** | — |
+| **D7-S15-A109-T02** | budget gate (depth/children/daily 超限退化 SpawnInline + warning log) | D7-S15-A109 | `workmodel/decompose_test.go::TestBudgetGate_SubWorktreeDepthExceeded` + `TestBudgetGate_ChildrenLimitExceeded` | **PLANNED** | **P0** | — |
+| **D7-S15-A110-T01** | `WorkItemPipelineRound.ResolutionReport` 字段 + 跨节点注入 (Plan → Verify → Decide 数据流) | D7-S15-A110 | `workmodel/pipeline_round_test.go::TestRound_ResolutionReportCrossNode` | **PLANNED** | **P0** | — |
+
+**D7-RT Total:** 19 T (11 P0 + 8 P1) — **0/19 IMPLEMENTED · 19/19 PLANNED**
+
+**Pre-registration:** Phase 1 (orchtypes/resolution.go + Plan/Execute schema + i18n guide) → Phase 2-3 (Verify + Decide binding) → Phase 4 (DecomposeFromSubWorktree + budget gate) → Phase 5 (safety net + tests + OpenSpec delta). 设计 SoT: `openspec/changes/devrix-d7-uncertainty-resolution-traceability/design.md` (6 段式) + `specs/d7-orchestration/d7-orchestration-resolution-contract-delta.md` (6 Requirement: RC-1..RC-6). **关联变更:** DM-20260704-001 (d7-uncertainty-spawn-decouple CC-U1..U6) + DM-20260705-003 (mups-semantics-schema-alignment) + DM-20260705-004 (mups-node-prompt-dedup) + DM-20260629-007/008 (devrix-d7-taskcontract-unification PR-A/B TaskContract 平行不冲突). **触发场景:** trace `c6f2d6910496e2ea63cbcf8f207b2c0a` (sess_1783239758810_0 wi_d0_s0_goal: review d7 plan 目录 → 3 obs_uncertainty → Plan decompose+2 child_specs → Decide SpawnInline → child_specs 整段失效 → 3 obs_uncertainty 永远不被工具消解).
+
+---
 
 **S1_Cancelled (DM-20260630-002 devrix-d7-spec-split):** 0 T (S1 阶段取消, replaced by devrix-spec-lite-mode DM-20260630-003, 详见 `openspec/archive/2026-06-30-devrix-d7-spec-split/acceptance-report.md`)
