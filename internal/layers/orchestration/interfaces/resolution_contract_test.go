@@ -255,6 +255,32 @@ func TestResolutionReport_EvidenceMissing(t *testing.T) {
 	}
 }
 
+func TestResolutionReport_EmptyAnswer(t *testing.T) {
+	// DM-20260704-006 S4 Phase 2 review fix: NewResolutionReport must
+	// mirror ResolutionClaim.IsResolved() — an empty Answer downgrades
+	// the claim to UnresolvedObs{Reason: no_resolution_claim} even when
+	// Confidence and SupportingEvidence look fine. Without this guard
+	// the report silently counts a half-formed claim as "resolved" and
+	// the Decide layer routes an unreliable answer.
+	strats := []ResolutionStrategy{{ObsID: "obs-1"}}
+	claims := []ResolutionClaim{
+		{ObsID: "obs-1", Answer: "", Confidence: 0.95, SupportingEvidence: "looks-good-evidence"},
+	}
+	r, err := NewResolutionReport("s1", "wi-1", 1, strats, claims)
+	if err != nil {
+		t.Fatalf("NewResolutionReport: %v", err)
+	}
+	if len(r.UnresolvedObs) != 1 {
+		t.Fatalf("UnresolvedObs len = %d, want 1 (empty Answer → no_resolution_claim)", len(r.UnresolvedObs))
+	}
+	if r.UnresolvedObs[0].Reason != ResolutionReasonNoClaim {
+		t.Errorf("Reason = %s, want no_resolution_claim", r.UnresolvedObs[0].Reason)
+	}
+	if r.CoverageRatio != 0 {
+		t.Errorf("CoverageRatio = %.3f, want 0 (empty Answer does not count as resolved)", r.CoverageRatio)
+	}
+}
+
 func TestResolutionReport_NoStrategy(t *testing.T) {
 	strats := []ResolutionStrategy{{ObsID: "obs-1"}}
 	claims := []ResolutionClaim{
