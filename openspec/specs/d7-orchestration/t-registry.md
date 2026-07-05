@@ -1170,6 +1170,18 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 **A94 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260701-001)
 **A95 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260704-004)
 
+### shared-A99: MUPS go-struct binding kernel (DM-20260705-003 M1)
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **shared-A99-T01** | `MustRegisterFrame[T]` 反射注册（happy path） | IMPLEMENTED | `prompttags/structbind_test.go::TestMustRegisterFrame_HappyPath` | Spec_Review |
+| **shared-A99-T02** | `BuildLineFrameFromStruct` 反射序列化（byte-equal + 边界） | IMPLEMENTED | `prompttags/structbind_test.go::TestBuildLineFrameFromStruct_{FullStruct,OmitEmpty,EdgeCases}` | Spec_Review |
+| **shared-A99-T03** | `DocBlockFromStruct[T]` 反射 schema 文档 | IMPLEMENTED | `prompttags/structbind_test.go::TestDocBlockFromStruct_ShapeMatches` | Spec_Review |
+| **shared-A99-T04** | 4 项 init panic 校验（pt 缺 / plane 错 / i18n 缺 / 字段数漂移） | IMPLEMENTED | `prompttags/structbind_test.go::TestMustRegisterFrame_{InvalidPlanePanics,NonStructPanics,HappyPath}` + `TestParseFrameFieldTag_Errors` + `TestRegisterFrameFieldGuide_MissingPanics` | Spec_Review |
+| **shared-A99-T05** | `RegisterFrameFieldGuide` i18n 校验函数 | IMPLEMENTED | `prompttags/structbind_test.go::TestRegisterFrameFieldGuide_MissingPanics` | Spec_Review |
+
+**shared-A99 Total:** 5 P0 T — 5 IMPLEMENTED (DM-20260705-003 M1)
+
 ### D7-S16-A96: MUPS IO convergence gates（DM-20260704-005）
 
 | T ID | Description | Status | File | Span Evidence |
@@ -1197,6 +1209,22 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 | **D7-S5-A98-T02** | Observe parse fail → round.ObserveParseReject → next Observe user frame | IMPLEMENTED | `parse_reject_feedback_test.go::TestObserveWorkItem_ParseRejectFeedsNextObserveFrame` | SubContext_Signal |
 
 **A98 Total:** 2 P0 T — 2 IMPLEMENTED (DM-20260705-002)
+
+### D7-S5-A99: MUPS go-struct-driven I/O contract (DM-20260705-003 M1)
+
+| T ID | Description | Status | File | Span Evidence |
+|------|-------------|--------|------| --- |
+| **D7-S5-A99-T01** | `ObserveSignalInput` 9 字段 + pt tag 反射注册成功 | IMPLEMENTED | `observe_structbind_test.go::TestObserveSignalInput_RegisteredAtInit` | SubContext_Signal |
+| **D7-S5-A99-T02** | `buildObserveSignalInput` 扁平化 `ScopeContract.GoalStatement` → `ScopeGoal` / `OpenQuestions` → `ScopeOpenQuestions` | IMPLEMENTED | `observe_structbind_test.go::TestBuildObserveSignalInput_FlattensScopeContract` | SubContext_Signal |
+| **D7-S5-A99-T03** | `IncrementalOnly = len(PriorObservationIDs) > 0` | IMPLEMENTED | `observe_structbind_test.go::TestBuildObserveSignalInput_FlattensScopeContract` | SubContext_Signal |
+| **D7-S5-A99-T04** | `buildLLMObservationUserPrompt` 反射版字节等价旧手工 map | IMPLEMENTED | `observe_structbind_test.go::TestBuildLLMObservationUserPrompt_FullInput` | SubContext_Signal |
+| **D7-S5-A99-T05** | golden snapshot 4 组合 PASS（FullInput / OmitEmpty / GoldenZH / FlattensScopeContract） | IMPLEMENTED | `observe_structbind_test.go::TestBuildLLMObservationUserPrompt_GoldenZH` | SubContext_Signal |
+| **D7-S5-A99-T06** | 现有 `llm_observation_proposer_test.go` 3 测试 0 行为变化 PASS | IMPLEMENTED | `llm_observation_proposer_test.go` | SubContext_Signal |
+| **D7-S5-A99-T07** | 现有 `observation_proposer_test.go` 5 测试 0 行为变化 PASS | IMPLEMENTED | `observation_proposer_test.go` | SubContext_Signal |
+| **D7-S5-A99-T08** | 现有 `item_observe_test.go` E2E 0 行为变化 PASS | IMPLEMENTED | `item_observe_test.go` | SubContext_Signal |
+| **D7-S5-A99-T09** | 现有 `parse_reject_feedback_test.go` E2E 0 行为变化 PASS（DM-20260705-002 链路保留） | IMPLEMENTED | `parse_reject_feedback_test.go` | SubContext_Signal |
+
+**A99 Total:** 9 P0 T — 9 IMPLEMENTED (DM-20260705-003 M1)
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
 
