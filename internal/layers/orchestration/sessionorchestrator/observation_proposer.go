@@ -8,6 +8,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 const (
@@ -26,6 +27,7 @@ type ObserveSignalInput struct {
 	InboundSignalLines    []string
 	PriorMean             float64
 	PriorObservationIDs   []string
+	PriorParseReject      string
 }
 
 // ObservationProposal is a raw LLM proposal before rule validation (G3: propose → rule).
@@ -73,6 +75,11 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 	}
 	if item != nil && item.LastRound != nil && len(item.LastRound.ObservationIDs) > 0 {
 		in.PriorObservationIDs = append([]string(nil), item.LastRound.ObservationIDs...)
+	}
+	if item != nil && item.LastRound != nil {
+		if s := strings.TrimSpace(item.LastRound.ObserveParseReject); s != "" {
+			in.PriorParseReject = s
+		}
 	}
 	if tm != nil && item != nil {
 		if dl, ok := tm.ChildDownlinkFor(sessionID, item.ID); ok {
@@ -180,17 +187,27 @@ func mergeProposedObservations(
 	item *workmodel.WorkItem,
 	tm *workmodel.TaskManager,
 	prior *learn.AdaptivePrior,
-) ([]orchtypes.Observation, error) {
+) ([]orchtypes.Observation, string, error) {
 	if proposer == nil || item == nil {
-		return nil, nil
+		return nil, "", nil
 	}
 	in := buildObserveSignalInput(sessionID, item, tm)
 	if prior != nil {
 		in.PriorMean = prior.PriorBeta.Mean()
 	}
 	proposals, err := proposer.ProposeObservations(ctx, in)
-	if err != nil || len(proposals) == 0 {
-		return nil, err
+	if err != nil {
+		return nil, parseRejectFromObserveError(err, "").CompactJSON(), nil
 	}
-	return ValidateObservationProposals(proposals, sessionID, item.ID)
+	if len(proposals) == 0 {
+		return nil, "", nil
+	}
+	obs, valErr := ValidateObservationProposals(proposals, sessionID, item.ID)
+	if valErr != nil {
+		return obs, parseRejectFromObserveError(valErr, "").CompactJSON(), nil
+	}
+	if len(proposals) > 0 && len(obs) == 0 {
+		return nil, prompttags.NewObserveParseReject(prompttags.RejectValidateEmpty, "all proposals failed validation", "").CompactJSON(), nil
+	}
+	return obs, "", nil
 }

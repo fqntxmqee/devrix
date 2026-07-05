@@ -29,7 +29,7 @@ func TestObserveWorkItem_IncludesChildStructuredBubble(t *testing.T) {
 	_ = tm.UpdateStatus("s1", child.ID, workmodel.TaskStatusInProgress)
 	_ = tm.UpdateStatus("s1", child.ID, workmodel.TaskStatusCompleted)
 
-	_, obsIDs, err := observeWorkItem(
+	_, obsIDs, _, err := observeWorkItem(
 		context.Background(),
 		"s1",
 		parent,
@@ -68,7 +68,7 @@ func TestObserveWorkItem_RollupDualBubbles(t *testing.T) {
 	_ = tm.UpdateStatus("s1", child.ID, workmodel.TaskStatusInProgress)
 	_ = tm.UpdateStatus("s1", child.ID, workmodel.TaskStatusCompleted)
 
-	report, _, err := observeWorkItem(context.Background(), "s1", parent, nil, nil, "", tm, nil)
+	report, _, _, err := observeWorkItem(context.Background(), "s1", parent, nil, nil, "", tm, nil)
 	if err != nil {
 		t.Fatalf("observeWorkItem: %v", err)
 	}

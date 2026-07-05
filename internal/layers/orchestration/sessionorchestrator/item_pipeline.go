@@ -14,8 +14,9 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
-	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/prompttags"
+	"github.com/devrix/devrix/internal/shared/textutil"
 	"github.com/devrix/devrix/internal/shared/types"
 )
 
@@ -190,7 +191,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	ctx = contracts.WithMUPSPrepareCache(ctx)
 
 	ctx, endObservePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
-	report, obsIDs, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
+	report, obsIDs, observeParseReject, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
 	if err != nil {
 		endObservePhase(err)
 		return nil, err
@@ -201,6 +202,11 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 
 	var strategic *StrategicPlanProposal
 	strategicRejectRationale := ""
+	planParseReject := ""
+	priorPlanReject := ""
+	if item.LastRound != nil {
+		priorPlanReject = strings.TrimSpace(item.LastRound.PlanParseReject)
+	}
 	if r.StrategicPlanProposer != nil && !isRollup {
 		intentKind := ""
 		if report.QuantizedIntent != nil {
@@ -224,6 +230,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			Budget:          workmodel.StrategicPlanBudget(sessionID, item, r.Tasks),
 			ParentScopeIn:   parentScopeIn,
 			UncertaintyMean: item.Uncertainty,
+			PriorParseReject: priorPlanReject,
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
@@ -235,6 +242,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 					strategicRejectRationale += "\n"
 				}
 				strategicRejectRationale += "scope: " + scopeReason
+				planParseReject = prompttags.NewPlanParseReject(prompttags.RejectScopeGate, "scope_in", scopeReason, 0, 0).CompactJSON()
 			}
 			if len(prop.ScopeIn) > 0 {
 				applyStrategicScope(sessionID, item, prop, r.Tasks)
@@ -243,6 +251,9 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			var reject *StrategicPlanReject
 			if errors.As(propErr, &reject) {
 				strategicRejectRationale = formatStrategicPlanReject(reject)
+				planParseReject = parseRejectFromStrategicPlan(reject).CompactJSON()
+			} else {
+				planParseReject = parseRejectFromPlanError(propErr).CompactJSON()
 			}
 		}
 	}
@@ -529,6 +540,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		DeliverableContract: deliverableContract,
 		StartedAt:         started,
 		CompletedAt:       time.Now(),
+	}
+	if observeParseReject != "" {
+		round.ObserveParseReject = observeParseReject
+	}
+	if planParseReject != "" {
+		round.PlanParseReject = planParseReject
 	}
 	// RH-MUPS-03 (DM-20260701-001): increment RollupRetries on non-Pass
 	// rollup rounds so SpawnPolicyEvaluator can escalate after the

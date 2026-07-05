@@ -66,6 +66,7 @@ var observeSemantics = PhaseSemantics{
 	},
 	InputRules: []FieldSemantic{
 		{Name: string(TagDirective), Plane: PlaneData, WhenUse: "observe.input.directive.when_use"},
+		{Name: string(TagPriorParseReject), Plane: PlaneControl, WhenUse: "observe.input.prior_parse_reject.when_use", Enforced: true},
 		{Name: string(TagSignal), Plane: PlaneData, WhenUse: "observe.input.signal.when_use"},
 		{Name: string(TagPriorMean), Plane: PlaneControl, WhenUse: "observe.input.prior_mean.when_use"},
 		{Name: string(TagScopeOpenQuestion), Plane: PlaneData, WhenUse: "observe.input.scope_open_question.when_use"},
@@ -83,6 +84,7 @@ var planSemantics = PhaseSemantics{
 	},
 	InputRules: []FieldSemantic{
 		{Name: string(TagDirective), Plane: PlaneData, WhenUse: "plan.input.directive.when_use"},
+		{Name: string(TagPriorParseReject), Plane: PlaneControl, WhenUse: "plan.input.prior_parse_reject.when_use", Enforced: true},
 		{Name: string(TagObservationSummary), Plane: PlaneData, WhenUse: "plan.input.observation_summary.when_use"},
 		{Name: string(TagUncertaintyMean), Plane: PlaneControl, WhenUse: "plan.input.uncertainty_mean.when_use", Enforced: true},
 		{Name: string(TagRemainingChildren), Plane: PlaneControl, WhenUse: "plan.input.remaining_children.when_use"},
@@ -103,9 +105,10 @@ var executeSemantics = PhaseSemantics{
 
 var frameFieldPlanes = map[FrameName]map[TagName]PromptPlane{
 	FrameObserveUser: {
-		TagWorkItemID:         PlaneControl,
-		TagDirective:          PlaneData,
-		TagPriorMean:          PlaneControl,
+		TagWorkItemID:          PlaneControl,
+		TagDirective:           PlaneData,
+		TagPriorParseReject:    PlaneControl,
+		TagPriorMean:           PlaneControl,
 		TagScopeGoal:          PlaneData,
 		TagScopeOpenQuestion:  PlaneData,
 		TagSignal:             PlaneData,
@@ -115,6 +118,7 @@ var frameFieldPlanes = map[FrameName]map[TagName]PromptPlane{
 	FramePlanUser: {
 		TagWorkItemID:         PlaneControl,
 		TagDirective:          PlaneData,
+		TagPriorParseReject:   PlaneControl,
 		TagObservationIDs:     PlaneData,
 		TagObservationSummary: PlaneData,
 		TagDepth:              PlaneControl,

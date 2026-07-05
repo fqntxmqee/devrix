@@ -28,6 +28,7 @@ const (
 	TagUncertaintyMean       TagName = "uncertainty_mean"
 	TagPriorObservationIDs   TagName = "prior_observation_ids"
 	TagIncrementalOnly       TagName = "incremental_only"
+	TagPriorParseReject      TagName = "prior_parse_reject"
 )
 
 // FrameSpec defines fixed-order key: value lines for a MUPS user prompt frame.
@@ -40,6 +41,7 @@ var ObserveUserFrame = FrameSpec{
 	Fields: []TagName{
 		TagWorkItemID,
 		TagDirective,
+		TagPriorParseReject,
 		TagPriorMean,
 		TagScopeGoal,
 		TagScopeOpenQuestion,
@@ -54,6 +56,7 @@ var PlanUserFrame = FrameSpec{
 	Fields: []TagName{
 		TagWorkItemID,
 		TagDirective,
+		TagPriorParseReject,
 		TagObservationIDs,
 		TagObservationSummary,
 		TagDepth,

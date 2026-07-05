@@ -1,10 +1,10 @@
 # Devrix T 层测试点注册表（索引）
 
 **Status:** Active
-**Version:** 5.18.0
-**Last Updated:** 2026-07-05 (mups-prompt-tag-semantics DM-20260705-001: +4 D2 +2 D7 T IMPLEMENTED 685→691, P0 486→490)
+**Version:** 5.19.0
+**Last Updated:** 2026-07-05 (mups-parse-reject-feedback DM-20260705-002: +2 D2 +2 D7 T IMPLEMENTED 691→695, P0 490→494)
 
-**Version:** 5.18.0 (mups-prompt-tag-semantics DM-20260705-001 S4: +6 T 总计 IMPLEMENTED 685→691, P0 486→490 — D2 +4 + D7 +2)
+**Version:** 5.19.0 (mups-parse-reject-feedback DM-20260705-002 S4: +4 T 总计 IMPLEMENTED 691→695, P0 490→494 — D2 +2 + D7 +2)
 **Layering Spec:** `openspec/specs/project/dsaft-methodology.md`
 
 ---

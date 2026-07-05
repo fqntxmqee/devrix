@@ -83,7 +83,7 @@ func TestObserveWorkItem_MergesValidatedProposals(t *testing.T) {
 		Question:  "Need API version?",
 		Evidence:  []string{"goal_1"},
 	}}}
-	report, _, err := observeWorkItem(context.Background(), "s1", goal, nil, nil, "", tm, proposer)
+	report, _, _, err := observeWorkItem(context.Background(), "s1", goal, nil, nil, "", tm, proposer)
 	if err != nil {
 		t.Fatal(err)
 	}

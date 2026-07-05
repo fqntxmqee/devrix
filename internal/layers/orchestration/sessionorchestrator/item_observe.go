@@ -41,14 +41,14 @@ func observeWorkItem(
 	trackMode string,
 	tasks *workmodel.TaskManager,
 	proposer ObservationProposer,
-) (orchtypes.UncertaintyReport, []string, error) {
+) (orchtypes.UncertaintyReport, []string, string, error) {
 	directive := itemDirective(item)
 	if directive == "" {
-		return orchtypes.UncertaintyReport{}, nil, fmt.Errorf("item_pipeline: empty directive")
+		return orchtypes.UncertaintyReport{}, nil, "", fmt.Errorf("item_pipeline: empty directive")
 	}
 	observeReq, err := buildObserveRequestForItem(ctx, sessionID, directive, trackMode, learner)
 	if err != nil {
-		return orchtypes.UncertaintyReport{}, nil, err
+		return orchtypes.UncertaintyReport{}, nil, "", err
 	}
 	prior := observeReq.EffectivePrior()
 
@@ -56,7 +56,7 @@ func observeWorkItem(
 	if classifier != nil {
 		intent, err = classifier.ClassifyWithPrior(ctx, directive, prior)
 		if err != nil {
-			return orchtypes.UncertaintyReport{}, nil, fmt.Errorf("item_pipeline: classify: %w", err)
+			return orchtypes.UncertaintyReport{}, nil, "", fmt.Errorf("item_pipeline: classify: %w", err)
 		}
 	} else {
 		intent = orchtypes.IntentClassification{Kind: orchtypes.IntentOrchestrate, Confidence: 80}
@@ -64,36 +64,36 @@ func observeWorkItem(
 
 	obs, err := observationsFromItem(sessionID, item, intent, prior)
 	if err != nil {
-		return orchtypes.UncertaintyReport{}, nil, err
+		return orchtypes.UncertaintyReport{}, nil, "", err
 	}
 	scopeObs, err := mapScopeContractToObservations(sessionID, item)
 	if err != nil {
-		return orchtypes.UncertaintyReport{}, nil, err
+		return orchtypes.UncertaintyReport{}, nil, "", err
 	}
 	obs = append(obs, scopeObs...)
 	childObs, err := observationsFromChildStructuredBubbles(tasks, sessionID, item)
 	if err != nil {
-		return orchtypes.UncertaintyReport{}, nil, err
+		return orchtypes.UncertaintyReport{}, nil, "", err
 	}
 	obs = append(obs, childObs...)
 	if item.NeedsRollup {
 		summaryObs, err := observationsFromChildSummaryBubbles(tasks, sessionID, item)
 		if err != nil {
-			return orchtypes.UncertaintyReport{}, nil, err
+			return orchtypes.UncertaintyReport{}, nil, "", err
 		}
 		obs = append(obs, summaryObs...)
 		checklistObs, err := observationsFromChecklistChildBubbles(tasks, sessionID, item)
 		if err != nil {
-			return orchtypes.UncertaintyReport{}, nil, err
+			return orchtypes.UncertaintyReport{}, nil, "", err
 		}
 		obs = append(obs, checklistObs...)
 	}
-	proposed, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prior)
+	proposed, observeReject, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prior)
 	obs = append(obs, proposed...)
 	obs = append(obs, observeDeliverableSignals(item)...)
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
 	if err != nil {
-		return orchtypes.UncertaintyReport{}, nil, err
+		return orchtypes.UncertaintyReport{}, nil, "", err
 	}
 	report.QuantizedIntent = &orchtypes.QuantizedIntent{
 		Kind:       intent.Kind,
@@ -113,7 +113,7 @@ func observeWorkItem(
 	for _, o := range obs {
 		ids = append(ids, o.ID)
 	}
-	return report, ids, nil
+	return report, ids, observeReject, nil
 }
 
 // observeDeliverableSignals emits CC-U5 structured verify signals from LastRound (no LLM).

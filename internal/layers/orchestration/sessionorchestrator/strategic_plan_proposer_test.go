@@ -8,6 +8,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
+	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
 func TestStrategicPlanAppendix_UsesContractDimensions(t *testing.T) {
@@ -27,6 +28,18 @@ func TestStrategicPlanAppendix_UsesContractDimensions(t *testing.T) {
 }
 
 // T: D7-S5-A97-T02 — Plan proposer user prompt includes control/data frame guide.
+func TestBuildStrategicPlanUserPrompt_IncludesPriorParseReject(t *testing.T) {
+	reject := prompttags.NewPlanParseReject(prompttags.RejectBudgetCap, "child_specs", "too many", 5, 2).CompactJSON()
+	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
+		WorkItemID:       "wi_1",
+		Directive:        "review code",
+		PriorParseReject: reject,
+	}, i18n.LocaleZH)
+	if !strings.Contains(got, "prior_parse_reject:") || !strings.Contains(got, reject) {
+		t.Fatalf("missing prior_parse_reject in plan frame:\n%s", got)
+	}
+}
+
 func TestBuildStrategicPlanUserPrompt_IncludesFrameGuide(t *testing.T) {
 	got := buildStrategicPlanUserPrompt(StrategicPlanInput{
 		WorkItemID: "wi_1",

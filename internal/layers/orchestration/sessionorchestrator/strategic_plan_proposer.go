@@ -32,6 +32,8 @@ type StrategicPlanInput struct {
 	ParentScopeIn []string
 	// UncertaintyMean is the WorkItem's stored uncertainty at plan time (CC-U4).
 	UncertaintyMean float64
+	// PriorParseReject is compact JSON from the previous round's PlanParseReject field.
+	PriorParseReject string
 }
 
 type rawStrategicChildSpec struct {
@@ -159,6 +161,9 @@ func buildStrategicPlanUserPrompt(in StrategicPlanInput, loc i18n.Locale) string
 	}
 	if in.UncertaintyMean > 0 {
 		fields[prompttags.TagUncertaintyMean] = in.UncertaintyMean
+	}
+	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
+		fields[prompttags.TagPriorParseReject] = s
 	}
 	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FramePlanUser, prompttags.PlanUserFrame, fields)
 	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FramePlanUser, loc, fields)
