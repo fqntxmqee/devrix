@@ -1590,4 +1590,31 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 
 ---
 
+## D7-FD — MUPS 5 节点 Frame Delta 闭环节流（DM-20260705-010 devrix-d7-mups-frame-delta-closure）
+
+| T-ID | 描述 | A-ID | 测试 | 状态 | 优先级 | Span |
+|------|------|------|------|------|--------|------|
+| **D7-S9-A112-T01** | `InjectPlanFrameDelta` 注入正确（摘要 + schema hash 双轨）| D7-S9-A112 | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_OK` | **IMPLEMENTED** | **P0** | `D7_Execute_PlanFrameDelta_Inject` |
+| **D7-S9-A112-T02** | 摘要 ≤ 80 字符截断 | D7-S9-A112 | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_SummaryUnder80Chars` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A112-T03** | schema hash 稳定（幂等）| D7-S9-A112 | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_SchemaHashStable` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A112-T04** | 零值 FrameDelta → baseline 无注入 | D7-S9-A112 | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_ZeroValueReturnsBaseline` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A112-T05** | 注入 ≤ MaxPlanFrameDeltaInjectChars=200 安全网 | D7-S9-A112 | `execute_plan_frame_inject_test.go::TestInjectPlanFrameDelta_BudgetExceededFallsBackToBaseline` | **IMPLEMENTED** | **P0** | — |
+| **D7-S5-A111-T01** | `BuildObservePriorDelta` 首轮零值 | D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_FirstRoundZero` | **IMPLEMENTED** | **P0** | `D7_Observe_PriorDelta_Inject` |
+| **D7-S5-A111-T02** | 非首轮含上一轮收敛度量（≤80 摘要）| D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_NonFirstRoundHasArtifactSummary` | **IMPLEMENTED** | **P0** | — |
+| **D7-S5-A111-T03** | known_gaps Phase 2 stub 空数组 | D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_KnownGapsPhase2StubEmpty` | **IMPLEMENTED** | **P1** | — |
+| **D7-S5-A111-T04** | 封闭式 JSON 不破坏（BuildLineFrame 11 字段契约）| D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_ObserveUserFrame_Contract` | **IMPLEMENTED** | **P0** | — |
+| **D7-S5-A111-T05** | 既存 9 字段顺序 0 修改（append-only）| D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_FrameObserveUserAppendOnly` | **IMPLEMENTED** | **P0** | — |
+| **D7-S5-A111-T06** | i18n en + zh 键完整 | D7-S5-A111 | `observe_frame_delta_test.go::TestBuildObservePriorDelta_I18nKeysComplete` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A113-T01** | 首轮/空 subTurns → 零值 ConvergenceMetric | D7-S9-A113 | `convergence_metric_test.go::TestComputeConvergenceMetric_FirstRoundZero` | **IMPLEMENTED** | **P0** | `D7_Execute_ConvergenceMetric_Emit` |
+| **D7-S9-A113-T02** | 工具 diff → uncertainty_reduction_rate（AC7 末轮 ≥ 0.5）| D7-S9-A113 | `convergence_metric_test.go::TestComputeConvergenceMetric_ToolDiffRate` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A113-T03** | ResolutionClaim 闭合 gap 计数 + report 优先 | D7-S9-A113 | `convergence_metric_test.go::TestBuildRoundSubTurnRecord_ClaimAccumulation` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A113-T04** | Jaeger nil-bridge span emit 不 panic | D7-S9-A113 | `convergence_metric_test.go::TestEmitConvergenceMetric_JaegerSpanComplete` | **IMPLEMENTED** | **P0** | — |
+| **D7-S9-A113-T05** | 纯函数 deterministic + 0 LLM | D7-S9-A113 | `convergence_metric_test.go::TestComputeConvergenceMetric_ZeroLLMDeterministic` | **IMPLEMENTED** | **P0** | — |
+
+**D7-FD Total:** 16 T (14 P0 + 2 P1) — **16/16 IMPLEMENTED**（Phase 1-3 code landed via PR #434）。**PLANNED（Phase 4 S5 验收）:** L5-MUPS-FD-1..5 trace 重放 (T6/T11/T15/T16/T17) + 三方 review (T19) — 需 running system + Jaeger + codex/cursor 外部评审。
+
+**Pre-registration:** Phase 1 (interfaces/mups_frame_delta.go + InjectPlanFrameDelta) → Phase 2 (BuildObservePriorDelta + FrameObserveUser 9→11) → Phase 3 (ComputeConvergenceMetric deterministic) → Phase 4 (端到端 trace 重放 + spec sync + 归档). 设计 SoT: `openspec/changes/devrix-d7-mups-frame-delta-closure/design.md` (六段式) + `specs/d7-orchestration/mups-frame-delta-spec.md` (Frame Delta I/O 协议). **不变性承诺:** M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 契约 0 修改（append-only 注入）；T18 71 现有 frame 测试 0 行为变化 PASS.
+
+---
+
 **S1_Cancelled (DM-20260630-002 devrix-d7-spec-split):** 0 T (S1 阶段取消, replaced by devrix-spec-lite-mode DM-20260630-003, 详见 `openspec/archive/2026-06-30-devrix-d7-spec-split/acceptance-report.md`)

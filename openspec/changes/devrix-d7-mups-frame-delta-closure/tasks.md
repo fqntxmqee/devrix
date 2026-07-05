@@ -29,10 +29,10 @@
 | **Phase 4 — 端到端收敛验证** | | | |
 | T16 `e2e_frame_delta_test.go`: 端到端 trace 重放 — sess_1783255992426_6000 wi_d0_s0_goal 重跑 → Observe→Plan→Execute LLM frame delta span tag 全可见 + AC5 通过 | AC5 | [ ] |
 | T17 L5-MUPS-FD-4: 跨链 LLM 帧 delta 单调不增 — Observe→Plan→Execute prompt size 在 trace 上满足 ±5% 噪声内不增 | AC7 | [ ] |
-| T18 L5-MUPS-FD-5: 70+ 现有 LLM frame 测试 0 行为变化 PASS（M1-M5 契约 0 修改回归） | AC6 | [ ] |
+| T18 L5-MUPS-FD-5: 70+ 现有 LLM frame 测试 0 行为变化 PASS（M1-M5 契约 0 修改回归） | AC6 | [x] |
 | T19 S3-Gate 三方博弈论 review：codex + cursor 三方共识评论通过 | AC8 | [ ] |
-| T20 d7 spec.md 5 节点管道 I/O 协议段新增 frame delta 描述 + CHANGELOG.md 顶部条目 | spec sync | [ ] |
-| T21 t-registry.md D7-S5-A111 / D7-S9-A112 / D7-S9-A113 登记 PLANNED | t-registry | [ ] |
+| T20 d7 spec.md 5 节点管道 I/O 协议段新增 frame delta 描述 + CHANGELOG.md 顶部条目 | spec sync | [x] |
+| T21 t-registry.md D7-S5-A111 / D7-S9-A112 / D7-S9-A113 登记 PLANNED | t-registry | [x] |
 
 ## Verification
 

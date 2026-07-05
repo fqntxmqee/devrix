@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-mups-frame-delta-closure`
 **Demand ID:** DM-20260705-010
-**Status:** S3_Design (PLANNED — 待 S4 实现落地)
+**Status:** S4_Implemented (Phase 1-3 code landed via PR #434; Phase 4 端到端 trace 重放 + 三方 review 待 S5 验收)
 **Parent Proposal:** [proposal.md](../../changes/devrix-d7-mups-frame-delta-closure/proposal.md)
 **Parent Design:** [design.md](../../changes/devrix-d7-mups-frame-delta-closure/design.md)（六段式 detail-design-framework）
 **Created:** 2026-07-05
