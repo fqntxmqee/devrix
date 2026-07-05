@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
@@ -34,6 +35,195 @@ type StrategicPlanInput struct {
 	UncertaintyMean float64
 	// PriorParseReject is compact JSON from the previous round's PlanParseReject field.
 	PriorParseReject string
+}
+
+
+// StrategicPlanFrame is the LLM-view flat struct for the Plan user frame.
+// It mirrors PlanUserFrame (16 fields, 1:1) so the prompttags reflection
+// kernel can register and serialize it via pt struct tags. This is the
+// conversion target of buildStrategicPlanFrame; nested DivergenceBudget
+// is flattened here (DM-20260705-004 go-struct-driven M2).
+//
+// init() registers this struct with prompttags.MustRegisterFrame; any
+// drift between struct / FrameSpec / i18n guide panics at process start.
+type StrategicPlanFrame struct {
+	// 1. work_item_id (control, omit_zero) - always emitted when non-empty.
+	WorkItemID string `pt:"work_item_id,control,omit_empty"`
+
+	// 2. directive (data, omit_empty) - always emitted when non-empty.
+	Directive string `pt:"directive,data,omit_empty"`
+
+	// 3. prior_parse_reject (control, omit_empty) - DM-20260705-002 cross-round feedback.
+	PriorParseReject string `pt:"prior_parse_reject,control,omit_empty"`
+
+	// 4. observation_ids (data, omit_empty) - prior Obs IDs (incremental).
+	ObservationIDs []string `pt:"observation_ids,data,omit_empty"`
+
+	// 5. observation_summary (data, omit_empty) - prior Obs summary.
+	ObservationSummary string `pt:"observation_summary,data,omit_empty"`
+
+	// 6-14. Budget 9-field flatten (control, no omit). 0 values are
+	// emitted as literal "0" (matches the prior 35-line manual map
+	// output; the Budget.MaxChildren>0 guard in buildStrategicPlanFrame
+	// suppresses the entire block when no budget is set).
+	Depth *int `pt:"depth,control"`
+	MaxDepth *int `pt:"max_depth,control"`
+	ExistingChildren *int `pt:"existing_children,control"`
+	RemainingChildren *int `pt:"remaining_children,control"`
+	MaxChildren *int `pt:"max_children,control"`
+	DecomposeUsedToday *int `pt:"decompose_used_today,control"`
+	RemainingDaily *int `pt:"remaining_daily,control"`
+	MaxDaily *int `pt:"max_daily,control"`
+	MaxIters *int `pt:"max_iters,control"`
+
+	// 15. parent_scope_in (control, omit_empty) - parent in-paths.
+	ParentScopeIn []string `pt:"parent_scope_in,control,omit_empty"`
+
+	// 16. uncertainty_mean (control, omit_zero) - WorkItem uncertainty.
+	UncertaintyMean float64 `pt:"uncertainty_mean,control,omit_zero"`
+}
+
+// init registers StrategicPlanFrame with the prompttags user-frame registry.
+// Panics at process start on any drift between struct / FrameSpec / i18n guide.
+func init() {
+	prompttags.MustRegisterFrame[StrategicPlanFrame](prompttags.FramePlanUser)
+}
+
+// buildStrategicPlanFrame converts StrategicPlanInput (domain) to
+// StrategicPlanFrame (LLM view), flattening nested DivergenceBudget
+// and applying the same conditional guards as the prior 35-line
+// manual map. 0 行为变化: guards + field order are identical.
+//
+// Guards retained for byte-equivalence with buildStrategicPlanUserPrompt v1:
+//   - ObservationIDs: emit iff len > 0
+//   - ReportSummary : emit iff TrimSpace != ""
+//   - Budget 9 fields: emit iff Budget.MaxChildren > 0
+//   - ParentScopeIn : emit iff len > 0
+//   - UncertaintyMean: emit iff > 0
+//   - PriorParseReject: emit iff TrimSpace != ""
+func buildStrategicPlanFrame(in StrategicPlanInput) StrategicPlanFrame {
+	frame := StrategicPlanFrame{
+		WorkItemID: in.WorkItemID,
+		Directive:  in.Directive,
+	}
+	if len(in.ObservationIDs) > 0 {
+		frame.ObservationIDs = in.ObservationIDs
+	}
+	if s := strings.TrimSpace(in.ReportSummary); s != "" {
+		frame.ObservationSummary = s
+	}
+	// RH-MUPS-07 (DM-20260701-001 T-P1-2): flatten Budget when MaxChildren > 0.
+	if in.Budget.MaxChildren > 0 {
+		b := in.Budget
+		d, md := b.Depth, b.MaxDepth
+		frame.Depth = &d
+		frame.MaxDepth = &md
+		ec, rc, mc := b.ExistingChildren, b.RemainingChildren(), b.MaxChildren
+		frame.ExistingChildren = &ec
+		frame.RemainingChildren = &rc
+		frame.MaxChildren = &mc
+		dut, rd, md2 := b.DecomposeUsedToday, b.RemainingDaily(), b.MaxDaily
+		frame.DecomposeUsedToday = &dut
+		frame.RemainingDaily = &rd
+		frame.MaxDaily = &md2
+		mi := b.MaxIters
+		frame.MaxIters = &mi
+	}
+	if len(in.ParentScopeIn) > 0 {
+		frame.ParentScopeIn = in.ParentScopeIn
+	}
+	if in.UncertaintyMean > 0 {
+		frame.UncertaintyMean = in.UncertaintyMean
+	}
+	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
+		frame.PriorParseReject = s
+	}
+	return frame
+}
+
+// planFrameToMap converts a StrategicPlanFrame to the map[TagName]any
+// expected by i18n.RenderFrameFieldGuideForFields, applying the same
+// omit_empty / omit_zero rules as the kernel. This preserves the v1
+// behavior of only emitting when-use guides for fields actually present
+// in the rendered user frame.
+func planFrameToMap(frame StrategicPlanFrame) map[prompttags.TagName]any {
+	out := map[prompttags.TagName]any{}
+	v := reflect.ValueOf(frame)
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		raw, ok := f.Tag.Lookup("pt")
+		if !ok || raw == "-" {
+			continue
+		}
+		parts := strings.Split(raw, ",")
+		if len(parts) < 2 {
+			continue
+		}
+		name := prompttags.TagName(strings.TrimSpace(parts[0]))
+		plane := strings.TrimSpace(parts[1])
+		if plane != string(prompttags.PlaneData) && plane != string(prompttags.PlaneControl) {
+			continue
+		}
+		oe, oz := false, false
+		for _, p := range parts[2:] {
+			p = strings.TrimSpace(p)
+			switch p {
+			case "omit_empty":
+				oe = true
+			case "omit_zero":
+				oz = true
+			}
+		}
+		fv := v.Field(i)
+		if oe && isFrameEmptyValue(fv) {
+			continue
+		}
+		if oz && fv.IsZero() {
+			continue
+		}
+		// Unwrap pointer if non-nil; nil pointer -> field is absent.
+		for fv.Kind() == reflect.Ptr {
+			if fv.IsNil() {
+				fv = reflect.Value{}
+				break
+			}
+			fv = fv.Elem()
+		}
+		switch fv.Kind() {
+		case reflect.String:
+			out[name] = fv.String()
+		case reflect.Float32, reflect.Float64:
+			out[name] = fv.Float()
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			out[name] = fv.Int()
+		case reflect.Slice, reflect.Array:
+			if fv.Len() > 0 {
+				ss := make([]string, 0, fv.Len())
+				for j := 0; j < fv.Len(); j++ {
+					if fv.Index(j).Kind() == reflect.String {
+						ss = append(ss, fv.Index(j).String())
+					}
+				}
+				if len(ss) > 0 {
+					out[name] = ss
+				}
+			}
+		}
+	}
+	return out
+}
+
+func isFrameEmptyValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return v.String() == ""
+	case reflect.Slice, reflect.Array, reflect.Map:
+		return v.Len() == 0
+	case reflect.Ptr, reflect.Interface:
+		return v.IsNil()
+	}
+	return false
 }
 
 type rawStrategicChildSpec struct {
@@ -130,47 +320,22 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 	return prop, nil
 }
 
+// buildStrategicPlanUserPrompt serializes StrategicPlanInput to the
+// Plan user prompt via reflection-based BuildLineFrameFromStruct
+// (DM-20260705-004 go-struct-driven M2). Schema is the sole
+// responsibility of StrategicPlanFrame's pt struct tags; this function
+// only chooses guide header + frame body. 0 行为变化 vs the prior
+// 35-line manual map (T-P1-4): field order, plane, omit guards, and
+// guide-only-when-set semantics are preserved.
 func buildStrategicPlanUserPrompt(in StrategicPlanInput, loc i18n.Locale) string {
-	fields := map[prompttags.TagName]any{
-		prompttags.TagWorkItemID: in.WorkItemID,
-		prompttags.TagDirective:  in.Directive,
-	}
-	if len(in.ObservationIDs) > 0 {
-		fields[prompttags.TagObservationIDs] = in.ObservationIDs
-	}
-	if s := strings.TrimSpace(in.ReportSummary); s != "" {
-		fields[prompttags.TagObservationSummary] = s
-	}
-	// RH-MUPS-07 (DM-20260701-001 T-P1-2): inject the divergence budget so
-	// the LLM can self-bound its proposal. Field order is fixed in
-	// prompttags.PlanUserFrame; reordering breaks T-P1-4.
-	if in.Budget.MaxChildren > 0 {
-		budget := in.Budget
-		fields[prompttags.TagDepth] = budget.Depth
-		fields[prompttags.TagMaxDepth] = budget.MaxDepth
-		fields[prompttags.TagExistingChildren] = budget.ExistingChildren
-		fields[prompttags.TagRemainingChildren] = budget.RemainingChildren()
-		fields[prompttags.TagMaxChildren] = budget.MaxChildren
-		fields[prompttags.TagDecomposeUsedToday] = budget.DecomposeUsedToday
-		fields[prompttags.TagRemainingDaily] = budget.RemainingDaily()
-		fields[prompttags.TagMaxDaily] = budget.MaxDaily
-		fields[prompttags.TagMaxIters] = budget.MaxIters
-	}
-	if len(in.ParentScopeIn) > 0 {
-		fields[prompttags.TagParentScopeIn] = in.ParentScopeIn
-	}
-	if in.UncertaintyMean > 0 {
-		fields[prompttags.TagUncertaintyMean] = in.UncertaintyMean
-	}
-	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
-		fields[prompttags.TagPriorParseReject] = s
-	}
-	frame := prompttags.BuildAnnotatedLineFrame(prompttags.FramePlanUser, prompttags.PlanUserFrame, fields)
-	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FramePlanUser, loc, fields)
+	frame := buildStrategicPlanFrame(in)
+	userFrame := prompttags.BuildLineFrameFromStruct(prompttags.FramePlanUser, frame)
+	fieldMap := planFrameToMap(frame)
+	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FramePlanUser, loc, fieldMap)
 	if guide == "" {
-		return frame
+		return userFrame
 	}
-	return guide + "\n\n" + frame
+	return guide + "\n\n" + userFrame
 }
 
 func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, error) {
