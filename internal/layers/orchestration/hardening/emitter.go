@@ -634,10 +634,11 @@ func EmitObservePriorDelta(ctx context.Context, sessionID, priorArtifactSummary 
 
 // EmitConvergenceMetric wraps ConvergenceMetricRecord deterministic compute
 // after Verify yields a Verdict. AC8: Phase 3 cross-round convergence
-// tracking — coverage_ratio is a float in [0,1], gaps_closed_count is the
-// integer delta from previous round, frame_delta_consumed is the bool flag
-// indicating whether the round's FrameDelta payload was actually consumed
-// (false when the budget guard fell back to baseline).
+// tracking — uncertainty_reduction_rate is a float in [0,1],
+// gaps_closed_count is the integer delta from previous round,
+// frame_delta_consumed is the bool flag indicating whether the round's
+// FrameDelta payload was actually consumed (false when the budget guard
+// fell back to baseline).
 //
 // rate / gapsClosed are recorded as string types for Jaeger
 // compatibility (floatToString 4-decimal precision matches the existing
@@ -645,7 +646,7 @@ func EmitObservePriorDelta(ctx context.Context, sessionID, priorArtifactSummary 
 func EmitConvergenceMetric(ctx context.Context, sessionID string, rate float64, gapsClosed int, frameDeltaConsumed bool) func(error) {
 	attrs := []tracer.Attribute{
 		{Key: "session_id", Value: sessionID},
-		{Key: "convergence.coverage_ratio", Value: floatToString(rate)},
+		{Key: "convergence.uncertainty_reduction_rate", Value: floatToString(rate)},
 		{Key: "convergence.gaps_closed_count", Value: intToString(gapsClosed)},
 		{Key: "convergence.frame_delta_consumed", Value: boolToString(frameDeltaConsumed)},
 	}

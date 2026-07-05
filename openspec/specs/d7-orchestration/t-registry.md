@@ -1610,10 +1610,14 @@ Integration: `tests/integration/d7/d7_deliverable_convergence_test.go` (tag `int
 | **D7-S9-A113-T03** | ResolutionClaim 闭合 gap 计数 + report 优先 | D7-S9-A113 | `convergence_metric_test.go::TestBuildRoundSubTurnRecord_ClaimAccumulation` | **IMPLEMENTED** | **P0** | — |
 | **D7-S9-A113-T04** | Jaeger nil-bridge span emit 不 panic | D7-S9-A113 | `convergence_metric_test.go::TestEmitConvergenceMetric_JaegerSpanComplete` | **IMPLEMENTED** | **P0** | — |
 | **D7-S9-A113-T05** | 纯函数 deterministic + 0 LLM | D7-S9-A113 | `convergence_metric_test.go::TestComputeConvergenceMetric_ZeroLLMDeterministic` | **IMPLEMENTED** | **P0** | — |
+| **L5-MUPS-FD-3 / T15** | Execute 5 sub-turn 全 convergence_metric span + 末轮 `convergence.uncertainty_reduction_rate ≥ 0.5` | D7-S9-A113 | `tests/integration/d7/d7_frame_delta_e2e_test.go::TestIntegration_D7FrameDelta_E2E_SpansAndMonotonicity` | **IMPLEMENTED (PR #437)** | **P0** | `D7_Execute_ConvergenceMetric_Emit` |
+| **L5-MUPS-FD-4 / T16** | 端到端 trace 重放 (sess_1783255992426_6000 wi_d0_s0_goal)：Observe→Plan→Execute LLM frame delta span tag 全可见 + AC5 通过 | D7-S9-A113 | `tests/integration/d7/d7_frame_delta_e2e_test.go::TestIntegration_D7FrameDelta_E2E_SpansAndMonotonicity` | **IMPLEMENTED (PR #437)** | **P0** | `D7_Execute_ConvergenceMetric_Emit` |
+| **L5-MUPS-FD-5 / T17** | 跨链 LLM 帧 delta 单调不增 — Observe→Plan→Execute prompt size last ≤ first*3 + AC7 rate ≥ 0.5 | D7-S9-A113 | `tests/integration/d7/d7_frame_delta_e2e_test.go::TestIntegration_D7FrameDelta_ConvergenceMonotonic` | **IMPLEMENTED (PR #437)** | **P0** | — |
+| **T19** | S3-Gate 三方博弈论 review (codex + cursor + claude 外部评审) | D7-S13-A42 | cc-connect relay (codex + cursor + claude) | **FOLLOW-UP** | **P0** | — |
 
-**D7-FD Total:** 16 T (14 P0 + 2 P1) — **16/16 IMPLEMENTED**（Phase 1-3 code landed via PR #434）。**PLANNED（Phase 4 S5 验收）:** L5-MUPS-FD-1..5 trace 重放 (T6/T11/T15/T16/T17) + 三方 review (T19) — 需 running system + Jaeger + codex/cursor 外部评审。
+**D7-FD Total:** 19 T (17 P0 + 2 P1) — **18/19 IMPLEMENTED**（Phase 1-3 16 T via PR #434 + Phase 4 e2e trace replay 3 T via PR #437；span 属性 key 对齐 hardening L648 `convergence.uncertainty_reduction_rate`；2 子测试 PASS = T15 + T16 + T17）。**1 FOLLOW-UP:** T19 三方 review (codex + cursor + claude 外部评审) — 单独 OpenSpec 入口。
 
-**Pre-registration:** Phase 1 (interfaces/mups_frame_delta.go + InjectPlanFrameDelta) → Phase 2 (BuildObservePriorDelta + FrameObserveUser 9→11) → Phase 3 (ComputeConvergenceMetric deterministic) → Phase 4 (端到端 trace 重放 + spec sync + 归档). 设计 SoT: `openspec/changes/devrix-d7-mups-frame-delta-closure/design.md` (六段式) + `specs/d7-orchestration/mups-frame-delta-spec.md` (Frame Delta I/O 协议). **不变性承诺:** M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 契约 0 修改（append-only 注入）；T18 71 现有 frame 测试 0 行为变化 PASS.
+**Pre-registration:** Phase 1 (interfaces/mups_frame_delta.go + InjectPlanFrameDelta) → Phase 2 (BuildObservePriorDelta + FrameObserveUser 9→11) → Phase 3 (ComputeConvergenceMetric deterministic) → Phase 4 (端到端 trace 重放 via PR #437 + spec/code 对齐 + 归档). 设计 SoT: `openspec/archive/2026-07-05-devrix-d7-mups-frame-delta-closure/design.md` (六段式) + `specs/d7-orchestration/mups-frame-delta-spec.md` (Frame Delta I/O 协议). **不变性承诺:** M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 契约 0 修改（append-only 注入）；T18 71 现有 frame 测试 0 行为变化 PASS.
 
 ---
 

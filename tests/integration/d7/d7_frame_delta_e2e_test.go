@@ -205,10 +205,9 @@ func TestIntegration_D7FrameDelta_E2E_SpansAndMonotonicity(t *testing.T) {
 	}
 
 	// --- T15 attribute check: convergence_metric span must carry a
-	// coverage_ratio / uncertainty_reduction_rate attr. Code currently
-	// emits `convergence.coverage_ratio`; spec uses
-	// `uncertainty_reduction_rate`. Either form satisfies the contract
-	// here, with alignment deferred to a follow-up PR. ---
+	// uncertainty_reduction_rate attr per mups-frame-delta-spec.md §AC4.
+	// Code emits `convergence.uncertainty_reduction_rate` (hardening
+	// span attribute key, aligned with spec via Phase 4 sync PR). ---
 	for _, s := range spans {
 		if s.Name() != telemetry.OpD7_S9_Execute_ConvergenceMetric_Emit {
 			continue
@@ -220,15 +219,13 @@ func TestIntegration_D7FrameDelta_E2E_SpansAndMonotonicity(t *testing.T) {
 		}
 		var has bool
 		for k := range attrs {
-			if strings.Contains(k, "uncertainty_reduction_rate") ||
-				strings.Contains(k, "coverage_ratio") ||
-				strings.Contains(k, "convergence.coverage_ratio") {
+			if strings.Contains(k, "uncertainty_reduction_rate") {
 				has = true
 				break
 			}
 		}
 		if !has {
-			t.Errorf("convergence_metric span lacks coverage_ratio/uncertainty_reduction_rate attribute: %+v", attrs)
+			t.Errorf("convergence_metric span lacks uncertainty_reduction_rate attribute: %+v", attrs)
 		}
 		break
 	}

@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-mups-frame-delta-closure`
 **Demand:** DM-20260705-010
-**Status:** S4_Implemented (Phase 1-3 code landed via PR #434; Phase 4 trace 重放 + 三方 review 待 S5 验收)
+**Status:** S5_Accepted (Phase 1-3 code via PR #434; Phase 4 e2e trace replay via PR #437; alignment hotfix PR TBD; T19 三方 review in flight)
 
 ## P0
 
@@ -25,10 +25,10 @@
 | T12 `sessionorchestrator/convergence_metric.go` (new): `ConvergenceMetric` struct + `ComputeConvergenceMetric(subTurns []SubTurnRecord) ConvergenceMetric` 纯 deterministic（工具结果 diff + claim 数 + obs_uncertainty 残量） | AC4 | [x] |
 | T13 `item_pipeline.go`: 每个 sub-turn 结束 emit `convergence_metric` span（含 `uncertainty_reduction_rate` + `observed_gaps_closed_count` + `frame_delta_consumed`） | AC4 | [x] |
 | T14 `convergence_metric_test.go`: 5 子测试（首轮 0 / 工具 diff 计算 / claim 累加 / Jaeger span 完整 / 0 LLM 调用验证） | D7-S9-A113-T01..T05 | [x] |
-| T15 L5-MUPS-FD-3: trace 重放 Execute 5 个 sub-turn 全有 convergence_metric span + 末轮 uncertainty_reduction_rate ≥ 0.5 | AC4 + AC7 | [ ] |
+| T15 L5-MUPS-FD-3: trace 重放 Execute 5 个 sub-turn 全有 convergence_metric span + 末轮 uncertainty_reduction_rate ≥ 0.5 | AC4 + AC7 | [x] |
 | **Phase 4 — 端到端收敛验证** | | | |
-| T16 `e2e_frame_delta_test.go`: 端到端 trace 重放 — sess_1783255992426_6000 wi_d0_s0_goal 重跑 → Observe→Plan→Execute LLM frame delta span tag 全可见 + AC5 通过 | AC5 | [ ] |
-| T17 L5-MUPS-FD-4: 跨链 LLM 帧 delta 单调不增 — Observe→Plan→Execute prompt size 在 trace 上满足 ±5% 噪声内不增 | AC7 | [ ] |
+| T16 `e2e_frame_delta_test.go`: 端到端 trace 重放 — sess_1783255992426_6000 wi_d0_s0_goal 重跑 → Observe→Plan→Execute LLM frame delta span tag 全可见 + AC5 通过 | AC5 | [x] |
+| T17 L5-MUPS-FD-4: 跨链 LLM 帧 delta 单调不增 — Observe→Plan→Execute prompt size 在 trace 上满足 ±5% 噪声内不增 | AC7 | [x] |
 | T18 L5-MUPS-FD-5: 70+ 现有 LLM frame 测试 0 行为变化 PASS（M1-M5 契约 0 修改回归） | AC6 | [x] |
 | T19 S3-Gate 三方博弈论 review：codex + cursor 三方共识评论通过 | AC8 | [ ] |
 | T20 d7 spec.md 5 节点管道 I/O 协议段新增 frame delta 描述 + CHANGELOG.md 顶部条目 | spec sync | [x] |
