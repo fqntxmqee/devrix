@@ -15,12 +15,12 @@ func TestMUPSSemanticAppendix_GoldenHash(t *testing.T) {
 		loc  Locale
 		want string
 	}{
-		{"observe_zh", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleZH, "30167b0fd8d933e899acabe93cea938bd1af6f869a8a368665496617c03953e9"}, // DM-20260705-003: SemanticBlock JSON-lines + condition glossary
-		{"observe_en", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleEN, "37683d9238a85ecc2157242a6b90e221fbec330c2cbd46fed051da9cc6480445"}, // DM-20260705-003: SemanticBlock JSON-lines + condition glossary
-		{"plan_zh", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleZH, "b2ee3d311adfc0f7b7dd11faa77427a89afb43d7864ca8a528b22f305f665f68"},
-		{"plan_en", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleEN, "3f6a629c2141059b6b5eace7bd4d991ba938d8e8660b30b7046b69912cf3bc76"},
-		{"execute_zh", func(l Locale) string { return WorkItemExecuteOutputHints(l) }, LocaleZH, "4a52d28773b5367f03580beca3cf720c560e04c507cd73da44201dc369f5cad1"},
-		{"execute_en", func(l Locale) string { return WorkItemExecuteOutputHints(l) }, LocaleEN, "d4ca892fa809204ccbf18cfb89cbc930fd28d7f978c790e01f21531c1946e8f8"},
+		{"observe_zh", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleZH, "b7528e80d2f168be69b83bfc872fbbf69b641c57ff4e5a65587d5cd48c3b0c39"}, // DM-20260705-004: no duplicate node_role
+		{"observe_en", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleEN, "5533d2eb5be3ee90486a1637fadb2b3c530907101f3c6ca2fc910b5a552b4a6a"}, // DM-20260705-004: no duplicate node_role
+		{"plan_zh", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleZH, "246c4e1affee56a146695a904b085a39e36a28b4f1ac753b607520e15ed6e5c9"},
+		{"plan_en", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleEN, "e9d132780e028fc17cefda0c86764540cb00cf47c2bb3bcb6525e6c618575c73"},
+		{"execute_zh", func(l Locale) string { return WorkItemExecuteOutputHints(l) }, LocaleZH, "54b25bf342bf7e0ebdbf2ca3f2a033a70ba742c6dfcbcadce932db9dfda5a965"},
+		{"execute_en", func(l Locale) string { return WorkItemExecuteOutputHints(l) }, LocaleEN, "b87ef933103031fc7b0acc4af616674880274cc1dbf905a4e7c6b4d330f4e2be"},
 	}
 	for _, c := range cases {
 		got := hashHex(c.fn(c.loc))

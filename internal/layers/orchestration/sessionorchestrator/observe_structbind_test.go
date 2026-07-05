@@ -42,7 +42,7 @@ func TestObserveSignalInput_RegisteredAtInit(t *testing.T) {
 }
 
 // T: D7-S5-A99-T04 / L5-MUPS-GSD-02 — buildLLMObservationUserPrompt output
-// contains the expected lines for a fully-populated ObserveSignalInput.
+// contains classifier-visible fields only (DM-20260705-004).
 func TestBuildLLMObservationUserPrompt_FullInput(t *testing.T) {
 	in := ObserveSignalInput{
 		SessionID:           "s1",
@@ -57,21 +57,29 @@ func TestBuildLLMObservationUserPrompt_FullInput(t *testing.T) {
 		IncrementalOnly:     true,
 	}
 	body := frameBody(buildLLMObservationUserPrompt(in, i18n.LocaleEN))
-	checks := []string{
-		"[control] work_item_id: wi_1",
-		"[data] directive: refactor login",
-		"[control] prior_parse_reject:",
-		"[control] prior_mean: 0.600",
-		"[data] scope_goal: ship login v2",
-		"[data] scope_open_question: q1",
-		"[data] scope_open_question: q2",
-		"[data] signal: artifact_summary: prior step ok",
-		"[control] prior_observation_ids: obs_1,obs_2",
-		"[control] incremental_only: true",
+	mustContain := []string{
+		"directive: refactor login",
+		"prior_parse_reject:",
+		"scope_goal: ship login v2",
+		"scope_open_question: q1",
+		"signal: artifact_summary: prior step ok",
+		"prior_observation_ids: obs_1,obs_2",
 	}
-	for _, want := range checks {
+	for _, want := range mustContain {
 		if !strings.Contains(body, want) {
-			t.Errorf("missing %q in:\\n%s", want, body)
+			t.Errorf("missing %q in:\n%s", want, body)
+		}
+	}
+	mustNotContain := []string{
+		"work_item_id:",
+		"prior_mean:",
+		"incremental_only:",
+		"[control]",
+		"[data]",
+	}
+	for _, banned := range mustNotContain {
+		if strings.Contains(body, banned) {
+			t.Errorf("orchestration-only field leaked %q in:\n%s", banned, body)
 		}
 	}
 }
@@ -86,26 +94,19 @@ func TestBuildLLMObservationUserPrompt_OmitEmpty(t *testing.T) {
 	body := frameBody(buildLLMObservationUserPrompt(in, i18n.LocaleEN))
 	mustNotContain := []string{
 		"prior_parse_reject:",
-		"prior_mean:",
 		"scope_goal:",
 		"scope_open_question:",
 		"signal:",
 		"prior_observation_ids:",
-		"incremental_only:",
+		"work_item_id:",
 	}
 	for _, banned := range mustNotContain {
 		if strings.Contains(body, banned) {
-			t.Errorf("frame should be omitted but found %q in:\\n%s", banned, body)
+			t.Errorf("frame should omit %q but found in:\n%s", banned, body)
 		}
 	}
-	mustContain := []string{
-		"work_item_id: wi_1",
-		"directive: do thing",
-	}
-	for _, want := range mustContain {
-		if !strings.Contains(body, want) {
-			t.Errorf("missing %q in:\\n%s", want, body)
-		}
+	if !strings.Contains(body, "directive: do thing") {
+		t.Errorf("missing directive in:\n%s", body)
 	}
 }
 
@@ -163,8 +164,8 @@ func TestBuildObserveSignalInput_NilScopeContract(t *testing.T) {
 	}
 }
 
-// T: D7-S5-A99-T04 / L5-MUPS-GSD-02 — golden snapshot for ZH locale: frame
-// has 8 lines (all 9 minus signal which is empty), guide header has zh marker.
+// T: D7-S5-A99-T04 / L5-MUPS-GSD-02 — golden snapshot for ZH locale: guide lists
+// only present classifier-visible fields (DM-20260705-004).
 func TestBuildLLMObservationUserPrompt_GoldenZH(t *testing.T) {
 	in := ObserveSignalInput{
 		SessionID:           "s1",
@@ -178,12 +179,15 @@ func TestBuildLLMObservationUserPrompt_GoldenZH(t *testing.T) {
 		IncrementalOnly:     true,
 	}
 	got := buildLLMObservationUserPrompt(in, i18n.LocaleZH)
-	if !strings.Contains(got, "编排预算/约束") {
-		t.Errorf("missing zh plane.guide header: %s", got)
+	if !strings.Contains(got, "User 帧字段") {
+		t.Errorf("missing zh user-frame guide header: %s", got)
+	}
+	if strings.Contains(got, "work_item_id") || strings.Contains(got, "prior_mean") {
+		t.Errorf("orchestration fields should not appear in LLM prompt: %s", got)
 	}
 	body := frameBody(got)
 	frameLines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(frameLines) != 8 {
-		t.Errorf("frame lines = %d, want 8:\n%s", len(frameLines), body)
+	if len(frameLines) != 5 {
+		t.Errorf("frame lines = %d, want 5:\n%s", len(frameLines), body)
 	}
 }

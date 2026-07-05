@@ -115,7 +115,8 @@ func MustRegisterFrame[T any](frameName FrameName) *RegisteredFrame {
 }
 
 // BuildLineFrameFromStruct serializes struct fields via reflection.
-// Output is byte-equivalent to BuildAnnotatedLineFrame(frame, spec, structFieldsMap(s)).
+// Output uses plain key: value lines (no [control]/[data] prefix); plane is documented
+// in the user-frame field guide when present (DM-20260705-004).
 //
 // Accepts either T or *T; nil pointer returns "".
 func BuildLineFrameFromStruct(frame FrameName, s any) string {
@@ -191,7 +192,7 @@ func BuildLineFrameFromStruct(frame FrameName, s any) string {
 			}
 		}
 	}
-	return BuildAnnotatedLineFrame(frame, spec, fields)
+	return BuildLineFrame(spec, fields)
 }
 
 // DocBlockFromStruct returns a one-line-per-field schema sketch derived from pt tags.

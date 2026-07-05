@@ -46,20 +46,15 @@ func planeGuide(loc Locale) string {
 }
 
 // RenderSemanticAppendix returns locale-aware semantic appendix: machine JSON-lines + glossary.
+// Observe/Plan phase appendices already declare node role in intro — node_role keys are
+// omitted there. Execute keeps react/final section hints only (role lives in WorkItemExecuteIntro).
 func RenderSemanticAppendix(phase contracts.MUPSPhase, loc Locale) string {
-	sem := prompttags.SemanticsForPhase(phase)
 	block := prompttags.SemanticBlock(phase)
-	if sem.NodeRoleKey == "" && block == "" {
+	if block == "" && phase != contracts.MUPSPhaseExecute {
 		return ""
 	}
 	var b strings.Builder
-	if sem.NodeRoleKey != "" {
-		b.WriteString(semanticNodeRole(loc, sem.NodeRoleKey))
-	}
 	if block != "" {
-		if b.Len() > 0 {
-			b.WriteString("\n")
-		}
 		if loc == LocaleEN {
 			b.WriteString("Semantic rules (machine-readable):\n")
 		} else {
@@ -73,7 +68,9 @@ func RenderSemanticAppendix(phase contracts.MUPSPhase, loc Locale) string {
 		}
 	}
 	if phase == contracts.MUPSPhaseExecute {
-		b.WriteString("\n")
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
 		b.WriteString(semanticNodeRole(loc, "execute.output.section.react"))
 		b.WriteString("\n")
 		b.WriteString(semanticNodeRole(loc, "execute.output.section.final"))
@@ -111,8 +108,11 @@ func RenderFrameFieldGuideForFields(frame prompttags.FrameName, loc Locale, fiel
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(planeGuide(loc))
-	b.WriteString("\n")
+	if loc == LocaleEN {
+		b.WriteString("User frame fields:\n")
+	} else {
+		b.WriteString("User 帧字段：\n")
+	}
 	present := fields
 	for _, rule := range prompttags.InputRulesForFrame(frame) {
 		name := prompttags.TagName(rule.Target)
@@ -121,7 +121,6 @@ func RenderFrameFieldGuideForFields(frame prompttags.FrameName, loc Locale, fiel
 				continue
 			}
 		} else {
-			// when fields nil, iterate spec order for stable output
 			var inSpec bool
 			for _, f := range spec.Fields {
 				if f == name {
@@ -137,7 +136,7 @@ func RenderFrameFieldGuideForFields(frame prompttags.FrameName, loc Locale, fiel
 		if label == "" {
 			label = string(rule.WhenUse)
 		}
-		fmt.Fprintf(&b, "- [%s] %s: %s\n", rule.Plane, rule.Target, label)
+		fmt.Fprintf(&b, "- %s: %s\n", rule.Target, label)
 	}
 	return strings.TrimSpace(b.String())
 }

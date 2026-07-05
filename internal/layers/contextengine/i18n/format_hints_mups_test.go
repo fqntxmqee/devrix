@@ -64,19 +64,22 @@ func TestWorkItemExecuteOutputHints_IncludesRequiredOptionalMatrix(t *testing.T)
 	}
 }
 
-// T: D2-S15-A97-T04 — L5-MUPS-TAG-05 user frame control/data guide.
+// T: D2-S15-A97-T04 — L5-MUPS-TAG-05 user frame field guide (no plane prefixes).
 func TestRenderFrameFieldGuide_ObservePlan(t *testing.T) {
 	for _, tc := range []struct {
 		frame prompttags.FrameName
 		loc   Locale
 		want  string
 	}{
-		{prompttags.FrameObserveUser, LocaleZH, "[control]"},
-		{prompttags.FramePlanUser, LocaleEN, "[data]"},
+		{prompttags.FrameObserveUser, LocaleZH, "User 帧字段"},
+		{prompttags.FramePlanUser, LocaleEN, "User frame fields"},
 	} {
 		got := RenderFrameFieldGuide(tc.frame, tc.loc)
 		if !strings.Contains(got, tc.want) {
 			t.Fatalf("frame %q loc %q guide missing %q:\n%s", tc.frame, tc.loc, tc.want, got)
+		}
+		if strings.Contains(got, "[control]") || strings.Contains(got, "[data]") {
+			t.Fatalf("plane prefixes should be removed:\n%s", got)
 		}
 	}
 }

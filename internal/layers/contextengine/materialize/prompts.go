@@ -69,7 +69,7 @@ func buildWaveSystemPrompt(req Request) string {
 // via PrepareBase and appends hints separately to avoid duplication.
 func buildWorkItemSystemBody(req Request) string {
 	loc := i18n.ParseLanguage(req.Policy.Locale)
-	labels := i18n.WorkItemExecuteFieldLabels
+	labels := i18n.WorkItemExecuteLabelsFor(loc)
 
 	var b strings.Builder
 	b.WriteString(i18n.WorkItemExecuteIntro(loc))

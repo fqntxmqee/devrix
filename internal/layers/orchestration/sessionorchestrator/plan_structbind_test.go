@@ -168,18 +168,18 @@ func TestBuildStrategicPlanUserPrompt_GoldenEN(t *testing.T) {
 	body := planFrameBody(buildStrategicPlanUserPrompt(in, i18n.LocaleEN))
 	// Each line must match exactly (field: value, no extra whitespace).
 	wantLines := []string{
-		"[control] work_item_id: wi_g",
-		"[data] directive: ship it",
-		"[control] depth: 1",
-		"[control] max_depth: 3",
-		"[control] existing_children: 0",
-		"[control] remaining_children: 7",
-		"[control] max_children: 7",
-		"[control] decompose_used_today: 0",
-		"[control] remaining_daily: 5",
-		"[control] max_daily: 5",
-		"[control] max_iters: 5",
-		"[control] uncertainty_mean: 0.400",
+		"work_item_id: wi_g",
+		"directive: ship it",
+		"depth: 1",
+		"max_depth: 3",
+		"existing_children: 0",
+		"remaining_children: 7",
+		"max_children: 7",
+		"decompose_used_today: 0",
+		"remaining_daily: 5",
+		"max_daily: 5",
+		"max_iters: 5",
+		"uncertainty_mean: 0.400",
 	}
 	gotLines := strings.Split(strings.TrimSpace(body), "\n")
 	if len(gotLines) != len(wantLines) {

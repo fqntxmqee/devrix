@@ -15,8 +15,8 @@ func TestBuildSystemPrompt_ZHLocale(t *testing.T) {
 	if strings.Contains(got, "You are executing one WorkItem") {
 		t.Fatalf("ZH prompt must not use English intro: %q", got)
 	}
-	if !strings.Contains(got, "Directive: review d2 kernel") {
-		t.Fatalf("ZH prompt must use English field labels: %q", got)
+	if !strings.Contains(got, "任务指令: review d2 kernel") {
+		t.Fatalf("ZH prompt must use localized field labels: %q", got)
 	}
 	if !strings.Contains(got, "Observe 节点") {
 		t.Fatalf("ZH prompt missing localized output hints: %q", got)

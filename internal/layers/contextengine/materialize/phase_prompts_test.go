@@ -4,57 +4,32 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
 
-// T: D2-S15-A92-T01 — observe/plan zh/en parity.
-func TestPhaseAppendix_ZhEnParity(t *testing.T) {
-	obsZH := BuildPhaseAppendix(contracts.MUPSPhaseObserve, i18n.LocaleZH, nil, "", "")
-	obsEN := BuildPhaseAppendix(contracts.MUPSPhaseObserve, i18n.LocaleEN, nil, "", "")
-	if obsZH == obsEN {
-		t.Fatal("observe appendix should differ by locale")
+func TestAssembleMUPSExecuteSystemPrompt_TaskBeforeHints(t *testing.T) {
+	got := AssembleMUPSExecuteSystemPrompt("BASE", "HINTS", "TASK", "")
+	idxTask := strings.Index(got, "TASK")
+	idxHints := strings.Index(got, "HINTS")
+	idxBase := strings.Index(got, "BASE")
+	if idxTask < 0 || idxHints < 0 || idxBase < 0 {
+		t.Fatalf("missing segment: %q", got)
 	}
-	if !strings.Contains(obsZH, "Observe 节点") || !strings.Contains(obsEN, "Observe node") {
-		t.Fatalf("zh=%q en=%q", obsZH, obsEN)
-	}
-	planZH := BuildPhaseAppendix(contracts.MUPSPhasePlan, i18n.LocaleZH, nil, "", `{"citation":["file_line"]}`)
-	planEN := BuildPhaseAppendix(contracts.MUPSPhasePlan, i18n.LocaleEN, nil, "", `{"citation":["file_line"]}`)
-	if planZH == planEN {
-		t.Fatal("plan appendix should differ by locale")
+	if !(idxTask < idxHints && idxHints < idxBase) {
+		t.Fatalf("want TASK → HINTS → BASE, got:\n%s", got)
 	}
 }
 
-// T: D2-S15-A92-T02 — execute output hints contain deliverable_schema.
-func TestBuildExecuteOutputHints_DeliverableSchema(t *testing.T) {
-	wi := &contracts.MUPSWorkItemSnapshot{
-		DeliverableSchema: "findings_json",
-	}
-	got := BuildExecuteOutputHints(i18n.LocaleEN, wi)
-	if !strings.Contains(got, "<deliverable_schema>findings_json</deliverable_schema>") {
-		t.Fatalf("hints = %q", got)
+func TestAssembleMUPSPhaseSystemPrompt_ExecuteUsesTaskFirst(t *testing.T) {
+	got := AssembleMUPSPhaseSystemPrompt(contracts.MUPSPhaseExecute, "BASE", "HINTS", "TASK", "")
+	if strings.Index(got, "TASK") > strings.Index(got, "HINTS") {
+		t.Fatalf("execute phase should place TASK before HINTS:\n%s", got)
 	}
 }
 
-func TestAssembleMUPSSystemPrompt_Layers(t *testing.T) {
-	got := AssembleMUPSSystemPrompt("base", "hints", "wibody", "appendix")
-	for _, want := range []string{"base", "hints", "wibody", "appendix"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("assembled = %q, missing %q", got, want)
-		}
-	}
-	idxHints := strings.Index(got, "hints")
-	idxBody := strings.Index(got, "wibody")
-	idxAppendix := strings.Index(got, "appendix")
-	idxBase := strings.Index(got, "base")
-	if !(idxHints < idxBody && idxBody < idxAppendix && idxAppendix < idxBase) {
-		t.Fatalf("dynamic-before-static order violated: %q", got)
-	}
-}
-
-func TestBuildPhaseAppendix_RollupSynth(t *testing.T) {
-	got := BuildPhaseAppendix(contracts.MUPSPhaseExecute, i18n.LocaleEN, nil, "rollup_synth", "")
-	if !strings.Contains(got, "synthesize") {
-		t.Fatalf("rollup appendix = %q", got)
+func TestAssembleMUPSPhaseSystemPrompt_ObserveKeepsAppendixBeforeBase(t *testing.T) {
+	got := AssembleMUPSPhaseSystemPrompt(contracts.MUPSPhaseObserve, "BASE", "", "", "APPENDIX")
+	if strings.Index(got, "APPENDIX") > strings.Index(got, "BASE") {
+		t.Fatalf("observe phase should place APPENDIX before BASE:\n%s", got)
 	}
 }

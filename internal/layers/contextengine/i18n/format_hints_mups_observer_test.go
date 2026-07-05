@@ -70,20 +70,19 @@ func TestObservationTaskAppendix_ClosedClassifierAndUncertainty_EN(t *testing.T)
 	}
 }
 
-// T: D7-S5-A99-T13 (NEW, DM-20260705-009) — observe.node_role semantic key
-// stays in sync with the intro role declaration (i.e. the formal Observe node
-// description in the semantic appendix is not stale relative to the intro).
-func TestObserveNodeRoleSyncedWithClosedClassifierIntro(t *testing.T) {
+// T: D7-S5-A99-T13 (DM-20260705-004) — observe.node_role must NOT duplicate intro role.
+func TestObservationTaskAppendix_NoDuplicateNodeRole(t *testing.T) {
 	for _, loc := range []Locale{LocaleZH, LocaleEN} {
 		got := ObservationTaskAppendix(loc)
-		if !strings.Contains(got, semanticText(loc, "observe.node_role")) {
-			t.Fatalf("loc=%s appendix missing observe.node_role: %s", loc, got)
+		nodeRole := semanticText(loc, "observe.node_role")
+		if strings.Contains(got, nodeRole) {
+			t.Fatalf("loc=%s appendix must not repeat observe.node_role:\n%s", loc, got)
 		}
-		if loc == LocaleZH && !strings.Contains(got, "封闭式分类器") {
-			t.Errorf("loc=ZH appendix should mention 封闭式分类器 in node_role, got: %s", got)
+		if loc == LocaleZH && !strings.Contains(got, "封闭式分类助手") {
+			t.Errorf("loc=ZH appendix should keep intro role, got: %s", got)
 		}
 		if loc == LocaleEN && !strings.Contains(got, "closed-set classifier") {
-			t.Errorf("loc=EN appendix should mention closed-set classifier in node_role, got: %s", got)
+			t.Errorf("loc=EN appendix should keep intro role, got: %s", got)
 		}
 	}
 }
