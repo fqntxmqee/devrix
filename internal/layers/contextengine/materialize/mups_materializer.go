@@ -123,7 +123,7 @@ func (m *MUPSMaterializer) MaterializeForMUPS(ctx context.Context, req contracts
 		tokenBudget = matReq.Policy.TokenBudget
 	}
 
-	systemPrompt := AssembleMUPSSystemPrompt(baseSystem, outputHints, wiBody, phaseAppendix)
+	systemPrompt := AssembleMUPSPhaseSystemPrompt(req.Phase, baseSystem, outputHints, wiBody, phaseAppendix)
 	counter := token.NewCounter()
 	tokEst := counter.CountMessages(messages) + counter.CountText(systemPrompt)
 

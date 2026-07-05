@@ -2,29 +2,12 @@ package prompttags
 
 import "github.com/devrix/devrix/internal/shared/contracts"
 
-// PromptPlane classifies a prompt field/tag as task payload (data) or format/budget (control).
-type PromptPlane string
-
-const (
-	PlaneData    PromptPlane = "data"
-	PlaneControl PromptPlane = "control"
-)
-
-// FieldSemantic documents LLM-facing when/when-not guidance for one field or output kind.
-type FieldSemantic struct {
-	Name     string // tag name, lineframe key, or obs_* kind
-	Plane    PromptPlane
-	WhenUse  string // i18n key suffix under prompttags.semantics.*
-	WhenNot  string // optional i18n key suffix
-	Enforced bool   // true when a Go gate backs the prompt claim
-}
-
-// PhaseSemantics holds node role and input/output semantic entries for one MUPS phase.
+// PhaseSemantics holds node role and output semantic entries for one MUPS phase.
+// Input rules are derived via InputRulesForFrame (LineFrameRegistry SoT).
 type PhaseSemantics struct {
 	Phase       contracts.MUPSPhase
-	NodeRoleKey string // i18n key for one-line node role
-	OutputRules []FieldSemantic
-	InputRules  []FieldSemantic
+	NodeRoleKey string // i18n key for one-line node role (locale overlay only)
+	OutputRules []SemanticRule
 }
 
 // SemanticsForPhase returns the locale-neutral TagSemanticsRegistry entry for phase.
@@ -54,66 +37,37 @@ func FrameFieldPlane(frame FrameName, name TagName) PromptPlane {
 var observeSemantics = PhaseSemantics{
 	Phase:       contracts.MUPSPhaseObserve,
 	NodeRoleKey: "observe.node_role",
-	OutputRules: []FieldSemantic{
-		{Name: "obs_uncertainty", Plane: PlaneData, WhenUse: "observe.kind.obs_uncertainty.when_use", WhenNot: "observe.kind.obs_uncertainty.when_not"},
-		{Name: "obs_fact", Plane: PlaneData, WhenUse: "observe.kind.obs_fact.when_use", WhenNot: "observe.kind.obs_fact.when_not", Enforced: true},
-		{Name: "obs_signal", Plane: PlaneData, WhenUse: "observe.kind.obs_signal.when_use", WhenNot: "observe.kind.obs_signal.when_not"},
-		{Name: "obs_deviation", Plane: PlaneData, WhenUse: "observe.kind.obs_deviation.when_use", WhenNot: "observe.kind.obs_deviation.when_not"},
-		{Name: "strength", Plane: PlaneControl, WhenUse: "observe.field.strength.when_use"},
-		{Name: "question", Plane: PlaneData, WhenUse: "observe.field.question.when_use", Enforced: true},
-		{Name: "evidence", Plane: PlaneData, WhenUse: "observe.field.evidence.when_use"},
-		{Name: "max_proposals", Plane: PlaneControl, WhenUse: "observe.rule.max_proposals", Enforced: true},
-	},
-	InputRules: []FieldSemantic{
-		{Name: string(TagDirective), Plane: PlaneData, WhenUse: "observe.input.directive.when_use"},
-		{Name: string(TagPriorParseReject), Plane: PlaneControl, WhenUse: "observe.input.prior_parse_reject.when_use", Enforced: true},
-		{Name: string(TagSignal), Plane: PlaneData, WhenUse: "observe.input.signal.when_use"},
-		{Name: string(TagPriorMean), Plane: PlaneControl, WhenUse: "observe.input.prior_mean.when_use"},
-		{Name: string(TagScopeGoal), Plane: PlaneData, WhenUse: "observe.input.scope_goal.when_use"},
-		{Name: string(TagScopeOpenQuestion), Plane: PlaneData, WhenUse: "observe.input.scope_open_question.when_use"},
-		{Name: string(TagIncrementalOnly), Plane: PlaneControl, WhenUse: "observe.input.incremental_only.when_use", Enforced: true},
-		{Name: string(TagWorkItemID), Plane: PlaneControl, WhenUse: "observe.input.work_item_id.when_use"},
-		{Name: string(TagPriorObservationIDs), Plane: PlaneControl, WhenUse: "observe.input.prior_observation_ids.when_use"},
+	OutputRules: []SemanticRule{
+		{Target: "obs_uncertainty", Plane: PlaneData, WhenUse: CondScopeUnclear, WhenNot: CondStrongFactExists},
+		{Target: "obs_fact", Plane: PlaneData, WhenUse: CondSignalBacked, WhenNot: CondNoSpeculation, Enforced: true, Gate: "obs_fact_strength_cap"},
+		{Target: "obs_signal", Plane: PlaneData, WhenUse: CondStructuredSignal, WhenNot: CondPreferUncertainty},
+		{Target: "obs_deviation", Plane: PlaneData, WhenUse: CondMetricDelta, WhenNot: CondNoBaseline},
+		{Target: "strength", Plane: PlaneControl, WhenUse: CondStrengthAlignedKind},
+		{Target: "question", Plane: PlaneData, WhenUse: CondRequiredForObsUncertainty, Enforced: true, Gate: "obs_uncertainty_question"},
+		{Target: "evidence", Plane: PlaneData, WhenUse: CondEvidenceExistingIDsOnly},
+		{Target: "max_proposals", Plane: PlaneControl, WhenUse: CondMaxProposalsThree, Enforced: true, Gate: "ValidateObservationProposals"},
 	},
 }
 
 var planSemantics = PhaseSemantics{
 	Phase:       contracts.MUPSPhasePlan,
 	NodeRoleKey: "plan.node_role",
-	OutputRules: []FieldSemantic{
-		{Name: "execution_mode", Plane: PlaneControl, WhenUse: "plan.output.execution_mode.when_use", Enforced: true},
-		{Name: "deliverable_contract", Plane: PlaneControl, WhenUse: "plan.output.deliverable_contract.when_use"},
-		{Name: "child_specs", Plane: PlaneControl, WhenUse: "plan.output.child_specs.when_use", Enforced: true},
-	},
-	InputRules: []FieldSemantic{
-		{Name: string(TagDirective), Plane: PlaneData, WhenUse: "plan.input.directive.when_use"},
-		{Name: string(TagPriorParseReject), Plane: PlaneControl, WhenUse: "plan.input.prior_parse_reject.when_use", Enforced: true},
-		{Name: string(TagWorkItemID), Plane: PlaneControl, WhenUse: "plan.input.work_item_id.when_use", Enforced: true},
-		{Name: string(TagObservationIDs), Plane: PlaneData, WhenUse: "plan.input.observation_ids.when_use"},
-		{Name: string(TagDepth), Plane: PlaneControl, WhenUse: "plan.input.depth.when_use"},
-		{Name: string(TagMaxDepth), Plane: PlaneControl, WhenUse: "plan.input.max_depth.when_use"},
-		{Name: string(TagExistingChildren), Plane: PlaneControl, WhenUse: "plan.input.existing_children.when_use"},
-		{Name: string(TagMaxChildren), Plane: PlaneControl, WhenUse: "plan.input.max_children.when_use"},
-		{Name: string(TagDecomposeUsedToday), Plane: PlaneControl, WhenUse: "plan.input.decompose_used_today.when_use"},
-		{Name: string(TagRemainingDaily), Plane: PlaneControl, WhenUse: "plan.input.remaining_daily.when_use"},
-		{Name: string(TagMaxDaily), Plane: PlaneControl, WhenUse: "plan.input.max_daily.when_use"},
-		{Name: string(TagMaxIters), Plane: PlaneControl, WhenUse: "plan.input.max_iters.when_use"},
-		{Name: string(TagParentScopeIn), Plane: PlaneControl, WhenUse: "plan.input.parent_scope_in.when_use"},
-		{Name: string(TagObservationSummary), Plane: PlaneData, WhenUse: "plan.input.observation_summary.when_use"},
-		{Name: string(TagUncertaintyMean), Plane: PlaneControl, WhenUse: "plan.input.uncertainty_mean.when_use", Enforced: true},
-		{Name: string(TagRemainingChildren), Plane: PlaneControl, WhenUse: "plan.input.remaining_children.when_use"},
+	OutputRules: []SemanticRule{
+		{Target: "execution_mode", Plane: PlaneControl, WhenUse: CondExecutionModeDecisionTree, Enforced: true, Gate: "applySingleModeUncertaintyGate"},
+		{Target: "deliverable_contract", Plane: PlaneControl, WhenUse: CondDeliverableContractExample},
+		{Target: "child_specs", Plane: PlaneControl, WhenUse: CondChildSpecsDecomposeMax2, Enforced: true, Gate: "applyBudgetCap"},
 	},
 }
 
 var executeSemantics = PhaseSemantics{
 	Phase:       contracts.MUPSPhaseExecute,
 	NodeRoleKey: "execute.node_role",
-	OutputRules: []FieldSemantic{
-		{Name: string(TagDeliverableContract), Plane: PlaneControl, WhenUse: "execute.output.deliverable_contract.when_use", Enforced: true},
-		{Name: "findings_json", Plane: PlaneData, WhenUse: "execute.output.findings_json.when_use", Enforced: true},
-		{Name: string(TagOpenQuestions), Plane: PlaneData, WhenUse: "execute.output.open_questions.when_use"},
-		{Name: string(TagScopeContract), Plane: PlaneControl, WhenUse: "execute.output.scope_contract.when_use"},
-		{Name: "conclusion", Plane: PlaneData, WhenUse: "execute.output.conclusion.when_use"},
+	OutputRules: []SemanticRule{
+		{Target: string(TagDeliverableContract), Plane: PlaneControl, WhenUse: CondRequiredWhenContract, Enforced: true, Gate: "VerifyDeliverableContract"},
+		{Target: "findings_json", Plane: PlaneData, WhenUse: CondRequiredWhenFindingsJSON, Enforced: true, Gate: "findings_json_verify"},
+		{Target: string(TagOpenQuestions), Plane: PlaneData, WhenUse: CondOptionalResidualQuestions},
+		{Target: string(TagScopeContract), Plane: PlaneControl, WhenUse: CondOptionalScopeUpdate},
+		{Target: "conclusion", Plane: PlaneData, WhenUse: CondOptionalConclusionProse},
 	},
 }
 
@@ -123,7 +77,7 @@ var frameFieldPlanes = map[FrameName]map[TagName]PromptPlane{
 		TagDirective:           PlaneData,
 		TagPriorParseReject:    PlaneControl,
 		TagPriorMean:           PlaneControl,
-		TagScopeGoal:          PlaneData,
+		TagScopeGoal:           PlaneData,
 		TagScopeOpenQuestion:  PlaneData,
 		TagSignal:             PlaneData,
 		TagPriorObservationIDs: PlaneControl,

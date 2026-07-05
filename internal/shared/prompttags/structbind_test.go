@@ -140,12 +140,12 @@ func TestBuildLineFrameFromStruct_FullStruct(t *testing.T) {
 	defer delete(LineFrameRegistry, "dummy_frame_test")
 
 	got := BuildLineFrameFromStruct("dummy_frame_test", &in)
-	want := "[data] work_item_id: wi-1\n" +
-		"[data] directive: do thing\n" +
-		"[data] signal: a\n" +
-		"[data] signal: b\n" +
-		"[data] prior_mean: 0.700\n" +
-		"[data] incremental_only: true\n"
+	want := "work_item_id: wi-1\n" +
+		"directive: do thing\n" +
+		"signal: a\n" +
+		"signal: b\n" +
+		"prior_mean: 0.700\n" +
+		"incremental_only: true\n"
 	if got != want {
 		t.Errorf("byte mismatch:\nstruct:\n%s\nwant:\n%s", got, want)
 	}

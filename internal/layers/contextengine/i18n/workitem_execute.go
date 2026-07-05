@@ -8,12 +8,27 @@ import (
 )
 
 // WorkItemExecuteFieldLabels are machine-readable field headings for Execute-phase
-// WorkItem system prompts. Always English — values (directive text) follow user locale.
+// WorkItem system prompts (English defaults).
 var WorkItemExecuteFieldLabels = WorkItemExecuteLabels{
 	Directive:      "Directive",
 	ScopeIn:        "ScopeIn",
 	ScopeOut:       "ScopeOut",
 	ExpectedReturn: "ExpectedReturn",
+}
+
+var workItemExecuteFieldLabelsZH = WorkItemExecuteLabels{
+	Directive:      "任务指令",
+	ScopeIn:        "ScopeIn",
+	ScopeOut:       "ScopeOut",
+	ExpectedReturn: "ExpectedReturn",
+}
+
+// WorkItemExecuteLabelsFor returns locale-aware field headings for Execute WorkItem body.
+func WorkItemExecuteLabelsFor(loc Locale) WorkItemExecuteLabels {
+	if loc == LocaleZH {
+		return workItemExecuteFieldLabelsZH
+	}
+	return WorkItemExecuteFieldLabels
 }
 
 // WorkItemExecuteLabels holds English field keys for WorkItem execute prompts.

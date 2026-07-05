@@ -45,8 +45,11 @@ func TestBuildStrategicPlanUserPrompt_IncludesFrameGuide(t *testing.T) {
 		WorkItemID: "wi_1",
 		Directive:  "plan",
 	}, i18n.LocaleZH)
-	if !strings.Contains(got, "[control]") || !strings.Contains(got, "[data]") {
-		t.Fatalf("missing plane guide/prefixes:\n%s", got)
+	if !strings.Contains(got, "User 帧字段") || !strings.Contains(got, "directive:") {
+		t.Fatalf("missing user frame guide:\n%s", got)
+	}
+	if strings.Contains(got, "[control]") || strings.Contains(got, "[data]") {
+		t.Fatalf("plane prefixes should be removed:\n%s", got)
 	}
 }
 
@@ -125,18 +128,18 @@ func TestBuildStrategicPlanUserPrompt_AllBudgetFields(t *testing.T) {
 	}
 	got := buildStrategicPlanUserPrompt(in, i18n.LocaleZH)
 	for _, want := range []string{
-		"[control] work_item_id: wi_42",
-		"[data] directive: review d2 code",
-		"[control] depth: 1",
-		"[control] max_depth: 3",
-		"[control] existing_children: 2",
-		"[control] remaining_children: 5",
-		"[control] max_children: 7",
-		"[control] decompose_used_today: 1",
-		"[control] remaining_daily: 4",
-		"[control] max_daily: 5",
-		"[control] max_iters: 5",
-		"[control] parent_scope_in: internal/layers/contextengine/,internal/layers/orchestration/",
+		"work_item_id: wi_42",
+		"directive: review d2 code",
+		"depth: 1",
+		"max_depth: 3",
+		"existing_children: 2",
+		"remaining_children: 5",
+		"max_children: 7",
+		"decompose_used_today: 1",
+		"remaining_daily: 4",
+		"max_daily: 5",
+		"max_iters: 5",
+		"parent_scope_in: internal/layers/contextengine/,internal/layers/orchestration/",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Plan user prompt missing %q, got:\n%s", want, got)
@@ -169,7 +172,7 @@ func TestBuildStrategicPlanUserPrompt_InjectsUncertaintyMean(t *testing.T) {
 		Directive:       "plan next",
 		UncertaintyMean: 0.62,
 	}, i18n.LocaleZH)
-	if !strings.Contains(got, "[control] uncertainty_mean: 0.620") {
+	if !strings.Contains(got, "uncertainty_mean: 0.620") {
 		t.Fatalf("missing uncertainty_mean, got:\n%s", got)
 	}
 }

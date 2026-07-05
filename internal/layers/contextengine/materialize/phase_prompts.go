@@ -47,7 +47,8 @@ func BuildExecuteOutputHints(loc i18n.Locale, wi *contracts.MUPSWorkItemSnapshot
 
 // AssembleMUPSSystemPrompt builds the final MUPS system prompt with node-specific
 // dynamic sections before the static PrepareBase system prompt (devrix_core).
-// Order: outputHints → workItemBody → phaseAppendix → staticBase.
+// Default order: outputHints → workItemBody → phaseAppendix → staticBase.
+// Execute uses AssembleMUPSExecuteSystemPrompt (task body before output hints).
 func AssembleMUPSSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix string) string {
 	var parts []string
 	for _, s := range []string{outputHints, workItemBody, phaseAppendix, staticBase} {
@@ -56,4 +57,23 @@ func AssembleMUPSSystemPrompt(staticBase, outputHints, workItemBody, phaseAppend
 		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// AssembleMUPSExecuteSystemPrompt puts WorkItem task context before output format hints.
+func AssembleMUPSExecuteSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix string) string {
+	var parts []string
+	for _, s := range []string{workItemBody, outputHints, phaseAppendix, staticBase} {
+		if t := strings.TrimSpace(s); t != "" {
+			parts = append(parts, t)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// AssembleMUPSPhaseSystemPrompt selects assembly order by MUPS phase.
+func AssembleMUPSPhaseSystemPrompt(phase contracts.MUPSPhase, staticBase, outputHints, workItemBody, phaseAppendix string) string {
+	if phase == contracts.MUPSPhaseExecute {
+		return AssembleMUPSExecuteSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix)
+	}
+	return AssembleMUPSSystemPrompt(staticBase, outputHints, workItemBody, phaseAppendix)
 }

@@ -59,13 +59,41 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 	return parseObservationProposalsJSON(raw)
 }
 
-// buildLLMObservationUserPrompt serializes ObserveSignalInput to the Observe user prompt
-// via reflection-based BuildLineFrameFromStruct (DM-20260705-003 go-struct-driven).
-// Schema is the sole responsibility of ObserveSignalInput's pt struct tags; this
-// function only chooses guide header + frame body.
+// observeLLMFieldMap returns fields visible to the closed Observe classifier.
+// Orchestration-only control fields are omitted (Go adds work_item_id to evidence).
+func observeLLMFieldMap(in ObserveSignalInput) map[prompttags.TagName]any {
+	m := map[prompttags.TagName]any{
+		prompttags.TagDirective: in.Directive,
+	}
+	if s := strings.TrimSpace(in.PriorParseReject); s != "" {
+		m[prompttags.TagPriorParseReject] = s
+	}
+	if s := strings.TrimSpace(in.ScopeGoal); s != "" {
+		m[prompttags.TagScopeGoal] = s
+	}
+	if len(in.ScopeOpenQuestions) > 0 {
+		m[prompttags.TagScopeOpenQuestion] = in.ScopeOpenQuestions
+	}
+	if len(in.InboundSignalLines) > 0 {
+		m[prompttags.TagSignal] = in.InboundSignalLines
+	}
+	if len(in.PriorObservationIDs) > 0 {
+		m[prompttags.TagPriorObservationIDs] = in.PriorObservationIDs
+	}
+	return m
+}
+
+// buildLLMObservationUserPrompt serializes ObserveSignalInput to the Observe user prompt.
+// Only classifier-visible data fields (+ prior_parse_reject) are sent; schema order follows
+// ObserveUserFrame via BuildLineFrame (DM-20260705-004 prompt dedup).
 func buildLLMObservationUserPrompt(in ObserveSignalInput, loc i18n.Locale) string {
-	frame := prompttags.BuildLineFrameFromStruct(prompttags.FrameObserveUser, &in)
-	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, nil)
+	fields := observeLLMFieldMap(in)
+	spec, ok := prompttags.LookupLineFrame(prompttags.FrameObserveUser)
+	if !ok {
+		return ""
+	}
+	frame := prompttags.BuildLineFrame(spec, fields)
+	guide := i18n.RenderFrameFieldGuideForFields(prompttags.FrameObserveUser, loc, fields)
 	if guide == "" {
 		return frame
 	}

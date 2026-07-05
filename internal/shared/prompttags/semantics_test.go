@@ -16,7 +16,7 @@ func TestSemanticsForPhase_ObserveOutputRulesNonEmpty(t *testing.T) {
 	}
 	for _, rule := range sem.OutputRules {
 		if rule.WhenUse == "" {
-			t.Fatalf("empty WhenUse for %q", rule.Name)
+			t.Fatalf("empty WhenUse for %q", rule.Target)
 		}
 	}
 }
@@ -25,7 +25,7 @@ func TestSemanticsForPhase_PlanExecutionModeEnforced(t *testing.T) {
 	sem := SemanticsForPhase(contracts.MUPSPhasePlan)
 	var found bool
 	for _, rule := range sem.OutputRules {
-		if rule.Name == "execution_mode" {
+		if rule.Target == "execution_mode" {
 			found = true
 			if !rule.Enforced {
 				t.Fatal("execution_mode must be Enforced")
@@ -42,7 +42,7 @@ func TestSemanticsForPhase_ExecuteRequiredTagsEnforced(t *testing.T) {
 	enforced := map[string]bool{}
 	for _, rule := range sem.OutputRules {
 		if rule.Enforced {
-			enforced[rule.Name] = true
+			enforced[rule.Target] = true
 		}
 	}
 	for _, name := range []string{string(TagDeliverableContract), "findings_json"} {
@@ -68,7 +68,7 @@ func TestSemanticsEnforcedFlags_AlignWithGates(t *testing.T) {
 		sem := SemanticsForPhase(c.phase)
 		var ok bool
 		for _, rule := range sem.OutputRules {
-			if rule.Name == c.name && rule.Enforced {
+			if rule.Target == c.name && rule.Enforced {
 				ok = true
 				break
 			}
@@ -84,7 +84,7 @@ func TestExecuteSemantics_CoversTagPhases(t *testing.T) {
 	sem := SemanticsForPhase(contracts.MUPSPhaseExecute)
 	names := map[string]bool{}
 	for _, rule := range sem.OutputRules {
-		names[rule.Name] = true
+		names[rule.Target] = true
 	}
 	for tag := range tagPhases {
 		if tag == TagPriorVerifyReason {
