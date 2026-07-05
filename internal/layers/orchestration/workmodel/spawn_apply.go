@@ -1,5 +1,11 @@
 package workmodel
 
+import (
+	"fmt"
+
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
+)
+
 // PrepareDecomposeSpecs ensures round carries capped child specs and passes I4.
 func PrepareDecomposeSpecs(sessionID string, item *WorkItem, round *WorkItemPipelineRound, tm *TaskManager) error {
 	if round == nil {
@@ -47,6 +53,20 @@ func ApplySpawnPolicy(sessionID string, item *WorkItem, round *WorkItemPipelineR
 		}
 		_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
 		return nil
+	case SpawnUserGate:
+		// DM-20260704-006 RC-4b: opens a verify child with
+		// ToolFilter=["ask_user_question"] so the LLM cannot bypass the
+		// gate via free-form tools (read_file / delegate_explore). Falls
+		// through to human review creation on any failure so the user
+		// always sees something rather than a silent round.
+		if err := createUserGateWorkItem(sessionID, item, round, tm); err != nil {
+			if herr := createHumanReviewWorkItem(sessionID, item, round, tm); herr != nil {
+				return err
+			}
+			round.SpawnRationale = round.SpawnRationale + " (user-gate creation failed; escalated to human review)"
+		}
+		_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
+		return nil
 	default:
 		if round.RollupSynthRequested && item != nil {
 			_ = tm.Tree().SetNeedsRollup(sessionID, item.ID, true)
@@ -80,6 +100,77 @@ func createHumanReviewWorkItem(sessionID string, item *WorkItem, round *WorkItem
 	}
 	_ = tm.Tree().SetRoundPhase(sessionID, item.ID, RoundPhaseAwaitChild)
 	return nil
+}
+
+// UserGateItemTitle (DM-20260704-006 RC-4b) marks WorkItems created by
+// SpawnUserGate. Distinct from HumanReviewItemTitle so dashboards can
+// distinguish "user-facing question needs answering" from "verifier
+// abstained, escalate to operator review".
+const UserGateItemTitle = "User gate required"
+
+// DefaultUserGateToolFilter is the tool whitelist applied to user-gate
+// WorkItems. ask_user_question is the only tool that can satisfy the
+// gate; all other tools are dropped at the executor's contract.ToolFilter
+// step (see bootstrap/surfaces.go + decisionplanning/filter_adapter.go).
+//
+// "ask_user_question" matches the tool name used in
+// internal/layers/contextengine/enforce/tools/surface/orthogonal_flags.go
+// (the canonical surface registry). If that name ever changes, update
+// this constant in the same commit and re-run the tool-surface contract
+// tests (TestAskUserQuestionSurface in
+// internal/layers/contextengine/enforce/tools/surface/).
+var DefaultUserGateToolFilter = []string{"ask_user_question"}
+
+// createUserGateWorkItem opens a verify child gated on ask_user_question.
+// Mirrors createHumanReviewWorkItem but stamps the WorkItem.ToolFilter so
+// the LLM cannot bypass the gate via free-form tools. The Directive is
+// built from the round's ResolutionReport.UnresolvedObs so the child LLM
+// sees which ObsIDs it must surface to the user.
+func createUserGateWorkItem(sessionID string, item *WorkItem, round *WorkItemPipelineRound, tm *TaskManager) error {
+	if tm == nil || item == nil || round == nil {
+		return nil
+	}
+	directive := round.SpawnRationale
+	if round.ResolutionReport != nil && len(round.ResolutionReport.UnresolvedObs) > 0 {
+		obsList := buildUserGateObsList(round.ResolutionReport.UnresolvedObs)
+		directive = directive + "\n\nUnresolved ObsIDs:\n" + obsList
+	}
+	if item.Directive != "" {
+		directive = directive + "\n\nOriginal directive:\n" + item.Directive
+	}
+	_, err := tm.CreateWorkItem(sessionID, CreateWorkItemInput{
+		ParentID:   item.ID,
+		Kind:       WorkKindVerify,
+		Title:      UserGateItemTitle,
+		Directive:  directive,
+		Policy:     ExecPolicyReadonly,
+		ToolFilter: DefaultUserGateToolFilter,
+	})
+	if err != nil {
+		return err
+	}
+	_ = tm.Tree().SetRoundPhase(sessionID, item.ID, RoundPhaseAwaitChild)
+	return nil
+}
+
+// buildUserGateObsList renders the UnresolvedObs slice as a human-readable
+// bullet list for the user-gate child's directive. Strength + Reason are
+// included so the LLM knows the priority order. Truncated to the top-10
+// unresolved ObsIDs to keep the directive well within token budget.
+func buildUserGateObsList(unresolved []interfaces.UnresolvedObs) string {
+	if len(unresolved) == 0 {
+		return "  (none)"
+	}
+	const cap = 10
+	out := ""
+	for i, uo := range unresolved {
+		if i >= cap {
+			out += fmt.Sprintf("  ... +%d more\n", len(unresolved)-cap)
+			break
+		}
+		out += fmt.Sprintf("  - %s (strength=%.3f, reason=%s)\n", uo.ObsID, uo.Strength, uo.Reason)
+	}
+	return out
 }
 
 // pipelineItemNeedsContinuation reports whether the session loop should schedule

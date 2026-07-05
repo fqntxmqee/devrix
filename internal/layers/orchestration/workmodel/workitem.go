@@ -58,6 +58,13 @@ type WorkItem struct {
 	SourceSession  string          `json:"source_session,omitempty"`
 	ContextScopeID string          `json:"context_scope_id,omitempty"`
 	ContextPolicy  ContextLinkKind `json:"context_policy,omitempty"`
+	// ToolFilter (DM-20260704-006 RC-4b) is the read-time tool whitelist
+	// applied when this WorkItem runs. SpawnUserGate creates a child with
+	// ToolFilter=["ask_user_question"] so the LLM cannot bypass the gate
+	// via free-form tools (read_file, delegate_explore, ...). Empty slice
+	// (default) means "no extra constraint; rely on the executor's
+	// default tool profile".
+	ToolFilter []string `json:"tool_filter,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
@@ -72,6 +79,9 @@ type CreateWorkItemInput struct {
 	Policy        ExecPolicy
 	Ephemeral     bool
 	SourceSession string
+	// ToolFilter (DM-20260704-006 RC-4b) sets the read-time tool whitelist
+	// on the new WorkItem. Empty (default) means "no extra constraint".
+	ToolFilter []string
 }
 
 // ChecklistEntry is one row in a todo_write snapshot.
