@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -35,6 +36,14 @@ type StrategicPlanInput struct {
 	UncertaintyMean float64
 	// PriorParseReject is compact JSON from the previous round's PlanParseReject field.
 	PriorParseReject string
+	// ResolutionStrategies (DM-20260704-006, RC-1) — cross-round feedback
+	// from the previous round. When present, the LLM sees the per-ObsID
+	// resolution paths and either refines them or emits new ones.
+	ResolutionStrategies []interfaces.ResolutionStrategy
+	// ResolutionClaims (DM-20260704-006, RC-2) — previous round's Execute
+	// answers (per-ObsID answers + confidence + evidence). Surfaced to the
+	// LLM so it can adjust strategies across rounds.
+	ResolutionClaims []interfaces.ResolutionClaim
 }
 
 
@@ -62,24 +71,33 @@ type StrategicPlanFrame struct {
 	// 5. observation_summary (data, omit_empty) - prior Obs summary.
 	ObservationSummary string `pt:"observation_summary,data,omit_empty"`
 
-	// 6-14. Budget 9-field flatten (control, no omit). 0 values are
+	// 6. resolution_strategies (data, omit_empty) - DM-20260704-006 RC-1
+	// current round's per-ObsID resolution plan; the LLM emits this when
+	// following the new contract.
+	ResolutionStrategies []string `pt:"resolution_strategies,data,omit_empty"`
+
+	// 7. resolution_claims (data, omit_empty) - DM-20260704-006 RC-2
+	// previous round's per-ObsID Execute answers (cross-round feedback).
+	ResolutionClaims []string `pt:"resolution_claims,data,omit_empty"`
+
+	// 8-16. Budget 9-field flatten (control, no omit). 0 values are
 	// emitted as literal "0" (matches the prior 35-line manual map
 	// output; the Budget.MaxChildren>0 guard in buildStrategicPlanFrame
 	// suppresses the entire block when no budget is set).
-	Depth *int `pt:"depth,control"`
-	MaxDepth *int `pt:"max_depth,control"`
-	ExistingChildren *int `pt:"existing_children,control"`
+	Depth             *int `pt:"depth,control"`
+	MaxDepth          *int `pt:"max_depth,control"`
+	ExistingChildren  *int `pt:"existing_children,control"`
 	RemainingChildren *int `pt:"remaining_children,control"`
-	MaxChildren *int `pt:"max_children,control"`
+	MaxChildren       *int `pt:"max_children,control"`
 	DecomposeUsedToday *int `pt:"decompose_used_today,control"`
-	RemainingDaily *int `pt:"remaining_daily,control"`
-	MaxDaily *int `pt:"max_daily,control"`
-	MaxIters *int `pt:"max_iters,control"`
+	RemainingDaily    *int `pt:"remaining_daily,control"`
+	MaxDaily          *int `pt:"max_daily,control"`
+	MaxIters          *int `pt:"max_iters,control"`
 
-	// 15. parent_scope_in (control, omit_empty) - parent in-paths.
+	// 17. parent_scope_in (control, omit_empty) - parent in-paths.
 	ParentScopeIn []string `pt:"parent_scope_in,control,omit_empty"`
 
-	// 16. uncertainty_mean (control, omit_zero) - WorkItem uncertainty.
+	// 18. uncertainty_mean (control, omit_zero) - WorkItem uncertainty.
 	UncertaintyMean float64 `pt:"uncertainty_mean,control,omit_zero"`
 }
 
@@ -112,6 +130,14 @@ func buildStrategicPlanFrame(in StrategicPlanInput) StrategicPlanFrame {
 	if s := strings.TrimSpace(in.ReportSummary); s != "" {
 		frame.ObservationSummary = s
 	}
+	// DM-20260704-006 (RC-1 + RC-2): render prior-round ResolutionContract
+	// as one compact JSON line per entry so the LLM sees them in-context.
+	if lines := marshalResolutionStrategiesJSON(in.ResolutionStrategies); len(lines) > 0 {
+		frame.ResolutionStrategies = lines
+	}
+	if lines := marshalResolutionClaimsJSON(in.ResolutionClaims); len(lines) > 0 {
+		frame.ResolutionClaims = lines
+	}
 	// RH-MUPS-07 (DM-20260701-001 T-P1-2): flatten Budget when MaxChildren > 0.
 	if in.Budget.MaxChildren > 0 {
 		b := in.Budget
@@ -139,6 +165,48 @@ func buildStrategicPlanFrame(in StrategicPlanInput) StrategicPlanFrame {
 		frame.PriorParseReject = s
 	}
 	return frame
+}
+
+// marshalResolutionStrategiesJSON encodes a []ResolutionStrategy slice as
+// one compact JSON line per strategy. Returns nil when empty so the
+// omit_empty guard in buildStrategicPlanFrame skips the field.
+func marshalResolutionStrategiesJSON(in []interfaces.ResolutionStrategy) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		b, err := json.Marshal(s)
+		if err != nil {
+			continue
+		}
+		out = append(out, string(b))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// marshalResolutionClaimsJSON encodes a []ResolutionClaim slice as one
+// compact JSON line per claim. Returns nil when empty so the omit_empty
+// guard in buildStrategicPlanFrame skips the field.
+func marshalResolutionClaimsJSON(in []interfaces.ResolutionClaim) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	for _, c := range in {
+		b, err := json.Marshal(c)
+		if err != nil {
+			continue
+		}
+		out = append(out, string(b))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // planFrameToMap converts a StrategicPlanFrame to the map[TagName]any
@@ -233,14 +301,27 @@ type rawStrategicChildSpec struct {
 	ScopeIn         []string `json:"scope_in"`
 }
 
+// rawResolutionStrategy mirrors interfaces.ResolutionStrategy on the wire.
+// DM-20260704-006 RC-1: Plan LLM may emit resolution_strategies[] (preferred
+// path) instead of (or in addition to) the legacy child_specs[]. Each entry
+// binds an ObsID to a resolution path; sub_worktree is the optional sibling
+// child that forces SpawnDecompose via RC-4a.
+type rawResolutionStrategy struct {
+	ObsID            string                  `json:"obs_id"`
+	PlannedTool      string                  `json:"planned_tool"`
+	SuccessCriterion string                  `json:"success_criterion"`
+	SubWorktree      *rawStrategicChildSpec  `json:"sub_worktree"`
+}
+
 type rawStrategicPlan struct {
-	ExecutionMode       string                  `json:"execution_mode"`
-	ScopeIn             []string                `json:"scope_in"`
-	ChildSpecs          []rawStrategicChildSpec `json:"child_specs"`
+	ExecutionMode       string                    `json:"execution_mode"`
+	ScopeIn             []string                  `json:"scope_in"`
+	ChildSpecs          []rawStrategicChildSpec   `json:"child_specs"`
+	ResolutionStrategies []rawResolutionStrategy  `json:"resolution_strategies"`
 	DeliverableContract workmodel.DeliverableContract `json:"deliverable_contract"`
-	DeliverableSchema   string                  `json:"deliverable_schema"`
-	ReactItersHint      int                     `json:"react_iters_hint"`
-	Rationale           string                  `json:"rationale"`
+	DeliverableSchema   string                    `json:"deliverable_schema"`
+	ReactItersHint      int                       `json:"react_iters_hint"`
+	Rationale           string                    `json:"rationale"`
 }
 
 // StrategicPlanProposal is a validated LLM strategic plan (DM-20260630-012).
@@ -248,6 +329,13 @@ type StrategicPlanProposal struct {
 	ExecutionMode       string
 	ScopeIn             []string
 	ChildSpecs          []workmodel.ChildSpec
+	// ResolutionStrategies (DM-20260704-006 RC-1) — the new Obs→Resolution
+	// contract. When the LLM emits these (preferred path), the strategic
+	// plan carries a typed resolution_strategies[] alongside the legacy
+	// ChildSpecs (which are still populated from sub_worktree entries for
+	// Decide compat). Plans with no ResolutionStrategies fall back to the
+	// legacy execution_mode + child_specs[] path (RC-5).
+	ResolutionStrategies []interfaces.ResolutionStrategy
 	DeliverableContract workmodel.DeliverableContract
 	DeliverableSchema   workmodel.DeliverableSchema
 	ReactItersHint      int
@@ -369,6 +457,15 @@ func parseStrategicPlanJSON(raw, baseDirective string) (*StrategicPlanProposal, 
 	}
 	prop.QuantizedKind = mapExecutionModeToQuantizedKind(prop.ExecutionMode)
 	prop.ChildSpecs = mapRawChildSpecs(baseDirective, row.ChildSpecs, prop.ExecutionMode)
+	// DM-20260704-006 RC-1: parse resolution_strategies[] when present.
+	// When non-empty, override prop.ChildSpecs with sub_worktree-derived
+	// children (preserving the legacy child_specs[] field for backwards
+	// compatibility but populating it from the new contract). Empty
+	// resolution_strategies falls back to the legacy child_specs[] path.
+	prop.ResolutionStrategies = mapRawResolutionStrategies(row.ResolutionStrategies)
+	if len(prop.ResolutionStrategies) > 0 {
+		prop.ChildSpecs = resolutionStrategiesToChildSpecs(baseDirective, prop.ResolutionStrategies)
+	}
 	if err := validateStrategicPlan(prop); err != nil {
 		return nil, err
 	}
@@ -423,6 +520,84 @@ func mapRawChildSpecs(base string, raw []rawStrategicChildSpec, mode string) []w
 			Title:          title,
 			Directive:      directive,
 			ScopeIn:        append([]string(nil), r.ScopeIn...),
+			ExpectedReturn: expected,
+		})
+	}
+	return workmodel.CapChildSpecs(out)
+}
+
+// mapRawResolutionStrategies converts LLM-emitted raw resolution_strategies
+// into typed orchtypes.ResolutionStrategy values. Empty ObsIDs are skipped
+// (fail-loud validation happens at orchtypes.ResolutionStrategy.Validate()
+// which runs later in the pipeline). The DM-20260704-006 RC-1 wire format
+// allows the LLM to declare sub_worktree as either a nested object or null;
+// nil sub_worktree is preserved so Decide can distinguish "tool-agnostic"
+// from "sub_worktree required".
+func mapRawResolutionStrategies(raw []rawResolutionStrategy) []interfaces.ResolutionStrategy {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]interfaces.ResolutionStrategy, 0, len(raw))
+	for _, r := range raw {
+		obsID := strings.TrimSpace(r.ObsID)
+		if obsID == "" {
+			continue
+		}
+		strat := interfaces.ResolutionStrategy{
+			ObsID:            obsID,
+			PlannedTool:      strings.TrimSpace(r.PlannedTool),
+			SuccessCriterion: strings.TrimSpace(r.SuccessCriterion),
+		}
+		if r.SubWorktree != nil {
+			spec := &interfaces.SubWorktreeSpec{
+				Title:           strings.TrimSpace(r.SubWorktree.Title),
+				DirectiveSuffix: strings.TrimSpace(r.SubWorktree.DirectiveSuffix),
+				ExpectedReturn:  strings.TrimSpace(r.SubWorktree.ExpectedReturn),
+				ScopeIn:         append([]string(nil), r.SubWorktree.ScopeIn...),
+			}
+			// Skip empty-Title sub_worktree entries — interfaces.Validate
+			// would reject them downstream, so filter here for clean
+			// Decide behavior.
+			if spec.Title != "" {
+				strat.SubWorktree = spec
+			}
+		}
+		out = append(out, strat)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// resolutionStrategiesToChildSpecs converts the Obs-bound sub_worktree[]
+// entries back into workmodel.ChildSpec[] so Decide's legacy
+// DecomposeChildren path can still spawn the children. Each sub_worktree
+// entry produces one ChildSpec; the directive is base + "\n\n" + suffix.
+//
+// This function is the bridge between the new RC-1 contract and the legacy
+// Decide/Decompose pipeline (RT-08). Future phases can replace it with a
+// direct DecomposeFromSubWorktree path (RT-12).
+func resolutionStrategiesToChildSpecs(base string, strats []interfaces.ResolutionStrategy) []workmodel.ChildSpec {
+	var out []workmodel.ChildSpec
+	for _, s := range strats {
+		if s.SubWorktree == nil {
+			continue
+		}
+		spec := s.SubWorktree
+		directive := base
+		if suffix := strings.TrimSpace(spec.DirectiveSuffix); suffix != "" {
+			directive = strings.TrimSpace(base) + "\n\n" + suffix
+		}
+		expected := strings.TrimSpace(spec.ExpectedReturn)
+		if expected == "" {
+			expected = workmodel.DefaultChildExpectedReturn(nil, base)
+		}
+		out = append(out, workmodel.ChildSpec{
+			Kind:           workmodel.WorkKindExplore,
+			Title:          spec.Title,
+			Directive:      directive,
+			ScopeIn:        append([]string(nil), spec.ScopeIn...),
 			ExpectedReturn: expected,
 		})
 	}

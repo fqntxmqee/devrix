@@ -49,6 +49,10 @@ var semanticGlossaryZH = map[prompttags.SemanticCondition]string{
 	prompttags.CondMaxDailyControl:          "每日 decompose 上限 (control)",
 	prompttags.CondMaxItersControl:          "单 WorkItem ReAct 迭代上限 (control)",
 	prompttags.CondParentScopeInControl:     "父级 scope in 路径 (control, 子集约束)",
+
+	// ResolutionContract (DM-20260704-006, RC-1) — Plan user frame fields.
+	prompttags.CondResolutionStrategies: "resolution_strategies (data)：每个 ObsUncertainty 一条，绑定 obs_id + planned_tool + success_criterion；需 sibling 调查时挂 sub_worktree",
+	prompttags.CondResolutionClaims:     "resolution_claims (data, 跨轮反馈)：上一轮 Execute 输出的 per-obs_id 答案+confidence+evidence",
 }
 
 // semanticNodeRoleZH maps node-role keys to one-line zh-CN descriptions.

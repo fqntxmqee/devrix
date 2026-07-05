@@ -3,6 +3,7 @@ package workmodel
 import (
 	"time"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/shared/types"
 )
@@ -110,6 +111,20 @@ type WorkItemPipelineRound struct {
 	// PlanParseReject carries compact JSON for the next Plan user frame (DM-20260705-002).
 	PlanParseReject string `json:"plan_parse_reject,omitempty"`
 	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`
+
+	// ResolutionClaims (DM-20260704-006) — per-ObsID answers extracted
+	// from the Execute artifact. Populated by the Execute layer; Verify
+	// reads this slice to compute CoverageRatio. Optional for legacy
+	// rounds that pre-date the ResolutionContract.
+	ResolutionClaims []interfaces.ResolutionClaim `json:"resolution_claims,omitempty"`
+
+	// ResolutionReport (DM-20260704-006) — the cross-round handoff
+	// produced by Verify. Decide reads AnySubWorktreePending +
+	// MaxUnresolvedStrength to pick SpawnDecompose / SpawnUserGate /
+	// SpawnInline. Nil when the round pre-dates the contract or when
+	// Verify chose not to compute one (legacy Verifier fall-back).
+	ResolutionReport *interfaces.ResolutionReport `json:"resolution_report,omitempty"`
+
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`
 }

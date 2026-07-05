@@ -29,6 +29,13 @@ const (
 	TagPriorObservationIDs   TagName = "prior_observation_ids"
 	TagIncrementalOnly       TagName = "incremental_only"
 	TagPriorParseReject      TagName = "prior_parse_reject"
+
+	// ResolutionContract (DM-20260704-006) — Plan user frame fields
+	// emitted by strategic_plan_proposer when the LLM follows the new
+	// RC-1 contract. Both are tagged `data` plane (the LLM fills them,
+	// not the kernel); the kernel only renders them when present.
+	TagResolutionStrategies TagName = "resolution_strategies"
+	TagResolutionClaims     TagName = "resolution_claims"
 )
 
 // FrameSpec defines fixed-order key: value lines for a MUPS user prompt frame.
@@ -59,6 +66,8 @@ var PlanUserFrame = FrameSpec{
 		TagPriorParseReject,
 		TagObservationIDs,
 		TagObservationSummary,
+		TagResolutionStrategies,
+		TagResolutionClaims,
 		TagDepth,
 		TagMaxDepth,
 		TagExistingChildren,
@@ -116,6 +125,17 @@ func writeLineField(b *strings.Builder, frame FrameName, name TagName, v any, an
 			return
 		}
 		fmt.Fprintf(b, "%s%s: %s\n", prefix, name, strings.Join(lines, ","))
+	// DM-20260704-006 (RC-1 + RC-2): one line per ResolutionStrategy /
+	// ResolutionClaim JSON entry so the LLM sees a copy-paste-friendly list
+	// instead of a single comma-joined line that breaks on embedded braces.
+	case TagResolutionStrategies, TagResolutionClaims:
+		lines, ok := v.([]string)
+		if !ok || len(lines) == 0 {
+			return
+		}
+		for _, line := range lines {
+			fmt.Fprintf(b, "%s%s: %s\n", prefix, name, line)
+		}
 	case TagPriorMean:
 		f, ok := v.(float64)
 		if !ok || f <= 0 {
