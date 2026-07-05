@@ -2,7 +2,7 @@
 
 **Change ID:** d7-mups-strategy-injection
 **Demand ID:** DM-20260705-008
-**Status:** S3_Design
+**Status:** Archived (s7_archived)
 
 ## 1. Background
 

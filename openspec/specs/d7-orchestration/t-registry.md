@@ -1,8 +1,8 @@
 # D7 Orchestration Domain — T 层测试点注册表
 
 **Status:** Active
-**Version:** 4.32.0
-**Last Updated:** 2026-07-05 (mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
+**Version:** 4.33.0
+**Last Updated:** 2026-07-05 (d7-mups-strategy-injection DM-20260705-008: M3 Strategy 抽象注入 WorkItemExecContext — Strategy interface (workmodel 4 method) + 4 PlanKind 实现 (commitment/protocol/scenario/exploration) + DefaultStrategy registry + 19 NEW 测试 (14 strategy + 5 algebra integration 4×5 cases) + 2 UPDATED (R4/R6 M3 行为增量对齐); 4 PlanKind × 5 VerdictKind = 20 组合中 4 行为增量; 5 节点重构总图最后一步收口; PR #413 MERGED; **previous**: mups-cleanup-legacy DM-20260705-007: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 旧符号 + 2 build tag; 0 行为变化; 70 测试 0 修改全 PASS; CI 单元测试 3m15s 绿; PR #411 MERGED)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
 **Spec:** `openspec/specs/d7-orchestration/spec.md`
