@@ -145,6 +145,19 @@ func BuildLineFrameFromStruct(frame FrameName, s any) string {
 			continue
 		}
 		fv := v.Field(i)
+		// Dereference pointer for omit + type-switch; nil pointer -> absent field.
+		// Added in M2 (DM-20260705-004) for StrategicPlanFrame.Budget 9 fields
+		// which use *int to express "absent when Budget.MaxChildren == 0".
+		for fv.Kind() == reflect.Ptr {
+			if fv.IsNil() {
+				fv = reflect.Value{}
+				break
+			}
+			fv = fv.Elem()
+		}
+		if !fv.IsValid() {
+			continue
+		}
 		// Apply omit rules before type conversion.
 		if tag.OmitZero && fv.IsZero() {
 			continue
