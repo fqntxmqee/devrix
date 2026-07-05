@@ -1,7 +1,6 @@
 package sessionorchestrator
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -25,61 +24,18 @@ var (
 	userGateToolRE = regexp.MustCompile(`ask_user_question\s*[\({]`)
 )
 
-// verifyArtifact derives a deterministic Verdict from Execute output (Phase B).
-// Production may swap in LLM Verifier via ItemPipelineDeps.Verifier later.
+// M4 (mups-verify-table-driven, DM-20260705-005) — verifyArtifact 走决策表。
+// 49 行 → 5 行：建 ctx + applyDecisionTable。
 func verifyArtifact(art *wavescheduler.Artifact) workmodel.Verdict {
-	if art == nil {
-		return workmodel.Verdict{
-			Kind:       types.VerdictIndeterminate,
-			Reason:     "missing artifact",
-			Confidence: 0,
-		}.WithIndeterminateReason("env_limited")
-	}
-	id := art.TaskID
-	if id == "" {
-		id = "artifact_unknown"
-	}
-	if art.Error != "" || art.ExitCode != 0 {
-		if reason, _ := art.Metadata["stop_reason"].(string); reason == "max_iters" {
-			if calls, _ := art.Metadata["tool_calls"].(int); calls > 0 {
-				return workmodel.Verdict{
-					Kind:       types.VerdictPartial,
-					Reason:     "iteration cap with partial progress",
-					SourceID:   id,
-					Confidence: 0.55,
-				}
-			}
-		}
-		return workmodel.Verdict{
-			Kind:       types.VerdictFail,
-			Reason:     fmt.Sprintf("execute failed: %s", art.Error),
-			SourceID:   id,
-			Confidence: 0.9,
+	id := ""
+	if art != nil {
+		id = art.TaskID
+		if id == "" {
+			id = "artifact_unknown"
 		}
 	}
-	switch art.SideEffectStatus {
-	case types.SideEffectRolledBack:
-		return workmodel.Verdict{
-			Kind:       types.VerdictFail,
-			Reason:     "side effect rolled back",
-			SourceID:   id,
-			Confidence: 0.85,
-		}
-	case types.SideEffectUnknown, types.SideEffectInflight:
-		return workmodel.Verdict{
-			Kind:       types.VerdictPartial,
-			Reason:     "side effect uncertain",
-			SourceID:   id,
-			Confidence: 0.6,
-		}
-	default:
-		return workmodel.Verdict{
-			Kind:       types.VerdictPass,
-			Reason:     art.Summary,
-			SourceID:   id,
-			Confidence: 0.9,
-		}
-	}
+	ctx := &verifyContext{art: art, id: id}
+	return applyDecisionTable(artifactDecisionTable, art, ctx)
 }
 
 // verifyArtifactForWorkItem applies pipeline-aware checks so autonomous rounds
@@ -105,25 +61,26 @@ func verifyArtifactForWorkItemWithSchema(
 	return verifyArtifactForWorkItemWithContract(art, item, pl, workmodel.ExpandLegacySchemaToContract(schema))
 }
 
+// verifyArtifactForWorkItemWithContract M4 重构：先走 artifactDecisionTable 拿 base verdict，
+// 再叠加 3 overlay detector (user_gate / scope_only / deliverable_incomplete) 形成最终 verdict。
+// 54 行 → ~35 行。
 func verifyArtifactForWorkItemWithContract(
 	art *wavescheduler.Artifact,
 	item *workmodel.WorkItem,
 	pl *plan.Plan,
 	contract workmodel.DeliverableContract,
 ) WorkItemVerifyOutcome {
-	v := verifyArtifact(art)
 	schema := workmodel.DeliverableSchemaNotApplicable
 	if contract.ContractApplicable() {
 		schema = workmodel.DeliverableSchema("legacy_contract")
 	}
-	if art == nil {
-		return WorkItemVerifyOutcome{Verdict: v, DeliverableContract: contract, DeliverableSchema: schema}
+	id := "artifact_unknown"
+	if art != nil && art.TaskID != "" {
+		id = art.TaskID
 	}
-	id := art.TaskID
-	if id == "" {
-		id = "artifact_unknown"
-	}
-	if artifactAwaitingUserGate(art) {
+	ctx := &verifyContext{art: art, item: item, pl: pl, contract: contract, id: id}
+	v := applyDecisionTable(artifactDecisionTable, art, ctx)
+	if detectUserGate(art, ctx) {
 		v = workmodel.Verdict{
 			Kind:       types.VerdictPartial,
 			Reason:     "interactive user gate not allowed in pipeline execute",
@@ -131,27 +88,21 @@ func verifyArtifactForWorkItemWithContract(
 			Confidence: 0.85,
 		}
 	}
-	if item != nil && workmodel.CanDecompose(item.Kind) && pl != nil && pl.Kind == plan.ExplorationPlan {
-		if isScopeOnlyDeliverable(art, item) {
-			v = workmodel.Verdict{
-				Kind:       types.VerdictPartial,
-				Reason:     "scope contract emitted without deliverable; decompose required",
-				SourceID:   id,
-				Confidence: 0.8,
-			}
+	if detectScopeOnlyDeliverable(art, ctx) {
+		v = workmodel.Verdict{
+			Kind:       types.VerdictPartial,
+			Reason:     "scope contract emitted without deliverable; decompose required",
+			SourceID:   id,
+			Confidence: 0.8,
 		}
 	}
 	deliverable := VerifyDeliverableContract(contract, art)
-	if contract.ContractApplicable() {
-		if deliverable.Status == workmodel.DeliverableStatusIncomplete {
-			if v.Kind == types.VerdictPass {
-				v = workmodel.Verdict{
-					Kind:       types.VerdictPartial,
-					Reason:     deliverableReason(deliverable),
-					SourceID:   id,
-					Confidence: 0.65,
-				}
-			}
+	if contract.ContractApplicable() && deliverable.Status == workmodel.DeliverableStatusIncomplete && v.Kind == types.VerdictPass {
+		v = workmodel.Verdict{
+			Kind:       types.VerdictPartial,
+			Reason:     deliverableReason(deliverable),
+			SourceID:   id,
+			Confidence: 0.65,
 		}
 	}
 	return WorkItemVerifyOutcome{

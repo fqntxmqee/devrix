@@ -1,0 +1,16 @@
+schema: openspec
+change-id: mups-verify-table-driven
+demand-id: DM-20260705-005
+status: S3_Design
+title: "MUPS Verify 节点决策表化 — 4 VerdictKind × N trigger 表驱动重构"
+author: DM-20260705-005 S3 planning
+parent_demands:
+  - DM-20260705-003  # M1 kernel (depends on)
+  - DM-20260705-004  # M2 plan structbind
+domains: [d7-orchestration]
+capabilities:
+  - d7-orchestration
+  - shared/types
+  - shared/prompttags
+scope: foundation
+labels: [mups, refactor, verify, decision-table, m4]
