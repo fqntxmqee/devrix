@@ -2,7 +2,7 @@
 
 **Change ID:** `d7-observe-closed-classifier-prompt`
 **Demand:** DM-20260705-009
-**Status:** S2_Proposal
+**Status:** Archived (s7_archived)
 
 ## Why
 

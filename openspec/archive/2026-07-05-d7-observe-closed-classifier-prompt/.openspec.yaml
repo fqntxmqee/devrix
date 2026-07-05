@@ -1,7 +1,7 @@
 schema: openspec
 change-id: d7-observe-closed-classifier-prompt
 demand-id: DM-20260705-009
-status: s2_design
+status: s7_archived
 title: "Observe 节点封闭式分类器定位强化"
 author: DM-20260705-009 S2 proposal
 parent_demands:
