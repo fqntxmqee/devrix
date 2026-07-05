@@ -1,0 +1,35 @@
+change_id: devrix-d7-mups-frame-delta-closure
+priority: P0
+demand_id: DM-20260705-010
+status: S1_Proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Decision & Planning (Observe frame delta)
+  - D7-S9   # Execute Node (Plan frame delta injection)
+dsaft_activities:
+  - D7-S5-A111  # Observe frame delta fields (prior_artifact_summary + known_gaps)
+  - D7-S9-A112  # Execute system_prompt Plan frame delta injection
+  - D7-S9-A113  # Execute convergence_metric deterministic compute + Jaeger emit
+t_points: []  # S2 阶段登记
+version_scope:
+  v1.0: "S1 Proposal: 5 节点 frame delta 闭环候选方案 C, 待 S2-S3 拆分 T 点 + S3-Gate 三方共识"
+created: 2026-07-05
+author: devrix-d7-mups-frame-delta-closure proposal
+title: "D7 MUPS 5 节点 frame delta 闭环 — Observe→Plan→Execute LLM I/O 协议显式收敛"
+related_changes:
+  - devrix-d7-uncertainty-resolution-traceability  # DM-20260704-006 — Obs→Verify→Decide 闭环
+  - d7-mups-strategy-injection  # DM-20260705-008 — Strategy 抽象
+  - mups-go-struct-driven  # DM-20260705-003 — Frame 9 字段契约
+  - mups-node-prompt-dedup  # DM-20260705-004 — Prompt 净化
+  - d7-observe-closed-classifier-prompt  # DM-20260705-009 — 封闭式分类器定位
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d7-orchestration/mups-node-llm-protocols.md
+parent_demands:
+  - DM-20260704-006
+  - DM-20260705-003
+  - DM-20260705-004
+  - DM-20260705-008
+  - DM-20260705-009
+evidence_traces:
+  - "38144cebcf8dda7a123827d96a731bc5"  # sess_1783255992426_6000 wi_d0_s0_goal + wi_d1_s0_explore
