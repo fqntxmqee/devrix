@@ -19,15 +19,47 @@ const (
 
 // ObserveSignalInput carries structured signals for LLM observation proposals.
 // MUST NOT include WorkItem private ReAct transcript (DM-20260627-003 LC6 / T35).
+//
+// Field order matches ObserveUserFrame.Fields; pt struct tag is the SoT for
+// the user-prompt schema (DM-20260705-003 go-struct-driven).
+// init() registers this struct with prompttags.MustRegisterFrame; any drift
+// between struct / FrameSpec / i18n guide panics at process start.
 type ObserveSignalInput struct {
-	SessionID          string
-	WorkItemID         string
-	Directive          string
-	ScopeContract      *workmodel.ScopeContract
-	InboundSignalLines    []string
-	PriorMean             float64
-	PriorObservationIDs   []string
-	PriorParseReject      string
+	// SessionID is not part of the user frame (routing only).
+	SessionID string `pt:"-"`
+
+	// 1. work_item_id (control) — always emitted.
+	WorkItemID string `pt:"work_item_id,control"`
+
+	// 2. directive (data) — always emitted.
+	Directive string `pt:"directive,data"`
+
+	// 3. prior_parse_reject (control, omit_empty) — DM-20260705-002 cross-round feedback.
+	PriorParseReject string `pt:"prior_parse_reject,control,omit_empty"`
+
+	// 4. prior_mean (control, omit_zero) — Bayesian prior (DM-20260624-001 LP-1).
+	PriorMean float64 `pt:"prior_mean,control,omit_zero"`
+
+	// 5. scope_goal (data, omit_empty) — flattened from item.ScopeContract.GoalStatement.
+	ScopeGoal string `pt:"scope_goal,data,omit_empty"`
+
+	// 6. scope_open_question (data, omit_empty, multi-line) — flattened from item.ScopeContract.OpenQuestions.
+	ScopeOpenQuestions []string `pt:"scope_open_question,data,omit_empty"`
+
+	// 7. signal (data, omit_empty, multi-line) — artifact_summary + child_downlink lines.
+	InboundSignalLines []string `pt:"signal,data,omit_empty"`
+
+	// 8. prior_observation_ids (control, omit_empty, comma-joined) — incremental context.
+	PriorObservationIDs []string `pt:"prior_observation_ids,control,omit_empty"`
+
+	// 9. incremental_only (control, omit_zero) — true iff PriorObservationIDs non-empty.
+	IncrementalOnly bool `pt:"incremental_only,control,omit_zero"`
+}
+
+// init registers ObserveSignalInput with the prompttags user-frame registry.
+// Panics at process start on any drift between struct / FrameSpec / i18n guide.
+func init() {
+	prompttags.MustRegisterFrame[ObserveSignalInput](prompttags.FrameObserveUser)
 }
 
 // ObservationProposal is a raw LLM proposal before rule validation (G3: propose → rule).
@@ -65,7 +97,16 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 		Directive:  itemDirective(item),
 	}
 	if item != nil && item.ScopeContract != nil {
-		in.ScopeContract = item.ScopeContract
+		if s := strings.TrimSpace(item.ScopeContract.GoalStatement); s != "" {
+			in.ScopeGoal = s
+		}
+		var questions []string
+		for _, q := range item.ScopeContract.OpenQuestions {
+			if strings.TrimSpace(q) != "" {
+				questions = append(questions, q)
+			}
+		}
+		in.ScopeOpenQuestions = questions
 	}
 	if item != nil && item.LastRound != nil {
 		if s := strings.TrimSpace(item.LastRound.ArtifactSummary); s != "" {
@@ -75,6 +116,7 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 	}
 	if item != nil && item.LastRound != nil && len(item.LastRound.ObservationIDs) > 0 {
 		in.PriorObservationIDs = append([]string(nil), item.LastRound.ObservationIDs...)
+		in.IncrementalOnly = true
 	}
 	if item != nil && item.LastRound != nil {
 		if s := strings.TrimSpace(item.LastRound.ObserveParseReject); s != "" {
