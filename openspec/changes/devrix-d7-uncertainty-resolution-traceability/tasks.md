@@ -1,10 +1,11 @@
 # Tasks: devrix-d7-uncertainty-resolution-traceability
 
-**Status:** S1_Proposal (Option C unified Obs→Execution)
+**Status:** S3_Design (Option C unified Obs→Execution — design.md + spec delta 就位)
 **Created:** 2026-07-04
-**Updated:** 2026-07-04 (supersede Option B → adopt Option C unified)
+**Updated:** 2026-07-05 (→ S3_Design: design.md 6 段式 + spec delta 6 Requirement + .openspec.yaml 完整 + t-registry 19 T points 预登记)
 
 > S1 阶段 tasks.md 仅作预登记，详细分解待 S2/S3 设计阶段细化。
+> S3 设计就位: design.md (6 段式) + spec delta (6 Requirement) + .openspec.yaml (19 T points)
 > T ID 命名遵循 `D{X}-S{X}-A{XX}-T{XX}` DSAFT 规范。
 
 ## 预登记 T 点（草案，待 S3 评审细化）
@@ -86,13 +87,16 @@
 - [ ] sub_worktree 数量上限（≤ ResolutionStrategy 总数？与 Budget 联动？）
 - [ ] 旧 `child_specs[]` 字段何时移除（1 个版本 deprecated 后再删？）
 
-## 检查清单（S1 完成）
+## 检查清单（S3 完成）
 
 - [x] demand.md 完整（含 11 个 P0 + 5 个 P1 L5）
 - [x] proposal.md 完整（含 Obs→Execution 统一契约 + DecideBinding 治本 + 兼容路径）
-- [x] tasks.md 预登记（5 Phase × 13 T ID）
-- [ ] S1 评审通过 → 进入 S2 提案
-- [ ] t-registry.md 预登记（D7-S16-A103..A106 + D7-S5-A108 + D7-S15-A109/A110）
+- [x] design.md 完整（6 段式 + File Manifest + Rollback Plan + 回归风险）
+- [x] spec delta 创建（6 Requirement: RC-1..RC-6）
+- [x] .openspec.yaml 创建（S3 状态 + domains + 19 T points 预登记）
+- [x] tasks.md 预登记（5 Phase × 19 T ID）
+- [ ] t-registry.md 预登记更新（D7-S16-A103..A106 + D7-S5-A108 + D7-S15-A109/A110）
+- [ ] S3-Gate Review 通过 → 进入 S4 实现
 
 ## 治本对照
 

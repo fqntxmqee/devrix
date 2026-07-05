@@ -3,9 +3,13 @@
 **Change ID:** `devrix-d7-uncertainty-resolution-traceability`
 **Demand ID:** DM-20260704-006
 **Created:** 2026-07-04
-**Updated:** 2026-07-04 (supersede Option B → adopt Option C unified)
-**Status:** S1_Proposal
+**Updated:** 2026-07-05 (→ S3_Design: design.md + spec delta + .openspec.yaml + t-registry 预登记就位; S3-Gate 待 Review)
+**Status:** S3_Design
 **Demand:** [`demand.md`](demand.md)
+**Design:** [`design.md`](design.md)
+**Spec Delta:** [`specs/d7-orchestration/d7-orchestration-resolution-contract-delta.md`](specs/d7-orchestration/d7-orchestration-resolution-contract-delta.md)
+**Tasks:** [`tasks.md`](tasks.md)
+**OpenSpec YAML:** [`.openspec.yaml`](.openspec.yaml)
 
 ---
 
