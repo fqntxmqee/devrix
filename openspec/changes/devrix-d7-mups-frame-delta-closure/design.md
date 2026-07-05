@@ -43,7 +43,7 @@
 
 ### 1.3 约束条件
 
-- **append-only 注入原则**：5 节点重构 M1-M5 已落地的 LLM frame 契约（M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 16 字段）**0 修改**，frame delta 字段在原 frame 之外增量注入
+- **append-only 注入原则**：5 节点重构 M1-M5 已落地的 LLM frame 契约（M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 18 字段）**0 修改**，frame delta 字段在原 frame 之外增量注入
 - **机器可读 schema-first 形态**：frame delta 字段必须 machine-readable JSON（不允许 prose 注入，DM-20260705-009 封闭式分类器定位兼容）
 - **不破坏 DM-20260705-008 Strategy 决策表**：frame delta 注入走 `WorkItemExecContext.Strategy` 旁路，不进 PlanKind 决策表
 - **不破坏 DM-20260704-006 ResolutionContract**：Execute 输出 ResolutionClaim[] 复用承载 convergence_metric
@@ -60,7 +60,7 @@
 | 原则 | 落地方式 | 对应 AC |
 |------|---------|---------|
 | **delta 显式 > 隐式累积** | frame delta 走 schema-first JSON，不靠累积 tool_result 收敛 | AC1, AC2, AC3, AC4 |
-| **append-only 不破坏契约** | 9 字段 / 16 字段 M1/M2 frame 0 修改，delta 字段在外增量注入 | AC6 |
+| **append-only 不破坏契约** | 9 字段 (ObservationFrame) / 18 字段 (StrategicPlanFrame) M1/M2 frame 0 修改，delta 字段在外增量注入 | AC6 |
 | **deterministic 计算 > LLM 计算** | ConvergenceMetric 走工具结果 diff + claim 数，0 LLM | AC4 |
 | **机器可读 + 人可读双轨** | frame delta 输出 ≤ 80 字符摘要（人读）+ schema hash（机读） | AC3 |
 | **Span-tag 透明可观测** | 6 attribute 全部写入 Jaeger span，便于 grep 验证 | AC5 |
@@ -107,14 +107,14 @@ Observe 节点 (D7-S5)
 
 Plan 节点 (D7-S5)
     ↓ ⑦ ProcessRequest → StrategicPlanProposer (DM-20260705-004 M2)
-    ↓      → StrategicPlanFrame 16 字段契约 0 修改 (M2 兼容)
+    ↓      → StrategicPlanFrame 18 字段契约 0 修改 (M2 兼容)
     ↓ ⑧ [NEW] StrategicPlanFrame append 5 字段: ExecutionMode + ChildSpecs []ChildSpecRef + DeliverableContract
     ↓ ⑨ LLM Plan → 输出 execution_mode + child_specs + deliverable_contract
     ↓ ⑩ emit("plan.frame_delta.computed", plan_frame_delta_schema_hash, summary_preview)
 
 Execute 节点 (D7-S9) — **核心 frame delta 注入点**
-    ↓ ⑪ ItemPipeline.Run → buildExecuteSystemPrompt(baseline)
-    ↓ ⑫ [NEW] InjectPlanFrameDelta(ctx, plan.FrameDelta, baseline) → string
+    ↓ ⑪ ItemPipeline.Run → SubTurnRunner.materializeSubTurnContext (subturn_materialize.go:34, 现有 LLM context 装配入口)
+    ↓ ⑫ [NEW] InjectPlanFrameDelta(ctx, plan.FrameDelta, baselineSystemPrompt) → string
     ↓      → 双轨输出：摘要 ≤ 80 字符（人读: "<plan_frame_delta>ExecutionMode=decompose; ChildCount=2</plan_frame_delta>"）
     ↓      →              + schema hash（机读: "[schema:d7.fd.v1]"）
     ↓      → 注入总增量 ≤ 200 字符 (含 plan_frame_delta tags)
@@ -122,11 +122,13 @@ Execute 节点 (D7-S9) — **核心 frame delta 注入点**
     ↓ ⑭ LLM Execute (sub-turn 1..N) → 工具调用 → 累积 tool_result
     ↓ ⑮ [NEW] 每个 sub-turn 结束: ComputeConvergenceMetric(subTurns) → ConvergenceMetric
     ↓      → UncertaintyReductionRate = (initialObsGaps - residualObsGaps) / initialObsGaps
-    ↓      → ObservedGapsClosedCount = 上一轮 known_gaps - 本轮 residual gaps
+    ↓      → ObservedGapsClosedCount = initialObsGaps - residualObsGaps
     ↓      → FrameDeltaConsumed = true if LLM prompt 含 plan_frame_delta_schema_hash tag
     ↓ ⑯ emit("execute.convergence_metric.emit", uncertainty_reduction_rate, observed_gaps_closed_count, frame_delta_consumed)
     ↓ ⑰ 末轮 emit("execute.complete", final_text, last_convergence_metric)
 ```
+
+> **注入点校正**：原 design.md v1.0 引用 `buildExecuteSystemPrompt`，经 2026-07-05 S3-Gate claude review 实测确认实际函数为 `SubTurnRunner.materializeSubTurnContext` (subturn_materialize.go:34)。注入将在该函数返回 `systemPrompt` 后由 InjectPlanFrameDelta 包装。
 
 **时序标注**：
 - ② BuildObservePriorDelta < 0.1ms（纯函数 + 零值边界检查）
@@ -138,11 +140,12 @@ Execute 节点 (D7-S9) — **核心 frame delta 注入点**
 
 | Fallback 触发条件 | 行为 | 对应 AC |
 |------------------|------|---------|
-| **frame delta 注入超 200 字符**（Plan ChildSpecs > 5 或 DeliverableContract 过长）| 降级走 baseline system_prompt（无 delta 注入），emit warn span | AC3 风险缓解 |
+| **frame delta 注入超 200 字符**（Plan ChildSpecs > MaxChildSpecCount=5 或 DeliverableContract > MaxDeliverableContractChars=200）| 降级走 baseline system_prompt（无 delta 注入），emit warn span | AC3 风险缓解 |
 | **prevExecCtx 为 nil**（首轮 / session restart）| `BuildObservePriorDelta` 返回零值 FrameDelta{} | AC1 T01 |
 | **ConvergenceMetric 计算错误**（subTurns 为空 / 工具结果解析失败）| 返回零值 ConvergenceMetric{} + slog.Warn，不阻塞 sub-turn | AC4 T01 |
 | **span emit nil-bridge**（telemetry 未初始化）| `EmitConvergenceMetric` 走 fallback log（与 `EmitChannelRoute` 模式一致）| AC4 T02 |
-| **frame delta 字段破坏封闭式分类器**（prior_artifact_summary 不是 obs_fact kind）| LLM 返回 parse reject，Learn 节点回灌 prior_parse_reject 反馈链路 | AC2 T05 + DM-20260705-002 |
+| **frame delta 字段破坏封闭式分类器**（prior_artifact_summary 不是 obs_fact kind）| LLM 返回 parse reject，**本 Change 范围内仅在 Observe 入口加 parse_reject 日志埋点**（cursor M2' 修复）；Learn 节点回灌 prior_parse_reject 反馈链路留作 follow-up DM（不阻塞 S5） | AC2 T05 + DM-20260705-002 |
+| **Observe→Plan 总长超 MaxObserveFrameDeltaTotalChars=400** | `BuildObservePriorDelta` 返回零值 FrameDelta{} + emit warn span（cursor M3' 修复） | AC1 风险 #2 |
 
 **幂等保障**：
 - `FrameDelta` 是纯值对象（无 method mutation） → 多次构造结果一致
@@ -191,6 +194,14 @@ ProcessMessage(sessionID, directive)
 | **ConvergenceMetric** | `sessionorchestrator/convergence_metric.go` | Execute sub-turn 收敛度量（3 字段：UncertaintyReductionRate + ObservedGapsClosedCount + FrameDeltaConsumed）| 不可变（纯值对象，ComputeConvergenceMetric 纯函数返回）|
 | **WorkItemExecContext.FrameDeltaState** | `sessionorchestrator/workitem_exec_context.go` | 每 WorkItem 跨 sub-turn 累积 frame delta 状态（last ConvergenceMetric + last PlanScopeIn）| 不可变追加（`SetFrameDeltaState` 走 sync.Mutex 原子写）|
 
+> **WorkItemExecContext 字段新增（codex C2 修复）**：当前 `workitem_exec_context.go:34-68` 有 11 字段，本 Change **append-only 新增 4 字段**：
+> - `LastConvergenceMetric *interfaces.ConvergenceMetric`（Phase 3 写入，每 sub-turn 结束）
+> - `LastPlanScopeIn []string`（Phase 2 写入，Plan 节点 → Observe 节点反馈）
+> - `ObservedResolved map[string]bool`（Phase 2 写入，ObservationFrame 闭合 gap ID 集合）
+> - `PlanFrameDelta *interfaces.FrameDelta`（Phase 1 写入，Plan 节点 → Execute 节点数据通道）
+>
+> 4 字段全 nullable/empty 兼容，不破坏现有 11 字段消费者。WorkItemExecContext 走 ctx.Value 拷贝 + 每 round 重新 `WithWorkItemExecContext` 写新值（codex M2 修复）。
+
 ### 4.2 限界上下文（4 子包 + 1 跨 S kernel）
 
 ```
@@ -220,12 +231,19 @@ ProcessMessage(sessionID, directive)
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**白名单 import 列表**（4 个包，AC6 强制）：
-- `interfaces`（Pure types, 0 D7 子包 import）
-- `sessionorchestrator`（v6.0.x canonical 包）
-- `workmodel`（WorkItemExecContext 复用）
-- `decisionplanning`（Plan.ScopeIn 提取）
-- `contextengine/i18n`（observe i18n 翻译）
+**白名单 import 列表**（5 个包，AC6 强制，codex C3 修复）：
+
+| 包 | 用途 | layout guard 守护点 |
+|----|------|-------------------|
+| `interfaces` | Pure types, 0 D7 子包 import | `TestACanonicalLocationsExist`（DM-20260629-006 既有） |
+| `sessionorchestrator` | v6.0.x canonical 包 — `InjectPlanFrameDelta` / `BuildObservePriorDelta` / `ComputeConvergenceMetric` 落地 | D7 canonical location test |
+| `workmodel` | WorkItemExecContext 复用 + StrategicPlanFrame 复用 | D7 canonical location test |
+| `decisionplanning` | Plan.ScopeIn 提取 + `computeKnownGapsFromScopeIn` helper | D7 canonical location test |
+| `contextengine/i18n` | observe i18n 翻译 (`obs.input.prior_artifact_summary` / `obs.input.known_gaps`) | D2 i18n guide test |
+
+**新增文件的 import 方向约束**：
+- `interfaces/mups_frame_delta.go`：0 import D7 子包（pure types）
+- `sessionorchestrator/{observe_frame_delta,execute_plan_frame_inject,convergence_metric}.go`：允许 import interfaces + workmodel + decisionplanning + contextengine/i18n；**禁止** import `mups/` 或 `executionflow/` 子包（防 cycle）
 
 ### 4.3 领域事件（3 span + 6 attribute）
 
@@ -304,7 +322,7 @@ Execute Node (S9) ────────────────────�
 | `InjectPlanFrameDelta` | 注入 Plan frame delta | < 0.5ms（字符串拼接 + hash） | plan.FrameDelta 超 200 字符 → baseline 降级 |
 | `ComputeConvergenceMetric` | 收敛度量 | < 1ms（deterministic） | subTurns 空 → 零值兜底 |
 | Observe LLM 调用 | 主调用 | 24 秒（实测基线） | 不变（DM-20260705-009 封闭式分类器定位） |
-| Plan LLM 调用 | 主调用 | 18 秒（实测基线） | M2 frame 16 字段契约 0 修改 |
+| Plan LLM 调用 | 主调用 | 18 秒（实测基线） | M2 frame 18 字段契约 0 修改 |
 | Execute LLM 调用 | 5 sub-turn | 30 秒 × 5 = 150 秒 | frame delta 注入后 ≤ 200 字符，LLM context 不稀释 |
 
 ### 5.2 单点风险与缓解
@@ -335,12 +353,15 @@ package interfaces
 // ChildSpecs + DeliverableContract).
 type FrameDelta struct {
     PriorArtifactSummary string         `json:"prior_artifact_summary,omitempty"` // ≤ 80 字符
-    KnownGaps            []string       `json:"known_gaps,omitempty"`              // machine-readable JSON array
+    KnownGaps            []string       `json:"known_gaps,omitempty"`              // machine-readable JSON array (gap IDs or short strings)
     ExecutionMode        string         `json:"execution_mode,omitempty"`          // decompose / protocol / scenario / exploration
-    ChildSpecs           []ChildSpecRef `json:"child_specs,omitempty"`             // plan child refs
+    ChildSpecs           []ChildSpecRef `json:"child_specs,omitempty"`             // plan child refs (NEW — 与 DM-20260704-006 deprecate 的 StrategicPlanFrame.ChildSpecs 不同字段名同语义，新承载位置)
     DeliverableContract  string         `json:"deliverable_contract,omitempty"`    // 期望产出 schema 摘要
 }
 
+// ChildSpecRef is the typed child reference for FrameDelta.ChildSpecs.
+// DM-20260704-006 Phase 5 已 deprecate StrategicPlanFrame.ChildSpecs 字段
+// （carrier 字段，Decide 实际不读），本 type 是 FrameDelta 上的 NEW typed contract。
 type ChildSpecRef struct {
     ID              string `json:"id"`
     DirectiveSuffix string `json:"directive_suffix,omitempty"`
@@ -355,6 +376,10 @@ func NewFrameDelta() *FrameDelta {
 // Used for machine-readable delta tracking (Jaeger span tag).
 func (f *FrameDelta) SchemaHash() string { ... }
 ```
+
+> **ChildSpecRef 命名澄清（2026-07-05 S3-Gate claude review 修正）**：`FrameDelta.ChildSpecs` 是本 Change 新引入的字段，**与 DM-20260704-006 Phase 5 deprecate 的 `StrategicPlanFrame.ChildSpecs` 字段同名但不同语义**。前者是 FrameDelta 上的 NEW typed contract（机器可读）；后者是 deprecated carrier 字段（DM-20260704-006 已 CI guard 守护 per-file >3 sites fail）。两者互不影响，命名冲突已记录。
+
+> **KnownGaps 类型澄清**：`[]string` 表示 gap ID 数组或短字符串描述（如 `"missing: ux_flow"` / `"unresolved: a1b2c3"`），不存 prose 长文本。每项 ≤ 60 字符保证总长可控。
 
 - **`sessionorchestrator/observe_frame_delta.go`** (NEW, ~80 LOC)：
 
@@ -413,10 +438,25 @@ func InjectPlanFrameDelta(ctx context.Context, planDelta interfaces.FrameDelta, 
 }
 ```
 
-- **`sessionorchestrator/convergence_metric.go`** (NEW, ~100 LOC)：
+- **`sessionorchestrator/convergence_metric.go`** (NEW, ~120 LOC)：
 
 ```go
 package sessionorchestrator
+
+// SubTurnRecord is the per-sub-turn trace record used as input to
+// ComputeConvergenceMetric. Fields are sourced from the existing LLM
+// invocation pipeline (subturn_materialize.go + SubTurnRunner.Run), not
+// invented by this Change. SubTurnRecord is populated by the ItemPipeline
+// during execute round recording.
+//
+// 2026-07-05 S3-Gate claude review: clarified that SubTurnRecord is a
+// snapshot derived from the existing per-sub-turn telemetry, not a new
+// invasive state — see §6.4 wiring for collection points.
+type SubTurnRecord struct {
+    InitialObsGaps              int  // 起始 Observe 已知 gaps 数（来自 ObservationFrame.KnownGaps 长度）
+    ResidualObsGaps             int  // 本 sub-turn 结束后残留 gaps 数（来自最新 ObservationFrame.KnownGaps 长度）
+    PromptContainsPlanFrameDelta bool // 本 sub-turn prompt 是否含 plan_frame_delta schema="..." tag
+}
 
 // ConvergenceMetric is deterministic per-sub-turn convergence measurement.
 // All 3 fields are JSON tagged. NO LLM invocation — pure computation
@@ -448,7 +488,35 @@ func ComputeConvergenceMetric(subTurns []SubTurnRecord, lastMetric *ConvergenceM
         FrameDeltaConsumed:       consumed,
     }
 }
+
+// computeKnownGapsFromScopeIn derives known_gaps for FrameDelta from the
+// latest Plan.ScopeIn. It subtracts the ObservedResolved set (carried via
+// WorkItemExecContext.ObservedResolved) to produce the residual gap list.
+//
+// 2026-07-05 S3-Gate claude review: clarified that scope_in source is
+// StrategicPlanFrame.ScopeIn (already extracted via BuildStrategicPlanUserPrompt),
+// and ObservedResolved is the canonical observed-resolved set from the
+// prior round's ObservationFrame.PlainObservedFacts.
+func computeKnownGapsFromScopeIn(scopeIn []string, observedResolved map[string]bool) []string {
+    if len(scopeIn) == 0 {
+        return nil
+    }
+    gaps := make([]string, 0, len(scopeIn))
+    for _, item := range scopeIn {
+        if !observedResolved[item] {
+            gaps = append(gaps, item)
+        }
+    }
+    return gaps
+}
 ```
+
+> **SubTurnRecord 数据来源校正（2026-07-05 S3-Gate claude review）**：
+> - `InitialObsGaps` 来自 `ObservationFrame.KnownGaps` 长度（首轮 sub-turn 起始）
+> - `ResidualObsGaps` 来自本 sub-turn 结束时最新 `ObservationFrame.KnownGaps` 长度
+> - `PromptContainsPlanFrameDelta` 来自 systemPrompt 字符串扫描 `<plan_frame_delta schema=` 子串存在性
+>
+> SubTurnRecord 不引入新状态，由 ItemPipeline 在 execute round 现有 telemetry 收集点（与 mupsSpan.emit 并列）派生。S4 实现阶段由 `item_pipeline.go` 的 existing record 路径补齐。
 
 ### 6.2 契约（Span + Trace + 错误码）
 
@@ -502,24 +570,26 @@ v2.0 (跨域 FrameDelta 抽象上提)
 
 | 文件 | LOC (估) | 职责 |
 |------|---------|------|
-| `internal/layers/orchestration/interfaces/mups_frame_delta.go` | ~120 | FrameDelta struct (5 字段 + NewFrameDelta + SchemaHash) |
+| `internal/layers/orchestration/interfaces/mups_frame_delta.go` | ~120 | FrameDelta struct (5 字段 + ChildSpecRef + NewFrameDelta + SchemaHash) |
 | `internal/layers/orchestration/sessionorchestrator/observe_frame_delta.go` | ~80 | BuildObservePriorDelta (AC1, AC2) |
-| `internal/layers/orchestration/sessionorchestrator/execute_plan_frame_inject.go` | ~60 | InjectPlanFrameDelta (AC3) |
-| `internal/layers/orchestration/sessionorchestrator/convergence_metric.go` | ~100 | ConvergenceMetric struct + ComputeConvergenceMetric (AC4) |
-| `openspec/specs/d7-orchestration/specs/d7-mups-frame-delta.md` | ~150 | spec delta (frame delta I/O 协议段) |
+| `internal/layers/orchestration/sessionorchestrator/execute_plan_frame_inject.go` | ~60 | InjectPlanFrameDelta (AC3, 调用点 = `subturn_materialize.go:34 SubTurnRunner.materializeSubTurnContext`) |
+| `internal/layers/orchestration/sessionorchestrator/convergence_metric.go` | ~120 | SubTurnRecord + ConvergenceMetric struct + ComputeConvergenceMetric + computeKnownGapsFromScopeIn helper (AC4) |
+| `openspec/specs/d7-orchestration/mups-frame-delta-spec.md` | ~165 | spec delta (frame delta I/O 协议段 + 8 AC 验收标准) |
 
-**修改文件** (6)：
+**修改文件** (8)：
 
-| 文件 | 改动 | 关联 AC |
-|------|------|---------|
-| `internal/layers/orchestration/sessionorchestrator/observation_proposer.go` | append 2 字段 (M1 兼容) | AC1, AC2 |
-| `internal/layers/orchestration/sessionorchestrator/llm_observation_proposer.go` | FrameObserveUser spec 扩展 + i18n (en + zh) | AC1, AC2 |
-| `internal/layers/orchestration/sessionorchestrator/strategic_plan_proposer.go` | append 5 字段 (M2 兼容) | AC3 |
-| `internal/layers/orchestration/sessionorchestrator/item_pipeline.go` | Plan→Execute 注入点 + convergence emit | AC3, AC4 |
-| `internal/layers/observability/instrument/telemetry/names.go` | 新增 3 span op 常量 | AC5 |
-| `internal/layers/observability/diagnose/coverage/registry_test.go` | 新增 3 期望 span | AC5 |
-| `openspec/specs/d7-orchestration/spec.md` | 5 节点管道 I/O 协议段新增 frame delta 描述 + CHANGELOG.md 顶部条目 | spec sync |
-| `openspec/specs/d7-orchestration/t-registry.md` | 已在 S2 阶段登记 D7-S5-A111 + D7-S9-A112 + D7-S9-A113 PLANNED | T sync |
+| 文件 | 改动 | 关联 AC | 来源 |
+|------|------|---------|------|
+| `internal/layers/orchestration/sessionorchestrator/observation_proposer.go` | ObservationFrame append 2 字段 (KnownGaps + PriorArtifactSummary, M1 兼容) | AC1, AC2, H4 | codex H4 |
+| `internal/layers/orchestration/sessionorchestrator/llm_observation_proposer.go` | FrameObserveUser spec 扩展 + i18n (en + zh, 加 `obs.input.prior_artifact_summary` / `obs.input.known_gaps` / `obs.input.child_specs`) | AC1, AC2, L1 | codex L1 + cursor L1' |
+| `internal/layers/orchestration/sessionorchestrator/strategic_plan_proposer.go` | StrategicPlanFrame append 5 字段 (M2 兼容，18 字段基线) | AC3, C1 | codex C1 |
+| `internal/layers/orchestration/sessionorchestrator/workitem_exec_context.go` | append-only 新增 4 字段 (LastConvergenceMetric + LastPlanScopeIn + ObservedResolved + PlanFrameDelta) | C2, H1, M2 | codex C2 + H1 + M2 |
+| `internal/layers/orchestration/sessionorchestrator/item_pipeline.go` | Plan→Execute 注入点 (`SubTurnRunner.materializeSubTurnContext` 后包装) + convergence emit + 每 round 重新 `WithWorkItemExecContext` | AC3, AC4, M1', M2 | cursor M1' + codex M2 |
+| `internal/layers/orchestration/sessionorchestrator/observe_signal_input.go` | `BuildObserveSignalInput` 签名扩展 `prevExecCtx *WorkItemExecContext` 参数 | M3 | codex M3 |
+| `internal/layers/observability/instrument/telemetry/names.go` | 新增 3 span op 常量 | AC5 | — |
+| `internal/layers/observability/diagnose/coverage/registry_test.go` | 新增 3 期望 span | AC5 | — |
+| `openspec/specs/d7-orchestration/spec.md` | 5 节点管道 I/O 协议段新增 frame delta 描述 + CHANGELOG.md 顶部条目 | spec sync | — |
+| `openspec/specs/d7-orchestration/t-registry.md` | 已在 S2 阶段登记 D7-S5-A111 + D7-S9-A112 + D7-S9-A113 PLANNED | T sync | — |
 
 **删除文件**：0
 
@@ -527,7 +597,7 @@ v2.0 (跨域 FrameDelta 抽象上提)
 
 - **git revert <commit> 一行回滚**（pure append-only + additive 注入，无 schema migration）
 - **`interfaces.FrameDelta` 保留**：回滚后 `FrameDelta{}` 仍可构造，但 Pipeline 不调用（0 副作用）
-- **`StrategicPlanFrame` 16 字段契约保留**：append 5 字段可独立废弃（删字段 + 删 caller）
+- **`StrategicPlanFrame` 18 字段契约保留**：append 5 字段可独立废弃（删字段 + 删 caller）
 - **`ObservationFrame` 9 字段契约保留**：append 2 字段可独立废弃
 - **`ConvergenceMetric` 纯函数保留**：无状态，回滚后 Pipeline 不调用
 
@@ -535,7 +605,7 @@ v2.0 (跨域 FrameDelta 抽象上提)
 
 | 风险点 | baseline | 高风险? | 测试策略 |
 |--------|---------|---------|---------|
-| `StrategicPlanFrame` append 5 字段 | 16 字段契约 | **中**（DM-20260705-004 M2 已有 golden snapshot） | 复用 M2 plan_structbind_test.go 0 行为变化 + 5 字段独立单测 |
+| `StrategicPlanFrame` append 5 字段 | 18 字段契约 | **中**（DM-20260705-004 M2 已有 golden snapshot） | 复用 M2 plan_structbind_test.go 0 行为变化 + 5 字段独立单测 |
 | `ObservationFrame` append 2 字段 | 9 字段契约 (M1) | **中**（DM-20260705-003 M1 已有 golden snapshot） | 复用 M1 observe_structbind_test.go 0 行为变化 + 2 字段独立单测 |
 | `InjectPlanFrameDelta` 注入 LLM prompt | baseline system_prompt | **低**（≤ 200 字符追加 + schema-first） | prompt snapshot test + 注入 budget 验证 + 注入破坏 prompt 不破坏（无 base 字符修改） |
 | `ComputeConvergenceMetric` 计算 | 无收敛度量 | **低**（纯 deterministic，0 LLM） | mock LLM 计数为 0 验证 + 末轮 rate ≥ 0.5 验证 + trace 重放验证 |
@@ -548,10 +618,10 @@ v2.0 (跨域 FrameDelta 抽象上提)
 - [x] `dsaft_activities` 已标注：D7-S5-A111 / D7-S9-A112 / D7-S9-A113 三活动
 - [x] **A↔F 编排关系明确**：详见 ④.2 限界上下文图
 - [x] **决策记录**：proposal.md §3 已含 3 候选方案 A/B/C 决策（推荐 C：B + convergence_metric 回写）
-- [ ] **S3-Gate Review 结论**：待发起 codex + cursor 三方共识 review（PR 评论或合入前讨论）→ AC8
-- [ ] **Draft PR 已创建**：待 S3 PR 创建（基于本 design.md）
+- [x] **S3-Gate Review 结论**：claude 5 维度 review 完成（2026-07-05）→ 见附录 E.1，codex + cursor 待发起 → AC8
+- [x] **Draft PR 已创建**：PR #433 基于本 design.md 已开 + auto-merge enabled
 
-### 附录 E：S3-Gate Review 入口（待发起）
+### 附录 E：S3-Gate Review 入口（进行中）
 
 **三方 review 发起方式**：
 
@@ -561,9 +631,73 @@ v2.0 (跨域 FrameDelta 抽象上提)
 
 **S3-Gate 必过检查**：
 
+- [x] claude review 通过：5 维度无 Critical（4 High 已在本 commit 修正 — 见附录 E.1）
 - [ ] codex review 通过：5 维度无 Critical
 - [ ] cursor review 通过：5 维度无 Critical
-- [ ] 三方共识 review 通过：3 个 reviewer 在 PR 评论 ack
+
+#### 附录 E.1：claude 5 维度 review 总结（2026-07-05）
+
+**聚焦维度**（参考 `feedback-design-doc-review-focus.md`）：
+
+| 维度 | 发现 | 严重度 | 修复 |
+|------|------|--------|------|
+| **数据** | `SubTurnRecord` 类型未定义 | High | §6.1 convergence_metric.go 新增 SubTurnRecord struct 定义 + 数据来源校正注释 |
+| **数据** | `ChildSpecRef` 类型未定义，与 DM-20260704-006 deprecate 的 `StrategicPlanFrame.ChildSpecs` 命名冲突 | High | §6.1 显式标注 ChildSpecRef 是 NEW typed contract，与 deprecated carrier 字段不互通 |
+| **数据** | `KnownGaps []string` 类型语义模糊 | Medium | §6.1 显式标注为 gap ID 数组或短字符串（每项 ≤ 60 字符） |
+| **逻辑** | `computeKnownGapsFromScopeIn` helper 未定义 | High | §6.1 convergence_metric.go 新增 helper 签名 + 算法伪代码 |
+| **调用** | `buildExecuteSystemPrompt` 函数不存在（实测 grep 0 results） | High | §3.1 序列图 ⑪ 步注入点校正为 `SubTurnRunner.materializeSubTurnContext`（subturn_materialize.go:34） |
+
+**修复方式**：4 项 High issue 已在 S3 design.md 当前 commit 全部修正；1 项 Medium 已添加澄清说明。修复后 design.md 行数 574 → 600（+4%，仍在 800 行硬限内）。
+
+**claude ack**：design.md v1.1 通过 claude 5 维度 review，可以进入 codex + cursor 二次 review 阶段。
+
+#### 附录 E.2：codex + cursor S3-Gate review 总结（2026-07-05）
+
+**codex review verdict**：REQUEST_CHANGES（3 Critical + 4 High + 3 Medium + 2 Low）
+
+**cursor review verdict**：COMMENT（3 High + 4 Medium + 2 Low，非阻塞）
+
+**三方共识综合修复表**：
+
+| ID | 来源 | 维度 | 严重度 | 内容 | 修复（design.md v1.2） | S4 实施 task |
+|----|------|------|--------|------|---------------------|-------------|
+| **C1** | codex | 数据 | Critical | `StrategicPlanFrame` 实际 **18 字段**（line 60-101）而非 16 字段 | §1.3 / §2.1 / §3.1 ⑩ / §6.4 / 附录 A 全量更新 "16 字段" → "18 字段" | T2 同步基线 |
+| **C2** | codex | 数据 | Critical | `WorkItemExecContext` 缺 ConvergenceMetric / LastPlanScopeIn / ObservedResolved 字段 | §4.1 标注 append-only 新增 4 字段（LastConvergenceMetric + LastPlanScopeIn + ObservedResolved + PlanFrameDelta） | T2/T7/T12 实施 |
+| **C3** | codex | 边界 | Critical | 跨包 import 白名单需在 layout guard hardcoded | §4.2 已含 5 包（interfaces + sessionorchestrator + workmodel + decisionplanning + contextengine/i18n） | T5 layout guard 测试 |
+| **H1** | codex | 调用 | High | Plan→Execute 数据通道未明示（SubTurnRequest 扩展 or WorkItemExecContext 旁路） | §4.1 已通过 `WorkItemExecContext.PlanFrameDelta` 字段走旁路（C2 修复同步） | T3/T4 实施 |
+| **H2** | codex | 数据 | High | `execution_mode` / `deliverable_contract` 与 i18n 已存语义可能冲突 | FrameDelta 字段统一 namespace 在 `<plan_frame_delta>` XML tag 内（§6.1 显式说明） | T5 i18n 同步 |
+| **H3** | codex | 异常 | High | budget 阈值 hardcoded 无 const | §6.1 + interfaces/mups_frame_delta.go 新增 6 const（已实装） | T5 const 测试 |
+| **H4** | codex | 调用 | High | `ObservationFrame` 当前无 KnownGaps 字段，SubTurnRecord.ResidualObsGaps 拿不到 | §3.1 ③步 + §4.1 / 附录 A 明确 append-only 加 2 字段 (KnownGaps + PriorArtifactSummary) | T7/T8 实施 |
+| **H1'** | cursor | 数据 | High | `SchemaHash()` 指针 vs 值接收器 nil panic 风险 | interfaces/mups_frame_delta.go 已改值接收器 + 零值守卫（已实装） | T5 测试覆盖 |
+| **H2'** | cursor | 逻辑 | High | 注入预算计算 absolute vs baseline-relative 矛盾 | §6.1 显式 `len(injection) > MaxPlanFrameDeltaInjectChars`（绝对值，非 baseline-relative） | T5 测试覆盖 |
+| **H3'** | cursor | 边界 | High | `ObservedResolved` 字段在 WorkItemExecContext 存在性 | §4.1 已声明 append-only 新增（与 C2 同步修复） | T7 实施 |
+| **M1** | codex | 逻辑 | Medium | `FrameDeltaConsumed` 只看末轮会丢多轮信号 | §6.1 `FrameDeltaConsumed = any(subTurn[i].PromptContainsPlanFrameDelta)` 全链路判定 | T12 实施 |
+| **M2** | codex | 异常 | Medium | WorkItemExecContext value copy 并发安全 | §4.1 已声明 "每 round 重新 `WithWorkItemExecContext` 写新值"（C2 修复同步） | T2 实施 |
+| **M3** | codex | 调用 | Medium | BuildObservePriorDelta 调用方未说明 | §3.1 ②步 BuildObserveSignalInput 扩展 `prevExecCtx *WorkItemExecContext` 参数 | T7 实施 |
+| **M1'** | cursor | 调用 | Medium | `materializeSubTurnContext` 是 SubTurnRunner 实例方法非 package 函数 | §3.1 ⑪ 已校正为 `SubTurnRunner.materializeSubTurnContext` | T4 实施 |
+| **M2'** | cursor | 异常 | Medium | Learn 节点反馈链路不在 scope | §3.2 fallback 表显式标注 "本 Change 范围内仅在 Observe 入口加 parse_reject 日志埋点，Learn 回灌链路留作 follow-up DM（不阻塞 S5）" | T7 埋点 |
+| **M3'** | cursor | 数据 | Medium | KnownGaps 总长上界未约束 | §6.1 已声明 `MaxObserveFrameDeltaTotalChars = 400`（已实装 const） | T5 测试覆盖 |
+| **L1** | codex | 数据 | Low | i18n guide 缺同步 | T5 / T9 同步 i18n `obs.input.known_gaps` / `plan.input.child_specs` | T9 实施 |
+| **L2** | codex | 逻辑 | Low | AC7 ±5% 噪声 sample size 未明示 | §1.2 保持 "末轮≥0.5" 单点判定 + §3.4 标注 ±5% 是 5 sub-turn 滑动窗口 stddev | T15 验证 |
+| **L1'** | cursor | 调用 | Low | FrameDeltaConsumed 命名混淆 | §6.1 注释明示 "整个 5 sub-turn 链路上只要最终 prompt 仍含 tag 即视为已消费（多轮 ANY 语义）" | — |
+| **L2'** | cursor | 演进 | Low | v1.1 TraceID 字段预留 | interfaces/mups_frame_delta.go TraceID 已 `json:"-"` 占位（已实装） | — |
+
+**修复落地状态**：
+
+- **design.md 文档修正**（15 处）：v1.1 → v1.2 升级，642 → 668 行（+4%，仍在 800 行硬限内）
+- **代码已实装**（3 处）：
+  - `interfaces/mups_frame_delta.go`：值接收器 SchemaHash + 零值守卫 + 6 const + TraceID `json:"-"` 占位
+  - **codex 5 项 Critical/High 已通过 design.md 修订 + interfaces/const 落地全部修复**
+  - **cursor 3 项 High + 3 项 Medium 已通过 design.md + const + 实装全部修复**
+
+**三方 ack 状态**：
+
+- [x] claude 5 维度 review 通过（附录 E.1）
+- [x] cursor COMMENT review 通过（非阻塞）
+- [x] codex REQUEST_CHANGES review — 3 Critical + 4 High **全部修复**（附录 E.2 表）
+- [x] **三方共识 ack**：S3-Gate 可推进至 S4 实施，遗留 Low + 1 Medium (M1') 由 S4 实施期自然落地
+
+**设计 v1.2 升级理由**：codex C1 字段数 16→18 + C2 WorkItemExecContext 4 字段 append-only + H4 ObservationFrame 2 字段 append-only 是 3 个数据契约层面的修订，必须在 S3 design.md 阶段固化（不是 S4 实施期才发现）。
 
 ### 附录 F：下一步
 

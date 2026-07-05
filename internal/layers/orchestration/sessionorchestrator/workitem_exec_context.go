@@ -65,6 +65,20 @@ type WorkItemExecContext struct {
 	// nil/empty → legacy verdict-based path; the ItemPipelineRunner no-ops
 	// on extractResolutionClaimsFromArtifact.
 	ResolutionStrategies []interfaces.ResolutionStrategy
+	// PlanFrameDelta carries the Plan→Execute typed delta (DM-20260705-010
+	// devrix-d7-mups-frame-delta-closure, Phase 1 T4). Set by the orchestrator
+	// AFTER Plan yields a StrategicPlanProposal and BEFORE Execute's system
+	// prompt is materialized (subturn_materialize.go). nil → legacy path,
+	// InjectPlanFrameDelta no-ops (returns baseline unchanged + emits
+	// prior_delta_empty span).
+	PlanFrameDelta *interfaces.FrameDelta
+	// LastConvergenceMetric carries the previous round's deterministic
+	// ConvergenceMetric (DM-20260705-010 Phase 3 T13). Written by
+	// item_pipeline.go after each Execute round's ComputeConvergenceMetric.
+	// nil → first round / no prior convergence signal; the next round's
+	// BuildObservePriorDelta then falls back to the raw ArtifactSummary
+	// instead of the convergence-aware "Round N: X% converged" format.
+	LastConvergenceMetric *ConvergenceMetric
 }
 
 // WithWorkItemExecContext attaches WorkItem exec metadata to ctx.

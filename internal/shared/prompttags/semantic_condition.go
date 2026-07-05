@@ -47,6 +47,11 @@ const (
 	CondPriorObservationIDs      SemanticCondition = "prior_observation_ids"
 	CondObservationSummary       SemanticCondition = "observation_summary"
 	CondUncertaintyMeanControl   SemanticCondition = "uncertainty_mean_control"
+
+	// DM-20260705-010 (devrix-d7-mups-frame-delta-closure) Phase 2 T9:
+	// Observe→Plan frame delta inject input semantics.
+	CondPriorArtifactSummary     SemanticCondition = "prior_artifact_summary"
+	CondKnownGaps                SemanticCondition = "known_gaps"
 	CondRemainingChildrenBudget  SemanticCondition = "remaining_children_budget"
 	CondObservationIDs           SemanticCondition = "observation_ids"
 	CondDepthControl             SemanticCondition = "depth_control"

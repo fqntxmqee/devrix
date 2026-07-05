@@ -42,6 +42,10 @@ var semanticGlossaryZH = map[prompttags.SemanticCondition]string{
 	prompttags.CondObservationIDs:           "上一轮 Obs IDs (data, 增量上下文)",
 	prompttags.CondDepthControl:             "当前工作项深度 (control)",
 	prompttags.CondMaxDepthControl:          "允许的最大深度 (control)",
+
+	// DM-20260705-010 Phase 2 T9: Observe→Plan frame delta inject.
+	prompttags.CondPriorArtifactSummary:     "上一轮 artifact 摘要（data）；≤80 字符；承载前一轮 Execute 收敛上下文",
+	prompttags.CondKnownGaps:                "已知未闭合 gap ID（data）；机读 JSON 数组；桥接 Observe→Plan",
 	prompttags.CondExistingChildrenControl:  "已存在非临时子节点数 (control)",
 	prompttags.CondMaxChildrenControl:       "允许的最大子节点数 (control)",
 	prompttags.CondDecomposeUsedToday:       "24h 内已用 decompose 次数 (control)",

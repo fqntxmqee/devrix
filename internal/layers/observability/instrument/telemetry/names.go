@@ -217,6 +217,28 @@ const (
 	OpD7_S18_Hard_Evidence_Reject         = "D7_Hard_Evidence_Reject"
 	OpD7_S18_Worktree_VersionChain_Append = "D7_Worktree_VersionChain_Append"
 	OpD7_S18_Similarity_Check_Intercept   = "D7_Similarity_Check_Intercept"
+
+	// --- DM-20260705-010 (devrix-d7-mups-frame-delta-closure) S4 spans ---
+	// 3 inner-layer Span ops for the MUPS 5-node FrameDelta closure (AC5/AC8/AC9).
+	// All three follow the same package-level hardening.emit pattern: no-op
+	// when bridge nil. The 3 ops cover the three injection/closure points
+	// that make the MUPS I/O protocol an explicit convergence process.
+	//
+	// D7-S5 Observe→Plan frame delta inject (P0, AC5):
+	// wraps BuildObservePriorDelta inside buildObserveRequest. Records the
+	// injected prior_artifact_summary + known_gaps payload so dashboards can
+	// confirm Observe→Plan contract is being honoured per round.
+	OpD7_S5_Observe_PriorDelta_Inject = "D7_Observe_PriorDelta_Inject"
+	// D7-S9 Execute Plan→Execute frame delta inject (P0, AC5):
+	// wraps InjectPlanFrameDelta inside item_pipeline.run. Records the
+	// schema_hash + injection_chars + injection_status triple so dashboards
+	// can detect budget_exceeded_fallback_baseline regressions.
+	OpD7_S9_Execute_PlanFrameDelta_Inject = "D7_Execute_PlanFrameDelta_Inject"
+	// D7-S9 Execute convergence metric emit (P0, AC8):
+	// wraps ConvergenceMetricRecord deterministic compute after Verify
+	// yields a Verdict. Records coverage_ratio + gaps_closed_count +
+	// frame_delta_consumed flag for Phase 3 cross-round convergence tracking.
+	OpD7_S9_Execute_ConvergenceMetric_Emit = "D7_Execute_ConvergenceMetric_Emit"
 )
 
 // SpanAttrs returns the extra attributes only. Layer/component are intentionally
@@ -292,7 +314,10 @@ func LayerAndComponent(operation string) (layer, component string) {
 		strings.HasPrefix(operation, "D7_AdaptivePrior_Inject"),
 		strings.HasPrefix(operation, "D7_Anomaly_Trigger"),
 		strings.HasPrefix(operation, "D7_LongTerm_Reputation_Update"),
-		strings.HasPrefix(operation, "D7_LastText_Quality_Gate"):
+		strings.HasPrefix(operation, "D7_LastText_Quality_Gate"),
+		strings.HasPrefix(operation, "D7_Observe_PriorDelta_Inject"),
+		strings.HasPrefix(operation, "D7_Execute_PlanFrameDelta_Inject"),
+		strings.HasPrefix(operation, "D7_Execute_ConvergenceMetric_Emit"):
 		// DM-20260629-001 PR-6 t-span-coverage 5 ops (T35) +
 		// DM-20260630-011 lasttext.quality_gate. Long-running reputation
 		// learning, anomaly triggers, prior injection, resume decision

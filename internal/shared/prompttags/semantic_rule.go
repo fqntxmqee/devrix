@@ -103,6 +103,9 @@ var observeInputSemantics = map[TagName]SemanticRule{
 	TagPriorObservationIDs: {WhenUse: CondPriorObservationIDs},
 	TagIncrementalOnly:     {WhenUse: CondIncrementalRound, Enforced: true, Gate: "incremental_observe"},
 	TagWorkItemID:          {WhenUse: CondWorkItemIdentifier},
+	// DM-20260705-010 Phase 2 T9: append-only 2 字段 Observe→Plan frame delta.
+	TagPriorArtifactSummary: {WhenUse: CondPriorArtifactSummary},
+	TagKnownGaps:            {WhenUse: CondKnownGaps},
 }
 
 var planInputSemantics = map[TagName]SemanticRule{

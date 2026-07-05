@@ -54,6 +54,19 @@ type ObserveSignalInput struct {
 
 	// 9. incremental_only (control, omit_zero) — true iff PriorObservationIDs non-empty.
 	IncrementalOnly bool `pt:"incremental_only,control,omit_zero"`
+
+	// 10. prior_artifact_summary (data, omit_empty) — DM-20260705-010
+	// (devrix-d7-mups-frame-delta-closure) Phase 2 T8: Observe→Plan frame
+	// delta inject. ≤80-char human-readable summary of the previous round's
+	// Execute convergence (built by BuildObservePriorDelta). Append-only;
+	// existing 9 字段契约 0 修改.
+	PriorArtifactSummary string `pt:"prior_artifact_summary,data,omit_empty"`
+
+	// 11. known_gaps (data, omit_empty, multi-line) — machine-readable gap
+	// ID array (each ≤60 chars) bridging Observe→Plan. Phase 2 stub: empty
+	// array. Phase 3+ will compute as
+	// WorkItemExecContext.LastPlanScopeIn - ObservedResolved diff (design.md §3.2).
+	KnownGaps []string `pt:"known_gaps,data,omit_empty"`
 }
 
 // init registers ObserveSignalInput with the prompttags user-frame registry.
@@ -90,7 +103,7 @@ func (p StaticObservationProposer) ProposeObservations(_ context.Context, _ Obse
 	return append([]ObservationProposal(nil), p.Proposals...), nil
 }
 
-func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *workmodel.TaskManager) ObserveSignalInput {
+func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *workmodel.TaskManager, prevExecCtx *WorkItemExecContext) ObserveSignalInput {
 	in := ObserveSignalInput{
 		SessionID:  sessionID,
 		WorkItemID: item.ID,
@@ -134,6 +147,14 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 					"expected_return: "+dl.ExpectedReturn)
 			}
 		}
+	}
+	// DM-20260705-010 Phase 2 T8: bind Observe→Plan frame delta from prev round.
+	// prevExecCtx nil → BuildObservePriorDelta returns zero-value FrameDelta
+	// (no signal, observe.prior_delta_empty span emitted via hardening).
+	fd := BuildObservePriorDelta(context.Background(), sessionID, prevExecCtx)
+	in.PriorArtifactSummary = fd.PriorArtifactSummary
+	if len(fd.KnownGaps) > 0 {
+		in.KnownGaps = append([]string(nil), fd.KnownGaps...)
 	}
 	return in
 }
@@ -233,7 +254,7 @@ func mergeProposedObservations(
 	if proposer == nil || item == nil {
 		return nil, "", nil
 	}
-	in := buildObserveSignalInput(sessionID, item, tm)
+	in := buildObserveSignalInput(sessionID, item, tm, nil)
 	if prior != nil {
 		in.PriorMean = prior.PriorBeta.Mean()
 	}

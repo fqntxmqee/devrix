@@ -26,8 +26,9 @@ func TestObserveSignalInput_RegisteredAtInit(t *testing.T) {
 	if !ok {
 		t.Fatal("FrameObserveUser missing from LineFrameRegistry")
 	}
-	if len(spec.Fields) != 9 {
-		t.Fatalf("FrameObserveUser has %d fields, want 9: %v", len(spec.Fields), spec.Fields)
+	// DM-20260705-010 Phase 2 T8: 9 → 11 字段契约 (append-only 加 prior_artifact_summary + known_gaps).
+	if len(spec.Fields) != 11 {
+		t.Fatalf("FrameObserveUser has %d fields, want 11 (DM-20260705-010 v1.1): %v", len(spec.Fields), spec.Fields)
 	}
 	expected := []prompttags.TagName{
 		prompttags.TagWorkItemID, prompttags.TagDirective, prompttags.TagPriorParseReject,
@@ -125,7 +126,7 @@ func TestBuildObserveSignalInput_FlattensScopeContract(t *testing.T) {
 	item.LastRound = &workmodel.WorkItemPipelineRound{
 		ObservationIDs: []string{"obs_1"},
 	}
-	in := buildObserveSignalInput("s1", item, tm)
+	in := buildObserveSignalInput("s1", item, tm, nil)
 	if in.ScopeGoal != "ship login v2" {
 		t.Errorf("ScopeGoal = %q, want %q", in.ScopeGoal, "ship login v2")
 	}
@@ -149,7 +150,7 @@ func TestBuildObserveSignalInput_NilScopeContract(t *testing.T) {
 	}
 	item.ScopeContract = nil
 	item.LastRound = nil
-	in := buildObserveSignalInput("s1", item, tm)
+	in := buildObserveSignalInput("s1", item, tm, nil)
 	if in.ScopeGoal != "" {
 		t.Errorf("ScopeGoal = %q, want empty", in.ScopeGoal)
 	}
