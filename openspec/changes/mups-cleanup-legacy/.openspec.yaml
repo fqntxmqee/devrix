@@ -1,0 +1,13 @@
+change_id: mups-cleanup-legacy
+priority: P2
+demand_id: DM-20260705-007
+status: s3_design
+domains: [D7]
+dsaft_scenarios: [D7-S10, D7-S15]
+dsaft_activities: [D7-S10-A101, D7-S15-A102]
+t_points: []
+version_scope:
+  v1.0: |
+    mups-cleanup-legacy: 删除 M4 verify_legacy_test.go (307 行) + M5 spawn_policy_legacy_test.go (356 行) + 4 个旧符号 (verifyArtifactLegacy/verifyArtifactForWorkItemWithContractLegacy/verifyRollupArtifactLegacy/SpawnPolicyEvaluatorLegacy) + 2 个 build tag (legacy_verify/legacy_spawn). 0 行为变化 (仅 test 编译路径).
+metrics_definitions: []
+span_naming: []
