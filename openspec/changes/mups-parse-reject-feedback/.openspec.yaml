@@ -1,0 +1,12 @@
+schema: openspec
+change-id: mups-parse-reject-feedback
+demand-id: DM-20260705-002
+status: planning
+title: "MUPS parse/budget reject — 结构化反馈注入下一轮 user frame"
+parent_demands:
+  - DM-20260704-005  # IO registry; P2 defer reject feedback
+  - DM-20260705-001  # tag semantics layer (archived)
+capabilities:
+  - shared/prompttags
+  - d7-orchestration
+  - d2-context-engine
