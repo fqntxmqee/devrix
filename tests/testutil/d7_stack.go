@@ -58,6 +58,12 @@ type D7StackOptions struct {
 	// the bootstrap to wire TurnState + TranscriptReader. Default 0
 	// (disabled, pre-D7-S15 behavior).
 	PriorContextRounds int
+
+	// ObsConfig (DM-20260705-010 Phase 4, T16) overrides the observability
+	// config (default: observability.DefaultConfig() = OTLP + prometheus).
+	// Tests that want in-process span inspection pass a memory exporter
+	// config (Exporter: "memory"). Default nil = DefaultConfig().
+	ObsConfig *observability.Config
 }
 
 // D7TestStack holds a production-like D1+D2+D3+D7 wiring for integration tests.
@@ -80,7 +86,11 @@ func NewD7TestStack(t *testing.T, opt D7StackOptions) *D7TestStack {
 	t.Helper()
 
 	workDir := t.TempDir()
-	obs, err := observability.New(observability.DefaultConfig())
+	obsCfg := opt.ObsConfig
+	if obsCfg == nil {
+		obsCfg = observability.DefaultConfig()
+	}
+	obs, err := observability.New(obsCfg)
 	if err != nil {
 		t.Fatalf("observability: %v", err)
 	}
