@@ -149,6 +149,15 @@ func TestAllOperations_should_match_telemetry_constants(t *testing.T) {
 
 		// D6 Evolution - Runtime Validation (D6-S4)
 		telemetry.OpD6_S4_Validation_Decision,
+
+		// DM-20260705-XXX D3/D1 ghost-time tracing spans (P0):
+		// D3_LLM_Stream_Consume covers SSE chunk consumption between
+		// Adapter_Stream and Retry span end; D1_Capture_Transcript_Append
+		// + D1_Capture_Dispatch expose file I/O + Feishu HTTP latency
+		// inside EngineEvent_Handle.
+		telemetry.OpD1_S13_Capture_Transcript_Append,
+		telemetry.OpD1_S13_Capture_Dispatch,
+		telemetry.OpD3_S3_LLM_Stream_Consume,
 	}
 
 	registry := coverage.AllOperations()
