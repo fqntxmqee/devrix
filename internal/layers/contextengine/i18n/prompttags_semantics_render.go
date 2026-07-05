@@ -8,63 +8,95 @@ import (
 	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
-func semanticText(loc Locale, key string) string {
+func localizeCondition(loc Locale, cond prompttags.SemanticCondition) string {
+	if cond == "" || cond == prompttags.CondApplies {
+		return ""
+	}
 	if loc == LocaleEN {
-		if s, ok := prompttagsSemanticsEN[key]; ok {
+		if s, ok := semanticGlossaryEN[cond]; ok {
 			return s
 		}
-	} else if s, ok := prompttagsSemanticsZH[key]; ok {
+	} else if s, ok := semanticGlossaryZH[cond]; ok {
+		return s
+	}
+	return string(cond)
+}
+
+func semanticNodeRole(loc Locale, key string) string {
+	if loc == LocaleEN {
+		if s, ok := semanticNodeRoleEN[key]; ok {
+			return s
+		}
+	} else if s, ok := semanticNodeRoleZH[key]; ok {
 		return s
 	}
 	return key
 }
 
-// RenderSemanticAppendix returns locale-aware semantic bullets for phase (no schema duplication).
+// semanticText resolves a node-role key for tests and legacy call sites.
+func semanticText(loc Locale, key string) string {
+	return semanticNodeRole(loc, key)
+}
+
+func planeGuide(loc Locale) string {
+	if loc == LocaleEN {
+		return semanticPlaneGuideEN
+	}
+	return semanticPlaneGuideZH
+}
+
+// RenderSemanticAppendix returns locale-aware semantic appendix: machine JSON-lines + glossary.
 func RenderSemanticAppendix(phase contracts.MUPSPhase, loc Locale) string {
 	sem := prompttags.SemanticsForPhase(phase)
-	if sem.NodeRoleKey == "" && len(sem.OutputRules) == 0 {
+	block := prompttags.SemanticBlock(phase)
+	if sem.NodeRoleKey == "" && block == "" {
 		return ""
 	}
 	var b strings.Builder
 	if sem.NodeRoleKey != "" {
-		b.WriteString(semanticText(loc, sem.NodeRoleKey))
+		b.WriteString(semanticNodeRole(loc, sem.NodeRoleKey))
 	}
-	if len(sem.OutputRules) > 0 {
+	if block != "" {
 		if b.Len() > 0 {
 			b.WriteString("\n")
 		}
 		if loc == LocaleEN {
-			b.WriteString("Semantics:\n")
+			b.WriteString("Semantic rules (machine-readable):\n")
 		} else {
-			b.WriteString("语义：\n")
+			b.WriteString("语义规则（机器可读）：\n")
 		}
-		for _, rule := range sem.OutputRules {
-			writeSemanticBullet(&b, loc, rule)
+		b.WriteString(block)
+		glossary := renderConditionGlossary(loc, prompttags.SemanticConditionsForPhase(phase))
+		if glossary != "" {
+			b.WriteString("\n")
+			b.WriteString(glossary)
 		}
 	}
 	if phase == contracts.MUPSPhaseExecute {
 		b.WriteString("\n")
-		b.WriteString(semanticText(loc, "execute.output.section.react"))
+		b.WriteString(semanticNodeRole(loc, "execute.output.section.react"))
 		b.WriteString("\n")
-		b.WriteString(semanticText(loc, "execute.output.section.final"))
+		b.WriteString(semanticNodeRole(loc, "execute.output.section.final"))
 	}
 	return strings.TrimSpace(b.String())
 }
 
-func writeSemanticBullet(b *strings.Builder, loc Locale, rule prompttags.FieldSemantic) {
-	line := fmt.Sprintf("- %s: %s", rule.Name, semanticText(loc, rule.WhenUse))
-	if rule.WhenNot != "" {
-		line += "; " + semanticText(loc, rule.WhenNot)
+func renderConditionGlossary(loc Locale, conds []prompttags.SemanticCondition) string {
+	if len(conds) == 0 {
+		return ""
 	}
-	if rule.Enforced {
-		if loc == LocaleEN {
-			line += " [enforced]"
-		} else {
-			line += " [enforce]"
+	var b strings.Builder
+	if loc == LocaleEN {
+		b.WriteString("Condition glossary:\n")
+	} else {
+		b.WriteString("条件说明：\n")
+	}
+	for _, c := range conds {
+		if label := localizeCondition(loc, c); label != "" {
+			fmt.Fprintf(&b, "- %s: %s\n", c, label)
 		}
 	}
-	b.WriteString(line)
-	b.WriteString("\n")
+	return strings.TrimSpace(b.String())
 }
 
 // RenderFrameFieldGuide returns a compact control/data plane guide for Observe/Plan user frames.
@@ -79,33 +111,33 @@ func RenderFrameFieldGuideForFields(frame prompttags.FrameName, loc Locale, fiel
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(semanticText(loc, "plane.guide"))
+	b.WriteString(planeGuide(loc))
 	b.WriteString("\n")
-	for _, name := range spec.Fields {
-		if fields != nil {
-			if _, ok := fields[name]; !ok {
+	present := fields
+	for _, rule := range prompttags.InputRulesForFrame(frame) {
+		name := prompttags.TagName(rule.Target)
+		if present != nil {
+			if _, ok := present[name]; !ok {
+				continue
+			}
+		} else {
+			// when fields nil, iterate spec order for stable output
+			var inSpec bool
+			for _, f := range spec.Fields {
+				if f == name {
+					inSpec = true
+					break
+				}
+			}
+			if !inSpec {
 				continue
 			}
 		}
-		plane := prompttags.FrameFieldPlane(frame, name)
-		whenKey := frameFieldWhenKey(frame, name)
-		if whenKey == "" {
-			continue
+		label := localizeCondition(loc, rule.WhenUse)
+		if label == "" {
+			label = string(rule.WhenUse)
 		}
-		fmt.Fprintf(&b, "- [%s] %s: %s\n", plane, name, semanticText(loc, whenKey))
+		fmt.Fprintf(&b, "- [%s] %s: %s\n", rule.Plane, rule.Target, label)
 	}
 	return strings.TrimSpace(b.String())
-}
-
-func frameFieldWhenKey(frame prompttags.FrameName, name prompttags.TagName) string {
-	phase := contracts.MUPSPhaseObserve
-	if frame == prompttags.FramePlanUser {
-		phase = contracts.MUPSPhasePlan
-	}
-	for _, rule := range prompttags.SemanticsForPhase(phase).InputRules {
-		if rule.Name == string(name) {
-			return rule.WhenUse
-		}
-	}
-	return ""
 }

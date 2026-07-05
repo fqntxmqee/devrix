@@ -8,18 +8,18 @@ import (
 	"github.com/devrix/devrix/internal/shared/prompttags"
 )
 
-// T: D2-S15-A97-T01 — L5-MUPS-TAG-01 Observe appendix includes obs_uncertainty when-use.
+// T: D2-S15-A97-T01 — L5-MUPS-TAG-01 Observe appendix includes obs_uncertainty machine rule + glossary.
 func TestObservationTaskAppendix_IncludesObserveKindSemantics(t *testing.T) {
 	for _, loc := range []Locale{LocaleZH, LocaleEN} {
 		got := ObservationTaskAppendix(loc)
-		if !strings.Contains(got, "obs_uncertainty") {
-			t.Fatalf("loc %q missing obs_uncertainty: %q", loc, got)
+		if !strings.Contains(got, `"target":"obs_uncertainty"`) {
+			t.Fatalf("loc %q missing obs_uncertainty machine rule: %q", loc, got)
 		}
 		if loc == LocaleZH && !strings.Contains(got, "范围/目标不清") {
-			t.Fatalf("zh missing when-use: %q", got)
+			t.Fatalf("zh missing scope_unclear glossary: %q", got)
 		}
 		if loc == LocaleEN && !strings.Contains(got, "scope/goal unclear") {
-			t.Fatalf("en missing when-use: %q", got)
+			t.Fatalf("en missing scope_unclear glossary: %q", got)
 		}
 		if !strings.Contains(got, `{"kind":"obs_fact`) {
 			t.Fatalf("schema line missing after semantics: %q", got)
@@ -27,13 +27,16 @@ func TestObservationTaskAppendix_IncludesObserveKindSemantics(t *testing.T) {
 	}
 }
 
-// T: D2-S15-A97-T02 — L5-MUPS-TAG-02 Plan appendix includes execution_mode decision tree.
+// T: D2-S15-A97-T02 — L5-MUPS-TAG-02 Plan appendix includes execution_mode decision tree glossary.
 func TestStrategicPlanAppendix_IncludesExecutionModeSemantics(t *testing.T) {
 	dims := `{"citation":["file_line"]}`
 	for _, loc := range []Locale{LocaleZH, LocaleEN} {
 		got := StrategicPlanAppendix(loc, dims)
+		if !strings.Contains(got, `"target":"execution_mode"`) {
+			t.Fatalf("loc %q missing execution_mode machine rule: %q", loc, got)
+		}
 		if !strings.Contains(got, "uncertainty_mean") {
-			t.Fatalf("loc %q missing uncertainty gate: %q", loc, got)
+			t.Fatalf("loc %q missing uncertainty gate glossary: %q", loc, got)
 		}
 		if !strings.Contains(got, "decompose") {
 			t.Fatalf("loc %q missing decompose branch: %q", loc, got)
@@ -41,25 +44,22 @@ func TestStrategicPlanAppendix_IncludesExecutionModeSemantics(t *testing.T) {
 	}
 }
 
-// T: D2-S15-A97-T03 — L5-MUPS-TAG-03 Execute hints include Required/Optional matrix.
+// T: D2-S15-A97-T03 — L5-MUPS-TAG-03 Execute hints include Required/Optional matrix via glossary.
 func TestWorkItemExecuteOutputHints_IncludesRequiredOptionalMatrix(t *testing.T) {
 	for _, loc := range []Locale{LocaleZH, LocaleEN} {
 		got := WorkItemExecuteOutputHints(loc)
-		if !strings.Contains(got, "deliverable_contract") {
-			t.Fatalf("loc %q missing deliverable_contract semantics: %q", loc, got)
+		if !strings.Contains(got, `"target":"deliverable_contract"`) {
+			t.Fatalf("loc %q missing deliverable_contract machine rule: %q", loc, got)
 		}
-		if !strings.Contains(got, "findings_json") {
-			t.Fatalf("loc %q missing findings_json semantics: %q", loc, got)
+		if !strings.Contains(got, `"target":"findings_json"`) {
+			t.Fatalf("loc %q missing findings_json machine rule: %q", loc, got)
 		}
 		if loc == LocaleZH {
 			if !strings.Contains(got, "必填") || !strings.Contains(got, "可选") {
-				t.Fatalf("zh missing 必填/可选 markers: %q", got)
-			}
-			if strings.Contains(got, "Required when contract applicable") {
-				t.Fatalf("zh must not use English execute semantics: %q", got)
+				t.Fatalf("zh missing 必填/可选 glossary markers: %q", got)
 			}
 		} else if !strings.Contains(got, "Required") && !strings.Contains(got, "Optional") {
-			t.Fatalf("en missing Required/Optional markers: %q", got)
+			t.Fatalf("en missing Required/Optional glossary markers: %q", got)
 		}
 	}
 }
