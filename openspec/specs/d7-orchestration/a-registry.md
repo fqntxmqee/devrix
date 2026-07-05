@@ -2,7 +2,7 @@
 
 **Capability:** architecture-layering
 **Status:** Active
-**Version:** 5.6.0
+**Version:** 5.7.0
 **Last Updated:** 2026-07-05 (mups-verify-table-driven DM-20260705-005: D7-S10-A101 verify_decision_table kernel + 3 verify 函数走表驱动化活动登记 → v5.6.0; **previous**: devrix-d7-physical-layout-alignment DM-20260701-004 PR-3: D7-S6 段新增 D7-S6-A03 PlanValidate + D7-S6-A04 PlanGenerate 行 + 新增 ## D7-S5 plan/ ↔ decisionplanning/ 双登记说明段 + S5 段加 cross-reference → v5.5.0)
 **Parent:** `openspec/specs/architecture/layering.md`
 **Domain SoT:** `d7-domain.md`
@@ -324,3 +324,27 @@ Former D7-S7–S14 MUPS node sections, D7-S18 pessimistic runtime, D7-S20/S21 Ta
 - 28 新测试 + 3 byte-equivalent 测试 (legacy_verify build tag) 全 PASS
 - 17 现有测试 (item_verify + deliverable_verify + item_pipeline_rollup) 0 修改 PASS
 - 0 行为变化; 决策表 trigger 顺序显式声明 (5 artifact + 4 rollup = 9 explicit)
+
+
+---
+
+## D7-S15-A102: spawn_decision_algebra kernel (M5, DM-20260705-006)
+
+> **d7-spawn-decision-algebra (DM-20260705-006) — MUPS 5 节点重构总图 M5 落地 (M1+M2+M4 已 S7_archived).**
+
+**A 定位 (5 个 F)**: 3 子决策 kernel (spawn_decision_algebra.go) + normalizeCtx helper + SpawnPolicyEvaluator 主函数 3 步显式调用 + _legacy_test.go 旧实现保留
+
+| A ID | 名称 | 角色 | Code Location | Notes |
+|------|------|------|---------------|-------|
+| **D7-S15-A102-F01** | **`normalizeCtx` 不可变 helper (5 default-value guards)** | **A-BE** | **`workmodel/spawn_decision_algebra.go:30-44`** (normalizeCtx 函数) | TreeEvalContext value type; 5 字段 `if ctx.X <= 0` 兜底 (MaxDepth/Threshold/MaxIndeterminateRetries/MaxRollupRetries/MaxInlineRetriesAtMaxDepth); 返回新 ctx 零成本 copy 不改入参 |
+| **D7-S15-A102-F02** | **`checkBudget(round, ctx) (SpawnPolicy, bool)` 4 budget gates (R0/R0.5/R1/R2)** | **A-BE** | **`workmodel/spawn_decision_algebra.go:48-72`** (checkBudget 函数) | 早退 budget gates 与 VerdictKind 无关; R0 + R0.5 + R1 (3 sub-branches w/ cont/w/ exhaust/no schema) + R2; 4 case 单测覆盖 + 1 fall-through |
+| **D7-S15-A102-F03** | **`checkRollupGuard(round, ctx) (SpawnPolicy, bool)` 跨 verdict rollup retry exhausted guard (RH-MUPS-03 单一权威位置)** | **A-BE** | **`workmodel/spawn_decision_algebra.go:80-93`** (checkRollupGuard 函数) | 取代 R5/R6/R7 verdict 块顶部 3 处重复 5 行代码; 4 case 单测覆盖 (at-limit escalate/below-limit inline/non-rollup fall-through/Pass+Rollup skip); VerdictPass 排除保持 R3/R4 → SpawnNone 不变 |
+| **D7-S15-A102-F04** | **`checkVerdictDirection(round, ctx) SpawnPolicy` R3..R8 switch on VerdictKind (6 case)** | **A-BE** | **`workmodel/spawn_decision_algebra.go:97-145`** (checkVerdictDirection 函数) | switch on `round.VerdictKind`; 5 case (Pass+R3/R4/Partial+R5/Fail+R6/Indeterminate+R7) + default R8 覆盖所有 VerdictKind; rollup guard 抽走后 switch 块内不嵌 if-else, 逻辑清晰 |
+| **D7-S15-A102-F05** | **`SpawnPolicyEvaluator` 主函数 50+→8 行 (3 步显式调用) + `_legacy_test.go` 旧实现保留 (build tag `legacy_spawn`)** | **A-BE** | **`workmodel/spawn_policy.go:18-30`** (SpawnPolicyEvaluator 8 行主函数) + **`workmodel/spawn_policy_legacy_test.go`** (旧 50+ 行 `SpawnPolicyEvaluatorLegacy` + 27 byte-equivalent sub-cases) | 主函数 = nil round 兜底 + `ctx = normalizeCtx(ctx)` + `if p, fired := checkBudget(...); fired { return p }` + `if p, fired := checkRollupGuard(...); fired { return p }` + `return checkVerdictDirection(...)`; 旧实现仅在 `-tags legacy_spawn` 编译; 22 现有测试 0 修改 + 27 byte-equivalent sub-cases 字节级 PASS; 下个 change (`mups-cleanup-legacy`) 删除 |
+
+**A-门禁**:
+- `internal/layers/orchestration/workmodel/spawn_decision_algebra.go` 165 行 (含 4 函数 + helpers + 注释)
+- 17 新测试 + 1 byte-equivalent 测试 (legacy_spawn build tag) 全 PASS
+- 22 现有测试 (`spawn_policy_test.go` 21 + `spawn_policy_inline_test.go` 1) 0 修改 PASS
+- 0 行为变化; 3 子决策顺序显式声明 (`checkBudget` → `checkRollupGuard` → `checkVerdictDirection`); rollup retry exhausted guard 单一权威位置 (1 处实现, 不再 3 处重复)
+
