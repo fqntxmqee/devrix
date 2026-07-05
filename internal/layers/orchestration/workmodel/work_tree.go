@@ -231,6 +231,9 @@ func (t *WorkTree) Create(sessionID string, in CreateWorkItemInput) (*WorkItem, 
 	item.Policy = in.Policy
 	item.Ephemeral = in.Ephemeral
 	item.SourceSession = in.SourceSession
+	if in.ToolFilter != nil {
+		item.ToolFilter = append([]string(nil), in.ToolFilter...)
+	}
 	if item.Policy == "" {
 		item.Policy = ExecPolicySync
 	}

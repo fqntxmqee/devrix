@@ -33,6 +33,14 @@ const (
 	SpawnAwait           SpawnPolicy = "await"
 	SpawnInline          SpawnPolicy = "inline"
 	SpawnEscalateHuman   SpawnPolicy = "escalate_human"
+	// SpawnUserGate (DM-20260704-006 RC-4b) is emitted when Verify's
+	// ResolutionReport has UnresolvedObs with Strength >= DefaultUnresolvedStrengthThreshold
+	// (0.85) and no SubWorktree is available. The SpawnApply step creates
+	// a verify child with tool_filter=["ask_user_question"] so the LLM
+	// cannot bypass the gate. Without this hook, a Pass+high-strength
+	// unresolved ObsID pair would SpawnNone and silently strand the
+	// user-facing question.
+	SpawnUserGate SpawnPolicy = "user_gate"
 )
 
 // DefaultMaxIndeterminateRetries matches MVE MaxRetries (OQ-4).
