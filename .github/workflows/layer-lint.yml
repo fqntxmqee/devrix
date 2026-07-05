@@ -5,6 +5,10 @@ name: layer-lint
 # - 分层 import 硬门禁（strict gate）从 GitHub branch protection 移除
 # - 架构 lint 违规仍会在 PR 评论展示，但不再阻断 PR merge
 # - 本地开发者自检：`go run ./cmd/devrix-layer-lint --root=internal/layers --strict`
+#
+# Docs-only fast path (2026-07-05, DM-20260705-009)：
+# - 与 ci.yml 对齐：纯 `*.md` / `openspec/**` / `docs/**` PR 跳过 layer-lint scan
+#   并报告 PASS（job 名 "layer-lint (warn)" 仍存在以满足 branch protection）。
 
 # Covers: CROSS-T03  (CI gate that blocks reverse D{N}→D{M} imports)
 # In WARN mode the scanner reports violations but exits 0.
@@ -26,6 +30,26 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect code changes
+        id: detect
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD_SHA" 2>/dev/null || echo "")
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+          CODE=$(printf '%s\n' "$CHANGED" | grep -E '\.(go|mod|sum|sh|yaml|yml)$|^scripts/|^.github/workflows/' || true)
+          if [ -n "$CODE" ]; then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-go@v5
         with:
@@ -33,4 +57,11 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run layer-lint (report only)
+        if: steps.detect.outputs.code_changed == 'true'
         run: go run ./cmd/devrix-layer-lint --root=internal/layers --format=text
+
+      - name: Skip (docs-only change)
+        if: steps.detect.outputs.code_changed != 'true'
+        run: |
+          echo "✓ Docs-only PR — skipping layer-lint scan."
+          echo "  Pure doc paths (*.md / openspec/** / docs/**) do not affect import topology."

@@ -6,6 +6,14 @@ name: ci
 # - 删除 gate (integration / e2e / acceptance) job
 # - 删除 CI 中 coverage 生成与上传（coverage 完全本地兜底）
 # - layer-lint 移到独立 workflow（layer-lint.yml），只保留 warn（不阻断）
+#
+# Docs-only fast path (2026-07-05, DM-20260705-009)：
+# - 纯 `*.md` / `openspec/**` / `docs/**` PR 跳过 heavy steps（unit tests / vet / build /
+#   lint scripts / bridge guard），因为 Go 代码未变，跑也是空跑。
+# - Job 名仍叫 "unit tests" 保持 PASS，branch protection 的 required check 一直存在。
+# - 检测方式：`git diff --name-only base...head` 后用 grep 扫 .go/.mod/.sum/.sh/scripts/。
+# - workflow 文件本身（.github/workflows/**）计入 code_changed=true，因为 CI 改动自身
+#   也要跑测试兜底。
 
 on:
   push:
@@ -25,31 +33,58 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          fetch-depth: 0
+
+      - name: Detect code changes
+        id: detect
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD_SHA" 2>/dev/null || echo "")
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+          echo "Changed files:"
+          printf '%s\n' "$CHANGED"
+          CODE=$(printf '%s\n' "$CHANGED" | grep -E '\.(go|mod|sum|sh|yaml|yml)$|^scripts/|^.github/workflows/' || true)
+          if [ -n "$CODE" ]; then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            echo "→ Code changes detected (running full smoke):"
+            printf '%s\n' "$CODE"
+          else
+            echo "code_changed=false" >> "$GITHUB_OUTPUT"
+            echo "→ Docs-only change detected (skipping heavy steps)."
+          fi
 
       - name: Verify module
+        if: steps.detect.outputs.code_changed == 'true'
         run: go mod verify
 
       - name: D1 import boundary lint (DM-20260628-003)
+        if: steps.detect.outputs.code_changed == 'true'
         run: chmod +x ./scripts/lint-d1-imports.sh && ./scripts/lint-d1-imports.sh
 
       - name: D7 main-path architecture lint (TurnLoop + WorkTree + MUPS)
+        if: steps.detect.outputs.code_changed == 'true'
         run: chmod +x ./scripts/lint-d7-main-path.sh && ./scripts/lint-d7-main-path.sh
 
       - name: Build
+        if: steps.detect.outputs.code_changed == 'true'
         run: go build ./...
 
       - name: Vet
+        if: steps.detect.outputs.code_changed == 'true'
         run: go vet ./...
 
       - name: Property rights audit (AC23/AC25)
+        if: steps.detect.outputs.code_changed == 'true'
         run: chmod +x ./scripts/audit-property-rights.sh && ./scripts/audit-property-rights.sh
 
       - name: Verify dependency versions (DM-20260618-007 W0)
+        if: steps.detect.outputs.code_changed == 'true'
         run: |
           # Lock mvdan.cc/sh/v3 to v3.x to avoid silent v4 major-version upgrades.
           # `go list -m` outputs "<module> <version>" (e.g. "mvdan.cc/sh/v3 v3.13.1").
@@ -62,12 +97,14 @@ jobs:
           esac
 
       - name: Unit tests
+        if: steps.detect.outputs.code_changed == 'true'
         run: ./scripts/test-unit.sh
 
       # AC-B3: bridge 防回归（devrix-d5-v2-terminal DM-20260619-006）
       # 9 个 v2.0 bridge 包已删除，import 必须直接走 canonical `instrument/*`、`export/*`、`diagnose/*`、`configure/*` 路径。
       # 任何命中即视为回归，CI 阻断。
       - name: Bridge regression guard
+        if: steps.detect.outputs.code_changed == 'true'
         run: |
           set -e
           matches=$(grep -rn \
@@ -93,3 +130,10 @@ jobs:
             echo "Use canonical paths: instrument/*, export/*, diagnose/*, configure/*"
             exit 1
           fi
+
+      - name: Skip (docs-only change)
+        if: steps.detect.outputs.code_changed != 'true'
+        run: |
+          echo "✓ Docs-only PR — skipping unit tests / vet / build / lint / bridge guard."
+          echo "  Pure doc paths (*.md / openspec/** / docs/**) do not affect Go code."
+          echo "  Local full tests still required before merge per DM-20260619-005 policy."
