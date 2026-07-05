@@ -1,6 +1,7 @@
 package workmodel
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
@@ -45,6 +46,22 @@ func ApplySpawnPolicy(sessionID string, item *WorkItem, round *WorkItemPipelineR
 		_, err := tm.DecomposeChildren(sessionID, item.ID, round.ChildSpecs)
 		if err == nil {
 			_ = tm.Tree().ResetInlineRetriesAtMaxDepth(sessionID, item.ID)
+			return nil
+		}
+		// DM-20260704-006 Phase 4 (D7-S15-A109-T02): budget gate
+		// degradation. When DecomposeChildren fails because the
+		// parent is at max depth / max children / daily decompose
+		// limit, RC-4a-driven decompose degrades gracefully to
+		// SpawnInline rather than aborting the session loop. This
+		// matches the legacy `execution_mode: "decompose"` behavior
+		// (silent inline retry) so callers see no observable
+		// regression. Other errors (parent not found, scope
+		// validation, etc.) are returned to the caller.
+		if isBudgetGateError(err) {
+			round.SpawnPolicy = SpawnInline
+			round.SpawnRationale = "budget gate: " + err.Error() + " → inline retry (RC-4a graceful degradation)"
+			_ = tm.Tree().SetRoundPhase(sessionID, item.ID, RoundPhaseIdle)
+			return nil
 		}
 		return err
 	case SpawnEscalateHuman:
@@ -171,6 +188,29 @@ func buildUserGateObsList(unresolved []interfaces.UnresolvedObs) string {
 		out += fmt.Sprintf("  - %s (strength=%.3f, reason=%s)\n", uo.ObsID, uo.Strength, uo.Reason)
 	}
 	return out
+}
+
+// isBudgetGateError reports whether err is one of the three decompose
+// budget gates (depth / children / daily). When true, RC-4a-driven
+// SpawnDecompose degrades to SpawnInline rather than aborting the
+// session loop.
+//
+// DM-20260704-006 Phase 4 (D7-S15-A109-T02): the legacy
+// `execution_mode: "decompose"` + `child_specs[]` carrier silently
+// dropped these errors (the LLM proposal was narrative intent only),
+// so callers observed "no children spawned" without a session abort.
+// Phase 4 preserves that observable behavior by degrading to inline
+// retry when the budget is exhausted.
+//
+// Non-budget errors (parent not found, scope validation, ...) still
+// propagate so callers see real failures.
+func isBudgetGateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, ErrDecomposeDepthExceeded) ||
+		errors.Is(err, ErrTooManyChildren) ||
+		errors.Is(err, ErrDecomposeDailyLimit)
 }
 
 // pipelineItemNeedsContinuation reports whether the session loop should schedule

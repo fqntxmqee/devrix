@@ -204,6 +204,14 @@ type UnresolvedObs struct {
 	// by Verify during the report build so Decide does not need to
 	// look up the originating ResolutionStrategy.
 	HasSubWorktree bool `json:"has_sub_worktree"`
+
+	// SubWorktree (DM-20260704-006 Phase 4) carries the originating
+	// ResolutionStrategy.SubWorktree verbatim so the Decide layer can
+	// build a meaningful ChildSpec (Title + DirectiveSuffix +
+	// ExpectedReturn + ScopeIn) without walking back to the upstream
+	// Plan. Only set when HasSubWorktree=true; nil otherwise. Wire-
+	// compatible with Phase 1/2/3 consumers that ignore the field.
+	SubWorktree *SubWorktreeSpec `json:"sub_worktree,omitempty"`
 }
 
 // ResolutionReport is the cross-round handoff between Verify and Decide.
@@ -400,6 +408,7 @@ func NewResolutionReport(sessionID, workItemID string, roundNo int, strategies [
 				Strength:       extractObsStrength(s.ObsID),
 				Reason:         ResolutionReasonNoClaim,
 				HasSubWorktree: s.HasSubWorktree(),
+				SubWorktree:    s.SubWorktree,
 			})
 			continue
 		}
@@ -414,6 +423,7 @@ func NewResolutionReport(sessionID, workItemID string, roundNo int, strategies [
 				Strength:       extractObsStrength(s.ObsID),
 				Reason:         ResolutionReasonNoClaim,
 				HasSubWorktree: s.HasSubWorktree(),
+				SubWorktree:    s.SubWorktree,
 			})
 			continue
 		}
@@ -423,6 +433,7 @@ func NewResolutionReport(sessionID, workItemID string, roundNo int, strategies [
 				Strength:       extractObsStrength(s.ObsID),
 				Reason:         ResolutionReasonLowConfidence,
 				HasSubWorktree: s.HasSubWorktree(),
+				SubWorktree:    s.SubWorktree,
 			})
 			continue
 		}
@@ -432,6 +443,7 @@ func NewResolutionReport(sessionID, workItemID string, roundNo int, strategies [
 				Strength:       extractObsStrength(s.ObsID),
 				Reason:         ResolutionReasonEvidenceMissing,
 				HasSubWorktree: s.HasSubWorktree(),
+				SubWorktree:    s.SubWorktree,
 			})
 			continue
 		}
