@@ -3,8 +3,8 @@
 **Change ID:** `devrix-d7-mups-frame-delta-closure`
 **Demand ID:** DM-20260705-010
 **Status:** S4_Implemented (Phase 1-3 code landed via PR #434; Phase 4 端到端 trace 重放 + 三方 review 待 S5 验收)
-**Parent Proposal:** [proposal.md](../../changes/devrix-d7-mups-frame-delta-closure/proposal.md)
-**Parent Design:** [design.md](../../changes/devrix-d7-mups-frame-delta-closure/design.md)（六段式 detail-design-framework）
+**Parent Proposal:** [proposal.md](../../archive/2026-07-05-devrix-d7-mups-frame-delta-closure/proposal.md)
+**Parent Design:** [design.md](../../archive/2026-07-05-devrix-d7-mups-frame-delta-closure/design.md)（六段式 detail-design-framework）
 **Created:** 2026-07-05
 
 ---
@@ -158,9 +158,9 @@ v2.0 (跨域 FrameDelta 抽象上提)
 
 ## 8. 参考
 
-- **完整设计（6 段式）**：[design.md](../../changes/devrix-d7-mups-frame-delta-closure/design.md)
-- **任务分解（4 Phase × 21 T）**：[tasks.md](../../changes/devrix-d7-mups-frame-delta-closure/tasks.md)
-- **提案（决策记录）**：[proposal.md](../../changes/devrix-d7-mups-frame-delta-closure/proposal.md)
+- **完整设计（6 段式）**：[design.md](../../archive/2026-07-05-devrix-d7-mups-frame-delta-closure/design.md)
+- **任务分解（4 Phase × 21 T）**：[tasks.md](../../archive/2026-07-05-devrix-d7-mups-frame-delta-closure/tasks.md)
+- **提案（决策记录）**：[proposal.md](../../archive/2026-07-05-devrix-d7-mups-frame-delta-closure/proposal.md)
 - **MUPS 5 节点总图**：[mups-5node-refactor-roadmap.md](mups-5node-refactor-roadmap.md)
 - **Pipeline 端到端运行时序**：[pipeline-architecture.md](pipeline-architecture.md)
 - **DM-20260704-006 Obs→Verify→Decide 闭环**：spec.md ResolutionContract 段 + uncertainty-spawn-contract.md

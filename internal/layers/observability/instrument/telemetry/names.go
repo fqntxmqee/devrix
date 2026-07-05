@@ -236,8 +236,9 @@ const (
 	OpD7_S9_Execute_PlanFrameDelta_Inject = "D7_Execute_PlanFrameDelta_Inject"
 	// D7-S9 Execute convergence metric emit (P0, AC8):
 	// wraps ConvergenceMetricRecord deterministic compute after Verify
-	// yields a Verdict. Records coverage_ratio + gaps_closed_count +
-	// frame_delta_consumed flag for Phase 3 cross-round convergence tracking.
+	// yields a Verdict. Records uncertainty_reduction_rate +
+	// gaps_closed_count + frame_delta_consumed flag for Phase 3
+	// cross-round convergence tracking.
 	OpD7_S9_Execute_ConvergenceMetric_Emit = "D7_Execute_ConvergenceMetric_Emit"
 )
 
