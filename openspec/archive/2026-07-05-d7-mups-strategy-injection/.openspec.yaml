@@ -1,7 +1,7 @@
 change_id: d7-mups-strategy-injection
 priority: P0
 demand_id: DM-20260705-008
-status: s5_accepted
+status: s7_archived
 domains: [D7]
 dsaft_scenarios: [D7-S9, D7-S15, D7-S22]
 dsaft_activities: [D7-S9-A50, D7-S15-A89, D7-S22-A101]
