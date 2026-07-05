@@ -16,5 +16,6 @@ func (spansProvider) Spans() []coverage.OperationMeta {
 		{Name: "D3_LLM_CircuitBreaker", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "D3_LLM_Retry", Layer: "llm", Component: "llm_gateway", SinceVersion: "2.0.0", Instrumented: true},
 		{Name: "D3_LLM_Adapter_Stream", Layer: "llm", Component: "llm_adapter", SinceVersion: "2.0.0", Instrumented: true},
+		{Name: "D3_LLM_Stream_Consume", Layer: "llm", Component: "llm_gateway", SinceVersion: "3.3.0", Instrumented: true},
 	}
 }
