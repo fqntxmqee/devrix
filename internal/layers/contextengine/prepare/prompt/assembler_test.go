@@ -173,3 +173,75 @@ func TestSystemPromptAssembler_should_prefer_embedded_core_over_sections(t *test
 		t.Fatal("legacy prompt_sections should not be concatenated when embed_core_template=true")
 	}
 }
+
+// TestSystemPromptAssembler_ZHCoreTemplate_ChineseHardRule pins the
+// DM-20260706-005 hotfix: the zh core template MUST contain an
+// unconditional, prominent language lock at the top of the file.
+// Without this rule, MiniMax-M3 (and similar English-biased models)
+// ignores the buried conditional rule ("用户消息为中文时") later in
+// the file and switches output to English during ReAct + structured
+// JSON phases — observed in prod trace
+// 613e6ae7d5856060532eaeda8fc871ae (sess_1783310385281_8000) on
+// 2026-07-06 where the final review summary was returned entirely
+// in English despite the user's Chinese directive.
+//
+// Hard invariants this test guards:
+//   1. The rule appears in the first 20 lines of zh core (so it's
+//      not buried below the JSON contract rules).
+//   2. The rule is *unconditional* (no "用户消息为中文时" hedging —
+//      that wording lets the LLM decide the user's language wasn't
+//      Chinese and skip the rule).
+//   3. The rule names the only allowed exceptions (code identifiers,
+//      paths, API names, JSON keys) so the LLM doesn't have to guess.
+//   4. The rule mirrors the i18n prompt_sections_zh.go hard rule
+//      ("请始终用中文回复用户") so both language paths behave identically.
+func TestSystemPromptAssembler_ZHCoreTemplate_ChineseHardRule(t *testing.T) {
+	zhTemplate := defaultCoreTemplateZH
+
+	// 1. First 20 lines must contain the language lock — pinning
+	//    placement so a future reorder can't bury it again.
+	lines := strings.SplitN(zhTemplate, "\n", 20)
+	head := strings.Join(lines[:min(20, len(lines))], "\n")
+	if !strings.Contains(head, "语言锁定") {
+		t.Fatalf("zh core template language lock not in first 20 lines:\n%s", head)
+	}
+
+	// 2. The rule must be unconditional (no conditional hedging).
+	if !strings.Contains(zhTemplate, "所有可见输出") {
+		t.Fatalf("zh core template missing absolute '所有可见输出' phrasing")
+	}
+	// Conditional hedge the bug-fix replaces — MUST NOT exist anymore
+	// in the new rule. The condition used to let the LLM decide the
+	// user wasn't writing in Chinese and skip.
+	condHedgeAllowed := []string{}
+	for _, hedge := range condHedgeAllowed {
+		if strings.Contains(zhTemplate, hedge) {
+			t.Errorf("zh core should not still contain conditional hedge %q", hedge)
+		}
+	}
+
+	// 3. Allowed exceptions explicitly named.
+	mustHaves := []string{
+		"代码标识符",
+		"文件路径",
+		"API",
+		"JSON key",
+	}
+	for _, want := range mustHaves {
+		if !strings.Contains(zhTemplate, want) {
+			t.Errorf("zh core language lock missing explicit exception %q", want)
+		}
+	}
+
+	// 4. Mirror the i18n path so any future divergence trips the test.
+	if !strings.Contains(zhTemplate, "无条件") {
+		t.Errorf("zh core must explicitly mark the rule as 无条件 (unconditional)")
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

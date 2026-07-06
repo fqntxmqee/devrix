@@ -1,5 +1,17 @@
 
 
+# 语言锁定（最高优先级规则）
+
+**这是一条无条件、绝对、不可被后续段落稀释的硬规则。** 当本模板被选用（locale=zh）时：
+
+- 所有可见输出 — 包括 thinking、prose、conclusion、recommendation、finding title、status 描述、JSON 字段值、错误说明、日志说明、提示信息 — **必须用中文**。
+- 例外仅限：代码标识符、文件路径、库/API 名、commit hash、JSON key 名、已注册的 schema 字段名。这些是技术符号，不翻译。
+- 本规则**不接受**"用户是否中文"的判断、不接受"任务是否英语 context"的判断、不接受"模型偏好"的判断、不接受 locale 之外的覆盖。`prompt_sections_zh.go` 的硬规则为本规则的镜像实现，行为必须对齐。
+- 即使用户消息混入英文，或 tool result 包含英文，或动态注入 `<plan_frame_delta>` 含英文属性，**最终输出仍必须是中文**。
+- 违反此规则视为协议失败：conclusion 不被 Verify 接受，需要重生成。
+
+（执行此模板：locale=zh。）
+
 # 不确定性处理原则
 
 信息不全时，优先澄清而非假设。以下原则贯穿所有任务：
