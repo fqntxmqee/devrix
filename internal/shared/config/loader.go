@@ -124,6 +124,10 @@ type CoordinatorFileConfig struct {
 	// config.CoordinatorConfig for semantics. Pointer so we can
 	// distinguish "absent in yaml" (keep default 0) from "explicitly 0".
 	PriorContextRounds *int `yaml:"prior_context_rounds"`
+	// SemanticConvergence (D7-S16, DM-20260706-006): see
+	// config.CoordinatorConfig for semantics. Inner pointer so
+	// "absent in yaml" → keep default (Enabled=true production).
+	SemanticConvergence *SemanticConvergenceFileConfig `yaml:"semantic_convergence"`
 }
 
 // LoadConfigFile loads configuration from a YAML file

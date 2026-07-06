@@ -451,17 +451,16 @@ d7:
   # so turn N+1 sees turn N's finalText via <prior-output-summary>.
   # 0 (default) → no injection; same-session multi-turn LLM has no memory of prior turns.
   prior_context_rounds: 3         # inject last 3 turns' finalText into next turn's directive
-  # DM-20260706-006 hotfix: LLM-driven semantic convergence (Plan A + B).
+  # DM-20260706-006: LLM-driven semantic convergence (Plan A + B).
   # When the code-based verify rubber-stamps Pass but the artifact looks
   # structurally identical to a prior round (Jaccard ≥ min_similarity),
   # ask the LLM "did this round actually answer the user's question?".
-  # The LLM's verdict overrides the code path. Defaults to OFF — the
-  # hotfix path uses code-only verify until production validation.
-  # NOTE: this flag currently has no runtime wiring; DefaultSemanticSimilarityConfig
-  # returns Enabled=false. Production rollout requires adding the config
-  # loader path in bootstrap (tracked in DM-20260706-006 follow-up).
+  # The LLM's verdict overrides the code path. ON by default — the
+  # Jaccard pre-check is cheap and only fires the LLM call on
+  # stagnation-suspect rounds. Set enabled=false to fall back to
+  # code-only verify.
   semantic_convergence:
-    enabled: false
+    enabled: true                   # production default ON
     min_similarity: 0.85            # Jaccard threshold to trigger LLM call
     lookback_n: 5                   # prior rounds scanned for mimicry
     timeout_ms: 8000                # LLM semantic call cap

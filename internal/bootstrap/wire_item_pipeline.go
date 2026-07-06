@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/decisionplanning"
@@ -26,6 +27,12 @@ type ItemPipelineWireDeps struct {
 	CtxPreparer    sessionorchestrator.ContextPreparer
 	PromptLanguage string
 	TrackMode      string
+	// SemanticConvergence (DM-20260706-006) configures the LLM-driven
+	// MUPS Verify override. Zero value uses orchtypes defaults
+	// (Enabled=true production). Bootstrap wires the Enabled value
+	// into ItemPipelineRunner.SemanticConfig and constructs a
+	// DefaultSemanticVerifier when Enabled=true.
+	SemanticConvergence orchtypes.SemanticConvergenceConfig
 }
 
 // WireDefaultMUPSLearner constructs the in-process LP-1 learner used by both
@@ -61,6 +68,23 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 	if mat := newDefaultMaterializer(); mat != nil {
 		executor.Materializer = mat
 	}
+	// DM-20260706-006: build the SemanticConfig + (optionally) the
+	// SemanticVerifier so the per-WorkItem ItemPipelineRunner consults
+	// the LLM when the code-based verify rubber-stamps Pass but the
+	// artifact looks structurally identical to a prior round.
+	semanticCfg := buildItemPipelineSemanticConfig(deps.SemanticConvergence)
+	var semanticVerifier sessionorchestrator.SemanticVerifier
+	if semanticCfg.Enabled && deps.LLMInvoker != nil {
+		timeoutMs := deps.SemanticConvergence.TimeoutMs
+		if timeoutMs <= 0 {
+			timeoutMs = 8000
+		}
+		semanticVerifier = &sessionorchestrator.DefaultSemanticVerifier{
+			LLM:       deps.LLMInvoker,
+			ModelTier: deps.SemanticConvergence.ModelTier,
+			Timeout:   time.Duration(timeoutMs) * time.Millisecond,
+		}
+	}
 	runner, err := sessionorchestrator.NewItemPipelineRunner(sessionorchestrator.ItemPipelineDeps{
 		Classifier: deps.Classifier,
 		Executor:   executor,
@@ -77,9 +101,29 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 			mups,
 			i18n.ParseLanguage(deps.PromptLanguage),
 		),
+		// DM-20260706-006: pass through the wired semantic config +
+		// verifier. The runner uses cfg.Enabled as the master switch
+		// (looksLikeTemplateMimicry short-circuits on false). When
+		// verifier is nil and cfg.Enabled is true, the cheap Jaccard
+		// pre-check still runs but the LLM call is skipped (graceful
+		// degradation when LLMInvoker is unavailable).
+		SemanticConfig:    semanticCfg,
+		SemanticVerifier:  semanticVerifier,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)
 	}
 	return runner, learner, nil
+}
+
+// buildItemPipelineSemanticConfig translates the runtime config shape
+// (orchtypes.SemanticConvergenceConfig) into the package-internal
+// sessionorchestrator.SemanticSimilarityConfig. Kept as a separate
+// function so the field mapping is testable in isolation.
+func buildItemPipelineSemanticConfig(in orchtypes.SemanticConvergenceConfig) sessionorchestrator.SemanticSimilarityConfig {
+	return sessionorchestrator.SemanticSimilarityConfig{
+		Enabled:                in.Enabled,
+		MinSimilarityForVerify: in.MinSimilarity,
+		MinArtifactChars:       100, // mirrors sessionorchestrator.DefaultSemanticSimilarityConfig
+	}
 }

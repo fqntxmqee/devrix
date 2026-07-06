@@ -67,12 +67,12 @@ func TestLooksLikeTemplateMimicry_SubstantiveChange(t *testing.T) {
 }
 
 // TestDefaultSemanticSimilarityConfig verifies the production defaults.
-// Regression guard: the hotfix path must remain default-OFF until
-// production validation flips it on.
+// DM-20260706-006: Enabled=true is the production default. The Jaccard
+// pre-check is cheap and only fires the LLM on stagnation-suspect rounds.
 func TestDefaultSemanticSimilarityConfig(t *testing.T) {
 	cfg := DefaultSemanticSimilarityConfig()
-	if cfg.Enabled {
-		t.Fatal("default config must have Enabled=false (hotfix path)")
+	if !cfg.Enabled {
+		t.Fatal("default config must have Enabled=true (production path)")
 	}
 	if cfg.MinSimilarityForVerify != interfaces.DefaultInterceptThreshold {
 		t.Errorf("MinSimilarityForVerify=%v want=%v", cfg.MinSimilarityForVerify, interfaces.DefaultInterceptThreshold)
