@@ -580,3 +580,152 @@ func TestFilterEphemeralExecuteMessages_dropsSynthesisHint(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+// DM-20260706-010: thinking chunks MUST NOT pollute WorkItemResult.Content.
+// Previously streamLLM concatenated chunk.Thinking into the same strings.Builder
+// as chunk.Content, so for a trivial Q&A like "2×3=几?" the final user-visible
+// answer was a verbose template wrapping the LLM's reasoning. Transcript
+// evidence (sess_1783349211523_1000 entry 5): result.Content = "2 × 3 = ...6...
+// 用户问了一个简单的数学题...让我给出简洁的中文回答。<conclusion>2×3=6（六）。
+// </conclusion>" — exactly the bug. Fix: only chunk.Content accumulates into the
+// return string; chunk.Thinking still emits a "thinking" EngineEvent for trace.
+func TestWorkItemExecutor_ThinkingDoesNotPolluteResult_DM20260706_010(t *testing.T) {
+	var (
+		mu          sync.Mutex
+		eventTypes  []string
+		thinkingEv  *contracts.EngineEvent
+	)
+	emit := func(ev *contracts.EngineEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		cp := *ev
+		eventTypes = append(eventTypes, cp.Type)
+		if cp.Type == "thinking" {
+			thinkingEv = &cp
+		}
+	}
+
+	// Simulate minimax M2.7-style streaming: thinking interleaved with text,
+	// bracketed by template tokens the LLM emitted in its prior round.
+	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
+		{
+			{Content: "用户问了一个简单的数学题。", Thinking: "用户问了一个简单的数学题，让我心算一下："},
+			{Content: "2 × 3 = ", Thinking: "2 乘以 3 = 6"},
+			{Content: "6", Thinking: "得到答案 6"},
+			{Content: "（六）", FinishReason: "stop"},
+		},
+	}}
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, nil)
+
+	ctx, itemID := workItemExecTestCtx("sess_think_pollute")
+	ec, _ := WorkItemExecContextFrom(ctx)
+	ec.Emit = emit
+	ctx = WithWorkItemExecContext(ctx, ec)
+
+	res, err := exec.ExecuteWorkItem(ctx, "sess_think_pollute", itemID, "2×3=几?")
+	if err != nil {
+		t.Fatalf("ExecuteWorkItem: %v", err)
+	}
+	if !res.Done {
+		t.Fatalf("Done=false StopReason=%q", res.StopReason)
+	}
+
+	// (1) result.Content MUST be content-only, no thinking bleed.
+	want := "用户问了一个简单的数学题。2 × 3 = 6（六）"
+	if res.Content != want {
+		t.Fatalf("result.Content polluted by thinking:\n got: %q\nwant: %q", res.Content, want)
+	}
+	for _, leak := range []string{
+		"让我心算",
+		"2 乘以 3",
+		"得到答案",
+		"<think>",
+		"<conclusion>",
+	} {
+		if strings.Contains(res.Content, leak) {
+			t.Fatalf("result.Content contains thinking/template leak %q:\n%s", leak, res.Content)
+		}
+	}
+
+	// (2) thinking events still fire (trace + transcript contract).
+	mu.Lock()
+	defer mu.Unlock()
+	wantThinkCount := 3
+	gotThinkCount := 0
+	for _, et := range eventTypes {
+		if et == "thinking" {
+			gotThinkCount++
+		}
+	}
+	if gotThinkCount != wantThinkCount {
+		t.Fatalf("thinking event count = %d, want %d (eventTypes=%v)", gotThinkCount, wantThinkCount, eventTypes)
+	}
+	if thinkingEv == nil {
+		t.Fatalf("no thinking event captured (eventTypes=%v)", eventTypes)
+	}
+	// thinking loop iterates and overwrites thinkingEv, so we can only
+	// assert at least one thinking event fired with any of the scripted
+	// chunks. The count assertion above is the strong invariant.
+	wantThinkSubstrings := []string{"让我心算", "2 乘以 3", "得到答案"}
+	matchedAny := false
+	for _, want := range wantThinkSubstrings {
+		if strings.Contains(thinkingEv.Content, want) {
+			matchedAny = true
+			break
+		}
+	}
+	if !matchedAny {
+		t.Fatalf("last thinking event has unexpected content %q", thinkingEv.Content)
+	}
+}
+
+// DM-20260706-010: assistant message carried into the next LLM iteration must
+// not include thinking either (otherwise we'd echo the LLM's prior reasoning
+// back into its own context, inflating tokens and potentially confusing the
+// model on multi-iter tool-call loops). This locks the wire-format invariant
+// for `buildWorkItemAssistantToolCallMsg`.
+func TestWorkItemExecutor_AssistantMsgExcludesThinking_DM20260706_010(t *testing.T) {
+	llm := &scriptedLLM{script: [][]llmgateway.Chunk{
+		// Iter 1: LLM emits thinking + tool_call. Expect assistant message
+		// pushed into iter 2's history to contain Content only.
+		{{
+			Content:      "let me read the file",
+			Thinking:     "reasoning should NOT appear in assistant message",
+			ToolCalls:    []llmgateway.ToolCall{{ID: "call_1", Name: "read_file", Input: `{"path":"x.go"}`}},
+			FinishReason: "tool_calls",
+		}},
+		// Iter 2: final answer — only content, no thinking.
+		{{Content: "answer is 42", FinishReason: "stop"}},
+	}}
+	tools := &scriptedTools{results: []ToolRoundResult{
+		{Results: []ToolResult{{ToolCallID: "call_1", Output: "package x"}}},
+	}}
+	exec := NewWorkItemExecutor(llm, stubExecMUPS{}, tools)
+	ctx, itemID := workItemExecTestCtx("sess_think_msg")
+	if _, err := exec.ExecuteWorkItem(ctx, "sess_think_msg", itemID, "explain x"); err != nil {
+		t.Fatalf("ExecuteWorkItem: %v", err)
+	}
+	if len(llm.messages) != 2 {
+		t.Fatalf("expected 2 LLM calls, got %d", len(llm.messages))
+	}
+
+	// Iter 2's messages = [system(setup)..., user(question), assistant(content+tool_call), tool(result)]
+	// Find the assistant message — must not contain "reasoning should NOT".
+	iter2 := llm.messages[1]
+	var assistantMsg *types.Message
+	for i := range iter2 {
+		if iter2[i].Role == types.MessageRoleAssistant {
+			assistantMsg = &iter2[i]
+			break
+		}
+	}
+	if assistantMsg == nil {
+		t.Fatalf("iter 2 has no assistant message: %+v", iter2)
+	}
+	if strings.Contains(assistantMsg.Content, "reasoning should NOT") {
+		t.Fatalf("assistant message polluted by thinking:\n  Content=%q", assistantMsg.Content)
+	}
+	if assistantMsg.Content != "let me read the file" {
+		t.Fatalf("assistant Content = %q, want %q", assistantMsg.Content, "let me read the file")
+	}
+}

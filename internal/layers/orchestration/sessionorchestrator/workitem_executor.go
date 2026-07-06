@@ -507,7 +507,13 @@ func (e *DefaultWorkItemExecutor) streamLLM(
 			}
 		}
 		if chunk.Thinking != "" {
-			content.WriteString(chunk.Thinking)
+			// DM-20260706-010: thinking chunks MUST NOT pollute result.Content
+			// — they are surfaced via the "thinking" event for trace/transcript
+			// but the final user-facing answer is content-only. Previously
+			// streamLLM concatenated chunk.Thinking into the same strings.Builder
+			// as chunk.Content, so the Feishu card showed <think>...echoed...
+			// </think> sandwiched around the real answer (observed for trivial
+			// Q&A like "2×3=几?"). Thinking is a side-channel; keep it that way.
 			emitEvent(ctx, emit, &contracts.EngineEvent{
 				Type:      "thinking",
 				Content:   chunk.Thinking,
