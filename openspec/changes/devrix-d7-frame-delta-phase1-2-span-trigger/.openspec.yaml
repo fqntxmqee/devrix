@@ -1,0 +1,35 @@
+change_id: devrix-d7-frame-delta-phase1-2-span-trigger
+priority: P1
+demand_id: DM-20260706-001
+status: s1_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Observe 节点 prior_delta span 真实触发
+  - D7-S9   # Execute 节点 plan_frame_delta.inject span 真实触发
+dsaft_activities:
+  - D7-S9-A112-L5-MUPS-FD-6   # e2e Phase 1+2 span 触发链路 (新登记)
+  - D7-S5-A111-L5-MUPS-FD-6   # e2e Phase 2 prior_delta span 触发链路 (新登记)
+t_points:
+  - L5-MUPS-FD-6   # e2e Phase 1+2 span 触发链路 (新登记)
+created: 2026-07-06
+author: devrix-d7-frame-delta-phase1-2-span-trigger proposal
+title: "D7 MUPS Frame Delta Phase 1+2 spans 端到端触发 — 真实路径或 mock 注入覆盖 e2e gap"
+parent_change: devrix-d7-mups-frame-delta-closure
+parent_demand: DM-20260705-010
+parent_archive: openspec/archive/2026-07-05-devrix-d7-mups-frame-delta-closure/
+related_changes:
+  - devrix-d7-mups-frame-delta-closure  # DM-20260705-010 — parent (Phase 4 §8.3 文档化此 gap)
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d7-orchestration/mups-frame-delta-spec.md
+  - openspec/specs/d7-orchestration/t-registry.md
+  - openspec/specs/d7-orchestration/CHANGELOG.md
+parent_demands:
+  - DM-20260705-010  # frame-delta-closure parent
+scope:
+  testutil_only: true   # 仅修改 testutil + integration test,production code 0 修改
+  append_only: true     # append-only 注入原则不变
+  zero_llm: true        # Phase 2/3 deterministic 0 LLM 承诺不变
+follow_up_gaps:
+  - T19 S3-Gate 三方 review (codex + cursor + claude) — 单独 OpenSpec entry
+  - running system 真实飞书 session 验证 — out of scope,需 user action
