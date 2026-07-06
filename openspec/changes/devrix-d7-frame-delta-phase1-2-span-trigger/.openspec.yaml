@@ -1,7 +1,7 @@
 change_id: devrix-d7-frame-delta-phase1-2-span-trigger
 priority: P1
 demand_id: DM-20260706-001
-status: s2_design
+status: s3_design
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Observe 节点 prior_delta span 真实触发
