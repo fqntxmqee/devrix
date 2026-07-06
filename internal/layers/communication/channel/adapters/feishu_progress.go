@@ -829,10 +829,7 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 		return nil
 	}
 	if textutil.LooksLikeFindingsJSONStream(chunk) {
-		stream := a.sessionStream(sessionID)
-		stream.mu.Lock()
-		defer stream.mu.Unlock()
-		return a.patchFindingsJSONPlaceholderLocked(ctx, stream, sessionID, chatID)
+		return a.patchFindingsJSONPlaceholder(ctx, sessionID, chatID)
 	}
 
 	stream := a.sessionStream(sessionID)
@@ -886,8 +883,25 @@ func (a *FeishuAdapter) appendResponseText(ctx context.Context, sessionID, chatI
 	return a.patchResponseCard(ctx, sessionID, chatID, stream, content)
 }
 
-func (a *FeishuAdapter) patchFindingsJSONPlaceholderLocked(ctx context.Context, stream *feishuSessionStream, sessionID, chatID string) error {
+// patchFindingsJSONPlaceholder writes the "⏳ 正在整理 review 结论…"
+// placeholder into textBuffer and dispatches to the appropriate send
+// helper when the LLM output matches LooksLikeFindingsJSONStream.
+//
+// DM-20260706-004 (devrix-d1-feishu-self-deadlock) hotfix: previously
+// this helper required the caller to hold stream.mu, and then branched
+// into send helpers (patchResponseCard / startStreamingReplyCard /
+// streamReplyElement) that each acquire stream.mu themselves. Go
+// sync.Mutex is non-reentrant → the nested Lock deadlocked forever and
+// the goroutine sat waiting in c7ffb7d20721cd7e9a28d6d89004c117
+// (sess_1783308539025_5000) until killed. Refactored to a self-contained
+// helper that mutates stream state under the lock, snapshots the
+// routing decision under the same lock, then DROPS the lock and
+// dispatches to whichever send helper fits (each takes its own lock).
+func (a *FeishuAdapter) patchFindingsJSONPlaceholder(ctx context.Context, sessionID, chatID string) error {
+	stream := a.sessionStream(sessionID)
+	stream.mu.Lock()
 	if stream.findingsJSONPlaceholderShown {
+		stream.mu.Unlock()
 		return nil
 	}
 	stream.findingsJSONPlaceholderShown = true
@@ -896,14 +910,23 @@ func (a *FeishuAdapter) patchFindingsJSONPlaceholderLocked(ctx context.Context, 
 	}
 	stream.textBuffer.WriteString("⏳ 正在整理 review 结论…")
 	content := stream.textBuffer.String()
-	if !a.streamingEnabled {
+	// Snapshot routing state under the lock so the post-release branches
+	// see a consistent view. We MUST drop the lock before dispatching —
+	// every send helper (patchResponseCard / startStreamingReplyCard /
+	// streamReplyElement) takes stream.mu itself, and Go's sync.Mutex is
+	// not reentrant.
+	streamingEnabled := a.streamingEnabled
+	started := stream.responseMsgID != "" || stream.cardkitEnabled
+	useCardkit := started && stream.cardkitEnabled && stream.replyCardID != ""
+	stream.mu.Unlock()
+
+	if !streamingEnabled {
 		return a.patchResponseCard(ctx, sessionID, chatID, stream, content)
 	}
-	started := stream.responseMsgID != "" || stream.cardkitEnabled
 	if !started {
 		return a.startStreamingReplyCard(ctx, sessionID, chatID, stream, content)
 	}
-	if stream.cardkitEnabled && stream.replyCardID != "" {
+	if useCardkit {
 		return a.streamReplyElement(ctx, stream, content, false)
 	}
 	return a.patchResponseCard(ctx, sessionID, chatID, stream, content)
@@ -984,11 +1007,25 @@ func (a *FeishuAdapter) streamReplyElement(ctx context.Context, stream *feishuSe
 }
 
 func (a *FeishuAdapter) patchResponseCard(ctx context.Context, sessionID, chatID string, stream *feishuSessionStream, content string) error {
-	card := NewCard().Markdown(content).Build()
-	cardJSON := BuildCardJSON(card)
-
 	stream.mu.Lock()
 	defer stream.mu.Unlock()
+	return a.patchResponseCardLocked(ctx, sessionID, chatID, stream, content)
+}
+
+// patchResponseCardLocked is the no-lock body of patchResponseCard.
+// Callers MUST already hold stream.mu. Kept for callers that genuinely
+// need to mutate stream state and dispatch under the same critical
+// section (e.g. appendResponseText's normal text-write path).
+//
+// DM-20260706-004 (devrix-d1-feishu-self-deadlock) hotfix: extracted
+// from patchResponseCard after observing an 8 min hang in prod trace
+// c7ffb7d20721cd7e9a28d6d89004c117 (sess_1783308539025_5000). The old
+// patchFindingsJSONPlaceholderLocked held the caller-supplied lock,
+// then called patchResponseCard, which Lock()-ed the same mutex — Go
+// sync.Mutex is non-reentrant, so the goroutine was stuck forever.
+func (a *FeishuAdapter) patchResponseCardLocked(ctx context.Context, sessionID, chatID string, stream *feishuSessionStream, content string) error {
+	card := NewCard().Markdown(content).Build()
+	cardJSON := BuildCardJSON(card)
 
 	if stream.responseMsgID == "" {
 		msgID, err := a.sendInteractiveContentAndGetID(ctx, sessionID, chatID, cardJSON)

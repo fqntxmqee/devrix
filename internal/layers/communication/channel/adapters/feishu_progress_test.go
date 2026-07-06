@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
@@ -1491,3 +1492,189 @@ func TestSendSummaryCard_TaskIncomplete_TitleAndColor(t *testing.T) {
 // now flows through verbatim — accepted trade-off documented at
 // feishu_progress.go:appendResponseText.
 // ============================================================================
+
+// ============================================================================
+// DM-20260706-004 (devrix-d1-feishu-self-deadlock) regression tests.
+//
+// Background: when the LLM output matches LooksLikeFindingsJSONStream,
+// patchFindingsJSONPlaceholder writes "⏳ 正在整理 review 结论…" into
+// the session textBuffer and dispatches the buffered content to one of
+// patchResponseCard / startStreamingReplyCard / streamReplyElement —
+// each of which takes stream.mu internally. Before the fix, the old
+// patchFindingsJSONPlaceholderLocked assumed the caller already held
+// stream.mu and dispatched directly to those helpers, double-Locking
+// the mutex. Go sync.Mutex is non-reentrant, so the goroutine sat in
+// `sync.Mutex.Lock` forever — observed 8 min hang in prod trace
+// c7ffb7d20721cd7e9a28d6d89004c117 (sess_1783308539025_5000) until the
+// session timeout fired.
+//
+// The fix refactored patchFindingsJSONPlaceholder to be self-contained
+// (acquires/releases the lock itself, snapshots routing state, then
+// dispatches AFTER releasing). These tests pin the three routing
+// branches end-to-end with a 3 s timeout — if a future change ever
+// reintroduces a caller-held-lock assumption, the test hangs and the
+// CI flags it. The goroutine + timeout pattern is intentional: a true
+// deadlock lets the test time out instead of wallclock-hanging the
+// whole test suite.
+// ============================================================================
+
+// runWithTimeout runs fn in a goroutine and fails the test if it does
+// not return within d. Returns true if fn completed in time.
+func runWithTimeout(t *testing.T, d time.Duration, fn func() error) bool {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() { done <- fn() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Logf("runWithTimeout: fn returned error (non-fatal for deadlock test): %v", err)
+		}
+		return true
+	case <-time.After(d):
+		return false
+	}
+}
+
+// TestPatchFindingsJSONPlaceholder_NoSelfDeadlock_AllBranches exercises
+// the three routing branches patchFindingsJSONPlaceholder can dispatch
+// into:
+//
+//  1. !streamingEnabled      → patchResponseCard
+//  2. streamingEnabled, !started → startStreamingReplyCard
+//  3. streamingEnabled, cardkit active → streamReplyElement
+//
+// Each branch used to deadlock (DM-20260706-004 prod trace). After the
+// refactor, the helper snapshots routing state under the lock and
+// releases before dispatching — so each branch must complete in < 3 s.
+func TestPatchFindingsJSONPlaceholder_NoSelfDeadlock_AllBranches(t *testing.T) {
+	cases := []struct {
+		name string
+		// preconfig sets up the adapter and stream state for the branch.
+		preconfig func(a *FeishuAdapter, stream *feishuSessionStream)
+	}{
+		{
+			name: "non_streaming_branch_patchResponseCard",
+			preconfig: func(a *FeishuAdapter, stream *feishuSessionStream) {
+				a.streamingEnabled = false
+				stream.replyCardID = ""
+				stream.responseMsgID = ""
+				stream.cardkitEnabled = false
+			},
+		},
+		{
+			name: "streaming_branch_startStreamingReplyCard",
+			preconfig: func(a *FeishuAdapter, stream *feishuSessionStream) {
+				a.streamingEnabled = true
+				stream.replyCardID = ""
+				stream.responseMsgID = ""
+				stream.cardkitEnabled = false
+			},
+		},
+		{
+			name: "cardkit_branch_streamReplyElement",
+			preconfig: func(a *FeishuAdapter, stream *feishuSessionStream) {
+				a.streamingEnabled = true
+				stream.replyCardID = "card_existing"
+				stream.responseMsgID = "om_existing"
+				stream.cardkitEnabled = true
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			msgID := "om_x"
+			mockMsgAPI := &mockMessageAPI{
+				replyFunc: func(_ context.Context, _ *larkim.ReplyMessageReq) (*larkim.ReplyMessageResp, error) {
+					return &larkim.ReplyMessageResp{Data: &larkim.ReplyMessageRespData{MessageId: &msgID}}, nil
+				},
+				createFunc: func(_ context.Context, _ *larkim.CreateMessageReq) (*larkim.CreateMessageResp, error) {
+					return &larkim.CreateMessageResp{Data: &larkim.CreateMessageRespData{MessageId: &msgID}}, nil
+				},
+				patchFunc: func(_ context.Context, _ *larkim.PatchMessageReq) (*larkim.PatchMessageResp, error) {
+					return &larkim.PatchMessageResp{}, nil
+				},
+			}
+			mockImAPI := &mockImAPI{messageAPI: mockMsgAPI, messageReactionAPI: &mockMessageReactionAPI{}}
+			mockAPI := &mockFeishuAPI{
+				imAPI: mockImAPI,
+				postFunc: func(_ context.Context, path string, _ interface{}, _ larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+					// cardkit CreateCard returns card_id; otherwise echo.
+					if strings.Contains(path, "/cards") {
+						return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0,"data":{"card_id":"card_x"}}`)}, nil
+					}
+					return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+				},
+				putFunc: func(_ context.Context, _ string, _ interface{}, _ larkcore.AccessTokenType) (*larkcore.ApiResp, error) {
+					return &larkcore.ApiResp{StatusCode: 200, RawBody: []byte(`{"code":0}`)}, nil
+				},
+			}
+			adapter := NewFeishuAdapter(nil, &FeishuConfig{
+				AppID:     "test_app",
+				AppSecret: "test_secret",
+				Streaming: FeishuStreamingConfig{Enabled: true},
+			}, &config.CommunicationConfig{}, WithFeishuAPI(mockAPI))
+			adapter.sessionReplyCtx.Store("sess_deadlock_guard", feishuReplyContext{userMessageID: "om_root"})
+
+			const sessionID = "sess_deadlock_guard"
+			stream := adapter.sessionStream(sessionID)
+			stream.textBuffer.WriteString("some leading report text\n")
+			tc.preconfig(adapter, stream)
+
+			// The whole point of the fix: this MUST return within 3 s. A
+			// future change that re-introduces a caller-held-lock dance
+			// (or any nested Lock) will hang here and the test will fail.
+			ok := runWithTimeout(t, 3*time.Second, func() error {
+				return adapter.patchFindingsJSONPlaceholder(context.Background(), sessionID, "feishu_oc_1")
+			})
+			if !ok {
+				t.Fatalf("patchFindingsJSONPlaceholder deadlocked (DM-20260706-004 regression)")
+			}
+
+			// State invariant: findingsJSONPlaceholderShown flipped to
+			// true and the placeholder was appended to the buffer.
+			stream.mu.Lock()
+			shown := stream.findingsJSONPlaceholderShown
+			buf := stream.textBuffer.String()
+			stream.mu.Unlock()
+			if !shown {
+				t.Errorf("findingsJSONPlaceholderShown = false, want true after patchFindingsJSONPlaceholder")
+			}
+			if !strings.Contains(buf, "⏳ 正在整理 review 结论…") {
+				t.Errorf("textBuffer missing placeholder text. buffer=%q", buf)
+			}
+		})
+	}
+}
+
+// TestPatchFindingsJSONPlaceholder_IdempotentShortCircuit verifies the
+// helper exits early on the second call. The hotfix route once
+// deadlocked on the first call; we want the second call (which would
+// return immediately due to findingsJSONPlaceholderShown=true) to also
+// be safe — and instant — so a retry of appendResponseText after a
+// network blip doesn't double-flush the helper again.
+func TestPatchFindingsJSONPlaceholder_IdempotentShortCircuit(t *testing.T) {
+	adapter := NewFeishuAdapter(nil, &FeishuConfig{
+		AppID:     "test_app",
+		AppSecret: "test_secret",
+	}, &config.CommunicationConfig{}, WithFeishuAPI(&mockFeishuAPI{}))
+	const sessionID = "sess_idem"
+	stream := adapter.sessionStream(sessionID)
+	stream.mu.Lock()
+	stream.findingsJSONPlaceholderShown = true
+	initialBufLen := stream.textBuffer.Len()
+	stream.mu.Unlock()
+
+	ok := runWithTimeout(t, 1*time.Second, func() error {
+		return adapter.patchFindingsJSONPlaceholder(context.Background(), sessionID, "feishu_oc_1")
+	})
+	if !ok {
+		t.Fatalf("idempotent short-circuit path deadlocked — should have returned immediately")
+	}
+	stream.mu.Lock()
+	finalBufLen := stream.textBuffer.Len()
+	stream.mu.Unlock()
+	if finalBufLen != initialBufLen {
+		t.Errorf("buffer mutated on short-circuit call: %d → %d", initialBufLen, finalBufLen)
+	}
+}
