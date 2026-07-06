@@ -29,6 +29,25 @@ type CoordinatorConfig struct {
 	// serialization (one turn at a time per session) and transcript
 	// reader wired in bootstrap.InitOrchestration.
 	PriorContextRounds int `yaml:"prior_context_rounds"`
+	// SemanticConvergence (D7-S16, DM-20260706-006) controls whether
+	// the per-WorkItem ItemPipelineRunner consults an LLM SemanticVerifier
+	// when the code-based verify rubber-stamps Pass but the artifact
+	// looks structurally identical to a prior round (Jaccard ≥
+	// MinSimilarity). Mirrors orchtypes.SemanticConvergenceConfig — the
+	// bootstrap layer merges this into ItemPipelineRunner.SemanticConfig
+	// and constructs a DefaultSemanticVerifier.
+	SemanticConvergence SemanticConvergenceFileConfig `yaml:"semantic_convergence"`
+}
+
+// SemanticConvergenceFileConfig mirrors orchtypes.SemanticConvergenceConfig
+// for YAML deserialization. Pointer fields let BuildCoordinatorConfig
+// distinguish "absent in yaml" (keep default) from "explicitly false / 0".
+type SemanticConvergenceFileConfig struct {
+	Enabled       *bool    `yaml:"enabled"`
+	MinSimilarity *float64 `yaml:"min_similarity"`
+	LookbackN     *int     `yaml:"lookback_n"`
+	TimeoutMs     *int     `yaml:"timeout_ms"`
+	ModelTier     *string  `yaml:"model_tier"`
 }
 
 // DefaultCoordinatorConfig returns the v1.0 defaults — matches
@@ -44,8 +63,24 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 		CommandWhitelist: []string{
 			"/plan", "/stop", "/task", "/help",
 		},
+		// SemanticConvergence production default = Enabled=true
+		// (DM-20260706-006). The Jaccard pre-check is cheap; the LLM
+		// call only fires on stagnation-suspect rounds.
+		SemanticConvergence: SemanticConvergenceFileConfig{
+			Enabled:       boolPtr(true),
+			MinSimilarity: coordFloat64Ptr(0.85),
+			LookbackN:     coordIntPtr(5),
+			TimeoutMs:     coordIntPtr(8000),
+			ModelTier:     coordStringPtr(""),
+		},
 	}
 }
+
+// boolPtr is defined in contextengine.go (shared by all config types).
+// These three are the coordinator.go-local numeric / string helpers.
+func coordIntPtr(n int) *int             { return &n }
+func coordFloat64Ptr(f float64) *float64 { return &f }
+func coordStringPtr(s string) *string    { return &s }
 
 // BuildCoordinatorConfig merges file over defaults. Nil fields in file keep defaults.
 func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
@@ -76,6 +111,25 @@ func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
 	}
 	if file.PriorContextRounds != nil {
 		cfg.PriorContextRounds = *file.PriorContextRounds
+	}
+	if file.SemanticConvergence != nil {
+		// inner SemanticConvergence is a value (CoordinatorFileConfig
+		// already nil-checked), so merge per-field.
+		if file.SemanticConvergence.Enabled != nil {
+			cfg.SemanticConvergence.Enabled = file.SemanticConvergence.Enabled
+		}
+		if file.SemanticConvergence.MinSimilarity != nil {
+			cfg.SemanticConvergence.MinSimilarity = file.SemanticConvergence.MinSimilarity
+		}
+		if file.SemanticConvergence.LookbackN != nil {
+			cfg.SemanticConvergence.LookbackN = file.SemanticConvergence.LookbackN
+		}
+		if file.SemanticConvergence.TimeoutMs != nil {
+			cfg.SemanticConvergence.TimeoutMs = file.SemanticConvergence.TimeoutMs
+		}
+		if file.SemanticConvergence.ModelTier != nil {
+			cfg.SemanticConvergence.ModelTier = file.SemanticConvergence.ModelTier
+		}
 	}
 	return cfg
 }

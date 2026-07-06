@@ -113,6 +113,12 @@ type ItemPipelineDeps struct {
 	// ObservationProposer optional @ Observe; production uses D2 Prepare → D3 (DM-20260630-001).
 	ObservationProposer   ObservationProposer
 	StrategicPlanProposer StrategicPlanProposer
+	// DM-20260706-006: pass through the semantic verify wiring. Both
+	// fields are optional — nil cfg → production default
+	// (Enabled=true), nil verifier → no LLM call (the cheap Jaccard
+	// pre-check still runs but short-circuits when verifier is nil).
+	SemanticConfig   SemanticSimilarityConfig
+	SemanticVerifier SemanticVerifier
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -132,6 +138,13 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 	if classifier == nil {
 		classifier = decisionplanning.NewRuleClassifier(nil)
 	}
+	semanticCfg := deps.SemanticConfig
+	// Use the zero-value of MinSimilarityForVerify as a sentinel for
+	// "not wired"; fall back to defaults in that case so the bootstrap
+	// path always gets a valid config.
+	if semanticCfg.MinSimilarityForVerify == 0 && semanticCfg.MinArtifactChars == 0 && !semanticCfg.Enabled {
+		semanticCfg = DefaultSemanticSimilarityConfig()
+	}
 	return &ItemPipelineRunner{
 		Classifier:            classifier,
 		Planner:               planner,
@@ -141,7 +154,8 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		Executor:              deps.Executor,
 		ObservationProposer:   deps.ObservationProposer,
 		StrategicPlanProposer: deps.StrategicPlanProposer,
-		SemanticConfig:        DefaultSemanticSimilarityConfig(), // Enabled=false (hotfix default)
+		SemanticConfig:        semanticCfg,
+		SemanticVerifier:      deps.SemanticVerifier,
 	}, nil
 }
 

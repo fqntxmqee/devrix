@@ -121,11 +121,18 @@ type SemanticSimilarityConfig struct {
 }
 
 // DefaultSemanticSimilarityConfig returns the production defaults.
+//
+// DM-20260706-006: production default is Enabled=true. The Jaccard
+// pre-check is cheap (O(priors) interfaces.Jaccard calls) and only fires
+// the LLM call when there's a structural stagnation signal, so the
+// always-on default adds near-zero cost to healthy rounds and a
+// single 8s timeout-bounded LLM call to stagnation-suspect rounds.
+// Set Enabled=false explicitly to disable (tests / emergency rollback).
 func DefaultSemanticSimilarityConfig() SemanticSimilarityConfig {
 	return SemanticSimilarityConfig{
 		MinSimilarityForVerify: interfaces.DefaultInterceptThreshold, // 0.85
 		MinArtifactChars:       100,
-		Enabled:                false, // hotfix-path: default OFF until production-validated
+		Enabled:                true, // production default ON
 	}
 }
 

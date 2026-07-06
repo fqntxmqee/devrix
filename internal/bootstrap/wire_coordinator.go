@@ -57,6 +57,7 @@ func InitOrchestration(
 		RoutingMode:        strPtr(coordCfg.coordCfg.RoutingMode),
 		CommandFirst:       boolPtr(coordCfg.coordCfg.CommandFirst),
 		PriorContextRounds: intPtr(coordCfg.coordCfg.PriorContextRounds),
+		SemanticConvergence: buildSemanticConvergenceFileConfig(coordCfg.coordCfg.SemanticConvergence),
 	}
 	coordinatorCfg := orchtypes.BuildConfig(&coordinatorFileCfg)
 
@@ -144,6 +145,12 @@ func InitOrchestration(
 		LLMInvoker:       llmInvoker,
 		CtxPreparer:      ctxAdapter,
 		PromptLanguage:   coordCfg.promptLanguage,
+		// DM-20260706-006: wire the LLM-driven semantic verifier into
+		// the per-WorkItem MUPS pipeline. Production default Enabled=true
+		// (set in shared/config.DefaultCoordinatorConfig). The Jaccard
+		// pre-check (MinSimilarity) gates the LLM call so the cost is
+		// bounded to stagnation-suspect rounds only.
+		SemanticConvergence: coordinatorCfg.SemanticConvergence,
 	})
 	if err != nil {
 		return fmt.Errorf("d7: wire item pipeline: %w", err)
