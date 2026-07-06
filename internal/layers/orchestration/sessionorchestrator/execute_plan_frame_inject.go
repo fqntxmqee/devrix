@@ -41,9 +41,10 @@ func InjectPlanFrameDelta(ctx context.Context, sessionID string, planDelta inter
 	hash := planDelta.SchemaHash()
 	if planDelta.IsZero() || hash == "" {
 		// 零值/无信号 → no-op (0 注入 + emit span 标记 prior_delta_empty)
-		hardening.EmitPlanFrameDeltaInject(
+		endPlan := hardening.EmitPlanFrameDeltaInject(
 			ctx, sessionID, hash, 0, hardening.PlanFrameDeltaInjectEmpty,
 		)
+		endPlan(nil)
 		return baseline
 	}
 	summary := summarizePlanFrameDelta(planDelta)
@@ -56,16 +57,18 @@ func InjectPlanFrameDelta(ctx context.Context, sessionID string, planDelta inter
 	)
 	// ABSOLUTE budget: 不依赖 baseline 长度 (cursor H2' 修复)
 	if len(injection) > interfaces.MaxPlanFrameDeltaInjectChars {
-		hardening.EmitPlanFrameDeltaInject(
+		endPlan := hardening.EmitPlanFrameDeltaInject(
 			ctx, sessionID, hash, len(injection),
 			hardening.PlanFrameDeltaInjectBudgetExceeded,
 		)
+		endPlan(nil)
 		return baseline
 	}
-	hardening.EmitPlanFrameDeltaInject(
+	endPlan := hardening.EmitPlanFrameDeltaInject(
 		ctx, sessionID, hash, len(injection),
 		hardening.PlanFrameDeltaInjectOK,
 	)
+	endPlan(nil)
 	return baseline + injection
 }
 

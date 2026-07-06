@@ -45,12 +45,14 @@ import (
 func BuildObservePriorDelta(ctx context.Context, sessionID string, prevExecCtx *WorkItemExecContext) interfaces.FrameDelta {
 	if prevExecCtx == nil || prevExecCtx.Item == nil || prevExecCtx.Item.LastRound == nil {
 		// 首轮 / fresh session → no signal, no-op FrameDelta
-		hardening.EmitObservePriorDelta(ctx, sessionID, "", 0, false)
+		endObs := hardening.EmitObservePriorDelta(ctx, sessionID, "", 0, false)
+		endObs(nil)
 		return interfaces.FrameDelta{}
 	}
 	summary := strings.TrimSpace(prevExecCtx.Item.LastRound.ArtifactSummary)
 	if summary == "" {
-		hardening.EmitObservePriorDelta(ctx, sessionID, "", 0, false)
+		endObs := hardening.EmitObservePriorDelta(ctx, sessionID, "", 0, false)
+		endObs(nil)
 		return interfaces.FrameDelta{}
 	}
 	if len(summary) > interfaces.MaxPriorArtifactSummaryChars {
@@ -63,6 +65,7 @@ func BuildObservePriorDelta(ctx context.Context, sessionID string, prevExecCtx *
 		// 计算 machine-readable gap ID 数组 (每项 ≤ MaxKnownGapsItemChars=60)。
 		KnownGaps: nil,
 	}
-	hardening.EmitObservePriorDelta(ctx, sessionID, fd.PriorArtifactSummary, len(fd.KnownGaps), true)
+	endObs := hardening.EmitObservePriorDelta(ctx, sessionID, fd.PriorArtifactSummary, len(fd.KnownGaps), true)
+	endObs(nil)
 	return fd
 }
