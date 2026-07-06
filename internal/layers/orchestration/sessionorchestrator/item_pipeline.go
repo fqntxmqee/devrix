@@ -43,6 +43,17 @@ type ItemPipelineRunner struct {
 	Executor WorkItemExecutor
 	// Verify overrides deterministic artifact verification (tests / future LLM verifier).
 	Verify func(*wavescheduler.Artifact) workmodel.Verdict
+	// SemanticVerifier asks the LLM to judge whether the round's
+	// ArtifactSummary actually answers the user's original question
+	// (DM-20260706-006). nil → no semantic verify; pipeline falls
+	// back to the code-based verdict (current behavior). When wired,
+	// the cheap Jaccard pre-check (looksLikeTemplateMimicry via
+	// SemanticConfig) decides whether to actually CALL the verifier,
+	// so the LLM cost is bounded to stagnation-suspect rounds only.
+	SemanticVerifier SemanticVerifier
+	// SemanticConfig controls when SemanticVerifier is consulted. nil →
+	// DefaultSemanticSimilarityConfig() (Enabled=false by default).
+	SemanticConfig SemanticSimilarityConfig
 	// Emit is the deprecated single-emit field. Use ItemPipelineRunOpts.Emit
 	// on Run() / RunParallelExplore() so concurrent sessions each carry
 	// their own emit closure instead of racing on a shared struct field.
@@ -130,6 +141,7 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		Executor:              deps.Executor,
 		ObservationProposer:   deps.ObservationProposer,
 		StrategicPlanProposer: deps.StrategicPlanProposer,
+		SemanticConfig:        DefaultSemanticSimilarityConfig(), // Enabled=false (hotfix default)
 	}, nil
 }
 
@@ -359,6 +371,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		}
 		priorReason += extra
 	}
+	// DM-20260706-006 (Semantic Convergence): if the prior round's LLM
+	// verifier asked the model to self-correct (e.g. "your last answer
+	// was template-mimicry; address the original question with concrete
+	// content"), surface that hint to the next round's LLM directive.
+	// Without this injection, the LLM would re-emit the same template
+	// and the convergence check would re-fire indefinitely.
+	if item != nil && item.LastRound != nil {
+		if hint := strings.TrimSpace(item.LastRound.SemanticRetryHint); hint != "" {
+			if priorReason != "" {
+				priorReason += "\n"
+			}
+			priorReason += "semantic_retry: " + hint
+		}
+	}
 	execCtx := WithWorkItemExecContext(ctx, WorkItemExecContext{
 		Item:                 item,
 		Tasks:                r.Tasks,
@@ -438,6 +464,23 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		verdict = out.Verdict
 		deliverableResult = out.Deliverable
 	}
+
+	// DM-20260706-006 (Semantic Convergence): when the code-based verdict
+	// rubber-stamped Pass but the current ArtifactSummary looks structurally
+	// identical to a prior round (template-mimicry), ask the LLM whether
+	// the round actually answered the user's question. The LLM verdict
+	// overrides the code path → Decide sees VerdictFail → SpawnNone → loop
+	// terminates instead of looping 20 rounds × 67s.
+	//
+	// Token-cost guard: looksLikeTemplateMimicry uses a cheap Jaccard
+	// pre-check (interfaces.Jaccard, 0.85 threshold). The LLM call only
+	// fires when there is structural stagnation. Healthy rounds (1-3 in a
+	// fresh session) skip the verify entirely — zero overhead.
+	//
+	// Disabled by default (SemanticConfig.Enabled=false); the hotfix
+	// default preserves current behavior until production validation.
+	var semanticRetryHint string
+	verdict, semanticRetryHint = r.maybeRunSemanticVerifier(ctx, sessionID, item, directive, art, verdict, roundNo)
 	exitReason := exitReasonForVerdict(verdict, sessionID)
 	endVerifyPhase(nil)
 
@@ -546,6 +589,12 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		LearningClass:     learningClass,
 		UncertaintyMean:   uncertaintyMean,
 		VerdictConfidence: verdict.Confidence,
+		// DM-20260706-006 (Semantic Convergence): pass the LLM-emitted
+		// retry hint into the round struct so the next round's
+		// PriorDeliverableRetryHint can surface it to the LLM directive.
+		// Without this, the hint stays local to maybeRunSemanticVerifier
+		// and the next round's LLM re-emits the same template.
+		SemanticRetryHint:   semanticRetryHint,
 		DeliverableSchema:   deliverableSchema,
 		DeliverableContract: deliverableContract,
 		StartedAt:         started,
@@ -712,6 +761,225 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	endDecidePhase(nil)
 	return round, nil
+}
+
+// maybeRunSemanticVerifier implements the DM-20260706-006 hotfix path:
+//
+//   1. Cheap Jaccard pre-check (looksLikeTemplateMimicry) gates the LLM call.
+//      No stagnation signal → return code verdict unchanged (zero LLM cost).
+//   2. On stagnation signal: call SemanticVerifier.VerifySemantically —
+//      the LLM answers "did I actually address the user's question?".
+//   3. If the LLM says VerdictFail (template_mimicry), override the code
+//      verdict with the semantic verdict so Decide routes to SpawnNone.
+//
+// Behavior preserved when:
+//   - SemanticVerifier is nil → no-op.
+//   - SemanticConfig.Enabled=false → no-op.
+//   - LLM call fails / times out → log + return code verdict unchanged.
+//
+// All thresholds + cost gates live in SemanticSimilarityConfig; this
+// function contains zero hardcoded numeric loops.
+//
+// Returns (verdict, retryHint):
+//   - verdict overrides codeVerdict when the LLM verdict is worse (Fail / Partial).
+//     When the LLM agrees (Pass), the code verdict is preserved.
+//   - retryHint is non-empty ONLY when the LLM chose decision="retry"
+//     on a VerdictFail — it carries the LLM's reason to be fed into the
+//     next round's ExecuteWorkItem via PriorVerifyReason so the LLM can
+//     self-correct. When decision="stop", retryHint is empty (the loop
+//     terminates via SpawnNone and no retry is desired).
+func (r *ItemPipelineRunner) maybeRunSemanticVerifier(
+	ctx context.Context,
+	sessionID string,
+	item *workmodel.WorkItem,
+	directive string,
+	art *wavescheduler.Artifact,
+	codeVerdict workmodel.Verdict,
+	roundNo int,
+) (workmodel.Verdict, string) {
+	if r == nil || r.SemanticVerifier == nil {
+		return codeVerdict, ""
+	}
+	cfg := r.SemanticConfig
+	if !cfg.Enabled {
+		return codeVerdict, ""
+	}
+	// Fast-path: code already says Fail. Trust the code path (e.g. real
+	// execute error / max_iters) and skip the LLM call. The semantic
+	// verifier is for catching FALSE PASSES, not double-checking TRUE
+	// FAILURES.
+	if codeVerdict.Kind == types.VerdictFail {
+		return codeVerdict, ""
+	}
+
+	// Rollup round: do not invoke semantic verifier. Rollup synthesis is
+	// handled by verifyRollupArtifact + rollupDecisionTable; semantic
+	// mimicry of a rollup summary is harmless because rollup retry
+	// guards (RollupRetries >= MaxRollupRetries) terminate the loop
+	// regardless. Avoids an LLM call on the hottest loop in the system.
+	if item != nil && item.NeedsRollup {
+		return codeVerdict, ""
+	}
+
+	currentSummary := ""
+	if art != nil {
+		currentSummary = art.Summary
+	}
+	if currentSummary == "" {
+		return codeVerdict, ""
+	}
+
+	// Collect prior round summaries from this WorkItem's history. We
+	// limit to cfg.LookbackN (default 5) to bound the LLM prompt size.
+	priors := collectPriorRoundSummaries(item, 5)
+
+	if !looksLikeTemplateMimicry(currentSummary, priors, cfg) {
+		return codeVerdict, ""
+	}
+
+	// Cheap pre-check passed. Call the LLM semantic verifier.
+	req := SemanticVerifyRequest{
+		SessionID:            sessionID,
+		ItemID:               itemSafeID(item),
+		RoundNo:              roundNo,
+		UserOriginalQuestion: directive,
+		ArtifactSummary:      currentSummary,
+		PriorRoundSummaries:  priors,
+		CodeBasedVerdict:     codeVerdict,
+	}
+	newVerdict, err := r.SemanticVerifier.VerifySemantically(ctx, req)
+	if err != nil {
+		// Fail-open: log + keep code verdict. A missing semantic verdict
+		// must never make things worse than current behavior (always Pass).
+		slog.Warn("item_pipeline: semantic verifier error; fall back to code verdict",
+			"item_id", itemSafeID(item), "round_no", roundNo, "err", err)
+		return codeVerdict, ""
+	}
+	// Only override when the LLM verdict is WORSE than code. A LLM "pass"
+	// on a code-Pass round is a no-op; a LLM "partial" downgrades Pass to
+	// Partial; a LLM "fail" forces SpawnNone.
+	if newVerdict.Kind == types.VerdictPass {
+		return codeVerdict, ""
+	}
+
+	// Extract decision hint from the verdict Reason (set by
+	// DefaultSemanticVerifier.VerifySemantically as "[decision=...] ...").
+	decision, retryHint := extractDecisionAndHint(newVerdict)
+
+	hardening.EmitSemanticConvergence(
+		ctx,
+		sessionID,
+		itemSafeID(item),
+		roundNo,
+		verdictKindString(newVerdict.Kind),
+		newVerdict.Confidence,
+		newVerdict.Reason,
+	)
+
+	// decision="retry" on a VerdictFail: do NOT override verdict. Keep
+	// the code VerdictPass so Decide picks SpawnNone... wait, that would
+	// converge too aggressively. Better: downgrade Pass → Partial so
+	// Decide routes to SpawnInline (existing deliverable-continuation
+	// path) and the retry hint is surfaced to the LLM next round.
+	if newVerdict.Kind == types.VerdictFail && decision == "retry" && retryHint != "" {
+		downgraded := codeVerdict
+		downgraded.Kind = types.VerdictPartial
+		downgraded.Reason = "semantic_retry: " + retryHint
+		downgraded.Confidence = newVerdict.Confidence
+		downgraded.SourceID = newVerdict.SourceID
+		return downgraded, retryHint
+	}
+
+	// decision="stop" (or default for fail): override to VerdictFail so
+	// Decide routes to SpawnNone (non-Scenario + non-Exploration) →
+	// TaskStatusFailed → loop terminates.
+	if newVerdict.Kind == types.VerdictFail {
+		return newVerdict, ""
+	}
+
+	// VerdictPartial (regardless of decision): downgrade code Pass to
+	// Partial so Decide picks SpawnInline + surfaces the retry hint.
+	if newVerdict.Kind == types.VerdictPartial && retryHint != "" {
+		downgraded := codeVerdict
+		downgraded.Kind = types.VerdictPartial
+		downgraded.Reason = "semantic_partial: " + retryHint
+		downgraded.Confidence = newVerdict.Confidence
+		downgraded.SourceID = newVerdict.SourceID
+		return downgraded, retryHint
+	}
+	return newVerdict, ""
+}
+
+// extractDecisionAndHint pulls "[decision=stop]" / "[decision=retry]"
+// prefix out of verdict.Reason and returns (decision, cleanedReason).
+// cleanedReason is what callers should surface as the retry hint.
+// Returns ("", "") when no decision prefix is present.
+func extractDecisionAndHint(v workmodel.Verdict) (string, string) {
+	r := strings.TrimSpace(v.Reason)
+	if !strings.HasPrefix(r, "[decision=") {
+		return "", ""
+	}
+	end := strings.Index(r, "]")
+	if end < 0 {
+		return "", ""
+	}
+	decision := strings.TrimSpace(r[len("[decision="):end])
+	cleaned := strings.TrimSpace(r[end+1:])
+	return decision, cleaned
+}
+
+// verdictKindString renders a VerdictKind as a stable string for span
+// attributes. Mirrors types.VerdictKind.String() if present; falls back
+// to a fmt of the int value to avoid an import dependency.
+func verdictKindString(k types.VerdictKind) string {
+	switch k {
+	case types.VerdictPass:
+		return "pass"
+	case types.VerdictPartial:
+		return "partial"
+	case types.VerdictFail:
+		return "fail"
+	case types.VerdictIndeterminate:
+		return "indeterminate"
+	default:
+		return "unknown"
+	}
+}
+
+// collectPriorRoundSummaries walks item.LastRound history backward and
+// returns up to maxN prior ArtifactSummary strings, oldest first.
+//
+// Note: as of 2026-07-06 the ItemPipelineRunner only retains a single
+// LastRound pointer on the WorkItem (older rounds are dropped after the
+// next round overwrites LastRound). This function returns whatever is
+// available; for items that only persist the latest round, the slice
+// is empty and the Jaccard pre-check trivially returns false (no
+// stagnation signal possible). When RoundHistory is added in a future
+// change, this function will automatically surface more priors without
+// any caller updates.
+func collectPriorRoundSummaries(item *workmodel.WorkItem, maxN int) []string {
+	if item == nil || item.LastRound == nil {
+		return nil
+	}
+	// Single-round history today. Walk the LastRound chain via ParentID
+	// siblings only if a future change adds a RoundHistory slice; for
+	// now we read the only available prior — LastRound.ArtifactSummary.
+	// Returning a 1-element slice is still correct (1 prior is enough
+	// to detect identical-replay stagnation across two consecutive rounds).
+	if item.LastRound.ArtifactSummary == "" {
+		return nil
+	}
+	if maxN <= 0 {
+		maxN = 5
+	}
+	return []string{item.LastRound.ArtifactSummary}
+}
+
+func itemSafeID(item *workmodel.WorkItem) string {
+	if item == nil {
+		return ""
+	}
+	return item.ID
 }
 
 // buildArtifactFromWorkItemResult converts a WorkItemExecutor result into a

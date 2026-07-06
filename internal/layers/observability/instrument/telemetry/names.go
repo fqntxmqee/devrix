@@ -146,6 +146,15 @@ const (
 	// CoverageRatio + unresolved_count per round without re-parsing
 	// artifact JSON.
 	OpD7_S4_Resolution_Coverage = "D7_Resolution_Coverage"
+	// D7-S4 ExecutionFlow + Verify (mups.semantic_convergence P0,
+	// DM-20260706-006). Emits when ItemPipelineRunner invokes the
+	// SemanticVerifier to ask the LLM whether the round's ArtifactSummary
+	// actually addresses the user's original question (vs. template-
+	// mimicking). Only fires when the cheap Jaccard pre-check signals
+	// structural stagnation. The span carries the LLM's verdict kind +
+	// confidence + reason so dashboards can graph "how often is the
+	// verifier consulted" + "what does it usually answer".
+	OpD7_S4_Semantic_Convergence = "D7_Semantic_Convergence"
 	// D7-S5 DecisionPlanning + Observe (taskgraph.synthesize P1)
 	OpD7_S5_TaskGraph_Synthesize = "D7_TaskGraph_Synthesize"
 	// D7-S6 MUPS Pipeline (channel.route P0)

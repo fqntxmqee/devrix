@@ -447,3 +447,22 @@ d7:
   fast_path_threshold: 90          # ClassifyIntent 置信度阈值
   command_first: true             # 命令优先（/plan /stop /task /help）
   plan_mode_approve_gate: true    # Wave 触发需要显式 Plan 批准
+  # DM-20260706-006 hotfix: enable D7-S15 prior-output-summary injection
+  # so turn N+1 sees turn N's finalText via <prior-output-summary>.
+  # 0 (default) → no injection; same-session multi-turn LLM has no memory of prior turns.
+  prior_context_rounds: 3         # inject last 3 turns' finalText into next turn's directive
+  # DM-20260706-006 hotfix: LLM-driven semantic convergence (Plan A + B).
+  # When the code-based verify rubber-stamps Pass but the artifact looks
+  # structurally identical to a prior round (Jaccard ≥ min_similarity),
+  # ask the LLM "did this round actually answer the user's question?".
+  # The LLM's verdict overrides the code path. Defaults to OFF — the
+  # hotfix path uses code-only verify until production validation.
+  # NOTE: this flag currently has no runtime wiring; DefaultSemanticSimilarityConfig
+  # returns Enabled=false. Production rollout requires adding the config
+  # loader path in bootstrap (tracked in DM-20260706-006 follow-up).
+  semantic_convergence:
+    enabled: false
+    min_similarity: 0.85            # Jaccard threshold to trigger LLM call
+    lookback_n: 5                   # prior rounds scanned for mimicry
+    timeout_ms: 8000                # LLM semantic call cap
+    model_tier: ""                  # "" → use verifier default tier
