@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
@@ -495,6 +496,77 @@ func TestWorkItemExecutor_NilEmit_NoOp(t *testing.T) {
 	}
 	if !res.Done || res.Content != "ok" {
 		t.Fatalf("res = %+v, want Done=true Content=ok", res)
+	}
+}
+
+// TestWorkItemExecutor_PlanFrameDelta_Binder_DM20260706_002 covers the
+// hotfix binder for D7 Phase 1 FrameDelta injection: when ec.PlanFrameDelta
+// is non-nil the LLM must receive a system_prompt whose suffix carries the
+// `<plan_frame_delta schema=...>` block produced by summarizePlanFrameDelta.
+// When ec.PlanFrameDelta is nil the system_prompt is the baseline verbatim
+// (InjectPlanFrameDelta no-op branch). Pre-hotfix Jaeger verification showed
+// 0 D7_Execute_PlanFrameDelta_Inject spans in production (trace
+// cf29aeaaa602f736 on 2026-07-06) even when ItemPipelineRunner.bind
+// produced a non-nil FrameDelta — the binder was missing in
+// ExecuteWorkItem. This test locks the wiring.
+func TestWorkItemExecutor_PlanFrameDelta_Binder_DM20260706_002(t *testing.T) {
+	const baselineSystem = "baseline-exec-system-prompt-DM-20260706-002"
+
+	type tc struct {
+		name      string
+		fd        *interfaces.FrameDelta // nil → expect verbatim baseline
+		wantDelta bool                    // expect system_prompt to differ from baseline
+		wantSub   string                  // substring to assert if wantDelta
+	}
+	cases := []tc{
+		{
+			name:      "nil_plan_frame_delta_returns_baseline_verbatim",
+			fd:        nil,
+			wantDelta: false,
+		},
+		{
+			name: "non_zero_plan_frame_delta_appends_injection",
+			fd: &interfaces.FrameDelta{
+				ExecutionMode: "protocol",
+			},
+			wantDelta: true,
+			wantSub:   `<plan_frame_delta schema="`,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			llm := &scriptedLLM{script: [][]llmgateway.Chunk{
+				{{Content: "ok", FinishReason: "stop"}},
+			}}
+			exec := NewWorkItemExecutor(llm, stubExecMUPS{system: baselineSystem}, nil)
+			ctx, itemID := workItemExecTestCtx("sess_" + c.name)
+			ec, _ := WorkItemExecContextFrom(ctx)
+			ec.PlanFrameDelta = c.fd
+			ctx = WithWorkItemExecContext(ctx, ec)
+			if _, err := exec.ExecuteWorkItem(ctx, "sess_"+c.name, itemID, "do-it"); err != nil {
+				t.Fatalf("ExecuteWorkItem: %v", err)
+			}
+			if len(llm.system) == 0 {
+				t.Fatalf("LLM received no system_prompt (calls=%d)", llm.calls)
+			}
+			got := llm.system[0]
+			if c.wantDelta {
+				if got == baselineSystem {
+					t.Fatalf("system_prompt unchanged; want baseline + InjectPlanFrameDelta injection")
+				}
+				if !strings.Contains(got, c.wantSub) {
+					t.Fatalf("system_prompt missing injection marker %q; got prefix=%q", c.wantSub, got[:min(160, len(got))])
+				}
+				// baseline is preserved as prefix
+				if !strings.HasPrefix(got, baselineSystem) {
+					t.Fatalf("system_prompt dropped baseline; got prefix=%q", got[:min(80, len(got))])
+				}
+			} else {
+				if got != baselineSystem {
+					t.Fatalf("system_prompt changed despite nil plan_delta; got=%q want=%q", got, baselineSystem)
+				}
+			}
+		})
 	}
 }
 
