@@ -1,11 +1,17 @@
 package sessionorchestrator
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
+
+// uncertaintyQuestionMaxLen caps the per-question string length embedded in
+// observation_summary. Without this, an LLM that emits a 1kB uncertainty
+// question would balloon the Plan LLM request frame. 120 chars matches the
+// default OpenSpec convention for inline question previews.
+const uncertaintyQuestionMaxLen = 120
 
 // AppendDeliverableContractExecuteHint adds contract tag + machine acceptance criteria.
 func AppendDeliverableContractExecuteHint(directive string, contract workmodel.DeliverableContract) string {
@@ -102,16 +108,86 @@ func AppendDeliverableExecuteHint(directive string, schema workmodel.Deliverable
 	return AppendDeliverableContractExecuteHint(directive, workmodel.ExpandLegacySchemaToContract(schema))
 }
 
-func uncertaintyReportSummary(anomalyCount int, intentKind string) string {
-	if anomalyCount == 0 && intentKind == "" {
-		return ""
-	}
+// uncertaintyReportSummary builds the Plan-side observation_summary from the
+// Observe-phase UncertaintyReport. DM-20260706-007: previously this only
+// counted anomalies (numeric), forcing Plan to guess at the scope when
+// Observe emitted a high-strength ObsUncertainty (e.g. "d7 领域路径未知").
+// Now the function serializes ObsUncertainty questions and ObsDeviation
+// statements inline so the Plan LLM can consume them as data, not guesses.
+//
+// We scan `report.Observations` (NOT report.Anomalies) because the LLM-driven
+// ObsUncertainty entries are CatBusiness and live in BusinessObservations —
+// not in Anomalies. Filtering by Kind + a minimum strength floor avoids
+// flooding the Plan frame with weak signals.
+//
+// Format (semicolon-joined, identical to the prior contract so the Plan
+// prompt parser stays unchanged):
+//   intent=<kind>; q=<truncated question>; dev=<statement>; ...
+//
+// intent is always emitted first when present. Empty input → empty string
+// (preserves the prior "all blank" fast path).
+func uncertaintyReportSummary(report orchtypes.UncertaintyReport, intentKind string) string {
 	var parts []string
 	if intentKind != "" {
 		parts = append(parts, "intent="+intentKind)
 	}
-	if anomalyCount > 0 {
-		parts = append(parts, fmt.Sprintf("anomalies=%d", anomalyCount))
+	for _, o := range report.Observations {
+		switch o.Kind {
+		case orchtypes.ObsUncertainty:
+			// Skip low-strength uncertainty noise; only surface questions
+			// that meaningfully change the Plan decision (matches the
+			// obsUncertaintyAnomalyThreshold used by Verify-side anomaly
+			// detection).
+			if o.Strength < 0.7 {
+				continue
+			}
+			if q := extractObservationQuestion(o); q != "" {
+				parts = append(parts, "q="+truncateForSummary(q, uncertaintyQuestionMaxLen))
+			}
+		case orchtypes.ObsDeviation:
+			if s := extractObservationStatement(o); s != "" {
+				parts = append(parts, "dev="+truncateForSummary(s, uncertaintyQuestionMaxLen))
+			}
+		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+// extractObservationQuestion reads UncertaintyPayload.Question regardless
+// of the concrete Payload type. Kept package-private because only the
+// summary helper needs it.
+func extractObservationQuestion(o orchtypes.Observation) string {
+	p, ok := o.Payload.(orchtypes.UncertaintyPayload)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(p.Question)
+}
+
+// extractObservationStatement reads FactPayload.Statement / SignalPayload.Name
+// for ObsDeviation rows. Deviation rows are typically SignalPayload (a
+// metric-delta tag) so we fall back to the signal name when statement is
+// unavailable.
+func extractObservationStatement(o orchtypes.Observation) string {
+	switch p := o.Payload.(type) {
+	case orchtypes.FactPayload:
+		return strings.TrimSpace(p.Statement)
+	case orchtypes.SignalPayload:
+		if p.Name == "" {
+			return ""
+		}
+		return p.Name
+	}
+	return ""
+}
+
+// truncateForSummary clips a string and appends an ellipsis when over the
+// cap. Trailing whitespace is preserved only inside the prefix (we don't
+// trim mid-string to keep the user's original wording intact up to the
+// cut point).
+func truncateForSummary(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/shared/contracts"
+	"github.com/devrix/devrix/internal/shared/types"
 )
 
 type stubObsMUPS struct {
@@ -108,5 +109,63 @@ func TestParseObservationProposalsJSON(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("got = %+v", got)
+	}
+}
+
+// stubObsMUPSWithPrepend extends stubObsMUPS with a UserContextPrepend payload
+// so the proposer test can verify messagesForLLMInvoke is wired correctly.
+// Used by DM-20260706-007 (Observe→Plan data flow).
+type stubObsMUPSWithPrepend struct {
+	prepend map[string]string
+}
+
+func (s *stubObsMUPSWithPrepend) MaterializeForMUPS(_ context.Context, _ contracts.MUPSContextRequest) (contracts.MUPSPreparedContext, error) {
+	return contracts.MUPSPreparedContext{
+		SystemPrompt:       "你是 Observe 助手。",
+		UserContextPrepend: s.prepend,
+	}, nil
+}
+
+type capturingObsLLM struct {
+	lastMessages []types.Message
+}
+
+func (s *capturingObsLLM) InvokeStream(_ context.Context, req orchtypes.LLMInvokeRequest) (<-chan llmgateway.Chunk, error) {
+	s.lastMessages = req.Messages
+	ch := make(chan llmgateway.Chunk, 1)
+	ch <- llmgateway.Chunk{Content: "[]"}
+	close(ch)
+	return ch, nil
+}
+
+// DM-20260706-007: when MUPS returns a UserContextPrepend (AGENTS.md /
+// claudeMd), the Observe LLM call must prepend it to messages so the LLM
+// sees the project structure table (D{N} → path mapping).
+func TestLLMObservationProposer_PrependsUserContext(t *testing.T) {
+	prepend := map[string]string{
+		"claudeMd": "D7 → internal/layers/orchestration/",
+	}
+	mups := &stubObsMUPSWithPrepend{prepend: prepend}
+	llm := &capturingObsLLM{}
+	proposer := NewLLMObservationProposer(llm, mups, i18n.LocaleZH)
+	if _, err := proposer.ProposeObservations(context.Background(), ObserveSignalInput{
+		SessionID:  "s1",
+		WorkItemID: "wi_1",
+		Directive:  "review d7 领域 plan目录下代码",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(llm.lastMessages) < 2 {
+		t.Fatalf("expected at least 2 messages after prepend (was %d)", len(llm.lastMessages))
+	}
+	first := llm.lastMessages[0]
+	if first.Role != types.MessageRoleUser {
+		t.Fatalf("prepend msg role = %q want user", first.Role)
+	}
+	if !strings.Contains(first.Content, "claudeMd") || !strings.Contains(first.Content, "D7 → internal/layers/orchestration/") {
+		t.Fatalf("prepend msg missing AGENTS.md content:\n%s", first.Content)
+	}
+	if !strings.Contains(first.Content, "<system-reminder>") {
+		t.Fatalf("prepend msg missing <system-reminder> wrapper:\n%s", first.Content)
 	}
 }
