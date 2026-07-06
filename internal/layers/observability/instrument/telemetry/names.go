@@ -169,6 +169,14 @@ const (
 	OpD7_S6_MUPS_Pipeline = "D7_MUPS_Pipeline"
 	// D7-S6 MUPS per-node phase span (Observe/Plan/Execute/Verify/Learn/Decide).
 	OpD7_S6_MUPS_Phase = "D7_MUPS_Phase"
+	// D7-S6 MUPS observational_answer fast-path (DM-20260706-011). Emitted
+	// as a child of the D7_MUPS_Pipeline root when Observe emits a high-
+	// strength CatBusiness ObsFact with no ObsUncertainty and the runner
+	// skips Plan + Execute + Verify to emit ObsFact.Statement directly.
+	// Dashboards graph "fastpath_trigger_ratio = count(D7_MUPS_FastPath) /
+	// count(D7_MUPS_Pipeline)" to measure how often trivial Q&A bypasses
+	// the 3 heavy nodes.
+	OpD7_S6_MUPS_FastPath = "D7_MUPS_FastPath"
 
 	// D7 Orchestration - inner observability spans (DM-20260626-009 follow-up,
 	// 2026-06-26). The 5-node MUPS spans cover top-level pipeline nodes; the

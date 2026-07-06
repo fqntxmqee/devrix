@@ -183,6 +183,57 @@ func hasHighStrengthFact(report orchtypes.UncertaintyReport, threshold float64) 
 	return false
 }
 
+// hasObsUncertainty reports whether the report carries any LLM/scoped
+// uncertainty that should block the observational_answer fast-path. Used by
+// maybeObservationalAnswer (DM-20260706-011) so a high-strength ObsFact with
+// an unresolved LLM question still falls through to Plan/Execute.
+//
+// Source filter: ObsUncertainties emitted by `observationsFromItem` (source =
+// "item_pipeline") are mechanical decomposition hints derived from
+// item.Uncertainty vs. DefaultUncertaintyDecomposeThreshold — they reflect
+// the planner's threshold, not a real question. The same is true for
+// internal verify signals ("verify_signal"). Fast-path should only be
+// blocked when an LLM/observation-proposer or scope-contract emitter
+// explicitly raises an uncertainty about the directive.
+func hasObsUncertainty(report orchtypes.UncertaintyReport) bool {
+	for _, o := range report.Observations {
+		if o.Kind != orchtypes.ObsUncertainty || o.Strength <= 0 {
+			continue
+		}
+		switch o.Source {
+		case "item_pipeline", "verify_signal":
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// pickHighStrengthBusinessFact returns the first CatBusiness ObsFact with
+// strength ≥ threshold, plus its FactPayload.Statement. Used by the
+// observational_answer fast-path to source the user-visible answer directly
+// from the Observe node (skipping Plan + Execute + Verify).
+//
+// Returns ("", "", false) when no qualifying fact exists; callers must treat
+// the bool as the authoritative gate signal.
+func pickHighStrengthBusinessFact(report orchtypes.UncertaintyReport, threshold float64) (string, string, bool) {
+	for _, o := range report.Observations {
+		if o.Kind != orchtypes.ObsFact || o.Category != orchtypes.CatBusiness || o.Strength < threshold {
+			continue
+		}
+		fp, ok := o.Payload.(orchtypes.FactPayload)
+		if !ok {
+			continue
+		}
+		stmt := strings.TrimSpace(fp.Statement)
+		if stmt == "" {
+			continue
+		}
+		return o.ID, stmt, true
+	}
+	return "", "", false
+}
+
 // extractObservationQuestion reads UncertaintyPayload.Question regardless
 // of the concrete Payload type. Kept package-private because only the
 // summary helper needs it.

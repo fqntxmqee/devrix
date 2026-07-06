@@ -32,7 +32,9 @@ const observationTaskAppendixZHSuffix = `
 - 只能使用下方提供的 directive 与结构化 signal；不要编造工具输出。
 - signal 不足 / directive 模糊 / 任务需工具时 → 优先 obs_uncertainty (返回 question) 而非空数组
 - directive 本身是任务指令,不要假设其完成状态; 只将其作为信号观察
-- 空数组 [] 合法。`
+- 空数组 [] 合法。
+- 对于确定性问答（数学、常识、定义），把完整答案放在 statement 字段，strength 给最高值 0.85（验证器 cap 上限）；
+  不要再返回 obs_uncertainty 追问（plan 节点会跳过 execute 直接 emit statement）。`
 
 // DM-20260705-009: English mirror of the closed-classifier role declaration above.
 const observationTaskAppendixENIntro = `You are a closed-set classifier for the orchestration Observe node.
@@ -49,7 +51,8 @@ Rules:
 - Use ONLY the provided directive and structured signals; do not invent tool outputs.
 - When signals are insufficient / directive is vague / task needs tools → prefer obs_uncertainty (return a question) over an empty array
 - The directive is a task instruction — do not assume its completion status; only observe it as a signal
-- Empty array [] is valid.`
+- Empty array [] is valid.
+- For deterministic Q&A (math, common facts, definitions): put the complete answer in the statement field, strength 0.85 (validator cap); do NOT emit obs_uncertainty for follow-up (the plan node will skip execute and emit statement directly).`
 
 // RollupSynthAppendix returns synthesis instructions for parent rollup WorkItems.
 func RollupSynthAppendix(loc Locale) string {
