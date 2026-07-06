@@ -255,7 +255,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			WorkItemID:      item.ID,
 			Directive:       directive,
 			ObservationIDs:  obsIDs,
-			ReportSummary:   uncertaintyReportSummary(len(report.Anomalies), intentKind),
+			ReportSummary:   uncertaintyReportSummary(report, intentKind),
 			Budget:          workmodel.StrategicPlanBudget(sessionID, item, r.Tasks),
 			ParentScopeIn:   parentScopeIn,
 			UncertaintyMean: item.Uncertainty,

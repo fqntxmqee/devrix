@@ -390,14 +390,20 @@ func (p *LLMStrategicPlanProposer) ProposeStrategicPlan(ctx context.Context, in 
 	}
 	systemPrompt := mergeMUPSPreparedSystem(prepared)
 	user := buildStrategicPlanUserPrompt(in, p.Locale)
+	// DM-20260706-007: route through messagesForLLMInvoke so the UserContextPrepend
+	// (AGENTS.md / claudeMd in mode=prepend) reaches the LLM. Without this the
+	// Plan LLM cannot resolve D{N} abbreviations in directives, so it returns
+	// scope_in values like ["d7领域/plan/"] that the FilterValidatedChildSpecs
+	// path validator rejects (observed in sess_1783333760211_6000).
+	msgs := messagesForLLMInvoke([]types.Message{{
+		SessionID: in.SessionID,
+		Role:      types.MessageRoleUser,
+		Content:   user,
+	}}, prepared.UserContextPrepend)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,
 		SystemPrompt: systemPrompt,
-		Messages: []types.Message{{
-			SessionID: in.SessionID,
-			Role:      types.MessageRoleUser,
-			Content:   user,
-		}},
+		Messages:     msgs,
 	})
 	if err != nil {
 		return nil, err

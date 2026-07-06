@@ -43,14 +43,19 @@ func (p *LLMObservationProposer) ProposeObservations(ctx context.Context, in Obs
 	}
 	systemPrompt := mergeMUPSPreparedSystem(prepared)
 	user := buildLLMObservationUserPrompt(in, p.Locale)
+	// DM-20260706-007: route through messagesForLLMInvoke so the UserContextPrepend
+	// (AGENTS.md / claudeMd in mode=prepend) reaches the LLM. Without this, the
+	// Observe LLM has no project structure (D{N} → path) and emits raw scope
+	// guesses that downstream validators reject.
+	msgs := messagesForLLMInvoke([]types.Message{{
+		SessionID: in.SessionID,
+		Role:      types.MessageRoleUser,
+		Content:   user,
+	}}, prepared.UserContextPrepend)
 	ch, err := p.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    in.SessionID,
 		SystemPrompt: systemPrompt,
-		Messages: []types.Message{{
-			SessionID: in.SessionID,
-			Role:      types.MessageRoleUser,
-			Content:   user,
-		}},
+		Messages:     msgs,
 	})
 	if err != nil {
 		return nil, err
